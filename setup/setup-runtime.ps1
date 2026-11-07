@@ -37,6 +37,12 @@ $C = @{
   gold  = [Drawing.Color]::FromArgb(217,165,74)
 }
 $ui = 'Microsoft YaHei UI'
+# Flat buttons default to a white hover; give them grimoire colours instead.
+function Style-Button($b, [bool]$primary) {
+  $b.FlatStyle = 'Flat'; $b.UseVisualStyleBackColor = $false; $b.ForeColor = $C.cream; $b.Cursor = 'Hand'
+  if ($primary) { $b.BackColor = $C.red; $b.FlatAppearance.BorderColor = $C.red; $b.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(222,72,82); $b.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(168,38,48) }
+  else { $b.BackColor = $C.card; $b.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(64,40,43); $b.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(84,48,52) }
+}
 function Img($name) { $p = Join-Path $Root "setup\$name"; if (Test-Path $p) { [Drawing.Image]::FromFile($p) } }
 $logo = Img 'logo.png'
 
@@ -117,7 +123,7 @@ function Option($x, $title, $sub, $items, $note, $ids, $primary) {
   [void](Label ('占用磁盘约 ' + (MB $disk)) 160 216 140 20 9 $false $warn $p)
   $b = New-Object Windows.Forms.Button; $b.Text = '选择' + $title; $b.FlatStyle = 'Flat'; $b.Location = New-Object Drawing.Point(20,240); $b.Size = New-Object Drawing.Size(276,32)
   $b.Font = New-Object Drawing.Font($ui, 10, [Drawing.FontStyle]::Bold); $b.ForeColor = $C.cream; $b.FlatAppearance.BorderColor = $accent; $b.Cursor = 'Hand'
-  $b.BackColor = if ($primary) { $C.red } else { $C.card }
+  Style-Button $b $primary; $b.FlatAppearance.BorderColor = $accent
   $b.Tag = $ids; $b.add_Click({ param($s) Start-Install $s.Tag })
   $p.Controls.Add($b); $choice.Controls.Add($p)
 }
@@ -178,7 +184,7 @@ function Set-Bar([int]$value) { $script:barBusy = $false; $shimmer.Stop(); $scri
 function Set-Busy { $script:barBusy = $true; $percent.Text = ''; $shimmer.Start(); $bar.Invalidate() }
 [void](Label ('安装位置：' + $runtimeDir) 32 160 656 20 8 $false $C.muted $progress)
 $button = New-Object Windows.Forms.Button; $button.Text = '取消 Cancel'; $button.FlatStyle = 'Flat'; $button.ForeColor = $C.cream
-$button.Font = New-Object Drawing.Font($ui, 9, [Drawing.FontStyle]::Bold); $button.FlatAppearance.BorderColor = $C.red; $button.Location = New-Object Drawing.Point(568,200); $button.Size = New-Object Drawing.Size(120,34); $button.Cursor = 'Hand'
+$button.Font = New-Object Drawing.Font($ui, 9, [Drawing.FontStyle]::Bold); Style-Button $button $false; $button.FlatAppearance.BorderColor = $C.red; $button.Location = New-Object Drawing.Point(568,200); $button.Size = New-Object Drawing.Size(120,34); $button.Cursor = 'Hand'
 $progress.Controls.Add($button)
 
 $client = New-Object Net.WebClient; $client.Headers.Add('User-Agent','MeguLit-setup')
@@ -229,7 +235,7 @@ function Next-Pack {
   $script:urlIndex = 0; $script:sources = @(Order-Sources (Current)); Start-Download
 }
 function Start-Download {
-  $script:mode = 'download'; $button.Text = '取消 Cancel'; $status.ForeColor = $C.muted; Set-Bar 0
+  $script:stage = 'download'; $script:mode = 'download'; $button.Text = '取消 Cancel'; Style-Button $button $false; $button.FlatAppearance.BorderColor = $C.red; $status.ForeColor = $C.muted; Set-Bar 0
   $title.Text = '正在下载运行组件…'
   $status.Text = ('[{0}/{1}] 正在下载{2}…  来源 {3}' -f ($script:index+1), $script:queue.Count, $names[(Current)], (Source-Name $script:sources[$script:urlIndex]))
   if (Test-Path (Part)) { Remove-Item (Part) -Force }
@@ -237,8 +243,9 @@ function Start-Download {
 }
 function Fail([string]$message) {
   $script:mode = 'failed'; $status.ForeColor = $C.red; Set-Bar 0
-  $title.Text = '下载中断了'
-  $status.Text = $message + "`n检查网络后点「重试」 / Check your connection and retry"; $button.Text = '重试 Retry'
+  $title.Text = if ($script:stage -eq 'unpack') { '安装没完成' } else { '下载中断了' }
+  $hint = if ($script:stage -eq 'unpack') { '磁盘空间不足或文件被占用时会这样，点「重试」再来一次 / Retry' } else { '检查网络后点「重试」 / Check your connection and retry' }
+  $status.Text = $message + "`n" + $hint; $button.Text = '重试 Retry'; Style-Button $button $true
 }
 
 $client.add_DownloadProgressChanged({ param($s,$e)
@@ -255,6 +262,7 @@ $client.add_DownloadFileCompleted({ param($s,$e)
   }
   try {
     $part = Part; $unpack = Join-Path $Root ('runtime-' + (Current) + '.unpack')
+    $script:stage = 'unpack'
     $status.Text = '正在校验… / Verifying'; $form.Refresh()
     if ((Get-FileHash -Algorithm SHA256 $part).Hash -ne $packs.(Current).sha256.ToUpper()) {
       Remove-Item $part -Force
@@ -265,7 +273,9 @@ $client.add_DownloadFileCompleted({ param($s,$e)
     if (Test-Path $unpack) { Remove-Item $unpack -Recurse -Force }
     New-Item -ItemType Directory $unpack | Out-Null
     $tar = Start-Process -FilePath "$env:SystemRoot\System32\tar.exe" -ArgumentList @('-xf', "`"$part`"", '-C', "`"$unpack`"") -NoNewWindow -PassThru
+    $null = $tar.Handle  # keep the handle so ExitCode is readable after exit
     while (-not $tar.HasExited) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
+    $tar.WaitForExit()
     if ($tar.ExitCode -ne 0 -or -not (Test-Path (Join-Path $unpack 'runtime'))) { throw '解压失败' }
     New-Item -ItemType Directory -Force $runtimeDir | Out-Null
     Get-ChildItem (Join-Path $unpack 'runtime') | ForEach-Object { $dest = Join-Path $runtimeDir $_.Name; if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }; Move-Item $_.FullName $dest }
@@ -280,7 +290,7 @@ $button.add_Click({
 })
 $form.add_FormClosing({ if (-not $script:done) { $client.CancelAsync() } })
 # MEGULIT_SETUP_PREVIEW=<png>: render the choice page to an image and exit (used to check the layout).
-if ($env:MEGULIT_SETUP_PREVIEW) { $form.add_Shown({ if ($env:MEGULIT_SETUP_PREVIEW_STATE -eq 'progress') { $choice.Visible = $false; $progress.Visible = $true; $status.Text = '[1/3] 正在下载基础组件  47 / 107 MB  ·  来源 github.com'; Set-Bar 440 }; $form.Refresh(); $bmp = New-Object Drawing.Bitmap $form.Width, $form.Height; $form.DrawToBitmap($bmp, (New-Object Drawing.Rectangle 0,0,$form.Width,$form.Height)); $bmp.Save($env:MEGULIT_SETUP_PREVIEW); $form.Close() }) }
+if ($env:MEGULIT_SETUP_PREVIEW) { $form.add_Shown({ if ($env:MEGULIT_SETUP_PREVIEW_STATE -eq 'failed') { $choice.Visible = $false; $progress.Visible = $true; $script:stage = 'download'; Fail '下载失败：无法连接到服务器' }; if ($env:MEGULIT_SETUP_PREVIEW_STATE -eq 'progress') { $choice.Visible = $false; $progress.Visible = $true; $status.Text = '[1/3] 正在下载基础组件  47 / 107 MB  ·  来源 github.com'; Set-Bar 440 }; $form.Refresh(); $bmp = New-Object Drawing.Bitmap $form.Width, $form.Height; $form.DrawToBitmap($bmp, (New-Object Drawing.Rectangle 0,0,$form.Width,$form.Height)); $bmp.Save($env:MEGULIT_SETUP_PREVIEW); $form.Close() }) }
 [void]$form.ShowDialog()
 $client.Dispose()
 Get-ChildItem $Root -Filter 'runtime-*.part' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
