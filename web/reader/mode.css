@@ -1,0 +1,20 @@
+html.tome-ui-normal,body.tome-ui-normal { background:var(--theme-background,#12213a)!important; opacity:1!important; backdrop-filter:none!important; } html.tome-ui-translation,body.tome-ui-translation { background:transparent!important; background-image:none!important; box-shadow:none!important; backdrop-filter:none!important; }
+  /* While covered the window is fully transparent: no theme background (it showed as an empty dark window) and no
+     stray child that sets its own visibility. */
+  html.tome-mode-cover,html.tome-mode-cover body { background:transparent!important; background-image:none!important; }
+  html.tome-mode-cover body,html.tome-mode-cover body * { visibility:hidden!important; }
+  html.tome-mode-cover body * { animation-play-state:paused!important; }
+  /* The main view squeezes into its bottom edge and unfolds from it. Only scale and opacity are animated (compositor,
+     full frame rate); the theme background is on body alone meanwhile, so it unfolds with the content. */
+  html.tome-mode-out-normal,html.tome-mode-in-normal { background:transparent!important; }
+  html.tome-mode-out-normal body { transform-origin:50% 100%; will-change:scale,opacity; animation:tome-squeeze .24s cubic-bezier(.5,0,.75,0) both; }
+  @keyframes tome-squeeze { from { scale:1 1; opacity:1; } 60% { opacity:1; } to { scale:1 .06; opacity:0; } }
+  html.tome-mode-in-normal body { transform-origin:50% 100%; will-change:scale,opacity; animation:tome-unfold .34s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes tome-unfold { from { scale:1 .06; opacity:0; } 30% { opacity:1; } to { scale:1 1; opacity:1; } }
+  html.tome-mode-in-normal body > * { animation:tome-unfold-content .34s cubic-bezier(.3,0,.2,1) both; }
+  @keyframes tome-unfold-content { from { opacity:0; } 35% { opacity:0; } to { opacity:1; } }
+  html.tome-mode-out-translation :is(.sentence-window,.tome-native-mask) { transform-origin:50% 100%; animation:tome-box-out .18s cubic-bezier(.5,0,.75,0) both; }
+  @keyframes tome-box-out { to { opacity:0; scale:1 .9; } }
+  html.tome-mode-in-translation .sentence-window { transform-origin:50% 100%; animation:tome-box-in .3s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes tome-box-in { from { opacity:0; scale:1 .82; translate:0 6px; } to { opacity:1; scale:1 1; translate:0 0; } }
+  @media (prefers-reduced-motion: reduce) { html[class*=tome-mode-] body, html[class*=tome-mode-] .sentence-window { animation:none!important; } }

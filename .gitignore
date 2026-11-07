@@ -1,0 +1,58 @@
+# Build output
+desktop/target/
+*.exe
+*.dll
+*.obj
+*.pdb
+*.lib
+*.exp
+*.ilk
+*.next.*
+*.rollback*
+*.bak
+*.bak-*
+build-manifest.json
+
+# Runtime, models and third-party binaries (fetched or built separately)
+runtime/*
+!runtime/NODE-LICENSE.txt
+models/
+*.gguf
+
+# User data, logs, caches
+data/
+logs/
+cache/
+*.sqlite
+*.db
+*.log
+*.tomebak
+
+# Test output
+validation/*
+!validation/*.test.cjs
+validation/**/results*/
+validation/**/*-profile-*/
+
+# Generated file that embeds a locally extracted font
+web/reader/modules/local-font.js
+
+# Local working notes
+handoff/
+HANDOFF-*.md
+CLAUDE-HANDOFF*.md
+IMPLEMENTATION-*.md
+MIGRATION-STATUS-*.md
+TASKS-*.md
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+
+# Local dev notes
+ENGINE-ADAPTATION-NOTES.md
+preserved/ENGINE-ADAPTATION-NOTES.md
+.impeccable/
+.claude/

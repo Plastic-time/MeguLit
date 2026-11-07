@@ -1,0 +1,28 @@
+const labels={zh:['游戏启动失败','关闭'],en:['Game could not start','Close'],ja:['ゲームを起動できませんでした','閉じる']};
+const reasons={
+ JAPANESE_EXECUTABLE_REQUIRED:['没有找到可用的日文原版启动程序。请先安装日文原版或在游戏目录中恢复原版，再选择启动程序。MeguLit 需要日文原文才能使用','A usable Japanese original executable is required. Install or restore the original, then choose its executable.','日本語版をインストールまたは復元し、実行ファイルを選択してください'],
+ PATCH_STATE_INVALID:['无法读取语言切换记录，请查看启动诊断日志','Could not read the language switch record. See the launch log','言語切替の記録を読めません。起動ログを確認してください'],
+ PATCH_UNSAFE_PATH:['补丁文件夹包含异常路径，请从完整安装中选择启动程序','The patch contains an unsupported path. Choose the executable from a complete installation','未対応のパスが含まれています。完全なインストールの実行ファイルを選んでください'],
+ GAME_RUNNING:['请先关闭游戏窗口，再切换语言','Close the game before switching languages','ゲームを閉じてから言語を切り替えてください'],
+ GAME_ELEVATION_REQUIRED:['检测到启动程序旁有管理员权限声明。如果启动受阻，可通过 Windows 启动并处理系统确认','This program has an administrator manifest. If launching is blocked, use Windows to open it and respond to any system prompt','管理者権限を要求する設定があります。起動できない場合は Windows から開いてシステムの確認に従ってください'],
+ GAME_ELEVATION_CANCELLED:['已取消 Windows 的管理员确认','The Windows elevation prompt was cancelled','Windows の管理者確認が取り消されました'],
+ PROCESS_QUERY_FAILED:['无法检查游戏是否已运行，请关闭游戏后重试','Could not check whether the game was running. Close the game and retry','ゲームの起動状態を確認できません。ゲームを閉じてから再試行してください'],
+ GAME_PROCESS_EXITED:['游戏在窗口准备好前就退出了','The game exited before its window was ready','ウィンドウが開く前にゲームが終了しました'],
+ GAME_RUNNING_HIDDEN:['这部游戏已经在后台运行，但没有窗口（可能上次没有完全退出）。请在任务管理器里结束它后再启动','This game is already running in the background without a window (it may not have closed last time). End it in Task Manager, then launch again','このゲームはウィンドウのないままバックグラウンドで動いています（前回正しく終了していない可能性があります）。タスク マネージャーで終了してから起動してください'],
+ GAME_WINDOW_NOT_READY:['在等待时间内没有出现可用的游戏窗口','A game window did not appear in time','制限時間内にウィンドウが開きませんでした'],
+ LE_HELPER_FAILED:['日文区域启动工具退出并报告失败','The Japanese locale launcher exited with an error','日本語ロケールの起動ツールがエラーで終了しました'],
+ LE_SPAWN_FAILED:['Windows 无法运行日文区域启动工具','Windows could not start the Japanese locale launcher','日本語ロケールの起動ツールを開けませんでした'],
+ LE_PROCESS_CHECK_FAILED:['无法读取游戏进程，请关闭残留的游戏窗口后重试','Could not read the game process. Close remaining game windows and retry','ゲームの状態を確認できません。ゲームを閉じてから再試行してください'],
+ PATCH_ORIGINAL_INCOMPLETE:['日文版缺少启动程序或关键文件，请切回汉化版或选择一份完整的日文安装','The Japanese version is missing required files. Switch back or choose a complete Japanese installation','日本語版の必須ファイルが不足しています。中国語版に戻すか、完全な日本語版を選んでください'],
+ PATCH_ORIGINAL_NOT_IDENTIFIED:['可能是启动器加载的汉化补丁。请从完整的日文安装中选择启动程序','A translation DLL may be in use. Choose a complete Japanese installation','翻訳 DLL が使われている可能性があります。完全な日本語版を選んでください'],
+ PATCH_BACKUP_AMBIGUOUS:['找到多个可能的原版程序，请从完整的日文安装中选择启动程序','Multiple possible originals were found. Choose a complete Japanese installation','原版の候補が複数あります。完全な日本語版を選んでください'],
+ PATCH_RECOVERY_REQUIRED:['上次切换未完成，请先切回汉化版','The previous switch did not finish. Switch back to Chinese first','前回の切替が完了していません。中国語版に戻してください'],
+ PATCH_DIRECTORY_CHANGED:['切换记录指向原安装位置，请恢复原位置再切回汉化版','Return the game to its previous folder before switching back','元のフォルダーに戻してから中国語版へ切り替えてください'],
+ PATCH_BACKUP_MISSING:['找不到切换前的备份，请用原汉化补丁安装包修复游戏','The original backup is missing. Repair the game with the translation installer','切替前のファイルが見つかりません。翻訳パッチで修復してください'],
+ PATCH_TRANSLATED_MISSING:['找不到汉化启动程序，请选择完整汉化安装中的启动程序','Choose the executable from a complete Chinese installation','完全な中国語版の実行ファイルを選んでください'],
+ PATCH_INSPECTION_FAILED:['无法检查补丁，请确认游戏文件夹可以读取','Could not inspect the patch. Check access to the game folder','パッチを確認できません。フォルダーへのアクセスを確認してください'],
+ PATCH_SWAP_CONFLICT:['发现已有备份或重名文件，请检查游戏文件夹','A backup or conflicting file exists. Check the game folder','バックアップか同名のファイルが残っています。ゲームフォルダーを確認してください']
+};
+export const launchCopy=locale=>labels[locale]||labels.en;
+export const launchReason=(error,locale)=>reasons[typeof error==='string'?error:error?.message]?.[locale==='zh'?0:locale==='ja'?2:1]||'';
+

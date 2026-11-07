@@ -1,0 +1,1 @@
+export function recentGames(games){return [...new Map(games.filter(g=>g.lastLaunchedAt||g.lastPlayedAt).map(g=>[g.id,g])).values()].sort((a,b)=>(b.lastLaunchedAt||b.lastPlayedAt)-(a.lastLaunchedAt||a.lastPlayedAt)||a.id.localeCompare(b.id)).slice(0,5);}

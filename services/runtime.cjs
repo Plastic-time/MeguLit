@@ -1,0 +1,71 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+const path=require('node:path');
+const {readJSON}=require('./store.cjs');
+class Runtime {
+ constructor(root,emit=()=>{}){this.root=root;this.folder=path.join(root,'data','config');this.emit=emit;this.stopped=false;}
+ config(){return require('../core/v4-config.cjs').cleanV4(readJSON(path.join(this.folder,'v4-preferences.json')));}
+ prepareGame(executable,{enter=true}={}){this.pendingGameEnter=enter;this.pendingGame=path.basename(executable,path.extname(executable));this.pendingExecutable=executable;this.reader?.selectGame(this.pendingGame,enter,executable);}
+ // Point the hook at the Japanese original index for this executable, or clear it.
+ learning(){return this.localLearning??=new(require('../core/learning-native.cjs').LocalLearning)(this.root,message=>this.emit('reader-event',message));}
+ ankiProcess(){return this.ankiRunner??=new(require('../core/anki-process.cjs').AnkiProcess)({config:()=>this.config(),log:line=>{try{require('node:fs').appendFileSync(path.join(this.root,'logs','anki-process.log'),new Date().toISOString()+' '+line+'\n');}catch{}}});}
+ services(){return this.serviceManager??=new(require('../core/services.cjs').Services)(this.root);}
+ speech(){return this.speechEngine??=new(require('../core/speech.cjs').Speech)(path.join(this.root,'cache'));}
+ models(){return this.modelStore??=new(require('../core/model-store.cjs').ModelStore)(this.root);}
+ packs(){return this.packStore??=new(require('../core/runtime-packs.cjs').RuntimePacks)(this.root);}
+ local(){return this.localEngine??=new(require('../core/local-llm.cjs').LocalLlm)({root:this.root,models:this.models(),logs:path.join(this.root,'logs')});}
+ library(){return this.libraryManager??=new(require('../core/library.cjs').Library)(require('../core/layout.cjs'));}
+ history(){return this.historyTranslations??=new(require('./history-view.cjs').HistoryTranslations)(this.root,async text=>{if(this.stopped)throw Error('RUNTIME_STOPPED');const {createTranslationService,resolveOptions}=require('../core/providers.cjs'),preferences=require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json'))),options=resolveOptions(preferences),translator=createTranslationService();if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless){const {SecretStore}=require('../core/secrets.cjs');for(const[base,key]of new SecretStore(this.folder,undefined,path.join(this.root,'native','KeyVault.exe')).entries())translator.setKey(base,key);}await this.local().ensure(options);return translator.translate(text,options);});}
+ reviews(){return this.gameReviews??=new(require('./game-reviews.cjs').GameReviews)(this.root,fetch,{engine:()=>require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json'))).reviewEngine||'machine',translate:(text,lang,mode)=>this.reviewTranslate(text,lang,mode)});}
+ // Community reviews through the user's translation engine, or a local model.
+ async reviewTranslate(text,lang,mode){if(this.stopped)throw Error('RUNTIME_STOPPED');const {createTranslationService,resolveOptions}=require('../core/providers.cjs'),{ENGINES}=require('../core/engines.cjs'),preferences=require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json')));
+  const useConfigured=mode!=='local'||ENGINES[preferences.provider]?.group==='local',options={...resolveOptions(useConfigured?preferences:{provider:'sakura'}),learnerLanguage:lang==='en'?'en':'zh',contextEnabled:false},translator=this.reviewTranslator??=createTranslationService();
+  if(options.provider!=='google'&&!ENGINES[options.provider]?.keyless){const {SecretStore}=require('../core/secrets.cjs');for(const[base,key]of new SecretStore(this.folder,undefined,path.join(this.root,'native','KeyVault.exe')).entries())translator.setKey(base,key);}
+  await this.local().ensure(options);return translator.translate(text,options);}
+ // Synopses: free machine translation first, then the user's own translation engine (Chinese or English).
+ metadata(){const {machine}=require('../core/library.cjs');return this.gameEnrichment??=new(require('./game-enrichment.cjs').GameEnrichment)(this.root,this.emit,fetch,async(text,lang)=>(await machine(text,lang))||(lang!=='ja'?String(await this.reviewTranslate(text,lang,'follow').catch(()=>'')||'').trim():''));}
+ settingsSaved(request){if(request.scope==='library'){const db=require('./store.cjs').openStore(this.root);try{require('./series.cjs').autoGroup(db,this.root);}finally{db.close();}}const reader=this.reader,g=reader?.gal;if(!g)return;const settings=new(require('./settings.cjs').Settings)(this.root);
+  if(['background','panels'].includes(request.scope))this.emit('reader-event',{type:'panelAppearance',values:settings.ui()});
+  if(['text','embedding','position'].includes(request.scope)&&(!request.profile||request.profile===g.styleSync.profileKey)){const global=require('../core/game-style.js').clean(readJSON(path.join(this.folder,'gal-preferences.json'))),profile=readJSON(path.join(this.folder,'game-style-profiles.json')).entries?.[g.styleSync.profileKey]?.prefs||{};const effective={...global,...profile,gameProcess:g.preferences.gameProcess,bindEnabled:g.preferences.bindEnabled};g.preferences=require('../core/game-style.js').clean(effective);g.preview(g.preferences);this.emit('reader-event',{type:'call',method:'restoreGalSettings',args:[g.preferences]});}
+  reader.immersion?.configure(this.config());g.setGameAudio(this.config().ankiGameMedia!==false);this.emit('reader-event',{type:'call',method:'restoreSettings',args:[reader.prefs()]});this.emit('reader-event',{type:'word-status-changed'});
+ }
+ readerStatus(){const native=this.reader?.gal,alive=native?.process?.exitCode===null,hotkey=native?.state?.hotkey;return {ready:!!this.readerReady&&alive&&hotkey===true,hotkey,error:this.readerError||(this.readerReady&&alive&&hotkey===false?'READER_HOTKEY_IN_USE':''),phase:this.readerPhase||'not-started'};}
+ async call(request){
+  if(this.stopped)throw Error('RUNTIME_STOPPED');const config=this.config();
+  switch(request.action){
+   case 'library_scan':{this.libraryScans??=new(require('./library-scan.cjs').LibraryScans)(async options=>{const library=this.library();library.state=library.read();await library.scan(progress=>this.emit('library-progress',progress),options);const result=require('./library.cjs').reconcile(this.root,library.load().games,{restoreRemoved:!options.incremental});const db=require('./store.cjs').openStore(this.root);try{this.metadata().enqueue(db.prepare('SELECT id FROM games WHERE removed_at IS NULL').all().map(g=>g.id));}finally{db.close();}return {...result,games:library.load().games};});return this.libraryScans.run({startup:request.startup===true});}
+   case 'library_find_steam':return this.library().findSteam();
+   case 'reader_status':return this.readerStatus();
+   case 'reader_health':{const phase=String(request.phase||'').slice(0,100),error=String(request.error||'').slice(0,3000);this.readerReady=phase==='ready'&&!error;this.readerPhase=phase;this.readerError=error;if(error)await this.reader?.stop();this.emit('reader-health',this.readerStatus());require('node:fs').appendFileSync(path.join(this.root,'logs','reader-startup.log'),new Date().toISOString()+' '+phase+' '+error+'\n');return {saved:true};}
+   case 'reader_bootstrap':return {native:{...require('./settings.cjs').nativeDefaults,...readJSON(path.join(this.folder,'native-preferences.json'))},engines:Object.fromEntries(Object.entries(require('../core/engines.cjs').ENGINES).map(([name,engine])=>[name,{label:engine.label,group:engine.group,kind:engine.kind,keyless:!!engine.keyless,editable:!!engine.editable,pair:!!engine.pair,baseUrl:engine.baseUrl,model:engine.model||'',hint:engine.hint||''}]))};
+   case 'reader_detach':this.readerReady=false;this.readerError='';await this.reader?.stop();return {stopped:true};
+   case 'reader_attach':{const reader=this.reader??=new(require('./reader.cjs').Reader)(this);if(reader.stopping)await reader.stopping;return reader.attach(request);}
+   case 'reader_message':return (this.reader??=new(require('./reader.cjs').Reader)(this)).message(request.message);
+   case 'reader_invoke':return (this.reader??=new(require('./reader.cjs').Reader)(this)).invoke(request.command,request.args);
+   case 'model_status':return {...this.models().status(),runtime:this.local().status()};
+   case 'model_download':return this.models().download(String(request.id),String(request.source||'hf'));
+   case 'pack_status':return this.packs().status();
+   case 'pack_download':return this.packs().download(request.ids);
+   case 'pack_cancel':return this.packs().cancel();
+   case 'model_cancel':return this.models().cancel(String(request.id));
+   case 'local_start':{const options=require('../core/providers.cjs').resolveOptions(require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json'))));if(!this.local().local(options))throw Error('LOCAL_ENGINE_REQUIRED');await this.local().ensure(options);return this.local().status();}
+   case 'local_stop':await this.local().stop();return this.local().status();
+   case 'runtime_download':return this.local().download();
+   case 'runtime_cancel':return this.local().cancel();
+   case 'speakers':await this.services().ensureSpeech(config.aivisUrl,config.aivisGpu);{const list=await this.speech().speakers(config);this.services().rememberSpeakers(list);return list;}
+   case 'speakers_cached':return this.services().cachedSpeakers();
+   case 'speech_preview':{const text=String(request.text||'').trim();if(!text||text.length>200)throw Error('INVALID_PREVIEW_TEXT');const options=require('../core/v4-config.cjs').cleanV4({...config,...(Number.isSafeInteger(Number(request.speaker))?{aivisSpeaker:Number(request.speaker)}:{}),...(Number.isFinite(Number(request.speed))?{aivisSpeed:Number(request.speed)}:{})});await this.services().ensureSpeech(options.aivisUrl,options.aivisGpu);return this.speech().synthesize({surface:text,reading:'',pitch:[]},options);}
+   case 'tokenize':{const text=String(request.text||'');if(!text||text.length>4000)throw Error('INVALID_READER_TEXT');return this.learning().tokenize(text);}
+   case 'translate_preview':{
+    const text=String(request.text||'').trim();if(!text||text.length>1000)throw Error('INVALID_PREVIEW_TEXT');
+    const {createTranslationService,resolveOptions}=require('../core/providers.cjs');this.translator??=createTranslationService();
+    const preferences=require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json'))),options=resolveOptions(preferences);
+    if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless){const {SecretStore}=require('../core/secrets.cjs');for(const[base,key]of new SecretStore(this.folder,undefined,path.join(this.root,'native','KeyVault.exe')).entries())this.translator.setKey(base,key);}
+    await this.local().ensure(options);return {text:await this.translator.translate(text,options)};
+   }
+   default:throw Error('UNKNOWN_RUNTIME_ACTION');
+  }
+ }
+ async stop(){if(this.stopping)return this.stopping;this.stopped=true;this.gameEnrichment?.stop();this.gameReviews?.stop();this.stopping=(async()=>{await Promise.all([this.reader?.stop(),this.ankiRunner?.stop().catch(()=>{})]);this.localLearning?.stop();if(this.modelStore)for(const id of Object.keys(this.modelStore.jobs))this.modelStore.cancel(id);this.localEngine?.cancel();await Promise.allSettled([this.serviceManager?.stop(),this.localEngine?.stop()]);})();return this.stopping;}
+}
+module.exports={Runtime};

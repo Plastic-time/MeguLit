@@ -1,0 +1,54 @@
+/* MOJi 辞書 in-page sign-in and entry detail (E218). Scoped to .moji-* only. */
+.moji-account{display:flex;align-items:center;gap:14px;min-height:30px;margin:0 0 12px;font-size:12px;color:var(--g-t2,var(--muted))}
+.moji-state{display:inline-flex;align-items:center;gap:7px}
+.moji-state:before{content:"";width:6px;height:6px;rotate:45deg;background:var(--g-t3,#777)}
+.moji-state.signed:before{background:var(--g-gold,#edb56e)}
+.moji-qr-panel{display:flex;align-items:center;gap:22px;padding:14px 18px;border-top:1px solid var(--g-rule,#ffffff14);border-bottom:1px solid var(--g-rule,#ffffff14);width:100%}
+.moji-qr{width:150px;height:150px;flex:none;padding:6px;background:#fff;border-radius:3px;box-shadow:0 0 0 1px var(--g-rule-strong,#fff3);transition:opacity .25s,filter .25s}
+.moji-qr svg{display:block;width:100%;height:100%}
+.moji-qr-panel.scanned .moji-qr{opacity:.55}
+.moji-qr-panel.expired .moji-qr{opacity:.25;filter:grayscale(1)}
+.moji-qr-side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.moji-qr-hint{margin:0;line-height:1.7;color:var(--g-t1,var(--text))}
+.moji-qr-actions{display:flex;gap:12px;align-items:center}
+.moji-tags{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 8px}
+.moji-tag{font-size:11px;line-height:1;padding:4px 7px;border:1px solid var(--g-rule-strong,#fff3);border-radius:3px;color:var(--g-gold,#edb56e)}
+.moji-entry{cursor:pointer;transition:background .18s var(--g-ease,ease)}
+.moji-entry:hover,.moji-entry:focus-visible{background:var(--surface-hover)}
+.moji-detail{padding:4px 2px 20px;animation:moji-in .22s var(--g-ease,ease)}
+.moji-detail header{padding:10px 0 14px;border-bottom:1px solid var(--g-rule,#ffffff14);margin-bottom:12px}
+.moji-back{margin-bottom:6px}
+.moji-meanings{margin:0;padding-left:22px;display:grid;gap:16px}
+.moji-meanings>li::marker{color:var(--g-gold,#edb56e);font-family:var(--g-serif,serif)}
+.moji-meaning{font-size:14px;line-height:1.7;color:var(--g-t1,var(--text))}
+.moji-meaning-ja{font-size:13px;line-height:1.7;color:var(--g-t2,var(--muted));font-family:var(--g-serif-ja,serif)}
+.moji-examples{list-style:none;margin:8px 0 0;padding:0 0 0 12px;border-left:1px solid var(--g-rule-strong,#fff3);display:grid;gap:8px}
+.moji-examples span{display:block;font-family:var(--g-serif-ja,serif);font-size:14px;line-height:1.7}
+.moji-examples small{display:block;color:var(--g-t3,var(--muted));font-size:12px;line-height:1.6}
+@keyframes moji-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.moji-detail{animation:none}.moji-qr,.moji-entry{transition:none}}
+
+/* MOJi detail: pronunciation + notes */
+.moji-head-row{display:flex;align-items:center;gap:10px}
+.moji-play{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;border:1px solid rgba(214,170,110,.35);background:rgba(255,255,255,.04);color:#e8c48a;cursor:pointer;transition:background-color .15s,transform .1s}
+.moji-play:hover{background:rgba(214,170,110,.14)}
+.moji-play:active{transform:scale(.94)}
+.moji-play:disabled{opacity:.5;cursor:progress}
+.moji-play:focus-visible{outline:2px solid #e8c48a;outline-offset:2px}
+.moji-notes{margin-top:22px;padding-top:14px;border-top:1px solid rgba(214,170,110,.18)}
+.moji-notes h3{font-size:13px;font-weight:600;margin:0 0 10px;opacity:.8}
+.moji-note{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.moji-note-title{font-weight:600;margin-bottom:4px}
+.moji-note-body{white-space:pre-wrap;line-height:1.7}
+.moji-note-meta{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;font-size:13px;color:#e8c48a}
+.moji-note-replies{margin-top:6px;padding-left:10px;border-left:2px solid rgba(214,170,110,.25);font-size:13px;opacity:.8;display:grid;gap:3px}
+.moji-note-replies span{color:#e8c48a}
+.moji-note.mine{border-left:2px solid #e8c48a;padding-left:10px}
+/* E240 例句收进次级菜单 */
+.moji-ex{margin-top:6px}
+.moji-ex>summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;list-style:none;padding:3px 12px 3px 10px;border-radius:999px;font-size:12px;letter-spacing:.06em;color:rgba(242,232,218,.8);background:rgba(255,255,255,.04);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);transition:color .2s,box-shadow .2s}
+.moji-ex>summary::-webkit-details-marker{display:none}
+.moji-ex>summary::before{content:"";width:5px;height:5px;border:solid #c8303c;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg);transition:transform .2s}
+.moji-ex[open]>summary::before{transform:rotate(45deg)}
+.moji-ex>summary b{font-weight:500;color:#edb56e}
+.moji-ex>summary:hover{color:#ffd7a0;box-shadow:inset 0 0 0 1px rgba(255,215,160,.35)}

@@ -1,0 +1,1 @@
+export const historyMessages={zh:{waiting:'等待补译',translating:'正在使用当前翻译引擎补译…',failed:'补译失败，请检查翻译设置',retry:'重试'},ja:{waiting:'翻訳待ち',translating:'選択中の翻訳エンジンで翻訳中…',failed:'翻訳できませんでした。翻訳設定を確認してください',retry:'再試行'},en:{waiting:'Translation queued',translating:'Translating with the selected engine…',failed:'Translation failed. Check your translation settings',retry:'Retry'}};

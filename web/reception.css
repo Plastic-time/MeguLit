@@ -1,0 +1,82 @@
+/* Community ratings strip and review drawer */
+.game-reception .review-platforms{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:14px}
+.review-platform{display:grid;gap:4px;align-content:start;text-align:left;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--surface) 70%,#000);color:var(--text);transition:border-color .15s,background .15s,transform .15s}
+.review-platform:not(.is-unavailable):hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
+.review-platform[aria-expanded=true]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,color-mix(in srgb,var(--surface) 70%,#000))}
+.review-platform.is-unavailable{opacity:.55;cursor:default}
+.review-region{font-size:10px;color:var(--muted);letter-spacing:.02em}
+.review-name{font-size:12px;font-weight:600}
+.review-score{font-size:22px;font-weight:650;line-height:1.25;font-variant-numeric:tabular-nums}.review-score small{font-size:11px;font-weight:500;color:var(--muted)}.review-score.is-pending,.review-score.is-missing{color:var(--muted)}
+.review-platform>small{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.review-drawer{display:grid;grid-template-rows:1fr;margin-top:12px;animation:review-drop .22s ease-out}
+.review-drawer-inner{min-height:0;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--surface) 78%,#000);padding:14px 16px}
+@keyframes review-drop{from{grid-template-rows:0fr;opacity:0}to{grid-template-rows:1fr;opacity:1}}
+@media (prefers-reduced-motion:reduce){.review-drawer{animation:none}}
+.review-toolbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px 16px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.rv-source{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;font-size:12px;color:var(--muted)}.rv-source strong{font-size:14px;color:var(--text)}
+.rv-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.review-translate{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.rv-controls select{height:30px;padding:0 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;font-size:12px}
+.review-translate-toggle{height:30px;padding:0 12px;border:1px solid var(--line);border-radius:8px;font-size:12px;color:var(--text)}.review-translate-toggle[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.review-size{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.review-list{display:grid}.review-list.is-loading{opacity:.55;transition:opacity .15s}
+.review-item{padding:12px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent)}.review-item:last-child{border-bottom:0}
+.review-item header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:12px}.review-item header strong{font-weight:600}.review-item time{margin-left:auto;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.review-rating,.review-verdict,.review-kind{padding:1px 7px;border-radius:999px;font-size:11px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--text);font-variant-numeric:tabular-nums}.review-rating small{color:var(--muted)}
+.review-verdict.is-negative{background:color-mix(in srgb,var(--text) 10%,transparent)}.review-kind{background:color-mix(in srgb,var(--text) 8%,transparent);color:var(--muted)}
+.review-body{position:relative;margin-top:8px}.review-body p{margin:0;font-size:13px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere}
+.review-item.is-spoiler .review-body>p{filter:blur(6px);user-select:none;pointer-events:none}
+.review-spoiler{position:absolute;inset:0;z-index:1;display:grid;place-items:center;font-size:12px;color:var(--text);border-radius:8px;background:color-mix(in srgb,var(--surface) 35%,transparent)}
+.review-original{margin-top:6px;font-size:11px;color:var(--muted)}.review-original summary{cursor:pointer}.review-original p{margin-top:6px;font-size:12px;color:var(--muted)}
+.review-item footer{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin-top:8px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}.review-item footer .text-button{margin-left:auto;font-size:11px}
+.review-status{margin:16px 0 4px;font-size:12px;color:var(--muted)}
+.review-pager{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:4px;padding-top:12px;border-top:1px solid var(--line)}
+.rv-page{min-width:30px;height:30px;padding:0 8px;border-radius:8px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}.rv-page:hover:not(:disabled){background:color-mix(in srgb,var(--text) 8%,transparent);color:var(--text)}.rv-page.is-current{background:var(--accent);color:#fff}.rv-page:disabled{opacity:.35;cursor:default}
+.review-gap{padding:0 4px;color:var(--muted);font-size:12px}
+.review-jump{display:flex;align-items:center;gap:6px;margin-left:8px;font-size:12px;color:var(--muted)}.review-jump input{width:56px;height:30px;padding:0 6px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;font-size:12px;text-align:center}
+.review-go{height:30px;padding:0 12px;border:1px solid var(--line);border-radius:8px;font-size:12px;color:var(--text)}
+.review-fetched{display:block;margin-top:12px}
+@media(max-width:900px){.game-reception .review-platforms{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:560px){.game-reception .review-platforms{grid-template-columns:repeat(2,minmax(0,1fr))}.rv-controls{width:100%}}
+.review-body p.is-clamped{display:-webkit-box;-webkit-line-clamp:8;-webkit-box-orient:vertical;overflow:hidden}
+.review-expand{margin-top:4px;font-size:11px;color:var(--accent)}
+.review-platform.is-pending{cursor:progress}
+/* Auto-translate switch and compact themed dropdowns */
+.review-auto{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none}
+.review-auto input{position:absolute;opacity:0;width:0;height:0}
+.review-switch{position:relative;width:30px;height:17px;border-radius:999px;background:color-mix(in srgb,var(--text) 18%,transparent);transition:background .15s}
+.review-switch::after{content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:transform .15s}
+.review-auto input:checked+.review-switch{background:var(--accent)}.review-auto input:checked+.review-switch::after{transform:translateX(13px)}
+.review-auto input:focus-visible+.review-switch{outline:2px solid var(--accent);outline-offset:2px}
+.rv-controls .select-control{width:auto;flex:none}
+.review-translate .select-control{min-width:96px}.review-size .select-control{min-width:74px}
+.rv-controls .select-trigger{height:30px;min-height:30px;padding:0 28px 0 10px;border-radius:8px;font-size:12px}
+.review-translate-error{margin:8px 0 0;color:#e6a56f}
+.rv-controls .select-trigger{line-height:28px}
+/* Game language dialog: Japanese original restore */
+.language-restore{display:grid;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.language-restore header{display:grid;gap:4px}.language-restore header small{color:var(--muted);font-size:12px}
+.restore-option{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--surface) 70%,#000)}
+.restore-option.is-recommended{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.restore-option>div{display:grid;gap:5px;min-width:0}.restore-option p{margin:0;font-size:12px;line-height:1.6;color:var(--muted)}.restore-option small{font-size:11px;color:var(--muted)}
+.restore-option>button{flex:none}
+details.restore-option{display:block}details.restore-option summary{cursor:pointer;list-style:none}details.restore-option summary::-webkit-details-marker{display:none}details.restore-option p{margin:8px 0 10px}
+.restore-tag{margin-left:8px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:600;color:var(--text);background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.restore-mode{position:relative;display:inline-flex;align-items:center;gap:8px;margin-top:4px;font-size:12px;cursor:pointer}.restore-mode input{position:absolute;opacity:0;width:0;height:0}.restore-mode input:checked+.review-switch{background:var(--accent)}.restore-mode input:checked+.review-switch::after{transform:translateX(13px)}
+
+.review-engine .select-control{min-width:112px}
+.rv-controls{row-gap:8px}
+
+.restore-actions{display:flex;flex-direction:column;gap:6px;flex:none}
+
+.restore-actions{width:132px}
+.restore-actions button{width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.restore-progress{color:var(--text)!important}
+/* Extraction plan as a collapsible row under the recommended restore */
+details.restore-extract>summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;user-select:none}
+details.restore-extract>summary::-webkit-details-marker{display:none}
+.restore-chevron{width:16px;height:16px;margin-left:auto;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s}
+details.restore-extract[open] .restore-chevron{transform:rotate(90deg)}
+.restore-body{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;margin-top:10px}
+.restore-body>div:first-child{display:grid;gap:5px;min-width:0}
+.language-swap-note{display:block;margin-top:4px;max-width:250px;line-height:1.5}

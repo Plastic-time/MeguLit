@@ -1,0 +1,11 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { DatabaseSync } = require('node:sqlite');
+const root = path.resolve(__dirname, '..', 'migration', 'baseline-20261103');
+const db = new DatabaseSync(path.join(root, 'legacy.sqlite'), { readOnly: true });
+const tables = db.prepare("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all();
+const tableCounts = Object.fromEntries(tables.map(({ name }) => [name, db.prepare('SELECT COUNT(*) AS n FROM "' + name.replaceAll('"', '""') + '"').get().n]));
+const library = JSON.parse(fs.readFileSync(path.join(root, 'config', 'library.json'), 'utf8'));
+const output = { tables, tableCounts, games: library.games?.map(g => ({ id:g.id, mediaId:g.mediaId, title:g.title, cover:g.cover, exe:g.exe })), localStorage: fs.existsSync(path.join(root, 'webview-local-storage')) };
+db.close();
+process.stdout.write(JSON.stringify(output).replace(/[^\x00-\x7f]/g, c => String.fromCharCode(92) + 'u' + c.charCodeAt(0).toString(16).padStart(4, '0')));

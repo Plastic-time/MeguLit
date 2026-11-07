@@ -1,0 +1,44 @@
+/* The reader hosts floating tools, not another homepage. These rules must win
+   over the retained module themes, including their injected background styles. */
+html:root:root:root:root,html:root:root:root:root body{background:transparent!important;background-image:none!important;box-shadow:none!important;border:0!important;outline:0!important}
+html:root:root:root:root #tome-bg{display:none!important}
+html:root:root:root:root .tomoyo-cn-dialog::backdrop{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+html:root:root:root:root body.tomoyo-ui-normal #reader-base{display:none!important}
+/* Host artwork uses the same restrained surface and accent as the new home. */
+html:root:root:root:root .tomoyo-cn-dialog{font-family:"Microsoft YaHei UI","Yu Gothic UI","Segoe UI",sans-serif!important;border-color:color-mix(in srgb,var(--theme-text) 11%,transparent)!important;box-shadow:0 18px 54px #0005!important}
+html:root:root:root:root body.tomoyo-ui-normal .tomoyo-cn-dialog{background:var(--theme-surface,#24272e)!important}
+html:root:root:root:root .tomoyo-menu-header{padding:16px 22px 12px!important;gap:7px}
+html:root:root:root:root .tomoyo-cn-dialog button:focus:not(:focus-visible){outline:none!important}
+html:root:root:root:root .tomoyo-cn-dialog input[type=number]{text-align:center!important;max-width:80px}
+html:root:root:root:root .tomoyo-cn-dialog input[type=range]{height:4px!important;border-radius:99px;accent-color:var(--theme-primary,#ad1539)}
+
+body.tomoyo-gal-bound #reader-host{display:block;position:fixed;inset:0;pointer-events:none}
+body.tomoyo-gal-bound #reader-base{pointer-events:auto;transition:opacity .14s ease-out}
+/* E213.2: #reader-host is click-through, so its dialogue text must opt back in or lookups and selection never start. */
+body.tomoyo-gal-bound:not(.megulit-dialog-hidden):not(.tome-box-dragging) #reader-host .sentence-text{pointer-events:auto}
+body.megulit-dialog-hidden #reader-base{opacity:0!important;pointer-events:none}
+/* The game's own LOG is open (E215.2): no MeguLit text over it. */
+body.megulit-native-log #reader-host,body.megulit-native-log .tome-island-page,body.megulit-native-log .tome-island-pair,body.megulit-native-log .tomoyo-selection-card,body.megulit-native-log .megulit-wait-marker{visibility:hidden!important;pointer-events:none!important}
+@media(prefers-reduced-motion:reduce){body.tomoyo-gal-bound #reader-base{transition:none}}
+[data-megulit-ui-scan] small{display:block;margin:6px 0}
+[data-megulit-ui-scan] ol{max-height:14em;overflow:auto}
+[data-megulit-ui-scan] button{margin:6px 8px 6px 0}
+[name=galTranslationPrompt]{display:block;box-sizing:border-box;width:100%;resize:vertical;min-height:5em;color:inherit;background:var(--theme-background);border:1px solid var(--theme-border);border-radius:8px;padding:8px}
+.megulit-mining-capture { opacity: 0 !important; }
+/* E215.6: while a card picture is taken only the reader text (and native ISLAND pages) stay visible. */
+body.megulit-capturing *{visibility:hidden!important}
+body.megulit-capturing .sentence-window,body.megulit-capturing .sentence-window *,
+body.megulit-capturing .tome-island-page,body.megulit-capturing .tome-island-page *,
+body.megulit-capturing .tome-island-pair,body.megulit-capturing .tome-island-pair *{visibility:visible!important}
+body.megulit-capturing .megulit-mining-capture,body.megulit-capturing .megulit-mining-capture *{visibility:hidden!important}
+body.megulit-english-style .sentence-text .char-token.megulit-latin,
+body.megulit-english-style .tomoyo-cn-output:not([data-state=error]) .megulit-latin {
+  font-family: var(--megulit-en-font, inherit) !important;
+  font-size: var(--megulit-en-size) !important;
+  letter-spacing: var(--megulit-en-spacing) !important;
+  font-weight: var(--megulit-en-weight) !important;
+  -webkit-text-stroke: var(--megulit-en-stroke) var(--megulit-en-stroke-color) !important;
+  paint-order: stroke fill;
+}
+/* E215.8: no red "not allowed" cursor on buttons that are only waiting. */
+html:root:root:root:root button:disabled{cursor:default!important}

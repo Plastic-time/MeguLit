@@ -1,0 +1,6 @@
+* text=auto
+*.png binary
+*.dic binary
+docs/** linguist-documentation
+tools/sponsor-card/** linguist-documentation
+preserved/** linguist-vendored

@@ -1,0 +1,100 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process'),{createInterface}=require('node:readline');
+function cleanSource(text,name='',code=''){if(code.endsWith(':JIT:UNITY'))text=text.replace(/<br\s*\/?>/gi,'\n').replace(/<ruby[^>]*>(.*?)<\/ruby>/gis,'$1').replace(/<\/?(?:color|size|font|b|i|u|s|mark|align|line-height|cspace|mspace|indent|margin|voffset|alpha|link|style|noparse|sprite)(?:[=\s][^>]*)?>/gi,'');return text.replace(/\r\n?/g,'\n').replace(/\x05/g,/^BGI(?:\.exe)?$/i.test(name)?'\n':'').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,'');}
+const IslandSource=require('./island-source.js');
+class HookNative{
+ constructor(layout,onEvent,spawnHelper=spawn,now=Date.now){this.layout=typeof layout==='string'?{native:layout,hook:path.join(layout,'hook-runtime')}:layout;this.folder=this.layout.native;this.emit=onEvent;this.spawn=spawnHelper;this.now=now;this.state={hookActive:false,hookAvailable:false,hookThreads:[],processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookMessage:'Hook 未启用'};this.islandSources=new Map();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;this.lastSource="";this.identity="";this.serial=0;this.enabled=false;this.attempt=0;this.retryAt=0;this.timer=setInterval(()=>this.tick(),1000);this.timer.unref?.();}
+ trace(message){try{const file=path.join(this.layout.logs||path.join(this.folder,"..","logs"),"hook-events.log");if(fs.existsSync(file)&&fs.statSync(file).size>=1048576){fs.rmSync(file+".previous",{force:true});fs.renameSync(file,file+".previous");}fs.appendFileSync(file,new Date().toISOString()+" "+message+"\n");}catch{}}
+ notify(v){if(Object.entries(v).every(([k,value])=>this.state[k]===value))return;this.state={...this.state,...v};this.emit({type:'hook',...v});}
+ configure(preferences,state){this.preferences=preferences;this.windowState=state;const pid=Number(state.gameProcessId),hwnd=String(state.gameHwnd||'');this.wanted=(preferences.hookAutoStart||['hook','local'].includes(preferences.maskMode))&&preferences.bindEnabled===true&&preferences.hookProfile!=='off';this.target=Number.isSafeInteger(pid)&&pid>0&&/^\d{1,19}$/.test(hwnd)?{pid,hwnd,name:String(state.processName||''),started:String(state.gameStarted||'')}:null;
+  if(!this.wanted||!this.target){this.stop(false);return;}if(this.process&&(this.pid!==pid||this.started!==this.target.started))this.stop(false);
+  const enabled=preferences.hookProfile!=='read'&&!this.preflight&&state.bound===true&&state.coverEnabled!==false;const route=enabled?(preferences.hookProfile==='embed'?'embed':'custom'):'read';if(this.process&&(enabled!==this.enabled||route!==this.route)){
+   // The verified CS2 draw adapter and Naninovel can toggle hiding in place; reconnecting would drop the first
+   // line after calibration. Other engines retain their verified reconnect behavior.
+   if(this.state.hookFramework==='cs2'||(this.state.hookFramework==='naninovel'&&['read','embed'].includes(route)&&['read','embed'].includes(this.route))){this.trace('render mode switched in place '+this.route+' -> '+route);this.enabled=enabled;this.route=route;this.verified=false;this.send({type:enabled?'enable':'disable'});}
+   else{this.trace('render mode changed; detach then reconnect');this.stop(false);this.retryAt=this.now()+2500;return;}}if(!this.process&&this.now()>=this.retryAt)this.start(this.target);this.syncMarker();}
+ tick(){if(this.process&&this.now()-this.lastHeartbeat>12000){const old=this.process;this.process=null;++this.serial;old.kill();this.retry('Hook 通信无响应');}if(!this.process&&this.wanted&&this.target&&this.now()>=this.retryAt)this.start(this.target);}
+ retry(message){this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.enabled=false;this.retryAt=this.now()+Math.min(30000,1000*2**Math.min(this.attempt++,5));this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookSource:this.lastSource||null,hookRecovering:!!this.lastSource,hookThreads:[],hookMessage:message+'；正在自动重连'});}
+ start({pid,hwnd,name,started}){if(!/^[A-Za-z0-9_\-. \u0080-\uffff]{1,100}$/.test(name)||!/^\d{10,20}$/.test(started))return;
+  // Do not keep re-attaching to a game process that has exited; wait for the window bridge to bind the new one.
+  if(this.spawn===spawn)try{process.kill(pid,0);}catch(e){if(e.code==='ESRCH'){this.retryAt=this.now()+3000;this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,hookMessage:'游戏进程已退出，等待游戏重新启动后自动绑定'});return;}}
+  // A HookBridge built while ToMe ran is staged as HookBridge.updated.exe and installed here, before the bridge starts.
+  const staged=path.join(this.folder,'HookBridge.updated.exe');if(fs.existsSync(staged))try{fs.copyFileSync(staged,path.join(this.folder,'HookBridge.exe'));fs.unlinkSync(staged);}catch{}
+  const root=this.layout.hook,required=['LunaHost64.dll','LunaHook32.dll','LunaHook64.dll'],missing=required.filter(n=>!fs.existsSync(path.join(root,n)));if(missing.length||!fs.existsSync(path.join(this.folder,'HookBridge.exe'))){this.retryAt=this.now()+30000;this.notify({hookMessage:'Hook 组件缺失：'+missing.join('、'),hookAvailable:false});return;}
+  const identity=pid+"|"+started;if(identity!==this.identity){this.lastSource="";this.lastSourceAt=0;this.preferredThread=null;this.identity=identity;this.state.hookFramework=null;}this.pid=pid;this.started=started;this.enabled=this.preferences?.hookProfile!=='read'&&!this.preflight&&this.windowState?.bound===true&&this.windowState?.coverEnabled!==false;this.route=this.enabled?(this.preferences?.hookProfile==='embed'?'embed':'custom'):'read';this.markerKey='';this.lastHeartbeat=this.now();const serial=++this.serial,child=this.process=this.spawn(path.join(this.folder,'HookBridge.exe'),[String(pid),hwnd,name,started,...(this.route==='read'?['--read-only']:this.route==='embed'?['--official-embed']:[])],{cwd:this.folder,windowsHide:true,stdio:['pipe','pipe','ignore']});child.stdin.on('error',()=>{});if(this.enabled)this.send({type:'enable'});
+  const failed=()=>{if(serial!==this.serial)return;this.process=null;++this.serial;this.retry('Hook 连接停止');};child.on('error',failed);child.on('exit',failed);
+  createInterface({input:child.stdout}).on('line',line=>{if(serial!==this.serial||line.length>30000)return;let m;try{m=JSON.parse(line);}catch{return;}this.lastHeartbeat=this.now();
+   if(m.type==='hookEngineFeature'&&['naninovel','cs2'].includes(m.framework)){this.notify({hookFramework:m.framework});return;}
+   if(m.type==='hookTextPos'||m.type==='hookPage'||m.type==='hookDialog'){this.emit(m);if(m.type==='hookPage')this.islandPage(m);return;}
+   if(m.type==='hookRender'){this.notify({hookDrawCount:Number(m.count)||0,hookDrawAt:Number(m.at)||0});return;}
+   if(m.type==='waitMarkerDrawn'){this.emit({type:'waitMarkerDrawn'});return;}
+   if(m.type==='waitMarkerStatus'){this.notify({waitMarkerMessage:String(m.message||'').slice(0,300),waitMarkerHookActive:m.active===true});return;}
+   if(m.type==='hookSource'&&typeof m.text==='string'&&m.text.length<=4000){this.source(m,name);return;}
+   if(m.type==='hookThreads'&&Array.isArray(m.hookThreads)){// Unity games create a stream per String-method call site (often 100+); keep the selected and embeddable ones
+   // ahead of the cut so a late dialogue stream such as Naninovel's printer is never dropped.
+   const rank=t=>(t&&t.selected===true?2:0)+(t&&t.embeddable===true?1:0);this.notify({hookAvailable:true,hookThreads:m.hookThreads.slice().sort((a,b)=>rank(b)-rank(a)).slice(0,100).filter(t=>typeof t.id==='string'&&t.id.length<100).map(t=>({id:t.id,name:String(t.name||'').slice(0,100),code:String(t.code||'').slice(0,1000),sample:String(t.sample||'').slice(0,110),selected:t.selected===true,embeddable:t.embeddable===true}))});if(this.preferredThread&&this.state.hookThreads.some(t=>t.id===this.preferredThread)){const id=this.preferredThread;this.preferredThread=null;this.select(id);}return;}
+   if(['hookStatus','hookError','hookHeartbeat'].includes(m.type)){const value={};for(const k of ['processAttached','streamSelected','receivedText'])if(typeof m[k]==='boolean')value[k]=m[k];if(typeof m.replacementState==='string')value.replacementState=this.verified&&this.enabled?'user-verified':m.replacementState;if(typeof m.hookActive==='boolean')value.hookActive=m.hookActive;if(m.hookMessage)value.hookMessage=String(m.hookMessage).slice(0,400);if(m.type!=='hookError'&&(value.receivedText??this.state.receivedText)&&(value.processAttached??this.state.processAttached)&&(value.streamSelected??this.state.streamSelected))value.hookMessage='已收到真实游戏台词；'+((value.replacementState||this.state.replacementState)==='user-verified'?'原文隐藏已由用户确认':'原文替换状态请见分阶段诊断');this.notify(value);if(m.type==='hookError')this.retryAt=this.now()+1000;this.syncMarker();}
+  });this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookSource:this.lastSource||null,hookRecovering:!!this.lastSource,hookFramework:this.state.hookFramework||null,hookMessage:'正在连接 LunaHook；等待实际文本流'});
+ }
+ source(m,name){
+  // The game's own ruby readings ride after the line as \x1d base \x1c reading pairs (ISLAND hook): split them off
+  // before anything else sees the text, and attach them when this line is delivered (user, 2026-11-03).
+  const raw=String(m.text??''),cut=raw.indexOf('\x1d');let ruby=[];if(cut>=0){ruby=raw.slice(cut+1).split('\x1d').map(p=>p.split('\x1c')).filter(p=>p.length===2&&p[0]&&p[1]&&p[0].length<=20&&p[1].length<=40&&/[\u3041-\u309f\u30a1-\u30fc]/.test(p[1]));m={...m,text:raw.slice(0,cut)};}
+  this.attempt=0;const text=cleanSource(m.text,name,String(m.sourceCode||'')).replace(/\n+$/,'');
+  if(ruby.length){const map=this.sourceRuby||(this.sourceRuby=new Map());map.set(text,ruby);if(map.size>64)map.delete(map.keys().next().value);}
+  if(m.sourceName==='EmbedToMeCS2_DrawPreserve'){if(m.origin==='history'&&this.state.receivedText)return;this.queueIslandSource(text,m.origin);return;}
+  if(!/EmbedToMeCS2_DrawPreserve|EmbedEuphoria474_DrawHide/.test(m.sourceName||'')){this.deliverSource(text,m.origin);return;}
+  const pending=this.pendingSource;
+  if(pending&&text!==pending.text&&!text.startsWith(pending.text)&&!pending.text.startsWith(text))this.flushSource();
+  if(this.pendingSource){if(text.length>=this.pendingSource.text.length)this.pendingSource={text,origin:m.origin};return;}
+  this.pendingSource={text,origin:m.origin};const serial=this.serial;this.sourceTimer=setTimeout(()=>{if(serial===this.serial)this.flushSource();},40);this.sourceTimer.unref?.();
+ }
+ // A render burst can report several sentences before the host flushes their source frames.
+ // Join every native line, in draw order; a later token must never overwrite an earlier unmatched line.
+ islandPage(m){
+  if(m.engine!=='cs2'||!Number.isSafeInteger(m.token)||m.token<0||m.token>0xffffffff||!Number.isSafeInteger(m.line)||m.line<1||(this.islandDraw&&m.line<=this.islandDraw.line))return;
+  this.islandDraw={token:m.token,line:m.line,at:this.now()};this.islandDraws.push(this.islandDraw);
+  if(this.islandDraws.length>64)this.islandDraws.shift();
+  clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.drainIsland();
+ }
+ drainIsland(){
+  clearTimeout(this.islandTimer);
+  while(this.islandDraws.length){const draw=this.islandDraws[0],candidate=this.islandSources.get(draw.token),age=this.now()-draw.at;
+   if(!candidate||this.now()-candidate.at>=5000){
+    // Ordered delivery keeps a burst's earlier lines (240 ms before a later ready line moves on). The newest draw blocks
+    // nothing, so its frame may be later: dropping it at 240 ms hid the original with no ToMe text (Opus 5.5, 2026-11-02).
+    const limit=this.islandDraws.length===1?1500:240;
+    if(age<limit){const serial=this.serial;this.islandTimer=setTimeout(()=>{if(serial===this.serial)this.drainIsland();},limit-age);this.islandTimer.unref?.();return;}
+    this.trace('ISLAND missing source line='+draw.line+' token='+draw.token);this.islandDraws.shift();continue;
+   }
+   this.islandDraws.shift();if(draw.line<=this.islandDelivered)continue;this.islandDelivered=draw.line;
+   this.deliverSource(candidate.text,candidate.origin,'cs2',draw.line);
+  }
+ }
+ queueIslandSource(text,origin){
+  const key=IslandSource.token(text);this.islandSources.set(key,{text,origin,at:this.now()});
+  if(this.islandSources.size>64)this.islandSources.delete(this.islandSources.keys().next().value);
+  if(this.islandDraw){this.drainIsland();return;}
+  // Preserve read-only startup capture until the first native draw report is available.
+  const serial=this.serial,pending=this.pendingSource;
+  if(pending){pending.callbacks=(pending.callbacks||1)+1;if(text===pending.text||pending.text.startsWith(text))return;pending.text=text;pending.origin=origin;}
+  else{this.pendingSource={text,origin,callbacks:1};this.sourceDeadline=setTimeout(()=>{if(serial===this.serial)this.flushSource();},240);this.sourceDeadline.unref?.();}
+  clearTimeout(this.sourceTimer);this.sourceTimer=setTimeout(()=>{if(serial===this.serial)this.flushSource();},80);this.sourceTimer.unref?.();
+ }
+ flushSource(){clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;const pending=this.pendingSource;this.pendingSource=null;if(pending){if(pending.callbacks&&this.islandDraw){this.drainIsland();return;}if(pending.callbacks)this.trace('ISLAND source burst settled callbacks='+pending.callbacks+' chars='+pending.text.length);this.deliverSource(pending.text,pending.origin,pending.callbacks?'cs2':'');}}
+ deliverSource(text,origin,engine='',nativeLine=0){
+  if((origin==='history'&&this.state.receivedText)||(!nativeLine&&text===this.lastSource&&this.state.hookActive&&this.state.receivedText&&!this.state.hookRecovering&&this.now()-(this.lastSourceAt||0)<650)){this.trace('source duplicate ignored chars='+text.length);return;}
+  this.lastSource=text;this.lastSourceAt=this.now();this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.notify({hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSourceEngine:engine,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
+ }
+ markerTarget(v){this.waitTarget=v;this.syncMarker();}
+ // The Direct3D9 wait-marker draw hook no longer runs any probing code inside the game (that once crashed a game);
+ // it only patches system d3d9.dll functions whose address and bytes match a probe made in a separate process.
+ syncMarker(){const v={...(this.waitTarget||{}),type:'waitMarker',active:!!this.waitTarget?.active&&this.enabled&&this.state.hookActive&&this.preferences?.hideWaitMarker!==false},key=JSON.stringify(v);if(this.process&&key!==this.markerKey){this.markerKey=key;this.send(v);}}
+ confirmReplacement(){if(this.enabled&&this.state.receivedText){this.verified=true;this.notify({replacementState:'user-verified'});}}
+ select(id){this.verified=false;if(this.process&&typeof id==='string'&&this.state.hookThreads.some(t=>t.id===id)){this.trace('select id='+id+' replace='+this.enabled);this.send({type:'select',id,replace:this.enabled});}else{this.trace('select rejected id='+String(id));this.notify({hookMessage:'文本流尚未就绪，请重新扫描后选择'});}}
+ rescan(){this.send({type:'rescan'});}
+ send(v){if(this.process?.stdin.writable)this.process.stdin.write(JSON.stringify(v)+'\n');}
+ stop(dispose=true){this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.retryAt=0;this.attempt=0;this.markerKey='';this.waitTarget=null;if(this.process){const old=this.process;this.send({type:'quit'});old.stdin.end();this.process=null;++this.serial;const timer=setTimeout(()=>{if(old.exitCode===null)old.kill();},2000);timer.unref?.();}this.enabled=false;this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'disabled',hookSource:null,hookThreads:[],hookDrawCount:0,hookDrawAt:0});if(dispose){this.lastSource='';this.identity='';this.wanted=false;clearInterval(this.timer);}}
+}
+module.exports={HookNative,cleanSource};

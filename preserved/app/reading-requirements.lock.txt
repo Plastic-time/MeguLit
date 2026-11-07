@@ -1,0 +1,4 @@
+SudachiPy==0.7.0
+fugashi==1.5.2
+sudachidict-full==20261015
+unidic-lite==1.0.8

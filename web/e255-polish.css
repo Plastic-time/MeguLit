@@ -1,0 +1,214 @@
+/* E255 魔导书星章按钮、设置页对齐与主题同步（最后加载，覆盖旧层） */
+
+/* ---------- 1. 主按钮：星章魔导书签 ---------- */
+body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button){
+ position:relative!important;isolation:isolate;overflow:hidden!important;
+ height:48px!important;min-height:48px!important;min-width:128px!important;
+ padding:0 22px 0 16px!important;gap:10px!important;justify-content:center!important;align-items:center!important;
+ border:0!important;border-radius:10px!important;clip-path:none!important;color:#fbeedd!important;
+ font-size:16px!important;letter-spacing:.08em;font-weight:600;
+ background:
+  radial-gradient(1.2px 1.2px at 78% 28%,rgba(255,226,180,.9),transparent 70%),
+  radial-gradient(1px 1px at 88% 66%,rgba(255,226,180,.7),transparent 70%),
+  radial-gradient(1px 1px at 64% 78%,rgba(255,226,180,.5),transparent 70%),
+  radial-gradient(120% 140% at 0% 50%,rgba(196,40,58,.55),transparent 62%),
+  linear-gradient(135deg,#3a1720 0%,#2a1219 45%,#1d1016 100%)!important;
+ box-shadow:inset 0 0 0 1px rgba(237,181,110,.42),inset 0 0 0 3px rgba(20,10,12,.55),inset 0 0 0 4px rgba(237,181,110,.14),
+  inset 0 1px 0 4px rgba(255,220,170,.06),0 6px 18px -6px rgba(150,20,40,.55)!important;
+ backdrop-filter:none!important;text-shadow:0 0 10px rgba(255,170,120,.35);
+ transition:box-shadow .25s ease,transform .18s ease,filter .25s ease!important}
+/* 金色魔法阵星：四芒星 + 菱环 */
+body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button)::before{
+ content:""!important;display:block!important;position:relative!important;inset:auto!important;
+ width:12px!important;height:12px!important;flex:0 0 12px!important;margin:0!important;border:0!important;
+ background:radial-gradient(circle,#fff6e0 0 18%,#ffd38a 30%,#e59a4a 70%)!important;
+ clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%)!important;
+ filter:drop-shadow(0 0 4px rgba(255,190,110,.9));transform:none!important;transition:transform .5s cubic-bezier(.2,.8,.2,1)!important}
+/* 掠光 */
+body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button)::after{
+ content:""!important;position:absolute!important;inset:0!important;z-index:-1;pointer-events:none;display:block!important;
+ background:linear-gradient(110deg,transparent 30%,rgba(255,215,160,.16) 48%,transparent 62%)!important;
+ transform:translateX(-120%);transition:transform .7s ease!important;width:auto!important;height:auto!important;border:0!important}
+body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):hover{
+ filter:brightness(1.08)!important;transform:translateY(-1px);
+ box-shadow:inset 0 0 0 1px rgba(255,215,160,.75),inset 0 0 0 3px rgba(20,10,12,.5),inset 0 0 0 4px rgba(237,181,110,.28),0 10px 24px -8px rgba(200,40,60,.6)!important}
+body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):hover::before{transform:rotate(90deg) scale(1.2)!important}
+body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):hover::after{transform:translateX(120%)}
+body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):active{transform:translateY(0) scale(.97)}
+body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button) .primary-label::after{content:none!important}
+body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):disabled{filter:grayscale(.6) brightness(.8)!important;transform:none}
+@media(prefers-reduced-motion:reduce){body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button),body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button)::before,body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button)::after{transition:none!important}}
+:root[data-theme=light] body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button){color:#fff4e4!important}
+
+/* ---------- 2. 设置页：分区切换时位置不动 ---------- */
+/* 保存状态会塞进页头，原规则让页头从隐藏变显示把整页下推；改为浮在右上，不占位 */
+.main:has(.settings-layout){position:relative}
+.main:has(.settings-layout) .page-header{display:flex!important;position:absolute!important;top:0;right:clamp(16px,3vw,40px);height:0;min-height:0!important;margin:0!important;padding:0!important;border:0!important;overflow:visible;pointer-events:none;z-index:4}
+.main:has(.settings-layout) .page-header>:not(.page-tools){display:none!important}
+.main:has(.settings-layout) .page-header .page-tools{position:absolute;right:0;top:6px}
+.settings-autosave-status[hidden]{display:none!important}
+.main .settings-content .settings-search{margin-top:0!important}
+
+/* ---------- 3. 设置行：文字与控件一律垂直居中 ---------- */
+.main .settings-content .settings-row{display:flex!important;align-items:center!important;min-height:64px;padding-block:14px!important;box-sizing:border-box}
+.main .settings-content .settings-row>div:first-child{display:flex;flex-direction:column;justify-content:center;gap:6px;align-self:center!important;margin:0!important}
+.main .settings-content .settings-row>.settings-label,.main .settings-content .settings-row .settings-label{margin:0!important;line-height:1.4!important;align-self:center}
+.main .settings-content .settings-help{margin:0!important;line-height:1.5!important}
+.main .settings-content .settings-row>:not(:first-child){align-self:center!important;margin-block:0!important}
+.main .settings-content .settings-row>div:not(:first-child),.main .settings-content .settings-row .color-swatches{display:flex;align-items:center;gap:10px}
+.main .settings-content :is(.panel-title,.settings-section-title){display:flex;align-items:center;min-height:48px;margin:0!important;padding-block:12px 4px!important;line-height:1.3}
+/* 背景图片等面板上下留白一致 */
+.main .settings-content .panel{padding-block:8px!important}
+.main .settings-content .panel>:last-child{margin-bottom:0!important}
+.main .settings-content .panel>.settings-row:last-child{border-bottom-color:transparent!important}
+
+/* ---------- 4. 颜色选择：宝石色板 ---------- */
+.main .settings-content input[type=color]{-webkit-appearance:none;appearance:none;width:52px!important;height:30px!important;padding:3px!important;border:0!important;border-radius:999px!important;cursor:pointer;
+ background:linear-gradient(135deg,rgba(255,215,160,.5),rgba(120,70,40,.4))!important;box-shadow:0 0 0 1px rgba(237,181,110,.35),0 4px 10px -4px rgba(0,0,0,.6)!important;transition:box-shadow .2s,transform .2s}
+.main .settings-content input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.main .settings-content input[type=color]::-webkit-color-swatch{border:0;border-radius:999px;box-shadow:inset 0 1px 2px rgba(255,255,255,.25),inset 0 -2px 4px rgba(0,0,0,.35)}
+.main .settings-content input[type=color]:hover{transform:translateY(-1px);box-shadow:0 0 0 1px #ffd7a0,0 0 12px rgba(255,190,110,.35)!important}
+.color-swatches{gap:10px!important}
+.color-swatches .swatch{width:24px!important;height:24px!important;min-width:0!important;border:0!important;border-radius:50%!important;cursor:pointer;position:relative;
+ background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.45),transparent 42%),var(--swatch)!important;
+ box-shadow:inset 0 -3px 5px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.12),0 3px 8px -3px rgba(0,0,0,.6)!important;transition:transform .2s,box-shadow .2s!important}
+.color-swatches .swatch:hover{transform:translateY(-2px) scale(1.06)}
+.color-swatches .swatch.active{box-shadow:inset 0 -3px 5px rgba(0,0,0,.35),0 0 0 2px var(--e-ink,#17181c),0 0 0 3.5px #edb56e,0 0 12px rgba(237,181,110,.45)!important}
+.accent-custom{height:28px!important;padding:0 12px!important;border-radius:999px!important;border:1px solid rgba(237,181,110,.35)!important;background:transparent!important;font-size:12.5px!important}
+.accent-custom::before{content:"";width:12px;height:12px;margin-right:6px;border-radius:50%;background:conic-gradient(#e0475a,#e8b04c,#4fb38f,#3d8ec9,#8a5cc4,#e0475a)}
+.accent-custom:hover{border-color:#edb56e!important}
+
+/* ---------- 5. 左侧栏：主题同步，上下留白一致 ---------- */
+.main .settings-nav{padding:18px 18px!important;box-sizing:border-box}
+.main .settings-nav .settings-category:first-child>summary{padding-top:0!important}
+.main .settings-nav .settings-category:last-child{padding-bottom:0!important;margin-bottom:0!important}
+.main .settings-nav .settings-category:last-child:not([open])>summary,.main .settings-nav .settings-category:last-child .settings-category-items>:last-child{padding-bottom:4px!important;margin-bottom:0!important}
+:root[data-theme=light] .main .settings-nav,:root[data-theme=light] .home-glass .main .settings-nav{
+ background:linear-gradient(180deg,rgba(252,244,232,.62),rgba(244,232,216,.55))!important;border:1px solid rgba(176,120,64,.32)!important;border-radius:12px!important;
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 14px 34px -14px rgba(80,40,20,.28)!important;backdrop-filter:blur(16px) saturate(1.1)}
+:root[data-theme=light] .main .settings-nav .settings-category summary{color:#a8652d!important}
+:root[data-theme=light] .main .settings-nav .settings-category button{color:#6e4f47!important}
+:root[data-theme=light] .main .settings-nav .settings-category button.active{color:#301919!important}
+:root[data-theme=black] .main .settings-nav,:root[data-theme=black] .home-glass .main .settings-nav{
+ background:linear-gradient(180deg,rgba(14,12,13,.86),rgba(6,6,7,.82))!important;border:1px solid rgba(237,181,110,.2)!important;border-radius:12px!important;
+ box-shadow:inset 0 1px 0 rgba(255,215,160,.06),0 16px 40px rgba(0,0,0,.5)!important}
+
+/* 下拉弹层跟随主题 */
+:root[data-theme=light] .select-popup{background:rgba(250,243,233,.97)!important;color:#301919!important;border:1px solid rgba(176,120,64,.3)!important;box-shadow:0 14px 34px -10px rgba(80,40,20,.35)!important}
+:root[data-theme=light] .select-popup :is(button,[role=option],li){color:#4a2a24!important;background:transparent!important}
+:root[data-theme=light] .select-popup :is(button,[role=option],li):hover{background:rgba(176,40,56,.08)!important;color:#301919!important}
+:root[data-theme=light] .select-popup :is([aria-selected=true],.selected,.active){color:#a8202f!important}
+:root[data-theme=black] .select-popup{background:rgba(8,8,9,.97)!important;border:1px solid rgba(237,181,110,.18)!important}
+
+/* ---------- 6. 游戏库悬停详情：底角不漏色 ---------- */
+.library-card .cover-frame{background:#140d0c!important}
+.library-card .game-hover{inset:-3px!important;background:linear-gradient(transparent 6%,rgba(26,17,16,.88) 54%,#140d0c 92%)!important}
+/* E258 悬停瞬间漏色：封面图内缩 1px，边缘永远落在深色底与遮罩里；遮罩不再从 0 透明度淡入边缘 */
+.library-card .cover-frame>:is(img,.cover){clip-path:inset(1px round 5px)}
+.library-card .cover-frame{box-shadow:inset 0 0 0 1px #140d0c}
+.library-card .game-hover{transition:opacity .12s linear!important;will-change:opacity}
+/* E259 悬停只认封面本身；去掉过渡中的亚像素帧（漏色来源） */
+.library-card:hover .game-hover,.library-card:hover .game-hover>*{opacity:0}
+.library-card:hover .cover-frame{transform:none!important}
+.library-card .cover-frame:hover .game-hover,.library-card:has(.game-card:focus-visible) .game-hover{opacity:1!important}
+.library-card .cover-frame:hover .game-hover>*,.library-card:has(.game-card:focus-visible) .game-hover>*{opacity:1;translate:0 0}
+.library-card .cover-frame:hover{transform:none!important}
+.library-card .cover-frame,.library-card .game-hover,.library-card .game-hover>*{transition:none!important}
+/* E259 光晕去掉明显光心：平缓衰减 + 柔化边界，看不出光源位置 */
+.grimoire-glow .ember{background:radial-gradient(closest-side,color-mix(in srgb,var(--c) 62%,transparent) 0%,color-mix(in srgb,var(--c) 44%,transparent) 30%,color-mix(in srgb,var(--c) 20%,transparent) 62%,transparent 100%)!important;filter:blur(48px);top:-26vh!important}
+/* E260 下拉框按内容收窄，文字居中 */
+.main .settings-content .settings-row .select-control,.main .settings-content .settings-row .select-control.compact-select,.main .settings-content .font-control>.compact-select{width:max-content!important;min-width:128px!important;max-width:240px!important;flex:none!important}
+.main .settings-content .settings-row .select-trigger{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;width:100%!important;padding:0 34px!important;white-space:nowrap}
+.main .settings-content .select-popup{min-width:100%!important;width:max-content!important}
+.main .settings-content .select-popup :is([role=option],button,li){justify-content:center!important;text-align:center!important}
+/* 颜色：去油光，不裁切 */
+.main .settings-content .settings-row .color-swatches{width:auto!important;max-width:none!important;flex:none!important;overflow:visible!important;flex-wrap:nowrap;padding:4px}
+.color-swatches .swatch{width:22px!important;height:22px!important;background:var(--swatch)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)!important}
+.color-swatches .swatch:hover{transform:translateY(-1px)}
+.color-swatches .swatch.active{box-shadow:0 0 0 2px var(--e-ink,#17181c),0 0 0 3px #edb56e!important}
+.main .settings-content input[type=color]{width:44px!important;height:26px!important;padding:2px!important;border-radius:8px!important;background:transparent!important;box-shadow:0 0 0 1px rgba(237,181,110,.4)!important;overflow:visible}
+.main .settings-content input[type=color]::-webkit-color-swatch{border-radius:6px;box-shadow:none}
+.main .settings-content input[type=color]:hover{transform:none;box-shadow:0 0 0 1px #edb56e!important}
+/* E260 修正：标题/说明在左列内靠左（竖排 flex 里 align-self:center 会水平居中） */
+.main .settings-content .settings-row>div:first-child{align-items:flex-start!important;text-align:left!important}
+.main .settings-content .settings-row>div:first-child>:is(.settings-label,.settings-help){align-self:flex-start!important;text-align:left!important}
+.main .settings-content .settings-row>.settings-label{text-align:left!important;margin-right:auto!important}
+/* E261 开关/滑条命中范围只限可见本体 */
+.main .settings-content .settings-row input.switch{flex:none!important;align-self:center!important;margin-block:0!important;max-height:30px}
+.main .settings-content .settings-row input.switch::before,.main .settings-content .settings-row input.switch::after{pointer-events:none}
+.main .settings-content .setting-slider{align-self:center!important;height:auto!important}
+.main .settings-content .setting-slider input[type=range]{height:20px!important;margin:0!important}
+/* E262 下拉宽度按最长选项（JS 写入 --select-width），文字居中 */
+.main .settings-content .settings-row .select-control,.main .settings-content .settings-row .select-control.compact-select,.main .settings-content .font-control>.compact-select{width:var(--select-width,140px)!important;min-width:0!important;max-width:220px!important}
+.main .settings-content .settings-row .select-trigger{padding:0 26px!important}
+/* 命中范围：行本身不接收指针，只有控件本体可点/可悬停 */
+.main .settings-content .settings-row{pointer-events:none}
+.main .settings-content .settings-row :is(input,select,textarea,button,a,.select-control,.select-trigger,.color-swatches,.accent-custom,.review-controls,.font-control){pointer-events:auto}
+.main .settings-content .settings-row .setting-slider{pointer-events:none}
+.main .settings-content .settings-row .setting-slider>input{pointer-events:auto}
+/* 侧栏选中星：与文字垂直对齐、不被裁 */
+.main .settings-nav .settings-category button{overflow:visible!important}
+.main .settings-nav .settings-category-items{overflow:visible}
+.main .settings-nav .settings-category button.active{padding-left:18px!important}
+.main .settings-nav .settings-category button.active::before{left:4px!important;top:50%!important;margin-top:0!important;transform:translateY(-50%) rotate(45deg)!important}
+/* 顶部栏取色：恢复胶囊宝石款，留出右侧光圈空间 */
+.main .settings-content input[type=color]{width:52px!important;height:30px!important;padding:3px!important;margin-right:6px!important;border-radius:999px!important;background:linear-gradient(135deg,rgba(255,215,160,.5),rgba(120,70,40,.4))!important;box-shadow:0 0 0 1px rgba(237,181,110,.35),0 4px 10px -4px rgba(0,0,0,.6)!important}
+.main .settings-content input[type=color]::-webkit-color-swatch{border-radius:999px;box-shadow:inset 0 1px 2px rgba(255,255,255,.25),inset 0 -2px 4px rgba(0,0,0,.35)}
+.main .settings-content input[type=color]:hover{transform:translateY(-1px);box-shadow:0 0 0 1px #ffd7a0,0 0 12px rgba(255,190,110,.35)!important}
+.main .settings-content,.main .settings-content .panel{overflow-x:visible}
+/* 悬停详情：恢复动画——整块封面作为单一合成层上移，遮罩淡入、文字上滑 */
+.library-card .cover-frame{will-change:transform;backface-visibility:hidden;transition:transform .2s var(--g-ease,ease)!important}
+.library-card .cover-frame:hover{transform:translate3d(0,-3px,0)!important}
+.library-card .game-hover{transition:opacity .18s ease!important}
+.library-card .game-hover>*{translate:0 6px;transition:translate .22s var(--g-ease,ease),opacity .18s ease!important}
+.lib-field .field-feature .library-card .cover-frame:hover{transform:none!important}
+/* 无限墙切换：搜索栏与开关平滑移动，网格交叉淡化 */
+#game-search{view-transition-name:lib-search}
+.library-wall-toggle{view-transition-name:lib-wall-toggle}
+::view-transition-group(lib-search),::view-transition-group(lib-wall-toggle){animation-duration:.42s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.32s}
+/* E263 星与文字同一水平中线：改为行内 flex 项，不再绝对定位 */
+.main .settings-nav .settings-category button{display:flex!important;align-items:center!important;justify-content:flex-start!important}
+.main .settings-nav .settings-category button.active{padding-left:0!important}
+.main .settings-nav .settings-category button.active::before{position:static!important;flex:none;display:block!important;width:5px!important;height:5px!important;margin:0 9px 0 3px!important;transform:rotate(45deg) translateY(-1px)!important;left:auto!important;top:auto!important}
+body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button)::before{translate:0 -1px}
+body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button) .primary-label{display:inline-flex!important;align-items:center;line-height:1!important;padding-top:1px}
+/* 设置页底部留白收紧 */
+.main .settings-content{padding-bottom:20px!important}
+.main .settings-content .panel{padding-bottom:0!important;margin-bottom:0!important}
+/* E264 长选项：下拉宽度上限放宽，选项不换行 */
+.main .settings-content .settings-row .select-control,.main .settings-content .settings-row .select-control.compact-select,.main .settings-content .font-control>.compact-select{max-width:min(420px,48vw)!important}
+.main .settings-content .settings-row .select-trigger{overflow:hidden;text-overflow:ellipsis}
+.main .settings-content .select-popup :is([role=option],button,li){white-space:nowrap!important}
+/* E266 切换入场前只隐藏卡片，不动容器（暗角不闪） */
+.lib-entering .library-card{opacity:0}
+/* E269 无限墙放大时清晰：静止时不让封面成为独立合成层（否则按原尺寸栅格化再被放大而发糊）；拖动/缩放中才提升图层保流畅 */
+.lib-field .library-card .cover-frame{will-change:auto!important;backface-visibility:visible!important}
+.lib-field .library-card .cover-frame:hover{will-change:transform!important}
+.lib-field.field-moving .field-plane>*,.lib-field.field-fast .field-plane>*{will-change:transform}
+.lib-field:not(.field-moving):not(.field-fast) .field-plane,.lib-field:not(.field-moving):not(.field-fast) .field-plane>*{will-change:auto!important}
+.lib-field .field-plane img{image-rendering:auto}
+/* E270 覆盖 E269：默认保留合成层（流畅，缩小时略软可接受）；只有放大且静止时才取消图层，按实际尺寸清晰重绘 */
+.lib-field .field-plane>*{will-change:transform!important}
+.lib-field[data-zoom=large]:not(.field-moving):not(.field-fast) .field-plane>*{will-change:auto!important}
+.lib-field:not(.field-moving):not(.field-fast) .field-plane{will-change:auto!important}
+/* E272 缩得很小时：作品名渐隐（不再绘制文字），封面降采样，减轻绘制 */
+.lib-field .game-caption,.lib-field .library-card-meta{transition:opacity .25s ease,visibility 0s linear 0s}
+.lib-field[data-zoom=tiny] .game-caption,.lib-field[data-zoom=tiny] .library-card-meta{opacity:0;visibility:hidden;transition:opacity .25s ease,visibility 0s linear .25s}
+.lib-field[data-zoom=tiny] .field-plane img{image-rendering:pixelated;image-rendering:-webkit-optimize-contrast}
+.lib-field[data-zoom=tiny] .library-card .cover-frame{box-shadow:none!important}
+.lib-field[data-zoom=tiny] .game-hover{display:none}
+
+/* E266 detail page motion: synopsis height animation (no line-clamp, JS sets max-height), fade at the cut, sliding tab bar */
+.synopsis-panel.is-collapsed .game-synopsis{display:block!important;-webkit-line-clamp:unset!important;-webkit-box-orient:initial!important}
+.synopsis-panel .game-synopsis{overflow:hidden;transition:max-height .42s cubic-bezier(.2,.8,.2,1)}
+.synopsis-panel.is-collapsed:not(.is-short) .game-synopsis{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 2.2em),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 2.2em),transparent)}
+.synopsis-panel.is-short .synopsis-footer [data-synopsis-toggle]{display:none}
+.synopsis-panel [data-synopsis-toggle] span{display:inline-block;transition:transform .32s cubic-bezier(.2,.8,.2,1)}
+.main .detail-tabs{position:relative}
+.main .detail-tabs .detail-tab-bar{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--e-red,#c8303c);border-radius:2px;pointer-events:none;transition:transform .34s cubic-bezier(.2,.8,.2,1),width .34s cubic-bezier(.2,.8,.2,1)}
+@media(prefers-reduced-motion:reduce){.synopsis-panel .game-synopsis,.main .detail-tabs .detail-tab-bar{transition:none!important}}
+/* E273 no-match hint sits under the search capsule, not in the corner */
+#library-results{position:relative}
+#library-results .library-empty-hint{position:absolute;left:50%;top:calc(50% + 56px);transform:translateX(-50%);margin:0;white-space:nowrap;font-size:13px;letter-spacing:.06em;color:var(--g-t3,#aaa49c);animation:megulit-empty-in .36s cubic-bezier(.2,.8,.2,1) both}
+@keyframes megulit-empty-in{from{opacity:0;transform:translate(-50%,6px)}to{opacity:1;transform:translate(-50%,0)}}

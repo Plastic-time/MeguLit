@@ -1,0 +1,36 @@
+{
+  "repository": "tsukumijima/deberta-v2-large-japanese-char-wwm-onnx",
+  "revision": "d701ec67708287b20d2063270f6b535e6eed09ab",
+  "files": [
+    {
+      "name": "config.json",
+      "size": 895,
+      "sha256": "8f387ab4c6b36e47c7071327c7a42099002781279b00a7e6a7fe88f3da237a3f"
+    },
+    {
+      "name": "model_fp16.onnx",
+      "size": 653075699,
+      "sha256": "23f633ae7c5900ff82b35a428b67a54e7e7911d5d6a6dcfc77967be8f1c94dc6"
+    },
+    {
+      "name": "special_tokens_map.json",
+      "size": 125,
+      "sha256": "b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3"
+    },
+    {
+      "name": "tokenizer.json",
+      "size": 430981,
+      "sha256": "21a17e4d0032739e82dc60f155b4ae37e94519103e0d399657fdd249ec3e7905"
+    },
+    {
+      "name": "tokenizer_config.json",
+      "size": 520,
+      "sha256": "1cc5203f09ecac12bb7a98a05cb9c2e39a9e37a113a7d85d12542ef29190583b"
+    },
+    {
+      "name": "vocab.txt",
+      "size": 88151,
+      "sha256": "902cbd7e218aaf23a72955533293ceac12fcc4e010ad98c0c14757b94ce7abb6"
+    }
+  ]
+}

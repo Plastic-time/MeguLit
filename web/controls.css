@@ -1,0 +1,227 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Shared launcher controls. Reader modules keep their original stylesheet and behavior. */
+:root {
+  --control-fill: color-mix(in srgb, var(--bg) 78%, var(--surface));
+  --control-edge: color-mix(in srgb, var(--text) 11%, transparent);
+  --control-hover-edge: color-mix(in srgb, var(--text) 23%, transparent);
+  --control-focus: color-mix(in srgb, var(--accent) 65%, var(--text));
+  --control-highlight: color-mix(in srgb, var(--text) 5%, transparent);
+  --control-selected: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  --floating-fill: var(--surface);
+  --floating-blur: 0px;
+  --floating-shadow: 0 18px 48px #0005, 0 3px 10px #0002;
+  --control-ease: cubic-bezier(.2, .75, .25, 1);
+}
+:root[data-theme=light] { --floating-shadow: 0 16px 42px #18203418, 0 2px 8px #1820340a; }
+:root.home-glass {
+  --control-fill: color-mix(in srgb, var(--bg) 52%, transparent);
+  --floating-fill: color-mix(in srgb, var(--surface) var(--home-glass-alpha, 65%), transparent);
+  --floating-blur: var(--home-glass-blur, 14px);
+  --control-selected: color-mix(in srgb, var(--accent) 17%, transparent);
+}
+button, input, textarea, summary { -webkit-tap-highlight-color: transparent; }
+/* E215.8 (user): buttons disabled while a request runs no longer show the red "not allowed" cursor. */
+button:disabled { cursor: default; }
+button[aria-busy=true] { cursor: progress; }
+.main:focus-visible { outline: none; }
+:is(.primary, .secondary, .icon-button, .text-button, .tab, .nav-item):focus-visible {
+  outline: 2px solid var(--control-focus); outline-offset: 3px;
+}
+
+/* A single quiet material for text fields and select triggers. */
+:is(.settings-content, .lookup-form, .page-tools, .input-group, dialog) :is(input:not([type=range]):not([type=color]):not([type=checkbox]):not([type=radio]), textarea),
+.select-trigger, .home-glass .select-trigger {
+  background: var(--control-fill); border: 1px solid var(--control-edge); border-radius: 11px;
+  color: var(--text); box-shadow: inset 0 1px 0 #ffffff03;
+  transition: border-color .16s, background .16s, box-shadow .16s;
+}
+:is(.settings-content, .lookup-form, .page-tools, .input-group, dialog) :is(input:not([type=range]):not([type=color]):not([type=checkbox]):not([type=radio]), textarea):hover,
+.select-trigger:hover { border-color: var(--control-hover-edge); }
+:is(.settings-content, .lookup-form, .page-tools, .input-group, dialog) :is(input:not([type=range]):not([type=color]):not([type=checkbox]):not([type=radio]), textarea):focus-visible,
+.select-trigger:focus-visible {
+  outline: none; border-color: var(--control-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent);
+}
+.select-trigger { min-height: 42px; padding: 10px 39px 10px 14px; font-weight: 450; }
+.select-trigger[aria-expanded=true] {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--control-edge));
+  background: color-mix(in srgb, var(--accent) 5%, var(--control-fill));
+}
+.select-trigger:after {
+  width: 6px; height: 6px; right: 16px; top: calc(50% - 4px);
+  border-width: 1.4px; transition: transform .18s var(--control-ease), border-color .18s;
+}
+.select-trigger[aria-expanded=true]:after { transform: translateY(3px) rotate(225deg); border-color: var(--accent-light); }
+.select-trigger:disabled { opacity: .45; }
+
+/* Lists share the glass switch, selection indicator and scroll treatment. */
+.select-popup, .context-menu, .settings-search-results, .home-glass :is(.select-popup, .context-menu, .settings-search-results) {
+  padding: 6px; border: 1px solid var(--control-edge); border-radius: 14px;
+  background: var(--floating-fill); color: var(--text); box-shadow: var(--floating-shadow);
+  backdrop-filter: blur(var(--floating-blur)); -webkit-backdrop-filter: blur(var(--floating-blur));
+}
+.select-popup {
+  overscroll-behavior: contain; scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 35%, transparent) transparent;
+  animation: control-list-in .16s var(--control-ease);
+}
+@keyframes control-list-in { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
+.select-popup::-webkit-scrollbar { display: block; width: 4px; }
+.select-popup::-webkit-scrollbar-thumb { border-radius: 8px; background: color-mix(in srgb, var(--muted) 35%, transparent); }
+.select-popup>button {
+  position: relative; min-height: 38px; padding: 9px 35px 9px 12px; border: 1px solid transparent;
+  border-radius: 9px; margin: 1px 0; font-size: 13px; line-height: 1.5; font-weight: 450;
+  color: var(--text); transition: background .12s, border-color .12s;
+}
+.select-popup>button:hover, .select-popup>button:focus-visible { background: var(--control-highlight); outline: none; }
+.select-popup>button[aria-selected=true] { background: var(--control-selected); border-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+.select-popup>button[aria-selected=true]:after {
+  content: ''; position: absolute; right: 15px; top: calc(50% - 5px); width: 5px; height: 9px;
+  border: solid var(--accent-light); border-width: 0 1.6px 1.6px 0; transform: rotate(45deg);
+}
+.context-menu>button, .settings-search-results button { border-radius: 9px; transition: background .12s; }
+.context-menu>button:hover, .settings-search-results button:hover { background: var(--control-highlight); }
+.word-actions .select-control { width: 108px; }
+.word-actions .select-trigger { min-height: 36px; font-size: 12px; padding-block: 7px; }
+
+/* A generous pointer target with a thin painted track; numbers remain small and centered. */
+:is(.settings-content, .tome-crop, .panel) input[type=range] {
+  appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; height: 28px; min-height: 28px;
+  padding: 0; margin-block: 0; border: 0; border-radius: 8px; cursor: pointer;
+  background: linear-gradient(to right, var(--accent) 0 var(--range-fill, 0%), color-mix(in srgb, var(--muted) 24%, transparent) var(--range-fill, 0%) 100%) center / 100% 4px no-repeat;
+  box-shadow: none;
+}
+:is(.settings-content, .tome-crop, .panel) input[type=range]::-webkit-slider-runnable-track { height: 4px; border: 0; background: transparent; border-radius: 8px; }
+:is(.settings-content, .tome-crop, .panel) input[type=range]::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px;
+  border: 2px solid var(--accent); border-radius: 50%; background: var(--text);
+  box-shadow: 0 1px 4px #0004; transition: box-shadow .14s, border-color .14s;
+}
+:is(.settings-content, .tome-crop, .panel) input[type=range]:hover::-webkit-slider-thumb,
+:is(.settings-content, .tome-crop, .panel) input[type=range]:focus-visible::-webkit-slider-thumb {
+  border-color: var(--control-focus); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 13%, transparent), 0 1px 4px #0003;
+}
+:is(.settings-content, .tome-crop, .panel) input[type=range]:focus-visible { outline: none; box-shadow: none; }
+.settings-content .settings-row .setting-slider {
+  display: grid; grid-template-columns: minmax(100px, 1fr) 58px; align-items: center;
+  width: 236px; max-width: 48%; min-width: 0; gap: 15px; flex: none;
+}
+.settings-content .settings-row .setting-slider input[type=number],
+.settings-content .settings-row>input[type=number] {
+  width: 58px!important; height: 36px; padding: 7px 3px; text-align: center!important;
+  border: 1px solid var(--control-edge); border-radius: 9px; background: var(--control-fill);
+  color: var(--text); font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums;
+}
+.switch { width: 38px; height: 22px; background: color-mix(in srgb, var(--muted) 32%, var(--bg)); box-shadow: inset 0 1px 3px #0002; }
+.switch:before { width: 16px; height: 16px; top: 3px; left: 3px; box-shadow: 0 1px 3px #0003; }
+.switch:checked { background: var(--accent); }
+.switch:checked:before { transform: translateX(16px); }
+.switch:hover { box-shadow: 0 0 0 4px color-mix(in srgb, var(--text) 4%, transparent); }
+.switch:focus-visible { outline: 2px solid var(--control-focus); outline-offset: 3px; }
+
+/* Navigation, section cards and segmented controls use the same edge weight. */
+.settings-nav { padding: 8px; border-color: var(--control-edge); border-radius: 17px; }
+.settings-category { padding-bottom: 8px; margin-bottom: 4px; }
+.settings-category summary { padding: 11px 10px; font-size: 12px; font-weight: 550; letter-spacing: .02em; }
+.settings-category summary:after { width: 5px; height: 5px; opacity: .7; }
+.settings-category-items { padding-top: 3px; }
+.settings-nav .settings-category button { padding: 9px 12px; margin: 3px 0; font-size: 13px; border-radius: 9px; color: var(--muted); transition: color .14s, background .14s; }
+.settings-nav .settings-category button:hover { background: var(--control-highlight); color: var(--text); }
+.settings-nav .settings-category button.active {
+  color: var(--text); font-weight: 550; background: color-mix(in srgb, var(--accent) 9%, var(--control-highlight));
+  box-shadow: inset 2px 0 color-mix(in srgb, var(--accent) 85%, var(--text));
+}
+.settings-category summary:focus-visible { outline: 2px solid var(--control-focus); outline-offset: 1px; }
+.settings-content .panel { border: 1px solid color-mix(in srgb, var(--text) 5%, transparent); box-shadow: inset 0 1px #ffffff02; }
+.settings-content .settings-row { border-bottom-color: color-mix(in srgb, var(--text) 5%, transparent); padding-block: 17px; }
+.settings-content .settings-row:first-of-type { padding-top: 0; }
+.settings-content .settings-row:last-child { padding-bottom: 0; }
+.settings-label { font-size: 13px; font-weight: 500; line-height: 1.65; }
+.settings-help { font-size: 12px; line-height: 1.8; }
+.settings-section-title { font-size: 20px; font-weight: 650; letter-spacing: -.02em; margin-bottom: 17px; }
+.settings-content .panel-title { font-size: 15px; font-weight: 600; margin-bottom: 20px; }
+.settings-search { min-height: 44px; border-radius: 12px; }
+.settings-page-tabs, .translation-types { border: 1px solid color-mix(in srgb, var(--text) 5%, transparent); padding: 4px; gap: 3px; border-radius: 12px; }
+:is(.settings-page-tabs, .translation-types) button { border-radius: 8px; padding: 8px 13px; font-size: 12px; line-height: 1.5; color: var(--muted); transition: color .14s, background .14s; }
+:is(.settings-page-tabs, .translation-types) button:hover { color: var(--text); background: var(--control-highlight); }
+:is(.settings-page-tabs, .translation-types) :is(button[aria-selected=true], button.active) {
+  color: var(--text); background: color-mix(in srgb, var(--accent) 13%, var(--control-highlight)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.engine-explanation { border-left-width: 2px; border-radius: 0 12px 12px 0; padding: 15px 17px; background: color-mix(in srgb, var(--text) 2.5%, transparent); }
+.setting-link { display: inline-flex; align-items: center; gap: 10px; border-color: var(--control-edge); background: var(--control-fill); border-radius: 11px; }
+.setting-link:hover { background: var(--control-highlight); border-color: var(--control-hover-edge); }
+
+.secondary { min-height: 39px; padding: 10px 15px; border: 1px solid var(--control-edge); border-radius: 11px; background: var(--control-fill); color: var(--text); font-size: 13px; transition: background .15s, border-color .15s; }
+.secondary:hover { border-color: var(--control-hover-edge); background: var(--control-highlight); }
+.primary { box-shadow: inset 0 1px #ffffff0d, 0 3px 9px color-mix(in srgb, var(--accent) 12%, transparent); }
+dialog, .tome-crop, .home-glass :is(dialog, .tome-crop) {
+  background: var(--floating-fill); border: 1px solid var(--control-edge); border-radius: 18px;
+  box-shadow: var(--floating-shadow); backdrop-filter: blur(var(--floating-blur)); -webkit-backdrop-filter: blur(var(--floating-blur));
+}
+dialog::backdrop { background: color-mix(in srgb, var(--bg) 66%, transparent); }
+.tome-crop { padding: 18px; gap: 16px; }
+.tome-crop header { font-size: 14px; font-weight: 600; }
+.tome-crop footer { padding-top: 4px; gap: 9px; }
+.tome-crop small { color: var(--muted); font-size: 11px; }
+.tome-crop output { color: var(--muted); text-align: center; }
+.library-card .edit-button { background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(var(--floating-blur)); }
+.game-card:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--control-edge)); }
+.library-card-meta { gap: 10px; padding: 8px 7px 10px; }
+
+@media(max-width:760px) {
+  .settings-content .settings-row .setting-slider { width: 100%; max-width: 100%; grid-template-columns: minmax(80px, 1fr) 58px; }
+  .settings-content .settings-row { padding-block: 15px; }
+  .settings-nav { padding: 6px; border-radius: 13px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .select-popup { animation: none; }
+  .select-trigger, .select-trigger:after, .select-popup>button, .secondary, .switch, .switch:before { transition: none; }
+}
+
+.path-picker{display:flex;align-items:center;gap:8px;width:min(440px,58%);min-width:0}.path-picker>input,.path-picker>textarea{flex:1;min-width:0;width:100%!important}.path-picker>button{flex:none;white-space:nowrap;padding:10px 12px}.locale-component h3{margin:0 0 8px}.locale-component .input-group{margin-top:14px}@media(max-width:760px){.path-picker{width:100%}}
+/* Accent row: saved/default chips plus a "Custom…" button that opens the shared picker */
+.accent-chips{display:contents}
+.accent-custom{position:relative;display:inline-flex;align-items:center;height:30px;padding:0 14px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--text);cursor:pointer;white-space:nowrap;transition:border-color .15s,background .15s}
+.accent-custom:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));background:color-mix(in srgb,var(--text) 5%,transparent)}
+.accent-custom input[type=color]{position:absolute;width:0;height:0;opacity:0;pointer-events:none;border:0;padding:0}
+
+/* Back / forward page history: same quiet buttons as the window controls, aligned with the page title */
+/* Pinned to the window's top-left corner with equal top and left insets, above the corner resize handle */
+.nav-history{position:fixed;top:8px;left:8px;z-index:10001;display:flex;align-items:center;gap:2px}
+.nav-step{display:grid;place-items:center;width:34px;height:34px;border-radius:8px;color:#969ba9;transition:background .15s,color .15s,opacity .15s}
+.nav-step svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-step:hover:not(:disabled){background:#ffffff0c;color:var(--text)}
+.nav-step:active:not(:disabled){background:color-mix(in srgb,var(--text) 14%,transparent)}
+.nav-step:disabled{opacity:.3;cursor:default}
+.nav-step:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* Model download source: segmented control instead of bare radio buttons */
+.download-source{display:flex!important;align-items:center;gap:12px;font-size:12px;color:var(--muted)}
+.download-source>span{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:color-mix(in srgb,var(--text) 5%,transparent);border:1px solid var(--line)}
+.download-source>span>label{position:relative;display:inline-flex;align-items:center;padding:6px 14px;border-radius:8px;font-size:12px;color:var(--muted);cursor:pointer;transition:background .15s,color .15s}
+.download-source>span>label input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+.download-source>span>label:has(input:checked){background:var(--accent);color:#fff;font-weight:600}
+.download-source>span>label:hover:not(:has(input:checked)){color:var(--text);background:color-mix(in srgb,var(--text) 7%,transparent)}
+.download-source>span>label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
+
+/* Frequently looked-up words: collapsed by default, compact chips when open */
+details.revisit-words{padding:14px 18px}
+details.revisit-words>summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;user-select:none}
+details.revisit-words>summary::-webkit-details-marker{display:none}
+.revisit-title{font-size:14px;font-weight:600}
+.revisit-chevron{width:16px;height:16px;margin-left:auto;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s}
+details.revisit-words[open] .revisit-chevron{transform:rotate(90deg)}
+details.revisit-words>.settings-help{margin:10px 0 8px;font-size:11px}
+.revisit-list{display:flex;flex-wrap:wrap;gap:6px;max-height:156px;overflow:auto;padding-right:4px}
+.revisit-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:color-mix(in srgb,var(--text) 6%,transparent);font-size:13px}
+.revisit-chip b{font-weight:500}.revisit-chip small{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Library refresh: the arrow glyph is asymmetric and wobbles when rotated; show a centred ring while busy */
+#refresh-library{position:relative}
+#refresh-library[aria-busy=true] .icon{visibility:hidden;animation:none!important}
+#refresh-library[aria-busy=true]::after{content:'';position:absolute;inset:0;margin:auto;width:16px;height:16px;box-sizing:border-box;border-radius:50%;border:2px solid color-mix(in srgb,currentColor 22%,transparent);border-top-color:currentColor;animation:library-refresh-spin .8s linear infinite}
+@media (prefers-reduced-motion:reduce){#refresh-library[aria-busy=true]::after{animation-duration:2.4s}}
+/* Embedding status: plain-language label, details on hover */
+.embed-status{cursor:help;text-decoration:underline dotted color-mix(in srgb,var(--muted) 60%,transparent);text-underline-offset:3px}
+.embed-status.embed-verified{color:color-mix(in srgb,#5fbf8f 80%,var(--text))}
+
+.locale-toggle{position:relative;display:flex;gap:10px;align-items:flex-start;margin:12px 0;cursor:pointer}.locale-toggle input{position:absolute;opacity:0;width:0;height:0}.locale-toggle .review-switch{flex:none;margin-top:2px}.locale-toggle input:checked+.review-switch{background:var(--accent)}.locale-toggle input:checked+.review-switch::after{transform:translateX(13px)}.locale-toggle span>small{display:block;margin-top:2px}

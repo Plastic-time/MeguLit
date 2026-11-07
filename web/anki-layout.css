@@ -1,0 +1,32 @@
+/* Keep review actions in view; only exceptionally long notes scroll inside the card. */
+.main.review-page{display:flex;flex-direction:column;overflow:hidden}
+.review-page>.page-header{flex:none;margin-bottom:12px}.review-page>.tabs{flex:none;margin-bottom:12px}
+.review-page #learning-content,.review-page #learning-content>div,.review-page #review-content{display:flex;flex-direction:column;flex:1;min-height:0}
+.review-page .review-sources{flex:none;margin-bottom:12px}
+.review-page .anki-review-panel{display:flex;flex-direction:column;flex:1;min-height:0;margin:0;padding:14px 18px}
+.anki-review-panel>.record-meta{flex:none;min-height:34px;align-items:center;margin-bottom:8px}
+.anki-review-panel>.record-meta>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.anki-toolbar{display:flex;align-items:center;gap:14px;flex:none}.anki-toolbar button{white-space:nowrap;font-size:11px}
+.anki-toolbar [aria-pressed=true]{color:var(--accent-light)}
+.anki-mixer{position:relative;color:var(--g-t2,var(--muted));font-size:11px}
+.anki-mixer summary{list-style:none;cursor:pointer;white-space:nowrap;padding:5px 8px;border-radius:5px}
+.anki-mixer summary::-webkit-details-marker{display:none}
+.anki-mixer summary:hover,.anki-mixer[open] summary{background:var(--surface-hover);color:var(--g-t1,var(--text))}
+.anki-mixer-controls{position:absolute;z-index:9;top:calc(100% + 7px);right:0;width:270px;padding:12px;border:1px solid var(--g-rule-strong,var(--line));border-radius:9px;background:var(--g-raise,var(--surface));box-shadow:0 12px 30px #0005}
+.anki-mixer-controls label{display:grid;grid-template-columns:6.5em minmax(0,1fr) 3em;align-items:center;gap:8px;padding:5px 0}
+.anki-mixer-controls input{width:100%;min-width:0;accent-color:var(--g-gold,var(--accent))}
+.anki-mixer-controls output{text-align:right;font-variant-numeric:tabular-nums}
+.anki-mixer-controls small{display:block;margin-top:6px}
+.review-page [data-card]{flex:1;min-height:0;overflow:hidden;border-radius:12px;background:var(--surface)}
+.review-page .anki-card-frame{display:block;width:100%;height:100%;min-height:0;max-height:none;margin:0;border:0;border-radius:12px}
+.review-page .anki-review-panel>.review-controls{flex:none;margin-top:12px;gap:10px;flex-wrap:nowrap}
+.review-page .anki-rating{min-height:54px;min-width:76px;padding:8px 18px;justify-content:center}
+.review-page #review-content>.review-card{flex:1;min-height:0;overflow:auto;margin:0;align-content:center;padding:24px}
+.review-page #review-content>.loading-screen{height:auto;flex:1;min-height:0}
+@media(max-height:680px){.review-page>.page-header{margin-bottom:8px}.review-page>.page-header h1{font-size:23px}.review-page .tabs{margin-bottom:8px}.review-page .tab{padding:7px 12px}.review-page .anki-review-panel{padding:10px 12px}.review-page .anki-review-panel>.review-controls{margin-top:8px}.review-page .anki-rating{min-height:48px}}
+@media(max-width:760px){.anki-toolbar{gap:8px}.anki-toolbar button{font-size:10px}.review-page .anki-rating{min-width:62px;padding:8px 12px}.review-page .anki-review-panel{padding-inline:10px}}
+/* E215.7: study tools, daily limits form and the settings tools row. */
+.review-card .anki-tools{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+.anki-limits label{display:inline-flex;gap:8px;align-items:center}
+.anki-limits input[type=number]{width:96px;text-align:center;border-radius:10px}
+.settings-row.anki-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}

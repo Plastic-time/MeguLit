@@ -1,0 +1,26 @@
+html{color-scheme:dark;background:#24272e}html,body{margin:0!important;width:100%!important;height:100%!important;overflow:hidden!important}
+#card-viewport{position:fixed!important;inset:0!important;overflow:auto!important;padding:12px!important;box-sizing:border-box!important}
+#card-stage{position:relative!important;margin:0 auto!important;overflow:hidden!important;box-sizing:border-box!important}
+#card-content{position:absolute!important;top:0!important;left:0!important;transform-origin:top left!important;box-sizing:border-box!important;margin:0!important;padding:12px!important;min-height:0!important;color:#eee;background:transparent;font:20px/1.6 "Yu Gothic UI","Microsoft YaHei UI",sans-serif;overflow-wrap:anywhere}
+#card-content img,#card-content video{max-width:100%!important;max-height:min(32vh,240px)!important;width:auto!important;height:auto!important;object-fit:contain}
+#card-content audio{max-width:100%}#card-content a{color:#ef9cb1}
+#card-content [data-anki-media]{display:inline-flex!important;align-items:center;vertical-align:middle;gap:6px}
+#card-content .tome-anki-play{display:inline-flex!important;align-items:center;justify-content:center;width:32px;height:32px;padding:5px;border:1px solid #747b8955;border-radius:50%;color:#e5b3c0;background:#ffffff0c;cursor:pointer;vertical-align:middle;flex:none}
+#card-content .tome-anki-play:hover,#card-content .tome-anki-play[aria-pressed=true]{background:#ad153940;color:#fff;border-color:#e88b9e}
+#card-content .tome-anki-play:focus-visible{outline:2px solid #e88b9e;outline-offset:2px}
+#card-content [data-anki-media] audio[hidden]{display:none!important}
+/* Eggroll templates reserve empty image/sentence slots and rely on note JS to move audio.
+   Keep their text, ruby and illustrations, but remove unused reserved space in this host. */
+#card-content.compact-eggroll .CardSide{max-width:100%!important;margin:0!important;padding:14px 18px!important;box-sizing:border-box!important}
+#card-content.compact-eggroll .Question{min-height:68px!important;padding:8px 0!important}
+#card-content.compact-eggroll .SentenceList{min-height:0!important;padding-block:10px!important;margin-block:4px!important}
+#card-content.compact-eggroll [data-tome-duplicate]{display:none!important}
+#media-error{position:fixed;bottom:8px;left:8px;right:8px;padding:8px 12px;border-radius:8px;background:#4b2230;color:#ffe2ea;font:13px/1.5 sans-serif;pointer-events:none}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#ffffff30;border-radius:8px}
+
+/* MeguLit notes no longer display the redundant standalone kana reading. */
+#card-content .tm-reading{display:none!important}
+@media(min-width:1000px) and (min-height:620px){
+ #card-content .tm-card{max-width:960px!important;margin:8px auto!important}
+ #card-content .tm-shot img{max-height:min(52vh,520px)!important}
+}
