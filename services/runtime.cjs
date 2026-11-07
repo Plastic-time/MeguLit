@@ -5,6 +5,8 @@ const {readJSON}=require('./store.cjs');
 class Runtime {
  constructor(root,emit=()=>{}){this.root=root;this.folder=path.join(root,'data','config');this.emit=emit;this.stopped=false;}
  config(){return require('../core/v4-config.cjs').cleanV4(readJSON(path.join(this.folder,'v4-preferences.json')));}
+ // Bind the window of a game MeguLit just launched; retried a few times while the reader/bridge finishes starting.
+ bindLaunched(pid){if(!Number.isInteger(Number(pid))||Number(pid)<=0)return;let tries=0;const go=()=>{const g=this.reader?.gal;if(g){g.send({type:'bindProcess',pid:String(pid)});if(++tries<4)setTimeout(go,1500);}else if(++tries<20)setTimeout(go,500);};setTimeout(go,300);}
  prepareGame(executable,{enter=true}={}){this.pendingGameEnter=enter;this.pendingGame=path.basename(executable,path.extname(executable));this.pendingExecutable=executable;this.reader?.selectGame(this.pendingGame,enter,executable);}
  // Point the hook at the Japanese original index for this executable, or clear it.
  learning(){return this.localLearning??=new(require('../core/learning-native.cjs').LocalLearning)(this.root,message=>this.emit('reader-event',message));}
@@ -33,7 +35,7 @@ class Runtime {
  async call(request){
   if(this.stopped)throw Error('RUNTIME_STOPPED');const config=this.config();
   switch(request.action){
-   case 'library_scan':{this.libraryScans??=new(require('./library-scan.cjs').LibraryScans)(async options=>{const library=this.library();library.state=library.read();await library.scan(progress=>this.emit('library-progress',progress),options);const result=require('./library.cjs').reconcile(this.root,library.load().games,{restoreRemoved:!options.incremental});const db=require('./store.cjs').openStore(this.root);try{this.metadata().enqueue(db.prepare('SELECT id FROM games WHERE removed_at IS NULL').all().map(g=>g.id));}finally{db.close();}return {...result,games:library.load().games};});return this.libraryScans.run({startup:request.startup===true});}
+   case 'library_scan':{this.libraryScans??=new(require('./library-scan.cjs').LibraryScans)(async options=>{const library=this.library();library.state=library.read();await library.scan(progress=>this.emit('library-progress',progress),options);const result=require('./library.cjs').reconcile(this.root,library.load().games,{restoreRemoved:!options.incremental});const db=require('./store.cjs').openStore(this.root);try{this.metadata().enqueue(db.prepare('SELECT id FROM games WHERE removed_at IS NULL').all().map(g=>g.id),options?.incremental!==true);}finally{db.close();}return {...result,games:library.load().games};});return this.libraryScans.run({startup:request.startup===true});}
    case 'library_find_steam':return this.library().findSteam();
    case 'reader_status':return this.readerStatus();
    case 'reader_health':{const phase=String(request.phase||'').slice(0,100),error=String(request.error||'').slice(0,3000);this.readerReady=phase==='ready'&&!error;this.readerPhase=phase;this.readerError=error;if(error)await this.reader?.stop();this.emit('reader-health',this.readerStatus());require('node:fs').appendFileSync(path.join(this.root,'logs','reader-startup.log'),new Date().toISOString()+' '+phase+' '+error+'\n');return {saved:true};}

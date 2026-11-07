@@ -56,9 +56,9 @@ async function launch(db,id,runtime=null,windowsLaunch=false) {
   if(focused==='focused'||focused==='running') {
     // An earlier instance that never showed (or lost) its window blocks single-instance games: say so (E215.2, user:
     // サノバウィッチ 'would not start' while a hidden copy from a Japanese-locale launch kept running).
-    try{const state=await ready();trace('existing-window-ready',state);}catch(error){trace('existing-window-not-ready',{error:error.message});throw error.message==='GAME_WINDOW_NOT_READY'?Object.assign(Error('GAME_RUNNING_HIDDEN'),{detail:path.basename(game.executable)}):error;}
+    let readyState=null;try{const state=await ready();readyState=state;trace('existing-window-ready',state);}catch(error){trace('existing-window-not-ready',{error:error.message});throw error.message==='GAME_WINDOW_NOT_READY'?Object.assign(Error('GAME_RUNNING_HIDDEN'),{detail:path.basename(game.executable)}):error;}
     db.prepare('UPDATE games SET last_launched_at=? WHERE id=?').run(Math.floor(Date.now()/1000),id);
-    runtime?.prepareGame(game.executable);return {action:focused,connected:false};
+    runtime?.prepareGame(game.executable);runtime?.bindLaunched?.(readyState?.pid);return {action:focused,connected:false};
   }
   trace('launch-request',{windowsLaunch});
   let state;
@@ -81,7 +81,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false) {
   }
   trace('new-window-ready',state);
   db.prepare('UPDATE games SET last_launched_at=? WHERE id=?').run(Math.floor(Date.now()/1000),id);
-  runtime?.prepareGame(game.executable);return {action:'launched',connected:false};
+  runtime?.prepareGame(game.executable);runtime?.bindLaunched?.(state?.pid);return {action:'launched',connected:false};
   }catch(error){trace('launch-failed',{phase:stage,error:error.message,detail:error.detail||error.code});throw error;}
 }
 function deleteWord(db,id) {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -349,6 +349,13 @@ public class GalWindowBridge {
         else if(type=="toggleMode")PageToggleMode();
         else if(type=="enterGame")EnterGamePending=true;
         else if(type=="expectExecutable"){WantedExecutable=Str(d,"path");NextAutoBind=DateTime.MinValue;}
+        // MeguLit launched this process and saw its window come up: bind to its largest visible window right away.
+        // If none is usable yet, remember the process (name + exact image) so the auto-bind loop picks it up.
+        else if(type=="bindProcess"){uint pid=(uint)Int64.Parse(Str(d,"pid"));IntPtr best=IntPtr.Zero;long bestArea=0;
+            EnumWindows(delegate(IntPtr candidate,IntPtr unused){uint owner;GetWindowThreadProcessId(candidate,out owner);Rect r;
+                if(owner==pid&&candidate!=Overlay&&IsWindowVisible(candidate)&&!IsIconic(candidate)&&GetClientRect(candidate,out r)){long area=(long)r.Right*r.Bottom;if(area>bestArea){bestArea=area;best=candidate;}}return true;},IntPtr.Zero);
+            string name=ProcessName(pid),image=ProcessImage(pid);if(name!="")WantedProcess=name;if(image!="")WantedExecutable=image;NextAutoBind=DateTime.MinValue;
+            if(best!=IntPtr.Zero&&bestArea>=320L*240&&Target!=best){try{Bind(best);}catch{}}}
         else if(type=="bind"){WantedExecutable="";FindOverlay();if(Overlay!=IntPtr.Zero&&IsIconic(Overlay))ShowWindow(Overlay,9);if(d.TryGetValue("settings",out value)&&value is Dictionary<string,object>)Settings((Dictionary<string,object>)value);bool keepMenu=MenuOpen;InterfaceMode(true,false);if(keepMenu){MenuOpen=true;MenuFocusPending=true;}Bind(new IntPtr(Int64.Parse(Str(d,"hwnd"))),true);}
         else if(type=="configure"){if(!ModeConfigured&&d.ContainsKey("interfaceMode")){ModeConfigured=true;InterfaceMode(Str(d,"interfaceMode")=="translation",false);}Settings(d);WantedProcess=Bool(d,"bindEnabled")?Str(d,"gameProcess"):"";if(!Bool(d,"bindEnabled")&&(Target!=IntPtr.Zero||TrackedGame!=null)){ForgetGame();Target=IntPtr.Zero;Restore();Emit(new{type="bound",bound=false,message="已解除窗口绑定"});}}
         else if(type=="unbind"){WantedExecutable="";WantedProcess="";ForgetGame();Target=IntPtr.Zero;Restore();Emit(new{type="bound",bound=false,message="已解除窗口绑定"});}
