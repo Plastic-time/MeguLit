@@ -58,6 +58,7 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 | 本地模型与 TTS | 实验中 | 需要本地显卡环境，测得还不够 |
 | 开场字幕、章节标题 | 计划中 | |
 | 更多学习语言 | 计划中 | |
+| 联网排行榜 | 计划中 | 和其他玩家比一比阅读量、生词数 |
 
 ### 最近在忙什么（2026 年 10–11 月）
 
@@ -89,6 +90,7 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 - [ ] 保住游戏原生 LOG 里的原文
 - [ ] 开场、章节标题、独立字幕
 - [ ] 可复现的公开构建和发布包
+- [ ] 联网排行榜：阅读量、生词数、连续打卡天数
 - [ ] 更多学习语言，以及轻小说和 Galgame 以外的游戏
 
 ### 安装
@@ -164,6 +166,7 @@ The UI comes in Simplified Chinese, English and Japanese. It's mainly for Chines
 | Local models & TTS | Experimental | Needs a local GPU setup, lightly tested |
 | Opening credits, chapter titles | Planned | |
 | More learner languages | Planned | |
+| Online leaderboards | Planned | Compare reading time and word counts with other players |
 
 ### The hard parts
 
@@ -187,6 +190,7 @@ The features aren't the hard part. Engines are:
 - [ ] Keep the original text in the game's own backlog
 - [ ] Openings, chapter titles, standalone subtitles
 - [ ] Reproducible public builds and release packages
+- [ ] Online leaderboards: reading time, words learned, streaks
 - [ ] More learner languages, plus light novels and games beyond visual novels
 
 ### Install
@@ -236,25 +240,26 @@ UI は簡体字中国語・英語・日本語に対応。中国語・英語話�
 
 ### いまできること
 
-> 「使える」は実際にゲームで使っているもの、「実験的」は一部のエンジンでしか動かないか、自動テストしか通っていないものです
+> ✅ 使える：実際にゲームで使っているもの　🧪 実験的：一部のエンジンでしか動かないか、自動テストしか通っていないもの　📅 予定：未実装
 
 | 機能 | 状態 | 備考 |
 |---|---|---|
-| テキスト取得 | 使える | LunaHook ベース。ストリームは自動選択、手動切り替えも可 |
-| 読書レイヤー | 使える | Alt+T でメニュー。作品ごとにスタイル保存、画面に合わせて調整 |
-| タイプライター表示 | 使える | |
-| ふりがな | 使える | ゲーム内ルビ優先、なければ辞書と文脈から |
-| クリック辞書 | 使える | クリックで単語、ドラッグでフレーズ。オフライン辞書。クリックしても物語は進まない |
-| リアルタイム翻訳 | 使える | DeepL、Bing、Google、Gemini、DeepSeek、Sakura、Ollama、OpenAI 互換 API など |
-| AI 解説 | 使える | 単語や一文の文法・文脈を説明 |
-| 単語帳 | 使える | 単語、例文、ゴミ箱、読書統計 |
-| Anki | 使える | AnkiConnect 経由。スクショと原作ボイス付き、ボイスのない地の文はローカル TTS |
-| ライブラリ・ランチャー | 使える | フォルダ・Steam スキャン、日本語版 EXE 判別、作品ごとの Locale Emulator、シリーズまとめ |
-| バックアップ | 使える | 復元に失敗したら自動ロールバック |
-| 埋め込み置換 | 実験的 | ゲーム内の文字を直接置き換える。エンジンによってはエラーやクラッシュあり |
-| ローカルモデル・TTS | 実験的 | ローカル GPU 環境が必要 |
-| オープニング・章タイトル | 予定 | |
-| 学習言語の追加 | 予定 | |
+| テキスト取得 | ✅ | LunaHook ベース。ストリームは自動選択、手動切り替えも可 |
+| 読書レイヤー | ✅ | Alt+T でメニュー。作品ごとにスタイル保存、画面に合わせて調整 |
+| タイプライター表示 | ✅ | |
+| ふりがな | ✅ | ゲーム内ルビ優先、なければ辞書と文脈から |
+| クリック辞書 | ✅ | クリックで単語、ドラッグでフレーズ。オフライン辞書。クリックしても物語は進まない |
+| リアルタイム翻訳 | ✅ | DeepL、Bing、Google、Gemini、DeepSeek、Sakura、Ollama、OpenAI 互換 API など |
+| AI 解説 | ✅ | 単語や一文の文法・文脈を説明 |
+| 単語帳 | ✅ | 単語、例文、ゴミ箱、読書統計 |
+| Anki | ✅ | AnkiConnect 経由。スクショと原作ボイス付き、ボイスのない地の文はローカル TTS |
+| ライブラリ・ランチャー | ✅ | フォルダ・Steam スキャン、日本語版 EXE 判別、作品ごとの Locale Emulator、シリーズまとめ |
+| バックアップ | ✅ | 復元に失敗したら自動ロールバック |
+| 埋め込み置換 | 🧪 | ゲーム内の文字を直接置き換える。エンジンによってはエラーやクラッシュあり |
+| ローカルモデル・TTS | 🧪 | ローカル GPU 環境が必要 |
+| オープニング・章タイトル | 📅 | |
+| 学習言語の追加 | 📅 | |
+| オンラインランキング | 📅 | 読書量や単語数をほかのプレイヤーと比べられるランキング |
 
 ### 難しいところ
 
@@ -316,15 +321,12 @@ GPL-3.0-or-later。[LICENSE](LICENSE) を参照してください
 
 <div align="center">
 
-The battle against the Bug Demon King's army goes on, but my adventuring funds are running dangerously low... (›´ω`‹ )
+MeguLit is free, open source, and built in my spare time.<br>
+If it helped you read a few more lines in Japanese, a small sponsorship keeps the updates coming.
 
-If MeguLit has made your Japanese learning journey a little easier, consider tossing a few Eris into the adventurer's coin pouch!
+<sub>Every Eris counts ♡</sub>
 
-Your support helps keep MeguLit free, open-source, and growing, one update at a time.
-
-**Every little bit helps this adventure go a little further ヾ(≧▽≦*)o**
-
-[![♡ Sponsor on GitHub](https://img.shields.io/badge/%E2%99%A1%20Sponsor%20on%20GitHub-c8323c?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/ilynthn)
+[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor%20on%20GitHub-c8323c?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/ilynthn)
 
 </div>
 

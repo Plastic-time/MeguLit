@@ -23,7 +23,10 @@ class RuntimePacks{
  async install(id,pack,job){
   const part=path.join(this.root,'runtime-'+id+'.part'),stage=path.join(this.root,'runtime-'+id+'.unpack');
   let lastError=null;
-  for(const url of pack.urls||[]){
+  // Mainland China (by time zone / locale, no IP lookup): try GitHub mirrors first. SHA-256 still has to match.
+  const direct=pack.urls||[],mirrored=(this.manifest().mirrors||[]).flatMap(m=>direct.map(u=>m.replace('{url}',u)));
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'',china=['Asia/Shanghai','Asia/Chongqing','Asia/Harbin','Asia/Urumqi','PRC'].includes(tz);
+  for(const url of china?[...mirrored,...direct]:[...direct,...mirrored]){
    job.state='downloading';job.stage='download';job.received=0;job.controller=new AbortController();
    try{
     const digest=await fetchTo(url,part,job);

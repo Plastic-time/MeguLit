@@ -38,7 +38,7 @@ $C = @{
 }
 $ui = 'Microsoft YaHei UI'
 function Img($name) { $p = Join-Path $Root "setup\$name"; if (Test-Path $p) { [Drawing.Image]::FromFile($p) } }
-$logo = Img 'logo.png'; $megumin = Img 'megumin.png'
+$logo = Img 'logo.png'
 
 # Double-buffered panel so the hand-drawn line art does not flicker.
 Add-Type -ReferencedAssemblies System.Windows.Forms,System.Drawing -TypeDefinition @'
@@ -66,7 +66,7 @@ function Draw-Book($g, $x, $y, $color) {
 }
 
 $form = New-Object Windows.Forms.Form
-$form.Text = 'MeguLit'; $form.ClientSize = New-Object Drawing.Size(720,560); $form.StartPosition = 'CenterScreen'
+$form.Text = 'MeguLit'; $form.ClientSize = New-Object Drawing.Size(720,590); $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.BackColor = $C.bg; $form.ForeColor = $C.cream
 $exe = Join-Path $Root 'MeguLit.exe'; if (Test-Path $exe) { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon($exe) }
 
@@ -82,22 +82,22 @@ $stage = New-Object GrimoirePanel; $stage.Dock = 'Fill'; $stage.BackColor = $C.b
 $stage.add_Paint({ param($s,$e)
   $g = $e.Graphics; $g.SmoothingMode = 'AntiAlias'
   Draw-Circle $g 640 70 190 $C.red 46
-  Draw-Circle $g 40 530 150 $C.gold 30
-  if ($logo) { $g.DrawImage($logo, 30, 18, 212, 81) }
-  if ($megumin) { $g.InterpolationMode = 'HighQualityBicubic'; $g.DrawImage($megumin, 582, 10, 112, 112) }
+  Draw-Circle $g 40 560 150 $C.gold 30
+  if ($logo) { $g.InterpolationMode = 'HighQualityBicubic'; $g.DrawImage($logo, 30, 18, 212, 81) }
   $p = Pen $C.line 255 1; $g.DrawLine($p, 32, 122, 688, 122); $p.Dispose()
 })
 $form.Controls.Add($stage)
 
 # ---- choice page ----
-$choice = New-Object Windows.Forms.Panel; $choice.Location = New-Object Drawing.Point(0,124); $choice.Size = New-Object Drawing.Size(720,436); $choice.BackColor = [Drawing.Color]::Transparent
+$choice = New-Object Windows.Forms.Panel; $choice.Location = New-Object Drawing.Point(0,124); $choice.Size = New-Object Drawing.Size(720,466); $choice.BackColor = [Drawing.Color]::Transparent
 $stage.Controls.Add($choice)
-[void](Label '翻开魔导书之前，先准备一下运行组件' 32 12 560 30 14 $true $C.cream $choice)
-[void](Label 'MeguLit 需要的运行环境都会装进它自己的文件夹，电脑上不用预先安装 Node.js、Python 或其他软件' 32 44 656 20 9 $false $C.muted $choice)
+[void](Label '第一次使用 MeguLit' 32 12 560 30 14 $true $C.cream $choice)
+[void](Label '先下载运行组件。它们都会装进 MeguLit 自己的文件夹，电脑上不用预先安装 Node.js、Python 或其他软件' 32 44 656 20 9 $false $C.muted $choice)
+[void](Label '组件包放在 MeguLit 的 GitHub Releases，里面是 Node.js、Python、LunaHook、AivisSpeech 等项目官方发布的原版文件，下载后逐个校验 SHA-256，被改动过的文件不会安装' 32 66 656 34 8 $false $C.muted $choice)
 $free = (Get-Item $Root).PSDrive.Free
 
 function Option($x, $title, $sub, $items, $note, $ids, $primary) {
-  $p = New-Object GrimoirePanel; $p.Location = New-Object Drawing.Point($x,76); $p.Size = New-Object Drawing.Size(316,282); $p.BackColor = $C.card
+  $p = New-Object GrimoirePanel; $p.Location = New-Object Drawing.Point($x,106); $p.Size = New-Object Drawing.Size(316,282); $p.BackColor = $C.card
   $down = Sum $ids 'size'; $disk = (Sum $ids 'unpacked') + $appSize
   $accent = if ($primary) { $C.red } else { $C.gold }
   $p.add_Paint({ param($s,$e)
@@ -126,20 +126,20 @@ Option 32 '精简版' 'LITE · 先用起来' $baseItems '注音分词词典第�
 Option 372 '完整版' 'FULL · 一次装齐' @('精简版的全部组件','SudachiDict / UniDic 注音分词词典','AivisSpeech 语音引擎（朗读、原声补全）') '本地翻译模型体积很大，不包含在内，需要时在设置里按需下载' $full $false
 
 $runtimeDir = Join-Path $Root 'runtime'
-[void](Label ('直接装进这个 MeguLit 文件夹，不会写到别处：' + $runtimeDir) 32 370 656 20 8 $false $C.muted $choice)
-[void](Label ('所在磁盘可用 ' + (MB $free) + '   ·   以后移动 MeguLit 文件夹，组件会跟着一起走') 32 390 656 20 8 $false $C.muted $choice)
+[void](Label ('直接装进这个 MeguLit 文件夹，不会写到别处：' + $runtimeDir) 32 400 656 20 8 $false $C.muted $choice)
+[void](Label ('所在磁盘可用 ' + (MB $free) + '   ·   以后移动 MeguLit 文件夹，组件会跟着一起走') 32 420 656 20 8 $false $C.muted $choice)
 if (-not $webview) {
   $link = New-Object Windows.Forms.LinkLabel; $link.Text = '这台电脑缺少 Microsoft Edge WebView2 运行时，MeguLit 的界面需要它：点这里去微软官网下载安装'
-  $link.Location = New-Object Drawing.Point(32,410); $link.Size = New-Object Drawing.Size(656,20); $link.Font = New-Object Drawing.Font($ui, 8, [Drawing.FontStyle]::Bold)
+  $link.Location = New-Object Drawing.Point(32,440); $link.Size = New-Object Drawing.Size(656,20); $link.Font = New-Object Drawing.Font($ui, 8, [Drawing.FontStyle]::Bold)
   $link.LinkColor = $C.red; $link.ActiveLinkColor = $C.gold; $link.BackColor = [Drawing.Color]::Transparent
   $link.add_LinkClicked({ Start-Process 'https://developer.microsoft.com/microsoft-edge/webview2/' })
   $choice.Controls.Add($link)
 }
 
 # ---- progress page ----
-$progress = New-Object Windows.Forms.Panel; $progress.Location = New-Object Drawing.Point(0,124); $progress.Size = New-Object Drawing.Size(720,436); $progress.BackColor = [Drawing.Color]::Transparent; $progress.Visible = $false
+$progress = New-Object Windows.Forms.Panel; $progress.Location = New-Object Drawing.Point(0,124); $progress.Size = New-Object Drawing.Size(720,466); $progress.BackColor = [Drawing.Color]::Transparent; $progress.Visible = $false
 $stage.Controls.Add($progress)
-$title = Label '正在誊写魔导书…' 32 40 640 32 14 $true $C.cream $progress
+$title = Label '正在下载运行组件…' 32 40 640 32 14 $true $C.cream $progress
 $status = Label '' 32 84 656 44 9 $false $C.muted $progress
 $bar = New-Object Windows.Forms.ProgressBar; $bar.Location = New-Object Drawing.Point(32,136); $bar.Size = New-Object Drawing.Size(656,12); $bar.Maximum = 1000
 $progress.Controls.Add($bar)
@@ -153,6 +153,38 @@ $script:queue = @(); $script:index = 0; $script:urlIndex = 0; $script:done = $fa
 $names = @{ base = '基础组件'; reading = '注音分词词典'; voice = '语音引擎' }
 $markers = @{ base = 'runtime\node.exe'; reading = 'runtime\reading\sudachidict_full\resources\system.dic'; voice = 'runtime\aivis\run.exe' }
 
+# ---- download source ----
+# Users in mainland China often get very slow GitHub downloads. We do not look up the user's IP
+# (that would send it to a third-party geo service); the system time zone / UI language is enough
+# to decide whether to probe mirrors. When it looks like China, every source gets a short ranged
+# download and the fastest wins. Mirrors only relay the same GitHub file; SHA-256 still has to match.
+$inChina = ([TimeZoneInfo]::Local.Id -eq 'China Standard Time') -or ((Get-Culture).Name -eq 'zh-CN')
+function Source-Name($url) { ([Uri]$url).Host }
+function Candidates($id) {
+  $direct = @($packs.$id.urls)
+  $mirrored = foreach ($m in @($manifest.mirrors)) { foreach ($u in $direct) { $m.Replace('{url}', $u) } }
+  if ($inChina) { @($mirrored) + $direct } else { $direct + @($mirrored) }
+}
+function Probe($url) {
+  try {
+    $req = [Net.HttpWebRequest]::Create($url); $req.AddRange(0, 1048575); $req.Timeout = 6000; $req.ReadWriteTimeout = 6000; $req.UserAgent = 'MeguLit-setup'
+    $sw = [Diagnostics.Stopwatch]::StartNew(); $res = $req.GetResponse(); $stream = $res.GetResponseStream()
+    $buf = New-Object byte[] 65536; $n = 0
+    while ($sw.ElapsedMilliseconds -lt 6000) { $r = $stream.Read($buf, 0, $buf.Length); if ($r -le 0) { break }; $n += $r }
+    $res.Close(); if ($n -lt 65536) { return 0 }
+    return $n / [math]::Max(0.05, $sw.Elapsed.TotalSeconds)
+  } catch { return 0 }
+}
+function Order-Sources($id) {
+  $list = @(Candidates $id)
+  if (-not $inChina -or $list.Count -lt 2) { return $list }
+  $status.Text = '正在为你挑选最快的下载源（GitHub / 国内镜像）…'; $form.Refresh()
+  $scored = foreach ($u in $list) { [Windows.Forms.Application]::DoEvents(); [pscustomobject]@{ url = $u; speed = (Probe $u) } }
+  $ok = @($scored | Where-Object { $_.speed -gt 0 } | Sort-Object speed -Descending | ForEach-Object { $_.url })
+  $bad = @($scored | Where-Object { $_.speed -le 0 } | ForEach-Object { $_.url })
+  return $ok + $bad
+}
+
 function Start-Install($ids) {
   $script:queue = @($ids | Where-Object { -not (Test-Path (Join-Path $Root $markers[$_])) })
   $script:index = 0; $choice.Visible = $false; $progress.Visible = $true; Next-Pack
@@ -161,37 +193,41 @@ function Current { $script:queue[$script:index] }
 function Part { Join-Path $Root ('runtime-' + (Current) + '.part') }
 function Next-Pack {
   if ($script:index -ge $script:queue.Count) { $script:done = $true; $form.Close(); return }
-  $script:urlIndex = 0; Start-Download
+  $script:urlIndex = 0; $script:sources = @(Order-Sources (Current)); Start-Download
 }
 function Start-Download {
   $script:mode = 'download'; $button.Text = '取消 Cancel'; $status.ForeColor = $C.muted; $bar.Style = 'Continuous'; $bar.Value = 0
-  $title.Text = '正在誊写魔导书…'
-  $status.Text = ('[{0}/{1}] 正在下载{2}…' -f ($script:index+1), $script:queue.Count, $names[(Current)])
+  $title.Text = '正在下载运行组件…'
+  $status.Text = ('[{0}/{1}] 正在下载{2}…  来源 {3}' -f ($script:index+1), $script:queue.Count, $names[(Current)], (Source-Name $script:sources[$script:urlIndex]))
   if (Test-Path (Part)) { Remove-Item (Part) -Force }
-  $client.DownloadFileAsync([Uri]@($packs.(Current).urls)[$script:urlIndex], (Part))
+  $client.DownloadFileAsync([Uri]$script:sources[$script:urlIndex], (Part))
 }
 function Fail([string]$message) {
   $script:mode = 'failed'; $status.ForeColor = $C.red; $bar.Style = 'Continuous'; $bar.Value = 0
-  $title.Text = '咏唱被打断了'
+  $title.Text = '下载中断了'
   $status.Text = $message + "`n检查网络后点「重试」 / Check your connection and retry"; $button.Text = '重试 Retry'
 }
 
 $client.add_DownloadProgressChanged({ param($s,$e)
   $total = [math]::Max($e.TotalBytesToReceive, $packs.(Current).size)
   $bar.Value = [int][math]::Min(1000, 1000 * $e.BytesReceived / $total)
-  $status.Text = ('[{0}/{1}] 正在下载{2}  {3:N0} / {4:N0} MB' -f ($script:index+1), $script:queue.Count, $names[(Current)], ($e.BytesReceived/1MB), ($total/1MB))
+  $status.Text = ('[{0}/{1}] 正在下载{2}  {3:N0} / {4:N0} MB  ·  来源 {5}' -f ($script:index+1), $script:queue.Count, $names[(Current)], ($e.BytesReceived/1MB), ($total/1MB), (Source-Name $script:sources[$script:urlIndex]))
 })
 $client.add_DownloadFileCompleted({ param($s,$e)
   if ($e.Cancelled) { return }
   if ($e.Error) {
-    if ($script:urlIndex + 1 -lt @($packs.(Current).urls).Count) { $script:urlIndex++; Start-Download; return }
+    if ($script:urlIndex + 1 -lt $script:sources.Count) { $script:urlIndex++; Start-Download; return }
     $msg = if ($e.Error.InnerException) { $e.Error.InnerException.Message } else { $e.Error.Message }
     Fail ('下载失败：' + $msg); return
   }
   try {
     $part = Part; $unpack = Join-Path $Root ('runtime-' + (Current) + '.unpack')
     $status.Text = '正在校验… / Verifying'; $form.Refresh()
-    if ((Get-FileHash -Algorithm SHA256 $part).Hash -ne $packs.(Current).sha256.ToUpper()) { Remove-Item $part -Force; throw '文件校验失败，可能下载不完整' }
+    if ((Get-FileHash -Algorithm SHA256 $part).Hash -ne $packs.(Current).sha256.ToUpper()) {
+      Remove-Item $part -Force
+      if ($script:urlIndex + 1 -lt $script:sources.Count) { $script:urlIndex++; Start-Download; return }
+      throw '文件校验失败，可能下载不完整'
+    }
     $status.Text = ('正在解压{0}… / Unpacking' -f $names[(Current)]); $bar.Style = 'Marquee'; $form.Refresh()
     if (Test-Path $unpack) { Remove-Item $unpack -Recurse -Force }
     New-Item -ItemType Directory $unpack | Out-Null
@@ -205,7 +241,7 @@ $client.add_DownloadFileCompleted({ param($s,$e)
 })
 
 $button.add_Click({
-  if ($script:mode -eq 'failed') { Start-Download }
+  if ($script:mode -eq 'failed') { $script:urlIndex = 0; Start-Download }
   else { $client.CancelAsync(); $form.Close() }
 })
 $form.add_FormClosing({ if (-not $script:done) { $client.CancelAsync() } })
