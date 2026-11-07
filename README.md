@@ -112,19 +112,6 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 
 要准备 Rust（Tauri）、Node.js 和 .NET Framework 的 C# 编译器。完整步骤等构建流程能稳定复现了再补
 
-<details>
-<summary>开源前检查清单</summary>
-
-- [ ] 第三方依赖许可证：Rust crates（`desktop/Cargo.lock`）、Node.js 运行时、WebView2 Loader、pip 等，见 [THIRD-PARTY.md](THIRD-PARTY.md)
-- [ ] LunaHook 为 GPL：分发二进制时附上对应源码及修改，保留版权与许可声明
-- [ ] JMdict / 词典数据：保留 EDRDG 署名与 CC BY-SA 许可
-- [ ] 美术与字体：确认来源和再分发权限
-- [ ] 敏感信息：不提交日志、数据库、缓存、API 密钥、本地路径、个人游戏记录和回滚 EXE
-- [ ] 构建可复现：锁版本、记工具链、写清从干净环境构建的步骤
-- [ ] 不分发任何游戏文件
-
-</details>
-
 ### 致谢
 
 没有这些项目就没有 MeguLit：
