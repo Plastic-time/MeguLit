@@ -404,3 +404,6 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button) .primary-la
 
 /* E249.2: jacket and today column start at the top of their row and are moved down to the "last read" line by script */
 .g-hero .jacket,.g-hero .today{align-self:start!important;margin-bottom:0!important}
+/* Empty shelf (first launch): no jacket to size against, so keep the Today column at a natural height. */
+.g-hero.empty .today{height:auto!important;min-height:min(360px,48vh)!important;min-width:240px}
+.g-hero.empty .today .fig{min-height:72px}

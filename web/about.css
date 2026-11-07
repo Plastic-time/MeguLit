@@ -34,3 +34,15 @@
 .about-credits p{margin:0;color:#a8998f;line-height:1.8;font-size:13px}
 @media (max-width:760px){.about-grid,.about-pay{grid-template-columns:1fr}.about-intl{border-left:0;padding-left:0}}
 .about-support-strong{margin:10px 0 0;font-weight:700;color:#f3e9dc!important}
+/* First-run "add your game folders" dialog */
+.first-run{border:0;padding:0;background:transparent;color:#f3e9dc;max-width:min(520px,92vw)}
+.first-run::backdrop{background:rgba(12,9,10,.62);backdrop-filter:blur(6px)}
+.first-run-card{margin:0;padding:28px 28px 22px;border-radius:20px;background:#211a1b;border:1px solid rgba(217,165,74,.22);box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.first-run h2{margin:0;font-size:22px}
+.first-run-sub{margin:10px 0 18px;color:#cdbfb3;line-height:1.7;text-wrap:pretty}
+.first-run-list{margin:0 0 12px;padding:0;list-style:none;display:grid;gap:6px;max-height:150px;overflow:auto}
+.first-run-list li{padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.05);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.first-run-pick{width:100%;justify-content:center}
+.first-run-status{min-height:20px;margin:10px 0 0;color:#d9a54a;font-size:13px}
+.first-run-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+.first-run-hint{margin:14px 0 0;font-size:12px;color:#a8998f}

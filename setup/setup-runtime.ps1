@@ -141,11 +141,44 @@ $progress = New-Object Windows.Forms.Panel; $progress.Location = New-Object Draw
 $stage.Controls.Add($progress)
 $title = Label '正在下载运行组件…' 32 40 640 32 14 $true $C.cream $progress
 $status = Label '' 32 84 656 44 9 $false $C.muted $progress
-$bar = New-Object Windows.Forms.ProgressBar; $bar.Location = New-Object Drawing.Point(32,136); $bar.Size = New-Object Drawing.Size(656,12); $bar.Maximum = 1000
+# Hand-drawn progress bar: rounded dark track, crimson-to-gold fill, a soft shimmer while unpacking.
+$script:barValue = 0; $script:barBusy = $false; $script:barPhase = 0.0
+$bar = New-Object GrimoirePanel; $bar.Location = New-Object Drawing.Point(32,132); $bar.Size = New-Object Drawing.Size(656,14); $bar.BackColor = [Drawing.Color]::Transparent
+function Round-Rect($x, $y, $w, $h) {
+  $r = [math]::Min($h, $w); $gp = New-Object Drawing.Drawing2D.GraphicsPath
+  if ($w -le 0) { return $gp }
+  $gp.AddArc([float]$x, [float]$y, [float]$r, [float]$h, 90, 180); $gp.AddArc([float]($x + $w - $r), [float]$y, [float]$r, [float]$h, 270, 180); $gp.CloseFigure(); $gp
+}
+$bar.add_Paint({ param($s,$e)
+  $g = $e.Graphics; $g.SmoothingMode = 'AntiAlias'; $w = $bar.Width - 1; $h = $bar.Height - 1
+  $track = Round-Rect 0 0 $w $h
+  $tb = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(52,41,42)); $g.FillPath($tb, $track); $tb.Dispose()
+  if ($script:barBusy) {
+    $seg = [int]($w * 0.28); $x = [int](($w + $seg) * $script:barPhase) - $seg
+    $g.SetClip($track)
+    $rect = New-Object Drawing.Rectangle ($x, 0, [math]::Max(1,$seg), ($h + 1))
+    $lg = New-Object Drawing.Drawing2D.LinearGradientBrush $rect, ([Drawing.Color]::FromArgb(0,$C.red)), ([Drawing.Color]::FromArgb(0,$C.gold)), 0.0
+    $blend = New-Object Drawing.Drawing2D.ColorBlend 3
+    $blend.Colors = @([Drawing.Color]::FromArgb(0,$C.red), $C.red, [Drawing.Color]::FromArgb(0,$C.gold)); $blend.Positions = @(0.0, 0.55, 1.0); $lg.InterpolationColors = $blend
+    $g.FillRectangle($lg, $rect); $lg.Dispose(); $g.ResetClip()
+  } elseif ($script:barValue -gt 0) {
+    $fw = [math]::Max($h, [int]($w * $script:barValue / 1000))
+    $fill = Round-Rect 0 0 $fw $h
+    $lg = New-Object Drawing.Drawing2D.LinearGradientBrush (New-Object Drawing.Rectangle 0, 0, ($fw + 1), ($h + 1)), $C.red, $C.gold, 0.0
+    $g.FillPath($lg, $fill); $lg.Dispose()
+    $hl = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(60,255,255,255)); $g.FillRectangle($hl, [float]($h/2), 2, [float]([math]::Max(0,$fw - $h)), [float]([math]::Max(1,$h/4))); $hl.Dispose()
+  }
+  $edge = Pen $C.line 255 1; $g.DrawPath($edge, $track); $edge.Dispose()
+})
 $progress.Controls.Add($bar)
+$percent = Label '' 600 104 88 20 9 $true $C.gold $progress; $percent.TextAlign = 'MiddleRight'
+$shimmer = New-Object Windows.Forms.Timer; $shimmer.Interval = 30
+$shimmer.add_Tick({ $script:barPhase = ($script:barPhase + 0.012) % 1.0; $bar.Invalidate() })
+function Set-Bar([int]$value) { $script:barBusy = $false; $shimmer.Stop(); $script:barValue = [math]::Max(0, [math]::Min(1000, $value)); $percent.Text = if ($value -gt 0) { ('{0:N0}%' -f ($script:barValue / 10)) } else { '' }; $bar.Invalidate() }
+function Set-Busy { $script:barBusy = $true; $percent.Text = ''; $shimmer.Start(); $bar.Invalidate() }
 [void](Label ('安装位置：' + $runtimeDir) 32 160 656 20 8 $false $C.muted $progress)
 $button = New-Object Windows.Forms.Button; $button.Text = '取消 Cancel'; $button.FlatStyle = 'Flat'; $button.ForeColor = $C.cream
-$button.FlatAppearance.BorderColor = $C.red; $button.Location = New-Object Drawing.Point(568,200); $button.Size = New-Object Drawing.Size(120,34); $button.Cursor = 'Hand'
+$button.Font = New-Object Drawing.Font($ui, 9, [Drawing.FontStyle]::Bold); $button.FlatAppearance.BorderColor = $C.red; $button.Location = New-Object Drawing.Point(568,200); $button.Size = New-Object Drawing.Size(120,34); $button.Cursor = 'Hand'
 $progress.Controls.Add($button)
 
 $client = New-Object Net.WebClient; $client.Headers.Add('User-Agent','MeguLit-setup')
@@ -196,21 +229,21 @@ function Next-Pack {
   $script:urlIndex = 0; $script:sources = @(Order-Sources (Current)); Start-Download
 }
 function Start-Download {
-  $script:mode = 'download'; $button.Text = '取消 Cancel'; $status.ForeColor = $C.muted; $bar.Style = 'Continuous'; $bar.Value = 0
+  $script:mode = 'download'; $button.Text = '取消 Cancel'; $status.ForeColor = $C.muted; Set-Bar 0
   $title.Text = '正在下载运行组件…'
   $status.Text = ('[{0}/{1}] 正在下载{2}…  来源 {3}' -f ($script:index+1), $script:queue.Count, $names[(Current)], (Source-Name $script:sources[$script:urlIndex]))
   if (Test-Path (Part)) { Remove-Item (Part) -Force }
   $client.DownloadFileAsync([Uri]$script:sources[$script:urlIndex], (Part))
 }
 function Fail([string]$message) {
-  $script:mode = 'failed'; $status.ForeColor = $C.red; $bar.Style = 'Continuous'; $bar.Value = 0
+  $script:mode = 'failed'; $status.ForeColor = $C.red; Set-Bar 0
   $title.Text = '下载中断了'
   $status.Text = $message + "`n检查网络后点「重试」 / Check your connection and retry"; $button.Text = '重试 Retry'
 }
 
 $client.add_DownloadProgressChanged({ param($s,$e)
   $total = [math]::Max($e.TotalBytesToReceive, $packs.(Current).size)
-  $bar.Value = [int][math]::Min(1000, 1000 * $e.BytesReceived / $total)
+  Set-Bar ([int][math]::Min(1000, 1000 * $e.BytesReceived / $total))
   $status.Text = ('[{0}/{1}] 正在下载{2}  {3:N0} / {4:N0} MB  ·  来源 {5}' -f ($script:index+1), $script:queue.Count, $names[(Current)], ($e.BytesReceived/1MB), ($total/1MB), (Source-Name $script:sources[$script:urlIndex]))
 })
 $client.add_DownloadFileCompleted({ param($s,$e)
@@ -228,10 +261,11 @@ $client.add_DownloadFileCompleted({ param($s,$e)
       if ($script:urlIndex + 1 -lt $script:sources.Count) { $script:urlIndex++; Start-Download; return }
       throw '文件校验失败，可能下载不完整'
     }
-    $status.Text = ('正在解压{0}… / Unpacking' -f $names[(Current)]); $bar.Style = 'Marquee'; $form.Refresh()
+    $status.Text = ('正在解压{0}… / Unpacking' -f $names[(Current)]); Set-Busy; $form.Refresh()
     if (Test-Path $unpack) { Remove-Item $unpack -Recurse -Force }
     New-Item -ItemType Directory $unpack | Out-Null
-    $tar = Start-Process -FilePath "$env:SystemRoot\System32\tar.exe" -ArgumentList @('-xf', "`"$part`"", '-C', "`"$unpack`"") -NoNewWindow -Wait -PassThru
+    $tar = Start-Process -FilePath "$env:SystemRoot\System32\tar.exe" -ArgumentList @('-xf', "`"$part`"", '-C', "`"$unpack`"") -NoNewWindow -PassThru
+    while (-not $tar.HasExited) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
     if ($tar.ExitCode -ne 0 -or -not (Test-Path (Join-Path $unpack 'runtime'))) { throw '解压失败' }
     New-Item -ItemType Directory -Force $runtimeDir | Out-Null
     Get-ChildItem (Join-Path $unpack 'runtime') | ForEach-Object { $dest = Join-Path $runtimeDir $_.Name; if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }; Move-Item $_.FullName $dest }
@@ -246,7 +280,7 @@ $button.add_Click({
 })
 $form.add_FormClosing({ if (-not $script:done) { $client.CancelAsync() } })
 # MEGULIT_SETUP_PREVIEW=<png>: render the choice page to an image and exit (used to check the layout).
-if ($env:MEGULIT_SETUP_PREVIEW) { $form.add_Shown({ $form.Refresh(); $bmp = New-Object Drawing.Bitmap $form.Width, $form.Height; $form.DrawToBitmap($bmp, (New-Object Drawing.Rectangle 0,0,$form.Width,$form.Height)); $bmp.Save($env:MEGULIT_SETUP_PREVIEW); $form.Close() }) }
+if ($env:MEGULIT_SETUP_PREVIEW) { $form.add_Shown({ if ($env:MEGULIT_SETUP_PREVIEW_STATE -eq 'progress') { $choice.Visible = $false; $progress.Visible = $true; $status.Text = '[1/3] 正在下载基础组件  47 / 107 MB  ·  来源 github.com'; Set-Bar 440 }; $form.Refresh(); $bmp = New-Object Drawing.Bitmap $form.Width, $form.Height; $form.DrawToBitmap($bmp, (New-Object Drawing.Rectangle 0,0,$form.Width,$form.Height)); $bmp.Save($env:MEGULIT_SETUP_PREVIEW); $form.Close() }) }
 [void]$form.ShowDialog()
 $client.Dispose()
 Get-ChildItem $Root -Filter 'runtime-*.part' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue

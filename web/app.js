@@ -19,6 +19,7 @@ import {createHomeMotion} from './home-motion.js';
 import {renderGamePage} from './game-detail.js';
 import {words as grimoireWords,paintGlow,stopGlow,setupMarquees,fitShelf,placeGreeting,closeDialog,toolsHTML,dockPageTools,pageEnter,subpageEnter,watchHomeFade,matchJacket,fieldify,stopField,moveTabInk} from './grimoire.js';
 import {aboutHTML,aboutLabel,mountAbout} from './about.js';
+import {maybeFirstRun} from './first-run.js';
 let selectedGameId='',gameOrigin='library',selectedSeriesId='';
 import {renderSettings} from './settings.js';
 import {openBackgroundCrop,backgroundGeometry} from './background-crop.js';
@@ -121,7 +122,7 @@ function setAppearance(preferences=model.preferences){
   if(Object.hasOwn(bg,'dim'))document.documentElement.style.setProperty('--background-dim',clamp(bg.dim,0,100,35)/100);
   document.documentElement.style.setProperty('--home-glass-blur',clamp(bg.glassBlur,0,40,14)+'px');
   document.documentElement.style.setProperty('--home-glass-alpha',clamp(bg.glassAlpha,0,100,55)+'%');
-  document.documentElement.classList.toggle('home-glass',!!preferences.homeBackground&&bg.glass===true);
+  document.documentElement.classList.toggle('home-glass',bg.glass===true);
   const reading=model.historyAppearance||{};const font=String(reading.history_font_family||'Yu Gothic').replace(/["\\;{}]/g,'');
   document.documentElement.style.setProperty('--history-font-family','"'+font+'","Yu Gothic","Microsoft YaHei",sans-serif');
   document.documentElement.style.setProperty('--history-font-size',clamp(reading.history_font_size,12,32,16)+'px');
@@ -199,6 +200,7 @@ function home(){
   if(!changed)return;
   main.querySelector('#view-library')?.addEventListener('click',()=>navigate('library'));
   main.querySelector('#home-add')?.addEventListener('click',()=>editGame());
+  maybeFirstRun({gamesCount:model.games.length,api,invoke,locale,esc,toast,onDone:()=>renderRoute()});
   main.querySelector('#view-words')?.addEventListener('click',()=>navigate('learning','words'));
   main.querySelector('#view-statistics')?.addEventListener('click',()=>navigate('statistics'));
   main.querySelectorAll('[data-stats]').forEach(b=>b.addEventListener('click',()=>navigate('statistics')));
