@@ -15,9 +15,11 @@ Windows 上的 Galgame 阅读与日语学习工具
 </div>
 
 > [!WARNING]
-> 还在开发中，没有正式版。功能、数据格式、界面随时可能变
-> Still in active development, no stable release yet. Things will change.
-> 開発中です。安定版はまだありません
+> 还在积极开发中，功能、数据格式、界面随时可能变
+>
+> Still in active development. Things may change.
+>
+> 開発中です。機能や画面は変わることがあります
 
 ---
 
@@ -92,7 +94,14 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 
 ### 安装
 
-还没有发布版<!-- TODO: Release 链接 -->
+去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.0.0-win-x64.zip`（不到 10 MB），解压后运行 `MeguLit.exe`
+
+第一次启动会弹出安装窗口，二选一：
+
+- **精简版**：下载约 107 MB，能用阅读层、翻译和查词。注音分词词典和语音引擎以后可以在「设置 → 语音 / 词典」里补装
+- **完整版**：下载约 565 MB，一次装齐全部组件，需要预留约 1.8 GB 磁盘
+
+本地翻译模型比较大，不在这两个包里，需要的话在设置里按需下载
 
 需要 Windows 10/11 x64 和 Microsoft Edge WebView2 Runtime。想用 Anki 功能，还得自己装 Anki 和 AnkiConnect
 
@@ -196,7 +205,14 @@ The features aren't the hard part. Engines are:
 
 ### Install
 
-No release yet.<!-- TODO: Release link -->
+Grab `MeguLit-v1.0.0-win-x64.zip` (under 10 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`.
+
+On first launch a setup window asks you to pick one:
+
+- **Lite**: about 107 MB. Reader overlay, translation and lookup work. The furigana dictionaries and voice engine can be added later under Settings → Speech / Dictionary.
+- **Full**: about 565 MB, everything at once. Leave about 1.8 GB of disk space.
+
+Local translation models are large and not in either pack; download them in Settings if you want them.
 
 You'll need Windows 10/11 x64 and the Microsoft Edge WebView2 Runtime. For the Anki features, install Anki and AnkiConnect yourself.
 
@@ -264,7 +280,12 @@ UI は簡体字中国語・英語・日本語に対応。中国語・英語話�
 
 ### インストール
 
-まだリリースはありません<!-- TODO: Release link -->
+[Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.0.0-win-x64.zip`（10 MB 未満）をダウンロードして展開し、`MeguLit.exe` を起動してください
+
+初回起動時にセットアップ画面が出ます：
+
+- **軽量版**：約 107 MB。読書レイヤー・翻訳・辞書が使えます。ふりがな辞書と音声エンジンは後から「設定 → 音声 / 辞書」で追加できます
+- **完全版**：約 565 MB。すべて一度に入れます。空き容量は約 1.8 GB 必要です
 
 Windows 10/11 x64 と Microsoft Edge WebView2 Runtime が必要です。Anki 機能を使うには Anki と AnkiConnect を入れてください
 

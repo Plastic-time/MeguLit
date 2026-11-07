@@ -9,7 +9,7 @@ const MARKERS={base:'runtime/node.exe',reading:'runtime/reading/sudachidict_full
 
 class RuntimePacks{
  constructor(root){this.root=root;this.jobs={};}
- manifest(){try{return JSON.parse(fs.readFileSync(path.join(this.root,'setup','runtime.json'),'utf8'));}catch{return {packs:{}};}}
+ manifest(){try{return JSON.parse(fs.readFileSync(path.join(this.root,'setup','runtime.json'),'utf8').replace(/^﻿/,''));}catch{return {packs:{}};}}
  installed(id){const marker=MARKERS[id];return !!marker&&fs.existsSync(path.join(this.root,marker));}
  status(){const m=this.manifest();return {version:m.version||'',packs:Object.entries(m.packs||{}).map(([id,p])=>{const j=this.jobs[id];return {id,size:p.size||0,unpacked:p.unpacked||0,installed:this.installed(id),job:j?{state:j.state,stage:j.stage,received:j.received,total:j.total,error:j.error}:null};})};}
  download(ids){
@@ -26,12 +26,8 @@ class RuntimePacks{
   for(const url of pack.urls||[]){
    job.state='downloading';job.stage='download';job.received=0;job.controller=new AbortController();
    try{
-    const res=await fetch(url,{redirect:'follow',signal:job.controller.signal});if(!res.ok||!res.body)throw Error('HTTP '+res.status);
-    job.total=Number(res.headers.get('content-length'))||pack.size||0;
-    const hash=createHash('sha256'),out=fs.createWriteStream(part);
-    for await(const chunk of res.body){if(job.state==='cancelled')throw Error('cancelled');hash.update(chunk);job.received+=chunk.length;if(!out.write(chunk))await new Promise(r=>out.once('drain',r));}
-    await new Promise((r,j)=>out.end(e=>e?j(e):r()));
-    if(hash.digest('hex').toLowerCase()!==String(pack.sha256).toLowerCase())throw Error('文件校验失败');
+    const digest=await fetchTo(url,part,job);
+    if(digest.toLowerCase()!==String(pack.sha256).toLowerCase())throw Error('文件校验失败');
     lastError=null;break;
    }catch(error){lastError=error;try{fs.rmSync(part,{force:true});}catch{}if(job.state==='cancelled')throw error;}
   }
@@ -44,5 +40,22 @@ class RuntimePacks{
   fs.rmSync(stage,{recursive:true,force:true});fs.rmSync(part,{force:true});
   if(!this.installed(id))throw Error('安装不完整');
  }
+}
+// node:http(s) instead of fetch: follows GitHub's CDN redirects and streams with normal backpressure.
+function fetchTo(url,file,job,hops=0){
+ return new Promise((resolve,reject)=>{
+  const lib=url.startsWith('https:')?require('node:https'):require('node:http');
+  const req=lib.get(url,{headers:{'User-Agent':'MeguLit-runtime'},signal:job.controller.signal},res=>{
+   if([301,302,303,307,308].includes(res.statusCode)&&res.headers.location){res.resume();if(hops>8)return reject(Error('重定向过多'));return resolve(fetchTo(new URL(res.headers.location,url).toString(),file,job,hops+1));}
+   if(res.statusCode!==200){res.resume();return reject(Error('HTTP '+res.statusCode));}
+   job.total=Number(res.headers['content-length'])||job.total;
+   const hash=createHash('sha256'),out=fs.createWriteStream(file);
+   res.on('data',chunk=>{hash.update(chunk);job.received+=chunk.length;});
+   res.on('error',reject);out.on('error',reject);
+   out.on('finish',()=>{if(job.total&&job.received<job.total)return reject(Error('下载不完整'));resolve(hash.digest('hex'));});
+   res.pipe(out);
+  });
+  req.on('error',reject);
+ });
 }
 module.exports={RuntimePacks,MARKERS};
