@@ -62,7 +62,6 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 ### 最近在忙什么（2026 年 10–11 月）
 
 - 整个宿主重写了一遍。早期是挂在别的前端上的叠加层，现在换成了自己的 Tauri / WebView2 程序、SQLite 数据库和常驻服务
-- 改名叫 MeguLit。旧数据表、存储键都兼容，老数据直接搬过来就能用
 - 点读终于不会推进剧情了：用低级鼠标 Hook 把点击拦下来再交给阅读层。顺手把打字机改成 rAF，不再掉帧
 - 注音贴着汉字走，字体、字距、换行、DPI 变了也不会歪；以前会把异体读音用错，修了
 - 内嵌替换会分辨台词和脚本控制串，不再顺手把资源名清空导致游戏报错
@@ -90,7 +89,7 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 - [ ] 保住游戏原生 LOG 里的原文
 - [ ] 开场、章节标题、独立字幕
 - [ ] 可复现的公开构建和发布包
-- [ ] 更多学习语言，以及 Galgame 以外的游戏
+- [ ] 更多学习语言，以及轻小说和 Galgame 以外的游戏
 
 ### 安装
 
@@ -201,7 +200,7 @@ The features aren't the hard part. Engines are:
 - [ ] Keep the original text in the game's own backlog
 - [ ] Openings, chapter titles, standalone subtitles
 - [ ] Reproducible public builds and release packages
-- [ ] More learner languages, and games beyond visual novels
+- [ ] More learner languages, plus light novels and games beyond visual novels
 
 ### Install
 
