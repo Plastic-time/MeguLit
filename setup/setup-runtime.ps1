@@ -1,4 +1,4 @@
-﻿﻿# SPDX-License-Identifier: GPL-3.0-or-later
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # MeguLit first-launch setup.
 # The release zip ships without runtime\. This window lets the user pick:
 #   Lite  = base pack only (Node, Python, hooks, JMdict). Other packs can be added later in Settings.
