@@ -1,0 +1,36 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* About page: grimoire palette, cream on dark, crimson accents. */
+.about-page{max-width:920px;margin:0 auto;padding:28px 32px 48px;color:#f3e9dc}
+.about-hero{text-align:center;padding:8px 0 22px;border-bottom:1px solid rgba(217,165,74,.22)}
+.about-logo{width:300px;max-width:70%;height:auto;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45))}
+.about-tag{margin:6px 0 0;font-size:13px;letter-spacing:.18em;color:#d9a54a;text-transform:uppercase}
+.about-intro{margin:14px auto 0;max-width:680px;line-height:1.8;color:#cdbfb3;text-wrap:pretty}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px}
+.about-facts,.about-links,.about-support,.about-credits{background:rgba(42,34,35,.72);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:18px 20px}
+.about-facts{margin:0;display:grid;gap:10px}
+.about-facts div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dashed rgba(255,255,255,.08);padding-bottom:8px}
+.about-facts div:last-child{border-bottom:0;padding-bottom:0}
+.about-facts dt{color:#a8998f}.about-facts dd{margin:0;font-variant-numeric:tabular-nums}
+.about-links h3,.about-cn h3,.about-intl h3,.about-credits h3{margin:0 0 10px;font-size:13px;letter-spacing:.08em;color:#d9a54a}
+.about-link{display:flex;justify-content:space-between;align-items:center;width:100%;margin:6px 0 0;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);color:#f3e9dc;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}
+.about-link:hover{background:rgba(200,50,60,.14);border-color:rgba(200,50,60,.45)}
+.about-link span{color:#c8323c}
+.about-made{margin:16px 2px 0;font-size:13px;color:#a8998f}
+.about-support{margin-top:22px;border-top:3px solid #c8323c}
+.about-support h2{margin:0;font-size:22px}
+.about-support>p{margin:8px 0 0;color:#cdbfb3;line-height:1.7}
+.about-pay{display:grid;grid-template-columns:1.5fr 1fr;gap:18px;margin-top:18px}
+.about-qrs{display:flex;gap:16px}
+.about-qrs figure{margin:0;text-align:center}
+.about-qr{width:168px;height:168px;padding:10px;background:#fff;border-radius:12px}
+.about-qr img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated;display:block}
+.about-qrs figcaption{margin-top:8px;font-weight:600}
+.about-intl{border-left:1px solid rgba(255,255,255,.08);padding-left:18px}
+.about-intl p{margin:0;color:#cdbfb3;line-height:1.7}
+.about-sponsor{margin-top:14px;width:100%}
+.about-sponsor:active,.about-link:active{transform:scale(.97)}
+.about-thanks{margin-top:12px!important;color:#d9a54a!important}
+.about-credits{margin-top:18px}
+.about-credits p{margin:0;color:#a8998f;line-height:1.8;font-size:13px}
+@media (max-width:760px){.about-grid,.about-pay{grid-template-columns:1fr}.about-intl{border-left:0;padding-left:0}}
+.about-support-strong{margin:10px 0 0;font-weight:700;color:#f3e9dc!important}
