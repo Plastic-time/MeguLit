@@ -16,8 +16,7 @@
 .about-link:hover{background:rgba(200,50,60,.14);border-color:rgba(200,50,60,.45)}
 .about-link span{color:#c8323c}
 .about-made{margin:16px 2px 0;font-size:13px;color:#a8998f}
-.about-support{margin-top:22px;position:relative;overflow:hidden}
-.about-support::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:#c8323c}
+.about-support{margin-top:22px;border-color:rgba(200,50,60,.35);background:linear-gradient(180deg,rgba(200,50,60,.10),rgba(42,34,35,.72) 120px)}
 .about-support h2{margin:0;font-size:22px}
 .about-support>p{margin:8px 0 0;color:#cdbfb3;line-height:1.7}
 .about-pay{display:grid;grid-template-columns:1.5fr 1fr;gap:18px;margin-top:18px}
