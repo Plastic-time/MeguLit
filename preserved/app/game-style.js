@@ -12,7 +12,7 @@
     autoGameStyle:true, livePosition:false, hookProfile:'read', hookAutoStart:true, hookHide:true, hookFast:true, mask: false, maskMode: 'hook', maskColor: '#171923',
     scanX: 2, scanY: 60, scanWidth: 96, scanHeight: 38, blurRadius: 13, maskPadding: 6, fastMask:true,
     maskVersion:26, maskStyle:'blend', japaneseBold:false, chineseBold:false,
-    hideWaitMarker:true,relocateWaitMarker:true,waitCoverStyle:'frame',
+    hideWaitMarker:false,relocateWaitMarker:false,waitCoverStyle:'frame',
     japaneseFont:'originalGothic', chineseFont:'patch', rubyFont:'round',
     japaneseOutline:true, chineseOutline:true, japaneseOutlineColor:'#ffffff', chineseOutlineColor:'#ffffff', rubyOutline:true, rubyOutlineColor:'#ffffff', rubyOutlineWidth:.45,
     japaneseOutlineWidth:1, chineseOutlineWidth:1
@@ -30,7 +30,8 @@
       const number = value[key] === '' || value[key] == null ? NaN : Number(value[key]);
       if (Number.isFinite(number)) result[key] = Math.max(min, Math.min(max, number));
     }
-    for (const key of ['typewriter','furigana','autoScale','fastMask','hideWaitMarker','relocateWaitMarker']) result[key] = value[key] !== false;
+    for (const key of ['typewriter','furigana','autoScale','fastMask']) result[key] = value[key] !== false;
+    for (const key of ['hideWaitMarker','relocateWaitMarker']) result[key] = value[key] === true;
     for(const key of ['textGradient','readTextGradient'])result[key]=value[key]===true;
     // Where the top colour starts turning into the bottom colour, as % of the line height (0 = from the top).
     for(const key of ['textGradientStart','readTextGradientStart'])if(Number.isFinite(Number(value[key])))result[key]=Math.max(0,Math.min(95,Math.round(Number(value[key]))));
