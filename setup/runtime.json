@@ -6,7 +6,7 @@
                                "unpacked":  340484266,
                                "sha256":  "DE25B4B093B7121D7DEDA7249DABEA6A486D08C61297481A0315BEAC44D243A4",
                                "urls":  [
-                                            "https://github.com/ilynthn/MeguLit/releases/download/v1.0.0/MeguLit-runtime-base-v1.0.0.zip"
+                                            "https://github.com/ilynthn/MeguLit/releases/download/runtime-v1.0.0/MeguLit-runtime-base-v1.0.0.zip"
                                         ]
                            },
                   "reading":  {
@@ -14,7 +14,7 @@
                                   "unpacked":  596838029,
                                   "sha256":  "9751B854139CF8E2227F8C56B4149077185E9E07D8390DE4EAE70E9796A151DC",
                                   "urls":  [
-                                               "https://github.com/ilynthn/MeguLit/releases/download/v1.0.0/MeguLit-runtime-reading-v1.0.0.zip"
+                                               "https://github.com/ilynthn/MeguLit/releases/download/runtime-v1.0.0/MeguLit-runtime-reading-v1.0.0.zip"
                                            ]
                               },
                   "voice":  {
@@ -22,7 +22,7 @@
                                 "unpacked":  844860314,
                                 "sha256":  "F23A9950A2FAE7C5FD0F097A39E2E808BFAE51A0E66284DA01E4DDFC91F7FF30",
                                 "urls":  [
-                                             "https://github.com/ilynthn/MeguLit/releases/download/v1.0.0/MeguLit-runtime-voice-v1.0.0.zip"
+                                             "https://github.com/ilynthn/MeguLit/releases/download/runtime-v1.0.0/MeguLit-runtime-voice-v1.0.0.zip"
                                          ]
                             }
               },
