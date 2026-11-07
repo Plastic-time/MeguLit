@@ -65,7 +65,7 @@
   style.textContent = `
     .tome-island-layout-hint { display:none; }
     body.tome-island-active .tome-island-layout-hint { display:block; }
-    body.tome-island-active label:has(>input[name=galX]),body.tome-island-active label:has(>input[name=galY]),body.tome-island-active label:has(>input[name=galWidth]),body.tome-island-active label:has(>select[name=galPreset]),body.tome-island-active [data-gal-drag],body.tome-island-active [data-gal-position-sync],body.tome-island-active .tome-live-position,body.tome-island-active .tome-manual-region-hint { display:none!important; }
+    body.tome-island-active label:has(>select[name=galPreset]),body.tome-island-active [data-gal-drag],body.tome-island-active [data-gal-position-sync],body.tome-island-active .tome-live-position,body.tome-island-active .tome-manual-region-hint { display:none!important; }
     .sentence-text.tomoyo-furigana { line-height:var(--tomoyo-gal-ruby-line-height,2.55)!important; padding-top:.55em; } /* furigana needs room between wrapped rows even with a tight line height */
     .sentence-text .char-token[data-tomoyo-reading] { position:relative; }
     body.tome-line-read .sentence-window:not(.tome-island-page) { --tomoyo-gal-color:var(--tomoyo-gal-read-color); --tomoyo-gal-gradient:var(--tomoyo-gal-read-gradient); --tomoyo-gal-fill:var(--tomoyo-gal-read-fill); --tomoyo-gal-jp-stroke:var(--tomoyo-gal-read-jp-stroke); --tomoyo-gal-cn-stroke:var(--tomoyo-gal-read-cn-stroke); --tomoyo-gal-jp-filter:var(--tomoyo-gal-read-jp-filter); --tomoyo-gal-cn-filter:var(--tomoyo-gal-read-cn-filter); }

@@ -65,7 +65,7 @@
   style.textContent = `
     .tome-island-layout-hint { display:none; }
     body.tome-island-active .tome-island-layout-hint { display:block; }
-    body.tome-island-active label:has(>input[name=galX]),body.tome-island-active label:has(>input[name=galY]),body.tome-island-active label:has(>input[name=galWidth]),body.tome-island-active label:has(>select[name=galPreset]),body.tome-island-active [data-gal-drag],body.tome-island-active [data-gal-position-sync],body.tome-island-active .tome-live-position,body.tome-island-active .tome-manual-region-hint { display:none!important; }
+    body.tome-island-active label:has(>select[name=galPreset]),body.tome-island-active [data-gal-drag],body.tome-island-active [data-gal-position-sync],body.tome-island-active .tome-live-position,body.tome-island-active .tome-manual-region-hint { display:none!important; }
     .sentence-window .sentence-text.tomoyo-furigana {
       --megulit-ruby-line:var(--tomoyo-gal-ruby-line-height,2.55);
       line-height:calc(var(--megulit-ruby-line) * 1em)!important;
