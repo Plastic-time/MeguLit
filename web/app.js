@@ -318,6 +318,8 @@ function library(){
   });
   searchAppearance();
   main.querySelector('#select-games').onclick=()=>seriesUI.toggleSelection(main.querySelector('#library-results'));main.querySelector('#add-game').addEventListener('click',()=>editGame());main.querySelector('#refresh-library').onclick=()=>refreshLibrary().then(result=>toast(result.added?libraryCopy().added(result.added):libraryCopy().done)).catch(error=>toast(errorMessage(error)));main.querySelector('#library-settings').onclick=()=>{settingsSection='library';settingsProfile='';navigate('settings');};renderGames();
+  /* v1.1.6 (user): opening the library straight into the wall plays the same outside-in gathering as switching to it */
+  if(localStorage.getItem(LIBRARY_WALL_KEY)!=='off'&&!search.trim())requestAnimationFrame(()=>requestAnimationFrame(async()=>{try{const m=await import('./library-switch-motion.js');const h=document.querySelector('#library-results');if(h&&route==='library')m.wallIn(h);}catch{}}));
 }
 // E245.5 (user): entering a search, the wall fades out in place as dominoes from the centre outwards, then the matches
 // fade in on the orbit; clearing it, the orbit fades out, then the wall returns as dominoes from the edges inwards.
