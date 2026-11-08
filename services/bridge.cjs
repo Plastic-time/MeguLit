@@ -252,7 +252,7 @@ async function dispatch(request,runtime=null) {
       case 'update_apply':return await require('./update.cjs').apply(root,String(request.current||''));
       case 'update_start':{const u=require('./update.cjs');u.start(root,String(request.current||''));return u.status();}
       case 'update_status':return require('./update.cjs').status();
-      case 'update_install':return require('./update.cjs').install(root);
+      case 'update_install':return await require('./update.cjs').install(root);
       case 'kana_progress':return require('./kana.cjs').read(root);
       case 'kana_progress_save':return require('./kana.cjs').save(root,request.data);
       case 'kana_game_words':return require('./kana.cjs').gameWords(db,request.words);

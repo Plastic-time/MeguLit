@@ -6,12 +6,12 @@
 
 在 Galgame 里读日语的小魔导书 ✦
 
-[![Version](https://img.shields.io/badge/version-1.1.1-e0a84b?style=flat-square)](https://github.com/ilynthn/MeguLit/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.1.2-e0a84b?style=flat-square)](https://github.com/ilynthn/MeguLit/releases/latest)
 [![Platform](https://img.shields.io/badge/Windows%2010%20%2F%2011-x64-3b2124?style=flat-square)](#zh-install)
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-8b1e2d?style=flat-square)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/%E2%99%A1-Sponsor-c8323c?style=flat-square)](https://github.com/sponsors/ilynthn)
 
-**[下载 v1.1.1](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [♡ 赞赏](#support)
+**[下载 v1.1.2](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [♡ 赞赏](#support)
 
 <br>
 
@@ -40,11 +40,12 @@
 | **默认背景** | 自带浅色、深色两张背景，跟着主题自动切换；设了自己的图片就用你的 |
 | **学习统计** | 魔导书 × 毛玻璃风格重做。日历、本月读的书、字数走势、阅读时段、星期分布、阅读手感、常查的词，每一块都能单独切换年 / 月 / 周 / 日 |
 | **空页面** | 句子、单词、回收站、历史为空时，告诉你这里会出现什么、怎么让它出现；词典首页列出你常查的词 |
+| **v1.1.2** | 修好「重启并更新」：更新脚本改由 Windows 启动，不会再随 MeguLit 一起退出 · 更新卡片写明安装包具体大了 / 小了多少 MB |
 | **v1.1.1** | 关闭游戏后主页停在半透明的问题从根上修好 · 本地模型缺运行组件时自动下载，阅读层直接写明原因，不再只显示「翻译暂不可用」 |
 | **修复** | 部分电脑上「无法检查游戏是否已运行」导致游戏启动不了（Steam 游戏多见）· 关闭游戏后主窗口变半透明 · 多语言版游戏把日文、简中、繁中整串显示出来 · 日文原文还原认不出中日文路径下正在运行的游戏 · Rance02 匹配不到 VNDB |
 
 > [!NOTE]
-> 旧版本还没有自动更新，这一次请手动下载 v1.1.1 覆盖安装；已经是 v1.1.0 的会自动更新。以后的版本 MeguLit 会自己更新
+> v1.1.0 和 v1.1.1 的自动更新有 bug：点「重启并更新」后打开的还是旧版本。请手动下载 v1.1.2 覆盖安装一次，从 v1.1.2 开始就能正常自动更新了
 
 <br>
 
@@ -218,7 +219,7 @@ MeguLit 想做的只有一件事：**游戏还是那个游戏，只是你能读�
 > [!IMPORTANT]
 > **游戏剧情必须是日文原文**。MeguLit 读的是游戏正在显示的台词，剧情被汉化后读到的就不是日文。只汉化了菜单、剧情仍是日文的游戏不受影响；汉化版可以先试试「工具 → 日文原版恢复」
 
-1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.1.1-win-x64.zip`（约 18 MB），解压后运行 `MeguLit.exe`
+1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.1.2-win-x64.zip`（约 18 MB），解压后运行 `MeguLit.exe`
 2. 第一次启动会弹出安装窗口，二选一
    - **完整版**：下载约 565 MB，一次装齐注音词典和 AivisSpeech 语音引擎，需要约 1.8 GB 空间（推荐）
    - **精简版**：下载约 107 MB，能用阅读层、翻译和查词，其余组件以后在设置里补装
@@ -349,10 +350,11 @@ GPL-3.0-or-later，见 [LICENSE](LICENSE)；第三方组件按各自许可证，
 | **Auto update** | Checks for a new release on every start and downloads it in the background, with the version, notes, size change and real progress. Only program files are replaced |
 | **Default backgrounds** | A light and a dark one that follow the theme |
 | **Statistics** | Redesigned; every panel switches between year / month / week / day |
+| **v1.1.2** | "Restart and update" now really updates: Windows starts the update script, so it no longer exits with MeguLit |
 | **v1.1.1** | Home no longer stays half transparent after a game closes · a local model with no runtime downloads it by itself and the overlay says why |
 | **Fixes** | Launch failing with "could not check whether the game was running" · window staying half transparent after a game closes · multilingual builds showing every language track |
 
-Older versions have no updater, so download v1.1.1 by hand once; v1.1.0 updates itself.
+The updater in v1.1.0 and v1.1.1 reopens the old version, so download v1.1.2 by hand once; from v1.1.2 on it updates itself.
 
 <table>
 <tr>
@@ -367,7 +369,7 @@ Older versions have no updater, so download v1.1.1 by hand once; v1.1.0 updates 
 
 ### Install
 
-1. Download `MeguLit-v1.1.1-win-x64.zip` (about 18 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`
+1. Download `MeguLit-v1.1.2-win-x64.zip` (about 18 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`
 2. Pick **Full** (about 565 MB, furigana dictionaries and the AivisSpeech voice engine) or **Lite** (about 107 MB)
 3. Choose your game folder, pick a game and press *Launch*. Press <kbd>Alt</kbd> + <kbd>T</kbd> for the overlay menu
 
@@ -398,10 +400,11 @@ GPL-3.0-or-later · [LICENSE](LICENSE) · [THIRD-PARTY.md](THIRD-PARTY.md)
 | **自動アップデート** | 起動のたびに新しいバージョンを確認し、裏でダウンロード。バージョン、更新内容、サイズの増減、実際の進捗を表示。プログラムだけを置き換えます |
 | **デフォルト背景** | ライト / ダークのテーマに合わせて切り替わる 2 枚 |
 | **学習統計** | 作り直し。パネルごとに年 / 月 / 週 / 日を切り替え |
+| **v1.1.2** | 「再起動して更新」で実際に更新されるよう修正 |
 | **v1.1.1** | ゲーム終了後にホームが半透明のまま残る問題を根本修正 · ローカルモデルの実行環境がない場合は自動でダウンロード |
 | **修正** | 「ゲームが起動中か確認できません」で起動できない問題 · 終了後にウィンドウが半透明になる問題 · 多言語版で全言語の文が出る問題 |
 
-旧バージョンには自動更新がないため、今回だけ手動で v1.1.1 をダウンロードしてください
+v1.1.0 と v1.1.1 の自動更新には不具合があるため、今回だけ手動で v1.1.2 をダウンロードしてください。v1.1.2 からは自動で更新されます
 
 <table>
 <tr>
@@ -412,7 +415,7 @@ GPL-3.0-or-later · [LICENSE](LICENSE) · [THIRD-PARTY.md](THIRD-PARTY.md)
 
 ### インストール
 
-1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.1.1-win-x64.zip`（約 18 MB）をダウンロードして展開し、`MeguLit.exe` を起動
+1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.1.2-win-x64.zip`（約 18 MB）をダウンロードして展開し、`MeguLit.exe` を起動
 2. 初回セットアップで **完全版**（約 565 MB）か **軽量版**（約 107 MB）を選択
 3. ゲームフォルダを選び、作品を選んで「ゲーム起動」。<kbd>Alt</kbd> + <kbd>T</kbd> でメニュー
 
