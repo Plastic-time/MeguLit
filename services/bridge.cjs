@@ -253,7 +253,7 @@ async function dispatch(request,runtime=null) {
       }
       case 'history':return db.prepare('SELECT s.*,g.title FROM reading_sessions s LEFT JOIN games g ON s.game_id=g.id ORDER BY s.started_at DESC LIMIT 500').all();
       case 'dialogue':return require('./history-view.cjs').dialogue(db);
-      case 'update_check':return await require('./update.cjs').check(String(request.current||''));
+      case 'update_check':return await require('./update.cjs').check(String(request.current||''),fetch,root);
       case 'update_apply':return await require('./update.cjs').apply(root,String(request.current||''));
       case 'update_start':{const u=require('./update.cjs');u.start(root,String(request.current||''));return u.status();}
       case 'update_status':return require('./update.cjs').status();

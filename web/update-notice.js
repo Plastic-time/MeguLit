@@ -26,9 +26,10 @@ function render(info,{api,invoke,locale}){
  card=document.createElement('aside');card.className='upd-card';card.setAttribute('role','dialog');card.setAttribute('aria-label',t.title(info.latest));
  const delta=info.delta==null?'':(Math.abs(info.delta)<51200?t.same:info.delta>0?t.bigger:t.smaller)+(locale==='en'?' (':'（')+deltaMb(info.delta)+(locale==='en'?')':'）');
  const notes=notesFor(info.notes,locale);
+ const same=info.hotfix?({zh:'（热修复）',ja:'（修正版）',en:' (hotfix)'})[locale]||'':'';
  card.innerHTML=`<button type="button" class="upd-x" data-upd-close aria-label="${esc(t.later)}">×</button>
   <div class="upd-eyebrow">${esc(t.current(info.current))} → v${esc(info.latest)}</div>
-  <h3>${esc(t.title(info.latest))}</h3>
+  <h3>${esc(t.title(info.latest))}${esc(same)}</h3>
   <p class="upd-size">${esc(t.size(mb(info.size||0)))}${delta?` · <b class="${info.delta>0?'up':'down'}">${esc(delta)}</b>`:''}</p>
   ${notes.length?`<div class="upd-notes" tabindex="0"><span>${esc(t.notes)}</span>${notes.map(n=>n.head?`<h4>${esc(n.text)}</h4>`:`<p>${esc(n.text)}</p>`).join('')}</div>`:''}
   <div class="upd-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>

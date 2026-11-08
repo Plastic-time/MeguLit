@@ -241,3 +241,7 @@ input.switch:focus-visible{box-shadow:none!important;outline:2px solid rgba(237,
 .sp-read button{height:22px;padding:0 10px;border-radius:999px;font-size:11.5px;color:#a8907e}
 .sp-read button[aria-pressed=true]{color:#1a1010;background:#edb56e}
 .sp-read+.sp-next{margin-left:8px}
+
+/* v1.1.8 (user: the scrollbar on the right of every settings page looks ugly): keep wheel scrolling, hide the bar */
+.main .settings-layout>.settings-content,.main .settings-layout>.settings-content *{scrollbar-width:none!important}
+.main .settings-layout>.settings-content::-webkit-scrollbar,.main .settings-layout>.settings-content *::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
