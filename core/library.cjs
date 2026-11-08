@@ -34,7 +34,9 @@ const ENGINES=[
  {name:'TyranoScript',hook:true,test:f=>f.sub('data',/^scenario$/i)||f.sub('resources',/^app\.asar$/i)&&f.has(/^tyrano/i)},
  {name:'Leaf / AQUAPLUS',hook:true,test:f=>f.has(/^grp\.pak$/i)&&f.has(/^char\.pak$/i)&&f.has(/^(voice|bgm|se)\.pak$/i)},
  // Unity games read through LunaHook's Mono/IL2CPP hooks for many, not all, titles: verified on first play.
- {name:'Unity',hook:null,generic:true,test:f=>f.has(/^unityplayer\.dll$/i)||f.has(/_Data$/i)},
+ // A Unity build keeps <Name>_Data beside <Name>.exe. A folder that only holds something named *_Data (a library
+ // folder, or the folder a game was unpacked into) is not a Unity game by itself.
+ {name:'Unity',hook:null,generic:true,test:f=>f.has(/^unityplayer\.dll$/i)||f.names.some(n=>/_Data$/i.test(n)&&f.names.some(e=>e.toLowerCase()===n.slice(0,-5).toLowerCase()+'.exe'))},
 ];
 const SKIP_EXE_ANY=/(卸载|卸載|アンインストール|uninst|設定|设置|设定|config|setting|register|update|installer|fontinst)/i;
 // Reject recognisable Chinese and English editions both while scanning and before launch: ToMe reads the Japanese text.
