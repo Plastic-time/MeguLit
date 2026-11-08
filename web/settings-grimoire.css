@@ -260,3 +260,74 @@ input.switch:focus-visible{box-shadow:none!important;outline:2px solid rgba(237,
 :root[data-theme=light] .select-popup>button[role=option][aria-selected=true]{color:#a8202f!important;background:rgba(168,32,47,.09)!important}
 .select-trigger>.select-name,.select-trigger>.select-note{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .select-trigger>.select-name{flex:0 0 auto;max-width:100%}.select-trigger>.select-note{flex:0 1 auto;margin-left:6px}
+
+/* E271 Tools → 日文原版恢复 window (user: the window opened from the tool card needs a redesign too) */
+dialog.jr-dialog{width:min(580px,calc(100vw - 48px));padding:0;overflow:hidden;border-radius:18px;border:1px solid rgba(237,181,110,.16);
+ background:linear-gradient(180deg,rgba(38,26,24,.96),rgba(22,16,16,.97));box-shadow:0 30px 80px rgba(0,0,0,.55),0 1px 0 rgba(255,236,214,.05) inset;color:#f3e6da}
+dialog.jr-dialog[open]{animation:jr-in .22s cubic-bezier(.16,1,.3,1)}
+@keyframes jr-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){dialog.jr-dialog[open]{animation:none}}
+.jr-dialog .jr-head{position:relative;padding:24px 28px 14px;background:radial-gradient(120% 140% at 0 0,rgba(200,48,60,.16),transparent 60%)}
+.jr-dialog .jr-eyebrow{display:inline-block;margin-bottom:6px;font-size:11px;letter-spacing:.18em;color:#edb56e;font-weight:600}
+.jr-dialog .jr-head h2{margin:0 0 6px;font-size:21px;line-height:1.3;color:#fbefe3}
+.jr-dialog .jr-head .settings-help{margin:0;font-size:12.5px;line-height:1.65;color:#bfa999;text-wrap:pretty}
+.jr-dialog .tool-key-note{margin:0 28px 14px}
+.jr-dialog [data-jr-body]{padding:0 28px}
+.jr-dialog .jr-search{box-sizing:border-box;width:100%;height:40px;margin:0 0 14px;padding:0 14px 0 40px;border:1px solid rgba(237,181,110,.16);border-radius:11px;font-size:13.5px;color:#f3e6da;
+ background:rgba(14,9,9,.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23a8907e' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E") 14px 50%/15px no-repeat!important;
+ outline:none;transition:border-color .2s,box-shadow .2s}
+.jr-dialog .jr-search::placeholder{color:#8a7668}
+.jr-dialog .jr-search:hover{border-color:rgba(237,181,110,.3)}
+.jr-dialog .jr-search:focus{border-color:rgba(237,181,110,.6);box-shadow:0 0 0 3px rgba(237,181,110,.1)}
+.jr-dialog .jr-search::-webkit-search-cancel-button{filter:grayscale(1) brightness(1.6)}
+.jr-dialog .jr-grid{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:14px;max-height:min(330px,42vh);padding:4px 4px 10px;margin:0 -4px;scrollbar-width:none}
+.jr-dialog .jr-grid::-webkit-scrollbar{display:none}
+.jr-dialog .jr-item{gap:8px;padding:0;border-radius:10px;background:none;color:#bfa999;box-shadow:none;transition:color .18s}
+.jr-dialog .jr-item:hover{background:none;color:#fbefe3}
+.jr-dialog .jr-item[aria-selected=true]{background:none;box-shadow:none;color:#fbefe3}
+.jr-dialog .jr-art{position:relative;display:block;border-radius:9px;overflow:hidden;aspect-ratio:3/4;background:rgba(255,255,255,.04);
+ box-shadow:0 0 0 1px rgba(255,236,214,.08),0 8px 20px rgba(0,0,0,.35);transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .2s}
+.jr-dialog .jr-art .jr-cover{width:100%;height:100%;aspect-ratio:auto;border-radius:0;object-fit:cover}
+.jr-dialog .jr-item:hover .jr-art{transform:translateY(-2px);box-shadow:0 0 0 1px rgba(237,181,110,.35),0 12px 26px rgba(0,0,0,.45)}
+.jr-dialog .jr-item:active .jr-art{transform:scale(.97)}
+.jr-dialog .jr-item[aria-selected=true] .jr-art{box-shadow:0 0 0 2px #c8303c,0 0 0 5px rgba(200,48,60,.22),0 12px 26px rgba(0,0,0,.45)}
+.jr-dialog .jr-check{position:absolute;right:7px;top:7px;width:22px;height:22px;border-radius:50%;background:#c8303c;box-shadow:0 2px 8px rgba(0,0,0,.45);opacity:0;transform:scale(.6);transition:opacity .18s,transform .22s cubic-bezier(.2,.8,.2,1)}
+.jr-dialog .jr-check::after{content:"";position:absolute;left:8px;top:4.5px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.jr-dialog .jr-item[aria-selected=true] .jr-check{opacity:1;transform:none}
+.jr-dialog .jr-name{font-size:12.5px;line-height:1.4;font-weight:600;padding:0 2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.jr-dialog .jr-item:focus-visible{outline:none}.jr-dialog .jr-item:focus-visible .jr-art{box-shadow:0 0 0 2px #edb56e}
+.jr-dialog [data-jr-status]{display:flex;align-items:center;gap:10px;min-height:20px;margin:4px 0 0;padding:11px 14px;border-radius:10px;font-size:13px;font-weight:600;line-height:1.5;
+ color:#d9c6b6;background:rgba(255,236,214,.04);border:1px solid rgba(255,236,214,.07)}
+.jr-dialog [data-jr-status]:empty{display:none}
+.jr-dialog [data-jr-status]::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:#8a7668}
+.jr-dialog [data-jr-status][data-state=checking]::before{background:#edb56e;animation:jr-pulse 1s ease-in-out infinite}
+.jr-dialog [data-jr-status][data-state=restorable]{color:#ffe3b8;background:rgba(237,181,110,.08);border-color:rgba(237,181,110,.25)}
+.jr-dialog [data-jr-status][data-state=restorable]::before{background:#edb56e}
+.jr-dialog [data-jr-status]:is([data-state=applied],[data-state=already]){color:#bfe8c8;background:rgba(92,184,120,.08);border-color:rgba(92,184,120,.25)}
+.jr-dialog [data-jr-status]:is([data-state=applied],[data-state=already])::before{background:#5cb878;box-shadow:0 0 0 3px rgba(92,184,120,.18)}
+.jr-dialog [data-jr-status]:is([data-state=unsupported],[data-state=none],[data-state=missing]){color:#e8b4b4;background:rgba(200,48,60,.07);border-color:rgba(200,48,60,.22)}
+.jr-dialog [data-jr-status]:is([data-state=unsupported],[data-state=none],[data-state=missing])::before{background:#c8303c}
+@keyframes jr-pulse{50%{opacity:.35}}
+.jr-dialog .muted{padding:18px 0;text-align:center;color:#8a7668}
+.jr-dialog .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding:14px 28px 18px;border-top:1px solid rgba(255,236,214,.06);background:rgba(0,0,0,.14)}
+.jr-dialog .dialog-actions .jr-close{margin-right:auto}
+.jr-dialog .dialog-actions button{min-width:96px;height:38px;border-radius:10px;font-weight:600;transition:background-color .18s,border-color .18s,transform .1s}
+.jr-dialog .dialog-actions button:active{transform:scale(.97)}
+.jr-dialog .dialog-actions .secondary{background:rgba(255,236,214,.05);border:1px solid rgba(255,236,214,.12);color:#e6d4c4}
+.jr-dialog .dialog-actions .secondary:hover{background:rgba(255,236,214,.09);border-color:rgba(237,181,110,.3)}
+.jr-dialog .dialog-actions .primary{background:linear-gradient(180deg,#d23a46,#a8263a);border:1px solid #d84a56;color:#fff;box-shadow:0 6px 16px rgba(200,48,60,.3),0 1px 0 rgba(255,255,255,.15) inset}
+.jr-dialog .dialog-actions .primary:hover{filter:brightness(1.08)}
+.jr-dialog .dialog-actions button:disabled{opacity:.5;cursor:default;transform:none}
+:root[data-theme=light] dialog.jr-dialog{background:linear-gradient(180deg,#fbf6f1,#f3ebe3);border-color:rgba(168,50,63,.18);color:#2a1e1a;box-shadow:0 30px 80px rgba(60,30,20,.25)}
+:root[data-theme=light] .jr-dialog .jr-head{background:radial-gradient(120% 140% at 0 0,rgba(168,50,63,.1),transparent 60%)}
+:root[data-theme=light] .jr-dialog .jr-eyebrow{color:#a8323f}
+:root[data-theme=light] .jr-dialog .jr-head h2{color:#2a1e1a}
+:root[data-theme=light] .jr-dialog .jr-head .settings-help,:root[data-theme=light] .jr-dialog .jr-item{color:#6e5a50}
+:root[data-theme=light] .jr-dialog .jr-item:hover,:root[data-theme=light] .jr-dialog .jr-item[aria-selected=true]{color:#2a1e1a}
+:root[data-theme=light] .jr-dialog .jr-search{background-color:#fff!important;color:#2a1e1a;border-color:rgba(168,50,63,.2)}
+:root[data-theme=light] .jr-dialog [data-jr-status]{color:#4a3a33;background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.08)}
+:root[data-theme=light] .jr-dialog [data-jr-status][data-state=restorable]{color:#7a4a12;background:rgba(237,181,110,.14)}
+:root[data-theme=light] .jr-dialog [data-jr-status]:is([data-state=applied],[data-state=already]){color:#1f6b38;background:rgba(92,184,120,.12)}
+:root[data-theme=light] .jr-dialog [data-jr-status]:is([data-state=unsupported],[data-state=none],[data-state=missing]){color:#8a2430;background:rgba(200,48,60,.08)}
+:root[data-theme=light] .jr-dialog .dialog-actions{background:rgba(0,0,0,.03);border-top-color:rgba(0,0,0,.06)}
+:root[data-theme=light] .jr-dialog .dialog-actions .secondary{background:#fff;border-color:rgba(0,0,0,.12);color:#3a2a24}
