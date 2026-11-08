@@ -33,3 +33,10 @@ test('update: background download reports real progress, verifies and reuses the
  u.reset();const again=await u.start(root,'1.1.0',fetcher);assert.equal(again.phase,'ready');assert.equal(downloads,1,'a verified package is reused');
  u.reset();fs.rmSync(root,{recursive:true,force:true});
 });
+test('v1.1.2: the update script is started by Windows (WMI), and a failed launch keeps MeguLit open',async()=>{
+ const {EventEmitter}=require('node:events');let seen=null;
+ const fake=code=>(cmd,args,opt)=>{seen={cmd,args,opt};const c=new EventEmitter();setTimeout(()=>c.emit('exit',code),5);return c;};
+ assert.equal(await u.launchScript('C:\MeguLit',{run:fake(0)}),true);
+ assert.match(seen.args.join(' '),/Win32_Process -MethodName Create/);assert.match(seen.opt.env.MEGULIT_UPDATE_COMMAND,/-File ".*" -Root "C:\MeguLit"/);
+ assert.equal(await u.launchScript('C:\MeguLit',{run:fake(9)}),false);
+});

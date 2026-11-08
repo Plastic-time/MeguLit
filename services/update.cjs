@@ -74,14 +74,29 @@ function start(root,current,fetcher=fetch){
  return job;
 }
 
-/* Hands the verified package to the script; the caller then quits MeguLit. */
-function install(root){
+/* Hands the verified package to the script; the caller then quits MeguLit.
+   v1.1.2 (user, 2026-11-09: "restart and update" reopened the same version, logs/update.log never appeared): a detached
+   powershell.exe started from MeguLit's service exits at once without running anything, and a plain child dies with
+   MeguLit. The script is therefore started by Windows itself through WMI (Win32_Process.Create), outside MeguLit's
+   process tree, and the launcher's return code is checked before MeguLit is allowed to quit. */
+function launchScript(root,{run=spawn}={}){
+ const line=`powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${state.ps1}" -Root "${root}" -Zip "${state.zip}"`;
+ const create='$r=Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine=$env:MEGULIT_UPDATE_COMMAND};exit [int]$r.ReturnValue';
+ return new Promise(resolve=>{
+  let child;try{child=run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-Command',create],{stdio:'ignore',windowsHide:true,env:{...process.env,MEGULIT_UPDATE_COMMAND:line}});}catch{resolve(false);return;}
+  const timer=setTimeout(()=>resolve(false),20000);
+  child.on('error',()=>{clearTimeout(timer);resolve(false);});
+  child.on('exit',code=>{clearTimeout(timer);resolve(code===0);});
+ });
+}
+async function install(root,options){
  if(state.phase!=='ready'||!state.zip||!fs.existsSync(state.zip))throw Error('UPDATE_NOT_READY');
  fs.mkdirSync(path.join(root,'logs'),{recursive:true});
- const child=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',state.ps1,'-Root',root,'-Zip',state.zip],{detached:true,stdio:'ignore',windowsHide:true});
- child.unref();state={...state,phase:'installing'};return status();
+ if(!/^[^"]+$/.test(root+state.ps1+state.zip))throw Error('UPDATE_PATH_REJECTED');
+ if(!await launchScript(root,options))throw Error('UPDATE_LAUNCH_FAILED');
+ state={...state,phase:'installing'};return status();
 }
-async function apply(root,current,fetcher=fetch){await start(root,current,fetcher);return {...install(root),staged:true};}
+async function apply(root,current,fetcher=fetch){await start(root,current,fetcher);return {...await install(root),staged:true};}
 
 /* Runs after MeguLit has exited: only files that exist in the zip are copied. */
 function script(){return `param([string]$Root,[string]$Zip)
@@ -112,4 +127,4 @@ Start-Process -FilePath (Join-Path $Root 'MeguLit.exe') -WorkingDirectory $Root
 Log 'restarted'
 `;}
 function reset(){state={phase:'idle'};job=null;found=null;}
-module.exports={check,start,status,install,apply,newer,latest,installedSize,reset};
+module.exports={check,start,status,install,apply,newer,latest,installedSize,reset,launchScript};
