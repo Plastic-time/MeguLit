@@ -68,13 +68,21 @@ export async function switchLibrary(toWall,render){
     el.animate([{clipPath:'inset(0 0 100% 0)',translate:'0 -14px',opacity:0},{clipPath:'inset(0 0 0 0)',translate:'0 0',opacity:1}],{duration:420,delay,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});
     cover(el)?.animate([{scale:1.18,translate:'0 -5%'},{scale:1,translate:'0 0'}],{duration:640,delay,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});});
   }else{
-   const [cx,cy]=centre(next);
-   for(const el of incoming){const r=el.getBoundingClientRect(),dx=cx-(r.left+r.width/2),dy=cy-(r.top+r.height/2),delay=Math.min(220,Math.hypot(dx,dy)*.18);
-    el.animate([{translate:`${dx*.7}px ${dy*.7}px`,scale:.5,opacity:0},{translate:'0 0',scale:1,opacity:1}],{duration:480,delay,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});
-    cover(el)?.animate([{scale:1.18,translate:`${(-dx/Math.max(1,Math.hypot(dx,dy)))*4}% ${(-dy/Math.max(1,Math.hypot(dx,dy)))*4}%`},{scale:1,translate:'0 0'}],{duration:700,delay,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});}
+   wallIn(next,incoming);
   }
  next.classList.remove('lib-entering');
   // safety: once everything has played, no animation may keep holding a card or cover
   setTimeout(()=>{for(const el of document.querySelectorAll('#library-results .library-card,#library-results .cover-frame img,#library-results .cover-frame .cover'))for(const a of el.getAnimations())if(a.playState==='finished'||a.effect?.getComputedTiming?.().fill==='forwards')a.cancel();},1600);
  }finally{busy=false;host()?.classList.remove('lib-entering');}
+}
+
+/* v1.1.6 (user: switching back to the wall, and opening the library, must gather from the outside in, not spread out
+   from the centre): cards start further out from the centre, a little larger and transparent, and settle inward; the
+   outer ring arrives first. Also played when the library opens straight into the wall. */
+export function wallIn(next,incoming=next?[...next.querySelectorAll('.library-card')].slice(0,400):[]){
+ if(!next||!incoming.length||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ const [cx,cy]=centre(next);let far=1;const d=incoming.map(el=>{const r=el.getBoundingClientRect(),dx=(r.left+r.width/2)-cx,dy=(r.top+r.height/2)-cy,h=Math.hypot(dx,dy);far=Math.max(far,h);return {el,dx,dy,h};});
+ for(const {el,dx,dy,h} of d){const delay=Math.round((1-h/far)*240);
+  el.animate([{translate:`${dx*.32}px ${dy*.32}px`,scale:1.12,opacity:0},{translate:'0 0',scale:1,opacity:1}],{duration:520,delay,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});
+  cover(el)?.animate([{scale:1.16,translate:`${(dx/Math.max(1,h))*-4}% ${(dy/Math.max(1,h))*-4}%`},{scale:1,translate:'0 0'}],{duration:720,delay,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});}
 }
