@@ -25,9 +25,16 @@ internal static class EmbedTextPolicy {
     // closing bracket, a command letter, a tag, an escape or a run of control/private-use characters.
     static readonly Regex Construct = new Regex(@"[【《\[][\$＄@＠][^】》\]\r\n]{0,64}[】》\]]|[%％*＊][A-ZＡ-Ｚ](?![A-Za-zＡ-Ｚａ-ｚ])|[\$＄][\p{L}\p{N}_＿]+|</?[A-Za-z][^>\r\n]*>|\\[nrt](?![A-Za-z])|[\x00-\x08\x0b\x0c\x0e-\x1f-]+");
 
+    // Multilingual containers (E243, Maitetsu Pure Station): every language of a line in one string, split by the engine
+    // through separators the hook decodes as ？？？ / U+FFFD / private-use runs, or written inline as %l<ja>;<zh>%l.
+    // Rewriting one breaks the engine's own split, so all tracks were drawn; such strings are never written back.
+    static readonly Regex TrackSeparator = new Regex(@"\S{2,}[?？�-￰-￿]{3,}\s*\S{2,}");
+    static readonly Regex InlineTrack = new Regex(@"%l[^%\r\n]*;[^%\r\n]*%l|%l\S");
+    public static bool Container(string value) { return value != null && (TrackSeparator.IsMatch(value) || InlineTrack.IsMatch(value)); }
+
     public static string Hide(string value) {
         // An empty reply tells LunaHook to skip writeback entirely, including its own re-encoding.
-        if (String.IsNullOrWhiteSpace(value) || value.Length > 600 || Resource.IsMatch(value)) return "";
+        if (String.IsNullOrWhiteSpace(value) || value.Length > 600 || Resource.IsMatch(value) || Container(value)) return "";
         // A dialogue line that carries a few script constructs used to be skipped whole, so its original stayed under
         // MeguLit's text (CLANNAD HD overlap, user 2026-11-06). Now only the visible text is blanked and every construct
         // stays intact for the engine. Strings dense with constructs (name/variable tables) are still left alone.
@@ -51,6 +58,9 @@ internal static class EmbedTextPolicy {
             Hide("トーンカーブ.dat") == "" && Hide("「またね」<wait>") == "　　　　　<wait>" &&
             Hide("名前%Q") == "" && Hide("「またね」\u0001") == "　　　　　\u0001" &&
             Hide("「やっと来たね」\r\nそうですね……") == "　　　　　　　　\r\n　　　　　　　" &&
-            Hide("Good evening!") == "             ";
+            Hide("Good evening!") == "             " &&
+            Hide("「ついてないわね」「ついてないわね」？？？？？？「真够不走运的」") == "" &&
+            Hide("「確認開始%l砂撒き;放沙%l;。」") == "" &&
+            Hide("「えっ？？？」").Length == "「えっ？？？」".Length;
     }
 }

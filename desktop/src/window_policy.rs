@@ -92,6 +92,17 @@ pub fn restore_home_surface(window:&tauri::WebviewWindow){
  }
  round_home_frame(window);
 }
+/// v1.0.6: the home window must never stay half-faded. If a fade-out ended without the native hide
+/// (hide failed, or a game exit raced the transition), clear the layered alpha whenever it is used again.
+pub fn ensure_home_opaque(window:&tauri::WebviewWindow){
+ if window.label()!="main"{return;}
+ #[cfg(windows)] unsafe{
+  use std::ffi::c_void;
+  #[link(name="user32")]extern "system"{fn GetWindowLongW(hwnd:*mut c_void,index:i32)->i32;}
+  if let Ok(handle)=window.hwnd(){if GetWindowLongW(handle.0 as *mut c_void,-20)&0x80000==0{return;}}else{return;}
+ }
+ restore_home_surface(window);
+}
 #[cfg(test)] mod tests{
  use super::*;
  #[test] fn missing_or_invalid_preference_defaults_to_tray_without_service(){let folder=std::env::temp_dir().join(format!("tome-policy-{}",std::process::id()));std::fs::create_dir_all(folder.join("data")).unwrap();assert!(close_to_tray(&folder));std::fs::write(folder.join("data/preferences.json"),b"{invalid").unwrap();assert!(close_to_tray(&folder));std::fs::remove_dir_all(folder).unwrap();}

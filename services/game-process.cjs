@@ -17,7 +17,7 @@ function shellOpen(root,executable){
 async function gameProcesses(root,exe){
  const pending=path.join(root,'native','GalWindowBridge.updated.exe');
  const bridge=fs.existsSync(pending)?pending:path.join(root,'native','GalWindowBridge.exe');
- const output=await new Promise((resolve,reject)=>execFile(bridge,['--process-status',path.normalize(exe)],{windowsHide:true,timeout:2500,encoding:'utf8'},(error,out)=>error?reject(Error('PROCESS_QUERY_FAILED')):resolve(out)));
+ const output=await new Promise((resolve,reject)=>execFile(bridge,['--process-status',path.normalize(exe)],{windowsHide:true,timeout:8000,encoding:'utf8'},(error,out)=>error?reject(Error('PROCESS_QUERY_FAILED')):resolve(out)));
  const result=JSON.parse(output.trim());
  if(result.type!=='gameProcesses'||!Array.isArray(result.processes))throw Error('PROCESS_QUERY_FAILED');
  return result.processes;

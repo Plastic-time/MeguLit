@@ -7,7 +7,7 @@ Windows 上的 Galgame 阅读与日语学习工具
 
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-8b1e2d)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-3b2124)
-![Version](https://img.shields.io/badge/version-1.0.5-e0a84b)
+![Version](https://img.shields.io/badge/version-1.1.0-e0a84b)
 [![Sponsor](https://img.shields.io/badge/%E2%99%A1-Sponsor-c8323c)](https://github.com/sponsors/ilynthn)
 
 [简体中文](#zh) · [English](#en) · [日本語](#ja) · [♡ 赞赏 / Support](#support)
@@ -30,10 +30,11 @@ Windows 上的 Galgame 阅读与日语学习工具
 ## 简体中文
 
 - [为什么做这个](#zh-why)
-- [v1.0.5 新内容](#zh-new)
+- [v1.1.0 新内容](#zh-new)
 - [功能预览与用法](#zh-tour)
 - [五十音学习（新）](#zh-kana)
 - [安装与快速上手](#zh-install)
+- [常见问题](#faq)
 - [现在能做什么](#zh-status)
 - [接下来](#zh-roadmap)
 - [致谢与许可](#zh-thanks)
@@ -52,18 +53,20 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 
 <a id="zh-new"></a>
 
-### v1.0.5 新内容
+### v1.1.0 新内容
 
-- **五十音学习（Beta）**：「学习」里新增「五十音」和「假名游戏」两个标签，给完全没学过日语的人从零开始用
-  - 25 课：平假名、片假名、浊音，每课一行，认识 → 辨认 → 回忆 → 混合四步
-  - 笔顺动画（KanjiVG 数据）、字源、例词、易混对比
-  - **例句来自你自己玩过的游戏**：学 あ行 时，会从你的阅读记录里找出含这个假名的台词
-  - 发音走 MeguLit 的 AivisSpeech，用词典读音和音调，默认「まお · おちつき」风格，有单独的音量
-- **三个假名小游戏**：行段识别、前后假名、平片转换，四档难度，支持日语输入法和屏幕假名键盘
-- **达成率评分**：满分 101.0000%，分 CRITICAL PERFECT / PERFECT / GREAT / GOOD / MISS 五种判定和 SSS+ 到 D 的评级；结算页逐项列出分数来源和错题分析
-- **学习手帐**：熟悉度、到期复习（1 → 3 → 7 → 21 天）、个人最佳、练习记录
-- **汉字读音**：在 MeguLit 里打开《漢字でGO!》官方页面（外部网站，与 MeguLit 无关）
-- 学习进度存在本地 `data/kana-progress.json`，重启后恢复
+- **自动更新**：每次启动会联网检查新版本，有的话直接在后台下载。右下角会显示版本号、更新内容、安装包比现在大还是小，以及真实的下载进度。下载完会先校验，再由你决定「重启并更新」还是「稍后」。只替换程序文件，游戏库、学习记录和设置都会保留。「关于」页也能手动检查
+- **默认背景**：自带一张浅色、一张深色背景，跟着浅色 / 深色主题自动切换。设了自己的图片就用你的
+- **学习统计重做**：魔导书 × 毛玻璃风格。日历、本月读的书、字数走势、阅读时段、星期分布、阅读手感、常查的词和文字分析，每一块都能单独切换年 / 月 / 周 / 日
+- **空页面重做**：句子、单词、回收站、历史为空时，会告诉你这里会出现什么、怎么让它出现。词典首页列出你常查的词，点一下就能查
+- **关于页**：重新做了打赏区，链接里加了「常见问题」
+- **修复**
+  - 部分电脑上点「启动游戏」直接报「无法检查游戏是否已运行」，Steam 游戏尤其常见。现在查不到进程也会照常启动
+  - 关闭游戏后 MeguLit 主窗口偶尔变成半透明
+  - 多语言版游戏（如 Maitetsu Pure Station）把日文、简中、繁中整串显示出来，或者漏出 %l 这类标记
+
+> [!NOTE]
+> v1.0.5 及更早的版本还没有自动更新，这一次需要手动下载 v1.1.0 覆盖。之后的版本 MeguLit 会自己更新
 
 <a id="zh-tour"></a>
 
@@ -81,6 +84,11 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 <td>游戏库：扫描文件夹和 Steam，系列作品会归到一起</td>
 </tr>
 </table>
+
+<div align="center">
+<img src="docs/screenshots/library-search.gif" width="800" alt="游戏库搜索">
+<br><sub>游戏库搜索：每打一个字母，不相关的封面就散开，留下来的自动排到中间</sub>
+</div>
 
 1. 第一次打开时选择放游戏的文件夹，MeguLit 会自动找出日文原版 EXE
 2. 点封面进入作品详情，点「启动游戏」。需要转区的游戏可以在详情里单独打开 Locale Emulator
@@ -128,7 +136,13 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 
 <img src="docs/screenshots/stats.jpg" width="900" alt="学习统计">
 
-学习统计：按年 / 月 / 周 / 日看阅读字数、时长、查词次数和每部作品的阅读量
+<img src="docs/screenshots/stats-trend.jpg" width="900" alt="字数走势与阅读时段">
+
+学习统计：阅读字数、时长、查词、阅读日历、每部作品的阅读量、字数走势、阅读时段、星期分布和阅读手感。每一块都能单独切换年 / 月 / 周 / 日
+
+<img src="docs/screenshots/empty-state.jpg" width="900" alt="空页面">
+
+还没有内容的页面会告诉你这里会出现什么，以及怎么让它出现
 
 - 在阅读层查词时点「制卡」，会带上游戏截图和原声（没配音的旁白用本地 TTS 补）
 - Anki 需要自己安装 Anki 和 AnkiConnect，MeguLit 可以一键装好 AnkiConnect
@@ -230,7 +244,7 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 > [!WARNING]
 > **游戏剧情必须是日文原文。** MeguLit 读取的是游戏正在显示的台词：如果剧情文本被汉化或翻译成其他语言，读到的就不是日文，注音、点读、翻译都会变成乱码或无法使用。只汉化了菜单、按钮等界面、剧情仍是日文的游戏不受影响。中文版游戏可以先试试「工具 → 日文原版恢复（实验性）」
 
-1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.0.5-win-x64.zip`（约 17 MB），解压后运行 `MeguLit.exe`
+1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.1.0-win-x64.zip`（约 18 MB），解压后运行 `MeguLit.exe`
 2. 第一次启动会弹出安装窗口，二选一：
    - **完整版**：下载约 565 MB，一次装齐全部组件（注音分词词典、AivisSpeech 语音引擎），需要预留约 1.8 GB 磁盘。推荐
    - **精简版**：下载约 107 MB，能用阅读层、翻译和查词，其余组件以后可以在设置里补装
@@ -238,9 +252,36 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 4. 在游戏库点一部作品 → 「启动游戏」，阅读层会自动接上
 5. 零基础的话，先去 学习 → 五十音 学完平假名再开始读
 
-已经装过旧版：直接用新文件覆盖旧的 MeguLit 文件夹，组件和数据都会保留
+已经装过旧版：直接用新文件覆盖旧的 MeguLit 文件夹，组件和数据都会保留。从 v1.1.0 开始，新版本会在启动时自动下载更新
+
+**请用窗口模式玩游戏**：全屏（独占全屏）下阅读层会显示不全，见[常见问题](#faq)
 
 需要 Windows 10/11 x64 和 Microsoft Edge WebView2 Runtime。本地翻译模型比较大，不在安装包里，需要的话在设置里按需下载
+
+<a id="faq"></a>
+
+### 常见问题
+
+**Q：全屏玩的时候翻译显示不全，或者文字跑到桌面上了？**
+A：请把游戏切到**窗口模式**。全屏现在有 bug：独占全屏时游戏会盖住其他窗口，MeguLit 的阅读层没法稳定地画在游戏上面。窗口模式下效果最好，窗口拉大一点也没关系
+
+**Q：点「启动游戏」提示「无法检查游戏是否已运行」？**
+A：v1.1.0 已经修复。旧版本在部分电脑上（多半是杀毒软件拦了进程查询）会这样，更新到 v1.1.0 就好
+
+**Q：读到的全是乱码，或者不是日文？**
+A：MeguLit 读的是游戏正在显示的剧情文本，剧情必须是日文原文。汉化版可以先试试「工具 → 日文原版恢复」
+
+**Q：更新会不会把我的数据弄丢？**
+A：不会。自动更新只替换程序文件，`data`、`logs`、`cache`、`runtime`、`models` 这几个文件夹都不碰，旧的 `MeguLit.exe` 还会留一份 `MeguLit.rollback-update.exe`
+
+**Q：Anki 连不上？**
+A：先打开 Anki，并装好 AnkiConnect（MeguLit 里可以一键安装）。如果端口 8765 被别的程序占了，也会连不上
+
+**Q：游戏库里找不到我的游戏？**
+A：在游戏库点「+」手动添加游戏的 EXE，或者在设置里加扫描文件夹。Steam 游戏会自动扫到
+
+**Q：某个游戏读不到文字？**
+A：不同引擎的情况差别很大。可以在 [Issues](https://github.com/ilynthn/MeguLit/issues) 里留下游戏名，最好附上 `logs` 文件夹
 
 <a id="zh-status"></a>
 
@@ -333,23 +374,25 @@ I didn't want either, so I built my own, mostly by vibe coding with AI. I use it
 
 The UI comes in Simplified Chinese, English and Japanese. The new kana course below is Chinese-only for now.
 
-### New in v1.0.5
+### New in v1.1.0
 
-- **Kana course (beta)**: two new tabs under Learn, *Kana* and *Kana games*. 25 lessons (hiragana, katakana, voiced kana), stroke-order animation from KanjiVG, kana origins, example words, look-alike comparisons, and **example lines taken from games you've actually read**. Voice goes through MeguLit's AivisSpeech with dictionary readings and pitch accent, with its own volume.
-- **Three kana games** (row/column, before/after, hiragana ↔ katakana) with four difficulty levels, Japanese IME input and an on-screen kana keyboard
-- **Achievement scoring**: max 101.0000%, five judgments (CRITICAL PERFECT to MISS), ranks from SSS+ to D, and a results page that explains every point and every mistake
-- **Study notebook**: familiarity map, spaced review (1 → 3 → 7 → 21 days), personal bests, practice log
-- **Kanji reading**: opens the official *漢字でGO!* page (by Micelle, on PLiCy) inside MeguLit. It's an external site and not part of MeguLit.
+- **Automatic updates**: MeguLit checks for a new release on every start and downloads it in the background. A card shows the version, what changed, how the package size changes and the real download progress. Restart to update now or later. Only program files are replaced; your library, study records and settings stay
+- **Default backgrounds**: a light one and a dark one that follow the light / dark theme. Your own picture still wins
+- **Statistics redesigned**: calendar, books, character trend, reading hours, weekdays, reading feel, top lookups and text analysis, each switchable between year / month / week / day
+- **Empty pages** for sentences, words, trash and history now say what will appear there and how to get it
+- **Fixes**: "could not check whether the game was running" on some PCs (mostly Steam games); the main window staying half transparent after closing a game; multilingual builds showing every language track or %l markers
+
+v1.0.5 and earlier have no updater, so download v1.1.0 by hand once. Later versions update themselves.
 
 ### Tour
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/library.jpg" alt="Library"></td>
+<td width="50%"><img src="docs/screenshots/library-search.gif" alt="Library search"></td>
 <td width="50%"><img src="docs/screenshots/game-detail.jpg" alt="Game page"></td>
 </tr>
 <tr>
-<td>Library: folder and Steam scan, series grouping</td>
+<td>Library search: covers that do not match scatter away as you type</td>
 <td>Game page: synopsis, ratings, reading log, linked words</td>
 </tr>
 <tr>
@@ -385,12 +428,19 @@ The UI comes in Simplified Chinese, English and Japanese. The new kana course be
 > [!WARNING]
 > **The game's story text must be the original Japanese.** A translated interface is fine as long as the dialogue itself is still Japanese. For a translated edition, try Tools → Restore Japanese (experimental) first.
 
-1. Download `MeguLit-v1.0.5-win-x64.zip` (about 17 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`. Upgrading: unzip over the old folder; components and data are kept.
+1. Download `MeguLit-v1.1.0-win-x64.zip` (about 18 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`. Upgrading: unzip over the old folder; components and data are kept.
 2. Pick **Full** (about 565 MB, everything including furigana dictionaries and the AivisSpeech voice engine, about 1.8 GB on disk) or **Lite** (about 107 MB; add the rest later in Settings).
 3. Choose your game folder, pick a game in the library and press *Launch*. The overlay attaches by itself.
 4. New to Japanese? Start with Learn → Kana.
 
 Needs Windows 10/11 x64 and the Microsoft Edge WebView2 Runtime. For the Anki features, install Anki and AnkiConnect.
+
+### FAQ
+
+- **Translations cut off or text on the desktop in fullscreen?** Play in **windowed mode**. Exclusive fullscreen has a bug where the overlay cannot stay on top of the game; windowed mode works best.
+- **"Could not check whether the game was running"?** Fixed in v1.1.0.
+- **Garbled text?** The story text must be the original Japanese.
+- **Will an update delete my data?** No. Only program files are replaced; `data`, `logs`, `cache`, `runtime` and `models` are left alone.
 
 ### Roadmap
 
@@ -426,14 +476,14 @@ GPL-3.0-or-later, see [LICENSE](LICENSE). Third-party components keep their own 
 
 やりたいことはひとつだけ。**ゲームはそのまま、でも読めるようになる。** 原文、翻訳、ふりがな、辞書、AI 解説、単語帳、Anki 復習を、ゲームの横で全部済ませられます
 
-### v1.0.5 の新機能
+### v1.1.0 の新機能
 
-- **五十音コース（ベータ）**：「学習」に「五十音」と「仮名ゲーム」を追加。全 25 課（ひらがな・カタカナ・濁音）、KanjiVG の筆順アニメ、字源、例語、似ている仮名の比較、そして **自分が読んだゲームの台詞から例文を表示**。発音は MeguLit の AivisSpeech（辞書の読みとアクセント付き）
-- **仮名ゲーム 3 種**：行と段、前後の仮名、ひらがな ↔ カタカナ。4 段階の難易度、日本語 IME と画面上の仮名キーボードに対応
-- **達成率**：最大 101.0000%、CRITICAL PERFECT から MISS までの判定、SSS+ から D までのランク。結果画面で得点の内訳とミスの傾向を表示
-- **学習手帳**：習熟度、間隔反復（1 → 3 → 7 → 21 日）、自己ベスト、練習記録
-- **漢字の読み**：PLiCy の『漢字でGO!』（作者 Micelle）公式ページを MeguLit の中で開きます。外部サイトであり、MeguLit とは関係ありません
-- 学習の説明文は現在中国語のみです
+- **自動アップデート**：起動のたびに新しいバージョンを確認し、裏でダウンロードします。バージョン、更新内容、サイズの増減、実際の進捗を表示。プログラムだけを置き換え、ライブラリ・学習記録・設定は残ります
+- **デフォルト背景**：ライト / ダークのテーマに合わせて切り替わる背景を 2 枚同梱
+- **学習統計を作り直し**：カレンダー、作品、文字数の推移、時間帯、曜日、読書の手応えなど、パネルごとに年 / 月 / 週 / 日を切り替え
+- **修正**：一部の PC で「ゲームが起動中か確認できません」と出て起動できない問題（Steam 版に多い）、ゲーム終了後にウィンドウが半透明になる問題、多言語版で全言語の文が表示される問題
+
+v1.0.5 以前には自動更新がないため、今回だけ手動で v1.1.0 をダウンロードしてください
 
 <table>
 <tr>
@@ -447,11 +497,17 @@ GPL-3.0-or-later, see [LICENSE](LICENSE). Third-party components keep their own 
 > [!WARNING]
 > **ゲームのシナリオ本文が日本語原文である必要があります。** メニューなど UI だけが翻訳されていて本文が日本語なら問題ありません。翻訳版は先に「ツール → 日本語に戻す（実験的）」をお試しください
 
-1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.0.5-win-x64.zip`（約 17 MB）をダウンロードして展開し、`MeguLit.exe` を起動。旧版からは上書きで更新でき、コンポーネントとデータは残ります
+1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.1.0-win-x64.zip`（約 18 MB）をダウンロードして展開し、`MeguLit.exe` を起動。旧版からは上書きで更新でき、コンポーネントとデータは残ります
 2. 初回のセットアップで **完全版**（約 565 MB、ふりがな辞書と AivisSpeech 音声エンジンを含む、空き容量約 1.8 GB）か **軽量版**（約 107 MB、残りは設定から追加）を選択
 3. ゲームフォルダを選び、ライブラリから作品を選んで「ゲーム起動」。読書レイヤーは自動で接続されます（Alt+T でメニュー）
 
 Windows 10/11 x64 と Microsoft Edge WebView2 Runtime が必要です。Anki 機能には Anki と AnkiConnect が必要です
+
+### よくある質問
+
+- **フルスクリーンで翻訳が欠ける・文字がデスクトップに出る**：**ウィンドウモード**で遊んでください。排他フルスクリーンには不具合があり、ウィンドウモードがいちばん安定します
+- **「ゲームが起動中か確認できません」**：v1.1.0 で修正済みです
+- **アップデートでデータは消える？**：消えません。プログラムだけを置き換えます
 
 ### 今後
 

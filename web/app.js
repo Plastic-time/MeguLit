@@ -3,6 +3,7 @@ import './primary-buttons.js';
 import {embedStatus} from './embed-status.js';
 import {statisticsHTML,statisticsResultsHTML,bindStatistics,bindStatisticsCharts} from './statistics-view.js';
 import {renderActivity} from './learning-activity.js';
+import {mountStatistics} from './statistics-grimoire.js';
 import {mountHistoryTranslations} from './history-translation.js';
 import {updateHomeOverview,createHomeRefresh} from './home-refresh.js';
 import {recentGames} from './home-library.js';
@@ -18,7 +19,8 @@ import {renderAnkiReview} from './anki-review.js';
 import {createHomeMotion} from './home-motion.js';
 import {renderGamePage} from './game-detail.js';
 import {words as grimoireWords,paintGlow,stopGlow,setupMarquees,fitShelf,placeGreeting,closeDialog,toolsHTML,dockPageTools,pageEnter,subpageEnter,watchHomeFade,matchJacket,fieldify,stopField,moveTabInk} from './grimoire.js';
-import {aboutHTML,aboutLabel,mountAbout} from './about.js';
+import {aboutHTML,aboutLabel,mountAbout,VERSION} from './about.js';
+import {checkForUpdates} from './update-notice.js';
 import {maybeFirstRun} from './first-run.js';
 let selectedGameId='',gameOrigin='library',selectedSeriesId='';
 import {renderSettings} from './settings.js';
@@ -38,7 +40,9 @@ const refreshLibrary=createLibraryRefresh({api:(...args)=>api(...args),onBusy:li
 let locale='zh',text=messages.zh;
 let homeImageDimensions=null,backgroundPreview=null,currentBackgroundSrc='',backgroundRequest=0,backgroundEditRequest=0;
 function placeBackground(){const layer=document.querySelector('.app-backdrop');if(!layer||!homeImageDimensions)return;const crop=backgroundPreview?.crop||model.background?.crop||{},g=backgroundGeometry(homeImageDimensions,crop,{width:innerWidth,height:innerHeight},model.background?.blur||0);layer.style.setProperty('--home-image-position',`${g.ox}px ${g.oy}px`);layer.style.setProperty('--home-image-size',`${Math.ceil(g.dw)}px ${Math.ceil(g.dh)}px`);}
-async function applyBackground(image){const revision=++backgroundRequest;if(!model.preferences.homeBackground&&!backgroundPreview)image='';const layer=document.querySelector('.app-backdrop');if(!layer)return false;if(!image){layer.style.setProperty('--home-image','none');homeImageDimensions=null;if(!backgroundPreview)currentBackgroundSrc='';return true;}try{const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=image;});if(revision!==backgroundRequest||!layer.isConnected)return false;layer.style.setProperty('--home-image',`url("${image}")`);homeImageDimensions=[img.naturalWidth,img.naturalHeight];if(!backgroundPreview)currentBackgroundSrc=image;placeBackground();return true;}catch{return false;}}
+/* v1.1.0: with no picture of the user's own, the bundled default follows the light/dark theme */
+const defaultBackground=()=>document.documentElement.dataset.theme==='light'?'assets/default-background-light.webp':'assets/default-background-dark.webp';let backgroundIsDefault=false;const themeBackground=()=>{if(backgroundIsDefault)applyBackground('');};
+async function applyBackground(image){const revision=++backgroundRequest;backgroundIsDefault=!image&&!backgroundPreview&&!!model.preferences.homeBackground;if(backgroundIsDefault)image=defaultBackground();if(!model.preferences.homeBackground&&!backgroundPreview)image='';const layer=document.querySelector('.app-backdrop');if(!layer)return false;if(!image){layer.style.setProperty('--home-image','none');homeImageDimensions=null;if(!backgroundPreview)currentBackgroundSrc='';return true;}try{const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=image;});if(revision!==backgroundRequest||!layer.isConnected)return false;layer.style.setProperty('--home-image',`url("${image}")`);homeImageDimensions=[img.naturalWidth,img.naturalHeight];if(!backgroundPreview)currentBackgroundSrc=image;placeBackground();return true;}catch{return false;}}
 
 addEventListener('resize',placeBackground);
 addEventListener('tome-background-preview',event=>{const next={...model.background,crop:{...model.background?.crop}};for(const[key,value]of Object.entries(event.detail||{})){if(key.startsWith('crop.'))next.crop[key.slice(5)]=value;else next[key]=value;}model.background=next;setAppearance();});
@@ -102,7 +106,7 @@ document.addEventListener('focusin',e=>{const t=e.target;if(t?.matches?.('input:
 function setAppearance(preferences=model.preferences){
   locale=['zh','ja','en'].includes(preferences.language)?preferences.language:'zh';text=messages[locale];
   document.documentElement.lang=locales[locale];
-  document.documentElement.dataset.theme=preferences.themeMode||'dark';
+  {const theme=preferences.themeMode||'dark',was=document.documentElement.dataset.theme;document.documentElement.dataset.theme=theme;if(was&&was!==theme&&typeof themeBackground==='function')themeBackground();}
   document.documentElement.style.setProperty('--g-bar',/^#[0-9a-f]{6}$/i.test(preferences.barColor||'')?preferences.barColor:'#1a1110');
   document.documentElement.dataset.glow=preferences.glow===false?'off':'on';document.documentElement.style.setProperty('--home-font-scale',Number(preferences.homeFontScale)||1);document.documentElement.style.setProperty('--glow-speed',Number(preferences.glowSpeed)||1);
   document.documentElement.style.setProperty('--accent',preferences.accent);
@@ -174,7 +178,25 @@ function bindDrag(){
  document.querySelector('.app-frame').addEventListener('mousedown',event=>{if(event.target.matches('.app-frame,.workspace,.main'))drag(event);});
 }
 
-function empty(label,symbol='library',sub=''){return `<div class="empty-state">${icon(symbol)}<h2>${esc(label)}</h2>${sub?`<p>${esc(sub)}</p>`:''}</div>`;}
+function empty(label,symbol='library',sub=''){const kind={[text.emptyWords]:'words',[text.emptySentences]:'sentences',[text.emptyTrash]:'trash',[text.emptyHistory]:'history',[text.emptyDialogue]:'history'}[label];if(kind)return blankPage(kind);return `<div class="empty-state">${icon(symbol)}<h2>${esc(label)}</h2>${sub?`<p>${esc(sub)}</p>`:''}</div>`;}
+/* v1.0.5 空状态：说明这里会出现什么、怎么让它出现，并给出可以直接点的入口 */
+const BLANK={
+ zh:{sentences:['句','句子','还没有收藏句子','在游戏里读到喜欢、想记住的台词，收藏下来，会连同作品名、时间和译文一起留在这里，也能做成 Anki 卡片',[['启动游戏','从游戏库打开一部作品'],['打开阅读层菜单','按 Alt+T'],['收藏这一句','当前台词会存到这里']],[['library','去游戏库 →']]],
+  words:['詞','单词','生词本还是空的','在游戏里点一下不认识的词，在查词卡片上收录，它就会带着读音、释义和出处例句来到这里',[['点一下生词','阅读层里直接点'],['拖一段短语','可以查整句里的搭配'],['收录','之后可以同步到 Anki']],[['library','去游戏库 →'],['kana','先学五十音']]],
+  trash:['屑','回收站','回收站是空的','从生词本删掉的词会先放在这里，不会马上消失。点「恢复」就能放回去，连同例句和掌握程度',[],[['words','← 回到单词本',1]]],
+  history:['頁','历史','还没有阅读记录','每次用 MeguLit 打开游戏，读了多久、读了多少字、每一句原文和译文，都会自动记在这里，不用手动保存',[['选一部作品','游戏库里点封面'],['启动游戏','阅读层会自动接上'],['开始读','记录自动生成']],[['library','去游戏库 →']]]},
+ ja:{sentences:['句','文','保存した文はまだありません','気に入った台詞を保存すると、作品名・日時・訳文と一緒にここに残り、Anki カードにもできます',[['ゲームを起動','ライブラリから作品を開く'],['読書メニューを開く','Alt+T'],['この台詞を保存','現在の台詞がここに入ります']],[['library','ライブラリへ →']]],
+  words:['詞','単語','単語帳はまだ空です','ゲーム中にわからない語をクリックし、辞書カードで登録すると、読み・意味・出典の例文と一緒にここに入ります',[['語をクリック','読書レイヤーで直接'],['フレーズをドラッグ','組み合わせも調べられます'],['登録','Anki にも同期できます']],[['library','ライブラリへ →'],['kana','五十音から始める']]],
+  trash:['屑','ごみ箱','ごみ箱は空です','単語帳から削除した語はいったんここに入ります。「復元」で例文や習熟度ごと戻せます',[],[['words','← 単語帳へ',1]]],
+  history:['頁','履歴','読書の記録はまだありません','MeguLit でゲームを開くと、読書時間・文字数・原文と訳文が自動でここに記録されます',[['作品を選ぶ','ライブラリでカバーをクリック'],['ゲームを起動','読書レイヤーが自動で接続'],['読み始める','記録は自動で作られます']],[['library','ライブラリへ →']]]},
+ en:{sentences:['句','Sentences','No saved sentences yet','Save a line you like while reading. It stays here with the game, time and translation, and can become an Anki card',[['Launch a game','Open one from the library'],['Open the reader menu','Press Alt+T'],['Save this line','The current line lands here']],[['library','Go to library →']]],
+  words:['詞','Words','Your word list is empty','Click an unknown word in the game and add it from the lookup card. It arrives here with its reading, meaning and the line it came from',[['Click a word','Right in the overlay'],['Drag a phrase','Look up whole expressions'],['Add it','Sync to Anki later']],[['library','Go to library →'],['kana','Start with kana']]],
+  trash:['屑','Recycle bin','The recycle bin is empty','Words you delete wait here first. Restore brings them back with their examples and progress',[],[['words','← Back to words',1]]],
+  history:['頁','History','No reading yet','Every time MeguLit opens a game, reading time, characters and every line with its translation are recorded here automatically',[['Pick a game','Click a cover in the library'],['Launch it','The overlay attaches by itself'],['Start reading','Records appear automatically']],[['library','Go to library →']]]}
+};
+function blankPage(kind){const [glyph,eyebrow,title,lede,steps,acts]=(BLANK[locale]||BLANK.zh)[kind],nums=['壱','弐','参'];
+ return `<section class="g-blank"><span class="glyph" aria-hidden="true">${glyph}</span><div class="eyebrow">${esc(eyebrow)}</div><h2>${esc(title)}</h2><p class="lede">${esc(lede)}</p>${steps.length?`<div class="steps">${steps.map(([b,s],i)=>`<div><i>${nums[i]}</i><b>${esc(b)}</b>${esc(s)}</div>`).join('')}</div>`:''}<div class="acts">${acts.map(([to,label,alt],i)=>`<button type="button" class="${i||alt?'alt':'go'}" data-blank-go="${to}">${esc(label)}</button>`).join('')}</div></section>`;}
+document.addEventListener('click',event=>{const b=event.target.closest?.('[data-blank-go]');if(!b)return;const to=b.dataset.blankGo;if(to==='library')navigate('library');else navigate('learning',to==='kana'?'kana':'words');});
 function heading(title,tools=''){return `<div class="page-header"><h1>${esc(title)}</h1><div class="page-tools">${tools}</div></div>`;}
 function card(game,library=false){
  const copy={zh:{hook:'Hook 可用',pending:'Hook 待实测',unsupported:'Hook 未适配',hookHint:'依据已有作品适配记录；实时连接状态请在游戏内查看',reading:'累计阅读',words:'关联单词',engine:'游戏引擎',last:'上次游玩',details:'点击查看详情'},en:{hook:'Hook supported',pending:'Hook unverified',unsupported:'Hook unsupported',hookHint:'From the saved compatibility record; check live status in game',reading:'Total reading',words:'Linked words',engine:'Engine',last:'Last played',details:'Click for details'},ja:{hook:'Hook 対応',pending:'Hook 未検証',unsupported:'Hook 未対応',hookHint:'保存済みの対応情報です。現在の接続はゲーム内で確認できます',reading:'累計読書',words:'関連単語',engine:'エンジン',last:'前回のプレイ',details:'クリックで詳細'}}[locale],embed=embedStatus(game,locale),hook=embed.label;
@@ -553,6 +575,8 @@ function dictionary(target){
   let ticket=0,poll=0,lastItems=[],lastOnline=false;
   target.innerHTML=`<div class="moji-account" id="moji-account"></div><form class="lookup-form" id="lookup-form"><input type="search" id="lookup-input" autocomplete="off" spellcheck="false" placeholder="${text.lookupHint}" aria-label="${text.dictionary}" maxlength="100"><button type="submit" value="moji" class="primary">${L.online}</button><button type="submit" value="local" class="secondary">${L.local}</button></form><div id="lookup-results"></div>`;
   const account=target.querySelector('#moji-account'),results=target.querySelector('#lookup-results');
+  /* v1.0.5：还没输入时，列出常查的词，点一下直接查 */
+  api('unknown_words').then(list=>{if(!list?.length||!results.isConnected||results.children.length)return;const chips=document.createElement('div');chips.className='g-dict-chips';chips.innerHTML=`<span>${{zh:'你常查的',ja:'よく調べる語',en:'Often looked up'}[locale]}</span>`+list.slice(0,10).map(w=>`<button type="button" data-chip="${esc(w.surface)}">${esc(w.surface)}<small>${number(w.lookups)}</small></button>`).join('');chips.onclick=e=>{const c=e.target.closest('[data-chip]');if(!c)return;const input=target.querySelector('#lookup-input'),form=target.querySelector('#lookup-form');input.value=c.dataset.chip;form.querySelector('button[value=local]').click();};target.querySelector('#lookup-form').after(chips);}).catch(()=>{});
   const stopPoll=()=>{clearTimeout(poll);poll=0;};
   const showStatus=state=>{stopPoll();account.innerHTML=state?.signedIn?`<span class="moji-state signed">${L.signed}${state.name?' · '+esc(state.name):''}</span><button type="button" class="text-button" data-moji-logout>${L.logout}</button>`:`<span class="moji-state">${L.anon}</span><button type="button" class="text-button" data-moji-login>${L.login}</button>`;
     account.querySelector('[data-moji-login]')?.addEventListener('click',startLogin);
@@ -680,11 +704,9 @@ function learningSlot(){
 }
 let statisticsSelection={range:'month',date:new Date().toLocaleDateString('en-CA')};
 async function statistics(token){
- subtab='statistics';const main=learningSlot(),env={locale,text,esc,icon,duration,number,cover,heading:()=>''};
- const [data,activity]=await Promise.all([api('statistics',statisticsSelection),api('learning_activity').catch(()=>null)]);if(token!==pageToken)return;
- main.closest('.main').classList.remove('review-page');main.innerHTML=statisticsHTML(data,env);let request=0;
- const controls=bindStatistics(main,{env,onChange:async selection=>{const ticket=++request;try{const next=await api('statistics',selection);if(token!==pageToken||ticket!==request)return;statisticsSelection=selection;const scroll=main.scrollTop;main.querySelector('.statistics-results').innerHTML=statisticsResultsHTML(next,env);bindStatisticsCharts(main,env);controls.updateSelection(next.period);main.scrollTop=scroll;}catch(error){if(token===pageToken&&ticket===request){controls.updateSelection(statisticsSelection);toast(errorMessage(error));}}}});
- if(activity)renderActivity(main.querySelector('#statistics-activity'),activity,{locale,esc,duration,number},api);
+ subtab='statistics';const main=learningSlot();main.closest('.main').classList.remove('review-page');
+ const env={locale,text,esc,icon,duration,number,cover,gameById:id=>(model.games||[]).find(g=>g.id===id)};
+ if(token!==pageToken)return;await mountStatistics(main,{api,env,selection:statisticsSelection,onSelection:selection=>{statisticsSelection=selection;}});
 }
 
 function loading(){return '<div class="loading-screen"><span class="spinner" aria-label="'+text.loading+'"></span></div>';}
@@ -710,6 +732,8 @@ async function start(){
     const recovered={};for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(/^(tome|tomoyo)-/.test(key)&&!/key|token|secret|password/i.test(key))recovered[key]=localStorage.getItem(key);}
     await api('preserve_ui',{values:recovered});
     model=await api('home');setAppearance();shell();await renderRoute();
+    /* v1.1.0: look for a new release once per start; silent unless there is one */
+    if(!window.__megulitUpdateChecked){window.__megulitUpdateChecked=true;setTimeout(()=>checkForUpdates({api,invoke,version:VERSION,toast}),4000);}
     const callback=window.__TAURI_INTERNALS__?.transformCallback(response=>{playHomeMotion(response.payload);if(response.payload==='hidden'&&pendingHomeGame){const id=pendingHomeGame;pendingHomeGame='';api('focus_game',{id}).catch(error=>toast(errorMessage(error)));}});if(callback)await invoke('plugin:event|listen',{event:'overlay-home',target:{kind:'Any'},handler:callback});const healthCallback=window.__TAURI_INTERNALS__?.transformCallback(response=>{const state=response.payload;if(state.ready)readerNotice('');else if(state.error)readerNotice(state.error);});if(healthCallback)await invoke('plugin:event|listen',{event:'reader-health',target:{kind:'Any'},handler:healthCallback});const pendingCallback=window.__TAURI_INTERNALS__?.transformCallback(response=>{if(response.payload.type==='bindPending'&&document.hasFocus())toast(({zh:'等待游戏窗口。游戏已打开时，也可以用 Alt+T 手动绑定窗口',en:'Waiting for a game window. Use Alt+T to select a game window manually.',ja:'ゲームウィンドウを待機中です。Alt+T で手動選択できます'})[locale]);});if(pendingCallback)await invoke('plugin:event|listen',{event:'reader-event',target:{kind:'Any'},handler:pendingCallback});await invoke('window_action',{action:'ready'});const metadataCallback=window.__TAURI_INTERNALS__?.transformCallback(async()=>{try{model=await api('home');if(route==='library')renderGames();else if(route==='home')home();else if(route==='series')seriesUI.renderDetail(document.querySelector('#main'),selectedSeriesId);}catch{}});if(metadataCallback)await invoke('plugin:event|listen',{event:'library-updated',target:{kind:'Any'},handler:metadataCallback});window.__TOME_READY__=true;refreshLibrary({startup:true}).catch(()=>{});invoke('reader_open',{background:true}).then(()=>waitReader()).catch(error=>readerNotice(error.message||error)); 
   }
   catch(error){app.innerHTML=`<div class="loading-screen"><div>${text.loadingFailed}<button class="primary" id="startup-retry">${text.retry}</button></div></div>`;document.querySelector('#startup-retry').addEventListener('click',start);await invoke('window_action',{action:'ready'}).catch(()=>{});}

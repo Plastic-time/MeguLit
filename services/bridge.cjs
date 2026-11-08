@@ -32,6 +32,8 @@ function savePreferences(request) {
   if(typeof patch.fontFamily==='string' && !/[<>{};]/.test(patch.fontFamily))next.fontFamily=patch.fontFamily.slice(0,120);
   if(Number.isFinite(patch.backgroundDim))next.backgroundDim=Math.max(0,Math.min(1,patch.backgroundDim));
   if(typeof patch.homeBackground==='boolean')next.homeBackground=patch.homeBackground?'background.jpg':'';
+  /* v1.1.0 ships a default background: the first save turns it on once, a later toggle-off is kept */
+  if(!next.defaultBackground110){if(typeof patch.homeBackground!=='boolean')next.homeBackground=next.homeBackground||'background.jpg';next.defaultBackground110=true;}
   if(['dark','black','light'].includes(patch.themeMode))next.themeMode=patch.themeMode;
   const file=path.join(root,'data','preferences.json'),temporary=file+'.'+process.pid+'.tmp';
   fs.writeFileSync(temporary,JSON.stringify(next,null,2));fs.renameSync(temporary,file);
@@ -52,7 +54,8 @@ async function launch(db,id,runtime=null,windowsLaunch=false) {
   const {gameProcesses}=require('./game-process.cjs');
   const ready=()=>require('./game-readiness.cjs').waitForVisibleGame(()=>gameProcesses(root,game.executable));
   // Paths are passed as literal process arguments, never interpolated into a shell.
-  const focused=await require('./game-process.cjs').gameProcess(root,game.executable,{focus:true});
+  /* If MeguLit cannot query processes here, launch anyway: a single-instance game handles a second start itself (v1.1.0). */
+  let focused='absent';try{focused=await require('./game-process.cjs').gameProcess(root,game.executable,{focus:true});}catch(error){if(error.message!=='PROCESS_QUERY_FAILED')throw error;trace('process-check-unavailable');}
   if(focused==='focused'||focused==='running') {
     // An earlier instance that never showed (or lost) its window blocks single-instance games: say so (E215.2, user:
     // サノバウィッチ 'would not start' while a hidden copy from a Japanese-locale launch kept running).
@@ -245,6 +248,11 @@ async function dispatch(request,runtime=null) {
       }
       case 'history':return db.prepare('SELECT s.*,g.title FROM reading_sessions s LEFT JOIN games g ON s.game_id=g.id ORDER BY s.started_at DESC LIMIT 500').all();
       case 'dialogue':return require('./history-view.cjs').dialogue(db);
+      case 'update_check':return await require('./update.cjs').check(String(request.current||''));
+      case 'update_apply':return await require('./update.cjs').apply(root,String(request.current||''));
+      case 'update_start':{const u=require('./update.cjs');u.start(root,String(request.current||''));return u.status();}
+      case 'update_status':return require('./update.cjs').status();
+      case 'update_install':return require('./update.cjs').install(root);
       case 'kana_progress':return require('./kana.cjs').read(root);
       case 'kana_progress_save':return require('./kana.cjs').save(root,request.data);
       case 'kana_game_words':return require('./kana.cjs').gameWords(db,request.words);
