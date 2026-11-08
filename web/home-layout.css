@@ -41,3 +41,6 @@
 /* E215.6 (user): the glass tab bars were square-cornered; every glass block in Learning is rounded. */
 .home-glass :is(.main:has(#learning-content)>.tabs,#learning-content .tabs){border-radius:14px;padding:4px}
 .home-glass :is(#learning-content .review-card,#learning-content .record,#learning-content .revisit-words,#learning-content .anki-review-panel,#learning-content .anki-card-frame){border-radius:14px}
+/* E273: no resize corners while maximized; the top-right one stays small so the close button keeps its corner */
+html.is-maximized .window-corner{display:none}
+.window-corner.corner-ne{width:6px;height:6px}

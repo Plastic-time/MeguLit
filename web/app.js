@@ -164,6 +164,9 @@ function shell(){
   document.querySelectorAll('[data-route]').forEach(button=>button.addEventListener('click',()=>{navigate(button.dataset.route);}));
   if(model.preferences.homeBackground)api('background').then(image=>{if(!backgroundPreview)applyBackground(image);}).catch(()=>{});
   document.querySelector('#reader-notice button').onclick=event=>retryReader(event.currentTarget);
+  /* E273 (user: the close button did nothing when maximized): the invisible top-right resize corner sat over the close
+     button and swallowed the click, and resizing is a no-op while maximized. Hide the corners while maximized. */
+  {const mark=()=>document.documentElement.classList.toggle('is-maximized',outerWidth>=screen.availWidth-2&&outerHeight>=screen.availHeight-2);mark();addEventListener('resize',mark);}
   document.querySelectorAll('[data-resize]').forEach(handle=>handle.addEventListener('mousedown',event=>{if(event.button!==0)return;event.preventDefault();event.stopPropagation();invoke('window_action',{action:'resize_'+handle.dataset.resize}).catch(error=>toast(errorMessage(error)));}));
   {const end=document.querySelector('.titlebar-end'),hist=document.querySelector('.titlebar .nav-history');if(end&&hist)end.prepend(hist);}
   bindDrag();
