@@ -89,7 +89,8 @@ Invoke-WebRequest -Uri $prevAsset.browser_download_url -OutFile $prevZip -UseBas
 $old=[IO.Compression.ZipFile]::OpenRead($prevZip)
 $names=New-Object 'System.Collections.Generic.SortedSet[string]' ([StringComparer]::Ordinal)
 foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and -not $e.FullName.EndsWith('/')){[void]$names.Add($e.FullName.Substring(8))}}
-foreach($f in (git ls-files core services web setup)){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
+# --others: files added in this release are not tracked yet when the list is built (-IncludeWorkingChanges)
+foreach($f in (git ls-files --cached --others --exclude-standard core services web setup)){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
 $zipPath=Join-Path $work $Asset
 $out=[IO.Compression.ZipFile]::Open($zipPath,'Create')
 try{
