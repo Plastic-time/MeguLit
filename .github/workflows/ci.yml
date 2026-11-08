@@ -74,7 +74,7 @@ jobs:
           if (-not $tests.Count) { throw 'No tests found' }
           node --test @tests 2>&1 | Tee-Object -FilePath test-output.txt
           if ($LASTEXITCODE) { throw 'Tests failed' }
-          $count = [regex]::Match((Get-Content test-output.txt -Raw), '(?m)^# tests (\d+)').Groups[1].Value
+          $count = [regex]::Match((Get-Content test-output.txt -Raw), '(?m)^(?:#|ℹ) tests (\d+)').Groups[1].Value
           if (-not $count -or [int]$count -eq 0) { throw 'Test runner reported zero tests' }
           "Ran $count tests"
 
