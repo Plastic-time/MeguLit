@@ -28,6 +28,8 @@ function pickVn(results,title){
 }
 async function json(fetcher,url,options={}){const r=await fetcher(url,{...options,signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('METADATA_NETWORK');return r.json();}
 const post=body=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+// A VNDB entry typed by the user: "v12345", "12345" or a vndb.org link. Empty clears it; anything else is refused.
+function vndbIdFrom(value){const text=String(value??'').trim();if(!text)return '';const m=/^(?:https?:\/\/(?:www\.)?vndb\.org\/)?v?(\d{1,7})(?:[/?#].*)?$/i.exec(text);if(!m||!Number(m[1]))throw Error('INVALID_VNDB_ID');return 'v'+Number(m[1]);}
 class GameEnrichment{
  constructor(root,emit=()=>{},fetcher=fetch,translate=null){this.root=root;this.emit=emit;this.abort=new AbortController();this.fetch=(url,options={})=>fetcher(url,{...options,signal:AbortSignal.any([this.abort.signal,...(options.signal?[options.signal]:[])])});this.running=new Map();this.queue=[];this.file=path.join(root,'data/config/game-reception.json');this.synopses=new(require('../core/library.cjs').Synopses)({config:path.join(root,'data/config')},translate?{translate}:{});}
  stop(){this.closed=true;this.queue.length=0;this.abort.abort();}
@@ -36,10 +38,13 @@ class GameEnrichment{
  ensure(id,locale='zh',refresh=false){if(this.closed)return Promise.reject(Error('RUNTIME_STOPPED'));const key=id+':'+locale;if(this.running.has(key))return this.running.get(key);const job=this.run(id,locale,refresh).finally(()=>this.running.delete(key));this.running.set(key,job);return job;}
  async run(id,locale,refresh){const store=require('./store.cjs');let db=store.openStore(this.root),game;try{const row=db.prepare('SELECT * FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row)throw Error('GAME_NOT_FOUND');game={row,original:JSON.parse(row.original||'{}')};}finally{db.close();}
   const coverPresent=!!store.imageData(this.root,'covers',game.row.cover);const cache=store.readJSON(this.file),cached=cache[id];if(!refresh&&cached?.synopsisPolicy===2&&require('../core/synopsis-policy.cjs').approved(cached?.synopses?.[locale]?.source)&&cached?.synopses?.[locale]?.text&&Date.now()-cached.at<86400000&&coverPresent)return this.result(id,locale,cached);
-  let lib=game.original.library||{},vn=null,appid=String(lib.appid||'')||steamAppidFor(game.row.executable),vnid=String(lib.vndbId||''),cover='';const titles=candidates(game),previousVnid=vnid;
+  // A VNDB entry the user set (save_game) wins over every automatic match and is kept outside `library`, which each
+  // library scan rewrites. When it differs from the last match, the cover and synopsis follow it like a correction.
+  const manualVnid=vndbIdFrom(game.original.vndbManual||'');
+  let lib=game.original.library||{},vn=null,appid=String(lib.appid||'')||steamAppidFor(game.row.executable),vnid=manualVnid||String(lib.vndbId||''),cover='';const titles=candidates(game),previousVnid=String(lib.vndbId||'');
   // A Steam appid identifies the exact VNDB entry; it also corrects an earlier wrong title match.
-  if(/^\d+$/.test(appid))try{const r=await json(this.fetch,'https://api.vndb.org/kana/release',post({filters:['extlink','=',['steam',Number(appid)]],fields:'vns.id',results:5}));const id=r.results?.flatMap(x=>x.vns||[])[0]?.id;if(id)vnid=id;}catch{}
-  if(refresh&&!/^\d+$/.test(appid)&&vnid===previousVnid)vnid='';
+  if(!manualVnid&&/^\d+$/.test(appid))try{const r=await json(this.fetch,'https://api.vndb.org/kana/release',post({filters:['extlink','=',['steam',Number(appid)]],fields:'vns.id',results:5}));const id=r.results?.flatMap(x=>x.vns||[])[0]?.id;if(id)vnid=id;}catch{}
+  if(refresh&&!manualVnid&&!/^\d+$/.test(appid)&&vnid===previousVnid)vnid='';
   try{if(/^v?\d+$/.test(vnid)){const r=await json(this.fetch,'https://api.vndb.org/kana/vn',post({filters:['id','=',vnid.startsWith('v')?vnid:'v'+vnid],fields:'title,alttitle,titles.title,image.url,rating,votecount,released,developers.name,extlinks.url'}));vn=r.results?.[0];}
    else for(const title of titles){const r=await json(this.fetch,'https://api.vndb.org/kana/vn',post({filters:['search','=',title],fields:'title,alttitle,titles.title,aliases,image.url,rating,votecount,released,developers.name,extlinks.url',results:8,sort:'searchrank'}));vn=pickVn(r.results||[],title);if(vn)break;}
   }catch{}
@@ -69,4 +74,4 @@ class GameEnrichment{
  saveCover(id,src){const m=/^data:image\/(png|jpeg);base64,(.+)$/s.exec(src);if(!m)return '';const file='enriched-'+crypto.createHash('sha256').update(id).digest('hex').slice(0,16)+(m[1]==='png'?'.png':'.jpg'),folder=path.join(this.root,'data/assets/covers');fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(path.join(folder,file),Buffer.from(m[2],'base64'));return file;}
  result(id,locale,value){const db=require('./store.cjs').openStore(this.root);try{const result=require('./game-detail.cjs').detail(db,this.root,id,locale);if(require('../core/synopsis-policy.cjs').approved(value.synopses?.[locale]?.source))result.synopsis=value.synopses[locale];result.reception={vndb:value.vndb,steam:value.steam,critic:value.critic,reviews:value.reviews?.[locale]||[],at:value.at};return result;}finally{db.close();}}
 }
-module.exports={GameEnrichment,candidates,steamAppidFor,pickVn};
+module.exports={GameEnrichment,candidates,steamAppidFor,pickVn,vndbIdFrom};
