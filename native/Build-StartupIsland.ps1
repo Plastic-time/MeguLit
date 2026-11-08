@@ -8,7 +8,7 @@ $work=[IO.Path]::GetFullPath((Join-Path $env:TEMP ('tome-startup-'+[Guid]::NewGu
 [IO.Directory]::CreateDirectory($work)|Out-Null
 try {
   # The artwork is committed as native/megumin-face-source.png; an existing build is only a fallback.
-  $face=Join-Path $native 'assets\startup-face.png'
+  $face=Join-Path $native 'megumin-face-source.png'
   if(!(Test-Path -LiteralPath $face)){
     if(!(Test-Path -LiteralPath $target)){throw "Startup artwork missing: expected $face"}
     $assembly=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes($target))

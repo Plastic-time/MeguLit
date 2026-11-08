@@ -33,7 +33,7 @@ foreach ($taskScript in @(Get-ChildItem -LiteralPath (Join-Path $taskRoot 'web/r
 if (-not (Test-Path -LiteralPath $taskLld)) { throw 'Bundled Rust LLVM linker not found' }
 if (-not $taskMsvc -or -not $taskSdk) { throw 'Local Windows import libraries not found' }
 $env:LIB = (Join-Path $taskMsvc.FullName 'lib\x64')+';'+(Join-Path $taskSdk.FullName 'ucrt\x64')+';'+(Join-Path $taskSdk.FullName 'um\x64')
-& $taskCargo rustc @taskCargoNet --locked --release --features custom-protocol --manifest-path (Join-Path $taskRoot 'desktop\Cargo.toml') -- -C "linker=$taskLld" -C linker-flavor=lld-link -L ("native="+(Join-Path $taskMsvc.FullName 'lib\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'ucrt\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'um\x64'))
+& $taskCargo rustc $taskCargoNet --locked --release --features custom-protocol --manifest-path (Join-Path $taskRoot 'desktop\Cargo.toml') -- -C "linker=$taskLld" -C linker-flavor=lld-link -L ("native="+(Join-Path $taskMsvc.FullName 'lib\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'ucrt\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'um\x64'))
 if ($LASTEXITCODE -ne 0) { throw 'Independent desktop build failed' }
 $taskBuilt = Join-Path $taskRoot 'desktop\target\release\megulit.exe'
 if ($Check) {

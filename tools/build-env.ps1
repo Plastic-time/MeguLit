@@ -39,12 +39,12 @@ if ($taskSysroot) {
  $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = $taskLld
 }
 if ($taskOffline) { $env:CARGO_NET_OFFLINE = 'true' } else { Remove-Item Env:CARGO_NET_OFFLINE -ErrorAction SilentlyContinue }
-$taskCargoNet = $(if ($taskOffline) { @('--offline') } else { @() })
+$taskCargoNet = [string[]]$(if ($taskOffline) { '--offline' } else { @() })
 
 # Windows SDK (resource compiler and import libraries): newest installed version
 $taskKits = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10'
 $taskSdk = Get-ChildItem -LiteralPath (Join-Path $taskKits 'Lib') -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'um\x64\kernel32.lib') } | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
-$env:RC = Resolve-First @($env:MEGULIT_RC) + @(Get-ChildItem -LiteralPath (Join-Path $taskKits 'bin') -Directory -ErrorAction SilentlyContinue | Sort-Object { try { [version]$_.Name } catch { [version]'0.0' } } -Descending | ForEach-Object { Join-Path $_.FullName 'x64\rc.exe' })
+$env:RC = Resolve-First (@($env:MEGULIT_RC) + @(Get-ChildItem -LiteralPath (Join-Path $taskKits 'bin') -Directory -ErrorAction SilentlyContinue | Sort-Object { try { [version]$_.Name } catch { [version]'0.0' } } -Descending | ForEach-Object { Join-Path $_.FullName 'x64\rc.exe' }))
 if (-not $taskSdk) { $taskProblems.Add('Windows 10/11 SDK libraries not found (install the Windows SDK, e.g. with Visual Studio Build Tools)') }
 if (-not $env:RC) { $taskProblems.Add('rc.exe (Windows SDK resource compiler) not found') }
 
@@ -62,7 +62,7 @@ if (-not (Test-Path -LiteralPath $taskCsc)) { $taskProblems.Add(".NET Framework 
 # Node.js: bundled runtime first, then PATH
 $taskNode = Resolve-First @((Join-Path $taskRoot 'runtime\node.exe'), (Get-Command node.exe -ErrorAction SilentlyContinue).Source)
 if (-not $taskNode) { $taskProblems.Add('Node.js 20+ not found (put node.exe on PATH)') }
-elseif ([int]((& $taskNode -p 'process.versions.node.split(".")[0]') 2>$null) -lt 20) { $taskProblems.Add("Node.js 20+ required: $taskNode") }
+elseif ([int](((& $taskNode --version) -replace '^v','') -split '\.')[0] -lt 20) { $taskProblems.Add("Node.js 20+ required: $taskNode") }
 
 $env:Path = (@($taskRustBin, $(if ($taskNode) { Split-Path -Parent $taskNode }), (Join-Path $env:WINDIR 'System32'), $env:WINDIR, (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0')) | Where-Object { $_ }) -join ';'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'; $env:VSCMD_SKIP_SENDTELEMETRY = '1'; $env:POWERSHELL_TELEMETRY_OPTOUT = '1'
