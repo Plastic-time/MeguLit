@@ -200,3 +200,44 @@ input.switch:checked{background:repeating-linear-gradient(90deg,rgba(255,224,206
 .tool-key-note::before{content:"◆";position:absolute;left:12px;top:9px;font-size:9px;color:#edb56e}
 :root[data-theme=light] .tool-key-note{color:#7a2a2a;background:linear-gradient(90deg,rgba(168,50,63,.1),rgba(168,50,63,.02));border-color:rgba(168,50,63,.3)}
 :root[data-theme=light] .tool-key-note::before{color:#a8323f}
+
+/* Translation: a connection card for the chosen engine, shared options below (v1.1.6) */
+.tr-conn{margin:6px 0 18px;padding:6px 18px 10px;border-radius:12px;border:1px solid rgba(237,181,110,.16);background:rgba(20,13,12,.42)}
+.tr-conn-head,.tr-shared-head{font:500 12px var(--g-sans,sans-serif);letter-spacing:.16em;color:#d9a54a;padding:12px 0 4px}
+.tr-shared-head{margin-top:8px;padding-top:6px;border-top:1px solid rgba(241,224,210,.07)}
+.tr-conn .settings-row:last-of-type{border-bottom:0}
+.tr-conn .key-panel{margin:6px 0 4px!important;padding:12px 0 6px!important;border:0!important;border-top:1px solid rgba(241,224,210,.07)!important;background:none!important;box-shadow:none!important}
+.tr-conn .key-panel .panel-title{font-size:13.5px!important}
+.tr-conn-empty{margin:4px 0 8px}
+:root[data-theme=light] .tr-conn{background:rgba(255,250,246,.7);border-color:rgba(158,27,50,.14)}
+:root[data-theme=light] .tr-conn-head,:root[data-theme=light] .tr-shared-head{color:#a8323f}
+
+/* v1.1.6 (user: the left menu floats with margins but the right sheet ran into the top and bottom edges): both columns
+   are full-height cards with the same insets; the right one scrolls inside, with the search field pinned at its top */
+.main:has(>.settings-layout),.main:has(.settings-layout){overflow:hidden!important}
+.main .settings-layout{height:100%;box-sizing:border-box;padding:6px 0 14px;align-items:stretch!important}
+.main .settings-layout>.settings-nav{position:relative!important;top:auto!important;max-height:none!important;height:auto;overflow:auto}
+.main .settings-layout>.settings-content{min-height:0;overflow-y:auto!important;overscroll-behavior:contain;scrollbar-width:thin}
+.main .settings-content .settings-search{position:sticky!important;top:-22px;z-index:8;margin-top:-22px!important;margin-bottom:14px!important;box-shadow:0 10px 18px -12px rgba(0,0,0,.8)!important}
+.main .settings-content .settings-search{background-color:#1b1314!important}
+.home-glass .main .settings-content .settings-search{background-color:color-mix(in srgb,#170f10 88%,transparent)!important}
+:root[data-theme=light] .main .settings-content .settings-search{background-color:#fbf4ef!important}
+.sp-preview{top:34px}
+/* v1.1.6: the inset highlight (0 1px 0) left two bright corner pixels on rounded switches; no shadows on switches at all */
+input.switch,input.switch:hover,input.switch:checked,input.switch:checked:hover,input.switch:focus,input.switch:active{box-shadow:none!important}
+input.switch:focus-visible{box-shadow:none!important;outline:2px solid rgba(237,181,110,.55)!important;outline-offset:2px}
+
+/* previews sit on the app's own background (v1.1.6) */
+.sp-preview{background:rgba(18,12,13,.28)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.sp-scene{background-color:transparent!important;background-size:cover!important;background-position:center!important;background-attachment:fixed!important}
+.sp-scene{filter:none}
+.sp-scene::before{background:none!important}
+
+.sp-next{margin-left:auto;height:26px;padding:0 12px;border-radius:999px;border:1px solid rgba(237,181,110,.35);font-size:12px;color:#edb56e;background:rgba(237,181,110,.06);transition:background .2s,border-color .2s}
+.sp-next:hover{background:rgba(237,181,110,.14);border-color:rgba(237,181,110,.6)}
+.sp-next:active{transform:scale(.97)}
+
+.sp-read{display:inline-flex;margin-left:auto;padding:2px;border-radius:999px;border:1px solid rgba(237,181,110,.25)}
+.sp-read button{height:22px;padding:0 10px;border-radius:999px;font-size:11.5px;color:#a8907e}
+.sp-read button[aria-pressed=true]{color:#1a1010;background:#edb56e}
+.sp-read+.sp-next{margin-left:8px}

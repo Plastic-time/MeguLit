@@ -71,10 +71,15 @@ function createSpeech(api,store){
  function system(t){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='ja-JP';u.rate=.85;u.volume=volume();speechSynthesis.speak(u);}catch{}}
  async function say(text){
   const my=++seq;stop();
-  if(!offline){try{const url=await synth(text);if(my!==seq)return;current=new Audio(url);current.volume=volume();await current.play();return;}catch{offline=true;setTimeout(()=>{offline=false;},15000);}}
+  /* v1.1.6 (user: the speaker button stayed silent until a voice preview in Settings had started the engine): a cold
+     AivisSpeech refuses the first requests for a few seconds; keep retrying up to ~20 s instead of going offline at once */
+  if(!offline){for(let tries=0;tries<14&&my===seq;tries++){try{const url=await synth(text);if(my!==seq)return;current=new Audio(url);current.volume=volume();await current.play();return;}catch{await new Promise(r=>setTimeout(r,1500));}}
+   if(my!==seq)return;offline=true;setTimeout(()=>{offline=false;},15000);}
   if(my===seq)system(text);
  }
  function stop(){if(current){current.pause();current=null;}try{speechSynthesis.cancel();}catch{}}
+ /* start the voice engine as soon as the kana module opens, so the first click already has a voice */
+ setTimeout(()=>{synth('あ').catch(()=>{});},300);
  let queue=Promise.resolve();
  function prefetch(list){queue=queue.then(async()=>{for(const t of [...new Set(list)].slice(0,120)){if(offline)return;try{await synth(t);}catch{return;}}});return queue;}
  function setVolume(v){if(current)current.volume=v;}

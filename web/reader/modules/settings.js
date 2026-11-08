@@ -5,7 +5,7 @@
   if (!bridge || bridge.openSettings) return;
   const defaults = { font: 'Microsoft YaHei', size: 18, color: '', bold: false, enabled: bridge.isEnabled(), transparent: true, provider: 'google', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4.1-mini' };
   defaults.region = ''; defaults.deeplTier = 'free'; defaults.contextEnabled = true; defaults.contextLines = 4; defaults.learnerLanguage='zh';defaults.readingEngine='sudachi';
-  defaults.lookupProvider='local';defaults.lookupProfiles={"deepseek":{"baseUrl":"https://api.deepseek.com","model":"deepseek-flash"},"gemini":{"baseUrl":"https://generativelanguage.googleapis.com/v1beta/openai","model":""},"gpt":{"baseUrl":"https://api.openai.com/v1","model":"gpt-4.1-mini"},"qwen":{"baseUrl":"https://dashscope.aliyuncs.com/compatible-mode/v1","model":"qwen-plus"},"kimi":{"baseUrl":"https://api.moonshot.ai/v1","model":"kimi-k2.6"},"glm":{"baseUrl":"https://open.bigmodel.cn/api/paas/v4","model":"glm-4.7"}};
+  defaults.lookupProvider='moji';defaults.lookupProfiles={"deepseek":{"baseUrl":"https://api.deepseek.com","model":"deepseek-flash"},"gemini":{"baseUrl":"https://generativelanguage.googleapis.com/v1beta/openai","model":""},"gpt":{"baseUrl":"https://api.openai.com/v1","model":"gpt-4.1-mini"},"qwen":{"baseUrl":"https://dashscope.aliyuncs.com/compatible-mode/v1","model":"qwen-plus"},"kimi":{"baseUrl":"https://api.moonshot.ai/v1","model":"kimi-k2.6"},"glm":{"baseUrl":"https://open.bigmodel.cn/api/paas/v4","model":"glm-4.7"}};
   let settings = { ...defaults }, dialog, status, pendingSave = null, saveSerial = 0;
   try {
     const saved = JSON.parse(localStorage.getItem('tomoyo-chinese-settings') || '{}');

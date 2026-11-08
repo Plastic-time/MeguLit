@@ -42,3 +42,8 @@ body.megulit-english-style .tomoyo-cn-output:not([data-state=error]) .megulit-la
 }
 /* E215.8: no red "not allowed" cursor on buttons that are only waiting. */
 html:root:root:root:root button:disabled{cursor:default!important}
+
+/* v1.1.6 (user: the first Alt+T showed a blue frame at the top until the menu was dragged): the browser's default focus
+   ring on the menu when it receives focus on open; keyboard focus inside the menu keeps its own styles */
+.tomoyo-cn-dialog:focus,.tomoyo-cn-dialog:focus-visible,.tomoyo-menu-header:focus,.tomoyo-menu-header:focus-visible,dialog:focus{outline:none!important}
+.tomoyo-cn-dialog :focus:not(:focus-visible){outline:none!important}
