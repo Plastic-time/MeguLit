@@ -126,7 +126,7 @@ function setAppearance(preferences=model.preferences){
   if(Object.hasOwn(bg,'dim'))document.documentElement.style.setProperty('--background-dim',clamp(bg.dim,0,100,35)/100);
   document.documentElement.style.setProperty('--home-glass-blur',clamp(bg.glassBlur,0,40,14)+'px');
   document.documentElement.style.setProperty('--home-glass-alpha',clamp(bg.glassAlpha,0,100,55)+'%');
-  document.documentElement.classList.toggle('home-glass',bg.glass===true);
+  document.documentElement.classList.toggle('home-glass',bg.glass!==false); /* v1.1.5: same default as Settings (on), so the switch and the screen agree */
   const reading=model.historyAppearance||{};const font=String(reading.history_font_family||'Yu Gothic').replace(/["\\;{}]/g,'');
   document.documentElement.style.setProperty('--history-font-family','"'+font+'","Yu Gothic","Microsoft YaHei",sans-serif');
   document.documentElement.style.setProperty('--history-font-size',clamp(reading.history_font_size,12,32,16)+'px');
@@ -455,7 +455,7 @@ function japaneseRestore(){
   st:{restorable:n=>'復元できます：'+n.files+' ファイル、'+n.cells.toLocaleString()+' 箇所',applied:()=>'日本語に戻してあります',already:()=>'すでに日本語です',unsupported:()=>'言語ごとにファイルが分かれているため、まだ対応していません',none:()=>'日本語データがありません。日本語版をお使いください',missing:()=>'ゲームフォルダが見つかりません'},
   done:n=>n.applied+' ファイルを戻しました',undone:n=>n.skipped.length?n.restored+' ファイルを戻しました。更新で変わった '+n.skipped.length+' ファイルはそのままです':n.restored+' ファイルを元に戻しました',errs:{GAME_RUNNING:'ゲームが起動中です。先に閉じてください',NOTHING_TO_RESTORE:'戻す内容がありません',NOT_APPLIED:'まだ戻していません'}}};
  const t=w[locale]||w.zh;
- const d=modal(`<h2>${t.title}</h2><p class="settings-help">${t.sub}</p><div data-jr-body><p class="muted">${t.check}</p></div><div class="dialog-actions"><button type="button" class="secondary" data-jr-close>${t.close}</button><button type="button" class="secondary" data-jr-undo hidden>${t.undo}</button><button type="button" class="primary" data-jr-apply hidden>${t.apply}</button></div>`);
+ const d=modal(`<h2>${t.title}</h2><p class="settings-help">${t.sub}</p><p class="tool-key-note">${({zh:'在 Steam 买的、只显示中文 / 英文的游戏（比如 Key 社的 Summer Pockets），一定要先运行这个工具，否则 MeguLit 读到的是中文或英文，用不了',en:'Games bought on Steam that only show Chinese or English (such as Key’s Summer Pockets) must go through this tool first, otherwise MeguLit only gets the translated text',ja:'Steam 版で中国語・英語しか表示されないゲーム（Key の Summer Pockets など）は、先にこのツールを実行してください。実行しないと翻訳文しか取得できません'})[locale]||''}</p><div data-jr-body><p class="muted">${t.check}</p></div><div class="dialog-actions"><button type="button" class="secondary" data-jr-close>${t.close}</button><button type="button" class="secondary" data-jr-undo hidden>${t.undo}</button><button type="button" class="primary" data-jr-apply hidden>${t.apply}</button></div>`);
  d.showModal();d.querySelector('[data-jr-close]').onclick=()=>d.close();
  const body=d.querySelector('[data-jr-body]'),applyBtn=d.querySelector('[data-jr-apply]'),undoBtn=d.querySelector('[data-jr-undo]');let id='';
  const fail=e=>{const c=typeof e==='string'?e:e?.message;toast(t.errs[c]||errorMessage(e));};

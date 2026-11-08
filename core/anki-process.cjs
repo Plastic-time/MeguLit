@@ -84,7 +84,8 @@ class AnkiProcess{
   if(hide){this.hidden=true;this.watch(30000);}
   const child=spawn(exe,[],{cwd:path.dirname(exe),detached:true,stdio:'ignore',windowsHide:hide});child.on('error',()=>{});child.unref();
   this.started=true;this.log('[MeguLit] started Anki '+exe+(hide?' (hidden)':''));
-  for(let i=0;i<60;i++){await new Promise(resolve=>setTimeout(resolve,750));if(hide&&i%2===0)await this.hide();if(await this.online()){if(hide){await this.hide();}return {running:true,started:true};}}
+  /* v1.1.5: a cold Anki syncs and loads add-ons before AnkiConnect answers; 45 s was often too short, so wait up to 90 s */
+  for(let i=0;i<120;i++){await new Promise(resolve=>setTimeout(resolve,750));if(hide&&i%2===0)await this.hide();if(await this.online()){if(hide){await this.hide();}return {running:true,started:true};}}
   throw Error('ANKI_OFFLINE');
  }
  async hide(){const n=await this.windows('hideall');if(n)this.hidden=true;return n;}

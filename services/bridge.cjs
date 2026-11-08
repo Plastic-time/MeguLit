@@ -183,6 +183,7 @@ async function dispatch(request,runtime=null) {
       case 'asset_get':return require('./assets.cjs').get(root,String(request.slot||'home'));
       case 'asset_preview':return require('./assets.cjs').preview(request.path);
       case 'asset_set':return require('./assets.cjs').set(root,String(request.slot||'home'),request.path);
+      case 'asset_clear':return require('./assets.cjs').clear(root,String(request.slot||'home'));
       case 'background':{
         return require('./assets.cjs').get(root,'home');
       }

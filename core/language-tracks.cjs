@@ -44,6 +44,10 @@ function semicolonTracks(text){
  return parts.slice(1).every(s=>!KANA.test(s)&&HAN.test(s))?parts[0]:null;
 }
 
+/* A whole line of Chinese (no kana, mostly Han, at least two characters only Chinese uses). Japanese lines written only in
+   kanji are short and do not use these function characters. */
+const ZH_ONLY=/[這这麼么嗎吗您們们個个裡請请說说沒没還还讓让給给對对呢吧啊妳哪喔]/gu;
+function foreignLine(text){const t=String(text||'');if(KANA.test(t))return false;const han=(t.match(/[㐀-鿿]/gu)||[]).length;if(han<6)return false;return (t.match(ZH_ONLY)||[]).length>=2;}
 function japaneseTrack(text){
  if(typeof text!=='string'||!text)return text;
  let out=inlineAlternatives(text);
@@ -51,4 +55,4 @@ function japaneseTrack(text){
  out=semicolonTracks(out)??out;
  return out;
 }
-module.exports={japaneseTrack,inlineAlternatives,tracks,semicolonTracks};
+module.exports={foreignLine,japaneseTrack,inlineAlternatives,tracks,semicolonTracks};
