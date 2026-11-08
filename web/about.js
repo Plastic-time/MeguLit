@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // About page: what MeguLit is, version, links, credits, and the support (sponsor) codes.
 import {checkForUpdates} from './update-notice.js';
-export const VERSION='1.1.0';
+export const VERSION='1.1.1';
 const REPO='https://github.com/ilynthn/MeguLit';
 const SPONSOR='https://github.com/sponsors/ilynthn';
 export const aboutLabel={zh:'关于',en:'About',ja:'について'};

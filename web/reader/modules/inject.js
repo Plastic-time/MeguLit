@@ -127,7 +127,12 @@
     if(bridge.deliverPageTranslation?.(id,text,error,message))return;
     if (id !== bridge.serial || !enabled || !translationVisible || !output?.isConnected) return;
     bridge.lastTranslationError = error ? message || '暂时无法翻译，请检查网络' : '';
-    setText(error ? bridge.quietTranslation ? '翻译暂不可用 · Alt+T' : message || '暂时无法翻译，请检查网络，按 Alt+T 打开设置重试' : text, !!error, !error);
+    const local = /^LOCAL_RUNTIME_DOWNLOADING:?(\d*)/.exec(message||'') ? `正在下载本地翻译服务程序 ${/:(\d+)/.exec(message)?.[1]||0}%，下载完自动开始翻译`
+      : message === 'LOCAL_MODEL_MISSING' ? '还没有下载本地翻译模型 · Alt+T 打开设置下载'
+      : message === 'LOCAL_SERVER_FAILED' ? '本地模型没能启动（可能是显存不够）· 可以换小一点的模型或改用在线翻译'
+      : message === 'LOCAL_RUNTIME_MISSING' ? '缺少本地翻译服务程序 · Alt+T 打开设置安装' : '';
+    if (error && local) bridge.lastTranslationError = local;
+    setText(error ? local || (bridge.quietTranslation ? '翻译暂不可用 · Alt+T' : message || '暂时无法翻译，请检查网络，按 Alt+T 打开设置重试') : text, !!error, !error);
     bridge.alignText?.();
   };
   const observer = new MutationObserver(records => {

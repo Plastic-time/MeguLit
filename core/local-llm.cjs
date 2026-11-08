@@ -57,6 +57,10 @@ class LocalLlm{
   if(this.server&&this.server.port===target.port&&await this.alive(target.origin))return;
   if(!this.server&&await this.alive(target.origin))return; // the user's own server
   if(this.starting)return this.starting;
+  /* v1.1.1: the model alone cannot translate. Fetch the pinned runtime in the background and say so, instead of failing
+     every line; the next line after the download finishes starts the server. */
+  if(!this.exe()){if(this.job?.state!=='downloading'){this.log('runtime missing; downloading for '+target.provider);this.download();}
+   const j=this.job,pct=j&&j.total?Math.floor(j.received/j.total*100):0;throw Object.assign(Error('LOCAL_RUNTIME_DOWNLOADING:'+pct),{code:'LOCAL_RUNTIME_DOWNLOADING'});}
   this.starting=this.start(target).finally(()=>{this.starting=null;});return this.starting;
  }
  async start(target){

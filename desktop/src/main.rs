@@ -305,7 +305,9 @@ fn animate_home(handle:tauri::AppHandle,ticket:u64,leaving:bool){
       for step in 0..=14{
         let ui=handle.clone();let _=handle.run_on_main_thread(move||{
             let state=ui.state::<DesktopState>();
-            if state.exiting.load(Ordering::SeqCst)||!state.home_transition.current(ticket){return;}
+            if state.exiting.load(Ordering::SeqCst){return;}
+            // A superseded fade-in must not leave the window partly transparent: if nothing is leaving, finish opaque.
+            if !state.home_transition.current(ticket){if step==14&&!leaving&&!state.home_transition.is_leaving(){if let Some(home)=ui.get_webview_window("main"){window_policy::ensure_home_opaque(&home);}}return;}
             if step==14{
               if leaving&&state.home_transition.commit(ticket){if let Err(error)=hide_home(&ui){reader_log(&state.root,"home-hide-failed",&error);if let Some(home)=ui.get_webview_window("main"){window_policy::restore_home_surface(&home);}}else{let _=ui.emit("overlay-home","hidden");}}
               if !leaving{if let Some(home)=ui.get_webview_window("main"){window_policy::restore_home_surface(&home);}}
@@ -359,9 +361,13 @@ static LAST_REVEAL:std::sync::atomic::AtomicU64=std::sync::atomic::AtomicU64::ne
 fn reveal(app: &tauri::AppHandle) {
     let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d|d.as_millis() as u64).unwrap_or(0);
     let last=LAST_REVEAL.swap(now,Ordering::SeqCst);
-    let reversing=app.state::<DesktopState>().home_transition.cancel();
     if let Some(flag)=&app.state::<DesktopState>().splash{let _=std::fs::write(format!("{}.suppressed",flag.display()),"0");}
-    if let Some(window) = app.get_webview_window("main") { let was_visible=window.is_visible().unwrap_or(false)&&!window.is_minimized().unwrap_or(false);if was_visible&&!reversing&&now.saturating_sub(last)<800{let _=window.set_focus();return;}let _=window.set_skip_taskbar(false);let _=window.set_always_on_top(false);window_policy::restore_home_surface(&window);let _ = window.unminimize();if !was_visible||reversing{let _=app.emit("overlay-home","return");}if !was_visible||reversing{window_policy::animate_home_surface(&window,0.01);}let _ = window.show();let _ = window.set_focus();if !was_visible||reversing{animate_home(app.clone(),app.state::<DesktopState>().home_transition.generation(),false);}if !was_visible{reader_log(&app.state::<DesktopState>().root,"home-shown","");} }
+    if let Some(window) = app.get_webview_window("main") { let was_visible=window.is_visible().unwrap_or(false)&&!window.is_minimized().unwrap_or(false);
+        // v1.1.1 (home stayed half transparent after a game closed): closing a game reveals home twice in a row. The second
+        // reveal used to cancel the first one's fade-in and then return early, freezing the window at partial alpha.
+        // A repeated reveal now leaves a running fade-in alone; only a pending exit is cancelled.
+        if was_visible&&!app.state::<DesktopState>().home_transition.is_leaving()&&now.saturating_sub(last)<800{let _=window.set_focus();return;}
+        let reversing=app.state::<DesktopState>().home_transition.cancel();let _=window.set_skip_taskbar(false);let _=window.set_always_on_top(false);window_policy::restore_home_surface(&window);let _ = window.unminimize();if !was_visible||reversing{let _=app.emit("overlay-home","return");}if !was_visible||reversing{window_policy::animate_home_surface(&window,0.01);}let _ = window.show();let _ = window.set_focus();if !was_visible||reversing{animate_home(app.clone(),app.state::<DesktopState>().home_transition.generation(),false);}if !was_visible{reader_log(&app.state::<DesktopState>().root,"home-shown","");} }
 }
 
 fn prepare_profile(root:&std::path::Path,profile:&std::path::Path) {
