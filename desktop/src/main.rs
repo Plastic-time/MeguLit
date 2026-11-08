@@ -63,6 +63,69 @@ async fn moji_login(window:tauri::WebviewWindow)->Result<(),String>{
     Ok(())
 }
 
+/// 学习 → 五十音 → 汉字读音：在独立窗口里打开《漢字でGO!》官方网页（PLiCy），不改动、不缓存页面内容。
+#[tauri::command]
+async fn kanji_go_open(window:tauri::WebviewWindow)->Result<(),String>{
+    if window.label()!="main"{return Err("INVALID_HOME_WINDOW".into());}
+    let app=window.app_handle();
+    if let Some(existing)=app.get_webview_window("kanji-go"){
+        existing.show().map_err(|e|e.to_string())?;
+        return existing.set_focus().map_err(|e|e.to_string());
+    }
+    let url="https://plicy.net/GamePlay/155561".parse().map_err(|_|"INVALID_KANJI_GO_URL".to_string())?;
+    tauri::WebviewWindowBuilder::new(app,"kanji-go",tauri::WebviewUrl::External(url))
+        .title("漢字でGO!（Micelle · PLiCy）· 外部网站")
+        .inner_size(1180.0,800.0).min_inner_size(720.0,520.0).center()
+        .data_directory(app.state::<DesktopState>().root.join("cache/kanji-go-profile"))
+        .on_navigation(|url|url.scheme()=="https"&&url.host_str().is_some_and(|h|h=="plicy.net"||h.ends_with(".plicy.net")))
+        .on_new_window(|_,_|tauri::webview::NewWindowResponse::Deny)
+        .build().map_err(|e|e.to_string())?;
+    Ok(())
+}
+
+/// 学习 → 五十音 → 汉字读音：原样显示 PLiCy 官方整页（含广告与署名）。
+/// 不往主窗口里加第二个网页（那样主窗口就不再是普通窗口，标题栏按钮和页面命令会失效），
+/// 而是开一个无边框、归 MeguLit 所有的小窗口，精确贴在页面里的边框上；主窗口移动、缩放时由页面通知跟随。
+fn kanji_log(root:&std::path::Path,line:&str){use std::io::Write;if let Ok(mut f)=std::fs::OpenOptions::new().create(true).append(true).open(root.join("logs/kanji-embed.log")){let _=writeln!(f,"{:?} {}",std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d|d.as_millis()).unwrap_or(0),line);}}
+#[tauri::command]
+async fn kanji_go_embed(window:tauri::WebviewWindow,x:f64,y:f64,width:f64,height:f64,zoom:Option<f64>)->Result<(),String>{
+    if window.label()!="main"{return Err("INVALID_HOME_WINDOW".into());}
+    let app=window.app_handle().clone();let root=app.state::<DesktopState>().root.clone();
+    let scale=window.scale_factor().map_err(|e|e.to_string())?;
+    let origin=window.inner_position().map_err(|e|e.to_string())?;
+    let position=tauri::PhysicalPosition::new(origin.x+(x*scale).round() as i32,origin.y+(y*scale).round() as i32);
+    let size=tauri::PhysicalSize::new((width.max(160.0)*scale).round() as u32,(height.max(120.0)*scale).round() as u32);
+    let zoom=zoom.unwrap_or(1.0).clamp(0.75,2.0);
+    let embed=match app.get_webview_window("kanji-go-embed"){
+        Some(existing)=>existing,
+        None=>{
+            let url="https://plicy.net/GamePlay/155561".parse().map_err(|_|"INVALID_KANJI_GO_URL".to_string())?;
+            let built=tauri::WebviewWindowBuilder::new(&app,"kanji-go-embed",tauri::WebviewUrl::External(url))
+                .title("漢字でGO!（PLiCy · 外部网站）")
+                .decorations(false).resizable(false).skip_taskbar(true).shadow(false).visible(false).focused(false)
+                .parent(&window).map_err(|e|e.to_string())?
+                .data_directory(root.join("cache/kanji-go-profile"))
+                .on_navigation(|url|url.scheme()=="https"&&url.host_str().is_some_and(|h|h=="plicy.net"||h.ends_with(".plicy.net")))
+                .on_new_window(|_,_|tauri::webview::NewWindowResponse::Deny)
+                .build();
+            kanji_log(&root,&format!("create -> {:?}",built.as_ref().map(|_|())));
+            built.map_err(|e|e.to_string())?
+        }
+    };
+    let result=embed.set_size(size).and_then(|_|embed.set_position(position)).and_then(|_|embed.set_zoom(zoom)).and_then(|_|embed.show());
+    kanji_log(&root,&format!("place {}x{} at {},{} zoom {zoom} -> {result:?}",size.width,size.height,position.x,position.y));
+    result.map_err(|e|e.to_string())
+}
+
+/// 离开「汉字读音」页面：关闭贴着的小窗口（回来时重新打开）。
+#[tauri::command]
+async fn kanji_go_hide(app:tauri::AppHandle)->Result<(),String>{
+    if let Some(embed)=app.get_webview_window("kanji-go-embed"){
+        let root=app.state::<DesktopState>().root.clone();let closed=embed.close();kanji_log(&root,&format!("close -> {closed:?}"));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn reader_open(app:tauri::AppHandle,background:Option<bool>)->Result<(),String>{
     reader_log(&app.state::<DesktopState>().root,"open-request","");
@@ -344,7 +407,7 @@ fn main() {
     let window_memory=window_memory::WindowMemory::new(&root);
     let state = DesktopState { root, exiting: AtomicBool::new(false), headless, splash,window_memory,reader_background:AtomicBool::new(true),home_transition:home_transition::HomeTransition::default() };
     tauri::Builder::default().manage(state).plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![service, tray_menu::tray_menu_action, window_action, pick_executable, pick_image, pick_directories, pick_backup, set_tray_language, reader_open, reader_connect, reader_restart, read_clipboard, moji_login])
+        .invoke_handler(tauri::generate_handler![service, tray_menu::tray_menu_action, window_action, pick_executable, pick_image, pick_directories, pick_backup, set_tray_language, reader_open, reader_connect, reader_restart, read_clipboard, moji_login, kanji_go_open, kanji_go_embed, kanji_go_hide])
         .setup(move |app| {
             broker::attach(app.handle().clone());
             if !headless{single_instance::watch(app.handle().clone(),app.state::<DesktopState>().root.clone());}

@@ -10,6 +10,8 @@ This is an inventory, not a claim that the complete project's license audit is f
 - LunaHook and its engine adaptations: source and notices retained under `preserved/source/`; the custom native/runtime bridge is now integrated with the independent reader, with live game verification still pending
 - Existing custom startup helper and character artwork: preserved from the user's project; artwork origin/usage should remain in the distribution inventory
 - Noto Sans JP and Noto Serif JP (Google Fonts, https://github.com/google/fonts/tree/main/ofl): SIL Open Font License 1.1, license text in `web/fonts/OFL-NotoJP.txt`. Bundled as `web/fonts/NotoSansJP.woff2` and `NotoSerifJP.woff2`, converted unmodified from the variable TTF to WOFF2
+- KanjiVG (https://kanjivg.tagaini.net, © Ulrich Apel): kana stroke-order SVGs under Creative Commons Attribution-Share Alike 3.0, license text in `web/kana/kanjivg/COPYING`. Bundled unmodified as `web/kana/kanjivg/*.svg` (hiragana and katakana only) for the 学习 → 五十音 stroke animations; the credit is shown under every stroke diagram
+- 漢字でGO! (Micelle, hosted on PLiCy): not bundled. 学习 → 五十音 only opens the official page https://plicy.net/GamePlay/155561 in a separate window; no game code, assets or questions are copied
 - Tomoyo: historical inspiration and legacy input-data compatibility. Its application executable, Svelte application and Rust application are not included in the new runtime. Legacy data namespace strings are migration inputs, not the new application identity
 
 No existing third-party license was deleted from the preservation checkpoint.
