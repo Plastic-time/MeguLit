@@ -1,4 +1,6 @@
 const fs=require('node:fs'),path=require('node:path'),r=path.resolve(__dirname,'..')+path.sep,src=r+'migration/original-overlay-20261104/native/';
+// Without the private migration snapshot the committed native sources are already the restored, maintained host.
+if(!fs.existsSync(src)){console.log('Native host: using committed sources');process.exit(0);}
 const names=['GalWindowBridge.cs','GameTextMask.cs','GameWaitMarker.cs','NativeMaskLayer.cs','DialogDetector.cs','GameHookVerifier.cs','GameCapture.cs','GameAudio.cs','GlassLayer.cs'];for(const n of names)fs.copyFileSync(src+n,r+'native/'+n);
 const p=r+'native/GalWindowBridge.cs';let s=fs.readFileSync(p,'latin1');function rep(a,b){if(!s.includes(a))throw Error('Missing native host anchor '+a.slice(0,70));s=s.replace(a,b);}
 if(!s.includes('PreferredOverlay')){

@@ -2,6 +2,20 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),root=path.resolve(__dirname,'..');
 const snapshot=path.join(root,'migration/original-overlay-20261104/app'),target=path.join(root,'web/reader/modules');
+// The committed web/reader/modules are MeguLit's maintained reader source. The ToMe overlay snapshot they were first
+// migrated from is not part of the public repository; when it is absent the build uses the committed modules as they
+// are and only checks that every listed module exists. With the snapshot present (original developer machine) the
+// modules are regenerated from it exactly as before.
+if(!fs.existsSync(snapshot)){
+ const modules=JSON.parse(fs.readFileSync(path.join(root,'web/reader/modules.json'),'utf8'));
+ const optional=new Set(['local-font']);
+ const missing=modules.filter(name=>!optional.has(name)&&!fs.existsSync(path.join(target,name+'.js')));
+ if(missing.length){console.error('Reader modules missing from web/reader/modules: '+missing.join(', '));process.exit(1);}
+ const fontFile=path.join(target,'local-font.js');
+ if(!fs.existsSync(fontFile)){const localFont=require('../core/local-font.cjs').localFontScript();fs.writeFileSync(fontFile,localFont||'// No optional local font asset was found\n');}
+ console.log(JSON.stringify({source:'committed',hostModules:modules.length}));
+ process.exit(0);
+}
 const originals=['ui-state','native-transport','taskbar-sync','game-style','game-profile','typewriter','ruby-layout','furigana','inject','settings','learning','learning-layout','gal','game-fonts-ui','menu-layout','lookup-layout','selection','island-source','island-page','hook-reader','wait-marker','hook-panel','v4','voice-layout','interaction','backlog','box-preview','polish','i18n','about','background','settings-tabs','anki-sync','difficulty','color-picker','ui-behavior','game-style-sync-ui','text-position'];
 const legacyStorageKeys=new Set();for(const name of [...originals,'interface-mode']){const text=fs.readFileSync(path.join(snapshot,name+'.js'),'utf8');for(const match of text.matchAll(/['"](tomoyo-[\w.-]+)['"]/g))legacyStorageKeys.add(match[1]);}
 const manifest=[];for(const name of originals){const source=fs.readFileSync(path.join(snapshot,name+'.js'));let text=source.toString('utf8').replace(/\bToMe\b/g,'MeguLit');

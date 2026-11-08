@@ -1,6 +1,6 @@
-# Rebuilds native\GalWindowBridge.exe from the .cs files next to this script.
+﻿# Rebuilds native\GalWindowBridge.exe from the .cs files next to this script.
 # Usage (PowerShell):  powershell -ExecutionPolicy Bypass -File E:\Apps\ToMe.V3\native\Build-GalWindowBridge.ps1
-# - Uses the VS 2022 Build Tools C# compiler in E:\Apps\build-tools\vs2022 when present, otherwise the .NET Framework
+# - Uses the VS 2022 Build Tools C# compiler from the local build-tools folder (MEGULIT_BUILD_TOOLS) when present, otherwise the .NET Framework
 #   compiler that ships with Windows.
 # - The new exe must pass its own --mode-self-test before it is installed.
 # - If ToMe is running, the result is written as GalWindowBridge.updated.exe and ToMe swaps it in on its next start;
@@ -13,7 +13,7 @@ foreach ($s in $sources) { if (-not (Test-Path -LiteralPath $s)) { throw "Missin
 $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
 if (-not (Test-Path -LiteralPath $fw)) { $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319' }
 $compilers = @()
-foreach ($c in @('E:\Apps\build-tools\vs2022\MSBuild\Current\Bin\Roslyn\csc.exe', (Join-Path $fw 'csc.exe'))) { if (Test-Path -LiteralPath $c) { $compilers += $c } }
+foreach ($c in @($(if ($env:MEGULIT_ROSLYN_CSC) { $env:MEGULIT_ROSLYN_CSC } else { Join-Path $(if ($env:MEGULIT_BUILD_TOOLS) { $env:MEGULIT_BUILD_TOOLS } else { Join-Path (Split-Path (Split-Path $PSScriptRoot)) 'build-tools' }) 'vs2022\MSBuild\Current\Bin\Roslyn\csc.exe' }), (Join-Path $fw 'csc.exe'))) { if (Test-Path -LiteralPath $c) { $compilers += $c } }
 if (-not $compilers.Count) { throw 'No C# compiler found (neither VS Build Tools Roslyn nor the .NET Framework csc.exe).' }
 
 # WinRT metadata for Windows.Media.Ocr. Candidates, tried in order:

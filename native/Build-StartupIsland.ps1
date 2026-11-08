@@ -1,4 +1,4 @@
-# Rebuild the startup animation while preserving its existing embedded artwork
+﻿# Rebuild the startup animation while preserving its existing embedded artwork
 param([string]$OutputPath='')
 $ErrorActionPreference='Stop'
 $native=$PSScriptRoot
@@ -7,12 +7,17 @@ if(!$OutputPath){$OutputPath=Join-Path $native 'StartupIsland.updated.exe'}
 $work=[IO.Path]::GetFullPath((Join-Path $env:TEMP ('tome-startup-'+[Guid]::NewGuid().ToString('N'))))
 [IO.Directory]::CreateDirectory($work)|Out-Null
 try {
-  $assembly=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes($target))
-  $input=$assembly.GetManifestResourceStream('MeguLit.MeguminFace')
-  if(!$input){$input=$assembly.GetManifestResourceStream('ToMe.MeguminFace')}
-  if(!$input){throw 'Existing startup artwork resource missing'}
-  $face=Join-Path $work 'face.png';$output=[IO.File]::Create($face)
-  try{$input.CopyTo($output)}finally{$output.Dispose();$input.Dispose()}
+  # The artwork is committed as native/megumin-face-source.png; an existing build is only a fallback.
+  $face=Join-Path $native 'assets\startup-face.png'
+  if(!(Test-Path -LiteralPath $face)){
+    if(!(Test-Path -LiteralPath $target)){throw "Startup artwork missing: expected $face"}
+    $assembly=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes($target))
+    $input=$assembly.GetManifestResourceStream('MeguLit.MeguminFace')
+    if(!$input){$input=$assembly.GetManifestResourceStream('ToMe.MeguminFace')}
+    if(!$input){throw 'Existing startup artwork resource missing'}
+    $face=Join-Path $work 'face.png';$output=[IO.File]::Create($face)
+    try{$input.CopyTo($output)}finally{$output.Dispose();$input.Dispose()}
+  }
   $compiler=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
   if(!(Test-Path -LiteralPath $compiler)){$compiler=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'}
   $built=Join-Path $work 'StartupIsland.exe'

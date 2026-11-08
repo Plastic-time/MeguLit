@@ -1,29 +1,13 @@
 ﻿param([switch]$Check)
 $ErrorActionPreference = 'Stop'
 $taskRoot = $PSScriptRoot
-# Local toolchain folder (rustup, cargo, MSVC libs). Override with MEGULIT_BUILD_TOOLS.
-$taskTools = $(if ($env:MEGULIT_BUILD_TOOLS) { $env:MEGULIT_BUILD_TOOLS } else { Join-Path (Split-Path $PSScriptRoot) 'build-tools' })
-# Restrict the build to explicit local compilers; do not inherit Visual Studio,
-# rustup proxy, shell wrapper or telemetry helper executables from the caller.
-$taskSysroot = (Join-Path $taskTools 'rustup\toolchains\stable-x86_64-pc-windows-msvc')
-$taskRustBin = Join-Path $taskSysroot 'bin'
-$env:CARGO_HOME = (Join-Path $taskTools 'cargo')
-$env:RUSTC = Join-Path $taskRustBin 'rustc.exe'
-$env:RUSTDOC = Join-Path $taskRustBin 'rustdoc.exe'
-$env:CARGO_NET_OFFLINE = 'true'
-$env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
-$env:VSCMD_SKIP_SENDTELEMETRY = '1'
-$env:POWERSHELL_TELEMETRY_OPTOUT = '1'
-$env:RC = 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\rc.exe'
-$env:Path = $taskRustBin+';'+(Join-Path $taskRoot 'runtime')+';'+$env:WINDIR+'\System32;'+$env:WINDIR+';'+$env:WINDIR+'\System32\WindowsPowerShell\v1.0'
-$env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = Join-Path $taskSysroot 'lib\rustlib\x86_64-pc-windows-msvc\bin\rust-lld.exe'
-foreach ($taskTool in @($env:RUSTC,$env:RUSTDOC,$env:RC,$env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER,(Join-Path $taskRustBin 'cargo.exe'))) {
- if (-not (Test-Path -LiteralPath $taskTool)) { throw "Required local compiler not found: $taskTool" }
-}
+# Toolchain discovery (local offline tools folder, or a standard Windows setup); see tools/build-env.ps1.
+. (Join-Path $taskRoot 'tools/build-env.ps1')
+if ($taskProblems.Count) { $taskProblems | ForEach-Object { Write-Error "MISSING: $_" -ErrorAction Continue }; throw 'Build environment incomplete; run tools/check-env.ps1 for details' }
 & (Join-Path $taskRoot 'tools/build-tray-icon.ps1')
-& (Join-Path $taskRoot 'runtime/node.exe') (Join-Path $taskRoot 'tools/prepare-reader.cjs')
+& $taskNode (Join-Path $taskRoot 'tools/prepare-reader.cjs')
 if ($LASTEXITCODE -ne 0) { throw 'Original overlay source preparation failed' }
-& (Join-Path $taskRoot 'runtime/node.exe') (Join-Path $taskRoot 'tools/restore-native-host.cjs')
+& $taskNode (Join-Path $taskRoot 'tools/restore-native-host.cjs')
 if ($LASTEXITCODE -ne 0) { throw 'Native overlay host preparation failed' }
 & (Join-Path $taskRoot 'tools/build-reader-bridge.ps1')
 $taskHookPending = Join-Path $taskRoot 'native/HookBridge.updated.exe'
@@ -33,31 +17,28 @@ try { Copy-Item -LiteralPath $taskHookPending -Destination $taskHookFinal -Force
 catch [System.IO.IOException] { Write-Output 'Hook bridge update staged for the next attach' }
 & (Join-Path $taskRoot 'native/Build-GameStyleProbe.ps1')
 & (Join-Path $taskRoot 'native/Build-StartupIsland.ps1') -OutputPath (Join-Path $taskRoot 'native/StartupIsland.exe')
-& (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe') /nologo /target:exe /optimize+ ("/out:" + (Join-Path $taskRoot 'native\GameProcess.exe')) (Join-Path $taskRoot 'native\GameProcess.cs')
+& $taskCsc /nologo /target:exe /optimize+ ("/out:" + (Join-Path $taskRoot 'native\GameProcess.exe')) (Join-Path $taskRoot 'native\GameProcess.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Native game process helper build failed' }
-& (Join-Path $taskRoot 'runtime\node.exe') --check (Join-Path $taskRoot 'services\bridge.cjs')
+& $taskNode --check (Join-Path $taskRoot 'services\bridge.cjs')
 if ($LASTEXITCODE -ne 0) { throw 'Service syntax check failed' }
 foreach ($taskScript in @('web/app.js','web/primary-buttons.js','web/library-grid-fit.js','web/tray-menu.js','web/launch-feedback.js','web/reader/game-ui.js','web/home-motion.js','web/library-refresh.js','web/series-library.js','web/series-i18n.js','web/game-reception.js','web/settings-autosave.js','web/path-picker.js','web/game-language.js','web/grid-motion.js','web/game-detail.js','web/settings.js','web/settings-layout.js','web/settings-search.js','web/settings-help.js','web/select-control.js','web/translation-settings.js','web/speech-settings.js','web/voice-style.js','web/background-crop.js','web/backup-ui.js','web/anki-review.js','web/anki-fit.js','web/anki-card.js','web/reader/host-transport.js','web/reader/bootstrap.js','web/reader/learning-notice.js','web/reader/host-startup.js','web/reader/host-regions.js','web/reader/module-list.js','web/reader/mode.js','web/reader/word-status.js')) {
- & (Join-Path $taskRoot 'runtime\node.exe') --check (Join-Path $taskRoot $taskScript)
+ & $taskNode --check (Join-Path $taskRoot $taskScript)
  if ($LASTEXITCODE -ne 0) { throw "UI syntax check failed: $taskScript" }
 }
 foreach ($taskScript in @(Get-ChildItem -LiteralPath (Join-Path $taskRoot 'web/reader/modules') -Filter '*.js' -File | ForEach-Object {$_.FullName}) + @('services/reader.cjs','services/legacy-reader-sql.cjs','services/runtime.cjs','services/game-detail.cjs','services/anki-review.cjs','services/anki-media.cjs','services/settings-schema.cjs','services/store.cjs','services/assets.cjs','services/locale-launch.cjs','services/patch-swap.cjs','services/game-readiness.cjs','core/game-ui.cjs','core/translate.cjs','services/library-scan.cjs','services/series.cjs','services/series-migration.cjs','services/game-enrichment.cjs','services/launch-path.cjs','core/series-recognition.cjs','services/anki-model.cjs','core/python-installer.cjs','core/lookup-models.cjs','services/brand-migration.cjs','tools/prepare-reader.cjs')) {
- & (Join-Path $taskRoot 'runtime/node.exe') --check $(if ([IO.Path]::IsPathRooted($taskScript)) { $taskScript } else { Join-Path $taskRoot $taskScript })
+ & $taskNode --check $(if ([IO.Path]::IsPathRooted($taskScript)) { $taskScript } else { Join-Path $taskRoot $taskScript })
  if ($LASTEXITCODE -ne 0) { throw "Syntax check failed: $taskScript" }
 }
 # Link the final host with Rust's bundled LLVM linker, without Visual Studio linker helper processes.
-$taskLld = Join-Path $taskSysroot 'lib\rustlib\x86_64-pc-windows-msvc\bin\rust-lld.exe'
 if (-not (Test-Path -LiteralPath $taskLld)) { throw 'Bundled Rust LLVM linker not found' }
-$taskMsvc = Get-ChildItem -LiteralPath (Join-Path $taskTools 'vs2022\VC\Tools\MSVC') -Directory | Sort-Object Name -Descending | Select-Object -First 1
-$taskSdk = Get-ChildItem -LiteralPath 'C:\Program Files (x86)\Windows Kits\10\Lib' -Directory | Sort-Object Name -Descending | Select-Object -First 1
 if (-not $taskMsvc -or -not $taskSdk) { throw 'Local Windows import libraries not found' }
 $env:LIB = (Join-Path $taskMsvc.FullName 'lib\x64')+';'+(Join-Path $taskSdk.FullName 'ucrt\x64')+';'+(Join-Path $taskSdk.FullName 'um\x64')
-& (Join-Path $taskRustBin 'cargo.exe') rustc --offline --locked --release --features custom-protocol --manifest-path (Join-Path $taskRoot 'desktop\Cargo.toml') -- -C "linker=$taskLld" -C linker-flavor=lld-link -L ("native="+(Join-Path $taskMsvc.FullName 'lib\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'ucrt\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'um\x64'))
+& $taskCargo rustc @taskCargoNet --locked --release --features custom-protocol --manifest-path (Join-Path $taskRoot 'desktop\Cargo.toml') -- -C "linker=$taskLld" -C linker-flavor=lld-link -L ("native="+(Join-Path $taskMsvc.FullName 'lib\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'ucrt\x64')) -L ("native="+(Join-Path $taskSdk.FullName 'um\x64'))
 if ($LASTEXITCODE -ne 0) { throw 'Independent desktop build failed' }
 $taskBuilt = Join-Path $taskRoot 'desktop\target\release\megulit.exe'
 if ($Check) {
  $taskTests = @(Get-ChildItem -LiteralPath (Join-Path $taskRoot 'validation') -Filter '*.test.cjs' -File -Recurse | ForEach-Object { $_.FullName })
- $taskTestOutput = & (Join-Path $taskRoot 'runtime\node.exe') --test @taskTests 2>&1
+ $taskTestOutput = & $taskNode --test @taskTests 2>&1
  $taskTestExit = $LASTEXITCODE
  $taskTestOutput | Set-Content -LiteralPath (Join-Path $taskRoot 'validation/automated-results.txt') -Encoding utf8
  $taskTestText = $taskTestOutput -join "`n"
