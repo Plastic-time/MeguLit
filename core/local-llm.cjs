@@ -30,10 +30,26 @@ class LocalLlm{
   const zip=path.join(this.root,'runtime',RUNTIME.file+'.part'),stage=this.dir+'.new';
   (async()=>{try{
     fs.mkdirSync(path.dirname(zip),{recursive:true});
-    const res=await this.fetch(RUNTIME.url,{redirect:'follow',signal:controller.signal});if(!res.ok||!res.body)throw Error('HTTP '+res.status);
-    const hash=createHash('sha256'),out=fs.createWriteStream(zip);
-    try{for await(const chunk of res.body){job.received+=chunk.length;hash.update(chunk);if(!out.write(chunk))await new Promise(r=>out.once('drain',r));}}finally{await new Promise(r=>out.end(r));}
-    if(hash.digest('hex')!==RUNTIME.sha256)throw Error('checksum mismatch');
+    /* v1.1.4 (user: download speed is the big problem): mainland China tries the GitHub mirrors from setup/runtime.json
+       first, like the runtime packs; a source that sends nothing for 20 s is dropped for the next. SHA-256 must match. */
+    let mirrors=[];try{mirrors=JSON.parse(fs.readFileSync(path.join(this.root,'setup','runtime.json'),'utf8')).mirrors||[];}catch{}
+    const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'',china=['Asia/Shanghai','Asia/Chongqing','Asia/Harbin','Asia/Urumqi','PRC'].includes(tz);
+    const mirrored=mirrors.map(m=>m.replace('{url}',RUNTIME.url)),urls=china?[...mirrored,RUNTIME.url]:[RUNTIME.url,...mirrored];
+    let ok=false,last=null;
+    for(const url of urls){
+     if(controller.signal.aborted)break;
+     const attempt=new AbortController(),stop=()=>attempt.abort();controller.signal.addEventListener('abort',stop,{once:true});
+     let idle=setTimeout(stop,20000);const touch=()=>{clearTimeout(idle);idle=setTimeout(stop,20000);};
+     job.received=0;const hash=createHash('sha256'),out=fs.createWriteStream(zip);
+     try{
+      const res=await this.fetch(url,{redirect:'follow',signal:attempt.signal});if(!res.ok||!res.body)throw Error('HTTP '+res.status);
+      try{for await(const chunk of res.body){touch();job.received+=chunk.length;hash.update(chunk);if(!out.write(chunk))await new Promise(r=>out.once('drain',r));}}finally{await new Promise(r=>out.end(r));}
+      if(hash.digest('hex')!==RUNTIME.sha256)throw Error('checksum mismatch');
+      this.log('runtime downloaded from '+new URL(url).host);ok=true;break;
+     }catch(e){last=e;if(!out.closed)await new Promise(r=>out.end(r));this.log('runtime source failed '+new URL(url).host+': '+String(e.message||e));}
+     finally{clearTimeout(idle);controller.signal.removeEventListener('abort',stop);}
+    }
+    if(!ok)throw last||Error('download failed');
     fs.rmSync(stage,{recursive:true,force:true});fs.mkdirSync(stage,{recursive:true});await this.extract(zip,stage);
     if(!fs.existsSync(path.join(stage,'llama-server.exe'))&&!fs.readdirSync(stage).some(n=>fs.existsSync(path.join(stage,n,'llama-server.exe'))))throw Error('llama-server.exe missing');
     await this.stop();fs.rmSync(this.dir,{recursive:true,force:true});fs.renameSync(stage,this.dir);job.state='done';this.log('runtime '+RUNTIME.version+' installed');

@@ -33,7 +33,7 @@
  let entries=[];try{const saved=JSON.parse(store().getItem(KEY)||sessionStorage.getItem(KEY)||'[]');if(Array.isArray(saved))entries=saved.filter(e=>e&&typeof e.src==='string').slice(-cfg.max).map(e=>({...e,tr:normalizeTranslation(e.tr)}));}catch{}
  let saveTimer=0;const persist=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{store().setItem(KEY,JSON.stringify(entries));(cfg.keep?sessionStorage:localStorage).removeItem(KEY);}catch{}},300);};
  const norm=v=>String(v||'').replace(/\s+/g,'');
- function record(src){const body=String(src||'').trim(),raw=b.hookActive&&typeof b.hookSourceText==='string'&&norm(split(b.hookSourceText).text)===norm(body)?b.hookSourceText:body;const text=raw.trim();if(!text)return;const last=entries.at(-1);if(last&&norm(last.src)===norm(text))return;entries.push({src:text,tr:'',at:Date.now()});if(entries.length>cfg.max)entries.splice(0,entries.length-cfg.max);persist();refreshLog();}
+ function record(src){const body=String(src||'').trim(),raw=b.hookActive&&typeof b.hookSourceText==='string'&&norm(split(b.hookSourceText).text)===norm(body)?b.hookSourceText:body;const text=raw.trim();if(!text)return;const last=entries.at(-1);if(last&&norm(last.src)===norm(text))return;const speaker=raw===b.hookSourceText&&!split(text).name&&typeof b.hookSpeaker==='string'?b.hookSpeaker:'';entries.push(speaker?{src:text,tr:'',at:Date.now(),name:speaker}:{src:text,tr:'',at:Date.now()});if(entries.length>cfg.max)entries.splice(0,entries.length-cfg.max);persist();refreshLog();}
  function translated(src,text){const key=norm(split(src).text);for(let i=entries.length-1;i>=Math.max(0,entries.length-20);i--)if(norm(split(entries[i].src).text)===key){entries[i].tr=String(text||'');persist();refreshLog();return;}}
  const source=b.onSourceText;b.onSourceText=text=>{source?.(text);record(text);};
  if(b.sourceText)record(b.sourceText);
@@ -164,7 +164,7 @@
  const pad=n=>String(n).padStart(2,'0');const clock=at=>{const d=new Date(at);return pad(d.getHours())+':'+pad(d.getMinutes());};
  // Without a search the original is laid out as char tokens, so selecting a word opens the same local lookup card.
  function highlight(node,text){node.textContent='';if(!query){if(node.classList.contains('tome-log-src'))node.append(...[...text].map((c,i)=>{const span=document.createElement('span');span.className='char-token';span.dataset.index=String(i);span.textContent=c;return span;}));else node.textContent=text;return;}const lower=text.toLowerCase(),q=query.toLowerCase();let i=0,j;while((j=lower.indexOf(q,i))>=0){node.append(text.slice(i,j));const m=document.createElement('mark');m.className='tome-log-hit';m.textContent=text.slice(j,j+q.length);node.append(m);i=j+q.length;}node.append(text.slice(i));}
- function item(entry,latest,sample){const s=split(entry.src),it=document.createElement('div');it.className='tome-log-item';if(latest)it.dataset.latest='';
+ function item(entry,latest,sample){const s=split(entry.src);if(!s.name&&entry.name)s.name=entry.name;const it=document.createElement('div');it.className='tome-log-item';if(latest)it.dataset.latest='';
   const name=document.createElement('div');name.className='tome-log-name';if(s.name){const n=document.createElement('b');n.textContent=s.name;n.title=s.name;name.append(n);}else{const n=document.createElement('i');n.textContent=t('narration');name.append(n);}
   const body=document.createElement('div');body.className='tome-log-body';const src=document.createElement('div');src.className='tome-log-src';src.lang='ja';src.__logText=s.text;highlight(src,s.text);const tr=document.createElement('div');tr.className='tome-log-tr';
   if(entry.tr)highlight(tr,entry.tr);else{tr.dataset.missing='';tr.textContent=latest&&!sample&&b.isEnabled?.()?t('pending'):t('none');}body.append(src,tr);
@@ -273,7 +273,7 @@
   const [width,wOut]=range('width',520,1400,10,v=>v+'px'),[height,hOut]=range('height',40,100,1,v=>v+'%'),[opacity,oOut]=range('opacity',50,100,1,v=>v+'%');
   const max=el('select');for(const n of [100,300,500,1000,2000])max.add(new Option(String(n),String(n)));max.value=String(cfg.max);max.onchange=()=>{cfg.max=Number(max.value);if(entries.length>cfg.max){entries.splice(0,entries.length-cfg.max);persist();}changed();};
   const actions=el('div','tome-log-actions-row'),copyAll=el('button',null,t('copyAll')),clear=el('button',null,t('clear'));copyAll.type=clear.type='button';
-  copyAll.onclick=()=>{const text=entries.map(e=>{const s=split(e.src);return (s.name?s.name+'：':'')+s.text+(e.tr?'\n'+e.tr:'');}).join('\n\n');try{navigator.clipboard.writeText(text);copyAll.textContent=t('copied');setTimeout(()=>{copyAll.textContent=t('copyAll');},1400);}catch{}};
+  copyAll.onclick=()=>{const text=entries.map(e=>{const s=split(e.src);if(!s.name&&e.name)s.name=e.name;return (s.name?s.name+'：':'')+s.text+(e.tr?'\n'+e.tr:'');}).join('\n\n');try{navigator.clipboard.writeText(text);copyAll.textContent=t('copied');setTimeout(()=>{copyAll.textContent=t('copyAll');},1400);}catch{}};
   let armed=0;clear.onclick=()=>{if(Date.now()-armed>3000){armed=Date.now();clear.textContent=t('confirmClear');setTimeout(()=>{clear.textContent=t('clear');},3000);return;}entries=[];persist();clear.textContent=t('cleared');if(panel)render();};
   actions.append(copyAll,clear);
   box.append(h,note,openBtn,el('h4',null,t('preview')),preview,

@@ -80,8 +80,10 @@ function start(root,current,fetcher=fetch){
    MeguLit. The script is therefore started by Windows itself through WMI (Win32_Process.Create), outside MeguLit's
    process tree, and the launcher's return code is checked before MeguLit is allowed to quit. */
 function launchScript(root,{run=spawn}={}){
- const line=`powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${state.ps1}" -Root "${root}" -Zip "${state.zip}"`;
- const create='$r=Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine=$env:MEGULIT_UPDATE_COMMAND};exit [int]$r.ReturnValue';
+ /* v1.1.4: Windows 11 hands console programs to Windows Terminal, which ignores -WindowStyle Hidden and showed the
+    script's progress window. conhost --headless runs it with no window at all; the startup info also asks for SW_HIDE. */
+ const line=`conhost.exe --headless powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "${state.ps1}" -Root "${root}" -Zip "${state.zip}"`;
+ const create='$s=New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ShowWindow=[uint16]0};$r=Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine=$env:MEGULIT_UPDATE_COMMAND;ProcessStartupInformation=$s};exit [int]$r.ReturnValue';
  return new Promise(resolve=>{
   let child;try{child=run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-Command',create],{stdio:'ignore',windowsHide:true,env:{...process.env,MEGULIT_UPDATE_COMMAND:line}});}catch{resolve(false);return;}
   const timer=setTimeout(()=>resolve(false),20000);
@@ -101,6 +103,7 @@ async function apply(root,current,fetcher=fetch){await start(root,current,fetche
 /* Runs after MeguLit has exited: only files that exist in the zip are copied. */
 function script(){return `param([string]$Root,[string]$Zip)
 $ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
 $log=Join-Path $Root 'logs\\update.log'
 New-Item -ItemType Directory -Force (Split-Path $log) -ErrorAction SilentlyContinue | Out-Null
 function Log($m){try{Add-Content -LiteralPath $log -Value ((Get-Date -Format o)+' '+$m) -Encoding utf8}catch{}}
