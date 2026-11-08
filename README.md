@@ -1,114 +1,99 @@
 <div align="center">
 
-<img src="docs/assets/logo.png" width="520" alt="MeguLit">
+<img src="docs/assets/logo.png" width="480" alt="MeguLit">
 
-**Read the game, keep the game.**
-Windows 上的 Galgame 阅读与日语学习工具
+<h3>Read the game, keep the game.</h3>
 
-[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-8b1e2d)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-3b2124)
-![Version](https://img.shields.io/badge/version-1.1.0-e0a84b)
-[![Sponsor](https://img.shields.io/badge/%E2%99%A1-Sponsor-c8323c)](https://github.com/sponsors/ilynthn)
+在 Galgame 里读日语的小魔导书 ✦
 
-[简体中文](#zh) · [English](#en) · [日本語](#ja) · [♡ 赞赏 / Support](#support)
+[![Version](https://img.shields.io/badge/version-1.1.0-e0a84b?style=flat-square)](https://github.com/ilynthn/MeguLit/releases/latest)
+[![Platform](https://img.shields.io/badge/Windows%2010%20%2F%2011-x64-3b2124?style=flat-square)](#zh-install)
+[![License](https://img.shields.io/badge/license-GPL--3.0--or--later-8b1e2d?style=flat-square)](LICENSE)
+[![Sponsor](https://img.shields.io/badge/%E2%99%A1-Sponsor-c8323c?style=flat-square)](https://github.com/sponsors/ilynthn)
+
+**[下载 v1.1.0](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [♡ 赞赏](#support)
+
+<br>
 
 <img src="docs/screenshots/home.jpg" width="900" alt="MeguLit 首页">
 
 </div>
 
-> [!WARNING]
-> 还在积极开发中，功能、数据格式、界面随时可能变
->
-> Still in active development. Things may change.
->
-> 開発中です。機能や画面は変わることがあります
+<br>
 
----
+> [!WARNING]
+> 还在积极开发中，功能、数据格式和界面随时可能变 &nbsp;·&nbsp; Still in active development &nbsp;·&nbsp; 開発中です
+
+<br>
 
 <a id="zh"></a>
 
-## 简体中文
-
-- [为什么做这个](#zh-why)
-- [v1.1.0 新内容](#zh-new)
-- [功能预览与用法](#zh-tour)
-- [五十音学习（新）](#zh-kana)
-- [安装与快速上手](#zh-install)
-- [常见问题](#faq)
-- [现在能做什么](#zh-status)
-- [接下来](#zh-roadmap)
-- [致谢与许可](#zh-thanks)
-
-<a id="zh-why"></a>
-
-### 为什么做这个
-
-我想靠 Galgame 学日语，结果发现现有的工具都在逼我二选一：要么老老实实玩原版，遇到不认识的词就切出去查；要么在旁边外挂一个窗口，游戏里的原文照样显示，两份字摆在眼前，看着很难受
-
-两个我都不想要，所以干脆自己做了一个。基本是和 AI 一起 vibe coding 出来的，每天自己在用，哪里难受就改哪里
-
-MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能读懂了**。原文、翻译、注音、查词、AI 讲解、生词本、Anki 复习，都在游戏旁边完成，不用来回切窗口
-
-界面有简体中文、English、日本語三种。学日语的中文/英文用户是主要对象，反过来用日语学中文或英文也可以
+# 简体中文
 
 <a id="zh-new"></a>
 
-### v1.1.0 新内容
+## ✦ v1.1.0 新内容
 
-- **自动更新**：每次启动会联网检查新版本，有的话直接在后台下载。右下角会显示版本号、更新内容、安装包比现在大还是小，以及真实的下载进度。下载完会先校验，再由你决定「重启并更新」还是「稍后」。只替换程序文件，游戏库、学习记录和设置都会保留。「关于」页也能手动检查
-- **默认背景**：自带一张浅色、一张深色背景，跟着浅色 / 深色主题自动切换。设了自己的图片就用你的
-- **学习统计重做**：魔导书 × 毛玻璃风格。日历、本月读的书、字数走势、阅读时段、星期分布、阅读手感、常查的词和文字分析，每一块都能单独切换年 / 月 / 周 / 日
-- **空页面重做**：句子、单词、回收站、历史为空时，会告诉你这里会出现什么、怎么让它出现。词典首页列出你常查的词，点一下就能查
-- **关于页**：重新做了打赏区，链接里加了「常见问题」
-- **修复**
-  - 部分电脑上点「启动游戏」直接报「无法检查游戏是否已运行」，Steam 游戏尤其常见。现在查不到进程也会照常启动
-  - 关闭游戏后 MeguLit 主窗口偶尔变成半透明
-  - 多语言版游戏（如 Maitetsu Pure Station）把日文、简中、繁中整串显示出来，或者漏出 %l 这类标记
+| | |
+|---|---|
+| **自动更新** | 每次启动检查新版本，有就直接在后台下载。卡片上写着版本号、更新内容、安装包变大还是变小，进度条是真实的。下载完先校验，再由你选「重启并更新」或「稍后」。只换程序文件，游戏库、学习记录和设置都保留 |
+| **默认背景** | 自带浅色、深色两张背景，跟着主题自动切换；设了自己的图片就用你的 |
+| **学习统计** | 魔导书 × 毛玻璃风格重做。日历、本月读的书、字数走势、阅读时段、星期分布、阅读手感、常查的词，每一块都能单独切换年 / 月 / 周 / 日 |
+| **空页面** | 句子、单词、回收站、历史为空时，告诉你这里会出现什么、怎么让它出现；词典首页列出你常查的词 |
+| **修复** | 部分电脑上「无法检查游戏是否已运行」导致游戏启动不了（Steam 游戏多见）· 关闭游戏后主窗口变半透明 · 多语言版游戏把日文、简中、繁中整串显示出来 · 日文原文还原认不出中日文路径下正在运行的游戏 · Rance02 匹配不到 VNDB |
 
 > [!NOTE]
-> v1.0.5 及更早的版本还没有自动更新，这一次需要手动下载 v1.1.0 覆盖。之后的版本 MeguLit 会自己更新
+> 旧版本还没有自动更新，这一次请手动下载 v1.1.0 覆盖安装。以后的版本 MeguLit 会自己更新
 
-<a id="zh-tour"></a>
+<br>
 
-### 功能预览与用法
+## 为什么做这个
 
-#### 首页与游戏库
+想靠 Galgame 学日语，可现有的工具都逼人二选一：要么玩原版，遇到生词就切出去查；要么在旁边外挂一个窗口，游戏里的原文照样显示，两份字叠在眼前
+
+MeguLit 想做的只有一件事：**游戏还是那个游戏，只是你能读懂了**。原文、翻译、注音、查词、AI 讲解、生词本、Anki 复习，都在游戏旁边完成，不用来回切窗口
+
+界面有简体中文、English、日本語。主要面向学日语的中文 / 英文用户，反过来用日语学中文或英文也可以
+
+<br>
+
+## 功能预览
+
+### 游戏库
+
+<div align="center">
+<img src="docs/screenshots/library-search.gif" width="820" alt="游戏库搜索">
+<br><sub>每打一个字母，不相关的封面就散开，剩下的排到中间</sub>
+</div>
+
+<br>
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/home.jpg" alt="首页"></td>
 <td width="50%"><img src="docs/screenshots/library.jpg" alt="游戏库"></td>
+<td width="50%"><img src="docs/screenshots/game-detail.jpg" alt="作品详情"></td>
 </tr>
 <tr>
-<td>首页：上次读到哪、最近游玩、今天读了多少</td>
-<td>游戏库：扫描文件夹和 Steam，系列作品会归到一起</td>
+<td><sub><b>游戏库</b> · 扫描文件夹和 Steam，系列作品自动归到一起</sub></td>
+<td><sub><b>作品详情</b> · 简介、各站评分、阅读记录、关联单词和收藏的句子</sub></td>
 </tr>
 </table>
 
-<div align="center">
-<img src="docs/screenshots/library-search.gif" width="800" alt="游戏库搜索">
-<br><sub>游戏库搜索：每打一个字母，不相关的封面就散开，留下来的自动排到中间</sub>
-</div>
+1. 第一次打开时选好放游戏的文件夹，MeguLit 会自动找出日文原版 EXE
+2. 点封面进入作品详情，点「启动游戏」。需要转区的游戏可以单独开 Locale Emulator
+3. 游戏启动后阅读层自动接上，按 <kbd>Alt</kbd> + <kbd>T</kbd> 呼出菜单
 
-1. 第一次打开时选择放游戏的文件夹，MeguLit 会自动找出日文原版 EXE
-2. 点封面进入作品详情，点「启动游戏」。需要转区的游戏可以在详情里单独打开 Locale Emulator
-3. 游戏启动后阅读层会自动接上；按 **Alt+T** 呼出阅读层菜单
+### 阅读层
 
-<img src="docs/screenshots/game-detail.jpg" width="900" alt="作品详情">
+浮在游戏上面，不抢焦点，点它也不会让剧情往下走
 
-作品详情：简介、Bangumi / 2DFan / VNDB / Steam 评分、阅读记录、关联单词和收录的句子
-
-#### 阅读层：注音、点读、翻译
-
-阅读层浮在游戏上面，不抢焦点，也不会让剧情往下走
-
-- **点一下** 查单词，**拖一段** 查短语，离线词典
-- 注音优先用游戏自带的 ruby，没有时再用词典和上下文
+- **点一下**查单词，**拖一段**查短语，离线词典
+- 注音优先用游戏自带的 ruby，没有再用词典和上下文
 - 翻译支持 DeepL、Bing、Google、Gemini、DeepSeek、Sakura、Ollama 和 OpenAI 兼容接口，密钥加密存在本地
-- 选中词或整句可以让 AI 讲语法和语境
-- 每部作品单独记字体、颜色、位置，可以对着游戏画面调
+- 选中词或整句，让 AI 讲语法和语境
+- 每部作品单独记字体、颜色和位置
 
-#### 历史
+### 历史
 
 <table>
 <tr>
@@ -116,12 +101,12 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 <td width="50%"><img src="docs/screenshots/dialogue.jpg" alt="对话记录"></td>
 </tr>
 <tr>
-<td>阅读会话：每次玩了多久、读了多少字</td>
-<td>对话记录：读过的每一句原文和译文</td>
+<td><sub><b>阅读会话</b> · 每次玩了多久、读了多少字</sub></td>
+<td><sub><b>对话记录</b> · 读过的每一句原文和译文</sub></td>
 </tr>
 </table>
 
-#### 学习：Anki、单词、统计
+### 学习
 
 <table>
 <tr>
@@ -129,81 +114,80 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 <td width="50%"><img src="docs/screenshots/words.jpg" alt="单词本"></td>
 </tr>
 <tr>
-<td>Anki 复习：直接用 Anki 的卡片和调度，评分写回 Anki</td>
-<td>单词本：查过的词、读音、释义和掌握程度</td>
+<td><sub><b>Anki 复习</b> · 直接用 Anki 的卡片和调度，评分写回 Anki</sub></td>
+<td><sub><b>单词本</b> · 查过的词、读音、释义和掌握程度</sub></td>
 </tr>
 </table>
 
-<img src="docs/screenshots/stats.jpg" width="900" alt="学习统计">
+<img src="docs/screenshots/stats.jpg" width="100%" alt="学习统计">
 
-<img src="docs/screenshots/stats-trend.jpg" width="900" alt="字数走势与阅读时段">
+<img src="docs/screenshots/stats-trend.jpg" width="100%" alt="字数走势与阅读时段">
 
-学习统计：阅读字数、时长、查词、阅读日历、每部作品的阅读量、字数走势、阅读时段、星期分布和阅读手感。每一块都能单独切换年 / 月 / 周 / 日
-
-<img src="docs/screenshots/empty-state.jpg" width="900" alt="空页面">
-
-还没有内容的页面会告诉你这里会出现什么，以及怎么让它出现
-
-- 在阅读层查词时点「制卡」，会带上游戏截图和原声（没配音的旁白用本地 TTS 补）
-- Anki 需要自己安装 Anki 和 AnkiConnect，MeguLit 可以一键装好 AnkiConnect
-
-#### 工具
-
-<img src="docs/screenshots/tools.jpg" width="900" alt="工具">
-
-- **日文原版恢复（实验性）**：游戏自带日文数据时，把显示语言切回日文
-- **修复内嵌替换（研究中）**：诊断内嵌为什么变成只读，能修就修，修不了说明原因
-
-<a id="zh-kana"></a>
-
-### 五十音学习（新）
-
-给完全零基础的人：先认得每一个假名，再在游戏里读出来
-
-<img src="docs/screenshots/kana-home.jpg" width="900" alt="五十音主页">
-
-**怎么开始**：学习 → 五十音 → 「开始学习」。主页会记住你学到哪一课，右边是平假名熟悉度、本周数据和下一步建议
-
-#### 一课四步
-
-<img src="docs/screenshots/kana-lesson.jpg" width="900" alt="一课">
-
-1. **认识**：看笔顺动画、字源（例如「加 → か」）、例词，点喇叭听发音
-2. **辨认**：看假名选读音，干扰项会故意放形近的字
-3. **回忆**：看罗马音或听发音，选出假名
-4. **混合**：本课和学过的假名打乱出题，答错的稍后会再出现
-
-「在你的游戏里」会从你自己的阅读记录里找含这个假名的台词，例如上图的 か 来自 ISLAND。标题行右边的「发音」细尺单独调学习发音的音量，不影响游戏朗读
-
-快捷键：Enter 下一个，空格发音，← → 切换假名，答题时按 1–4
-
-#### 五十音图
-
-<img src="docs/screenshots/kana-chart.jpg" width="900" alt="五十音图">
-
-- 平假名 / 片假名，清音 / 浊音·半浊音 / 拗音，罗马音可以隐藏自测
-- や行、わ行的空位和「ん」按真实位置排，不硬填
-- 点格子看详情：笔顺、字源、发音要点、例词、易混对比；按 1–4 手动标熟悉度
-- 方向键移动，空格发音，Tab 切换平 / 片
-
-#### 假名游戏
+<p align="center"><sub><b>学习统计</b> · 阅读字数、时长、查词、日历、每部作品的阅读量、字数走势、阅读时段和星期分布</sub></p>
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/kana-games.jpg" alt="练习入口"></td>
-<td width="50%"><img src="docs/screenshots/kana-play-choice.jpg" alt="行段识别"></td>
+<td width="50%"><img src="docs/screenshots/empty-state.jpg" alt="空页面"></td>
+<td width="50%"><img src="docs/screenshots/tools.jpg" alt="工具"></td>
 </tr>
 <tr>
-<td>选玩法和难度，题量、限时、提示、题库都写在面板上</td>
-<td>行段识别：先按辅音字母选行，再按元音选段</td>
+<td><sub><b>空页面</b> · 告诉你这里会出现什么、怎么让它出现</sub></td>
+<td><sub><b>工具</b> · 日文原版恢复、修复内嵌替换</sub></td>
 </tr>
 </table>
 
+- 在阅读层查词时点「制卡」，会带上游戏截图和原声；没配音的旁白用本地 TTS 补
+- Anki 需要自己安装 Anki 和 AnkiConnect，MeguLit 可以一键装好 AnkiConnect
+
+<br>
+
+<a id="zh-kana"></a>
+
+## 五十音
+
+给零基础的人：先认得每一个假名，再到游戏里把它读出来
+
+<img src="docs/screenshots/kana-home.jpg" width="100%" alt="五十音主页">
+
+**学习 → 五十音 → 开始学习**。主页记住你学到哪一课，右边是平假名熟悉度
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/kana-lesson.jpg" alt="一课"></td>
+<td width="50%"><img src="docs/screenshots/kana-chart.jpg" alt="五十音图"></td>
+</tr>
+<tr>
+<td><sub><b>一课四步</b> · 认识 → 辨认 → 回忆 → 混合。笔顺、字源、例词，还有<b>你自己玩过的游戏里</b>含这个假名的台词</sub></td>
+<td><sub><b>五十音图</b> · 平 / 片假名，清音、浊音、拗音；点格子看笔顺、发音要点和易混字</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/kana-games.jpg" alt="假名游戏"></td>
+<td><img src="docs/screenshots/kana-play-choice.jpg" alt="行段识别"></td>
+</tr>
+<tr>
+<td><sub><b>假名游戏</b> · 三种玩法、四档难度，规则都写在面板上</sub></td>
+<td><sub><b>行段识别</b> · 先按辅音字母选行，再按元音选段</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/kana-results.jpg" alt="结算"></td>
+<td><img src="docs/screenshots/kana-records.jpg" alt="学习手帐"></td>
+</tr>
+<tr>
+<td><sub><b>结算</b> · 达成率、判定、答题轨迹和错题分析，一键错题再挑战</sub></td>
+<td><sub><b>学习手帐</b> · 熟悉度、到期复习（1 → 3 → 7 → 21 天）、个人最佳</sub></td>
+</tr>
+</table>
+
+<details>
+<summary><b>玩法、难度和评分规则</b></summary>
+
+<br>
+
 | 玩法 | 怎么玩 |
 |---|---|
-| 行段识别 | 看到「き」，答出 か行 · い段。键盘先按辅音字母（k）再按元音（i） |
+| 行段识别 | 看到「き」，答出 か行 · い段。键盘先按 <kbd>k</kbd> 再按 <kbd>i</kbd> |
 | 前后假名 | 按 あいうえお…わをん 的顺序说出前一个和后一个，空位直接跳过 |
-| 平片转换 | 看到平假名写片假名，反过来也一样。可以用日语输入法（F7 / F6 转换），也可以按 K 打开屏幕假名键盘 |
+| 平片转换 | 看平假名写片假名，反过来也一样。可以用日语输入法（<kbd>F7</kbd> / <kbd>F6</kbd>），也可以按 <kbd>K</kbd> 打开屏幕假名键盘 |
 
 | 难度 | 规则 |
 |---|---|
@@ -212,278 +196,209 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 | 进阶 | 加入浊音、拗音和易混字，限时更短 |
 | 挑战 | 总计 90 秒，错 3 次结束，没有提示 |
 
-<img src="docs/screenshots/kana-play-input.jpg" width="900" alt="平片转换">
-
-#### 达成率与结算
-
-<img src="docs/screenshots/kana-results.jpg" width="900" alt="结算">
-
 - 每道题是一个音符：普通假名算 TAP，最容易认错的几组（シ / ツ、ソ / ン、ぬ / め、ね / れ / わ…）算 **BREAK**，分量是 5 倍
-- 判定：答得快是 CRITICAL PERFECT，稍慢 PERFECT，再慢 GREAT；用了提示算 GOOD，答错或超时算 MISS
-- 基础 100% 加 BREAK 奖励最多 1%，**满分 101.0000%**；评级从 SSS+（100.5% 以上）到 D
-- 结算页列出每种判定的次数、答题轨迹、错误类型和建议，可以一键「错题再挑战」或「薄弱假名专项」
+- 答得快是 CRITICAL PERFECT，稍慢 PERFECT，再慢 GREAT；用了提示算 GOOD，答错或超时算 MISS
+- 基础 100% 加 BREAK 奖励最多 1%，**满分 101.0000%**，评级从 SSS+ 到 D
 
-#### 学习手帐
+快捷键：<kbd>Enter</kbd> 下一个，<kbd>Space</kbd> 发音，<kbd>←</kbd> <kbd>→</kbd> 切换假名，答题时按 <kbd>1</kbd>–<kbd>4</kbd>
 
-<img src="docs/screenshots/kana-records.jpg" width="900" alt="学习手帐">
+</details>
 
-- 熟悉度按竖排五十音显示，颜色越深越熟
-- 复习间隔 1 → 3 → 7 → 21 天，答对进下一档，答错回到 1 天；到期的假名会出现在「今日复习」
-- 个人最佳、练习记录、近期薄弱的假名和下一步建议
+<img src="docs/screenshots/kanji.jpg" width="100%" alt="汉字读音">
 
-#### 汉字读音
+<sub><b>汉字读音</b> · 学完假名可以玩《漢字でGO!》。MeguLit 只是在窗口里原样打开 PLiCy 上的官方页面（作者 Micelle，含广告），<b>不是 MeguLit 的一部分</b>；不想在 MeguLit 里玩，可以点「在浏览器打开」</sub>
 
-<img src="docs/screenshots/kanji.jpg" width="900" alt="汉字读音">
-
-学完假名后可以玩《漢字でGO!》练汉字读音。MeguLit 只是在窗口里原样打开 PLiCy 上的官方页面（作者 Micelle，含广告），**不是 MeguLit 的一部分**，也不复制任何游戏内容；不想在 MeguLit 里玩，可以点「在浏览器打开」
+<br><br>
 
 <a id="zh-install"></a>
 
-### 安装与快速上手
+## 安装
 
-> [!WARNING]
-> **游戏剧情必须是日文原文。** MeguLit 读取的是游戏正在显示的台词：如果剧情文本被汉化或翻译成其他语言，读到的就不是日文，注音、点读、翻译都会变成乱码或无法使用。只汉化了菜单、按钮等界面、剧情仍是日文的游戏不受影响。中文版游戏可以先试试「工具 → 日文原版恢复（实验性）」
+> [!IMPORTANT]
+> **游戏剧情必须是日文原文**。MeguLit 读的是游戏正在显示的台词，剧情被汉化后读到的就不是日文。只汉化了菜单、剧情仍是日文的游戏不受影响；汉化版可以先试试「工具 → 日文原版恢复」
 
 1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.1.0-win-x64.zip`（约 18 MB），解压后运行 `MeguLit.exe`
-2. 第一次启动会弹出安装窗口，二选一：
-   - **完整版**：下载约 565 MB，一次装齐全部组件（注音分词词典、AivisSpeech 语音引擎），需要预留约 1.8 GB 磁盘。推荐
-   - **精简版**：下载约 107 MB，能用阅读层、翻译和查词，其余组件以后可以在设置里补装
-3. 选择放游戏的文件夹，等游戏库扫描完
-4. 在游戏库点一部作品 → 「启动游戏」，阅读层会自动接上
-5. 零基础的话，先去 学习 → 五十音 学完平假名再开始读
+2. 第一次启动会弹出安装窗口，二选一
+   - **完整版**：下载约 565 MB，一次装齐注音词典和 AivisSpeech 语音引擎，需要约 1.8 GB 空间（推荐）
+   - **精简版**：下载约 107 MB，能用阅读层、翻译和查词，其余组件以后在设置里补装
+3. 选好放游戏的文件夹，等游戏库扫描完
+4. 点一部作品 →「启动游戏」，**用窗口模式玩**
+5. 零基础的话，先去 学习 → 五十音
 
-已经装过旧版：直接用新文件覆盖旧的 MeguLit 文件夹，组件和数据都会保留。从 v1.1.0 开始，新版本会在启动时自动下载更新
+装过旧版：用新文件覆盖旧的 MeguLit 文件夹即可，组件和数据都保留
 
-**请用窗口模式玩游戏**：全屏（独占全屏）下阅读层会显示不全，见[常见问题](#faq)
+需要 Windows 10 / 11 x64 和 Microsoft Edge WebView2 Runtime。本地翻译模型比较大，不在安装包里，需要时在设置里下载
 
-需要 Windows 10/11 x64 和 Microsoft Edge WebView2 Runtime。本地翻译模型比较大，不在安装包里，需要的话在设置里按需下载
+<br>
 
 <a id="faq"></a>
 
-### 常见问题
+## 常见问题
 
-**Q：全屏玩的时候翻译显示不全，或者文字跑到桌面上了？**
-A：请把游戏切到**窗口模式**。全屏现在有 bug：独占全屏时游戏会盖住其他窗口，MeguLit 的阅读层没法稳定地画在游戏上面。窗口模式下效果最好，窗口拉大一点也没关系
+<details open>
+<summary><b>全屏玩的时候翻译显示不全，或者文字跑到了桌面上</b></summary>
 
-**Q：点「启动游戏」提示「无法检查游戏是否已运行」？**
-A：v1.1.0 已经修复。旧版本在部分电脑上（多半是杀毒软件拦了进程查询）会这样，更新到 v1.1.0 就好
+<br>
 
-**Q：读到的全是乱码，或者不是日文？**
-A：MeguLit 读的是游戏正在显示的剧情文本，剧情必须是日文原文。汉化版可以先试试「工具 → 日文原版恢复」
+请把游戏切到**窗口模式**。全屏（独占全屏）现在有 bug：游戏会盖住其他所有窗口，阅读层没法稳定地画在游戏上面。窗口模式下效果最好，窗口拉大一点也没关系
 
-**Q：更新会不会把我的数据弄丢？**
-A：不会。自动更新只替换程序文件，`data`、`logs`、`cache`、`runtime`、`models` 这几个文件夹都不碰，旧的 `MeguLit.exe` 还会留一份 `MeguLit.rollback-update.exe`
+</details>
 
-**Q：Anki 连不上？**
-A：先打开 Anki，并装好 AnkiConnect（MeguLit 里可以一键安装）。如果端口 8765 被别的程序占了，也会连不上
+<details>
+<summary><b>点「启动游戏」提示「无法检查游戏是否已运行」</b></summary>
 
-**Q：游戏库里找不到我的游戏？**
-A：在游戏库点「+」手动添加游戏的 EXE，或者在设置里加扫描文件夹。Steam 游戏会自动扫到
+<br>
 
-**Q：某个游戏读不到文字？**
-A：不同引擎的情况差别很大。可以在 [Issues](https://github.com/ilynthn/MeguLit/issues) 里留下游戏名，最好附上 `logs` 文件夹
+v1.1.0 已经修复。旧版本在部分电脑上（多半是杀毒软件拦了进程查询）会这样，更新就好
 
-<a id="zh-status"></a>
+</details>
 
-### 现在能做什么
+<details>
+<summary><b>读到的是乱码，或者根本不是日文</b></summary>
 
-> 写「能用」的，是我真的拿游戏玩过的；「实验中」是代码接上了，但只在部分引擎上跑通，或者只过了自动测试
+<br>
+
+剧情必须是日文原文。汉化版先试试「工具 → 日文原版恢复」
+
+</details>
+
+<details>
+<summary><b>更新会不会弄丢我的数据</b></summary>
+
+<br>
+
+不会。自动更新只替换程序文件，`data`、`logs`、`cache`、`runtime`、`models` 都不碰。旧的 `MeguLit.exe` 还会留一份 `MeguLit.rollback-update.exe`
+
+</details>
+
+<details>
+<summary><b>Anki 连不上</b></summary>
+
+<br>
+
+先打开 Anki，并装好 AnkiConnect（MeguLit 里可以一键安装）。端口 8765 被别的程序占用也会连不上
+
+</details>
+
+<details>
+<summary><b>某个游戏读不到文字</b></summary>
+
+<br>
+
+不同引擎差别很大。请在 [Issues](https://github.com/ilynthn/MeguLit/issues) 留下游戏名，最好附上 MeguLit 的 `logs` 文件夹
+
+</details>
+
+<br>
+
+## 现在能做什么
 
 | 功能 | 状态 | 说明 |
-|---|---|---|
-| 抓取游戏文本 | 能用 | 基于 LunaHook，自动挑文本流，不对可以手动换 |
-| 阅读层 | 能用 | Alt+T 呼出菜单；每部作品单独记样式 |
-| 打字机效果 | 能用 | 逐字出现，等待符跟着文字走 |
-| 假名注音 | 能用 | 游戏自带 ruby 优先，没有再用词典和上下文判断 |
-| 点读查词 | 能用 | 点一下查单词，拖一段查短语，离线词典；点读不会让剧情往下走 |
-| 实时翻译 / AI 讲解 | 能用 | 多家翻译和大模型接口，密钥加密存在本地 |
-| 生词本 / Anki | 能用 | 单词、例句、回收站；AnkiConnect 制卡，带截图和原声 |
-| 游戏库 / 启动器 | 能用 | 扫文件夹和 Steam，自动认日文原版 EXE，可按作品开 Locale Emulator |
-| 备份恢复 | 能用 | 一键完整备份，恢复失败自动回滚 |
-| 五十音学习 | Beta | 25 课、五十音图、三个小游戏、达成率、学习手帐 |
-| 内嵌替换 | 实验中 | 把游戏里的原文直接换掉。部分引擎会报错甚至闪退，不建议开 |
-| 本地模型与 TTS | 实验中 | 需要本地显卡环境，测得还不够 |
+|---|:---:|---|
+| 抓取游戏文本 | ✅ | 基于 LunaHook，自动挑文本流，不对可以手动换 |
+| 阅读层 · 注音 · 点读 | ✅ | 游戏自带 ruby 优先；点读不推进剧情 |
+| 实时翻译 · AI 讲解 | ✅ | 多家翻译和大模型接口，密钥加密存在本地 |
+| 生词本 · Anki | ✅ | 单词、例句、回收站；制卡带截图和原声 |
+| 游戏库 · 启动器 | ✅ | 扫文件夹和 Steam，自动认日文原版 EXE |
+| 学习统计 | ✅ | 年 / 月 / 周 / 日，每块单独切换 |
+| 自动更新 · 备份恢复 | ✅ | 只换程序文件；备份恢复失败自动回滚 |
+| 五十音 | Beta | 25 课、五十音图、三个小游戏、学习手帐 |
+| 内嵌替换 | 实验中 | 部分引擎会报错甚至闪退 |
+| 本地模型与 TTS | 实验中 | 需要本地显卡环境 |
 
-### 难在哪
+## 接下来
 
-做久了才发现，麻烦的不是功能本身，而是每个引擎都不按常理出牌：
-
-- **能读不能写**：很多引擎只给只读的文本流。能写的那条，又常常和脚本、资源名、历史记录共用一个函数，一写就崩
-- **只能做通用规则**：给单个游戏打补丁很快，可游戏太多了，修复必须对一类引擎都成立
-- **重复和漏句**：同一句被重绘好几次、多条候选流、注音排版，都会造成重复或者漏掉。可有些台词就是故意重复的，不能一刀切去重
-- **点一下就跳剧情**：不少游戏直接轮询鼠标状态，你点的是阅读层，游戏也以为你点了它
-- **注音排版**：不能撑开行距，要对齐汉字，还要扛住描边、混排、逐字显示和高 DPI
-
-<a id="zh-roadmap"></a>
-
-### 接下来
-
-- [x] 主流引擎上点读、拖选不推进剧情（实机验过）
-- [x] 注音偏移和行距彻底分开
-- [x] 主界面设全局文字样式，新游戏自动继承
-- [x] 五十音学习：课程、五十音图、三个小游戏、学习手帐
-- [ ] **第四个假名小游戏：类似太鼓的节奏游戏**，随机用你装的 Galgame 的 BGM，自动检测 BPM 和鼓点，跟着节奏认假名
+- [ ] **第四个假名小游戏：太鼓风节奏游戏**，随机用你装的 Galgame 的 BGM，检测 BPM 和鼓点，跟着节奏认假名
 - [ ] 五十音学习的英文、日文界面
-- [ ] 把脚本控制串、名字变量挡在阅读和学习数据之外
-- [ ] 按引擎能力判断能不能安全内嵌，找脚本执行之后的绘制入口
-- [ ] 靠引擎事件或行 ID 区分「重绘」和「真的又说了一遍」
-- [ ] 保住游戏原生 LOG 里的原文
-- [ ] 开场、章节标题、独立字幕
+- [ ] 按引擎判断能不能安全内嵌；区分「重绘」和「真的又说了一遍」
+- [ ] 保住游戏原生 LOG 里的原文；开场、章节标题、独立字幕
 - [ ] 联网排行榜：阅读量、生词数、连续打卡天数
-- [ ] 更多学习语言，以及轻小说和 Galgame 以外的游戏
+- [ ] 更多学习语言，以及 Galgame 以外的游戏
 
-### 从源码构建
+## 从源码构建
 
 ```powershell
 .\Build.ps1 -Check
 ```
 
-要准备 Rust（Tauri）、Node.js 和 .NET Framework 的 C# 编译器
+需要 Rust（Tauri）、Node.js 和 .NET Framework 的 C# 编译器
 
-<a id="zh-thanks"></a>
+## 致谢
 
-### 致谢
+[LunaHook](https://github.com/HIllya51/LunaHook)（文本 Hook）· [JMdict / EDRDG](https://www.edrdg.org/jmdict/j_jmdict.html)（词典）· [SudachiDict](https://github.com/WorksApplications/SudachiDict)（分词）· [KanjiVG](https://kanjivg.tagaini.net/)（© Ulrich Apel，CC BY-SA 3.0，笔顺）· [AivisSpeech](https://aivis-project.com/)（语音）· [Tauri](https://tauri.app/) · [Anki](https://apps.ankiweb.net/) & AnkiConnect · [Tomoyo](https://github.com/46daishi/tomoyo)（最早的灵感）
 
-没有这些项目就没有 MeguLit：
+推荐游戏：[漢字でGO!](https://plicy.net/GamePlay/155561)（Micelle · PLiCy），只是推荐，与 MeguLit 无关
 
-- [LunaHook](https://github.com/HIllya51/LunaHook)：文本 Hook
-- [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) / EDRDG：日语词典数据
-- [SudachiDict](https://github.com/WorksApplications/SudachiDict)：分词词典
-- [KanjiVG](https://kanjivg.tagaini.net/)（© Ulrich Apel，CC BY-SA 3.0）：假名笔顺数据
-- [AivisSpeech](https://aivis-project.com/)：语音合成
-- [Tauri](https://tauri.app/)：桌面宿主
-- [Anki](https://apps.ankiweb.net/) 和 AnkiConnect
-- [Tomoyo](https://github.com/46daishi/tomoyo)：最早的参考和灵感
-- 推荐游戏：[漢字でGO!](https://plicy.net/GamePlay/155561)（Micelle · PLiCy）。只是推荐，与 MeguLit 无关
+GPL-3.0-or-later，见 [LICENSE](LICENSE)；第三方组件按各自许可证，见 [THIRD-PARTY.md](THIRD-PARTY.md)
 
-### 许可证
-
-GPL-3.0-or-later，见 [LICENSE](LICENSE)。第三方组件按各自的许可证，见 [THIRD-PARTY.md](THIRD-PARTY.md)
+<br>
 
 ---
 
 <a id="en"></a>
 
-## English
+# English
 
-### Why this exists
-
-I wanted to learn Japanese by playing visual novels, and every tool I tried made me pick one: play the original game and alt-tab to a dictionary every other line, or float a separate window next to it while the game keeps showing its own text underneath.
-
-I didn't want either, so I built my own, mostly by vibe coding with AI. I use it every day and fix whatever annoys me. The idea fits in one line: **it's still the same game, you just get to understand it.**
-
-The UI comes in Simplified Chinese, English and Japanese. The new kana course below is Chinese-only for now.
+**A small grimoire for reading Japanese inside visual novels.** The game stays the same game; you just get to understand it. Original text, translation, furigana, lookups, AI explanations, a word list and Anki review all happen next to the game, with no alt-tabbing.
 
 ### New in v1.1.0
 
-- **Automatic updates**: MeguLit checks for a new release on every start and downloads it in the background. A card shows the version, what changed, how the package size changes and the real download progress. Restart to update now or later. Only program files are replaced; your library, study records and settings stay
-- **Default backgrounds**: a light one and a dark one that follow the light / dark theme. Your own picture still wins
-- **Statistics redesigned**: calendar, books, character trend, reading hours, weekdays, reading feel, top lookups and text analysis, each switchable between year / month / week / day
-- **Empty pages** for sentences, words, trash and history now say what will appear there and how to get it
-- **Fixes**: "could not check whether the game was running" on some PCs (mostly Steam games); the main window staying half transparent after closing a game; multilingual builds showing every language track or %l markers
+| | |
+|---|---|
+| **Auto update** | Checks for a new release on every start and downloads it in the background, with the version, notes, size change and real progress. Only program files are replaced |
+| **Default backgrounds** | A light and a dark one that follow the theme |
+| **Statistics** | Redesigned; every panel switches between year / month / week / day |
+| **Fixes** | Launch failing with "could not check whether the game was running" · window staying half transparent after a game closes · multilingual builds showing every language track |
 
-v1.0.5 and earlier have no updater, so download v1.1.0 by hand once. Later versions update themselves.
-
-### Tour
+Older versions have no updater, so download v1.1.0 by hand once.
 
 <table>
 <tr>
 <td width="50%"><img src="docs/screenshots/library-search.gif" alt="Library search"></td>
-<td width="50%"><img src="docs/screenshots/game-detail.jpg" alt="Game page"></td>
-</tr>
-<tr>
-<td>Library search: covers that do not match scatter away as you type</td>
-<td>Game page: synopsis, ratings, reading log, linked words</td>
-</tr>
-<tr>
-<td><img src="docs/screenshots/dialogue.jpg" alt="Dialogue history"></td>
-<td><img src="docs/screenshots/stats.jpg" alt="Statistics"></td>
-</tr>
-<tr>
-<td>History: every line you read, with its translation</td>
-<td>Statistics: characters, time and lookups per day and per game</td>
+<td width="50%"><img src="docs/screenshots/stats.jpg" alt="Statistics"></td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/kana-lesson.jpg" alt="Kana lesson"></td>
-<td><img src="docs/screenshots/kana-chart.jpg" alt="Kana chart"></td>
-</tr>
-<tr>
-<td>Kana lesson: strokes, origin, example word, a line from your own games</td>
-<td>Kana chart: details, look-alikes and familiarity per kana</td>
-</tr>
-<tr>
-<td><img src="docs/screenshots/kana-play-choice.jpg" alt="Kana game"></td>
-<td><img src="docs/screenshots/kana-results.jpg" alt="Results"></td>
-</tr>
-<tr>
-<td>Kana game: pick the row, then the column</td>
-<td>Results: achievement, judgments and mistakes</td>
+<td><img src="docs/screenshots/kana-results.jpg" alt="Kana results"></td>
 </tr>
 </table>
 
-**In the reader overlay** (over the game, Alt+T for the menu): click a word or drag across a phrase to look it up, furigana from in-game ruby first, live translation from many providers, AI explanations, one-click Anki cards with a screenshot and the original voice line. Clicks never advance the story.
-
 ### Install
 
-> [!WARNING]
-> **The game's story text must be the original Japanese.** A translated interface is fine as long as the dialogue itself is still Japanese. For a translated edition, try Tools → Restore Japanese (experimental) first.
+1. Download `MeguLit-v1.1.0-win-x64.zip` (about 18 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`
+2. Pick **Full** (about 565 MB, furigana dictionaries and the AivisSpeech voice engine) or **Lite** (about 107 MB)
+3. Choose your game folder, pick a game and press *Launch*. Press <kbd>Alt</kbd> + <kbd>T</kbd> for the overlay menu
 
-1. Download `MeguLit-v1.1.0-win-x64.zip` (about 18 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`. Upgrading: unzip over the old folder; components and data are kept.
-2. Pick **Full** (about 565 MB, everything including furigana dictionaries and the AivisSpeech voice engine, about 1.8 GB on disk) or **Lite** (about 107 MB; add the rest later in Settings).
-3. Choose your game folder, pick a game in the library and press *Launch*. The overlay attaches by itself.
-4. New to Japanese? Start with Learn → Kana.
-
-Needs Windows 10/11 x64 and the Microsoft Edge WebView2 Runtime. For the Anki features, install Anki and AnkiConnect.
+The game's story text must be the original Japanese. Needs Windows 10 / 11 x64 and the WebView2 Runtime.
 
 ### FAQ
 
-- **Translations cut off or text on the desktop in fullscreen?** Play in **windowed mode**. Exclusive fullscreen has a bug where the overlay cannot stay on top of the game; windowed mode works best.
+- **Translations cut off, or text on the desktop in fullscreen?** Play in **windowed mode**. Exclusive fullscreen has a bug where the overlay cannot stay on top of the game.
 - **"Could not check whether the game was running"?** Fixed in v1.1.0.
-- **Garbled text?** The story text must be the original Japanese.
-- **Will an update delete my data?** No. Only program files are replaced; `data`, `logs`, `cache`, `runtime` and `models` are left alone.
+- **Does an update delete my data?** No. Only program files are replaced.
 
-### Roadmap
+GPL-3.0-or-later · [LICENSE](LICENSE) · [THIRD-PARTY.md](THIRD-PARTY.md)
 
-- [x] Kana course, chart, three games and study notebook
-- [ ] **A fourth kana game: a taiko-style rhythm game** that plays a random BGM from your installed visual novels, detects the BPM and beats, and has you read kana on the beat
-- [ ] English and Japanese UI for the kana course
-- [ ] Keep script control strings and name variables out of reading data; safer embedding per engine; keep the original text in the game's own backlog
-- [ ] Openings, chapter titles, standalone subtitles; online leaderboards; more learner languages
-
-### Build from source
-
-```powershell
-.\Build.ps1 -Check
-```
-
-Needs Rust (Tauri), Node.js and the .NET Framework C# compiler.
-
-### Thanks and license
-
-[LunaHook](https://github.com/HIllya51/LunaHook) · [JMdict / EDRDG](https://www.edrdg.org/jmdict/j_jmdict.html) · [SudachiDict](https://github.com/WorksApplications/SudachiDict) · [KanjiVG](https://kanjivg.tagaini.net/) (CC BY-SA 3.0) · [AivisSpeech](https://aivis-project.com/) · [Tauri](https://tauri.app/) · [Anki](https://apps.ankiweb.net/) & AnkiConnect · [Tomoyo](https://github.com/46daishi/tomoyo), where it all started. Recommended, not affiliated: [漢字でGO!](https://plicy.net/GamePlay/155561) by Micelle.
-
-GPL-3.0-or-later, see [LICENSE](LICENSE). Third-party components keep their own licenses, see [THIRD-PARTY.md](THIRD-PARTY.md).
+<br>
 
 ---
 
 <a id="ja"></a>
 
-## 日本語
+# 日本語
 
-### つくった理由
-
-ギャルゲーで日本語を勉強したかったのに、どのツールも「原作のまま遊んで、わからない単語は別ウィンドウで調べる」か「別ウィンドウを横に出す」かの二択でした。どちらも嫌だったので、自分で作ることにしました
-
-やりたいことはひとつだけ。**ゲームはそのまま、でも読めるようになる。** 原文、翻訳、ふりがな、辞書、AI 解説、単語帳、Anki 復習を、ゲームの横で全部済ませられます
+**ギャルゲーの中で日本語を読むための小さな魔導書。** ゲームはそのまま、でも読めるようになる。原文、翻訳、ふりがな、辞書、AI 解説、単語帳、Anki 復習を、ゲームの横で全部済ませられます
 
 ### v1.1.0 の新機能
 
-- **自動アップデート**：起動のたびに新しいバージョンを確認し、裏でダウンロードします。バージョン、更新内容、サイズの増減、実際の進捗を表示。プログラムだけを置き換え、ライブラリ・学習記録・設定は残ります
-- **デフォルト背景**：ライト / ダークのテーマに合わせて切り替わる背景を 2 枚同梱
-- **学習統計を作り直し**：カレンダー、作品、文字数の推移、時間帯、曜日、読書の手応えなど、パネルごとに年 / 月 / 週 / 日を切り替え
-- **修正**：一部の PC で「ゲームが起動中か確認できません」と出て起動できない問題（Steam 版に多い）、ゲーム終了後にウィンドウが半透明になる問題、多言語版で全言語の文が表示される問題
+| | |
+|---|---|
+| **自動アップデート** | 起動のたびに新しいバージョンを確認し、裏でダウンロード。バージョン、更新内容、サイズの増減、実際の進捗を表示。プログラムだけを置き換えます |
+| **デフォルト背景** | ライト / ダークのテーマに合わせて切り替わる 2 枚 |
+| **学習統計** | 作り直し。パネルごとに年 / 月 / 週 / 日を切り替え |
+| **修正** | 「ゲームが起動中か確認できません」で起動できない問題 · 終了後にウィンドウが半透明になる問題 · 多言語版で全言語の文が出る問題 |
 
-v1.0.5 以前には自動更新がないため、今回だけ手動で v1.1.0 をダウンロードしてください
+旧バージョンには自動更新がないため、今回だけ手動で v1.1.0 をダウンロードしてください
 
 <table>
 <tr>
@@ -494,41 +409,29 @@ v1.0.5 以前には自動更新がないため、今回だけ手動で v1.1.0 �
 
 ### インストール
 
-> [!WARNING]
-> **ゲームのシナリオ本文が日本語原文である必要があります。** メニューなど UI だけが翻訳されていて本文が日本語なら問題ありません。翻訳版は先に「ツール → 日本語に戻す（実験的）」をお試しください
+1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.1.0-win-x64.zip`（約 18 MB）をダウンロードして展開し、`MeguLit.exe` を起動
+2. 初回セットアップで **完全版**（約 565 MB）か **軽量版**（約 107 MB）を選択
+3. ゲームフォルダを選び、作品を選んで「ゲーム起動」。<kbd>Alt</kbd> + <kbd>T</kbd> でメニュー
 
-1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.1.0-win-x64.zip`（約 18 MB）をダウンロードして展開し、`MeguLit.exe` を起動。旧版からは上書きで更新でき、コンポーネントとデータは残ります
-2. 初回のセットアップで **完全版**（約 565 MB、ふりがな辞書と AivisSpeech 音声エンジンを含む、空き容量約 1.8 GB）か **軽量版**（約 107 MB、残りは設定から追加）を選択
-3. ゲームフォルダを選び、ライブラリから作品を選んで「ゲーム起動」。読書レイヤーは自動で接続されます（Alt+T でメニュー）
-
-Windows 10/11 x64 と Microsoft Edge WebView2 Runtime が必要です。Anki 機能には Anki と AnkiConnect が必要です
+シナリオ本文は日本語原文である必要があります。Windows 10 / 11 x64 と WebView2 Runtime が必要です
 
 ### よくある質問
 
-- **フルスクリーンで翻訳が欠ける・文字がデスクトップに出る**：**ウィンドウモード**で遊んでください。排他フルスクリーンには不具合があり、ウィンドウモードがいちばん安定します
+- **フルスクリーンで翻訳が欠ける・文字がデスクトップに出る**：**ウィンドウモード**で遊んでください。排他フルスクリーンには不具合があります
 - **「ゲームが起動中か確認できません」**：v1.1.0 で修正済みです
 - **アップデートでデータは消える？**：消えません。プログラムだけを置き換えます
 
-### 今後
+GPL-3.0-or-later · [LICENSE](LICENSE) · [THIRD-PARTY.md](THIRD-PARTY.md)
 
-- [ ] **4 つ目の仮名ゲーム：太鼓風のリズムゲーム**。インストール済みギャルゲーの BGM をランダムに使い、BPM とビートを検出して、リズムに合わせて仮名を読む
-- [ ] 五十音コースの英語・日本語 UI
-- [ ] 埋め込みの安全性判定、ゲーム内バックログの原文保持、オンラインランキング、学習言語の追加
-
-### 謝辞・ライセンス
-
-[LunaHook](https://github.com/HIllya51/LunaHook) · [JMdict / EDRDG](https://www.edrdg.org/jmdict/j_jmdict.html) · [SudachiDict](https://github.com/WorksApplications/SudachiDict) · [KanjiVG](https://kanjivg.tagaini.net/)（CC BY-SA 3.0） · [AivisSpeech](https://aivis-project.com/) · [Tauri](https://tauri.app/) · [Anki](https://apps.ankiweb.net/) & AnkiConnect · [Tomoyo](https://github.com/46daishi/tomoyo)（すべての始まり）。おすすめ（無関係）：[漢字でGO!](https://plicy.net/GamePlay/155561)（Micelle）
-
-GPL-3.0-or-later。[LICENSE](LICENSE) と [THIRD-PARTY.md](THIRD-PARTY.md) を参照してください
+<br>
 
 ---
 
-
 <a id="support"></a>
 
-## ♡ Support MeguLit
-
 <div align="center">
+
+# ♡ Support MeguLit
 
 和 Bug 魔王军的战斗还在继续，冒险经费倒是快见底了……(›´ω`‹ )
 
@@ -536,24 +439,18 @@ GPL-3.0-or-later。[LICENSE](LICENSE) と [THIRD-PARTY.md](THIRD-PARTY.md) を�
 
 **每一份支持，都能让这场冒险走得更远 ヾ(≧▽≦*)o**
 
-</div>
+<br>
 
-### 国内赞赏
+<img src="docs/assets/sponsor/support-card.png" width="680" alt="支付宝 / 微信赞赏码">
 
-<div align="center">
-<img src="docs/assets/sponsor/support-card.png" width="720" alt="支付宝 / 微信赞赏码">
-</div>
-
-### International Support
-
-<div align="center">
+<br><br>
 
 MeguLit is free, open source, and built in my spare time.<br>
 If it helped you read a few more lines in Japanese, a small sponsorship keeps the updates coming.
 
-<sub>Every Eris counts ♡</sub>
-
 [![Sponsor on GitHub](https://img.shields.io/badge/Sponsor%20on%20GitHub-c8323c?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/ilynthn)
+
+<sub>Every Eris counts ♡</sub>
 
 </div>
 
