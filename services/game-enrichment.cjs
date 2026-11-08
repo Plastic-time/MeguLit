@@ -12,10 +12,11 @@ function steamAppidFor(executable){
  return map.get(install)||'';
 }
 // Exact title (case/width-insensitive, symbols kept) or "title + subtitle" first; symbol-stripped equality
-// only for titles long enough not to collide ("eden*" must not become "Eden").
+// only for titles long enough not to collide ("eden*" must not become "Eden"). VNDB aliases count like other
+// titles: a folder is often named by one (千恋万花 for 千恋＊万花).
 const plain=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim();
 function pickVn(results,title){
- const q=plain(title),loose=normalize(title),main=v=>[v.title,v.alttitle].filter(Boolean),all=v=>[...main(v),...(v.titles||[]).map(x=>x.title)].filter(Boolean);
+ const q=plain(title),loose=normalize(title),main=v=>[v.title,v.alttitle].filter(Boolean),all=v=>[...main(v),...(v.titles||[]).map(x=>x.title),...(v.aliases||[])].filter(Boolean);
  // append discs, fan discs, trials: only when nothing else fits
  const extra=v=>main(v).some(n=>/append|fan ?disc|ファンディスク|追加ディスク|特典|体験版|trial|demo|re:graphic/i.test(n));
  const prefix=n=>{const t=plain(n);return q.length>=3&&(t.startsWith(q+' ')||t.startsWith(q+':')||t.startsWith(q+' -')||t.startsWith(q+' －'));};
@@ -40,7 +41,7 @@ class GameEnrichment{
   if(/^\d+$/.test(appid))try{const r=await json(this.fetch,'https://api.vndb.org/kana/release',post({filters:['extlink','=',['steam',Number(appid)]],fields:'vns.id',results:5}));const id=r.results?.flatMap(x=>x.vns||[])[0]?.id;if(id)vnid=id;}catch{}
   if(refresh&&!/^\d+$/.test(appid)&&vnid===previousVnid)vnid='';
   try{if(/^v?\d+$/.test(vnid)){const r=await json(this.fetch,'https://api.vndb.org/kana/vn',post({filters:['id','=',vnid.startsWith('v')?vnid:'v'+vnid],fields:'title,alttitle,titles.title,image.url,rating,votecount,released,developers.name,extlinks.url'}));vn=r.results?.[0];}
-   else for(const title of titles){const r=await json(this.fetch,'https://api.vndb.org/kana/vn',post({filters:['search','=',title],fields:'title,alttitle,titles.title,image.url,rating,votecount,released,developers.name,extlinks.url',results:8,sort:'searchrank'}));vn=pickVn(r.results||[],title);if(vn)break;}
+   else for(const title of titles){const r=await json(this.fetch,'https://api.vndb.org/kana/vn',post({filters:['search','=',title],fields:'title,alttitle,titles.title,aliases,image.url,rating,votecount,released,developers.name,extlinks.url',results:8,sort:'searchrank'}));vn=pickVn(r.results||[],title);if(vn)break;}
   }catch{}
   if(vn){vnid=vn.id;cover=vn.image?.url||'';const steam=(vn.extlinks||[]).map(x=>x.url).find(u=>/^https:\/\/store\.steampowered\.com\/app\/\d+/.test(u));if(steam&&!appid)appid=/\/app\/(\d+)/.exec(steam)[1];}
   if(vnid&&!appid)try{const r=await json(this.fetch,'https://api.vndb.org/kana/release',post({filters:['vn','=', ['id','=',vnid]],fields:'extlinks.url',results:20}));const steam=(r.results||[]).flatMap(v=>v.extlinks||[]).map(v=>v.url).find(u=>/^https:\/\/store\.steampowered\.com\/app\/\d+/.test(u));if(steam)appid=/\/app\/(\d+)/.exec(steam)[1];}catch{}
