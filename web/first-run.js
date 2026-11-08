@@ -39,5 +39,5 @@ export function maybeFirstRun({gamesCount,api,invoke,locale,esc,toast,onDone}){
    toast(n?t.done(n):t.none);close();onDone?.();
   }catch{status.textContent=t.failed;scan.disabled=pick.disabled=false;}
  };
- dialog.showModal();
+ dialog.showModal();/* A modal dialog makes the top bar inert, so the window could not be moved during first run (user, 2026-11-08): drag from the backdrop or any empty part of the card instead. */dialog.addEventListener('mousedown',event=>{if(event.button!==0||event.detail>1||event.target.closest('button,input,select,textarea,a,label,li'))return;event.preventDefault();window.__TAURI_INTERNALS__?.invoke('plugin:window|start_dragging',{label:'main'}).catch(()=>{});});
 }
