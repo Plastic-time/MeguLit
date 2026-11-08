@@ -75,7 +75,7 @@ function Draw-Book($g, $x, $y, $color) {
 # An own AppUserModelID gives the window its own taskbar entry with the MeguLit icon set below.
 try { Add-Type -Namespace MeguLit -Name Shell -MemberDefinition '[DllImport("shell32.dll")] public static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string id);'; [void][MeguLit.Shell]::SetCurrentProcessExplicitAppUserModelID('app.megulit.setup') } catch {}
 $form = New-Object Windows.Forms.Form
-$form.Text = 'MeguLit'; $form.ClientSize = New-Object Drawing.Size(720,590); $form.StartPosition = 'CenterScreen'
+$form.Text = 'MeguLit'; $form.ClientSize = New-Object Drawing.Size(720,650); $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.BackColor = $C.bg; $form.ForeColor = $C.cream
 $exe = Join-Path $Root 'MeguLit.exe'; if (Test-Path $exe) { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon($exe) }
 
@@ -98,55 +98,61 @@ $stage.add_Paint({ param($s,$e)
 $form.Controls.Add($stage)
 
 # ---- choice page ----
-$choice = New-Object Windows.Forms.Panel; $choice.Location = New-Object Drawing.Point(0,124); $choice.Size = New-Object Drawing.Size(720,466); $choice.BackColor = [Drawing.Color]::Transparent
+$choice = New-Object Windows.Forms.Panel; $choice.Location = New-Object Drawing.Point(0,124); $choice.Size = New-Object Drawing.Size(720,526); $choice.BackColor = [Drawing.Color]::Transparent
 $stage.Controls.Add($choice)
 [void](Label '第一次使用 MeguLit' 32 12 560 30 14 $true $C.cream $choice)
 [void](Label '先下载运行组件。它们都会装进 MeguLit 自己的文件夹，电脑上不用预先安装 Node.js、Python 或其他软件' 32 44 656 20 9 $false $C.muted $choice)
 [void](Label '组件包放在 MeguLit 的 GitHub Releases，里面是 Node.js、Python、LunaHook、AivisSpeech 等项目官方发布的原版文件，下载后逐个校验 SHA-256，被改动过的文件不会安装' 32 66 656 34 8 $false $C.muted $choice)
 $free = (Get-Item $Root).PSDrive.Free
 
-function Option($x, $title, $sub, $items, $note, $ids, $primary) {
-  $p = New-Object GrimoirePanel; $p.Location = New-Object Drawing.Point($x,106); $p.Size = New-Object Drawing.Size(316,282); $p.BackColor = $C.card
+function Option($x, $title, $sub, $items, $pros, $cons, $ids, $primary, $badge) {
+  $p = New-Object GrimoirePanel; $p.Location = New-Object Drawing.Point($x,106); $p.Size = New-Object Drawing.Size(316,346); $p.BackColor = $C.card
   $down = Sum $ids 'size'; $disk = (Sum $ids 'unpacked') + $appSize
-  $accent = if ($primary) { $C.red } else { $C.gold }
+  $accent = if ($primary) { $C.red } else { $C.line }
+  $edgeColor = if ($primary) { $C.red } else { $C.line }
   $p.add_Paint({ param($s,$e)
     $g = $e.Graphics; $g.SmoothingMode = 'AntiAlias'
-    $b = New-Object Drawing.SolidBrush $accent; $g.FillRectangle($b, 0, 0, 316, 3)
-    $g.FillPolygon($b, [Drawing.Point[]]@((New-Object Drawing.Point(272,0)),(New-Object Drawing.Point(290,0)),(New-Object Drawing.Point(290,30)),(New-Object Drawing.Point(281,23)),(New-Object Drawing.Point(272,30)))); $b.Dispose()
-    Draw-Book $g 20 20 $accent
-    $pen = Pen $C.line 255 1; $g.DrawRectangle($pen, 0, 0, 315, 281); $g.DrawLine($pen, 20, 206, 296, 206); $pen.Dispose()
+    $b = New-Object Drawing.SolidBrush $accent; $g.FillRectangle($b, 0, 0, 316, $(if ($primary) { 4 } else { 2 }))
+    if ($primary) { $g.FillPolygon($b, [Drawing.Point[]]@((New-Object Drawing.Point(272,0)),(New-Object Drawing.Point(290,0)),(New-Object Drawing.Point(290,30)),(New-Object Drawing.Point(281,23)),(New-Object Drawing.Point(272,30)))) }; $b.Dispose()
+    Draw-Book $g 20 20 $(if ($primary) { $C.red } else { $C.muted })
+    $pen = Pen $edgeColor 255 $(if ($primary) { 2 } else { 1 }); $g.DrawRectangle($pen, 0, 0, 315, 345); $pen.Dispose()
+    $pen = Pen $C.line 255 1; $g.DrawLine($pen, 20, 262, 296, 262); $pen.Dispose()
   }.GetNewClosure())
-  [void](Label $title 58 16 200 30 13 $true $C.cream $p)
-  [void](Label $sub 59 44 200 18 8 $false $C.muted $p)
-  [void](Label '包含 / Includes' 20 70 280 18 8 $true $accent $p)
-  [void](Label (($items | ForEach-Object { '·  ' + $_ }) -join "`n") 20 90 286 82 9 $false $C.cream $p)
-  [void](Label $note 20 172 286 32 8 $false $C.muted $p)
-  [void](Label ('下载约 ' + (MB $down)) 20 214 140 22 10 $true $C.cream $p)
+  [void](Label $title 58 16 120 30 13 $true $C.cream $p)
+  if ($badge) { $bd = Label $badge 132 23 40 18 8 $true $C.cream $p; $bd.BackColor = $C.red; $bd.TextAlign = 'MiddleCenter'; $bd.AutoSize = $false }
+  [void](Label $sub 59 44 220 18 8 $false $C.muted $p)
+  [void](Label '包含 / Includes' 20 68 280 18 8 $true $(if ($primary) { $C.red } else { $C.muted }) $p)
+  [void](Label (($items | ForEach-Object { '·  ' + $_ }) -join "`n") 20 86 286 68 9 $false $C.cream $p)
+  [void](Label (($pros | ForEach-Object { '✓  ' + $_ }) -join "`n") 20 158 286 52 9 $false $C.gold $p)
+  [void](Label (($cons | ForEach-Object { '–  ' + $_ }) -join "`n") 20 212 286 48 8 $false $C.muted $p)
+  [void](Label ('下载约 ' + (MB $down)) 20 270 140 22 10 $true $C.cream $p)
   $warn = if ($free -lt $disk * 1.1) { $C.red } else { $C.muted }
-  [void](Label ('占用磁盘约 ' + (MB $disk)) 160 216 140 20 9 $false $warn $p)
-  $b = New-Object Windows.Forms.Button; $b.Text = '选择' + $title; $b.FlatStyle = 'Flat'; $b.Location = New-Object Drawing.Point(20,240); $b.Size = New-Object Drawing.Size(276,32)
-  $b.Font = New-Object Drawing.Font($ui, 10, [Drawing.FontStyle]::Bold); $b.ForeColor = $C.cream; $b.FlatAppearance.BorderColor = $accent; $b.Cursor = 'Hand'
-  Style-Button $b $primary; $b.FlatAppearance.BorderColor = $accent
+  [void](Label ('占用磁盘约 ' + (MB $disk)) 160 272 140 20 9 $false $warn $p)
+  $b = New-Object Windows.Forms.Button; $b.Text = $(if ($primary) { '安装' + $title + '（推荐）' } else { '只装' + $title }); $b.FlatStyle = 'Flat'
+  $b.Location = New-Object Drawing.Point(20,$(if ($primary) { 298 } else { 302 })); $b.Size = New-Object Drawing.Size(276,$(if ($primary) { 38 } else { 30 }))
+  $b.Font = New-Object Drawing.Font($ui, $(if ($primary) { 11 } else { 9 }), $(if ($primary) { [Drawing.FontStyle]::Bold } else { [Drawing.FontStyle]::Regular })); $b.ForeColor = $C.cream; $b.Cursor = 'Hand'
+  Style-Button $b $primary; if (-not $primary) { $b.FlatAppearance.BorderColor = $C.line; $b.ForeColor = $C.muted }
   $b.Tag = $ids; $b.add_Click({ param($s) Start-Install $s.Tag })
   $p.Controls.Add($b); $choice.Controls.Add($p)
+  if ($primary) { $form.AcceptButton = $b }
 }
 $baseItems = @('Node.js 运行时（程序后台服务）','Python 3（分词与注音）','文本 Hook 引擎（读取游戏文字）','JMdict 日英 / 日中离线词典')
-Option 32 '精简版' 'LITE · 先用起来' $baseItems '注音分词词典第一次用时自动补装；语音引擎可以以后在「设置 → 语音 / 词典」里补装' $lite $true
-Option 372 '完整版' 'FULL · 一次装齐' @('精简版的全部组件','SudachiDict / UniDic 注音分词词典','AivisSpeech 语音引擎（朗读、原声补全）') '本地翻译模型体积很大，不包含在内，需要时在设置里按需下载' $full $false
+Option 32 '完整版' 'FULL · 一次装齐，开箱即用' @('精简版的全部组件','SudachiDict / UniDic 注音分词词典','AivisSpeech 语音引擎（朗读、原声补全）') @('注音和分词更准，生僻词、人名读音更可靠','朗读、制卡配音、原声补全马上能用','装完就不用再下载，断网也能用') @('下载约大五倍，第一次要多等一会','本地翻译模型不含在内，要用时在设置里下载') $full $true '推荐'
+Option 372 '精简版' 'LITE · 先用起来' $baseItems @('下载最小，几分钟就能开始玩','读取台词、点读查词、在线翻译都能用') @('第一次显示注音时才补装词典，要等一下','没有语音：朗读、配音要以后在「设置 → 语音 / 词典」补装') $lite $false ''
 
 $runtimeDir = Join-Path $Root 'runtime'
-[void](Label ('直接装进这个 MeguLit 文件夹，不会写到别处：' + $runtimeDir) 32 400 656 20 8 $false $C.muted $choice)
-[void](Label ('所在磁盘可用 ' + (MB $free) + '   ·   以后移动 MeguLit 文件夹，组件会跟着一起走') 32 420 656 20 8 $false $C.muted $choice)
+[void](Label ('直接装进这个 MeguLit 文件夹，不会写到别处：' + $runtimeDir) 32 466 656 20 8 $false $C.muted $choice)
+[void](Label ('所在磁盘可用 ' + (MB $free) + '   ·   以后移动 MeguLit 文件夹，组件会跟着一起走') 32 486 656 20 8 $false $C.muted $choice)
 if (-not $webview) {
   $link = New-Object Windows.Forms.LinkLabel; $link.Text = '这台电脑缺少 Microsoft Edge WebView2 运行时，MeguLit 的界面需要它：点这里去微软官网下载安装'
-  $link.Location = New-Object Drawing.Point(32,440); $link.Size = New-Object Drawing.Size(656,20); $link.Font = New-Object Drawing.Font($ui, 8, [Drawing.FontStyle]::Bold)
+  $link.Location = New-Object Drawing.Point(32,506); $link.Size = New-Object Drawing.Size(656,20); $link.Font = New-Object Drawing.Font($ui, 8, [Drawing.FontStyle]::Bold)
   $link.LinkColor = $C.red; $link.ActiveLinkColor = $C.gold; $link.BackColor = [Drawing.Color]::Transparent
   $link.add_LinkClicked({ Start-Process 'https://developer.microsoft.com/microsoft-edge/webview2/' })
   $choice.Controls.Add($link)
 }
 
 # ---- progress page ----
-$progress = New-Object Windows.Forms.Panel; $progress.Location = New-Object Drawing.Point(0,124); $progress.Size = New-Object Drawing.Size(720,466); $progress.BackColor = [Drawing.Color]::Transparent; $progress.Visible = $false
+$progress = New-Object Windows.Forms.Panel; $progress.Location = New-Object Drawing.Point(0,124); $progress.Size = New-Object Drawing.Size(720,526); $progress.BackColor = [Drawing.Color]::Transparent; $progress.Visible = $false
 $stage.Controls.Add($progress)
 $title = Label '正在下载运行组件…' 32 40 640 32 14 $true $C.cream $progress
 $status = Label '' 32 84 656 44 9 $false $C.muted $progress
