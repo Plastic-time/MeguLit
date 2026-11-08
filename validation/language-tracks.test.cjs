@@ -20,3 +20,8 @@ test('ordinary lines are untouched',()=>{
 test('container then repeat normalizer gives one line from the first block',()=>{
  const r=new RepeatNormalizer();assert.equal(r.normalize('k',japaneseTrack(JP+JP+'？？？？？？'+JP+JP+'？？？？？？'+SC+SC)),JP);
 });
+test('v1.1.5: a whole Chinese line is another language track; Japanese kanji-only lines are not',()=>{
+ const {foreignLine}=require('../core/language-tracks.cjs');
+ assert.equal(foreignLine('「您好，這裡是Soleil。需要訂購什麼嗎？」'),true);assert.equal(foreignLine('「您好，这里是Soleil。请问需要订购什么呢？」'),true);
+ for(const s of ['「はい、ソレイユです。」','「一期一会」','「本日開店、大盛況」','具体的な話'])assert.equal(foreignLine(s),false);
+});

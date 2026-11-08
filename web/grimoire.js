@@ -164,7 +164,7 @@ export function closeDialog(locale){
 export function toolsHTML(locale,esc){
  const w=words[locale]||words.zh;
  return `<div class="grimoire-page"><div class="g-page-head"><h1>${w.tools}<span class="count">${w.toolsCount(w.toolList.length)}</span></h1></div>
-  <div class="tools-grid">${w.toolList.map(([t,d,m],i)=>`<button type="button" class="tool-card" data-tool="${i}"><span class="tool-top"><b>${esc(t)}</b><em>${i===0?({zh:"实验性",en:"Experimental",ja:"実験的"})[locale]||"实验性":w.researching}</em></span><span class="tool-desc">${esc(d)}</span><span class="tool-meta">${esc(m)}</span></button>`).join('')}</div></div>`;
+  <div class="tools-grid">${w.toolList.map(([t,d,m],i)=>`<button type="button" class="tool-card" data-tool="${i}"><span class="tool-top"><b>${esc(t)}</b><em>${i===0?({zh:"实验性",en:"Experimental",ja:"実験的"})[locale]||"实验性":w.researching}</em></span><span class="tool-desc">${esc(d)}</span>${i===0?`<span class="tool-key-note">${({zh:'在 Steam 买的、只显示中文 / 英文的游戏（比如 Key 社的 Summer Pockets），一定要先运行这个工具，否则 MeguLit 读到的是中文或英文，用不了',en:'Games bought on Steam that only show Chinese or English (such as Key’s Summer Pockets) must go through this tool first, otherwise MeguLit only gets the translated text',ja:'Steam 版で中国語・英語しか表示されないゲーム（Key の Summer Pockets など）は、先にこのツールを実行してください。実行しないと翻訳文しか取得できません'})[locale]||''}</span>`:''}<span class="tool-meta">${esc(m)}</span></button>`).join('')}</div></div>`;
 }
 
 /* ---------- page tools live in the top bar; pages don't repeat their own name ---------- */

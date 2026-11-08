@@ -75,3 +75,128 @@
 .review-page #review-content>.review-card:has(>.anki-tools)>.anki-tools .text-button:hover{color:var(--ak-t1)!important;background:rgba(241,224,210,.04)!important}
 :root[data-theme=light] .review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch])){--ak-t1:#301919;--ak-t2:#6e4f47;--ak-t3:#8a6f66;--ak-gold:#a8323f;--ak-line:rgba(158,27,50,.16);--ak-rule:rgba(58,31,28,.1);background:linear-gradient(165deg,#fbf3ee,#f3e7df)!important}
 :root[data-theme=light] .review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch]))::after{color:rgba(158,27,50,.05)}
+
+/* Offline Anki card: every line centred under the title */
+.review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch])){text-align:center;align-items:center}
+.review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch]))>p.muted{margin-left:auto!important;margin-right:auto!important;text-align:center}
+.review-page #review-content>.review-card:has([data-launch])>.review-controls{justify-content:center;margin-top:26px!important}
+
+/* v1.1.5 fixes: a key press (Shift) made the focused item show a gold box; the active state now switches at once
+   (background and diamond used to cross-fade separately, so the diamond seemed to jump ahead of the highlight) */
+.main .settings-nav .settings-category button,.main .settings-nav .settings-category button::before{transition:color .18s!important}
+.main .settings-nav .settings-category button:focus-visible,.main .settings-nav .settings-category>summary:focus-visible{outline:none!important;background:rgba(241,224,210,.05)!important}
+.main .settings-nav .settings-category button:focus:not(:focus-visible){outline:none!important}
+
+/* Settings search: a glass field with a magnifier, gold on focus */
+.main .settings-content .settings-search{box-sizing:border-box;height:42px!important;min-height:42px!important;width:100%;padding:0 16px 0 42px!important;
+ border:1px solid rgba(237,181,110,.16)!important;border-radius:11px!important;font-size:13.5px!important;color:#f3e6da!important;
+ background:rgba(20,13,12,.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23a8907e' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E") 15px 50%/15px no-repeat!important;
+ box-shadow:0 1px 0 rgba(241,224,210,.04) inset!important;transition:border-color .2s,box-shadow .2s,background-color .2s!important}
+.main .settings-content .settings-search::placeholder{color:#8a7668}
+.main .settings-content .settings-search:hover{border-color:rgba(237,181,110,.3)!important}
+.main .settings-content .settings-search:focus,.main .settings-content .settings-search:focus-visible{outline:none!important;border-color:rgba(237,181,110,.6)!important;box-shadow:0 0 0 3px rgba(237,181,110,.1)!important;background-color:rgba(20,13,12,.62)!important}
+.home-glass .main .settings-content .settings-search{background-color:color-mix(in srgb,#140d0e var(--home-glass-alpha,55%),transparent)!important;backdrop-filter:blur(var(--home-glass-blur,14px))}
+:root[data-theme=light] .main .settings-content .settings-search{color:#301919!important;background-color:rgba(255,250,246,.85)!important;border-color:rgba(158,27,50,.18)!important}
+:root[data-theme=light] .main .settings-content .settings-search:focus{border-color:rgba(158,27,50,.5)!important;box-shadow:0 0 0 3px rgba(158,27,50,.08)!important}
+
+/* Voice preview row: the preview button keeps its own width */
+.speech-preview-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px 16px;margin-top:14px}
+.speech-preview-actions>button{flex:none;min-width:max-content;white-space:nowrap}
+
+/* v1.1.5 (user: the left menu already names the page): no repeated page title on the right */
+.main .settings-content .settings-section-title{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Live preview (settings-preview.js): stays in view while the options below scroll */
+.sp-preview{position:sticky;top:0;z-index:5;margin:14px 0 18px;padding:12px;border-radius:14px;border:1px solid rgba(237,181,110,.16);background:rgba(18,12,13,.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 18px 40px -28px rgba(0,0,0,.9)}
+.sp-head{display:flex;align-items:baseline;gap:12px;margin:0 4px 10px;font:500 13px var(--g-serif,serif);color:#edb56e;letter-spacing:.08em}
+.sp-head small{font:12px var(--g-sans,sans-serif);color:#9a8577;letter-spacing:0}
+.sp-scene{position:relative;display:flex;align-items:flex-end;min-height:190px;padding-top:26px;border-radius:10px;overflow:hidden;background:#140c0c center/cover no-repeat}
+.sp-scene::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 30%,rgba(0,0,0,.35))}
+.sp-window{position:relative;width:100%;margin:0 4% 4%;border-radius:10px;background:linear-gradient(180deg,rgba(14,10,14,.55),rgba(14,10,14,.72));border:1px solid rgba(255,236,214,.12)}
+.sp-name{position:absolute;top:-13px;left:18px;padding:3px 14px;border-radius:999px;font:600 12.5px var(--g-serif,serif);color:#fff3e2;background:linear-gradient(90deg,#8e2234,#5e1220);box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.sp-ja ruby{ruby-position:over}.sp-ja ruby rt{opacity:.95;line-height:1}
+.sp-scene-panel{align-items:center;justify-content:center;min-height:240px;padding:18px}
+.sp-panel{position:relative;width:min(420px,92%);overflow:hidden;color:#f3e6da;box-shadow:0 20px 50px -20px rgba(0,0,0,.8)}
+.sp-pic{position:absolute;inset:-30px;background:center/cover no-repeat}
+.sp-tint{position:absolute;inset:0}
+.sp-body{position:relative;padding:16px 18px;display:flex;flex-direction:column;gap:8px;font-size:12.5px}
+.sp-p-title{font:600 14px var(--g-serif,serif);color:#edb56e;margin-bottom:2px}
+.sp-p-row{display:flex;justify-content:space-between;align-items:center;color:#e8d8ca}
+.sp-p-row i{width:30px;height:16px;border-radius:999px;background:rgba(255,255,255,.18);position:relative}
+.sp-p-row i::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#e8d8ca}
+.sp-p-row i.on{background:#b72a36}.sp-p-row i.on::after{left:16px;background:#fff}
+.sp-p-log{display:grid;grid-template-columns:56px 1fr;gap:10px;color:#f3e6da}
+.sp-p-log b{text-align:right;font-weight:600;color:#edb56e;font-size:12px}
+.sp-p-log small{display:block;color:#bfae9f;font-size:11.5px;margin-top:2px}
+.sp-p-word{font:600 24px var(--g-serif,serif)}.sp-p-word small{margin-left:10px;font-size:13px;color:#edb56e}
+.sp-p-def{color:#e8d8ca}.sp-p-def.dim{color:#a8998f;font-size:12px}
+
+/* v1.1.5 light theme: word list, dictionary results and About used fixed dark cards with dark text */
+:root[data-theme=light] .main:not(:has(>.game-detail-content)) .record{background:linear-gradient(180deg,rgba(255,251,247,.9),rgba(250,242,235,.84))!important;border-color:rgba(158,27,50,.14)!important;box-shadow:0 10px 26px -20px rgba(80,30,30,.45)}
+:root[data-theme=light] .main:not(:has(>.game-detail-content)) .record:hover{background:linear-gradient(180deg,#fffaf6,#f7ede5)!important;border-color:rgba(158,27,50,.28)!important}
+:root[data-theme=light] .main .record :is(.word-spelling,h3,strong){color:#2b1716!important}
+:root[data-theme=light] .main .record :is(.word-def,.moji-meaning,.moji-note-body,p,li){color:#4f3630!important}
+:root[data-theme=light] .main .record :is(.word-reading){color:#a8323f!important}
+:root[data-theme=light] .main .record .moji-tags>*{color:#6e4f47!important;border-color:rgba(58,31,28,.2)!important;background:rgba(58,31,28,.05)!important}
+:root[data-theme=light] .main .record-meta{color:#8a6f66!important}
+:root[data-theme=light] :is(.about-facts,.about-links,.about-credits){background:linear-gradient(180deg,rgba(255,251,247,.9),rgba(250,242,235,.84))!important;border-color:rgba(158,27,50,.14)!important;color:#301919}
+:root[data-theme=light] :is(.about-facts dt,.about-credits p){color:#7a5e56!important}
+:root[data-theme=light] :is(.about-facts dd){color:#301919!important}
+:root[data-theme=light] .about-facts>div+div{border-color:rgba(58,31,28,.12)!important}
+:root[data-theme=light] .about-link{background:rgba(255,255,255,.7)!important;border-color:rgba(58,31,28,.14)!important;color:#301919!important}
+:root[data-theme=light] .about-link:hover{border-color:rgba(158,27,50,.35)!important;background:#fff!important}
+:root[data-theme=light] .about-update{color:#8e2234!important;border-color:rgba(158,27,50,.4)!important;background:rgba(255,255,255,.6)!important}
+:root[data-theme=light] .about-update-state{color:#7a5e56!important}
+:root[data-theme=light] .about-intl p,:root[data-theme=light] .about-cn h3,:root[data-theme=light] .about-intl h3{color:#6e4f47!important}
+:root[data-theme=light] .about-intro{color:#6e4f47!important}
+
+/* v1.1.5 (user: the Glass panels switch did nothing visible): the large surfaces now follow it.
+   Off: solid sheets that hide the picture. On: frosted sheets using the Glass blur / opacity sliders. */
+.main .settings-layout>.settings-content{padding:22px 28px 28px!important;border-radius:14px!important;border:1px solid rgba(237,181,110,.12)!important;
+ background:linear-gradient(170deg,#1d1415,#141011)!important;box-shadow:0 1px 0 rgba(241,224,210,.04) inset,0 24px 50px -36px rgba(0,0,0,.9)!important;backdrop-filter:none!important}
+.home-glass .main .settings-layout>.settings-content{background:linear-gradient(170deg,color-mix(in srgb,#251a1a var(--home-glass-alpha,55%),transparent),color-mix(in srgb,#120d0e var(--home-glass-alpha,55%),transparent))!important;
+ backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important}
+:root[data-theme=light] .main .settings-layout>.settings-content{background:linear-gradient(170deg,#fbf3ee,#f3e7df)!important;border-color:rgba(158,27,50,.14)!important}
+:root[data-theme=light].home-glass .main .settings-layout>.settings-content{background:linear-gradient(170deg,color-mix(in srgb,#fff7f2 var(--home-glass-alpha,65%),transparent),color-mix(in srgb,#f3e5dc var(--home-glass-alpha,65%),transparent))!important}
+/* word and dictionary cards: solid when the switch is off */
+:root:not(.home-glass):not([data-theme=light]) .main:not(:has(>.game-detail-content)) .record{background:linear-gradient(180deg,#1c1415,#151012)!important;backdrop-filter:none!important}
+.home-glass .main:not(:has(>.game-detail-content)) .record{backdrop-filter:blur(var(--home-glass-blur,14px))!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,14px))!important}
+
+/* v1.1.5 switches: no clipped focus outline (it left two stray dots on top after a click); a stitched centre line */
+input.switch:focus,input.switch:focus-visible{outline:none!important}
+input.switch:focus-visible{box-shadow:0 0 0 2px rgba(237,181,110,.45)!important}
+input.switch{background:repeating-linear-gradient(90deg,rgba(242,232,218,.32) 0 4px,transparent 4px 7px) 8px 50%/calc(100% - 16px) 1px no-repeat,#3a2a27!important}
+input.switch:checked{background:repeating-linear-gradient(90deg,rgba(255,224,206,.62) 0 4px,transparent 4px 7px) 8px 50%/calc(100% - 16px) 1px no-repeat,var(--e-red-btn)!important}
+:root[data-theme=light] input.switch:not(:checked){background:repeating-linear-gradient(90deg,rgba(58,31,28,.35) 0 4px,transparent 4px 7px) 8px 50%/calc(100% - 16px) 1px no-repeat,#e7d9d0!important}
+
+/* v1.1.5 Tools: grimoire cards with a faint watermark, a status seal and an "open" cue */
+.tools-grid{gap:22px!important}
+.tool-card{position:relative;overflow:hidden;display:flex!important;flex-direction:column;align-items:flex-start;gap:10px;min-height:190px;padding:26px 28px 24px!important;text-align:left;
+ border-radius:16px!important;border:1px solid rgba(237,181,110,.16)!important;background:linear-gradient(165deg,#241817,#151011)!important;
+ box-shadow:0 1px 0 rgba(241,224,210,.05) inset,0 26px 50px -34px rgba(0,0,0,.9)!important;transition:border-color .2s,transform .2s,box-shadow .2s!important}
+.home-glass .tool-card{background:linear-gradient(165deg,color-mix(in srgb,#2c1d1b var(--home-glass-alpha,58%),transparent),color-mix(in srgb,#140d0e var(--home-glass-alpha,58%),transparent))!important;backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important}
+.tool-card::before{content:"";position:absolute;top:-1px;left:28px;width:72px;height:1px;background:linear-gradient(90deg,transparent,rgba(237,181,110,.9),transparent)}
+.tool-card::after{position:absolute;right:-6px;bottom:-40px;font:400 170px/1 var(--g-serif,serif);color:rgba(237,181,110,.05);pointer-events:none;transition:color .3s}
+.tool-card[data-tool="0"]::after{content:"原"}.tool-card[data-tool="1"]::after{content:"修"}
+.tool-card:hover{border-color:rgba(237,181,110,.42)!important;transform:translateY(-2px);box-shadow:0 1px 0 rgba(241,224,210,.06) inset,0 30px 56px -30px rgba(0,0,0,.95)!important}
+.tool-card:hover::after{color:rgba(237,181,110,.09)}
+.tool-card:active{transform:translateY(0) scale(.99)}
+.tool-card .tool-top{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%}
+.tool-card .tool-top b{font:500 22px/1.3 var(--g-serif,serif);color:#f3e6da}
+.tool-card .tool-top em{font-style:normal;font-size:11px;letter-spacing:.14em;padding:3px 10px;border-radius:999px;color:#edb56e;border:1px solid rgba(237,181,110,.35);background:rgba(237,181,110,.06)}
+.tool-card .tool-desc{position:relative;font-size:13.5px;line-height:1.75;color:#cdb8a8;max-width:34em}
+.tool-card .tool-meta{position:relative;margin-top:auto;padding-top:12px;width:100%;border-top:1px solid rgba(241,224,210,.08);font-size:12px;color:#9a8577}
+.tool-card .tool-meta::after{content:"打开 →";float:right;color:#edb56e;opacity:0;transform:translateX(-4px);transition:opacity .2s,transform .2s}
+:root[lang^=en] .tool-card .tool-meta::after{content:"Open →"}:root[lang^=ja] .tool-card .tool-meta::after{content:"開く →"}
+.tool-card:hover .tool-meta::after,.tool-card:focus-visible .tool-meta::after{opacity:1;transform:none}
+.tool-card:focus-visible{outline:none;border-color:rgba(237,181,110,.6)!important}
+:root[data-theme=light] .tool-card{background:linear-gradient(165deg,#fbf3ee,#f3e7df)!important;border-color:rgba(158,27,50,.16)!important}
+:root[data-theme=light] .tool-card .tool-top b{color:#301919}:root[data-theme=light] .tool-card .tool-desc{color:#5a3f38}:root[data-theme=light] .tool-card .tool-meta{color:#8a6f66;border-color:rgba(58,31,28,.1)}
+:root[data-theme=light] .tool-card::after{color:rgba(158,27,50,.05)}:root[data-theme=light] .tool-card .tool-top em,:root[data-theme=light] .tool-card .tool-meta::after{color:#a8323f;border-color:rgba(158,27,50,.3)}
+@media (prefers-reduced-motion:reduce){.tool-card,.tool-card .tool-meta::after{transition:none!important}}
+
+/* Key titles need Japanese restore first (user, 2026-11-09): a gold seal note on the card and in the dialog */
+.tool-key-note{position:relative;display:block;margin:2px 0 0;padding:9px 12px 9px 30px;border-radius:9px;font-size:12.5px;line-height:1.6;font-weight:600;color:#ffe3b8;background:linear-gradient(90deg,rgba(237,181,110,.16),rgba(237,181,110,.04));border:1px solid rgba(237,181,110,.32);text-align:left}
+.tool-key-note::before{content:"◆";position:absolute;left:12px;top:9px;font-size:9px;color:#edb56e}
+:root[data-theme=light] .tool-key-note{color:#7a2a2a;background:linear-gradient(90deg,rgba(168,50,63,.1),rgba(168,50,63,.02));border-color:rgba(168,50,63,.3)}
+:root[data-theme=light] .tool-key-note::before{color:#a8323f}
