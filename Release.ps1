@@ -115,7 +115,7 @@ if($Prepare){Step "prepared $Tag (built and tested; release later with -SkipBuil
 # ---------- package ----------
 Step 'package'
 $work=Join-Path $env:TEMP "megulit-release-$Version";if(Test-Path $work){Remove-Item $work -Recurse -Force};New-Item -ItemType Directory $work | Out-Null
-$prevZip=Join-Path $work $prevAsset.name
+$prevZip=Join-Path $work ("previous-"+$prevAsset.name) # a hotfix downloads a package of the same name it then writes
 Invoke-WebRequest -Uri $prevAsset.browser_download_url -OutFile $prevZip -UseBasicParsing
 $old=[IO.Compression.ZipFile]::OpenRead($prevZip)
 $names=New-Object 'System.Collections.Generic.SortedSet[string]' ([StringComparer]::Ordinal)

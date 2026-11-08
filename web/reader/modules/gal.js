@@ -220,10 +220,14 @@
       const r=char.getBoundingClientRect();if(!r.width||!r.height)continue;
       const size=parseFloat(getComputedStyle(char).fontSize)||16;
       const em=size*(r.height/(char.offsetHeight||r.height)),bottom=(r.top+r.bottom+em)/2;
-      const row=rows.find(r0=>Math.abs(r0.top-r.top)<2);
-      if(row)row.bottom=Math.max(row.bottom,bottom);else rows.push({top:r.top,bottom});
+      /* E270 (user, ATRI: two rows showed 16 row chips and the per-row Y did nothing): rows were keyed by each glyph's
+         exact top, so glyphs mid typewriter rise, small kana and punctuation each opened a row of their own and the row
+         numbers no longer matched the visual rows. Group glyphs whose centres sit within half a glyph of each other. */
+      const center=(r.top+r.bottom)/2,row=rows.find(r0=>Math.abs(r0.center-center)<Math.max(4,Math.max(r0.height,r.height)*.5));
+      if(row){row.top=Math.min(row.top,r.top);row.bottom=Math.max(row.bottom,bottom);}else rows.push({top:r.top,bottom,center,height:r.height});
     }
-    rows.sort((a,b)=>a.top-b.top);
+    rows.sort((a,b)=>a.center-b.center);
+    const rowOf=g=>{const c=(g.top+g.bottom)/2;let best=0;for(let i=1;i<rows.length;i++)if(Math.abs(rows[i].center-c)<Math.abs(rows[best].center-c))best=i;return best;};
     for(const node of bases()){
       const first=node.firstElementChild,style=getComputedStyle(first),rect=node.getBoundingClientRect(),glyph=first.getBoundingClientRect();
       const baseFont=parseFloat(style.fontSize)||16;
@@ -235,13 +239,13 @@
       // The reading sits above the kanji's full em box: Japanese kanji ink nearly fills it, so anchoring on the estimated
       // ink top left readings touching their kanji (user, E215.3).
       node.style.setProperty('--megulit-ruby-top',(boxTop-rect.top)/scaleY+'px');
-      const previous=rows.findLast(row=>row.top<glyph.top-2);
+      const rowIndex=rows.length?rowOf(glyph):0,previous=rows[rowIndex-1];
       // Keep the Y offset independent of line height and constrain it to the space between the outlined glyphs.
       const space=previous?(boxTop-previous.bottom)/scaleY:Infinity;
       const font=Math.max(6,baseFont*preferences.rubyScale); /* E256: the user sets the size; no auto shrink */
       const maxLift=Math.max(minGap,space-minGap-font);
       const rest=Math.min(Math.max(minGap+travel,baseFont*.22),maxLift);
-      const rowIndex=Math.max(0,rows.findIndex(r0=>Math.abs(r0.top-glyph.top)<2)),rowOffset=(Number(String(preferences.rubyRowOffsets||'').split(',')[rowIndex])||0)*(parseFloat(root.getPropertyValue('--megulit-ruby-unit'))||1);
+      const rowOffset=(Number(String(preferences.rubyRowOffsets||'').split(',')[rowIndex])||0)*(parseFloat(root.getPropertyValue('--megulit-ruby-unit'))||1);
       const lift=rest-yOffset-rowOffset; /* E255 free ±100; E264 plus this row's own offset */
       node.style.setProperty('--megulit-ruby-lift',lift+'px');
       canvas.font=font+'px '+family;
@@ -251,7 +255,7 @@
     }
     // One reading size for the whole sentence (user: 一样大最好): the smallest that fits any of its rows.
     const common=Math.min(...items.map(i=>i.font));for(const i of items){i.width*=common/i.font;i.font=common;}
-    {const n=Math.min(16,rows.length);if(n>(window.__megulitRubyRows||0)){window.__megulitRubyRows=n;dispatchEvent(new Event('megulit-ruby-rows'));}}
+    {const n=Math.min(16,rows.length);if(n&&n!==window.__megulitRubyRows){window.__megulitRubyRows=n;dispatchEvent(new Event('megulit-ruby-rows'));}} /* E270: the rows of the current sentence, not the most ever seen */
     for(const item of window.TomoyoRubyLayout.layout(items,{minFont:1e9})){
       if(!item.visible){item.node.removeAttribute('data-tomoyo-reading');continue;}
       item.node.setAttribute('data-tomoyo-reading',item.reading);
@@ -654,7 +658,12 @@
       input.step='any';
       
       input.insertAdjacentElement('beforebegin',output);
-      const update=()=>{input.value=String(Number(Number(input.value).toFixed(3)));output.value=input.value;output.textContent=input.value;};
+      /* E270 (user: values like 30.597 are too exact to read): the slider keeps full precision, the label is rounded */
+      const span=Math.abs(Number(input.max)-Number(input.min))||100,shown=v=>String(span>=10?Math.round(v):Math.round(v*100)/100);
+      const update=()=>{input.value=String(Number(Number(input.value).toFixed(3)));output.value=shown(Number(input.value));output.textContent=output.value;};
+      /* E270 (user: a slider stopped half way with a no-entry cursor): a drag that strayed over the label selected its text
+         and turned into a native text drag; clear the selection and never start one from the settings. */
+      input.addEventListener('pointerdown',()=>getSelection()?.removeAllRanges());
       input.addEventListener('input',update);sliderOutputs.push(update);update();
     }
     f('galPreset').onchange = () => {

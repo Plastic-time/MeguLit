@@ -47,3 +47,6 @@ html:root:root:root:root button:disabled{cursor:default!important}
    ring on the menu when it receives focus on open; keyboard focus inside the menu keeps its own styles */
 .tomoyo-cn-dialog:focus,.tomoyo-cn-dialog:focus-visible,.tomoyo-menu-header:focus,.tomoyo-menu-header:focus-visible,dialog:focus{outline:none!important}
 .tomoyo-cn-dialog :focus:not(:focus-visible){outline:none!important}
+/* E270: no text selection or native drag inside the settings menu (a slider drag turned into a text drag) */
+.tomoyo-cn-dialog label,.tomoyo-cn-dialog output,.tomoyo-cn-dialog summary,.tomoyo-cn-dialog small,.tomoyo-cn-dialog span,.tomoyo-cn-dialog h3,.tomoyo-cn-dialog strong{-webkit-user-select:none!important;user-select:none!important}
+.tomoyo-cn-dialog input[type=range],.tomoyo-cn-dialog img{-webkit-user-drag:none!important}
