@@ -550,7 +550,7 @@ const tabs=names=>`<div class="tabs">${names.map(k=>`<button class="tab ${subtab
 const LEARNING_TABS=['review','kana','kanagames','words','sentences','dictionary','trash','statistics'];
 const ACCENT_DEFAULTS=['#ad1539','#9d314d','#7b5ba7','#347b91','#398775'];
 function accentChipsHTML(prefs){return [...new Set([...(prefs.accentPresets||[]),...ACCENT_DEFAULTS])].map(color=>`<button type="button" class="swatch ${color===String(prefs.accent).toLowerCase()?'active':''}" data-color="${color}" style="--swatch:${color}" aria-label="${color}" title="${color.toUpperCase()}"></button>`).join('');}
-function bindTabs(page){document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>page==='learning'&&button.dataset.tab==='statistics'?navigate('statistics'):navigate(page==='statistics'?'learning':page,button.dataset.tab)));}
+function bindTabs(page){document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>page==='learning'&&button.dataset.tab==='statistics'?navigate('statistics'):navigate(page==='statistics'?'learning':page,button.dataset.tab)));alignSubtabs(); /* align as soon as the bar exists, not after the page finishes loading (复习 jumped right once Anki answered) */}
 function definitions(value){
   try{const d=JSON.parse(value);if(Array.isArray(d))return d.map(x=>typeof x==='string'?x:typeof x==='object'?x.gloss||x.definition||x.meaning||Object.values(x).filter(v=>typeof v==='string').join(' · '):'').filter(Boolean).join('\n');if(d&&typeof d==='object')return Object.values(d).flat().filter(v=>typeof v==='string').join('\n');}
   catch{}return String(value||'');
