@@ -245,3 +245,18 @@ input.switch:focus-visible{box-shadow:none!important;outline:2px solid rgba(237,
 /* v1.1.8 (user: the scrollbar on the right of every settings page looks ugly): keep wheel scrolling, hide the bar */
 .main .settings-layout>.settings-content,.main .settings-layout>.settings-content *{scrollbar-width:none!important}
 .main .settings-layout>.settings-content::-webkit-scrollbar,.main .settings-layout>.settings-content *::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+
+/* v1.1.9 dropdowns: every main-window list matches the in-game panel (Alt+T): group headers, name + quiet note, left-aligned rows, crimson bar + check on the chosen row */
+.select-popup{padding:5px!important;border-radius:10px!important}
+.select-popup>.select-group{padding:8px 12px 3px;color:var(--g-t3,#8a746b);font-size:11px;font-weight:650;letter-spacing:.04em;line-height:1.45;text-align:left;white-space:nowrap}
+.select-popup>.select-group:not(:first-child){margin-top:4px;border-top:1px solid color-mix(in srgb,var(--g-t1,#f1e0d2) 8%,transparent)}
+.select-popup>button[role=option]{position:relative;display:flex!important;align-items:baseline;justify-content:flex-start!important;gap:6px;width:100%;min-height:0;margin:0;padding:7px 30px 7px 12px!important;border:0!important;border-radius:6px!important;text-align:left!important;white-space:nowrap!important;overflow-wrap:normal;font-size:13px;line-height:1.45;font-weight:400;color:var(--g-t1,#f1e0d2);background:none!important;transition:background .1s}
+.select-popup>button[role=option] .select-note,.select-trigger .select-note{color:var(--muted,#b49c8e);font-size:11.5px;font-weight:400}
+.select-popup>button[role=option]:is(:hover,:focus-visible){background:color-mix(in srgb,var(--g-t1,#f1e0d2) 8%,transparent)!important;outline:none}
+.select-popup>button[role=option][aria-selected=true]{color:color-mix(in srgb,var(--e-red,#c8303c) 72%,#f2e8da)!important;font-weight:650;background:color-mix(in srgb,var(--e-red,#c8303c) 14%,transparent)!important}
+.select-popup>button[role=option][aria-selected=true]::before{content:"";position:absolute;left:3px;top:9px;bottom:9px;width:3px;height:auto;border-radius:2px;background:var(--e-red,#c8303c)}
+.select-popup>button[role=option][aria-selected=true]::after{content:"";position:absolute;right:11px;top:50%;width:9px;height:5px;margin-top:-4px;border:solid var(--e-red,#c8303c);border-width:0 0 2px 2px;transform:rotate(-45deg)}
+.select-popup>button[role=option]:disabled{opacity:.4;cursor:default}
+:root[data-theme=light] .select-popup>button[role=option][aria-selected=true]{color:#a8202f!important;background:rgba(168,32,47,.09)!important}
+.select-trigger>.select-name,.select-trigger>.select-note{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.select-trigger>.select-name{flex:0 0 auto;max-width:100%}.select-trigger>.select-note{flex:0 1 auto;margin-left:6px}
