@@ -28,6 +28,15 @@ export function renderActivity(root,records,env,api){
  const html=activityHTML(records,{...env,selection:state.selection});root.dataset.activityDate=state.selection.date;root.dataset.activityRange=state.selection.range;
  if(state.html===html)return false;
  const left=root.querySelector('.activity-scroll')?.scrollLeft||0;root.innerHTML=html;state.html=html;const scroll=root.querySelector('.activity-scroll');if(scroll)scroll.scrollLeft=left;bindActivity(root);
- const change=async selection=>{const revision=++state.revision,v=viewWords[env.locale],status=root.querySelector('[data-activity-status]');status.textContent=v.loading;try{const result=await api(selection.range==='day'?'statistics':'learning_activity',selection);if(revision!==state.revision||!root.isConnected)return;state.selection=selection;renderActivity(root,selection.range==='day'?result.buckets:result,state.env,state.api);}catch{if(root.isConnected&&revision===state.revision)status.textContent=v.failed;}};
+ /* E272 (user: switching 月 back to 年 pushed the section up): a shorter view made the page scroll; keep the section's
+    top where it was on screen. */
+ const keepInPlace=(node,before)=>{let box=node.parentElement;while(box&&box!==document.body){const o=getComputedStyle(box).overflowY;if((o==='auto'||o==='scroll')&&box.scrollHeight>box.clientHeight)break;box=box.parentElement;}
+  const scroller=box&&box!==document.body?box:document.scrollingElement;if(!scroller)return;const delta=node.getBoundingClientRect().top-before;if(Math.abs(delta)>1)scroller.scrollTop+=delta;};
+ /* A shorter view at the bottom of the page cannot keep its place (the scroll clamps); hold the old height for a moment
+    and let it shrink, so the page glides instead of jumping. */
+ const settle=(node,before,tall)=>{const now=node.offsetHeight;if(now<tall-1&&!matchMedia('(prefers-reduced-motion: reduce)').matches){node.style.transition='none';node.style.minHeight=tall+'px';keepInPlace(node,before);
+   requestAnimationFrame(()=>requestAnimationFrame(()=>{node.style.transition='min-height .42s cubic-bezier(.2,.8,.2,1)';node.style.minHeight=now+'px';setTimeout(()=>{node.style.transition='';node.style.minHeight='';},480);}));}
+  else keepInPlace(node,before);};
+ const change=async selection=>{const revision=++state.revision,v=viewWords[env.locale],status=root.querySelector('[data-activity-status]');status.textContent=v.loading;try{const result=await api(selection.range==='day'?'statistics':'learning_activity',selection);if(revision!==state.revision||!root.isConnected)return;state.selection=selection;const before=root.getBoundingClientRect().top,tall=root.offsetHeight;renderActivity(root,selection.range==='day'?result.buckets:result,state.env,state.api);settle(root,before,tall);}catch{if(root.isConnected&&revision===state.revision)status.textContent=v.failed;}};
  root.querySelectorAll('[data-activity-view]').forEach(button=>button.onclick=()=>change({...state.selection,range:button.dataset.activityView}));root.querySelectorAll('[data-activity-shift]').forEach(button=>button.onclick=()=>change(shiftPeriod(state.selection,Number(button.dataset.activityShift))));return true;
 }
