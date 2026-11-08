@@ -149,7 +149,7 @@
     // on this PC, and classic machine translation (free ones first).
     { const sel = field('provider'), groups = [['AI 大模型接口（填入 API Key 即可）',['llm'],[['deepseek','DeepSeek'],['gpt','GPT / OpenAI 兼容接口（自定义地址）']]],['本地大模型（离线运行）',['local'],[]],['传统机器翻译',['free','api'],[['google','Google 免费'],['bing','Bing / Azure Translator API'],['deepl','DeepL API']]]];
       sel.replaceChildren();
-      for (const [title,keys,base] of groups) { const g = document.createElement('optgroup'); g.label = title; for (const [v,t] of [...base, ...keys.flatMap(key=>Object.entries(ENG).filter(([,e])=>e.group===key).map(([k,e])=>[k,e.label]))]) g.append(new Option(t,v)); sel.append(g); } }
+      for (const [title,keys,base] of groups) { const g = document.createElement('optgroup'); g.label = title; for (const [v,t] of [...base, ...keys.flatMap(key=>Object.entries(ENG).filter(([k,e])=>e.group===key&&(!e.hidden||k===settings.provider)).map(([k,e])=>[k,e.label]))]) g.append(new Option(t,v)); sel.append(g); } }
     field('font').value = settings.font;
     field('size').value = settings.size;
     field('color').value = /^#[0-9a-f]{6}$/i.test(settings.color) ? settings.color : '#c6c6d2';

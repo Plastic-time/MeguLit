@@ -21,6 +21,14 @@ function statistics(db,request={}){
  const games=db.prepare(`SELECT g.id,COALESCE(g.title,'—') title,SUM(r.active_seconds) readingSeconds,SUM(r.characters) characters,SUM(r.sentences) sentences FROM reading_sessions r LEFT JOIN games g ON g.id=r.game_id WHERE r.started_at>=? AND r.started_at<? GROUP BY r.game_id ORDER BY readingSeconds DESC,characters DESC`).all(p.from,p.until);
  const totals=p.buckets.reduce((a,r)=>{for(const k of ['seconds','characters','sentences','lookups'])a[k]+=r[k]||0;return a;},{seconds:0,characters:0,sentences:0,lookups:0});
  const last=db.prepare("SELECT date(MAX(started_at),'unixepoch','localtime') day FROM reading_sessions WHERE started_at>=? AND started_at<?").get(p.from,p.until).day||'';
- const {buckets,from,until,...selection}=p;return {period:selection,buckets,games,totals,last};
+ /* v1.0.5 统计页：分时、星期、常查的词、新收录的词与例句 */
+ const hours=Array(24).fill(0),weekdays=Array(7).fill(0);
+ for(const row of db.prepare("SELECT CAST(strftime('%H',started_at,'unixepoch','localtime') AS INTEGER) h,CAST(strftime('%w',started_at,'unixepoch','localtime') AS INTEGER) w,SUM(active_seconds) s FROM reading_sessions WHERE started_at>=? AND started_at<? GROUP BY h,w").all(p.from,p.until)){hours[row.h]+=row.s||0;weekdays[row.w]+=row.s||0;}
+ const topLookups=db.prepare("SELECT l.surface,COUNT(*) count,(SELECT g.title FROM lookup_events x LEFT JOIN games g ON g.id=x.game_id WHERE x.surface=l.surface AND x.occurred_at>=? AND x.occurred_at<? GROUP BY x.game_id ORDER BY COUNT(*) DESC LIMIT 1) title FROM lookup_events l WHERE l.occurred_at>=? AND l.occurred_at<? AND l.surface IS NOT NULL AND l.surface!='' GROUP BY l.surface ORDER BY count DESC,MAX(l.occurred_at) DESC LIMIT 12").all(p.from,p.until,p.from,p.until);
+ const distinctLookups=db.prepare("SELECT COUNT(DISTINCT surface) n FROM lookup_events WHERE occurred_at>=? AND occurred_at<?").get(p.from,p.until).n||0;
+ for(const row of db.prepare(`SELECT strftime('${format}',created_at,'unixepoch','localtime') day,COUNT(*) n FROM vocabulary WHERE created_at>=? AND created_at<? GROUP BY day`).all(p.from,p.until))if(byDay.has(row.day))byDay.get(row.day).newWords=row.n;
+ const newWords=db.prepare('SELECT COUNT(*) n FROM vocabulary WHERE created_at>=? AND created_at<?').get(p.from,p.until).n||0;
+ const examples=db.prepare('SELECT COUNT(*) n FROM examples WHERE created_at>=? AND created_at<?').get(p.from,p.until).n||0;
+ const {buckets,from,until,...selection}=p;return {period:selection,buckets,games,totals,last,hours,weekdays,topLookups,distinctLookups,newWords,examples};
 }
 module.exports={period,statistics};

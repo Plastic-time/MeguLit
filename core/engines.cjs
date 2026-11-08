@@ -29,7 +29,7 @@ const ENGINES={
  openrouter:{label:'OpenRouter',group:'llm',kind:'llm',baseUrl:'https://openrouter.ai/api/v1',model:'google/gemini-2.5-flash',hint:'填 OpenRouter 的 API Key，模型名写 厂商/模型'},
  // local
  sakura:{label:'Sakura 本地翻译模型',group:'local',kind:'llm',baseUrl:'http://127.0.0.1:8080/v1',model:'sakura',keyless:true,editable:true,hint:'在下方「离线模型下载」下载运行库和一个模型后，MeguLit 会自动在 127.0.0.1:8080 启动本地服务；专为日文轻小说、Galgame 翻译成中文训练'},
- llamacpp:{label:'llama.cpp 本地服务（通用模型）',group:'local',kind:'llm',baseUrl:'http://127.0.0.1:8080/v1',model:'local',keyless:true,editable:true,hint:'下载运行库后，MeguLit 会用已下载的模型自动启动 llama-server；也可以填你自己启动的服务地址。日译中专用模型请选上面的 Sakura'},
+ llamacpp:{hidden:true,label:'llama.cpp 本地服务（通用模型）',group:'local',kind:'llm',baseUrl:'http://127.0.0.1:8080/v1',model:'local',keyless:true,editable:true,hint:'下载运行库后，MeguLit 会用已下载的模型自动启动 llama-server；也可以填你自己启动的服务地址。日译中专用模型请选上面的 Sakura'},
  ollama:{label:'Ollama 本地模型',group:'local',kind:'llm',baseUrl:'http://127.0.0.1:11434/v1',model:'qwen2.5:7b',keyless:true,editable:true,hint:'先运行 Ollama 并拉取模型，模型名与 ollama list 一致'},
  lmstudio:{label:'LM Studio 本地模型',group:'local',kind:'llm',baseUrl:'http://127.0.0.1:1234/v1',model:'',keyless:true,editable:true,hint:'在 LM Studio 里加载模型并开启本地服务，模型名填加载的模型'},
 };

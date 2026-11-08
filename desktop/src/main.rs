@@ -126,6 +126,13 @@ async fn kanji_go_hide(app:tauri::AppHandle)->Result<(),String>{
     Ok(())
 }
 
+/// 关于 → 更新：更新脚本已在后台等待，主窗口发起退出，让脚本替换程序文件。
+#[tauri::command]
+fn app_exit_for_update(window:tauri::WebviewWindow){
+    if window.label()!="main"{return;}
+    let app=window.app_handle();app.state::<DesktopState>().exiting.store(true,Ordering::SeqCst);app.exit(0);
+}
+
 #[tauri::command]
 async fn reader_open(app:tauri::AppHandle,background:Option<bool>)->Result<(),String>{
     reader_log(&app.state::<DesktopState>().root,"open-request","");
@@ -300,7 +307,7 @@ fn animate_home(handle:tauri::AppHandle,ticket:u64,leaving:bool){
             let state=ui.state::<DesktopState>();
             if state.exiting.load(Ordering::SeqCst)||!state.home_transition.current(ticket){return;}
             if step==14{
-              if leaving&&state.home_transition.commit(ticket){if let Err(error)=hide_home(&ui){reader_log(&state.root,"home-hide-failed",&error);}else{let _=ui.emit("overlay-home","hidden");}}
+              if leaving&&state.home_transition.commit(ticket){if let Err(error)=hide_home(&ui){reader_log(&state.root,"home-hide-failed",&error);if let Some(home)=ui.get_webview_window("main"){window_policy::restore_home_surface(&home);}}else{let _=ui.emit("overlay-home","hidden");}}
               if !leaving{if let Some(home)=ui.get_webview_window("main"){window_policy::restore_home_surface(&home);}}
             }else if let Some(home)=ui.get_webview_window("main"){let p=step as f64/14.0;let eased=1.0-(1.0-p).powi(3);window_policy::animate_home_surface(&home,if leaving{1.0-p*p}else{eased});}
         });
@@ -407,7 +414,7 @@ fn main() {
     let window_memory=window_memory::WindowMemory::new(&root);
     let state = DesktopState { root, exiting: AtomicBool::new(false), headless, splash,window_memory,reader_background:AtomicBool::new(true),home_transition:home_transition::HomeTransition::default() };
     tauri::Builder::default().manage(state).plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![service, tray_menu::tray_menu_action, window_action, pick_executable, pick_image, pick_directories, pick_backup, set_tray_language, reader_open, reader_connect, reader_restart, read_clipboard, moji_login, kanji_go_open, kanji_go_embed, kanji_go_hide])
+        .invoke_handler(tauri::generate_handler![service, tray_menu::tray_menu_action, window_action, pick_executable, pick_image, pick_directories, pick_backup, set_tray_language, reader_open, reader_connect, reader_restart, read_clipboard, moji_login, kanji_go_open, kanji_go_embed, kanji_go_hide, app_exit_for_update])
         .setup(move |app| {
             broker::attach(app.handle().clone());
             if !headless{single_instance::watch(app.handle().clone(),app.state::<DesktopState>().root.clone());}
@@ -459,7 +466,7 @@ fn main() {
         .on_window_event(|window,event| {
             if window.label()=="main"&&matches!(event,WindowEvent::Resized(_)|WindowEvent::Moved(_)|WindowEvent::ScaleFactorChanged{..}){window.state::<DesktopState>().window_memory.queue_capture(window.clone());if matches!(event,WindowEvent::Resized(_)|WindowEvent::ScaleFactorChanged{..}){if let Some(home)=window.app_handle().get_webview_window("main"){window_policy::round_home_frame(&home);}}}
             // Showing, focusing or restoring the home window re-asserts its rounded corners.
-            if window.label()=="main"&&matches!(event,WindowEvent::Focused(true)){if let Some(home)=window.app_handle().get_webview_window("main"){window_policy::round_home_frame(&home);}}
+            if window.label()=="main"&&matches!(event,WindowEvent::Focused(true)){if let Some(home)=window.app_handle().get_webview_window("main"){if !window.state::<DesktopState>().home_transition.is_leaving(){window_policy::ensure_home_opaque(&home);}window_policy::round_home_frame(&home);}}
             if let WindowEvent::CloseRequested { api,.. }=event {
             let state=window.state::<DesktopState>();
             if window.label()=="reader"{let root=state.root.clone();std::thread::spawn(move||{let _=run_service(root,json!({"action":"reader_detach"}));});return;}

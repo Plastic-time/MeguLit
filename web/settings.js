@@ -44,7 +44,7 @@ export async function renderSettings({main,api,invoke,text,locale,esc,toast,head
  const input=field=>{
   const value=values[field.key],name=esc(field.key);
   if(field.type==='boolean')return `<input class="switch" name="${name}" type="checkbox" ${value?'checked':''}>`;
-  if(field.type==='select')return `<select name="${name}">${field.options.map(option=>`<option value="${esc(option.value)}" ${option.value===value?'selected':''}>${esc(option.label[locale])}</option>`).join('')}${value&&!field.options.some(o=>o.value===value)?`<option value="${esc(value)}" selected>${esc(value)}</option>`:''}</select>`;
+  if(field.type==='select')return `<select name="${name}">${field.options.filter(option=>!option.hidden||option.value===value).map(option=>`<option value="${esc(option.value)}" ${option.value===value?'selected':''}>${esc(option.label[locale])}</option>`).join('')}${value&&!field.options.some(o=>o.value===value)?`<option value="${esc(value)}" selected>${esc(value)}</option>`:''}</select>`;
   if(field.type==='multiline')return `<textarea name="${name}" rows="4">${esc(value)}</textarea>`;
   if(field.type==='color')return `<input type="color" name="${name}" data-empty="${value===''?'true':'false'}" value="${esc(/^#[0-9a-f]{6}$/i.test(value)?value:'#ffffff')}">`;
   if(field.type==='number'&&Number.isFinite(field.max)&&field.max-field.min<=10000)return `<span class="setting-slider"><input type="range" name="${name}" min="${field.min}" max="${field.max}" step="${field.step??1}" value="${esc(value)}" aria-label="${esc(field.label[locale])}"><input type="number" data-slider-number="${name}" min="${field.min}" max="${field.max}" step="${field.step??1}" value="${esc(value)}" aria-label="${esc(field.label[locale])}"></span>`;

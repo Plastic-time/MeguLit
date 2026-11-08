@@ -54,9 +54,9 @@ class HookNative{
   // The game's own ruby readings ride after the line as \x1d base \x1c reading pairs (ISLAND hook): split them off
   // before anything else sees the text, and attach them when this line is delivered (user, 2026-11-03).
   const extracted=require('./source-ruby.cjs').extractSourceRuby(m.text);let ruby=extracted.ruby;m={...m,text:extracted.text};
-  // Streams that deliver every line several times (or every character doubled) are learned and undone per stream (E215).
+  // Multilingual containers keep only the Japanese track (E243); streams that deliver every line several times (or every character doubled) are learned and undone per stream (E215).
   this.repeats=this.repeats||new (require('./repeat-normalizer.cjs').RepeatNormalizer)();
-  this.attempt=0;const text=this.originalTextFor(this.repeats.normalize(String(m.sourceCode||m.sourceName||name||''),scriptSource(cleanSource(m.text,name,String(m.sourceCode||'')))).replace(/\n+$/,''));
+  this.attempt=0;const text=this.originalTextFor(this.repeats.normalize(String(m.sourceCode||m.sourceName||name||''),require('./language-tracks.cjs').japaneseTrack(scriptSource(cleanSource(m.text,name,String(m.sourceCode||''))))).replace(/\n+$/,''));
   if(!text.trim())return;
   // The game's own LOG/backlog (E215.2, user: hide MeguLit there and do not read it): opening it replays lines read
   // earlier, several within a second. Two or more earlier lines (other than the current one) inside one second mark the
