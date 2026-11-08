@@ -319,7 +319,8 @@ function library(){
   searchAppearance();
   main.querySelector('#select-games').onclick=()=>seriesUI.toggleSelection(main.querySelector('#library-results'));main.querySelector('#add-game').addEventListener('click',()=>editGame());main.querySelector('#refresh-library').onclick=()=>refreshLibrary().then(result=>toast(result.added?libraryCopy().added(result.added):libraryCopy().done)).catch(error=>toast(errorMessage(error)));main.querySelector('#library-settings').onclick=()=>{settingsSection='library';settingsProfile='';navigate('settings');};renderGames();
   /* v1.1.6 (user): opening the library straight into the wall plays the same outside-in gathering as switching to it */
-  if(localStorage.getItem(LIBRARY_WALL_KEY)!=='off'&&!search.trim())requestAnimationFrame(()=>requestAnimationFrame(async()=>{try{const m=await import('./library-switch-motion.js');const h=document.querySelector('#library-results');if(h&&route==='library')m.wallIn(h);}catch{}}));
+  /* hidden from the first paint (cards start at opacity 0) and revealed only once each card holds its start frame, so the laid-out wall never flashes */
+  if(localStorage.getItem(LIBRARY_WALL_KEY)!=='off'&&!search.trim()&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const h0=document.querySelector('#library-results');h0?.classList.add('lib-entering');const reveal=()=>document.querySelector('#library-results')?.classList.remove('lib-entering');setTimeout(reveal,900);requestAnimationFrame(()=>requestAnimationFrame(async()=>{try{const m=await import('./library-switch-motion.js');const h=document.querySelector('#library-results');if(h&&route==='library')m.wallIn(h);}catch{}finally{reveal();}}));}
 }
 // E245.5 (user): entering a search, the wall fades out in place as dominoes from the centre outwards, then the matches
 // fade in on the orbit; clearing it, the orbit fades out, then the wall returns as dominoes from the edges inwards.
@@ -719,7 +720,7 @@ async function statistics(token){
 
 function loading(){return '<div class="loading-screen"><span class="spinner" aria-label="'+text.loading+'"></span></div>';}
 /* v1.1.6 (user): the second-level tab bar starts under the first top tab (首页), on every page and size */
-function alignSubtabs(){const bar=document.querySelector('#main>.tabs'),home=document.querySelector('.top-tabs .top-tab');if(!bar||!home)return;bar.style.marginLeft='0px';const first=bar.querySelector('.tab');if(!first)return;const textLeft=el=>el.getBoundingClientRect().left+(parseFloat(getComputedStyle(el).paddingLeft)||0),delta=textLeft(home)-textLeft(first);bar.style.marginLeft=Math.max(0,Math.round(delta))+'px';}
+function alignSubtabs(){const bar=document.querySelector('#main>.tabs'),home=document.querySelector('.top-tabs .top-tab');if(!bar||!home)return;bar.style.setProperty('margin-left','0px','important');const first=bar.querySelector('.tab');if(!first)return;const textLeft=el=>el.getBoundingClientRect().left+(parseFloat(getComputedStyle(el).paddingLeft)||0),delta=textLeft(home)-textLeft(first);bar.style.setProperty('margin-left',Math.max(0,Math.round(delta))+'px','important'); /* the theme sets margin with !important */}
 addEventListener('resize',()=>requestAnimationFrame(alignSubtabs));
 async function renderRoute(){
   stopHistoryTranslations();stopHistoryTranslations=()=>{};

@@ -40,3 +40,15 @@ test('v1.1.2: the update script is started by Windows (WMI), and a failed launch
  assert.match(seen.args.join(' '),/Win32_Process -MethodName Create/);assert.match(seen.opt.env.MEGULIT_UPDATE_COMMAND,/-File ".*" -Root "C:\MeguLit"/);
  assert.equal(await u.launchScript('C:\MeguLit',{run:fake(9)}),false);
 });
+test('v1.1.8: the same version with a different package online is a hotfix',async()=>{
+ const fs=require('fs'),os=require('os'),path=require('path');const root=fs.mkdtempSync(path.join(os.tmpdir(),'hf-'));u.reset();
+ let digest='sha256:'+'a'.repeat(64);
+ const rel=()=>({tag_name:'v1.1.8',assets:[{name:'MeguLit-v1.1.8-win-x64.zip',size:3,digest,browser_download_url:'https://github.com/ilynthn/MeguLit/releases/download/v1.1.8/MeguLit-v1.1.8-win-x64.zip'}]});
+ const fetcher=async url=>url.endsWith('/latest')?{ok:true,json:async()=>rel()}:{ok:false,status:404};
+ assert.equal((await u.check('1.1.8',fetcher,root)).newer,false,'first check records what is online');
+ assert.equal((await u.check('1.1.8',fetcher,root)).newer,false,'same package: nothing to do');
+ digest='sha256:'+'b'.repeat(64);
+ const r=await u.check('1.1.8',fetcher,root);assert.equal(r.newer,true);assert.equal(r.hotfix,true);
+ assert.equal((await u.check('1.1.8',fetcher,'')).newer,false,'without a root no hotfix guess');
+ u.reset();fs.rmSync(root,{recursive:true,force:true});
+});

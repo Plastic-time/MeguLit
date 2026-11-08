@@ -31,12 +31,23 @@ async function installedSize(current,fetcher=fetch){
 let state={phase:'idle'},job=null,found=null;
 const status=()=>({...state});
 
-async function check(current,fetcher=fetch){
- const rel=await latest(fetcher),isNewer=newer(rel.version,current);
- found=isNewer?rel:null;
+/* v1.1.8 hotfixes: a release can be replaced in place under the same version. The package this install came from is
+   remembered by GitHub's digest; the same version with a different digest online is offered as an update. A manual
+   install has no record yet, so the first check simply records what is online. */
+function installedFile(root){return root?path.join(root,'data','update-installed.json'):'';}
+function readInstalled(root){try{return JSON.parse(fs.readFileSync(installedFile(root),'utf8'));}catch{return null;}}
+function writeInstalled(root,value){if(!root)return;try{fs.mkdirSync(path.dirname(installedFile(root)),{recursive:true});fs.writeFileSync(installedFile(root),JSON.stringify(value));}catch{}}
+function isHotfix(root,rel,current){
+ if(!root||!rel.digest||String(rel.version)!==String(current).replace(/^v/,''))return false;
+ const mine=readInstalled(root);if(!mine||mine.version!==rel.version){writeInstalled(root,{version:rel.version,digest:rel.digest});return false;}
+ return !!mine.digest&&mine.digest!==rel.digest;
+}
+async function check(current,fetcher=fetch,root=''){
+ const rel=await latest(fetcher),hotfix=isHotfix(root,rel,current),isNewer=newer(rel.version,current)||hotfix;
+ found=isNewer?{...rel,hotfix}:null;
  const previous=isNewer?await installedSize(current,fetcher):0;
  if(isNewer&&!['downloading','ready'].includes(state.phase))state={phase:'available',version:rel.version,total:rel.size,received:0};
- return {current,latest:rel.version,newer:isNewer,size:rel.size,previousSize:previous,delta:previous?rel.size-previous:null,notes:rel.notes,page:rel.page,published:rel.published,phase:state.phase};
+ return {current,latest:rel.version,newer:isNewer,hotfix,size:rel.size,previousSize:previous,delta:previous?rel.size-previous:null,notes:rel.notes,page:rel.page,published:rel.published,phase:state.phase};
 }
 
 /* Writes zip + script; resolves when the package is verified and ready to install. */
@@ -44,7 +55,7 @@ function start(root,current,fetcher=fetch){
  if(job)return job;
  job=(async()=>{
   try{
-   const rel=found&&newer(found.version,current)?found:await latest(fetcher);if(!newer(rel.version,current))throw Error('ALREADY_LATEST');
+   const rel=found&&(newer(found.version,current)||found.hotfix)?found:await latest(fetcher);if(!newer(rel.version,current)&&!rel.hotfix)throw Error('ALREADY_LATEST');
    const dir=path.join(root,'cache','update');fs.mkdirSync(dir,{recursive:true});
    const zip=path.join(dir,rel.name),ps1=path.join(dir,'apply-update.ps1');
    state={phase:'downloading',version:rel.version,total:rel.size||0,received:0};
@@ -96,6 +107,7 @@ async function install(root,options){
  fs.mkdirSync(path.join(root,'logs'),{recursive:true});
  if(!/^[^"]+$/.test(root+state.ps1+state.zip))throw Error('UPDATE_PATH_REJECTED');
  if(!await launchScript(root,options))throw Error('UPDATE_LAUNCH_FAILED');
+ writeInstalled(root,{version:state.version,digest:state.sha256});
  state={...state,phase:'installing'};return status();
 }
 async function apply(root,current,fetcher=fetch){await start(root,current,fetcher);return {...await install(root),staged:true};}

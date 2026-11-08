@@ -141,7 +141,9 @@ Option 32 '完整版' 'FULL · 一次装齐，开箱即用' @('精简版的全�
 Option 372 '精简版' 'LITE · 先用起来' $baseItems @('下载最小，几分钟就能开始玩','读取台词、点读查词、在线翻译都能用') @('第一次显示注音时才补装词典，要等一下','没有语音：朗读、配音要以后在「设置 → 语音 / 词典」补装') $lite $false ''
 
 $runtimeDir = Join-Path $Root 'runtime'
-[void](Label ('直接装进这个 MeguLit 文件夹，不会写到别处：' + $runtimeDir) 32 466 656 20 8 $false $C.muted $choice)
+# A long path wrapped to a second line that the 20px label cut in half; keep it on one line and end it with … instead
+$where = Label ('装进 MeguLit 自己的文件夹，不会写到别处：' + $runtimeDir) 32 466 656 20 8 $false $C.muted $choice
+$where.AutoEllipsis = $true; (New-Object Windows.Forms.ToolTip).SetToolTip($where, $runtimeDir)
 [void](Label ('所在磁盘可用 ' + (MB $free) + '   ·   以后移动 MeguLit 文件夹，组件会跟着一起走') 32 486 656 20 8 $false $C.muted $choice)
 if (-not $webview) {
   $link = New-Object Windows.Forms.LinkLabel; $link.Text = '这台电脑缺少 Microsoft Edge WebView2 运行时，MeguLit 的界面需要它：点这里去微软官网下载安装'

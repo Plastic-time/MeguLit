@@ -5,6 +5,7 @@
 #   .\Release.ps1 -Version 1.1.3 -Notes notes.md -DryRun  # bump, build, test and package only; nothing is pushed
 #   .\Release.ps1 -Version 1.1.6 -Prepare                 # bump, build and test now; then release with -SkipBuild
 #   .\Release.ps1 -Version 1.1.6 -Notes notes.md -SkipBuild  # skips the build when nothing changed since
+#   .\Release.ps1 -Version 1.1.8 -Notes notes.md -Hotfix -IncludeWorkingChanges  # fix the latest release in place
 #   -IncludeWorkingChanges                                 # also commit the uncommitted changes in this release
 #
 # notes.md: Chinese first, then a line with only ---, then English (the in-app update card shows the reader's half).
@@ -17,6 +18,7 @@ param(
  [switch]$DryRun,
  [switch]$Prepare,   # bump + build + test only, and remember this tree so a later -SkipBuild can reuse the build
  [switch]$SkipBuild, # reuse the last -Prepare (or release) build when the tree and MeguLit.exe are unchanged since
+ [switch]$Hotfix,    # replace the package of the latest release (same version); installs from v1.1.8 on pick it up
  [switch]$IncludeWorkingChanges  # ship uncommitted changes in the release commit instead of refusing
 )
 $ErrorActionPreference='Stop'
@@ -70,7 +72,8 @@ $latest=Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/late
 $prev=$latest.tag_name -replace '^v',''
 $prevAsset=$latest.assets | Where-Object {$_.name -match '^MeguLit-v\d+\.\d+\.\d+-win-x64\.zip$'} | Select-Object -First 1
 if(-not $prevAsset){throw 'Previous release has no package to take the file list from'}
-if([version]$Version -le [version]$prev){throw "Version $Version is not newer than the latest release $prev"}
+if($Hotfix){if($Version -ne $prev){throw "-Hotfix replaces the latest release ($prev); pass -Version $prev"}}
+elseif([version]$Version -le [version]$prev){throw "Version $Version is not newer than the latest release $prev"}
 Write-Host "previous release v$prev -> $Tag"
 
 # ---------- version ----------
@@ -141,12 +144,12 @@ if($DryRun){& git.exe checkout -- web/about.js desktop/Cargo.toml desktop/tauri.
 
 # ---------- merge ----------
 Step 'commit, pull request, merge'
-$branch="release/$Tag"
+$branch=if($Hotfix){"hotfix/$Tag-"+(Get-Date -Format 'MMddHHmm')}else{"release/$Tag"}
 G checkout -q -b $branch
 G add -A
-G -c "user.name=$Author" -c "user.email=$Email" commit -q -m "$Tag"
+G -c "user.name=$Author" -c "user.email=$Email" commit -q -m $(if($Hotfix){"$Tag hotfix"}else{"$Tag"})
 G push -q origin $branch
-$pr=Api POST '/pulls' @{title="$Tag";head=$branch;base='main';body=$Body}
+$pr=Api POST '/pulls' @{title=$(if($Hotfix){"$Tag hotfix"}else{"$Tag"});head=$branch;base='main';body=$Body}
 $merged=Api PUT "/pulls/$($pr.number)/merge" @{merge_method='merge'}
 if(-not $merged.merged){throw "PR #$($pr.number) did not merge"}
 G checkout -q main
@@ -156,7 +159,14 @@ Write-Host "PR #$($pr.number) merged at $($merged.sha)"
 
 # ---------- release ----------
 Step 'publish release'
-$rel=Api POST '/releases' @{tag_name=$Tag;target_commitish=$merged.sha;name="MeguLit $Tag";body=$Body;make_latest='true'}
+if($Hotfix){
+ # same version: swap the package, append the notes; the tag stays on the first commit of this version
+ $rel=Api GET "/releases/tags/$Tag"
+ foreach($old in @($rel.assets | Where-Object {$_.name -eq $Asset})){Api DELETE "/releases/assets/$($old.id)" | Out-Null}
+ $rel=Api PATCH "/releases/$($rel.id)" @{body=($rel.body+"`n`n---`n`n### "+(Get-Date -Format 'yyyy-MM-dd HH:mm')+" hotfix`n`n"+$Body)}
+}else{
+ $rel=Api POST '/releases' @{tag_name=$Tag;target_commitish=$merged.sha;name="MeguLit $Tag";body=$Body;make_latest='true'}
+}
 $upload=($rel.upload_url -replace '\{.*$','')+"?name=$Asset"
 $a=Invoke-RestMethod -Method Post -Uri $upload -Headers $Headers -ContentType 'application/zip' -InFile $zipPath
 if($a.size -ne $size){throw "Uploaded size $($a.size) differs from $size"}
