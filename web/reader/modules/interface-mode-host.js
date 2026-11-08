@@ -55,7 +55,10 @@
   if(next!==mode&&next==='translation'){normalPath=location.pathname;try{localStorage.setItem('tomoyo-normal-path',normalPath);}catch{}}
   const changed=next!==mode;if(changed){cover(true);root().classList.remove('tome-mode-hold');requestPending=0;}
   mode=next;try{localStorage.setItem('tomoyo-interface-mode',mode);}catch{}
-  syncTaskbar();remember();paint();window.dispatchEvent(new Event('resize'));if(changed||navigation)navigate();
+  syncTaskbar();remember();paint();window.dispatchEvent(new Event('resize'));
+  /* E272 (user, twice: starting a game must not hide the home window): a game binding switches to translation mode by
+     itself; only a switch the user asked for (Alt+M) moves the home window away. Returning to normal still shows it. */
+  if(navigation||(changed&&mode==='normal'))navigate();
   if(changed&&document.body)reveal(mode);
  }
  function gameClosed(){
