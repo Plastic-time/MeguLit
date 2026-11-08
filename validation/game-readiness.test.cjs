@@ -1,0 +1,5 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const {waitForVisibleGame}=require('../services/game-readiness.cjs');
+test('a startup splash that disappears is not reported as a ready game',async()=>{let i=0;await assert.rejects(waitForVisibleGame(async()=>++i<3?[{pid:1,visible:true}]:[],{attempts:8,sleep:async()=>{}}),/GAME_PROCESS_EXITED/);});
+test('window readiness requires consecutive visible samples from the same process',async()=>{const samples=[[{pid:1,visible:true}],[{pid:2,visible:true}],[{pid:2,visible:false}],...[1,2,3,4].map(()=>[{pid:3,visible:true}])];let i=0;assert.deepEqual(await waitForVisibleGame(async()=>samples[i++],{sleep:async()=>{}}),{pid:3});assert.equal(i,7);});
+test('a running process without a window leaves the home available and native query errors remain failures',async()=>{await assert.rejects(waitForVisibleGame(async()=>[{pid:1,visible:false}],{attempts:2,sleep:async()=>{}}),/GAME_WINDOW_NOT_READY/);await assert.rejects(waitForVisibleGame(async()=>{throw Error('PROCESS_QUERY_FAILED')}),/PROCESS_QUERY_FAILED/);});

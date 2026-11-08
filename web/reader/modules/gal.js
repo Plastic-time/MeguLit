@@ -17,7 +17,27 @@
   let gameScale = 1;
   let layoutInfo, maskImage, maskGeometry, maskFrameId = 0;
   const send = message => { if(['galConfigure','galPreview'].includes(message.type)&&bridge.gameProfileKey?.())message={...message,gameStyleKey:bridge.gameProfileKey()};try { window.__tomoyoTranslateRequest(JSON.stringify(message)); } catch {} };
-  bridge.onSourceText = text => {if(text!==lastText&&!bridge.pageTranslationActive?.()){renderSerial++;clearRuby();}alignText();send({ type:'galSource',text });};
+  // Story text that is not Japanese (a Chinese/English translation patch) cannot be read: furigana, lookups and
+  // translation turn into garbage. Several Han-only lines in a row with no kana at all mean the story is translated;
+  // a translated interface alone never trips this, because the dialogue still carries kana. (user, 2026-11-08)
+  let nonJapaneseRun=0,nonJapaneseDismissed=false;
+  function checkStoryLanguage(text){
+    const t=String(text||''),kana=(t.match(/[ぁ-ゖァ-ヺ]/g)||[]).length,han=(t.match(/[一-鿿]/g)||[]).length,latin=(t.match(/[A-Za-z]/g)||[]).length;
+    if(kana>=2){nonJapaneseRun=0;document.querySelector('.megulit-language-warning')?.remove();return;}
+    if(han>=6||latin>=20)nonJapaneseRun++;
+    if(nonJapaneseRun<4||nonJapaneseDismissed||document.querySelector('.megulit-language-warning'))return;
+    const lang=(document.documentElement.lang||'zh').slice(0,2),copy={
+      zh:['游戏剧情不是日文','MeguLit 只能读取日文原文。检测到最近几句台词都不是日文，可能装了汉化或翻译补丁，注音、点读和翻译都会出错。只汉化菜单界面不受影响。可以试试「工具 → 恢复日文（实验性）」，或改用日文原版启动','知道了'],
+      ja:['シナリオが日本語ではありません','MeguLit は日本語原文のみ読み取れます。直近の台詞が日本語ではないため、翻訳パッチが入っている可能性があります。ふりがな・辞書・翻訳が正しく動きません。UI だけの翻訳なら問題ありません。「ツール → 日本語に戻す（実験的）」か日本語版での起動をお試しください','閉じる'],
+      en:['The story text is not Japanese','MeguLit only reads original Japanese text. The last few lines were not Japanese, so a translation patch is probably installed; furigana, lookups and translation will break. A translated interface alone is fine. Try Tools → Restore Japanese (experimental), or launch the Japanese edition.','Got it']}[lang]||null;
+    const [title,body,ok]=copy||['游戏剧情不是日文','MeguLit 只能读取日文原文，汉化或翻译后的剧情无法使用','知道了'];
+    const box=document.createElement('div');box.className='megulit-language-warning';box.setAttribute('role','alert');
+    box.innerHTML='<b></b><p></p><button type="button"></button>';box.querySelector('b').textContent='⚠ '+title;box.querySelector('p').textContent=body;
+    const button=box.querySelector('button');button.textContent=ok;button.onclick=()=>{nonJapaneseDismissed=true;box.remove();};
+    if(!document.querySelector('#megulit-language-warning-style')){const st=document.createElement('style');st.id='megulit-language-warning-style';st.textContent='.megulit-language-warning{position:fixed;z-index:2147481500;left:50%;top:24px;transform:translateX(-50%);box-sizing:border-box;width:min(560px,calc(100vw - 32px));padding:16px 18px 14px;border-radius:14px;background:#2a1215f2;border:1px solid #e0495a;color:#fff;font:14px/1.6 system-ui,sans-serif;box-shadow:0 18px 40px -12px #000c;pointer-events:auto}.megulit-language-warning b{display:block;font-size:16px;margin-bottom:6px;color:#ff8a95}.megulit-language-warning p{margin:0 0 10px;color:#f1dcdc}.megulit-language-warning button{float:right;padding:6px 16px;border:0;border-radius:8px;background:#e0495a;color:#fff;font:inherit;font-weight:600;cursor:pointer}';document.head.append(st);}
+    document.body.append(box);
+  }
+  bridge.onSourceText = text => {if(text!==lastText&&!bridge.pageTranslationActive?.()){renderSerial++;clearRuby();}checkStoryLanguage(text);alignText();send({ type:'galSource',text });};
   if (bridge.sourceText) bridge.onSourceText(bridge.sourceText);
   function placeLayers() {
     const dpr = Math.max(.5, Number(window.devicePixelRatio) || 1);

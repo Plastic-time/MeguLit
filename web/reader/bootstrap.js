@@ -66,6 +66,6 @@ try{
  await import('./word-status.js');installLearningNotice(window.__tomoyoChinese);loaded=true;for(const message of queued.splice(0))event(message);
  installHostRegions(message=>api('reader_message',{message}).catch(error=>{status.textContent=String(error);}));
  installGameUiScan(window.__tomoyoChinese);
- deliver(await api('reader_message',{message:{type:'loadGalPreferences'}}));window.__TOME_READER_READY__=true;await health('ready');
+ deliver(await api('reader_message',{message:{type:'loadGalPreferences'}}));window.__TOME_READER_READY__=true;document.documentElement?.classList?.add?.('megulit-ready');await health('ready');
  const set=Storage.prototype.setItem;let timer;Storage.prototype.setItem=function(key,value){set.call(this,key,value);if(this===localStorage&&/^(tome|tomoyo)-/.test(key)&&!/key|token|secret|password/i.test(key)){clearTimeout(timer);timer=setTimeout(()=>{uiState=snapshot();api('preserve_ui',{values:uiState}).catch(()=>{});},400);}};
 }catch(error){status.textContent=String(error);await health(phase,error);}

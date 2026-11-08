@@ -1,0 +1,5 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+test('natural home layout keeps a compact row in a tall window and fits the remaining height in a short window',async()=>{
+ const {fitHome}=await import('../web/home-fit.js');const original=global.getComputedStyle;global.getComputedStyle=node=>node.kind==='main'?{paddingTop:'0',paddingBottom:'8'}:{columnGap:'14'};
+ try{for(const viewport of [480,860]){let height;const main={kind:'main',clientHeight:viewport},overview={offsetHeight:460,querySelectorAll:()=>[]},grid={children:[],clientWidth:1100,offsetHeight:160,closest:selector=>selector==='.home-overview'?overview:main,style:{setProperty:(key,value)=>height=parseInt(value)}};let callback;const stop=fitHome(grid,{Observer:class{constructor(fn){callback=fn;}observe(){}disconnect(){}}});assert.equal(height,viewport===480?132:265);assert(300+height+40+8<=viewport);if(viewport===860)assert(300+height+40+8<viewport-150);callback();assert.equal(height,viewport===480?132:265);stop();}}finally{global.getComputedStyle=original;}
+});

@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      full_build:
+        description: Also run the full Build.ps1 -Check (Rust release build, ~10 min)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Syntax, C# compile, cargo check, tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: JavaScript syntax
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Recurse -File -Include *.js,*.cjs,*.mjs -Path web,services,core,tools,validation |
+            Where-Object { $_.FullName -notmatch '\\node_modules\\' }
+          $failed = 0
+          foreach ($f in $files) {
+            # .js files are either classic scripts or ES modules: accept the file if it parses as either.
+            node --check $f.FullName 2>$null
+            if ($LASTEXITCODE -ne 0 -and $f.Extension -eq '.js') { $copy = Join-Path $env:RUNNER_TEMP ($f.BaseName + '-' + [guid]::NewGuid() + '.mjs'); Copy-Item $f.FullName $copy; node --check $copy }
+            if ($LASTEXITCODE -ne 0) { Write-Error "Syntax error: $($f.FullName)" -ErrorAction Continue; $failed++ }
+          }
+          "Checked $($files.Count) files"
+          if (-not $files.Count) { throw 'No JavaScript files found' }
+          if ($failed) { throw "$failed file(s) failed the syntax check" }
+
+      - name: C# helpers (.NET Framework csc)
+        shell: pwsh
+        run: |
+          $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          & $csc /nologo /target:exe /optimize+ /out:native\GameProcess.exe native\GameProcess.cs; if ($LASTEXITCODE) { throw 'GameProcess' }
+          & $csc /nologo /target:exe /optimize+ /platform:x86 /out:native\HookInjector32.exe native\HookInjector.cs native\HookTarget.cs; if ($LASTEXITCODE) { throw 'HookInjector32' }
+          & $csc /nologo /target:exe /optimize+ /platform:x64 /out:native\HookInjector64.exe native\HookInjector.cs native\HookTarget.cs; if ($LASTEXITCODE) { throw 'HookInjector64' }
+          & $csc /nologo /target:exe /optimize+ /reference:System.Security.dll /out:native\KeyVault.exe native\KeyVault.cs; if ($LASTEXITCODE) { throw 'KeyVault' }
+
+      - name: Hook bridge (Roslyn) with self-test
+        shell: pwsh
+        run: ./native/Build-HookBridge.ps1 -OutputPath native/HookBridge.exe
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+
+      - name: cargo fetch + check
+        shell: pwsh
+        run: |
+          cargo fetch --locked --manifest-path desktop/Cargo.toml
+          cargo check --locked --manifest-path desktop/Cargo.toml
+
+      - name: Unit and integration tests
+        shell: pwsh
+        run: |
+          $tests = @(Get-ChildItem validation -Filter *.test.cjs -File | ForEach-Object FullName)
+          if (-not $tests.Count) { throw 'No tests found' }
+          node --test @tests 2>&1 | Tee-Object -FilePath test-output.txt
+          if ($LASTEXITCODE) { throw 'Tests failed' }
+          $count = [regex]::Match((Get-Content test-output.txt -Raw), '(?m)^# tests (\d+)').Groups[1].Value
+          if (-not $count -or [int]$count -eq 0) { throw 'Test runner reported zero tests' }
+          "Ran $count tests"
+
+  full-build:
+    name: Full Build.ps1 -Check (manual)
+    if: github.event_name == 'workflow_dispatch' && inputs.full_build
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Environment preflight
+        shell: pwsh
+        run: ./tools/check-env.ps1
+      - name: Build and test
+        shell: pwsh
+        run: ./Build.ps1 -Check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MeguLit-exe
+          path: MeguLit.exe

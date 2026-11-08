@@ -93,6 +93,9 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 - [ ] 联网排行榜：阅读量、生词数、连续打卡天数
 - [ ] 更多学习语言，以及轻小说和 Galgame 以外的游戏
 
+> [!WARNING]
+> **游戏剧情必须是日文原文。** MeguLit 读取的是游戏正在显示的台词：如果剧情文本被汉化或翻译成其他语言，读到的就不是日文，注音、点读、翻译都会变成乱码或无法使用。只汉化了菜单、按钮等界面、剧情仍是日文的游戏不受影响。中文版游戏可以先试试「工具 → 恢复日文（实验性）」切回日文
+
 ### 安装
 
 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.0.2-win-x64.zip`（不到 10 MB），解压后运行 `MeguLit.exe`
@@ -193,6 +196,9 @@ The features aren't the hard part. Engines are:
 - [ ] Online leaderboards: reading time, words learned, streaks
 - [ ] More learner languages, plus light novels and games beyond visual novels
 
+> [!WARNING]
+> **The game's story text must be the original Japanese.** MeguLit reads the lines the game is showing. If the story has been translated (a Chinese or English patch), what it reads is not Japanese and furigana, lookups and translation turn into garbage. A translated interface (menus, buttons) is fine as long as the dialogue itself is still Japanese. For a translated edition, try Tools → Restore Japanese (experimental) first.
+
 ### Install
 
 Grab `MeguLit-v1.0.2-win-x64.zip` (under 10 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`.
@@ -268,6 +274,9 @@ UI は簡体字中国語・英語・日本語に対応。中国語・英語話�
 - 再描画による重複と取りこぼし。ただし、わざと繰り返される台詞は残したい
 - マウスを直接見ているゲームでは、オーバーレイへのクリックがゲームにも届いてしまう
 - ふりがなは行間を広げず、縁取りや高 DPI でも漢字の上にきちんと揃えたい
+
+> [!WARNING]
+> **ゲームのシナリオ本文が日本語原文である必要があります。** MeguLit はゲームが表示している台詞を読み取ります。シナリオが中国語・英語などに翻訳されていると日本語として読めず、ふりがな・辞書・翻訳が文字化けしたり使えなかったりします。メニューなど UI だけが翻訳されていて本文が日本語なら問題ありません。翻訳版は先に「ツール → 日本語に戻す（実験的）」をお試しください
 
 ### インストール
 

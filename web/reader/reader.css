@@ -6,3 +6,6 @@ html.tomoyo-ui-normal,body.tomoyo-ui-normal{background:transparent!important}bod
 html.tomoyo-ui-normal,body.tomoyo-ui-normal{background:transparent!important}body.tomoyo-ui-normal #reader-base{display:none}#reader-host{display:contents}#reader-status{display:none}
 
 :root.tomoyo-ui-normal,html.tomoyo-ui-normal body.tomoyo-ui-normal{background:transparent!important}
+
+/* An Alt+T right after launch opened the menu before its styles had loaded: unstyled sliders showed as a solid blue bar at the top. The menu stays invisible until every reader module is in. */
+html:not(.megulit-ready) .tomoyo-cn-dialog{visibility:hidden!important}

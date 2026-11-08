@@ -1,0 +1,3 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+test('retained voice style names stay translated and the default audition keeps the saved chant',async()=>{const {styleLabel,defaultPreview}=await import('data:text/javascript;base64,'+fs.readFileSync(path.join(__dirname,'../web/voice-style.js')).toString('base64'));assert.match(styleLabel('ノーマル','zh'),/普通/);assert.match(styleLabel('怒り','en'),/Angry/);assert.equal(styleLabel('ノーマル','ja'),'ノーマル');assert.equal(defaultPreview,'黒より黒く闇より暗き漆黒に我が深紅の混淆を望みたもう。');});

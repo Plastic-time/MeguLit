@@ -19,6 +19,11 @@ catch [System.IO.IOException] { Write-Output 'Hook bridge update staged for the 
 & (Join-Path $taskRoot 'native/Build-StartupIsland.ps1') -OutputPath (Join-Path $taskRoot 'native/StartupIsland.exe')
 & $taskCsc /nologo /target:exe /optimize+ ("/out:" + (Join-Path $taskRoot 'native\GameProcess.exe')) (Join-Path $taskRoot 'native\GameProcess.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Native game process helper build failed' }
+# The hook injectors (one per game bitness) and the API key vault were only shipped as prebuilt binaries; build them here.
+foreach ($taskHelper in @(@('HookInjector32.exe','/platform:x86','HookInjector.cs','HookTarget.cs'),@('HookInjector64.exe','/platform:x64','HookInjector.cs','HookTarget.cs'),@('KeyVault.exe','/reference:System.Security.dll','KeyVault.cs'))) {
+ & $taskCsc /nologo /target:exe /optimize+ $taskHelper[1] ('/out:' + (Join-Path $taskRoot ('native\' + $taskHelper[0]))) @($taskHelper[2..($taskHelper.Count-1)] | ForEach-Object { Join-Path $taskRoot ('native\' + $_) })
+ if ($LASTEXITCODE -ne 0) { throw "Native helper build failed: $($taskHelper[0])" }
+}
 & $taskNode --check (Join-Path $taskRoot 'services\bridge.cjs')
 if ($LASTEXITCODE -ne 0) { throw 'Service syntax check failed' }
 foreach ($taskScript in @('web/app.js','web/primary-buttons.js','web/library-grid-fit.js','web/tray-menu.js','web/launch-feedback.js','web/reader/game-ui.js','web/home-motion.js','web/library-refresh.js','web/series-library.js','web/series-i18n.js','web/game-reception.js','web/settings-autosave.js','web/path-picker.js','web/game-language.js','web/grid-motion.js','web/game-detail.js','web/settings.js','web/settings-layout.js','web/settings-search.js','web/settings-help.js','web/select-control.js','web/translation-settings.js','web/speech-settings.js','web/voice-style.js','web/background-crop.js','web/backup-ui.js','web/anki-review.js','web/anki-fit.js','web/anki-card.js','web/reader/host-transport.js','web/reader/bootstrap.js','web/reader/learning-notice.js','web/reader/host-startup.js','web/reader/host-regions.js','web/reader/module-list.js','web/reader/mode.js','web/reader/word-status.js')) {
@@ -38,6 +43,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Independent desktop build failed' }
 $taskBuilt = Join-Path $taskRoot 'desktop\target\release\megulit.exe'
 if ($Check) {
  $taskTests = @(Get-ChildItem -LiteralPath (Join-Path $taskRoot 'validation') -Filter '*.test.cjs' -File -Recurse | ForEach-Object { $_.FullName })
+ if (-not $taskTests.Count) { throw 'No tests found in validation/*.test.cjs; -Check must not pass with zero tests' }
  $taskTestOutput = & $taskNode --test @taskTests 2>&1
  $taskTestExit = $LASTEXITCODE
  $taskTestOutput | Set-Content -LiteralPath (Join-Path $taskRoot 'validation/automated-results.txt') -Encoding utf8
@@ -45,6 +51,7 @@ if ($Check) {
  @{ recordedAt=[DateTime]::UtcNow.ToString('o'); exitCode=$taskTestExit; tests=[int]([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Groups[1].Value); passed=[int]([regex]::Match($taskTestText,'(?m)pass\s+(\d+)').Groups[1].Value); failed=[int]([regex]::Match($taskTestText,'(?m)fail\s+(\d+)').Groups[1].Value) } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskRoot 'validation/automated-results.json') -Encoding utf8
  Write-Output ($taskTestOutput | Select-Object -Last 9)
  if ($taskTestExit -ne 0) { throw 'Independent data checks failed; see validation/automated-results.txt' }
+ if (-not ([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Success) -or [int]([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Groups[1].Value) -eq 0) { throw 'Test runner reported zero tests' }
 }
 $taskOutput = Join-Path $taskRoot 'MeguLit.exe'
 try { Copy-Item -LiteralPath $taskBuilt -Destination $taskOutput -Force }
