@@ -174,8 +174,9 @@ if($a.digest -and $a.digest -ne "sha256:$hash"){throw "GitHub digest $($a.digest
 
 Step 'verify download'
 $back=Join-Path $work 'check.zip'
-Invoke-WebRequest -Uri $a.browser_download_url -OutFile $back -UseBasicParsing
-if((Get-FileHash $back -Algorithm SHA256).Hash.ToLower() -ne $hash){throw 'Downloaded package hash differs'}
+# a hotfix replaces a file under the same URL; the download edge can serve the old one for a few seconds
+$ok=$false;for($try=0;$try -lt 8 -and -not $ok;$try++){if($try){Start-Sleep -Seconds 5};Invoke-WebRequest -Uri $a.browser_download_url -OutFile $back -UseBasicParsing;$ok=(Get-FileHash $back -Algorithm SHA256).Hash.ToLower() -eq $hash}
+if(-not $ok){throw 'Downloaded package hash differs'}
 $probe=& node -e "require('./services/update.cjs').check('$prev').then(r=>console.log(r.latest+' '+r.newer)).catch(e=>console.log('ERR '+e.message))"
 Write-Host "update check from v${prev}: $probe"
 Remove-Item $work -Recurse -Force
