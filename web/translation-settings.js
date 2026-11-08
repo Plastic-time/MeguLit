@@ -11,8 +11,16 @@ export function configureTranslation({content,form,data,locale,api,esc,toast}){
  function apply(reset){const meta=data.providers?.[provider.value]||{};if(reset){const draft=drafts.get(provider.value);base.value=draft?.baseUrl??meta.baseUrl??'';model.value=draft?.model??meta.model??'';}
   base.readOnly=!meta.editable;const isDefault=base.value===(meta.defaultBaseUrl||meta.baseUrl);addressNote.textContent=isDefault?({zh:'默认地址，已自动填写，通常无需修改',en:'Default URL, filled automatically; usually no changes needed',ja:'既定の URL を自動入力しています。通常は変更不要です'})[locale]:({zh:'当前使用自定义地址',en:'Using a custom URL',ja:'カスタム URL を使用中'})[locale];const mt=['google','microsoft','bing','deepl','baiduapi','youdaoapi','tencentapi','aliyunapi','caiyunapi','xiaoniu','googleapi','yandexapi'].includes(provider.value);
   row('baseUrl').dataset.unavailable=String(kind==='free');row('model').dataset.unavailable=String(mt);row('region').dataset.unavailable=String(provider.value!=='bing');row('deeplTier').dataset.unavailable=String(provider.value!=='deepl');
-  content.querySelector('.key-panel').hidden=meta.keyless===true;panel.hidden=kind!=='local';panel.querySelector('.local-hint').textContent=managedLocal(provider.value)?w.hint:w.external;draw();
+  for(const name of ['baseUrl','model','region','deeplTier'])row(name).hidden=row(name).dataset.unavailable==='true';
+  content.querySelector('.key-panel').hidden=meta.keyless===true;
+  { const any=['baseUrl','model','region','deeplTier'].some(n=>!row(n).hidden)||meta.keyless!==true;conn.dataset.empty=String(!any);conn.querySelector('.tr-conn-empty').hidden=any; }panel.hidden=kind!=='local';panel.querySelector('.local-hint').textContent=managedLocal(provider.value)?w.hint:w.external;draw();
  }
+ /* v1.1.6 (user: the three tabs repeated the same rows): engine-specific rows live in one connection card under the engine
+    picker and only show what the chosen engine needs; the remaining rows are the shared options below it. */
+ const conn=document.createElement('section');conn.className='tr-conn';
+ conn.innerHTML=`<div class="tr-conn-head">${({zh:'连接设置',en:'Connection',ja:'接続設定'})[locale]}</div><p class="tr-conn-empty settings-help">${({zh:'这个引擎不需要额外设置，直接可用',en:'This engine needs no setup',ja:'このエンジンは追加設定なしで使えます'})[locale]}</p>`;
+ row('provider').after(conn);for(const name of ['baseUrl','model','region','deeplTier'])conn.append(row(name));const keyPanel=content.querySelector('.key-panel');if(keyPanel){conn.append(keyPanel);keyPanel.querySelectorAll('button:not([type])').forEach(b=>b.type='button');}
+ const shared=document.createElement('div');shared.className='tr-shared-head';shared.textContent=({zh:'通用翻译选项',en:'Shared options',ja:'共通オプション'})[locale];conn.after(shared);
  function filter(){provider.replaceChildren(...original.filter(option=>translationKind(option.value)===kind).map(option=>option.cloneNode(true)));}
  function updateTypes(){types.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.kind===kind)));}
  types.querySelectorAll('button').forEach(button=>button.onclick=()=>{drafts.set(provider.value,{baseUrl:base.value,model:model.value});const selected=provider.value;kind=button.dataset.kind;filter();if([...provider.options].some(option=>option.value===selected))provider.value=selected;provider.dispatchEvent(new Event('change',{bubbles:true}));updateTypes();});

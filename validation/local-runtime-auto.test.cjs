@@ -26,3 +26,12 @@ test('the overlay gets live download progress, then the model start, then the tr
  assert.equal(events[0],'LOCAL_RUNTIME_DOWNLOADING:0');assert.ok(events.some(e=>/:(40|80)$/.test(e)));
  assert.deepEqual(events.slice(-2),['LOCAL_RUNTIME_DOWNLOADING:100','LOCAL_STARTING']);assert.equal(calls,2);
 });
+test('v1.1.6: MOJi is a lookup explanation source that needs no model profile',()=>{
+ const {cleanLookup,lookupOptions}=require('../core/lookup-models.cjs');
+ assert.equal(cleanLookup({lookupProvider:'moji'}).lookupProvider,'moji');
+ assert.deepEqual(lookupOptions({lookupProvider:'moji'}),{provider:'moji'});
+});
+test('v1.1.6: MOJi is the default lookup explanation source; an explicit choice is kept',()=>{
+ const {cleanLookup}=require('../core/lookup-models.cjs');
+ assert.equal(cleanLookup({}).lookupProvider,'moji');assert.equal(cleanLookup({lookupProvider:'local'}).lookupProvider,'local');
+});

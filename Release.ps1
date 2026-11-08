@@ -3,6 +3,8 @@
 #
 #   .\Release.ps1 -Version 1.1.3 -Notes notes.md          # full release
 #   .\Release.ps1 -Version 1.1.3 -Notes notes.md -DryRun  # bump, build, test and package only; nothing is pushed
+#   .\Release.ps1 -Version 1.1.6 -Prepare                 # bump, build and test now; then release with -SkipBuild
+#   .\Release.ps1 -Version 1.1.6 -Notes notes.md -SkipBuild  # skips the build when nothing changed since
 #   -IncludeWorkingChanges                                 # also commit the uncommitted changes in this release
 #
 # notes.md: Chinese first, then a line with only ---, then English (the in-app update card shows the reader's half).
@@ -11,8 +13,10 @@
 # web/ and setup/; files that are not in the repository (prebuilt helpers) are carried over from the previous zip.
 param(
  [Parameter(Mandatory=$true)][string]$Version,
- [Parameter(Mandatory=$true)][string]$Notes,
+ [string]$Notes,
  [switch]$DryRun,
+ [switch]$Prepare,   # bump + build + test only, and remember this tree so a later -SkipBuild can reuse the build
+ [switch]$SkipBuild, # reuse the last -Prepare (or release) build when the tree and MeguLit.exe are unchanged since
  [switch]$IncludeWorkingChanges  # ship uncommitted changes in the release commit instead of refusing
 )
 $ErrorActionPreference='Stop'
@@ -28,16 +32,20 @@ function G{ & git.exe @args; if($LASTEXITCODE -ne 0){throw "git $($args -join ' 
 function Utf8NoBom{New-Object System.Text.UTF8Encoding($false)}
 function ReadText($p){[IO.File]::ReadAllText((Join-Path $Root $p),[Text.Encoding]::UTF8)}
 function WriteText($p,$t){[IO.File]::WriteAllText((Join-Path $Root $p),$t,(Utf8NoBom))}
-function Swap($p,$pattern,$replacement){$t=ReadText $p;$n=[regex]::Replace($t,$pattern,$replacement);if($n -eq $t -and -not ($t -match [regex]::Escape($Version))){throw "version not found in $p"};WriteText $p $n}
+function Swap($p,$pattern,$replacement){$t=ReadText $p;$n=[regex]::Replace($t,$pattern,$replacement);if($n -eq $t -and -not ($t -match [regex]::Escape($Version))){throw "version not found in $p"};if($n -ne $t){WriteText $p $n}}
 
 # ---------- checks ----------
 if($Version -notmatch '^\d+\.\d+\.\d+$'){throw 'Version must look like 1.2.3'}
-$NotesPath=(Resolve-Path $Notes).Path
-$Body=[IO.File]::ReadAllText($NotesPath,[Text.Encoding]::UTF8)
-if($Body -notmatch "(?m)^---\s*$"){throw 'Notes need a --- line between the Chinese and English halves'}
+$Body=''
+if(-not $Prepare){
+ if(-not $Notes){throw 'Pass -Notes notes.md (or -Prepare to only build)'}
+ $NotesPath=(Resolve-Path $Notes).Path
+ $Body=[IO.File]::ReadAllText($NotesPath,[Text.Encoding]::UTF8)
+ if($Body -notmatch "(?m)^---\s*$"){throw 'Notes need a --- line between the Chinese and English halves'}
+}
 $Tag="v$Version";$Asset="MeguLit-$Tag-win-x64.zip"
 $Token=$null
-if(-not $DryRun){
+if(-not $DryRun -and -not $Prepare){
  $cred="protocol=https`nhost=github.com`n`n" | git credential fill
  $Token=($cred | Where-Object {$_ -like 'password=*'}) -replace '^password=',''
  if(-not $Token){throw 'No GitHub token from git credential fill'}
@@ -51,7 +59,7 @@ function Api($method,$path,$body=$null){
 }
 
 Step 'sync main'
-if(-not $DryRun){
+if(-not $DryRun -and -not $Prepare){
  $dirty=git status --porcelain --untracked-files=no
  if($dirty -and -not $IncludeWorkingChanges){throw "Working tree has uncommitted changes (add -IncludeWorkingChanges to ship them):`n$dirty"}
  G checkout -q main
@@ -74,12 +82,32 @@ Swap 'desktop/Cargo.lock' '(name = "megulit"\r?\nversion = )"\d+\.\d+\.\d+"' "`$
 $readme=ReadText 'README.md'
 $readme=[regex]::Replace($readme,'MeguLit-v\d+\.\d+\.\d+-win-x64\.zip',$Asset)
 $readme=[regex]::Replace($readme,'\u4e0b\u8f7d v\d+\.\d+\.\d+',"$([char]0x4e0b)$([char]0x8f7d) $Tag")
-WriteText 'README.md' $readme
+if($readme -ne (ReadText 'README.md')){WriteText 'README.md' $readme}
 
 # ---------- build ----------
 Step 'build and test'
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'Build.ps1') -Check
-if($LASTEXITCODE -ne 0){throw 'Build or tests failed'}
+# Reuse rule: the last build was for this version and no source file is newer than MeguLit.exe. The bump above only
+# writes files whose content changes, and cargo's own rewrite of Cargo.lock happens before the exe is produced.
+$stampFile=Join-Path $env:TEMP 'megulit-release-stamp.json';$exePath=Join-Path $Root 'MeguLit.exe'
+function NewestSource{
+ $files=git ls-files --cached --others --exclude-standard web services core setup desktop/src desktop/Cargo.toml desktop/tauri.conf.json native
+ $newest=$null;foreach($f in $files){if($f -match '\.(exe|dll|lib|obj|png|jpg|webp|ico)$'){continue};$p=Join-Path $Root $f;if(-not (Test-Path -LiteralPath $p)){continue};$t=(Get-Item -LiteralPath $p).LastWriteTimeUtc;if(-not $newest -or $t -gt $newest.Time){$newest=@{Time=$t;File=$f}}}
+ $newest
+}
+$reuse=$false
+if($SkipBuild -and (Test-Path $stampFile) -and (Test-Path $exePath)){
+ $stamp=Get-Content $stampFile -Raw | ConvertFrom-Json;$exeTime=(Get-Item $exePath).LastWriteTimeUtc;$src=NewestSource
+ if($stamp.version -eq $Version -and $stamp.exe -eq (Get-FileHash $exePath -Algorithm SHA256).Hash -and $src.Time -le $exeTime){$reuse=$true}
+ elseif($src.Time -gt $exeTime){Write-Host "  $($src.File) changed after the last build"}
+}
+if($reuse){Write-Host "  nothing changed since the last build of $Tag; reusing MeguLit.exe"}
+else{
+ if($SkipBuild){Write-Host '  building (no reusable build for this version)'}
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'Build.ps1') -Check
+ if($LASTEXITCODE -ne 0){throw 'Build or tests failed'}
+ @{version=$Version;exe=(Get-FileHash $exePath -Algorithm SHA256).Hash} | ConvertTo-Json | Set-Content $stampFile
+}
+if($Prepare){Step "prepared $Tag (built and tested; release later with -SkipBuild)";return}
 
 # ---------- package ----------
 Step 'package'
