@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const mime={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif','.bmp':'image/bmp'};
+const mime={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif','.bmp':'image/bmp','.avif':'image/avif'};
+/* E274 (user: some pictures could not be used as a background): browsers save JPEGs as .jfif / .jpe and AVIF is common;
+   the file's content decides what it is, the extension only has to look like an image. */
+const IMAGE_EXT=/\.(png|jpe?g|jfif|jpe|pjpeg|pjp|webp|gif|bmp|dib|avif)$/i;
 const names={home:'background',panels:'background-game',avatar:'avatar'};
-function imageType(bytes){const h=bytes.subarray(0,16);return h.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex'))?'.png':h[0]===255&&h[1]===216?'.jpg':h.toString('ascii',0,4)==='RIFF'&&h.toString('ascii',8,12)==='WEBP'?'.webp':/^GIF8[79]a/.test(h.toString('ascii'))?'.gif':h.toString('ascii',0,2)==='BM'?'.bmp':'';}
+function imageType(bytes){const h=bytes.subarray(0,16);return h.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex'))?'.png':h[0]===255&&h[1]===216?'.jpg':h.toString('ascii',0,4)==='RIFF'&&h.toString('ascii',8,12)==='WEBP'?'.webp':/^GIF8[79]a/.test(h.toString('ascii'))?'.gif':h.toString('ascii',0,2)==='BM'?'.bmp':h.toString('ascii',4,8)==='ftyp'&&/^avi[fs]$/.test(h.toString('ascii',8,12))?'.avif':'';}
 function readImage(source){
- if(typeof source!=='string'||!path.isAbsolute(source)||!mime[path.extname(source).toLowerCase()])throw Error('INVALID_IMAGE');
+ if(typeof source!=='string'||!path.isAbsolute(source)||!IMAGE_EXT.test(source))throw Error('INVALID_IMAGE');
  let bytes;try{const stat=fs.statSync(source);if(!stat.isFile()||stat.size>40*1024*1024)throw Error();bytes=fs.readFileSync(source);}catch{throw Error('INVALID_IMAGE');}
  const ext=imageType(bytes);if(!ext)throw Error('INVALID_IMAGE');return {bytes,ext,src:'data:'+mime[ext]+';base64,'+bytes.toString('base64')};
 }

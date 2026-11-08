@@ -175,7 +175,7 @@ async fn pick_executable(app:tauri::AppHandle,directory:Option<String>) -> Resul
 
 #[tauri::command]
 async fn pick_image(app:tauri::AppHandle) -> Result<Option<String>,String> {
-    tauri::async_runtime::spawn_blocking(move || app.dialog().file().add_filter("Image",&["png","jpg","jpeg","webp","gif","bmp"]).blocking_pick_file().map(|p|p.into_path().map(|v|v.to_string_lossy().to_string()).map_err(|e|e.to_string())).transpose()).await.map_err(|e|e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || app.dialog().file().add_filter("Image",&["png","jpg","jpeg","jfif","jpe","webp","gif","bmp","avif"]).blocking_pick_file().map(|p|p.into_path().map(|v|v.to_string_lossy().to_string()).map_err(|e|e.to_string())).transpose()).await.map_err(|e|e.to_string())?
 }
 
 #[tauri::command]
