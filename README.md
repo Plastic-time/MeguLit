@@ -98,7 +98,7 @@ MeguLit 想做的事情就一句话：**游戏还是那个游戏，只是你能�
 
 ### 安装
 
-去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.0.3-win-x64.zip`（不到 10 MB），解压后运行 `MeguLit.exe`
+去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.0.4-win-x64.zip`（不到 10 MB），解压后运行 `MeguLit.exe`
 
 第一次启动会弹出安装窗口，二选一：
 
@@ -201,7 +201,7 @@ The features aren't the hard part. Engines are:
 
 ### Install
 
-Grab `MeguLit-v1.0.3-win-x64.zip` (under 10 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`.
+Grab `MeguLit-v1.0.4-win-x64.zip` (under 10 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`.
 
 On first launch a setup window asks you to pick one:
 
@@ -280,7 +280,7 @@ UI は簡体字中国語・英語・日本語に対応。中国語・英語話�
 
 ### インストール
 
-[Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.0.3-win-x64.zip`（10 MB 未満）をダウンロードして展開し、`MeguLit.exe` を起動してください
+[Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.0.4-win-x64.zip`（10 MB 未満）をダウンロードして展開し、`MeguLit.exe` を起動してください
 
 初回起動時にセットアップ画面が出ます：
 
