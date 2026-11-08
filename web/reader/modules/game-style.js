@@ -14,7 +14,7 @@
     scanX: 2, scanY: 60, scanWidth: 96, scanHeight: 38, blurRadius: 13, maskPadding: 6, fastMask:true,
     maskVersion:26, maskStyle:'blend', japaneseBold:false, chineseBold:false,
     hideWaitMarker:false,relocateWaitMarker:false,waitCoverStyle:'frame',
-    japaneseFont:'originalGothic', chineseFont:'patch', rubyFont:'round', englishFont:'inherit',
+    japaneseFont:'originalGothic', chineseFont:'patch', rubyFont:'notoSansJP', englishFont:'inherit',
     englishEnabled:false, englishSize:34, englishSpacingPx:0, englishBold:false,
     englishOutline:true, englishOutlineColor:'#ffffff', englishOutlineWidth:1,
     japaneseOutline:true, chineseOutline:true, japaneseOutlineColor:'#ffffff', chineseOutlineColor:'#ffffff', rubyOutline:true, rubyOutlineColor:'#ffffff', rubyOutlineWidth:.45,
@@ -131,7 +131,7 @@
       ['yuGothicUI','Yu Gothic UI','sans'],['meiryoUI','Meiryo UI','sans'],['msPGothic','MS PGothic','sans'],
       ['msUIGothic','MS UI Gothic','sans'],['msPMincho','MS PMincho','serif'],['bizUDGothic','BIZ UDゴシック','sans'],
       ['bizUDPGothic','BIZ UDPゴシック','sans'],['bizUDMincho','BIZ UD明朝','serif'],['bizUDPMincho','BIZ UDP明朝','serif'],
-      ['notoSansJP','Noto Sans JP','sans',true],['notoSerifJP','Noto Serif JP','serif',true],
+      ['notoSansJP','Noto Sans JP','sans'],['notoSerifJP','Noto Serif JP','serif'],
     ],
     chineseFont:[
       ['patch','font.ttf','patch'],['simhei','SimHei','sans'],['yahei','Microsoft YaHei','sans'],

@@ -139,7 +139,7 @@ class HookNative{
  markerTarget(v){this.waitTarget=v;this.syncMarker();}
  // The Direct3D9 wait-marker draw hook no longer runs any probing code inside the game (that once crashed a game);
  // it only patches system d3d9.dll functions whose address and bytes match a probe made in a separate process.
- syncMarker(){const v={...(this.waitTarget||{}),type:'waitMarker',active:!!this.waitTarget?.active&&this.enabled&&this.state.hookActive&&this.preferences?.hideWaitMarker!==false},key=JSON.stringify(v);if(this.process&&key!==this.markerKey){this.markerKey=key;this.send(v);}}
+ syncMarker(){const v={...(this.waitTarget||{}),type:'waitMarker',active:!!this.waitTarget?.active&&this.enabled&&this.state.hookActive&&this.preferences?.hideWaitMarker===true},key=JSON.stringify(v);if(this.process&&key!==this.markerKey){this.markerKey=key;this.send(v);}}
  confirmReplacement(){if(this.enabled&&this.state.receivedText){this.verified=true;this.notify({replacementState:'user-verified'});}}
  select(id){this.verified=false;if(this.process&&typeof id==='string'&&this.state.hookThreads.some(t=>t.id===id)){this.trace('select id='+id+' replace='+this.enabled);this.send({type:'select',id,replace:this.enabled});}else{this.trace('select rejected id='+String(id));this.notify({hookMessage:'文本流尚未就绪，请重新扫描后选择'});}}
  rescan(){this.send({type:'rescan'});}

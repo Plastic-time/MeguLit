@@ -9,3 +9,8 @@ html.tomoyo-ui-normal,body.tomoyo-ui-normal{background:transparent!important}bod
 
 /* An Alt+T right after launch opened the menu before its styles had loaded: unstyled sliders showed as a solid blue bar at the top. The menu stays invisible until every reader module is in. */
 html:not(.megulit-ready) .tomoyo-cn-dialog{visibility:hidden!important}
+
+/* Bundled Noto Sans JP / Noto Serif JP (SIL OFL 1.1, web/fonts/OFL-NotoJP.txt): the default furigana font and two
+   Japanese text choices that no longer need a system install. A locally installed copy still wins. */
+@font-face{font-family:'Noto Sans JP';src:local('Noto Sans JP'),url('../fonts/NotoSansJP.woff2') format('woff2');font-weight:100 900;font-display:swap}
+@font-face{font-family:'Noto Serif JP';src:local('Noto Serif JP'),url('../fonts/NotoSerifJP.woff2') format('woff2');font-weight:200 900;font-display:swap}

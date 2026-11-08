@@ -69,7 +69,7 @@
   // turned off in the home settings. A launch counts once, however many status updates it sends.
   let seen={};try{seen=JSON.parse(localStorage.getItem('megulit-new-game-tip')||'{}')||{};}catch{}if(!seen||typeof seen!=='object'||Array.isArray(seen))seen={};
   const launch=String(m.gameStyleIdentity||'')||'page:'+firstRunPage,entry=seen[key]&&typeof seen[key]==='object'?seen[key]:{count:0,last:''};
-  if(entry.last===launch||entry.count>=5||document.querySelector('.tome-first-run'))return;
+  if(entry.last===launch||entry.count>=5||document.querySelector('.tome-first-run')||isBusy())return;
   seen[key]={count:(Number(entry.count)||0)+1,last:launch};const keys=Object.keys(seen);if(keys.length>300)delete seen[keys[0]];
   try{localStorage.setItem('megulit-new-game-tip',JSON.stringify(seen));}catch{}
   const box=document.createElement('div');box.className='tome-first-run';box.dataset.noI18n='';box.setAttribute('role','status');box.innerHTML='<b></b><p></p><small></small><button type="button"></button>';
@@ -81,6 +81,7 @@
  function restore(id){if(saving)return;const version=session.select(id);if(!version)return;stopMeasurement();apply(version.prefs,version.map);message=t('historyPreview');last={...last,gameStyleState:'measured'};paint();}
  function resync(part='all'){
   if(!session.key){message=t('unbound');paint();return;}
+  /* The visible-client capture reads the screen: an overlay hint over the game was measured as its text and moved the box to the top (user, 2026-11-08). Close it before measuring. */document.querySelector('.tome-first-run')?.remove();
   stopMeasurement();window.__tomeTextPosition?.startCalibration?.();message='';last={...last,gameStyleState:'revealing'};send({type:'gameStyleSync',key:session.key,part,owner});paint();
  }
  function receivedMeasurement(m){
