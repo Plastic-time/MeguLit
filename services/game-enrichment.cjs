@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const normalize=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu,'');
-function candidates(game){const lib=game.original.library||{},exe=path.win32.basename(game.row.executable,'.exe').toLowerCase();const precise={rance01:'ランス01 光をもとめて',rance02:'ランス02 反逆の少女たち',rance03:'ランス03 リーザス陥落'};return [...new Set([precise[exe],game.row.title,...(lib.names||[]),game.original.media?.title].filter(Boolean).flatMap(t=>[t,...String(t).split(/\s+\/\s+/)]) )].filter(t=>t.length>2).slice(0,6);}
+function candidates(game){const lib=game.original.library||{},exe=path.win32.basename(game.row.executable,'.exe').toLowerCase();const precise={rance01:'ランス01 光をもとめて',rance02:'ランス02改 反逆の少女たち',rance03:'ランス03 リーザス陥落'};return [...new Set([precise[exe],game.row.title,...(lib.names||[]),game.original.media?.title].filter(Boolean).flatMap(t=>[t,...String(t).split(/\s+\/\s+/)]) )].filter(t=>t.length>2).slice(0,6);}
 // Games under <Steam>\steamapps\common\<dir> carry their appid in steamapps\appmanifest_<id>.acf, even when the
 // library found them through a plain folder scan. The appid is the most reliable key for VNDB and covers.
 const manifestCache=new Map();
