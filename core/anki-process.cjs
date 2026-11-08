@@ -12,9 +12,33 @@ function candidates(configured,env=process.env){
  const venv=env.LOCALAPPDATA?['ankiw.exe','anki.exe'].map(name=>path.join(env.LOCALAPPDATA,'AnkiProgramFiles','.venv','Scripts',name)):[];
  return [configured,...roots.map(folder=>path.join(folder,'Anki','anki.exe')),...venv].filter(Boolean);
 }
-function find(configured,env=process.env,exists=file=>{try{return fs.statSync(file).isFile();}catch{return false;}}){
- for(const file of candidates(configured,env))if(exists(file))return file;return '';
+// Cold detection (user: Anki installed outside C: was never found): when no default location has Anki, read where
+// Windows says it was installed (uninstall entries and App Paths, per user and per machine), then other drives' usual
+// folders. Read-only registry queries; a hit is remembered for the session.
+let coldHit;
+function coldCandidates(env=process.env){
+ const B=String.fromCharCode(92);
+ const out=[],reg=path.join(env.WINDIR||['C:','Windows'].join(B),'System32','reg.exe');
+ const query=key=>{try{return require('node:child_process').execFileSync(reg,['query',key,'/s'],{encoding:'utf8',windowsHide:true,timeout:4000,maxBuffer:8<<20,stdio:['ignore','pipe','ignore']});}catch{return '';}};
+ for(const root of [['HKCU','SOFTWARE'].join(B),['HKLM','SOFTWARE'].join(B),['HKLM','SOFTWARE','WOW6432Node'].join(B)]){
+  for(const block of query(root+['','Microsoft','Windows','CurrentVersion','Uninstall'].join(B)).split(/\r?\n\r?\n/)){
+   if(!/DisplayName\s+REG_SZ\s+Anki\b/i.test(block))continue;
+   for(const m of block.matchAll(/(InstallLocation|DisplayIcon|UninstallString)\s+REG_(?:EXPAND_)?SZ\s+(.+)/gi)){let v=m[2].trim().replace(/,\d+$/,'').replace(/"/g,'');if(/\.exe$/i.test(v))v=path.dirname(v);out.push(path.join(v,'anki.exe'),path.join(v,'ankiw.exe'));}
+  }
+  const app=query(root+['','Microsoft','Windows','CurrentVersion','App Paths','anki.exe'].join(B)).match(/\(Default\)\s+REG_SZ\s+(.+)/i);if(app)out.push(app[1].trim().replace(/"/g,''));
+ }
+ for(const drive of 'CDEFGH')out.push(drive+[':','Anki','anki.exe'].join(B),drive+[':','Program Files','Anki','anki.exe'].join(B),drive+[':','Apps','Anki','anki.exe'].join(B));
+ if(env.USERPROFILE)out.push(path.join(env.USERPROFILE,'scoop','apps','anki','current','anki.exe'));
+ return out;
 }
+function find(configured,env=process.env,exists=file=>{try{return fs.statSync(file).isFile();}catch{return false;}}){
+ for(const file of candidates(configured,env))if(exists(file))return file;
+ if(coldHit&&exists(coldHit))return coldHit;
+ for(const file of coldCandidates(env))if(exists(file))return coldHit=file;
+ return '';
+}
+// AnkiConnect is an Anki add-on (code 2055492159). Without it MeguLit cannot add cards even when Anki is open.
+function ankiConnectInstalled(env=process.env){const base=env.APPDATA&&path.join(env.APPDATA,'Anki2','addons21');if(!base)return null;try{return fs.readdirSync(base).some(name=>name==='2055492159'||/anki-?connect/i.test(name));}catch{return null;}}
 // Anki's main window is a Qt window titled "Anki" or "<profile> - Anki"; the 25.x launcher runs Anki in a child
 // process, so windows are matched by title and class rather than by the spawned PID.
 const WINDOWS=`
@@ -96,4 +120,4 @@ class AnkiProcess{
   }catch(error){this.log('[MeguLit] Anki close failed '+error.message);try{await this.show();}catch{}return {closed:false};}
  }
 }
-module.exports={AnkiProcess,find,candidates,windows};
+module.exports={AnkiProcess,find,candidates,coldCandidates,ankiConnectInstalled,windows};

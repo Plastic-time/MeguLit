@@ -29,7 +29,7 @@
   for(const key of ['textColor','readTextColor','textGradient','textGradientTop','textGradientBottom','readTextGradient','readTextGradientTop','readTextGradientBottom'])if(s[key]!==undefined)out[key]=s[key];
   const size=r.inkHeight>0?r.inkHeight*k/f.ink:Number(s.japaneseSize);if(Number.isFinite(size)&&size>4){out.japaneseSize=Math.round(size*10)/10;out.translationSize=Math.round(Math.max(12,Math.min(60,out.japaneseSize))*10)/10;}
   if(out.japaneseSize&&r.advance>0)out.japaneseSpacingPx=Math.round(clamp(r.advance*k-out.japaneseSize*f.adv,-out.japaneseSize*.45,out.japaneseSize)*10)/10;
-  if(out.japaneseSize&&r.lineStep>0)out.lineHeight=Math.round(clamp(r.lineStep*k/out.japaneseSize,1,3.5)*100)/100;else if(Number.isFinite(s.lineHeight))out.lineHeight=clamp(s.lineHeight,1,3.5);
+  if(out.japaneseSize&&r.lineStep>0)out.lineHeight=Math.round(clamp(r.lineStep*k/out.japaneseSize,1.45,3.5)*100)/100;else if(Number.isFinite(s.lineHeight))out.lineHeight=clamp(s.lineHeight,1.45,3.5); /* a measured step under 1.45 em is a mis-read (user: ISLAND came out with crushed line spacing); furigana needs the room */
   if(Number.isFinite(out.lineHeight)){out.lineHeight-=1.95;out.lineHeightMode='offset';}
   const x=Number(s.x),y=Number(s.y);if(Number.isFinite(x)&&Number.isFinite(y)){out.x=clamp(x,0,95);out.y=clamp(y,0,95);
    const step=(r.lineStep>0?r.lineStep:(out.japaneseSize||28)/k*(Number.isFinite(out.lineHeight)?1.95+out.lineHeight:1.6))*100/ch;
@@ -161,7 +161,7 @@
  .tomoyo-menu-header h3{flex-wrap:wrap!important;align-items:center!important;gap:4px 10px!important}
  [data-calibration-current]{flex:1;min-width:160px;font-size:11px!important;font-weight:400!important;letter-spacing:0;line-height:1.55;color:var(--theme-textSecondary,#aaa);overflow-wrap:anywhere}
  [data-calibration-current][data-preview=true]{color:var(--theme-primary,#e0495a)}
- .tome-first-run{position:fixed;z-index:2147482600;left:50%;top:24px;transform:translateX(-50%);box-sizing:border-box;width:min(520px,calc(100vw - 32px));padding:14px 16px 12px;border-radius:14px;background:color-mix(in srgb,var(--theme-surface,#18181b) 94%,transparent);color:var(--theme-text,#eee);border:1px solid color-mix(in srgb,var(--theme-primary,#e0495a) 45%,transparent);box-shadow:none;font-size:13px;line-height:1.6}
+ .tome-first-run{position:fixed;z-index:2147481000;left:50%;top:24px;transform:translateX(-50%);box-sizing:border-box;width:min(520px,calc(100vw - 32px));padding:14px 16px 12px;border-radius:14px;background:color-mix(in srgb,var(--theme-surface,#18181b) 94%,transparent);color:var(--theme-text,#eee);border:1px solid color-mix(in srgb,var(--theme-primary,#e0495a) 45%,transparent);box-shadow:none;font-size:13px;line-height:1.6}
  .tome-first-run b{display:block;margin-bottom:4px;font-size:14px}.tome-first-run p{margin:0 0 10px;color:var(--theme-textSecondary,#bbb)}
  .tome-first-run button{float:right;padding:5px 14px;border-radius:8px;border:0;background:var(--theme-primary,#e0495a);color:#fff;font:inherit;font-weight:600;cursor:pointer}
  .tome-game-style-sync{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 18px;padding:12px;border:1px solid var(--menu-border,#444);border-radius:12px}
