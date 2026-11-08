@@ -477,7 +477,7 @@
     if(message?.type==='modeRequest'){if(window.__tomoyoMode?.requestToggle)window.__tomoyoMode.requestToggle();else send({type:'galToggleMode'});return;}
     if(message?.type==='regionApplied'){window.dispatchEvent(new CustomEvent('tome-region-applied',{detail:message}));return;}
     if(typeof message.hookActive==='boolean'){bridge.hookActive=message.hookActive;if(!message.hookActive)bridge.hookSourceText='';}
-    if(typeof message.hookSource==='string')bridge.hookSourceText=message.hookSource;
+    if(typeof message.hookSource==='string'){bridge.hookSourceText=message.hookSource;bridge.hookSpeaker=typeof message.hookSpeaker==='string'?message.hookSpeaker:'';}
     if(message.hookRubyDict&&typeof message.hookRubyDict==='object')bridge.gameRuby=message.hookRubyDict;
     if(message.hookMessage)bridge.hookMessage=message.hookMessage;if(message.waitMarkerMessage){bridge.waitMarkerMessage=message.waitMarkerMessage;if(dialogFields?.waitMarkerState)dialogFields.waitMarkerState.textContent=message.waitMarkerMessage;}
     if(message.hookThreads)bridge.hookThreads=message.hookThreads;

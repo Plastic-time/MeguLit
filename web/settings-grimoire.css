@@ -1,0 +1,77 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Settings sidebar (v1.1.4): a grimoire index in the same glass language as statistics and the update card.
+   The glass now follows Settings → Home background → Glass panels (:root.home-glass); off, it is a solid page.
+   Loaded last on purpose: it replaces the stacked E236/E237/E255 sidebar rules. */
+.main .settings-nav,.home-glass .main .settings-nav{
+ --sn-t1:#f3e6da;--sn-t2:#cdb8a8;--sn-t3:#9a8577;--sn-gold:#edb56e;--sn-line:rgba(237,181,110,.16);--sn-rule:rgba(241,224,210,.07);
+ position:relative;padding:18px 12px 14px!important;border-radius:14px!important;border:1px solid var(--sn-line)!important;
+ background:linear-gradient(170deg,#211615,#161011)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+ box-shadow:0 1px 0 rgba(241,224,210,.05) inset,0 22px 44px -30px rgba(0,0,0,.9)!important}
+.home-glass .main .settings-nav{
+ background:linear-gradient(170deg,color-mix(in srgb,#2a1c1b var(--home-glass-alpha,62%),transparent),color-mix(in srgb,#140d0e var(--home-glass-alpha,62%),transparent))!important;
+ backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.2)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.2)!important}
+.main .settings-nav::before{content:"";position:absolute;top:-1px;left:26px;width:64px;height:1px;background:linear-gradient(90deg,transparent,rgba(237,181,110,.85),transparent);pointer-events:none}
+
+/* Category: a serif heading with a thin rotating chevron, hairlines between groups */
+.main .settings-nav .settings-category{margin:0!important;padding:0!important;border:0!important}
+.main .settings-nav .settings-category+.settings-category{border-top:1px solid var(--sn-rule)!important}
+.main .settings-nav .settings-category>summary{list-style:none;display:flex!important;align-items:center;justify-content:space-between;gap:10px;
+ margin:0!important;padding:13px 10px 13px 12px!important;border-radius:9px;background:none!important;box-shadow:none!important;
+ font:500 15px/1.3 var(--g-serif,serif)!important;letter-spacing:.04em!important;color:var(--sn-t2)!important;cursor:pointer;transition:color .2s,background .2s}
+.main .settings-nav .settings-category>summary::-webkit-details-marker{display:none}
+.main .settings-nav .settings-category>summary::before{content:none!important}
+.main .settings-nav .settings-category>summary::after{content:""!important;position:static!important;width:6px!important;height:6px!important;flex:none;margin:0 2px 0 0!important;border:0!important;border-right:1.5px solid currentColor!important;border-bottom:1.5px solid currentColor!important;background:none!important;box-shadow:none!important;border-radius:0!important;
+ transform:rotate(-45deg);opacity:.55;transition:transform .25s cubic-bezier(.2,.8,.2,1),opacity .2s}
+.main .settings-nav .settings-category[open]>summary{color:var(--sn-gold)!important}
+.main .settings-nav .settings-category[open]>summary::after{transform:rotate(45deg) translate(-2px,-1px);opacity:.9}
+.main .settings-nav .settings-category>summary:hover{color:var(--sn-t1)!important;background:rgba(241,224,210,.04)!important}
+.main .settings-nav .settings-category>summary:focus-visible{outline:1px solid var(--sn-gold);outline-offset:-1px}
+
+/* Items: an indented list on a faint gold spine */
+.main .settings-nav .settings-category-items{position:relative;display:flex;flex-direction:column;gap:2px;margin:0 0 10px 14px!important;padding:2px 0 2px 10px!important;border-left:1px solid var(--sn-rule)}
+.main .settings-nav .settings-category button{position:relative;display:flex!important;align-items:center!important;justify-content:flex-start!important;width:100%;
+ min-height:34px;margin:0!important;padding:0 12px!important;border-radius:8px!important;background:none!important;box-shadow:none!important;
+ font-size:13.5px!important;color:var(--sn-t3)!important;text-align:left;transition:color .2s,background .2s}
+.main .settings-nav .settings-category button::after{content:none!important}
+.main .settings-nav .settings-category button::before{content:""!important;position:absolute!important;left:-11px!important;top:50%!important;width:5px!important;height:5px!important;margin:-2.5px 0 0!important;
+ transform:rotate(45deg)!important;background:var(--sn-gold)!important;opacity:0;box-shadow:0 0 6px rgba(237,181,110,.7)!important;transition:opacity .2s;display:block!important}
+.main .settings-nav .settings-category button:hover{color:var(--sn-t1)!important;background:rgba(241,224,210,.04)!important}
+.main .settings-nav .settings-category button.active{color:#fff3e2!important;padding-left:12px!important;
+ background:linear-gradient(90deg,rgba(237,181,110,.13),rgba(237,181,110,.02) 75%,transparent)!important}
+.main .settings-nav .settings-category button.active::before{opacity:1}
+.main .settings-nav .settings-category button:focus-visible{outline:1px solid var(--sn-gold);outline-offset:-1px}
+.main .settings-nav .settings-category button:active{transform:scale(.98)}
+
+/* Light theme */
+:root[data-theme=light] .main .settings-nav{--sn-t1:#301919;--sn-t2:#6e4f47;--sn-t3:#8a6f66;--sn-gold:#a8323f;--sn-line:rgba(158,27,50,.16);--sn-rule:rgba(58,31,28,.09);
+ background:linear-gradient(170deg,#fbf3ee,#f3e7df)!important}
+:root[data-theme=light].home-glass .main .settings-nav{background:linear-gradient(170deg,color-mix(in srgb,#fff7f2 var(--home-glass-alpha,70%),transparent),color-mix(in srgb,#f3e5dc var(--home-glass-alpha,70%),transparent))!important}
+:root[data-theme=light] .main .settings-nav .settings-category button.active{color:#301919!important;background:linear-gradient(90deg,rgba(168,50,63,.1),transparent 75%)!important}
+:root[data-theme=light] .main .settings-nav .settings-category button::before{box-shadow:none!important}
+/* Black theme: deeper page, same structure */
+:root[data-theme=black] .main .settings-nav{background:linear-gradient(170deg,#120c0c,#0a0708)!important}
+@media (prefers-reduced-motion:reduce){.main .settings-nav .settings-category>summary::after,.main .settings-nav .settings-category button{transition:none}}
+
+/* Anki review landing (v1.1.4): a compact glass card instead of a full-height grey slab; glass follows the same switch */
+.review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch])){
+ --ak-t1:#f3e6da;--ak-t2:#cdb8a8;--ak-t3:#9a8577;--ak-gold:#edb56e;--ak-line:rgba(237,181,110,.16);--ak-rule:rgba(241,224,210,.08);
+ position:relative;overflow:hidden;flex:0 0 auto!important;align-self:center;width:min(660px,100%);margin:clamp(28px,9vh,110px) auto 24px!important;
+ padding:44px 48px 30px!important;border-radius:16px!important;border:1px solid var(--ak-line)!important;
+ background:linear-gradient(165deg,#241817,#151011)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+ box-shadow:0 1px 0 rgba(241,224,210,.05) inset,0 30px 60px -36px rgba(0,0,0,.9)!important}
+.home-glass .review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch])){
+ background:linear-gradient(165deg,color-mix(in srgb,#2c1d1b var(--home-glass-alpha,60%),transparent),color-mix(in srgb,#140d0e var(--home-glass-alpha,60%),transparent))!important;
+ backdrop-filter:blur(var(--home-glass-blur,18px)) saturate(1.2)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,18px)) saturate(1.2)!important}
+.review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch]))::before{content:"";position:absolute;top:-1px;left:50%;width:96px;margin-left:-48px;height:1px;background:linear-gradient(90deg,transparent,rgba(237,181,110,.9),transparent)}
+.review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch]))::after{content:"復";position:absolute;right:-14px;bottom:-58px;font:400 220px/1 var(--g-serif,serif);color:rgba(237,181,110,.045);pointer-events:none;user-select:none}
+.review-page #review-content>.review-card:has(>.anki-tools)>h2,.review-page #review-content>.review-card:has([data-launch])>h2{margin:14px 0 0!important;font:500 30px/1.25 var(--g-serif,serif)!important;color:var(--ak-t1)!important;letter-spacing:.02em}
+.review-page #review-content>.review-card:has(>.anki-tools)>p.muted,.review-page #review-content>.review-card:has([data-launch])>p.muted{margin:10px 0 0!important;max-width:30em;font-size:13px!important;line-height:1.7;color:var(--ak-t2)!important}
+.review-page #review-content>.review-card:has(>.anki-tools)>.review-controls:not(.anki-tools){flex-wrap:wrap;margin-top:30px!important}
+.review-page #review-content>.review-card:has(>.anki-tools) select[data-deck]{min-width:260px;flex-basis:100%;max-width:340px;margin:0 auto 4px!important}
+.review-page #review-content>.review-card:has(>.anki-tools)>.review-controls:not(.anki-tools){row-gap:14px!important}
+.review-page #review-content>.review-card:has(>.anki-tools)>.anki-tools{display:flex!important;flex-wrap:wrap;justify-content:center;gap:4px 0!important;width:100%;margin-top:24px!important;padding-top:16px!important;border-top:1px solid var(--ak-rule)!important}
+.review-page #review-content>.review-card:has(>.anki-tools)>.anki-tools .text-button{height:auto!important;min-height:0!important;padding:4px 14px!important;border:0!important;border-radius:6px!important;background:none!important;box-shadow:none!important;font-size:12.5px!important;color:var(--ak-t3)!important;transition:color .2s,background .2s}
+.review-page #review-content>.review-card:has(>.anki-tools)>.anki-tools .text-button+.text-button{border-left:1px solid var(--ak-rule)!important;border-radius:0!important}
+.review-page #review-content>.review-card:has(>.anki-tools)>.anki-tools .text-button:hover{color:var(--ak-t1)!important;background:rgba(241,224,210,.04)!important}
+:root[data-theme=light] .review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch])){--ak-t1:#301919;--ak-t2:#6e4f47;--ak-t3:#8a6f66;--ak-gold:#a8323f;--ak-line:rgba(158,27,50,.16);--ak-rule:rgba(58,31,28,.1);background:linear-gradient(165deg,#fbf3ee,#f3e7df)!important}
+:root[data-theme=light] .review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch]))::after{color:rgba(158,27,50,.05)}

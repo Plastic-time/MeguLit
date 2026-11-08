@@ -83,7 +83,18 @@ class Reader{
  }
  translator(){if(!this.translation){this.translation=require('../core/providers.cjs').createTranslationService();}return this.translation;}
  loadKeys(){const {SecretStore}=require('../core/secrets.cjs');if(fs.existsSync(path.join(this.folder,'secrets.dpapi')))for(const[base,key]of new SecretStore(this.folder,undefined,path.join(this.root,'native','KeyVault.exe')).entries())this.translator().setKey(base,key);}
- async translate(request){const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;const options=require('../core/providers.cjs').resolveOptions({...this.prefs(),...(request.options&&typeof request.options==='object'?request.options:{}),translationPrompt:this.workPrompt||''});if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();const gameId=this.gameId;await this.runtime.local().ensure(options);const translated=normalizeTranslation(await this.translator().translate(text,options,current));if(gameId)this.stats.translation(gameId,text,translated);return translated;}
+ /* v1.1.4 (user: show the real progress from 0% to 100%): while the llama.cpp runtime downloads, the overlay line of
+    the waiting sentence is updated every half second, then shows the model starting, then the translation. */
+ async localReady(options,id,current){
+  const llm=this.runtime.local(),push=message=>{if(Number.isSafeInteger(id))this.runtime.emit('reader-event',{type:'call',method:'deliver',args:[id,'',true,message]});};
+  try{return await llm.ensure(options);}catch(error){if(!/^LOCAL_RUNTIME_DOWNLOADING/.test(error.message))throw error;}
+  while(llm.job?.state==='downloading'&&current()){const j=llm.job;push('LOCAL_RUNTIME_DOWNLOADING:'+(j.total?Math.min(100,Math.floor(j.received/j.total*100)):0));await new Promise(r=>setTimeout(r,500));}
+  if(!current())throw Error('SUPERSEDED');
+  if(llm.job?.state!=='done')throw Error('LOCAL_RUNTIME_DOWNLOAD_FAILED');
+  push('LOCAL_RUNTIME_DOWNLOADING:100');push('LOCAL_STARTING');
+  return llm.ensure(options);
+ }
+ async translate(request){const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;const options=require('../core/providers.cjs').resolveOptions({...this.prefs(),...(request.options&&typeof request.options==='object'?request.options:{}),translationPrompt:this.workPrompt||''});if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();const gameId=this.gameId;await this.localReady(options,request.id,current);const translated=normalizeTranslation(await this.translator().translate(text,options,current));if(gameId)this.stats.translation(gameId,text,translated);return translated;}
  async invoke(command,args={}){
   if(command.startsWith('plugin:sql|'))return require('./legacy-reader-sql.cjs').request(this.root,command,args);
   if(command==='word_states'){const forms=Array.isArray(args.forms)?[...new Set(args.forms.filter(v=>typeof v==='string'&&v.length<=100))].slice(0,200):[];if(!forms.length)return [];const db=openStore(this.root);try{return db.prepare('SELECT id,spelling,reading,status FROM vocabulary WHERE spelling IN ('+forms.map(()=>'?').join(',')+')').all(...forms);}finally{db.close();}}

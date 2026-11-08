@@ -3,6 +3,7 @@
 #
 #   .\Release.ps1 -Version 1.1.3 -Notes notes.md          # full release
 #   .\Release.ps1 -Version 1.1.3 -Notes notes.md -DryRun  # bump, build, test and package only; nothing is pushed
+#   -IncludeWorkingChanges                                 # also commit the uncommitted changes in this release
 #
 # notes.md: Chinese first, then a line with only ---, then English (the in-app update card shows the reader's half).
 # The package keeps the updater contract: MeguLit-vX.Y.Z-win-x64.zip with every entry under MeguLit/ (see
@@ -11,7 +12,8 @@
 param(
  [Parameter(Mandatory=$true)][string]$Version,
  [Parameter(Mandatory=$true)][string]$Notes,
- [switch]$DryRun
+ [switch]$DryRun,
+ [switch]$IncludeWorkingChanges  # ship uncommitted changes in the release commit instead of refusing
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version 2
@@ -51,7 +53,7 @@ function Api($method,$path,$body=$null){
 Step 'sync main'
 if(-not $DryRun){
  $dirty=git status --porcelain --untracked-files=no
- if($dirty){throw "Working tree has uncommitted changes:`n$dirty"}
+ if($dirty -and -not $IncludeWorkingChanges){throw "Working tree has uncommitted changes (add -IncludeWorkingChanges to ship them):`n$dirty"}
  G checkout -q main
  G fetch -q origin
  G merge -q --ff-only origin/main

@@ -3,6 +3,8 @@
 const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process'),{createInterface}=require('node:readline');
 const {identifierNoise}=require('./text-noise.cjs');
 function cleanSource(text,name='',code=''){if(code.endsWith(':JIT:UNITY'))text=text.replace(/<br\s*\/?>/gi,'\n').replace(/<ruby[^>]*>(.*?)<\/ruby>/gis,'$1').replace(/<\/?(?:color|size|font|b|i|u|s|mark|align|line-height|cspace|mspace|indent|margin|voffset|alpha|link|style|noparse|sprite)(?:[=\s][^>]*)?>/gi,'');return text.replace(/\r\n?/g,'\n').replace(/\x05/g,/^BGI(?:\.exe)?$/i.test(name)?'\n':'').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,'');}
+/* A speaker name from a name stream: brackets and control marks stripped; anything that reads like a sentence is not a name. */
+function speakerName(raw){const n=String(raw||'').replace(/[\x00-\x1f]/g,'').replace(/^[\s【\[「『(（]+|[\s】\]」』)）:：]+$/gu,'').trim();return n&&n.length<=16&&(/^[?？]+$/.test(n)||!/[。、！？!?…]/.test(n))?n:'';}
 function scriptSource(text){
  // Script VM syntax left in a hooked string (variable references, ％Ａ/＊Ｂ commands); "50％OFF" is ordinary text (E215).
  const marker=/[【《\[][\$＄]|[%％*＊][A-ZＡ-Ｚ](?![A-Za-zＡ-Ｚａ-ｚ])|[\$＄][\p{L}_＿]/u.exec(text);
@@ -41,6 +43,8 @@ class HookNative{
    if(m.type==='waitMarkerDrawn'){this.emit({type:'waitMarkerDrawn'});return;}
    if(m.type==='waitMarkerStatus'){this.notify({waitMarkerMessage:String(m.message||'').slice(0,300),waitMarkerHookActive:m.active===true});return;}
    if(m.type==='hookSource'&&typeof m.text==='string'&&m.text.length<=4000){this.source(m,name);return;}
+   // v1.1.4: speaker names from a name-role stream, for every engine that reports one (user: the log showed every line as narration).
+   if(m.type==='hookName'&&typeof m.text==='string'){const n=speakerName(m.text);if(n)this.speaker={text:n,at:this.now()};return;}
    if(m.type==='hookThreads'&&Array.isArray(m.hookThreads)){// Unity games create a stream per String-method call site (often 100+); keep the selected and embeddable ones
    // ahead of the cut so a late dialogue stream such as Naninovel's printer is never dropped.
    const rank=t=>(t&&t.selected===true?2:0)+(t&&t.embeddable===true?1:0);this.notify({hookAvailable:true,hookThreads:m.hookThreads.slice().sort((a,b)=>rank(b)-rank(a)).slice(0,100).filter(t=>typeof t.id==='string'&&t.id.length<100).map(t=>({id:t.id,name:String(t.name||'').slice(0,100),code:String(t.code||'').slice(0,1000),sample:String(t.sample||'').slice(0,110),selected:t.selected===true,embeddable:t.embeddable===true}))});if(this.preferredThread&&this.state.hookThreads.some(t=>t.id===this.preferredThread)){const id=this.preferredThread;this.preferredThread=null;this.select(id);}return;}
@@ -134,7 +138,7 @@ class HookNative{
    if(L.seen.some(x=>x.text===text)){L.repeats.push(now);if(L.looping||L.repeats.length>=2){if(!L.looping)this.trace('menu loop detected; repeating lines ignored');L.looping=true;return;}}
    else{if(L.looping)this.trace('menu loop ended');L.looping=false;L.repeats=[];}
    L.seen.push({text,at:now});if(L.seen.length>12)L.seen.shift();}
-  this.lastSource=text;this.lastSourceAt=this.now();this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.notify({hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSourceEngine:engine,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
+  const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;this.lastSource=text;this.lastSourceAt=this.now();this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.notify({hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
  }
  markerTarget(v){this.waitTarget=v;this.syncMarker();}
  // The Direct3D9 wait-marker draw hook no longer runs any probing code inside the game (that once crashed a game);
