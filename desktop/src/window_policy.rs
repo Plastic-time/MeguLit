@@ -42,6 +42,15 @@ pub fn animate_home_surface(window:&tauri::WebviewWindow,amount:f64){
 pub fn close_to_tray(root:&Path)->bool{
  std::fs::read(root.join("data/preferences.json")).ok().and_then(|bytes|serde_json::from_slice::<serde_json::Value>(&bytes).ok()).and_then(|value|value["closeToTray"].as_bool()).unwrap_or(true)
 }
+// E270 (user: a big blue frame appeared over the game when the Alt+T menu took focus): Windows 11 draws its accent
+// colour border around a focused borderless window; the full-screen reader overlay must never show one.
+pub fn no_accent_border(window:&tauri::WebviewWindow){
+ #[cfg(windows)]unsafe{
+  use std::ffi::c_void;
+  #[link(name="dwmapi")]extern "system"{fn DwmSetWindowAttribute(hwnd:*mut c_void,attribute:u32,value:*const u32,size:u32)->i32;}
+  if let Ok(handle)=window.hwnd(){let no_border=0xfffffffeu32;DwmSetWindowAttribute(handle.0 as *mut c_void,34,&no_border,4);}
+ }
+}
 pub fn configure_home_frame(window:&tauri::WebviewWindow){
  if window.label()!="main"{return;}
  #[cfg(windows)]unsafe{

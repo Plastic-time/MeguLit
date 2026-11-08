@@ -143,7 +143,8 @@ async fn reader_open(app:tauri::AppHandle,background:Option<bool>)->Result<(),St
         .title("MeguLit tools").inner_size(1000.0,700.0).decorations(false).shadow(false).resizable(false).transparent(true).background_color(tauri::utils::config::Color(0,0,0,0)).visible(false).skip_taskbar(true)
         .data_directory(state.root.join("cache/webview-profile"))
         .initialization_script("document.addEventListener('contextmenu',event=>event.preventDefault(),true);")
-        .build().map_err(|e|{reader_log(&state.root,"window-create-failed",&e.to_string());e.to_string()})?;reader_log(&state.root,"window-created","");Ok(())
+        .build().map_err(|e|{reader_log(&state.root,"window-create-failed",&e.to_string());e.to_string()})
+        .map(|w|window_policy::no_accent_border(&w))?;reader_log(&state.root,"window-created","");Ok(())
 }
 
 #[tauri::command]

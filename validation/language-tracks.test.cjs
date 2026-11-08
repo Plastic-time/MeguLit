@@ -25,3 +25,12 @@ test('v1.1.5: a whole Chinese line is another language track; Japanese kanji-onl
  assert.equal(foreignLine('「您好，這裡是Soleil。需要訂購什麼嗎？」'),true);assert.equal(foreignLine('「您好，这里是Soleil。请问需要订购什么呢？」'),true);
  for(const s of ['「はい、ソレイユです。」','「一期一会」','「本日開店、大盛況」','具体的な話'])assert.equal(foreignLine(s),false);
 });
+test('E270 ATRI: Traditional Chinese with few function words, and a Chinese row after the Japanese rows',()=>{
+ const {foreignLine,foreignRows,japaneseTrack}=require('../core/language-tracks.cjs');
+ assert.equal(foreignLine('沒有光。一絲也沒有。我從完全封閉、一無所有的黑暗中，試圖爬出來。'),true);
+ assert.equal(foreignLine('我從黑暗中試圖爬出來'),true);
+ for(const s of ['「国立海洋研究所」','高性能アンドロイド','東京都千代田区一番町','時間学会与党'])assert.equal(foreignLine(s),false);
+ assert.equal(foreignRows('光はない。一条も差さない。\n沒有光。一絲也沒有。我從黑暗中，試圖爬出來。'),'光はない。一条も差さない。');
+ assert.equal(japaneseTrack('光はない。\n我從黑暗中，試圖爬出來。'),'光はない。');
+ assert.equal(foreignRows('「はい」\n「そうです」'),'「はい」\n「そうです」');
+});

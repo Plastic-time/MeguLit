@@ -133,8 +133,13 @@ class HookNative{
   if(S.count===1)this.trace('skip burst: holding lines until the game stops');
   const serial=this.serial;S.timer=setTimeout(()=>{const held=S.held;S.held=null;S.timer=null;if(!held||serial!==this.serial)return;this.trace('skip burst settled; skipped='+(S.count-1));S.count=0;this.emitSource(held.text,held.origin);},400);S.timer.unref?.();
  }
+ /* E270 (user, ATRI: one line was often typed out twice): games re-send the shown line when the voice ends or the
+    window repaints, seconds later (after a long voice) and sometimes with different line breaks. The same line (ignoring
+    white space) right after itself is ignored until another line comes; very short lines such as …… keep the old
+    650 ms so a script that repeats them still advances. */
+ sameAsLast(text){const k=s=>String(s||'').replace(/\s+/g,''),key=k(text);if(!key||key!==k(this.lastSource))return false;return key.length>=6||this.now()-(this.lastSourceAt||0)<650;}
  emitSource(text,origin,engine='',nativeLine=0){
-  if((origin==='history'&&this.state.receivedText)||(!nativeLine&&text===this.lastSource&&this.state.hookActive&&this.state.receivedText&&!this.state.hookRecovering&&this.now()-(this.lastSourceAt||0)<650)){this.trace('source duplicate ignored chars='+text.length);return;}
+  if((origin==='history'&&this.state.receivedText)||(!nativeLine&&this.sameAsLast(text)&&this.state.hookActive&&this.state.receivedText&&!this.state.hookRecovering)){this.trace('source duplicate ignored chars='+text.length);return;}
   // E247 (user: a game settings screen looped its prompts into the text bar): when lines already shown in the last
   // 8 s keep coming back (two or more repeats), the stream is cycling menu/system text; drop it until an unseen line.
   if(!nativeLine&&(origin||'live')==='live'){const now=this.now(),L=this.loopGuard||(this.loopGuard={seen:[],repeats:[],looping:false});L.seen=L.seen.filter(x=>now-x.at<8000);L.repeats=L.repeats.filter(t=>now-t<8000);

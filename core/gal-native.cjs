@@ -68,12 +68,15 @@ class GalNative {
   // Anki: the game's own sound and picture. Lines are remembered with the time they arrived; a card's sentence is cut
   // from its line's start to the next line's start (or now) out of the bridge's in-memory recording of the game.
   setGameAudio(enabled){this.gameAudioWanted=!!enabled;this.send({type:'gameAudio',enabled:this.gameAudioWanted});}
-  rememberLine(text){if(typeof text!=='string'||!text.trim())return;const lines=this.lines||(this.lines=[]);if(lines.at(-1)?.text===text)return;lines.push({text,at:Date.now()});if(lines.length>300)lines.splice(0,lines.length-300);}
+  rememberLine(text){if(typeof text!=='string'||!text.trim())return;const lines=this.lines||(this.lines=[]);if(String(lines.at(-1)?.text||'').replace(/\s+/g,'')===text.replace(/\s+/g,''))return; /* E270: a re-sent line with other breaks is the same line */lines.push({text,at:Date.now()});if(lines.length>300)lines.splice(0,lines.length-300);}
   gameMedia(text,now=Date.now(),screenshot=true){const {spoken}=require('./island-source.js'),norm=v=>spoken(String(v||'')).replace(/<[^>]*>/g,'').normalize('NFKC').replace(/\s+/g,'');const lines=this.lines||[],want=norm(text);
    let i=want?lines.findLastIndex(line=>norm(line.text)===want):-1;
    if(i<0&&[...want].length>=6)i=lines.findLastIndex(line=>norm(line.text).endsWith(want));
    // The capture ring holds two minutes. Unmatched text can still take a screenshot,
    // but must not pick up dialogue from an unrelated line in the last few seconds.
+   /* E270 (user, ATRI: the game voice was missing on a card): when the game sent the line twice, the clip started at the
+      second copy, after the voice had played. Start from the first copy of a run. */
+   while(i>0&&norm(lines[i-1].text)===norm(lines[i].text))i--;
    if(i>=0&&now-lines[i].at>=120000)i=-1;
    const from=i>=0?lines[i].at-450:now,to=i>=0?Math.min(lines[i+1]?.at??now,from+30000):now,id=String(++this.mediaSerial||(this.mediaSerial=1));
    return new Promise(resolve=>{const map=this.mediaPending||(this.mediaPending=new Map());const timer=setTimeout(()=>{map.delete(id);resolve(null);},6000);timer.unref?.();
