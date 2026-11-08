@@ -5,7 +5,7 @@ const snapshot=path.join(root,'migration/original-overlay-20261104/app'),target=
 const originals=['ui-state','native-transport','taskbar-sync','game-style','game-profile','typewriter','ruby-layout','furigana','inject','settings','learning','learning-layout','gal','game-fonts-ui','menu-layout','lookup-layout','selection','island-source','island-page','hook-reader','wait-marker','hook-panel','v4','voice-layout','interaction','backlog','box-preview','polish','i18n','about','background','settings-tabs','anki-sync','difficulty','color-picker','ui-behavior','game-style-sync-ui','text-position'];
 const legacyStorageKeys=new Set();for(const name of [...originals,'interface-mode']){const text=fs.readFileSync(path.join(snapshot,name+'.js'),'utf8');for(const match of text.matchAll(/['"](tomoyo-[\w.-]+)['"]/g))legacyStorageKeys.add(match[1]);}
 const manifest=[];for(const name of originals){const source=fs.readFileSync(path.join(snapshot,name+'.js'));let text=source.toString('utf8').replace(/\bToMe\b/g,'MeguLit');
- if(['gal','game-style','game-profile','game-style-sync-ui','menu-layout','backlog','interaction','i18n','island-page'].includes(name))text=require('./adapt-reader-ui.cjs').adapt(name,text,root);
+ if(['gal','game-style','game-profile','game-style-sync-ui','menu-layout','backlog','interaction','i18n','island-page','text-position'].includes(name))text=require('./adapt-reader-ui.cjs').adapt(name,text,root);
  if(name==='gal')text=require('./adapt-reader-ruby.cjs').gal(text);
  if(name==='ruby-layout')text=require('./adapt-reader-ruby.cjs').layout(text);
  if(name==='furigana')text=require('./adapt-reader-ruby.cjs').furigana(text);

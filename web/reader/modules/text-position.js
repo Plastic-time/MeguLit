@@ -30,7 +30,7 @@
     pairs.sort((a,b)=>a.line.y0-b.line.y0||a.line.x0-b.line.x0);const pair=pairs[0];c=pair.line;target={...target,...pair.sample};}
    if(!c||!Number.isFinite(c.x0)||!(target.width>0)||!(target.height>0))return;
    const reported=c.x1-c.x0+c.size,measured=Number(target.textWidth)||0;let s=reported>0&&measured>0?measured/reported:target.width/1280;s=Math.max(.1,Math.min(10,s));
-   const next={engine:c.engine,s,bx:target.inkLeft-s*c.x0,by:target.inkTop-s*c.y0,dx:target.inkLeft-prefs.x*target.width/100,dy:target.inkTop-prefs.y*target.height/100,cw:target.width,ch:target.height};
+   const next={px:Number(prefs.x),py:Number(prefs.y),pw:Number(prefs.width),engine:c.engine,s,bx:target.inkLeft-s*c.x0,by:target.inkTop-s*c.y0,dx:target.inkLeft-prefs.x*target.width/100,dy:target.inkTop-prefs.y*target.height/100,cw:target.width,ch:target.height};
    if(!plausibleMap(next))return;map=next;if(options.persist!==false)send({type:'textPosMapSave',map:next,key:b.gameProfileKey?.()});repaint();return next;}
  };
  window.__tomeTextPosition=api;

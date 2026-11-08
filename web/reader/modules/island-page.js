@@ -66,7 +66,7 @@
    const readOnly=p.hookHide===false;for(const r of model.records){const node=nodes.get(r);if(!node)continue;const pos=r.position;node.hidden=!pos;if(!pos)continue;let x,y,width,size;
     if(pos){const mapped=w.__tomeTextPosition?.mapExtent?.(pos);if(mapped){x=mapped.x/dpr+ox;y=mapped.y/dpr+oy;width=mapped.width/dpr;size=mapped.size/dpr;}else{x=left+pos.x0*k;y=top+pos.y0*k;width=(pos.x1-pos.x0+pos.size)*k;size=pos.size*k;}}
     width=Math.max(size*2,width+size*.6);const centered=model.records.filter(r=>r.position).length===1&&pos.y1===pos.y0&&Math.abs((pos.x0+pos.x1+pos.size)/2-640)<=Math.max(12,pos.size*.75);
-    x+=(Number(p.paddingX)||0)*k;y+=(Number(p.paddingY)||0)*k;width=Math.max(size*2,width-2*(Number(p.paddingX)||0)*k);
+    x+=(Number(p.paddingX)||0)*k;{const m0=w.__tomeTextPosition?.getMap?.(),base=Number.isFinite(m0?.px)?{x:m0.px,y:m0.py,w:m0.pw}:(w.__megulitPageBase||(w.__megulitPageBase={x:Number(p.x)||0,y:Number(p.y)||0,w:Number(p.width)||100}));x+=((Number(p.x)||0)-base.x)*cw/100;y+=((Number(p.y)||0)-base.y)*ch/100;if(base.w>0&&Number(p.width)>0)width*=Number(p.width)/base.w;}y+=(Number(p.paddingY)||0)*k;width=Math.max(size*2,width-2*(Number(p.paddingX)||0)*k);
     node.style.cssText='left:'+x+'px;top:'+y+'px;width:'+width+'px;transform:none;';node.style.setProperty('--tome-island-jp-size',size+'px');node.style.setProperty('--tome-island-cn-size',Math.min(size, (p.translationSize||24)*k)+'px');node.style.setProperty('--tome-island-align',centered?'center':'left');
     // The engine reports each line's own fill colour (read lines and unread lines differ in many games): follow it while
     // game style sync is on, otherwise keep the user's single text colour.
