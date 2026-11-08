@@ -6,12 +6,12 @@
 
 在 Galgame 里读日语的小魔导书 ✦
 
-[![Version](https://img.shields.io/badge/version-1.1.2-e0a84b?style=flat-square)](https://github.com/ilynthn/MeguLit/releases/latest)
+[![Version](https://img.shields.io/github/v/release/ilynthn/MeguLit?style=flat-square&label=version&color=e0a84b)](https://github.com/ilynthn/MeguLit/releases/latest)
 [![Platform](https://img.shields.io/badge/Windows%2010%20%2F%2011-x64-3b2124?style=flat-square)](#zh-install)
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-8b1e2d?style=flat-square)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/%E2%99%A1-Sponsor-c8323c?style=flat-square)](https://github.com/sponsors/ilynthn)
 
-**[下载 v1.1.2](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [♡ 赞赏](#support)
+**[下载 v1.1.2](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [更新日志](https://github.com/ilynthn/MeguLit/releases) &nbsp;·&nbsp; [♡ 赞赏](#support)
 
 <br>
 
