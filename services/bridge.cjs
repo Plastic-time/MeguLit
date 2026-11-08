@@ -193,9 +193,12 @@ async function dispatch(request,runtime=null) {
         if(request.id){
           const existing=db.prepare('SELECT id,original FROM games WHERE id=?').get(String(request.id));if(!existing)throw Error('GAME_NOT_FOUND');
           const original=JSON.parse(existing.original);if(original.library)original.library.exe=executable;
+          // vndb: a VNDB entry chosen by the user ("" goes back to automatic matching); left out, it stays as it is.
+          const vndb=request.vndb===undefined?undefined:require('./game-enrichment.cjs').vndbIdFrom(request.vndb),vndbChanged=vndb!==undefined&&vndb!==(original.vndbManual||'');
+          if(vndbChanged){if(vndb)original.vndbManual=vndb;else delete original.vndbManual;}
           original.library={...original.library,exe:executable,executableSignature:require('./library.cjs').signature(executable)};
           db.prepare('UPDATE games SET title=?,executable=?,original=? WHERE id=?').run(title,executable,JSON.stringify(original),existing.id);
-          require('./series.cjs').autoGroup(db,root);runtime?.metadata().enqueue([existing.id]);return {id:existing.id};
+          require('./series.cjs').autoGroup(db,root);runtime?.metadata().enqueue([existing.id],vndbChanged);return {id:existing.id,vndbChanged};
         }
         const library=require('./library.cjs'),match=library.matchGame(db,{title,exe:executable},{manual:true});
         const id=match?.id||'game-'+crypto.randomUUID(),original=match?JSON.parse(match.original):{};
