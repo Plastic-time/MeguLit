@@ -85,6 +85,16 @@ MeguLit 想做的只有一件事：**游戏还是那个游戏，只是你能读�
 2. 点封面进入作品详情，点「启动游戏」。需要转区的游戏可以单独开 Locale Emulator
 3. 游戏启动后阅读层自动接上，按 <kbd>Alt</kbd> + <kbd>T</kbd> 呼出菜单
 
+### 自动更新
+
+<img src="docs/screenshots/auto-update.jpg" width="100%" alt="自动更新">
+
+- 每次启动都会联网检查一次新版本，有的话直接在后台下载
+- 卡片上写着版本号、更新内容，以及安装包比现在大还是小多少
+- 下载有真实进度条，下完先校验，再由你选「重启并更新」或「稍后」
+- 也可以随时到「关于」页点「检查更新」手动检查
+- 只替换程序文件，游戏库、学习记录和设置都会保留
+
 ### 阅读层
 
 浮在游戏上面，不抢焦点，点它也不会让剧情往下走
@@ -355,6 +365,8 @@ GPL-3.0-or-later，见 [LICENSE](LICENSE)；第三方组件按各自许可证，
 | **Fixes** | Launch failing with "could not check whether the game was running" · window staying half transparent after a game closes · multilingual builds showing every language track |
 
 The updater in v1.1.0 and v1.1.1 reopens the old version, so download v1.1.2 by hand once; from v1.1.2 on it updates itself.
+
+From then on MeguLit checks for a new release on every start and downloads it in the background (or check by hand under About → Check for updates). Only program files are replaced.
 
 <table>
 <tr>
