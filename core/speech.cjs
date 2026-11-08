@@ -17,7 +17,7 @@ class Speech{
   // AivisSpeech estimate the accent itself, but keep the contextual reading from SudachiDict when it differs.
   const auto=!(word.pitch?.length===1&&word.reading&&!word.ambiguous);
   const speakers=await this.speakers(c),styles=speakers.flatMap(s=>s.styles||[]);if(!styles.length)throw Error('AivisSpeech 尚未安装话者模型');if(!styles.some(s=>s.id===c.aivisSpeaker)){if(c.aivisSpeaker!==0)throw Error('所选 AivisSpeech 话者不存在，请重新读取话者');c.aivisSpeaker=styles[0].id;}
-  const accent=auto?null:word.pitch[0],pron=auto?'':accentKana(word.reading,accent),key=createHash('sha256').update(JSON.stringify([c.aivisUrl,c.aivisSpeaker,c.aivisSpeed,word.surface,word.reading,auto?'auto':accent,word.ambiguous?'engine-reading':'','unidic-lite-1.0.8-v2'])).digest('hex'),file=path.join(this.folder,key+'.wav');
+  const accent=auto?null:word.pitch[0],pron=auto?'':accentKana(word.reading,accent),key=createHash('sha256').update(JSON.stringify([c.aivisUrl,c.aivisSpeaker,c.aivisSpeed,word.surface,word.reading,auto?'auto':accent,word.ambiguous?'engine-reading':'','unidic-lite-1.0.8-v2',...(word.tuning?[word.tuning]:[])])).digest('hex'),file=path.join(this.folder,key+'.wav');
   fs.mkdirSync(this.folder,{recursive:true});if(prefetch)this.latestPrefetch=key;else this.explicit.add(key);if(fs.existsSync(file)){this.explicit.delete(key);return {filename:key+'.wav',data:fs.readFileSync(file).toString('base64'),cached:true,autoAccent:auto};}if(this.pending.has(key))return this.pending.get(key);
   // The CPU engine handles one inference at a time. Run requests one by one and drop
   // background prefetches for cards that were already replaced, so a click never waits
@@ -28,6 +28,8 @@ class Speech{
    if(!auto)query.accent_phrases=await(await this.api(c.aivisUrl,'/accent_phrases?'+new URLSearchParams({text:pron,speaker,is_kana:'true'}),{method:'POST'})).json();
    else if(word.reading&&!word.ambiguous&&!sameReading(query.accent_phrases,word.reading)){const byKana=await(await this.api(c.aivisUrl,'/audio_query?'+new URLSearchParams({text:katakana(word.reading),speaker}),{method:'POST'})).json();query.accent_phrases=byKana.accent_phrases;}
    query.kana=word.surface||word.reading;query.speedScale=c.aivisSpeed;
+   /* 学习模块的发音调校（抑扬、前后留白）；朗读和制卡不传，保持原样 */
+   if(word.tuning){const t=word.tuning;if(Number.isFinite(t.intonation))query.intonationScale=t.intonation;if(Number.isFinite(t.pre))query.prePhonemeLength=t.pre;if(Number.isFinite(t.post))query.postPhonemeLength=t.post;}
    const data=Buffer.from(await(await this.api(c.aivisUrl,'/synthesis?speaker='+speaker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(query)})).arrayBuffer());if(data.length<44||data.length>12000000||data.toString('ascii',0,4)!=='RIFF'||data.toString('ascii',8,12)!=='WAVE')throw Error('AivisSpeech 返回了无效 WAV');fs.writeFileSync(file+'.tmp',data);fs.renameSync(file+'.tmp',file);this.prune();return {filename:key+'.wav',data:data.toString('base64'),cached:false,autoAccent:auto};}).finally(()=>{this.pending.delete(key);this.explicit.delete(key);});this.chain=pending.catch(()=>{});this.pending.set(key,pending);return pending;
  }
  prune(){const files=fs.readdirSync(this.folder).filter(n=>/^[a-f0-9]{64}\.wav$/.test(n)).map(n=>({n,time:fs.statSync(path.join(this.folder,n)).mtimeMs})).sort((a,b)=>b.time-a.time);for(const f of files.slice(300))fs.unlinkSync(path.join(this.folder,f.n));}

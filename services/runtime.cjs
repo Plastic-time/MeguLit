@@ -59,6 +59,20 @@ class Runtime {
    case 'speakers':await this.services().ensureSpeech(config.aivisUrl,config.aivisGpu);{const list=await this.speech().speakers(config);this.services().rememberSpeakers(list);return list;}
    case 'speakers_cached':return this.services().cachedSpeakers();
    case 'speech_preview':{const text=String(request.text||'').trim();if(!text||text.length>200)throw Error('INVALID_PREVIEW_TEXT');const options=require('../core/v4-config.cjs').cleanV4({...config,...(Number.isSafeInteger(Number(request.speaker))?{aivisSpeaker:Number(request.speaker)}:{}),...(Number.isFinite(Number(request.speed))?{aivisSpeed:Number(request.speed)}:{})});await this.services().ensureSpeech(options.aivisUrl,options.aivisGpu);return this.speech().synthesize({surface:text,reading:'',pitch:[]},options);}
+   case 'kana_speak':{
+    /* Kana module: speak a kana or a study word through the same dictionary reading and UniDic pitch path the reader uses. */
+    const text=String(request.text||'').trim(),want=String(request.reading||'').trim();if(!text||[...text].length>24)throw Error('INVALID_KANA_TEXT');
+    const options=require('../core/v4-config.cjs').cleanV4({...config,...(Number.isFinite(Number(request.speed))&&request.speed!==null?{aivisSpeed:Math.min(1.3,Math.max(0.7,Number(request.speed)))}:{})});await this.services().ensureSpeech(options.aivisUrl,options.aivisGpu);
+    /* 学习发音单独选风格：没指定时用当前话者的「おちつき」（没有就用「ノーマル」）；伤感、耳语类风格读单个假名会发黏 */
+    try{const speakers=await this.speech().speakers(options),pick=Number(request.speaker);if(Number.isSafeInteger(pick)&&speakers.some(s=>(s.styles||[]).some(t=>t.id===pick)))options.aivisSpeaker=pick;else{const owner=speakers.find(s=>(s.styles||[]).some(t=>t.id===options.aivisSpeaker)),calm=owner?.styles?.find(t=>t.name==='おちつき')||owner?.styles?.find(t=>/ノーマル|normal/i.test(t.name));if(calm)options.aivisSpeaker=calm.id;}}catch{}
+    const hira=v=>String(v||'').replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+    let word={surface:text,reading:want,pitch:[]};
+    if([...text].length>1){try{const found=await this.learning().word({text,start:0,end:[...text].length});if(found?.reading&&(!want||hira(found.reading)===hira(want)))word={...found,surface:text};}catch{}}
+    /* 试听选定的调校：抑扬 1.3、前后留白，多字词句尾加「。」让收尾自然 */
+    const into=Number(request.intonation);word.tuning={intonation:Number.isFinite(into)&&request.intonation!==null?Math.min(2,Math.max(0.5,into)):1.3,pre:0.12,post:0.15};
+    if([...text].length>1&&!/[。！？!?]$/.test(word.surface))word={...word,surface:word.surface+'。'};
+    return this.speech().synthesize(word,options);
+   }
    case 'tokenize':{const text=String(request.text||'');if(!text||text.length>4000)throw Error('INVALID_READER_TEXT');return this.learning().tokenize(text);}
    case 'translate_preview':{
     const text=String(request.text||'').trim();if(!text||text.length>1000)throw Error('INVALID_PREVIEW_TEXT');
