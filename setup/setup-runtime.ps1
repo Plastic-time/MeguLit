@@ -71,6 +71,9 @@ function Draw-Book($g, $x, $y, $color) {
   $p.Dispose()
 }
 
+# The setup runs inside powershell.exe, so the taskbar grouped it with PowerShell and showed PowerShell's icon.
+# An own AppUserModelID gives the window its own taskbar entry with the MeguLit icon set below.
+try { Add-Type -Namespace MeguLit -Name Shell -MemberDefinition '[DllImport("shell32.dll")] public static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string id);'; [void][MeguLit.Shell]::SetCurrentProcessExplicitAppUserModelID('app.megulit.setup') } catch {}
 $form = New-Object Windows.Forms.Form
 $form.Text = 'MeguLit'; $form.ClientSize = New-Object Drawing.Size(720,590); $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.BackColor = $C.bg; $form.ForeColor = $C.cream
