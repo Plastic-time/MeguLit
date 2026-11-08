@@ -129,9 +129,24 @@ function setAppearance(preferences=model.preferences){
   document.documentElement.style.setProperty('--history-line-height',clamp(reading.history_line_height,1.3,2.6,1.9));
   placeBackground();
 }
-function readerNotice(error){const panel=document.querySelector('#reader-notice');if(!panel)return;panel.hidden=!error;if(!error)return;const label={zh:'游戏内功能未就绪',en:'In-game features are not ready',ja:'ゲーム内機能が準備できていません'}[locale];panel.querySelector('span').textContent=label;panel.title=String(error);panel.querySelector('button').disabled=false;}
-async function waitReader(){let state;const deadline=Date.now()+15000;do{state=await api('reader_status');if(state.error)throw Error(state.error);if(state.ready){readerNotice('');return state;}await new Promise(resolve=>setTimeout(resolve,120));}while(Date.now()<deadline);throw Error('READER_START_TIMEOUT');}
-async function retryReader(button){button.disabled=true;try{await invoke('reader_restart');await waitReader();}catch(error){readerNotice(error.message||error);}finally{button.disabled=false;}}
+/* Reader start failures (user, 2026-11-08: players only saw 「游戏内功能未就绪」 and could not tell why): say which cause it is and what to do, with the code visible. */
+const READER_HINTS={
+ READER_NATIVE_MISSING:{zh:'MeguLit 的游戏组件不见了，多半被杀毒软件隔离：从隔离区恢复，并把 MeguLit 文件夹加入信任后重开',en:'MeguLit game components are missing, most likely quarantined by antivirus: restore them and trust the MeguLit folder, then reopen',ja:'ゲーム用コンポーネントが見つかりません。ウイルス対策ソフトの隔離を解除し、MeguLit フォルダーを除外に追加して再起動してください'},
+ READER_NATIVE_EXITED:{zh:'游戏组件启动后被关闭，多半是杀毒软件拦截：把 MeguLit 文件夹加入信任后点「重新连接」',en:'The game component was stopped right after starting, usually by antivirus: trust the MeguLit folder and press Reconnect',ja:'ゲーム用コンポーネントが停止されました。ウイルス対策ソフトで MeguLit フォルダーを除外して「再接続」を押してください'},
+ READER_HOTKEY_IN_USE:{zh:'Alt+T 被别的程序占用，或开了两个 MeguLit：关掉多余的再点「重新连接」',en:'Alt+T is taken by another program or a second MeguLit: close it and press Reconnect',ja:'Alt+T が他のアプリか 2 つ目の MeguLit に使われています。閉じてから「再接続」を押してください'},
+ READER_START_TIMEOUT:{zh:'游戏组件启动太慢（第一次启动或电脑较忙时常见）：稍等后点「重新连接」',en:'The game component is slow to start (common on first launch): wait a moment and press Reconnect',ja:'ゲーム用コンポーネントの起動が遅れています。少し待ってから「再接続」を押してください'}};
+let readerFailures=0;
+function readerNotice(error){const panel=document.querySelector('#reader-notice');if(!panel)return;panel.hidden=!error;if(!error){readerFailures=0;return;}
+ const text=String(error),code=(text.match(/READER_[A-Z_]+/)||[''])[0],label={zh:'游戏内功能未就绪',en:'In-game features are not ready',ja:'ゲーム内機能が準備できていません'}[locale];
+ panel.querySelector('span').textContent=label;panel.title=text;panel.querySelector('button').disabled=false;
+ let detail=panel.querySelector('small');if(!detail){detail=document.createElement('small');detail.style.cssText='display:block;flex-basis:100%;margin-top:4px;font-size:12px;line-height:1.5;opacity:.85;white-space:normal';panel.insertBefore(detail,panel.querySelector('button'));}
+ detail.textContent=((READER_HINTS[code]||{})[locale]||text)+(code?' ('+code+')':'');
+ let copy=panel.querySelector('[data-reader-diagnostics]');
+ if(readerFailures>=2&&!copy){copy=document.createElement('button');copy.type='button';copy.dataset.readerDiagnostics='';copy.textContent={zh:'复制诊断信息',en:'Copy diagnostics',ja:'診断情報をコピー'}[locale];copy.onclick=async()=>{const status=await api('reader_status').catch(e=>({error:String(e)}));const info=['MeguLit '+(document.querySelector('[data-app-version]')?.textContent||''),'error: '+text,'status: '+JSON.stringify(status),'logs: MeguLit/logs/reader-startup.log, MeguLit/logs/reader-native.log'].join('\n');try{await navigator.clipboard.writeText(info);copy.textContent={zh:'已复制，可粘贴到反馈里',en:'Copied',ja:'コピーしました'}[locale];}catch{}};panel.append(copy);}
+}
+let readerWaits=0;
+async function waitReader(){let state;const deadline=Date.now()+(readerWaits++?20000:45000);do{state=await api('reader_status');if(state.error)throw Error(state.error);if(state.ready){readerNotice('');return state;}await new Promise(resolve=>setTimeout(resolve,120));}while(Date.now()<deadline);throw Error('READER_START_TIMEOUT');}
+async function retryReader(button){button.disabled=true;try{await invoke('reader_restart');await waitReader();}catch(error){readerFailures++;readerNotice(error.message||error);}finally{button.disabled=false;}}
 function shell(){
   app.setAttribute('aria-busy','false');
   app.innerHTML=`${["nw","ne","sw","se"].map(c=>`<div class="window-corner corner-${c}" data-resize="${c}" aria-hidden="true"></div>`).join('')}<div class="app-backdrop" aria-hidden="true"></div><div class="app-frame">

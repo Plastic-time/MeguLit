@@ -120,4 +120,28 @@ class AnkiProcess{
   }catch(error){this.log('[MeguLit] Anki close failed '+error.message);try{await this.show();}catch{}return {closed:false};}
  }
 }
-module.exports={AnkiProcess,find,candidates,coldCandidates,ankiConnectInstalled,windows};
+// One-click AnkiConnect (user, 2026-11-08: most "Anki will not connect" reports were a missing add-on). Downloads the
+// add-on from AnkiWeb (its official channel), checks it really is the AnkiConnect package, and unpacks it into
+// Anki's add-on folder under its AnkiWeb code. Anki must be closed so it does not overwrite the folder; an existing
+// install is never replaced.
+const ANKICONNECT_CODE='2055492159';
+function ankiRunning(){try{return /^"?(anki|ankiw)\.exe"?,/im.test(require('node:child_process').execFileSync('tasklist',['/fo','csv','/nh'],{encoding:'utf8',windowsHide:true,timeout:5000}));}catch{return false;}}
+async function installAnkiConnect(env=process.env){
+ if(!env.APPDATA)throw Error('ANKI_ADDON_FOLDER_MISSING');
+ const base=path.join(env.APPDATA,'Anki2','addons21'),target=path.join(base,ANKICONNECT_CODE);
+ if(ankiConnectInstalled(env))return {installed:true,already:true};
+ if(!fs.existsSync(path.join(env.APPDATA,'Anki2')))throw Error('ANKI_NEVER_STARTED');
+ if(ankiRunning())throw Error('ANKI_RUNNING');
+ const response=await fetch('https://ankiweb.net/shared/download/'+ANKICONNECT_CODE+'?v=2.1&p=250900',{redirect:'follow',signal:AbortSignal.timeout(60000),headers:{'User-Agent':'MeguLit'}});
+ if(!response.ok)throw Error('ANKICONNECT_DOWNLOAD_FAILED: HTTP '+response.status);
+ const bytes=Buffer.from(await response.arrayBuffer());if(bytes.length<4096||bytes.length>5<<20||bytes.readUInt32LE(0)!==0x04034b50)throw Error('ANKICONNECT_DOWNLOAD_FAILED: not an add-on package');
+ const work=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'megulit-ankiconnect-')),zip=path.join(work,'addon.zip'),out=path.join(work,'addon');
+ try{
+  fs.writeFileSync(zip,bytes);
+  require('node:child_process').execFileSync(path.join(env.WINDIR||'C:/Windows','System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoProfile','-NonInteractive','-Command','Expand-Archive -LiteralPath $env:MEGULIT_ZIP -DestinationPath $env:MEGULIT_OUT -Force'],{windowsHide:true,timeout:60000,env:{...env,MEGULIT_ZIP:zip,MEGULIT_OUT:out}});
+  const init=path.join(out,'__init__.py');if(!fs.existsSync(init)||!/AnkiConnect|anki_connect|web\.WebServer|webBindAddress/i.test(fs.readFileSync(init,'utf8')+fs.readFileSync(path.join(out,'config.json'),'utf8')))throw Error('ANKICONNECT_DOWNLOAD_FAILED: unexpected package');
+  fs.mkdirSync(base,{recursive:true});fs.cpSync(out,target,{recursive:true,errorOnExist:true,force:false});
+  return {installed:true,path:target};
+ }finally{fs.rmSync(work,{recursive:true,force:true});}
+}
+module.exports={AnkiProcess,find,candidates,coldCandidates,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows};
