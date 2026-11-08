@@ -52,7 +52,8 @@ class GameEnrichment{
   }catch{}
   for(const review of reviews)if(review.text&&review.language!==({zh:'schinese',ja:'japanese',en:'english'}[locale])){const translated=await require('../core/library.cjs').machine(review.text,locale);if(translated)review.translatedText=translated;}
   // A corrected match (new VNDB id, or a Steam appid that differs from what the cover came from) replaces the old cover.
-  const corrected=!!vnid&&!!previousVnid&&vnid.replace(/^v/,'')!==previousVnid.replace(/^v/,''),coverKey=/^\d+$/.test(appid)?'steam:'+appid:(vnid?'vndb:'+vnid:''),replaceCover=!!coverKey&&(corrected||(!!cached?.coverKey&&cached.coverKey!==coverKey));
+  // A cover the user picked (game_cover) is never replaced.
+  const corrected=!!vnid&&!!previousVnid&&vnid.replace(/^v/,'')!==previousVnid.replace(/^v/,''),coverKey=/^\d+$/.test(appid)?'steam:'+appid:(vnid?'vndb:'+vnid:''),replaceCover=!game.original.coverCustom&&!!coverKey&&(corrected||(!!cached?.coverKey&&cached.coverKey!==coverKey));
   // The Steam capsule comes first. Newer Steam apps keep it under a hashed folder and the plain path answers 404,
   // so the VNDB cover is tried next.
   let file='';if(!coverPresent||replaceCover){const folder=path.dirname(game.row.executable);for(const name of ['cover.jpg','cover.png','folder.jpg','jacket.jpg','封面.jpg','封面.png']){const p=path.join(folder,name);try{const src=require('./assets.cjs').preview(p);file=this.saveCover(id,src);if(file)break;}catch{}}for(const url of [steamCover,cover]){if(file||!url)continue;try{const r=await this.fetch(url,{signal:AbortSignal.timeout(12000)});if(r.ok){const bytes=Buffer.from(await r.arrayBuffer());if(bytes.length<=12*1024*1024){const ext=bytes[0]===255&&bytes[1]===216?'jpeg':bytes.subarray(0,8).toString('hex')==='89504e470d0a1a0a'?'png':'';if(ext)file=this.saveCover(id,`data:image/${ext};base64,`+bytes.toString('base64'));}}}catch{}}}
