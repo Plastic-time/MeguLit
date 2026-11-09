@@ -12,10 +12,12 @@ const HOSTS=new Set(['github.com','objects.githubusercontent.com','release-asset
    unreachable there, so the package also comes through the same relays the runtime installer uses. A relay only
    passes GitHub's own file along; the package must still match GitHub's sha256 digest, and without a digest no
    relay is used. China-looking systems (time zone / language) try the relays first. */
-const MIRRORS=['https://gh-proxy.com/{url}','https://ghproxy.net/{url}'];
+/* E289 (user report 2026-11-10, Henan: the download failed right at the end): ghfast.top added as a third relay; relays
+   get the package digest as a query so a cached copy from before a same-version hotfix is never served. */
+const MIRRORS=['https://gh-proxy.com/{url}','https://ghproxy.net/{url}','https://ghfast.top/{url}'];
 const MIRROR_HOSTS=new Set(MIRRORS.map(m=>new URL(m.replace('{url}','')).hostname));
 const inChina=()=>{try{const o=Intl.DateTimeFormat().resolvedOptions();return o.timeZone==='Asia/Shanghai'||o.timeZone==='Asia/Urumqi'||/^zh-CN/i.test(o.locale||'');}catch{return false;}};
-function sources(rel,china=inChina()){const direct=[rel.url];if(!rel.digest)return direct;const relayed=MIRRORS.map(m=>m.replace('{url}',rel.url));return china?[...relayed,...direct]:[...direct,...relayed];}
+function sources(rel,china=inChina()){const direct=[rel.url];if(!rel.digest)return direct;const fresh=rel.url+(rel.url.includes('?')?'&':'?')+'v='+String(rel.digest).slice(0,12);const relayed=MIRRORS.map(m=>m.replace('{url}',fresh));return china?[...relayed,...direct]:[...direct,...relayed];}
 const updateLog=(root,line)=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','update.log'),new Date().toISOString()+' '+line+'\n');}catch{}};
 const HEADERS={'User-Agent':'MeguLit-Updater','Accept':'application/vnd.github+json'};
 const parse=v=>String(v||'').replace(/^v/,'').split('.').map(n=>Number(n)||0);
@@ -68,20 +70,27 @@ async function check(current,fetcher=fetch,root=''){tidyRollback(root);refreshIc
  return {current,latest:rel.version,newer:isNewer,hotfix,size:rel.size,previousSize:previous,delta:previous?rel.size-previous:null,notes:rel.notes,page:rel.page,published:rel.published,phase:state.phase};
 }
 
-/* Writes zip + script; resolves when the package is verified and ready to install. */
-async function download(url,rel,fetcher=fetch){
+/* Writes zip + script; resolves when the package is verified and ready to install.
+   E289: a connection that drops near the end no longer throws the whole package away. What arrived is kept in `part`
+   and the next try (same source again, then the next one) asks only for the rest with an HTTP Range request; a source
+   that ignores the range sends the whole file and the kept part is replaced. The digest still checks the result. */
+async function download(url,rel,fetcher=fetch,part={chunks:[],length:0}){
  const control=new AbortController();let idle=setTimeout(()=>control.abort(),30000);const poke=()=>{clearTimeout(idle);idle=setTimeout(()=>control.abort(),30000);};
  try{
-  const r=await fetcher(url,{headers:{'User-Agent':'MeguLit-Updater'},redirect:'follow',signal:AbortSignal.any?AbortSignal.any([control.signal,AbortSignal.timeout(600000)]):control.signal});
+  const from=rel.size&&part.length>0&&part.length<rel.size?part.length:0;if(!from){part.chunks=[];part.length=0;}
+  const headers={'User-Agent':'MeguLit-Updater',...(from?{Range:'bytes='+from+'-'}:{})};
+  const r=await fetcher(url,{headers,redirect:'follow',signal:AbortSignal.any?AbortSignal.any([control.signal,AbortSignal.timeout(600000)]):control.signal});
   if(!r.ok)throw Error('HTTP_'+r.status);
   const final=new URL(r.url||url);if(final.protocol!=='https:'||!(HOSTS.has(final.hostname)||MIRROR_HOSTS.has(final.hostname)))throw Error('UPDATE_URL_REJECTED');
-  const chunks=[];poke();
-  if(r.body&&r.body.getReader){const reader=r.body.getReader();for(;;){const {done,value}=await reader.read();if(done)break;poke();chunks.push(Buffer.from(value));state.received+=value.length;}}
-  else{const b=Buffer.from(await r.arrayBuffer());chunks.push(b);state.received=b.length;}
-  const data=Buffer.concat(chunks);
-  if(rel.size&&data.length!==rel.size)throw Error('UPDATE_SIZE_MISMATCH');
-  if(data.subarray(0,2).toString('latin1')!=='PK')throw Error('UPDATE_NOT_ZIP');
-  if(rel.digest&&crypto.createHash('sha256').update(data).digest('hex')!==rel.digest)throw Error('UPDATE_HASH_MISMATCH');
+  if(from&&r.status!==206){part.chunks=[];part.length=0;}
+  state.received=part.length;poke();
+  if(r.body&&r.body.getReader){const reader=r.body.getReader();for(;;){const {done,value}=await reader.read();if(done)break;poke();const b=Buffer.from(value);part.chunks.push(b);part.length+=b.length;state.received=part.length;}}
+  else{const b=Buffer.from(await r.arrayBuffer());part.chunks.push(b);part.length+=b.length;state.received=part.length;}
+  const data=Buffer.concat(part.chunks);
+  if(rel.size&&data.length<rel.size)throw Error('UPDATE_INCOMPLETE');
+  if(rel.size&&data.length!==rel.size){part.chunks=[];part.length=0;throw Error('UPDATE_SIZE_MISMATCH');}
+  if(data.subarray(0,2).toString('latin1')!=='PK'){part.chunks=[];part.length=0;throw Error('UPDATE_NOT_ZIP');}
+  if(rel.digest&&crypto.createHash('sha256').update(data).digest('hex')!==rel.digest){part.chunks=[];part.length=0;throw Error('UPDATE_HASH_MISMATCH');}
   return data;
  }catch(error){throw Error(control.signal.aborted&&!/^UPDATE_/.test(error.message)?'STALLED':error.message);}finally{clearTimeout(idle);}
 }
@@ -102,10 +111,15 @@ function start(root,current,fetcher=fetch){
    let pick=rel;
    for(let round=0;!data&&round<2;round++){
     if(round){try{const fresh=await latest(fetcher);if(fresh.digest===pick.digest&&fresh.size===pick.size)break;pick=fresh;state.total=fresh.size||0;}catch{break;}}
+    const part={chunks:[],length:0};
     for(const url of sources(pick)){
-     state.received=0;
-     try{data=await download(url,pick,fetcher);break;}
-     catch(error){updateLog(root,'download failed '+new URL(url).hostname+' '+error.message);}
+     // A source that delivered part of the file gets two more tries to finish it before the next source continues.
+     for(let attempt=0;!data&&attempt<3;attempt++){
+      const before=part.length;
+      try{data=await download(url,pick,fetcher,part);}
+      catch(error){updateLog(root,'download failed '+new URL(url).hostname+' '+error.message+' at '+part.length+'/'+(pick.size||0));if(part.length<=before)break;}
+     }
+     if(data)break;
     }
    }
    if(!data)throw Error('UPDATE_DOWNLOAD_FAILED');

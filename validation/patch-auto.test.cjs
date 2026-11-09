@@ -36,7 +36,7 @@ test('BGI lines follow code order; patch scenes are checked on shared identifier
  assert.match(src,/refs\.push\(off\)/);
  assert.match(ot,/skipped:'operands'/);
  assert.match(ot,/'bgi-code-order\\n'/,'old BGI indexes are rebuilt');
- assert.match(ot,/find\(s=>s\?\.runtime\?\.file&&runningDirOf\(s\.runtime\)/,'folder engines are looked up by the game folder');assert.match(ot,/bgi:\{folder:true,/);
+ assert.match(ot,/runningDirOf\(s\.runtime\)\.toLowerCase\(\)===path\.dirname\(String\(executable\)\)/,'folder engines are looked up by the game folder');assert.match(ot,/bgi:\{folder:true,/);
 });
 
 test('search runs on its own: dialog status, game start, and a picker that names the file',()=>{
@@ -78,4 +78,53 @@ test('immersion default on with a one-time switch',()=>{
  assert.strictEqual(cleanV4({}).immersion,true);
  assert.strictEqual(cleanV4({immersion:false}).immersion,true);
  assert.strictEqual(cleanV4({immersion:false,immersionV:2}).immersion,false);
+});
+
+// E285 (CLANNAD write-back report): script first, Chinese font, Alt+H leaves write-back on, English and "none" display.
+test('write-back uses the script, a Chinese font, survives Alt+H; display offers English and none',()=>{
+ const read=f=>fs.readFileSync(path.join(root,f),'utf8');
+ assert.match(read('services/reader.cjs'),/scriptTranslation\?\.\(text\)/);
+ assert.match(read('native/HookBridge.cs'),/TranslateMode\?TranslateFont\(\):""/);
+ assert.match(read('core/hook-native.cjs'),/coverEnabled!==false\|\|preferences\.embedTranslation===true/);
+ assert.match(read('core/hook-control.cjs'),/m\.matched&&h\.preferences\?\.embedTranslation===true/);
+ const style=require('../core/game-style.js');
+ for(const d of ['bilingual-en','english','none'])assert.match(read('core/game-style.js'),new RegExp("'"+d+"'"));
+ const {HookNative}=require('../core/hook-native.cjs'),hook=Object.create(HookNative.prototype);hook.trace=()=>{};
+ hook.originalText={kind:'patch',resolve:t=>t==='「やあ」'?{status:'exact',translation:'「嗨」',indices:[0]}:{status:'none'}};
+ assert.strictEqual(hook.scriptTranslation('「やあ」'),'「嗨」');assert.strictEqual(hook.scriptTranslation('別'),'');
+});
+
+// E288: polling the dialog status must not report a search that is not actually scanning.
+test('status says searching only while a scan is recorded and recent',()=>{
+ const ot=require('../services/original-text.cjs'),data=fs.mkdtempSync(path.join(os.tmpdir(),'ot-s-')),game=fs.mkdtempSync(path.join(os.tmpdir(),'ot-g-'));
+ const exe=path.join(game,'Game.exe');fs.writeFileSync(exe,'MZ');const row={id:'g',executable:exe},db={prepare:()=>({get:id=>id==='g'?row:undefined})};
+ const write=ps=>{fs.mkdirSync(path.join(data,'data/config'),{recursive:true});fs.writeFileSync(path.join(data,'data/config/original-text.json'),JSON.stringify({g:{patchSearch:ps}}));};
+ write({running:false,declined:true,at:Date.now()});assert.strictEqual(ot.status(data,db,'g').patchSearch.running,false);
+ write({running:true,at:Date.now()-10*60*1000});assert.strictEqual(ot.status(data,db,'g').patchSearch.running,false,'a scan left over from a closed app');
+ write({running:true,at:Date.now()});assert.strictEqual(ot.status(data,db,'g').patchSearch.running,true);
+});
+
+// E290 / E291: covers for Chinese-tagged folder titles, Steam reviews for folder games, review language filter.
+test('cover search cleans release tags and spells kanji the Japanese way; Steam found through VNDB',async()=>{
+ const e=require('../services/game-enrichment.cjs');
+ const c=e.candidates({row:{title:'[001229][TYPE-MOON] 月姬 v1.6',executable:'E:/x/Tsukihime.exe'},original:{library:{}}});
+ assert.strictEqual(c[0],'月姫');assert.ok(c.includes('Tsukihime'));
+ assert.ok(!e.candidates({row:{title:'eden*',executable:'E:/x/eden_en.exe'},original:{library:{}}}).includes('eden_en'));
+ const {GameReviews}=require('../services/game-reviews.cjs'),r=Object.create(GameReviews.prototype),seen=[];
+ r.identity=async(g,k)=>k==='vndb'?{id:'v4'}:null;
+ r.request=async(url,opt)=>{seen.push(url);return {results:[{extlinks:[{url:'https://vndb.org/x'}]},{extlinks:[{url:'https://store.steampowered.com/app/324160/'}]}]};};
+ assert.deepStrictEqual(await r.find_steam({appid:''}),{id:'324160'});
+ const src=fs.readFileSync(path.join(root,'services/game-reviews.cjs'),'utf8');assert.match(src,/filterLanguage=\$\{lang\}/);
+});
+
+// E292: a Chinese-named translated launcher next to the kana-named original: "find" picks the original.
+test('find original exe: kana-named launcher with engine companion files wins over a Chinese-named one',()=>{
+ const gl=require('../services/game-language.cjs'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'mhy-')),data=fs.mkdtempSync(path.join(os.tmpdir(),'mhyd-'));
+ const zh=path.join(dir,'魔法使之夜.exe'),ja=path.join(dir,'魔法使いの夜.exe');
+ for(const f of [zh,ja,path.join(dir,'ファイル破損チェックツール.exe')])fs.writeFileSync(f,Buffer.concat([Buffer.from('MZ'),Buffer.alloc(300000)]));
+ fs.writeFileSync(path.join(dir,'魔法使いの夜.cf'),'x');
+ let row={id:'m',executable:zh,original:JSON.stringify({library:{dir}})};
+ const db={prepare:sql=>({get:()=>row,run:(exe,orig)=>{row={...row,executable:exe,original:orig};}})};
+ const r=gl.originalExecutable(db,'m',data,'find');
+ assert.strictEqual(r.executable,ja);
 });

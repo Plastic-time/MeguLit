@@ -1,7 +1,18 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const normalize=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu,'');
-function candidates(game){const lib=game.original.library||{},exe=path.win32.basename(game.row.executable,'.exe').toLowerCase();const precise={rance01:'ランス01 光をもとめて',rance02:'ランス02改 反逆の少女たち',rance03:'ランス03 リーザス陥落'};return [...new Set([precise[exe],game.row.title,...(lib.names||[]),game.original.media?.title].filter(Boolean).flatMap(t=>[t,...String(t).split(/\s+\/\s+/)]) )].filter(t=>t.length>2).slice(0,6);}
+/* E290 (user, 2026-11-10: 月姬 v1.4 / 月姬 v1.6 / 月姬PLUS+DISC had no cover): folder titles from Chinese releases carry
+   release tags ([001229][TYPE-MOON]), version suffixes (v1.6) and Chinese forms of Japanese kanji (姬 for 姫). The search
+   also tries the cleaned title, its Japanese spelling, and a program name that is itself a title (Tsukihime.exe). */
+const JP_FORMS={'姬':'姫','樱':'桜','櫻':'桜','剑':'剣','劍':'剣','战':'戦','戰':'戦','乐':'楽','樂':'楽','圣':'聖','龙':'竜','龍':'竜','恶':'悪','惡':'悪','灵':'霊','靈':'霊','恋':'恋','戀':'恋','变':'変','變':'変','亚':'亜','亞':'亜','缘':'縁','緣':'縁','壳':'殻','殼':'殻','饰':'飾','实':'実','實':'実','学':'学','學':'学','国':'国','國':'国','经':'経','經':'経','县':'県','縣':'県','杀':'殺','狱':'獄','嘱':'嘱','囑':'嘱'};
+const cleanTitle=t=>String(t||'').replace(/^\s*(?:[\[［【(（][^\]］】)）]{1,40}[\]］】)）]\s*)+/,'').replace(/\s*(?:[vV]er(?:sion)?\.?\s*|[vV])\d+(?:\.\d+)*[a-z]?\s*$/,'').replace(/\s*[\[［【(（](?:汉化|漢化|中文|简体|繁體|繁体|完全汉化)[^\]］】)）]*[\]］】)）]\s*$/,'').trim();
+const jpForm=t=>Array.from(t,c=>JP_FORMS[c]||c).join('');
+const GENERIC_EXE=/^(?:game|start|launcher|play|main|setup|config|bgi|siglusengine.*|reallive|nscr.*|advhd|cs2|malie|lightvn|renpy|nw|krkr.*|tvp.*|system|app|run)$/i;
+function candidates(game){const lib=game.original.library||{},exeName=path.win32.basename(game.row.executable).replace(/\.exe$/i,''),exe=exeName.toLowerCase();const precise={rance01:'ランス01 光をもとめて',rance02:'ランス02改 反逆の少女たち',rance03:'ランス03 リーザス陥落'};
+ const raw=[precise[exe],game.row.title,...(lib.names||[]),game.original.media?.title].filter(Boolean).flatMap(t=>[t,...String(t).split(/\s+\/\s+/)]);
+ const cleaned=raw.map(cleanTitle).filter(Boolean),spelled=cleaned.map(jpForm);
+ const program=/^[A-Za-z][A-Za-z0-9 +'!-]{4,40}$/.test(exeName)&&!GENERIC_EXE.test(exeName)&&!/_(?:chs|cht|cn|sc|tc|en)$/i.test(exeName)?[exeName]:[];
+ return [...new Set([...spelled.filter((t,i)=>t!==cleaned[i]),...raw,...cleaned,...program])].filter(t=>t.length>2||t.length===2&&/[぀-鿿]/.test(t)).slice(0,8);}
 // Games under <Steam>\steamapps\common\<dir> carry their appid in steamapps\appmanifest_<id>.acf, even when the
 // library found them through a plain folder scan. The appid is the most reliable key for VNDB and covers.
 const {steamAppidFor}=require('../core/library.cjs');
@@ -74,4 +85,4 @@ class GameEnrichment{
  saveCover(id,src){const m=/^data:image\/(png|jpeg);base64,(.+)$/s.exec(src);if(!m)return '';const file='enriched-'+crypto.createHash('sha256').update(id).digest('hex').slice(0,16)+(m[1]==='png'?'.png':'.jpg'),folder=path.join(this.root,'data/assets/covers');fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(path.join(folder,file),Buffer.from(m[2],'base64'));return file;}
  result(id,locale,value){const db=require('./store.cjs').openStore(this.root);try{const result=require('./game-detail.cjs').detail(db,this.root,id,locale);if(require('../core/synopsis-policy.cjs').approved(value.synopses?.[locale]?.source))result.synopsis=value.synopses[locale];result.reception={vndb:value.vndb,steam:value.steam,critic:value.critic,reviews:value.reviews?.[locale]||[],at:value.at};return result;}finally{db.close();}}
 }
-module.exports={GameEnrichment,candidates,steamAppidFor,pickVn,vndbIdFrom};
+module.exports={GameEnrichment,candidates,steamAppidFor,pickVn,vndbIdFrom,cleanTitle,jpForm};

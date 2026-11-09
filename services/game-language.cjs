@@ -111,6 +111,12 @@ function originalExecutable(db,id,root,mode,executable){
   selected=explicit.length===1?explicit[0]:explicit.length>1?'':
    valid(configured)&&family(configured)===family(row.executable)&&!localTranslated&&siblings.length<=1?configured:
    !localTranslated&&siblings.length===1&&(languageHint(row.executable)==='zh'||!blocked)?siblings[0]:!blocked?row.executable:'';
+  /* E292 (user, 2026-11-10: 魔法使之夜 picked the Chinese 魔法使之夜.exe next to the original 魔法使いの夜.exe): a translated
+     launcher named in Chinese shares no stem with the original. When the pick has no kana and the folder holds one launcher
+     whose name has kana and the engine's own companion files (.cf / .exe.sig / .exe.emb), that one is the original. */
+  const kana=f=>/[぀-ヿ]/.test(path.parse(f).name);
+  if(!selected||!kana(selected)){const own=candidates.filter(f=>path.dirname(f).toLowerCase()===dir.toLowerCase()&&kana(f)&&!/ツール|チェック|設定|アンインストール|インストール|ランチャー/.test(path.parse(f).name)&&['.cf','.exe.sig','.exe.emb'].some(x=>isFile(f.replace(/\.exe$/i,'')+x)||isFile(f+x.replace(/^\.exe/,''))));
+   if(own.length===1)selected=own[0];}
  }else if(mode!=='select')throw Error('INVALID_EXECUTABLE');
  if(!valid(selected)||legacyBlocked&&key(selected)===key(row.executable))throw Error('JAPANESE_EXECUTABLE_REQUIRED');
  const steamProgram=lib.source==='steam'&&key(row.executable)===key(selected);

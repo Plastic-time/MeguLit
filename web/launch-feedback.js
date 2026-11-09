@@ -7,7 +7,8 @@ const reasons={
  GAME_ELEVATION_REQUIRED:['检测到启动程序旁有管理员权限声明。如果启动受阻，可通过 Windows 启动并处理系统确认','This program has an administrator manifest. If launching is blocked, use Windows to open it and respond to any system prompt','管理者権限を要求する設定があります。起動できない場合は Windows から開いてシステムの確認に従ってください'],
  GAME_ELEVATION_CANCELLED:['已取消 Windows 的管理员确认','The Windows elevation prompt was cancelled','Windows の管理者確認が取り消されました'],
  PROCESS_QUERY_FAILED:['无法检查游戏是否已运行，请关闭游戏后重试','Could not check whether the game was running. Close the game and retry','ゲームの起動状態を確認できません。ゲームを閉じてから再試行してください'],
- GAME_PROCESS_EXITED:['游戏在窗口准备好前就退出了','The game exited before its window was ready','ウィンドウが開く前にゲームが終了しました'],
+ /* E293 (user, 2026-11-10: 魔法使いの夜.exe showed its own "Authentication failed" and closed, also when opened by hand) */
+ GAME_PROCESS_EXITED:['游戏在窗口准备好前就退出了。如果直接双击这个程序也打不开（比如弹出 Authentication failed 这类认证失败），说明程序本身无法运行，常见于下载版认证或补丁包缺文件，请在「日文原版启动程序」里换成能正常运行的程序','The game exited before its window was ready. If the program also fails when opened directly (for example an "Authentication failed" message), the program itself cannot run, often a download licence check or a repack missing files; choose a working program under Japanese executable','ウィンドウが開く前にゲームが終了しました。実行ファイルを直接開いても起動しない場合（「Authentication failed」など）、ファイル自体が起動できません。ダウンロード版の認証やファイル不足が多い原因です。「日本語版の実行ファイル」で起動できるファイルを選んでください'],
  GAME_RUNNING_HIDDEN:['这部游戏已经在后台运行，但没有窗口（可能上次没有完全退出）。请在任务管理器里结束它后再启动','This game is already running in the background without a window (it may not have closed last time). End it in Task Manager, then launch again','このゲームはウィンドウのないままバックグラウンドで動いています（前回正しく終了していない可能性があります）。タスク マネージャーで終了してから起動してください'],
  GAME_WINDOW_NOT_READY:['在等待时间内没有出现可用的游戏窗口','A game window did not appear in time','制限時間内にウィンドウが開きませんでした'],
  LE_HELPER_FAILED:['日文区域启动工具退出并报告失败','The Japanese locale launcher exited with an error','日本語ロケールの起動ツールがエラーで終了しました'],

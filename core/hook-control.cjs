@@ -65,6 +65,10 @@ class HookControl{
   if(m.stage==='read'){this.status({hookCheckState:m.matched?'captured':'unverified',hookVisualVerified:false,hookCheckMessage:m.matched?'捕捉成功，游戏原文可见（当前仅读取）':'捕捉成功，画面未匹配到本句原文'});return;}
   /* The replacement was answered but the game still drew the original (WHITE ALBUM2, user 2026-11-09): cover this line
      with the OCR mask so the original does not show through; the next line is tried through the hook again. */
+  /* E285 (user: CLANNAD got blocks over the credits and scenery): with the translation written back into the game, a line
+     still in Japanese is the intended fallback while its translation is on the way, and OCR reads the drawn Chinese kanji as
+     the original; no OCR cover then. */
+  if(m.matched&&h.preferences?.embedTranslation===true){this.status({hookCheckState:'replaced',hookVisualVerified:false,hookCheckMessage:'译文由游戏自己显示'});return;}
   if(m.matched){if(h.hooks.lastSource)h.send({type:'maskAssist',source:h.hooks.lastSource});this.status({hookCheckState:'visible',hookVisualVerified:false,hookCheckMessage:'游戏原文仍然可见，本句已临时用遮罩盖住'});return;}
   if(m.sample<2)return;
   const drawFresh=(h.hooks.state.hookDrawAt||0)>=this.sourceAt-1800;

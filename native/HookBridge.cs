@@ -73,7 +73,10 @@ public static class HookBridge {
 
  // under load), and holding Ctrl/Shift no longer skips the replacement (fastskipignore showed the original, user: STEINS;GATE).
 
- static void ApplySettings(){Luna_SettingsEx(Pid,TranslateMode?4000u:1000u,TranslateMode?(byte)134:(byte)0,TranslateMode,"",0,false,false,false,1,false,UnityFontDir);Diagnostic("settings clearText=False; guarded callbacks; mode="+(TranslateMode?"translate":"hide"));}
+ // E285 (user: CLANNAD wrote 「它正抓着什·　。」): the Chinese charset alone keeps the game's Japanese face, which has no
+ // Simplified glyphs. Translated lines are drawn with a Chinese system font that also has kana.
+ static string TranslateFont(){string fonts=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"Fonts");return File.Exists(Path.Combine(fonts,"msyh.ttc"))?"Microsoft YaHei":File.Exists(Path.Combine(fonts,"simhei.ttf"))?"SimHei":"";}
+ static void ApplySettings(){Luna_SettingsEx(Pid,TranslateMode?4000u:1000u,TranslateMode?(byte)134:(byte)0,TranslateMode,TranslateMode?TranslateFont():"",0,false,false,false,1,false,UnityFontDir);Diagnostic("settings clearText=False; guarded callbacks; mode="+(TranslateMode?"translate":"hide"));}
 // Translation written back into the game (user, 2026-11-09): instead of blanking a dialogue
 // line for MeguLit to draw over, the bridge asks MeguLit for the line's translation and hands that to LunaHook, so the
 // game draws Chinese in its own text box and font. LunaHook keeps the game waiting up to the embed wait (4 s here);
@@ -90,6 +93,13 @@ static void FinishEmbed(long id,string trans){PendingEmbed p;lock(Gate){if(!Pend
  // code points of its separators, at most one per stream every 30 s, so the hook point can be fixed from real bytes.
  static readonly Dictionary<string,DateTime> ContainerSeen=new Dictionary<string,DateTime>();
  static void ContainerSample(string name,string text){try{DateTime last;string k=name??"";lock(Gate){if(ContainerSeen.TryGetValue(k,out last)&&(DateTime.UtcNow-last).TotalSeconds<30)return;ContainerSeen[k]=DateTime.UtcNow;}var marks=new SortedSet<string>();foreach(char ch in text){var cat=Char.GetUnicodeCategory(ch);if(ch=='?'||ch=='？'||ch=='�'||ch=='%'||ch==';'||cat==System.Globalization.UnicodeCategory.PrivateUse||cat==System.Globalization.UnicodeCategory.Surrogate||cat==System.Globalization.UnicodeCategory.OtherNotAssigned||cat==System.Globalization.UnicodeCategory.Control||cat==System.Globalization.UnicodeCategory.Format)marks.Add(((int)ch).ToString("x4"));}Diagnostic("container "+k+" chars="+text.Length+" marks="+String.Join(",",marks)+" raw="+Json.Serialize(text.Length>400?text.Substring(0,400):text));}catch{}}
+ // E293 KiriKiri Z games with strong archive encryption (サノバウィッチ): MeguLitScn<bit>.dll saves the scene files the
+ // engine itself decrypts to cache\kirikiri-scn (native\scncapture\ScnCapture.cpp). Only for games with .xp3 archives next to
+ // the program; any failure is only logged and the hook carries on as before.
+ [DllImport("kernel32.dll",CharSet=CharSet.Unicode)] static extern bool QueryFullProcessImageName(IntPtr process,uint flags,System.Text.StringBuilder path,ref int size);
+ static void ScnCapture(string bit,string loader,string[] args){try{string dll=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"MeguLitScn"+bit+".dll"),exe="";if(!File.Exists(dll))return;IntPtr h=OpenProcess(0x1000,false,Pid);if(h==IntPtr.Zero)return;try{var sb=new System.Text.StringBuilder(32768);int size=sb.Capacity;if(QueryFullProcessImageName(h,0,sb,ref size))exe=sb.ToString();}finally{CloseHandle(h);}
+  if(exe==""||Directory.GetFiles(Path.GetDirectoryName(exe),"*.xp3").Length==0)return;var start=new ProcessStartInfo(loader,Pid+" "+args[1]+" \""+args[2]+"\" "+args[3]+" \""+dll+"\""){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true};
+  using(var child=Process.Start(start)){if(!child.WaitForExit(12000)){Diagnostic("scene capture load timed out");return;}Diagnostic(child.ExitCode==0?"scene capture loaded":"scene capture failed: "+child.StandardError.ReadToEnd().Trim());}}catch(Exception e){Diagnostic("scene capture skipped: "+e.Message);}}
  static void Diagnostic(string value){try{string file=Under("logs","hook-diagnostics.log");lock(OutputGate){if(!File.Exists(file)||new FileInfo(file).Length<1048576)File.AppendAllText(file,DateTime.UtcNow.ToString("o")+" "+value+Environment.NewLine);}}catch{}}
  // E244 per-game stream memory: the dialogue stream that last replaced text is remembered per game executable (name + size),
  // so the next launch pre-arms it and embeds from the first line. Written only after a real replacement; ignored on mismatch.
@@ -256,6 +266,7 @@ static void FinishEmbed(long id,string trans){PendingEmbed p;lock(Gate){if(!Pend
     var engineInfo=EngineInfo(s);if(engineInfo!=null)Emit(engineInfo);};InsertEvent insert=OnInsert;EmbedEvent embed=OnEmbed;QueryEvent query=s=>IntPtr.Zero;GameEvent game=(i,t,v)=>{};Keep.AddRange(new Delegate[]{connected,disconnected,create,destroy,output,info,insert,embed,query,game});
    Luna_Settings(180,932,4000,4000,false);Luna_Start(connected,disconnected,create,destroy,output,info,insert,embed,query,game);Started=true;Luna_ConnectProcess(Pid);
    if(Luna_CheckIfNeedInject(Pid)){var start=new ProcessStartInfo(loader,Pid+" "+args[1]+" \""+args[2]+"\" "+args[3]+" \""+hook+"\""){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true};using(var child=Process.Start(start)){if(!child.WaitForExit(12000))throw new Exception("LunaHook 加载超时");if(child.ExitCode!=0)throw new Exception("LunaHook 加载失败："+child.StandardError.ReadToEnd().Trim());}}
+   ScnCapture(bit,loader,args);
    new Thread(Input){IsBackground=true}.Start();DateTime until=DateTime.UtcNow.AddSeconds(15);while(!Quit){if(!Connected&&DateTime.UtcNow>until)throw new Exception("LunaHook 未连接当前游戏");if(WaitHook!=null)WaitHook.Tick();Heartbeat();Thread.Sleep(40);}return 0;
   }catch(Exception e){Emit(new{type="hookError",hookActive=false,hookMessage=e.Message});return 1;}
   finally{if(WaitHook!=null)WaitHook.Dispose();if(Started){try{Deactivate("bridge-shutdown");Luna_DetachProcess(Pid);}catch{}}GC.KeepAlive(Keep);/* Keep loaded native code alive until process exit: native worker callbacks may still be returning. */}

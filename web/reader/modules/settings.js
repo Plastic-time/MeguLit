@@ -126,7 +126,7 @@
       <label><input name="themeColor" type="checkbox">颜色跟随 MeguLit 主题</label>
       <label style="display:none"><input name="bold" type="checkbox">加粗中文</label>
       </details>
-      <label>翻译引擎<select name="provider"><option value="google">Google 免费</option><option value="bing">Bing / Microsoft Translator API</option><option value="deepseek">DeepSeek API</option><option value="deepl">DeepL API</option><option value="gpt">GPT / OpenAI 兼容接口</option></select></label>
+      <p class="hint megulit-script-hint">当前作品已用汉化脚本：能对上的句子直接用汉化组译文（零延迟），翻译引擎只翻对不上的句子</p><label>翻译引擎<select name="provider"><option value="google">Google 免费</option><option value="bing">Bing / Microsoft Translator API</option><option value="deepseek">DeepSeek API</option><option value="deepl">DeepL API</option><option value="gpt">GPT / OpenAI 兼容接口</option></select></label>
       <div class="tomoyo-cn-gpt">
         <label>API 地址<input name="baseUrl" type="url" placeholder="https://api.openai.com/v1"></label>
         <label>模型名<input name="model" type="text" placeholder="gpt-4.1-mini" maxlength="200"></label>

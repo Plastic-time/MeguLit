@@ -49,6 +49,8 @@ class Reader{
   if(typeof message.hookSource==='string'){this.gal?.send({type:'markerSource',text:message.hookSource});if(!message.hookRecovering&&message.hookSourceOrigin!=='history'){
    if(message.hookSource&&message.hookSource!==this.immersion.currentText)this.gal?.send({type:'dialogSceneLine'});
    this.immersion.source(message.hookSource,message.hookSourceEngine);
+   /* E287: translate the next few lines the script leaves untranslated, so they are ready before the game reaches them. */
+   if(typeof message.hookSource==='string'&&message.hookSource.trim())require('./script-prefetch.cjs').ahead(this).catch(()=>{});
   }const line={gameId:this.gameId,text:message.hookSource,sequence:message.hookSequence,active:message.hookActive,recovering:message.hookRecovering,origin:message.hookSourceOrigin};if(this.pendingLines){if(this.pendingLines.length<40)this.pendingLines.push(line);}else this.stats.line(line);}
   this.runtime.emit('reader-event',message);if(typeof message.hotkey==='boolean')this.runtime.emit('reader-health',this.runtime.readerStatus?.()||{});
  }
@@ -104,18 +106,22 @@ class Reader{
  refreshTextSource(){try{const hooks=this.gal?.hooks;if(!hooks)return;hooks.originalText=this.gameExe?require('./original-text.cjs').provider(this.root,this.gameExe):null;}catch{}}
  // E280: a Japanese game started without a patch set up: look for one on this computer in the background.
  findTextSource(gameId){const hooks=this.gal?.hooks;if(!gameId||hooks?.originalText)return;require('./original-text.cjs').autoPatchLater(this.root,gameId,()=>this.refreshTextSource());}
- embedKey(text){return String(text||'').replace(/\s+/g,'');}
+ // E285: the overlay's display choice picks the translation language (日文＋英文 / 仅英文 translate into English).
+ displayLanguage(){const d=this.gal?.preferences?.display;return d==='bilingual-en'||d==='english'?'en':'';}
+ langOptions(o){const lang=this.displayLanguage();return lang?{...o,learnerLanguage:lang}:o;}
+ embedKey(text){return (this.displayLanguage()==='en'?'en|':'')+String(text||'').replace(/\s+/g,'');}
  embedCached(text,value){this.embedCache??=new Map();const key=this.embedKey(text);if(!key)return undefined;if(value===undefined)return this.embedCache.get(key);this.embedCache.delete(key);this.embedCache.set(key,value);if(this.embedCache.size>800)this.embedCache.delete(this.embedCache.keys().next().value);return value;}
  async embedTranslate(id,text){
   let trans='';
   try{
    trans=this.embedCached(text)||'';
-   if(!trans){const options=require('../core/providers.cjs').resolveOptions({...this.prefs(),translationPrompt:this.workPrompt||''});if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();
+   if(!trans&&this.displayLanguage()!=='en'){trans=this.gal?.hooks?.scriptTranslation?.(text)||'';if(trans)this.embedCached(text,trans);}
+   if(!trans){const options=this.langOptions(require('../core/providers.cjs').resolveOptions({...this.prefs(),translationPrompt:this.workPrompt||''}));if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();
     const until=Date.now()+3500,inTime=()=>Date.now()<until;await this.localReady(options,null,inTime);trans=normalizeTranslation(await this.translator().translate(text,options,()=>true));if(trans)this.embedCached(text,trans);}
   }catch(error){try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'embedTranslateFailed',error:String(error?.message||error).slice(0,200)})+'\n');}catch{}}
   this.gal?.hooks?.embedReply(id,trans);
  }
- async translate(request){const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;{const cached=this.embedCached(text);if(cached)return cached;}const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;const options=require('../core/providers.cjs').resolveOptions({...this.prefs(),...(request.options&&typeof request.options==='object'?request.options:{}),translationPrompt:this.workPrompt||''});if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();const gameId=this.gameId;await this.localReady(options,request.id,current);const translated=normalizeTranslation(await this.translator().translate(text,options,current));if(gameId)this.stats.translation(gameId,text,translated);if(translated)this.embedCached(text,translated);return translated;}
+ async translate(request){const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;{const cached=this.embedCached(text);if(cached)return cached;}const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;const options=this.langOptions(require('../core/providers.cjs').resolveOptions({...this.prefs(),...(request.options&&typeof request.options==='object'?request.options:{}),translationPrompt:this.workPrompt||''}));if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();const gameId=this.gameId;await this.localReady(options,request.id,current);const translated=normalizeTranslation(await this.translator().translate(text,options,current));if(gameId)this.stats.translation(gameId,text,translated);if(translated)this.embedCached(text,translated);return translated;}
  async invoke(command,args={}){
   if(command.startsWith('plugin:sql|'))return require('./legacy-reader-sql.cjs').request(this.root,command,args);
   if(command==='word_states'){const forms=Array.isArray(args.forms)?[...new Set(args.forms.filter(v=>typeof v==='string'&&v.length<=100))].slice(0,200):[];if(!forms.length)return [];const db=openStore(this.root);try{return db.prepare('SELECT id,spelling,reading,status FROM vocabulary WHERE spelling IN ('+forms.map(()=>'?').join(',')+')').all(...forms);}finally{db.close();}}

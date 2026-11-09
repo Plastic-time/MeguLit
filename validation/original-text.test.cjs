@@ -70,9 +70,9 @@ test('an imported Chinese patch gives each Japanese line the group\'s translatio
   const r=p.resolve('「やっと来たね」');assert.equal(r.status,'exact');assert.equal(r.translation,'「你终于来了啊」');
   const {HookNative}=require('../core/hook-native.cjs'),hook=Object.create(HookNative.prototype),events=[];hook.trace=()=>{};hook.emit=e=>events.push(e);hook.originalText=p;
   assert.equal(hook.originalTextFor('「やっと来たね」'),'「やっと来たね」','the Japanese line is kept');
-  assert.deepEqual(events,[{type:'hookPatchTranslation',japanese:'「やっと来たね」',chinese:'「你终于来了啊」'}]);
+  assert.deepEqual(events,[{type:'hookPatchTranslation',japanese:'「やっと来たね」',chinese:'「你终于来了啊」',machine:false}]);
   events.length=0;hook.originalTextFor('くくく……いいザマだな');assert.deepEqual(events,[],'a line the patch left in Japanese is no translation');
-  ot.clearPatch(root,'g1');assert.equal(ot.provider(root,row.executable),null);
+  ot.clearPatch(root,'g1');{const left=ot.provider(root,row.executable);assert.equal(left.patch,false,'without the patch only filled lines are translated');assert.equal(left.resolve('「やっと来たね」').status,'none');}
   // A folder whose script is still Japanese is not taken as a patch.
   const same=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-patch-ja-'));fs.writeFileSync(path.join(same,'Game.ain'),ain([...original.slice(0,6),'違う行'],'sjis'));
   assert.throws(()=>ot.importPatch(root,db,'g1',same),/PATCH_NOT_TRANSLATED/);fs.rmSync(same,{recursive:true,force:true});

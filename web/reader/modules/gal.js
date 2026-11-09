@@ -137,6 +137,7 @@
     body.tomoyo-game-style .tomoyo-cn-row:has(.tomoyo-cn-output:empty) { visibility:hidden; }
     body.tomoyo-gal-ja-only .tomoyo-cn-row { display:none!important; }
     body.tomoyo-gal-zh-only .sentence-text { display:none!important; }
+    body.tomoyo-gal-none :is(.sentence-text,.tomoyo-cn-row) { visibility:hidden!important; }
     body.tomoyo-gal-zh-only .tomoyo-cn-row { margin-top:0!important; }
     body.tomoyo-gal-mask .sentence-window { background:var(--tomoyo-gal-mask,#171923)!important; }
     body.tomoyo-game-style .sentence-text .char-token,body.tomoyo-game-style .tomoyo-cn-output,body.tomoyo-gal-bound .sentence-text .char-token,body.tomoyo-gal-bound .tomoyo-cn-output {
@@ -434,9 +435,11 @@
     root.setProperty('--tomoyo-ruby-font',appearance.japaneseFonts[preferences.rubyFont]|| (preferences.rubyFont==='round'?'Meiryo,\"Yu Gothic UI\",sans-serif':preferences.rubyFont==='inherit'?appearance.japaneseFonts[preferences.japaneseFont]:appearance.japaneseFonts[preferences.rubyFont==='mincho'?'originalMincho':'originalGothic']));
     document.body.classList.toggle('tomoyo-game-style', preferences.interfaceMode==='translation' && preferences.style !== 'custom');
     document.body.classList.toggle('tomoyo-gal-ja-only', preferences.interfaceMode==='translation' && preferences.display === 'japanese');
-    document.body.classList.toggle('tomoyo-gal-zh-only', preferences.interfaceMode==='translation' && preferences.display === 'chinese');
+    /* E285 (user: English counterparts, and a way to show nothing while the game draws the translation itself) */
+    document.body.classList.toggle('tomoyo-gal-zh-only', preferences.interfaceMode==='translation' && (preferences.display === 'chinese' || preferences.display === 'english'));
+    document.body.classList.toggle('tomoyo-gal-none', preferences.interfaceMode==='translation' && preferences.display === 'none');
     bridge.quietTranslation = preferences.style !== 'custom';
-    bridge.setTranslationVisible(preferences.display !== 'japanese');
+    bridge.setTranslationVisible(preferences.display !== 'japanese' && preferences.display !== 'none');
     document.body.classList.toggle('tomoyo-gal-bound', bound);
     document.body.classList.toggle('tomoyo-gal-mask', bound && preferences.maskMode === 'full');bridge.islandPage?.refresh();
     markReader();
@@ -489,6 +492,8 @@
     /* Borrowed-code (Chinese patch) text was dropped: say why in the sentence window; the next real line clears it. */
     if(message.hookNotice){let n=document.querySelector('.megulit-hook-notice');const host=document.querySelector('.sentence-window');if(host&&!n){n=document.createElement('div');n.className='megulit-hook-notice';n.setAttribute('role','status');n.style.cssText='font:13px/1.6 Meiryo,"Microsoft YaHei",sans-serif;color:#ffd9a8;background:rgba(40,20,10,.72);border:1px solid rgba(255,190,120,.35);border-radius:8px;padding:6px 10px;margin-top:8px;pointer-events:none;text-shadow:none;-webkit-text-stroke:0;';host.appendChild(n);}if(n)n.textContent=message.hookNotice;}
     if(typeof message.hookSource==='string'&&message.hookSource)document.querySelector('.megulit-hook-notice')?.remove();
+    /* E285: the translation tab says when the imported script supplies the translations (the engine still covers the rest). */
+    if(typeof message.scriptSource==='boolean'){document.body.classList.toggle('megulit-script-source',message.scriptSource);if(!document.getElementById('megulit-script-source-style')){const st=document.createElement('style');st.id='megulit-script-source-style';st.textContent='.megulit-script-hint{display:none;margin:0 0 8px;padding:8px 10px;border-radius:8px;background:rgba(92,184,120,.1);color:#bfe8c8;font-size:12px;line-height:1.5}body.megulit-script-source .megulit-script-hint{display:block}';document.head.append(st);}}
     if(typeof message.embedTranslating==='boolean'){document.body.classList.toggle('megulit-embed-translation',message.embedTranslating);if(!document.getElementById('megulit-embed-translation-style')){const st=document.createElement('style');st.id='megulit-embed-translation-style';st.textContent='body.megulit-embed-translation .tomoyo-cn-output{display:none!important}';document.head.append(st);}}
     if(message.hookMessage)bridge.hookMessage=message.hookMessage;if(message.waitMarkerMessage){bridge.waitMarkerMessage=message.waitMarkerMessage;if(dialogFields?.waitMarkerState)dialogFields.waitMarkerState.textContent=message.waitMarkerMessage;}
     if(message.hookThreads)bridge.hookThreads=message.hookThreads;
@@ -534,8 +539,8 @@
       <div class="tome-game-style-sync"><label class="tome-auto-style-switch"><input type="checkbox" name="galAutoGameStyle">自动同步游戏原文样式</label><button type="button" data-game-style-sync>从游戏同步</button><small data-game-style-state></small></div>
       <label>原文替换方式<select name="galMaskMode"><option value="hook">Hook 引擎与原文替换内嵌（优先）</option><option value="local">OCR 覆盖原文（最后兜底）</option></select></label>
       <label class="tome-auto-style-switch" data-embed-translation><input type="checkbox" name="galEmbedTranslation">译文由游戏自己显示（写回游戏文本框）</label>
-      <small class="tomoyo-hotkey-hint">开启后游戏文本框直接显示中文译文，位置和字体都由游戏自己处理；MeguLit 窗口保留日文原文、注音和点读。译文来不及时，这句照常显示日文</small>
-      <small class="tomoyo-hotkey-hint" data-mask-hotkey><kbd>Alt+H</kbd> 随时一键关闭 / 恢复内嵌（连同全部 MeguLit 覆盖），用来对比游戏原文</small>
+      <small class="tomoyo-hotkey-hint">开启后游戏文本框直接显示译文，位置和字体都由游戏自己处理；Alt+H 只开关 MeguLit 自己的显示，不影响游戏写回的译文</small>
+      <small class="tomoyo-hotkey-hint" data-mask-hotkey><kbd>Alt+H</kbd> 随时一键关闭 / 恢复内嵌（连同全部 MeguLit 覆盖），用来对比游戏原文；开着「译文由游戏自己显示」时，游戏里的译文不受 Alt+H 影响，只由这个开关控制</small>
       <div data-gal-hook-options><label>对话文本流<select name="galHookThread"><option value="">先绑定游戏并推进一句</option></select></label><button type="button" data-gal-hook-select>使用这条对话流</button><div class="tomoyo-hook-state" role="status"></div><small>选择前请核对内容是完整对话。仅读取的流可以显示台词，不能清空游戏原文；可清空的流仅在覆盖模式启用替换。Alt+H 隐藏覆盖或 Alt+M 返回普通界面会关闭替换，台词读取继续。</small></div>
       <label data-gal-full-color>整块底板颜色<input type="color" name="galMaskColor"></label>
       <label><input name="galRelocateWaitMarker" type="checkbox">将原等待符移到 MeguLit 句末</label>
@@ -557,7 +562,7 @@
       <label><input name="galTypewriter" type="checkbox">文字逐字显示</label>
       <label>显示速度（字/秒）<input name="galTypewriterSpeed" type="number" min="5" max="120" step="1"></label>
       <small>点击游戏或按空格可补全当前文字；按住 Ctrl 快速显示，不拦截游戏操作</small>
-      <label>显示内容<select name="galDisplay"><option value="bilingual">日文＋假名／中文</option><option value="japanese">仅日文＋假名</option><option value="chinese">仅中文 · 接近汉化版</option></select></label>
+      <label>显示内容<select name="galDisplay"><option value="bilingual">日文＋假名／中文</option><option value="japanese">仅日文＋假名</option><option value="chinese">仅中文 · 接近汉化版</option><option value="bilingual-en">日文＋假名／英文</option><option value="english">仅英文</option><option value="none">不显示（只看游戏文本框）</option></select></label>
       <div class="tomoyo-cn-grid tomoyo-type-sizes"><label>中文字号<input name="galChineseSize" type="number" min="12" max="60"></label></div>
       <div class="tomoyo-cn-grid"><label>未读渐变<input name="galTextGradient" type="checkbox"></label><label>已读渐变<input name="galReadTextGradient" type="checkbox"></label><label>未读渐变上色<input name="galTextGradientTop" type="color"></label><label>未读渐变下色<input name="galTextGradientBottom" type="color"></label><label>已读渐变上色<input name="galReadTextGradientTop" type="color"></label><label>已读渐变下色<input name="galReadTextGradientBottom" type="color"></label><label>未读渐变起点（%）<input name="galTextGradientStart" type="number" min="0" max="95" step="1"></label><label>已读渐变起点（%）<input name="galReadTextGradientStart" type="number" min="0" max="95" step="1"></label></div>
       <div class="tomoyo-cn-grid"><label>文字颜色<input name="galTextColor" type="color"></label><label>已读文字颜色<input name="galReadTextColor" type="color"></label><label>文字阴影<select name="galShadow"><option value="outline">细描边 · 适合复杂背景</option><option value="soft">柔和阴影</option><option value="none">无阴影</option></select></label></div>
