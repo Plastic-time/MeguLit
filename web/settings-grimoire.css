@@ -300,9 +300,11 @@ dialog.jr-dialog[open]{animation:jr-in .22s cubic-bezier(.16,1,.3,1)}
 .jr-dialog .jr-item[aria-selected=true] .jr-check{opacity:1;transform:none}
 .jr-dialog .jr-name{font-size:12.5px;line-height:1.4;font-weight:600;padding:0 2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .jr-dialog .jr-item:focus-visible{outline:none}.jr-dialog .jr-item:focus-visible .jr-art{box-shadow:0 0 0 2px #edb56e}
-.jr-dialog [data-jr-status]{display:flex;align-items:center;gap:10px;min-height:20px;margin:4px 0 0;padding:11px 14px;border-radius:10px;font-size:13px;font-weight:600;line-height:1.5;
+/* E284 (user: the restore dialog jumped taller and shorter on every click): the status keeps two lines of room
+   and stays in the layout while empty, so a state change never resizes the centred dialog. */
+.jr-dialog [data-jr-status]{display:flex;align-items:center;gap:10px;min-height:40px;box-sizing:content-box;margin:4px 0 0;padding:11px 14px;border-radius:10px;font-size:13px;font-weight:600;line-height:1.5;
  color:#d9c6b6;background:rgba(255,236,214,.04);border:1px solid rgba(255,236,214,.07)}
-.jr-dialog [data-jr-status]:empty{display:none}
+.jr-dialog [data-jr-status]:empty{visibility:hidden}
 .jr-dialog [data-jr-status]::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:#8a7668}
 .jr-dialog [data-jr-status][data-state=checking]::before{background:#edb56e;animation:jr-pulse 1s ease-in-out infinite}
 .jr-dialog [data-jr-status][data-state=restorable]{color:#ffe3b8;background:rgba(237,181,110,.08);border-color:rgba(237,181,110,.25)}
@@ -313,7 +315,7 @@ dialog.jr-dialog[open]{animation:jr-in .22s cubic-bezier(.16,1,.3,1)}
 .jr-dialog [data-jr-status]:is([data-state=unsupported],[data-state=none],[data-state=missing])::before{background:#c8303c}
 @keyframes jr-pulse{50%{opacity:.35}}
 .jr-dialog .muted{padding:18px 0;text-align:center;color:#8a7668}
-.jr-dialog .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding:14px 28px 18px;border-top:1px solid rgba(255,236,214,.06);background:rgba(0,0,0,.14)}
+.jr-dialog .dialog-actions{display:flex;justify-content:flex-end;align-items:center;min-height:52px;gap:10px;margin-top:18px;padding:14px 28px 18px;border-top:1px solid rgba(255,236,214,.06);background:rgba(0,0,0,.14)}
 .jr-dialog .dialog-actions .jr-close{margin-right:auto}
 .jr-dialog .dialog-actions button{min-width:96px;height:38px;border-radius:10px;font-weight:600;transition:background-color .18s,border-color .18s,transform .1s}
 .jr-dialog .dialog-actions button:active{transform:scale(.97)}

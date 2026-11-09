@@ -71,3 +71,14 @@ test("Ren'Py: tl/<language> old/new pairs, the Chinese folder is picked",async()
  const r=await ot.autoPatch(data,db,'1',{drives:false,force:true});assert.ok(r.found,JSON.stringify(r));
  assert.strictEqual(ot.provider(data,exe).resolve('そうだね、散歩に行こうか。').translation,'是啊，去散步吧。');
 });
+
+// Real data when this machine has it: Summer Pockets (Steam) restored to Japanese, Chinese column kept in the backup.
+const sp=path.join('E:/','Steam','steamapps','common','Summer Pockets');
+test('Siglus (Summer Pockets): Japanese column lines up with the Chinese column of the same table',{skip:!fs.existsSync(path.join(sp,'.megulit-japanese','dat'))&&'no local copy'},async()=>{
+ const {DatabaseSync}=require('node:sqlite'),db=new DatabaseSync(':memory:');db.exec('CREATE TABLE games(id TEXT,executable TEXT,removed_at TEXT)');
+ const exe=path.join(sp,'SiglusEngine_Steam.exe');db.prepare('INSERT INTO games VALUES(?,?,NULL)').run('1',exe);
+ const data=fs.mkdtempSync(path.join(os.tmpdir(),'sp-'));
+ assert.strictEqual(ot.scanRunning(data,'1',exe).runtime.engine,'siglus');
+ const r=await ot.autoPatch(data,db,'1',{drives:false,force:true});assert.ok(r.found,JSON.stringify(r));
+ assert.strictEqual(ot.provider(data,exe).resolve('島の輪郭がはっきりと目にでき始めたころ。').translation,'当能看清楚整个岛屿轮廓的时候。');
+});

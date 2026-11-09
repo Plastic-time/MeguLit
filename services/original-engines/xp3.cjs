@@ -21,6 +21,7 @@ function list(file){
   for(const c of chunks(index,0,index.length)){if(c.tag!=='File')continue;const entry={name:'',size:0,packed:0,encrypted:false,segments:[]};
    for(const s of chunks(index,c.start,c.end)){
     if(s.tag==='info'){entry.encrypted=index.readUInt32LE(s.start)!==0;entry.size=Number(index.readBigUInt64LE(s.start+4));entry.packed=Number(index.readBigUInt64LE(s.start+12));const len=index.readUInt16LE(s.start+20);entry.name=index.toString('utf16le',s.start+22,s.start+22+len*2);}
+    else if(s.tag==='adlr')entry.hash=index.readUInt32LE(s.start);
     else if(s.tag==='segm')for(let p=s.start;p+28<=s.end;p+=28)entry.segments.push({zlib:(index.readUInt32LE(p)&7)===1,offset:Number(index.readBigUInt64LE(p+4)),size:Number(index.readBigUInt64LE(p+12)),packed:Number(index.readBigUInt64LE(p+20))});
    }
    if(entry.name)files.push(entry);}
