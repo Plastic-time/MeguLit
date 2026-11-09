@@ -1,0 +1,71 @@
+name: Signed build
+
+# Builds MeguLit.exe and the native helpers from source on a GitHub-hosted runner, then sends them to
+# SignPath (free open-source signing, certificate by SignPath Foundation). Each signing request still
+# needs a manual approval in SignPath. Until the repository variables below are set, the signing job
+# is skipped and the workflow only produces the unsigned artifact.
+#
+# Repository settings → Secrets and variables → Actions:
+#   secret   SIGNPATH_API_TOKEN
+#   variable SIGNPATH_ORGANIZATION_ID
+#   variable SIGNPATH_PROJECT_SLUG          (e.g. MeguLit)
+#   variable SIGNPATH_SIGNING_POLICY_SLUG   (release-signing)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Environment preflight
+        shell: pwsh
+        run: ./tools/check-env.ps1
+      - name: Build and test
+        shell: pwsh
+        run: ./Build.ps1 -Check
+      - name: Collect binaries to sign
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force unsigned | Out-Null
+          Copy-Item MeguLit.exe unsigned/
+          Get-ChildItem native -Filter *.exe | Copy-Item -Destination unsigned/
+          Get-ChildItem unsigned | Format-Table Name, Length
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: MeguLit-unsigned
+          path: unsigned/
+
+  sign:
+    needs: build
+    if: vars.SIGNPATH_ORGANIZATION_ID != ''
+    runs-on: windows-latest
+    steps:
+      - uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ needs.build.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MeguLit-signed
+          path: signed/
