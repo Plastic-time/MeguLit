@@ -12,6 +12,8 @@ class Reader{
  event(message){
   if(message.type==='homeHotkey'){this.runtime.emit('home-toggle',null);return;}
   if(message.type==='readerPointer'){this.runtime.emit('reader-pointer-input',message);return;}
+  /* Binding changes, kept so a reader that drops off the game (floating strip at the screen top) can be traced. */
+  if(message.type==='bindTrace'||message.type==='coverDebug'||typeof message.bound==='boolean'){try{fs.appendFileSync(path.join(this.root,'logs','reader-bind.log'),JSON.stringify({at:new Date().toISOString(),type:message.type,bound:message.bound,mode:message.interfaceMode,text:String(message.text||message.message||'').slice(0,200)})+'\n');}catch{}if(message.type==='bindTrace'||message.type==='coverDebug')return;}
   if(message.type==='hookEmbedRequest'){this.embedTranslate(message.id,message.text);return;}
   /* A Chinese-patched game read in Japanese: the patch's line is the translation, cached before the page asks. */
   if(message.type==='hookPatchTranslation'){if(typeof message.japanese==='string'&&typeof message.chinese==='string'&&message.chinese.length<=4000)this.embedCached(message.japanese,message.chinese.trim());return;}
@@ -207,7 +209,12 @@ class Reader{
   if(action==='configure'){atomic(path.join(this.folder,'v4-preferences.json'),{...readJSON(path.join(this.folder,'v4-preferences.json')),...require('../core/v4-config.cjs').cleanV4(args)});this.immersion?.configure(this.runtime.config());const current=this.runtime.config();this.gal?.send({type:'dialogConfig',scene:current.immersion===true,auto:current.immersion===true,active:current.immersion&&current.dialogDetection==='visual',marker:current.immersion&&current.dialogDetection==='marker'});this.gal?.setGameAudio(this.runtime.config().ankiGameMedia!==false);return this.runtime.config();}
   const mapped={modelStatus:'model_status',modelDownload:'model_download',modelCancel:'model_cancel',runtimeDownload:'runtime_download',runtimeCancel:'runtime_cancel',speakers:'speakers',speakersCached:'speakers_cached',preview:'speech_preview'};
   if(mapped[action])return this.runtime.call({action:mapped[action],...args});
-  if(action==='backgroundGet')return {image:require('./assets.cjs').get(this.root,args.slot==='game'?'panels':'home')};
+  if(action==='backgroundGet'){const image=require('./assets.cjs').get(this.root,args.slot==='game'?'panels':'home');if(image||args.slot==='game')return {image};
+   /* The home page shows its built-in background when none is chosen; the in-game panels follow the home background, so
+      they get the same picture instead of nothing (user, 2026-11-09: the three panels turned fully transparent). */
+   let prefs={};try{prefs=JSON.parse(fs.readFileSync(path.join(this.root,'data','preferences.json'),'utf8'))||{};}catch{}
+   if(prefs.homeBackground===''&&prefs.defaultBackground110)return {image:''};
+   try{const file=path.join(this.root,'web','assets',prefs.theme==='light'?'default-background-light.webp':'default-background-dark.webp');return {image:'data:image/webp;base64,'+fs.readFileSync(file).toString('base64'),builtIn:true};}catch{return {image:''};}}
   if(action==='backgroundSet')return require('./assets.cjs').set(this.root,args.slot==='game'?'panels':'home',args.path);
   if(action==='backgroundPeek')return {image:require('./assets.cjs').preview(args.path)};
   if(action==='backgroundClear')return require('./assets.cjs').clear(this.root,args.slot==='game'?'panels':'home');
