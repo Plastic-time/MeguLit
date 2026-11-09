@@ -21,7 +21,7 @@ class Reader{
   }
   const config=this.runtime.config();
   if(message.gameProcessId&&message.gameProcessId!==this.gamePid){this.gamePid=message.gameProcessId;this.gameId=null;this.pendingLines=[];this.translation?.clearContext();this.setWorkPrompt('');this.stats.reset();const pid=this.gamePid;
-   require('../core/game-fonts.cjs').exePath(pid).then(exe=>{exe=require('./launch-path.cjs').canonical(exe);if(this.gamePid!==pid)return;this.gameExe=exe;this.translation?.clearContext();const db=openStore(this.root);try{const game=require('./library.cjs').activeGameForProgram(db,exe);this.gameId=game?.id||null;this.setWorkPrompt(game?.id|| (exe?'exe-'+require('node:crypto').createHash('sha256').update(exe.toLowerCase()).digest('hex'):''));for(const line of this.pendingLines||[])this.stats.line({...line,gameId:this.gameId});this.pendingLines=null;this.runtime.emit('reader-event',{type:'activeGame',legacyId:game?.legacy_id??null});}finally{db.close();}}).catch(()=>{});this.fonts.detect(pid).catch(()=>{});
+   require('../core/game-fonts.cjs').exePath(pid).then(exe=>{exe=require('./launch-path.cjs').canonical(exe);if(this.gamePid!==pid)return;this.gameExe=exe;this.refreshTextSource();this.translation?.clearContext();const db=openStore(this.root);try{const game=require('./library.cjs').activeGameForProgram(db,exe);this.gameId=game?.id||null;this.setWorkPrompt(game?.id|| (exe?'exe-'+require('node:crypto').createHash('sha256').update(exe.toLowerCase()).digest('hex'):''));for(const line of this.pendingLines||[])this.stats.line({...line,gameId:this.gameId});this.pendingLines=null;this.runtime.emit('reader-event',{type:'activeGame',legacyId:game?.legacy_id??null});}finally{db.close();}}).catch(()=>{});this.fonts.detect(pid).catch(()=>{});
   }
   if(message.bound===false&&this.gal?.process&&this.gal.process.exitCode!==null&&!this.gal.stopped){this.runtime.readerReady=false;this.runtime.readerError='READER_NATIVE_EXITED';this.runtime.emit('reader-health',{ready:false,error:'READER_NATIVE_EXITED'});}
   if(message.type==='gameClosed'){this.gameId=null;this.gamePid=null;this.pendingLines=null;this.setWorkPrompt('');this.stats.reset();}
@@ -100,6 +100,8 @@ class Reader{
  // Translation written back into the game (embedTranslation): the hook bridge holds the line until this answers (about
  // 3.7 s); an empty answer lets the original line through. Lines are cached so the reader page, which asks for the
  // same line a moment later, and repeated lines (backlog, redraws) do not call the translation service again.
+ // The imported script source (Chinese patch or Japanese original) for the running game, if one lines up.
+ refreshTextSource(){try{const hooks=this.gal?.hooks;if(!hooks)return;hooks.originalText=this.gameExe?require('./original-text.cjs').provider(this.root,this.gameExe):null;}catch{}}
  embedKey(text){return String(text||'').replace(/\s+/g,'');}
  embedCached(text,value){this.embedCache??=new Map();const key=this.embedKey(text);if(!key)return undefined;if(value===undefined)return this.embedCache.get(key);this.embedCache.delete(key);this.embedCache.set(key,value);if(this.embedCache.size>800)this.embedCache.delete(this.embedCache.keys().next().value);return value;}
  async embedTranslate(id,text){

@@ -75,11 +75,33 @@ function importOriginal(root,db,id,dir){
   return writeState(root,id,{original:{dir,file,sha256:hash,index,codepage:ain.codepage,lines:ain.lines.length,executable:exe?path.join(dir,exe):''},alignment,status:alignment.reliable?'ready':'unreliable',mode:readState(root)[id]?.mode||(alignment.reliable?'original':'off'),error:''});
  }catch(error){writeState(root,id,{status:'failed',error:String(error.message||error)});throw error;}
 }
+// ---- Chinese patch import (user, 2026-11-09): the game runs in Japanese and a translation group's patch is imported --
+// The patch's script is read with the same engine adapter and lined up with the running Japanese script; the patch's
+// line i then is the translation of Japanese line i (zero-latency bilingual, the group's own wording). The patch may
+// be the patch folder itself or an unpacked archive, so its script is looked for a few folders deep.
+function findScript(dir,base,depth=3){const here=locate(dir,base);if(here)return here;if(depth<=0)return null;let names=[];try{names=fs.readdirSync(dir,{withFileTypes:true});}catch{return null;}
+ for(const e of names){if(!e.isDirectory()||/^(save|savedata|\.megulit)/i.test(e.name))continue;const found=findScript(path.join(dir,e.name),base,depth-1);if(found)return found;}return null;}
+function importPatch(root,db,id,dir){
+ const row=gameRow(db,id);if(typeof dir!=='string'||!path.isAbsolute(dir)||!fs.statSync(dir,{throwIfNoEntry:false})?.isDirectory())throw Error('INVALID_PATCH_DIRECTORY');
+ if(path.resolve(dir).toLowerCase()===path.dirname(row.executable).toLowerCase())throw Error('PATCH_IS_RUNNING_COPY');
+ const state=scanRunning(root,id,row.executable);if(!state.runtime)throw Error(state.error||'NO_SUPPORTED_SCRIPT');
+ const loc=findScript(dir,path.parse(state.runtime.file).name);if(!loc||loc.engine!==(state.runtime.engine||'system4'))throw Error('PATCH_SCRIPT_NOT_FOUND');
+ const hash=fingerprint(loc);if(hash===state.runtime.sha256)throw Error('PATCH_SAME_AS_RUNNING');
+ const script=readScript(loc),runtime=readIndex(state.runtime.index),nonEmpty=script.lines.filter(t=>t.trim()).length,japanese=script.lines.filter(t=>t.trim()&&japaneseLine(t)).length;
+ // A patch must actually be translated: most of its lines are no longer Japanese.
+ if(!nonEmpty||japanese>=nonEmpty*.5)throw Error('PATCH_NOT_TRANSLATED');
+ // Lines the patch left in Japanese must equal the running script at the same index (same measure as the original import).
+ const alignment=align({...script,structure:script.structure},runtime);
+ const index=writeIndex(root,id,'patch-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'patch',engine:script.engine,version:script.version,codepage:script.codepage,source:{file:loc.target,sha256:hash,dir},structure:script.structure,lines:script.lines});
+ return writeState(root,id,{patch:{dir,file:loc.target,sha256:hash,index,lines:script.lines.length},patchAlignment:alignment,patchStatus:alignment.reliable?'ready':'unreliable',error:''});
+}
+function clearPatch(root,id){return writeState(root,id,{patch:null,patchAlignment:null,patchStatus:'none'});}
 function status(root,db,id){
  const row=gameRow(db,id),saved=readState(root)[id];let state=saved;
  try{if(!saved?.runtime||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,status:'failed',error:String(error.message||error)};}
  const {index:_a,...runtime}=state?.runtime||{},{index:_b,...original}=state?.original||{};
- return {engine:state?.engine||'',status:state?.status||'unsupported',mode:state?.mode||'off',error:state?.error||'',lastSearch:state?.lastSearch?{at:state.lastSearch.at,found:state.lastSearch.found,searched:state.lastSearch.searched,complete:state.lastSearch.complete}:null,runtime:state?.runtime?runtime:null,original:state?.original?original:null,alignment:state?.alignment||null};
+ const patchInfo=state?.patch?{dir:state.patch.dir,file:state.patch.file,lines:state.patch.lines}:null;
+ return {patch:patchInfo,patchStatus:state?.patchStatus||'none',patchAlignment:state?.patchAlignment||null,engine:state?.engine||'',status:state?.status||'unsupported',mode:state?.mode||'off',error:state?.error||'',lastSearch:state?.lastSearch?{at:state.lastSearch.at,found:state.lastSearch.found,searched:state.lastSearch.searched,complete:state.lastSearch.complete}:null,runtime:state?.runtime?runtime:null,original:state?.original?original:null,alignment:state?.alignment||null};
 }
 function setMode(root,id,mode){if(!['off','original'].includes(mode))throw Error('INVALID_TEXT_MODE');const s=readState(root)[id];if(mode==='original'&&s?.status!=='ready')throw Error('ORIGINAL_NOT_READY');return writeState(root,id,{mode});}
 
@@ -103,8 +125,16 @@ class Matcher{
 // The provider the hook pipeline consults for one running executable, or null when nothing reliable is set up.
 function provider(root,executable){
  const state=Object.values(readState(root)).find(s=>s?.runtime?.file&&path.dirname(s.runtime.file).toLowerCase()===path.dirname(String(executable)).toLowerCase());
- if(!state||state.mode!=='original'||state.status!=='ready'||!state.original?.index)return null;
- try{if(fingerprint({engine:state.runtime.engine||'system4',target:state.runtime.file})!==state.runtime.sha256)return null;const m=new Matcher(readIndex(state.runtime.index).lines,readIndex(state.original.index).lines);return {resolve:text=>m.match(text)};}catch{return null;}
+ if(!state)return null;
+ try{if(fingerprint({engine:state.runtime.engine||'system4',target:state.runtime.file})!==state.runtime.sha256)return null;
+  if(state.mode==='original'&&state.status==='ready'&&state.original?.index){const m=new Matcher(readIndex(state.runtime.index).lines,readIndex(state.original.index).lines);
+   // A patched game shown in Japanese: the patched line itself is the group's translation of the restored line.
+   return {kind:'original',resolve:text=>m.match(text)};}
+  if(state.patchStatus==='ready'&&state.patch?.index){const m=new Matcher(readIndex(state.runtime.index).lines,readIndex(state.patch.index).lines);
+   // The Japanese game with an imported patch: the line stays Japanese; the patch's line at the same place is its translation.
+   return {kind:'patch',resolve:text=>{const r=m.match(text);return r.japanese!==undefined?{...r,translation:r.japanese,japanese:undefined}:r;}};}
+  return null;
+ }catch{return null;}
 }
 // ---- Automatic search for the user's own Japanese copy ------------------------------------------
 // Looks on local drives for a script with the same name as the running one (another install, a store library,
@@ -127,4 +157,4 @@ async function discover(root,db,id,options={}){
  writeState(root,id,{status:state.original?.index?(state.alignment?.reliable?'ready':'unreliable'):status,lastSearch:{at:Date.now(),found:search.found.length,complete:search.complete,searched:search.searched,checked}});
  return {notFound:true,search:{found:search.found.length,complete:search.complete,searched:search.searched,checked}};
 }
-module.exports={locate,readScript,ADAPTERS,readAin,align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,norm,discover,findCandidates};
+module.exports={importPatch,clearPatch,findScript,locate,readScript,ADAPTERS,readAin,align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,norm,discover,findCandidates};

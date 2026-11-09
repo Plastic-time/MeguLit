@@ -54,3 +54,27 @@ test('local search finds same-named scripts outside the running folder only',asy
 });
 test('AIN v12+ MSG1 tables are de-obfuscated',()=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-msg1-'));fs.writeFileSync(path.join(dir,'x.ain'),ain(original,'sjis',['main'],true));assert.deepEqual(ot.readAin(path.join(dir,'x.ain')).lines,original);fs.rmSync(dir,{recursive:true,force:true});});
 test('BGI scenario archives decompress to Japanese script lines (local install, skipped when absent)',{skip:!fs.existsSync('E:/GAL/素晴日/素晴らしき日々HD版/data01101.arc')},()=>{const bgi=require('../services/original-engines/bgi.cjs');const entry=bgi.readArc('E:/GAL/素晴日/素晴らしき日々HD版/data01101.arc')[0];const lines=bgi.scriptLines(bgi.dsc(entry.data));assert(lines.includes('ボクたちは'));assert.equal(ot.locate('E:/GAL/素晴日/素晴らしき日々HD版','BGI').engine,'bgi');});
+
+// Chinese patch import (user, 2026-11-09): the game runs in Japanese; a translation group's patch (even nested in an
+// unpacked folder) is lined up with it, and each captured Japanese line gets the group's line as its translation.
+test('an imported Chinese patch gives each Japanese line the group\'s translation, keeping the Japanese text',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-patch-root-')),game=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-patch-game-')),pack=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-patch-pack-'));
+ try{
+  fs.writeFileSync(path.join(game,'Game.ain'),ain(original,'sjis'));fs.writeFileSync(path.join(game,'Game.exe'),'x');
+  fs.mkdirSync(path.join(pack,'汉化补丁','data'),{recursive:true});fs.writeFileSync(path.join(pack,'汉化补丁','data','Game.ain'),ain(patched,'gbk'));
+  const row={id:'g1',executable:path.join(game,'Game.exe')},db={prepare:()=>({get:id=>id==='g1'?row:undefined})};
+  assert.throws(()=>ot.importPatch(root,db,'g1',game),/PATCH_IS_RUNNING_COPY/);
+  ot.importPatch(root,db,'g1',pack);
+  const s=ot.status(root,db,'g1');assert.equal(s.status,'native-japanese');assert.equal(s.patchStatus,'ready');assert.equal(s.patch.lines,7);
+  const p=ot.provider(root,row.executable);assert.equal(p.kind,'patch');
+  const r=p.resolve('「やっと来たね」');assert.equal(r.status,'exact');assert.equal(r.translation,'「你终于来了啊」');
+  const {HookNative}=require('../core/hook-native.cjs'),hook=Object.create(HookNative.prototype),events=[];hook.trace=()=>{};hook.emit=e=>events.push(e);hook.originalText=p;
+  assert.equal(hook.originalTextFor('「やっと来たね」'),'「やっと来たね」','the Japanese line is kept');
+  assert.deepEqual(events,[{type:'hookPatchTranslation',japanese:'「やっと来たね」',chinese:'「你终于来了啊」'}]);
+  events.length=0;hook.originalTextFor('くくく……いいザマだな');assert.deepEqual(events,[],'a line the patch left in Japanese is no translation');
+  ot.clearPatch(root,'g1');assert.equal(ot.provider(root,row.executable),null);
+  // A folder whose script is still Japanese is not taken as a patch.
+  const same=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-patch-ja-'));fs.writeFileSync(path.join(same,'Game.ain'),ain([...original.slice(0,6),'違う行'],'sjis'));
+  assert.throws(()=>ot.importPatch(root,db,'g1',same),/PATCH_NOT_TRANSLATED/);fs.rmSync(same,{recursive:true,force:true});
+ }finally{for(const d of [root,game,pack])fs.rmSync(d,{recursive:true,force:true});}
+});
