@@ -11,8 +11,8 @@ export function originalExecutableError(error,locale){const text=String(error?.m
 export async function openGameLanguage({id,api,invoke,locale,esc,toast,onChanged}){
  const [title,find,pick,close,hint,saved,searching]=labels[locale]||labels.en;
  const state=await api('game_original_executable',{id});
- const dialog=document.createElement('dialog');
- dialog.innerHTML=`<h2>${title}</h2><p>${hint}</p><p class="settings-help" role="status">${esc(state.executable||launchReason('JAPANESE_EXECUTABLE_REQUIRED',locale))}</p><label class="locale-toggle"><input type="checkbox" data-locale ${state.localeJapanese?'checked':''}><span class="review-switch" aria-hidden="true"></span><span><strong>${(localeWords[locale]||localeWords.en)[0]}</strong><small class="settings-help">${(localeWords[locale]||localeWords.en)[1]}</small></span></label><div class="dialog-actions"><button class="secondary" data-close>${close}</button><button class="secondary" data-find>${find}</button><button class="primary" data-pick>${pick}</button></div>`;
+ const dialog=document.createElement('dialog');dialog.className='exe-dialog';
+ dialog.innerHTML=`<h2>${title}</h2><p>${hint}</p><p class="exe-path" role="status" title="${esc(state.executable||'')}">${esc(state.executable||launchReason('JAPANESE_EXECUTABLE_REQUIRED',locale))}</p><label class="locale-toggle"><input type="checkbox" data-locale ${state.localeJapanese?'checked':''}><span class="review-switch" aria-hidden="true"></span><span><strong>${(localeWords[locale]||localeWords.en)[0]}</strong><small class="settings-help">${(localeWords[locale]||localeWords.en)[1]}</small></span></label><div class="dialog-actions"><button class="text-button exe-close" data-close>${close}</button><button class="secondary" data-find>${find}</button><button class="primary" data-pick>${pick}</button></div>`;
  document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
  dialog.querySelector('[data-close]').onclick=()=>dialog.close();
  const controls=[dialog.querySelector('[data-find]'),dialog.querySelector('[data-pick]')];
