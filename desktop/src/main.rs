@@ -173,6 +173,18 @@ async fn pick_executable(app:tauri::AppHandle,directory:Option<String>) -> Resul
     }).await.map_err(|e|e.to_string())?
 }
 
+// E280: manual patch pick. The title says which file to choose; any file type is accepted (the picked file's folder is read).
+#[tauri::command]
+async fn pick_patch_file(app:tauri::AppHandle,title:String,directory:Option<String>) -> Result<Option<String>,String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut picker=app.dialog().file().set_title(title);
+        if let Some(folder)=directory.map(PathBuf::from).filter(|folder|folder.is_absolute()){
+            if let Some(existing)=folder.ancestors().find(|part|part.is_dir()){picker=picker.set_directory(existing);}
+        }
+        picker.blocking_pick_file().map(|p|p.into_path().map(|v|v.to_string_lossy().to_string()).map_err(|e|e.to_string())).transpose()
+    }).await.map_err(|e|e.to_string())?
+}
+
 #[tauri::command]
 async fn pick_image(app:tauri::AppHandle) -> Result<Option<String>,String> {
     tauri::async_runtime::spawn_blocking(move || app.dialog().file().add_filter("Image",&["png","jpg","jpeg","jfif","jpe","webp","gif","bmp","avif"]).blocking_pick_file().map(|p|p.into_path().map(|v|v.to_string_lossy().to_string()).map_err(|e|e.to_string())).transpose()).await.map_err(|e|e.to_string())?
@@ -421,7 +433,7 @@ fn main() {
     let window_memory=window_memory::WindowMemory::new(&root);
     let state = DesktopState { root, exiting: AtomicBool::new(false), headless, splash,window_memory,reader_background:AtomicBool::new(true),home_transition:home_transition::HomeTransition::default() };
     tauri::Builder::default().manage(state).plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![service, tray_menu::tray_menu_action, window_action, pick_executable, pick_image, pick_directories, pick_backup, set_tray_language, reader_open, reader_connect, reader_restart, read_clipboard, moji_login, kanji_go_open, kanji_go_embed, kanji_go_hide, app_exit_for_update])
+        .invoke_handler(tauri::generate_handler![service, tray_menu::tray_menu_action, window_action, pick_executable, pick_patch_file, pick_image, pick_directories, pick_backup, set_tray_language, reader_open, reader_connect, reader_restart, read_clipboard, moji_login, kanji_go_open, kanji_go_embed, kanji_go_hide, app_exit_for_update])
         .setup(move |app| {
             broker::attach(app.handle().clone());
             if !headless{single_instance::watch(app.handle().clone(),app.state::<DesktopState>().root.clone());}
