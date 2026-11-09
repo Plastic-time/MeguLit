@@ -51,6 +51,10 @@ class LocalLearning{
   catch(error){
    // User report (2026-11-09): the worker died on start (a half-finished install) and every lookup said
    // "reinstall in settings" without saying where. Repair the reading components once on our own, then retry.
+   // A missing standard-library module (zipfile, encodings…) means MeguLit's own Python is damaged; reinstalling the
+   // dictionaries cannot fix that, the base runtime has to be set up again (the launcher does it on next start).
+   const missing=/No module named '([^'.]+)/.exec(String(error?.message||''))?.[1];
+   if(missing&&!['sudachipy','sudachidict_full','fugashi','unidic_lite'].includes(missing))throw Error('MeguLit 自带的 Python 不完整（缺少 '+missing+'），重装词典修不好：请完全退出 MeguLit（托盘图标也退出）再打开，会自动重新下载基础组件');
    if(this.selfRepaired)throw this.workerError(error);
    this.selfRepaired=true;this.onStatus({learningMessage:'分词组件无法启动，正在自动修复（重新下载 Sudachi 组件）…'});
    try{await this.install(true,true);await this.spawnWorker();}catch(again){throw this.workerError(again);}

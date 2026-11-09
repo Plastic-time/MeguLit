@@ -4,7 +4,12 @@
 use std::path::Path;
 #[cfg(windows)] use std::os::windows::process::CommandExt;
 
-pub fn ready(root:&Path)->bool{root.join("runtime/node.exe").is_file()}
+// User report (2026-11-09): an install interrupted by "file in use" left runtime/python without parts of its standard
+// library (No module named 'zipfile'), and node.exe alone said everything was fine. The base pack counts as ready only
+// when Python and its core library are there too; otherwise the setup window reinstalls it.
+pub fn ready(root:&Path)->bool{
+ ["runtime/node.exe","runtime/python/python.exe","runtime/python/Lib/zipfile/__init__.py","runtime/python/Lib/encodings/__init__.py"].iter().all(|p|root.join(p).is_file())
+}
 
 pub fn ensure(root:&Path)->bool{
  if ready(root){return true;}
