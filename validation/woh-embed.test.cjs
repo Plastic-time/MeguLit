@@ -79,3 +79,44 @@ test("E323 wiring: per-sentence indent, marker on the current line, box probes o
  assert.match(view,/\.tome-island-flow \.sentence-text\[data-megulit-native-breaks\]\{white-space:pre-wrap!important/,"a paragraph with the game's own breaks still wraps at the box width");
  assert.doesNotMatch(view,/--tomoyo-gal-gap'\)\)\|\|8/,'the slider gap is not added between lines');
 });
+
+test('E349: the TYPE-MOON hint stream (same hook code as the story) is never the WoH source; the story stream is selected',t=>{
+ const f=fixture(t);const sent=[];f.hook.process={stdin:{write(){},end(){}},kill(){},removeAllListeners(){}};f.hook.send=m=>sent.push(m);
+ f.hook.originalText={kind:'patch',resolve:text=>text.includes('ボイス')||text.includes('早送り')?{status:'none',method:'no-cover'}:{status:'exact'}};
+ assert.equal(f.hook.flowStory('ボイスを再生します'),false);assert.equal(f.hook.flowStory('　彼女がはじめて命に<rふ>触</r>れた。'),true);
+ f.hook.state.hookThreads=[{id:'hint',name:'typemoon',selected:true,embeddable:true,sample:'押している間、早送りします'},{id:'story',name:'typemoon',selected:false,embeddable:true,sample:'　数分後。'}];
+ f.line('ボイスを再生します');f.tick(500);
+ assert.deepEqual(f.sources(),[],'a control hint is not read');
+ assert.deepEqual(sent.filter(m=>m.type==='select').map(m=>m.id),['story'],'the story stream is selected instead');
+ delete f.hook.originalText;
+ assert.equal(f.hook.flowStory('押している間、早送りします'),false,'without the script table: no indent, no quote, no sentence end');
+ assert.equal(f.hook.flowStory('　もっとも、それは夏だけの話。'),true);
+});
+
+test('E349: 重新选取文本流 on WoH skips hint streams; earlier lines fade to 30 %; an overtaken page translation is asked again, never shown',()=>{
+ const gal=read('core/gal-native.cjs'),view=read('web/reader/modules/island-page.js'),ui=read('web/reader/modules/game-style-sync-ui.js');
+ assert.match(gal,/flow&&!this\.hooks\.flowStory\(t\)\?-5:0/);
+ assert.match(view,/Superseded sentence\|AbortError\|aborted\|已跳过过期\/i\.test\(String\(message\|\|''\)\)\)\{r\.requested=false;r\.state='pending';scheduleRetry\(\);return true;\}/);
+ assert.match(ui,/整页游戏：请在一页的第一句时校准/);
+});
+
+test('E350: hovering the control bar (tooltips run together) never reaches the page, never wins a stream pick, and the story stream wins back',t=>{
+ const f=fixture(t);const sent=[];f.hook.process={stdin:{write(){},end(){}},kill(){},removeAllListeners(){}};f.hook.send=m=>sent.push(m);
+ const joined='前のシーン、選択肢までジャンプします押している間、早戻ししますオートモードのＯＮ、ＯＦＦを切り替えますクイックセーブを行いますボイスを再生します';
+ assert.equal(HookNative.uiHelp(joined),true);assert.equal(HookNative.uiHelp('ボイスを再生します'),true);
+ for(const story of ['　もっとも、それは夏だけの話。','「わかりました」','そっちこそ、一度した約束は絶対守','鳶丸は開けっぱなしの扉を閉め、鍵をかけて'])assert.equal(HookNative.uiHelp(story),false,story);
+ // Even when the script table would (wrongly) accept it, a tooltip is not story.
+ f.hook.originalText={kind:'patch',resolve:()=>({status:'exact'})};assert.equal(f.hook.flowStory(joined),false);
+ // The tooltip stream got selected (hover on the bar); the next story line on the other stream takes the pick back.
+ f.hook.state.hookThreads=[{id:'hint',name:'typemoon',selected:true,embeddable:true,sample:joined},{id:'story',name:'typemoon',selected:false,embeddable:true,sample:'　数分後。'}];
+ f.line(joined);f.tick(500);
+ assert.deepEqual(f.sources(),[]);assert.deepEqual(sent.filter(m=>m.type==='select').map(m=>m.id),['story']);
+ // 重新选取文本流 never picks a tooltip stream, in any game.
+ const {GalNative}=require('../core/gal-native.cjs');const picked=[];
+ const g=Object.create(GalNative.prototype);g.state={gameProcessId:1,gameStarted:'1'};g.hooks={flowPage:false,state:{hookThreads:[{id:'a',selected:true,sample:'　数分後。'},{id:'help',selected:false,sample:'クイックロードを行います'},{id:'b',selected:false,sample:'「それは夏だけの話」'}]},select:id=>picked.push(id),flowStory:()=>true,flowStreamCheck(){}};
+ g.userStart=(profile,force,id)=>picked.push(id);
+ assert.deepEqual(g.reselectStream(),{selected:'b',name:undefined});assert.deepEqual(picked,['b'],'tooltip stream skipped');
+ // 校准当前句 (onlyIfBad) on a selected tooltip stream switches away from it.
+ g.hooks.state.hookThreads=[{id:'help',selected:true,sample:'クイックロードを行います'},{id:'a',selected:false,sample:'　数分後。'}];picked.length=0;g.skippedRun=null;
+ assert.deepEqual(g.reselectStream(true),{selected:'a',name:undefined});
+});

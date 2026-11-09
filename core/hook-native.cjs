@@ -65,7 +65,7 @@ class HookNative{
    if(m.type==='hookName'&&typeof m.text==='string'){const n=speakerName(m.text);if(n)this.speaker={text:n,at:this.now()};return;}
    if(m.type==='hookThreads'&&Array.isArray(m.hookThreads)){// Unity games create a stream per String-method call site (often 100+); keep the selected and embeddable ones
    // ahead of the cut so a late dialogue stream such as Naninovel's printer is never dropped.
-   const rank=t=>(t&&t.selected===true?2:0)+(t&&t.embeddable===true?1:0);this.notify({hookAvailable:true,hookThreads:m.hookThreads.slice().sort((a,b)=>rank(b)-rank(a)).slice(0,100).filter(t=>typeof t.id==='string'&&t.id.length<100).map(t=>({id:t.id,name:String(t.name||'').slice(0,100),code:String(t.code||'').slice(0,1000),sample:String(t.sample||'').slice(0,110),selected:t.selected===true,embeddable:t.embeddable===true}))});if(this.preferredThread&&this.state.hookThreads.some(t=>t.id===this.preferredThread)){const id=this.preferredThread;this.preferredThread=null;this.select(id);}return;}
+   const rank=t=>(t&&t.selected===true?2:0)+(t&&t.embeddable===true?1:0);this.notify({hookAvailable:true,hookThreads:m.hookThreads.slice().sort((a,b)=>rank(b)-rank(a)).slice(0,100).filter(t=>typeof t.id==='string'&&t.id.length<100).map(t=>({id:t.id,name:String(t.name||'').slice(0,100),code:String(t.code||'').slice(0,1000),sample:String(t.sample||'').slice(0,110),selected:t.selected===true,embeddable:t.embeddable===true}))});if(this.preferredThread&&this.state.hookThreads.some(t=>t.id===this.preferredThread)){const id=this.preferredThread;this.preferredThread=null;this.select(id);}else this.flowStreamCheck();return;}
    if(['hookStatus','hookError','hookHeartbeat'].includes(m.type)){const value={};for(const k of ['processAttached','streamSelected','receivedText'])if(typeof m[k]==='boolean')value[k]=m[k];if(typeof m.replacementState==='string')value.replacementState=this.verified&&this.enabled?'user-verified':m.replacementState;if(typeof m.hookActive==='boolean')value.hookActive=m.hookActive;if(m.hookMessage)value.hookMessage=String(m.hookMessage).slice(0,400);if(m.type!=='hookError'&&(value.receivedText??this.state.receivedText)&&(value.processAttached??this.state.processAttached)&&(value.streamSelected??this.state.streamSelected))value.hookMessage='已收到真实游戏台词；'+((value.replacementState||this.state.replacementState)==='user-verified'?'原文隐藏已由用户确认':'原文替换状态请见分阶段诊断');this.notify(value);if(m.type==='hookError')this.retryAt=this.now()+1000;this.syncMarker();}
   });this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookSource:this.lastSource||null,hookRecovering:!!this.lastSource,hookFramework:this.state.hookFramework||null,hookMessage:'正在连接 LunaHook；等待实际文本流'});
  }
@@ -89,8 +89,11 @@ class HookNative{
  languageCheck(text){try{const t=String(text||'').replace(/%l[^;%]*;[^%]*%l;/g,'');if(!t.trim())return;
   if(!HookNative.sjis){const dec=new TextDecoder('shift_jis'),set=new Set();for(let a=0x81;a<=0xfc;a++)for(let b=0x40;b<=0xfc;b++){const c=dec.decode(Buffer.from([a,b]));if(c.length===1&&c!=='�')set.add(c);}HookNative.sjis=set;}
   const han=t.match(/[一-鿿]/g)||[],kana=/[぀-ヿ]/.test(t),foreign=han.filter(c=>!HookNative.sjis.has(c)).length;
-  const chinese=!kana&&han.length>=4;this.chineseRun=chinese?(this.chineseRun||0)+1:0;this.chineseForeign=chinese?(this.chineseForeign||0)+foreign:0;
-  if(this.chineseRun>=3&&this.chineseForeign>=2&&!this.state?.sourceChinese){this.trace('source looks like Simplified Chinese');this.notify({sourceChinese:true,hookMessage:'读到的台词是简体中文，不是日文原文：请先用「日文原版恢复」或换成日文版，再读游戏'});}
+  /* E347 (user 2026-11-10, Steam 沙耶の唄 with a Chinese patch): Chinese text read as Shift-JIS comes out as kanji mixed
+     with half-width katakana (ｹｯｦ) and boxes, which also counts as a Chinese build. */
+  const garbled=han.length>=4&&(t.match(/[\uff61-\uff9f\u25a1\ufffd]/g)||[]).length>=3;
+  const chinese=(!kana||garbled)&&han.length>=4;this.chineseRun=chinese?(this.chineseRun||0)+1:0;this.chineseForeign=chinese?(this.chineseForeign||0)+foreign:0;
+  if(this.chineseRun>=3&&(this.chineseForeign>=2||garbled)&&!this.state?.sourceChinese){this.trace('source looks like Simplified Chinese');this.notify({sourceChinese:true,hookMessage:'当前是中文版：如果游戏支持日语，先在 Steam（游戏属性 → 语言）或游戏自己的设置里切换成日语；否则在作品页的「日文原版启动程序」改成日文版；没有日文版的话，去「工具 → 日文原版恢复」替换成日文版，再启动游戏'});}
   else if(kana&&this.state?.sourceChinese)this.notify({sourceChinese:false});}catch{}}
  source(m,name){
   // The game's own ruby readings ride after the line as \x1d base \x1c reading pairs (ISLAND hook): split them off
@@ -103,7 +106,7 @@ class HookNative{
   /* E320 WITCH ON THE HOLY NIGHT (flow page): its title-screen help ("Change text display speed.Change auto-scroll speed." ...) came through the dialogue hook
      and was read as a story line, and one line once arrived twice in one piece. Text without any Japanese is menu/help text here, and a line made of
      the same sentence twice is that sentence. */
-  if(this.flowPage){if(!/[\u3040-\u30ff\u3400-\u9fff]/.test(text)){this.trace('flow page: non-Japanese text dropped (menu/help) '+JSON.stringify(text.slice(0,40)));return;}
+  if(this.flowPage){if(!this.flowStory(text)){this.trace('flow page: not a story line, dropped (menu/help) '+JSON.stringify(text.slice(0,40)));this.flowStreamCheck(true);return;}
    const once=HookNative.undouble(text);if(once!==text){this.trace('flow page: doubled line collapsed chars='+text.length);this.source({...m,text:once},name);return;}}
   /* E282 (user: game ruby first): readings the game's own script gives this line (KiriKiri Z scene files) join the ruby
      the hook delivered; only for a line the script matched, and never twice for one base. */
@@ -190,6 +193,23 @@ class HookNative{
  // "A。A。" (also with the game's leading ideographic spaces) -> "A。"; anything else unchanged.
  static undouble(text){const n=text.replace(/[\s\u3000]/g,'');if(n.length<12||n.length%2||n.slice(0,n.length/2)!==n.slice(n.length/2)||!/[。！？!?」』…―）)]$/.test(n))return text;
   let seen=0;for(let i=0;i<text.length;i++){if(!/[\s\u3000]/.test(text[i])&&++seen===n.length/2)return text.slice(0,i+1);}return text;}
+ /* E349 (user, WoH 1.2.7: "不替换也不隐藏也不内嵌", the overlay showed only control hints such as "ボイスを再生します").
+    TYPE-MOON's hook point carries two streams with the same hook code: the story text and the title/menu control hints.
+    The hint stream appears first (title screen) and the remembered stream is matched by hook code, so the hints were
+    selected and the story was neither read, hidden nor replaced. A story line is one the game's own script table has
+    (original-text provider); without the table, one with the game's paragraph indent, a quote or sentence-final
+    punctuation. A selected stream whose text is not story is switched to the stream that carries story. */
+ flowStory(text){const t=String(text||'').replace(/<r[^<>]*>|<\/r>/g,'').trim();if(!t||!/[\u3040-\u30ff\u3400-\u9fff]/.test(t)||HookNative.uiHelp(t))return false;
+  try{const r=this.originalText?this.resolveSource(t):null;if(r&&r.status)return r.status!=='none';}catch{}
+  return /^[\u3000「『“（(]/.test(String(text||''))||/[。！？!?…」』”）)―]$/.test(t);}
+ flowStreamCheck(now=false){if(!this.flowPage||!this.process)return false;const threads=this.state.hookThreads||[],cur=threads.find(t=>t.selected);if(!cur||!now&&(!cur.sample||this.flowStory(cur.sample)))return false;
+  const next=threads.filter(t=>t.id!==cur.id&&t.sample&&this.flowStory(t.sample)).sort((a,b)=>(b.embeddable===true)-(a.embeddable===true))[0];if(!next)return false;
+  if(this.flowSwitchAt&&this.now()-this.flowSwitchAt<2000)return false;this.flowSwitchAt=this.now();this.trace('flow page: selected stream carries menu/help text, switching to '+next.id);this.select(next.id);return true;}
+ /* E350 (user, WoH: hovering the top control bar filled the page with its tooltips, run together). Control hints are short
+    descriptions ending in ます/します/ません with no sentence stop, no quote and no paragraph indent; a hover over several
+    buttons joins them into one string. Such text (each joined piece) is never a story line and never a stream to pick. */
+ static uiHelp(text){const t=String(text||'').replace(/<r[^<>]*>|<\/r>/g,'').replace(/\s+$/,'');if(!t||/[「」『』“”。！？!?]/.test(t)||/^[\u3000\s]/.test(t))return false;
+  const parts=t.split(/(?<=ます|ません)/).map(p=>p.trim()).filter(Boolean);return parts.length>0&&parts.every(p=>/(?:ます|ません)$/.test(p)&&[...p].length<=32);}
  static holdFor(engine){return engine==='ocr'?5000:1500;}
  releasePageHeld(){const K=this.pageState;if(!K)return;const held=K.held;K.held=[];clearTimeout(K.timer);for(const h of held)this.deliverSource(h.text,h.origin);}
  // A render burst can report several sentences before the host flushes their source frames.
