@@ -232,6 +232,10 @@ input.switch:focus-visible{box-shadow:none!important;outline:2px solid rgba(237,
 .sp-scene{background-color:transparent!important;background-size:cover!important;background-position:center!important;background-attachment:fixed!important}
 .sp-scene{filter:none}
 .sp-scene::before{background:none!important}
+/* The preview stays in view (sticky) while the options scroll under it, so it sat on top of the first sliders and every
+   click landed on the preview. It only shows things; let clicks through to the options, except its own header buttons. */
+.sp-preview{pointer-events:none}
+.sp-preview .sp-head button{pointer-events:auto}
 
 .sp-next{margin-left:auto;height:26px;padding:0 12px;border-radius:999px;border:1px solid rgba(237,181,110,.35);font-size:12px;color:#edb56e;background:rgba(237,181,110,.06);transition:background .2s,border-color .2s}
 .sp-next:hover{background:rgba(237,181,110,.14);border-color:rgba(237,181,110,.6)}
