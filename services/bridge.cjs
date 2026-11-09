@@ -164,7 +164,7 @@ async function dispatch(request,runtime=null) {
       case 'settings_save':{const result=new(require('./settings.cjs').Settings)(root).save({scope:request.scope,values:request.values,profile:String(request.profile||'')});runtime?.settingsSaved(request);return result;}
       case 'save_key':return new(require('./settings.cjs').Settings)(root).saveKey({provider:request.provider,baseUrl:request.baseUrl,apiKey:request.apiKey});
       case 'anki_find':return {path:runtime.ankiProcess().find()};
-      case 'anki_install_connect':return await require('../core/anki-process.cjs').installAnkiConnect();
+      case 'anki_install_connect':return await require('../core/anki-process.cjs').installAnkiConnect(process.env,runtime?{locate:()=>runtime.ankiProcess().find()}:{});
       case 'anki_connect_status':return {installed:require('../core/anki-process.cjs').ankiConnectInstalled()};
       case 'anki_launch':{const runner=runtime.ankiProcess(),hide=!!runtime.config().ankiHidden;if(String(request.reason||'')==='ANKI_PORT_TAKEN')return await runner.repair({hide});return await runner.start({hide});}
       case 'anki_repair':return await runtime.ankiProcess().repair({hide:!!runtime.config().ankiHidden});

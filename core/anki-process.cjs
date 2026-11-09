@@ -12,9 +12,24 @@ function candidates(configured,env=process.env){
  const venv=env.LOCALAPPDATA?['ankiw.exe','anki.exe'].map(name=>path.join(env.LOCALAPPDATA,'AnkiProgramFiles','.venv','Scripts',name)):[];
  return [configured,...roots.map(folder=>path.join(folder,'Anki','anki.exe')),...venv].filter(Boolean);
 }
+// Target of a Windows shortcut (.lnk, MS-SHLLINK): the local base path stored in its LinkInfo. '' when unreadable.
+// That path is often stored only in the ANSI code page; a non-ASCII one is read back through the Shell as UTF-8.
+function shortcutTarget(file){
+ try{
+  const b=fs.readFileSync(file);if(b.length<0x4c||b.readUInt32LE(0)!==0x4c)return '';
+  const flags=b.readUInt32LE(0x14);let at=0x4c;if(flags&1)at+=2+b.readUInt16LE(at);if(!(flags&2))return '';
+  const info=at,header=b.readUInt32LE(info+4),infoFlags=b.readUInt32LE(info+8);if(!(infoFlags&1))return '';
+  const wide=offset=>{const start=info+offset;let end=start;while(end+1<b.length&&b.readUInt16LE(end))end+=2;return b.toString('utf16le',start,end);};
+  if(header>=0x24)return wide(b.readUInt32LE(info+28))+wide(b.readUInt32LE(info+32));
+  const narrow=offset=>{const start=info+offset;const end=b.indexOf(0,start);return b.subarray(start,end<0?b.length:end);},ansi=Buffer.concat([narrow(b.readUInt32LE(info+16)),narrow(b.readUInt32LE(info+24))]);
+  if(!ansi.some(byte=>byte>0x7e))return ansi.toString('latin1');
+  return require('node:child_process').execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command','[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;(New-Object -ComObject WScript.Shell).CreateShortcut($env:MEGULIT_LNK).TargetPath'],{encoding:'utf8',windowsHide:true,timeout:10000,env:{...process.env,MEGULIT_LNK:file}}).replace(/^﻿/,'').trim();
+ }catch{return '';}
+}
 // Cold detection (user: Anki installed outside C: was never found): when no default location has Anki, read where
-// Windows says it was installed (uninstall entries and App Paths, per user and per machine), then other drives' usual
-// folders. Read-only registry queries; a hit is remembered for the session.
+// Windows says it was installed (uninstall entries and App Paths, per user and per machine), then the Start menu
+// shortcut the installer made, then other drives' usual folders. The official MSI leaves InstallLocation and
+// DisplayIcon empty, so a custom install folder is only on record in that shortcut. Read-only; a hit is remembered.
 let coldHit;
 function coldCandidates(env=process.env){
  const B=String.fromCharCode(92);
@@ -23,9 +38,14 @@ function coldCandidates(env=process.env){
  for(const root of [['HKCU','SOFTWARE'].join(B),['HKLM','SOFTWARE'].join(B),['HKLM','SOFTWARE','WOW6432Node'].join(B)]){
   for(const block of query(root+['','Microsoft','Windows','CurrentVersion','Uninstall'].join(B)).split(/\r?\n\r?\n/)){
    if(!/DisplayName\s+REG_SZ\s+Anki\b/i.test(block))continue;
-   for(const m of block.matchAll(/(InstallLocation|DisplayIcon|UninstallString)\s+REG_(?:EXPAND_)?SZ\s+(.+)/gi)){let v=m[2].trim().replace(/,\d+$/,'').replace(/"/g,'');if(/\.exe$/i.test(v))v=path.dirname(v);out.push(path.join(v,'anki.exe'),path.join(v,'ankiw.exe'));}
+   // The official MSI leaves InstallLocation empty and its UninstallString is "MsiExec.exe /X{...}": an empty value
+   // must not take the next line, and only absolute folders are used.
+   for(const m of block.matchAll(/(InstallLocation|DisplayIcon|UninstallString)[ \t]+REG_(?:EXPAND_)?SZ[ \t]+(\S[^\r\n]*)/gi)){let v=m[2].trim().replace(/,\d+$/,'').replace(/"/g,'');if(/^msiexec/i.test(path.basename(v.split(/\s+\//)[0])))continue;if(/\.exe$/i.test(v))v=path.dirname(v);if(path.isAbsolute(v))out.push(path.join(v,'anki.exe'),path.join(v,'ankiw.exe'));}
   }
   const app=query(root+['','Microsoft','Windows','CurrentVersion','App Paths','anki.exe'].join(B)).match(/\(Default\)\s+REG_SZ\s+(.+)/i);if(app)out.push(app[1].trim().replace(/"/g,''));
+ }
+ for(const menu of [env.APPDATA&&path.join(env.APPDATA,'Microsoft','Windows','Start Menu','Programs'),env.ProgramData&&path.join(env.ProgramData,'Microsoft','Windows','Start Menu','Programs')].filter(Boolean)){
+  for(const link of [path.join(menu,'Anki','Anki.lnk'),path.join(menu,'Anki.lnk')]){const target=shortcutTarget(link);if(/\.exe$/i.test(target))out.push(target);}
  }
  for(const drive of 'CDEFGH')out.push(drive+[':','Anki','anki.exe'].join(B),drive+[':','Program Files','Anki','anki.exe'].join(B),drive+[':','Apps','Anki','anki.exe'].join(B));
  if(env.USERPROFILE)out.push(path.join(env.USERPROFILE,'scoop','apps','anki','current','anki.exe'));
@@ -158,11 +178,13 @@ const ANKICONNECT_CODE='2055492159';
 function ankiRunning(){if(ankiProcesses().length)return true;try{return /^"?(anki|ankiw)\.exe"?,/im.test(require('node:child_process').execFileSync('tasklist',['/fo','csv','/nh'],{encoding:'utf8',windowsHide:true,timeout:5000}));}catch{return false;}}
 // Anki 25.x runs as pythonw.exe from its own venv, which tasklist names only "pythonw.exe"; find those by path.
 function ankiProcesses(){try{const out=require('node:child_process').execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',"Get-Process -ErrorAction SilentlyContinue|Where-Object{$_.Path -and ($_.ProcessName -match '^ankiw?$' -or $_.Path -match 'AnkiProgramFiles')}|ForEach-Object{$_.Id}"],{encoding:'utf8',windowsHide:true,timeout:15000});return out.split(/\r?\n/).map(Number).filter(n=>n>4);}catch{return [];}}
-async function installAnkiConnect(env=process.env){
+// locate: the Anki program MeguLit can find (the configured path first). Without Anki2 that tells "never started"
+// from "not installed", which needs a different hint.
+async function installAnkiConnect(env=process.env,{locate=()=>find('',env)}={}){
  if(!env.APPDATA)throw Error('ANKI_ADDON_FOLDER_MISSING');
  const base=path.join(env.APPDATA,'Anki2','addons21'),target=path.join(base,ANKICONNECT_CODE);
  if(ankiConnectInstalled(env))return {installed:true,already:true};
- if(!fs.existsSync(path.join(env.APPDATA,'Anki2')))throw Error('ANKI_NEVER_STARTED');
+ if(!fs.existsSync(path.join(env.APPDATA,'Anki2')))throw Error(locate()?'ANKI_NEVER_STARTED':'ANKI_NOT_INSTALLED');
  if(ankiRunning())throw Error('ANKI_RUNNING');
  const response=await fetch('https://ankiweb.net/shared/download/'+ANKICONNECT_CODE+'?v=2.1&p=250900',{redirect:'follow',signal:AbortSignal.timeout(60000),headers:{'User-Agent':'MeguLit'}});
  if(!response.ok)throw Error('ANKICONNECT_DOWNLOAD_FAILED: HTTP '+response.status);
@@ -176,4 +198,4 @@ async function installAnkiConnect(env=process.env){
   return {installed:true,path:target};
  }finally{fs.rmSync(work,{recursive:true,force:true});}
 }
-module.exports={AnkiProcess,find,candidates,coldCandidates,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};
+module.exports={AnkiProcess,find,candidates,coldCandidates,shortcutTarget,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};
