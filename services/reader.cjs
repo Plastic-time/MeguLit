@@ -32,13 +32,13 @@ class Reader{
   if(message.type==='hookGameUi'){
    const kind=message.kind;
    if(['choice','settings'].includes(kind)){
-    this.immersion.scene(false);
+    this.immersion.scene(false,'game-ui '+kind);
     this.gal?.send({type:'gameUi',items:require('../core/game-ui.cjs').uiItems(message.items,kind,this.gal?.preferences)});
    }else if(['dialogue','transition','clear'].includes(kind)){
     this.gal?.send({type:'gameUi',items:[]});this.immersion.scene(kind==='dialogue');
    }
   }
-  if(message.type==='dialogScene')this.immersion.scene(message.visible);
+  /* E322: every whole-layer hide or show is logged with its cause (user: the layer faded out by itself in several games). */if(message.type==='dialogScene'||message.type==='dialogSceneKept')this.logVisibility({type:message.type,visible:message.visible,reason:message.reason});if(message.type==='dialogScene')this.immersion.scene(message.visible,'scene '+(message.reason||''));
   if(message.type==='dialogAuto')this.immersion.autoBox(message.visible);
   if(message.type==='readerInput')this.immersion.skip(message.skipHeld);
   if(message.type==='hookDialog')this.immersion.engine(message.visible,message.engine);
@@ -54,6 +54,7 @@ class Reader{
   }const line={gameId:this.gameId,text:message.hookSource,sequence:message.hookSequence,active:message.hookActive,recovering:message.hookRecovering,origin:message.hookSourceOrigin};if(this.pendingLines){if(this.pendingLines.length<40)this.pendingLines.push(line);}else this.stats.line(line);}
   this.runtime.emit('reader-event',message);if(typeof message.hotkey==='boolean')this.runtime.emit('reader-health',this.runtime.readerStatus?.()||{});
  }
+ logVisibility(entry){try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),...entry})+'\n');}catch{}}
  selectGame(processName,enter=true,executable=''){
   if(!this.gal)return;
   if(this.gal.preferences.gameProcess!==processName||this.expectedExecutable&&this.expectedExecutable!==executable)this.gal.send({type:'unbind'});
@@ -67,7 +68,7 @@ class Reader{
   if(this.gal)return {attached:true};
   this.overlayPid=pid;
   const layout={...require('../core/layout.cjs'),overlayHwnd:String(hwnd)};
-  this.immersion=new(require('../core/immersion.cjs').Immersion)(message=>{this.runtime.emit('reader-event',{type:'dialogVisibility',visible:message.dialogVisible});clearTimeout(this.hideTimer);if(message.dialogVisible===false)this.hideTimer=setTimeout(()=>this.gal?.send({type:'dialogVisibility',visible:false}),140);else this.gal?.send({type:'dialogVisibility',visible:message.dialogVisible});this.runtime.emit('reader-event',message);});this.immersion.configure(this.runtime.config());this.tick=setInterval(()=>this.immersion.tick(),100);this.tick.unref();
+  this.immersion=new(require('../core/immersion.cjs').Immersion)(message=>{this.logVisibility({type:'dialogVisibility',visible:message.dialogVisible,reason:message.reason});this.runtime.emit('reader-event',{type:'dialogVisibility',visible:message.dialogVisible});clearTimeout(this.hideTimer);if(message.dialogVisible===false)this.hideTimer=setTimeout(()=>this.gal?.send({type:'dialogVisibility',visible:false}),140);else this.gal?.send({type:'dialogVisibility',visible:message.dialogVisible});this.runtime.emit('reader-event',message);});this.immersion.configure(this.runtime.config());this.tick=setInterval(()=>this.immersion.tick(),100);this.tick.unref();
   this.fonts=new(require('../core/game-fonts.cjs').GameFonts)(layout,()=>{this.runtime.emit('reader-event',{type:'fonts',fonts:this.fonts.payload(true)});});
   this.gal=new(require('../core/gal-native.cjs').GalNative)(layout,pid,message=>this.event(message),this.runtime.spawnReaderNative);
   if(!this.gal.process){this.stop();throw Error('READER_NATIVE_MISSING');}

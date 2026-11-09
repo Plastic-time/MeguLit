@@ -344,13 +344,18 @@
     while (node) { node.setAttribute('data-gal-reader-container', ''); node = node.parentElement; }
   }
   function alignText() {
-    let leading=true;
+    /* E323 (user, WoH: every click pushed the previous line one space to the right): "leading" ran on across the whole
+       page, so only the first sentence in DOM order (the newest) lost its indent and every older one got it back.
+       It is per sentence now, and a flow page keeps the game's own paragraph indent on every line. */
     const spans=[...document.querySelectorAll('.sentence-text .char-token')];
-    for(const span of spans){
-      const text=span.textContent||'';
-      const hide=leading&&/^[ \t\u00a0\u3000]+$/.test(text);
-      if(hide)span.setAttribute('data-tomoyo-leading-space','');else span.removeAttribute('data-tomoyo-leading-space');
-      if(text.includes('\n'))leading=true;else if(!hide&&text)leading=false;
+    for(const sentence of document.querySelectorAll('.sentence-text')){
+      let leading=!sentence.closest('.tome-island-flow');
+      for(const span of sentence.querySelectorAll('.char-token')){
+        const text=span.textContent||'';
+        const hide=leading&&/^[ \t\u00a0\u3000]+$/.test(text);
+        if(hide)span.setAttribute('data-tomoyo-leading-space','');else span.removeAttribute('data-tomoyo-leading-space');
+        if(text.includes('\n'))leading=true;else if(!hide&&text)leading=false;
+      }
     }
     const context=document.createElement('canvas').getContext?.('2d');
     if(context){

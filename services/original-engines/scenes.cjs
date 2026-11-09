@@ -8,6 +8,7 @@
 //   artemis   PFS archives (pf6 plain, pf8 XOR with the SHA-1 of the index) and loose .ast files
 //   renpy     game/*.rpy; a patch is a tl/<language> folder of old/new pairs, matched by the original text
 //   siglus    Steam dat/*.dbs language tables (Summer Pockets): Japanese column + the Chinese column
+//   yuris     YU-RIS YPF archives (pac/ysbin.ypf + update*.ypf), YSTB scene files (yuris.cjs)
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const xp3=require('./xp3.cjs');
 const KANA=/[ぁ-ゖァ-ヺ]/g;
@@ -328,7 +329,9 @@ const hunex={
  patchLines:(base,found)=>kirikiriCx.patchLines(base,found),
 };
 
-const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex};
+// E329 YU-RIS (ysbin.ypf + update*.ypf, YSTB scenes): yuris.cjs.
+const yuris=require('./yuris.cjs');
+const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,8)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;}

@@ -107,6 +107,17 @@ test('the native pieces stay wired: DLL source, HookBridge protocol and injectio
  assert.match(bridge,/PageDll\(dll,"MeguLitKrkr-","KRKR",loader,args\)/);assert.match(bridge,/KrkrText\(bit,loader,args\);/);
  assert.match(read('native/HookInjector.cs'),/"MeguLitKrkr32\.dll"/);
  assert.match(read('Release.ps1'),/MeguLitKrkr32\.dll/);
+ // E321 (ライムライト on a friend's PC: no page layout at all): 64-bit KiriKiri Z gets its own build of the same DLL.
+ assert.match(read('native/HookInjector.cs'),/"MeguLitKrkr64\.dll"/);assert.match(read('Release.ps1'),/MeguLitKrkr64\.dll/);
+ assert.match(read('native/krkrtext/build.cmd'),/MeguLitKrkr64\.dll/);assert.doesNotMatch(bridge,/page DLL is 32-bit only/);
+ assert.match(script,/chColor/);assert.match(bridge,/color=\(\[0-9a-f\]\{6\}\)/);
+});
+
+test('E321: the colour the game drew a page sentence in reaches its position (read / unread colours)',t=>{
+ const f=fixture(t);
+ f.begin(1,false);f.tick(400);f.end(1,false,'既に読んだ文。',true,{color:'#a0b0ff'});
+ f.begin(2,true);f.tick(400);f.end(2,true,'まだ読んでいない文。',true,{color:'not-a-colour'});
+ const pos=f.of('hookTextPos');assert.equal(pos[0].color,'#a0b0ff');assert.equal('color' in pos[1],false);
 });
 
 // 魔法使いの夜 (Steam): on a full-screen page the game greys the sentences already read and keeps the newest one white.
@@ -176,9 +187,17 @@ test('NVL without engine positions (魔法使いの夜): lines go down the page 
  assert.deepEqual(pairs(),[['ただし、残りの一割は真実だ。',60,'bright']],'the first line starts at the top of the text box');
  assert.equal(sent.filter(m=>m.text).length,1,'a FLOW line is translated at once (no page report will come)');
  say('今日はその一割の話。');
- assert.deepEqual(pairs(),[['ただし、残りの一割は真実だ。',60,'dim'],['今日はその一割の話。',110,'bright']],'the next line sits under the last, the last one dims');
+ assert.deepEqual(pairs(),[['ただし、残りの一割は真実だ。',60,'dim'],['今日はその一割の話。',100,'bright']],'the next line sits right under the last (no extra gap: the slider gap lives inside each pair), the last one dims');
  const first=sent.find(m=>m.text==='ただし、残りの一割は真実だ。');b.deliverPageTranslation(first.id,'不过，剩下的一成是真的。');
- assert.deepEqual(pairs().map(p=>p[1]),[60,140],'a translation that comes in pushes the lines below it down');
+ assert.deepEqual(pairs().map(p=>p[1]),[60,130],'a translation that comes in pushes the lines below it down');
+ // E323: the game turned the page (wait marker moved up): the line that just arrived is the new page's first line, the rest go.
+ say('新しいページの一文目。');assert.equal(pairs().length,3);
+ b.islandPage.page({engine:'nvl',line:1,same:false,token:0});
+ assert.deepEqual(pairs(),[['新しいページの一文目。',60,'bright']],'the new page keeps only its first line, back at the top of the box');
+ // Translation display off: the translation row takes no room, lines sit one Japanese row apart.
+ b.isTranslationVisible=()=>false;say('訳文なしの二文目。');
+ assert.deepEqual(pairs().map(p=>p[1]),[60,100]);b.isTranslationVisible=()=>true;
+ b.islandPage.page({engine:'nvl',line:2,same:false,token:0});
  for(let i=0;i<14;i++)say('次の文その'+i+'。');
  const shown=pairs();
  assert.ok(shown.at(-1)[1]+40<=720,'the newest line stays inside the game');

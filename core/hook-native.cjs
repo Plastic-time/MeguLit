@@ -145,7 +145,7 @@ class HookNative{
     KiriKiri games read exactly as before.
     E301: the same protocol carries Ren'Py (MeguLitRenpy32/64.dll + native/MeguLitRenpy.py, NVL pages); every name
     here takes the engine from the report (PAGE_ENGINES), positions go out as <engine>_screen_v1. */
- pageReset(){if(this.pageState)clearTimeout(this.pageState.timer);this.pageState=null;this.pageMode=null;}
+ pageReset(){if(this.pageState)clearTimeout(this.pageState.timer);this.pageState=null;this.pageMode=null;this.flowMarkerAt=null;}
  pageNvl(){return this.pageMode?.mode==='nvl'&&this.now()-this.pageMode.at<120000;}
  pageLine(m){
   // E320: a flow page (WoH) is laid out by the reader from the text box; the screen OCR locator placed the same lines again (doubles, jumps).
@@ -164,7 +164,7 @@ class HookNative{
   if(!text){this.trace(engine+' page line '+m.line+' had no readable text');return;}
   const token=IslandSource.token(text),line=m.line*2;
   this.emit({type:'hookPage',engine,line,same:e.same,token,at:now});
-  this.emit({type:'hookTextPos',engine:engine+'_screen_v1',line,token,x0:m.x0,y0:m.y0,x1:m.x1,y1:m.y1,size:m.size,sw:m.sw,sh:m.sh,count:m.count,at:now});
+  this.emit({type:'hookTextPos',engine:engine+'_screen_v1',line,token,x0:m.x0,y0:m.y0,x1:m.x1,y1:m.y1,size:m.size,sw:m.sw,sh:m.sh,count:m.count,...(typeof m.color==='string'&&/^#[0-9a-f]{6}$/i.test(m.color)?{color:m.color}:{}),at:now});
   this.emitSource(text,e.origin==='history'?'live':e.origin,engine,line);
  }
  // The drawn text keeps the game's rows; the hook's text is the original when they differ (same length: re-broken there).
@@ -252,7 +252,13 @@ class HookNative{
    L.seen.push({text,at:now});if(L.seen.length>12)L.seen.shift();}
   const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;this.lastSource=text;this.lastSourceAt=this.now();this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.notify({hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
  }
- markerTarget(v){this.waitTarget=v;this.syncMarker();}
+ markerTarget(v){this.waitTarget=v;this.syncMarker();this.flowMarker(v);}
+ /* E323 (user: WoH kept the old page's lines when the game cleared the page). A full-screen page has no clear signal in
+    the text hook, but the game's wait marker sits after the newest line and only ever moves DOWN the page; the one time
+    it moves up (more than its own height) the game has started a new page. Emitted as the page protocol's turn
+    (hookPage same:false); the reader keeps the line that just arrived and drops the rest. */
+ flowMarker(v){if(!this.flowPage||!v||v.active!==true||![v.y,v.height].every(Number.isFinite))return;const prev=this.flowMarkerAt;this.flowMarkerAt={y:v.y,height:v.height,at:this.now()};
+  if(prev&&prev.y-v.y>Math.max(prev.height,v.height,8)*1.2){this.flowPageLine=(this.flowPageLine||0)+1;this.trace('flow page: wait marker moved up '+(prev.y-v.y)+'px, new page');this.emit({type:'hookPage',engine:'nvl',line:this.flowPageLine,same:false,token:0,at:this.now()});}}
  // The Direct3D9 wait-marker draw hook no longer runs any probing code inside the game (that once crashed a game);
  // it only patches system d3d9.dll functions whose address and bytes match a probe made in a separate process.
  syncMarker(){const v={...(this.waitTarget||{}),type:'waitMarker',active:!!this.waitTarget?.active&&this.enabled&&this.state.hookActive&&this.preferences?.hideWaitMarker===true},key=JSON.stringify(v);if(this.process&&key!==this.markerKey){this.markerKey=key;this.send(v);}}

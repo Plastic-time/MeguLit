@@ -43,8 +43,11 @@
   past(r){return this.records.length>1&&this.records.includes(r)&&r!==this.current();}
   // FLOW pages: each line is shown at once (no page report will settle it) under the one before; the view turns the
   // page when the next line no longer fits (turn keeps only the newest line).
-  flow(text,sequence){const r=this.source(text,sequence,0);if(!r.obsolete){r.settled=true;if(this.records.length>24)this.records=this.records.slice(-24);}return r;}
+  flow(text,sequence){const r=this.source(text,sequence,0);if(!r.obsolete){r.settled=true;r.at=Date.now();if(this.records.length>24)this.records=this.records.slice(-24);}return r;}
   turn(){const top=this.current();if(!top||this.records.length<2)return false;this.records=[top];this.epoch++;return true;}
+  // E323: the game turned the page (wait marker moved up). The marker is seen a moment after the new page's first line
+  // arrived, so a line younger than 1.5 s is that page's first line and stays; everything older goes.
+  clearFlow(now=Date.now()){const keep=this.records.filter(r=>now-(r.at||0)<1500).slice(-1);if(!this.records.length)return false;this.records=keep;this.epoch++;return true;}
   position(m){
    if(!m||!/^(?:cs2_screen_v[13]|(?:krkr|renpy|ocr)_screen_v1)$/.test(m.engine)||!Number.isSafeInteger(m.token)||!Number.isSafeInteger(m.line)||m.line<this.floor||![m.x0,m.y0,m.x1,m.y1,m.size].every(Number.isFinite)||m.x0< -2000||m.y0< -2000||m.x1>10000||m.y1>10000||m.x1<m.x0||m.y1<m.y0||m.size<6||m.size>160)return false;
    const r=[...this.records].reverse().find(p=>p.token===m.token&&(p.line==null||p.line===m.line));
@@ -54,7 +57,7 @@
  }
  // Injected at document start, before inject.js has created the bridge on DOMContentLoaded: wait for it instead of
  // giving up, or every ISLAND line falls back to the single-line reader.
- function install(w){const d=w.document,b=w.__tomoyoChinese;if(!b||!d.head){if(d&&!install.waiting){install.waiting=true;d.addEventListener('DOMContentLoaded',()=>{install.waiting=false;install(w);},{once:true});}return;}if(b.islandPage)return;const model=new Page();let active=false,engine='',root=null,source='',sequence=0,session=0,revision=0,scope='',layoutQueued=false;const nodes=new Map(),requests=new Map(),timers=new Map();
+ function install(w){const d=w.document,b=w.__tomoyoChinese;if(!b||!d.head){if(d&&!install.waiting){install.waiting=true;d.addEventListener('DOMContentLoaded',()=>{install.waiting=false;install(w);},{once:true});}return;}if(b.islandPage)return;const model=new Page();let active=false,engine='',root=null,source='',sequence=0,session=0,revision=0,scope='',layoutQueued=false;const nodes=new Map(),requests=new Map(),timers=new Map();let flowObserver=null;
   const send=m=>{try{w.__tomoyoTranslateRequest(JSON.stringify(m));}catch{}};
   const translationOn=()=>b.isEnabled?.()!==false&&b.isTranslationVisible?.()!==false;
   const pageScope=()=>{const next=translationOn()?'cs2:'+session+':'+model.epoch+':'+revision:'';if(next!==scope){scope=next;send({type:'pageTranslationScope',key:scope});}return scope;};
@@ -76,12 +79,14 @@
   /* FLOW: no engine positions. Lines start at the top of the calibrated text box and each one sits under the last (its measured height, translation included), as the game itself writes them down the page. When the newest line runs past the bottom of the game area the earlier lines go (the page turned). */
   function placeFlow(){const info=b.galLayoutInfo?.(),p=b.galPreferences?.()||{},dpr=w.devicePixelRatio||1,cw=(info?.clientWidth||1280)/dpr,ch=(info?.clientHeight||720)/dpr,cx=(info?.clientX??0)/dpr,cy=(info?.clientY??0)/dpr,x=Number.isFinite(info?.readerX)?info.readerX/dpr:cx+cw*.1,top=Number.isFinite(info?.readerY)?info.readerY/dpr:cy+ch*.08,width=Number.isFinite(info?.readerWidth)&&info.readerWidth>0?info.readerWidth/dpr:cw*.8,limit=cy+ch-ch*.03,current=model.current();let y=top,last=null;
    const readOnly=p.hookHide===false,dim=p.pageDimPast!==false;
-   for(const r of [...model.records].sort((a,c)=>a.sequence-c.sequence)){const node=nodes.get(r);if(!node)continue;node.hidden=false;node.classList.add('tome-island-wrap','tome-island-flow');
+   for(const r of [...model.records].sort((a,c)=>a.sequence-c.sequence)){const node=nodes.get(r);if(!node)continue;node.hidden=false;node.classList.add('tome-island-wrap','tome-island-flow');node.classList.toggle('tome-island-current',r===current);
+    /* E323: a translation typed out after its line was measured made the next line overlap it: re-lay the page whenever a pair changes height. */if(!node.__tomeFlowObserved&&typeof w.ResizeObserver==='function'){node.__tomeFlowObserved=true;(flowObserver||(flowObserver=new w.ResizeObserver(()=>scheduleLayout()))).observe(node);}
     node.style.cssText='left:'+x+'px;top:'+y+'px;width:'+Math.max(40,width)+'px;transform:none;';node.style.setProperty('--tome-island-jp-size','var(--tomoyo-gal-jp-size,28px)');node.style.setProperty('--tome-island-cn-size','var(--tomoyo-gal-cn-size,24px)');node.style.setProperty('--tome-island-align','left');node.style.setProperty('--tome-island-cn-width',Math.max(40,width)+'px');
     const paint=w.TomoyoGameStyle.paintFor(p,r.read===true,'');for(const [key,value]of Object.entries(w.TomoyoGameStyle.paintVariables(paint)))node.style.setProperty(key,value);
     node.classList.toggle('tome-island-past',dim&&r!==current);node.classList.toggle('tome-island-original-visible',readOnly);
-    const jp=node.querySelector('.sentence-text');jp.style.minHeight='0px';if(!r.revealed){r.revealed=true;revealWithRuby(jp);}const cn=node.querySelector('.tomoyo-cn-output');if(!cn.hidden&&r.state==='ready'&&r.translation&&cn.dataset.revealValue!==r.translation){cn.dataset.revealValue=r.translation;w.TomeTypewriter?.text(cn,r.translation);}
-    const h=node.getBoundingClientRect().height||0;last={r,bottom:y+h};y+=h+(parseFloat(w.getComputedStyle?.(node).getPropertyValue('--tomoyo-gal-gap'))||8);}
+    const jp=node.querySelector('.sentence-text');jp.style.minHeight='0px';if(!r.revealed){r.revealed=true;revealWithRuby(jp);}const cn=node.querySelector('.tomoyo-cn-output');/* E323: the 原文与译文间距 slider is the gap under each Japanese line only; without a translation the row takes no room. */const row=node.querySelector('.tomoyo-cn-row');if(row)row.hidden=cn.hidden;if(!cn.hidden&&r.state==='ready'&&r.translation&&cn.dataset.revealValue!==r.translation){cn.dataset.revealValue=r.translation;w.TomeTypewriter?.text(cn,r.translation);}
+    // The game writes its lines one under the other with no extra space; the slider gap sits inside each pair.
+    const h=node.getBoundingClientRect().height||0;last={r,bottom:y+h};y+=h;}
    if(last&&last.bottom>limit&&last.r===current&&model.turn()){synchronize();return;}
    w.__tomoyoHitRegionsRefresh?.();}
   function place(){if(!active||!root)return;if(FLOW.has(engine)){placeFlow();return;}const info=b.galLayoutInfo?.(),p=b.galPreferences?.()||{},dpr=w.devicePixelRatio||1,cw=(info?.clientWidth||1280)/dpr,ch=(info?.clientHeight||720)/dpr,ox=(info?.clientX??((info?.readerX||0)-(p.x||0)*(info?.clientWidth||1280)/100))/dpr,oy=(info?.clientY??((info?.readerY||0)-(p.y||0)*(info?.clientHeight||720)/100))/dpr,ref=model.records.find(r=>r.position)?.position,bw=ref?.sw>0?ref.sw:1280,bh=ref?.sh>0?ref.sh:720,k=Math.min(cw/bw,ch/bh),left=ox+(cw-bw*k)/2,top=oy+(ch-bh*k)/2;
@@ -114,14 +119,15 @@
     if(!active&&spatial){active=true;session++;}
     if(typeof m.hookSource==='string'){const next=w.TomeIslandSource?.spoken(m.hookSource)??b.splitDialogue?.(m.hookSource).text??m.hookSource,nextSequence=m.hookSequence??sequence+1;if(next.trim()&&(next!==source||nextSequence!==sequence)){source=next;sequence=nextSequence;const rec=FLOW.has(engine)?model.flow(next,nextSequence):model.source(next,nextSequence,m.hookSourceLine);b.prefetchRuby?.(next);if(typeof m.hookSourceRead==='boolean')rec.read=m.hookSourceRead;if(active&&!rec.obsolete){b.sourceText=next;b.onSourceText?.(next);}}}
     if(!active)return false;
-    synchronize();return true;},page(m){if(!PAGED.has(m.engine))return false;model.page(m);synchronize();return true;},position(m){if(!/^(?:cs2_screen_v[13]|(?:krkr|renpy|ocr)_screen_v1)$/.test(m?.engine))return false;model.position(m);place();scheduleLayout();return true;},refresh:()=>{place();scheduleLayout();},status:()=>({active,sequence,chars:source.length,rendered:!!root?.isConnected,pairs:model.records.length,positioned:model.records.filter(r=>r.position).length,typing:null})};
+    synchronize();return true;},page(m){if(!PAGED.has(m.engine))return false;if(FLOW.has(m.engine)){if(m.same===false&&model.clearFlow())synchronize();return true;}model.page(m);synchronize();return true;},position(m){if(!/^(?:cs2_screen_v[13]|(?:krkr|renpy|ocr)_screen_v1)$/.test(m?.engine))return false;model.position(m);place();scheduleLayout();return true;},refresh:()=>{place();scheduleLayout();},status:()=>({active,sequence,chars:source.length,rendered:!!root?.isConnected,pairs:model.records.length,positioned:model.records.filter(r=>r.position).length,typing:null})};
   const style=d.createElement('style');style.textContent=`
 body.tomoyo-gal-bound .sentence-window.tome-island-page{left:0!important;top:0!important;width:0!important;height:0!important;min-width:0!important;margin:0!important;padding:0!important;overflow:visible!important}
 .tome-island-pair[hidden]{display:none!important}
 .tome-island-pair{position:fixed;box-sizing:border-box;overflow:visible;background:transparent;transform-origin:top left;transition:filter .6s ease}
 .tome-island-pair.tome-island-past{filter:brightness(var(--tome-island-past-brightness,.55))}
 /* FLOW pages wrap like the game: at the calibrated box width, strict kinsoku, continuation rows without the leading indent (the indent is the line's own first character). */
-body.tomoyo-gal-bound .tome-island-pair.tome-island-flow .sentence-text{white-space:pre-wrap!important;line-break:strict;word-break:normal;overflow-wrap:anywhere}
+body.tomoyo-gal-bound .sentence-window .tome-island-pair.tome-island-flow .sentence-text,body.tomoyo-gal-bound .sentence-window .tome-island-pair.tome-island-flow .sentence-text[data-megulit-native-breaks]{white-space:pre-wrap!important;line-break:strict;word-break:normal;overflow-wrap:anywhere}
+.tome-island-pair.tome-island-flow .tomoyo-cn-row[hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){.tome-island-pair{transition:none}}
 body.tomoyo-gal-bound .tome-island-pair .sentence-text{width:100%!important;font-size:var(--tome-island-jp-size,28px)!important;line-height:var(--tomoyo-gal-line-height,1.25)!important;padding:0!important;letter-spacing:var(--tomoyo-gal-jp-spacing,0px)!important;text-indent:0!important;text-align:left!important}
 body.tomoyo-gal-bound .tome-island-pair .sentence-text{white-space:pre!important}.tome-island-pair.tome-island-wrap .sentence-text{white-space:pre-wrap!important}

@@ -56,3 +56,26 @@ test('hiding rules: HuneX ruby lines are blanked with their tags, skip bursts go
  assert.match(bridge,/\{"policy",EmbedTextPolicy\.Version\}/);
  assert.match(bridge,/Convert\.ToInt32\(p\)>=EmbedTextPolicy\.Version/);
 });
+
+test("E323: the wait marker moving up the page is the game's page turn; moving down is the next line",t=>{
+ const f=fixture(t);const pages=()=>f.events.filter(m=>m.type==='hookPage').map(m=>[m.engine,m.same,m.line]);
+ const marker=(y,active=true)=>f.hook.markerTarget({active,x:900,y,width:24,height:24,clientWidth:1378,clientHeight:775});
+ marker(300);marker(360);marker(420);assert.deepEqual(pages(),[],'down the page: same page');
+ marker(425);assert.deepEqual(pages(),[],'a wobble smaller than the marker is not a turn');
+ marker(180);assert.deepEqual(pages(),[['nvl',false,1]],'up by rows: new page');
+ marker(240);marker(170);assert.deepEqual(pages(),[['nvl',false,1],['nvl',false,2]]);
+ f.hook.flowPage=false;marker(500);marker(100);assert.equal(pages().length,2,'other games: no flow page turns');
+ const {Page}=require('../web/reader/modules/island-page.js');const model=new Page();
+ model.flow('古いページの文。',1);model.records[0].at=Date.now()-5000;model.flow('新しいページの一文目。',2);
+ assert.equal(model.clearFlow(),true);assert.deepEqual(model.records.map(r=>r.source),['新しいページの一文目。']);
+ model.records[0].at=Date.now()-5000;model.clearFlow();assert.deepEqual(model.records,[],'a turn with no fresh line clears everything');
+});
+
+test("E323 wiring: per-sentence indent, marker on the current line, box probes off on a flow page",()=>{
+ const gal=read('web/reader/modules/gal.js'),wait=read('web/reader/modules/wait-marker.js'),imm=read('core/immersion.cjs'),view=read('web/reader/modules/island-page.js');
+ assert.match(gal,/for\(const sentence of document\.querySelectorAll\('\.sentence-text'\)\)\{\r?\n\s+let leading=!sentence\.closest\('\.tome-island-flow'\);/);
+ assert.match(wait,/\.tome-island-pair\.tome-island-current/);
+ assert.match(imm,/source\(text,engine\)\{this\.flow=engine==='nvl';/);assert.match(imm,/scene\(visible,why='scene'\)\{[^}]*\|\|this\.flow\)return;/);assert.match(imm,/autoBox\(visible\)\{[^}]*\|\|this\.flow\)return;/);
+ assert.match(view,/\.tome-island-flow \.sentence-text\[data-megulit-native-breaks\]\{white-space:pre-wrap!important/,"a paragraph with the game's own breaks still wraps at the box width");
+ assert.doesNotMatch(view,/--tomoyo-gal-gap'\)\)\|\|8/,'the slider gap is not added between lines');
+});

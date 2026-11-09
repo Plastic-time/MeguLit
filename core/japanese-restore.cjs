@@ -86,12 +86,39 @@ function siglusPlan(gameDir){
  return {adapter:'siglus-dbs',dir,japaneseColumn:japanese,targetColumns:[...targets],changes,cells,japaneseTables};
 }
 
+/* E326 YU-RIS (user 2026-11-10, 女装山脈 with the 1.1 Chinese patch had no Japanese): the Japanese scripts stay in
+   ysbin.ypf; a Chinese patch adds update*.ypf next to the exe, which the engine loads over ysbin. Restoring moves the
+   script-carrying update archives into the backup folder; undo moves them back. Only when the folder shows a Chinese
+   patch (an exe or folder named cn/chs/汉化/中文), so an official update archive is never touched. */
+function yurisPlan(gameDir){
+ const names=fs.readdirSync(gameDir),ysbin=[path.join(gameDir,'ysbin.ypf'),path.join(gameDir,'pac','ysbin.ypf')].find(f=>fs.existsSync(f));if(!ysbin)return null;
+ const chinese=names.some(n=>/(cn\d|chs|汉化|中文|簡體|简体)/i.test(n));
+ const updates=names.filter(n=>/^update\d*\.ypf$/i.test(n)).filter(n=>{try{const fd=fs.openSync(path.join(gameDir,n),'r'),b=Buffer.alloc(Math.min(fs.fstatSync(fd).size,1<<20));fs.readSync(fd,b,0,b.length,0);fs.closeSync(fd);return b.slice(0,3).toString('latin1')==='YPF'&&(b.includes(Buffer.from('ysbin\\','latin1'))||b.includes(Buffer.from('ysbin\\','latin1').map(x=>x^0xFF)));}catch{return false;}});
+ return {adapter:'yuris-update',ysbin,chinese,updates:chinese?updates:[]};
+}
+function yurisApply(gameDir,plan){
+ const backup=path.join(gameDir,BACKUP_DIR,'yuris');fs.mkdirSync(backup,{recursive:true});const files=[];
+ for(const n of plan.updates){const from=path.join(gameDir,n),buf=fs.readFileSync(from);fs.renameSync(from,path.join(backup,n));files.push({file:n,originalSha256:sha(buf),kind:'moved'});}
+ writeAtomic(manifestPath(gameDir),Buffer.from(JSON.stringify({version:1,adapter:'yuris-update',at:new Date().toISOString(),files},null,1)));
+ return {applied:files.length,cells:0};
+}
+function yurisRestore(gameDir,manifest){
+ const backup=path.join(gameDir,BACKUP_DIR,'yuris'),skipped=[];let restored=0;
+ for(const e of manifest.files){const keep=path.join(backup,e.file),target=path.join(gameDir,e.file);
+  if(!fs.existsSync(keep)||fs.existsSync(target)){skipped.push(e.file);continue;}fs.renameSync(keep,target);restored++;}
+ if(!skipped.length)fs.rmSync(path.join(gameDir,BACKUP_DIR),{recursive:true,force:true});
+ return {restored,skipped};
+}
+
 function manifestPath(gameDir){return path.join(gameDir,BACKUP_DIR,'manifest.json');}
 function readManifest(gameDir){try{return JSON.parse(fs.readFileSync(manifestPath(gameDir),'utf8'));}catch{return null;}}
 
 function detect(gameDir){
  gameDir=path.resolve(String(gameDir||''));if(!fs.existsSync(gameDir))return {state:'missing'};
- const manifest=readManifest(gameDir),siglus=siglusPlan(gameDir);
+ const manifest=readManifest(gameDir);
+ if(manifest?.adapter==='yuris-update')return {state:'applied',adapter:'yuris-update',files:manifest.files.length,cells:0,pending:0,manifest:{at:manifest.at,files:manifest.files.length}};
+ const yuris=yurisPlan(gameDir);if(yuris&&yuris.updates.length)return {state:'restorable',adapter:'yuris-update',files:yuris.updates.length,cells:0,pending:yuris.updates.length,manifest:null};
+ const siglus=siglusPlan(gameDir);
  if(siglus&&(siglus.changes.length||manifest))return {state:manifest?'applied':'restorable',adapter:'siglus-dbs',files:siglus.changes.length,cells:siglus.cells,japaneseColumn:siglus.japaneseColumn,targetColumns:siglus.targetColumns,pending:siglus.changes.length,manifest:manifest&&{at:manifest.at,files:manifest.files.length}};
  /* E294 (user report 2026-11-10: a friend's Steam CLANNAD stayed Chinese after the restore): the Steam release's tables hold
     English and Chinese only; the Japanese text comes from a separate Japanese patch. No Japanese column anywhere means
@@ -119,6 +146,7 @@ function writeAtomic(file,data){const tmp=file+'.megulit-tmp';fs.writeFileSync(t
 
 function apply(gameDir){
  gameDir=path.resolve(String(gameDir||''));if(gameRunning(gameDir))throw Error('GAME_RUNNING');
+ {const y=readManifest(gameDir)?null:yurisPlan(gameDir);if(y&&y.updates.length)return yurisApply(gameDir,y);}
  const plan=siglusPlan(gameDir);if(!plan||!plan.changes.length)throw Error('NOTHING_TO_RESTORE');
  const backup=path.join(gameDir,BACKUP_DIR,'dat');fs.mkdirSync(backup,{recursive:true});
  const prior=readManifest(gameDir),entries=prior?prior.files:[],built=[];
@@ -139,7 +167,7 @@ function apply(gameDir){
 
 function restore(gameDir){
  gameDir=path.resolve(String(gameDir||''));if(gameRunning(gameDir))throw Error('GAME_RUNNING');
- const manifest=readManifest(gameDir);if(!manifest)throw Error('NOT_APPLIED');
+ const manifest=readManifest(gameDir);if(!manifest)throw Error('NOT_APPLIED');if(manifest.adapter==='yuris-update')return yurisRestore(gameDir,manifest);
  const dat=path.join(gameDir,'dat'),backup=path.join(gameDir,BACKUP_DIR,'dat'),skipped=[];let restored=0;
  for(const e of manifest.files){const target=path.join(dat,e.file),keep=path.join(backup,e.file);
   if(!fs.existsSync(keep)){skipped.push(e.file);continue;}
@@ -162,4 +190,4 @@ function repairShared(gameDir){
  const undone=restore(gameDir);if(undone.skipped.length)return {repaired:false,skipped:undone.skipped};
  const done=apply(gameDir);return {repaired:true,applied:done.applied};
 }
-module.exports={repairShared,detect,apply,restore,_internal:{gameRunning,decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};
+module.exports={repairShared,detect,apply,restore,_internal:{yurisPlan,gameRunning,decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};

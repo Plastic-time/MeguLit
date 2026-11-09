@@ -22,6 +22,18 @@ function cmap(buf,t){
   for(let c=start;c<=end&&c!==0xffff;c++){let gid;if(!ro)gid=(c+delta)&0xffff;else{const at=ranges+s*2+ro+(c-start)*2;if(at+2>buf.length)continue;gid=buf.readUInt16BE(at);if(gid)gid=(gid+delta)&0xffff;}if(gid)map.set(c,gid);}}
  return map;
 }
+/* E329 (女装山脈 1.1 patch: its SimHei 1.01 copy has other hinting than Windows' SimHei, so only 30% of the glyph bytes
+   matched): a simple glyph is hashed by its outline alone (contour ends, on-curve flags, absolute points), without the
+   hinting instructions. Composite glyphs (and anything that does not parse) keep the hash of their bytes. */
+function outlineKey(g){
+ const nc=g.readInt16BE(0);if(nc<=0)return null;let p=10;const ends=[];for(let i=0;i<nc;i++){ends.push(g.readUInt16BE(p));p+=2;}
+ p+=2+g.readUInt16BE(p);const n=ends[nc-1]+1,flags=[];
+ while(flags.length<n){const f=g[p++];flags.push(f);if(f&8){let r=g[p++];while(r--&&flags.length<n)flags.push(f);}}
+ const axis=(short,same)=>{const out=[];let v=0;for(const f of flags){if(f&short){const d=g[p++];v+=f&same?d:-d;}else if(!(f&same)){v+=g.readInt16BE(p);p+=2;}out.push(v);}return out;};
+ const xs=axis(2,16),ys=axis(4,32);if(p>g.length)return null;
+ return ends.join(',')+'|'+flags.map(f=>f&1).join('')+'|'+xs.join(',')+'|'+ys.join(',');
+}
+function glyphHash(g){let key=null;try{key=outlineKey(g);}catch{}return crypto.createHash('md5').update(key===null?g:'o'+key).digest('hex');}
 // code point -> glyph outline hash, for one font face (TrueType outlines only).
 function glyphHashes(buf,at){
  const t=tables(buf,at);if(!t.cmap||!t.glyf||!t.loca||!t.head||!t.maxp)return null;
@@ -29,7 +41,7 @@ function glyphHashes(buf,at){
  const loca=i=>long?buf.readUInt32BE(t.loca.offset+i*4):buf.readUInt16BE(t.loca.offset+i*2)*2;
  const out=new Map();
  for(const [code,gid] of cmap(buf,t.cmap)){if(gid>=count)continue;const a=loca(gid),b=loca(gid+1);if(b<=a)continue;
-  out.set(code,crypto.createHash('md5').update(buf.subarray(t.glyf.offset+a,t.glyf.offset+b)).digest('hex'));}
+  out.set(code,glyphHash(buf.subarray(t.glyf.offset+a,t.glyf.offset+b)));}
  return out;
 }
 const CJK=c=>c>=0x3000&&c<=0x30ff||c>=0x3400&&c<=0x9fff||c>=0xf900&&c<=0xfaff||c>=0xff00&&c<=0xffef;
@@ -42,9 +54,11 @@ function systemReverse(name){
  systemCache.set(name,rev);return rev;
 }
 // Font buffers bundled with a patch -> Map(stored char -> real char), or null when the fonts are not remapped.
-function unmapping(fontBuffers,{systemFonts=SYSTEM}={}){
+// anyCode: every code point of the patch font counts, not only CJK ones (E329: the rioLoader font puts its glyphs at
+// scattered code points, U+286C for 。).
+function unmapping(fontBuffers,{systemFonts=SYSTEM,anyCode=false}={}){
  const glyphs=new Map();
- for(const buf of fontBuffers){try{for(const at of faces(buf)){const h=glyphHashes(buf,at);if(h)for(const [c,v] of h)if(CJK(c)&&!glyphs.has(c))glyphs.set(c,v);}}catch{}}
+ for(const buf of fontBuffers){try{for(const at of faces(buf)){const h=glyphHashes(buf,at);if(h)for(const [c,v] of h)if((anyCode||CJK(c))&&!glyphs.has(c))glyphs.set(c,v);}}catch{}}
  if(glyphs.size<200)return null;
  const map=new Map();let best=null,bestHits=0;
  for(const name of systemFonts){const rev=systemReverse(name);if(!rev)continue;let hits=0;for(const v of glyphs.values())if(rev.has(v))hits++;if(hits>bestHits){best=rev;bestHits=hits;}if(hits>=glyphs.size*.9)break;}

@@ -10,7 +10,7 @@
   if(!document.body?.classList.contains('tomoyo-ui-translation')||document.body.classList.contains('tomoyo-cover-hidden')||document.querySelector('.tome-backlog[data-open]'))return null;
   const readers=[...document.querySelectorAll('.sentence-window')].filter(visible);
   // The original marker belongs after the original (Japanese) line; the translation is only used when no Japanese line shows.
-  for(const reader of readers){const current=reader.querySelector('.tome-island-pair');if(current){const ja=current.querySelector('.sentence-text');if(visible(ja))return ja;}const ja=reader.querySelector('.sentence-text');if(visible(ja)&&ja.textContent.trim())return ja;const cn=reader.querySelector('.tomoyo-cn-output:not([data-state=error])');if(visible(cn)&&cn.textContent.trim())return cn;}
+  for(const reader of readers){const current=reader.querySelector('.tome-island-pair.tome-island-current')||reader.querySelector('.tome-island-pair');if(current){const ja=current.querySelector('.sentence-text');if(visible(ja))return ja;}const ja=reader.querySelector('.sentence-text');if(visible(ja)&&ja.textContent.trim())return ja;const cn=reader.querySelector('.tomoyo-cn-output:not([data-state=error])');if(visible(cn)&&cn.textContent.trim())return cn;}
   return null;
  }
  function place(){
