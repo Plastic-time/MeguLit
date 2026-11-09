@@ -8,6 +8,15 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto'),{spawn}=req
 const REPO='https://api.github.com/repos/ilynthn/MeguLit/releases';
 const ASSET=/^MeguLit-v(\d+)\.(\d+)\.(\d+)-win-x64\.zip$/;
 const HOSTS=new Set(['github.com','objects.githubusercontent.com','release-assets.githubusercontent.com']);
+/* User report (2026-11-09, mainland China): "restart and update" said download failed. GitHub downloads are often
+   unreachable there, so the package also comes through the same relays the runtime installer uses. A relay only
+   passes GitHub's own file along; the package must still match GitHub's sha256 digest, and without a digest no
+   relay is used. China-looking systems (time zone / language) try the relays first. */
+const MIRRORS=['https://gh-proxy.com/{url}','https://ghproxy.net/{url}'];
+const MIRROR_HOSTS=new Set(MIRRORS.map(m=>new URL(m.replace('{url}','')).hostname));
+const inChina=()=>{try{const o=Intl.DateTimeFormat().resolvedOptions();return o.timeZone==='Asia/Shanghai'||o.timeZone==='Asia/Urumqi'||/^zh-CN/i.test(o.locale||'');}catch{return false;}};
+function sources(rel,china=inChina()){const direct=[rel.url];if(!rel.digest)return direct;const relayed=MIRRORS.map(m=>m.replace('{url}',rel.url));return china?[...relayed,...direct]:[...direct,...relayed];}
+const updateLog=(root,line)=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','update.log'),new Date().toISOString()+' '+line+'\n');}catch{}};
 const HEADERS={'User-Agent':'MeguLit-Updater','Accept':'application/vnd.github+json'};
 const parse=v=>String(v||'').replace(/^v/,'').split('.').map(n=>Number(n)||0);
 const newer=(a,b)=>{const x=parse(a),y=parse(b);for(let i=0;i<3;i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)>(y[i]||0);}return false;};
@@ -51,31 +60,47 @@ async function check(current,fetcher=fetch,root=''){
 }
 
 /* Writes zip + script; resolves when the package is verified and ready to install. */
+async function download(url,rel,fetcher=fetch){
+ const control=new AbortController();let idle=setTimeout(()=>control.abort(),30000);const poke=()=>{clearTimeout(idle);idle=setTimeout(()=>control.abort(),30000);};
+ try{
+  const r=await fetcher(url,{headers:{'User-Agent':'MeguLit-Updater'},redirect:'follow',signal:AbortSignal.any?AbortSignal.any([control.signal,AbortSignal.timeout(600000)]):control.signal});
+  if(!r.ok)throw Error('HTTP_'+r.status);
+  const final=new URL(r.url||url);if(final.protocol!=='https:'||!(HOSTS.has(final.hostname)||MIRROR_HOSTS.has(final.hostname)))throw Error('UPDATE_URL_REJECTED');
+  const chunks=[];poke();
+  if(r.body&&r.body.getReader){const reader=r.body.getReader();for(;;){const {done,value}=await reader.read();if(done)break;poke();chunks.push(Buffer.from(value));state.received+=value.length;}}
+  else{const b=Buffer.from(await r.arrayBuffer());chunks.push(b);state.received=b.length;}
+  const data=Buffer.concat(chunks);
+  if(rel.size&&data.length!==rel.size)throw Error('UPDATE_SIZE_MISMATCH');
+  if(data.subarray(0,2).toString('latin1')!=='PK')throw Error('UPDATE_NOT_ZIP');
+  if(rel.digest&&crypto.createHash('sha256').update(data).digest('hex')!==rel.digest)throw Error('UPDATE_HASH_MISMATCH');
+  return data;
+ }catch(error){throw Error(control.signal.aborted&&!/^UPDATE_/.test(error.message)?'STALLED':error.message);}finally{clearTimeout(idle);}
+}
 function start(root,current,fetcher=fetch){
  if(job)return job;
  job=(async()=>{
   try{
-   const rel=found&&(newer(found.version,current)||found.hotfix)?found:await latest(fetcher);if(!newer(rel.version,current)&&!rel.hotfix)throw Error('ALREADY_LATEST');
+   let rel=found&&(newer(found.version,current)||found.hotfix)?found:await latest(fetcher);if(!newer(rel.version,current)&&!rel.hotfix)throw Error('ALREADY_LATEST');
    const dir=path.join(root,'cache','update');fs.mkdirSync(dir,{recursive:true});
    const zip=path.join(dir,rel.name),ps1=path.join(dir,'apply-update.ps1');
    state={phase:'downloading',version:rel.version,total:rel.size||0,received:0};
    let data=null;
    /* A package downloaded earlier (user chose "later") is reused when it still verifies. */
    if(fs.existsSync(zip)){const old=fs.readFileSync(zip);if((!rel.size||old.length===rel.size)&&(!rel.digest||crypto.createHash('sha256').update(old).digest('hex')===rel.digest))data=old;}
-   if(!data){
-    const r=await fetcher(rel.url,{headers:{'User-Agent':'MeguLit-Updater'},redirect:'follow',signal:AbortSignal.timeout(600000)});
-    if(!r.ok)throw Error('UPDATE_DOWNLOAD_FAILED');
-    const final=new URL(r.url||rel.url);if(final.protocol!=='https:'||!HOSTS.has(final.hostname))throw Error('UPDATE_URL_REJECTED');
-    const total=Number(r.headers?.get?.('content-length'))||rel.size||0;state.total=total;
-    const chunks=[];
-    if(r.body&&r.body.getReader){const reader=r.body.getReader();for(;;){const {done,value}=await reader.read();if(done)break;chunks.push(Buffer.from(value));state.received+=value.length;}}
-    else{const b=Buffer.from(await r.arrayBuffer());chunks.push(b);state.received=b.length;}
-    data=Buffer.concat(chunks);
+   /* One source after another; a source that stalls for 30 s, fails or delivers a different file is skipped. A
+      size or digest mismatch on every source usually means the release was replaced meanwhile (hotfix), so the
+      release is read again once and the download repeated. */
+   let pick=rel;
+   for(let round=0;!data&&round<2;round++){
+    if(round){try{const fresh=await latest(fetcher);if(fresh.digest===pick.digest&&fresh.size===pick.size)break;pick=fresh;state.total=fresh.size||0;}catch{break;}}
+    for(const url of sources(pick)){
+     state.received=0;
+     try{data=await download(url,pick,fetcher);break;}
+     catch(error){updateLog(root,'download failed '+new URL(url).hostname+' '+error.message);}
+    }
    }
-   state.received=data.length;
-   if(rel.size&&data.length!==rel.size)throw Error('UPDATE_SIZE_MISMATCH');
-   if(data.subarray(0,2).toString('latin1')!=='PK')throw Error('UPDATE_NOT_ZIP');
-   const hash=crypto.createHash('sha256').update(data).digest('hex');if(rel.digest&&hash!==rel.digest)throw Error('UPDATE_HASH_MISMATCH');
+   if(!data)throw Error('UPDATE_DOWNLOAD_FAILED');
+   rel=pick;const hash=crypto.createHash('sha256').update(data).digest('hex');
    fs.writeFileSync(zip,data);fs.writeFileSync(ps1,'﻿'+script(),'utf8');
    state={phase:'ready',version:rel.version,total:data.length,received:data.length,sha256:hash,zip,ps1};
    return status();
@@ -142,4 +167,4 @@ Start-Process -FilePath (Join-Path $Root 'MeguLit.exe') -WorkingDirectory $Root
 Log 'restarted'
 `;}
 function reset(){state={phase:'idle'};job=null;found=null;}
-module.exports={check,start,status,install,apply,newer,latest,installedSize,reset,launchScript};
+module.exports={sources,check,start,status,install,apply,newer,latest,installedSize,reset,launchScript};
