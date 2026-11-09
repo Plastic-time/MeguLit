@@ -164,14 +164,14 @@ const os=require('node:os');
 const MEDIA_XP3=/^(?:bg|fg|ev|sd)?image|^(?:bgm|voice|sound|se|movie|video|thum|emote|font|sysse)/i;
 const cxArchives=dir=>{try{return fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)&&!MEDIA_XP3.test(f)).map(f=>path.join(dir,f));}catch{return [];}};
 const cxCache=file=>{const st=fs.statSync(file);return path.join(os.tmpdir(),'megulit-cx',crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+'|3').digest('hex').slice(0,24)+'.json');};
-const cxBuilds=new Map(),cxMemo=new Map(),cxQueue=[];let cxRunning=false;
+const cxBuilds=new Map(),cxMemo=new Map(),cxQueue=[],cxStarted=new Map();let cxRunning=false;
 function cxDocs(file){
  let out;try{out=cxCache(file);}catch{return null;}
  try{const st=fs.statSync(out),hit=cxMemo.get(out);if(hit&&hit.at===st.mtimeMs)return hit.docs;const docs=JSON.parse(fs.readFileSync(out,'utf8')).docs||[];cxMemo.set(out,{at:st.mtimeMs,docs});return docs;}catch{}
  if(!cxBuilds.has(out)){
   // Only archives that look like cx KiriKiri (encrypted entries) are worth a worker; one worker at a time.
   let list;try{list=xp3.list(file);}catch{list=null;}if(!list||!list.files.some(e=>e.encrypted))return [];
-  cxBuilds.set(out,null);cxQueue.push({file,out});cxNext();
+  cxBuilds.set(out,null);cxStarted.set(out,Date.now());cxQueue.push({file,out});cxNext();
  }
  return null;
 }
@@ -277,4 +277,14 @@ function detect(dir){for(const id of Object.keys(ENGINES))if(readable(id,dir))re
 function read(id,dir,overlay){const engine=ENGINES[id];
  return engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=engine.parse(replaced||s.read());}catch{}return {name:s.name,...parsed,patched:!!replaced};});}
 function fingerprint(id,dir){return crypto.createHash('sha256').update(id+'\n'+ENGINES[id].sources(dir).sort().map(f=>path.basename(f)+'|'+stat(f)).join('\n')).digest('hex');}
-module.exports={cxBuilds,chineseColumn,ENGINES,detect,readable,read,fingerprint,parseKs,parseAst,parseRpy,pfsList,pfsRead,tlPairs,decode};
+/* E294 (user: say that the first use needs 30-90 s of unpacking instead of "not supported"): what a game that cannot
+   be read yet is waiting for. 'unpack': its cx archives are being decrypted in the background (started: when);
+   'capture': strongly encrypted KiriKiri archives, read while the game runs (kirikiri-dump), nothing saved yet. */
+function preparing(dir){
+ let started=0;for(const file of cxArchives(dir)){let out;try{out=cxCache(file);}catch{continue;}if(cxBuilds.has(out))started=Math.min(started||Infinity,cxStarted.get(out)||Date.now());}
+ if(started)return {kind:'unpack',startedAt:started};
+ const archives=cxArchives(dir);if(!archives.length)return null;
+ let encrypted=false;for(const file of archives){try{if(xp3.list(file)?.files.some(e=>e.encrypted)){encrypted=true;break;}}catch{}}
+ return encrypted?{kind:'capture'}:null;
+}
+module.exports={preparing,cxBuilds,chineseColumn,ENGINES,detect,readable,read,fingerprint,parseKs,parseAst,parseRpy,pfsList,pfsRead,tlPairs,decode};
