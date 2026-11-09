@@ -7,6 +7,7 @@
 //   kirikiri  plain XP3 archives and loose .ks files (encrypted archives are skipped: their filters are per game)
 //   artemis   PFS archives (pf6 plain, pf8 XOR with the SHA-1 of the index) and loose .ast files
 //   renpy     game/*.rpy; a patch is a tl/<language> folder of old/new pairs, matched by the original text
+//   siglus    Steam dat/*.dbs language tables (Summer Pockets): Japanese column + the Chinese column
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const xp3=require('./xp3.cjs');
 const KANA=/[ぁ-ゖァ-ヺ]/g;
@@ -117,7 +118,36 @@ const renpy={
  },
 };
 
-const ENGINES={kirikiri,artemis,renpy};
+// ---- Siglus (Steam multi-language) ---------------------------------------------------------------------------
+// Steam releases keep every line in dat/*.dbs tables with one column per language. The running table's Japanese column
+// gives the lines; the Chinese column comes from the same table before MeguLit's Japanese restore (its backup in
+// .megulit-japanese), from the table itself when it was never restored, or from a <name>_zh.dbs twin.
+const siglusTables=()=>require('../../core/japanese-restore.cjs')._internal;
+const DBS=n=>/\.dbs$/i.test(n)&&!/_(?:en|zh|cn|tw|ko|ru)\.dbs$/i.test(n);
+const HAN=/[\u4e00-\u9fff]/,KANA1=/[\u3040-\u30ff]/;
+function dbsTable(buf){const t=siglusTables(),d=t.decrypt(buf);return t.parse(d.raw,d.marker);}
+function columnShares(table){return table.columns.map((c,i)=>{if(c.type!==0x53)return null;let filled=0,kana=0,han=0;for(const r of table.cells){const v=r[i];if(!v)continue;filled++;if(KANA1.test(v))kana++;else if(HAN.test(v))han++;}return {index:i,filled,kana:filled?kana/filled:0,han:filled?han/filled:0};}).filter(Boolean);}
+function parseDbs(buf){const table=dbsTable(buf),cols=columnShares(table).filter(c=>c.filled);const jp=cols.sort((a,b)=>b.kana-a.kana)[0];
+ if(!jp||jp.kana<.3)return {lines:[],anchors:[],rows:table.rows};return {lines:table.cells.map(r=>String(r[jp.index]||'')),anchors:[],rows:table.rows};}
+function chineseColumn(table,rows){if(table.rows!==rows)return null;const c=columnShares(table).filter(c=>c.filled>=table.rows*.3&&c.kana<.1&&c.han>.5).sort((a,b)=>b.han-a.han)[0];return c?table.cells.map(r=>String(r[c.index]||'')):null;}
+const siglusDat=dir=>{const d=path.join(dir,'dat');try{return fs.readdirSync(d).some(DBS)?d:'';}catch{return '';}};
+const siglus={
+ id:'siglus',hint:'dat\*.dbs',
+ scenes(dir){const d=siglusDat(dir);if(!d)return [];return fs.readdirSync(d).filter(DBS).sort().map(f=>({name:f,read:()=>fs.readFileSync(path.join(d,f))}));},
+ archives:()=>[],sources:dir=>{const d=siglusDat(dir);return d?fs.readdirSync(d).filter(DBS).map(f=>path.join(d,f)):[];},
+ parse:parseDbs,test:DBS,
+ patchLines(base,found){
+  const dirs=[...new Set(found.dirs.flatMap(d=>[d,path.join(d,'.megulit-japanese','dat'),path.join(d,'dat')]))];let any=false;
+  const list=base.map(scene=>{const stem=scene.name.replace(/\.dbs$/i,'');
+   for(const d of dirs)for(const name of [scene.name,stem+'_zh.dbs',stem+'_cn.dbs',stem+'_tw.dbs']){const file=path.join(d,name);let buf;try{buf=fs.readFileSync(file);}catch{continue;}
+    let lines;try{lines=chineseColumn(dbsTable(buf),scene.lines.length);}catch{continue;}if(!lines)continue;any=true;
+    return {...scene,patched:true,lines:lines.map((t,k)=>t||scene.lines[k])};}
+   return scene;});
+  return any?list:null;
+ },
+};
+
+const ENGINES={kirikiri,artemis,renpy,siglus};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,8)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;}

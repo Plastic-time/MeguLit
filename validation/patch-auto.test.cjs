@@ -71,3 +71,11 @@ test('calibration drops a read colour that inverts the text colour',()=>{
  assert.strictEqual(combine([mk('#f7fcfe',false),mk('#030304',true)]).style.readTextColor,'');
  assert.strictEqual(combine([mk('#ffffff',false),mk('#4080ff',true)]).style.readTextColor,'#4080ff');
 });
+
+// E283: immersion is on by default, turned on once for settings saved before, and a later choice is kept.
+test('immersion default on with a one-time switch',()=>{
+ const {cleanV4}=require('../core/v4-config.cjs');
+ assert.strictEqual(cleanV4({}).immersion,true);
+ assert.strictEqual(cleanV4({immersion:false}).immersion,true);
+ assert.strictEqual(cleanV4({immersion:false,immersionV:2}).immersion,false);
+});
