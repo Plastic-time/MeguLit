@@ -396,8 +396,8 @@
     window.TomeTypewriter?.configure({enabled:preferences.typewriter,speed:preferences.typewriterSpeed});
     root.setProperty('--tomoyo-gal-gap', scaled(preferences.gap));
     root.setProperty('--megulit-translation-line-offset',preferences.translationLineHeight);root.setProperty('--tomoyo-gal-line-height', appearance.lineHeightFor(preferences));root.setProperty('--tomoyo-gal-ruby-line-height',appearance.lineHeightFor(preferences,true));root.setProperty('--tomoyo-ruby-offset-x',scaled(preferences.rubyOffsetX));root.setProperty('--tomoyo-ruby-offset-y',scaled(preferences.rubyOffsetY));root.setProperty('--megulit-ruby-unit',scaled(1));
-    root.setProperty('--tomoyo-gal-jp-spacing',scaled(Math.max(-preferences.japaneseSize*.45,preferences.japaneseSpacingPx)+(preferences.japaneseOutline?2*(Number(preferences.japaneseOutlineWidth)||0):0)));
-    root.setProperty('--tomoyo-gal-cn-spacing',scaled(Math.max(-preferences.translationSize*.45,preferences.chineseSpacingPx)+(preferences.chineseOutline?2*(Number(preferences.chineseOutlineWidth)||0):0)));
+    root.setProperty('--tomoyo-gal-jp-spacing',scaled(Math.max(-preferences.japaneseSize*.45,preferences.japaneseSpacingPx)));
+    root.setProperty('--tomoyo-gal-cn-spacing',scaled(Math.max(-preferences.translationSize*.45,preferences.chineseSpacingPx)));
     root.setProperty('--tomoyo-jp-outline',appearance.outlineFor(preferences.japaneseOutline&&String(preferences.japaneseOutlineColor||'').toLowerCase()!==String(preferences.textColor||'').toLowerCase(),preferences.japaneseOutlineColor,preferences.japaneseOutlineWidth*gameScale,window.devicePixelRatio));
     root.setProperty('--tomoyo-cn-outline',appearance.outlineFor(preferences.chineseOutline,preferences.chineseOutlineColor,preferences.chineseOutlineWidth*gameScale,window.devicePixelRatio));
     root.setProperty('--tomoyo-ruby-outline',appearance.outlineFor(preferences.rubyOutline,preferences.rubyOutlineColor,preferences.rubyOutlineWidth*gameScale,window.devicePixelRatio));root.setProperty('--tomoyo-ruby-stroke-color',preferences.rubyOutlineColor);

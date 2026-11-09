@@ -2,6 +2,7 @@
 'use strict';
 const naninovelStream=t=>/Naninovel.*RevealableText|:Naninovel\.UI:RevealableText:SetTextValue:/i.test((t.name||'')+' '+(t.code||''));
 const streamRank=t=>naninovelStream(t)?300:/^Embed/.test(t.name||'')||t.embeddable===true?200:/TMP_Text|TextMeshPro|TextElement|TextField/.test(t.name||'')?10:100;
+const EMBED_FEEDBACK='这个游戏暂时不能隐藏原文：请在「关于」里提交反馈，附上游戏名和截图，一般一天内就能适配';
 class HookControl{
  constructor(host,now=Date.now){this.host=host;this.now=now;this.seq=0;this.baseline=false;this.plan='read';this.running=false;this.lastIdentity='';}
  status(value){if(value.hookCheckState)this.host.hooks.trace?.('check '+value.hookCheckState+' '+(value.hookCheckMessage||''));this.host.notify({type:'hookCheck',hookProfile:this.plan,hookAutoOcr:!!this.autoOcr,...value});}
@@ -22,7 +23,7 @@ class HookControl{
   if(this.styleCalibration)this.beginStyleSync(false);
   if(profile!=='off'&&profile!=='read'&&!h.state.bound)h.send({type:'toggleMode'});
   if(profile!=='off'&&profile!=='read'&&h.state.coverEnabled===false)h.send({type:'toggleCover'});
-  this.status({hookProfile:profile,hookBaselineVerified:false,hookVisualVerified:false,hookCheckState:profile==='off'?'stopped':profile==='read'?'reading':force?'unverified':'baseline',hookCheckMessage:profile==='off'?'Hook 已停止':profile==='read'?'读取已启动，推进一句后检查捕捉结果':force?'隐藏已开启，约 3 秒后从下一句开始生效':'先检查游戏原文，请推进一句；识别到原文后自动启动隐藏'});
+  this.status({hookProfile:profile,...(profile==='read'?{}:{hookEmbedUnsupported:false}),hookBaselineVerified:false,hookVisualVerified:false,hookCheckState:profile==='off'?'stopped':profile==='read'?'reading':force?'unverified':'baseline',hookCheckMessage:profile==='off'?'Hook 已停止':profile==='read'?'读取已启动，推进一句后检查捕捉结果':force?'隐藏已开启，约 3 秒后从下一句开始生效':'先检查游戏原文，请推进一句；识别到原文后自动启动隐藏'});
  }
  beginStyleSync(manual=false,purpose='all',owner=''){
   const h=this.host;if(!h.styleSync||!h.state.bound){this.styleCalibration=false;h.styleSync?.status('waiting');return;}
@@ -100,7 +101,7 @@ class HookControl{
   if(hiding)this.start('read');
   if(!t){if(this.plan==='off')this.start('read');
    // Streams carry text but none can be embedded: this game is covered by OCR instead.
-   if(threads.some(x=>x.selected&&x.sample)){if(this.readOnlySince==null)this.readOnlySince=this.now();if(this.now()-this.readOnlySince<8000){this.status({hookCheckState:'waiting',hookCheckMessage:'优先查找可内嵌的引擎文本流，暂不启用 OCR'});return;}this.status({hookCheckState:'reading',hookCheckMessage:'当前文本流不提供内嵌，保持 Hook 读取，游戏原文保持可见；需要遮盖时请在设置里手动选择 OCR 遮盖'});return;}
+   if(threads.some(x=>x.selected&&x.sample)){if(this.readOnlySince==null)this.readOnlySince=this.now();if(this.now()-this.readOnlySince<8000){this.status({hookCheckState:'waiting',hookCheckMessage:'优先查找可内嵌的引擎文本流，暂不启用 OCR'});return;}/* E346 (user 2026-11-10): every engine that ends here tells the user how to get the game adapted. */this.status({hookCheckState:'reading',hookEmbedUnsupported:true,hookCheckMessage:EMBED_FEEDBACK});return;}
    this.status({hookCheckState:'waiting',hookCheckMessage:'已开启隐藏：等 Hook 找到游戏文本流，推进一句后自动开始隐藏'});return;}
   if(!explicit&&!(h.state.bound&&h.state.coverEnabled!==false))return;
   h.hooks.preferredThread=t.id;this.start(/DrawHide/.test(t.name)?'euphoria474':'embed',p.hookFast!==false);

@@ -85,3 +85,43 @@ test('Japanese import then zero-latency translation from the files that were mov
  assert.strictEqual(ot.provider(data,path.join(game,'game.exe')).resolve('あの公園まで歩いていこう。').translation.trim(),'走到那个公园去吧。');
  fs.rmSync(base,{recursive:true,force:true});
 });
+
+// E338: a Japanese release of another build (Steam Saya_Steam.exe + *.npk vs the 2003 saya.exe + *.pak) is set up as its own copy.
+test('a Japanese release of another build becomes the game program instead of being swapped in',async()=>{
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'jio-sep-')),game=path.join(base,'steam'),jp=path.join(base,'saya-jp');
+ put(game,{'Saya_Steam.exe':'x','script.npk':'a','cg.npk':'b'});
+ put(jp,{'saya.exe':Buffer.alloc(45056),'script.pak':'c','image.pak':'d'});
+ const before=tree(game);
+ const p=await jio.preview(game,jp);assert.equal(p.state,'separate');assert.equal(p.exe,'saya.exe');assert.equal(p.target,jp);assert.equal(p.copy,false);
+ const r=await jio.apply(game,jp,'');assert.equal(r.separate,true);assert.equal(r.exe,path.join(jp,'saya.exe'));
+ assert.deepStrictEqual(tree(game),before,'the current game files are not touched');
+ fs.rmSync(base,{recursive:true,force:true});
+});
+
+test('a disc image is reported as one, not as another game',async()=>{
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'jio-disc-')),game=path.join(base,'steam'),jp=path.join(base,'disc');
+ put(game,{'Saya_Steam.exe':'x','script.npk':'a'});put(jp,{'saya.cue':'FILE "saya.bin" BINARY','saya.bin':'x'});
+ await assert.rejects(jio.preview(game,jp),/IMPORT_DISC_(IMAGE|UNREADABLE)/);
+ fs.rmSync(base,{recursive:true,force:true});
+});
+
+// E339: ISO 9660 read from a raw 2352-byte .bin (Mode 1) with Shift-JIS names; an installer disc is offered as an .iso.
+test('disc images: files are read from a raw bin, an installer disc becomes an iso',async()=>{
+ const disc=require('../core/disc-image.cjs'),base=fs.mkdtempSync(path.join(os.tmpdir(),'disc-'));
+ const sectors=24,user=Buffer.alloc(sectors*2048);
+ const pvd=user.subarray(16*2048);pvd[0]=1;pvd.write('CD001',1,'latin1');pvd[156]=34;pvd.writeUInt32LE(18,156+2);pvd.writeUInt32LE(2048,156+10);pvd[156+25]=2;
+ user.subarray(17*2048)[0]=255;user.subarray(17*2048).write('CD001',1,'latin1');
+ const rec=(name,lba,size,dir)=>{const n=Buffer.from(name,'latin1'),len=33+n.length+(n.length%2?0:1),r=Buffer.alloc(len);r[0]=len;r.writeUInt32LE(lba,2);r.writeUInt32LE(size,10);r[25]=dir?2:0;r[32]=n.length;n.copy(r,33);return r;};
+ const sj=Buffer.from([0x8d,0xb9,0x96,0xeb]); /* 沙耶 in Shift-JIS */
+ const name=Buffer.concat([sj,Buffer.from('.TXT;1','latin1')]).toString('latin1');
+ Buffer.concat([rec('\x00',18,2048,true),rec('\x01',18,2048,true),rec('SETUP.EXE;1',19,5,false),rec(name,20,3,false)]).copy(user,18*2048);
+ user.write('hello',19*2048,'latin1');user.write('abc',20*2048,'latin1');
+ const raw=Buffer.alloc(sectors*2352);for(let i=0;i<sectors;i++){const s=raw.subarray(i*2352);Buffer.from([0,255,255,255,255,255,255,255,255,255,255,0]).copy(s);s[15]=1;user.copy(s,16,i*2048,i*2048+2048);}
+ const bin=path.join(base,'GAME.bin');fs.writeFileSync(bin,raw);fs.writeFileSync(path.join(base,'GAME.cue'),'FILE "GAME.bin" BINARY');
+ assert.equal(disc.imageOf(path.join(base,'GAME.cue')),bin);
+ assert.equal(await disc.extract(bin,path.join(base,'out')),2);
+ assert.equal(fs.readFileSync(path.join(base,'out','沙耶.TXT'),'utf8'),'abc');
+ const iso=await disc.toIso(bin,path.join(base,'GAME.iso'));assert.equal(fs.statSync(iso).size,sectors*2048);
+ assert.equal(await disc.extract(iso,path.join(base,'out2')),2);
+ fs.rmSync(base,{recursive:true,force:true});
+});
