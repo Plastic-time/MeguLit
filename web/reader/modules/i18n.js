@@ -35,7 +35,7 @@
  const ZH={
   '校准':['Calibration','調整'],'字体、字号与显示':['Fonts, size and display','フォント・サイズ・表示'],
   '文字颜色与已读未读':['Text colours, read and unread','文字色・既読と未読'],'行距、间距与留白':['Line spacing, gaps and insets','行間・字間・余白'],
-  '文本位置与实时跟随':['Text position and live tracking','文字位置とリアルタイム追従'],'窗口绑定（高级）':['Window binding (advanced)','ウィンドウ連携（詳細）'],
+  '文本位置与实时跟随':['Text position and live tracking','文字位置とリアルタイム追従'],'内嵌没生效，或译文、对话框位置乱跑（部分紫社等作品自动识别不准）：展开「窗口绑定（高级）」，选中游戏窗口，点「绑定此窗口」手动绑定即可':['If embedding does nothing, or the translation or dialog box jumps around (auto-detection misses some games, e.g. Purple software titles): open Window binding (advanced), pick the game window and click Bind this window','埋め込みが効かない、または訳文や会話欄の位置がずれる場合（パープルソフトウェア作品など自動検出が合わないことがあります）：「ウィンドウ連携（詳細）」を開き、ゲームウィンドウを選んで「このウィンドウと連携」を押してください'],'窗口绑定（高级）':['Window binding (advanced)','ウィンドウ連携（詳細）'],
   '未读渐变':['Unread gradient','未読グラデーション'],'已读渐变':['Read gradient','既読グラデーション'],
   '未读渐变上色':['Unread gradient top','未読・上の色'],'未读渐变下色':['Unread gradient bottom','未読・下の色'],
   '已读渐变上色':['Read gradient top','既読・上の色'],'已读渐变下色':['Read gradient bottom','既読・下の色'],
