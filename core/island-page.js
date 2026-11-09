@@ -2,6 +2,8 @@
 // Each ISLAND sentence owns its source, draw extent and asynchronous translation for the lifetime of its page.
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else{root.TomeIslandPage=api;api.install(root);}})(typeof window==='object'?window:this,function(){
  'use strict';
+ // Engines that report per-line positions and pages: ISLAND (cs2), KiriKiri KAG message layers (krkr, E300) Ren'Py NVL pages (renpy, E301) and OCR-located pages of any other engine (ocr, E306).
+ const PAGED=new Set(['cs2','krkr','renpy','ocr']);
  const token=value=>{value=value.replace(/[ \u3000\r\n]/g,'');let h=2166136261;for(let i=0;i<value.length;i++)h=Math.imul(h^value.charCodeAt(i),16777619);return h>>>0;};
  class Page{
   constructor(){this.reset();}
@@ -35,7 +37,7 @@
    if(r)return this.apply(r,m);this.reports.set(m.line,m);if(this.reports.size>64)this.reports.delete(this.reports.keys().next().value);return false;
   }
   position(m){
-   if(!m||!/^cs2_screen_v[13]$/.test(m.engine)||!Number.isSafeInteger(m.token)||!Number.isSafeInteger(m.line)||m.line<this.floor||![m.x0,m.y0,m.x1,m.y1,m.size].every(Number.isFinite)||m.x0< -2000||m.y0< -2000||m.x1>10000||m.y1>10000||m.x1<m.x0||m.y1<m.y0||m.size<6||m.size>160)return false;
+   if(!m||!/^(?:cs2_screen_v[13]|(?:krkr|renpy|ocr)_screen_v1)$/.test(m.engine)||!Number.isSafeInteger(m.token)||!Number.isSafeInteger(m.line)||m.line<this.floor||![m.x0,m.y0,m.x1,m.y1,m.size].every(Number.isFinite)||m.x0< -2000||m.y0< -2000||m.x1>10000||m.y1>10000||m.x1<m.x0||m.y1<m.y0||m.size<6||m.size>160)return false;
    const r=[...this.records].reverse().find(p=>p.token===m.token&&(p.line==null||p.line===m.line));
    if(r){if(m.replacementRequested===false&&r.position&&r.position.replacementRequested!==false)m={...m,replacementRequested:true};r.position=m;return true;}
    this.positions.set(m.line,m);if(this.positions.size>64)this.positions.delete(this.positions.keys().next().value);return false;
@@ -70,10 +72,10 @@
   function revealWithRuby(jp){const chars=[...jp.children];for(const c of chars)c.classList.add('tome-typewriter-pending');
    const go=()=>{if(jp.isConnected&&!jp.dataset.tomeRubyRevealed){jp.dataset.tomeRubyRevealed='1';w.TomeTypewriter?.reveal(jp,[...jp.children],{instant:false});}};
    const ready=b.prepareRuby?.(jp);if(!ready){go();return;}Promise.race([ready.catch(()=>false),new Promise(r=>setTimeout(r,300))]).then(go);}
-  function place(){if(!active||!root)return;const info=b.galLayoutInfo?.(),p=b.galPreferences?.()||{},dpr=w.devicePixelRatio||1,cw=(info?.clientWidth||1280)/dpr,ch=(info?.clientHeight||720)/dpr,ox=(info?.clientX??((info?.readerX||0)-(p.x||0)*(info?.clientWidth||1280)/100))/dpr,oy=(info?.clientY??((info?.readerY||0)-(p.y||0)*(info?.clientHeight||720)/100))/dpr,k=Math.min(cw/1280,ch/720),left=ox+(cw-1280*k)/2,top=oy+(ch-720*k)/2;
+  function place(){if(!active||!root)return;const info=b.galLayoutInfo?.(),p=b.galPreferences?.()||{},dpr=w.devicePixelRatio||1,cw=(info?.clientWidth||1280)/dpr,ch=(info?.clientHeight||720)/dpr,ox=(info?.clientX??((info?.readerX||0)-(p.x||0)*(info?.clientWidth||1280)/100))/dpr,oy=(info?.clientY??((info?.readerY||0)-(p.y||0)*(info?.clientHeight||720)/100))/dpr,ref=model.records.find(r=>r.position)?.position,bw=ref?.sw>0?ref.sw:1280,bh=ref?.sh>0?ref.sh:720,k=Math.min(cw/bw,ch/bh),left=ox+(cw-bw*k)/2,top=oy+(ch-bh*k)/2;
    const readOnly=p.hookHide===false,items=[];for(const r of model.records){const node=nodes.get(r);if(!node)continue;const pos=r.position;node.hidden=!pos;if(!pos)continue;let x,y,width,size;
     if(pos){const mapped=w.__tomeTextPosition?.mapExtent?.(pos);if(mapped){x=mapped.x/dpr+ox;y=mapped.y/dpr+oy;width=mapped.width/dpr;size=mapped.size/dpr;}else{x=left+pos.x0*k;y=top+pos.y0*k;width=(pos.x1-pos.x0+pos.size)*k;size=pos.size*k;}}
-    width=Math.max(size*2,Math.min(cw,width+size*.6));const centered=model.records.filter(r=>r.position).length===1&&pos.y1===pos.y0&&Math.abs((pos.x0+pos.x1+pos.size)/2-640)<=Math.max(12,pos.size*.75);if(centered){width=Math.min(cw-24,Math.max(width,cw*.7));x=ox+(cw-width)/2;}
+    width=Math.max(size*2,Math.min(cw,width+size*.6));const centered=model.records.filter(r=>r.position).length===1&&pos.y1===pos.y0&&Math.abs((pos.x0+pos.x1+pos.size)/2-bw/2)<=Math.max(12,pos.size*.75);if(centered){width=Math.min(cw-24,Math.max(width,cw*.7));x=ox+(cw-width)/2;}
     x+=(Number(p.paddingX)||0)*k;y+=(Number(p.paddingY)||0)*k;width=Math.max(size*2,width-2*(Number(p.paddingX)||0)*k);
     node.style.cssText='left:'+x+'px;top:'+y+'px;width:'+width+'px;transform:none;';node.style.setProperty('--tome-island-jp-size',size+'px');node.style.setProperty('--tome-island-cn-size',Math.min(size, (p.translationSize||24)*k)+'px');node.style.setProperty('--tome-island-align',centered?'center':'left');
     // The engine reports each line's own fill colour (read lines and unread lines differ in many games): follow it while
@@ -98,14 +100,14 @@
   b.pageTranslationActive=()=>active;
   b.refreshPageTranslations=()=>{if(!active)return false;revision++;for(const r of model.records){r.requested=false;r.translation='';r.state='pending';}requests.clear();synchronize();return true;};
   b.deliverPageTranslation=(id,text,error,message)=>{const r=requests.get(id);if(!r)return false;requests.delete(id);if(!active||!model.records.includes(r))return true;r.translation=error?(message||''):String(text||'');r.state=error?'error':'ready';if(!error&&r.translation.trim())b.backlogTranslated?.(r.source,r.translation);b.lastTranslationError=error?message:'';synchronize();return true;};
-  b.islandPage={model,accept(m){if(typeof m.hookSourceEngine==='string'&&m.hookSourceEngine!==engine){if(engine==='cs2'){active=false;reset();d.body.classList.remove('tome-island-active');}engine=m.hookSourceEngine;}
-    if(m.type==='gameClosed'||m.hookSource===null){if(engine==='cs2'){active=false;engine='';reset();d.body.classList.remove('tome-island-active','tomoyo-hook-reader-active');}return false;}if(engine!=='cs2')return false;
+  b.islandPage={model,accept(m){if(typeof m.hookSourceEngine==='string'&&m.hookSourceEngine!==engine){if(PAGED.has(engine)){active=false;reset();d.body.classList.remove('tome-island-active');}engine=m.hookSourceEngine;}
+    if(m.type==='gameClosed'||m.hookSource===null){if(PAGED.has(engine)){active=false;engine='';reset();d.body.classList.remove('tome-island-active','tomoyo-hook-reader-active');}return false;}if(!PAGED.has(engine))return false;
     const spatial=d.body.classList.contains('tomoyo-ui-translation')&&(b.isGalBound?.()??d.body.classList.contains('tomoyo-gal-bound'));
     if(active&&!spatial){active=false;for(const timer of timers.values())clearTimeout(timer);timers.clear();requests.clear();dropView();scope='';send({type:'pageTranslationScope',key:''});d.body.classList.remove('tome-island-active','tomoyo-hook-reader-active');if(typeof m.hookSource!=='string'){m.hookSource=source;m.hookSequence=sequence;}}
     if(!active&&spatial){active=true;session++;}
     if(typeof m.hookSource==='string'){const next=w.TomeIslandSource?.spoken(m.hookSource)??b.splitDialogue?.(m.hookSource).text??m.hookSource,nextSequence=m.hookSequence??sequence+1;if(next.trim()&&(next!==source||nextSequence!==sequence)){source=next;sequence=nextSequence;const rec=model.source(next,nextSequence,m.hookSourceLine);b.prefetchRuby?.(next);if(typeof m.hookSourceRead==='boolean')rec.read=m.hookSourceRead;if(active&&!rec.obsolete){b.sourceText=next;b.onSourceText?.(next);}}}
     if(!active)return false;
-    synchronize();return true;},page(m){if(m.engine!=='cs2')return false;model.page(m);synchronize();return true;},position(m){if(!/^cs2_screen_v[13]$/.test(m?.engine))return false;model.position(m);place();scheduleLayout();return true;},refresh:()=>{place();scheduleLayout();},status:()=>({active,sequence,chars:source.length,rendered:!!root?.isConnected,pairs:model.records.length,positioned:model.records.filter(r=>r.position).length,typing:null})};
+    synchronize();return true;},page(m){if(!PAGED.has(m.engine))return false;model.page(m);synchronize();return true;},position(m){if(!/^(?:cs2_screen_v[13]|(?:krkr|renpy|ocr)_screen_v1)$/.test(m?.engine))return false;model.position(m);place();scheduleLayout();return true;},refresh:()=>{place();scheduleLayout();},status:()=>({active,sequence,chars:source.length,rendered:!!root?.isConnected,pairs:model.records.length,positioned:model.records.filter(r=>r.position).length,typing:null})};
   const style=d.createElement('style');style.textContent=`
 body.tomoyo-gal-bound .sentence-window.tome-island-page{left:0!important;top:0!important;width:0!important;height:0!important;min-width:0!important;margin:0!important;padding:0!important;overflow:visible!important}
 .tome-island-pair[hidden]{display:none!important}

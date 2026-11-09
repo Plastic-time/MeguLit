@@ -128,3 +128,39 @@ test('find original exe: kana-named launcher with engine companion files wins ov
  const r=gl.originalExecutable(db,'m',data,'find');
  assert.strictEqual(r.executable,ja);
 });
+
+// E294: a Chinese script read by the hook is flagged, Japanese lines (even all-kanji ones) are not.
+test('hook flags a run of Simplified Chinese lines, never Japanese ones',()=>{
+ const {HookNative}=require('../core/hook-native.cjs');
+ const run=lines=>{const h=Object.create(HookNative.prototype);h.state={};h.trace=()=>{};h.notify=v=>{h.state={...h.state,...v};};for(const t of lines)h.languageCheck(t);return !!h.state.sourceChinese;};
+ assert.strictEqual(run(['一望无际的白色世界…','无尽的白色世界……','这条路是通往学校的主干道']),true);
+ assert.strictEqual(run(['学校に続く大通り','本来生徒賑','計算歩行','天気予報','東京都庁舎前']),false);
+ assert.match(fs.readFileSync(path.join(root,'core/japanese-restore.cjs'),'utf8'),/reason:'NO_JAPANESE_TEXT'/);
+});
+
+// E295: a folder named as an English or Chinese edition keeps its own program in the library.
+test('library lists a translated-edition folder with its main program',()=>{
+ const src=fs.readFileSync(path.join(root,'core/library.cjs'),'utf8');
+ assert.match(src,/function mainExe\(dir,translatedDir=false\)\{\r?\n if\(!translatedDir&&isTranslated\(dir\)\)return ''/);
+ assert.match(src,/if\(g&&g\.engine&&!g\.exe&&isTranslated\(g\.dir\)\)\{const own=mainExe\(g\.dir,true\)/);
+});
+
+// E296: KiriKiri inline commands (%n;) leak no more, and a line handed over twice is shown once.
+test('KiriKiri %n; codes are removed and doubled lines kept once',()=>{
+ const lt=require('../core/language-tracks.cjs');
+ assert.strictEqual(lt.japaneseTrack('%n;あの瞬間のことは、あやふやにしか思い出せない。あの瞬間のことは、あやふやにしか思い出せない。V'),'あの瞬間のことは、あやふやにしか思い出せない。');
+ assert.strictEqual(lt.japaneseTrack('%n;汗は垂れ流して、息が切れて苦しい。\n左の指は痺れて。汗は垂れ流して、息が切れて苦しい。左の指は痺れて。'),'汗は垂れ流して、息が切れて苦しい。\n左の指は痺れて。');
+ assert.strictEqual(lt.japaneseTrack('はい。はい。'),'はい。はい。');assert.strictEqual(lt.japaneseTrack('100%の力'),'100%の力');
+});
+
+// E297: release notes are bilingual collapsible blocks; the update card still shows the reader's language.
+test('release body uses language blocks; update card reads them',()=>{
+ const rel=fs.readFileSync(path.join(root,'Release.ps1'),'utf8');
+ assert.match(rel,/function LangBlocks/);assert.match(rel,/Hotfix \$stamp/);
+ const src=fs.readFileSync(path.join(root,'web/update-notice.js'),'utf8').replace(/\r\n/g,'\n'),a=src.indexOf('function blockText'),b=src.indexOf('let card=null');
+ const notesFor=new Function(src.slice(a,b)+';return notesFor;')();
+ const body='## MeguLit v9\n\n<details open>\n<summary><b>中文</b></summary>\n\n- 修复A\n\n</details>\n\n---\n\n<details>\n<summary><b>English</b></summary>\n\n- Fixed A\n\n</details>';
+ assert.deepStrictEqual(notesFor(body,'zh').map(n=>n.text),['MeguLit v9','修复A']);
+ assert.deepStrictEqual(notesFor(body,'en').map(n=>n.text),['MeguLit v9','Fixed A']);
+ assert.deepStrictEqual(notesFor('- 旧\n---\n- old','en').map(n=>n.text),['old']);
+});

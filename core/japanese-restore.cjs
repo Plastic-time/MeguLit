@@ -65,7 +65,7 @@ function datDir(gameDir){const d=path.join(gameDir,'dat');return fs.existsSync(d
 
 function siglusPlan(gameDir){
  const dir=datDir(gameDir);if(!dir)return null;
- const files=fs.readdirSync(dir).filter(f=>/\.dbs$/i.test(f)),changes=[];let japanese=null,targets=new Set(),cells=0;
+ const files=fs.readdirSync(dir).filter(f=>/\.dbs$/i.test(f)),changes=[];let japanese=null,targets=new Set(),cells=0,japaneseTables=0;
  for(const name of files){
   const twin=name.match(/^(.*)_(en|zh|cn|tw|ko|ru)\.dbs$/i);
   let file,decoded,table;try{file=fs.readFileSync(path.join(dir,name));decoded=decrypt(file);table=parse(decoded.raw,decoded.marker);}catch{continue;}
@@ -75,6 +75,7 @@ function siglusPlan(gameDir){
     const next=table.cells.map((row,r)=>row.map((v,c)=>table.columns[c].type===0x53&&bt.cells[r][c]?bt.cells[r][c]:v));
     let n=0;next.forEach((row,r)=>row.forEach((v,c)=>{if(v!==table.cells[r][c])n++;}));if(n)changes.push({name,file,decoded,table,next,changed:n,kind:'twin',from:base});cells+=n;}catch{}continue;}
   const langs=languageColumns(table),jp=langs.filter(c=>c.filled).sort((a,b)=>b.kana-a.kana)[0];
+  if(jp&&jp.kana>=.3)japaneseTables++;
   if(!jp||jp.kana<.3||langs.filter(c=>c.filled).length<2)continue;
   if(japanese==null)japanese=jp.index;
   const tgt=translationColumns(table,langs,jp.index);tgt.forEach(c=>targets.add(c.index));
@@ -82,7 +83,7 @@ function siglusPlan(gameDir){
   let n=0;next.forEach((row,r)=>row.forEach((v,c)=>{if(v!==table.cells[r][c])n++;}));
   if(n)changes.push({name,file,decoded,table,next,changed:n,kind:'column',from:jp.index,to:tgt.map(t=>t.index)});cells+=n;
  }
- return {adapter:'siglus-dbs',dir,japaneseColumn:japanese,targetColumns:[...targets],changes,cells};
+ return {adapter:'siglus-dbs',dir,japaneseColumn:japanese,targetColumns:[...targets],changes,cells,japaneseTables};
 }
 
 function manifestPath(gameDir){return path.join(gameDir,BACKUP_DIR,'manifest.json');}
@@ -92,6 +93,10 @@ function detect(gameDir){
  gameDir=path.resolve(String(gameDir||''));if(!fs.existsSync(gameDir))return {state:'missing'};
  const manifest=readManifest(gameDir),siglus=siglusPlan(gameDir);
  if(siglus&&(siglus.changes.length||manifest))return {state:manifest?'applied':'restorable',adapter:'siglus-dbs',files:siglus.changes.length,cells:siglus.cells,japaneseColumn:siglus.japaneseColumn,targetColumns:siglus.targetColumns,pending:siglus.changes.length,manifest:manifest&&{at:manifest.at,files:manifest.files.length}};
+ /* E294 (user report 2026-11-10: a friend's Steam CLANNAD stayed Chinese after the restore): the Steam release's tables hold
+    English and Chinese only; the Japanese text comes from a separate Japanese patch. No Japanese column anywhere means
+    there is nothing to restore, not "already Japanese". */
+ if(siglus&&!siglus.japaneseTables)return {state:'none',adapter:'siglus-dbs',reason:'NO_JAPANESE_TEXT'};
  if(siglus)return {state:'already',adapter:'siglus-dbs'};
  const names=fs.readdirSync(gameDir);
  const localeSets=names.filter(n=>/^(scene|gameexe)(jp|ja|en|zh|cn|tw)?\.(pck|dat)$/i.test(n)||/_(jp|ja)\.(xp3|pck|arc|dat)$/i.test(n));

@@ -60,12 +60,18 @@ function foreignLine(text){const t=String(text||'');if(KANA.test(t))return false
 // Japanese dialogue of that length always carries kana and uses 、 (user report 2026-11-09, WHITE ALBUM2).
 function borrowedCode(text){const t=String(text||'').replace(/\s+/g,'');if(KANA.test(t)||!t.includes('，'))return false;const han=(t.match(/[㐀-鿿]/gu)||[]).length;return han>=12&&han/[...t].length>=.7&&zhScore(t)<=1;}
 function foreignRows(text){const rows=String(text).split(/\r?\n/);if(rows.length<2||!rows.some(r=>KANA.test(r)))return text;const kept=rows.filter(r=>!foreignLine(r));return kept.length&&kept.length<rows.length?kept.join('\n'):text;}
+/* E296 (user, 2026-11-10, ライムライト・レモネードジャム: "%n;あの瞬間の…ない。あの瞬間の…ない。V" on screen): KiriKiri inline commands
+   (%n; %p; %f0; …, colour #rrggbb; / #;) leak as text, and the engine hands a line over twice. Commands go; a line that is
+   then two equal halves (a stray end marker letter allowed) keeps one. %l groups are left to inlineAlternatives. */
+function inlineCommands(text){return text.replace(/%(?!l)[a-z][a-z0-9]*;/gi,'').replace(/#(?:[0-9a-f]{6,8})?;/gi,'');}
+function halveLoose(s){const once=halve(s);if(once!==s)return once;const m=/^([\s\S]*?)[A-Za-z]{1,2}\s*$/.exec(s);if(m&&KANA.test(m[1])){const body=m[1].trimEnd(),h=halve(body);if(h!==body)return h;}return s;}
 function japaneseTrack(text){
  if(typeof text!=='string'||!text)return text;
  let out=inlineAlternatives(text);
+ if(/%(?!l)[a-z][a-z0-9]*;|#(?:[0-9a-f]{6,8})?;/i.test(out)){out=inlineCommands(out);out=halveLoose(out);}
  out=tracks(out)??out;
  out=semicolonTracks(out)??out;
  out=foreignRows(out);
  return out;
 }
-module.exports={borrowedCode,foreignLine,foreignRows,japaneseTrack,inlineAlternatives,tracks,semicolonTracks};
+module.exports={inlineCommands,halveLoose,borrowedCode,foreignLine,foreignRows,japaneseTrack,inlineAlternatives,tracks,semicolonTracks};

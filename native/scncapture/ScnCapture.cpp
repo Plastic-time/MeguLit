@@ -7,6 +7,9 @@
 // <MeguLit>\cache\kirikiri-scn\<game key>\ (never into the game folder). services/original-engines/scenes.cjs
 // (kirikiri-dump) reads that folder. Scenes the game has not opened yet are asked for once, one at a time on the game's
 // own thread, from the names MeguLit writes to want.txt. Every step is guarded: on any failure the game runs untouched.
+// E296 (魔法使いの夜, a packed Chinese build): names in want.txt that are not .scn (scenario .ks) are read as text through
+// the exporter's TVPCreateTextStreamForRead, which resolves them the way the running game does (its Chinese patch first)
+// and decrypts and decodes them; each is saved as UTF-16 to run-<program>\ in the same folder.
 #include <windows.h>
 #include <objidl.h>
 #include <tlhelp32.h>
@@ -26,6 +29,9 @@ struct VariantString { int RefCount; wchar_t *LongString; wchar_t ShortString[22
 typedef IStream *(__stdcall *CreateIStreamFn)(const void *name, unsigned flags);
 typedef bool(__stdcall *ExistsFn)(const void *name);
 typedef bool(__cdecl *QueryNarrowFn)(void *self, const char **names, void **functions, unsigned count);
+typedef void *(__stdcall *TextStreamFn)(const void *name, const void *mode);
+typedef unsigned(__cdecl *TextReadFn)(void *self, void *target, unsigned size);
+typedef void(__cdecl *TextDestructFn)(void *self);
 
 HMODULE Self;
 wchar_t Out[1024];
@@ -34,6 +40,8 @@ HANDLE Wake;
 DWORD Tls = TLS_OUT_OF_INDEXES;
 CreateIStreamFn Original, Target;
 ExistsFn Exists;
+TextStreamFn TextStream;
+wchar_t RunDir[1024];             // run-<program>\ for scripts read as text
 volatile LONG LayoutOk, MainThread;
 std::set<std::wstring> Done;     // lower-case file names already in the folder
 std::set<std::wstring> Asked;    // names from want.txt already tried
@@ -117,6 +125,26 @@ char *ReadAll(IStream *s, DWORD *size) {
   return NULL;
  }
 }
+// The whole script as the engine decodes it (iTJSTextReadStream: Read(target, 0) reads everything, Destruct frees it).
+bool ReadTextGuarded(const void *ref, wchar_t **out, int *length) {
+ void *stream = NULL;
+ *out = NULL; *length = 0;
+ __try {
+  if (!Exists(ref)) return false;
+  VariantString *mode = NULL, *target = NULL;
+  stream = TextStream(ref, &mode);
+  if (!stream) return false;
+  void **vt = *(void ***)stream;
+  ((TextReadFn)vt[0])(stream, &target, 0);
+  if (target) {
+   const wchar_t *t = target->LongString ? target->LongString : target->ShortString;
+   int n = target->Length;
+   if (n > 0 && n < (64 << 20)) { *out = (wchar_t *)malloc(((size_t)n + 1) * sizeof(wchar_t)); if (*out) { memcpy(*out, t, (size_t)n * sizeof(wchar_t)); (*out)[n] = 0; *length = n; } }
+  }
+  ((TextDestructFn)vt[1])(stream);
+  return *out != NULL;
+ } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
 IStream *OpenGuarded(const void *ref) {
  __try { return Exists(ref) ? Original(ref, 0) : NULL; } __except (EXCEPTION_EXECUTE_HANDLER) { return NULL; }
 }
@@ -162,6 +190,7 @@ IStream *__stdcall HookCreateIStream(const void *name, unsigned flags) {
 }
 
 // ---- scenes MeguLit asks for (want.txt), opened on the game's own thread between its messages ----------------------
+bool HaveText(const std::wstring &name) { return GetFileAttributesW((std::wstring(RunDir) + BaseOf(name.c_str())).c_str()) != INVALID_FILE_ATTRIBUTES; }
 void AskOne(const std::wstring &name) {
  VariantString *v = (VariantString *)calloc(1, sizeof(VariantString)); // kept for good: the engine may hold on to it
  if (!v) return;
@@ -174,13 +203,28 @@ void AskOne(const std::wstring &name) {
  TlsSetValue(Tls, NULL);
  if (s) { OnOpen(ref, s, true); ReleaseGuarded(s); }
 }
+void AskText(const std::wstring &name) {
+ if (!TextStream || HaveText(name)) return;
+ VariantString *v = (VariantString *)calloc(1, sizeof(VariantString)); // kept for good: the engine may hold on to it
+ VariantString **ref = (VariantString **)malloc(sizeof(void *));
+ if (!v || !ref || !(v->LongString = _wcsdup(name.c_str()))) return;
+ v->RefCount = 0x3fffffff; v->Length = (int)name.size(); *ref = v;
+ wchar_t *text; int n;
+ TlsSetValue(Tls, (void *)1);
+ bool ok = ReadTextGuarded(ref, &text, &n);
+ TlsSetValue(Tls, NULL);
+ if (!ok) { Log("not read " + Utf8(name)); return; }
+ std::wstring body(L"\xFEFF"); body.append(text, n); free(text);
+ bool saved = WriteWhole(std::wstring(RunDir) + BaseOf(name.c_str()), body.data(), (DWORD)(body.size() * sizeof(wchar_t)));
+ Log(std::string(saved ? "read " : "save failed ") + Utf8(name) + " " + std::to_string(n) + " chars");
+}
 LRESULT CALLBACK OnMessage(int code, WPARAM wp, LPARAM lp) {
- if (code >= 0 && wp == PM_REMOVE && GetTickCount() - LastAsk >= 250) {
+ if (code >= 0 && wp == PM_REMOVE && GetTickCount() - LastAsk >= 120) {
   std::wstring next;
   EnterCriticalSection(&Gate);
-  while (!Wanted.empty() && next.empty()) { next = Wanted.front(); Wanted.pop_front(); if (Done.count(Lower(BaseOf(next.c_str()))) ) next.clear(); }
+  while (!Wanted.empty() && next.empty()) { next = Wanted.front(); Wanted.pop_front(); if (IsScene(next.c_str()) ? Done.count(Lower(BaseOf(next.c_str()))) > 0 : HaveText(next)) next.clear(); }
   LeaveCriticalSection(&Gate);
-  if (!next.empty()) { LastAsk = GetTickCount(); AskOne(next); }
+  if (!next.empty()) { LastAsk = GetTickCount(); if (IsScene(next.c_str())) AskOne(next); else AskText(next); }
  }
  return CallNextHookEx(NULL, code, wp, lp);
 }
@@ -196,6 +240,7 @@ void ReadWants() {
  while (ReadFile(h, buf, sizeof buf, &n, NULL) && n && text.size() < (8u << 20)) text.append(buf, n);
  CloseHandle(h);
  size_t added = 0, at = 0;
+ bool deferred = false;
  EnterCriticalSection(&Gate);
  while (at < text.size()) {
   size_t e = text.find('\n', at); if (e == std::string::npos) e = text.size();
@@ -203,10 +248,15 @@ void ReadWants() {
   while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
   if (line.empty() || line.size() > 400) continue;
   std::wstring w = Wide(line);
-  if (!IsScene(w.c_str()) || Done.count(Lower(BaseOf(w.c_str()))) || !Asked.insert(Lower(w)).second) continue;
+  bool scene = IsScene(w.c_str());
+  // Scene files wait until a game-opened scene has confirmed the string layout; the list is read again then.
+  if (scene && !LayoutOk) { deferred = true; continue; }
+  if (scene ? Done.count(Lower(BaseOf(w.c_str()))) > 0 : (!TextStream || HaveText(w))) continue;
+  if (!Asked.insert(Lower(w)).second) continue;
   Wanted.push_back(w); added++;
  }
  LeaveCriticalSection(&Gate);
+ if (deferred) ZeroMemory(&WantSeen, sizeof WantSeen);
  if (added) Log("asked for " + std::to_string(added) + " scenes");
 }
 
@@ -285,7 +335,16 @@ void Flush() {
  }
 }
 
+// The thread that owns the game's visible top-level window (KiriKiri runs its scripts there).
+BOOL CALLBACK OwnWindow(HWND h, LPARAM out) {
+ DWORD pid = 0, tid = GetWindowThreadProcessId(h, &pid);
+ if (pid == GetCurrentProcessId() && IsWindowVisible(h)) { *(DWORD *)out = tid; return FALSE; }
+ return TRUE;
+}
+DWORD GameThread() { DWORD tid = 0; EnumWindows(OwnWindow, (LPARAM)&tid); return tid; }
+DWORD Started;
 DWORD WINAPI Run(void *) {
+ Started = GetTickCount();
  // Output folder: <MeguLit>\cache\kirikiri-scn\<FNV-1a of the lower-case game folder>\ (this DLL is <MeguLit>\native\).
  wchar_t self[1024], game[1024];
  if (!GetModuleFileNameW(Self, self, 1024) || !GetModuleFileNameW(NULL, game, 1024)) return 0;
@@ -296,22 +355,30 @@ DWORD WINAPI Run(void *) {
  swprintf_s(Out, L"%s\\cache", self); CreateDirectoryW(Out, NULL);
  swprintf_s(Out, L"%s\\cache\\kirikiri-scn", self); CreateDirectoryW(Out, NULL);
  swprintf_s(Out, L"%s\\cache\\kirikiri-scn\\%08x\\", self, hash); CreateDirectoryW(Out, NULL);
+ {
+  wchar_t program[1024]; GetModuleFileNameW(NULL, program, 1024);
+  std::wstring run = L"run-" + Lower(BaseOf(wcsrchr(program, L'\\') ? wcsrchr(program, L'\\') + 1 : program));
+  swprintf_s(RunDir, L"%s%s\\", Out, run.c_str()); CreateDirectoryW(RunDir, NULL);
+ }
  WriteWhole(std::wstring(Out) + L"game.txt", Utf8(game).data(), (DWORD)Utf8(game).size());
  if (GetFileAttributesW((std::wstring(Out) + L"off").c_str()) != INVALID_FILE_ATTRIBUTES) { Log("disabled by the off file"); return 0; }
  LoadDone();
  void *exporter = NULL;
  for (int tries = 0; tries < 30 && !exporter; tries++) { exporter = FindExporter(); if (!exporter) Sleep(2000); }
  if (!exporter) { Log("no KiriKiri function exporter; nothing hooked"); return 0; }
- void *fn = NULL, *exists = NULL;
+ void *fn = NULL, *exists = NULL, *text = NULL;
  QueryGuarded(exporter, "IStream * ::TVPCreateIStream(const ttstr &,tjs_uint32)", &fn);
  if (QueryGuarded(exporter, "bool ::TVPIsExistentStorage(const ttstr &)", &exists)) Exists = (ExistsFn)exists;
+ if (QueryGuarded(exporter, "iTJSTextReadStream * ::TVPCreateTextStreamForRead(const ttstr &,const ttstr &)", &text)) TextStream = (TextStreamFn)text;
  if (MH_Initialize() != MH_OK || MH_CreateHook(fn, (void *)&HookCreateIStream, (void **)&Original) != MH_OK || MH_EnableHook(fn) != MH_OK) { Log("hook failed"); return 0; }
  Target = (CreateIStreamFn)fn;
  Log("hooked TVPCreateIStream; " + std::to_string(Done.size()) + " scenes already saved");
  for (;;) {
   WaitForSingleObject(Wake, 1000);
   Flush();
-  if (!Exists || !MainThread || !LayoutOk) continue;
+  if (!Exists) continue;
+  if (!MainThread && GetTickCount() - Started > 8000) { DWORD t = GameThread(); if (t) { InterlockedExchange(&MainThread, (LONG)t); Log("game thread from its window"); } }
+  if (!MainThread) continue;
   ReadWants();
   EnterCriticalSection(&Gate); bool more = !Wanted.empty(); LeaveCriticalSection(&Gate);
   if (more && !MessageHook) { MessageHook = SetWindowsHookExW(WH_GETMESSAGE, OnMessage, NULL, (DWORD)MainThread); if (MessageHook) Log("asking on the game thread"); }

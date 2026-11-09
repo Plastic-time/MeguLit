@@ -288,34 +288,49 @@ function openFill(file){let map=new Map(),timer=null;
  const save=()=>{timer=null;try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify({schema:SCHEMA,lines:Object.fromEntries(map)}));fs.renameSync(file+'.tmp',file);}catch{}};
  return {get:text=>map.get(norm(text)),has:text=>map.has(norm(text)),set(text,value){map.set(norm(text),String(value));if(!timer)timer=setTimeout(save,2000);timer.unref?.();},flush(){if(timer){clearTimeout(timer);save();}},size:()=>map.size};
 }
-// E293 scene files the game saves while it runs (kirikiri-dump): the provider rebuilds the running script and the
-// game's own Chinese when the capture folder changes, so a new scene reads from its first line. A miss re-checks at once;
-// otherwise the rebuild runs between lines. Until the first scene is saved every line simply goes the usual way.
+// E293/E296 scripts the game hands over while it runs (kirikiri-dump: KiriKiri Z scene files with the game's own Chinese;
+// kirikiri-ks: a packed Chinese build's scripts, with the Japanese ones as the original): the provider rebuilds the
+// running script and its counterpart when the capture folder changes, so a new scene reads from its first line. A miss
+// re-checks at once; otherwise the rebuild runs between lines. Until something is saved every line goes the usual way.
+const liveEngines=()=>Object.values(scenes.ENGINES).filter(e=>e.live);
 function liveProvider(root,id,executable){
- const engine=scenes.ENGINES['kirikiri-dump'],dir=path.dirname(String(executable));let inner=null,stamp=null,checked=0,timer=null;
+ const engine=liveEngines()[0],dir=path.dirname(String(executable));let inner=null,stamp=null,checked=0,timer=null;
  const rebuild=()=>{const now=engine.stamp(dir);if(now===stamp)return false;stamp=now;
-  try{const state=scanRunning(root,id,executable);
-   if(state.runtime&&state.engine==='kirikiri-dump'){
+  try{let state=scanRunning(root,id,executable);const eng=scenes.ENGINES[state.runtime?.engine];
+   if(state.runtime&&eng?.live){
     const fresh=state.patchStatus==='ready'&&state.patch?.runtimeSha===state.runtime.sha256&&state.patch.version===PATCH_VERSION;
-    if(state.status==='native-japanese'&&!fresh)try{importPatch(root,null,id,dir,{auto:true,executable});}catch{}
+    if(eng.patchLines&&state.status==='native-japanese'&&!fresh)try{importPatch(root,null,id,dir,{auto:true,executable});}catch{}
+    if(eng.originalLines&&state.status!=='native-japanese')try{state=adoptOriginal(root,id,state,dir);}catch{}
     pruneIndexes(root,id);}
    inner=staticProvider(root,executable);}catch{inner=null;}
   return true;};
  const later=()=>{if(timer)return;timer=setTimeout(()=>{timer=null;rebuild();},400);timer.unref?.();};
  const changed=()=>{checked=Date.now();return engine.stamp(dir)!==stamp;};
  rebuild();
- return {kind:'patch',live:true,get patch(){return !!inner?.patch;},get fill(){return inner?.fill;},
+ return {live:true,get kind(){return inner?.kind||'patch';},get patch(){return !!inner?.patch;},get fill(){return inner?.fill;},
   resolve(text){if(Date.now()-checked>300&&changed())later();let r=inner?inner.resolve(text):{status:'none',method:'no-scenes'};
    if(r.status==='none'&&r.method!=='empty'&&changed()&&rebuild()&&inner)r=inner.resolve(text);return r;},
   upcoming(count){return inner?.upcoming?inner.upcoming(count):[];}};
 }
-// Each rebuild writes a runtime index under a new name; only the one in use is kept.
-function pruneIndexes(root,id){const keep=readState(root)[id]?.runtime?.index;if(!keep)return;const dir=indexDir(root,id);
- try{for(const f of fs.readdirSync(dir))if(/^runtime-[0-9a-f]+\.json$/.test(f)&&path.join(dir,f)!==keep)fs.rmSync(path.join(dir,f),{force:true});}catch{}}
+// Each rebuild writes indexes under new names; only the ones in use are kept.
+function pruneIndexes(root,id){const s=readState(root)[id],keep=new Set([s?.runtime?.index,s?.original?.index,s?.patch?.index].filter(Boolean)),dir=indexDir(root,id);if(!s?.runtime?.index)return;
+ try{for(const f of fs.readdirSync(dir))if(/^(?:runtime|original)-[0-9a-f]+\.json$/.test(f)&&!keep.has(path.join(dir,f)))fs.rmSync(path.join(dir,f),{force:true});}catch{}}
+// The Japanese script the engine lines up with the running (translated) one, kept as the original: the same import as a
+// picked Japanese copy (importOriginal), from what the engine read. Original mode is chosen unless it was turned off.
+function adoptOriginal(root,id,state,dir){
+ const eng=scenes.ENGINES[state.runtime.engine],runtime=readIndex(state.runtime.index),lines=eng.originalLines(dir);
+ if(!Array.isArray(lines)||lines.length!==runtime.lines.length||!lines.some(t=>t&&japaneseLine(t)))return state;
+ const hash=crypto.createHash('sha256').update('original\n'+state.runtime.sha256).digest('hex');
+ if(state.original?.sha256===hash&&state.original.index&&fs.existsSync(state.original.index)&&state.status==='ready')return state;
+ const alignment=align(runtime,{lines,structure:runtime.structure});
+ const index=writeIndex(root,id,'original-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'original',engine:runtime.engine,version:0,codepage:'text',source:{file:dir,sha256:hash,dir},structure:runtime.structure,lines});
+ return writeState(root,id,{original:{dir,file:dir,sha256:hash,index,codepage:'text',lines:lines.length,executable:'',auto:true},alignment,status:alignment.reliable?'ready':'unreliable',mode:state.mode||(alignment.reliable?'original':'off'),error:''});
+}
 function provider(root,executable){
  const dir=path.dirname(String(executable)).toLowerCase(),entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir:String(s?.gameDir||'').toLowerCase()===dir);
  if(!entry)return null;
- if(entry[1].runtime?.engine==='kirikiri-dump'||!entry[1].runtime&&scenes.ENGINES['kirikiri-dump'].eligible(path.dirname(String(executable))))return liveProvider(root,entry[0],executable);
+ const gameDir=path.dirname(String(executable));
+ if(scenes.ENGINES[entry[1].runtime?.engine]?.live||!entry[1].runtime&&liveEngines().some(e=>e.eligible(gameDir)))return liveProvider(root,entry[0],executable);
  return staticProvider(root,executable);
 }
 function staticProvider(root,executable){

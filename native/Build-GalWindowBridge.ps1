@@ -7,7 +7,7 @@
 #   otherwise the old exe is backed up and replaced right away.
 $ErrorActionPreference = 'Stop'
 $native = $PSScriptRoot
-$sources = @('GalWindowBridge.cs','GameTextMask.cs','GameWaitMarker.cs','NativeMaskLayer.cs','DialogDetector.cs','DialogBoxProbe.cs','GameHookVerifier.cs','GameCapture.cs','GameAudio.cs','GlassLayer.cs','GameSceneProbe.cs','GameUiLayer.cs','WaitPageMarker.cs') | ForEach-Object { Join-Path $native $_ }
+$sources = @('GalWindowBridge.cs','GameTextMask.cs','PageLocator.cs','GameWaitMarker.cs','NativeMaskLayer.cs','DialogDetector.cs','DialogBoxProbe.cs','GameHookVerifier.cs','GameCapture.cs','GameAudio.cs','GlassLayer.cs','GameSceneProbe.cs','GameUiLayer.cs','WaitPageMarker.cs','ReaderPointerGate.cs','ReaderScreenshot.cs') | ForEach-Object { Join-Path $native $_ }
 foreach ($s in $sources) { if (-not (Test-Path -LiteralPath $s)) { throw "Missing source: $s" } }
 
 $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
@@ -53,6 +53,8 @@ if (-not $built) { throw 'GalWindowBridge.exe could not be compiled; the install
 
 & $out --mode-self-test | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Self-test failed (exit $LASTEXITCODE); the installed exe was left unchanged." }
+& $out --page-locator-self-test | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Page locator self-test failed (exit $LASTEXITCODE); the installed exe was left unchanged." }
 & $out --audio-self-test | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Audio self-test failed (exit $LASTEXITCODE); the installed exe was left unchanged." }
 

@@ -207,7 +207,7 @@ const kirikiriCx={
 // provider (original-text.cjs) picks new scenes up while the game runs. Same language slots as kirikiri-cx.
 const cxText=()=>require('./cx-worker.cjs'),psb=require('./psb.cjs');
 const captureRoot=()=>process.env.MEGULIT_SCN_CAPTURE||path.join(__dirname,'..','..','cache','kirikiri-scn');
-function captureKey(dir){const s=path.resolve(dir).replace(/[\/]+$/,'');let h=0x811c9dc5;
+function captureKey(dir){const s=path.resolve(dir).replace(/[\\/]+$/,'');let h=0x811c9dc5;
  for(let i=0;i<s.length;i++){let c=s.charCodeAt(i);if(c>=65&&c<=90)c+=32;h=Math.imul(h^c,16777619)>>>0;}return h.toString(16).padStart(8,'0');}
 // The folder for this game: by key, else the one whose game.txt names it (another spelling of the same path).
 function captureDir(dir){const root=captureRoot(),own=path.join(root,captureKey(dir));if(fs.existsSync(own))return own;
@@ -215,6 +215,8 @@ function captureDir(dir){const root=captureRoot(),own=path.join(root,captureKey(
  for(const n of names){try{if(path.resolve(fs.readFileSync(path.join(root,n,'game.txt'),'utf8').trim()).toLowerCase()===want)return path.join(root,n);}catch{}}
  return own;}
 const SCN=n=>/\.scn$/i.test(n);
+// Changes whenever the DLL saves a file (it writes by rename, which touches the folder it writes to).
+function captureStamp(dir){const d=captureDir(dir);let out='';try{out=String(fs.statSync(d).mtimeMs);for(const e of fs.readdirSync(d,{withFileTypes:true}))if(e.isDirectory())out+='|'+fs.statSync(path.join(d,e.name)).mtimeMs;}catch{}return out;}
 const dumpMemo=new Map();
 // One saved file: its text (as kirikiri-cx stores it) and the scene files it names (nexts, storage references).
 function dumpDoc(file){
@@ -236,7 +238,7 @@ function wantedScenes(docs){
  for(const d of docs){have.add(d.name.toLowerCase());have.add(d.file.toLowerCase());
   if(d.file.toLowerCase().startsWith(d.name.toLowerCase())&&d.file.length>d.name.length){const sfx=d.file.slice(d.name.length);suffixes.set(sfx,(suffixes.get(sfx)||0)+1);}}
  const suffix=[...suffixes].sort((a,b)=>b[1]-a[1])[0]?.[0]||'.scn',out=new Set();
- for(const d of docs)for(const ref of d.refs){const base=ref.replace(/^.*[\/>]/,'');if(!base||have.has(base.toLowerCase()))continue;
+ for(const d of docs)for(const ref of d.refs){const base=ref.replace(/^.*[\\/>]/,'');if(!base||have.has(base.toLowerCase()))continue;
   const name=SCN(base)?base:base+suffix;if(!have.has(name.toLowerCase()))out.add(name);}
  return [...out].sort();
 }
@@ -265,11 +267,68 @@ const kirikiriDump={
  // KiriKiri Z with the PSB plug-in: worth a live provider before its first scene is saved.
  eligible(dir){try{return fs.existsSync(captureDir(dir))||fs.existsSync(path.join(dir,'plugin','psbfile.dll'))&&fs.readdirSync(dir).some(f=>/\.xp3$/i.test(f));}catch{return false;}},
  // Changes whenever the DLL saves a file (it writes by rename, which touches the folder).
- stamp(dir){try{return String(fs.statSync(captureDir(dir)).mtimeMs);}catch{return '';}},
+ stamp:dir=>captureStamp(dir),
  captureDir,captureKey,wantedScenes,
 };
 
-const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump};
+// ---- KiriKiri 2 with cx-style text encryption, played through a packed Chinese build (E296: 魔法使いの夜) ---------------
+// The Japanese scripts in data.xp3 are decrypted from their own text (ks-cx.cjs). The Chinese build is one packed program
+// whose scripts exist only in memory, so MeguLitScn32.dll asks the running game for every scenario file by name (want.txt
+// lists them) and saves what the engine returns to run-<program>/ in the capture folder. The running (Chinese) script is
+// that folder; the Japanese one lines up with it file by file and is the original (original-text.cjs, original mode).
+const ksCx=require('./ks-cx.cjs'),ksMemo=new Map();
+function encryptedKs(dir){const out=new Map();
+ for(const a of cxArchives(dir).sort((x,y)=>rank(path.basename(x))-rank(path.basename(y)))){let t;const k=a+'|'+stat(a),hit=ksMemo.get(k);
+  if(hit)t=hit;else{try{t=xp3.list(a);}catch{t=null;}ksMemo.set(k,t);}
+  if(!t)continue;for(const e of t.files)if(e.encrypted&&KS(e.name)){const name=path.basename(e.name.replace(/\\/g,'/'));out.set(name.toLowerCase(),{name,entry:e,archive:a});}}
+ return out;}
+const ksText=new Map();
+function japaneseKs(item){const k=item.archive+'|'+item.entry.name+'|'+stat(item.archive);if(ksText.has(k))return ksText.get(k);
+ let text=null;try{text=ksCx.decryptText(xp3.read(item.archive,item.entry))?.text??null;}catch{}ksText.set(k,text);if(ksText.size>3000)ksText.delete(ksText.keys().next().value);return text;}
+// The run folder holding the Chinese build's scripts (most lines Chinese), newest first when there are several.
+function chineseRun(dir){const d=captureDir(dir);let runs=[];try{runs=fs.readdirSync(d,{withFileTypes:true}).filter(e=>e.isDirectory()&&/^run-/i.test(e.name)).map(e=>path.join(d,e.name));}catch{return null;}
+ const scored=runs.map(r=>{let zh=0,ja=0,at=0;try{at=fs.statSync(r).mtimeMs;for(const f of fs.readdirSync(r).filter(KS).slice(0,40)){const {lines}=parseKs(fs.readFileSync(path.join(r,f)));for(const t of lines){const k=(t.match(KANA)||[]).length;if(k>=2)ja++;else if(/[一-鿿]{2}/.test(t))zh++;}}}catch{}return {r,zh,ja,at};});
+ return scored.filter(x=>x.zh>x.ja).sort((a,b)=>b.at-a.at)[0]?.r||null;}
+function syncKsWants(dir,names){if(!names.length)return;const d=captureDir(dir),file=path.join(d,'want.txt'),text=names.sort().join('\r\n');
+ let old=null;try{old=fs.readFileSync(file,'utf8');}catch{}if(old===text)return;
+ try{fs.mkdirSync(d,{recursive:true});fs.writeFileSync(file+'.tmp',text);fs.renameSync(file+'.tmp',file);}catch{}}
+const kirikiriKs={
+ id:'kirikiri-ks',hint:'data.xp3（汉化版运行中读出）',live:true,
+ scenes(dir){const enc=encryptedKs(dir);syncKsWants(dir,[...enc.values()].map(x=>x.name));const run=chineseRun(dir);if(!run)return [];
+  let files=[];try{files=fs.readdirSync(run).filter(KS);}catch{}
+  return files.map(f=>({name:f,read:()=>fs.readFileSync(path.join(run,f))})).sort((a,b)=>a.name.localeCompare(b.name));},
+ archives:()=>[],
+ sources:dir=>{const run=chineseRun(dir);try{return run?fs.readdirSync(run).filter(KS).map(f=>path.join(run,f)):[];}catch{return [];}},
+ parse:parseKs,test:()=>false,
+ // Japanese lines in the running script's order: a file lines up when it has as many text lines and the same anchors.
+ originalLines(dir){const enc=encryptedKs(dir);
+  return this.scenes(dir).flatMap(s=>{let own;try{own=parseKs(s.read());}catch{return [];}const item=enc.get(s.name.toLowerCase()),text=item&&japaneseKs(item);
+   if(!text)return own.lines.map(()=>'');const ja=parseKs(Buffer.from('\ufeff'+text,'utf16le'));
+   const n=Math.min(ja.anchors.length,own.anchors.length);let same=0;for(let k=0;k<n;k++)if(ja.anchors[k]===own.anchors[k])same++;
+   if(ja.lines.length!==own.lines.length||own.anchors.length>=5&&same<own.anchors.length*.9)return own.lines.map(()=>'');
+   return ja.lines;});},
+ eligible(dir){const enc=encryptedKs(dir);if(!enc.size)return false;const first=[...enc.values()].find(x=>x.entry.size>2000)||enc.values().next().value;return !!japaneseKs(first);},
+ stamp:dir=>captureStamp(dir),
+ japaneseKs,encryptedKs,
+};
+
+// ---- HuneX (E304: 魔法使いの夜 / WITCH ON THE HOLY NIGHT, Steam) ------------------------------------------------------
+// Every line lives in per-language text tables inside the HFA archives (hunex.cjs); line i is the same line in each.
+// The whole table is one scene: Japanese lines, the release's Simplified (else Traditional) Chinese, and the game's ruby.
+const hunexLib=()=>require('./hunex.cjs');
+const hunex={
+ id:'hunex',hint:'data00200.hfa（script_text_ja.ctd）',
+ scenes(dir){const lib=hunexLib(),t=lib.tables(dir);if(!t.ja)return [];
+  return [{name:'script_text',read:()=>{const ja=lib.tableLines(t.ja)||[],zh=(t.zc&&lib.tableLines(t.zc))||(t.zt&&lib.tableLines(t.zt))||[];return Buffer.from(JSON.stringify({ja,zh:zh.length===ja.length?zh:[]}));}}];},
+ archives:()=>[],
+ sources(dir){const t=hunexLib().tables(dir);return [...new Set([t.ja,t.zc,t.zt].filter(Boolean).map(x=>x.file))];},
+ parse(buf){const lib=hunexLib(),doc=JSON.parse(buf.toString('utf8'));
+  return {lines:doc.ja.map(lib.clean),anchors:[],zh:doc.ja.map((_,i)=>lib.clean(doc.zh[i]||'')),ruby:doc.ja.map(t=>{const r=lib.rubyOf(t);return r.length?r:null;})};},
+ test:()=>false,
+ patchLines:(base,found)=>kirikiriCx.patchLines(base,found),
+};
+
+const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,8)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;}

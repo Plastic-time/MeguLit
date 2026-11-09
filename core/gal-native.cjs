@@ -15,7 +15,7 @@ class GalNative {
     this.gameRuby=new GameRuby(layout.config);
     this.styleSync=new GameStyleSync(layout,m=>{if(m.gameStyleState==='profile'&&m.gameStyleKey&&m.gameStyleEffectivePrefs){this.previewPreferences=null;this.save({...this.preferences,...m.gameStyleEffectivePrefs});}this.onEvent(m);if(m.gameStyleState==='measured')this.controller?.finishStyleSync(true);else if(['unavailable','timeout','unmatched'].includes(m.gameStyleState))this.controller?.finishStyleSync(false);});this.styleSync.overlayPid=overlayPid;
     this.preferences = this.read();this.state.hookProfile=this.preferences.hookProfile;
-    this.hooks=new HookNative(layout,message=>this.hookEvent(message));this.controller=new HookControl(this);this.controller.plan=this.preferences.hookProfile;this.controller.running=this.preferences.hookProfile!=='off';this.hooks.preflight=!['read','off'].includes(this.preferences.hookProfile)&&(this.preferences.hookFast===false||this.preferences.autoGameStyle!==false);
+    this.hooks=new HookNative(layout,message=>this.hookEvent(message));this.hooks.locate=text=>{if(this.state.bound&&this.preferences?.pageLocate!==false)this.send({type:'pageLocate',text});};this.controller=new HookControl(this);this.controller.plan=this.preferences.hookProfile;this.controller.running=this.preferences.hookProfile!=='off';this.hooks.preflight=!['read','off'].includes(this.preferences.hookProfile)&&(this.preferences.hookFast===false||this.preferences.autoGameStyle!==false);
     if(this.preferences.hookAutoStart){this.preferences={...this.preferences,hookHide:true,hookProfile:this.preferences.hookProfile==='off'?'read':this.preferences.hookProfile};this.controller.plan=this.preferences.hookProfile;this.controller.running=true;}
     Object.assign(this.state,this.hookPrefs());
     // Start every launch in the normal (home) interface; Alt+M switches to the translation window.
@@ -41,6 +41,9 @@ class GalNative {
       if(message.type==='waitMarkerFrame'){this.onEvent(message);return;}
       if(message.type==='glassFrame'){this.onEvent(message);return;}
       if (message.type === 'maskFrame') { this.lastFrameId = message.id; this.onEvent(message); return; }
+      // E306 OCR page locator (PageLocator.cs): sentence boxes go through the same page path as the native engines.
+      if(message.type==='hookEngineLine'){this.hooks.pageLine?.(message);return;}
+      if(message.type==='pageLocateStatus'){this.hooks.trace?.('ocr page '+message.status);return;}
       if(message.type==='markerTarget'){this.hooks.markerTarget(message);this.onEvent({type:'markerDebug',markerDebug:message.active?`found at ${message.x},${message.y} ${message.width}x${message.height} in ${message.clientWidth}x${message.clientHeight}`:'not active'});return;}
       if (message.type === 'layout') { this.notify({ layout:message }); return; }
       this.notify(message);

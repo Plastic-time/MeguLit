@@ -1,0 +1,124 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// TJS run by KrkrText.cpp through Scripts.eval on the game's own thread. It wraps each KAG message layer's processCh
+// and clear and the window's showLineBreak / showPageBreak, and reports one sentence at a time (begin: first character
+// drawn; end: the click wait or the layer being cleared) with where the game drew it, in game-screen pixels:
+//   ToMe_KRKR begin|end line=N same=0|1 nvl=0|1 x0= y0= x1= y1= size= sw= sh= n= [text=...]
+// same=0 when the layer was cleared since its last sentence (a new page). nvl=1 for message layers at least 45 % of the
+// screen high (full-screen pages); layers under 20 % (name plates) are not reported. Nothing the game saves is
+// touched: the state lives in global.__megulitKrkrState and every wrapper falls back to the game's own method.
+// Field names follow the KAG3 MessageLayer (lineLayer, lineLayerPos, lineLayerOriginY, lineLayerBase, fontSize,
+// marginR, vertical); a layer without lineLayer is measured with its x / y cursor. Vertical text is not reported.
+// The end text keeps the game's own line breaks: a character drawn on a new row starts with a newline.
+LR"MGLT((function(){
+ try {
+  if(typeof global.kag!='Object' || global.kag===void || global.kag===null) return 'wait kag';
+  var k=global.kag;
+  if(typeof k.fore!='Object' || k.fore===void) return 'wait fore';
+  var st=global.__megulitKrkrState;
+  if(st===void) {
+   st=%['recs'=>[],'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
+   st.screen=function(){
+    var sw=+this.kag.scWidth,sh=+this.kag.scHeight;
+    if(!(sw>0) || !(sh>0)) {sw=+this.kag.primaryLayer.width;sh=+this.kag.primaryLayer.height;}
+    return [sw,sh];
+   } incontextof st;
+   st.abs=function(L){
+    var ax=0,ay=0,l=L;
+    for(var i=0;i<16;i++) {var p=l.parent;if(p===void || p===null) break;ax+=l.left;ay+=l.top;l=p;}
+    return [ax,ay];
+   } incontextof st;
+   st.send=function(kind,rec,x0,x1){
+    var s='ToMe_KRKR '+kind+' line='+rec.line+' same='+rec.same+' nvl='+rec.nvl+' x0='+int(x0)+' y0='+int(rec.y0)+' x1='+int(x1)+' y1='+int(rec.y1)+' size='+int(rec.size)+' sw='+int(rec.sw)+' sh='+int(rec.sh)+' n='+rec.n;
+    if(kind=='end') s+=' text='+rec.text;
+    this.report(s);
+   } incontextof st;
+   st.track=function(rec,ch,lm,p0,oy){
+    var L=rec.target;
+    if(L.vertical) return;
+    var scr=this.screen(),sw=scr[0],sh=scr[1];
+    if(!(sw>0) || !(sh>0) || L.height<sh*0.2) return;
+    var size=+L.fontSize;
+    if(!(size>0)) size=Math.abs(+L.font.height);
+    if(!(size>0)) return;
+    var cx,cy;
+    if(lm) {
+     var ll=L.lineLayer;
+     if(+L.lineLayerOriginY!=oy) p0=4;
+     else if(+L.lineLayerPos==p0) return;
+     cx=ll.left+p0;cy=ll.top+(+L.lineLayerBase)-size;
+    } else {
+     if(+L.y!=oy) {cx=+L.x-L.font.getTextWidth(ch);cy=+L.y;}
+     else {if(+L.x==p0) return;cx=p0;cy=oy;}
+    }
+    var a=this.abs(L);cx+=a[0];cy+=a[1];
+    if(rec.n==0) {
+     rec.line=++this.line;rec.x0=cx;rec.y0=cy;rec.x1=cx;rec.y1=cy;rec.size=size;rec.text='';rec.sw=sw;rec.sh=sh;
+     rec.nvl=L.height>=sh*0.45?1:0;rec.same=rec.cleared?0:1;rec.cleared=false;
+     var right=a[0]+L.width-(+L.marginR)-size;
+     if(!(right>cx)) right=cx;
+     this.send('begin',rec,cx,right);
+    }
+    if(ch!='\n' && ch!='\r') {if(rec.n>0 && cy!=rec.ly) rec.text+='\n';rec.text+=ch;}
+    rec.ly=cy;
+    rec.n++;
+    if(cx<rec.x0) rec.x0=cx;
+    if(cx>rec.x1) rec.x1=cx;
+    if(cy<rec.y0) rec.y0=cy;
+    if(cy>rec.y1) rec.y1=cy;
+   } incontextof st;
+   st.flush=function(rec){
+    if(rec.n>0) this.send('end',rec,rec.x0,rec.x1);
+    rec.n=0;rec.text='';
+   } incontextof st;
+   st.flushAll=function(){for(var i=0;i<this.recs.count;i++) this.flush(this.recs[i]);} incontextof st;
+   st.install=function(L){
+    for(var i=0;i<this.recs.count;i++) if(this.recs[i].target===L) return;
+    if(typeof L.processCh!='Object') return;
+    var rec=%['target'=>L,'st'=>this,'oldCh'=>L.processCh,'oldClear'=>void,'n'=>0,'text'=>'','line'=>0,'same'=>0,'cleared'=>true,'nvl'=>0,'x0'=>0,'y0'=>0,'x1'=>0,'y1'=>0,'size'=>0,'sw'=>0,'sh'=>0,'ly'=>0];
+    rec.ch=function(ch){
+     var L=this.target,lm=false,p0=0,oy=0;
+     try {
+      var t=typeof L.lineLayerPos;
+      if(typeof L.lineLayer=='Object' && L.lineLayer!==void && L.lineLayer!==null && (t=='Integer' || t=='Real')) {lm=true;p0=+L.lineLayerPos;oy=+L.lineLayerOriginY;}
+      else {p0=+L.x;oy=+L.y;}
+     } catch(e) {}
+     var result=(this.oldCh incontextof L)(...);
+     try {this.st.track(this,ch,lm,p0,oy);} catch(e) {}
+     return result;
+    } incontextof rec;
+    rec.clr=function(){
+     try {this.st.flush(this);this.cleared=true;} catch(e) {}
+     return (this.oldClear incontextof this.target)(...);
+    } incontextof rec;
+    L.processCh=rec.ch;
+    if(typeof L.clear=='Object') {rec.oldClear=L.clear;L.clear=rec.clr;}
+    this.recs.add(rec);
+   } incontextof st;
+   st.lb=function(){try {this.flushAll();} catch(e) {} return (this.oldLB incontextof this.kag)(...);} incontextof st;
+   st.pb=function(){try {this.flushAll();} catch(e) {} return (this.oldPB incontextof this.kag)(...);} incontextof st;
+   st.pbc=function(){try {this.flushAll();} catch(e) {} return (this.oldPBC incontextof this.kag)(...);} incontextof st;
+   st.refresh=function(){
+    try {
+     var k=this.kag;
+     if(global.kag!==k) return 'kag changed';
+     if(!this.hooked) {
+      if(typeof k.showLineBreak=='Object') {this.oldLB=k.showLineBreak;k.showLineBreak=this.lb;}
+      if(typeof k.showPageBreak=='Object') {this.oldPB=k.showPageBreak;k.showPageBreak=this.pb;}
+      if(typeof k.showPageBreakAndClear=='Object') {this.oldPBC=k.showPageBreakAndClear;k.showPageBreakAndClear=this.pbc;}
+      this.hooked=1;
+     }
+     for(var i=this.recs.count-1;i>=0;i--) if(!isvalid this.recs[i].target) this.recs.erase(i);
+     var pages=[k.fore,k.back];
+     for(var i=0;i<pages.count;i++) {
+      var ms=pages[i].messages;
+      if(typeof ms!='Object' || ms===void || ms===null) continue;
+      for(var j=0;j<ms.count && j<32;j++) this.install(ms[j]);
+     }
+     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0);
+    } catch(e) {return 'error '+e.message;}
+   } incontextof st;
+   global.__megulitKrkrState=st;
+  }
+  return st.refresh();
+ } catch(e) {return 'error '+e.message;}
+})())MGLT"

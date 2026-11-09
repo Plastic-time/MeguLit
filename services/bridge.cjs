@@ -91,12 +91,16 @@ async function launch(db,id,runtime=null,windowsLaunch=false) {
       failed). For Steam launches a game process from any program in that folder counts. */
    const siblings=steam?(()=>{try{return fs.readdirSync(path.dirname(game.executable)).filter(f=>/\.exe$/i.test(f)&&!/^(unins|setup|install|config|crash|unitycrash|vc_?redist|dxsetup|launcher_?config)/i.test(f)).map(f=>path.join(path.dirname(game.executable),f)).filter(f=>f.toLowerCase()!==game.executable.toLowerCase()&&fs.statSync(f).size>200000).slice(0,8);}catch{return [];}})():[];
    const anyProcess=async()=>{const own=await gameProcesses(root,game.executable);if(own.length||!siblings.length)return own;for(const exe of siblings){const found=await gameProcesses(root,exe).catch(()=>[]);if(found.length){trace('steam-runs-other-program',{exe:path.basename(exe)});return found;}}return own;};
-   state=await waitForVisibleGame(anyProcess,{helper:steam,indirect:steam,helperError:'GAME_LAUNCH_FAILED',exit:()=>child.exit,trace});
+   /* E303: Steam may prepare a first start (cloud sync, install scripts) for longer than 15 s; wait up to 45 s for its window. */
+   state=await waitForVisibleGame(anyProcess,{helper:steam,indirect:steam,helperError:'GAME_LAUNCH_FAILED',exit:()=>child.exit,trace,...(steam?{attempts:180,timeout:45000}:{})});
   }
   trace('new-window-ready',state);
   db.prepare('UPDATE games SET last_launched_at=? WHERE id=?').run(Math.floor(Date.now()/1000),id);
   runtime?.prepareGame(game.executable);runtime?.bindLaunched?.(state?.pid);return {action:'launched',connected:false};
-  }catch(error){trace('launch-failed',{phase:stage,error:error.message,detail:error.detail||error.code});throw error;}
+  }catch(error){
+   /* E299: a boxed release whose protection plug-in wants the original DVD quits on start; say so (disc-check.cjs). */
+   if(['GAME_PROCESS_EXITED','GAME_WINDOW_NOT_READY'].includes(error.message)&&game.executable&&require('./disc-check.cjs').discProtected(path.dirname(game.executable)))error=Object.assign(Error('GAME_DISC_REQUIRED'),{detail:error.message});
+   trace('launch-failed',{phase:stage,error:error.message,detail:error.detail||error.code});throw error;}
 }
 function deleteWord(db,id) {
   const word=db.prepare('SELECT * FROM vocabulary WHERE id=?').get(id);
