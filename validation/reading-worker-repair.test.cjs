@@ -27,3 +27,14 @@ test('when repair does not help, the error says exactly where to repair and why'
  /* no endless repair loop on the next lookup */
  await assert.rejects(l.ready(),/Alt\+T/);assert.equal(log.installs.length,1);
 });
+
+test('a missing standard-library module points to restarting MeguLit, not to reinstalling dictionaries',async()=>{
+ const {l,log}=rig([false]);
+ l.spawnWorker=async function(){log.spawns++;throw Error("ModuleNotFoundError: No module named 'zipfile'");};
+ await assert.rejects(l.ready(),e=>/Python 不完整/.test(e.message)&&/zipfile/.test(e.message)&&/完全退出 MeguLit/.test(e.message));
+ assert.equal(log.installs.length,0,'no useless dictionary reinstall');
+});
+test('the launcher treats a runtime without Python core library as not ready',()=>{
+ const rs=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','desktop','src','runtime_setup.rs'),'utf8');
+ assert.match(rs,/runtime\/python\/Lib\/zipfile\/__init__\.py/);assert.match(rs,/runtime\/python\/Lib\/encodings\/__init__\.py/);
+});

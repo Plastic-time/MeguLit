@@ -201,7 +201,8 @@ $progress.Controls.Add($button)
 $client = New-Object Net.WebClient; $client.Headers.Add('User-Agent','MeguLit-setup')
 $script:queue = @(); $script:index = 0; $script:urlIndex = 0; $script:done = $false; $script:mode = ''
 $names = @{ base = '基础组件'; reading = '注音分词词典'; voice = '语音引擎' }
-$markers = @{ base = 'runtime\node.exe'; reading = 'runtime\reading\sudachidict_full\resources\system.dic'; voice = 'runtime\aivis\run.exe' }
+# base needs Python's core library too: an interrupted install once left node.exe but no Lib\zipfile.
+$markers = @{ base = @('runtime\node.exe','runtime\python\python.exe','runtime\python\Lib\zipfile\__init__.py','runtime\python\Lib\encodings\__init__.py'); reading = 'runtime\reading\sudachidict_full\resources\system.dic'; voice = 'runtime\aivis\run.exe' }
 
 # ---- download source ----
 # Users in mainland China often get very slow GitHub downloads. We do not look up the user's IP
@@ -236,7 +237,7 @@ function Order-Sources($id) {
 }
 
 function Start-Install($ids) {
-  $script:queue = @($ids | Where-Object { -not (Test-Path (Join-Path $Root $markers[$_])) })
+  $script:queue = @($ids | Where-Object { $id = $_; @($markers[$id] | Where-Object { -not (Test-Path (Join-Path $Root $_)) }).Count -gt 0 })
   $script:index = 0; $choice.Visible = $false; $progress.Visible = $true; Next-Pack
 }
 function Current { $script:queue[$script:index] }
