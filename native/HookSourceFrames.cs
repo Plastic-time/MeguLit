@@ -59,7 +59,13 @@ public sealed class EmbedSourceBatch{
  // E267 (user: ATRI came up in Traditional Chinese): multilingual scripts hand the draw hook every language of a line
  // in one burst (JP, zh-TW, zh-CN). The newest line of such a burst is the last language, not the shown one: prefer the
  // newest line that has kana, and keep the old choice when none has.
- static bool Kana(string s){foreach(char ch in s)if(ch>='ぁ'&&ch<='ヿ'&&ch!='・'&&ch!='ー')return true;return false;}
+ // E282 (user: 爱上火车 read Traditional Chinese as Japanese): KiriKiri ruby markup %l<word>;<reading>%l; keeps the Japanese
+ // word in every language (「立即與前方最近的%lレイルロオド;鐵路人偶%l;…」), so kana inside markup says nothing.
+ static readonly System.Text.RegularExpressions.Regex RubyMarkup=new System.Text.RegularExpressions.Regex("%l([^;%]*);([^%]*)%l;");
+ static readonly System.Text.RegularExpressions.Regex ColorMarkup=new System.Text.RegularExpressions.Regex("#(?:[0-9a-fA-F]{6,8})?;");
+ static bool Kana(string s){s=RubyMarkup.Replace(s??"","");foreach(char ch in s)if(ch>='ぁ'&&ch<='ヿ'&&ch!='・'&&ch!='ー')return true;return false;}
+ // One copy of a line however it was drawn: ruby markup to its word, colour codes and line breaks dropped.
+ static string Plain(string s){s=RubyMarkup.Replace(s??"","$1");s=ColorMarkup.Replace(s,"");var b=new System.Text.StringBuilder(s.Length);foreach(char ch in s)if(!Char.IsWhiteSpace(ch))b.Append(ch);return b.ToString();}
  static string Japanese(List<string> oldestFirst,string fallback){for(int i=oldestFirst.Count-1;i>=0;i--)if(Kana(oldestFirst[i]))return oldestFirst[i];return fallback;}
  public static string Unrepeat(string text){
   if(text==null)return text;string v=text.Trim();int n=v.Length;
@@ -68,7 +74,30 @@ public sealed class EmbedSourceBatch{
    if(!all)continue;string t=unit.Trim();
    bool quoted=t.Length>=2&&"「『（“‘【《〈(".IndexOf(t[0])>=0&&"」』）”’】》〉)".IndexOf(t[t.Length-1])>=0;
    if(quoted||k>=3)return unit;return text;}
+  return UnrepeatDrawn(text);
+ }
+ // E282 (user: 爱上火车 showed one line five times): the copies of a redrawn line differ in markup (one with ruby and a line
+ // break, one plain), so they are compared without it. The first copy is kept as it was drawn (its ruby is the game's).
+ static string UnrepeatDrawn(string text){
+  string v=text.Trim();if(v.Length<4||v.Length>4000||v.IndexOf('%')<0&&v.IndexOf('\n')<0&&v.IndexOf('#')<0)return text;
+  string plain=Plain(v);int n=plain.Length;if(n<2)return text;
+  for(int u=1;u<=n/2;u++){if(n%u!=0)continue;int k=n/u;bool all=true;
+   for(int i=1;i<k&&all;i++)all=String.CompareOrdinal(plain,i*u,plain,0,u)==0;
+   if(!all)continue;string unit=plain.Substring(0,u);
+   bool quoted="「『（“‘【《〈(".IndexOf(unit[0])>=0&&"」』）”’】》〉)".IndexOf(unit[unit.Length-1])>=0;
+   if(!quoted&&k<3)return text;
+   for(int e=u;e<=v.Length;e++)if(Plain(v.Substring(0,e))==unit){while(e<v.Length&&Char.IsWhiteSpace(v[e]))e++;return v.Substring(0,e).Trim();}
+   return unit;}
   return text;
+ }
+ static bool DrawnTest(){
+  string a="「%l砂撒き;砂撒き%l;を確認。……%l粘着力;粘着力%l;の増加は確認できず。\n脱線の危険があります」",b="「砂撒きを確認。……粘着力の増加は確認できず。脱線の危険があります」";
+  if(Unrepeat(a+a+b+b+b+a)!=a)return false;
+  var batch=new EmbedSourceBatch();var now=DateTime.UtcNow;
+  string ja="「すぐに先方の%lレイルロオド;レイルロオド%l;へ連絡――っ！？」",sc="「立即与前方最近的%lレイルロオド;铁路人偶%l;连结！？」",tc="「立即與前方最近的%lレイルロオド;鐵路人偶%l;連結！？」";
+  batch.Add(ja,now);batch.Add(sc,now);batch.Add(tc,now);
+  if(batch.LastLine(ja+sc+tc,now)!=ja)return false;
+  return Unrepeat("「はい。」「いいえ。」")=="「はい。」「いいえ。」";
  }
  static bool LangTest(){
   var batch=new EmbedSourceBatch();var now=DateTime.UtcNow;
@@ -89,6 +118,6 @@ public sealed class EmbedSourceBatch{
    &&batch.LastLine("A real line. Two.",now)=="A real line. Two."
    &&batch.LastLine("One.Two.",now.AddSeconds(2))=="One.Two."
    &&batch.LastLine("Old line.One.Two.Three.",now)=="Three."
-   &&RepeatTest()&&LangTest()&&Unrepeat("「あんたこそ誰よ」「あんたこそ誰よ」「あんたこそ誰よ」「あんたこそ誰よ」")=="「あんたこそ誰よ」"&&Unrepeat("はい。はい。")=="はい。はい。";
+   &&RepeatTest()&&LangTest()&&DrawnTest()&&Unrepeat("「あんたこそ誰よ」「あんたこそ誰よ」「あんたこそ誰よ」「あんたこそ誰よ」")=="「あんたこそ誰よ」"&&Unrepeat("はい。はい。")=="はい。はい。";
  }
 }

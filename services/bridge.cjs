@@ -161,9 +161,10 @@ async function dispatch(request,runtime=null) {
       case 'game_locale_mode':{const row=db.prepare('SELECT original FROM games WHERE id=? AND removed_at IS NULL').get(String(request.id));if(!row)throw Error('GAME_NOT_FOUND');const original=JSON.parse(row.original||'{}');original.library={...original.library,localeMode:request.japanese===true?'japanese':'off'};db.prepare('UPDATE games SET original=? WHERE id=?').run(JSON.stringify(original),String(request.id));return {japanese:request.japanese===true};}
       // Script sources for zero-latency bilingual: a Chinese patch for the Japanese game, or the Japanese original
       // for a patched game. Both are lined up with the installed script; the running reader picks the change up.
-      case 'text_source_status':return require('./original-text.cjs').status(root,db,String(request.id));
+      // E280: opening the dialog also looks for a Chinese patch already on this computer (never downloads anything).
+      case 'text_source_status':{const ot=require('./original-text.cjs'),id=String(request.id);ot.autoPatchLater(root,id,()=>runtime?.reader?.refreshTextSource?.(),{force:!!request.search});return ot.status(root,db,id);}
       case 'text_source_import':{const ot=require('./original-text.cjs'),id=String(request.id),dir=String(request.dir||'');
-        if(request.kind==='patch')ot.importPatch(root,db,id,dir);else if(request.kind==='original')ot.importOriginal(root,db,id,dir);else throw Error('INVALID_TEXT_SOURCE');
+        if(request.kind==='patch'){const r=ot.importPatch(root,db,id,dir);if(r.patchStatus!=='ready'){runtime?.reader?.refreshTextSource?.();return ot.status(root,db,id);}}else if(request.kind==='original')ot.importOriginal(root,db,id,dir);else throw Error('INVALID_TEXT_SOURCE');
         runtime?.reader?.refreshTextSource?.();return ot.status(root,db,id);}
       case 'text_source_clear':{const ot=require('./original-text.cjs'),id=String(request.id);if(request.kind==='patch')ot.clearPatch(root,id);else ot.setMode(root,id,'off');runtime?.reader?.refreshTextSource?.();return ot.status(root,db,id);}
       case 'game_original_executable':{const result=require('./game-language.cjs').originalExecutable(db,String(request.id),root,request.mode,request.executable);const row=db.prepare('SELECT original FROM games WHERE id=?').get(String(request.id));return {...result,localeJapanese:JSON.parse(row?.original||'{}').library?.localeMode==='japanese'};}

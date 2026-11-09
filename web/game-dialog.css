@@ -1,0 +1,38 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* E281 (user: polish the add game dialog). Program first as one card, name below, same palette as the other dialogs. */
+dialog.game-dialog{width:min(560px,calc(100vw - 32px));max-width:none;padding:0;border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#25191c 0%,#1b1517 100%);border:1px solid rgba(255,236,214,.1);color:#f1e4d8;box-shadow:0 28px 70px rgba(0,0,0,.55)}
+dialog.game-dialog .game-dialog-head{position:relative;padding:26px 28px 18px;background:radial-gradient(120% 140% at 0% 0%,rgba(200,48,60,.22),transparent 60%);border-bottom:1px solid rgba(255,236,214,.07)}
+dialog.game-dialog .game-dialog-kicker{display:block;margin-bottom:6px;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:#d98b84}
+dialog.game-dialog .game-dialog-head h2{margin:0;font-size:22px;letter-spacing:.03em}
+dialog.game-dialog .game-dialog-head p{margin:6px 0 0;font-size:13px;line-height:1.6;color:#bfae9f}
+dialog.game-dialog .game-form{display:flex;flex-direction:column;padding:20px 28px 0}
+dialog.game-dialog .exe-card{display:grid;grid-template-columns:44px minmax(0,1fr) auto;align-items:center;gap:14px;width:100%;padding:14px 16px;border-radius:14px;border:1px dashed rgba(255,236,214,.22);background:rgba(0,0,0,.22);color:inherit;text-align:left;cursor:pointer;transition:border-color .18s ease,background-color .18s ease,transform .12s ease}
+dialog.game-dialog .exe-card:hover{border-color:rgba(217,139,132,.6);background:rgba(200,48,60,.08)}
+dialog.game-dialog .exe-card:active{transform:scale(.99)}
+dialog.game-dialog .exe-card:focus-visible{outline:2px solid #d98b84;outline-offset:2px}
+dialog.game-dialog .exe-card.picked{border-style:solid;border-color:rgba(217,139,132,.35);background:rgba(200,48,60,.07)}
+dialog.game-dialog .exe-card-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:rgba(200,48,60,.16);color:#ecb2aa}
+dialog.game-dialog .exe-card-text{display:flex;flex-direction:column;gap:3px;min-width:0}
+dialog.game-dialog .exe-card-text strong{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+dialog.game-dialog .exe-card-text small{font:12px/1.45 Consolas,"Cascadia Mono",monospace;color:#a8978a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}
+dialog.game-dialog .exe-card-action{padding:7px 12px;border-radius:999px;border:1px solid rgba(255,236,214,.14);font-size:12px;color:#e9d8c9;white-space:nowrap}
+dialog.game-dialog .form-label{margin:18px 0 6px;font-size:12px;letter-spacing:.06em;color:#bfae9f}
+dialog.game-dialog .game-path-label{margin-top:12px;font-size:11px;color:#8f8075}
+dialog.game-dialog input.form-input{box-sizing:border-box;width:100%;height:42px;padding:0 14px!important;border:1px solid rgba(255,236,214,.1)!important;border-radius:10px!important;background:rgba(0,0,0,.24)!important;color:#f1e4d8;font-size:14px;transition:border-color .18s ease,background-color .18s ease}
+dialog.game-dialog input.form-input:hover{border-color:rgba(255,236,214,.2)!important}
+dialog.game-dialog input.form-input:focus{border-color:rgba(217,139,132,.7)!important;background:rgba(0,0,0,.32)!important;outline:none}
+dialog.game-dialog input.game-path{height:36px;font:12px Consolas,"Cascadia Mono",monospace;color:#cdbcae}
+dialog.game-dialog input.game-name{height:46px;font-size:16px}
+dialog.game-dialog input::placeholder{color:#7d6f66}
+dialog.game-dialog .image-picker{display:flex;align-items:center;gap:12px}
+dialog.game-dialog .image-picker img{width:54px;height:76px;object-fit:cover;border-radius:8px;box-shadow:0 0 0 1px rgba(255,236,214,.1)}
+dialog.game-dialog .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin:24px -28px 0;padding:16px 28px;border-top:1px solid rgba(255,236,214,.07);background:rgba(0,0,0,.18)}
+@media (prefers-reduced-motion:reduce){dialog.game-dialog .exe-card{transition:none}}
+:root[data-theme=light] dialog.game-dialog{background:linear-gradient(180deg,#fbf6f1,#f3ebe3);border-color:rgba(168,50,63,.18);color:#2a1e1a;box-shadow:0 30px 80px rgba(60,30,20,.25)}
+:root[data-theme=light] dialog.game-dialog .game-dialog-head{background:radial-gradient(120% 140% at 0% 0%,rgba(200,48,60,.12),transparent 60%);border-color:rgba(60,30,20,.08)}
+:root[data-theme=light] dialog.game-dialog :is(.game-dialog-head p,.form-label){color:#6e4f47}
+:root[data-theme=light] dialog.game-dialog .exe-card{background:rgba(255,255,255,.6);border-color:rgba(120,60,50,.25)}
+:root[data-theme=light] dialog.game-dialog .exe-card-text small{color:#8a6e64}
+:root[data-theme=light] dialog.game-dialog .exe-card-action{border-color:rgba(120,60,50,.2);color:#4a2f28}
+:root[data-theme=light] dialog.game-dialog input.form-input{background:rgba(255,255,255,.7)!important;border-color:rgba(120,60,50,.18)!important;color:#2a1e1a}
+:root[data-theme=light] dialog.game-dialog .dialog-actions{background:rgba(120,60,50,.04);border-color:rgba(60,30,20,.08)}

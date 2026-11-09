@@ -16,6 +16,11 @@ function combine(samples){
  // Colours differ slightly from line to line (anti-aliasing, background): the per-channel median, not an exact match.
  // Many games draw already-read lines in another colour (ISLAND: unread white, read blue). Never average the two:
  // samples are split by whether ToMe had shown that line before, and each group gets its own median.
+ // E282 (user: 爱上火车 turned pure black after a manual calibration): the read colour came out #030304, the outline
+ // under white text. Games tint read lines (ISLAND: white -> blue); they never turn white text black or black text
+ // white, so a read colour on the far side of the brightness scale is a mis-measure and is dropped.
+ const luma=hex=>{const m=/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex||'');return m?(.2126*parseInt(m[1],16)+.7152*parseInt(m[2],16)+.0722*parseInt(m[3],16))/255:null;};
+ const inverted=(a,b)=>{const x=luma(a),y=luma(b);return x!==null&&y!==null&&Math.abs(x-y)>.6;};
  const colour=list=>{const rgb=list.map(s=>/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(s.style.textColor||'')).filter(Boolean).map(m=>m.slice(1).map(v=>parseInt(v,16)));return rgb.length?'#'+[0,1,2].map(i=>Math.round(median(rgb.map(c=>c[i]))).toString(16).padStart(2,'0')).join(''):undefined;};
  const unread=valid.filter(s=>s.read!==true),read=valid.filter(s=>s.read===true),textColor=colour(unread.length?unread:valid),readTextColor=read.length&&unread.length?colour(read):undefined;
  const style={x,y,width:Math.min(100-x,right-x),textHeight:Number.isFinite(bottom)?bottom-y:undefined,japaneseSize:median(st('japaneseSize')),japaneseSpacingPx:median(st('japaneseSpacingPx')),lineHeight:median(st('lineHeight')),paddingX:0,paddingY:0,autoScale:true};
@@ -25,6 +30,7 @@ function combine(samples){
  if(textColor)style.textColor=textColor;if(readTextColor)style.readTextColor=readTextColor;
  palette(unread,'text');palette(read,'readText');
  if(!unread.length&&read.length){style.readTextColor=textColor;delete style.textColor;}
+ if(style.textColor&&style.readTextColor&&inverted(style.textColor,style.readTextColor)){style.readTextColor='';style.readTextGradient=false;}
 
  return {valid:true,method:'visual-measurement',samples:valid.length,width,height,inkHeight:median(n('inkHeight')),advance:median(n('advance')),lineStep:median(n('lineStep').filter(v=>v>0)),wrapWidth:Math.max(0,...n('wrapWidth').filter(Number.isFinite)),inkLeft:Math.min(...n('inkLeft').filter(Number.isFinite)),inkTop:Math.min(...n('inkTop').filter(Number.isFinite)),rows:Math.max(...n('rows').filter(Number.isFinite)),positionSamples:valid.filter(s=>Number.isSafeInteger(s.sourceToken)).map(s=>({token:s.sourceToken,inkLeft:s.inkLeft,inkTop:s.inkTop,textWidth:Number(s.style.width)*s.width/100})),style};
 }
@@ -56,7 +62,7 @@ class GameStyleSync{
  status(state,extra={}){const count=this.samples.length,needed=NEEDED;this.emit({type:'gameStyleStatus',gameStyleState:state,gameStyleSamples:count,gameStyleNeeded:needed,...this.snapshot(),gameStylePurpose:this.purpose||'all',gameStyleAutomatic:this.automatic===true,gameStyleOwner:this.owner||'',gameStyleCalibrationSerial:this.calibrationSerial||0,...extra});}
  begin(purpose='all'){this.purpose=['position','text'].includes(purpose)?purpose:'all';this.calibrationSerial=(this.calibrationSerial||0)+1;this.attemptGeneration=null;this.sampleAttempts=0;this.samples=[];this.calibrating=true;this.status('sampling',{gameStyleSamples:0,gameStyleNeeded:NEEDED});}
  // Ends a calibration with what was measured so far; false when nothing was.
- publish(){const result=combine(this.samples);this.samples=[];if(!result)return false;if(!result.style.textColor&&result.style.readTextColor)result.style.textColor=this.p?.textColor||gameStyle.defaults.textColor;this.latest=result;this.status('measured',{gameStyle:result,gameStyleConfirm:true,gameStyleSamples:result.samples,gameStyleNeeded:Math.max(NEEDED,result.samples)});return true;}
+ publish(){const result=combine(this.samples);this.samples=[];if(!result)return false;if(!result.style.textColor&&result.style.readTextColor)result.style.textColor=this.p?.textColor||gameStyle.defaults.textColor;if(!result.style.readTextGradient&&combine.inverted(result.style.textColor,result.style.readTextColor))result.style.readTextColor='';this.latest=result;this.status('measured',{gameStyle:result,gameStyleConfirm:true,gameStyleSamples:result.samples,gameStyleNeeded:Math.max(NEEDED,result.samples)});return true;}
  saveProfile(prefs,kind='all',key=this.profileKey,map,saveId){
   if(!this.profileKey||key!==this.profileKey||!prefs||typeof prefs!=='object')return false;
   const clean=profileTools.pick(prefs,kind),previous=this.profile||{prefs:{},textSavedAt:0,positionSavedAt:0},now=Math.max(Date.now(),(previous.savedAt||0)+1);
@@ -103,4 +109,5 @@ class GameStyleSync{
  sample(){if(this.pending||!this.s?.bound||!this.source||!this.start())return;if(this.attemptGeneration!==this.generation){this.attemptGeneration=this.generation;this.sampleAttempts=0;}if(this.calibrating&&this.sampleAttempts>=3)return;this.sampleAttempts++;const id=++this.seq;this.lastAt=Date.now();this.pending={id,generation:this.generation,calibration:!!this.calibrating,session:this.calibrationSerial||0};const d={id,hwnd:String(this.s.gameHwnd),pid:Number(this.s.gameProcessId),source:this.source,overlayPid:this.overlayPid||0,scanX:0,scanY:0,scanWidth:100,scanHeight:100,captureMode:'visible-client'};this.pending.request=d;this.status('measuring',{gameStylePreview:true,gameStyleCaptureId:id});if(this.spawn===spawn){this.captureTimer=setTimeout(()=>this.captureReady(id),250);this.captureTimer.unref?.();}else this.captureReady(id);this.timeout=setTimeout(()=>{const old=this.child;this.child=null;this.pending=null;old?.kill();this.emit({type:'gameStyleStatus',gameStylePreview:false});this.status('timeout');},8000);this.timeout.unref?.();}
  stop(){clearTimeout(this.timer);clearTimeout(this.captureTimer);clearTimeout(this.timeout);this.calibrating=false;this.pending=null;this.generation++;this.child?.stdin.end();const child=this.child;this.child=null;if(child){const timer=setTimeout(()=>child.kill(),1000);timer.unref?.();}}
 }
+combine.inverted=(a,b)=>{const luma=hex=>{const m=/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex||'');return m?(.2126*parseInt(m[1],16)+.7152*parseInt(m[2],16)+.0722*parseInt(m[3],16))/255:null;};const x=luma(a),y=luma(b);return x!==null&&y!==null&&Math.abs(x-y)>.6;};
 module.exports={GameStyleSync,combine};
