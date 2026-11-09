@@ -475,5 +475,6 @@ If it helped you read a few more lines in Japanese, a small sponsorship keeps th
 ---
 
 <div align="center">
-<sub>Made by <a href="https://github.com/ilynthn">ilynthn</a> with love, caffeine, and a concerning number of bugs ✦</sub>
+<sub>Made by <a href="https://github.com/ilynthn">ilynthn</a> with love, caffeine, and a concerning number of bugs ✦</sub><br>
+<sub>Free code signing provided by <a href="https://about.signpath.io">SignPath.io</a>, certificate by <a href="https://signpath.org">SignPath Foundation</a> · <a href="docs/CODE-SIGNING.md">Code signing policy</a></sub>
 </div>
