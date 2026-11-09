@@ -46,12 +46,30 @@ class LocalLearning{
  async ready(){
   if(this.closed)throw Error('本地辞书已关闭');
   if(this.installing)await this.installing.catch(()=>{});
-  if(!this.installed())await this.install();if(this.worker)return;
+  if(!this.installed())await this.install();if(this.worker)return this.starting;
+  try{await this.spawnWorker();}
+  catch(error){
+   // User report (2026-11-09): the worker died on start (a half-finished install) and every lookup said
+   // "reinstall in settings" without saying where. Repair the reading components once on our own, then retry.
+   if(this.selfRepaired)throw this.workerError(error);
+   this.selfRepaired=true;this.onStatus({learningMessage:'分词组件无法启动，正在自动修复（重新下载 Sudachi 组件）…'});
+   try{await this.install(true,true);await this.spawnWorker();}catch(again){throw this.workerError(again);}
+  }
+ }
+ workerError(error){const why=String(error?.message||'').slice(0,200);return Error('分词组件无法运行，自动修复后仍失败：请按 Alt+T → 设置 → 词典 → 「修复 / 重新下载」'+(why?'（'+why+'）':''));}
+ // Starts reading-worker.py and resolves once it reports ready; a crash before that rejects with its last stderr
+ // line, which is also kept in logs/reading-worker.log so a failed start can be diagnosed.
+ spawnWorker(){
   const child=spawn(this.python(),[path.join(__dirname,'reading-worker.py')],{windowsHide:true,cwd:__dirname,env:{...process.env,TOMOYO_READING_RUNTIME:this.runtimeFolder()},stdio:['pipe','pipe','pipe']});this.worker=child;
-  child.stdin.on('error',()=>{});child.stderr.on('data',()=>{});
-  const fail=()=>{if(this.worker===child)this.worker=null;for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(Error('Sudachi 本地组件无法运行，请在设置中重新安装'));}this.pending.clear();};
-  child.on('error',fail);child.on('exit',fail);
-  createInterface({input:child.stdout}).on('line',line=>{let m;try{m=JSON.parse(line);}catch{return;}if(m.type==='ready'){this.runtimeInfo=m;this.onStatus({learningMessage:'实际运行：'+m.dictionary+' '+m.dictionaryVersion+' / SudachiPy '+m.engineVersion+' ＋本机 JMdict'});return;}const p=this.pending.get(m.id);if(!p)return;clearTimeout(p.timer);this.pending.delete(m.id);m.error?p.reject(Error(m.error)):p.resolve(m.tokens);});
+  let stderr='',ready=false;child.stdin.on('error',()=>{});child.stderr.on('data',d=>{stderr=(stderr+d.toString()).slice(-6000);});
+  const log=text=>{try{fs.appendFileSync(path.join(require('./layout.cjs').logs,'reading-worker.log'),'\n===== '+new Date().toISOString()+'\n'+text+'\n');}catch{}};
+  this.starting=new Promise((resolve,reject)=>{
+   const fail=error=>{if(this.worker===child)this.worker=null;const last=stderr.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).at(-1)||(error?.message||'');if(stderr||error)log((error?.message||'exit')+'\n'+stderr);
+    for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(this.workerError(Error(last)));}this.pending.clear();if(!ready)reject(Error(last||'worker exited'));};
+   child.on('error',fail);child.on('exit',code=>fail(code?Error('exit code '+code):null));
+   createInterface({input:child.stdout}).on('line',line=>{let m;try{m=JSON.parse(line);}catch{return;}if(m.type==='ready'){ready=true;this.runtimeInfo=m;this.onStatus({learningMessage:'实际运行：'+m.dictionary+' '+m.dictionaryVersion+' / SudachiPy '+m.engineVersion+' ＋本机 JMdict'});resolve();return;}const p=this.pending.get(m.id);if(!p)return;clearTimeout(p.timer);this.pending.delete(m.id);m.error?p.reject(Error(m.error)):p.resolve(m.tokens);});
+  });
+  this.starting.catch(()=>{});return this.starting;
  }
  async tokenize(text){
   if(this.cache.has(text))return this.cache.get(text);await this.ready();
