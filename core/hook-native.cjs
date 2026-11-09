@@ -59,7 +59,11 @@ class HookNative{
  }
  // Japanese original for a translated build (services/original-text.cjs). Only an exact or position-confirmed match
  // replaces the captured line; anything else, or any error, keeps the captured text so the dialogue never goes missing.
- originalTextFor(text){const provider=this.originalText;if(!provider||!text)return text;try{const r=provider.resolve(text);if((r.status==='exact'||r.status==='high')&&r.japanese&&!r.alreadyJapanese){this.trace('original-text '+r.status+' '+r.method+' #'+r.indices[0]);return r.japanese;}if(r.status!=='none')this.trace('original-text kept '+r.status+' '+r.method);}catch(error){this.trace('original-text error '+(error?.message||error));}return text;}
+ originalTextFor(text){const provider=this.originalText;if(!provider||!text)return text;try{const r=provider.resolve(text);if((r.status==='exact'||r.status==='high')&&r.japanese&&!r.alreadyJapanese){this.trace('original-text '+r.status+' '+r.method+' #'+r.indices[0]);
+   /* The patched line is the translation group's own Chinese for this Japanese line (user, 2026-11-09: zero-latency
+      bilingual from an existing 汉化). Hand the pair to the reader before the line itself, so its translation is ready. */
+   if(typeof r.captured==='string'&&r.captured.trim()&&typeof this.emit==='function')this.emit({type:'hookPatchTranslation',japanese:r.japanese,chinese:r.captured});
+   return r.japanese;}if(r.status!=='none')this.trace('original-text kept '+r.status+' '+r.method);}catch(error){this.trace('original-text error '+(error?.message||error));}return text;}
  source(m,name){
   // The game's own ruby readings ride after the line as \x1d base \x1c reading pairs (ISLAND hook): split them off
   // before anything else sees the text, and attach them when this line is delivered (user, 2026-11-03).

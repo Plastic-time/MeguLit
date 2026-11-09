@@ -13,6 +13,8 @@ class Reader{
   if(message.type==='homeHotkey'){this.runtime.emit('home-toggle',null);return;}
   if(message.type==='readerPointer'){this.runtime.emit('reader-pointer-input',message);return;}
   if(message.type==='hookEmbedRequest'){this.embedTranslate(message.id,message.text);return;}
+  /* A Chinese-patched game read in Japanese: the patch's line is the translation, cached before the page asks. */
+  if(message.type==='hookPatchTranslation'){if(typeof message.japanese==='string'&&typeof message.chinese==='string'&&message.chinese.length<=4000)this.embedCached(message.japanese,message.chinese.trim());return;}
   if(message.type==='hostFrame'){
    try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),...message})+'\n');}catch{}
    return;

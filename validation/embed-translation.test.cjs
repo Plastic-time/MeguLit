@@ -46,3 +46,15 @@ test('the native bridge holds the line, answers with the translation, and lets t
  assert.match(cs,/new Timer\(_=>FinishEmbed\(id,null\),null,3700,Timeout\.Infinite\)/);
  assert.match(cs,/type=="embedReply"/);assert.match(cs,/TranslateMode\?4000u:1000u/);
 });
+
+// Chinese-patched game read in Japanese (original-text import): the patch's own line becomes the translation, ready
+// before the page asks, with no translation service call (zero-latency bilingual from an existing 汉化).
+test('a matched patch line is cached as the translation of its Japanese original',async()=>{
+ const {h,events}=hook();h.originalText={resolve:()=>({status:'exact',method:'unique',indices:[3],japanese:'おはよう、春希',captured:'早上好，春希',alreadyJapanese:false})};
+ assert.equal(h.originalTextFor('早上好，春希'),'おはよう、春希');
+ assert.deepEqual(events.find(e=>e.type==='hookPatchTranslation'),{type:'hookPatchTranslation',japanese:'おはよう、春希',chinese:'早上好，春希'});
+ const {Reader}=require('../services/reader.cjs'),r=Object.create(Reader.prototype);let calls=0;
+ Object.assign(r,{root:'Z:/no-root',runtime:{},translator:()=>({translate:async()=>{calls++;return 'x';}})});
+ r.embedCached('おはよう、春希','早上好，春希');
+ assert.equal(r.embedCached('おはよう、 春希'),'早上好，春希','whitespace does not matter');assert.equal(calls,0);
+});
