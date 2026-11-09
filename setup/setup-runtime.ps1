@@ -240,7 +240,28 @@ function Start-Install($ids) {
   $script:index = 0; $choice.Visible = $false; $progress.Visible = $true; Next-Pack
 }
 function Current { $script:queue[$script:index] }
-function Part { Join-Path $Root ('runtime-' + (Current) + '.part') }
+# Each download attempt gets its own file name: antivirus scanners often hold a freshly written
+# file for a few seconds, and reusing one name made every retry fail with "file in use".
+$script:attempt = 0
+function Part { Join-Path $Root ('runtime-' + (Current) + '-' + $script:attempt + '.part') }
+# Remove/move with patience: retry for ~15 s while another process (antivirus, indexer, an old
+# MeguLit still running) holds the file, instead of failing the whole install on the first try.
+function With-Retry([scriptblock]$op) {
+  for ($i = 0; ; $i++) {
+    try { & $op; return }
+    catch {
+      if ($i -ge 30) { throw }
+      $until = [DateTime]::Now.AddMilliseconds(500)
+      while ([DateTime]::Now -lt $until) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
+    }
+  }
+}
+# Processes started from this install's own runtime folder (node / aivis from an earlier MeguLit run)
+# lock the files we are about to replace. Only processes inside $runtimeDir are touched.
+function Stop-RuntimeProcesses {
+  $prefix = [IO.Path]::GetFullPath($runtimeDir).TrimEnd('\') + '\'
+  Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { try { $_.Kill(); $_.WaitForExit(3000) | Out-Null } catch {} }
+}
 function Next-Pack {
   if ($script:index -ge $script:queue.Count) { $script:done = $true; $form.Close(); return }
   $script:urlIndex = 0; $script:sources = @(Order-Sources (Current)); Start-Download
@@ -249,7 +270,8 @@ function Start-Download {
   $script:stage = 'download'; $script:mode = 'download'; $button.Text = '取消 Cancel'; Style-Button $button $false; $button.FlatAppearance.BorderColor = $C.red; $status.ForeColor = $C.muted; Set-Bar 0
   $title.Text = '正在下载运行组件…'
   $status.Text = ('[{0}/{1}] 正在下载{2}…  来源 {3}' -f ($script:index+1), $script:queue.Count, $names[(Current)], (Source-Name $script:sources[$script:urlIndex]))
-  if (Test-Path (Part)) { Remove-Item (Part) -Force }
+  $script:attempt++
+  if (Test-Path (Part)) { try { Remove-Item (Part) -Force -ErrorAction Stop } catch { $script:attempt++ } }
   $client.DownloadFileAsync([Uri]$script:sources[$script:urlIndex], (Part))
 }
 function Fail([string]$message) {
@@ -272,16 +294,17 @@ $client.add_DownloadFileCompleted({ param($s,$e)
     Fail ('下载失败：' + $msg); return
   }
   try {
-    $part = Part; $unpack = Join-Path $Root ('runtime-' + (Current) + '.unpack')
+    $part = Part; $unpack = Join-Path $Root ('runtime-' + (Current) + '-' + $script:attempt + '.unpack')
     $script:stage = 'unpack'
     $status.Text = '正在校验… / Verifying'; $form.Refresh()
-    if ((Get-FileHash -Algorithm SHA256 $part).Hash -ne $packs.(Current).sha256.ToUpper()) {
-      Remove-Item $part -Force
+    $hash = $null; With-Retry { $script:hashValue = (Get-FileHash -Algorithm SHA256 $part -ErrorAction Stop).Hash }; $hash = $script:hashValue
+    if ($hash -ne $packs.(Current).sha256.ToUpper()) {
+      try { Remove-Item $part -Force -ErrorAction Stop } catch {}
       if ($script:urlIndex + 1 -lt $script:sources.Count) { $script:urlIndex++; Start-Download; return }
       throw '文件校验失败，可能下载不完整'
     }
     $status.Text = ('正在解压{0}… / Unpacking' -f $names[(Current)]); Set-Busy; $form.Refresh()
-    if (Test-Path $unpack) { Remove-Item $unpack -Recurse -Force }
+    if (Test-Path $unpack) { With-Retry { Remove-Item $unpack -Recurse -Force -ErrorAction Stop } }
     New-Item -ItemType Directory $unpack | Out-Null
     $tar = Start-Process -FilePath "$env:SystemRoot\System32\tar.exe" -ArgumentList @('-xf', "`"$part`"", '-C', "`"$unpack`"") -NoNewWindow -PassThru
     $null = $tar.Handle  # keep the handle so ExitCode is readable after exit
@@ -289,8 +312,15 @@ $client.add_DownloadFileCompleted({ param($s,$e)
     $tar.WaitForExit()
     if ($tar.ExitCode -ne 0 -or -not (Test-Path (Join-Path $unpack 'runtime'))) { throw '解压失败' }
     New-Item -ItemType Directory -Force $runtimeDir | Out-Null
-    Get-ChildItem (Join-Path $unpack 'runtime') | ForEach-Object { $dest = Join-Path $runtimeDir $_.Name; if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }; Move-Item $_.FullName $dest }
-    Remove-Item $unpack -Recurse -Force; Remove-Item $part -Force
+    Stop-RuntimeProcesses
+    Get-ChildItem (Join-Path $unpack 'runtime') | ForEach-Object {
+      $src = $_.FullName; $dest = Join-Path $runtimeDir $_.Name
+      if (Test-Path $dest) { With-Retry { Remove-Item $dest -Recurse -Force -ErrorAction Stop } }
+      With-Retry { Move-Item $src $dest -ErrorAction Stop }
+    }
+    # Leftovers are harmless; never fail an install that already succeeded over a temp file.
+    try { Remove-Item $unpack -Recurse -Force -ErrorAction Stop } catch {}
+    try { Remove-Item $part -Force -ErrorAction Stop } catch {}
     $script:index++; Next-Pack
   } catch { Fail ('安装失败：' + $_.Exception.Message) }
 })
@@ -305,4 +335,5 @@ if ($env:MEGULIT_SETUP_PREVIEW) { $form.add_Shown({ if ($env:MEGULIT_SETUP_PREVI
 [void]$form.ShowDialog()
 $client.Dispose()
 Get-ChildItem $Root -Filter 'runtime-*.part' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+Get-ChildItem $Root -Directory -Filter 'runtime-*.unpack' -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 if ($script:done -and (Test-Path (Join-Path $Root 'runtime\node.exe'))) { exit 0 } else { exit 1 }
