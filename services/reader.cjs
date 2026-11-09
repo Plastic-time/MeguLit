@@ -12,8 +12,6 @@ class Reader{
  event(message){
   if(message.type==='homeHotkey'){this.runtime.emit('home-toggle',null);return;}
   if(message.type==='readerPointer'){this.runtime.emit('reader-pointer-input',message);return;}
-  /* Binding changes, kept so a reader that drops off the game (floating strip at the screen top) can be traced. */
-  if(message.type==='bindTrace'||message.type==='coverDebug'||typeof message.bound==='boolean'){try{fs.appendFileSync(path.join(this.root,'logs','reader-bind.log'),JSON.stringify({at:new Date().toISOString(),type:message.type,bound:message.bound,mode:message.interfaceMode,text:String(message.text||message.message||'').slice(0,200)})+'\n');}catch{}if(message.type==='bindTrace'||message.type==='coverDebug')return;}
   if(message.type==='hookEmbedRequest'){this.embedTranslate(message.id,message.text);return;}
   /* A Chinese-patched game read in Japanese: the patch's line is the translation, cached before the page asks. */
   if(message.type==='hookPatchTranslation'){if(typeof message.japanese==='string'&&typeof message.chinese==='string'&&message.chinese.length<=4000)this.embedCached(message.japanese,message.chinese.trim());return;}

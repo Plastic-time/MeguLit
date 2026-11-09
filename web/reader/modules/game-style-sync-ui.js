@@ -162,6 +162,10 @@
  .tomoyo-menu-header h3{flex-wrap:wrap!important;align-items:center!important;gap:4px 10px!important}
  [data-calibration-current]{flex:1;min-width:160px;font-size:11px!important;font-weight:400!important;letter-spacing:0;line-height:1.55;color:var(--theme-textSecondary,#aaa);overflow-wrap:anywhere}
  [data-calibration-current][data-preview=true]{color:var(--theme-primary,#e0495a)}
+ /* Window-sized containers never draw a focus ring (user, 2026-11-09): Alt+T is a keyboard action, so Chromium drew a
+    light-blue focus-visible ring on a container as large as the reader window; the window only shows its hit regions,
+    so the ring's top edge appeared as a blue line above the new-game tip, or above the menu dragged to the top. */
+ html:focus,html:focus-visible,body:focus,body:focus-visible,dialog:focus,dialog:focus-visible,.sentence-window:focus,.sentence-window:focus-visible{outline:none!important}
  .tome-first-run{position:fixed;z-index:2147481000;left:50%;top:24px;transform:translateX(-50%);box-sizing:border-box;width:min(520px,calc(100vw - 32px));padding:14px 16px 12px;border-radius:14px;background:color-mix(in srgb,var(--theme-surface,#18181b) 94%,transparent);color:var(--theme-text,#eee);border:1px solid color-mix(in srgb,var(--theme-primary,#e0495a) 45%,transparent);box-shadow:none;font-size:13px;line-height:1.6}
  .tome-first-run b{display:block;margin-bottom:4px;font-size:14px}.tome-first-run p{margin:0 0 10px;color:var(--theme-textSecondary,#bbb)}
  .tome-first-run button{float:right;padding:5px 14px;border-radius:8px;border:0;background:var(--theme-primary,#e0495a);color:#fff;font:inherit;font-weight:600;cursor:pointer}
