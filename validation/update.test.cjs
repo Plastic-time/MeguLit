@@ -56,8 +56,9 @@ test('v1.1.8: the same version with a different package online is a hotfix',asyn
    relays, verified against GitHub's digest; a release replaced mid-download (hotfix) is read again once. */
 test('update: relays are tried when GitHub fails, and only with a digest',()=>{
  const rel={url:'https://github.com/ilynthn/MeguLit/releases/download/v9.9.9/a.zip',digest:'a'.repeat(64)};
- assert.deepEqual(u.sources(rel,false),[rel.url,'https://gh-proxy.com/'+rel.url,'https://ghproxy.net/'+rel.url]);
- assert.equal(u.sources(rel,true)[2],rel.url,'China tries relays first');
+ const fresh=rel.url+'?v='+'a'.repeat(12);
+ assert.deepEqual(u.sources(rel,false),[rel.url,'https://gh-proxy.com/'+fresh,'https://ghproxy.net/'+fresh,'https://ghfast.top/'+fresh],'relays get the digest so a cached old package is not served');
+ assert.equal(u.sources(rel,true)[3],rel.url,'China tries relays first');
  assert.deepEqual(u.sources({...rel,digest:''},true),[rel.url],'no digest, no relay');
 });
 test('update: a failing GitHub download falls back to a relay; a replaced release is fetched again',async()=>{
@@ -86,4 +87,18 @@ test('update: an old rollback exe moves out of the MeguLit folder; the script ba
   assert.equal(u.tidyRollback(root),false);}finally{fs.rmSync(root,{recursive:true,force:true});}
  const src=fs.readFileSync(path.join(__dirname,'..','services','update.cjs'),'utf8');
  assert.match(src,/robocopy \$Root \$bak \/MIR/);assert.match(src,/ie4uinit\.exe'\) -show/);assert.match(src,/rolling back/);assert.doesNotMatch(src,/Copy-Item -LiteralPath \$exe -Destination \$backup/);
+});
+
+// E289 (Henan user: the download failed right at the end): a dropped connection resumes from the bytes it already has.
+test('update: a download cut off near the end resumes with a range request',async()=>{
+ const fs=require('fs'),os=require('os'),path=require('path'),crypto=require('crypto');
+ const zip=Buffer.concat([Buffer.from('PK'),crypto.randomBytes(9000)]),digest=crypto.createHash('sha256').update(zip).digest('hex');
+ const rel={tag_name:'v9.9.9',assets:[{name:'MeguLit-v9.9.9-win-x64.zip',size:zip.length,digest:'sha256:'+digest,browser_download_url:'https://github.com/ilynthn/MeguLit/releases/download/v9.9.9/MeguLit-v9.9.9-win-x64.zip'}]};
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'upd-'));u.reset();const ranges=[];
+ const stream=(data,fail)=>{let sent=false;return {getReader:()=>({read:async()=>{if(!sent){sent=true;return {done:false,value:data};}if(fail)throw Error('ECONNRESET');return {done:true};}})};};
+ const r=await u.start(root,'1.0.0',async(url,opts)=>{if(url.endsWith('/latest'))return {ok:true,json:async()=>rel};const range=opts?.headers?.Range;ranges.push(range||'');
+  if(!range)return {ok:true,status:200,url,body:stream(zip.subarray(0,8000),true)};
+  const from=Number(/bytes=(\d+)-/.exec(range)[1]);return {ok:true,status:206,url,body:stream(zip.subarray(from),false)};});
+ assert.equal(r.phase,'ready');assert.equal(r.sha256,digest);assert.deepEqual(ranges,['','bytes=8000-']);
+ u.reset();fs.rmSync(root,{recursive:true,force:true});
 });

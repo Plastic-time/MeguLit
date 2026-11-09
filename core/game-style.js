@@ -76,7 +76,7 @@
     // Colour of lines the game marks as already read; empty = same as textColor.
     if (value.readTextColor === '' || /^#[0-9a-f]{6}$/i.test(value.readTextColor)) result.readTextColor = value.readTextColor;
     if (['classic','clean','custom'].includes(value.style)) result.style = value.style;
-    if (['bilingual','japanese','chinese'].includes(value.display)) result.display = value.display;
+    if (['bilingual','japanese','chinese','bilingual-en','english','none'].includes(value.display)) result.display = value.display;
     if (['outline','soft','none'].includes(value.shadow)) result.shadow = value.shadow;
     if (typeof value.gameProcess === 'string') result.gameProcess = value.gameProcess.slice(0,100);
     return result;

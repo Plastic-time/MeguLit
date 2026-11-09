@@ -127,6 +127,8 @@ $names=New-Object 'System.Collections.Generic.SortedSet[string]' ([StringCompare
 foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and -not $e.FullName.EndsWith('/')){[void]$names.Add($e.FullName.Substring(8))}}
 # --others: files added in this release are not tracked yet when the list is built (-IncludeWorkingChanges)
 foreach($f in (git ls-files --cached --others --exclude-standard core services web setup)){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
+# Prebuilt native helpers added after the previous package (not tracked: *.dll is ignored); E293 scene capture.
+foreach($f in 'native/MeguLitScn32.dll','native/MeguLitScn64.dll'){if(Test-Path -LiteralPath (Join-Path $Root $f)){[void]$names.Add($f)}}
 $zipPath=Join-Path $work $Asset
 $out=[IO.Compression.ZipFile]::Open($zipPath,'Create')
 try{

@@ -40,7 +40,7 @@ const ADAPTERS={
 // E280: engines read as scene files (KiriKiri, Artemis, Ren'Py); their script is the game folder like BGI's.
 const scenes=require('./original-engines/scenes.cjs');
 for(const id of Object.keys(scenes.ENGINES))ADAPTERS[id]={folder:true,scene:true,locate:dir=>scenes.readable(id,dir)?{engine:id,target:dir}:null,
- read:dir=>{const list=scenes.read(id,dir),lines=list.flatMap(x=>x.lines);return {engine:id,version:0,codepage:'text',lines,structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
+ read:dir=>{const list=scenes.read(id,dir),lines=list.flatMap(x=>x.lines),ruby=list.some(x=>x.ruby)?list.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;return {engine:id,version:0,codepage:'text',lines,ruby,structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
  fingerprint:dir=>scenes.fingerprint(id,dir)};
 const runningDirOf=runtime=>ADAPTERS[runtime.engine||'system4']?.folder?runtime.file:path.dirname(runtime.file);
 function locate(dir,base){for(const adapter of Object.values(ADAPTERS)){const found=adapter.locate(dir,base);if(found)return found;}return null;}
@@ -49,12 +49,12 @@ function gameRow(db,id){const row=db.prepare('SELECT * FROM games WHERE id=? AND
 
 // ---- Running build: what the installed (patched) game still contains ---------------------------
 function scanRunning(root,id,executable){
- const dir=path.dirname(executable),loc=locate(dir,path.parse(executable).name);if(!loc)return writeState(root,id,{status:'unsupported',error:'NO_SUPPORTED_SCRIPT',runtime:null});const file=loc.target;
+ const dir=path.dirname(executable),loc=locate(dir,path.parse(executable).name);if(!loc)return writeState(root,id,{status:'unsupported',error:'NO_SUPPORTED_SCRIPT',runtime:null,gameDir:dir});const file=loc.target;
  const hash=fingerprint(loc),current=readState(root)[id];if(current?.runtime?.sha256===hash&&current.runtime.index&&fs.existsSync(current.runtime.index))return current;
  const ain=readScript(loc),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length,nonEmpty=ain.lines.filter(prose).length;
  // An English (or other) original read by a scene engine is neither the Japanese game nor a Chinese build: nothing to do.
- if(ADAPTERS[loc.engine].scene){const chinese=ain.lines.filter(t=>prose(t)&&!japaneseLine(t)&&/[一-鿿]{2}/.test(t)).length;if(!nonEmpty||japanese<nonEmpty*.5&&chinese<nonEmpty*.3)return writeState(root,id,{status:'unsupported',error:'SCRIPT_NOT_JAPANESE',runtime:null});}
- const index=writeIndex(root,id,'runtime-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'runtime',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash},structure:ain.structure,lines:ain.lines});
+ if(ADAPTERS[loc.engine].scene){const chinese=ain.lines.filter(t=>prose(t)&&!japaneseLine(t)&&/[一-鿿]{2}/.test(t)).length;if(!nonEmpty||japanese<nonEmpty*.5&&chinese<nonEmpty*.3)return writeState(root,id,{status:'unsupported',error:'SCRIPT_NOT_JAPANESE',runtime:null,gameDir:dir});}
+ const index=writeIndex(root,id,'runtime-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'runtime',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash},structure:ain.structure,lines:ain.lines,...(ain.ruby?{ruby:ain.ruby}:{})});
  const original=current?.original;const runtime={file,engine:loc.engine,sha256:hash,index,codepage:ain.codepage,version:ain.version,structure:ain.structure,lines:nonEmpty,japaneseLines:japanese};
  // A changed game build invalidates the earlier alignment; the original index itself stays.
  return writeState(root,id,{engine:loc.engine,runtime,status:japanese>=nonEmpty*.5?'native-japanese':original?.index&&current?.runtime?.sha256===hash?current.status:original?.index?'needs-recheck':'awaiting-original'});
@@ -181,8 +181,8 @@ function buildPatch(runningState,source){
  if(!nonEmpty||japanese>=nonEmpty*.5)throw Error('PATCH_NOT_TRANSLATED');
  return {script,patched,sources:found.sources};
 }
-function importPatch(root,db,id,source,{auto=false}={}){
- const row=gameRow(db,id);if(typeof source!=='string'||!path.isAbsolute(source)||!fs.statSync(source,{throwIfNoEntry:false}))throw Error('INVALID_PATCH_DIRECTORY');
+function importPatch(root,db,id,source,{auto=false,executable}={}){
+ const row=executable?{executable}:gameRow(db,id);if(typeof source!=='string'||!path.isAbsolute(source)||!fs.statSync(source,{throwIfNoEntry:false}))throw Error('INVALID_PATCH_DIRECTORY');
  // A picked script file stands for its folder (the folder may hold more than that one file).
  if(fs.statSync(source).isFile()&&!/\.exe$/i.test(source))source=path.dirname(source);
  const state=scanRunning(root,id,row.executable);if(!state.runtime)throw Error(state.error||'NO_SUPPORTED_SCRIPT');
@@ -193,7 +193,7 @@ function importPatch(root,db,id,source,{auto=false}={}){
  // Lines the patch left in Japanese must equal the running script at the same index (same measure as the original import).
  const alignment=align({...script,structure:script.structure},runtime),hash=patchFingerprint(source),isDir=fs.statSync(source).isDirectory();
  const index=writeIndex(root,id,'patch-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'patch',engine:script.engine,version:script.version,codepage:script.codepage,source:{file:source,sha256:hash,sources},structure:script.structure,lines:script.lines});
- return writeState(root,id,{patch:{dir:isDir?source:path.dirname(source),source,file:source,sha256:hash,index,lines:script.lines.length,scenes:patched,fontMapped:!!script.fontMapped,auto,runtimeSha:state.runtime.sha256},patchAlignment:alignment,patchStatus:alignment.reliable?'ready':'unreliable',patchSearch:{...state.patchSearch,running:false,declined:false},error:''});
+ return writeState(root,id,{patch:{dir:isDir?source:path.dirname(source),source,file:source,sha256:hash,index,lines:script.lines.length,scenes:patched,fontMapped:!!script.fontMapped,auto,runtimeSha:state.runtime.sha256,version:PATCH_VERSION},patchAlignment:alignment,patchStatus:alignment.reliable?'ready':'unreliable',patchSearch:{...state.patchSearch,running:false,declined:false},error:''});
 }
 // Where a patch may already be on this computer, nearest first: the game folder (packed programs, loose scenes, patch
 // subfolders), the other folders next to it, then the same script elsewhere on local drives.
@@ -202,6 +202,8 @@ function nearbyPatchSources(executable){
  try{for(const e of fs.readdirSync(parent,{withFileTypes:true}))if(e.isDirectory()&&!sameDir(path.join(parent,e.name),dir)&&!SKIP_DIR.test(e.name))out.push(path.join(parent,e.name));}catch{}
  return out;
 }
+// Bumped when the way patches are read changes; older stored patches are rebuilt before use.
+const PATCH_VERSION=2;
 const autoRuns=new Map();
 // Fire and forget, with its own database handle (callers' handles close when their request ends).
 function autoPatchLater(root,id,done,options={}){
@@ -214,8 +216,11 @@ function autoPatch(root,db,id,options={}){
  const run=(async()=>{
   const row=gameRow(db,id);let state=scanRunning(root,id,row.executable);if(!state.runtime||state.status!=='native-japanese')return {skipped:'not-japanese'};
   // A stored patch whose running script changed (game update, new line order) is rebuilt from where it was found.
-  if(state.patch?.source&&(state.patchStatus!=='ready'||state.patch.runtimeSha!==state.runtime.sha256)&&fs.existsSync(state.patch.source)){
-   try{const r=importPatch(root,db,id,state.patch.source,{auto:!!state.patch.auto});if(r.patchStatus==='ready')return {found:state.patch.source,rebuilt:true};}catch{}}
+  // A stored patch built by an older reader (E286: a name column taken for the translation) is rebuilt the same way.
+  const stale=state.patch&&state.patch.version!==PATCH_VERSION;
+  if(state.patch?.source&&(stale||state.patchStatus!=='ready'||state.patch.runtimeSha!==state.runtime.sha256)&&fs.existsSync(state.patch.source)){
+   try{const r=importPatch(root,db,id,state.patch.source,{auto:!!state.patch.auto});if(r.patchStatus==='ready')return {found:state.patch.source,rebuilt:true};}catch{}
+   if(stale||state.patchStatus==='ready'){state=writeState(root,id,{patch:null,patchAlignment:null,patchStatus:'none',patchSearch:{...state.patchSearch,at:0}});options={...options,force:true};}}
   if(state.patchStatus==='ready')return {kept:true};
   if(state.patchSearch?.declined&&!options.force)return {declined:true};
   const recent=state.patchSearch?.at&&Date.now()-state.patchSearch.at<(options.maxAge??864e5)&&state.patchSearch.runtimeSha===state.runtime.sha256;
@@ -245,7 +250,9 @@ function status(root,db,id){
  try{if(!saved?.runtime||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,status:'failed',error:String(error.message||error)};}
  const {index:_a,...runtime}=state?.runtime||{},{index:_b,...original}=state?.original||{};
  const patchInfo=state?.patch?{dir:state.patch.dir,file:state.patch.file,source:state.patch.source||state.patch.file,lines:state.patch.lines,auto:!!state.patch.auto,fontMapped:!!state.patch.fontMapped}:null;
- const searching=autoRuns.has(String(id)),patchSearch=state?.patchSearch||searching?{running:searching,found:!!state?.patchSearch?.found,at:state?.patchSearch?.at||0,declined:!!state?.patchSearch?.declined}:null;
+ /* E288 (user: the dialog stayed on 正在查找 for good after removing a patch): every status poll starts autoPatchLater, so
+    an entry in autoRuns says nothing; only a search that really scans (it records running) counts, for two minutes at most. */
+ const searching=!!state?.patchSearch?.running&&Date.now()-(state.patchSearch.at||0)<120000,patchSearch=state?.patchSearch||searching?{running:searching,found:!!state?.patchSearch?.found,at:state?.patchSearch?.at||0,declined:!!state?.patchSearch?.declined}:null;
  return {patchSearch,patchHint:patchHint(state?.runtime),gameDir:path.dirname(row.executable),patch:patchInfo,patchStatus:state?.patchStatus||'none',patchAlignment:state?.patchAlignment||null,engine:state?.engine||'',status:state?.status||'unsupported',mode:state?.mode||'off',error:state?.error||'',lastSearch:state?.lastSearch?{at:state.lastSearch.at,found:state.lastSearch.found,searched:state.lastSearch.searched,complete:state.lastSearch.complete}:null,runtime:state?.runtime?runtime:null,original:state?.original?original:null,alignment:state?.alignment||null};
 }
 function setMode(root,id,mode){if(!['off','original'].includes(mode))throw Error('INVALID_TEXT_MODE');const s=readState(root)[id];if(mode==='original'&&s?.status!=='ready')throw Error('ORIGINAL_NOT_READY');return writeState(root,id,{mode});}
@@ -268,18 +275,76 @@ class Matcher{
  }
 }
 // The provider the hook pipeline consults for one running executable, or null when nothing reliable is set up.
+// ---- Filling the gaps (user, 2026-11-10: complete a partial patch, and give every line zero latency) ----------------
+// Lines the patch does not translate (or every line, when there is no patch) are translated a few lines ahead of the
+// reading position by services/script-prefetch.cjs and kept per game and script version, so they are ready when shown
+// and free the next time. They are machine translations and are marked so (machine:true).
+const fillFile=(root,id,sha)=>path.join(indexDir(root,id),'fill-'+String(sha).slice(0,16)+'.json');
+// One store per file, so a provider rebuilt while the game runs keeps the lines its predecessor had not saved yet.
+const fillStores=new Map();
+function fillStore(root,id,sha){const file=fillFile(root,id,sha);if(!fillStores.has(file))fillStores.set(file,openFill(file));return fillStores.get(file);}
+function openFill(file){let map=new Map(),timer=null;
+ try{const v=JSON.parse(fs.readFileSync(file,'utf8'));if(v.schema===SCHEMA&&v.lines)map=new Map(Object.entries(v.lines));}catch{}
+ const save=()=>{timer=null;try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify({schema:SCHEMA,lines:Object.fromEntries(map)}));fs.renameSync(file+'.tmp',file);}catch{}};
+ return {get:text=>map.get(norm(text)),has:text=>map.has(norm(text)),set(text,value){map.set(norm(text),String(value));if(!timer)timer=setTimeout(save,2000);timer.unref?.();},flush(){if(timer){clearTimeout(timer);save();}},size:()=>map.size};
+}
+// E293 scene files the game saves while it runs (kirikiri-dump): the provider rebuilds the running script and the
+// game's own Chinese when the capture folder changes, so a new scene reads from its first line. A miss re-checks at once;
+// otherwise the rebuild runs between lines. Until the first scene is saved every line simply goes the usual way.
+function liveProvider(root,id,executable){
+ const engine=scenes.ENGINES['kirikiri-dump'],dir=path.dirname(String(executable));let inner=null,stamp=null,checked=0,timer=null;
+ const rebuild=()=>{const now=engine.stamp(dir);if(now===stamp)return false;stamp=now;
+  try{const state=scanRunning(root,id,executable);
+   if(state.runtime&&state.engine==='kirikiri-dump'){
+    const fresh=state.patchStatus==='ready'&&state.patch?.runtimeSha===state.runtime.sha256&&state.patch.version===PATCH_VERSION;
+    if(state.status==='native-japanese'&&!fresh)try{importPatch(root,null,id,dir,{auto:true,executable});}catch{}
+    pruneIndexes(root,id);}
+   inner=staticProvider(root,executable);}catch{inner=null;}
+  return true;};
+ const later=()=>{if(timer)return;timer=setTimeout(()=>{timer=null;rebuild();},400);timer.unref?.();};
+ const changed=()=>{checked=Date.now();return engine.stamp(dir)!==stamp;};
+ rebuild();
+ return {kind:'patch',live:true,get patch(){return !!inner?.patch;},get fill(){return inner?.fill;},
+  resolve(text){if(Date.now()-checked>300&&changed())later();let r=inner?inner.resolve(text):{status:'none',method:'no-scenes'};
+   if(r.status==='none'&&r.method!=='empty'&&changed()&&rebuild()&&inner)r=inner.resolve(text);return r;},
+  upcoming(count){return inner?.upcoming?inner.upcoming(count):[];}};
+}
+// Each rebuild writes a runtime index under a new name; only the one in use is kept.
+function pruneIndexes(root,id){const keep=readState(root)[id]?.runtime?.index;if(!keep)return;const dir=indexDir(root,id);
+ try{for(const f of fs.readdirSync(dir))if(/^runtime-[0-9a-f]+\.json$/.test(f)&&path.join(dir,f)!==keep)fs.rmSync(path.join(dir,f),{force:true});}catch{}}
 function provider(root,executable){
- // BGI's script is the whole game folder, AIN is a file in it.
- const state=Object.values(readState(root)).find(s=>s?.runtime?.file&&runningDirOf(s.runtime).toLowerCase()===path.dirname(String(executable)).toLowerCase());
- if(!state)return null;
+ const dir=path.dirname(String(executable)).toLowerCase(),entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir:String(s?.gameDir||'').toLowerCase()===dir);
+ if(!entry)return null;
+ if(entry[1].runtime?.engine==='kirikiri-dump'||!entry[1].runtime&&scenes.ENGINES['kirikiri-dump'].eligible(path.dirname(String(executable))))return liveProvider(root,entry[0],executable);
+ return staticProvider(root,executable);
+}
+function staticProvider(root,executable){
+ // BGI's and scene engines' script is the whole game folder, AIN is a file in it.
+ const entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file&&runningDirOf(s.runtime).toLowerCase()===path.dirname(String(executable)).toLowerCase());
+ if(!entry)return null;const [id,state]=entry;
  try{if(fingerprint({engine:state.runtime.engine||'system4',target:state.runtime.file})!==state.runtime.sha256)return null;
   if(state.mode==='original'&&state.status==='ready'&&state.original?.index){const m=new Matcher(readIndex(state.runtime.index).lines,readIndex(state.original.index).lines);
    // A patched game shown in Japanese: the patched line itself is the group's translation of the restored line.
    return {kind:'original',resolve:text=>m.match(text)};}
-  if(state.patchStatus==='ready'&&state.patch?.index&&(!state.patch.runtimeSha||state.patch.runtimeSha===state.runtime.sha256)){const m=new Matcher(readIndex(state.runtime.index).lines,readIndex(state.patch.index).lines);
-   // The Japanese game with an imported patch: the line stays Japanese; the patch's line at the same place is its translation.
-   return {kind:'patch',resolve:text=>{const r=m.match(text);return r.japanese!==undefined?{...r,translation:r.japanese,japanese:undefined}:r;}};}
-  return null;
+  const patched=state.patchStatus==='ready'&&state.patch?.index&&state.patch.version===PATCH_VERSION&&(!state.patch.runtimeSha||state.patch.runtimeSha===state.runtime.sha256);
+  if(!patched&&state.status!=='native-japanese')return null;
+  // The Japanese game, with an imported patch or with none: the line stays Japanese; the patch's line at the same place is
+  // its translation, and a line the patch leaves as it is (or every line, without a patch) takes the filled translation.
+  const rtIndex=readIndex(state.runtime.index),rt=rtIndex.lines,m=new Matcher(rt,patched?readIndex(state.patch.index).lines:rt),fill=fillStore(root,id,scenes.ENGINES[state.runtime.engine]?.live?'live':state.runtime.sha256);
+  // The script's own ruby for the matched lines (KiriKiri Z scene files): game readings come before dictionary ones.
+  const readings=Array.isArray(rtIndex.ruby)?rtIndex.ruby:null,withRuby=r=>{if(!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
+  const untranslated=i=>{const o=m.og[i];return !o||norm(o)===norm(rt[i]);};
+  const api={kind:'patch',patch:!!patched,fill,
+   resolve:text=>withRuby(resolveLine(text))};
+  function resolveLine(text){const r=m.match(text);if(r.japanese===undefined)return r;
+    if(r.indices.some(untranslated)){const t=fill.get(r.indices.map(i=>rt[i]).join(''));return t?{...r,translation:t,japanese:undefined,machine:true}:{status:'none',method:'untranslated',indices:r.indices};}
+    return {...r,translation:r.japanese,japanese:undefined};}
+  return {...api,
+   // The next lines after the reading position that still need a translation, each with the lines before it as context.
+   upcoming(count=8){if(m.last<0)return [];const out=[];
+    for(let i=m.last+1;i<rt.length&&i<=m.last+200&&out.length<count;i++){const t=rt[i];if(!t||!prose(t)||!japaneseLine(t)||!untranslated(i)||fill.has(t))continue;
+     const context=[];for(let k=i-1;k>=0&&k>=i-12&&context.length<4;k--)if(rt[k]&&prose(rt[k]))context.unshift(rt[k]);out.push({text:t,context});}
+    return out;}};
  }catch{return null;}
 }
 // ---- Automatic search for the user's own Japanese copy ------------------------------------------

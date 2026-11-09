@@ -21,6 +21,7 @@ function htmlText(s){return decode(String(s||'').replace(/<br\s*\/?>/gi,'\n').re
 const between=(s,a,b)=>{const i=s.indexOf(a);if(i<0)return '';const j=s.indexOf(b,i+a.length);return j<0?'':s.slice(i+a.length,j);};
 // Best title match: exact normalized name first, then containment either way.
 function bestMatch(candidates,titles,names){const wanted=titles.map(normalize).filter(t=>t.length>1);let best=null,score=0;for(const c of candidates){for(const n of names(c).map(normalize).filter(Boolean)){for(const t of wanted){const s=n===t?3:n.includes(t)||t.includes(n)?(Math.min(n.length,t.length)/Math.max(n.length,t.length)>.5?2:1):0;if(s>score){score=s;best=c;}}}}return score>=2?best:null;}
+const STEAM_LANGS=['all','schinese','tchinese','japanese','english'];
 // Steam English dates: "September 29, 2016", "4 January, 2018", or no year for the current year.
 function steamDate(s){const m=String(s).match(/^(?:(\d{1,2}) (\w+)|(\w+) (\d{1,2})),?(?: (\d{4}))?$/);if(!m)return s;const month=new Date(`${m[2]||m[3]} 1, 2000`).getMonth();if(!Number.isFinite(month))return s;const year=Number(m[5])||new Date().getFullYear(),day=Number(m[1]||m[4]);return `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;}
 function sqlString(s){return "'"+String(s).replace(/'/g,"''").replace(/\\/g,'\\\\').slice(0,120)+"'";}
@@ -43,9 +44,10 @@ class GameReviews{
   async identity(game,key){
    const saved=this.readSources()[game.id]?.[key];
    const steamMatches=key!=='vndb'||!game.appid||saved?.appid===game.appid&&(!game.vndb||saved.id===game.vndb);
-   if(saved&&steamMatches&&!(key==='vndb'&&game.vndbManual&&saved.id!==game.vndbManual)&&(saved.id||Date.now()-saved.at<86400000))return saved.id?saved:null;
+   const staleMiss=key==='steam'&&saved&&!saved.id&&saved.v!==2;
+   if(saved&&!staleMiss&&steamMatches&&!(key==='vndb'&&game.vndbManual&&saved.id!==game.vndbManual)&&(saved.id||Date.now()-saved.at<86400000))return saved.id?saved:null;
    let found=null;try{found=await this['find_'+key](game);}catch(error){if(error.message==='RUNTIME_STOPPED')throw error;return null;}
-   this.saveSource(game.id,key,{...(found||{id:null}),...(key==='vndb'&&game.appid?{appid:game.appid}:{}),at:Date.now()});return found;
+   this.saveSource(game.id,key,{...(found||{id:null}),...(key==='vndb'&&game.appid?{appid:game.appid}:{}),...(key==='steam'?{v:2}:{}),at:Date.now()});return found;
   }
  async find_bangumi(game){for(const title of game.titles.slice(0,5)){const r=await this.request('https://api.bgm.tv/v0/search/subjects?limit=10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keyword:title,filter:{type:[4]}})},'json');const hit=bestMatch(r.data||[],game.titles,s=>[s.name,s.name_cn]);if(hit)return {id:String(hit.id),title:hit.name_cn||hit.name};}return null;}
  async find_twodfan(game){for(const title of game.titles.slice(0,4)){const html=await this.request('https://2dfan.com/subjects/search?keyword='+encodeURIComponent(title));const cards=[...html.matchAll(/<div class="subject-card" id="subject_card_(\d+)">([\s\S]*?)(?=<div class="subject-card" id=|<\/div>\s*<\/div>\s*<\/div>\s*<div id="subject-list-pagination"|$)/g)].map(m=>({id:m[1],title:htmlText(between(m[2],'class="subject-card-title">','</h3>')),score:Number(htmlText(between(m[2],'subject-card-score-value">','</span>'))),votes:Number((htmlText(between(m[2],'subject-card-score-count">','</span>')).match(/\d+/)||[0])[0])}));const hit=bestMatch(cards,game.titles,c=>[c.title]);if(hit)return hit;}return null;}
@@ -60,7 +62,13 @@ class GameReviews{
   // Enrichment may have matched VNDB without writing the id back to the library row.
   try{const url=JSON.parse(fs.readFileSync(path.join(this.root,'data/config/game-reception.json'),'utf8'))[game.id]?.vndb?.url||'';const m=/vndb\.org\/(v\d+)/.exec(url);if(m)return {id:m[1]};}catch{}
   for(const title of game.titles.slice(0,4)){const r=await this.request('https://api.vndb.org/kana/vn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filters:['search','=',title],fields:'title,alttitle,titles.title',results:8,sort:'searchrank'})},'json');const hit=bestMatch(r.results||[],game.titles,v=>[v.title,v.alttitle,...(v.titles||[]).map(t=>t.title)]);if(hit)return {id:hit.id,title:hit.title};}return null;}
- async find_steam(game){return /^\d+$/.test(game.appid)?{id:game.appid}:null;}
+ /* E291 (user: CLANNAD and 魔法使いの夜 are on Steam but showed 未收录): games added from a folder have no appid. The VNDB
+    entry lists its releases' store links, so the Steam page comes from there. */
+ async find_steam(game){if(/^\d+$/.test(game.appid))return {id:game.appid};
+  const vn=await this.identity(game,'vndb');if(!vn?.id)return null;
+  const r=await this.request('https://api.vndb.org/kana/release',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filters:['vn','=',['id','=',vn.id]],fields:'extlinks.url',results:50})},'json');
+  const ids=(r.results||[]).flatMap(x=>(x.extlinks||[]).map(l=>(/store\.steampowered\.com\/app\/(\d+)/.exec(l.url)||[])[1])).filter(Boolean);
+  return ids.length?{id:ids[0]}:null;}
 
  async score(key,ident){
   if(key==='bangumi'){const r=await this.request('https://api.bgm.tv/v0/subjects/'+ident.id,{},'json');return {value:r.rating?.score||null,scale:10,votes:r.rating?.total||0,url:'https://bgm.tv/subject/'+ident.id};}
@@ -73,7 +81,7 @@ class GameReviews{
 
  // Each source has its own native page size; arbitrary user page sizes are
  // served by fetching the covering source pages and slicing.
- async source(key,ident,n){return this.cached(`src:${key}:${ident.id}:${n}`,30*60000,()=>this['page_'+key](ident,n));}
+ async source(key,ident,n,lang='all'){return this.cached(`src:${key}:${ident.id}:${lang}:${n}`,30*60000,()=>this['page_'+key](ident,n,lang));}
  async page_bangumi(ident,n){const size=50,r=await this.request(`https://next.bgm.tv/p1/subjects/${ident.id}/comments?limit=${size}&offset=${(n-1)*size}`,{},'json');return {size,total:r.total||0,items:(r.data||[]).map(c=>({id:'bgm'+c.id,author:c.user?.nickname||c.user?.username||'',rating:c.rate?{value:c.rate,scale:10}:null,date:c.updatedAt?new Date(c.updatedAt*1000).toISOString().slice(0,10):'',text:String(c.comment||''),url:`https://bgm.tv/subject/${ident.id}/comments`}))};}
  async page_twodfan(ident,n){const html=await this.request(`https://2dfan.com/subjects/${ident.id}?page=${n}`),list=between(html,'id="comments-list"','id="load-more-container"')||html,meta=htmlText(between(html,'nexus-pagination-info">','</span>')),total=Number((meta.match(/(\d+)\s*条/)||[])[1])||0;
   const items=[...list.matchAll(/<div class="comment-item" id="comment-(\d+)">([\s\S]*?)(?=<div class="comment-item" id="comment-|$)/g)].map(([,cid,body])=>({id:'2df'+cid,author:htmlText(between(body,'comment-author-name">','</span>')),date:(body.match(/datetime="(\d{4}-\d{2}-\d{2})/)||[])[1]||'',spoiler:/data-spoiler="true"/.test(body),text:htmlText(between(body,'data-collapsible-content>','</div>')),likes:Number(htmlText(between(body,'comment-diggs-count">','</span>')))||0,url:'https://2dfan.com/comments/'+cid}));
@@ -86,17 +94,18 @@ class GameReviews{
   const items=[...list.matchAll(/<article>([\s\S]*?)<\/article>/g)].map(([,a])=>{const head=a.match(/<span>(\w+) by <a [^>]*>([^<]*)<\/a> on (\d{4}-\d{2}-\d{2})<\/span>/)||[],wid=(a.match(/\/report\/(w\d+)/)||[])[1]||'',body=(a.match(/<\/span>&gt;<\/span>([\s\S]*?)<\/div><div><a href="\/w\d+#threadstart">/)||a.match(/report<\/a>><\/span>([\s\S]*?)<\/div><div>/)||[])[1]||'';return {id:'vndb'+wid,author:decode(head[2]||''),kind:head[1]||'',date:head[3]||'',rating:(a.match(/<span>(\d+(?:\.\d+)?)\/10<\/span>/)||[])[1]?{value:Number(a.match(/<span>(\d+(?:\.\d+)?)\/10<\/span>/)[1]),scale:10}:null,text:htmlText(body.replace(/<a href="\/w\d+#review">[\s\S]*$/,'')),more:/Read more/.test(body),replies:Number((a.match(/>(\d+) comments?<\/a>/)||[])[1])||0,likes:Number((a.match(/(-?\d+) points?<\/small>/)||[])[1])||0,url:'https://vndb.org/'+wid};}).filter(x=>x.text);
   return {size:Math.max(1,items.length),total:items.length,items};}
  // Steam's homecontent serves review page n at p=n+1 (p=1 and p=2 are both the first page).
- async page_steam(ident,n){const size=10,q=n+1,html=await this.request(`https://steamcommunity.com/app/${ident.id}/homecontent/?userreviewsoffset=${n*size}&p=${q}&numperpage=${size}&browsefilter=toprated&appid=${ident.id}&appHubSubSection=10&l=english&filterLanguage=all&searchText=&maxInappropriateScore=100&forceanon=1`);
+ // E291: Steam reviews can be read per language (all / schinese / tchinese / japanese / english).
+ async page_steam(ident,n,lang='all'){lang=STEAM_LANGS.includes(lang)?lang:'all';const size=10,q=n+1,html=await this.request(`https://steamcommunity.com/app/${ident.id}/homecontent/?userreviewsoffset=${n*size}&p=${q}&numperpage=${size}&browsefilter=toprated&appid=${ident.id}&appHubSubSection=10&l=english&filterLanguage=${lang}&searchText=&maxInappropriateScore=100&forceanon=1`);
   const items=html.split('class="apphub_Card ').slice(1).map(card=>{const helpful=htmlText(between(card,'class="found_helpful">','<div class="review_award')||between(card,'class="found_helpful">','</div>')),url=(card.match(/data-modal-content-url="([^"]+)"/)||[])[1]||'',text=between(card,'class="apphub_CardTextContent">','<div class="UserReviewCardContent_Footer">'),body=text.replace(/<div class="date_posted">[\s\S]*?<\/div>/,'').replace(/<div class="received_compensation"[\s\S]*?<\/div>/,'').replace(/(<\/div>\s*)+$/,'');return {id:'steam'+url.replace(/\D/g,''),author:htmlText(between(card,'apphub_CardContentAuthorName','</a>').replace(/^[^>]*>/,'').replace(/^[^>]*>/,'')),date:steamDate(htmlText(between(card,'class="date_posted">','</div>')).replace(/^Posted:\s*/,'')),recommended:/icon_thumbsUp/.test(card),hours:Number((htmlText(between(card,'class="hours">','</div>')).replace(/,/g,'').match(/[\d.]+/)||[])[0])||0,text:htmlText(body.replace(/<\/div>\s*<\/div>[\s\S]*$/,'')),likes:Number((helpful.replace(/,/g,'').match(/(\d+) (?:people|person) found this review helpful/)||[])[1])||0,funny:Number((helpful.replace(/,/g,'').match(/(\d+) (?:people|person) found this review funny/)||[])[1])||0,replies:Number(htmlText(between(card,'apphub_CardCommentCount alignNews">','</div>')))||0,url};}).filter(x=>x.text);
   return {size,total:undefined,items};}
- async page(id,key,page=1,size=10){
+ async page(id,key,page=1,size=10,lang='all'){lang=key==='steam'&&STEAM_LANGS.includes(lang)?lang:'all';
   const platform=PLATFORMS.find(p=>p.key===key);if(!platform)throw Error('INVALID_REVIEW_PLATFORM');size=Math.max(5,Math.min(50,Math.floor(Number(size))||10));page=Math.max(1,Math.floor(Number(page))||1);
   const game=this.game(String(id)),ident=await this.identity(game,key);if(!ident)return {platform:key,available:false,items:[],total:0,page:1,pages:1,size};
   // Steam pages chain through a cursor, so cap its depth to keep jumps bounded.
-  const first=await this.source(key,ident,1);let total=first.total;if(total===undefined)total=Math.min(STEAM_DEPTH,(await this.summary(id)).platforms.find(p=>p.key===key)?.votes||first.items.length);
+  const first=await this.source(key,ident,1,lang);let total=first.total;if(total===undefined)total=Math.min(STEAM_DEPTH,(await this.summary(id)).platforms.find(p=>p.key===key)?.votes||first.items.length);
   const pages=Math.max(1,Math.ceil(total/size));page=Math.min(page,pages);const start=(page-1)*size,end=Math.min(total,start+size),items=[];
-  for(let n=Math.floor(start/first.size)+1;n<=Math.floor(Math.max(start,end-1)/first.size)+1;n++){const src=n===1?first:await this.source(key,ident,n);const base=(n-1)*first.size;items.push(...src.items.filter((_,i)=>base+i>=start&&base+i<end));if(src.items.length<first.size)break;}
-  return {platform:key,available:true,matched:ident.title||'',items,total,page,pages,size,url:(await this.score(key,ident).catch(()=>({}))).url||platform.home};
+  for(let n=Math.floor(start/first.size)+1;n<=Math.floor(Math.max(start,end-1)/first.size)+1;n++){const src=n===1?first:await this.source(key,ident,n,lang);const base=(n-1)*first.size;items.push(...src.items.filter((_,i)=>base+i>=start&&base+i<end));if(src.items.length<first.size)break;}
+  return {platform:key,available:true,matched:ident.title||'',items,total,page,pages,size,lang,url:(await this.score(key,ident).catch(()=>({}))).url||platform.home};
  }
  async translate(texts,target,source='auto'){if(!LANGS.has(target)||target==='auto'||!LANGS.has(source))throw Error('INVALID_LANGUAGE');const list=(Array.isArray(texts)?texts:[]).slice(0,60).map(t=>String(t||'').slice(0,4000));
   // The app's API / model engines translate into Chinese or English only; other targets use machine translation.
