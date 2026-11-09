@@ -30,3 +30,6 @@
 .anki-limits label{display:inline-flex;gap:8px;align-items:center}
 .anki-limits input[type=number]{width:96px;text-align:center;border-radius:10px}
 .settings-row.anki-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+/* grimoire.css sets .main .anki-tools{gap:0!important} for the review page's dot-separated links; the settings row of
+   buttons keeps its own spacing. */
+.main .settings-row.anki-tools{gap:8px!important}
