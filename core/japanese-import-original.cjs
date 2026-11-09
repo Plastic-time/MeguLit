@@ -94,6 +94,12 @@ function freeFolder(dir){let out=dir,n=2;while(fs.existsSync(out))out=dir+' ('+(
 function separatePlan(gameDir,source,info){
  const exe=separateLauncher(info.base);
  /* A disc image (bin/cue, iso, mdf, ccd) holds the installer, not the game: it has to be mounted and installed first. */
+ /* E348: an InstallShield setup (data1.hdr + dataN.cab) is unpacked directly into a folder next to the archive or image;
+    the setup program never runs. Anything else that only installs (msi, other setups) still becomes a mountable .iso. */
+ if(!exe){const hdr=require('./installshield.cjs').findHeader(info.base);if(hdr){let files=[];try{files=require('./installshield.cjs').gameFiles(hdr);}catch{}
+  const launcher=files.filter(f=>/\.exe$/i.test(f.name)&&isLauncher(f.name)&&languageHint(f.name)!=='zh').sort((a,b)=>b.size-a.size)[0];
+  if(launcher){const name=path.basename(source).replace(/\.(zip|7z|rar|iso|cue|bin|img)$/i,'').replace(/\s*\((?:bin|iso|img)[^)]*\)\s*$/i,'').replace(/[<>:"|?*]/g,'').trim()||'Japanese';
+   return {root:path.dirname(hdr),cab:hdr,exe:path.join(launcher.dir.replace(/^[\\/]+/,''),launcher.name),target:freeFolder(path.join(path.dirname(path.resolve(source)),name)),move:true};}}}
  if(!exe&&info.image){const installer=fs.readdirSync(info.base).some(n=>/^(setup|install|autorun)\.(exe|inf)$/i.test(n))||walk(info.base,5000).some(r=>/\.(cab|msi)$/i.test(r));
   if(installer)return {installer:true,image:info.image,iso:/\.iso$/i.test(info.image)?info.image:path.join(path.dirname(path.resolve(source)),path.basename(info.image).replace(/\.(cue|bin|img)$/i,'')+'.iso'),from:require('./disc-image.cjs').imageOf(info.image)};}
  if(!exe){const disc=(()=>{const stack=[[info.base,2]];while(stack.length){const [d,depth]=stack.pop();let list;try{list=fs.readdirSync(d,{withFileTypes:true});}catch{continue;}for(const e of list){if(e.isFile()&&/\.(bin|cue|iso|mdf|mds|ccd|img|nrg)$/i.test(e.name)&&(e.name.match(/\.(cue|iso|mds|ccd|nrg)$/i)||(stat(path.join(d,e.name))?.size||0)>50e6))return true;if(e.isDirectory()&&depth>0)stack.push([path.join(d,e.name),depth-1]);}}return false;})();throw Error(disc?'IMPORT_DISC_IMAGE':'IMPORT_SOURCE_NO_MATCH');}
@@ -126,7 +132,8 @@ async function apply(gameDir,source,previousExe=''){
  const p=await plan(gameDir,source);
  if(p.separate?.installer)throw Error('IMPORT_DISC_INSTALLER');
  if(p.separate){const s=p.separate;
-  if(s.move){try{await fsp.rename(s.root,s.target);}catch{await fsp.cp(s.root,s.target,{recursive:true});}await fsp.rm(path.join(path.resolve(gameDir),STAGING_DIR),{recursive:true,force:true});}
+  if(s.cab){await fsp.mkdir(s.target,{recursive:true});try{await require('./installshield.cjs').extract(s.cab,s.target);}catch(error){await fsp.rm(s.target,{recursive:true,force:true});throw /^IMPORT_/.test(error?.message)?error:Object.assign(Error('IMPORT_INSTALLER_UNSUPPORTED'),{detail:String(error?.message||error).slice(0,300)});}await fsp.rm(path.join(path.resolve(gameDir),STAGING_DIR),{recursive:true,force:true});}
+  else if(s.move){try{await fsp.rename(s.root,s.target);}catch{await fsp.cp(s.root,s.target,{recursive:true});}await fsp.rm(path.join(path.resolve(gameDir),STAGING_DIR),{recursive:true,force:true});}
   return {separate:true,installed:s.target,exe:path.join(s.target,s.exe),imported:0,replaced:0,added:0,removed:0};}
  if(!p.replace.length&&!p.add.length&&!p.remove.length)throw Error('NOTHING_TO_IMPORT');
  const backup=path.join(p.gameDir,BACKUP_DIR,'files'),done=[];

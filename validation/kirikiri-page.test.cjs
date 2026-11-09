@@ -143,8 +143,8 @@ test('full-screen embed: a new sentence dims the earlier ones, a page turn clear
  assert.deepEqual(look(),[['次のページ。','bright']]);
  const view=fs.readFileSync(path.join(__dirname,'..','web/reader/modules/island-page.js'),'utf8');
  assert.match(view,/classList\.toggle\('tome-island-past',dim&&model\.past\(r\)\)/);
- assert.match(view,/\.tome-island-pair\{[^}]*transition:filter/);
- assert.match(view,/\.tome-island-pair\.tome-island-past\{filter:brightness/);
+ assert.match(view,/\.tome-island-pair\{[^}]*transition:opacity/);
+ assert.match(view,/\.tome-island-pair\.tome-island-past\{opacity:var\(--tome-island-past-opacity,\.3\)\}/,'E349: earlier lines are 30 % opaque, not darkened');assert.doesNotMatch(view,/tome-island-past\{filter/);
  assert.match(view,/dim=engine!=='cs2'/,'ISLAND (cs2) pages keep their look');
 });
 

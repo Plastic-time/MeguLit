@@ -58,12 +58,13 @@ class GalNative {
      stream whose sample reads as Japanese best, skipping the current one (and ones already skipped for this game run).
      onlyIfBad: called by 校准当前句; switches only when the current sample looks garbled. */
   static sampleScore(text){const s=String(text||'');if(!s.trim())return -1;const jp=(s.match(/[\u3040-\u30ff\u3400-\u9fff]/g)||[]).length,bad=(s.match(/[\uff61-\uff9f\u25a1\ufffd\ue000-\uf8ff]/g)||[]).length;return bad>=2&&bad>=jp*.15?-2:jp/Math.max(1,s.length)*Math.min(1,s.length/12)-bad*.2;}
-  reselectStream(onlyIfBad=false){const threads=this.hooks?.state?.hookThreads||[],score=GalNative.sampleScore,current=threads.find(t=>t.selected);
+  reselectStream(onlyIfBad=false){const threads=this.hooks?.state?.hookThreads||[],flow=this.hooks?.flowPage===true,score=t=>GalNative.sampleScore(t)+(flow&&!this.hooks.flowStory(t)?-5:0)+(require('./hook-native.cjs').HookNative.uiHelp(t)?-6:0)/* E350: a tooltip/menu-help stream is never picked, in any game *//* E349: on a flow page (WoH) a menu/hint stream is never the pick */,current=threads.find(t=>t.selected);
+   if(flow&&onlyIfBad&&current&&!this.hooks.flowStory(current.sample)){this.hooks.flowStreamCheck(true);return {switched:true};}
    if(onlyIfBad&&(!current||score(current.sample)>-2))return {kept:true};
    const run=String(this.state?.gameProcessId||'')+'|'+String(this.state?.gameStarted||'');if(this.skippedRun!==run){this.skippedRun=run;this.skipped=new Set();}
    if(current)this.skipped.add(current.id);
    let next=threads.filter(t=>!this.skipped.has(t.id)&&t.sample&&score(t.sample)>-2).sort((a,b)=>score(b.sample)-score(a.sample))[0];
-   if(!next&&!onlyIfBad){this.skipped=new Set(current?[current.id]:[]);next=threads.filter(t=>t.id!==current?.id&&t.sample).sort((a,b)=>score(b.sample)-score(a.sample))[0];}
+   if(!next&&!onlyIfBad){this.skipped=new Set(current?[current.id]:[]);next=threads.filter(t=>t.id!==current?.id&&t.sample&&!require('./hook-native.cjs').HookNative.uiHelp(t.sample)).sort((a,b)=>score(b.sample)-score(a.sample))[0];}
    if(!next){this.userStart('auto',false);return {restarted:true};}
    this.userStart('auto',false,next.id);return {selected:next.id,name:next.name};}
   userStart(profile,force,id){if(profile==='auto'){if(typeof id==='string'&&id.length<100)this.hooks.preferredThread=id;const c=this.controller;if(!this.preferences.hookHide){c.start('read');return;}if(['embed','euphoria474'].includes(c.plan))c.start('read');c.apply(true);return;}if(['embed','euphoria474'].includes(profile)||profile==='read'){const hide=profile!=='read';if(hide!==this.preferences.hookHide){this.preferences={...this.preferences,hookHide:hide};this.notify(this.hookPrefs());}}if(typeof id==='string'&&id.length<100)this.hooks.preferredThread=id;this.controller.start(profile,force);}
