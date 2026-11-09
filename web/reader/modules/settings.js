@@ -4,7 +4,7 @@
   const bridge = window.__tomoyoChinese;
   if (!bridge || bridge.openSettings) return;
   const defaults = { font: 'Microsoft YaHei', size: 18, color: '', bold: false, enabled: bridge.isEnabled(), transparent: true, provider: 'google', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4.1-mini' };
-  defaults.region = ''; defaults.deeplTier = 'free'; defaults.contextEnabled = true; defaults.contextLines = 4; defaults.learnerLanguage='zh';defaults.readingEngine='sudachi';
+  defaults.region = ''; defaults.deeplTier = 'free'; defaults.contextEnabled = true; defaults.scriptTranslation = true; defaults.contextLines = 4; defaults.learnerLanguage='zh';defaults.readingEngine='sudachi';
   defaults.lookupProvider='moji';defaults.contextProvider='deepseek';defaults.lookupProfiles={"deepseek":{"baseUrl":"https://api.deepseek.com","model":"deepseek-flash"},"gemini":{"baseUrl":"https://generativelanguage.googleapis.com/v1beta/openai","model":""},"gpt":{"baseUrl":"https://api.openai.com/v1","model":"gpt-4.1-mini"},"qwen":{"baseUrl":"https://dashscope.aliyuncs.com/compatible-mode/v1","model":"qwen-plus"},"kimi":{"baseUrl":"https://api.moonshot.ai/v1","model":"kimi-k2.6"},"glm":{"baseUrl":"https://open.bigmodel.cn/api/paas/v4","model":"glm-4.7"}};
   let settings = { ...defaults }, dialog, status, pendingSave = null, saveSerial = 0;
   try {
@@ -126,7 +126,7 @@
       <label><input name="themeColor" type="checkbox">颜色跟随 MeguLit 主题</label>
       <label style="display:none"><input name="bold" type="checkbox">加粗中文</label>
       </details>
-      <p class="hint megulit-script-hint">当前作品已用汉化脚本：能对上的句子直接用汉化组译文（零延迟），翻译引擎只翻对不上的句子</p><label>翻译引擎<select name="provider"><option value="google">Google 免费</option><option value="bing">Bing / Microsoft Translator API</option><option value="deepseek">DeepSeek API</option><option value="deepl">DeepL API</option><option value="gpt">GPT / OpenAI 兼容接口</option></select></label>
+      <label class="megulit-script-toggle"><input name="scriptTranslation" type="checkbox">零延迟翻译（汉化脚本）</label><p class="hint megulit-script-hint">当前作品已用汉化脚本：能对上的句子直接用汉化组译文（零延迟），翻译引擎只翻对不上的句子</p><label>翻译引擎<select name="provider"><option value="google">Google 免费</option><option value="bing">Bing / Microsoft Translator API</option><option value="deepseek">DeepSeek API</option><option value="deepl">DeepL API</option><option value="gpt">GPT / OpenAI 兼容接口</option></select></label>
       <div class="tomoyo-cn-gpt">
         <label>API 地址<input name="baseUrl" type="url" placeholder="https://api.openai.com/v1"></label>
         <label>模型名<input name="model" type="text" placeholder="gpt-4.1-mini" maxlength="200"></label>
@@ -163,6 +163,7 @@
     field('region').value = settings.region || '';
     field('deeplTier').value = settings.deeplTier || 'free';
     field('contextEnabled').checked = settings.contextEnabled !== false;
+    field('scriptTranslation').checked = settings.scriptTranslation !== false;
     field('contextLines').value = settings.contextLines || 4;
     status = dialog.querySelector('.tomoyo-cn-status');
     keyField = field('apiKey');
@@ -170,7 +171,7 @@
     status.textContent = bridge.lastTranslationError || '';
     const readForm = () => ({ ...settings, font: field('font').value, size: Number(field('size').value), color: field('themeColor').checked ? '' : field('color').value,
       bold: field('bold').checked, enabled: field('enabled').checked, transparent: field('transparent').checked,
-      provider: field('provider').value, baseUrl: field('baseUrl').value.trim(), model: field('model').value.trim(), region:field('region').value.trim(), deeplTier:field('deeplTier').value,contextEnabled:field('contextEnabled').checked,contextLines:Number(field('contextLines').value) });
+      provider: field('provider').value, baseUrl: field('baseUrl').value.trim(), model: field('model').value.trim(), region:field('region').value.trim(), deeplTier:field('deeplTier').value,contextEnabled:field('contextEnabled').checked,scriptTranslation:field('scriptTranslation').checked,contextLines:Number(field('contextLines').value) });
     // Offline model files for the local servers above: download (HuggingFace or its China mirror), cancel, delete.
     const models = { timer: 0, source: 'hf', async paint(box) {
       let s; try { s = await bridge.v4Request('modelStatus', {}); } catch { return; }

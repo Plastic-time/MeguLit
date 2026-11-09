@@ -33,7 +33,7 @@ class Settings{
   }
   if(v4Scopes.has(scope))return cleanV4(readJSON(this.file('v4-preferences.json')));
   if(nativeScopes.has(scope))return {...nativeDefaults,...readJSON(this.file('native-preferences.json'))};
-  if(['translation','dictionary'].includes(scope))return {enabled:true,provider:'google',contextEnabled:true,contextLines:4,learnerLanguage:'zh',readingEngine:'sudachi',reviewEngine:'machine',...cleanPreferences(readJSON(this.file('preferences.json')))};
+  if(['translation','dictionary'].includes(scope))return {enabled:true,provider:'google',contextEnabled:true,scriptTranslation:true,contextLines:4,learnerLanguage:'zh',readingEngine:'sudachi',reviewEngine:'machine',...cleanPreferences(readJSON(this.file('preferences.json')))};
   if(scope==='background')return this.uiObject('tome-background',backgroundDefaults);
   if(scope==='panels'){
     const value=this.uiObject('tome-menu-background',{...panelDefaults,surfaces:{menu:'image',log:'image',card:'image'}});value.panels={...value.panels};

@@ -104,7 +104,7 @@ class Reader{
  // 3.7 s); an empty answer lets the original line through. Lines are cached so the reader page, which asks for the
  // same line a moment later, and repeated lines (backlog, redraws) do not call the translation service again.
  // The imported script source (Chinese patch or Japanese original) for the running game, if one lines up.
- refreshTextSource(){try{const hooks=this.gal?.hooks;if(!hooks)return;hooks.originalText=this.gameExe?require('./original-text.cjs').provider(this.root,this.gameExe):null;}catch{}}
+ refreshTextSource(){try{const hooks=this.gal?.hooks;if(!hooks)return;/* E330 the 零延迟翻译 switch in the translation settings */hooks.scriptAllowed=()=>this.prefs().scriptTranslation!==false;hooks.originalText=this.gameExe?require('./original-text.cjs').provider(this.root,this.gameExe):null;}catch{}}
  // E280: a Japanese game started without a patch set up: look for one on this computer in the background.
  findTextSource(gameId){const hooks=this.gal?.hooks;if(!gameId||hooks?.originalText)return;require('./original-text.cjs').autoPatchLater(this.root,gameId,()=>this.refreshTextSource());}
  // E285: the overlay's display choice picks the translation language (日文＋英文 / 仅英文 translate into English).
