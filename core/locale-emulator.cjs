@@ -85,12 +85,19 @@ class LocaleEmulator{
   const s=await this.status();if(!s.installed)return {needLocaleEmulator:true,...s};
   const launchExe=require('../services/launch-path.cjs').compatiblePath(this.root,exe);
   const {startProcess,waitForVisibleGame}=require('../services/game-readiness.cjs');
-  const child=await startProcess(s.path,['-runas',s.profile,launchExe],path.dirname(launchExe),'LE_SPAWN_FAILED',spawn);
-  trace('locale-helper-started',{pid:child.pid,alias:launchExe!==exe});
-  const result=await waitForVisibleGame(async()=>{
-   const matches=await this.processes(launchExe);
-   return matches.length||launchExe===exe?matches:this.processes(exe);
-  },{exit:()=>child.exit,helper:true,trace});
+  /* E333 (user 2026-11-10, 女装山脈): LEProc sometimes crashes on start (0xC0000005) before the game appears; the next
+     try works. A crash with no game process is retried twice before it is reported. */
+  let result;
+  for(let attempt=0;;attempt++){
+   const child=await startProcess(s.path,['-runas',s.profile,launchExe],path.dirname(launchExe),'LE_SPAWN_FAILED',spawn);
+   trace('locale-helper-started',{pid:child.pid,alias:launchExe!==exe,...(attempt?{retry:attempt}:{})});
+   try{result=await waitForVisibleGame(async()=>{
+     const matches=await this.processes(launchExe);
+     return matches.length||launchExe===exe?matches:this.processes(exe);
+    },{exit:()=>child.exit,helper:true,trace});break;}
+   catch(error){const code=child.exit?.code;if(error.message!=='LE_HELPER_FAILED'||attempt>=2||!(code===3221225477||code===-1073741819))throw error;
+    trace('locale-helper-retry',{code,attempt:attempt+1});await new Promise(r=>setTimeout(r,400));}
+  }
   return {localeJapanese:true,localePath:s.path,gamePid:result.pid};
  }
 }
