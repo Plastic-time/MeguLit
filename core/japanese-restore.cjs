@@ -146,4 +146,15 @@ function restore(gameDir){
  return {restored,skipped};
 }
 
-module.exports={detect,apply,restore,_internal:{decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};
+// Files written by versions before 1.2.2 shared one string between equal cells, which Siglus cannot read: CLANNAD and
+// Summer Pockets crashed on start (0xC0000005, user 2026-11-09). Before a launch, a table MeguLit itself wrote that
+// still has shared strings is rewritten: restore the kept original, then apply again with the current writer.
+function sharedPool(file){const {marker,raw}=decrypt(fs.readFileSync(file)),t=parse(raw,marker),offs=[];for(let r=0;r<t.rows;r++)for(let c=0;c<t.cols;c++)if(t.columns[c].type===0x53)offs.push(raw.readUInt32LE(t.data+(r*t.cols+c)*4));return new Set(offs).size<offs.length;}
+function repairShared(gameDir){
+ gameDir=path.resolve(String(gameDir||''));const manifest=readManifest(gameDir);if(!manifest||manifest.adapter!=='siglus-dbs')return {repaired:false};
+ const dat=path.join(gameDir,'dat'),ours=manifest.files.find(e=>{try{return sha(fs.readFileSync(path.join(dat,e.file)))===e.patchedSha256;}catch{return false;}});
+ if(!ours||!sharedPool(path.join(dat,ours.file)))return {repaired:false};
+ const undone=restore(gameDir);if(undone.skipped.length)return {repaired:false,skipped:undone.skipped};
+ const done=apply(gameDir);return {repaired:true,applied:done.applied};
+}
+module.exports={repairShared,detect,apply,restore,_internal:{decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};

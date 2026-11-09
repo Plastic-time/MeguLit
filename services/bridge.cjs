@@ -50,6 +50,8 @@ async function launch(db,id,runtime=null,windowsLaunch=false) {
   if(require('./game-language.cjs').originalExecutable(db,id,root).blocked)throw Error('JAPANESE_EXECUTABLE_REQUIRED');
   const elevation=require('./locale-launch.cjs').requiresAdministrator(game.executable);
   runtime?.prepareGame(game.executable,{enter:false});
+  /* Japanese restore tables written before 1.2.2 crash Siglus games on start: rewrite them before launching */
+  try{const fix=require('../core/japanese-restore.cjs').repairShared(path.dirname(game.executable));if(fix.repaired||fix.skipped)trace('japanese-restore-repaired',fix);}catch(error){trace('japanese-restore-repair-failed',{error:String(error?.message||error).slice(0,200)});}
   stage='process-check';
   const {gameProcesses}=require('./game-process.cjs');
   const ready=()=>require('./game-readiness.cjs').waitForVisibleGame(()=>gameProcesses(root,game.executable));
@@ -82,7 +84,12 @@ async function launch(db,id,runtime=null,windowsLaunch=false) {
    const child=await startProcess(steam?'explorer.exe':game.executable,steam?['steam://rungameid/'+profile.appid]:[],path.dirname(game.executable),'GAME_LAUNCH_FAILED');
    trace('launch-process-started',{pid:child.pid,steam});
    stage='window-wait';
-   state=await waitForVisibleGame(()=>gameProcesses(root,game.executable),{helper:steam,indirect:steam,helperError:'GAME_LAUNCH_FAILED',exit:()=>child.exit,trace});
+   /* Steam may start another program in the install folder than the one on record (Summer Pockets: the library has
+      SummerPocketsRB.exe, Steam runs SiglusEngine_Steam.exe; user 2026-11-09: the game was up and MeguLit said the launch
+      failed). For Steam launches a game process from any program in that folder counts. */
+   const siblings=steam?(()=>{try{return fs.readdirSync(path.dirname(game.executable)).filter(f=>/\.exe$/i.test(f)&&!/^(unins|setup|install|config|crash|unitycrash|vc_?redist|dxsetup|launcher_?config)/i.test(f)).map(f=>path.join(path.dirname(game.executable),f)).filter(f=>f.toLowerCase()!==game.executable.toLowerCase()&&fs.statSync(f).size>200000).slice(0,8);}catch{return [];}})():[];
+   const anyProcess=async()=>{const own=await gameProcesses(root,game.executable);if(own.length||!siblings.length)return own;for(const exe of siblings){const found=await gameProcesses(root,exe).catch(()=>[]);if(found.length){trace('steam-runs-other-program',{exe:path.basename(exe)});return found;}}return own;};
+   state=await waitForVisibleGame(anyProcess,{helper:steam,indirect:steam,helperError:'GAME_LAUNCH_FAILED',exit:()=>child.exit,trace});
   }
   trace('new-window-ready',state);
   db.prepare('UPDATE games SET last_launched_at=? WHERE id=?').run(Math.floor(Date.now()/1000),id);

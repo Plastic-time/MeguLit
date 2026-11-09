@@ -31,3 +31,16 @@ test('a folder with nothing running is not reported as running',()=>{
   assert.throws(()=>jr.restore(dir),/NOT_APPLIED/);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+// Tables written before 1.2.2 shared strings between equal cells and crashed Siglus games (CLANNAD, Summer Pockets,
+// 0xC0000005). Launch rewrites such tables; folders MeguLit never wrote are left alone.
+test('the pre-launch repair leaves folders without a MeguLit restore untouched and is wired into launch',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-repair-'));
+ try{assert.deepEqual(jr.repairShared(root),{repaired:false});}finally{fs.rmSync(root,{recursive:true,force:true});}
+ assert.match(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),/japanese-restore\.cjs'\)\.repairShared\(path\.dirname\(game\.executable\)\)/);
+});
+test('a Steam launch accepts a game process from another program in the install folder',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');
+ assert.match(src,/const anyProcess=async\(\)=>\{const own=await gameProcesses\(root,game\.executable\)/);
+ assert.match(src,/waitForVisibleGame\(anyProcess,\{helper:steam/);
+});
