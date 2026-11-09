@@ -47,7 +47,7 @@ function render(){
    <section>
     <div class="sec-title"><h2>熟悉度</h2><span>颜色越深越熟</span></div>
     <div class="mgrid">${GRID.map(k=>k==="_"?`<span class="gap"></span>`:`<span class="l${lvOf(disp(k))}" title="${disp(k)} · ${["未学","见过","熟悉","掌握"][lvOf(disp(k))]}">${disp(k)}</span>`).join("")}</div>
-    <div class="mrow"><div class="legend"><span><i style="background:var(--raise)"></i>未学</span><span><i style="background:var(--raise-2)"></i>见过</span><span><i style="background:rgba(237,181,110,.35)"></i>熟悉</span><span><i style="background:var(--accent)"></i>掌握</span></div>
+    <div class="mrow"><div class="legend"><span><i style="background:var(--raise)"></i>未学</span><span><i style="background:var(--raise-2)"></i>见过</span><span><i style="background:color-mix(in srgb,var(--gold-accent,#edb56e) 35%,transparent)"></i>熟悉</span><span><i style="background:var(--accent)"></i>掌握</span></div>
      <div class="seg" id="scr"><button data-v="h" aria-pressed="${script==="h"}">平假名</button><button data-v="k" aria-pressed="${script==="k"}">片假名</button></div></div>
     <div class="bars">${[["清音 · 平假名",SEION,cS],["清音 · 片假名",SEION.map(toKata),cK],["浊音 · 半浊音",DAKU,count(DAKU)],["拗音",YOON,count(YOON)]].map(([n,l,c])=>`<div class="barrow"><span>${n}</span><div class="stack"><i style="width:${c[3]/l.length*100}%;background:var(--m3)"></i><i style="width:${c[2]/l.length*100}%;background:var(--m2)"></i><i style="width:${c[1]/l.length*100}%;background:var(--m1)"></i></div><b class="num">${c[2]+c[3]} / ${l.length}</b></div>`).join("")}</div>
    </section>

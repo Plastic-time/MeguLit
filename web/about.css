@@ -48,29 +48,29 @@
 .first-run-hint{margin:14px 0 0;font-size:12px;color:#a8998f}
 
 /* v1.0.6 检查更新 */
-.about-update{margin-left:10px;height:26px;padding:0 12px;border-radius:999px;border:1px solid rgba(237,181,110,.3);background:none;color:var(--g-t2,#c3ab9c);font-size:12px;cursor:pointer;transition:border-color .2s,color .2s,background .2s}
-.about-update:hover{border-color:var(--g-gold,#edb56e);color:var(--g-t1,#f1e0d2)}
+.about-update{margin-left:10px;height:26px;padding:0 12px;border-radius:999px;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 30%,transparent);background:none;color:var(--g-t2,#c3ab9c);font-size:12px;cursor:pointer;transition:border-color .2s,color .2s,background .2s}
+.about-update:hover{border-color:var(--g-gold,var(--gold-accent,#edb56e));color:var(--g-t1,#f1e0d2)}
 .about-update.ready{background:var(--accent);border-color:var(--accent);color:#fbefe6}
 .about-update[disabled]{opacity:.6;cursor:default}
 .about-update-state{display:block;margin-top:6px;font-size:12px;color:var(--g-t3,#8a746b);line-height:1.6}
 
 /* v1.1.0 support panel: grimoire x glass, same language as the statistics and empty pages */
-.about-support{position:relative;overflow:hidden;margin-top:26px;padding:30px 32px 28px;border-radius:16px;border:1px solid rgba(237,181,110,.18);
+.about-support{position:relative;overflow:hidden;margin-top:26px;padding:30px 32px 28px;border-radius:16px;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 18%,transparent);
  background:linear-gradient(160deg,rgba(58,24,30,.62),rgba(24,15,15,.55) 55%,rgba(20,13,12,.5));backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);
  box-shadow:0 1px 0 rgba(241,224,210,.06) inset,0 26px 54px -32px rgba(0,0,0,.9)}
-.about-support::before{content:"";position:absolute;top:-1px;left:32px;width:72px;height:1px;background:linear-gradient(90deg,transparent,rgba(237,181,110,.9),transparent)}
-.about-glyph{position:absolute;right:-10px;bottom:-46px;font:400 230px/1 var(--g-serif,serif);color:rgba(237,181,110,.05);pointer-events:none;user-select:none}
+.about-support::before{content:"";position:absolute;top:-1px;left:32px;width:72px;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--gold-accent,#edb56e) 90%,transparent),transparent)}
+.about-glyph{position:absolute;right:-10px;bottom:-46px;font:400 230px/1 var(--g-serif,serif);color:color-mix(in srgb,var(--gold-accent,#edb56e) 5%,transparent);pointer-events:none;user-select:none}
 .about-eyebrow{font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:#d9a54a}
 .about-eyebrow::before{content:"◆";font-size:8px;margin-right:8px;vertical-align:2px}
 .about-support h2{margin:8px 0 0;font:500 24px var(--g-serif,serif);color:#f3e6da}
 .about-support>p{position:relative;margin:10px 0 0;max-width:40em;color:#cdbfb3;line-height:1.8}
-.about-support-strong{margin-top:12px!important;font-weight:500!important;color:#edb56e!important;font-family:var(--g-serif,serif)}
+.about-support-strong{margin-top:12px!important;font-weight:500!important;color:var(--gold-accent,#edb56e)!important;font-family:var(--g-serif,serif)}
 .about-pay{position:relative;grid-template-columns:auto 1fr;gap:0;margin-top:22px;border-top:1px solid rgba(241,224,210,.08);padding-top:20px}
 .about-cn{padding-right:28px}
 .about-cn h3,.about-intl h3{font-size:11px;letter-spacing:.2em;color:#9a8577;font-weight:500}
 .about-qrs{gap:18px}
-.about-qcard{position:relative;padding:12px 12px 10px;border-radius:14px;background:rgba(20,13,12,.45);border:1px solid rgba(237,181,110,.16);transition:border-color .2s,transform .2s}
-.about-qcard:hover{border-color:rgba(237,181,110,.45);transform:translateY(-2px)}
+.about-qcard{position:relative;padding:12px 12px 10px;border-radius:14px;background:rgba(20,13,12,.45);border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent);transition:border-color .2s,transform .2s}
+.about-qcard:hover{border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 45%,transparent);transform:translateY(-2px)}
 .about-qcard::before,.about-qcard::after{content:"";position:absolute;width:12px;height:12px;border:1px solid #d9a54a;opacity:.7}
 .about-qcard::before{top:6px;left:6px;border-right:0;border-bottom:0}
 .about-qcard::after{bottom:6px;right:6px;border-left:0;border-top:0}

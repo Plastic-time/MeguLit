@@ -119,6 +119,10 @@ function setAppearance(preferences=model.preferences){
   document.documentElement.style.setProperty('--accent',preferences.accent);
   const rootStyle=document.documentElement.style,accent=preferences.accent||'#ad1539';
   for(const [key,fallback]of Object.entries({'--e-red':'#c8303c','--e-red-btn':'#b72a36','--g-wine':'#9e1b32','--g-wine-hi':'#c02a43','--g-wine-deep':'#5e0f1d'}))rootStyle.setProperty(key,accent==='#ad1539'?fallback:accent);
+  /* Decorative gold (thin rules, diamonds, open headings). Empty keeps the theme's own gold; the highlight is a lighter shade of it. */
+  {const gold=/^#[0-9a-f]{6}$/i.test(preferences.goldColor||'')?preferences.goldColor:'';
+   if(gold){rootStyle.setProperty('--gold-accent',gold);rootStyle.setProperty('--g-gold',gold);rootStyle.setProperty('--gold-hi',`color-mix(in srgb,${gold} 50%,#fff)`);}
+   else for(const key of ['--gold-accent','--g-gold','--gold-hi'])rootStyle.removeProperty(key);}
   const chosenFont=String(preferences.fontFamily||'').replace(/["\\;{}]/g,'');
   for(const key of ['--g-zh','--g-serif','--g-serif-ja']){if(chosenFont)rootStyle.setProperty(key,'"'+chosenFont+'",sans-serif');else rootStyle.removeProperty(key);}
 
@@ -720,13 +724,18 @@ function basicSettings(main=document.querySelector('#main')){
   <label class="settings-row"><div><div class="settings-label">${({zh:'主页字体大小',en:'Home text size',ja:'ホームの文字サイズ'})[locale]}</div><div class="settings-help">${({zh:'只影响首页，1 为默认（100%）',en:'Home page only; 1 is the default (100%)',ja:'ホームのみ。1 が既定（100%）'})[locale]}</div></div><span class="setting-slider"><input type="range" name="homeFontScale" min="0.85" max="1.3" step="any" value="${Number(prefs.homeFontScale)||1}"><input type="number" data-basic-slider="homeFontScale" min="0.85" max="1.3" step="any" value="${Number(prefs.homeFontScale)||1}" aria-label="${({zh:'主页字体大小',en:'Home text size',ja:'ホームの文字サイズ'})[locale]}"></span></label>
   <label class="settings-row"><div><div class="settings-label">${text.closeToTray}</div><div class="settings-help">${text.closeHint}</div></div><input type="checkbox" class="switch" name="closeToTray" ${prefs.closeToTray?'checked':''}></label><label class="settings-row"><div><div class="settings-label">${({zh:'关闭窗口时询问',en:'Ask when closing the window',ja:'閉じるときに確認する'})[locale]}</div><div class="settings-help">${({zh:'点右上角关闭时，先问是收进托盘还是退出',en:'Ask whether to go to the tray or quit when you click close',ja:'閉じるボタンでトレイ格納か終了かを確認します'})[locale]}</div></div><input type="checkbox" class="switch" name="closeAsk" ${prefs.closeAsk!==false?'checked':''}></label></section>
   <section class="panel"><h2 class="panel-title">${text.appearance}</h2><div class="settings-row"><div class="settings-label">${text.accent}</div><div class="color-swatches"><span class="accent-chips" data-accent-chips>${accentChipsHTML(prefs)}</span><label class="accent-custom">${({zh:'自定义…',ja:'カスタム…',en:'Custom…'})[locale]}<input type="color" name="accent" data-color-action="saveAccent" aria-label="${text.accent}" value="${esc(prefs.accent)}"></label></div></div>
+  <div class="settings-row"><div><div class="settings-label">${({zh:'点缀色',en:'Detail colour',ja:'装飾色'})[locale]}</div><div class="settings-help">${({zh:'细线、菱形、展开的分类标题等点缀，默认金色，与强调色分开',en:'Thin rules, diamonds and open headings (gold by default); separate from the accent',ja:'細線・菱形・開いた見出しなどの装飾（既定は金色）。強調色とは別'})[locale]}</div></div><span class="glass-color-control"><button type="button" class="setting-link" data-gold-reset ${prefs.goldColor?'':'hidden'}>${({zh:'恢复默认',en:'Reset',ja:'既定に戻す'})[locale]}</button><input type="color" name="goldColor" data-empty="${prefs.goldColor?'false':'true'}" value="${esc(prefs.goldColor||'#edb56e')}"></span></div>
   <label class="settings-row"><div class="settings-label">${text.font}</div><input name="fontFamily" list="interface-fonts" placeholder="${text.systemFont}" value="${esc(prefs.fontFamily||'')}" maxlength="120"><datalist id="interface-fonts"><option value="Microsoft YaHei UI"><option value="Segoe UI"><option value="Yu Gothic UI"><option value="Meiryo"></datalist></label>
   <div class="settings-row"><span class="settings-label">${extra.home}</span><button type="button" class="setting-link" data-background-settings>${{zh:'调整背景',en:'Customize background',ja:'背景を調整'}[locale]} ${icon('arrow')}</button></div></section>
   </form>`;
   const form=main.querySelector('#settings-form');
   form.querySelectorAll('[name=username],[name=fontFamily],[name=themeMode]').forEach(input=>input.closest('.settings-row')?.classList.add('compact-setting'));
-  const previewAppearance=()=>setAppearance({...model.preferences,accent:form.elements.accent.value,themeMode:form.elements.themeMode.value,fontFamily:form.elements.fontFamily.value});
+  const previewAppearance=()=>setAppearance({...model.preferences,goldColor:form.elements.goldColor.dataset.empty==='true'?'':form.elements.goldColor.value,accent:form.elements.accent.value,themeMode:form.elements.themeMode.value,fontFamily:form.elements.fontFamily.value});
   form.addEventListener('input',previewAppearance);form.addEventListener('change',previewAppearance);
+  const goldInput=form.elements.goldColor,goldReset=form.querySelector('[data-gold-reset]');
+  goldInput.addEventListener('input',()=>{goldInput.dataset.empty='false';goldReset.hidden=false;});
+  goldReset.onclick=()=>{goldInput.dataset.empty='true';goldReset.hidden=true;goldInput.dispatchEvent(new Event('change',{bubbles:true}));};
+
 
   form.querySelectorAll('[data-basic-slider]').forEach(number=>{const range=form.elements.namedItem(number.dataset.basicSlider);range.addEventListener('input',()=>{range.value=String(Number(Number(range.value).toFixed(3)));number.value=range.value;});number.addEventListener('input',()=>{if(number.value!==''&&number.checkValidity()){range.value=number.value;range.dispatchEvent(new Event('input',{bubbles:true}));}});});
 

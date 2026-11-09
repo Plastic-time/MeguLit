@@ -3,14 +3,14 @@
    The glass now follows Settings → Home background → Glass panels (:root.home-glass); off, it is a solid page.
    Loaded last on purpose: it replaces the stacked E236/E237/E255 sidebar rules. */
 .main .settings-nav,.home-glass .main .settings-nav{
- --sn-t1:#f3e6da;--sn-t2:#cdb8a8;--sn-t3:#9a8577;--sn-gold:#edb56e;--sn-line:rgba(237,181,110,.16);--sn-rule:rgba(241,224,210,.07);
+ --sn-t1:#f3e6da;--sn-t2:#cdb8a8;--sn-t3:#9a8577;--sn-gold:var(--gold-accent,#edb56e);--sn-line:color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent);--sn-rule:rgba(241,224,210,.07);
  position:relative;padding:18px 12px 14px!important;border-radius:14px!important;border:1px solid var(--sn-line)!important;
  background:linear-gradient(170deg,#211615,#161011)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
  box-shadow:0 1px 0 rgba(241,224,210,.05) inset,0 22px 44px -30px rgba(0,0,0,.9)!important}
 .home-glass .main .settings-nav{
  background:linear-gradient(170deg,color-mix(in srgb,#2a1c1b var(--home-glass-alpha,62%),transparent),color-mix(in srgb,#140d0e var(--home-glass-alpha,62%),transparent))!important;
  backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.2)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.2)!important}
-.main .settings-nav::before{content:"";position:absolute;top:-1px;left:26px;width:64px;height:1px;background:linear-gradient(90deg,transparent,rgba(237,181,110,.85),transparent);pointer-events:none}
+.main .settings-nav::before{content:"";position:absolute;top:-1px;left:26px;width:64px;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--gold-accent,#edb56e) 85%,transparent),transparent);pointer-events:none}
 
 /* Category: a serif heading with a thin rotating chevron, hairlines between groups */
 .main .settings-nav .settings-category{margin:0!important;padding:0!important;border:0!important}
@@ -34,10 +34,10 @@
  font-size:13.5px!important;color:var(--sn-t3)!important;text-align:left;transition:color .2s,background .2s}
 .main .settings-nav .settings-category button::after{content:none!important}
 .main .settings-nav .settings-category button::before{content:""!important;position:absolute!important;left:-11px!important;top:50%!important;width:5px!important;height:5px!important;margin:-2.5px 0 0!important;
- transform:rotate(45deg)!important;background:var(--sn-gold)!important;opacity:0;box-shadow:0 0 6px rgba(237,181,110,.7)!important;transition:opacity .2s;display:block!important}
+ transform:rotate(45deg)!important;background:var(--sn-gold)!important;opacity:0;box-shadow:0 0 6px color-mix(in srgb,var(--gold-accent,#edb56e) 70%,transparent)!important;transition:opacity .2s;display:block!important}
 .main .settings-nav .settings-category button:hover{color:var(--sn-t1)!important;background:rgba(241,224,210,.04)!important}
 .main .settings-nav .settings-category button.active{color:#fff3e2!important;padding-left:12px!important;
- background:linear-gradient(90deg,rgba(237,181,110,.13),rgba(237,181,110,.02) 75%,transparent)!important}
+ background:linear-gradient(90deg,color-mix(in srgb,var(--gold-accent,#edb56e) 13%,transparent),color-mix(in srgb,var(--gold-accent,#edb56e) 2%,transparent) 75%,transparent)!important}
 .main .settings-nav .settings-category button.active::before{opacity:1}
 .main .settings-nav .settings-category button:focus-visible{outline:1px solid var(--sn-gold);outline-offset:-1px}
 .main .settings-nav .settings-category button:active{transform:scale(.98)}
@@ -54,7 +54,7 @@
 
 /* Anki review landing (v1.1.4): a compact glass card instead of a full-height grey slab; glass follows the same switch */
 .review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch])){
- --ak-t1:#f3e6da;--ak-t2:#cdb8a8;--ak-t3:#9a8577;--ak-gold:#edb56e;--ak-line:rgba(237,181,110,.16);--ak-rule:rgba(241,224,210,.08);
+ --ak-t1:#f3e6da;--ak-t2:#cdb8a8;--ak-t3:#9a8577;--ak-gold:var(--gold-accent,#edb56e);--ak-line:color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent);--ak-rule:rgba(241,224,210,.08);
  position:relative;overflow:hidden;flex:0 0 auto!important;align-self:center;width:min(660px,100%);margin:clamp(28px,9vh,110px) auto 24px!important;
  padding:44px 48px 30px!important;border-radius:16px!important;border:1px solid var(--ak-line)!important;
  background:linear-gradient(165deg,#241817,#151011)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
@@ -62,8 +62,8 @@
 .home-glass .review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch])){
  background:linear-gradient(165deg,color-mix(in srgb,#2c1d1b var(--home-glass-alpha,60%),transparent),color-mix(in srgb,#140d0e var(--home-glass-alpha,60%),transparent))!important;
  backdrop-filter:blur(var(--home-glass-blur,18px)) saturate(1.2)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,18px)) saturate(1.2)!important}
-.review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch]))::before{content:"";position:absolute;top:-1px;left:50%;width:96px;margin-left:-48px;height:1px;background:linear-gradient(90deg,transparent,rgba(237,181,110,.9),transparent)}
-.review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch]))::after{content:"復";position:absolute;right:-14px;bottom:-58px;font:400 220px/1 var(--g-serif,serif);color:rgba(237,181,110,.045);pointer-events:none;user-select:none}
+.review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch]))::before{content:"";position:absolute;top:-1px;left:50%;width:96px;margin-left:-48px;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--gold-accent,#edb56e) 90%,transparent),transparent)}
+.review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch]))::after{content:"復";position:absolute;right:-14px;bottom:-58px;font:400 220px/1 var(--g-serif,serif);color:color-mix(in srgb,var(--gold-accent,#edb56e) 4.5%,transparent);pointer-events:none;user-select:none}
 .review-page #review-content>.review-card:has(>.anki-tools)>h2,.review-page #review-content>.review-card:has([data-launch])>h2{margin:14px 0 0!important;font:500 30px/1.25 var(--g-serif,serif)!important;color:var(--ak-t1)!important;letter-spacing:.02em}
 .review-page #review-content>.review-card:has(>.anki-tools)>p.muted,.review-page #review-content>.review-card:has([data-launch])>p.muted{margin:10px 0 0!important;max-width:30em;font-size:13px!important;line-height:1.7;color:var(--ak-t2)!important}
 .review-page #review-content>.review-card:has(>.anki-tools)>.review-controls:not(.anki-tools){flex-wrap:wrap;margin-top:30px!important}
@@ -89,12 +89,12 @@
 
 /* Settings search: a glass field with a magnifier, gold on focus */
 .main .settings-content .settings-search{box-sizing:border-box;height:42px!important;min-height:42px!important;width:100%;padding:0 16px 0 42px!important;
- border:1px solid rgba(237,181,110,.16)!important;border-radius:11px!important;font-size:13.5px!important;color:#f3e6da!important;
+ border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent)!important;border-radius:11px!important;font-size:13.5px!important;color:#f3e6da!important;
  background:rgba(20,13,12,.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23a8907e' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E") 15px 50%/15px no-repeat!important;
  box-shadow:0 1px 0 rgba(241,224,210,.04) inset!important;transition:border-color .2s,box-shadow .2s,background-color .2s!important}
 .main .settings-content .settings-search::placeholder{color:#8a7668}
-.main .settings-content .settings-search:hover{border-color:rgba(237,181,110,.3)!important}
-.main .settings-content .settings-search:focus,.main .settings-content .settings-search:focus-visible{outline:none!important;border-color:rgba(237,181,110,.6)!important;box-shadow:0 0 0 3px rgba(237,181,110,.1)!important;background-color:rgba(20,13,12,.62)!important}
+.main .settings-content .settings-search:hover{border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 30%,transparent)!important}
+.main .settings-content .settings-search:focus,.main .settings-content .settings-search:focus-visible{outline:none!important;border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 60%,transparent)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--gold-accent,#edb56e) 10%,transparent)!important;background-color:rgba(20,13,12,.62)!important}
 .home-glass .main .settings-content .settings-search{background-color:color-mix(in srgb,#140d0e var(--home-glass-alpha,55%),transparent)!important;backdrop-filter:blur(var(--home-glass-blur,14px))}
 :root[data-theme=light] .main .settings-content .settings-search{color:#301919!important;background-color:rgba(255,250,246,.85)!important;border-color:rgba(158,27,50,.18)!important}
 :root[data-theme=light] .main .settings-content .settings-search:focus{border-color:rgba(158,27,50,.5)!important;box-shadow:0 0 0 3px rgba(158,27,50,.08)!important}
@@ -107,8 +107,8 @@
 .main .settings-content .settings-section-title{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* Live preview (settings-preview.js): stays in view while the options below scroll */
-.sp-preview{position:sticky;top:0;z-index:5;margin:14px 0 18px;padding:12px;border-radius:14px;border:1px solid rgba(237,181,110,.16);background:rgba(18,12,13,.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 18px 40px -28px rgba(0,0,0,.9)}
-.sp-head{display:flex;align-items:baseline;gap:12px;margin:0 4px 10px;font:500 13px var(--g-serif,serif);color:#edb56e;letter-spacing:.08em}
+.sp-preview{position:sticky;top:0;z-index:5;margin:14px 0 18px;padding:12px;border-radius:14px;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent);background:rgba(18,12,13,.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 18px 40px -28px rgba(0,0,0,.9)}
+.sp-head{display:flex;align-items:baseline;gap:12px;margin:0 4px 10px;font:500 13px var(--g-serif,serif);color:var(--gold-accent,#edb56e);letter-spacing:.08em}
 .sp-head small{font:12px var(--g-sans,sans-serif);color:#9a8577;letter-spacing:0}
 .sp-scene{position:relative;display:flex;align-items:flex-end;min-height:190px;padding-top:26px;border-radius:10px;overflow:hidden;background:#140c0c center/cover no-repeat}
 .sp-scene::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 30%,rgba(0,0,0,.35))}
@@ -120,15 +120,15 @@
 .sp-pic{position:absolute;inset:-30px;background:center/cover no-repeat}
 .sp-tint{position:absolute;inset:0}
 .sp-body{position:relative;padding:16px 18px;display:flex;flex-direction:column;gap:8px;font-size:12.5px}
-.sp-p-title{font:600 14px var(--g-serif,serif);color:#edb56e;margin-bottom:2px}
+.sp-p-title{font:600 14px var(--g-serif,serif);color:var(--gold-accent,#edb56e);margin-bottom:2px}
 .sp-p-row{display:flex;justify-content:space-between;align-items:center;color:#e8d8ca}
 .sp-p-row i{width:30px;height:16px;border-radius:999px;background:rgba(255,255,255,.18);position:relative}
 .sp-p-row i::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#e8d8ca}
 .sp-p-row i.on{background:#b72a36}.sp-p-row i.on::after{left:16px;background:#fff}
 .sp-p-log{display:grid;grid-template-columns:56px 1fr;gap:10px;color:#f3e6da}
-.sp-p-log b{text-align:right;font-weight:600;color:#edb56e;font-size:12px}
+.sp-p-log b{text-align:right;font-weight:600;color:var(--gold-accent,#edb56e);font-size:12px}
 .sp-p-log small{display:block;color:#bfae9f;font-size:11.5px;margin-top:2px}
-.sp-p-word{font:600 24px var(--g-serif,serif)}.sp-p-word small{margin-left:10px;font-size:13px;color:#edb56e}
+.sp-p-word{font:600 24px var(--g-serif,serif)}.sp-p-word small{margin-left:10px;font-size:13px;color:var(--gold-accent,#edb56e)}
 .sp-p-def{color:#e8d8ca}.sp-p-def.dim{color:#a8998f;font-size:12px}
 
 /* v1.1.5 light theme: word list, dictionary results and About used fixed dark cards with dark text */
@@ -152,7 +152,7 @@
 
 /* v1.1.5 (user: the Glass panels switch did nothing visible): the large surfaces now follow it.
    Off: solid sheets that hide the picture. On: frosted sheets using the Glass blur / opacity sliders. */
-.main .settings-layout>.settings-content{padding:22px 28px 28px!important;border-radius:14px!important;border:1px solid rgba(237,181,110,.12)!important;
+.main .settings-layout>.settings-content{padding:22px 28px 28px!important;border-radius:14px!important;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 12%,transparent)!important;
  background:linear-gradient(170deg,#1d1415,#141011)!important;box-shadow:0 1px 0 rgba(241,224,210,.04) inset,0 24px 50px -36px rgba(0,0,0,.9)!important;backdrop-filter:none!important}
 .home-glass .main .settings-layout>.settings-content{background:linear-gradient(170deg,color-mix(in srgb,#251a1a var(--home-glass-alpha,55%),transparent),color-mix(in srgb,#120d0e var(--home-glass-alpha,55%),transparent))!important;
  backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important}
@@ -164,7 +164,7 @@
 
 /* v1.1.5 switches: no clipped focus outline (it left two stray dots on top after a click); a stitched centre line */
 input.switch:focus,input.switch:focus-visible{outline:none!important}
-input.switch:focus-visible{box-shadow:0 0 0 2px rgba(237,181,110,.45)!important}
+input.switch:focus-visible{box-shadow:0 0 0 2px color-mix(in srgb,var(--gold-accent,#edb56e) 45%,transparent)!important}
 input.switch{background:repeating-linear-gradient(90deg,rgba(242,232,218,.32) 0 4px,transparent 4px 7px) 8px 50%/calc(100% - 16px) 1px no-repeat,#3a2a27!important}
 input.switch:checked{background:repeating-linear-gradient(90deg,rgba(255,224,206,.62) 0 4px,transparent 4px 7px) 8px 50%/calc(100% - 16px) 1px no-repeat,var(--e-red-btn)!important}
 :root[data-theme=light] input.switch:not(:checked){background:repeating-linear-gradient(90deg,rgba(58,31,28,.35) 0 4px,transparent 4px 7px) 8px 50%/calc(100% - 16px) 1px no-repeat,#e7d9d0!important}
@@ -172,37 +172,37 @@ input.switch:checked{background:repeating-linear-gradient(90deg,rgba(255,224,206
 /* v1.1.5 Tools: grimoire cards with a faint watermark, a status seal and an "open" cue */
 .tools-grid{gap:22px!important}
 .tool-card{position:relative;overflow:hidden;display:flex!important;flex-direction:column;align-items:flex-start;gap:10px;min-height:190px;padding:26px 28px 24px!important;text-align:left;
- border-radius:16px!important;border:1px solid rgba(237,181,110,.16)!important;background:linear-gradient(165deg,#241817,#151011)!important;
+ border-radius:16px!important;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent)!important;background:linear-gradient(165deg,#241817,#151011)!important;
  box-shadow:0 1px 0 rgba(241,224,210,.05) inset,0 26px 50px -34px rgba(0,0,0,.9)!important;transition:border-color .2s,transform .2s,box-shadow .2s!important}
 .home-glass .tool-card{background:linear-gradient(165deg,color-mix(in srgb,#2c1d1b var(--home-glass-alpha,58%),transparent),color-mix(in srgb,#140d0e var(--home-glass-alpha,58%),transparent))!important;backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important}
-.tool-card::before{content:"";position:absolute;top:-1px;left:28px;width:72px;height:1px;background:linear-gradient(90deg,transparent,rgba(237,181,110,.9),transparent)}
-.tool-card::after{position:absolute;right:-6px;bottom:-40px;font:400 170px/1 var(--g-serif,serif);color:rgba(237,181,110,.05);pointer-events:none;transition:color .3s}
+.tool-card::before{content:"";position:absolute;top:-1px;left:28px;width:72px;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--gold-accent,#edb56e) 90%,transparent),transparent)}
+.tool-card::after{position:absolute;right:-6px;bottom:-40px;font:400 170px/1 var(--g-serif,serif);color:color-mix(in srgb,var(--gold-accent,#edb56e) 5%,transparent);pointer-events:none;transition:color .3s}
 .tool-card[data-tool="0"]::after{content:"原"}.tool-card[data-tool="1"]::after{content:"修"}
-.tool-card:hover{border-color:rgba(237,181,110,.42)!important;transform:translateY(-2px);box-shadow:0 1px 0 rgba(241,224,210,.06) inset,0 30px 56px -30px rgba(0,0,0,.95)!important}
-.tool-card:hover::after{color:rgba(237,181,110,.09)}
+.tool-card:hover{border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 42%,transparent)!important;transform:translateY(-2px);box-shadow:0 1px 0 rgba(241,224,210,.06) inset,0 30px 56px -30px rgba(0,0,0,.95)!important}
+.tool-card:hover::after{color:color-mix(in srgb,var(--gold-accent,#edb56e) 9%,transparent)}
 .tool-card:active{transform:translateY(0) scale(.99)}
 .tool-card .tool-top{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%}
 .tool-card .tool-top b{font:500 22px/1.3 var(--g-serif,serif);color:#f3e6da}
-.tool-card .tool-top em{font-style:normal;font-size:11px;letter-spacing:.14em;padding:3px 10px;border-radius:999px;color:#edb56e;border:1px solid rgba(237,181,110,.35);background:rgba(237,181,110,.06)}
+.tool-card .tool-top em{font-style:normal;font-size:11px;letter-spacing:.14em;padding:3px 10px;border-radius:999px;color:var(--gold-accent,#edb56e);border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 35%,transparent);background:color-mix(in srgb,var(--gold-accent,#edb56e) 6%,transparent)}
 .tool-card .tool-desc{position:relative;font-size:13.5px;line-height:1.75;color:#cdb8a8;max-width:34em}
 .tool-card .tool-meta{position:relative;margin-top:auto;padding-top:12px;width:100%;border-top:1px solid rgba(241,224,210,.08);font-size:12px;color:#9a8577}
-.tool-card .tool-meta::after{content:"打开 →";float:right;color:#edb56e;opacity:0;transform:translateX(-4px);transition:opacity .2s,transform .2s}
+.tool-card .tool-meta::after{content:"打开 →";float:right;color:var(--gold-accent,#edb56e);opacity:0;transform:translateX(-4px);transition:opacity .2s,transform .2s}
 :root[lang^=en] .tool-card .tool-meta::after{content:"Open →"}:root[lang^=ja] .tool-card .tool-meta::after{content:"開く →"}
 .tool-card:hover .tool-meta::after,.tool-card:focus-visible .tool-meta::after{opacity:1;transform:none}
-.tool-card:focus-visible{outline:none;border-color:rgba(237,181,110,.6)!important}
+.tool-card:focus-visible{outline:none;border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 60%,transparent)!important}
 :root[data-theme=light] .tool-card{background:linear-gradient(165deg,#fbf3ee,#f3e7df)!important;border-color:rgba(158,27,50,.16)!important}
 :root[data-theme=light] .tool-card .tool-top b{color:#301919}:root[data-theme=light] .tool-card .tool-desc{color:#5a3f38}:root[data-theme=light] .tool-card .tool-meta{color:#8a6f66;border-color:rgba(58,31,28,.1)}
 :root[data-theme=light] .tool-card::after{color:rgba(158,27,50,.05)}:root[data-theme=light] .tool-card .tool-top em,:root[data-theme=light] .tool-card .tool-meta::after{color:#a8323f;border-color:rgba(158,27,50,.3)}
 @media (prefers-reduced-motion:reduce){.tool-card,.tool-card .tool-meta::after{transition:none!important}}
 
 /* Key titles need Japanese restore first (user, 2026-11-09): a gold seal note on the card and in the dialog */
-.tool-key-note{position:relative;display:block;margin:2px 0 0;padding:9px 12px 9px 30px;border-radius:9px;font-size:12.5px;line-height:1.6;font-weight:600;color:#ffe3b8;background:linear-gradient(90deg,rgba(237,181,110,.16),rgba(237,181,110,.04));border:1px solid rgba(237,181,110,.32);text-align:left}
-.tool-key-note::before{content:"◆";position:absolute;left:12px;top:9px;font-size:9px;color:#edb56e}
+.tool-key-note{position:relative;display:block;margin:2px 0 0;padding:9px 12px 9px 30px;border-radius:9px;font-size:12.5px;line-height:1.6;font-weight:600;color:#ffe3b8;background:linear-gradient(90deg,color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent),color-mix(in srgb,var(--gold-accent,#edb56e) 4%,transparent));border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 32%,transparent);text-align:left}
+.tool-key-note::before{content:"◆";position:absolute;left:12px;top:9px;font-size:9px;color:var(--gold-accent,#edb56e)}
 :root[data-theme=light] .tool-key-note{color:#7a2a2a;background:linear-gradient(90deg,rgba(168,50,63,.1),rgba(168,50,63,.02));border-color:rgba(168,50,63,.3)}
 :root[data-theme=light] .tool-key-note::before{color:#a8323f}
 
 /* Translation: a connection card for the chosen engine, shared options below (v1.1.6) */
-.tr-conn{margin:6px 0 18px;padding:6px 18px 10px;border-radius:12px;border:1px solid rgba(237,181,110,.16);background:rgba(20,13,12,.42)}
+.tr-conn{margin:6px 0 18px;padding:6px 18px 10px;border-radius:12px;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent);background:rgba(20,13,12,.42)}
 .tr-conn-head,.tr-shared-head{font:500 12px var(--g-sans,sans-serif);letter-spacing:.16em;color:#d9a54a;padding:12px 0 4px}
 .tr-shared-head{margin-top:8px;padding-top:6px;border-top:1px solid rgba(241,224,210,.07)}
 .tr-conn .settings-row:last-of-type{border-bottom:0}
@@ -225,7 +225,7 @@ input.switch:checked{background:repeating-linear-gradient(90deg,rgba(255,224,206
 .sp-preview{top:34px}
 /* v1.1.6: the inset highlight (0 1px 0) left two bright corner pixels on rounded switches; no shadows on switches at all */
 input.switch,input.switch:hover,input.switch:checked,input.switch:checked:hover,input.switch:focus,input.switch:active{box-shadow:none!important}
-input.switch:focus-visible{box-shadow:none!important;outline:2px solid rgba(237,181,110,.55)!important;outline-offset:2px}
+input.switch:focus-visible{box-shadow:none!important;outline:2px solid color-mix(in srgb,var(--gold-accent,#edb56e) 55%,transparent)!important;outline-offset:2px}
 
 /* previews sit on the app's own background (v1.1.6) */
 .sp-preview{background:rgba(18,12,13,.28)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
@@ -237,13 +237,13 @@ input.switch:focus-visible{box-shadow:none!important;outline:2px solid rgba(237,
 .sp-preview{pointer-events:none}
 .sp-preview .sp-head button{pointer-events:auto}
 
-.sp-next{margin-left:auto;height:26px;padding:0 12px;border-radius:999px;border:1px solid rgba(237,181,110,.35);font-size:12px;color:#edb56e;background:rgba(237,181,110,.06);transition:background .2s,border-color .2s}
-.sp-next:hover{background:rgba(237,181,110,.14);border-color:rgba(237,181,110,.6)}
+.sp-next{margin-left:auto;height:26px;padding:0 12px;border-radius:999px;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 35%,transparent);font-size:12px;color:var(--gold-accent,#edb56e);background:color-mix(in srgb,var(--gold-accent,#edb56e) 6%,transparent);transition:background .2s,border-color .2s}
+.sp-next:hover{background:color-mix(in srgb,var(--gold-accent,#edb56e) 14%,transparent);border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 60%,transparent)}
 .sp-next:active{transform:scale(.97)}
 
-.sp-read{display:inline-flex;margin-left:auto;padding:2px;border-radius:999px;border:1px solid rgba(237,181,110,.25)}
+.sp-read{display:inline-flex;margin-left:auto;padding:2px;border-radius:999px;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 25%,transparent)}
 .sp-read button{height:22px;padding:0 10px;border-radius:999px;font-size:11.5px;color:#a8907e}
-.sp-read button[aria-pressed=true]{color:#1a1010;background:#edb56e}
+.sp-read button[aria-pressed=true]{color:#1a1010;background:var(--gold-accent,#edb56e)}
 .sp-read+.sp-next{margin-left:8px}
 
 /* v1.1.8 (user: the scrollbar on the right of every settings page looks ugly): keep wheel scrolling, hide the bar */
@@ -266,23 +266,23 @@ input.switch:focus-visible{box-shadow:none!important;outline:2px solid rgba(237,
 .select-trigger>.select-name{flex:0 0 auto;max-width:100%}.select-trigger>.select-note{flex:0 1 auto;margin-left:6px}
 
 /* E271 Tools → 日文原版恢复 window (user: the window opened from the tool card needs a redesign too) */
-dialog.jr-dialog{width:min(580px,calc(100vw - 48px));padding:0;overflow:hidden;border-radius:18px;border:1px solid rgba(237,181,110,.16);
+dialog.jr-dialog{width:min(580px,calc(100vw - 48px));padding:0;overflow:hidden;border-radius:18px;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent);
  background:linear-gradient(180deg,rgba(38,26,24,.96),rgba(22,16,16,.97));box-shadow:0 30px 80px rgba(0,0,0,.55),0 1px 0 rgba(255,236,214,.05) inset;color:#f3e6da}
 dialog.jr-dialog[open]{animation:jr-in .22s cubic-bezier(.16,1,.3,1)}
 @keyframes jr-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){dialog.jr-dialog[open]{animation:none}}
 .jr-dialog .jr-head{position:relative;padding:24px 28px 14px;background:radial-gradient(120% 140% at 0 0,rgba(200,48,60,.16),transparent 60%)}
-.jr-dialog .jr-eyebrow{display:inline-block;margin-bottom:6px;font-size:11px;letter-spacing:.18em;color:#edb56e;font-weight:600}
+.jr-dialog .jr-eyebrow{display:inline-block;margin-bottom:6px;font-size:11px;letter-spacing:.18em;color:var(--gold-accent,#edb56e);font-weight:600}
 .jr-dialog .jr-head h2{margin:0 0 6px;font-size:21px;line-height:1.3;color:#fbefe3}
 .jr-dialog .jr-head .settings-help{margin:0;font-size:12.5px;line-height:1.65;color:#bfa999;text-wrap:pretty}
 .jr-dialog .tool-key-note{margin:0 28px 14px}
 .jr-dialog [data-jr-body]{padding:0 28px}
-.jr-dialog .jr-search{box-sizing:border-box;width:100%;height:40px;margin:0 0 14px;padding:0 14px 0 40px;border:1px solid rgba(237,181,110,.16);border-radius:11px;font-size:13.5px;color:#f3e6da;
+.jr-dialog .jr-search{box-sizing:border-box;width:100%;height:40px;margin:0 0 14px;padding:0 14px 0 40px;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent);border-radius:11px;font-size:13.5px;color:#f3e6da;
  background:rgba(14,9,9,.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23a8907e' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E") 14px 50%/15px no-repeat!important;
  outline:none;transition:border-color .2s,box-shadow .2s}
 .jr-dialog .jr-search::placeholder{color:#8a7668}
-.jr-dialog .jr-search:hover{border-color:rgba(237,181,110,.3)}
-.jr-dialog .jr-search:focus{border-color:rgba(237,181,110,.6);box-shadow:0 0 0 3px rgba(237,181,110,.1)}
+.jr-dialog .jr-search:hover{border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 30%,transparent)}
+.jr-dialog .jr-search:focus{border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 60%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--gold-accent,#edb56e) 10%,transparent)}
 .jr-dialog .jr-search::-webkit-search-cancel-button{filter:grayscale(1) brightness(1.6)}
 .jr-dialog .jr-grid{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:14px;max-height:min(330px,42vh);padding:4px 4px 10px;margin:0 -4px;scrollbar-width:none}
 .jr-dialog .jr-grid::-webkit-scrollbar{display:none}
@@ -292,23 +292,23 @@ dialog.jr-dialog[open]{animation:jr-in .22s cubic-bezier(.16,1,.3,1)}
 .jr-dialog .jr-art{position:relative;display:block;border-radius:9px;overflow:hidden;aspect-ratio:3/4;background:rgba(255,255,255,.04);
  box-shadow:0 0 0 1px rgba(255,236,214,.08),0 8px 20px rgba(0,0,0,.35);transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .2s}
 .jr-dialog .jr-art .jr-cover{width:100%;height:100%;aspect-ratio:auto;border-radius:0;object-fit:cover}
-.jr-dialog .jr-item:hover .jr-art{transform:translateY(-2px);box-shadow:0 0 0 1px rgba(237,181,110,.35),0 12px 26px rgba(0,0,0,.45)}
+.jr-dialog .jr-item:hover .jr-art{transform:translateY(-2px);box-shadow:0 0 0 1px color-mix(in srgb,var(--gold-accent,#edb56e) 35%,transparent),0 12px 26px rgba(0,0,0,.45)}
 .jr-dialog .jr-item:active .jr-art{transform:scale(.97)}
 .jr-dialog .jr-item[aria-selected=true] .jr-art{box-shadow:0 0 0 2px #c8303c,0 0 0 5px rgba(200,48,60,.22),0 12px 26px rgba(0,0,0,.45)}
 .jr-dialog .jr-check{position:absolute;right:7px;top:7px;width:22px;height:22px;border-radius:50%;background:#c8303c;box-shadow:0 2px 8px rgba(0,0,0,.45);opacity:0;transform:scale(.6);transition:opacity .18s,transform .22s cubic-bezier(.2,.8,.2,1)}
 .jr-dialog .jr-check::after{content:"";position:absolute;left:8px;top:4.5px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
 .jr-dialog .jr-item[aria-selected=true] .jr-check{opacity:1;transform:none}
 .jr-dialog .jr-name{font-size:12.5px;line-height:1.4;font-weight:600;padding:0 2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.jr-dialog .jr-item:focus-visible{outline:none}.jr-dialog .jr-item:focus-visible .jr-art{box-shadow:0 0 0 2px #edb56e}
+.jr-dialog .jr-item:focus-visible{outline:none}.jr-dialog .jr-item:focus-visible .jr-art{box-shadow:0 0 0 2px var(--gold-accent,#edb56e)}
 /* E284 (user: the restore dialog jumped taller and shorter on every click): the status keeps two lines of room
    and stays in the layout while empty, so a state change never resizes the centred dialog. */
 .jr-dialog [data-jr-status]{display:flex;align-items:center;gap:10px;min-height:40px;box-sizing:content-box;margin:4px 0 0;padding:11px 14px;border-radius:10px;font-size:13px;font-weight:600;line-height:1.5;
  color:#d9c6b6;background:rgba(255,236,214,.04);border:1px solid rgba(255,236,214,.07)}
 .jr-dialog [data-jr-status]:empty{visibility:hidden}
 .jr-dialog [data-jr-status]::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:#8a7668}
-.jr-dialog [data-jr-status][data-state=checking]::before{background:#edb56e;animation:jr-pulse 1s ease-in-out infinite}
-.jr-dialog [data-jr-status][data-state=restorable]{color:#ffe3b8;background:rgba(237,181,110,.08);border-color:rgba(237,181,110,.25)}
-.jr-dialog [data-jr-status][data-state=restorable]::before{background:#edb56e}
+.jr-dialog [data-jr-status][data-state=checking]::before{background:var(--gold-accent,#edb56e);animation:jr-pulse 1s ease-in-out infinite}
+.jr-dialog [data-jr-status][data-state=restorable]{color:#ffe3b8;background:color-mix(in srgb,var(--gold-accent,#edb56e) 8%,transparent);border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 25%,transparent)}
+.jr-dialog [data-jr-status][data-state=restorable]::before{background:var(--gold-accent,#edb56e)}
 .jr-dialog [data-jr-status]:is([data-state=applied],[data-state=already]){color:#bfe8c8;background:rgba(92,184,120,.08);border-color:rgba(92,184,120,.25)}
 .jr-dialog [data-jr-status]:is([data-state=applied],[data-state=already])::before{background:#5cb878;box-shadow:0 0 0 3px rgba(92,184,120,.18)}
 .jr-dialog [data-jr-status]:is([data-state=unsupported],[data-state=none],[data-state=missing]){color:#e8b4b4;background:rgba(200,48,60,.07);border-color:rgba(200,48,60,.22)}
@@ -320,7 +320,7 @@ dialog.jr-dialog[open]{animation:jr-in .22s cubic-bezier(.16,1,.3,1)}
 .jr-dialog .dialog-actions button{min-width:96px;height:38px;border-radius:10px;font-weight:600;transition:background-color .18s,border-color .18s,transform .1s}
 .jr-dialog .dialog-actions button:active{transform:scale(.97)}
 .jr-dialog .dialog-actions .secondary{background:rgba(255,236,214,.05);border:1px solid rgba(255,236,214,.12);color:#e6d4c4}
-.jr-dialog .dialog-actions .secondary:hover{background:rgba(255,236,214,.09);border-color:rgba(237,181,110,.3)}
+.jr-dialog .dialog-actions .secondary:hover{background:rgba(255,236,214,.09);border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 30%,transparent)}
 .jr-dialog .dialog-actions .primary{background:linear-gradient(180deg,#d23a46,#a8263a);border:1px solid #d84a56;color:#fff;box-shadow:0 6px 16px rgba(200,48,60,.3),0 1px 0 rgba(255,255,255,.15) inset}
 .jr-dialog .dialog-actions .primary:hover{filter:brightness(1.08)}
 .jr-dialog .dialog-actions button:disabled{opacity:.5;cursor:default;transform:none}
@@ -332,7 +332,7 @@ dialog.jr-dialog[open]{animation:jr-in .22s cubic-bezier(.16,1,.3,1)}
 :root[data-theme=light] .jr-dialog .jr-item:hover,:root[data-theme=light] .jr-dialog .jr-item[aria-selected=true]{color:#2a1e1a}
 :root[data-theme=light] .jr-dialog .jr-search{background-color:#fff!important;color:#2a1e1a;border-color:rgba(168,50,63,.2)}
 :root[data-theme=light] .jr-dialog [data-jr-status]{color:#4a3a33;background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.08)}
-:root[data-theme=light] .jr-dialog [data-jr-status][data-state=restorable]{color:#7a4a12;background:rgba(237,181,110,.14)}
+:root[data-theme=light] .jr-dialog [data-jr-status][data-state=restorable]{color:#7a4a12;background:color-mix(in srgb,var(--gold-accent,#edb56e) 14%,transparent)}
 :root[data-theme=light] .jr-dialog [data-jr-status]:is([data-state=applied],[data-state=already]){color:#1f6b38;background:rgba(92,184,120,.12)}
 :root[data-theme=light] .jr-dialog [data-jr-status]:is([data-state=unsupported],[data-state=none],[data-state=missing]){color:#8a2430;background:rgba(200,48,60,.08)}
 :root[data-theme=light] .jr-dialog .dialog-actions{background:rgba(0,0,0,.03);border-top-color:rgba(0,0,0,.06)}
@@ -368,7 +368,7 @@ dialog.exe-dialog .dialog-actions button:active{transform:scale(.97)}
 dialog.exe-dialog .dialog-actions .exe-close{margin-right:auto;padding:0 6px;background:none;border:0;color:#bfae9f}
 dialog.exe-dialog .dialog-actions .exe-close:hover{color:#f1e4d8}
 dialog.exe-dialog .dialog-actions .secondary{background:rgba(255,236,214,.05);border:1px solid rgba(255,236,214,.12);color:#e6d4c4}
-dialog.exe-dialog .dialog-actions .secondary:hover{background:rgba(255,236,214,.09);border-color:rgba(237,181,110,.3)}
+dialog.exe-dialog .dialog-actions .secondary:hover{background:rgba(255,236,214,.09);border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 30%,transparent)}
 dialog.exe-dialog .dialog-actions .primary{background:linear-gradient(180deg,#d23a46,#a8263a);border:1px solid #d84a56;color:#fff;box-shadow:0 6px 16px rgba(200,48,60,.3),0 1px 0 rgba(255,255,255,.15) inset}
 dialog.exe-dialog .dialog-actions .primary:hover{filter:brightness(1.08)}
 dialog.exe-dialog .dialog-actions button:disabled{opacity:.5;cursor:default;transform:none}
