@@ -527,6 +527,7 @@
       <label>版式预设<select name="galPreset"><option value="custom">自定义位置</option><option value="bottom">底部对话框（ADV）</option><option value="full">全屏文本（NVL）</option><option value="top">画面上方字幕</option></select></label>
       <label>游戏窗口<select name="galGame"><option value="">点击刷新选择窗口</option></select></label>
       <button type="button" data-gal-refresh>刷新窗口</button><button type="button" data-gal-bind>绑定此窗口</button><button type="button" data-gal-unbind>解除绑定</button>
+      <small class="tomoyo-hotkey-hint" data-gal-bind-hint>内嵌没生效，或译文、对话框位置乱跑（部分紫社等作品自动识别不准）：展开「窗口绑定（高级）」，选中游戏窗口，点「绑定此窗口」手动绑定即可</small>
       <div class="tomoyo-cn-grid"><label>文本框左边距<input type="number" name="galX" min="0" max="95" step="0.1"></label><label>文本框上边距<input type="number" name="galY" min="0" max="95" step="0.1"></label><label>文字换行宽度<input type="number" name="galWidth" min="20" max="100" step="0.1"></label><input type="hidden" name="galHeight"><small class="tome-manual-region-hint">显示区域随实际文字增长，高度自动调整</small><small class="tome-island-layout-hint">按原文位置排布，文字可自然延伸到游戏窗口外</small></div>
       <button type="button" data-gal-drag>拖动文本框</button>
       <div class="tome-position-sync"><button type="button" data-gal-position-sync>同步位置</button><label class="tome-live-position"><input type="checkbox" name="galLivePosition">实时同步原文坐标</label><small data-position-state></small></div>
