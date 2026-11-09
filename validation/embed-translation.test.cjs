@@ -1,5 +1,5 @@
 'use strict';
-// "译文行用游戏自己画" (user, 2026-11-09, after 团子翻译器's Hook mode): with the per-work switch on, the hook bridge holds a
+// "译文行用游戏自己画" (user, 2026-11-09): with the per-work switch on, the hook bridge holds a
 // dialogue line, MeguLit translates it and the translation is written back so the game draws Chinese in its own box.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {HookNative}=require('../core/hook-native.cjs');

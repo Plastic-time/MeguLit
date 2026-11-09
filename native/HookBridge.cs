@@ -74,7 +74,7 @@ public static class HookBridge {
  // under load), and holding Ctrl/Shift no longer skips the replacement (fastskipignore showed the original, user: STEINS;GATE).
 
  static void ApplySettings(){Luna_SettingsEx(Pid,TranslateMode?4000u:1000u,TranslateMode?(byte)134:(byte)0,TranslateMode,"",0,false,false,false,1,false,UnityFontDir);Diagnostic("settings clearText=False; guarded callbacks; mode="+(TranslateMode?"translate":"hide"));}
-// Translation written back into the game (user, 2026-11-09, after 团子翻译器's Hook mode): instead of blanking a dialogue
+// Translation written back into the game (user, 2026-11-09): instead of blanking a dialogue
 // line for MeguLit to draw over, the bridge asks MeguLit for the line's translation and hands that to LunaHook, so the
 // game draws Chinese in its own text box and font. LunaHook keeps the game waiting up to the embed wait (4 s here);
 // a translation that is not back by then lets the original line through unchanged, so the game never stalls or blanks.
