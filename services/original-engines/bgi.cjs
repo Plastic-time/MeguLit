@@ -23,18 +23,24 @@ function dsc(input){
   if(code>=256){let offset=0;for(let i=0;i<12;i++)offset=(offset<<1)|getBit();offset+=2;let run=(code&0xff)+2;const from=dst-offset;for(let i=0;i<run&&dst<size;i++)out[dst++]=out[from+i];}else out[dst++]=code;}
  return out;
 }
-// Strings live after the bytecode; every text/name operand points into that area. Collect them in file order.
+const KANA=/[ぁ-ゖァ-ヺ]/g;
+function codepage(buffers){const score=enc=>{const dec=new TextDecoder(enc);let bad=0,kana=0;for(const b of buffers){const t=dec.decode(b);bad+=(t.match(/�/g)||[]).length;kana+=(t.match(KANA)||[]).length;}return {bad,kana};};const sj=score('shift_jis'),gbk=score('gbk');return sj.bad<gbk.bad||sj.bad===gbk.bad&&sj.kana>=gbk.kana?'shift_jis':'gbk';}
+// Strings live after the bytecode; every text/name operand ("push string", 0x03, offset relative to the code start)
+// points into that area. Lines are listed in the order the code uses them, so a patch that reorders or resizes the
+// string area still lines up with the original operand for operand.
 function scriptLines(data){
  if(!data.subarray(0,28).toString('latin1').startsWith('BurikoCompiledScriptVer1.00'))return null;
- const header=28+data.readUInt32LE(28),dec=new TextDecoder('shift_jis'),lines=[];let at=header,stringsAt=data.length;
- // Text opcodes are "push string" (0x03) with an offset relative to the code start; the smallest offset marks the string area.
- for(let p=header;p+8<=data.length;p+=4){if(data.readUInt32LE(p)===3){const off=data.readUInt32LE(p+4);if(off>0&&header+off<data.length&&header+off>p)stringsAt=Math.min(stringsAt,header+off);}}
- at=stringsAt;while(at<data.length){const end=data.indexOf(0,at);if(end<0)break;if(end>at)lines.push(dec.decode(data.subarray(at,end)));at=end+1;}
- return lines;
+ const header=28+data.readUInt32LE(28),refs=[];let stringsAt=data.length;
+ for(let p=header;p+8<=data.length;p+=4){if(data.readUInt32LE(p)===3){const off=data.readUInt32LE(p+4);if(off>0&&header+off<data.length&&header+off>p){stringsAt=Math.min(stringsAt,header+off);refs.push(off);}}}
+ const raw=[];for(const off of refs){const at=header+off;if(at<stringsAt)continue;let end=data.indexOf(0,at);if(end<0)end=data.length;raw.push(data.subarray(at,end));}
+ // Chinese patches store their text as GBK; pick the code page that decodes cleanly.
+ const dec=new TextDecoder(codepage(raw));return raw.map(b=>dec.decode(b));
 }
-function scan(dir){
+const isScript=data=>data.subarray(0,15).toString('latin1').startsWith('DSC FORMAT 1.00')||data.subarray(0,27).toString('latin1').startsWith('BurikoCompiled');
+// overlay: scene name (lower case) -> replacement entry data, for patches that ship loose scene files.
+function scan(dir,overlay){
  const scenes=[];for(const name of fs.readdirSync(dir).filter(f=>/^data0\d{4}\.arc$/i.test(f)).sort()){let entries;try{entries=readArc(path.join(dir,name));}catch{continue;}if(!entries)continue;
-  for(const entry of entries){if(!entry.data.subarray(0,15).toString('latin1').startsWith('DSC FORMAT 1.00')&&!entry.data.subarray(0,27).toString('latin1').startsWith('BurikoCompiled'))continue;let data;try{data=dsc(entry.data);}catch{continue;}const lines=scriptLines(data);if(lines)scenes.push({archive:name,name:entry.name,lines});}}
+  for(const entry of entries){if(!isScript(entry.data))continue;const replaced=overlay?.get(entry.name.toLowerCase());let data;try{data=dsc(replaced||entry.data);}catch{continue;}const lines=scriptLines(data);if(lines)scenes.push({archive:name,name:entry.name,lines,patched:!!replaced});}}
  return scenes;
 }
-module.exports={readArc,dsc,scriptLines,scan};
+module.exports={readArc,dsc,scriptLines,scan,codepage,isScript};

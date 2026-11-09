@@ -110,6 +110,14 @@ function deleteWord(db,id) {
   }catch(error){db.exec('ROLLBACK');throw error;}
   return {deleted:id};
 }
+// E280: after a Japanese import (or its undo) the game starts from the Japanese program (or the translated one again).
+function importedExecutable(db,id,file,language){
+  if(language==='ja'){require('./game-language.cjs').originalExecutable(db,id,root,'select',file);}
+  const row=db.prepare('SELECT original FROM games WHERE id=?').get(id),original=JSON.parse(row?.original||'{}'),lib=original.library||{};
+  if(language==='ja')original.library={...lib,localeMode:require('../core/locale-emulator.cjs').x86(file)?'japanese':lib.localeMode||'off'};
+  else{original.library={...lib,exe:file,contentLanguage:'zh',originalExecutableVerified:false};db.prepare('UPDATE games SET executable=? WHERE id=?').run(file,id);}
+  db.prepare('UPDATE games SET original=? WHERE id=?').run(JSON.stringify(original),id);
+}
 function restoreWord(db,id) {
   const entry=db.prepare('SELECT * FROM word_trash WHERE id=?').get(id);
   if(!entry)throw Error('WORD_NOT_FOUND');
@@ -160,8 +168,14 @@ async function dispatch(request,runtime=null) {
       case 'text_source_clear':{const ot=require('./original-text.cjs'),id=String(request.id);if(request.kind==='patch')ot.clearPatch(root,id);else ot.setMode(root,id,'off');runtime?.reader?.refreshTextSource?.();return ot.status(root,db,id);}
       case 'game_original_executable':{const result=require('./game-language.cjs').originalExecutable(db,String(request.id),root,request.mode,request.executable);const row=db.prepare('SELECT original FROM games WHERE id=?').get(String(request.id));return {...result,localeJapanese:JSON.parse(row?.original||'{}').library?.localeMode==='japanese'};}
       // E237 Japanese restore (Tools page): list library games that ship Japanese data, then apply or undo per game.
-      case 'jp_restore_list':{const fs=require('node:fs'),path=require('node:path');return db.prepare('SELECT id,title,executable FROM games WHERE removed_at IS NULL ORDER BY title').all().map(g=>{const dir=g.executable?path.dirname(g.executable):'';let hint='';try{if(dir&&fs.existsSync(path.join(dir,'.megulit-japanese')))hint='applied';else if(dir&&fs.existsSync(path.join(dir,'dat'))&&fs.readdirSync(path.join(dir,'dat')).some(f=>/\.dbs$/i.test(f)))hint='candidate';else if(dir&&fs.readdirSync(dir).some(n=>/^(scene|gameexe)(jp|ja|en|zh|cn|tw)?\.(pck|dat)$/i.test(n)||/_(jp|ja)\.(xp3|pck|arc|dat)$/i.test(n)))hint='unsupported';}catch{}return hint?{id:g.id,title:g.title,hint,dir:dir.toLowerCase()}:null;}).filter(Boolean).filter((g,i,all)=>all.findIndex(o=>o.dir===g.dir)===i).map(({dir,...g})=>g);}
-      case 'jp_restore_detect':case 'jp_restore_apply':case 'jp_restore_undo':{const row=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(String(request.id));if(!row?.executable)throw Error('GAME_NOT_FOUND');const dir=require('node:path').dirname(row.executable),jr=require('../core/japanese-restore.cjs');return request.action==='jp_restore_detect'?jr.detect(dir):request.action==='jp_restore_apply'?jr.apply(dir):jr.restore(dir);}
+      case 'jp_restore_list':{const fs=require('node:fs'),path=require('node:path');return db.prepare('SELECT id,title,executable FROM games WHERE removed_at IS NULL ORDER BY title').all().map(g=>{const dir=g.executable?path.dirname(g.executable):'';let hint='';try{if(dir&&(fs.existsSync(path.join(dir,'.megulit-japanese'))||fs.existsSync(path.join(dir,'.megulit-japanese-import'))))hint='applied';else if(dir&&require('../core/japanese-import.cjs').translatedOnly(dir,g.executable))hint='translated';else if(dir&&fs.existsSync(path.join(dir,'dat'))&&fs.readdirSync(path.join(dir,'dat')).some(f=>/\.dbs$/i.test(f)))hint='candidate';else if(dir&&fs.readdirSync(dir).some(n=>/^(scene|gameexe)(jp|ja|en|zh|cn|tw)?\.(pck|dat)$/i.test(n)||/_(jp|ja)\.(xp3|pck|arc|dat)$/i.test(n)))hint='unsupported';}catch{}return hint?{id:g.id,title:g.title,hint,dir:dir.toLowerCase()}:null;}).filter(Boolean).filter((g,i,all)=>all.findIndex(o=>o.dir===g.dir)===i).map(({dir,...g})=>g);}
+      case 'jp_restore_detect':case 'jp_restore_apply':case 'jp_restore_undo':case 'jp_import_apply':{const id=String(request.id),row=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row?.executable)throw Error('GAME_NOT_FOUND');const dir=require('node:path').dirname(row.executable),jr=require('../core/japanese-restore.cjs'),ji=require('../core/japanese-import.cjs');
+       /* E280 Chinese-only packages: say so, and import the script archives from a Japanese original the user points at */
+       const imported=ji.detect(dir,row.executable);
+       if(request.action==='jp_restore_detect'){const r=jr.detect(dir);return imported&&(imported.state==='imported'||['none','unsupported'].includes(r.state))?imported:r;}
+       if(request.action==='jp_import_apply'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=ji.apply(dir,row.executable,request.source);importedExecutable(db,id,r.exe,'ja');return r;}
+       if(request.action==='jp_restore_undo'&&imported?.state==='imported'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=ji.restore(dir);if(!r.skipped.length)importedExecutable(db,id,r.exe,'zh');return r;}
+       return request.action==='jp_restore_apply'?jr.apply(dir):jr.restore(dir);}
       case 'game_cover':return require('./game-cover.cjs').setCover(db,root,String(request.id),request.path);
       case 'game_detail':return require('./game-detail.cjs').detail(db,root,String(request.id),request.locale);
       case 'game_synopsis':return await require('./game-detail.cjs').refreshSynopsis(db,root,String(request.id),request.locale);
