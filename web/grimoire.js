@@ -225,6 +225,8 @@ export function matchJacket(root=document){
 let fieldStop=()=>{};
 const fieldState={x:0,y:0,z:1};
 const modulo=(value,period)=>((value%period)+period)%period;
+/* E279: row offset for the open wall; below / diagonal neighbours (stride, stride+-1 mod n) must not be the same game. */
+export const wallStride=(cols,n)=>{for(let k=0;k<n;k++){const sd=modulo(cols+k,n);if(sd>1&&sd<n-1)return cols+k;}return cols;};
 const fieldActions='[data-game],[data-edit],[data-launch],[data-series]';
 
 function fieldBlurFilters(){
@@ -284,6 +286,7 @@ export function fieldify(grid,filtered=false){
  const count=filtered?items.length*(items.length===2?3:items.length<=5?2:1):items.length;
  const cols=Math.min(count,Math.max(2,Math.round(Math.sqrt(count*(filtered?1:1.5*host.clientWidth/Math.max(1,host.clientHeight))))));
  const rows=Math.ceil(count/cols);
+ const stride=wallStride(cols,items.length);
  const cx0=(cols-1)*cw/2,cy0=(rows-1)*ch/2;
  const cells=new Map(),sources=new WeakMap();
  const state=filtered?{x:cx0,y:cy0,z:1}:fieldState;
@@ -331,7 +334,10 @@ export function fieldify(grid,filtered=false){
   }
   const added=document.createDocumentFragment();
   for(let row=firstRow;row<=lastRow;row++)for(let col=firstCol;col<=lastCol;col++){
-   const index=modulo(row,rows)*cols+modulo(col,cols);
+   /* E279 (user report 2026-11-09: the same game twice, side by side): a cols x ceil(n/cols) tile has more cells than
+      games and refilled the spare ones from the start, right next to the originals. The open wall is one running
+      sequence instead: +1 to the right, +stride down, every game once per run, no equal neighbour in any direction. */
+   const index=filtered?modulo(row,rows)*cols+modulo(col,cols):modulo(row*stride+col,items.length);
    if(filtered&&index>=count)continue;
    const key=row+':'+col;
    let cell=cells.get(key);
