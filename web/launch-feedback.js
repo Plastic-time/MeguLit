@@ -1,6 +1,6 @@
 const labels={zh:['游戏启动失败','关闭'],en:['Game could not start','Close'],ja:['ゲームを起動できませんでした','閉じる']};
 const reasons={
- JAPANESE_EXECUTABLE_REQUIRED:['没有找到可用的日文原版启动程序。请先安装日文原版或在游戏目录中恢复原版，再选择启动程序。MeguLit 需要日文原文才能使用','A usable Japanese original executable is required. Install or restore the original, then choose its executable.','日本語版をインストールまたは復元し、実行ファイルを選択してください'],
+ JAPANESE_EXECUTABLE_REQUIRED:['没有找到可用的日文原版启动程序。这份可能是纯汉化包。请安装日文原版并选择启动程序，或到「工具 → 日文原版恢复」从日文原版导入剧本。MeguLit 需要日文原文才能使用','A usable Japanese original executable is required. This may be a Chinese-only package. Install the Japanese release and choose its program, or import its script under Tools → Restore Japanese original.','中国語だけのパッケージかもしれません。日本語版をインストールして実行ファイルを選ぶか、「ツール → 日本語原版に戻す」で日本語版からシナリオを取り込んでください'],
  PATCH_STATE_INVALID:['无法读取语言切换记录，请查看启动诊断日志','Could not read the language switch record. See the launch log','言語切替の記録を読めません。起動ログを確認してください'],
  PATCH_UNSAFE_PATH:['补丁文件夹包含异常路径，请从完整安装中选择启动程序','The patch contains an unsupported path. Choose the executable from a complete installation','未対応のパスが含まれています。完全なインストールの実行ファイルを選んでください'],
  GAME_RUNNING:['请先关闭游戏窗口，再切换语言','Close the game before switching languages','ゲームを閉じてから言語を切り替えてください'],
