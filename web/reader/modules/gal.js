@@ -525,6 +525,7 @@
       <div class="tome-position-sync"><button type="button" data-gal-position-sync>同步位置</button><label class="tome-live-position"><input type="checkbox" name="galLivePosition">实时同步原文坐标</label><small data-position-state></small></div>
       <div class="tome-game-style-sync"><label class="tome-auto-style-switch"><input type="checkbox" name="galAutoGameStyle">自动同步游戏原文样式</label><button type="button" data-game-style-sync>从游戏同步</button><small data-game-style-state></small></div>
       <label>原文替换方式<select name="galMaskMode"><option value="hook">Hook 引擎与原文替换内嵌（优先）</option><option value="local">OCR 覆盖原文（最后兜底）</option></select></label>
+      <small class="tomoyo-hotkey-hint" data-mask-hotkey><kbd>Alt+H</kbd> 随时一键关闭 / 恢复内嵌（连同全部 MeguLit 覆盖），用来对比游戏原文</small>
       <div data-gal-hook-options><label>对话文本流<select name="galHookThread"><option value="">先绑定游戏并推进一句</option></select></label><button type="button" data-gal-hook-select>使用这条对话流</button><div class="tomoyo-hook-state" role="status"></div><small>选择前请核对内容是完整对话。仅读取的流可以显示台词，不能清空游戏原文；可清空的流仅在覆盖模式启用替换。Alt+H 隐藏覆盖或 Alt+M 返回普通界面会关闭替换，台词读取继续。</small></div>
       <label data-gal-full-color>整块底板颜色<input type="color" name="galMaskColor"></label>
       <label><input name="galRelocateWaitMarker" type="checkbox">将原等待符移到 MeguLit 句末</label>

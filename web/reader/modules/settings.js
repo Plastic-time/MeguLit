@@ -116,7 +116,7 @@
     dialog.className = 'tomoyo-cn-dialog';
     dialog.innerHTML = `<form>
       <h3>阅读设置</h3>
-      <small>Alt+M 显示／隐藏 MeguLit 主页，Alt+T 开关菜单<br>Alt+H 一键显示 / 隐藏全部 MeguLit 覆盖</small>
+      <small>Alt+M 显示／隐藏 MeguLit 主页，Alt+T 开关菜单<br>Alt+H 一键开关内嵌和全部 MeguLit 覆盖</small>
       <label><input name="enabled" type="checkbox">启用中文翻译</label>
       <label><input name="transparent" type="checkbox">背景全透明（绑定游戏后固定开启）</label>
       <details><summary>自定义译文字体与颜色</summary>

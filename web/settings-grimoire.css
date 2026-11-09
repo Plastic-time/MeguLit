@@ -347,3 +347,22 @@ html.app-boot #main .shelf .book{animation:boot-card 620ms calc(600ms + var(--bo
 @keyframes boot-rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
 @keyframes boot-card{from{opacity:0;transform:translateY(30px) scale(.96)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){html.app-boot-pre *{opacity:1!important}html.app-boot *{animation:none!important}}
+
+/* 日文原版启动程序 dialog (user: buttons wrapped one character per line). Close sits left as a quiet text button,
+   the two path actions keep their labels on one line on the right; the path reads as a path. */
+dialog.exe-dialog{width:min(560px,calc(100vw - 32px));max-width:none;padding:26px 28px 0;border-radius:16px;background:linear-gradient(180deg,#24191c,#1a1416);border:1px solid rgba(255,236,214,.1);color:#f1e4d8;box-shadow:0 24px 60px rgba(0,0,0,.55)}
+dialog.exe-dialog h2{margin:0 0 8px;font-size:20px;letter-spacing:.02em}
+dialog.exe-dialog>p:not(.exe-path){margin:0 0 14px;color:#bfae9f;font-size:13px;line-height:1.6}
+dialog.exe-dialog .exe-path{margin:0 0 4px;padding:9px 12px;border-radius:9px;background:rgba(0,0,0,.28);border:1px solid rgba(255,236,214,.07);font:12px/1.5 Consolas,"Cascadia Mono",monospace;color:#e6d4c4;overflow-wrap:anywhere}
+dialog.exe-dialog .locale-toggle{margin:16px 0 0}
+dialog.exe-dialog .locale-toggle small{display:block;margin-top:3px;line-height:1.55}
+dialog.exe-dialog .dialog-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin:22px -28px 0;padding:14px 28px 18px;border-top:1px solid rgba(255,236,214,.06);background:rgba(0,0,0,.14);border-radius:0 0 16px 16px}
+dialog.exe-dialog .dialog-actions button{flex:0 0 auto;width:auto;min-width:0;height:38px;padding:0 16px;white-space:nowrap;border-radius:10px;font-weight:600;word-break:keep-all;transition:background-color .18s,border-color .18s,transform .1s}
+dialog.exe-dialog .dialog-actions button:active{transform:scale(.97)}
+dialog.exe-dialog .dialog-actions .exe-close{margin-right:auto;padding:0 6px;background:none;border:0;color:#bfae9f}
+dialog.exe-dialog .dialog-actions .exe-close:hover{color:#f1e4d8}
+dialog.exe-dialog .dialog-actions .secondary{background:rgba(255,236,214,.05);border:1px solid rgba(255,236,214,.12);color:#e6d4c4}
+dialog.exe-dialog .dialog-actions .secondary:hover{background:rgba(255,236,214,.09);border-color:rgba(237,181,110,.3)}
+dialog.exe-dialog .dialog-actions .primary{background:linear-gradient(180deg,#d23a46,#a8263a);border:1px solid #d84a56;color:#fff;box-shadow:0 6px 16px rgba(200,48,60,.3),0 1px 0 rgba(255,255,255,.15) inset}
+dialog.exe-dialog .dialog-actions .primary:hover{filter:brightness(1.08)}
+dialog.exe-dialog .dialog-actions button:disabled{opacity:.5;cursor:default;transform:none}
