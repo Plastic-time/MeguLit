@@ -42,10 +42,11 @@ function parse(raw,marker){
 }
 function rebuild(raw,marker,table,cells){ // keep the header, index and column table; rewrite the string pool
  if(!table.unicode)throw Error('DBS_NOT_UNICODE');
- const head=Buffer.from(raw.subarray(0,table.text)),pool=[],offsets=new Map();let size=0;
- const put=s=>{if(offsets.has(s))return offsets.get(s);const b=Buffer.from(s+'\0','utf16le');offsets.set(s,size);pool.push(b);size+=b.length;return offsets.get(s);};
- cells.forEach((row,r)=>row.forEach((v,c)=>{if(table.columns[c].type===0x53)head.writeUInt32LE(put(v),table.data+(r*table.cols+c)*4);}));
- const out=Buffer.concat([head,...pool]);out.writeUInt32LE(out.length,0);return out;
+ // Like the engine's own tables: one string per cell in row order (no shared offsets) and the
+ // decoded table zero-padded to 32 bytes; a deduplicated pool crashed CLANNAD (0xC0000005).
+ const head=Buffer.from(raw.subarray(0,table.text)),pool=[];let size=0;
+ cells.forEach((row,r)=>row.forEach((v,c)=>{if(table.columns[c].type!==0x53)return;const b=Buffer.from(v+'\0','utf16le');head.writeUInt32LE(size,table.data+(r*table.cols+c)*4);pool.push(b);size+=b.length;}));
+ const body=Buffer.concat([head,...pool]),out=Buffer.alloc(Math.ceil(body.length/32)*32);body.copy(out);out.writeUInt32LE(body.length,0);return out;
 }
 
 function languageColumns(table){ // per string column: share of non-empty cells holding kana / CJK

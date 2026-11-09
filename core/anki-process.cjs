@@ -22,7 +22,8 @@ function shortcutTarget(file){
   const wide=offset=>{const start=info+offset;let end=start;while(end+1<b.length&&b.readUInt16LE(end))end+=2;return b.toString('utf16le',start,end);};
   if(header>=0x24)return wide(b.readUInt32LE(info+28))+wide(b.readUInt32LE(info+32));
   const narrow=offset=>{const start=info+offset;const end=b.indexOf(0,start);return b.subarray(start,end<0?b.length:end);},ansi=Buffer.concat([narrow(b.readUInt32LE(info+16)),narrow(b.readUInt32LE(info+24))]);
-  if(!ansi.some(byte=>byte>0x7e))return ansi.toString('latin1');
+  /* a name outside the ANSI code page is stored as ? (en-US CI runner, Japanese folder): ask Windows for the Unicode target */
+  if(!ansi.some(byte=>byte>0x7e||byte===0x3f))return ansi.toString('latin1');
   return require('node:child_process').execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command','[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;(New-Object -ComObject WScript.Shell).CreateShortcut($env:MEGULIT_LNK).TargetPath'],{encoding:'utf8',windowsHide:true,timeout:10000,env:{...process.env,MEGULIT_LNK:file}}).replace(/^﻿/,'').trim();
  }catch{return '';}
 }

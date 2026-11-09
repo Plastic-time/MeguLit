@@ -51,8 +51,10 @@ $Tag="v$Version";$Asset="MeguLit-$Tag-win-x64.zip"
 $DownloadLine="> **[⬇ 下载 MeguLit $Tag 安装包 / Download $Asset](https://github.com/ilynthn/MeguLit/releases/download/$Tag/$Asset)**"
 $Token=$null
 if(-not $DryRun -and -not $Prepare){
- $cred="protocol=https`nhost=github.com`n`n" | git credential fill
- $Token=($cred | Where-Object {$_ -like 'password=*'}) -replace '^password=',''
+ # gh first: Windows PowerShell 5.1 pipes CRLF, which newer git credential fill rejects
+ try{$Token=(gh auth token 2>$null|Out-String).Trim()}catch{}
+ if(-not $Token){$cred="protocol=https`nhost=github.com`n`n" | git credential fill
+ $Token=($cred | Where-Object {$_ -like 'password=*'}) -replace '^password=',''}
  if(-not $Token){throw 'No GitHub token from git credential fill'}
 }
 $Headers=@{'User-Agent'='megulit-release';'Accept'='application/vnd.github+json'}

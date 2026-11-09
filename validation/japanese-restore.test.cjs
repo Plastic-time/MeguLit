@@ -48,3 +48,16 @@ fs.writeFileSync(path.join(empty,'SceneEN.pck'),'x');assert.equal(jr.detect(empt
 assert.throws(()=>jr.apply(empty),/NOTHING_TO_RESTORE/);
 fs.rmSync(root,{recursive:true,force:true});fs.rmSync(empty,{recursive:true,force:true});
 console.log('japanese-restore ok');
+
+require('node:test')('rebuilding a Siglus table keeps the engine layout: one string per cell in order, padded to 32 bytes',()=>{
+ const {_internal:I}=require('../core/japanese-restore.cjs');
+ /* CLANNAD crashed (0xC0000005) on a deduplicated, unpadded pool; an unchanged table must rebuild byte for byte */
+ const cells=[['あ',''],['あ','x']],rows=2,cols=2,fmt=28,data=fmt+cols*8,text=data+rows*cols*4;
+ const pool=[];let off=0;const idx=[];for(const row of cells)for(const v of row){idx.push(off);const b=Buffer.from(v+'\0','utf16le');pool.push(b);off+=b.length;}
+ const head=Buffer.alloc(text);[0,rows,cols,0,fmt,data,text].forEach((v,i)=>head.writeUInt32LE(v,i*4));
+ for(let c=0;c<cols;c++){head.writeUInt32LE(c,fmt+c*8);head.writeUInt32LE(0x53,fmt+c*8+4);}idx.forEach((v,i)=>head.writeUInt32LE(v,data+i*4));
+ const body=Buffer.concat([head,...pool]),raw=Buffer.alloc(Math.ceil(body.length/32)*32);body.copy(raw);raw.writeUInt32LE(body.length,0);
+ const t=I.parse(raw,1);assert.ok(I.rebuild(raw,1,t,t.cells).equals(raw));
+ const next=I.rebuild(raw,1,t,[['あ','あ'],['あ','あ']]),offs=[0,1,2,3].map(i=>next.readUInt32LE(data+i*4));
+ assert.equal(new Set(offs).size,4);assert.equal(next.length%32,0);assert.equal(next.readUInt32LE(0),text+16);
+});
