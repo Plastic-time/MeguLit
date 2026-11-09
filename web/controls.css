@@ -15,7 +15,7 @@
 :root[data-theme=light] { --floating-shadow: 0 16px 42px #18203418, 0 2px 8px #1820340a; }
 :root.home-glass {
   --control-fill: color-mix(in srgb, var(--bg) 52%, transparent);
-  --floating-fill: color-mix(in srgb, var(--surface) var(--home-glass-alpha, 65%), transparent);
+  --floating-fill: color-mix(in srgb,var(--glass-tint,var(--surface)) var(--home-glass-alpha, 65%), transparent);
   --floating-blur: var(--home-glass-blur, 14px);
   --control-selected: color-mix(in srgb, var(--accent) 17%, transparent);
 }

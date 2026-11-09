@@ -2,13 +2,16 @@
 /* Settings sidebar (v1.1.4): a grimoire index in the same glass language as statistics and the update card.
    The glass now follows Settings → Home background → Glass panels (:root.home-glass); off, it is a solid page.
    Loaded last on purpose: it replaces the stacked E236/E237/E255 sidebar rules. */
+/* Glass panel colour (Settings → Appearance): --glass-tint is set from JS; the lower stop is a darker shade of it */
+:root.custom-glass{--glass-tint-deep:color-mix(in srgb,var(--glass-tint) 52%,#000)}
+:root.custom-glass[data-theme=light]{--glass-tint-deep:color-mix(in srgb,var(--glass-tint) 94%,#000)}
 .main .settings-nav,.home-glass .main .settings-nav{
  --sn-t1:#f3e6da;--sn-t2:#cdb8a8;--sn-t3:#9a8577;--sn-gold:var(--gold-accent,#edb56e);--sn-line:color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent);--sn-rule:rgba(241,224,210,.07);
  position:relative;padding:18px 12px 14px!important;border-radius:14px!important;border:1px solid var(--sn-line)!important;
  background:linear-gradient(170deg,#211615,#161011)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
  box-shadow:0 1px 0 rgba(241,224,210,.05) inset,0 22px 44px -30px rgba(0,0,0,.9)!important}
 .home-glass .main .settings-nav{
- background:linear-gradient(170deg,color-mix(in srgb,#2a1c1b var(--home-glass-alpha,62%),transparent),color-mix(in srgb,#140d0e var(--home-glass-alpha,62%),transparent))!important;
+ background:linear-gradient(170deg,color-mix(in srgb,var(--glass-tint,#2a1c1b) var(--home-glass-alpha,62%),transparent),color-mix(in srgb,var(--glass-tint-deep,#140d0e) var(--home-glass-alpha,62%),transparent))!important;
  backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.2)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.2)!important}
 .main .settings-nav::before{content:"";position:absolute;top:-1px;left:26px;width:64px;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--gold-accent,#edb56e) 85%,transparent),transparent);pointer-events:none}
 
@@ -45,7 +48,7 @@
 /* Light theme */
 :root[data-theme=light] .main .settings-nav{--sn-t1:#301919;--sn-t2:#6e4f47;--sn-t3:#8a6f66;--sn-gold:#a8323f;--sn-line:rgba(158,27,50,.16);--sn-rule:rgba(58,31,28,.09);
  background:linear-gradient(170deg,#fbf3ee,#f3e7df)!important}
-:root[data-theme=light].home-glass .main .settings-nav{background:linear-gradient(170deg,color-mix(in srgb,#fff7f2 var(--home-glass-alpha,70%),transparent),color-mix(in srgb,#f3e5dc var(--home-glass-alpha,70%),transparent))!important}
+:root[data-theme=light].home-glass .main .settings-nav{background:linear-gradient(170deg,color-mix(in srgb,var(--glass-tint,#fff7f2) var(--home-glass-alpha,70%),transparent),color-mix(in srgb,var(--glass-tint-deep,#f3e5dc) var(--home-glass-alpha,70%),transparent))!important}
 :root[data-theme=light] .main .settings-nav .settings-category button.active{color:#301919!important;background:linear-gradient(90deg,rgba(168,50,63,.1),transparent 75%)!important}
 :root[data-theme=light] .main .settings-nav .settings-category button::before{box-shadow:none!important}
 /* Black theme: deeper page, same structure */
@@ -60,7 +63,7 @@
  background:linear-gradient(165deg,#241817,#151011)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
  box-shadow:0 1px 0 rgba(241,224,210,.05) inset,0 30px 60px -36px rgba(0,0,0,.9)!important}
 .home-glass .review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch])){
- background:linear-gradient(165deg,color-mix(in srgb,#2c1d1b var(--home-glass-alpha,60%),transparent),color-mix(in srgb,#140d0e var(--home-glass-alpha,60%),transparent))!important;
+ background:linear-gradient(165deg,color-mix(in srgb,var(--glass-tint,#2c1d1b) var(--home-glass-alpha,60%),transparent),color-mix(in srgb,var(--glass-tint-deep,#140d0e) var(--home-glass-alpha,60%),transparent))!important;
  backdrop-filter:blur(var(--home-glass-blur,18px)) saturate(1.2)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,18px)) saturate(1.2)!important}
 .review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch]))::before{content:"";position:absolute;top:-1px;left:50%;width:96px;margin-left:-48px;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--gold-accent,#edb56e) 90%,transparent),transparent)}
 .review-page #review-content>.review-card:is(:has(>.anki-tools),:has([data-launch]))::after{content:"復";position:absolute;right:-14px;bottom:-58px;font:400 220px/1 var(--g-serif,serif);color:color-mix(in srgb,var(--gold-accent,#edb56e) 4.5%,transparent);pointer-events:none;user-select:none}
@@ -95,7 +98,7 @@
 .main .settings-content .settings-search::placeholder{color:#8a7668}
 .main .settings-content .settings-search:hover{border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 30%,transparent)!important}
 .main .settings-content .settings-search:focus,.main .settings-content .settings-search:focus-visible{outline:none!important;border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 60%,transparent)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--gold-accent,#edb56e) 10%,transparent)!important;background-color:rgba(20,13,12,.62)!important}
-.home-glass .main .settings-content .settings-search{background-color:color-mix(in srgb,#140d0e var(--home-glass-alpha,55%),transparent)!important;backdrop-filter:blur(var(--home-glass-blur,14px))}
+.home-glass .main .settings-content .settings-search{background-color:color-mix(in srgb,var(--glass-tint-deep,#140d0e) var(--home-glass-alpha,55%),transparent)!important;backdrop-filter:blur(var(--home-glass-blur,14px))}
 :root[data-theme=light] .main .settings-content .settings-search{color:#301919!important;background-color:rgba(255,250,246,.85)!important;border-color:rgba(158,27,50,.18)!important}
 :root[data-theme=light] .main .settings-content .settings-search:focus{border-color:rgba(158,27,50,.5)!important;box-shadow:0 0 0 3px rgba(158,27,50,.08)!important}
 
@@ -154,10 +157,10 @@
    Off: solid sheets that hide the picture. On: frosted sheets using the Glass blur / opacity sliders. */
 .main .settings-layout>.settings-content{padding:22px 28px 28px!important;border-radius:14px!important;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 12%,transparent)!important;
  background:linear-gradient(170deg,#1d1415,#141011)!important;box-shadow:0 1px 0 rgba(241,224,210,.04) inset,0 24px 50px -36px rgba(0,0,0,.9)!important;backdrop-filter:none!important}
-.home-glass .main .settings-layout>.settings-content{background:linear-gradient(170deg,color-mix(in srgb,#251a1a var(--home-glass-alpha,55%),transparent),color-mix(in srgb,#120d0e var(--home-glass-alpha,55%),transparent))!important;
+.home-glass .main .settings-layout>.settings-content{background:linear-gradient(170deg,color-mix(in srgb,var(--glass-tint,#251a1a) var(--home-glass-alpha,55%),transparent),color-mix(in srgb,var(--glass-tint-deep,#120d0e) var(--home-glass-alpha,55%),transparent))!important;
  backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important}
 :root[data-theme=light] .main .settings-layout>.settings-content{background:linear-gradient(170deg,#fbf3ee,#f3e7df)!important;border-color:rgba(158,27,50,.14)!important}
-:root[data-theme=light].home-glass .main .settings-layout>.settings-content{background:linear-gradient(170deg,color-mix(in srgb,#fff7f2 var(--home-glass-alpha,65%),transparent),color-mix(in srgb,#f3e5dc var(--home-glass-alpha,65%),transparent))!important}
+:root[data-theme=light].home-glass .main .settings-layout>.settings-content{background:linear-gradient(170deg,color-mix(in srgb,var(--glass-tint,#fff7f2) var(--home-glass-alpha,65%),transparent),color-mix(in srgb,var(--glass-tint-deep,#f3e5dc) var(--home-glass-alpha,65%),transparent))!important}
 /* word and dictionary cards: solid when the switch is off */
 :root:not(.home-glass):not([data-theme=light]) .main:not(:has(>.game-detail-content)) .record{background:linear-gradient(180deg,#1c1415,#151012)!important;backdrop-filter:none!important}
 .home-glass .main:not(:has(>.game-detail-content)) .record{backdrop-filter:blur(var(--home-glass-blur,14px))!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,14px))!important}
@@ -174,7 +177,7 @@ input.switch:checked{background:repeating-linear-gradient(90deg,rgba(255,224,206
 .tool-card{position:relative;overflow:hidden;display:flex!important;flex-direction:column;align-items:flex-start;gap:10px;min-height:190px;padding:26px 28px 24px!important;text-align:left;
  border-radius:16px!important;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 16%,transparent)!important;background:linear-gradient(165deg,#241817,#151011)!important;
  box-shadow:0 1px 0 rgba(241,224,210,.05) inset,0 26px 50px -34px rgba(0,0,0,.9)!important;transition:border-color .2s,transform .2s,box-shadow .2s!important}
-.home-glass .tool-card{background:linear-gradient(165deg,color-mix(in srgb,#2c1d1b var(--home-glass-alpha,58%),transparent),color-mix(in srgb,#140d0e var(--home-glass-alpha,58%),transparent))!important;backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important}
+.home-glass .tool-card{background:linear-gradient(165deg,color-mix(in srgb,var(--glass-tint,#2c1d1b) var(--home-glass-alpha,58%),transparent),color-mix(in srgb,var(--glass-tint-deep,#140d0e) var(--home-glass-alpha,58%),transparent))!important;backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important;-webkit-backdrop-filter:blur(var(--home-glass-blur,16px)) saturate(1.15)!important}
 .tool-card::before{content:"";position:absolute;top:-1px;left:28px;width:72px;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--gold-accent,#edb56e) 90%,transparent),transparent)}
 .tool-card::after{position:absolute;right:-6px;bottom:-40px;font:400 170px/1 var(--g-serif,serif);color:color-mix(in srgb,var(--gold-accent,#edb56e) 5%,transparent);pointer-events:none;transition:color .3s}
 .tool-card[data-tool="0"]::after{content:"原"}.tool-card[data-tool="1"]::after{content:"修"}
