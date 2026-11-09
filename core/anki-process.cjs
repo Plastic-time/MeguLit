@@ -71,11 +71,22 @@ public static class MeguLitAnkiWindows{
 }
 '@
 $mode=[string]($args[0]);if($mode -like 'watch:*'){$until=[DateTime]::Now.AddMilliseconds([int]$mode.Substring(6));$ids=@();$n=0;while([DateTime]::Now -lt $until){if($n%10 -eq 0){$ids=@(Get-Process -ErrorAction SilentlyContinue|Where-Object{$_.Path -and $_.Path -like '*Anki*'}|ForEach-Object{$_.Id})};if($ids.Count){[void][MeguLitAnkiWindows]::HidePids([int[]]$ids)};[void][MeguLitAnkiWindows]::Apply('hideall');Start-Sleep -Milliseconds 30;$n++};0}elseif($mode -like 'keys:*'){[void][MeguLitAnkiWindows]::Apply('show');if([MeguLitAnkiWindows]::Focus()){Start-Sleep -Milliseconds 350;Add-Type -AssemblyName System.Windows.Forms;$k=$mode.Substring(5);if($k){[System.Windows.Forms.SendKeys]::SendWait($k)};1}else{0}}else{[MeguLitAnkiWindows]::Apply($mode)}`;
+// Who listens on AnkiConnect's port (user, 2026-11-09: another program on 8765 answered instead of AnkiConnect and
+// "reconnect" could never succeed). Returns [{pid,name,path}] from the OS; read-only.
+const LISTENERS=`$p=[int]$args[0];$ids=@(Get-NetTCPConnection -State Listen -LocalPort $p -ErrorAction SilentlyContinue|ForEach-Object{$_.OwningProcess}|Sort-Object -Unique);foreach($i in $ids){$x=Get-Process -Id $i -ErrorAction SilentlyContinue;if($x){[string]$i+[char]9+$x.ProcessName+[char]9+$x.Path}}`;
+function listeners(port){
+ return new Promise(resolve=>{execFile('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-Command','& {'+LISTENERS+'} '+Number(port)],{windowsHide:true,timeout:20000},(error,stdout)=>{
+  if(error)return resolve([]);resolve(String(stdout).split(/\r?\n/).filter(Boolean).map(line=>{const [pid,name,file]=line.split('\t');return {pid:Number(pid),name:name||'',path:file||''};}).filter(x=>x.pid>4));});});
+}
+// Anki itself: anki.exe / ankiw.exe, or the Python of Anki 25.x's own venv (%LOCALAPPDATA%\AnkiProgramFiles).
+function isAnki(proc){return /^ankiw?$/i.test(proc.name)||/[\\/]AnkiProgramFiles[\\/]|[\\/]Anki[\\/]/i.test(proc.path||'');}
+function portOf(url){try{const u=new URL(url||'http://127.0.0.1:8765');return Number(u.port)||(u.protocol==='https:'?443:80);}catch{return 8765;}}
+function kill(pid){try{process.kill(pid);return true;}catch{return false;}}
 function windows(mode){
  return new Promise(resolve=>{execFile('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-Command','& {'+WINDOWS+'} '+"'"+String(mode).replace(/'/g,"''")+"'"],{windowsHide:true,timeout:20000},(error,stdout)=>resolve(error?0:Number(String(stdout).trim())||0));});
 }
 class AnkiProcess{
- constructor({config,log=()=>{},anki=new Anki(),windowControl=windows}){this.windows=windowControl;this.config=config;this.log=log;this.anki=anki;this.started=false;this.hidden=false;}
+ constructor({config,log=()=>{},anki=new Anki(),windowControl=windows,portOwners=listeners,killer=kill,running=ankiRunning,ankiPids=ankiProcesses,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){this.portOwners=portOwners;this.killer=killer;this.running=running;this.ankiPids=ankiPids;this.wait=wait;this.windows=windowControl;this.config=config;this.log=log;this.anki=anki;this.started=false;this.hidden=false;}
  async online(){try{await this.anki.call(this.config(),'version');return true;}catch{return false;}}
  find(){return find(this.config().ankiPath);}
  async start({hide=false}={}){
@@ -87,6 +98,24 @@ class AnkiProcess{
   /* v1.1.5: a cold Anki syncs and loads add-ons before AnkiConnect answers; 45 s was often too short, so wait up to 90 s */
   for(let i=0;i<120;i++){await new Promise(resolve=>setTimeout(resolve,750));if(hide&&i%2===0)await this.hide();if(await this.online()){if(hide){await this.hide();}return {running:true,started:true};}}
   throw Error('ANKI_OFFLINE');
+ }
+ // "Reconnect" that actually reconnects (user, 2026-11-09): close whatever else holds AnkiConnect's port, and when
+ // AnkiConnect still does not answer, close Anki normally and start it cold so the add-on binds the port again.
+ // Only programs listening on that port are touched; MeguLit itself never is.
+ async repair({hide=false}={}){
+  if(await this.online())return {running:true,repaired:false};
+  const port=portOf(this.config().ankiUrl),owners=(await this.portOwners(port)).filter(p=>p.pid!==process.pid);
+  const others=owners.filter(p=>!isAnki(p)),killed=[];
+  for(const p of others)if(this.killer(p.pid)){killed.push(p.name||String(p.pid));this.log('[MeguLit] closed '+(p.name||p.pid)+' (pid '+p.pid+') holding AnkiConnect port '+port);}
+  if(killed.length){for(let i=0;i<8;i++){await this.wait(500);if(await this.online())return {running:true,repaired:true,killed};}}
+  // Cold start: a running Anki whose AnkiConnect failed to bind (or hangs) is closed the normal way first.
+  const anki=(await this.portOwners(port)).some(isAnki)||this.running();
+  if(anki){
+   await this.windows('close');
+   for(let i=0;i<30&&this.running();i++)await this.wait(500);
+   if(this.running()){for(const p of this.ankiPids())this.killer(p);await this.wait(1000);this.log('[MeguLit] Anki did not close for a cold restart; stopped it');}
+  }
+  const result=await this.start({hide});return {...result,repaired:true,killed,restarted:anki};
  }
  async hide(){const n=await this.windows('hideall');if(n)this.hidden=true;return n;}
  // E259: Anki's sync progress dialog and its 'collection synced' tooltip are separate windows of the same process
@@ -126,7 +155,9 @@ class AnkiProcess{
 // Anki's add-on folder under its AnkiWeb code. Anki must be closed so it does not overwrite the folder; an existing
 // install is never replaced.
 const ANKICONNECT_CODE='2055492159';
-function ankiRunning(){try{return /^"?(anki|ankiw)\.exe"?,/im.test(require('node:child_process').execFileSync('tasklist',['/fo','csv','/nh'],{encoding:'utf8',windowsHide:true,timeout:5000}));}catch{return false;}}
+function ankiRunning(){if(ankiProcesses().length)return true;try{return /^"?(anki|ankiw)\.exe"?,/im.test(require('node:child_process').execFileSync('tasklist',['/fo','csv','/nh'],{encoding:'utf8',windowsHide:true,timeout:5000}));}catch{return false;}}
+// Anki 25.x runs as pythonw.exe from its own venv, which tasklist names only "pythonw.exe"; find those by path.
+function ankiProcesses(){try{const out=require('node:child_process').execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',"Get-Process -ErrorAction SilentlyContinue|Where-Object{$_.Path -and ($_.ProcessName -match '^ankiw?$' -or $_.Path -match 'AnkiProgramFiles')}|ForEach-Object{$_.Id}"],{encoding:'utf8',windowsHide:true,timeout:15000});return out.split(/\r?\n/).map(Number).filter(n=>n>4);}catch{return [];}}
 async function installAnkiConnect(env=process.env){
  if(!env.APPDATA)throw Error('ANKI_ADDON_FOLDER_MISSING');
  const base=path.join(env.APPDATA,'Anki2','addons21'),target=path.join(base,ANKICONNECT_CODE);
@@ -145,4 +176,4 @@ async function installAnkiConnect(env=process.env){
   return {installed:true,path:target};
  }finally{fs.rmSync(work,{recursive:true,force:true});}
 }
-module.exports={AnkiProcess,find,candidates,coldCandidates,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows};
+module.exports={AnkiProcess,find,candidates,coldCandidates,ankiConnectInstalled,installAnkiConnect,ankiRunning,windows,listeners,isAnki,portOf};
