@@ -3,7 +3,16 @@
  'use strict';if(document.readyState==='loading'||!window.__tomoyoChinese?.galStatus){document.addEventListener('DOMContentLoaded',installHookPanel,{once:true});return;}const b=window.__tomoyoChinese;if(b.tomeHookPanel)return;b.tomeHookPanel=true;
  let state={},panels=new Set();
  const send=m=>window.__tomoyoTranslateRequest(JSON.stringify(m));
- const previous=b.galStatus;b.galStatus=m=>{previous(m);state={...state,...m};if(m.hookProfile)b.restoreGalSettings?.({hookProfile:m.hookProfile,maskMode:m.hookAutoOcr?'local':'hook',bindEnabled:true});for(const p of panels)if(p.isConnected)paint(p);else panels.delete(p);};
+ /* E346 (user 2026-11-10): when no stream of any engine can be embedded, say once under the caption how to get the game adapted; the 内嵌 panel keeps the same line with a button. */
+ const FEEDBACK_URL='https://github.com/ilynthn/MeguLit/issues',feedbackShown=new Set();
+ const feedbackCopy=()=>({zh:['这个游戏暂时不能隐藏原文：请在「关于」里提交反馈，附上游戏名和截图，一般一天内就能适配','去反馈'],ja:['このゲームはまだ原文を隠せません：「について」からゲーム名とスクリーンショットを添えて報告してください。通常 1 日以内に対応します','報告する'],en:['This game cannot hide its original text yet. Send feedback from About with the game name and a screenshot; it is usually supported within a day','Send feedback']})[(document.documentElement.lang||'zh').slice(0,2)]||['这个游戏暂时不能隐藏原文：请在「关于」里提交反馈，附上游戏名和截图，一般一天内就能适配','去反馈'];
+ const openFeedback=()=>{try{const inv=window.__TAURI_INTERNALS__?.invoke;if(inv){inv('plugin:opener|open_url',{url:FEEDBACK_URL}).catch(()=>navigator.clipboard?.writeText(FEEDBACK_URL));return;}}catch{}try{navigator.clipboard.writeText(FEEDBACK_URL);}catch{}};
+ function captionFeedback(){const id=String(state.gameProcessId||'')+'|'+String(state.gameStarted||'');if(feedbackShown.has(id))return;feedbackShown.add(id);document.querySelector('.megulit-embed-feedback')?.remove();
+  const n=document.createElement('div');n.className='megulit-embed-feedback';n.setAttribute('role','status');n.textContent=feedbackCopy()[0];
+  n.style.cssText='font:13px/1.6 Meiryo,"Microsoft YaHei",sans-serif;color:#ffd9a8;background:rgba(40,20,10,.78);border:1px solid rgba(255,190,120,.35);border-radius:8px;padding:6px 10px;margin-top:8px;text-shadow:none;-webkit-text-stroke:0;cursor:pointer;transition:opacity .6s ease;';
+  const host=document.querySelector('.sentence-window');if(host)host.appendChild(n);else{n.style.cssText+='position:fixed;z-index:2147481500;left:50%;bottom:24px;transform:translateX(-50%);max-width:min(620px,calc(100vw - 32px));';document.body.appendChild(n);}
+  const close=()=>{n.style.opacity='0';setTimeout(()=>n.remove(),650);};n.addEventListener('click',e=>{e.stopPropagation();close();},{capture:true});setTimeout(close,8000);}
+ const previous=b.galStatus;b.galStatus=m=>{previous(m);state={...state,...m};if(m.hookEmbedUnsupported===true)captionFeedback();else if(m.hookEmbedUnsupported===false)document.querySelector('.megulit-embed-feedback')?.remove();if(m.hookProfile)b.restoreGalSettings?.({hookProfile:m.hookProfile,maskMode:m.hookAutoOcr?'local':'hook',bindEnabled:true});for(const p of panels)if(p.isConnected)paint(p);else panels.delete(p);};
  const style=document.createElement('style');style.textContent=`
  .tome-hook-main{display:grid;gap:8px;margin-bottom:10px}.tome-hook-summary{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;padding:8px 10px;border-radius:9px;background:#7891ad16}.tome-hook-summary i{width:9px;height:9px;border-radius:50%;flex:none;background:#888}.tome-hook-summary[data-tone=ok] i{background:#4fc08a;box-shadow:0 0 6px #4fc08a99}.tome-hook-summary[data-tone=busy] i{background:#e0b04f}.tome-hook-summary[data-tone=warn] i{background:#e0794f}.tome-hooks .tome-hook-switch{display:flex!important;align-items:center;margin:0!important;font-size:13px;cursor:pointer}.tome-hook-hint{margin:-4px 0 0 41px}.tome-hook-advanced h5{margin:12px 0 0;font-size:12px}.tome-hook-advanced .tome-hook-switch{margin-top:12px!important}
  .tome-hooks{margin:15px 0;padding:14px;border:1px solid var(--theme-border,#45607e);border-radius:12px;background:color-mix(in srgb,var(--theme-background,#14263e) 45%,transparent)}
@@ -22,7 +31,8 @@ for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookP
     // Chosen automatically: embed when the game's stream can be embedded, otherwise read + OCR cover.
     text(p.querySelector('[data-hook-mode]'),state.hookProfile==='off'?'Hook 已停止':state.hookProfile==='euphoria474'?'自动：YU-RIS 0.474 绘制隐藏原文':state.hookProfile==='embed'?'自动：LunaHook 内嵌，在引擎内隐藏原文':state.hookAutoOcr?'自动：只读取台词 + OCR 遮盖原文（当前已发现的文本流没有提供内嵌）':state.hookHide?'自动：只读取台词，等待可内嵌的文本流':'自动：只读取台词（未开启隐藏原文）');
   const proof=p.querySelector('[data-hook-proof]');proof.dataset.state=state.hookCheckState||'waiting';
-  text(p.querySelector('[data-hook-message]'),state.hookCheckMessage||'选择下方 Hook 启动方式，再在游戏里推进一句');
+  text(p.querySelector('[data-hook-message]'),state.hookEmbedUnsupported?feedbackCopy()[0]:state.hookCheckMessage||'选择下方 Hook 启动方式，再在游戏里推进一句');
+  {const row=p.querySelector('[data-hook-feedback-row]'),show=state.hookEmbedUnsupported===true&&state.hookProfile!=='off';if(row.hidden===show)row.hidden=!show;text(row.querySelector('button'),feedbackCopy()[1]);}
   text(p.querySelector('[data-hook-connection]'),state.hookProfile==='off'?'已停止':state.processAttached?'游戏已连接':'等待游戏连接');
   text(p.querySelector('[data-hook-capture]'),state.receivedText&&state.hookCaptureCharacters?'已捕捉 '+state.hookCaptureCharacters+' 字':'等待新台词');
   text(p.querySelector('[data-hook-hide]'),state.hookVisualVerified?'隐藏检查通过':state.hookCheckState==='visible'?'原文仍可见':state.hookProfile==='read'?'仅读取':'画面待确认');
@@ -42,10 +52,11 @@ for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookP
     <div class="tome-hook-summary" data-hook-summary><i data-hook-dot></i><span data-hook-summary-text></span></div>
     <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookHide"><span>隐藏游戏原文</span></label>
     <small class="tome-hook-hint">开或关之后约 3 秒，从下一句开始生效；当前已显示的那句不会立刻变</small>
+    <div class="tome-hook-actions"><button type="button" data-hook-reselect title="当前文本流读到的是乱码或不是台词时，换一条文本流">文本不对？重新选取文本流</button></div>
     <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookAutoStart">全自动：读取台词、同步原文样式并内嵌</label>
     <small class="tome-hook-mode" data-hook-mode></small>
    </div>
-   <div class="tome-hook-proof" data-hook-proof role="status" aria-live="polite"><div class="tome-hook-chips"><span data-hook-connection></span><span data-hook-capture></span><span data-hook-hide></span></div><strong data-hook-message></strong><small class="tome-hook-time" data-hook-time></small></div>
+   <div class="tome-hook-proof" data-hook-proof role="status" aria-live="polite"><div class="tome-hook-chips"><span data-hook-connection></span><span data-hook-capture></span><span data-hook-hide></span></div><strong data-hook-message></strong><div class="tome-hook-actions" data-hook-feedback-row hidden><button type="button" data-hook-feedback></button></div><small class="tome-hook-time" data-hook-time></small></div>
    <details class="tome-hook-advanced"><summary>高级：Hook 引擎与文本流</summary>
     <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookFast">快速切换（跳过「先显示一句确认原文位置」，少等一句）</label>
     <div class="tome-hook-actions"><button type="button" data-hook-check>重新检查游戏画面</button><button type="button" data-hook-restart>重新启动 Hook</button><button type="button" data-hook-stop>停止 Hook</button><button type="button" data-hook-force hidden>跳过基线并启动（效果未确认）</button></div>
@@ -53,6 +64,8 @@ for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookP
     <h5>已发现的文本流</h5><div data-hook-streams><small>还没有发现文本流，在游戏里推进一句</small></div>
    </details>`;
   p.querySelector('[data-hook-restart]').onclick=()=>send({type:'hookStart',profile:'auto'});
+  p.querySelector('[data-hook-reselect]').onclick=()=>send({type:'hookReselect'});
+  p.querySelector('[data-hook-feedback]').onclick=openFeedback;
   for(const cb of p.querySelectorAll('[data-hook-pref]'))cb.onchange=()=>{state={...state,[cb.dataset.hookPref]:cb.checked};send({type:'hookPrefs',settings:{[cb.dataset.hookPref]:cb.checked}});paint(p)};
   p.querySelector('[data-hook-check]').onclick=()=>send({type:'hookCheck'});p.querySelector('[data-hook-stop]').onclick=()=>send({type:'hookStart',profile:'off'});p.querySelector('[data-hook-force]').onclick=()=>send({type:'hookStart',profile:state.hookProfile,force:true});
   container.prepend(p);panels.add(p);paint(p);

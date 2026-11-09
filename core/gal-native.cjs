@@ -54,6 +54,18 @@ class GalNative {
   hookPrefs(){return {hookAutoStart:this.preferences.hookAutoStart,hookHide:this.preferences.hookHide,hookFast:this.preferences.hookFast};}
   // The UI's copy of these can be stale, so the backend value always wins unless own=true.
   setHookPrefs(v){const next={...this.preferences};for(const k of ['hookAutoStart','hookHide','hookFast'])if(typeof v?.[k]==='boolean')next[k]=v[k];if(next.hookAutoStart&&!this.preferences.hookAutoStart&&typeof v?.hookHide!=='boolean')next.hookHide=true;const hideChanged=next.hookHide!==this.preferences.hookHide,autoOn=next.hookAutoStart&&!this.preferences.hookAutoStart;this.save(next,true,true);this.notify(this.hookPrefs());if(hideChanged||autoOn)this.controller.apply(true);}
+  /* E337 (user 2026-11-10, 女装山脈: a stream decoded as garbage was picked, "文本流捕捉错了要加个手动刷新重新选取"): pick the
+     stream whose sample reads as Japanese best, skipping the current one (and ones already skipped for this game run).
+     onlyIfBad: called by 校准当前句; switches only when the current sample looks garbled. */
+  static sampleScore(text){const s=String(text||'');if(!s.trim())return -1;const jp=(s.match(/[\u3040-\u30ff\u3400-\u9fff]/g)||[]).length,bad=(s.match(/[\uff61-\uff9f\u25a1\ufffd\ue000-\uf8ff]/g)||[]).length;return bad>=2&&bad>=jp*.15?-2:jp/Math.max(1,s.length)*Math.min(1,s.length/12)-bad*.2;}
+  reselectStream(onlyIfBad=false){const threads=this.hooks?.state?.hookThreads||[],score=GalNative.sampleScore,current=threads.find(t=>t.selected);
+   if(onlyIfBad&&(!current||score(current.sample)>-2))return {kept:true};
+   const run=String(this.state?.gameProcessId||'')+'|'+String(this.state?.gameStarted||'');if(this.skippedRun!==run){this.skippedRun=run;this.skipped=new Set();}
+   if(current)this.skipped.add(current.id);
+   let next=threads.filter(t=>!this.skipped.has(t.id)&&t.sample&&score(t.sample)>-2).sort((a,b)=>score(b.sample)-score(a.sample))[0];
+   if(!next&&!onlyIfBad){this.skipped=new Set(current?[current.id]:[]);next=threads.filter(t=>t.id!==current?.id&&t.sample).sort((a,b)=>score(b.sample)-score(a.sample))[0];}
+   if(!next){this.userStart('auto',false);return {restarted:true};}
+   this.userStart('auto',false,next.id);return {selected:next.id,name:next.name};}
   userStart(profile,force,id){if(profile==='auto'){if(typeof id==='string'&&id.length<100)this.hooks.preferredThread=id;const c=this.controller;if(!this.preferences.hookHide){c.start('read');return;}if(['embed','euphoria474'].includes(c.plan))c.start('read');c.apply(true);return;}if(['embed','euphoria474'].includes(profile)||profile==='read'){const hide=profile!=='read';if(hide!==this.preferences.hookHide){this.preferences={...this.preferences,hookHide:hide};this.notify(this.hookPrefs());}}if(typeof id==='string'&&id.length<100)this.hooks.preferredThread=id;this.controller.start(profile,force);}
   save(value, configure = true, own = false) { if(!own&&this.preferences)value={...value,...this.hookPrefs()};this.preferences = cleanGal(value);this.previewPreferences=null; const file=path.join(this.folder,'gal-preferences.json'),{translationPrompt,...global}=this.preferences;fs.writeFileSync(file+'.tmp',JSON.stringify(global,null,2));fs.renameSync(file+'.tmp',file); if(configure)this.send({ type: 'configure', ...this.preferences });this.styleSync.configure(this.preferences,this.state);this.hooks.configure(this.preferences,this.state); }
   preview(value) { this.previewPreferences=cleanGal({...value,...this.hookPrefs()});this.send({type:'configure',...this.previewPreferences});this.hooks.configure(this.previewPreferences,this.state);this.styleSync.configure(this.previewPreferences,this.state); }

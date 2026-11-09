@@ -59,15 +59,51 @@ async function unpack(gameDir,archive){
 
 async function sourceRoot(gameDir,source){
  source=path.resolve(String(source||''));const s=stat(source);if(!s)throw Error('IMPORT_SOURCE_MISSING');
- let base=s.isDirectory()?source:ARCHIVE.test(source)?await unpack(gameDir,source):/\.exe$/i.test(source)?path.dirname(source):'';
+ const disc=require('./disc-image.cjs');
+ let base=s.isDirectory()?source:ARCHIVE.test(source)?await unpack(gameDir,source):disc.IMAGE.test(source)?await discUnpack(gameDir,source):/\.exe$/i.test(source)?path.dirname(source):'';
  if(!base)throw Error('IMPORT_SOURCE_TYPE');
  if(path.resolve(base).toLowerCase()===path.resolve(gameDir).toLowerCase())throw Error('IMPORT_SOURCE_SAME_FOLDER');
- const root=matchRoot(base,gameDir);if(!root)throw Error('IMPORT_SOURCE_NO_MATCH');
- return {root,staged:base.toLowerCase().startsWith(path.join(gameDir,STAGING_DIR).toLowerCase())};}
+ let root=matchRoot(base,gameDir),image='';
+ /* E339: an archive holding a disc image (bin/cue, iso, img): read the disc and look again inside its files */
+ if(!root&&!separateLauncher(base)){image=findImage(base);if(image){base=await discUnpack(gameDir,image);root=matchRoot(base,gameDir);}}
+ return {root,base,image,staged:base.toLowerCase().startsWith(path.join(gameDir,STAGING_DIR).toLowerCase())};}
+
+function findImage(dir){const stack=[[dir,2]];while(stack.length){const [d,depth]=stack.pop();let list;try{list=fs.readdirSync(d,{withFileTypes:true});}catch{continue;}
+  const cue=list.find(e=>e.isFile()&&/\.cue$/i.test(e.name));if(cue)return path.join(d,cue.name);
+  const img=list.find(e=>e.isFile()&&/\.(iso|img|bin)$/i.test(e.name)&&(stat(path.join(d,e.name))?.size||0)>50e6);if(img)return path.join(d,img.name);
+  for(const e of list)if(e.isDirectory()&&depth>0&&!e.name.startsWith('.'))stack.push([path.join(d,e.name),depth-1]);}
+ return '';}
+// The disc's files go to a staging folder next to the game; reused while the image is unchanged.
+async function discUnpack(gameDir,image){
+ const disc=require('./disc-image.cjs'),data=disc.imageOf(path.resolve(image)),s=stat(data);if(!s)throw Error('IMPORT_SOURCE_MISSING');
+ const dir=path.join(gameDir,STAGING_DIR,'disc'),stamp=path.join(dir,'.source.json'),key=JSON.stringify({image:data.toLowerCase(),size:s.size,mtime:s.mtimeMs});
+ try{if(fs.readFileSync(stamp,'utf8')===key)return path.join(dir,'files');}catch{}
+ await fsp.rm(dir,{recursive:true,force:true});await fsp.mkdir(path.join(dir,'files'),{recursive:true});
+ try{await disc.extract(data,path.join(dir,'files'));}catch(error){await fsp.rm(dir,{recursive:true,force:true});throw /^IMPORT_/.test(error?.message)?error:Object.assign(Error('IMPORT_DISC_UNREADABLE'),{detail:String(error?.message||error).slice(0,300)});}
+ await fsp.writeFile(stamp,key);return path.join(dir,'files');}
+
+/* E338 (user 2026-11-10, The Song of Saya: the Steam build is Saya_Steam.exe + *.npk, the 2003 Japanese release is saya.exe
+   + *.pak): a Japanese release of another build shares no files with this one, so nothing can be swapped. It is set up
+   as its own copy instead: an archive is unpacked next to itself (a folder or program is used where it is), and its
+   game program becomes this game's Japanese program. */
+function separateLauncher(base){
+ const found=[];const scan=(dir,depth)=>{let list;try{list=fs.readdirSync(dir,{withFileTypes:true});}catch{return;}
+  for(const e of list){const f=path.join(dir,e.name);if(e.isFile()&&/\.exe$/i.test(e.name)&&isLauncher(e.name)&&languageHint(e.name)!=='zh'&&(stat(f)?.size||0)>=20000)found.push(f);else if(e.isDirectory()&&depth>0&&!SKIP_DIR.test(e.name)&&!/(?:bak|backup|patch|补丁|備份|备份)/i.test(e.name))scan(f,depth-1);}};
+ scan(base,3);found.sort((a,b)=>a.split(path.sep).length-b.split(path.sep).length||(stat(b)?.size||0)-(stat(a)?.size||0));return found[0]||'';}
+function freeFolder(dir){let out=dir,n=2;while(fs.existsSync(out))out=dir+' ('+(n++)+')';return out;}
+function separatePlan(gameDir,source,info){
+ const exe=separateLauncher(info.base);
+ /* A disc image (bin/cue, iso, mdf, ccd) holds the installer, not the game: it has to be mounted and installed first. */
+ if(!exe&&info.image){const installer=fs.readdirSync(info.base).some(n=>/^(setup|install|autorun)\.(exe|inf)$/i.test(n))||walk(info.base,5000).some(r=>/\.(cab|msi)$/i.test(r));
+  if(installer)return {installer:true,image:info.image,iso:/\.iso$/i.test(info.image)?info.image:path.join(path.dirname(path.resolve(source)),path.basename(info.image).replace(/\.(cue|bin|img)$/i,'')+'.iso'),from:require('./disc-image.cjs').imageOf(info.image)};}
+ if(!exe){const disc=(()=>{const stack=[[info.base,2]];while(stack.length){const [d,depth]=stack.pop();let list;try{list=fs.readdirSync(d,{withFileTypes:true});}catch{continue;}for(const e of list){if(e.isFile()&&/\.(bin|cue|iso|mdf|mds|ccd|img|nrg)$/i.test(e.name)&&(e.name.match(/\.(cue|iso|mds|ccd|nrg)$/i)||(stat(path.join(d,e.name))?.size||0)>50e6))return true;if(e.isDirectory()&&depth>0)stack.push([path.join(d,e.name),depth-1]);}}return false;})();throw Error(disc?'IMPORT_DISC_IMAGE':'IMPORT_SOURCE_NO_MATCH');}
+ const root=path.dirname(exe);
+ const target=info.staged?freeFolder(path.join(path.dirname(path.resolve(source)),path.basename(source).replace(/\.(zip|7z|rar)$/i,'').replace(/[<>:"|?*]/g,'').trim()||'Japanese')):root;
+ return {root,exe:path.relative(root,exe),target,move:info.staged};}
 
 async function plan(gameDir,source){
  gameDir=path.resolve(String(gameDir||''));if(readManifest(gameDir))throw Error('ALREADY_IMPORTED');
- const {root,staged}=await sourceRoot(gameDir,source),theirs=walk(root),ours=walk(gameDir);
+ const info=await sourceRoot(gameDir,source),{root,staged}=info;if(!root)return {separate:separatePlan(gameDir,source,info)};const theirs=walk(root),ours=walk(gameDir);
  const mine=new Map(ours.map(r=>[r.toLowerCase(),r])),them=new Set(theirs.map(r=>r.toLowerCase()));
  const replace=[],add=[],remove=[];let addedBytes=0;
  for(const rel of theirs){const target=mine.get(rel.toLowerCase()),from=path.join(root,rel);
@@ -80,12 +116,19 @@ async function plan(gameDir,source){
 
 async function preview(gameDir,source){
  const p=await plan(gameDir,source),list=a=>a.map(({file,size})=>({file,size}));
+ if(p.separate?.installer){const s=p.separate;if(!fs.existsSync(s.iso))await require('./disc-image.cjs').toIso(s.from,s.iso);return {state:'installer',iso:s.iso};}
+ if(p.separate)return {state:'separate',exe:p.separate.exe,target:p.separate.target,copy:p.separate.move};
  return {state:'preview',root:p.root,replace:list(p.replace),add:list(p.add),remove:list(p.remove),exe:p.exe,changes:p.replace.length+p.add.length+p.remove.length};}
 
 async function place(from,to,staged){await fsp.mkdir(path.dirname(to),{recursive:true});if(staged){try{await fsp.rename(from,to);return;}catch{}}await fsp.copyFile(from,to);}
 
 async function apply(gameDir,source,previousExe=''){
- const p=await plan(gameDir,source);if(!p.replace.length&&!p.add.length&&!p.remove.length)throw Error('NOTHING_TO_IMPORT');
+ const p=await plan(gameDir,source);
+ if(p.separate?.installer)throw Error('IMPORT_DISC_INSTALLER');
+ if(p.separate){const s=p.separate;
+  if(s.move){try{await fsp.rename(s.root,s.target);}catch{await fsp.cp(s.root,s.target,{recursive:true});}await fsp.rm(path.join(path.resolve(gameDir),STAGING_DIR),{recursive:true,force:true});}
+  return {separate:true,installed:s.target,exe:path.join(s.target,s.exe),imported:0,replaced:0,added:0,removed:0};}
+ if(!p.replace.length&&!p.add.length&&!p.remove.length)throw Error('NOTHING_TO_IMPORT');
  const backup=path.join(p.gameDir,BACKUP_DIR,'files'),done=[];
  const record=async(entry,file)=>{const s=stat(file);done.push({...entry,size:s?.size??0,mtime:s?.mtimeMs??0});};
  try{
@@ -115,4 +158,4 @@ function restore(gameDir){
 
 function cleanup(gameDir){fs.rmSync(path.join(path.resolve(String(gameDir||'')),STAGING_DIR),{recursive:true,force:true});}
 
-module.exports={preview,apply,restore,cleanup,readManifest,ADAPTER,_internal:{matchRoot,walk,OVERRIDE}};
+module.exports={separateLauncher,preview,apply,restore,cleanup,readManifest,ADAPTER,_internal:{matchRoot,walk,OVERRIDE}};

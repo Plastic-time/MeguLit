@@ -158,6 +158,7 @@ class Reader{
    case 'galShutdown':this.stop();break;
    case 'hookPrefs':g?.setHookPrefs(r.settings);break;
    case 'hookStart':g?.userStart(r.profile,r.force===true,r.id);break;
+   case 'hookReselect':g?.reselectStream?.(r.onlyIfBad===true);break;
    case 'hookSelect':g?.hooks.select(r.id);break;
    case 'hookCheck':g?.controller.check();break;
    case 'hookRescan':g?.hooks.rescan();break;

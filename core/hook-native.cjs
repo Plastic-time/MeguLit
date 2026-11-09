@@ -44,6 +44,7 @@ class HookNative{
   if(this.spawn===spawn)try{process.kill(pid,0);}catch(e){if(e.code==='ESRCH'){this.retryAt=this.now()+3000;this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,hookMessage:'游戏进程已退出，等待游戏重新启动后自动绑定'});return;}}
   // A HookBridge built while ToMe ran is staged as HookBridge.updated.exe and installed here, before the bridge starts.
   const staged=path.join(this.folder,'HookBridge.updated.exe');if(fs.existsSync(staged))try{fs.copyFileSync(staged,path.join(this.folder,'HookBridge.exe'));fs.unlinkSync(staged);}catch{}
+  HookNative.syncShippedHook(this.folder);
   const root=this.layout.hook,required=['LunaHost64.dll','LunaHook32.dll','LunaHook64.dll'],missing=required.filter(n=>!fs.existsSync(path.join(root,n)));if(missing.length||!fs.existsSync(path.join(this.folder,'HookBridge.exe'))){this.retryAt=this.now()+30000;this.notify({hookMessage:'Hook 组件缺失：'+missing.join('、'),hookAvailable:false});return;}
   this.flowPage=FLOW_PAGE_EXES.test(name);  const identity=pid+"|"+started;if(identity!==this.identity){this.lastSource="";this.lastSourceAt=0;this.preferredThread=null;this.identity=identity;this.state.hookFramework=null;}this.pid=pid;this.started=started;this.enabled=this.preferences?.hookProfile!=='read'&&!this.preflight&&this.windowState?.bound===true&&(this.windowState?.coverEnabled!==false||this.preferences?.embedTranslation===true);this.route=this.enabled?(this.preferences?.hookProfile==='embed'?'embed':'custom'):'read';this.markerKey='';this.lastHeartbeat=this.now();const serial=++this.serial,child=this.process=this.spawn(path.join(this.folder,'HookBridge.exe'),[String(pid),hwnd,name,started,...(this.route==='read'?['--read-only']:this.route==='embed'?['--official-embed']:[])],{cwd:this.folder,windowsHide:true,stdio:['pipe','pipe','ignore']});child.stdin.on('error',()=>{});if(this.enabled)this.send({type:'enable'});
   const failed=()=>{if(serial!==this.serial)return;this.process=null;++this.serial;this.retry('Hook 连接停止');};child.on('error',failed);child.on('exit',failed);
@@ -227,9 +228,33 @@ class HookNative{
  // Fast-forward / held Ctrl (E215.4, user: after skipping, every skipped line poured into MeguLit). Lines arriving less
  // than 300 ms apart are a skip burst: they are held, each replacing the last, and only the line the game stops on is
  // shown, 400 ms after the burst ends. Native page engines (ISLAND cs2, several lines per page) keep ordered delivery.
+ /* E345 the hook engine (MeguLitHook32/64.dll) comes with the runtime pack, which is downloaded once. A newer build shipped
+    with MeguLit in native\megulithook\ (YU-RIS embed) replaces the installed one before a game is attached; the old file
+    is kept as .previous. A file still loaded by a running game cannot be replaced and is tried again next time. */
+ static syncShippedHook(folder){for(const name of ['MeguLitHook32.dll','MeguLitHook64.dll']){try{
+  const src=path.join(folder,'megulithook',name),dst=path.join(folder,'..','runtime','megulithook',name);
+  if(!fs.existsSync(src)||!fs.existsSync(path.dirname(dst)))continue;
+  const a=fs.statSync(src),b=fs.existsSync(dst)?fs.statSync(dst):null;
+  if(b&&a.size===b.size&&fs.readFileSync(src).equals(fs.readFileSync(dst)))continue;
+  if(b&&!fs.existsSync(dst+'.previous'))fs.copyFileSync(dst,dst+'.previous');
+  fs.copyFileSync(src,dst+'.tmp');fs.renameSync(dst+'.tmp',dst);}catch{}}}
+ /* E334 (user 2026-11-10, 女装山脈 with Ctrl held): some engines (YU-RIS) hand over every skipped line as one long text.
+    Such a text is cut back to the line the game stopped on: with a script, the shortest ending that is a known script
+    line; without one, the part after the last speaker change (name「…). Ordinary long narration is left whole. */
+ lastOfMerged(text){
+  const s=String(text||'');if(s.length<120)return s;
+  const cuts=[];const re=/[。！？!?…」』）)―─]+(?=[^。！？!?…」』）)―─])/g;let m;while((m=re.exec(s)))cuts.push(m.index+m[0].length);
+  if(cuts.length<3)return s;
+  if(this.originalText){for(let i=cuts.length-1;i>=0;i--){const part=s.slice(cuts[i]).trim();if(part.length<2)continue;
+   const r=this.resolveSource(part.replace(/^[^「『\s]{1,8}(?=[「『])/,''))||this.resolveSource(part);if(r&&(r.status==='exact'||r.status==='high')){for(let k=i-1;k>=Math.max(0,i-4);k--){const longer=s.slice(cuts[k]).trim(),q=this.resolveSource(longer);if(!q||q.status!=='exact'&&q.status!=='high')break;i=k;}return s.slice(cuts[i]).trim();}}}
+  const speakers=[...s.matchAll(/(?:^|[。！？!?…」』])([^\s「」『』。！？!?…]{1,8})[「『]/g)];
+  if(speakers.length>=2){const at=speakers[speakers.length-1].index+(/^[。！？!?…」』]/.test(speakers[speakers.length-1][0])?1:0);const tail=s.slice(at).trim();if(tail.length>=2&&tail.length<s.length*.6)return tail;}
+  return s;
+ }
  deliverSource(text,origin,engine='',nativeLine=0){
   const now=this.now(),live=!engine&&!nativeLine&&(origin||'live')==='live',S=this.skipBurst||(this.skipBurst={last:0,held:null,timer:null,count:0});
   if(!live){this.emitSource(text,origin,engine,nativeLine);return;}
+  {const last=this.lastOfMerged(text);if(last!==text){this.trace('merged skip text: kept the last line of '+text.length+' chars');text=last;}}
   const gap=now-S.last;S.last=now;
   if(gap>=300&&!S.held){S.count=0;this.emitSource(text,origin,engine,nativeLine);return;}
   S.count++;S.held={text,origin};clearTimeout(S.timer);
