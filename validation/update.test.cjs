@@ -78,3 +78,12 @@ test('update: a failing GitHub download falls back to a relay; a replaced releas
  assert.equal(r.sha256,crypto.createHash('sha256').update(after).digest('hex'));
  u.reset();fs.rmSync(root,{recursive:true,force:true});
 });
+/* The previous version is kept in migration\update-rollback, not as a second exe next to MeguLit.exe (user, 2026-11-09). */
+test('update: an old rollback exe moves out of the MeguLit folder; the script backs up and rolls back from there',()=>{
+ const fs=require('fs'),os=require('os'),path=require('path');const root=fs.mkdtempSync(path.join(os.tmpdir(),'upd-'));
+ try{fs.writeFileSync(path.join(root,'MeguLit.rollback-update.exe'),'old');assert.equal(u.tidyRollback(root),true);
+  assert.equal(fs.existsSync(path.join(root,'MeguLit.rollback-update.exe')),false);assert.equal(fs.readFileSync(path.join(root,'migration','update-rollback','MeguLit.exe'),'utf8'),'old');
+  assert.equal(u.tidyRollback(root),false);}finally{fs.rmSync(root,{recursive:true,force:true});}
+ const src=fs.readFileSync(path.join(__dirname,'..','services','update.cjs'),'utf8');
+ assert.match(src,/robocopy \$Root \$bak \/MIR/);assert.match(src,/ie4uinit\.exe'\) -show/);assert.match(src,/rolling back/);assert.doesNotMatch(src,/Copy-Item -LiteralPath \$exe -Destination \$backup/);
+});

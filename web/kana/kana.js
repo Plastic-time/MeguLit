@@ -5,6 +5,17 @@ import * as D from './data.js';
 
 const VIEWS=['index','lesson','gojuon','games','play','results','records','kanji'];
 const BASE=new URL('./',import.meta.url).href;
+import {RECORDED} from './audio/index.js';
+/* Kana voices (user, 2026-11-09): single kana are best heard from a person. 'female' / 'male' play the recordings in
+   kana/audio (Wikimedia Commons, see kana/audio/CREDITS.md); anything without a recording, and 'ai', use the synthesis. */
+const toHira=t=>String(t||'').replace(/[\u30a1-\u30f6]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+export const VOICES=[['female','女声'],['male','男声'],['ai','AI 合成']];
+export function voicePicker(ctx,{note=true}={}){
+ const box=document.createElement('div');box.className='kn-voice';
+ const draw=()=>{const cur=(ctx.store.get(KEY.p,{}).voice)||'female';box.innerHTML='<span class="kn-voice-label">发音</span><div class="kn-voice-seg" role="radiogroup" aria-label="发音">'+VOICES.map(([v,l])=>'<button type="button" role="radio" data-voice="'+v+'" aria-checked="'+(v===cur)+'">'+l+'</button>').join('')+'</div>'+(note?'<small class="kn-voice-note">清音、浊音播放母语者真人录音（来自 Wikimedia Commons）；拗音暂无真人录音，统一用 AI 合成</small>':'');
+  box.querySelectorAll('[data-voice]').forEach(b=>b.onclick=()=>{const p=ctx.store.get(KEY.p,{});ctx.store.set(KEY.p,{...p,voice:b.dataset.voice});draw();ctx.speech.say(b.dataset.voice==='male'?'お':'あ');});};
+ draw();return box;
+}
 const KEY={m:'megulit.kana.mastery',b:'megulit.kana.boxes',r:'megulit.kana.runs',a:'megulit.kana.applied',l:'megulit.kana.lessons',p:'megulit.kana.prefs'};
 const FIELD={[KEY.m]:'mastery',[KEY.b]:'boxes',[KEY.r]:'runs',[KEY.a]:'applied',[KEY.l]:'lessons',[KEY.p]:'prefs'};
 const INTERVAL=[1,3,7,21],DAY=864e5;
@@ -69,8 +80,11 @@ function createSpeech(api,store){
   cache.set(text,p);p.catch(()=>cache.delete(text));return p;
  }
  function system(t){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='ja-JP';u.rate=.85;u.volume=volume();speechSynthesis.speak(u);}catch{}}
+ const voice=()=>(store.get(KEY.p,{}).voice)||'female';
+ const recorded=text=>{const v=voice();if(v==='ai')return '';const k=toHira(text);return RECORDED[v]&&RECORDED[v].includes(','+k+',')?BASE+'audio/'+v+'/'+[...k].map(c=>c.codePointAt(0).toString(16).padStart(4,'0')).join('-')+'.'+RECORDED.ext/* ASCII file names: the release zip and updater stay encoding-safe */:'';};
  async function say(text){
   const my=++seq;stop();
+  {const url=recorded(text);if(url){try{current=new Audio(url);current.volume=volume();await current.play();return;}catch{if(my!==seq)return;}}}
   /* v1.1.6 (user: the speaker button stayed silent until a voice preview in Settings had started the engine): a cold
      AivisSpeech refuses the first requests for a few seconds; keep retrying up to ~20 s instead of going offline at once */
   if(!offline){for(let tries=0;tries<14&&my===seq;tries++){try{const url=await synth(text);if(my!==seq)return;current=new Audio(url);current.volume=volume();await current.play();return;}catch{await new Promise(r=>setTimeout(r,1500));}}
@@ -81,7 +95,7 @@ function createSpeech(api,store){
  /* start the voice engine as soon as the kana module opens, so the first click already has a voice */
  setTimeout(()=>{synth('あ').catch(()=>{});},300);
  let queue=Promise.resolve();
- function prefetch(list){queue=queue.then(async()=>{for(const t of [...new Set(list)].slice(0,120)){if(offline)return;try{await synth(t);}catch{return;}}});return queue;}
+ function prefetch(list){queue=queue.then(async()=>{for(const t of [...new Set(list)].slice(0,120)){if(offline)return;if(recorded(t))continue;try{await synth(t);}catch{return;}}});return queue;}
  function setVolume(v){if(current)current.volume=v;}
  return {say,prefetch,stop,setVolume};
 }
@@ -101,7 +115,7 @@ export async function mountKana(target,{api,invoke,toast,start='index',openTab}=
  let gameWordsCache=null;
  const gameWords=()=>gameWordsCache??=api('kana_game_words',{words:D.GAME_WORDS}).then(r=>r.words||{}).catch(()=>({}));
  let keyHandlers=[],leaveHandlers=[],current={name:'index',params:{}};
- const ctx={base:BASE,api,invoke,home:start,openTab:openTab||null,toast:toast||(()=>{}),store,speech,data:D,gameWords,lastRun:null,go,onKey:h=>keyHandlers.push(h),onLeave:h=>leaveHandlers.push(h),root:shadow};
+ const ctx={voicePicker:o=>voicePicker(ctx,o),base:BASE,api,invoke,home:start,openTab:openTab||null,toast:toast||(()=>{}),store,speech,data:D,gameWords,lastRun:null,go,onKey:h=>keyHandlers.push(h),onLeave:h=>leaveHandlers.push(h),root:shadow};
  function go(url){
   if(url==='@reload'){show(current.name,current.params);return;}
   /* 在「假名游戏」标签里，回到学习主页就切去「五十音」标签；反之亦然 */

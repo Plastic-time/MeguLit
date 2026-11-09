@@ -14,7 +14,7 @@
     scanX: 2, scanY: 60, scanWidth: 96, scanHeight: 38, blurRadius: 13, maskPadding: 6, fastMask:true,
     maskVersion:26, maskStyle:'blend', japaneseBold:false, chineseBold:false,
     hideWaitMarker:true,relocateWaitMarker:true,waitCoverStyle:'frame',
-    japaneseFont:'originalGothic', chineseFont:'patch', rubyFont:'round', englishFont:'inherit',
+    japaneseFont:'originalGothic', chineseFont:'notoSansSC', rubyFont:'notoSansJP', englishFont:'inherit',
     englishEnabled:false, englishSize:34, englishSpacingPx:0, englishBold:false,
     englishOutline:true, englishOutlineColor:'#ffffff', englishOutlineWidth:1,
     japaneseOutline:true, chineseOutline:true, japaneseOutlineColor:'#ffffff', chineseOutlineColor:'#ffffff', rubyOutline:true, rubyOutlineColor:'#ffffff', rubyOutlineWidth:.45,

@@ -210,7 +210,7 @@
    const move=e=>{last=e.getCoalescedEvents?.().at(-1)||e;if(!frame)frame=requestAnimationFrame(paint);};
    const up=()=>{header.removeEventListener('pointermove',move);header.removeEventListener('pointerup',up);header.removeEventListener('pointercancel',up);if(frame){cancelAnimationFrame(frame);paint();}
     node.style.removeProperty('transform');node.style.left=pos.x+'px';node.style.top=pos.y+'px';node.classList.remove('tome-menu-dragging','tome-log-dragging');
-    const a=gameArea();offset={x:Math.round(pos.x+w/2-(a.x+a.width/2)),y:Math.round(pos.y+h/2-(a.y+a.height/2))};try{localStorage.setItem(POSITION,JSON.stringify(offset));}catch{}};
+    const a=gameArea();offset={x:Math.round(pos.x+w/2-(a.x+a.width/2)),y:Math.round(pos.y+h/2-(a.y+a.height/2))};try{localStorage.setItem(POSITION,JSON.stringify(offset));}catch{}requestAnimationFrame(()=>window.__tomoyoHitRegionsRefresh?.(true));};
    header.addEventListener('pointermove',move);header.addEventListener('pointerup',up);header.addEventListener('pointercancel',up);});
   // Double-click on the header: back to the middle of the game window.
   header.addEventListener('dblclick',e=>{if(e.target.closest('button,input'))return;offset={x:0,y:0};try{localStorage.removeItem(POSITION);}catch{}placePanel(node);});}

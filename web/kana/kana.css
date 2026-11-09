@@ -846,3 +846,35 @@ td.none{color:var(--t3)}
 .v-kanji .kg-frame{margin-top:12px;height:420px;border-radius:10px;border:1px solid var(--rule-strong);background:var(--raise);display:grid;place-items:center;overflow:hidden}
 .v-kanji .kg-frame p{color:var(--t3);font-size:13px}
 .v-games .rv-empty{color:var(--t3);font-size:12px;margin-top:6px}
+
+/* 1080p and smaller heights (user, 2026-11-09: the kana overview and practice pages needed a scroll even maximized at
+   1920x1080). The same layout with tighter vertical rhythm, so each fits one screen. */
+@media (max-height:1120px){
+ .kana-root .page{padding-top:0!important;padding-bottom:16px!important;row-gap:28px}
+ .kana-root .lede{margin-top:6px}
+ .kana-root .folio{margin-top:16px}
+ .kana-root .folio-body{padding:18px 26px 16px}
+ .kana-root .folio-kana{font-size:62px}
+ .kana-root .folio-row{margin-top:12px}
+ .kana-root .toc-head{margin-top:22px}
+ .kana-root .chapter{padding:11px 8px}
+ .kana-root .chips{margin-top:5px}
+ .kana-root .side{margin-top:6px}
+ .kana-root .mastery{max-width:196px;gap:3px;margin-top:10px}
+ .kana-root .stats{gap:8px 12px;margin-top:10px}
+ .kana-root .wrap{padding-top:10px;padding-bottom:16px}
+ .kana-root .sheet{padding:20px 28px 18px}
+ .kana-root .label{margin-top:14px}
+ .kana-root .rule{padding-top:9px;padding-bottom:9px}
+ .kana-root .start-row{margin-top:14px;padding-top:12px}
+ .kana-root .review{margin-top:14px}
+}
+
+/* Kana voice choice: 女声 / 男声 / AI 合成 */
+.kn-voice{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:12px}
+.kn-voice-label{font-size:11px;letter-spacing:.2em;color:var(--t3)}
+.kn-voice-seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:999px;padding:2px;background:var(--raise)}
+.kn-voice-seg button{height:26px;padding:0 12px;border-radius:999px;color:var(--t2);font-size:12px;transition:background .2s,color .2s}
+.kn-voice-seg button[aria-checked="true"]{background:var(--accent);color:var(--on-accent)}
+.kn-voice-seg button:hover:not([aria-checked="true"]){color:var(--t1)}
+.kn-voice-note{flex-basis:100%;color:var(--t3);font-size:11px;line-height:1.5}

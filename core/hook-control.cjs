@@ -63,7 +63,9 @@ class HookControl{
    return;
   }
   if(m.stage==='read'){this.status({hookCheckState:m.matched?'captured':'unverified',hookVisualVerified:false,hookCheckMessage:m.matched?'捕捉成功，游戏原文可见（当前仅读取）':'捕捉成功，画面未匹配到本句原文'});return;}
-  if(m.matched){this.status({hookCheckState:'visible',hookVisualVerified:false,hookCheckMessage:'捕捉成功，但游戏原文仍然可见，隐藏未通过'});return;}
+  /* The replacement was answered but the game still drew the original (WHITE ALBUM2, user 2026-11-09): cover this line
+     with the OCR mask so the original does not show through; the next line is tried through the hook again. */
+  if(m.matched){if(h.hooks.lastSource)h.send({type:'maskAssist',source:h.hooks.lastSource});this.status({hookCheckState:'visible',hookVisualVerified:false,hookCheckMessage:'游戏原文仍然可见，本句已临时用遮罩盖住'});return;}
   if(m.sample<2)return;
   const drawFresh=(h.hooks.state.hookDrawAt||0)>=this.sourceAt-1800;
   if(this.baseline&&(drawFresh||h.hooks.state.replacementState==='callback-acknowledged')&&m.japaneseCharacters===0){this.status({hookCheckState:'verified',hookVisualVerified:true,hookCheckedAt:m.checkedAt,hookCheckMessage:'隐藏检查通过：绘制已拦截，连续两次未在游戏扫描区识别到日文'});}

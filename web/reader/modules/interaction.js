@@ -21,7 +21,9 @@
  };
  let queued=false,last='';const watched=new WeakSet(),resize=new ResizeObserver(schedule);
  const NODES='.sentence-text .char-token,.tome-page-lines>div,.tome-inline-wait,.tomoyo-cn-output,.tome-translation-char,.tomoyo-learning-notice,.tome-first-run,.lookup-tooltip,.tomoyo-selection-card,.tomoyo-cn-dialog[open],.tomoyo-cn-dialog[data-leaving],.tome-backlog[data-open],.tome-backlog[data-leaving],.tome-box-deco,.sentence-placeholder,.mg-select-pop,.tome-color-panel,body.tomoyo-ui-translation:not(.tomoyo-gal-bound) .sentence-window';
- const MENUS='.tomoyo-cn-dialog,.tome-backlog,.mg-select-pop,.tome-color-panel';
+ /* The lookup card is a panel too (user, 2026-11-09: clicks inside it went through to the game and advanced the story):
+    menu regions keep their clicks, text regions pass them to the game. */
+ const MENUS='.tomoyo-cn-dialog,.tome-backlog,.mg-select-pop,.tome-color-panel,.tomoyo-selection-card';
  function schedule(){if(queued)return;queued=true;queueMicrotask(report);}
  // WebView2 only redraws damaged parts of its surface; a part that was outside the old region can still hold stale
  // (black) pixels when the region grows, which showed as black blocks for the first frame of a menu or the backlog.

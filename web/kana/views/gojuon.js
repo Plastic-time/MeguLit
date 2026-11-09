@@ -31,6 +31,7 @@ el.innerHTML=`<div class="wrap">
   </div>
   <p class="note">笔顺数据：KanjiVG（© Ulrich Apel，CC BY-SA 3.0）</p>
 </div>`;
+ /* voice choice under the gojuon chart (user, 2026-11-09) */el.querySelector('#table')?.after(ctx.voicePicker());
 
 /* ======== 数据 ======== */
 const COLS=["a","i","u","e","o"],COLH="あいうえお",COLK="アイウエオ";

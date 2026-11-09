@@ -336,6 +336,7 @@ public class GalWindowBridge {
         else if(type=="dialogSceneLine"){Scene.Line();GameUi.Clear();}
         else if(type=="dialogVisibility"){DialogVisible=Bool(d,"visible");}
         else if(type=="hookVerify"){if(HookVerifier!=null)HookVerifier.Request(Target,d);}
+        else if(type=="maskAssist"){if(TextMask!=null)TextMask.Assist(Str(d,"source"));}
         else if(type=="hookVerifyCancel"){if(HookVerifier!=null)HookVerifier.Cancel();}
         else if(type=="gameAudio"){AudioWanted=Bool(d,"enabled");uint pid=0;if(AudioWanted&&Target!=IntPtr.Zero)GetWindowThreadProcessId(Target,out pid);if(AudioWanted&&pid!=0)Audio.Start(pid);else if(!AudioWanted)Audio.Stop();}
         else if(type=="mediaClip"){string id=Str(d,"id");long from=(long)Num(d,"from",0),to=(long)Num(d,"to",0);bool shot=Bool(d,"screenshot"),readerShot=Bool(d,"readerScreenshot");IntPtr target=Target,readerWindow=Overlay;

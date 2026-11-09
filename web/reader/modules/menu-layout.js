@@ -82,8 +82,11 @@
   const header=dialog.querySelector('.tomoyo-menu-header');if(!header||header.dataset.menuDrag)return;header.dataset.menuDrag='true';
   const key='tomoyo-menu-position-'+(document.body.classList.contains('tomoyo-ui-translation')?'overlay':'normal');
   const clamp=(x,y,w,h)=>({x:Math.max(4,Math.min(Math.max(4,innerWidth-w-4),x)),y:Math.max(4,Math.min(Math.max(4,innerHeight-h-4),y))});
-  const place=(x,y)=>{const r=dialog.getBoundingClientRect(),p=clamp(x,y,r.width,r.height);for(const [k,v]of [['left',p.x+'px'],['top',p.y+'px'],['right','auto'],['bottom','auto'],['margin','0']])dialog.style.setProperty(k,v,'important');return p;};
-  try{const pos=JSON.parse(localStorage.getItem(key)||'null');if(pos&&Number.isFinite(pos.x)&&Number.isFinite(pos.y)){if(document.body.classList.contains('tomoyo-ui-translation')){dialog.style.setProperty('left',pos.x+'px','important');dialog.style.setProperty('top',pos.y+'px','important');dialog.style.setProperty('right','auto','important');dialog.style.setProperty('bottom','auto','important');dialog.style.setProperty('margin','0','important');}else place(pos.x,pos.y);}}catch{}
+  /* A moved panel must move its click and glass regions too (user, 2026-11-09: clicks on a dragged or restored Alt+T menu
+     went through to the game and advanced the story). ResizeObserver reports size, not position, so refresh here. */
+  const regions=()=>requestAnimationFrame(()=>window.__tomoyoHitRegionsRefresh?.(true));
+  const place=(x,y)=>{const r=dialog.getBoundingClientRect(),p=clamp(x,y,r.width,r.height);for(const [k,v]of [['left',p.x+'px'],['top',p.y+'px'],['right','auto'],['bottom','auto'],['margin','0']])dialog.style.setProperty(k,v,'important');regions();return p;};
+  try{const pos=JSON.parse(localStorage.getItem(key)||'null');if(pos&&Number.isFinite(pos.x)&&Number.isFinite(pos.y)){if(document.body.classList.contains('tomoyo-ui-translation')){dialog.style.setProperty('left',pos.x+'px','important');dialog.style.setProperty('top',pos.y+'px','important');dialog.style.setProperty('right','auto','important');dialog.style.setProperty('bottom','auto','important');dialog.style.setProperty('margin','0','important');regions();}else place(pos.x,pos.y);}}catch{}
   // The panel moves with a transform while the pointer is down (one compositor update per frame, no relayout and no
   // window-region change per event); the final position is written once on release.
   header.addEventListener('pointerdown',down=>{
