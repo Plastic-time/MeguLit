@@ -236,7 +236,7 @@ class Library{
   const g=this.state.games.find(x=>x.key===key&&!x.missing);if(!g)throw Error('没有找到这个游戏，请重新扫描游戏路径');
   const exe=this.exeOf(key,variant),name=path.basename(exe).replace(/.exe$/i,'');if(!exe||!fs.existsSync(exe))throw Error('游戏程序不在了：'+exe);
   const running=(await this.locale.processes(exe)).length>0;
-  let localeResult={};if(!running&&options.localeJapanese!==false&&recommended(g,exe)){localeResult=await this.locale.launch(exe);if(localeResult.needLocaleEmulator)return localeResult;}
+  let localeResult={};if(!running&&options.localeJapanese!==false&&recommended(g,exe)){localeResult=await this.locale.launch(exe);if(localeResult.needLocaleEmulator){try{await this.locale.ensure();localeResult=await this.locale.launch(exe);}catch{}if(localeResult.needLocaleEmulator)return localeResult;}}
   if(!running&&!localeResult.localeJapanese){const {spawn}=require('node:child_process');
    if(g.source==='steam'&&/^\d+$/.test(String(g.appid)))spawn('explorer.exe',['steam://rungameid/'+g.appid],{detached:true,stdio:'ignore'}).unref();
    else spawn(exe,[],{cwd:path.dirname(exe),detached:true,stdio:'ignore'}).unref();}
