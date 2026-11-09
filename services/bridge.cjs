@@ -68,7 +68,9 @@ async function launch(db,id,runtime=null,windowsLaunch=false) {
   // "Japanese system environment": non-Unicode Japanese games (WA2) show their own dialogs garbled under a Chinese locale.
   if(!elevation&&!windowsLaunch&&profile.localeMode==='japanese'&&profile.source!=='steam'&&require('../core/locale-emulator.cjs').x86(game.executable)){
    stage='locale-start';const lib=runtime?.library?.()||new(require('../core/library.cjs').Library)(require('../core/layout.cjs'));
-   const result=await lib.locale.launch(game.executable,{trace});if(result.needLocaleEmulator)throw Error('LOCALE_EMULATOR_REQUIRED');state={pid:result.gamePid,locale:'japanese'};
+   let result=await lib.locale.launch(game.executable,{trace});
+   if(result.needLocaleEmulator){trace('locale-emulator-install',{});await lib.locale.ensure();result=await lib.locale.launch(game.executable,{trace});if(result.needLocaleEmulator)throw Error('LOCALE_EMULATOR_REQUIRED');}
+   state={pid:result.gamePid,locale:'japanese'};
   }else if(elevation||windowsLaunch){
    stage='windows-launch';
    await require('./game-process.cjs').shellOpen(root,game.executable);

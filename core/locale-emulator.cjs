@@ -4,6 +4,10 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {execFile,spawn}=require('node:child_process');
 const RELEASE='2.5.0.1',URL='https://github.com/xupefei/Locale-Emulator/releases/download/v2.5.0.1/Locale.Emulator.2.5.0.1.zip';
+// Pinned official package (size + sha256), so the same file may also come through a relay when GitHub is slow or
+// unreachable (user report 2026-11-09, mainland China); a relay only passes GitHub's own file along.
+const SHA256='808ff584426d52cc775ad6406da00622f454be95bd4c8fbca42eef4b7235ad5c',SIZE=154135;
+const SOURCES=[URL,'https://gh-proxy.com/'+URL,'https://ghproxy.net/'+URL];
 const REQUIRED=['LEProc.exe','LECommonLibrary.dll','LoaderDll.dll','LocaleEmulator.dll'];
 const GUID='b56f4ea1-f9ac-418a-add7-653dc2302e91';
 const XML=`<?xml version="1.0" encoding="utf-8"?><LEConfig><Profiles><Profile Name="Run in Japanese" Guid="${GUID}" MainMenu="false"><Parameter></Parameter><Location>ja-JP</Location><Timezone>Tokyo Standard Time</Timezone><RunAsAdmin>false</RunAsAdmin><RedirectRegistry>true</RedirectRegistry><IsAdvancedRedirection>false</IsAdvancedRedirection><RunWithSuspend>false</RunWithSuspend></Profile></Profiles></LEConfig>`;
@@ -18,7 +22,7 @@ function x86(exe){try{const fd=fs.openSync(exe,'r');try{const head=Buffer.alloc(
 // for the current user only (CLANNAD HD: "未发现字体 Noto Sans Mono CJK SC", E215.2), so it is not recommended there.
 function recommended(game,exe){return game.source!=='steam'&&!require('./locale-policy.cjs').chineseSystem4Patch(exe)&&/YU-RIS|BGI|KiriKiri|RealLive|CatSystem|AdvHD|WillPlus|Majiro|QLIE|SoftPal|NeXAS|System4|ShiinaRio|Entis|Cotopha|NScripter|LiveMaker/i.test(game.engine||'')&&x86(exe);}
 class LocaleEmulator{
- constructor(root){this.root=root;this.dir=path.join(root,'runtime','locale-emulator');this.job=null;this.cached=null;}
+ constructor(root,fetcher=(...a)=>fetch(...a)){this.fetch=fetcher;this.root=root;this.dir=path.join(root,'runtime','locale-emulator');this.job=null;this.cached=null;}
  async status(refresh=false){
   if(!refresh&&this.cached&&Date.now()-this.cached.at<15000)return {...this.cached.value,job:this.job};
   const dirs=[];try{const chosen=JSON.parse(fs.readFileSync(path.join(this.root,'data/config/library.json'),'utf8')).localePath;if(chosen)dirs.push(path.extname(chosen)?path.dirname(chosen):chosen);}catch{}dirs.push(this.dir);
@@ -36,17 +40,37 @@ class LocaleEmulator{
   this.installing=this.prepare().then(()=>{this.job.state='done';this.cached=null;}).catch(e=>{this.job.state='error';fs.appendFileSync(path.join(this.root,'logs','locale-emulator.log'),new Date().toISOString()+' '+String(e.message||e)+'\n');this.job.error=/^LE_[A-Z_]+$/.test(e.message)?e.message:'LE_INSTALL_FAILED';});
   return this.status();
  }
+ // Launch-time install (user report 2026-11-09: the message sent people to an install button that no longer exists):
+ // download and set up Locale Emulator, wait for it, and report whether it is ready now.
+ async ensure(){
+  let s=await this.status(true);if(s.installed)return s;
+  await this.install();await this.installing?.catch(()=>{});
+  s=await this.status(true);if(!s.installed)throw Error(this.job?.error==='LE_DOWNLOAD_FAILED'?'LOCALE_EMULATOR_DOWNLOAD_FAILED':'LOCALE_EMULATOR_REQUIRED');
+  return s;
+ }
  async prepare(){
   const cache=path.join(this.root,'cache');fs.mkdirSync(cache,{recursive:true});
   const zip=path.join(cache,'Locale.Emulator.'+RELEASE+'.zip'),part=zip+'.part';
   const stage=this.dir+'.stage-'+crypto.randomUUID();
   try{
-   const response=await fetch(URL,{signal:AbortSignal.timeout(120000)});if(!response.ok||!response.body)throw Error('HTTP '+response.status);
-   const chunks=[];for await(const chunk of response.body){this.job.received+=chunk.length;if(this.job.received>5000000)throw Error('LE_PACKAGE_INVALID');chunks.push(chunk);}
-   const bytes=Buffer.concat(chunks);if(bytes.length!==154135||bytes.readUInt32LE(0)!==0x04034b50)throw Error('LE_PACKAGE_INVALID');fs.writeFileSync(part,bytes);fs.renameSync(part,zip);
+   let bytes=null;const cached=fs.existsSync(zip)?fs.readFileSync(zip):null;
+   if(cached&&cached.length===SIZE&&crypto.createHash('sha256').update(cached).digest('hex')===SHA256)bytes=cached;
+   for(const url of bytes?[]:SOURCES){
+    try{
+     this.job.received=0;const response=await this.fetch(url,{signal:AbortSignal.timeout(60000)});if(!response.ok||!response.body)throw Error('HTTP '+response.status);
+     const chunks=[];for await(const chunk of response.body){this.job.received+=chunk.length;if(this.job.received>5000000)throw Error('LE_PACKAGE_INVALID');chunks.push(chunk);}
+     const got=Buffer.concat(chunks);if(got.length!==SIZE||got.readUInt32LE(0)!==0x04034b50||crypto.createHash('sha256').update(got).digest('hex')!==SHA256)throw Error('LE_PACKAGE_INVALID');
+     bytes=got;break;
+    }catch(e){try{fs.appendFileSync(path.join(this.root,'logs','locale-emulator.log'),new Date().toISOString()+' download '+new globalThis.URL(url).hostname+' '+String(e.message||e)+'\n');}catch{}}
+   }
+   if(!bytes)throw Error('LE_DOWNLOAD_FAILED');
+   if(bytes!==cached){fs.writeFileSync(part,bytes);fs.renameSync(part,zip);}
    this.job.state='extracting';
    const script=`import sys,zipfile,pathlib\nz=zipfile.ZipFile(sys.argv[1]); root=pathlib.Path(sys.argv[2]).resolve(); root.mkdir(parents=True)\nfor e in z.infolist():\n p=(root/e.filename).resolve()\n if not p.is_relative_to(root) or e.file_size>20000000 or (e.external_attr>>16)&0o170000==0o120000: raise ValueError('Unsafe archive entry')\nz.extractall(root)\n`;
-   await run(path.join(this.root,'runtime','python','python.exe'),['-c',script,zip,stage]);
+   const python=path.join(this.root,'runtime','python','python.exe');
+   // Without MeguLit's Python (reading components not installed) Windows' own tar unpacks the zip.
+   if(fs.existsSync(python))await run(python,['-c',script,zip,stage]);
+   else{fs.mkdirSync(stage,{recursive:true});await run(path.join(process.env.SystemRoot||'C:\\Windows','System32','tar.exe'),['-xf',zip,'-C',stage]);}
    await run('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(__dirname,'extract-locale.ps1'),'-Installer',path.join(stage,'LEInstaller.exe'),'-OutputDirectory',stage]);
    if(!complete(stage))throw Error('LE_COMPONENTS_MISSING');
    // A private portable configuration prevents an application profile or global admin profile taking priority
