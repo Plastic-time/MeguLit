@@ -29,6 +29,7 @@ function savePreferences(request) {
   if(Number.isFinite(patch.glowSpeed))next.glowSpeed=Math.max(.25,Math.min(3,patch.glowSpeed));
   if(/^#[0-9a-f]{6}$/i.test(patch.barColor))next.barColor=patch.barColor.toLowerCase();
   if(patch.glassColor===''||/^#[0-9a-f]{6}$/i.test(patch.glassColor))next.glassColor=String(patch.glassColor).toLowerCase();
+  if(patch.goldColor===''||/^#[0-9a-f]{6}$/i.test(patch.goldColor))next.goldColor=String(patch.goldColor).toLowerCase();
   if(typeof patch.username==='string')next.username=patch.username.slice(0,80);
   if(typeof patch.fontFamily==='string' && !/[<>{};]/.test(patch.fontFamily))next.fontFamily=patch.fontFamily.slice(0,120);
   if(Number.isFinite(patch.backgroundDim))next.backgroundDim=Math.max(0,Math.min(1,patch.backgroundDim));

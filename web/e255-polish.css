@@ -13,7 +13,7 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button){
   radial-gradient(1px 1px at 64% 78%,rgba(255,226,180,.5),transparent 70%),
   radial-gradient(120% 140% at 0% 50%,rgba(196,40,58,.55),transparent 62%),
   linear-gradient(135deg,#3a1720 0%,#2a1219 45%,#1d1016 100%)!important;
- box-shadow:inset 0 0 0 1px rgba(237,181,110,.42),inset 0 0 0 3px rgba(20,10,12,.55),inset 0 0 0 4px rgba(237,181,110,.14),
+ box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold-accent,#edb56e) 42%,transparent),inset 0 0 0 3px rgba(20,10,12,.55),inset 0 0 0 4px color-mix(in srgb,var(--gold-accent,#edb56e) 14%,transparent),
   inset 0 1px 0 4px rgba(255,220,170,.06),0 6px 18px -6px rgba(150,20,40,.55)!important;
  backdrop-filter:none!important;text-shadow:0 0 10px rgba(255,170,120,.35);
  transition:box-shadow .25s ease,transform .18s ease,filter .25s ease!important}
@@ -27,11 +27,11 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button)::before{
 /* 掠光 */
 body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button)::after{
  content:""!important;position:absolute!important;inset:0!important;z-index:-1;pointer-events:none;display:block!important;
- background:linear-gradient(110deg,transparent 30%,rgba(255,215,160,.16) 48%,transparent 62%)!important;
+ background:linear-gradient(110deg,transparent 30%,color-mix(in srgb,var(--gold-hi,#ffd7a0) 16%,transparent) 48%,transparent 62%)!important;
  transform:translateX(-120%);transition:transform .7s ease!important;width:auto!important;height:auto!important;border:0!important}
 body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):hover{
  filter:brightness(1.08)!important;transform:translateY(-1px);
- box-shadow:inset 0 0 0 1px rgba(255,215,160,.75),inset 0 0 0 3px rgba(20,10,12,.5),inset 0 0 0 4px rgba(237,181,110,.28),0 10px 24px -8px rgba(200,40,60,.6)!important}
+ box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold-hi,#ffd7a0) 75%,transparent),inset 0 0 0 3px rgba(20,10,12,.5),inset 0 0 0 4px color-mix(in srgb,var(--gold-accent,#edb56e) 28%,transparent),0 10px 24px -8px rgba(200,40,60,.6)!important}
 body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):hover::before{transform:rotate(90deg) scale(1.2)!important}
 body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):hover::after{transform:translateX(120%)}
 body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):active{transform:translateY(0) scale(.97)}
@@ -64,19 +64,19 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):disabled{fi
 
 /* ---------- 4. 颜色选择：宝石色板 ---------- */
 .main .settings-content input[type=color]{-webkit-appearance:none;appearance:none;width:52px!important;height:30px!important;padding:3px!important;border:0!important;border-radius:999px!important;cursor:pointer;
- background:linear-gradient(135deg,rgba(255,215,160,.5),rgba(120,70,40,.4))!important;box-shadow:0 0 0 1px rgba(237,181,110,.35),0 4px 10px -4px rgba(0,0,0,.6)!important;transition:box-shadow .2s,transform .2s}
+ background:linear-gradient(135deg,color-mix(in srgb,var(--gold-hi,#ffd7a0) 50%,transparent),rgba(120,70,40,.4))!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--gold-accent,#edb56e) 35%,transparent),0 4px 10px -4px rgba(0,0,0,.6)!important;transition:box-shadow .2s,transform .2s}
 .main .settings-content input[type=color]::-webkit-color-swatch-wrapper{padding:0}
 .main .settings-content input[type=color]::-webkit-color-swatch{border:0;border-radius:999px;box-shadow:inset 0 1px 2px rgba(255,255,255,.25),inset 0 -2px 4px rgba(0,0,0,.35)}
-.main .settings-content input[type=color]:hover{transform:translateY(-1px);box-shadow:0 0 0 1px #ffd7a0,0 0 12px rgba(255,190,110,.35)!important}
+.main .settings-content input[type=color]:hover{transform:translateY(-1px);box-shadow:0 0 0 1px var(--gold-hi,#ffd7a0),0 0 12px rgba(255,190,110,.35)!important}
 .color-swatches{gap:10px!important}
 .color-swatches .swatch{width:24px!important;height:24px!important;min-width:0!important;border:0!important;border-radius:50%!important;cursor:pointer;position:relative;
  background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.45),transparent 42%),var(--swatch)!important;
  box-shadow:inset 0 -3px 5px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.12),0 3px 8px -3px rgba(0,0,0,.6)!important;transition:transform .2s,box-shadow .2s!important}
 .color-swatches .swatch:hover{transform:translateY(-2px) scale(1.06)}
-.color-swatches .swatch.active{box-shadow:inset 0 -3px 5px rgba(0,0,0,.35),0 0 0 2px var(--e-ink,#17181c),0 0 0 3.5px #edb56e,0 0 12px rgba(237,181,110,.45)!important}
-.accent-custom{height:28px!important;padding:0 12px!important;border-radius:999px!important;border:1px solid rgba(237,181,110,.35)!important;background:transparent!important;font-size:12.5px!important}
+.color-swatches .swatch.active{box-shadow:inset 0 -3px 5px rgba(0,0,0,.35),0 0 0 2px var(--e-ink,#17181c),0 0 0 3.5px var(--gold-accent,#edb56e),0 0 12px color-mix(in srgb,var(--gold-accent,#edb56e) 45%,transparent)!important}
+.accent-custom{height:28px!important;padding:0 12px!important;border-radius:999px!important;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 35%,transparent)!important;background:transparent!important;font-size:12.5px!important}
 .accent-custom::before{content:"";width:12px;height:12px;margin-right:6px;border-radius:50%;background:conic-gradient(#e0475a,#e8b04c,#4fb38f,#3d8ec9,#8a5cc4,#e0475a)}
-.accent-custom:hover{border-color:#edb56e!important}
+.accent-custom:hover{border-color:var(--gold-accent,#edb56e)!important}
 
 /* ---------- 5. 左侧栏：主题同步，上下留白一致 ---------- */
 .main .settings-nav{padding:18px 18px!important;box-sizing:border-box}
@@ -90,15 +90,15 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):disabled{fi
 :root[data-theme=light] .main .settings-nav .settings-category button{color:#6e4f47!important}
 :root[data-theme=light] .main .settings-nav .settings-category button.active{color:#301919!important}
 :root[data-theme=black] .main .settings-nav,:root[data-theme=black] .home-glass .main .settings-nav{
- background:linear-gradient(180deg,rgba(14,12,13,.86),rgba(6,6,7,.82))!important;border:1px solid rgba(237,181,110,.2)!important;border-radius:12px!important;
- box-shadow:inset 0 1px 0 rgba(255,215,160,.06),0 16px 40px rgba(0,0,0,.5)!important}
+ background:linear-gradient(180deg,rgba(14,12,13,.86),rgba(6,6,7,.82))!important;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 20%,transparent)!important;border-radius:12px!important;
+ box-shadow:inset 0 1px 0 color-mix(in srgb,var(--gold-hi,#ffd7a0) 6%,transparent),0 16px 40px rgba(0,0,0,.5)!important}
 
 /* 下拉弹层跟随主题 */
 :root[data-theme=light] .select-popup{background:rgba(250,243,233,.97)!important;color:#301919!important;border:1px solid rgba(176,120,64,.3)!important;box-shadow:0 14px 34px -10px rgba(80,40,20,.35)!important}
 :root[data-theme=light] .select-popup :is(button,[role=option],li){color:#4a2a24!important;background:transparent!important}
 :root[data-theme=light] .select-popup :is(button,[role=option],li):hover{background:rgba(176,40,56,.08)!important;color:#301919!important}
 :root[data-theme=light] .select-popup :is([aria-selected=true],.selected,.active){color:#a8202f!important}
-:root[data-theme=black] .select-popup{background:rgba(8,8,9,.97)!important;border:1px solid rgba(237,181,110,.18)!important}
+:root[data-theme=black] .select-popup{background:rgba(8,8,9,.97)!important;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 18%,transparent)!important}
 
 /* ---------- 6. 游戏库悬停详情：底角不漏色 ---------- */
 .library-card .cover-frame{background:#140d0c!important}
@@ -125,10 +125,10 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):disabled{fi
 .main .settings-content .settings-row .color-swatches{width:auto!important;max-width:none!important;flex:none!important;overflow:visible!important;flex-wrap:nowrap;padding:4px}
 .color-swatches .swatch{width:22px!important;height:22px!important;background:var(--swatch)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)!important}
 .color-swatches .swatch:hover{transform:translateY(-1px)}
-.color-swatches .swatch.active{box-shadow:0 0 0 2px var(--e-ink,#17181c),0 0 0 3px #edb56e!important}
-.main .settings-content input[type=color]{width:44px!important;height:26px!important;padding:2px!important;border-radius:8px!important;background:transparent!important;box-shadow:0 0 0 1px rgba(237,181,110,.4)!important;overflow:visible}
+.color-swatches .swatch.active{box-shadow:0 0 0 2px var(--e-ink,#17181c),0 0 0 3px var(--gold-accent,#edb56e)!important}
+.main .settings-content input[type=color]{width:44px!important;height:26px!important;padding:2px!important;border-radius:8px!important;background:transparent!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--gold-accent,#edb56e) 40%,transparent)!important;overflow:visible}
 .main .settings-content input[type=color]::-webkit-color-swatch{border-radius:6px;box-shadow:none}
-.main .settings-content input[type=color]:hover{transform:none;box-shadow:0 0 0 1px #edb56e!important}
+.main .settings-content input[type=color]:hover{transform:none;box-shadow:0 0 0 1px var(--gold-accent,#edb56e)!important}
 /* E260 修正：标题/说明在左列内靠左（竖排 flex 里 align-self:center 会水平居中） */
 .main .settings-content .settings-row>div:first-child{align-items:flex-start!important;text-align:left!important}
 .main .settings-content .settings-row>div:first-child>:is(.settings-label,.settings-help){align-self:flex-start!important;text-align:left!important}
@@ -152,9 +152,9 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):disabled{fi
 .main .settings-nav .settings-category button.active{padding-left:18px!important}
 .main .settings-nav .settings-category button.active::before{left:4px!important;top:50%!important;margin-top:0!important;transform:translateY(-50%) rotate(45deg)!important}
 /* 顶部栏取色：恢复胶囊宝石款，留出右侧光圈空间 */
-.main .settings-content input[type=color]{width:52px!important;height:30px!important;padding:3px!important;margin-right:6px!important;border-radius:999px!important;background:linear-gradient(135deg,rgba(255,215,160,.5),rgba(120,70,40,.4))!important;box-shadow:0 0 0 1px rgba(237,181,110,.35),0 4px 10px -4px rgba(0,0,0,.6)!important}
+.main .settings-content input[type=color]{width:52px!important;height:30px!important;padding:3px!important;margin-right:6px!important;border-radius:999px!important;background:linear-gradient(135deg,color-mix(in srgb,var(--gold-hi,#ffd7a0) 50%,transparent),rgba(120,70,40,.4))!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--gold-accent,#edb56e) 35%,transparent),0 4px 10px -4px rgba(0,0,0,.6)!important}
 .main .settings-content input[type=color]::-webkit-color-swatch{border-radius:999px;box-shadow:inset 0 1px 2px rgba(255,255,255,.25),inset 0 -2px 4px rgba(0,0,0,.35)}
-.main .settings-content input[type=color]:hover{transform:translateY(-1px);box-shadow:0 0 0 1px #ffd7a0,0 0 12px rgba(255,190,110,.35)!important}
+.main .settings-content input[type=color]:hover{transform:translateY(-1px);box-shadow:0 0 0 1px var(--gold-hi,#ffd7a0),0 0 12px rgba(255,190,110,.35)!important}
 .main .settings-content,.main .settings-content .panel{overflow-x:visible}
 /* 悬停详情：恢复动画——整块封面作为单一合成层上移，遮罩淡入、文字上滑 */
 .library-card .cover-frame{will-change:transform;backface-visibility:hidden;transition:transform .2s var(--g-ease,ease)!important}

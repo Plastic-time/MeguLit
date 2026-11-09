@@ -74,7 +74,7 @@ el.innerHTML=`<main class="page">
     <div class="side">
       <h5>平假名熟悉度</h5>
       <div class="mastery">${[...grid].map(c=>c==='　'?'<span class="gap"></span>':`<span class="m${lv(c)}" title="${c}">${c}</span>`).join('')}</div>
-      <div class="legend"><span><i style="background:var(--raise)"></i>未学</span><span><i style="background:var(--raise-2)"></i>见过</span><span><i style="background:rgba(237,181,110,.3)"></i>熟悉</span><span><i style="background:var(--accent)"></i>掌握</span></div>
+      <div class="legend"><span><i style="background:var(--raise)"></i>未学</span><span><i style="background:var(--raise-2)"></i>见过</span><span><i style="background:color-mix(in srgb,var(--gold-accent,#edb56e) 30%,transparent)"></i>熟悉</span><span><i style="background:var(--accent)"></i>掌握</span></div>
     </div>
     <div class="side">
       <h5>本周</h5>
