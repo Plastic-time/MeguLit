@@ -46,7 +46,7 @@ class HookControl{
   const stage=h.hooks.preflight?'baseline':h.hooks.enabled&&this.plan!=='read'?'hidden':'read';
   if(stage==='baseline'&&this.styleCalibration)h.styleSync?.status('measuring');
   this.stage=stage;this.status({hookCapturedAt:this.sourceAt,hookCaptureCharacters:text.length,hookVisualVerified:false,hookCheckState:stage==='baseline'?'baseline':stage==='hidden'?'checking':'captured',hookCheckMessage:stage==='baseline'?'已抓到台词，正在检查游戏中的原文':stage==='hidden'?'台词已捕捉，正在检查游戏原文是否消失':'台词捕捉成功，正在检查游戏画面'});
-  h.send({type:'hookVerify',source:text,sequence:this.seq,stage,scanX:h.preferences.scanX,scanY:h.preferences.scanY,scanWidth:h.preferences.scanWidth,scanHeight:h.preferences.scanHeight});
+  h.send({type:'hookVerify',source:text,sequence:this.seq,stage,...require('./scan-area.cjs').area(h.preferences,h.flowPage||undefined)});
  }
  visual(m){
   if(!this.running||m.sequence!==this.seq||m.stage!==this.stage)return;

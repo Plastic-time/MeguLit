@@ -8,6 +8,7 @@ This is an inventory, not a claim that the complete project's license audit is f
 - Microsoft WebView2 loader: generic x64 dependency artifact; the Evergreen WebView2 runtime is installed separately
 - JMdict-derived data: imported from the user's existing dictionary data. Retain the dictionary source attribution and applicable data/translation notices before public distribution; the data is not newly authored by this rewrite
 - LunaHook and its engine adaptations: source and notices retained under `preserved/source/`; the custom native/runtime bridge is now integrated with the independent reader, with live game verification still pending
+- LunaHook MAGES character table (GPL-3.0): `services/original-engines/mages-charset-sghd.txt` is copied from LunaHook's MAGES engine adaptation and used to decode STEINS;GATE scripts for zero-latency translation
 - MinHook 1.3 (Tsuda Kageyu, BSD 2-Clause): vendored under `native/scncapture/minhook/` with its `LICENSE.txt`, linked into `native/MeguLitScn32.dll` / `MeguLitScn64.dll` (KiriKiri Z scene capture)
 - KiriKiri 2 plug-in SDK stub (`tp_stub.h` / `tp_stub.cpp`, W.Dee and contributors, KiriKiri license / GNU GPL dual license, GPL chosen): copied unmodified from https://github.com/krkrz/krkr2 into `native/krkrtext/sdk/` with its `license.txt`, linked into `native/MeguLitKrkr32.dll` (KiriKiri text positions)
 - Existing custom startup helper and character artwork: preserved from the user's project; artwork origin/usage should remain in the distribution inventory

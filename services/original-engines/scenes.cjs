@@ -9,6 +9,12 @@
 //   renpy     game/*.rpy; a patch is a tl/<language> folder of old/new pairs, matched by the original text
 //   siglus    Steam dat/*.dbs language tables (Summer Pockets): Japanese column + the Chinese column
 //   yuris     YU-RIS YPF archives (pac/ysbin.ypf + update*.ypf), YSTB scene files (yuris.cjs)
+//   aquaplus  AQUAPLUS / Leaf KCAP script.pak string tables (aquaplus.cjs)
+//   nscripter NScripter / ONScripter 0.txt or nscript.dat, one scene per label block (nscripter.cjs)
+//   unity-text Unity TextAssets whose lines carry every language (unity-text.cjs)
+//   higurashi 07th Expansion Unity StreamingAssets/Scripts/*.txt (higurashi.cjs)
+//   mages     MAGES. USRDIR/script.mpk SC3 scenes, Japanese releases only (mages.cjs)
+//   capcom-msg Capcom Unity Ace Attorney scriptmessage bundles, Japanese + the Chinese bundle (capcom-msg.cjs)
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const xp3=require('./xp3.cjs');
 const KANA=/[ぁ-ゖァ-ヺ]/g;
@@ -331,7 +337,15 @@ const hunex={
 
 // E329 YU-RIS (ysbin.ypf + update*.ypf, YSTB scenes): yuris.cjs.
 const yuris=require('./yuris.cjs');
-const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris};
+// E330 AQUAPLUS / Leaf KCAP (script.pak, WHITE ALBUM2): aquaplus.cjs.
+const aquaplus=require('./aquaplus.cjs');
+// E331 NScripter / ONScripter (0.txt or nscript.dat, blocks by label): nscripter.cjs.
+const nscripter=require('./nscripter.cjs');
+// E340 Unity TextAssets with 日本語※简体※繁體 lines (月に寄りそう乙女の作法): unity-text.cjs. E341 07th Expansion Unity
+// (ひぐらし 奉, StreamingAssets/Scripts OutputLine): higurashi.cjs. E342 MAGES. script.mpk SC3 (STEINS;GATE): mages.cjs.
+// E343 Capcom Unity Ace Attorney collections (逆転検事 1&2, scriptmessage bundles): capcom-msg.cjs.
+const unityText=require('./unity-text.cjs'),higurashi=require('./higurashi.cjs'),mages=require('./mages.cjs'),capcomMsg=require('./capcom-msg.cjs');
+const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,8)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;}

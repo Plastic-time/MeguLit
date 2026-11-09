@@ -11,7 +11,7 @@
     paddingX: 20, paddingY: 10, textColor: '#fffaf2', readTextColor: '', textGradient:false, textGradientTop:'#fffaf2', textGradientBottom:'#a8c8ff', readTextGradient:false, readTextGradientTop:'#b0e2ff', readTextGradientBottom:'#639bd1', textGradientStart:0, readTextGradientStart:0, shadow: 'outline', autoScale: true,
     bindEnabled: false, interfaceMode:'normal', gameProcess: 'BGI', x: 4, y: 70, width: 92, height: 27,
     autoGameStyle:true, livePosition:false, hookProfile:'read', embedTranslation:false, hookAutoStart:true, hookHide:true, hookFast:true, mask: false, maskMode: 'hook', maskColor: '#171923',
-    scanX: 2, scanY: 60, scanWidth: 96, scanHeight: 38, blurRadius: 13, maskPadding: 6, fastMask:true,
+    scanAuto: true, scanX: 2, scanY: 60, scanWidth: 96, scanHeight: 38, blurRadius: 13, maskPadding: 6, fastMask:true,
     maskVersion:26, maskStyle:'blend', japaneseBold:false, chineseBold:false,
     hideWaitMarker:true,relocateWaitMarker:true,waitCoverStyle:'frame',
     japaneseFont:'originalGothic', chineseFont:'notoSansSC', rubyFont:'notoSansJP', englishFont:'inherit',
@@ -33,7 +33,7 @@
       const number = value[key] === '' || value[key] == null ? NaN : Number(value[key]);
       if (Number.isFinite(number)) result[key] = Math.max(min, Math.min(max, number));
     }
-    for (const key of ['typewriter','furigana','autoScale','fastMask','hideWaitMarker','relocateWaitMarker']) result[key] = value[key] !== false;
+    for (const key of ['typewriter','furigana','autoScale','fastMask','hideWaitMarker','relocateWaitMarker','scanAuto']) result[key] = value[key] !== false;
     for(const key of ['textGradient','readTextGradient'])result[key]=value[key]===true;
     // Where the top colour starts turning into the bottom colour, as % of the line height (0 = from the top).
     for(const key of ['textGradientStart','readTextGradientStart'])if(Number.isFinite(Number(value[key])))result[key]=Math.max(0,Math.min(95,Number(value[key])));
