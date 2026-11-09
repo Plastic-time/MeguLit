@@ -10,7 +10,7 @@
     translationSize: 30, rubyScale: .55, rubyOffsetX:0, rubyOffsetY:0, rubyRowOffsets:'', lineHeight: 0, lineHeightMode:'offset', translationLineHeight:0, japaneseSpacing:0, japaneseSpacingPx:0,chineseSpacingPx:0, gap: 6, translationWidth: 75,
     paddingX: 20, paddingY: 10, textColor: '#fffaf2', readTextColor: '', textGradient:false, textGradientTop:'#fffaf2', textGradientBottom:'#a8c8ff', readTextGradient:false, readTextGradientTop:'#b0e2ff', readTextGradientBottom:'#639bd1', textGradientStart:0, readTextGradientStart:0, shadow: 'outline', autoScale: true,
     bindEnabled: false, interfaceMode:'normal', gameProcess: 'BGI', x: 4, y: 70, width: 92, height: 27,
-    autoGameStyle:true, livePosition:false, hookProfile:'read', hookAutoStart:true, hookHide:true, hookFast:true, mask: false, maskMode: 'hook', maskColor: '#171923',
+    autoGameStyle:true, livePosition:false, hookProfile:'read', embedTranslation:false, hookAutoStart:true, hookHide:true, hookFast:true, mask: false, maskMode: 'hook', maskColor: '#171923',
     scanX: 2, scanY: 60, scanWidth: 96, scanHeight: 38, blurRadius: 13, maskPadding: 6, fastMask:true,
     maskVersion:26, maskStyle:'blend', japaneseBold:false, chineseBold:false,
     hideWaitMarker:false,relocateWaitMarker:false,waitCoverStyle:'frame',
@@ -47,7 +47,7 @@
     result.bindEnabled = value.bindEnabled === true;
     result.autoGameStyle=value.autoGameStyle!==false;result.livePosition=value.livePosition===true;
     if(['read','euphoria474','embed','off'].includes(value.hookProfile))result.hookProfile=value.hookProfile;
-    result.hookAutoStart=value.hookAutoStart!==false;result.hookFast=value.hookFast!==false;
+    result.embedTranslation=value.embedTranslation===true;result.hookAutoStart=value.hookAutoStart!==false;result.hookFast=value.hookFast!==false;
     result.hookHide=value.hookHide!==false;
     result.interfaceMode=value.interfaceMode==='translation'?'translation':'normal';
     result.japaneseBold = value.japaneseBold === true;

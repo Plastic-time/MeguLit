@@ -12,6 +12,7 @@ class Reader{
  event(message){
   if(message.type==='homeHotkey'){this.runtime.emit('home-toggle',null);return;}
   if(message.type==='readerPointer'){this.runtime.emit('reader-pointer-input',message);return;}
+  if(message.type==='hookEmbedRequest'){this.embedTranslate(message.id,message.text);return;}
   if(message.type==='hostFrame'){
    try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),...message})+'\n');}catch{}
    return;
@@ -94,7 +95,21 @@ class Reader{
   push('LOCAL_RUNTIME_DOWNLOADING:100');push('LOCAL_STARTING');
   return llm.ensure(options);
  }
- async translate(request){const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;const options=require('../core/providers.cjs').resolveOptions({...this.prefs(),...(request.options&&typeof request.options==='object'?request.options:{}),translationPrompt:this.workPrompt||''});if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();const gameId=this.gameId;await this.localReady(options,request.id,current);const translated=normalizeTranslation(await this.translator().translate(text,options,current));if(gameId)this.stats.translation(gameId,text,translated);return translated;}
+ // Translation written back into the game (embedTranslation): the hook bridge holds the line until this answers (about
+ // 3.7 s); an empty answer lets the original line through. Lines are cached so the reader page, which asks for the
+ // same line a moment later, and repeated lines (backlog, redraws) do not call the translation service again.
+ embedKey(text){return String(text||'').replace(/\s+/g,'');}
+ embedCached(text,value){this.embedCache??=new Map();const key=this.embedKey(text);if(!key)return undefined;if(value===undefined)return this.embedCache.get(key);this.embedCache.delete(key);this.embedCache.set(key,value);if(this.embedCache.size>800)this.embedCache.delete(this.embedCache.keys().next().value);return value;}
+ async embedTranslate(id,text){
+  let trans='';
+  try{
+   trans=this.embedCached(text)||'';
+   if(!trans){const options=require('../core/providers.cjs').resolveOptions({...this.prefs(),translationPrompt:this.workPrompt||''});if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();
+    const until=Date.now()+3500,inTime=()=>Date.now()<until;await this.localReady(options,null,inTime);trans=normalizeTranslation(await this.translator().translate(text,options,()=>true));if(trans)this.embedCached(text,trans);}
+  }catch(error){try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'embedTranslateFailed',error:String(error?.message||error).slice(0,200)})+'\n');}catch{}}
+  this.gal?.hooks?.embedReply(id,trans);
+ }
+ async translate(request){const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;{const cached=this.embedCached(text);if(cached)return cached;}const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;const options=require('../core/providers.cjs').resolveOptions({...this.prefs(),...(request.options&&typeof request.options==='object'?request.options:{}),translationPrompt:this.workPrompt||''});if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();const gameId=this.gameId;await this.localReady(options,request.id,current);const translated=normalizeTranslation(await this.translator().translate(text,options,current));if(gameId)this.stats.translation(gameId,text,translated);if(translated)this.embedCached(text,translated);return translated;}
  async invoke(command,args={}){
   if(command.startsWith('plugin:sql|'))return require('./legacy-reader-sql.cjs').request(this.root,command,args);
   if(command==='word_states'){const forms=Array.isArray(args.forms)?[...new Set(args.forms.filter(v=>typeof v==='string'&&v.length<=100))].slice(0,200):[];if(!forms.length)return [];const db=openStore(this.root);try{return db.prepare('SELECT id,spelling,reading,status FROM vocabulary WHERE spelling IN ('+forms.map(()=>'?').join(',')+')').all(...forms);}finally{db.close();}}
