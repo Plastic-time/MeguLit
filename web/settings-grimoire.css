@@ -366,3 +366,11 @@ dialog.exe-dialog .dialog-actions .secondary:hover{background:rgba(255,236,214,.
 dialog.exe-dialog .dialog-actions .primary{background:linear-gradient(180deg,#d23a46,#a8263a);border:1px solid #d84a56;color:#fff;box-shadow:0 6px 16px rgba(200,48,60,.3),0 1px 0 rgba(255,255,255,.15) inset}
 dialog.exe-dialog .dialog-actions .primary:hover{filter:brightness(1.08)}
 dialog.exe-dialog .dialog-actions button:disabled{opacity:.5;cursor:default;transform:none}
+
+dialog.exe-dialog .exe-bilingual{margin:18px 0 0;padding:14px 16px;border-radius:12px;background:rgba(255,236,214,.035);border:1px solid rgba(255,236,214,.08)}
+dialog.exe-dialog .exe-bilingual>strong{display:block;font-size:14px;letter-spacing:.02em}
+dialog.exe-dialog .exe-bilingual [data-ts-status]{margin:6px 0 0;line-height:1.6}
+dialog.exe-dialog .exe-bilingual-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+dialog.exe-dialog .exe-bilingual-actions button{height:34px;padding:0 14px;border-radius:9px;white-space:nowrap;background:rgba(255,236,214,.05);border:1px solid rgba(255,236,214,.12);color:#e6d4c4;font-weight:600}
+dialog.exe-dialog .exe-bilingual-actions .text-button{background:none;border:0;color:#bfae9f}
+dialog.exe-dialog .exe-bilingual-actions button:disabled{opacity:.5}

@@ -59,7 +59,8 @@ class HookNative{
  }
  // Japanese original for a translated build (services/original-text.cjs). Only an exact or position-confirmed match
  // replaces the captured line; anything else, or any error, keeps the captured text so the dialogue never goes missing.
- originalTextFor(text){const provider=this.originalText;if(!provider||!text)return text;try{const r=provider.resolve(text);if((r.status==='exact'||r.status==='high')&&r.japanese&&!r.alreadyJapanese){this.trace('original-text '+r.status+' '+r.method+' #'+r.indices[0]);
+ originalTextFor(text){const provider=this.originalText;if(!provider||!text)return text;try{const r=provider.resolve(text);
+  if(provider.kind==='patch'){if((r.status==='exact'||r.status==='high')&&typeof r.translation==='string'&&r.translation.trim()&&!require('../services/original-text.cjs').japaneseLine(r.translation)&&typeof this.emit==='function'){this.trace('patch-text '+r.status+' #'+r.indices[0]);this.emit({type:'hookPatchTranslation',japanese:text,chinese:r.translation});}return text;}if((r.status==='exact'||r.status==='high')&&r.japanese&&!r.alreadyJapanese){this.trace('original-text '+r.status+' '+r.method+' #'+r.indices[0]);
    /* The patched line is the translation group's own Chinese for this Japanese line (user, 2026-11-09: zero-latency
       bilingual from an existing 汉化). Hand the pair to the reader before the line itself, so its translation is ready. */
    if(typeof r.captured==='string'&&r.captured.trim()&&typeof this.emit==='function')this.emit({type:'hookPatchTranslation',japanese:r.japanese,chinese:r.captured});
