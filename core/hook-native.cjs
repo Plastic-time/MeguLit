@@ -64,7 +64,7 @@ class HookNative{
   this.attempt=0;const text=this.originalTextFor(this.repeats.normalize(String(m.sourceCode||m.sourceName||name||''),require('./language-tracks.cjs').japaneseTrack(scriptSource(cleanSource(m.text,name,String(m.sourceCode||''))))).replace(/\n+$/,''));
   if(!text.trim())return;
   // v1.1.5: a line of another language track (Traditional/Simplified Chinese) inside a Japanese stream is not dialogue to read.
-  {const lt=require('./language-tracks.cjs');if(lt.foreignLine(text)&&this.japaneseStream){this.trace('drop foreign-language line '+JSON.stringify(text.slice(0,40)));return;}if(/[ぁ-ゟァ-ヺ]/u.test(text))this.japaneseStream=true;}
+  {const lt=require('./language-tracks.cjs');if(lt.borrowedCode(text)){this.trace('drop borrowed-code (Chinese patch) line '+JSON.stringify(text.slice(0,40)));if(!this.japaneseStream)this.notify({hookNotice:'这句是汉化补丁的「借码」文字，不是日文原文（常见于汉化版存下的存档）。MeguLit 不会读取它；请从日文原版存的档或新游戏开始',hookNoticeAt:this.now()});return;}if(lt.foreignLine(text)&&this.japaneseStream){this.trace('drop foreign-language line '+JSON.stringify(text.slice(0,40)));return;}if(/[ぁ-ゟァ-ヺ]/u.test(text))this.japaneseStream=true;}
   // The game's own LOG/backlog (E215.2, user: hide MeguLit there and do not read it): opening it replays lines read
   // earlier, several within a second. Two or more earlier lines (other than the current one) inside one second mark the
   // LOG: those lines are neither read nor recorded and the reader hides; it returns after 1.5 s without replays or at

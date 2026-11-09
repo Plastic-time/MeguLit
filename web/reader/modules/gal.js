@@ -483,6 +483,9 @@
     if(typeof message.hookActive==='boolean'){bridge.hookActive=message.hookActive;if(!message.hookActive)bridge.hookSourceText='';}
     if(typeof message.hookSource==='string'){bridge.hookSourceText=message.hookSource;bridge.hookSpeaker=typeof message.hookSpeaker==='string'?message.hookSpeaker:'';}
     if(message.hookRubyDict&&typeof message.hookRubyDict==='object')bridge.gameRuby=message.hookRubyDict;
+    /* Borrowed-code (Chinese patch) text was dropped: say why in the sentence window; the next real line clears it. */
+    if(message.hookNotice){let n=document.querySelector('.megulit-hook-notice');const host=document.querySelector('.sentence-window');if(host&&!n){n=document.createElement('div');n.className='megulit-hook-notice';n.setAttribute('role','status');n.style.cssText='font:13px/1.6 Meiryo,"Microsoft YaHei",sans-serif;color:#ffd9a8;background:rgba(40,20,10,.72);border:1px solid rgba(255,190,120,.35);border-radius:8px;padding:6px 10px;margin-top:8px;pointer-events:none;text-shadow:none;-webkit-text-stroke:0;';host.appendChild(n);}if(n)n.textContent=message.hookNotice;}
+    if(typeof message.hookSource==='string'&&message.hookSource)document.querySelector('.megulit-hook-notice')?.remove();
     if(message.hookMessage)bridge.hookMessage=message.hookMessage;if(message.waitMarkerMessage){bridge.waitMarkerMessage=message.waitMarkerMessage;if(dialogFields?.waitMarkerState)dialogFields.waitMarkerState.textContent=message.waitMarkerMessage;}
     if(message.hookThreads)bridge.hookThreads=message.hookThreads;
     if(dialogFields?.hookState&&message.hookMessage)dialogFields.hookState.textContent=message.hookMessage;

@@ -54,6 +54,11 @@ const ZH_FORM=/[從圖讓與學會實點經國關應歡聽讀賣錢樣黑處體�
 function zhScore(t){return (t.match(ZH_ONLY)||[]).length+(t.match(ZH_FORM)||[]).length;}
 function foreignLine(text){const t=String(text||'');if(KANA.test(t))return false;const han=(t.match(/[㐀-鿿]/gu)||[]).length;if(han<6)return false;const score=zhScore(t);return score>=2||(score>=1&&t.includes('，'));}
 /* A line that arrives as Japanese rows plus a Chinese row of the same text keeps only the Japanese rows. */
+// Chinese translation patches that "borrow" Shift-JIS code points (借码) store Chinese sentences as unrelated JIS kanji;
+// only the patch's own font shows them as Chinese. Read back (an old save from the patched game, a patch launcher
+// bypassed) they look like 根劃痩，扇晃顧顕亜錘廠笠… : long, kana-free, kanji-only, with Chinese full-width commas.
+// Japanese dialogue of that length always carries kana and uses 、 (user report 2026-11-09, WHITE ALBUM2).
+function borrowedCode(text){const t=String(text||'').replace(/\s+/g,'');if(KANA.test(t)||!t.includes('，'))return false;const han=(t.match(/[㐀-鿿]/gu)||[]).length;return han>=12&&han/[...t].length>=.7&&zhScore(t)<=1;}
 function foreignRows(text){const rows=String(text).split(/\r?\n/);if(rows.length<2||!rows.some(r=>KANA.test(r)))return text;const kept=rows.filter(r=>!foreignLine(r));return kept.length&&kept.length<rows.length?kept.join('\n'):text;}
 function japaneseTrack(text){
  if(typeof text!=='string'||!text)return text;
@@ -63,4 +68,4 @@ function japaneseTrack(text){
  out=foreignRows(out);
  return out;
 }
-module.exports={foreignLine,foreignRows,japaneseTrack,inlineAlternatives,tracks,semicolonTracks};
+module.exports={borrowedCode,foreignLine,foreignRows,japaneseTrack,inlineAlternatives,tracks,semicolonTracks};

@@ -34,3 +34,14 @@ test('E270 ATRI: Traditional Chinese with few function words, and a Chinese row 
  assert.equal(japaneseTrack('光はない。\n我從黑暗中，試圖爬出來。'),'光はない。');
  assert.equal(foreignRows('「はい」\n「そうです」'),'「はい」\n「そうです」');
 });
+
+// User report (2026-11-09, WHITE ALBUM2): a save made under a Chinese "borrowed code" patch reads back as random JIS
+// kanji with Chinese commas. It is not Japanese: never captured, and the reader says why.
+test('borrowed-code Chinese patch text is recognised; Japanese and real Chinese are not',()=>{
+ const {borrowedCode}=require('../core/language-tracks.cjs');
+ assert.equal(borrowedCode('根劃痩，扇晃顧顕亜錘廠笠盛列嬉棲能料寂，化麟晴咽廠痩己姿莉刃仔含春，'),true);
+ assert.equal(borrowedCode('盛嬉枯液瑛莉既移頑凧，化麟晴咽廠痩己姿莉刃仔含春。'),true);
+ assert.equal(borrowedCode('空港に着いたときから、いつ泣き出すかもしれなかった空は、'),false);
+ assert.equal(borrowedCode('東京、大阪、名古屋'),false);
+ assert.equal(borrowedCode('从抵达机场时起，那片随时都可能哭出来的天空，稍稍逞强了一下'),false,'plain Chinese is handled by foreignLine');
+});
