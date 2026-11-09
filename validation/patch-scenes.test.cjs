@@ -6,10 +6,10 @@ const test=require('node:test'),assert=require('node:assert'),fs=require('node:f
 const ot=require('../services/original-text.cjs'),scenes=require('../services/original-engines/scenes.cjs'),xp3=require('../services/original-engines/xp3.cjs');
 const u64=n=>{const b=Buffer.alloc(8);b.writeBigUInt64LE(BigInt(n));return b;},u32=n=>{const b=Buffer.alloc(4);b.writeUInt32LE(n);return b;},u16=n=>{const b=Buffer.alloc(2);b.writeUInt16LE(n);return b;};
 const chunk=(tag,body)=>Buffer.concat([Buffer.from(tag,'latin1'),u64(body.length),body]);
-function writeXp3(file,entries){
+function writeXp3(file,entries,flags=0){
  const datas=[],index=[];let at=11+8;
  for(const [name,content] of entries){const data=Buffer.from(content);const n=Buffer.from(name,'utf16le');
-  index.push(chunk('File',Buffer.concat([chunk('info',Buffer.concat([u32(0),u64(data.length),u64(data.length),u16(name.length),n])),chunk('segm',Buffer.concat([u32(0),u64(at),u64(data.length),u64(data.length)])),chunk('adlr',u32(0))])));
+  index.push(chunk('File',Buffer.concat([chunk('info',Buffer.concat([u32(flags),u64(data.length),u64(data.length),u16(name.length),n])),chunk('segm',Buffer.concat([u32(0),u64(at),u64(data.length),u64(data.length)])),chunk('adlr',u32(0))])));
   datas.push(data);at+=data.length;}
  const idx=Buffer.concat(index);
  fs.writeFileSync(file,Buffer.concat([xp3.MAGIC,u64(at),...datas,Buffer.from([0]),u64(idx.length),idx]));
@@ -116,4 +116,12 @@ test('gaps are filled ahead of the reading position: next line ready before it i
  assert.strictEqual(cached.get('そうだね、散歩に行こうか。'),'译：そうだね、散歩に行こうか。');
  provider.fill.flush();const again=ot.provider(data,exe);again.resolve('おはよう、今日はいい天気だね。');
  assert.strictEqual(again.resolve('そうだね、散歩に行こうか。').translation,'译：そうだね、散歩に行こうか。','kept for the next session');
+});
+
+// E294: an encrypted KiriKiri game that cannot be read yet says it is being prepared, not that it is unsupported.
+test('encrypted KiriKiri archives report preparing (unpack, then capture), not unsupported',async()=>{
+ const {data,exe}=setup(game=>{writeXp3(path.join(game,'scn.xp3'),[['0123456789abcdef0123456789abcdef',Buffer.from('random bytes that are no PSB')]],0x80000000);});
+ const first=ot.scanRunning(data,'1',exe);assert.strictEqual(first.status,'preparing');assert.ok(['unpack','capture'].includes(first.preparing.kind));
+ for(let i=0;i<100&&require('../services/original-engines/scenes.cjs').cxBuilds.size;i++)await new Promise(r=>setTimeout(r,50));
+ const later=ot.scanRunning(data,'1',exe);assert.strictEqual(later.status,'preparing');assert.strictEqual(later.preparing.kind,'capture');
 });

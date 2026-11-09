@@ -13,18 +13,21 @@ export function originalExecutableError(error,locale){const text=String(error?.m
 // original for a patched game. Shown inside the executable dialog; the reader uses an import on the next line.
 const sourceWords={
  zh:{title:'汉化脚本 · 零延迟双语',checking:'正在检查游戏脚本…',search:'重新查找',pick:'手动选择',original:'导入日文原版',clear:'移除',importing:'正在读取并对齐脚本…',searching:'正在本机查找这部作品的汉化包…',declined:'已移除自动找到的汉化包，不会再自动用回；点「重新查找」可以恢复',
+  unpacking:n=>'首次使用需要先解包这部作品的剧本，大约 30～90 秒，完成后自动生效'+(n?'（已用 '+n+' 秒）':''),capture:'这部作品的剧本加密较强，需要边玩边读取：开始游戏、进入剧情后会自动生效，读过的部分之后直接可用',
   unsupported:'这部作品的引擎暂时读不了脚本（目前支持 System4、BGI / Ethornell、Steam 版 Siglus、KiriKiri（含 Steam 版加密封包）、Artemis、Ren\'Py）',patched:'当前是汉化版：导入日文原版后，显示日文，译文直接用汉化组的翻译',
   notFound:h=>'本机没找到汉化包。手动选择时，打开汉化版（或汉化补丁）的游戏根目录，选中 '+h+'；汉化补丁是单个启动程序的，直接选那个 exe',
   pickTitle:h=>'打开汉化版的游戏根目录，选中 '+h+'（或汉化启动程序 exe）',
   patchReady:n=>'已用汉化包（'+n+' 行）：译文直接用汉化组的翻译',autoReady:n=>'已自动找到本机的汉化包（'+n+' 行）：译文直接用汉化组的翻译',originalReady:'已导入日文原版：显示日文，译文使用汉化组翻译',unreliable:'找到的脚本和当前游戏版本对不上，没有启用；请换成同一版本的汉化包或原版',
   errors:{PATCH_SCRIPT_NOT_FOUND:'这里没找到对应的脚本，请按提示选中文件',PATCH_NOT_TRANSLATED:'这里的脚本还是日文，不像汉化包',PATCH_SAME_AS_RUNNING:'选的是游戏自己的文件，请选汉化版里的文件',PATCH_IS_RUNNING_COPY:'选的是游戏自己的文件夹，请选汉化版所在的文件夹',ORIGINAL_SCRIPT_NOT_FOUND:'这个文件夹里没找到对应的脚本文件',ORIGINAL_NOT_JAPANESE:'这个文件夹里的脚本不是日文',ORIGINAL_SAME_AS_RUNNING:'选的是游戏自己的文件，请选日文原版所在的文件夹',ORIGINAL_IS_RUNNING_COPY:'选的是游戏自己的文件夹，请选日文原版所在的文件夹'},failed:'导入失败'},
  en:{title:'Translation script · zero-latency bilingual',checking:'Checking the game script…',search:'Search again',pick:'Choose manually',original:'Import Japanese original',clear:'Remove',importing:'Reading and lining up the script…',searching:'Looking for a Chinese patch on this computer…',declined:'The patch found automatically was removed and will not come back by itself; Search again restores it',
+  unpacking:n=>'First use: unpacking this game\'s script, about 30-90 seconds; it turns on by itself when done'+(n?' ('+n+' s so far)':''),capture:'This game\'s script is strongly encrypted and is read while you play: start the game and it turns on once the story begins; what has been read stays available',
   unsupported:'This engine\'s script cannot be read yet (System4, BGI / Ethornell, Steam Siglus, KiriKiri (including encrypted Steam archives), Artemis and Ren\'Py for now)',patched:'Patched edition: import the Japanese original to read Japanese with the group\'s translation',
   notFound:h=>'No Chinese patch found on this computer. To choose one, open the patched game\'s folder and select '+h+', or the patch\'s own launcher exe',
   pickTitle:h=>'Open the patched game folder and select '+h+' (or the patch launcher exe)',
   patchReady:n=>'Chinese patch in use ('+n+' lines): translations come from the group',autoReady:n=>'Found a Chinese patch on this computer ('+n+' lines): translations come from the group',originalReady:'Japanese original imported: Japanese text, group translations',unreliable:'The script found does not match this game version, so it is not used',
   errors:{PATCH_SCRIPT_NOT_FOUND:'No matching script here; select the file named above',PATCH_NOT_TRANSLATED:'This script is still Japanese',PATCH_SAME_AS_RUNNING:'These are the game\'s own files',PATCH_IS_RUNNING_COPY:'This is the game\'s own folder',ORIGINAL_SCRIPT_NOT_FOUND:'No matching script in this folder',ORIGINAL_NOT_JAPANESE:'This folder\'s script is not Japanese',ORIGINAL_SAME_AS_RUNNING:'These are the game\'s own files',ORIGINAL_IS_RUNNING_COPY:'This is the game\'s own folder'},failed:'Import failed'},
  ja:{title:'翻訳スクリプト・遅延なしの対訳',checking:'ゲームのスクリプトを確認しています…',search:'再検索',pick:'手動で選択',original:'日本語版を読み込む',clear:'解除',importing:'スクリプトを読み込んで照合しています…',searching:'この PC で中国語パッチを探しています…',declined:'自動で見つけたパッチを解除しました。再検索で元に戻せます',
+  unpacking:n=>'初回はスクリプトの展開に 30～90 秒ほどかかります。終わると自動で有効になります'+(n?'（'+n+' 秒経過）':''),capture:'このゲームのスクリプトは強く暗号化されているため、プレイ中に読み込みます。本編が始まると自動で有効になり、読んだ部分は次回からすぐ使えます',
   unsupported:'このエンジンのスクリプトはまだ読み込めません（現在は System4、BGI / Ethornell、Steam 版 Siglus、KiriKiri（Steam 版の暗号化アーカイブを含む）、Artemis、Ren\'Py）',patched:'翻訳版です。日本語版を読み込むと日本語で表示し、訳にパッチの翻訳を使います',
   notFound:h=>'この PC に中国語パッチは見つかりませんでした。手動の場合は翻訳版のゲームフォルダを開いて '+h+' を選択してください',
   pickTitle:h=>'翻訳版のゲームフォルダを開いて '+h+' を選択',
@@ -37,6 +40,8 @@ function mountTextSource(dialog,{id,api,invoke,locale,esc}){
  const status=box.querySelector('[data-ts-status]'),searchBtn=box.querySelector('[data-ts="search"]'),patchBtn=box.querySelector('[data-ts="patch"]'),originalBtn=box.querySelector('[data-ts="original"]'),clearBtn=box.querySelector('[data-ts-clear]');
  let timer=0,last=null;
  const paint=s=>{last=s;clearTimeout(timer);searchBtn.hidden=patchBtn.hidden=originalBtn.hidden=clearBtn.hidden=true;
+  /* E294 (user: say the first use needs 30-90 s of unpacking): a script still being unpacked, or read while the game runs. */
+  if(s?.status==='preparing'&&s.preparing){if(s.preparing.kind==='unpack'){status.textContent=w.unpacking(s.preparing.startedAt?Math.max(0,Math.round((Date.now()-s.preparing.startedAt)/1000)):0);if(dialog.open)timer=setTimeout(load,3000);}else status.textContent=w.capture;return;}
   if(!s||s.status==='unsupported'){status.textContent=w.unsupported;return;}
   if(s.patchStatus==='ready'){status.textContent=(s.patch?.auto?w.autoReady:w.patchReady)(s.patch?.lines||0);clearBtn.hidden=false;clearBtn.dataset.kind='patch';patchBtn.hidden=false;return;}
   if(s.mode==='original'&&s.status==='ready'){status.textContent=w.originalReady;clearBtn.hidden=false;clearBtn.dataset.kind='original';return;}
