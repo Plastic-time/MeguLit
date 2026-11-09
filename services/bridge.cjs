@@ -157,7 +157,8 @@ async function dispatch(request,runtime=null) {
       case 'anki_find':return {path:runtime.ankiProcess().find()};
       case 'anki_install_connect':return await require('../core/anki-process.cjs').installAnkiConnect();
       case 'anki_connect_status':return {installed:require('../core/anki-process.cjs').ankiConnectInstalled()};
-      case 'anki_launch':{const runner=runtime.ankiProcess();return await runner.start({hide:!!runtime.config().ankiHidden});}
+      case 'anki_launch':{const runner=runtime.ankiProcess(),hide=!!runtime.config().ankiHidden;if(String(request.reason||'')==='ANKI_PORT_TAKEN')return await runner.repair({hide});return await runner.start({hide});}
+      case 'anki_repair':return await runtime.ankiProcess().repair({hide:!!runtime.config().ankiHidden});
       case 'anki_hide':return {hidden:(await runtime.ankiProcess().hide())>0};
       case 'anki_open':return await runtime.ankiProcess().open(String(request.target||''),String(request.deck||''));
       case 'anki_status':case 'anki_current':case 'anki_start':case 'anki_show_answer':case 'anki_grade':case 'anki_play_audio':case 'anki_stop':case 'anki_practice':case 'anki_deck_config':case 'anki_deck_limits':{

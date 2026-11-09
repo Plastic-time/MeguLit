@@ -3,6 +3,11 @@ const {createHash}=require('node:crypto'),{cleanV4}=require('./v4-config.cjs');
 const fields=['Word','Pitch','PartOfSpeech','Meaning','Sentence','Audio'];
 const extraFields=['SentenceFurigana','SentenceTranslation','SentenceAudio','Screenshot','WordReading'];
 const CIRCLED='⓪①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+// Answer-side reading rule (user, 2026-11-09): words with kanji get their reading in hiragana on its own line;
+// kana-only words need none. Dictionary readings may arrive in katakana.
+const KANJI=/[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff々〆ヶ]/;
+const hiragana=s=>String(s||'').replace(/[\u30a1-\u30f4]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+const answerReading=(word,reading)=>KANJI.test(String(word||''))?hiragana(reading):'';
 const circled=list=>(list||[]).filter(n=>Number.isInteger(n)&&n>=0&&n<=20).map(n=>CIRCLED[n]).join('');
 // Card design: word + pitch on the front with the context sentence dimmed; back adds reading, meaning,
 // the sentence with furigana and the word highlighted, its translation and audio.
@@ -66,7 +71,20 @@ class Anki{
   let available=await this.call(c,'modelFieldNames',{modelName:c.ankiModel});
   if(fields.some(f=>!available.includes(f)))throw Error('笔记类型缺少需要字段：'+fields.join(', '));
   if(own&&!this.upgraded){for(const f of extraFields)if(!available.includes(f)){await this.call(c,'modelFieldAdd',{modelName:c.ankiModel,fieldName:f,index:available.length});available=[...available,f];}const names=await this.call(c,'modelTemplates',{modelName:c.ankiModel}).catch(()=>({}));const tname=Object.keys(names||{})[0]||'日本語';await this.call(c,'updateModelTemplates',{model:{name:c.ankiModel,templates:{[tname]:{Front:FRONT,Back:BACK}}}});await this.call(c,'updateModelStyling',{model:{name:c.ankiModel,css:CSS}});this.upgraded=true;}
+  if(own&&available.includes('WordReading')&&!this.readingsFixed){this.readingsFixed=true;this.fixReadings(c).catch(()=>{});}
   return {available,owned:own};
+ }
+ // Existing MeguLit notes follow the same reading rule: katakana readings become hiragana, kana-only words drop it.
+ async fixReadings(c){
+  const quote=s=>'"'+s.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"',ids=await this.call(c,'findNotes',{query:'note:'+quote(c.ankiModel)});let changed=0;
+  for(let i=0;i<ids.length;i+=200){
+   for(const n of await this.call(c,'notesInfo',{notes:ids.slice(i,i+200)})){
+    const word=String(n.fields?.Word?.value||'').replace(/<[^>]*>/g,''),current=String(n.fields?.WordReading?.value??'');if(!n.fields?.WordReading)continue;
+    const want=answerReading(word,current);if(want===current)continue;
+    try{await this.call(c,'updateNoteFields',{note:{id:n.noteId,fields:{WordReading:want}}});changed++;}catch{}
+   }
+  }
+  return changed;
  }
  async save(word,c,audio,id,extra={}){const {available,owned}=await this.prepareModel(c);await this.call(c,'createDeck',{deck:c.ankiDeck});
   const quote=s=>'"'+s.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"',tag='tomoyo::'+id,found=await this.call(c,'findNotes',{query:'tag:'+tag+' deck:'+quote(c.ankiDeck)+' note:'+quote(c.ankiModel)});if(found.length>1)throw Error('找到多个同步词条，请先在 Anki 中消除重复笔记');
@@ -74,7 +92,7 @@ class Anki{
   if(available.includes('SentenceFurigana'))values.SentenceFurigana=extra.sentenceHtml||'';if(available.includes('SentenceTranslation'))values.SentenceTranslation=html(extra.translation||'');if(available.includes('SentenceAudio'))values.SentenceAudio='';
   if(available.includes('Screenshot'))values.Screenshot='';
   // E215.6 (user): the answer shows the word's reading under the word, as common decks do.
-  if(available.includes('WordReading'))values.WordReading=html(word.reading);
+  if(available.includes('WordReading'))values.WordReading=html(answerReading(word.base||word.surface,word.reading));
   // Game window picture taken for this card (answer side).
   if(extra.screenshot&&available.includes('Screenshot')){const name='tomoyo_p_'+createHash('sha256').update(extra.screenshot).digest('hex').slice(0,16)+'.jpg';await this.call(c,'storeMediaFile',{filename:name,data:extra.screenshot});values.Screenshot='<img src="'+name+'">';}
   // The game's own voice for the line when it was recorded, otherwise the synthesized sentence.
@@ -84,4 +102,4 @@ class Anki{
   const note=await this.call(c,'addNote',{note:{deckName:c.ankiDeck,modelName:c.ankiModel,fields:values,options:{allowDuplicate:false},tags:['tomoyo_megumin',tag]}});if(!note)throw Error('Anki 未创建笔记');return {id:note,updated:false,screenshotAttached:!!extra.screenshot&&available.includes('Screenshot')};
  }
 }
-module.exports={Anki,fields,extraFields,html,circled,FRONT,BACK,CSS};
+module.exports={Anki,answerReading,hiragana,fields,extraFields,html,circled,FRONT,BACK,CSS};

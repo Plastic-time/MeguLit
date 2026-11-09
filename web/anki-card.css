@@ -18,8 +18,7 @@ html{color-scheme:dark;background:#24272e}html,body{margin:0!important;width:100
 #media-error{position:fixed;bottom:8px;left:8px;right:8px;padding:8px 12px;border-radius:8px;background:#4b2230;color:#ffe2ea;font:13px/1.5 sans-serif;pointer-events:none}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#ffffff30;border-radius:8px}
 
-/* MeguLit notes no longer display the redundant standalone kana reading. */
-#card-content .tm-reading{display:none!important}
+/* The answer shows the kanji word's hiragana reading on its own line above part of speech and meaning (user). */
 @media(min-width:1000px) and (min-height:620px){
  #card-content .tm-card{max-width:960px!important;margin:8px auto!important}
  #card-content .tm-shot img{max-height:min(52vh,520px)!important}
