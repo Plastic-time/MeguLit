@@ -52,3 +52,29 @@ test('v1.1.8: the same version with a different package online is a hotfix',asyn
  assert.equal((await u.check('1.1.8',fetcher,'')).newer,false,'without a root no hotfix guess');
  u.reset();fs.rmSync(root,{recursive:true,force:true});
 });
+/* User report (2026-11-09, mainland China): "restart and update" failed to download. The package also comes through
+   relays, verified against GitHub's digest; a release replaced mid-download (hotfix) is read again once. */
+test('update: relays are tried when GitHub fails, and only with a digest',()=>{
+ const rel={url:'https://github.com/ilynthn/MeguLit/releases/download/v9.9.9/a.zip',digest:'a'.repeat(64)};
+ assert.deepEqual(u.sources(rel,false),[rel.url,'https://gh-proxy.com/'+rel.url,'https://ghproxy.net/'+rel.url]);
+ assert.equal(u.sources(rel,true)[2],rel.url,'China tries relays first');
+ assert.deepEqual(u.sources({...rel,digest:''},true),[rel.url],'no digest, no relay');
+});
+test('update: a failing GitHub download falls back to a relay; a replaced release is fetched again',async()=>{
+ const fs=require('fs'),os=require('os'),path=require('path'),crypto=require('crypto');
+ const make=()=>Buffer.concat([Buffer.from('PK'),crypto.randomBytes(5000)]);
+ const body=data=>({ok:true,headers:{get:()=>String(data.length)},arrayBuffer:async()=>data});
+ const relOf=data=>({tag_name:'v9.9.9',assets:[{name:'MeguLit-v9.9.9-win-x64.zip',size:data.length,digest:'sha256:'+crypto.createHash('sha256').update(data).digest('hex'),browser_download_url:'https://github.com/ilynthn/MeguLit/releases/download/v9.9.9/MeguLit-v9.9.9-win-x64.zip'}]});
+ /* GitHub unreachable, relay works */
+ let root=fs.mkdtempSync(path.join(os.tmpdir(),'upd-'));u.reset();const zip=make(),hits=[];
+ let r=await u.start(root,'1.0.0',async url=>{if(url.endsWith('/latest'))return {ok:true,json:async()=>relOf(zip)};hits.push(new URL(url).hostname);if(url.startsWith('https://github.com'))throw Error('ECONNRESET');return {...body(zip),url};});
+ assert.equal(r.phase,'ready');assert.ok(hits.some(h=>h!=='github.com'));
+ assert.match(fs.readFileSync(path.join(root,'logs','update.log'),'utf8'),/download failed github\.com/);
+ u.reset();fs.rmSync(root,{recursive:true,force:true});
+ /* hotfix replaced the package after the check: every source returns the new file, the release is read again */
+ root=fs.mkdtempSync(path.join(os.tmpdir(),'upd-'));const before=make(),after=make();let reads=0;
+ r=await u.start(root,'1.0.0',async url=>{if(url.endsWith('/latest')){reads++;return {ok:true,json:async()=>relOf(reads===1?before:after)};}return {...body(after),url};});
+ assert.equal(r.phase,'ready');assert.equal(reads,2);
+ assert.equal(r.sha256,crypto.createHash('sha256').update(after).digest('hex'));
+ u.reset();fs.rmSync(root,{recursive:true,force:true});
+});
