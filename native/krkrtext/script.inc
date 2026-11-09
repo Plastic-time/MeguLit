@@ -9,6 +9,8 @@
 // Field names follow the KAG3 MessageLayer (lineLayer, lineLayerPos, lineLayerOriginY, lineLayerBase, fontSize,
 // marginR, vertical); a layer without lineLayer is measured with its x / y cursor. Vertical text is not reported.
 // The end text keeps the game's own line breaks: a character drawn on a new row starts with a newline.
+// E321: the end line also carries color=rrggbb, the layer's chColor for the sentence's last character: games draw read and
+// unread text in different colours, and the reader paints each page line in the colour the game used.
 LR"MGLT((function(){
  try {
   if(typeof global.kag!='Object' || global.kag===void || global.kag===null) return 'wait kag';
@@ -29,6 +31,7 @@ LR"MGLT((function(){
    } incontextof st;
    st.send=function(kind,rec,x0,x1){
     var s='ToMe_KRKR '+kind+' line='+rec.line+' same='+rec.same+' nvl='+rec.nvl+' x0='+int(x0)+' y0='+int(rec.y0)+' x1='+int(x1)+' y1='+int(rec.y1)+' size='+int(rec.size)+' sw='+int(rec.sw)+' sh='+int(rec.sh)+' n='+rec.n;
+    if(kind=='end' && rec.color>=0) {var h='',v=rec.color;for(var i=0;i<6;i++) {h='0123456789abcdef'.charAt(v&15)+h;v=v>>4;} s+=' color='+h;}
     if(kind=='end') s+=' text='+rec.text;
     this.report(s);
    } incontextof st;
@@ -61,6 +64,7 @@ LR"MGLT((function(){
     if(ch!='\n' && ch!='\r') {if(rec.n>0 && cy!=rec.ly) rec.text+='\n';rec.text+=ch;}
     rec.ly=cy;
     rec.n++;
+    if(typeof L.chColor=='Integer') rec.color=L.chColor&0xffffff;
     if(cx<rec.x0) rec.x0=cx;
     if(cx>rec.x1) rec.x1=cx;
     if(cy<rec.y0) rec.y0=cy;
@@ -74,7 +78,7 @@ LR"MGLT((function(){
    st.install=function(L){
     for(var i=0;i<this.recs.count;i++) if(this.recs[i].target===L) return;
     if(typeof L.processCh!='Object') return;
-    var rec=%['target'=>L,'st'=>this,'oldCh'=>L.processCh,'oldClear'=>void,'n'=>0,'text'=>'','line'=>0,'same'=>0,'cleared'=>true,'nvl'=>0,'x0'=>0,'y0'=>0,'x1'=>0,'y1'=>0,'size'=>0,'sw'=>0,'sh'=>0,'ly'=>0];
+    var rec=%['target'=>L,'st'=>this,'oldCh'=>L.processCh,'oldClear'=>void,'n'=>0,'text'=>'','line'=>0,'same'=>0,'cleared'=>true,'nvl'=>0,'x0'=>0,'y0'=>0,'x1'=>0,'y1'=>0,'size'=>0,'sw'=>0,'sh'=>0,'ly'=>0,'color'=>-1];
     rec.ch=function(ch){
      var L=this.target,lm=false,p0=0,oy=0;
      try {

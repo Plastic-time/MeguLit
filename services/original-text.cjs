@@ -198,7 +198,11 @@ function importPatch(root,db,id,source,{auto=false,executable}={}){
 // Where a patch may already be on this computer, nearest first: the game folder (packed programs, loose scenes, patch
 // subfolders), the other folders next to it, then the same script elsewhere on local drives.
 function nearbyPatchSources(executable){
- const dir=path.dirname(executable),parent=path.dirname(dir),out=[dir];
+ const dir=path.dirname(executable),parent=path.dirname(dir),out=[];
+ /* E328 a game switched to Japanese by MeguLit keeps the files it replaced (the translation patch) in its backup
+    folders; those are the patch, so they are tried first and zero-latency translation follows the Japanese import. */
+ for(const rel of ['.megulit-japanese-import/files','.megulit-japanese/yuris','.megulit-japanese/dat']){const b=path.join(dir,rel);try{if(fs.statSync(b).isDirectory())out.push(b);}catch{}}
+ out.push(dir);
  try{for(const e of fs.readdirSync(parent,{withFileTypes:true}))if(e.isDirectory()&&!sameDir(path.join(parent,e.name),dir)&&!SKIP_DIR.test(e.name))out.push(path.join(parent,e.name));}catch{}
  return out;
 }

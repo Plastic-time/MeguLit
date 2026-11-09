@@ -228,9 +228,9 @@ static void FinishEmbed(long id,string trans){PendingEmbed p;lock(Gate){if(!Pend
  // KRKR = KiriKiri KAG message layers (MeguLitKrkr32.dll, native\krkrtext), RENPY = Ren'Py NVL pages (MeguLitRenpy32/64.dll
  // + MeguLitRenpy.py, native\renpytext). The engine name becomes hookEngineLine.engine (krkr / renpy).
  static object PageInfo(string s){
-  var m=System.Text.RegularExpressions.Regex.Match(s??"",@"^ToMe_(KRKR|RENPY) (begin|end) line=(\d+) same=([01]) nvl=([01]) x0=(-?\d+) y0=(-?\d+) x1=(-?\d+) y1=(-?\d+) size=(\d+) sw=(\d+) sh=(\d+) n=(\d+)(?: text=(.*))?$");
-  if(!m.Success)return null;string text=m.Groups[14].Success?m.Groups[14].Value.Replace('\u001f','\n'):"";if(text.Length>4000)text=text.Substring(0,4000);Func<int,long> n=i=>Int64.Parse(m.Groups[i].Value);
-  return new{type="hookEngineLine",engine=m.Groups[1].Value.ToLowerInvariant(),phase=m.Groups[2].Value,line=n(3),same=m.Groups[4].Value=="1",nvl=m.Groups[5].Value=="1",x0=n(6),y0=n(7),x1=n(8),y1=n(9),size=n(10),sw=n(11),sh=n(12),count=n(13),text=text,at=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()};
+  var m=System.Text.RegularExpressions.Regex.Match(s??"",@"^ToMe_(KRKR|RENPY) (begin|end) line=(\d+) same=([01]) nvl=([01]) x0=(-?\d+) y0=(-?\d+) x1=(-?\d+) y1=(-?\d+) size=(\d+) sw=(\d+) sh=(\d+) n=(\d+)(?: color=([0-9a-f]{6}))?(?: text=(.*))?$");
+  if(!m.Success)return null;string text=m.Groups[15].Success?m.Groups[15].Value.Replace('\u001f','\n'):"";if(text.Length>4000)text=text.Substring(0,4000);Func<int,long> n=i=>Int64.Parse(m.Groups[i].Value);
+  return new{type="hookEngineLine",engine=m.Groups[1].Value.ToLowerInvariant(),phase=m.Groups[2].Value,line=n(3),same=m.Groups[4].Value=="1",nvl=m.Groups[5].Value=="1",x0=n(6),y0=n(7),x1=n(8),y1=n(9),size=n(10),sw=n(11),sh=n(12),count=n(13),color=m.Groups[14].Success?"#"+m.Groups[14].Value:null,text=text,at=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()};
  }
  static bool PageSelfTest(){
   var b=Json.Deserialize<Dictionary<string,object>>(Json.Serialize(PageInfo("ToMe_KRKR begin line=7 same=0 nvl=1 x0=120 y0=96 x1=1160 y1=96 size=30 sw=1280 sh=720 n=0")));
@@ -239,7 +239,7 @@ static void FinishEmbed(long id,string trans){PendingEmbed p;lock(Gate){if(!Pend
   return Convert.ToString(b["type"])=="hookEngineLine"&&Convert.ToString(b["engine"])=="krkr"&&Convert.ToString(b["phase"])=="begin"&&Convert.ToInt64(b["line"])==7&&!Convert.ToBoolean(b["same"])&&Convert.ToBoolean(b["nvl"])&&Convert.ToString(b["text"])==""&&Convert.ToInt64(b["x1"])==1160
    &&Convert.ToString(e["phase"])=="end"&&Convert.ToBoolean(e["same"])&&!Convert.ToBoolean(e["nvl"])&&Convert.ToInt64(e["x0"])==-4&&Convert.ToInt64(e["count"])==41&&Convert.ToString(e["text"])=="空は青い。\n = 二行目"
    &&Convert.ToString(r["engine"])=="renpy"&&Convert.ToInt64(r["sw"])==1920&&Convert.ToInt64(r["y1"])==118&&Convert.ToString(r["text"])=="春の風が吹いた。\n二行目です。"
-   &&PageInfo("ToMe_KRKR status ok layers=4")==null&&PageInfo("ToMe_RENPY status ok")==null&&PageInfo("ToMe_KRKR end line=x")==null&&PageInfo("ToMe_OTHER end line=1 same=0 nvl=1 x0=0 y0=0 x1=0 y1=0 size=9 sw=1 sh=1 n=0")==null;
+   &&Convert.ToString(Json.Deserialize<Dictionary<string,object>>(Json.Serialize(PageInfo("ToMe_KRKR end line=8 same=1 nvl=1 x0=1 y0=2 x1=3 y1=4 size=30 sw=1280 sh=720 n=2 color=a0b0ff text=既読")))["color"])=="#a0b0ff"&&PageInfo("ToMe_KRKR status ok layers=4")==null&&PageInfo("ToMe_RENPY status ok")==null&&PageInfo("ToMe_KRKR end line=x")==null&&PageInfo("ToMe_OTHER end line=1 same=0 nvl=1 x0=0 y0=0 x1=0 y1=0 size=9 sw=1 sh=1 n=0")==null;
  }
  // The DLL (or, for Ren'Py, the game's own Python) writes to \.\pipe\<name><pid>; one connection at a time, reconnecting
  // after the game side drops it. tag: KRKR / RENPY, the protocol prefix; status lines only go to the diagnostics log.

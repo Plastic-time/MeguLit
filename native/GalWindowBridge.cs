@@ -429,7 +429,7 @@ public class GalWindowBridge {
         else GameUi.Clear();
         if(SceneDetection&&foregroundGame&&!MenuOpen&&!LookupOpen&&CoverEnabled&&Target!=IntPtr.Zero&&!GameCapture.Busy(Target)){
             Rect sceneRect;var sceneOrigin=new Point();if(GetClientRect(Target,out sceneRect)&&ClientToScreen(Target,ref sceneOrigin)){
-                bool? present=Scene.Tick(sceneOrigin.X,sceneOrigin.Y,sceneRect.Right,sceneRect.Bottom);if(present.HasValue)Emit(new{type="dialogScene",visible=present.Value});
+                /* E322: the game window itself, never the screen with MeguLit's own layer on it */string kept=Scene.Reason;bool? present=Scene.Tick(Target,sceneRect.Right,sceneRect.Bottom);if(present.HasValue)Emit(new{type="dialogScene",visible=present.Value,reason=Scene.Reason});else if(Scene.Reason!=kept&&Scene.Reason.StartsWith("kept"))Emit(new{type="dialogSceneKept",reason=Scene.Reason});
             }
         }
         // Alt+T menu open over a bound game: the layer stays above the game whatever is in front (user, 2026-11-03: dragging
@@ -545,6 +545,7 @@ public class GalWindowBridge {
             try{int count=GameTextMask.SelfTest(args.Length>1?args[1]:null);Emit(new{type="mask-selftest",passed=true,words=count,fastPathMilliseconds=GameTextMask.LastFastTestMilliseconds});return 0;}catch(Exception error){Emit(new{type="mask-selftest",passed=false,message=error.Message});return 3;}
         }
         if(args.Length>0&&args[0]=="--mode-self-test"){
+            if(!GameSceneProbe.SelfTest())return 6;
             Command(new Dictionary<string,object>{{"type","configure"},{"interfaceMode","translation"}});
             if(!TranslationMode)return 4;
             Command(new Dictionary<string,object>{{"type","configure"},{"interfaceMode","normal"}});

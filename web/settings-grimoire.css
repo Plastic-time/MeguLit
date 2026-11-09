@@ -383,3 +383,12 @@ dialog.exe-dialog .exe-bilingual-actions{display:flex;gap:8px;flex-wrap:wrap;mar
 dialog.exe-dialog .exe-bilingual-actions button{height:34px;padding:0 14px;border-radius:9px;white-space:nowrap;background:rgba(255,236,214,.05);border:1px solid rgba(255,236,214,.12);color:#e6d4c4;font-weight:600}
 dialog.exe-dialog .exe-bilingual-actions .text-button{background:none;border:0;color:#bfae9f}
 dialog.exe-dialog .exe-bilingual-actions button:disabled{opacity:.5}
+/* E327 import from a Japanese original: picker, summary and file list */
+.jr-dialog .jr-import{margin:4px 0 12px;padding:12px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 18%,transparent);background:rgba(255,255,255,.03)}
+.jr-dialog .jr-import .settings-help{margin:0 0 10px}
+.jr-dialog .jr-import-sum{margin:0 0 8px;font-size:13px;line-height:1.6;color:#fbefe3}
+.jr-dialog .jr-import-list summary{cursor:pointer;font-size:12px;color:#bfa999}
+.jr-dialog .jr-import-list ul{max-height:180px;overflow:auto;margin:6px 0 0;padding:0;list-style:none;font-size:12px;line-height:1.7;color:#d9c6b6}
+.jr-dialog .jr-kind{display:inline-block;min-width:4.5em;margin-right:8px;color:var(--gold-accent,#edb56e)}
+.jr-dialog .jr-kind[data-kind=remove]{color:#e69a8c}
+.jr-dialog .jr-import-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}

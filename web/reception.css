@@ -80,3 +80,5 @@ details.restore-extract[open] .restore-chevron{transform:rotate(90deg)}
 .restore-body{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;margin-top:10px}
 .restore-body>div:first-child{display:grid;gap:5px;min-width:0}
 .language-swap-note{display:block;margin-top:4px;max-width:250px;line-height:1.5}
+
+.review-full-error{display:block;margin-top:4px;font-size:12px;opacity:.7}
