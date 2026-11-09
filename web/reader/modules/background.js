@@ -8,7 +8,7 @@
  const KEY='tome-background';
  const defaults={blur:0,dim:35,saturate:100,glass:true,glassBlur:14,glassAlpha:55};
  let cfg={...defaults};try{cfg={...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')};}catch{}
- let image='';
+ let image='',homeDefault='';
  // The Alt+T menu over the game: same picture, its own effect values.
  // Used by every panel over the game (Alt+T menu, backlog, lookup card). The picture follows the home picture unless
  // the user picks one for these panels on the home settings page (custom); the Alt+T menu no longer edits it.
@@ -175,9 +175,9 @@
      const blob=await new Promise(r=>canvas.toBlob(r,'image/jpeg',.9));if(!blob)continue;url=URL.createObjectURL(blob);const pre=new Image();pre.src=url;await pre.decode().catch(()=>{});panelImages.set(key,url);}
     panelKeys[p]=key;root.style.setProperty('--tome-'+p+'-image','url("'+url+'")');}
    drop();}catch{}},120);}
- const imageHome=()=>image;
+ const imageHome=()=>image||homeDefault;
  function save(){try{localStorage.setItem(KEY,JSON.stringify(cfg));}catch{}paint();}
- async function load(){try{image=(await b.v4Request('backgroundGet',{})).image||'';}catch{image='';}try{gameImage=(await b.v4Request('backgroundGet',{slot:'game'})).image||'';}catch{gameImage='';}paint();refreshMenu();refreshGameMenu();}
+ async function load(){try{const r=await b.v4Request('backgroundGet',{});/* the built-in home picture is only for the panels, never the reader's own backdrop */homeDefault=r.builtIn?r.image||'':'';image=r.builtIn?'':r.image||'';}catch{image='';homeDefault='';}try{gameImage=(await b.v4Request('backgroundGet',{slot:'game'})).image||'';}catch{gameImage='';}paint();refreshMenu();refreshGameMenu();}
 
  // Section in the menu's Misc tab, built when the menu is open (same approach as the game-folder section).
  let menu=null;

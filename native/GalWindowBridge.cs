@@ -156,7 +156,9 @@ public class GalWindowBridge {
             try{int oldValue;if(DwmGetWindowAttribute(Overlay,pair[0],out oldValue,4)==0){int newValue=pair[1];if(DwmSetWindowAttribute(Overlay,pair[0],ref newValue,4)==0)OriginalDwm[pair[0]]=oldValue;}}catch{}
         }
     }
-    static void RestoreFrame(){foreach(var pair in OriginalDwm){try{int value=pair.Value;DwmSetWindowAttribute(Overlay,pair.Key,ref value,4);}catch{}}OriginalDwm.Clear();}
+    // The reader is MeguLit's own window: its Windows 11 accent border (DWMWA_BORDER_COLOR, 34) stays off even when the
+    // window gets its normal frame back, or a blue outline shows around it whenever it has focus (user, 2026-11-09).
+    static void RestoreFrame(){foreach(var pair in OriginalDwm){if(pair.Key==34)continue;try{int value=pair.Value;DwmSetWindowAttribute(Overlay,pair.Key,ref value,4);}catch{}}OriginalDwm.Clear();}
     static string Str(Dictionary<string,object> d,string key,string fallback=""){object v;return d.TryGetValue(key,out v)?Convert.ToString(v):fallback;}
     static double Num(Dictionary<string,object> d,string key,double fallback){object v;double n;return d.TryGetValue(key,out v)&&Double.TryParse(Convert.ToString(v),out n)?n:fallback;}
     static bool Bool(Dictionary<string,object> d,string key){object v;return d.TryGetValue(key,out v)&&v is bool&&(bool)v;}
@@ -459,7 +461,7 @@ public class GalWindowBridge {
             if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();if(MenuOpen&&MenuRegionReady&&HitRegions.Count>0){Rect menuClient;if(GetClientRect(Overlay,out menuClient))ApplyRegion(menuClient.Right,menuClient.Bottom);if(!IsWindowVisible(Overlay))SetWindowPos(Overlay,IntPtr.Zero,0,0,0,0,0x0001|0x0002|0x0010|0x0040);IsShown=true;AckRegion();FocusMenuOnce();}else{if(IsWindowVisible(Overlay))ShowWindow(Overlay,0);IsShown=false;}return;}
         if(!TranslationMode){if((GetWindowLong(Overlay,-20)&8)!=0)SetWindowPos(Overlay,new IntPtr(-2),0,0,0,0,0x0001|0x0002|0x0010);if(TextMask!=null)TextMask.Hide();if(WaitMarker!=null)WaitMarker.Hide();if(DateTime.UtcNow<NormalShowUntil&&!IsWindowVisible(Overlay)){ShowWindow(Overlay,4);IsShown=true;}KeepPlacement();return;}
         if(Target==IntPtr.Zero){
-            Capture();if(!FloatingPlaced){Rect r=FloatingBase();SetWindowPos(Overlay,IntPtr.Zero,r.Left+FloatDX,r.Top+FloatDY,r.Right-r.Left,r.Bottom-r.Top,0x0020|0x0010);FloatingPlaced=true;}
+            Capture();if(!FloatingPlaced){Rect r=FloatingBase();Emit(new{type="bindTrace",text="floating strip (no game bound) at "+r.Left+","+r.Top+" "+(r.Right-r.Left)+"x"+(r.Bottom-r.Top)+" original="+OriginalRect.Left+","+OriginalRect.Top});SetWindowPos(Overlay,IntPtr.Zero,r.Left+FloatDX,r.Top+FloatDY,r.Right-r.Left,r.Bottom-r.Top,0x0020|0x0010);FloatingPlaced=true;}
             Rect floatingClient;if(GetClientRect(Overlay,out floatingClient))ApplyRegion(floatingClient.Right,floatingClient.Bottom);
             if(!CoverEnabled&&!(MenuOpen&&MenuRegionReady)){if(IsShown)HideReason("floating, cover off");ShowWindow(Overlay,0);IsShown=false;}else if(!IsShown){ShowWindow(Overlay,4);IsShown=true;}
             if(IsShown)AckRegion();

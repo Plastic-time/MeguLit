@@ -38,7 +38,7 @@ class GalNative {
       if(message.type==='error')this.pending=null;
       if ((message.type === 'hotkey'||message.type==='homeHotkey')) { this.onEvent(message); return; }
       if (message.type === 'modeRequest' || message.type === 'backlogHotkey' || message.type === 'regionApplied' || message.type === 'readerInput') { this.onEvent(message); return; }
-      if(message.type==='waitMarkerFrame'){this.onEvent(message);return;}
+      if(message.type==='waitMarkerFrame'||message.type==='bindTrace'||message.type==='coverDebug'){this.onEvent(message);return;}
       if(message.type==='glassFrame'){this.onEvent(message);return;}
       if (message.type === 'maskFrame') { this.lastFrameId = message.id; this.onEvent(message); return; }
       if(message.type==='markerTarget'){this.hooks.markerTarget(message);this.onEvent({type:'markerDebug',markerDebug:message.active?`found at ${message.x},${message.y} ${message.width}x${message.height} in ${message.clientWidth}x${message.clientHeight}`:'not active'});return;}
