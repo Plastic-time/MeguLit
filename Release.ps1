@@ -150,7 +150,11 @@ G add -A
 G -c "user.name=$Author" -c "user.email=$Email" commit -q -m $(if($Hotfix){"$Tag hotfix"}else{"$Tag"})
 G push -q origin $branch
 $pr=Api POST '/pulls' @{title=$(if($Hotfix){"$Tag hotfix"}else{"$Tag"});head=$branch;base='main';body=$Body}
-$merged=Api PUT "/pulls/$($pr.number)/merge" @{merge_method='merge'}
+# GitHub answers 405 "Base branch was modified" while it is still computing a brand-new PR's mergeability; retry.
+for($try=1;;$try++){
+ try{$merged=Api PUT "/pulls/$($pr.number)/merge" @{merge_method='merge'};break}
+ catch{if($try -ge 6){throw};Write-Host "  merge not ready yet, retrying ($try)";Start-Sleep -Seconds 5}
+}
 if(-not $merged.merged){throw "PR #$($pr.number) did not merge"}
 G checkout -q main
 G fetch -q origin
