@@ -134,6 +134,7 @@ static void FinishEmbed(long id,string trans){PendingEmbed p;lock(Gate){if(!Pend
  [UnmanagedFunctionPointer(CallingConvention.Cdecl)]delegate void HistoryEvent([MarshalAs(UnmanagedType.LPWStr)]string text);
  [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate void DLuna_QueryThreadHistory(ThreadParam tp,[MarshalAs(UnmanagedType.I1)]bool latest,HistoryEvent callback); static DLuna_QueryThreadHistory _Luna_QueryThreadHistory; static void Luna_QueryThreadHistory(ThreadParam tp,bool latest,HistoryEvent callback){_Luna_QueryThreadHistory(tp, latest, callback);}
  static readonly EmbedSourceBatch EmbedBatch=new EmbedSourceBatch();
+ static DateTime LastEmbedAt=DateTime.MinValue;static string LastEmbedText="";static bool SkipNoted;
  static void OnEmbed(string text,ThreadParam tp){
   lock(Gate){
    Candidate candidate;
@@ -143,6 +144,9 @@ static void FinishEmbed(long id,string trans){PendingEmbed p;lock(Gate){if(!Pend
    EmbedBatch.Add(text,DateTime.UtcNow);
    bool printer=(candidate.code??"").Contains(":Naninovel.UI:RevealableText:SetTextValue:");
    string replacement=printer?HideNaninovel(text):EmbedTextPolicy.Hide(text);
+   /* E320 (魔法使いの夜): the game stopped with "Micro Thread ... [0x80000012]" right after a skip burst that was written back line by line (several lines within 2-40 ms). While the game skips, its lines go back unchanged; hiding resumes at the first line read at normal speed; a redraw of the same line is not a burst. */
+   DateTime embedNow=DateTime.UtcNow;bool burst=(embedNow-LastEmbedAt).TotalMilliseconds<250&&text!=LastEmbedText;LastEmbedAt=embedNow;LastEmbedText=text;
+   if(burst&&candidate.name=="typemoon"&&replacement.Length>0){replacement="";if(!SkipNoted){SkipNoted=true;Diagnostic("typemoon skip burst: lines go back unchanged until the game stops skipping");}}else if(!burst)SkipNoted=false;
    if(!printer&&replacement.Length>0&&IsSharedResourceStream(candidate.name)&&!IsCurrentDialogue(text))replacement="";
    if(TranslateMode&&!printer&&replacement.Length>0&&replacement!=text){
     long id=++EmbedSerial;var pending=new PendingEmbed{tp=tp,text=text};PendingEmbeds[id]=pending;
@@ -190,8 +194,8 @@ static void FinishEmbed(long id,string trans){PendingEmbed p;lock(Gate){if(!Pend
  static string UnsafeFile(){return Under("cache","embed-unsafe.json");}
  static string UnsafeKey(string name,int role){return (BoundProcess??"").ToLowerInvariant()+"|"+name+"|"+role;}
  static Dictionary<string,object> LoadUnsafe(){try{string f=UnsafeFile();if(File.Exists(f)){var v=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(f));if(v!=null)return v;}}catch{}return new Dictionary<string,object>();}
- static bool Unsafe(string name,int role){return LoadUnsafe().ContainsKey(UnsafeKey(name,role));}
- static void MarkUnsafe(string reason){Candidate c;lock(Gate){if(Selected==""||!Candidates.TryGetValue(Selected,out c)||!c.embed)return;c.embed=false;if(Connected)Luna_UseEmbed(c.tp,false);ReplacementCallback=false;var all=LoadUnsafe();all[UnsafeKey(c.name,c.role)]=new Dictionary<string,object>{{"reason",reason},{"at",DateTime.UtcNow.ToString("o")}};try{File.WriteAllText(UnsafeFile(),Json.Serialize(all));}catch{}List();}
+ /* E320: an entry only counts under the hiding rules it was learned with; 魔法使いの夜 was marked unsafe while every ruby line went back unchanged. */static bool Unsafe(string name,int role){object v;if(!LoadUnsafe().TryGetValue(UnsafeKey(name,role),out v))return false;var d=v as Dictionary<string,object>;object p;if(d==null||!d.TryGetValue("policy",out p))return false;try{return Convert.ToInt32(p)>=EmbedTextPolicy.Version;}catch{return false;}}
+ static void MarkUnsafe(string reason){Candidate c;lock(Gate){if(Selected==""||!Candidates.TryGetValue(Selected,out c)||!c.embed)return;c.embed=false;if(Connected)Luna_UseEmbed(c.tp,false);ReplacementCallback=false;var all=LoadUnsafe();all[UnsafeKey(c.name,c.role)]=new Dictionary<string,object>{{"reason",reason},{"at",DateTime.UtcNow.ToString("o")},{"policy",EmbedTextPolicy.Version}};try{File.WriteAllText(UnsafeFile(),Json.Serialize(all));}catch{}List();}
   Diagnostic("embed-guard disabled writeback "+c.name+" role "+c.role+": "+reason);Emit(new{type="hookEmbedUnsafe",name=c.name,role=c.role,reason=reason});Status("游戏在内嵌替换后报错，已自动停用这个文本流的写回并记住；继续读取文字");}
  static void StartGuard(){if(Guard!=null)return;try{GameProcess=Process.GetProcessById((int)Pid);}catch{}var seen=new HashSet<IntPtr>();bool first=true;
   Guard=new Thread(()=>{while(!Quit){try{var now=new List<IntPtr>();EnumWindowsProc callback=(h,l)=>{uint owner;GetWindowThreadProcessId(h,out owner);if(owner==Pid&&IsWindowVisible(h)){var cls=new System.Text.StringBuilder(64);GetClassName(h,cls,64);if(cls.ToString()=="#32770")now.Add(h);}return true;};EnumWindows(callback,IntPtr.Zero);GC.KeepAlive(callback);
@@ -244,8 +248,8 @@ static void FinishEmbed(long id,string trans){PendingEmbed p;lock(Gate){if(!Pend
  static void PageDll(string dll,string pipe,string tag,string loader,string[] args){string label=tag.ToLowerInvariant();PagePipe(pipe,tag);var start=new ProcessStartInfo(loader,Pid+" "+args[1]+" \""+args[2]+"\" "+args[3]+" \""+dll+"\""){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true};
   using(var child=Process.Start(start)){if(!child.WaitForExit(12000)){Diagnostic(label+" positions load timed out");return;}Diagnostic(child.ExitCode==0?label+" positions loaded":label+" positions failed: "+child.StandardError.ReadToEnd().Trim());}}
  // Loaded like the scene capture: only into 32-bit games with .xp3 archives next to the program; failures are only logged.
- static void KrkrText(string bit,string loader,string[] args){try{string dll=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"MeguLitKrkr"+bit+".dll");if(bit!="32"||!File.Exists(dll))return;string exe=BoundExe();
-  if(exe==""||Directory.GetFiles(Path.GetDirectoryName(exe),"*.xp3").Length==0)return;PageDll(dll,"MeguLitKrkr-","KRKR",loader,args);}catch(Exception e){Diagnostic("krkr positions skipped: "+e.Message);}}
+ static void KrkrText(string bit,string loader,string[] args){try{string dll=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"MeguLitKrkr"+bit+".dll");/* E321 (user, 2026-11-10: ライムライト never switched to page layout and nothing said why) *//* 64-bit KiriKiri Z games get MeguLitKrkr64.dll (same source, native/krkrtext/build.cmd). */if(!File.Exists(dll)){Diagnostic("krkr positions unavailable: "+Path.GetFileName(dll)+" missing");return;}string exe=BoundExe();
+  if(exe==""||Directory.GetFiles(Path.GetDirectoryName(exe),"*.xp3").Length==0){Diagnostic("krkr positions skipped: no .xp3 next to "+(exe==""?"(unbound)":Path.GetFileName(exe)));return;}PageDll(dll,"MeguLitKrkr-","KRKR",loader,args);}catch(Exception e){Diagnostic("krkr positions skipped: "+e.Message);}}
  // Ren'Py: a game folder with renpy\ and game\ beside the program (Ren'Py 7/8 put the real program there; older
  // builds run lib\windows-*\ python, so the parents are checked too). The DLL needs MeguLitRenpy.py next to it.
  static bool IsRenpyFolder(string exe){try{var dir=new DirectoryInfo(Path.GetDirectoryName(exe));for(int i=0;i<3&&dir!=null;i++,dir=dir.Parent)if(Directory.Exists(Path.Combine(dir.FullName,"renpy"))&&Directory.Exists(Path.Combine(dir.FullName,"game")))return true;}catch{}return false;}

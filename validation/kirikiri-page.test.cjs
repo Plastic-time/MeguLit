@@ -189,7 +189,7 @@ test('NVL without engine positions (魔法使いの夜): lines go down the page 
 
 test('hook-native marks lines of WITCH ON THE HOLY NIGHT (WoH.exe) as an NVL flow page; other games unchanged',t=>{
  const {FLOW_PAGE_EXES}=require('../core/hook-native.cjs');
- assert.ok(FLOW_PAGE_EXES.test('WoH.exe'));assert.ok(!FLOW_PAGE_EXES.test('魔法使之夜.exe'));
+ assert.ok(FLOW_PAGE_EXES.test('WoH.exe'));assert.ok(FLOW_PAGE_EXES.test('WoH'),'GalWindowBridge reports Process.ProcessName without .exe');assert.ok(!FLOW_PAGE_EXES.test('WoHelper'));assert.ok(!FLOW_PAGE_EXES.test('魔法使之夜.exe'));
  const f=fixture(t);f.hookLine('普通の台詞。');f.tick(100);
  f.hook.flowPage=true;f.hookLine('今日はその一割の話。');f.tick(400);
  assert.deepEqual(f.events.filter(m=>m.hookSource).map(m=>[m.hookSource,m.hookSourceEngine]),[['普通の台詞。',''],['今日はその一割の話。','nvl']]);

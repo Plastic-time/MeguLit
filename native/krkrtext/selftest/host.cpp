@@ -106,7 +106,11 @@ struct Exporter : iTVPFunctionExporter {
 };
 static Exporter TheExporter;
 extern "C" iTVPFunctionExporter *__stdcall TVPGetFunctionExporter() { return &TheExporter; }
+#ifdef _M_IX86
 #pragma comment(linker, "/EXPORT:TVPGetFunctionExporter=_TVPGetFunctionExporter@0")
+#else
+#pragma comment(linker, "/EXPORT:TVPGetFunctionExporter")
+#endif
 
 // ---- the pipe ------------------------------------------------------------------------------------------------------
 static HWND Window;

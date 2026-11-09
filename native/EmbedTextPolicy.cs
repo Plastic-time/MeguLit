@@ -32,9 +32,31 @@ internal static class EmbedTextPolicy {
     static readonly Regex InlineTrack = new Regex(@"%l[^%\r\n]*;[^%\r\n]*%l|%l\S");
     public static bool Container(string value) { return value != null && (TrackSeparator.IsMatch(value) || InlineTrack.IsMatch(value)); }
 
+    // Bumped when the rules change, so a stream remembered as unsafe under older rules gets one more try (E320).
+    public const int Version = 2;
+
+    // E320 HuneX ruby (魔法使いの夜: <rふ>触</r>): the closing tag's "/" read as a path and each ruby counted as two
+    // constructs, so every line with furigana went back unchanged and its original stayed under MeguLit's text. A ruby
+    // group is now blanked whole (reading and base) with its tag letters kept; any other construct in such a line still
+    // leaves the line to the engine.
+    static readonly Regex Ruby = new Regex(@"<r([^<>\r\n]{1,32})>([^<>\r\n]{1,32})</r>");
+    static string HideRuby(string value) {
+        string plain = Ruby.Replace(value, m => m.Groups[2].Value);
+        if (Resource.IsMatch(plain) || Container(plain) || Construct.IsMatch(plain) || !Dialogue.IsMatch(plain)) return "";
+        var output = new System.Text.StringBuilder(value.Length);
+        int at = 0;
+        foreach (Match m in Ruby.Matches(value)) {
+            output.Append(Blank(value.Substring(at, m.Index - at))).Append("<r").Append(Blank(m.Groups[1].Value)).Append('>').Append(Blank(m.Groups[2].Value)).Append("</r>");
+            at = m.Index + m.Length;
+        }
+        return output.Append(Blank(value.Substring(at))).ToString();
+    }
+
     public static string Hide(string value) {
         // An empty reply tells LunaHook to skip writeback entirely, including its own re-encoding.
-        if (String.IsNullOrWhiteSpace(value) || value.Length > 600 || Resource.IsMatch(value) || Container(value)) return "";
+        if (String.IsNullOrWhiteSpace(value) || value.Length > 600) return "";
+        if (Ruby.IsMatch(value)) return HideRuby(value);
+        if (Resource.IsMatch(value) || Container(value)) return "";
         // A dialogue line that carries a few script constructs used to be skipped whole, so its original stayed under
         // MeguLit's text (CLANNAD HD overlap, user 2026-11-06). Now only the visible text is blanked and every construct
         // stays intact for the engine. Strings dense with constructs (name/variable tables) are still left alone.
@@ -61,6 +83,9 @@ internal static class EmbedTextPolicy {
             Hide("Good evening!") == "             " &&
             Hide("「ついてないわね」「ついてないわね」？？？？？？「真够不走运的」") == "" &&
             Hide("「確認開始%l砂撒き;放沙%l;。」") == "" &&
-            Hide("「えっ？？？」").Length == "「えっ？？？」".Length;
+            Hide("「えっ？？？」").Length == "「えっ？？？」".Length &&
+            Hide("　彼女がはじめて命に<rふ>触</r>れた、<rしず>厳</r>かな朝の出来事だ。") == "　　　　　　　　　　<r　>　</r>　　　<r　　>　</r>　　　　　　　　　" &&
+            Hide("　車の窓は<rしも>霜</r>だらけで、\n　走りだせない。") == "　　　　　<r　　>　</r>　　　　　\n　　　　　　　　" &&
+            Hide("<rふ>触</r>【＄名前】") == "" && Hide(@"<rx>data\a</r>") == "";
     }
 }

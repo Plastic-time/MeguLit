@@ -120,6 +120,8 @@ body.tomoyo-gal-bound .sentence-window.tome-island-page{left:0!important;top:0!i
 .tome-island-pair[hidden]{display:none!important}
 .tome-island-pair{position:fixed;box-sizing:border-box;overflow:visible;background:transparent;transform-origin:top left;transition:filter .6s ease}
 .tome-island-pair.tome-island-past{filter:brightness(var(--tome-island-past-brightness,.55))}
+/* FLOW pages wrap like the game: at the calibrated box width, strict kinsoku, continuation rows without the leading indent (the indent is the line's own first character). */
+body.tomoyo-gal-bound .tome-island-pair.tome-island-flow .sentence-text{white-space:pre-wrap!important;line-break:strict;word-break:normal;overflow-wrap:anywhere}
 @media (prefers-reduced-motion:reduce){.tome-island-pair{transition:none}}
 body.tomoyo-gal-bound .tome-island-pair .sentence-text{width:100%!important;font-size:var(--tome-island-jp-size,28px)!important;line-height:var(--tomoyo-gal-line-height,1.25)!important;padding:0!important;letter-spacing:var(--tomoyo-gal-jp-spacing,0px)!important;text-indent:0!important;text-align:left!important}
 body.tomoyo-gal-bound .tome-island-pair .sentence-text{white-space:pre!important}.tome-island-pair.tome-island-wrap .sentence-text{white-space:pre-wrap!important}

@@ -18,7 +18,8 @@ const PAGE_ENGINES=new Set(['krkr','renpy','ocr']);
 /* E305 full-screen (NVL) games whose engine reports no line positions or page turns (魔法使いの夜 / WITCH ON THE HOLY NIGHT,
    HuneX, LunaHook typemoon): their lines go out as engine 'nvl', and the reader stacks each one under the last inside
    the calibrated text box, turning the page when the box is full. Keyed by the game's process name. */
-const FLOW_PAGE_EXES=/^(?:WoH)\.exe$/i;
+/* The window bridge reports Process.ProcessName (no extension): "WoH"; the file name is accepted too. */
+const FLOW_PAGE_EXES=/^WoH(?:\.exe)?$/i;
 class HookNative{
  constructor(layout,onEvent,spawnHelper=spawn,now=Date.now){this.layout=typeof layout==='string'?{native:layout,hook:path.join(layout,'hook-runtime')}:layout;this.folder=this.layout.native;this.emit=onEvent;this.spawn=spawnHelper;this.now=now;this.state={hookActive:false,hookAvailable:false,hookThreads:[],processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookMessage:'Hook 未启用'};this.islandSources=new Map();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;this.lastSource="";this.identity="";this.serial=0;this.enabled=false;this.attempt=0;this.retryAt=0;this.timer=setInterval(()=>this.tick(),1000);this.timer.unref?.();}
  trace(message){try{const file=path.join(this.layout.logs||path.join(this.folder,"..","logs"),"hook-events.log");if(fs.existsSync(file)&&fs.statSync(file).size>=1048576){fs.rmSync(file+".previous",{force:true});fs.renameSync(file,file+".previous");}fs.appendFileSync(file,new Date().toISOString()+" "+message+"\n");}catch{}}
@@ -98,6 +99,11 @@ class HookNative{
   this.repeats=this.repeats||new (require('./repeat-normalizer.cjs').RepeatNormalizer)();
   this.attempt=0;const text=this.originalTextFor(this.repeats.normalize(String(m.sourceCode||m.sourceName||name||''),require('./language-tracks.cjs').japaneseTrack(scriptSource(cleanSource(m.text,name,String(m.sourceCode||''))))).replace(/\n+$/,''));
   if(!text.trim())return;
+  /* E320 WITCH ON THE HOLY NIGHT (flow page): its title-screen help ("Change text display speed.Change auto-scroll speed." ...) came through the dialogue hook
+     and was read as a story line, and one line once arrived twice in one piece. Text without any Japanese is menu/help text here, and a line made of
+     the same sentence twice is that sentence. */
+  if(this.flowPage){if(!/[\u3040-\u30ff\u3400-\u9fff]/.test(text)){this.trace('flow page: non-Japanese text dropped (menu/help) '+JSON.stringify(text.slice(0,40)));return;}
+   const once=HookNative.undouble(text);if(once!==text){this.trace('flow page: doubled line collapsed chars='+text.length);this.source({...m,text:once},name);return;}}
   /* E282 (user: game ruby first): readings the game's own script gives this line (KiriKiri Z scene files) join the ruby
      the hook delivered; only for a line the script matched, and never twice for one base. */
   if(this.originalText?.kind==='patch'){const r=this.resolveSource(text);if(r&&Array.isArray(r.ruby)&&(r.status==='exact'||r.status==='high'||r.method==='untranslated'))for(const pair of r.ruby)if(!ruby.some(q=>q[0]===pair[0]))ruby.push(pair);}
@@ -142,6 +148,8 @@ class HookNative{
  pageReset(){if(this.pageState)clearTimeout(this.pageState.timer);this.pageState=null;this.pageMode=null;}
  pageNvl(){return this.pageMode?.mode==='nvl'&&this.now()-this.pageMode.at<120000;}
  pageLine(m){
+  // E320: a flow page (WoH) is laid out by the reader from the text box; the screen OCR locator placed the same lines again (doubles, jumps).
+  if(this.flowPage&&m.engine==='ocr')return;
   if(!Number.isSafeInteger(m.line)||m.line<1||!['begin','end'].includes(m.phase))return;
   const now=this.now(),engine=m.engine,K=this.pageState&&this.pageState.engine===engine?this.pageState:(this.pageReset(),this.pageState={engine,lines:new Map(),held:[],timer:null});
   if(!m.nvl){if(this.pageMode?.mode==='nvl')this.trace(engine+' page mode off');this.pageMode={mode:'adv',engine,at:now};this.releasePageHeld();return;}
@@ -177,7 +185,10 @@ class HookNative{
     line is sent there (gal-native sets this.locate) unless a native page engine (krkr / renpy) reported in the last
     10 minutes; ISLAND lines never get here. The OCR answer takes up to ~3.5 s, so on an OCR page a held hook line waits
     5 s, and one the picture never showed is delivered as an ordinary line instead of dropped (OCR may simply miss it). */
- locatePage(text,origin){if(typeof this.locate!=='function'||(origin&&origin!=='live'))return;const P=this.pageState;if(P&&P.engine!=='ocr'&&this.now()-(this.pageMode?.at||0)<600000)return;try{this.locate(text);}catch{}}
+ locatePage(text,origin){if(this.flowPage||typeof this.locate!=='function'||(origin&&origin!=='live'))return;const P=this.pageState;if(P&&P.engine!=='ocr'&&this.now()-(this.pageMode?.at||0)<600000)return;try{this.locate(text);}catch{}}
+ // "A。A。" (also with the game's leading ideographic spaces) -> "A。"; anything else unchanged.
+ static undouble(text){const n=text.replace(/[\s\u3000]/g,'');if(n.length<12||n.length%2||n.slice(0,n.length/2)!==n.slice(n.length/2)||!/[。！？!?」』…―）)]$/.test(n))return text;
+  let seen=0;for(let i=0;i<text.length;i++){if(!/[\s\u3000]/.test(text[i])&&++seen===n.length/2)return text.slice(0,i+1);}return text;}
  static holdFor(engine){return engine==='ocr'?5000:1500;}
  releasePageHeld(){const K=this.pageState;if(!K)return;const held=K.held;K.held=[];clearTimeout(K.timer);for(const h of held)this.deliverSource(h.text,h.origin);}
  // A render burst can report several sentences before the host flushes their source frames.
