@@ -45,14 +45,19 @@ public sealed class GameTextMask : IDisposable {
     public void SetSource(string source){
         source=source??"";if(source==Source)return;Source=source.Length>4000?source.Substring(0,4000):source;Generation++;SourceChanged=DateTime.UtcNow;Next=DateTime.UtcNow;
         if(String.IsNullOrWhiteSpace(Source)){Hide();return;}
-        if(Fast&&Mode=="local"&&Cached!=null){
+        if(Fast&&Active&&Cached!=null){
             try{var boxes=PredictBoxes(Source,Cached.Boxes,Cached.Advance,Cached.Region.Width,Cached.Region.Height);using(var pixels=RenderBackground(Cached.Background,Cached.Region.Width,Cached.Region.Height,boxes,Math.Max(3,(int)Math.Round(Padding*Cached.Width/1280))))SendPixels(pixels,Cached.Region,boxes.Count,true);}
             catch{ /* Retain the last valid cover until OCR catches up. */ }
         }else Hide();
     }
     void Invalidate(){Generation++;Cached=null;Hide();Next=DateTime.UtcNow;}
     void Status(string message){if(message==LastMessage)return;LastMessage=message;Emit(new{type="mask",maskMessage=message});}
-    public Rectangle SurfaceRegion(int width,int height){return Mode=="local"?ScanRegion(width,height,X,Y,W,H):Rectangle.Empty;}
+    public Rectangle SurfaceRegion(int width,int height){return Active?ScanRegion(width,height,X,Y,W,H):Rectangle.Empty;}
+    // Per-line backstop (user, 2026-11-09, WHITE ALBUM2): when the hook answered a replacement but the screen check still
+    // sees the game's original line, this line alone is covered the OCR way; the next line goes back to the hook.
+    string AssistSource;
+    bool Active{get{return Mode=="local"||(AssistSource!=null&&AssistSource==Source&&Source.Length>0);}}
+    public void Assist(string source){if(Mode=="local"||String.IsNullOrWhiteSpace(Source))return;AssistSource=Source;Next=DateTime.UtcNow;Status("本句原文未被隐藏，已临时用遮罩盖住");}
     public void Hide(){if(HasFrame){HasFrame=false;Emit(new{type="maskFrame",clear=true,id=++FrameSerial});}}
     void SendPixels(Bitmap pixels,Rectangle region,int count,bool provisional){
         using(var stream=new MemoryStream()){
@@ -72,7 +77,7 @@ public sealed class GameTextMask : IDisposable {
             using(frame){
                 if(frame.Skipped)continue; // window dragged / minimised: keep the current cover, read again next time
                 if(frame.Generation!=Generation||frame.Width!=width||frame.Height!=height)continue;
-                if(!visible||Mode!="local"){Hide();continue;}
+                if(!visible||!Active){Hide();continue;}
                 if(frame.Pixels==null){if(!Fast||(DateTime.UtcNow-SourceChanged).TotalSeconds>1.5)Hide();if(!String.IsNullOrEmpty(frame.Message))Status(frame.Message);continue;}
                 try{
                     Cached=new FastTemplate{Width=width,Height=height,Region=frame.Region,Background=frame.Background,Boxes=frame.Boxes,Advance=frame.Advance};
@@ -80,7 +85,7 @@ public sealed class GameTextMask : IDisposable {
                 }catch{Hide();Status("局部遮罩传递失败；请缩小扫描范围后重试");}
             }
         }
-        if(!visible||target==IntPtr.Zero||Mode!="local"||String.IsNullOrWhiteSpace(Source)){Hide();return changed;}
+        if(!visible||target==IntPtr.Zero||!Active||String.IsNullOrWhiteSpace(Source)){Hide();return changed;}
         if(Busy){if((DateTime.UtcNow-Started).TotalSeconds>6){Hide();Status("游戏画面读取较慢；可在 Alt+T 关闭局部遮字，不会改动游戏");}return changed;}
         if(DateTime.UtcNow<Next)return changed;
         int generation=Generation;string source=Source;

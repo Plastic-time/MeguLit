@@ -215,7 +215,10 @@
      sentence.style.setProperty('--megulit-ruby-floor',Math.ceil(em*1.08+minRuby+2*minGap+travel)+'px');}
     // The glyph's em box excludes the leading in its line box.
     const rows=[];
-    for(const char of chars){
+    /* E276 (user: every row chip moved every row): a page draws each line as its own .sentence-text, so rows counted per
+       element always started at row 1. Rows are counted over the whole page, so row 2 is the page's second line. */
+    const page=sentence.closest('.tome-island-page'),rowChars=page?[...page.querySelectorAll('.sentence-text .char-token')]:chars;
+    for(const char of rowChars){
       if(!char.textContent.trim())continue;
       const r=char.getBoundingClientRect();if(!r.width||!r.height)continue;
       const size=parseFloat(getComputedStyle(char).fontSize)||16;
@@ -642,12 +645,18 @@
       else f(name).value = preferences[key];
     }
     f('galReadTextColor').value = preferences.readTextColor || preferences.textColor;
-    {const box=group.querySelector('[data-ruby-rows]');if(box){const chips=box.querySelector('.megulit-ruby-rows-chips'),slider=box.querySelector('.megulit-ruby-rows-slider'),out=box.querySelector('.megulit-ruby-rows-value'),hidden=f('galRubyRowOffsets');let pick=0;
+    {const box=group.querySelector('[data-ruby-rows]');if(box){const chips=box.querySelector('.megulit-ruby-rows-chips'),slider=box.querySelector('.megulit-ruby-rows-slider'),out=box.querySelector('.megulit-ruby-rows-value'),hidden=f('galRubyRowOffsets');
+      if(!Number.isInteger(box.__pick))box.__pick=0;
       const values=()=>String(hidden.value||'').split(',').map(n=>Number(n)||0);
-      const draw=()=>{const v=values(),n=Math.max(2,Math.min(16,window.__megulitRubyRows||2,16),v.length);chips.textContent='';for(let i=0;i<n;i++){const b=document.createElement('button');b.type='button';b.setAttribute('role','tab');b.className='megulit-ruby-row-chip'+(i===pick?' is-on':'')+(v[i]?' is-set':'');b.textContent=String(i+1);b.title='第 '+(i+1)+' 行'+(v[i]?'：'+v[i]+'px':'');b.onclick=()=>{pick=i;draw();};chips.append(b);}slider.value=String(v[pick]||0);out.textContent=String(v[pick]||0);};
-      slider.addEventListener('input',e=>{e.stopPropagation();const v=values();while(v.length<=pick)v.push(0);v[pick]=Number(slider.value);while(v.length&&!v[v.length-1])v.pop();hidden.value=v.join(',');out.textContent=slider.value;hidden.dispatchEvent(new Event('input',{bubbles:true}));draw();});
+      const draw=()=>{const v=values(),n=Math.max(2,Math.min(16,window.__megulitRubyRows||2,16),v.length);chips.textContent='';for(let i=0;i<n;i++){const b=document.createElement('button');b.type='button';b.setAttribute('role','tab');b.className='megulit-ruby-row-chip'+(i===box.__pick?' is-on':'')+(v[i]?' is-set':'');b.textContent=String(i+1);b.title='第 '+(i+1)+' 行'+(v[i]?'：'+v[i]+'px':'');b.onclick=()=>{box.__pick=i;draw();};chips.append(b);}slider.value=String(v[box.__pick]||0);out.textContent=String(v[box.__pick]||0);};
+      if(!box.__bound){box.__bound=true;
+      slider.addEventListener('input',e=>{e.stopPropagation();const v=values();while(v.length<=box.__pick)v.push(0);v[box.__pick]=Number(slider.value);while(v.length&&!v[v.length-1])v.pop();hidden.value=v.join(',');out.textContent=slider.value;hidden.dispatchEvent(new Event('input',{bubbles:true}));draw();});
       slider.addEventListener('dblclick',()=>{slider.value='0';slider.dispatchEvent(new Event('input'));});
-      addEventListener('megulit-ruby-rows',draw);draw();}}
+      addEventListener('megulit-ruby-rows',()=>box.__draw?.());}
+      /* E276 (user: rows 1, 2 and 3 all moved every row): this block runs on every menu open; each run used to add
+         another set of listeners with its own row choice starting at row 1. Listeners are added once, the chosen row
+         lives on the box, and draw() is refreshed per open. */
+      box.__draw=draw;draw();}}
     let committed = { ...preferences };
     commitSynchronizedStyle=changed=>Object.assign(committed,changed);
     const colorHistoryKey='tome-previous-text-color';

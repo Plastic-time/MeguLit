@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # One-command release: bump the version, build and test, package, merge to main, tag and publish on GitHub.
 #
 #   .\Release.ps1 -Version 1.1.3 -Notes notes.md          # full release
@@ -46,6 +46,9 @@ if(-not $Prepare){
  if($Body -notmatch "(?m)^---\s*$"){throw 'Notes need a --- line between the Chinese and English halves'}
 }
 $Tag="v$Version";$Asset="MeguLit-$Tag-win-x64.zip"
+# One click to the package at the top of the release page, however many hotfix sections follow (user, 2026-11-09).
+# The in-app update card drops this line (services/update.cjs).
+$DownloadLine="> **[⬇ 下载 MeguLit $Tag 安装包 / Download $Asset](https://github.com/ilynthn/MeguLit/releases/download/$Tag/$Asset)**"
 $Token=$null
 if(-not $DryRun -and -not $Prepare){
  $cred="protocol=https`nhost=github.com`n`n" | git credential fill
@@ -167,9 +170,10 @@ if($Hotfix){
  # same version: swap the package, append the notes; the tag stays on the first commit of this version
  $rel=Api GET "/releases/tags/$Tag"
  foreach($old in @($rel.assets | Where-Object {$_.name -eq $Asset})){Api DELETE "/releases/assets/$($old.id)" | Out-Null}
- $rel=Api PATCH "/releases/$($rel.id)" @{body=($rel.body+"`n`n---`n`n### "+(Get-Date -Format 'yyyy-MM-dd HH:mm')+" hotfix`n`n"+$Body)}
+ $old=[string]$rel.body;if($old -notmatch [regex]::Escape($DownloadLine)){$old=$DownloadLine+"`n`n"+$old}
+ $rel=Api PATCH "/releases/$($rel.id)" @{body=($old+"`n`n---`n`n### "+(Get-Date -Format 'yyyy-MM-dd HH:mm')+" hotfix`n`n"+$Body)}
 }else{
- $rel=Api POST '/releases' @{tag_name=$Tag;target_commitish=$merged.sha;name="MeguLit $Tag";body=$Body;make_latest='true'}
+ $rel=Api POST '/releases' @{tag_name=$Tag;target_commitish=$merged.sha;name="MeguLit $Tag";body=($DownloadLine+"`n`n"+$Body);make_latest='true'}
 }
 $upload=($rel.upload_url -replace '\{.*$','')+"?name=$Asset"
 $a=Invoke-RestMethod -Method Post -Uri $upload -Headers $Headers -ContentType 'application/zip' -InFile $zipPath

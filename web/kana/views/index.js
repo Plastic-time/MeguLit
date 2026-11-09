@@ -98,5 +98,6 @@ el.innerHTML=`<main class="page">
     </div>
   </aside>
 </main>`;
+ /* voice choice under the kana chart (user, 2026-11-09) */el.querySelector('.legend')?.after(ctx.voicePicker({note:false}));
 
 }

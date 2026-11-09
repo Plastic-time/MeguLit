@@ -41,7 +41,8 @@ test('a scene cut fades the previous line and stale hook redraws cannot bring it
  now+=45000;immersion.tick();assert.deepEqual(events,[]);
  immersion.scene(false);immersion.source('前のセリフ','unity');immersion.marker(true);immersion.tick();
  assert.deepEqual(events,[false]);
- immersion.source('次のセリフ','unity');assert.deepEqual(events,[false,true]);
+ immersion.source('次のセリフ','unity');assert.deepEqual(events,[false],'E277: a new line waits until it is on screen');
+ immersion.marker(true);assert.deepEqual(events,[false,true]);
  immersion.scene(false);immersion.scene(true);assert.deepEqual(events,[false,true,false,true]);
 });
 test('held fast-forward hides the reading layer after a threshold and waits for a fresh line',()=>{
@@ -50,7 +51,7 @@ test('held fast-forward hides the reading layer after a threshold and waits for 
  immersion.configure({immersion:true});immersion.source('元の文字','hook');
  immersion.skip(true);now+=100;immersion.tick();assert.deepEqual(events,[]);
  now+=300;immersion.tick();immersion.source('途中','hook');immersion.skip(false);immersion.tick();
- assert.deepEqual(events,[false]);immersion.source('次の文字','hook');assert.deepEqual(events,[false,true]);
+ assert.deepEqual(events,[false]);immersion.source('次の文字','hook');assert.deepEqual(events,[false]);now+=700;immersion.tick();assert.deepEqual(events,[false,true],'shown after 0.7 s without other signals');
 });
 test('choice colours follow selected state and the OCR preview never claims a choice state',()=>{
  const {uiItems}=require('../core/game-ui.cjs'),common={text:'続ける',x:.2,y:.3,width:.4,height:.05,font:'Yu Mincho',color:'#101010',originalHidden:true};
@@ -74,4 +75,16 @@ test('desktop overlay region stays independent of the game window',()=>{
  assert.doesNotMatch(module('interaction'),/leftBound|rightBound|megulit-client-clip/);
  assert.match(module('interaction'),/Math.min\(innerWidth,r.right\+side\)/);
  assert.match(module('gal'),/galTranslationLineHeight/);
+});
+
+// E277 (user, 2026-11-09): the layer hid late into transitions, and a line read during a black-screen transition showed
+// before the game drew it. Hide 0.6 s after the wait marker leaves; while hidden, show a new line once it is on screen.
+test('auto-hide follows the marker quickly and a hidden layer waits for the next line to be drawn',()=>{
+ const {Immersion}=require('../core/immersion.cjs'),events=[];let now=1000;
+ const im=new Immersion(e=>events.push(e.dialogVisible),()=>now);
+ im.configure({immersion:true,dialogDetection:'marker'});im.bind('w');im.source('短い台詞','hook');
+ now+=500;im.marker(true);im.tick();now+=2000;im.marker(false);
+ now+=500;im.tick();assert.deepEqual(events,[],'not yet');now+=150;im.tick();assert.deepEqual(events,[false],'hidden 0.6 s after the marker left');
+ im.source('黒画面の独白','hook');now+=300;im.tick();assert.deepEqual(events,[false],'read but not drawn yet');
+ im.marker(true);assert.deepEqual(events,[false,true],'shown once the game draws it');
 });

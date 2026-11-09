@@ -30,7 +30,7 @@ async function latest(fetcher=fetch){
  const r=await fetcher(REPO+'/latest',{headers:HEADERS,signal:AbortSignal.timeout(15000)});
  if(!r.ok)throw Error('UPDATE_CHECK_FAILED');
  const rel=await r.json(),a=asset(rel);
- return {version:String(rel.tag_name||'').replace(/^v/,''),name:a.name,size:a.size,url:a.browser_download_url,digest:/^sha256:[a-f0-9]{64}$/i.test(a.digest||'')?a.digest.slice(7).toLowerCase():'',notes:String(rel.body||'').slice(0,6000),page:rel.html_url,published:rel.published_at||''};
+ return {version:String(rel.tag_name||'').replace(/^v/,''),name:a.name,size:a.size,url:a.browser_download_url,digest:/^sha256:[a-f0-9]{64}$/i.test(a.digest||'')?a.digest.slice(7).toLowerCase():'',notes:String(rel.body||'').replace(/^> \*\*\[⬇[^\n]*\n*/m,'').slice(0,6000),page:rel.html_url,published:rel.published_at||''};
 }
 /* Size of the package the user is running, for "bigger / smaller than now". Unknown is fine. */
 async function installedSize(current,fetcher=fetch){
@@ -51,7 +51,16 @@ function isHotfix(root,rel,current){
  const mine=readInstalled(root);if(!mine||mine.version!==rel.version){writeInstalled(root,{version:rel.version,digest:rel.digest});return false;}
  return !!mine.digest&&mine.digest!==rel.digest;
 }
-async function check(current,fetcher=fetch,root=''){
+// Updates made by an older version left MeguLit.rollback-update.exe next to MeguLit.exe; it moves into the rollback
+// folder so the MeguLit folder holds a single program to start (user, 2026-11-09).
+function tidyRollback(root){if(!root)return false;const old=path.join(root,'MeguLit.rollback-update.exe');try{if(!fs.existsSync(old))return false;const dir=path.join(root,'migration','update-rollback');fs.mkdirSync(dir,{recursive:true});const dest=path.join(dir,'MeguLit.exe');if(!fs.existsSync(dest))fs.renameSync(old,dest);else fs.rmSync(old,{force:true});return true;}catch{return false;}}
+// A new version may bring a new icon; Windows keeps showing the old one from its icon cache until that is refreshed.
+// Done once per installed version, also when the update itself was run by an older version's script.
+function refreshIcons(root,current,run=(file,args)=>require('node:child_process').spawn(file,args,{detached:true,stdio:'ignore',windowsHide:true}).unref()){
+ if(!root||!current)return false;const mark=path.join(root,'data','icon-refresh.json');let seen='';try{seen=JSON.parse(fs.readFileSync(mark,'utf8')).version||'';}catch{}
+ if(seen===String(current))return false;try{run(path.join(process.env.SystemRoot||'C:\Windows','System32','ie4uinit.exe'),['-show']);fs.mkdirSync(path.dirname(mark),{recursive:true});fs.writeFileSync(mark,JSON.stringify({version:String(current)}));return true;}catch{return false;}
+}
+async function check(current,fetcher=fetch,root=''){tidyRollback(root);refreshIcons(root,current);
  const rel=await latest(fetcher),hotfix=isHotfix(root,rel,current),isNewer=newer(rel.version,current)||hotfix;
  found=isNewer?{...rel,hotfix}:null;
  const previous=isNewer?await installedSize(current,fetcher):0;
@@ -155,16 +164,36 @@ try{
  Expand-Archive -LiteralPath $Zip -DestinationPath $stage -Force
  $src=Join-Path $stage 'MeguLit'
  if(-not (Test-Path (Join-Path $src 'MeguLit.exe'))){throw 'zip has no MeguLit\\MeguLit.exe'}
- $backup=Join-Path $Root ('MeguLit.rollback-update.exe')
- Copy-Item -LiteralPath $exe -Destination $backup -Force
+ # The previous version is kept in migration\\update-rollback (user, 2026-11-09: a second exe next to MeguLit.exe
+ # confused people about which one to start). The whole program is kept, not only the exe, so a rollback is complete.
+ $bak=Join-Path $Root 'migration\\update-rollback'
+ New-Item -ItemType Directory -Force $bak | Out-Null
+ & robocopy $Root $bak /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /XD data logs cache runtime models migration /XF MeguLit.rollback-update.exe | Out-Null
+ if($LASTEXITCODE -ge 8){throw "backup failed $LASTEXITCODE"}
+ Remove-Item -LiteralPath (Join-Path $Root 'MeguLit.rollback-update.exe') -Force -ErrorAction SilentlyContinue
+ Log 'backed up previous version'
  & robocopy $src $Root /E /R:5 /W:1 /NFL /NDL /NJH /NJS /XD data logs cache runtime models | Out-Null
  if($LASTEXITCODE -ge 8){throw "robocopy failed $LASTEXITCODE"}
  Log 'copied'
  Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
  Remove-Item -LiteralPath $Zip -Force -ErrorAction SilentlyContinue
 }catch{ Log ('failed: '+$_) }
-Start-Process -FilePath (Join-Path $Root 'MeguLit.exe') -WorkingDirectory $Root
+# A new icon must show at once: refresh the shell's icon cache (the system's own tool; Explorer keeps running).
+try{ & (Join-Path $env:SystemRoot 'System32\\ie4uinit.exe') -show; Log 'icon cache refreshed' }catch{}
+$started=Start-Process -FilePath (Join-Path $Root 'MeguLit.exe') -WorkingDirectory $Root -PassThru
 Log 'restarted'
+# A new version that crashes right after start is replaced by the kept previous version and started again.
+try{
+ Start-Sleep -Seconds 20
+ $bak=Join-Path $Root 'migration\\update-rollback'
+ if($started -and $started.HasExited -and $started.ExitCode -ne 0 -and (Test-Path (Join-Path $bak 'MeguLit.exe'))){
+  Log ('new version exited with '+$started.ExitCode+'; rolling back')
+  & robocopy $bak $Root /E /R:5 /W:1 /NFL /NDL /NJH /NJS | Out-Null
+  try{Remove-Item -LiteralPath (Join-Path $Root 'data\\update-installed.json') -Force -ErrorAction SilentlyContinue}catch{}
+  Start-Process -FilePath (Join-Path $Root 'MeguLit.exe') -WorkingDirectory $Root
+  Log 'rolled back'
+ }
+}catch{ Log ('rollback check failed: '+$_) }
 `;}
 function reset(){state={phase:'idle'};job=null;found=null;}
-module.exports={sources,check,start,status,install,apply,newer,latest,installedSize,reset,launchScript};
+module.exports={refreshIcons,tidyRollback,sources,check,start,status,install,apply,newer,latest,installedSize,reset,launchScript};
