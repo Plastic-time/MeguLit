@@ -50,7 +50,7 @@ if ($Check) {
  $taskTestText = $taskTestOutput -join "`n"
  @{ recordedAt=[DateTime]::UtcNow.ToString('o'); exitCode=$taskTestExit; tests=[int]([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Groups[1].Value); passed=[int]([regex]::Match($taskTestText,'(?m)pass\s+(\d+)').Groups[1].Value); failed=[int]([regex]::Match($taskTestText,'(?m)fail\s+(\d+)').Groups[1].Value) } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskRoot 'validation/automated-results.json') -Encoding utf8
  Write-Output ($taskTestOutput | Select-Object -Last 9)
- if ($taskTestExit -ne 0) { throw 'Independent data checks failed; see validation/automated-results.txt' }
+ if ($taskTestExit -ne 0) { $taskTestOutput | Select-String -Pattern '^not ok|^\s+(error|location):' | ForEach-Object { Write-Output $_.Line }; throw 'Independent data checks failed; see validation/automated-results.txt' }
  if (-not ([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Success) -or [int]([regex]::Match($taskTestText,'(?m)tests\s+(\d+)').Groups[1].Value) -eq 0) { throw 'Test runner reported zero tests' }
 }
 $taskOutput = Join-Path $taskRoot 'MeguLit.exe'
