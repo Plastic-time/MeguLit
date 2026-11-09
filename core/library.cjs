@@ -30,6 +30,8 @@ const ENGINES=[
  {name:'Light.vn',hook:true,test:f=>f.has(/\.vndat$/i)},
  {name:'minori (PAZ)',hook:true,test:f=>f.has(/^(scr|sys)\.paz$/i)},
  {name:'Nitroplus (NPK)',hook:true,test:f=>f.has(/^(script|system)\.npk$/i)},
+ // Older Nitroplus titles (装甲悪鬼村正, 沙耶の唄, スマガ…) pack scripts as nss.npa / system.npa (user report 2026-11-09).
+ {name:'Nitroplus (NPA)',hook:true,test:f=>f.has(/^(nss|system|cg|sound)\.npa$/i)||f.names.filter(n=>/\.npa$/i.test(n)).length>=2},
  {name:"Ren'Py",hook:true,test:f=>f.has(/^renpy$/i)||f.sub('game',/\.rp[ay]c?$/i)},
  {name:'TyranoScript',hook:true,test:f=>f.sub('data',/^scenario$/i)||f.sub('resources',/^app\.asar$/i)&&f.has(/^tyrano/i)},
  {name:'Leaf / AQUAPLUS',hook:true,test:f=>f.has(/^grp\.pak$/i)&&f.has(/^char\.pak$/i)&&f.has(/^(voice|bgm|se)\.pak$/i)},
@@ -140,6 +142,22 @@ function folderGames(folder){
  for(const n of names){const root=path.join(folder,n);try{if(!fs.statSync(root).isDirectory())continue;}catch{continue;}out.push({source:'folder',title:label(root),root});}
  return out;
 }
+// Names to look a folder up by on VNDB. Downloaded folders are often "[160825][Nitroplus] 装甲悪鬼村正 DL版 Ver1.02":
+// dates, brand tags, edition and version words hide the title, so each is also tried with those removed, and the
+// longest Japanese/Chinese run on its own (user report 2026-11-09: a game never showed up in the library).
+function searchNames(name){
+ const raw=String(name||'').normalize('NFKC').trim();if(!raw)return [];
+ const out=[raw];
+ let t=raw.replace(/[\[【［(（{][^\]】］)）}]*[\]】］)）}]/g,' ')
+  .replace(/(^|\s)\d{6,8}(?=\s|$)/g,' ')
+  .replace(/\b(?:ver(?:sion)?\.?\s*[\d.]+|v\d+(?:\.\d+)+)\b/gi,' ')
+  .replace(/(DL版|パッケージ版|通常版|初回版|限定版|廉価版|HD版|高清版|steam版|汉化版|漢化版|中文版|简体中文|繁體中文|日文版|日语版|原版|硬盘版|免安装|绿色版|修正版|修复版|\bHD\b|\bSteam\b)/gi,' ')
+  .replace(/[_\s]+/g,' ').trim();
+ if(t&&t!==raw)out.push(t);
+ const cjk=(t||raw).match(/[\u3040-\u30ff\u3400-\u9fff々〆ヶー・～〜！？!?]+/g)||[];
+ const longest=cjk.sort((a,b)=>b.length-a.length)[0];if(longest&&longest.length>=2&&longest!==t)out.push(longest);
+ return [...new Set(out)];
+}
 function label(root){
  const parts=path.resolve(root).split(/[\\/]+/).filter(Boolean);return (parts[parts.length-1]||'Game').replace(/[_\- ]?(hd|hd版|高清版|steam版|dl版|パッケージ版)$/i,'').trim()||parts[parts.length-1];
 }
@@ -176,13 +194,16 @@ class Library{
  // Scans Steam and the folders; returns games with engine, hook state, program and a cover file inside Tomoyo's
  // covers folder (Tomoyo only reads images there). Known games keep their media id and confirmed hook state.
  async scan(progress=()=>{},{incremental=false}={}){
+  // Folders in the user's game folders that could not be confirmed as visual novels (unknown engine and no VNDB
+  // match) are reported instead of vanishing, so the library can offer to add them by hand.
+  this.unconfirmed=[];
   const found=[],skipped=[];this.restorable=new Map();if(this.state.steamPath)found.push(...steamGames(this.state.steamPath));for(const f of this.state.folders)found.push(...folderGames(f));
   const known=new Map(this.state.games.map(g=>[String(g.dir||'').toLowerCase(),g]));if(!this.state.notGal)this.state.notGal={};const games=[];let i=0;
   try{fs.mkdirSync(this.coverDir,{recursive:true});}catch{}
   for(const c of found){progress({done:i++,total:found.length,title:c.title});
    // Folders already found not to be a visual novel are skipped until their contents change (start-up checks stay fast).
    const stamp=(()=>{try{return Math.round(fs.statSync(c.root).mtimeMs);}catch{return 0;}})(),rootKey=c.root.toLowerCase();
-   if(this.state.notGal[rootKey]===stamp&&!known.has(rootKey))continue;
+   if(this.state.notGal[rootKey]===stamp&&!known.has(rootKey)){if(c.source==='folder')this.unconfirmed.push({title:c.title,dir:c.root});continue;}
    const g=findGame(c.root);
    // A visual-novel folder whose only program is a translated edition (CLANNAD's clannadFV_sc.exe, the original REALLIVE.EXE
    // moved aside by the patch) is kept as a library game in that language; the game language dialog offers the original.
@@ -194,12 +215,12 @@ class Library{
     }
    // A folder game is named after its game folder when that is deeper (E:GAL素晴日素晴らしき日々HD版 -> 素晴らしき日々).
    const names=[...new Set([c.source==='folder'&&g.dir!==c.root?label(g.dir):'',c.title].filter(Boolean))];
-   let vn=null,lookupFailed=false;const queries=[...new Set(names.flatMap(n=>[n,n.replace(/\s*[（(][^）)]*[）)]/g,'').trim(),...[...n.matchAll(/[（(]([^）)]+)[）)]/g)].map(m=>m[1])]).filter(Boolean))];if(c.source==='steam'&&(!g.engine||g.engine.generic)){const hit=await vndbSteam(c.appid);if(hit===undefined)lookupFailed=true;else if(hit)vn=hit;}
+   let vn=null,lookupFailed=false;const queries=[...new Set(names.flatMap(n=>[n,n.replace(/\s*[（(][^）)]*[）)]/g,'').trim(),...searchNames(n),...[...n.matchAll(/[（(]([^）)]+)[）)]/g)].map(m=>m[1])]).filter(Boolean))].slice(0,8);if(c.source==='steam'&&(!g.engine||g.engine.generic)){const hit=await vndbSteam(c.appid);if(hit===undefined)lookupFailed=true;else if(hit)vn=hit;}
    if(!vn&&(!g.engine||g.engine.hook===null||c.source==='folder'))for(const n of queries){const result=await vndb(n,c.source==='steam');if(result===undefined)lookupFailed=true;else if(result){vn=result;break;}}
    if(!vn&&lookupFailed&&c.source==='steam'&&previous?.appid===c.appid&&previous.vndbId)vn={id:previous.vndbId,title:previous.names?.[1]||previous.title};
    // Without a visual-novel engine (none, or a general one like Unity), only titles VNDB knows are kept: Steam
    // libraries also hold ordinary games. Steam names must match exactly; folder names may be a shortened title.
-   if((!g.engine||g.engine.generic)&&!vn){if(!lookupFailed)this.state.notGal[rootKey]=stamp;continue;}delete this.state.notGal[rootKey];
+   if((!g.engine||g.engine.generic)&&!vn){if(!lookupFailed)this.state.notGal[rootKey]=stamp;if(c.source==='folder')this.unconfirmed.push({title:c.title,dir:g.dir,exe:g.exe});continue;}delete this.state.notGal[rootKey];
    const old=known.get(g.dir.toLowerCase())||{};const key=crypto.createHash('sha1').update(g.dir.toLowerCase()).digest('hex').slice(0,16);
    let cover=old.cover&&fs.existsSync(old.cover)?old.cover:'';
    if(!cover){const target=path.join(this.coverDir,'tome-'+key+'.jpg');
@@ -309,4 +330,4 @@ class Synopses{
   if(!out.zh&&!out.en&&!out.ja)return Object.keys(old.src||{}).some(l=>require('./synopsis-policy.cjs').approved(old.src[l]))?old:null;if(!fs.existsSync(this.file+'.pre-vndb.json')&&fs.existsSync(this.file))fs.copyFileSync(this.file,this.file+'.pre-vndb.json');this.cache[String(a.mediaId)]=out;this.write();return out;
  }
 }
-module.exports={machine,restoreTool,Library,Synopses,engineOf,findGame,steamGames,folderGames,findSteam,findVariants,isTranslated,playableGame};
+module.exports={searchNames,machine,restoreTool,Library,Synopses,engineOf,findGame,steamGames,folderGames,findSteam,findVariants,isTranslated,playableGame};
