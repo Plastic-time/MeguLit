@@ -6,6 +6,8 @@ function extractSourceRuby(value){
  text=text.replace(/<ruby\b[^>]*>([^<>]*?)<rt\b[^>]*>([^<>]*?)<\/rt>\s*<\/ruby>/gi,(_,base,reading)=>add(base,reading));
  text=text.replace(/<ruby\s*=\s*["']([^"']+)["']\s*>([^<>]*?)<\/ruby>/gi,(_,reading,base)=>add(base,reading));
  text=text.replace(/[｜|]([^\s《》|｜]+)《([^《》]+)》/g,(_,base,reading)=>add(base,reading));
+ /* E305 (user, 2026-11-10: WITCH ON THE HOLY NIGHT showed <rちゅうふく>中腹</r> as text): HuneX engine ruby, reading first. */
+ text=text.replace(/<r([^<>]*)>([^<>]*?)<\/r>/g,(_,reading,base)=>add(base,reading));
  return {text,ruby};
 }
 module.exports={extractSourceRuby};

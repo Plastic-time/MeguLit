@@ -49,6 +49,11 @@ $Tag="v$Version";$Asset="MeguLit-$Tag-win-x64.zip"
 # One click to the package at the top of the release page, however many hotfix sections follow (user, 2026-11-09).
 # The in-app update card drops this line (services/update.cjs).
 $DownloadLine="> **[⬇ 下载 MeguLit $Tag 安装包 / Download $Asset](https://github.com/ilynthn/MeguLit/releases/download/$Tag/$Asset)**"
+# E297 (user, 2026-11-10: every release note, hotfixes too, bilingual and collapsible like DangoMusic's): the notes file
+# stays "Chinese --- English"; the page shows each language in its own collapsed <details> block, and a hotfix is
+# one collapsed block holding both. A --- line still separates the halves for update cards older than 1.2.4.
+$Halves=[regex]::Split($Body.Trim(),"(?m)^---\s*$");$Zh=$Halves[0].Trim();$En=($Halves[1..($Halves.Count-1)] -join "`n").Trim()
+function LangBlocks($zh,$en,$openZh){$o=if($openZh){' open'}else{''};return "<details$o>`n<summary><b>中文</b></summary>`n`n$zh`n`n</details>`n`n---`n`n<details>`n<summary><b>English</b></summary>`n`n$en`n`n</details>"}
 $Token=$null
 if(-not $DryRun -and -not $Prepare){
  # gh first: Windows PowerShell 5.1 pipes CRLF, which newer git credential fill rejects
@@ -128,7 +133,8 @@ foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and -not $e.FullNa
 # --others: files added in this release are not tracked yet when the list is built (-IncludeWorkingChanges)
 foreach($f in (git ls-files --cached --others --exclude-standard core services web setup)){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
 # Prebuilt native helpers added after the previous package (not tracked: *.dll is ignored); E293 scene capture.
-foreach($f in 'native/MeguLitScn32.dll','native/MeguLitScn64.dll'){if(Test-Path -LiteralPath (Join-Path $Root $f)){[void]$names.Add($f)}}
+# E301 Ren'Py positions: the DLLs run native/MeguLitRenpy.py, which must ship next to them.
+foreach($f in 'native/MeguLitScn32.dll','native/MeguLitScn64.dll','native/MeguLitKrkr32.dll','native/MeguLitRenpy32.dll','native/MeguLitRenpy64.dll','native/MeguLitRenpy.py'){if(Test-Path -LiteralPath (Join-Path $Root $f)){[void]$names.Add($f)}}
 $zipPath=Join-Path $work $Asset
 $out=[IO.Compression.ZipFile]::Open($zipPath,'Create')
 try{
@@ -175,9 +181,11 @@ if($Hotfix){
  $rel=Api GET "/releases/tags/$Tag"
  foreach($old in @($rel.assets | Where-Object {$_.name -eq $Asset})){Api DELETE "/releases/assets/$($old.id)" | Out-Null}
  $old=[string]$rel.body;if($old -notmatch [regex]::Escape($DownloadLine)){$old=$DownloadLine+"`n`n"+$old}
- $rel=Api PATCH "/releases/$($rel.id)" @{body=($old+"`n`n---`n`n### "+(Get-Date -Format 'yyyy-MM-dd HH:mm')+" hotfix`n`n"+$Body)}
+ $stamp=Get-Date -Format 'yyyy-MM-dd HH:mm'
+ $section="<details>`n<summary><b>🔧 Hotfix $stamp</b>（点击展开 / click to expand）</summary>`n`n"+(LangBlocks $Zh $En $false)+"`n`n</details>"
+ $rel=Api PATCH "/releases/$($rel.id)" @{body=($old+"`n`n---`n`n"+$section)}
 }else{
- $rel=Api POST '/releases' @{tag_name=$Tag;target_commitish=$merged.sha;name="MeguLit $Tag";body=($DownloadLine+"`n`n"+$Body);make_latest='true'}
+ $rel=Api POST '/releases' @{tag_name=$Tag;target_commitish=$merged.sha;name="MeguLit $Tag";body=($DownloadLine+"`n`n## MeguLit $Tag`n`n"+(LangBlocks $Zh $En $false));make_latest='true'}
 }
 $upload=($rel.upload_url -replace '\{.*$','')+"?name=$Asset"
 $a=Invoke-RestMethod -Method Post -Uri $upload -Headers $Headers -ContentType 'application/zip' -InFile $zipPath

@@ -105,6 +105,7 @@ public class GalWindowBridge {
     static DateTime LastModeToggle=DateTime.MinValue;
     static DateTime LastCoverToggle=DateTime.MinValue;
     static GameTextMask TextMask;
+    static PageLocator PageLocate; // E306: OCR sentence positions for engines without their own
     static GameWaitMarker WaitMarker;
     static NativeMaskLayer MaskLayer;
     // Live frosted glass behind glass-mode panels (GlassLayer.cs): rectangles come from the page, the bridge keeps them under the overlay.
@@ -336,6 +337,7 @@ public class GalWindowBridge {
         else if(type=="dialogSceneLine"){Scene.Line();GameUi.Clear();}
         else if(type=="dialogVisibility"){DialogVisible=Bool(d,"visible");}
         else if(type=="hookVerify"){if(HookVerifier!=null)HookVerifier.Request(Target,d);}
+        else if(type=="pageLocate"){if(PageLocate!=null&&Target!=IntPtr.Zero)PageLocate.Request(Target,Str(d,"text"));}
         else if(type=="maskAssist"){if(TextMask!=null)TextMask.Assist(Str(d,"source"));}
         else if(type=="hookVerifyCancel"){if(HookVerifier!=null)HookVerifier.Cancel();}
         else if(type=="gameAudio"){AudioWanted=Bool(d,"enabled");uint pid=0;if(AudioWanted&&Target!=IntPtr.Zero)GetWindowThreadProcessId(Target,out pid);if(AudioWanted&&pid!=0)Audio.Start(pid);else if(!AudioWanted)Audio.Stop();}
@@ -527,6 +529,8 @@ public class GalWindowBridge {
                 Emit(new{type="game-window-policy-selftest",passed=true,hiddenWindowPreserved=true});return 0;
             }
         }
+        if(args.Length>=1&&args[0]=="--page-locator-ocr-test"){string r=PageLocator.OcrSelfTest(args.Length>1?args[1]:null);Console.WriteLine(r=="0"?"PASS page locator OCR: three drawn paragraphs found, wrapped where they were drawn, boxes at the drawn margin":(r.StartsWith("skip")?"SKIP "+r:"FAIL page locator OCR: "+r));return r=="0"||r.StartsWith("skip")?0:13;}
+        if(args.Length==1&&args[0]=="--page-locator-self-test"){bool passed=PageLocator.SelfTest();Console.WriteLine(passed?"PASS page locator: hook line aligned to OCR rows, split where the game wrapped, OCR mistakes tolerated, punctuation kept on its row":"FAIL page locator");return passed?0:12;}
         if(args.Length==1&&args[0]=="--wait-page-marker-self-test"){bool passed=WaitPageMarker.SelfTest();Emit(new{type="wait-page-marker-selftest",passed=passed});return passed?0:10;}
         if(args.Length==1&&args[0]=="--reader-pointer-self-test"){bool passed=ReaderPointerGate.SelfTest();Emit(new{type="reader-pointer-selftest",passed=passed});return passed?0:11;}
         if(args.Length>0&&args[0]=="--diagnose"){Diagnose();return 0;}
@@ -563,7 +567,7 @@ public class GalWindowBridge {
         }
         if((args.Length!=1&&args.Length!=2)||!Int32.TryParse(args[0],out OverlayPid))return 2;
         if(args.Length==2){long handle;if(!Int64.TryParse(args[1],out handle))return 2;PreferredOverlay=new IntPtr(handle);uint owner;GetWindowThreadProcessId(PreferredOverlay,out owner);if(owner!=OverlayPid)return 2;}
-        HookVerifier=new GameHookVerifier(Emit);MaskLayer=new NativeMaskLayer();TextMask=new GameTextMask(MaskOutput);
+        HookVerifier=new GameHookVerifier(Emit);MaskLayer=new NativeMaskLayer();TextMask=new GameTextMask(MaskOutput);PageLocate=new PageLocator(Emit);
         WaitMarker=new GameWaitMarker(Emit);
         try{SetProcessDpiAwarenessContext(new IntPtr(-4));}catch{}
         PointerGate=new ReaderPointerGate(Emit);

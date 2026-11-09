@@ -12,6 +12,13 @@ function scriptSource(text){
  return marker?text.slice(0,marker.index).trimEnd():text;
 }
 const IslandSource=require('./island-source.js');
+// Engines whose MeguLit DLL reports each sentence of a full-screen page (hookEngineLine): KiriKiri (E300), Ren'Py (E301),
+// and every other engine through the OCR page locator (E306, GalWindowBridge PageLocator.cs).
+const PAGE_ENGINES=new Set(['krkr','renpy','ocr']);
+/* E305 full-screen (NVL) games whose engine reports no line positions or page turns (魔法使いの夜 / WITCH ON THE HOLY NIGHT,
+   HuneX, LunaHook typemoon): their lines go out as engine 'nvl', and the reader stacks each one under the last inside
+   the calibrated text box, turning the page when the box is full. Keyed by the game's process name. */
+const FLOW_PAGE_EXES=/^(?:WoH)\.exe$/i;
 class HookNative{
  constructor(layout,onEvent,spawnHelper=spawn,now=Date.now){this.layout=typeof layout==='string'?{native:layout,hook:path.join(layout,'hook-runtime')}:layout;this.folder=this.layout.native;this.emit=onEvent;this.spawn=spawnHelper;this.now=now;this.state={hookActive:false,hookAvailable:false,hookThreads:[],processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookMessage:'Hook 未启用'};this.islandSources=new Map();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;this.lastSource="";this.identity="";this.serial=0;this.enabled=false;this.attempt=0;this.retryAt=0;this.timer=setInterval(()=>this.tick(),1000);this.timer.unref?.();}
  trace(message){try{const file=path.join(this.layout.logs||path.join(this.folder,"..","logs"),"hook-events.log");if(fs.existsSync(file)&&fs.statSync(file).size>=1048576){fs.rmSync(file+".previous",{force:true});fs.renameSync(file,file+".previous");}fs.appendFileSync(file,new Date().toISOString()+" "+message+"\n");}catch{}}
@@ -30,20 +37,21 @@ class HookNative{
  syncEmbedMode(){const want=!!(this.process&&this.enabled&&this.preferences?.embedTranslation===true);if(!this.process){this.embedModeSent=undefined;return;}if(want===this.embedModeSent)return;this.embedModeSent=want;if(!want&&this.state?.embedTranslating)this.notify({embedTranslating:false});this.trace('embed mode '+(want?'translate':'hide'));this.send({type:'embedMode',mode:want?'translate':'hide'});}
  embedReply(id,trans){if(!this.process||!Number.isSafeInteger(id))return;this.send({type:'embedReply',id,trans:String(trans||'').slice(0,4000)});if(trans&&this.embedModeSent)this.notify({embedTranslating:true});}
  tick(){if(this.process&&this.now()-this.lastHeartbeat>12000){const old=this.process;this.process=null;++this.serial;old.kill();this.retry('Hook 通信无响应');}if(!this.process&&this.wanted&&this.target&&this.now()>=this.retryAt)this.start(this.target);}
- retry(message){this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.enabled=false;this.retryAt=this.now()+Math.min(30000,1000*2**Math.min(this.attempt++,5));this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookSource:this.lastSource||null,hookRecovering:!!this.lastSource,hookThreads:[],hookMessage:message+'；正在自动重连'});}
+ retry(message){this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.enabled=false;this.retryAt=this.now()+Math.min(30000,1000*2**Math.min(this.attempt++,5));this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookSource:this.lastSource||null,hookRecovering:!!this.lastSource,hookThreads:[],hookMessage:message+'；正在自动重连'});}
  start({pid,hwnd,name,started}){if(!/^[A-Za-z0-9_\-. \u0080-\uffff]{1,100}$/.test(name)||!/^\d{10,20}$/.test(started))return;
   // Do not keep re-attaching to a game process that has exited; wait for the window bridge to bind the new one.
   if(this.spawn===spawn)try{process.kill(pid,0);}catch(e){if(e.code==='ESRCH'){this.retryAt=this.now()+3000;this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,hookMessage:'游戏进程已退出，等待游戏重新启动后自动绑定'});return;}}
   // A HookBridge built while ToMe ran is staged as HookBridge.updated.exe and installed here, before the bridge starts.
   const staged=path.join(this.folder,'HookBridge.updated.exe');if(fs.existsSync(staged))try{fs.copyFileSync(staged,path.join(this.folder,'HookBridge.exe'));fs.unlinkSync(staged);}catch{}
   const root=this.layout.hook,required=['LunaHost64.dll','LunaHook32.dll','LunaHook64.dll'],missing=required.filter(n=>!fs.existsSync(path.join(root,n)));if(missing.length||!fs.existsSync(path.join(this.folder,'HookBridge.exe'))){this.retryAt=this.now()+30000;this.notify({hookMessage:'Hook 组件缺失：'+missing.join('、'),hookAvailable:false});return;}
-  const identity=pid+"|"+started;if(identity!==this.identity){this.lastSource="";this.lastSourceAt=0;this.preferredThread=null;this.identity=identity;this.state.hookFramework=null;}this.pid=pid;this.started=started;this.enabled=this.preferences?.hookProfile!=='read'&&!this.preflight&&this.windowState?.bound===true&&(this.windowState?.coverEnabled!==false||this.preferences?.embedTranslation===true);this.route=this.enabled?(this.preferences?.hookProfile==='embed'?'embed':'custom'):'read';this.markerKey='';this.lastHeartbeat=this.now();const serial=++this.serial,child=this.process=this.spawn(path.join(this.folder,'HookBridge.exe'),[String(pid),hwnd,name,started,...(this.route==='read'?['--read-only']:this.route==='embed'?['--official-embed']:[])],{cwd:this.folder,windowsHide:true,stdio:['pipe','pipe','ignore']});child.stdin.on('error',()=>{});if(this.enabled)this.send({type:'enable'});
+  this.flowPage=FLOW_PAGE_EXES.test(name);  const identity=pid+"|"+started;if(identity!==this.identity){this.lastSource="";this.lastSourceAt=0;this.preferredThread=null;this.identity=identity;this.state.hookFramework=null;}this.pid=pid;this.started=started;this.enabled=this.preferences?.hookProfile!=='read'&&!this.preflight&&this.windowState?.bound===true&&(this.windowState?.coverEnabled!==false||this.preferences?.embedTranslation===true);this.route=this.enabled?(this.preferences?.hookProfile==='embed'?'embed':'custom'):'read';this.markerKey='';this.lastHeartbeat=this.now();const serial=++this.serial,child=this.process=this.spawn(path.join(this.folder,'HookBridge.exe'),[String(pid),hwnd,name,started,...(this.route==='read'?['--read-only']:this.route==='embed'?['--official-embed']:[])],{cwd:this.folder,windowsHide:true,stdio:['pipe','pipe','ignore']});child.stdin.on('error',()=>{});if(this.enabled)this.send({type:'enable'});
   const failed=()=>{if(serial!==this.serial)return;this.process=null;++this.serial;this.retry('Hook 连接停止');};child.on('error',failed);child.on('exit',failed);
   createInterface({input:child.stdout}).on('line',line=>{if(serial!==this.serial||line.length>30000)return;let m;try{m=JSON.parse(line);}catch{return;}this.lastHeartbeat=this.now();
    if(m.type==='hookEngineFeature'&&['naninovel','cs2','siglus'].includes(m.framework)){
     if(m.framework==='siglus'&&this.enabled){this.enabled=false;this.route='read';this.verified=false;this.preferredThread=null;this.send({type:'disable',reason:'script-vm-capture-only'});}
     this.notify({hookFramework:m.framework});return;
    }
+   if(m.type==='hookEngineLine'&&PAGE_ENGINES.has(m.engine)){this.pageLine(m);return;}
    if(m.type==='hookTextPos'||m.type==='hookPage'||m.type==='hookDialog'||m.type==='hookGameUi'){this.emit(m);if(m.type==='hookPage')this.islandPage(m);return;}
    /* Translation written back into the game: the bridge holds a dialogue line and asks for its translation. */
    if(m.type==='embedRequest'&&Number.isSafeInteger(m.id)&&typeof m.text==='string'&&m.text.length<=4000){this.emit({type:'hookEmbedRequest',id:m.id,text:m.text});return;}
@@ -73,10 +81,19 @@ class HookNative{
       bilingual from an existing 汉化). Hand the pair to the reader before the line itself, so its translation is ready. */
    this.markScriptSource();if(typeof r.captured==='string'&&r.captured.trim()&&typeof this.emit==='function')this.emit({type:'hookPatchTranslation',japanese:r.japanese,chinese:r.captured});
    return r.japanese;}if(r.status!=='none')this.trace('original-text kept '+r.status+' '+r.method);}catch(error){this.trace('original-text error '+(error?.message||error));}return text;}
+ /* E294 (user: a friend's Steam CLANNAD was read as Japanese while the game showed Simplified Chinese, furigana and all):
+    three lines in a row with no kana and several characters no Japanese font has (际 无 尽 这 们) mean the game is
+    running a Chinese script; the status says so once, so the user restores Japanese instead of reading Chinese. */
+ languageCheck(text){try{const t=String(text||'').replace(/%l[^;%]*;[^%]*%l;/g,'');if(!t.trim())return;
+  if(!HookNative.sjis){const dec=new TextDecoder('shift_jis'),set=new Set();for(let a=0x81;a<=0xfc;a++)for(let b=0x40;b<=0xfc;b++){const c=dec.decode(Buffer.from([a,b]));if(c.length===1&&c!=='�')set.add(c);}HookNative.sjis=set;}
+  const han=t.match(/[一-鿿]/g)||[],kana=/[぀-ヿ]/.test(t),foreign=han.filter(c=>!HookNative.sjis.has(c)).length;
+  const chinese=!kana&&han.length>=4;this.chineseRun=chinese?(this.chineseRun||0)+1:0;this.chineseForeign=chinese?(this.chineseForeign||0)+foreign:0;
+  if(this.chineseRun>=3&&this.chineseForeign>=2&&!this.state?.sourceChinese){this.trace('source looks like Simplified Chinese');this.notify({sourceChinese:true,hookMessage:'读到的台词是简体中文，不是日文原文：请先用「日文原版恢复」或换成日文版，再读游戏'});}
+  else if(kana&&this.state?.sourceChinese)this.notify({sourceChinese:false});}catch{}}
  source(m,name){
   // The game's own ruby readings ride after the line as \x1d base \x1c reading pairs (ISLAND hook): split them off
   // before anything else sees the text, and attach them when this line is delivered (user, 2026-11-03).
-  const extracted=require('./source-ruby.cjs').extractSourceRuby(m.text);let ruby=extracted.ruby;m={...m,text:extracted.text};
+  const extracted=require('./source-ruby.cjs').extractSourceRuby(m.text);let ruby=extracted.ruby;m={...m,text:extracted.text};this.languageCheck(m.text);
   // Multilingual containers keep only the Japanese track (E243); streams that deliver every line several times (or every character doubled) are learned and undone per stream (E215).
   this.repeats=this.repeats||new (require('./repeat-normalizer.cjs').RepeatNormalizer)();
   this.attempt=0;const text=this.originalTextFor(this.repeats.normalize(String(m.sourceCode||m.sourceName||name||''),require('./language-tracks.cjs').japaneseTrack(scriptSource(cleanSource(m.text,name,String(m.sourceCode||''))))).replace(/\n+$/,''));
@@ -103,12 +120,66 @@ class HookNative{
   if(identifierNoise(text)){this.trace('drop identifier text '+JSON.stringify(text.slice(0,60)));return;}
   if(ruby.length){const map=this.sourceRuby||(this.sourceRuby=new Map());map.set(text,ruby);if(map.size>64)map.delete(map.keys().next().value);}
   if(m.sourceName==='EmbedToMeCS2_DrawPreserve'){if(m.origin==='history'&&this.state.receivedText)return;this.queueIslandSource(text,m.origin);return;}
+  this.locatePage(text,m.origin);
+  if(this.pageRoute(text,m.origin))return;
   if(!/EmbedToMeCS2_DrawPreserve|EmbedEuphoria474_DrawHide/.test(m.sourceName||'')){this.deliverSource(text,m.origin);return;}
   const pending=this.pendingSource;
   if(pending&&text!==pending.text&&!text.startsWith(pending.text)&&!pending.text.startsWith(text))this.flushSource();
   if(this.pendingSource){if(text.length>=this.pendingSource.text.length)this.pendingSource={text,origin:m.origin};return;}
   this.pendingSource={text,origin:m.origin};const serial=this.serial;this.sourceTimer=setTimeout(()=>{if(serial===this.serial)this.flushSource();},40);this.sourceTimer.unref?.();
  }
+ /* E300 KiriKiri full-screen pages (user: ライムライト・レモネードジャム keeps several paragraphs on screen, each line where the
+    game wrapped it). MeguLitKrkr32.dll reports each sentence of a KAG message layer (hookEngineLine): begin at its first
+    character, end at its click wait with the box it filled and the text it drew, a newline at every row the game started.
+    On a full-screen layer (nvl) each sentence becomes one page line at its own place, as on ISLAND: a new page clears the
+    old one at its first character (page line 2n-1), the sentence itself is delivered at its end (page line 2n) with the
+    game's own breaks. The hook's text for it (it arrives with the first character) is the original when the drawn text
+    differs (blanked or written back by the embed), re-broken at the same rows. Hook lines no page sentence takes within
+    1.5 s are dropped while the page is up, and delivered as usual once the game is back in its ADV box (nvl=0), so ADV
+    KiriKiri games read exactly as before.
+    E301: the same protocol carries Ren'Py (MeguLitRenpy32/64.dll + native/MeguLitRenpy.py, NVL pages); every name
+    here takes the engine from the report (PAGE_ENGINES), positions go out as <engine>_screen_v1. */
+ pageReset(){if(this.pageState)clearTimeout(this.pageState.timer);this.pageState=null;this.pageMode=null;}
+ pageNvl(){return this.pageMode?.mode==='nvl'&&this.now()-this.pageMode.at<120000;}
+ pageLine(m){
+  if(!Number.isSafeInteger(m.line)||m.line<1||!['begin','end'].includes(m.phase))return;
+  const now=this.now(),engine=m.engine,K=this.pageState&&this.pageState.engine===engine?this.pageState:(this.pageReset(),this.pageState={engine,lines:new Map(),held:[],timer:null});
+  if(!m.nvl){if(this.pageMode?.mode==='nvl')this.trace(engine+' page mode off');this.pageMode={mode:'adv',engine,at:now};this.releasePageHeld();return;}
+  if(this.pageMode?.mode!=='nvl')this.trace(engine+' page mode on');this.pageMode={mode:'nvl',engine,at:now};
+  let e=K.lines.get(m.line);if(!e){e={line:m.line,same:m.same===true,hookText:'',origin:'live',ended:false,at:now};K.lines.set(m.line,e);if(K.lines.size>64)K.lines.delete(K.lines.keys().next().value);
+   if(!e.same)this.emit({type:'hookPage',engine,line:m.line*2-1,same:false,token:0,at:now});}
+  if(!e.hookText){const h=K.held.shift();if(h){e.hookText=h.text;e.origin=h.origin;}}
+  // OCR reports after the hook line: the first sentence of a page was already delivered as an ordinary line; it is re-read as the page's.
+  if(!e.hookText&&engine==='ocr'&&this.lastSource&&HookNative.flat(this.lastSource)===HookNative.flat(String(m.text||'')))e.hookText=this.lastSource;
+  if(m.phase!=='end'||e.ended)return;e.ended=true;
+  const drawn=HookNative.pageText(String(m.text||''),e.hookText),text=e.hookText||!drawn?drawn:this.originalTextFor(drawn);
+  if(!text){this.trace(engine+' page line '+m.line+' had no readable text');return;}
+  const token=IslandSource.token(text),line=m.line*2;
+  this.emit({type:'hookPage',engine,line,same:e.same,token,at:now});
+  this.emit({type:'hookTextPos',engine:engine+'_screen_v1',line,token,x0:m.x0,y0:m.y0,x1:m.x1,y1:m.y1,size:m.size,sw:m.sw,sh:m.sh,count:m.count,at:now});
+  this.emitSource(text,e.origin==='history'?'live':e.origin,engine,line);
+ }
+ // The drawn text keeps the game's rows; the hook's text is the original when they differ (same length: re-broken there).
+ static flat(v){return String(v||'').replace(/[ \u3000\r\n]/g,'');}
+ static pageText(drawn,hook){const flat=v=>v.replace(/[ \u3000\r\n]/g,''),own=drawn.replace(/^\n+|\n+$/g,'');
+  if(hook&&flat(hook)!==flat(own)){const rows=own.split('\n').map(r=>[...r].length),chars=[...hook.replace(/\n/g,'')];if(rows.length<2||rows.reduce((a,b)=>a+b,0)!==chars.length)return hook;
+   let at=0;return rows.map(n=>{const r=chars.slice(at,at+n).join('');at+=n;return r;}).join('\n');}
+  return /[\u3040-\u30ff\u3400-\u9fff]/.test(own)?own:hook||'';}
+ pageRoute(text,origin){
+  if(!this.pageNvl())return false;
+  const K=this.pageState,now=this.now(),open=[...K.lines.values()].reverse().find(e=>!e.ended&&!e.hookText&&now-e.at<3000);
+  if(open){open.hookText=text;open.origin=origin||'live';return true;}
+  K.held.push({text,origin:origin||'live',at:now});if(K.held.length>8)K.held.shift();this.schedulePageHeld();return true;
+ }
+ schedulePageHeld(){const K=this.pageState;if(!K)return;clearTimeout(K.timer);if(!K.held.length)return;const serial=this.serial,wait=Math.max(0,K.held[0].at+HookNative.holdFor(K.engine)-this.now());K.timer=setTimeout(()=>{if(serial===this.serial)this.expirePageHeld();},wait);K.timer.unref?.();}
+ expirePageHeld(){const K=this.pageState;if(!K)return;const now=this.now(),keep=[];for(const h of K.held){if(now-h.at<HookNative.holdFor(K.engine)){keep.push(h);continue;}if(this.pageNvl()&&K.engine!=='ocr')this.trace(K.engine+' page: hook line drawn nowhere on the page, dropped chars='+h.text.length);else this.deliverSource(h.text,h.origin);}K.held=keep;this.schedulePageHeld();}
+ /* E306: engines without a page DLL are located on the picture (OCR, PageLocator.cs in GalWindowBridge). Each live hook
+    line is sent there (gal-native sets this.locate) unless a native page engine (krkr / renpy) reported in the last
+    10 minutes; ISLAND lines never get here. The OCR answer takes up to ~3.5 s, so on an OCR page a held hook line waits
+    5 s, and one the picture never showed is delivered as an ordinary line instead of dropped (OCR may simply miss it). */
+ locatePage(text,origin){if(typeof this.locate!=='function'||(origin&&origin!=='live'))return;const P=this.pageState;if(P&&P.engine!=='ocr'&&this.now()-(this.pageMode?.at||0)<600000)return;try{this.locate(text);}catch{}}
+ static holdFor(engine){return engine==='ocr'?5000:1500;}
+ releasePageHeld(){const K=this.pageState;if(!K)return;const held=K.held;K.held=[];clearTimeout(K.timer);for(const h of held)this.deliverSource(h.text,h.origin);}
  // A render burst can report several sentences before the host flushes their source frames.
  // Join every native line, in draw order; a later token must never overwrite an earlier unmatched line.
  islandPage(m){
@@ -160,6 +231,7 @@ class HookNative{
     650 ms so a script that repeats them still advances. */
  sameAsLast(text){const k=s=>String(s||'').replace(/\s+/g,''),key=k(text);if(!key||key!==k(this.lastSource))return false;return key.length>=6||this.now()-(this.lastSourceAt||0)<650;}
  emitSource(text,origin,engine='',nativeLine=0){
+  if(!engine&&!nativeLine&&this.flowPage)engine='nvl';
   if((origin==='history'&&this.state.receivedText)||(!nativeLine&&this.sameAsLast(text)&&this.state.hookActive&&this.state.receivedText&&!this.state.hookRecovering)){this.trace('source duplicate ignored chars='+text.length);return;}
   // E247 (user: a game settings screen looped its prompts into the text bar): when lines already shown in the last
   // 8 s keep coming back (two or more repeats), the stream is cycling menu/system text; drop it until an unseen line.
@@ -179,6 +251,6 @@ class HookNative{
  // E246: style sampling pauses the embed replacement so the game draws one original line, then resumes it.
  suspendReplacement(on){if(!this.process||!this.enabled)return;if(on&&!this.suspended){this.suspended=true;this.trace('replacement paused for style sampling');this.send({type:'disable',reason:'style-sampling'});}else if(!on&&this.suspended){this.suspended=false;this.trace('replacement resumed after style sampling');this.send({type:'enable'});}}
  send(v){if(this.process?.stdin.writable)this.process.stdin.write(JSON.stringify(v)+'\n');}
- stop(dispose=true){this.embedModeSent=undefined;if(this.state?.scriptSource)this.notify({scriptSource:false});if(this.state?.embedTranslating)this.notify({embedTranslating:false});clearTimeout(this.skipBurst?.timer);this.skipBurst=null;this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.retryAt=0;this.attempt=0;this.markerKey='';this.waitTarget=null;if(this.process){const old=this.process;this.send({type:'quit'});old.stdin.end();this.process=null;++this.serial;const timer=setTimeout(()=>{if(old.exitCode===null)old.kill();},2000);timer.unref?.();}this.enabled=false;this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'disabled',hookSource:null,hookThreads:[],hookDrawCount:0,hookDrawAt:0});if(dispose){this.lastSource='';this.identity='';this.wanted=false;clearInterval(this.timer);}}
+ stop(dispose=true){this.embedModeSent=undefined;if(this.state?.scriptSource)this.notify({scriptSource:false});if(this.state?.embedTranslating)this.notify({embedTranslating:false});clearTimeout(this.skipBurst?.timer);this.skipBurst=null;this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.retryAt=0;this.attempt=0;this.markerKey='';this.waitTarget=null;if(this.process){const old=this.process;this.send({type:'quit'});old.stdin.end();this.process=null;++this.serial;const timer=setTimeout(()=>{if(old.exitCode===null)old.kill();},2000);timer.unref?.();}this.enabled=false;this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'disabled',hookSource:null,hookThreads:[],hookDrawCount:0,hookDrawAt:0});if(dispose){this.lastSource='';this.identity='';this.wanted=false;clearInterval(this.timer);}}
 }
-module.exports={HookNative,cleanSource,scriptSource,identifierNoise};
+module.exports={FLOW_PAGE_EXES,HookNative,PAGE_ENGINES,cleanSource,scriptSource,identifierNoise};

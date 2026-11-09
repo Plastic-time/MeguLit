@@ -83,8 +83,8 @@ function listing(dir){let names=[];try{names=fs.readdirSync(dir);}catch{}const c
  const managed=re=>{const data=names.find(n=>/_Data$/i.test(n));if(!data)return false;if(!('\0managed' in cache))try{cache['\0managed']=fs.readdirSync(path.join(dir,data,'Managed'));}catch{cache['\0managed']=[];}return cache['\0managed'].some(n=>re.test(n));};
  return {names,magic,managed,has:re=>names.some(n=>re.test(n)),sub:(name,re)=>{const real=names.find(n=>n.toLowerCase()===name.toLowerCase());if(!real)return false;if(!(real in cache))try{cache[real]=fs.readdirSync(path.join(dir,real));}catch{cache[real]=[];}return cache[real].some(n=>re.test(n));}};}
 function engineOf(dir){const f=listing(dir);for(const e of ENGINES)if(e.test(f))return e;return null;}
-function mainExe(dir){
- if(isTranslated(dir))return ''; 
+function mainExe(dir,translatedDir=false){
+ if(!translatedDir&&isTranslated(dir))return ''; 
  // The game's own program: the engine's usual name or the folder's name first, translation-patch and variant
  // launchers (BGI-CHS.exe, euphoria_sc.exe, BGI_patch.exe) last, the larger file among equals.
  const variant=/([-_ .](chs|cht|cn|sc|tc|zh|chinese|patch|\d{6,8})|中文|汉化|漢化|简体|繁體|补丁|パッチ)/i,folder=path.basename(dir).toLowerCase();
@@ -240,6 +240,10 @@ class Library{
    // A visual-novel folder whose only program is a translated edition (CLANNAD's clannadFV_sc.exe, the original REALLIVE.EXE
    // moved aside by the patch) is kept as a library game in that language; the game language dialog offers the original.
    if(g&&g.engine&&!g.exe){const patched=listing(g.dir).names.filter(n=>/\.exe$/i.test(n)&&isTranslated(n)&&!SKIP_EXE.test(n)&&!SKIP_EXE_ANY.test(n)).sort((a,b)=>{try{return fs.statSync(path.join(g.dir,b)).size-fs.statSync(path.join(g.dir,a)).size;}catch{return 0;}})[0];if(patched){this.restorable.set(g.dir.toLowerCase(),restoreTool(g.dir,patched));g.exe=path.join(g.dir,patched);g.translated=translationOf(patched.replace(/\.exe$/i,''))||'zh';}}
+   /* E295 (user report 2026-11-10: Steam's "Tomoyo After ~It's a Wonderful Life~ English Edition" was not listed): a folder
+      named as a translated edition hides its own program from the scan. It is listed with its main program as that
+      language's edition, so the game language dialog can point to a Japanese one. */
+   if(g&&g.engine&&!g.exe&&isTranslated(g.dir)){const own=mainExe(g.dir,true);if(own){g.exe=own;g.translated=translationOf(path.basename(g.dir))||'en';}}
     if(!g||!g.exe)continue;
     const appid=c.appid||steamAppidFor(g.exe);
     if(appid){c.source='steam';c.appid=appid;}
