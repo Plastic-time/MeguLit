@@ -345,17 +345,30 @@ if (finePointer && !reduce) {
   });
 }
 
+// Feature clips from the promo video: loaded and played only while on screen; posters only when motion is reduced.
+if (!reduce) {
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      const v = e.target;
+      if (e.isIntersecting) { if (!v.getAttribute('src')) v.src = v.dataset.src; v.play().catch(() => {}); }
+      else v.pause();
+    }
+  }, { rootMargin: '120px 0px' });
+  for (const v of $$('video.clip')) io.observe(v);
+}
+
 // GMV ticker: engine names on the crimson band, game titles on the outlined band. Two copies make the loop seamless.
-const TICK_ENGINES = ['KiriKiri', 'BGI', 'SiglusEngine', 'YU-RIS', 'Artemis', 'CatSystem2', "Ren'Py", 'HuneX', 'Naninovel', 'MAGES', 'AQUAPLUS', 'NScripter'];
-const TICK_GAMES = ['ISLAND', '魔法使いの夜', 'WHITE ALBUM2', 'euphoria', '千恋＊万花', 'CLANNAD', 'The Shell', '魔法少女ノ魔女裁判', 'STEINS;GATE', '月姫'];
+// The ticker speaks Japanese in every UI language: what MeguLit does, and lines from the games in the video.
+const TICK_FEATURES = ['埋め込み', 'ふりがな', 'クリックで辞書', 'Anki カード', '復習', '五十音', '学習統計', '会話ログ', 'AI 解説'];
+const TICK_LINES = ['雪に埋もれた', '何かを掴んでいた', '顔を覆う', '空気を読む', '続きを読もう', '最後まで', '物語', '言葉'];
 function fillTicker() {
   const fill = (el, words) => {
     if (!el) return;
     const once = words.flatMap(w => { const s = document.createElement('span'); s.textContent = w; const i = document.createElement('i'); i.textContent = '✦'; return [s, i]; });
     el.replaceChildren(...once, ...once.map(n => n.cloneNode(true)));
   };
-  fill($('.js-tk-a'), engines ? engines.adapters.map(a => a.name.replace(/^Unity \((.+)\)$/, '$1')) : TICK_ENGINES);
-  fill($('.js-tk-b'), engines ? engines.games.map(g => g.title) : TICK_GAMES);
+  fill($('.js-tk-a'), TICK_FEATURES);
+  fill($('.js-tk-b'), TICK_LINES);
 }
 
 if (lang !== 'zh') applyLang(lang);

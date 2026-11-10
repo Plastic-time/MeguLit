@@ -885,3 +885,56 @@ section[data-kanji]::before {
 @media (hover: none) { .sound-fab .label { max-width: none; opacity: 1; } }
 @media (max-width: 40rem) { .sound-fab { position: relative; right: auto; bottom: auto; justify-self: end; margin: 1.2rem var(--gutter) 0 0; height: 2.8rem; } }
 @media (prefers-reduced-motion: reduce) { .sound-fab .eq i { animation: none; } }
+
+/* ---- chapters: real footage, one feature at a time -------------------------------------------------------------- */
+.chapters .sec-lede { margin-bottom: clamp(3rem, 7vw, 6rem); }
+.chap {
+  display: grid; grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr); gap: clamp(2rem, 5vw, 5.5rem); align-items: center;
+  margin-bottom: clamp(5rem, 11vw, 9rem);
+}
+.chap:nth-of-type(even) { grid-template-columns: minmax(0, 1.18fr) minmax(0, .82fr); }
+.chap:nth-of-type(even) .chap-copy { order: 2; }
+.chap-copy { position: relative; isolation: isolate; }
+.chap-copy::before {
+  content: attr(data-k); position: absolute; z-index: -1; left: -.1em; top: -.55em; pointer-events: none; white-space: nowrap;
+  font: 700 clamp(4.5rem, 9vw, 8.5rem)/1 var(--serif-ja); color: transparent; -webkit-text-stroke: 1px var(--line); opacity: .9;
+}
+.chap-n { display: flex; align-items: baseline; gap: .8rem; margin: 0 0 .9rem; color: var(--crimson-ink); }
+.chap-n b { font: 600 2.2rem/1 var(--serif); }
+.chap-n span { font: 500 .9375rem/1 var(--serif-ja); color: var(--gold); letter-spacing: .2em; }
+.chap-t { font-size: clamp(1.9rem, 2.8vw + .5rem, 3.1rem); margin-bottom: 1rem; }
+.chap-copy p:last-child { color: var(--muted); font-size: 1.0625rem; max-width: 30em; }
+.chap-media {
+  position: relative; margin: 0; border-radius: 20px; padding: 10px; isolation: isolate;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--surface) 80%, var(--crimson) 20%), color-mix(in srgb, var(--surface) 70%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 50px 100px -40px rgba(0, 0, 0, .75), 0 30px 80px -50px color-mix(in srgb, var(--crimson) 70%, transparent);
+  transform: perspective(1400px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform .45s cubic-bezier(.2, .7, .2, 1);
+}
+.chap-media::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(140deg, color-mix(in srgb, var(--gold) 75%, transparent), transparent 40%, transparent 60%, color-mix(in srgb, var(--crimson) 65%, transparent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.clip { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 12px; background: #1a1214; object-fit: cover; }
+.chap-duo .chap-media { padding-bottom: 18%; }
+.chap-duo .clip:first-child { width: 88%; }
+.chap-duo .clip-2 { position: absolute; width: 62%; right: -4%; bottom: -6%; box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .8), 0 0 0 1px var(--line); }
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .chap-media { animation: chap-in linear both; animation-timeline: view(); animation-range: entry 0% cover 40%; }
+    .chap:nth-of-type(even) .chap-media { animation-name: chap-in-r; }
+    .chap-copy::before { animation: drift linear both; animation-timeline: view(); }
+  }
+}
+@keyframes chap-in { from { opacity: .2; transform: perspective(1400px) rotateY(-24deg) rotateX(10deg) translateX(4rem) scale(.9); } to { opacity: 1; transform: perspective(1400px); } }
+@keyframes chap-in-r { from { opacity: .2; transform: perspective(1400px) rotateY(24deg) rotateX(10deg) translateX(-4rem) scale(.9); } to { opacity: 1; transform: perspective(1400px); } }
+@media (max-width: 60rem) {
+  .chap, .chap:nth-of-type(even) { grid-template-columns: minmax(0, 1fr); gap: 1.8rem; }
+  .chap:nth-of-type(even) .chap-copy { order: 0; }
+}
+/* the bento is now 2 x 2 */
+.card-spec { grid-column: span 6; }
+.card-sm { grid-column: span 6; }
+@media (max-width: 60rem) { .card-spec, .card-sm { grid-column: span 12; } }
+.hp-card img { aspect-ratio: 16 / 9; }
