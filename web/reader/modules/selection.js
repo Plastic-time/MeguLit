@@ -80,12 +80,19 @@
   return dist<=576?best:null;}
  function pointerTrace(kind,e,token){try{const chars=token?paragraphText(token).chars:[],t=e.target;window.__tomoyoTranslateRequest?.(JSON.stringify({type:'pointerDiagnostic',kind,clientX:Math.round(e.clientX),clientY:Math.round(e.clientY),screenX:e.screenX,screenY:e.screenY,dpr:devicePixelRatio,detail:e.detail,target:String(t?.className?.baseVal??t?.className??t?.tagName??''),targetText:String(t?.textContent||'').slice(0,6),direct:String(t?.closest?.('.char-token')?.textContent||''),token:token?.textContent||'',index:token?chars.indexOf(token):-1,focused:document.hasFocus(),win:[window.screenX,window.screenY,innerWidth,innerHeight],sentences:[...document.querySelectorAll('.sentence-text')].slice(0,3).map(n=>{const r=n.getBoundingClientRect(),c=getComputedStyle(n);return [Math.round(r.left),Math.round(r.top),Math.round(r.width),Math.round(r.height),c.visibility,c.opacity,c.display,String(n.textContent||'').slice(0,8)];}),under:document.elementsFromPoint(e.clientX,e.clientY).slice(0,4).map(n=>String(n.className?.baseVal??n.className??n.tagName).slice(0,40))}));}catch{}}
  document.addEventListener('pointerdown',e=>{if(inOwn(e.target))return;if(card&&!e.target.closest?.('.sentence-text'))close();const token=tokenAt(e);pointerTrace('down',e,token);if(!token||e.button!==0)return;down={x:e.clientX,y:e.clientY,token};clearTimeout(hold);if(e.pointerType==='touch')hold=setTimeout(()=>{suppressUntil=Date.now()+700;const selection=selected();selection?show(selection.args,selection.anchor):showPoint(token);},480);},true);
+ /* E422 (user, WoH, screen recording: dragging over the text, the red highlight jumped to 「魔法」, 「見たコト」, 「とは違」 in
+    other lines and off the page, now and then). The browser's own drag selection ran alongside this one: on a page every
+    sentence is its own positioned box, and once the pointer left the sentence the drag began in, the native selection
+    kept growing in DOM order through the other boxes. The native selection never starts on a line; this drag owns it. */
+ document.addEventListener('selectstart',e=>{if(e.target?.closest?.('.sentence-text')||e.target?.parentElement?.closest?.('.sentence-text'))e.preventDefault();},true);
  document.addEventListener('pointermove',e=>{
   if(!down||!(e.buttons&1)||Math.hypot(e.clientX-down.x,e.clientY-down.y)<=6)return;
   clearTimeout(hold);
   const end=e.target.closest?.('.char-token:not(.tome-typewriter-pending)')||tokenAt(e);
   const {root,chars,text}=paragraphText(down.token);
-  if(!root||!end||!root.contains(end)||down.drag?.end===end)return;
+  /* E422: outside the sentence the drag began in, keep the last range (never a range through other lines) */
+  if(!root||!end||!root.contains(end)){if(down.drag?.anchor){const s=getSelection();if(s&&(s.rangeCount!==1||s.getRangeAt(0).toString()!==down.drag.anchor.toString())){s.removeAllRanges();s.addRange(down.drag.anchor);}}return;}
+  if(down.drag?.end===end)return;
   const a=chars.indexOf(down.token),b=chars.indexOf(end);
   if(a<0||b<0)return;
   const first=Math.min(a,b),last=Math.max(a,b),range=document.createRange();

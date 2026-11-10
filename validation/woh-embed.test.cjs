@@ -298,3 +298,9 @@ test('E422: the drag frame goes around the page lines, not the 0x0 text window',
  assert.match(view,/body\.tome-box-dragging \.sentence-window\.tome-island-page\{outline:none!important\}/);
  assert.match(view,/body\.tome-box-dragging \.sentence-window\.tome-island-page \.tome-island-pair:not\(\[hidden\]\)\{outline:2px dashed/);
 });
+
+test('E422: dragging over a page selects only inside the sentence it began in; the native selection never starts on a line',()=>{
+ const sel=read('web/reader/modules/selection.js');
+ assert.match(sel,/document\.addEventListener\('selectstart',e=>\{if\(e\.target\?\.closest\?\.\('\.sentence-text'\)/);
+ assert.match(sel,/if\(!root\|\|!end\|\|!root\.contains\(end\)\)\{if\(down\.drag\?\.anchor\)/);
+});
