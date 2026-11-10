@@ -166,7 +166,7 @@ export async function articleGet(env,url,{json,fail},now=new Date(),fetcher=fetc
 /* E415 a short Chinese note per hot word (退市 / 棒球选手 / 快餐产品), written once a day by Workers AI with the
    headline as context. The app prefers its own dictionary and falls back to machine translation when this is empty. */
 export const GLOSS_MODEL='@cf/qwen/qwen3-30b-a3b-fp8',GLOSS_FALLBACK='@cf/qwen/qwen3.8-27b';
-export const GLOSS_PROMPT='你是日语词汇注释员。对每个日语词，结合给出的新闻标题，用简体中文写一个不超过12个字的释义：普通词写词义；人名、地名、团体、作品、商品等专有名词写「是什么」（例如：棒球选手、足球俱乐部、快餐产品）。只输出 JSON 数组，按顺序每项一个字符串，不要解释。';
+export const GLOSS_PROMPT='你是给中国读者看的日语词汇注释员。对每个日语词，结合给出的新闻标题，写一个不超过12个字的简体中文释义。必须全部使用简体中文，不能出现任何日文假名。普通词写中文词义（例：上場廃止→退市）；人名写身份并尽量具体（例：棒球选手、演员、政治家）；地名、团体、作品、商品写它是什么（例：足球俱乐部、动画作品、快餐产品）。只输出 JSON 字符串数组，顺序与输入一致，例如 ["退市","棒球选手"]，不要输出其他内容。';
 /* Models answer with a JSON array of strings, or (Qwen 3 in JSON mode) an already-parsed array of objects such as
    {"term":"上場廃止","gloss":"退市"}: take the gloss-like field, else the first string that is not the term. */
 const GLOSS_KEYS=['gloss','释义','meaning','definition','translation','note','解释','意思'];
@@ -175,11 +175,13 @@ function glossOf(v){
  if(v&&typeof v==='object'){for(const k of GLOSS_KEYS)if(typeof v[k]==='string'&&v[k].trim())return v[k];const vals=Object.values(v).filter(x=>typeof x==='string');return vals.length>1?vals[vals.length-1]:vals[0]||'';}
  return '';
 }
+/* a note with kana is Japanese, not a Chinese gloss: drop it so the app falls back to machine translation */
+const KANA_RE=/[\u3040-\u309f\u30a0-\u30ff]/;
 export function parseGlosses(text,count){
  let list=Array.isArray(text)?text:null;
  if(!list){const raw=String(text||'').replace(/<think>[\s\S]*?<\/think>/g,'');const m=raw.match(/\[[\s\S]*\]/);if(!m)return [];try{list=JSON.parse(m[0]);}catch{return [];}}
  if(!Array.isArray(list))return [];
- return list.slice(0,count).map(v=>glossOf(v).replace(/[\r\n]+/g,' ').trim().slice(0,24));
+ return list.slice(0,count).map(v=>{const g=glossOf(v).replace(/[\r\n]+/g,' ').trim().slice(0,24);return KANA_RE.test(g)?'':g;});
 }
 async function glossWords(env,words){
  if(!env.AI||typeof env.AI.run!=='function'||!words.length)return 0;

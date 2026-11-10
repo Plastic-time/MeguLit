@@ -235,3 +235,9 @@ test('relay glosses: Qwen 3 JSON-mode answers (arrays of objects) are understood
  const r=await d.hotWordsDailyGet(e,new URL('https://x/api/hotwords/daily'),{json:v=>v,fail:c=>c},new Date('2026-11-11T00:10:00Z'));
  assert.deepEqual(r.words.slice(0,2).map(w=>w.gloss),['快餐产品','学校活动']);
 });
+
+test('relay glosses: Japanese notes (with kana) are dropped, the prompt asks for Chinese only',async()=>{
+ const d=await load('daily.js');
+ assert.deepEqual(d.parseGlosses(['建設会社','ブナの実の収穫量','棒球选手','人名'],4),['建設会社','','棒球选手','人名']);
+ assert.match(d.GLOSS_PROMPT,/必须全部使用简体中文/);
+});
