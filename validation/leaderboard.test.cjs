@@ -288,7 +288,7 @@ test('E402 every tab draws the same top and sub rows (no jump), the podium keeps
   assert.doesNotMatch(html,/lb-title|<h1/,name+': no page title (the top bar already says 排行榜)');
  }
  assert.match(pages.board,/lb-toprow-end"><button type="button" class="lb-mychip" data-lb-me/,'my rank sits at the right of the top row');
- assert.equal((pages.board.match(/class="lb-place is-vacant"/g)||[]).length,2,'two vacant stands next to the only reader');
+ assert.doesNotMatch(pages.board,/lb-stage|lb-place/,'E419 no podium for readers');assert.equal((pages.board.match(/class="lb-grimoire[ "]/g)||[]).length,1,'one equal card per reader');
  assert.match(pages.hot,/lb-empty-state/);assert.equal((pages.follow.match(/lb-empty-state/g)||[]).length,2);
  assert.doesNotMatch(pages.board,/is-accent/,'all tiles look the same');assert.equal((pages.board.match(/class="lb-tile"/g)||[]).length,8);
 });
@@ -303,8 +303,21 @@ test('E404 the 我的主页 chip shows on every tab and opens the panel; signed 
  const follow=view.leaderboardHTML({...base,joined:true,account:true,name:'めぐみん',tab:'follow',self:{avatar:null},social:{state:'ok',following:[],kindred:[],avatars:{}}},'ja',esc);
  assert.match(chip(follow),/マイページ/);assert.match(chip(follow),/めぐみん/);
  const board=view.leaderboardHTML({...base,joined:true,account:true,name:'A',tab:'board',board:{state:'ok',entries:[{rank:3,name:'A',value:9,me:true}],me:{rank:3,value:9}}},'en',esc);
- assert.match(chip(board),/My rank/);assert.match(chip(board),/data-lb-me/);
+ assert.match(chip(board),/My profile/);assert.doesNotMatch(chip(board),/#3/,'E419 no rank on the chip');assert.match(chip(board),/data-lb-me/);
  for(const html of [guest,follow,board])assert.equal((chip(html).match(/<small>/g)||[]).length,1,'same two-line chip in every state');
  const settings=fs.readFileSync(path.join(__dirname,'..','web','settings.js'),'utf8');assert.match(settings,/section==='personal'\)\{openProfilePanel/);assert.doesNotMatch(settings,/mountProfileSettings/);
  const panel=fs.readFileSync(path.join(__dirname,'..','web','profile-panel.js'),'utf8');assert.match(panel,/mountEmailLogin/);assert.match(panel,/onSignedOut:\(\)=>paint\(\)/);
+});
+
+test('E420 the board head: most-read work with cover for time / characters, a lookup word for new words, the circle otherwise',async()=>{
+ const view=await import(pathToFileURL(path.join(__dirname,'..','web','leaderboard-view.js')).href);
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+ const entries=[{rank:1,name:'A',value:3600}];
+ const html=(metric,extra)=>{view.setView?.({metric});return view.boardHTML({board:{state:'ok',entries,...extra}},{},'zh',esc);};
+ const work=html('seconds',{feature:{title:'作品',value:7200,readers:5,cover:'data:image/png;base64,AA=='}});
+ assert.match(work,/lb-circle is-feature/);assert.match(work,/作品/);assert.match(work,/<img src="data:image\/png/);
+ const word=html('words',{word:{term:'憧憬',users:4}});
+ assert.match(word,/data-lb-lookup="憧憬"/);assert.doesNotMatch(word,/lb-sigil/);
+ assert.match(html('reviews',{}),/lb-sigil/);
+ const worker=fs.readFileSync(path.join(__dirname,'..','relay','src','worker.js'),'utf8');assert.match(worker,/return json\(\{entries,total,me:mine,feature\}\)/);
 });
