@@ -5,6 +5,7 @@
    E379: avatars (moderated on the relay; default = initial on a preset colour) with a report button, and a second
    view 每周热词: 词汇 / 短语 / 短句, podium for 1–3, cards with the AI guess for 4–10, a plain list for 11–50. */
 import {mountEmailLogin} from './account-ui.js';
+import {changeAvatar} from './avatar-crop.js';
 export const leaderboardLabel={zh:'排行榜',ja:'ランキング',en:'Leaderboard'};
 const W={
  zh:{title:'排行榜',week:'本周',month:'本月',all:'全部',characters:'阅读字数',seconds:'阅读时长',words:'收录单词',streak:'连续天数',games:'按游戏',
@@ -66,9 +67,9 @@ export function avatarHTML(entry,images,esc){
    ruled rows under column headings; hot words use the same stage, 4–10 as one column of honour rows (no orphan
    card), 11–50 as a compact two-column index. */
 const EXTRA={
- zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次'},
- ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位'},
- en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank'}
+ zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次',changeAvatar:'换头像',uploading:'上传并审核中…'},
+ ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',changeAvatar:'アイコンを変更',uploading:'アップロードして審査中…'},
+ en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',changeAvatar:'Change picture',uploading:'Uploading and checking…'}
 };
 const words=locale=>({...leaderboardWords(locale),...(EXTRA[locale]||EXTRA.zh)});
 function segmented(name,items,current,w){return `<div class="lb-seg" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
@@ -139,10 +140,13 @@ function joinHTML(data,w,esc){
   <p class="leaderboard-error" data-lb-error hidden></p><button type="button" class="primary" data-lb-join>${w.join}</button></section>`;
 }
 function hero(w,esc,chip=''){return `<header class="lb-hero"><div><p class="lb-eyebrow">${w.eyebrow}</p><h1 class="lb-title">${w.title}</h1></div>${chip}</header>`;}
+/* E388 your own avatar is the way to change it: click → pick → crop window → upload. */
+const camera='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 3.2 6.5 2h3l.9 1.2H13a1.5 1.5 0 0 1 1.5 1.5v7.1A1.5 1.5 0 0 1 13 13.3H3a1.5 1.5 0 0 1-1.5-1.5V4.7A1.5 1.5 0 0 1 3 3.2zM8 11a2.9 2.9 0 1 0 0-5.8A2.9 2.9 0 0 0 8 11z"/></svg>';
+function avatarButton(entry,data,w,esc){return `<button type="button" class="lb-avatar-edit" data-lb-avatar title="${esc(w.changeAvatar)}" aria-label="${esc(w.changeAvatar)}">${avatarHTML(entry,data.avatars||{},esc)}<span class="lb-avatar-badge">${camera}</span></button>`;}
 function myChip(data,w,locale,esc){
  const me=data.board?.me,metric=view.metric==='games'?'characters':view.metric;if(!data.joined||!me)return '';
  const mine=(data.board.entries||[]).find(e=>e.me)||{name:data.name};
- return `<div class="lb-mychip">${avatarHTML(mine,data.avatars||{},esc)}<div><small>${w.myRank}</small><strong>${esc(fill(w.rank,{n:me.rank}))}</strong></div><span>${esc(formatValue(metric,me.value,locale))}</span></div>`;
+ return `<div class="lb-mychip">${avatarButton(mine,data,w,esc)}<div><small>${w.myRank}</small><strong>${esc(fill(w.rank,{n:me.rank}))}</strong></div><span>${esc(formatValue(metric,me.value,locale))}</span></div>`;
 }
 export function leaderboardHTML(data,locale,esc){
  const w=words(locale);
@@ -151,7 +155,7 @@ export function leaderboardHTML(data,locale,esc){
  const tab=data.tab==='hot'?'hot':'board',tabs=segmented('tab',['board','hot'],tab,w);
  if(tab==='hot')return `<div class="leaderboard-page">${hero(w,esc)}<div class="lb-controls">${tabs}</div><section class="lb-card leaderboard-hot"><h2 class="lb-h2">${w.hot} <span>· ${w[view.category]}</span></h2>${hotHTML(data.hot,w,locale,esc)}</section></div>`;
  const controls=`<div class="lb-controls">${tabs}${segmented('period',PERIODS,view.period,w)}</div>${underline('metric',METRICS,view.metric,w)}`;
- const body=data.joined?`<section class="lb-card leaderboard-board"><div class="lb-card-head"><h2 class="lb-h2">${w[view.metric]} <span>· ${view.metric==='games'?w.all:w[view.period]}</span></h2><small>${esc(fill(w.joinedAs,{name:data.name}))} · <button type="button" class="leaderboard-leave" data-lb-leave>${w.leave}</button></small></div>${boardHTML(data,w,locale,esc)}</section>`:joinHTML(data,w,esc);
+ const body=data.joined?`<section class="lb-card leaderboard-board"><div class="lb-card-head"><h2 class="lb-h2">${w[view.metric]} <span>· ${view.metric==='games'?w.all:w[view.period]}</span></h2><small>${esc(fill(w.joinedAs,{name:data.name}))} · <button type="button" class="leaderboard-leave" data-lb-avatar>${w.changeAvatar}</button> · <button type="button" class="leaderboard-leave" data-lb-leave>${w.leave}</button></small></div>${boardHTML(data,w,locale,esc)}</section>`:joinHTML(data,w,esc);
  return `<div class="leaderboard-page">${hero(w,esc,myChip(data,w,locale,esc))}${controls}${body}${localHTML(data,w,locale,esc)}</div>`;
 }
 /* Mounts the page into main; isCurrent() guards against a late reply after the user moved on. */
@@ -170,6 +174,8 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
   main.querySelector('[data-lb-week]')?.addEventListener('change',event=>{view.week=event.currentTarget.value;render();});
   main.querySelectorAll('[data-lb-game]').forEach(b=>b.onclick=()=>{view.game=b.dataset.lbGame;render();});
   main.querySelectorAll('[data-lb-report]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('leaderboard_report',{avatar:b.dataset.lbReport});toast(r?.hidden?w.reportHidden:w.reported);}catch{toast(w.offline);b.disabled=false;}});
+  main.querySelectorAll('[data-lb-avatar]').forEach(b=>b.onclick=async()=>{const buttons=[...main.querySelectorAll('[data-lb-avatar]')];
+   const r=await changeAvatar({api,locale,toast,onBusy:busy=>{buttons.forEach(x=>{x.disabled=busy;x.classList.toggle('is-busy',busy);});if(busy)toast(words(locale).uploading);}});if(r&&isCurrent())render();});
   main.querySelector('[data-lb-back]')?.addEventListener('click',()=>{view.game='';render();});
   main.querySelector('[data-lb-retry]')?.addEventListener('click',()=>render());
   const login=main.querySelector('[data-lb-login]');if(login)mountEmailLogin(login,{api,locale,esc,toast,onDone:()=>render()});
