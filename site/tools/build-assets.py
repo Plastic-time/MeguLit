@@ -135,20 +135,6 @@ if REC.exists() and Path(FFMPEG).exists():
             box = (0, 138, 1000, 700) if k == 5 else (0, 0, 1244, 700)
             im.crop(box).resize((800, 450), Image.LANCZOS).save(IMG / f'card-{k}-800.webp', 'WEBP', quality=80, method=6)
 
-# ---- English in the background lyrics: Playfair Display Italic (OFL) at weight 500, ASCII only ----------------------
-import urllib.request
-cache = Path.home() / '.cache' / 'megulit-fonts'
-cache.mkdir(parents=True, exist_ok=True)
-pf = cache / 'PlayfairDisplay-Italic[wght].ttf'
-if not pf.exists():
-    urllib.request.urlretrieve('https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/PlayfairDisplay-Italic%5Bwght%5D.ttf', pf)
-pfont = TTFont(pf, lazy=False)
-o = subset.Options(); o.flavor = 'woff2'; o.layout_features = ['kern', 'liga']; o.name_IDs = ['*']
-sb = subset.Subsetter(o); sb.populate(text=''.join(chr(c) for c in range(0x20, 0x7f)) + '’‘“”…—–'); sb.subset(pfont)
-pfont = instancer.instantiateVariableFont(pfont, {'wght': 500})
-pfont.flavor = 'woff2'; pfont.save(PUB / 'assets' / 'fonts' / 'lyric-italic.woff2')
-print('font lyric-italic', (PUB / 'assets' / 'fonts' / 'lyric-italic.woff2').stat().st_size // 1024, 'KB')
-
 # ---- cache busting: fonts are cached for 30 days, so site.css names each one with a hash of its bytes ------------------
 import hashlib
 css_path = PUB / 'assets' / 'css' / 'site.css'
