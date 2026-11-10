@@ -184,16 +184,21 @@ if($Hotfix){
 }else{
  $rel=Api POST '/releases' @{tag_name=$Tag;target_commitish=$merged.sha;name="MeguLit v$Label";body=($DownloadLine+"`n`n## MeguLit v$Label`n`n"+(LangBlocks $Zh $En $false));make_latest='true'}
 }
-$upload=($rel.upload_url -replace '\{.*$','')+"?name=$Asset"
-$a=Invoke-RestMethod -Method Post -Uri $upload -Headers $Headers -ContentType 'application/zip' -InFile $zipPath
+# E386 upload with gh: Invoke-RestMethod hung for over an hour on v1.3.0 with no timeout; gh finished in seconds
+$ghExe=(Get-Command gh -ErrorAction SilentlyContinue).Source;if(-not $ghExe){$ghExe='E:/Apps/tools/gh/bin/gh.exe'}
+$job=Start-Job -ScriptBlock {param($gh,$tag,$zip,$repo) & $gh release upload $tag $zip -R $repo --clobber 2>&1} -ArgumentList $ghExe,$Tag,$zipPath,$Repo
+if(-not (Wait-Job $job -Timeout 900)){Stop-Job $job;throw 'Upload did not finish in 15 minutes'};Receive-Job $job | Out-Host;Remove-Job $job
+$a=(Api GET "/releases/$($rel.id)").assets | Where-Object {$_.name -eq $Asset} | Select-Object -First 1
+if(-not $a){throw 'Uploaded asset not found on the release'}
 if($a.size -ne $size){throw "Uploaded size $($a.size) differs from $size"}
 if($a.digest -and $a.digest -ne "sha256:$hash"){throw "GitHub digest $($a.digest) differs from sha256:$hash"}
 
 Step 'verify download'
 $back=Join-Path $work 'check.zip'
 # a hotfix replaces a file under the same URL; the download edge can serve the old one for a few seconds
-$ok=$false;for($try=0;$try -lt 8 -and -not $ok;$try++){if($try){Start-Sleep -Seconds 5};Invoke-WebRequest -Uri $a.browser_download_url -OutFile $back -UseBasicParsing;$ok=(Get-FileHash $back -Algorithm SHA256).Hash.ToLower() -eq $hash}
-if(-not $ok){throw 'Downloaded package hash differs'}
+# E386 GitHub's own SHA-256 of the uploaded file is checked above; downloading it back from here can take an hour, so
+# the download is tried with a time limit and only a mismatch fails the release
+$ok=$false;try{Invoke-WebRequest -Uri $a.browser_download_url -OutFile $back -UseBasicParsing -TimeoutSec 120;$ok=(Get-FileHash $back -Algorithm SHA256).Hash.ToLower() -eq $hash;if(-not $ok){throw 'Downloaded package hash differs'}}catch{if($_.Exception.Message -eq 'Downloaded package hash differs'){throw};Write-Host "  download check skipped (slow network): $($_.Exception.Message)";if(-not $a.digest){throw 'No GitHub digest and no download to check'}}
 # An installed copy of the previous package (its version label and package digest recorded as after an update) must see
 # this release as an update: a new version by number, a hotfix by package digest (E358: 1.2.8a slipped through).
 $prevDigest=(Get-FileHash $prevZip -Algorithm SHA256).Hash.ToLower();$probeRoot=Join-Path $work 'probe';New-Item -ItemType Directory (Join-Path $probeRoot 'data') -Force | Out-Null
