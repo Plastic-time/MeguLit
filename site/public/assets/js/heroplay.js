@@ -4,9 +4,9 @@
 // game; after the last line the headline comes back. Lines are written as text with {漢字|かんじ} for ruby.
 
 const LINES = {
-  zh: ['又卡在生词上了？', '别切出去查词典了，\n点一下就行', '「[[{好|す}き]]」……不认识也没关系，\n点一下看看', '读过的词它都记着，\n下次就认识了', '接下来，\n往下看看它还能做什么'],
-  ja: ['また知らない単語で止まった？', '辞書はもういいよ。\nクリックひとつで', '「[[{好|す}き]]」……読めなくても大丈夫、\n押してみて', '読んだ言葉は、\nちゃんと覚えておくから', '次は、\nほかにできることも見ていって'],
-  en: ['Stuck on a word again?', 'Skip the dictionary.\nJust click it', '「[[{好|す}き]]」… can’t read it? That’s fine.\nGive it a click', 'Every word you read,\nit remembers', 'Next up —\nsee what else it can do'],
+  zh: ['又卡在生词上了？', '别切出去查词典了，\n点一下就行', '「[[{好|す}き]]」——游戏里的每个词，\n都能这样点开', '读过的词它都记着，\n下次就认识了', '接下来，\n往下看看它还能做什么'],
+  ja: ['また知らない単語で止まった？', '辞書はもういいよ。\nクリックひとつで', '「[[{好|す}き]]」——ゲームの中の言葉は、\n全部こうして開ける', '読んだ言葉は、\nちゃんと覚えておくから', '次は、\nほかにできることも見ていって'],
+  en: ['Stuck on a word again?', 'Skip the dictionary.\nJust click it', '「[[{好|す}き]]」— every word in the game\nopens like this', 'Every word you read,\nit remembers', 'Next up —\nsee what else it can do'],
 };
 // the word in [[...]] can be clicked: a small lookup card opens beside it, as MeguLit's own does in a game
 const CARD = {
@@ -77,9 +77,9 @@ export function heroPlay(h1, { reduce = false } = {}) {
   const openCard = w => {
     const c = CARD[lang()] || CARD.en;
     card = document.createElement('span'); card.className = 'ht-card'; card.setAttribute('role', 'dialog');
-    card.innerHTML = '<span class="hc-head"><b lang="ja">好き</b><i lang="ja">すき</i><em></em></span><span class="hc-mean"></span><span class="hc-ex"><span lang="ja"></span><small></small></span><span class="hc-note"></span>';
+    card.innerHTML = '<span class="hc-head"><b lang="ja">好き</b><i lang="ja">すき</i><em></em></span><span class="hc-mean"></span><span class="hc-ex"><span lang="ja"></span><small></small></span>';
     card.querySelector('em').textContent = c.pos; card.querySelector('.hc-mean').textContent = c.mean;
-    card.querySelector('.hc-ex span').textContent = c.ex; card.querySelector('.hc-ex small').textContent = c.exT; card.querySelector('.hc-note').textContent = c.note;
+    card.querySelector('.hc-ex span').textContent = c.ex; card.querySelector('.hc-ex small').textContent = c.exT;
     h1.append(card);
     // under the word, kept inside the headline's width
     const hr = h1.getBoundingClientRect(), wr = w.getBoundingClientRect();
