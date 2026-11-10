@@ -75,4 +75,20 @@ function glyphs(dir,lang='ja'){const code=LANGS[lang];if(!code)return null;const
  try{const want=new Set(['Font'+code+'0000.ccit','Font'+code+'0001.ccit']);for(const f of fs.readdirSync(dir).filter(f=>/\.hfa$/i.test(f)).sort()){const file=path.join(dir,f);let list=null;try{list=hfaList(file);}catch{}if(!list)continue;
   for(const e of list)if(want.has(e.name)){set??=new Set();for(const c of ccit(hfaRead(file,e)))set.add(c);}}}catch{set=null;}
  if(set&&set.size<100)set=null;glyphMemo.set(key,set);return set;}
-module.exports={hfaList,hfaRead,lenzu,clean,rubyOf,tables,tableLines,ccit,glyphs};
+// E410 (user: WoH kept the previous page's lines on the next page). The page breaks are not in the text table but in the
+// compiled scripts (*.chs, "HunexCompiledScriptVer1.00", LenZu): 32-bit words, string pointers are file offsets - 0x30.
+// A text command is 123, 0x12345678, n, ptr, 0, wait, 0,1,0,0,0,0, 3, ptr, 320[, 321]; the string names the table lines it
+// shows ("$000008\n$000009", an @x prefix continues the row the last line ended on). wait 2 followed by 321 waits for the
+// click and clears the page (7122 of 7163 such commands): the next text command starts a page, as the first of each script.
+// starts/cont/known hold table line numbers (WoH: 250 scripts, 23093 text commands, 23807 lines).
+const TEXT_OP=123,TEXT_TAG=0x12345678,CLEAR_OP=321,pageMemo=new Map();
+function scriptPages(x,out){if(x.length<0x30||x.toString('latin1',0,19)!=='HunexCompiledScript')return;const n=x.length>>2,word=i=>x.readUInt32LE(i*4);
+ const str=v=>{const p=v+0x30;if(p<0x30||p>=x.length)return null;const e=x.indexOf(0,p);return x.toString('utf8',p,e<0?x.length:e);};let first=true,clear=false;
+ for(let i=0;i+15<n;i++){if(word(i)!==TEXT_OP||word(i+1)!==TEXT_TAG)continue;const s=str(word(i+3));if(!s||s.includes('＆')||!/^(?:@[a-z]\d*|\n)*\$\d{6}/.test(s))continue;
+  const ids=[...s.matchAll(/\$(\d{6})/g)].map(m=>+m[1]);for(const id of ids)out.known.add(id);if(first||clear)out.starts.add(ids[0]);if(/^@x/.test(s))out.cont.add(ids[0]);
+  first=false;clear=word(i+5)===2&&word(i+15)===CLEAR_OP;}}
+function pages(dir){const key=String(dir).toLowerCase();if(pageMemo.has(key))return pageMemo.get(key);const out={starts:new Set(),cont:new Set(),known:new Set()};
+ try{for(const f of fs.readdirSync(dir).filter(f=>/\.hfa$/i.test(f)).sort()){const file=path.join(dir,f);let list=null;try{list=hfaList(file);}catch{}if(!list)continue;
+  for(const e of list)if(/\.chs$/i.test(e.name)){try{scriptPages(lenzu(hfaRead(file,e)),out);}catch{}}}}catch{}
+ const result=out.known.size?out:null;pageMemo.set(key,result);return result;}
+module.exports={hfaList,hfaRead,lenzu,clean,rubyOf,tables,tableLines,ccit,glyphs,pages,scriptPages};

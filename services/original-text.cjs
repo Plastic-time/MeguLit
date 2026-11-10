@@ -371,7 +371,11 @@ function staticProvider(root,executable){
   let glyphSet,tableOk;const glyphs=()=>{if(glyphSet===undefined){glyphSet=null;try{const g=scenes.ENGINES[state.runtime.engine]?.glyphs?.(path.dirname(String(executable)));if(g&&g.size)glyphSet=g;}catch{}}return glyphSet;};
   const drawable=text=>{const g=glyphs();if(!g)return null;for(const c of String(text||'').replace(/</g,'〈').replace(/>/g,'〉'))if(!/\s/.test(c)&&!g.has(c))return false;return true;};
   const tableDrawable=()=>{if(tableOk===undefined){tableOk=null;if(glyphs()&&patched){let n=0,ok=0;for(let i=0;i<rt.length;i++){const o=m.og[i];if(!o||norm(o)===norm(rt[i]))continue;n++;if(drawable(o))ok++;}tableOk=n===0||ok/n>=.995;}}return tableOk;};
-  const api={kind:'patch',patch:!!patched,fill,drawable,tableDrawable,
+  /* E410: an engine that knows its scripts' page breaks (HuneX) says, per table line, whether it starts a page and whether it
+     continues the row the last line ended on. null when unknown (other engines, a line no script shows). */
+  let pageSet;const pageInfo=()=>{if(pageSet===undefined){pageSet=null;try{pageSet=scenes.ENGINES[state.runtime.engine]?.pages?.(path.dirname(String(executable)))||null;}catch{}}return pageSet;};
+  const flowLayout=indices=>{const P=pageInfo(),i=Array.isArray(indices)?indices[0]:undefined;if(!P||!Number.isSafeInteger(i)||!P.known.has(i))return null;return {index:i,pageStart:P.starts.has(i),row:P.cont.has(i)?'continue':'new'};};
+  const api={kind:'patch',patch:!!patched,fill,drawable,tableDrawable,flowLayout,
    resolve:text=>withRuby(resolveLine(text))};
   function resolveLine(text){const r=m.match(text);if(r.japanese===undefined)return r;
     if(r.indices.some(untranslated)){const t=fill.get(r.indices.map(i=>rt[i]).join(''));return t?{...r,translation:t,japanese:undefined,machine:true}:{status:'none',method:'untranslated',indices:r.indices};}

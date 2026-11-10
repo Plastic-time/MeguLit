@@ -360,6 +360,8 @@ const hunex={
  patchLines:(base,found)=>kirikiriCx.patchLines(base,found),
  /* E358: the characters the Japanese game's text font can draw (a translation written back into the game must use only these). */
  glyphs:dir=>hunexLib().glyphs(dir,'ja'),
+ /* E410: which table lines start a page (the script clears it) and which continue the row the last line ended on. */
+ pages:dir=>hunexLib().pages(dir),
 };
 
 // E329 YU-RIS (ysbin.ypf + update*.ypf, YSTB scenes): yuris.cjs.
