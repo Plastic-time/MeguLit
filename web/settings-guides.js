@@ -43,10 +43,10 @@ const GUIDES = {
         ],
       },
       {
-        head: T('API Key、积分是什么？', 'What are an API key and credits?', 'API キーやクレジットとは？'),
+        head: T('API Key 和余额是什么？', 'What are an API key and credits?', 'API キーやクレジットとは？'),
         steps: [
           T('API Key 是 AI 平台发给你的一串密码，MeguLit 用它替你调用 AI 翻译，平台按用量从你的余额里扣钱', 'An API key is a password-like string the AI platform gives you. MeguLit uses it to ask the AI to translate, and the platform charges your balance by usage', 'API キーは AI サービスが発行するパスワードのような文字列です。MeguLit はこれで AI に翻訳を頼み、使った分だけ残高から引かれます'),
-          T('「积分 / 余额」就是你在平台上充的钱或送的免费额度。翻译按字数计费，读一整部游戏一般只要几块钱；很多平台新用户还送免费额度', 'Credits or balance is the money you top up, or the free allowance you get. Translation is billed by characters; a whole game usually costs very little, and many platforms give new users free credit', 'クレジット・残高はチャージした金額や無料枠のことです。文字数課金で、1 本読み切っても多くの場合わずかな金額です。新規登録で無料枠がもらえることも多いです'),
+          T('「余额」就是你在平台上充的钱，或者平台送的免费额度。翻译按字数计费，读一整部游戏一般只要几块钱；很多平台新用户还送免费额度', 'Credits or balance is the money you top up, or the free allowance you get. Translation is billed by characters; a whole game usually costs very little, and many platforms give new users free credit', 'クレジット・残高はチャージした金額や無料枠のことです。文字数課金で、1 本読み切っても多くの場合わずかな金額です。新規登録で無料枠がもらえることも多いです'),
           T('API Key 只保存在你电脑上（加密），不要发给别人', 'The key is stored only on your PC, encrypted. Never share it', 'キーはこの PC にだけ暗号化して保存されます。他人に渡さないでください'),
         ],
       },

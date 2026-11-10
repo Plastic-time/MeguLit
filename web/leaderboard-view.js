@@ -139,7 +139,8 @@ function joinHTML(data,w,esc){
   <label class="leaderboard-check"><input type="checkbox" class="switch" data-lb-consent><span>${w.consent}</span></label>
   <p class="leaderboard-error" data-lb-error hidden></p><button type="button" class="primary" data-lb-join>${w.join}</button></section>`;
 }
-function hero(w,esc,chip=''){return `<header class="lb-hero"><div><p class="lb-eyebrow">${w.eyebrow}</p><h1 class="lb-title">${w.title}</h1></div>${chip}</header>`;}
+/* E393 no page title: the top bar already says 排行榜 (rule: never repeat a first-level menu item on its page); only my rank chip stays */
+function hero(w,esc,chip=''){return chip?`<header class="lb-hero">${chip}</header>`:'';}
 /* E388 your own avatar is the way to change it: click → pick → crop window → upload. */
 const camera='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 3.2 6.5 2h3l.9 1.2H13a1.5 1.5 0 0 1 1.5 1.5v7.1A1.5 1.5 0 0 1 13 13.3H3a1.5 1.5 0 0 1-1.5-1.5V4.7A1.5 1.5 0 0 1 3 3.2zM8 11a2.9 2.9 0 1 0 0-5.8A2.9 2.9 0 0 0 8 11z"/></svg>';
 function avatarButton(entry,data,w,esc){return `<button type="button" class="lb-avatar-edit" data-lb-avatar title="${esc(w.changeAvatar)}" aria-label="${esc(w.changeAvatar)}">${avatarHTML(entry,data.avatars||{},esc)}<span class="lb-avatar-badge">${camera}</span></button>`;}
@@ -150,7 +151,7 @@ function myChip(data,w,locale,esc){
 }
 export function leaderboardHTML(data,locale,esc){
  const w=words(locale);
- if(!data)return hero(w,esc);
+ if(!data)return '<div class="leaderboard-page"></div>'; /* E393 loading keeps the same centred column, so nothing jumps when data arrives */
  if(!data.configured)return `<div class="leaderboard-page">${hero(w,esc)}${segmented('period',PERIODS,view.period,w)}<section class="lb-card leaderboard-notice"><h2 class="lb-h2">${w.notReady}</h2><p class="lb-note">${w.notReadyText}</p></section>${localHTML(data,w,locale,esc)}</div>`;
  const tab=data.tab==='hot'?'hot':'board',tabs=segmented('tab',['board','hot'],tab,w);
  if(tab==='hot')return `<div class="leaderboard-page">${hero(w,esc)}<div class="lb-controls">${tabs}</div><section class="lb-card leaderboard-hot"><h2 class="lb-h2">${w.hot} <span>· ${w[view.category]}</span></h2>${hotHTML(data.hot,w,locale,esc)}</section></div>`;

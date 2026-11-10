@@ -8,7 +8,7 @@
 .leaderboard-page button{font:inherit}
 
 /* hero */
-.lb-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding:8px 2px 2px}
+.lb-hero{display:flex;align-items:flex-end;justify-content:flex-end;gap:20px;padding:8px 2px 2px}
 .lb-eyebrow{margin:0 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--lb-gold)}
 .lb-title{margin:0;font-family:var(--g-serif,serif);font-size:34px;font-weight:600;letter-spacing:.02em;color:var(--lb-ink);line-height:1.1}
 .lb-mychip{display:flex;align-items:center;gap:12px;padding:8px 16px 8px 8px;border-radius:999px;background:var(--lb-raise-2);box-shadow:inset 0 0 0 1px var(--lb-rule-strong)}
