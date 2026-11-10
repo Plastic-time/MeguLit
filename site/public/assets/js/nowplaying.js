@@ -76,13 +76,13 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
   box.setAttribute('aria-live', 'off');
   box.innerHTML = '<span class="np-eq" aria-hidden="true"><i></i><i></i><i></i></span><span class="np-meta"><b class="np-title"></b><span class="np-artist"></span></span>'
     + '<p class="np-lyric" lang="ja" aria-hidden="true"></p>'
-    + `<div class="np-ctl"><button type="button" class="np-b" data-a="prev">${ICON.prev}</button><button type="button" class="np-b np-play" data-a="play">${ICON.pause}</button><button type="button" class="np-b" data-a="next">${ICON.next}</button>`
-    + '<input class="np-seek" type="range" min="0" max="1000" value="0"><span class="np-time">00:00 / --:--</span></div>'
+    + `<div class="np-ctl"><div class="np-btns"><button type="button" class="np-b" data-a="prev">${ICON.prev}</button><button type="button" class="np-b np-play" data-a="play">${ICON.pause}</button><button type="button" class="np-b" data-a="next">${ICON.next}</button></div>`
+    + '<div class="np-bar"><span class="np-now">00:00</span><input class="np-seek" type="range" min="0" max="1000" value="0"><span class="np-dur">--:--</span></div></div>'
     + '<p class="np-switches"><button type="button" class="np-sw" data-sw="lyrics"></button><button type="button" class="np-sw" data-sw="bg"></button></p><p class="np-credit"></p>';
   host.append(box);
   const $ = s => box.querySelector(s);
   const title = $('.np-title'), artist = $('.np-artist'), lyric = $('.np-lyric'), credit = $('.np-credit');
-  const playBtn = $('.np-play'), seek = $('.np-seek'), time = $('.np-time');
+  const playBtn = $('.np-play'), seek = $('.np-seek'), nowEl = $('.np-now'), durEl = $('.np-dur');
   let pl = { text: {}, tracks: [] }, idx = 0, lines = [], cur = -1, hold = false, seeking = false;
   const ui = () => UI[pageLang()] || UI.zh;
 
@@ -148,7 +148,7 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
     ensureSrc() { if (!audio.getAttribute('src')) { const t = pl.tracks[idx] || { id: FALLBACK }; audio.src = srcOf(t); audio.dataset.track = t.id; } },
     next: () => go(idx + 1),
     // "previous" restarts the song when it is a few seconds in, like any player
-    prev: () => { if (audio.currentTime > 3 || pl.tracks.length === 1) { audio.currentTime = 0; cur = -1; } else go(idx - 1); },
+    prev: () => { if (audio.currentTime > 3 || pl.tracks.length === 1) jump(0).catch(() => {}); else go(idx - 1); },
   };
   audio.addEventListener('ended', () => { if (pl.tracks.length > 1) player.next(); });
 
@@ -162,10 +162,28 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
   const paintTime = () => {
     const d = audio.duration, t = audio.currentTime;
     if (!seeking && Number.isFinite(d) && d > 0) { seek.value = Math.round(t / d * 1000); seek.style.setProperty('--fill', `${t / d * 100}%`); }
-    time.textContent = `${mmss(t)} / ${mmss(d)}`;
+    if (!seeking) nowEl.textContent = mmss(t);
+    durEl.textContent = mmss(d);
   };
-  seek.addEventListener('input', () => { seeking = true; const d = audio.duration; if (Number.isFinite(d)) { time.textContent = `${mmss(seek.value / 1000 * d)} / ${mmss(d)}`; seek.style.setProperty('--fill', `${seek.value / 10}%`); } });
-  seek.addEventListener('change', () => { const d = audio.duration; if (Number.isFinite(d)) { audio.currentTime = seek.value / 1000 * d; cur = -1; } seeking = false; });
+  // The site's static hosting ignores byte ranges, so the browser cannot jump inside a streamed file. The first seek in
+  // a song fetches it whole (usually from the cache), switches the audio to that in-memory copy and jumps there.
+  const blobs = new Map();
+  const jump = async target => {
+    const t = current, wasPlaying = !audio.paused;
+    const seekable = audio.seekable.length && audio.seekable.end(audio.seekable.length - 1) >= target - .5 && audio.seekable.start(0) <= target;
+    if (!seekable && !audio.src.startsWith('blob:')) {
+      let url = blobs.get(t.id);
+      if (!url) { const r = await fetch(srcOf(t)); url = URL.createObjectURL(await r.blob()); blobs.set(t.id, url); }
+      if (current !== t) return;
+      hold = true;
+      audio.src = url;
+      await new Promise(res => audio.addEventListener('loadedmetadata', res, { once: true }));
+    }
+    audio.currentTime = target; cur = -1;
+    if (wasPlaying) { hold = false; audio.play().catch(() => {}); }
+  };
+  seek.addEventListener('input', () => { seeking = true; const d = audio.duration; if (Number.isFinite(d)) { nowEl.textContent = mmss(seek.value / 1000 * d); seek.style.setProperty('--fill', `${seek.value / 10}%`); } });
+  seek.addEventListener('change', async () => { const d = audio.duration; if (Number.isFinite(d)) await jump(seek.value / 1000 * d).catch(() => {}); seeking = false; paintTime(); });
   audio.addEventListener('timeupdate', paintTime);
   audio.addEventListener('loadedmetadata', paintTime);
 
