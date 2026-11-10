@@ -38,7 +38,10 @@ export function heroPlay(h1, { reduce = false } = {}) {
   const btn = document.createElement('button');
   btn.type = 'button'; btn.className = 'ht-next';
   btn.innerHTML = '<span class="ht-next-k"></span><i aria-hidden="true">▼</i>';
-  h1.after(btn);
+  // the headline sits in a galgame text box: a frame, a name tag, and the ▼ "continue" mark in its corner
+  const box = document.createElement('div'); box.className = 'ht-box';
+  const name = document.createElement('span'); name.className = 'ht-name'; name.setAttribute('aria-hidden', 'true'); name.textContent = 'MeguLit';
+  h1.before(box); box.append(name, h1, btn);
   // the last line points down the page: an arrow that scrolls to the features
   const down = document.createElement('a');
   down.className = 'ht-down'; down.href = '#features'; down.hidden = true; down.setAttribute('aria-label', '↓');
@@ -69,8 +72,9 @@ export function heroPlay(h1, { reduce = false } = {}) {
     card?.remove(); card = null;
     const lines = LINES[lang()] || LINES.en;
     idx = (idx + 1) % (lines.length + 1);
-    if (idx === 0) { down.hidden = true; h1.innerHTML = saved; h1.classList.remove('saying'); h1.style.removeProperty('min-height'); return; }
-    if (!h1.classList.contains('saying')) h1.style.setProperty('min-height', `${h1.offsetHeight}px`);
+    if (idx === 0) { down.hidden = true; h1.innerHTML = saved; h1.classList.remove('saying'); h1.style.removeProperty('min-height'); box.style.removeProperty('min-width'); return; }
+    // the box keeps the headline's size through every line (no jumping frame)
+    if (!h1.classList.contains('saying')) { h1.style.setProperty('min-height', `${h1.offsetHeight}px`); box.style.setProperty('min-width', `${box.offsetWidth}px`); }
     h1.classList.add('saying');
     const say = document.createElement('span'); say.className = 'ht-say'; say.lang = lang() === 'en' ? 'en' : 'ja';
     h1.replaceChildren(say);
@@ -111,7 +115,8 @@ export function heroPlay(h1, { reduce = false } = {}) {
     if (innerWidth - textRight - 40 >= card.offsetWidth) { card.style.setProperty('left', `${textRight - hr.left + 32}px`); card.style.setProperty('top', `${wr.top - hr.top}px`); }
     else { card.style.setProperty('left', '0px'); card.style.setProperty('top', `${sr.bottom - hr.top + 12}px`); }
   };
-  h1.addEventListener('click', e => {
+  // the whole text box takes the click, not only the words
+  box.addEventListener('click', e => {
     if (e.target.closest('a, button, .ht-card')) return;
     const w = e.target.closest('.ht-word');
     if (w && !typing) { if (card) closeCard(); else openCard(w); return; }
@@ -121,5 +126,5 @@ export function heroPlay(h1, { reduce = false } = {}) {
   h1.addEventListener('keydown', e => { const w = e.target.closest?.('.ht-word'); if (w && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); if (card) closeCard(); else openCard(w); } });
   btn.addEventListener('click', () => { if (card) { card.remove(); card = null; return; } advance(); });
   // a language change puts the headline back in the new language
-  addEventListener('megulit:lang', () => { card = null; down.hidden = true; clearTimeout(timer); typing = false; rest = []; idx = 0; saved = h1.innerHTML; h1.classList.remove('saying', 'typing'); h1.style.removeProperty('min-height'); label(); });
+  addEventListener('megulit:lang', () => { card = null; down.hidden = true; clearTimeout(timer); typing = false; rest = []; idx = 0; saved = h1.innerHTML; h1.classList.remove('saying', 'typing'); h1.style.removeProperty('min-height'); box.style.removeProperty('min-width'); label(); });
 }
