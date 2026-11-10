@@ -211,6 +211,11 @@ async function dispatch(request,runtime=null) {
        if(request.action==='jp_restore_undo'&&imported?.state==='imported'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=ji.restore(dir);if(!r.skipped.length)importedExecutable(db,id,r.exe,'zh');return r;}
        return request.action==='jp_restore_apply'?withPatch(jr.apply(dir)):jr.restore(dir);}
       case 'game_cover':return require('./game-cover.cjs').setCover(db,root,String(request.id),request.path);
+      /* E362 adaptation overview + one-click diagnostic package (built locally; shown to the user before any upload) */
+      case 'adaptation_overview':return require('./adaptation-overview.cjs').overview(db,root);
+      case 'diagnostics_build':return require('./diagnostics.cjs').build(root,db,String(request.id),{version:String(request.version||'').slice(0,40)});
+      case 'diagnostics_reveal':{const file=require('./diagnostics.cjs').ownPackage(root,request.path);const child=spawn('explorer.exe',['/select,'+file],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {ok:true};}
+      case 'diagnostics_upload':{const file=require('./diagnostics.cjs').ownPackage(root,request.path),m=request.meta||{};return require('./diagnostics-upload.cjs').upload(file,{version:m.version,game:m.game,note:m.note},{root});}
       case 'game_detail':return require('./game-detail.cjs').detail(db,root,String(request.id),request.locale);
       case 'game_synopsis':return await require('./game-detail.cjs').refreshSynopsis(db,root,String(request.id),request.locale);
       case 'unknown_words':return require('./unknown-words.cjs').unknownWords(root);
