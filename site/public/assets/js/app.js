@@ -312,7 +312,7 @@ const deepLayer = $('.kana-deep') ? kana($('.kana-deep'), { still: reduce, deep:
 let skyLayer = null;
 let topLayer = null;
 const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-const lyricLayers = { say: text => { const pick = Array.from({ length: 6 }, Math.random), hud = text ? `\u266a ${mmss(bgm.currentTime)}` : ''; deepLayer?.say(text, pick, hud); skyLayer?.say(text, pick, hud); }, clear: () => { deepLayer?.clear(); skyLayer?.clear(); } };
+const lyricLayers = { say: text => { const pick = Math.random() * 2 ** 32, hud = text ? `\u266a ${mmss(bgm.currentTime)}` : ''; deepLayer?.say(text, pick, hud); skyLayer?.say(text, pick, hud); }, clear: () => { deepLayer?.clear(); skyLayer?.clear(); } };
 if ($('.sound-ctl')) nowPlaying(bgm, $('.sound-ctl'), { reduce, background: deepLayer ? lyricLayers : null });
 bgmCredit();
 notice({ t: k => d(k), lang: () => lang, after: playIntro() });
