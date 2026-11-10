@@ -1364,7 +1364,7 @@ img, video, canvas, svg { -webkit-user-drag: none; user-drag: none; }
 .dc-front .dc-word rt { color: #c8323c; font-size: max(11px, .32em); letter-spacing: .1em; }
 .dc-front .dc-ex { position: relative; margin: .6rem 0 auto; max-width: none; color: #3a3a3a; font: 500 1rem/1.75 var(--serif-ja); }
 .dc-ex mark { background: linear-gradient(transparent 62%, rgba(200, 50, 60, .28) 62%); color: inherit; padding: 0 .05em; }
-.dc-flip { position: relative; bottom: auto; align-self: flex-start; font: 300 .6875rem/1 "MeguLit Mono", var(--mono); letter-spacing: .3em; color: #8a8a8a; text-transform: lowercase; }
+.dc-flip { position: relative; bottom: auto; align-self: flex-start; font: 300 .6875rem/1 "MeguLit Mono", var(--mono); letter-spacing: .3em; color: #5e5e5e; text-transform: lowercase; }
 .dc-flip::before { content: "↻  "; color: #c8323c; }
 .dc-back { background: #0b0b0b; color: #f4f4f2; display: flex; flex-direction: column; padding: 0; }
 .dc-back img { flex: none; display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-bottom: 1px solid rgba(244, 244, 242, .12); }
