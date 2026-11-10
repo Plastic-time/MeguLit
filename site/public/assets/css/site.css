@@ -223,12 +223,12 @@ p { text-wrap: pretty; }
   min-height: min(100svh, 72rem); display: grid; grid-template-rows: 1fr auto; align-items: center; padding-bottom: 5.5rem;
 }
 .hero-media { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
-.hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(1.5px) contrast(1.08) saturate(1.15) brightness(.66); transform: scale(1.06); }
+.hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: contrast(1.06) saturate(1.2) brightness(.86); transform: scale(1.06); }
 .hero-scrim {
   position: absolute; inset: 0;
   background:
     linear-gradient(120deg, rgba(150, 20, 40, .28), transparent 50%),
-    linear-gradient(90deg, rgba(18, 10, 12, .95) 0%, rgba(18, 10, 12, .86) 36%, rgba(18, 10, 12, .35) 64%, rgba(18, 10, 12, .1) 100%),
+    linear-gradient(90deg, rgba(18, 10, 12, .55) 0%, rgba(18, 10, 12, .25) 45%, rgba(18, 10, 12, 0) 75%),
     linear-gradient(180deg, rgba(18, 10, 12, .7) 0%, transparent 22%, transparent 70%, rgba(18, 10, 12, .85) 100%);
 }
 /* the dark hero melts into the page (light or dark) below the chips */
@@ -242,7 +242,7 @@ p { text-wrap: pretty; }
 
 /* Megumin's magic circle, drawn in SVG and turning behind the copy */
 .circle, .ring-fx {
-  position: absolute; width: min(92vmin, 54rem); right: max(-12rem, -10vw); top: 50%;
+  position: absolute; z-index: 1; width: min(92vmin, 54rem); right: max(-12rem, -10vw); top: 50%;
   translate: var(--px, 0px) calc(-50% + var(--py, 0px)); opacity: .62; mix-blend-mode: screen; overflow: visible;
   transition: translate .6s cubic-bezier(.2, .7, .2, 1);
 }
@@ -595,8 +595,8 @@ section[data-kanji]::before {
   .circle, .ring-fx { width: 120vmin; right: -40vmin; top: 30%; }
   .circle { opacity: .4; }
   .ring-fx { opacity: .7; }
-  .hero-scrim { background: linear-gradient(120deg, rgba(150, 20, 40, .32), transparent 55%), linear-gradient(180deg, rgba(18, 10, 12, .9) 0%, rgba(18, 10, 12, .84) 45%, rgba(18, 10, 12, .94) 100%); }
-  .hero-video { filter: blur(3px) brightness(.6) saturate(1.1); }
+  .hero-scrim { background: linear-gradient(120deg, rgba(150, 20, 40, .32), transparent 55%), linear-gradient(180deg, rgba(18, 10, 12, .55) 0%, rgba(18, 10, 12, .2) 40%, rgba(18, 10, 12, .7) 100%); }
+  .hero-video { filter: brightness(.8) saturate(1.15); }
 }
 @media (max-width: 40rem) {
   :root { --top-h: 3.5rem; }
@@ -646,4 +646,37 @@ section[data-kanji]::before {
   .hp { height: auto; }
   .hp-stage { position: relative; height: auto; overflow-x: auto; padding-bottom: 2rem; }
   .hp-row:nth-child(2) { margin-left: 0; }
+}
+
+/* ---- depth of field + glass --------------------------------------------------------------------------------------- */
+/* The video stays sharp in a focal pocket and melts into blur toward the edges, like a shallow lens. */
+.dof {
+  position: absolute; inset: 0;
+  backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-mask-image: radial-gradient(ellipse 42% 58% at 66% 46%, transparent 35%, rgba(0, 0, 0, .55) 62%, #000 88%);
+  mask-image: radial-gradient(ellipse 42% 58% at 66% 46%, transparent 35%, rgba(0, 0, 0, .55) 62%, #000 88%);
+}
+/* The copy sits on frosted glass with a lit edge, so the video can stay bright behind it. */
+.hero-copy {
+  position: relative; padding: clamp(1.4rem, 3vw, 2.6rem); border-radius: 28px;
+  background: linear-gradient(145deg, rgba(40, 18, 24, .5), rgba(18, 10, 12, .34));
+  backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 40px 90px -40px rgba(0, 0, 0, .8);
+}
+.hero-copy::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(140deg, rgba(255, 236, 200, .55), rgba(234, 187, 95, .18) 30%, rgba(255, 255, 255, .05) 60%, rgba(210, 58, 72, .45));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.hero-copy .display { margin-bottom: 1.1rem; }
+.hero-copy .lede { margin-bottom: 1.6rem; }
+.hero .circle { opacity: .5; }
+.hero .ring-fx { opacity: .85; }
+.hero-bar .chip { background: rgba(30, 14, 18, .38); backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4); }
+@media (max-width: 60rem) {
+  .dof { -webkit-mask-image: radial-gradient(ellipse 70% 40% at 50% 22%, transparent 30%, #000 85%); mask-image: radial-gradient(ellipse 70% 40% at 50% 22%, transparent 30%, #000 85%); }
+}
+@media (max-width: 40rem) {
+  .hero-copy { padding: 1.3rem 1.1rem; border-radius: 22px; margin-inline: -.25rem; }
 }
