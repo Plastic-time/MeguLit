@@ -228,7 +228,8 @@ test('E414: multilingual KiriKiri blocks pair by label, [l] continues the row, [
  const zh='*start\r\n[jinobun]\r\n\t「[if exp="sf.e!=1"]你[endif][if exp="sf.e==1"]死者[endif]」醒了过来。[p]\r\n*s_AAA|\r\n[cm]\r\n[jinobun]\r\n\t窗外漆黑。[l]能听到雨声。[p]\r\n*s_BBB|\r\n[cm]\r\n[unknown]\r\n\t有人在说话。[l][r]\r\n\t会是谁呢。[p]\r\n*s_CCC|\r\n[cm]\r\n[soul]\r\n…………[p][cm]\r\n';
  const p=pair(ja,zh);
  assert.deepEqual(p.lines,['「あなた」は目を覚ました。','窓は暗い。','雨の音がする。','声がする。','誰だろう。','…………。']);
- assert.deepEqual(p.zh,['「你」醒了过来。','窗外漆黑。','能听到雨声。','有人在说话。','会是谁呢。',''],'paired by label; a block without its label has no pair');
+ assert.deepEqual(p.zh,['「你」醒了过来。','窗外漆黑。','能听到雨声。','有人在说话。','会是谁呢。','…………'],'paired by label; a block without a shared label pairs in order after the last shared one');
+ const extra=pair(ja,zh.replace('…………[p][cm]','…………[p][cm]\r\n多出来的一句。[p][cm]'));assert.equal(extra.zh.at(-1),'','a stretch with a different number of blocks stays unpaired');
  assert.deepEqual(p.starts,[0,1,3,5]);assert.deepEqual(p.cont,[2],'only the sentence after [l] on the same physical line continues the row');
 });
 

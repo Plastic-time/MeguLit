@@ -33,9 +33,17 @@ function blocks(text){const out=[],anchors=[];let rows=[];const close=key=>{if(r
   if(/\[(?:cm|er|ct)\]/i.test(t))close(null);}
  close(null);return {blocks:out,anchors};}
 // One scenario: Japanese lines with the Chinese of the same label, page starts and row continuations (local indices).
+/* Blocks without a label both languages share (unlabelled blocks: choices, whole scenes such as badend4.ks; labels
+   regenerated in one language, memory1.ks) pair in order within the stretch between two shared labels, when that
+   stretch holds as many of them on both sides (user, 2026-11-11: "and the remaining 0.7%?"). */
+function byOrder(ja,zh,byKey){const out=new Map(),jaKeys=new Set(ja.map(b=>b.key).filter(Boolean));
+ const runs=(list,shared)=>{const m=new Map();let seg='';for(const b of list){if(b.key&&shared(b.key)){seg=b.key;continue;}if(!m.has(seg))m.set(seg,[]);m.get(seg).push(b);}return m;};
+ const a=runs(ja,k=>byKey.has(k)),z=runs(zh,k=>jaKeys.has(k));
+ for(const [seg,list] of a){const other=z.get(seg);if(other&&other.length===list.length)list.forEach((b,i)=>out.set(b,other[i]));}
+ return out;}
 function pair(jaText,zhText){const ja=blocks(jaText),zh=zhText?blocks(zhText):{blocks:[]},byKey=new Map();for(const b of zh.blocks)if(b.key&&!byKey.has(b.key))byKey.set(b.key,b);
- const lines=[],trans=[],starts=[],cont=[];
- for(const b of ja.blocks){const z=b.key?byKey.get(b.key):null,jaFlat=b.rows.flat(),zhFlat=z?z.rows.flat():[];
+ const lines=[],trans=[],starts=[],cont=[],ordered=byOrder(ja.blocks,zh.blocks,byKey);
+ for(const b of ja.blocks){const z=(b.key&&byKey.get(b.key))||ordered.get(b)||null,jaFlat=b.rows.flat(),zhFlat=z?z.rows.flat():[];
   if(z&&zhFlat.length===jaFlat.length){let k=0;b.rows.forEach(row=>row.forEach((s,i)=>{const at=lines.length;if(!k)starts.push(at);if(i)cont.push(at);lines.push(s);trans.push(zhFlat[k++]);}));continue;}
   if(z&&z.rows.length===b.rows.length){b.rows.forEach((row,r)=>{const at=lines.length;if(!r)starts.push(at);lines.push(row.join(''));trans.push(z.rows[r].join(''));});continue;}
   /* Different shape (or no Chinese block): one line for the block, the Chinese block whole. */
