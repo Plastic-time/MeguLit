@@ -342,7 +342,7 @@ async fn window_action(action: String, window: tauri::WebviewWindow, state: Stat
                 let _=std::fs::write(state.root.join("validation/frontend-smoke.json"),serde_json::to_vec_pretty(&status).unwrap());
             } else if let Some(flag)=&state.splash {
                 let flag=flag.clone();
-                let _=std::fs::write(format!("{}.progress",flag.display()),"100");
+                let _=std::fs::write(format!("{}.progress",flag.display()),"100");if window.label()=="main"{startup_mark(&state.root,"home-ready");}
                 std::thread::spawn(move || { std::thread::sleep(std::time::Duration::from_millis(450));let _=std::fs::write(flag,"1"); });
             } else { window.show().map_err(|e| e.to_string())?; }
         },
@@ -383,6 +383,15 @@ fn reveal(app: &tauri::AppHandle) {
         let reversing=app.state::<DesktopState>().home_transition.cancel();let _=window.set_skip_taskbar(false);let _=window.set_always_on_top(false);window_policy::restore_home_surface(&window);let _ = window.unminimize();if !was_visible||reversing{let _=app.emit("overlay-home","return");}if !was_visible||reversing{window_policy::animate_home_surface(&window,0.01);}let _ = window.show();let _ = window.set_focus();if !was_visible||reversing{animate_home(app.clone(),app.state::<DesktopState>().home_transition.generation(),false);}if !was_visible{reader_log(&app.state::<DesktopState>().root,"home-shown","");} }
 }
 
+// E384 startup timeline: one line per stage with the time since launch, so a slow start says which step waited.
+static STARTED:std::sync::OnceLock<std::time::Instant>=std::sync::OnceLock::new();
+fn startup_mark(root:&std::path::Path,label:&str){
+    let since=STARTED.get_or_init(std::time::Instant::now).elapsed().as_millis();
+    let file=root.join("logs/startup-timeline.log");let _=std::fs::create_dir_all(root.join("logs"));
+    if std::fs::metadata(&file).map(|m|m.len()>256*1024).unwrap_or(false){let _=std::fs::remove_file(&file);}
+    let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d|d.as_millis()).unwrap_or(0);
+    use std::io::Write;if let Ok(mut f)=std::fs::OpenOptions::new().create(true).append(true).open(&file){let _=writeln!(f,"{now} +{since}ms pid={} {label}",std::process::id());}
+}
 fn prepare_profile(root:&std::path::Path,profile:&std::path::Path) {
     let checkpoint=root.join("migration/baseline-20261103/webview-local-storage");
     let destination=profile.join("EBWebView/Default/Local Storage/leveldb");
@@ -395,6 +404,7 @@ fn prepare_profile(root:&std::path::Path,profile:&std::path::Path) {
 }
 
 fn main() {
+    STARTED.get_or_init(std::time::Instant::now);
     let root = root_directory();
     if std::env::args().any(|arg|arg=="--home-window-self-test"){
         let result=window_policy::native_hide_self_test();let _=std::fs::create_dir_all(root.join("validation"));
@@ -408,7 +418,9 @@ fn main() {
     let control=if std::env::args().any(|arg|arg=="--stop-instance"){Some("exit")}else{None};
     let isolated=std::env::args().any(|arg|arg=="--headless-check"||arg=="--headless-ui-check");
     let _instance_lease=if isolated{None}else{match single_instance::acquire(&root,control){Ok(single_instance::Acquisition::Owner(lease))=>Some(lease),Ok(_)=>return,Err(error)=>{let _=std::fs::create_dir_all(root.join("logs"));let _=std::fs::write(root.join("logs/instance-error.log"),error);return;}}};
+    if !isolated{startup_mark(&root,"process-start");}
     if !isolated&&!runtime_setup::ensure(&root){return;}
+    if !isolated{startup_mark(&root,"runtime-ready");}
     let diagnostic_root=root.clone();
     std::panic::set_hook(Box::new(move |info| {
         let _=std::fs::create_dir_all(diagnostic_root.join("logs"));
@@ -420,6 +432,9 @@ fn main() {
     let profile=cache.join(if headless {"smoke-profile"}else{"webview-profile"});
     prepare_profile(&root,&profile);
     std::env::set_var("WEBVIEW2_USER_DATA_FOLDER",&profile);
+    // E384 WebView2 writes its own warnings and errors (GPU, profile lock, network service) next to our logs. The variable
+    // replaces Tauri's default browser arguments, so they are repeated here; every window shares one set of arguments.
+    if !headless{let log=root.join("logs/webview2-browser.log");std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",format!("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-logging --log-file=\"{}\" --log-level=1",log.display()));}
     let mut context=tauri::generate_context!();
     for window in &mut context.config_mut().app.windows {window.data_directory=Some(profile.clone());window.create=false;}
     let splash=if !headless && root.join("native/StartupIsland.exe").is_file() {
@@ -428,7 +443,7 @@ fn main() {
         let mut command=Command::new(root.join("native/StartupIsland.exe"));
         command.arg(&flag).arg(preferences["language"].as_str().unwrap_or("zh")).arg(preferences["accent"].as_str().unwrap_or("#ad1539"));
         #[cfg(windows)] command.creation_flags(0x08000000);
-        if command.spawn().is_ok() {let _=std::fs::write(format!("{}.pid",flag.display()),std::process::id().to_string());let _=std::fs::write(format!("{}.progress",flag.display()),"20");Some(flag)}else{None}
+        startup_mark(&root,"splash-start");if command.spawn().is_ok() {let _=std::fs::write(format!("{}.pid",flag.display()),std::process::id().to_string());let _=std::fs::write(format!("{}.progress",flag.display()),"20");Some(flag)}else{None}
     }else{None};
     let window_memory=window_memory::WindowMemory::new(&root);
     let state = DesktopState { root, exiting: AtomicBool::new(false), headless, splash,window_memory,reader_background:AtomicBool::new(true),home_transition:home_transition::HomeTransition::default() };
@@ -440,7 +455,7 @@ fn main() {
             let state=app.state::<DesktopState>();
             let _=std::fs::create_dir_all(state.root.join("logs"));
             let stage=state.root.join("logs/native-startup-stage.log");
-            let _=std::fs::write(&stage,"creating hidden WebView");
+            let _=std::fs::write(&stage,"creating hidden WebView");if !headless{startup_mark(&state.root,"webview-build-start");}
             let mut config=app.config().app.windows[0].clone();
             if !headless{
                 let mut saved=state.window_memory.snapshot();
@@ -452,7 +467,7 @@ fn main() {
                 .initialization_script("document.addEventListener('contextmenu',function(event){event.preventDefault();},true);")
                 .build()
                 .map_err(|error| {let _=std::fs::write(&stage,format!("WebView creation failed: {error:?}"));error})?;
-            let _=std::fs::write(&stage,"WebView created");
+            let _=std::fs::write(&stage,"WebView created");if !headless{startup_mark(&state.root,"webview-built");}
             if let Some(home)=app.get_webview_window("main"){window_policy::configure_home_frame(&home);}
             if !headless {
                 app.manage(TrayItems{language:std::sync::Mutex::new("zh".into())});
