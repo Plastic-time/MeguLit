@@ -7,6 +7,7 @@
 import {mountEmailLogin} from './account-ui.js';
 import {changeAvatar} from './avatar-crop.js';
 import {personButton,socialHTML,bindSocial} from './leaderboard-social.js';
+import {openProfilePanel} from './profile-panel.js';
 export const leaderboardLabel={zh:'排行榜',ja:'ランキング',en:'Leaderboard'};
 const W={
  zh:{title:'排行榜',week:'本周',month:'本月',all:'全部',characters:'阅读字数',seconds:'阅读时长',words:'新收录单词',reviews:'复习次数',kana:'假名练习',streak:'连续天数',games:'按游戏',
@@ -68,9 +69,9 @@ export function avatarHTML(entry,images,esc){
    ruled rows under column headings; hot words use the same stage, 4–10 as one column of honour rows (no orphan
    card), 11–50 as a compact two-column index. */
 const EXTRA={
- zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次',follow:'关注',vacant:'虚位以待',followSub:'关注的人和同好',changeAvatar:'换头像',editProfile:'编辑个人主页',uploading:'上传并审核中…'},
- ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',follow:'フォロー',vacant:'空席',followSub:'フォロー中の人と同好',changeAvatar:'アイコンを変更',editProfile:'プロフィールを編集',uploading:'アップロードして審査中…'},
- en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',follow:'Following',vacant:'Open spot',followSub:'People you follow and kindred readers',changeAvatar:'Change picture',editProfile:'Edit profile',uploading:'Uploading and checking…'}
+ zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次',myPage:'我的主页',signIn:'注册 / 登录',follow:'关注',vacant:'虚位以待',followSub:'关注的人和同好',changeAvatar:'换头像',editProfile:'编辑个人主页',uploading:'上传并审核中…'},
+ ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',myPage:'マイページ',signIn:'登録 / ログイン',follow:'フォロー',vacant:'空席',followSub:'フォロー中の人と同好',changeAvatar:'アイコンを変更',editProfile:'プロフィールを編集',uploading:'アップロードして審査中…'},
+ en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',myPage:'My profile',signIn:'Sign up / sign in',follow:'Following',vacant:'Open spot',followSub:'People you follow and kindred readers',changeAvatar:'Change picture',editProfile:'Edit profile',uploading:'Uploading and checking…'}
 };
 const words=locale=>({...leaderboardWords(locale),...(EXTRA[locale]||EXTRA.zh)});
 function segmented(name,items,current,w){return `<div class="lb-seg" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
@@ -159,20 +160,23 @@ function page(top,sub,body){return `<div class="leaderboard-page">${top}${subRow
 /* E388 your own avatar is the way to change it: click → pick → crop window → upload. */
 const camera='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 3.2 6.5 2h3l.9 1.2H13a1.5 1.5 0 0 1 1.5 1.5v7.1A1.5 1.5 0 0 1 13 13.3H3a1.5 1.5 0 0 1-1.5-1.5V4.7A1.5 1.5 0 0 1 3 3.2zM8 11a2.9 2.9 0 1 0 0-5.8A2.9 2.9 0 0 0 8 11z"/></svg>';
 function avatarButton(entry,data,w,esc){return `<button type="button" class="lb-avatar-edit" data-lb-avatar title="${esc(w.changeAvatar)}" aria-label="${esc(w.changeAvatar)}">${avatarHTML(entry,data.avatars||{},esc)}<span class="lb-avatar-badge">${camera}</span></button>`;}
+/* E404 the 我的主页 chip, on every tab: your picture and name (or 注册 / 登录 when signed out); on 阅读榜 with a rank it
+   also shows the rank and value. The whole chip opens the 个人主页 panel. Same two-line height in every state. */
 function myChip(data,w,locale,esc){
- const me=data.board?.me,metric=view.metric==='games'?'characters':view.metric;if(!data.joined||!me)return '';
- const mine=(data.board.entries||[]).find(e=>e.me)||{name:data.name};
- return `<div class="lb-mychip">${avatarButton(mine,data,w,esc)}<div><small>${w.myRank}</small><strong>${esc(fill(w.rank,{n:me.rank}))}</strong></div><span>${esc(formatValue(metric,me.value,locale))}</span></div>`;
+ const me=view.tab==='board'||data.tab==='board'?data.board?.me:null,ranked=!!(data.joined&&me&&data.tab!=='hot'&&data.tab!=='follow');
+ const metric=view.metric==='games'?'characters':view.metric,self={name:data.name||'?',avatar:data.self?.avatar||null};
+ const line=ranked?esc(fill(w.rank,{n:me.rank})):data.joined||data.account?esc(data.name||w.myPage):w.signIn;
+ return `<button type="button" class="lb-mychip" data-lb-me aria-label="${esc(w.myPage)}">${avatarHTML(self,data.avatars||{},esc)}<div><small>${ranked?w.myRank:w.myPage}</small><strong>${line}</strong></div>${ranked?`<span>${esc(formatValue(metric,me.value,locale))}</span>`:''}</button>`;
 }
 export function leaderboardHTML(data,locale,esc){
  const w=words(locale);
  /* E393/E402 loading: the same rows as the tab being loaded, with a spinner in the body */
  if(!data){const tab=view.tab||'board';return page(topRow(w,tab),tab==='board'?boardControls(w):tab==='hot'?hotControls(null,w,esc):`<p class="lb-subrow-caption">${w.followSub}</p>`,'<div class="lb-loading"><span class="spinner"></span></div>');}
- if(!data.configured)return page(topRow(w,'board'),segmented('period',PERIODS,view.period,w),`<section class="lb-card leaderboard-notice"><h2 class="lb-h2">${w.notReady}</h2><p class="lb-note">${w.notReadyText}</p></section>${localHTML(data,w,locale,esc)}`);
+ if(!data.configured)return page(topRow(w,'board',myChip(data,w,locale,esc)),segmented('period',PERIODS,view.period,w),`<section class="lb-card leaderboard-notice"><h2 class="lb-h2">${w.notReady}</h2><p class="lb-note">${w.notReadyText}</p></section>${localHTML(data,w,locale,esc)}`);
  const tab=['hot','follow'].includes(data.tab)?data.tab:'board';
  /* E397 关注: people you follow, then 同好 */
- if(tab==='follow')return page(topRow(w,tab),`<p class="lb-subrow-caption">${w.followSub}</p>`,socialHTML(data.social,locale,esc,avatarHTML));
- if(tab==='hot')return page(topRow(w,tab),hotControls(data.hot,w,esc),`<section class="lb-card leaderboard-hot"><div class="lb-card-head"><h2 class="lb-h2">${w.hot} <span>· ${w[view.category]}</span></h2></div>${hotHTML(data.hot,w,locale,esc)}</section>`);
+ if(tab==='follow')return page(topRow(w,tab,myChip(data,w,locale,esc)),`<p class="lb-subrow-caption">${w.followSub}</p>`,socialHTML(data.social,locale,esc,avatarHTML));
+ if(tab==='hot')return page(topRow(w,tab,myChip(data,w,locale,esc)),hotControls(data.hot,w,esc),`<section class="lb-card leaderboard-hot"><div class="lb-card-head"><h2 class="lb-h2">${w.hot} <span>· ${w[view.category]}</span></h2></div>${hotHTML(data.hot,w,locale,esc)}</section>`);
  const body=data.joined?`<section class="lb-card leaderboard-board"><div class="lb-card-head"><h2 class="lb-h2">${w[view.metric]} <span>· ${view.metric==='games'?w.all:w[view.period]}</span></h2><small>${esc(fill(w.joinedAs,{name:data.name}))} · <button type="button" class="leaderboard-leave" data-lb-profile>${w.editProfile}</button></small></div>${boardHTML(data,w,locale,esc)}</section>`:joinHTML(data,w,esc);
  return page(topRow(w,tab,myChip(data,w,locale,esc)),boardControls(w),body+localHTML(data,w,locale,esc));
 }
@@ -202,8 +206,10 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
    if(!main.querySelector('[data-lb-consent]').checked){box.textContent=w.CONSENT_REQUIRED;box.hidden=false;return;}
    render('leaderboard_join',{name:main.querySelector('[data-lb-name]').value,shareGames:main.querySelector('[data-lb-share]').checked,consent:true});});
   /* E394 leaving, nickname and sharing moved to Settings → 个人主页 */
-  main.querySelectorAll('[data-lb-profile]').forEach(b=>b.addEventListener('click',()=>openSettings('personal')));
-  bindSocial(main,{api,locale,esc,toast,images:()=>({...(last?.avatars||{}),...(last?.social?.avatars||{})}),avatarHTML,openSettings,rerender:()=>{if(isCurrent())render();}});
+  /* E404 the chip and every 编辑个人主页 open the 个人主页 panel; closing it refreshes the page */
+  const openProfile=()=>openProfilePanel({api,locale,esc,toast,openSettings,onClose:()=>{if(isCurrent())render();}});
+  main.querySelectorAll('[data-lb-me],[data-lb-profile]').forEach(b=>b.addEventListener('click',openProfile));
+  bindSocial(main,{api,locale,esc,toast,images:()=>({...(last?.avatars||{}),...(last?.social?.avatars||{})}),avatarHTML,openSettings:section=>section==='personal'?openProfile():openSettings(section),rerender:()=>{if(isCurrent())render();}});
  };
  main.innerHTML=leaderboardHTML(null,locale,esc);
  await render();

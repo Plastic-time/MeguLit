@@ -203,13 +203,14 @@ test('E394 个人主页: leaderboard fields leave 联网服务, search lands on 
  const layout=await import(pathToFileURL(path.join(__dirname,'..','web','settings-layout.js')).href);
  const fields=[{scope:'online',key:'leaderboardEnabled'},{scope:'online',key:'leaderboardName'},{scope:'online',key:'leaderboardShareGames'},{scope:'online',key:'relayUrl'}];
  assert.deepEqual(layout.visibleFields('online',fields).map(f=>f.key),['relayUrl']);
- const category=layout.navigation.find(c=>c.ids.includes('online'));assert.ok(category.ids.includes('personal'));assert.ok(category.ids.indexOf('personal')<category.ids.indexOf('online'));
+ /* E404 个人主页 is a panel now, not a settings page */
+ assert.ok(!layout.navigation.some(c=>c.ids.includes('personal')),'no 个人主页 page in the settings nav');
  const search=await import('data:text/javascript;base64,'+fs.readFileSync(path.join(__dirname,'..','web','settings-search.js')).toString('base64'));
  const entries=search.globalSearchEntries({fields:fields.map(f=>({...f,label:{zh:f.key==='leaderboardName'?'排行榜昵称':f.key,en:f.key}}))},{});
  assert.equal(entries.find(e=>e.key==='leaderboardName').scope,'personal');assert.equal(entries.find(e=>e.key==='relayUrl').scope,'online');
  const hits=q=>entries.filter(e=>search.matchesSetting(e,q)).map(e=>e.scope);
  assert.ok(hits('touxiang').includes('personal'),'头像 by pinyin');assert.ok(hits('gerenzhuye').includes('personal'),'个人主页 by pinyin');assert.ok(hits('tuichu').includes('personal'),'退出 by pinyin');
- const view=fs.readFileSync(path.join(__dirname,'..','web','leaderboard-view.js'),'utf8');assert.doesNotMatch(view,/data-lb-leave/,'no leave button on the 排行榜 page');assert.match(view,/openSettings\('personal'\)/);
+ const view=fs.readFileSync(path.join(__dirname,'..','web','leaderboard-view.js'),'utf8');assert.doesNotMatch(view,/data-lb-leave/,'no leave button on the 排行榜 page');assert.match(view,/openProfilePanel\(/);
  const {root}=fixture(t);lb.join(root,{name:'Kazuma',shareGames:true,consent:true});
  const {execFileSync}=require('node:child_process');
  const out=execFileSync(process.execPath,['-e',`require(${JSON.stringify(path.join(__dirname,'..','services','bridge.cjs'))}).dispatch({action:'leaderboard_profile'}).then(r=>console.log(JSON.stringify(r))).catch(e=>console.log('ERR '+e.message))`],{env:{...process.env,MEGULIT_ROOT:root,MEGULIT_RELAY_BASE:''},encoding:'utf8'});
@@ -286,8 +287,24 @@ test('E402 every tab draws the same top and sub rows (no jump), the podium keeps
   assert.match(html,/class="lb-toprow"><div class="lb-seg" role="group" data-lb-group="tab">/,name+': the tab switch opens the top row');
   assert.doesNotMatch(html,/lb-title|<h1/,name+': no page title (the top bar already says 排行榜)');
  }
- assert.match(pages.board,/lb-toprow-end"><div class="lb-mychip"/,'my rank sits at the right of the top row');
+ assert.match(pages.board,/lb-toprow-end"><button type="button" class="lb-mychip" data-lb-me/,'my rank sits at the right of the top row');
  assert.equal((pages.board.match(/class="lb-place is-vacant"/g)||[]).length,2,'two vacant stands next to the only reader');
  assert.match(pages.hot,/lb-empty-state/);assert.equal((pages.follow.match(/lb-empty-state/g)||[]).length,2);
  assert.doesNotMatch(pages.board,/is-accent/,'all tiles look the same');assert.equal((pages.board.match(/class="lb-tile"/g)||[]).length,8);
+});
+
+test('E404 the 我的主页 chip shows on every tab and opens the panel; signed out it says 注册 / 登录; settings page gone',async()=>{
+ const view=await import(pathToFileURL(path.join(__dirname,'..','web','leaderboard-view.js')).href);
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+ const base={configured:true,local:{stats:{week:{}},totals:{words:0}},avatars:{}};
+ const chip=html=>(html.match(/<button type="button" class="lb-mychip"[\s\S]*?<\/button>/)||[''])[0];
+ const guest=view.leaderboardHTML({...base,joined:false,account:false,tab:'hot',hot:{state:'ok',settled:false,awards:[],weeks:[]}},'zh',esc);
+ assert.match(chip(guest),/我的主页/);assert.match(chip(guest),/注册 \/ 登录/);
+ const follow=view.leaderboardHTML({...base,joined:true,account:true,name:'めぐみん',tab:'follow',self:{avatar:null},social:{state:'ok',following:[],kindred:[],avatars:{}}},'ja',esc);
+ assert.match(chip(follow),/マイページ/);assert.match(chip(follow),/めぐみん/);
+ const board=view.leaderboardHTML({...base,joined:true,account:true,name:'A',tab:'board',board:{state:'ok',entries:[{rank:3,name:'A',value:9,me:true}],me:{rank:3,value:9}}},'en',esc);
+ assert.match(chip(board),/My rank/);assert.match(chip(board),/data-lb-me/);
+ for(const html of [guest,follow,board])assert.equal((chip(html).match(/<small>/g)||[]).length,1,'same two-line chip in every state');
+ const settings=fs.readFileSync(path.join(__dirname,'..','web','settings.js'),'utf8');assert.match(settings,/section==='personal'\)\{openProfilePanel/);assert.doesNotMatch(settings,/mountProfileSettings/);
+ const panel=fs.readFileSync(path.join(__dirname,'..','web','profile-panel.js'),'utf8');assert.match(panel,/mountEmailLogin/);assert.match(panel,/onSignedOut:\(\)=>paint\(\)/);
 });

@@ -37,7 +37,7 @@ const T={
   publicLogin:'Sign in to set up a public profile',publicJoin:'Join the leaderboard to set up a public profile',publicHidden:'Your profile was reported and is hidden until it is reviewed; it comes back by itself if all is fine',objection:'Objection!',objectionTitle:'Dispute the report',objectionHint:'Think the report is wrong? Object and the developer reviews it by hand. Once per hiding',objectionPh:'Why (optional)',objectionSend:'Send objection',appealed:'Objection sent; waiting for a human review',
   bio:'Signature',bioHint:'One line, up to 60 characters; no links, adult or abusive content',bioPh:'e.g. One explosion a day',favorites:'Favourite games',favoritesHint:'Pick up to 5 from your library',addFavorite:'+ Add a game',removeFavorite:'Remove'}
 };
-export async function mountProfileSettings({content,api,locale,esc,toast,openSection=()=>{}}){
+export async function mountProfileSettings({content,api,locale,esc,toast,openSection=()=>{},onSignedOut=null}){
  const t=T[locale]||T.zh,lw=leaderboardWords(locale),root=document.createElement('div');root.className='profile-settings';content.append(root);
  /* order: account, picture, leaderboard. The leaderboard block is the page's only <form>, so settings search finds
     its fields (leaderboardName …) by name */
@@ -55,7 +55,7 @@ export async function mountProfileSettings({content,api,locale,esc,toast,openSec
    mountEmailLogin(accountBox.querySelector('[data-email-login]'),{api,locale,esc,toast,onDone:async()=>{await paintAccount();await paintBoard();await paintPublic();}});return;}
   accountBox.innerHTML=`<h2 class="panel-title">${t.account}</h2><div class="settings-row profile-account-row"><span class="setting-description"><span class="settings-label">${t.signedIn}</span><small class="settings-help">${esc(account.email||'')}</small></span><span class="review-controls"><button type="button" class="secondary" data-profile-sync>${t.syncDevices}</button><button type="button" class="secondary" data-profile-logout>${t.signOut}</button></span></div>`;
   accountBox.querySelector('[data-profile-sync]').onclick=()=>openSection('account');
-  accountBox.querySelector('[data-profile-logout]').onclick=async event=>{event.currentTarget.disabled=true;try{await api('account_logout',{});toast(t.signedOut);}catch{toast(t.offline);}await paintAccount();await paintBoard();await paintPublic();};
+  accountBox.querySelector('[data-profile-logout]').onclick=async event=>{event.currentTarget.disabled=true;try{await api('account_logout',{});toast(t.signedOut);}catch{toast(t.offline);}if(onSignedOut){onSignedOut();return;}/* E404 the panel switches back to sign-in */await paintAccount();await paintBoard();await paintPublic();};
  }
 
  /* E397 公开主页: signature, favourite games (from your library), the public switch. Needs an account and a joined

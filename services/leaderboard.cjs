@@ -258,13 +258,16 @@ async function view(root,db,request={},options={}){
  const now=options.now||new Date(),period=PERIODS.includes(request.period)?request.period:'week',metric=[...METRICS,'games'].includes(request.metric)?request.metric:'seconds';
  const local=collectStats(db,now,root),c=config(root,options.env,options),tab=request.tab==='hot'?'hot':'board';
  const result={configured:c.configured,joined:c.joined,enabled:c.enabled,name:c.name,shareGames:c.shareGames,account:c.account,tab,period,metric,local,board:null,hot:null,avatars:{}};
+ /* E404 your own approved picture, for the 我的主页 chip on every tab */
+ const selfAvatar=AVATAR_ID.test(String(relay.readJSON(stateFile(root)).avatar?.id||''))?relay.readJSON(stateFile(root)).avatar.id:null;result.self={avatar:selfAvatar};
+ if(selfAvatar&&c.configured)result.avatars=await avatarImages(root,[selfAvatar],options);
  if(!c.configured)return {...result,board:{state:'not-configured'}};
  if(c.joined&&(request.submit===true||now.getTime()-c.lastSubmitAt>SUBMIT_EVERY))result.submit=await submit(local,{...options,root,now});
  /* E397 关注 tab: following and 同好 */
  if(request.tab==='follow'){result.tab='follow';result.social=await social(root,options);return result;}
  if(tab==='hot'){result.hot=await hotWords(root,{week:request.week||'',category:CATEGORIES.includes(request.category)?request.category:'word'},options);return result;}
  result.board=await fetchBoard(period,metric,{...options,root,now,game:request.game});
- if(result.board.state==='ok'){const ids=[...(result.board.entries||[]),...(result.board.games||[]).map(g=>g.top).filter(Boolean)].map(e=>e.avatar);result.avatars=await avatarImages(root,ids,options);}
+ if(result.board.state==='ok'){const ids=[...(result.board.entries||[]),...(result.board.games||[]).map(g=>g.top).filter(Boolean)].map(e=>e.avatar);result.avatars={...result.avatars,...await avatarImages(root,ids,options)};}
  return result;
 }
 

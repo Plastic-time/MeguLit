@@ -289,3 +289,35 @@
 /* E402 my numbers: every tile looks the same, two rows of four */
 .lb-tile strong{font-size:19px}
 @media (max-width:760px){.lb-toprow{flex-wrap:wrap}.lb-subrow{flex-wrap:wrap;align-items:center}.lb-subrow .lb-tabs{flex-basis:100%}}
+
+/* E404 the 我的主页 chip is a button on every tab */
+button.lb-mychip{border:0;font:inherit;color:inherit;cursor:pointer;text-align:left;transition:box-shadow .16s,background-color .16s}
+button.lb-mychip:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--lb-gold) 55%,transparent)}
+button.lb-mychip:focus-visible{outline:2px solid var(--lb-gold);outline-offset:3px}
+button.lb-mychip:active{transform:scale(.98)}
+.lb-mychip strong{display:block;max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* E404 个人主页 panel: a drawer on the right, fixed size; only the body changes (fade) */
+.profile-panel{position:fixed;inset:0 0 0 auto;margin:0;width:min(520px,calc(100vw - 24px));height:100vh;max-height:none;max-width:none;padding:0;border:0;border-radius:18px 0 0 18px;
+ background:var(--g-surface,var(--surface,#1d1a19));color:var(--g-t1,var(--text,#eee));box-shadow:-24px 0 60px rgba(0,0,0,.45),inset 1px 0 0 color-mix(in srgb,var(--g-gold,#edb56e) 30%,transparent);
+ display:flex;flex-direction:column;animation:profile-panel-in .24s var(--g-ease,cubic-bezier(.2,.8,.2,1)) both}
+.profile-panel:not([open]){display:none}
+.profile-panel::backdrop{background:rgba(0,0,0,.45)}
+@keyframes profile-panel-in{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+.profile-panel-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 22px 14px;border-bottom:1px solid var(--g-rule,rgba(255,255,255,.08))}
+.profile-panel-head h2{margin:0;font-family:var(--g-serif,serif);font-size:19px;font-weight:600}
+.profile-panel-close{all:unset;display:grid;place-items:center;width:32px;height:32px;border-radius:9px;cursor:pointer;font-size:20px;color:var(--g-t3,var(--muted))}
+.profile-panel-close:hover{background:rgba(255,255,255,.08);color:var(--g-t1,var(--text))}
+.profile-panel-close:focus-visible{outline:2px solid var(--g-gold,var(--accent));outline-offset:2px}
+.profile-panel-body{flex:1;min-height:0;overflow-y:auto;padding:16px 22px 28px;opacity:0}
+.profile-panel-body.is-in{opacity:1;transition:opacity .18s ease}
+.profile-panel-body .profile-settings{gap:14px}
+.profile-panel-body .panel{margin:0}
+.profile-panel-loading{display:grid;place-items:center;min-height:240px}
+.profile-panel-intro h3{margin:4px 0 6px;font-family:var(--g-serif,serif);font-size:17px}
+.profile-perks{list-style:none;margin:14px 0 18px;padding:0;display:grid;gap:8px}
+.profile-perks li{position:relative;padding:10px 12px 10px 34px;border-radius:10px;font-size:13px;line-height:1.5;background:rgba(255,255,255,.04);box-shadow:inset 0 0 0 1px var(--g-rule,rgba(255,255,255,.08))}
+.profile-perks li::before{content:"";position:absolute;left:13px;top:50%;width:8px;height:8px;margin-top:-4px;transform:rotate(45deg);background:var(--g-gold,var(--accent))}
+.profile-panel-login{margin-top:6px}
+.profile-privacy{margin:14px 0 0;font-size:11.5px;color:var(--g-t3,var(--muted))}
+@media (prefers-reduced-motion:reduce){.profile-panel{animation:none}.profile-panel-body.is-in{transition:none}}

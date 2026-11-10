@@ -3,7 +3,8 @@ import {mountSettingsAutosave,leaveSettings,flushSettings} from './settings-auto
 import {mountPathPickers} from './path-picker.js';
 import {renderBackup} from './backup-ui.js';
 import {renderAccount,accountLabel} from './account-ui.js';
-import {mountProfileSettings,profileLabel} from './profile-settings.js';
+import {profileLabel} from './profile-settings.js';
+import {openProfilePanel} from './profile-panel.js';
 
 import {enhanceSelects} from './select-control.js';
 import {configureSpeech} from './speech-settings.js';
@@ -30,7 +31,9 @@ export async function renderSettings({main,api,invoke,text,locale,esc,toast,head
  const labels={zh:{general:'常规与外观',global:'全局默认',profile:'按游戏设置',apiKey:'API 密钥',keyHint:'留空保留已有密钥，密钥仅由当前 Windows 账户加密保存',saveKey:'保存密钥',keySaved:'密钥已加密保存',invalid:'设置值无效，请检查后重试',selectProfile:'选择已保存的游戏配置',saved:'设置已保存',savedHint:'游戏内设置将由独立阅读服务读取',emptyProfiles:'绑定并保存游戏设置后，可在这里选择',models:'离线模型',modelHint:'保留已下载的模型文件；只在使用对应引擎时运行',refreshVoices:'刷新声音列表',voice:'声音',style:'说话风格',keyRequired:'请填写密钥',restore:'恢复历史配置',history:'配置历史'},ja:{general:'一般・外観',global:'全体の既定値',profile:'作品別の設定',apiKey:'API キー',keyHint:'空欄では既存キーを保持します。現在の Windows アカウントで暗号化保存します',saveKey:'キーを保存',keySaved:'キーを暗号化して保存しました',invalid:'設定値を確認してください',selectProfile:'保存済みの作品設定を選択',saved:'設定を保存しました',savedHint:'独立した読書サービスがゲーム内設定を読み込みます',emptyProfiles:'ゲームの設定を保存すると、ここで選択できます',models:'オフラインモデル',modelHint:'ダウンロード済みモデルを保持し、対象エンジンの使用時だけ起動します',refreshVoices:'声の一覧を更新',voice:'声',style:'話し方',keyRequired:'キーを入力してください',restore:'設定履歴から復元',history:'設定履歴'},en:{general:'General and appearance',global:'Global defaults',profile:'Per-game settings',apiKey:'API key',keyHint:'Leave empty to keep existing keys. Encrypted with the current Windows account',saveKey:'Save key',keySaved:'Key saved encrypted',invalid:'Check the setting values and try again',selectProfile:'Choose a saved game profile',saved:'Settings saved',savedHint:'The independent reading service reads in-game settings',emptyProfiles:'Saved game settings will be selectable here',models:'Offline models',modelHint:'Downloaded models are retained and run only when their engine is used',refreshVoices:'Refresh voices',voice:'Voice',style:'Speaking style',keyRequired:'Enter a key',restore:'Restore settings history',history:'Settings history'}}[locale];
  if(!main.querySelector('.settings-layout'))main.innerHTML=heading(text.settings)+'<div class="loading-screen"><span class="spinner"></span></div>';
  const cacheKey=profile||'';const data=main.__settingsData?.key===cacheKey?main.__settingsData.data:await api('settings_get',{profile});main.__settingsData={key:cacheKey,data};if(!isCurrent()||renderId!==settingsRender)return;
- if(section&&!data.groups.some(group=>group.id===section)&&section!=='data'&&section!=='account'&&section!=='personal')section='general';
+ /* E404 个人主页 is a panel now: an old link or a search hit opens it over 联网服务 */
+ if(section==='personal'){openProfilePanel({api,locale,esc,toast,openSettings:next=>{setSection(next);renderSettings({main,api,invoke,text,locale,esc,toast,heading,basicSettings,isCurrent,onSaved,section:next,setSection,profile,setProfile}).catch(()=>toast(text.serviceFailed));}}).catch(()=>toast(text.serviceFailed));section='online';setSection(section);}
+ if(section&&!data.groups.some(group=>group.id===section)&&section!=='data'&&section!=='account')section='general';
  const sectionName=id=>id==='general'?labels.general:id==='personal'?profileLabel[locale]||profileLabel.zh:id==='account'?accountLabel[locale]||accountLabel.zh:id==='data'?{zh:'数据与备份',en:'Data and backup',ja:'データ・バックアップ'}[locale]:data.groups.find(g=>g.id===id)?.label[locale];
  if(savedCategories===null){for(const category of navigation)if(category.ids.includes(section))openCategories.add(category.ids[0]);}
  const navScroll=main.querySelector('.settings-nav')?.scrollTop??main.__settingsNavScroll??0;main.__settingsNavScroll=navScroll;
@@ -47,8 +50,6 @@ export async function renderSettings({main,api,invoke,text,locale,esc,toast,head
  if(section==='data'){const body=document.createElement('div');content.append(body);renderBackup({target:body,api,invoke,locale,esc,toast,onSaved});return;}
  /* E378 账号 page (web/account-ui.js) */
  if(section==='account'){const body=document.createElement('div');content.append(body);renderAccount({target:body,api,locale,esc,toast}).catch(()=>toast(text.serviceFailed));return;}
- /* E394 个人主页 page (web/profile-settings.js): account, picture, nickname, sharing, join / leave */
- if(section==='personal'){const go=next=>{setSection(next);renderSettings({main,api,invoke,text,locale,esc,toast,heading,basicSettings,isCurrent,onSaved,section:next,setSection,profile,setProfile}).catch(()=>toast(text.serviceFailed));};mountProfileSettings({content,api,locale,esc,toast,openSection:go}).catch(()=>toast(text.serviceFailed));return;}
  const group=data.groups.find(g=>g.id===section),fields=visibleFields(section,data.fields),values=data.values[section];
  const scoped=['text','embedding','position'].includes(section);
  const pages=fieldPages(section,fields);let activePage=selectedPages.get(section)||pages[0].id;if(!pages.some(p=>p.id===activePage))activePage=pages[0].id;
