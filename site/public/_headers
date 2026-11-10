@@ -6,6 +6,9 @@
   Cache-Control: public, max-age=0, must-revalidate
 /assets/js/*
   Cache-Control: public, max-age=0, must-revalidate
+/assets/updates.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300
 /data/*
   Cache-Control: public, max-age=300
 /*
