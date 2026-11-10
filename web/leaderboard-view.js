@@ -69,9 +69,9 @@ export function avatarHTML(entry,images,esc){
    ruled rows under column headings; hot words use the same stage, 4–10 as one column of honour rows (no orphan
    card), 11–50 as a compact two-column index. */
 const EXTRA={
- zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次',myPage:'我的主页',signIn:'注册 / 登录',follow:'关注',vacant:'虚位以待',followSub:'关注的人和同好',changeAvatar:'换头像',editProfile:'编辑个人主页',uploading:'上传并审核中…'},
- ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',myPage:'マイページ',signIn:'登録 / ログイン',follow:'フォロー',vacant:'空席',followSub:'フォロー中の人と同好',changeAvatar:'アイコンを変更',editProfile:'プロフィールを編集',uploading:'アップロードして審査中…'},
- en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',myPage:'My profile',signIn:'Sign up / sign in',follow:'Following',vacant:'Open spot',followSub:'People you follow and kindred readers',changeAvatar:'Change picture',editProfile:'Edit profile',uploading:'Uploading and checking…'}
+ zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次',myPage:'我的主页',circleTitle:'本周众人汇聚的魔力',circleSub:'{n} 位读者在此共鸣',meTag:'吾',signIn:'注册 / 登录',follow:'关注',vacant:'虚位以待',followSub:'关注的人和同好',changeAvatar:'换头像',editProfile:'编辑个人主页',uploading:'上传并审核中…'},
+ ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',myPage:'マイページ',circleTitle:'みんなで集めた魔力',circleSub:'{n} 人の読者が共鳴中',meTag:'我',signIn:'登録 / ログイン',follow:'フォロー',vacant:'空席',followSub:'フォロー中の人と同好',changeAvatar:'アイコンを変更',editProfile:'プロフィールを編集',uploading:'アップロードして審査中…'},
+ en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',myPage:'My profile',circleTitle:'Mana gathered together',circleSub:'{n} readers in resonance',meTag:'You',signIn:'Sign up / sign in',follow:'Following',vacant:'Open spot',followSub:'People you follow and kindred readers',changeAvatar:'Change picture',editProfile:'Edit profile',uploading:'Uploading and checking…'}
 };
 const words=locale=>({...leaderboardWords(locale),...(EXTRA[locale]||EXTRA.zh)});
 function segmented(name,items,current,w){return `<div class="lb-seg" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
@@ -105,6 +105,18 @@ function tableRows(entries,metric,w,locale,esc,images,max=0){
  const pct=e=>max>0?Math.max(2,Math.min(100,Math.round((Number(e.value)||0)/max*100))):0;
  return `<div class="lb-table"><div class="lb-thead" aria-hidden="true"><span>${w.colRank}</span><span>${w.colReader}</span><span>${w[metric]}</span></div><ol class="leaderboard-list lb-rows">${entries.map(e=>`<li class="${e.me?'is-me':''}" style="--pct:${pct(e)}%"><span class="leaderboard-rank">${e.rank}</span>${personButton(e,`${avatarHTML(e,images,esc)}<span class="leaderboard-name">${esc(e.name)}</span>`,esc)}${reportButton(e,w,esc)}<strong>${esc(formatValue(metric,e.value,locale))}</strong></li>`).join('')}</ol></div>`;
 }
+/* E419 readers as equals: no podium, no rank ladder. A magic circle shows what everyone gathered together, then one
+   grimoire card per reader, all the same size; the order is kept but the number is only a small sigil code. */
+const SIGIL=(()=>{const c=100,pt=(r,a)=>`${(c+r*Math.cos(a)).toFixed(1)},${(c+r*Math.sin(a)).toFixed(1)}`;
+ const tri=o=>`<polygon points="${[0,1,2].map(k=>pt(62,o+k*2*Math.PI/3)).join(' ')}"/>`;
+ const ticks=Array.from({length:36},(_,k)=>{const a=k*Math.PI/18;return `<line x1="${pt(84,a).split(',')[0]}" y1="${pt(84,a).split(',')[1]}" x2="${pt(k%3?88:92,a).split(',')[0]}" y2="${pt(k%3?88:92,a).split(',')[1]}"/>`;}).join('');
+ return `<svg class="lb-sigil" viewBox="0 0 200 200" aria-hidden="true"><g class="lb-sigil-spin"><circle cx="100" cy="100" r="94"/><circle cx="100" cy="100" r="84"/>${ticks}</g><g class="lb-sigil-spin is-back">${tri(-Math.PI/2)}${tri(Math.PI/2)}<circle cx="100" cy="100" r="62"/><circle cx="100" cy="100" r="31"/></g></svg>`;})();
+function circleHTML(entries,metric,w,locale,esc,images){
+ const total=entries.reduce((n,e)=>n+(Number(e.value)||0),0);
+ const code=n=>'No.'+String(n).padStart(2,'0');
+ return `<section class="lb-circle"><div class="lb-circle-sigil">${SIGIL}</div><div class="lb-circle-text"><small>${w.circleTitle}</small><strong>${esc(formatValue(metric,total,locale))}</strong><span>${esc(fill(w.circleSub,{n:entries.length}))}</span></div></section>
+ <ol class="lb-grimoires" role="list">${entries.map((e,i)=>`<li class="lb-grimoire${e.me?' is-me':''}" style="--i:${i}">${e.me?`<em class="lb-me-tag">${w.meTag}</em>`:''}<span class="lb-code">${code(e.rank)}</span>${personButton(e,`<span class="lb-gem">${avatarHTML(e,images,esc)}</span><span class="lb-gname">${esc(e.name)}</span>`,esc)}<strong class="lb-gvalue">${esc(formatValue(metric,e.value,locale))}</strong>${reportButton(e,w,esc)}</li>`).join('')}</ol>`;
+}
 export function boardHTML(data,w,locale,esc){
  w={...words(locale),...w};
  const board=data.board||{},images=data.avatars||{};
@@ -114,7 +126,7 @@ export function boardHTML(data,w,locale,esc){
  const metric=view.metric==='games'?'characters':view.metric,entries=board.entries||[];
  if(!entries.length)return (view.game?`<button type="button" class="leaderboard-back" data-lb-back>‹ ${w.back}</button>`:'')+`<p class="lb-empty">${w.empty}</p>`;
  const top=entries.slice(0,3),rest=entries.slice(3);
- return (view.game?`<button type="button" class="leaderboard-back" data-lb-back>‹ ${w.back}</button><h3 class="leaderboard-game-title">${esc(view.game)}</h3>`:'')+podiumPeople(top,metric,w,locale,esc,images)+tableRows(rest,metric,w,locale,esc,images,Number(entries[0]?.value)||0);
+ return (view.game?`<button type="button" class="leaderboard-back" data-lb-back>‹ ${w.back}</button><h3 class="leaderboard-game-title">${esc(view.game)}</h3>`:'')+circleHTML(entries,metric,w,locale,esc,images);
 }
 /* ---- 每周热词 ------------------------------------------------------------------------------------------------- */
 /* Pure split used by the page and the tests: podium 1–3, cards 4–10, list 11–50. */
@@ -163,8 +175,8 @@ function avatarButton(entry,data,w,esc){return `<button type="button" class="lb-
 function myChip(data,w,locale,esc){
  const me=view.tab==='board'||data.tab==='board'?data.board?.me:null,ranked=!!(data.joined&&me&&data.tab!=='hot'&&data.tab!=='follow');
  const metric=view.metric==='games'?'characters':view.metric,self={name:data.name||'?',avatar:data.self?.avatar||null};
- const line=ranked?esc(fill(w.rank,{n:me.rank})):data.joined||data.account?esc(data.name||w.myPage):w.signIn;
- return `<button type="button" class="lb-mychip" data-lb-me aria-label="${esc(w.myPage)}">${avatarHTML(self,data.avatars||{},esc)}<div><small>${ranked?w.myRank:w.myPage}</small><strong>${line}</strong></div>${ranked?`<span>${esc(formatValue(metric,me.value,locale))}</span>`:''}</button>`;
+ const line=ranked?esc(data.name||w.myPage):data.joined||data.account?esc(data.name||w.myPage):w.signIn;
+ return `<button type="button" class="lb-mychip" data-lb-me aria-label="${esc(w.myPage)}">${avatarHTML(self,data.avatars||{},esc)}<div><small>${w.myPage}</small><strong>${line}</strong></div>${ranked?`<span>${esc(formatValue(metric,me.value,locale))}</span>`:''}</button>`;
 }
 export function leaderboardHTML(data,locale,esc){
  const w=words(locale);
