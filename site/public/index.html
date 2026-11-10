@@ -149,13 +149,24 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  </div>
 </section>
 
+<section class="facts-strip" aria-label="MeguLit 一览" data-i-attr="aria-label:fs.label">
+ <div class="wrap fs-grid">
+  <div class="fs"><b class="count js-count-engines" data-to="40">40</b><span data-i="fs.engines">种 Galgame 引擎能识别</span></div>
+  <div class="fs"><b class="count js-count-adapters" data-to="13">13</b><span data-i="fs.adapters">种引擎有专门适配</span></div>
+  <div class="fs"><b class="count" data-to="3">3</b><span data-i="fs.langs">种界面语言：中文、日本語、English</span></div>
+  <div class="fs"><b class="count" data-to="0">0</b><span data-i="fs.free">元。免费，GPL-3.0 开源</span></div>
+ </div>
+</section>
+
 <section class="sec" id="features" data-kanji="内嵌" aria-labelledby="f-title">
  <div class="wrap">
   <h2 id="f-title" class="h2" data-i="f.title">读的时候，什么都在游戏里</h2>
   <p class="sec-lede" data-i="f.lede">阅读层浮在游戏上面，不抢焦点，点它也不会让剧情往下走</p>
 
-  <div class="spec-row">
-  <figure class="specimen tilt" aria-labelledby="specimen-cap">
+  <div class="bento">
+   <article class="card card-spec spot tilt-card">
+    <h3 class="h3" data-i="f.spec.t">注音和释义，就贴在台词上</h3>
+    <figure class="specimen" aria-labelledby="specimen-cap">
    <div class="page">
     <p class="jp" lang="ja"><span class="b">さあ、</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="0"><ruby>物語<rt>ものがたり</rt></ruby></span>の</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="1"><ruby>続<rt>つづ</rt></ruby>き</span>を</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="2"><ruby>読<rt>よ</rt></ruby>もう</span></span></p>
     <p class="tr" data-i="spec.tr">来吧，把故事接着读下去</p>
@@ -167,18 +178,15 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    </div>
    <figcaption id="specimen-cap" data-i="spec.cap">示意：原文、注音、译文和释义排在一起。指一下词看释义</figcaption>
   </figure>
-  </div>
-
-  <div class="embed">
-   <div class="embed-copy">
+   </article>
+   <article class="card card-embed spot tilt-card">
     <h3 class="h3" data-i="f.embed.t">译文直接写进游戏的文本框</h3>
     <p data-i="f.embed.d">内嵌替换把游戏自己的台词原地换成你要的样子：日文加注音，或者日文加译文。用游戏自己的字体和版面画出来，眼睛不用在两个窗口之间来回跳</p>
     <div class="seg" role="group" aria-label="对比" data-i-attr="aria-label:f.embed.cmp">
      <button type="button" data-embed="before" aria-pressed="false" data-i="f.embed.before">原版</button>
      <button type="button" data-embed="after" aria-pressed="true" data-i="f.embed.after">内嵌之后</button>
     </div>
-   </div>
-   <figure class="textbox tilt" data-state="after">
+    <figure class="textbox" data-state="after">
     <div class="tb-scene" aria-hidden="true"></div>
     <div class="tb-window">
      <span class="tb-name" lang="ja">？？？</span>
@@ -187,21 +195,20 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
     </div>
     <figcaption data-i="f.embed.cap">示意图，实际效果取决于游戏和引擎</figcaption>
    </figure>
-  </div>
-
-  <div class="trio spot-group">
-   <article class="spot">
+   </article>
+   <article class="card card-sm spot tilt-card"><span class="glyph" aria-hidden="true" lang="ja">訳</span>
     <h3 class="h3" data-i="f.zero.t">汉化补丁就是译文，一句不等</h3>
     <p data-i="f.zero.d">装过汉化补丁的游戏，MeguLit 直接拿补丁里的译文对上日文原文，台词一出来译文就在。KiriKiri、BGI、Siglus、YU-RIS、Artemis、Ren'Py 都已实测；补丁里没有的句子会提前机翻好</p>
    </article>
-   <article class="spot">
+   <article class="card card-sm spot tilt-card"><span class="glyph" aria-hidden="true" lang="ja">振</span>
     <h3 class="h3" data-i="f.ruby.t">注音先听游戏的</h3>
     <p data-i="f.ruby.d">游戏自带 ruby 的地方，用游戏标的读音；没有标的，再按词典和上下文判断。人名、当て字也跟着作品走</p>
    </article>
-   <article class="spot">
+   <article class="card card-sm spot tilt-card"><span class="glyph" aria-hidden="true" lang="ja">辞</span>
     <h3 class="h3" data-i="f.dict.t">点一下查词，拖一段查短语</h3>
     <p data-i="f.dict.d">离线词典，查过的词自动进单词本。也可以选中整句，让 AI 讲语法和语境。翻译支持 DeepL、Google、Gemini、DeepSeek、Sakura、Ollama 等，密钥加密存在本地</p>
    </article>
+  </div>
   </div>
  </div>
 </section>

@@ -180,6 +180,10 @@ function fillEngines() {
     return el;
   };
   $('.js-engine-count') && ($('.js-engine-count').textContent = e.detected.length);
+  for (const [sel, n] of [['.js-count-engines', e.detected.length], ['.js-count-adapters', e.adapters.length]]) {
+    const el = $(sel);
+    if (el) { el.dataset.to = n; if (!el.dataset.counted) el.textContent = n; }
+  }
   $('.js-adapters')?.replaceChildren(...e.adapters.map(a => li(a.name, a.games.join(' · '))));
   $('.js-games')?.replaceChildren(...e.games.map(g => {
     const el = li(lang === 'en' && g.en ? g.en : g.title, g.engine);
@@ -326,13 +330,14 @@ if (hero && finePointer && !reduce) {
   });
 }
 if (finePointer && !reduce) {
-  const box = $('.textbox');
-  box?.addEventListener('pointermove', e => {
-    const r = box.getBoundingClientRect();
-    box.style.setProperty('--ry', `${((e.clientX - r.left) / r.width - .5) * 12}deg`);
-    box.style.setProperty('--rx', `${((e.clientY - r.top) / r.height - .5) * -9}deg`);
-  });
-  box?.addEventListener('pointerleave', () => { box.style.setProperty('--rx', '0deg'); box.style.setProperty('--ry', '0deg'); });
+  for (const box of $$('.tilt-card')) {
+    box.addEventListener('pointermove', e => {
+      const r = box.getBoundingClientRect();
+      box.style.setProperty('--ry', `${((e.clientX - r.left) / r.width - .5) * 8}deg`);
+      box.style.setProperty('--rx', `${((e.clientY - r.top) / r.height - .5) * -6}deg`);
+    });
+    box.addEventListener('pointerleave', () => { box.style.setProperty('--rx', '0deg'); box.style.setProperty('--ry', '0deg'); });
+  }
   for (const el of $$('.spot')) el.addEventListener('pointermove', e => {
     const r = el.getBoundingClientRect();
     el.style.setProperty('--mx', `${e.clientX - r.left}px`);

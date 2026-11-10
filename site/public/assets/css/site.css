@@ -583,7 +583,7 @@ section[data-kanji]::before {
   @media (prefers-reduced-motion: no-preference) {
     .rise3d { animation: rise3d linear both; animation-timeline: view(); animation-range: entry 0% cover 38%; transform-origin: 50% 100%; }
     section[data-kanji]::before { animation: drift linear both; animation-timeline: view(); }
-    .trio .spot, .steps li, .adapters li { animation: pop linear both; animation-timeline: view(); animation-range: entry 0% cover 25%; }
+    .card, .steps li, .adapters li, .fs { animation: pop linear both; animation-timeline: view(); animation-range: entry 0% cover 25%; }
   }
 }
 @keyframes rise3d { from { opacity: .15; transform: perspective(1400px) rotateX(28deg) translateY(5rem) scale(.92); } to { opacity: 1; transform: none; } }
@@ -785,3 +785,76 @@ section[data-kanji]::before {
   content: ""; position: absolute; inset: 18%; border-radius: 50%; border: 3px solid rgba(255, 214, 150, .85);
   box-shadow: 0 0 30px rgba(255, 120, 120, .6), inset 0 0 30px rgba(255, 200, 140, .5);
 }
+
+/* ---- bento ------------------------------------------------------------------------------------------------------ */
+.bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: clamp(1rem, 1.8vw, 1.5rem); }
+.card {
+  position: relative; isolation: isolate; border-radius: 26px; padding: clamp(1.4rem, 2.4vw, 2.2rem);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 82%, var(--crimson) 18%), color-mix(in srgb, var(--surface) 70%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 30px 70px -40px rgba(0, 0, 0, .7);
+  transform: perspective(1200px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform .45s cubic-bezier(.2, .7, .2, 1);
+  overflow: hidden;
+}
+.card::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; z-index: 1;
+  background: linear-gradient(140deg, color-mix(in srgb, var(--gold) 70%, transparent), transparent 35%, transparent 65%, color-mix(in srgb, var(--crimson) 60%, transparent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.card p { color: var(--muted); }
+.card-spec { grid-column: span 5; }
+.card-embed { grid-column: span 7; }
+.card-sm { grid-column: span 4; padding-top: 5.6rem; }
+.card-sm p { margin: 0; }
+.glyph {
+  position: absolute; top: .6rem; right: 1.2rem; font: 700 5.2rem/1 var(--serif-ja);
+  background: linear-gradient(160deg, var(--gold), var(--crimson-ink)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  opacity: .9; filter: drop-shadow(0 6px 18px color-mix(in srgb, var(--crimson) 40%, transparent));
+}
+.card .specimen { margin-top: 1.2rem; }
+.card .page { background: color-mix(in srgb, var(--bg) 55%, transparent); box-shadow: inset 0 0 0 1px var(--line-2); }
+.card-embed .seg { margin: .4rem 0 1.4rem; }
+.card-embed .textbox { margin: 0; }
+.card-embed .tb-window { bottom: calc(4% + 2.2rem); }
+
+/* ---- facts strip -------------------------------------------------------------------------------------------------- */
+.facts-strip { padding: clamp(3rem, 7vw, 5rem) 0 0; }
+.fs-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5rem; border-block: 1px solid var(--line); padding: 2rem var(--gutter); }
+.fs { display: grid; gap: .3rem; }
+.fs b {
+  font: 600 clamp(2.8rem, 5vw, 4.6rem)/1 var(--serif); font-variant-numeric: tabular-nums;
+  background: linear-gradient(170deg, var(--text) 30%, var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.fs span { color: var(--muted); font-size: .9375rem; }
+
+/* ---- steps: a line drawn as you scroll ------------------------------------------------------------------------------ */
+.steps { position: relative; }
+.steps::after {
+  content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; transform-origin: left; pointer-events: none;
+  background: linear-gradient(90deg, var(--crimson), var(--gold)); box-shadow: 0 0 14px color-mix(in srgb, var(--crimson) 60%, transparent);
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .steps::after { animation: grow linear both; animation-timeline: view(); animation-range: entry 30% cover 55%; }
+  }
+}
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+@media (max-width: 68rem) {
+  .card-spec, .card-embed { grid-column: span 12; }
+  .card-sm { grid-column: span 4; }
+}
+@media (max-width: 60rem) {
+  .card-sm { grid-column: span 12; }
+  .fs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 40rem) {
+  .card-embed .tb-window { position: relative; bottom: auto; }
+  .glyph { font-size: 4rem; }
+  .card-sm { padding-top: 4.6rem; }
+}
+.card-sm { padding-top: 6.6rem; }
+.glyph { font-size: 4.4rem; top: 1rem; }
+.card-spec { display: flex; flex-direction: column; }
+.card-spec .specimen { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+@media (max-width: 40rem) { .card-sm { padding-top: 5.4rem; } .glyph { font-size: 3.6rem; } }

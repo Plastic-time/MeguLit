@@ -14,6 +14,7 @@ export async function run({ reduce, finePointer }) {
   await playIntro();
   intro();
   headings();
+  counters();
   parallax(false);
   rays();
   if (finePointer) { magnets(); sparks(); }
@@ -30,6 +31,20 @@ function intro() {
   const strokes = $$('.circle .c-line, .circle .c-star, .circle .c-dash');
   if (strokes.length) animate(createDrawable(strokes), { draw: ['0 0', '0 1'], duration: 2200, delay: stagger(90), ease: 'inOut(3)' });
   animate('.circle .c-runes', { opacity: [0, .9], duration: 1600, delay: 900 });
+}
+
+// Numbers count up from zero when they scroll into view.
+function counters() {
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target);
+      const el = e.target, to = Number(el.dataset.to) || 0, o = { v: to ? 0 : 9 };
+      el.dataset.counted = '1';
+      animate(o, { v: to, duration: 1700, ease: 'out(4)', onUpdate: () => { el.textContent = String(Math.round(o.v)); } });
+    }
+  }, { rootMargin: '0px 0px -10% 0px' });
+  for (const el of $$('.count')) io.observe(el);
 }
 
 // Section titles decode from katakana when they scroll into view.
