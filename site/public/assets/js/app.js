@@ -384,6 +384,7 @@ function setSoundLabel() {
 // Volume: sound starts at 20% (the file itself is 16 dB down); the slider sets it from there.
 const volInput = $('#hero-volume'), volOut = $('.vol-v');
 const volume = () => (volInput ? Number(volInput.value) : 20) / 100;
+volInput?.style.setProperty('--fill', `${volInput.value}%`);   /* the CSP forbids inline style attributes */
 volInput?.addEventListener('input', () => {
   bgm.volume = volume();
   if (volOut) volOut.textContent = `${volInput.value}%`;
