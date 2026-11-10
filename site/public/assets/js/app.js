@@ -5,6 +5,7 @@ import { MIRROR, downloadSources, formatSize, formatDate, pickLang, renderMarkdo
 import { kana } from './spell.js';
 import { playIntro, introShown } from './intro.js';
 import { nowPlaying, bgmCredit } from './nowplaying.js';
+import { ScAudio } from './sc.js';
 import { notice } from './notice.js';
 import { tryIt } from './try.js';
 // the entrance starts before anything else on the page is set up
@@ -304,9 +305,8 @@ function splitKinetic() {
 const video = $('.hero-video');
 let heroSeen = true;
 // The sound is the full theme song, a separate file fetched only when the visitor turns sound on; the video stays muted.
-const bgm = new Audio();
-bgm.loop = true;
-bgm.preload = 'none';
+// the music streams from SoundCloud's embedded player (sc.js); nothing is hosted here
+const bgm = new ScAudio();
 // the bottom layer: a few far kana all the way down the page, and the song's lyric lines while it plays
 const deepLayer = $('.kana-deep') ? kana($('.kana-deep'), { still: reduce, deep: true, hero: $('.hero') }) : null;
 // lyric lines go to the bottom layer and to the sky layer (built further down); each shows them where it is visible
