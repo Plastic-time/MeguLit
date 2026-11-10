@@ -38,7 +38,7 @@
 .gm-tr.gm-none{font-style:italic}
 .gm-pitfalls{display:grid;gap:6px;margin:0;padding-left:20px;font-size:13px;line-height:1.8}
 .gm-examples{list-style:none;margin:0;padding:0;display:grid;gap:10px}
-.gm-ex{padding:12px 14px;border-radius:10px;background:color-mix(in srgb,var(--text) 4%,transparent);border-left:2px solid color-mix(in srgb,var(--gm-gold) 45%,transparent)}
+.gm-ex{padding:12px 14px;border-radius:10px;background:color-mix(in srgb,var(--text) 4%,transparent);border:1px solid var(--gm-rule)}
 .gm-ex-meta{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:6px;font-size:11px;color:var(--gm-t2);font-variant-numeric:tabular-nums}
 .gm-hl{background:color-mix(in srgb,var(--gm-gold) 22%,transparent);color:var(--gm-gold);border-radius:3px;padding:0 1px}
 .gm-practice{padding-top:4px;border-top:1px solid var(--gm-rule)}
