@@ -1040,7 +1040,7 @@ section[data-kanji]::before {
 .hero-dl { display: flex; align-items: center; gap: 1.4rem; }
 .dl-orb { position: relative; display: grid; place-items: center; width: clamp(8.5rem, 11.5vw, 11.5rem); aspect-ratio: 1; border-radius: 50%; color: #fff; text-decoration: none; }
 .orb-ring { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.orb-ring text { fill: var(--gold); font: 600 13px var(--sans); letter-spacing: .06em; }
+.orb-ring text { fill: var(--gold); font: 600 13px var(--sans); }
 :lang(zh) .orb-ring text, :lang(ja) .orb-ring text { font-size: 14px; }
 @media (prefers-reduced-motion: no-preference) {
   .orb-ring { animation: spin 16s linear infinite; }
@@ -1050,12 +1050,12 @@ section[data-kanji]::before {
 @keyframes orb-pulse { from { transform: scale(1); opacity: .9; } to { transform: scale(1.75); opacity: 0; } }
 .orb-core {
   position: relative; width: 62%; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: .15rem;
-  background: radial-gradient(circle at 34% 28%, #ff7884, #c8283c 46%, #6a0d1b);
+  background: radial-gradient(circle at 34% 28%, #e4485a, #b8243a 46%, #6a0d1b);
   box-shadow: inset 0 0 0 1px rgba(255, 222, 176, .55), inset 0 -8px 16px rgba(0, 0, 0, .35), 0 20px 44px -12px rgba(200, 30, 50, .8), 0 0 0 9px rgba(210, 58, 72, .14);
   transition: transform .45s cubic-bezier(.2, .8, .2, 1), box-shadow .3s;
 }
 .orb-core svg { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.orb-core b { font: 700 .95rem/1 var(--sans); letter-spacing: .08em; }
+.orb-core b { font: 700 .95rem/1 var(--sans); text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
 :lang(ja) .orb-core b { font-size: .85rem; }
 .dl-orb:hover .orb-core { transform: scale(1.08); box-shadow: inset 0 0 0 1px rgba(255, 222, 176, .8), inset 0 -8px 16px rgba(0, 0, 0, .35), 0 26px 56px -12px rgba(220, 40, 60, .95), 0 0 0 12px rgba(234, 187, 95, .2); }
 .dl-orb:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; }
