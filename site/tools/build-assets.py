@@ -79,3 +79,56 @@ dst = PUB / 'assets' / 'fonts' / 'megulit-serif.woff2'
 font.flavor = 'woff2'
 font.save(dst)
 print('font', len(chars), 'chars', dst.stat().st_size // 1024, 'KB')
+
+# ---- hero fonts from the megu-edit template (all OFL): Cormorant, IBM Plex Mono, Source Han Serif ------------------
+# Sources live outside the repo (they are large); only the subsets are committed. MEGU_FONTS overrides the folder.
+MEGU = Path(os.environ.get('MEGU_FONTS', 'E:/Apps/MeguLit-Tutorial/megu-edit/public/fonts'))
+def subset_to(src, dst, chars, instance=None):
+    f = TTFont(src, lazy=False)
+    o = subset.Options(); o.flavor = 'woff2'; o.layout_features = ['kern', 'liga', 'palt']; o.name_IDs = ['*']
+    sb = subset.Subsetter(o); sb.populate(text=''.join(sorted(set(chars)))); sb.subset(f)
+    f.flavor = 'woff2'; f.save(dst); print('font', dst.name, dst.stat().st_size // 1024, 'KB')
+if MEGU.exists():
+    ascii_ = ''.join(chr(c) for c in range(0x20, 0x7f)) + '▮·—–✦↓→←…’'
+    FD = PUB / 'assets' / 'fonts'
+    subset_to(MEGU / 'IBMPlexMono-Light.ttf', FD / 'plex-mono.woff2', ascii_)
+    subset_to(MEGU / 'Cormorant-Italic.ttf', FD / 'cormorant-italic.woff2', ascii_)
+    hero_text = '玩学日语日本語を学ぼう下载备用免费开源続きを読もうがくにちごにほんごギャルゲーで、，。' + ascii_
+    for html in PUB.glob('*.html'):
+        m = re.search(r'<h1[^>]*hero-type.*?</h1>', html.read_text('utf8'), re.S)
+        if m: hero_text += re.sub(r'<[^>]+>', '', m.group(0))
+    for key in ('hero.title', 'dl.button', 'dl.alt'):
+        for v in re.findall(r"'" + re.escape(key) + r"': '((?:[^'\\]|\\.)*)'", (PUB / 'assets' / 'js' / 'i18n.js').read_text('utf8')):
+            hero_text += re.sub(r'<[^>]+>', '', v)
+    subset_to(MEGU / 'SourceHanSerifCN-SemiBold.otf', FD / 'han-serif-hero.woff2', hero_text)
+else:
+    print('megu-edit fonts not found, hero fonts unchanged')
+
+# ---- black serif for the Chinese hero title: Noto Serif SC (OFL, the same variable font as above) at weight 900 -------
+hero_black = TTFont(src, lazy=False)
+o = subset.Options(); o.flavor = 'woff2'; o.layout_features = ['kern', 'liga', 'palt']; o.name_IDs = ['*']
+sb = subset.Subsetter(o); sb.populate(text='学日语玩，, Galgame'); sb.subset(hero_black)
+hero_black = instancer.instantiateVariableFont(hero_black, {'wght': 900})
+hero_black.flavor = 'woff2'
+hero_black.save(PUB / 'assets' / 'fonts' / 'hero-black.woff2')
+print('font hero-black', (PUB / 'assets' / 'fonts' / 'hero-black.woff2').stat().st_size // 1024, 'KB')
+
+# ---- logo split into cape and the rest (hat + letters), from the megu-edit template, for the entrance's cape unfurl ----
+MEGU_PUB = Path(os.environ.get('MEGU_PUBLIC', 'E:/Apps/MeguLit-Tutorial/megu-edit/public'))
+if (MEGU_PUB / 'logo_cape.png').exists():
+    webp(MEGU_PUB / 'logo_cape.png', 'logo-cape', (720,), quality=90)
+    webp(MEGU_PUB / 'logo_rest.png', 'logo-rest', (720,), quality=90)
+
+# ---- Anki deck backs: the exact frame where each card's line is on screen, from the template's game recordings ------
+import subprocess, tempfile
+REC = MEGU_PUB / 'rec'
+FFMPEG = os.environ.get('FFMPEG', 'E:/Apps/MeguLit-Tutorial/.tools/bin/ffmpeg.exe')
+CARDS = [('card', 2.0), ('lookup-long', 13.2), ('lookup-long', 4.0), ('ruby', 4.3), ('hook', 4.5), ('translate', 3.5)]
+if REC.exists() and Path(FFMPEG).exists():
+    with tempfile.TemporaryDirectory() as tmp:
+        for k, (name, at) in enumerate(CARDS):
+            png = Path(tmp) / f'{k}.png'
+            subprocess.run([FFMPEG, '-hide_banner', '-loglevel', 'error', '-y', '-ss', str(at), '-i', str(REC / f'{name}.webm'), '-frames:v', '1', str(png)], check=True)
+            im = Image.open(png).convert('RGB')   # 1280x720; the last one keeps clear of the settings panel on the right
+            box = (0, 138, 1000, 700) if k == 5 else (0, 0, 1244, 700)
+            im.crop(box).resize((800, 450), Image.LANCZOS).save(IMG / f'card-{k}-800.webp', 'WEBP', quality=80, method=6)

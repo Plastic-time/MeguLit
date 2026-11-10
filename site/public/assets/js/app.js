@@ -3,6 +3,9 @@
 import { I18N } from './i18n.js';
 import { MIRROR, downloadSources, formatSize, formatDate, pickLang, renderMarkdown } from './core.mjs';
 import { kana } from './spell.js';
+import { playIntro, introShown } from './intro.js';
+// the entrance starts before anything else on the page is set up
+playIntro();
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -80,7 +83,7 @@ for (const b of $$('[data-embed]')) b.addEventListener('click', () => {
 });
 
 // ---- tabs (arrow keys move between tabs, as the ARIA tabs pattern expects) ------------------------------------------------
-const tabs = $$('[role="tab"]');
+const tabs = $$('.tabs [role="tab"]');
 function selectTab(tab, focus) {
   for (const t of tabs) {
     const sel = t === tab;
@@ -258,6 +261,12 @@ function splitKinetic() {
             frag.append(word);
           }
           child.replaceWith(frag);
+        } else if (child.nodeType === 1 && child.tagName === 'RUBY') {
+          const span = document.createElement('span');
+          span.className = 'ch';
+          span.style.setProperty('--i', i++);
+          child.replaceWith(span);
+          span.append(child);
         } else if (child.nodeType === 1 && !child.classList.contains('ch') && !child.classList.contains('wd') && child.tagName !== 'WBR') walk(child);
       }
     };
@@ -271,6 +280,23 @@ function splitKinetic() {
 
 // Background video: the smallest file that looks sharp on this screen; none when motion is reduced or data is saved.
 const video = $('.hero-video');
+let heroSeen = true;
+// The sound is the full theme song, a separate file fetched only when the visitor turns sound on; the video stays muted.
+const bgm = new Audio();
+bgm.loop = true;
+bgm.preload = 'none';
+let soundOn = false;
+// while the sound is on and the hero is off screen, the sound control floats in the corner so it can be turned off
+const soundCtl = $('.sound-ctl'), soundHome = soundCtl && document.createComment('sound-ctl');
+soundCtl?.before(soundHome);
+// it moves to <body> while floating: inside the hero it would sit under every later section
+const floatSound = () => {
+  if (!soundCtl) return;
+  const float = soundOn && !heroSeen;
+  if (float === soundCtl.classList.contains('floating')) return;
+  if (float) document.body.append(soundCtl); else soundHome.after(soundCtl);
+  soundCtl.classList.toggle('floating', float);
+};
 function videoSrc() {
   const w = Math.max(innerWidth, innerHeight) * Math.min(devicePixelRatio || 1, 2);
   return w <= 900 ? video.dataset.sm : w <= 1700 ? video.dataset.md : video.dataset.lg;
@@ -281,23 +307,43 @@ function startVideo() {
   video.play().catch(() => {});
 }
 if (video && !reduce && !navigator.connection?.saveData) {
-  startVideo();
-  new IntersectionObserver(([e]) => { if (e.isIntersecting) video.play().catch(() => {}); else video.pause(); }).observe(video);
+  // the background video starts once the entrance logo is up, so the two never compete for the first bytes
+  introShown.then(startVideo);
+  // off screen the picture pauses to save power; the music is a separate track and keeps playing down the page
+  new IntersectionObserver(([e]) => {
+    heroSeen = e.isIntersecting;
+    if (heroSeen) video.play().catch(() => {}); else video.pause();
+    floatSound();
+  }).observe(video);
 }
-if ($('.kana-fx') && $('.hero')) kana($('.kana-fx'), $('.hero'), { still: reduce });
+if ($('.kana-sky')) kana($('.kana-sky'), { still: reduce, hero: $('.hero'), until: $('.hp') });
+if ($('.kana-top')) kana($('.kana-top'), { still: reduce, hero: $('.hero'), near: true });
 const soundBtn = $('.js-sound');
 function setSoundLabel() {
   if (!soundBtn) return;
-  const on = Boolean(video && !video.muted);
+  const on = soundOn;
   soundBtn.setAttribute('aria-pressed', String(on));
   $('.js-sound-label').textContent = on ? d('soundOff') : d('soundOn');
+  const vol = $('.vol');
+  if (vol) vol.hidden = !on;
 }
+// Volume: sound starts quiet (5%) when turned on; the slider sets it from there.
+const volInput = $('#hero-volume'), volOut = $('.vol-v');
+const volume = () => (volInput ? Number(volInput.value) : 5) / 100;
+volInput?.addEventListener('input', () => {
+  bgm.volume = volume();
+  if (volOut) volOut.textContent = `${volInput.value}%`;
+  volInput.style.setProperty('--fill', `${volInput.value}%`);
+});
 soundBtn?.addEventListener('click', () => {
-  if (!video) return;
-  startVideo();
-  video.muted = !video.muted;
-  if (!video.muted) { video.volume = .8; video.play().catch(() => {}); }
+  soundOn = !soundOn;
+  if (soundOn) {
+    if (!bgm.getAttribute('src')) bgm.src = new URL('../audio/megulit-bgm.mp3', import.meta.url).href;
+    bgm.volume = volume();
+    bgm.play().catch(() => { soundOn = false; setSoundLabel(); floatSound(); });
+  } else bgm.pause();
   setSoundLabel();
+  floatSound();
 });
 
 // The top bar turns transparent over the hero.
@@ -310,7 +356,7 @@ if (topBar && hero) {
 
 // 3D parallax: copy, specimen and the magic circle lean toward the pointer.
 if (hero && finePointer && !reduce) {
-  const copy = $('.hero-copy'), spec = $('.hero .specimen'), circle = $('.hero-media');
+  const copy = $('.hero-type'), spec = $('.hero-vert'), circle = $('.hero-media');
   let raf = 0;
   hero.addEventListener('pointermove', e => {
     cancelAnimationFrame(raf);
@@ -352,27 +398,61 @@ if (!reduce) {
       else v.pause();
     }
   }, { rootMargin: '120px 0px' });
-  for (const v of $$('video.clip')) if (!v.closest('.stage-item')) io.observe(v);
+  for (const v of $$('video.clip')) if (!v.closest('.feat-item')) io.observe(v);
 }
 
-// GMV ticker: engine names on the crimson band, game titles on the outlined band. Two copies make the loop seamless.
-// The ticker speaks Japanese in every UI language: what MeguLit does, and lines from the games in the video.
-const TICK_FEATURES = ['埋め込み', 'ふりがな', 'クリックで辞書', 'Anki カード', '復習', '五十音', '学習統計', '会話ログ', 'AI 解説'];
-const TICK_LINES = ['雪に埋もれた', '何かを掴んでいた', '顔を覆う', '空気を読む', '続きを読もう', '最後まで', '物語', '言葉'];
+// Two bands in the two poles. Paper band: what MeguLit does, in Japanese with a small lowercase gloss. Black band:
+// real lines from the game in the clips, numbered like a script. Two copies make the loop seamless; the bands speak
+// Japanese in every UI language.
+const TICK_FEATURES = [['埋め込み', 'embed'], ['ふりがな', 'furigana'], ['クリックで辞書', 'click to look up'], ['Anki カード', 'anki'], ['復習', 'review'], ['五十音', 'kana'], ['学習統計', 'stats'], ['会話ログ', 'backlog'], ['AI 解説', 'explain']];
+const TICK_LINES = ['雪に埋もれた…僕の手。', 'それが、何かを掴んでいた。', '彼女の顔を覆う雪を払う。', '僕はこんなところで何をしているのだろう…。', '今なお、それは降り続け、', 'そう。雪だ。'];
 function fillTicker() {
-  const fill = (el, words) => {
+  const make = (tag, cls, text) => { const n = document.createElement(tag); n.className = cls; n.textContent = text; return n; };
+  const fill = (el, items) => {
     if (!el) return;
-    const once = words.flatMap(w => { const s = document.createElement('span'); s.textContent = w; const i = document.createElement('i'); i.textContent = '✦'; return [s, i]; });
+    const once = items.flatMap(([main, sub], k) => {
+      const item = document.createElement('span');
+      item.className = 'tk-item';
+      if (el.classList.contains('js-tk-b')) item.append(make('b', 'tk-no', String(k + 1).padStart(2, '0')));
+      item.append(make('span', 'tk-jp', main));
+      if (sub) item.append(make('small', 'tk-sub', sub));
+      return [item, make('i', 'tk-sep', '')];
+    });
     el.replaceChildren(...once, ...once.map(n => n.cloneNode(true)));
   };
   fill($('.js-tk-a'), TICK_FEATURES);
-  fill($('.js-tk-b'), TICK_LINES);
+  fill($('.js-tk-b'), TICK_LINES.map(l => [l]));
 }
 
 if (lang !== 'zh') applyLang(lang);
 else { splitKinetic(); fillTicker(); setSoundLabel(); }
 
 // Motion layer (anime.js). If it cannot load, a CSS fallback shows everything after a moment.
+// Warm-up: while the entrance plays (or right away when it is skipped), fetch everything below the fold so nothing pops
+// in later. Fonts and images first; the clips one after another once the hero video has a head start. Skipped when the
+// visitor asked to save data.
+function warmUp() {
+  if (navigator.connection?.saveData) return;
+  try { document.fonts.forEach(f => { if (f.status === 'unloaded') f.load().catch(() => {}); }); } catch {}
+  for (const img of $$('img[loading="lazy"]')) { img.loading = 'eager'; img.decode?.().catch(() => {}); }
+  if (reduce) return;
+  const clips = $$('video.clip').filter(v => v.dataset.src && !v.getAttribute('src'));
+  const next = () => {
+    const v = clips.shift();
+    if (!v) return;
+    if (!v.getAttribute('src')) { v.preload = 'auto'; v.src = v.dataset.src; }
+    let done = false;
+    const go = () => { if (!done) { done = true; next(); } };
+    v.addEventListener('canplaythrough', go, { once: true });
+    v.addEventListener('error', go, { once: true });
+    setTimeout(go, 2500);
+  };
+  let started = false;
+  const begin = () => { if (!started) { started = true; next(); } };
+  if (video && video.getAttribute('src') && video.readyState < 3) { video.addEventListener('canplay', begin, { once: true }); setTimeout(begin, 1500); }
+  else begin();
+}
+introShown.then(warmUp);
 import('./fx.js').then(m => m.run({ reduce, finePointer })).catch(() => {});
 loadRelease();
 loadEngines();

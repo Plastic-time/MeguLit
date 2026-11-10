@@ -8,7 +8,7 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 
 export function run({ reduce, finePointer }) {
-  stickyChapters(reduce);
+  featureSwitcher(reduce);
   deck(reduce);
   if (reduce) return;
   velocityTicker();
@@ -16,39 +16,45 @@ export function run({ reduce, finePointer }) {
   if (finePointer) glowEdges();
 }
 
-// ---- Sticky chapters: the copy scrolls, one pinned stage crossfades between the clips, a beam traces progress ----
-function stickyChapters(reduce) {
-  const flow = $('.chap-flow');
-  if (!flow) return;
-  const wide = matchMedia('(min-width: 60.01rem)');
-  const chaps = $$('.chap-list .chap', flow), items = $$('.stage-item', flow), rail = $('.chap-rail', flow);
-  let active = -1;
-  const setActive = i => {
-    if (i === active) return;
-    active = i;
-    chaps.forEach((c, k) => c.classList.toggle('is-on', k === i));
-    items.forEach((it, k) => {
-      const on = k === i;
-      it.classList.toggle('on', on);
-      for (const v of $$('video', it)) {
-        if (on && wide.matches && !reduce) { if (!v.getAttribute('src')) v.src = v.dataset.src; v.play().catch(() => {}); }
-        else v.pause();
-      }
+// ---- Feature switcher: one stage, six real clips; plays through them, or pick one ---------------------------------
+function featureSwitcher(reduce) {
+  const root = $('.feat');
+  if (!root) return;
+  const tabs = $$('.ft', root), items = $$('.feat-item', root);
+  const MIN = 4800; // ms each feature stays up, short clips loop until then
+  let cur = 0, start = 0, visible = false, raf = 0, auto = !reduce;
+  const vids = i => $$('video', items[i]);
+  const show = (i, focus) => {
+    tabs.forEach((t, k) => { const on = k === i; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; t.style.setProperty('--p', '0'); });
+    items.forEach((it, k) => it.classList.toggle('on', k === i));
+    items.forEach((_, k) => { if (k !== i) vids(k).forEach(v => v.pause()); });
+    cur = i; start = performance.now();
+    if (focus) tabs[i].focus();
+    if (!reduce && visible) vids(i).forEach(v => { if (!v.getAttribute('src')) v.src = v.dataset.src; v.currentTime = 0; v.play().catch(() => {}); });
+  };
+  const tick = now => {
+    raf = requestAnimationFrame(tick);
+    if (!visible || !auto) return;
+    const v = vids(cur)[0];
+    const dur = Math.max(MIN, (v && v.duration ? v.duration * 1000 : MIN));
+    const p = Math.min(1, (now - start) / dur);
+    tabs[cur].style.setProperty('--p', p.toFixed(4));
+    if (p >= 1) show((cur + 1) % tabs.length);
+  };
+  for (const it of items) for (const v of $$('video', it)) v.addEventListener('ended', () => { if (items[cur] === it) { v.currentTime = 0; v.play().catch(() => {}); } });
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => { auto = false; show(i); tabs[i].style.setProperty('--p', '1'); });
+    t.addEventListener('keydown', e => {
+      const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+      if (step) { e.preventDefault(); auto = false; show((i + step + tabs.length) % tabs.length, true); tabs[cur].style.setProperty('--p', '1'); }
     });
-  };
-  const io = new IntersectionObserver(entries => {
-    for (const e of entries) if (e.isIntersecting) setActive(Number(e.target.dataset.i));
-  }, { rootMargin: '-45% 0px -45% 0px' });
-  chaps.forEach(c => io.observe(c));
-  setActive(0);
-  let raf = 0;
-  const beam = () => {
-    raf = 0;
-    const r = flow.getBoundingClientRect();
-    rail?.style.setProperty('--p', clamp((innerHeight * .5 - r.top) / r.height).toFixed(4));
-  };
-  addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(beam); }, { passive: true });
-  beam();
+  });
+  new IntersectionObserver(([e]) => {
+    visible = e.isIntersecting;
+    if (visible) { start = performance.now() - 0; show(cur); if (!raf && !reduce) raf = requestAnimationFrame(tick); }
+    else vids(cur).forEach(v => v.pause());
+  }, { threshold: .35 }).observe(root);
+  show(0);
 }
 
 // ---- Anki deck: drag the top card away to send it to the back, click to flip it to the scene ----------------------
