@@ -3,14 +3,14 @@
 
 @font-face {
   font-family: "MeguLit Serif";
-  src: url("/assets/fonts/megulit-serif.woff2") format("woff2");
+  src: url("/assets/fonts/megulit-serif.woff2?v=146f272b8e") format("woff2");
   font-weight: 600;
   font-display: swap;
 }
 /* Same file without the curly quotes: the CJK font draws them full-width, which looks broken in English. */
 @font-face {
   font-family: "MeguLit Serif Latin";
-  src: url("/assets/fonts/megulit-serif.woff2") format("woff2");
+  src: url("/assets/fonts/megulit-serif.woff2?v=146f272b8e") format("woff2");
   font-weight: 600;
   font-display: swap;
   unicode-range: U+0000-2017, U+2020-FFFF;
@@ -1158,9 +1158,9 @@ html { overflow-x: clip; }
 /* ---- hero, round 3: the megu-edit look -------------------------------------------------------------------------------
    two poles (black #000 / paper #f4f4f2), mono footage, one accent (#c8323c), lowercase tracked mono micro-text,
    a roman/han serif headline with a soft glow, dashed rules, a running number, barcode stripes, focus pull to open. */
-@font-face { font-family: "MeguLit Mono"; src: url("/assets/fonts/plex-mono.woff2") format("woff2"); font-weight: 300; font-display: swap; }
-@font-face { font-family: "MeguLit Cormorant"; src: url("/assets/fonts/cormorant-italic.woff2") format("woff2"); font-style: italic; font-display: swap; }
-@font-face { font-family: "MeguLit Han"; src: url("/assets/fonts/han-serif-hero.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "MeguLit Mono"; src: url("/assets/fonts/plex-mono.woff2?v=d95f8ddb15") format("woff2"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "MeguLit Cormorant"; src: url("/assets/fonts/cormorant-italic.woff2?v=da2fa255bd") format("woff2"); font-style: italic; font-display: swap; }
+@font-face { font-family: "MeguLit Han"; src: url("/assets/fonts/han-serif-hero.woff2?v=c6cbf1fa23") format("woff2"); font-weight: 600; font-display: swap; }
 .hero { --paper: #f4f4f2; --accent: #c8323c; --dim: #8a8a8a; background: #000; }
 .hero-tint, .rays-fx { display: none; }
 .hero-video {
@@ -1298,7 +1298,7 @@ img, video, canvas, svg { -webkit-user-drag: none; user-drag: none; }
 .top { z-index: 20; }
 .vol[hidden] { display: none; }
 /* Chinese hero title in a brush hand (Zhi Mang Xing, OFL); Japanese and English keep their serif faces */
-@font-face { font-family: "MeguLit Black"; src: url("/assets/fonts/hero-black.woff2") format("woff2"); font-weight: 900; font-display: swap; }
+@font-face { font-family: "MeguLit Black"; src: url("/assets/fonts/hero-black.woff2?v=8029e99aaf") format("woff2"); font-weight: 900; font-display: swap; }
 :lang(zh) .ht-big { font-family: "MeguLit Black", "MeguLit Han", var(--serif); font-weight: 900; letter-spacing: .01em; font-size: clamp(5.5rem, 21vw, 23rem); line-height: 1; text-shadow: 0 0 .25em rgba(244, 244, 242, .22); }
 :lang(zh) .ht-big rt { font-size: max(11px, .08em) !important; }
 @media (max-width: 40rem) { :lang(zh) .ht-big { font-size: 30vw; } }
