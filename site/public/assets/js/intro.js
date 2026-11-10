@@ -3,7 +3,7 @@
 // while the hat and letters land big -> small, soft -> sharp, and a red lowercase line types underneath (the promo
 // video's end-card move, redrawn on a canvas); then the black parts in strips sliding left and right.
 // The overlay is black from the first paint (CSS), so the page never shows before the entrance.
-// Nothing flashes and overall brightness never jumps. Once per browser session; any click or key skips it; never
+// Nothing flashes and overall brightness never jumps. Every visit; any click or key skips it; never
 // shown when motion is reduced (the head script decides).
 
 const STRIPS = 10, CAPE_N = 48;
@@ -11,17 +11,25 @@ const CAPE_MS = 850, HOLD_MS = 220;
 const clamp = v => Math.max(0, Math.min(1, v));
 const eo = (t, a, b, p = 4) => 1 - Math.pow(1 - clamp((t - a) / (b - a)), p);   // fast -> slow
 
-const load = src => new Promise(res => { const i = new Image(); i.onload = i.onerror = () => res(i); i.src = src; });
+// loaded and decoded, so the first frame of the cape is ready to draw
+const load = src => new Promise(res => { const i = new Image(); i.src = src; (i.decode ? i.decode() : new Promise((a, b) => { i.onload = a; i.onerror = b; })).then(() => res(i), () => res(i)); });
 
-let running = null;
+// wait until the page has finished its start-up work (two smooth frames in a row), at most 900 ms
+const settle = () => new Promise(res => {
+  const t0 = performance.now(); let last = 0, calm = 0;
+  const step = now => { calm = last && now - last < 40 ? calm + 1 : 0; last = now; if (calm >= 2 || now - t0 > 900) res(); else requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+});
+let running = null, markShown;
+// resolves once the logo is on screen (or at once when there is no entrance): heavy loading waits for it
+export const introShown = new Promise(r => { markShown = r; });
 // Called as early as possible by app.js and again by fx.js; both get the same run.
 export function playIntro() { return running || (running = play()); }
 
 function play() {
   const root = document.documentElement;
   const el = document.querySelector('.intro');
-  if (!el || !root.classList.contains('intro-on')) return Promise.resolve();
-  try { sessionStorage.setItem('megulit-intro', '1'); } catch {}
+  if (!el || !root.classList.contains('intro-on')) { markShown(); return Promise.resolve(); }
   document.body.style.overflow = 'hidden';
 
   const logo = el.querySelector('.gl-logo');
@@ -43,6 +51,7 @@ function play() {
     const finish = () => {
       if (done) return;
       done = true;
+      markShown();
       cancelAnimationFrame(raf);
       root.classList.remove('intro-on');
       document.body.style.overflow = '';
@@ -65,12 +74,14 @@ function play() {
       cape.width = Math.round((w + padX * 2) * dpr); cape.height = Math.round((h + padY * 2) * dpr);
       const sw = w / CAPE_N, kx = img.naturalWidth / w;
       const scale = w / 900;                                                         // the video's logo was 900 px wide
-      let t0 = 0;
+      // time advances at most 34 ms per frame: when the page is busy loading, the cape slows down instead of skipping
+      let t = 0, last = 0;
       setTimeout(type, 300);
+      setTimeout(markShown, 400);
       const frame = now => {
         if (done) return;
-        if (!t0) t0 = now;
-        const t = now - t0, f = t / 16.67;                                           // the video's 30 fps timing, played at double speed
+        t += last ? Math.min(34, now - last) : 0; last = now;
+        const f = t / 16.67;                                           // the video's 30 fps timing, played at double speed
         const unfurl = eo(t, 0, 475, 3), amp = 30 * scale * (1 - eo(t, 125, 800, 2));
         const front = unfurl * (CAPE_N + 6) - 3;
         g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -109,11 +120,11 @@ function play() {
       Promise.all(anims.map(a => a.finished)).then(finish);
     };
 
-    // start once the cape and the letters are decoded (the head preloads them); never wait long
-    Promise.race([Promise.all([load(logo.dataset.cape), load(logo.dataset.rest)]), new Promise(r => setTimeout(r, 450, null))]).then(r => {
+    // start once the cape and the letters are decoded (the head preloads them); the screen stays black meanwhile
+    Promise.race([Promise.all([load(logo.dataset.cape), load(logo.dataset.rest)]), new Promise(r => setTimeout(r, 5000, null))]).then(r => {
       if (done) return;
-      if (r && r[0].naturalWidth && r[1].naturalWidth) { rest.src = r[1].src; runCape(r[0]); }
-      else { cape.remove(); rest.src = logo.dataset.src; rest.style.opacity = 1; setTimeout(type, 120); setTimeout(exit, 700); }
+      if (r && r[0].naturalWidth && r[1].naturalWidth) { rest.src = r[1].src; settle().then(() => { if (!done) runCape(r[0]); }); }
+      else { cape.remove(); rest.src = logo.dataset.src; rest.style.opacity = 1; markShown(); setTimeout(type, 120); setTimeout(exit, 700); }
     });
   });
 }

@@ -3,7 +3,7 @@
 import { I18N } from './i18n.js';
 import { MIRROR, downloadSources, formatSize, formatDate, pickLang, renderMarkdown } from './core.mjs';
 import { kana } from './spell.js';
-import { playIntro } from './intro.js';
+import { playIntro, introShown } from './intro.js';
 // the entrance starts before anything else on the page is set up
 playIntro();
 
@@ -307,7 +307,8 @@ function startVideo() {
   video.play().catch(() => {});
 }
 if (video && !reduce && !navigator.connection?.saveData) {
-  startVideo();
+  // the background video starts once the entrance logo is up, so the two never compete for the first bytes
+  introShown.then(startVideo);
   // off screen the picture pauses to save power; the music is a separate track and keeps playing down the page
   new IntersectionObserver(([e]) => {
     heroSeen = e.isIntersecting;
@@ -451,7 +452,7 @@ function warmUp() {
   if (video && video.getAttribute('src') && video.readyState < 3) { video.addEventListener('canplay', begin, { once: true }); setTimeout(begin, 1500); }
   else begin();
 }
-warmUp();
+introShown.then(warmUp);
 import('./fx.js').then(m => m.run({ reduce, finePointer })).catch(() => {});
 loadRelease();
 loadEngines();
