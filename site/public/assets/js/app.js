@@ -4,7 +4,7 @@ import { I18N } from './i18n.js';
 import { MIRROR, downloadSources, formatSize, formatDate, pickLang, renderMarkdown } from './core.mjs';
 import { kana } from './spell.js';
 import { playIntro, introShown } from './intro.js';
-import { nowPlaying } from './nowplaying.js';
+import { nowPlaying, bgmCredit } from './nowplaying.js';
 // the entrance starts before anything else on the page is set up
 playIntro();
 
@@ -306,6 +306,7 @@ const bgm = new Audio();
 bgm.loop = true;
 bgm.preload = 'none';
 if ($('.sound-ctl')) nowPlaying(bgm, $('.sound-ctl'), { reduce });
+bgmCredit();
 let soundOn = false;
 // while the sound is on and the hero is off screen, the sound control floats in the corner so it can be turned off
 const soundCtl = $('.sound-ctl'), soundHome = soundCtl && document.createComment('sound-ctl');

@@ -1516,3 +1516,12 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 .np-meta { flex-direction: column; align-items: flex-start; gap: .25rem; }
 .np-title, .np-artist { max-width: 100%; }
 .np-eq { grid-row: 1; align-self: start; margin-top: .3rem; }
+
+/* song credit: CC BY-NC asks for author, source, licence and changes, in the label and in the footer */
+.np-credit { grid-column: 1 / -1; margin: .35rem 0 0; padding-top: .35rem; border-top: 1px solid rgba(244, 244, 242, .12);
+  font: 400 .6875rem/1.5 var(--sans); color: #8a8a8a; white-space: normal; }
+.np-credit a { color: #c8c8c6; text-decoration: underline; text-decoration-color: rgba(244, 244, 242, .3); text-underline-offset: 2px; }
+.np-credit a:hover { color: #fff; text-decoration-color: #c8323c; }
+.np { width: min(22rem, 80vw); }
+.bgm-credit { margin: 0; }
+.bgm-credit a { color: inherit; }
