@@ -1343,3 +1343,61 @@ img, video, canvas, svg { -webkit-user-drag: none; user-drag: none; }
 .intro .gl-band .ch-b { opacity: calc(var(--fa) * .45); }
 .intro .gl-line { white-space: nowrap; }
 @media (max-width: 600px) { .intro .gl-line { letter-spacing: .28em; font-size: .6875rem; } }
+
+/* ---- Anki deck, round 2: index cards in the two poles. Paper front (word, the line it came from), black back
+   (the scene, reading, numbered meanings, the line with the game's own translation) ----------------------------------- */
+.deck { height: clamp(32rem, 44vw, 36rem); }
+.dcard { top: 6%; width: min(25rem, 84%); aspect-ratio: 5 / 7; }
+.dc-face {
+  border-radius: 2px; padding: 0; gap: 0; text-align: left; justify-items: stretch; align-content: stretch;
+  box-shadow: 0 0 0 1px rgba(244, 244, 242, .14), 0 34px 70px -30px rgba(0, 0, 0, .95);
+}
+.dc-front { background: #f4f4f2; color: #0b0b0b; display: flex; flex-direction: column; padding: 1.3rem 1.4rem; }
+.dc-front::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+  background: repeating-linear-gradient(180deg, transparent 0 2.3rem, rgba(11, 11, 11, .06) 2.3rem calc(2.3rem + 1px));
+}
+.dc-top { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.dc-deck { font: 300 .6875rem/1 "MeguLit Mono", var(--mono); letter-spacing: .3em; color: #6b6b6b; text-transform: lowercase; }
+.dc-pos { font: 300 .6875rem/1.2 "MeguLit Mono", var(--mono); letter-spacing: .12em; color: #c8323c; border: 1px solid currentColor; padding: .25rem .45rem; white-space: nowrap; }
+.dc-front .dc-word { position: relative; margin: auto 0 0; font: 600 clamp(2.4rem, 4.2vw, 3.3rem)/1.5 var(--serif-ja); color: #0b0b0b; text-align: left; }
+.dc-front .dc-word rt { color: #c8323c; font-size: max(11px, .32em); letter-spacing: .1em; }
+.dc-front .dc-ex { position: relative; margin: .6rem 0 auto; max-width: none; color: #3a3a3a; font: 500 1rem/1.75 var(--serif-ja); }
+.dc-ex mark { background: linear-gradient(transparent 62%, rgba(200, 50, 60, .28) 62%); color: inherit; padding: 0 .05em; }
+.dc-flip { position: relative; bottom: auto; align-self: flex-start; font: 300 .6875rem/1 "MeguLit Mono", var(--mono); letter-spacing: .3em; color: #8a8a8a; text-transform: lowercase; }
+.dc-flip::before { content: "↻  "; color: #c8323c; }
+.dc-back { background: #0b0b0b; color: #f4f4f2; display: flex; flex-direction: column; padding: 0; }
+.dc-back img { flex: none; display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-bottom: 1px solid rgba(244, 244, 242, .12); }
+.dc-body { display: flex; flex-direction: column; gap: .75rem; padding: 1rem 1.2rem 1.1rem; min-height: 0; flex: 1; }
+.dc-head { margin: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: .3rem .7rem; font: 600 1.5rem/1.2 var(--serif-ja); }
+.dc-kana { font: 500 .9375rem/1 var(--serif-ja); color: #c8323c; letter-spacing: .08em; }
+.dc-head .dc-pos { margin-left: auto; align-self: center; }
+.dc-means { margin: 0; padding: 0; list-style: none; counter-reset: m; display: grid; gap: .35rem; font: 500 .9375rem/1.45 var(--sans); }
+.dc-means li { counter-increment: m; display: grid; grid-template-columns: 1.4rem 1fr; }
+.dc-means li::before { content: counter(m); font: 300 .75rem/1.9 "MeguLit Mono", var(--mono); color: #c8323c; }
+.dc-means li + li { color: #a8a8a8; }
+.dc-src { margin: auto 0 0; padding-top: .7rem; border-top: 1px dashed rgba(244, 244, 242, .18); display: grid; gap: .2rem; font-size: .8125rem; line-height: 1.55; color: #8a8a8a; }
+.dc-src [lang="ja"] { font-family: var(--serif-ja); color: #cfcfcf; }
+@media (max-width: 60rem) { .deck { height: 34rem; } .dcard { left: 3%; width: min(23rem, 86%); } }
+@media (max-width: 400px) { .dc-means { font-size: .875rem; } .dc-body { gap: .55rem; padding: .85rem 1rem .9rem; } .dc-head { font-size: 1.3rem; } }
+
+/* download slab: the colour change on hover / focus / tap wipes in instead of switching at once */
+.dl-box {
+  background: linear-gradient(#0b0b0b, #0b0b0b) no-repeat left / 0% 100%, var(--paper);
+  transition: background-size .5s cubic-bezier(.65, 0, .35, 1), color .3s ease .2s, box-shadow .4s ease, scale .2s ease;
+}
+.dl-box .db-hud { transition: color .35s ease .08s; }
+.dl-box .db-arrow { transition: background-color .4s ease; }
+.dl-box:hover, .dl-box:focus-visible { background: linear-gradient(#0b0b0b, #0b0b0b) no-repeat left / 100% 100%, var(--paper); }
+
+/* sound control: while the sound is on it follows the reader down the page */
+.sound-ctl.floating { position: fixed; z-index: 60; top: auto; bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); right: max(1rem, env(safe-area-inset-right, 0px)); flex-direction: row-reverse; align-items: center; animation: sound-in .35s cubic-bezier(.2, .7, .2, 1); }
+@keyframes sound-in { from { opacity: 0; translate: 0 .6rem; } }
+@media (max-width: 40rem) { .sound-ctl.floating .vol { display: none; } }
+.sound-ctl { --paper: #f4f4f2; --accent: #c8323c; --dim: #8a8a8a; }
+.sound-ctl.floating .sound-fab { position: static; margin: 0; }
+/* text turns once the black is past it, never white on paper mid-wipe */
+.dl-box, .dl-box .db-hud { transition-delay: 0s, .2s, 0s, 0s; }
+.dl-box .db-hud { transition: color .3s ease .2s; }
+.dcard { aspect-ratio: 5 / 6.4; }
+.deck:focus-visible { outline: 1px solid rgba(244, 244, 242, .5); outline-offset: 10px; border-radius: 0; }

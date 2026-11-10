@@ -277,6 +277,18 @@ function splitKinetic() {
 
 // Background video: the smallest file that looks sharp on this screen; none when motion is reduced or data is saved.
 const video = $('.hero-video');
+let heroSeen = true;
+// while the sound is on and the hero is off screen, the sound control floats in the corner so it can be turned off
+const soundCtl = $('.sound-ctl'), soundHome = soundCtl && document.createComment('sound-ctl');
+soundCtl?.before(soundHome);
+// it moves to <body> while floating: inside the hero it would sit under every later section
+const floatSound = () => {
+  if (!soundCtl) return;
+  const float = Boolean(video && !video.muted && !heroSeen);
+  if (float === soundCtl.classList.contains('floating')) return;
+  if (float) document.body.append(soundCtl); else soundHome.after(soundCtl);
+  soundCtl.classList.toggle('floating', float);
+};
 function videoSrc() {
   const w = Math.max(innerWidth, innerHeight) * Math.min(devicePixelRatio || 1, 2);
   return w <= 900 ? video.dataset.sm : w <= 1700 ? video.dataset.md : video.dataset.lg;
@@ -288,7 +300,12 @@ function startVideo() {
 }
 if (video && !reduce && !navigator.connection?.saveData) {
   startVideo();
-  new IntersectionObserver(([e]) => { if (e.isIntersecting) video.play().catch(() => {}); else video.pause(); }).observe(video);
+  // off screen the picture pauses to save power, unless the sound is on: then the music keeps playing down the page
+  new IntersectionObserver(([e]) => {
+    heroSeen = e.isIntersecting;
+    if (heroSeen || !video.muted) video.play().catch(() => {}); else video.pause();
+    floatSound();
+  }).observe(video);
 }
 if ($('.kana-sky')) kana($('.kana-sky'), { still: reduce, hero: $('.hero'), until: $('.hp') });
 const soundBtn = $('.js-sound');
@@ -313,7 +330,9 @@ soundBtn?.addEventListener('click', () => {
   startVideo();
   video.muted = !video.muted;
   if (!video.muted) { video.volume = volume(); video.play().catch(() => {}); }
+  else if (!heroSeen) video.pause();
   setSoundLabel();
+  floatSound();
 });
 
 // The top bar turns transparent over the hero.

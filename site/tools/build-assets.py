@@ -118,3 +118,17 @@ MEGU_PUB = Path(os.environ.get('MEGU_PUBLIC', 'E:/Apps/MeguLit-Tutorial/megu-edi
 if (MEGU_PUB / 'logo_cape.png').exists():
     webp(MEGU_PUB / 'logo_cape.png', 'logo-cape', (720,), quality=90)
     webp(MEGU_PUB / 'logo_rest.png', 'logo-rest', (720,), quality=90)
+
+# ---- Anki deck backs: the exact frame where each card's line is on screen, from the template's game recordings ------
+import subprocess, tempfile
+REC = MEGU_PUB / 'rec'
+FFMPEG = os.environ.get('FFMPEG', 'E:/Apps/MeguLit-Tutorial/.tools/bin/ffmpeg.exe')
+CARDS = [('card', 2.0), ('lookup-long', 13.2), ('lookup-long', 4.0), ('ruby', 4.3), ('hook', 4.5), ('translate', 3.5)]
+if REC.exists() and Path(FFMPEG).exists():
+    with tempfile.TemporaryDirectory() as tmp:
+        for k, (name, at) in enumerate(CARDS):
+            png = Path(tmp) / f'{k}.png'
+            subprocess.run([FFMPEG, '-hide_banner', '-loglevel', 'error', '-y', '-ss', str(at), '-i', str(REC / f'{name}.webm'), '-frames:v', '1', str(png)], check=True)
+            im = Image.open(png).convert('RGB')   # 1280x720; the last one keeps clear of the settings panel on the right
+            box = (0, 138, 1000, 700) if k == 5 else (0, 0, 1244, 700)
+            im.crop(box).resize((800, 450), Image.LANCZOS).save(IMG / f'card-{k}-800.webp', 'WEBP', quality=80, method=6)
