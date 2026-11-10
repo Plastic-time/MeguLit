@@ -223,12 +223,12 @@ p { text-wrap: pretty; }
   min-height: min(100svh, 72rem); display: grid; grid-template-rows: 1fr auto; align-items: center; padding-bottom: 5.5rem;
 }
 .hero-media { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
-.hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: contrast(1.06) saturate(1.1) brightness(.82); transform: scale(1.04); }
+.hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(1.5px) contrast(1.08) saturate(1.15) brightness(.66); transform: scale(1.06); }
 .hero-scrim {
   position: absolute; inset: 0;
   background:
     linear-gradient(120deg, rgba(150, 20, 40, .28), transparent 50%),
-    linear-gradient(90deg, rgba(18, 10, 12, .9) 0%, rgba(18, 10, 12, .5) 40%, rgba(18, 10, 12, .08) 100%),
+    linear-gradient(90deg, rgba(18, 10, 12, .95) 0%, rgba(18, 10, 12, .86) 36%, rgba(18, 10, 12, .35) 64%, rgba(18, 10, 12, .1) 100%),
     linear-gradient(180deg, rgba(18, 10, 12, .7) 0%, transparent 22%, transparent 70%, rgba(18, 10, 12, .85) 100%);
 }
 /* the dark hero melts into the page (light or dark) below the chips */
@@ -253,14 +253,13 @@ p { text-wrap: pretty; }
 .c-line { fill: none; stroke: var(--gold); stroke-width: 1.2; opacity: .75; }
 .c-ticks { fill: none; stroke: var(--gold); stroke-width: 12; stroke-dasharray: 1.4 9; opacity: .5; }
 .c-dash { fill: none; stroke: var(--crimson-ink); stroke-width: 1.6; stroke-dasharray: 16 9; }
-.c-star { fill: none; stroke: var(--crimson-ink); stroke-width: 1.4; opacity: .5; stroke-dasharray: 1100; stroke-dashoffset: 0; }
+.c-star { fill: none; stroke: var(--crimson-ink); stroke-width: 1.4; opacity: .5; }
 .c-runes { fill: var(--gold); font: 600 15px var(--serif-ja); letter-spacing: 7px; opacity: .9; }
 .c-dot { fill: var(--gold); }
 @media (prefers-reduced-motion: no-preference) {
   .c-outer { animation: spin 90s linear infinite; }
   .c-inner { animation: spin 56s linear infinite reverse; }
   .c-core { animation: pulse 3.2s ease-in-out infinite; }
-  .js .c-star { stroke-dashoffset: 1100; animation: draw 2.6s .4s cubic-bezier(.6, 0, .2, 1) forwards; }
 }
 @keyframes spin { to { rotate: 360deg; } }
 @keyframes pulse { 50% { scale: 1.18; opacity: .6; } }
@@ -596,7 +595,8 @@ section[data-kanji]::before {
   .circle, .ring-fx { width: 120vmin; right: -40vmin; top: 30%; }
   .circle { opacity: .4; }
   .ring-fx { opacity: .7; }
-  .hero-scrim { background: linear-gradient(120deg, rgba(150, 20, 40, .32), transparent 55%), linear-gradient(180deg, rgba(18, 10, 12, .78) 0%, rgba(18, 10, 12, .62) 45%, rgba(18, 10, 12, .9) 100%); }
+  .hero-scrim { background: linear-gradient(120deg, rgba(150, 20, 40, .32), transparent 55%), linear-gradient(180deg, rgba(18, 10, 12, .9) 0%, rgba(18, 10, 12, .84) 45%, rgba(18, 10, 12, .94) 100%); }
+  .hero-video { filter: blur(3px) brightness(.6) saturate(1.1); }
 }
 @media (max-width: 40rem) {
   :root { --top-h: 3.5rem; }
@@ -608,4 +608,42 @@ section[data-kanji]::before {
 }
 @media (prefers-reduced-motion: reduce) {
   .tk-track, .grain, .circle g, .js .kinetic, .js .kinetic .ch, .btn-primary::before { animation: none !important; }
+}
+
+/* ---- anime.js layer ---------------------------------------------------------------------------------------------- */
+/* hidden until the intro timeline brings them in; a CSS fallback shows them if the script never runs */
+@media (prefers-reduced-motion: no-preference) {
+  .js .hero .lede, .js .hero .cta > *, .js .hero .cta-meta, .js .hero-bar > * { opacity: 0; animation: fx-fallback 0s 3.2s forwards; }
+}
+@keyframes fx-fallback { to { opacity: 1; } }
+.rays-fx { position: absolute; inset: 0; width: 100%; height: 100%; mix-blend-mode: screen; opacity: .7; }
+.sparks { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 80; }
+
+/* Aceternity-style hero parallax: a wall of real screens tilted in 3D, straightening as you scroll */
+.hp { position: relative; padding: clamp(4rem, 9vw, 7rem) 0 0; height: 230vh; overflow: clip; }
+.hp-head { position: relative; z-index: 2; }
+.hp-stage { position: sticky; top: 0; height: 100vh; perspective: 1000px; perspective-origin: 50% 0; overflow: visible; }
+.hp-rows { display: grid; gap: clamp(1rem, 2.4vw, 2.2rem); padding-top: 6vh; transform-style: preserve-3d; transform-origin: 50% 0; will-change: transform, opacity; }
+.hp-row { display: flex; gap: clamp(1rem, 2.4vw, 2.2rem); width: max-content; will-change: transform; }
+.hp-row:nth-child(2) { margin-left: -14rem; }
+.hp-card {
+  margin: 0; position: relative; width: clamp(15rem, 30vw, 30rem); aspect-ratio: 16 / 9; border-radius: var(--r-md); overflow: hidden;
+  box-shadow: var(--shadow); background: #1a1214; transition: transform .35s cubic-bezier(.2, .7, .2, 1);
+}
+.hp-card img { width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+.hp-card figcaption {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 2.4rem 1rem .8rem; font: 600 .9375rem/1.2 var(--serif);
+  color: #f5ebe0; background: linear-gradient(transparent, rgba(12, 6, 8, .88)); opacity: 0; transition: opacity .25s;
+}
+.hp-card:hover { transform: translateY(-.6rem) scale(1.02); }
+.hp-card:hover figcaption, .hp-card:focus-within figcaption { opacity: 1; }
+@media (hover: none) { .hp-card figcaption { opacity: 1; } }
+@media (max-width: 40rem) {
+  .hp { height: 170vh; }
+  .hp-row:nth-child(2) { margin-left: -8rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hp { height: auto; }
+  .hp-stage { position: relative; height: auto; overflow-x: auto; padding-bottom: 2rem; }
+  .hp-row:nth-child(2) { margin-left: 0; }
 }

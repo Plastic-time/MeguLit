@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MeguLit · 在 Galgame 里读日语原文</title>
-<meta name="description" content="MeguLit 是免费开源的 Windows 工具：接上 Galgame 正在显示的日文台词，给它注音、翻译、查词，把生词送进 Anki，还能把译文直接写进游戏的文本框">
+<title>MeguLit · 用 Galgame 学日语</title>
+<meta name="description" content="MeguLit 是免费开源的 Galgame 日语学习工具：台词带注音和释义，点一下查词，一键制成 Anki 卡片，阅读量和生词都记着，译文还能直接写进游戏的文本框">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#170f11" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f8f1ee" media="(prefers-color-scheme: light)">
@@ -15,7 +15,7 @@
 <link rel="alternate" hreflang="ja" href="https://megulit.com/?lang=ja">
 <link rel="alternate" hreflang="en" href="https://megulit.com/?lang=en">
 <meta property="og:title" content="MeguLit">
-<meta property="og:description" content="在 Galgame 里读日语原文：注音、翻译、查词、Anki，译文直接写进游戏">
+<meta property="og:description" content="用 Galgame 学日语：注音、查词、Anki 制卡、学习统计，译文直接写进游戏">
 <meta property="og:image" content="https://megulit.com/assets/img/og.jpg">
 <meta property="og:url" content="https://megulit.com/">
 <meta name="twitter:card" content="summary_large_image">
@@ -64,6 +64,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  <div class="hero-media" aria-hidden="true">
   <video class="hero-video" muted loop playsinline preload="none" poster="/assets/img/hero-poster.webp" data-sm="/assets/video/megulit-360.mp4" data-md="/assets/video/megulit-720.mp4" data-lg="/assets/video/megulit-1080.mp4"></video>
   <div class="hero-scrim"></div>
+  <canvas class="rays-fx"></canvas>
   <canvas class="kana-fx"></canvas>
   <svg class="circle" viewBox="-300 -300 600 600">
    <defs><path id="ring-path" d="M 0,-246 a 246,246 0 1,1 0,492 a 246,246 0 1,1 0,-492"/></defs>
@@ -86,8 +87,8 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  </div>
  <div class="wrap hero-grid">
   <div class="hero-copy tilt">
-   <h1 id="hero-title" class="display kinetic" data-i-html="hero.title"><span class="b">在 Galgame 里，</span><wbr><span class="b">直接读日语原文</span></h1>
-   <p class="lede" data-i="hero.lede">MeguLit 接上游戏正在显示的台词，给它注音、翻译、查词，把生词送进 Anki。译文还能直接写进游戏自己的文本框</p>
+   <h1 id="hero-title" class="display kinetic" data-i-html="hero.title"><span class="b">玩 Galgame，</span><wbr><span class="b">学日语</span></h1>
+   <p class="lede" data-i="hero.lede">给 Galgame 玩家的日语学习工具。游戏里的每句台词都带上注音和释义，点一下查词，一键制成 Anki 卡片，读了多少、学了哪些词都替你记着</p>
    <div class="cta">
     <a class="btn btn-primary btn-xl js-download" href="https://github.com/ilynthn/MeguLit/releases/latest">
      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
@@ -116,9 +117,19 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  <div class="tk tk-b"><div class="tk-track js-tk-b"></div></div>
 </div>
 
-<div class="wrap shot-hero">
- <img class="rise3d" src="/assets/img/home-1360.webp" srcset="/assets/img/home-720.webp 720w, /assets/img/home-1360.webp 1360w" sizes="(min-width: 75rem) 75rem, 100vw" width="1360" height="765" alt="MeguLit 首页：上次读到的作品、最近游玩和今日学习数据" data-i-attr="alt:shot.home" loading="lazy">
-</div>
+<section class="hp" aria-labelledby="hp-title">
+ <div class="wrap hp-head">
+  <h2 id="hp-title" class="h2" data-i="hp.title">学日语的一整圈，都在一个应用里</h2>
+  <p class="sec-lede" data-i="hp.lede">游戏库、阅读层、单词本、Anki、学习统计、五十音。下面都是 MeguLit 的真实界面</p>
+ </div>
+ <div class="hp-stage">
+  <div class="hp-rows">
+    <div class="hp-row"><figure class="hp-card"><img src="/assets/img/home-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.home">首页</figcaption></figure><figure class="hp-card"><img src="/assets/img/library-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.library">游戏库</figcaption></figure><figure class="hp-card"><img src="/assets/img/game-detail-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.detail">作品详情</figcaption></figure><figure class="hp-card"><img src="/assets/img/words-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.words">单词本</figcaption></figure><figure class="hp-card"><img src="/assets/img/anki-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.anki">Anki 复习</figcaption></figure></div>
+    <div class="hp-row"><figure class="hp-card"><img src="/assets/img/stats-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.stats">学习统计</figcaption></figure><figure class="hp-card"><img src="/assets/img/stats-trend-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.trend">字数走势</figcaption></figure><figure class="hp-card"><img src="/assets/img/history-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.history">阅读会话</figcaption></figure><figure class="hp-card"><img src="/assets/img/dialogue-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.dialogue">对话记录</figcaption></figure><figure class="hp-card"><img src="/assets/img/home-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.home">首页</figcaption></figure></div>
+    <div class="hp-row"><figure class="hp-card"><img src="/assets/img/kana-home-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.kana">五十音</figcaption></figure><figure class="hp-card"><img src="/assets/img/kana-lesson-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.lesson">五十音课程</figcaption></figure><figure class="hp-card"><img src="/assets/img/auto-update-800.webp" width="800" height="382" loading="lazy" alt=""><figcaption data-i="hp.c.update">自动更新</figcaption></figure><figure class="hp-card"><img src="/assets/img/words-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.words">单词本</figcaption></figure><figure class="hp-card"><img src="/assets/img/anki-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.anki">Anki 复习</figcaption></figure></div>
+  </div>
+ </div>
+</section>
 
 <section class="sec" id="features" data-kanji="内嵌" aria-labelledby="f-title">
  <div class="wrap">

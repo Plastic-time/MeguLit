@@ -355,6 +355,9 @@ function fillTicker() {
 
 if (lang !== 'zh') applyLang(lang);
 else { splitKinetic(); fillTicker(); setSoundLabel(); }
+
+// Motion layer (anime.js). If it cannot load, a CSS fallback shows everything after a moment.
+import('./fx.js').then(m => m.run({ reduce, finePointer })).catch(() => {});
 loadRelease();
 loadEngines();
 loadReleases();
