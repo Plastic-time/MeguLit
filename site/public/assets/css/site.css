@@ -1916,3 +1916,5 @@ html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
 
 /* the line after each version's notes: small and grey */
 .notes-caveat { margin: 1.1rem 0 0; padding-top: .7rem; border-top: 1px dashed color-mix(in srgb, currentColor 18%, transparent); font-size: .75rem; line-height: 1.6; color: var(--muted, #8a8a8a); }
+
+.nt-updates-note { margin: .55rem 0 0; font-size: .8125rem; line-height: 1.6; color: #8a8a8a; }

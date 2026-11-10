@@ -73,6 +73,15 @@ export function notice({ t, lang, after }) {
       return li;
     }));
     list.hidden = !rows.length;
+    // these were only tested on the developer's own machine: say so right under them, small
+    let note = list.nextElementSibling?.classList.contains('nt-updates-note') ? list.nextElementSibling : null;
+    if (!note) { note = document.createElement('p'); note.className = 'nt-updates-note'; list.after(note); }
+    note.textContent = ({
+      zh: '以上游戏只在作者本地做过部分测试，实际游玩中如果还有问题，欢迎继续反馈，会跟进修复',
+      ja: '上のゲームは作者の手元で一部しか確認していません。実際に遊んで問題があれば、引き続き知らせてください。修正していきます',
+      en: 'These were only partly tested on the author’s own machine. If anything still goes wrong when you play, please keep telling us and we’ll fix it',
+    })[l] || '';
+    note.hidden = !rows.length;
   }).catch(() => {});
   // every visit, once the entrance has finished
   Promise.resolve(after).then(() => setTimeout(() => open('welcome'), 350));
