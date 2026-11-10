@@ -6,6 +6,7 @@ import { kana } from './spell.js';
 import { playIntro, introShown } from './intro.js';
 import { nowPlaying, bgmCredit } from './nowplaying.js';
 import { notice } from './notice.js';
+import { tryIt } from './try.js';
 // the entrance starts before anything else on the page is set up
 playIntro();
 
@@ -316,6 +317,7 @@ const lyricLayers = { say: text => { const pick = Math.random() * 2 ** 32, hud =
 if ($('.sound-ctl')) nowPlaying(bgm, $('.sound-ctl'), { reduce, background: deepLayer ? lyricLayers : null });
 bgmCredit();
 notice({ t: k => d(k), lang: () => lang, after: playIntro() });
+tryIt({ lang: () => lang, reduce });
 let soundOn = false;
 // while the sound is on and the hero is off screen, the sound control floats in the corner so it can be turned off
 const soundCtl = $('.sound-ctl'), soundHome = soundCtl && document.createComment('sound-ctl');
