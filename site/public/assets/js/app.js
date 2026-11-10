@@ -402,7 +402,10 @@ function setSound(on) {
   if (on) {
     player?.ensureSrc();
     bgm.volume = volume();
-    started = bgm.play().then(() => true, () => { soundOn = false; setSoundLabel(); floatSound(); return false; });
+    // SoundCloud's player can report a start and then stop at once when the browser has not allowed sound yet: the music
+    // only counts as started if it is still playing a moment later (otherwise the first click on the page starts it)
+    started = bgm.play().then(() => new Promise(res => setTimeout(res, 1500))).then(() => { if (bgm.paused && soundOn) throw new Error('blocked'); return true; })
+      .catch(() => { if (!soundOn) return false; soundOn = false; bgm.pause(); setSoundLabel(); floatSound(); return false; });
   } else bgm.pause();
   setSoundLabel();
   floatSound();
