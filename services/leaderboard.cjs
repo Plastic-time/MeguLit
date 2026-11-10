@@ -184,7 +184,17 @@ async function avatarStatus(root,options={}){
  const res=await avatarCall(root,'GET',options);if(res.state!=='ok')return {...res,status:relay.readJSON(stateFile(root)).avatar?.status||'none'};
  const status=['approved','rejected','pending','hidden','none'].includes(res.data.status)?res.data.status:'none';
  const avatar=AVATAR_ID.test(String(res.data.avatar||''))?res.data.avatar:null;
- return {state:'ok',status,reason:String(res.data.reason||'').slice(0,40),avatar,image:avatar?(await avatarImages(root,[avatar],options))[avatar]||'':''};
+ const issueUrl=/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+$/.test(String(res.data.issueUrl||''))?res.data.issueUrl:'';
+ return {state:'ok',status,reason:String(res.data.reason||'').slice(0,40),avatar,appealed:res.data.appealed===true,issueUrl,image:avatar?(await avatarImages(root,[avatar],options))[avatar]||'':''};
+}
+/* E379 the owner thinks a rejection is wrong: the relay opens a GitHub issue for a human review (one per picture). */
+async function appealAvatar(root,options={}){
+ const c=config(root,options.env,options);if(!c.configured)return {state:'not-configured'};if(!c.joined)return {state:'disabled'};
+ let version='';try{version=String(require('../package.json').version||'');}catch{}
+ const res=await call(c.base+'/api/leaderboard/avatar/appeal?id='+encodeURIComponent(c.installId),{method:'POST',body:JSON.stringify({version:options.version||version})},options.fetch||fetch,identity(root,options));
+ if(res.state!=='ok')return res;
+ const issueUrl=/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+$/.test(String(res.data.issueUrl||''))?res.data.issueUrl:'';
+ return {state:'ok',issueUrl};
 }
 async function report(root,avatarId,options={}){
  if(!AVATAR_ID.test(String(avatarId||'')))throw Error('LEADERBOARD_INVALID_QUERY');
@@ -231,4 +241,4 @@ async function view(root,db,request={},options={}){
  if(result.board.state==='ok'){const ids=[...(result.board.entries||[]),...(result.board.games||[]).map(g=>g.top).filter(Boolean)].map(e=>e.avatar);result.avatars=await avatarImages(root,ids,options);}
  return result;
 }
-module.exports={PERIODS,METRICS,CATEGORIES,BLOCKED,cleanName,cleanTerm,collectStats,collectLookups,hotWeekKey,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile,identity,setAvatar,removeAvatar,avatarStatus,avatarImages,report,hotWords};
+module.exports={PERIODS,METRICS,CATEGORIES,BLOCKED,cleanName,cleanTerm,collectStats,collectLookups,hotWeekKey,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile,identity,setAvatar,removeAvatar,avatarStatus,appealAvatar,avatarImages,report,hotWords};

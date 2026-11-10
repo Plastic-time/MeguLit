@@ -61,62 +61,93 @@ export function avatarHTML(entry,images,esc){
  if(src&&/^data:image\/webp;base64,/.test(src))return `<img class="leaderboard-avatar" src="${esc(src)}" alt="" width="36" height="36" loading="lazy" decoding="async">`;
  const d=defaultAvatar(entry?.name);return `<span class="leaderboard-avatar is-default" style="--avatar-color:${d.color}" aria-hidden="true">${esc(d.initial)}</span>`;
 }
-function switches(name,items,current,w){return `<div class="statistics-ranges leaderboard-switch" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
+/* E380 layout (references: podium-first leaderboards on Dribbble): a stage with the top three on medal blocks, then
+   ruled rows under column headings; hot words use the same stage, 4–10 as one column of honour rows (no orphan
+   card), 11–50 as a compact two-column index. */
+const EXTRA={
+ zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次'},
+ ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位'},
+ en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank'}
+};
+const words=locale=>({...leaderboardWords(locale),...(EXTRA[locale]||EXTRA.zh)});
+function segmented(name,items,current,w){return `<div class="lb-seg" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
+function underline(name,items,current,w){return `<div class="lb-tabs" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
+/* laurel wreath around the place number: two branches rising from the bottom along a circle, leaves on the tangent */
+function laurel(rank){
+ const leaves=[],cx=40,cy=42,r=27;
+ for(let i=0;i<7;i++){const a=(112+i*19)*Math.PI/180;for(const side of [-1,1]){const phi=side<0?a:Math.PI-a,x=cx+r*Math.cos(phi),y=cy+r*Math.sin(phi),deg=phi*180/Math.PI+side*-18;
+  leaves.push(`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="2.9" ry="6.6" transform="rotate(${deg.toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`);}}
+ return `<svg class="lb-laurel" viewBox="0 0 80 80" aria-hidden="true"><g class="lb-leaves">${leaves.join('')}</g><text x="40" y="52" text-anchor="middle">${rank}</text></svg>`;
+}
+const crown='<svg class="lb-crown" viewBox="0 0 32 20" aria-hidden="true"><path d="M2 18 4 5l7 6 5-9 5 9 7-6 2 13z"/></svg>';
+const MEDAL={1:'gold',2:'silver',3:'bronze'};
 function localHTML(data,w,locale,esc){
  const stats=data.local?.stats?.[view.period]||{};
- return `<section class="panel leaderboard-mine"><div class="section-header"><h2 class="panel-title">${w.mine} · ${w[view.period]}</h2></div><div class="leaderboard-tiles">${['characters','seconds','words','streak'].map(m=>`<div class="leaderboard-tile"><small>${w[m]}</small><strong>${esc(formatValue(m,stats[m],locale))}</strong></div>`).join('')}<div class="leaderboard-tile"><small>${w.currentStreak}</small><strong>${esc(formatValue('streak',data.local?.currentStreak,locale))}</strong></div></div></section>`;
+ return `<section class="lb-mine"><h2 class="lb-h2">${w.mine} <span>· ${w[view.period]}</span></h2><div class="lb-tiles">${['characters','seconds','words','streak'].map(m=>`<div class="lb-tile"><small>${w[m]}</small><strong>${esc(formatValue(m,stats[m],locale))}</strong></div>`).join('')}<div class="lb-tile is-accent"><small>${w.currentStreak}</small><strong>${esc(formatValue('streak',data.local?.currentStreak,locale))}</strong></div></div></section>`;
 }
 const flag='<svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14"><path d="M6 21V4m0 0h10l-2 4 2 4H6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
-function rows(entries,metric,w,locale,esc,images){
- if(!entries.length)return `<p class="statistics-empty">${w.empty}</p>`;
- return `<ol class="leaderboard-list">${entries.map(e=>`<li class="${e.me?'is-me':''}"><span class="leaderboard-rank">${e.rank}</span>${avatarHTML(e,images,esc)}<span class="leaderboard-name">${esc(e.name)}</span>${e.avatar&&!e.me?`<button type="button" class="leaderboard-report" data-lb-report="${esc(e.avatar)}" title="${w.report}" aria-label="${w.report}">${flag}</button>`:''}<strong>${esc(formatValue(metric,e.value,locale))}</strong></li>`).join('')}</ol>`;
+const reportButton=(e,w,esc)=>e.avatar&&!e.me?`<button type="button" class="leaderboard-report" data-lb-report="${esc(e.avatar)}" title="${w.report}" aria-label="${w.report}">${flag}</button>`:'';
+function podiumPeople(entries,metric,w,locale,esc,images){
+ /* the first three entries by position (ties keep their shared rank number); shown 2 · 1 · 3 */
+ const order=[1,0,2].map(i=>entries[i]&&{e:entries[i],place:i+1}).filter(Boolean);
+ return `<div class="lb-stage" role="list">${order.map(({e,place})=>`<div class="lb-place medal-${MEDAL[place]}${e.me?' is-me':''}" role="listitem" data-rank="${place}" style="--delay:${({1:2,2:1,3:0})[place]*140}ms"><div class="lb-who">${place===1?crown:''}<span class="lb-ring">${avatarHTML(e,images,esc)}</span><span class="lb-name">${esc(e.name)}</span><span class="lb-score">${esc(formatValue(metric,e.value,locale))}</span>${reportButton(e,w,esc)}</div><div class="lb-block">${laurel(e.rank)}</div></div>`).join('')}</div>`;
+}
+function tableRows(entries,metric,w,locale,esc,images){
+ if(!entries.length)return '';
+ return `<div class="lb-table"><div class="lb-thead" aria-hidden="true"><span>${w.colRank}</span><span>${w.colReader}</span><span>${w[metric]}</span></div><ol class="leaderboard-list lb-rows">${entries.map(e=>`<li class="${e.me?'is-me':''}"><span class="leaderboard-rank">${e.rank}</span>${avatarHTML(e,images,esc)}<span class="leaderboard-name">${esc(e.name)}</span>${reportButton(e,w,esc)}<strong>${esc(formatValue(metric,e.value,locale))}</strong></li>`).join('')}</ol></div>`;
 }
 export function boardHTML(data,w,locale,esc){
+ w={...words(locale),...w};
  const board=data.board||{},images=data.avatars||{};
  if(board.state==='error')return `<div class="leaderboard-offline"><p>${w.offline}</p><button type="button" class="primary" data-lb-retry>${w.retry}</button></div>`;
- if(view.metric==='games'&&!view.game){const games=board.games||[];if(!games.length)return `<p class="statistics-empty">${w.empty}</p>`;
-  return `<ol class="leaderboard-list leaderboard-games">${games.map(g=>`<li><button type="button" data-lb-game="${esc(g.title)}"><span class="leaderboard-name">${esc(g.title)}</span><small>${esc(fill(w.readers,{n:g.readers}))}${g.top?` · ${w.top} ${esc(g.top.name)}`:''}</small></button></li>`).join('')}</ol>`;}
- const metric=view.metric==='games'?'characters':view.metric;
- const me=board.me?`<p class="leaderboard-me">${w.me}：<strong>${esc(fill(w.rank,{n:board.me.rank}))}</strong> · ${esc(formatValue(metric,board.me.value,locale))}</p>`:'';
- return (view.game?`<button type="button" class="leaderboard-back" data-lb-back>‹ ${w.back}</button><h3 class="leaderboard-game-title">${esc(view.game)}</h3>`:'')+me+rows(board.entries||[],metric,w,locale,esc,images);
+ if(view.metric==='games'&&!view.game){const games=board.games||[];if(!games.length)return `<p class="lb-empty">${w.empty}</p>`;
+  return `<ol class="leaderboard-list leaderboard-games lb-rows">${games.map(g=>`<li><button type="button" data-lb-game="${esc(g.title)}"><span class="leaderboard-name">${esc(g.title)}</span><small>${esc(fill(w.readers,{n:g.readers}))}${g.top?` · ${w.top} ${esc(g.top.name)}`:''}</small></button></li>`).join('')}</ol>`;}
+ const metric=view.metric==='games'?'characters':view.metric,entries=board.entries||[];
+ if(!entries.length)return (view.game?`<button type="button" class="leaderboard-back" data-lb-back>‹ ${w.back}</button>`:'')+`<p class="lb-empty">${w.empty}</p>`;
+ const top=entries.slice(0,3),rest=entries.slice(3);
+ return (view.game?`<button type="button" class="leaderboard-back" data-lb-back>‹ ${w.back}</button><h3 class="leaderboard-game-title">${esc(view.game)}</h3>`:'')+podiumPeople(top,metric,w,locale,esc,images)+tableRows(rest,metric,w,locale,esc,images);
 }
 /* ---- 每周热词 ------------------------------------------------------------------------------------------------- */
 /* Pure split used by the page and the tests: podium 1–3, cards 4–10, list 11–50. */
 export function splitAwards(awards){const sorted=[...(awards||[])].sort((a,b)=>a.rank-b.rank);return {podium:sorted.filter(a=>a.rank<=3),cards:sorted.filter(a=>a.rank>=4&&a.rank<=10),list:sorted.filter(a=>a.rank>=11&&a.rank<=50)};}
-const MEDAL={1:'gold',2:'silver',3:'bronze'};
 export function hotHTML(hot,w,locale,esc){
+ w={...words(locale),...w};
  if(!hot||hot.state==='error')return `<div class="leaderboard-offline"><p>${w.offline}</p><button type="button" class="primary" data-lb-retry>${w.retry}</button></div>`;
- const n=v=>nf(locale).format(v||0);
- const weeks=hot.weeks||[];
- const picker=weeks.length>1?`<label class="leaderboard-weeks"><span>${w.pastWeeks}</span><select data-lb-week>${weeks.map(k=>`<option value="${esc(k)}" ${k===hot.week?'selected':''}>${esc(fill(w.weekOf,{week:k}))}</option>`).join('')}</select></label>`:'';
- const head=`<div class="leaderboard-hot-head">${switches('category',CATS,view.category,w)}${picker}</div>`;
- if(!hot.settled||!hot.awards?.length)return head+`<p class="statistics-empty">${hot.settled?w.hotEmpty:w.hotPending}</p><p class="leaderboard-note">${w.hotRule}</p>`;
+ const n=v=>nf(locale).format(v||0),weeks=hot.weeks||[];
+ const picker=weeks.length>1?`<label class="lb-week"><span>${w.pastWeeks}</span><select data-lb-week>${weeks.map(k=>`<option value="${esc(k)}" ${k===hot.week?'selected':''}>${esc(fill(w.weekOf,{week:k}))}</option>`).join('')}</select></label>`:'';
+ const head=`<div class="lb-controls">${segmented('category',CATS,view.category,w)}${picker}</div>`;
+ if(!hot.settled||!hot.awards?.length)return head+`<div class="lb-empty-stage"><p class="lb-empty">${hot.settled?w.hotEmpty:w.hotPending}</p><p class="lb-note">${w.hotRule}</p></div>`;
  const {podium,cards,list}=splitAwards(hot.awards);
- /* visual order 2 · 1 · 3, the champion in the middle and highest */
  const order=[2,1,3].map(r=>podium.find(a=>a.rank===r)).filter(Boolean);
- const ai=a=>a.reason?`<p class="leaderboard-reason">${a.ai?`<span class="leaderboard-ai">${w.aiGuess}</span>`:''}${esc(a.reason)}</p>`:'';
- return head+`<p class="leaderboard-note">${esc(fill(w.weekOf,{week:hot.week}))} · ${esc(fill(w.participants,{n:n(hot.participants)}))} · ${w.hotRule}</p>
-  <div class="leaderboard-podium" role="list">${order.map(a=>`<div class="podium-place medal-${MEDAL[a.rank]}" role="listitem" data-rank="${a.rank}" style="--delay:${({1:2,2:1,3:0})[a.rank]*140}ms"><div class="podium-term" lang="ja">${esc(a.term)}</div><small>${esc(fill(w.lookedUp,{users:n(a.users),n:n(a.lookups)}))}</small>${ai(a)}<div class="podium-step"><span>${a.rank}</span></div></div>`).join('')}</div>
-  ${cards.length?`<ol class="leaderboard-cards">${cards.map(a=>`<li class="leaderboard-card"><span class="leaderboard-rank">${a.rank}</span><div><strong lang="ja">${esc(a.term)}</strong><small>${esc(fill(w.lookedUp,{users:n(a.users),n:n(a.lookups)}))}</small>${ai(a)}</div></li>`).join('')}</ol>`:''}
-  ${list.length?`<ol class="leaderboard-list leaderboard-hot-list">${list.map(a=>`<li><span class="leaderboard-rank">${a.rank}</span><span class="leaderboard-name" lang="ja">${esc(a.term)}</span><strong>${esc(fill(w.times,{n:n(a.lookups)}))}</strong></li>`).join('')}</ol>`:''}`;
+ const reason=a=>a.reason?`<p class="leaderboard-reason">${a.ai?`<span class="leaderboard-ai">${w.aiGuess}</span>`:''}${esc(a.reason)}</p>`:'';
+ const meta=a=>esc(fill(w.lookedUp,{users:n(a.users),n:n(a.lookups)}));
+ return head+`<p class="lb-note">${esc(fill(w.weekOf,{week:hot.week}))} · ${esc(fill(w.participants,{n:n(hot.participants)}))} · ${w.hotRule}</p>
+  <div class="lb-stage leaderboard-podium is-terms" role="list">${order.map(a=>`<div class="lb-place podium-place medal-${MEDAL[a.rank]}" role="listitem" data-rank="${a.rank}" style="--delay:${({1:2,2:1,3:0})[a.rank]*140}ms"><div class="lb-who">${a.rank===1?crown:''}<span class="lb-term" lang="ja">${esc(a.term)}</span><span class="lb-score">${meta(a)}</span>${reason(a)}</div><div class="lb-block">${laurel(a.rank)}</div></div>`).join('')}</div>
+  ${cards.length?`<section class="lb-section"><h3 class="lb-h3">${w.honours}</h3><ol class="leaderboard-cards lb-honours">${cards.map(a=>`<li class="leaderboard-card"><span class="leaderboard-rank">${a.rank}</span><div class="lb-honour-term"><strong lang="ja">${esc(a.term)}</strong><small>${meta(a)}</small></div>${reason(a)||'<span></span>'}</li>`).join('')}</ol></section>`:''}
+  ${list.length?`<section class="lb-section"><h3 class="lb-h3">${w.rest}</h3><ol class="leaderboard-list leaderboard-hot-list" style="--rows:${Math.ceil(list.length/2)}">${list.map(a=>`<li><span class="leaderboard-rank">${a.rank}</span><span class="leaderboard-name" lang="ja">${esc(a.term)}</span><strong>${esc(fill(w.times,{n:n(a.lookups)}))}</strong></li>`).join('')}</ol></section>`:''}`;
 }
 function joinHTML(data,w,esc){
- return `<section class="panel leaderboard-join"><h2 class="panel-title">${w.joinTitle}</h2><p class="leaderboard-note">${w.joinText}</p>
+ return `<section class="lb-card leaderboard-join"><h2 class="lb-h2">${w.joinTitle}</h2><p class="lb-note">${w.joinText}</p>
   <label class="leaderboard-field"><span>${w.nickname}</span><input type="text" maxlength="16" data-lb-name value="${esc(data.name||'')}" placeholder="${w.nicknameHint}" autocomplete="off" spellcheck="false"></label>
   <label class="leaderboard-check"><input type="checkbox" class="switch" data-lb-share ${data.shareGames?'checked':''}><span>${w.shareGames}</span></label>
   <label class="leaderboard-check"><input type="checkbox" class="switch" data-lb-consent><span>${w.consent}</span></label>
   <p class="leaderboard-error" data-lb-error hidden></p><button type="button" class="primary" data-lb-join>${w.join}</button></section>`;
 }
+function hero(w,esc,chip=''){return `<header class="lb-hero"><div><p class="lb-eyebrow">${w.eyebrow}</p><h1 class="lb-title">${w.title}</h1></div>${chip}</header>`;}
+function myChip(data,w,locale,esc){
+ const me=data.board?.me,metric=view.metric==='games'?'characters':view.metric;if(!data.joined||!me)return '';
+ const mine=(data.board.entries||[]).find(e=>e.me)||{name:data.name};
+ return `<div class="lb-mychip">${avatarHTML(mine,data.avatars||{},esc)}<div><small>${w.myRank}</small><strong>${esc(fill(w.rank,{n:me.rank}))}</strong></div><span>${esc(formatValue(metric,me.value,locale))}</span></div>`;
+}
 export function leaderboardHTML(data,locale,esc){
- const w=leaderboardWords(locale);
- const head=`<div class="page-header"><h1>${w.title}</h1><div class="page-tools"></div></div>`;
- if(!data)return head;
- if(!data.configured)return head+`<div class="leaderboard-page">${switches('period',PERIODS,view.period,w)}<section class="panel leaderboard-notice"><h2 class="panel-title">${w.notReady}</h2><p class="leaderboard-note">${w.notReadyText}</p></section>${localHTML(data,w,locale,esc)}</div>`;
- const tab=data.tab==='hot'?'hot':'board',tabs=switches('tab',['board','hot'],tab,w);
- if(tab==='hot')return head+`<div class="leaderboard-page">${tabs}<section class="panel leaderboard-hot"><h2 class="panel-title">${w.hot} · ${w[view.category]}</h2>${hotHTML(data.hot,w,locale,esc)}</section></div>`;
- const top=tabs+switches('period',PERIODS,view.period,w)+switches('metric',METRICS,view.metric,w);
- const body=data.joined?`<section class="panel leaderboard-board"><div class="section-header"><h2 class="panel-title">${w[view.metric]} · ${view.metric==='games'?w.all:w[view.period]}</h2><small>${esc(fill(w.joinedAs,{name:data.name}))} · <button type="button" class="leaderboard-leave" data-lb-leave>${w.leave}</button></small></div>${boardHTML(data,w,locale,esc)}</section>`:joinHTML(data,w,esc);
- return head+`<div class="leaderboard-page">${top}${body}${localHTML(data,w,locale,esc)}</div>`;
+ const w=words(locale);
+ if(!data)return hero(w,esc);
+ if(!data.configured)return `<div class="leaderboard-page">${hero(w,esc)}${segmented('period',PERIODS,view.period,w)}<section class="lb-card leaderboard-notice"><h2 class="lb-h2">${w.notReady}</h2><p class="lb-note">${w.notReadyText}</p></section>${localHTML(data,w,locale,esc)}</div>`;
+ const tab=data.tab==='hot'?'hot':'board',tabs=segmented('tab',['board','hot'],tab,w);
+ if(tab==='hot')return `<div class="leaderboard-page">${hero(w,esc)}<div class="lb-controls">${tabs}</div><section class="lb-card leaderboard-hot"><h2 class="lb-h2">${w.hot} <span>· ${w[view.category]}</span></h2>${hotHTML(data.hot,w,locale,esc)}</section></div>`;
+ const controls=`<div class="lb-controls">${tabs}${segmented('period',PERIODS,view.period,w)}</div>${underline('metric',METRICS,view.metric,w)}`;
+ const body=data.joined?`<section class="lb-card leaderboard-board"><div class="lb-card-head"><h2 class="lb-h2">${w[view.metric]} <span>· ${view.metric==='games'?w.all:w[view.period]}</span></h2><small>${esc(fill(w.joinedAs,{name:data.name}))} · <button type="button" class="leaderboard-leave" data-lb-leave>${w.leave}</button></small></div>${boardHTML(data,w,locale,esc)}</section>`:joinHTML(data,w,esc);
+ return `<div class="leaderboard-page">${hero(w,esc,myChip(data,w,locale,esc))}${controls}${body}${localHTML(data,w,locale,esc)}</div>`;
 }
 /* Mounts the page into main; isCurrent() guards against a late reply after the user moved on. */
 export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>true}){

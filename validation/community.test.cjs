@@ -27,12 +27,12 @@ function webp(size=128,{height=size,animated=false}={}){
 }
 
 test('moderation fails closed: only a clean SAFE approves',async()=>{
- const {moderateImage}=await load('community.js'),img=webp();
- assert.deepEqual(await moderateImage({AI:ai('SAFE')},img),{approved:true,reason:''});
- assert.deepEqual(await moderateImage({AI:ai(' safe.')},img),{approved:true,reason:''});
- assert.deepEqual(await moderateImage({AI:ai('UNSAFE')},img),{approved:false,reason:'NSFW'});
+ const {moderateImage}=await load('community.js'),img=webp();const v=r=>({approved:r.approved,reason:r.reason});
+ assert.deepEqual(v(await moderateImage({AI:ai('SAFE')},img)),{approved:true,reason:''});
+ assert.deepEqual(v(await moderateImage({AI:ai(' safe.')},img)),{approved:true,reason:''});
+ assert.deepEqual(await moderateImage({AI:ai('UNSAFE')},img),{approved:false,reason:'NSFW',answer:'UNSAFE'});
  for(const unclear of ['Probably safe','SAFE? not sure','','I cannot tell'])assert.equal((await moderateImage({AI:ai(unclear)},img)).reason,'MODERATION_UNCLEAR',unclear);
- assert.deepEqual(await moderateImage({AI:ai(new Error('model down'))},img),{approved:false,reason:'MODERATION_ERROR'});
+ assert.deepEqual(v(await moderateImage({AI:ai(new Error('model down'))},img)),{approved:false,reason:'MODERATION_ERROR'});
  assert.deepEqual(await moderateImage({},img),{approved:false,reason:'MODERATION_UNAVAILABLE'});
  const model=ai('SAFE');await moderateImage({AI:model,AVATAR_MODEL:'@cf/x/vision'},img);assert.equal(model.calls[0].model,'@cf/x/vision');assert.equal(model.calls[0].input.image.length,img.length);
 });
@@ -52,9 +52,10 @@ test('avatars: pending is invisible, approved shows on the board, rejected is de
  assert.equal(up.status,'approved');assert.match(up.avatar,/^[0-9a-f]{32}$/);
  const board=await (await handle(req('GET','/api/leaderboard?period=week&metric=characters&key=2026-W46'),e,NOW)).json();assert.equal(board.entries[0].avatar,up.avatar);
  const pic=await handle(req('GET','/api/avatar/'+up.avatar),e,NOW);assert.equal(pic.status,200);assert.equal(pic.headers.get('content-type'),'image/webp');
- /* a new upload that fails replaces the old one: nothing shows, both objects are gone */
+ /* a new upload that fails replaces the old one: nothing shows; only the rejected picture is kept, privately, for an appeal */
  e.AI=ai('UNSAFE');const bad=await (await handle(req('POST','/api/leaderboard/avatar?id='+id,webp(),{'content-type':'image/webp'}),e,NOW)).json();
- assert.deepEqual([bad.status,bad.reason,bad.avatar],['rejected','NSFW',null]);assert.equal(e.BUCKET.store.size,0);
+ assert.deepEqual([bad.status,bad.reason,bad.avatar],['rejected','NSFW',null]);assert.equal(e.BUCKET.store.size,1);
+ const kept=e.DB.raw.prepare('SELECT avatar_id FROM avatars').get().avatar_id;assert.equal((await handle(req('GET','/api/avatar/'+kept),e,NOW)).status,404,'rejected pictures are never public');
  assert.equal((await handle(req('GET','/api/avatar/'+up.avatar),e,NOW)).status,404);
  const after=await (await handle(req('GET','/api/leaderboard?period=week&metric=characters&key=2026-W46'),e,NOW)).json();assert.equal(after.entries[0].avatar,null);
  e.AI=ai(new Error('boom'));assert.equal((await (await handle(req('POST','/api/leaderboard/avatar?id='+id,webp(),{'content-type':'image/webp'}),e,NOW)).json()).reason,'MODERATION_ERROR');
@@ -157,4 +158,31 @@ test('page: podium 1–3 (shown 2·1·3), cards 4–10 with the AI label, 11–5
  assert.match(view.hotHTML({state:'ok',weeks:[],settled:false,awards:[]},view.leaderboardWords('ja'),'ja',esc),/月曜 0:00/);
  const d=view.defaultAvatar('めぐみん');assert.equal(d.initial,'め');assert.match(d.color,/^#[0-9a-f]{6}$/);
  assert.match(view.avatarHTML({name:'x',avatar:'a'.repeat(32)},{['a'.repeat(32)]:'javascript:alert(1)'},esc),/is-default/,'only webp data URLs are used as images');
+});
+
+test('appeal: one click opens a GitHub issue with a private, expiring review link; one appeal per picture',async()=>{
+ const {handle}=await load('worker.js'),{cleanupAvatars}=await load('community.js'),calls=[];
+ const e=env({AI:ai('UNSAFE'),GITHUB_TOKEN:'ghp_x',fetch:async(url,init)=>{calls.push({url,body:JSON.parse(init.body)});return new Response(JSON.stringify({html_url:'https://github.com/ilynthn/MeguLit/issues/88'}),{status:201});}});
+ const id=uuid(7);await handle(req('POST','/api/leaderboard',join(id)),e,NOW);
+ assert.equal((await handle(req('POST','/api/leaderboard/avatar/appeal?id='+id,'{}'),e,NOW)).status,400,'nothing to appeal yet');
+ await handle(req('POST','/api/leaderboard/avatar?id='+id,webp(),{'content-type':'image/webp'}),e,NOW);
+ const res=await (await handle(req('POST','/api/leaderboard/avatar/appeal?id='+id,{version:'1.2.9'}),e,NOW)).json();
+ assert.equal(res.issueUrl,'https://github.com/ilynthn/MeguLit/issues/88');
+ const issue=calls[0].body;assert.deepEqual(issue.labels,['avatar-appeal']);assert.match(issue.title,/头像复核.*NSFW/);
+ assert.match(issue.body,/model answer: `UNSAFE`/);assert.match(issue.body,/1\.2\.9/);assert.doesNotMatch(issue.body,/!\[/,'the picture is linked, never embedded');
+ assert.match(issue.body,/status='approved'/);
+ const link=issue.body.match(/https:\/\/relay\.test\/api\/avatar\/[0-9a-f]{32}\/review\?\S+/)[0];
+ const view=await handle(new Request(link),e,NOW);assert.equal(view.status,200);assert.equal(view.headers.get('cache-control'),'private, no-store');
+ assert.equal((await handle(new Request(link.replace(/sig=./,'sig=0')),e,NOW)).status,404);
+ assert.equal((await handle(new Request(link),e,new Date(NOW.getTime()+73*3600000))).status,410);
+ const again=await (await handle(req('POST','/api/leaderboard/avatar/appeal?id='+id,'{}'),e,NOW)).json();assert.equal(again.already,true);assert.equal(calls.length,1);
+ assert.deepEqual(e.DB.raw.prepare("SELECT kind FROM moderation_queue").all().map(r=>r.kind),['appeal']);
+ const status=await (await handle(req('GET','/api/leaderboard/avatar?id='+id),e,NOW)).json();assert.deepEqual([status.status,status.appealed,status.issueUrl],['rejected',true,'https://github.com/ilynthn/MeguLit/issues/88']);
+ /* the maintainer approves with the SQL from the issue: it is public at once */
+ const avatar=e.DB.raw.prepare('SELECT avatar_id FROM avatars').get().avatar_id;e.DB.raw.prepare("UPDATE avatars SET status='approved',reason='APPEAL_APPROVED' WHERE avatar_id=?").run(avatar);
+ assert.equal((await handle(req('GET','/api/avatar/'+avatar),e,NOW)).status,200);
+ /* unappealed rejections are deleted after 30 days */
+ const id2=uuid(8);await handle(req('POST','/api/leaderboard',join(id2)),e,NOW);await handle(req('POST','/api/leaderboard/avatar?id='+id2,webp(),{'content-type':'image/webp'}),e,NOW);
+ const before=e.BUCKET.store.size;assert.equal(await cleanupAvatars(e,new Date(NOW.getTime()+29*86400000)),0);assert.equal(await cleanupAvatars(e,new Date(NOW.getTime()+31*86400000)),1);
+ assert.equal(e.BUCKET.store.size,before-1);assert.equal(e.DB.raw.prepare("SELECT status FROM avatars WHERE id_hash=?").get(sha(id2)).status,'expired');
 });

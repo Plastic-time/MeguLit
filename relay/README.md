@@ -216,6 +216,23 @@ With `authorization: Bearer <account token>` the account is the identity instead
 avatar across PCs). The user must have joined the leaderboard first (403 `NOT_JOINED`). Leaderboard rows carry
 `avatar` (the approved id or null); avatar ids are random per upload and say nothing about the user.
 
+### Appeals (the check got it wrong)
+
+A rejected picture is kept privately in R2 (never served by `/api/avatar/:id`). In Settings › 联网服务 its owner can
+press 「判断错了？提交人工复核」 once per picture:
+
+```
+POST /api/leaderboard/avatar/appeal?id=<uuid>   body {"version":"1.2.9"}   → {"ok":true,"issueUrl":"https://github.com/.../issues/<n>"}
+GET  /api/avatar/<avatar id>/review?exp=&sig=                             → image/webp, private, for the reviewer only
+```
+
+The relay opens an issue labelled `avatar-appeal` (create the label once, or let the first issue create it) with the
+verdict, the model's raw answer, the app version, a review link signed with `LINK_SECRET` that expires after 72 hours
+(linked, not embedded, so nothing shows inline on the public issue), and the two `wrangler d1 execute` commands to
+approve or keep the rejection. It also adds a `moderation_queue` row of kind `appeal`. Approving makes the picture
+public right away; the user's Settings page picks it up on the next visit. Rejected pictures nobody appealed are
+deleted by the weekly cron after 30 days (status `expired`). Appeals: 3 per day per user.
+
 ### Moderation queue
 
 Avatars reported by `REPORT_THRESHOLD` different people are hidden and queued. Review from the CLI:
