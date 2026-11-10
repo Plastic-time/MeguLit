@@ -96,7 +96,7 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
     const place = () => {
       const r = slot.getBoundingClientRect(), shown = !box.hidden && r.width > 40 && r.height > 12 && getComputedStyle(slot).opacity > .5;
       dock.classList.toggle('away', !shown);
-      if (shown) { dock.style.left = `${r.left}px`; dock.style.top = `${r.top + r.height - 34}px`; dock.style.width = `${r.width}px`; }
+      if (shown) { dock.style.left = `${r.left}px`; dock.style.top = `${r.top + r.height - 32}px`; dock.style.width = `${r.width}px`; }
       requestAnimationFrame(place);
     };
     requestAnimationFrame(place);

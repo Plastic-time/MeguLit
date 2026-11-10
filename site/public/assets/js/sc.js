@@ -17,6 +17,7 @@ const loadApi = () => apiPromise || (apiPromise = new Promise((res, rej) => {
 const OPTS = {
   color: '#c8323c', auto_play: 'false', hide_related: 'true', show_comments: 'false', show_user: 'true', show_reposts: 'false', show_teaser: 'false', visual: 'false',
 };
+const LOAD_OPTS = { ...Object.fromEntries(Object.entries(OPTS).map(([k, v]) => [k, v === 'true' ? true : v === 'false' ? false : v])), color: OPTS.color.slice(1) };
 const playerUrl = url => 'https://w.soundcloud.com/player/?' + new URLSearchParams({ url, ...OPTS });
 
 export class ScAudio extends EventTarget {
@@ -84,7 +85,9 @@ export class ScAudio extends EventTarget {
       // a new song: the widget stops the old one; it starts the new one itself when a play was asked for
       const go = this._wantPlay;
       if (!this._paused) { this._paused = true; this.dispatchEvent(new Event('pause')); }
-      await new Promise(res => this._widget.load(url, { ...OPTS, auto_play: go ? 'true' : 'false', callback: res }));
+      // load() wants real booleans: the strings of the URL form ('false') read as true here, and the player came back
+      // in its large artwork layout
+      await new Promise(res => this._widget.load(url, { ...LOAD_OPTS, auto_play: go, callback: res }));
     }
     const w = this._widget;
     this._duration = await new Promise(res => w.getDuration(ms => res(ms > 0 ? ms / 1000 : NaN)));
