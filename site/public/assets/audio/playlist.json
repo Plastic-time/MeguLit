@@ -5,21 +5,24 @@
       "by": "作者",
       "from": "收录于",
       "license": "授权",
-      "listen": "在 SoundCloud 收听"
+      "listen": "在 SoundCloud 收听",
+      "listenNe": "在网易云音乐收听"
     },
     "ja": {
       "music": "BGM",
       "by": "作者",
       "from": "収録",
       "license": "ライセンス",
-      "listen": "SoundCloud で聴く"
+      "listen": "SoundCloud で聴く",
+      "listenNe": "NetEase Cloud Music で聴く"
     },
     "en": {
       "music": "Background music",
       "by": "by",
       "from": "from",
       "license": "License",
-      "listen": "listen on SoundCloud"
+      "listen": "listen on SoundCloud",
+      "listenNe": "listen on NetEase Cloud Music"
     }
   },
   "tracks": [
@@ -35,7 +38,8 @@
       "licenseUrl": "",
       "sc": "https://soundcloud.com/kettenkrad8901/tell-me-about-the-music-that-makes-up-you",
       "lyrics": true,
-      "duration": 226.4
+      "duration": 226.4,
+      "ne": 2150486811
     },
     {
       "id": "blxty-prod-akura-it-s-winter",
@@ -49,7 +53,8 @@
       "licenseUrl": "",
       "sc": "https://soundcloud.com/bitekivibes/blxty-its-winter-prod-akura",
       "lyrics": true,
-      "duration": 157.1
+      "duration": 157.1,
+      "ne": 3348298950
     },
     {
       "id": "blackwinterwells-8485-tmorave-weathered",
@@ -63,7 +68,8 @@
       "licenseUrl": "",
       "sc": "https://soundcloud.com/helixtears/www",
       "lyrics": true,
-      "duration": 137.4
+      "duration": 137.4,
+      "ne": 1818777304
     },
     {
       "id": "helix-tears-w-blxty-yurms-idku",
@@ -77,7 +83,8 @@
       "licenseUrl": "",
       "sc": "https://soundcloud.com/helixtears/prfct",
       "lyrics": true,
-      "duration": 231.3
+      "duration": 231.3,
+      "ne": 1824472262
     },
     {
       "id": "miraie-blackwinterwells-facade",
@@ -91,7 +98,8 @@
       "licenseUrl": "",
       "sc": "https://soundcloud.com/miraie/facade",
       "lyrics": true,
-      "duration": 133.6
+      "duration": 133.6,
+      "ne": 1501224698
     },
     {
       "id": "blxty-funeral-sebii-prod-maple-overseas",
@@ -105,7 +113,8 @@
       "licenseUrl": "",
       "sc": "https://soundcloud.com/careinq/overseas",
       "lyrics": true,
-      "duration": 141.2
+      "duration": 141.2,
+      "ne": 1466617994
     },
     {
       "id": "blxty-ft-orchid-awful",
@@ -119,7 +128,8 @@
       "licenseUrl": "",
       "sc": "https://soundcloud.com/blxty/awful",
       "lyrics": true,
-      "duration": 123.8
+      "duration": 123.8,
+      "ne": 1808181016
     },
     {
       "id": "5v-i-rly-hate-it-here",
@@ -133,7 +143,8 @@
       "licenseUrl": "",
       "sc": "https://soundcloud.com/5vexe/hate-it-here",
       "lyrics": true,
-      "duration": 144.1
+      "duration": 144.1,
+      "ne": 1820099153
     },
     {
       "id": "maple-feat-sebii-kuru-blackjack",
@@ -147,7 +158,8 @@
       "licenseUrl": "",
       "sc": "https://soundcloud.com/careinq/blackjack-feat-sebii-kuru",
       "lyrics": true,
-      "duration": 174.7
+      "duration": 174.7,
+      "ne": 1854529859
     },
     {
       "id": "d0llywood1-prod-vagex-ihonestlymightjustgiveup",
@@ -161,7 +173,8 @@
       "licenseUrl": "",
       "sc": "https://soundcloud.com/sanriorose/ihonestlymightjustgiveup",
       "lyrics": true,
-      "duration": 126.2
+      "duration": 126.2,
+      "ne": 1467362493
     }
   ]
 }

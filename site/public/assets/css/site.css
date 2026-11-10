@@ -1591,18 +1591,18 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 /* floating player, compact: down the page it is one small strip (title + current line), so it never covers what you
    read; the volume, the switches and the credit open on hover or keyboard focus (tap on phones) */
 .sound-ctl.floating .vol { display: none; }
-.sound-ctl.floating:hover .vol, .sound-ctl.floating:focus-within .vol { display: flex; }
+.sound-ctl.floating.hov .vol, .sound-ctl.floating:focus-within .vol { display: flex; }
 .sound-ctl.floating .np, .sound-ctl.floating .np.has-lyrics { width: min(16rem, 52vw); max-width: none; padding: .45rem .7rem; gap: .1rem .55rem; background: rgba(0, 0, 0, .62); }
 .sound-ctl.floating .np-artist, .sound-ctl.floating .np-switches, .sound-ctl.floating .np-credit { display: none; }
 .sound-ctl.floating .np-title { font-size: .8125rem; }
 .sound-ctl.floating .np.has-lyrics .np-lyric { height: 1.5em; font-size: .75rem; }
 .sound-ctl.floating .np-line { -webkit-line-clamp: 1; }
-.sound-ctl.floating:hover .np, .sound-ctl.floating:focus-within .np { width: min(22rem, 70vw); }
-.sound-ctl.floating:hover .np-artist, .sound-ctl.floating:focus-within .np-artist { display: inline; }
-.sound-ctl.floating:hover .np-switches, .sound-ctl.floating:focus-within .np-switches { display: flex; }
-.sound-ctl.floating:hover .np-credit, .sound-ctl.floating:focus-within .np-credit { display: block; }
-.sound-ctl.floating:hover .np.has-lyrics .np-lyric, .sound-ctl.floating:focus-within .np.has-lyrics .np-lyric { height: 3em; font-size: .8125rem; }
-.sound-ctl.floating:hover .np-line, .sound-ctl.floating:focus-within .np-line { -webkit-line-clamp: 2; }
+.sound-ctl.floating.hov .np, .sound-ctl.floating:focus-within .np { width: min(22rem, 70vw); }
+.sound-ctl.floating.hov .np-artist, .sound-ctl.floating:focus-within .np-artist { display: inline; }
+.sound-ctl.floating.hov .np-switches, .sound-ctl.floating:focus-within .np-switches { display: flex; }
+.sound-ctl.floating.hov .np-credit, .sound-ctl.floating:focus-within .np-credit { display: block; }
+.sound-ctl.floating.hov .np.has-lyrics .np-lyric, .sound-ctl.floating:focus-within .np.has-lyrics .np-lyric { height: 3em; font-size: .8125rem; }
+.sound-ctl.floating.hov .np-line, .sound-ctl.floating:focus-within .np-line { -webkit-line-clamp: 2; }
 .sound-ctl.floating .np { cursor: default; }
 @media (max-width: 40rem) { .sound-ctl.floating .np, .sound-ctl.floating .np.has-lyrics { width: min(13rem, 58vw); } }
 
@@ -1625,15 +1625,15 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 .sound-ctl.floating .np-switches { display: flex; }
 .sound-ctl.floating .np.has-lyrics .np-lyric { margin-top: .2rem; }
 /* floating: open */
-.sound-ctl.floating:hover .np, .sound-ctl.floating:focus-within .np { width: min(22rem, 70vw); padding: .75rem .95rem .8rem; }
-.sound-ctl.floating:hover .np-artist, .sound-ctl.floating:focus-within .np-artist { max-height: 1.4rem; opacity: 1; }
-.sound-ctl.floating:hover .np-switches, .sound-ctl.floating:focus-within .np-switches { max-height: 3rem; opacity: 1; margin-top: .6rem; }
-.sound-ctl.floating:hover .np-credit, .sound-ctl.floating:focus-within .np-credit { max-height: 6rem; opacity: 1; margin-top: .65rem; padding-top: .6rem; border-top-color: rgba(244, 244, 242, .12); }
-.sound-ctl.floating:hover .np.has-lyrics .np-lyric, .sound-ctl.floating:focus-within .np.has-lyrics .np-lyric { margin-top: .45rem; }
+.sound-ctl.floating.hov .np, .sound-ctl.floating:focus-within .np { width: min(22rem, 70vw); padding: .75rem .95rem .8rem; }
+.sound-ctl.floating.hov .np-artist, .sound-ctl.floating:focus-within .np-artist { max-height: 1.4rem; opacity: 1; }
+.sound-ctl.floating.hov .np-switches, .sound-ctl.floating:focus-within .np-switches { max-height: 3rem; opacity: 1; margin-top: .6rem; }
+.sound-ctl.floating.hov .np-credit, .sound-ctl.floating:focus-within .np-credit { max-height: 6rem; opacity: 1; margin-top: .65rem; padding-top: .6rem; border-top-color: rgba(244, 244, 242, .12); }
+.sound-ctl.floating.hov .np.has-lyrics .np-lyric, .sound-ctl.floating:focus-within .np.has-lyrics .np-lyric { margin-top: .45rem; }
 /* floating: the volume bar slides open beside the button instead of appearing */
 .sound-ctl.floating .vol { display: flex; max-width: 0; opacity: 0; padding: 0; border-width: 0; overflow: hidden; white-space: nowrap;
   transition: max-width .38s cubic-bezier(.2, .7, .2, 1), opacity .25s ease, padding .38s; }
-.sound-ctl.floating:hover .vol, .sound-ctl.floating:focus-within .vol { max-width: 20rem; opacity: 1; padding: 0 1rem; border-width: 1px; }
+.sound-ctl.floating.hov .vol, .sound-ctl.floating:focus-within .vol { max-width: 20rem; opacity: 1; padding: 0 1rem; border-width: 1px; }
 @media (max-width: 40rem) { .sound-ctl.floating .vol { display: none; } }
 @media (prefers-reduced-motion: reduce) { .np, .np *, .sound-ctl.floating .vol { transition: none !important; } }
 
@@ -1742,7 +1742,7 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
   .sound-ctl.open .np.has-lyrics .np-lyric { height: 3em; font-size: .8125rem; }
   .sound-ctl.open .np-line { -webkit-line-clamp: 2; }
   /* hover sticks after a tap on phones; only .open opens things there */
-  .sound-ctl.floating:hover .vol { display: none; }
+  .sound-ctl.floating.hov .vol { display: none; }
   .sound-ctl.floating.open .vol { display: flex; max-width: 20rem; opacity: 1; padding: 0 .8rem; border-width: 1px; }
 }
 
@@ -1760,11 +1760,11 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 .np-time { font: 300 .6875rem/1 "MeguLit Mono", var(--mono); letter-spacing: .06em; color: #9a9a9a; font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* compact strip (down the page, and on phones): the controls fold away with the other extras */
 .sound-ctl.floating .np-ctl { display: grid; max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; transition: max-height .38s cubic-bezier(.2, .7, .2, 1), opacity .25s, margin .38s; }
-.sound-ctl.floating:hover .np-ctl, .sound-ctl.floating:focus-within .np-ctl { max-height: 3rem; opacity: 1; margin-top: .55rem; }
+.sound-ctl.floating.hov .np-ctl, .sound-ctl.floating:focus-within .np-ctl { max-height: 3rem; opacity: 1; margin-top: .55rem; }
 @media (max-width: 40rem) {
   .sound-ctl .np-ctl { display: grid; max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; transition: max-height .35s, opacity .25s, margin .35s; }
   .sound-ctl.open .np-ctl { max-height: 3rem; opacity: 1; margin-top: .55rem; }
-  .sound-ctl.floating:hover .np-ctl { max-height: 0; opacity: 0; margin-top: 0; }
+  .sound-ctl.floating.hov .np-ctl { max-height: 0; opacity: 0; margin-top: 0; }
   .sound-ctl.floating.open .np-ctl { max-height: 3rem; opacity: 1; margin-top: .55rem; }
 }
 
@@ -1790,7 +1790,7 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 .np-sw[aria-pressed="true"] { color: #f4f4f2; background: none; border: 0; }
 .np-sw[aria-pressed="true"]::before { background: #c8323c; border-color: #c8323c; }
 .np-sw:hover, .np-sw:focus-visible { color: #fff; border: 0; outline: none; }
-.sound-ctl.floating:hover .np-ctl, .sound-ctl.floating:focus-within .np-ctl { max-height: 5rem; }
+.sound-ctl.floating.hov .np-ctl, .sound-ctl.floating:focus-within .np-ctl { max-height: 5rem; }
 @media (max-width: 40rem) { .sound-ctl.open .np-ctl, .sound-ctl.floating.open .np-ctl { max-height: 5rem; } }
 
 /* SoundCloud's own mini player inside the label (the music streams from there) */
@@ -1798,7 +1798,7 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 .sc-frame { position: fixed; left: -9999px; width: 300px; height: 20px; }
 .np .sc-frame { position: static; left: auto; }
 .sound-ctl.floating .np .sc-frame { max-height: 0; opacity: 0; margin-top: 0; overflow: hidden; transition: max-height .38s, opacity .25s, margin .38s; }
-.sound-ctl.floating:hover .np .sc-frame, .sound-ctl.floating:focus-within .np .sc-frame { max-height: 20px; opacity: 1; margin-top: .6rem; }
+.sound-ctl.floating.hov .np .sc-frame, .sound-ctl.floating:focus-within .np .sc-frame { max-height: 20px; opacity: 1; margin-top: .6rem; }
 @media (max-width: 40rem) {
   .sound-ctl .np .sc-frame { max-height: 0; opacity: 0; margin-top: 0; }
   .sound-ctl.open .np .sc-frame { max-height: 20px; opacity: 1; margin-top: .6rem; }
@@ -1821,7 +1821,7 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 .np .np-src .sc-frame:hover { opacity: 1; }
 /* compact strip: the source strip folds away with the other extras */
 .sound-ctl.floating .np-src { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; padding-top: 0; border-top-color: transparent; transition: max-height .38s, opacity .25s, margin .38s, padding .38s; }
-.sound-ctl.floating:hover .np-src, .sound-ctl.floating:focus-within .np-src { max-height: 3rem; opacity: 1; margin-top: .6rem; padding-top: .6rem; border-top-color: rgba(244, 244, 242, .1); }
+.sound-ctl.floating.hov .np-src, .sound-ctl.floating:focus-within .np-src { max-height: 3rem; opacity: 1; margin-top: .6rem; padding-top: .6rem; border-top-color: rgba(244, 244, 242, .1); }
 .sound-ctl.floating .np .sc-frame { max-height: none; opacity: .92; margin: 0; }
 @media (max-width: 40rem) {
   .sound-ctl .np-src { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; padding-top: 0; border-top-color: transparent; }

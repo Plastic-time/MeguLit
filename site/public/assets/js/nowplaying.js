@@ -5,15 +5,18 @@
 // (arriving character by character), play/pause, previous/next, a seek bar, two switches and the song's credit.
 // Every element marked .js-bgm-credit (the footer) shows the current song's credit, in the page language.
 
+import { neUrl, nePage } from './ne.js';
+
 const pageLang = () => (document.documentElement.lang || 'zh').slice(0, 2);
 const base = new URL('../audio/', import.meta.url);
-const FALLBACK = { id: 'kettenkrad-tell-me-about-the-music-that-makes-up-you', sc: 'https://soundcloud.com/kettenkrad8901/tell-me-about-the-music-that-makes-up-you', lyrics: true };
+const FALLBACK = { id: 'kettenkrad-tell-me-about-the-music-that-makes-up-you', sc: 'https://soundcloud.com/kettenkrad8901/tell-me-about-the-music-that-makes-up-you', ne: 2150486811, lyrics: true };
 const a = (href, text) => { const el = document.createElement('a'); el.href = href; el.textContent = text; el.rel = 'noopener'; el.target = '_blank'; return el; };
 const mmss = s => (Number.isFinite(s) ? `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '--:--');
 
 let listPromise = null;
 const getList = () => listPromise || (listPromise = fetch(new URL('playlist.json', base)).then(r => r.json()).catch(() => ({ text: {}, tracks: [] })));
-let current = null;   // the track playing now (or about to), shared with the footer credit
+let current = null;
+let viaNe = false;     // true when the songs come from NetEase Cloud Music (visitors in mainland China, see ne.js)   // the track playing now (or about to), shared with the footer credit
 
 // author · album (label) · licence, as nodes with links
 function creditNodes(m, text) {
@@ -23,7 +26,8 @@ function creditNodes(m, text) {
   if (m.artist) out.push(document.createTextNode(`${t.by || 'by'} `), m.artistUrl ? a(m.artistUrl, m.artist) : document.createTextNode(m.artist));
   if (m.album) { if (out.length) sep(); out.push(document.createTextNode(`${t.from || 'from'} `), m.albumUrl ? a(m.albumUrl, `${m.album}${m.label ? ` (${m.label})` : ''}`) : document.createTextNode(m.album)); }
   if (m.license) { if (out.length) sep(); out.push(m.licenseUrl ? a(m.licenseUrl, m.license) : document.createTextNode(m.license)); }
-  if (m.sc) { if (out.length) sep(); out.push(a(m.sc, t.listen || 'SoundCloud')); }
+  if (viaNe && m.ne) { if (out.length) sep(); out.push(a(nePage(m.ne), t.listenNe || 'NetEase Cloud Music')); }
+  else if (m.sc) { if (out.length) sep(); out.push(a(m.sc, t.listen || 'SoundCloud')); }
   return out;
 }
 
@@ -71,6 +75,7 @@ const ICON = {
 // background: an object with say(text) and clear() (the kana layers); it gets every lyric line while "背景歌词" is on.
 // Returns the player: ensureSrc() points the audio at the current track (call it before the first play()).
 export function nowPlaying(audio, host, { reduce = false, background = null } = {}) {
+  viaNe = audio.source === 'ne';
   const box = document.createElement('div');
   box.className = 'np';
   box.hidden = true;
@@ -95,6 +100,11 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
       requestAnimationFrame(place);
     };
     requestAnimationFrame(place);
+    // the dock sits outside the label, so the label's hover state counts the dock too: otherwise the pointer on
+    // SoundCloud's strip would close the label, the strip would slide away, the label would reopen, and so on
+    let hovT = 0;
+    const hov = on => { clearTimeout(hovT); if (on) host.classList.add('hov'); else hovT = setTimeout(() => host.classList.remove('hov'), 180); };
+    for (const el of [host, dock]) { el.addEventListener('pointerenter', () => hov(true)); el.addEventListener('pointerleave', () => hov(false)); }
   }
   const $ = s => box.querySelector(s);
   const title = $('.np-title'), artist = $('.np-artist'), lyric = $('.np-lyric'), credit = $('.np-credit');
@@ -136,7 +146,7 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
 
   // ---- tracks -------------------------------------------------------------------------------------------------------------
   const ready = getList().then(list => { pl = list; if (!pl.tracks.length) pl.tracks = [{ ...FALLBACK, title: '' }]; current = pl.tracks[idx]; paintTrack(); });
-  const srcOf = t => t.sc || new URL(`${t.id}.mp3`, base).href;
+  const srcOf = t => (viaNe ? t.ne && neUrl(t.ne) : t.sc) || new URL(`${t.id}.mp3`, base).href;
   const paintTrack = () => {
     const t = pl.tracks[idx];
     current = t;

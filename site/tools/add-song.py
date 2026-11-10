@@ -3,6 +3,7 @@
 #   - with --soundcloud URL (the normal case): the song plays from its artist's SoundCloud page through SoundCloud's
 #     embedded player; no audio is stored here. The local file is only used for the beats and the length.
 #   - without it (only for music you may redistribute): 16 dB quieter, 96 kbps stereo MP3, metadata stripped
+#   - with --netease ID: visitors in mainland China (where SoundCloud does not load) play the song from NetEase Cloud Music
 #   - lyrics: the .lrc next to the song (or --lrc); Chinese translation lines are dropped automatically (a line with Han
 #     characters but no kana, or a second line at the same timestamp that has no kana, is treated as a translation)
 #   - beats: kicks and snares for the page's motion (beats.py)
@@ -26,6 +27,7 @@ ap.add_argument('--lrc'); ap.add_argument('--id'); ap.add_argument('--title'); a
 ap.add_argument('--artist-url', default=''); ap.add_argument('--album', default=''); ap.add_argument('--label', default='')
 ap.add_argument('--album-url', default=''); ap.add_argument('--license', default=''); ap.add_argument('--license-url', default='')
 ap.add_argument('--bitrate', default='96k'); ap.add_argument('--gain', default='-16dB'); ap.add_argument('--soundcloud', default='')
+ap.add_argument('--netease', type=int, default=0)   # the song's NetEase Cloud Music id: visitors in China play it from there
 a = ap.parse_args()
 src = Path(a.src)
 
@@ -79,7 +81,7 @@ except subprocess.CalledProcessError:
 # playlist
 pl = json.loads(PLAYLIST.read_text('utf8')) if PLAYLIST.exists() else {'tracks': []}
 entry = {'id': slug, 'title': title, 'artist': artist, 'artistUrl': a.artist_url, 'album': album, 'label': a.label, 'albumUrl': a.album_url,
-         'license': a.license, 'licenseUrl': a.license_url, 'sc': a.soundcloud, 'lyrics': has_lrc, 'duration': round(dur, 1)}
+         'license': a.license, 'licenseUrl': a.license_url, 'sc': a.soundcloud, 'ne': a.netease or None, 'lyrics': has_lrc, 'duration': round(dur, 1)}
 pl['tracks'] = [t for t in pl.get('tracks', []) if t.get('id') != slug] + [entry]
 PLAYLIST.write_text(json.dumps(pl, ensure_ascii=False, indent=2) + '\n', 'utf8')
 print(f'{slug}: {"SoundCloud" if a.soundcloud else f"{mp3.stat().st_size / 1e6:.1f} MB"}, {dur:.0f} s, playlist now {len(pl["tracks"])} songs')
