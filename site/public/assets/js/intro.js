@@ -29,7 +29,7 @@ export function playIntro() { return running || (running = play()); }
 function play() {
   const root = document.documentElement;
   const el = document.querySelector('.intro');
-  if (!el || !root.classList.contains('intro-on')) { markShown(); return Promise.resolve(); }
+  if (!el || !root.classList.contains('intro-on')) { root.classList.remove('intro-on'); markShown(); return Promise.resolve(); }
   document.body.style.overflow = 'hidden';
 
   const logo = el.querySelector('.gl-logo');
