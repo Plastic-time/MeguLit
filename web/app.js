@@ -641,6 +641,10 @@ function bootEntrance(){const html=document.documentElement;if(!tabsMotion()){ht
  document.querySelectorAll('#main .shelf .book').forEach((book,i)=>book.style.setProperty('--boot-i',String(Math.min(i,10))));
  const go=()=>{if(!html.classList.contains('app-boot-pre'))return;html.classList.remove('app-boot-pre');html.classList.add('app-boot');setTimeout(()=>html.classList.remove('app-boot'),2000);};
  const later=()=>requestAnimationFrame(()=>requestAnimationFrame(go));
+ /* E391 the startup island keeps this window cloaked until its bar finishes, so painting is no sign the window can be
+    seen: the host sends home-revealed when the island starts fading the window in, and the entrance plays then */
+ const callback=window.__TAURI_INTERNALS__?.transformCallback?.(()=>later());
+ if(callback){invoke('plugin:event|listen',{event:'home-revealed',target:{kind:'Any'},handler:callback}).catch(later);setTimeout(go,8000);return;}
  if(document.visibilityState==='hidden')document.addEventListener('visibilitychange',later,{once:true});else later();
  setTimeout(go,3000);}
 function bindTabs(page){{const group=page==='statistics'?'learning':page,bar=document.querySelector('#main>.tabs');if(bar&&tabsGroup!==group)dropTabs(bar);tabsGroup=group;}document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>page==='learning'&&button.dataset.tab==='statistics'?navigate('statistics'):navigate(page==='statistics'?'learning':page,button.dataset.tab)));alignSubtabs(); /* align as soon as the bar exists, not after the page finishes loading (复习 jumped right once Anki answered) */}

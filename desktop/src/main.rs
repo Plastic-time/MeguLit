@@ -343,8 +343,13 @@ async fn window_action(action: String, window: tauri::WebviewWindow, state: Stat
             } else if let Some(flag)=&state.splash {
                 let flag=flag.clone();
                 let _=std::fs::write(format!("{}.progress",flag.display()),"100");if window.label()=="main"{startup_mark(&state.root,"home-ready");}
-                std::thread::spawn(move || { std::thread::sleep(std::time::Duration::from_millis(450));let _=std::fs::write(flag,"1"); });
-            } else { window.show().map_err(|e| e.to_string())?; }
+                // E391 once the startup island starts fading the window in (it writes .revealed), the page plays its entrance
+                let app=window.app_handle().clone();
+                std::thread::spawn(move || { std::thread::sleep(std::time::Duration::from_millis(450));let _=std::fs::write(&flag,"1");
+                    let revealed=std::path::PathBuf::from(format!("{}.revealed",flag.display()));
+                    for _ in 0..200 {if revealed.is_file(){break;}std::thread::sleep(std::time::Duration::from_millis(25));}
+                    let _=std::fs::remove_file(&revealed);let _=app.emit("home-revealed","splash"); });
+            } else { window.show().map_err(|e| e.to_string())?;let _=window.app_handle().emit("home-revealed","shown"); }
         },
         "enter_overlay" => begin_home_exit(window.app_handle())?,
         "hide_home" => {state.home_transition.cancel();hide_home(window.app_handle())?;},

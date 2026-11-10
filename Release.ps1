@@ -89,7 +89,9 @@ $prevAsset=$latest.assets | Where-Object {$_.name -match '^MeguLit-v\d+\.\d+\.\d
 if(-not $prevAsset){throw 'Previous release has no package to take the file list from'}
 if($Hotfix){if($Version -ne $prev){throw "-Hotfix replaces the latest release ($prev); pass -Version $prev"}}
 elseif([version]$Version -le [version]$prev){throw "Version $Version is not newer than the latest release $prev"}
-Write-Host "previous release v$prev -> $Tag"
+# E392 the labels people see (1.3.1a), not only the numeric tags: the progress band and the log read this line
+$prevLabelShown=$prev;$aboutNow=git show HEAD:web/about.js 2>$null|Out-String;if($aboutNow -match "VERSION='(\d+\.\d+\.\d+[a-z]?)'"){$prevLabelShown=$matches[1]}
+Write-Host "previous release v$prevLabelShown -> v$Label ($Tag)"
 
 # ---------- version ----------
 Step 'bump version'

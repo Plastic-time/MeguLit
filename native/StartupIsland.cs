@@ -85,7 +85,10 @@ sealed class StartupIsland : Form {
  }
  bool MainSuppressed(){try{return File.ReadAllText(Flag+".suppressed").Trim()=="1";}catch{return false;}}
  void StartReveal(){
-  if(RevealStarted)return;RevealStarted=true;if(EventHook!=IntPtr.Zero){UnhookWinEvent(EventHook);EventHook=IntPtr.Zero;}
+  if(RevealStarted)return;RevealStarted=true;
+  // E391 tells the host the main window is now fading in, so the page starts its entrance while it can be seen
+  try{File.WriteAllText(Flag+".revealed","1");}catch{}
+  if(EventHook!=IntPtr.Zero){UnhookWinEvent(EventHook);EventHook=IntPtr.Zero;}
   foreach(var h in Hidden)if(IsWindow(h)){Alpha(h,0);ShowWindow(h,MainSuppressed()?0:5);Cloak(h,false);}
   if(!MainSuppressed()&&Hidden.Count>0){var h=Hidden[0];SetWindowPos(h,new IntPtr(-1),0,0,0,0,0x43);SetWindowPos(h,new IntPtr(-2),0,0,0,0,0x43);SetForegroundWindow(h);}
  }
