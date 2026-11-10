@@ -131,7 +131,13 @@ if($Prepare){Step "prepared $Tag (built and tested; release later with -SkipBuil
 Step 'package'
 $work=Join-Path $env:TEMP "megulit-release-$Version";if(Test-Path $work){Remove-Item $work -Recurse -Force};New-Item -ItemType Directory $work | Out-Null
 $prevZip=Join-Path $work ("previous-"+$prevAsset.name) # a hotfix downloads a package of the same name it then writes
-Invoke-WebRequest -Uri $prevAsset.browser_download_url -OutFile $prevZip -UseBasicParsing
+# E386 the previous package: a local copy from the last release, then our mirror dl.megulit.com, then GitHub (from here
+# GitHub can take an hour for 20 MB). Whatever the source, its SHA-256 must match GitHub's digest of the asset.
+$want=([string]$prevAsset.digest) -replace '^sha256:','';$got=$false
+$local=Join-Path $env:TEMP ("megulit-release-$prev\"+$prevAsset.name)
+if($want -and (Test-Path $local) -and (Get-FileHash $local -Algorithm SHA256).Hash.ToLower() -eq $want){Copy-Item $local $prevZip -Force;$got=$true;Write-Host '  previous package from the local copy'}
+if(-not $got -and $want){try{Invoke-WebRequest -Uri "https://dl.megulit.com/files/$want/$($prevAsset.name)" -OutFile $prevZip -UseBasicParsing -TimeoutSec 300;$got=(Get-FileHash $prevZip -Algorithm SHA256).Hash.ToLower() -eq $want;if($got){Write-Host '  previous package from dl.megulit.com'}}catch{}}
+if(-not $got){Invoke-WebRequest -Uri $prevAsset.browser_download_url -OutFile $prevZip -UseBasicParsing -TimeoutSec 1800;if($want -and (Get-FileHash $prevZip -Algorithm SHA256).Hash.ToLower() -ne $want){throw 'Previous package hash differs from GitHub digest'}}
 $old=[IO.Compression.ZipFile]::OpenRead($prevZip)
 $names=New-Object 'System.Collections.Generic.SortedSet[string]' ([StringComparer]::Ordinal)
 foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and -not $e.FullName.EndsWith('/') -and $e.FullName -notmatch '\.(lib|obj|pdb|exp|ilk|iobj|ipdb)$' -and $e.FullName -notmatch '/build/'){[void]$names.Add($e.FullName.Substring(8))}}
