@@ -4,9 +4,9 @@
 // game; after the last line the headline comes back. Lines are written as text with {漢字|かんじ} for ruby.
 
 const LINES = {
-  zh: ['台词上，{読|よ}み{方|かた}已经标好了', '{分|わ}からない的词，点一下就懂', '读过的词，它都帮你记着', '那么——{始|はじ}めようか'],
-  ja: ['セリフには、{読|よ}み{方|かた}がもう{付|つ}いてる', '{分|わ}からない{言葉|ことば}は、クリックひとつ', '{読|よ}んだ{言葉|ことば}は、ちゃんと{覚|おぼ}えておく', 'さあ、{始|はじ}めよう'],
-  en: ['Every line comes with its readings', 'Don’t know a word? One click', 'What you read, it remembers', 'Now — shall we begin?'],
+  zh: ['又卡在生词上了？', '别切出去查词典了，点一下就行', '「{好|す}き」——这回看懂了吧', '读过的词它都记着，下次就认识了', '……好啦，剧情还在等你呢'],
+  ja: ['また知らない単語で止まった？', '辞書はもういいよ。クリックひとつで', '「{好|す}き」——今度は読めたでしょ', '読んだ言葉は、ちゃんと覚えておくから', '……ほら、物語の続きが待ってるよ'],
+  en: ['Stuck on a word again?', 'Skip the dictionary. Just click it', '「{好|す}き」 — you can read that now, right?', 'Every word you read, it remembers', '…Okay. The story’s waiting for you'],
 };
 const NEXT = { zh: '点击继续', ja: 'クリックで次へ', en: 'click to continue' };
 
