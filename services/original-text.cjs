@@ -153,8 +153,9 @@ function buildPatch(runningState,source){
   script={engine:'bgi',version:0,codepage:'mixed',lines,structure:{messages:lines.length,functions:scenes.length,functionHash:crypto.createHash('sha256').update(scenes.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};
  }else if(scenes.ENGINES[engine]){
   const eng=scenes.ENGINES[engine],base=scenes.read(engine,runningDir);let list;
-  if(eng.patchLines){list=eng.patchLines(base,found);if(!list)throw Error('PATCH_SCRIPT_NOT_FOUND');}
-  else{
+  if(eng.patchLines)list=eng.patchLines(base,found);
+  if(!list&&eng.patchLines&&!eng.archives)throw Error('PATCH_SCRIPT_NOT_FOUND');
+  if(!list){
    const names=new Set(base.map(x=>x.name.toLowerCase())),overlay=new Map();
    for(const [key,f] of found.files){if(!names.has(key)||!eng.test(f.name)||f.path&&sameDir(path.dirname(f.path),runningDir))continue;try{overlay.set(key,f.read());}catch{}}
    for(const dir of found.dirs){if(sameDir(dir,runningDir))continue;let items=[];try{items=eng.archives(dir);}catch{}for(const item of items){const key=item.name.toLowerCase();if(names.has(key)&&!overlay.has(key))try{overlay.set(key,item.read());}catch{}}}

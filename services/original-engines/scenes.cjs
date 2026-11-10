@@ -74,7 +74,28 @@ function pfsRead(file,entry,key){const fd=fs.openSync(file,'r');try{const b=Buff
 const AST=n=>/\.ast$/i.test(n);
 function pfsScenes(file){let t;try{t=pfsList(file);}catch{return [];}if(!t)return [];return t.files.filter(e=>AST(e.name)).map(e=>({name:path.basename(e.name.replace(/\\/g,'/')),read:()=>pfsRead(file,e,t.key)}));}
 // Quoted strings in file order: the ones with any non-ASCII character are text, the rest are anchors.
+/* E352 multilingual Artemis (Steam The Shell: every message is text = { ja = {...}, en = {...}, tw = {...}, cn = {...} }):
+   the Japanese table is the line, the release's own Simplified (else Traditional) Chinese is its translation, and
+   {"ruby", text="よみ"} before a base string is the game's own reading. Pages of one message are joined by a newline. */
+function luaBlock(text,open){let depth=0,q=false;for(let i=open;i<text.length;i++){const c=text[i];if(q){if(c==='\\'){i++;continue;}if(c==='"')q=false;continue;}if(c==='"'){q=true;continue;}if(c==='{')depth++;else if(c==='}'&&--depth===0)return i;}return -1;}
+function luaLang(block){/* {{ "text", {"ruby", text="よみ"}, "base", {"/ruby"}, ... }, {...next page} } */
+ const pages=[],ruby=[];let depth=0,page='',pending=null,i=0;
+ while(i<block.length){const c=block[i];
+  if(c==='"'){let j=i+1,s='';while(j<block.length&&block[j]!=='"'){if(block[j]==='\\'){s+=block[j+1];j+=2;continue;}s+=block[j++];}
+   if(depth===2){page+=s;if(pending){ruby.push([s,pending]);pending=null;}}i=j+1;continue;}
+  if(c==='{'){if(depth===2){const end=luaBlock(block,i),tag=block.slice(i,end+1),r=/^\{\s*"ruby"\s*,\s*text\s*=\s*"((?:[^"\\]|\\.)*)"/.exec(tag);if(r)pending=r[1];i=end+1;continue;}depth++;if(depth===2)page='';}
+  else if(c==='}'){if(depth===2&&page)pages.push(page);depth--;}
+  i++;}
+ return {text:pages.join('\n'),ruby};}
+function parseAstMulti(text){const lines=[],zh=[],ruby=[],anchors=[],re=/\btext\s*=\s*\{/g;let m,last=0;
+ while((m=re.exec(text))){const open=text.indexOf('{',m.index),end=luaBlock(text,open);if(end<0)break;
+  for(const a of text.slice(last,m.index).matchAll(/"((?:[^"\\]|\\.)*)"/g))if(ascii(a[1]))anchors.push(a[1]);
+  const block=text.slice(open,end+1),langs={};for(const k of block.matchAll(/\b(ja|cn|tw|en)\s*=\s*\{/g)){const o=k.index+k[0].length-1,e=luaBlock(block,o);if(e>0&&!(k[1] in langs))langs[k[1]]=luaLang(block.slice(o,e+1));}
+  if(langs.ja){lines.push(langs.ja.text);zh.push((langs.cn||langs.tw)?.text||'');ruby.push(langs.ja.ruby.length?langs.ja.ruby:null);}
+  last=end+1;re.lastIndex=end+1;}
+ return {lines,anchors,zh,ruby};}
 function parseAst(buf){const lines=[],anchors=[],text=decode(buf),re=/"((?:[^"\\]|\\.)*)"/g;let m;
+ if(/\btext\s*=\s*\{\s*ja\s*=\s*\{/.test(text))return parseAstMulti(text);
  while((m=re.exec(text))){const s=m[1].replace(/\\(.)/g,'$1');if(ascii(s))anchors.push(s);else lines.push(s);}
  return {lines,anchors};}
 const isPfs=f=>/\.pfs(?:\.\d+)?$/i.test(f);
@@ -86,6 +107,8 @@ const artemis={
  archives:dir=>fs.readdirSync(dir).filter(isPfs).flatMap(a=>pfsScenes(path.join(dir,a))),
  sources:dir=>[...fs.readdirSync(dir).filter(isPfs).map(f=>path.join(dir,f)),...walk(dir,3,AST)],
  parse:parseAst,test:AST,
+ // E352: a multilingual release carries its own Chinese; other games fall back to the usual patch overlay.
+ patchLines(base){let any=false;const list=base.map(scene=>{const zh=scene.zh||[];if(!zh.some(Boolean))return scene;any=true;return {...scene,patched:true,lines:scene.lines.map((t,k)=>zh[k]||t)};});return any?list:null;},
 };
 
 // ---- Ren'Py ---------------------------------------------------------------------------------------------------
@@ -344,8 +367,8 @@ const nscripter=require('./nscripter.cjs');
 // E340 Unity TextAssets with 日本語※简体※繁體 lines (月に寄りそう乙女の作法): unity-text.cjs. E341 07th Expansion Unity
 // (ひぐらし 奉, StreamingAssets/Scripts OutputLine): higurashi.cjs. E342 MAGES. script.mpk SC3 (STEINS;GATE): mages.cjs.
 // E343 Capcom Unity Ace Attorney collections (逆転検事 1&2, scriptmessage bundles): capcom-msg.cjs.
-const unityText=require('./unity-text.cjs'),higurashi=require('./higurashi.cjs'),mages=require('./mages.cjs'),capcomMsg=require('./capcom-msg.cjs');
-const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg};
+const catsystem2=require('./catsystem2.cjs'),naninovel=require('./naninovel.cjs'),unityText=require('./unity-text.cjs'),higurashi=require('./higurashi.cjs'),mages=require('./mages.cjs'),capcomMsg=require('./capcom-msg.cjs');
+const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,8)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;}
