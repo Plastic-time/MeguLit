@@ -34,6 +34,7 @@
     .tome-models-head select { width:auto; }
     .tome-models-head strong { white-space:nowrap; }
     .tome-model-row { display:grid; grid-template-columns:1fr auto; gap:2px 8px; align-items:center; }
+    .tome-model-runtime { padding:10px 12px; margin:0 0 12px; border:1px solid #c8303c66; border-radius:10px; background:#c8303c14; } /* E399 the runtime sits apart from the model list */
     .tome-model-row small { grid-column:1; opacity:.7; word-break:break-all; }
     .tome-model-row button { grid-column:2; grid-row:1 / span 2; }
     .tomoyo-cn-dialog { width:430px; max-width:calc(100vw - 30px); max-height:calc(100vh - 30px); box-sizing:border-box; overflow-y:auto; padding:22px; border:1px solid #494c5c; border-radius:14px; background:#20222c; color:#eceef5; font:14px/1.6 'Microsoft YaHei',sans-serif; pointer-events:auto!important; -webkit-app-region:no-drag; }
@@ -195,16 +196,16 @@
       });
       // The runtime that runs these files (user, 2026-11-03: a downloaded model alone only gave "fetch failed").
       const lang = window.__tomeI18n?.get?.(), rt = s.runtime, rjob = rt?.job, rbusy = rjob?.state === 'downloading';
-      const L = ({ en:{ name:'llama.cpp local runtime (runs the models; NVIDIA / AMD / Intel GPUs)', ready:'Installed · ', running:' · running ', get:'Download', cancel:'Cancel', del:'Delete', fail:'Download failed: ', note:'Saved in ', note2:'. With the runtime and one model downloaded, pick the Sakura or llama.cpp engine: MeguLit starts the local server itself (the first line takes a while to load). A server you run yourself at the address above is used as is' },
-        ja:{ name:'llama.cpp ローカル実行環境（モデルを動かす本体・NVIDIA / AMD / Intel GPU 対応）', ready:'インストール済み · ', running:' · 実行中 ', get:'ダウンロード', cancel:'取消', del:'削除', fail:'ダウンロード失敗：', note:'保存先：', note2:'。実行環境とモデルを 1 つダウンロードし、Sakura か llama.cpp エンジンを選ぶと MeguLit がローカルサーバーを自動で起動します（最初の 1 行は読み込みに時間がかかります）。上のアドレスで自分で起動したサーバーはそのまま使います' } })[lang] || { name:'llama.cpp 本地运行库（运行上面的模型，NVIDIA / AMD / Intel 显卡通用）', ready:'已安装 · ', running:' · 正在运行 ', get:'下载', cancel:'取消', del:'删除', fail:'下载失败：', note:'保存位置：', note2:'。下载运行库和一个模型后，选 Sakura 或 llama.cpp 引擎即可，MeguLit 会自动启动本地服务（第一句需要等模型加载）；上方地址上你自己启动的服务会直接使用' };
-      const runtime = document.createElement('div'); runtime.className = 'tome-model-row';
+      const L = ({ en:{ name:'llama.cpp local runtime (runs the models; NVIDIA / AMD / Intel GPUs)', ready:'Installed · ', running:' · running ', get:'Download and install', cancel:'Cancel', del:'Delete', fail:'Download failed: ', note:'Saved in ', note2:'. With the runtime and one model downloaded, pick the Sakura or llama.cpp engine: MeguLit starts the local server itself (the first line takes a while to load). A server you run yourself at the address above is used as is' },
+        ja:{ name:'llama.cpp ローカル実行環境（モデルを動かす本体・NVIDIA / AMD / Intel GPU 対応）', ready:'インストール済み · ', running:' · 実行中 ', get:'ダウンロードしてインストール', cancel:'取消', del:'削除', fail:'ダウンロード失敗：', note:'保存先：', note2:'。実行環境とモデルを 1 つダウンロードし、Sakura か llama.cpp エンジンを選ぶと MeguLit がローカルサーバーを自動で起動します（最初の 1 行は読み込みに時間がかかります）。上のアドレスで自分で起動したサーバーはそのまま使います' } })[lang] || { name:'llama.cpp 本地运行库（运行下面的模型，NVIDIA / AMD / Intel 显卡通用）', ready:'已安装 · ', running:' · 正在运行 ', get:'下载并安装', cancel:'取消', del:'删除', fail:'下载失败：', note:'保存位置：', note2:'。下载运行库和一个模型后，选 Sakura 或 llama.cpp 引擎即可，MeguLit 会自动启动本地服务（第一句需要等模型加载）；上方地址上你自己启动的服务会直接使用' };
+      const runtime = document.createElement('div'); runtime.className = 'tome-model-row tome-model-runtime'; /* E399 its own block above the model list (user: 移出这个列表，单独一个按钮下载安装) */
       if (rt) { const name = document.createElement('span'); name.textContent = L.name; name.dataset.noI18n = ''; const meta = document.createElement('small'); meta.dataset.noI18n = '';
         meta.textContent = rbusy ? gb(rjob.received) + ' / ' + gb(rjob.total || rt.size) : rjob?.state === 'error' ? L.fail + rjob.error : rt.installed ? L.ready + rt.version + (rt.running ? L.running + rt.model : '') : rt.version + ' · ' + (rt.size / 1048576).toFixed(0) + ' MB';
         const act = document.createElement('button'); act.type = 'button'; act.dataset.noI18n = ''; act.textContent = rbusy ? L.cancel : rt.installed ? L.del : L.get;
         act.onclick = async () => { act.disabled = true; try { await bridge.v4Request(rbusy ? 'runtimeCancel' : rt.installed ? 'runtimeDelete' : 'runtimeDownload', {}); } catch {} models.paint(box); };
         runtime.append(name, meta, act); }
       const note = document.createElement('small'); note.textContent = L.note + s.dir + L.note2; note.dataset.noI18n = '';
-      box.replaceChildren(head, ...(rt ? [runtime] : []), ...rows, note);
+      box.replaceChildren(...(rt ? [runtime] : []), head, ...rows, note);
       clearTimeout(models.timer); if (rbusy || s.models.some(m => m.job?.state === 'downloading')) models.timer = setTimeout(() => models.paint(box), 800);
     } };
     const updateForm = () => {
