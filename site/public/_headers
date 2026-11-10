@@ -3,9 +3,9 @@
 /assets/fonts/*
   Cache-Control: public, max-age=2592000
 /assets/css/*
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=0, must-revalidate
 /assets/js/*
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=0, must-revalidate
 /data/*
   Cache-Control: public, max-age=300
 /*
