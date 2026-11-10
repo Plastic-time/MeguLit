@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Background-music player. The library is assets/audio/playlist.json (built by site/tools/add-song.py): every track has
-// <id>.mp3 (16 dB down, 96 kbps), an optional <id>.lrc (timed lyrics, Chinese translation lines already removed) and
-// <id>.beats.json. While a song plays, a label beside the sound control shows its title, artist, the current lyric line
+// Background-music player. The library is assets/audio/playlist.json (built by site/tools/add-song.py): every track is a
+// song on its artist's SoundCloud page (played through SoundCloud's embedded player, see sc.js), with an optional
+// <id>.lrc (timed lyrics, Chinese translation lines already removed) and <id>.beats.json made from a local copy. While a song plays, a label beside the sound control shows its title, artist, the current lyric line
 // (arriving character by character), play/pause, previous/next, a seek bar, two switches and the song's credit.
 // Every element marked .js-bgm-credit (the footer) shows the current song's credit, in the page language.
 
 const pageLang = () => (document.documentElement.lang || 'zh').slice(0, 2);
 const base = new URL('../audio/', import.meta.url);
-const FALLBACK = 'kettenkrad-tell-me-about-the-music-that-makes-up-you';
+const FALLBACK = { id: 'kettenkrad-tell-me-about-the-music-that-makes-up-you', sc: 'https://soundcloud.com/kettenkrad8901/tell-me-about-the-music-that-makes-up-you', lyrics: true };
 const a = (href, text) => { const el = document.createElement('a'); el.href = href; el.textContent = text; el.rel = 'noopener'; el.target = '_blank'; return el; };
 const mmss = s => (Number.isFinite(s) ? `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '--:--');
 
@@ -23,6 +23,7 @@ function creditNodes(m, text) {
   if (m.artist) out.push(document.createTextNode(`${t.by || 'by'} `), m.artistUrl ? a(m.artistUrl, m.artist) : document.createTextNode(m.artist));
   if (m.album) { if (out.length) sep(); out.push(document.createTextNode(`${t.from || 'from'} `), m.albumUrl ? a(m.albumUrl, `${m.album}${m.label ? ` (${m.label})` : ''}`) : document.createTextNode(m.album)); }
   if (m.license) { if (out.length) sep(); out.push(m.licenseUrl ? a(m.licenseUrl, m.license) : document.createTextNode(m.license)); }
+  if (m.sc) { if (out.length) sep(); out.push(a(m.sc, t.listen || 'SoundCloud')); }
   return out;
 }
 
@@ -80,6 +81,8 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
     + '<div class="np-bar"><span class="np-now">00:00</span><input class="np-seek" type="range" min="0" max="1000" value="0"><span class="np-dur">--:--</span></div></div>'
     + '<p class="np-switches"><button type="button" class="np-sw" data-sw="lyrics"></button><button type="button" class="np-sw" data-sw="bg"></button></p><p class="np-credit"></p>';
   host.append(box);
+  // SoundCloud's own mini player sits in the label, below the controls
+  if (audio.frame) box.querySelector('.np-switches').before(audio.frame);
   const $ = s => box.querySelector(s);
   const title = $('.np-title'), artist = $('.np-artist'), lyric = $('.np-lyric'), credit = $('.np-credit');
   const playBtn = $('.np-play'), seek = $('.np-seek'), nowEl = $('.np-now'), durEl = $('.np-dur');
@@ -119,8 +122,8 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
   };
 
   // ---- tracks -------------------------------------------------------------------------------------------------------------
-  const ready = getList().then(list => { pl = list; if (!pl.tracks.length) pl.tracks = [{ id: FALLBACK, title: '', lyrics: true }]; current = pl.tracks[idx]; paintTrack(); });
-  const srcOf = t => new URL(`${t.id}.mp3`, base).href;
+  const ready = getList().then(list => { pl = list; if (!pl.tracks.length) pl.tracks = [{ ...FALLBACK, title: '' }]; current = pl.tracks[idx]; paintTrack(); });
+  const srcOf = t => t.sc || new URL(`${t.id}.mp3`, base).href;
   const paintTrack = () => {
     const t = pl.tracks[idx];
     current = t;
@@ -145,7 +148,7 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
     if (play) { hold = false; audio.play().catch(() => {}); }
   };
   const player = {
-    ensureSrc() { if (!audio.getAttribute('src')) { const t = pl.tracks[idx] || { id: FALLBACK }; audio.src = srcOf(t); audio.dataset.track = t.id; } },
+    ensureSrc() { if (!audio.getAttribute('src')) { const t = pl.tracks[idx] || FALLBACK; audio.src = srcOf(t); audio.dataset.track = t.id; } },
     next: () => go(idx + 1),
     // "previous" restarts the song when it is a few seconds in, like any player
     prev: () => { if (audio.currentTime > 3 || pl.tracks.length === 1) jump(0).catch(() => {}); else go(idx - 1); },

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Adds a song to the website's background-music library (site/public/assets/audio/).
-#   - audio: 16 dB quieter, 96 kbps stereo MP3 (about 0.7 MB a minute), metadata stripped
+#   - with --soundcloud URL (the normal case): the song plays from its artist's SoundCloud page through SoundCloud's
+#     embedded player; no audio is stored here. The local file is only used for the beats and the length.
+#   - without it (only for music you may redistribute): 16 dB quieter, 96 kbps stereo MP3, metadata stripped
 #   - lyrics: the .lrc next to the song (or --lrc); Chinese translation lines are dropped automatically (a line with Han
 #     characters but no kana, or a second line at the same timestamp that has no kana, is treated as a translation)
 #   - beats: kicks and snares for the page's motion (beats.py)
@@ -23,22 +25,26 @@ ap.add_argument('src')
 ap.add_argument('--lrc'); ap.add_argument('--id'); ap.add_argument('--title'); ap.add_argument('--artist')
 ap.add_argument('--artist-url', default=''); ap.add_argument('--album', default=''); ap.add_argument('--label', default='')
 ap.add_argument('--album-url', default=''); ap.add_argument('--license', default=''); ap.add_argument('--license-url', default='')
-ap.add_argument('--bitrate', default='96k'); ap.add_argument('--gain', default='-16dB')
+ap.add_argument('--bitrate', default='96k'); ap.add_argument('--gain', default='-16dB'); ap.add_argument('--soundcloud', default='')
 a = ap.parse_args()
 src = Path(a.src)
 
-tags = json.loads(subprocess.run([FFPROBE, '-v', 'error', '-show_entries', 'format_tags', '-of', 'json', str(src)], capture_output=True, text=True, encoding='utf8').stdout or '{}').get('format', {}).get('tags', {})
+tags = json.loads(subprocess.run([FFPROBE, '-v', 'error', '-show_entries', 'format_tags', '-of', 'json', str(src)], capture_output=True, text=True, encoding='utf-8', errors='replace').stdout or '{}').get('format', {}).get('tags', {})
 tags = {k.lower(): v for k, v in tags.items()}
 title = a.title or tags.get('title') or src.stem
 artist = a.artist or tags.get('artist') or ''
 album = a.album or tags.get('album') or ''
 slug = a.id or re.sub(r'[^a-z0-9]+', '-', unicodedata.normalize('NFKD', f'{artist} {title}').encode('ascii', 'ignore').decode().lower()).strip('-')[:60] or 'song'
 
-# audio
+# audio: hosted only when there is no SoundCloud page
 mp3 = AUDIO / f'{slug}.mp3'
-subprocess.run([FFMPEG, '-v', 'error', '-y', '-i', str(src), '-vn', '-map_metadata', '-1', '-af', f'volume={a.gain}', '-ac', '2', '-ar', '44100',
-                '-c:a', 'libmp3lame', '-b:a', a.bitrate, str(mp3)], check=True)
-dur = float(subprocess.run([FFPROBE, '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(mp3)], capture_output=True, text=True).stdout.strip() or 0)
+if not a.soundcloud:
+    subprocess.run([FFMPEG, '-v', 'error', '-y', '-i', str(src), '-vn', '-map_metadata', '-1', '-af', f'volume={a.gain}', '-ac', '2', '-ar', '44100',
+                    '-c:a', 'libmp3lame', '-b:a', a.bitrate, str(mp3)], check=True)
+elif mp3.exists():
+    mp3.unlink()
+try: dur = float(subprocess.run([FFPROBE, '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(src)], capture_output=True, text=True, encoding='utf-8', errors='replace').stdout.strip() or 0)
+except ValueError: dur = 0
 
 # lyrics, without Chinese translation lines
 lrc_src = Path(a.lrc) if a.lrc else src.with_suffix('.lrc')
@@ -63,14 +69,18 @@ if lrc_src.exists():
     print(f'lyrics: {len(out)} lines kept, {dropped} translation lines dropped')
 
 # beats
-subprocess.run([sys.executable, '-I', str(ROOT / 'site' / 'tools' / 'beats.py'), str(mp3), str(AUDIO / f'{slug}.beats.json')], check=True,
-               env={**os.environ, 'FFMPEG': FFMPEG})
+# (a local copy that cannot be decoded, e.g. an encrypted .ncm, just means no beats for this song)
+try:
+    subprocess.run([sys.executable, '-I', str(ROOT / 'site' / 'tools' / 'beats.py'), str(src), str(AUDIO / f'{slug}.beats.json')], check=True,
+                   env={**os.environ, 'FFMPEG': FFMPEG}, capture_output=True)
+except subprocess.CalledProcessError:
+    print('beats: the local file could not be decoded, so this song has no beats')
 
 # playlist
 pl = json.loads(PLAYLIST.read_text('utf8')) if PLAYLIST.exists() else {'tracks': []}
 entry = {'id': slug, 'title': title, 'artist': artist, 'artistUrl': a.artist_url, 'album': album, 'label': a.label, 'albumUrl': a.album_url,
-         'license': a.license, 'licenseUrl': a.license_url, 'lyrics': has_lrc, 'duration': round(dur, 1)}
+         'license': a.license, 'licenseUrl': a.license_url, 'sc': a.soundcloud, 'lyrics': has_lrc, 'duration': round(dur, 1)}
 pl['tracks'] = [t for t in pl.get('tracks', []) if t.get('id') != slug] + [entry]
 PLAYLIST.write_text(json.dumps(pl, ensure_ascii=False, indent=2) + '\n', 'utf8')
-print(f'{slug}: {mp3.stat().st_size / 1e6:.1f} MB, {dur:.0f} s, playlist now {len(pl["tracks"])} songs')
-if not a.license: print('warning: no licence given; fill it in playlist.json before publishing')
+print(f'{slug}: {"SoundCloud" if a.soundcloud else f"{mp3.stat().st_size / 1e6:.1f} MB"}, {dur:.0f} s, playlist now {len(pl["tracks"])} songs')
+if not a.soundcloud and not a.license: print('warning: hosted audio without a licence; only add music you may redistribute')
