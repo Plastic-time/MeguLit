@@ -381,9 +381,9 @@ function setSoundLabel() {
   const vol = $('.vol');
   if (vol) vol.hidden = !on;
 }
-// Volume: sound starts quiet (5%) when turned on; the slider sets it from there.
+// Volume: sound starts at 20% (the file itself is 16 dB down); the slider sets it from there.
 const volInput = $('#hero-volume'), volOut = $('.vol-v');
-const volume = () => (volInput ? Number(volInput.value) : 5) / 100;
+const volume = () => (volInput ? Number(volInput.value) : 20) / 100;
 volInput?.addEventListener('input', () => {
   bgm.volume = volume();
   if (volOut) volOut.textContent = `${volInput.value}%`;
@@ -407,7 +407,7 @@ soundBtn?.addEventListener('click', () => {
   store.set('megulit-sound', soundOn ? '0' : '1');   // the visitor's own choice wins from now on
   setSound(!soundOn);
 });
-// Music on by default (at 5%), unless this visitor turned it off before or asked to save data. Browsers only allow
+// Music on by default (at 20%), unless this visitor turned it off before or asked to save data. Browsers only allow
 // sound after the visitor has interacted with the page, so when the first try is refused it starts on the first
 // click, tap or key press anywhere (not on the sound button, which makes its own choice).
 const firstTouch = e => {
