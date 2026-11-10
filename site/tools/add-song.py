@@ -6,7 +6,7 @@
 #   - with --netease ID: visitors in mainland China (where SoundCloud does not load) play the song from NetEase Cloud Music
 #   - lyrics: the .lrc next to the song (or --lrc); Chinese translation lines are dropped automatically (a line with Han
 #     characters but no kana, or a second line at the same timestamp that has no kana, is treated as a translation)
-#   - beats: kicks and snares for the page's motion (beats.py)
+#   - beats: kicks and snares for the page's motion (beats.py); spectrum: 16 bands over time for the equalisers (spectrum.py)
 #   - playlist.json: the song's entry is added or updated (title/artist from the file's tags unless given)
 # Only add music you may share: the licence fields go into the credit the site shows while the song plays.
 # Usage (from the repo root):
@@ -77,6 +77,12 @@ try:
                    env={**os.environ, 'FFMPEG': FFMPEG}, capture_output=True)
 except subprocess.CalledProcessError:
     print('beats: the local file could not be decoded, so this song has no beats')
+# spectrum, for the equalisers and the spectrum scrollbar (spectrum.py)
+try:
+    subprocess.run([sys.executable, '-I', str(ROOT / 'site' / 'tools' / 'spectrum.py'), str(src), str(AUDIO / f'{slug}.spec')], check=True,
+                   env={**os.environ, 'FFMPEG': FFMPEG}, capture_output=True)
+except subprocess.CalledProcessError:
+    print('spectrum: the local file could not be decoded, so this song has no spectrum')
 
 # playlist
 pl = json.loads(PLAYLIST.read_text('utf8')) if PLAYLIST.exists() else {'tracks': []}

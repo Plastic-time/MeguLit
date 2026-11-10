@@ -1903,3 +1903,10 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
   .sound-ctl .np-ctl .np-switches { max-height: none; opacity: 1; margin: 0; }
   .np-ctl { grid-template-columns: auto minmax(0, 1fr); }
 }
+
+/* equalisers driven by the song's spectrum (spectrum.js): no loop animation, each bar's height is its bands' level */
+.sound-fab .eq.live i, .np-eq.live i { animation: none !important; transform: scaleY(var(--l, .18)); }
+/* the page's scrollbar as a spectrum (spectrum.js draws it; the native one is hidden only when it is there) */
+html.spec-on { scrollbar-width: none; }
+html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
+.spec-scroll { position: fixed; z-index: 70; top: 0; right: 0; width: 14px; height: 100vh; cursor: default; touch-action: none; }

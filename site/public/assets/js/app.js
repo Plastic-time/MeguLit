@@ -7,6 +7,7 @@ import { playIntro, introShown } from './intro.js';
 import { nowPlaying, bgmCredit } from './nowplaying.js';
 import { ScAudio } from './sc.js';
 import { neAudio, inChina } from './ne.js';
+import { spectrum, eqBars, spectrumScrollbar } from './spectrum.js';
 import { notice } from './notice.js';
 import { tryIt } from './try.js';
 // the entrance starts before anything else on the page is set up
@@ -317,6 +318,10 @@ let topLayer = null;
 const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const lyricLayers = { say: text => { const pick = Math.random() * 2 ** 32, hud = text ? `\u266a ${mmss(bgm.currentTime)}` : ''; deepLayer?.say(text, pick, hud); skyLayer?.say(text, pick, hud); }, clear: () => { deepLayer?.clear(); skyLayer?.clear(); } };
 const player = $('.sound-ctl') ? nowPlaying(bgm, $('.sound-ctl'), { reduce, background: deepLayer ? lyricLayers : null }) : null;
+// the equalisers and the right-hand scrollbar follow the song's real spectrum (measured offline, see spectrum.js)
+const spec = spectrum(bgm, { reduce });
+document.querySelectorAll('.sound-fab .eq, .np-eq').forEach(el => eqBars(spec, el));
+spectrumScrollbar(spec);
 bgmCredit();
 notice({ t: k => d(k), lang: () => lang, after: playIntro() });
 tryIt({ lang: () => lang, reduce });
