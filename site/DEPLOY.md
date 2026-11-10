@@ -4,7 +4,7 @@ Two pieces, both on Cloudflare:
 
 | Piece | Source | Lives at |
 |---|---|---|
-| Website (Cloudflare Pages) | `site/public/` | `https://megulit.com` (and `www.megulit.com`) |
+| Website (Worker with static assets) | `site/public/` + `site/wrangler.toml` | `https://megulit.com` (and `www.megulit.com`) |
 | Download mirror (Worker + R2 + cron) | `site/mirror/` | `https://dl.megulit.com` |
 
 The mirror checks GitHub Releases every 10 minutes. When the asset `MeguLit-vX.Y.Z-win-x64.zip` is new, or keeps its
@@ -13,7 +13,7 @@ if the bytes do not match GitHub's SHA-256, and the Worker hashes the stream a s
 `latest.json` move to the new file, so visitors never get an unverified or half-uploaded installer. The current file
 and the two before it are kept; older ones are deleted.
 
-Nothing here has been deployed yet. Everything below runs from the repository root unless it says otherwise, with
+Both are live since 2026-11-10. Everything below runs from the repository root unless it says otherwise, with
 Node.js 20+ installed. `npx wrangler` downloads Wrangler on first use.
 
 ## 0. Account access
@@ -52,7 +52,7 @@ The bucket stays private. Files are served only through the Worker on `dl.meguli
 
 ```bash
 cd site/mirror
-npx wrangler deploy
+npx wrangler deploy        # or from the root: npx wrangler deploy -c site/mirror/wrangler.toml
 ```
 
 `wrangler.toml` already declares:
@@ -105,31 +105,20 @@ SHA-256 on upload, so no unverified file is ever published.
 | `/releases.json` | the last 40 app releases for the changelog page (CORS `*`) |
 | `POST /sync` | runs a sync now; needs `Authorization: Bearer <SYNC_TOKEN>` |
 
-## 3. Website on Cloudflare Pages
+## 3. Website (Worker with static assets)
 
-Refresh the generated data first (engine list from the source, release snapshot from GitHub):
+Wrangler's `pages project create` now makes a Worker instead of a Pages project, so the site is deployed as a Worker
+that serves `site/public/` (`_headers` and `404.html` work the same). Refresh the generated data first, then deploy
+with the config named explicitly; without `-c`, Wrangler may generate a new config in the repository root and
+deploy the wrong folder:
 
 ```bash
 node site/tools/gen-data.mjs
+npx wrangler deploy -c site/wrangler.toml
 ```
 
-Create the project once, then deploy:
-
-```bash
-npx wrangler pages project create megulit --production-branch main
-npx wrangler pages deploy site/public --project-name megulit --branch main
-```
-
-Custom domains for Pages are added in the dashboard (Wrangler has no command for it): Workers & Pages → `megulit`
-→ Custom domains → Set up a domain → `megulit.com`, then again for `www.megulit.com`. Cloudflare creates the DNS
-records. The same through the API:
-
-```bash
-for d in megulit.com www.megulit.com; do
-  curl -X POST "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/megulit/domains" \
-    -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" --data "{\"name\":\"$d\"}"
-done
-```
+`site/wrangler.toml` declares `megulit.com` and `www.megulit.com` as custom domains, so Cloudflare creates the DNS
+records and issues and renews the HTTPS certificates. On Windows PowerShell use `npx.cmd` if `npx.ps1` is blocked.
 
 To send `www` to the bare domain, add a Redirect Rule on the zone: `www.megulit.com/*` → `https://megulit.com/${1}`, 301.
 
@@ -191,7 +180,7 @@ node --test validation/*.test.cjs
 
 ## Rollback
 
-- Website: Workers & Pages → `megulit` → Deployments → pick an earlier one → Rollback.
+- Website: `npx wrangler rollback -c site/wrangler.toml`.
 - Mirror: `npx wrangler rollback` in `site/mirror`. To pin downloads to an older verified installer, put the
   previous `latest.json` back with `npx wrangler r2 object put megulit-downloads/latest.json --file latest.json --remote`
   (the last three installers stay in the bucket).

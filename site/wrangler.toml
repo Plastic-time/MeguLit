@@ -1,0 +1,13 @@
+name = "megulit"
+compatibility_date = "2025-09-01"
+workers_dev = false
+
+# megulit.com and www.megulit.com; custom_domain creates the DNS records and certificates.
+routes = [
+  { pattern = "megulit.com", custom_domain = true },
+  { pattern = "www.megulit.com", custom_domain = true },
+]
+
+[assets]
+directory = "./public"
+not_found_handling = "404-page"
