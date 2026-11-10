@@ -122,7 +122,7 @@ test('every example taken from a game says when it was read, to the minute',asyn
  assert.equal(readTime(null,'zh'),'');
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';'),p=N5.find(x=>x.id==='wo');
  const html=g.lessonHTML(p,{examples:{wo:[{text:'本を閉じた。',start:1,end:2,title:'魔法使いの夜',readAt:at,translation:'合上了书。',translationSource:'group',origin:'history'}]},progress:{}},{locale:'zh',esc});
- assert.match(html,/魔法使いの夜 · 2026年11月10日 05:13 读到/);assert.match(html,/<mark class="gm-hl">を<\/mark>/);assert.match(html,/加入 Anki/);
+ assert.match(html,/魔法使いの夜 · 2026年11月10日 05:13 读到/);assert.match(html,/data-explain="wo">を<\/mark>/);assert.match(html,/加入 Anki/);
  /* 读过的词 shows the last time each word was read; the 句子 page shows when the line was saved while reading */
  const ri=await import('../web/reading-insights.js');
  assert.match(ri.readingInsightsHTML({lines:1,pending:0,weekly:[{key:'雪',base:'雪',count:1,lastAt:at,games:[{id:'g',title:'G'}]}],frequent:[],jlpt:[],games:[]},{locale:'zh',esc,number:String}),/最近一次： 2026年11月10日 05:13 读到/);
@@ -133,4 +133,54 @@ test('the learning page has the 语法 tab in zh/ja/en and loads its styles',asy
  const {messages}=await import('../web/i18n.js');assert.deepEqual(['zh','ja','en'].map(l=>messages[l].grammar),['语法','文法','Grammar']);
  const app=fs.readFileSync(path.join(__dirname,'..','web','app.js'),'utf8');assert.match(app,/LEARNING_TABS=\[[^\]]*'grammar'/);assert.match(app,/import\('\.\/grammar\.js'\)/);
  assert.match(fs.readFileSync(path.join(__dirname,'..','web','index.html'),'utf8'),/grammar\.css/);
+});
+
+test('interactive: the core-system map places every N5 point, nodes light up as points are learned',async()=>{
+ const {MAP,POINT_NODES,nodeOf}=await import('../web/grammar-map.js'),{N5}=await import('../web/grammar-n5.js'),g=await import('../web/grammar.js');
+ assert.deepEqual(MAP.map(n=>n.id),['order','particles','classes','conjugation','auxiliary','politeness','aspect','viewpoint','clauses']);
+ for(const n of MAP)for(const l of ['zh','ja','en'])assert.ok(n.title[l]&&n.line[l]&&n.body[l],n.id+' '+l);
+ for(const p of N5){assert.ok(POINT_NODES[p.id]?.length,p.id);for(const id of POINT_NODES[p.id])assert.ok(MAP.some(n=>n.id===id),p.id+' → '+id);}
+ assert.equal(nodeOf('wo'),'particles');assert.equal(nodeOf('teiru'),'aspect');
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+ const html=g.mapHTML({progress:{wa:{learned:true}}},{locale:'zh',esc,open:'particles'});
+ assert.match(html,/data-node="particles"[^>]*>/);assert.match(html,/gm-node open lit/);assert.match(html,/aria-expanded="true"/);
+ assert.match(html,/class="gm-chip lit" data-point="wa"/,'a learned point is lit on the map');assert.match(html,/data-point="wo"/,'points open their lesson');
+ assert.doesNotMatch(g.mapHTML({progress:{}},{locale:'zh',esc}),/gm-node-body/,'closed nodes show only their line');
+ const lesson=g.lessonHTML(N5.find(p=>p.id==='teiru'),{progress:{},examples:{}},{locale:'zh',esc});assert.match(lesson,/data-map="aspect"/,'each lesson shows where it sits on the map');
+ assert.match(g.listHTML({progress:{},completion:g.completion({}),examples:{}},{locale:'zh',esc}),/class="gm-overview" data-map/,'the overview comes first in the list');
+});
+
+test('interactive: the conjugation lab changes only the ending, readings included',async()=>{
+ const c=await import('../web/conjugate.js'),g=await import('../web/grammar.js');
+ const by=w=>c.WORDS.find(x=>x.word===w),forms=w=>['masu','te','nai','ta'].map(f=>c.formText(by(w),f));
+ assert.deepEqual(forms('書く'),['書きます','書いて','書かない','書いた']);
+ assert.deepEqual(forms('読む'),['読みます','読んで','読まない','読んだ']);
+ assert.deepEqual(forms('会う'),['会います','会って','会わない','会った']);
+ assert.deepEqual(forms('行く'),['行きます','行って','行かない','行った']);
+ assert.deepEqual(forms('泳ぐ'),['泳ぎます','泳いで','泳がない','泳いだ']);
+ assert.deepEqual(forms('話す'),['話します','話して','話さない','話した']);
+ assert.deepEqual(forms('食べる'),['食べます','食べて','食べない','食べた']);
+ assert.deepEqual(forms('する'),['します','して','しない','した']);
+ assert.deepEqual(forms('来る'),['来ます','来て','来ない','来た']);assert.equal(c.conjugate(by('来る'),'nai').reading,'こない');
+ assert.deepEqual(forms('高い'),['高いです','高くて','高くない','高かった']);
+ assert.deepEqual(forms('いい'),['いいです','よくて','よくない','よかった']);
+ assert.deepEqual(forms('静か'),['静かです','静かで','静かじゃない','静かだった']);
+ assert.deepEqual(c.conjugate(by('書く'),'te'),{stem:'書',ending:'いて',rule:'く → いて'},'the stem stays, the ending is what changes');
+ const esc=s=>String(s??'');const html=g.conjHTML('te',{locale:'zh',esc,wordIndex:c.WORDS.filter(x=>['godan','ichidan','suru','kuru'].includes(x.type)).findIndex(x=>x.word==='行く'),form:'te'});
+ assert.match(html,/<span class="gm-stem">行<\/span><span class="gm-ending">って<\/span>/);assert.match(html,/いって/,'reading follows the same rule');
+ assert.match(g.conjHTML('iadj',{locale:'zh',esc}),/優しい/,'the い-adjective lesson offers adjectives');
+});
+
+test('interactive: particle puzzle gaps, explanations on the grammar, read aloud, and a same-kind retry after a miss',async()=>{
+ const {N5}=await import('../web/grammar-n5.js'),g=await import('../web/grammar.js'),wo=N5.find(p=>p.id==='wo');
+ const real=[{text:'本を閉じた。',start:1,end:2,translation:'合上了书。',translationSource:'group',title:'G',readAt:1794300000,origin:'history'}];
+ const gaps=g.particleGaps(wo,real);assert.equal(gaps[0].text,'本を閉じた。');assert.equal(gaps[0].answer,'を');
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+ const puzzle=g.particleHTML(wo,real,{locale:'zh',esc});assert.match(puzzle,/draggable="true" data-tile="を"/);assert.match(puzzle,/本<button type="button" class="gm-slot" data-slot="0"/);assert.match(puzzle,/<p class="gm-tr gm-gap-tr" hidden>合上了书。/,'the translation shows once the line lights up');
+ const lesson=g.lessonHTML(wo,{examples:{wo:real},progress:{}},{locale:'zh',esc});
+ assert.match(lesson,/<mark class="gm-hl" role="button" tabindex="0" data-explain="wo">を<\/mark>/,'the grammar part opens an explanation');assert.match(lesson,/data-speak="本を閉じた。"/);assert.match(lesson,/data-particles/);
+ const q=g.exercisesFor(wo,real)[0],wrong=q.choices.find(c=>c!==q.answer);
+ const miss=g.quizHTML(wo,q,{locale:'zh',esc,answered:wrong});assert.match(miss,/正确答案是「を」/);assert.match(miss,/正确的接法/);assert.match(miss,/data-retry/);assert.match(miss,/名词 \+ を \+ 他动词/,'shows how it attaches');
+ const hit=g.quizHTML(wo,q,{locale:'zh',esc,answered:'を'});assert.match(hit,/答对了/);assert.match(hit,/data-next/);
+ const src=fs.readFileSync(path.join(__dirname,'..','web','grammar.js'),'utf8');assert.match(src,/api\('speech_preview'/,'read aloud uses the existing voice engine');assert.match(src,/prefers-reduced-motion/);
 });
