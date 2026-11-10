@@ -162,7 +162,17 @@ Only needed when screenshots, the logo or heading text change:
 python -I site/tools/build-assets.py
 ```
 
-It converts `docs/screenshots/*` and the logo to WebP and subsets Noto Serif SC (OFL, ships with Windows 11) to the
+The hero's background video lives in `site/public/assets/video/` (360p / 720p / 1080p, no larger than 8 MB each, so
+well under Pages' 25 MB file limit). To rebuild it from a new 16:9 cut, for each width 640 / 1280 / 1920:
+
+```bash
+ffmpeg -i MeguLit-16x9.mp4 -vf scale=1280:-2 -c:v libx264 -preset slow -crf 27 -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart site/public/assets/video/megulit-720.mp4
+```
+
+The page picks the smallest file that is sharp on the visitor's screen, starts it muted, pauses it off-screen, and
+skips it entirely when the visitor prefers reduced motion or has Data Saver on (the poster stays).
+
+`build-assets.py` converts `docs/screenshots/*` and the logo to WebP and subsets Noto Serif SC (OFL, ships with Windows 11) to the
 characters used in headings, about 100 KB. No font is loaded from Google or any other third party.
 
 ## 6. Local preview

@@ -61,21 +61,41 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
 <main id="main">
 
 <section class="hero" aria-labelledby="hero-title">
+ <div class="hero-media" aria-hidden="true">
+  <video class="hero-video" muted loop playsinline preload="none" poster="/assets/img/hero-poster.webp" data-sm="/assets/video/megulit-360.mp4" data-md="/assets/video/megulit-720.mp4" data-lg="/assets/video/megulit-1080.mp4"></video>
+  <div class="hero-scrim"></div>
+  <svg class="circle" viewBox="-300 -300 600 600">
+   <defs><path id="ring-path" d="M 0,-246 a 246,246 0 1,1 0,492 a 246,246 0 1,1 0,-492"/></defs>
+   <g class="c-outer">
+    <circle r="288" class="c-line"/>
+    <circle r="276" class="c-ticks"/>
+    <text class="c-runes"><textPath href="#ring-path">読む ・ 物語 ・ 言葉 ・ 魔導書 ・ ふりがな ・ 単語帳 ・ 続きを読もう ・ 読む ・ 物語 ・ 言葉 ・ 魔導書 ・ ふりがな ・ 単語帳 ・ 続きを読もう ・ </textPath></text>
+   </g>
+   <g class="c-inner">
+    <circle r="222" class="c-line"/>
+    <circle r="214" class="c-dash"/>
+    <polygon class="c-star" points="0,-210 181.9,105 -181.9,105"/>
+    <polygon class="c-star" points="0,210 181.9,-105 -181.9,-105"/>
+    <circle r="105" class="c-line"/>
+   </g>
+   <g class="c-core"><circle r="58" class="c-dash"/><circle r="6" class="c-dot"/></g>
+  </svg>
+  <div class="grain"></div>
+ </div>
  <div class="wrap hero-grid">
-  <div class="hero-copy">
-   <h1 id="hero-title" class="display" data-i-html="hero.title"><span class="b">在 Galgame 里，</span><wbr><span class="b">直接读日语原文</span></h1>
+  <div class="hero-copy tilt">
+   <h1 id="hero-title" class="display kinetic" data-i-html="hero.title"><span class="b">在 Galgame 里，</span><wbr><span class="b">直接读日语原文</span></h1>
    <p class="lede" data-i="hero.lede">MeguLit 接上游戏正在显示的台词，给它注音、翻译、查词，把生词送进 Anki。译文还能直接写进游戏自己的文本框</p>
    <div class="cta">
-    <a class="btn btn-primary js-download" href="https://github.com/ilynthn/MeguLit/releases/latest">
-     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
+    <a class="btn btn-primary btn-xl js-download" href="https://github.com/ilynthn/MeguLit/releases/latest">
+     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
      <span data-i="dl.button">下载 MeguLit</span>
     </a>
     <a class="btn btn-quiet" href="#download" data-i="dl.alt">备用下载</a>
    </div>
    <p class="cta-meta"><span class="js-version">v1.2.8</span><span class="js-size">20.0 MB</span><span data-i="dl.os">Windows 10 / 11 x64</span><span data-i="dl.free">免费 · 开源</span></p>
   </div>
-
-  <figure class="specimen" aria-labelledby="specimen-cap">
+  <figure class="specimen tilt" aria-labelledby="specimen-cap">
    <div class="page">
     <p class="jp" lang="ja"><span class="b">さあ、</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="0"><ruby>物語<rt>ものがたり</rt></ruby></span>の</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="1"><ruby>続<rt>つづ</rt></ruby>き</span>を</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="2"><ruby>読<rt>よ</rt></ruby>もう</span></span></p>
     <p class="tr" data-i="spec.tr">来吧，把故事接着读下去</p>
@@ -88,13 +108,28 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    <figcaption id="specimen-cap" data-i="spec.cap">示意：原文、注音、译文和释义排在一起。指一下词看释义</figcaption>
   </figure>
  </div>
-
- <div class="wrap shot-hero">
-  <img src="/assets/img/home-1360.webp" srcset="/assets/img/home-720.webp 720w, /assets/img/home-1360.webp 1360w" sizes="(min-width: 75rem) 75rem, 100vw" width="1360" height="765" alt="MeguLit 首页：上次读到的作品、最近游玩和今日学习数据" data-i-attr="alt:shot.home" fetchpriority="high">
+ <div class="wrap hero-bar">
+  <button type="button" class="chip js-sound" aria-pressed="false">
+   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path class="s-on" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="s-off" d="m17 9 5 5m0-5-5 5"/></svg>
+   <span class="js-sound-label" data-i="v.sound">打开声音</span>
+  </button>
+  <a class="chip" href="https://b23.tv/5JGC1Ob" rel="noopener" target="_blank">
+   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4l3 3m7-3-3 3M4 8h16v11H4z"/><path d="M10 12v3m4-3v3"/></svg>
+   <span data-i="v.bili">在哔哩哔哩看完整视频</span>
+  </a>
  </div>
 </section>
 
-<section class="sec" id="features" aria-labelledby="f-title">
+<div class="ticker" aria-hidden="true">
+ <div class="tk tk-a"><div class="tk-track js-tk-a"></div></div>
+ <div class="tk tk-b"><div class="tk-track js-tk-b"></div></div>
+</div>
+
+<div class="wrap shot-hero">
+ <img class="rise3d" src="/assets/img/home-1360.webp" srcset="/assets/img/home-720.webp 720w, /assets/img/home-1360.webp 1360w" sizes="(min-width: 75rem) 75rem, 100vw" width="1360" height="765" alt="MeguLit 首页：上次读到的作品、最近游玩和今日学习数据" data-i-attr="alt:shot.home" loading="lazy">
+</div>
+
+<section class="sec" id="features" data-kanji="内嵌" aria-labelledby="f-title">
  <div class="wrap">
   <h2 id="f-title" class="h2" data-i="f.title">读的时候，什么都在游戏里</h2>
   <p class="sec-lede" data-i="f.lede">阅读层浮在游戏上面，不抢焦点，点它也不会让剧情往下走</p>
@@ -108,7 +143,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
      <button type="button" data-embed="after" aria-pressed="true" data-i="f.embed.after">内嵌之后</button>
     </div>
    </div>
-   <figure class="textbox" data-state="after">
+   <figure class="textbox tilt" data-state="after">
     <div class="tb-scene" aria-hidden="true"></div>
     <div class="tb-window">
      <span class="tb-name" lang="ja">？？？</span>
@@ -119,16 +154,16 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    </figure>
   </div>
 
-  <div class="trio">
-   <article>
+  <div class="trio spot-group">
+   <article class="spot">
     <h3 class="h3" data-i="f.zero.t">汉化补丁就是译文，一句不等</h3>
     <p data-i="f.zero.d">装过汉化补丁的游戏，MeguLit 直接拿补丁里的译文对上日文原文，台词一出来译文就在。KiriKiri、BGI、Siglus、YU-RIS、Artemis、Ren'Py 都已实测；补丁里没有的句子会提前机翻好</p>
    </article>
-   <article>
+   <article class="spot">
     <h3 class="h3" data-i="f.ruby.t">注音先听游戏的</h3>
     <p data-i="f.ruby.d">游戏自带 ruby 的地方，用游戏标的读音；没有标的，再按词典和上下文判断。人名、当て字也跟着作品走</p>
    </article>
-   <article>
+   <article class="spot">
     <h3 class="h3" data-i="f.dict.t">点一下查词，拖一段查短语</h3>
     <p data-i="f.dict.d">离线词典，查过的词自动进单词本。也可以选中整句，让 AI 讲语法和语境。翻译支持 DeepL、Google、Gemini、DeepSeek、Sakura、Ollama 等，密钥加密存在本地</p>
    </article>
@@ -136,7 +171,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  </div>
 </section>
 
-<section class="sec sec-learn" id="learn" aria-labelledby="l-title">
+<section class="sec sec-learn" id="learn" data-kanji="記録" aria-labelledby="l-title">
  <div class="wrap">
   <h2 id="l-title" class="h2" data-i="l.title">读过的，都能留下来</h2>
   <p class="sec-lede" data-i="l.lede">查过的词、读过的句子和花掉的时间，MeguLit 都替你记着</p>
@@ -149,25 +184,25 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
   <div class="panes">
    <div class="pane" role="tabpanel" id="pane-words" aria-labelledby="tab-words">
     <p data-i="l.words.d">查过的词、读音、释义和掌握程度，还有它出现在哪部作品、哪一句里</p>
-    <img src="/assets/img/words-1360.webp" srcset="/assets/img/words-720.webp 720w, /assets/img/words-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="单词本：每个词的写法、读音、释义和掌握程度" data-i-attr="alt:l.words.alt">
+    <img class="rise3d" src="/assets/img/words-1360.webp" srcset="/assets/img/words-720.webp 720w, /assets/img/words-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="单词本：每个词的写法、读音、释义和掌握程度" data-i-attr="alt:l.words.alt">
    </div>
    <div class="pane" role="tabpanel" id="pane-anki" aria-labelledby="tab-anki" hidden>
     <p data-i="l.anki.d">在阅读层点「制卡」，卡片带上游戏截图和原声，没配音的旁白用本地语音补上。复习直接用 Anki 的卡片和调度，评分写回 Anki</p>
-    <img src="/assets/img/anki-1360.webp" srcset="/assets/img/anki-720.webp 720w, /assets/img/anki-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="在 MeguLit 里复习 Anki 卡片" data-i-attr="alt:l.anki.alt">
+    <img class="rise3d" src="/assets/img/anki-1360.webp" srcset="/assets/img/anki-720.webp 720w, /assets/img/anki-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="在 MeguLit 里复习 Anki 卡片" data-i-attr="alt:l.anki.alt">
    </div>
    <div class="pane" role="tabpanel" id="pane-stats" aria-labelledby="tab-stats" hidden>
     <p data-i="l.stats.d">阅读字数、时长、查词次数、阅读日历，每部作品读了多少，按年、月、周、日切换</p>
-    <img src="/assets/img/stats-1360.webp" srcset="/assets/img/stats-720.webp 720w, /assets/img/stats-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="学习统计：阅读字数、时长、查词次数、阅读日历和本月读的书" data-i-attr="alt:l.stats.alt">
+    <img class="rise3d" src="/assets/img/stats-1360.webp" srcset="/assets/img/stats-720.webp 720w, /assets/img/stats-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="学习统计：阅读字数、时长、查词次数、阅读日历和本月读的书" data-i-attr="alt:l.stats.alt">
    </div>
    <div class="pane" role="tabpanel" id="pane-hist" aria-labelledby="tab-hist" hidden>
     <p data-i="l.hist.d">读过的每一句原文和译文都按会话存好，回头找哪句话一搜就有</p>
-    <img src="/assets/img/dialogue-1360.webp" srcset="/assets/img/dialogue-720.webp 720w, /assets/img/dialogue-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="对话记录：读过的原文和译文" data-i-attr="alt:l.hist.alt">
+    <img class="rise3d" src="/assets/img/dialogue-1360.webp" srcset="/assets/img/dialogue-720.webp 720w, /assets/img/dialogue-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="对话记录：读过的原文和译文" data-i-attr="alt:l.hist.alt">
    </div>
   </div>
  </div>
 </section>
 
-<section class="sec" id="care" aria-labelledby="c-title">
+<section class="sec" id="care" data-kanji="省心" aria-labelledby="c-title">
  <div class="wrap">
   <h2 id="c-title" class="h2" data-i="c.title">少折腾</h2>
   <div class="care">
@@ -183,13 +218,13 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    <article class="care-update">
     <h3 class="h3" data-i="c.update.t">自动更新</h3>
     <p data-i="c.update.d">每次启动检查一次新版本，后台下载、校验完再问你要不要重启更新。只替换程序文件，游戏库、学习记录和设置都留着</p>
-    <img src="/assets/img/auto-update-1600.webp" srcset="/assets/img/auto-update-800.webp 800w, /assets/img/auto-update-1600.webp 1600w" sizes="(min-width: 64rem) 36rem, 100vw" width="1600" height="764" loading="lazy" alt="自动更新：启动时弹出新版本卡片，显示更新内容和下载进度" data-i-attr="alt:c.update.alt">
+    <img class="rise3d" src="/assets/img/auto-update-1600.webp" srcset="/assets/img/auto-update-800.webp 800w, /assets/img/auto-update-1600.webp 1600w" sizes="(min-width: 64rem) 36rem, 100vw" width="1600" height="764" loading="lazy" alt="自动更新：启动时弹出新版本卡片，显示更新内容和下载进度" data-i-attr="alt:c.update.alt">
    </article>
   </div>
  </div>
 </section>
 
-<section class="sec" id="games" aria-labelledby="g-title">
+<section class="sec" id="games" data-kanji="引擎" aria-labelledby="g-title">
  <div class="wrap">
   <h2 id="g-title" class="h2" data-i="g.title">支持的引擎和游戏</h2>
   <p class="sec-lede"><span data-i="g.lede1">MeguLit 能认出</span> <b class="js-engine-count">40</b> <span data-i="g.lede2">种 Galgame 引擎，下面这些有专门适配：零延迟双语、日文原版导入或整页排版</span></p>
@@ -205,7 +240,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  </div>
 </section>
 
-<section class="sec" id="start" aria-labelledby="s-title">
+<section class="sec" id="start" data-kanji="開始" aria-labelledby="s-title">
  <div class="wrap">
   <h2 id="s-title" class="h2" data-i="s.title">五步开始读</h2>
   <ol class="steps">
@@ -218,9 +253,9 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  </div>
 </section>
 
-<section class="sec sec-dl" id="download" aria-labelledby="d-title">
+<section class="sec sec-dl" id="download" data-kanji="下載" aria-labelledby="d-title">
  <div class="wrap dl-grid">
-  <div class="dl-main">
+  <div class="dl-main spot">
    <h2 id="d-title" class="h2" data-i="d.title">下载</h2>
    <p class="dl-version"><span class="js-title">MeguLit v1.2.8</span></p>
    <dl class="facts">
@@ -272,7 +307,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  </div>
 </section>
 
-<section class="sec" id="faq" aria-labelledby="q-title">
+<section class="sec" id="faq" data-kanji="問答" aria-labelledby="q-title">
  <div class="wrap narrow">
   <h2 id="q-title" class="h2" data-i="q.title">常见问题</h2>
   <div class="faq">
@@ -288,7 +323,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  </div>
 </section>
 
-<section class="sec sec-support" id="support" aria-labelledby="sp-title">
+<section class="sec sec-support" id="support" data-kanji="応援" aria-labelledby="sp-title">
  <div class="wrap support">
   <div>
    <h2 id="sp-title" class="h2" data-i="sp.title">支持 MeguLit</h2>

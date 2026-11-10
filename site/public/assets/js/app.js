@@ -34,9 +34,11 @@ function applyLang(next) {
     el.setAttribute(attr, pick('a', key));
   }
   for (const b of $$('[data-lang]')) b.setAttribute('aria-pressed', String(b.dataset.lang === lang));
+  splitKinetic();
+  setSoundLabel();
   document.title = document.body.dataset.page === 'changelog' ? `${pick('t', 'cl.title')} · MeguLit` : d('title');
   if (release) fillRelease();
-  if (engines) fillEngines();
+  if (engines) fillEngines(); else fillTicker();
   if (releases) fillReleases();
   setNotes(lang === 'zh' ? 'zh' : 'en');
 }
@@ -183,6 +185,7 @@ function fillEngines() {
     el.firstChild.lang = 'ja';
     return el;
   }));
+  fillTicker();
   $('.js-detected')?.replaceChildren(...e.detected.map(n => { const el = document.createElement('li'); el.textContent = n; return el; }));
 }
 async function loadEngines() {
@@ -218,7 +221,135 @@ async function loadReleases() {
   else $('.js-releases').innerHTML = `<li class="rel"><p>${d('loadFail')}</p></li>`;
 }
 
+
+// ---- motion ------------------------------------------------------------------------------------------------------------
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const finePointer = matchMedia('(pointer: fine)').matches;
+
+// Headline letters flip in one by one. The heading keeps its words for screen readers.
+function splitKinetic() {
+  for (const h of $$('.kinetic')) {
+    h.setAttribute('aria-label', h.textContent.replace(/\s+/g, ' ').trim());
+    let i = 0;
+    const walk = node => {
+      for (const child of [...node.childNodes]) {
+        if (child.nodeType === 3) {
+          // Letters are grouped per word (or per CJK phrase) so a line never breaks inside one; spaces stay breakable.
+          const frag = document.createDocumentFragment();
+          for (const token of child.textContent.split(/(\s+)/)) {
+            if (!token) continue;
+            if (/^\s+$/.test(token)) { frag.append(token); continue; }
+            const word = document.createElement('span');
+            word.className = 'wd';
+            for (const ch of token) {
+              const span = document.createElement('span');
+              span.className = 'ch';
+              span.setAttribute('aria-hidden', 'true');
+              span.style.setProperty('--i', i++);
+              span.textContent = ch;
+              word.append(span);
+            }
+            frag.append(word);
+          }
+          child.replaceWith(frag);
+        } else if (child.nodeType === 1 && !child.classList.contains('ch') && !child.classList.contains('wd') && child.tagName !== 'WBR') walk(child);
+      }
+    };
+    walk(h);
+    h.style.setProperty('--n', i);
+    h.classList.remove('split');
+    void h.offsetWidth;
+    h.classList.add('split');
+  }
+}
+
+// Background video: the smallest file that looks sharp on this screen; none when motion is reduced or data is saved.
+const video = $('.hero-video');
+function videoSrc() {
+  const w = Math.max(innerWidth, innerHeight) * Math.min(devicePixelRatio || 1, 2);
+  return w <= 900 ? video.dataset.sm : w <= 1700 ? video.dataset.md : video.dataset.lg;
+}
+function startVideo() {
+  if (!video || video.getAttribute('src')) return;
+  video.src = videoSrc();
+  video.play().catch(() => {});
+}
+if (video && !reduce && !navigator.connection?.saveData) {
+  startVideo();
+  new IntersectionObserver(([e]) => { if (e.isIntersecting) video.play().catch(() => {}); else video.pause(); }).observe(video);
+}
+const soundBtn = $('.js-sound');
+function setSoundLabel() {
+  if (!soundBtn) return;
+  const on = Boolean(video && !video.muted);
+  soundBtn.setAttribute('aria-pressed', String(on));
+  $('.js-sound-label').textContent = on ? d('soundOff') : d('soundOn');
+}
+soundBtn?.addEventListener('click', () => {
+  if (!video) return;
+  startVideo();
+  video.muted = !video.muted;
+  if (!video.muted) { video.volume = .8; video.play().catch(() => {}); }
+  setSoundLabel();
+});
+
+// The top bar turns transparent over the hero.
+const topBar = $('.top'), hero = $('.hero');
+if (topBar && hero) {
+  const over = () => topBar.classList.toggle('over', hero.getBoundingClientRect().bottom > topBar.offsetHeight + 8);
+  over();
+  addEventListener('scroll', over, { passive: true });
+}
+
+// 3D parallax: copy, specimen and the magic circle lean toward the pointer.
+if (hero && finePointer && !reduce) {
+  const copy = $('.hero-copy'), spec = $('.hero .specimen'), circle = $('.circle');
+  let raf = 0;
+  hero.addEventListener('pointermove', e => {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      const r = hero.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width * 2 - 1, y = (e.clientY - r.top) / r.height * 2 - 1;
+      copy?.style.setProperty('--ry', `${x * 4}deg`); copy?.style.setProperty('--rx', `${-y * 3}deg`);
+      spec?.style.setProperty('--ry', `${x * -10}deg`); spec?.style.setProperty('--rx', `${y * 7}deg`);
+      circle?.style.setProperty('--px', `${x * -24}px`); circle?.style.setProperty('--py', `${y * -18}px`);
+    });
+  });
+  hero.addEventListener('pointerleave', () => {
+    for (const el of [copy, spec]) { el?.style.setProperty('--rx', '0deg'); el?.style.setProperty('--ry', '0deg'); }
+    circle?.style.setProperty('--px', '0px'); circle?.style.setProperty('--py', '0px');
+  });
+}
+if (finePointer && !reduce) {
+  const box = $('.textbox');
+  box?.addEventListener('pointermove', e => {
+    const r = box.getBoundingClientRect();
+    box.style.setProperty('--ry', `${((e.clientX - r.left) / r.width - .5) * 12}deg`);
+    box.style.setProperty('--rx', `${((e.clientY - r.top) / r.height - .5) * -9}deg`);
+  });
+  box?.addEventListener('pointerleave', () => { box.style.setProperty('--rx', '0deg'); box.style.setProperty('--ry', '0deg'); });
+  for (const el of $$('.spot')) el.addEventListener('pointermove', e => {
+    const r = el.getBoundingClientRect();
+    el.style.setProperty('--mx', `${e.clientX - r.left}px`);
+    el.style.setProperty('--my', `${e.clientY - r.top}px`);
+  });
+}
+
+// GMV ticker: engine names on the crimson band, game titles on the outlined band. Two copies make the loop seamless.
+const TICK_ENGINES = ['KiriKiri', 'BGI', 'SiglusEngine', 'YU-RIS', 'Artemis', 'CatSystem2', "Ren'Py", 'HuneX', 'Naninovel', 'MAGES', 'AQUAPLUS', 'NScripter'];
+const TICK_GAMES = ['ISLAND', '魔法使いの夜', 'WHITE ALBUM2', 'euphoria', '千恋＊万花', 'CLANNAD', 'The Shell', '魔法少女ノ魔女裁判', 'STEINS;GATE', '月姫'];
+function fillTicker() {
+  const fill = (el, words) => {
+    if (!el) return;
+    const once = words.flatMap(w => { const s = document.createElement('span'); s.textContent = w; const i = document.createElement('i'); i.textContent = '✦'; return [s, i]; });
+    el.replaceChildren(...once, ...once.map(n => n.cloneNode(true)));
+  };
+  fill($('.js-tk-a'), engines ? engines.adapters.map(a => a.name.replace(/^Unity \((.+)\)$/, '$1')) : TICK_ENGINES);
+  fill($('.js-tk-b'), engines ? engines.games.map(g => g.title) : TICK_GAMES);
+}
+
 if (lang !== 'zh') applyLang(lang);
+else { splitKinetic(); fillTicker(); setSoundLabel(); }
 loadRelease();
 loadEngines();
 loadReleases();
