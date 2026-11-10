@@ -236,7 +236,7 @@ function home(){
     <button class="fig" data-stats><span class="fig-value">${number(model.stats.lookups)}<small>${w.unitTimes}</small></span><span class="fig-label">${w.lookups}</span></button>
     <button class="g-link" id="view-statistics">${w.full}${icon('arrow')}</button></aside>`;
   let hero;
-  if(game){const embed=embedStatus(game,locale),kind=embed.kind==='verified'||embed.kind==='supported'?'ok':embed.kind==='unsupported'?'bad':'wait',[gn,gu]=parts(game.readingSeconds);
+  if(game){const embed=embedStatus(game,locale),kind=embed.kind==='verified'||embed.kind==='supported'?'ok':embed.kind==='unsupported'||embed.kind==='readonly'?'bad':'wait',[gn,gu]=parts(game.readingSeconds);
    hero=`<section class="g-hero" data-hero="${esc(game.id)}"><div class="jacket">${cover(game,'jacket-img')}<span class="ribbon" aria-hidden="true"></span></div>
     <div class="hero-copy"><p class="kicker">${w.kicker}</p><div role="heading" aria-level="1" class="hero-title" title="${esc(game.title)}">${esc(game.title)}</div>
      <div class="hero-meta"><span>${relativeTime(game.lastPlayedAt)}</span>${game.engine?`<span>${esc(game.engine)}</span>`:''}<span title="${esc(embed.tooltip)}"><i class="status-dot ${kind}"></i>${esc(embed.label)}</span></div>

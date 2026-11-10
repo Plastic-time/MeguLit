@@ -134,7 +134,7 @@ $prevZip=Join-Path $work ("previous-"+$prevAsset.name) # a hotfix downloads a pa
 Invoke-WebRequest -Uri $prevAsset.browser_download_url -OutFile $prevZip -UseBasicParsing
 $old=[IO.Compression.ZipFile]::OpenRead($prevZip)
 $names=New-Object 'System.Collections.Generic.SortedSet[string]' ([StringComparer]::Ordinal)
-foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and -not $e.FullName.EndsWith('/')){[void]$names.Add($e.FullName.Substring(8))}}
+foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and -not $e.FullName.EndsWith('/') -and $e.FullName -notmatch '\.(lib|obj|pdb|exp|ilk|iobj|ipdb)$' -and $e.FullName -notmatch '/build/'){[void]$names.Add($e.FullName.Substring(8))}}
 # --others: files added in this release are not tracked yet when the list is built (-IncludeWorkingChanges)
 foreach($f in (git ls-files --cached --others --exclude-standard core services web setup)){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
 # Prebuilt native helpers added after the previous package (not tracked: *.dll is ignored); E293 scene capture.
@@ -194,7 +194,15 @@ $back=Join-Path $work 'check.zip'
 # a hotfix replaces a file under the same URL; the download edge can serve the old one for a few seconds
 $ok=$false;for($try=0;$try -lt 8 -and -not $ok;$try++){if($try){Start-Sleep -Seconds 5};Invoke-WebRequest -Uri $a.browser_download_url -OutFile $back -UseBasicParsing;$ok=(Get-FileHash $back -Algorithm SHA256).Hash.ToLower() -eq $hash}
 if(-not $ok){throw 'Downloaded package hash differs'}
-$probe=& node -e "require('./services/update.cjs').check('$prev').then(r=>console.log(r.latest+' '+r.newer)).catch(e=>console.log('ERR '+e.message))"
-Write-Host "update check from v${prev}: $probe"
+# An installed copy of the previous package (its version label and package digest recorded as after an update) must see
+# this release as an update: a new version by number, a hotfix by package digest (E358: 1.2.8a slipped through).
+$prevDigest=(Get-FileHash $prevZip -Algorithm SHA256).Hash.ToLower();$probeRoot=Join-Path $work 'probe';New-Item -ItemType Directory (Join-Path $probeRoot 'data') -Force | Out-Null
+$prevLabel=if($Hotfix){(Select-String -Path (Join-Path $Root 'web/about.js') -Pattern "VERSION='([^']+)'" | Select-Object -First 1).Matches[0].Groups[1].Value}else{$prev}
+if($Hotfix){$prevLabel=(& git.exe show "HEAD~1:web/about.js" | Select-String -Pattern "VERSION='([^']+)'" | Select-Object -First 1).Matches[0].Groups[1].Value}
+@{version=$Version;digest=$prevDigest} | ConvertTo-Json -Compress | Set-Content (Join-Path $probeRoot 'data/update-installed.json') -Encoding ascii
+@{version=$prevLabel} | ConvertTo-Json -Compress | Set-Content (Join-Path $probeRoot 'data/icon-refresh.json') -Encoding ascii
+$probe=& node -e "require('./services/update.cjs').check(process.argv[1],fetch,process.argv[2]).then(r=>console.log(r.latest+' '+r.newer+(r.hotfix?' hotfix':''))).catch(e=>console.log('ERR '+e.message))" $prevLabel $probeRoot
+Write-Host "update check from v${prevLabel}: $probe"
+if($probe -notmatch ' true'){throw "An installed v$prevLabel does not see this release as an update: $probe"}
 Remove-Item $work -Recurse -Force
 Step "released $($rel.html_url)"

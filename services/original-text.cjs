@@ -250,6 +250,13 @@ function autoPatch(root,db,id,options={}){
 }
 // Removing a patch the search found also stops the search from bringing it back.
 function clearPatch(root,id){const s=readState(root)[id];return writeState(root,id,{patch:null,patchAlignment:null,patchStatus:'none',patchSearch:{...s?.patchSearch,running:false,declined:!!s?.patch?.auto}});}
+/* E360 one word for the game page and the library, from the saved state only (no scan): patch = the translation
+   group's / release's own Chinese is ready, machine = Japanese script read, the next lines are machine-translated ahead,
+   needs-japanese = a Chinese build (restore or import the Japanese release), preparing, none, unknown (not checked yet). */
+function brief(root,id){const s=readState(root)[String(id)];if(!s)return 'unknown';
+ if(s.status==='native-japanese')return s.patchStatus==='ready'?'patch':'machine';
+ if(s.status==='ready')return 'patch';if(s.status==='awaiting-original'||s.status==='needs-recheck')return 'needs-japanese';
+ if(s.status==='preparing')return 'preparing';return 'none';}
 function status(root,db,id){
  const row=gameRow(db,id),saved=readState(root)[id];let state=saved;
  try{if(!saved?.runtime||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,status:'failed',error:String(error.message||error)};}
@@ -395,4 +402,4 @@ async function discover(root,db,id,options={}){
  writeState(root,id,{status:state.original?.index?(state.alignment?.reliable?'ready':'unreliable'):status,lastSearch:{at:Date.now(),found:search.found.length,complete:search.complete,searched:search.searched,checked}});
  return {notFound:true,search:{found:search.found.length,complete:search.complete,searched:search.searched,checked}};
 }
-module.exports={autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,clearPatch,locate,readScript,ADAPTERS,readAin,align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,norm,discover,findCandidates};
+module.exports={brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,clearPatch,locate,readScript,ADAPTERS,readAin,align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,norm,discover,findCandidates};

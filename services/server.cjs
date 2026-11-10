@@ -15,5 +15,7 @@ async function handle(line){
  }catch(error){reply({id,ok:false,error:/^[A-Z_]+$/.test(error.message)?error.message:'SERVICE_FAILED'});}finally{if(counted)active--;if(exclusive)maintenance=false;}
 }
 setTimeout(()=>{if(!closing)runtime.ankiProcess().auto().catch(()=>{});},1500).unref();
+/* E361 read library games' scripts in a worker thread, a while after start */
+try{require('./script-prewarm.cjs').start(root,{onDone:()=>{if(!closing)reply({event:'library-updated',data:{}});}});}catch{}
 input.on('line',line=>{handle(line).catch(()=>{});});
 input.on('close',()=>{closing=true;runtime.stop().finally(()=>process.exit(0));});
