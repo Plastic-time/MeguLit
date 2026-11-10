@@ -312,7 +312,7 @@ undo it), adds a `moderation_queue` row of kind `profile` and, with `REPORT_REPO
 `profile-report` in that private repository: kind, reason (optional), nickname, signature, favourites, a 72-hour private
 link to the picture, and the two commands to restore or clear it. One report per reader and profile; 3 reports a day.
 
-The owner sees the hiding in Settings › 个人主页 and can press 「一斤鸭梨！異議あり！」 once per hiding, with an optional
+The owner sees the hiding in Settings › 个人主页 and can press 「一斤鸭梨！」 (Japanese UI: 「異議あり！」, English: Objection!; tooltip 驳回举报) once per hiding, with an optional
 statement. That opens a second issue labelled `profile-appeal` in the same private repository (every report on the
 profile, the statement, and the command that shows it again) plus a `moderation_queue` row of kind `profile-appeal`.
 The profile stays hidden until you decide; a new report after a restore allows a new objection. 3 objections a day.

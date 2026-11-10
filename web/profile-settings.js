@@ -16,7 +16,7 @@ const T={
   joinNow:'参加',saved:'已保存',leaveAsk:'退出排行榜会删除服务器上的记录（名次、昵称、头像），之后可以重新参加。确定退出吗？',leaveYes:'确认退出',leaveNo:'取消',left:'已退出排行榜，服务器上的记录已删除',leftLocal:'已退出排行榜；服务器暂时连不上，下次联网时不会再上传',
   offline:'暂时连不上联网服务',
   publicTitle:'公开主页',publicSwitch:'公开我的主页',publicHint:'公开后，别人可以在排行榜上点开你的主页、关注你，也会在“同好”里看到你。最近在玩只在打开“公开我读过的游戏”时显示',
-  publicLogin:'登录后可以设置公开主页',publicJoin:'参加排行榜后可以设置公开主页',publicHidden:'你的主页被举报，已暂时隐藏，等待人工审核。审核通过后会自动恢复',objection:'一斤鸭梨！異議あり！',objectionHint:'觉得举报不成立？提出异议，开发者会人工复核。每次被隐藏只能提一次',objectionPh:'说说为什么（可不填）',objectionSend:'提出异议',appealed:'已提出异议，等待人工复核',
+  publicLogin:'登录后可以设置公开主页',publicJoin:'参加排行榜后可以设置公开主页',publicHidden:'你的主页被举报，已暂时隐藏，等待人工审核。审核通过后会自动恢复',objection:'一斤鸭梨！',objectionTitle:'驳回举报',objectionHint:'觉得举报不成立？提出异议，开发者会人工复核。每次被隐藏只能提一次',objectionPh:'说说为什么（可不填）',objectionSend:'提出异议',appealed:'已提出异议，等待人工复核',
   bio:'签名',bioHint:'一行，最多 60 字；不能包含网址、成人或辱骂内容',bioPh:'比如：爆裂魔法一日一发',favorites:'最喜欢的游戏',favoritesHint:'从游戏库里选，最多 5 个',addFavorite:'＋ 添加游戏',removeFavorite:'移除'},
  ja:{account:'アカウント',signedIn:'ログイン中',signOut:'ログアウト',signedOut:'ログアウトしました',syncDevices:'同期とデバイス',notReady:'オンラインサービスは準備中のため、アカウントとランキングはまだ使えません',
   loginHint:'ランキングに参加するには、メールアドレスで MeguLit アカウントにログインしてください。アドレスはログインにのみ使い、ランキングには表示されません',
@@ -25,7 +25,7 @@ const T={
   joinNow:'参加する',saved:'保存しました',leaveAsk:'退出すると、サーバー上の記録（順位・ニックネーム・アイコン）が削除されます。あとで再参加できます。退出しますか？',leaveYes:'退出する',leaveNo:'キャンセル',left:'ランキングから退出し、サーバーの記録を削除しました',leftLocal:'ランキングから退出しました。サーバーに接続できませんでしたが、今後は送信しません',
   offline:'オンラインサービスに接続できません',
   publicTitle:'公開プロフィール',publicSwitch:'プロフィールを公開',publicHint:'公開すると、ほかの人がランキングからプロフィールを開いたりフォローしたりでき、「同好」にも表示されます。最近読んでいるゲームは「読んだゲームを公開」がオンのときだけ表示されます',
-  publicLogin:'ログインすると公開プロフィールを設定できます',publicJoin:'ランキングに参加すると公開プロフィールを設定できます',publicHidden:'通報を受けたため、プロフィールは確認まで非表示です。問題がなければ自動で戻ります',objection:'異議あり！',objectionHint:'通報が不当だと思ったら異議を申し立てられます。開発者が確認します。非表示 1 回につき 1 度だけです',objectionPh:'理由（任意）',objectionSend:'異議を申し立てる',appealed:'異議を申し立てました。確認をお待ちください',
+  publicLogin:'ログインすると公開プロフィールを設定できます',publicJoin:'ランキングに参加すると公開プロフィールを設定できます',publicHidden:'通報を受けたため、プロフィールは確認まで非表示です。問題がなければ自動で戻ります',objection:'異議あり！',objectionTitle:'通報に異議を申し立てる',objectionHint:'通報が不当だと思ったら異議を申し立てられます。開発者が確認します。非表示 1 回につき 1 度だけです',objectionPh:'理由（任意）',objectionSend:'異議を申し立てる',appealed:'異議を申し立てました。確認をお待ちください',
   bio:'ひとこと',bioHint:'1 行、60 文字まで。URL・成人向け・暴言は使えません',bioPh:'例：爆裂魔法は一日一発',favorites:'好きなゲーム',favoritesHint:'ライブラリから最大 5 本',addFavorite:'＋ ゲームを追加',removeFavorite:'削除'},
  en:{account:'Account',signedIn:'Signed in',signOut:'Sign out',signedOut:'Signed out',syncDevices:'Sync and devices',notReady:'Online services are not ready yet, so accounts and the leaderboard are unavailable',
   loginHint:'Sign in to a MeguLit account with your email to join the leaderboard. Your email is used only to sign in and never shows on the board',
@@ -34,7 +34,7 @@ const T={
   joinNow:'Join',saved:'Saved',leaveAsk:'Leaving deletes your entry on the server (rank, nickname, picture). You can join again later. Leave now?',leaveYes:'Leave',leaveNo:'Cancel',left:'You left the leaderboard; your server entry was deleted',leftLocal:'You left the leaderboard; the server could not be reached, but nothing more will be uploaded',
   offline:'Cannot reach the online service right now',
   publicTitle:'Public profile',publicSwitch:'Make my profile public',publicHint:'Others can open your profile from the leaderboard, follow you, and find you under Kindred readers. Reading lately shows only while "Show the games I read" is on',
-  publicLogin:'Sign in to set up a public profile',publicJoin:'Join the leaderboard to set up a public profile',publicHidden:'Your profile was reported and is hidden until it is reviewed; it comes back by itself if all is fine',objection:'Objection!',objectionHint:'Think the report is wrong? Object and the developer reviews it by hand. Once per hiding',objectionPh:'Why (optional)',objectionSend:'Send objection',appealed:'Objection sent; waiting for a human review',
+  publicLogin:'Sign in to set up a public profile',publicJoin:'Join the leaderboard to set up a public profile',publicHidden:'Your profile was reported and is hidden until it is reviewed; it comes back by itself if all is fine',objection:'Objection!',objectionTitle:'Dispute the report',objectionHint:'Think the report is wrong? Object and the developer reviews it by hand. Once per hiding',objectionPh:'Why (optional)',objectionSend:'Send objection',appealed:'Objection sent; waiting for a human review',
   bio:'Signature',bioHint:'One line, up to 60 characters; no links, adult or abusive content',bioPh:'e.g. One explosion a day',favorites:'Favourite games',favoritesHint:'Pick up to 5 from your library',addFavorite:'+ Add a game',removeFavorite:'Remove'}
 };
 export async function mountProfileSettings({content,api,locale,esc,toast,openSection=()=>{}}){
@@ -69,7 +69,7 @@ export async function mountProfileSettings({content,api,locale,esc,toast,openSec
   let favorites=[...p.favorites];
   const draw=()=>{
    const left=library.filter(title=>!favorites.some(f=>f.title===title));
-   publicBox.innerHTML=`${head}${p.hidden?`<div class="profile-hidden" role="status"><p>${t.publicHidden}</p>${p.appealed?`<p class="profile-appealed">${t.appealed}</p>`:`<button type="button" class="profile-objection" data-objection>${t.objection}</button><small>${t.objectionHint}</small><div class="profile-objection-form" data-objection-form hidden><textarea rows="3" maxlength="500" placeholder="${esc(t.objectionPh)}" aria-label="${esc(t.objectionPh)}"></textarea><button type="button" class="primary" data-objection-send>${t.objectionSend}</button></div>`}</div>`:''}
+   publicBox.innerHTML=`${head}${p.hidden?`<div class="profile-hidden" role="status"><p>${t.publicHidden}</p>${p.appealed?`<p class="profile-appealed">${t.appealed}</p>`:`<button type="button" class="profile-objection" data-objection title="${esc(t.objectionTitle)}">${t.objection}</button><small>${t.objectionHint}</small><div class="profile-objection-form" data-objection-form hidden><textarea rows="3" maxlength="500" placeholder="${esc(t.objectionPh)}" aria-label="${esc(t.objectionPh)}"></textarea><button type="button" class="primary" data-objection-send>${t.objectionSend}</button></div>`}</div>`:''}
     <label class="settings-row"><span class="setting-description"><span class="settings-label">${t.publicSwitch}</span><small class="settings-help">${t.publicHint}</small></span><input class="switch" type="checkbox" name="profilePublic" ${p.public?'checked':''}></label>
     <label class="settings-row"><span class="setting-description"><span class="settings-label">${t.bio}</span><small class="settings-help">${t.bioHint}</small></span><input name="profileBio" type="text" maxlength="60" value="${esc(p.bio)}" placeholder="${esc(t.bioPh)}"></label>
     <div class="settings-row profile-favorites"><span class="setting-description"><span class="settings-label">${t.favorites}</span><small class="settings-help">${t.favoritesHint}</small></span>
