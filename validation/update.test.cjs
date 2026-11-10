@@ -102,3 +102,10 @@ test('update: a download cut off near the end resumes with a range request',asyn
  assert.equal(r.phase,'ready');assert.equal(r.sha256,digest);assert.deepEqual(ranges,['','bytes=8000-']);
  u.reset();fs.rmSync(root,{recursive:true,force:true});
 });
+
+// E350: hotfix letters order after the base version, and lettered packages are accepted.
+test('versions compare with hotfix letters',()=>{
+ const u=require('../services/update.cjs');
+ assert.equal(u.newer('1.2.8a','1.2.8'),true);assert.equal(u.newer('1.2.8b','1.2.8a'),true);assert.equal(u.newer('1.2.9','1.2.8z'),true);
+ assert.equal(u.newer('1.2.8','1.2.8b'),false);assert.equal(u.newer('v1.2.8b','1.2.8b'),false);assert.equal(u.newer('1.2.8','1.2.7'),true);
+});

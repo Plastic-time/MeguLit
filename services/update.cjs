@@ -6,7 +6,7 @@
    and reopens it. data / logs / cache / runtime / models are never touched. */
 const fs=require('fs'),path=require('path'),crypto=require('crypto'),{spawn}=require('child_process');
 const REPO='https://api.github.com/repos/ilynthn/MeguLit/releases';
-const ASSET=/^MeguLit-v(\d+)\.(\d+)\.(\d+)-win-x64\.zip$/;
+const ASSET=/^MeguLit-v(\d+)\.(\d+)\.(\d+)([a-z]?)-win-x64\.zip$/i;
 const HOSTS=new Set(['github.com','objects.githubusercontent.com','release-assets.githubusercontent.com']);
 /* User report (2026-11-09, mainland China): "restart and update" said download failed. GitHub downloads are often
    unreachable there, so the package also comes through the same relays the runtime installer uses. A relay only
@@ -24,8 +24,11 @@ const HEADERS={'User-Agent':'MeguLit-Updater','Accept':'application/vnd.github+j
    numeric (v1.2.8, MeguLit-v1.2.8-win-x64.zip) so every installed updater keeps working; a lettered hotfix is found by the
    package digest like any hotfix. The letter is dropped before comparing. */
 const base=v=>String(v||'').trim().replace(/^v/,'').replace(/[a-z]+$/i,'');
-const parse=v=>base(v).split('.').map(n=>Number(n)||0);
-const newer=(a,b)=>{const x=parse(a),y=parse(b);for(let i=0;i<3;i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)>(y[i]||0);}return false;};
+/* E350 (user 2026-11-10: "修改以后的自动更新识别规则"): versions compare as major.minor.patch plus the hotfix letter
+   (1.2.8 < 1.2.8a < 1.2.8b < 1.2.9), and a package named MeguLit-v1.2.8b-win-x64.zip is accepted, so later releases
+   may carry the letter in the tag itself. */
+const parse=v=>{const m=/^(\d+)\.(\d+)\.(\d+)([a-z]?)$/i.exec(String(v||'').trim().replace(/^v/,''));if(!m)return base(v).split('.').map(n=>Number(n)||0).concat(0);return [+m[1],+m[2],+m[3],m[4]?m[4].toLowerCase().charCodeAt(0)-96:0];};
+const newer=(a,b)=>{const x=parse(a),y=parse(b);for(let i=0;i<4;i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)>(y[i]||0);}return false;};
 
 function asset(rel){
  const a=(rel.assets||[]).find(a=>ASSET.test(a.name));if(!a)throw Error('UPDATE_ASSET_MISSING');
@@ -39,8 +42,8 @@ async function latest(fetcher=fetch){
  return {version:String(rel.tag_name||'').replace(/^v/,''),name:a.name,size:a.size,url:a.browser_download_url,digest:/^sha256:[a-f0-9]{64}$/i.test(a.digest||'')?a.digest.slice(7).toLowerCase():'',notes:String(rel.body||'').replace(/^> \*\*\[⬇[^\n]*\n*/m,'').slice(0,6000),page:rel.html_url,published:rel.published_at||''};
 }
 /* Size of the package the user is running, for "bigger / smaller than now". Unknown is fine. */
-async function installedSize(current,fetcher=fetch){current=base(current);
- try{const r=await fetcher(REPO+'/tags/v'+String(current).replace(/^v/,''),{headers:HEADERS,signal:AbortSignal.timeout(10000)});if(!r.ok)return 0;return asset(await r.json()).size||0;}catch{return 0;}
+async function installedSize(current,fetcher=fetch){
+ try{let r=await fetcher(REPO+'/tags/v'+String(current).replace(/^v/,''),{headers:HEADERS,signal:AbortSignal.timeout(10000)});if(!r.ok&&base(current)!==String(current).replace(/^v/,''))r=await fetcher(REPO+'/tags/v'+base(current),{headers:HEADERS,signal:AbortSignal.timeout(10000)});if(!r.ok)return 0;return asset(await r.json()).size||0;}catch{return 0;}
 }
 
 let state={phase:'idle'},job=null,found=null;
@@ -52,7 +55,7 @@ const status=()=>({...state});
 function installedFile(root){return root?path.join(root,'data','update-installed.json'):'';}
 function readInstalled(root){try{return JSON.parse(fs.readFileSync(installedFile(root),'utf8'));}catch{return null;}}
 function writeInstalled(root,value){if(!root)return;try{fs.mkdirSync(path.dirname(installedFile(root)),{recursive:true});fs.writeFileSync(installedFile(root),JSON.stringify(value));}catch{}}
-function isHotfix(root,rel,current){current=base(current);
+function isHotfix(root,rel,current){if(base(rel.version)!==base(current)||newer(current,rel.version))return false;current=String(rel.version);
  if(!root||!rel.digest||String(rel.version)!==String(current).replace(/^v/,''))return false;
  const mine=readInstalled(root);if(!mine||mine.version!==rel.version){writeInstalled(root,{version:rel.version,digest:rel.digest});return false;}
  return !!mine.digest&&mine.digest!==rel.digest;
@@ -66,7 +69,7 @@ function refreshIcons(root,current,run=(file,args)=>require('node:child_process'
  if(!root||!current)return false;const mark=path.join(root,'data','icon-refresh.json');let seen='';try{seen=JSON.parse(fs.readFileSync(mark,'utf8')).version||'';}catch{}
  if(seen===String(current))return false;try{run(path.join(process.env.SystemRoot||'C:\Windows','System32','ie4uinit.exe'),['-show']);fs.mkdirSync(path.dirname(mark),{recursive:true});fs.writeFileSync(mark,JSON.stringify({version:String(current)}));return true;}catch{return false;}
 }
-async function check(current,fetcher=fetch,root=''){current=base(current);tidyRollback(root);refreshIcons(root,current);
+async function check(current,fetcher=fetch,root=''){current=String(current||'').trim().replace(/^v/,'');tidyRollback(root);refreshIcons(root,current);
  const rel=await latest(fetcher),hotfix=isHotfix(root,rel,current),isNewer=newer(rel.version,current)||hotfix;
  found=isNewer?{...rel,hotfix}:null;
  const previous=isNewer?await installedSize(current,fetcher):0;
@@ -98,7 +101,7 @@ async function download(url,rel,fetcher=fetch,part={chunks:[],length:0}){
   return data;
  }catch(error){throw Error(control.signal.aborted&&!/^UPDATE_/.test(error.message)?'STALLED':error.message);}finally{clearTimeout(idle);}
 }
-function start(root,current,fetcher=fetch){current=base(current);
+function start(root,current,fetcher=fetch){current=String(current||'').trim().replace(/^v/,'');
  if(job)return job;
  job=(async()=>{
   try{
