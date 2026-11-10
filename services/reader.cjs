@@ -44,7 +44,7 @@ class Reader{
   }
   /* E322: every whole-layer hide or show is logged with its cause (user: the layer faded out by itself in several games). */if(message.type==='dialogScene'||message.type==='dialogSceneKept')this.logVisibility({type:message.type,visible:message.visible,reason:message.reason});if(message.type==='dialogScene')this.immersion.scene(message.visible,'scene '+(message.reason||''));
   if(message.type==='dialogAuto')this.immersion.autoBox(message.visible);
-  if(message.type==='readerInput')this.immersion.skip(message.skipHeld);
+  if(message.type==='readerInput'){this.immersion.skip(message.skipHeld);if(typeof message.skipHeld==='boolean')this.gal?.hooks?.skipHeld?.(message.skipHeld);}
   if(message.type==='hookDialog')this.immersion.engine(message.visible,message.engine);
   if(message.type==='markerPresence')this.immersion.marker(message.present===true);
   if(message.type==='waitMarkerDrawn'){this.immersion.markerDrawn();this.gal?.send({type:'markerHookDrawn'});}
@@ -72,7 +72,7 @@ class Reader{
   if(this.gal)return {attached:true};
   this.overlayPid=pid;
   const layout={...require('../core/layout.cjs'),overlayHwnd:String(hwnd)};
-  this.immersion=new(require('../core/immersion.cjs').Immersion)(message=>{this.logVisibility({type:'dialogVisibility',visible:message.dialogVisible,reason:message.reason});this.runtime.emit('reader-event',{type:'dialogVisibility',visible:message.dialogVisible});clearTimeout(this.hideTimer);if(message.dialogVisible===false)this.hideTimer=setTimeout(()=>this.gal?.send({type:'dialogVisibility',visible:false}),140);else this.gal?.send({type:'dialogVisibility',visible:message.dialogVisible});this.runtime.emit('reader-event',message);});this.immersion.configure(this.runtime.config());this.tick=setInterval(()=>this.immersion.tick(),100);this.tick.unref();
+  this.immersion=new(require('../core/immersion.cjs').Immersion)(message=>{this.logVisibility({type:'dialogVisibility',visible:message.dialogVisible,reason:message.reason});this.runtime.emit('reader-event',{type:'dialogVisibility',visible:message.dialogVisible});clearTimeout(this.hideTimer);if(message.dialogVisible===false)this.hideTimer=setTimeout(()=>this.gal?.send({type:'dialogVisibility',visible:false}),140);else this.gal?.send({type:'dialogVisibility',visible:message.dialogVisible});this.runtime.emit('reader-event',message);});this.immersion.configure(this.runtime.config());/* E422: a page game is known before its first line */this.immersion.flowGame=()=>this.gal?.hooks?.flowPage===true;this.tick=setInterval(()=>this.immersion.tick(),100);this.tick.unref();
   this.fonts=new(require('../core/game-fonts.cjs').GameFonts)(layout,()=>{this.runtime.emit('reader-event',{type:'fonts',fonts:this.fonts.payload(true)});});
   this.gal=new(require('../core/gal-native.cjs').GalNative)(layout,pid,message=>this.event(message),this.runtime.spawnReaderNative);
   if(!this.gal.process){this.stop();throw Error('READER_NATIVE_MISSING');}

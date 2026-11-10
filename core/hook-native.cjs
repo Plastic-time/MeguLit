@@ -29,6 +29,8 @@ class HookNative{
  /* E414 (user: "做成通用解法"): a game is a page game when its program is listed (WoH) or when its own script says so: the
     script provider knows where pages start and most pages hold more than one line (HuneX tables, multilingual KiriKiri
     [cm]/[l]). Every page rule (page clears, no duplicates, row continuation, no marker/box auto-hide, no preflight) follows. */
+ /* E422: the reader's skip key (Ctrl / the game's skip held), for the bridge's skip-burst rule. */
+ skipHeld(v){const held=v===true;if(held===this.skipKey)return;this.skipKey=held;if(this.process)this.send({type:'skipHeld',held});}
  get flowPage(){return this._flowPage===true||this.originalText?.flowGame?.()===true;}
  set flowPage(v){this._flowPage=v===true;}
  get preflight(){return this._preflight===true&&this.flowPage!==true;}

@@ -75,7 +75,7 @@ test("E323 wiring: per-sentence indent, marker on the current line, box probes o
  const gal=read('web/reader/modules/gal.js'),wait=read('web/reader/modules/wait-marker.js'),imm=read('core/immersion.cjs'),view=read('web/reader/modules/island-page.js');
  assert.match(gal,/for\(const sentence of document\.querySelectorAll\('\.sentence-text'\)\)\{\r?\n\s+let leading=!sentence\.closest\('\.tome-island-flow'\);/);
  assert.match(wait,/\.tome-island-pair\.tome-island-current/);
- assert.match(imm,/source\(text,engine\)\{this\.flow=engine==='nvl';/);assert.match(imm,/scene\(visible,why='scene'\)\{[^}]*\|\|this\.flow\)return;/);assert.match(imm,/autoBox\(visible\)\{[^}]*\|\|this\.flow\)return;/);
+ assert.match(imm,/source\(text,engine\)\{const flow=engine==='nvl';/);assert.match(imm,/scene\(visible,why='scene'\)\{[^\n]*if\(this\.isFlow\(\)\)\{/);assert.match(imm,/autoBox\(visible\)\{[^}]*\|\|this\.isFlow\(\)\)return;/);
  assert.match(view,/\.tome-island-flow \.sentence-text\[data-megulit-native-breaks\]\{white-space:pre-wrap!important/,"a paragraph with the game's own breaks still wraps at the box width");
  assert.doesNotMatch(view,/--tomoyo-gal-gap'\)\)\|\|8/,'the slider gap is not added between lines');
 });
@@ -258,4 +258,49 @@ test('E411 WoH flow page: the translation is indented only when its sentence sta
  const view=read('web/reader/modules/island-page.js');
  assert.match(view,/const shown=r\.translation\?\(at\.col===0&&\/\^(\u3000|　)\/\.test\(String\(r\.source\|\|''\)\)\?/);
  assert.match(view,/r\.translation\.replace\(\/\^\[ (\u3000|　)\]\+\/,''\)/);
+});
+
+// E422 (user, WoH 1.3.8: the original still showed now and then, the layer still hid by itself, the drag frame flew away).
+test('E422: lines a page shows together are hidden; only a held skip key or a run past the longest group passes through',()=>{
+ const bridge=read('native/HookBridge.cs');
+ assert.match(bridge,/bool quick=\(embedNow-LastEmbedAt\)\.TotalMilliseconds<250&&text!=LastEmbedText;BurstRun=quick\?BurstRun\+1:0;bool burst=quick&&\(SkipHeld\|\|BurstRun>=BurstSkipLines\);/);
+ assert.match(bridge,/const int BurstSkipLines=8;/);assert.match(bridge,/type=="skipHeld"\)\{object hv;SkipHeld=/);
+ assert.match(read('services/reader.cjs'),/this\.gal\?\.hooks\?\.skipHeld\?\.\(message\.skipHeld\)/);
+});
+
+test('E422: the skip key reaches the bridge once per change',t=>{
+ const f=fixture(t);const sent=[];f.hook.process={stdin:{write(){},end(){}},kill(){},removeAllListeners(){}};f.hook.send=m=>sent.push(m);
+ f.hook.skipHeld(true);f.hook.skipHeld(true);f.hook.skipHeld(false);
+ assert.deepEqual(sent.filter(m=>m.type==='skipHeld'),[{type:'skipHeld',held:true},{type:'skipHeld',held:false}]);
+});
+
+test('E422 real data: no WoH group shown without a click is long enough to count as a skip',t=>{
+ const dir='E:\\Steam\\steamapps\\common\\WITCH ON THE HOLY NIGHT';if(!fs.existsSync(dir)){t.skip('WoH not installed');return;}
+ const h=require('../services/original-engines/hunex.cjs');let max=0;
+ for(const f of fs.readdirSync(dir).filter(f=>/\.hfa$/i.test(f))){const l=h.hfaList(path.join(dir,f));if(!l)continue;for(const e of l){if(!/\.chs$/i.test(e.name))continue;
+  const x=h.lenzu(h.hfaRead(path.join(dir,f),e)),n=x.length>>2,w=i=>x.readUInt32LE(i*4);let run=0;
+  for(let i=0;i+15<n;i++){if(w(i)!==123||w(i+1)!==0x12345678)continue;const p=w(i+3)+0x30;if(p>=x.length)continue;const s=x.toString('utf8',p,Math.max(p,x.indexOf(0,p)));if(!/\$\d{6}/.test(s))continue;run+=(s.match(/\$\d{6}/g)||[]).length;if(w(i+5)!==0){max=Math.max(max,run);run=0;}}}}
+ assert.ok(max>=2&&max<8,'longest group '+max+' must stay under the skip threshold');
+});
+
+test('E422: a scene hide before the first page line is lifted; a page game is known before any line',()=>{
+ const {Immersion}=require('../core/immersion.cjs'),events=[];let now=5000;
+ const im=new Immersion(e=>events.push(e.dialogVisible),()=>now);im.configure({immersion:true,dialogDetection:'marker'});im.bind('woh');
+ im.scene(false);assert.equal(events.at(-1),false,'not known yet: hidden');
+ im.source('　彼女の家は山の中腹にあった。','nvl');im.marker(true);now+=800;im.tick();assert.equal(events.at(-1),true,'the first page line lifts it');
+ im.scene(false);now+=1000;im.tick();assert.equal(events.at(-1),true,'scene probes never hide a page');
+ const ev2=[],im2=new Immersion(e=>ev2.push(e.dialogVisible),()=>now);im2.flowGame=()=>true;im2.configure({immersion:true,dialogDetection:'marker'});im2.bind('woh');
+ im2.scene(false);im2.evidence(false,'visual');now+=1000;im2.tick();assert.ok(!ev2.includes(false),'known from the hook: never hidden by a probe');
+});
+
+test('E422: the drag frame goes around the page lines, not the 0x0 text window',()=>{
+ const view=read('web/reader/modules/island-page.js');
+ assert.match(view,/body\.tome-box-dragging \.sentence-window\.tome-island-page\{outline:none!important\}/);
+ assert.match(view,/body\.tome-box-dragging \.sentence-window\.tome-island-page \.tome-island-pair:not\(\[hidden\]\)\{outline:2px dashed/);
+});
+
+test('E422: dragging over a page selects only inside the sentence it began in; the native selection never starts on a line',()=>{
+ const sel=read('web/reader/modules/selection.js');
+ assert.match(sel,/document\.addEventListener\('selectstart',e=>\{if\(e\.target\?\.closest\?\.\('\.sentence-text'\)/);
+ assert.match(sel,/if\(!root\|\|!end\|\|!root\.contains\(end\)\)\{if\(down\.drag\?\.anchor\)/);
 });
