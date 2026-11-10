@@ -25,7 +25,7 @@ export function aboutHTML(locale,esc){
     <div><dt>${esc(t.license)}</dt><dd>GPL-3.0-or-later</dd></div>
     <div><dt>${esc(t.author)}</dt><dd>魚魚棟 · ilynthn</dd></div>
    </dl>
-   <div class="about-links"><h3>${esc(t.links)}</h3>${link(REPO,t.repo)}${link(REPO+'#faq',({zh:'常见问题',ja:'よくある質問',en:'FAQ'})[locale]||'FAQ')}${link(REPO+'/issues',t.issues)}${link(REPO+'/releases',t.releases)}</div>
+   <div class="about-links"><h3>${esc(t.links)}</h3>${link('https://megulit.com',({zh:'官网',ja:'公式サイト',en:'Website'})[locale]||'Website')}${link(REPO,t.repo)}${link(REPO+'#faq',({zh:'常见问题',ja:'よくある質問',en:'FAQ'})[locale]||'FAQ')}${link(REPO+'/issues',t.issues)}${link(REPO+'/releases',t.releases)}</div>
   </div>
   <section class="about-support">
    <span class="about-glyph" aria-hidden="true">援</span>
