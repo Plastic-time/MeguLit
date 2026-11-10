@@ -1992,3 +1992,4 @@ html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
 .ht-down[hidden] { display: none; }
 @keyframes ht-drop { 50% { transform: translateY(5px); } }
 @media (prefers-reduced-motion: reduce) { .ht-down { animation: none; } }
+.ht-card { background: #120d09; }
