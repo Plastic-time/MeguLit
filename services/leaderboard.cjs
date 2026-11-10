@@ -68,8 +68,8 @@ function collectStats(db,now=new Date()){
  }
  out.currentStreak=currentRun(sessions.filter(reading).map(readDay),now);
  const titles=new Map(db.prepare('SELECT id,title FROM games WHERE removed_at IS NULL AND hidden_at IS NULL').all().map(g=>[g.id,String(g.title||'').trim()]));
- const perGame=new Map();for(const s of sessions){const title=titles.get(s.game_id);if(!title)continue;const g=perGame.get(title)||{title,characters:0,seconds:0};g.characters+=s.characters||0;g.seconds+=s.active_seconds||0;perGame.set(title,g);}
- out.games=[...perGame.values()].filter(g=>g.characters>0).sort((a,b)=>b.characters-a.characters).slice(0,MAX_GAMES).map(g=>({title:g.title.slice(0,120),characters:int(g.characters),seconds:int(g.seconds)}));
+ const perGame=new Map();for(const s of sessions){const title=titles.get(s.game_id);if(!title)continue;const g=perGame.get(title)||{title,characters:0,seconds:0,last:0};g.characters+=s.characters||0;g.seconds+=s.active_seconds||0;g.last=Math.max(g.last,int(s.started_at));perGame.set(title,g);}
+ out.games=[...perGame.values()].filter(g=>g.characters>0).sort((a,b)=>b.characters-a.characters).slice(0,MAX_GAMES).map(g=>({title:g.title.slice(0,120),characters:int(g.characters),seconds:int(g.seconds),last:int(g.last)}));
  out.hot=collectLookups(db,now);
  return out;
 }
@@ -135,7 +135,7 @@ async function submit(stats,options={}){
  if(!c.joined)return {state:'disabled'};if(!c.configured)return {state:'not-configured'};
  const body={version:1,id:c.installId,name:cleanName(c.name).name,keys:{week:stats?.keys?.week,month:stats?.keys?.month},stats:{}};
  for(const period of PERIODS){const p=stats?.stats?.[period]||{};body.stats[period]=Object.fromEntries(METRICS.map(m=>[m,int(p[m])]));}
- if(c.shareGames&&Array.isArray(stats?.games))body.games=stats.games.slice(0,MAX_GAMES).map(g=>({title:String(g.title||'').slice(0,120),characters:int(g.characters),seconds:int(g.seconds)})).filter(g=>g.title);
+ if(c.shareGames&&Array.isArray(stats?.games))body.games=stats.games.slice(0,MAX_GAMES).map(g=>({title:String(g.title||'').slice(0,120),characters:int(g.characters),seconds:int(g.seconds),last:Math.min(int(g.last),Math.floor((options.now||new Date()).getTime()/1000))})).filter(g=>g.title);
  if(stats?.hot?.week)body.hot={week:stats.hot.week,terms:(stats.hot.terms||[]).slice(0,HOT_TERMS).map(t=>({term:t.term,count:Math.min(1000,int(t.count))})).filter(t=>t.count>0)};
  const res=await call(c.base+'/api/leaderboard',{method:'POST',body:JSON.stringify(body)},options.fetch||fetch,identity(root,options));
  if(res.state==='ok'&&root)atomic(stateFile(root),{...relay.readJSON(stateFile(root)),lastSubmitAt:(options.now||new Date()).getTime()});
@@ -149,7 +149,7 @@ async function fetchBoard(period,metric,options={}){
  const q=new URLSearchParams(isGames?{metric}:{period,metric});if(!isGames&&period!=='all')q.set('key',periodKeys(options.now)[period]);
  if(isGames&&options.game)q.set('game',String(options.game).slice(0,120));if(c.me)q.set('me',c.me);
  const res=await call(c.base+'/api/leaderboard?'+q,{method:'GET'},options.fetch||fetch);if(res.state!=='ok')return res;
- const clean=e=>({rank:int(e?.rank),name:String(e?.name||'').slice(0,32),value:int(e?.value),me:e?.me===true,avatar:AVATAR_ID.test(String(e?.avatar||''))?e.avatar:null});
+ const clean=e=>({rank:int(e?.rank),name:String(e?.name||'').slice(0,32),value:int(e?.value),me:e?.me===true,avatar:AVATAR_ID.test(String(e?.avatar||''))?e.avatar:null,pid:/^[0-9a-f]{16}$/.test(String(e?.pid||''))?e.pid:null});
  if(isGames&&!options.game)return {state:'ok',games:(Array.isArray(res.data.games)?res.data.games:[]).slice(0,100).map(g=>({title:String(g?.title||'').slice(0,120),readers:int(g?.readers),top:g?.top?clean(g.top):null}))};
  return {state:'ok',entries:(Array.isArray(res.data.entries)?res.data.entries:[]).slice(0,100).map(clean),total:int(res.data.total),me:res.data.me?{rank:int(res.data.me.rank),value:int(res.data.me.value)}:null};
 }
@@ -238,9 +238,73 @@ async function view(root,db,request={},options={}){
  const result={configured:c.configured,joined:c.joined,enabled:c.enabled,name:c.name,shareGames:c.shareGames,account:c.account,tab,period,metric,local,board:null,hot:null,avatars:{}};
  if(!c.configured)return {...result,board:{state:'not-configured'}};
  if(c.joined&&(request.submit===true||now.getTime()-c.lastSubmitAt>SUBMIT_EVERY))result.submit=await submit(local,{...options,root,now});
+ /* E397 关注 tab: following and 同好 */
+ if(request.tab==='follow'){result.tab='follow';result.social=await social(root,options);return result;}
  if(tab==='hot'){result.hot=await hotWords(root,{week:request.week||'',category:CATEGORIES.includes(request.category)?request.category:'word'},options);return result;}
  result.board=await fetchBoard(period,metric,{...options,root,now,game:request.game});
  if(result.board.state==='ok'){const ids=[...(result.board.entries||[]),...(result.board.games||[]).map(g=>g.top).filter(Boolean)].map(e=>e.avatar);result.avatars=await avatarImages(root,ids,options);}
  return result;
 }
-module.exports={PERIODS,METRICS,CATEGORIES,BLOCKED,cleanName,cleanTerm,collectStats,collectLookups,hotWeekKey,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile,identity,setAvatar,removeAvatar,avatarStatus,appealAvatar,avatarImages,report,hotWords};
+
+/* ---- E397 public profiles, follows, 同好, profile reports (relay/src/social.js) -------------------------------- */
+const PID=/^[0-9a-f]{16}$/,VNDB=/^v[1-9]\d{0,6}$/,REPORT_KINDS=['discrimination','nudity','racism','harassment','spam','other'],NAME_ONLY=['admin','管理员','官方','megulit'];
+/* Signature rules — keep in step with relay/src/validate.js cleanBio (validation/social-client.test.cjs checks both). */
+function cleanBio(value){
+ if(value===undefined||value===null)return {ok:true,bio:''};if(typeof value!=='string')return {ok:false,error:'BIO_INVALID'};
+ const bio=value.normalize('NFKC').replace(/\s+/g,' ').trim();if(!bio)return {ok:true,bio:''};
+ if([...bio].length>60)return {ok:false,error:'BIO_LENGTH'};
+ if([...bio].some(hidden)||/[<>`\\]/.test(bio)||/https?:|www\.|\.(?:com|net|org|cn|jp|io)\b|@/i.test(bio))return {ok:false,error:'BIO_INVALID'};
+ const lower=bio.toLowerCase(),flat=lower.replace(/[\s._\-*·・]/g,''),tokens=lower.split(/[^a-z]+/).filter(Boolean);
+ if(BLOCKED.some(word=>!NAME_ONLY.includes(word)&&(/^[a-z]+$/.test(word)?tokens.some(t=>t.startsWith(word)):flat.includes(word))))return {ok:false,error:'BIO_BLOCKED'};
+ return {ok:true,bio};
+}
+const str=(v,n)=>String(v??'').slice(0,n);
+const cleanFavorites=list=>(Array.isArray(list)?list:[]).slice(0,5).map(g=>({title:str(g?.title,120),vndb:VNDB.test(String(g?.vndb||''))?g.vndb:''})).filter(g=>g.title);
+const cleanRecent=list=>(Array.isArray(list)?list:[]).slice(0,5).map(g=>({title:str(g?.title,120),last:int(g?.last)})).filter(g=>g.title);
+const avatarId=v=>AVATAR_ID.test(String(v||''))?v:null;
+async function socialCall(root,method,route,body,options={},needLogin=true){
+ const c=config(root,options.env,options);if(!c.configured)return {state:'not-configured'};
+ const who=identity(root,options);if(needLogin&&!who)return {state:'login'};
+ return call(c.base+route,{method,body:body===undefined?undefined:JSON.stringify(body)},options.fetch||fetch,who);
+}
+/* your own profile as the relay has it ({joined,pid,public,hidden,bio,favorites}) */
+async function profileGet(root,options={}){
+ const res=await socialCall(root,'GET','/api/profile',undefined,options);if(res.state!=='ok')return res;const d=res.data;
+ return {state:'ok',joined:d.joined===true,pid:PID.test(String(d.pid||''))?d.pid:null,public:d.public===true,hidden:d.hidden===true,bio:str(d.bio,60),favorites:cleanFavorites(d.favorites)};
+}
+async function profileSave(root,{bio,favorites,public:open}={},options={}){
+ const checked=cleanBio(bio);if(!checked.ok)throw Error('LEADERBOARD_'+checked.error);
+ const res=await socialCall(root,'PUT','/api/profile',{bio:checked.bio,favorites:cleanFavorites(favorites),public:open===true},options);
+ if(res.state==='error'&&/^(BIO_|INVALID_FAVORITES|NOT_JOINED)/.test(res.error))throw Error('LEADERBOARD_'+res.error);
+ return res.state==='ok'?profileGet(root,options):res;
+}
+/* someone's card; a private or unknown pid answers {state:'private'} */
+async function profileCard(root,pid,options={}){
+ if(!PID.test(String(pid||'')))return {state:'private'};
+ const res=await socialCall(root,'GET','/api/profile/'+pid,undefined,options,false);
+ if(res.state==='error'&&res.error==='NOT_FOUND')return {state:'private'};if(res.state!=='ok')return res;const d=res.data;
+ const card={state:'ok',pid,name:str(d.name,32),avatar:avatarId(d.avatar),bio:str(d.bio,60),favorites:cleanFavorites(d.favorites),recent:cleanRecent(d.recent),followers:int(d.followers),following:d.following===true,me:d.me===true,canFollow:!!identity(root,options)};
+ card.avatars=await avatarImages(root,[card.avatar],options);return card;
+}
+async function followSet(root,pid,on,options={}){
+ if(!PID.test(String(pid||'')))return {state:'error',error:'NOT_FOUND'};
+ const res=await socialCall(root,on?'POST':'DELETE','/api/follow/'+pid,undefined,options);return res.state==='ok'?{state:'ok',following:res.data.following===true}:res;
+}
+async function reportProfile(root,pid,{kind,reason}={},options={}){
+ if(!PID.test(String(pid||'')))return {state:'error',error:'NOT_FOUND'};if(!REPORT_KINDS.includes(kind))throw Error('LEADERBOARD_INVALID_KIND');
+ const res=await socialCall(root,'POST',`/api/profile/${pid}/report`,{kind,reason:str(reason,500)},options);return res.state==='ok'?{state:'ok',hidden:true}:res;
+}
+/* the 关注 tab: who you follow (newest reading first) and up to 20 同好 */
+async function social(root,options={}){
+ const [following,kindred]=await Promise.all([socialCall(root,'GET','/api/following',undefined,options),socialCall(root,'GET','/api/kindred',undefined,options)]);
+ if(following.state!=='ok')return following;
+ const people=(Array.isArray(following.data.following)?following.data.following:[]).slice(0,500).map(p=>({pid:PID.test(String(p?.pid||''))?p.pid:null,name:str(p?.name,32),public:p?.public===true,avatar:avatarId(p?.avatar),recent:cleanRecent(p?.recent).slice(0,3)}));
+ const kin=kindred.state==='ok'&&Array.isArray(kindred.data.kindred)?kindred.data.kindred.slice(0,20).map(p=>({pid:PID.test(String(p?.pid||''))?p.pid:null,name:str(p?.name,32),avatar:avatarId(p?.avatar),shared:(Array.isArray(p?.shared)?p.shared:[]).slice(0,10).map(t=>str(t,120)),count:int(p?.count),following:p?.following===true})).filter(p=>p.pid):[];
+ return {state:'ok',following:people,kindred:kin,avatars:await avatarImages(root,[...people,...kin].map(p=>p.avatar),options)};
+}
+/* titles in your library for the favourites picker (most recently read first) */
+function libraryTitles(db){
+ const rows=db.prepare('SELECT g.title,MAX(s.started_at) last FROM games g LEFT JOIN reading_sessions s ON s.game_id=g.id WHERE g.removed_at IS NULL AND g.hidden_at IS NULL GROUP BY g.id ORDER BY last IS NULL,last DESC,g.title').all();
+ const seen=new Set();return rows.map(r=>String(r.title||'').trim().slice(0,120)).filter(t=>t&&!seen.has(t)&&seen.add(t)).slice(0,500);
+}
+module.exports={cleanBio,profileGet,profileSave,profileCard,followSet,reportProfile,social,libraryTitles,REPORT_KINDS,PERIODS,METRICS,CATEGORIES,BLOCKED,cleanName,cleanTerm,collectStats,collectLookups,hotWeekKey,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile,identity,setAvatar,removeAvatar,avatarStatus,appealAvatar,avatarImages,report,hotWords};

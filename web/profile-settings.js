@@ -14,26 +14,35 @@ const T={
   board:'排行榜',joined:'参加排行榜',joinedHint:'只上传阅读字数、时长、收录单词数、连续天数和本周查词的汇总',
   nickname:'昵称',nicknameHint:'2–16 个字，显示在排行榜上',share:'公开我读过的游戏',shareHint:'用于“按游戏”排行，只显示游戏名',
   joinNow:'参加',saved:'已保存',leaveAsk:'退出排行榜会删除服务器上的记录（名次、昵称、头像），之后可以重新参加。确定退出吗？',leaveYes:'确认退出',leaveNo:'取消',left:'已退出排行榜，服务器上的记录已删除',leftLocal:'已退出排行榜；服务器暂时连不上，下次联网时不会再上传',
-  offline:'暂时连不上联网服务'},
+  offline:'暂时连不上联网服务',
+  publicTitle:'公开主页',publicSwitch:'公开我的主页',publicHint:'公开后，别人可以在排行榜上点开你的主页、关注你，也会在“同好”里看到你。最近在玩只在打开“公开我读过的游戏”时显示',
+  publicLogin:'登录后可以设置公开主页',publicJoin:'参加排行榜后可以设置公开主页',publicHidden:'你的主页被举报，已暂时隐藏，等待人工审核。审核通过后会自动恢复',
+  bio:'签名',bioHint:'一行，最多 60 字；不能包含网址、成人或辱骂内容',bioPh:'比如：爆裂魔法一日一发',favorites:'最喜欢的游戏',favoritesHint:'从游戏库里选，最多 5 个',addFavorite:'＋ 添加游戏',removeFavorite:'移除'},
  ja:{account:'アカウント',signedIn:'ログイン中',signOut:'ログアウト',signedOut:'ログアウトしました',syncDevices:'同期とデバイス',notReady:'オンラインサービスは準備中のため、アカウントとランキングはまだ使えません',
   loginHint:'ランキングに参加するには、メールアドレスで MeguLit アカウントにログインしてください。アドレスはログインにのみ使い、ランキングには表示されません',
   board:'ランキング',joined:'ランキングに参加',joinedHint:'読んだ文字数・時間・登録単語数・連続日数と、今週調べた語の合計だけを送ります',
   nickname:'ニックネーム',nicknameHint:'2〜16 文字。ランキングに表示されます',share:'読んだゲームを公開',shareHint:'ゲーム別ランキング用。ゲーム名だけを表示します',
   joinNow:'参加する',saved:'保存しました',leaveAsk:'退出すると、サーバー上の記録（順位・ニックネーム・アイコン）が削除されます。あとで再参加できます。退出しますか？',leaveYes:'退出する',leaveNo:'キャンセル',left:'ランキングから退出し、サーバーの記録を削除しました',leftLocal:'ランキングから退出しました。サーバーに接続できませんでしたが、今後は送信しません',
-  offline:'オンラインサービスに接続できません'},
+  offline:'オンラインサービスに接続できません',
+  publicTitle:'公開プロフィール',publicSwitch:'プロフィールを公開',publicHint:'公開すると、ほかの人がランキングからプロフィールを開いたりフォローしたりでき、「同好」にも表示されます。最近読んでいるゲームは「読んだゲームを公開」がオンのときだけ表示されます',
+  publicLogin:'ログインすると公開プロフィールを設定できます',publicJoin:'ランキングに参加すると公開プロフィールを設定できます',publicHidden:'通報を受けたため、プロフィールは確認まで非表示です。問題がなければ自動で戻ります',
+  bio:'ひとこと',bioHint:'1 行、60 文字まで。URL・成人向け・暴言は使えません',bioPh:'例：爆裂魔法は一日一発',favorites:'好きなゲーム',favoritesHint:'ライブラリから最大 5 本',addFavorite:'＋ ゲームを追加',removeFavorite:'削除'},
  en:{account:'Account',signedIn:'Signed in',signOut:'Sign out',signedOut:'Signed out',syncDevices:'Sync and devices',notReady:'Online services are not ready yet, so accounts and the leaderboard are unavailable',
   loginHint:'Sign in to a MeguLit account with your email to join the leaderboard. Your email is used only to sign in and never shows on the board',
   board:'Leaderboard',joined:'Join the leaderboard',joinedHint:'Uploads only totals: characters, reading time, words saved, streak days and this week\'s looked-up words',
   nickname:'Nickname',nicknameHint:'2–16 characters, shown on the leaderboard',share:'Show the games I read',shareHint:'For the per-game boards; only game titles are shown',
   joinNow:'Join',saved:'Saved',leaveAsk:'Leaving deletes your entry on the server (rank, nickname, picture). You can join again later. Leave now?',leaveYes:'Leave',leaveNo:'Cancel',left:'You left the leaderboard; your server entry was deleted',leftLocal:'You left the leaderboard; the server could not be reached, but nothing more will be uploaded',
-  offline:'Cannot reach the online service right now'}
+  offline:'Cannot reach the online service right now',
+  publicTitle:'Public profile',publicSwitch:'Make my profile public',publicHint:'Others can open your profile from the leaderboard, follow you, and find you under Kindred readers. Reading lately shows only while "Show the games I read" is on',
+  publicLogin:'Sign in to set up a public profile',publicJoin:'Join the leaderboard to set up a public profile',publicHidden:'Your profile was reported and is hidden until it is reviewed; it comes back by itself if all is fine',
+  bio:'Signature',bioHint:'One line, up to 60 characters; no links, adult or abusive content',bioPh:'e.g. One explosion a day',favorites:'Favourite games',favoritesHint:'Pick up to 5 from your library',addFavorite:'+ Add a game',removeFavorite:'Remove'}
 };
 export async function mountProfileSettings({content,api,locale,esc,toast,openSection=()=>{}}){
  const t=T[locale]||T.zh,lw=leaderboardWords(locale),root=document.createElement('div');root.className='profile-settings';content.append(root);
  /* order: account, picture, leaderboard. The leaderboard block is the page's only <form>, so settings search finds
     its fields (leaderboardName …) by name */
- root.innerHTML=`<section class="panel profile-account" data-profile-account><h2 class="panel-title">${t.account}</h2><p class="settings-help">…</p></section><div data-profile-avatar></div><form class="panel profile-board" data-profile-board autocomplete="off"><h2 class="panel-title">${t.board}</h2><p class="settings-help">…</p></form>`;
- const accountBox=root.querySelector('[data-profile-account]'),avatarBox=root.querySelector('[data-profile-avatar]'),form=root.querySelector('[data-profile-board]');
+ root.innerHTML=`<section class="panel profile-account" data-profile-account><h2 class="panel-title">${t.account}</h2><p class="settings-help">…</p></section><div data-profile-avatar></div><form class="panel profile-board" data-profile-board autocomplete="off"><h2 class="panel-title">${t.board}</h2><p class="settings-help">…</p></form><section class="panel profile-public" data-profile-public><h2 class="panel-title">${t.publicTitle}</h2><p class="settings-help">…</p></section>`;
+ const publicBox=root.querySelector('[data-profile-public]'),accountBox=root.querySelector('[data-profile-account]'),avatarBox=root.querySelector('[data-profile-avatar]'),form=root.querySelector('[data-profile-board]');
  let account={configured:false,loggedIn:false},board=null;
  const errorText=error=>{const code=String(error?.message||error).replace(/^LEADERBOARD_/,'');return lw[code]||t.offline;};
  async function paintAvatar(){avatarBox.replaceChildren();await mountAvatarSettings({content:avatarBox,api,locale,esc,toast}).catch(()=>{});}
@@ -41,10 +50,41 @@ export async function mountProfileSettings({content,api,locale,esc,toast,openSec
   try{account=await api('account_status',{autoSync:false});}catch{account={configured:false,loggedIn:false};}
   if(!account.configured){accountBox.innerHTML=`<h2 class="panel-title">${t.account}</h2><p class="settings-help">${t.notReady}</p>`;return;}
   if(!account.loggedIn){accountBox.innerHTML=`<h2 class="panel-title">${t.account}</h2><p class="settings-help">${t.loginHint}</p><div data-email-login></div>`;
-   mountEmailLogin(accountBox.querySelector('[data-email-login]'),{api,locale,esc,toast,onDone:async()=>{await paintAccount();await paintBoard();}});return;}
+   mountEmailLogin(accountBox.querySelector('[data-email-login]'),{api,locale,esc,toast,onDone:async()=>{await paintAccount();await paintBoard();await paintPublic();}});return;}
   accountBox.innerHTML=`<h2 class="panel-title">${t.account}</h2><div class="settings-row profile-account-row"><span class="setting-description"><span class="settings-label">${t.signedIn}</span><small class="settings-help">${esc(account.email||'')}</small></span><span class="review-controls"><button type="button" class="secondary" data-profile-sync>${t.syncDevices}</button><button type="button" class="secondary" data-profile-logout>${t.signOut}</button></span></div>`;
   accountBox.querySelector('[data-profile-sync]').onclick=()=>openSection('account');
-  accountBox.querySelector('[data-profile-logout]').onclick=async event=>{event.currentTarget.disabled=true;try{await api('account_logout',{});toast(t.signedOut);}catch{toast(t.offline);}await paintAccount();await paintBoard();};
+  accountBox.querySelector('[data-profile-logout]').onclick=async event=>{event.currentTarget.disabled=true;try{await api('account_logout',{});toast(t.signedOut);}catch{toast(t.offline);}await paintAccount();await paintBoard();await paintPublic();};
+ }
+
+ /* E397 公开主页: signature, favourite games (from your library), the public switch. Needs an account and a joined
+    leaderboard; saved to the relay on every change. A reported profile shows why it is hidden. */
+ async function paintPublic(){
+  let p;try{p=await api('leaderboard_profile_get',{});}catch{p={state:'error'};}
+  const head=`<h2 class="panel-title">${t.publicTitle}</h2>`;
+  if(p.state==='not-configured'){publicBox.innerHTML=head+`<p class="settings-help">${t.notReady}</p>`;return;}
+  if(p.state==='login'){publicBox.innerHTML=head+`<p class="settings-help">${t.publicLogin}</p>`;return;}
+  if(p.state!=='ok'){publicBox.innerHTML=head+`<p class="settings-help">${t.offline}</p>`;return;}
+  if(!p.joined){publicBox.innerHTML=head+`<p class="settings-help">${t.publicJoin}</p>`;return;}
+  let library=[];try{library=await api('leaderboard_library',{});}catch{}
+  let favorites=[...p.favorites];
+  const draw=()=>{
+   const left=library.filter(title=>!favorites.some(f=>f.title===title));
+   publicBox.innerHTML=`${head}${p.hidden?`<p class="profile-hidden" role="status">${t.publicHidden}</p>`:''}
+    <label class="settings-row"><span class="setting-description"><span class="settings-label">${t.publicSwitch}</span><small class="settings-help">${t.publicHint}</small></span><input class="switch" type="checkbox" name="profilePublic" ${p.public?'checked':''}></label>
+    <label class="settings-row"><span class="setting-description"><span class="settings-label">${t.bio}</span><small class="settings-help">${t.bioHint}</small></span><input name="profileBio" type="text" maxlength="60" value="${esc(p.bio)}" placeholder="${esc(t.bioPh)}"></label>
+    <div class="settings-row profile-favorites"><span class="setting-description"><span class="settings-label">${t.favorites}</span><small class="settings-help">${t.favoritesHint}</small></span>
+     <div class="profile-favorite-list">${favorites.map((f,i)=>`<span class="lb-chip profile-favorite">${esc(f.title)}<button type="button" data-remove-favorite="${i}" aria-label="${esc(t.removeFavorite)}">×</button></span>`).join('')}
+      ${favorites.length<5?`<select data-add-favorite aria-label="${esc(t.addFavorite)}"><option value="">${t.addFavorite}</option>${left.map(title=>`<option value="${esc(title)}">${esc(title)}</option>`).join('')}</select>`:''}</div></div>
+    <p class="leaderboard-error" data-public-error hidden></p>`;
+   const error=publicBox.querySelector('[data-public-error]');
+   const save=async()=>{error.hidden=true;try{const r=await api('leaderboard_profile_save',{bio:publicBox.querySelector('[name=profileBio]').value,favorites,public:publicBox.querySelector('[name=profilePublic]').checked});
+     if(r.state!=='ok'){error.textContent=t.offline;error.hidden=false;return;}p=r;favorites=[...r.favorites];toast(t.saved);draw();}
+    catch(e){error.textContent=errorText(e);error.hidden=false;}};
+   publicBox.querySelector('[name=profilePublic]').onchange=save;publicBox.querySelector('[name=profileBio]').onchange=save;
+   publicBox.querySelectorAll('[data-remove-favorite]').forEach(b=>b.onclick=()=>{favorites.splice(Number(b.dataset.removeFavorite),1);save();});
+   publicBox.querySelector('[data-add-favorite]')?.addEventListener('change',event=>{const title=event.currentTarget.value;if(!title)return;favorites.push({title,vndb:''});save();});
+  };
+  draw();
  }
  async function paintBoard(){
   try{board=await api('leaderboard_profile',{});}catch{board=null;}
@@ -63,11 +103,11 @@ export async function mountProfileSettings({content,api,locale,esc,toast,openSec
   const saveLocal=async()=>{try{await api('settings_save',{scope:'online',values:{leaderboardName:name.value.trim(),leaderboardShareGames:share.checked}});error.hidden=true;}catch(e){fail(e);}};
   toggle.onchange=()=>{error.hidden=true;if(joined){leave.hidden=toggle.checked;if(!toggle.checked)leave.querySelector('[data-leave-no]').focus();}else join.hidden=!toggle.checked;};
   $('[data-leave-no]').onclick=()=>{toggle.checked=true;leave.hidden=true;};
-  $('[data-leave-yes]').onclick=async event=>{event.currentTarget.disabled=true;try{const r=await api('leaderboard_leave');toast(r?.remote==='deleted'?t.left:t.leftLocal);}catch{toast(t.offline);}await paintBoard();await paintAvatar();};
+  $('[data-leave-yes]').onclick=async event=>{event.currentTarget.disabled=true;try{const r=await api('leaderboard_leave');toast(r?.remote==='deleted'?t.left:t.leftLocal);}catch{toast(t.offline);}await paintBoard();await paintAvatar();await paintPublic();};
   $('[data-profile-join-go]').onclick=async event=>{error.hidden=true;if(!$('[data-profile-consent]').checked){error.textContent=lw.CONSENT_REQUIRED;error.hidden=false;return;}
-   const b=event.currentTarget;b.disabled=true;try{await api('leaderboard_join',{name:name.value,shareGames:share.checked,consent:true});await paintBoard();await paintAvatar();}catch(e){b.disabled=false;fail(e);}};
+   const b=event.currentTarget;b.disabled=true;try{await api('leaderboard_join',{name:name.value,shareGames:share.checked,consent:true});await paintBoard();await paintAvatar();await paintPublic();}catch(e){b.disabled=false;fail(e);}};
   name.onchange=()=>joined?saveJoined():saveLocal();share.onchange=()=>joined?saveJoined():saveLocal();
   form.onsubmit=event=>{event.preventDefault();name.blur();};
  }
- await paintAccount();await Promise.all([paintBoard(),paintAvatar()]);
+ await paintAccount();await Promise.all([paintBoard(),paintAvatar(),paintPublic()]);
 }

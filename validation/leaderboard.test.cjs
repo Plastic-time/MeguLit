@@ -83,7 +83,7 @@ test('opt-in needs consent and a clean nickname; only totals are uploaded; games
  await lb.view(root,db,{},{env:BASE_ENV,fetch,now:new Date(NOW.getTime()+60000)});assert.equal(sent.filter(r=>r.method==='POST').length,1);
  lb.join(root,{name:'めぐみん',consent:true,shareGames:true});
  await lb.submit(lb.collectStats(db,NOW),{root,env:BASE_ENV,fetch});
- assert.deepEqual(sent.at(-1).body.games,[{title:'ATRI',characters:10500,seconds:4500},{title:'千恋＊万花',characters:2100,seconds:1260}]);
+ assert.deepEqual(sent.at(-1).body.games.map(({last,...g})=>g),[{title:'ATRI',characters:10500,seconds:4500},{title:'千恋＊万花',characters:2100,seconds:1260}]);
 });
 
 test('opt-out: Settings switch off deletes the server entry and forgets the id and consent',async t=>{
@@ -118,7 +118,7 @@ test('nickname rules match the relay; fetch output is sanitized',async t=>{
  assert.equal(lb.cleanName('  爆裂  魔法  ').name,'爆裂 魔法');assert.equal(lb.cleanName('grape lover').ok,true);
  const {root}=fixture(t);lb.join(root,{name:'Kazuma',consent:true});
  const res=await lb.fetch('all','streak',{root,env:BASE_ENV,fetch:async()=>new Response(JSON.stringify({entries:[{rank:'1',name:'x'.repeat(50),value:-5,me:'yes',extra:1}],total:3}))});
- assert.deepEqual(res.entries,[{rank:1,name:'x'.repeat(32),value:0,me:false,avatar:null}]);
+ assert.deepEqual(res.entries,[{rank:1,name:'x'.repeat(32),value:0,me:false,avatar:null,pid:null}]);
  assert.deepEqual(await lb.fetch('week','characters',{root,env:BASE_ENV,fetch:async()=>new Response('{"ok":false,"error":"RATE_LIMITED"}',{status:429})}),{state:'error',error:'RATE_LIMITED'});
  await assert.rejects(()=>lb.fetch('year','characters',{root,env:BASE_ENV}),/LEADERBOARD_INVALID_QUERY/);
 });
@@ -214,4 +214,33 @@ test('E394 个人主页: leaderboard fields leave 联网服务, search lands on 
  const {execFileSync}=require('node:child_process');
  const out=execFileSync(process.execPath,['-e',`require(${JSON.stringify(path.join(__dirname,'..','services','bridge.cjs'))}).dispatch({action:'leaderboard_profile'}).then(r=>console.log(JSON.stringify(r))).catch(e=>console.log('ERR '+e.message))`],{env:{...process.env,MEGULIT_ROOT:root,MEGULIT_RELAY_BASE:''},encoding:'utf8'});
  const r=JSON.parse(out.trim().split('\n').pop());assert.deepEqual([r.joined,r.name,r.shareGames,typeof r.configured],[true,'Kazuma',true,'boolean']);assert.equal(r.board,undefined,'no board fetch');
+});
+
+test('E397 client: signature rules match the relay, last-read times ride along, social calls need an account and stay private-safe',async t=>{
+ const relayValidate=await import(pathToFileURL(path.join(__dirname,'..','relay','src','validate.js')).href);
+ for(const sample of ['爆裂魔法 一日一发','','あ'.repeat(61),'看 www.x.com','r18 only','约炮吗','I love MeguLit','you are a bitch','<b>','Dickens fan',undefined,7])assert.deepEqual(lb.cleanBio(sample),relayValidate.cleanBio(sample),String(sample));
+ assert.deepEqual(lb.REPORT_KINDS,relayValidate.REPORT_KINDS);
+ const {root,db}=fixture(t);seed(db);const stats=lb.collectStats(db,NOW);
+ assert.equal(stats.games.find(g=>g.title==='ATRI').last,at(2026,11,10),'newest session start');
+ lb.join(root,{name:'Kazuma',shareGames:true,consent:true});
+ const sent=[];await lb.submit(stats,{root,env:BASE_ENV,account:null,now:NOW,fetch:async(u,i)=>{sent.push(JSON.parse(i.body));return new Response('{"ok":true}');}});
+ assert.ok(sent[0].games.every(g=>Number.isInteger(g.last)&&g.last<=Math.floor(NOW.getTime()/1000)));
+ /* no account: nothing is sent */
+ let calls=0;const none={env:BASE_ENV,account:null,fetch:async()=>{calls++;return new Response('{}');}};
+ assert.equal((await lb.profileGet(root,none)).state,'login');assert.equal((await lb.followSet(root,'0123456789abcdef',true,none)).state,'login');assert.equal((await lb.social(root,none)).state,'login');
+ assert.equal(calls,0);
+ await assert.rejects(()=>lb.profileSave(root,{bio:'约炮吗'},none),/LEADERBOARD_BIO_BLOCKED/,'checked before sending');
+ await assert.rejects(()=>lb.reportProfile(root,'0123456789abcdef',{kind:'bad'},none),/LEADERBOARD_INVALID_KIND/);
+ /* with an account: bearer token, cleaned replies; a private card is just "private" */
+ const account={accountId:'acc9',token:()=>'mgl_'+'B'.repeat(43),save:()=>{}},seen=[];
+ const replies={'/api/profile/0123456789abcdef':[404,{ok:false,error:'NOT_FOUND'}],'/api/following':[200,{following:[{pid:'0123456789abcdef',name:'Aqua',public:true,avatar:'zz',recent:[{title:'ATRI',last:5},{title:'x'.repeat(300),last:'bad'}]}]}],'/api/kindred':[200,{kindred:[{pid:'nope',name:'bad'},{pid:'fedcba9876543210',name:'Wiz',shared:['ATRI'],count:1}]}],'/api/profile':[200,{joined:true,pid:null,public:false,hidden:true,bio:'hi',favorites:[{title:'ATRI',vndb:'javascript:'}]}]};
+ const fetch=async(url,init)=>{const route=new URL(url).pathname;seen.push({route,method:init.method,auth:init.headers.authorization});const [status,data]=replies[route]||[404,{}];return new Response(JSON.stringify(data),{status});};
+ const opts={env:BASE_ENV,account,fetch};
+ assert.deepEqual(await lb.profileCard(root,'0123456789abcdef',opts),{state:'private'});assert.deepEqual(await lb.profileCard(root,'../x',opts),{state:'private'});
+ const own=await lb.profileGet(root,opts);assert.deepEqual([own.hidden,own.favorites],[true,[{title:'ATRI',vndb:''}]]);
+ const s=await lb.social(root,opts);assert.equal(s.following[0].avatar,null,'bad avatar id dropped');assert.equal(s.following[0].recent[1].title.length,120);assert.equal(s.following[0].recent[1].last,0);
+ assert.deepEqual(s.kindred.map(p=>p.name),['Wiz'],'rows without a valid pid are dropped');
+ assert.ok(seen.every(c=>c.auth==='Bearer mgl_'+'B'.repeat(43)));
+ const view=await lb.view(root,db,{tab:'follow'},{...opts,now:NOW});assert.equal(view.tab,'follow');assert.equal(view.social.state,'ok');
+ assert.deepEqual(lb.libraryTitles(db),['ATRI','千恋＊万花'],'hidden games are not offered');
 });

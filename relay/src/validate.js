@@ -50,7 +50,9 @@ export function validateLeaderboard(body,now=new Date()){
   for(const g of body.games){const title=typeof g?.title==='string'?g.title.normalize('NFKC').replace(/\s+/g,' ').trim():'';
    if(!title||[...title].length>LIMITS.title||[...title].some(hidden)||/[<>]/.test(title))return {ok:false,error:'INVALID_GAMES'};
    if(!isInt(g.characters)||!isInt(g.seconds)||g.characters>CAPS.all.characters||g.seconds>CAPS.all.seconds)return {ok:false,error:'INVALID_GAMES'};
-   const key=gameKey(title);if(seen.has(key))continue;seen.add(key);games.push({key,title,characters:g.characters,seconds:g.seconds});}}
+   /* E397 optional last-read time (unix seconds), never in the future */
+   const last=g.last===undefined?0:g.last;if(!isInt(last)||last>Math.floor(now.getTime()/1000)+86400)return {ok:false,error:'INVALID_GAMES'};
+   const key=gameKey(title);if(seen.has(key))continue;seen.add(key);games.push({key,title,characters:g.characters,seconds:g.seconds,last});}}
  return {ok:true,value:{id:body.id,name:name.name,keys,stats,games}};
 }
 /* GET /api/leaderboard query → {ok,value} */
@@ -149,4 +151,45 @@ export function validateAvatar(bytes){
  const info=webpInfo(bytes);if(!info)return {ok:false,error:'AVATAR_NOT_WEBP'};
  if(info.width!==info.height||info.width>AVATAR.max||info.width<AVATAR.min)return {ok:false,error:'AVATAR_SIZE'};
  return {ok:true,value:info};
+}
+
+/* ---- E397 public profiles ------------------------------------------------------------------------------------- */
+export const PROFILE={bio:60,favorites:5,follows:500,recent:5,kindred:20};
+/* A one-line signature: same filter as nicknames (R18, abuse, links), up to 60 characters; empty is fine. Keep in step
+   with services/leaderboard.cjs cleanBio. */
+export function cleanBio(value){
+ if(value===undefined||value===null)return {ok:true,bio:''};
+ if(typeof value!=='string')return {ok:false,error:'BIO_INVALID'};
+ const bio=value.normalize('NFKC').replace(/\s+/g,' ').trim();if(!bio)return {ok:true,bio:''};
+ if([...bio].length>PROFILE.bio)return {ok:false,error:'BIO_LENGTH'};
+ if([...bio].some(hidden)||/[<>`\\]/.test(bio)||/https?:|www\.|\.(?:com|net|org|cn|jp|io)\b|@/i.test(bio))return {ok:false,error:'BIO_INVALID'};
+ const lower=bio.toLowerCase(),flat=lower.replace(/[\s._\-*·・]/g,''),tokens=lower.split(/[^a-z]+/).filter(Boolean);
+ if(BLOCKED.some(word=>!NAME_ONLY.includes(word)&&(/^[a-z]+$/.test(word)?tokens.some(t=>t.startsWith(word)):flat.includes(word))))return {ok:false,error:'BIO_BLOCKED'};
+ return {ok:true,bio};
+}
+/* words blocked in nicknames only (impersonation), fine inside a signature */
+export const NAME_ONLY=['admin','管理员','官方','megulit'];
+/* E397 profile reports */
+export const REPORT_KINDS=['discrimination','nudity','racism','harassment','spam','other'];
+export function cleanReportReason(value){
+ if(value===undefined||value===null||value==='')return {ok:true,reason:''};
+ if(typeof value!=='string')return {ok:false,error:'INVALID_REASON'};
+ const reason=value.normalize('NFKC').replace(/\s+/g,' ').trim();
+ if([...reason].length>500||[...reason].some(hidden))return {ok:false,error:'INVALID_REASON'};
+ return {ok:true,reason};
+}
+export const VNDB=/^v[1-9]\d{0,6}$/;
+export const PID=/^[0-9a-f]{16}$/;
+/* PUT /api/profile body: {bio, favorites:[{title, vndb?}], public} */
+export function validateProfile(body){
+ if(!body||typeof body!=='object'||Array.isArray(body))return {ok:false,error:'INVALID_BODY'};
+ const bio=cleanBio(body.bio);if(!bio.ok)return bio;
+ if(body.public!==undefined&&typeof body.public!=='boolean')return {ok:false,error:'INVALID_BODY'};
+ const list=body.favorites===undefined?[]:body.favorites;if(!Array.isArray(list)||list.length>PROFILE.favorites)return {ok:false,error:'INVALID_FAVORITES'};
+ const favorites=[],seen=new Set();
+ for(const g of list){const title=typeof g?.title==='string'?g.title.normalize('NFKC').replace(/\s+/g,' ').trim():'';
+  if(!title||[...title].length>LIMITS.title||[...title].some(hidden)||/[<>]/.test(title))return {ok:false,error:'INVALID_FAVORITES'};
+  const vndb=g.vndb===undefined||g.vndb===''?'':String(g.vndb).toLowerCase();if(vndb&&!VNDB.test(vndb))return {ok:false,error:'INVALID_FAVORITES'};
+  const key=gameKey(title);if(seen.has(key))continue;seen.add(key);favorites.push({key,title,vndb});}
+ return {ok:true,value:{bio:bio.bio,favorites,public:body.public===true}};
 }

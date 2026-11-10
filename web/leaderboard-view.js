@@ -6,6 +6,7 @@
    view 每周热词: 词汇 / 短语 / 短句, podium for 1–3, cards with the AI guess for 4–10, a plain list for 11–50. */
 import {mountEmailLogin} from './account-ui.js';
 import {changeAvatar} from './avatar-crop.js';
+import {personButton,socialHTML,bindSocial} from './leaderboard-social.js';
 export const leaderboardLabel={zh:'排行榜',ja:'ランキング',en:'Leaderboard'};
 const W={
  zh:{title:'排行榜',week:'本周',month:'本月',all:'全部',characters:'阅读字数',seconds:'阅读时长',words:'收录单词',streak:'连续天数',games:'按游戏',
@@ -19,7 +20,7 @@ const W={
   board:'阅读榜',hot:'每周热词',word:'词汇',phrase:'短语',sentence:'短句',weekOf:'{week} 周',pastWeeks:'往期',
   hotPending:'本周热词会在周一 00:00（北京时间）揭晓',hotEmpty:'这一周还没有达到上榜门槛的词',hotRule:'至少 3 位读者查过才会上榜，只统计参加排行榜的读者',
   lookedUp:'{users} 人查过 · {n} 次',times:'{n} 次',aiGuess:'AI 推测',participants:'{n} 位读者参与',
-  NAME_REQUIRED:'请填写昵称',NAME_LENGTH:'昵称需要 2–16 个字',NAME_INVALID:'昵称不能包含网址、引号或特殊字符',NAME_BLOCKED:'这个昵称不能使用，换一个吧',CONSENT_REQUIRED:'请先勾选同意'},
+  NAME_REQUIRED:'请填写昵称',NAME_LENGTH:'昵称需要 2–16 个字',NAME_INVALID:'昵称不能包含网址、引号或特殊字符',NAME_BLOCKED:'这个昵称不能使用，换一个吧',CONSENT_REQUIRED:'请先勾选同意',BIO_LENGTH:'签名最多 60 字',BIO_INVALID:'签名不能包含网址或特殊字符',BIO_BLOCKED:'签名里有不能使用的内容',NOT_JOINED:'请先参加排行榜',INVALID_FAVORITES:'最喜欢的游戏有误'},
  ja:{title:'ランキング',week:'今週',month:'今月',all:'全期間',characters:'読んだ文字数',seconds:'読書時間',words:'登録単語',streak:'連続日数',games:'ゲーム別',
   notReady:'オンラインサービスは準備中です',notReadyText:'公開後、ランキングはここに表示されます。下はこの PC だけで計算した個人の記録で、送信されません',
   mine:'自分の記録',currentStreak:'現在の連続',days:'日',unitChars:'字',unitWords:'語',hours:'時間',minutes:'分',
@@ -31,7 +32,7 @@ const W={
   board:'読書ランキング',hot:'今週の注目語',word:'単語',phrase:'フレーズ',sentence:'短文',weekOf:'{week} 週',pastWeeks:'過去の週',
   hotPending:'今週の注目語は月曜 0:00（UTC+8）に発表されます',hotEmpty:'この週は掲載基準に達した語がありません',hotRule:'3 人以上が調べた語だけを掲載します。ランキング参加者のみ集計',
   lookedUp:'{users} 人が {n} 回調べました',times:'{n} 回',aiGuess:'AI の推測',participants:'{n} 人が参加',
-  NAME_REQUIRED:'ニックネームを入力してください',NAME_LENGTH:'ニックネームは 2〜16 文字です',NAME_INVALID:'URL・引用符・特殊文字は使えません',NAME_BLOCKED:'このニックネームは使えません',CONSENT_REQUIRED:'同意にチェックしてください'},
+  NAME_REQUIRED:'ニックネームを入力してください',NAME_LENGTH:'ニックネームは 2〜16 文字です',NAME_INVALID:'URL・引用符・特殊文字は使えません',NAME_BLOCKED:'このニックネームは使えません',CONSENT_REQUIRED:'同意にチェックしてください',BIO_LENGTH:'ひとことは 60 文字までです',BIO_INVALID:'URL や特殊文字は使えません',BIO_BLOCKED:'使えない内容が含まれています',NOT_JOINED:'先にランキングに参加してください',INVALID_FAVORITES:'好きなゲームの指定が正しくありません'},
  en:{title:'Leaderboard',week:'This week',month:'This month',all:'All time',characters:'Characters read',seconds:'Reading time',words:'Words saved',streak:'Streak days',games:'By game',
   notReady:'Online services are still being set up',notReadyText:'The leaderboard will appear here once it is live. Below are your own numbers, computed on this PC and not uploaded',
   mine:'My numbers',currentStreak:'Current streak',days:'days',unitChars:'chars',unitWords:'words',hours:'h',minutes:'min',
@@ -43,7 +44,7 @@ const W={
   board:'Reading',hot:'Weekly hot words',word:'Words',phrase:'Phrases',sentence:'Sentences',weekOf:'Week {week}',pastWeeks:'Past weeks',
   hotPending:'This week\'s hot words are announced Monday 00:00 (UTC+8)',hotEmpty:'No term reached the threshold this week',hotRule:'A term needs at least 3 different readers; only people who joined the leaderboard count',
   lookedUp:'{users} readers · {n} lookups',times:'{n}×',aiGuess:'AI guess',participants:'{n} readers took part',
-  NAME_REQUIRED:'Enter a nickname',NAME_LENGTH:'Nicknames are 2–16 characters',NAME_INVALID:'No links, quotes or special characters',NAME_BLOCKED:'That nickname is not allowed',CONSENT_REQUIRED:'Please tick the agreement first'}
+  NAME_REQUIRED:'Enter a nickname',NAME_LENGTH:'Nicknames are 2–16 characters',NAME_INVALID:'No links, quotes or special characters',NAME_BLOCKED:'That nickname is not allowed',CONSENT_REQUIRED:'Please tick the agreement first',BIO_LENGTH:'Signatures are up to 60 characters',BIO_INVALID:'No links or special characters',BIO_BLOCKED:'That signature is not allowed',NOT_JOINED:'Join the leaderboard first',INVALID_FAVORITES:'Those favourite games are not valid'}
 };
 const PERIODS=['week','month','all'],METRICS=['seconds','characters','words','streak','games'],CATS=['word','phrase','sentence'];
 let view={tab:'board',period:'week',metric:'seconds',game:'',category:'word',week:''};
@@ -67,9 +68,9 @@ export function avatarHTML(entry,images,esc){
    ruled rows under column headings; hot words use the same stage, 4–10 as one column of honour rows (no orphan
    card), 11–50 as a compact two-column index. */
 const EXTRA={
- zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次',changeAvatar:'换头像',editProfile:'编辑个人主页',uploading:'上传并审核中…'},
- ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',changeAvatar:'アイコンを変更',editProfile:'プロフィールを編集',uploading:'アップロードして審査中…'},
- en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',changeAvatar:'Change picture',editProfile:'Edit profile',uploading:'Uploading and checking…'}
+ zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次',follow:'关注',changeAvatar:'换头像',editProfile:'编辑个人主页',uploading:'上传并审核中…'},
+ ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',follow:'フォロー',changeAvatar:'アイコンを変更',editProfile:'プロフィールを編集',uploading:'アップロードして審査中…'},
+ en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',follow:'Following',changeAvatar:'Change picture',editProfile:'Edit profile',uploading:'Uploading and checking…'}
 };
 const words=locale=>({...leaderboardWords(locale),...(EXTRA[locale]||EXTRA.zh)});
 function segmented(name,items,current,w){return `<div class="lb-seg" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
@@ -92,11 +93,11 @@ const reportButton=(e,w,esc)=>e.avatar&&!e.me?`<button type="button" class="lead
 function podiumPeople(entries,metric,w,locale,esc,images){
  /* the first three entries by position (ties keep their shared rank number); shown 2 · 1 · 3 */
  const order=[1,0,2].map(i=>entries[i]&&{e:entries[i],place:i+1}).filter(Boolean);
- return `<div class="lb-stage" role="list">${order.map(({e,place})=>`<div class="lb-place medal-${MEDAL[place]}${e.me?' is-me':''}" role="listitem" data-rank="${place}" style="--delay:${({1:2,2:1,3:0})[place]*140}ms"><div class="lb-who">${place===1?crown:''}<span class="lb-ring">${avatarHTML(e,images,esc)}</span><span class="lb-name">${esc(e.name)}</span><span class="lb-score">${esc(formatValue(metric,e.value,locale))}</span>${reportButton(e,w,esc)}</div><div class="lb-block">${laurel(e.rank)}</div></div>`).join('')}</div>`;
+ return `<div class="lb-stage" role="list">${order.map(({e,place})=>`<div class="lb-place medal-${MEDAL[place]}${e.me?' is-me':''}" role="listitem" data-rank="${place}" style="--delay:${({1:2,2:1,3:0})[place]*140}ms"><div class="lb-who">${place===1?crown:''}${personButton(e,`<span class="lb-ring">${avatarHTML(e,images,esc)}</span><span class="lb-name">${esc(e.name)}</span>`,esc)}<span class="lb-score">${esc(formatValue(metric,e.value,locale))}</span>${reportButton(e,w,esc)}</div><div class="lb-block">${laurel(e.rank)}</div></div>`).join('')}</div>`;
 }
 function tableRows(entries,metric,w,locale,esc,images){
  if(!entries.length)return '';
- return `<div class="lb-table"><div class="lb-thead" aria-hidden="true"><span>${w.colRank}</span><span>${w.colReader}</span><span>${w[metric]}</span></div><ol class="leaderboard-list lb-rows">${entries.map(e=>`<li class="${e.me?'is-me':''}"><span class="leaderboard-rank">${e.rank}</span>${avatarHTML(e,images,esc)}<span class="leaderboard-name">${esc(e.name)}</span>${reportButton(e,w,esc)}<strong>${esc(formatValue(metric,e.value,locale))}</strong></li>`).join('')}</ol></div>`;
+ return `<div class="lb-table"><div class="lb-thead" aria-hidden="true"><span>${w.colRank}</span><span>${w.colReader}</span><span>${w[metric]}</span></div><ol class="leaderboard-list lb-rows">${entries.map(e=>`<li class="${e.me?'is-me':''}"><span class="leaderboard-rank">${e.rank}</span>${personButton(e,`${avatarHTML(e,images,esc)}<span class="leaderboard-name">${esc(e.name)}</span>`,esc)}${reportButton(e,w,esc)}<strong>${esc(formatValue(metric,e.value,locale))}</strong></li>`).join('')}</ol></div>`;
 }
 export function boardHTML(data,w,locale,esc){
  w={...words(locale),...w};
@@ -153,7 +154,9 @@ export function leaderboardHTML(data,locale,esc){
  const w=words(locale);
  if(!data)return '<div class="leaderboard-page"></div>'; /* E393 loading keeps the same centred column, so nothing jumps when data arrives */
  if(!data.configured)return `<div class="leaderboard-page">${hero(w,esc)}${segmented('period',PERIODS,view.period,w)}<section class="lb-card leaderboard-notice"><h2 class="lb-h2">${w.notReady}</h2><p class="lb-note">${w.notReadyText}</p></section>${localHTML(data,w,locale,esc)}</div>`;
- const tab=data.tab==='hot'?'hot':'board',tabs=segmented('tab',['board','hot'],tab,w);
+ const tab=['hot','follow'].includes(data.tab)?data.tab:'board',tabs=segmented('tab',['board','hot','follow'],tab,w);
+ /* E397 关注: people you follow, then 同好 */
+ if(tab==='follow')return `<div class="leaderboard-page">${hero(w,esc)}<div class="lb-controls">${tabs}</div>${socialHTML(data.social,locale,esc,avatarHTML)}</div>`;
  if(tab==='hot')return `<div class="leaderboard-page">${hero(w,esc)}<div class="lb-controls">${tabs}</div><section class="lb-card leaderboard-hot"><h2 class="lb-h2">${w.hot} <span>· ${w[view.category]}</span></h2>${hotHTML(data.hot,w,locale,esc)}</section></div>`;
  const controls=`<div class="lb-controls">${tabs}${segmented('period',PERIODS,view.period,w)}</div>${underline('metric',METRICS,view.metric,w)}`;
  const body=data.joined?`<section class="lb-card leaderboard-board"><div class="lb-card-head"><h2 class="lb-h2">${w[view.metric]} <span>· ${view.metric==='games'?w.all:w[view.period]}</span></h2><small>${esc(fill(w.joinedAs,{name:data.name}))} · <button type="button" class="leaderboard-leave" data-lb-profile>${w.editProfile}</button></small></div>${boardHTML(data,w,locale,esc)}</section>`:joinHTML(data,w,esc);
@@ -162,10 +165,11 @@ export function leaderboardHTML(data,locale,esc){
 /* Mounts the page into main; isCurrent() guards against a late reply after the user moved on. */
 export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>true,openSettings=()=>{}}){
  const w=leaderboardWords(locale);
+ let last=null;
  const render=async(action='leaderboard_view',extra={})=>{
   let data;try{data=await api(action,{tab:view.tab,period:view.period,metric:view.metric,game:view.game,category:view.category,week:view.week,...extra});}
   catch(error){const code=String(error?.message||error).replace(/^LEADERBOARD_/,'');const box=main.querySelector('[data-lb-error]');if(box&&w[code]){box.textContent=w[code];box.hidden=false;return;}toast(w.offline);return;}
-  if(!isCurrent())return;main.innerHTML=leaderboardHTML(data,locale,esc);bind();
+  if(!isCurrent())return;last=data;main.innerHTML=leaderboardHTML(data,locale,esc);bind();
  };
  const bind=()=>{
   main.querySelectorAll('[data-lb-tab]').forEach(b=>b.onclick=()=>{view.tab=b.dataset.lbTab;render();});
@@ -184,7 +188,8 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
    if(!main.querySelector('[data-lb-consent]').checked){box.textContent=w.CONSENT_REQUIRED;box.hidden=false;return;}
    render('leaderboard_join',{name:main.querySelector('[data-lb-name]').value,shareGames:main.querySelector('[data-lb-share]').checked,consent:true});});
   /* E394 leaving, nickname and sharing moved to Settings → 个人主页 */
-  main.querySelector('[data-lb-profile]')?.addEventListener('click',()=>openSettings('personal'));
+  main.querySelectorAll('[data-lb-profile]').forEach(b=>b.addEventListener('click',()=>openSettings('personal')));
+  bindSocial(main,{api,locale,esc,toast,images:()=>({...(last?.avatars||{}),...(last?.social?.avatars||{})}),avatarHTML,openSettings,rerender:()=>{if(isCurrent())render();}});
  };
  main.innerHTML=leaderboardHTML(null,locale,esc)+'<div class="loading-screen"><span class="spinner"></span></div>';
  await render();

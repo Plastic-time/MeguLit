@@ -235,6 +235,13 @@ async function dispatch(request,runtime=null) {
       case 'leaderboard_join':{const lb=require('./leaderboard.cjs');lb.join(root,{name:request.name,shareGames:request.shareGames===true,consent:request.consent===true,requireAccount:true});return await lb.view(root,db,{period:String(request.period||''),metric:String(request.metric||''),submit:true});}
       /* E394 Settings → 个人主页 reads the switch, nickname and sharing without fetching the board */
       case 'leaderboard_profile':{const c=require('./leaderboard.cjs').config(root);return {configured:c.configured,joined:c.joined,enabled:c.enabled,name:c.name,shareGames:c.shareGames,account:c.account};}
+      /* E397 profiles, follows, 同好, reports */
+      case 'leaderboard_profile_get':return await require('./leaderboard.cjs').profileGet(root);
+      case 'leaderboard_profile_save':return await require('./leaderboard.cjs').profileSave(root,{bio:typeof request.bio==='string'?request.bio:'',favorites:Array.isArray(request.favorites)?request.favorites:[],public:request.public===true});
+      case 'leaderboard_card':return await require('./leaderboard.cjs').profileCard(root,String(request.pid||''));
+      case 'leaderboard_follow':return await require('./leaderboard.cjs').followSet(root,String(request.pid||''),request.on===true);
+      case 'leaderboard_report_profile':return await require('./leaderboard.cjs').reportProfile(root,String(request.pid||''),{kind:String(request.kind||''),reason:typeof request.reason==='string'?request.reason:''});
+      case 'leaderboard_library':return require('./leaderboard.cjs').libraryTitles(db);
       case 'leaderboard_leave':return await require('./leaderboard.cjs').leave(root);
       case 'save_key':return new(require('./settings.cjs').Settings)(root).saveKey({provider:request.provider,baseUrl:request.baseUrl,apiKey:request.apiKey});
       case 'anki_find':return {path:runtime.ankiProcess().find()};

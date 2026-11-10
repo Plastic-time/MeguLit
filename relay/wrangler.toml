@@ -1,5 +1,5 @@
 # E377 MeguLit relay (Cloudflare Worker + D1 + R2). Deploy steps: README.md in this folder.
-# No secrets here: GITHUB_TOKEN, LINK_SECRET, HASH_SALT (and optional DIAG_TOKEN) are set with `wrangler secret put`.
+# No secrets here: GITHUB_TOKEN, LINK_SECRET, HASH_SALT (and optional DIAG_TOKEN, REPORT_REPO, REPORT_TOKEN) are set with `wrangler secret put`.
 name = "megulit-relay"
 main = "src/worker.js"
 compatibility_date = "2026-10-01"

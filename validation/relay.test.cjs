@@ -32,7 +32,7 @@ test('leaderboard body validation: id, nickname, period keys, caps and games',as
  assert.equal(validateLeaderboard(body({games:[{title:'<script>',characters:1,seconds:1}]}),NOW).error,'INVALID_GAMES');
  assert.equal(validateLeaderboard(body({games:Array.from({length:31},(_,i)=>({title:'g'+i,characters:1,seconds:1}))}),NOW).error,'INVALID_GAMES');
  const ok=validateLeaderboard(body({games:[{title:'ATRI ',characters:5,seconds:6},{title:'atri',characters:1,seconds:1}]}),NOW);
- assert.deepEqual(ok.value.games,[{key:'atri',title:'ATRI',characters:5,seconds:6}]);
+ assert.deepEqual(ok.value.games,[{key:'atri',title:'ATRI',characters:5,seconds:6,last:0}]);
  /* a client a few hours ahead (UTC+9 on Monday morning) is still accepted */
  assert.equal(validateLeaderboard(body({keys:{week:'2026-W46',month:'2026-11'}}),new Date('2026-11-08T20:00:00Z')).ok,true);
 });

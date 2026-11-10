@@ -66,7 +66,8 @@ npx wrangler r2 bucket lifecycle add megulit-diagnostics expire-diagnostics diag
 ```
 
 `migrations apply` runs every file in `migrations/` in order: `0001_init.sql` (leaderboard, adaptation, diagnostics),
-`0005_accounts.sql` (accounts, relay/ACCOUNTS.md) and `0006_community.sql` (avatars, reports, hot words). Avatars live in
+`0005_accounts.sql` (accounts, relay/ACCOUNTS.md), `0006_community.sql` (avatars, reports, hot words) and
+`0007_social.sql` (public profiles, follows, profile reports; adds `last_at` to `leaderboard_games`). Avatars live in
 the same bucket as diagnostics under `avatars/`; do not add a lifecycle rule for that prefix.
 
 ### 2b. Workers AI (avatar moderation and hot-word guesses)
@@ -111,6 +112,22 @@ npx wrangler secret put HASH_SALT
 - Optional `DIAG_TOKEN`: if set, `POST /api/diagnostics` needs `Authorization: Bearer <DIAG_TOKEN>`. It ships inside the app, so it only stops casual abuse.
 
 From a script, pipe the value in: `printf '%s' "$GITHUB_TOKEN" | npx wrangler secret put GITHUB_TOKEN`.
+
+#### Profile reports go to a private repository
+
+Profile reports contain what the reported reader wrote, so they never go to the public repository. Create a
+**private** repository only you can see (for example `ilynthn/megulit-reports`), then:
+
+```bash
+npx wrangler secret put REPORT_REPO     # owner/name of the private repository
+npx wrangler secret put REPORT_TOKEN    # optional: a fine-grained token for that repository only
+```
+
+- `REPORT_TOKEN`: fine-grained token, repository access = only the private reports repository, permission
+  **Issues: Read and write** (Metadata read-only comes with it). Without it the relay uses `GITHUB_TOKEN`, which then
+  must include the private repository as well.
+- Without `REPORT_REPO` no issue is opened at all (the relay never falls back to `GITHUB_REPO`); reports still hide the
+  profile and wait in `moderation_queue` with kind `profile`.
 
 ### 4. Custom domain and deploy
 
@@ -265,9 +282,43 @@ GET /api/hotwords?category=word|phrase|sentence[&week=2026-W46]
 
 `reason` is filled for ranks 1–10 only; `ai` is true when it is the model's guess (the page labels it "AI 推测").
 
+### Public profiles, follows and 同好
+
+All of these need a signed-in account (`Authorization: Bearer mgl_…`) except reading a public card. A profile belongs to
+the account's leaderboard row, so the reader must have joined the leaderboard. Profiles are **private by default**:
+only a public, unreported profile gets a `pid` on the board, can be opened, followed or suggested. "Reading lately"
+comes only from readers who share game titles (`leaderboard_games.last_at`, sent by the app with each shared game).
+
+```
+GET    /api/profile                       → {joined, pid, public, hidden, bio, favorites:[{title,vndb}]}
+PUT    /api/profile  {bio, favorites, public}   bio: one line ≤60 chars, nickname filter (BIO_LENGTH/BIO_INVALID/BIO_BLOCKED);
+                                                favorites ≤5 [{title, vndb:'v123'|''}]; NOT_JOINED (409) without a board row
+GET    /api/profile/<pid>                 → {name, avatar, bio, favorites, recent:[{title,last}], followers, following, me}
+                                            404 for private, reported or unknown pids alike
+POST   /api/follow/<pid>   DELETE /api/follow/<pid>   (cannot follow yourself; at most 500; unfollow works after they go private)
+GET    /api/following                     → {following:[{pid, name, public, avatar, recent (≤3)}]}, newest reading first
+GET    /api/kindred                       → {kindred:[{pid, name, avatar, shared:[titles], count, following}]}, ≤20, most overlap first
+POST   /api/profile/<pid>/report {kind, reason?}   kind: discrimination | nudity | racism | harassment | spam | other
+```
+
+Board rows (`GET /api/leaderboard`) now carry `pid` (or `null`). Leaving the leaderboard or deleting the account
+removes the profile, favourites, every follow in both directions and the reader's own reports.
+
+### Profile reports
+
+A report hides the profile at once (`profiles.hidden=1`, private everywhere; the owner sees why in Settings and cannot
+undo it), adds a `moderation_queue` row of kind `profile` and, with `REPORT_REPO` set, opens an issue labelled
+`profile-report` in that private repository: kind, reason (optional), nickname, signature, favourites, a 72-hour private
+link to the picture, and the two commands to restore or clear it. One report per reader and profile; 3 reports a day.
+
+```bash
+npx wrangler d1 execute megulit-relay --remote --command "SELECT r.kind,r.reason,p.pid,datetime(r.created_at,'unixepoch') FROM profile_reports r JOIN profiles p ON p.id_hash=r.target WHERE p.hidden=1"
+```
+
 ## Rate limits
 
 Fixed windows in D1 (`RATE` in `src/worker.js`): 120 requests/min per IP overall; leaderboard writes 6 per 10 min per IP
 and 20 per hour per install id; leaderboard reads 60/min; adaptation writes 30/hour, reads 120/hour; diagnostics uploads
 5/hour and downloads 30/hour per IP; avatar uploads 5/hour per user, avatar reads 600/min, reports 20/hour, hot
-words 60/min per IP.
+words 60/min per IP; profile saves 30/hour, profile and follow reads 120/min, follow changes 60/hour per account;
+profile reports 3/day per account.
