@@ -16,8 +16,8 @@ function isDark() {
   return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-function sprite(ch, size, blur, color) {
-  const pad = Math.ceil(blur * 2.5 + 2), w = Math.ceil(size * 1.25) + pad * 2;
+function sprite(ch, size, blur, color, { font = FONT, weight = 600, halo = '' } = {}) {
+  const pad = Math.ceil(blur * 2.5 + (halo ? size * .25 : 2)), w = Math.ceil(size * 1.25) + pad * 2;
   const c = document.createElement('canvas');
   const dpr = Math.min(devicePixelRatio || 1, 2);
   c.width = c.height = Math.ceil(w * dpr);
@@ -25,7 +25,8 @@ function sprite(ch, size, blur, color) {
   g.scale(dpr, dpr);
   g.filter = blur > .3 ? `blur(${blur.toFixed(1)}px)` : 'none';
   g.fillStyle = color;
-  g.font = `600 ${size}px ${FONT}`;
+  g.font = `${weight} ${size}px ${font}`;
+  if (halo) { g.shadowColor = halo; g.shadowBlur = size * .18; }
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillText(ch, w / 2, w / 2);
@@ -75,27 +76,79 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
     if (d === dark) return;
     dark = d;
     parts = parts.map(p => { const n = make(p.i, false); n.x = p.x; n.y = p.y; return n; });
-    words.forEach(w => { w.spr = sprite(w.ch, w.size, 0, palette().ink); });
+    words.forEach(w => { w.spr = wordSprite(w); });
   };
   new MutationObserver(reink).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', reink);
 
-  // lyric lines: one glyph per character, laid out in a row in the lower part of the screen; each is pulled back to its
-  // place by a spring, so the pointer can scatter a line and watch it come back; a line fades in, stays, then drifts up
+  // lyric lines: one glyph per character, kept in a straight row so they read, but each line gets its own place on the
+  // screen, size and colour (Megumin's red, gold or white). Each glyph is pulled back to its place by a spring, so the
+  // pointer can scatter a line and watch it come back; a line fades in, stays, then drifts up and away.
+  // pick: four numbers in [0,1) (place x, place y, size, colour), shared by the layers so they show the same line
+  const LYRIC_FONT = '"Noto Serif JP","Yu Mincho","Hiragino Mincho ProN","MeguLit Serif",serif';
+  const lyricInk = key => dark ? { red: '#e0505c', gold: '#f0c36a', white: '#f4f1ea' }[key] : { red: '#a51d2d', gold: '#9a6a12', white: '#3a1a1e' }[key];
   let words = [];
-  const say = text => {
+  const HUD_FONT = '"MeguLit Mono",ui-monospace,Consolas,monospace';
+  // lyric glyphs: serif with a soft glow in their own colour; HUD glyphs: tiny grey mono
+  const glow = { red: 'rgba(224,80,92,.55)', gold: 'rgba(240,195,106,.5)', white: 'rgba(244,241,234,.45)' };
+  const wordSprite = w => w.hud
+    ? sprite(w.ch, w.size, 0, dark ? '#8a8a8a' : '#6b6b6b', { font: HUD_FONT, weight: 300 })
+    : sprite(w.ch, w.size, 0, lyricInk(w.ink), { font: LYRIC_FONT, weight: 700, halo: dark ? glow[w.ink] : 'rgba(255,250,244,.8)' });
+  // pick: six numbers in [0,1) shared by the layers so both show the same line: place x, place y, size, colour, layout
+  // and a spare. Layouts (megu-edit): a straight row, a vertical column (縦書き) for short lines, or a row that steps
+  // down; every line keeps reading order and a straight baseline or column, so it stays readable.
+  // hud: a tiny lowercase label set above the line (e.g. "♪ 01:23 · 12/69")
+  const say = (text, pick = Array.from({ length: 6 }, Math.random), hud = '') => {
     const now = performance.now();
     words.forEach(w => { if (w.out > now) w.out = now; });
     text = String(text || '').trim();
     if (!text) return;
     const chars = [...text].slice(0, 40);
-    const size = Math.max(22, Math.min(56, (W * .86) / Math.max(chars.length, 8)));
-    const step = size * 1.02, x0 = W / 2 - (chars.length - 1) * step / 2, y = H * .7;
-    chars.forEach((ch, k) => {
+    const [px, py, ps, pc, pl] = pick;
+    const ink = ['red', 'gold', 'white'][Math.floor(pc * 3)];
+    const layout = chars.length <= 14 && H > 420 && pl < .25 ? 'column' : pl > .75 ? 'stair' : 'row';
+    const put = [];
+    if (layout === 'column') {
+      // 30–60 px, the column fits 70% of the screen height; near the left or right edge
+      const size = Math.max(22, Math.min(30 + ps * 30, (H * .7) / chars.length / 1.08));
+      const step = size * 1.08, x = px < .5 ? W * (.07 + px * .3) : W * (.63 + (px - .5) * .3), y0 = H * .15 + py * Math.max(0, H * .7 - chars.length * step);
+      chars.forEach((ch, k) => put.push([ch, x, y0 + k * step, size]));
+      hud && [...hud].forEach((ch, k) => put.push([ch, x + size * .9, y0 + k * 11, 10, true]));
+    } else {
+      // 30–72 px at random, never wider than 88% of the screen; "stair" drops a little with each character
+      const size = Math.max(20, Math.min(30 + ps * 42, (W * .88) / Math.max(chars.length, 1) / 1.04));
+      const step = size * 1.04, width = (chars.length - 1) * step, drop = layout === 'stair' ? size * .16 : 0;
+      const x0 = W * .06 + size / 2 + px * Math.max(0, W * .88 - width - size);
+      const y = H * .18 + py * Math.max(0, H * .62 - drop * chars.length);
+      chars.forEach((ch, k) => put.push([ch, x0 + k * step, y + k * drop, size]));
+      hud && [...hud].forEach((ch, k) => put.push([ch, x0 - size * .3 + k * 8.5, y - size * .85, 10, true]));
+    }
+    put.forEach(([ch, x, y, size, isHud], k) => {
       if (/\s/.test(ch)) return;
-      words.push({ ch, size, spr: sprite(ch, size, 0, palette().ink), hx: x0 + k * step, hy: y, x: x0 + k * step, y: y + 18, vx: 0, vy: 0,
-        rot: 0, vr: 0, born: now + k * 45, out: now + 9000 });
+      const w = { ch, size, ink, hud: Boolean(isHud), hx: x, hy: y, x, y: y + 18, vx: 0, vy: 0, rot: 0, vr: 0, pop: 1, born: now + (isHud ? 0 : k * 45), out: now + 9000 };
+      w.spr = wordSprite(w);
+      words.push(w);
     });
+  };
+
+  // a drum hit: each layer picks one of a few moves at random, sized by the hit's strength. Nothing flashes and the
+  // brightness never changes; the hits are spatial only (pushes, spins, pops)
+  const MOVES = ['burst', 'spin', 'pop', 'jump', 'sway'];
+  const pulse = (kind, strength = 1) => {
+    if (still) return;
+    const s = Math.max(.2, Math.min(1, strength)) * (kind === 'kick' ? 1 : .6);
+    const move = MOVES[Math.floor(Math.random() * MOVES.length)];
+    const cx = W / 2, cy = H / 2;
+    const k = deep ? .6 : near ? 1.2 : 1;
+    for (const p of parts) {
+      if (Math.random() > .55) continue;                 // a random share of the glyphs reacts to each hit
+      if (move === 'burst') { const dx = p.x - cx, dy = p.y - cy, d = Math.hypot(dx, dy) || 1; p.vx += dx / d * 160 * s * k; p.vy += dy / d * 160 * s * k; }
+      else if (move === 'spin') p.vr += (Math.random() < .5 ? -1 : 1) * 2.4 * s;
+      else if (move === 'pop') p.pop = 1 + .45 * s;
+      else if (move === 'jump') p.vy -= 140 * s * k;
+      else p.vx += (Math.random() < .5 ? -1 : 1) * 120 * s * k;
+    }
+    for (const w of words) { w.pop = 1 + (w.hud ? .1 : .22) * s; if (move === 'jump') w.vy -= 60 * s; else if (move === 'sway' || move === 'burst') w.vx += (Math.random() - .5) * 120 * s; }
   };
   const drawWords = (now, dt, dy, layerVis) => {
     words = words.filter(w => now < w.out + 1400);
@@ -110,9 +163,10 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
         w.x += w.vx * dt; w.y += w.vy * dt - dy * .2; w.hy -= dy * .2; w.rot += w.vr * dt;
       }
       const fadeIn = clamp((now - w.born) / 600), fadeOut = 1 - clamp((now - w.out) / 1400);
-      const a = .42 * fadeIn * fadeOut * layerVis;
+      const a = (w.hud ? .8 : .62) * fadeIn * fadeOut * layerVis;
       if (a < .005) continue;
-      const m = w.spr.w;
+      w.pop += (1 - w.pop) * Math.min(1, dt * 7);
+      const m = w.spr.w * w.pop;
       ctx.save(); ctx.globalAlpha = a; ctx.translate(w.x, w.y); ctx.rotate(w.rot); ctx.drawImage(w.spr.c, -m / 2, -m / 2, m, m); ctx.restore();
     }
   };
@@ -142,7 +196,8 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
         p.vr += dy * .0016 * (.3 + p.z) * (p.i % 2 ? 1 : -1);   // a quick scroll gives them a spin
         p.vr *= .985;
       }
-      const m = p.spr.w;
+      p.pop = p.pop ? p.pop + (1 - p.pop) * Math.min(1, dt * 6) : 1;
+      const m = p.spr.w * p.pop;
       if (p.y < -m) { p.y = H + m * .5; p.x = Math.random() * W; }
       if (p.y > H + m) { p.y = -m * .5; p.x = Math.random() * W; }
       if (p.x < -m) p.x = W + m * .5; else if (p.x > W + m) p.x = -m * .5;
@@ -163,5 +218,5 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
   const start = () => { if (running) return; running = true; last = 0; requestAnimationFrame(frame); };
   if (still) { requestAnimationFrame(frame); addEventListener('scroll', () => requestAnimationFrame(frame), { passive: true }); }
   else { start(); document.addEventListener('visibilitychange', () => { if (!document.hidden) start(); }); }
-  return { say, clear: () => say('') };
+  return { say, pulse, clear: () => say('') };
 }

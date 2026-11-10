@@ -310,7 +310,9 @@ bgm.preload = 'none';
 const deepLayer = $('.kana-deep') ? kana($('.kana-deep'), { still: reduce, deep: true, hero: $('.hero') }) : null;
 // lyric lines go to the bottom layer and to the sky layer (built further down); each shows them where it is visible
 let skyLayer = null;
-const lyricLayers = { say: text => { deepLayer?.say(text); skyLayer?.say(text); }, clear: () => { deepLayer?.clear(); skyLayer?.clear(); } };
+let topLayer = null;
+const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const lyricLayers = { say: text => { const pick = Array.from({ length: 6 }, Math.random), hud = text ? `\u266a ${mmss(bgm.currentTime)}` : ''; deepLayer?.say(text, pick, hud); skyLayer?.say(text, pick, hud); }, clear: () => { deepLayer?.clear(); skyLayer?.clear(); } };
 if ($('.sound-ctl')) nowPlaying(bgm, $('.sound-ctl'), { reduce, background: deepLayer ? lyricLayers : null });
 bgmCredit();
 notice({ t: k => d(k), lang: () => lang, after: playIntro() });
@@ -346,7 +348,30 @@ if (video && !reduce && !navigator.connection?.saveData) {
   }).observe(video);
 }
 if ($('.kana-sky')) skyLayer = kana($('.kana-sky'), { still: reduce, hero: $('.hero'), until: $('.hp') });
-if ($('.kana-top')) kana($('.kana-top'), { still: reduce, hero: $('.hero'), near: true });
+if ($('.kana-top')) topLayer = kana($('.kana-top'), { still: reduce, hero: $('.hero'), near: true });
+// Drum hits: the song's kicks and snares (found offline by site/tools/beats.py) move every floating layer while it plays
+if (!reduce) {
+  let beats = null, ki = 0, si = 0, lastT = 0, raf = 0;
+  const hit = (kind, s) => { for (const l of [deepLayer, skyLayer, topLayer]) l?.pulse(kind, s); };
+  const seek = t => { ki = beats.kick.findIndex(b => b[0] >= t); si = beats.snare.findIndex(b => b[0] >= t); if (ki < 0) ki = beats.kick.length; if (si < 0) si = beats.snare.length; };
+  const tick = () => {
+    raf = 0;
+    if (bgm.paused || !beats) return;
+    const t = bgm.currentTime;
+    if (t < lastT - .5) seek(t);                      // the song looped (or was sought back)
+    lastT = t;
+    while (ki < beats.kick.length && beats.kick[ki][0] <= t) { if (t - beats.kick[ki][0] < .15) hit('kick', beats.kick[ki][1]); ki++; }
+    while (si < beats.snare.length && beats.snare[si][0] <= t) { if (t - beats.snare[si][0] < .15) hit('snare', beats.snare[si][1]); si++; }
+    raf = requestAnimationFrame(tick);
+  };
+  bgm.addEventListener('play', async () => {
+    if (!beats) beats = await fetch(new URL('../audio/megulit-bgm.beats.json', import.meta.url)).then(r => r.json()).catch(() => null);
+    if (!beats) return;
+    seek(bgm.currentTime); lastT = bgm.currentTime;
+    if (!raf) raf = requestAnimationFrame(tick);
+  });
+  bgm.addEventListener('seeked', () => { if (beats) seek(bgm.currentTime); });
+}
 const soundBtn = $('.js-sound');
 function setSoundLabel() {
   if (!soundBtn) return;
