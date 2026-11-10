@@ -123,6 +123,18 @@
     clearTimeout(bridge.timer);
     bridge.timer = setTimeout(read, 220);
   }
+  /* E415: the local model is missing, so lines go to Microsoft machine translation (E406). Say it once, in one small
+     line under the translation, then let it fade; the reader session never repeats it. */
+  bridge.mtNotice = () => {
+    if (bridge.mtNoticed) return; bridge.mtNoticed = true;
+    const host = output?.parentElement; if (!host) return;
+    const note = document.createElement('small');
+    note.className = 'tm-mt-note';
+    note.textContent = '当前为微软机器翻译，效果一般 · 想要更好的译文可在 设置 › 翻译 接入自己的 AI API（Alt+T）';
+    note.style.cssText = 'display:block;margin-top:4px;font-size:11px;line-height:1.4;opacity:.72;transition:opacity .6s';
+    host.appendChild(note);
+    setTimeout(() => { note.style.opacity = '0'; setTimeout(() => note.remove(), 700); }, 9000);
+  };
   bridge.deliver = (id, text, error, message = '') => {
     if(bridge.deliverPageTranslation?.(id,text,error,message))return;
     if (id !== bridge.serial || !enabled || !translationVisible || !output?.isConnected) return;

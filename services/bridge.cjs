@@ -229,7 +229,7 @@ async function dispatch(request,runtime=null) {
       /* E415 每日 page: Galgame news and hot words from the relay (services/daily.cjs) */
       case 'daily_view':return await require('./daily.cjs').view(root,db,{runtime});
       case 'daily_article':return await require('./daily.cjs').article(root,String(request.link||''),{runtime});
-      case 'daily_translate':return await require('./daily.cjs').translate(root,runtime,request.texts,String(request.target||'zh'));
+      case 'daily_translate':return await require('./daily.cjs').translate(root,runtime,request.texts,String(request.target||'zh'),{withEngine:true});
       case 'daily_anki':return await require('./daily.cjs').anki(root,runtime,request);
       case 'daily_open':{const url=String(request.url||'');if(!require('./daily.cjs').canOpen(url))throw Error('URL_NOT_ALLOWED');const child=spawn('explorer.exe',[new URL(url).href],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {opened:true};}
       /* E377 opt-in leaderboard (services/leaderboard.cjs) */

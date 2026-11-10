@@ -6,7 +6,7 @@ const relayDir=path.join(__dirname,'..','relay');
 const load=name=>import(pathToFileURL(path.join(relayDir,'src',name)).href);
 const MIGRATIONS=fs.readdirSync(path.join(relayDir,'migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>fs.readFileSync(path.join(relayDir,'migrations',f),'utf8')).join('');
 function d1(){const db=new DatabaseSync(':memory:');db.exec(MIGRATIONS);const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>{db.prepare(sql).run(...args);return {success:true};}});return {prepare:sql=>stmt(sql)};}
-const MOE=`<rss><channel><item><title>2027年1月発売タイトル新規登録</title><link>https://moepedia.net/news/2026/1030/793/</link><pubDate>Fri, 30 Oct 2026 04:07:50 +0000</pubDate><description><![CDATA[1月29日発売予定。『逆転支配』ほか。続きはこちら。]]></description><content:encoded><![CDATA[<p><img src="https://moepedia.net/a.jpg">本文はコピーしない</p>]]></content:encoded></item></channel></rss>`;
+const MOE=`<rss><channel><item><title>2027年1月発売タイトル新規登録</title><link>https://moepedia.net/news/2026/1030/793/</link><pubDate>Mon, 09 Nov 2026 04:07:50 +0000</pubDate><description><![CDATA[1月29日発売予定。『逆転支配』ほか。続きはこちら。]]></description><content:encoded><![CDATA[<p><img src="https://moepedia.net/a.jpg">本文はコピーしない</p>]]></content:encoded></item></channel></rss>`;
 const G4=`<rdf:RDF><item rdf:about="https://www.4gamer.net/games/1/"><title>PS3 20周年</title><link>https://www.4gamer.net/games/1/</link><dc:date>2026-11-11T07:00:00+09:00</dc:date><description>ゲーム機の話</description></item><item rdf:about="https://www.4gamer.net/games/2/"><title>恋愛ADV「星の歌」Steam版が発売</title><link>https://www.4gamer.net/games/2/</link><dc:date>2026-11-10T07:00:00+09:00</dc:date><description>ノベルゲームの新作です。</description></item></rdf:RDF>`;
 const DEN=`<rss><item><title>美少女ゲーム特集 &amp; 対談</title><link>https://news.denfaminicogamer.jp/news/1</link><pubDate>Tue, 10 Nov 2026 15:52:28 +0000</pubDate><description><![CDATA[一文目。二文目。三文目は要らない。]]></description><enclosure url="https://news.denfaminicogamer.jp/x.jpg" type="image/jpeg" length="1"/></item></rss>`;
 const TRENDS=`<rss><channel><item><title>チキンマックナゲット</title><ht:approx_traffic>200+</ht:approx_traffic><ht:news_item><ht:news_item_title>ナゲット値下げ</ht:news_item_title><ht:news_item_url>https://news.yahoo.co.jp/a</ht:news_item_url><ht:news_item_source>Yahoo!ニュース</ht:news_item_source></ht:news_item></item><item><title>arsenal</title></item><item><title>文化祭</title></item></channel></rss>`;
@@ -171,4 +171,34 @@ test('relay glosses: Workers AI JSON list (thinking stripped), fallback model, k
  const e={DB:d1(),AI,HOT_MODEL:'@cf/meta/llama-3.1-8b-instruct'};await d.refreshWords(e,new Date('2026-11-11T00:00:00Z'),fetcher(FEEDS));
  const r=await d.hotWordsDailyGet(e,new URL('https://x/api/hotwords/daily'),{json:v=>v,fail:c=>c},new Date('2026-11-11T00:10:00Z'));
  assert.deepEqual(r.words.slice(0,2).map(w=>w.gloss),['快餐产品','学校活动']);assert.deepEqual(seen,[d.GLOSS_MODEL,'@cf/meta/llama-3.1-8b-instruct']);
+});
+test('more news: Atom feeds, ACG category, stories kept for days across refreshes, capped per category',async()=>{
+ const d=await load('daily.js');
+ const atom='<feed><entry><title>新刊リスト</title><link rel="alternate" href="https://natalie.mu/comic/news/1"></link><updated>2026-11-11T00:00:00+09:00</updated><summary type="html">マンガ雑誌のお知らせ。</summary></entry></feed>';
+ const nat=d.NEWS_FEEDS.find(f=>f.id==='natalie');const x=d.parseNews(atom,nat);
+ assert.deepEqual(x.map(n=>[n.title,n.link,n.cat,n.summary]),[['新刊リスト','https://natalie.mu/comic/news/1','acg','マンガ雑誌のお知らせ。']]);
+ assert.ok(d.NEWS_FEEDS.filter(f=>f.cat==='acg').length>=2);assert.ok(d.NEWS_FEEDS.length>=10);
+ const e={DB:d1()},day1=new Date('2026-11-11T00:00:00Z');
+ await d.refreshNews(e,day1,fetcher({...FEEDS,'https://natalie.mu':atom}));
+ /* next day: the feeds no longer list the 4Gamer story, it stays; ten days later it is gone */
+ await d.refreshNews(e,new Date('2026-11-12T00:00:00Z'),fetcher({'https://moepedia.net':MOE}));
+ let n=await d.newsGet(e,{json:v=>v},new Date('2026-11-12T00:10:00Z'));
+ assert.ok(n.items.some(i=>i.sourceId==='4gamer'));assert.ok(n.items.some(i=>i.cat==='acg'));
+ await d.refreshNews(e,new Date('2026-11-25T00:00:00Z'),fetcher({'https://moepedia.net':MOE.replace('Mon, 09 Nov 2026','Tue, 24 Nov 2026')}));
+ n=await d.newsGet(e,{json:v=>v},new Date('2026-11-25T00:10:00Z'));assert.deepEqual(n.items.map(i=>i.sourceId),['moepedia']);
+});
+test('Microsoft hint: the reader learns which engine answered (also from cache); the overlay says it once',async()=>{
+ const daily=require('../services/daily.cjs'),root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'dl-'));
+ const broken={reviews:()=>({translate:async list=>list.map(()=>'')})},free=async t=>'译:'+t;
+ const r=await daily.translate(root,broken,['甲。'],'zh',{translateFree:free,withEngine:true});assert.deepEqual(r,{texts:['译:甲。'],engine:'microsoft'});
+ assert.match((await daily.translate(root,broken,['甲。'],'zh',{translateFree:free,withEngine:true})).engine,/microsoft/,'cached Microsoft lines still show the hint');
+ const fine={reviews:()=>({translate:async list=>list.map(t=>'引擎:'+t)})};assert.equal((await daily.translate(root,fine,['乙。'],'zh',{withEngine:true})).engine,'app');
+ const view=fs.readFileSync(path.join(__dirname,'..','web','daily-view.js'),'utf8');
+ assert.match(view,/当前为微软机器翻译，效果一般。想要更好的译文，可以在设置 › 翻译里接入自己的 AI API/);assert.match(view,/openSettings\?\.\('translation'\)/);assert.match(view,/data-rd-mt-x/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','web','app.js'),'utf8'),/route==='daily'\)await mountDaily\(main,.*?openSettings:section=>\{settingsSection=section/);
+ const inject=fs.readFileSync(path.join(__dirname,'..','web','reader','modules','inject.js'),'utf8');assert.match(inject,/bridge\.mtNotice = \(\) => \{\s*if \(bridge\.mtNoticed\) return;/);
+ assert.match(fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8'),/if\(!this\.mtNoticed\)\{this\.mtNoticed=true;this\.runtime\.emit\('reader-event',\{type:'call',method:'mtNotice'/);
+ const page=await import(pathToFileURL(path.join(__dirname,'..','web','daily-view.js')).href);
+ const esc=s=>String(s);const html=page.pageHTML({state:'ok',news:{items:[{title:'G',link:'https://a/1',source:'A',cat:'gal'},{title:'C',link:'https://a/2',source:'B',cat:'acg'}]},words:{words:[]}},{locale:'zh',esc,cat:'acg'});
+ assert.match(html,/data-dl-cat="acg" aria-selected="true"/);assert.match(html,/<h2>C<\/h2>/);assert.doesNotMatch(html,/<h2>G<\/h2>/);
 });

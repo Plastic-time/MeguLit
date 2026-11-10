@@ -15,11 +15,24 @@ const UA='MeguLitRelay/1.0 (+https://megulit.com)';
 export const NEWS_FEEDS=[
  {id:'moepedia',name:'Moepedia',url:'https://moepedia.net/feed/',all:true},
  {id:'4gamer',name:'4Gamer.net',url:'https://www.4gamer.net/rss/index.xml'},
- {id:'denfami',name:'電ファミニコゲーマー',url:'https://news.denfaminicogamer.jp/feed'}
+ {id:'denfami',name:'電ファミニコゲーマー',url:'https://news.denfaminicogamer.jp/feed'},
+ /* E415 more sources (robots.txt allows the feeds): the first is Moepedia's second page, the rest are general game
+    news filtered by GAL_WORDS */
+ {id:'moepedia',name:'Moepedia',url:'https://moepedia.net/feed/?paged=2',all:true},
+ {id:'4gamer',name:'4Gamer.net',url:'https://www.4gamer.net/rss/pc/pc_news.xml'},
+ {id:'gamespark',name:'Game*Spark',url:'https://www.gamespark.jp/rss/index.rdf'},
+ {id:'inside',name:'インサイド',url:'https://www.inside-games.jp/rss/index.rdf'},
+ {id:'automaton',name:'AUTOMATON',url:'https://automaton-media.com/feed/'},
+ {id:'gamewatch',name:'GAME Watch',url:'https://game.watch.impress.co.jp/data/rss/1.0/gmw/feed.rdf'},
+ /* ACG tab: anime, manga and other 二次元 news, unfiltered */
+ {id:'animeanime',name:'アニメ!アニメ!',url:'https://animeanime.jp/rss/index.rdf',all:true,cat:'acg'},
+ {id:'natalie',name:'コミックナタリー',url:'https://natalie.mu/comic/feed/news',all:true,cat:'acg'}
 ];
+export const CATEGORIES=['gal','acg'];
 export const TRENDS_URL='https://trends.google.com/trending/rss?geo=JP',NHK_URL='https://www3.nhk.or.jp/rss/news/cat0.xml';
-export const GAL_WORDS=/ノベル|美少女|ギャルゲ|エロゲ|恋愛|乙女ゲ|Key|ゆずソフト|サガプラネッツ|ぱれっと|オーガスト|TYPE-MOON|ニトロプラス|アリスソフト|Navel|まどそふと|ういんどみる|クロシェット|SMEE|HOOKSOFT|あざらしそふと|ensemble|feng|minori|CIRCUS|ねこねこ|Frontwing|フロントウイング|MAGES|ヒロイン|Galgame|galgame/;
-const MAX_NEWS=40,MAX_WORDS=20;
+export const GAL_WORDS=/ノベル|ADV|成人向け|18禁|R18|FANZA|DLsite|同人ゲーム|萌え|美少女|ギャルゲ|エロゲ|恋愛|乙女ゲ|Key|ゆずソフト|サガプラネッツ|ぱれっと|オーガスト|TYPE-MOON|ニトロプラス|アリスソフト|Navel|まどそふと|ういんどみる|クロシェット|SMEE|HOOKSOFT|あざらしそふと|ensemble|feng|minori|CIRCUS|ねこねこ|Frontwing|フロントウイング|MAGES|ヒロイン|Galgame|galgame/;
+/* stories stay KEEP_NEWS_DAYS after they first appear, so the page keeps a full front page between quiet days */
+const MAX_NEWS=60,MAX_WORDS=20,KEEP_NEWS_DAYS=10;
 
 /* ---- tiny RSS/RDF reader (no DOM in Workers) ------------------------------------------------------------------ */
 const ENT={amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:' '};
@@ -29,14 +42,15 @@ const tag=(xml,name)=>{const m=xml.match(new RegExp('<'+name+'(?:\\s[^>]*)?>([\\
 const safeUrl=v=>{try{const u=new URL(decode(v).trim());return u.protocol==='https:'||u.protocol==='http:'?u.href.slice(0,500):'';}catch{return '';}};
 /* one or two sentences, at most 120 characters */
 export function summary(s){const t=text(s).replace(/\s*\[…\]$|\s*\[&#8230;\]$/,'');const parts=t.match(/[^。！？!?]+[。！？!?]?/g)||[];let out='';for(const p of parts.slice(0,2)){if((out+p).length>120)break;out+=p;}return (out||t.slice(0,118)+(t.length>118?'…':'')).trim();}
-export function items(xml){return [...String(xml||'').matchAll(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/g)].map(m=>m[1]);}
+/* RSS <item> and Atom <entry> */
+export function items(xml){return [...String(xml||'').matchAll(/<(item|entry)(?:\s[^>]*)?>([\s\S]*?)<\/\1>/g)].map(m=>m[2]);}
 export function parseNews(xml,feed){
  return items(xml).map(it=>{
-  const title=text(tag(it,'title')).slice(0,160),link=safeUrl(tag(it,'link')||(it.match(/rdf:about="([^"]+)"/)||[])[1]||'');
-  const when=Date.parse(text(tag(it,'pubDate')||tag(it,'dc:date')));
+  const title=text(tag(it,'title')).slice(0,160),link=safeUrl(tag(it,'link')||(it.match(/<link[^>]*href="([^"]+)"/)||[])[1]||(it.match(/rdf:about="([^"]+)"/)||[])[1]||'');
+  const when=Date.parse(text(tag(it,'pubDate')||tag(it,'dc:date')||tag(it,'updated')||tag(it,'published')));
   const body=tag(it,'content:encoded');
   const image=safeUrl((it.match(/<enclosure[^>]*url="([^"]+)"[^>]*type="image/)||it.match(/<media:(?:content|thumbnail)[^>]*url="([^"]+)"/)||decode(body).match(/<img[^>]*src="([^"]+)"/)||[])[1]||'');
-  return {title,link,date:Number.isFinite(when)?new Date(when).toISOString():'',source:feed.name,sourceId:feed.id,summary:summary(tag(it,'description')||body),image};
+  return {title,link,date:Number.isFinite(when)?new Date(when).toISOString():'',source:feed.name,sourceId:feed.id,cat:feed.cat||'gal',summary:summary(tag(it,'description')||tag(it,'summary')||body),image};
  }).filter(n=>n.title&&n.link&&(feed.all||GAL_WORDS.test(n.title+' '+n.summary)));
 }
 const KANA=/^[ぁ-ゟ゠-ヿー・\s]+$/;
@@ -60,10 +74,12 @@ async function save(env,kind,day,payload,now){await env.DB.prepare('INSERT INTO 
 async function load(env,kind,day){const row=day?await env.DB.prepare('SELECT payload,updated_at FROM daily_cache WHERE kind=? AND day=?').bind(kind,day).first():await env.DB.prepare('SELECT payload,updated_at FROM daily_cache WHERE kind=? ORDER BY day DESC LIMIT 1').bind(kind).first();if(!row)return null;try{return {...JSON.parse(row.payload),updatedAt:new Date(row.updated_at).toISOString()};}catch{return null;}}
 export async function refreshNews(env,now=new Date(),fetcher=fetch){
  const lists=await Promise.all(NEWS_FEEDS.map(async f=>parseNews(await get(f.url,fetcher),f)));
- const seen=new Set(),all=lists.flat().filter(n=>!seen.has(n.link)&&seen.add(n.link)).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,MAX_NEWS);
+ const prev=(await load(env,'news','').catch(()=>null))?.items||[],cutoff=now.getTime()-KEEP_NEWS_DAYS*864e5;
+ const fresh=lists.flat(),seen=new Set();
+ const all=[...fresh,...prev].filter(n=>n?.link&&!seen.has(n.link)&&seen.add(n.link)).filter(n=>!n.date||Date.parse(n.date)>=cutoff).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).filter((n,_,list)=>list.filter(x=>(x.cat||'gal')===(n.cat||'gal')).indexOf(n)<MAX_NEWS);
  if(!all.length)return 0;
  if(env.BUCKET)await mirrorImages(env,all,now,fetcher).catch(()=>0);else for(const n of all)n.image='';
- await save(env,'news',dayKey(now),{items:all,sources:NEWS_FEEDS.map(f=>({id:f.id,name:f.name}))},now);return all.length;
+ await save(env,'news',dayKey(now),{items:all,sources:[...new Map(NEWS_FEEDS.map(f=>[f.id,{id:f.id,name:f.name,cat:f.cat||'gal'}])).values()]},now);return all.length;
 }
 export async function refreshWords(env,now=new Date(),fetcher=fetch){
  let words=parseTrends(await get(TRENDS_URL,fetcher)),source='Google トレンド';
@@ -96,7 +112,7 @@ export async function hotWordsDailyGet(env,url,{json,fail},now=new Date()){
    is copied to R2 (daily-img/<id>) and served as GET /api/news/img/<id>. Stories without an RSS picture get their
    page's og:image (only for the top MIRROR stories, to stay under the Worker's subrequest limit). Objects older than
    KEEP_DAYS are deleted by the same cron. */
-export const MIRROR=16,IMG_MAX=900*1024,KEEP_DAYS=2;
+export const MIRROR=120,NEW_IMAGES=16,IMG_MAX=900*1024,KEEP_DAYS=2;
 const IMG_TYPES=/^image\/(jpeg|png|webp|gif|avif)$/;
 async function hex(text){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,32);}
 async function ogImage(link,fetcher){try{const r=await fetcher(link,{headers:{'user-agent':UA,accept:'text/html'},signal:AbortSignal.timeout(8000)});if(!r.ok)return '';const html=(await r.text()).slice(0,200000);const m=html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)||html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);return m?safeUrl(new URL(decode(m[1]),link).href):'';}catch{return '';}}
@@ -107,12 +123,13 @@ async function copyImage(env,key,url,fetcher,now){
   await env.BUCKET.put(key,bytes,{httpMetadata:{contentType:type},customMetadata:{at:String(now.getTime())}});return true;}catch{return false;}
 }
 export async function mirrorImages(env,items,now=new Date(),fetcher=fetch){
- let done=0;
+ let done=0,fetched=0;
  for(const [i,n] of items.entries()){
   const id=await hex(n.link),key='daily-img/'+id;
   if(i>=MIRROR){n.image='';continue;}
   let have=!!(await env.BUCKET.head?.(key));
-  if(!have){const src=n.image||await ogImage(n.link,fetcher);have=!!src&&await copyImage(env,key,src,fetcher,now);}
+  /* at most NEW_IMAGES downloads per run keeps the cron under the Worker's subrequest limit; the rest follow next run */
+  if(!have&&fetched<NEW_IMAGES){fetched++;const src=/^\/api\//.test(n.image||'')?'':n.image||await ogImage(n.link,fetcher);have=!!src&&await copyImage(env,key,src,fetcher,now);}
   n.image=have?'/api/news/img/'+id:'';if(have)done++;
  }
  return done;

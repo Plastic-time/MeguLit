@@ -28,8 +28,16 @@
 .dl-head h3{margin:0;font-size:12px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:var(--g-t1)}
 .dl-head small{font-size:11px;color:var(--g-t3,#8a746b);letter-spacing:.04em}
 
+/* category switch: Galgame / ACG, large type, the active one in full ink */
+.dl-cats{display:flex;align-items:baseline;gap:18px}
+.dl-cats button{padding:0;font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--g-t3);transition:color .2s}
+.dl-cats button:hover{color:var(--g-t2)}
+.dl-cats button[aria-selected=true]{color:var(--g-t1)}
+.dl-news{transition:opacity .16s ease}
+.dl-news.dl-swap{opacity:0}
+.dl-head{flex-wrap:wrap}
 /* source filter: a sliding underline */
-.dl-filters{position:relative;display:flex;gap:2px}
+.dl-filters{position:relative;display:flex;flex-wrap:wrap;gap:2px}
 .dl-filters button{padding:4px 10px 6px;font-size:12px;color:var(--g-t3);transition:color .2s}
 .dl-filters button:hover,.dl-filters button[aria-selected=true]{color:var(--g-t1)}
 .dl-filter-ink{position:absolute;left:0;bottom:-11px;height:3px;background:var(--dl-gold);transition:transform .35s var(--dl-ease),width .35s var(--dl-ease)}
@@ -182,6 +190,10 @@ a:hover .dl-plate i:nth-child(2){transform:translate(8%,-6%) rotate(45deg)}
 .rd-hint{margin:12px 0 22px;font-size:11.5px;color:var(--g-t3)}
 .rd-text{transition:opacity .14s ease,transform .14s ease}
 .rd-text.rd-swap{opacity:0;transform:translateY(4px)}
+.rd-mt{display:flex;align-items:center;gap:12px;margin:0 0 18px;padding:9px 12px;border:1px solid var(--dl-hair);border-left:0;background:color-mix(in srgb,var(--dl-gold) 5%,transparent);font-size:12px;line-height:1.6;color:var(--g-t2);animation:rd-pop .25s var(--dl-ease)}
+.rd-mt span{flex:1}
+.rd-mt-x{width:22px;height:22px;flex:none;color:var(--g-t3)!important;font-size:16px!important;line-height:1;transition:color .2s}
+.rd-mt-x:hover{color:var(--g-t1)!important}
 .rd-p{padding:0 0 18px}
 .rd-p+.rd-p{border-top:1px solid transparent}
 .rd-text[data-mode=bi] .rd-p{display:grid;gap:6px;padding:14px 0 16px;border-top:1px solid var(--dl-hair)}

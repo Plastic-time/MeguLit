@@ -100,7 +100,10 @@ class Reader{
   try{return await llm.ensure(options);}catch(error){
    /* E406 (user: 零延迟翻译有时报错无本地大模型): lines the translation script does not cover go to the engine; with
       a local engine but no model downloaded, use the free online engine for them instead of showing an error */
-   if(error?.code==='LOCAL_MODEL_MISSING'){Object.assign(options,{provider:'microsoft'});return;}
+   if(error?.code==='LOCAL_MODEL_MISSING'){Object.assign(options,{provider:'microsoft'});
+    /* E415 (user: 提示用户是微软机翻): the overlay says so once per reader session, in one small line */
+    if(!this.mtNoticed){this.mtNoticed=true;this.runtime.emit('reader-event',{type:'call',method:'mtNotice',args:[]});}
+    return;}
    if(!/^LOCAL_RUNTIME_DOWNLOADING/.test(error.message))throw error;}
   while(llm.job?.state==='downloading'&&current()){const j=llm.job;push('LOCAL_RUNTIME_DOWNLOADING:'+(j.total?Math.min(100,Math.floor(j.received/j.total*100)):0));await new Promise(r=>setTimeout(r,500));}
   if(!current())throw Error('SUPERSEDED');

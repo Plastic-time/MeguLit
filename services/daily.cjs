@@ -14,7 +14,7 @@ async function get(url,fetcher){
  catch(e){return {state:'error',error:e?.name==='TimeoutError'?'TIMEOUT':'NETWORK'};}
 }
 function cleanNews(d){
- const items=(Array.isArray(d?.items)?d.items:[]).slice(0,40).map(n=>({fulltext:n?.fulltext===true,title:str(n?.title,160),link:link(n?.link),date:str(n?.date,30),source:str(n?.source,40),sourceId:str(n?.sourceId,20),summary:str(n?.summary,160),image:/^\/api\/news\/img\/[0-9a-f]{32}$/.test(String(n?.image||''))?n.image:''})).filter(n=>n.title&&n.link);
+ const items=(Array.isArray(d?.items)?d.items:[]).slice(0,120).map(n=>({fulltext:n?.fulltext===true,cat:n?.cat==='acg'?'acg':'gal',title:str(n?.title,160),link:link(n?.link),date:str(n?.date,30),source:str(n?.source,40),sourceId:str(n?.sourceId,20),summary:str(n?.summary,160),image:/^\/api\/news\/img\/[0-9a-f]{32}$/.test(String(n?.image||''))?n.image:''})).filter(n=>n.title&&n.link);
  return {items,sources:(Array.isArray(d?.sources)?d.sources:[]).slice(0,10).map(s=>({id:str(s?.id,20),name:str(s?.name,40)})),updatedAt:str(d?.updatedAt,30)||null};
 }
 /* the local dictionary is Chinese: its first line, first two senses, make the short gloss beside a hot word.
@@ -40,15 +40,17 @@ let trCache=null;
 function trLoad(root){if(trCache)return trCache;trCache=new Map();try{for(const [k,v] of Object.entries(JSON.parse(fs.readFileSync(trFile(root),'utf8'))))trCache.set(k,v);}catch{}return trCache;}
 function trSave(root){const f=trFile(root);if(!f)return;try{const all=[...trLoad(root)].slice(-3000);fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(Object.fromEntries(all)));}catch{}}
 async function translateList(root,runtime,list,goal,options={}){
- const cache=trLoad(root),key=t=>goal+'|'+t,out=list.map(t=>t.trim()?cache.get(key(t))||'':'');
- const todo=list.map((t,i)=>i).filter(i=>list[i].trim()&&!out[i]);if(!todo.length)return {texts:out,engine:'cache'};
+ const cache=trLoad(root),key=t=>goal+'|'+t,val=v=>typeof v==='string'?{t:v,e:''}:v||{t:'',e:''},out=list.map(t=>t.trim()?val(cache.get(key(t))).t:'');
+ const cachedEngines=new Set(list.map(t=>val(cache.get(key(t))).e).filter(Boolean));
+ const todo=list.map((t,i)=>i).filter(i=>list[i].trim()&&!out[i]);if(!todo.length)return {texts:out,engine:[...cachedEngines].join('+')||'cache'};
  let engine='',reason='';
  if(runtime?.reviews)try{const got=await runtime.reviews().translate(todo.map(i=>list[i]),goal,'ja');if(Array.isArray(got)&&got.some(Boolean)){todo.forEach((i,n)=>{out[i]=String(got[n]||'');});engine='app';}else reason='ENGINE_EMPTY';}catch(e){reason=String(e?.message||e);}
  const left=todo.filter(i=>!out[i]);
  if(left.length){const free=options.translateFree||require('../core/translate.cjs').translateFree;let failed='';
   for(const i of left){try{out[i]=String(await free(list[i],{source:'ja',target:goal,preferred:'microsoft',fetcher:options.fetch||fetch})||'');}catch(e){failed=String(e?.message||e);}}
   if(left.some(i=>out[i]))engine=engine?engine+'+microsoft':'microsoft';else if(failed)reason=failed;}
- for(const i of todo)if(out[i])cache.set(key(list[i]),out[i]);trSave(root);
+ const by=new Set(left.filter(i=>out[i]));for(const i of todo)if(out[i])cache.set(key(list[i]),{t:out[i],e:by.has(i)?'microsoft':'app'});trSave(root);
+ if(cachedEngines.has('microsoft')&&!engine.includes('microsoft'))engine=engine?engine+'+microsoft':'microsoft';
  if(!out.some(Boolean)&&list.some(t=>t.trim())){const e=Error('TRANSLATION_FAILED:'+(reason||'UNKNOWN'));throw e;}
  return {texts:out,engine};
 }
@@ -114,7 +116,9 @@ async function article(root,link,options={}){
 async function translate(root,runtime,texts,target,options={}){
  const goal={zh:'zh-CN',en:'en','zh-CN':'zh-CN'}[String(target)]||'zh-CN';
  const list=(Array.isArray(texts)?texts:[]).slice(0,60).map(t=>String(t||'').slice(0,2000));
- return (await translateList(root,runtime,list,goal,options)).texts;
+ const r=await translateList(root,runtime,list,goal,options);
+ /* withEngine (the reader): also say which engine answered, so the page can point out the Microsoft fallback */
+ return options.withEngine?{texts:r.texts,engine:r.engine}:r.texts;
 }
 /* one card per word per article, in the megulit_news deck (created on first use) */
 const NEWS_DECK='megulit_news';
