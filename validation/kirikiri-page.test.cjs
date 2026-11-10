@@ -231,7 +231,7 @@ test('E351 WoH page grid: lines sit on the game\'s rows and columns, wrap where 
  const {gridLayout}=IslandPage;
  assert.deepEqual(gridLayout(['　青子自身、自分が慢性的な頭痛持ちなんじゃないかと疑うほど、無害なものに反感を覚える事があったりする。'],27)[0].breaks,[27],'27 cells: 「…疑う」|「ほど、…」 as the game wraps');
  assert.deepEqual(gridLayout(['　あいうえおかきくけこさしすせそたちつてとなにぬねのは。'],27)[0].breaks,[],'a stop may hang in a 28th cell');
- assert.match(fs.readFileSync(path.join(__dirname,'..','core/hook-control.cjs'),'utf8'),/!this\.styleCalibration&&!h\.hooks\?\.flowPage&&/,'no automatic box calibration on a flow page');
+ assert.match(fs.readFileSync(path.join(__dirname,'..','core/hook-control.cjs'),'utf8'),/!this\.styleCalibration&&!\(h\.hooks\?\.flowPage&&h\.hooks\?\.flowGridName\)/,'no automatic box calibration on a page with a measured grid');
 });
 
 test('E358 per line: a line the game draws in translation is not drawn again; a line it cannot draw is drawn by MeguLit',t=>{

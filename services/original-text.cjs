@@ -375,7 +375,9 @@ function staticProvider(root,executable){
      continues the row the last line ended on. null when unknown (other engines, a line no script shows). */
   let pageSet;const pageInfo=()=>{if(pageSet===undefined){pageSet=null;try{pageSet=scenes.ENGINES[state.runtime.engine]?.pages?.(path.dirname(String(executable)))||null;}catch{}}return pageSet;};
   const flowLayout=indices=>{const P=pageInfo(),i=Array.isArray(indices)?indices[0]:undefined;if(!P||!Number.isSafeInteger(i)||!P.known.has(i))return null;return {index:i,pageStart:P.starts.has(i),row:P.cont.has(i)?'continue':'new'};};
-  const api={kind:'patch',patch:!!patched,fill,drawable,tableDrawable,flowLayout,
+  /* E414: a page game by its own script: at least 15 % of its pages hold more than one line (WoH 70 %, Fata Morgana 20 %). */
+  let flowOk;const flowGame=()=>{if(flowOk===undefined){const P=pageInfo();if(!P||!P.starts.size)flowOk=false;else{let multi=0;for(const i of P.starts)if(P.known.has(i+1)&&!P.starts.has(i+1))multi++;flowOk=multi/P.starts.size>=.15;}}return flowOk;};
+  const api={kind:'patch',patch:!!patched,fill,drawable,tableDrawable,flowLayout,flowGame,
    resolve:text=>withRuby(resolveLine(text))};
   function resolveLine(text){const r=m.match(text);if(r.japanese===undefined)return r;
     if(r.indices.some(untranslated)){const t=fill.get(r.indices.map(i=>rt[i]).join(''));return t?{...r,translation:t,japanese:undefined,machine:true}:{status:'none',method:'untranslated',indices:r.indices};}

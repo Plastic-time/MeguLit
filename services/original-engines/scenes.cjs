@@ -339,7 +339,8 @@ const kirikiriKs={
    const n=Math.min(ja.anchors.length,own.anchors.length);let same=0;for(let k=0;k<n;k++)if(ja.anchors[k]===own.anchors[k])same++;
    if(ja.lines.length!==own.lines.length||own.anchors.length>=5&&same<own.anchors.length*.9)return own.lines.map(()=>'');
    return ja.lines;});},
- eligible(dir){const enc=encryptedKs(dir);if(!enc.size)return false;const first=[...enc.values()].find(x=>x.entry.size>2000)||enc.values().next().value;return !!japaneseKs(first);},
+ /* E414: a multilingual release keeps plain scripts under the encrypted flag; kirikiri-lang reads them. */
+ eligible(dir){if(krkrLang.archives(dir))return false;const enc=encryptedKs(dir);if(!enc.size)return false;const first=[...enc.values()].find(x=>x.entry.size>2000)||enc.values().next().value;return !!japaneseKs(first);},
  stamp:dir=>captureStamp(dir),
  japaneseKs,encryptedKs,
 };
@@ -364,6 +365,18 @@ const hunex={
  pages:dir=>hunexLib().pages(dir),
 };
 
+// E414 multilingual KiriKiri (data_jp.xp3 + data_zh.xp3, plain scripts under the encrypted flag; ファタモルガーナの館): krkr-lang.cjs.
+const krkrLang=require('./krkr-lang.cjs');
+const kirikiriLang={
+ id:'kirikiri-lang',hint:'data_jp.xp3（+ data_zh.xp3）',
+ scenes:dir=>krkrLang.scenes(dir),archives:()=>[],
+ sources(dir){const a=krkrLang.archives(dir);return a?[a.ja,a.zh].filter(Boolean):[];},
+ parse:buf=>krkrLang.parse(buf),test:()=>false,
+ patchLines(base){let any=false;const list=base.map(scene=>{const zh=scene.zh||[];if(!zh.some(Boolean))return scene;any=true;return {...scene,patched:true,lines:scene.lines.map((t,k)=>zh[k]||t)};});return any?list:null;},
+ /* page starts and row continuations, from the script's own [cm] and [l] */
+ pages:dir=>krkrLang.pages(dir),
+};
+
 // E329 YU-RIS (ysbin.ypf + update*.ypf, YSTB scenes): yuris.cjs.
 const yuris=require('./yuris.cjs');
 // E330 AQUAPLUS / Leaf KCAP (script.pak, WHITE ALBUM2): aquaplus.cjs.
@@ -378,7 +391,7 @@ const rpgmaker=require('./rpgmaker.cjs'),wolf=require('./wolf.cjs');
 const catsystem2=require('./catsystem2.cjs'),naninovel=require('./naninovel.cjs'),unityText=require('./unity-text.cjs'),higurashi=require('./higurashi.cjs'),mages=require('./mages.cjs'),capcomMsg=require('./capcom-msg.cjs');
 // E409 Nitroplus N4 (Steam The Song of Saya, script.npk NPK2): nitroplus-n4.cjs.
 const nitroplusN4=require('./nitroplus-n4.cjs');
-const ENGINES={'nitroplus-n4':nitroplusN4,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf};
+const ENGINES={'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,8)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;}

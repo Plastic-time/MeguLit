@@ -124,7 +124,7 @@ test('E350: hovering the control bar (tooltips run together) never reaches the p
 test('E352: a full-screen page with the game\'s own translation table is written back by the game (translate embed); others keep their setting',t=>{
  const f=fixture(t);const sent=[];f.hook.process={stdin:{write(){},end(){}},kill(){},removeAllListeners(){}};f.hook.send=m=>sent.push(m);f.hook.enabled=true;f.hook.preferences={embedTranslation:false};
  f.hook.syncEmbedMode();assert.deepEqual(sent.filter(m=>m.type==='embedMode').map(m=>m.mode),['hide'],'no script table yet: hide as set');
- f.hook.originalText={kind:'patch',resolve:()=>({status:'exact'})};f.hook.scriptAllowed=()=>true;
+ f.hook.originalText={kind:'patch',resolve:()=>({status:'exact'}),tableDrawable:()=>true};f.hook.scriptAllowed=()=>true;
  f.line('　もっとも、それは夏だけの話。');f.tick(100);
  assert.deepEqual(sent.filter(m=>m.type==='embedMode').map(m=>m.mode),['hide','translate'],'the official table is there: the game draws the translation');
  f.hook.scriptAllowed=()=>false;f.hook.syncEmbedMode();assert.equal(sent.filter(m=>m.type==='embedMode').at(-1).mode,'hide','零延迟翻译 off: back to hiding');
@@ -218,4 +218,37 @@ test('E411: on a full-screen page the layer is not hidden when the wait marker l
  im.skip(true);now+=400;im.tick();assert.equal(events.at(-1)[0],false,'held fast-forward still hides');
  const other=[],im2=new Immersion(e=>other.push(e.dialogVisible),()=>now);im2.configure({immersion:true,dialogDetection:'marker'});im2.bind('adv');
  im2.source('普通の台詞。','krkr');im2.marker(true);now+=2000;im2.tick();im2.marker(false);now+=1000;im2.tick();assert.equal(other.at(-1),false,'ADV games keep the marker rule');
+});
+
+// E414 (user: ファタモルガーナの館 / The House in Fata Morgana, "做成通用解法"): multilingual KiriKiri scripts, and page games
+// recognised by their own script instead of a program list.
+test('E414: multilingual KiriKiri blocks pair by label, [l] continues the row, [cm] starts a page, inline [if] keeps one name',()=>{
+ const {pair}=require('../services/original-engines/krkr-lang.cjs');
+ const ja='*start\r\n[jinobun]\r\n\t「[if exp="sf.e!=1"]あなた[endif][if exp="sf.e==1"]死者[endif]」は目を覚ました。[p]\r\n*s_AAA|\r\n[cm]\r\n[jinobun]\r\n\t窓は暗い。[l]雨の音がする。[p]\r\n*s_BBB|\r\n[cm]\r\n[unknown]\r\n\t声がする。[l][r]\r\n\t誰だろう。[p]\r\n*s_CCC|\r\n[cm]\r\n[soul]\r\n…………。[p]\r\n*s_DDD|\r\n[cm]\r\n';
+ const zh='*start\r\n[jinobun]\r\n\t「[if exp="sf.e!=1"]你[endif][if exp="sf.e==1"]死者[endif]」醒了过来。[p]\r\n*s_AAA|\r\n[cm]\r\n[jinobun]\r\n\t窗外漆黑。[l]能听到雨声。[p]\r\n*s_BBB|\r\n[cm]\r\n[unknown]\r\n\t有人在说话。[l][r]\r\n\t会是谁呢。[p]\r\n*s_CCC|\r\n[cm]\r\n[soul]\r\n…………[p][cm]\r\n';
+ const p=pair(ja,zh);
+ assert.deepEqual(p.lines,['「あなた」は目を覚ました。','窓は暗い。','雨の音がする。','声がする。','誰だろう。','…………。']);
+ assert.deepEqual(p.zh,['「你」醒了过来。','窗外漆黑。','能听到雨声。','有人在说话。','会是谁呢。',''],'paired by label; a block without its label has no pair');
+ assert.deepEqual(p.starts,[0,1,3,5]);assert.deepEqual(p.cont,[2],'only the sentence after [l] on the same physical line continues the row');
+});
+
+test('E414: a page game by its own script turns on every page rule; a game whose pages hold one line does not',t=>{
+ const f=fixture(t);f.hook.flowPage=false;
+ const page=(starts,known)=>({kind:'patch',resolve:()=>({status:'exact',indices:[0]}),flowGame:()=>{let multi=0;for(const i of starts)if(known.includes(i+1)&&!starts.includes(i+1))multi++;return multi/starts.length>=.15;},flowLayout:()=>null});
+ f.hook.originalText=page([0,1,2,3,4,5,6,7,8,9],[0,1,2,3,4,5,6,7,8,9]);assert.equal(f.hook.flowPage,false,'one line per page: an ADV game');
+ f.hook.originalText=page([0,2,4,5,6,7,8,9],[0,1,2,3,4,5,6,7,8,9]);assert.equal(f.hook.flowPage,true,'two of eight pages hold two lines');
+ f.hook.preflight=true;assert.equal(f.hook.preflight,false,'no baseline preflight on a page game');
+ f.line('　窓は暗い。');f.tick(500);const s=f.events.filter(m=>typeof m.hookSource==='string'&&m.hookSource).at(-1);
+ assert.equal(s.hookSourceEngine,'nvl');assert.equal(s.hookFlowGrid,'','no grid: the calibrated box');
+ f.hook.originalText={kind:'patch',resolve:()=>({status:'exact'})};f.hook.scriptAllowed=()=>true;assert.equal(f.hook.autoTranslateEmbed(),false,'the game draws translations only when its glyphs are known to cover them');
+});
+
+test('E414 real data: The House in Fata Morgana (multilingual KiriKiri) reads Japanese with the release\'s Chinese and its pages',t=>{
+ const dir='E:\\GAL\\海市蜃楼之馆';if(!fs.existsSync(path.join(dir,'data_jp.xp3'))){t.skip('Fata Morgana not installed');return;}
+ const sc=require('../services/original-engines/scenes.cjs');assert.equal(sc.detect(dir),'kirikiri-lang');
+ const list=sc.read('kirikiri-lang',dir),lines=list.flatMap(x=>x.lines),zh=list.flatMap(x=>x.zh||[]);
+ assert.ok(lines.length>40000);assert.ok(zh.filter(Boolean).length/lines.length>.95);
+ const i=lines.indexOf('まるで屋敷全体を暗闇が包み込んでいるようだ。');assert.equal(zh[i],'如同整间屋子都在黑暗的怀抱中一般。');
+ const P=sc.ENGINES['kirikiri-lang'].pages(dir);assert.ok(P.cont.has(i)&&P.starts.has(i-1));
+ assert.equal(sc.ENGINES['kirikiri-ks'].eligible(dir),false,'not routed to the live capture');
 });

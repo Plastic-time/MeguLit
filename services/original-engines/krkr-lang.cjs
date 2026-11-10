@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+// E414 multilingual KiriKiri releases (user, 2026-11-11: ファタモルガーナの館 / The House in Fata Morgana, Steam 中日英):
+// one program per language (fata_jp.exe / fata_cn.exe / fata_en.exe) and one archive per language next to the shared
+// data.xp3: data_jp.xp3, data_zh.xp3, data_en.xp3. Their entries carry the archive's "encrypted" flag, but the scripts
+// inside are plain UTF-16 text (BOM), so they are read as they are; an entry that is really encrypted is skipped.
+// The Japanese and Chinese scripts are the same scenario with the text swapped; every message block ends with
+// "text[p]", a unique label "*scenario_<GUID>|" and "[cm]" (clear). Blocks are paired by that label, line by line:
+// 34250 of 34405 labelled blocks pair, 34073 with the same number of lines.
+// Lines are the text between tags; "[l]" inside a physical line splits it into sentences on one row (the second one
+// continues the row), a new physical line ("[r]") is a new row, and the first line of each block starts a page.
+// "[if exp=…]A[endif][if exp=…]B[endif]" inside a line (a name the player sees one of) keeps the first branch.
+const fs=require('node:fs'),path=require('node:path'),xp3=require('./xp3.cjs');
+const JA=/^data_(?:jp|ja|jpn|japanese)\.xp3$/i,ZH=/^data_(?:zh|cn|chs|sc|zhs|schinese)\.xp3$/i,ZT=/^data_(?:tw|zt|cht|tc|tchinese)\.xp3$/i;
+const KS=n=>/\.ks$/i.test(n);
+const listMemo=new Map();
+function stamp(file){try{const s=fs.statSync(file);return s.size+'|'+s.mtimeMs;}catch{return '';}}
+function list(file){const k=file+'|'+stamp(file);if(listMemo.has(k))return listMemo.get(k);let t=null;try{t=xp3.list(file);}catch{}listMemo.set(k,t);if(listMemo.size>16)listMemo.delete(listMemo.keys().next().value);return t;}
+function archives(dir){let files=[];try{files=fs.readdirSync(dir);}catch{return null;}const find=re=>{const f=files.find(n=>re.test(n));return f?path.join(dir,f):null;};
+ const ja=find(JA);if(!ja)return null;return {ja,zh:find(ZH)||find(ZT)};}
+// Plain text of one entry (UTF-16 or UTF-8 with BOM), else null.
+function entryText(file,entry){try{const t=xp3.decodeText(xp3.read(file,entry));return t&&typeof t.text==='string'?t.text:null;}catch{return null;}}
+function scripts(file){const t=list(file);if(!t)return [];return t.files.filter(e=>KS(e.name)&&e.size>0).map(e=>({name:e.name.replace(/\\/g,'/'),entry:e})).sort((a,b)=>a.name.localeCompare(b.name));}
+const INLINE_IF=/\[if exp="[^"]*"\]([^\[]*)\[endif\](?:\[if exp="[^"]*"\][^\[]*\[endif\])+/gi;
+const ascii=t=>/^[\x20-\x7e]*$/.test(t);
+// Blocks of one script: {key, rows:[[sentence,…],…]}; anchors: ASCII command/label lines.
+function blocks(text){const out=[],anchors=[];let rows=[];const close=key=>{if(rows.length)out.push({key,rows});rows=[];};
+ for(const raw of String(text||'').split(/\r?\n/)){const t=raw.trim();if(!t||t[0]===';')continue;
+  if(t[0]==='*'){if(ascii(t))anchors.push(t);close(t.includes('|')?t:null);continue;}
+  if(t[0]==='@'){if(ascii(t))anchors.push(t);continue;}
+  const line=t.replace(INLINE_IF,'$1'),parts=line.split(/\[l\]/i).map(s=>s.replace(/\[[^\]]*\]/g,'').trim()).filter(Boolean);
+  if(parts.length)rows.push(parts);else if(ascii(t))anchors.push(t);
+  if(/\[(?:cm|er|ct)\]/i.test(t))close(null);}
+ close(null);return {blocks:out,anchors};}
+// One scenario: Japanese lines with the Chinese of the same label, page starts and row continuations (local indices).
+function pair(jaText,zhText){const ja=blocks(jaText),zh=zhText?blocks(zhText):{blocks:[]},byKey=new Map();for(const b of zh.blocks)if(b.key&&!byKey.has(b.key))byKey.set(b.key,b);
+ const lines=[],trans=[],starts=[],cont=[];
+ for(const b of ja.blocks){const z=b.key?byKey.get(b.key):null,jaFlat=b.rows.flat(),zhFlat=z?z.rows.flat():[];
+  if(z&&zhFlat.length===jaFlat.length){let k=0;b.rows.forEach(row=>row.forEach((s,i)=>{const at=lines.length;if(!k)starts.push(at);if(i)cont.push(at);lines.push(s);trans.push(zhFlat[k++]);}));continue;}
+  if(z&&z.rows.length===b.rows.length){b.rows.forEach((row,r)=>{const at=lines.length;if(!r)starts.push(at);lines.push(row.join(''));trans.push(z.rows[r].join(''));});continue;}
+  /* Different shape (or no Chinese block): one line for the block, the Chinese block whole. */
+  starts.push(lines.length);lines.push(b.rows.map(r=>r.join('')).join('\n'));trans.push(z?z.rows.map(r=>r.join('')).join('\n'):'');}
+ return {lines,zh:trans,anchors:ja.anchors,starts,cont};}
+// Scenes as the scene reader lists them (sorted by name); each one carries both languages.
+function scenes(dir){const a=archives(dir);if(!a)return [];const zhList=a.zh?new Map(scripts(a.zh).map(s=>[s.name.toLowerCase(),s])):new Map();
+ return scripts(a.ja).map(s=>({name:s.name,read:()=>{const ja=entryText(a.ja,s.entry);if(ja==null)return Buffer.from('null');const z=zhList.get(s.name.toLowerCase());return Buffer.from(JSON.stringify({ja,zh:z?entryText(a.zh,z.entry):null}));}}));}
+function parse(buf){const doc=JSON.parse(buf.toString('utf8'));if(!doc||typeof doc.ja!=='string')return {lines:[],anchors:[]};const p=pair(doc.ja,doc.zh);return {lines:p.lines,anchors:p.anchors,zh:p.zh,starts:p.starts,cont:p.cont};}
+// Page structure over the whole script, in the scene reader's line order (scenes concatenated by name).
+const pageMemo=new Map();
+function pages(dir){const a=archives(dir);if(!a)return null;const key=a.ja+'|'+stamp(a.ja)+'|'+(a.zh?stamp(a.zh):'');if(pageMemo.has(key))return pageMemo.get(key);
+ const out={starts:new Set(),cont:new Set(),known:new Set()};let base=0;
+ for(const s of scenes(dir)){let p;try{p=parse(s.read());}catch{continue;}for(const i of p.starts||[])out.starts.add(base+i);for(const i of p.cont||[])out.cont.add(base+i);for(let i=0;i<p.lines.length;i++)out.known.add(base+i);base+=p.lines.length;}
+ const result=out.known.size?out:null;pageMemo.set(key,result);return result;}
+module.exports={archives,scenes,parse,pages,pair,blocks};
