@@ -82,7 +82,20 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
     + '<p class="np-switches"><button type="button" class="np-sw" data-sw="lyrics"></button><button type="button" class="np-sw" data-sw="bg"></button></p><p class="np-credit"></p>';
   host.append(box);
   // SoundCloud's own mini player is the label's last row: the source of the music, left exactly as SoundCloud draws it
-  if (audio.frame) { const src = document.createElement('div'); src.className = 'np-src'; src.append(audio.frame); box.append(src); }
+  // The frame itself never moves in the page: moving an iframe reloads it (the song would restart and the widget's
+  // events would be lost). It lives in a fixed dock in <body>, laid over the empty strip at the bottom of the label
+  // whenever that strip is showing, and is moved off screen otherwise.
+  if (audio.frame) {
+    const slot = document.createElement('div'); slot.className = 'np-src'; box.append(slot);
+    const dock = document.createElement('div'); dock.className = 'sc-dock'; dock.append(audio.frame); document.body.append(dock);
+    const place = () => {
+      const r = slot.getBoundingClientRect(), shown = !box.hidden && r.width > 40 && r.height > 12 && getComputedStyle(slot).opacity > .5;
+      dock.classList.toggle('away', !shown);
+      if (shown) { dock.style.left = `${r.left}px`; dock.style.top = `${r.top + r.height - 20}px`; dock.style.width = `${r.width}px`; }
+      requestAnimationFrame(place);
+    };
+    requestAnimationFrame(place);
+  }
   const $ = s => box.querySelector(s);
   const title = $('.np-title'), artist = $('.np-artist'), lyric = $('.np-lyric'), credit = $('.np-credit');
   const playBtn = $('.np-play'), seek = $('.np-seek'), nowEl = $('.np-now'), durEl = $('.np-dur');
