@@ -163,6 +163,10 @@ body.tomoyo-gal-bound .sentence-window .tome-island-pair.tome-island-flow .sente
 /* E352/E358: a line the game draws in translation is not drawn again on top; a line its font cannot draw (the game hides it) is
    drawn by MeguLit. While the game draws translations, a line not answered yet stays hidden until it is. */
 .tome-island-pair.tome-island-game-drawn{visibility:hidden!important}
+/* E422 (user, WoH: the drag highlight flew off the screen): on a page the text window is a 0x0 point and each line is placed on
+   its own; the dashed frame goes around the lines instead. */
+body.tome-box-dragging .sentence-window.tome-island-page{outline:none!important}
+body.tome-box-dragging .sentence-window.tome-island-page .tome-island-pair:not([hidden]){outline:2px dashed var(--theme-primary,#e0495a)!important;outline-offset:2px}
 body.megulit-embed-translation .sentence-window.tome-island-page .tome-island-pair:not(.tome-island-overlay-drawn){visibility:hidden!important}
 /* E351 page grid: one fixed cell per character, the game's row height, its breaks only; a line's translation shows while it is the current line (an earlier one would cover the rows the game writes next). */
 body.tomoyo-gal-bound .sentence-window .tome-island-pair.tome-flow-grid .sentence-text,body.tomoyo-gal-bound .sentence-window .tome-island-pair.tome-flow-grid .sentence-text.tomoyo-furigana,body.tomoyo-gal-bound .sentence-window .tome-island-pair.tome-flow-grid .sentence-text[data-megulit-native-breaks]{font-size:var(--tome-flow-size)!important;line-height:var(--tome-flow-row)!important;letter-spacing:var(--tome-flow-spacing)!important;text-indent:var(--tome-flow-indent)!important;white-space:pre!important;margin-top:0!important}

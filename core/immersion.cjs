@@ -20,9 +20,13 @@ class Immersion{
  // CS2 re-sends the current line's text several times per line and again on redraws: only a different line counts as
  // a new line, or a repeat would cancel every pending hide (OP, CG) right after the sprite went off.
  skip(held){if(!this.enabled)return;if(held){this.skipAt??=this.now();}else this.skipAt=null;}
- scene(visible,why='scene'){if(!this.enabled||typeof visible!=='boolean'||this.flow)return;this.sceneHidden=!visible;if(!visible){this.pending=null;this.resumeAt=0;this.set(false,why);}else if(this.skipAt==null)this.set(true);}
+ /* E422 (user, WoH: the layer still hid by itself; reader log: "scene changed 98%"). A scene hide that came before the first
+    page line stayed: once the game was known as a page game every "scene back" was ignored. The page game is known from
+    the hook (flowGame) before any line, and a hide already in place is lifted. */
+ isFlow(){return this.flow===true||this.flowGame?.()===true;}
+ scene(visible,why='scene'){if(!this.enabled||typeof visible!=='boolean')return;if(this.isFlow()){if(this.sceneHidden){this.sceneHidden=false;if(this.skipAt==null)this.set(true);}return;}this.sceneHidden=!visible;if(!visible){this.pending=null;this.resumeAt=0;this.set(false,why);}else if(this.skipAt==null)this.set(true);}
  /* E323: a flow page (WoH) has no dialogue box; the box probes (auto box, scene) hid and showed the layer at random there. */
- source(text,engine){this.flow=engine==='nvl';if(this.sceneHidden&&text===this.currentText)return;/* E282 (user: 爱上火车 kept the layer on the title screen): KiriKiri redraws hand the same line over again and again; only a different line restarts the line timers */if(engine!=='cs2'&&typeof text==='string'&&text.trim()&&text===this.currentText&&this.now()-this.lineAt<60000)return;if(engine==='cs2'&&typeof text==='string'){if(text===this.engineText)return;this.engineText=text;}if(engine==='cs2'){this.engineSignal=true;this.pending=null;}if(typeof text==='string'&&text.trim()){this.pending=null;this.resetLine();this.currentText=text;this.lineLength=[...text].length;this.lineReadyAt=this.lineAt+Math.min(15000,Math.max(0,(this.lineLength-40)*35));this.sceneHidden=false;if(this.skipAt==null)this.showWhenDrawn();}else if(typeof text==='string'&&text==='')this.evidence(false,'hook');}
+ source(text,engine){const flow=engine==='nvl';if(flow&&this.sceneHidden){this.sceneHidden=false;this.hiddenByMarker=false;this.hiddenByAuto=false;}this.flow=flow;if(this.sceneHidden&&text===this.currentText)return;/* E282 (user: 爱上火车 kept the layer on the title screen): KiriKiri redraws hand the same line over again and again; only a different line restarts the line timers */if(engine!=='cs2'&&typeof text==='string'&&text.trim()&&text===this.currentText&&this.now()-this.lineAt<60000)return;if(engine==='cs2'&&typeof text==='string'){if(text===this.engineText)return;this.engineText=text;}if(engine==='cs2'){this.engineSignal=true;this.pending=null;}if(typeof text==='string'&&text.trim()){this.pending=null;this.resetLine();this.currentText=text;this.lineLength=[...text].length;this.lineReadyAt=this.lineAt+Math.min(15000,Math.max(0,(this.lineLength-40)*35));this.sceneHidden=false;if(this.skipAt==null)this.showWhenDrawn();}else if(typeof text==='string'&&text==='')this.evidence(false,'hook');}
  /* E277 (user, 2026-11-09): the hook often reads the next line while the game is still in a transition or on a black
     screen, and the layer showed before the game drew a single character. While the layer is auto-hidden, a new line
     shows it only once something proves it is on screen (wait marker, dialog box, engine signal, scene) or after
@@ -32,7 +36,7 @@ class Immersion{
  reveal(text,typing){if(text!==this.currentText||typeof typing!=='boolean')return;this.typing=typing;if(typing){this.markerSeen=false;this.markerGoneAt=0;this.drawnAt=0;}else this.lineReadyAt=Math.min(this.lineReadyAt,this.now());}
  /* E411 (user, WoH: the layer kept hiding by itself). A full-screen page has no dialogue box to see: the visual box edge
     and the auto box never hide it. */
- evidence(visible,source){if(!this.enabled||visible&&(this.sceneHidden||this.skipAt!=null))return;if(!visible&&this.flow&&(source==='visual'||source==='auto'))return;if(this.engineLive()&&source!=='engine')return;if(visible){this.pending=null;this.set(true);}else if(!this.pending||this.pending.source!==source)this.pending={at:this.now(),source};}
+ evidence(visible,source){if(!this.enabled||visible&&(this.sceneHidden||this.skipAt!=null))return;if(!visible&&this.isFlow()&&(source==='visual'||source==='auto'))return;if(this.engineLive()&&source!=='engine')return;if(visible){this.pending=null;this.set(true);}else if(!this.pending||this.pending.source!==source)this.pending={at:this.now(),source};}
  // A marker that comes back after a marker-based hide means the same line's dialogue box is back (window restored
  // after Hide W., a menu or the backlog closed): show the layer again instead of waiting for the next line.
  // The engine signal covers only the window it watches (ISLAND: the narration page). Lines drawn elsewhere (ADV box,
@@ -40,7 +44,7 @@ class Immersion{
  engineLive(){return this.engineSignal!=null&&(this.engineAt||0)>=this.lineAt-1500;}
  engine(visible,engine){if(!/^[a-z][a-z0-9_-]{1,40}$/i.test(engine||'')||typeof visible!=='boolean')return;this.engineAt=this.now();this.engineSignal=visible;if(!this.enabled)return;if(visible){this.drawn();if(this.sceneHidden||this.skipAt!=null)return;this.pending=null;if(this.visible)this.set(true);else if(!this.resumeAt)this.resumeAt=this.now()+150;}else{this.resumeAt=0;this.evidence(false,'engine');}}
  // E263: the auto-calibrated box probe (any game, no setup). A visible wait marker or an engine signal wins.
- autoBox(visible){if(!this.enabled||typeof visible!=='boolean'||this.engineLive()||this.flow)return;if(visible){this.drawn();if(this.hiddenByAuto){this.hiddenByAuto=false;if(!this.sceneHidden&&this.skipAt==null)this.set(true);}if(this.pending?.source==='auto')this.pending=null;return;}if(this.typing||this.present())return;this.hiddenByAuto=true;this.evidence(false,'auto');}
+ autoBox(visible){if(!this.enabled||typeof visible!=='boolean'||this.engineLive()||this.isFlow())return;if(visible){this.drawn();if(this.hiddenByAuto){this.hiddenByAuto=false;if(!this.sceneHidden&&this.skipAt==null)this.set(true);}if(this.pending?.source==='auto')this.pending=null;return;}if(this.typing||this.present())return;this.hiddenByAuto=true;this.evidence(false,'auto');}
  marker(present){if(this.engineLive())return;this.markerPresent=!!present;if(present)this.drawn();if(this.typing||this.now()<this.lineReadyAt)return;if(present){this.markerSeen=true;if(this.hiddenByMarker&&this.enabled&&this.mode==='marker'&&!this.sceneHidden&&this.skipAt==null){this.hiddenByMarker=false;this.set(true);}}else if(this.markerSeen)this.markerGoneAt=this.now();}
  markerDrawn(){this.drawn();if(this.engineLive()||this.typing||this.now()<this.lineReadyAt)return;this.drawnAt=this.now();this.markerSeen=true;}
  present(){return this.markerPresent||this.now()-this.drawnAt<1500;}
@@ -55,7 +59,7 @@ class Immersion{
   if(this.engineLive())return;
   /* E411: on a full-screen page the wait marker leaves at every click while the page's text stays (reader log: "marker"
      hides every few seconds); its absence is no sign that the text is gone. Skip and the page's own lines still decide. */
-  if(this.flow)return;
+  if(this.isFlow())return;
   if(this.typing||this.now()<this.lineReadyAt)return;
   // A marker still on screen 0.4 s into a line belongs to this line (the previous one is cleared when the game advances).
   if(this.mode==='marker'&&!this.markerSeen&&this.markerPresent&&this.now()-this.lineAt>=400)this.markerSeen=true;
