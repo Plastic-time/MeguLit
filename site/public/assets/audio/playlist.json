@@ -108,20 +108,6 @@
       "duration": 141.2
     },
     {
-      "id": "matter-w-sebii-all-the-time",
-      "title": "all the time",
-      "artist": "matter w/ SEBii",
-      "artistUrl": "https://soundcloud.com/matter4x",
-      "album": "all the time",
-      "label": "",
-      "albumUrl": "",
-      "license": "",
-      "licenseUrl": "",
-      "sc": "https://soundcloud.com/matter4x/all-the-time-w-sebii-prod-skress-yeoj",
-      "lyrics": false,
-      "duration": 136.0
-    },
-    {
       "id": "blxty-ft-orchid-awful",
       "title": "awful",
       "artist": "blxty ft. orchid",
@@ -136,88 +122,46 @@
       "duration": 123.8
     },
     {
-      "id": "loveyouparadise-complicated",
-      "title": "complicated",
-      "artist": "loveyouparadise",
-      "artistUrl": "https://soundcloud.com/pos3r",
-      "album": "complicated",
-      "label": "",
-      "albumUrl": "",
-      "license": "",
-      "licenseUrl": "",
-      "sc": "https://soundcloud.com/pos3r/complicated",
-      "lyrics": false,
-      "duration": 135.6
-    },
-    {
-      "id": "nokerb-prod-bequite-might-die",
-      "title": "Might Die",
-      "artist": "nokerb (prod. bequite)",
-      "artistUrl": "https://soundcloud.com/nokerbforever",
-      "album": "",
-      "label": "",
-      "albumUrl": "",
-      "license": "",
-      "licenseUrl": "",
-      "sc": "https://soundcloud.com/nokerbforever/might-die",
-      "lyrics": false,
-      "duration": 0.0
-    },
-    {
       "id": "5v-i-rly-hate-it-here",
       "title": "i rly hate it here",
       "artist": "5v",
       "artistUrl": "https://soundcloud.com/5vexe",
-      "album": "",
+      "album": "i rly hate it here..",
       "label": "",
       "albumUrl": "",
       "license": "",
       "licenseUrl": "",
       "sc": "https://soundcloud.com/5vexe/hate-it-here",
       "lyrics": true,
-      "duration": 0.0
+      "duration": 144.1
     },
     {
       "id": "maple-feat-sebii-kuru-blackjack",
       "title": "blackjack",
       "artist": "Maple feat. SEBii & kuru",
       "artistUrl": "https://soundcloud.com/careinq",
-      "album": "",
+      "album": "PLASTIC SURGEON",
       "label": "",
       "albumUrl": "",
       "license": "",
       "licenseUrl": "",
       "sc": "https://soundcloud.com/careinq/blackjack-feat-sebii-kuru",
       "lyrics": true,
-      "duration": 0.0
+      "duration": 174.7
     },
     {
       "id": "d0llywood1-prod-vagex-ihonestlymightjustgiveup",
       "title": "ihonestlymightjustgiveup",
       "artist": "d0llywood1 (prod. vagex)",
       "artistUrl": "https://soundcloud.com/sanriorose",
-      "album": "",
+      "album": "ihonestlymightjustgiveup",
       "label": "",
       "albumUrl": "",
       "license": "",
       "licenseUrl": "",
       "sc": "https://soundcloud.com/sanriorose/ihonestlymightjustgiveup",
       "lyrics": true,
-      "duration": 0.0
-    },
-    {
-      "id": "saya-prod-sayako-watered-garden-of-souls",
-      "title": "Watered Garden of Souls",
-      "artist": "Saya (prod. sayako)",
-      "artistUrl": "https://soundcloud.com/heartsayako",
-      "album": "",
-      "label": "",
-      "albumUrl": "",
-      "license": "",
-      "licenseUrl": "",
-      "sc": "https://soundcloud.com/heartsayako/watered_garden_of_souls",
-      "lyrics": true,
-      "duration": 0.0
+      "duration": 126.2
     }
   ]
 }
