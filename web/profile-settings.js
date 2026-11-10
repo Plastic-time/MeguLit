@@ -44,7 +44,9 @@ export async function mountProfileSettings({content,api,locale,esc,toast,openSec
  root.innerHTML=`<section class="panel profile-account" data-profile-account><h2 class="panel-title">${t.account}</h2><p class="settings-help">…</p></section><div data-profile-avatar></div><form class="panel profile-board" data-profile-board autocomplete="off"><h2 class="panel-title">${t.board}</h2><p class="settings-help">…</p></form><section class="panel profile-public" data-profile-public><h2 class="panel-title">${t.publicTitle}</h2><p class="settings-help">…</p></section>`;
  const publicBox=root.querySelector('[data-profile-public]'),accountBox=root.querySelector('[data-profile-account]'),avatarBox=root.querySelector('[data-profile-avatar]'),form=root.querySelector('[data-profile-board]');
  let account={configured:false,loggedIn:false},board=null;
- const errorText=error=>{const code=String(error?.message||error).replace(/^LEADERBOARD_/,'');return lw[code]||t.offline;};
+ /* E400 the bridge error may arrive as an Error or a plain string, sometimes with a prefix: pick the code out of it */
+ const errorCode=error=>{const text=String(error?.message||error||'');return (text.match(/LEADERBOARD_([A-Z_]+)/)||text.match(/\b([A-Z][A-Z_]{3,})\b/)||[])[1]||'';};
+ const errorText=error=>{const code=errorCode(error);return code==='UNAUTHORIZED'?t.publicLogin:lw[code]||(code?t.offline+' ('+code+')':t.offline);};
  async function paintAvatar(){avatarBox.replaceChildren();await mountAvatarSettings({content:avatarBox,api,locale,esc,toast}).catch(()=>{});}
  async function paintAccount(){
   try{account=await api('account_status',{autoSync:false});}catch{account={configured:false,loggedIn:false};}
@@ -77,16 +79,31 @@ export async function mountProfileSettings({content,api,locale,esc,toast,openSec
       ${favorites.length<5?`<select data-add-favorite aria-label="${esc(t.addFavorite)}"><option value="">${t.addFavorite}</option>${left.map(title=>`<option value="${esc(title)}">${esc(title)}</option>`).join('')}</select>`:''}</div></div>
     <p class="leaderboard-error" data-public-error hidden></p>`;
    const error=publicBox.querySelector('[data-public-error]');
-   const save=async()=>{error.hidden=true;try{const r=await api('leaderboard_profile_save',{bio:publicBox.querySelector('[name=profileBio]').value,favorites,public:publicBox.querySelector('[name=profilePublic]').checked});
-     if(r.state!=='ok'){error.textContent=t.offline;error.hidden=false;return;}p=r;favorites=[...r.favorites];toast(t.saved);draw();}
-    catch(e){error.textContent=errorText(e);error.hidden=false;}};
+   /* E400 saving: on every change, and 0.9 s after typing stops. A refusal keeps what you typed on screen and says
+      why (sign in first, signature rule, offline …) instead of failing quietly. */
+   const local=()=>({bio:publicBox.querySelector('[name=profileBio]').value,favorites:[...favorites],public:publicBox.querySelector('[name=profilePublic]').checked});
+   const failWith=(message,values)=>{p={...p,...values};favorites=[...values.favorites];draw();const box=publicBox.querySelector('[data-public-error]');box.textContent=message;box.hidden=false;};
+   let saving=null,again=false,typing=0;
+   const save=async()=>{
+    clearTimeout(typing);if(saving){again=true;return;}
+    const values=local();error.hidden=true;
+    saving=(async()=>{
+     try{const r=await api('leaderboard_profile_save',values);
+      if(r?.state==='ok'){p=r;favorites=[...r.favorites];toast(t.saved);draw();return;}
+      failWith(r?.state==='login'?t.publicLogin:r?.state==='not-configured'?t.notReady:errorText(r?.error||''),values);}
+     catch(e){failWith(errorText(e),values);}
+    })();
+    try{await saving;}finally{saving=null;if(again){again=false;save();}}
+   };
    /* E398 異議あり！ opens a short statement box, then sends the objection once */
    publicBox.querySelector('[data-objection]')?.addEventListener('click',()=>{const f=publicBox.querySelector('[data-objection-form]');f.hidden=false;f.querySelector('textarea').focus();});
    publicBox.querySelector('[data-objection-send]')?.addEventListener('click',async event=>{const b=event.currentTarget;b.disabled=true;
     try{const r=await api('leaderboard_profile_appeal',{reason:publicBox.querySelector('[data-objection-form] textarea').value});if(r.state!=='ok'){toast(t.offline);b.disabled=false;return;}p={...p,appealed:true};toast(t.appealed);draw();}catch{toast(t.offline);b.disabled=false;}});
-   publicBox.querySelector('[name=profilePublic]').onchange=save;publicBox.querySelector('[name=profileBio]').onchange=save;
+   publicBox.querySelector('[name=profilePublic]').onchange=save;
+   const bioInput=publicBox.querySelector('[name=profileBio]');bioInput.onchange=save;bioInput.addEventListener('input',()=>{clearTimeout(typing);typing=setTimeout(save,900);});
+   bioInput.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();save();}});
    publicBox.querySelectorAll('[data-remove-favorite]').forEach(b=>b.onclick=()=>{favorites.splice(Number(b.dataset.removeFavorite),1);save();});
-   publicBox.querySelector('[data-add-favorite]')?.addEventListener('change',event=>{const title=event.currentTarget.value;if(!title)return;favorites.push({title,vndb:''});save();});
+   publicBox.querySelector('[data-add-favorite]')?.addEventListener('change',event=>{const title=event.currentTarget.value;if(!title||favorites.some(f=>f.title===title)||favorites.length>=5)return;favorites.push({title,vndb:''});save();});
   };
   draw();
  }

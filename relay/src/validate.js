@@ -160,10 +160,14 @@ export const PROFILE={bio:60,favorites:5,follows:500,recent:5,kindred:20};
 export function cleanBio(value){
  if(value===undefined||value===null)return {ok:true,bio:''};
  if(typeof value!=='string')return {ok:false,error:'BIO_INVALID'};
- const bio=value.normalize('NFKC').replace(/\s+/g,' ').trim();if(!bio)return {ok:true,bio:''};
+ /* E400 kept as typed (NFC): NFKC would turn kaomoji like ( ´∀｀) into a backtick and combining marks. Checks run on an
+    NFKC copy so full-width links and words are still caught. Only links, e-mail addresses, control or invisible
+    characters (the emoji joiner U+200D is fine) and blocked words are refused. */
+ const bio=value.normalize('NFC').replace(/\s+/g,' ').trim();if(!bio)return {ok:true,bio:''};
  if([...bio].length>PROFILE.bio)return {ok:false,error:'BIO_LENGTH'};
- if([...bio].some(hidden)||/[<>`\\]/.test(bio)||/https?:|www\.|\.(?:com|net|org|cn|jp|io)\b|@/i.test(bio))return {ok:false,error:'BIO_INVALID'};
- const lower=bio.toLowerCase(),flat=lower.replace(/[\s._\-*·・]/g,''),tokens=lower.split(/[^a-z]+/).filter(Boolean);
+ const folded=bio.normalize('NFKC');
+ if([...bio].some(ch=>ch!=='\u200d'&&hidden(ch))||/https?:|www\.|\.(?:com|net|org|cn|jp|io)\b|[\w.+-]+@[\w-]+\.[a-z]{2,}/i.test(folded))return {ok:false,error:'BIO_INVALID'};
+ const lower=folded.toLowerCase(),flat=lower.replace(/[\s._\-*·・]/g,''),tokens=lower.split(/[^a-z]+/).filter(Boolean);
  if(BLOCKED.some(word=>!NAME_ONLY.includes(word)&&(/^[a-z]+$/.test(word)?tokens.some(t=>t.startsWith(word)):flat.includes(word))))return {ok:false,error:'BIO_BLOCKED'};
  return {ok:true,bio};
 }

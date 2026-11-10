@@ -218,7 +218,7 @@ test('E394 个人主页: leaderboard fields leave 联网服务, search lands on 
 
 test('E397 client: signature rules match the relay, last-read times ride along, social calls need an account and stay private-safe',async t=>{
  const relayValidate=await import(pathToFileURL(path.join(__dirname,'..','relay','src','validate.js')).href);
- for(const sample of ['爆裂魔法 一日一发','','あ'.repeat(61),'看 www.x.com','r18 only','约炮吗','I love MeguLit','you are a bitch','<b>','Dickens fan',undefined,7])assert.deepEqual(lb.cleanBio(sample),relayValidate.cleanBio(sample),String(sample));
+ for(const sample of ['(｡･ω･｡)','( ´∀｀)','(｀・ω・´)','ヽ(✿ﾟ▽ﾟ)ノ','(@_@)','mail a@b.cn','爆裂魔法 一日一发','','あ'.repeat(61),'看 www.x.com','r18 only','约炮吗','I love MeguLit','you are a bitch','<b>','Dickens fan',undefined,7])assert.deepEqual(lb.cleanBio(sample),relayValidate.cleanBio(sample),String(sample));
  assert.deepEqual(lb.REPORT_KINDS,relayValidate.REPORT_KINDS);
  const {root,db}=fixture(t);seed(db);const stats=lb.collectStats(db,NOW);
  assert.equal(stats.games.find(g=>g.title==='ATRI').last,at(2026,11,10),'newest session start');

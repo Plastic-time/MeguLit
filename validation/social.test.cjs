@@ -29,7 +29,9 @@ test('profile validation: one-line signature with the nickname filter, up to fiv
  const {cleanBio,validateProfile}=await load('validate.js');
  assert.deepEqual(cleanBio('  爆裂魔法  一日一发 '),{ok:true,bio:'爆裂魔法 一日一发'});assert.deepEqual(cleanBio(''),{ok:true,bio:''});assert.deepEqual(cleanBio(undefined),{ok:true,bio:''});
  assert.equal(cleanBio('あ'.repeat(61)).error,'BIO_LENGTH');assert.equal(cleanBio('あ'.repeat(60)).ok,true);
- for(const bad of ['看 www.example.com','mail me a@b.c','<b>x</b>'])assert.equal(cleanBio(bad).error,'BIO_INVALID',bad);
+ for(const bad of ['看 www.example.com','看 ｗｗｗ．ｅｘａｍｐｌｅ．ｃｏｍ','mail me a@b.cn','a​b'])assert.equal(cleanBio(bad).error,'BIO_INVALID',bad);
+ /* E400 kaomoji, emoji, kana and full-width symbols pass and are kept exactly as typed */
+ for(const ok of ['(｡･ω･｡)','(￣▽￣)','╮(╯▽╰)╭','( ´∀｀)','ヽ(✿ﾟ▽ﾟ)ノ','(*´▽`*)','(｀・ω・´)','(>_<)','(@_@)','ʕ•ᴥ•ʔ','🥰👨‍👩‍👧','きょうも一日がんばるぞい！','＜ＡＴＲＩ＞最高'])assert.deepEqual(cleanBio(ok),{ok:true,bio:ok},ok);
  for(const bad of ['喜欢色情游戏','r18 only','you are a bitch','约炮吗'])assert.equal(cleanBio(bad).error,'BIO_BLOCKED',bad);
  assert.equal(cleanBio('I love MeguLit').ok,true,'impersonation words are only for nicknames');
  const ok=validateProfile({bio:'hi',favorites:[{title:'ATRI'},{title:' atri '},{title:'千恋＊万花',vndb:'V19073'}],public:true});
