@@ -81,29 +81,29 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
   new MutationObserver(reink).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', reink);
 
-  // ---- lyric lines, AMV style -----------------------------------------------------------------------------------------
-  // A line is cut into tokens: one per Japanese character, one per English word (kept whole, so it kerns properly and
-  // reads as a word). Every token gets its own colour (Megumin's red, gold or white), size, depth blur, blend mode and
-  // tilt, and flies in from depth. The line is laid out on one of several paths (row with a wandering baseline, arc,
-  // column, steps, scatter band, spiral), always in reading order. All lyric tokens sit under a "camera" that drifts,
-  // dollies and rolls on its own and punches, shakes and twists on the drum hits. The pointer still scatters tokens,
-  // and springs pull them back. Randomness comes from a seed so the two layers that show lyrics show the same shot.
+  // ---- lyric lines -----------------------------------------------------------------------------------------------------
+  // A line is cut into tokens: one per Japanese character, one per English word (kept whole in Playfair Display italic,
+  // so it kerns and reads as a word). A line has one colour (Megumin's red, gold or white) and an orderly shape (row,
+  // gentle arc, column, steps); each token varies a little in size and tilt, has its own opacity, and now and then a
+  // soft depth blur or a screen blend. Tokens drift in from just off their place. All lyric tokens sit under a quiet
+  // "camera" that drifts and gives a small push, shake or twist on the drum hits. The pointer scatters tokens and
+  // springs pull them back. Randomness comes from a seed so the two layers that show lyrics show the same shot.
   const JA_FONT = '"Noto Serif JP","Yu Mincho","Hiragino Mincho ProN","MeguLit Serif",serif';
-  const EN_FONT = '"MeguLit Cormorant","Cormorant Garamond",Georgia,serif';
+  const EN_FONT = '"MeguLit Lyric","Playfair Display",Georgia,serif';
   const HUD_FONT = '"MeguLit Mono",ui-monospace,Consolas,monospace';
-  try { document.fonts?.load('italic 40px "MeguLit Cormorant"'); document.fonts?.load('300 12px "MeguLit Mono"'); } catch {}
+  try { document.fonts?.load('italic 500 40px "MeguLit Lyric"'); document.fonts?.load('300 12px "MeguLit Mono"'); } catch {}
   const INK = { red: ['#e0505c', '#a51d2d'], gold: ['#f0c36a', '#9a6a12'], white: ['#f4f1ea', '#3a1a1e'] };
   const GLOW = { red: 'rgba(224,80,92,.6)', gold: 'rgba(240,195,106,.55)', white: 'rgba(244,241,234,.5)' };
-  const BLENDS_DARK = ['source-over', 'source-over', 'screen', 'lighter', 'overlay'];
-  const BLENDS_LIGHT = ['source-over', 'source-over', 'multiply', 'color-burn'];
-  const BLURS = [0, 0, 0, 0, 1.5, 3.5, 7];
+  const BLENDS_DARK = ['source-over', 'source-over', 'source-over', 'screen'];
+  const BLENDS_LIGHT = ['source-over', 'source-over', 'source-over', 'multiply'];
+  const BLURS = [0, 0, 0, 0, 0, 0, 1.2, 2.5];
   const rng = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const pickOf = (r, list) => list[Math.floor(r() * list.length)];
   const measurer = document.createElement('canvas').getContext('2d');
 
   // one token rendered once (with its blur and glow) to an offscreen canvas
   function tokenSprite(t) {
-    const font = t.hud ? `300 ${t.size}px ${HUD_FONT}` : t.en ? `italic 600 ${t.size * 1.18}px ${EN_FONT}` : `700 ${t.size}px ${JA_FONT}`;
+    const font = t.hud ? `300 ${t.size}px ${HUD_FONT}` : t.en ? `italic 500 ${t.size * 1.08}px ${EN_FONT}` : `700 ${t.size}px ${JA_FONT}`;
     measurer.font = font;
     const tw = Math.max(t.size * .5, measurer.measureText(t.text).width), pad = Math.ceil(t.blur * 2.5 + t.size * .3);
     const w = Math.ceil(tw + pad * 2), h = Math.ceil(t.size * 1.5 + pad * 2);
@@ -141,17 +141,20 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
     const r = rng(seed >>> 0);
     const toks = tokenize(text).slice(0, 48);
     const real = toks.filter(t => !t.space);
-    const shapes = real.length <= 12 && H > 420 ? ['row', 'arc', 'column', 'stair', 'scatter', 'spiral'] : ['row', 'row', 'arc', 'stair', 'scatter'];
+    // orderly paths: the line keeps a clear reading shape; the randomness lives in the details, not the layout
+    const shapes = real.length <= 12 && H > 420 ? ['row', 'row', 'arc', 'column', 'stair'] : ['row', 'row', 'row', 'arc', 'stair'];
     const shape = pickOf(r, shapes);
-    const base = 26 + r() * 30;                                   // a line's base size; tokens vary around it
+    const base = 26 + r() * 22;                                   // a line's base size; tokens vary a little around it
     const blends = dark ? BLENDS_DARK : BLENDS_LIGHT;
+    const lineInk = pickOf(r, ['red', 'gold', 'white']);       // one colour per line
     // tokens: size, colour, blur, blend, tilt are each random per token
     for (const t of real) {
-      t.size = Math.round(base * (.65 + r() * .95) * (t.en ? .85 : 1));
-      t.ink = pickOf(r, ['red', 'gold', 'white']);
+      t.size = Math.round(base * (.86 + r() * .3) * (t.en ? .85 : 1));
+      t.ink = lineInk;
       t.blur = pickOf(r, BLURS);
+      t.alpha = .3 + r() * .5;                                     // random opacity per token: .3–.8
       t.blend = pickOf(r, blends);
-      t.tilt = (r() - .5) * (shape === 'column' ? .25 : .55);
+      t.tilt = (r() - .5) * (shape === 'column' ? .08 : .16);
       t.spr = tokenSprite(t);
     }
     // the path, in reading order, in screen coordinates
@@ -166,18 +169,18 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
       if (t.space) continue;
       const f = mid / Math.max(1, total * fit);                   // 0 → 1 along the line
       let x, y, rot = t.tilt;
-      if (shape === 'column') { const step = Math.min(base * 1.15, (H * .72) / Math.max(1, real.length)); x = cx + (r() - .5) * base * .4; y = H * .14 + place.length * step; rot *= .5; }
-      else if (shape === 'arc') { const R = W * (.5 + r() * .15), ang = (f - .5) * (total * fit) / R; x = W / 2 + Math.sin(ang) * R; y = cy + R - Math.cos(ang) * R - R * .02; rot = ang + t.tilt * .4; }
-      else if (shape === 'stair') { x = W * .07 + mid * (W * .86) / Math.max(1, total * fit); y = H * .18 + f * H * .55; }
+      if (shape === 'column') { const step = Math.min(base * 1.15, (H * .72) / Math.max(1, real.length)); x = cx; y = H * .14 + place.length * step; rot *= .5; }
+      else if (shape === 'arc') { const R = W * (.9 + r() * .4), ang = (f - .5) * (total * fit) / R; x = W / 2 + Math.sin(ang) * R; y = cy + R - Math.cos(ang) * R - R * .02; rot = ang + t.tilt * .4; }
+      else if (shape === 'stair') { x = W * .07 + mid * (W * .86) / Math.max(1, total * fit); y = cy - H * .12 + f * H * .24; }
       else if (shape === 'scatter') { x = W * .07 + mid * (W * .86) / Math.max(1, total * fit); y = cy + (r() - .5) * H * .34; rot = t.tilt * 1.6; }
       else if (shape === 'spiral') { const ang = f * Math.PI * 1.6 - Math.PI * .8, rad = H * (.08 + f * .3); x = W / 2 + Math.cos(ang) * rad * 1.5; y = H / 2 + Math.sin(ang) * rad; rot = ang + Math.PI / 2 + t.tilt * .3; }
-      else { x = W * .07 + mid * (W * .86) / Math.max(1, total * fit); y = cy + Math.sin(f * Math.PI * (1 + r() * 2)) * base * .5 + (r() - .5) * base * .3; }
+      else { x = W * .07 + mid * (W * .86) / Math.max(1, total * fit); y = cy + (r() - .5) * base * .12; }
       place.push([t, x, y, rot]);
     }
     place.forEach(([t, x, y, rot], k) => {
-      const from = r() * Math.PI * 2, dist = 120 + r() * 380;     // flies in from depth, off to one side
-      words.push({ ...t, hx: x, hy: y, x: x + Math.cos(from) * dist, y: y + Math.sin(from) * dist, vx: 0, vy: 0, rot: rot + (r() - .5) * 1.6, hrot: rot, vr: 0,
-        zoom: 2.4 + r() * 1.6, pop: 1, born: now + k * (40 + r() * 50), out: now + 9000, exitDir: r() * Math.PI * 2 });
+      const from = r() * Math.PI * 2, dist = 30 + r() * 70;       // drifts in from slightly off its place
+      words.push({ ...t, hx: x, hy: y, x: x + Math.cos(from) * dist, y: y + Math.sin(from) * dist, vx: 0, vy: 0, rot: rot + (r() - .5) * .3, hrot: rot, vr: 0,
+        zoom: 1.25 + r() * .35, pop: 1, born: now + k * (40 + r() * 50), out: now + 9000, exitDir: r() * Math.PI * 2 });
     });
     if (hud) {
       const [t0, x0, y0] = place[0] || [null, W * .1, H * .3];
@@ -185,13 +188,13 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
       words.push({ ...h, hx: x0 - (t0 ? t0.spr.tw / 2 : 0) + h.spr.tw / 2, hy: y0 - base * 1.05, x: x0, y: y0 - base, vx: 0, vy: 0, rot: 0, hrot: 0, vr: 0, zoom: 1, pop: 1, born: now, out: now + 9000, exitDir: -Math.PI / 2 });
     }
     // each line is a new shot: a slow dolly and roll for the camera to drift through
-    cam.drift = { x: (r() - .5) * 80, y: (r() - .5) * 50, z: (r() - .5) * .16, r: (r() - .5) * .12 }; cam.t0 = now;
+    cam.drift = { x: (r() - .5) * 30, y: (r() - .5) * 20, z: (r() - .5) * .05, r: (r() - .5) * .03 }; cam.t0 = now;
   };
 
   // drum hits on the lyric camera: kicks punch in and shake, snares twist
   const camHit = (kind, s) => {
-    if (kind === 'kick') { cam.vz += .9 * s; cam.vx += (Math.random() - .5) * 900 * s; cam.vy += (Math.random() - .5) * 600 * s; }
-    else cam.vr += (Math.random() < .5 ? -1 : 1) * .9 * s;
+    if (kind === 'kick') { cam.vz += .25 * s; cam.vx += (Math.random() - .5) * 160 * s; cam.vy += (Math.random() - .5) * 110 * s; }
+    else cam.vr += (Math.random() < .5 ? -1 : 1) * .18 * s;
   };
 
   // a drum hit: each layer picks one of a few moves at random, sized by the hit's strength. Nothing flashes and the
@@ -211,7 +214,7 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
       else if (move === 'jump') p.vy -= 140 * s * k;
       else p.vx += (Math.random() < .5 ? -1 : 1) * 120 * s * k;
     }
-    for (const w of words) { w.pop = 1 + (w.hud ? .1 : .3) * s * (.5 + Math.random()); if (move === 'jump') w.vy -= 90 * s; else if (move !== 'pop') w.vx += (Math.random() - .5) * 200 * s; }
+    for (const w of words) { w.pop = 1 + (w.hud ? .05 : .12) * s * (.5 + Math.random()); if (move === 'jump') w.vy -= 30 * s; else if (move !== 'pop') w.vx += (Math.random() - .5) * 60 * s; }
     camHit(kind, s);
   };
   const drawWords = (now, dt, dy, layerVis) => {
@@ -233,7 +236,7 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
       if (!still && d2 < 170 * 170) { const d = Math.sqrt(d2) || 1, f = (1 - d / 170) * 1800; w.vx += dx / d * f * dt; w.vy += dyp / d * f * dt; w.vr += (dx > 0 ? 1 : -1) * f * .003 * dt; }
       const leaving = now > w.out;
       if (!still) {
-        if (leaving) { w.vx += Math.cos(w.exitDir) * 900 * dt; w.vy += Math.sin(w.exitDir) * 900 * dt - 200 * dt; w.vr += (w.exitDir > Math.PI ? 1 : -1) * 3 * dt; }
+        if (leaving) { w.vx += Math.cos(w.exitDir) * 120 * dt; w.vy += Math.sin(w.exitDir) * 120 * dt - 80 * dt; }
         else { w.vx += (w.hx - w.x) * 7 * dt; w.vy += (w.hy - w.y) * 7 * dt; w.vr += (w.hrot - w.rot) * 6 * dt; }
         const damp = Math.pow(.08, dt);
         w.vx *= damp; w.vy *= damp; w.vr *= damp;
@@ -241,10 +244,10 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
         w.zoom += (1 - w.zoom) * Math.min(1, dt * 6);              // flies in from depth
       } else { w.x = w.hx; w.y = w.hy; w.rot = w.hrot; w.zoom = 1; }
       const fadeIn = clamp((now - w.born) / 450), fadeOut = 1 - clamp((now - w.out) / 1100);
-      const a = (w.hud ? .85 : .78) * fadeIn * fadeOut * layerVis;
+      const a = (w.hud ? .7 : (w.alpha ?? .55)) * .75 * fadeIn * fadeOut * layerVis;
       if (a < .005) continue;
       w.pop += (1 - w.pop) * Math.min(1, dt * 7);
-      const s = w.zoom * w.pop * (leaving ? 1 + (1 - fadeOut) * .8 : 1), sw = w.spr.w * s, sh = w.spr.h * s;
+      const s = w.zoom * w.pop * (leaving ? 1 + (1 - fadeOut) * .15 : 1), sw = w.spr.w * s, sh = w.spr.h * s;
       ctx.save();
       ctx.globalAlpha = a;
       ctx.globalCompositeOperation = w.blend || 'source-over';

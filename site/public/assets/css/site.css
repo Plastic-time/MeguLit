@@ -3,14 +3,14 @@
 
 @font-face {
   font-family: "MeguLit Serif";
-  src: url("/assets/fonts/megulit-serif.woff2?v=146f272b8e") format("woff2");
+  src: url("/assets/fonts/megulit-serif.woff2?v=fdeec63eb4") format("woff2");
   font-weight: 600;
   font-display: swap;
 }
 /* Same file without the curly quotes: the CJK font draws them full-width, which looks broken in English. */
 @font-face {
   font-family: "MeguLit Serif Latin";
-  src: url("/assets/fonts/megulit-serif.woff2?v=146f272b8e") format("woff2");
+  src: url("/assets/fonts/megulit-serif.woff2?v=fdeec63eb4") format("woff2");
   font-weight: 600;
   font-display: swap;
   unicode-range: U+0000-2017, U+2020-FFFF;
@@ -1158,9 +1158,9 @@ html { overflow-x: clip; }
 /* ---- hero, round 3: the megu-edit look -------------------------------------------------------------------------------
    two poles (black #000 / paper #f4f4f2), mono footage, one accent (#c8323c), lowercase tracked mono micro-text,
    a roman/han serif headline with a soft glow, dashed rules, a running number, barcode stripes, focus pull to open. */
-@font-face { font-family: "MeguLit Mono"; src: url("/assets/fonts/plex-mono.woff2?v=d95f8ddb15") format("woff2"); font-weight: 300; font-display: swap; }
-@font-face { font-family: "MeguLit Cormorant"; src: url("/assets/fonts/cormorant-italic.woff2?v=da2fa255bd") format("woff2"); font-style: italic; font-display: swap; }
-@font-face { font-family: "MeguLit Han"; src: url("/assets/fonts/han-serif-hero.woff2?v=c6cbf1fa23") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "MeguLit Mono"; src: url("/assets/fonts/plex-mono.woff2?v=30b9a722ed") format("woff2"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "MeguLit Cormorant"; src: url("/assets/fonts/cormorant-italic.woff2?v=ce9c1f916b") format("woff2"); font-style: italic; font-display: swap; }
+@font-face { font-family: "MeguLit Han"; src: url("/assets/fonts/han-serif-hero.woff2?v=f62c282fff") format("woff2"); font-weight: 600; font-display: swap; }
 .hero { --paper: #f4f4f2; --accent: #c8323c; --dim: #8a8a8a; background: #000; }
 .hero-tint, .rays-fx { display: none; }
 .hero-video {
@@ -1298,7 +1298,7 @@ img, video, canvas, svg { -webkit-user-drag: none; user-drag: none; }
 .top { z-index: 20; }
 .vol[hidden] { display: none; }
 /* Chinese hero title in a brush hand (Zhi Mang Xing, OFL); Japanese and English keep their serif faces */
-@font-face { font-family: "MeguLit Black"; src: url("/assets/fonts/hero-black.woff2?v=8029e99aaf") format("woff2"); font-weight: 900; font-display: swap; }
+@font-face { font-family: "MeguLit Black"; src: url("/assets/fonts/hero-black.woff2?v=19e9815eb0") format("woff2"); font-weight: 900; font-display: swap; }
 :lang(zh) .ht-big { font-family: "MeguLit Black", "MeguLit Han", var(--serif); font-weight: 900; letter-spacing: .01em; font-size: clamp(5.5rem, 21vw, 23rem); line-height: 1; text-shadow: 0 0 .25em rgba(244, 244, 242, .22); }
 :lang(zh) .ht-big rt { font-size: max(11px, .08em) !important; }
 @media (max-width: 40rem) { :lang(zh) .ht-big { font-size: 30vw; } }
@@ -1605,3 +1605,35 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 .sound-ctl.floating:hover .np-line, .sound-ctl.floating:focus-within .np-line { -webkit-line-clamp: 2; }
 .sound-ctl.floating .np { cursor: default; }
 @media (max-width: 40rem) { .sound-ctl.floating .np, .sound-ctl.floating .np.has-lyrics { width: min(13rem, 58vw); } }
+@font-face { font-family: "MeguLit Lyric"; src: url("/assets/fonts/lyric-italic.woff2?v=3767be11d8") format("woff2"); font-style: italic; font-weight: 500; font-display: swap; }
+
+/* ---- now-playing label, final layout: equaliser in a narrow left column, everything else lined up in the right one;
+   down the page it is one strip that opens in place on hover/focus, with every part sliding and fading, not popping -- */
+.np { grid-template-columns: 14px minmax(0, 1fr); column-gap: .75rem; row-gap: 0; align-items: start; width: min(22rem, 80vw); padding: .75rem .95rem .8rem;
+  transition: width .38s cubic-bezier(.2, .7, .2, 1), padding .38s cubic-bezier(.2, .7, .2, 1), background-color .3s; }
+.np-eq { grid-column: 1; grid-row: 1; align-self: center; margin: 0; }
+.np-meta { grid-column: 2; grid-row: 1; gap: .2rem; }
+.np-title { font-size: .875rem; }
+.np-lyric { grid-column: 2; margin-top: .45rem; transition: height .38s cubic-bezier(.2, .7, .2, 1), margin .38s, font-size .3s; }
+.np-switches { grid-column: 2; margin: .6rem 0 0; gap: .35rem; }
+.np-sw { padding: .32rem .6rem; border-radius: 999px; }
+.np-credit { grid-column: 1 / -1; margin: .65rem 0 0; padding-top: .6rem; line-height: 1.6; }
+/* floating: collapsed strip */
+.sound-ctl.floating .np, .sound-ctl.floating .np.has-lyrics { width: min(16rem, 52vw); padding: .5rem .75rem; }
+.sound-ctl.floating .np-artist, .sound-ctl.floating .np-switches, .sound-ctl.floating .np-credit {
+  display: block; max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; padding-top: 0; border-top-color: transparent;
+  transition: max-height .38s cubic-bezier(.2, .7, .2, 1), opacity .25s ease, margin .38s, padding .38s, border-color .3s; }
+.sound-ctl.floating .np-switches { display: flex; }
+.sound-ctl.floating .np.has-lyrics .np-lyric { margin-top: .2rem; }
+/* floating: open */
+.sound-ctl.floating:hover .np, .sound-ctl.floating:focus-within .np { width: min(22rem, 70vw); padding: .75rem .95rem .8rem; }
+.sound-ctl.floating:hover .np-artist, .sound-ctl.floating:focus-within .np-artist { max-height: 1.4rem; opacity: 1; }
+.sound-ctl.floating:hover .np-switches, .sound-ctl.floating:focus-within .np-switches { max-height: 3rem; opacity: 1; margin-top: .6rem; }
+.sound-ctl.floating:hover .np-credit, .sound-ctl.floating:focus-within .np-credit { max-height: 6rem; opacity: 1; margin-top: .65rem; padding-top: .6rem; border-top-color: rgba(244, 244, 242, .12); }
+.sound-ctl.floating:hover .np.has-lyrics .np-lyric, .sound-ctl.floating:focus-within .np.has-lyrics .np-lyric { margin-top: .45rem; }
+/* floating: the volume bar slides open beside the button instead of appearing */
+.sound-ctl.floating .vol { display: flex; max-width: 0; opacity: 0; padding: 0; border-width: 0; overflow: hidden; white-space: nowrap;
+  transition: max-width .38s cubic-bezier(.2, .7, .2, 1), opacity .25s ease, padding .38s; }
+.sound-ctl.floating:hover .vol, .sound-ctl.floating:focus-within .vol { max-width: 20rem; opacity: 1; padding: 0 1rem; border-width: 1px; }
+@media (max-width: 40rem) { .sound-ctl.floating .vol { display: none; } }
+@media (prefers-reduced-motion: reduce) { .np, .np *, .sound-ctl.floating .vol { transition: none !important; } }
