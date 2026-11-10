@@ -138,7 +138,8 @@ test('website feedback becomes a GitHub issue: mentions defused, honeypot and si
  const {handle}=await load('worker.js');
  const sent=[];
  const fakeFetch=async(url,init)=>{sent.push({url,init:JSON.parse(init.body)});return new Response(JSON.stringify({html_url:'https://github.com/ilynthn/MeguLit/issues/999'}),{status:201});};
- const e=env({GITHUB_TOKEN:'t',GITHUB_REPO:'ilynthn/MeguLit',ALLOWED_ORIGINS:'https://megulit.com',fetch:fakeFetch});
+ const mem=new Map(),bucket={put:async(k,v)=>{mem.set(k,v);},get:async k=>mem.has(k)?{body:mem.get(k)}:null,delete:async k=>{mem.delete(k);},list:async()=>({objects:[]})};
+ const e=env({BUCKET:bucket,GITHUB_TOKEN:'t',GITHUB_REPO:'ilynthn/MeguLit',ALLOWED_ORIGINS:'https://megulit.com',fetch:fakeFetch});
  const site={origin:'https://megulit.com'};
  const ok=await handle(req('POST','/api/feedback',{kind:'game',text:'ファタモルガーナの館 @someone',lang:'zh',page:'/'},site),e,NOW);
  assert.equal(ok.status,201);assert.equal((await ok.json()).url,'https://github.com/ilynthn/MeguLit/issues/999');
@@ -152,6 +153,24 @@ test('website feedback becomes a GitHub issue: mentions defused, honeypot and si
  assert.equal((await handle(req('POST','/api/feedback',{kind:'nope',text:'x'},site),e,NOW)).status,400);
  for(let i=0;i<3;i++)await handle(req('POST','/api/feedback',{kind:'feedback',text:'line '+i},site),e,NOW);
  assert.equal((await handle(req('POST','/api/feedback',{kind:'feedback',text:'one too many'},site),e,NOW)).status,429);
- const none=env({fetch:fakeFetch});
+ const none=env({BUCKET:undefined,fetch:fakeFetch});
  assert.equal((await handle(req('POST','/api/feedback',{kind:'feedback',text:'hi'}),none,NOW)).status,503);
+});
+
+test('website feedback is kept in the relay first: a GitHub failure queues it, the 30-minute cron opens the issue later', async () => {
+ const {handle,scheduled}=await load('worker.js');
+ const store=new Map();
+ const bucket={store,put:async(k,v)=>{store.set(k,typeof v==='string'?v:new TextDecoder().decode(v));},get:async k=>store.has(k)?{body:store.get(k)}:null,delete:async k=>{store.delete(k);},list:async({prefix,limit})=>({objects:[...store.keys()].filter(k=>k.startsWith(prefix)).sort().slice(0,limit).map(key=>({key}))})};
+ let up=false;const opened=[];
+ const fakeFetch=async(url,init)=>{if(!up)return new Response('down',{status:502});opened.push(JSON.parse(init.body).title);return new Response(JSON.stringify({html_url:'https://github.com/ilynthn/MeguLit/issues/7'}),{status:201});};
+ const e=env({BUCKET:bucket,GITHUB_TOKEN:'t',fetch:fakeFetch});
+ const res=await handle(req('POST','/api/feedback',{kind:'game',text:'ATRI'}),e,NOW),data=await res.json();
+ assert.equal(res.status,201);assert.equal(data.queued,true);assert.equal(data.url,'');
+ assert.equal([...store.keys()].filter(k=>k.startsWith('feedback/pending/')).length,1);
+ up=true;
+ await scheduled({cron:'*/30 * * * *',scheduledTime:NOW.getTime()},e,null);
+ assert.deepEqual(opened,['[官网想玩] ATRI']);
+ assert.equal([...store.keys()].filter(k=>k.startsWith('feedback/pending/')).length,0);
+ const done=[...store.keys()].find(k=>k.startsWith('feedback/done/'));assert.ok(done);
+ assert.equal(JSON.parse(store.get(done)).issueUrl,'https://github.com/ilynthn/MeguLit/issues/7');
 });

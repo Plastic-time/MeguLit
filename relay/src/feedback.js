@@ -38,20 +38,58 @@ export function feedbackIssue({ kind, text, contact, lang, page }) {
   return { title, body: lines.join('\n'), labels: [k.label] };
 }
 
+const ghIssue = async (env, issue) => {
+  const repo = /^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPO || '') ? env.GITHUB_REPO : 'ilynthn/MeguLit';
+  const r = await (env.fetch || fetch)(`https://api.github.com/repos/${repo}/issues`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + env.GITHUB_TOKEN, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'megulit-relay', 'content-type': 'application/json' },
+    body: JSON.stringify(issue),
+  });
+  if (!r.ok) throw new Error('github ' + r.status);
+  const data = await r.json().catch(() => ({}));
+  return typeof data.html_url === 'string' ? data.html_url : '';
+};
+
+/* Relay first, GitHub second: every submission is written to R2 (feedback/pending/...) before the issue is opened, so
+   a GitHub outage or a bad token never loses one. Synced entries move to feedback/done/ with their issue link; the
+   cron in worker.js retries whatever is still pending. */
+const PENDING = 'feedback/pending/', DONE = 'feedback/done/';
+async function sync(env, key, entry) {
+  const url = await ghIssue(env, feedbackIssue(entry));
+  await env.BUCKET.put(DONE + key.slice(PENDING.length), JSON.stringify({ ...entry, issueUrl: url, syncedAt: new Date().toISOString() }), { httpMetadata: { contentType: 'application/json' } });
+  await env.BUCKET.delete(key);
+  return url;
+}
+
 export async function feedbackPost(request, env, { readJSON, fail, json, hit }, ip, now = new Date()) {
   if (!await hit(env, 'feedback', ip, now.getTime()) || !await hit(env, 'feedback-day', ip, now.getTime())) return fail('RATE_LIMITED', 429);
   const body = await readJSON(request, 8 * 1024);
   if (body.error) return fail(body.error, body.error === 'PAYLOAD_TOO_LARGE' ? 413 : 400);
   const checked = validateFeedback(body.value);
   if (!checked.ok) return fail(checked.error);
-  if (!env.GITHUB_TOKEN) return fail('NOT_CONFIGURED', 503);
-  const repo = /^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPO || '') ? env.GITHUB_REPO : 'ilynthn/MeguLit';
-  const r = await (env.fetch || fetch)(`https://api.github.com/repos/${repo}/issues`, {
-    method: 'POST',
-    headers: { authorization: 'Bearer ' + env.GITHUB_TOKEN, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'megulit-relay', 'content-type': 'application/json' },
-    body: JSON.stringify(feedbackIssue(checked.value)),
-  });
-  if (!r.ok) return fail('UPSTREAM', 502);
-  const data = await r.json().catch(() => ({}));
-  return json({ ok: true, url: typeof data.html_url === 'string' ? data.html_url : '' }, 201);
+  if (!env.BUCKET) return fail('NOT_CONFIGURED', 503);
+  const id = crypto.randomUUID();
+  const key = `${PENDING}${now.toISOString().replace(/[:.]/g, '-')}-${id}.json`;
+  const entry = { ...checked.value, id, ipHash: ip, createdAt: now.toISOString() };
+  await env.BUCKET.put(key, JSON.stringify(entry), { httpMetadata: { contentType: 'application/json' } });
+  let url = '';
+  if (env.GITHUB_TOKEN) { try { url = await sync(env, key, entry); } catch (e) { console.error('feedback sync', e?.message); } }
+  return json({ ok: true, id, url, queued: !url }, 201);
+}
+
+// cron: open issues for anything still pending (oldest first, a few per run)
+export async function syncPendingFeedback(env, max = 10) {
+  if (!env.BUCKET?.list || !env.GITHUB_TOKEN) return 0;
+  const { objects = [] } = await env.BUCKET.list({ prefix: PENDING, limit: max });
+  let done = 0;
+  for (const o of objects) {
+    try {
+      const obj = await env.BUCKET.get(o.key);
+      if (!obj) continue;
+      const entry = JSON.parse(await new Response(obj.body).text());
+      await sync(env, o.key, entry);
+      done++;
+    } catch (e) { console.error('feedback retry', o.key, e?.message); }
+  }
+  return done;
 }

@@ -28,7 +28,8 @@ binding = "AI"
 
 # Monday 00:00 UTC+8 = Sunday 16:00 UTC: settle last week's hot words.
 [triggers]
-crons = ["0 16 * * SUN"]
+# and every 30 minutes: website feedback still waiting for its GitHub issue (src/feedback.js)
+crons = ["0 16 * * SUN", "*/30 * * * *"]
 
 # Filled in from `wrangler d1 create megulit-relay` (copy the database_id it prints).
 [[d1_databases]]

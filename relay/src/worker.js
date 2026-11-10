@@ -7,7 +7,7 @@ import {LIMITS,validateLeaderboard,validateBoardQuery,validateAdaptationRecord,v
 /* E379 accounts (relay/ACCOUNTS.md) and community features (avatars, hot words) */
 import {handleAccounts,isAccountsPath,authenticate} from './accounts.js';
 /* website game-request and feedback forms → GitHub issues */
-import {feedbackPost} from './feedback.js';
+import {feedbackPost,syncPendingFeedback} from './feedback.js';
 import {avatarUpload,avatarDelete,avatarGet,avatarReport,avatarsFor,avatarStatus,avatarAppeal,avatarReview,cleanupAvatars,hotStatements,hotWordsGet,settleDue} from './community.js';
 
 /* requests per window; key prefix → [limit, seconds] */
@@ -206,5 +206,8 @@ export async function handle(request,env,now=new Date()){
  return response;
 }
 /* Cron (wrangler.toml [triggers]): Monday 00:00 UTC+8 settles last week's hot words. */
-export async function scheduled(event,env,ctx){const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
+export async function scheduled(event,env,ctx){
+ /* every 30 minutes: website feedback still waiting for its GitHub issue; the weekly cron settles hot words */
+ if(event?.cron==='*/30 * * * *'){const job=syncPendingFeedback(env).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
+ const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
 export default {fetch:(request,env)=>handle(request,env),scheduled};
