@@ -14,7 +14,7 @@ function inflate(buf,size,type){if(type===0)return buf;if(type===2||type===3)ret
 function cstr(buf,p){const e=buf.indexOf(0,p);return [buf.toString('utf8',p,e),e+1];}
 
 function read(file){
- const b=fs.readFileSync(file);if(b.toString('latin1',0,7)!=='UnityFS')throw Error('NOT_UNITYFS');
+ const b=Buffer.isBuffer(file)?file:fs.readFileSync(file);if(b.toString('latin1',0,7)!=='UnityFS')throw Error('NOT_UNITYFS');
  let p=8;const version=b.readUInt32BE(p);p+=4;let s;[s,p]=cstr(b,p);[s,p]=cstr(b,p);
  p+=8;/* total size */const cInfo=b.readUInt32BE(p),uInfo=b.readUInt32BE(p+4),flags=b.readUInt32BE(p+8);p+=12;
  if(version>=7)p=(p+15)&~15;
