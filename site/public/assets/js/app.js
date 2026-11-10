@@ -306,7 +306,12 @@ let heroSeen = true;
 const bgm = new Audio();
 bgm.loop = true;
 bgm.preload = 'none';
-if ($('.sound-ctl')) nowPlaying(bgm, $('.sound-ctl'), { reduce });
+// the bottom layer: a few far kana all the way down the page, and the song's lyric lines while it plays
+const deepLayer = $('.kana-deep') ? kana($('.kana-deep'), { still: reduce, deep: true, hero: $('.hero') }) : null;
+// lyric lines go to the bottom layer and to the sky layer (built further down); each shows them where it is visible
+let skyLayer = null;
+const lyricLayers = { say: text => { deepLayer?.say(text); skyLayer?.say(text); }, clear: () => { deepLayer?.clear(); skyLayer?.clear(); } };
+if ($('.sound-ctl')) nowPlaying(bgm, $('.sound-ctl'), { reduce, background: deepLayer ? lyricLayers : null });
 bgmCredit();
 notice({ t: k => d(k), lang: () => lang, after: playIntro() });
 let soundOn = false;
@@ -340,7 +345,7 @@ if (video && !reduce && !navigator.connection?.saveData) {
     floatSound();
   }).observe(video);
 }
-if ($('.kana-sky')) kana($('.kana-sky'), { still: reduce, hero: $('.hero'), until: $('.hp') });
+if ($('.kana-sky')) skyLayer = kana($('.kana-sky'), { still: reduce, hero: $('.hero'), until: $('.hp') });
 if ($('.kana-top')) kana($('.kana-top'), { still: reduce, hero: $('.hero'), near: true });
 const soundBtn = $('.js-sound');
 function setSoundLabel() {

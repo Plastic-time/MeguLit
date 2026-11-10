@@ -1577,3 +1577,13 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 .nt-hud span:first-child, .tk-no, .dc-back .dc-pos, .dc-kana, .dc-means li::before, .intro .gl-line { color: #e35a63; }
 .nt-input::placeholder { color: #8a8a8a; }
 .ht-big rt { font-size: max(11px, .09em) !important; }
+
+/* bottom layer: z-index -1 puts it just above the page background (body, propagated to the canvas) and under every section, card and line of text */
+.kana-deep { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; }
+/* lyrics switches in the now-playing label */
+.np-switches { grid-column: 2; margin: .2rem 0 0; display: flex; gap: .4rem; flex-wrap: wrap; }
+.np-sw { font: 300 .6875rem/1 "MeguLit Mono", var(--mono); letter-spacing: .12em; color: #9a9a9a; background: none; border: 1px solid rgba(244, 244, 242, .2); padding: .3rem .5rem; cursor: pointer; transition: color .2s, border-color .2s, background-color .2s; }
+.np-sw[aria-pressed="true"] { color: #f4f4f2; border-color: #c8323c; background: rgba(200, 50, 60, .18); }
+.np-sw:hover, .np-sw:focus-visible { color: #fff; outline: none; border-color: #e35a63; }
+.np-sw[hidden] { display: none; }
+.np.lyrics-off .np-lyric { height: 0 !important; }
