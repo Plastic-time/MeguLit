@@ -3,6 +3,7 @@ import {mountSettingsAutosave,leaveSettings,flushSettings} from './settings-auto
 import {mountPathPickers} from './path-picker.js';
 import {renderBackup} from './backup-ui.js';
 import {renderAccount,accountLabel} from './account-ui.js';
+import {mountAvatarSettings} from './leaderboard-avatar.js';
 import {enhanceSelects} from './select-control.js';
 import {configureSpeech} from './speech-settings.js';
 import {mountRuntimePacks} from './runtime-packs.js';
@@ -75,6 +76,8 @@ export async function renderSettings({main,api,invoke,text,locale,esc,toast,head
   toggle.onchange=async()=>{toggle.disabled=true;try{await api('save_preferences',{values:{homeBackground:toggle.checked}});await onSaved({scope:'background-toggle'});}catch{toggle.checked=!toggle.checked;toast(text.serviceFailed);}finally{toggle.disabled=false;}};
   controls.querySelector('[data-crop]').onclick=()=>dispatchEvent(new Event('tome-open-home-crop'));controls.querySelector('[data-choose]').onclick=()=>dispatchEvent(new Event('tome-pick-home-picture'));
  }
+ /* E379 leaderboard avatar under 联网服务 */
+ if(section==='online')mountAvatarSettings({content,api,locale,esc,toast}).catch(()=>{});
  if(section==='library'){
   mountHiddenGames({content,api,locale,esc,toast,onSaved,text});
   const tools=document.createElement('div');tools.className='review-controls';const words={zh:['自动查找 Steam','扫描游戏目录','已更新游戏库'],en:['Find Steam','Scan game folders','Library updated'],ja:['Steam を探す','ゲームフォルダをスキャン','ライブラリを更新しました']}[locale];tools.innerHTML=`<button type="button" class="secondary" data-steam>${words[0]}</button><button type="button" class="secondary" data-scan>${words[1]}</button>`;content.append(tools);

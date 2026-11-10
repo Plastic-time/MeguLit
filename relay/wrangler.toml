@@ -15,6 +15,19 @@ routes = [
 GITHUB_REPO = "ilynthn/MeguLit"
 LINK_DAYS = "30"
 ALLOWED_ORIGINS = ""
+# E379 avatars and weekly hot words (src/community.js)
+AVATAR_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
+HOT_MODEL = "@cf/meta/llama-3.1-8b-instruct"
+HOT_MIN_USERS = "3"
+REPORT_THRESHOLD = "3"
+
+# Workers AI: avatar moderation and the AI guesses on the hot-word awards. No token needed inside the Worker.
+[ai]
+binding = "AI"
+
+# Monday 00:00 UTC+8 = Sunday 16:00 UTC: settle last week's hot words.
+[triggers]
+crons = ["0 16 * * SUN"]
 
 # Filled in from `wrangler d1 create megulit-relay` (copy the database_id it prints).
 [[d1_databases]]

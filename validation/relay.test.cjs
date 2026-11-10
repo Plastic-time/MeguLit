@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
 const relayDir=path.join(__dirname,'..','relay');
 const load=name=>import(pathToFileURL(path.join(relayDir,'src',name)).href);
-const MIGRATION=fs.readFileSync(path.join(relayDir,'migrations','0001_init.sql'),'utf8');
+const MIGRATION=fs.readdirSync(path.join(relayDir,'migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>fs.readFileSync(path.join(relayDir,'migrations',f),'utf8')).join('');
 function d1(){
  const db=new DatabaseSync(':memory:');db.exec(MIGRATION);
  const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>{db.prepare(sql).run(...args);return {success:true};}});

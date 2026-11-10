@@ -7,6 +7,9 @@ One Cloudflare Worker that MeguLit's online features talk to, so nothing depends
 | `POST /api/diagnostics` | 诊断上传 (`services/diagnostics-upload.cjs`) | zip in R2, a GitHub issue on `ilynthn/MeguLit` |
 | `POST /api/adaptation`, `POST /api/adaptation/query`, `GET /api/adaptation?fp=` | 共享适配 (`services/shared-adaptation-sync.cjs`) | D1 `adaptation_records` |
 | `POST` / `GET` / `DELETE /api/leaderboard` | 排行榜 (`services/leaderboard.cjs`) | D1 `leaderboard_*` |
+| `POST/GET/DELETE /api/leaderboard/avatar`, `GET /api/avatar/:id`, `POST /api/avatar/:id/report` | 排行榜头像 | R2 `avatars/`, D1 `avatars`, `avatar_reports`, `moderation_queue` |
+| `GET /api/hotwords` + weekly cron | 每周热词 | D1 `hot_lookups` (raw, deleted after settling), `hot_awards`, `hot_weeks` |
+| `/api/auth/*`, `/api/me`, `/api/sync/*` | 账号与云同步 (`relay/ACCOUNTS.md`) | D1 `accounts`, `account_sessions`, `sync_records` |
 | `GET /api/health` | checks | none |
 
 Nothing is deployed yet. The app works without the relay: each feature reports "not configured" until the
@@ -61,6 +64,36 @@ Optional, keeps the bucket small: delete diagnostics after 90 days.
 ```bash
 npx wrangler r2 bucket lifecycle add megulit-diagnostics expire-diagnostics diagnostics/ --expire-days 90
 ```
+
+`migrations apply` runs every file in `migrations/` in order: `0001_init.sql` (leaderboard, adaptation, diagnostics),
+`0005_accounts.sql` (accounts, relay/ACCOUNTS.md) and `0006_community.sql` (avatars, reports, hot words). Avatars live in
+the same bucket as diagnostics under `avatars/`; do not add a lifecycle rule for that prefix.
+
+### 2b. Workers AI (avatar moderation and hot-word guesses)
+
+The Worker reaches Workers AI through the `[ai]` binding in `wrangler.toml` (`binding = "AI"`); no AI token is stored
+in the Worker. The deploy token needs nothing extra for the binding. Usage is billed to the account (free daily
+allowance first).
+
+| Use | Model (var) | Notes |
+|---|---|---|
+| Avatar NSFW check | `@cf/meta/llama-3.2-11b-vision-instruct` (`AVATAR_MODEL`) | Answers SAFE / UNSAFE. Only a clean `SAFE` publishes; UNSAFE, an unclear answer, a model error or a missing binding all reject. |
+| "为什么是这个词" | `@cf/meta/llama-3.1-8b-instruct` (`HOT_MODEL`) | One call per category per week for the top 10. If it fails, a plain "N 位读者查过" line is stored and not labelled as AI. |
+
+The Llama 3.2 vision model needs its license accepted once per account before the first real call. Run this once
+(an API token with **Account → Workers AI → Read** is enough; it is not stored anywhere):
+
+```bash
+curl https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/run/@cf/meta/llama-3.2-11b-vision-instruct   -H "Authorization: Bearer $CLOUDFLARE_AI_TOKEN" -d '{"prompt":"agree"}'
+```
+
+Until that is done every avatar is rejected with `MODERATION_ERROR` (fail closed), which is safe but means no avatars.
+`HOT_MIN_USERS` (default 3) is the privacy threshold for hot words, `REPORT_THRESHOLD` (default 3) the number of
+different reporters that hides an avatar.
+
+The weekly settlement runs from `[triggers] crons = ["0 16 * * SUN"]` (Monday 00:00 UTC+8). It settles every finished
+week that still has raw rows, so a missed run catches up the next week. To run it by hand while testing locally:
+`npx wrangler dev --test-scheduled`, then `curl "http://127.0.0.1:8787/__scheduled?cron=0+16+*+*+SUN"`.
 
 ### 3. Secrets
 
@@ -168,8 +201,56 @@ The zip must start with `PK`; when `meta.sha256` is given it must match. The iss
 and a link `GET /api/diagnostics/download/<id>?exp=&sig=` signed with `LINK_SECRET`, valid for `LINK_DAYS` (30) days.
 Issues on a public repo are public, so anyone with the issue can download the package until the link expires.
 
+### Avatars
+
+```
+POST   /api/leaderboard/avatar?id=<uuid>   body: still WebP, square, 32–256 px, ≤ 64 KB, content-type image/webp
+                                            → {"ok":true,"status":"approved"|"rejected","reason","avatar":"<32 hex>"|null}
+GET    /api/leaderboard/avatar?id=<uuid>   → {"status":"none"|"pending"|"approved"|"rejected"|"hidden","reason","avatar"}
+DELETE /api/leaderboard/avatar?id=<uuid>   → {"ok":true}
+GET    /api/avatar/<avatar id>              → image/webp, only while approved (404 for pending / rejected / hidden)
+POST   /api/avatar/<avatar id>/report[?id=<uuid>]   → {"ok":true,"hidden":bool}
+```
+
+With `authorization: Bearer <account token>` the account is the identity instead of the install id (one row and one
+avatar across PCs). The user must have joined the leaderboard first (403 `NOT_JOINED`). Leaderboard rows carry
+`avatar` (the approved id or null); avatar ids are random per upload and say nothing about the user.
+
+### Moderation queue
+
+Avatars reported by `REPORT_THRESHOLD` different people are hidden and queued. Review from the CLI:
+
+```bash
+npx wrangler d1 execute megulit-relay --remote --command "SELECT id,subject,reason,datetime(created_at,'unixepoch') FROM moderation_queue WHERE resolved_at=0"
+```
+
+Look at the picture with `npx wrangler r2 object get megulit-diagnostics/avatars/<subject>.webp --file a.webp --remote`. Then either restore it:
+
+```bash
+npx wrangler d1 execute megulit-relay --remote --command "UPDATE avatars SET status='approved',reason='' WHERE avatar_id='<subject>'; DELETE FROM avatar_reports WHERE avatar_id='<subject>'; UPDATE moderation_queue SET resolved_at=unixepoch() WHERE subject='<subject>'"
+```
+
+or reject it for good: `UPDATE avatars SET status='rejected',reason='REVIEWED' WHERE avatar_id='<subject>'` plus the
+same `moderation_queue` update, and delete the R2 object.
+
+### Weekly hot words
+
+Each leaderboard POST may carry `"hot":{"week":"2026-W46","terms":[{"term":"仕方ない","count":3}]}` (≤ 100 terms,
+1–40 characters with kana or kanji, count 1–1000): this week's lookups of a joined user, term and count only. Weeks
+start Monday 00:00 UTC+8. Settlement keeps terms looked up by at least `HOT_MIN_USERS` different people, drops terms on
+the name block list, sorts each of 词汇 / 短语 / 短句 (`classifyTerm` in `src/validate.js`) by people then lookups, keeps
+50, adds the AI guess for the top 10, freezes them in `hot_awards` and deletes that week's raw rows.
+
+```
+GET /api/hotwords?category=word|phrase|sentence[&week=2026-W46]
+→ {"week","weeks":[last 26 settled],"settled":true,"participants","awards":[{"rank","term","users","lookups","reason","ai"}]}
+```
+
+`reason` is filled for ranks 1–10 only; `ai` is true when it is the model's guess (the page labels it "AI 推测").
+
 ## Rate limits
 
 Fixed windows in D1 (`RATE` in `src/worker.js`): 120 requests/min per IP overall; leaderboard writes 6 per 10 min per IP
 and 20 per hour per install id; leaderboard reads 60/min; adaptation writes 30/hour, reads 120/hour; diagnostics uploads
-5/hour and downloads 30/hour per IP.
+5/hour and downloads 30/hour per IP; avatar uploads 5/hour per user, avatar reads 600/min, reports 20/hour, hot
+words 60/min per IP.

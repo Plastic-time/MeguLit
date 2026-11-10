@@ -27,7 +27,7 @@ function atomic(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});co
 
 /* ---- nickname ------------------------------------------------------------------------------------------------- */
 /* Same rules as relay/src/validate.js cleanName (kept in step by validation/leaderboard.test.cjs). */
-const BLOCKED=['fuck','shit','bitch','cunt','nigger','nigga','faggot','rape','porn','penis','vagina','asshole','dick','whore','slut','hitler','nazi','傻逼','煞笔','傻b','sb','操你','草你','肏','日你','你妈','尼玛','妈逼','屌','鸡巴','婊子','贱人','强奸','做爱','色情','黄片','习近平','共产党','法轮','台独','死ね','殺す','ちんこ','まんこ','うんこ','セックス','レイプ','きちがい','キチガイ','admin','管理员','官方','megulit'];
+const BLOCKED=['fuck','shit','bitch','cunt','nigger','nigga','faggot','rape','porn','penis','vagina','asshole','dick','whore','slut','hitler','nazi','傻逼','煞笔','傻b','sb','操你','草你','肏','日你','你妈','尼玛','妈逼','屌','鸡巴','婊子','贱人','强奸','做爱','色情','黄片','习近平','共产党','法轮','台独','死ね','殺す','ちんこ','まんこ','うんこ','セックス','レイプ','きちがい','キチガイ','admin','管理员','官方','megulit','hentai','nsfw','sex','loli','shota','cnm','nmsl','tmd','retard','kys','r18','18禁','成人向','巨乳','爆乳','乳头','裸体','全裸','约炮','卖淫','嫖','淫','骚货','痴汉','中出','av女优','エロ','ロリ','ショタ','おっぱい','パイズリ','中出し','ヘンタイ','変態','废物','垃圾人','去死','脑残','智障','弱智','狗东西','ばか野郎','クソ野郎','消えろ'];
 /* control, bidi and zero-width characters */
 const hidden=ch=>{const c=ch.codePointAt(0);return c<32||c>=0x7f&&c<=0x9f||c>=0x200b&&c<=0x200f||c>=0x2028&&c<=0x202e||c>=0x2060&&c<=0x206f||c===0xfeff;};
 function cleanName(value){
@@ -70,7 +70,26 @@ function collectStats(db,now=new Date()){
  const titles=new Map(db.prepare('SELECT id,title FROM games WHERE removed_at IS NULL AND hidden_at IS NULL').all().map(g=>[g.id,String(g.title||'').trim()]));
  const perGame=new Map();for(const s of sessions){const title=titles.get(s.game_id);if(!title)continue;const g=perGame.get(title)||{title,characters:0,seconds:0};g.characters+=s.characters||0;g.seconds+=s.active_seconds||0;perGame.set(title,g);}
  out.games=[...perGame.values()].filter(g=>g.characters>0).sort((a,b)=>b.characters-a.characters).slice(0,MAX_GAMES).map(g=>({title:g.title.slice(0,120),characters:int(g.characters),seconds:int(g.seconds)}));
+ out.hot=collectLookups(db,now);
  return out;
+}
+
+/* ---- E379 this week's lookups for the hot-word awards (term + count only; no sentence, game or time) -------------- */
+/* Hot-word weeks run Monday 00:00 to Monday 00:00 in UTC+8, the same on every PC; relay/src/validate.js hotWeekKey. */
+function hotWeekKey(now=new Date()){const d=new Date(now.getTime()+8*3600000);const u=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()));const day=u.getUTCDay()||7;u.setUTCDate(u.getUTCDate()+4-day);const year=u.getUTCFullYear(),first=new Date(Date.UTC(year,0,1));return `${year}-W${String(Math.ceil(((u-first)/86400000+1)/7)).padStart(2,'0')}`;}
+function hotWeekStart(now=new Date()){const d=new Date(now.getTime()+8*3600000);d.setUTCHours(0,0,0,0);d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);return Math.floor((d.getTime()-8*3600000)/1000);}
+const HOT_TERMS=100;
+const japanese=ch=>{const c=ch.codePointAt(0);return c>=0x3040&&c<=0x30ff||c>=0x3400&&c<=0x9fff||c>=0xff66&&c<=0xff9f;};
+/* same rule as relay/src/validate.js cleanTerm */
+function cleanTerm(value){
+ if(typeof value!=='string')return '';const term=value.normalize('NFKC').replace(/\s+/g,' ').trim(),chars=[...term];
+ if(!chars.length||chars.length>40||chars.some(hidden)||!chars.some(japanese)||/https?:|www\.|[<>@\\`]/i.test(term))return '';
+ return term;
+}
+function collectLookups(db,now=new Date()){
+ const from=hotWeekStart(now),rows=db.prepare('SELECT surface,COUNT(*) n FROM lookup_events WHERE occurred_at>=? AND occurred_at<=? GROUP BY surface ORDER BY n DESC LIMIT 300').all(from,Math.floor(now.getTime()/1000));
+ const counts=new Map();for(const r of rows){const term=cleanTerm(r.surface);if(term)counts.set(term,(counts.get(term)||0)+r.n);}
+ return {week:hotWeekKey(now),terms:[...counts].sort((a,b)=>b[1]-a[1]).slice(0,HOT_TERMS).map(([term,count])=>({term,count:Math.min(1000,count)}))};
 }
 
 /* ---- opt-in state --------------------------------------------------------------------------------------------- */
@@ -78,8 +97,15 @@ function online(root){const v=relay.readJSON(relay.onlineFile(root));return {ena
 function saveOnline(root,patch){const file=relay.onlineFile(root);atomic(file,{...relay.readJSON(file),...patch});}
 function state(root){const s=relay.readJSON(stateFile(root));return {installId:/^[0-9a-f-]{36}$/.test(String(s.installId||''))?s.installId:'',consentAt:typeof s.consentAt==='string'?s.consentAt:'',lastSubmitAt:Number(s.lastSubmitAt)||0};}
 const publicHash=id=>id?crypto.createHash('sha256').update(String(id)).digest('hex'):'';
+/* E379 a logged-in MeguLit account (services/account.cjs) is the leaderboard identity, so two PCs are one row; the
+   nickname stays the leaderboard nickname (accounts carry no display name). Without an account: the install id. */
+function identity(root,options={}){
+ if(options.account!==undefined)return options.account;
+ try{const account=require('./account.cjs');const st=account.status(root);if(!st.loggedIn||!st.accountId)return null;
+  return {accountId:st.accountId,token:()=>account.token(root),save:token=>new account.Account(root).setToken(token)};}catch{return null;}
+}
 /* Taking part = switch on + consent given + a nickname that passes the filter. */
-function config(root,env=process.env){const o=online(root),s=state(root),base=relay.relayBase(root,env);return {...o,...s,base,configured:!!base,joined:o.enabled&&!!s.consentAt&&!!s.installId&&cleanName(o.name).ok,me:publicHash(s.installId)};}
+function config(root,env=process.env,options={}){const o=online(root),s=state(root),base=relay.relayBase(root,env),who=identity(root,options);return {...o,...s,base,configured:!!base,joined:o.enabled&&!!s.consentAt&&!!s.installId&&cleanName(o.name).ok,account:!!who,me:who?publicHash('account:'+who.accountId):publicHash(s.installId)};}
 function join(root,{name,shareGames=false,consent}={}){
  if(consent!==true)throw Error('LEADERBOARD_CONSENT_REQUIRED');
  const checked=cleanName(name);if(!checked.ok)throw Error('LEADERBOARD_'+checked.error);
@@ -89,52 +115,120 @@ function join(root,{name,shareGames=false,consent}={}){
 }
 
 /* ---- network -------------------------------------------------------------------------------------------------- */
-async function call(url,init,fetcher){
- let r;try{r=await fetcher(url,{...init,headers:{'user-agent':'MeguLit',...(init.body?{'content-type':'application/json'}:{})},signal:AbortSignal.timeout(TIMEOUT)});}
+async function call(url,init,fetcher,who=null,raw=false){
+ const headers={'user-agent':'MeguLit',...(init.body&&!init.type?{'content-type':'application/json'}:{}),...(init.type?{'content-type':init.type}:{})};
+ if(who){let token='';try{token=who.token();}catch{}if(token)headers.authorization='Bearer '+token;}
+ let r;try{r=await fetcher(url,{method:init.method,body:init.body,headers,signal:AbortSignal.timeout(TIMEOUT)});}
  catch(e){return {state:'error',error:e?.name==='TimeoutError'?'TIMEOUT':'NETWORK'};}
+ /* the relay rotates account tokens at most daily; keep the new one or the account would log out a day later */
+ const rotated=r.headers?.get?.('x-megulit-token');if(who&&rotated&&/^mgl_[A-Za-z0-9_-]{43}$/.test(rotated))try{who.save(rotated);}catch{}
+ if(raw&&r.ok){try{return {state:'ok',bytes:Buffer.from(await r.arrayBuffer())};}catch{return {state:'error',error:'BAD_RESPONSE'};}}
  let data=null;try{data=await r.json();}catch{}
  if(!r.ok)return {state:'error',error:typeof data?.error==='string'&&/^[A-Z_]{2,40}$/.test(data.error)?data.error:'HTTP_'+r.status};
  return {state:'ok',data:data||{}};
 }
-/* submit(stats) — stats as collectStats() returns it. */
+/* submit(stats) — stats as collectStats() returns it; this week's lookup counts ride along (term + count only). */
 async function submit(stats,options={}){
- const root=options.root,c=config(root,options.env);
+ const root=options.root,c=config(root,options.env,options);
  if(!c.joined)return {state:'disabled'};if(!c.configured)return {state:'not-configured'};
  const body={version:1,id:c.installId,name:cleanName(c.name).name,keys:{week:stats?.keys?.week,month:stats?.keys?.month},stats:{}};
  for(const period of PERIODS){const p=stats?.stats?.[period]||{};body.stats[period]=Object.fromEntries(METRICS.map(m=>[m,int(p[m])]));}
  if(c.shareGames&&Array.isArray(stats?.games))body.games=stats.games.slice(0,MAX_GAMES).map(g=>({title:String(g.title||'').slice(0,120),characters:int(g.characters),seconds:int(g.seconds)})).filter(g=>g.title);
- const res=await call(c.base+'/api/leaderboard',{method:'POST',body:JSON.stringify(body)},options.fetch||fetch);
+ if(stats?.hot?.week)body.hot={week:stats.hot.week,terms:(stats.hot.terms||[]).slice(0,HOT_TERMS).map(t=>({term:t.term,count:Math.min(1000,int(t.count))})).filter(t=>t.count>0)};
+ const res=await call(c.base+'/api/leaderboard',{method:'POST',body:JSON.stringify(body)},options.fetch||fetch,identity(root,options));
  if(res.state==='ok'&&root)atomic(stateFile(root),{...relay.readJSON(stateFile(root)),lastSubmitAt:(options.now||new Date()).getTime()});
  return res.state==='ok'?{state:'ok'}:res;
 }
+const AVATAR_ID=/^[0-9a-f]{32}$/;
 /* fetch(period, metric) — named fetchBoard inside so the global fetch stays reachable. */
 async function fetchBoard(period,metric,options={}){
- const c=config(options.root,options.env);if(!c.configured)return {state:'not-configured'};
+ const c=config(options.root,options.env,options);if(!c.configured)return {state:'not-configured'};
  const isGames=metric==='games';if(!isGames&&(!PERIODS.includes(period)||!METRICS.includes(metric)))throw Error('LEADERBOARD_INVALID_QUERY');
  const q=new URLSearchParams(isGames?{metric}:{period,metric});if(!isGames&&period!=='all')q.set('key',periodKeys(options.now)[period]);
  if(isGames&&options.game)q.set('game',String(options.game).slice(0,120));if(c.me)q.set('me',c.me);
  const res=await call(c.base+'/api/leaderboard?'+q,{method:'GET'},options.fetch||fetch);if(res.state!=='ok')return res;
- const clean=e=>({rank:int(e?.rank),name:String(e?.name||'').slice(0,32),value:int(e?.value),me:e?.me===true});
+ const clean=e=>({rank:int(e?.rank),name:String(e?.name||'').slice(0,32),value:int(e?.value),me:e?.me===true,avatar:AVATAR_ID.test(String(e?.avatar||''))?e.avatar:null});
  if(isGames&&!options.game)return {state:'ok',games:(Array.isArray(res.data.games)?res.data.games:[]).slice(0,100).map(g=>({title:String(g?.title||'').slice(0,120),readers:int(g?.readers),top:g?.top?clean(g.top):null}))};
  return {state:'ok',entries:(Array.isArray(res.data.entries)?res.data.entries:[]).slice(0,100).map(clean),total:int(res.data.total),me:res.data.me?{rank:int(res.data.me.rank),value:int(res.data.me.value)}:null};
 }
 /* Turning the switch off: delete the server entry (when reachable), then forget id and consent either way. */
 async function leave(root,options={}){
- const c=config(root,options.env);let remote='skipped';
- if(c.installId&&c.configured){const res=await call(c.base+'/api/leaderboard?id='+encodeURIComponent(c.installId),{method:'DELETE'},options.fetch||fetch);remote=res.state==='ok'?'deleted':res.error;}
+ const c=config(root,options.env,options);let remote='skipped';
+ if(c.installId&&c.configured){const res=await call(c.base+'/api/leaderboard?id='+encodeURIComponent(c.installId),{method:'DELETE'},options.fetch||fetch,identity(root,options));remote=res.state==='ok'?'deleted':res.error;}
  else if(!c.configured)remote='not-configured';
- const s=relay.readJSON(stateFile(root));delete s.installId;delete s.consentAt;delete s.lastSubmitAt;atomic(stateFile(root),s);
+ const s=relay.readJSON(stateFile(root));delete s.installId;delete s.consentAt;delete s.lastSubmitAt;delete s.avatar;atomic(stateFile(root),s);
  saveOnline(root,{leaderboardEnabled:false});
  return {state:'left',remote};
 }
+
+/* ---- E379 avatars --------------------------------------------------------------------------------------------- */
+/* The page crops to a square and encodes a WebP of at most 256 px; this side only checks it is a small WebP. */
+function avatarBytes(data){
+ const b64=String(data||'').replace(/^data:image\/webp;base64,/,'');if(!/^[A-Za-z0-9+/=]+$/.test(b64)||b64.length>90000)throw Error('LEADERBOARD_AVATAR_INVALID');
+ const bytes=Buffer.from(b64,'base64');if(bytes.length<30||bytes.length>64*1024||bytes.toString('latin1',0,4)!=='RIFF'||bytes.toString('latin1',8,12)!=='WEBP')throw Error('LEADERBOARD_AVATAR_INVALID');
+ return bytes;
+}
+async function avatarCall(root,method,options={},body){
+ const c=config(root,options.env,options);if(!c.configured)return {state:'not-configured'};if(!c.joined)return {state:'disabled'};
+ return call(c.base+'/api/leaderboard/avatar?id='+encodeURIComponent(c.installId),{method,body,type:body?'image/webp':''},options.fetch||fetch,identity(root,options));
+}
+/* → {state:'ok',status:'approved'|'rejected',reason} */
+async function setAvatar(root,data,options={}){
+ const res=await avatarCall(root,'POST',options,avatarBytes(data));if(res.state!=='ok')return res;
+ const status=res.data.status==='approved'?'approved':'rejected';
+ atomic(stateFile(root),{...relay.readJSON(stateFile(root)),avatar:{status,reason:String(res.data.reason||'').slice(0,40),id:status==='approved'&&AVATAR_ID.test(String(res.data.avatar||''))?res.data.avatar:''}});
+ return {state:'ok',status,reason:String(res.data.reason||'').slice(0,40)};
+}
+async function removeAvatar(root,options={}){const res=await avatarCall(root,'DELETE',options);if(res.state==='ok'){const s=relay.readJSON(stateFile(root));delete s.avatar;atomic(stateFile(root),s);}return res.state==='ok'?{state:'ok'}:res;}
+async function avatarStatus(root,options={}){
+ const res=await avatarCall(root,'GET',options);if(res.state!=='ok')return {...res,status:relay.readJSON(stateFile(root)).avatar?.status||'none'};
+ const status=['approved','rejected','pending','hidden','none'].includes(res.data.status)?res.data.status:'none';
+ const avatar=AVATAR_ID.test(String(res.data.avatar||''))?res.data.avatar:null;
+ return {state:'ok',status,reason:String(res.data.reason||'').slice(0,40),avatar,image:avatar?(await avatarImages(root,[avatar],options))[avatar]||'':''};
+}
+async function report(root,avatarId,options={}){
+ if(!AVATAR_ID.test(String(avatarId||'')))throw Error('LEADERBOARD_INVALID_QUERY');
+ const c=config(root,options.env,options);if(!c.configured)return {state:'not-configured'};
+ const res=await call(c.base+'/api/avatar/'+avatarId+'/report'+(c.installId?'?id='+encodeURIComponent(c.installId):''),{method:'POST'},options.fetch||fetch,identity(root,options));
+ return res.state==='ok'?{state:'ok',hidden:res.data.hidden===true}:res;
+}
+/* Avatar pictures as data URLs (the page's CSP allows no remote images). Ids are immutable, so they are cached on
+   disk; at most AVATAR_CACHE files are kept. */
+const AVATAR_CACHE=400;
+async function avatarImages(root,ids,options={}){
+ const c=config(root,options.env,options),out={},folder=path.join(root,'data','cache','avatars');if(!c.configured)return out;
+ const wanted=[...new Set(ids.filter(id=>AVATAR_ID.test(String(id||''))))].slice(0,60),missing=[];
+ for(const id of wanted){const file=path.join(folder,id+'.webp');try{out[id]='data:image/webp;base64,'+fs.readFileSync(file).toString('base64');}catch{missing.push(id);}}
+ const fetcher=options.fetch||fetch;
+ for(let i=0;i<missing.length;i+=8)await Promise.all(missing.slice(i,i+8).map(async id=>{const res=await call(c.base+'/api/avatar/'+id,{method:'GET'},fetcher,null,true);
+  if(res.state!=='ok'||res.bytes.length>64*1024||res.bytes.toString('latin1',8,12)!=='WEBP')return;out[id]='data:image/webp;base64,'+res.bytes.toString('base64');
+  try{fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(path.join(folder,id+'.webp'),res.bytes);}catch{}}));
+ if(missing.length)try{const files=fs.readdirSync(folder).map(name=>({name,t:fs.statSync(path.join(folder,name)).mtimeMs})).sort((a,b)=>b.t-a.t);for(const f of files.slice(AVATAR_CACHE))fs.rmSync(path.join(folder,f.name),{force:true});}catch{}
+ return out;
+}
+
+/* ---- E379 weekly hot words ------------------------------------------------------------------------------------ */
+const CATEGORIES=['word','phrase','sentence'];
+async function hotWords(root,{week='',category='word'}={},options={}){
+ const c=config(root,options.env,options);if(!c.configured)return {state:'not-configured'};
+ if(!CATEGORIES.includes(category)||week&&!/^\d{4}-W\d{2}$/.test(week))throw Error('LEADERBOARD_INVALID_QUERY');
+ const q=new URLSearchParams({category});if(week)q.set('week',week);
+ const res=await call(c.base+'/api/hotwords?'+q,{method:'GET'},options.fetch||fetch);if(res.state!=='ok')return res;
+ const d=res.data,weeks=(Array.isArray(d.weeks)?d.weeks:[]).filter(w=>/^\d{4}-W\d{2}$/.test(String(w))).slice(0,26);
+ const awards=(Array.isArray(d.awards)?d.awards:[]).slice(0,50).map(a=>({rank:int(a?.rank),term:String(a?.term||'').slice(0,40),users:int(a?.users),lookups:int(a?.lookups),reason:String(a?.reason||'').slice(0,120),ai:a?.ai===true})).filter(a=>a.term&&a.rank>=1);
+ return {state:'ok',week:/^\d{4}-W\d{2}$/.test(String(d.week||''))?d.week:null,weeks,settled:d.settled===true,participants:int(d.participants),category,awards};
+}
+
 /* Everything the 排行榜 page needs in one call; refreshes the user's own entry at most every 10 minutes. */
 async function view(root,db,request={},options={}){
  const now=options.now||new Date(),period=PERIODS.includes(request.period)?request.period:'week',metric=[...METRICS,'games'].includes(request.metric)?request.metric:'characters';
- const local=collectStats(db,now),c=config(root,options.env);
- const result={configured:c.configured,joined:c.joined,enabled:c.enabled,name:c.name,shareGames:c.shareGames,period,metric,local,board:null};
+ const local=collectStats(db,now),c=config(root,options.env,options),tab=request.tab==='hot'?'hot':'board';
+ const result={configured:c.configured,joined:c.joined,enabled:c.enabled,name:c.name,shareGames:c.shareGames,account:c.account,tab,period,metric,local,board:null,hot:null,avatars:{}};
  if(!c.configured)return {...result,board:{state:'not-configured'}};
  if(c.joined&&(request.submit===true||now.getTime()-c.lastSubmitAt>SUBMIT_EVERY))result.submit=await submit(local,{...options,root,now});
+ if(tab==='hot'){result.hot=await hotWords(root,{week:request.week||'',category:CATEGORIES.includes(request.category)?request.category:'word'},options);return result;}
  result.board=await fetchBoard(period,metric,{...options,root,now,game:request.game});
+ if(result.board.state==='ok'){const ids=[...(result.board.entries||[]),...(result.board.games||[]).map(g=>g.top).filter(Boolean)].map(e=>e.avatar);result.avatars=await avatarImages(root,ids,options);}
  return result;
 }
-module.exports={PERIODS,METRICS,BLOCKED,cleanName,collectStats,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile};
+module.exports={PERIODS,METRICS,CATEGORIES,BLOCKED,cleanName,cleanTerm,collectStats,collectLookups,hotWeekKey,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile,identity,setAvatar,removeAvatar,avatarStatus,avatarImages,report,hotWords};

@@ -2,7 +2,7 @@
 /* E377 pure request validation for the MeguLit relay. No I/O here, so validation/relay.test.cjs can run it in Node. */
 
 /* Nickname rules — keep in step with services/leaderboard.cjs cleanName (validation/leaderboard.test.cjs checks both). */
-export const BLOCKED=['fuck','shit','bitch','cunt','nigger','nigga','faggot','rape','porn','penis','vagina','asshole','dick','whore','slut','hitler','nazi','傻逼','煞笔','傻b','sb','操你','草你','肏','日你','你妈','尼玛','妈逼','屌','鸡巴','婊子','贱人','强奸','做爱','色情','黄片','习近平','共产党','法轮','台独','死ね','殺す','ちんこ','まんこ','うんこ','セックス','レイプ','きちがい','キチガイ','admin','管理员','官方','megulit'];
+export const BLOCKED=['fuck','shit','bitch','cunt','nigger','nigga','faggot','rape','porn','penis','vagina','asshole','dick','whore','slut','hitler','nazi','傻逼','煞笔','傻b','sb','操你','草你','肏','日你','你妈','尼玛','妈逼','屌','鸡巴','婊子','贱人','强奸','做爱','色情','黄片','习近平','共产党','法轮','台独','死ね','殺す','ちんこ','まんこ','うんこ','セックス','レイプ','きちがい','キチガイ','admin','管理员','官方','megulit','hentai','nsfw','sex','loli','shota','cnm','nmsl','tmd','retard','kys','r18','18禁','成人向','巨乳','爆乳','乳头','裸体','全裸','约炮','卖淫','嫖','淫','骚货','痴汉','中出','av女优','エロ','ロリ','ショタ','おっぱい','パイズリ','中出し','ヘンタイ','変態','废物','垃圾人','去死','脑残','智障','弱智','狗东西','ばか野郎','クソ野郎','消えろ'];
 const hidden=ch=>{const c=ch.codePointAt(0);return c<32||c>=0x7f&&c<=0x9f||c>=0x200b&&c<=0x200f||c>=0x2028&&c<=0x202e||c>=0x2060&&c<=0x206f||c===0xfeff;};
 export function cleanName(value){
  if(typeof value!=='string')return {ok:false,error:'NAME_REQUIRED'};
@@ -96,4 +96,57 @@ export function issueBody(meta,link,days){
   `Download (expires in ${days} days): ${link}`];
  if(meta.note)lines.push('','User note:','',meta.note.split(/\r?\n/).map(l=>'> '+mdText(l)).join('\n'));
  return lines.join('\n');
+}
+
+/* ---- E379 weekly hot lookups ----------------------------------------------------------------------------------- */
+/* Hot-word weeks run Monday 00:00 to Monday 00:00 in UTC+8 (China / Taiwan time; Japan is an hour later). */
+export function hotWeekKey(date){return isoWeek(new Date(date.getTime()+8*3600000));}
+export const HOT={terms:100,count:1000,termChars:40,minUsers:3,top:50,podium:3,cards:10};
+export const CATEGORIES=['word','phrase','sentence'];
+const JAPANESE=/[぀-ヿ㐀-鿿ｦ-ﾟ]/;
+const hiddenChar=ch=>{const c=ch.codePointAt(0);return c<32||c>=0x7f&&c<=0x9f||c>=0x200b&&c<=0x200f||c>=0x2028&&c<=0x202e||c>=0x2060&&c<=0x206f||c===0xfeff;};
+/* The looked-up text itself, normalized; '' when it is not a Japanese lookup worth counting. */
+export function cleanTerm(value){
+ if(typeof value!=='string')return '';const term=value.normalize('NFKC').replace(/\s+/g,' ').trim();const chars=[...term];
+ if(!chars.length||chars.length>HOT.termChars||chars.some(hiddenChar)||!JAPANESE.test(term)||/https?:|www\.|[<>@\\`]/i.test(term))return '';
+ return term;
+}
+/* 短句: sentence punctuation or long; 短语: a particle between content words, or a 、/space; 词汇: everything else. */
+export function classifyTerm(term){
+ const length=[...term].length;
+ if(/[。！？!?…]/.test(term)||length>12)return 'sentence';
+ if(length>=4&&(/[、 ]/.test(term)||/[㐀-鿿゠-ヿ][をにがはでとのもへ][぀-ヿ㐀-鿿]/.test(term)))return 'phrase';
+ return 'word';
+}
+/* Term on the block list (R18 / abuse): never awarded. */
+export function blockedTerm(term){const flat=term.toLowerCase().replace(/[\s._\-*·・]/g,'');return BLOCKED.some(word=>flat.includes(word));}
+/* submit body .hot = {week:'2026-W46',terms:[{term,count}]} → {ok,value:{week,terms:Map}} ; absent → {ok,value:null} */
+export function validateHot(hot,now=new Date()){
+ if(hot===undefined||hot===null)return {ok:true,value:null};
+ if(typeof hot!=='object'||Array.isArray(hot)||!Array.isArray(hot.terms)||hot.terms.length>HOT.terms)return {ok:false,error:'INVALID_LOOKUPS'};
+ const week=String(hot.week||'');if(week!==hotWeekKey(now)&&week!==hotWeekKey(new Date(now.getTime()-3600000)))return {ok:false,error:'PERIOD_KEY_OUT_OF_RANGE'};
+ const terms=new Map();
+ for(const item of hot.terms){const term=cleanTerm(item?.term);if(!term||!Number.isSafeInteger(item.count)||item.count<1||item.count>HOT.count)return {ok:false,error:'INVALID_LOOKUPS'};terms.set(term,Math.min(HOT.count,(terms.get(term)||0)+item.count));}
+ return {ok:true,value:{week,terms}};
+}
+
+/* ---- E379 avatars ---------------------------------------------------------------------------------------------- */
+export const AVATAR={bytes:64*1024,max:256,min:32};
+/* Width/height of a still WebP (VP8 / VP8L / VP8X); null for anything else, animated files included. */
+export function webpInfo(bytes){
+ if(!(bytes instanceof Uint8Array)||bytes.length<30)return null;
+ const tag=(o,s)=>String.fromCharCode(...bytes.subarray(o,o+4))===s;
+ if(!tag(0,'RIFF')||!tag(8,'WEBP'))return null;
+ const riff=bytes[4]|bytes[5]<<8|bytes[6]<<16|bytes[7]<<24;if(riff+8!==bytes.length&&riff+8!==bytes.length-1)return null;
+ if(tag(12,'VP8 ')){if(bytes[23]!==0x9d||bytes[24]!==0x01||bytes[25]!==0x2a)return null;return {width:(bytes[26]|bytes[27]<<8)&0x3fff,height:(bytes[28]|bytes[29]<<8)&0x3fff};}
+ if(tag(12,'VP8L')){if(bytes[20]!==0x2f)return null;const b=bytes[21]|bytes[22]<<8|bytes[23]<<16|bytes[24]<<24;return {width:(b&0x3fff)+1,height:(b>>>14&0x3fff)+1};}
+ if(tag(12,'VP8X')){if(bytes[20]&0x02)return null;return {width:1+(bytes[24]|bytes[25]<<8|bytes[26]<<16),height:1+(bytes[27]|bytes[28]<<8|bytes[29]<<16)};}
+ return null;
+}
+export function validateAvatar(bytes){
+ if(!(bytes instanceof Uint8Array)||!bytes.length)return {ok:false,error:'AVATAR_REQUIRED'};
+ if(bytes.length>AVATAR.bytes)return {ok:false,error:'PAYLOAD_TOO_LARGE'};
+ const info=webpInfo(bytes);if(!info)return {ok:false,error:'AVATAR_NOT_WEBP'};
+ if(info.width!==info.height||info.width>AVATAR.max||info.width<AVATAR.min)return {ok:false,error:'AVATAR_SIZE'};
+ return {ok:true,value:info};
 }

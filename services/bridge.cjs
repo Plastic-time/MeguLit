@@ -225,7 +225,12 @@ async function dispatch(request,runtime=null) {
       case 'settings_get':return new(require('./settings.cjs').Settings)(root).get(String(request.profile||''));
       case 'settings_save':{const leaving=request.scope==='online'&&request.values?.leaderboardEnabled===false&&require('./leaderboard.cjs').config(root).enabled;const result=new(require('./settings.cjs').Settings)(root).save({scope:request.scope,values:request.values,profile:String(request.profile||'')});runtime?.settingsSaved(request);if(leaving)await require('./leaderboard.cjs').leave(root).catch(()=>{});return leaving?new(require('./settings.cjs').Settings)(root).get(String(request.profile||'')):result;}
       /* E377 opt-in leaderboard (services/leaderboard.cjs) */
-      case 'leaderboard_view':return await require('./leaderboard.cjs').view(root,db,{period:String(request.period||''),metric:String(request.metric||''),game:typeof request.game==='string'?request.game:'',submit:request.submit===true});
+      case 'leaderboard_view':return await require('./leaderboard.cjs').view(root,db,{period:String(request.period||''),metric:String(request.metric||''),game:typeof request.game==='string'?request.game:'',submit:request.submit===true,tab:String(request.tab||''),week:String(request.week||''),category:String(request.category||'')});
+      /* E379 avatars (moderated on the relay) and reports */
+      case 'leaderboard_avatar_set':return await require('./leaderboard.cjs').setAvatar(root,String(request.data||''));
+      case 'leaderboard_avatar_remove':return await require('./leaderboard.cjs').removeAvatar(root);
+      case 'leaderboard_avatar_status':return await require('./leaderboard.cjs').avatarStatus(root);
+      case 'leaderboard_report':return await require('./leaderboard.cjs').report(root,String(request.avatar||''));
       case 'leaderboard_join':{const lb=require('./leaderboard.cjs');lb.join(root,{name:request.name,shareGames:request.shareGames===true,consent:request.consent===true});return await lb.view(root,db,{period:String(request.period||''),metric:String(request.metric||''),submit:true});}
       case 'leaderboard_leave':return await require('./leaderboard.cjs').leave(root);
       case 'save_key':return new(require('./settings.cjs').Settings)(root).saveKey({provider:request.provider,baseUrl:request.baseUrl,apiKey:request.apiKey});
