@@ -25,9 +25,9 @@ const NOW=new Date(2026,10,10,20,0,0);
 test('collectStats sums week / month / all time, words and streaks from local records only',t=>{
  const {db}=fixture(t);seed(db);const s=lb.collectStats(db,NOW);
  assert.deepEqual(s.keys,{week:'2026-W46',month:'2026-11',all:'all'});
- assert.deepEqual(s.stats.week,{characters:1510,seconds:910,words:1,streak:2});
- assert.deepEqual(s.stats.month,{characters:3610,seconds:2170,words:2,streak:4});
- assert.deepEqual(s.stats.all,{characters:12610,seconds:5770,words:3,streak:4});
+ assert.deepEqual(s.stats.week,{characters:1510,seconds:910,words:1,streak:2,reviews:0,kana:0});
+ assert.deepEqual(s.stats.month,{characters:3610,seconds:2170,words:2,streak:4,reviews:0,kana:0});
+ assert.deepEqual(s.stats.all,{characters:12610,seconds:5770,words:3,streak:4,reviews:0,kana:0});
  assert.equal(s.currentStreak,4);
  assert.deepEqual(s.games.map(g=>[g.title,g.characters]),[['ATRI',10500],['千恋＊万花',2100]],'hidden games stay out');
  assert.equal(lb.longestRun(['2026-01-01','2026-01-02','2026-01-04']),2);
@@ -76,7 +76,7 @@ test('opt-in needs consent and a clean nickname; only totals are uploaded; games
  const post=sent.find(r=>r.method==='POST');
  assert.equal(post.url,'https://relay.test/api/leaderboard');
  assert.deepEqual(Object.keys(post.body).sort(),['hot','id','keys','name','stats','version']);assert.deepEqual(post.body.hot,{week:'2026-W46',terms:[]},'no lookups recorded');
- assert.deepEqual(post.body.stats.week,{characters:1510,seconds:910,words:1,streak:2});
+ assert.deepEqual(post.body.stats.week,{characters:1510,seconds:910,words:1,streak:2,reviews:0,kana:0});
  assert.equal(post.body.name,'めぐみん');assert.ok(!JSON.stringify(post.body).includes(os.hostname()),'no machine names');
  const get=sent.find(r=>r.method==='GET');assert.match(get.url,/period=week&metric=characters&key=2026-W46&me=[0-9a-f]{64}$/);
  /* within 10 minutes the page does not post again */
@@ -243,4 +243,34 @@ test('E397 client: signature rules match the relay, last-read times ride along, 
  assert.ok(seen.every(c=>c.auth==='Bearer mgl_'+'B'.repeat(43)));
  const view=await lb.view(root,db,{tab:'follow'},{...opts,now:NOW});assert.equal(view.tab,'follow');assert.equal(view.social.state,'ok');
  assert.deepEqual(lb.libraryTitles(db),['ATRI','千恋＊万花'],'hidden games are not offered');
+});
+
+test('E401 reviews and kana practice: counted per period, Anki answers that come back with a sync count once, word total kept apart',async t=>{
+ const {root,db}=fixture(t);seed(db);
+ db.exec('CREATE TABLE IF NOT EXISTS anki_review_events(operation_id TEXT PRIMARY KEY,card_id INTEGER NOT NULL,ease INTEGER NOT NULL,reviewed_at INTEGER NOT NULL)');
+ db.exec('CREATE TABLE IF NOT EXISTS anki_synced_reviews(review_id INTEGER PRIMARY KEY,word_id INTEGER NOT NULL)');
+ const r=db.prepare('INSERT INTO review_events(word_id,reviewed_at) VALUES(1,?)');r.run(at(2026,11,10));r.run(at(2026,11,9));r.run(at(2026,11,2));r.run(at(2026,10,1));
+ const a=db.prepare('INSERT INTO anki_review_events VALUES(?,1,3,?)');a.run('op1',at(2026,11,10,9));a.run('op2',at(2026,11,10,10));
+ /* op2 came back with an Anki sync (review id = epoch ms, 2 s later): already in review_events, so it is not counted twice */
+ db.prepare('INSERT INTO anki_synced_reviews VALUES(?,1)').run(at(2026,11,10,10)*1000+2000);r.run(at(2026,11,10,10)+2);
+ const ms=(y,m,d)=>new Date(y,m-1,d,12).getTime(),log=n=>Array.from({length:n},()=>({show:'あ',ok:true}));
+ fs.mkdirSync(path.join(root,'data'),{recursive:true});
+ fs.writeFileSync(path.join(root,'data','kana-progress.json'),JSON.stringify({version:1,runs:[{id:ms(2026,11,10),log:log(20)},{id:ms(2026,11,3),log:log(12)},{id:ms(2026,9,1),log:log(5)}]}));
+ const s=lb.collectStats(db,NOW,root);
+ assert.deepEqual([s.stats.week.reviews,s.stats.month.reviews,s.stats.all.reviews],[4,5,6]);
+ assert.deepEqual([s.stats.week.kana,s.stats.month.kana,s.stats.all.kana],[20,32,37]);
+ assert.equal(s.totals.words,3,'all-time words saved, apart from "new this week"');assert.equal(s.stats.week.words,1);
+ assert.equal(lb.collectStats(db,NOW).stats.week.kana,0,'no root: no kana file read');
+ /* only numbers are uploaded */
+ lb.join(root,{name:'Kazuma',consent:true});const sent=[];
+ await lb.submit(s,{root,env:BASE_ENV,account:null,now:NOW,fetch:async(u,i)=>{sent.push(JSON.parse(i.body));return new Response('{"ok":true}');}});
+ assert.deepEqual(sent[0].stats.week,{characters:1510,seconds:910,words:1,streak:2,reviews:4,kana:20});
+ const relayValidate=await import(pathToFileURL(path.join(__dirname,'..','relay','src','validate.js')).href);
+ assert.equal(relayValidate.validateLeaderboard(sent[0],NOW).ok,true);
+ /* an older client without the new numbers is still accepted; they count as 0 */
+ const old=JSON.parse(JSON.stringify(sent[0]));for(const p of ['week','month','all']){delete old.stats[p].reviews;delete old.stats[p].kana;}
+ const checked=relayValidate.validateLeaderboard(old,NOW);assert.equal(checked.ok,true);assert.equal(checked.value.stats.week.kana,0);
+ const big=JSON.parse(JSON.stringify(sent[0]));big.stats.week.reviews=100001;assert.equal(relayValidate.validateLeaderboard(big,NOW).error,'STATS_OUT_OF_RANGE');
+ const view=await import(pathToFileURL(path.join(__dirname,'..','web','leaderboard-view.js')).href);
+ assert.equal(view.formatValue('kana',20,'zh'),'20 题');assert.equal(view.formatValue('reviews',4,'en'),'4 reviews');
 });

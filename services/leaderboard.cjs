@@ -21,7 +21,7 @@
    The relay stores only sha256(id); `me` is that hash so the page can mark the user's own row. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const relay=require('./relay-config.cjs');
-const PERIODS=['week','month','all'],METRICS=['characters','seconds','words','streak'],TIMEOUT=8000,SUBMIT_EVERY=10*60*1000,MAX_GAMES=30;
+const PERIODS=['week','month','all'],METRICS=['characters','seconds','words','streak','reviews','kana'],TIMEOUT=8000,SUBMIT_EVERY=10*60*1000,MAX_GAMES=30;
 const stateFile=root=>path.join(root,'data','config','leaderboard.json');
 function atomic(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(value,null,1));fs.renameSync(tmp,file);}
 
@@ -57,14 +57,36 @@ function longestRun(days){let best=0,run=0,prev=null;for(const day of [...days].
 /* Days in a row up to today (or up to yesterday when today has no reading yet). */
 function currentRun(days,now=new Date()){const set=new Set(days),d=new Date(now);d.setHours(0,0,0,0);if(!set.has(dayKey(d)))d.setDate(d.getDate()-1);let run=0;while(set.has(dayKey(d))){run++;d.setDate(d.getDate()-1);}return run;}
 const int=v=>Math.max(0,Math.min(Number.MAX_SAFE_INTEGER,Math.round(Number(v)||0)));
-function collectStats(db,now=new Date()){
+/* E401 learning activity, as unix-second timestamps:
+   - reviews: every word review in MeguLit (review_events, which also holds reviews pulled in from Anki notes) plus every
+     card answered through the in-app Anki review (anki_review_events). An in-app Anki answer that later comes back
+     with an Anki sync (anki_synced_reviews; Anki review ids are epoch milliseconds) is counted once.
+   - kana: one per question answered in the kana games (data/kana-progress.json keeps the last 200 runs, so the
+     all-time count covers those runs). */
+function reviewTimes(db,until){
+ const out=[];const safe=fn=>{try{return fn();}catch{return [];}};
+ out.push(...safe(()=>db.prepare('SELECT reviewed_at t FROM review_events WHERE reviewed_at<?').all(until)).map(r=>Number(r.t)||0));
+ const synced=safe(()=>db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='anki_synced_reviews'").all()).length>0;
+ out.push(...safe(()=>db.prepare(synced?'SELECT a.reviewed_at t FROM anki_review_events a WHERE a.reviewed_at<? AND NOT EXISTS (SELECT 1 FROM anki_synced_reviews s WHERE ABS(s.review_id/1000-a.reviewed_at)<=5)':'SELECT reviewed_at t FROM anki_review_events WHERE reviewed_at<?').all(until)).map(r=>Number(r.t)||0));
+ return out;
+}
+function kanaTimes(root,until){
+ if(!root)return [];
+ let runs=[];try{runs=require('./kana.cjs').read(root).runs;}catch{return [];}
+ const out=[];for(const run of runs){const t=Math.floor(Number(run.id)/1000);if(!(t>0&&t<until))continue;for(let i=0;i<Math.min(run.log.length,500);i++)out.push(t);}
+ return out;
+}
+function collectStats(db,now=new Date(),root=''){
  const w=windows(now),out={keys:periodKeys(now),stats:{},games:[]};
  const sessions=db.prepare('SELECT game_id,started_at,active_seconds,characters FROM reading_sessions WHERE started_at<?').all(w.all.until);
  const words=db.prepare('SELECT created_at FROM vocabulary WHERE created_at<?').all(w.all.until).map(r=>Number(r.created_at)||0);
  const readDay=s=>dayKey(new Date(s.started_at*1000)),reading=s=>s.characters>0||s.active_seconds>0;
+ const reviews=reviewTimes(db,w.all.until),kana=kanaTimes(root,w.all.until);
+ /* E401 the period numbers count what happened in that week or month ("新收录"); the all-time word total is separate */
+ out.totals={words:int(db.prepare('SELECT COUNT(*) n FROM vocabulary').get().n)};
  for(const period of PERIODS){
   const {from,until}=w[period],inside=sessions.filter(s=>s.started_at>=from&&s.started_at<until);
-  out.stats[period]={characters:int(inside.reduce((n,s)=>n+(s.characters||0),0)),seconds:int(inside.reduce((n,s)=>n+(s.active_seconds||0),0)),words:words.filter(t=>t>=from&&t<until).length,streak:longestRun(new Set(inside.filter(reading).map(readDay)))};
+  out.stats[period]={characters:int(inside.reduce((n,s)=>n+(s.characters||0),0)),seconds:int(inside.reduce((n,s)=>n+(s.active_seconds||0),0)),words:words.filter(t=>t>=from&&t<until).length,streak:longestRun(new Set(inside.filter(reading).map(readDay))),reviews:reviews.filter(t=>t>=from&&t<until).length,kana:kana.filter(t=>t>=from&&t<until).length};
  }
  out.currentStreak=currentRun(sessions.filter(reading).map(readDay),now);
  const titles=new Map(db.prepare('SELECT id,title FROM games WHERE removed_at IS NULL AND hidden_at IS NULL').all().map(g=>[g.id,String(g.title||'').trim()]));
@@ -234,7 +256,7 @@ async function hotWords(root,{week='',category='word'}={},options={}){
 /* Everything the 排行榜 page needs in one call; refreshes the user's own entry at most every 10 minutes. */
 async function view(root,db,request={},options={}){
  const now=options.now||new Date(),period=PERIODS.includes(request.period)?request.period:'week',metric=[...METRICS,'games'].includes(request.metric)?request.metric:'seconds';
- const local=collectStats(db,now),c=config(root,options.env,options),tab=request.tab==='hot'?'hot':'board';
+ const local=collectStats(db,now,root),c=config(root,options.env,options),tab=request.tab==='hot'?'hot':'board';
  const result={configured:c.configured,joined:c.joined,enabled:c.enabled,name:c.name,shareGames:c.shareGames,account:c.account,tab,period,metric,local,board:null,hot:null,avatars:{}};
  if(!c.configured)return {...result,board:{state:'not-configured'}};
  if(c.joined&&(request.submit===true||now.getTime()-c.lastSubmitAt>SUBMIT_EVERY))result.submit=await submit(local,{...options,root,now});

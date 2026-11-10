@@ -67,7 +67,9 @@ npx wrangler r2 bucket lifecycle add megulit-diagnostics expire-diagnostics diag
 
 `migrations apply` runs every file in `migrations/` in order: `0001_init.sql` (leaderboard, adaptation, diagnostics),
 `0005_accounts.sql` (accounts, relay/ACCOUNTS.md), `0006_community.sql` (avatars, reports, hot words) and
-`0007_social.sql` (public profiles, follows, profile reports; adds `last_at` to `leaderboard_games`). Avatars live in
+`0007_social.sql` (public profiles, follows, profile reports; adds `last_at` to `leaderboard_games`) and
+`0008_learning.sql` (`reviews` and `kana` columns on `leaderboard_stats`: word reviews incl. Anki, and kana questions
+answered; older clients leave them out and they count as 0). Avatars live in
 the same bucket as diagnostics under `avatars/`; do not add a lifecycle rule for that prefix.
 
 ### 2b. Workers AI (avatar moderation and hot-word guesses)
@@ -180,9 +182,9 @@ All JSON replies have `cache-control: no-store`. Errors are `{"ok":false,"error"
 ```
 POST /api/leaderboard
 {"version":1,"id":"<uuid v4>","name":"めぐみん","keys":{"week":"2026-W46","month":"2026-11"},
- "stats":{"week":{"characters":0,"seconds":0,"words":0,"streak":0},"month":{...},"all":{...}},
+ "stats":{"week":{"characters":0,"seconds":0,"words":0,"streak":0,"reviews":0,"kana":0},"month":{...},"all":{...}},
  "games":[{"title":"ATRI","characters":120000,"seconds":36000}]}          → {"ok":true}
-GET /api/leaderboard?period=week|month|all&metric=characters|seconds|words|streak[&key=2026-W46][&me=<sha256 of id>]
+GET /api/leaderboard?period=week|month|all&metric=characters|seconds|words|streak|reviews|kana[&key=2026-W46][&me=<sha256 of id>]
                                                                         → {"entries":[{"rank","name","value","me"}],"total","me":{"rank","value"}|null}
 GET /api/leaderboard?metric=games                                       → {"games":[{"title","readers","top":{"name","value"}}]}
 GET /api/leaderboard?metric=games&game=ATRI                             → {"entries":[...],"total","me"}

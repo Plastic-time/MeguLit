@@ -15,12 +15,14 @@ export function cleanName(value){
  return {ok:true,name};
 }
 
-export const PERIODS=['week','month','all'],METRICS=['characters','seconds','words','streak'];
+export const PERIODS=['week','month','all'],METRICS=['characters','seconds','words','streak','reviews','kana'];
+/* E401 reviews and kana arrived later: older clients leave them out and they count as 0 */
+export const OPTIONAL_METRICS=['reviews','kana'];
 /* Upper bounds a real reader cannot pass; anything above is rejected as a whole. */
 export const CAPS={
- week:{characters:3_000_000,seconds:7*86400,words:20_000,streak:7},
- month:{characters:12_000_000,seconds:31*86400,words:80_000,streak:31},
- all:{characters:2_000_000_000,seconds:200_000_000,words:2_000_000,streak:40_000}
+ week:{characters:3_000_000,seconds:7*86400,words:20_000,streak:7,reviews:100_000,kana:200_000},
+ month:{characters:12_000_000,seconds:31*86400,words:80_000,streak:31,reviews:400_000,kana:800_000},
+ all:{characters:2_000_000_000,seconds:200_000_000,words:2_000_000,streak:40_000,reviews:50_000_000,kana:50_000_000}
 };
 export const LIMITS={body:64*1024,games:30,title:120,adaptationRecords:50,adaptationRecord:16*1024,keys:50,meta:16*1024,zip:20*1024*1024};
 const isInt=v=>Number.isSafeInteger(v)&&v>=0;
@@ -43,7 +45,7 @@ export function validateLeaderboard(body,now=new Date()){
  if(!allowed.week.has(keys.week)||!allowed.month.has(keys.month))return {ok:false,error:'PERIOD_KEY_OUT_OF_RANGE'};
  const stats={};
  for(const period of PERIODS){const p=body.stats?.[period];if(!p||typeof p!=='object')return {ok:false,error:'INVALID_STATS'};stats[period]={};
-  for(const metric of METRICS){const v=p[metric];if(!isInt(v))return {ok:false,error:'INVALID_STATS'};if(v>CAPS[period][metric])return {ok:false,error:'STATS_OUT_OF_RANGE'};stats[period][metric]=v;}}
+  for(const metric of METRICS){const v=p[metric]===undefined&&OPTIONAL_METRICS.includes(metric)?0:p[metric];if(!isInt(v))return {ok:false,error:'INVALID_STATS'};if(v>CAPS[period][metric])return {ok:false,error:'STATS_OUT_OF_RANGE'};stats[period][metric]=v;}}
  if(stats.all.characters<stats.month.characters||stats.all.seconds<stats.month.seconds)return {ok:false,error:'INVALID_STATS'};
  let games=null;
  if(body.games!==undefined){if(!Array.isArray(body.games)||body.games.length>LIMITS.games)return {ok:false,error:'INVALID_GAMES'};games=[];const seen=new Set();

@@ -23,7 +23,9 @@
 .lb-seg button:hover{color:var(--lb-ink)}
 .lb-seg button[aria-pressed=true]{background:linear-gradient(180deg,color-mix(in srgb,var(--lb-gold) 26%,var(--lb-raise-2)),var(--lb-raise-2));color:var(--lb-ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--lb-gold) 45%,transparent)}
 .lb-seg button:active{transform:scale(.97)}
-.lb-tabs{display:flex;gap:22px;border-bottom:1px solid var(--lb-rule);padding:0 2px}
+.lb-tabs{display:flex;gap:22px;border-bottom:1px solid var(--lb-rule);padding:0 2px;overflow-x:auto;scrollbar-width:none}
+.lb-tabs::-webkit-scrollbar{display:none}
+.lb-tabs button{flex:none;white-space:nowrap}
 .lb-tabs button{border:0;background:none;color:var(--lb-ink-3);padding:10px 0 9px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .16s,border-color .16s}
 .lb-tabs button:hover{color:var(--lb-ink-2)}
 .lb-tabs button[aria-pressed=true]{color:var(--lb-ink);border-bottom-color:var(--lb-gold)}
@@ -114,7 +116,7 @@
 
 /* my numbers */
 .lb-mine{padding:4px 2px}
-.lb-tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:6px}
+.lb-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:6px}
 .lb-tile{display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:14px;background:var(--lb-raise);box-shadow:inset 0 0 0 1px var(--lb-rule)}
 .lb-tile small{color:var(--lb-ink-3);font-size:11px}
 .lb-tile strong{font-family:var(--g-serif,serif);font-size:20px;font-weight:600;color:var(--lb-ink);font-variant-numeric:tabular-nums}

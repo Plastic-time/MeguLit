@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 const hints={
- leaderboardEnabled:['只上传阅读字数、时长、收录单词数和连续天数的汇总；参加要先用邮箱登录 MeguLit 账号，邮箱不会出现在榜上；关闭后会删除服务器上的记录','Uploads only totals (characters, time, words saved, streak). Joining needs a MeguLit account signed in with your email, which never shows on the board. Turning it off deletes your entry on the server','読んだ文字数・時間・登録単語数・連続日数の合計だけを送ります。参加にはメールアドレスで MeguLit アカウントにログインする必要があり、アドレスはランキングに表示されません。オフにするとサーバーの記録を削除します'],
+ leaderboardEnabled:['只上传阅读字数、时长、收录单词数、复习次数、假名练习题数和连续天数的汇总；参加要先用邮箱登录 MeguLit 账号，邮箱不会出现在榜上；关闭后会删除服务器上的记录','Uploads only totals (characters, time, words saved, reviews, kana practice, streak). Joining needs a MeguLit account signed in with your email, which never shows on the board. Turning it off deletes your entry on the server','読んだ文字数・時間・登録単語数・復習回数・かな練習の問題数・連続日数の合計だけを送ります。参加にはメールアドレスで MeguLit アカウントにログインする必要があり、アドレスはランキングに表示されません。オフにするとサーバーの記録を削除します'],
  leaderboardName:['排行榜上显示的名字，2–16 个字，不能含网址或不雅词','Name shown on the leaderboard, 2–16 characters, no links or offensive words','ランキングに表示される名前。2〜16 文字、URL や不適切な語は使えません'],
  leaderboardShareGames:['打开后会公开你读过的游戏名称和各自字数，用于“按游戏”排行','Shares the titles you read and their character counts for the per-game boards','読んだゲーム名と文字数を公開し、ゲーム別ランキングに参加します'],
  relayUrl:['诊断上传、共享适配和排行榜共用的服务地址；一般留空即可','Address shared by diagnostic upload, shared adaptation and the leaderboard; normally leave empty','診断アップロード・共有設定・ランキング共通のサーバーアドレス。通常は空欄のままで構いません'],
