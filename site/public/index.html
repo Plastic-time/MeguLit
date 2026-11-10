@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeguLit · 在 Galgame 里读日语原文</title>
+<meta name="description" content="MeguLit 是免费开源的 Windows 工具：接上 Galgame 正在显示的日文台词，给它注音、翻译、查词，把生词送进 Anki，还能把译文直接写进游戏的文本框">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#170f11" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f8f1ee" media="(prefers-color-scheme: light)">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" hreflang="zh-CN" href="https://megulit.com/">
+<link rel="alternate" hreflang="ja" href="https://megulit.com/?lang=ja">
+<link rel="alternate" hreflang="en" href="https://megulit.com/?lang=en">
+<meta property="og:title" content="MeguLit">
+<meta property="og:description" content="在 Galgame 里读日语原文：注音、翻译、查词、Anki，译文直接写进游戏">
+<meta property="og:image" content="https://megulit.com/assets/img/og.jpg">
+<meta property="og:url" content="https://megulit.com/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/assets/fonts/megulit-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preconnect" href="https://dl.megulit.com" crossorigin>
+<link rel="stylesheet" href="/assets/css/site.css">
+<script>/* theme before paint, so the page never flashes the wrong colours */
+document.documentElement.classList.add('js');try{var t=localStorage.getItem('megulit-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}
+</script>
+<script type="module" src="/assets/js/app.js"></script>
+</head>
+<body>
+<a class="skip" href="#main" data-i="skip">跳到正文</a>
+
+<header class="top" id="top">
+ <div class="wrap top-row">
+  <a class="brand" href="/" aria-label="MeguLit">
+   <img src="/assets/img/logo-360.webp" width="360" height="139" alt="MeguLit">
+  </a>
+  <nav class="nav" aria-label="主导航" data-i-attr="aria-label:nav.label">
+   <a href="#features" data-i="nav.features">功能</a>
+   <a href="#games" data-i="nav.games">支持的游戏</a>
+   <a href="#start" data-i="nav.start">上手</a>
+   <a href="#faq" data-i="nav.faq">常见问题</a>
+   <a href="/changelog.html" data-i="nav.changelog">更新日志</a>
+  </nav>
+  <div class="tools">
+   <div class="lang" role="group" aria-label="语言" data-i-attr="aria-label:lang.label">
+    <button type="button" data-lang="zh" aria-pressed="true">中</button>
+    <button type="button" data-lang="ja" aria-pressed="false">日</button>
+    <button type="button" data-lang="en" aria-pressed="false">EN</button>
+   </div>
+   <button class="icon-btn" type="button" id="theme" aria-label="切换浅色 / 深色" data-i-attr="aria-label:theme.label">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="sun" d="M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/><path class="moon" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>
+   </button>
+   <a class="icon-btn" href="https://github.com/ilynthn/MeguLit" aria-label="GitHub">
+    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.34.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg>
+   </a>
+  </div>
+ </div>
+</header>
+
+<main id="main">
+
+<section class="hero" aria-labelledby="hero-title">
+ <div class="wrap hero-grid">
+  <div class="hero-copy">
+   <h1 id="hero-title" class="display" data-i-html="hero.title"><span class="b">在 Galgame 里，</span><wbr><span class="b">直接读日语原文</span></h1>
+   <p class="lede" data-i="hero.lede">MeguLit 接上游戏正在显示的台词，给它注音、翻译、查词，把生词送进 Anki。译文还能直接写进游戏自己的文本框</p>
+   <div class="cta">
+    <a class="btn btn-primary js-download" href="https://github.com/ilynthn/MeguLit/releases/latest">
+     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
+     <span data-i="dl.button">下载 MeguLit</span>
+    </a>
+    <a class="btn btn-quiet" href="#download" data-i="dl.alt">备用下载</a>
+   </div>
+   <p class="cta-meta"><span class="js-version">v1.2.8</span><span class="js-size">20.0 MB</span><span data-i="dl.os">Windows 10 / 11 x64</span><span data-i="dl.free">免费 · 开源</span></p>
+  </div>
+
+  <figure class="specimen" aria-labelledby="specimen-cap">
+   <div class="page">
+    <p class="jp" lang="ja"><span class="b">さあ、</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="0"><ruby>物語<rt>ものがたり</rt></ruby></span>の</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="1"><ruby>続<rt>つづ</rt></ruby>き</span>を</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="2"><ruby>読<rt>よ</rt></ruby>もう</span></span></p>
+    <p class="tr" data-i="spec.tr">来吧，把故事接着读下去</p>
+    <dl class="gloss" aria-live="polite">
+     <dt lang="ja">物語 <span>ものがたり</span></dt><dd data-i="spec.g0">故事</dd>
+     <dt lang="ja">続き <span>つづき</span></dt><dd data-i="spec.g1">后续，接下来的部分</dd>
+     <dt lang="ja">読もう <span>よもう</span></dt><dd data-i="spec.g2">读吧（読む 的意志形）</dd>
+    </dl>
+   </div>
+   <figcaption id="specimen-cap" data-i="spec.cap">示意：原文、注音、译文和释义排在一起。指一下词看释义</figcaption>
+  </figure>
+ </div>
+
+ <div class="wrap shot-hero">
+  <img src="/assets/img/home-1360.webp" srcset="/assets/img/home-720.webp 720w, /assets/img/home-1360.webp 1360w" sizes="(min-width: 75rem) 75rem, 100vw" width="1360" height="765" alt="MeguLit 首页：上次读到的作品、最近游玩和今日学习数据" data-i-attr="alt:shot.home" fetchpriority="high">
+ </div>
+</section>
+
+<section class="sec" id="features" aria-labelledby="f-title">
+ <div class="wrap">
+  <h2 id="f-title" class="h2" data-i="f.title">读的时候，什么都在游戏里</h2>
+  <p class="sec-lede" data-i="f.lede">阅读层浮在游戏上面，不抢焦点，点它也不会让剧情往下走</p>
+
+  <div class="embed">
+   <div class="embed-copy">
+    <h3 class="h3" data-i="f.embed.t">译文直接写进游戏的文本框</h3>
+    <p data-i="f.embed.d">内嵌替换把游戏自己的台词原地换成你要的样子：日文加注音，或者日文加译文。用游戏自己的字体和版面画出来，眼睛不用在两个窗口之间来回跳</p>
+    <div class="seg" role="group" aria-label="对比" data-i-attr="aria-label:f.embed.cmp">
+     <button type="button" data-embed="before" aria-pressed="false" data-i="f.embed.before">原版</button>
+     <button type="button" data-embed="after" aria-pressed="true" data-i="f.embed.after">内嵌之后</button>
+    </div>
+   </div>
+   <figure class="textbox" data-state="after">
+    <div class="tb-scene" aria-hidden="true"></div>
+    <div class="tb-window">
+     <span class="tb-name" lang="ja">？？？</span>
+     <p class="tb-line" lang="ja"><span class="b">「この<ruby>先<rt>さき</rt></ruby>に、</span><wbr><span class="b">まだ<ruby>誰<rt>だれ</rt></ruby>も</span><wbr><span class="b"><ruby>知<rt>し</rt></ruby>らない</span><wbr><span class="b"><ruby>景色<rt>けしき</rt></ruby>がある」</span></p>
+     <p class="tb-tr" data-i="f.embed.tr">“在这前面，有一片谁都还没见过的风景”</p>
+    </div>
+    <figcaption data-i="f.embed.cap">示意图，实际效果取决于游戏和引擎</figcaption>
+   </figure>
+  </div>
+
+  <div class="trio">
+   <article>
+    <h3 class="h3" data-i="f.zero.t">汉化补丁就是译文，一句不等</h3>
+    <p data-i="f.zero.d">装过汉化补丁的游戏，MeguLit 直接拿补丁里的译文对上日文原文，台词一出来译文就在。KiriKiri、BGI、Siglus、YU-RIS、Artemis、Ren'Py 都已实测；补丁里没有的句子会提前机翻好</p>
+   </article>
+   <article>
+    <h3 class="h3" data-i="f.ruby.t">注音先听游戏的</h3>
+    <p data-i="f.ruby.d">游戏自带 ruby 的地方，用游戏标的读音；没有标的，再按词典和上下文判断。人名、当て字也跟着作品走</p>
+   </article>
+   <article>
+    <h3 class="h3" data-i="f.dict.t">点一下查词，拖一段查短语</h3>
+    <p data-i="f.dict.d">离线词典，查过的词自动进单词本。也可以选中整句，让 AI 讲语法和语境。翻译支持 DeepL、Google、Gemini、DeepSeek、Sakura、Ollama 等，密钥加密存在本地</p>
+   </article>
+  </div>
+ </div>
+</section>
+
+<section class="sec sec-learn" id="learn" aria-labelledby="l-title">
+ <div class="wrap">
+  <h2 id="l-title" class="h2" data-i="l.title">读过的，都能留下来</h2>
+  <p class="sec-lede" data-i="l.lede">查过的词、读过的句子和花掉的时间，MeguLit 都替你记着</p>
+  <div class="tabs" role="tablist" aria-label="学习功能" data-i-attr="aria-label:l.title">
+   <button role="tab" id="tab-words" aria-controls="pane-words" aria-selected="true" data-i="l.words.t">单词本</button>
+   <button role="tab" id="tab-anki" aria-controls="pane-anki" aria-selected="false" tabindex="-1" data-i="l.anki.t">Anki</button>
+   <button role="tab" id="tab-stats" aria-controls="pane-stats" aria-selected="false" tabindex="-1" data-i="l.stats.t">学习统计</button>
+   <button role="tab" id="tab-hist" aria-controls="pane-hist" aria-selected="false" tabindex="-1" data-i="l.hist.t">对话记录</button>
+  </div>
+  <div class="panes">
+   <div class="pane" role="tabpanel" id="pane-words" aria-labelledby="tab-words">
+    <p data-i="l.words.d">查过的词、读音、释义和掌握程度，还有它出现在哪部作品、哪一句里</p>
+    <img src="/assets/img/words-1360.webp" srcset="/assets/img/words-720.webp 720w, /assets/img/words-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="单词本：每个词的写法、读音、释义和掌握程度" data-i-attr="alt:l.words.alt">
+   </div>
+   <div class="pane" role="tabpanel" id="pane-anki" aria-labelledby="tab-anki" hidden>
+    <p data-i="l.anki.d">在阅读层点「制卡」，卡片带上游戏截图和原声，没配音的旁白用本地语音补上。复习直接用 Anki 的卡片和调度，评分写回 Anki</p>
+    <img src="/assets/img/anki-1360.webp" srcset="/assets/img/anki-720.webp 720w, /assets/img/anki-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="在 MeguLit 里复习 Anki 卡片" data-i-attr="alt:l.anki.alt">
+   </div>
+   <div class="pane" role="tabpanel" id="pane-stats" aria-labelledby="tab-stats" hidden>
+    <p data-i="l.stats.d">阅读字数、时长、查词次数、阅读日历，每部作品读了多少，按年、月、周、日切换</p>
+    <img src="/assets/img/stats-1360.webp" srcset="/assets/img/stats-720.webp 720w, /assets/img/stats-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="学习统计：阅读字数、时长、查词次数、阅读日历和本月读的书" data-i-attr="alt:l.stats.alt">
+   </div>
+   <div class="pane" role="tabpanel" id="pane-hist" aria-labelledby="tab-hist" hidden>
+    <p data-i="l.hist.d">读过的每一句原文和译文都按会话存好，回头找哪句话一搜就有</p>
+    <img src="/assets/img/dialogue-1360.webp" srcset="/assets/img/dialogue-720.webp 720w, /assets/img/dialogue-1360.webp 1360w" sizes="(min-width: 75rem) 72rem, 100vw" width="1360" height="765" loading="lazy" alt="对话记录：读过的原文和译文" data-i-attr="alt:l.hist.alt">
+   </div>
+  </div>
+ </div>
+</section>
+
+<section class="sec" id="care" aria-labelledby="c-title">
+ <div class="wrap">
+  <h2 id="c-title" class="h2" data-i="c.title">少折腾</h2>
+  <div class="care">
+   <article class="care-restore">
+    <h3 class="h3" data-i="c.restore.t">换回日文原版</h3>
+    <p data-i="c.restore.d">MeguLit 读的是日文台词，所以剧情得是日文。Steam 中文 / 英文版可以一键换回日文；手上有日文原版的话，压缩包、文件夹、光盘镜像都能直接选，MeguLit 自动对照替换</p>
+    <ul class="ticks">
+     <li data-i="c.restore.l1">支持 .iso、.bin / .cue 光盘镜像，只有 InstallShield 安装程序的老光盘也能直接解包</li>
+     <li data-i="c.restore.l2">替换前全部备份，一键还原</li>
+     <li data-i="c.restore.l3">启动的是中文版时，会直接告诉你怎么换成日文</li>
+    </ul>
+   </article>
+   <article class="care-update">
+    <h3 class="h3" data-i="c.update.t">自动更新</h3>
+    <p data-i="c.update.d">每次启动检查一次新版本，后台下载、校验完再问你要不要重启更新。只替换程序文件，游戏库、学习记录和设置都留着</p>
+    <img src="/assets/img/auto-update-1600.webp" srcset="/assets/img/auto-update-800.webp 800w, /assets/img/auto-update-1600.webp 1600w" sizes="(min-width: 64rem) 36rem, 100vw" width="1600" height="764" loading="lazy" alt="自动更新：启动时弹出新版本卡片，显示更新内容和下载进度" data-i-attr="alt:c.update.alt">
+   </article>
+  </div>
+ </div>
+</section>
+
+<section class="sec" id="games" aria-labelledby="g-title">
+ <div class="wrap">
+  <h2 id="g-title" class="h2" data-i="g.title">支持的引擎和游戏</h2>
+  <p class="sec-lede"><span data-i="g.lede1">MeguLit 能认出</span> <b class="js-engine-count">40</b> <span data-i="g.lede2">种 Galgame 引擎，下面这些有专门适配：零延迟双语、日文原版导入或整页排版</span></p>
+  <ul class="adapters js-adapters" aria-label="专门适配的引擎" data-i-attr="aria-label:g.adapters"></ul>
+  <h3 class="h3 games-h" data-i="g.tested">实测过的作品</h3>
+  <ul class="games js-games"></ul>
+  <details class="more">
+   <summary data-i="g.all">全部能识别的引擎</summary>
+   <p class="small" data-i="g.allnote">识别到引擎后，文字通过通用 Hook 读取，第一次游玩时确认。这份列表由 MeguLit 的源码自动生成</p>
+   <ul class="chips js-detected"></ul>
+  </details>
+  <p class="small" data-i-html="g.issue">你的游戏读不到文字？到 <a href="https://github.com/ilynthn/MeguLit/issues">GitHub Issues</a> 留下游戏名，最好附上 MeguLit 的 <code>logs</code> 文件夹</p>
+ </div>
+</section>
+
+<section class="sec" id="start" aria-labelledby="s-title">
+ <div class="wrap">
+  <h2 id="s-title" class="h2" data-i="s.title">五步开始读</h2>
+  <ol class="steps">
+   <li><h3 data-i="s.1.t">下载并解压</h3><p data-i-html="s.1.d">下载 <code class="js-filename">MeguLit-v1.2.8-win-x64.zip</code>，解压到任意文件夹，运行 <code>MeguLit.exe</code></p></li>
+   <li><h3 data-i="s.2.t">选完整版或精简版</h3><p data-i="s.2.d">完整版约 565 MB，一次装齐注音词典和语音引擎（推荐）；精简版约 107 MB，其余组件以后在设置里补装</p></li>
+   <li><h3 data-i="s.3.t">选游戏文件夹</h3><p data-i="s.3.d">MeguLit 扫描文件夹和 Steam，自动找出日文原版 EXE，系列作品归到一起</p></li>
+   <li><h3 data-i="s.4.t">启动游戏，用窗口模式玩</h3><p data-i-html="s.4.d">点作品 →「启动游戏」，阅读层自动接上，按 <kbd>Alt</kbd> + <kbd>T</kbd> 呼出菜单</p></li>
+   <li><h3 data-i="s.5.t">零基础先学五十音</h3><p data-i="s.5.d">学习 → 五十音：25 课、五十音图和三个假名小游戏，例句来自你自己玩过的游戏</p></li>
+  </ol>
+ </div>
+</section>
+
+<section class="sec sec-dl" id="download" aria-labelledby="d-title">
+ <div class="wrap dl-grid">
+  <div class="dl-main">
+   <h2 id="d-title" class="h2" data-i="d.title">下载</h2>
+   <p class="dl-version"><span class="js-title">MeguLit v1.2.8</span></p>
+   <dl class="facts">
+    <div><dt data-i="d.date">发布日期</dt><dd class="js-date">2026年11月10日</dd></div>
+    <div><dt data-i="d.size">大小</dt><dd class="js-size">20.0 MB</dd></div>
+    <div><dt data-i="d.file">文件</dt><dd class="js-filename mono">MeguLit-v1.2.8-win-x64.zip</dd></div>
+    <div class="sha"><dt>SHA-256</dt><dd><code class="js-sha mono">59d34289bca48ceb07687c49b4360880db494c5cd22ad5fd5c6bc942e94e68e3</code><button type="button" class="copy js-copy" data-i="d.copy">复制</button></dd></div>
+   </dl>
+   <a class="btn btn-primary btn-wide js-download" href="https://github.com/ilynthn/MeguLit/releases/latest">
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
+    <span data-i="dl.button">下载 MeguLit</span>
+   </a>
+   <p class="small js-source-note" data-i="d.mirror">从 megulit.com 的国内友好镜像下载，与 GitHub Releases 自动同步并校验 SHA-256</p>
+   <div class="alt">
+    <h3 class="h4" data-i="dl.alt">备用下载</h3>
+    <ul class="js-alt">
+     <li><a href="https://gh-proxy.com/https://github.com/ilynthn/MeguLit/releases/latest" rel="noopener"><span data-i="d.proxy">GitHub 加速镜像</span><span>gh-proxy.com</span></a></li>
+     <li><a href="https://ghproxy.net/https://github.com/ilynthn/MeguLit/releases/latest" rel="noopener"><span data-i="d.proxy">GitHub 加速镜像</span><span>ghproxy.net</span></a></li>
+     <li><a href="https://github.com/ilynthn/MeguLit/releases/latest" rel="noopener"><span data-i="d.github">GitHub 直连</span><span>github.com</span></a></li>
+    </ul>
+   </div>
+  </div>
+  <div class="dl-side">
+   <div class="notes">
+    <div class="notes-head">
+     <h3 class="h4" data-i="d.notes">更新内容</h3>
+     <div class="seg seg-sm" role="group" aria-label="更新内容语言" data-i-attr="aria-label:d.notes">
+      <button type="button" data-notes="zh" aria-pressed="true">中文</button>
+      <button type="button" data-notes="en" aria-pressed="false">English</button>
+     </div>
+    </div>
+    <div class="notes-body js-notes"><p data-i="d.loading">正在读取更新内容…</p></div>
+    <a class="small link" href="/changelog.html" data-i="d.all">全部版本的更新日志</a>
+   </div>
+   <div class="req">
+    <h3 class="h4" data-i="d.req">系统要求</h3>
+    <ul>
+     <li data-i="d.req1">Windows 10 / 11，64 位</li>
+     <li data-i-html="d.req2">Microsoft Edge WebView2 Runtime（Windows 11 自带，Windows 10 没有的话从 <a href="https://developer.microsoft.com/microsoft-edge/webview2/">微软官网</a> 安装）</li>
+     <li data-i="d.req3">游戏剧情是日文原文。只汉化了菜单的游戏不受影响</li>
+     <li data-i="d.req4">首次启动下载组件：精简版约 107 MB，完整版约 565 MB（占用约 1.8 GB）</li>
+    </ul>
+   </div>
+   <div class="smart">
+    <h3 class="h4" data-i="d.smart">看到「Windows 已保护你的电脑」？</h3>
+    <p data-i-html="d.smart.d">新版本还没积累足够的下载量时，SmartScreen 会拦一下。点 <b>更多信息</b>，再点 <b>仍要运行</b> 即可。可以先用上面的 SHA-256 核对文件</p>
+   </div>
+  </div>
+ </div>
+</section>
+
+<section class="sec" id="faq" aria-labelledby="q-title">
+ <div class="wrap narrow">
+  <h2 id="q-title" class="h2" data-i="q.title">常见问题</h2>
+  <div class="faq">
+   <details open><summary data-i="q.1.q">全屏玩的时候翻译显示不全，或者文字跑到了桌面上</summary><p data-i="q.1.a">请把游戏切到窗口模式。独占全屏下游戏会盖住其他所有窗口，阅读层没法稳定地画在游戏上面。窗口拉大一点也没关系</p></details>
+   <details><summary data-i="q.2.q">读到的是乱码，或者根本不是日文</summary><p data-i="q.2.a">剧情必须是日文原文。汉化版先试试「工具 → 日文原版恢复」；如果只是文本流选错了，在阅读层里一键重选</p></details>
+   <details><summary data-i="q.3.q">下载很慢，或者打不开 GitHub</summary><p data-i="q.3.a">本页的下载按钮默认走 megulit.com 自己的镜像，和 GitHub Releases 自动同步。镜像不可用时，「备用下载」里还有两个 GitHub 加速镜像和 GitHub 直连</p></details>
+   <details><summary data-i="q.4.q">更新会不会弄丢我的数据</summary><p data-i-html="q.4.a">不会。自动更新只替换程序文件，<code>data</code>、<code>logs</code>、<code>cache</code>、<code>runtime</code>、<code>models</code> 都不碰，旧的 <code>MeguLit.exe</code> 还会留一份 <code>MeguLit.rollback-update.exe</code></p></details>
+   <details><summary data-i="q.5.q">点「启动游戏」提示「无法检查游戏是否已运行」</summary><p data-i="q.5.a">v1.1.0 已经修复。旧版本在部分电脑上（多半是杀毒软件拦了进程查询）会这样，更新就好</p></details>
+   <details><summary data-i="q.6.q">Anki 连不上</summary><p data-i="q.6.a">先打开 Anki，并装好 AnkiConnect（MeguLit 里可以一键安装）。端口 8765 被别的程序占用也会连不上</p></details>
+   <details><summary data-i="q.7.q">某个游戏读不到文字</summary><p data-i-html="q.7.a">不同引擎差别很大。请在 <a href="https://github.com/ilynthn/MeguLit/issues">GitHub Issues</a> 留下游戏名，最好附上 MeguLit 的 <code>logs</code> 文件夹</p></details>
+   <details><summary data-i="q.8.q">要钱吗？会收集我的数据吗？</summary><p data-i="q.8.a">免费，源码以 GPL-3.0 公开。学习记录和设置都存在你自己的电脑上；翻译接口的密钥加密保存在本地，只发给你选的那家服务</p></details>
+  </div>
+ </div>
+</section>
+
+<section class="sec sec-support" id="support" aria-labelledby="sp-title">
+ <div class="wrap support">
+  <div>
+   <h2 id="sp-title" class="h2" data-i="sp.title">支持 MeguLit</h2>
+   <p data-i="sp.d1">和 Bug 魔王军的战斗还在继续，冒险经费倒是快见底了……</p>
+   <p data-i="sp.d2">如果 MeguLit 为你的日语学习带来了一点帮助，欢迎赞助一点厄里斯，支持项目继续开发</p>
+   <div class="cta">
+    <a class="btn btn-quiet" href="https://github.com/sponsors/ilynthn">
+     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg>
+     <span data-i="sp.gh">在 GitHub 赞助</span>
+    </a>
+   </div>
+  </div>
+  <img class="support-card" src="/assets/img/support-card-720.webp" width="720" height="383" loading="lazy" alt="支付宝和微信赞赏码" data-i-attr="alt:sp.alt">
+ </div>
+</section>
+
+</main>
+
+<footer class="foot">
+ <div class="wrap foot-row">
+  <img src="/assets/img/logo-360.webp" width="120" height="46" alt="MeguLit" loading="lazy">
+  <nav aria-label="页脚" data-i-attr="aria-label:foot.label">
+   <a href="https://github.com/ilynthn/MeguLit">GitHub</a>
+   <a href="https://github.com/ilynthn/MeguLit/releases" data-i="foot.releases">全部版本</a>
+   <a href="/changelog.html" data-i="nav.changelog">更新日志</a>
+   <a href="https://github.com/ilynthn/MeguLit/issues" data-i="foot.issues">反馈问题</a>
+   <a href="https://github.com/ilynthn/MeguLit/blob/main/THIRD-PARTY.md" data-i="foot.third">第三方许可</a>
+  </nav>
+  <p class="small" data-i-html="foot.license">MeguLit 以 <a href="https://github.com/ilynthn/MeguLit/blob/main/LICENSE">GPL-3.0-or-later</a> 开源。文本 Hook 基于 LunaHook，词典来自 JMdict / EDRDG</p>
+ </div>
+</footer>
+</body>
+</html>

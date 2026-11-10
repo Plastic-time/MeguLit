@@ -1,0 +1,23 @@
+name = "megulit-dl"
+main = "src/index.mjs"
+compatibility_date = "2025-09-01"
+workers_dev = false
+
+# Custom domain dl.megulit.com (the zone megulit.com must be on this Cloudflare account).
+routes = [{ pattern = "dl.megulit.com", custom_domain = true }]
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "megulit-downloads"
+
+[vars]
+PUBLIC_BASE = "https://dl.megulit.com"
+# "0" skips the Worker's own second hash (R2 still verifies the SHA-256). Only needed on the free plan.
+VERIFY_IN_WORKER = "1"
+
+# Secrets (never in this file):
+#   wrangler secret put GITHUB_TOKEN   # optional, fine-grained token with public read only; lifts the 60/h API limit
+#   wrangler secret put SYNC_TOKEN     # random string; lets you trigger POST /sync by hand
