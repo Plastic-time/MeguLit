@@ -6,6 +6,11 @@ export const I18N = {
   ja: {
     'skip': '本文へ移動',
     'intro.skip': 'スキップ',
+    'try.title': 'まず、触ってみて',
+    'try.lede': 'ダウンロード不要。下の三つが、MeguLit がいつもやってくれることです',
+    'try.k1': 'タップで辞書 + ワンクリックでカード',
+    'try.k2': 'ゲームそのまま ↔ MeguLit あり',
+    'try.k3': '3 秒かなチャレンジ',
     'nav.feedback': 'フィードバック',
     'nt.title': 'MeguLit はまだ開発中です',
     'nt.lede': '一部のゲームはまだうまく動きません（例：『ファタモルガーナの館』）。遊びたいゲームの名前を下に書いて送信してください。早ければ半日、遅くとも一週間で対応します',
@@ -236,6 +241,11 @@ export const I18N = {
   en: {
     'skip': 'Skip to content',
     'intro.skip': 'Skip',
+    'try.title': 'Try it first',
+    'try.lede': 'No download needed. These three are what MeguLit does for you every day',
+    'try.k1': 'Tap to look up + one-click cards',
+    'try.k2': 'The game as is ↔ with MeguLit',
+    'try.k3': 'Three-second kana',
     'nav.feedback': 'Feedback',
     'nt.title': 'MeguLit is still in development',
     'nt.lede': 'Some games don’t work well yet (The House in Fata Morgana, for one). Type a game you want to play below and send it: support usually lands within half a day, and within a week at most',
