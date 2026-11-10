@@ -12,4 +12,4 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; script-src 'self' 'sha256-v8+3wGXRso65BtrBFD5WJXQWtO7kaZ03/6XY3ZWFFrs='; connect-src 'self' https://dl.megulit.com; frame-ancestors 'none'; base-uri 'self'
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; script-src 'self' 'sha256-w4U7NewrpTOLeQn5/0cG+ePsKNdrgJLQWuItjgLvJ2M='; connect-src 'self' https://dl.megulit.com; frame-ancestors 'none'; base-uri 'self'

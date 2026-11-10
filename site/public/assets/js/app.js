@@ -2,7 +2,7 @@
 // megulit.com page script: language and theme, the release data behind the download buttons, engine list, changelog.
 import { I18N } from './i18n.js';
 import { MIRROR, downloadSources, formatSize, formatDate, pickLang, renderMarkdown } from './core.mjs';
-import { ring, kana, audioSpectrum } from './spell.js';
+import { kana } from './spell.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -37,6 +37,7 @@ function applyLang(next) {
   for (const b of $$('[data-lang]')) b.setAttribute('aria-pressed', String(b.dataset.lang === lang));
   splitKinetic();
   setSoundLabel();
+  dispatchEvent(new Event('megulit:lang'));
   document.title = document.body.dataset.page === 'changelog' ? `${pick('t', 'cl.title')} · MeguLit` : d('title');
   if (release) fillRelease();
   if (engines) fillEngines(); else fillTicker();
@@ -180,6 +181,10 @@ function fillEngines() {
     return el;
   };
   $('.js-engine-count') && ($('.js-engine-count').textContent = e.detected.length);
+  for (const [sel, n] of [['.js-count-engines', e.detected.length], ['.js-count-adapters', e.adapters.length]]) {
+    const el = $(sel);
+    if (el) { el.dataset.to = n; if (!el.dataset.counted) el.textContent = n; }
+  }
   $('.js-adapters')?.replaceChildren(...e.adapters.map(a => li(a.name, a.games.join(' · '))));
   $('.js-games')?.replaceChildren(...e.games.map(g => {
     const el = li(lang === 'en' && g.en ? g.en : g.title, g.engine);
@@ -279,8 +284,6 @@ if (video && !reduce && !navigator.connection?.saveData) {
   startVideo();
   new IntersectionObserver(([e]) => { if (e.isIntersecting) video.play().catch(() => {}); else video.pause(); }).observe(video);
 }
-const spectrum = video ? audioSpectrum(video) : null;
-if ($('.ring-fx')) ring($('.ring-fx'), { still: reduce, spectrum: () => spectrum?.read() });
 if ($('.kana-fx') && $('.hero')) kana($('.kana-fx'), $('.hero'), { still: reduce });
 const soundBtn = $('.js-sound');
 function setSoundLabel() {
@@ -292,7 +295,6 @@ function setSoundLabel() {
 soundBtn?.addEventListener('click', () => {
   if (!video) return;
   startVideo();
-  spectrum?.start();
   video.muted = !video.muted;
   if (!video.muted) { video.volume = .8; video.play().catch(() => {}); }
   setSoundLabel();
@@ -326,13 +328,14 @@ if (hero && finePointer && !reduce) {
   });
 }
 if (finePointer && !reduce) {
-  const box = $('.textbox');
-  box?.addEventListener('pointermove', e => {
-    const r = box.getBoundingClientRect();
-    box.style.setProperty('--ry', `${((e.clientX - r.left) / r.width - .5) * 12}deg`);
-    box.style.setProperty('--rx', `${((e.clientY - r.top) / r.height - .5) * -9}deg`);
-  });
-  box?.addEventListener('pointerleave', () => { box.style.setProperty('--rx', '0deg'); box.style.setProperty('--ry', '0deg'); });
+  for (const box of $$('.tilt-card')) {
+    box.addEventListener('pointermove', e => {
+      const r = box.getBoundingClientRect();
+      box.style.setProperty('--ry', `${((e.clientX - r.left) / r.width - .5) * 8}deg`);
+      box.style.setProperty('--rx', `${((e.clientY - r.top) / r.height - .5) * -6}deg`);
+    });
+    box.addEventListener('pointerleave', () => { box.style.setProperty('--rx', '0deg'); box.style.setProperty('--ry', '0deg'); });
+  }
   for (const el of $$('.spot')) el.addEventListener('pointermove', e => {
     const r = el.getBoundingClientRect();
     el.style.setProperty('--mx', `${e.clientX - r.left}px`);
@@ -340,21 +343,37 @@ if (finePointer && !reduce) {
   });
 }
 
+// Feature clips from the promo video: loaded and played only while on screen; posters only when motion is reduced.
+if (!reduce) {
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      const v = e.target;
+      if (e.isIntersecting) { if (!v.getAttribute('src')) v.src = v.dataset.src; v.play().catch(() => {}); }
+      else v.pause();
+    }
+  }, { rootMargin: '120px 0px' });
+  for (const v of $$('video.clip')) if (!v.closest('.stage-item')) io.observe(v);
+}
+
 // GMV ticker: engine names on the crimson band, game titles on the outlined band. Two copies make the loop seamless.
-const TICK_ENGINES = ['KiriKiri', 'BGI', 'SiglusEngine', 'YU-RIS', 'Artemis', 'CatSystem2', "Ren'Py", 'HuneX', 'Naninovel', 'MAGES', 'AQUAPLUS', 'NScripter'];
-const TICK_GAMES = ['ISLAND', '魔法使いの夜', 'WHITE ALBUM2', 'euphoria', '千恋＊万花', 'CLANNAD', 'The Shell', '魔法少女ノ魔女裁判', 'STEINS;GATE', '月姫'];
+// The ticker speaks Japanese in every UI language: what MeguLit does, and lines from the games in the video.
+const TICK_FEATURES = ['埋め込み', 'ふりがな', 'クリックで辞書', 'Anki カード', '復習', '五十音', '学習統計', '会話ログ', 'AI 解説'];
+const TICK_LINES = ['雪に埋もれた', '何かを掴んでいた', '顔を覆う', '空気を読む', '続きを読もう', '最後まで', '物語', '言葉'];
 function fillTicker() {
   const fill = (el, words) => {
     if (!el) return;
     const once = words.flatMap(w => { const s = document.createElement('span'); s.textContent = w; const i = document.createElement('i'); i.textContent = '✦'; return [s, i]; });
     el.replaceChildren(...once, ...once.map(n => n.cloneNode(true)));
   };
-  fill($('.js-tk-a'), engines ? engines.adapters.map(a => a.name.replace(/^Unity \((.+)\)$/, '$1')) : TICK_ENGINES);
-  fill($('.js-tk-b'), engines ? engines.games.map(g => g.title) : TICK_GAMES);
+  fill($('.js-tk-a'), TICK_FEATURES);
+  fill($('.js-tk-b'), TICK_LINES);
 }
 
 if (lang !== 'zh') applyLang(lang);
 else { splitKinetic(); fillTicker(); setSoundLabel(); }
+
+// Motion layer (anime.js). If it cannot load, a CSS fallback shows everything after a moment.
+import('./fx.js').then(m => m.run({ reduce, finePointer })).catch(() => {});
 loadRelease();
 loadEngines();
 loadReleases();

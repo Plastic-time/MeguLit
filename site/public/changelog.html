@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>更新日志 · MeguLit</title>
-<meta name="description" content="MeguLit 是免费开源的 Windows 工具：接上 Galgame 正在显示的日文台词，给它注音、翻译、查词，把生词送进 Anki，还能把译文直接写进游戏的文本框">
+<meta name="description" content="MeguLit 是免费开源的 Galgame 日语学习工具：台词带注音和释义，点一下查词，一键制成 Anki 卡片，阅读量和生词都记着，译文还能直接写进游戏的文本框">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#170f11" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f8f1ee" media="(prefers-color-scheme: light)">
@@ -12,15 +12,15 @@
 <link rel="icon" href="/favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:title" content="MeguLit">
-<meta property="og:description" content="在 Galgame 里读日语原文：注音、翻译、查词、Anki，译文直接写进游戏">
+<meta property="og:description" content="用 Galgame 学日语：注音、查词、Anki 制卡、学习统计，译文直接写进游戏">
 <meta property="og:image" content="https://megulit.com/assets/img/og.jpg">
 <meta property="og:url" content="https://megulit.com/changelog.html">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preload" href="/assets/fonts/megulit-serif.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preconnect" href="https://dl.megulit.com" crossorigin>
 <link rel="stylesheet" href="/assets/css/site.css">
-<script>/* theme before paint, so the page never flashes the wrong colours */
-document.documentElement.classList.add('js');try{var t=localStorage.getItem('megulit-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}
+<script>/* theme before paint, so the page never flashes the wrong colours; the grimoire intro once per visit */
+document.documentElement.classList.add('js');try{var t=localStorage.getItem('megulit-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;if(!sessionStorage.getItem('megulit-intro')&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&!/[?&]nointro/.test(location.search))document.documentElement.classList.add('intro-on');}catch(e){}
 </script>
 <script type="module" src="/assets/js/app.js"></script>
 </head>
