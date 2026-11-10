@@ -22,13 +22,30 @@
 <link rel="preload" href="/assets/fonts/megulit-serif.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preconnect" href="https://dl.megulit.com" crossorigin>
 <link rel="stylesheet" href="/assets/css/site.css">
-<script>/* theme before paint, so the page never flashes the wrong colours */
-document.documentElement.classList.add('js');try{var t=localStorage.getItem('megulit-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}
+<script>/* theme before paint, so the page never flashes the wrong colours; the grimoire intro once per visit */
+document.documentElement.classList.add('js');try{var t=localStorage.getItem('megulit-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;if(!sessionStorage.getItem('megulit-intro')&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&!/[?&]nointro/.test(location.search))document.documentElement.classList.add('intro-on');}catch(e){}
 </script>
 <script type="module" src="/assets/js/app.js"></script>
 </head>
 <body>
-<a class="skip" href="#main" data-i="skip">跳到正文</a>
+<a class="skip-link" href="#main" data-i="skip">跳到正文</a>
+<div class="intro" aria-hidden="true">
+ <div class="intro-bg"></div>
+ <div class="book-stage">
+  <div class="book">
+   <div class="page-r"><div class="ink"><svg class="sigil" viewBox="-100 -100 200 200" aria-hidden="true"><circle r="92"/><circle r="84" class="t"/><circle r="56"/><polygon points="0,-84 72.7,42 -72.7,42"/><polygon points="0,84 72.7,-42 -72.7,-42"/><circle r="18"/></svg><p lang="ja">続きを<ruby>読<rt>よ</rt></ruby>もう</p></div></div>
+   <div class="leaf"><div class="face f"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="face b"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+   <div class="leaf"><div class="face f"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="face b"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+   <div class="leaf"><div class="face f"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="face b"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+   <div class="cover">
+    <div class="face front"><span class="corner c1"></span><span class="corner c2"></span><span class="corner c3"></span><span class="corner c4"></span><img src="/assets/img/logo-720.webp" width="720" height="279" alt=""><span class="tag" lang="ja">魔導書</span></div>
+    <div class="face inside"></div>
+   </div>
+   <div class="burst"></div>
+  </div>
+ </div>
+ <button type="button" class="skip" data-i="intro.skip">跳过</button>
+</div>
 
 <header class="top" id="top">
  <div class="wrap top-row">

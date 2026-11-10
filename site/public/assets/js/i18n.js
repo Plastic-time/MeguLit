@@ -5,6 +5,7 @@
 export const I18N = {
   ja: {
     'skip': '本文へ移動',
+    'intro.skip': 'スキップ',
     'nav.label': 'メインナビゲーション',
     'nav.features': '機能',
     'nav.games': '対応ゲーム',
@@ -148,6 +149,7 @@ export const I18N = {
   },
   en: {
     'skip': 'Skip to content',
+    'intro.skip': 'Skip',
     'nav.label': 'Main navigation',
     'nav.features': 'Features',
     'nav.games': 'Games',

@@ -109,8 +109,8 @@ kbd { font-weight: 600; padding: .1em .5em; border-radius: 6px; background: var(
 .small { font-size: .875rem; color: var(--muted); }
 .wrap { width: 100%; max-width: calc(var(--maxw) + 2 * var(--gutter)); margin: 0 auto; padding: 0 var(--gutter); }
 .narrow { max-width: calc(48rem + 2 * var(--gutter)); }
-.skip { position: absolute; left: -999px; top: 0; }
-.skip:focus { left: 1rem; top: 1rem; z-index: 50; background: var(--surface); padding: .5rem 1rem; }
+.skip-link { position: absolute; left: -999px; top: 0; }
+.skip-link:focus { left: 1rem; top: 1rem; z-index: 50; background: var(--surface); padding: .5rem 1rem; }
 
 /* ---- top bar ---------------------------------------------------------------------------------------------------- */
 .top {
@@ -613,7 +613,7 @@ section[data-kanji]::before {
 /* ---- anime.js layer ---------------------------------------------------------------------------------------------- */
 /* hidden until the intro timeline brings them in; a CSS fallback shows them if the script never runs */
 @media (prefers-reduced-motion: no-preference) {
-  .js .hero .lede, .js .hero .cta > *, .js .hero .cta-meta, .js .hero-bar > * { opacity: 0; animation: fx-fallback 0s 3.2s forwards; }
+  .js .hero .lede, .js .hero .cta > *, .js .hero .cta-meta, .js .hero-bar > * { opacity: 0; animation: fx-fallback 0s 8s forwards; }
 }
 @keyframes fx-fallback { to { opacity: 1; } }
 .rays-fx { position: absolute; inset: 0; width: 100%; height: 100%; mix-blend-mode: screen; opacity: .7; }
@@ -679,4 +679,109 @@ section[data-kanji]::before {
 }
 @media (max-width: 40rem) {
   .hero-copy { padding: 1.3rem 1.1rem; border-radius: 22px; margin-inline: -.25rem; }
+}
+
+/* ---- entrance: the grimoire opens ------------------------------------------------------------------------------- */
+.intro { display: none; }
+.intro-on .intro {
+  display: grid; place-items: center; position: fixed; inset: 0; z-index: 100; cursor: pointer;
+  animation: intro-failsafe .5s 7s forwards; /* if the script never runs, the book gets out of the way */
+}
+@keyframes intro-failsafe { to { opacity: 0; visibility: hidden; } }
+.intro-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(60% 50% at 50% 55%, rgba(120, 18, 34, .55), transparent 70%),
+    radial-gradient(120% 90% at 50% 50%, #1a0b0f 30%, #070304 100%);
+}
+.book-stage { position: relative; perspective: 2200px; perspective-origin: 50% 40%; }
+.book {
+  --bw: min(32vw, 50vh, 28rem);
+  position: relative; width: var(--bw); height: calc(var(--bw) * 1.38);
+  transform-style: preserve-3d; transform: rotateX(12deg); opacity: 0;
+}
+.book .face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+
+/* right page under everything: parchment with a sigil drawn in crimson ink */
+.page-r, .leaf .face, .cover .inside {
+  background:
+    radial-gradient(120% 100% at 0% 50%, rgba(80, 40, 20, .28), transparent 40%),
+    radial-gradient(90% 70% at 70% 30%, #fbf1df, #ecdcbf 70%, #d9c29b);
+}
+.page-r { position: absolute; inset: 3% 2% 3% 0; border-radius: 2px 10px 10px 2px; box-shadow: inset 8px 0 18px -10px rgba(60, 20, 10, .6), 0 30px 60px -20px rgba(0, 0, 0, .8); }
+.page-r .ink { position: absolute; inset: 10%; display: grid; place-items: center; align-content: center; gap: 6%; }
+.sigil { width: 78%; fill: none; stroke: #9e1b2d; stroke-width: 1.4; opacity: 0; }
+.sigil .t { stroke-dasharray: 1.5 4; stroke-width: 6; opacity: .6; }
+.page-r p { margin: 0; font: 600 calc(var(--bw) * .085) / 1.6 var(--serif-ja); color: #3a1418; letter-spacing: .08em; }
+.page-r rt { font-size: .4em; color: #9e1b2d; }
+
+/* fluttering leaves: printed lines on both sides */
+.leaf { position: absolute; inset: 3% 2% 3% 0; transform-origin: left center; transform-style: preserve-3d; }
+.leaf .face { border-radius: 2px 10px 10px 2px; padding: 16% 12%; display: grid; align-content: start; gap: 7%; box-shadow: inset 8px 0 16px -10px rgba(60, 20, 10, .55); }
+.leaf .b { transform: rotateY(180deg); border-radius: 10px 2px 2px 10px; }
+.leaf i { display: block; height: 3px; border-radius: 2px; background: rgba(70, 30, 26, .28); }
+.leaf i:nth-child(3n) { width: 70%; }
+.leaf i:nth-child(4n+1) { width: 88%; background: rgba(158, 27, 45, .35); }
+
+/* the cover: crimson leather, a gold frame, gilt corners and the logo */
+.cover { position: absolute; inset: 0 -2% 0 -1%; transform-origin: left center; transform-style: preserve-3d; z-index: 2; }
+.cover .front {
+  border-radius: 4px 14px 14px 4px; display: grid; place-items: center; align-content: center; gap: 4%;
+  background:
+    radial-gradient(110% 80% at 28% 18%, rgba(255, 140, 140, .22), transparent 50%),
+    radial-gradient(90% 70% at 80% 95%, rgba(0, 0, 0, .55), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(160deg, #861a2b, #520b18 58%, #2c050c);
+  box-shadow: inset 10px 0 18px -8px rgba(0, 0, 0, .7), inset -2px 0 0 rgba(255, 210, 160, .2), 0 40px 80px -24px rgba(0, 0, 0, .9);
+}
+.cover .front::before, .cover .front::after { content: ""; position: absolute; border-radius: 6px; pointer-events: none; }
+.cover .front::before { inset: 6%; border: 2px solid #d9a957; box-shadow: 0 0 0 1px rgba(0, 0, 0, .4), inset 0 0 0 1px rgba(0, 0, 0, .4); }
+.cover .front::after { inset: 8.2%; border: 1px solid rgba(217, 169, 87, .55); }
+.cover .front img { width: 80%; height: auto; position: relative; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .55)) drop-shadow(0 0 14px rgba(234, 187, 95, .35)); }
+.cover .tag { position: relative; font: 600 calc(var(--bw) * .06) / 1 var(--serif-ja); color: #e7bf6a; letter-spacing: .5em; padding-left: .5em; text-shadow: 0 1px 0 rgba(0, 0, 0, .6); }
+.corner { position: absolute; width: 11%; aspect-ratio: 1; border-top: 2px solid #e2b462; border-left: 2px solid #e2b462; border-top-left-radius: 40% 40%; }
+.corner::after { content: ""; position: absolute; left: 22%; top: 22%; width: 18%; aspect-ratio: 1; background: #e2b462; transform: rotate(45deg); box-shadow: 0 0 6px rgba(234, 187, 95, .6); }
+.c1 { top: 3%; left: 3%; } .c2 { top: 3%; right: 3%; transform: scaleX(-1); } .c3 { bottom: 3%; left: 3%; transform: scaleY(-1); } .c4 { bottom: 3%; right: 3%; transform: scale(-1); }
+.cover .inside { transform: rotateY(180deg); border-radius: 14px 4px 4px 14px; background: radial-gradient(80% 60% at 40% 40%, #6d1424, #3a0811); box-shadow: inset -10px 0 18px -8px rgba(0, 0, 0, .6); }
+.cover .inside::after { content: ""; position: absolute; inset: 7%; border: 1px solid rgba(217, 169, 87, .45); border-radius: 6px; }
+
+/* light bursting out of the open spread */
+.burst {
+  position: absolute; left: 0; top: 50%; width: calc(var(--bw) * 1.6); aspect-ratio: 1; translate: -50% -50%; opacity: 0;
+  border-radius: 50%; pointer-events: none; transform: translateZ(60px);
+  background: radial-gradient(circle, rgba(255, 246, 220, .95), rgba(255, 196, 120, .7) 22%, rgba(220, 60, 80, .4) 45%, transparent 70%);
+  mix-blend-mode: screen;
+}
+.intro .skip {
+  position: absolute; right: max(1rem, 3vw); bottom: max(1rem, 3vh); z-index: 2;
+  font: 500 .875rem/1 var(--sans); color: rgba(245, 235, 224, .75); background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(245, 235, 224, .18); border-radius: 999px; padding: .6rem 1.1rem; cursor: pointer;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.intro .skip:hover { color: #fff; border-color: rgba(234, 187, 95, .6); }
+@media (max-width: 40rem) { .book { --bw: min(44vw, 40vh); } }
+/* the headline waits behind the closed book */
+.intro-on .kinetic .ch, .intro-on .kinetic.split { animation-play-state: paused !important; }
+
+/* page block visible along the closed book's edge */
+.book::before {
+  content: ""; position: absolute; top: 2.2%; bottom: 2.2%; right: -2.6%; width: 4.5%; border-radius: 0 6px 6px 0;
+  background: repeating-linear-gradient(90deg, #f1e3c6 0 1.5px, #cdb68f 1.5px 2.5px); transform: translateZ(-4px);
+  box-shadow: 4px 6px 14px rgba(0, 0, 0, .6);
+}
+/* gold dust drifting in the dark */
+.intro-bg::after {
+  content: ""; position: absolute; inset: -20%; opacity: .55;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 30%, #f3cf86, transparent), radial-gradient(1px 1px at 28% 72%, #f3cf86, transparent),
+    radial-gradient(2px 2px at 44% 18%, #ffd9a0, transparent), radial-gradient(1px 1px at 63% 64%, #f3cf86, transparent),
+    radial-gradient(1.5px 1.5px at 78% 28%, #ffe2b0, transparent), radial-gradient(1px 1px at 88% 80%, #f3cf86, transparent),
+    radial-gradient(1.5px 1.5px at 35% 45%, #ff8f9a, transparent), radial-gradient(1px 1px at 55% 88%, #ffd9a0, transparent);
+  background-size: 420px 420px; animation: dust 18s linear infinite;
+}
+@keyframes dust { to { transform: translate3d(-60px, -140px, 0); } }
+/* the explosion's shockwave */
+.burst::after {
+  content: ""; position: absolute; inset: 18%; border-radius: 50%; border: 3px solid rgba(255, 214, 150, .85);
+  box-shadow: 0 0 30px rgba(255, 120, 120, .6), inset 0 0 30px rgba(255, 200, 140, .5);
 }

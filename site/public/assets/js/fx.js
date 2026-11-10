@@ -2,14 +2,16 @@
 // Motion built on anime.js 4 (self-hosted, MIT) plus small vanilla ports of effects popularised by React Bits
 // (light rays, click sparks, magnet) and Aceternity UI (hero parallax). Nothing here loads from a CDN.
 import { animate, createTimeline, stagger, scrambleText, createDrawable } from '../vendor/animejs-4.5.0/anime.esm.min.js';
+import { playIntro } from './intro.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const KATAKANA = 'ァ-ヶ';
 
-export function run({ reduce, finePointer }) {
+export async function run({ reduce, finePointer }) {
   document.documentElement.classList.add('fx');
   if (reduce) { reveal(); parallax(true); return; }
+  await playIntro();
   intro();
   headings();
   parallax(false);
