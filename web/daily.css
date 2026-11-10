@@ -97,8 +97,8 @@ a:hover .dl-plate i:nth-child(2){transform:translate(8%,-6%) rotate(45deg)}
 .dl-note{margin:-6px 0 14px;font-size:12px;line-height:1.7;color:var(--g-t3)}
 .dl-words{list-style:none;margin:0;padding:0;counter-reset:w}
 .dl-word{border-bottom:1px solid var(--dl-hair);position:relative}
-.dl-word::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--dl-red);transform:scaleY(0);transform-origin:top;transition:transform .3s var(--dl-ease)}
-.dl-word:hover::before,.dl-word.open::before{transform:scaleY(1)}
+.dl-word::before{content:"";position:absolute;left:0;top:50%;width:5px;height:5px;margin-top:-2.5px;background:var(--dl-red);transform:scale(0) rotate(45deg);transition:transform .3s var(--dl-ease)}
+.dl-word:hover::before,.dl-word.open::before{transform:scale(1) rotate(45deg)}
 .dl-word-row{display:flex;align-items:stretch}
 .dl-word-main{flex:1;display:grid!important;grid-template-columns:34px minmax(0,1fr) auto;align-items:end;gap:10px;padding:10px 6px 10px 12px!important;text-align:left;transition:background .25s}
 .dl-word-main:hover{background:color-mix(in srgb,var(--dl-gold) 6%,transparent)!important}
