@@ -213,7 +213,7 @@ $inChina = ([TimeZoneInfo]::Local.Id -eq 'China Standard Time') -or ((Get-Cultur
 function Source-Name($url) { ([Uri]$url).Host }
 function Candidates($id) {
   $direct = @($packs.$id.urls)
-  $mirrored = foreach ($m in @($manifest.mirrors)) { foreach ($u in $direct) { $m.Replace('{url}', $u) } }
+  $mirrored = foreach ($m in @($manifest.mirrors)) { foreach ($u in $direct) { $seg = $u.Split('/'); $m.Replace('{url}', $u).Replace('{tag}', $seg[-2]).Replace('{file}', $seg[-1]) } }
   if ($inChina) { @($mirrored) + $direct } else { $direct + @($mirrored) }
 }
 function Probe($url) {

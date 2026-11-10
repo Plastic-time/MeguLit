@@ -5,6 +5,8 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node:crypto'),{spawn}=require('node:child_process');
 
+/* E383 a mirror template may use {url} (whole GitHub URL), or {tag} and {file} (release tag and file name) for our own mirror dl.megulit.com */
+function mirrorUrl(template,url){const parts=String(url).split('/'),file=parts.pop()||'',tag=parts.pop()||'';return template.replace('{url}',url).replace('{tag}',tag).replace('{file}',file);}
 const MARKERS={base:'runtime/node.exe',reading:'runtime/reading/sudachidict_full/resources/system.dic',voice:'runtime/aivis/run.exe'};
 
 class RuntimePacks{
@@ -24,7 +26,7 @@ class RuntimePacks{
   const part=path.join(this.root,'runtime-'+id+'.part'),stage=path.join(this.root,'runtime-'+id+'.unpack');
   let lastError=null;
   // Mainland China (by time zone / locale, no IP lookup): try GitHub mirrors first. SHA-256 still has to match.
-  const direct=pack.urls||[],mirrored=(this.manifest().mirrors||[]).flatMap(m=>direct.map(u=>m.replace('{url}',u)));
+  const direct=pack.urls||[],mirrored=(this.manifest().mirrors||[]).flatMap(m=>direct.map(u=>mirrorUrl(m,u)));
   const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'',china=['Asia/Shanghai','Asia/Chongqing','Asia/Harbin','Asia/Urumqi','PRC'].includes(tz);
   for(const url of china?[...mirrored,...direct]:[...direct,...mirrored]){
    job.state='downloading';job.stage='download';job.received=0;job.controller=new AbortController();
@@ -61,4 +63,4 @@ function fetchTo(url,file,job,hops=0){
   req.on('error',reject);
  });
 }
-module.exports={RuntimePacks,MARKERS};
+module.exports={RuntimePacks,MARKERS,mirrorUrl};

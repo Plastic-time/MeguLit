@@ -49,8 +49,11 @@ export default {
 };
 
 // Content-addressed files never change, so they cache forever at the edge. Range requests resume broken downloads.
+// E383 runtime packs and the llama.cpp build are mirrored by hand (Release / docs); prune never touches them.
+const INSTALLER = /^files\/[0-9a-f]{64}\/MeguLit-v[\d.]+-win-x64\.zip$/;
+const RUNTIME_FILE = /^files\/(runtime-v[\d.]+\/MeguLit-runtime-(base|reading|voice)-v[\d.]+\.zip|b\d+\/llama-b\d+-bin-win-vulkan-x64\.zip)$/;
 async function serveFile(request, env, ctx, key) {
-  if (!/^files\/[0-9a-f]{64}\/MeguLit-v[\d.]+-win-x64\.zip$/.test(key)) return new Response('not found', { status: 404 });
+  if (!INSTALLER.test(key) && !RUNTIME_FILE.test(key)) return new Response('not found', { status: 404 });
   const cache = caches.default;
   const ranged = request.headers.has('range');
   if (!ranged && request.method === 'GET') {
@@ -149,7 +152,7 @@ async function releasesList(env) {
 
 async function prune(env, keep) {
   const listed = await env.BUCKET.list({ prefix: 'files/' });
-  const stale = listed.objects.map(o => o.key).filter(k => !keep.includes(k));
+  const stale = listed.objects.map(o => o.key).filter(k => INSTALLER.test(k) && !keep.includes(k));
   if (stale.length) await env.BUCKET.delete(stale);
 }
 
