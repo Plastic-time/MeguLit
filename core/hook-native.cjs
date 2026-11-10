@@ -100,7 +100,7 @@ class HookNative{
      with half-width katakana (ｹｯｦ) and boxes, which also counts as a Chinese build. */
   const garbled=han.length>=4&&(t.match(/[\uff61-\uff9f\u25a1\ufffd]/g)||[]).length>=3;
   const chinese=(!kana||garbled)&&han.length>=4;this.chineseRun=chinese?(this.chineseRun||0)+1:0;this.chineseForeign=chinese?(this.chineseForeign||0)+foreign:0;
-  if(this.chineseRun>=3&&(this.chineseForeign>=2||garbled)&&!this.state?.sourceChinese){this.trace('source looks like Simplified Chinese');this.notify({sourceChinese:true,hookMessage:'当前是中文版：如果游戏支持日语，先在 Steam（游戏属性 → 语言）或游戏自己的设置里切换成日语；否则在作品页的「日文原版启动程序」改成日文版；没有日文版的话，去「工具 → 日文原版恢复」替换成日文版，再启动游戏'});}
+  if(this.chineseRun>=3&&(this.chineseForeign>=2||garbled)&&!this.state?.sourceChinese){this.trace('source looks like Simplified Chinese');this.notify({sourceChinese:true,hookMessage:'检测到游戏剧本目前是中文，MeguLit 需要日文原文。请先在游戏设置或 Steam（游戏属性 → 语言）里改成日文；游戏本身不支持日文的话，用「工具 → 日文原版恢复」；如果游戏目录里没有检测到日文剧本，需要先自行获取日文原版资源，再选「从日文原版导入」，支持直接导入生肉压缩包，自动恢复成日文'});}
   else if(kana&&this.state?.sourceChinese)this.notify({sourceChinese:false});}catch{}}
  source(m,name){
   // The game's own ruby readings ride after the line as \x1d base \x1c reading pairs (ISLAND hook): split them off
