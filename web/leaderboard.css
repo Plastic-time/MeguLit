@@ -139,6 +139,26 @@
 .lb-login .input-group{display:flex;gap:8px}
 .lb-login .form-input{flex:1;min-width:0}
 
+/* E388 change your picture from the page: your avatar in 我的名次 is a button */
+.lb-avatar-edit{position:relative;display:inline-grid;padding:0;border:0;background:none;border-radius:50%;cursor:pointer;flex:none}
+.lb-avatar-edit .leaderboard-avatar{transition:filter .15s ease}
+.lb-avatar-edit:hover .leaderboard-avatar,.lb-avatar-edit:focus-visible .leaderboard-avatar{filter:brightness(.82)}
+.lb-avatar-edit:focus-visible{outline:2px solid var(--lb-gold,var(--accent));outline-offset:2px}
+.lb-avatar-badge{position:absolute;right:-3px;bottom:-3px;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--lb-gold,var(--accent));box-shadow:0 0 0 2px var(--lb-raise-2,var(--surface))}
+.lb-avatar-badge svg{width:11px;height:11px;fill:#1a1210}
+.lb-avatar-edit.is-busy{cursor:progress}.lb-avatar-edit.is-busy .leaderboard-avatar{animation:lb-pulse 1s ease-in-out infinite alternate}
+@keyframes lb-pulse{to{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.lb-avatar-edit.is-busy .leaderboard-avatar{animation:none;opacity:.6}}
+
+/* E388 avatar crop window: the background crop window plus a circular preview */
+.avatar-crop-body{display:flex;align-items:center;gap:18px}
+.avatar-crop .tome-crop-stage i{border-radius:2px}
+.avatar-crop .tome-crop-stage i::after{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,255,255,.7);pointer-events:none}
+.avatar-crop-preview{margin:0;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--theme-textSecondary,var(--muted,#aaa));font-size:12px}
+.avatar-crop-preview span{position:relative;display:block;width:96px;height:96px;border-radius:50%;overflow:hidden;background:#000;box-shadow:0 0 0 3px color-mix(in srgb,var(--g-gold,#edb56e) 70%,transparent)}
+.avatar-crop-preview img{position:absolute;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
+@media (max-width:560px){.avatar-crop-body{flex-direction:column}}
+
 /* settings › 联网服务: avatar block and appeal */
 .leaderboard-avatar-row{display:flex;align-items:center;gap:20px}
 .leaderboard-avatar-status{margin:0 0 10px;font-size:13px}
