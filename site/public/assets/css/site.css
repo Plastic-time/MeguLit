@@ -1137,3 +1137,17 @@ html { overflow-x: clip; }
   .feat { grid-template-columns: minmax(0, 1fr); }
   .feat-stage { order: -1; position: relative; top: auto; }
 }
+
+/* ---- entrance, round 3: one parchment page that curls as it turns -------------------------------------------------- */
+.intro-on .intro { perspective: 2200px; perspective-origin: 0% 50%; }
+.intro .curl { position: absolute; inset: 0; transform-style: preserve-3d; }
+.intro .strip { position: absolute; top: 0; height: 100%; transform-origin: 0 50%; transform-style: preserve-3d; --d: 0; }
+.intro .sf { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background-repeat: no-repeat; }
+.intro .sf::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(40, 18, 10, var(--d0, 0)), rgba(40, 18, 10, var(--d1, 0))); }
+.intro .back { transform: rotateY(180deg); }
+.intro .back::after { background: linear-gradient(270deg, rgba(40, 18, 10, calc(var(--d0, 0) * .8 + .06)), rgba(40, 18, 10, calc(var(--d1, 0) * .8 + .06))); }
+/* fibres and a soft grain, so it reads as paper and not as a board */
+.intro .front::before, .intro .back::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .9' numOctaves='3' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 .45  0 0 0 0 .32  0 0 0 0 .2  0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+}
