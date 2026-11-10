@@ -39,7 +39,7 @@ class Settings{
     const value=this.uiObject('tome-menu-background',{...panelDefaults,surfaces:{menu:'image',log:'image',card:'image'}});value.panels={...value.panels};
     for(const panel of ['menu','log','card'])value.panels[panel]={...panelDefaults,...Object.fromEntries(Object.keys(panelDefaults).map(k=>[k,value[k]??panelDefaults[k]])),...value.panels[panel]};return value;
   }
-  if(scope==='library'){const library=readJSON(this.file('library.json'));return {autoSeries:library.autoSeries!==false,steamPath:library.steamPath||'',folders:(library.folders||[]).join('\n')};}
+  if(scope==='library'){const library=readJSON(this.file('library.json'));return {autoSeries:library.autoSeries!==false,sharedAdaptation:library.sharedAdaptation!==false,steamPath:library.steamPath||'',folders:(library.folders||[]).join('\n')};}
   throw Error('SETTINGS_SCOPE_INVALID');
  }
  get(profile=''){
@@ -86,7 +86,7 @@ class Settings{
   }
   else if(scope==='background'||scope==='panels'){
     const ui=this.ui();ui[scope==='background'?'tome-background':'tome-menu-background']=JSON.stringify(next);atomic(path.join(this.root,'data','ui-state.json'),ui);
-  }else if(scope==='library')atomic(this.file('library.json'),{...readJSON(this.file('library.json')),steamPath:next.steamPath,folders:next.folders.split(/[\r\n;]+/).map(v=>v.trim()).filter(Boolean),autoSeries:next.autoSeries});
+  }else if(scope==='library')atomic(this.file('library.json'),{...readJSON(this.file('library.json')),steamPath:next.steamPath,folders:next.folders.split(/[\r\n;]+/).map(v=>v.trim()).filter(Boolean),autoSeries:next.autoSeries,sharedAdaptation:next.sharedAdaptation!==false});
   return this.get(profile);
  }
  saveKey({provider,baseUrl,apiKey}){

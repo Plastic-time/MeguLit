@@ -52,6 +52,8 @@ async function launch(db,id,runtime=null,windowsLaunch=false) {
   if(require('./game-language.cjs').originalExecutable(db,id,root).blocked)throw Error('JAPANESE_EXECUTABLE_REQUIRED');
   const elevation=require('./locale-launch.cjs').requiresAdministrator(game.executable);
   runtime?.prepareGame(game.executable,{enter:false});
+  /* E370: a first launch with nothing saved here starts from a matching shared adaptation record (stream memory before the Hook starts, locale mode for this launch) */
+  try{const before=profile.localeMode,shared=require('./shared-adaptation.cjs');shared.importFor(root,{executable:game.executable,engine:profile.engine||'',library:profile,styleSync:runtime?.reader?.gal?.styleSync});if(profile.localeMode!==before){original.library=profile;db.prepare('UPDATE games SET original=? WHERE id=?').run(JSON.stringify(original),id);}}catch{}
   /* Japanese restore tables written before 1.2.2 crash Siglus games on start: rewrite them before launching */
   try{const fix=require('../core/japanese-restore.cjs').repairShared(path.dirname(game.executable));if(fix.repaired||fix.skipped)trace('japanese-restore-repaired',fix);}catch(error){trace('japanese-restore-repair-failed',{error:String(error?.message||error).slice(0,200)});}
   /* E333 (user 2026-11-10, 女装山脈): a YU-RIS Chinese patch (update*.ypf) is still in place while the Japanese program is started: the game shows the Chinese text as garbage. Say so instead of launching. */
