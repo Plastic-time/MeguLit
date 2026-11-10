@@ -53,8 +53,8 @@
   --bg-2: #f2e8e4;
   --surface: #fffaf8;
   --text: #2a1518;
-  --muted: #6b5552;
-  --faint: #76625e;
+  --muted: #5b4542;
+  --faint: #66524e;
   --crimson: #a51d2d;
   --crimson-ink: #a51d2d;
   --gold: #82540c;
@@ -71,8 +71,8 @@
     --bg-2: #f2e8e4;
     --surface: #fffaf8;
     --text: #2a1518;
-    --muted: #6b5552;
-    --faint: #76625e;
+    --muted: #5b4542;
+    --faint: #66524e;
     --crimson: #a51d2d;
     --crimson-ink: #a51d2d;
     --gold: #82540c;
@@ -858,3 +858,6 @@ section[data-kanji]::before {
 .card-spec { display: flex; flex-direction: column; }
 .card-spec .specimen { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 @media (max-width: 40rem) { .card-sm { padding-top: 5.4rem; } .glyph { font-size: 3.6rem; } }
+/* the specimen inside its card is type on the card, not a second card */
+.card .page { background: none; box-shadow: none; padding: .4rem 0 0; }
+.card .page::before { display: none; }
