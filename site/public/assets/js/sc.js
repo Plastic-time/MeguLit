@@ -47,6 +47,7 @@ export class ScAudio extends EventTarget {
   set volume(v) { this._volume = v; this._ready?.then(w => w.setVolume(Math.round(v * GAIN * 100))); }
   play() {
     this._wantPlay = true;
+    this._ready?.then(w => w.setVolume(Math.round(this._volume * GAIN * 100)));
     if (!this._ready) return Promise.reject(new Error('no source'));
     return this._ready.then(w => new Promise((res, rej) => {
       // the widget reports PLAY when it really starts; a browser that wants a click first never does
@@ -66,6 +67,8 @@ export class ScAudio extends EventTarget {
       const E = SC.Widget.Events;
       await new Promise(res => w.bind(E.READY, res));
       w.bind(E.PLAY, () => {
+        // SoundCloud resets its volume to 100% on a reload or a new song: ours goes back on at every start
+        w.setVolume(Math.round(this._volume * GAIN * 100));
         // the length is only reliable once a sound plays
         w.getDuration(ms => { if (ms > 0 && ms / 1000 !== this._duration) { this._duration = ms / 1000; this.dispatchEvent(new Event('loadedmetadata')); } });
         if (this._paused) { this._paused = false; this.dispatchEvent(new Event('play')); }
