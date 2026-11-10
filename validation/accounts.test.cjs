@@ -60,7 +60,7 @@ test('login: code mail, verify, wrong tries, expiry, rate limits, missing mail k
  assert.equal((await (await handleAccounts(req('POST','/api/auth/code',{email:'nope'}),r.env,T0)).json()).error,'EMAIL_INVALID');
  const none=relay({RESEND_API_KEY:''});assert.equal((await handleAccounts(req('POST','/api/auth/code',{email:'a@example.com'}),none.env,T0)).status,503);
  assert.equal((await handleAccounts(req('POST','/api/auth/code',{email:'a@example.com'}),r.env,T0)).status,200);
- assert.equal(r.mails[0].url,'https://api.resend.com/emails');assert.equal(r.mails[0].body.from,'MeguLit <noreply@megulit.com>');assert.deepEqual(r.mails[0].body.to,['a@example.com']);assert.equal(r.mails[0].auth,'Bearer re_test');
+ assert.equal(r.mails[0].url,'https://api.resend.com/emails');assert.equal(r.mails[0].body.from,'MeguLit <mail@megulit.com>');assert.deepEqual(r.mails[0].body.to,['a@example.com']);assert.equal(r.mails[0].auth,'Bearer re_test');
  const stored=r.env.DB.raw.prepare('SELECT * FROM auth_codes').all();assert.equal(stored.length,1);
  assert.ok(!JSON.stringify(stored).includes(r.lastCode())&&!JSON.stringify(stored).includes('a@example.com'),'only hashes are stored');
  /* one code a minute per email */

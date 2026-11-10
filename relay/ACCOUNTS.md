@@ -32,7 +32,7 @@ app calls from Node with no Origin, so no CORS change is needed.
    - optional `npx wrangler secret put AUTH_PEPPER` (any long random string; falls back to `HASH_SALT`).
      Changing it later invalidates pending codes only.
 3. Resend: verify the `megulit.com` domain (SPF/DKIM records in Cloudflare DNS) and keep **open and click tracking
-   off** for it. The mail has no links and no images. Sender: `noreply@megulit.com` (`MAIL_FROM` var overrides).
+   off** for it. The mail has no links and no images. Sender: `mail@megulit.com` (`MAIL_FROM` var overrides).
 
 ## Endpoints
 

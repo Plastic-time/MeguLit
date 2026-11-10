@@ -4,7 +4,7 @@
    from worker.js) so it merges next to the leaderboard branch without touching its router.
 
    Bindings/secrets: DB (D1), RESEND_API_KEY (secret, mail), optional AUTH_PEPPER (secret, falls back to HASH_SALT).
-   Vars: optional MAIL_FROM (default "MeguLit <noreply@megulit.com>").
+   Vars: optional MAIL_FROM (default "MeguLit <mail@megulit.com>").
 
    handleAccounts(request,env,now) → Response, or null when the path is not an accounts path.
    authenticate(request,env,now) → {account,session,token} or null; the leaderboard can use account.id from it. */
@@ -125,7 +125,7 @@ async function sendCode(env, email, code) {
   const response = await (env.fetch || fetch)('https://api.resend.com/emails', {
     method: 'POST',
     headers: { authorization: 'Bearer ' + env.RESEND_API_KEY, 'content-type': 'application/json', 'user-agent': 'megulit-relay' },
-    body: JSON.stringify({ from: env.MAIL_FROM || 'MeguLit <noreply@megulit.com>', to: [email], subject: mail.subject, text: mail.text, html: mail.html })
+    body: JSON.stringify({ from: env.MAIL_FROM || 'MeguLit <mail@megulit.com>', to: [email], subject: mail.subject, text: mail.text, html: mail.html })
   });
   return response.ok;
 }
