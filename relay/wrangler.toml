@@ -1,0 +1,31 @@
+# E377 MeguLit relay (Cloudflare Worker + D1 + R2). Deploy steps: README.md in this folder.
+# No secrets here: GITHUB_TOKEN, LINK_SECRET, HASH_SALT (and optional DIAG_TOKEN) are set with `wrangler secret put`.
+name = "megulit-relay"
+main = "src/worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+# Custom domain: replace relay.example.com with the real host (its zone must be on this Cloudflare account).
+# Top-level key: keep it above the first [table] below.
+routes = [
+  { pattern = "relay.example.com", custom_domain = true }
+]
+
+[vars]
+GITHUB_REPO = "ilynthn/MeguLit"
+LINK_DAYS = "30"
+ALLOWED_ORIGINS = ""
+
+# Filled in from `wrangler d1 create megulit-relay` (copy the database_id it prints).
+[[d1_databases]]
+binding = "DB"
+database_name = "megulit-relay"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "megulit-diagnostics"
+
+[observability]
+enabled = true
