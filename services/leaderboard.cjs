@@ -231,7 +231,7 @@ async function hotWords(root,{week='',category='word'}={},options={}){
 
 /* Everything the 排行榜 page needs in one call; refreshes the user's own entry at most every 10 minutes. */
 async function view(root,db,request={},options={}){
- const now=options.now||new Date(),period=PERIODS.includes(request.period)?request.period:'week',metric=[...METRICS,'games'].includes(request.metric)?request.metric:'characters';
+ const now=options.now||new Date(),period=PERIODS.includes(request.period)?request.period:'week',metric=[...METRICS,'games'].includes(request.metric)?request.metric:'seconds';
  const local=collectStats(db,now),c=config(root,options.env,options),tab=request.tab==='hot'?'hot':'board';
  const result={configured:c.configured,joined:c.joined,enabled:c.enabled,name:c.name,shareGames:c.shareGames,account:c.account,tab,period,metric,local,board:null,hot:null,avatars:{}};
  if(!c.configured)return {...result,board:{state:'not-configured'}};

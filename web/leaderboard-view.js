@@ -43,8 +43,8 @@ const W={
   lookedUp:'{users} readers · {n} lookups',times:'{n}×',aiGuess:'AI guess',participants:'{n} readers took part',
   NAME_REQUIRED:'Enter a nickname',NAME_LENGTH:'Nicknames are 2–16 characters',NAME_INVALID:'No links, quotes or special characters',NAME_BLOCKED:'That nickname is not allowed',CONSENT_REQUIRED:'Please tick the agreement first'}
 };
-const PERIODS=['week','month','all'],METRICS=['characters','seconds','words','streak','games'],CATS=['word','phrase','sentence'];
-let view={tab:'board',period:'week',metric:'characters',game:'',category:'word',week:''};
+const PERIODS=['week','month','all'],METRICS=['seconds','characters','words','streak','games'],CATS=['word','phrase','sentence'];
+let view={tab:'board',period:'week',metric:'seconds',game:'',category:'word',week:''};
 export function leaderboardWords(locale){return W[locale]||W.zh;}
 function fill(template,values){return template.replace(/\{(\w+)\}/g,(_,k)=>values[k]??'');}
 const nf=locale=>new Intl.NumberFormat(locale==='zh'?'zh-CN':locale==='ja'?'ja-JP':'en-US');
@@ -83,7 +83,7 @@ const crown='<svg class="lb-crown" viewBox="0 0 32 20" aria-hidden="true"><path 
 const MEDAL={1:'gold',2:'silver',3:'bronze'};
 function localHTML(data,w,locale,esc){
  const stats=data.local?.stats?.[view.period]||{};
- return `<section class="lb-mine"><h2 class="lb-h2">${w.mine} <span>· ${w[view.period]}</span></h2><div class="lb-tiles">${['characters','seconds','words','streak'].map(m=>`<div class="lb-tile"><small>${w[m]}</small><strong>${esc(formatValue(m,stats[m],locale))}</strong></div>`).join('')}<div class="lb-tile is-accent"><small>${w.currentStreak}</small><strong>${esc(formatValue('streak',data.local?.currentStreak,locale))}</strong></div></div></section>`;
+ return `<section class="lb-mine"><h2 class="lb-h2">${w.mine} <span>· ${w[view.period]}</span></h2><div class="lb-tiles">${['seconds','characters','words','streak'].map(m=>`<div class="lb-tile"><small>${w[m]}</small><strong>${esc(formatValue(m,stats[m],locale))}</strong></div>`).join('')}<div class="lb-tile is-accent"><small>${w.currentStreak}</small><strong>${esc(formatValue('streak',data.local?.currentStreak,locale))}</strong></div></div></section>`;
 }
 const flag='<svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14"><path d="M6 21V4m0 0h10l-2 4 2 4H6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
 const reportButton=(e,w,esc)=>e.avatar&&!e.me?`<button type="button" class="leaderboard-report" data-lb-report="${esc(e.avatar)}" title="${w.report}" aria-label="${w.report}">${flag}</button>`:'';

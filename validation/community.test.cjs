@@ -173,7 +173,7 @@ test('appeal: one click opens a GitHub issue with a private, expiring review lin
  assert.match(issue.body,/status='approved'/);
  const link=issue.body.match(/https:\/\/relay\.test\/api\/avatar\/[0-9a-f]{32}\/review\?\S+/)[0];
  const view=await handle(new Request(link),e,NOW);assert.equal(view.status,200);assert.equal(view.headers.get('cache-control'),'private, no-store');
- assert.equal((await handle(new Request(link.replace(/sig=./,'sig=0')),e,NOW)).status,404);
+ assert.equal((await handle(new Request(link.replace(/sig=([0-9a-f])/,(m,c)=>'sig='+(c==='0'?'1':'0'))),e,NOW)).status,404);
  assert.equal((await handle(new Request(link),e,new Date(NOW.getTime()+73*3600000))).status,410);
  const again=await (await handle(req('POST','/api/leaderboard/avatar/appeal?id='+id,'{}'),e,NOW)).json();assert.equal(again.already,true);assert.equal(calls.length,1);
  assert.deepEqual(e.DB.raw.prepare("SELECT kind FROM moderation_queue").all().map(r=>r.kind),['appeal']);
