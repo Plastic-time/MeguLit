@@ -97,7 +97,11 @@ class Reader{
     the waiting sentence is updated every half second, then shows the model starting, then the translation. */
  async localReady(options,id,current){
   const llm=this.runtime.local(),push=message=>{if(Number.isSafeInteger(id))this.runtime.emit('reader-event',{type:'call',method:'deliver',args:[id,'',true,message]});};
-  try{return await llm.ensure(options);}catch(error){if(!/^LOCAL_RUNTIME_DOWNLOADING/.test(error.message))throw error;}
+  try{return await llm.ensure(options);}catch(error){
+   /* E406 (user: 零延迟翻译有时报错无本地大模型): lines the translation script does not cover go to the engine; with
+      a local engine but no model downloaded, use the free online engine for them instead of showing an error */
+   if(error?.code==='LOCAL_MODEL_MISSING'){Object.assign(options,{provider:'microsoft'});return;}
+   if(!/^LOCAL_RUNTIME_DOWNLOADING/.test(error.message))throw error;}
   while(llm.job?.state==='downloading'&&current()){const j=llm.job;push('LOCAL_RUNTIME_DOWNLOADING:'+(j.total?Math.min(100,Math.floor(j.received/j.total*100)):0));await new Promise(r=>setTimeout(r,500));}
   if(!current())throw Error('SUPERSEDED');
   if(llm.job?.state!=='done')throw Error('LOCAL_RUNTIME_DOWNLOAD_FAILED');
