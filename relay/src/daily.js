@@ -179,7 +179,8 @@ async function glossWords(env,words){
    /* Workers AI answers as {response} (Llama) or OpenAI-style {choices:[{message:{content}}]} (Qwen 3) */
    const raw=out?.response??out?.result?.response??out?.choices?.[0]?.message?.content??out?.result?.choices?.[0]?.message?.content??'';
    const list=parseGlosses(typeof raw==='string'?raw:JSON.stringify(raw),words.length);if(!list.length)console.warn('gloss: no list from',model,String(JSON.stringify(out)).slice(0,300));
-   if(list.filter(Boolean).length>=Math.ceil(words.length/3)){words.forEach((w,i)=>{if(list[i])w.gloss=list[i];});return list.length;}}catch(e){console.warn('gloss: model failed',model,String(e?.message||e).slice(0,200));}
+   if(list.filter(Boolean).length>=Math.ceil(words.length/3)){words.forEach((w,i)=>{if(list[i])w.gloss=list[i];});return list.length;}
+   console.warn('gloss: too few from',model,list.filter(Boolean).length,'/',words.length,String(raw).slice(0,400));}catch(e){console.warn('gloss: model failed',model,String(e?.message||e).slice(0,200));}
  }
  return 0;
 }

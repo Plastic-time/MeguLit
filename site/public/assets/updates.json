@@ -1,9 +1,58 @@
 [
- {"date":"2026-11-11","title":"海市蜃楼之馆","title_en":"The House in Fata Morgana","title_ja":"ファタモルガーナの館"},
- {"date":"2026-11-11","title":"沙耶之歌 HD（Steam）","title_en":"The Song of Saya HD (Steam)","title_ja":"沙耶の唄 HD（Steam）"},
- {"date":"2026-11-11","title":"魔法使之夜","title_en":"Witch on the Holy Night","title_ja":"魔法使いの夜"},
- {"date":"2026-11-11","title":"女装山脈","title_en":"Josou Sanmyaku","title_ja":"女装山脈"},
- {"date":"2026-11-11","text":"2026年11月11日 修复：短句显示两遍、未读句子颜色不对、开启渐变后注音变黑、选项按钮现在也能内嵌","text_en":"Nov 11, 2026 · fixed: short lines shown twice, wrong colour for unread lines, black furigana with gradients; choices are now embedded too","text_ja":"2026年11月11日 修正：短い文の二重表示、未読文の色、グラデーション時のふりがなの黒化。選択肢も埋め込み表示に対応"},
- {"date":"2026-11-10","title":"心跳文学部 Plus（DDLC）","title_en":"Doki Doki Literature Club Plus!","title_ja":"Doki Doki Literature Club Plus!","issue":76},
- {"date":"2026-11-10","title":"白色相簿2","title_en":"WHITE ALBUM2","title_ja":"WHITE ALBUM2","issue":85}
+ {
+  "date": "2026-11-11",
+  "text": "今天修复：短句被识别两次显示两遍；未读句子显示成已读颜色；开启渐变后注音变黑；汉化脚本对不上的句子没装本地模型时报错；整页类游戏翻页残留、重复绘制、莫名自动隐藏；魔法使之夜整页译文缩进不对",
+  "text_en": "Fixed today: short lines shown twice; unread lines in the read colour; black furigana with gradients; unmatched lines failing without a local model; full-page games keeping old pages, drawing twice or hiding themselves; wrong translation indent on Witch on the Holy Night full pages",
+  "text_ja": "本日の修正：短い文の二重表示、未読文が既読色になる、グラデーション時にふりがなが黒くなる、ローカルモデルなしで対応外の文がエラーになる、全画面テキストのゲームで前ページが残る・二重描画・勝手に非表示になる、魔法使いの夜の全画面訳文の字下げ"
+ },
+ {
+  "date": "2026-11-11",
+  "text": "今天新增内嵌支持：海市蜃楼之馆、沙耶之歌 HD（Steam）、魔法使之夜（整页）、女装山脈、euphoria、秽翼的尤斯蒂娅（汉化版自动对回日文原版）、逆转裁判456、虚之少女、纯白交响曲、解体插入新书、女王蜂的王房、丑陋的莫吉卡之子、涙、心跳文学部 Plus；所有引擎的选项按钮也能内嵌原文、注音和翻译",
+  "text_en": "Embedded today: The House in Fata Morgana, The Song of Saya HD (Steam), Witch on the Holy Night (full page), Josou Sanmyaku, euphoria, Eustia (Chinese build mapped back to the Japanese original), Apollo Justice Trilogy, Utsuro no Shoujo, Mashiroiro Symphony, Dustmania Grotesque, Queen Bee's Royal Chamber, Minikui Mojika no Ko, Namida, DDLC Plus; choice buttons in every engine show the original, furigana and translation",
+  "text_ja": "本日埋め込み対応：ファタモルガーナの館、沙耶の唄 HD（Steam）、魔法使いの夜（全画面）、女装山脈、euphoria、穢翼のユースティア（中国語版を日本語原文に自動対応）、逆転裁判456、虚ノ少女、ましろ色シンフォニー、解体挿入新書、女王蜂の王房、みにくいモジカの子、涙、DDLC Plus。すべてのエンジンで選択肢にも原文・ふりがな・翻訳を表示"
+ },
+ {
+  "date": "2026-11-11",
+  "text": "今天更新：顶栏新增「日报」（Galgame 新闻和每日热词）；学习页新增互动语法课 N5；排行榜改版，显示最热作品；个人主页独立面板；注音可按行左右微调；新增译文模糊（悬停显示）；查词停留时间计入阅读字数；启动提示每次显示今天的更新",
+  "text_en": "Updated today: a Daily tab (galgame news and trending words); interactive N5 grammar in Learning; a redesigned leaderboard with the most-read work; a separate profile panel; per-row furigana nudging left and right; blurred translation revealed on hover; dwell time on lookups counts toward characters read; the start-up notice now shows each day's changes",
+  "text_ja": "本日の更新：上部に「デイリー」（ギャルゲニュースと今日の単語）、学習に対話式 N5 文法、ランキングを刷新し人気作品を表示、プロフィールを独立パネルに、ふりがなを行ごとに左右調整、訳文ぼかし（ホバーで表示）、起動時のお知らせで毎日の更新を表示"
+ },
+ {
+  "date": "2026-11-11",
+  "title": "海市蜃楼之馆",
+  "title_en": "The House in Fata Morgana",
+  "title_ja": "ファタモルガーナの館"
+ },
+ {
+  "date": "2026-11-11",
+  "title": "沙耶之歌 HD（Steam）",
+  "title_en": "The Song of Saya HD (Steam)",
+  "title_ja": "沙耶の唄 HD（Steam）"
+ },
+ {
+  "date": "2026-11-11",
+  "title": "魔法使之夜",
+  "title_en": "Witch on the Holy Night",
+  "title_ja": "魔法使いの夜"
+ },
+ {
+  "date": "2026-11-11",
+  "title": "女装山脈",
+  "title_en": "Josou Sanmyaku",
+  "title_ja": "女装山脈"
+ },
+ {
+  "date": "2026-11-10",
+  "title": "心跳文学部 Plus（DDLC）",
+  "title_en": "Doki Doki Literature Club Plus!",
+  "title_ja": "Doki Doki Literature Club Plus!",
+  "issue": 76
+ },
+ {
+  "date": "2026-11-10",
+  "title": "白色相簿2",
+  "title_en": "WHITE ALBUM2",
+  "title_ja": "WHITE ALBUM2",
+  "issue": 85
+ }
 ]
