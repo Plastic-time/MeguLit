@@ -162,7 +162,11 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
     box.classList.toggle('has-lyrics', lines.length > 0);
   };
   let lyricsFor = null;
+  // while one song gives way to the next, the player reports a pause: the label stays open through it (closing it
+  // would also fold the floating player under the pointer, which was just on the next button)
+  let switching = 0;
   const go = (i, play = true) => {
+    if (play && !box.hidden) { clearTimeout(switching); switching = setTimeout(() => { switching = 0; if (audio.paused && !hold) box.hidden = true; }, 6000); }
     idx = (i + pl.tracks.length) % pl.tracks.length;
     paintTrack();
     audio.src = srcOf(current);
@@ -228,7 +232,7 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
   audio.addEventListener('play', async () => {
     await ready;
     if (lyricsFor !== current) { lyricsFor = current; await loadLyrics(current); }
-    box.hidden = false; hold = false;
+    box.hidden = false; hold = false; clearTimeout(switching); switching = 0;
     playBtn.innerHTML = ICON.pause; paintUi();
     cur = -1; if (!raf) raf = requestAnimationFrame(tick);
   });
@@ -236,7 +240,7 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
   audio.addEventListener('pause', () => {
     playBtn.innerHTML = ICON.play; paintUi();
     show(''); background?.clear(); cur = -1;
-    if (!hold) box.hidden = true;
+    if (!hold && !switching) box.hidden = true;
   });
   audio.addEventListener('seeked', () => { cur = -1; });
   return player;
