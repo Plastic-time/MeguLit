@@ -611,7 +611,7 @@ section[data-kanji]::before {
 /* ---- anime.js layer ---------------------------------------------------------------------------------------------- */
 /* hidden until the intro timeline brings them in; a CSS fallback shows them if the script never runs */
 @media (prefers-reduced-motion: no-preference) {
-  .js .hero .lede, .js .dl-orb, .js .hero-dl-meta, .js .hero-vert, .js .sound-fab { opacity: 0; animation: fx-fallback 0s 8s forwards; }
+  .js .hero .lede, .js .foot-rule, .js .dl-box, .js .hud-dl, .js .hud-tl, .js .hero-vert, .js .sound-fab, .js .hero-type { opacity: 0; animation: fx-fallback 0s 8s forwards; }
 }
 @keyframes fx-fallback { to { opacity: 1; } }
 .rays-fx { position: absolute; inset: 0; width: 100%; height: 100%; mix-blend-mode: screen; opacity: .7; }
@@ -1154,3 +1154,90 @@ html { overflow-x: clip; }
 /* skip sits on light parchment now */
 .intro .skip { color: #3a1418; background: rgba(255, 248, 236, .55); border-color: rgba(58, 20, 24, .35); }
 .intro .skip:hover { color: #1a0a0c; border-color: #9e1b2d; }
+
+/* ---- hero, round 3: the megu-edit look -------------------------------------------------------------------------------
+   two poles (black #000 / paper #f4f4f2), mono footage, one accent (#c8323c), lowercase tracked mono micro-text,
+   a roman/han serif headline with a soft glow, dashed rules, a running number, barcode stripes, focus pull to open. */
+@font-face { font-family: "MeguLit Mono"; src: url("/assets/fonts/plex-mono.woff2") format("woff2"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "MeguLit Cormorant"; src: url("/assets/fonts/cormorant-italic.woff2") format("woff2"); font-style: italic; font-display: swap; }
+@font-face { font-family: "MeguLit Han"; src: url("/assets/fonts/han-serif-hero.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+.hero { --paper: #f4f4f2; --accent: #c8323c; --dim: #8a8a8a; background: #000; }
+.hero-tint, .rays-fx { display: none; }
+.hero-video {
+  filter: grayscale(1) contrast(1.12) brightness(.5) blur(14px) !important; scale: 1.12;
+  transition: filter 1.8s cubic-bezier(.16, 1, .3, 1), scale 2.6s cubic-bezier(.16, 1, .3, 1);
+  animation: vdrift 38s ease-in-out infinite alternate;
+}
+.hero.focused .hero-video { filter: grayscale(1) contrast(1.12) brightness(.5) !important; scale: 1.04; }
+@keyframes vdrift { to { translate: -1.6% -1.2%; } }
+.hero-scrim { background: radial-gradient(ellipse 85% 75% at 55% 45%, transparent 35%, rgba(0, 0, 0, .78) 100%), linear-gradient(180deg, rgba(0, 0, 0, .5), transparent 22%, transparent 70%, rgba(0, 0, 0, .85)) !important; }
+.hero::before { content: ""; position: absolute; inset: 0; z-index: 5; background: var(--paper); opacity: 0; pointer-events: none; }
+.hero.flash::before { opacity: .9; }
+
+.hud { display: flex; flex-wrap: wrap; gap: .4rem 1.6em; margin: 0; font: 300 .75rem/1.6 "MeguLit Mono", var(--mono); letter-spacing: .35em; color: var(--dim); text-transform: lowercase; }
+.hud-tl { position: absolute; top: .2rem; right: calc(var(--gutter) + 3.6rem); }
+.typed { margin: 0 0 2.4rem; font: 300 .8125rem/1 "MeguLit Mono", var(--mono); letter-spacing: .5em; color: #bdbdbd; text-transform: lowercase; }
+.caret { color: var(--accent); font-weight: 400; margin-left: .2em; animation: caret 1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+
+.hero-type { color: var(--paper) !important; font-family: "MeguLit Han", var(--serif); }
+.ht-big { font-family: "MeguLit Han", var(--serif); font-weight: 600; text-shadow: 0 0 .22em rgba(255, 255, 255, .16), 0 0 1.1em rgba(255, 255, 255, .07) !important; letter-spacing: -.02em; }
+:lang(ja) .ht-big { font-family: "MeguLit Han", var(--serif-ja); }
+:lang(en) .ht-big { font-family: "MeguLit Cormorant", "Cormorant Garamond", Georgia, serif; font-style: italic; font-weight: 500; letter-spacing: -.01em; }
+.ht-big rt { color: var(--dim) !important; font: 300 .09em/1 "MeguLit Mono", var(--mono) !important; letter-spacing: .4em !important; text-shadow: none; }
+.ht-pre { font: italic 500 clamp(1.3rem, 2.4vw, 2.3rem)/1.1 "MeguLit Cormorant", "MeguLit Han", var(--serif); color: #bdbdbd !important; letter-spacing: .02em; }
+.hero-vert {
+  color: #bdbdbd; -webkit-text-stroke: 0; filter: none; font: 600 clamp(1rem, 1.3vw, 1.25rem)/1 "MeguLit Han", var(--serif-ja);
+  letter-spacing: .45em; top: 3rem;
+}
+.hero-vert::after { content: "▮"; color: var(--accent); margin-top: .3em; }
+
+.hero-foot { flex-wrap: wrap; row-gap: 1.6rem; }
+.foot-rule {
+  flex: 1 0 100%; display: flex; align-items: center; gap: 1.6rem; padding-top: .9rem; border-top: 1px dashed rgba(244, 244, 242, .28);
+  font: 300 .75rem/1 "MeguLit Mono", var(--mono); letter-spacing: .35em; color: var(--dim); text-transform: lowercase;
+}
+.barcode {
+  margin-left: auto; width: 7.5rem; height: .85rem; opacity: .7;
+  background: repeating-linear-gradient(90deg, var(--paper) 0 2px, transparent 2px 4px, var(--paper) 4px 5px, transparent 5px 8px, var(--paper) 8px 11px, transparent 11px 12px, var(--paper) 12px 13px, transparent 13px 17px);
+}
+.hero .lede { color: #c9c9c6; font-size: .9375rem; letter-spacing: .04em; text-shadow: none; max-width: 28em; }
+.hero .lede::before { display: none; }
+
+.hero-dl { align-items: flex-end; gap: 1.6rem; }
+.dl-box {
+  position: relative; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .55rem 2rem; min-width: 19rem;
+  padding: 1rem 1.3rem 1.1rem; border: 1px solid var(--paper); background: rgba(0, 0, 0, .35); color: var(--paper); text-decoration: none;
+}
+.db-hud { grid-column: 1 / -1; display: flex; align-items: center; gap: .7rem; font: 300 .75rem/1 "MeguLit Mono", var(--mono); letter-spacing: .45em; color: var(--dim); }
+.db-hud::before { content: ""; width: .5rem; height: .5rem; background: var(--accent); }
+.db-main { font: 600 1.2rem/1.2 "MeguLit Han", var(--serif); letter-spacing: .04em; }
+.db-arrow { font: 300 1.4rem/1 "MeguLit Mono", var(--mono); }
+/* hover: a hard invert to paper, the way the user cuts on accents */
+.dl-box:hover, .dl-box:focus-visible { background: var(--paper); color: #000; outline: none; }
+.dl-box:hover .db-hud, .dl-box:focus-visible .db-hud { color: #111; }
+.dl-box:active { scale: .98; }
+.hud-dl { display: grid; gap: .25rem; }
+.hud-dl .alt-link { color: var(--paper); letter-spacing: .1em; text-decoration: underline dashed rgba(244, 244, 242, .5); text-underline-offset: .35em; margin-top: .4rem; }
+.sound-fab { background: rgba(0, 0, 0, .5); border-color: rgba(244, 244, 242, .25); border-radius: 0; }
+.sound-fab .eq i { background: var(--accent); }
+.sound-fab[aria-pressed="true"] { border-color: var(--accent); }
+@media (max-width: 40rem) {
+  .hud-tl { display: none; }
+  .typed { letter-spacing: .3em; margin-bottom: 1.6rem; font-size: .75rem; }
+  .dl-box { min-width: 0; width: 100%; }
+  .hero-dl { flex-direction: column; align-items: stretch; }
+  .foot-rule span:nth-child(2) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .hero-video { filter: grayscale(1) contrast(1.12) brightness(.5) !important; scale: 1.04; } }
+/* hero round 3 fixes: sound toggle top-right beside the hud; phone stacks the foot */
+.hero .sound-fab { top: calc(var(--top-h) + .9rem); left: auto; right: var(--gutter); bottom: auto; }
+.hud-tl { top: .9rem; right: calc(var(--gutter) + 4.6rem); }
+.hero-vert { top: 4.8rem; }
+@media (max-width: 40rem) {
+  .hero-foot { display: grid; gap: 1.4rem; }
+  .foot-rule { flex: none; }
+  .hero-vert { display: none; }
+  .hero .sound-fab { position: absolute; top: calc(var(--top-h) + .6rem); right: var(--gutter); margin: 0; }
+  .typed { margin-top: 3.4rem; }
+}

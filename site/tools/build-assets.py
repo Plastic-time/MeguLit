@@ -79,3 +79,27 @@ dst = PUB / 'assets' / 'fonts' / 'megulit-serif.woff2'
 font.flavor = 'woff2'
 font.save(dst)
 print('font', len(chars), 'chars', dst.stat().st_size // 1024, 'KB')
+
+# ---- hero fonts from the megu-edit template (all OFL): Cormorant, IBM Plex Mono, Source Han Serif ------------------
+# Sources live outside the repo (they are large); only the subsets are committed. MEGU_FONTS overrides the folder.
+MEGU = Path(os.environ.get('MEGU_FONTS', 'E:/Apps/MeguLit-Tutorial/megu-edit/public/fonts'))
+def subset_to(src, dst, chars, instance=None):
+    f = TTFont(src, lazy=False)
+    o = subset.Options(); o.flavor = 'woff2'; o.layout_features = ['kern', 'liga', 'palt']; o.name_IDs = ['*']
+    sb = subset.Subsetter(o); sb.populate(text=''.join(sorted(set(chars)))); sb.subset(f)
+    f.flavor = 'woff2'; f.save(dst); print('font', dst.name, dst.stat().st_size // 1024, 'KB')
+if MEGU.exists():
+    ascii_ = ''.join(chr(c) for c in range(0x20, 0x7f)) + '▮·—–✦↓→←…’'
+    FD = PUB / 'assets' / 'fonts'
+    subset_to(MEGU / 'IBMPlexMono-Light.ttf', FD / 'plex-mono.woff2', ascii_)
+    subset_to(MEGU / 'Cormorant-Italic.ttf', FD / 'cormorant-italic.woff2', ascii_)
+    hero_text = '玩学日语日本語を学ぼう下载备用免费开源続きを読もうがくにちごにほんごギャルゲーで、，。' + ascii_
+    for html in PUB.glob('*.html'):
+        m = re.search(r'<h1[^>]*hero-type.*?</h1>', html.read_text('utf8'), re.S)
+        if m: hero_text += re.sub(r'<[^>]+>', '', m.group(0))
+    for key in ('hero.title', 'dl.button', 'dl.alt'):
+        for v in re.findall(r"'" + re.escape(key) + r"': '((?:[^'\\]|\\.)*)'", (PUB / 'assets' / 'js' / 'i18n.js').read_text('utf8')):
+            hero_text += re.sub(r'<[^>]+>', '', v)
+    subset_to(MEGU / 'SourceHanSerifCN-SemiBold.otf', FD / 'han-serif-hero.woff2', hero_text)
+else:
+    print('megu-edit fonts not found, hero fonts unchanged')

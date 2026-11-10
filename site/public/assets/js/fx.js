@@ -17,20 +17,32 @@ export async function run({ reduce, finePointer }) {
   headings();
   counters();
   parallax(false);
-  rays();
   if (finePointer) { magnets(); sparks(); }
 }
 
 function reveal() { for (const el of $$('.fx-in')) el.style.opacity = 1; }
 
-// Page-load sequence: the copy rises, buttons pop on a spring, the circle draws itself.
+// Page-load sequence in the megu-edit grammar: the video pulls focus, a lowercase line types itself behind a red
+// block caret, one white flash on the last letter, then the headline settles and the rest fades in.
 function intro() {
-  const tl = createTimeline({ defaults: { ease: 'out(4)' } });
-  tl.add('.hero .lede', { opacity: [0, 1], y: ['1.2rem', 0], duration: 900 }, 650)
-    .add('.dl-orb, .hero-dl-meta', { opacity: [0, 1], scale: [.6, 1], rotate: [-25, 0], duration: 1300, delay: stagger(120), ease: 'outElastic(1, .6)' }, 820)
-    .add('.hero-vert, .sound-fab', { opacity: [0, 1], y: ['.8rem', 0], duration: 700, delay: stagger(80) }, 1050);
-  const strokes = $$('.circle .c-line, .circle .c-star, .circle .c-dash');
-  if (strokes.length) animate(createDrawable(strokes), { draw: ['0 0', '0 1'], duration: 2200, delay: stagger(90), ease: 'inOut(3)' });
+  const hero = $('.hero');
+  if (!hero) return;
+  requestAnimationFrame(() => hero.classList.add('focused'));
+  animate('.hero-type', { opacity: [0, 1], filter: ['blur(14px)', 'blur(0px)'], scale: [1.06, 1], duration: 1600, ease: 'out(5)', delay: 250 });
+  const el = $('.typed-text'), full = el?.dataset.type || '';
+  if (el) {
+    el.textContent = '';
+    let i = 0;
+    const step = () => {
+      el.textContent = full.slice(0, ++i);
+      if (i < full.length) setTimeout(step, full[i - 1] === ',' ? 160 : 38);
+      else { hero.classList.add('flash'); setTimeout(() => hero.classList.remove('flash'), 70); }
+    };
+    setTimeout(step, 500);
+  }
+  createTimeline({ defaults: { ease: 'out(4)' } })
+    .add('.hero .lede, .foot-rule', { opacity: [0, 1], y: ['.8rem', 0], duration: 900, delay: stagger(90) }, 1700)
+    .add('.dl-box, .hud-dl, .hud-tl, .hero-vert, .sound-fab', { opacity: [0, 1], y: ['.6rem', 0], duration: 800, delay: stagger(70) }, 1900);
 }
 
 // Numbers count up from zero when they scroll into view.
@@ -87,7 +99,7 @@ function parallax(still) {
 
 // Buttons lean toward the pointer and spring back.
 function magnets() {
-  for (const el of $$('.btn-primary, .btn-quiet, .chip, .sound-fab, .dl-orb')) {
+  for (const el of $$('.btn-primary, .btn-quiet, .chip, .sound-fab, .dl-box')) {
     el.addEventListener('pointermove', e => {
       const r = el.getBoundingClientRect();
       const x = (e.clientX - r.left - r.width / 2) * .22, y = (e.clientY - r.top - r.height / 2) * .32;

@@ -2,7 +2,7 @@
 // Hero canvas effect, no libraries: kana drifting up through the hero, scattering away from the pointer.
 // Draws only while the hero is on screen, and renders one still frame when motion is reduced.
 
-const GOLD = [234, 187, 95], CRIMSON = [255, 92, 108];
+const GOLD = [236, 236, 232], CRIMSON = [200, 50, 60];
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
@@ -39,7 +39,7 @@ export function kana(canvas, host, { still = false } = {}) {
     x: Math.random() * w, y: anywhere ? Math.random() * h : h + 20,
     vx: 0, vy: -(8 + Math.random() * 18),
     size: 12 + Math.random() * 22, rot: (Math.random() - .5) * .6, vr: (Math.random() - .5) * .3,
-    hue: Math.random(), life: 0,
+    hue: Math.random() < .12 ? 1 : 0, life: 0,
   });
   loop(canvas, t => {
     const { w, h, dpr } = fit(canvas);

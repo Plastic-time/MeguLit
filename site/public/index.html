@@ -68,27 +68,26 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
 <section class="hero" aria-labelledby="hero-title">
  <div class="hero-media" aria-hidden="true">
   <video class="hero-video" muted loop playsinline preload="none" poster="/assets/img/hero-poster.webp" data-sm="/assets/video/megulit-360.mp4" data-md="/assets/video/megulit-720.mp4" data-lg="/assets/video/megulit-1080.mp4"></video>
-  <div class="hero-tint"></div>
   <div class="hero-scrim"></div>
   <div class="dof"></div>
-  <canvas class="rays-fx"></canvas>
   <canvas class="kana-fx"></canvas>
   <div class="grain"></div>
  </div>
  <div class="hero-stage">
-  <h1 id="hero-title" class="hero-type kinetic tilt" data-i-html="hero.title"><span class="ht-pre">玩 Galgame，</span><span class="ht-big"><ruby>学<rt>がく</rt></ruby><ruby>日<rt>にち</rt></ruby><ruby>语<rt>ご</rt></ruby></span></h1>
+  <p class="hud hud-tl" aria-hidden="true"><span>no.01</span><span>megulit</span><span class="js-version">v1.2.8</span></p>
+  <p class="typed" aria-hidden="true"><span class="typed-text" data-type="play galgame, learn japanese">play galgame, learn japanese</span><b class="caret">▮</b></p>
+  <h1 id="hero-title" class="hero-type" data-i-html="hero.title"><span class="ht-pre">玩 Galgame，</span><span class="ht-big"><ruby>学<rt>がく</rt></ruby><ruby>日<rt>にち</rt></ruby><ruby>语<rt>ご</rt></ruby></span></h1>
   <p class="hero-vert" lang="ja" aria-hidden="true">続きを読もう</p>
   <div class="hero-foot">
+   <div class="foot-rule" aria-hidden="true"><span>— 01</span><span>grimoire for galgame readers</span><i class="barcode"></i></div>
    <p class="lede" data-i="hero.lede">给 Galgame 玩家的日语学习工具。游戏里的每句台词都带上注音和释义，点一下查词，一键制成 Anki 卡片，读了多少、学了哪些词都替你记着</p>
    <div class="hero-dl">
-    <a class="dl-orb js-download" href="https://github.com/ilynthn/MeguLit/releases/latest" aria-label="下载 MeguLit" data-i-attr="aria-label:dl.button">
-     <svg class="orb-ring" viewBox="0 0 200 200" aria-hidden="true"><defs><path id="orb-path" d="M100,100 m-80,0 a80,80 0 1,1 160,0 a80,80 0 1,1 -160,0"/></defs><text><textPath href="#orb-path" textLength="498" lengthAdjust="spacing" data-i="orb.ring">下载 MeguLit ✦ 免费开源 ✦ Windows 10 / 11 ✦ </textPath></text></svg>
-     <span class="orb-core" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 4v13m0 0-5.5-5.5M12 17l5.5-5.5M5 20.5h14"/></svg><b data-i="orb.label">下载</b></span>
+    <a class="dl-box js-download" href="https://github.com/ilynthn/MeguLit/releases/latest">
+     <span class="db-hud" aria-hidden="true">download</span>
+     <span class="db-main" data-i="dl.button">下载 MeguLit</span>
+     <span class="db-arrow" aria-hidden="true">↓</span>
     </a>
-    <div class="hero-dl-meta">
-     <p class="cta-meta"><span class="js-version">v1.2.8</span><span class="js-size">20.0 MB</span><span data-i="dl.os">Windows 10 / 11 x64</span><span data-i="dl.free">免费 · 开源</span></p>
-     <a class="alt-link" href="#download" data-i="dl.alt">备用下载</a>
-    </div>
+    <p class="hud hud-dl"><span class="js-size">20.0 MB</span><span>win 10 · 11 x64</span><span>gpl-3.0</span><a class="alt-link" href="#download" data-i="dl.alt">备用下载</a></p>
    </div>
   </div>
  </div>
