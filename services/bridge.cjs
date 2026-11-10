@@ -232,7 +232,7 @@ async function dispatch(request,runtime=null) {
       case 'leaderboard_avatar_status':return await require('./leaderboard.cjs').avatarStatus(root);
       case 'leaderboard_avatar_appeal':return await require('./leaderboard.cjs').appealAvatar(root,{version:String(request.version||'').slice(0,20)});
       case 'leaderboard_report':return await require('./leaderboard.cjs').report(root,String(request.avatar||''));
-      case 'leaderboard_join':{const lb=require('./leaderboard.cjs');lb.join(root,{name:request.name,shareGames:request.shareGames===true,consent:request.consent===true});return await lb.view(root,db,{period:String(request.period||''),metric:String(request.metric||''),submit:true});}
+      case 'leaderboard_join':{const lb=require('./leaderboard.cjs');lb.join(root,{name:request.name,shareGames:request.shareGames===true,consent:request.consent===true,requireAccount:true});return await lb.view(root,db,{period:String(request.period||''),metric:String(request.metric||''),submit:true});}
       case 'leaderboard_leave':return await require('./leaderboard.cjs').leave(root);
       case 'save_key':return new(require('./settings.cjs').Settings)(root).saveKey({provider:request.provider,baseUrl:request.baseUrl,apiKey:request.apiKey});
       case 'anki_find':return {path:runtime.ankiProcess().find()};

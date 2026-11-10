@@ -8,6 +8,21 @@ const T={
 const KINDS=['words','sentences','reading','settings'];
 export const accountLabel={zh:T.zh.title,ja:T.ja.title,en:T.en.title};
 function errorText(t,error){const raw=String(error?.code||error?.message||error||'');const code=Object.keys(t.err).find(k=>raw.includes(k));return t.err[code]||t.err.other;}
+/* E385 the email + code form on its own, shared by Settings → 账号 and the leaderboard join card. kinds() gives the
+   sync choice to save at sign-in (null keeps the saved/default one); onDone runs after a successful sign-in. */
+export function mountEmailLogin(box,{api,locale,esc,toast,kinds=()=>null,onDone=()=>{}}){
+ const t=T[locale]||T.zh,fill=(s,v)=>s.replace(/\{(\w+)\}/g,(_,k)=>esc(String(v[k]??'')));
+ box.innerHTML=`<label class="form-label">${t.email}</label><div class="input-group"><input class="form-input" type="email" data-login-email autocomplete="email" spellcheck="false" placeholder="${t.emailPh}" aria-label="${t.email}"><button type="button" class="secondary" data-send>${t.send}</button></div>
+  <div data-code-step hidden><p class="settings-help" data-sent></p><label class="form-label">${t.code}</label><div class="input-group"><input class="form-input" data-login-code inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="${t.codePh}" aria-label="${t.code}"><button type="button" class="primary" data-login>${t.login}</button></div></div>`;
+ const email=box.querySelector('[data-login-email]'),code=box.querySelector('[data-login-code]'),step=box.querySelector('[data-code-step]'),send=box.querySelector('[data-send]');
+ const busy=on=>box.querySelectorAll('button,input').forEach(el=>el.disabled=on);
+ send.onclick=async()=>{busy(true);try{const r=await api('account_code',{email:email.value});step.hidden=false;box.querySelector('[data-sent]').innerHTML=fill(t.sentTo,{email:r.email});send.textContent=t.resend;busy(false);code.focus();}catch(error){busy(false);toast(errorText(t,error));}};
+ email.onkeydown=e=>{if(e.key==='Enter')send.click();};
+ let running=false;
+ const login=async()=>{if(running)return;running=true;busy(true);try{await api('account_verify',{email:email.value,code:code.value,kinds:kinds()});await onDone();}catch(error){toast(errorText(t,error));busy(false);}finally{running=false;}};
+ box.querySelector('[data-login]').onclick=login;code.onkeydown=e=>{if(e.key==='Enter')login();};
+ code.oninput=()=>{code.value=code.value.replace(/\D/g,'').slice(0,6);if(code.value.length===6)login();};
+}
 export async function renderAccount({target,api,locale,esc,toast}){
  const t=T[locale]||T.zh,fill=(s,v)=>s.replace(/\{(\w+)\}/g,(_,k)=>esc(String(v[k]??'')));
  const when=ms=>ms?new Date(ms).toLocaleString(locale==='zh'?'zh-CN':locale==='ja'?'ja-JP':'en-US'):t.never;
@@ -19,17 +34,10 @@ export async function renderAccount({target,api,locale,esc,toast}){
   status=await api('account_status',{autoSync:false});
   if(!status.configured){target.innerHTML=`<section class="panel"><h2>${t.title}</h2><p class="settings-help">${t.notReady}</p></section>`;return;}
   if(!status.loggedIn){
-   target.innerHTML=`<section class="panel account-login"><h2>${t.title}</h2><p class="settings-help">${t.intro}</p><p class="settings-help">${t.privacy}</p>
-    <label class="form-label" for="account-email">${t.email}</label><div class="input-group"><input id="account-email" class="form-input" type="email" autocomplete="email" spellcheck="false" placeholder="${t.emailPh}"><button class="secondary" data-send>${t.send}</button></div>
-    <div data-code-step hidden><p class="settings-help" data-sent></p><label class="form-label" for="account-code">${t.code}</label><div class="input-group"><input id="account-code" class="form-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="${t.codePh}"><button class="primary" data-login>${t.login}</button></div></div>
+   target.innerHTML=`<section class="panel account-login"><h2>${t.title}</h2><p class="settings-help">${t.intro}</p><p class="settings-help">${t.privacy}</p><div data-email-login></div>
     <h3 class="settings-label" style="margin:22px 0 4px">${t.kinds}</h3>${kindRows(status.kinds)}</section>`;
-   const email=target.querySelector('#account-email'),code=target.querySelector('#account-code'),step=target.querySelector('[data-code-step]'),send=target.querySelector('[data-send]');
    const chosen=()=>Object.fromEntries([...target.querySelectorAll('[data-kind]')].map(el=>[el.dataset.kind,el.checked]));
-   send.onclick=async()=>{busy(true);try{const r=await api('account_code',{email:email.value});step.hidden=false;target.querySelector('[data-sent]').innerHTML=fill(t.sentTo,{email:r.email});send.textContent=t.resend;code.focus();}catch(error){fail(error);}finally{busy(false);}};
-   email.onkeydown=e=>{if(e.key==='Enter')send.click();};
-   const login=async()=>{busy(true);try{await api('account_verify',{email:email.value,code:code.value,kinds:chosen()});await paint();}catch(error){fail(error);busy(false);}};
-   target.querySelector('[data-login]').onclick=login;code.onkeydown=e=>{if(e.key==='Enter')login();};
-   code.oninput=()=>{code.value=code.value.replace(/\D/g,'').slice(0,6);if(code.value.length===6)login();};
+   mountEmailLogin(target.querySelector('[data-email-login]'),{api,locale,esc,toast,kinds:chosen,onDone:()=>paint()});
    return;
   }
   const pending=Object.values(status.pending||{}).reduce((a,b)=>a+b,0);

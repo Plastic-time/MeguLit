@@ -65,6 +65,9 @@ test('opt-in needs consent and a clean nickname; only totals are uploaded; games
  const fetch=async(url,init)=>{sent.push({url,method:init.method,body:init.body?JSON.parse(init.body):null});return new Response(JSON.stringify(init.method==='GET'?{entries:[{rank:1,name:'めぐみん',value:1510,me:true}],total:1,me:{rank:1,value:1510}}:{ok:true}),{status:200});};
  assert.deepEqual(await lb.submit(lb.collectStats(db,NOW),{root,env:BASE_ENV,fetch}),{state:'disabled'},'nothing before joining');
  assert.throws(()=>lb.join(root,{name:'めぐみん'}),/LEADERBOARD_CONSENT_REQUIRED/);
+ /* E385 the app (bridge) joins only with a signed-in account */
+ assert.throws(()=>lb.join(root,{name:'めぐみん',consent:true,requireAccount:true},{account:null}),/LEADERBOARD_ACCOUNT_REQUIRED/);
+ assert.equal(lb.join(root,{name:'めぐみん',consent:true,requireAccount:true},{account:{accountId:'acc1',token:()=>''}}).joined,true);
  assert.throws(()=>lb.join(root,{name:'a',consent:true}),/LEADERBOARD_NAME_LENGTH/);
  assert.throws(()=>lb.join(root,{name:'sb',consent:true}),/LEADERBOARD_NAME_BLOCKED/);
  const joined=lb.join(root,{name:'  めぐみん ',consent:true});assert.equal(joined.joined,true);assert.match(joined.installId,/^[0-9a-f-]{36}$/);
@@ -130,7 +133,10 @@ test('top tab 排行榜 sits between 学习 and 工具 and the page renders the 
  const zh=view.leaderboardHTML({configured:false,local,board:{state:'not-configured'}},'zh',esc);
  assert.match(zh,/联网服务还在准备中/);assert.match(zh,/1,510 字/);assert.doesNotMatch(zh,/data-lb-join/);
  assert.match(view.leaderboardHTML({configured:false,local},'ja',esc),/オンラインサービスは準備中です/);
- assert.match(view.leaderboardHTML({configured:true,joined:false,local,board:{state:'ok',entries:[]}},'en',esc),/data-lb-join/);
+ const guest=view.leaderboardHTML({configured:true,joined:false,account:false,local,board:{state:'ok',entries:[]}},'zh',esc);
+ assert.match(guest,/data-lb-login/);assert.match(guest,/用邮箱登录/);assert.doesNotMatch(guest,/data-lb-join/);
+ const signed=view.leaderboardHTML({configured:true,joined:false,account:true,local,board:{state:'ok',entries:[]}},'en',esc);
+ assert.match(signed,/data-lb-join/);assert.doesNotMatch(signed,/data-lb-login/);
  const board=view.leaderboardHTML({configured:true,joined:true,name:'<x>',local,board:{state:'ok',entries:[{rank:1,name:'<img>',value:3600,me:true}],me:{rank:1,value:3600}}},'zh',esc);
  assert.doesNotMatch(board,/<img>|<x>/);assert.match(board,/is-me/);
  for(const locale of ['zh','ja','en'])assert.deepEqual(Object.keys(view.leaderboardWords(locale)).sort(),Object.keys(view.leaderboardWords('zh')).sort(),locale);
