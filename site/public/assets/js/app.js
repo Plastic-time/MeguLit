@@ -150,11 +150,13 @@ function fillRelease() {
   setNotes(notesLang);
 }
 
+// after every version's notes: it was only tested on the developer's machine; problems go through the app's feedback
+const caveat = l => { const p = document.createElement('p'); p.className = 'notes-caveat'; p.textContent = I18N.dyn[l]?.notesCaveat || d('notesCaveat'); return p; };
 function setNotes(which) {
   notesLang = which;
   for (const b of $$('[data-notes]')) b.setAttribute('aria-pressed', String(b.dataset.notes === which));
   const box = $('.js-notes');
-  if (box && release?.notes) box.innerHTML = renderMarkdown(release.notes[which] || release.notes.zh);
+  if (box && release?.notes) { box.innerHTML = renderMarkdown(release.notes[which] || release.notes.zh); box.append(caveat(lang === 'ja' ? 'ja' : which)); }
 }
 for (const b of $$('[data-notes]')) b.addEventListener('click', () => setNotes(b.dataset.notes));
 
@@ -244,6 +246,7 @@ function fillReleases() {
     $('.js-s', li).textContent = `${d('size')} ${formatSize(r.size, lang)}`;
     const a = $('a', li); a.href = r.page; a.textContent = d('github_page');
     $('.rel-body', li).innerHTML = renderMarkdown(r.notes[notesLangFor] || r.notes.zh);
+    $('.rel-body', li).append(caveat(lang));
     return li;
   }));
 }
