@@ -8,6 +8,7 @@ import { nowPlaying, bgmCredit } from './nowplaying.js';
 import { ScAudio } from './sc.js';
 import { neAudio, inChina } from './ne.js';
 import { spectrum, eqBars, spectrumScrollbar } from './spectrum.js';
+import { heroPlay } from './heroplay.js';
 import { notice } from './notice.js';
 import { tryIt } from './try.js';
 // the entrance starts before anything else on the page is set up
@@ -325,6 +326,8 @@ const player = $('.sound-ctl') ? nowPlaying(bgm, $('.sound-ctl'), { reduce, back
 const spec = spectrum(bgm, { reduce });
 document.querySelectorAll('.sound-fab .eq, .np-eq').forEach(el => eqBars(spec, el));
 spectrumScrollbar(spec);
+// the headline plays like a galgame text box (heroplay.js)
+heroPlay($('#hero-title'), { reduce });
 bgmCredit();
 notice({ t: k => d(k), lang: () => lang, after: playIntro() });
 tryIt({ lang: () => lang, reduce });
@@ -400,6 +403,16 @@ function setSoundLabel() {
 const volInput = $('#hero-volume'), volOut = $('.vol-v');
 const volume = () => (volInput ? Number(volInput.value) : 20) / 100;
 volInput?.style.setProperty('--fill', `${volInput.value}%`);   /* the CSP forbids inline style attributes */
+// iPhone and iPad: a page cannot change the volume of what it plays (Safari ignores it, SoundCloud's player too), so
+// the slider would do nothing there; it gives way to a hint about the phone's own buttons
+const fixedVolume = (() => { try { const a = document.createElement('audio'); a.volume = .5; return a.volume === 1; } catch { return false; } })();
+if (fixedVolume && volInput) {
+  const vol = volInput.closest('.vol'), hint = document.createElement('span');
+  hint.className = 'vol-hint'; vol.classList.add('fixed');
+  const paintHint = () => { hint.textContent = d('volHint'); };
+  paintHint(); addEventListener('megulit:lang', paintHint);
+  vol.append(hint);
+}
 volInput?.addEventListener('input', () => {
   bgm.volume = volume();
   if (volOut) volOut.textContent = `${volInput.value}%`;
