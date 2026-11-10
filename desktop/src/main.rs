@@ -432,9 +432,11 @@ fn main() {
     let profile=cache.join(if headless {"smoke-profile"}else{"webview-profile"});
     prepare_profile(&root,&profile);
     std::env::set_var("WEBVIEW2_USER_DATA_FOLDER",&profile);
-    // E384 WebView2 writes its own warnings and errors (GPU, profile lock, network service) next to our logs. The variable
-    // replaces Tauri's default browser arguments, so they are repeated here; every window shares one set of arguments.
-    {let (name,level)=if headless{("logs/webview2-headless.log","0 --v=1")}else{("logs/webview2-browser.log","1")};let log=root.join(name);std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",format!("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-logging --log-file=\"{}\" --log-level={level} {}",log.display(),std::env::var("MEGULIT_WEBVIEW_ARGS").unwrap_or_default()));}
+    // E390 WebView2's own log is opt-in (MEGULIT_WEBVIEW_LOG=1): --enable-logging also opens a console window on Windows,
+    // which 1.3.1 showed beside MeguLit. MEGULIT_WEBVIEW_ARGS adds arguments for comparison tests. The variable replaces
+    // Tauri's default browser arguments, so they are repeated; every window shares one set of arguments.
+    {let log_on=std::env::var("MEGULIT_WEBVIEW_LOG").map(|v|v=="1").unwrap_or(false);let extra=std::env::var("MEGULIT_WEBVIEW_ARGS").unwrap_or_default();
+     if log_on||!extra.is_empty(){let log=root.join(if headless{"logs/webview2-headless.log"}else{"logs/webview2-browser.log"});let logging=if log_on{format!(" --enable-logging --log-file=\"{}\" --log-level=1",log.display())}else{String::new()};std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",format!("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection{logging} {extra}"));}}
     let mut context=tauri::generate_context!();
     for window in &mut context.config_mut().app.windows {window.data_directory=Some(profile.clone());window.create=false;}
     let splash=if !headless && root.join("native/StartupIsland.exe").is_file() {
