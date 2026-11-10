@@ -198,3 +198,20 @@ test('name filter also blocks R18 and abuse words on both sides',async()=>{
  for(const name of ['ゆんゆん','Aqua','ダクネス','爆裂道'])assert.equal(lb.cleanName(name).ok,true,name);
  assert.deepEqual(relayValidate.BLOCKED,lb.BLOCKED);
 });
+
+test('E394 个人主页: leaderboard fields leave 联网服务, search lands on the profile page, the bridge reads them without the board',async t=>{
+ const layout=await import(pathToFileURL(path.join(__dirname,'..','web','settings-layout.js')).href);
+ const fields=[{scope:'online',key:'leaderboardEnabled'},{scope:'online',key:'leaderboardName'},{scope:'online',key:'leaderboardShareGames'},{scope:'online',key:'relayUrl'}];
+ assert.deepEqual(layout.visibleFields('online',fields).map(f=>f.key),['relayUrl']);
+ const category=layout.navigation.find(c=>c.ids.includes('online'));assert.ok(category.ids.includes('personal'));assert.ok(category.ids.indexOf('personal')<category.ids.indexOf('online'));
+ const search=await import('data:text/javascript;base64,'+fs.readFileSync(path.join(__dirname,'..','web','settings-search.js')).toString('base64'));
+ const entries=search.globalSearchEntries({fields:fields.map(f=>({...f,label:{zh:f.key==='leaderboardName'?'排行榜昵称':f.key,en:f.key}}))},{});
+ assert.equal(entries.find(e=>e.key==='leaderboardName').scope,'personal');assert.equal(entries.find(e=>e.key==='relayUrl').scope,'online');
+ const hits=q=>entries.filter(e=>search.matchesSetting(e,q)).map(e=>e.scope);
+ assert.ok(hits('touxiang').includes('personal'),'头像 by pinyin');assert.ok(hits('gerenzhuye').includes('personal'),'个人主页 by pinyin');assert.ok(hits('tuichu').includes('personal'),'退出 by pinyin');
+ const view=fs.readFileSync(path.join(__dirname,'..','web','leaderboard-view.js'),'utf8');assert.doesNotMatch(view,/data-lb-leave/,'no leave button on the 排行榜 page');assert.match(view,/openSettings\('personal'\)/);
+ const {root}=fixture(t);lb.join(root,{name:'Kazuma',shareGames:true,consent:true});
+ const {execFileSync}=require('node:child_process');
+ const out=execFileSync(process.execPath,['-e',`require(${JSON.stringify(path.join(__dirname,'..','services','bridge.cjs'))}).dispatch({action:'leaderboard_profile'}).then(r=>console.log(JSON.stringify(r))).catch(e=>console.log('ERR '+e.message))`],{env:{...process.env,MEGULIT_ROOT:root,MEGULIT_RELAY_BASE:''},encoding:'utf8'});
+ const r=JSON.parse(out.trim().split('\n').pop());assert.deepEqual([r.joined,r.name,r.shareGames,typeof r.configured],[true,'Kazuma',true,'boolean']);assert.equal(r.board,undefined,'no board fetch');
+});

@@ -233,6 +233,8 @@ async function dispatch(request,runtime=null) {
       case 'leaderboard_avatar_appeal':return await require('./leaderboard.cjs').appealAvatar(root,{version:String(request.version||'').slice(0,20)});
       case 'leaderboard_report':return await require('./leaderboard.cjs').report(root,String(request.avatar||''));
       case 'leaderboard_join':{const lb=require('./leaderboard.cjs');lb.join(root,{name:request.name,shareGames:request.shareGames===true,consent:request.consent===true,requireAccount:true});return await lb.view(root,db,{period:String(request.period||''),metric:String(request.metric||''),submit:true});}
+      /* E394 Settings → 个人主页 reads the switch, nickname and sharing without fetching the board */
+      case 'leaderboard_profile':{const c=require('./leaderboard.cjs').config(root);return {configured:c.configured,joined:c.joined,enabled:c.enabled,name:c.name,shareGames:c.shareGames,account:c.account};}
       case 'leaderboard_leave':return await require('./leaderboard.cjs').leave(root);
       case 'save_key':return new(require('./settings.cjs').Settings)(root).saveKey({provider:request.provider,baseUrl:request.baseUrl,apiKey:request.apiKey});
       case 'anki_find':return {path:runtime.ankiProcess().find()};

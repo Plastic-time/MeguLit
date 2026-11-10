@@ -7,13 +7,13 @@ export const AVATAR_LIMIT=64*1024;
 const T={
  zh:{title:'调整头像范围',hint:'拖动选框选择区域，滚轮或滑条缩放；右边是排行榜上显示的样子',zoom:'放大程度',preview:'预览',cancel:'取消',ok:'确认上传',
   unreadable:'读不出这张图片',tooSmall:'图片太小了，至少要 32×32',tooBig:'图片压缩后仍然太大，换一张试试',offline:'暂时连不上联网服务',
-  approved:'头像已通过审核',rejected:'头像没有通过审核',appealWhere:'觉得判断错了，可以在 设置 › 联网服务 里申诉',pending:'头像审核中'},
+  approved:'头像已通过审核',rejected:'头像没有通过审核',appealWhere:'觉得判断错了，可以在 设置 › 个人主页 里申诉',pending:'头像审核中'},
  ja:{title:'アイコンの範囲を調整',hint:'枠をドラッグして範囲を選び、ホイールかスライダーで拡大。右側がランキングでの見え方です',zoom:'拡大度',preview:'プレビュー',cancel:'キャンセル',ok:'アップロード',
   unreadable:'この画像を読み込めません',tooSmall:'画像が小さすぎます（32×32 以上）',tooBig:'圧縮しても大きすぎます。別の画像をお試しください',offline:'オンラインサービスに接続できません',
-  approved:'アイコンが審査を通過しました',rejected:'アイコンは審査を通過しませんでした',appealWhere:'判定が間違いだと思ったら、設定 › オンライン から確認を依頼できます',pending:'アイコンを審査中'},
+  approved:'アイコンが審査を通過しました',rejected:'アイコンは審査を通過しませんでした',appealWhere:'判定が間違いだと思ったら、設定 › プロフィール から確認を依頼できます',pending:'アイコンを審査中'},
  en:{title:'Adjust your picture',hint:'Drag the frame to choose the area; zoom with the wheel or slider. On the right is how it looks on the leaderboard',zoom:'Enlargement',preview:'Preview',cancel:'Cancel',ok:'Upload',
   unreadable:'Could not read this picture',tooSmall:'The picture is too small (at least 32×32)',tooBig:'Still too large after compression; try another picture',offline:'Cannot reach the online service right now',
-  approved:'Picture approved',rejected:'Picture not approved',appealWhere:'If the check got it wrong, ask for a review in Settings › Online',pending:'Picture being checked'}
+  approved:'Picture approved',rejected:'Picture not approved',appealWhere:'If the check got it wrong, ask for a review in Settings › Profile',pending:'Picture being checked'}
 };
 export const avatarCropWords=locale=>T[locale]||T.zh;
 /* Largest zoom: the kept square never gets smaller than 64 px of the source (or 5×). */
