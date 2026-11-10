@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 const fs=require('node:fs'),path=require('node:path'),{execFile}=require('node:child_process');
-function gameProcess(root,executable,{focus=false,execute=execFile}={}){
+/* E382 GameProcess.exe can fail once when the PC is busy (seen while building); one retry before PROCESS_QUERY_FAILED */
+async function gameProcess(root,executable,options={}){try{return await gameProcessOnce(root,executable,options);}catch(error){if(error.message!=='PROCESS_QUERY_FAILED')throw error;return gameProcessOnce(root,executable,options);}}
+function gameProcessOnce(root,executable,{focus=false,execute=execFile}={}){
  const original=executable,candidate=require('./launch-path.cjs').compatiblePath(root,executable,{create:false});executable=candidate;
  return new Promise((resolve,reject)=>execute(path.join(root,'native','GameProcess.exe'),[focus?'--focus':'--query',executable],{windowsHide:true,encoding:'utf8',timeout:10000},(error,stdout)=>{
   if(error)return reject(Error('PROCESS_QUERY_FAILED'));

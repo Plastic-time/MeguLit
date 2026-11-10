@@ -121,8 +121,9 @@ function assertStopped(root,programs){
  const native=path.join(root,'native','GameProcess.exe'),tool=fs.existsSync(native)?native:path.join(__dirname,'../native/GameProcess.exe');
  for(const file of new Set(programs.filter(Boolean))){
   let out;
-  try{out=execFileSync(tool,['--patch-check',file],{windowsHide:true,encoding:'utf8',timeout:4000}).trim();}
-  catch{throw Error('PROCESS_QUERY_FAILED');}
+  /* E382 one retry with a longer wait: under load the check can time out once */
+  const check=()=>execFileSync(tool,['--patch-check',file],{windowsHide:true,encoding:'utf8',timeout:8000}).trim();
+  try{out=check();}catch{try{out=check();}catch{throw Error('PROCESS_QUERY_FAILED');}}
   if(out==='running')throw Error('GAME_RUNNING');
   if(out!=='absent')throw Error('PROCESS_QUERY_FAILED');
  }
