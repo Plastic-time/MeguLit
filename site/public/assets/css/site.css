@@ -1401,3 +1401,29 @@ img, video, canvas, svg { -webkit-user-drag: none; user-drag: none; }
 .dl-box .db-hud { transition: color .3s ease .2s; }
 .dcard { aspect-ratio: 5 / 6.4; }
 .deck:focus-visible { outline: 1px solid rgba(244, 244, 242, .5); outline-offset: 10px; border-radius: 0; }
+
+/* entrance, round 5: no glitch. The overlay is black from the first paint so the page never shows first; the strips
+   take over the black when it parts */
+.intro-on .intro { background: #000; }
+.intro-on .intro.parting { background: transparent; }
+.intro .gl-scan, .intro .gl-band { display: none; }
+
+/* foreground kana: a few large, out-of-focus glyphs drifting over everything on the page (under the top bar and the
+   floating sound control), never catching the pointer */
+.kana-top { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 15; pointer-events: none; }
+
+/* ---- the two bands, round 2: the two poles instead of crimson + gold. A paper slab with black Japanese and small
+   lowercase glosses, a black strip with hairlines carrying the game's own lines, numbered like a script ------------- */
+.ticker { padding: 2.4rem 0 1.6rem; --tk-paper: #f4f4f2; --tk-red: #c8323c; }
+.tk-a, .tk-b { box-shadow: none; }
+.tk-a { background: var(--tk-paper); color: #0b0b0b; transform: rotate(-1.6deg); padding: .85rem 0; box-shadow: 0 22px 50px -26px rgba(0, 0, 0, .9); }
+.tk-b { background: #050505; color: var(--tk-paper); transform: rotate(.8deg); margin-top: 1.1rem; padding: .7rem 0; border-block: 1px solid rgba(244, 244, 242, .16); }
+.tk-track { gap: 1.6rem; padding-right: 1.6rem; }
+.tk-a .tk-track, .tk-b .tk-track { font: 600 clamp(1.05rem, 1.5vw, 1.45rem)/1.2 var(--serif-ja); letter-spacing: .06em; color: inherit; -webkit-text-stroke: 0; }
+.tk-b .tk-track { font-weight: 500; font-size: clamp(.95rem, 1.25vw, 1.2rem); letter-spacing: .12em; }
+.tk-item { display: inline-flex; align-items: baseline; gap: .7rem; white-space: nowrap; }
+.tk-sub { font: 300 .6875rem/1 "MeguLit Mono", var(--mono); letter-spacing: .32em; color: #6b6b6b; text-transform: lowercase; }
+.tk-no { font: 300 .6875rem/1 "MeguLit Mono", var(--mono); letter-spacing: .2em; color: var(--tk-red); }
+.tk-sep { width: .42rem; height: .42rem; background: var(--tk-red); align-self: center; font-size: 0; }
+.tk-b .tk-sep { width: 1px; height: 1.1rem; background: rgba(244, 244, 242, .28); }
+.tk-track i.tk-sep { color: transparent; }

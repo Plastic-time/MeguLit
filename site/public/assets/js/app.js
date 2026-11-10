@@ -3,6 +3,9 @@
 import { I18N } from './i18n.js';
 import { MIRROR, downloadSources, formatSize, formatDate, pickLang, renderMarkdown } from './core.mjs';
 import { kana } from './spell.js';
+import { playIntro } from './intro.js';
+// the entrance starts before anything else on the page is set up
+playIntro();
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -313,6 +316,7 @@ if (video && !reduce && !navigator.connection?.saveData) {
   }).observe(video);
 }
 if ($('.kana-sky')) kana($('.kana-sky'), { still: reduce, hero: $('.hero'), until: $('.hp') });
+if ($('.kana-top')) kana($('.kana-top'), { still: reduce, hero: $('.hero'), near: true });
 const soundBtn = $('.js-sound');
 function setSoundLabel() {
   if (!soundBtn) return;
@@ -396,18 +400,27 @@ if (!reduce) {
   for (const v of $$('video.clip')) if (!v.closest('.feat-item')) io.observe(v);
 }
 
-// GMV ticker: engine names on the crimson band, game titles on the outlined band. Two copies make the loop seamless.
-// The ticker speaks Japanese in every UI language: what MeguLit does, and lines from the games in the video.
-const TICK_FEATURES = ['埋め込み', 'ふりがな', 'クリックで辞書', 'Anki カード', '復習', '五十音', '学習統計', '会話ログ', 'AI 解説'];
-const TICK_LINES = ['雪に埋もれた', '何かを掴んでいた', '顔を覆う', '空気を読む', '続きを読もう', '最後まで', '物語', '言葉'];
+// Two bands in the two poles. Paper band: what MeguLit does, in Japanese with a small lowercase gloss. Black band:
+// real lines from the game in the clips, numbered like a script. Two copies make the loop seamless; the bands speak
+// Japanese in every UI language.
+const TICK_FEATURES = [['埋め込み', 'embed'], ['ふりがな', 'furigana'], ['クリックで辞書', 'click to look up'], ['Anki カード', 'anki'], ['復習', 'review'], ['五十音', 'kana'], ['学習統計', 'stats'], ['会話ログ', 'backlog'], ['AI 解説', 'explain']];
+const TICK_LINES = ['雪に埋もれた…僕の手。', 'それが、何かを掴んでいた。', '彼女の顔を覆う雪を払う。', '僕はこんなところで何をしているのだろう…。', '今なお、それは降り続け、', 'そう。雪だ。'];
 function fillTicker() {
-  const fill = (el, words) => {
+  const make = (tag, cls, text) => { const n = document.createElement(tag); n.className = cls; n.textContent = text; return n; };
+  const fill = (el, items) => {
     if (!el) return;
-    const once = words.flatMap(w => { const s = document.createElement('span'); s.textContent = w; const i = document.createElement('i'); i.textContent = '✦'; return [s, i]; });
+    const once = items.flatMap(([main, sub], k) => {
+      const item = document.createElement('span');
+      item.className = 'tk-item';
+      if (el.classList.contains('js-tk-b')) item.append(make('b', 'tk-no', String(k + 1).padStart(2, '0')));
+      item.append(make('span', 'tk-jp', main));
+      if (sub) item.append(make('small', 'tk-sub', sub));
+      return [item, make('i', 'tk-sep', '')];
+    });
     el.replaceChildren(...once, ...once.map(n => n.cloneNode(true)));
   };
   fill($('.js-tk-a'), TICK_FEATURES);
-  fill($('.js-tk-b'), TICK_LINES);
+  fill($('.js-tk-b'), TICK_LINES.map(l => [l]));
 }
 
 if (lang !== 'zh') applyLang(lang);

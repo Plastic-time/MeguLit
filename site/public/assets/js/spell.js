@@ -32,7 +32,8 @@ function sprite(ch, size, blur, color) {
   return { c, w };
 }
 
-export function kana(canvas, { still = false, hero = null, until = null } = {}) {
+// near: the foreground layer above the page (only near, large, out-of-focus glyphs, a few of them, all the way down)
+export function kana(canvas, { still = false, hero = null, until = null, near = false } = {}) {
   const ctx = canvas.getContext('2d');
   const pointer = { x: -1e4, y: -1e4 };
   addEventListener('pointermove', e => { pointer.x = e.clientX; pointer.y = e.clientY; }, { passive: true });
@@ -40,29 +41,29 @@ export function kana(canvas, { still = false, hero = null, until = null } = {}) 
   const palette = () => dark ? { ink: '#eceae6', red: '#d23a48' } : { ink: '#3a1a1e', red: '#a51d2d' };
 
   const make = (i, anywhere) => {
-    const z = Math.pow(Math.random(), 1.3);                       // more far glyphs than near ones
-    const size = 13 + z * 62;
-    const blur = Math.abs(z - FOCUS) * (z > FOCUS ? 16 : 7);
+    const z = near ? .66 + Math.random() * .34 : Math.pow(Math.random(), 1.3);   // more far glyphs than near ones
+    const size = near ? 34 + z * 60 : 13 + z * 62;
+    const blur = near ? 1.5 + (z - .66) * 10 : Math.abs(z - FOCUS) * (z > FOCUS ? 16 : 7);
     const red = Math.random() < .1;
     const ch = KANA[Math.floor(Math.random() * KANA.length)];
     const p = palette();
     return {
-      i, z, ch, red, follower: i < FOLLOWERS,
+      i, z, ch, red, follower: near || i < FOLLOWERS,
       spr: sprite(ch, size, blur, red ? p.red : p.ink),
       x: Math.random() * W, y: anywhere ? Math.random() * H : H + 60,
       vx: (Math.random() - .5) * 6, vy: -(4 + Math.random() * 10) * (.4 + z),
       rot: (Math.random() - .5) * .5, vr: (Math.random() - .5) * .12,
       sway: Math.random() * Math.PI * 2,
-      alpha: (.1 + .3 * (1 - Math.abs(z - FOCUS) * 1.4)) * (red ? 1.25 : 1),
+      alpha: near ? (.2 + Math.random() * .2) * (red ? 1.3 : 1) : (.1 + .3 * (1 - Math.abs(z - FOCUS) * 1.4)) * (red ? 1.25 : 1),
     };
   };
   const fit = () => {
     dpr = Math.min(devicePixelRatio || 1, 2);
     W = innerWidth; H = innerHeight;
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-    const want = Math.round(Math.min(90, W * H / 15000));
+    const want = near ? Math.max(5, Math.round(Math.min(16, W * H / 80000))) : Math.round(Math.min(90, W * H / 15000));
     while (parts.length < want) parts.push(make(parts.length, true));
-    parts.length = Math.max(want, FOLLOWERS);
+    parts.length = near ? want : Math.max(want, FOLLOWERS);
   };
   fit();
   addEventListener('resize', fit);
@@ -88,7 +89,7 @@ export function kana(canvas, { still = false, hero = null, until = null } = {}) 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     for (const p of parts) {
-      const vis = p.follower ? Math.max(heroVis, .75 * followVis) : heroVis;
+      const vis = near ? Math.max(heroVis, .85) : p.follower ? Math.max(heroVis, .75 * followVis) : heroVis;
       // the pointer pushes near glyphs more than far ones
       const dx = p.x - pointer.x, dyp = p.y - pointer.y, d2 = dx * dx + dyp * dyp;
       if (!still && d2 < 150 * 150) { const d = Math.sqrt(d2) || 1, f = (1 - d / 150) * 700 * (.3 + p.z); p.vx += dx / d * f * dt; p.vy += dyp / d * f * dt; }
