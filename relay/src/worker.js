@@ -94,7 +94,10 @@ export async function leaderboardGet(url,env,ip,now=new Date()){
  /* rank = 1 + number of strictly better values, so ties share a rank; id hashes never leave the server */
  const avatars=await avatarsFor(env,rows.map(r=>r.id_hash));
  let rank=0,prev=null;const entries=rows.map((r,i)=>{if(r.value!==prev){rank=i+1;prev=r.value;}return {rank,name:r.name,value:r.value,me:!!q.me&&r.id_hash===q.me,avatar:avatars.get(r.id_hash)||null,pid:r.pid||null};});
- return json({entries,total,me:mine});
+ /* E420 the most-read work (all time, from readers who share game names) for 阅读时长 / 阅读字数 */
+ let feature=null;
+ if(q.metric==='seconds'||q.metric==='characters'){const col=q.metric;const f=await env.DB.prepare(`SELECT MAX(title) title,SUM(${col}) value,COUNT(*) readers FROM leaderboard_games WHERE ${col}>0 GROUP BY game_key ORDER BY value DESC LIMIT 1`).first();if(f&&f.value>0)feature={title:f.title,value:f.value,readers:f.readers};}
+ return json({entries,total,me:mine,feature});
 }
 export async function leaderboardDelete(request,url,env,ip,now=new Date()){
  if(!await hit(env,'lb-post',ip,now.getTime()))return fail('RATE_LIMITED',429);

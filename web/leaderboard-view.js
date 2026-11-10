@@ -49,6 +49,7 @@ const W={
 };
 const PERIODS=['week','month','all'],METRICS=['seconds','characters','words','reviews','kana','streak','games'],CATS=['word','phrase','sentence'];
 let view={tab:'board',period:'week',metric:'seconds',game:'',category:'word',week:''};
+export const setView=patch=>{view={...view,...patch};};
 export function leaderboardWords(locale){return W[locale]||W.zh;}
 function fill(template,values){return template.replace(/\{(\w+)\}/g,(_,k)=>values[k]??'');}
 const nf=locale=>new Intl.NumberFormat(locale==='zh'?'zh-CN':locale==='ja'?'ja-JP':'en-US');
@@ -69,9 +70,9 @@ export function avatarHTML(entry,images,esc){
    ruled rows under column headings; hot words use the same stage, 4–10 as one column of honour rows (no orphan
    card), 11–50 as a compact two-column index. */
 const EXTRA={
- zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次',myPage:'我的主页',circleTitle:'本周众人汇聚的魔力',circleSub:'{n} 位读者在此共鸣',meTag:'吾',signIn:'注册 / 登录',follow:'关注',vacant:'虚位以待',followSub:'关注的人和同好',changeAvatar:'换头像',editProfile:'编辑个人主页',uploading:'上传并审核中…'},
- ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',myPage:'マイページ',circleTitle:'みんなで集めた魔力',circleSub:'{n} 人の読者が共鳴中',meTag:'我',signIn:'登録 / ログイン',follow:'フォロー',vacant:'空席',followSub:'フォロー中の人と同好',changeAvatar:'アイコンを変更',editProfile:'プロフィールを編集',uploading:'アップロードして審査中…'},
- en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',myPage:'My profile',circleTitle:'Mana gathered together',circleSub:'{n} readers in resonance',meTag:'You',signIn:'Sign up / sign in',follow:'Following',vacant:'Open spot',followSub:'People you follow and kindred readers',changeAvatar:'Change picture',editProfile:'Edit profile',uploading:'Uploading and checking…'}
+ zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次',myPage:'我的主页',circleTitle:'本周众人汇聚的魔力',circleSub:'{n} 位读者在此共鸣',featureTitle:'被阅读最多的作品',featureSub:'{n} 位读者一起读过 · 累计',wordTitle:'本周最多人查的词',wordSub:'{n} 位读者查过 · 点击查词',meTag:'吾',signIn:'注册 / 登录',follow:'关注',vacant:'虚位以待',followSub:'关注的人和同好',changeAvatar:'换头像',editProfile:'编辑个人主页',uploading:'上传并审核中…'},
+ ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',myPage:'マイページ',circleTitle:'みんなで集めた魔力',circleSub:'{n} 人の読者が共鳴中',featureTitle:'いちばん読まれた作品',featureSub:'{n} 人の読者が読みました · 累計',wordTitle:'今週いちばん調べられた語',wordSub:'{n} 人が調べました · クリックで辞書へ',meTag:'我',signIn:'登録 / ログイン',follow:'フォロー',vacant:'空席',followSub:'フォロー中の人と同好',changeAvatar:'アイコンを変更',editProfile:'プロフィールを編集',uploading:'アップロードして審査中…'},
+ en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',myPage:'My profile',circleTitle:'Mana gathered together',circleSub:'{n} readers in resonance',featureTitle:'The most-read work',featureSub:'Read by {n} readers · all time',wordTitle:'Most looked-up word this week',wordSub:'Looked up by {n} readers · click to look it up',meTag:'You',signIn:'Sign up / sign in',follow:'Following',vacant:'Open spot',followSub:'People you follow and kindred readers',changeAvatar:'Change picture',editProfile:'Edit profile',uploading:'Uploading and checking…'}
 };
 const words=locale=>({...leaderboardWords(locale),...(EXTRA[locale]||EXTRA.zh)});
 function segmented(name,items,current,w){return `<div class="lb-seg" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
@@ -111,10 +112,18 @@ const SIGIL=(()=>{const c=100,pt=(r,a)=>`${(c+r*Math.cos(a)).toFixed(1)},${(c+r*
  const tri=o=>`<polygon points="${[0,1,2].map(k=>pt(62,o+k*2*Math.PI/3)).join(' ')}"/>`;
  const ticks=Array.from({length:36},(_,k)=>{const a=k*Math.PI/18;return `<line x1="${pt(84,a).split(',')[0]}" y1="${pt(84,a).split(',')[1]}" x2="${pt(k%3?88:92,a).split(',')[0]}" y2="${pt(k%3?88:92,a).split(',')[1]}"/>`;}).join('');
  return `<svg class="lb-sigil" viewBox="0 0 200 200" aria-hidden="true"><g class="lb-sigil-spin"><circle cx="100" cy="100" r="94"/><circle cx="100" cy="100" r="84"/>${ticks}</g><g class="lb-sigil-spin is-back">${tri(-Math.PI/2)}${tri(Math.PI/2)}<circle cx="100" cy="100" r="62"/><circle cx="100" cy="100" r="31"/></g></svg>`;})();
-function circleHTML(entries,metric,w,locale,esc,images){
+/* E420 the head of the board: 阅读时长 / 阅读字数 show the most-read work (cover, title, total); 新收录单词 shows only
+   the week's top word, a button into the dictionary; the other metrics keep the magic circle with everyone's total */
+function headHTML(entries,metric,w,locale,esc,board){
+ const f=board?.feature,word=board?.word;
+ if((metric==='seconds'||metric==='characters')&&f)return `<section class="lb-circle is-feature"><div class="lb-cover">${f.cover?`<img src="${esc(f.cover)}" alt="">`:`<span class="lb-cover-blank">${esc([...f.title][0]||'?')}</span>`}</div><div class="lb-circle-text"><small>${w.featureTitle}</small><h3 class="lb-feature-title" lang="ja">${esc(f.title)}</h3><strong>${esc(formatValue(metric,f.value,locale))}</strong><span>${esc(fill(w.featureSub,{n:f.readers}))}</span></div></section>`;
+ if(metric==='words'&&word)return `<section class="lb-circle is-word"><button type="button" class="lb-word" data-lb-lookup="${esc(word.term)}" lang="ja" title="${esc(w.wordTitle+' · '+fill(w.wordSub,{n:word.users}))}">${esc(word.term)}</button></section>`;
  const total=entries.reduce((n,e)=>n+(Number(e.value)||0),0);
+ return `<section class="lb-circle"><div class="lb-circle-sigil">${SIGIL}</div><div class="lb-circle-text"><small>${w.circleTitle}</small><strong>${esc(formatValue(metric,total,locale))}</strong><span>${esc(fill(w.circleSub,{n:entries.length}))}</span></div></section>`;
+}
+function circleHTML(entries,metric,w,locale,esc,images,board){
  const code=n=>'No.'+String(n).padStart(2,'0');
- return `<section class="lb-circle"><div class="lb-circle-sigil">${SIGIL}</div><div class="lb-circle-text"><small>${w.circleTitle}</small><strong>${esc(formatValue(metric,total,locale))}</strong><span>${esc(fill(w.circleSub,{n:entries.length}))}</span></div></section>
+ return `${headHTML(entries,metric,w,locale,esc,board)}
  <ol class="lb-grimoires" role="list">${entries.map((e,i)=>`<li class="lb-grimoire${e.me?' is-me':''}" style="--i:${i}">${e.me?`<em class="lb-me-tag">${w.meTag}</em>`:''}<span class="lb-code">${code(e.rank)}</span>${personButton(e,`<span class="lb-gem">${avatarHTML(e,images,esc)}</span><span class="lb-gname">${esc(e.name)}</span>`,esc)}<strong class="lb-gvalue">${esc(formatValue(metric,e.value,locale))}</strong>${reportButton(e,w,esc)}</li>`).join('')}</ol>`;
 }
 export function boardHTML(data,w,locale,esc){
@@ -126,7 +135,7 @@ export function boardHTML(data,w,locale,esc){
  const metric=view.metric==='games'?'characters':view.metric,entries=board.entries||[];
  if(!entries.length)return (view.game?`<button type="button" class="leaderboard-back" data-lb-back>‹ ${w.back}</button>`:'')+`<p class="lb-empty">${w.empty}</p>`;
  const top=entries.slice(0,3),rest=entries.slice(3);
- return (view.game?`<button type="button" class="leaderboard-back" data-lb-back>‹ ${w.back}</button><h3 class="leaderboard-game-title">${esc(view.game)}</h3>`:'')+circleHTML(entries,metric,w,locale,esc,images);
+ return (view.game?`<button type="button" class="leaderboard-back" data-lb-back>‹ ${w.back}</button><h3 class="leaderboard-game-title">${esc(view.game)}</h3>`:'')+circleHTML(entries,metric,w,locale,esc,images,board);
 }
 /* ---- 每周热词 ------------------------------------------------------------------------------------------------- */
 /* Pure split used by the page and the tests: podium 1–3, cards 4–10, list 11–50. */
@@ -191,7 +200,7 @@ export function leaderboardHTML(data,locale,esc){
  return page(topRow(w,tab,myChip(data,w,locale,esc)),boardControls(w),body+localHTML(data,w,locale,esc));
 }
 /* Mounts the page into main; isCurrent() guards against a late reply after the user moved on. */
-export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>true,openSettings=()=>{}}){
+export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>true,openSettings=()=>{},lookup=null}){
  const w=leaderboardWords(locale);
  let last=null;
  const render=async(action='leaderboard_view',extra={})=>{
@@ -219,6 +228,7 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
   /* E404 the chip and every 编辑个人主页 open the 个人主页 panel; closing it refreshes the page */
   const openProfile=()=>openProfilePanel({api,locale,esc,toast,openSettings,onClose:()=>{if(isCurrent())render();}});
   main.querySelectorAll('[data-lb-me],[data-lb-profile]').forEach(b=>b.addEventListener('click',openProfile));
+  main.querySelectorAll('[data-lb-lookup]').forEach(b=>b.addEventListener('click',()=>lookup?.(b.dataset.lbLookup)));
   bindSocial(main,{api,locale,esc,toast,images:()=>({...(last?.avatars||{}),...(last?.social?.avatars||{})}),avatarHTML,openSettings:section=>section==='personal'?openProfile():openSettings(section),rerender:()=>{if(isCurrent())render();}});
  };
  main.innerHTML=leaderboardHTML(null,locale,esc);

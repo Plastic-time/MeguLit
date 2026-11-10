@@ -173,7 +173,27 @@ async function fetchBoard(period,metric,options={}){
  const res=await call(c.base+'/api/leaderboard?'+q,{method:'GET'},options.fetch||fetch);if(res.state!=='ok')return res;
  const clean=e=>({rank:int(e?.rank),name:String(e?.name||'').slice(0,32),value:int(e?.value),me:e?.me===true,avatar:AVATAR_ID.test(String(e?.avatar||''))?e.avatar:null,pid:/^[0-9a-f]{16}$/.test(String(e?.pid||''))?e.pid:null});
  if(isGames&&!options.game)return {state:'ok',games:(Array.isArray(res.data.games)?res.data.games:[]).slice(0,100).map(g=>({title:String(g?.title||'').slice(0,120),readers:int(g?.readers),top:g?.top?clean(g.top):null}))};
- return {state:'ok',entries:(Array.isArray(res.data.entries)?res.data.entries:[]).slice(0,100).map(clean),total:int(res.data.total),me:res.data.me?{rank:int(res.data.me.rank),value:int(res.data.me.value)}:null};
+ const f=res.data.feature,feature=f&&String(f.title||'').trim()?{title:String(f.title).slice(0,120),value:int(f.value),readers:int(f.readers)}:null;
+ return {state:'ok',entries:(Array.isArray(res.data.entries)?res.data.entries:[]).slice(0,100).map(clean),total:int(res.data.total),me:res.data.me?{rank:int(res.data.me.rank),value:int(res.data.me.value)}:null,feature};
+}
+/* E420 a cover for the most-read work: the user's own library cover when they have the game, otherwise the VNDB
+   cover (only images VNDB rates safe), saved once under data/assets/covers and remembered per title (misses too). */
+async function featureCover(root,db,title,options={}){
+ const store=require('./store.cjs'),key=String(title||'').trim().toLowerCase();if(!key)return null;
+ try{const row=db.prepare("SELECT cover FROM games WHERE removed_at IS NULL AND lower(trim(title))=? AND cover!='' LIMIT 1").get(key);if(row?.cover){const img=store.imageData(root,'covers',row.cover);if(img)return img;}}catch{}
+ const cacheFile=path.join(root,'data','config','leaderboard-covers.json'),cache=relay.readJSON(cacheFile);
+ if(Object.prototype.hasOwnProperty.call(cache,key))return cache[key]?store.imageData(root,'covers',cache[key]):null;
+ let file='';
+ try{const fetcher=options.fetch||fetch;
+  const r=await fetcher('https://api.vndb.org/kana/vn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filters:['search','=',title],fields:'image.url,image.sexual,image.violence',results:1,sort:'searchrank'}),signal:AbortSignal.timeout(TIMEOUT)});
+  const img=r.ok?(await r.json()).results?.[0]?.image:null;
+  if(img?.url&&/^https:\/\/[a-z0-9.-]*vndb\.org\//.test(img.url)&&Number(img.sexual)<1&&Number(img.violence)<1){
+   const b=await fetcher(img.url,{signal:AbortSignal.timeout(TIMEOUT)});const bytes=b.ok?Buffer.from(await b.arrayBuffer()):null;
+   if(bytes&&bytes.length>100&&bytes.length<4*1024*1024){const ext=/\.png$/i.test(img.url)?'png':/\.webp$/i.test(img.url)?'webp':'jpg';file='lb-'+crypto.createHash('sha256').update(key).digest('hex').slice(0,16)+'.'+ext;
+    const folder=path.join(root,'data','assets','covers');fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(path.join(folder,file),bytes);}}
+ }catch{return null;}
+ cache[key]=file;try{atomic(cacheFile,cache);}catch{}
+ return file?store.imageData(root,'covers',file):null;
 }
 /* Turning the switch off: delete the server entry (when reachable), then forget id and consent either way. */
 async function leave(root,options={}){
@@ -267,6 +287,9 @@ async function view(root,db,request={},options={}){
  if(request.tab==='follow'){result.tab='follow';result.social=await social(root,options);return result;}
  if(tab==='hot'){result.hot=await hotWords(root,{week:request.week||'',category:CATEGORIES.includes(request.category)?request.category:'word'},options);return result;}
  result.board=await fetchBoard(period,metric,{...options,root,now,game:request.game});
+ if(result.board.state==='ok'&&result.board.feature)result.board.feature.cover=await featureCover(root,db,result.board.feature.title,options);
+ /* E420 新收录单词: the week's top hot word, shown as a word you can look up */
+ if(result.board.state==='ok'&&metric==='words'){try{const h=await hotWords(root,{category:'word'},options);const top=h.state==='ok'?h.awards.find(a=>a.rank===1):null;if(top)result.board.word={term:top.term,users:top.users};}catch{}}
  if(result.board.state==='ok'){const ids=[...(result.board.entries||[]),...(result.board.games||[]).map(g=>g.top).filter(Boolean)].map(e=>e.avatar);result.avatars={...result.avatars,...await avatarImages(root,ids,options)};}
  return result;
 }
