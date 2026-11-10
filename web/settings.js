@@ -14,6 +14,7 @@ try{const value=JSON.parse(localStorage.getItem(categoryStateKey));if(Array.isAr
 const openCategories=new Set(savedCategories||[]);
 const saveCategories=()=>{try{localStorage.setItem(categoryStateKey,JSON.stringify([...openCategories]));}catch{}};
 import {configureTranslation} from './translation-settings.js';
+import {mountGuide} from './settings-guides.js';
 import {mountSettingsSearch} from './settings-search.js';
 import {configureDictionary,fieldHelp} from './settings-help.js';
 import {mountSettingsPreview} from './settings-preview.js';
@@ -91,6 +92,9 @@ export async function renderSettings({main,api,invoke,text,locale,esc,toast,head
  if(section==='dictionary')configureDictionary({content,form,locale});
  if(section==='speech')stopTranslation=configureSpeech({content,form,api,locale,esc,toast});
  stopPacks();stopPacks=['speech','dictionary'].includes(section)?mountRuntimePacks({content,api,locale,esc,toast}):()=>{};
+ /* E383 built-in tutorial card at the top of the page; its buttons run the step for the reader */
+ {const started={zh:'已开始下载，进度见本页下方「运行组件」',en:'Download started; progress is under Runtime components below',ja:'ダウンロードを開始しました。進行状況は下の「実行コンポーネント」に表示されます'}[locale]||'';const pack=id=>async()=>{try{await api('pack_download',{ids:[id]});toast(started);content.querySelector('.runtime-packs,[data-runtime-packs]')?.scrollIntoView({behavior:'smooth',block:'center'});}catch{toast(text.serviceFailed);}};
+  mountGuide({content,section,locale,esc,api,toast,actions:{voice:pack('voice'),reading:pack('reading'),ankiCheck:async()=>{try{const status=await api('anki_status');toast(status.connected?text.ankiConnected:text.ankiOffline);}catch{toast(text.serviceFailed);}}}});}
  enhanceSelects(content);
  form.querySelectorAll('input[type=color]').forEach(element=>element.oninput=()=>element.dataset.empty='false');
  content.querySelector('#settings-profile')?.addEventListener('change',event=>{const nextProfile=event.target.value;setProfile(nextProfile);renderSettings({main,api,invoke,text,locale,esc,toast,heading,basicSettings,isCurrent,onSaved,section,setSection,profile:nextProfile,setProfile}).catch(()=>toast(text.serviceFailed));});
