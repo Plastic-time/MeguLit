@@ -106,7 +106,9 @@ function identity(root,options={}){
 }
 /* Taking part = switch on + consent given + a nickname that passes the filter. */
 function config(root,env=process.env,options={}){const o=online(root),s=state(root),base=relay.relayBase(root,env),who=identity(root,options);return {...o,...s,base,configured:!!base,joined:o.enabled&&!!s.consentAt&&!!s.installId&&cleanName(o.name).ok,account:!!who,me:who?publicHash('account:'+who.accountId):publicHash(s.installId)};}
-function join(root,{name,shareGames=false,consent}={}){
+/* E385 the app joins only with a signed-in account (requireAccount); older anonymous entries keep working */
+function join(root,{name,shareGames=false,consent,requireAccount=false}={},options={}){
+ if(requireAccount&&!identity(root,options))throw Error('LEADERBOARD_ACCOUNT_REQUIRED');
  if(consent!==true)throw Error('LEADERBOARD_CONSENT_REQUIRED');
  const checked=cleanName(name);if(!checked.ok)throw Error('LEADERBOARD_'+checked.error);
  const s=state(root);atomic(stateFile(root),{...relay.readJSON(stateFile(root)),installId:s.installId||crypto.randomUUID(),consentAt:new Date().toISOString(),lastSubmitAt:0});

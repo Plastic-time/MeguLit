@@ -133,6 +133,11 @@
 .leaderboard-check{display:flex;align-items:center;gap:12px;margin-bottom:12px;font-size:13px;color:var(--lb-ink-2);cursor:pointer}
 .leaderboard-error{color:var(--accent);font-size:12px;margin:0 0 10px}
 .leaderboard-join .primary{display:inline-flex}
+/* E385 two-step join: email login first, then nickname */
+.leaderboard-join .lb-step{margin:18px 0 6px}
+.lb-login{display:flex;flex-direction:column;gap:6px;margin-top:12px;max-width:420px}
+.lb-login .input-group{display:flex;gap:8px}
+.lb-login .form-input{flex:1;min-width:0}
 
 /* settings › 联网服务: avatar block and appeal */
 .leaderboard-avatar-row{display:flex;align-items:center;gap:20px}

@@ -4,12 +4,13 @@
    numbers computed on this PC.
    E379: avatars (moderated on the relay; default = initial on a preset colour) with a report button, and a second
    view 每周热词: 词汇 / 短语 / 短句, podium for 1–3, cards with the AI guess for 4–10, a plain list for 11–50. */
+import {mountEmailLogin} from './account-ui.js';
 export const leaderboardLabel={zh:'排行榜',ja:'ランキング',en:'Leaderboard'};
 const W={
  zh:{title:'排行榜',week:'本周',month:'本月',all:'全部',characters:'阅读字数',seconds:'阅读时长',words:'收录单词',streak:'连续天数',games:'按游戏',
   notReady:'联网服务还在准备中',notReadyText:'排行榜上线后会显示在这里。下面是只在本机计算的个人数据，不会上传',
   mine:'我的数据',currentStreak:'当前连续',days:'天',unitChars:'字',unitWords:'个',hours:'小时',minutes:'分钟',
-  joinTitle:'参加排行榜',joinText:'参加后只会上传阅读字数、时长、收录单词数、连续天数的汇总，以及本周查词的词条和次数（不含原句和游戏进度），用本机随机生成的匿名 ID，不需要账号，也不读取硬件信息。登录了 MeguLit 账号时，几台电脑会合并成一行。随时可以在 设置 › 联网服务 关闭，关闭时会删除服务器上的记录',
+  joinTitle:'参加排行榜',joinText:'参加后只会上传阅读字数、时长、收录单词数、连续天数的汇总，以及本周查词的词条和次数（不含原句和游戏进度），不读取硬件信息。参加要先用邮箱登录 MeguLit 账号，几台电脑会合并成一行；邮箱只用来登录，不会出现在榜上。随时可以在 设置 › 联网服务 关闭，关闭时会删除服务器上的记录',loginStep:'第 1 步：用邮箱登录',loginText:'输入邮箱，收到 6 位验证码后填进来就登录好了，不用设密码。已经在 设置 › 账号 登录过的话会直接跳到下一步',joinStep:'第 2 步：起个昵称',ACCOUNT_REQUIRED:'请先用邮箱登录',
   nickname:'昵称',nicknameHint:'2–16 个字',shareGames:'同时公开我读过的游戏（用于“按游戏”排行）',consent:'我同意上传上述汇总数据',join:'参加',
   joinedAs:'以 {name} 参加',leave:'退出排行榜',leaveConfirm:'再点一次确认退出（会删除服务器上的记录）',left:'已退出排行榜',
   me:'我的排名',rank:'第 {n} 名',empty:'还没有人上榜',offline:'暂时连不上联网服务',retry:'重试',readers:'{n} 人在读',top:'榜首',back:'返回游戏列表',
@@ -21,7 +22,7 @@ const W={
  ja:{title:'ランキング',week:'今週',month:'今月',all:'全期間',characters:'読んだ文字数',seconds:'読書時間',words:'登録単語',streak:'連続日数',games:'ゲーム別',
   notReady:'オンラインサービスは準備中です',notReadyText:'公開後、ランキングはここに表示されます。下はこの PC だけで計算した個人の記録で、送信されません',
   mine:'自分の記録',currentStreak:'現在の連続',days:'日',unitChars:'字',unitWords:'語',hours:'時間',minutes:'分',
-  joinTitle:'ランキングに参加',joinText:'参加すると、読んだ文字数・時間・登録単語数・連続日数の合計と、今週調べた語とその回数（原文やゲームの進行状況は含みません）だけを、この PC で作った匿名のランダム ID で送ります。アカウントは不要で、ハードウェア情報も読みません。MeguLit アカウントにログインしていると、複数の PC が 1 行にまとまります。設定 › オンラインサービス でいつでもオフにでき、そのときサーバーの記録も削除します',
+  joinTitle:'ランキングに参加',joinText:'参加すると、読んだ文字数・時間・登録単語数・連続日数の合計と、今週調べた語とその回数（原文やゲームの進行状況は含みません）だけを送ります。ハードウェア情報は読みません。参加にはメールアドレスで MeguLit アカウントにログインする必要があり、複数の PC が 1 行にまとまります。メールアドレスはログインにのみ使い、ランキングには表示されません。設定 › オンラインサービス でいつでもオフにでき、そのときサーバーの記録も削除します',loginStep:'ステップ 1：メールアドレスでログイン',loginText:'メールアドレスを入力し、届いた 6 桁の確認コードを入れるだけでログインできます。パスワードは不要です。設定 › アカウント でログイン済みなら次のステップから始まります',joinStep:'ステップ 2：ニックネームを決める',ACCOUNT_REQUIRED:'先にメールアドレスでログインしてください',
   nickname:'ニックネーム',nicknameHint:'2〜16 文字',shareGames:'読んだゲームも公開する（ゲーム別ランキング用）',consent:'上記の合計データの送信に同意します',join:'参加する',
   joinedAs:'{name} として参加中',leave:'ランキングから退出',leaveConfirm:'もう一度押すと退出します（サーバーの記録を削除）',left:'ランキングから退出しました',
   me:'自分の順位',rank:'{n} 位',empty:'まだ誰も載っていません',offline:'オンラインサービスに接続できません',retry:'再試行',readers:'{n} 人が読書中',top:'1 位',back:'ゲーム一覧に戻る',
@@ -33,7 +34,7 @@ const W={
  en:{title:'Leaderboard',week:'This week',month:'This month',all:'All time',characters:'Characters read',seconds:'Reading time',words:'Words saved',streak:'Streak days',games:'By game',
   notReady:'Online services are still being set up',notReadyText:'The leaderboard will appear here once it is live. Below are your own numbers, computed on this PC and not uploaded',
   mine:'My numbers',currentStreak:'Current streak',days:'days',unitChars:'chars',unitWords:'words',hours:'h',minutes:'min',
-  joinTitle:'Join the leaderboard',joinText:'Only totals are uploaded: characters read, reading time, words saved, streak days, and this week\'s looked-up words with their counts (no sentences, no game progress), under a random anonymous id made on this PC. No account, no hardware ids. When you are signed in to a MeguLit account, your PCs share one row. Turn it off any time in Settings › Online services, which also deletes your entry on the server',
+  joinTitle:'Join the leaderboard',joinText:'Only totals are uploaded: characters read, reading time, words saved, streak days, and this week\'s looked-up words with their counts (no sentences, no game progress, no hardware ids). Joining needs a MeguLit account signed in with your email, so your PCs share one row; the email is only used to sign in and never shows on the board. Turn it off any time in Settings › Online services, which also deletes your entry on the server',loginStep:'Step 1: sign in with your email',loginText:'Enter your email, then type the 6-digit code we send you. No password. If you already signed in under Settings › Account, you start at step 2',joinStep:'Step 2: pick a nickname',ACCOUNT_REQUIRED:'Sign in with your email first',
   nickname:'Nickname',nicknameHint:'2–16 characters',shareGames:'Also show the games I read (for the per-game boards)',consent:'I agree to upload these totals',join:'Join',
   joinedAs:'Joined as {name}',leave:'Leave the leaderboard',leaveConfirm:'Click again to leave (deletes your entry on the server)',left:'You left the leaderboard',
   me:'My rank',rank:'#{n}',empty:'Nobody here yet',offline:'Cannot reach the online service right now',retry:'Retry',readers:'{n} readers',top:'Top',back:'Back to games',
@@ -126,8 +127,12 @@ export function hotHTML(hot,w,locale,esc){
   ${cards.length?`<section class="lb-section"><h3 class="lb-h3">${w.honours}</h3><ol class="leaderboard-cards lb-honours">${cards.map(a=>`<li class="leaderboard-card"><span class="leaderboard-rank">${a.rank}</span><div class="lb-honour-term"><strong lang="ja">${esc(a.term)}</strong><small>${meta(a)}</small></div>${reason(a)||'<span></span>'}</li>`).join('')}</ol></section>`:''}
   ${list.length?`<section class="lb-section"><h3 class="lb-h3">${w.rest}</h3><ol class="leaderboard-list leaderboard-hot-list" style="--rows:${Math.ceil(list.length/2)}">${list.map(a=>`<li><span class="leaderboard-rank">${a.rank}</span><span class="leaderboard-name" lang="ja">${esc(a.term)}</span><strong>${esc(fill(w.times,{n:n(a.lookups)}))}</strong></li>`).join('')}</ol></section>`:''}`;
 }
+/* E385 joining goes through the email login (one row per account, not per PC). Not signed in: step 1 only, the
+   shared email + code form from account-ui.js; signed in: step 2, nickname + consent. */
 function joinHTML(data,w,esc){
- return `<section class="lb-card leaderboard-join"><h2 class="lb-h2">${w.joinTitle}</h2><p class="lb-note">${w.joinText}</p>
+ const head=`<section class="lb-card leaderboard-join"><h2 class="lb-h2">${w.joinTitle}</h2><p class="lb-note">${w.joinText}</p>`;
+ if(!data.account)return `${head}<h3 class="lb-h3 lb-step">${w.loginStep}</h3><p class="lb-note">${w.loginText}</p><div class="lb-login" data-lb-login></div></section>`;
+ return `${head}<h3 class="lb-h3 lb-step">${w.joinStep}</h3>
   <label class="leaderboard-field"><span>${w.nickname}</span><input type="text" maxlength="16" data-lb-name value="${esc(data.name||'')}" placeholder="${w.nicknameHint}" autocomplete="off" spellcheck="false"></label>
   <label class="leaderboard-check"><input type="checkbox" class="switch" data-lb-share ${data.shareGames?'checked':''}><span>${w.shareGames}</span></label>
   <label class="leaderboard-check"><input type="checkbox" class="switch" data-lb-consent><span>${w.consent}</span></label>
@@ -167,6 +172,7 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
   main.querySelectorAll('[data-lb-report]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('leaderboard_report',{avatar:b.dataset.lbReport});toast(r?.hidden?w.reportHidden:w.reported);}catch{toast(w.offline);b.disabled=false;}});
   main.querySelector('[data-lb-back]')?.addEventListener('click',()=>{view.game='';render();});
   main.querySelector('[data-lb-retry]')?.addEventListener('click',()=>render());
+  const login=main.querySelector('[data-lb-login]');if(login)mountEmailLogin(login,{api,locale,esc,toast,onDone:()=>render()});
   main.querySelector('[data-lb-join]')?.addEventListener('click',()=>{const box=main.querySelector('[data-lb-error]');box.hidden=true;
    if(!main.querySelector('[data-lb-consent]').checked){box.textContent=w.CONSENT_REQUIRED;box.hidden=false;return;}
    render('leaderboard_join',{name:main.querySelector('[data-lb-name]').value,shareGames:main.querySelector('[data-lb-share]').checked,consent:true});});
