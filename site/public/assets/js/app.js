@@ -169,8 +169,27 @@ async function loadRelease() {
     release = await getJson(`${MIRROR}/latest.json`, 3000);
     mirrorOk = Boolean(release?.key);
   } catch { release = null; }
-  if (!release) release = await getJson('/data/latest.json', 8000).catch(() => null);
+  if (!release) {
+    // mirror out of reach: the snapshot shipped with the site, brought up to date from GitHub's own API when it can be
+    const snap = await getJson('/data/latest.json', 8000).catch(() => null);
+    const gh = await getJson('https://api.github.com/repos/ilynthn/MeguLit/releases/latest', 5000).catch(() => null);
+    release = mergeGithub(snap, gh);
+  }
   if (release) fillRelease();
+}
+// The fields the page needs, from a GitHub release; release notes stay the snapshot's unless the version matches.
+function mergeGithub(snap, gh) {
+  const asset = gh?.assets?.find(a => /^MeguLit-v[\d.]+[a-z]?-win-x64\.zip$/i.test(a.name));
+  if (!asset) return snap;
+  const label = (/v?(\d+\.\d+\.\d+[a-z]?)\s*$/i.exec(gh.name || '') || /v?(\d+\.\d+\.\d+[a-z]?)$/i.exec(gh.tag_name || '') || [])[1];
+  if (!label) return snap;
+  const same = snap && snap.label === label.toLowerCase();
+  return {
+    ...(same ? snap : { notes: snap?.notes && snap.label === label ? snap.notes : null }),
+    label: label.toLowerCase(), version: label.toLowerCase(), tag: gh.tag_name, title: gh.name, name: asset.name, size: asset.size,
+    sha256: String(asset.digest || '').replace(/^sha256:/, '') || (same ? snap.sha256 : ''),
+    published: gh.published_at, github: asset.browser_download_url, page: gh.html_url,
+  };
 }
 
 // ---- engines ---------------------------------------------------------------------------------------------------------------
