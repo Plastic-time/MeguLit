@@ -1767,3 +1767,28 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
   .sound-ctl.floating:hover .np-ctl { max-height: 0; opacity: 0; margin-top: 0; }
   .sound-ctl.floating.open .np-ctl { max-height: 3rem; opacity: 1; margin-top: .55rem; }
 }
+
+/* player controls, round 2: quiet glyph buttons around one round play button; the seek bar on its own row with the
+   elapsed and total time at its ends; the switches as small lowercase toggles with a dot */
+.np-ctl { display: grid; grid-template-columns: minmax(0, 1fr); gap: .45rem; margin-top: .6rem; }
+.np-btns { display: flex; align-items: center; gap: .9rem; }
+.np-b { width: 1.6rem; height: 1.6rem; border: 0; color: #c8c8c6; background: none; transition: color .2s, transform .15s; }
+.np-b:hover, .np-b:focus-visible { color: #fff; border: 0; outline: none; }
+.np-b:active { transform: scale(.9); }
+.np-b svg { width: .9rem; height: .9rem; }
+.np-play { width: 2.1rem; height: 2.1rem; border-radius: 50%; color: #0b0b0b; background: #f4f4f2; border: 0; box-shadow: 0 0 0 4px rgba(244, 244, 242, .08); }
+.np-play svg { width: .8rem; height: .8rem; }
+.np-play:hover, .np-play:focus-visible { background: #c8323c; color: #fff; box-shadow: 0 0 0 4px rgba(200, 50, 60, .25); }
+.np-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .6rem; }
+.np-now, .np-dur { font: 300 .625rem/1 "MeguLit Mono", var(--mono); letter-spacing: .06em; color: #8a8a8a; font-variant-numeric: tabular-nums; }
+.np-seek { height: 2px; margin: 0; }
+.np-seek::-webkit-slider-thumb { width: 9px; height: 9px; border-radius: 50%; }
+.np-seek::-moz-range-thumb { width: 9px; height: 9px; border-radius: 50%; }
+.np-switches { gap: .9rem; margin-top: .55rem; }
+.np-sw { position: relative; padding: .15rem 0 .15rem .9rem; border: 0; border-radius: 0; background: none; font: 300 .6875rem/1.2 "MeguLit Mono", var(--mono); letter-spacing: .14em; color: #8a8a8a; }
+.np-sw::before { content: ""; position: absolute; left: 0; top: 50%; width: .42rem; height: .42rem; translate: 0 -50%; border-radius: 50%; border: 1px solid currentColor; }
+.np-sw[aria-pressed="true"] { color: #f4f4f2; background: none; border: 0; }
+.np-sw[aria-pressed="true"]::before { background: #c8323c; border-color: #c8323c; }
+.np-sw:hover, .np-sw:focus-visible { color: #fff; border: 0; outline: none; }
+.sound-ctl.floating:hover .np-ctl, .sound-ctl.floating:focus-within .np-ctl { max-height: 5rem; }
+@media (max-width: 40rem) { .sound-ctl.open .np-ctl, .sound-ctl.floating.open .np-ctl { max-height: 5rem; } }
