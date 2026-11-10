@@ -14,7 +14,8 @@ routes = [
 [vars]
 GITHUB_REPO = "ilynthn/MeguLit"
 LINK_DAYS = "30"
-ALLOWED_ORIGINS = ""
+# the website forms (src/feedback.js) post from these origins
+ALLOWED_ORIGINS = "https://megulit.com,https://www.megulit.com"
 # E379 avatars and weekly hot words (src/community.js)
 AVATAR_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 HOT_MODEL = "@cf/meta/llama-3.1-8b-instruct"

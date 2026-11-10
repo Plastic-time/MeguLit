@@ -53,6 +53,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    <a href="#start" data-i="nav.start">上手</a>
    <a href="#faq" data-i="nav.faq">常见问题</a>
    <a href="/changelog.html" data-i="nav.changelog">更新日志</a>
+   <a href="https://github.com/ilynthn/MeguLit/issues" class="js-open-feedback" data-i="nav.feedback">问题反馈</a>
   </nav>
   <div class="tools">
    <div class="lang" role="group" aria-label="语言" data-i-attr="aria-label:lang.label">
@@ -485,13 +486,45 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    <a href="https://github.com/ilynthn/MeguLit">GitHub</a>
    <a href="https://github.com/ilynthn/MeguLit/releases" data-i="foot.releases">全部版本</a>
    <a href="/changelog.html" data-i="nav.changelog">更新日志</a>
-   <a href="https://github.com/ilynthn/MeguLit/issues" data-i="foot.issues">反馈问题</a>
+   <a href="https://github.com/ilynthn/MeguLit/issues" class="js-open-feedback" data-i="foot.issues">反馈问题</a>
    <a href="https://github.com/ilynthn/MeguLit/blob/main/THIRD-PARTY.md" data-i="foot.third">第三方许可</a>
   </nav>
   <p class="small bgm-credit js-bgm-credit">背景音乐：<i>Tell me about the music that makes up you</i> — 作者 <a href="https://soundcloud.com/kettenkrad8901/tell-me-about-the-music-that-makes-up-you">Kettenkrad</a> · 收录于 <a href="https://archive.org/details/lf231mp3">CAR CRASH AND SIREN (Lost Frog)</a> · <a href="https://creativecommons.org/licenses/by-nc/4.0/">CC BY-NC 4.0</a> · 已剪辑（音量降低 16 dB、重新压缩）</p>
   <p class="small" data-i-html="foot.license">MeguLit 以 <a href="https://github.com/ilynthn/MeguLit/blob/main/LICENSE">GPL-3.0-or-later</a> 开源。文本 Hook 基于 LunaHook，词典来自 JMdict / EDRDG</p>
  </div>
 </footer>
+<dialog class="notice" aria-labelledby="nt-title">
+ <form class="nt-pane nt-welcome" data-kind="game" novalidate>
+  <p class="nt-hud" aria-hidden="true"><span>notice</span><span>megulit · in development</span></p>
+  <h2 id="nt-title" class="nt-title" data-i="nt.title">MeguLit 还在开发中</h2>
+  <p class="nt-lede" data-i-html="nt.lede">有些游戏的适配还有问题，比如《海市蜃楼之馆》。把想玩的游戏名字写在下面点提交，最快半天、最迟一周内支持兼容</p>
+  <div class="nt-row">
+   <input class="nt-input" name="text" type="text" maxlength="200" autocomplete="off" required placeholder="想玩的游戏名字" data-i-attr="placeholder:nt.game.ph;aria-label:nt.game.ph" aria-label="想玩的游戏名字">
+   <input class="nt-hp" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
+   <button class="nt-submit" type="submit" data-i="nt.submit">提交</button>
+  </div>
+  <p class="nt-status" role="status" aria-live="polite"></p>
+  <p class="nt-more" data-i-html="nt.more">使用中遇到问题，点顶部的「问题反馈」提交表单就行；游戏里遇到问题也能一键反馈。欢迎各种留言、问题和建议，感谢支持！</p>
+  <div class="nt-actions">
+   <button type="button" class="nt-link js-open-feedback" data-i="nt.toFeedback">问题反馈</button>
+   <button type="button" class="nt-close" data-i="nt.close">知道了</button>
+  </div>
+ </form>
+ <form class="nt-pane nt-feedback" data-kind="feedback" hidden novalidate>
+  <p class="nt-hud" aria-hidden="true"><span>feedback</span><span>goes to github issues</span></p>
+  <h2 class="nt-title" data-i="fb.title">问题反馈</h2>
+  <p class="nt-lede" data-i="fb.lede">遇到的问题、想要的功能、任何留言都可以写在这里。提交后会变成 GitHub 上的一条 Issue，开发者会直接看到</p>
+  <textarea class="nt-input nt-area" name="text" rows="5" maxlength="2000" required placeholder="哪个游戏、做了什么、看到了什么" data-i-attr="placeholder:fb.text.ph;aria-label:fb.title" aria-label="问题反馈"></textarea>
+  <input class="nt-input" name="contact" type="text" maxlength="120" autocomplete="off" placeholder="联系方式（选填：QQ、邮箱、B 站、GitHub）" data-i-attr="placeholder:fb.contact.ph;aria-label:fb.contact.ph" aria-label="联系方式（选填）">
+  <input class="nt-hp" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
+  <p class="nt-status" role="status" aria-live="polite"></p>
+  <p class="nt-more" data-i="fb.public">反馈会公开在 GitHub 上，请不要写密码等隐私信息</p>
+  <div class="nt-actions">
+   <button type="button" class="nt-link js-back" data-i="fb.back">返回</button>
+   <button class="nt-submit" type="submit" data-i="nt.submit">提交</button>
+  </div>
+ </form>
+</dialog>
 <dialog class="lightbox" aria-label="大图" data-i-attr="aria-label:lb.label"><button type="button" class="lb-close" aria-label="关闭" data-i-attr="aria-label:lb.close">×</button><div class="lb-body"></div><p class="lb-cap"></p></dialog>
 <a class="to-top" href="#top" aria-label="回到顶部" data-i-attr="aria-label:top.label"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></a>
 </body>

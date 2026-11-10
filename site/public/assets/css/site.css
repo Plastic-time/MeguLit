@@ -1525,3 +1525,49 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 .np { width: min(22rem, 80vw); }
 .bgm-credit { margin: 0; }
 .bgm-credit a { color: inherit; }
+
+/* ---- welcome notice + feedback form: one dialog, megu-edit poles (black card, paper type, one red accent) ---------- */
+.notice { width: min(36rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: 0; border: 1px solid rgba(244, 244, 242, .2); background: #0b0b0b; color: #f4f4f2;
+  box-shadow: 0 0 0 1px rgba(200, 50, 60, .25), 0 50px 120px -40px #000; overflow: auto; }
+.notice::backdrop { background: rgba(0, 0, 0, .7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.notice[open] { animation: lb-in .32s cubic-bezier(.2, .7, .2, 1); }
+.nt-pane { display: grid; gap: 1rem; padding: clamp(1.4rem, 3vw, 2.2rem); }
+.nt-pane[hidden] { display: none; }
+.nt-hud { margin: 0; display: flex; justify-content: space-between; gap: 1rem; font: 300 .6875rem/1 "MeguLit Mono", var(--mono); letter-spacing: .3em; text-transform: lowercase; color: #8a8a8a; }
+.nt-hud span:first-child { color: #c8323c; }
+.nt-title { margin: 0; font: 600 clamp(1.5rem, 2.6vw, 2rem)/1.2 var(--serif); letter-spacing: .01em; }
+.nt-lede, .nt-more { margin: 0; color: #c8c8c6; line-height: 1.75; }
+.nt-more { font-size: .875rem; color: #9a9a9a; }
+.nt-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.nt-input { width: 100%; min-width: 0; padding: .85rem 1rem; font: inherit; color: #f4f4f2; background: #141414; border: 1px solid rgba(244, 244, 242, .22); border-radius: 0; outline: none; transition: border-color .2s; }
+.nt-input::placeholder { color: #6b6b6b; }
+.nt-input:focus { border-color: #c8323c; }
+.nt-area { resize: vertical; min-height: 7.5rem; line-height: 1.6; }
+.nt-submit { padding: 0 1.4rem; min-height: 2.9rem; font: 600 1rem/1 var(--serif); color: #0b0b0b; background: #f4f4f2; border: 1px solid #f4f4f2; border-radius: 0; cursor: pointer; transition: background-color .25s, color .25s; }
+.nt-submit:hover, .nt-submit:focus-visible { background: #c8323c; border-color: #c8323c; color: #fff; outline: none; }
+.nt-submit:disabled { opacity: .55; cursor: progress; }
+.nt-status { margin: 0; min-height: 1.4em; font-size: .875rem; color: #9a9a9a; }
+.nt-status.ok { color: #e8e8e6; }
+.nt-status.err { color: #e35a63; }
+.nt-status a { color: inherit; text-underline-offset: 3px; }
+.nt-actions { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.nt-link, .nt-close { font: 300 .75rem/1 "MeguLit Mono", var(--mono); letter-spacing: .25em; text-transform: lowercase; color: #c8c8c6; background: none; border: 0; padding: .6rem 0; cursor: pointer; }
+.nt-link { text-decoration: underline; text-decoration-color: rgba(244, 244, 242, .3); text-underline-offset: 4px; }
+.nt-close { padding: .7rem 1.2rem; border: 1px solid rgba(244, 244, 242, .3); }
+.nt-link:hover, .nt-close:hover, .nt-link:focus-visible, .nt-close:focus-visible { color: #fff; border-color: #c8323c; text-decoration-color: #c8323c; outline: none; }
+.nt-feedback .nt-actions .nt-submit { min-width: 7rem; }
+.nt-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+:lang(ja) .nt-title { font-family: var(--serif-ja); }
+@media (max-width: 30rem) { .nt-row { grid-template-columns: 1fr; gap: .6rem; } .nt-row .nt-submit { min-height: 2.9rem; } }
+/* a big notice, not a toast: larger on desktop, where the root size is scaled down */
+@media (min-width: 64em) {
+  .notice { width: min(50rem, calc(100vw - 4rem)); }
+  .nt-pane { gap: 1.3rem; padding: 2.8rem 3rem; }
+  .nt-title { font-size: clamp(2.2rem, 2.6vw, 3rem); }
+  .nt-lede { font-size: 1.2rem; }
+  .nt-more { font-size: 1rem; }
+  .nt-input, .nt-submit { font-size: 1.1rem; }
+  .nt-input { padding: 1.05rem 1.2rem; }
+  .nt-submit { min-height: 3.6rem; padding: 0 2rem; }
+  .nt-hud, .nt-link, .nt-close { font-size: .8125rem; }
+}
