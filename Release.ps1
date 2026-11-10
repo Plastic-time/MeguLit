@@ -174,7 +174,9 @@ if($DryRun){& git.exe checkout -- web/about.js desktop/Cargo.toml desktop/tauri.
 Step 'commit and push to main'
 if((G rev-parse --abbrev-ref HEAD) -ne 'main'){G checkout -q main}
 G add -A
-G -c "user.name=$Author" -c "user.email=$Email" commit -q -m $(if($Label -ne $Version){"v$Label"}elseif($Hotfix){"$Tag hotfix"}else{"$Tag"})
+# E400 a hotfix of the same version may change nothing tracked (the fix was committed before): push what is there
+& git.exe diff --cached --quiet
+if($LASTEXITCODE -ne 0){G -c "user.name=$Author" -c "user.email=$Email" commit -q -m $(if($Label -ne $Version){"v$Label"}elseif($Hotfix){"$Tag hotfix"}else{"$Tag"})}else{Write-Host '  nothing new to commit'}
 G push -q origin main
 $merged=@{sha=(G rev-parse HEAD)}
 Write-Host "pushed to main at $($merged.sha)"
