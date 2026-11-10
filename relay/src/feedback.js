@@ -25,15 +25,18 @@ export function validateFeedback(body) {
 
 export function feedbackIssue({ kind, text, contact, lang, page }) {
   const k = FEEDBACK_KINDS[kind];
+  /* E394 the desktop app posts the same forms with page "app/<version>" */
+  const fromApp = /^app(\/|$)/.test(page || '');
+  const appVersion = fromApp ? page.slice(4) : '';
   const first = text.split(/\r?\n/)[0].slice(0, 80);
-  const title = `[官网${k.tag}] ${defuse(first)}`.slice(0, 200);
+  const title = `[${fromApp ? '软件' : '官网'}${k.tag}] ${defuse(first)}`.slice(0, 200);
   const lines = [
     kind === 'game' ? `**想玩的游戏**：${defuse(text)}` : defuse(text).split(/\r?\n/).map(l => `> ${l}`).join('\n'),
     '',
     contact ? `联系方式：${defuse(contact)}` : '联系方式：（未留）',
-    `网站语言：${lang}${page ? ` · 页面：${page}` : ''}`,
+    fromApp ? `界面语言：${lang}` : `网站语言：${lang}${page ? ` · 页面：${page}` : ''}`,
     '',
-    '_来自 megulit.com 的表单，由 relay 自动创建_',
+    fromApp ? `_来自 MeguLit 软件${appVersion ? ' v' + appVersion : ''}，由 relay 自动创建_` : '_来自 megulit.com 的表单，由 relay 自动创建_',
   ];
   return { title, body: lines.join('\n'), labels: [k.label] };
 }

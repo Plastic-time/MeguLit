@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // About page: what MeguLit is, version, links, credits, and the support (sponsor) codes.
 import {checkForUpdates} from './update-notice.js';
+import {openFeedback} from './feedback-ui.js';
+import {openDiagnostics} from './diagnostics-ui.js';
 export const VERSION='1.3.1b';
 const REPO='https://github.com/ilynthn/MeguLit';
 const SPONSOR='https://github.com/sponsors/ilynthn';
@@ -25,7 +27,7 @@ export function aboutHTML(locale,esc){
     <div><dt>${esc(t.license)}</dt><dd>GPL-3.0-or-later</dd></div>
     <div><dt>${esc(t.author)}</dt><dd>魚魚棟 · ilynthn</dd></div>
    </dl>
-   <div class="about-links"><h3>${esc(t.links)}</h3>${link('https://megulit.com',({zh:'官网',ja:'公式サイト',en:'Website'})[locale]||'Website')}${link(REPO,t.repo)}${link(REPO+'#faq',({zh:'常见问题',ja:'よくある質問',en:'FAQ'})[locale]||'FAQ')}${link(REPO+'/issues',t.issues)}${link(REPO+'/releases',t.releases)}</div>
+   <div class="about-links"><h3>${esc(t.links)}</h3>${link('https://megulit.com',({zh:'官网',ja:'公式サイト',en:'Website'})[locale]||'Website')}${link(REPO,t.repo)}${link(REPO+'#faq',({zh:'常见问题',ja:'よくある質問',en:'FAQ'})[locale]||'FAQ')}<button type="button" class="about-link" data-feedback>${esc(t.issues)}</button><button type="button" class="about-link" data-logs>${esc(({zh:'一键上传日志',ja:'ログを送る',en:'Upload logs'})[locale]||'Upload logs')}</button>${link(REPO+'/releases',t.releases)}</div>
   </div>
   <section class="about-support">
    <span class="about-glyph" aria-hidden="true">援</span>
@@ -57,4 +59,8 @@ export function mountAbout(main,api,toast){
  const invoke=(cmd,args)=>window.__TAURI_INTERNALS__?.invoke(cmd,args);
  button?.addEventListener('click',async()=>{button.disabled=true;state.textContent=t.checking;const info=await checkForUpdates({api,invoke:(c,a)=>Promise.resolve(window.__TAURI_INTERNALS__?.invoke(c,a)),version:VERSION,toast,manual:true});state.textContent=info?(info.newer?t.found(info.latest):t.latest):'';button.disabled=false;});
  main.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>api('open_source',{url:b.dataset.open}).catch(()=>toast&&toast('…'))));
+ /* E394 feedback and logs go through MeguLit's relay, not a GitHub page many users cannot open */
+ const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+ main.querySelector('[data-feedback]')?.addEventListener('click',()=>openFeedback({api,locale,esc:escHTML,toast,version:VERSION}));
+ main.querySelector('[data-logs]')?.addEventListener('click',()=>openDiagnostics({api,id:'',locale,esc:escHTML,toast}));
 }
