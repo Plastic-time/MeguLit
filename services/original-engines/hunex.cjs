@@ -63,4 +63,16 @@ function tables(dir){const out={};let files=[];try{files=fs.readdirSync(dir).fil
 const memo=new Map();
 function tableLines(t){let st;try{st=fs.statSync(t.file);}catch{return null;}const key=t.file+'|'+t.entry.name+'|'+st.size+'|'+st.mtimeMs;
  if(memo.has(key))return memo.get(key);let lines=null;try{lines=lenzu(hfaRead(t.file,t.entry)).toString('utf8').split(/\r?\n/);}catch{}memo.set(key,lines);if(memo.size>12)memo.delete(memo.keys().next().value);return lines;}
-module.exports={hfaList,hfaRead,lenzu,clean,rubyOf,tables,tableLines};
+// E358 (user report, WoH 1.2.8: the Chinese the game drew had a blank for every third character). HuneX draws text from
+// prebuilt bitmap fonts, one set per game language (FONT_ja_*.mzp, FONT_zc_*.mzp ...), and FontLLTTSS.ccit lists the
+// characters of each: LL the language (00 ja, 01 en, 02 zc, 03 zt), TT the face, SS 00 ASCII / 01 the rest. Entries are
+// 8 bytes after a count and entry size: the UTF-8 bytes of the character as a big-endian number, then its glyph index.
+// The Japanese game's body face (Font000000 + Font000001) holds 2800 characters: it draws 4.9 % of the official Chinese lines.
+const LANGS={ja:'00',en:'01',zc:'02',zt:'03'},glyphMemo=new Map();
+function ccit(buf){const d=lenzu(buf),n=d.readUInt32LE(0),size=d.readUInt32LE(4)||8,out=[];if(size<8||8+n*size>d.length)return out;
+ for(let i=0;i<n;i++){const v=d.readUInt32LE(8+i*size),bytes=[v>>>24,(v>>>16)&255,(v>>>8)&255,v&255];while(bytes.length>1&&!bytes[0])bytes.shift();out.push(Buffer.from(bytes).toString('utf8'));}return out;}
+function glyphs(dir,lang='ja'){const code=LANGS[lang];if(!code)return null;const key=String(dir).toLowerCase()+'|'+code;if(glyphMemo.has(key))return glyphMemo.get(key);let set=null;
+ try{const want=new Set(['Font'+code+'0000.ccit','Font'+code+'0001.ccit']);for(const f of fs.readdirSync(dir).filter(f=>/\.hfa$/i.test(f)).sort()){const file=path.join(dir,f);let list=null;try{list=hfaList(file);}catch{}if(!list)continue;
+  for(const e of list)if(want.has(e.name)){set??=new Set();for(const c of ccit(hfaRead(file,e)))set.add(c);}}}catch{set=null;}
+ if(set&&set.size<100)set=null;glyphMemo.set(key,set);return set;}
+module.exports={hfaList,hfaRead,lenzu,clean,rubyOf,tables,tableLines,ccit,glyphs};

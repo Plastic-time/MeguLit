@@ -135,8 +135,40 @@ test('E352 wiring: writeback keeps indent and engine codes; embed lookups drop r
  const policy=read('native/EmbedTextPolicy.cs'),bridge=read('native/HookBridge.cs'),reader=read('services/reader.cjs'),view=read('web/reader/modules/island-page.js');
  assert.match(policy,/public static string Writeback\(string original, string translation\)/);
  assert.match(policy,/Writeback\("　彼女がはじめて命に<rふ>触<\/r>れた。", "她第一次触碰到生命。"\) == "　她第一次触碰到生命。"/);
- assert.match(bridge,/string reply=EmbedTextPolicy\.Writeback\(p\.text,trans\);/);
+ assert.match(bridge,/string reply=hide\?\(p\.hidden\?\?\"\"\):EmbedTextPolicy\.Writeback\(p\.text,trans\);/);
  assert.match(reader,/extractSourceRuby\(text\)\.text;if\(plain\.trim\(\)\)text=plain;/);
  assert.equal(require('../core/source-ruby.cjs').extractSourceRuby('　彼女がはじめて命に<rふ>触</r>れた。').text,'　彼女がはじめて命に触れた。');
- assert.match(view,/body\.megulit-embed-translation \.sentence-window\.tome-island-page\{visibility:hidden!important\}/);
+ assert.match(view,/\.tome-island-pair\.tome-island-game-drawn\{visibility:hidden!important\}/);
+});
+
+// E358 (user report on 1.2.8, WoH prologue: the Chinese the game drew had a blank for every third character). The game
+// draws from its own bitmap font, which in Japanese holds only the characters of the Japanese script.
+test('E358: a translation the game font cannot draw is hidden in the game and drawn by MeguLit; WoH is not switched to translate mode',t=>{
+ const f=fixture(t);const sent=[];f.hook.process={stdin:{write(){},end(){}},kill(){},removeAllListeners(){}};f.hook.send=m=>sent.push(m);f.hook.enabled=true;f.hook.preferences={embedTranslation:false};f.hook.scriptAllowed=()=>true;
+ f.hook.originalText={kind:'patch',resolve:()=>({status:'exact'}),tableDrawable:()=>false,drawable:()=>false};
+ f.hook.syncEmbedMode();assert.equal(sent.filter(m=>m.type==='embedMode').at(-1).mode,'hide','the game font cannot draw the official table: hide + overlay');
+ f.hook.originalText.tableDrawable=()=>true;f.hook.syncEmbedMode();assert.equal(sent.filter(m=>m.type==='embedMode').at(-1).mode,'translate','a font that has the glyphs: the game draws');
+ f.events.length=0;f.hook.embedReply(7,'',{hide:true,source:'　数分後。',text:'　几分钟后。'});
+ assert.deepEqual(sent.at(-1),{type:'embedReply',id:7,trans:'',hide:true});
+ const n=f.events.filter(m=>m.embedLine).at(-1);assert.equal(n.embedTranslating,false);assert.deepEqual(n.embedLine,{source:'　数分後。',text:'',drawn:false});
+ f.hook.embedReply(8,'　几分钟后。',{hide:false,source:'　数分後。',text:'　几分钟后。'});
+ assert.deepEqual(sent.at(-1),{type:'embedReply',id:8,trans:'　几分钟后。'});assert.equal(f.events.filter(m=>m.embedLine).at(-1).embedLine.drawn,true);
+});
+
+test('E358 wiring: the reader checks the game glyphs before writing back; the bridge hides a line it was told to',()=>{
+ const reader=read('services/reader.cjs'),bridge=read('native/HookBridge.cs'),text=read('services/original-text.cjs');
+ assert.match(reader,/hide=this\.gal\?\.hooks\?\.originalText\?\.drawable\?\.\(trans\)===false/);
+ assert.match(reader,/embedReply\(id,hide\?'':trans,\{hide,source:text,text:trans\}\)/);
+ assert.match(bridge,/string reply=hide\?\(p\.hidden\?\?""\):EmbedTextPolicy\.Writeback\(p\.text,trans\);/);
+ assert.match(bridge,/new PendingEmbed\{tp=tp,text=text,hidden=replacement\}/);
+ assert.match(bridge,/d\.TryGetValue\("hide",out hv\)&&Convert\.ToBoolean\(hv\)/);
+ assert.match(text,/const api=\{kind:'patch',patch:!!patched,fill,drawable,tableDrawable,/);
+});
+
+test('E358 real data: WoH\'s Japanese font cannot draw the reported line; every line it can draw has all its glyphs',t=>{
+ const dir='E:\\Steam\\steamapps\\common\\WITCH ON THE HOLY NIGHT';if(!fs.existsSync(dir)){t.skip('WoH not installed');return;}
+ const h=require('../services/original-engines/hunex.cjs'),g=h.glyphs(dir,'ja');assert.ok(g&&g.size>2000,'the Japanese body font');
+ const zc=h.tableLines(h.tables(dir).zc),line=h.clean(zc.find(x=>/河川/.test(x)&&/莫大/.test(x)));
+ assert.deepEqual([...line].filter(c=>!g.has(c)),[...'虽许满但那丽还给这记忆乡样'],'exactly the blanks the user saw');
+ assert.equal(require('../services/original-engines/scenes.cjs').ENGINES.hunex.glyphs(dir).size,g.size);
 });

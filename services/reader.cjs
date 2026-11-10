@@ -122,7 +122,9 @@ class Reader{
    if(!trans){const options=this.langOptions(require('../core/providers.cjs').resolveOptions({...this.prefs(),translationPrompt:this.workPrompt||''}));if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();
     const until=Date.now()+3500,inTime=()=>Date.now()<until;await this.localReady(options,null,inTime);trans=normalizeTranslation(await this.translator().translate(text,options,()=>true));if(trans)this.embedCached(text,trans);}
   }catch(error){try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'embedTranslateFailed',error:String(error?.message||error).slice(0,200)})+'\n');}catch{}}
-  this.gal?.hooks?.embedReply(id,trans);
+  /* E358: never let the game draw a translation with holes: a line its font cannot draw is hidden in the game and MeguLit draws it. */
+  let hide=false;if(trans){try{hide=this.gal?.hooks?.originalText?.drawable?.(trans)===false;}catch{}}
+  this.gal?.hooks?.embedReply(id,hide?'':trans,{hide,source:text,text:trans});
  }
  async translate(request){const text=String(request.text||'');if(!text.trim()||text.length>4000)throw Error('INVALID_READER_TEXT');const pageKey=request.pageKey;if(!pageKey)this.latest=request.id;{const cached=this.embedCached(text);if(cached)return cached;}const current=()=>pageKey?this.pageScope===pageKey:this.latest===request.id;const options=this.langOptions(require('../core/providers.cjs').resolveOptions({...this.prefs(),...(request.options&&typeof request.options==='object'?request.options:{}),translationPrompt:this.workPrompt||''}));if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();const gameId=this.gameId;await this.localReady(options,request.id,current);const translated=normalizeTranslation(await this.translator().translate(text,options,current));if(gameId)this.stats.translation(gameId,text,translated);if(translated)this.embedCached(text,translated);return translated;}
  async invoke(command,args={}){

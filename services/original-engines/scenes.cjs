@@ -356,6 +356,8 @@ const hunex={
   return {lines:doc.ja.map(lib.clean),anchors:[],zh:doc.ja.map((_,i)=>lib.clean(doc.zh[i]||'')),ruby:doc.ja.map(t=>{const r=lib.rubyOf(t);return r.length?r:null;})};},
  test:()=>false,
  patchLines:(base,found)=>kirikiriCx.patchLines(base,found),
+ /* E358: the characters the Japanese game's text font can draw (a translation written back into the game must use only these). */
+ glyphs:dir=>hunexLib().glyphs(dir,'ja'),
 };
 
 // E329 YU-RIS (ysbin.ypf + update*.ypf, YSTB scenes): yuris.cjs.

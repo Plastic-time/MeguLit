@@ -36,7 +36,7 @@ test('the reader translates a held line once and shares it with the page',async(
  assert.deepEqual(replies.at(-1),[3,''],'a failure answers empty so the game shows the original');
  const src=fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8');
  assert.match(src,/if\(message\.type==='hookEmbedRequest'\)\{this\.embedTranslate\(message\.id,message\.text\);return;\}/);
- assert.match(src,/this\.gal\?\.hooks\?\.embedReply\(id,trans\)/);
+ assert.match(src,/this\.gal\?\.hooks\?\.embedReply\(id,hide\?'':trans,/);
  assert.match(src,/\{const cached=this\.embedCached\(text\);if\(cached\)return cached;\}/);
 });
 

@@ -354,7 +354,13 @@ function staticProvider(root,executable){
   // The script's own ruby for the matched lines (KiriKiri Z scene files): game readings come before dictionary ones.
   const readings=Array.isArray(rtIndex.ruby)?rtIndex.ruby:null,withRuby=r=>{if(!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
   const untranslated=i=>{const o=m.og[i];return !o||norm(o)===norm(rt[i]);};
-  const api={kind:'patch',patch:!!patched,fill,
+  /* E358: an engine that draws from a fixed glyph set (HuneX bitmap fonts) says which characters it has. drawable(text) is
+     null when unknown; tableDrawable() is false when the game cannot draw its own translation table (WoH in Japanese draws
+     4.9 % of the official Chinese lines in full), so the game is not asked to draw translations it would leave with holes. */
+  let glyphSet,tableOk;const glyphs=()=>{if(glyphSet===undefined){glyphSet=null;try{const g=scenes.ENGINES[state.runtime.engine]?.glyphs?.(path.dirname(String(executable)));if(g&&g.size)glyphSet=g;}catch{}}return glyphSet;};
+  const drawable=text=>{const g=glyphs();if(!g)return null;for(const c of String(text||'').replace(/</g,'〈').replace(/>/g,'〉'))if(!/\s/.test(c)&&!g.has(c))return false;return true;};
+  const tableDrawable=()=>{if(tableOk===undefined){tableOk=null;if(glyphs()&&patched){let n=0,ok=0;for(let i=0;i<rt.length;i++){const o=m.og[i];if(!o||norm(o)===norm(rt[i]))continue;n++;if(drawable(o))ok++;}tableOk=n===0||ok/n>=.995;}}return tableOk;};
+  const api={kind:'patch',patch:!!patched,fill,drawable,tableDrawable,
    resolve:text=>withRuby(resolveLine(text))};
   function resolveLine(text){const r=m.match(text);if(r.japanese===undefined)return r;
     if(r.indices.some(untranslated)){const t=fill.get(r.indices.map(i=>rt[i]).join(''));return t?{...r,translation:t,japanese:undefined,machine:true}:{status:'none',method:'untranslated',indices:r.indices};}

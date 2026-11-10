@@ -233,3 +233,19 @@ test('E351 WoH page grid: lines sit on the game\'s rows and columns, wrap where 
  assert.deepEqual(gridLayout(['　あいうえおかきくけこさしすせそたちつてとなにぬねのは。'],27)[0].breaks,[],'a stop may hang in a 28th cell');
  assert.match(fs.readFileSync(path.join(__dirname,'..','core/hook-control.cjs'),'utf8'),/!this\.styleCalibration&&!h\.hooks\?\.flowPage&&/,'no automatic box calibration on a flow page');
 });
+
+test('E358 per line: a line the game draws in translation is not drawn again; a line it cannot draw is drawn by MeguLit',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const saved=global.MutationObserver;global.MutationObserver=class{observe(){}};t.after(()=>{global.MutationObserver=saved;});
+ const file=require.resolve('../web/reader/modules/island-page.js');delete require.cache[file];const IslandPage=require(file);
+ const {w,b,doc}=fakeWindow({clientX:58,clientY:85,clientWidth:1546,clientHeight:870,readerX:900,readerY:500,readerWidth:600,readerHeight:100});
+ IslandPage.install(w);let seq=0;const say=text=>b.islandPage.accept({hookSource:text,hookSourceEngine:'nvl',hookFlowGrid:'woh',hookSequence:++seq,hookSourceLine:0});
+ say('　数分後。');say('お父さんが車のボンネットを開けると、そこにはひとつの命があった。');
+ b.islandPage.accept({embedTranslating:true,embedLine:{source:'　数分後。',text:'　几分钟后。',drawn:true}});
+ b.islandPage.accept({embedTranslating:false,embedLine:{source:'お父さんが車のボンネットを開けると、そこにはひとつの命があった。',text:'',drawn:false}});
+ const nodes=doc.querySelectorAll('.tome-island-pair'),by=t=>nodes.find(n=>n.querySelector('.sentence-text').textContent===t);
+ assert.ok(by('　数分後。').classList.contains('tome-island-game-drawn'),'drawn by the game: hidden');
+ assert.ok(by('お父さんが車のボンネットを開けると、そこにはひとつの命があった。').classList.contains('tome-island-overlay-drawn'),'drawn by MeguLit');
+ const pitch=.0257*1546;assert.equal(Math.round(parseFloat(by('お父さんが車のボンネットを開けると、そこにはひとつの命があった。').style.props['--tome-flow-indent'])),Math.round(6*pitch),'continues after the 6 cells the game drew 「　几分钟后。」 in');
+ const css=fs.readFileSync(file,'utf8');assert.match(css,/body\.megulit-embed-translation \.sentence-window\.tome-island-page \.tome-island-pair:not\(\.tome-island-overlay-drawn\)\{visibility:hidden!important\}/);
+});
