@@ -64,6 +64,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  <div class="hero-media" aria-hidden="true">
   <video class="hero-video" muted loop playsinline preload="none" poster="/assets/img/hero-poster.webp" data-sm="/assets/video/megulit-360.mp4" data-md="/assets/video/megulit-720.mp4" data-lg="/assets/video/megulit-1080.mp4"></video>
   <div class="hero-scrim"></div>
+  <canvas class="kana-fx"></canvas>
   <svg class="circle" viewBox="-300 -300 600 600">
    <defs><path id="ring-path" d="M 0,-246 a 246,246 0 1,1 0,492 a 246,246 0 1,1 0,-492"/></defs>
    <g class="c-outer">
@@ -80,6 +81,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    </g>
    <g class="c-core"><circle r="58" class="c-dash"/><circle r="6" class="c-dot"/></g>
   </svg>
+  <canvas class="ring-fx"></canvas>
   <div class="grain"></div>
  </div>
  <div class="wrap hero-grid">
@@ -95,18 +97,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    </div>
    <p class="cta-meta"><span class="js-version">v1.2.8</span><span class="js-size">20.0 MB</span><span data-i="dl.os">Windows 10 / 11 x64</span><span data-i="dl.free">免费 · 开源</span></p>
   </div>
-  <figure class="specimen tilt" aria-labelledby="specimen-cap">
-   <div class="page">
-    <p class="jp" lang="ja"><span class="b">さあ、</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="0"><ruby>物語<rt>ものがたり</rt></ruby></span>の</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="1"><ruby>続<rt>つづ</rt></ruby>き</span>を</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="2"><ruby>読<rt>よ</rt></ruby>もう</span></span></p>
-    <p class="tr" data-i="spec.tr">来吧，把故事接着读下去</p>
-    <dl class="gloss" aria-live="polite">
-     <dt lang="ja">物語 <span>ものがたり</span></dt><dd data-i="spec.g0">故事</dd>
-     <dt lang="ja">続き <span>つづき</span></dt><dd data-i="spec.g1">后续，接下来的部分</dd>
-     <dt lang="ja">読もう <span>よもう</span></dt><dd data-i="spec.g2">读吧（読む 的意志形）</dd>
-    </dl>
-   </div>
-   <figcaption id="specimen-cap" data-i="spec.cap">示意：原文、注音、译文和释义排在一起。指一下词看释义</figcaption>
-  </figure>
+  
  </div>
  <div class="wrap hero-bar">
   <button type="button" class="chip js-sound" aria-pressed="false">
@@ -133,6 +124,21 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  <div class="wrap">
   <h2 id="f-title" class="h2" data-i="f.title">读的时候，什么都在游戏里</h2>
   <p class="sec-lede" data-i="f.lede">阅读层浮在游戏上面，不抢焦点，点它也不会让剧情往下走</p>
+
+  <div class="spec-row">
+  <figure class="specimen tilt" aria-labelledby="specimen-cap">
+   <div class="page">
+    <p class="jp" lang="ja"><span class="b">さあ、</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="0"><ruby>物語<rt>ものがたり</rt></ruby></span>の</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="1"><ruby>続<rt>つづ</rt></ruby>き</span>を</span><wbr><span class="b"><span class="w" tabindex="0" data-gloss="2"><ruby>読<rt>よ</rt></ruby>もう</span></span></p>
+    <p class="tr" data-i="spec.tr">来吧，把故事接着读下去</p>
+    <dl class="gloss" aria-live="polite">
+     <dt lang="ja">物語 <span>ものがたり</span></dt><dd data-i="spec.g0">故事</dd>
+     <dt lang="ja">続き <span>つづき</span></dt><dd data-i="spec.g1">后续，接下来的部分</dd>
+     <dt lang="ja">読もう <span>よもう</span></dt><dd data-i="spec.g2">读吧（読む 的意志形）</dd>
+    </dl>
+   </div>
+   <figcaption id="specimen-cap" data-i="spec.cap">示意：原文、注音、译文和释义排在一起。指一下词看释义</figcaption>
+  </figure>
+  </div>
 
   <div class="embed">
    <div class="embed-copy">

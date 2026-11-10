@@ -2,6 +2,7 @@
 // megulit.com page script: language and theme, the release data behind the download buttons, engine list, changelog.
 import { I18N } from './i18n.js';
 import { MIRROR, downloadSources, formatSize, formatDate, pickLang, renderMarkdown } from './core.mjs';
+import { ring, kana, audioSpectrum } from './spell.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -278,6 +279,9 @@ if (video && !reduce && !navigator.connection?.saveData) {
   startVideo();
   new IntersectionObserver(([e]) => { if (e.isIntersecting) video.play().catch(() => {}); else video.pause(); }).observe(video);
 }
+const spectrum = video ? audioSpectrum(video) : null;
+if ($('.ring-fx')) ring($('.ring-fx'), { still: reduce, spectrum: () => spectrum?.read() });
+if ($('.kana-fx') && $('.hero')) kana($('.kana-fx'), $('.hero'), { still: reduce });
 const soundBtn = $('.js-sound');
 function setSoundLabel() {
   if (!soundBtn) return;
@@ -288,6 +292,7 @@ function setSoundLabel() {
 soundBtn?.addEventListener('click', () => {
   if (!video) return;
   startVideo();
+  spectrum?.start();
   video.muted = !video.muted;
   if (!video.muted) { video.volume = .8; video.play().catch(() => {}); }
   setSoundLabel();
@@ -303,7 +308,7 @@ if (topBar && hero) {
 
 // 3D parallax: copy, specimen and the magic circle lean toward the pointer.
 if (hero && finePointer && !reduce) {
-  const copy = $('.hero-copy'), spec = $('.hero .specimen'), circle = $('.circle');
+  const copy = $('.hero-copy'), spec = $('.hero .specimen'), circle = $('.hero-media');
   let raf = 0;
   hero.addEventListener('pointermove', e => {
     cancelAnimationFrame(raf);

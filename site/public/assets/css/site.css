@@ -241,16 +241,19 @@ p { text-wrap: pretty; }
 @keyframes grain { 0%, 100% { transform: translate(0, 0); } 33% { transform: translate(-4%, 3%); } 66% { transform: translate(3%, -5%); } }
 
 /* Megumin's magic circle, drawn in SVG and turning behind the copy */
-.circle {
+.circle, .ring-fx {
   position: absolute; width: min(92vmin, 54rem); right: max(-12rem, -10vw); top: 50%;
   translate: var(--px, 0px) calc(-50% + var(--py, 0px)); opacity: .62; mix-blend-mode: screen; overflow: visible;
   transition: translate .6s cubic-bezier(.2, .7, .2, 1);
 }
+.ring-fx { opacity: 1; aspect-ratio: 1; height: auto; }
+.kana-fx { position: absolute; inset: 0; width: 100%; height: 100%; }
 .circle g { transform-box: fill-box; transform-origin: center; }
+.c-core { display: none; }
 .c-line { fill: none; stroke: var(--gold); stroke-width: 1.2; opacity: .75; }
 .c-ticks { fill: none; stroke: var(--gold); stroke-width: 12; stroke-dasharray: 1.4 9; opacity: .5; }
 .c-dash { fill: none; stroke: var(--crimson-ink); stroke-width: 1.6; stroke-dasharray: 16 9; }
-.c-star { fill: none; stroke: var(--crimson-ink); stroke-width: 1.8; stroke-dasharray: 1100; stroke-dashoffset: 0; }
+.c-star { fill: none; stroke: var(--crimson-ink); stroke-width: 1.4; opacity: .5; stroke-dasharray: 1100; stroke-dashoffset: 0; }
 .c-runes { fill: var(--gold); font: 600 15px var(--serif-ja); letter-spacing: 7px; opacity: .9; }
 .c-dot { fill: var(--gold); }
 @media (prefers-reduced-motion: no-preference) {
@@ -263,7 +266,8 @@ p { text-wrap: pretty; }
 @keyframes pulse { 50% { scale: 1.18; opacity: .6; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 
-.hero-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: clamp(2rem, 5vw, 5rem); align-items: center; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 46rem); align-items: center; }
+.spec-row { max-width: 44rem; margin: 0 0 clamp(4rem, 8vw, 6rem); }
 .tilt { transform: perspective(1300px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform .5s cubic-bezier(.2, .7, .2, 1); transform-style: preserve-3d; }
 
 /* 3D type: a crimson extrusion under every glyph, a chromatic flash as it lands */
@@ -589,7 +593,9 @@ section[data-kanji]::before {
 
 @media (max-width: 60rem) {
   .hero-grid { grid-template-columns: minmax(0, 1fr); }
-  .circle { width: 120vmin; right: -40vmin; top: 30%; opacity: .4; }
+  .circle, .ring-fx { width: 120vmin; right: -40vmin; top: 30%; }
+  .circle { opacity: .4; }
+  .ring-fx { opacity: .7; }
   .hero-scrim { background: linear-gradient(120deg, rgba(150, 20, 40, .32), transparent 55%), linear-gradient(180deg, rgba(18, 10, 12, .78) 0%, rgba(18, 10, 12, .62) 45%, rgba(18, 10, 12, .9) 100%); }
 }
 @media (max-width: 40rem) {
