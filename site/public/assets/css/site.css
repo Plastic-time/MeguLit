@@ -1509,3 +1509,10 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 @media (prefers-reduced-motion: reduce) { .np-line > span { animation: none; opacity: 1; filter: none; translate: none; } .np-eq i { animation: none; } }
 .np.has-lyrics { width: min(22rem, 80vw); }
 .sound-ctl.floating .np.has-lyrics { width: min(20rem, 60vw); }
+/* long lyric lines wrap to a second line instead of being cut */
+.np.has-lyrics .np-lyric { height: 3em; }
+.np-line { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.np-line > span { white-space: pre-wrap; }
+.np-meta { flex-direction: column; align-items: flex-start; gap: .25rem; }
+.np-title, .np-artist { max-width: 100%; }
+.np-eq { grid-row: 1; align-self: start; margin-top: .3rem; }
