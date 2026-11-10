@@ -53,14 +53,15 @@ const kirikiri={
  id:'kirikiri',hint:'*.ks（或 patch.xp3）',
  // Later archives override earlier ones, as the engine loads them (data < patch < patch2 ...).
  scenes(dir){const out=new Map();
-  const archives=fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)).sort((a,b)=>rank(a)-rank(b)||a.localeCompare(b));
-  for(const a of archives)for(const s of xp3Scenes(path.join(dir,a),KS))out.set(s.name.toLowerCase(),s);
+  for(const a of ksArchives(dir))for(const s of xp3Scenes(a,KS))out.set(s.name.toLowerCase(),s);
   for(const file of walk(dir,2,KS))out.set(path.basename(file).toLowerCase(),{name:path.basename(file),read:()=>fs.readFileSync(file)});
   return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));},
- archives:dir=>fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)).flatMap(a=>xp3Scenes(path.join(dir,a),KS)),
- sources:dir=>[...fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)).map(f=>path.join(dir,f)),...walk(dir,2,KS)],
+ archives:dir=>ksArchives(dir).flatMap(a=>xp3Scenes(a,KS)),
+ sources:dir=>[...ksArchives(dir),...walk(dir,2,KS)],
  parse:parseKs,test:KS,
 };
+// Archives next to the game, then those in arc/ (女王蜂の王房 keeps scenario.xp3 there), later ones overriding.
+function ksArchives(dir){const xp3=d=>{try{return fs.readdirSync(d).filter(f=>/\.xp3$/i.test(f)).sort((a,b)=>rank(a)-rank(b)||a.localeCompare(b)).map(f=>path.join(d,f));}catch{return [];}};return [...xp3(path.join(dir,'arc')),...xp3(dir)];}
 function rank(name){const m=name.toLowerCase().match(/^patch(\d*)\.xp3$/);return m?1+(+m[1]||0):0;}
 
 // ---- Artemis --------------------------------------------------------------------------------------------------
