@@ -158,6 +158,8 @@ async function dispatch(request,runtime=null) {
   if(request.action==='backup_preview')return require('./backup.cjs').previewBackup(root,request.path);
   if(request.action==='backup_apply'){runtime?.reader?.stop();if(runtime){runtime.reader=null;runtime.libraryManager=null;}return require('./backup.cjs').applyBackup(root,request.id);}
   if(request.action==='history_translate'){if(!runtime)throw Error('RUNTIME_REQUIRED');return runtime.history().ensure(Number(request.id));}
+  /* E378 account + cloud sync (services/account.cjs); opens the store itself */
+  if(String(request.action).startsWith('account_'))return await require('./account.cjs').handle(root,request);
   const db=store.openStore(root);
   try {
     if(String(request.action).startsWith('series_'))return require('./series.cjs').handle(db,root,request);

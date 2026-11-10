@@ -29,3 +29,5 @@ export function fieldPages(scope,fields){
  if(remaining.size)result.push({id:'other',label:words('其他选项','Other options','その他'),fields:[...remaining]});
  return result;
 }
+/* E378 Settings → 账号 (web/account-ui.js), last in 学习与数据 */
+navigation.find(category=>category.ids.includes('data'))?.ids.push('account');
