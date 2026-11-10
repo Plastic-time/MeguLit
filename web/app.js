@@ -20,6 +20,7 @@ import {createHomeMotion} from './home-motion.js';
 import {renderGamePage} from './game-detail.js';
 import {words as grimoireWords,paintGlow,stopGlow,setupMarquees,fitShelf,placeGreeting,closeDialog,toolsHTML,dockPageTools,pageEnter,subpageEnter,watchHomeFade,matchJacket,fieldify,stopField,moveTabInk} from './grimoire.js';
 import {aboutHTML,aboutLabel,mountAbout,VERSION} from './about.js';
+import {openAdaptationOverview,overviewLabel} from './adaptation-overview.js';
 import {checkForUpdates} from './update-notice.js';
 import {maybeFirstRun} from './first-run.js';
 let selectedGameId='',gameOrigin='library',selectedSeriesId='';
@@ -297,7 +298,7 @@ async function startGame(id,button){
 const seriesUI=createSeriesLibrary({model:()=>model,locale:()=>locale,text:()=>text,esc,icon,api,invoke,card,modal,duration,number,relativeTime,search:()=>search,toast,bindGames:attachGameActions,onLibraryRendered:showLibraryResults,openSeries:id=>{selectedSeriesId=id;navigate('series');},back:()=>navigate('library'),reload:async()=>{model=await api('home');const main=document.querySelector('#main'),scroll=main.scrollTop;if(route==='library')renderGames();else if(route==='series')seriesUI.renderDetail(main,selectedSeriesId);main.scrollTop=scroll;}});
 function library(){
   const main=document.querySelector('#main');
-  main.innerHTML=heading(text.library,`<span class="lib-left"></span><input id="game-search" type="search" placeholder="${text.searchGames}" aria-label="${text.searchGames}" value="${esc(search)}"><button class="icon-button" id="refresh-library" aria-label="${libraryCopy().refresh}" title="${libraryCopy().refresh}" aria-busy="${libraryBusy}" ${libraryBusy?'disabled':''}>${icon('refresh')}</button><button class="icon-button" id="library-settings" aria-label="${libraryCopy().settings}" title="${libraryCopy().settings}">${icon('settings')}</button><button class="icon-button" id="select-games" aria-label="${text.series.select}" title="${text.series.select}">${icon('multiselect')}</button><button class="icon-button" id="add-game" aria-label="${text.addGame}">${icon('plus')}</button>`)+`<div id="library-results"></div>`;
+  main.innerHTML=heading(text.library,`<span class="lib-left"></span><input id="game-search" type="search" placeholder="${text.searchGames}" aria-label="${text.searchGames}" value="${esc(search)}"><button class="icon-button" id="refresh-library" aria-label="${libraryCopy().refresh}" title="${libraryCopy().refresh}" aria-busy="${libraryBusy}" ${libraryBusy?'disabled':''}>${icon('refresh')}</button><button class="icon-button" id="library-settings" aria-label="${libraryCopy().settings}" title="${libraryCopy().settings}">${icon('settings')}</button><button class="icon-button" id="adaptation-overview" aria-label="${esc(overviewLabel(locale))}" title="${esc(overviewLabel(locale))}">${icon('stats')}</button><button class="icon-button" id="select-games" aria-label="${text.series.select}" title="${text.series.select}">${icon('multiselect')}</button><button class="icon-button" id="add-game" aria-label="${text.addGame}">${icon('plus')}</button>`)+`<div id="library-results"></div>`;
   const input=main.querySelector('#game-search');
   const wallToggle=document.createElement('button');
   const wallLabel={zh:'无限墙',en:'Infinite wall',ja:'無限ウォール'}[locale];
@@ -316,7 +317,7 @@ function library(){
 
   const pod=document.createElement('div'),left=document.createElement('span'),right=document.createElement('span');
   pod.className='field-search';left.className=right.className='side';
-  left.append(main.querySelector('#refresh-library'),main.querySelector('#library-settings'),wallToggle);
+  left.append(main.querySelector('#refresh-library'),main.querySelector('#library-settings'),main.querySelector('#adaptation-overview'),wallToggle);
   right.append(main.querySelector('#select-games'),main.querySelector('#add-game'));
   pod.append(left,input,right);main.append(pod);main.classList.add('field-page');
   const searchAppearance=()=>main.classList.toggle('searching',document.activeElement===input||!!input.value);
@@ -331,7 +332,9 @@ function library(){
     input.blur();
   });
   searchAppearance();
-  main.querySelector('#select-games').onclick=()=>seriesUI.toggleSelection(main.querySelector('#library-results'));main.querySelector('#add-game').addEventListener('click',()=>editGame());main.querySelector('#refresh-library').onclick=()=>refreshLibrary().then(result=>toast(result.added?libraryCopy().added(result.added):libraryCopy().done)).catch(error=>toast(errorMessage(error)));main.querySelector('#library-settings').onclick=()=>{settingsSection='library';settingsProfile='';navigate('settings');};renderGames();
+  main.querySelector('#select-games').onclick=()=>seriesUI.toggleSelection(main.querySelector('#library-results'));main.querySelector('#add-game').addEventListener('click',()=>editGame());main.querySelector('#refresh-library').onclick=()=>refreshLibrary().then(result=>toast(result.added?libraryCopy().added(result.added):libraryCopy().done)).catch(error=>toast(errorMessage(error)));main.querySelector('#library-settings').onclick=()=>{settingsSection='library';settingsProfile='';navigate('settings');};
+  /* E362 adaptation overview: a hidden game is not in model.games, so open its page directly */
+  main.querySelector('#adaptation-overview').onclick=()=>openAdaptationOverview({api,locale,esc,toast,relativeTime,onOpenGame:id=>{gameOrigin='library';selectedGameId=id;navigate('game');}}).catch(()=>{});renderGames();
   /* v1.1.6 (user): opening the library straight into the wall plays the same outside-in gathering as switching to it */
   /* hidden from the first paint (cards start at opacity 0) and revealed only once each card holds its start frame, so the laid-out wall never flashes */
   if(localStorage.getItem(LIBRARY_WALL_KEY)!=='off'&&!search.trim()&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const h0=document.querySelector('#library-results');h0?.classList.add('lib-entering');const reveal=()=>document.querySelector('#library-results')?.classList.remove('lib-entering');setTimeout(reveal,900);requestAnimationFrame(()=>requestAnimationFrame(async()=>{try{const m=await import('./library-switch-motion.js');const h=document.querySelector('#library-results');if(h&&route==='library')m.wallIn(h);}catch{}finally{reveal();}}));}
