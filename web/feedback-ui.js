@@ -97,10 +97,10 @@ async function fillUpdates(dialog, locale) {
   try {
     const response = await fetch(UPDATES_URL, { cache: 'no-cache' });
     const items = response.ok ? await response.json() : [];
-    const rows = (Array.isArray(items) ? items : []).slice(0, 5);
+    const rows = (Array.isArray(items) ? items : []).slice(0, 8);
     list.replaceChildren(...rows.map(it => {
       const [y, m, d] = String(it.date || '').split('-').map(Number), li = document.createElement('li');
-      li.textContent = t.upd(y, m, d, (locale !== 'zh' && it['title_' + locale]) || it.title || '');
+      li.textContent = ((locale !== 'zh' && it['text_' + locale]) || it.text) || t.upd(y, m, d, (locale !== 'zh' && it['title_' + locale]) || it.title || '');
       return li;
     }));
     note.textContent = t.updNote;

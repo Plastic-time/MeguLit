@@ -16,7 +16,9 @@
 //   mages     MAGES. USRDIR/script.mpk SC3 scenes, Japanese releases only (mages.cjs)
 //   rpgmaker  RPG Maker MV/MZ www/data JSON maps, common events, troops (rpgmaker.cjs)
 //   wolf      WOLF RPG Editor Data/MapData/*.mps + BasicData/CommonEvent.dat, loose or in plain .wolf (wolf.cjs)
+//   avg32      AVG32 TXT/SEEN.TXT PACL archives (ZERO 涙, avg32.cjs)
 //   capcom-msg Capcom Unity Ace Attorney scriptmessage bundles, Japanese + the Chinese bundle (capcom-msg.cjs)
+//   vgprompter Doki Doki Literature Club Plus! XOR'd language bundles, Japanese + Chinese by line hash (vgprompter.cjs)
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const xp3=require('./xp3.cjs');
 const KANA=/[ぁ-ゖァ-ヺ]/g;
@@ -37,29 +39,42 @@ function walk(dir,depth,test,out=[]){let entries;try{entries=fs.readdirSync(dir,
 // Text lines are what is left of a line after its tags; command lines (@...), labels (*...) and tag-only lines are
 // anchors when they hold no text a translation would change.
 function parseKs(buf){
- const lines=[],anchors=[];
+ const lines=[],anchors=[],ruby=[];let script=false,cont=false;
  for(const raw of decode(buf).split(/\r?\n/)){const t=raw.trim();if(!t||t[0]===';')continue;
+  // a command whose line ends in "\" goes on to the next line (女王蜂の王房 window positions)
+  if(cont){cont=t.endsWith('\\');continue;}if((t[0]==='@'||t[0]==='[')&&t.endsWith('\\')){cont=true;continue;}
+  // TJS between [iscript] and [endscript] is code, not text (女王蜂の王房 staff roll)
+  if(/^[@[]iscript\b/i.test(t)){script=true;continue;}if(script){if(/^[@[]endscript\b/i.test(t))script=false;continue;}
   if(t[0]==='@'||t[0]==='*'){if(ascii(t))anchors.push(t);continue;}
-  const text=t.replace(/\[[^\]]*\]/g,'').trim();
+  // A tag whose name is Japanese is a macro that prints that word (女王蜂の王房: [輝夜] [めのう] for character names,
+  // [輝夜ruby] with its reading, [漢字'よみ] for ruby); keep the word, drop the reading.
+  const text=t.replace(/\[([぀-ヿ一-鿿々ー]+)(?:ruby|'[^\]]*)?\]/g,'$1').replace(/\[[^\]]*\]/g,'').trim();
   if(!text){if(ascii(t))anchors.push(t);continue;}
+  const pairs=[...t.matchAll(/\[([぀-ヿ一-鿿々ー]+)'([^\]]+)\]/g)].map(m=>[m[1],m[2]]);if(pairs.length)ruby[lines.length]=pairs;
   lines.push(text);}
- return {lines,anchors};
+ // the game's own readings ([漢字'よみ]), only when the script has any
+ return ruby.length?{lines,anchors,ruby:lines.map((_,i)=>ruby[i]||null)}:{lines,anchors};
 }
 function xp3Scenes(file,test){let t;try{t=xp3.list(file);}catch{return [];}if(!t)return [];
- return t.files.filter(e=>!e.encrypted&&test(e.name)).map(e=>({name:path.basename(e.name.replace(/\\/g,'/')),read:()=>xp3.read(file,e)}));}
+ // An entry flagged "protected" can still be stored as plain text (女王蜂の王房): try the first one and keep the
+ // flagged ones when it reads as a script (UTF-16 BOM, or no control bytes at the start).
+ const plain=e=>{try{const d=xp3.read(file,e);if(d[0]===0xff&&d[1]===0xfe)return true;for(let i=0;i<Math.min(d.length,512);i++)if(d[i]<9||(d[i]>13&&d[i]<32&&d[i]!==27))return false;return d.length>0;}catch{return false;}};
+ const flagged=t.files.filter(e=>e.encrypted&&test(e.name)),open=flagged.length>0&&plain(flagged[0]);
+ return t.files.filter(e=>(!e.encrypted||open)&&test(e.name)).map(e=>({name:path.basename(e.name.replace(/\\/g,'/')),read:()=>xp3.read(file,e)}));}
 const KS=n=>/\.ks$/i.test(n);
 const kirikiri={
  id:'kirikiri',hint:'*.ks（或 patch.xp3）',
  // Later archives override earlier ones, as the engine loads them (data < patch < patch2 ...).
  scenes(dir){const out=new Map();
-  const archives=fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)).sort((a,b)=>rank(a)-rank(b)||a.localeCompare(b));
-  for(const a of archives)for(const s of xp3Scenes(path.join(dir,a),KS))out.set(s.name.toLowerCase(),s);
+  for(const a of ksArchives(dir))for(const s of xp3Scenes(a,KS))out.set(s.name.toLowerCase(),s);
   for(const file of walk(dir,2,KS))out.set(path.basename(file).toLowerCase(),{name:path.basename(file),read:()=>fs.readFileSync(file)});
   return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));},
- archives:dir=>fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)).flatMap(a=>xp3Scenes(path.join(dir,a),KS)),
- sources:dir=>[...fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)).map(f=>path.join(dir,f)),...walk(dir,2,KS)],
+ archives:dir=>ksArchives(dir).flatMap(a=>xp3Scenes(a,KS)),
+ sources:dir=>[...ksArchives(dir),...walk(dir,2,KS)],
  parse:parseKs,test:KS,
 };
+// Archives next to the game, then those in arc/ (女王蜂の王房 keeps scenario.xp3 there), later ones overriding.
+function ksArchives(dir){const xp3=d=>{try{return fs.readdirSync(d).filter(f=>/\.xp3$/i.test(f)).sort((a,b)=>rank(a)-rank(b)||a.localeCompare(b)).map(f=>path.join(d,f));}catch{return [];}};return [...xp3(path.join(dir,'arc')),...xp3(dir)];}
 function rank(name){const m=name.toLowerCase().match(/^patch(\d*)\.xp3$/);return m?1+(+m[1]||0):0;}
 
 // ---- Artemis --------------------------------------------------------------------------------------------------
@@ -388,13 +403,16 @@ const nscripter=require('./nscripter.cjs');
 // E343 Capcom Unity Ace Attorney collections (逆転検事 1&2, scriptmessage bundles): capcom-msg.cjs.
 // E375 RPG Maker MV/MZ (www/data JSON) and WOLF RPG Editor (Data/*.mps, CommonEvent.dat, plain .wolf): rpgmaker.cjs, wolf.cjs.
 const rpgmaker=require('./rpgmaker.cjs'),wolf=require('./wolf.cjs');
+// E403 DDLC Plus (StreamingAssets/AssetBundles/Windows/lang*.cy): vgprompter.cjs.
+const vgprompter=require('./vgprompter.cjs');
+const avg32=require('./avg32.cjs'),nitroNpk=require('./npk.cjs').engine,nitroPak=require('./nitro-pak.cjs').engine,iga=require('./iga.cjs').engine,paz=require('./paz.cjs').engine,bruns=require('./bruns.cjs').engine,rePak=require('./re-pak.cjs').engine;
 const catsystem2=require('./catsystem2.cjs'),naninovel=require('./naninovel.cjs'),unityText=require('./unity-text.cjs'),higurashi=require('./higurashi.cjs'),mages=require('./mages.cjs'),capcomMsg=require('./capcom-msg.cjs');
 // E409 Nitroplus N4 (Steam The Song of Saya, script.npk NPK2): nitroplus-n4.cjs.
 const nitroplusN4=require('./nitroplus-n4.cjs');
-const ENGINES={'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf};
+const ENGINES={'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak,vgprompter};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
- for(const s of scenes.slice(0,8)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;}
+ for(const s of scenes.slice(0,64)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
 function detect(dir){for(const id of Object.keys(ENGINES))if(readable(id,dir))return id;return null;}
 function read(id,dir,overlay){const engine=ENGINES[id];
  return engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=engine.parse(replaced||s.read());}catch{}return {name:s.name,...parsed,patched:!!replaced};});}

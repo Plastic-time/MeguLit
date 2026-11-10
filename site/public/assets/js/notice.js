@@ -63,11 +63,12 @@ export function notice({ t, lang, after }) {
   // Recently finished adaptations (assets/updates.json, newest first): "2026年11月11日 完善了《X》的内嵌使用"
   const list = box.querySelector('.nt-updates');
   if (list) fetch('/assets/updates.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).then(items => {
-    const l = lang(), rows = (Array.isArray(items) ? items : []).slice(0, 5);
+    const l = lang(), rows = (Array.isArray(items) ? items : []).slice(0, 8);
     list.replaceChildren(...rows.map(it => {
       const [y, m, d] = String(it.date || '').split('-').map(Number), li = document.createElement('li');
       const title = (l !== 'zh' && it['title_' + l]) || it.title || '';
-      li.textContent = l === 'en' ? `${new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })} · embedded mode for ${title} improved`
+      const own = (l !== 'zh' && it['text_' + l]) || it.text;
+      li.textContent = own ? own : l === 'en' ? `${new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })} · embedded mode for ${title} improved`
         : l === 'ja' ? `${y}年${m}月${d}日 「${title}」の埋め込み表示を改善しました`
         : `${y}年${m}月${d}日 完善了《${title}》的内嵌使用`;
       return li;
