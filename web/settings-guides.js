@@ -39,6 +39,7 @@ const GUIDES = {
         steps: [
           T('游戏装了汉化补丁，或者自带官方中文时，MeguLit 会提前读出整部剧本，把每句日文和汉化组或官方的中文对好', 'When a game has a fan translation patch or an official Chinese version, MeguLit reads the whole script in advance and pairs every Japanese line with its human Chinese translation', 'ゲームに中国語パッチや公式中国語がある場合、MeguLit は事前に台本を読み込み、日本語の各文と人による中国語訳を対応づけます'),
           T('玩的时候游戏显示日文，下面立刻出现对应的人工译文，不用等翻译引擎，也不花钱、不用联网', 'While you play, the game shows Japanese and the matching human translation appears instantly: no waiting for an engine, no cost, no network', 'プレイ中は日本語が表示され、対応する人の訳がすぐに出ます。翻訳エンジンを待たず、費用もネットも不要です'),
+          T('没自动找到汉化？在作品页「汉化脚本 · 零延迟双语」里点「手动选择」，选你手上的汉化补丁或汉化版游戏的文件就行', 'No translation found automatically? On the game page, under Translation script · zero-latency bilingual, click Choose manually and pick the translation patch or a file of the translated game you have', '自動で見つからない場合は、作品ページの「翻訳スクリプト · ゼロ遅延」で「手動で選択」を押し、手元の翻訳パッチや翻訳版ゲームのファイルを選んでください'),
           T('在「翻译」页打开「零延迟翻译（汉化脚本）」即可；作品页「技术资料」里能看到这部作品支不支持。只有极少数对不上的句子才会交给下面选的翻译方式', 'Turn on Zero-latency translation on this page; the game page technical details say whether a game supports it. Only the rare line that does not match goes to the translation method chosen below', 'このページで「ゼロ遅延翻訳」をオンにします。対応状況は作品ページの技術情報で確認できます。対応しない少数の文だけが下で選んだ翻訳方式に回ります'),
         ],
       },
