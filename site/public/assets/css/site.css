@@ -1829,3 +1829,10 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
   .sound-ctl .np .sc-frame, .sound-ctl.open .np .sc-frame { max-height: none; opacity: .92; margin: 0; }
   .np-ctl { grid-template-columns: minmax(0, 1fr); row-gap: .5rem; }
 }
+
+/* SoundCloud dock: the widget's iframe never moves in the DOM (that would reload it); this fixed layer is laid over
+   the label's bottom strip (.np-src, which only reserves the space) and goes off screen when the strip is folded */
+.np-src { height: 20px; box-sizing: content-box; }
+.sc-dock { position: fixed; z-index: 75; left: 0; top: 0; width: 300px; height: 20px; }
+.sc-dock .sc-frame { position: static; display: block; width: 100%; height: 20px; border: 0; opacity: .92; }
+.sc-dock.away { left: -10000px !important; top: 0 !important; }
