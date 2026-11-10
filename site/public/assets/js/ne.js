@@ -12,6 +12,8 @@ export const nePage = id => `https://music.163.com/#/song?id=${id}`;
 
 // SoundCloud is out of reach from mainland China; the time zone is the cheap, private way to tell
 export const inChina = () => {
+  // ?music=ne / ?music=sc in the address picks the source by hand (to try the NetEase player from outside China)
+  try { const m = new URLSearchParams(location.search).get('music'); if (m === 'ne') return true; if (m === 'sc') return false; } catch {}
   try { return /^Asia\/(Shanghai|Chongqing|Chungking|Harbin|Urumqi|Kashgar)$/.test(Intl.DateTimeFormat().resolvedOptions().timeZone); } catch { return false; }
 };
 
