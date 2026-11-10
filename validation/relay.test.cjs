@@ -133,3 +133,25 @@ test('wrangler.toml and README carry no secrets and name every binding',()=>{
  for(const s of ['binding = "DB"','binding = "BUCKET"','migrations_dir = "migrations"'])assert.ok(toml.includes(s),s);
  for(const s of ['wrangler login','d1 create','r2 bucket create','secret put GITHUB_TOKEN','custom_domain'])assert.ok(readme.includes(s),s);
 });
+
+test('website feedback becomes a GitHub issue: mentions defused, honeypot and size checked, rate limited, CORS for the site', async () => {
+ const {handle}=await load('worker.js');
+ const sent=[];
+ const fakeFetch=async(url,init)=>{sent.push({url,init:JSON.parse(init.body)});return new Response(JSON.stringify({html_url:'https://github.com/ilynthn/MeguLit/issues/999'}),{status:201});};
+ const e=env({GITHUB_TOKEN:'t',GITHUB_REPO:'ilynthn/MeguLit',ALLOWED_ORIGINS:'https://megulit.com',fetch:fakeFetch});
+ const site={origin:'https://megulit.com'};
+ const ok=await handle(req('POST','/api/feedback',{kind:'game',text:'ファタモルガーナの館 @someone',lang:'zh',page:'/'},site),e,NOW);
+ assert.equal(ok.status,201);assert.equal((await ok.json()).url,'https://github.com/ilynthn/MeguLit/issues/999');
+ assert.equal(ok.headers.get('access-control-allow-origin'),'https://megulit.com');
+ assert.match(sent[0].url,/repos\/ilynthn\/MeguLit\/issues$/);
+ assert.ok(sent[0].init.title.startsWith('[官网想玩] ファタモルガーナの館'));
+ assert.ok(!/@someone/.test(sent[0].init.body)&&/@‍someone/.test(sent[0].init.body));
+ assert.deepEqual(sent[0].init.labels,['game-request']);
+ assert.equal((await handle(req('POST','/api/feedback',{kind:'feedback',text:'x',website:'spam'},site),e,NOW)).status,400);
+ assert.equal((await handle(req('POST','/api/feedback',{kind:'feedback',text:'   '},site),e,NOW)).status,400);
+ assert.equal((await handle(req('POST','/api/feedback',{kind:'nope',text:'x'},site),e,NOW)).status,400);
+ for(let i=0;i<3;i++)await handle(req('POST','/api/feedback',{kind:'feedback',text:'line '+i},site),e,NOW);
+ assert.equal((await handle(req('POST','/api/feedback',{kind:'feedback',text:'one too many'},site),e,NOW)).status,429);
+ const none=env({fetch:fakeFetch});
+ assert.equal((await handle(req('POST','/api/feedback',{kind:'feedback',text:'hi'}),none,NOW)).status,503);
+});

@@ -6,10 +6,12 @@
 import {LIMITS,validateLeaderboard,validateBoardQuery,validateAdaptationRecord,validateKeys,validateMeta,issueBody,validateHot,INSTALL_ID,HEX64} from './validate.js';
 /* E379 accounts (relay/ACCOUNTS.md) and community features (avatars, hot words) */
 import {handleAccounts,isAccountsPath,authenticate} from './accounts.js';
+/* website game-request and feedback forms → GitHub issues */
+import {feedbackPost} from './feedback.js';
 import {avatarUpload,avatarDelete,avatarGet,avatarReport,avatarsFor,avatarStatus,avatarAppeal,avatarReview,cleanupAvatars,hotStatements,hotWordsGet,settleDue} from './community.js';
 
 /* requests per window; key prefix → [limit, seconds] */
-export const RATE={ip:[120,60],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[5,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60],appeal:[3,86400]};
+export const RATE={ip:[120,60],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[5,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60],appeal:[3,86400]};
 const encoder=new TextEncoder();
 const hex=buffer=>[...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');
 export async function sha256(value){return hex(await crypto.subtle.digest('SHA-256',typeof value==='string'?encoder.encode(value):value));}
@@ -195,6 +197,7 @@ export async function handle(request,env,now=new Date()){
   else if(isAccountsPath(path))response=await handleAccounts(request,env,now)||fail('NOT_FOUND',404);
   else if(path==='/api/adaptation')response=request.method==='POST'?await adaptationPost(request,env,ip,now):request.method==='GET'?await adaptationGet(url,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/adaptation/query')response=request.method==='POST'?await adaptationQuery(request,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/feedback')response=request.method==='POST'?await feedbackPost(request,env,{readJSON,fail,json,hit},ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/diagnostics')response=request.method==='POST'?await diagnosticsPost(request,env,ip,url,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path.startsWith('/api/diagnostics/download/')&&request.method==='GET')response=await diagnosticsDownload(url,env,ip,now);
   else response=fail('NOT_FOUND',404);
