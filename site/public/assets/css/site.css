@@ -1298,8 +1298,8 @@ img, video, canvas, svg { -webkit-user-drag: none; user-drag: none; }
 .top { z-index: 20; }
 .vol[hidden] { display: none; }
 /* Chinese hero title in a brush hand (Zhi Mang Xing, OFL); Japanese and English keep their serif faces */
-@font-face { font-family: "MeguLit Brush"; src: url("/assets/fonts/brush-hero.woff2") format("woff2"); font-display: swap; }
-:lang(zh) .ht-big { font-family: "MeguLit Brush", "MeguLit Han", var(--serif); font-weight: 400; letter-spacing: .02em; font-size: clamp(6rem, 23vw, 25rem); line-height: .95; }
+@font-face { font-family: "MeguLit Black"; src: url("/assets/fonts/hero-black.woff2") format("woff2"); font-weight: 900; font-display: swap; }
+:lang(zh) .ht-big { font-family: "MeguLit Black", "MeguLit Han", var(--serif); font-weight: 900; letter-spacing: .01em; font-size: clamp(5.5rem, 21vw, 23rem); line-height: 1; text-shadow: 0 0 .25em rgba(244, 244, 242, .22); }
 :lang(zh) .ht-big rt { font-size: .08em !important; }
 @media (max-width: 40rem) { :lang(zh) .ht-big { font-size: 30vw; } }
 /* round: no lamp, a shorter screen wall, less air around the deck */

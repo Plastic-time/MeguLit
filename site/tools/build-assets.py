@@ -104,14 +104,14 @@ if MEGU.exists():
 else:
     print('megu-edit fonts not found, hero fonts unchanged')
 
-# ---- brush face for the Chinese hero title: Zhi Mang Xing (OFL), fetched from google/fonts when not cached ---------
-import urllib.request
-cache = Path.home() / '.cache' / 'megulit-fonts'
-cache.mkdir(parents=True, exist_ok=True)
-brush = cache / 'ZhiMangXing-Regular.ttf'
-if not brush.exists():
-    urllib.request.urlretrieve('https://raw.githubusercontent.com/google/fonts/main/ofl/zhimangxing/ZhiMangXing-Regular.ttf', brush)
-subset_to(brush, PUB / 'assets' / 'fonts' / 'brush-hero.woff2', '学日语玩，, Galgame')
+# ---- black serif for the Chinese hero title: Noto Serif SC (OFL, the same variable font as above) at weight 900 -------
+hero_black = TTFont(src, lazy=False)
+o = subset.Options(); o.flavor = 'woff2'; o.layout_features = ['kern', 'liga', 'palt']; o.name_IDs = ['*']
+sb = subset.Subsetter(o); sb.populate(text='学日语玩，, Galgame'); sb.subset(hero_black)
+hero_black = instancer.instantiateVariableFont(hero_black, {'wght': 900})
+hero_black.flavor = 'woff2'
+hero_black.save(PUB / 'assets' / 'fonts' / 'hero-black.woff2')
+print('font hero-black', (PUB / 'assets' / 'fonts' / 'hero-black.woff2').stat().st_size // 1024, 'KB')
 
 # ---- logo split into cape and the rest (hat + letters), from the megu-edit template, for the entrance's cape unfurl ----
 MEGU_PUB = Path(os.environ.get('MEGU_PUBLIC', 'E:/Apps/MeguLit-Tutorial/megu-edit/public'))
