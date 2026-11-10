@@ -297,12 +297,22 @@ function setSoundLabel() {
   const on = Boolean(video && !video.muted);
   soundBtn.setAttribute('aria-pressed', String(on));
   $('.js-sound-label').textContent = on ? d('soundOff') : d('soundOn');
+  const vol = $('.vol');
+  if (vol) vol.hidden = !on;
 }
+// Volume: sound starts quiet (5%) when turned on; the slider sets it from there.
+const volInput = $('#hero-volume'), volOut = $('.vol-v');
+const volume = () => (volInput ? Number(volInput.value) : 5) / 100;
+volInput?.addEventListener('input', () => {
+  if (video) video.volume = volume();
+  if (volOut) volOut.textContent = `${volInput.value}%`;
+  volInput.style.setProperty('--fill', `${volInput.value}%`);
+});
 soundBtn?.addEventListener('click', () => {
   if (!video) return;
   startVideo();
   video.muted = !video.muted;
-  if (!video.muted) { video.volume = .8; video.play().catch(() => {}); }
+  if (!video.muted) { video.volume = volume(); video.play().catch(() => {}); }
   setSoundLabel();
 });
 

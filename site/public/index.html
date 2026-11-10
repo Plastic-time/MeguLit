@@ -83,19 +83,22 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    <p class="lede" data-i="hero.lede">给 Galgame 玩家的日语学习工具。游戏里的每句台词都带上注音和释义，点一下查词，一键制成 Anki 卡片，读了多少、学了哪些词都替你记着</p>
    <div class="hero-dl">
     <a class="dl-box js-download" href="https://github.com/ilynthn/MeguLit/releases/latest">
-     <span class="db-hud" aria-hidden="true">download</span>
+     <span class="db-hud" aria-hidden="true"><span>download</span><span class="js-version">v1.2.8</span><span class="js-size">20.0 MB</span></span>
      <span class="db-main" data-i="dl.button">下载 MeguLit</span>
-     <span class="db-arrow" aria-hidden="true">↓</span>
+     <span class="db-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 4v14m0 0-6-6m6 6 6-6"/></svg></span>
     </a>
     <p class="hud hud-dl"><span class="js-size">20.0 MB</span><span>win 10 · 11 x64</span><span>gpl-3.0</span><a class="alt-link" href="#download" data-i="dl.alt">备用下载</a></p>
    </div>
   </div>
  </div>
- <button type="button" class="sound-fab js-sound" aria-pressed="false">
-  <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="m16.5 9.5 5 5m0-5-5 5"/></svg>
-  <span class="label js-sound-label" data-i="v.sound">打开声音</span>
- </button>
+ <div class="sound-ctl">
+  <button type="button" class="sound-fab js-sound" aria-pressed="false">
+   <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+   <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="m16.5 9.5 5 5m0-5-5 5"/></svg>
+   <span class="label js-sound-label" data-i="v.sound">打开声音</span>
+  </button>
+  <label class="vol" hidden><span class="vol-k" data-i="v.volume">音量</span><input type="range" id="hero-volume" min="0" max="100" step="1" value="5"><output class="vol-v" for="hero-volume">5%</output></label>
+ </div>
 </section>
 
 <div class="ticker" aria-hidden="true">

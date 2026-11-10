@@ -42,7 +42,7 @@ function intro() {
   }
   createTimeline({ defaults: { ease: 'out(4)' } })
     .add('.hero .lede, .foot-rule', { opacity: [0, 1], y: ['.8rem', 0], duration: 900, delay: stagger(90) }, 1700)
-    .add('.dl-box, .hud-dl, .hud-tl, .hero-vert, .sound-fab', { opacity: [0, 1], y: ['.6rem', 0], duration: 800, delay: stagger(70) }, 1900);
+    .add('.dl-box, .hud-dl, .hud-tl, .hero-vert, .sound-ctl', { opacity: [0, 1], y: ['.6rem', 0], duration: 800, delay: stagger(70) }, 1900);
 }
 
 // Numbers count up from zero when they scroll into view.
