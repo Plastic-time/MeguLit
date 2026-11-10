@@ -374,7 +374,9 @@ const nscripter=require('./nscripter.cjs');
 // E375 RPG Maker MV/MZ (www/data JSON) and WOLF RPG Editor (Data/*.mps, CommonEvent.dat, plain .wolf): rpgmaker.cjs, wolf.cjs.
 const rpgmaker=require('./rpgmaker.cjs'),wolf=require('./wolf.cjs');
 const catsystem2=require('./catsystem2.cjs'),naninovel=require('./naninovel.cjs'),unityText=require('./unity-text.cjs'),higurashi=require('./higurashi.cjs'),mages=require('./mages.cjs'),capcomMsg=require('./capcom-msg.cjs');
-const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf};
+// E409 Nitroplus N4 (Steam The Song of Saya, script.npk NPK2): nitroplus-n4.cjs.
+const nitroplusN4=require('./nitroplus-n4.cjs');
+const ENGINES={'nitroplus-n4':nitroplusN4,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,8)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;}
