@@ -138,3 +138,13 @@ test('profiles, follows and 同好: login to write, private by default, privacy 
  for(const t of ['profiles','profile_favorites'])assert.equal(e.DB.raw.prepare(`SELECT COUNT(*) n FROM ${t} WHERE id_hash=?`).get(sha('account:acc2')).n,0,t);
  assert.equal(e.DB.raw.prepare('SELECT COUNT(*) n FROM follows').get().n,0);
 });
+
+test('E401 boards for reviews and kana practice (migration 0008); older uploads count as 0',async()=>{
+ const {handle}=await load('worker.js'),e=env();
+ const withStats=(n,reviews,kana)=>{const b=body(n);b.stats=JSON.parse(JSON.stringify(stats));for(const p of ['week','month','all'])Object.assign(b.stats[p],{reviews,kana});return b;};
+ await call(handle,e,'POST','/api/leaderboard',withStats(1,40,10));await call(handle,e,'POST','/api/leaderboard',withStats(2,90,0));await call(handle,e,'POST','/api/leaderboard',body(3));
+ const reviews=(await call(handle,e,'GET','/api/leaderboard?period=week&metric=reviews&key=2026-W46')).data;
+ assert.deepEqual(reviews.entries.map(r=>[r.name,r.value]),[['Reader2',90],['Reader1',40]],'zero rows are left out');
+ const kana=(await call(handle,e,'GET','/api/leaderboard?period=all&metric=kana')).data;assert.deepEqual(kana.entries.map(r=>[r.name,r.value]),[['Reader1',10]]);
+ assert.equal((await call(handle,e,'GET','/api/leaderboard?period=week&metric=anki')).data.error,'INVALID_QUERY');
+});
