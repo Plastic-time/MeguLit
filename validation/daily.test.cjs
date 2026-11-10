@@ -216,3 +216,13 @@ test('refresh: once a day on its own, on the first request of a new Japan day, a
  }finally{globalThis.fetch=real;}
  const src=fs.readFileSync(path.join(__dirname,'..','web','daily-view.js'),'utf8');assert.match(src,/api\('daily_view',spin\?\{force:true\}:\{\}\)/);
 });
+
+test('relay glosses also read OpenAI-style answers; feeds keep old-but-listed stories',async()=>{
+ const d=await load('daily.js');
+ const AI={run:async()=>({choices:[{message:{content:'["快餐产品","学校活动"]'}}]})};
+ const e={DB:d1(),AI};await d.refreshWords(e,new Date('2026-11-11T00:00:00Z'),fetcher(FEEDS));
+ const r=await d.hotWordsDailyGet(e,new URL('https://x/api/hotwords/daily'),{json:v=>v,fail:c=>c},new Date('2026-11-11T00:10:00Z'));
+ assert.deepEqual(r.words.slice(0,2).map(w=>w.gloss),['快餐产品','学校活动']);
+ const old=MOE.replace('Mon, 09 Nov 2026','Fri, 30 Oct 2026'),n={DB:d1()};await d.refreshNews(n,new Date('2026-11-11T00:00:00Z'),fetcher({'https://moepedia.net':old}));
+ assert.equal((await d.newsGet(n,{json:v=>v},new Date('2026-11-11T00:10:00Z'))).items.length,1,'a feed\'s own story is kept even when older than 10 days');
+});

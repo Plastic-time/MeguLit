@@ -76,7 +76,7 @@ export async function refreshNews(env,now=new Date(),fetcher=fetch){
  const lists=await Promise.all(NEWS_FEEDS.map(async f=>parseNews(await get(f.url,fetcher),f)));
  const prev=(await load(env,'news','').catch(()=>null))?.items||[],cutoff=now.getTime()-KEEP_NEWS_DAYS*864e5;
  const fresh=lists.flat(),seen=new Set();
- const all=[...fresh,...prev].filter(n=>n?.link&&!seen.has(n.link)&&seen.add(n.link)).filter(n=>!n.date||Date.parse(n.date)>=cutoff).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).filter((n,_,list)=>list.filter(x=>(x.cat||'gal')===(n.cat||'gal')).indexOf(n)<MAX_NEWS);
+ const all=[...fresh,...prev].filter(n=>n?.link&&!seen.has(n.link)&&seen.add(n.link)).filter(n=>fresh.includes(n)||!n.date||Date.parse(n.date)>=cutoff) /* what the feeds list now always stays; only carried-over stories expire */.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).filter((n,_,list)=>list.filter(x=>(x.cat||'gal')===(n.cat||'gal')).indexOf(n)<MAX_NEWS);
  if(!all.length)return 0;
  if(env.BUCKET)await mirrorImages(env,all,now,fetcher).catch(()=>0);else for(const n of all)n.image='';
  await save(env,'news',dayKey(now),{items:all,sources:[...new Map(NEWS_FEEDS.map(f=>[f.id,{id:f.id,name:f.name,cat:f.cat||'gal'}])).values()]},now);return all.length;
@@ -175,9 +175,11 @@ async function glossWords(env,words){
  if(!env.AI||typeof env.AI.run!=='function'||!words.length)return 0;
  const input=words.map((w,i)=>`${i+1}. ${w.term}${w.headline?' ｜ '+w.headline.slice(0,80):''}`).join('\n');
  for(const model of [env.DAILY_GLOSS_MODEL||GLOSS_MODEL,env.HOT_MODEL].filter(Boolean)){
-  try{const out=await env.AI.run(model,{messages:[{role:'system',content:GLOSS_PROMPT},{role:'user',content:input}],max_tokens:800,temperature:0.2});
-   const list=parseGlosses(out?.response??out?.result?.response??'',words.length);
-   if(list.filter(Boolean).length>=Math.ceil(words.length/2)){words.forEach((w,i)=>{if(list[i])w.gloss=list[i];});return list.length;}}catch{}
+  try{const out=await env.AI.run(model,{messages:[{role:'system',content:GLOSS_PROMPT+' /no_think'},{role:'user',content:input}],max_tokens:1200,temperature:0.2});
+   /* Workers AI answers as {response} (Llama) or OpenAI-style {choices:[{message:{content}}]} (Qwen 3) */
+   const raw=out?.response??out?.result?.response??out?.choices?.[0]?.message?.content??out?.result?.choices?.[0]?.message?.content??'';
+   const list=parseGlosses(typeof raw==='string'?raw:JSON.stringify(raw),words.length);if(!list.length)console.warn('gloss: no list from',model,String(JSON.stringify(out)).slice(0,300));
+   if(list.filter(Boolean).length>=Math.ceil(words.length/3)){words.forEach((w,i)=>{if(list[i])w.gloss=list[i];});return list.length;}}catch(e){console.warn('gloss: model failed',model,String(e?.message||e).slice(0,200));}
  }
  return 0;
 }
