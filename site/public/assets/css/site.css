@@ -1587,3 +1587,21 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 .np-sw:hover, .np-sw:focus-visible { color: #fff; outline: none; border-color: #e35a63; }
 .np-sw[hidden] { display: none; }
 .np.lyrics-off .np-lyric { height: 0 !important; }
+
+/* floating player, compact: down the page it is one small strip (title + current line), so it never covers what you
+   read; the volume, the switches and the credit open on hover or keyboard focus (tap on phones) */
+.sound-ctl.floating .vol { display: none; }
+.sound-ctl.floating:hover .vol, .sound-ctl.floating:focus-within .vol { display: flex; }
+.sound-ctl.floating .np, .sound-ctl.floating .np.has-lyrics { width: min(16rem, 52vw); max-width: none; padding: .45rem .7rem; gap: .1rem .55rem; background: rgba(0, 0, 0, .62); }
+.sound-ctl.floating .np-artist, .sound-ctl.floating .np-switches, .sound-ctl.floating .np-credit { display: none; }
+.sound-ctl.floating .np-title { font-size: .8125rem; }
+.sound-ctl.floating .np.has-lyrics .np-lyric { height: 1.5em; font-size: .75rem; }
+.sound-ctl.floating .np-line { -webkit-line-clamp: 1; }
+.sound-ctl.floating:hover .np, .sound-ctl.floating:focus-within .np { width: min(22rem, 70vw); }
+.sound-ctl.floating:hover .np-artist, .sound-ctl.floating:focus-within .np-artist { display: inline; }
+.sound-ctl.floating:hover .np-switches, .sound-ctl.floating:focus-within .np-switches { display: flex; }
+.sound-ctl.floating:hover .np-credit, .sound-ctl.floating:focus-within .np-credit { display: block; }
+.sound-ctl.floating:hover .np.has-lyrics .np-lyric, .sound-ctl.floating:focus-within .np.has-lyrics .np-lyric { height: 3em; font-size: .8125rem; }
+.sound-ctl.floating:hover .np-line, .sound-ctl.floating:focus-within .np-line { -webkit-line-clamp: 2; }
+.sound-ctl.floating .np { cursor: default; }
+@media (max-width: 40rem) { .sound-ctl.floating .np, .sound-ctl.floating .np.has-lyrics { width: min(13rem, 58vw); } }

@@ -364,16 +364,38 @@ volInput?.addEventListener('input', () => {
   if (volOut) volOut.textContent = `${volInput.value}%`;
   volInput.style.setProperty('--fill', `${volInput.value}%`);
 });
-soundBtn?.addEventListener('click', () => {
-  soundOn = !soundOn;
-  if (soundOn) {
+// on → resolves true once the music actually plays (false when the browser still wants a click first)
+function setSound(on) {
+  soundOn = on;
+  let started = Promise.resolve(false);
+  if (on) {
     if (!bgm.getAttribute('src')) bgm.src = new URL('../audio/megulit-bgm.mp3', import.meta.url).href;
     bgm.volume = volume();
-    bgm.play().catch(() => { soundOn = false; setSoundLabel(); floatSound(); });
+    started = bgm.play().then(() => true, () => { soundOn = false; setSoundLabel(); floatSound(); return false; });
   } else bgm.pause();
   setSoundLabel();
   floatSound();
+  return started;
+}
+soundBtn?.addEventListener('click', () => {
+  disarm();
+  store.set('megulit-sound', soundOn ? '0' : '1');   // the visitor's own choice wins from now on
+  setSound(!soundOn);
 });
+// Music on by default (at 5%), unless this visitor turned it off before or asked to save data. Browsers only allow
+// sound after the visitor has interacted with the page, so when the first try is refused it starts on the first
+// click, tap or key press anywhere (not on the sound button, which makes its own choice).
+const firstTouch = e => {
+  if (e.target.closest?.('.js-sound')) return;
+  disarm();
+  if (!soundOn) setSound(true);
+};
+const disarm = () => { for (const t of ['pointerdown', 'keydown', 'touchend']) removeEventListener(t, firstTouch, true); };
+if (soundBtn && store.get('megulit-sound') !== '0' && !navigator.connection?.saveData) {
+  introShown.then(() => setSound(true)).then(ok => {
+    if (!ok) for (const t of ['pointerdown', 'keydown', 'touchend']) addEventListener(t, firstTouch, true);
+  });
+}
 
 // Steps: the line over them fills with the scroll, from the first step to the last, and each number lights up as the
 // line reaches it (both ways, so scrolling back up empties it again).
