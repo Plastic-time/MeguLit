@@ -55,7 +55,7 @@ export function validateLeaderboard(body,now=new Date()){
 }
 /* GET /api/leaderboard query → {ok,value} */
 export function validateBoardQuery(params,now=new Date()){
- const metric=params.get('metric')||'characters',me=params.get('me')||'';
+ const metric=params.get('metric')||'seconds',me=params.get('me')||'';
  if(me&&!HEX64.test(me))return {ok:false,error:'INVALID_QUERY'};
  if(metric==='games'){const game=params.get('game');if(game!==null&&(!game.trim()||[...game].length>LIMITS.title))return {ok:false,error:'INVALID_QUERY'};return {ok:true,value:{metric,game:game===null?null:gameKey(game),me}};}
  const period=params.get('period')||'week';if(!PERIODS.includes(period)||!METRICS.includes(metric))return {ok:false,error:'INVALID_QUERY'};

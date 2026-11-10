@@ -6,10 +6,10 @@
 import {LIMITS,validateLeaderboard,validateBoardQuery,validateAdaptationRecord,validateKeys,validateMeta,issueBody,validateHot,INSTALL_ID,HEX64} from './validate.js';
 /* E379 accounts (relay/ACCOUNTS.md) and community features (avatars, hot words) */
 import {handleAccounts,isAccountsPath,authenticate} from './accounts.js';
-import {avatarUpload,avatarDelete,avatarGet,avatarReport,avatarsFor,avatarStatus,hotStatements,hotWordsGet,settleDue} from './community.js';
+import {avatarUpload,avatarDelete,avatarGet,avatarReport,avatarsFor,avatarStatus,avatarAppeal,avatarReview,cleanupAvatars,hotStatements,hotWordsGet,settleDue} from './community.js';
 
 /* requests per window; key prefix → [limit, seconds] */
-export const RATE={ip:[120,60],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[5,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60]};
+export const RATE={ip:[120,60],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[5,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60],appeal:[3,86400]};
 const encoder=new TextEncoder();
 const hex=buffer=>[...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');
 export async function sha256(value){return hex(await crypto.subtle.digest('SHA-256',typeof value==='string'?encoder.encode(value):value));}
@@ -182,6 +182,8 @@ export async function handle(request,env,now=new Date()){
   if(!await hit(env,'ip',ip,now.getTime()))response=fail('RATE_LIMITED',429);
   else if(path==='/api/health'&&request.method==='GET')response=json({ok:true,service:'megulit-relay'});
   else if(path==='/api/leaderboard')response=request.method==='POST'?await leaderboardPost(request,env,ip,now):request.method==='GET'?await leaderboardGet(url,env,ip,now):request.method==='DELETE'?await leaderboardDelete(request,url,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/leaderboard/avatar/appeal'&&request.method==='POST'){const who=await subjects(request,env,url.searchParams.get('id'),now);response=await hit(env,'appeal',who.primary||ip,now.getTime())?await avatarAppeal(request,env,who.primary,url,now):fail('RATE_LIMITED',429);}
+  else if(/^\/api\/avatar\/[0-9a-f]{32}\/review$/.test(path)&&request.method==='GET')response=await hit(env,'diag-dl',ip,now.getTime())?await avatarReview(url,env,now):fail('RATE_LIMITED',429);
   else if(path==='/api/leaderboard/avatar'){const who=await subjects(request,env,url.searchParams.get('id'),now);
    if(request.method==='GET')response=await avatarStatus(env,who.primary);
    else if(!await hit(env,'avatar',who.primary||ip,now.getTime()))response=fail('RATE_LIMITED',429);
@@ -201,5 +203,5 @@ export async function handle(request,env,now=new Date()){
  return response;
 }
 /* Cron (wrangler.toml [triggers]): Monday 00:00 UTC+8 settles last week's hot words. */
-export async function scheduled(event,env,ctx){const job=settleDue(env,new Date(event?.scheduledTime||Date.now()));if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
+export async function scheduled(event,env,ctx){const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
 export default {fetch:(request,env)=>handle(request,env),scheduled};

@@ -107,7 +107,7 @@ test('diagnostics: zip to R2, GitHub issue with diagnostics label and a signed e
  const issue=calls[0].init.body.body;assert.match(issue,/ATRI/);assert.match(issue,/\\@someone/);
  const link=issue.match(/https:\/\/relay\.test\/api\/diagnostics\/download\/\S+/)[0];
  const dl=await handle(new Request(link,{headers:{'cf-connecting-ip':'1.2.3.4'}}),e,NOW);assert.equal(dl.status,200);assert.equal(dl.headers.get('content-type'),'application/zip');
- assert.equal((await handle(new Request(link.replace(/sig=./,'sig=0'),{headers:{}}),e,NOW)).status,404);
+ assert.equal((await handle(new Request(link.replace(/sig=([0-9a-f])/,(m,c)=>'sig='+(c==='0'?'1':'0')),{headers:{}}),e,NOW)).status,404);
  assert.equal((await handle(new Request(link),e,new Date(NOW.getTime()+31*86400000))).status,410);
  /* wrong checksum, not a zip, missing package, bad version */
  assert.equal((await handle(await diagForm(zip,{version:'1.2.8d',sha256:'0'.repeat(64)}),e,NOW)).status,400);

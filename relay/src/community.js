@@ -29,10 +29,10 @@ export async function moderateImage(env,bytes){
  if(!env.AI||typeof env.AI.run!=='function')return {approved:false,reason:'MODERATION_UNAVAILABLE'};
  let answer;
  try{const out=await env.AI.run(env.AVATAR_MODEL||AVATAR_MODEL,{messages:[{role:'system',content:MODERATION_PROMPT},{role:'user',content:'Is this profile picture SAFE or UNSAFE?'}],image:[...bytes],max_tokens:4,temperature:0});answer=String(out?.response??out?.result?.response??'');}
- catch{return {approved:false,reason:'MODERATION_ERROR'};}
- const word=answer.trim().toUpperCase().replace(/[^A-Z]/g,'');
- if(word==='SAFE')return {approved:true,reason:''};
- return {approved:false,reason:word==='UNSAFE'?'NSFW':'MODERATION_UNCLEAR'};
+ catch(error){return {approved:false,reason:'MODERATION_ERROR',answer:String(error?.message||'').slice(0,60)};}
+ const word=answer.trim().toUpperCase().replace(/[^A-Z]/g,''),raw=answer.trim().slice(0,60);
+ if(word==='SAFE')return {approved:true,reason:'',answer:raw};
+ return {approved:false,reason:word==='UNSAFE'?'NSFW':'MODERATION_UNCLEAR',answer:raw};
 }
 
 /* ---- avatars --------------------------------------------------------------------------------------------------- */
@@ -45,11 +45,11 @@ export async function avatarUpload(request,env,subject,now=new Date()){
  const old=await env.DB.prepare('SELECT avatar_id FROM avatars WHERE id_hash=?').bind(subject).first();
  await env.BUCKET.put(key,bytes,{httpMetadata:{contentType:'image/webp'}});
  /* pending until the model answers: never served in that state */
- await env.DB.prepare("INSERT INTO avatars(id_hash,avatar_id,status,reason,reports,created_at,reviewed_at) VALUES(?,?,'pending','',0,?,0) ON CONFLICT(id_hash) DO UPDATE SET avatar_id=excluded.avatar_id,status='pending',reason='',reports=0,created_at=excluded.created_at,reviewed_at=0").bind(subject,avatarId,t).run();
+ await env.DB.prepare("INSERT INTO avatars(id_hash,avatar_id,status,reason,reports,created_at,reviewed_at) VALUES(?,?,'pending','',0,?,0) ON CONFLICT(id_hash) DO UPDATE SET avatar_id=excluded.avatar_id,status='pending',reason='',answer='',reports=0,created_at=excluded.created_at,reviewed_at=0,appealed_at=0,appeal_issue=''").bind(subject,avatarId,t).run();
  const verdict=await moderateImage(env,bytes);
- await env.DB.batch([env.DB.prepare('UPDATE avatars SET status=?,reason=?,reviewed_at=? WHERE id_hash=? AND avatar_id=?').bind(verdict.approved?'approved':'rejected',verdict.reason,t,subject,avatarId),env.DB.prepare('DELETE FROM avatar_reports WHERE avatar_id=?').bind(old?.avatar_id||'')]);
+ await env.DB.batch([env.DB.prepare('UPDATE avatars SET status=?,reason=?,answer=?,reviewed_at=? WHERE id_hash=? AND avatar_id=?').bind(verdict.approved?'approved':'rejected',verdict.reason,verdict.answer||'',t,subject,avatarId),env.DB.prepare('DELETE FROM avatar_reports WHERE avatar_id=?').bind(old?.avatar_id||'')]);
  if(old?.avatar_id)await env.BUCKET.delete?.(`avatars/${old.avatar_id}.webp`);
- if(!verdict.approved)await env.BUCKET.delete?.(key);
+ /* a rejected picture stays private in R2 (avatarGet never serves it) so its owner can appeal; cleanupAvatars drops it after APPEAL_DAYS */
  return json({ok:true,status:verdict.approved?'approved':'rejected',reason:verdict.reason,avatar:verdict.approved?avatarId:null});
 }
 export async function avatarDelete(env,subjects){
@@ -84,7 +84,60 @@ export async function avatarsFor(env,hashes){
  const {results}=await env.DB.prepare(`SELECT id_hash,avatar_id FROM avatars WHERE status='approved' AND id_hash IN (${hashes.map(()=>'?').join(',')})`).bind(...hashes).all();
  return new Map(results.map(r=>[r.id_hash,r.avatar_id]));
 }
-export async function avatarStatus(env,subject){const row=subject?await env.DB.prepare('SELECT avatar_id,status,reason FROM avatars WHERE id_hash=?').bind(subject).first():null;return json({status:row?.status||'none',reason:row?.reason||'',avatar:row?.status==='approved'?row.avatar_id:null});}
+export async function avatarStatus(env,subject){const row=subject?await env.DB.prepare('SELECT avatar_id,status,reason,appealed_at,appeal_issue FROM avatars WHERE id_hash=?').bind(subject).first():null;return json({status:row?.status||'none',reason:row?.reason||'',avatar:row?.status==='approved'?row.avatar_id:null,appealed:!!row?.appealed_at,issueUrl:row?.appeal_issue||''});}
+
+/* ---- appeals: the owner of a rejected picture asks a human ------------------------------------------------------
+   One click in Settings: a GitHub issue (label avatar-appeal) with the verdict, the model's raw answer and a private
+   review link (HMAC-signed with LINK_SECRET, REVIEW_HOURS long, not embedded so nothing shows inline in the issue),
+   plus a moderation_queue row. One appeal per picture. The maintainer approves or keeps it rejected with the commands
+   written into the issue (README: Moderation queue). */
+export const APPEAL_DAYS=30,REVIEW_HOURS=72;
+const enc=new TextEncoder(),hexOf=b=>[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+export async function signReview(secret,avatarId,exp){const key=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return hexOf(await crypto.subtle.sign('HMAC',key,enc.encode('review:'+avatarId+':'+exp)));}
+const FENCE='`'.repeat(3),TICK='`';
+export function appealBody(row,link,meta={}){
+ const at=v=>v?new Date(v*1000).toISOString().replace('T',' ').slice(0,16)+' UTC':'-';
+ const answer=String(row.answer||'').replace(/[`\r\n]/g,' ').trim()||'-',version=String(meta.version||'?').replace(/[^\w.]/g,'').slice(0,20)||'?';
+ const sql=command=>[FENCE,`npx wrangler d1 execute megulit-relay --remote --command "${command}"`,FENCE];
+ return ['A MeguLit user thinks the automatic check rejected their leaderboard picture by mistake.','',
+  `- Avatar id: ${TICK}${row.avatar_id}${TICK}`,`- Verdict: ${row.reason||'?'} (model answer: ${TICK}${answer}${TICK})`,`- Uploaded: ${at(row.created_at)} · checked: ${at(row.reviewed_at)}`,`- App: ${version}`,'',
+  `Private review link (opens the picture, expires in ${REVIEW_HOURS} h; not embedded on purpose):`,link,'',
+  'Approve (it shows on the leaderboard right away):',...sql(`UPDATE avatars SET status='approved',reason='APPEAL_APPROVED' WHERE avatar_id='${row.avatar_id}'; UPDATE moderation_queue SET resolved_at=unixepoch() WHERE subject='${row.avatar_id}'`),
+  'Keep it rejected:',...sql(`UPDATE avatars SET reason='APPEAL_REJECTED' WHERE avatar_id='${row.avatar_id}'; UPDATE moderation_queue SET resolved_at=unixepoch() WHERE subject='${row.avatar_id}'`)].join('\n');
+}
+export async function avatarAppeal(request,env,subject,url,now=new Date()){
+ if(!subject)return fail('INVALID_ID');
+ const row=await env.DB.prepare('SELECT * FROM avatars WHERE id_hash=?').bind(subject).first();
+ if(!row||row.status!=='rejected')return fail('NOTHING_TO_APPEAL');
+ if(row.appealed_at)return json({ok:true,issueUrl:row.appeal_issue||'',already:true});
+ if(!await env.BUCKET.get(`avatars/${row.avatar_id}.webp`))return fail('NOTHING_TO_APPEAL');
+ let meta={};try{meta=JSON.parse((await request.text())||'{}')||{};}catch{}
+ const t=sec(now),exp=t+REVIEW_HOURS*3600;
+ const link=env.LINK_SECRET?`${url.origin}/api/avatar/${row.avatar_id}/review?exp=${exp}&sig=${await signReview(env.LINK_SECRET,row.avatar_id,exp)}`:`(LINK_SECRET not set: npx wrangler r2 object get megulit-diagnostics/avatars/${row.avatar_id}.webp --remote --file a.webp)`;
+ let issueUrl='';
+ if(env.GITHUB_TOKEN){
+  const repo=/^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPO||'')?env.GITHUB_REPO:'ilynthn/MeguLit';
+  try{const r=await (env.fetch||fetch)(`https://api.github.com/repos/${repo}/issues`,{method:'POST',headers:{authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'megulit-relay','content-type':'application/json'},body:JSON.stringify({title:`[头像复核] ${row.reason||'rejected'} · ${row.avatar_id.slice(0,8)}`,body:appealBody(row,link,meta),labels:['avatar-appeal']})});
+   if(r.ok){const data=await r.json().catch(()=>({}));issueUrl=typeof data.html_url==='string'&&data.html_url.startsWith('https://github.com/')?data.html_url:'';}}catch{}
+ }
+ await env.DB.batch([env.DB.prepare('UPDATE avatars SET appealed_at=?,appeal_issue=? WHERE avatar_id=?').bind(t,issueUrl,row.avatar_id),env.DB.prepare("INSERT INTO moderation_queue(kind,subject,reason,created_at,resolved_at) VALUES('appeal',?,?,?,0)").bind(row.avatar_id,`appeal of ${row.reason}`,t)]);
+ return json({ok:true,issueUrl});
+}
+/* The signed review link serves the picture whatever its status, privately, until it expires. */
+export async function avatarReview(url,env,now=new Date()){
+ const id=url.pathname.split('/')[3]||'',exp=Number(url.searchParams.get('exp')),sig=url.searchParams.get('sig')||'';
+ if(!/^[0-9a-f]{32}$/.test(id)||!Number.isSafeInteger(exp)||!/^[0-9a-f]{64}$/.test(sig)||!env.LINK_SECRET)return fail('NOT_FOUND',404);
+ const want=await signReview(env.LINK_SECRET,id,exp);let d=0;for(let i=0;i<64;i++)d|=want.charCodeAt(i)^sig.charCodeAt(i);if(d)return fail('NOT_FOUND',404);
+ if(exp<sec(now))return fail('LINK_EXPIRED',410);
+ const object=await env.BUCKET.get(`avatars/${id}.webp`);if(!object)return fail('NOT_FOUND',404);
+ return new Response(object.body,{headers:{'content-type':'image/webp','cache-control':'private, no-store','x-robots-tag':'noindex','x-content-type-options':'nosniff'}});
+}
+/* Cron: drop rejected pictures nobody appealed after APPEAL_DAYS (the row stays as 'expired'). */
+export async function cleanupAvatars(env,now=new Date()){
+ const {results}=await env.DB.prepare("SELECT avatar_id FROM avatars WHERE status='rejected' AND appealed_at=0 AND reviewed_at>0 AND reviewed_at<?").bind(sec(now)-APPEAL_DAYS*86400).all();
+ for(const r of results){await env.BUCKET.delete?.(`avatars/${r.avatar_id}.webp`);await env.DB.prepare("UPDATE avatars SET status='expired' WHERE avatar_id=?").bind(r.avatar_id).run();}
+ return results.length;
+}
 
 /* ---- hot words: per-user weekly counts ------------------------------------------------------------------------- */
 /* Statements that replace this user's counts for the week (called from the leaderboard POST batch). */

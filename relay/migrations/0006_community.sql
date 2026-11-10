@@ -1,7 +1,8 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 -- E379 leaderboard avatars (moderated) and weekly hot-lookup awards (relay/src/community.js). Applies after 0005.
 
--- One avatar per leaderboard id hash. status: pending (being checked, never served) | approved | rejected | hidden (reported).
+-- One avatar per leaderboard id hash. status: pending (being checked, never served) | approved | rejected (kept private
+-- for an appeal) | hidden (reported) | expired (rejected, not appealed, picture deleted after 30 days).
 CREATE TABLE IF NOT EXISTS avatars (
   id_hash TEXT PRIMARY KEY,
   avatar_id TEXT NOT NULL UNIQUE,
@@ -9,7 +10,10 @@ CREATE TABLE IF NOT EXISTS avatars (
   reason TEXT NOT NULL DEFAULT '',
   reports INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
-  reviewed_at INTEGER NOT NULL DEFAULT 0
+  reviewed_at INTEGER NOT NULL DEFAULT 0,
+  answer TEXT NOT NULL DEFAULT '',          -- the model's raw answer, shown in appeals
+  appealed_at INTEGER NOT NULL DEFAULT 0,   -- owner asked for a human review (one appeal per picture)
+  appeal_issue TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS avatars_by_status ON avatars(status);
 -- reporter = id hash of a joined user, or a salted IP hash
