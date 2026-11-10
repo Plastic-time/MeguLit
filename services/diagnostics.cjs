@@ -135,9 +135,31 @@ function build(root,db,id,options={}){
  prune(dir,20);
  return {path:file,name:path.basename(file),bytes:buffer.length,game:{id:String(id),title,engine:info.game.engine},version:info.megulit.version,entries:files.map(f=>({name:f.name,kind:f.kind,bytes:Buffer.isBuffer(f.data)?f.data.length:Buffer.byteLength(String(f.data)),preview:f.kind==='info'?String(f.data).slice(0,6000):undefined}))};
 }
+/* E394 one package for MeguLit as a whole (About → 一键上传日志): the newest logs of the last week, each cut to its last
+   MAX_LINES lines, plus a short library overview, all scrubbed the same way. For a problem with one game the per-game
+   package above is sharper; this one is for "something is wrong and I don't know where". */
+const ALL_MAX_FILES=24,ALL_MAX_AGE_MS=7*24*3600*1000;
+function collectAll(root,db,{version='',now=new Date(),who=identity()}={}){
+ const dir=path.join(root,'logs');let names=[];
+ try{names=fs.readdirSync(dir).filter(n=>/\.log$/i.test(n)).map(n=>{let st=null;try{st=fs.statSync(path.join(dir,n));}catch{}return st&&st.isFile()?{n,t:st.mtimeMs}:null;}).filter(Boolean).filter(f=>now.getTime()-f.t<=ALL_MAX_AGE_MS).sort((a,b)=>b.t-a.t).slice(0,ALL_MAX_FILES).map(f=>f.n);}catch{}
+ const files=[],logInfo={};
+ for(const name of names){const all=readLog(root,name),kept=all.slice(-MAX_LINES);logInfo[name]={linesInLog:all.length,linesKept:kept.length};if(kept.length)files.push({name:'logs/'+name,data:scrub(kept.join('\n')+'\n',who),kind:'log'});}
+ let games=[];try{games=db.prepare('SELECT id,title,library FROM games ORDER BY last_launched_at DESC LIMIT 60').all().map(r=>{let lib={};try{lib=JSON.parse(r.library||'{}');}catch{}return {id:String(r.id),title:r.title,engine:String(lib.engine||''),hook:String(lib.hook||'')};});}catch{}
+ const info={schema:1,kind:'all',createdAt:now.toISOString(),megulit:{version:String(version||'')},os:osInfo(),games,logs:logInfo};
+ files.unshift({name:'info.json',data:scrub(JSON.stringify(info,null,2),who),kind:'info'});
+ const readme=['MeguLit diagnostic package (whole app)','','Created: '+now.toISOString(),'',...files.map(f=>`${f.name}  ${f.kind==='log'?'last lines of this log':'MeguLit version, OS and the library'}`),'','Privacy: the Windows user name and profile paths are replaced by placeholders and e-mail addresses are removed.'].join('\n');
+ files.push({name:'README.txt',data:scrub(readme,who),kind:'readme'});
+ return {files,info};
+}
+function buildAll(root,db,options={}){
+ const now=options.now||new Date(),{files,info}=collectAll(root,db,{...options,now}),dir=path.join(root,'data','diagnostics');fs.mkdirSync(dir,{recursive:true});
+ const file=path.join(dir,`MeguLit-diag-all-${stamp(now)}.zip`),buffer=zip(files,now),temporary=file+'.tmp';fs.writeFileSync(temporary,buffer);fs.renameSync(temporary,file);
+ prune(dir,20);
+ return {path:file,name:path.basename(file),bytes:buffer.length,game:{id:'',title:'MeguLit',engine:''},version:info.megulit.version,entries:files.map(f=>({name:f.name,kind:f.kind,bytes:Buffer.byteLength(String(f.data)),preview:f.kind==='info'?String(f.data).slice(0,6000):undefined}))};
+}
 /* keep the newest packages only */
 function prune(dir,keep){try{const zips=fs.readdirSync(dir).filter(n=>/^MeguLit-diag-.*\.zip$/.test(n)).map(n=>({n,t:fs.statSync(path.join(dir,n)).mtimeMs})).sort((a,b)=>b.t-a.t);for(const z of zips.slice(keep))fs.rmSync(path.join(dir,z.n),{force:true});}catch{}}
 /* Only packages MeguLit itself wrote may be revealed or uploaded. */
 function ownPackage(root,file){const dir=path.resolve(root,'data','diagnostics'),resolved=path.resolve(String(file||''));if(path.dirname(resolved).toLowerCase()!==dir.toLowerCase()||!/^MeguLit-diag-.*\.zip$/i.test(path.basename(resolved))||!fs.existsSync(resolved))throw Error('DIAGNOSTICS_NOT_FOUND');return resolved;}
 
-module.exports={ms,build,collect,scrub,identity,zip,zipEntries,crc32,runWindows,launchEntries,lastLaunch,filterLines,lineTime,ownPackage,hookStreams,LOGS,MAX_LINES};
+module.exports={ms,build,buildAll,collectAll,collect,scrub,identity,zip,zipEntries,crc32,runWindows,launchEntries,lastLaunch,filterLines,lineTime,ownPackage,hookStreams,LOGS,MAX_LINES};

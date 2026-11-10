@@ -7,7 +7,7 @@
   const defaults = Object.freeze({
     translationPrompt:'',choiceFont:'game',choiceSelectedColor:'',choiceUnselectedColor:'',
     typewriter:true,typewriterSpeed:35, layoutVersion: 22, style: 'classic', display: 'bilingual', furigana: true, japaneseSize: 34,
-    translationSize: 30, rubyScale: .55, rubyOffsetX:0, rubyOffsetY:0, rubyRowOffsets:'', lineHeight: 0, lineHeightMode:'offset', translationLineHeight:0, japaneseSpacing:0, japaneseSpacingPx:0,chineseSpacingPx:0, gap: 6, translationWidth: 75,
+    translationSize: 30, rubyScale: .55, rubyOffsetX:0, rubyOffsetY:0, rubyRowOffsets:'',rubyRowOffsetsX:'', lineHeight: 0, lineHeightMode:'offset', translationLineHeight:0, japaneseSpacing:0, japaneseSpacingPx:0,chineseSpacingPx:0, gap: 6, translationWidth: 75,
     paddingX: 20, paddingY: 10, textColor: '#fffaf2', readTextColor: '', textGradient:false, textGradientTop:'#fffaf2', textGradientBottom:'#a8c8ff', readTextGradient:false, readTextGradientTop:'#b0e2ff', readTextGradientBottom:'#639bd1', textGradientStart:0, readTextGradientStart:0, shadow: 'outline', autoScale: true,
     bindEnabled: false, interfaceMode:'normal', gameProcess: 'BGI', x: 4, y: 70, width: 92, height: 27,
     autoGameStyle:true, livePosition:false, hookProfile:'read', embedTranslation:false, hookAutoStart:true, hookHide:true, hookFast:true, mask: false, maskMode: 'hook', maskColor: '#171923',
@@ -43,6 +43,7 @@
     for(const key of ['choiceSelectedColor','choiceUnselectedColor'])if(/^#[0-9a-f]{6}$/i.test(value[key]))result[key]=value[key];
     /* E264 per-row furigana Y offsets, px, comma separated, row 1 first */
     if(typeof value.rubyRowOffsets==='string')result.rubyRowOffsets=value.rubyRowOffsets.split(',').slice(0,16).map(n=>Math.max(-100,Math.min(100,Number(n)||0))).join(',').replace(/^(0,)*0$/,'');
+if(typeof value.rubyRowOffsetsX==='string')result.rubyRowOffsetsX=value.rubyRowOffsetsX.split(',').slice(0,16).map(n=>Math.max(-100,Math.min(100,Number(n)||0))).join(',').replace(/^(0,)*0$/,'');
     result.bindEnabled = value.bindEnabled === true;
     result.autoGameStyle=value.autoGameStyle!==false;result.livePosition=value.livePosition===true;
     if(['read','euphoria474','embed','off'].includes(value.hookProfile))result.hookProfile=value.hookProfile;

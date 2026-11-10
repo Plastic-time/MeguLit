@@ -23,7 +23,10 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const MAX_BYTES=10*1024*1024,TIMEOUT_MS=60000;
 function config(root){
  let saved={};try{saved=JSON.parse(fs.readFileSync(path.join(root,'data','config','diagnostics-upload.json'),'utf8'))||{};}catch{}
- const endpoint=String(process.env.MEGULIT_DIAGNOSTICS_ENDPOINT||saved.endpoint||'').trim(),token=String(process.env.MEGULIT_DIAGNOSTICS_TOKEN||saved.token||'').trim();
+ /* E394 with nothing configured, MeguLit's own relay (api.megulit.com): the upload used to stop at "not configured" and
+    point people to GitHub, which many cannot open */
+ let relay='';try{relay=require('./relay-config.cjs').endpoint(root,'/api/diagnostics');}catch{}
+ const endpoint=String(process.env.MEGULIT_DIAGNOSTICS_ENDPOINT||saved.endpoint||relay||'').trim(),token=String(process.env.MEGULIT_DIAGNOSTICS_TOKEN||saved.token||'').trim();
  return {endpoint:/^https:\/\/[^\s/]+\/\S*$/i.test(endpoint)&&!endpoint.includes('<')?endpoint:'',token};
 }
 function requestMeta(buffer,meta={}){
