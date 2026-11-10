@@ -4,9 +4,9 @@
 // game; after the last line the headline comes back. Lines are written as text with {漢字|かんじ} for ruby.
 
 const LINES = {
-  zh: ['又卡在生词上了？', '别切出去查词典了，\n点一下就行', '「[[{好|す}き]]」——游戏里的每个词，\n都能这样点开', '读过的词它都记着，\n下次就认识了', '接下来，\n往下看看它还能做什么'],
-  ja: ['また知らない単語で止まった？', '辞書はもういいよ。\nクリックひとつで', '「[[{好|す}き]]」——ゲームの中の言葉は、\n全部こうして開ける', '読んだ言葉は、\nちゃんと覚えておくから', '次は、\nほかにできることも見ていって'],
-  en: ['Stuck on a word again?', 'Skip the dictionary.\nJust click it', '「[[{好|す}き]]」— every word in the game\nopens like this', 'Every word you read,\nit remembers', 'Next up —\nsee what else it can do'],
+  zh: ['又卡在生词上了？', '别切出去查词典了，\n点一下就行', '「[[{好|す}き]]」——\n游戏里的每个词，\n都能这样点开', '读过的词它都记着，\n下次就认识了', '接下来，\n往下看看它还能做什么'],
+  ja: ['また知らない単語で止まった？', '辞書はもういいよ。\nクリックひとつで', '「[[{好|す}き]]」——\nゲームの中の言葉は、\n全部こうして開ける', '読んだ言葉は、\nちゃんと覚えておくから', '次は、\nほかにできることも見ていって'],
+  en: ['Stuck on a word again?', 'Skip the dictionary.\nJust click it', '「[[{好|す}き]]」—\nevery word in the game\nopens like this', 'Every word you read,\nit remembers', 'Next up —\nsee what else it can do'],
 };
 // the word in [[...]] can be clicked: a small lookup card opens beside it, as MeguLit's own does in a game
 const CARD = {
