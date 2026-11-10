@@ -76,13 +76,9 @@ const EXTRA={
 const words=locale=>({...leaderboardWords(locale),...(EXTRA[locale]||EXTRA.zh)});
 function segmented(name,items,current,w){return `<div class="lb-seg" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
 function underline(name,items,current,w){return `<div class="lb-tabs" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
-/* laurel wreath around the place number: two branches rising from the bottom along a circle, leaves on the tangent */
-function laurel(rank){
- const leaves=[],cx=40,cy=42,r=27;
- for(let i=0;i<7;i++){const a=(112+i*19)*Math.PI/180;for(const side of [-1,1]){const phi=side<0?a:Math.PI-a,x=cx+r*Math.cos(phi),y=cy+r*Math.sin(phi),deg=phi*180/Math.PI+side*-18;
-  leaves.push(`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="2.9" ry="6.6" transform="rotate(${deg.toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`);}}
- return `<svg class="lb-laurel" viewBox="0 0 80 80" aria-hidden="true"><g class="lb-leaves">${leaves.join('')}</g><text x="40" y="52" text-anchor="middle">${rank}</text></svg>`;
-}
+/* E417 the place number on the block: a plain serif numeral with a short rule under it, no wreath (the old SVG wreath
+   was round and jagged at small sizes) */
+function laurel(rank){return `<span class="lb-laurel" aria-hidden="true"><b>${rank}</b><i></i></span>`;}
 /* E402 an empty podium place keeps its stand (dashed, "虚位以待") so the stage stays centred and complete */
 function vacantPlace(place,w){return `<div class="lb-place is-vacant" role="listitem" data-rank="${place}" aria-label="${w.vacant}"><div class="lb-who"><span class="lb-ring is-vacant"><span class="leaderboard-avatar is-vacant" aria-hidden="true">?</span></span><span class="lb-name">${w.vacant}</span></div><div class="lb-block is-vacant">${laurel(place)}</div></div>`;}
 /* E402 one empty-state look for every tab: small emblem, a line, an optional hint, centred */
