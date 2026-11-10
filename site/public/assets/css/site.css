@@ -1879,3 +1879,27 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 /* (in grey: SoundCloud keeps its own orange after a song change, whatever colour is asked for) */
 .sc-dock .sc-frame { opacity: .8; filter: grayscale(1) invert(1) contrast(1.1); mix-blend-mode: screen; transition: opacity .2s; }
 .sc-dock:hover .sc-frame { opacity: 1; }
+
+/* ---- player layout, round 5: everything on one left edge. Title block; the lyric; the seek bar across the full width
+   with the times at its ends; under it the transport (left) and the two switches (right) on one line; then the
+   credit and SoundCloud's strip. Square shapes only: the play button is a hairline square */
+.np, .np.has-lyrics { row-gap: 0; }
+.np-ctl { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 1rem; row-gap: .55rem; margin-top: .8rem; }
+.np-bar { grid-row: 1; grid-column: 1 / -1; gap: .6rem; }
+.np-btns { grid-row: 2; grid-column: 1; gap: .25rem; margin-left: -.35rem; }
+.np-ctl .np-switches { grid-row: 2; grid-column: 2; justify-self: end; margin: 0; gap: .9rem; }
+.np-lyric { grid-column: 2; }
+.np-play { border-radius: 0; width: 2rem; height: 2rem; }
+.np-b { width: 1.9rem; height: 1.9rem; }
+.np-credit { margin-top: .8rem; padding-top: .7rem; }
+.np-src { margin-top: .7rem; padding-top: 0; }
+/* compact floating strip: the controls row folds with the switches; it opens as one block */
+.sound-ctl.floating .np-ctl { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; transition: max-height .38s cubic-bezier(.2, .7, .2, 1), opacity .25s, margin .38s; }
+.sound-ctl.floating.hov .np-ctl, .sound-ctl.floating:focus-within .np-ctl { max-height: 6rem; opacity: 1; margin-top: .8rem; }
+.sound-ctl.floating .np-ctl .np-switches, .sound-ctl.floating.hov .np-ctl .np-switches { max-height: none; opacity: 1; margin: 0; overflow: visible; }
+@media (max-width: 40rem) {
+  .sound-ctl .np-ctl { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; }
+  .sound-ctl.open .np-ctl, .sound-ctl.floating.open .np-ctl { max-height: 6rem; opacity: 1; margin-top: .7rem; }
+  .sound-ctl .np-ctl .np-switches { max-height: none; opacity: 1; margin: 0; }
+  .np-ctl { grid-template-columns: auto minmax(0, 1fr); }
+}
