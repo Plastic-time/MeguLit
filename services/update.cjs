@@ -55,7 +55,7 @@ const status=()=>({...state});
 function installedFile(root){return root?path.join(root,'data','update-installed.json'):'';}
 function readInstalled(root){try{return JSON.parse(fs.readFileSync(installedFile(root),'utf8'));}catch{return null;}}
 function writeInstalled(root,value){if(!root)return;try{fs.mkdirSync(path.dirname(installedFile(root)),{recursive:true});fs.writeFileSync(installedFile(root),JSON.stringify(value));}catch{}}
-function isHotfix(root,rel,current){if(base(rel.version)!==base(current)||newer(current,rel.version))return false;current=String(rel.version);
+function isHotfix(root,rel,current){/* a lettered app (1.2.8a) under a numeric tag (v1.2.8) is still that release: only a real lettered tag older than the app is skipped */if(base(rel.version)!==base(current)||/[a-z]$/i.test(String(rel.version))&&newer(current,rel.version))return false;current=String(rel.version);
  if(!root||!rel.digest||String(rel.version)!==String(current).replace(/^v/,''))return false;
  const mine=readInstalled(root);if(!mine||mine.version!==rel.version){writeInstalled(root,{version:rel.version,digest:rel.digest});return false;}
  return !!mine.digest&&mine.digest!==rel.digest;

@@ -109,3 +109,13 @@ test('versions compare with hotfix letters',()=>{
  assert.equal(u.newer('1.2.8a','1.2.8'),true);assert.equal(u.newer('1.2.8b','1.2.8a'),true);assert.equal(u.newer('1.2.9','1.2.8z'),true);
  assert.equal(u.newer('1.2.8','1.2.8b'),false);assert.equal(u.newer('v1.2.8b','1.2.8b'),false);assert.equal(u.newer('1.2.8','1.2.7'),true);
 });
+
+// E350: an app showing 1.2.8a still gets a later hotfix published under the numeric tag v1.2.8.
+test('lettered app version still sees a hotfix of its numeric tag',async()=>{
+ const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),root=fs.mkdtempSync(path.join(os.tmpdir(),'upd-'));
+ const rel=(d)=>({tag_name:'v1.2.8',body:'',html_url:'https://github.com/ilynthn/MeguLit/releases/tag/v1.2.8',assets:[{name:'MeguLit-v1.2.8-win-x64.zip',size:1,digest:'sha256:'+d.repeat(64),browser_download_url:'https://github.com/ilynthn/MeguLit/releases/download/v1.2.8/MeguLit-v1.2.8-win-x64.zip'}]});
+ const fetcher=d=>async()=>({ok:true,json:async()=>rel(d)});
+ const first=await u.check('1.2.8a',fetcher('a'),root);assert.equal(first.newer,false);
+ const next=await u.check('1.2.8a',fetcher('b'),root);assert.equal(next.newer,true);assert.equal(next.hotfix,true);
+ fs.rmSync(root,{recursive:true,force:true});
+});
