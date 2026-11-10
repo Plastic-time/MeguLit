@@ -1287,3 +1287,13 @@ html { overflow-x: clip; }
   .vol { height: 2.6rem; }
   #hero-volume { width: 6.5rem; }
 }
+/* nothing highlights on double-click or drag; copyable things stay selectable */
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+code, .js-sha, .facts dd, .notes-body, .rel-body, .faq details p, input, textarea { -webkit-user-select: text; user-select: text; }
+img, video, canvas, svg { -webkit-user-drag: none; user-drag: none; }
+
+/* floating kana with depth of field over the whole page; the hero copy stays above it */
+.kana-sky { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none; }
+.hero-stage { position: relative; z-index: 2; }
+.top { z-index: 20; }
+.vol[hidden] { display: none; }

@@ -290,7 +290,7 @@ if (video && !reduce && !navigator.connection?.saveData) {
   startVideo();
   new IntersectionObserver(([e]) => { if (e.isIntersecting) video.play().catch(() => {}); else video.pause(); }).observe(video);
 }
-if ($('.kana-fx') && $('.hero')) kana($('.kana-fx'), $('.hero'), { still: reduce });
+if ($('.kana-sky')) kana($('.kana-sky'), { still: reduce, hero: $('.hero') });
 const soundBtn = $('.js-sound');
 function setSoundLabel() {
   if (!soundBtn) return;
