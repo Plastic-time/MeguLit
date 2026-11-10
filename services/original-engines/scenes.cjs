@@ -41,7 +41,9 @@ function parseKs(buf){
  const lines=[],anchors=[];
  for(const raw of decode(buf).split(/\r?\n/)){const t=raw.trim();if(!t||t[0]===';')continue;
   if(t[0]==='@'||t[0]==='*'){if(ascii(t))anchors.push(t);continue;}
-  const text=t.replace(/\[[^\]]*\]/g,'').trim();
+  // A tag whose name is Japanese is a macro that prints that word (女王蜂の王房: [輝夜] [めのう] for character names,
+  // [輝夜ruby] with its reading, [漢字'よみ] for ruby); keep the word, drop the reading.
+  const text=t.replace(/\[([぀-ヿ一-鿿々ー]+)(?:ruby|'[^\]]*)?\]/g,'$1').replace(/\[[^\]]*\]/g,'').trim();
   if(!text){if(ascii(t))anchors.push(t);continue;}
   lines.push(text);}
  return {lines,anchors};
