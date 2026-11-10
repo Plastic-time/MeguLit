@@ -91,12 +91,10 @@ export function openFeedback({ api, locale = 'zh', esc, toast, version = '' }) {
 
 /* E416 every start (once per launch), with the website's recent adaptations (megulit.com/assets/updates.json) */
 let shownThisLaunch = false;
-const UPDATES_URL = 'https://megulit.com/assets/updates.json';
-async function fillUpdates(dialog, locale) {
+async function fillUpdates(dialog, locale, api) {
   const t = words(locale), list = dialog.querySelector('.dev-notice-updates'), note = dialog.querySelector('.dev-notice-updates-note');
   try {
-    const response = await fetch(UPDATES_URL, { cache: 'no-cache' });
-    const items = response.ok ? await response.json() : [];
+    const items = await api('site_updates', {});
     const rows = (Array.isArray(items) ? items : []).slice(0, 8);
     list.replaceChildren(...rows.map(it => {
       const [y, m, d] = String(it.date || '').split('-').map(Number), li = document.createElement('li');
@@ -122,7 +120,7 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '' })
 <div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="secondary" data-ok>${esc(t.ok)}</button></div>`;
   document.body.append(dialog);
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  fillUpdates(dialog, locale);
+  fillUpdates(dialog, locale, api);
   const form = dialog.querySelector('form'), game = dialog.querySelector('.dev-notice-game'), status = dialog.querySelector('.feedback-status');
   form.onsubmit = async event => {
     event.preventDefault();
