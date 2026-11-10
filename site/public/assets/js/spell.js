@@ -76,59 +76,122 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
     if (d === dark) return;
     dark = d;
     parts = parts.map(p => { const n = make(p.i, false); n.x = p.x; n.y = p.y; return n; });
-    words.forEach(w => { w.spr = wordSprite(w); });
+    words.forEach(w => { w.spr = tokenSprite(w); });
   };
   new MutationObserver(reink).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', reink);
 
-  // lyric lines: one glyph per character, kept in a straight row so they read, but each line gets its own place on the
-  // screen, size and colour (Megumin's red, gold or white). Each glyph is pulled back to its place by a spring, so the
-  // pointer can scatter a line and watch it come back; a line fades in, stays, then drifts up and away.
-  // pick: four numbers in [0,1) (place x, place y, size, colour), shared by the layers so they show the same line
-  const LYRIC_FONT = '"Noto Serif JP","Yu Mincho","Hiragino Mincho ProN","MeguLit Serif",serif';
-  const lyricInk = key => dark ? { red: '#e0505c', gold: '#f0c36a', white: '#f4f1ea' }[key] : { red: '#a51d2d', gold: '#9a6a12', white: '#3a1a1e' }[key];
-  let words = [];
+  // ---- lyric lines, AMV style -----------------------------------------------------------------------------------------
+  // A line is cut into tokens: one per Japanese character, one per English word (kept whole, so it kerns properly and
+  // reads as a word). Every token gets its own colour (Megumin's red, gold or white), size, depth blur, blend mode and
+  // tilt, and flies in from depth. The line is laid out on one of several paths (row with a wandering baseline, arc,
+  // column, steps, scatter band, spiral), always in reading order. All lyric tokens sit under a "camera" that drifts,
+  // dollies and rolls on its own and punches, shakes and twists on the drum hits. The pointer still scatters tokens,
+  // and springs pull them back. Randomness comes from a seed so the two layers that show lyrics show the same shot.
+  const JA_FONT = '"Noto Serif JP","Yu Mincho","Hiragino Mincho ProN","MeguLit Serif",serif';
+  const EN_FONT = '"MeguLit Cormorant","Cormorant Garamond",Georgia,serif';
   const HUD_FONT = '"MeguLit Mono",ui-monospace,Consolas,monospace';
-  // lyric glyphs: serif with a soft glow in their own colour; HUD glyphs: tiny grey mono
-  const glow = { red: 'rgba(224,80,92,.55)', gold: 'rgba(240,195,106,.5)', white: 'rgba(244,241,234,.45)' };
-  const wordSprite = w => w.hud
-    ? sprite(w.ch, w.size, 0, dark ? '#8a8a8a' : '#6b6b6b', { font: HUD_FONT, weight: 300 })
-    : sprite(w.ch, w.size, 0, lyricInk(w.ink), { font: LYRIC_FONT, weight: 700, halo: dark ? glow[w.ink] : 'rgba(255,250,244,.8)' });
-  // pick: six numbers in [0,1) shared by the layers so both show the same line: place x, place y, size, colour, layout
-  // and a spare. Layouts (megu-edit): a straight row, a vertical column (縦書き) for short lines, or a row that steps
-  // down; every line keeps reading order and a straight baseline or column, so it stays readable.
-  // hud: a tiny lowercase label set above the line (e.g. "♪ 01:23 · 12/69")
-  const say = (text, pick = Array.from({ length: 6 }, Math.random), hud = '') => {
+  try { document.fonts?.load('italic 40px "MeguLit Cormorant"'); document.fonts?.load('300 12px "MeguLit Mono"'); } catch {}
+  const INK = { red: ['#e0505c', '#a51d2d'], gold: ['#f0c36a', '#9a6a12'], white: ['#f4f1ea', '#3a1a1e'] };
+  const GLOW = { red: 'rgba(224,80,92,.6)', gold: 'rgba(240,195,106,.55)', white: 'rgba(244,241,234,.5)' };
+  const BLENDS_DARK = ['source-over', 'source-over', 'screen', 'lighter', 'overlay'];
+  const BLENDS_LIGHT = ['source-over', 'source-over', 'multiply', 'color-burn'];
+  const BLURS = [0, 0, 0, 0, 1.5, 3.5, 7];
+  const rng = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const pickOf = (r, list) => list[Math.floor(r() * list.length)];
+  const measurer = document.createElement('canvas').getContext('2d');
+
+  // one token rendered once (with its blur and glow) to an offscreen canvas
+  function tokenSprite(t) {
+    const font = t.hud ? `300 ${t.size}px ${HUD_FONT}` : t.en ? `italic 600 ${t.size * 1.18}px ${EN_FONT}` : `700 ${t.size}px ${JA_FONT}`;
+    measurer.font = font;
+    const tw = Math.max(t.size * .5, measurer.measureText(t.text).width), pad = Math.ceil(t.blur * 2.5 + t.size * .3);
+    const w = Math.ceil(tw + pad * 2), h = Math.ceil(t.size * 1.5 + pad * 2);
+    const c = document.createElement('canvas'), dprS = Math.min(devicePixelRatio || 1, 2);
+    c.width = Math.ceil(w * dprS); c.height = Math.ceil(h * dprS);
+    const g = c.getContext('2d');
+    g.scale(dprS, dprS);
+    g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (t.hud) { g.fillStyle = dark ? '#8a8a8a' : '#6b6b6b'; try { g.letterSpacing = '.3em'; } catch {} }
+    else {
+      g.fillStyle = INK[t.ink][dark ? 0 : 1];
+      g.filter = t.blur > .3 ? `blur(${t.blur}px)` : 'none';
+      g.shadowColor = dark ? GLOW[t.ink] : 'rgba(255,250,244,.85)'; g.shadowBlur = t.size * .22;
+    }
+    g.fillText(t.text, w / 2, h / 2);
+    return { c, w, h, tw };
+  }
+
+  let words = [];
+  const cam = { zoom: 1, rot: 0, x: 0, y: 0, vz: 0, vr: 0, vx: 0, vy: 0, drift: { x: 0, y: 0, z: 0, r: 0 }, t0: 0 };
+  const tokenize = text => {
+    const out = [];
+    for (const m of text.matchAll(/[A-Za-z0-9'’]+(?:[-.][A-Za-z0-9'’]+)*|\s+|./gu)) {
+      if (/^\s+$/.test(m[0])) { out.push({ space: true }); continue; }
+      out.push({ text: m[0], en: /[A-Za-z0-9]/.test(m[0]) });
+    }
+    return out;
+  };
+
+  const say = (text, seed = Math.random() * 2 ** 32, hud = '') => {
     const now = performance.now();
-    words.forEach(w => { if (w.out > now) w.out = now; });
+    words.forEach(w => { if (w.out > now) { w.out = now; w.exit = true; } });
     text = String(text || '').trim();
     if (!text) return;
-    const chars = [...text].slice(0, 40);
-    const [px, py, ps, pc, pl] = pick;
-    const ink = ['red', 'gold', 'white'][Math.floor(pc * 3)];
-    const layout = chars.length <= 14 && H > 420 && pl < .25 ? 'column' : pl > .75 ? 'stair' : 'row';
-    const put = [];
-    if (layout === 'column') {
-      // 30–60 px, the column fits 70% of the screen height; near the left or right edge
-      const size = Math.max(22, Math.min(30 + ps * 30, (H * .7) / chars.length / 1.08));
-      const step = size * 1.08, x = px < .5 ? W * (.07 + px * .3) : W * (.63 + (px - .5) * .3), y0 = H * .15 + py * Math.max(0, H * .7 - chars.length * step);
-      chars.forEach((ch, k) => put.push([ch, x, y0 + k * step, size]));
-      hud && [...hud].forEach((ch, k) => put.push([ch, x + size * .9, y0 + k * 11, 10, true]));
-    } else {
-      // 30–72 px at random, never wider than 88% of the screen; "stair" drops a little with each character
-      const size = Math.max(20, Math.min(30 + ps * 42, (W * .88) / Math.max(chars.length, 1) / 1.04));
-      const step = size * 1.04, width = (chars.length - 1) * step, drop = layout === 'stair' ? size * .16 : 0;
-      const x0 = W * .06 + size / 2 + px * Math.max(0, W * .88 - width - size);
-      const y = H * .18 + py * Math.max(0, H * .62 - drop * chars.length);
-      chars.forEach((ch, k) => put.push([ch, x0 + k * step, y + k * drop, size]));
-      hud && [...hud].forEach((ch, k) => put.push([ch, x0 - size * .3 + k * 8.5, y - size * .85, 10, true]));
+    const r = rng(seed >>> 0);
+    const toks = tokenize(text).slice(0, 48);
+    const real = toks.filter(t => !t.space);
+    const shapes = real.length <= 12 && H > 420 ? ['row', 'arc', 'column', 'stair', 'scatter', 'spiral'] : ['row', 'row', 'arc', 'stair', 'scatter'];
+    const shape = pickOf(r, shapes);
+    const base = 26 + r() * 30;                                   // a line's base size; tokens vary around it
+    const blends = dark ? BLENDS_DARK : BLENDS_LIGHT;
+    // tokens: size, colour, blur, blend, tilt are each random per token
+    for (const t of real) {
+      t.size = Math.round(base * (.65 + r() * .95) * (t.en ? .85 : 1));
+      t.ink = pickOf(r, ['red', 'gold', 'white']);
+      t.blur = pickOf(r, BLURS);
+      t.blend = pickOf(r, blends);
+      t.tilt = (r() - .5) * (shape === 'column' ? .25 : .55);
+      t.spr = tokenSprite(t);
     }
-    put.forEach(([ch, x, y, size, isHud], k) => {
-      if (/\s/.test(ch)) return;
-      const w = { ch, size, ink, hud: Boolean(isHud), hx: x, hy: y, x, y: y + 18, vx: 0, vy: 0, rot: 0, vr: 0, pop: 1, born: now + (isHud ? 0 : k * 45), out: now + 9000 };
-      w.spr = wordSprite(w);
-      words.push(w);
+    // the path, in reading order, in screen coordinates
+    const advance = t => (t.space ? base * .45 : t.spr.tw * .92 + t.size * .12);
+    const total = toks.reduce((s, t) => s + advance(t), 0);
+    const fit = Math.min(1, (W * .86) / Math.max(1, total));      // a row never runs off the screen
+    const cx = W * (.3 + r() * .4), cy = H * (.25 + r() * .5);
+    let u = 0;
+    const place = [];
+    for (const t of toks) {
+      const a = advance(t) * fit, mid = u + a / 2; u += a;
+      if (t.space) continue;
+      const f = mid / Math.max(1, total * fit);                   // 0 → 1 along the line
+      let x, y, rot = t.tilt;
+      if (shape === 'column') { const step = Math.min(base * 1.15, (H * .72) / Math.max(1, real.length)); x = cx + (r() - .5) * base * .4; y = H * .14 + place.length * step; rot *= .5; }
+      else if (shape === 'arc') { const R = W * (.5 + r() * .15), ang = (f - .5) * (total * fit) / R; x = W / 2 + Math.sin(ang) * R; y = cy + R - Math.cos(ang) * R - R * .02; rot = ang + t.tilt * .4; }
+      else if (shape === 'stair') { x = W * .07 + mid * (W * .86) / Math.max(1, total * fit); y = H * .18 + f * H * .55; }
+      else if (shape === 'scatter') { x = W * .07 + mid * (W * .86) / Math.max(1, total * fit); y = cy + (r() - .5) * H * .34; rot = t.tilt * 1.6; }
+      else if (shape === 'spiral') { const ang = f * Math.PI * 1.6 - Math.PI * .8, rad = H * (.08 + f * .3); x = W / 2 + Math.cos(ang) * rad * 1.5; y = H / 2 + Math.sin(ang) * rad; rot = ang + Math.PI / 2 + t.tilt * .3; }
+      else { x = W * .07 + mid * (W * .86) / Math.max(1, total * fit); y = cy + Math.sin(f * Math.PI * (1 + r() * 2)) * base * .5 + (r() - .5) * base * .3; }
+      place.push([t, x, y, rot]);
+    }
+    place.forEach(([t, x, y, rot], k) => {
+      const from = r() * Math.PI * 2, dist = 120 + r() * 380;     // flies in from depth, off to one side
+      words.push({ ...t, hx: x, hy: y, x: x + Math.cos(from) * dist, y: y + Math.sin(from) * dist, vx: 0, vy: 0, rot: rot + (r() - .5) * 1.6, hrot: rot, vr: 0,
+        zoom: 2.4 + r() * 1.6, pop: 1, born: now + k * (40 + r() * 50), out: now + 9000, exitDir: r() * Math.PI * 2 });
     });
+    if (hud) {
+      const [t0, x0, y0] = place[0] || [null, W * .1, H * .3];
+      const h = { text: hud, hud: true, size: 11, blur: 0 }; h.spr = tokenSprite(h);
+      words.push({ ...h, hx: x0 - (t0 ? t0.spr.tw / 2 : 0) + h.spr.tw / 2, hy: y0 - base * 1.05, x: x0, y: y0 - base, vx: 0, vy: 0, rot: 0, hrot: 0, vr: 0, zoom: 1, pop: 1, born: now, out: now + 9000, exitDir: -Math.PI / 2 });
+    }
+    // each line is a new shot: a slow dolly and roll for the camera to drift through
+    cam.drift = { x: (r() - .5) * 80, y: (r() - .5) * 50, z: (r() - .5) * .16, r: (r() - .5) * .12 }; cam.t0 = now;
+  };
+
+  // drum hits on the lyric camera: kicks punch in and shake, snares twist
+  const camHit = (kind, s) => {
+    if (kind === 'kick') { cam.vz += .9 * s; cam.vx += (Math.random() - .5) * 900 * s; cam.vy += (Math.random() - .5) * 600 * s; }
+    else cam.vr += (Math.random() < .5 ? -1 : 1) * .9 * s;
   };
 
   // a drum hit: each layer picks one of a few moves at random, sized by the hit's strength. Nothing flashes and the
@@ -148,27 +211,48 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
       else if (move === 'jump') p.vy -= 140 * s * k;
       else p.vx += (Math.random() < .5 ? -1 : 1) * 120 * s * k;
     }
-    for (const w of words) { w.pop = 1 + (w.hud ? .1 : .22) * s; if (move === 'jump') w.vy -= 60 * s; else if (move === 'sway' || move === 'burst') w.vx += (Math.random() - .5) * 120 * s; }
+    for (const w of words) { w.pop = 1 + (w.hud ? .1 : .3) * s * (.5 + Math.random()); if (move === 'jump') w.vy -= 90 * s; else if (move !== 'pop') w.vx += (Math.random() - .5) * 200 * s; }
+    camHit(kind, s);
   };
   const drawWords = (now, dt, dy, layerVis) => {
-    words = words.filter(w => now < w.out + 1400);
+    words = words.filter(w => now < w.out + 1100);
+    // camera: springs back to rest, plus the line's slow dolly/roll and a gentle breathing zoom
+    if (!still) {
+      const life = Math.min(1, (now - cam.t0) / 9000), d = cam.drift;
+      cam.vz += ((1 + d.z * life + Math.sin(now / 1900) * .015) - cam.zoom) * 9 * dt; cam.vr += ((d.r * life) - cam.rot) * 7 * dt;
+      cam.vx += ((d.x * life) - cam.x) * 10 * dt; cam.vy += ((d.y * life) - cam.y) * 10 * dt;
+      const damp = Math.pow(.02, dt);
+      cam.vz *= damp; cam.vr *= damp; cam.vx *= damp; cam.vy *= damp;
+      cam.zoom += cam.vz * dt; cam.rot += cam.vr * dt; cam.x += cam.vx * dt; cam.y += cam.vy * dt;
+    }
+    ctx.save();
+    ctx.translate(W / 2 + cam.x, H / 2 + cam.y); ctx.scale(cam.zoom, cam.zoom); ctx.rotate(cam.rot); ctx.translate(-W / 2, -H / 2);
     for (const w of words) {
+      if (now < w.born) continue;
       const dx = w.x - pointer.x, dyp = w.y - pointer.y, d2 = dx * dx + dyp * dyp;
-      if (!still && d2 < 160 * 160) { const d = Math.sqrt(d2) || 1, f = (1 - d / 160) * 1600; w.vx += dx / d * f * dt; w.vy += dyp / d * f * dt; w.vr += (dx > 0 ? 1 : -1) * f * .002 * dt; }
+      if (!still && d2 < 170 * 170) { const d = Math.sqrt(d2) || 1, f = (1 - d / 170) * 1800; w.vx += dx / d * f * dt; w.vy += dyp / d * f * dt; w.vr += (dx > 0 ? 1 : -1) * f * .003 * dt; }
+      const leaving = now > w.out;
       if (!still) {
-        const leaving = now > w.out;
-        w.vx += (w.hx - w.x) * (leaving ? 0 : 6) * dt; w.vy += ((leaving ? w.hy - 140 : w.hy) - w.y) * (leaving ? 1.5 : 6) * dt;
-        w.vr += -w.rot * 5 * dt;
-        w.vx *= .9; w.vy *= .9; w.vr *= .9;
+        if (leaving) { w.vx += Math.cos(w.exitDir) * 900 * dt; w.vy += Math.sin(w.exitDir) * 900 * dt - 200 * dt; w.vr += (w.exitDir > Math.PI ? 1 : -1) * 3 * dt; }
+        else { w.vx += (w.hx - w.x) * 7 * dt; w.vy += (w.hy - w.y) * 7 * dt; w.vr += (w.hrot - w.rot) * 6 * dt; }
+        const damp = Math.pow(.08, dt);
+        w.vx *= damp; w.vy *= damp; w.vr *= damp;
         w.x += w.vx * dt; w.y += w.vy * dt - dy * .2; w.hy -= dy * .2; w.rot += w.vr * dt;
-      }
-      const fadeIn = clamp((now - w.born) / 600), fadeOut = 1 - clamp((now - w.out) / 1400);
-      const a = (w.hud ? .8 : .62) * fadeIn * fadeOut * layerVis;
+        w.zoom += (1 - w.zoom) * Math.min(1, dt * 6);              // flies in from depth
+      } else { w.x = w.hx; w.y = w.hy; w.rot = w.hrot; w.zoom = 1; }
+      const fadeIn = clamp((now - w.born) / 450), fadeOut = 1 - clamp((now - w.out) / 1100);
+      const a = (w.hud ? .85 : .78) * fadeIn * fadeOut * layerVis;
       if (a < .005) continue;
       w.pop += (1 - w.pop) * Math.min(1, dt * 7);
-      const m = w.spr.w * w.pop;
-      ctx.save(); ctx.globalAlpha = a; ctx.translate(w.x, w.y); ctx.rotate(w.rot); ctx.drawImage(w.spr.c, -m / 2, -m / 2, m, m); ctx.restore();
+      const s = w.zoom * w.pop * (leaving ? 1 + (1 - fadeOut) * .8 : 1), sw = w.spr.w * s, sh = w.spr.h * s;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.globalCompositeOperation = w.blend || 'source-over';
+      ctx.translate(w.x, w.y); ctx.rotate(w.rot);
+      ctx.drawImage(w.spr.c, -sw / 2, -sh / 2, sw, sh);
+      ctx.restore();
     }
+    ctx.restore();
   };
 
   let lastY = scrollY, last = 0, running = false;
