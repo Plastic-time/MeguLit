@@ -144,7 +144,8 @@
       background-image:var(--tomoyo-gal-gradient,none)!important;background-clip:text!important;-webkit-background-clip:text!important;
       -webkit-text-fill-color:var(--tomoyo-gal-fill,currentColor)!important;
     }
-    body.tomoyo-game-style .sentence-text,body.tomoyo-gal-bound .sentence-text { filter:var(--tomoyo-gal-jp-filter,none)!important; }
+    /* E409 (user: 一开渐变注音直接变全黑): the gradient outline is an SVG dilate filter at the Japanese outline width; on the whole line it also swelled the small ruby (::before of the ruby base) into blobs of the outline colour. It now goes on the characters only; ruby keeps its own fill and stroke. */
+    body.tomoyo-game-style .sentence-text .char-token,body.tomoyo-gal-bound .sentence-text .char-token { filter:var(--tomoyo-gal-jp-filter,none)!important; }
     body.tomoyo-game-style .tomoyo-cn-output,body.tomoyo-gal-bound .tomoyo-cn-output { filter:var(--tomoyo-gal-cn-filter,none)!important;background-size:100% calc((1.65 + var(--megulit-translation-line-offset,0)) * 1em)!important;background-repeat:repeat-y!important; }
     .sentence-text .megulit-ruby-base[data-tomoyo-reading]::before { -webkit-text-fill-color:var(--tomoyo-gal-color,#fffaf2)!important;background-image:none!important; }
     .tomoyo-gal-fields { border:1px solid #505465; border-radius:8px; padding:10px 12px; margin:14px 0; }
