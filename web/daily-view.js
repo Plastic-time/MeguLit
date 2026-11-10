@@ -1,0 +1,78 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+/* E415 日报 page (top tab after 排行榜). Data: bridge daily_view (services/daily.cjs) → relay GET /api/news and
+   GET /api/hotwords/daily. A newspaper layout in the grimoire palette: dateline strip, lead story, a ruled three-column
+   row, a compact list, and a right rail of today's hot words. Clicking a word opens 学习 › 查词 with that word.
+   Links open only through daily_open (the bridge accepts only links it just handed to this page). */
+export const dailyLabel={zh:'日报',ja:'日報',en:'Daily'};
+const W={
+ zh:{news:'Galgame 新闻',words:'今日热词',all:'全部',updated:'更新于',refresh:'刷新',issue:'第 {n} 号',lookup:'查词',read:'阅读原文',source:'来源',
+  wordsNote:'每天从日本的热门检索里挑出 20 个词。点一个词，直接在查词面板里看释义和例句',noReading:'读音见词典',
+  emptyTitle:'今天的报纸还在印刷',emptyText:'联网服务还没有送来新闻和热词。稍后再来，或者点刷新再试一次',errorTitle:'暂时连不上日报',errorText:'检查一下网络，或者稍后再刷新',
+  noNews:'这一栏今天还没有新闻',noWords:'今天的热词还没整理好',more:'更多新闻',weekday:['日','一','二','三','四','五','六'],credit:'标题与摘要来自各站公开 RSS，点开阅读原文'},
+ ja:{news:'ギャルゲーニュース',words:'今日の注目ワード',all:'すべて',updated:'更新',refresh:'更新',issue:'第 {n} 号',lookup:'辞書で調べる',read:'元記事を読む',source:'出典',
+  wordsNote:'日本で今日よく検索されている言葉を 20 語。クリックすると辞書パネルで意味と例文を表示します',noReading:'読みは辞書で',
+  emptyTitle:'今日の紙面は印刷中です',emptyText:'オンラインサービスからニュースとワードがまだ届いていません。しばらくしてから、または更新を押してください',errorTitle:'日報に接続できません',errorText:'ネットワークを確認するか、しばらくしてから更新してください',
+  noNews:'この欄のニュースはまだありません',noWords:'今日のワードはまだ準備中です',more:'その他のニュース',weekday:['日','月','火','水','木','金','土'],credit:'見出しと要約は各サイトの公開 RSS より。クリックで元記事へ'},
+ en:{news:'Galgame news',words:'Words of the day',all:'All',updated:'Updated',refresh:'Refresh',issue:'No. {n}',lookup:'Look up',read:'Read the article',source:'Source',
+  wordsNote:'Twenty words people in Japan are searching for today. Click one to open it in the dictionary with meanings and examples',noReading:'reading in dictionary',
+  emptyTitle:'Today’s paper is still at the press',emptyText:'The online service has not delivered news or words yet. Come back later or press Refresh',errorTitle:'Cannot reach the daily',errorText:'Check your connection or refresh later',
+  noNews:'No news in this column yet',noWords:'Today’s words are not ready yet',more:'More news',weekday:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],credit:'Headlines and summaries from each site’s public RSS. Click to read the original'}
+};
+const pad=n=>String(n).padStart(2,'0');
+function dateline(locale,w,now=new Date()){
+ const y=now.getFullYear(),m=now.getMonth()+1,d=now.getDate(),wd=w.weekday[now.getDay()];
+ const start=new Date(y,0,0),day=Math.floor((now-start)/864e5);
+ const date=locale==='en'?now.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'}):locale==='ja'?`${y}年${m}月${d}日（${wd}）`:`${y}年${m}月${d}日 星期${wd}`;
+ return {date,issue:w.issue.replace('{n}',day)};
+}
+function ago(iso,locale){
+ const t=Date.parse(iso||'');if(!Number.isFinite(t))return '';const min=Math.max(0,Math.round((Date.now()-t)/60000));
+ if(min<60)return {zh:`${min} 分钟前`,ja:`${min} 分前`,en:`${min} min ago`}[locale];const h=Math.round(min/60);
+ if(h<48)return {zh:`${h} 小时前`,ja:`${h} 時間前`,en:`${h} h ago`}[locale];const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()}`;
+}
+/* geometric placeholder when a story has no picture: deterministic per title */
+function plate(seed){let h=0;for(const c of seed)h=(h*31+c.charCodeAt(0))>>>0;return `<span class="dl-plate" data-v="${h%4}" aria-hidden="true"><i></i><i></i><i></i></span>`;}
+function figure(n,esc){return n.image?`<span class="dl-fig"><img src="${esc(n.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('dl-fig-fail')">${plate(n.title)}</span>`:`<span class="dl-fig dl-fig-fail">${plate(n.title)}</span>`;}
+function meta(n,locale,esc){return `<span class="dl-meta"><b>${esc(n.source)}</b>${n.date?`<time datetime="${esc(n.date)}">${esc(ago(n.date,locale))}</time>`:''}</span>`;}
+export function newsHTML(items,{locale,esc,w}){
+ if(!items.length)return `<p class="dl-none">${w.noNews}</p>`;
+ /* the lead is the newest story with a picture (within the first five), so the top of the page carries an image */
+ const pick=Math.max(0,items.slice(0,5).findIndex(n=>n.image)),lead=items[pick],rest=items.filter((_,i)=>i!==pick),cols=rest.slice(0,3),list=rest.slice(3,13);
+ return `<article class="dl-lead dl-in" style="--i:0"><a href="#" data-dl-open="${esc(lead.link)}">${figure(lead,esc)}<span class="dl-lead-copy">${meta(lead,locale,esc)}<h2${lead.title.length>34?' class="dl-long"':''}>${esc(lead.title)}</h2><p>${esc(lead.summary)}</p><span class="dl-read">${w.read}<i aria-hidden="true"></i></span></span></a></article>`
+  +(cols.length?`<div class="dl-cols">${cols.map((n,i)=>`<article class="dl-col dl-in" style="--i:${i+1}"><a href="#" data-dl-open="${esc(n.link)}">${figure(n,esc)}${meta(n,locale,esc)}<h3>${esc(n.title)}</h3><p>${esc(n.summary)}</p></a></article>`).join('')}</div>`:'')
+  +(list.length?`<section class="dl-list"><h4>${w.more}</h4><ol>${list.map((n,i)=>`<li class="dl-in" style="--i:${i+4}"><a href="#" data-dl-open="${esc(n.link)}"><span class="dl-idx">${pad(i+1)}</span><span class="dl-list-copy"><strong>${esc(n.title)}</strong>${meta(n,locale,esc)}</span></a></li>`).join('')}</ol></section>`:'');
+}
+export function wordsHTML(words,{esc,w}){
+ if(!words.length)return `<p class="dl-none">${w.noWords}</p>`;
+ return `<ol class="dl-words">${words.map((x,i)=>`<li class="dl-word dl-in" style="--i:${i}"><div class="dl-word-row"><button type="button" class="dl-word-main" data-dl-lookup="${esc(x.term)}" title="${w.lookup}"><span class="dl-rank">${pad(i+1)}</span><span class="dl-term">${x.reading&&x.reading!==x.term?`<ruby>${esc(x.term)}<rt>${esc(x.reading)}</rt></ruby>`:`<span>${esc(x.term)}</span>`}</span>${x.traffic?`<span class="dl-traffic">${esc(x.traffic)}</span>`:''}<span class="dl-go" aria-hidden="true">${w.lookup}</span></button>${x.headline?`<button type="button" class="dl-chev" data-dl-word aria-expanded="false" aria-label="${esc(x.headline)}"></button>`:''}</div><div class="dl-word-more"><div>${x.headline?`<p>${esc(x.headline)}</p>`:''}<span class="dl-word-actions">${x.url?`<a href="#" data-dl-open="${esc(x.url)}">${esc(x.source||w.read)}</a>`:''}</span></div></div></li>`).join('')}</ol>`;
+}
+function emptyHTML(w,error){return `<div class="dl-empty dl-in"><span class="dl-empty-art" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></span><h2>${error?w.errorTitle:w.emptyTitle}</h2><p>${error?w.errorText:w.emptyText}</p><button type="button" class="dl-btn" data-dl-refresh>${w.refresh}</button></div>`;}
+export function pageHTML(data,{locale,esc,filter='all'}){
+ const w=W[locale]||W.zh,{date,issue}=dateline(locale,w);
+ const news=data?.news?.items||[],words=data?.words?.words||[],sources=[...new Set(news.map(n=>n.source))];
+ const shown=filter==='all'?news:news.filter(n=>n.source===filter);
+ const updated=data?.news?.updatedAt||data?.words?.updatedAt;
+ const strip=`<header class="dl-strip"><span class="dl-date">${esc(date)}</span><span class="dl-issue">${esc(issue)}</span><span class="dl-strip-end">${updated?`<span>${w.updated} ${esc(ago(updated,locale))}</span>`:''}<button type="button" class="dl-icon" data-dl-refresh title="${w.refresh}" aria-label="${w.refresh}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button></span></header>`;
+ if(!data||data.state==='error'||data.state==='not-configured'||data.state==='empty')return `<div class="dl">${strip}${emptyHTML(w,data?.state==='error')}</div>`;
+ return `<div class="dl">${strip}<div class="dl-grid"><section class="dl-news" aria-label="${w.news}"><div class="dl-head"><h3>${w.news}</h3><nav class="dl-filters" role="tablist">${['all',...sources].map(s=>`<button type="button" role="tab" data-dl-filter="${esc(s)}" aria-selected="${s===filter}">${s==='all'?w.all:esc(s)}</button>`).join('')}<span class="dl-filter-ink" aria-hidden="true"></span></nav></div><div class="dl-news-body">${newsHTML(shown,{locale,esc,w})}</div><p class="dl-credit">${w.credit}</p></section>`
+  +`<aside class="dl-rail" aria-label="${w.words}"><div class="dl-head"><h3>${w.words}</h3>${data.words?.source?`<small>${esc(data.words.source)}</small>`:''}</div><p class="dl-note">${w.wordsNote}</p>${wordsHTML(words,{esc,w})}</aside></div></div>`;
+}
+function placeInk(root){const nav=root.querySelector('.dl-filters'),on=nav?.querySelector('[aria-selected=true]'),ink=nav?.querySelector('.dl-filter-ink');if(!on||!ink)return;ink.style.width=on.offsetWidth+'px';ink.style.transform=`translateX(${on.offsetLeft}px)`;}
+export async function mountDaily(main,{api,locale,esc,toast,isCurrent=()=>true,lookup}){
+ let data=null,filter='all';
+ const paint=()=>{main.innerHTML=pageHTML(data,{locale,esc,filter});bind();requestAnimationFrame(()=>{placeInk(main);main.querySelector('.dl')?.classList.add('dl-ready');});};
+ const load=async(spin)=>{if(spin)main.querySelector('[data-dl-refresh]')?.classList.add('dl-spin');try{data=await api('daily_view');}catch{data={state:'error'};}if(isCurrent())paint();};
+ function bind(){
+  main.querySelectorAll('[data-dl-refresh]').forEach(b=>b.onclick=()=>load(true));
+  main.querySelectorAll('[data-dl-open]').forEach(a=>a.onclick=e=>{e.preventDefault();api('daily_open',{url:a.dataset.dlOpen}).catch(()=>toast?.('…'));});
+  main.querySelectorAll('[data-dl-filter]').forEach(b=>b.onclick=()=>{if(b.dataset.dlFilter===filter)return;filter=b.dataset.dlFilter;
+   main.querySelectorAll('[data-dl-filter]').forEach(x=>x.setAttribute('aria-selected',String(x===b)));placeInk(main);
+   const body=main.querySelector('.dl-news-body'),w=W[locale]||W.zh,shown=filter==='all'?data.news.items:data.news.items.filter(n=>n.source===filter);
+   body.classList.add('dl-swap');setTimeout(()=>{if(!body.isConnected)return;body.innerHTML=newsHTML(shown,{locale,esc,w});bindOpen(body);body.classList.remove('dl-swap');},160);});
+  main.querySelectorAll('[data-dl-word]').forEach(b=>b.onclick=()=>{const li=b.closest('.dl-word'),open=!li.classList.contains('open');main.querySelectorAll('.dl-word.open').forEach(x=>{x.classList.remove('open');x.querySelector('[aria-expanded]').setAttribute('aria-expanded','false');});if(open){li.classList.add('open');b.setAttribute('aria-expanded','true');}});
+  main.querySelectorAll('[data-dl-lookup]').forEach(b=>b.onclick=()=>lookup?.(b.dataset.dlLookup));
+ }
+ function bindOpen(scope){scope.querySelectorAll('[data-dl-open]').forEach(a=>a.onclick=e=>{e.preventDefault();api('daily_open',{url:a.dataset.dlOpen}).catch(()=>toast?.('…'));});}
+ main.innerHTML=pageHTML(null,{locale,esc}).replace('dl-empty dl-in','dl-empty dl-in dl-loading');
+ await load(false);
+}
