@@ -6,6 +6,7 @@ export const I18N = {
   ja: {
     'skip': '本文へ移動',
     'intro.skip': 'スキップ',
+    'top.label': 'ページの先頭へ',
     'nav.label': 'メインナビゲーション',
     'nav.features': '機能',
     'nav.games': '対応ゲーム',
@@ -212,6 +213,7 @@ export const I18N = {
   en: {
     'skip': 'Skip to content',
     'intro.skip': 'Skip',
+    'top.label': 'Back to top',
     'nav.label': 'Main navigation',
     'nav.features': 'Features',
     'nav.games': 'Games',

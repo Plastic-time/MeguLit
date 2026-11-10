@@ -346,6 +346,34 @@ soundBtn?.addEventListener('click', () => {
   floatSound();
 });
 
+// Steps: the line over them fills with the scroll, from the first step to the last, and each number lights up as the
+// line reaches it (both ways, so scrolling back up empties it again).
+const steps = $('.steps');
+if (steps && !reduce) {
+  const items = $$('li', steps);
+  steps.classList.add('js-steps');
+  let queued = false;
+  const paint = () => {
+    queued = false;
+    const r = steps.getBoundingClientRect(), H = innerHeight;
+    const p = Math.min(1, Math.max(0, (H * .85 - r.top) / (H * .45)));
+    steps.style.setProperty('--fill', p.toFixed(3));
+    items.forEach((li, i) => li.classList.toggle('lit', p >= (i + .35) / items.length));
+  };
+  addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(paint); } }, { passive: true });
+  addEventListener('resize', paint);
+  paint();
+}
+
+// Back to top: shows once the first screen is behind you.
+const toTop = $('.to-top');
+if (toTop) {
+  const show = () => toTop.classList.toggle('on', scrollY > innerHeight * .9);
+  show();
+  addEventListener('scroll', show, { passive: true });
+  toTop.addEventListener('click', e => { e.preventDefault(); scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' }); });
+}
+
 // The top bar turns transparent over the hero.
 const topBar = $('.top'), hero = $('.hero');
 if (topBar && hero) {
