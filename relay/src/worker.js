@@ -11,10 +11,10 @@ import {feedbackPost,syncPendingFeedback} from './feedback.js';
 /* E397 public profiles, follows, 同好 */
 import {profileOwn,profileCard,followEdit,followingFeed,kindred,socialDeletes,profileReport,profileAppeal} from './social.js';
 import {avatarUpload,avatarDelete,avatarGet,avatarReport,avatarsFor,avatarStatus,avatarAppeal,avatarReview,signReview,cleanupAvatars,hotStatements,hotWordsGet,settleDue} from './community.js';
-import {newsGet,hotWordsDailyGet,refreshDaily} from './daily.js';
+import {newsGet,hotWordsDailyGet,refreshDaily,imageGet} from './daily.js';
 
 /* requests per window; key prefix → [limit, seconds] */
-export const RATE={ip:[120,60],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[5,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60],daily:[60,60],appeal:[3,86400],profile:[30,3600],'social-get':[120,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400]};
+export const RATE={ip:[120,60],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[5,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60],daily:[60,60],'daily-img':[240,60],appeal:[3,86400],profile:[30,3600],'social-get':[120,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400]};
 const encoder=new TextEncoder();
 const hex=buffer=>[...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');
 export async function sha256(value){return hex(await crypto.subtle.digest('SHA-256',typeof value==='string'?encoder.encode(value):value));}
@@ -206,6 +206,7 @@ export async function handle(request,env,now=new Date()){
   else if(path==='/api/kindred'&&request.method==='GET')response=await kindred(request,env,ip,now,social);
   /* E415 每日 page (relay/src/daily.js) */
   else if(path==='/api/news'&&request.method==='GET')response=await hit(env,'daily',ip,now.getTime())?await newsGet(env,{json},now):fail('RATE_LIMITED',429);
+  else if(/^\/api\/news\/img\/[0-9a-f]{32}$/.test(path)&&request.method==='GET')response=await hit(env,'daily-img',ip,now.getTime())?await imageGet(env,path.slice(14)):fail('RATE_LIMITED',429);
   else if(path==='/api/hotwords/daily'&&request.method==='GET')response=await hit(env,'daily',ip,now.getTime())?await hotWordsDailyGet(env,url,{json,fail},now):fail('RATE_LIMITED',429);
   else if(path==='/api/hotwords'&&request.method==='GET')response=await hit(env,'hot',ip,now.getTime())?await hotWordsGet(url,env):fail('RATE_LIMITED',429);
   else if(path==='/api/me'&&request.method==='DELETE'){const auth=await authenticate(request,env,now).catch(()=>null);response=await handleAccounts(request,env,now);if(auth&&response.ok)await removeSubjects(env,[await sha256('account:'+auth.account.id)]);}

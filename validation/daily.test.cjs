@@ -36,7 +36,7 @@ test('relay routes: /api/news and /api/hotwords/daily fetch once when empty, cro
   const news=await (await handle(req('/api/news'),e)).json();assert.equal(news.items.length,3);assert.ok(news.updatedAt);assert.equal(news.items[0].source,'電ファミニコゲーマー');
   const words=await (await handle(req('/api/hotwords/daily'),e)).json();assert.equal(words.words.length,3);
   assert.equal((await handle(req('/api/hotwords/daily?day=bad'),e)).status,400);
-  assert.deepEqual(await scheduled({cron:'20 */2 * * *',scheduledTime:Date.now()},e,null),{news:3,words:3});
+  assert.deepEqual(await scheduled({cron:'20 */2 * * *',scheduledTime:Date.now()},e,null),{news:3,words:3,removed:0});
   assert.match(fs.readFileSync(path.join(relayDir,'wrangler.toml'),'utf8'),/"20 \*\/2 \* \* \*"/);
  }finally{globalThis.fetch=real;}
 });
@@ -61,4 +61,31 @@ test('page: tab label, empty state, lookup on word click, ruby only with a readi
  const app=fs.readFileSync(path.join(__dirname,'..','web','app.js'),'utf8');assert.match(app,/navigate\('learning','dictionary'\)/);assert.match(app,/if\(pendingLookup\)/);
  assert.match(fs.readFileSync(path.join(__dirname,'..','web','index.html'),'utf8'),/daily\.css/);
  assert.match(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),/case 'daily_open':\{const url=String\(request\.url\|\|''\);if\(!require\('\.\/daily\.cjs'\)\.canOpen\(url\)\)/);
+});
+function r2(){const store=new Map();return {store,head:async k=>store.has(k)?{}:null,put:async(k,b,o)=>{store.set(k,{body:b,httpMetadata:o?.httpMetadata,customMetadata:o?.customMetadata});},get:async k=>store.get(k)||null,delete:async k=>{store.delete(k);},list:async()=>({objects:[...store].map(([key,v])=>({key,customMetadata:v.customMetadata})),truncated:false})};}
+test('thumbnails: copied to R2 (RSS picture or og:image), served from the relay, cleaned after two days',async()=>{
+ const d=await load('daily.js'),{handle}=await load('worker.js');
+ const img=(type='image/jpeg',size=10)=>({ok:true,headers:new Headers({'content-type':type}),arrayBuffer:async()=>new Uint8Array(size).buffer});
+ const calls=[];const f=async url=>{calls.push(url);if(url==='https://news.denfaminicogamer.jp/x.jpg')return img();if(url==='https://www.4gamer.net/games/2/')return {ok:true,text:async()=>'<meta property="og:image" content="/og.png">'};if(url==='https://www.4gamer.net/og.png')return img('image/png');if(url==='https://moepedia.net/a.jpg')return img('text/html');return fetcher(FEEDS)(url);};
+ const e={DB:d1(),BUCKET:r2()},t0=new Date('2026-11-11T00:00:00Z');
+ await d.refreshNews(e,t0,f);
+ const news=await d.newsGet(e,{json:v=>v},t0);
+ const by=Object.fromEntries(news.items.map(n=>[n.sourceId,n.image]));
+ assert.match(by.denfami,/^\/api\/news\/img\/[0-9a-f]{32}$/);assert.match(by['4gamer'],/^\/api\/news\/img\/[0-9a-f]{32}$/);assert.equal(by.moepedia,'','non-image content is not stored');
+ assert.equal(e.BUCKET.store.size,2);
+ calls.length=0;await d.refreshNews(e,t0,f);assert.ok(!calls.includes('https://news.denfaminicogamer.jp/x.jpg'),'already mirrored images are not fetched again');
+ const real=globalThis.fetch;globalThis.fetch=async()=>({ok:false,text:async()=>''});
+ try{const res=await handle(new Request('https://relay.test'+by.denfami,{headers:{'cf-connecting-ip':'10.9.0.2'}}),e);assert.equal(res.status,200);assert.equal(res.headers.get('content-type'),'image/jpeg');
+  assert.equal((await handle(new Request('https://relay.test/api/news/img/'+'0'.repeat(32),{headers:{'cf-connecting-ip':'10.9.0.2'}}),e)).status,404);}finally{globalThis.fetch=real;}
+ assert.equal(await d.cleanupImages(e,new Date(t0.getTime()+86400e3)),0);assert.equal(await d.cleanupImages(e,new Date(t0.getTime()+3*86400e3)),2);assert.equal(e.BUCKET.store.size,0);
+});
+test('bridge thumbnails: only relay image paths, fetched once into data/cache, returned as data: URLs',async()=>{
+ const daily=require('../services/daily.cjs'),root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'dl-'));
+ const id='a'.repeat(32);let imgCalls=0;
+ const f=async url=>{if(url.includes('/api/news/img/')){imgCalls++;return {ok:true,headers:new Headers({'content-type':'image/png'}),arrayBuffer:async()=>new Uint8Array([1,2,3]).buffer};}
+  return {ok:true,json:async()=>url.endsWith('/api/news')?{items:[{title:'t',link:'https://moepedia.net/n',image:'/api/news/img/'+id},{title:'u',link:'https://moepedia.net/m',image:'https://evil.example/x.png'}]}:{words:[]}};};
+ const opts={env:{MEGULIT_RELAY_BASE:'https://relay.test'},fetch:f};
+ const v=await daily.view(root,null,opts);assert.equal(v.news.items[0].image,'data:image/png;base64,AQID');assert.equal(v.news.items[1].image,'');
+ await daily.view(root,null,opts);assert.equal(imgCalls,1,'second view reads the local cache');
+ assert.ok(fs.existsSync(path.join(root,'data','cache','daily-img',id)));
 });

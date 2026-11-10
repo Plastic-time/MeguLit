@@ -61,6 +61,7 @@ export async function refreshNews(env,now=new Date(),fetcher=fetch){
  const lists=await Promise.all(NEWS_FEEDS.map(async f=>parseNews(await get(f.url,fetcher),f)));
  const seen=new Set(),all=lists.flat().filter(n=>!seen.has(n.link)&&seen.add(n.link)).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,MAX_NEWS);
  if(!all.length)return 0;
+ if(env.BUCKET)await mirrorImages(env,all,now,fetcher).catch(()=>0);else for(const n of all)n.image='';
  await save(env,'news',dayKey(now),{items:all,sources:NEWS_FEEDS.map(f=>({id:f.id,name:f.name}))},now);return all.length;
 }
 export async function refreshWords(env,now=new Date(),fetcher=fetch){
@@ -69,7 +70,7 @@ export async function refreshWords(env,now=new Date(),fetcher=fetch){
  words=words.slice(0,MAX_WORDS);if(!words.length)return 0;
  await save(env,'hotwords',dayKey(now),{words,source},now);return words.length;
 }
-export async function refreshDaily(env,now=new Date(),fetcher=fetch){const [news,words]=await Promise.all([refreshNews(env,now,fetcher).catch(()=>0),refreshWords(env,now,fetcher).catch(()=>0)]);return {news,words};}
+export async function refreshDaily(env,now=new Date(),fetcher=fetch){const [news,words]=await Promise.all([refreshNews(env,now,fetcher).catch(()=>0),refreshWords(env,now,fetcher).catch(()=>0)]);const images=env.BUCKET?await cleanupImages(env,now).catch(()=>0):0;return {news,words,removed:images};}
 const STALE=3*3600e3;
 async function cached(env,kind,now,refresh){
  let row=await load(env,kind,'');
@@ -82,4 +83,42 @@ export async function hotWordsDailyGet(env,url,{json,fail},now=new Date()){
  const day=url.searchParams.get('day')||'';if(day&&!/^\d{4}-\d{2}-\d{2}$/.test(day))return fail('INVALID_DAY',400);
  const row=day?await load(env,'hotwords',day):await cached(env,'hotwords',now,refreshWords);
  return json({day:day||dayKey(now),words:row?.words||[],source:row?.source||'',updatedAt:row?.updatedAt||null},200,{'cache-control':'public, max-age=600'});
+}
+
+/* ---- thumbnails mirrored into R2 -------------------------------------------------------------------------------
+   The app's CSP allows only its own images, and the source sites can be slow from mainland China, so every thumbnail
+   is copied to R2 (daily-img/<id>) and served as GET /api/news/img/<id>. Stories without an RSS picture get their
+   page's og:image (only for the top MIRROR stories, to stay under the Worker's subrequest limit). Objects older than
+   KEEP_DAYS are deleted by the same cron. */
+export const MIRROR=16,IMG_MAX=900*1024,KEEP_DAYS=2;
+const IMG_TYPES=/^image\/(jpeg|png|webp|gif|avif)$/;
+async function hex(text){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,32);}
+async function ogImage(link,fetcher){try{const r=await fetcher(link,{headers:{'user-agent':UA,accept:'text/html'},signal:AbortSignal.timeout(8000)});if(!r.ok)return '';const html=(await r.text()).slice(0,200000);const m=html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)||html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);return m?safeUrl(new URL(decode(m[1]),link).href):'';}catch{return '';}}
+async function copyImage(env,key,url,fetcher,now){
+ try{const r=await fetcher(url,{headers:{'user-agent':UA,accept:'image/*'},signal:AbortSignal.timeout(10000)});const type=(r.headers?.get?.('content-type')||'').split(';')[0].trim().toLowerCase();
+  if(!r.ok||!IMG_TYPES.test(type)||Number(r.headers?.get?.('content-length')||0)>IMG_MAX)return false;
+  const bytes=new Uint8Array(await r.arrayBuffer());if(!bytes.length||bytes.length>IMG_MAX)return false;
+  await env.BUCKET.put(key,bytes,{httpMetadata:{contentType:type},customMetadata:{at:String(now.getTime())}});return true;}catch{return false;}
+}
+export async function mirrorImages(env,items,now=new Date(),fetcher=fetch){
+ let done=0;
+ for(const [i,n] of items.entries()){
+  const id=await hex(n.link),key='daily-img/'+id;
+  if(i>=MIRROR){n.image='';continue;}
+  let have=!!(await env.BUCKET.head?.(key));
+  if(!have){const src=n.image||await ogImage(n.link,fetcher);have=!!src&&await copyImage(env,key,src,fetcher,now);}
+  n.image=have?'/api/news/img/'+id:'';if(have)done++;
+ }
+ return done;
+}
+export async function imageGet(env,id){
+ const obj=await env.BUCKET.get('daily-img/'+id);if(!obj)return new Response('',{status:404});
+ return new Response(obj.body,{headers:{'content-type':obj.httpMetadata?.contentType||'image/jpeg','cache-control':'public, max-age=86400','x-content-type-options':'nosniff'}});
+}
+export async function cleanupImages(env,now=new Date()){
+ let removed=0,cursor;
+ do{const page=await env.BUCKET.list({prefix:'daily-img/',cursor,include:['customMetadata']});
+  for(const o of page.objects||[]){const at=Number(o.customMetadata?.at)||new Date(o.uploaded||0).getTime();if(now.getTime()-at>KEEP_DAYS*864e5){await env.BUCKET.delete(o.key);removed++;}}
+  cursor=page.truncated?page.cursor:undefined;}while(cursor);
+ return removed;
 }
