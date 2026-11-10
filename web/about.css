@@ -89,3 +89,9 @@
 :root[data-theme="light"] .about-qrs figcaption{color:#3a1f1c}
 :root[data-theme="light"] .about-glyph{color:rgba(158,27,50,.05)}
 @media (max-width:760px){.about-pay{grid-template-columns:1fr}.about-cn{padding-right:0}.about-intl{border-left:0;padding-left:0;margin-top:18px}}
+/* links: two columns with room between them instead of five tight rows; the odd last one spans the card */
+.about-links{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start}
+.about-links h3{grid-column:1/-1;margin:0 0 4px}
+.about-links .about-link{margin:0;padding:13px 14px;min-height:46px}
+.about-links .about-link:last-child{grid-column:1/-1}
+@media (max-width:520px){.about-links{grid-template-columns:1fr}}
