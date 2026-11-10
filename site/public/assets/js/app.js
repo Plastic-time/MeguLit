@@ -4,6 +4,7 @@ import { I18N } from './i18n.js';
 import { MIRROR, downloadSources, formatSize, formatDate, pickLang, renderMarkdown } from './core.mjs';
 import { kana } from './spell.js';
 import { playIntro, introShown } from './intro.js';
+import { nowPlaying } from './nowplaying.js';
 // the entrance starts before anything else on the page is set up
 playIntro();
 
@@ -285,6 +286,7 @@ let heroSeen = true;
 const bgm = new Audio();
 bgm.loop = true;
 bgm.preload = 'none';
+if ($('.sound-ctl')) nowPlaying(bgm, $('.sound-ctl'), { reduce });
 let soundOn = false;
 // while the sound is on and the hero is off screen, the sound control floats in the corner so it can be turned off
 const soundCtl = $('.sound-ctl'), soundHome = soundCtl && document.createComment('sound-ctl');
@@ -363,6 +365,47 @@ if (steps && !reduce) {
   addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(paint); } }, { passive: true });
   addEventListener('resize', paint);
   paint();
+}
+
+// Full-size view: a screenshot card opens its large original, a clip card or feature clip opens the clip itself.
+const lightbox = $('.lightbox');
+if (lightbox && typeof lightbox.showModal === 'function') {
+  const body = $('.lb-body', lightbox), cap = $('.lb-cap', lightbox);
+  const big = src => {
+    const m = src.match(/^(.*\/assets\/img\/[a-z-]+?)-(?:720|800)\.webp$/);
+    if (m) return { img: m[1] + (/auto-update$/.test(m[1]) ? '-1600.webp' : '-1360.webp') };
+    const c = src.match(/^(.*\/assets\/clips\/[a-z-]+)\.webp$/);
+    if (c) return { video: c[1] + '.mp4', poster: src };
+    return { img: src };
+  };
+  const open = (what, caption) => {
+    let el;
+    if (what.video) {
+      el = document.createElement('video');
+      Object.assign(el, { src: what.video, poster: what.poster || '', muted: true, loop: true, autoplay: true, playsInline: true, controls: true });
+    } else {
+      el = document.createElement('img');
+      el.alt = caption || '';
+      el.src = what.img;
+      el.onerror = () => { if (what.fallback && el.src !== what.fallback) el.src = what.fallback; };
+    }
+    body.replaceChildren(el);
+    cap.textContent = caption || '';
+    lightbox.showModal();
+  };
+  document.addEventListener('click', e => {
+    const card = e.target.closest('.hp-card, .feat-item');
+    if (!card) return;
+    const cap1 = card.querySelector('figcaption')?.textContent.trim() || $('.ft[aria-selected="true"] .ft-t')?.textContent.trim() || '';
+    const v = card.querySelector('video');
+    if (v) { open({ video: v.dataset.src || v.currentSrc, poster: v.poster }, cap1); return; }
+    const img = card.querySelector('img');
+    if (img) open({ ...big(img.getAttribute('src')), fallback: img.currentSrc || img.src }, cap1);
+  });
+  const close = () => { lightbox.close(); };
+  $('.lb-close', lightbox).addEventListener('click', close);
+  lightbox.addEventListener('click', e => { if (e.target === lightbox) close(); });
+  lightbox.addEventListener('close', () => body.replaceChildren());
 }
 
 // Back to top: shows once the first screen is behind you.

@@ -93,7 +93,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
      <span class="db-main" data-i="dl.button">下载 MeguLit</span>
      <span class="db-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 4v14m0 0-6-6m6 6 6-6"/></svg></span>
     </a>
-    <p class="hud hud-dl"><span class="js-size">20.0 MB</span><span>win 10 · 11 x64</span><span>gpl-3.0</span><a class="alt-link" href="#download" data-i="dl.alt">备用下载</a></p>
+    <p class="hud hud-dl"><span class="js-size">20.0 MB</span><span data-i="dl.first">first run +107 / 565 mb</span><span>win 10 · 11 x64</span><span>gpl-3.0</span><a class="alt-link" href="#download" data-i="dl.alt">备用下载</a></p>
    </div>
   </div>
  </div>
@@ -174,20 +174,18 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  </div>
 </section>
 
-<section class="hp" aria-labelledby="hp-title">
- <div class="wrap hp-head">
-  <h2 id="hp-title" class="h2" data-i="hp.title">学日语的一整圈，都在一个应用里</h2>
-  <p class="sec-lede" data-i="hp.lede">游戏库、阅读层、单词本、Anki、学习统计、五十音。下面都是 MeguLit 的真实界面</p>
- </div>
- <div class="hp-stage">
-  <div class="hp-rows">
-    <div class="hp-row"><figure class="hp-card"><img src="/assets/img/home-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.home">首页</figcaption></figure><figure class="hp-card"><img src="/assets/clips/embed.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.embed">内嵌注音</figcaption></figure><figure class="hp-card"><img src="/assets/img/words-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.words">单词本</figcaption></figure><figure class="hp-card"><img src="/assets/clips/lookup.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.lookup">点读</figcaption></figure><figure class="hp-card"><img src="/assets/img/stats-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.stats">学习统计</figcaption></figure><figure class="hp-card"><img src="/assets/clips/anki.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.card">一键制卡</figcaption></figure><figure class="hp-card"><img src="/assets/img/kana-home-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.kana">五十音</figcaption></figure></div>
-    <div class="hp-row"><figure class="hp-card"><img src="/assets/clips/review.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.anki">Anki 复习</figcaption></figure><figure class="hp-card"><img src="/assets/img/library-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.library">游戏库</figcaption></figure><figure class="hp-card"><img src="/assets/clips/kana.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.stroke">笔顺</figcaption></figure><figure class="hp-card"><img src="/assets/img/stats-trend-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.trend">字数走势</figcaption></figure><figure class="hp-card"><img src="/assets/clips/history.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.dialogue">对话记录</figcaption></figure><figure class="hp-card"><img src="/assets/img/game-detail-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.detail">作品详情</figcaption></figure><figure class="hp-card"><img src="/assets/img/auto-update-800.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.update">自动更新</figcaption></figure></div>
-    <div class="hp-row"><figure class="hp-card"><img src="/assets/img/kana-lesson-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.lesson">五十音课程</figcaption></figure><figure class="hp-card"><img src="/assets/clips/detail.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.reviews">社区评价</figcaption></figure><figure class="hp-card"><img src="/assets/img/history-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.history">阅读会话</figcaption></figure><figure class="hp-card"><img src="/assets/clips/library.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.search">一搜就到</figcaption></figure><figure class="hp-card"><img src="/assets/img/anki-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.review">复习卡片</figcaption></figure><figure class="hp-card"><img src="/assets/clips/stats.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.hours">阅读时段</figcaption></figure><figure class="hp-card"><img src="/assets/img/dialogue-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.lines">原文与译文</figcaption></figure></div>
-  </div>
+<section class="sec" id="start" data-kanji="開始" aria-labelledby="s-title">
+ <div class="wrap">
+  <h2 id="s-title" class="h2" data-i="s.title">上手只要五步</h2>
+  <ol class="steps">
+   <li><h3 data-i="s.1.t">下载并解压</h3><p data-i-html="s.1.d">下载 <code class="js-filename">MeguLit-v1.2.8-win-x64.zip</code>，解压到任意文件夹，运行 <code>MeguLit.exe</code></p></li>
+   <li><h3 data-i="s.2.t">选完整版或精简版</h3><p data-i="s.2.d">完整版约 565 MB，一次装齐注音词典和语音引擎（推荐）；精简版约 107 MB，其余组件以后在设置里补装</p></li>
+   <li><h3 data-i="s.3.t">选游戏文件夹</h3><p data-i="s.3.d">MeguLit 扫描文件夹和 Steam，自动找出日文原版 EXE，系列作品归到一起</p></li>
+   <li><h3 data-i="s.4.t">启动游戏，用窗口模式玩</h3><p data-i-html="s.4.d">点作品 →「启动游戏」，阅读层自动接上，按 <kbd>Alt</kbd> + <kbd>T</kbd> 呼出菜单</p></li>
+   <li><h3 data-i="s.5.t">零基础先学五十音</h3><p data-i="s.5.d">学习 → 五十音：25 课、五十音图和三个假名小游戏，例句来自你自己玩过的游戏</p></li>
+  </ol>
  </div>
 </section>
-
 <section class="sec deck-sec" id="deck" data-kanji="復習" aria-labelledby="dk-title">
  <div class="wrap deck-grid">
   <div class="deck-copy">
@@ -307,6 +305,20 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
   </div>
  </div>
 </section>
+<section class="hp" aria-labelledby="hp-title">
+ <div class="wrap hp-head">
+  <h2 id="hp-title" class="h2" data-i="hp.title">学日语的一整圈，都在一个应用里</h2>
+  <p class="sec-lede" data-i="hp.lede">游戏库、阅读层、单词本、Anki、学习统计、五十音。下面都是 MeguLit 的真实界面</p>
+ </div>
+ <div class="hp-stage">
+  <div class="hp-rows">
+    <div class="hp-row"><figure class="hp-card"><img src="/assets/img/home-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.home">首页</figcaption></figure><figure class="hp-card"><img src="/assets/clips/embed.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.embed">内嵌注音</figcaption></figure><figure class="hp-card"><img src="/assets/img/words-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.words">单词本</figcaption></figure><figure class="hp-card"><img src="/assets/clips/lookup.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.lookup">点读</figcaption></figure><figure class="hp-card"><img src="/assets/img/stats-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.stats">学习统计</figcaption></figure><figure class="hp-card"><img src="/assets/clips/anki.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.card">一键制卡</figcaption></figure><figure class="hp-card"><img src="/assets/img/kana-home-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.kana">五十音</figcaption></figure></div>
+    <div class="hp-row"><figure class="hp-card"><img src="/assets/clips/review.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.anki">Anki 复习</figcaption></figure><figure class="hp-card"><img src="/assets/img/library-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.library">游戏库</figcaption></figure><figure class="hp-card"><img src="/assets/clips/kana.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.stroke">笔顺</figcaption></figure><figure class="hp-card"><img src="/assets/img/stats-trend-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.trend">字数走势</figcaption></figure><figure class="hp-card"><img src="/assets/clips/history.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.dialogue">对话记录</figcaption></figure><figure class="hp-card"><img src="/assets/img/game-detail-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.detail">作品详情</figcaption></figure><figure class="hp-card"><img src="/assets/img/auto-update-800.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.update">自动更新</figcaption></figure></div>
+    <div class="hp-row"><figure class="hp-card"><img src="/assets/img/kana-lesson-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.lesson">五十音课程</figcaption></figure><figure class="hp-card"><img src="/assets/clips/detail.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.reviews">社区评价</figcaption></figure><figure class="hp-card"><img src="/assets/img/history-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.history">阅读会话</figcaption></figure><figure class="hp-card"><img src="/assets/clips/library.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.search">一搜就到</figcaption></figure><figure class="hp-card"><img src="/assets/img/anki-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.review">复习卡片</figcaption></figure><figure class="hp-card"><img src="/assets/clips/stats.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.hours">阅读时段</figcaption></figure><figure class="hp-card"><img src="/assets/img/dialogue-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.lines">原文与译文</figcaption></figure></div>
+  </div>
+ </div>
+</section>
+
 
 <section class="sec" id="more" data-kanji="魔法" aria-labelledby="f-title">
  <div class="wrap">
@@ -368,18 +380,6 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  </div>
 </section>
 
-<section class="sec" id="start" data-kanji="開始" aria-labelledby="s-title">
- <div class="wrap">
-  <h2 id="s-title" class="h2" data-i="s.title">上手只要五步</h2>
-  <ol class="steps">
-   <li><h3 data-i="s.1.t">下载并解压</h3><p data-i-html="s.1.d">下载 <code class="js-filename">MeguLit-v1.2.8-win-x64.zip</code>，解压到任意文件夹，运行 <code>MeguLit.exe</code></p></li>
-   <li><h3 data-i="s.2.t">选完整版或精简版</h3><p data-i="s.2.d">完整版约 565 MB，一次装齐注音词典和语音引擎（推荐）；精简版约 107 MB，其余组件以后在设置里补装</p></li>
-   <li><h3 data-i="s.3.t">选游戏文件夹</h3><p data-i="s.3.d">MeguLit 扫描文件夹和 Steam，自动找出日文原版 EXE，系列作品归到一起</p></li>
-   <li><h3 data-i="s.4.t">启动游戏，用窗口模式玩</h3><p data-i-html="s.4.d">点作品 →「启动游戏」，阅读层自动接上，按 <kbd>Alt</kbd> + <kbd>T</kbd> 呼出菜单</p></li>
-   <li><h3 data-i="s.5.t">零基础先学五十音</h3><p data-i="s.5.d">学习 → 五十音：25 课、五十音图和三个假名小游戏，例句来自你自己玩过的游戏</p></li>
-  </ol>
- </div>
-</section>
 
 <section class="sec sec-dl" id="download" data-kanji="下載" aria-labelledby="d-title">
  <div class="lamp" aria-hidden="true"></div>
@@ -389,7 +389,8 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    <p class="dl-version"><span class="js-title">MeguLit v1.2.8</span></p>
    <dl class="facts">
     <div><dt data-i="d.date">发布日期</dt><dd class="js-date">2026年11月10日</dd></div>
-    <div><dt data-i="d.size">大小</dt><dd class="js-size">20.0 MB</dd></div>
+    <div><dt data-i="d.size">安装包</dt><dd class="js-size">20.0 MB</dd></div>
+    <div><dt data-i="d.first">首次运行</dt><dd data-i="d.first.v">另需下载组件：精简版约 107 MB，完整版约 565 MB</dd></div>
     <div><dt data-i="d.file">文件</dt><dd class="js-filename mono">MeguLit-v1.2.8-win-x64.zip</dd></div>
     <div class="sha"><dt>SHA-256</dt><dd><code class="js-sha mono">59d34289bca48ceb07687c49b4360880db494c5cd22ad5fd5c6bc942e94e68e3</code><button type="button" class="copy js-copy" data-i="d.copy">复制</button></dd></div>
    </dl>
@@ -397,7 +398,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
     <span data-i="dl.button">下载 MeguLit</span>
    </a>
-   <p class="small js-source-note" data-i="d.mirror">从 megulit.com 的国内友好镜像下载，与 GitHub Releases 自动同步并校验 SHA-256</p>
+   <p class="small js-source-note" data-i="d.mirror">下载按钮优先走 megulit.com 镜像（文件与 GitHub Releases 逐字节同步，并校验 SHA-256），镜像连不上时自动换成 GitHub</p>
    <div class="alt">
     <h3 class="h4" data-i="dl.alt">备用下载</h3>
     <ul class="js-alt">
@@ -430,7 +431,13 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    </div>
    <div class="smart">
     <h3 class="h4" data-i="d.smart">看到「Windows 已保护你的电脑」？</h3>
-    <p data-i-html="d.smart.d">新版本还没积累足够的下载量时，SmartScreen 会拦一下。点 <b>更多信息</b>，再点 <b>仍要运行</b> 即可。可以先用上面的 SHA-256 核对文件</p>
+    <p data-i-html="d.smart.d">新版本还没积累足够的下载量时，SmartScreen 会拦一下。点 <b>更多信息</b>，再点 <b>仍要运行</b> 即可。代码签名正在申请中，签好后就不会再拦</p>
+    <h3 class="h4" data-i="d.verify">放心起见，先核对文件</h3>
+    <ol class="verify">
+     <li data-i-html="d.verify.1">在下载文件夹的空白处按住 <kbd>Shift</kbd> 点右键，选「在终端中打开」</li>
+     <li data-i-html="d.verify.2">输入 <code>Get-FileHash .\<span class="js-filename">MeguLit-v1.2.8-win-x64.zip</span></code> 回车</li>
+     <li data-i-html="d.verify.3">输出的 Hash 和上面的 SHA-256 一字不差，就是官方原包。安装包只在 <a href="https://github.com/ilynthn/MeguLit/releases">GitHub ilynthn/MeguLit</a> 发布，本站镜像只做同步</li>
+    </ol>
    </div>
   </div>
  </div>
@@ -484,6 +491,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
   <p class="small" data-i-html="foot.license">MeguLit 以 <a href="https://github.com/ilynthn/MeguLit/blob/main/LICENSE">GPL-3.0-or-later</a> 开源。文本 Hook 基于 LunaHook，词典来自 JMdict / EDRDG</p>
  </div>
 </footer>
+<dialog class="lightbox" aria-label="大图" data-i-attr="aria-label:lb.label"><button type="button" class="lb-close" aria-label="关闭" data-i-attr="aria-label:lb.close">×</button><div class="lb-body"></div><p class="lb-cap"></p></dialog>
 <a class="to-top" href="#top" aria-label="回到顶部" data-i-attr="aria-label:top.label"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></a>
 </body>
 </html>
