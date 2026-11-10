@@ -205,3 +205,17 @@ test('E410 real data: WoH pages match the game (prologue pages start at lines 0,
  for(const i of [0,2,6,10])assert.ok(P.starts.has(i),'page start '+i);for(const i of [1,3,4,5,7,11])assert.ok(!P.starts.has(i),'same page '+i);
  assert.ok(P.cont.has(20)&&!P.cont.has(19));assert.ok(P.known.size>23000);
 });
+
+// E411 (user, WoH: "老是判定错误自动隐藏"; 『■■■■■―――』 stuck). Reader log: dialogVisibility false "marker" every few seconds.
+test('E411: on a full-screen page the layer is not hidden when the wait marker leaves or a box probe says no box; skip still hides',()=>{
+ const {Immersion}=require('../core/immersion.cjs'),events=[];let now=5000;
+ const im=new Immersion(e=>events.push([e.dialogVisible,e.dialogReason||e.reason]),()=>now);
+ im.configure({immersion:true,dialogDetection:'marker'});im.bind('woh');
+ im.source('　彼女の家は山の中腹にあった。','nvl');im.marker(true);now+=2000;im.tick();
+ im.marker(false);now+=3000;im.tick();im.tick();
+ im.evidence(false,'visual');im.evidence(false,'auto');now+=2000;im.tick();
+ assert.ok(!events.some(e=>e[0]===false),'never hidden by the marker or a box probe: '+JSON.stringify(events));
+ im.skip(true);now+=400;im.tick();assert.equal(events.at(-1)[0],false,'held fast-forward still hides');
+ const other=[],im2=new Immersion(e=>other.push(e.dialogVisible),()=>now);im2.configure({immersion:true,dialogDetection:'marker'});im2.bind('adv');
+ im2.source('普通の台詞。','krkr');im2.marker(true);now+=2000;im2.tick();im2.marker(false);now+=1000;im2.tick();assert.equal(other.at(-1),false,'ADV games keep the marker rule');
+});

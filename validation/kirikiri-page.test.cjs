@@ -266,3 +266,16 @@ test('E410 flow page from the script: a page start clears the page, a line alrea
  assert.deepEqual(gridLayout(['あいう。','……えお。'],27,['new','new']).map(l=>[l.row,l.col]),[[0,0],[1,0]],'the script says new row although the line has no indent');
  assert.deepEqual(gridLayout(['あいう。','「えお」'],27,['new','continue']).map(l=>[l.row,l.col]),[[0,0],[0,4]],'@x continues the row');
 });
+
+test('E411 a line of only symbols (『■■■■■―――』) is shown as it is, asks for no translation, and the page goes on',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const saved=global.MutationObserver;global.MutationObserver=class{observe(){}};t.after(()=>{global.MutationObserver=saved;});
+ const file=require.resolve('../web/reader/modules/island-page.js');delete require.cache[file];const IslandPage=require(file);
+ const {w,b,doc}=fakeWindow({clientX:58,clientY:85,clientWidth:1546,clientHeight:870,readerX:900,readerY:500,readerWidth:600,readerHeight:100});
+ IslandPage.install(w);let seq=0;const say=(text,index,pageStart)=>b.islandPage.accept({hookSource:text,hookSourceEngine:'nvl',hookFlowGrid:'woh',hookSequence:++seq,hookSourceLine:0,hookFlowPageStart:pageStart,hookSourceIndex:index,hookFlowRow:'new'});
+ const shown=()=>doc.querySelectorAll('.tome-island-pair').filter(n=>!n.hidden).map(n=>n.querySelector('.sentence-text').textContent);
+ say('　いつも通りにキーを差し込んでぐるりと回して、',13,false);say('　そんな、今まで何十回とくり返してきた、小さな彼女の誇らしげな仕事が終わったとき。',15,false);
+ say('『■■■■■―――』',16,true);assert.deepEqual(shown(),['『■■■■■―――』'],'the page with the dim lines is cleared');
+ say('　甲高い悲鳴が響く。',17,false);assert.deepEqual(shown().sort(),['　甲高い悲鳴が響く。','『■■■■■―――』'].sort());
+ const sym=b.islandPage.model.records.find(r=>r.source==='『■■■■■―――』');t.mock.timers.tick(1500);assert.equal(sym.state,'ready');assert.equal(sym.translation,'');
+});

@@ -30,7 +30,9 @@ class Immersion{
  showWhenDrawn(){if(!this.enabled||this.visible){this.set(true);return;}this.showAt=this.now()+700;}
  drawn(){if(this.showAt&&!this.sceneHidden&&this.skipAt==null)this.set(true);}
  reveal(text,typing){if(text!==this.currentText||typeof typing!=='boolean')return;this.typing=typing;if(typing){this.markerSeen=false;this.markerGoneAt=0;this.drawnAt=0;}else this.lineReadyAt=Math.min(this.lineReadyAt,this.now());}
- evidence(visible,source){if(!this.enabled||visible&&(this.sceneHidden||this.skipAt!=null))return;if(this.engineLive()&&source!=='engine')return;if(visible){this.pending=null;this.set(true);}else if(!this.pending||this.pending.source!==source)this.pending={at:this.now(),source};}
+ /* E411 (user, WoH: the layer kept hiding by itself). A full-screen page has no dialogue box to see: the visual box edge
+    and the auto box never hide it. */
+ evidence(visible,source){if(!this.enabled||visible&&(this.sceneHidden||this.skipAt!=null))return;if(!visible&&this.flow&&(source==='visual'||source==='auto'))return;if(this.engineLive()&&source!=='engine')return;if(visible){this.pending=null;this.set(true);}else if(!this.pending||this.pending.source!==source)this.pending={at:this.now(),source};}
  // A marker that comes back after a marker-based hide means the same line's dialogue box is back (window restored
  // after Hide W., a menu or the backlog closed): show the layer again instead of waiting for the next line.
  // The engine signal covers only the window it watches (ISLAND: the narration page). Lines drawn elsewhere (ADV box,
@@ -51,6 +53,9 @@ class Immersion{
   if(this.resumeAt&&this.now()>=this.resumeAt){this.resumeAt=0;this.set(true);}
   if(this.pending&&this.now()-this.pending.at>=(this.pending.source==='engine'?600:350)){const why=this.pending.source;this.pending=null;this.set(false,why);return;}
   if(this.engineLive())return;
+  /* E411: on a full-screen page the wait marker leaves at every click while the page's text stays (reader log: "marker"
+     hides every few seconds); its absence is no sign that the text is gone. Skip and the page's own lines still decide. */
+  if(this.flow)return;
   if(this.typing||this.now()<this.lineReadyAt)return;
   // A marker still on screen 0.4 s into a line belongs to this line (the previous one is cleared when the game advances).
   if(this.mode==='marker'&&!this.markerSeen&&this.markerPresent&&this.now()-this.lineAt>=400)this.markerSeen=true;
