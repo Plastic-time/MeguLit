@@ -746,7 +746,7 @@ section[data-kanji]::before {
 .sigil { width: min(48vmin, 30rem); fill: none; stroke: #9e1b2d; stroke-width: 1.2; }
 .sigil .t { stroke-dasharray: 1.5 4; stroke-width: 6; opacity: .6; }
 .parchment p { margin: 0; font: 600 clamp(1.6rem, 4.4vmin, 3.4rem)/1.7 var(--serif-ja); color: #3a1418; letter-spacing: .1em; }
-.parchment rt { font-size: .4em; color: #9e1b2d; }
+.parchment rt { font-size: max(11px, .4em); color: #7e1423; }
 .endpaper { background: radial-gradient(80% 60% at 60% 40%, #6d1424, #3a0811); }
 .endpaper::before { content: ""; position: absolute; inset: 4vmin; border: 1px solid rgba(217, 169, 87, .4); border-radius: 8px; }
 
@@ -972,7 +972,7 @@ section[data-kanji]::before {
 .dc-back img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
 .dc-tag { position: absolute; top: 1rem; left: 1rem; font: 600 .75rem/1 var(--sans); color: #fff; background: var(--crimson); padding: .3rem .6rem; border-radius: 999px; }
 .dc-word { margin: 0; font: 700 clamp(2.2rem, 4vw, 3rem)/1.6 var(--serif-ja); }
-.dc-word rt { font-size: .36em; color: var(--gold); }
+.dc-word rt { font-size: max(11px, .36em); color: var(--crimson-ink); }
 .dc-ex { margin: 0; color: var(--muted); font: 500 .9375rem/1.7 var(--serif-ja); max-width: 18em; }
 .dc-flip { position: absolute; bottom: 1rem; font-size: .8125rem; color: var(--faint); }
 .dc-mean { margin: .4rem 1.4rem 0; font: 600 1.25rem/1.5 var(--serif); }
