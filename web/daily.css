@@ -100,13 +100,18 @@ a:hover .dl-plate i:nth-child(2){transform:translate(8%,-6%) rotate(45deg)}
 .dl-word::before{content:"";position:absolute;left:0;top:50%;width:5px;height:5px;margin-top:-2.5px;background:var(--dl-red);transform:scale(0) rotate(45deg);transition:transform .3s var(--dl-ease)}
 .dl-word:hover::before,.dl-word.open::before{transform:scale(1) rotate(45deg)}
 .dl-word-row{display:flex;align-items:stretch}
-.dl-word-main{flex:1;display:grid!important;grid-template-columns:34px minmax(0,1fr) auto;align-items:end;gap:10px;padding:10px 6px 10px 12px!important;text-align:left;transition:background .25s}
+.dl-word-main{flex:1;display:grid!important;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 6px 10px 12px!important;text-align:left;transition:background .25s}
 .dl-word-main:hover{background:color-mix(in srgb,var(--dl-gold) 6%,transparent)!important}
 .dl-rank{grid-column:1;grid-row:1;font-family:var(--g-serif);font-size:22px;line-height:1;color:var(--g-t3);font-variant-numeric:tabular-nums;transition:color .25s}
 .dl-word:nth-child(-n+3) .dl-rank{grid-column:1;grid-row:1;color:var(--dl-gold)}
 .dl-word-main:hover .dl-rank{grid-column:1;grid-row:1;color:var(--dl-red);filter:brightness(1.4)}
 .dl-term{grid-column:2;grid-row:1;font-family:var(--g-serif-ja,var(--g-serif));font-size:19px;line-height:1.25;min-width:0;overflow-wrap:anywhere}
 .dl-word:nth-child(1) .dl-term{font-size:24px}
+.dl-gloss{display:block;margin-top:3px;font-family:var(--g-sans,inherit);font-size:11.5px;line-height:1.35;color:var(--g-t2,#c3ab9c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dl-facts{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0 0 8px;font-size:12px;line-height:1.55}
+.dl-facts dt{color:var(--g-t3);letter-spacing:.06em}
+.dl-facts dd{margin:0;color:var(--g-t2)}
+.dl-facts em{margin-left:8px;font-style:normal;font-size:10.5px;color:var(--g-t3)}
 .dl-term rt{font-size:10px;letter-spacing:.08em;color:var(--g-t3);font-family:var(--g-sans,inherit)}
 .dl-traffic{grid-column:3;grid-row:1;font-size:10.5px;color:var(--g-t3);font-variant-numeric:tabular-nums;letter-spacing:.04em;transition:opacity .2s}
 .dl-go{grid-column:3;grid-row:1;font-size:11px;letter-spacing:.14em;color:var(--dl-gold);opacity:0;transform:translateX(-6px);transition:opacity .2s,transform .3s var(--dl-ease);white-space:nowrap}

@@ -10,7 +10,7 @@ const SITES=[
  {host:/(^|\.)moepedia\.net$/,start:/class="post-body"/,end:/class="post-share"/}
 ];
 const MAX_PARAS=120,MAX_CHARS=20000;
-const ENT={amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:' '};
+const ENT={amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:' ',mdash:'—',ndash:'–',hellip:'…',lsquo:'‘',rsquo:'’',ldquo:'“',rdquo:'”',middot:'·',times:'×',yen:'¥',copy:'©',reg:'®',trade:'™'};
 const decode=s=>s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,(m,e)=>{if(e[0]==='#'){const n=e[1]==='x'||e[1]==='X'?parseInt(e.slice(2),16):Number(e.slice(1));return n>0&&n<0x110000?String.fromCodePoint(n):'';}return ENT[e.toLowerCase()]??m;});
 function region(html,host){
  const site=SITES.find(s=>s.host.test(host));
@@ -26,7 +26,7 @@ function paragraphs(fragment){
   .replace(/<br\s*\/?>/gi,'\n').replace(/<\/(p|div|h[1-6]|li|blockquote|dd|dt)>/gi,'\n').replace(/<(h[1-6])[^>]*>/gi,'\n')
   .replace(/<[^>]+>/g,'');
  const out=[];let size=0;
- for(const raw of decode(text).split(/\n+/)){
+ for(const raw of decode(decode(text)).split(/\n+/)){
   const line=raw.replace(/[ \t ]+/g,' ').trim();
   if(line.length<2||/^(?:https?:\/\/|pic\.twitter\.com\/)\S+$/i.test(line)||/^(Share|Tweet|シェア|ツイート|関連記事|この記事を|\[…\])$/i.test(line))continue;
   if(size+line.length>MAX_CHARS||out.length>=MAX_PARAS)break;out.push(line);size+=line.length;

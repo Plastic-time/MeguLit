@@ -24,6 +24,8 @@ REPORT_THRESHOLD = "3"
 # E415 日报 sources whose full article text the relay may cache (only with the site's permission), comma separated
 # source ids: moepedia, 4gamer, denfami. Empty = the app fetches articles on the user's PC.
 NEWS_FULLTEXT_SOURCES = ""
+# E415 one-line Chinese notes for the daily hot words (falls back to HOT_MODEL)
+DAILY_GLOSS_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
 
 # Workers AI: avatar moderation and the AI guesses on the hot-word awards. No token needed inside the Worker.
 [ai]

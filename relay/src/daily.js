@@ -69,6 +69,7 @@ export async function refreshWords(env,now=new Date(),fetcher=fetch){
  let words=parseTrends(await get(TRENDS_URL,fetcher)),source='Google トレンド';
  if(words.length<10){const nhk=parseNhk(await get(NHK_URL,fetcher));const have=new Set(words.map(w=>w.term));words=[...words,...nhk.filter(w=>!have.has(w.term))];source=!have.size?'NHK':nhk.length?'Google トレンド · NHK':source;}
  words=words.slice(0,MAX_WORDS);if(!words.length)return 0;
+ await glossWords(env,words).catch(()=>0);
  await save(env,'hotwords',dayKey(now),{words,source},now);return words.length;
 }
 export async function refreshDaily(env,now=new Date(),fetcher=fetch){const [news,words]=await Promise.all([refreshNews(env,now,fetcher).catch(()=>0),refreshWords(env,now,fetcher).catch(()=>0)]);const images=env.BUCKET?await cleanupImages(env,now).catch(()=>0):0;return {news,words,removed:images};}
@@ -139,4 +140,23 @@ export async function articleGet(env,url,{json,fail},now=new Date(),fetcher=fetc
  const body={title:x.title||item.title,paragraphs:x.paragraphs,source:item.source,link};
  await env.BUCKET.put(key,JSON.stringify(body),{httpMetadata:{contentType:'application/json'},customMetadata:{at:String(now.getTime())}});
  return json(body,200,{'cache-control':'public, max-age=3600',...NOINDEX});
+}
+
+/* E415 a short Chinese note per hot word (退市 / 棒球选手 / 快餐产品), written once a day by Workers AI with the
+   headline as context. The app prefers its own dictionary and falls back to machine translation when this is empty. */
+export const GLOSS_MODEL='@cf/qwen/qwen3-30b-a3b-fp8';
+export const GLOSS_PROMPT='你是日语词汇注释员。对每个日语词，结合给出的新闻标题，用简体中文写一个不超过12个字的释义：普通词写词义；人名、地名、团体、作品、商品等专有名词写「是什么」（例如：棒球选手、足球俱乐部、快餐产品）。只输出 JSON 数组，按顺序每项一个字符串，不要解释。';
+export function parseGlosses(text,count){
+ const raw=String(text||'').replace(/<think>[\s\S]*?<\/think>/g,'');const m=raw.match(/\[[\s\S]*\]/);if(!m)return [];
+ try{const list=JSON.parse(m[0]);return Array.isArray(list)?list.slice(0,count).map(v=>typeof v==='string'?v.replace(/[\r\n]+/g,' ').trim().slice(0,24):''):[];}catch{return [];}
+}
+async function glossWords(env,words){
+ if(!env.AI||typeof env.AI.run!=='function'||!words.length)return 0;
+ const input=words.map((w,i)=>`${i+1}. ${w.term}${w.headline?' ｜ '+w.headline.slice(0,80):''}`).join('\n');
+ for(const model of [env.DAILY_GLOSS_MODEL||GLOSS_MODEL,env.HOT_MODEL].filter(Boolean)){
+  try{const out=await env.AI.run(model,{messages:[{role:'system',content:GLOSS_PROMPT},{role:'user',content:input}],max_tokens:800,temperature:0.2});
+   const list=parseGlosses(out?.response??out?.result?.response??'',words.length);
+   if(list.filter(Boolean).length>=Math.ceil(words.length/2)){words.forEach((w,i)=>{if(list[i])w.gloss=list[i];});return list.length;}}catch{}
+ }
+ return 0;
 }

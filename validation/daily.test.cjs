@@ -43,7 +43,7 @@ test('relay routes: /api/news and /api/hotwords/daily fetch once when empty, cro
 test('bridge: not-configured without relay, cleans data, dictionary readings only for exact headwords, link gate',async()=>{
  const daily=require('../services/daily.cjs');
  assert.equal((await daily.view('',null,{env:{MEGULIT_RELAY_BASE:'off'}})).state,'not-configured');
- const db=new DatabaseSync(':memory:');db.exec("CREATE TABLE dictionary_entries(spelling TEXT,reading TEXT,frequency INTEGER);INSERT INTO dictionary_entries VALUES('文化祭','ぶんかさい',1)");
+ const db=new DatabaseSync(':memory:');db.exec("CREATE TABLE dictionary_entries(spelling TEXT,reading TEXT,definition TEXT,frequency INTEGER);INSERT INTO dictionary_entries VALUES('文化祭','ぶんかさい','文化节',1)");
  const f=async url=>({ok:true,json:async()=>url.endsWith('/api/news')?{items:[{title:'t',link:'https://moepedia.net/n',image:'javascript:alert(1)'},{title:'x',link:'javascript:alert(1)'}]}:{day:'2026-11-11',words:[{term:'文化祭'},{term:'線状降水帯',url:'https://www3.nhk.or.jp/news/1'}]}});
  const v=await daily.view('',db,{env:{MEGULIT_RELAY_BASE:'https://relay.test'},fetch:f});
  assert.equal(v.state,'ok');assert.equal(v.news.items.length,1);assert.equal(v.news.items[0].image,'');
@@ -135,4 +135,40 @@ test('bridge reader: article fetched on this PC unless the relay may serve it, c
  const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  assert.equal(view.paragraphHTML({text:'x',tokens:[{s:'新作',b:'新作',r:'しんさく'},{s:'。',b:'。',r:''},{s:'する',b:'する',r:'する'}]},esc),'<span class="rd-t" data-b="新作" data-r="しんさく"><ruby>新作<rt>しんさく</rt></ruby></span>。<span class="rd-t" data-b="する" data-r="する">する</span>');
  const shell=view.readerShell({title:'<t>',source:'S',link},{rdJa:'日文',rdTr:'译文',rdBi:'双语',rdOrig:'o',rdClose:'c',rdHint:'h',rdLoading:'l'},esc);assert.match(shell,/data-rd-mode="tr"/);assert.match(shell,/data-rd-mode="bi"/);assert.doesNotMatch(shell,/<t>/);
+});
+test('translation: engine first, Microsoft when the engine gives nothing, cached, failure carries the reason',async()=>{
+ const daily=require('../services/daily.cjs'),root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'dl-'));
+ const broken={reviews:()=>({translate:async list=>list.map(()=>'')})};let calls=[];
+ const free=async(text,o)=>{calls.push(o.preferred);return '译:'+text;};
+ assert.deepEqual(await daily.translate(root,broken,['一段目。','二段目。'],'zh',{translateFree:free}),['译:一段目。','译:二段目。']);
+ assert.deepEqual(calls,['microsoft','microsoft']);
+ calls=[];assert.deepEqual(await daily.translate(root,broken,['一段目。'],'zh',{translateFree:free}),['译:一段目。']);assert.equal(calls.length,0,'second time from cache');
+ const fine={reviews:()=>({translate:async list=>list.map(t=>'引擎:'+t)})};
+ assert.deepEqual(await daily.translate(root,fine,['三段目。'],'zh',{translateFree:free}),['引擎:三段目。']);
+ const dead={reviews:()=>({translate:async()=>{throw Error('LOCAL_MODEL_MISSING');}})};
+ await assert.rejects(daily.translate(root,dead,['四段目。'],'zh',{translateFree:async()=>{throw Error('TRANSLATION_HTTP_429');}}),/TRANSLATION_FAILED:TRANSLATION_HTTP_429/);
+ assert.ok(fs.existsSync(path.join(root,'data','cache','daily-translate.json')));
+});
+test('hot word glosses: dictionary first (first senses, first reading), then the relay AI note, then machine translation',async()=>{
+ const daily=require('../services/daily.cjs');
+ const db=new DatabaseSync(':memory:');db.exec("CREATE TABLE dictionary_entries(spelling TEXT,reading TEXT,definition TEXT,frequency INTEGER);INSERT INTO dictionary_entries VALUES('上場廃止','じょうじょうはいし','上市废止；退市；摘牌\n其他',1),('手術','しゅじゅつ · しゅずつ','手术；外科手术；手术操作',1)");
+ assert.deepEqual(daily.dictFor(db,'上場廃止'),{reading:'じょうじょうはいし',gloss:'上市废止；退市'});assert.equal(daily.dictFor(db,'手術').reading,'しゅじゅつ');
+ const f=async url=>url.endsWith('/api/news')?{ok:true,json:async()=>({items:[]})}:{ok:true,json:async()=>({words:[{term:'上場廃止'},{term:'中村晃',gloss:'棒球选手'},{term:'ナゲット'}]})};
+ const v=await daily.view('',db,{env:{MEGULIT_RELAY_BASE:'https://relay.test'},fetch:f,translateFree:async t=>t==='ナゲット'?'鸡块':t});
+ const g=Object.fromEntries(v.words.words.map(w=>[w.term,[w.gloss,w.glossFrom]]));
+ assert.deepEqual(g,{'上場廃止':['上市废止；退市','dict'],'中村晃':['棒球选手','ai'],'ナゲット':['鸡块','mt']});
+ const view=await import(pathToFileURL(path.join(__dirname,'..','web','daily-view.js')).href);
+ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ const html=view.pageHTML({state:'ok',news:{items:[]},words:v.words},{locale:'zh',esc});
+ assert.match(html,/<small class="dl-gloss">上市废止；退市<\/small>/);assert.match(html,/<dt>释义<\/dt><dd>棒球选手<em>AI 注释<\/em><\/dd>/);
+ const w={trWhy:{LOCAL_MODEL_MISSING:'本地模型还没下载',API_KEY_MISSING:'k',TRANSLATION_HTTP_429:'429',NETWORK:'net',TIMEOUT:'t',other:'o'}};
+ assert.equal(view.trReason(Error('TRANSLATION_FAILED:LOCAL_MODEL_MISSING'),w),'本地模型还没下载');assert.equal(view.trReason(Error('fetch failed'),w),'net');
+});
+test('relay glosses: Workers AI JSON list (thinking stripped), fallback model, kept on the stored words',async()=>{
+ const d=await load('daily.js');
+ assert.deepEqual(d.parseGlosses('<think>…</think>["退市","棒球选手"]',2),['退市','棒球选手']);assert.deepEqual(d.parseGlosses('nope',2),[]);
+ const seen=[];const AI={run:async model=>{seen.push(model);if(model===d.GLOSS_MODEL)throw Error('no model');return {response:'["快餐产品","学校活动"]'};}};
+ const e={DB:d1(),AI,HOT_MODEL:'@cf/meta/llama-3.1-8b-instruct'};await d.refreshWords(e,new Date('2026-11-11T00:00:00Z'),fetcher(FEEDS));
+ const r=await d.hotWordsDailyGet(e,new URL('https://x/api/hotwords/daily'),{json:v=>v,fail:c=>c},new Date('2026-11-11T00:10:00Z'));
+ assert.deepEqual(r.words.slice(0,2).map(w=>w.gloss),['快餐产品','学校活动']);assert.deepEqual(seen,[d.GLOSS_MODEL,'@cf/meta/llama-3.1-8b-instruct']);
 });

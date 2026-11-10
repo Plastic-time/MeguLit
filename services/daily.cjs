@@ -17,13 +17,40 @@ function cleanNews(d){
  const items=(Array.isArray(d?.items)?d.items:[]).slice(0,40).map(n=>({fulltext:n?.fulltext===true,title:str(n?.title,160),link:link(n?.link),date:str(n?.date,30),source:str(n?.source,40),sourceId:str(n?.sourceId,20),summary:str(n?.summary,160),image:/^\/api\/news\/img\/[0-9a-f]{32}$/.test(String(n?.image||''))?n.image:''})).filter(n=>n.title&&n.link);
  return {items,sources:(Array.isArray(d?.sources)?d.sources:[]).slice(0,10).map(s=>({id:str(s?.id,20),name:str(s?.name,40)})),updatedAt:str(d?.updatedAt,30)||null};
 }
-function readingFor(db,term){
- if(!db||!term)return '';
- try{const row=db.prepare('SELECT reading FROM dictionary_entries WHERE spelling=? ORDER BY frequency LIMIT 1').get(term);return str(row?.reading,40);}catch{return '';}
+/* the local dictionary is Chinese: its first line, first two senses, make the short gloss beside a hot word.
+   Readings: first of 'a · b'. Only exact headwords, never a tokenizer guess. */
+function dictFor(db,term){
+ if(!db||!term)return null;
+ try{const row=db.prepare('SELECT reading,definition FROM dictionary_entries WHERE spelling=? ORDER BY frequency LIMIT 1').get(term);if(!row)return null;
+  const first=String(row.definition||'').split('\n')[0].split(/[；;]/).map(x=>x.trim()).filter(Boolean).slice(0,2).join('；');
+  return {reading:str(String(row.reading||'').split(/\s*·\s*/)[0],40),gloss:first.slice(0,30)};}catch{return null;}
 }
+function readingFor(db,term){return dictFor(db,term)?.reading||'';}
 function cleanWords(d,db){
- const words=(Array.isArray(d?.words)?d.words:[]).slice(0,20).map(w=>{const term=str(w?.term,40).trim();return {term,reading:str(w?.reading,40)||readingFor(db,term),traffic:str(w?.traffic,12),headline:str(w?.headline,160),url:link(w?.url),source:str(w?.source,40)};}).filter(w=>w.term);
+ const words=(Array.isArray(d?.words)?d.words:[]).slice(0,20).map(w=>{const term=str(w?.term,40).trim(),dict=dictFor(db,term);
+  /* gloss: dictionary first, then the relay's one-line note (Workers AI, with the headline as context); machine translation fills the rest in view() */
+  const gloss=dict?.gloss?{gloss:dict.gloss,glossFrom:'dict'}:str(w?.gloss,40).trim()?{gloss:str(w.gloss,40).trim(),glossFrom:'ai'}:{gloss:'',glossFrom:''};
+  return {term,reading:str(w?.reading,40)||dict?.reading||'',...gloss,traffic:str(w?.traffic,12),headline:str(w?.headline,160),url:link(w?.url),source:str(w?.source,40)};}).filter(w=>w.term);
  return {day:/^\d{4}-\d{2}-\d{2}$/.test(String(d?.day||''))?d.day:null,source:str(d?.source,60),words,updatedAt:str(d?.updatedAt,30)||null};
+}
+/* ---- E415 translation for the 日报: the user's engine first; when it cannot run (local model not downloaded, no API
+   key, request failed) the free Microsoft engine, like E406. Paragraph results are cached in data/cache. ---------- */
+const trFile=root=>root?path.join(root,'data','cache','daily-translate.json'):'';
+let trCache=null;
+function trLoad(root){if(trCache)return trCache;trCache=new Map();try{for(const [k,v] of Object.entries(JSON.parse(fs.readFileSync(trFile(root),'utf8'))))trCache.set(k,v);}catch{}return trCache;}
+function trSave(root){const f=trFile(root);if(!f)return;try{const all=[...trLoad(root)].slice(-3000);fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(Object.fromEntries(all)));}catch{}}
+async function translateList(root,runtime,list,goal,options={}){
+ const cache=trLoad(root),key=t=>goal+'|'+t,out=list.map(t=>t.trim()?cache.get(key(t))||'':'');
+ const todo=list.map((t,i)=>i).filter(i=>list[i].trim()&&!out[i]);if(!todo.length)return {texts:out,engine:'cache'};
+ let engine='',reason='';
+ if(runtime?.reviews)try{const got=await runtime.reviews().translate(todo.map(i=>list[i]),goal,'ja');if(Array.isArray(got)&&got.some(Boolean)){todo.forEach((i,n)=>{out[i]=String(got[n]||'');});engine='app';}else reason='ENGINE_EMPTY';}catch(e){reason=String(e?.message||e);}
+ const left=todo.filter(i=>!out[i]);
+ if(left.length){const free=options.translateFree||require('../core/translate.cjs').translateFree;let failed='';
+  for(const i of left){try{out[i]=String(await free(list[i],{source:'ja',target:goal,preferred:'microsoft',fetcher:options.fetch||fetch})||'');}catch(e){failed=String(e?.message||e);}}
+  if(left.some(i=>out[i]))engine=engine?engine+'+microsoft':'microsoft';else if(failed)reason=failed;}
+ for(const i of todo)if(out[i])cache.set(key(list[i]),out[i]);trSave(root);
+ if(!out.some(Boolean)&&list.some(t=>t.trim())){const e=Error('TRANSLATION_FAILED:'+(reason||'UNKNOWN'));throw e;}
+ return {texts:out,engine};
 }
 async function view(root,db,options={}){
  const base=relay.relayBase(root,options.env||process.env);if(!base)return {state:'not-configured',news:null,words:null};
@@ -33,6 +60,8 @@ async function view(root,db,options={}){
 words=w.state==='ok'?cleanWords(w.data,db):null;
  const state=!news&&!words?'error':!(news?.items.length)&&!(words?.words.length)?'empty':'ok';
  if(news)await thumbnails(root,base,news.items,fetcher);
+ const bare=(words?.words||[]).filter(w=>!w.gloss);
+ if(bare.length)try{const r=await translateList(root,options.runtime,bare.map(w=>w.term),'zh-CN',options);bare.forEach((w,i)=>{const t=String(r.texts[i]||'').trim();if(t&&t!==w.term){w.gloss=t.slice(0,30);w.glossFrom='mt';}});}catch{}
  for(const n of news?.items||[])if(n.fulltext)fulltext.add(n.link);
  for(const u of [...(news?.items||[]).map(x=>x.link),...(words?.words||[]).map(x=>x.url)])if(u&&u.startsWith('https:'))shown.add(u);
  return {state,error:state==='error'?n.error||w.error:undefined,news,words};
@@ -82,11 +111,10 @@ async function article(root,link,options={}){
  const paragraphs=[];for(const text of body.paragraphs)paragraphs.push({text,tokens:await tokens(text,learning)});
  return {state:'ok',link,title:body.title,via:body.via,paragraphs};
 }
-async function translate(runtime,texts,target){
- if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');
+async function translate(root,runtime,texts,target,options={}){
  const goal={zh:'zh-CN',en:'en','zh-CN':'zh-CN'}[String(target)]||'zh-CN';
  const list=(Array.isArray(texts)?texts:[]).slice(0,60).map(t=>String(t||'').slice(0,2000));
- return runtime.reviews().translate(list,goal,'ja');
+ return (await translateList(root,runtime,list,goal,options)).texts;
 }
 /* one card per word per article, in the megulit_news deck (created on first use) */
 const NEWS_DECK='megulit_news';
@@ -99,4 +127,4 @@ async function anki(root,runtime,{term,reading,meaning,sentence,link,title}={}){
  const at=word.sentence.indexOf(term),html=at<0?h(word.sentence):h(word.sentence.slice(0,at))+'<b class="tm-hl">'+h(term)+'</b>'+h(word.sentence.slice(at+term.length));
  return await new(require('../core/anki.cjs').Anki)().sync(word,config,null,{sentenceHtml:html,gameTitle:str(title,200)});
 }
-module.exports={view,canOpen,article,translate,anki,NEWS_DECK,cleanNews,cleanWords,readingFor};
+module.exports={view,canOpen,article,translate,translateList,dictFor,anki,NEWS_DECK,cleanNews,cleanWords,readingFor};
