@@ -299,6 +299,7 @@ POST   /api/follow/<pid>   DELETE /api/follow/<pid>   (cannot follow yourself; a
 GET    /api/following                     → {following:[{pid, name, public, avatar, recent (≤3)}]}, newest reading first
 GET    /api/kindred                       → {kindred:[{pid, name, avatar, shared:[titles], count, following}]}, ≤20, most overlap first
 POST   /api/profile/<pid>/report {kind, reason?}   kind: discrimination | nudity | racism | harassment | spam | other
+POST   /api/profile/appeal {reason?}       the owner of a hidden profile objects (異議あり！), once per hiding → issue in REPORT_REPO
 ```
 
 Board rows (`GET /api/leaderboard`) now carry `pid` (or `null`). Leaving the leaderboard or deleting the account
@@ -311,6 +312,11 @@ undo it), adds a `moderation_queue` row of kind `profile` and, with `REPORT_REPO
 `profile-report` in that private repository: kind, reason (optional), nickname, signature, favourites, a 72-hour private
 link to the picture, and the two commands to restore or clear it. One report per reader and profile; 3 reports a day.
 
+The owner sees the hiding in Settings › 个人主页 and can press 「一斤鸭梨！異議あり！」 once per hiding, with an optional
+statement. That opens a second issue labelled `profile-appeal` in the same private repository (every report on the
+profile, the statement, and the command that shows it again) plus a `moderation_queue` row of kind `profile-appeal`.
+The profile stays hidden until you decide; a new report after a restore allows a new objection. 3 objections a day.
+
 ```bash
 npx wrangler d1 execute megulit-relay --remote --command "SELECT r.kind,r.reason,p.pid,datetime(r.created_at,'unixepoch') FROM profile_reports r JOIN profiles p ON p.id_hash=r.target WHERE p.hidden=1"
 ```
@@ -321,4 +327,4 @@ Fixed windows in D1 (`RATE` in `src/worker.js`): 120 requests/min per IP overall
 and 20 per hour per install id; leaderboard reads 60/min; adaptation writes 30/hour, reads 120/hour; diagnostics uploads
 5/hour and downloads 30/hour per IP; avatar uploads 5/hour per user, avatar reads 600/min, reports 20/hour, hot
 words 60/min per IP; profile saves 30/hour, profile and follow reads 120/min, follow changes 60/hour per account;
-profile reports 3/day per account.
+profile reports and objections 3/day each per account.

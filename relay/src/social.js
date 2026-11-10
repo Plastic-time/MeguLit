@@ -19,8 +19,8 @@ async function recentOf(env,idHash,limit=PROFILE.recent){
 }
 async function ownProfile(env,idHash){
  const user=await env.DB.prepare('SELECT name FROM leaderboard_users WHERE id_hash=?').bind(idHash).first();
- const row=await env.DB.prepare('SELECT pid,bio,public,hidden FROM profiles WHERE id_hash=?').bind(idHash).first();
- return {ok:true,joined:!!user,name:user?.name||'',pid:row?.public&&!row?.hidden?row.pid:null,public:!!row?.public,hidden:!!row?.hidden,bio:row?.bio||'',favorites:await favoritesOf(env,idHash)};
+ const row=await env.DB.prepare('SELECT pid,bio,public,hidden,appealed_at FROM profiles WHERE id_hash=?').bind(idHash).first();
+ return {ok:true,joined:!!user,name:user?.name||'',pid:row?.public&&!row?.hidden?row.pid:null,public:!!row?.public,hidden:!!row?.hidden,appealed:!!row?.hidden&&!!row?.appealed_at,bio:row?.bio||'',favorites:await favoritesOf(env,idHash)};
 }
 
 /* GET /api/profile — your own profile; PUT /api/profile — save bio, favourites and the public switch */
@@ -133,9 +133,41 @@ export async function profileReport(request,env,ip,now,ctx,pid){
    if(r.ok){const data=await r.json().catch(()=>({}));issueUrl=typeof data.html_url==='string'?data.html_url:'';}}catch{}
  }
  await env.DB.batch([env.DB.prepare('INSERT INTO profile_reports(target,reporter,kind,reason,issue_url,created_at) VALUES(?,?,?,?,?,?)').bind(row.id_hash,reporter,kind,reason.reason,issueUrl,t),
-  env.DB.prepare('UPDATE profiles SET hidden=1 WHERE id_hash=?').bind(row.id_hash),
+  env.DB.prepare('UPDATE profiles SET hidden=1,appealed_at=0 WHERE id_hash=?').bind(row.id_hash),
   env.DB.prepare("INSERT INTO moderation_queue(kind,subject,reason,created_at,resolved_at) VALUES('profile',?,?,?,0)").bind(pid,kind+(reason.reason?': '+reason.reason:''),t)]);
  return ctx.json({ok:true,hidden:true});
+}
+
+/* E398 POST /api/profile/appeal {reason?} — 異議あり！ The owner of a reported (hidden) profile objects once per
+   hiding. The objection goes to the same private REPORT_REPO as an issue labelled profile-appeal, with every report
+   on this profile, the owner's statement and the restore command; it also adds a moderation_queue row of kind
+   profile-appeal. The profile stays hidden until the maintainer decides. */
+export async function profileAppeal(request,env,ip,now,ctx){
+ const idHash=await me(request,env,now,ctx);if(!idHash)return ctx.fail('UNAUTHORIZED',401);
+ const body=await ctx.readJSON(request,4*1024);if(body.error)return ctx.fail(body.error,body.error==='PAYLOAD_TOO_LARGE'?413:400);
+ const reason=cleanReportReason(body.value?.reason);if(!reason.ok)return ctx.fail(reason.error);
+ const row=await env.DB.prepare('SELECT p.pid,p.bio,p.hidden,p.appealed_at,u.name FROM profiles p LEFT JOIN leaderboard_users u ON u.id_hash=p.id_hash WHERE p.id_hash=?').bind(idHash).first();
+ if(!row||!row.hidden)return ctx.fail('NOT_HIDDEN');
+ if(row.appealed_at)return ctx.json({ok:true,already:true});
+ if(!await ctx.hit(env,'profile-appeal',idHash,now.getTime()))return ctx.fail('RATE_LIMITED',429);
+ const t=seconds(now),{results:reports}=await env.DB.prepare('SELECT kind,reason,issue_url,created_at FROM profile_reports WHERE target=? ORDER BY created_at').bind(idHash).all();
+ let issueUrl='';
+ const repo=/^[\w.-]+\/[\w.-]+$/.test(env.REPORT_REPO||'')?env.REPORT_REPO:'',token=env.REPORT_TOKEN||env.GITHUB_TOKEN;
+ if(repo&&token){
+  const sql=s=>['```',`npx wrangler d1 execute megulit-relay --remote --command "${s}"`,'```'];
+  const text=['The owner of this reported profile objects (異議あり！). It stays hidden until you decide.','',
+   `- nickname: ${mdText(row.name||'')}`,`- signature: ${row.bio?mdText(row.bio):'(empty)'}`,`- pid: \`${row.pid}\``,
+   `- owner's statement: ${reason.reason?mdText(reason.reason):'(none given)'}`,'','Reports:',
+   ...reports.map(r=>`- \`${r.kind}\`${r.reason?': '+mdText(r.reason):''}${r.issue_url?` (${r.issue_url})`:''}`),'',
+   'Objection upheld (show the profile again):',...sql(`UPDATE profiles SET hidden=0,appealed_at=0 WHERE pid='${row.pid}'; UPDATE moderation_queue SET resolved_at=unixepoch() WHERE kind IN ('profile','profile-appeal') AND subject='${row.pid}'`),
+   'Objection overruled: leave it hidden and close this issue, or clear it with the command in the report issue.'].join('\n');
+  try{const r=await (env.fetch||fetch)(`https://api.github.com/repos/${repo}/issues`,{method:'POST',headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'megulit-relay','content-type':'application/json'},
+    body:JSON.stringify({title:`[異議あり] ${row.name||row.pid}`.slice(0,200),body:text,labels:['profile-appeal']})});
+   if(r.ok){const data=await r.json().catch(()=>({}));issueUrl=typeof data.html_url==='string'?data.html_url:'';}}catch{}
+ }
+ await env.DB.batch([env.DB.prepare('UPDATE profiles SET appealed_at=? WHERE id_hash=?').bind(t,idHash),
+  env.DB.prepare("INSERT INTO moderation_queue(kind,subject,reason,created_at,resolved_at) VALUES('profile-appeal',?,?,?,0)").bind(row.pid,reason.reason||'(none)',t)]);
+ return ctx.json({ok:true,appealed:true});
 }
 
 /* leaving the leaderboard or deleting the account removes all of it */

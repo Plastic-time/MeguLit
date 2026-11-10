@@ -58,9 +58,17 @@ test('report: kind required, reason optional; the profile hides at once; the iss
   await call(handle,e,'PUT','/api/profile',{bio:'hello',public:true},A);
   const own=(await call(handle,e,'GET','/api/profile',undefined,A)).data;assert.deepEqual([own.hidden,own.pid],[true,null]);
   assert.equal((await call(handle,e,'POST',`/api/profile/${pid}/report`,{kind:'racism'},B)).data.already,true,'one report per reader');
-  assert.deepEqual(e.DB.raw.prepare("SELECT kind,subject,reason FROM moderation_queue").all().map(r=>({...r})),[{kind:'profile',subject:pid,reason:'racism: 签名里有歧视内容'}]);
+  /* E398 異議あり！ the owner objects once per hiding; it stays hidden until the maintainer decides */
+  assert.equal((await call(handle,e,'POST','/api/profile/appeal',{reason:'只是普通签名'})).status,401);
+  assert.equal((await call(handle,e,'POST','/api/profile/appeal',{},B)).data.error,'NOT_HIDDEN');
+  assert.deepEqual((await call(handle,e,'POST','/api/profile/appeal',{reason:'只是普通签名'},A)).data,{ok:true,appealed:true});
+  assert.equal((await call(handle,e,'POST','/api/profile/appeal',{},A)).data.already,true);
+  assert.deepEqual((({hidden,appealed})=>[hidden,appealed])((await call(handle,e,'GET','/api/profile',undefined,A)).data),[true,true]);
+  assert.equal((await call(handle,e,'GET','/api/profile/'+pid)).status,404,'still hidden');
+  assert.deepEqual(e.DB.raw.prepare("SELECT kind,subject,reason FROM moderation_queue").all().map(r=>({...r})),[{kind:'profile',subject:pid,reason:'racism: 签名里有歧视内容'},{kind:'profile-appeal',subject:pid,reason:'只是普通签名'}]);
   if(repo){
-   assert.equal(calls.length,1);assert.equal(calls[0].url,'https://api.github.com/repos/owner/megulit-reports/issues');
+   assert.equal(calls.length,2);assert.ok(calls.every(c=>c.url==='https://api.github.com/repos/owner/megulit-reports/issues'),'both go to the private repo');
+   const objection=calls[1].body;assert.deepEqual(objection.labels,['profile-appeal']);assert.match(objection.title,/異議あり/);assert.match(objection.body,/只是普通签名/);assert.match(objection.body,/`racism`: 签名里有歧视内容/);assert.match(objection.body,/SET hidden=0,appealed_at=0/);
    const issue=calls[0].body;assert.deepEqual(issue.labels,['profile-report']);assert.match(issue.title,/racism · Reader1/);
    assert.match(issue.body,/签名里有歧视内容/);assert.match(issue.body,/signature: hello/);assert.match(issue.body,/favourites: ATRI/);assert.match(issue.body,/SET hidden=0 WHERE pid='[0-9a-f]{16}'/);
    assert.equal(e.DB.raw.prepare('SELECT issue_url FROM profile_reports').get().issue_url,'https://github.com/owner/megulit-reports/issues/1');

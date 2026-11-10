@@ -243,6 +243,7 @@ async function dispatch(request,runtime=null) {
       case 'leaderboard_card':return await require('./leaderboard.cjs').profileCard(root,String(request.pid||''));
       case 'leaderboard_follow':return await require('./leaderboard.cjs').followSet(root,String(request.pid||''),request.on===true);
       case 'leaderboard_report_profile':return await require('./leaderboard.cjs').reportProfile(root,String(request.pid||''),{kind:String(request.kind||''),reason:typeof request.reason==='string'?request.reason:''});
+      case 'leaderboard_profile_appeal':return await require('./leaderboard.cjs').appealProfile(root,{reason:typeof request.reason==='string'?request.reason:''});
       case 'leaderboard_library':return require('./leaderboard.cjs').libraryTitles(db);
       case 'leaderboard_leave':return await require('./leaderboard.cjs').leave(root);
       case 'save_key':return new(require('./settings.cjs').Settings)(root).saveKey({provider:request.provider,baseUrl:request.baseUrl,apiKey:request.apiKey});

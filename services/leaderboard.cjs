@@ -270,7 +270,7 @@ async function socialCall(root,method,route,body,options={},needLogin=true){
 /* your own profile as the relay has it ({joined,pid,public,hidden,bio,favorites}) */
 async function profileGet(root,options={}){
  const res=await socialCall(root,'GET','/api/profile',undefined,options);if(res.state!=='ok')return res;const d=res.data;
- return {state:'ok',joined:d.joined===true,pid:PID.test(String(d.pid||''))?d.pid:null,public:d.public===true,hidden:d.hidden===true,bio:str(d.bio,60),favorites:cleanFavorites(d.favorites)};
+ return {state:'ok',joined:d.joined===true,pid:PID.test(String(d.pid||''))?d.pid:null,public:d.public===true,hidden:d.hidden===true,appealed:d.appealed===true,bio:str(d.bio,60),favorites:cleanFavorites(d.favorites)};
 }
 async function profileSave(root,{bio,favorites,public:open}={},options={}){
  const checked=cleanBio(bio);if(!checked.ok)throw Error('LEADERBOARD_'+checked.error);
@@ -294,6 +294,10 @@ async function reportProfile(root,pid,{kind,reason}={},options={}){
  if(!PID.test(String(pid||'')))return {state:'error',error:'NOT_FOUND'};if(!REPORT_KINDS.includes(kind))throw Error('LEADERBOARD_INVALID_KIND');
  const res=await socialCall(root,'POST',`/api/profile/${pid}/report`,{kind,reason:str(reason,500)},options);return res.state==='ok'?{state:'ok',hidden:true}:res;
 }
+/* E398 異議あり！ — the owner of a hidden profile objects once per hiding */
+async function appealProfile(root,{reason}={},options={}){
+ const res=await socialCall(root,'POST','/api/profile/appeal',{reason:str(reason,500)},options);return res.state==='ok'?{state:'ok',appealed:true}:res;
+}
 /* the 关注 tab: who you follow (newest reading first) and up to 20 同好 */
 async function social(root,options={}){
  const [following,kindred]=await Promise.all([socialCall(root,'GET','/api/following',undefined,options),socialCall(root,'GET','/api/kindred',undefined,options)]);
@@ -307,4 +311,4 @@ function libraryTitles(db){
  const rows=db.prepare('SELECT g.title,MAX(s.started_at) last FROM games g LEFT JOIN reading_sessions s ON s.game_id=g.id WHERE g.removed_at IS NULL AND g.hidden_at IS NULL GROUP BY g.id ORDER BY last IS NULL,last DESC,g.title').all();
  const seen=new Set();return rows.map(r=>String(r.title||'').trim().slice(0,120)).filter(t=>t&&!seen.has(t)&&seen.add(t)).slice(0,500);
 }
-module.exports={cleanBio,profileGet,profileSave,profileCard,followSet,reportProfile,social,libraryTitles,REPORT_KINDS,PERIODS,METRICS,CATEGORIES,BLOCKED,cleanName,cleanTerm,collectStats,collectLookups,hotWeekKey,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile,identity,setAvatar,removeAvatar,avatarStatus,appealAvatar,avatarImages,report,hotWords};
+module.exports={appealProfile,cleanBio,profileGet,profileSave,profileCard,followSet,reportProfile,social,libraryTitles,REPORT_KINDS,PERIODS,METRICS,CATEGORIES,BLOCKED,cleanName,cleanTerm,collectStats,collectLookups,hotWeekKey,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile,identity,setAvatar,removeAvatar,avatarStatus,appealAvatar,avatarImages,report,hotWords};

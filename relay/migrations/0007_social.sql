@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   public     INTEGER NOT NULL DEFAULT 0,
   -- 1 = reported and hidden until the maintainer reviews it (social.js profileReport); counts as private everywhere
   hidden     INTEGER NOT NULL DEFAULT 0,
+  -- E398 when the owner objected to the current hiding (0 = not yet); a new report resets it
+  appealed_at INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL
 );
 
