@@ -623,7 +623,7 @@ async function history(token){
   target.innerHTML=historyHTML(items,{mode:subtab,locale,text,esc,icon,duration,datetime,number,games:model.games,cover,empty});attachGameActions(target);if(subtab==='dialogue')stopHistoryTranslations=mountHistoryTranslations({root:target,viewport:main,api,isCurrent:()=>token===pageToken,locale});
 }
 const tabs=names=>`<div class="tabs">${names.map(k=>`<button class="tab ${subtab===k?'active':''}" data-tab="${k}">${text[k]}</button>`).join('')}</div>`;
-const LEARNING_TABS=['review','kana','kanagames','words','sentences','dictionary','trash','statistics'];
+const LEARNING_TABS=['review','kana','kanagames','words','sentences','readwords','dictionary','trash','statistics'];
 const ACCENT_DEFAULTS=['#ad1539','#9d314d','#7b5ba7','#347b91','#398775'];
 function accentChipsHTML(prefs){return [...new Set([...(prefs.accentPresets||[]),...ACCENT_DEFAULTS])].map(color=>`<button type="button" class="swatch ${color===String(prefs.accent).toLowerCase()?'active':''}" data-color="${color}" style="--swatch:${color}" aria-label="${color}" title="${color.toUpperCase()}"></button>`).join('');}
 /* E272 (user: the sub-tab bar should drop down, retract when leaving, and retract then drop again between pages):
@@ -649,10 +649,12 @@ function definitions(value){
   catch{}return String(value||'');
 }
 async function learning(token){
-  if(!['review','kana','kanagames','words','sentences','dictionary','trash'].includes(subtab))subtab='review';
+  if(!['review','kana','kanagames','words','sentences','readwords','dictionary','trash'].includes(subtab))subtab='review';
   const tab=subtab,slot=learningSlot(),target=document.createElement('div');
  const commit=()=>{slot.closest('.main').classList.toggle('review-page',tab==='review');slot.replaceChildren(target);};
   if(subtab==='dictionary'){dictionary(target);commit();return;}
+  /* 读过的词: frequency, this week's new words and JLPT coverage from the lines read */
+  if(subtab==='readwords'){commit();try{const {mountReadingInsights}=await import('./reading-insights.js');if(token===pageToken)await mountReadingInsights(target,{api,locale,esc,number,toast,isCurrent:()=>token===pageToken,enhance:enhanceSelects});}catch(error){target.textContent=String(error?.message||error);}return;}
   if(subtab==='kana'||subtab==='kanagames'){commit();try{const {mountKana}=await import('./kana/kana.js');if(token===pageToken)await mountKana(target,{api,invoke,toast,start:subtab==='kanagames'?'games':'index',openTab:tab=>navigate('learning',tab)});}catch(error){target.textContent=String(error?.message||error);}return;}
   if(subtab==='review'){await review(token,target);if(token===pageToken){enhanceSelects(target);commit();}return;}
   const [items,pending]=await Promise.all([api(subtab==='words'?'vocabulary':subtab==='trash'?'word_trash':'sentences'),subtab==='words'?api('unknown_words').catch(()=>[]):[]]);if(token!==pageToken)return;

@@ -1,0 +1,42 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* 学习 → 读过的词 (2026-11-10): the words met in reading. This week's new words for review, the most frequent words
+   not saved yet (overall or per game) with one-click save, and JLPT N5–N1 coverage: met in reading vs saved, and the
+   levels each game's vocabulary leans on. */
+export const insightMessages={
+ zh:{weekly:'这周读到的生词',weeklyHelp:'本周（周一起）读到、还没收录的词，按出现次数排序',frequent:'常见未收录词',frequentHelp:'读过的台词里出现最多、还没收录的词',all:'全部游戏',times:'次',save:'收录',saved:'已收录',saving:'正在收录',saveFail:'收录失败',jlpt:'JLPT 覆盖',jlptHelp:'每一级的词：读到过的比例，和已收录的比例',met:'读到',collected:'收录',words:'词',lean:'各游戏的词汇等级',leanHelp:'每部游戏里读到的不同词语，按 JLPT 等级分布',beyond:'超纲',empty:'还没有读过的台词。玩游戏时 MeguLit 记录的台词会在这里统计',counting:'正在统计读过的台词，还剩 {n} 句',noRuntime:'本地分词组件就绪后才会统计新读的台词',lines:'句台词',source:'来源：MIT 授权的开源 JLPT 词表（基于 Jonathan Waller 的 JLPT Resources，CC BY）',none:'这周还没有新词',from:'出自'},
+ ja:{weekly:'今週読んだ新出語',weeklyHelp:'今週（月曜から）読んだ、まだ登録していない語を出現回数順に表示',frequent:'よく出る未登録語',frequentHelp:'読んだセリフに多く出て、まだ登録していない語',all:'すべてのゲーム',times:'回',save:'登録',saved:'登録済み',saving:'登録中',saveFail:'登録できませんでした',jlpt:'JLPT カバー率',jlptHelp:'各レベルの語のうち、読書で出会った割合と登録した割合',met:'出会った',collected:'登録',words:'語',lean:'ゲームごとの語彙レベル',leanHelp:'各ゲームで出会った異なり語の JLPT レベル分布',beyond:'範囲外',empty:'まだ読んだセリフがありません。プレイ中に MeguLit が記録したセリフをここで集計します',counting:'読んだセリフを集計中、残り {n} 文',noRuntime:'ローカル形態素解析が準備できると新しいセリフを集計します',lines:'文のセリフ',source:'出典：MIT ライセンスのオープン JLPT 語彙リスト（Jonathan Waller の JLPT Resources、CC BY に基づく）',none:'今週の新出語はまだありません',from:'出典'},
+ en:{weekly:'New words read this week',weeklyHelp:'Words read this week (from Monday) that you have not saved, most frequent first',frequent:'Frequent unsaved words',frequentHelp:'The words that appear most in the lines you read and are not saved yet',all:'All games',times:'×',save:'Save',saved:'Saved',saving:'Saving',saveFail:'Could not save',jlpt:'JLPT coverage',jlptHelp:'For each level: the share of its words met in reading, and the share saved',met:'Met',collected:'Saved',words:'words',lean:'Vocabulary level by game',leanHelp:'Distinct words met in each game, by JLPT level',beyond:'Beyond',empty:'No lines read yet. Lines MeguLit records while you play are counted here',counting:'Counting the lines you read, {n} left',noRuntime:'New lines are counted once the local tokenizer is ready',lines:'lines',source:'Source: open MIT-licensed JLPT word list (from Jonathan Waller\'s JLPT Resources, CC BY)',none:'No new words this week yet',from:'From'}
+};
+const pct=v=>`${Math.round((Number(v)||0)*1000)/10}%`;
+export function coverageRows(levels){return (levels||[]).map(l=>({level:l.level,total:l.total,met:l.met,saved:l.saved,metPct:pct(l.metShare),savedPct:pct(l.savedShare)}));}
+function wordList(items,{w,esc,number,saving}){
+ return `<div class="ri-words">${items.map(item=>`<article class="record ri-word" data-key="${esc(item.key)}"><div class="ri-word-main"><div class="ri-word-head"><span class="word-spelling">${esc(item.base)}</span>${item.jlpt?`<span class="ri-badge">${esc(item.jlpt)}</span>`:''}<span class="ri-count">${number(item.count)}${w.times==='×'?'×':' '+w.times}</span></div>${item.reading&&/[㐀-鿿々]/.test(item.base)?`<div class="word-reading">${esc(item.reading)}</div>`:''}${item.meaning?`<div class="word-def">${esc(item.meaning)}</div>`:''}${item.games?.length?`<div class="record-meta ri-games">${esc(w.from)} ${item.games.map(g=>esc(g.title||'')).filter(Boolean).join(' · ')}</div>`:''}</div><div class="word-actions"><button class="secondary ri-save" type="button" data-save="${esc(item.key)}" data-base="${esc(item.base)}"${saving.has(item.key)?' disabled':''}>${saving.has(item.key)?w.saving:w.save}</button></div></article>`).join('')}</div>`;
+}
+export function readingInsightsHTML(data,{locale,esc,number,gameId='',saving=new Set()}){
+ const w=insightMessages[locale]||insightMessages.zh;
+ if(!data||(!data.lines&&!data.pending))return `<section class="panel ri-panel"><p class="muted">${esc(w.empty)}</p></section>`;
+ const status=data.pending?`<p class="settings-help ri-status">${esc(data.counting?w.counting.replace('{n}',number(data.pending)):w.noRuntime)}</p>`:'';
+ const games=data.games||[];
+ const picker=`<select class="ri-game" aria-label="${esc(w.all)}"><option value="">${esc(w.all)}</option>${games.map(g=>`<option value="${esc(g.id)}"${g.id===gameId?' selected':''}>${esc(g.title)}</option>`).join('')}</select>`;
+ const bars=coverageRows(data.jlpt).map(r=>`<div class="ri-level"><span class="ri-level-name">${esc(r.level)}</span><div class="ri-bar" role="img" aria-label="${esc(`${r.level} ${w.met} ${r.metPct} · ${w.collected} ${r.savedPct}`)}"><i class="ri-bar-met" style="width:${r.metPct}"></i><i class="ri-bar-saved" style="width:${r.savedPct}"></i></div><span class="ri-level-num"><b>${r.metPct}</b> ${esc(w.met)} · ${r.savedPct} ${esc(w.collected)}<small> / ${number(r.total)} ${esc(w.words)}</small></span></div>`).join('');
+ const lean=games.slice(0,8).map(g=>`<div class="ri-lean-row"><span class="ri-lean-title" title="${esc(g.title)}">${esc(g.title)}</span><div class="ri-stack">${(g.levels||[]).filter(l=>l.count).map(l=>`<i class="ri-seg ri-${esc(l.level.toLowerCase())}" style="flex:${l.count}" title="${esc(`${l.level==='beyond'?w.beyond:l.level} ${pct(l.share)}`)}"></i>`).join('')}</div><small class="muted">${number(g.lines)} ${esc(w.lines)}</small></div>`).join('');
+ const legend=`<div class="ri-legend">${['N5','N4','N3','N2','N1','beyond'].map(l=>`<span><i class="ri-seg ri-${l.toLowerCase()}"></i>${esc(l==='beyond'?w.beyond:l)}</span>`).join('')}</div>`;
+ return `${status}<section class="panel ri-panel"><div class="section-header"><h2>${esc(w.weekly)}</h2></div><p class="settings-help">${esc(w.weeklyHelp)}</p>${data.weekly?.length?wordList(data.weekly.slice(0,20),{w,esc,number,saving}):`<p class="muted">${esc(w.none)}</p>`}</section>
+<section class="panel ri-panel"><div class="section-header"><h2>${esc(w.frequent)}</h2>${picker}</div><p class="settings-help">${esc(w.frequentHelp)}</p>${data.frequent?.length?wordList(data.frequent,{w,esc,number,saving}):`<p class="muted">${esc(w.none)}</p>`}</section>
+<section class="panel ri-panel"><div class="section-header"><h2>${esc(w.jlpt)}</h2><span class="ri-key"><i class="ri-bar-met"></i>${esc(w.met)} <i class="ri-bar-saved"></i>${esc(w.collected)}</span></div><p class="settings-help">${esc(w.jlptHelp)}</p><div class="ri-levels">${bars}</div>${games.length?`<h3 class="ri-sub">${esc(w.lean)}</h3><p class="settings-help">${esc(w.leanHelp)}</p>${legend}<div class="ri-lean">${lean}</div>`:''}<p class="settings-help ri-credit">${esc(w.source)}</p></section>`;
+}
+/* Mounts the page: loads the report, re-asks while lines are still being counted, saves a word in one click. */
+export async function mountReadingInsights(target,{api,locale,esc,number,toast,isCurrent=()=>true,enhance=()=>{}}){
+ const w=insightMessages[locale]||insightMessages.zh;let gameId='',data=null,saving=new Set(),timer=0;
+ const render=()=>{target.innerHTML=readingInsightsHTML(data,{locale,esc,number,gameId,saving});bind();enhance(target);};
+ const load=async(count=true)=>{clearTimeout(timer);try{const next=await api('reading_insights',{gameId,count});if(!isCurrent())return;data=next;render();if(next.pending&&next.counting&&count)timer=setTimeout(()=>{if(isCurrent())load(true);},1500);}catch(error){if(isCurrent()&&!data){target.innerHTML=`<section class="panel ri-panel"><p class="muted">${esc(String(error?.message||error))}</p></section>`;}}};
+ function bind(){
+  target.querySelector('.ri-game')?.addEventListener('change',event=>{gameId=event.target.value;load(false);});
+  target.querySelectorAll('[data-save]').forEach(button=>button.addEventListener('click',async()=>{const key=button.dataset.save;if(saving.has(key))return;saving.add(key);button.disabled=true;button.textContent=w.saving;
+   try{const saved=await api('reading_save_word',{key,base:button.dataset.base,gameId:gameId||null});toast?.(`${w.saved} · ${saved.spelling||saved.reading||key}`);for(const list of [data.weekly,data.frequent])if(Array.isArray(list)){const i=list.findIndex(x=>x.key===key);if(i>=0)list.splice(i,1);}}
+   catch{toast?.(w.saveFail);}finally{saving.delete(key);if(isCurrent())render();}}));
+ }
+ target.innerHTML=`<section class="panel ri-panel"><p class="muted">…</p></section>`;
+ await load(true);
+ return ()=>clearTimeout(timer);
+}

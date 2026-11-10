@@ -155,6 +155,8 @@ function restoreWord(db,id) {
   }catch(error){db.exec('ROLLBACK');throw error;}
   return {restored:w.id};
 }
+/* The JMdict entry for a word met in reading: its dictionary form first, then the normalized form. */
+async function lookupEntry(learning,base,key){for(const text of [...new Set([base,key].filter(Boolean))]){const result=await learning.request('lookup_exact',{text,start:0,end:[...text].length},'zh');const entry=result?.entries?.find(e=>require('./learning-insights.cjs').entryMatches(e,base,key));if(entry)return entry;}return null;}
 async function dispatch(request,runtime=null) {
   if(request.action==='backup_export')return require('./backup.cjs').exportBackup(root,request.path);
   if(request.action==='backup_preview')return require('./backup.cjs').previewBackup(root,request.path);
@@ -341,6 +343,21 @@ async function dispatch(request,runtime=null) {
       case 'delete_word':return deleteWord(db,Number(request.id));
       case 'restore_word':return restoreWord(db,Number(request.id));
       case 'learning_activity':return require('./learning-activity.cjs').activity(db,request);
+      /* Learning from reading: tokenizes the recorded lines not counted yet (needs the reading runtime), then reports
+         word frequency, the weekly review list and JLPT coverage. Without the runtime it reports what is counted. */
+      case 'reading_insights':{
+        const insights=require('./learning-insights.cjs'),gameId=typeof request.gameId==='string'&&request.gameId?request.gameId:null;
+        const learning=runtime&&typeof runtime.learning==='function'?runtime.learning():null,ready=!!learning?.installed?.();
+        if(ready&&request.count!==false)await insights.refresh(db,text=>learning.tokenize(text),{deadline:Date.now()+8000});
+        const result=insights.report(db,{gameId});
+        if(ready)await insights.describe(db,[...result.frequent,...result.weekly],(base,key)=>lookupEntry(learning,base,key),{deadline:Date.now()+5000});
+        return {...result,counting:ready,gameId};
+      }
+      case 'reading_save_word':{
+        if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');const insights=require('./learning-insights.cjs'),key=String(request.key||'').slice(0,40),base=String(request.base||key).slice(0,40);if(!key)throw Error('WORD_NOT_FOUND');
+        const entry=await lookupEntry(runtime.learning(),base,key);const saved=insights.saveWord(db,entry,insights.exampleLine(db,key,typeof request.gameId==='string'?request.gameId:null));
+        runtime.emit?.('reader-event',{type:'word-status-changed'});return saved;
+      }
       case 'statistics':return require('./statistics.cjs').statistics(db,request);
       case 'focus_game':{const game=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(String(request.id));if(!game)throw Error('GAME_NOT_FOUND');return {status:await require('./game-process.cjs').gameProcess(root,game.executable,{focus:true})};}
       case 'launch':return await launch(db,String(request.id),runtime,request.windowsLaunch===true);
