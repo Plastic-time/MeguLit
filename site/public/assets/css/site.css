@@ -2035,3 +2035,18 @@ html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
 .ht-box:hover .ht-next { color: #fff; }
 @media (max-width: 40rem) { .ht-box { padding: 1.5rem 1rem 3rem; } .ht-name { font-size: .75rem; } }
 @media (prefers-reduced-motion: reduce) { .ht-box .ht-next i { animation: none; } }
+
+/* the text box: one width for every line (wide enough for 学日语), its height slides between lines; every line is
+   set at one size, centred in the box's height */
+.ht-box { width: min(100%, calc(46vw + 2 * clamp(1.2rem, 2.4vw, 3rem))); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;
+  transition: height .5s cubic-bezier(.2, .7, .2, 1), border-color .25s; }
+.ht-box.resizing { overflow: hidden; }
+.ht-box .hero-type { width: 100%; }
+:lang(zh) .ht-box .ht-big { font-size: min(15vw, 15rem); white-space: nowrap; }
+:lang(en) .ht-box .ht-big { white-space: normal; }
+.ht-play.saying { display: block; }
+.ht-say { font-size: clamp(1.9rem, 3.9vw, 4.6rem); line-height: 1.42; letter-spacing: .03em; }
+.ht-say:lang(en) { font-size: clamp(2rem, 4.2vw, 5rem); line-height: 1.12; }
+@media (max-width: 40rem) { .ht-box { width: 100%; } .ht-say { font-size: 8.4vw; } .ht-say:lang(en) { font-size: 9vw; } :lang(zh) .ht-box .ht-big { font-size: 24vw; } :lang(ja) .ht-box .ht-big { font-size: 15vw; } :lang(en) .ht-box .ht-big { font-size: 13vw; } }
+:lang(ja) .ht-box .ht-big { font-size: min(10.5vw, 11rem); }
+:lang(en) .ht-box .ht-big { font-size: min(8vw, 9rem); }

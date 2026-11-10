@@ -65,6 +65,19 @@ export function heroPlay(h1, { reduce = false } = {}) {
     const step = () => { if (!rest.length) { finish(); return; } rest.shift().classList.remove('ht-hide'); timer = setTimeout(step, 55); };
     step();
   };
+  // the box's height follows each line, sliding from the old size to the new one
+  let sizeTimer = 0;
+  const resize = swap => {
+    const from = box.getBoundingClientRect().height;
+    box.style.removeProperty('height'); swap();
+    const to = box.getBoundingClientRect().height;
+    if (reduce || Math.abs(to - from) < 2) return;
+    clearTimeout(sizeTimer);
+    box.classList.add('resizing'); box.style.setProperty('height', `${from}px`);
+    void box.offsetHeight;
+    box.style.setProperty('height', `${to}px`);
+    sizeTimer = setTimeout(() => { box.classList.remove('resizing'); box.style.removeProperty('height'); }, 520);
+  };
   let continued = false;
   const advance = () => {
     continued = false;
@@ -72,23 +85,23 @@ export function heroPlay(h1, { reduce = false } = {}) {
     card?.remove(); card = null;
     const lines = LINES[lang()] || LINES.en;
     idx = (idx + 1) % (lines.length + 1);
-    if (idx === 0) { down.hidden = true; h1.innerHTML = saved; h1.classList.remove('saying'); h1.style.removeProperty('min-height'); box.style.removeProperty('min-width'); return; }
-    // the box keeps the headline's size through every line (no jumping frame)
-    if (!h1.classList.contains('saying')) { h1.style.setProperty('min-height', `${h1.offsetHeight}px`); box.style.setProperty('min-width', `${box.offsetWidth}px`); }
-    h1.classList.add('saying');
-    const say = document.createElement('span'); say.className = 'ht-say'; say.lang = lang() === 'en' ? 'en' : 'ja';
-    h1.replaceChildren(say);
-    // the whole line is laid out first, every piece hidden, then shown one by one: its lines never move while it types
+    if (idx === 0) { down.hidden = true; resize(() => { h1.innerHTML = saved; h1.classList.remove('saying'); }); return; }
     const text = lines[idx - 1], withAfter = text.includes('[[');
-    let all = pieces(text).concat(withAfter ? pieces(AFTER[lang()] || AFTER.en).map(n => { n.later = true; return n; }) : []);
-    rest = all.map(n => { const L = n.later; if (n.nodeType === 3) { const sp = document.createElement('span'); sp.append(n); n = sp; } n.later = L; if (n.tagName !== 'BR') n.classList.add('ht-hide'); return n; });
-    // the words after the clickable one sit in their own smaller block under it
-    const after = document.createElement('span'); after.className = 'ht-after';
-    after.append(...rest.filter(n => n.later));
-    say.append(...rest.filter(n => !n.later), ...(withAfter ? [after] : []));
-    later = rest.filter(n => n.later && n.tagName !== 'BR');
-    rest = rest.filter(n => !n.later && n.tagName !== 'BR');
-    down.hidden = idx !== lines.length;
+    resize(() => {
+      h1.classList.add('saying');
+      const say = document.createElement('span'); say.className = 'ht-say'; say.lang = lang() === 'en' ? 'en' : 'ja';
+      h1.replaceChildren(say);
+      // the whole line is laid out first, every piece hidden, then shown one by one: its lines never move while it types
+      const all = pieces(text).concat(withAfter ? pieces(AFTER[lang()] || AFTER.en).map(n => { n.later = true; return n; }) : []);
+      rest = all.map(n => { const L = n.later; if (n.nodeType === 3) { const sp = document.createElement('span'); sp.append(n); n = sp; } n.later = L; if (n.tagName !== 'BR') n.classList.add('ht-hide'); return n; });
+      // the words after the clickable one sit in their own smaller block under it
+      const after = document.createElement('span'); after.className = 'ht-after';
+      after.append(...rest.filter(n => n.later));
+      say.append(...rest.filter(n => !n.later), ...(withAfter ? [after] : []));
+      later = rest.filter(n => n.later && n.tagName !== 'BR');
+      rest = rest.filter(n => !n.later && n.tagName !== 'BR');
+      down.hidden = idx !== lines.length;
+    });
     if (reduce) { finish(); return; }
     typing = true; h1.classList.add('typing');
     const step = () => { if (!rest.length) { finish(); return; } rest.shift().classList.remove('ht-hide'); timer = setTimeout(step, 55); };
@@ -126,5 +139,5 @@ export function heroPlay(h1, { reduce = false } = {}) {
   h1.addEventListener('keydown', e => { const w = e.target.closest?.('.ht-word'); if (w && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); if (card) closeCard(); else openCard(w); } });
   btn.addEventListener('click', () => { if (card) { card.remove(); card = null; return; } advance(); });
   // a language change puts the headline back in the new language
-  addEventListener('megulit:lang', () => { card = null; down.hidden = true; clearTimeout(timer); typing = false; rest = []; idx = 0; saved = h1.innerHTML; h1.classList.remove('saying', 'typing'); h1.style.removeProperty('min-height'); box.style.removeProperty('min-width'); label(); });
+  addEventListener('megulit:lang', () => { card = null; down.hidden = true; clearTimeout(timer); typing = false; rest = []; idx = 0; saved = h1.innerHTML; h1.classList.remove('saying', 'typing'); box.style.removeProperty('height'); label(); });
 }
