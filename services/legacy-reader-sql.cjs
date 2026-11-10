@@ -31,7 +31,7 @@ function request(root,command,args={},{sentenceTranslation}={}){
    if(db.prepare('SELECT 1 FROM examples WHERE word_id=? AND text=?').get(Number(v[0]),String(v[1])))return {rowsAffected:0,lastInsertId:0};
    /* The game's own line is the example; its human translation (zero-latency) comes before the machine one. */
    let t={};try{t=sentenceTranslation?.(String(v[1]))||{};}catch{}
-   return execute('INSERT INTO examples(word_id,text,translation,highlight_start,highlight_end,game_id,created_at,original) VALUES(?,?,?,?,?,?,?,?)',[Number(v[0]),String(v[1]),t.translation||null,Number(v[2]),Number(v[3]),game?.id||null,Number(v[5])||Math.floor(Date.now()/1000),JSON.stringify(t.translationSource?{translationSource:t.translationSource}:{})]);
+   return execute('INSERT INTO examples(word_id,text,translation,highlight_start,highlight_end,game_id,created_at,original) VALUES(?,?,?,?,?,?,?,?)',[Number(v[0]),String(v[1]),t.translation||null,Number(v[2]),Number(v[3]),game?.id||null,Number(v[5])||Math.floor(Date.now()/1000),JSON.stringify({...(t.translationSource?{translationSource:t.translationSource}:{}),readAt:Math.floor(Date.now()/1000)})]);
   }
   if(/^INSERT OR REPLACE INTO tome_anki_links /i.test(q))return execute('INSERT OR REPLACE INTO anki_links(word_id,note_id) VALUES(?,?)',[Number(v[0]),Number(v[1])]);
   if(/^UPDATE words SET status = \$1, status_updated_at = unixepoch\(\) WHERE id = \$2 AND status != \$1$/i.test(q))return execute('UPDATE vocabulary SET status=? WHERE id=? AND status!=?',[Number(v[0]),Number(v[1]),Number(v[0])]);

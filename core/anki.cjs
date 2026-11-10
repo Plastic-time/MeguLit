@@ -66,7 +66,7 @@ class Anki{
   return notes.map(n=>{const cs=(n.cards||[]).map(id=>byId.get(id)).filter(Boolean);return {noteId:n.noteId,word:text(n.fields?.Word),reading:text(n.fields?.WordReading||n.fields?.Reading),sentence:text(n.fields?.Sentence),status:cs.length?Math.max(...cs.map(level)):0,reviews:(n.cards||[]).flatMap(id=>(reviews[String(id)]||[]).map(r=>Number(r.id)).filter(Number.isFinite))};});
  }
  async status(c){return {version:await this.call(c,'version'),decks:await this.call(c,'deckNames'),models:await this.call(c,'modelNames')};}
- async sync(word,config,audio,extra={}){const c=cleanV4(config);if(!word?.surface||!word?.reading)throw Error('当前词没有确定读音，无法制卡');const id=createHash('sha256').update(JSON.stringify([word.base||word.surface,word.reading])).digest('hex'),lock=JSON.stringify([c.ankiUrl,c.ankiDeck,c.ankiModel,id]);if(this.pending.has(lock))return this.pending.get(lock);const job=this.save(word,c,audio,id,extra).finally(()=>this.pending.delete(lock));this.pending.set(lock,job);return job;}
+ async sync(word,config,audio,extra={}){const c=cleanV4(config);if(!word?.surface||!word?.reading)throw Error('当前词没有确定读音，无法制卡');const id=createHash('sha256').update(JSON.stringify(word.cardKey?[word.cardKey]:[word.base||word.surface,word.reading])).digest('hex'),lock=JSON.stringify([c.ankiUrl,c.ankiDeck,c.ankiModel,id]);if(this.pending.has(lock))return this.pending.get(lock);const job=this.save(word,c,audio,id,extra).finally(()=>this.pending.delete(lock));this.pending.set(lock,job);return job;}
  async prepareModel(config){const c=cleanV4(config),models=await this.call(c,'modelNames'),own=['MeguLit','ToMe','tomoyo_megumin'].includes(c.ankiModel);
   if(!models.includes(c.ankiModel)){if(!own)throw Error('所选笔记类型不存在，请先在 Anki 中创建');await this.call(c,'createModel',{modelName:c.ankiModel,inOrderFields:[...fields,...extraFields],css:CSS,cardTemplates:[{Name:'日本語',Front:FRONT,Back:BACK}]});this.upgraded=true;}
   let available=await this.call(c,'modelFieldNames',{modelName:c.ankiModel});
@@ -93,7 +93,7 @@ class Anki{
   if(available.includes('SentenceFurigana'))values.SentenceFurigana=extra.sentenceHtml||'';if(available.includes('SentenceTranslation'))values.SentenceTranslation=html(extra.translation||'');{/* sentence card: game title and where the translation came from (human first) */const f=require('../services/learning-insights.cjs').ankiSentenceFields({translation:extra.translation,translationSource:extra.translationSource,gameTitle:extra.gameTitle},available);if('Game' in f)values.Game=html(f.Game);if('TranslationSource' in f)values.TranslationSource=html(f.TranslationSource);}if(available.includes('SentenceAudio'))values.SentenceAudio='';
   if(available.includes('Screenshot'))values.Screenshot='';
   // E215.6 (user): the answer shows the word's reading under the word, as common decks do.
-  if(available.includes('WordReading'))values.WordReading=html(answerReading(word.base||word.surface,word.reading));
+  if(available.includes('WordReading'))values.WordReading=word.noReading?'':html(answerReading(word.base||word.surface,word.reading));
   // Game window picture taken for this card (answer side).
   if(extra.screenshot&&available.includes('Screenshot')){const name='tomoyo_p_'+createHash('sha256').update(extra.screenshot).digest('hex').slice(0,16)+'.jpg';await this.call(c,'storeMediaFile',{filename:name,data:extra.screenshot});values.Screenshot='<img src="'+name+'">';}
   // The game's own voice for the line when it was recorded, otherwise the synthesized sentence.
