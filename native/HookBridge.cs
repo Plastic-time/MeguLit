@@ -84,7 +84,7 @@ public static class HookBridge {
 sealed class PendingEmbed {public ThreadParam tp;public string text;public Timer timer;}
 static volatile bool TranslateMode;static long EmbedSerial;static readonly Dictionary<long,PendingEmbed> PendingEmbeds=new Dictionary<long,PendingEmbed>();
 static void FinishEmbed(long id,string trans){PendingEmbed p;lock(Gate){if(!PendingEmbeds.TryGetValue(id,out p))return;PendingEmbeds.Remove(id);}
- if(p.timer!=null)p.timer.Dispose();string reply=String.IsNullOrEmpty(trans)?"":trans.Replace("\r\n","\n");
+ if(p.timer!=null)p.timer.Dispose();/* E352: indent and trailing engine codes kept, command-like characters removed */string reply=EmbedTextPolicy.Writeback(p.text,trans);
  try{Luna_EmbedCallback(p.tp,p.text,reply);}catch(Exception e){Diagnostic("embed-translate callback failed "+e.Message);return;}
  Diagnostic("embed-translate "+(reply.Length>0?"replace":"timeout passthrough")+" id="+id+" chars="+p.text.Length);
  if(reply.Length>0){lock(Gate){LastReplaceAt=DateTime.UtcNow;ReplacementCallback=true;ReceivedText=true;RememberStream();}Status("已把译文写回游戏，由游戏自己显示");}}

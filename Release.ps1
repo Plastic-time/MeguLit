@@ -37,7 +37,12 @@ function WriteText($p,$t){[IO.File]::WriteAllText((Join-Path $Root $p),$t,(Utf8N
 function Swap($p,$pattern,$replacement){$t=ReadText $p;$n=[regex]::Replace($t,$pattern,$replacement);if($n -eq $t -and -not ($t -match [regex]::Escape($Version))){throw "version not found in $p"};if($n -ne $t){WriteText $p $n}}
 
 # ---------- checks ----------
-if($Version -notmatch '^\d+\.\d+\.\d+$'){throw 'Version must look like 1.2.3'}
+if($Version -notmatch '^\d+\.\d+\.\d+[a-z]?$'){throw 'Version must look like 1.2.3 or 1.2.3a'}
+# Hotfix letters (1.2.8a, 1.2.8b ...): shown in the app and on the release page; the tag, package name and Cargo/Tauri
+# version stay numeric so installed updaters keep finding the package. A lettered version is a hotfix of its base when
+# that release exists, otherwise the first release of the base.
+$Label=$Version;$Version=$Version -replace '[a-z]$','';$LabelPrefix=if($Label -ne $Version){"v$Label · "}else{''}
+if($Label -ne $Version -and -not $Hotfix){try{$null=Invoke-RestMethod -Uri "https://api.github.com/repos/ilynthn/MeguLit/releases/tags/v$Version" -Headers @{'User-Agent'='MeguLit-release'};$Hotfix=[switch]$true}catch{}}
 $Body=''
 if(-not $Prepare){
  if(-not $Notes){throw 'Pass -Notes notes.md (or -Prepare to only build)'}
@@ -88,7 +93,7 @@ Write-Host "previous release v$prev -> $Tag"
 
 # ---------- version ----------
 Step 'bump version'
-Swap 'web/about.js' "export const VERSION='\d+\.\d+\.\d+';" "export const VERSION='$Version';"
+Swap 'web/about.js' "export const VERSION='\d+\.\d+\.\d+[a-z]?';" "export const VERSION='$Label';"
 Swap 'desktop/Cargo.toml' '(?m)^version = "\d+\.\d+\.\d+"' "version = `"$Version`""
 Swap 'desktop/tauri.conf.json' '"version": "\d+\.\d+\.\d+"' "`"version`": `"$Version`""
 Swap 'desktop/Cargo.lock' '(name = "megulit"\r?\nversion = )"\d+\.\d+\.\d+"' "`${1}`"$Version`""
@@ -155,24 +160,16 @@ $hash=(Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower();$size=(Get-Item $
 Write-Host "$Asset  $count files  $size bytes  sha256 $hash"
 if($DryRun){& git.exe checkout -- web/about.js desktop/Cargo.toml desktop/tauri.conf.json desktop/Cargo.lock README.md;Step "dry run finished; package at $zipPath (version files restored)";return}
 
-# ---------- merge ----------
-Step 'commit, pull request, merge'
-$branch=if($Hotfix){"hotfix/$Tag-"+(Get-Date -Format 'MMddHHmm')}else{"release/$Tag"}
-G checkout -q -b $branch
+# ---------- commit ----------
+# Direct commit on main, no pull request (user 2026-11-10: PRs opened through the GitHub integration list the bot as a
+# contributor). The commit carries only the author's own identity.
+Step 'commit and push to main'
+if((G rev-parse --abbrev-ref HEAD) -ne 'main'){G checkout -q main}
 G add -A
-G -c "user.name=$Author" -c "user.email=$Email" commit -q -m $(if($Hotfix){"$Tag hotfix"}else{"$Tag"})
-G push -q origin $branch
-$pr=Api POST '/pulls' @{title=$(if($Hotfix){"$Tag hotfix"}else{"$Tag"});head=$branch;base='main';body=$Body}
-# GitHub answers 405 "Base branch was modified" while it is still computing a brand-new PR's mergeability; retry.
-for($try=1;;$try++){
- try{$merged=Api PUT "/pulls/$($pr.number)/merge" @{merge_method='merge'};break}
- catch{if($try -ge 6){throw};Write-Host "  merge not ready yet, retrying ($try)";Start-Sleep -Seconds 5}
-}
-if(-not $merged.merged){throw "PR #$($pr.number) did not merge"}
-G checkout -q main
-G fetch -q origin
-G merge -q --ff-only origin/main
-Write-Host "PR #$($pr.number) merged at $($merged.sha)"
+G -c "user.name=$Author" -c "user.email=$Email" commit -q -m $(if($Label -ne $Version){"v$Label"}elseif($Hotfix){"$Tag hotfix"}else{"$Tag"})
+G push -q origin main
+$merged=@{sha=(G rev-parse HEAD)}
+Write-Host "pushed to main at $($merged.sha)"
 
 # ---------- release ----------
 Step 'publish release'
@@ -182,10 +179,10 @@ if($Hotfix){
  foreach($old in @($rel.assets | Where-Object {$_.name -eq $Asset})){Api DELETE "/releases/assets/$($old.id)" | Out-Null}
  $old=[string]$rel.body;if($old -notmatch [regex]::Escape($DownloadLine)){$old=$DownloadLine+"`n`n"+$old}
  $stamp=Get-Date -Format 'yyyy-MM-dd HH:mm'
- $section="<details>`n<summary><b>🔧 Hotfix $stamp</b>（点击展开 / click to expand）</summary>`n`n"+(LangBlocks $Zh $En $false)+"`n`n</details>"
+ $section="<details>`n<summary><b>🔧 ${LabelPrefix}Hotfix $stamp</b>（点击展开 / click to expand）</summary>`n`n"+(LangBlocks $Zh $En $false)+"`n`n</details>"
  $rel=Api PATCH "/releases/$($rel.id)" @{body=($old+"`n`n---`n`n"+$section)}
 }else{
- $rel=Api POST '/releases' @{tag_name=$Tag;target_commitish=$merged.sha;name="MeguLit $Tag";body=($DownloadLine+"`n`n## MeguLit $Tag`n`n"+(LangBlocks $Zh $En $false));make_latest='true'}
+ $rel=Api POST '/releases' @{tag_name=$Tag;target_commitish=$merged.sha;name="MeguLit v$Label";body=($DownloadLine+"`n`n## MeguLit v$Label`n`n"+(LangBlocks $Zh $En $false));make_latest='true'}
 }
 $upload=($rel.upload_url -replace '\{.*$','')+"?name=$Asset"
 $a=Invoke-RestMethod -Method Post -Uri $upload -Headers $Headers -ContentType 'application/zip' -InFile $zipPath

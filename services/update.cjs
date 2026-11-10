@@ -20,7 +20,11 @@ const inChina=()=>{try{const o=Intl.DateTimeFormat().resolvedOptions();return o.
 function sources(rel,china=inChina()){const direct=[rel.url];if(!rel.digest)return direct;const fresh=rel.url+(rel.url.includes('?')?'&':'?')+'v='+String(rel.digest).slice(0,12);const relayed=MIRRORS.map(m=>m.replace('{url}',fresh));return china?[...relayed,...direct]:[...direct,...relayed];}
 const updateLog=(root,line)=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','update.log'),new Date().toISOString()+' '+line+'\n');}catch{}};
 const HEADERS={'User-Agent':'MeguLit-Updater','Accept':'application/vnd.github+json'};
-const parse=v=>String(v||'').replace(/^v/,'').split('.').map(n=>Number(n)||0);
+/* Hotfix letters (user 2026-11-10: 1.2.8a, 1.2.8b ...) are a display label only: the GitHub tag and the package name stay
+   numeric (v1.2.8, MeguLit-v1.2.8-win-x64.zip) so every installed updater keeps working; a lettered hotfix is found by the
+   package digest like any hotfix. The letter is dropped before comparing. */
+const base=v=>String(v||'').trim().replace(/^v/,'').replace(/[a-z]+$/i,'');
+const parse=v=>base(v).split('.').map(n=>Number(n)||0);
 const newer=(a,b)=>{const x=parse(a),y=parse(b);for(let i=0;i<3;i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)>(y[i]||0);}return false;};
 
 function asset(rel){
@@ -35,7 +39,7 @@ async function latest(fetcher=fetch){
  return {version:String(rel.tag_name||'').replace(/^v/,''),name:a.name,size:a.size,url:a.browser_download_url,digest:/^sha256:[a-f0-9]{64}$/i.test(a.digest||'')?a.digest.slice(7).toLowerCase():'',notes:String(rel.body||'').replace(/^> \*\*\[⬇[^\n]*\n*/m,'').slice(0,6000),page:rel.html_url,published:rel.published_at||''};
 }
 /* Size of the package the user is running, for "bigger / smaller than now". Unknown is fine. */
-async function installedSize(current,fetcher=fetch){
+async function installedSize(current,fetcher=fetch){current=base(current);
  try{const r=await fetcher(REPO+'/tags/v'+String(current).replace(/^v/,''),{headers:HEADERS,signal:AbortSignal.timeout(10000)});if(!r.ok)return 0;return asset(await r.json()).size||0;}catch{return 0;}
 }
 
@@ -48,7 +52,7 @@ const status=()=>({...state});
 function installedFile(root){return root?path.join(root,'data','update-installed.json'):'';}
 function readInstalled(root){try{return JSON.parse(fs.readFileSync(installedFile(root),'utf8'));}catch{return null;}}
 function writeInstalled(root,value){if(!root)return;try{fs.mkdirSync(path.dirname(installedFile(root)),{recursive:true});fs.writeFileSync(installedFile(root),JSON.stringify(value));}catch{}}
-function isHotfix(root,rel,current){
+function isHotfix(root,rel,current){current=base(current);
  if(!root||!rel.digest||String(rel.version)!==String(current).replace(/^v/,''))return false;
  const mine=readInstalled(root);if(!mine||mine.version!==rel.version){writeInstalled(root,{version:rel.version,digest:rel.digest});return false;}
  return !!mine.digest&&mine.digest!==rel.digest;
@@ -62,7 +66,7 @@ function refreshIcons(root,current,run=(file,args)=>require('node:child_process'
  if(!root||!current)return false;const mark=path.join(root,'data','icon-refresh.json');let seen='';try{seen=JSON.parse(fs.readFileSync(mark,'utf8')).version||'';}catch{}
  if(seen===String(current))return false;try{run(path.join(process.env.SystemRoot||'C:\Windows','System32','ie4uinit.exe'),['-show']);fs.mkdirSync(path.dirname(mark),{recursive:true});fs.writeFileSync(mark,JSON.stringify({version:String(current)}));return true;}catch{return false;}
 }
-async function check(current,fetcher=fetch,root=''){tidyRollback(root);refreshIcons(root,current);
+async function check(current,fetcher=fetch,root=''){current=base(current);tidyRollback(root);refreshIcons(root,current);
  const rel=await latest(fetcher),hotfix=isHotfix(root,rel,current),isNewer=newer(rel.version,current)||hotfix;
  found=isNewer?{...rel,hotfix}:null;
  const previous=isNewer?await installedSize(current,fetcher):0;
@@ -94,7 +98,7 @@ async function download(url,rel,fetcher=fetch,part={chunks:[],length:0}){
   return data;
  }catch(error){throw Error(control.signal.aborted&&!/^UPDATE_/.test(error.message)?'STALLED':error.message);}finally{clearTimeout(idle);}
 }
-function start(root,current,fetcher=fetch){
+function start(root,current,fetcher=fetch){current=base(current);
  if(job)return job;
  job=(async()=>{
   try{

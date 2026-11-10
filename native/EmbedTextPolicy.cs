@@ -69,6 +69,26 @@ internal static class EmbedTextPolicy {
     }
     static string Blank(string text) { return Glyph.Replace(text, m => m.Value[0] <= 0x7f ? " " : "　"); }
 
+    // E352 (user: "perfect original-style embed, solved for every game"): the game draws the translation itself, so it
+    // lands in the game's own layout, font and effects. The written-back string keeps what the engine needs from the
+    // original line: its paragraph indent (WoH starts a new row only for an indented line) and the engine constructs
+    // it ends with (wait codes, control characters, tags); and the translation loses anything an engine could read as a
+    // command (control characters, tags, %A/$x/@x/^ prefixes). Ruby is dropped: the translation has no ruby of its own.
+    static readonly Regex Trailing = new Regex("(?:" + Construct.ToString() + ")+$");
+    public static string Writeback(string original, string translation) {
+        if (String.IsNullOrWhiteSpace(translation)) return "";
+        string t = translation.Replace("\r\n", "\n").Replace('\r', '\n');
+        t = Regex.Replace(t, @"[\x00-\x08\x0b\x0c\x0e-\x1f]", "");
+        t = t.Replace("<", "〈").Replace(">", "〉");
+        t = Regex.Replace(t, @"[%％*＊$＄@＠\^](?=[A-Za-zＡ-Ｚａ-ｚ])", "");
+        t = t.Trim();
+        if (t.Length == 0) return "";
+        string o = original ?? "";
+        string lead = Regex.Match(o, @"^[\u3000 ]+").Value;
+        string tail = Trailing.Match(Ruby.Replace(o, "")).Value;
+        return lead + t + tail;
+    }
+
     public static bool SelfTest() {
         const string mixed = "そう、雪だ。♪【$名前＿渚】【$名前＿渚】%A";
         return Role(true, 3) == 3 && Role(true, 1) == 1 && Role(false, 3) == 0 && Role(true, 0xe9a0f05) == 0 &&
@@ -86,6 +106,9 @@ internal static class EmbedTextPolicy {
             Hide("「えっ？？？」").Length == "「えっ？？？」".Length &&
             Hide("　彼女がはじめて命に<rふ>触</r>れた、<rしず>厳</r>かな朝の出来事だ。") == "　　　　　　　　　　<r　>　</r>　　　<r　　>　</r>　　　　　　　　　" &&
             Hide("　車の窓は<rしも>霜</r>だらけで、\n　走りだせない。") == "　　　　　<r　　>　</r>　　　　　\n　　　　　　　　" &&
+            Writeback("　彼女がはじめて命に<rふ>触</r>れた。", "她第一次触碰到生命。") == "　她第一次触碰到生命。" &&
+            Writeback("「またね」<wait>", "「再见」") == "「再见」<wait>" && Writeback("「またね」\u0001", "「再见」") == "「再见」\u0001" &&
+            Writeback("あ", "<b>%A$x译文\u0002") == "〈b〉A x译文".Replace(" ", "") && Writeback("あ", "  ") == "" &&
             Hide("<rふ>触</r>【＄名前】") == "" && Hide(@"<rx>data\a</r>") == "";
     }
 }

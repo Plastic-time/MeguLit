@@ -157,11 +157,11 @@ function fakeWindow(layout){
  class El{constructor(tag){this.tag=tag;this.className='';this.children=[];this.parent=null;this.dataset={};this.style=new Style();this.classList=new ClassList(this);this.hidden=false;this._text='';}
   get isConnected(){let e=this;while(e.parent)e=e.parent;return e===doc.documentElement;}
   set textContent(v){this.children=[];this._text=String(v);}get textContent(){return this._text+this.children.map(c=>c.textContent).join('');}
-  append(...c){for(const x of c){x.remove();x.parent=this;this.children.push(x);}}prepend(...c){for(const x of c.reverse()){x.remove();x.parent=this;this.children.unshift(x);}}
-  before(x){x.remove();const p=this.parent;x.parent=p;p.children.splice(p.children.indexOf(this),0,x);}
+  append(...c){for(const x of c){x.remove();x.parent=this;this.children.push(x);}}prepend(...c){for(const x of c.reverse()){x.remove();x.parent=this;this.children.unshift(x);}}
   remove(){if(this.parent){this.parent.children.splice(this.parent.children.indexOf(this),1);this.parent=null;}}
   get firstChild(){return this.children[0]||null;}
-  matches(sel){return sel.split(',').some(s=>this.classList.contains(s.trim().replace(/^\./,'')));}
+  matches(sel){return sel.split(',').some(s=>{const m=/^\.([^\[]+)(?:\[data-index="(\d+)"\])?$/.exec(s.trim());return !!m&&this.classList.contains(m[1])&&(m[2]===undefined||this.dataset.index===m[2]);});}
+  before(x){x.remove();const p=this.parent;x.parent=p;p.children.splice(p.children.indexOf(this),0,x);}
   querySelectorAll(sel){const out=[];const walk=e=>{for(const c of e.children){if(c.matches(sel))out.push(c);walk(c);}};walk(this);return out;}
   querySelector(sel){return this.querySelectorAll(sel)[0]||null;}
   getBoundingClientRect(){if(!this.classList.contains('tome-island-pair'))return {height:0,top:0,bottom:0};const cn=this.querySelector('.tomoyo-cn-output'),h=40+(cn&&!cn.hidden&&cn.textContent?30:0),top=parseFloat(this.style.props.top)||0;return {height:h,top,bottom:top+h};}}
@@ -212,4 +212,24 @@ test('hook-native marks lines of WITCH ON THE HOLY NIGHT (WoH.exe) as an NVL flo
  const f=fixture(t);f.hookLine('普通の台詞。');f.tick(100);
  f.hook.flowPage=true;f.hookLine('今日はその一割の話。');f.tick(400);
  assert.deepEqual(f.events.filter(m=>m.hookSource).map(m=>[m.hookSource,m.hookSourceEngine]),[['普通の台詞。',''],['今日はその一割の話。','nvl']]);
+});
+
+test('E351 WoH page grid: lines sit on the game\'s rows and columns, wrap where the game wraps, and ignore the calibrated box',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const saved=global.MutationObserver;global.MutationObserver=class{observe(){}};t.after(()=>{global.MutationObserver=saved;});
+ const file=require.resolve('../web/reader/modules/island-page.js');delete require.cache[file];const IslandPage=require(file);
+ // A 1546x870 client at (58,85), like the user's screenshot; the (wrong) auto-calibrated box is ignored.
+ const {w,b,doc}=fakeWindow({clientX:58,clientY:85,clientWidth:1546,clientHeight:870,readerX:900,readerY:500,readerWidth:600,readerHeight:100});
+ IslandPage.install(w);let seq=0;const say=text=>b.islandPage.accept({hookSource:text,hookSourceEngine:'nvl',hookFlowGrid:'woh',hookSequence:++seq,hookSourceLine:0});
+ const view=()=>doc.querySelectorAll('.tome-island-pair').filter(n=>!n.hidden).map(n=>({text:n.querySelector('.sentence-text').textContent,left:Math.round(parseFloat(n.style.props.left)),top:Math.round(parseFloat(n.style.props.top)),indent:Math.round(parseFloat(n.style.props['--tome-flow-indent'])),brs:n.querySelectorAll('.tome-flow-br').length,past:n.classList.contains('tome-island-past')})).sort((a,c)=>a.top-c.top||a.indent-c.indent);
+ say('　数分後。');say('お父さんが車のボンネットを開けると、そこにはひとつの命があった。');
+ const pitch=.0257*1546,row=.074*870,left=Math.round(58+.1445*1546),top0=Math.round(85+.174*870-row/2);
+ assert.deepEqual(view().map(v=>[v.left,v.top,v.indent,v.brs,v.past]),[[left,top0,0,0,true],[left,top0,Math.round(5*pitch),1,false]],'the second sentence continues the first row after 「数分後。」 and breaks once, before 「ひ」');
+ const br=doc.querySelectorAll('.tome-flow-br')[0];assert.equal(br.parent.children[br.parent.children.indexOf(br)+1].textContent,'ひ');
+ say('　ただし、残りの一割は真実だ。');
+ assert.equal(view().at(-1).top,Math.round(top0+2*row),'an indented sentence starts the row after the last one ended');
+ const {gridLayout}=IslandPage;
+ assert.deepEqual(gridLayout(['　青子自身、自分が慢性的な頭痛持ちなんじゃないかと疑うほど、無害なものに反感を覚える事があったりする。'],27)[0].breaks,[27],'27 cells: 「…疑う」|「ほど、…」 as the game wraps');
+ assert.deepEqual(gridLayout(['　あいうえおかきくけこさしすせそたちつてとなにぬねのは。'],27)[0].breaks,[],'a stop may hang in a 28th cell');
+ assert.match(fs.readFileSync(path.join(__dirname,'..','core/hook-control.cjs'),'utf8'),/!this\.styleCalibration&&!h\.hooks\?\.flowPage&&/,'no automatic box calibration on a flow page');
 });

@@ -120,3 +120,23 @@ test('E350: hovering the control bar (tooltips run together) never reaches the p
  g.hooks.state.hookThreads=[{id:'help',selected:true,sample:'クイックロードを行います'},{id:'a',selected:false,sample:'　数分後。'}];picked.length=0;g.skippedRun=null;
  assert.deepEqual(g.reselectStream(true),{selected:'a',name:undefined});
 });
+
+test('E352: a full-screen page with the game\'s own translation table is written back by the game (translate embed); others keep their setting',t=>{
+ const f=fixture(t);const sent=[];f.hook.process={stdin:{write(){},end(){}},kill(){},removeAllListeners(){}};f.hook.send=m=>sent.push(m);f.hook.enabled=true;f.hook.preferences={embedTranslation:false};
+ f.hook.syncEmbedMode();assert.deepEqual(sent.filter(m=>m.type==='embedMode').map(m=>m.mode),['hide'],'no script table yet: hide as set');
+ f.hook.originalText={kind:'patch',resolve:()=>({status:'exact'})};f.hook.scriptAllowed=()=>true;
+ f.line('　もっとも、それは夏だけの話。');f.tick(100);
+ assert.deepEqual(sent.filter(m=>m.type==='embedMode').map(m=>m.mode),['hide','translate'],'the official table is there: the game draws the translation');
+ f.hook.scriptAllowed=()=>false;f.hook.syncEmbedMode();assert.equal(sent.filter(m=>m.type==='embedMode').at(-1).mode,'hide','零延迟翻译 off: back to hiding');
+ f.hook.flowPage=false;f.hook.scriptAllowed=()=>true;f.hook.syncEmbedMode();assert.equal(sent.filter(m=>m.type==='embedMode').at(-1).mode,'hide','ADV games keep the user\'s choice');
+});
+
+test('E352 wiring: writeback keeps indent and engine codes; embed lookups drop ruby markup; MeguLit draws nothing over a page the game translates',()=>{
+ const policy=read('native/EmbedTextPolicy.cs'),bridge=read('native/HookBridge.cs'),reader=read('services/reader.cjs'),view=read('web/reader/modules/island-page.js');
+ assert.match(policy,/public static string Writeback\(string original, string translation\)/);
+ assert.match(policy,/Writeback\("　彼女がはじめて命に<rふ>触<\/r>れた。", "她第一次触碰到生命。"\) == "　她第一次触碰到生命。"/);
+ assert.match(bridge,/string reply=EmbedTextPolicy\.Writeback\(p\.text,trans\);/);
+ assert.match(reader,/extractSourceRuby\(text\)\.text;if\(plain\.trim\(\)\)text=plain;/);
+ assert.equal(require('../core/source-ruby.cjs').extractSourceRuby('　彼女がはじめて命に<rふ>触</r>れた。').text,'　彼女がはじめて命に触れた。');
+ assert.match(view,/body\.megulit-embed-translation \.sentence-window\.tome-island-page\{visibility:hidden!important\}/);
+});

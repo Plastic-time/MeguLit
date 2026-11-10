@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-8b1e2d?style=flat-square)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/%E2%99%A1-Sponsor-c8323c?style=flat-square)](https://github.com/sponsors/ilynthn)
 
-**[下载 v1.2.7](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [更新日志](https://github.com/ilynthn/MeguLit/releases) &nbsp;·&nbsp; [♡ 赞赏](#support)
+**[下载 v1.2.8](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [更新日志](https://github.com/ilynthn/MeguLit/releases) &nbsp;·&nbsp; [♡ 赞赏](#support)
 
 <br>
 
@@ -32,20 +32,18 @@
 
 <a id="zh-new"></a>
 
-## ✦ v1.1 新内容
+## ✦ v1.2 新内容
 
 | | |
 |---|---|
-| **自动更新** | 每次启动检查新版本，有就直接在后台下载。卡片上写着版本号、更新内容、安装包变大还是变小，进度条是真实的。下载完先校验，再由你选「重启并更新」或「稍后」。只换程序文件，游戏库、学习记录和设置都保留 |
-| **默认背景** | 自带浅色、深色两张背景，跟着主题自动切换；设了自己的图片就用你的 |
-| **学习统计** | 魔导书 × 毛玻璃风格重做。日历、本月读的书、字数走势、阅读时段、星期分布、阅读手感、常查的词，每一块都能单独切换年 / 月 / 周 / 日 |
-| **空页面** | 句子、单词、回收站、历史为空时，告诉你这里会出现什么、怎么让它出现；词典首页列出你常查的词 |
-| **v1.1.2** | 修好「重启并更新」：更新脚本改由 Windows 启动，不会再随 MeguLit 一起退出 · 更新卡片写明安装包具体大了 / 小了多少 MB |
-| **v1.1.1** | 关闭游戏后主页停在半透明的问题从根上修好 · 本地模型缺运行组件时自动下载，阅读层直接写明原因，不再只显示「翻译暂不可用」 |
-| **修复** | 部分电脑上「无法检查游戏是否已运行」导致游戏启动不了（Steam 游戏多见）· 关闭游戏后主窗口变半透明 · 多语言版游戏把日文、简中、繁中整串显示出来 · 日文原文还原认不出中日文路径下正在运行的游戏 · Rance02 匹配不到 VNDB |
+| **零延迟翻译** | 你装过的汉化补丁直接当译文用：日文原文 + 汉化组的翻译，一句不等。KiriKiri、BGI、Siglus、YU-RIS、Artemis、Ren'Py 等引擎，euphoria、WHITE ALBUM2、月姬、千恋＊万花都已实测；没有汉化的句子提前机翻 |
+| **日文原版恢复** | Steam 中文 / 英文版一键换回日文；也能直接选日文原版的压缩包、文件夹，甚至光盘镜像，MeguLit 自动对照替换，全部备份、一键还原 |
+| **内嵌替换更多游戏** | YU-RIS 通用内嵌，64 位 KiriKiri，整页文字的魔法使之夜逐行对齐原文 |
+| **省心** | 扫描范围跟着窗口和全屏自动调整 · 读到乱码一键重选文本流 · 中文版启动时直接告诉你怎么换成日文 |
+| **社区评价** | Steam 评论可选语言区，长评在 MeguLit 里直接展开全文 |
 
 > [!NOTE]
-> v1.1.0 和 v1.1.1 的自动更新有 bug：点「重启并更新」后打开的还是旧版本。请手动下载 v1.2.7 覆盖安装一次，从 v1.1.2 开始就能正常自动更新了
+> v1.1.0 和 v1.1.1 的自动更新有 bug：点「重启并更新」后打开的还是旧版本。请手动下载 v1.2.8 覆盖安装一次，从 v1.1.2 开始就能正常自动更新了
 
 <br>
 
@@ -53,7 +51,7 @@
 
 想靠 Galgame 学日语，可现有的工具都逼人二选一：要么玩原版，遇到生词就切出去查；要么在旁边外挂一个窗口，游戏里的原文照样显示，两份字叠在眼前
 
-MeguLit 想做的只有一件事：**游戏还是那个游戏，只是你能读懂了**。原文、翻译、注音、查词、AI 讲解、生词本、Anki 复习，都在游戏旁边完成，不用来回切窗口
+MeguLit 想做的只有一件事：让你在游戏里直接读懂日语。原文、翻译、注音、查词、AI 讲解、生词本、Anki 复习，都在游戏旁边完成，不用来回切窗口
 
 界面有简体中文、English、日本語。主要面向学日语的中文 / 英文用户，反过来用日语学中文或英文也可以
 
@@ -229,7 +227,7 @@ MeguLit 想做的只有一件事：**游戏还是那个游戏，只是你能读�
 > [!IMPORTANT]
 > **游戏剧情必须是日文原文**。MeguLit 读的是游戏正在显示的台词，剧情被汉化后读到的就不是日文。只汉化了菜单、剧情仍是日文的游戏不受影响；汉化版可以先试试「工具 → 日文原版恢复」
 
-1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.2.7-win-x64.zip`（约 18 MB），解压后运行 `MeguLit.exe`
+1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.2.8-win-x64.zip`（约 18 MB），解压后运行 `MeguLit.exe`
 2. 第一次启动会弹出安装窗口，二选一
    - **完整版**：下载约 565 MB，一次装齐注音词典和 AivisSpeech 语音引擎，需要约 1.8 GB 空间（推荐）
    - **精简版**：下载约 107 MB，能用阅读层、翻译和查词，其余组件以后在设置里补装
@@ -351,18 +349,17 @@ GPL-3.0-or-later，见 [LICENSE](LICENSE)；第三方组件按各自许可证，
 
 # English
 
-**A small grimoire for reading Japanese inside visual novels.** The game stays the same game; you just get to understand it. Original text, translation, furigana, lookups, AI explanations, a word list and Anki review all happen next to the game, with no alt-tabbing.
+**A small grimoire for reading Japanese inside visual novels.** Original text, translation, furigana, lookups, AI explanations, a word list and Anki review all happen next to the game, with no alt-tabbing.
 
-### New in v1.1
+### New in v1.2
 
 | | |
 |---|---|
-| **Auto update** | Checks for a new release on every start and downloads it in the background, with the version, notes, size change and real progress. Only program files are replaced |
-| **Default backgrounds** | A light and a dark one that follow the theme |
-| **Statistics** | Redesigned; every panel switches between year / month / week / day |
-| **v1.1.2** | "Restart and update" now really updates: Windows starts the update script, so it no longer exits with MeguLit |
-| **v1.1.1** | Home no longer stays half transparent after a game closes · a local model with no runtime downloads it by itself and the overlay says why |
-| **Fixes** | Launch failing with "could not check whether the game was running" · window staying half transparent after a game closes · multilingual builds showing every language track |
+| **Zero-latency translation** | A translation patch you already have becomes the translation: the Japanese original with the group's wording, no waiting. Tested on KiriKiri, BGI, Siglus, YU-RIS, Artemis and Ren'Py games such as euphoria, WHITE ALBUM2, Tsukihime and Senren＊Banka; untranslated lines are machine-translated ahead of time |
+| **Restore Japanese** | Switch Steam Chinese / English releases back to Japanese, or pick a Japanese release as an archive, folder or even a disc image; MeguLit swaps the files, backs everything up and undoes in one click |
+| **In-game replacement for more games** | Generic YU-RIS embedding, 64-bit KiriKiri, and full-page text in Witch on the Holy Night aligned line by line |
+| **Less fiddling** | The scan area follows the window and full screen · one click re-picks a garbled text stream · Chinese builds tell you how to switch to Japanese |
+| **Community reviews** | Steam reviews by language region; long reviews expand inside MeguLit |
 
 The updater in v1.1.0 and v1.1.1 reopens the old version, so download v1.1.2 by hand once; from v1.1.2 on it updates itself.
 
@@ -381,7 +378,7 @@ From then on MeguLit checks for a new release on every start and downloads it in
 
 ### Install
 
-1. Download `MeguLit-v1.2.7-win-x64.zip` (about 18 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`
+1. Download `MeguLit-v1.2.8-win-x64.zip` (about 18 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`
 2. Pick **Full** (about 565 MB, furigana dictionaries and the AivisSpeech voice engine) or **Lite** (about 107 MB)
 3. Choose your game folder, pick a game and press *Launch*. Press <kbd>Alt</kbd> + <kbd>T</kbd> for the overlay menu
 
@@ -403,18 +400,17 @@ GPL-3.0-or-later · [LICENSE](LICENSE) · [THIRD-PARTY.md](THIRD-PARTY.md)
 
 # 日本語
 
-**ギャルゲーの中で日本語を読むための小さな魔導書。** ゲームはそのまま、でも読めるようになる。原文、翻訳、ふりがな、辞書、AI 解説、単語帳、Anki 復習を、ゲームの横で全部済ませられます
+**ギャルゲーの中で日本語を読むための小さな魔導書。**原文、翻訳、ふりがな、辞書、AI 解説、単語帳、Anki 復習を、ゲームの横で全部済ませられます
 
-### v1.1 の新機能
+### v1.2 の新機能
 
 | | |
 |---|---|
-| **自動アップデート** | 起動のたびに新しいバージョンを確認し、裏でダウンロード。バージョン、更新内容、サイズの増減、実際の進捗を表示。プログラムだけを置き換えます |
-| **デフォルト背景** | ライト / ダークのテーマに合わせて切り替わる 2 枚 |
-| **学習統計** | 作り直し。パネルごとに年 / 月 / 週 / 日を切り替え |
-| **v1.1.2** | 「再起動して更新」で実際に更新されるよう修正 |
-| **v1.1.1** | ゲーム終了後にホームが半透明のまま残る問題を根本修正 · ローカルモデルの実行環境がない場合は自動でダウンロード |
-| **修正** | 「ゲームが起動中か確認できません」で起動できない問題 · 終了後にウィンドウが半透明になる問題 · 多言語版で全言語の文が出る問題 |
+| **ゼロ遅延翻訳** | 手元の中国語パッチをそのまま訳文に。日本語原文と翻訳グループの訳が待ち時間なしで並びます。KiriKiri、BGI、Siglus、YU-RIS、Artemis、Ren'Py など、euphoria、WHITE ALBUM2、月姫、千恋＊万花で確認済み。訳のない文は先に機械翻訳 |
+| **日本語原版に戻す** | Steam の中国語 / 英語版を日本語に戻せます。日本語版の圧縮ファイル、フォルダ、ディスクイメージからも取り込み可能。すべてバックアップし、ワンクリックで元に戻せます |
+| **埋め込み対応の拡大** | YU-RIS の汎用埋め込み、64 bit KiriKiri、全画面テキストの魔法使いの夜を行ごとに原文へ合わせて表示 |
+| **手間いらず** | スキャン範囲がウィンドウと全画面に自動追従 · 文字化けしたらワンクリックでストリーム選び直し · 中国語版なら日本語への切り替え方を案内 |
+| **コミュニティレビュー** | Steam レビューを言語地域別に表示、長文はアプリ内で全文展開 |
 
 v1.1.0 と v1.1.1 の自動更新には不具合があるため、今回だけ手動で v1.1.2 をダウンロードしてください。v1.1.2 からは自動で更新されます
 
@@ -427,7 +423,7 @@ v1.1.0 と v1.1.1 の自動更新には不具合があるため、今回だけ�
 
 ### インストール
 
-1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.2.7-win-x64.zip`（約 18 MB）をダウンロードして展開し、`MeguLit.exe` を起動
+1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.2.8-win-x64.zip`（約 18 MB）をダウンロードして展開し、`MeguLit.exe` を起動
 2. 初回セットアップで **完全版**（約 565 MB）か **軽量版**（約 107 MB）を選択
 3. ゲームフォルダを選び、作品を選んで「ゲーム起動」。<kbd>Alt</kbd> + <kbd>T</kbd> でメニュー
 

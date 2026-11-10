@@ -35,7 +35,11 @@ class HookNative{
    if(true){this.trace('render mode switched in place '+this.route+' -> '+route);this.enabled=enabled;this.route=route;this.verified=false;if(enabled)this.send({type:'enable'});else this.send({type:'disable',reason:preferences.hookProfile==='read'?'reader-profile':this.preflight?'reader-preflight':state.bound!==true?'reader-unbound':'cover-disabled'});}
    else{this.trace('render mode changed; detach then reconnect');this.stop(false);this.retryAt=this.now()+2500;return;}}if(!this.process&&this.now()>=this.retryAt)this.start(this.target);this.syncMarker();this.syncEmbedMode();}
  // 'translate' while the per-work switch is on and replacement is active; 'hide' (blank for MeguLit to draw) otherwise.
- syncEmbedMode(){const want=!!(this.process&&this.enabled&&this.preferences?.embedTranslation===true);if(!this.process){this.embedModeSent=undefined;return;}if(want===this.embedModeSent)return;this.embedModeSent=want;if(!want&&this.state?.embedTranslating)this.notify({embedTranslating:false});this.trace('embed mode '+(want?'translate':'hide'));this.send({type:'embedMode',mode:want?'translate':'hide'});}
+ /* E352 (user: perfect original-style embed for every game). A full-screen page has no box MeguLit could cover cleanly; when
+    the game's own translation table (official Chinese or an imported patch) answers every line at once, the game draws
+    the translation itself in its own layout. Unmatched lines get the usual translation within the bridge's wait. */
+ autoTranslateEmbed(){return this.flowPage===true&&this.scriptAllowed?.()!==false&&this.originalText?.kind==='patch';}
+ syncEmbedMode(){const want=!!(this.process&&this.enabled&&(this.preferences?.embedTranslation===true||this.autoTranslateEmbed()));if(!this.process){this.embedModeSent=undefined;return;}if(want===this.embedModeSent)return;this.embedModeSent=want;if(!want&&this.state?.embedTranslating)this.notify({embedTranslating:false});this.trace('embed mode '+(want?'translate':'hide'));this.send({type:'embedMode',mode:want?'translate':'hide'});}
  embedReply(id,trans){if(!this.process||!Number.isSafeInteger(id))return;this.send({type:'embedReply',id,trans:String(trans||'').slice(0,4000)});if(trans&&this.embedModeSent)this.notify({embedTranslating:true});}
  tick(){if(this.process&&this.now()-this.lastHeartbeat>12000){const old=this.process;this.process=null;++this.serial;old.kill();this.retry('Hook 通信无响应');}if(!this.process&&this.wanted&&this.target&&this.now()>=this.retryAt)this.start(this.target);}
  retry(message){this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.enabled=false;this.retryAt=this.now()+Math.min(30000,1000*2**Math.min(this.attempt++,5));this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookSource:this.lastSource||null,hookRecovering:!!this.lastSource,hookThreads:[],hookMessage:message+'；正在自动重连'});}
@@ -106,6 +110,7 @@ class HookNative{
   /* E320 WITCH ON THE HOLY NIGHT (flow page): its title-screen help ("Change text display speed.Change auto-scroll speed." ...) came through the dialogue hook
      and was read as a story line, and one line once arrived twice in one piece. Text without any Japanese is menu/help text here, and a line made of
      the same sentence twice is that sentence. */
+  if(this.flowPage)this.syncEmbedMode();
   if(this.flowPage){if(!this.flowStory(text)){this.trace('flow page: not a story line, dropped (menu/help) '+JSON.stringify(text.slice(0,40)));this.flowStreamCheck(true);return;}
    const once=HookNative.undouble(text);if(once!==text){this.trace('flow page: doubled line collapsed chars='+text.length);this.source({...m,text:once},name);return;}}
   /* E282 (user: game ruby first): readings the game's own script gives this line (KiriKiri Z scene files) join the ruby
@@ -199,8 +204,11 @@ class HookNative{
     selected and the story was neither read, hidden nor replaced. A story line is one the game's own script table has
     (original-text provider); without the table, one with the game's paragraph indent, a quote or sentence-final
     punctuation. A selected stream whose text is not story is switched to the stream that carries story. */
- flowStory(text){const t=String(text||'').replace(/<r[^<>]*>|<\/r>/g,'').trim();if(!t||!/[\u3040-\u30ff\u3400-\u9fff]/.test(t)||HookNative.uiHelp(t))return false;
-  try{const r=this.originalText?this.resolveSource(t):null;if(r&&r.status)return r.status!=='none';}catch{}
+ flowStory(text){const t=String(text||'').replace(/<r[^<>]*>|<\/r>/g,'').trim();if(!t||!/[\u3040-\u30ff\u3400-\u9fff]/.test(t)&&!/^[「『“]/.test(t)||HookNative.uiHelp(String(text||'')))return false;
+  /* E353 (offline replay of the whole WoH table): the table only ever says YES. A line it holds is story even when the
+     official Chinese left it as it is (names such as 「青子。」); a line it cannot match (spells written <rソウ>[swel]</r>,
+     Latin with katakana ruby) falls through to the layout test instead of being dropped. The hint test sees the indent. */
+  try{const r=this.originalText?this.resolveSource(t):null;if(r&&(r.status&&r.status!=='none'||r.method==='untranslated'))return true;}catch{}
   return /^[\u3000「『“（(]/.test(String(text||''))||/[。！？!?…」』”）)―]$/.test(t);}
  flowStreamCheck(now=false){if(!this.flowPage||!this.process)return false;const threads=this.state.hookThreads||[],cur=threads.find(t=>t.selected);if(!cur||!now&&(!cur.sample||this.flowStory(cur.sample)))return false;
   const next=threads.filter(t=>t.id!==cur.id&&t.sample&&this.flowStory(t.sample)).sort((a,b)=>(b.embeddable===true)-(a.embeddable===true))[0];if(!next)return false;
@@ -295,7 +303,7 @@ class HookNative{
    if(L.seen.some(x=>x.text===text)){L.repeats.push(now);if(L.looping||L.repeats.length>=2){if(!L.looping)this.trace('menu loop detected; repeating lines ignored');L.looping=true;return;}}
    else{if(L.looping)this.trace('menu loop ended');L.looping=false;L.repeats=[];}
    L.seen.push({text,at:now});if(L.seen.length>12)L.seen.shift();}
-  const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;this.lastSource=text;this.lastSourceAt=this.now();this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.notify({hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
+  const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;this.lastSource=text;this.lastSourceAt=this.now();this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.notify({hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookFlowGrid:engine==='nvl'?'woh':'',hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
  }
  markerTarget(v){this.waitTarget=v;this.syncMarker();this.flowMarker(v);}
  /* E323 (user: WoH kept the old page's lines when the game cleared the page). A full-screen page has no clear signal in
