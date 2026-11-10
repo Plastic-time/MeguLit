@@ -94,18 +94,19 @@ export function spectrumScrollbar(spec) {
     g.clearRect(0, 0, W, H);
     if (doc <= vh + 1) return;
     // the thumb's ground
-    g.fillStyle = `rgba(${ink},${hover || drag ? .16 : .09})`; g.fillRect(0, top, W, h);
+    g.fillStyle = `rgba(240,195,106,${hover || drag ? .16 : .08})`; g.fillRect(0, top, W, h);
     const step = 4, rows = Math.floor(H / step);
     for (let r = 0; r < rows; r++) {
       const y = H - (r + 1) * step, f = (r / Math.max(1, rows - 1)) * 15, b = Math.floor(f), k = f - b;
       const v = levels[b] * (1 - k) + levels[Math.min(15, b + 1)] * k;
       const inThumb = y + step > top && y < top + h;
       const w = 1.5 + v * (W - 2.5);
-      g.fillStyle = inThumb ? `rgba(${ink},${.55 + v * .45})` : `rgba(200,50,60,${.3 + v * .65})`;
+      // Megumin's colours: crimson along the strip, warming to her bright red when loud; the thumb in her gold
+      g.fillStyle = inThumb ? `rgba(240,195,106,${.5 + v * .5})` : (v > .55 ? `rgba(224,80,92,${.45 + v * .55})` : `rgba(165,29,45,${.35 + v * .7})`);
       g.fillRect(W - w, y + 1, w, step - 1.5);
     }
     // the thumb's edge
-    g.fillStyle = `rgba(${ink},.9)`; g.fillRect(W - 2, top, 2, h);
+    g.fillStyle = 'rgba(255,217,143,.95)'; g.fillRect(W - 2, top, 2, h);
   };
   spec.on((levels, playing) => { last = levels; draw(levels); dirty = false; });
   const idle = () => { if (dirty && last) { draw(last); dirty = false; } requestAnimationFrame(idle); };
