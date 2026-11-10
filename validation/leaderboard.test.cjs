@@ -274,3 +274,20 @@ test('E401 reviews and kana practice: counted per period, Anki answers that come
  const view=await import(pathToFileURL(path.join(__dirname,'..','web','leaderboard-view.js')).href);
  assert.equal(view.formatValue('kana',20,'zh'),'20 题');assert.equal(view.formatValue('reviews',4,'en'),'4 reviews');
 });
+
+test('E402 every tab draws the same top and sub rows (no jump), the podium keeps empty stands, one empty-state look',async()=>{
+ const view=await import(pathToFileURL(path.join(__dirname,'..','web','leaderboard-view.js')).href);
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+ const local={stats:{week:{}},totals:{words:3}};
+ const pages={loading:view.leaderboardHTML(null,'zh',esc),board:view.leaderboardHTML({configured:true,joined:true,tab:'board',name:'A',board:{state:'ok',entries:[{rank:1,name:'A',value:5,me:true}],me:{rank:1,value:5}},local,avatars:{}},'zh',esc),
+  hot:view.leaderboardHTML({configured:true,joined:true,tab:'hot',hot:{state:'ok',settled:false,awards:[],weeks:[]},local},'zh',esc),follow:view.leaderboardHTML({configured:true,joined:true,tab:'follow',social:{state:'ok',following:[],kindred:[],avatars:{}},local},'zh',esc)};
+ for(const [name,html] of Object.entries(pages)){
+  assert.ok(html.indexOf('lb-toprow')<html.indexOf('lb-subrow')&&html.indexOf('lb-subrow')<html.indexOf('lb-body'),name+': rows in order');
+  assert.match(html,/class="lb-toprow"><div class="lb-seg" role="group" data-lb-group="tab">/,name+': the tab switch opens the top row');
+  assert.doesNotMatch(html,/lb-title|<h1/,name+': no page title (the top bar already says 排行榜)');
+ }
+ assert.match(pages.board,/lb-toprow-end"><div class="lb-mychip"/,'my rank sits at the right of the top row');
+ assert.equal((pages.board.match(/class="lb-place is-vacant"/g)||[]).length,2,'two vacant stands next to the only reader');
+ assert.match(pages.hot,/lb-empty-state/);assert.equal((pages.follow.match(/lb-empty-state/g)||[]).length,2);
+ assert.doesNotMatch(pages.board,/is-accent/,'all tiles look the same');assert.equal((pages.board.match(/class="lb-tile"/g)||[]).length,8);
+});

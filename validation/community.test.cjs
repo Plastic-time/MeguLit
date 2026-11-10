@@ -155,7 +155,11 @@ test('page: podium 1–3 (shown 2·1·3), cards 4–10 with the AI label, 11–5
  const cards=html.slice(html.indexOf('leaderboard-cards'),html.indexOf('leaderboard-hot-list'));
  assert.equal((cards.match(/AI 推测/g)||[]).length,6,'rank 5 has a plain reason without the label');
  const list=html.slice(html.indexOf('leaderboard-hot-list'));assert.doesNotMatch(list,/可能是/);assert.equal((list.match(/<li>/g)||[]).length,40);
- assert.match(html,/data-lb-week/);assert.match(html,/2026-W45/);
+ /* E402 the week picker and categories sit in the shared sub row above the card */
+ const page=view.leaderboardHTML({configured:true,joined:true,tab:'hot',hot:{state:'ok',week:'2026-W46',weeks:['2026-W46','2026-W45'],settled:true,participants:12,awards},local:{stats:{}}},'zh',esc);
+ const sub=page.slice(page.indexOf('lb-subrow'),page.indexOf('lb-body'));assert.match(sub,/data-lb-week/);assert.match(sub,/2026-W45/);assert.match(sub,/data-lb-category/);
+ /* fewer than three awards: the empty places keep their stand */
+ assert.equal((view.hotHTML({state:'ok',week:'2026-W46',weeks:[],settled:true,participants:3,awards:awards.slice(0,1)},view.leaderboardWords('zh'),'zh',esc).match(/is-vacant" role="listitem"/g)||[]).length,2);
  assert.match(view.hotHTML({state:'ok',weeks:[],settled:false,awards:[]},view.leaderboardWords('ja'),'ja',esc),/月曜 0:00/);
  const d=view.defaultAvatar('めぐみん');assert.equal(d.initial,'め');assert.match(d.color,/^#[0-9a-f]{6}$/);
  assert.match(view.avatarHTML({name:'x',avatar:'a'.repeat(32)},{['a'.repeat(32)]:'javascript:alert(1)'},esc),/is-default/,'only webp data URLs are used as images');

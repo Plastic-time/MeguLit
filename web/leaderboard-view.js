@@ -68,9 +68,9 @@ export function avatarHTML(entry,images,esc){
    ruled rows under column headings; hot words use the same stage, 4–10 as one column of honour rows (no orphan
    card), 11–50 as a compact two-column index. */
 const EXTRA={
- zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次',follow:'关注',changeAvatar:'换头像',editProfile:'编辑个人主页',uploading:'上传并审核中…'},
- ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',follow:'フォロー',changeAvatar:'アイコンを変更',editProfile:'プロフィールを編集',uploading:'アップロードして審査中…'},
- en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',follow:'Following',changeAvatar:'Change picture',editProfile:'Edit profile',uploading:'Uploading and checking…'}
+ zh:{eyebrow:'读者 · 每周更新',colRank:'名次',colReader:'读者',colTerm:'词条',colWhy:'为什么是它',honours:'4 – 10 名',rest:'11 – 50 名',myRank:'我的名次',follow:'关注',vacant:'虚位以待',followSub:'关注的人和同好',changeAvatar:'换头像',editProfile:'编辑个人主页',uploading:'上传并审核中…'},
+ ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',follow:'フォロー',vacant:'空席',followSub:'フォロー中の人と同好',changeAvatar:'アイコンを変更',editProfile:'プロフィールを編集',uploading:'アップロードして審査中…'},
+ en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',follow:'Following',vacant:'Open spot',followSub:'People you follow and kindred readers',changeAvatar:'Change picture',editProfile:'Edit profile',uploading:'Uploading and checking…'}
 };
 const words=locale=>({...leaderboardWords(locale),...(EXTRA[locale]||EXTRA.zh)});
 function segmented(name,items,current,w){return `<div class="lb-seg" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
@@ -82,18 +82,25 @@ function laurel(rank){
   leaves.push(`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="2.9" ry="6.6" transform="rotate(${deg.toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`);}}
  return `<svg class="lb-laurel" viewBox="0 0 80 80" aria-hidden="true"><g class="lb-leaves">${leaves.join('')}</g><text x="40" y="52" text-anchor="middle">${rank}</text></svg>`;
 }
-const crown='<svg class="lb-crown" viewBox="0 0 32 20" aria-hidden="true"><path d="M2 18 4 5l7 6 5-9 5 9 7-6 2 13z"/></svg>';
+/* E402 an empty podium place keeps its stand (dashed, "虚位以待") so the stage stays centred and complete */
+function vacantPlace(place,w){return `<div class="lb-place is-vacant" role="listitem" data-rank="${place}" aria-label="${w.vacant}"><div class="lb-who"><span class="lb-ring is-vacant"><span class="leaderboard-avatar is-vacant" aria-hidden="true">?</span></span><span class="lb-name">${w.vacant}</span></div><div class="lb-block is-vacant">${laurel(place)}</div></div>`;}
+/* E402 one empty-state look for every tab: small emblem, a line, an optional hint, centred */
+const EMBLEM={empty:'<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 12h20a6 6 0 0 1 6 6v20H16a6 6 0 0 1-6-6z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16 20h14M16 26h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M36 10l1.2 2.6L40 14l-2.8 1.4L36 18l-1.2-2.6L32 14l2.8-1.4z" fill="currentColor"/></svg>',
+ pending:'<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M24 16v9l6 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+ people:'<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="19" cy="18" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 38c1.5-7 6-10 11-10s9.5 3 11 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M31 13a5 5 0 0 1 0 10M34 29c3 1.5 5 4.5 6 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'};
+export function emptyState(kind,title,hint=''){return `<div class="lb-empty-state"><span class="lb-empty-emblem">${EMBLEM[kind]||EMBLEM.empty}</span><p class="lb-empty-title">${title}</p>${hint?`<p class="lb-empty-hint">${hint}</p>`:''}</div>`;}
+const crown='<svg class="lb-crown\" viewBox="0 0 32 20" aria-hidden="true"><path d="M2 18 4 5l7 6 5-9 5 9 7-6 2 13z"/></svg>';
 const MEDAL={1:'gold',2:'silver',3:'bronze'};
 function localHTML(data,w,locale,esc){
  const stats=data.local?.stats?.[view.period]||{};
- return `<section class="lb-mine"><h2 class="lb-h2">${w.mine} <span>· ${w[view.period]}</span></h2><div class="lb-tiles">${['seconds','characters','words','reviews','kana','streak'].map(m=>`<div class="lb-tile"><small>${w[m]}</small><strong>${esc(formatValue(m,stats[m],locale))}</strong></div>`).join('')}<div class="lb-tile is-accent"><small>${w.currentStreak}</small><strong>${esc(formatValue('streak',data.local?.currentStreak,locale))}</strong></div><div class="lb-tile"><small>${w.totalWords}</small><strong>${esc(formatValue('words',data.local?.totals?.words,locale))}</strong></div></div></section>`;
+ return `<section class="lb-mine"><h2 class="lb-h2">${w.mine} <span>· ${w[view.period]}</span></h2><div class="lb-tiles">${[['seconds',stats.seconds],['characters',stats.characters],['words',stats.words],['totalWords',data.local?.totals?.words,'words'],['reviews',stats.reviews],['kana',stats.kana],['streak',stats.streak],['currentStreak',data.local?.currentStreak,'streak']].map(([key,value,unit])=>`<div class="lb-tile"><small>${w[key]}</small><strong>${esc(formatValue(unit||key,value,locale))}</strong></div>`).join('')}</div></div></section>`;
 }
 const flag='<svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14"><path d="M6 21V4m0 0h10l-2 4 2 4H6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
 const reportButton=(e,w,esc)=>e.avatar&&!e.me?`<button type="button" class="leaderboard-report" data-lb-report="${esc(e.avatar)}" title="${w.report}" aria-label="${w.report}">${flag}</button>`:'';
 function podiumPeople(entries,metric,w,locale,esc,images){
  /* the first three entries by position (ties keep their shared rank number); shown 2 · 1 · 3 */
- const order=[1,0,2].map(i=>entries[i]&&{e:entries[i],place:i+1}).filter(Boolean);
- return `<div class="lb-stage" role="list">${order.map(({e,place})=>`<div class="lb-place medal-${MEDAL[place]}${e.me?' is-me':''}" role="listitem" data-rank="${place}" style="--delay:${({1:2,2:1,3:0})[place]*140}ms"><div class="lb-who">${place===1?crown:''}${personButton(e,`<span class="lb-ring">${avatarHTML(e,images,esc)}</span><span class="lb-name">${esc(e.name)}</span>`,esc)}<span class="lb-score">${esc(formatValue(metric,e.value,locale))}</span>${reportButton(e,w,esc)}</div><div class="lb-block">${laurel(e.rank)}</div></div>`).join('')}</div>`;
+ const order=[1,0,2].map(i=>({e:entries[i],place:i+1}));
+ return `<div class="lb-stage" role="list">${order.map(({e,place})=>!e?vacantPlace(place,w):`<div class="lb-place medal-${MEDAL[place]}${e.me?' is-me':''}" role="listitem" data-rank="${place}" style="--delay:${({1:2,2:1,3:0})[place]*140}ms"><div class="lb-who">${place===1?crown:''}${personButton(e,`<span class="lb-ring">${avatarHTML(e,images,esc)}</span><span class="lb-name">${esc(e.name)}</span>`,esc)}<span class="lb-score">${esc(formatValue(metric,e.value,locale))}</span>${reportButton(e,w,esc)}</div><div class="lb-block">${laurel(e.rank)}</div></div>`).join('')}</div>`;
 }
 function tableRows(entries,metric,w,locale,esc,images){
  if(!entries.length)return '';
@@ -116,16 +123,14 @@ export function splitAwards(awards){const sorted=[...(awards||[])].sort((a,b)=>a
 export function hotHTML(hot,w,locale,esc){
  w={...words(locale),...w};
  if(!hot||hot.state==='error')return `<div class="leaderboard-offline"><p>${w.offline}</p><button type="button" class="primary" data-lb-retry>${w.retry}</button></div>`;
- const n=v=>nf(locale).format(v||0),weeks=hot.weeks||[];
- const picker=weeks.length>1?`<label class="lb-week"><span>${w.pastWeeks}</span><select data-lb-week>${weeks.map(k=>`<option value="${esc(k)}" ${k===hot.week?'selected':''}>${esc(fill(w.weekOf,{week:k}))}</option>`).join('')}</select></label>`:'';
- const head=`<div class="lb-controls">${segmented('category',CATS,view.category,w)}${picker}</div>`;
- if(!hot.settled||!hot.awards?.length)return head+`<div class="lb-empty-stage"><p class="lb-empty">${hot.settled?w.hotEmpty:w.hotPending}</p><p class="lb-note">${w.hotRule}</p></div>`;
+ const n=v=>nf(locale).format(v||0);
+ if(!hot.settled||!hot.awards?.length)return emptyState(hot.settled?'empty':'pending',hot.settled?w.hotEmpty:w.hotPending,w.hotRule);
  const {podium,cards,list}=splitAwards(hot.awards);
- const order=[2,1,3].map(r=>podium.find(a=>a.rank===r)).filter(Boolean);
+ const order=[2,1,3].map(r=>podium.find(a=>a.rank===r)||{rank:r,vacant:true});
  const reason=a=>a.reason?`<p class="leaderboard-reason">${a.ai?`<span class="leaderboard-ai">${w.aiGuess}</span>`:''}${esc(a.reason)}</p>`:'';
  const meta=a=>esc(fill(w.lookedUp,{users:n(a.users),n:n(a.lookups)}));
- return head+`<p class="lb-note">${esc(fill(w.weekOf,{week:hot.week}))} · ${esc(fill(w.participants,{n:n(hot.participants)}))} · ${w.hotRule}</p>
-  <div class="lb-stage leaderboard-podium is-terms" role="list">${order.map(a=>`<div class="lb-place podium-place medal-${MEDAL[a.rank]}" role="listitem" data-rank="${a.rank}" style="--delay:${({1:2,2:1,3:0})[a.rank]*140}ms"><div class="lb-who">${a.rank===1?crown:''}<span class="lb-term" lang="ja">${esc(a.term)}</span><span class="lb-score">${meta(a)}</span>${reason(a)}</div><div class="lb-block">${laurel(a.rank)}</div></div>`).join('')}</div>
+ return `<p class="lb-note">${esc(fill(w.weekOf,{week:hot.week}))} · ${esc(fill(w.participants,{n:n(hot.participants)}))} · ${w.hotRule}</p>
+  <div class="lb-stage leaderboard-podium is-terms" role="list">${order.map(a=>a.vacant?vacantPlace(a.rank,w):`<div class="lb-place podium-place medal-${MEDAL[a.rank]}" role="listitem" data-rank="${a.rank}" style="--delay:${({1:2,2:1,3:0})[a.rank]*140}ms"><div class="lb-who">${a.rank===1?crown:''}<span class="lb-term" lang="ja">${esc(a.term)}</span><span class="lb-score">${meta(a)}</span>${reason(a)}</div><div class="lb-block">${laurel(a.rank)}</div></div>`).join('')}</div>
   ${cards.length?`<section class="lb-section"><h3 class="lb-h3">${w.honours}</h3><ol class="leaderboard-cards lb-honours">${cards.map(a=>`<li class="leaderboard-card"><span class="leaderboard-rank">${a.rank}</span><div class="lb-honour-term"><strong lang="ja">${esc(a.term)}</strong><small>${meta(a)}</small></div>${reason(a)||'<span></span>'}</li>`).join('')}</ol></section>`:''}
   ${list.length?`<section class="lb-section"><h3 class="lb-h3">${w.rest}</h3><ol class="leaderboard-list leaderboard-hot-list" style="--rows:${Math.ceil(list.length/2)}">${list.map(a=>`<li><span class="leaderboard-rank">${a.rank}</span><span class="leaderboard-name" lang="ja">${esc(a.term)}</span><strong>${esc(fill(w.times,{n:n(a.lookups)}))}</strong></li>`).join('')}</ol></section>`:''}`;
 }
@@ -141,7 +146,16 @@ function joinHTML(data,w,esc){
   <p class="leaderboard-error" data-lb-error hidden></p><button type="button" class="primary" data-lb-join>${w.join}</button></section>`;
 }
 /* E393 no page title: the top bar already says 排行榜 (rule: never repeat a first-level menu item on its page); only my rank chip stays */
-function hero(w,esc,chip=''){return chip?`<header class="lb-hero">${chip}</header>`:'';}
+/* E402 every tab draws the same two rows, so switching tabs or loading never moves them:
+   1. top row: the 阅读榜 / 每周热词 / 关注 switch, and on the right 我的名次 (only on 阅读榜; the row keeps its height)
+   2. sub row: 阅读榜 = metric tabs + period, 每周热词 = category + past weeks, 关注 = a caption
+   The body below fades in. */
+function hero(){return '';}
+function topRow(w,tab,chip=''){return `<div class="lb-toprow">${segmented('tab',['board','hot','follow'],tab,w)}<div class="lb-toprow-end">${chip}</div></div>`;}
+function subRow(inner){return `<div class="lb-subrow">${inner}</div>`;}
+function hotControls(hot,w,esc){const weeks=hot?.weeks||[];const picker=weeks.length>1?`<label class="lb-week"><span>${w.pastWeeks}</span><select data-lb-week>${weeks.map(k=>`<option value="${esc(k)}" ${k===hot.week?'selected':''}>${esc(fill(w.weekOf,{week:k}))}</option>`).join('')}</select></label>`:'';return `${segmented('category',CATS,view.category,w)}${picker}`;}
+function boardControls(w){return `${underline('metric',METRICS,view.metric,w)}${segmented('period',PERIODS,view.period,w)}`;}
+function page(top,sub,body){return `<div class="leaderboard-page">${top}${subRow(sub)}<div class="lb-body">${body}</div></div>`;}
 /* E388 your own avatar is the way to change it: click → pick → crop window → upload. */
 const camera='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 3.2 6.5 2h3l.9 1.2H13a1.5 1.5 0 0 1 1.5 1.5v7.1A1.5 1.5 0 0 1 13 13.3H3a1.5 1.5 0 0 1-1.5-1.5V4.7A1.5 1.5 0 0 1 3 3.2zM8 11a2.9 2.9 0 1 0 0-5.8A2.9 2.9 0 0 0 8 11z"/></svg>';
 function avatarButton(entry,data,w,esc){return `<button type="button" class="lb-avatar-edit" data-lb-avatar title="${esc(w.changeAvatar)}" aria-label="${esc(w.changeAvatar)}">${avatarHTML(entry,data.avatars||{},esc)}<span class="lb-avatar-badge">${camera}</span></button>`;}
@@ -152,15 +166,15 @@ function myChip(data,w,locale,esc){
 }
 export function leaderboardHTML(data,locale,esc){
  const w=words(locale);
- if(!data)return '<div class="leaderboard-page"></div>'; /* E393 loading keeps the same centred column, so nothing jumps when data arrives */
- if(!data.configured)return `<div class="leaderboard-page">${hero(w,esc)}${segmented('period',PERIODS,view.period,w)}<section class="lb-card leaderboard-notice"><h2 class="lb-h2">${w.notReady}</h2><p class="lb-note">${w.notReadyText}</p></section>${localHTML(data,w,locale,esc)}</div>`;
- const tab=['hot','follow'].includes(data.tab)?data.tab:'board',tabs=segmented('tab',['board','hot','follow'],tab,w);
+ /* E393/E402 loading: the same rows as the tab being loaded, with a spinner in the body */
+ if(!data){const tab=view.tab||'board';return page(topRow(w,tab),tab==='board'?boardControls(w):tab==='hot'?hotControls(null,w,esc):`<p class="lb-subrow-caption">${w.followSub}</p>`,'<div class="lb-loading"><span class="spinner"></span></div>');}
+ if(!data.configured)return page(topRow(w,'board'),segmented('period',PERIODS,view.period,w),`<section class="lb-card leaderboard-notice"><h2 class="lb-h2">${w.notReady}</h2><p class="lb-note">${w.notReadyText}</p></section>${localHTML(data,w,locale,esc)}`);
+ const tab=['hot','follow'].includes(data.tab)?data.tab:'board';
  /* E397 关注: people you follow, then 同好 */
- if(tab==='follow')return `<div class="leaderboard-page">${hero(w,esc)}<div class="lb-controls">${tabs}</div>${socialHTML(data.social,locale,esc,avatarHTML)}</div>`;
- if(tab==='hot')return `<div class="leaderboard-page">${hero(w,esc)}<div class="lb-controls">${tabs}</div><section class="lb-card leaderboard-hot"><h2 class="lb-h2">${w.hot} <span>· ${w[view.category]}</span></h2>${hotHTML(data.hot,w,locale,esc)}</section></div>`;
- const controls=`<div class="lb-controls">${tabs}${segmented('period',PERIODS,view.period,w)}</div>${underline('metric',METRICS,view.metric,w)}`;
+ if(tab==='follow')return page(topRow(w,tab),`<p class="lb-subrow-caption">${w.followSub}</p>`,socialHTML(data.social,locale,esc,avatarHTML));
+ if(tab==='hot')return page(topRow(w,tab),hotControls(data.hot,w,esc),`<section class="lb-card leaderboard-hot"><div class="lb-card-head"><h2 class="lb-h2">${w.hot} <span>· ${w[view.category]}</span></h2></div>${hotHTML(data.hot,w,locale,esc)}</section>`);
  const body=data.joined?`<section class="lb-card leaderboard-board"><div class="lb-card-head"><h2 class="lb-h2">${w[view.metric]} <span>· ${view.metric==='games'?w.all:w[view.period]}</span></h2><small>${esc(fill(w.joinedAs,{name:data.name}))} · <button type="button" class="leaderboard-leave" data-lb-profile>${w.editProfile}</button></small></div>${boardHTML(data,w,locale,esc)}</section>`:joinHTML(data,w,esc);
- return `<div class="leaderboard-page">${hero(w,esc,myChip(data,w,locale,esc))}${controls}${body}${localHTML(data,w,locale,esc)}</div>`;
+ return page(topRow(w,tab,myChip(data,w,locale,esc)),boardControls(w),body+localHTML(data,w,locale,esc));
 }
 /* Mounts the page into main; isCurrent() guards against a late reply after the user moved on. */
 export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>true,openSettings=()=>{}}){
@@ -191,6 +205,6 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
   main.querySelectorAll('[data-lb-profile]').forEach(b=>b.addEventListener('click',()=>openSettings('personal')));
   bindSocial(main,{api,locale,esc,toast,images:()=>({...(last?.avatars||{}),...(last?.social?.avatars||{})}),avatarHTML,openSettings,rerender:()=>{if(isCurrent())render();}});
  };
- main.innerHTML=leaderboardHTML(null,locale,esc)+'<div class="loading-screen"><span class="spinner"></span></div>';
+ main.innerHTML=leaderboardHTML(null,locale,esc);
  await render();
 }
