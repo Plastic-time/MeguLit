@@ -55,8 +55,8 @@
   --faint: #76625e;
   --crimson: #a51d2d;
   --crimson-ink: #a51d2d;
-  --gold: #946313;
-  --gold-soft: rgba(148, 99, 19, .1);
+  --gold: #82540c;
+  --gold-soft: rgba(130, 84, 12, .1);
   --line: rgba(122, 22, 38, .16);
   --line-2: rgba(42, 21, 24, .08);
   --glow: rgba(165, 29, 45, .16);
@@ -73,8 +73,8 @@
     --faint: #76625e;
     --crimson: #a51d2d;
     --crimson-ink: #a51d2d;
-    --gold: #946313;
-    --gold-soft: rgba(148, 99, 19, .1);
+    --gold: #82540c;
+    --gold-soft: rgba(130, 84, 12, .1);
     --line: rgba(122, 22, 38, .16);
     --line-2: rgba(42, 21, 24, .08);
     --glow: rgba(165, 29, 45, .16);
@@ -209,7 +209,7 @@ p { text-wrap: pretty; }
   font-size: clamp(1.6rem, 1.2vw + .8rem, 2.3rem); letter-spacing: .02em;
 }
 .jp .b, .tb-line .b, :lang(zh) .display .b { white-space: nowrap; }
-.jp rt { font-size: .38em; color: var(--gold); letter-spacing: .08em; font-weight: 500; }
+.jp rt { font-size: max(11px, .38em); color: var(--gold); letter-spacing: .08em; font-weight: 500; }
 .jp .w { border-radius: 6px; cursor: help; transition: background-color .15s; padding: 0 .04em; }
 .jp .w:hover, .jp .w:focus-visible, .jp .w.on { background: var(--gold-soft); outline: none; }
 .tr { font-family: var(--serif); color: var(--crimson-ink); font-size: clamp(1.05rem, .8vw + .8rem, 1.35rem); margin: 0 0 1.4rem; }
@@ -273,7 +273,7 @@ p { text-wrap: pretty; }
   background: #5a1b25; border: 1px solid rgba(220, 171, 85, .5); font-size: .8rem; color: #f7e3c5;
 }
 .tb-line { font-family: var(--serif-ja); font-size: clamp(1rem, 1.3vw + .5rem, 1.45rem); line-height: 2; margin: 0; }
-.tb-line rt { font-size: .45em; color: #e6b866; transition: opacity .25s, transform .25s; }
+.tb-line rt { font-size: max(11px, .45em); color: #e6b866; transition: opacity .25s, transform .25s; }
 .tb-tr { margin: .2rem 0 0; color: #f08d92; font-family: var(--serif); font-size: clamp(.9rem, .8vw + .55rem, 1.1rem); transition: opacity .25s, transform .25s; }
 .textbox[data-state="before"] .tb-line rt { opacity: 0; transform: translateY(.3em); }
 .textbox[data-state="before"] .tb-tr { opacity: 0; transform: translateY(-.3em); }
