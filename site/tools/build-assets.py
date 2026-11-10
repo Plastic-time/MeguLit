@@ -134,3 +134,20 @@ if REC.exists() and Path(FFMPEG).exists():
             im = Image.open(png).convert('RGB')   # 1280x720; the last one keeps clear of the settings panel on the right
             box = (0, 138, 1000, 700) if k == 5 else (0, 0, 1244, 700)
             im.crop(box).resize((800, 450), Image.LANCZOS).save(IMG / f'card-{k}-800.webp', 'WEBP', quality=80, method=6)
+
+# ---- cache busting: fonts are cached for 30 days, so site.css names each one with a hash of its bytes ------------------
+import hashlib
+css_path = PUB / 'assets' / 'css' / 'site.css'
+css = css_path.read_text('utf8')
+for f in (PUB / 'assets' / 'fonts').glob('*.woff2'):
+    v = hashlib.sha256(f.read_bytes()).hexdigest()[:10]
+    css = re.sub(r'(url\("/assets/fonts/' + re.escape(f.name) + r')(\?v=[0-9a-f]+)?"', r'\1?v=' + v + '"', css)
+css_path.write_text(css, 'utf8', newline='\n')
+# the pages preload the heading font: same versioned address, or it downloads twice
+for html in PUB.glob('*.html'):
+    page = html.read_text('utf8')
+    for f in (PUB / 'assets' / 'fonts').glob('*.woff2'):
+        v = hashlib.sha256(f.read_bytes()).hexdigest()[:10]
+        page = re.sub(r'(href="/assets/fonts/' + re.escape(f.name) + r')(\?v=[0-9a-f]+)?"', r'\1?v=' + v + '"', page)
+    html.write_text(page, 'utf8', newline='\n')
+print('font links versioned')
