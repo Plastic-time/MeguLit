@@ -80,7 +80,7 @@ for (const b of $$('[data-embed]')) b.addEventListener('click', () => {
 });
 
 // ---- tabs (arrow keys move between tabs, as the ARIA tabs pattern expects) ------------------------------------------------
-const tabs = $$('[role="tab"]');
+const tabs = $$('.tabs [role="tab"]');
 function selectTab(tab, focus) {
   for (const t of tabs) {
     const sel = t === tab;
@@ -258,6 +258,12 @@ function splitKinetic() {
             frag.append(word);
           }
           child.replaceWith(frag);
+        } else if (child.nodeType === 1 && child.tagName === 'RUBY') {
+          const span = document.createElement('span');
+          span.className = 'ch';
+          span.style.setProperty('--i', i++);
+          child.replaceWith(span);
+          span.append(child);
         } else if (child.nodeType === 1 && !child.classList.contains('ch') && !child.classList.contains('wd') && child.tagName !== 'WBR') walk(child);
       }
     };
@@ -310,7 +316,7 @@ if (topBar && hero) {
 
 // 3D parallax: copy, specimen and the magic circle lean toward the pointer.
 if (hero && finePointer && !reduce) {
-  const copy = $('.hero-copy'), spec = $('.hero .specimen'), circle = $('.hero-media');
+  const copy = $('.hero-type'), spec = $('.hero-vert'), circle = $('.hero-media');
   let raf = 0;
   hero.addEventListener('pointermove', e => {
     cancelAnimationFrame(raf);
@@ -352,7 +358,7 @@ if (!reduce) {
       else v.pause();
     }
   }, { rootMargin: '120px 0px' });
-  for (const v of $$('video.clip')) if (!v.closest('.stage-item')) io.observe(v);
+  for (const v of $$('video.clip')) if (!v.closest('.feat-item')) io.observe(v);
 }
 
 // GMV ticker: engine names on the crimson band, game titles on the outlined band. Two copies make the loop seamless.

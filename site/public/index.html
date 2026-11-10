@@ -79,42 +79,29 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
 <section class="hero" aria-labelledby="hero-title">
  <div class="hero-media" aria-hidden="true">
   <video class="hero-video" muted loop playsinline preload="none" poster="/assets/img/hero-poster.webp" data-sm="/assets/video/megulit-360.mp4" data-md="/assets/video/megulit-720.mp4" data-lg="/assets/video/megulit-1080.mp4"></video>
+  <div class="hero-tint"></div>
   <div class="hero-scrim"></div>
   <div class="dof"></div>
   <canvas class="rays-fx"></canvas>
   <canvas class="kana-fx"></canvas>
-  <svg class="circle" viewBox="-300 -300 600 600">
-   <defs><path id="ring-path" d="M 0,-246 a 246,246 0 1,1 0,492 a 246,246 0 1,1 0,-492"/></defs>
-   <g class="c-outer">
-    <circle r="288" class="c-line"/>
-    <circle r="276" class="c-ticks"/>
-    <text class="c-runes"><textPath href="#ring-path">読む ・ 物語 ・ 言葉 ・ 魔導書 ・ ふりがな ・ 単語帳 ・ 続きを読もう ・ 読む ・ 物語 ・ 言葉 ・ 魔導書 ・ ふりがな ・ 単語帳 ・ 続きを読もう ・ </textPath></text>
-   </g>
-   <g class="c-inner">
-    <circle r="222" class="c-line"/>
-    <circle r="214" class="c-dash"/>
-    <polygon class="c-star" points="0,-210 181.9,105 -181.9,105"/>
-    <polygon class="c-star" points="0,210 181.9,-105 -181.9,-105"/>
-    <circle r="105" class="c-line"/>
-   </g>
-   <g class="c-core"><circle r="58" class="c-dash"/><circle r="6" class="c-dot"/></g>
-  </svg>
   <div class="grain"></div>
  </div>
- <div class="wrap hero-grid">
-  <div class="hero-copy tilt">
-   <h1 id="hero-title" class="display kinetic" data-i-html="hero.title"><span class="b">玩 Galgame，</span><wbr><span class="b">学日语</span></h1>
+ <div class="hero-stage">
+  <h1 id="hero-title" class="hero-type kinetic tilt" data-i-html="hero.title"><span class="ht-pre">玩 Galgame，</span><span class="ht-big"><ruby>学<rt>がく</rt></ruby><ruby>日<rt>にち</rt></ruby><ruby>语<rt>ご</rt></ruby></span></h1>
+  <p class="hero-vert" lang="ja" aria-hidden="true">続きを読もう</p>
+  <div class="hero-foot">
    <p class="lede" data-i="hero.lede">给 Galgame 玩家的日语学习工具。游戏里的每句台词都带上注音和释义，点一下查词，一键制成 Anki 卡片，读了多少、学了哪些词都替你记着</p>
-   <div class="cta">
-    <a class="btn btn-primary btn-xl js-download" href="https://github.com/ilynthn/MeguLit/releases/latest">
-     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>
-     <span data-i="dl.button">下载 MeguLit</span>
+   <div class="hero-dl">
+    <a class="dl-orb js-download" href="https://github.com/ilynthn/MeguLit/releases/latest" aria-label="下载 MeguLit" data-i-attr="aria-label:dl.button">
+     <svg class="orb-ring" viewBox="0 0 200 200" aria-hidden="true"><defs><path id="orb-path" d="M100,100 m-80,0 a80,80 0 1,1 160,0 a80,80 0 1,1 -160,0"/></defs><text><textPath href="#orb-path" textLength="498" lengthAdjust="spacing" data-i="orb.ring">下载 MeguLit ✦ 免费开源 ✦ Windows 10 / 11 ✦ </textPath></text></svg>
+     <span class="orb-core" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 4v13m0 0-5.5-5.5M12 17l5.5-5.5M5 20.5h14"/></svg><b data-i="orb.label">下载</b></span>
     </a>
-    <a class="btn btn-quiet" href="#download" data-i="dl.alt">备用下载</a>
+    <div class="hero-dl-meta">
+     <p class="cta-meta"><span class="js-version">v1.2.8</span><span class="js-size">20.0 MB</span><span data-i="dl.os">Windows 10 / 11 x64</span><span data-i="dl.free">免费 · 开源</span></p>
+     <a class="alt-link" href="#download" data-i="dl.alt">备用下载</a>
+    </div>
    </div>
-   <p class="cta-meta"><span class="js-version">v1.2.8</span><span class="js-size">20.0 MB</span><span data-i="dl.os">Windows 10 / 11 x64</span><span data-i="dl.free">免费 · 开源</span></p>
   </div>
-  
  </div>
  <button type="button" class="sound-fab js-sound" aria-pressed="false">
   <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
@@ -129,15 +116,6 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
 </div>
 
 
-<section class="facts-strip" aria-label="MeguLit 一览" data-i-attr="aria-label:fs.label">
- <div class="wrap fs-grid">
-  <div class="fs"><b class="count" data-to="25">25</b><span data-i="fs.lessons">课五十音，带笔顺动画和例词</span></div>
-  <div class="fs"><b class="count" data-to="3">3</b><span data-i="fs.games">种假名小游戏，四档难度</span></div>
-  <div class="fs"><b class="count" data-to="1">1</b><span data-i="fs.anki">键制成 Anki 卡片，带截图和原声</span></div>
-  <div class="fs"><b class="count" data-to="0">0</b><span data-i="fs.free">元。免费，GPL-3.0 开源</span></div>
- </div>
-</section>
-
 <section class="statement" aria-label="MeguLit">
  <div class="wrap">
   <p class="reveal-words" data-i="st.text">Galgame 里有你最想看完的故事。MeguLit 把注音、释义、制卡和复习都放进游戏里，你只管往下读，读过的词会自己留下来。</p>
@@ -148,67 +126,52 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  <div class="wrap">
   <h2 id="ch-title" class="h2" data-i="ch.title">一边玩，一边学</h2>
   <p class="sec-lede" data-i="ch.lede">下面都是 MeguLit 在真实游戏里的录屏</p>
-  <div class="chap-flow">
-   <div class="chap-rail" aria-hidden="true"><span class="beam"></span></div>
-   <div class="chap-list">
-   <article class="chap" data-i="0">
-    <div class="chap-copy" data-k="埋め込み">
-    <p class="chap-n"><b>I</b><span lang="ja">埋め込み</span></p>
-    <h3 class="h2 chap-t" data-i="ch1.t">字幕长在原版游戏里</h3>
-    <p data-i="ch1.d">内嵌替换把日文原文和译文直接写进游戏自己的文本框，注音在上、译文在下，用游戏的字体和版面画出来。眼睛不用在两个窗口之间来回跳</p>
+  <div class="feat">
+   <div class="feat-tabs" role="tablist" aria-label="功能" data-i-attr="aria-label:nav.features">
+    <button type="button" role="tab" class="ft" id="ft-0" aria-controls="fp-0" aria-selected="true" tabindex="0" data-k="0">
+     <span class="ft-head"><span class="ft-n">I</span><span class="ft-k" lang="ja">埋め込み</span></span>
+     <span class="ft-t" data-i="ch1.t">字幕长在原版游戏里</span>
+     <span class="ft-d"><span data-i="ch1.d">内嵌替换把日文原文和译文直接写进游戏自己的文本框，注音在上、译文在下，用游戏的字体和版面画出来。眼睛不用在两个窗口之间来回跳</span></span>
+     <span class="ft-bar" aria-hidden="true"><i></i></span>
+    </button>
+    <button type="button" role="tab" class="ft" id="ft-1" aria-controls="fp-1" aria-selected="false" tabindex="-1" data-k="1">
+     <span class="ft-head"><span class="ft-n">II</span><span class="ft-k" lang="ja">読む</span></span>
+     <span class="ft-t" data-i="ch2.t">在游戏里点一下，就懂了</span>
+     <span class="ft-d"><span data-i="ch2.d">点一个词看读音和释义，拖一段查短语和整句。读音优先用游戏自带的 ruby，阅读层不抢焦点，点它也不会让剧情往下走；想深究还能让 AI 讲语法和语境</span></span>
+     <span class="ft-bar" aria-hidden="true"><i></i></span>
+    </button>
+    <button type="button" role="tab" class="ft" id="ft-2" aria-controls="fp-2" aria-selected="false" tabindex="-1" data-k="2">
+     <span class="ft-head"><span class="ft-n">III</span><span class="ft-k" lang="ja">単語帳</span></span>
+     <span class="ft-t" data-i="ch3.t">一键 Anki</span>
+     <span class="ft-d"><span data-i="ch3.d">查到的词直接制成 Anki 卡片，游戏截图、例句和原声都带上，没配音的旁白用本地语音补上</span></span>
+     <span class="ft-bar" aria-hidden="true"><i></i></span>
+    </button>
+    <button type="button" role="tab" class="ft" id="ft-3" aria-controls="fp-3" aria-selected="false" tabindex="-1" data-k="3">
+     <span class="ft-head"><span class="ft-n">IV</span><span class="ft-k" lang="ja">復習</span></span>
+     <span class="ft-t" data-i="ch4.t">翻过来，是那一幕的画面</span>
+     <span class="ft-d"><span data-i="ch4.d">在 MeguLit 里直接复习，用的是 Anki 自己的卡片和调度，评分写回 Anki。每张卡的背面，就是你当时读到那句台词的游戏画面</span></span>
+     <span class="ft-bar" aria-hidden="true"><i></i></span>
+    </button>
+    <button type="button" role="tab" class="ft" id="ft-4" aria-controls="fp-4" aria-selected="false" tabindex="-1" data-k="4">
+     <span class="ft-head"><span class="ft-n">V</span><span class="ft-k" lang="ja">五十音</span></span>
+     <span class="ft-t" data-i="ch5.t">零基础，从五十音开始</span>
+     <span class="ft-d"><span data-i="ch5.d">25 课，笔顺动画、字源和例词，例句来自你自己玩过的游戏。学完一课，用三种假名小游戏和四档难度练到熟</span></span>
+     <span class="ft-bar" aria-hidden="true"><i></i></span>
+    </button>
+    <button type="button" role="tab" class="ft" id="ft-5" aria-controls="fp-5" aria-selected="false" tabindex="-1" data-k="5">
+     <span class="ft-head"><span class="ft-n">VI</span><span class="ft-k" lang="ja">記録</span></span>
+     <span class="ft-t" data-i="ch6.t">读了多少，一眼看到</span>
+     <span class="ft-d"><span data-i="ch6.d">阅读字数、时长、查词次数、阅读日历和时段分布都记着；读过的每一句原文和译文按会话存好，回头找哪句一搜就有</span></span>
+     <span class="ft-bar" aria-hidden="true"><i></i></span>
+    </button>
    </div>
-    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/embed.webp" data-src="/assets/clips/embed.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-   </article>
-   <article class="chap" data-i="1">
-    <div class="chap-copy" data-k="読む">
-    <p class="chap-n"><b>II</b><span lang="ja">読む</span></p>
-    <h3 class="h2 chap-t" data-i="ch2.t">在游戏里点一下，就懂了</h3>
-    <p data-i="ch2.d">点一个词看读音和释义，拖一段查短语和整句。读音优先用游戏自带的 ruby，阅读层不抢焦点，点它也不会让剧情往下走；想深究还能让 AI 讲语法和语境</p>
-   </div>
-    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/lookup.webp" data-src="/assets/clips/lookup.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-   </article>
-   <article class="chap" data-i="2">
-    <div class="chap-copy" data-k="単語帳">
-    <p class="chap-n"><b>III</b><span lang="ja">単語帳</span></p>
-    <h3 class="h2 chap-t" data-i="ch3.t">一键 Anki</h3>
-    <p data-i="ch3.d">查到的词直接制成 Anki 卡片，游戏截图、例句和原声都带上，没配音的旁白用本地语音补上</p>
-   </div>
-    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/anki.webp" data-src="/assets/clips/anki.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-   </article>
-   <article class="chap" data-i="3">
-    <div class="chap-copy" data-k="復習">
-    <p class="chap-n"><b>IV</b><span lang="ja">復習</span></p>
-    <h3 class="h2 chap-t" data-i="ch4.t">翻过来，是那一幕的画面</h3>
-    <p data-i="ch4.d">在 MeguLit 里直接复习，用的是 Anki 自己的卡片和调度，评分写回 Anki。每张卡的背面，就是你当时读到那句台词的游戏画面</p>
-   </div>
-    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/review.webp" data-src="/assets/clips/review.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-   </article>
-   <article class="chap" data-i="4">
-    <div class="chap-copy" data-k="五十音">
-    <p class="chap-n"><b>V</b><span lang="ja">五十音</span></p>
-    <h3 class="h2 chap-t" data-i="ch5.t">零基础，从五十音开始</h3>
-    <p data-i="ch5.d">25 课，笔顺动画、字源和例词，例句来自你自己玩过的游戏。学完一课，用三种假名小游戏和四档难度练到熟</p>
-   </div>
-    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/kana.webp" data-src="/assets/clips/kana.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-   </article>
-   <article class="chap chap-duo" data-i="5">
-    <div class="chap-copy" data-k="記録">
-    <p class="chap-n"><b>VI</b><span lang="ja">記録</span></p>
-    <h3 class="h2 chap-t" data-i="ch6.t">读了多少，一眼看到</h3>
-    <p data-i="ch6.d">阅读字数、时长、查词次数、阅读日历和时段分布都记着；读过的每一句原文和译文按会话存好，回头找哪句一搜就有</p>
-   </div>
-    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/stats.webp" data-src="/assets/clips/stats.mp4" width="960" height="540" aria-hidden="true"></video><video class="clip clip-2" muted loop playsinline preload="none" poster="/assets/clips/history.webp" data-src="/assets/clips/history.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-   </article>
-   </div>
-   <div class="chap-stage" aria-hidden="true">
-    <div class="stage-sticky">
-    <figure class="chap-media stage-item" data-i="0"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/embed.webp" data-src="/assets/clips/embed.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-    <figure class="chap-media stage-item" data-i="1"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/lookup.webp" data-src="/assets/clips/lookup.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-    <figure class="chap-media stage-item" data-i="2"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/anki.webp" data-src="/assets/clips/anki.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-    <figure class="chap-media stage-item" data-i="3"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/review.webp" data-src="/assets/clips/review.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-    <figure class="chap-media stage-item" data-i="4"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/kana.webp" data-src="/assets/clips/kana.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-    <figure class="chap-media stage-item chap-duo" data-i="5"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/stats.webp" data-src="/assets/clips/stats.mp4" width="960" height="540" aria-hidden="true"></video><video class="clip clip-2" muted loop playsinline preload="none" poster="/assets/clips/history.webp" data-src="/assets/clips/history.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-    </div>
+   <div class="feat-stage">
+    <figure class="feat-item on" id="fp-0" role="tabpanel" aria-labelledby="ft-0" data-k="0"><video class="clip" muted playsinline preload="none" poster="/assets/clips/embed.webp" data-src="/assets/clips/embed.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+    <figure class="feat-item" id="fp-1" role="tabpanel" aria-labelledby="ft-1" data-k="1"><video class="clip" muted playsinline preload="none" poster="/assets/clips/lookup.webp" data-src="/assets/clips/lookup.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+    <figure class="feat-item" id="fp-2" role="tabpanel" aria-labelledby="ft-2" data-k="2"><video class="clip" muted playsinline preload="none" poster="/assets/clips/anki.webp" data-src="/assets/clips/anki.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+    <figure class="feat-item" id="fp-3" role="tabpanel" aria-labelledby="ft-3" data-k="3"><video class="clip" muted playsinline preload="none" poster="/assets/clips/review.webp" data-src="/assets/clips/review.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+    <figure class="feat-item" id="fp-4" role="tabpanel" aria-labelledby="ft-4" data-k="4"><video class="clip" muted playsinline preload="none" poster="/assets/clips/kana.webp" data-src="/assets/clips/kana.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+    <figure class="feat-item duo" id="fp-5" role="tabpanel" aria-labelledby="ft-5" data-k="5"><video class="clip" muted playsinline preload="none" poster="/assets/clips/stats.webp" data-src="/assets/clips/stats.mp4" width="960" height="540" aria-hidden="true"></video><video class="clip clip-2" muted playsinline preload="none" poster="/assets/clips/history.webp" data-src="/assets/clips/history.mp4" width="960" height="540" aria-hidden="true"></video></figure>
    </div>
   </div>
  </div>
@@ -236,7 +199,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    <p class="small" data-i="dk.hint">键盘：Enter 翻面，→ 下一张</p>
   </div>
   <div class="deck" tabindex="0" role="group" aria-label="Anki 卡片示例" data-i-attr="aria-label:dk.label">
-    <div class="dcard" data-i="0">
+    <div class="dcard" data-k="0">
      <div class="dc-inner">
       <div class="dc-face dc-front">
        <span class="dc-tag">Anki</span>
@@ -250,7 +213,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
       </div>
      </div>
     </div>
-    <div class="dcard" data-i="1">
+    <div class="dcard" data-k="1">
      <div class="dc-inner">
       <div class="dc-face dc-front">
        <span class="dc-tag">Anki</span>
@@ -264,7 +227,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
       </div>
      </div>
     </div>
-    <div class="dcard" data-i="2">
+    <div class="dcard" data-k="2">
      <div class="dc-inner">
       <div class="dc-face dc-front">
        <span class="dc-tag">Anki</span>
@@ -278,7 +241,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
       </div>
      </div>
     </div>
-    <div class="dcard" data-i="3">
+    <div class="dcard" data-k="3">
      <div class="dc-inner">
       <div class="dc-face dc-front">
        <span class="dc-tag">Anki</span>
