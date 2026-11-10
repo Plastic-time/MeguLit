@@ -4,9 +4,9 @@
 // game; after the last line the headline comes back. Lines are written as text with {漢字|かんじ} for ruby.
 
 const LINES = {
-  zh: ['又卡在生词上了？', '别切出去查词典了，\n点一下就行', '「[[{好|す}き]]」——\n游戏里的每个词，\n都能这样点开', '读过的词它都记着，\n下次就认识了', '接下来，\n往下看看它还能做什么'],
-  ja: ['また知らない単語で止まった？', '辞書はもういいよ。\nクリックひとつで', '「[[{好|す}き]]」——\nゲームの中の言葉は、\n全部こうして開ける', '読んだ言葉は、\nちゃんと覚えておくから', '次は、\nほかにできることも見ていって'],
-  en: ['Stuck on a word again?', 'Skip the dictionary.\nJust click it', '「[[{好|す}き]]」—\nevery word in the game\nopens like this', 'Every word you read,\nit remembers', 'Next up —\nsee what else it can do'],
+  zh: ['又卡在生词上了？', '别切出去查词典了，\n点一下就行', '「[[{好|す}き]]」', '读过的词它都记着，\n下次就认识了', '接下来，\n往下看看它还能做什么'],
+  ja: ['また知らない単語で止まった？', '辞書はもういいよ。\nクリックひとつで', '「[[{好|す}き]]」', '読んだ言葉は、\nちゃんと覚えておくから', '次は、\nほかにできることも見ていって'],
+  en: ['Stuck on a word again?', 'Skip the dictionary.\nJust click it', '「[[{好|す}き]]」', 'Every word you read,\nit remembers', 'Next up,\nsee what else it can do'],
 };
 // the word in [[...]] can be clicked: a small lookup card opens beside it, as MeguLit's own does in a game
 const CARD = {
@@ -14,6 +14,8 @@ const CARD = {
   ja: { pos: '形容動詞', mean: '心がひかれる。気に入っている', ex: 'エクスプロージョンが、一番好き！', exT: '爆裂魔法こそ、至高にして最強', hint: '押して', note: 'ゲームの中の言葉も、全部こうして開ける' },
   en: { pos: 'na-adjective', mean: 'liked; fond of', ex: 'エクスプロージョンが、一番好き！', exT: 'Explosion magic is the best. Obviously.', hint: 'click me', note: 'Every word in the game opens just like this' },
 };
+// what the line goes on to say once the word has been clicked
+const AFTER = { zh: '游戏里的每个词，\n都能这样点开', ja: 'ゲームの中の言葉は、\n全部こうして開ける', en: 'every word in the game\nopens like this' };
 const NEXT = { zh: '点击继续', ja: 'クリックで次へ', en: 'click to continue' };
 
 // "{読|よ}み" -> pieces: a ruby group or a single character, each typed as one step
@@ -51,7 +53,18 @@ export function heroPlay(h1, { reduce = false } = {}) {
     const w = h1.querySelector('.ht-word');
     if (w && !w.querySelector('.ht-hint')) { const h = document.createElement('span'); h.className = 'ht-hint'; h.textContent = (CARD[lang()] || CARD.en).hint; w.append(h); w.classList.add('ready'); }
   };
+  // the words after the clickable one are laid out from the start (hidden), so nothing moves when they appear
+  let later = [];
+  const revealLater = () => {
+    rest = later; later = [];
+    if (reduce) { finish(); return; }
+    typing = true; h1.classList.add('typing');
+    const step = () => { if (!rest.length) { finish(); return; } rest.shift().classList.remove('ht-hide'); timer = setTimeout(step, 55); };
+    step();
+  };
+  let continued = false;
   const advance = () => {
+    continued = false;
     if (typing) { finish(); return; }
     card?.remove(); card = null;
     const lines = LINES[lang()] || LINES.en;
@@ -62,9 +75,15 @@ export function heroPlay(h1, { reduce = false } = {}) {
     const say = document.createElement('span'); say.className = 'ht-say'; say.lang = lang() === 'en' ? 'en' : 'ja';
     h1.replaceChildren(say);
     // the whole line is laid out first, every piece hidden, then shown one by one: its lines never move while it types
-    rest = pieces(lines[idx - 1]).map(n => { if (n.nodeType === 3) { const sp = document.createElement('span'); sp.append(n); n = sp; } if (n.tagName !== 'BR') n.classList.add('ht-hide'); return n; });
-    say.append(...rest);
-    rest = rest.filter(n => n.tagName !== 'BR');
+    const text = lines[idx - 1], withAfter = text.includes('[[');
+    let all = pieces(text).concat(withAfter ? pieces(AFTER[lang()] || AFTER.en).map(n => { n.later = true; return n; }) : []);
+    rest = all.map(n => { const L = n.later; if (n.nodeType === 3) { const sp = document.createElement('span'); sp.append(n); n = sp; } n.later = L; if (n.tagName !== 'BR') n.classList.add('ht-hide'); return n; });
+    // the words after the clickable one sit in their own smaller block under it
+    const after = document.createElement('span'); after.className = 'ht-after';
+    after.append(...rest.filter(n => n.later));
+    say.append(...rest.filter(n => !n.later), ...(withAfter ? [after] : []));
+    later = rest.filter(n => n.later && n.tagName !== 'BR');
+    rest = rest.filter(n => !n.later && n.tagName !== 'BR');
     down.hidden = idx !== lines.length;
     if (reduce) { finish(); return; }
     typing = true; h1.classList.add('typing');
@@ -83,9 +102,14 @@ export function heroPlay(h1, { reduce = false } = {}) {
     h1.append(card);
     // under the word, kept inside the headline's width
     const hr = h1.getBoundingClientRect(), wr = w.getBoundingClientRect();
-    const left = Math.max(0, Math.min(wr.left - hr.left, hr.width - card.offsetWidth));
-    card.style.setProperty('left', `${left}px`); card.style.setProperty('top', `${wr.bottom - hr.top + 8}px`);
     w.classList.add('on');
+    if (!continued && later.length) { continued = true; revealLater(); }
+    // beside the word when there is room (the words typed after it stay readable), else under it
+    // to the right of the whole line when there is room, else under it: never over the words
+    const say = h1.querySelector('.ht-say'), range = document.createRange(); range.selectNodeContents(say);
+    const textRight = Math.max(...[...range.getClientRects()].map(q => q.right)), sr = say.getBoundingClientRect();
+    if (innerWidth - textRight - 40 >= card.offsetWidth) { card.style.setProperty('left', `${textRight - hr.left + 32}px`); card.style.setProperty('top', `${wr.top - hr.top}px`); }
+    else { card.style.setProperty('left', '0px'); card.style.setProperty('top', `${sr.bottom - hr.top + 12}px`); }
   };
   h1.addEventListener('click', e => {
     if (e.target.closest('a, button, .ht-card')) return;

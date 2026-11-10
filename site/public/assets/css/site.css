@@ -2018,3 +2018,6 @@ html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
 .ht-next { font-size: 1rem; color: #c9c9c7; letter-spacing: .25em; }
 .ht-next i { font-size: .8rem; animation-duration: 1.8s; }
 @media (prefers-reduced-motion: reduce) { .ht-play .ht-big { animation: none !important; } }
+/* the explanation under the clicked word: smaller, a step down from it */
+.ht-after { display: block; margin-top: .35em; font-size: .62em; line-height: 1.45; color: #d9d6cf; letter-spacing: .04em; }
+.ht-card { z-index: 8; }
