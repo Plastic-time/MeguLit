@@ -123,9 +123,10 @@ export function heroPlay(h1, { reduce = false } = {}) {
     if (!continued && later.length) { continued = true; revealLater(); }
     // beside the word when there is room (the words typed after it stay readable), else under it
     // to the right of the whole line when there is room, else under it: never over the words
-    const say = h1.querySelector('.ht-say'), range = document.createRange(); range.selectNodeContents(say);
-    const textRight = Math.max(...[...range.getClientRects()].map(q => q.right)), sr = say.getBoundingClientRect();
-    if (innerWidth - textRight - 40 >= card.offsetWidth) { card.style.setProperty('left', `${textRight - hr.left + 32}px`); card.style.setProperty('top', `${wr.top - hr.top}px`); }
+    // measured on the words themselves (block boxes span the whole width), and kept inside the text box
+    const say = h1.querySelector('.ht-say'), sr = say.getBoundingClientRect(), br = box.getBoundingClientRect();
+    const textRight = Math.max(...[...say.querySelectorAll('span:not(.ht-after), ruby')].map(n => n.getBoundingClientRect().right));
+    if (br.right - 24 - textRight - 40 >= card.offsetWidth) { card.style.setProperty('left', `${textRight - hr.left + 40}px`); card.style.setProperty('top', `${wr.top - hr.top}px`); }
     else { card.style.setProperty('left', '0px'); card.style.setProperty('top', `${sr.bottom - hr.top + 12}px`); }
   };
   // the whole text box takes the click, not only the words
