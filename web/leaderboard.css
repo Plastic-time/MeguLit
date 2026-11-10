@@ -1,0 +1,39 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* E377 排行榜 page; period/metric switches reuse .statistics-ranges styling */
+.leaderboard-page{display:flex;flex-direction:column;gap:16px;max-width:880px}
+.leaderboard-switch{flex-wrap:wrap;align-self:flex-start}
+.leaderboard-page .panel{margin-bottom:0}
+.leaderboard-note{color:var(--muted);font-size:13px;line-height:1.75;margin:0 0 14px;max-width:68ch;text-wrap:pretty}
+.leaderboard-notice .panel-title{margin-bottom:8px}
+.leaderboard-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.leaderboard-tile{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--line);border-radius:12px}
+.leaderboard-tile small{color:var(--muted);font-size:11px}
+.leaderboard-tile strong{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.leaderboard-board .section-header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.leaderboard-board .section-header small{color:var(--muted);font-size:11px}
+.leaderboard-leave{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;font-size:11px;cursor:pointer}
+.leaderboard-leave[data-armed]{color:var(--accent)}
+.leaderboard-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.leaderboard-list li{display:flex;align-items:center;gap:14px;padding:10px 4px;border-bottom:1px solid var(--line);min-height:44px}
+.leaderboard-list li:last-child{border-bottom:0}
+.leaderboard-list li.is-me{background:color-mix(in srgb,var(--accent) 14%,transparent);border-radius:8px}
+.leaderboard-rank{width:2.4em;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.leaderboard-list li:nth-child(-n+3) .leaderboard-rank{color:var(--g-gold,var(--accent));font-weight:650}
+.leaderboard-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.leaderboard-list strong{font-variant-numeric:tabular-nums;font-weight:600}
+.leaderboard-games li{padding:0}
+.leaderboard-games button{display:flex;align-items:center;gap:14px;width:100%;padding:10px 4px;background:none;border:0;color:inherit;text-align:left;cursor:pointer;min-height:44px}
+.leaderboard-games button small{color:var(--muted);font-size:11px;white-space:nowrap}
+.leaderboard-games button:hover .leaderboard-name{color:var(--g-t1,var(--text))}
+.leaderboard-back{background:none;border:0;padding:4px 0;color:var(--muted);cursor:pointer}
+.leaderboard-game-title{margin:6px 0 10px;font-size:15px;font-weight:600}
+.leaderboard-me{margin:0 0 10px;color:var(--muted);font-size:13px}
+.leaderboard-me strong{color:var(--text)}
+.leaderboard-offline{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.leaderboard-offline p{margin:0;color:var(--muted)}
+.leaderboard-field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-width:320px}
+.leaderboard-field span{font-size:12px;color:var(--muted)}
+.leaderboard-field input{padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 80%,transparent);color:var(--text);font:inherit}
+.leaderboard-check{display:flex;align-items:center;gap:12px;margin-bottom:12px;font-size:13px;cursor:pointer}
+.leaderboard-error{color:var(--accent);font-size:12px;margin:0 0 10px}
+.leaderboard-join .primary{align-self:flex-start;display:inline-flex}

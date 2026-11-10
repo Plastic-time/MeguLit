@@ -57,7 +57,7 @@ for(let i=0;i<5;i++)field('lookup',`word_level_colors.${i}`,`${['新收录','学
 num('study','word_review_count','每轮单词复习数','Words per review','1回の単語復習数',1,500);num('study','sentence_review_count','每轮句子复习数','Sentences per review','1回の例文復習数',1,500);num('study','word_sentence_count','每个词条显示例句数','Examples per word','単語ごとの例文表示数',1,100);bool('study','only_review_translated','仅复习有译文的句子','Review translated sentences only','翻訳のある例文だけ復習');
 choice('study','default_dictionary_sort','词汇排序','Vocabulary order','単語の並び順',[option('date','收录时间','Date added','登録日'),option('spelling','词形','Spelling','表記'),option('status','掌握程度','Mastery','習得度')]);
 bool('reader','history_enabled','保存阅读历史','Save reading history','読書履歴を保存');num('reader','history_span','阅读历史保留天数','Reading history days','読書履歴の保存日数',1,36500);bool('reader','sentence_window_inverted','翻转原文与译文位置','Reverse source and translation order','原文と翻訳の順序を反転');
-const groups=[['translation','翻译','Translation','翻訳'],['dictionary','辞典与解释','Dictionaries and explanations','辞書・解説'],['lookup','查词与高亮','Lookup and highlighting','単語検索・色分け'],['study','学习与复习','Study and review','学習・復習'],['reader','阅读记录','Reading records','読書記録'],['text','文字与注音','Text and furigana','文字・ふりがな'],['embedding','内嵌与 Hook','Embedding and Hook','埋め込み・Hook'],['immersion','沉浸模式','Immersion','没入モード'],['position','位置与 OCR','Position and OCR','位置・OCR'],['panels','游戏内面板','In-game panels','ゲーム内パネル'],['speech','语音','Speech','音声'],['anki','Anki','Anki','Anki'],['library','游戏库','Library','ライブラリ'],['background','主页背景','Home background','ホーム背景']].map(([id,zh,en,ja])=>({id,label:{zh,en,ja}}));
+const groups=[['translation','翻译','Translation','翻訳'],['dictionary','辞典与解释','Dictionaries and explanations','辞書・解説'],['lookup','查词与高亮','Lookup and highlighting','単語検索・色分け'],['study','学习与复习','Study and review','学習・復習'],['reader','阅读记录','Reading records','読書記録'],['text','文字与注音','Text and furigana','文字・ふりがな'],['embedding','内嵌与 Hook','Embedding and Hook','埋め込み・Hook'],['immersion','沉浸模式','Immersion','没入モード'],['position','位置与 OCR','Position and OCR','位置・OCR'],['panels','游戏内面板','In-game panels','ゲーム内パネル'],['speech','语音','Speech','音声'],['anki','Anki','Anki','Anki'],['library','游戏库','Library','ライブラリ'],['background','主页背景','Home background','ホーム背景'],['online','联网服务','Online services','オンラインサービス']].map(([id,zh,en,ja])=>({id,label:{zh,en,ja}}));
 for(const field of fields)if(field.scope==='dictionary'&&/^lookupProfiles\.(deepseek|gemini)\.baseUrl$/.test(field.key))field.readOnly=true;
 field('reader','history_font_family','对话记录字体','Dialogue history font','会話履歴のフォント');
 num('reader','history_font_size','对话记录字号','Dialogue history font size','会話履歴の文字サイズ',12,32,1);
@@ -72,6 +72,11 @@ num('reader','history_line_height','对话记录行高','Dialogue history line s
  field('text','englishOutlineColor','英文描边颜色','English outline color','英語の縁取り色','color');}
 // New-game tip (E215): shown at each of a work's first five launches unless turned off here.
 bool('reader','new_game_tip','新游戏推进提示','New-game tip','ニューゲームの案内');
+// E377 online services: the leaderboard opt-in and the shared relay address (services/relay-config.cjs).
+bool('online','leaderboardEnabled','参加排行榜','Join the leaderboard','ランキングに参加');
+field('online','leaderboardName','排行榜昵称','Leaderboard nickname','ランキングのニックネーム');
+bool('online','leaderboardShareGames','在排行榜公开我读过的游戏','Show the games I read on the leaderboard','読んだゲームをランキングで公開');
+field('online','relayUrl','联网服务地址（留空使用默认）','Online service URL (empty uses the default)','オンラインサービスのアドレス（空欄で既定）');
 // Continuous visual/audio parameters; counts and identifiers retain integer steps.
 for(const item of fields)if(item.type==='number'&&(
  ['text','position','background','panels'].includes(item.scope)||

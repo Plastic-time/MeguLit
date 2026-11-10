@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 const hints={
+ leaderboardEnabled:['只上传阅读字数、时长、收录单词数和连续天数的汇总，用随机匿名 ID，不需要账号；关闭后会删除服务器上的记录','Uploads only totals (characters, time, words saved, streak) under a random anonymous id, no account. Turning it off deletes your entry on the server','読んだ文字数・時間・登録単語数・連続日数の合計だけを匿名のランダム ID で送ります。オフにするとサーバーの記録を削除します'],
+ leaderboardName:['排行榜上显示的名字，2–16 个字，不能含网址或不雅词','Name shown on the leaderboard, 2–16 characters, no links or offensive words','ランキングに表示される名前。2〜16 文字、URL や不適切な語は使えません'],
+ leaderboardShareGames:['打开后会公开你读过的游戏名称和各自字数，用于“按游戏”排行','Shares the titles you read and their character counts for the per-game boards','読んだゲーム名と文字数を公開し、ゲーム別ランキングに参加します'],
+ relayUrl:['诊断上传、共享适配和排行榜共用的服务地址；一般留空即可','Address shared by diagnostic upload, shared adaptation and the leaderboard; normally leave empty','診断アップロード・共有設定・ランキング共通のサーバーアドレス。通常は空欄のままで構いません'],
  history_font_family:['填写电脑上已安装的字体名称，仅影响历史中的对话正文；推荐 Yu Gothic 或 Noto Sans JP','Enter an installed font name for dialogue history, such as Yu Gothic or Noto Sans JP','会話履歴の本文に使うインストール済みフォント名を指定します'],
  history_font_size:['调整对话记录的正文大小，单位为像素','Dialogue history text size in pixels','会話履歴の本文サイズ（px）'],
  history_line_height:['每行文字的高度倍数，数值越大越疏朗','Line height multiplier for dialogue history','会話履歴の行の高さの倍率'],

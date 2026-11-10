@@ -39,6 +39,7 @@ class Settings{
     const value=this.uiObject('tome-menu-background',{...panelDefaults,surfaces:{menu:'image',log:'image',card:'image'}});value.panels={...value.panels};
     for(const panel of ['menu','log','card'])value.panels[panel]={...panelDefaults,...Object.fromEntries(Object.keys(panelDefaults).map(k=>[k,value[k]??panelDefaults[k]])),...value.panels[panel]};return value;
   }
+  if(scope==='online')return {relayUrl:'',leaderboardEnabled:false,leaderboardName:'',leaderboardShareGames:false,...readJSON(path.join(this.folder,'online.json'))};
   if(scope==='library'){const library=readJSON(this.file('library.json'));return {autoSeries:library.autoSeries!==false,steamPath:library.steamPath||'',folders:(library.folders||[]).join('\n')};}
   throw Error('SETTINGS_SCOPE_INVALID');
  }
@@ -86,6 +87,11 @@ class Settings{
   }
   else if(scope==='background'||scope==='panels'){
     const ui=this.ui();ui[scope==='background'?'tome-background':'tome-menu-background']=JSON.stringify(next);atomic(path.join(this.root,'data','ui-state.json'),ui);
+  }else if(scope==='online'){
+    /* E377: nickname through the leaderboard filter, relay address https (http only for localhost) */
+    if(Object.hasOwn(values,'leaderboardName')&&next.leaderboardName!==''){const checked=require('./leaderboard.cjs').cleanName(next.leaderboardName);if(!checked.ok)throw Error('LEADERBOARD_'+checked.error);next.leaderboardName=checked.name;}
+    if(Object.hasOwn(values,'relayUrl')&&next.relayUrl!==''){const base=require('./relay-config.cjs').normalizeBase(next.relayUrl);if(!base)throw Error('SETTINGS_INVALID_URL');next.relayUrl=base;}
+    const file=path.join(this.folder,'online.json');atomic(file,{...readJSON(file),relayUrl:next.relayUrl,leaderboardEnabled:next.leaderboardEnabled,leaderboardName:next.leaderboardName,leaderboardShareGames:next.leaderboardShareGames});
   }else if(scope==='library')atomic(this.file('library.json'),{...readJSON(this.file('library.json')),steamPath:next.steamPath,folders:next.folders.split(/[\r\n;]+/).map(v=>v.trim()).filter(Boolean),autoSeries:next.autoSeries});
   return this.get(profile);
  }
