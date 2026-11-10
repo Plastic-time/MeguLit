@@ -23,9 +23,17 @@ function parse(data){const lines=[];let i=0;
  while(i<data.length){let j=i;while(j+1<data.length&&lead(data[j])&&data[j+1]>=0x40&&data[j+1]!==0x7f)j+=2;
   if(j-i>=4){const t=dec.decode(data.subarray(i,j)).replace(/[\s　]+$/,'');if(/[ぁ-ゖァ-ヺ一-龯]/.test(t)&&!t.includes('�'))lines.push(t);i=j;}else i++;}
  return {lines,anchors:[]};}
+function defaultNames(dir){const out=new Map();let ini;try{ini=fs.readFileSync(path.join(dir,'GAMEEXE.INI'));}catch{return out;}
+ const s=ini.toString('latin1');for(const m of s.matchAll(/#NAME\.([A-Z])="([^"]*)"/g))out.set(m[1].charCodeAt(0)-65,Buffer.from(m[2],'latin1'));return out;}
+function withNames(data,names){const parts=[];let last=0;
+ for(let i=0;i+3<data.length;i++){if(data[i]===0x81&&data[i+1]===0x96&&data[i+2]===0x82&&data[i+3]>=0x60&&data[i+3]<=0x79&&names.has(data[i+3]-0x60)){parts.push(data.subarray(last,i),names.get(data[i+3]-0x60));i+=3;last=i+1;}}
+ parts.push(data.subarray(last));return Buffer.concat(parts);}
 const avg32={
  id:'avg32',hint:'TXT\\SEEN.TXT',
- scenes(dir){const f=seenFile(dir);if(!f)return [];return list(f)||[];},
+ // ＊Ａ..＊Ｚ are the characters' names; the game prints the defaults from GAMEEXE.INI (#NAME.A="忍"), so the text
+ // is read with those names in place (Shift-JIS bytes swapped before decoding).
+ scenes(dir){const f=seenFile(dir);if(!f)return [];const names=defaultNames(dir);
+  return (list(f)||[]).map(s=>({name:s.name,read:()=>names.size?withNames(s.read(),names):s.read()}));},
  archives:()=>[],
  sources:dir=>{const f=seenFile(dir);return f?[f]:[];},
  parse,test:n=>/^SEEN\d+\.TXT$/i.test(n),

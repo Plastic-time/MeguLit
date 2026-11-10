@@ -28,7 +28,7 @@ function list(file){const scheme=schemeOf(file),arc=path.parse(file).name.toLowe
    d=d.subarray(0,e.size);return e.packed?zlib.inflateSync(d):d;}});}
  return out;}
 function parse(data){const lines=[];
- for(const row of new TextDecoder('shift_jis').decode(data).split(/\r?\n/)){if(!row.startsWith('.message'))continue;const f=row.split('\t');const name=f[3]||'',text=(f.slice(4).join('\t')||'').trim();
+ for(const row of new TextDecoder('shift_jis').decode(data).split(/\r?\n/)){if(!row.startsWith('.message'))continue;const f=row.split('\t');const name=f[3]||'',text=(f.slice(4).join('\t')||'').replace(/\\#[0-9A-Fa-f]{6}/g,'').replace(/\\n/g,'').replace(/\\[-+*A-Za-z]/g,'').trim();/* \#RRGGBB colour, \n break, \+ etc. */
   if(!text)continue;if(name)lines.push(name);lines.push(text);}
  return {lines,anchors:[]};}
 function scrDat(dir){const f=path.join(dir,'scr.dat');return schemeOf(f)?f:null;}

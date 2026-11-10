@@ -31,3 +31,14 @@ test('re-pak: UTF-16 runs joined across line-break codes, other codes split, non
  put('USR\0');put('このマユなら、');u.push(6);put('ずいぶん前に');u.push(0xe001);put('ウチの課だ。');u.push(0x1b,4);put('いいね');u.push(0x1c);put('中文文本');u.push(0x1d);
  const d=Buffer.alloc(u.length*2);u.forEach((v,i)=>d.writeUInt16LE(v,i*2));d.write('USR\0',0,'latin1');
  assert.deepEqual(parse(d).lines,['このマユなら、ずいぶん前にウチの課だ。','いいね']);});
+test('kirikiri: Japanese macro names, [漢字\'よみ] ruby, [iscript] code and "\\" continuations',()=>{
+ const s=require('../services/original-engines/scenes.cjs');
+ const ks=['[iscript]','global.x = 1;','[endscript]','@position marginl=1 \\','margint=2','[輝夜]とふたり[r]','[貴峰丸\'たかねまる]が来た'].join('\r\n');
+ const r=s.ENGINES.kirikiri.parse(Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(ks,'utf16le')]));
+ assert.deepEqual(r.lines,['輝夜とふたり','貴峰丸が来た']);assert.deepEqual(r.ruby,[null,[['貴峰丸','たかねまる']]]);});
+test('paz: colour and break codes are dropped',()=>{
+ const {parse}=require('../services/original-engines/paz.cjs');
+ assert.deepEqual(parse(Buffer.from('.message\t1\t\t\t\\#FF0000red\\#FFFFFF\\nnext\r\n','latin1')).lines,['rednext']);});
+test('bgi: <R よみ>漢字</R> splits into text and ruby',()=>{
+ const {splitRuby}=require('../services/original-engines/bgi.cjs');
+ assert.deepEqual(splitRuby(['<R しゅんげん>峻厳</R>な崖','x']),{lines:['峻厳な崖','x'],ruby:[[['峻厳','しゅんげん']],null]});});

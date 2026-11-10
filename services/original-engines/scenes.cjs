@@ -38,15 +38,21 @@ function walk(dir,depth,test,out=[]){let entries;try{entries=fs.readdirSync(dir,
 // Text lines are what is left of a line after its tags; command lines (@...), labels (*...) and tag-only lines are
 // anchors when they hold no text a translation would change.
 function parseKs(buf){
- const lines=[],anchors=[];
+ const lines=[],anchors=[],ruby=[];let script=false,cont=false;
  for(const raw of decode(buf).split(/\r?\n/)){const t=raw.trim();if(!t||t[0]===';')continue;
+  // a command whose line ends in "\" goes on to the next line (女王蜂の王房 window positions)
+  if(cont){cont=t.endsWith('\\');continue;}if((t[0]==='@'||t[0]==='[')&&t.endsWith('\\')){cont=true;continue;}
+  // TJS between [iscript] and [endscript] is code, not text (女王蜂の王房 staff roll)
+  if(/^[@[]iscript\b/i.test(t)){script=true;continue;}if(script){if(/^[@[]endscript\b/i.test(t))script=false;continue;}
   if(t[0]==='@'||t[0]==='*'){if(ascii(t))anchors.push(t);continue;}
   // A tag whose name is Japanese is a macro that prints that word (女王蜂の王房: [輝夜] [めのう] for character names,
   // [輝夜ruby] with its reading, [漢字'よみ] for ruby); keep the word, drop the reading.
   const text=t.replace(/\[([぀-ヿ一-鿿々ー]+)(?:ruby|'[^\]]*)?\]/g,'$1').replace(/\[[^\]]*\]/g,'').trim();
   if(!text){if(ascii(t))anchors.push(t);continue;}
+  const pairs=[...t.matchAll(/\[([぀-ヿ一-鿿々ー]+)'([^\]]+)\]/g)].map(m=>[m[1],m[2]]);if(pairs.length)ruby[lines.length]=pairs;
   lines.push(text);}
- return {lines,anchors};
+ // the game's own readings ([漢字'よみ]), only when the script has any
+ return ruby.length?{lines,anchors,ruby:lines.map((_,i)=>ruby[i]||null)}:{lines,anchors};
 }
 function xp3Scenes(file,test){let t;try{t=xp3.list(file);}catch{return [];}if(!t)return [];
  // An entry flagged "protected" can still be stored as plain text (女王蜂の王房): try the first one and keep the
@@ -390,7 +396,7 @@ const nitroplusN4=require('./nitroplus-n4.cjs');
 const ENGINES={'nitroplus-n4':nitroplusN4,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
- for(const s of scenes.slice(0,8)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;}
+ for(const s of scenes.slice(0,64)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
 function detect(dir){for(const id of Object.keys(ENGINES))if(readable(id,dir))return id;return null;}
 function read(id,dir,overlay){const engine=ENGINES[id];
  return engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=engine.parse(replaced||s.read());}catch{}return {name:s.name,...parsed,patched:!!replaced};});}

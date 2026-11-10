@@ -32,7 +32,7 @@ function read(file,key,iv,segs){const fd=fs.openSync(file,'r');try{return Buffer
    0x08000010, length, UTF-8. Message text starts with CRLF; a spoken line is "//【名前】" CRLF "<voice ...>" CRLF 「…」.
    #{・・・}text# marks emphasis dots over text. */
 function strings(d){const out=[];for(let i=0;i+8<d.length;i++){if(d.readUInt32LE(i)===0x08000010){const len=d.readUInt32LE(i+4);if(len>0&&len<8000&&i+8+len<=d.length){out.push(d.toString('utf8',i+8,i+8+len));i+=7+len;}}}return out;}
-function clean(s){return s.replace(/^\s*\/\/【[^】]*】\s*/,'').replace(/<[^>]*>/g,'').replace(/#\{[^}]*\}([^#]*)#/g,'$1').replace(/[\r\n]+/g,'').trim();}
+function clean(s){return s.replace(/^\s*\/\/【[^】]*】[^\r\n]*/,'').replace(/<[^>]*>/g,'').replace(/#\{[^}]*\}([^#]*)#/g,'$1').replace(/[\r\n\t]+/g,'').trim();}
 function parse(d){const lines=[];for(const s of strings(d)){if(!s.startsWith('\r\n')&&!s.startsWith('//【'))continue;const name=(s.match(/^\s*\/\/【([^】]*)】/)||[])[1];const t=clean(s);if(!t||!/[ぁ-ゖァ-ヺ一-龯]/.test(t))continue;if(name)lines.push(name);lines.push(t);}return {lines,anchors:[]};}
 function scriptNpk(dir){for(const sub of ['.','..']){const f=path.join(dir,sub,'script.npk');try{if(fs.statSync(f).isFile()&&findKey(f))return f;}catch{}}return null;}
 const engine={

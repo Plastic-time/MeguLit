@@ -16,11 +16,12 @@ function list(file){let b;try{b=fs.readFileSync(file);}catch{return null;}if(b.l
 /* The scenario (script/<title>.txt in script.pak) is markup: <k> waits for a click, <clear> clears the box,
    <R TEXT="よみ">漢字</R> is ruby, <VOICE NAME="名前" ...> names the speaker. Text between waits is one line.
    (沙耶の唄 writes what the hero hears from the "monsters" as deliberately garbled katakana; it is kept as is.) */
-function parse(data){const t=sj.decode(data),lines=[];
+function parse(data){const t=sj.decode(data),lines=[],ruby=[];
  for(const part of t.split(/<k>|<clear>|<page>/i)){const name=(part.match(/<VOICE[^>]*NAME="([^"]*)"/i)||[])[1];
+  const pairs=[...part.matchAll(/<R TEXT="([^"]*)">([\s\S]*?)<\/R>/gi)].filter(m=>m[1]&&m[2]).map(m=>[m[2],m[1]]);
   const text=part.replace(/<R TEXT="[^"]*">([\s\S]*?)<\/R>/gi,'$1').replace(/<[^>]*>/g,'').replace(/[\r\n]+/g,'').replace(/^[　\s]+|[　\s]+$/g,'');
-  if(!text||!/[ぁ-ゖァ-ヺ一-龯]/.test(text))continue;if(name)lines.push(name);lines.push(text);}
- return {lines,anchors:[]};}
+  if(!text||!/[ぁ-ゖァ-ヺ一-龯]/.test(text))continue;if(name){lines.push(name);ruby.push(null);}lines.push(text);ruby.push(pairs.length?pairs:null);}
+ return {lines,anchors:[],ruby};}
 function scriptPak(dir){const f=path.join(dir,'script.pak');try{const l=list(f);if(l&&l.some(e=>/\.txt$/i.test(e.name)))return f;}catch{}return null;}
 const engine={
  id:'nitro-pak',hint:'script.pak',

@@ -28,7 +28,8 @@ const memo=new Map();
 function userEntries(dir){const files=paks(dir);if(!files.length)return [];const key=files.map(f=>f+'|'+statKey(f)).join('\n');if(memo.has(key))return memo.get(key);
  const by=new Map();for(const f of files){let t;try{t=toc(f);}catch{t=null;}if(!t)continue;for(const e of t)by.set(e.hash,e);}
  const out=[];for(const e of by.values()){if(e.size>4e6||e.size<16)continue;const h=head(e);if(h&&h.toString('latin1',0,4)==='USR\0')out.push(e);}
- out.sort((a,b)=>a.hash.localeCompare(b.hash));memo.set(key,out);return out;}
+ /* largest first: detection only looks at the first few scenes, and the story files are the big ones */
+ out.sort((a,b)=>b.size-a.size||a.hash.localeCompare(b.hash));memo.set(key,out);return out;}
 const TEXT=/[　-ヿ一-鿿！-ﾟ‐-‧×]/;
 function parse(data){if(data.toString('latin1',0,3)!=='USR')return {lines:[],anchors:[]};const lines=[];let cur='',pending=false;
  const flush=()=>{const s=cur.trim();/* Japanese lines carry hiragana; this also leaves out the package's Chinese and binary noise */if(/[ぁ-ん]{2}/.test(s))lines.push(s);cur='';pending=false;};

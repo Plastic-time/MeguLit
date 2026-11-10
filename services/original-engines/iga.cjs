@@ -15,13 +15,14 @@ function list(file){let b;try{b=fs.readFileSync(file);}catch{return null;}if(b.t
   for(let i=0;i<dir.length;i++){const n=(i+1<dir.length?dir[i+1].nameAt:names)-dir[i].nameAt,bytes=Buffer.alloc(n);for(let k=0;k<n;k++)bytes[k]=u();dir[i].name=sj.decode(bytes);dir[i].offset+=data;if(dir[i].offset+dir[i].size>b.length)return null;}
   return dir.map(e=>({name:e.name,read:()=>{const d=Buffer.from(b.subarray(e.offset,e.offset+e.size)),key=/\.s$/i.test(e.name)?0xff:0;for(let i=0;i<d.length;i++)d[i]^=((i+2)^key)&255;return d;}}));
  }catch{return null;}}
-function parse(d){const lines=[];
+function parse(d){const lines=[],ruby=[];
  for(let i=0;i+3<d.length;i++){if(d[i]!==0x04||d[i+1]!==0)continue;const n=d[i+2];if(n<3||i+3+n>d.length)continue;
   const z=d.indexOf(0,i+3);if(z<i+5||z>=i+3+n)continue;const t=sj.decode(d.subarray(i+3,z));if(t.includes('�')||!/[ぁ-ゖァ-ヺ一-龯]/.test(t))continue;
   if(/^[!-~]+$/.test(t))continue;i+=2+n;
-  if(t.startsWith('＃')){lines.push(t.slice(1));continue;}
-  lines.push(t.replace(/<([^<>]*)<[^<>]*>/g,'$1'));}
- return {lines,anchors:[]};}
+  if(t.startsWith('＃')){lines.push(t.slice(1));ruby.push(null);continue;}
+  const pairs=[...t.matchAll(/<([^<>]*)<([^<>]*)>/g)].filter(m=>m[1]&&m[2]).map(m=>[m[1],m[2]]);
+  lines.push(t.replace(/<([^<>]*)<[^<>]*>/g,'$1'));ruby.push(pairs.length?pairs:null);}
+ return {lines,anchors:[],ruby};}
 function scriptIga(dir){const f=path.join(dir,'script.iga');try{if(fs.statSync(f).isFile())return f;}catch{}return null;}
 const engine={
  id:'iga',hint:'script.iga',

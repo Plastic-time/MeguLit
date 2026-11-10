@@ -39,7 +39,7 @@ const bgi=require('./original-engines/bgi.cjs');
 const ADAPTERS={
  system4:{marker:base=>base+'.ain',locate:(dir,base)=>{const file=ainOf(dir,base);return file?{engine:'system4',target:file}:null;},read:target=>readAin(target),fingerprint:target=>sha256(target)},
  bgi:{folder:true,marker:()=>'data01000.arc',locate:dir=>{try{const arcs=fs.readdirSync(dir).filter(f=>/^data0\d{4}\.arc$/i.test(f));if(!arcs.length)return null;const head=Buffer.alloc(12),fd=fs.openSync(path.join(dir,arcs[0]),'r');try{fs.readSync(fd,head,0,12,0);}finally{fs.closeSync(fd);}return ['BURIKO ARC20','PackFile    '].includes(head.toString('latin1'))?{engine:'bgi',target:dir}:null;}catch{return null;}},
-  read:dir=>{const scenes=bgi.scan(dir),lines=scenes.flatMap(x=>x.lines);return {engine:'bgi',version:0,codepage:'shift_jis',lines,structure:{messages:lines.length,functions:scenes.length,functionHash:crypto.createHash('sha256').update(scenes.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
+  read:dir=>{const scenes=bgi.scan(dir),lines=scenes.flatMap(x=>x.lines),ruby=scenes.some(x=>x.ruby?.some(Boolean))?scenes.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;return {engine:'bgi',version:0,codepage:'shift_jis',lines,ruby,structure:{messages:lines.length,functions:scenes.length,functionHash:crypto.createHash('sha256').update(scenes.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
   fingerprint:dir=>crypto.createHash('sha256').update('bgi-code-order\n'+fs.readdirSync(dir).filter(f=>/^data0\d{4}\.arc$/i.test(f)).sort().map(f=>{const st=fs.statSync(path.join(dir,f));return f+'|'+st.size+'|'+st.mtimeMs;}).join('\n')).digest('hex')}};
 // E280: engines read as scene files (KiriKiri, Artemis, Ren'Py); their script is the game folder like BGI's.
 const scenes=require('./original-engines/scenes.cjs');
@@ -74,7 +74,8 @@ function align(runtime,original){
 }
 // BGI builds that differ by a few lines per scene (E3xx 穢翼のユースティア) are lined up scene by scene (bgi.alignLines).
 function realign(loc,ain,runtime,runningDir){if(loc.engine!=='bgi'||align(runtime,ain).sameStructure)return ain;
- const lines=bgi.alignLines(bgi.scan(runningDir),bgi.scan(loc.target));return lines.length===runtime.lines.length?{...ain,lines,structure:runtime.structure}:ain;}
+ const run=bgi.scan(runningDir),own=bgi.scan(loc.target),lines=bgi.alignLines(run,own),ruby=bgi.alignLines(run,own,'ruby');
+ return lines.length===runtime.lines.length?{...ain,lines,ruby:ruby.some(Boolean)?ruby:undefined,structure:runtime.structure}:ain;}
 function importOriginal(root,db,id,dir){
  const row=gameRow(db,id);if(typeof dir!=='string'||!path.isAbsolute(dir)||!fs.statSync(dir,{throwIfNoEntry:false})?.isDirectory())throw Error('INVALID_ORIGINAL_DIRECTORY');
  if(path.resolve(dir).toLowerCase()===path.dirname(row.executable).toLowerCase())throw Error('ORIGINAL_IS_RUNNING_COPY');
@@ -87,7 +88,7 @@ function importOriginal(root,db,id,dir){
   // Never accept a translated file as the original: most of its lines must be Japanese.
   if(japanese<ain.lines.filter(prose).length*.5)throw Error('ORIGINAL_NOT_JAPANESE');
   const alignment=align(runtime,{...ain,structure:ain.structure});
-  const index=writeIndex(root,id,'original-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'original',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash,dir},structure:ain.structure,lines:ain.lines});
+  const index=writeIndex(root,id,'original-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'original',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash,dir},structure:ain.structure,lines:ain.lines,...(Array.isArray(ain.ruby)?{ruby:ain.ruby}:{})});
   const exe=fs.readdirSync(dir).find(f=>/\.exe$/i.test(f)&&path.parse(f).name.toLowerCase()===path.parse(row.executable).name.toLowerCase());
   return writeState(root,id,{original:{dir,file,sha256:hash,index,codepage:ain.codepage,lines:ain.lines.length,executable:exe?path.join(dir,exe):''},alignment,status:alignment.reliable?'ready':'unreliable',mode:readState(root)[id]?.mode||(alignment.reliable?'original':'off'),error:''});
  }catch(error){writeState(root,id,{status:'failed',error:String(error.message||error)});throw error;}
@@ -357,9 +358,11 @@ function staticProvider(root,executable){
  const entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file&&runningDirOf(s.runtime).toLowerCase()===path.dirname(String(executable)).toLowerCase());
  if(!entry)return null;const [id,state]=entry;
  try{if(fingerprint({engine:state.runtime.engine||'system4',target:state.runtime.file})!==state.runtime.sha256)return null;
-  if(state.mode==='original'&&state.status==='ready'&&state.original?.index){const m=new Matcher(readIndex(state.runtime.index).lines,readIndex(state.original.index).lines);
+  if(state.mode==='original'&&state.status==='ready'&&state.original?.index){const og=readIndex(state.original.index),m=new Matcher(readIndex(state.runtime.index).lines,og.lines);
+   // The original's own ruby (BGI <R よみ>漢字</R>) for the restored lines: game readings before dictionary ones.
+   const readings=Array.isArray(og.ruby)?og.ruby:null,withRuby=r=>{if(!r||!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
    // A patched game shown in Japanese: the patched line itself is the group's translation of the restored line.
-   return {kind:'original',resolve:text=>m.match(text)};}
+   return {kind:'original',resolve:text=>withRuby(m.match(text))};}
   const patched=state.patchStatus==='ready'&&state.patch?.index&&state.patch.version===PATCH_VERSION&&(!state.patch.runtimeSha||state.patch.runtimeSha===state.runtime.sha256);
   if(!patched&&state.status!=='native-japanese')return null;
   // The Japanese game, with an imported patch or with none: the line stays Japanese; the patch's line at the same place is
