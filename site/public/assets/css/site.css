@@ -1300,7 +1300,7 @@ img, video, canvas, svg { -webkit-user-drag: none; user-drag: none; }
 /* Chinese hero title in a brush hand (Zhi Mang Xing, OFL); Japanese and English keep their serif faces */
 @font-face { font-family: "MeguLit Black"; src: url("/assets/fonts/hero-black.woff2") format("woff2"); font-weight: 900; font-display: swap; }
 :lang(zh) .ht-big { font-family: "MeguLit Black", "MeguLit Han", var(--serif); font-weight: 900; letter-spacing: .01em; font-size: clamp(5.5rem, 21vw, 23rem); line-height: 1; text-shadow: 0 0 .25em rgba(244, 244, 242, .22); }
-:lang(zh) .ht-big rt { font-size: .08em !important; }
+:lang(zh) .ht-big rt { font-size: max(11px, .08em) !important; }
 @media (max-width: 40rem) { :lang(zh) .ht-big { font-size: 30vw; } }
 /* round: no lamp, a shorter screen wall, less air around the deck */
 .lamp { display: none; }
@@ -1571,3 +1571,9 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
   .nt-submit { min-height: 3.6rem; padding: 0 2rem; }
   .nt-hud, .nt-link, .nt-close { font-size: .8125rem; }
 }
+
+/* contrast: small red text on black uses the lighter red (#e35a63, 5:1 on #0b0b0b); #c8323c stays for marks, bars and
+   large type. Placeholders and the title's furigana get readable floors */
+.nt-hud span:first-child, .tk-no, .dc-back .dc-pos, .dc-kana, .dc-means li::before, .intro .gl-line { color: #e35a63; }
+.nt-input::placeholder { color: #8a8a8a; }
+.ht-big rt { font-size: max(11px, .09em) !important; }
