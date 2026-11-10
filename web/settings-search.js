@@ -7,11 +7,17 @@ const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0300-\u03
 pinyinMap.set('引','yin');
 /* E377 联网服务 / 排行榜昵称 */
 pinyinMap.set('榜','bang');pinyinMap.set('昵','ni');pinyinMap.set('联','lian');pinyinMap.set('网','wang');
+/* E394 个人主页 头像 账号 邮箱 登录 退出 */
+/* E397 公开 签名 最喜欢 关注 同好 */
+for(const [c,p] of Object.entries({公:'gong',开:'kai',签:'qian',名:'ming',最:'zui',喜:'xi',欢:'huan',关:'guan',注:'zhu',同:'tong',好:'hao'}))if(!pinyinMap.has(c))pinyinMap.set(c,p);
+for(const [c,p] of Object.entries({个:'ge',人:'ren',主:'zhu',页:'ye',头:'tou',像:'xiang',账:'zhang',号:'hao',邮:'you',箱:'xiang',登:'deng',录:'lu',退:'tui',称:'cheng'}))if(!pinyinMap.has(c))pinyinMap.set(c,p);
 pinyinMap.set('惠','hui');pinyinMap.set('咏','yong');pinyinMap.set('唱','chang');pinyinMap.set('布','bu');pinyinMap.set('署','shu');/* E370 共享适配数据（匿名） */pinyinMap.set('享','xiang');pinyinMap.set('适','shi');pinyinMap.set('据','ju');pinyinMap.set('匿','ni');
 export function searchTerms(label){const tokens=[];for(let i=0;i<label.length;i++){const special=Object.entries({'角色':['jue','se'],'重定位':['chong','ding','wei'],'重新':['chong','xin']}).find(([word])=>label.startsWith(word,i));if(special){tokens.push(...special[1]);i+=special[0].length-1;}else tokens.push(pinyinMap.get(label[i])||label[i].toLowerCase());}return[normalize(label),normalize(tokens.join('')),normalize(tokens.map(token=>token[0]).join(''))];}
 export function matchesSetting(item,query){const words=query.trim().split(/\s+/).map(normalize).filter(Boolean),haystack=[...Object.values(item.label||{}),item.key||'',...(item.aliases||[])].flatMap(searchTerms);return words.every(word=>haystack.some(term=>term.includes(word)));}
 export function globalSearchEntries(data,text){return [
- ...data.fields.filter(field=>!(field.scope==='background'&&field.key.startsWith('crop.'))),
+ ...data.fields.filter(field=>!(field.scope==='background'&&field.key.startsWith('crop.'))).map(field=>field.scope==='online'&&/^leaderboard/.test(field.key)?{...field,scope:'personal'}:field),
+ {scope:'personal',key:'avatar',label:{zh:'个人主页 头像 换头像 排行榜头像 账号 邮箱 登录 退出登录 昵称 退出排行榜',en:'Profile picture avatar account email sign in sign out nickname leave leaderboard',ja:'プロフィール アイコン アカウント メール ログイン ログアウト ニックネーム ランキング 退出'}},
+ {scope:'personal',key:'profilePublic',label:{zh:'公开主页 签名 最喜欢的游戏 关注 同好',en:'Public profile signature favourite games follow kindred',ja:'公開プロフィール ひとこと 好きなゲーム フォロー 同好'}},
  ...['language','username','closeToTray','accent','fontFamily','themeMode','homeFontScale'].map(key=>({scope:'general',key,label:{zh:({fontFamily:'界面字体',homeFontScale:'主页字体大小',themeMode:'明暗模式',avatar:'头像'})[key]||text[key]||key,en:key}})),
  {scope:'background',key:'homeBackground',label:{zh:'主页背景图片 选择图片 调整显示区域 使用已有背景图',en:'Home background image crop',ja:'ホーム背景画像'}},
  {scope:'data',key:'backup',label:{zh:'数据导入导出备份恢复',en:'Data import export backup restore',ja:'データ バックアップ 復元'}}
