@@ -27,7 +27,7 @@ function intro() {
   const tl = createTimeline({ defaults: { ease: 'out(4)' } });
   tl.add('.hero .lede', { opacity: [0, 1], y: ['1.2rem', 0], duration: 900 }, 650)
     .add('.hero .cta > *', { opacity: [0, 1], y: ['1.6rem', 0], scale: [.86, 1], duration: 1100, delay: stagger(110), ease: 'outElastic(1, .65)' }, 820)
-    .add('.hero .cta-meta, .hero-bar > *', { opacity: [0, 1], y: ['.8rem', 0], duration: 700, delay: stagger(80) }, 1050);
+    .add('.hero .cta-meta, .sound-fab', { opacity: [0, 1], y: ['.8rem', 0], duration: 700, delay: stagger(80) }, 1050);
   const strokes = $$('.circle .c-line, .circle .c-star, .circle .c-dash');
   if (strokes.length) animate(createDrawable(strokes), { draw: ['0 0', '0 1'], duration: 2200, delay: stagger(90), ease: 'inOut(3)' });
   animate('.circle .c-runes', { opacity: [0, .9], duration: 1600, delay: 900 });
@@ -87,7 +87,7 @@ function parallax(still) {
 
 // Buttons lean toward the pointer and spring back.
 function magnets() {
-  for (const el of $$('.btn-primary, .btn-quiet, .chip')) {
+  for (const el of $$('.btn-primary, .btn-quiet, .chip, .sound-fab')) {
     el.addEventListener('pointermove', e => {
       const r = el.getBoundingClientRect();
       const x = (e.clientX - r.left - r.width / 2) * .22, y = (e.clientY - r.top - r.height / 2) * .32;

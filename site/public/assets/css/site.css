@@ -613,7 +613,7 @@ section[data-kanji]::before {
 /* ---- anime.js layer ---------------------------------------------------------------------------------------------- */
 /* hidden until the intro timeline brings them in; a CSS fallback shows them if the script never runs */
 @media (prefers-reduced-motion: no-preference) {
-  .js .hero .lede, .js .hero .cta > *, .js .hero .cta-meta, .js .hero-bar > * { opacity: 0; animation: fx-fallback 0s 8s forwards; }
+  .js .hero .lede, .js .hero .cta > *, .js .hero .cta-meta, .js .sound-fab { opacity: 0; animation: fx-fallback 0s 8s forwards; }
 }
 @keyframes fx-fallback { to { opacity: 1; } }
 .rays-fx { position: absolute; inset: 0; width: 100%; height: 100%; mix-blend-mode: screen; opacity: .7; }
@@ -861,3 +861,27 @@ section[data-kanji]::before {
 /* the specimen inside its card is type on the card, not a second card */
 .card .page { background: none; box-shadow: none; padding: .4rem 0 0; }
 .card .page::before { display: none; }
+
+/* ---- sound toggle: a round glass button in the hero's corner, like a video player ------------------------------- */
+.sound-fab {
+  position: absolute; z-index: 3; right: max(var(--gutter), calc(50% - 37.5rem)); bottom: 6.5rem;
+  display: inline-flex; align-items: center; gap: .6rem; height: 3.2rem; min-width: 3.2rem; padding: 0 1.05rem;
+  border-radius: 999px; border: 1px solid rgba(245, 235, 224, .22); color: #f5ebe0; cursor: pointer;
+  background: rgba(24, 12, 15, .42); backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 14px 34px -16px rgba(0, 0, 0, .8);
+  font: 500 .875rem/1 var(--sans); transition: border-color .2s, background-color .2s;
+}
+.sound-fab:hover { border-color: #eabb5f; background: rgba(60, 22, 30, .5); }
+.sound-fab svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.sound-fab .label { max-width: 0; overflow: hidden; white-space: nowrap; opacity: 0; transition: max-width .35s cubic-bezier(.2, .7, .2, 1), opacity .25s; }
+.sound-fab:hover .label, .sound-fab:focus-visible .label { max-width: 10rem; opacity: 1; }
+.sound-fab .eq { display: none; align-items: flex-end; gap: 3px; height: 16px; }
+.sound-fab .eq i { width: 3px; height: 100%; border-radius: 2px; background: linear-gradient(#ffd98f, #ff6f78); transform-origin: bottom; animation: eq 1s ease-in-out infinite; }
+.sound-fab .eq i:nth-child(2) { animation-delay: -.35s; } .sound-fab .eq i:nth-child(3) { animation-delay: -.7s; } .sound-fab .eq i:nth-child(4) { animation-delay: -.15s; }
+@keyframes eq { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+.sound-fab[aria-pressed="true"] .eq { display: inline-flex; }
+.sound-fab[aria-pressed="true"] svg { display: none; }
+.sound-fab[aria-pressed="true"] { border-color: rgba(234, 187, 95, .6); }
+@media (hover: none) { .sound-fab .label { max-width: none; opacity: 1; } }
+@media (max-width: 40rem) { .sound-fab { position: relative; right: auto; bottom: auto; justify-self: end; margin: 1.2rem var(--gutter) 0 0; height: 2.8rem; } }
+@media (prefers-reduced-motion: reduce) { .sound-fab .eq i { animation: none; } }
