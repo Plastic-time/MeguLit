@@ -10,9 +10,9 @@ const LINES = {
 };
 // the word in [[...]] can be clicked: a small lookup card opens beside it, as MeguLit's own does in a game
 const CARD = {
-  zh: { pos: '形容动词', mean: '喜欢；喜爱', ex: 'エクスプロージョンが、一番好き！', exT: '最喜欢的，果然还是爆裂魔法！', hint: '点我', note: '在游戏里也是这样，点一下就有' },
-  ja: { pos: '形容動詞', mean: '心がひかれる。気に入っている', ex: 'エクスプロージョンが、一番好き！', exT: '爆裂魔法こそ、至高にして最強', hint: '押して', note: 'ゲームの中でも、これと同じ' },
-  en: { pos: 'na-adjective', mean: 'liked; fond of', ex: 'エクスプロージョンが、一番好き！', exT: 'Explosion magic is the best. Obviously.', hint: 'click me', note: 'It works just like this inside the game' },
+  zh: { pos: '形容动词', mean: '喜欢；喜爱', ex: 'エクスプロージョンが、一番好き！', exT: '最喜欢的，果然还是爆裂魔法！', hint: '点我', note: '游戏里的每个词，都能这样点开' },
+  ja: { pos: '形容動詞', mean: '心がひかれる。気に入っている', ex: 'エクスプロージョンが、一番好き！', exT: '爆裂魔法こそ、至高にして最強', hint: '押して', note: 'ゲームの中の言葉も、全部こうして開ける' },
+  en: { pos: 'na-adjective', mean: 'liked; fond of', ex: 'エクスプロージョンが、一番好き！', exT: 'Explosion magic is the best. Obviously.', hint: 'click me', note: 'Every word in the game opens just like this' },
 };
 const NEXT = { zh: '点击继续', ja: 'クリックで次へ', en: 'click to continue' };
 
