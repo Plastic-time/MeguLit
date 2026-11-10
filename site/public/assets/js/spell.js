@@ -148,9 +148,12 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
     const margin = col ? Math.max(0, Math.min(col.left, W - col.right) - 16) : 0;
     // most English words go to the margins; a share of them (20–40% per line) stays in the line with the Japanese
     const r0 = rng((seed >>> 0) ^ 0x5bd1e995), inlineShare = .2 + r0() * .2;
-    toks.forEach(t => { if (t.en) t.inline = r0() < inlineShare; });
-    const enSide = margin >= 130 ? toks.filter(t => t.en && !t.inline) : [];
-    if (enSide.length) toks = toks.filter(t => !(t.en && !t.inline)).filter((t, i, a) => !(t.space && (i === 0 || a[i - 1].space)));
+    // an all-English line takes the same template as a Japanese one with English in it: the whole line keeps its shape in
+    // the middle, and a share of its words (20–40%) also plays in a margin
+    const allEn = toks.some(t => t.en) && !toks.some(t => !t.en && !t.space && /\p{L}/u.test(t.text));
+    toks.forEach(t => { if (t.en) t.inline = allEn || r0() < inlineShare; });
+    const enSide = margin < 130 ? [] : allEn ? toks.filter(t => t.en && r0() < inlineShare).map(t => ({ ...t, inline: false })) : toks.filter(t => t.en && !t.inline);
+    if (enSide.length && !allEn) toks = toks.filter(t => !(t.en && !t.inline)).filter((t, i, a) => !(t.space && (i === 0 || a[i - 1].space)));
     const real = toks.filter(t => !t.space);
     // orderly paths: the line keeps a clear reading shape; the randomness lives in the details, not the layout
     const shapes = real.length <= 12 && H > 420 ? ['row', 'row', 'arc', 'column', 'stair'] : ['row', 'row', 'row', 'arc', 'stair'];
