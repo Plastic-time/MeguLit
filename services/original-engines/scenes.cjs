@@ -17,6 +17,7 @@
 //   rpgmaker  RPG Maker MV/MZ www/data JSON maps, common events, troops (rpgmaker.cjs)
 //   wolf      WOLF RPG Editor Data/MapData/*.mps + BasicData/CommonEvent.dat, loose or in plain .wolf (wolf.cjs)
 //   capcom-msg Capcom Unity Ace Attorney scriptmessage bundles, Japanese + the Chinese bundle (capcom-msg.cjs)
+//   vgprompter Doki Doki Literature Club Plus! XOR'd language bundles, Japanese + Chinese by line hash (vgprompter.cjs)
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const xp3=require('./xp3.cjs');
 const KANA=/[ぁ-ゖァ-ヺ]/g;
@@ -373,8 +374,10 @@ const nscripter=require('./nscripter.cjs');
 // E343 Capcom Unity Ace Attorney collections (逆転検事 1&2, scriptmessage bundles): capcom-msg.cjs.
 // E375 RPG Maker MV/MZ (www/data JSON) and WOLF RPG Editor (Data/*.mps, CommonEvent.dat, plain .wolf): rpgmaker.cjs, wolf.cjs.
 const rpgmaker=require('./rpgmaker.cjs'),wolf=require('./wolf.cjs');
+// E403 DDLC Plus (StreamingAssets/AssetBundles/Windows/lang*.cy): vgprompter.cjs.
+const vgprompter=require('./vgprompter.cjs');
 const catsystem2=require('./catsystem2.cjs'),naninovel=require('./naninovel.cjs'),unityText=require('./unity-text.cjs'),higurashi=require('./higurashi.cjs'),mages=require('./mages.cjs'),capcomMsg=require('./capcom-msg.cjs');
-const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf};
+const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf,vgprompter};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,8)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;}
