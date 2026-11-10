@@ -1,0 +1,15 @@
+/assets/img/*
+  Cache-Control: public, max-age=2592000
+/assets/fonts/*
+  Cache-Control: public, max-age=2592000
+/assets/css/*
+  Cache-Control: public, max-age=3600
+/assets/js/*
+  Cache-Control: public, max-age=3600
+/data/*
+  Cache-Control: public, max-age=300
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; script-src 'self' 'sha256-v8+3wGXRso65BtrBFD5WJXQWtO7kaZ03/6XY3ZWFFrs='; connect-src 'self' https://dl.megulit.com; frame-ancestors 'none'; base-uri 'self'

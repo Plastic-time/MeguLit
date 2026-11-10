@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>更新日志 · MeguLit</title>
+<meta name="description" content="MeguLit 是免费开源的 Windows 工具：接上 Galgame 正在显示的日文台词，给它注音、翻译、查词，把生词送进 Anki，还能把译文直接写进游戏的文本框">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#170f11" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f8f1ee" media="(prefers-color-scheme: light)">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:title" content="MeguLit">
+<meta property="og:description" content="在 Galgame 里读日语原文：注音、翻译、查词、Anki，译文直接写进游戏">
+<meta property="og:image" content="https://megulit.com/assets/img/og.jpg">
+<meta property="og:url" content="https://megulit.com/changelog.html">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/assets/fonts/megulit-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preconnect" href="https://dl.megulit.com" crossorigin>
+<link rel="stylesheet" href="/assets/css/site.css">
+<script>/* theme before paint, so the page never flashes the wrong colours */
+document.documentElement.classList.add('js');try{var t=localStorage.getItem('megulit-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}
+</script>
+<script type="module" src="/assets/js/app.js"></script>
+</head>
+<body data-page="changelog">
+<a class="skip" href="#main" data-i="skip">跳到正文</a>
+
+<header class="top" id="top">
+ <div class="wrap top-row">
+  <a class="brand" href="/" aria-label="MeguLit">
+   <img src="/assets/img/logo-360.webp" width="360" height="139" alt="MeguLit">
+  </a>
+  <nav class="nav" aria-label="主导航" data-i-attr="aria-label:nav.label">
+   <a href="/#features" data-i="nav.features">功能</a>
+   <a href="/#games" data-i="nav.games">支持的游戏</a>
+   <a href="/#start" data-i="nav.start">上手</a>
+   <a href="/#faq" data-i="nav.faq">常见问题</a>
+   <a href="/changelog.html" data-i="nav.changelog">更新日志</a>
+  </nav>
+  <div class="tools">
+   <div class="lang" role="group" aria-label="语言" data-i-attr="aria-label:lang.label">
+    <button type="button" data-lang="zh" aria-pressed="true">中</button>
+    <button type="button" data-lang="ja" aria-pressed="false">日</button>
+    <button type="button" data-lang="en" aria-pressed="false">EN</button>
+   </div>
+   <button class="icon-btn" type="button" id="theme" aria-label="切换浅色 / 深色" data-i-attr="aria-label:theme.label">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="sun" d="M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/><path class="moon" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>
+   </button>
+   <a class="icon-btn" href="https://github.com/ilynthn/MeguLit" aria-label="GitHub">
+    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.34.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg>
+   </a>
+  </div>
+ </div>
+</header>
+
+<main id="main">
+<div class="wrap narrow page-head">
+ <h1 class="display" data-i="cl.title">更新日志</h1>
+ <p class="lede" data-i="cl.lede">MeguLit 的全部版本，和 GitHub Releases 自动同步</p>
+ <div class="cta"><a class="btn btn-primary js-download" href="https://github.com/ilynthn/MeguLit/releases/latest"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg><span data-i="dl.button">下载 MeguLit</span></a><a class="btn btn-quiet" href="/#download" data-i="dl.alt">备用下载</a></div>
+</div>
+<div class="wrap narrow"><ol class="releases js-releases" reversed><li class="rel"><p data-i="d.loading">正在读取更新内容…</p></li></ol></div>
+</main>
+
+<footer class="foot">
+ <div class="wrap foot-row">
+  <img src="/assets/img/logo-360.webp" width="120" height="46" alt="MeguLit" loading="lazy">
+  <nav aria-label="页脚" data-i-attr="aria-label:foot.label">
+   <a href="https://github.com/ilynthn/MeguLit">GitHub</a>
+   <a href="https://github.com/ilynthn/MeguLit/releases" data-i="foot.releases">全部版本</a>
+   <a href="/changelog.html" data-i="nav.changelog">更新日志</a>
+   <a href="https://github.com/ilynthn/MeguLit/issues" data-i="foot.issues">反馈问题</a>
+   <a href="https://github.com/ilynthn/MeguLit/blob/main/THIRD-PARTY.md" data-i="foot.third">第三方许可</a>
+  </nav>
+  <p class="small" data-i-html="foot.license">MeguLit 以 <a href="https://github.com/ilynthn/MeguLit/blob/main/LICENSE">GPL-3.0-or-later</a> 开源。文本 Hook 基于 LunaHook，词典来自 JMdict / EDRDG</p>
+ </div>
+</footer>
+</body>
+</html>
