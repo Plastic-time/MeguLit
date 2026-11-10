@@ -1297,3 +1297,49 @@ img, video, canvas, svg { -webkit-user-drag: none; user-drag: none; }
 .hero-stage { position: relative; z-index: 2; }
 .top { z-index: 20; }
 .vol[hidden] { display: none; }
+/* Chinese hero title in a brush hand (Zhi Mang Xing, OFL); Japanese and English keep their serif faces */
+@font-face { font-family: "MeguLit Brush"; src: url("/assets/fonts/brush-hero.woff2") format("woff2"); font-display: swap; }
+:lang(zh) .ht-big { font-family: "MeguLit Brush", "MeguLit Han", var(--serif); font-weight: 400; letter-spacing: .02em; font-size: clamp(6rem, 23vw, 25rem); line-height: .95; }
+:lang(zh) .ht-big rt { font-size: .08em !important; }
+@media (max-width: 40rem) { :lang(zh) .ht-big { font-size: 30vw; } }
+/* round: no lamp, a shorter screen wall, less air around the deck */
+.lamp { display: none; }
+.hp { height: 150vh; }
+@media (max-width: 40rem) { .hp { height: 120vh; } }
+.deck-sec { padding-top: clamp(2rem, 5vw, 4rem); }
+
+/* ---- entrance, round 4: glitch (photosensitive-safe: displacement and colour fringes, no flashing) ------------------ */
+.intro-on .intro { background: transparent; perspective: none; }
+.intro .gl-tear { position: absolute; inset: 0; overflow: hidden; }
+.intro .gl-tear i { position: absolute; left: 0; width: 100%; background: #000; }
+.intro .gl-tear i:nth-child(3n) { background: #050505; }
+.intro .gl-stage { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 2.2rem; }
+.intro .gl-logo { position: relative; width: min(64vw, 46rem); aspect-ratio: 720 / 279; }
+.intro .gl-band { position: absolute; inset: 0; --fx: 2px; }
+.intro .gl-band img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.intro .gl-band .ch-r { transform: translateX(calc(var(--fx) * -1)); filter: grayscale(1) brightness(1.1) sepia(1) hue-rotate(-50deg) saturate(6); mix-blend-mode: screen; opacity: .55; }
+.intro .gl-band .ch-b { transform: translateX(var(--fx)); filter: grayscale(1) brightness(1.1) sepia(1) hue-rotate(150deg) saturate(5); mix-blend-mode: screen; opacity: .45; }
+.intro .gl-line { margin: 0; font: 300 .8125rem/1 "MeguLit Mono", var(--mono); letter-spacing: .5em; color: #9a9a9a; text-transform: lowercase; min-height: 1em; }
+.intro .gl-scan {
+  position: absolute; inset: 0; pointer-events: none; opacity: .35;
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 3px);
+}
+.intro .skip { color: rgba(244, 244, 242, .75); background: rgba(255, 255, 255, .05); border-color: rgba(244, 244, 242, .22); }
+.intro .skip:hover { color: #fff; border-color: rgba(244, 244, 242, .6); }
+
+.intro .gl-tear i:nth-child(3n) { background: #000; }
+/* the screen wall eases in instead of poking into the section above: lower start, softer tilt, faded top edge */
+.hp { padding-top: clamp(5rem, 10vw, 8rem); }
+.hp-stage { -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 22%); mask-image: linear-gradient(180deg, transparent 0, #000 22%); }
+
+/* ---- entrance, beat 1: the cape unfurls before the glitch -------------------------------------------------------- */
+.intro .gl-logo.gl-hold .gl-band { visibility: hidden; }
+.intro .gl-cape { position: absolute; left: -10%; top: -60%; width: 120%; height: 220%; pointer-events: none; }
+.intro .gl-rest { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; will-change: transform, filter, opacity; }
+.intro .gl-line { color: #c8323c; }
+/* channel fringes only on the bands that jump, so the logo keeps its own colours between hits */
+.intro .gl-band { --fa: 0; }
+.intro .gl-band .ch-r { opacity: calc(var(--fa) * .55); }
+.intro .gl-band .ch-b { opacity: calc(var(--fa) * .45); }
+.intro .gl-line { white-space: nowrap; }
+@media (max-width: 600px) { .intro .gl-line { letter-spacing: .28em; font-size: .6875rem; } }

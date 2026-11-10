@@ -103,3 +103,18 @@ if MEGU.exists():
     subset_to(MEGU / 'SourceHanSerifCN-SemiBold.otf', FD / 'han-serif-hero.woff2', hero_text)
 else:
     print('megu-edit fonts not found, hero fonts unchanged')
+
+# ---- brush face for the Chinese hero title: Zhi Mang Xing (OFL), fetched from google/fonts when not cached ---------
+import urllib.request
+cache = Path.home() / '.cache' / 'megulit-fonts'
+cache.mkdir(parents=True, exist_ok=True)
+brush = cache / 'ZhiMangXing-Regular.ttf'
+if not brush.exists():
+    urllib.request.urlretrieve('https://raw.githubusercontent.com/google/fonts/main/ofl/zhimangxing/ZhiMangXing-Regular.ttf', brush)
+subset_to(brush, PUB / 'assets' / 'fonts' / 'brush-hero.woff2', '学日语玩，, Galgame')
+
+# ---- logo split into cape and the rest (hat + letters), from the megu-edit template, for the entrance's cape unfurl ----
+MEGU_PUB = Path(os.environ.get('MEGU_PUBLIC', 'E:/Apps/MeguLit-Tutorial/megu-edit/public'))
+if (MEGU_PUB / 'logo_cape.png').exists():
+    webp(MEGU_PUB / 'logo_cape.png', 'logo-cape', (720,), quality=90)
+    webp(MEGU_PUB / 'logo_rest.png', 'logo-rest', (720,), quality=90)

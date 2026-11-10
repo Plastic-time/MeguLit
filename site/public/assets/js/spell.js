@@ -32,7 +32,7 @@ function sprite(ch, size, blur, color) {
   return { c, w };
 }
 
-export function kana(canvas, { still = false, hero = null } = {}) {
+export function kana(canvas, { still = false, hero = null, until = null } = {}) {
   const ctx = canvas.getContext('2d');
   const pointer = { x: -1e4, y: -1e4 };
   addEventListener('pointermove', e => { pointer.x = e.clientX; pointer.y = e.clientY; }, { passive: true });
@@ -82,10 +82,13 @@ export function kana(canvas, { still = false, hero = null } = {}) {
     const dt = Math.min(.05, last ? (now - last) / 1000 : .016); last = now;
     const dy = scrollY - lastY; lastY = scrollY;
     const heroVis = clamp(1 - scrollY / (heroH() * .85));
+    // followers stay with the reader until the `until` section scrolls up to the top of the screen, then fade
+    const stop = until ? until.getBoundingClientRect().top : H;
+    const followVis = clamp(stop / (H * .6));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     for (const p of parts) {
-      const vis = p.follower ? Math.max(heroVis, .6) : heroVis;
+      const vis = p.follower ? Math.max(heroVis, .75 * followVis) : heroVis;
       // the pointer pushes near glyphs more than far ones
       const dx = p.x - pointer.x, dyp = p.y - pointer.y, d2 = dx * dx + dyp * dyp;
       if (!still && d2 < 150 * 150) { const d = Math.sqrt(d2) || 1, f = (1 - d / 150) * 700 * (.3 + p.z); p.vx += dx / d * f * dt; p.vy += dyp / d * f * dt; }
@@ -95,6 +98,8 @@ export function kana(canvas, { still = false, hero = null } = {}) {
         p.x += (p.vx + Math.sin(p.sway) * 6) * dt;
         p.y += p.vy * dt - dy * (.25 + p.z * .9);              // parallax: near glyphs slide past faster
         p.rot += p.vr * dt;
+        p.vr += dy * .0016 * (.3 + p.z) * (p.i % 2 ? 1 : -1);   // a quick scroll gives them a spin
+        p.vr *= .985;
       }
       const m = p.spr.w;
       if (p.y < -m) { p.y = H + m * .5; p.x = Math.random() * W; }

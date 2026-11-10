@@ -23,7 +23,7 @@ export async function run({ reduce, finePointer }) {
 function reveal() { for (const el of $$('.fx-in')) el.style.opacity = 1; }
 
 // Page-load sequence in the megu-edit grammar: the video pulls focus, a lowercase line types itself behind a red
-// block caret, one white flash on the last letter, then the headline settles and the rest fades in.
+// block caret (no flash: kept safe for photosensitive viewers), then the headline settles and the rest fades in.
 function intro() {
   const hero = $('.hero');
   if (!hero) return;
@@ -36,7 +36,6 @@ function intro() {
     const step = () => {
       el.textContent = full.slice(0, ++i);
       if (i < full.length) setTimeout(step, full[i - 1] === ',' ? 160 : 38);
-      else { hero.classList.add('flash'); setTimeout(() => hero.classList.remove('flash'), 70); }
     };
     setTimeout(step, 500);
   }
@@ -87,7 +86,7 @@ function parallax(still) {
     const q = Math.min(1, p / .22);
     const ease = 1 - Math.pow(1 - q, 3);
     const wide = innerWidth > 720;
-    stage.style.transform = `translateY(${(1 - ease) * (wide ? -22 : -10)}rem) rotateX(${(1 - ease) * 15}deg) rotateZ(${(1 - ease) * 18}deg)`;
+    stage.style.transform = `translateY(${(1 - ease) * (wide ? 6 : 3)}rem) rotateX(${(1 - ease) * 12}deg) rotateZ(${(1 - ease) * 8}deg)`;
     stage.style.opacity = String(.25 + ease * .75);
     const shift = p * (wide ? 60 : 40);
     rows.forEach((row, i) => { row.style.transform = `translateX(${(i % 2 ? -1 : 1) * shift - (i % 2 ? 0 : 20)}rem)`; });
