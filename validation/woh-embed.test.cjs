@@ -253,3 +253,9 @@ test('E414 real data: The House in Fata Morgana (multilingual KiriKiri) reads Ja
  const P=sc.ENGINES['kirikiri-lang'].pages(dir);assert.ok(P.cont.has(i)&&P.starts.has(i-1));
  assert.equal(sc.ENGINES['kirikiri-ks'].eligible(dir),false,'not routed to the live capture');
 });
+
+test('E411 WoH flow page: the translation is indented only when its sentence starts a row with the paragraph indent',()=>{
+ const view=read('web/reader/modules/island-page.js');
+ assert.match(view,/const shown=r\.translation\?\(at\.col===0&&\/\^(\u3000|　)\/\.test\(String\(r\.source\|\|''\)\)\?/);
+ assert.match(view,/r\.translation\.replace\(\/\^\[ (\u3000|　)\]\+\/,''\)/);
+});
