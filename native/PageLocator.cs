@@ -78,7 +78,7 @@ public sealed class PageLocator : IDisposable {
    List<Row> rows;
    using (var image = new Bitmap(w, h, PixelFormat.Format24bppRgb)) {
     if (!GameCapture.Into(target, image, 3)) return;
-    rows = Read(image, w, h);
+    lock (OcrLock) rows = Read(image, w, h);
    }
    if (Stale(serial)) return;
    var found = Find(rows, text);
@@ -107,6 +107,46 @@ public sealed class PageLocator : IDisposable {
   long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
   Emit(new { type = "hookEngineLine", engine = "ocr", phase = "begin", line = line, same = same, nvl = nvl, x0 = x0, y0 = y0, x1 = x1, y1 = y1, size = size, sw = w, sh = h, count = 0, text = "", at = now });
   Emit(new { type = "hookEngineLine", engine = "ocr", phase = "end", line = line, same = same, nvl = nvl, x0 = x0, y0 = y0, x1 = x1, y1 = y1, size = size, sw = w, sh = h, count = count, text = drawn, at = now });
+ }
+
+
+ // ---- choices (E407) -----------------------------------------------------------------------------------------------
+ // Choice texts come from the hook's other streams (read-only). Each is looked up on its own in the OCR rows; only the
+ // ones drawn as a row of their own come back, with their pixel boxes, so the reader can draw over the buttons.
+ readonly object OcrLock = new object();
+ int ChoiceSerial;
+ public void RequestChoices(IntPtr target, List<string> options) {
+  if (target == IntPtr.Zero || options == null || options.Count == 0 || options.Count > 12) return;
+  int serial = Interlocked.Increment(ref ChoiceSerial);
+  ThreadPool.QueueUserWorkItem(_ => { try { LocateChoices(target, options, serial); } catch (Exception e) { Emit(new { type = "pageLocateStatus", status = "choice error " + e.Message }); } });
+ }
+ void LocateChoices(IntPtr target, List<string> options, int serial) {
+  if (!EngineTried) { EngineTried = true; try { Engine = OcrEngine.TryCreateFromLanguage(new Language("ja")); } catch { Engine = null; } }
+  if (Engine == null) { Emit(new { type = "hookChoiceBoxes", serial = serial, items = new object[0], missed = options.ToArray(), rows = new string[0], status = "no Japanese OCR" }); return; }
+  foreach (int ms in new[] { 250, 700, 1500 }) {
+   Thread.Sleep(ms == 250 ? 250 : ms == 700 ? 450 : 800);
+   if (serial != ChoiceSerial || Disposed) return;
+   RECT rect; if (!GetClientRect(target, out rect) || rect.Right < 64 || rect.Bottom < 64 || rect.Right > 7680 || rect.Bottom > 4320) return;
+   int w = rect.Right, h = rect.Bottom;
+   List<Row> rows;
+   using (var image = new Bitmap(w, h, PixelFormat.Format24bppRgb)) {
+    if (!GameCapture.Into(target, image, 3)) return;
+    lock (OcrLock) rows = Read(image, w, h);
+   }
+   var items = new List<object>(); var missed = new List<string>();
+   foreach (var option in options) {
+    var f = Find(rows, option);
+    if (f == null || f.Last - f.First > 1) { missed.Add(option); continue; }
+    int x0 = int.MaxValue, y0 = int.MaxValue, x1 = 0, y1 = 0;
+    for (int i = f.First; i <= f.Last; i++) { var q = rows[i].Box; x0 = Math.Min(x0, q.Left); y0 = Math.Min(y0, q.Top); x1 = Math.Max(x1, q.Right); y1 = Math.Max(y1, q.Bottom); }
+    items.Add(new { text = option, x0 = x0, y0 = y0, x1 = x1, y1 = y1 });
+   }
+   if (items.Count >= 2 || ms == 1500) {
+    var seen = new List<string>(); foreach (var r in rows) { if (seen.Count >= 24) break; seen.Add(r.Text.Length > 40 ? r.Text.Substring(0, 40) : r.Text); }
+    Emit(new { type = "hookChoiceBoxes", serial = serial, sw = w, sh = h, items = items.ToArray(), missed = missed.ToArray(), rows = seen.ToArray(), status = items.Count >= 2 ? "found" : "miss" });
+    return;
+   }
+  }
  }
 
  // ---- OCR ----------------------------------------------------------------------------------------------------------
