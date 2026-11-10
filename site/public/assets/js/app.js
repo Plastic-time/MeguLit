@@ -334,6 +334,8 @@ const floatSound = () => {
 };
 function videoSrc() {
   const w = Math.max(innerWidth, innerHeight) * Math.min(devicePixelRatio || 1, 2);
+  // a portrait screen (phones) gets the vertical cut of the promo
+  if (innerHeight > innerWidth && video.dataset.psm) return w <= 1400 ? video.dataset.psm : video.dataset.pmd;
   return w <= 900 ? video.dataset.sm : w <= 1700 ? video.dataset.md : video.dataset.lg;
 }
 function startVideo() {
@@ -395,6 +397,14 @@ volInput?.addEventListener('input', () => {
   if (volOut) volOut.textContent = `${volInput.value}%`;
   volInput.style.setProperty('--fill', `${volInput.value}%`);
 });
+// true once the song's position has moved on by a third of a second, false if it has not within `ms`
+const moving = (a, ms) => new Promise(res => {
+  const t0 = a.currentTime;
+  const check = () => { if (a.currentTime > t0 + .3) done(true); };
+  const done = ok => { clearTimeout(timer); a.removeEventListener('timeupdate', check); res(ok); };
+  const timer = setTimeout(() => done(a.currentTime > t0 + .3), ms);
+  a.addEventListener('timeupdate', check);
+});
 // on → resolves true once the music actually plays (false when the browser still wants a click first)
 function setSound(on) {
   soundOn = on;
@@ -404,7 +414,8 @@ function setSound(on) {
     bgm.volume = volume();
     // SoundCloud's player can report a start and then stop at once when the browser has not allowed sound yet: the music
     // only counts as started if it is still playing a moment later (otherwise the first click on the page starts it)
-    started = bgm.play().then(() => new Promise(res => setTimeout(res, 1500))).then(() => { if (bgm.paused && soundOn) throw new Error('blocked'); return true; })
+    // (the test is whether the song's position moves: SoundCloud also reports short pauses while it buffers)
+    started = bgm.play().then(() => moving(bgm, 4000)).then(ok => { if (!ok && soundOn) throw new Error('blocked'); return true; })
       .catch(() => { if (!soundOn) return false; soundOn = false; bgm.pause(); setSoundLabel(); floatSound(); return false; });
   } else bgm.pause();
   setSoundLabel();
@@ -413,12 +424,16 @@ function setSound(on) {
 }
 // switching to another tab or app pauses the music; coming back resumes it (only if it was playing before)
 let pausedByHide = false;
-const onHide = () => { if (soundOn && !bgm.paused) { pausedByHide = true; bgm.pause(); } };
+// (whatever started the song: the sound button, or the label's own play button, which leaves the sound switch alone;
+// and the pause is sent even when the player last reported a pause, so a stale state cannot leave it playing)
+const onHide = () => { if (!bgm.paused) pausedByHide = true; if (bgm.getAttribute('src')) bgm.pause(); };
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) onHide();
-  else if (pausedByHide) { pausedByHide = false; if (soundOn) bgm.play().catch(() => {}); }
+  else if (pausedByHide) { pausedByHide = false; bgm.play().catch(() => {}); }
 });
 addEventListener('pagehide', onHide);
+addEventListener('freeze', onHide);
+addEventListener('blur', () => { if (document.hidden) onHide(); });
 // phones: the player is a small strip; a tap on it opens the volume, switches and credit, a tap elsewhere closes them
 const soundBox = $('.sound-ctl');
 document.addEventListener('click', e => {
