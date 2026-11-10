@@ -6,21 +6,21 @@
    leaderboard_view {tab:'follow'} (services/leaderboard.cjs → relay/src/social.js). */
 const T={
  zh:{follow:'关注',following:'已关注',unfollow:'取消关注',followers:'{n} 人关注',kindred:'同好',kindredHint:'最喜欢的游戏或最近在玩和你重合的公开读者',
-  followingTitle:'我关注的人',followingEmpty:'还没有关注任何人。点排行榜上的头像或名字打开主页，就能关注',kindredEmpty:'暂时没找到同好。在 个人主页 填上最喜欢的游戏、打开“公开我读过的游戏”，会更容易找到',
+  followingTitle:'我关注的人',followingEmptyTitle:'还没有关注任何人',followingEmpty:'点排行榜上的头像或名字打开主页，就能关注',kindredEmptyTitle:'暂时没找到同好',kindredEmpty:'在 个人主页 填上最喜欢的游戏、打开“公开我读过的游戏”，会更容易找到',
   loginFirst:'登录并参加排行榜后，可以关注别人、找同好',toProfile:'去个人主页',privateCard:'这位读者没有公开主页',privateMine:'你的主页还没有公开',privateFollowed:'对方已不再公开主页',
   bio:'签名',favorites:'最喜欢的游戏',recent:'最近在玩',nothingRecent:'没有公开最近在玩',both:'都在读：{titles}',you:'这是你',editProfile:'编辑个人主页',close:'关闭',back:'返回',
   report:'举报',reportTitle:'举报这个主页',reportHint:'提交后这个主页会先暂时隐藏，由开发者人工审核。理由可以不填',reportKind:'举报类型',reportReason:'举报理由（可不填）',reportSend:'提交举报',reportSent:'已举报，主页已暂时隐藏，等待人工审核',reportPick:'请先选择举报类型',
   kinds:{discrimination:'歧视',nudity:'裸露或色情',racism:'种族歧视',harassment:'骚扰辱骂',spam:'广告或刷屏',other:'其他'},
   offline:'暂时连不上联网服务',loginToFollow:'登录后才能关注',now:'刚刚',hoursAgo:'{n} 小时前',daysAgo:'{n} 天前'},
  ja:{follow:'フォロー',following:'フォロー中',unfollow:'フォロー解除',followers:'フォロワー {n} 人',kindred:'同好',kindredHint:'好きなゲームや最近読んでいるゲームがあなたと重なる公開ユーザー',
-  followingTitle:'フォロー中の人',followingEmpty:'まだ誰もフォローしていません。ランキングのアイコンか名前からプロフィールを開いてフォローできます',kindredEmpty:'まだ同好が見つかりません。プロフィールに好きなゲームを入れ、「読んだゲームを公開」をオンにすると見つかりやすくなります',
+  followingTitle:'フォロー中の人',followingEmptyTitle:'まだ誰もフォローしていません',followingEmpty:'ランキングのアイコンか名前からプロフィールを開いてフォローできます',kindredEmptyTitle:'まだ同好が見つかりません',kindredEmpty:'プロフィールに好きなゲームを入れ、「読んだゲームを公開」をオンにすると見つかりやすくなります',
   loginFirst:'ログインしてランキングに参加すると、フォローや同好探しができます',toProfile:'プロフィールへ',privateCard:'この読者はプロフィールを公開していません',privateMine:'あなたのプロフィールはまだ非公開です',privateFollowed:'相手はプロフィールを非公開にしました',
   bio:'ひとこと',favorites:'好きなゲーム',recent:'最近読んでいる',nothingRecent:'最近読んでいるゲームは非公開です',both:'共通：{titles}',you:'あなたです',editProfile:'プロフィールを編集',close:'閉じる',back:'戻る',
   report:'通報',reportTitle:'このプロフィールを通報',reportHint:'送信するとこのプロフィールは一時的に非表示になり、開発者が確認します。理由は空欄でもかまいません',reportKind:'種類',reportReason:'理由（任意）',reportSend:'通報する',reportSent:'通報しました。プロフィールは確認まで非表示です',reportPick:'種類を選んでください',
   kinds:{discrimination:'差別',nudity:'露出・性的な内容',racism:'人種差別',harassment:'嫌がらせ・暴言',spam:'宣伝・スパム',other:'その他'},
   offline:'オンラインサービスに接続できません',loginToFollow:'フォローするにはログインしてください',now:'たった今',hoursAgo:'{n} 時間前',daysAgo:'{n} 日前'},
  en:{follow:'Follow',following:'Following',unfollow:'Unfollow',followers:'{n} followers',kindred:'Kindred readers',kindredHint:'Public readers whose favourite or recent games overlap yours',
-  followingTitle:'People you follow',followingEmpty:'You are not following anyone yet. Click a picture or name on the leaderboard to open a profile and follow',kindredEmpty:'No kindred readers yet. Add favourite games in your Profile and share the games you read to find more',
+  followingTitle:'People you follow',followingEmptyTitle:'Not following anyone yet',followingEmpty:'Click a picture or name on the leaderboard to open a profile and follow',kindredEmptyTitle:'No kindred readers yet',kindredEmpty:'Add favourite games in your Profile and share the games you read to find more',
   loginFirst:'Sign in and join the leaderboard to follow readers and find kindred ones',toProfile:'Open Profile',privateCard:'This reader\'s profile is not public',privateMine:'Your profile is not public yet',privateFollowed:'No longer public',
   bio:'Signature',favorites:'Favourite games',recent:'Reading lately',nothingRecent:'Recent games are not shared',both:'Both reading: {titles}',you:'This is you',editProfile:'Edit profile',close:'Close',back:'Back',
   report:'Report',reportTitle:'Report this profile',reportHint:'The profile is hidden right away and reviewed by the developer. A reason is optional',reportKind:'Kind',reportReason:'Reason (optional)',reportSend:'Send report',reportSent:'Reported; the profile is hidden until it is reviewed',reportPick:'Pick a kind first',
@@ -39,14 +39,15 @@ export function ago(seconds,locale,now=Date.now()){
 export function personButton(e,inner,esc){return `<button type="button" class="lb-person" data-lb-person data-pid="${esc(e.pid||'')}" data-name="${esc(e.name||'')}" data-avatar="${esc(e.avatar||'')}" data-me="${e.me?'1':''}">${inner}</button>`;}
 const recentLine=(list,w,locale,esc)=>list.length?list.map(g=>`<span>${esc(g.title)}${g.last?` <small>· ${esc(ago(g.last,locale))}</small>`:''}</span>`).join(''):`<span class="is-muted">${w.nothingRecent}</span>`;
 /* the 关注 tab body */
+import {emptyState} from './leaderboard-view.js';
 export function socialHTML(state,locale,esc,avatarHTML){
  const w=socialWords(locale);
- if(!state||state.state==='login')return `<section class="lb-card lb-social-empty"><p>${w.loginFirst}</p><button type="button" class="primary" data-lb-profile>${w.toProfile}</button></section>`;
+ if(!state||state.state==='login')return `<section class="lb-card">${emptyState('people',w.loginFirst)}<div class="lb-empty-action"><button type="button" class="primary" data-lb-profile>${w.toProfile}</button></div></section>`;
  if(state.state!=='ok')return `<section class="lb-card"><p class="lb-note">${w.offline}</p><button type="button" class="primary" data-lb-retry>↻</button></section>`;
  const img=state.avatars||{},who=p=>personButton(p,`${avatarHTML(p,img,esc)}<span class="leaderboard-name">${esc(p.name)}</span>`,esc);
- const following=state.following.length?`<ul class="lb-people">${state.following.map(p=>`<li>${who(p)}<div class="lb-people-recent">${p.public?recentLine(p.recent,w,locale,esc):`<span class="is-muted">${w.privateFollowed}</span>`}</div>${p.pid?`<button type="button" class="leaderboard-leave" data-lb-follow="${esc(p.pid)}" data-on="">${w.unfollow}</button>`:''}</li>`).join('')}</ul>`:`<p class="lb-note lb-empty">${w.followingEmpty}</p>`;
- const kindred=state.kindred.length?`<ul class="lb-people">${state.kindred.map(p=>`<li>${who(p)}<div class="lb-people-recent"><span>${esc(fill(w.both,{titles:p.shared.join(locale==='en'?', ':'、')}))}</span></div>${p.following?`<span class="lb-chip">${w.following}</span>`:`<button type="button" class="lb-follow-button" data-lb-follow="${esc(p.pid)}" data-on="1">${w.follow}</button>`}</li>`).join('')}</ul>`:`<p class="lb-note lb-empty">${w.kindredEmpty}</p>`;
- return `<section class="lb-card"><h2 class="lb-h2">${w.followingTitle} <span>· ${state.following.length}</span></h2>${following}</section><section class="lb-card"><h2 class="lb-h2">${w.kindred}</h2><p class="lb-note">${w.kindredHint}</p>${kindred}</section>`;
+ const following=state.following.length?`<ul class="lb-people">${state.following.map(p=>`<li>${who(p)}<div class="lb-people-recent">${p.public?recentLine(p.recent,w,locale,esc):`<span class="is-muted">${w.privateFollowed}</span>`}</div>${p.pid?`<button type="button" class="leaderboard-leave" data-lb-follow="${esc(p.pid)}" data-on="">${w.unfollow}</button>`:''}</li>`).join('')}</ul>`:emptyState('people',w.followingEmptyTitle,w.followingEmpty);
+ const kindred=state.kindred.length?`<ul class="lb-people">${state.kindred.map(p=>`<li>${who(p)}<div class="lb-people-recent"><span>${esc(fill(w.both,{titles:p.shared.join(locale==='en'?', ':'、')}))}</span></div>${p.following?`<span class="lb-chip">${w.following}</span>`:`<button type="button" class="lb-follow-button" data-lb-follow="${esc(p.pid)}" data-on="1">${w.follow}</button>`}</li>`).join('')}</ul>`:emptyState('empty',w.kindredEmptyTitle,w.kindredEmpty);
+ return `<section class="lb-card"><div class="lb-card-head"><h2 class="lb-h2">${w.followingTitle} <span>· ${state.following.length}</span></h2></div>${following}</section><section class="lb-card"><div class="lb-card-head"><h2 class="lb-h2">${w.kindred}</h2></div><p class="lb-card-sub">${w.kindredHint}</p>${kindred}</section>`;
 }
 let openDialog=null;
 /* opens a reader's card; person = {pid,name,avatar,me} from the clicked row, images = data URLs already on the page */
