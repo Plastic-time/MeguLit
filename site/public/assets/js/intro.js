@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Entrance: the grimoire opens. The crimson leather cover swings open in 3D, a few pages flutter past, light bursts
-// out of the open book and the view dives into the page, revealing the site. Once per browser session; any click or
-// key skips it; never shown when the visitor prefers reduced motion (the inline head script decides).
+// Entrance as a page turn: the whole screen is the grimoire's cover, and it turns from right to left like a page,
+// hinged on the left edge, followed by one parchment page, uncovering the site underneath. Once per browser
+// session; any click or key skips it; never shown when the visitor prefers reduced motion (the head script decides).
 import { createTimeline } from '../vendor/animejs-4.5.0/anime.esm.min.js';
 
 export function playIntro() {
@@ -21,18 +21,22 @@ export function playIntro() {
       removeEventListener('keydown', skip);
       resolve();
     };
-    const book = el.querySelector('.book');
-    const tl = createTimeline({ defaults: { ease: 'inOut(3)' }, onComplete: finish });
-    tl.add(book, { opacity: [0, 1], scale: [.82, 1], rotateX: [24, 12], y: ['6vh', 0], duration: 900, ease: 'out(4)' }, 0)
-      .add('.intro .sigil', { opacity: [0, 1], duration: 600 }, 300)
-      .add('.intro .cover', { rotateY: [0, -178], duration: 1300, ease: 'inOut(4)' }, 1000)
-      .add(book, { x: ['0%', '50%'], rotateX: [12, 6], duration: 1300, ease: 'inOut(4)' }, 1000)
-      .add('.intro .leaf', { rotateY: [0, -176], duration: 760, delay: (_, i) => i * 120, ease: 'inOut(3)' }, 1500)
-      .add('.intro .burst', { opacity: [0, 1], scale: [.2, 2.6], duration: 900, ease: 'out(3)' }, 2350)
-      .add(book, { scale: [1, 5.5], rotateX: [6, 0], opacity: [1, 0], duration: 900, ease: 'in(3)' }, 2650)
-      .add('.intro-bg', { opacity: [1, 0], duration: 700, ease: 'out(2)' }, 2950)
-      .add('.intro .skip', { opacity: 0, duration: 300 }, 2650);
-    const skip = () => { tl.pause(); el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300 }).finished.then(finish); };
+    // --turn drives the shading: 0 flat, 1 standing on its edge, back to 0 when it lies on the left.
+    const shade = (sel, p) => { const v = Math.sin(Math.min(1, Math.max(0, p)) * Math.PI); el.querySelector(sel).style.setProperty('--turn', v.toFixed(3)); };
+    const tl = createTimeline({ onComplete: finish });
+    tl.add('.intro .cover-art', { opacity: [0, 1], scale: [.94, 1], duration: 700, ease: 'out(3)' }, 0)
+      .add('.intro .glint', { x: ['-120%', '220%'], duration: 900, ease: 'inOut(2)' }, 350)
+      .add('.intro .s1', {
+        rotateY: [0, -180], duration: 1400, ease: 'inOut(3)',
+        onUpdate: a => shade('.s1', a.progress),
+      }, 1050)
+      .add('.intro .s2', {
+        rotateY: [0, -180], duration: 1250, ease: 'inOut(3)',
+        onUpdate: a => shade('.s2', a.progress),
+      }, 1650)
+      .add('.intro .under-shade', { opacity: [.55, 0], duration: 1000, ease: 'out(2)' }, 1900)
+      .add('.intro .skip', { opacity: 0, duration: 250 }, 1050);
+    const skip = () => { tl.pause(); el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 280 }).finished.then(finish); };
     el.addEventListener('click', skip);
     addEventListener('keydown', skip);
   });
