@@ -18,7 +18,7 @@
 .leaderboard-list li:last-child{border-bottom:0}
 .leaderboard-list li.is-me{background:color-mix(in srgb,var(--accent) 14%,transparent);border-radius:8px}
 .leaderboard-rank{width:2.4em;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
-.leaderboard-list li:nth-child(-n+3) .leaderboard-rank{color:var(--g-gold,var(--accent));font-weight:650}
+.leaderboard-list:not(.leaderboard-hot-list) li:nth-child(-n+3) .leaderboard-rank{color:var(--g-gold,var(--accent));font-weight:650}
 .leaderboard-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .leaderboard-list strong{font-variant-numeric:tabular-nums;font-weight:600}
 .leaderboard-games li{padding:0}
