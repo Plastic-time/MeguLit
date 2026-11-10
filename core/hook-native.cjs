@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process'),{createInterface}=require('node:readline');
-const {identifierNoise}=require('./text-noise.cjs');
+const {identifierNoise}=require('./text-noise.cjs');const {ChoiceCapture}=require('./choice-capture.cjs');
 function cleanSource(text,name='',code=''){if(code.endsWith(':JIT:UNITY'))text=text.replace(/<br\s*\/?>/gi,'\n').replace(/<ruby[^>]*>(.*?)<\/ruby>/gis,'$1').replace(/<\/?(?:color|size|font|b|i|u|s|mark|align|line-height|cspace|mspace|indent|margin|voffset|alpha|link|style|noparse|sprite)(?:[=\s][^>]*)?>/gi,'');return text.replace(/\r\n?/g,'\n').replace(/\x05/g,/^BGI(?:\.exe)?$/i.test(name)?'\n':'').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,'');}
 /* A speaker name from a name stream: brackets and control marks stripped; anything that reads like a sentence is not a name. */
 function speakerName(raw){const n=String(raw||'').replace(/[\x00-\x1f]/g,'').replace(/^[\s【\[「『(（]+|[\s】\]」』)）:：]+$/gu,'').trim();if(n.length%2===0&&n.length>=4&&n.slice(0,n.length/2)===n.slice(n.length/2))return speakerName(n.slice(0,n.length/2)); /* a name stream that sends the name twice (時雨時雨) */
@@ -21,6 +21,13 @@ const PAGE_ENGINES=new Set(['krkr','renpy','ocr']);
 /* The window bridge reports Process.ProcessName (no extension): "WoH"; the file name is accepted too. */
 const FLOW_PAGE_EXES=/^WoH(?:\.exe)?$/i;
 class HookNative{
+ /* E410 (user: WoH's original stayed visible under the overlay). The baseline preflight lets one line through unhidden to
+    find where the game draws it; on a full-screen page that line stays on the page, under the overlay, and the page is laid
+    out on the game's own grid anyway. A flow page never runs it. */
+ get preflight(){return this._preflight===true&&this.flowPage!==true;}
+ set preflight(v){this._preflight=v===true;}
+ /* E410: where a flow line sits on the page, from the game's own scripts (null when unknown). */
+ flowLayout(text){try{const provider=this.originalText;if(!provider?.flowLayout)return null;const r=this.resolveSource(text);if(!r||!(r.status==='exact'||r.status==='high'||r.method==='untranslated'))return null;return provider.flowLayout(r.indices)||null;}catch{return null;}}
  constructor(layout,onEvent,spawnHelper=spawn,now=Date.now){this.layout=typeof layout==='string'?{native:layout,hook:path.join(layout,'hook-runtime')}:layout;this.folder=this.layout.native;this.emit=onEvent;this.spawn=spawnHelper;this.now=now;this.state={hookActive:false,hookAvailable:false,hookThreads:[],processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookMessage:'Hook 未启用'};this.islandSources=new Map();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;this.lastSource="";this.identity="";this.serial=0;this.enabled=false;this.attempt=0;this.retryAt=0;this.timer=setInterval(()=>this.tick(),1000);this.timer.unref?.();}
  trace(message){try{const file=path.join(this.layout.logs||path.join(this.folder,"..","logs"),"hook-events.log");if(fs.existsSync(file)&&fs.statSync(file).size>=1048576){fs.rmSync(file+".previous",{force:true});fs.renameSync(file,file+".previous");}fs.appendFileSync(file,new Date().toISOString()+" "+message+"\n");}catch{}}
  notify(v){if(Object.entries(v).every(([k,value])=>this.state[k]===value))return;this.state={...this.state,...v};this.emit({type:'hook',...v});}
@@ -69,6 +76,7 @@ class HookNative{
    if(m.type==='waitMarkerStatus'){this.notify({waitMarkerMessage:String(m.message||'').slice(0,300),waitMarkerHookActive:m.active===true});return;}
    if(m.type==='hookSource'&&typeof m.text==='string'&&m.text.length<=4000){this.source(m,name);return;}
    // v1.1.4: speaker names from a name-role stream, for every engine that reports one (user: the log showed every line as narration).
+   if(m.type==='hookAuxText'&&typeof m.text==='string'&&m.text.length<=400){this.auxText(m);return;}
    if(m.type==='hookName'&&typeof m.text==='string'){const n=speakerName(m.text);if(n)this.speaker={text:n,at:this.now()};return;}
    if(m.type==='hookThreads'&&Array.isArray(m.hookThreads)){// Unity games create a stream per String-method call site (often 100+); keep the selected and embeddable ones
    // ahead of the cut so a late dialogue stream such as Naninovel's printer is never dropped.
@@ -100,8 +108,25 @@ class HookNative{
      with half-width katakana (ｹｯｦ) and boxes, which also counts as a Chinese build. */
   const garbled=han.length>=4&&(t.match(/[\uff61-\uff9f\u25a1\ufffd]/g)||[]).length>=3;
   const chinese=(!kana||garbled)&&han.length>=4;this.chineseRun=chinese?(this.chineseRun||0)+1:0;this.chineseForeign=chinese?(this.chineseForeign||0)+foreign:0;
-  if(this.chineseRun>=3&&(this.chineseForeign>=2||garbled)&&!this.state?.sourceChinese){this.trace('source looks like Simplified Chinese');this.notify({sourceChinese:true,hookMessage:'当前是中文版：如果游戏支持日语，先在 Steam（游戏属性 → 语言）或游戏自己的设置里切换成日语；否则在作品页的「日文原版启动程序」改成日文版；没有日文版的话，去「工具 → 日文原版恢复」替换成日文版，再启动游戏'});}
+  if(this.chineseRun>=3&&(this.chineseForeign>=2||garbled)&&!this.state?.sourceChinese){this.trace('source looks like Simplified Chinese');this.notify({sourceChinese:true,hookMessage:'检测到游戏剧本目前是中文，MeguLit 需要日文原文。请先在游戏设置或 Steam（游戏属性 → 语言）里改成日文；游戏本身不支持日文的话，用「工具 → 日文原版恢复」；如果游戏目录里没有检测到日文剧本，需要先自行获取日文原版资源，再选「从日文原版导入」，支持直接导入生肉压缩包，自动恢复成日文'});}
   else if(kana&&this.state?.sourceChinese)this.notify({sourceChinese:false});}catch{}}
+ /* E407 choices (every engine): text from the hook's non-dialogue streams is collected (never written back), OCR finds
+    each choice's row on screen, and the reader draws ruby and translation over the buttons. Every step is logged to
+    hook-events.log under "choice". */
+ auxText(m){const C=this.choice||(this.choice=new ChoiceCapture(()=>this.now()));const added=C.add(m.text,this.lastSource,this.speaker?.text);
+  this.trace('choice aux '+String(m.sourceName||'').slice(0,40)+' role='+(m.role??'')+' added='+JSON.stringify(added)+' text='+JSON.stringify(String(m.text).slice(0,80)));
+  if(!added.length)return;clearTimeout(this.choiceTimer);this.choiceTimer=setTimeout(()=>this.requestChoices(0),450);this.choiceTimer.unref?.();}
+ requestChoices(round){const options=round>0&&this.choiceOptions?this.choiceOptions:this.choice?.options();
+  if(!options){this.trace('choice candidates too few n='+(this.choice?.items.length||0));return;}
+  if(typeof this.locateChoices!=='function'){this.trace('choice locate unavailable');return;}
+  this.choiceOptions=options;this.choiceRound=round;this.trace('choice locate round='+round+' options='+JSON.stringify(options));this.locateChoices(options);}
+ choiceBoxes(m){const n=v=>Number.isFinite(Number(v))?Math.round(Number(v)):0,items=(Array.isArray(m.items)?m.items:[]).filter(i=>i&&typeof i.text==='string').slice(0,12).map(i=>({text:i.text.slice(0,120),x0:n(i.x0),y0:n(i.y0),x1:n(i.x1),y1:n(i.y1)}));
+  this.trace('choice ocr '+String(m.status||'')+' found='+items.length+' boxes='+JSON.stringify(items.map(i=>[i.text,i.x0,i.y0,i.x1,i.y1]))+' missed='+JSON.stringify(m.missed||[])+' screen='+m.sw+'x'+m.sh+' rows='+JSON.stringify(m.rows||[]));
+  if(!this.choiceOptions)return;
+  if(items.length>=2){this.choice.active=true;this.notify({hookChoices:{items,sw:n(m.sw),sh:n(m.sh),at:this.now()}});
+   /* the buttons can move (hover, animation): read them again a few times while the choice screen is up */const r=(this.choiceRound||0)+1;if(r<=8){clearTimeout(this.choiceTimer);this.choiceTimer=setTimeout(()=>{if(this.choice?.active)this.requestChoices(r);},1500);this.choiceTimer.unref?.();}}
+  else if(this.choice?.active)this.clearChoices('choices no longer on screen');}
+ clearChoices(why){clearTimeout(this.choiceTimer);const shown=!!this.choice?.active||!!this.state.hookChoices;this.choice?.reset();this.choiceOptions=null;if(!shown)return;this.trace('choice cleared: '+why);this.notify({hookChoices:null});}
  source(m,name){
   // The game's own ruby readings ride after the line as \x1d base \x1c reading pairs (ISLAND hook): split them off
   // before anything else sees the text, and attach them when this line is delivered (user, 2026-11-03).
@@ -306,7 +331,7 @@ class HookNative{
    if(L.seen.some(x=>x.text===text)){L.repeats.push(now);if(L.looping||L.repeats.length>=2){if(!L.looping)this.trace('menu loop detected; repeating lines ignored');L.looping=true;return;}}
    else{if(L.looping)this.trace('menu loop ended');L.looping=false;L.repeats=[];}
    L.seen.push({text,at:now});if(L.seen.length>12)L.seen.shift();}
-  const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;this.lastSource=text;this.lastSourceAt=this.now();this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.notify({hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookFlowGrid:engine==='nvl'?'woh':'',hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
+  const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;/* E407 a new dialogue line ends the choice screen */if(text.replace(/\s+/g,'')!==String(this.lastSource||'').replace(/\s+/g,''))this.clearChoices('new dialogue line');this.lastSource=text;this.lastSourceAt=this.now();this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.notify({hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookFlowGrid:engine==='nvl'?'woh':'',...(()=>{const f=engine==='nvl'?this.flowLayout(text):null;/* E410 */return {hookFlowPageStart:f?.pageStart===true,hookFlowRow:f?.row||'',hookSourceIndex:Number.isSafeInteger(f?.index)?f.index:-1};})(),hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
  }
  markerTarget(v){this.waitTarget=v;this.syncMarker();this.flowMarker(v);}
  /* E323 (user: WoH kept the old page's lines when the game cleared the page). A full-screen page has no clear signal in

@@ -249,3 +249,20 @@ test('E358 per line: a line the game draws in translation is not drawn again; a 
  const pitch=.0257*1546;assert.equal(Math.round(parseFloat(by('お父さんが車のボンネットを開けると、そこにはひとつの命があった。').style.props['--tome-flow-indent'])),Math.round(6*pitch),'continues after the 6 cells the game drew 「　几分钟后。」 in');
  const css=fs.readFileSync(file,'utf8');assert.match(css,/body\.megulit-embed-translation \.sentence-window\.tome-island-page \.tome-island-pair:not\(\.tome-island-overlay-drawn\)\{visibility:hidden!important\}/);
 });
+
+test('E410 flow page from the script: a page start clears the page, a line already on it is not drawn again, script rows win',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const saved=global.MutationObserver;global.MutationObserver=class{observe(){}};t.after(()=>{global.MutationObserver=saved;});
+ const file=require.resolve('../web/reader/modules/island-page.js');delete require.cache[file];const IslandPage=require(file);
+ const {w,b,doc}=fakeWindow({clientX:58,clientY:85,clientWidth:1546,clientHeight:870,readerX:900,readerY:500,readerWidth:600,readerHeight:100});
+ IslandPage.install(w);let seq=0;const say=(text,index,pageStart,row='new')=>b.islandPage.accept({hookSource:text,hookSourceEngine:'nvl',hookFlowGrid:'woh',hookSequence:++seq,hookSourceLine:0,hookFlowPageStart:pageStart,hookSourceIndex:index,hookFlowRow:row});
+ const shown=()=>doc.querySelectorAll('.tome-island-pair').filter(n=>!n.hidden).map(n=>n.querySelector('.sentence-text').textContent);
+ say('　その子の影になったのは８年前の冬のこと。',0,true);say('　彼女がはじめて命に触れた、厳かな朝の出来事だ。',1,false);
+ assert.equal(shown().length,2);
+ say('　彼女がはじめて命に触れた、厳かな朝の出来事だ。',1,false);assert.equal(shown().length,2,'the same script line again is not a second copy');
+ say('　彼女の家は山の中腹にあった。',2,true);assert.deepEqual(shown(),['　彼女の家は山の中腹にあった。'],'the script cleared the page');
+ say('　まわりは何もない荒れ地。',3,false);assert.equal(shown().length,2);
+ const {gridLayout}=IslandPage;
+ assert.deepEqual(gridLayout(['あいう。','……えお。'],27,['new','new']).map(l=>[l.row,l.col]),[[0,0],[1,0]],'the script says new row although the line has no indent');
+ assert.deepEqual(gridLayout(['あいう。','「えお」'],27,['new','continue']).map(l=>[l.row,l.col]),[[0,0],[0,4]],'@x continues the row');
+});

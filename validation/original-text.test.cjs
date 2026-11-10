@@ -78,3 +78,12 @@ test('an imported Chinese patch gives each Japanese line the group\'s translatio
   assert.throws(()=>ot.importPatch(root,db,'g1',same),/PATCH_NOT_TRANSLATED/);fs.rmSync(same,{recursive:true,force:true});
  }finally{for(const d of [root,game,pack])fs.rmSync(d,{recursive:true,force:true});}
 });
+test('YU-RIS 女装山脈: speaker-prefixed script lines, ruby and masked letters still meet the captured line',()=>{
+ const rt=['行人「ここは≪何処／どこ≫だ……」','完全に迷った……','由良「いい大人が、年下の男の娘にチ●ポを拘束されてるのよ？　まさか本気で逃げられないわけないわよね？」'];
+ const zh=['行人「这里是哪里……」','完全迷路了啊……','由良「是大人的话，怎么会被比自己年纪小的伪娘控制住肉棒呢？真的想逃的话不可能逃不掉吧？」'];
+ const m=new ot.Matcher(rt,zh);
+ assert.equal(m.match('「ここは何処だ……」').japanese,'「这里是哪里……」');
+ assert.equal(m.match('完全に迷った……').japanese,'完全迷路了啊……');
+ assert.equal(m.match('「いい大人が、年下の男の娘にチ○ポを拘束されてるのよ？　まさか本気で\n逃げられないわけないわよね？」').japanese,zh[2].slice(2));
+ assert.equal(new ot.Matcher(rt,zh).match('行人「ここは何処だ……」').japanese,'行人「这里是哪里……」');
+});

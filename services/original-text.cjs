@@ -8,6 +8,10 @@ const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib'),
 const SCHEMA=1,KANA=/[ぁ-ゖァ-ヺ]/g,HAN=/[一-鿿]/g;
 const sha256=file=>{const hash=crypto.createHash('sha256'),fd=fs.openSync(file,'r'),buf=Buffer.alloc(1<<20);try{let n;while((n=fs.readSync(fd,buf,0,buf.length,null))>0)hash.update(buf.subarray(0,n));}finally{fs.closeSync(fd);}return hash.digest('hex');};
 const norm=s=>String(s||'').replace(/[\s　]+/g,'');
+/* E408: scripts (YU-RIS 女装山脈, 9 043 of 13 696 lines) keep the speaker in the line, 行人「…」, while the game shows the name
+   in its own box and the hook captures only 「…」. Lines match without the leading name and with ruby ≪何処／どこ≫ read as its base text; masked letters (●○◯＊) fold together. */
+const SPEAKER=/^[^「『（(\s。、…―]{1,16}(?=[「『（(])/u;
+const matchKey=s=>norm(s).replace(/≪([^≪≫／]*)／[^≪≫]*≫/g,'$1').replace(SPEAKER,'').replace(/[●○◯〇＊*■□]/g,'●');
 const japaneseLine=t=>{const k=(t.match(KANA)||[]).length,h=(t.match(HAN)||[]).length;return k>=2&&k>=h*.2;};
 // Lines that carry language at all (not file names, labels or numbers): what the Japanese / translated share is measured on.
 const prose=t=>/[^\x00-\x7f]/.test(t)&&!!String(t).trim();
@@ -276,15 +280,15 @@ function setMode(root,id,mode){if(!['off','original'].includes(mode))throw Error
 // Captured text is one or more consecutive message lines. Exact cover of the text by consecutive runtime lines is
 // required; repeated lines ("はい", "……") are resolved by the reading position, never by content alone.
 class Matcher{
- constructor(runtimeLines,originalLines){this.rt=runtimeLines;this.og=originalLines;this.normalized=runtimeLines.map(norm);this.heads=new Map();this.normalized.forEach((t,i)=>{if(!t)return;const k=t.slice(0,4);if(!this.heads.has(k))this.heads.set(k,[]);this.heads.get(k).push(i);});this.last=-1;}
+ constructor(runtimeLines,originalLines){this.rt=runtimeLines;this.og=originalLines;this.normalized=runtimeLines.map(matchKey);this.heads=new Map();this.normalized.forEach((t,i)=>{if(!t)return;const k=t.slice(0,4);if(!this.heads.has(k))this.heads.set(k,[]);this.heads.get(k).push(i);});this.last=-1;}
  cover(start,s){let at=0,i=start;const used=[];while(at<s.length&&i<this.normalized.length){const t=this.normalized[i];if(!t){i++;continue;}if(!s.startsWith(t,at))return null;used.push(i);at+=t.length;i++;}return at===s.length?used:null;}
  match(text){
-  const s=norm(text);if(!s)return {status:'none',method:'empty'};const starts=new Set();for(let k=Math.min(4,s.length);k>=1;k--)for(const i of this.heads.get(s.slice(0,k))||[])if(s.startsWith(this.normalized[i]))starts.add(i);
+  const s=matchKey(text);if(!s)return {status:'none',method:'empty'};const starts=new Set();for(let k=Math.min(4,s.length);k>=1;k--)for(const i of this.heads.get(s.slice(0,k))||[])if(s.startsWith(this.normalized[i]))starts.add(i);
   const found=[...starts].map(i=>this.cover(i,s)).filter(Boolean);if(!found.length)return {status:'none',method:'no-cover'};
   let pick,method,status;
   if(found.length===1){pick=found[0];method='unique';status='exact';}
   else{const ahead=found.filter(c=>c[0]>this.last&&c[0]-this.last<=400).sort((a,b)=>a[0]-b[0]);if(this.last>=0&&ahead.length){pick=ahead[0];method='position';status='high';}else return {status:'uncertain',method:'repeated',candidates:found.length};}
-  this.last=pick.at(-1);const original=pick.map(i=>this.og[i]??''),already=pick.every(i=>japaneseLine(this.rt[i]));
+  this.last=pick.at(-1);const named=SPEAKER.test(norm(text)),original=pick.map((i,k)=>{const o=this.og[i]??'';return k||named||!SPEAKER.test(norm(this.rt[i]))?o:o.replace(/^s*/,'').replace(SPEAKER,'');}),already=pick.every(i=>japaneseLine(this.rt[i]));
   if(original.some(t=>!t.trim()))return {status:'uncertain',method:'empty-original',indices:pick};
   return {status,method,indices:pick,japanese:original.join('\n'),captured:text,alreadyJapanese:already};
  }
@@ -370,7 +374,11 @@ function staticProvider(root,executable){
   let glyphSet,tableOk;const glyphs=()=>{if(glyphSet===undefined){glyphSet=null;try{const g=scenes.ENGINES[state.runtime.engine]?.glyphs?.(path.dirname(String(executable)));if(g&&g.size)glyphSet=g;}catch{}}return glyphSet;};
   const drawable=text=>{const g=glyphs();if(!g)return null;for(const c of String(text||'').replace(/</g,'〈').replace(/>/g,'〉'))if(!/\s/.test(c)&&!g.has(c))return false;return true;};
   const tableDrawable=()=>{if(tableOk===undefined){tableOk=null;if(glyphs()&&patched){let n=0,ok=0;for(let i=0;i<rt.length;i++){const o=m.og[i];if(!o||norm(o)===norm(rt[i]))continue;n++;if(drawable(o))ok++;}tableOk=n===0||ok/n>=.995;}}return tableOk;};
-  const api={kind:'patch',patch:!!patched,fill,drawable,tableDrawable,
+  /* E410: an engine that knows its scripts' page breaks (HuneX) says, per table line, whether it starts a page and whether it
+     continues the row the last line ended on. null when unknown (other engines, a line no script shows). */
+  let pageSet;const pageInfo=()=>{if(pageSet===undefined){pageSet=null;try{pageSet=scenes.ENGINES[state.runtime.engine]?.pages?.(path.dirname(String(executable)))||null;}catch{}}return pageSet;};
+  const flowLayout=indices=>{const P=pageInfo(),i=Array.isArray(indices)?indices[0]:undefined;if(!P||!Number.isSafeInteger(i)||!P.known.has(i))return null;return {index:i,pageStart:P.starts.has(i),row:P.cont.has(i)?'continue':'new'};};
+  const api={kind:'patch',patch:!!patched,fill,drawable,tableDrawable,flowLayout,
    resolve:text=>withRuby(resolveLine(text))};
   function resolveLine(text){const r=m.match(text);if(r.japanese===undefined)return r;
     if(r.indices.some(untranslated)){const t=fill.get(r.indices.map(i=>rt[i]).join(''));return t?{...r,translation:t,japanese:undefined,machine:true}:{status:'none',method:'untranslated',indices:r.indices};}

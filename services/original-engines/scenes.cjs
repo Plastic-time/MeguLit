@@ -368,6 +368,8 @@ const hunex={
  patchLines:(base,found)=>kirikiriCx.patchLines(base,found),
  /* E358: the characters the Japanese game's text font can draw (a translation written back into the game must use only these). */
  glyphs:dir=>hunexLib().glyphs(dir,'ja'),
+ /* E410: which table lines start a page (the script clears it) and which continue the row the last line ended on. */
+ pages:dir=>hunexLib().pages(dir),
 };
 
 // E329 YU-RIS (ysbin.ypf + update*.ypf, YSTB scenes): yuris.cjs.
@@ -383,7 +385,9 @@ const nscripter=require('./nscripter.cjs');
 const rpgmaker=require('./rpgmaker.cjs'),wolf=require('./wolf.cjs');
 const avg32=require('./avg32.cjs'),nitroNpk=require('./npk.cjs').engine,nitroPak=require('./nitro-pak.cjs').engine,iga=require('./iga.cjs').engine,paz=require('./paz.cjs').engine,bruns=require('./bruns.cjs').engine,rePak=require('./re-pak.cjs').engine;
 const catsystem2=require('./catsystem2.cjs'),naninovel=require('./naninovel.cjs'),unityText=require('./unity-text.cjs'),higurashi=require('./higurashi.cjs'),mages=require('./mages.cjs'),capcomMsg=require('./capcom-msg.cjs');
-const ENGINES={kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak};
+// E409 Nitroplus N4 (Steam The Song of Saya, script.npk NPK2): nitroplus-n4.cjs.
+const nitroplusN4=require('./nitroplus-n4.cjs');
+const ENGINES={'nitroplus-n4':nitroplusN4,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,8)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;}

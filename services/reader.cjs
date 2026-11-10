@@ -97,7 +97,11 @@ class Reader{
     the waiting sentence is updated every half second, then shows the model starting, then the translation. */
  async localReady(options,id,current){
   const llm=this.runtime.local(),push=message=>{if(Number.isSafeInteger(id))this.runtime.emit('reader-event',{type:'call',method:'deliver',args:[id,'',true,message]});};
-  try{return await llm.ensure(options);}catch(error){if(!/^LOCAL_RUNTIME_DOWNLOADING/.test(error.message))throw error;}
+  try{return await llm.ensure(options);}catch(error){
+   /* E406 (user: 零延迟翻译有时报错无本地大模型): lines the translation script does not cover go to the engine; with
+      a local engine but no model downloaded, use the free online engine for them instead of showing an error */
+   if(error?.code==='LOCAL_MODEL_MISSING'){Object.assign(options,{provider:'microsoft'});return;}
+   if(!/^LOCAL_RUNTIME_DOWNLOADING/.test(error.message))throw error;}
   while(llm.job?.state==='downloading'&&current()){const j=llm.job;push('LOCAL_RUNTIME_DOWNLOADING:'+(j.total?Math.min(100,Math.floor(j.received/j.total*100)):0));await new Promise(r=>setTimeout(r,500));}
   if(!current())throw Error('SUPERSEDED');
   if(llm.job?.state!=='done')throw Error('LOCAL_RUNTIME_DOWNLOAD_FAILED');
@@ -165,6 +169,7 @@ class Reader{
    case 'galReadings':reply('deliverReadings',r.id,this.runtime.learning().readings.resolve(r.tokens||[]));break;
    case 'pageTranslationScope':this.pageScope=String(r.key||'').slice(0,100);break;
    case 'galSource':if(typeof r.text==='string'&&r.text.length<=4000){this.translator().observeSource(r.text);g?.send({type:'source',text:r.text});}break;
+   case 'layoutDiagnostic':/* E407: where the line was drawn against the game's text (ruby rows, offsets, hide state) */{const v={};for(const [k,x]of Object.entries(r))if(k!=='type'&&Object.keys(v).length<40&&(typeof x==='number'&&Number.isFinite(x)||typeof x==='boolean'||typeof x==='string'&&x.length<=200))v[k]=x;this.logVisibility({type:'layoutDiagnostic',...v});}break;
    case 'perfDiagnostic':try{const file=path.join(this.root,'logs','reader-perf.log');if(fs.existsSync(file)&&fs.statSync(file).size>1<<20)fs.renameSync(file,file+'.1');fs.appendFileSync(file,JSON.stringify({at:new Date().toISOString(),...r})+'\n');}catch{}break;
    case 'pointerDiagnostic':try{const file=path.join(this.root,'logs','reader-pointer.log');if(fs.existsSync(file)&&fs.statSync(file).size>1<<20)fs.renameSync(file,file+'.1');fs.appendFileSync(file,JSON.stringify({at:new Date().toISOString(),...r})+'\n');}catch{}break;
    case 'galConfigure':case 'galPreview':if(!g||r.gameStyleKey&&r.gameStyleKey!==g.styleSync.profileKey)break;{const settings={...r.settings,gameProcess:g.preferences.gameProcess,bindEnabled:g.preferences.bindEnabled};settings.maskModeSource=settings.maskMode==='local'?(g.preferences.maskMode==='local'?g.preferences.maskModeSource:'user'):'';r.type==='galConfigure'?g.save(settings):g.preview(settings);}break;

@@ -12,7 +12,11 @@ async function handle(line){
   if(!Number.isSafeInteger(id)||!request||typeof request.action!=='string')throw Error('INVALID_REQUEST');
   if(request.action==='__shutdown'){closing=true;await runtime.stop();reply({id,ok:true,data:{stopped:true}});input.close();return;}
   if(closing)throw Error('RUNTIME_STOPPED');if(maintenance)throw Error('BACKUP_BUSY');if(request.action==='backup_apply'){if(active)throw Error('BACKUP_BUSY');maintenance=true;exclusive=true;}active++;counted=true;const data=await dispatch(request,runtime);reply({id,ok:true,data});
- }catch(error){reply({id,ok:false,error:/^[A-Z_]+$/.test(error.message)?error.message:'SERVICE_FAILED'});}finally{if(counted)active--;if(exclusive)maintenance=false;}
+ }catch(error){const code=/^[A-Z_]+$/.test(error?.message)?error.message:'SERVICE_FAILED';
+  /* E405 an unexpected exception used to vanish behind SERVICE_FAILED; its action, message and first stack lines go to
+     logs/service-errors.log (request data never does) */
+  if(code==='SERVICE_FAILED')try{const fs=require('node:fs'),file=path.join(root,'logs','service-errors.log');fs.mkdirSync(path.dirname(file),{recursive:true});if((fs.statSync(file,{throwIfNoEntry:false})?.size||0)>512*1024)fs.renameSync(file,file+'.previous');let action='';try{action=String(JSON.parse(line)?.request?.action||'').slice(0,60);}catch{}fs.appendFileSync(file,new Date().toISOString()+' '+action+' '+String(error?.stack||error).split(/\r?\n/).slice(0,6).join(' | ')+'\n');}catch{}
+  reply({id,ok:false,error:code});}finally{if(counted)active--;if(exclusive)maintenance=false;}
 }
 setTimeout(()=>{if(!closing)runtime.ankiProcess().auto().catch(()=>{});},1500).unref();
 /* E361 read library games' scripts in a worker thread, a while after start */

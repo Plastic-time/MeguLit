@@ -13,7 +13,8 @@
     on (「数分後。」 then 「お父さんが…」 on one row). The overlay is laid out on that grid, wrapped where the game wraps. */
  const GRIDS={woh:{left:.1445,top:.174,row:.074,pitch:.0257,cells:27,rows:11}};
  const OPENS=/^[\u3000「『“（(〝【]/,HANGS=/^[、。，．」』）)”〟】！？!?…]$/;
- function gridLayout(texts,cells){let row=0,col=0;const out=[];for(const text of texts){const chars=[...String(text||'')];if(col>0&&OPENS.test(chars[0]||'')){row++;col=0;}const start={row,col},breaks=[];
+ /* E410: rows[i] from the game's script ('continue' = @x, 'new'), else the indent/quote guess. */
+ function gridLayout(texts,cells,rows=[]){let row=0,col=0;const out=[];for(const [k,text]of texts.entries()){const chars=[...String(text||'')],how=rows[k];if(col>0&&(how==='new'||how!=='continue'&&OPENS.test(chars[0]||''))){row++;col=0;}const start={row,col},breaks=[];
   chars.forEach((c,i)=>{if(c==='\n'){row++;col=0;return;}const width=/[\x20-\x7e\uff61-\uff9f]/.test(c)?.5:1;if(col+width>cells+1e-6&&!(HANGS.test(c)&&col<=cells)){row++;col=0;breaks.push(i);}col+=width;});
   out.push({row:start.row,col:start.col,breaks,endRow:row,endCol:col});}return out;}
  const token=value=>{value=value.replace(/[ \u3000\r\n]/g,'');let h=2166136261;for(let i=0;i<value.length;i++)h=Math.imul(h^value.charCodeAt(i),16777619);return h>>>0;};
@@ -54,7 +55,12 @@
   past(r){return this.records.length>1&&this.records.includes(r)&&r!==this.current();}
   // FLOW pages: each line is shown at once (no page report will settle it) under the one before; the view turns the
   // page when the next line no longer fits (turn keeps only the newest line).
-  flow(text,sequence){const r=this.source(text,sequence,0);if(!r.obsolete){r.settled=true;r.at=Date.now();if(this.records.length>24)this.records=this.records.slice(-24);}return r;}
+  /* E410: o.pageStart = the game's script clears the page before this line; o.index = its script line: a line already on
+     the page (same script line, or the same longer text) is that line again, not another copy below it. */
+  flow(text,sequence,o={}){const index=Number.isSafeInteger(o.index)&&o.index>=0?o.index:null;
+   if(o.pageStart===true){const last=this.records.at(-1);if(!(last&&last.source===text&&(index===null||last.index===index)&&this.records.length===1)){this.records=[];this.epoch++;}}
+   else{const letters=s=>String(s||'').replace(/[^\p{L}\p{N}]/gu,'');const shown=this.records.find(p=>index!==null&&p.index!==undefined&&p.index!==null?p.index===index:p.source===text&&letters(text).length>=6);if(shown)return shown;}
+   const r=this.source(text,sequence,0);if(index!==null)r.index=index;if(o.row==='continue'||o.row==='new')r.row=o.row;if(!r.obsolete){r.settled=true;r.at=Date.now();if(this.records.length>24)this.records=this.records.slice(-24);}return r;}
   turn(){const top=this.current();if(!top||this.records.length<2)return false;this.records=[top];this.epoch++;return true;}
   // E323: the game turned the page (wait marker moved up). The marker is seen a moment after the new page's first line
   // arrived, so a line younger than 1.5 s is that page's first line and stays; everything older goes.
@@ -90,7 +96,7 @@
    const ready=b.prepareRuby?.(jp);if(!ready){go();return;}Promise.race([ready.catch(()=>false),new Promise(r=>setTimeout(r,300))]).then(go);}
   /* FLOW: no engine positions. Lines start at the top of the calibrated text box and each one sits under the last (its measured height, translation included), as the game itself writes them down the page. When the newest line runs past the bottom of the game area the earlier lines go (the page turned). */
   function placeGrid(G){const info=b.galLayoutInfo?.(),p=b.galPreferences?.()||{},dpr=w.devicePixelRatio||1,cw=(info?.clientWidth||1280)/dpr,ch=(info?.clientHeight||720)/dpr,cx=(info?.clientX??0)/dpr,cy=(info?.clientY??0)/dpr,gw=Math.min(cw,ch*16/9),gh=gw*9/16,gx=cx+(cw-gw)/2,gy=cy+(ch-gh)/2,pitch=G.pitch*gw,rowH=G.row*gh,left=gx+G.left*gw,top0=gy+G.top*gh-rowH/2,size=pitch*.92,current=model.current();
-   const readOnly=p.hookHide===false,dim=p.pageDimPast!==false,records=[...model.records].sort((a,c)=>a.sequence-c.sequence),lay=gridLayout(records.map(r=>{const v=embedLines.get(lineKey(r.source));return typeof v==='string'&&v.trim()?(String(r.source).match(/^[\u3000 ]*/)[0]+v.trim()):r.source;}),G.cells);
+   const readOnly=p.hookHide===false,dim=p.pageDimPast!==false,records=[...model.records].sort((a,c)=>a.sequence-c.sequence),lay=gridLayout(records.map(r=>{const v=embedLines.get(lineKey(r.source));return typeof v==='string'&&v.trim()?(String(r.source).match(/^[\u3000 ]*/)[0]+v.trim()):r.source;}),G.cells,records.map(r=>r.row||''));
    /* The game turns the page before its grid runs out; if it did not report it (no wait marker), keep the newest line. */if(lay.length>1&&lay.at(-1).endRow>=G.rows&&records.at(-1)===current&&model.turn()){synchronize();return;}
    records.forEach((r,i)=>{const node=nodes.get(r);if(!node)return;const at=lay[i];node.hidden=false;node.classList.remove('tome-island-wrap');node.classList.add('tome-island-flow','tome-flow-grid');node.classList.toggle('tome-island-current',r===current);
     node.style.cssText='left:'+left+'px;top:'+(top0+at.row*rowH)+'px;width:'+((G.cells+1)*pitch)+'px;transform:none;';
@@ -141,7 +147,7 @@
     const spatial=d.body.classList.contains('tomoyo-ui-translation')&&(b.isGalBound?.()??d.body.classList.contains('tomoyo-gal-bound'));
     if(active&&!spatial){active=false;for(const timer of timers.values())clearTimeout(timer);timers.clear();requests.clear();dropView();scope='';send({type:'pageTranslationScope',key:''});d.body.classList.remove('tome-island-active','tomoyo-hook-reader-active');if(typeof m.hookSource!=='string'){m.hookSource=source;m.hookSequence=sequence;}}
     if(!active&&spatial){active=true;session++;}
-    if(typeof m.hookSource==='string'){const next=w.TomeIslandSource?.spoken(m.hookSource)??b.splitDialogue?.(m.hookSource).text??m.hookSource,nextSequence=m.hookSequence??sequence+1;if(next.trim()&&(next!==source||nextSequence!==sequence)){source=next;sequence=nextSequence;if(typeof m.hookFlowGrid==='string')flowGrid=m.hookFlowGrid;const rec=FLOW.has(engine)?model.flow(next,nextSequence):model.source(next,nextSequence,m.hookSourceLine);b.prefetchRuby?.(next);if(typeof m.hookSourceRead==='boolean')rec.read=m.hookSourceRead;if(active&&!rec.obsolete){b.sourceText=next;b.onSourceText?.(next);}}}
+    if(typeof m.hookSource==='string'){const next=w.TomeIslandSource?.spoken(m.hookSource)??b.splitDialogue?.(m.hookSource).text??m.hookSource,nextSequence=m.hookSequence??sequence+1;if(next.trim()&&(next!==source||nextSequence!==sequence)){source=next;sequence=nextSequence;if(typeof m.hookFlowGrid==='string')flowGrid=m.hookFlowGrid;const rec=FLOW.has(engine)?model.flow(next,nextSequence,{pageStart:m.hookFlowPageStart===true,index:m.hookSourceIndex,row:m.hookFlowRow}):model.source(next,nextSequence,m.hookSourceLine);b.prefetchRuby?.(next);if(typeof m.hookSourceRead==='boolean')rec.read=m.hookSourceRead;if(active&&!rec.obsolete){b.sourceText=next;b.onSourceText?.(next);}}}
     if(!active)return false;
     synchronize();return true;},page(m){if(!PAGED.has(m.engine))return false;if(FLOW.has(m.engine)){if(m.same===false&&model.clearFlow())synchronize();return true;}model.page(m);synchronize();return true;},position(m){if(!/^(?:cs2_screen_v[13]|(?:krkr|renpy|ocr)_screen_v1)$/.test(m?.engine))return false;model.position(m);place();scheduleLayout();return true;},refresh:()=>{place();scheduleLayout();},status:()=>({active,sequence,chars:source.length,rendered:!!root?.isConnected,pairs:model.records.length,positioned:model.records.filter(r=>r.position).length,typing:null})};
   const style=d.createElement('style');style.textContent=`

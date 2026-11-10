@@ -172,3 +172,36 @@ test('E358 real data: WoH\'s Japanese font cannot draw the reported line; every 
  assert.deepEqual([...line].filter(c=>!g.has(c)),[...'虽许满但那丽还给这记忆乡样'],'exactly the blanks the user saw');
  assert.equal(require('../services/original-engines/scenes.cjs').ENGINES.hunex.glyphs(dir).size,g.size);
 });
+
+// E410 (user: WoH kept the previous page's lines on the next page, drew a line twice, and the original showed under the
+// overlay). Page breaks come from the game's compiled scripts; a full-screen page never runs the baseline preflight.
+test('E410: HuneX compiled scripts give page starts (wait 2 + clear) and row continuations (@x)',()=>{
+ const {scriptPages}=require('../services/original-engines/hunex.cjs');
+ const head=Buffer.alloc(0x30);head.write('HunexCompiledScriptVer1.00','latin1');
+ const pool=['$000000','$000001','$000002','@x$000003','$000004\n$000005'],words=[],strs=[];let off=0;const ptr=[];
+ for(const s of pool){ptr.push(off);strs.push(Buffer.from(s+'\0','utf8'));off+=Buffer.byteLength(s)+1;}
+ const text=(k,wait,clear)=>words.push(127,0,k,123,0x12345678,k,0,0,wait,0,1,0,0,0,0,3,0,320,...(clear?[321]:[]));
+ text(0,1,false);text(1,2,true);text(2,0,false);text(3,1,false);text(4,2,true);
+ const body=Buffer.alloc(words.length*4),base=0x30+body.length;
+ /* string pointers are file offsets - 0x30 */let t=0;for(let i=0;i<words.length;i++){if(words[i]===123&&words[i+1]===0x12345678){words[i+3]=base+ptr[t]-0x30;words[i+13]=words[i+3];t++;}}
+ words.forEach((w,i)=>body.writeUInt32LE(w>>>0,i*4));
+ const out={starts:new Set(),cont:new Set(),known:new Set()};scriptPages(Buffer.concat([head,body,...strs]),out);
+ assert.deepEqual([...out.starts],[0,2],'the first line, and the line after the wait-and-clear');
+ assert.deepEqual([...out.cont],[3]);assert.deepEqual([...out.known].sort((a,b)=>a-b),[0,1,2,3,4,5]);
+});
+
+test('E410: a flow line carries its page start, row and script line; a flow page never lets a baseline line through',t=>{
+ const f=fixture(t);
+ f.hook.originalText={kind:'patch',resolve:text=>({status:'exact',indices:[text.includes('中腹')?2:3]}),flowLayout:i=>({index:i[0],pageStart:i[0]===2,row:'new'})};
+ f.line('　彼女の家は山の中腹にあった。');f.tick(500);f.line('　まわりは何もない荒れ地。');f.tick(500);
+ const s=f.events.filter(m=>typeof m.hookSource==='string'&&m.hookSource);
+ assert.deepEqual(s.map(m=>[m.hookFlowPageStart,m.hookFlowRow,m.hookSourceIndex]),[[true,'new',2],[false,'new',3]]);
+ f.hook.preflight=true;assert.equal(f.hook.preflight,false,'flow page');f.hook.flowPage=false;assert.equal(f.hook.preflight,true,'other games keep the preflight');
+});
+
+test('E410 real data: WoH pages match the game (prologue pages start at lines 0, 2, 6, 10; 「数分後。」 and the next line share a row)',t=>{
+ const dir='E:\\Steam\\steamapps\\common\\WITCH ON THE HOLY NIGHT';if(!fs.existsSync(dir)){t.skip('WoH not installed');return;}
+ const P=require('../services/original-engines/hunex.cjs').pages(dir);
+ for(const i of [0,2,6,10])assert.ok(P.starts.has(i),'page start '+i);for(const i of [1,3,4,5,7,11])assert.ok(!P.starts.has(i),'same page '+i);
+ assert.ok(P.cont.has(20)&&!P.cont.has(19));assert.ok(P.known.size>23000);
+});
