@@ -89,3 +89,50 @@ test('bridge thumbnails: only relay image paths, fetched once into data/cache, r
  await daily.view(root,null,opts);assert.equal(imgCalls,1,'second view reads the local cache');
  assert.ok(fs.existsSync(path.join(root,'data','cache','daily-img',id)));
 });
+
+const G4PAGE='<html><head><meta property="og:title" content="恋愛ADV「星の歌」"></head><body><nav>メニュー</nav><div class="maintxt"><!--[if !IE]>↓本文↓<![endif]--><div class="entry-content">　新作の<strong>恋愛ADV</strong>が発売された。<br><table><tr><td><img src="x"></td></tr></table><br>　価格は3000円だ。<script>ad()</script><!--[if !IE]>↑本文↑<![endif]--></div><footer>Copyright</footer></body></html>';
+test('article text: site body only, no tags, scripts, tables or footer',()=>{
+ const a=require('../services/news-article.cjs');
+ const x=a.extract(G4PAGE,'https://www.4gamer.net/games/2/');
+ assert.equal(x.title,'恋愛ADV「星の歌」');assert.deepEqual(x.paragraphs,['新作の恋愛ADVが発売された。','価格は3000円だ。']);
+ const den=a.extract('<div id="articleBody" ><p>一段目。</p><p>二段目。</p><div class="inner-related-article"><p>関連</p></div></div>','https://news.denfaminicogamer.jp/news/1');assert.deepEqual(den.paragraphs,['一段目。','二段目。']);
+ const moe=a.extract('<div class="post-body"><p>1月29日発売予定<br />『作品』</p></div><div class="post-share"><p>Share</p></div>','https://moepedia.net/news/1');assert.deepEqual(moe.paragraphs,['1月29日発売予定','『作品』']);
+});
+test('fast fetch: falls back to a plain request when DoH gives nothing',async()=>{
+ const ff=require('../services/fast-fetch.cjs');let plain=0;
+ const r=await ff.getText('https://example.invalid/a',{doh:async()=>({ok:false}),fetch:async()=>{plain++;return {ok:true,url:'https://example.invalid/a',text:async()=>'<p>x</p>'};}});
+ assert.equal(r.ok,true);assert.equal(r.via,'direct');assert.equal(plain,1);
+ assert.equal(await ff.fastest([]),'');
+});
+test('relay full text: only for NEWS_FULLTEXT_SOURCES and only current stories, cached in R2',async()=>{
+ const d=await load('daily.js');const e={DB:d1(),BUCKET:r2()},t0=new Date('2026-11-11T00:00:00Z');
+ await d.refreshNews(e,t0,fetcher(FEEDS));
+ const json=(v,status=200)=>({v,status}),fail=(c,status)=>({v:{error:c},status});
+ const link='https://www.4gamer.net/games/2/',u=new URL('https://x/api/news/article?link='+encodeURIComponent(link));
+ assert.equal((await d.articleGet(e,u,{json,fail},t0,async()=>({ok:true,text:async()=>G4PAGE}))).status,404,'empty allowlist: nothing is served');
+ e.NEWS_FULLTEXT_SOURCES='4gamer';let calls=0;const page=async()=>{calls++;return {ok:true,text:async()=>G4PAGE};};
+ const r=await d.articleGet(e,u,{json,fail},t0,page);assert.equal(r.status,200);assert.deepEqual(r.v.paragraphs,['新作の恋愛ADVが発売された。','価格は3000円だ。']);
+ await d.articleGet(e,u,{json,fail},t0,page);assert.equal(calls,1,'second read comes from R2');
+ assert.equal((await d.articleGet(e,new URL('https://x/api/news/article?link='+encodeURIComponent('https://evil.example/')),{json,fail},t0,page)).status,404);
+ const news=await d.newsGet(e,{json:v=>v},t0);assert.equal(news.items.find(n=>n.sourceId==='4gamer').fulltext,true);assert.equal(news.items.find(n=>n.sourceId==='moepedia').fulltext,false);
+ assert.equal(await d.cleanupImages(e,new Date(t0.getTime()+3*86400e3))>=1,true);assert.equal([...e.BUCKET.store.keys()].filter(k=>k.startsWith('daily-article/')).length,0);
+});
+test('bridge reader: article fetched on this PC unless the relay may serve it, cached, tokens keep only dictionary readings; Anki deck megulit_news',async()=>{
+ const daily=require('../services/daily.cjs'),root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'dl-'));
+ const link='https://www.4gamer.net/games/9/';const calls=[];
+ const f=async url=>{calls.push(url);if(url.endsWith('/api/news'))return {ok:true,json:async()=>({items:[{title:'t',link,source:'4Gamer.net'}]})};if(url.includes('/api/hotwords'))return {ok:true,json:async()=>({words:[]})};if(url===link)return {ok:true,url:link,text:async()=>G4PAGE};return {ok:false};};
+ const opts={env:{MEGULIT_RELAY_BASE:'https://relay.test'},fetch:f,doh:async()=>({ok:false})};
+ await assert.rejects(daily.article(root,'https://evil.example/',opts),/URL_NOT_ALLOWED/);
+ await daily.view(root,null,opts);
+ const learning={installed:()=>true,tokenize:async()=>[{surface:'新作',reading:'シンサク'},{surface:'。'}],readings:{resolve:t=>[{...t[0],reading:'しんさく',readingSource:'dictionary'},{surface:'価格',reading:'カカク',base_form:'価格'}]}};
+ const a=await daily.article(root,link,{...opts,runtime:{learning:()=>learning}});
+ assert.equal(a.state,'ok');assert.equal(a.via,'direct');assert.equal(a.paragraphs.length,2);assert.ok(!calls.some(u=>u.includes('/api/news/article')),'not on the relay allowlist: no relay request');
+ assert.deepEqual(a.paragraphs[0].tokens,[{s:'新作',b:'新作',r:'しんさく'},{s:'価格',b:'価格',r:''}]);
+ calls.length=0;await daily.article(root,link,opts);assert.ok(!calls.includes(link),'second open reads data/cache');
+ assert.equal(daily.NEWS_DECK,'megulit_news');
+ const src=fs.readFileSync(path.join(__dirname,'..','services','daily.cjs'),'utf8');assert.match(src,/ankiDeck:NEWS_DECK/);
+ const view=await import(pathToFileURL(path.join(__dirname,'..','web','daily-view.js')).href);
+ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ assert.equal(view.paragraphHTML({text:'x',tokens:[{s:'新作',b:'新作',r:'しんさく'},{s:'。',b:'。',r:''},{s:'する',b:'する',r:'する'}]},esc),'<span class="rd-t" data-b="新作" data-r="しんさく"><ruby>新作<rt>しんさく</rt></ruby></span>。<span class="rd-t" data-b="する" data-r="する">する</span>');
+ const shell=view.readerShell({title:'<t>',source:'S',link},{rdJa:'日文',rdTr:'译文',rdBi:'双语',rdOrig:'o',rdClose:'c',rdHint:'h',rdLoading:'l'},esc);assert.match(shell,/data-rd-mode="tr"/);assert.match(shell,/data-rd-mode="bi"/);assert.doesNotMatch(shell,/<t>/);
+});

@@ -14,7 +14,7 @@ async function get(url,fetcher){
  catch(e){return {state:'error',error:e?.name==='TimeoutError'?'TIMEOUT':'NETWORK'};}
 }
 function cleanNews(d){
- const items=(Array.isArray(d?.items)?d.items:[]).slice(0,40).map(n=>({title:str(n?.title,160),link:link(n?.link),date:str(n?.date,30),source:str(n?.source,40),sourceId:str(n?.sourceId,20),summary:str(n?.summary,160),image:/^\/api\/news\/img\/[0-9a-f]{32}$/.test(String(n?.image||''))?n.image:''})).filter(n=>n.title&&n.link);
+ const items=(Array.isArray(d?.items)?d.items:[]).slice(0,40).map(n=>({fulltext:n?.fulltext===true,title:str(n?.title,160),link:link(n?.link),date:str(n?.date,30),source:str(n?.source,40),sourceId:str(n?.sourceId,20),summary:str(n?.summary,160),image:/^\/api\/news\/img\/[0-9a-f]{32}$/.test(String(n?.image||''))?n.image:''})).filter(n=>n.title&&n.link);
  return {items,sources:(Array.isArray(d?.sources)?d.sources:[]).slice(0,10).map(s=>({id:str(s?.id,20),name:str(s?.name,40)})),updatedAt:str(d?.updatedAt,30)||null};
 }
 function readingFor(db,term){
@@ -33,6 +33,7 @@ async function view(root,db,options={}){
 words=w.state==='ok'?cleanWords(w.data,db):null;
  const state=!news&&!words?'error':!(news?.items.length)&&!(words?.words.length)?'empty':'ok';
  if(news)await thumbnails(root,base,news.items,fetcher);
+ for(const n of news?.items||[])if(n.fulltext)fulltext.add(n.link);
  for(const u of [...(news?.items||[]).map(x=>x.link),...(words?.words||[]).map(x=>x.url)])if(u&&u.startsWith('https:'))shown.add(u);
  return {state,error:state==='error'?n.error||w.error:undefined,news,words};
 }
@@ -52,4 +53,50 @@ async function thumbnails(root,base,items,fetcher){pruneImages(root);await Promi
 /* only links the page was just given (news articles and hot-word headlines) open in the browser */
 const shown=new Set();
 function canOpen(url){return shown.has(String(url||''));}
-module.exports={view,canOpen,cleanNews,cleanWords,readingFor};
+
+/* ---- E415 reader: article text, translation, Anki ------------------------------------------------------------- */
+const crypto=require('node:crypto');
+const artDir=root=>root?path.join(root,'data','cache','daily-article'):'';
+const hash=v=>crypto.createHash('sha256').update(String(v)).digest('hex').slice(0,32);
+/* sources the relay may cache in full (wrangler.toml NEWS_FULLTEXT_SOURCES); the relay marks those items fulltext:true */
+const fulltext=new Set();
+async function fromRelay(base,link,fetcher){const r=await get(base+'/api/news/article?link='+encodeURIComponent(link),fetcher);return r.state==='ok'&&Array.isArray(r.data?.paragraphs)?{title:str(r.data.title,200),paragraphs:r.data.paragraphs.slice(0,120).map(p=>str(p,2000)).filter(Boolean),via:'relay'}:null;}
+async function fromSite(link,options){const page=await require('./fast-fetch.cjs').getText(link,{fetch:options.fetch,doh:options.doh});if(!page.ok)return null;const x=require('./news-article.cjs').extract(page.text,page.url||link);return x.paragraphs.length?{...x,via:page.via}:null;}
+/* readings only when the dictionary settled them (readingSource 'dictionary'), never the tokenizer's guess */
+async function tokens(text,learning){
+ if(!learning)return null;
+ try{const list=learning.readings.resolve(await learning.tokenize(text));return list.map(t=>({s:String(t.surface||''),b:String(t.base_form&&t.base_form!=='*'?t.base_form:t.surface||''),r:t.readingSource==='dictionary'?String(t.reading||''):''})).filter(t=>t.s);}catch{return null;}
+}
+async function article(root,link,options={}){
+ if(!canOpen(link))throw Error('URL_NOT_ALLOWED');
+ const dir=artDir(root),file=dir&&path.join(dir,hash(link)+'.json');
+ let body=null;
+ if(file)try{const st=fs.statSync(file);if(Date.now()-st.mtimeMs<KEEP_DAYS*864e5)body=JSON.parse(fs.readFileSync(file,'utf8'));}catch{}
+ if(!body){
+  const base=relay.relayBase(root,options.env||process.env),fetcher=options.fetch||fetch;
+  body=(fulltext.has(link)&&base?await fromRelay(base,link,fetcher).catch(()=>null):null)||await fromSite(link,options).catch(()=>null);
+  if(!body)return {state:'error',link};
+  if(file)try{fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(file,JSON.stringify(body));for(const n of fs.readdirSync(dir)){const f=path.join(dir,n);if(Date.now()-fs.statSync(f).mtimeMs>KEEP_DAYS*864e5)fs.rmSync(f,{force:true});}}catch{}
+ }
+ let learning=null;try{const l=options.runtime?.learning?.();if(l?.installed?.())learning=l;}catch{}
+ const paragraphs=[];for(const text of body.paragraphs)paragraphs.push({text,tokens:await tokens(text,learning)});
+ return {state:'ok',link,title:body.title,via:body.via,paragraphs};
+}
+async function translate(runtime,texts,target){
+ if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');
+ const goal={zh:'zh-CN',en:'en','zh-CN':'zh-CN'}[String(target)]||'zh-CN';
+ const list=(Array.isArray(texts)?texts:[]).slice(0,60).map(t=>String(t||'').slice(0,2000));
+ return runtime.reviews().translate(list,goal,'ja');
+}
+/* one card per word per article, in the megulit_news deck (created on first use) */
+const NEWS_DECK='megulit_news';
+async function anki(root,runtime,{term,reading,meaning,sentence,link,title}={}){
+ term=str(term,40).trim();reading=str(reading,40).trim();if(!term)throw Error('INVALID_WORD');
+ const store=require('./store.cjs');
+ const config={...(runtime?.config?.()||store.readJSON(path.join(root,'data','config','v4-preferences.json'))),ankiDeck:NEWS_DECK};
+ const word={surface:term,base:term,reading:reading||term,noReading:!reading,cardKey:'news:'+term+':'+str(link,500),meaning:str(meaning,2000),pos:'',pitch:[],sentence:str(sentence,1000)};
+ const h=v=>v.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const at=word.sentence.indexOf(term),html=at<0?h(word.sentence):h(word.sentence.slice(0,at))+'<b class="tm-hl">'+h(term)+'</b>'+h(word.sentence.slice(at+term.length));
+ return await new(require('../core/anki.cjs').Anki)().sync(word,config,null,{sentenceHtml:html,gameTitle:str(title,200)});
+}
+module.exports={view,canOpen,article,translate,anki,NEWS_DECK,cleanNews,cleanWords,readingFor};

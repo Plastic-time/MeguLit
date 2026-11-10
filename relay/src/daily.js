@@ -10,6 +10,7 @@
      Google トレンド (JP daily)      https://trends.google.com/trending/rss?geo=JP   (hot words, with one related headline)
      NHK ニュース                    https://www3.nhk.or.jp/rss/news/cat0.xml        (fallback hot words when Trends fails:
                                                                                      「」-quoted terms in the headlines) */
+import newsArticle from '../../services/news-article.cjs';
 const UA='MeguLitRelay/1.0 (+https://megulit.com)';
 export const NEWS_FEEDS=[
  {id:'moepedia',name:'Moepedia',url:'https://moepedia.net/feed/',all:true},
@@ -78,7 +79,11 @@ async function cached(env,kind,now,refresh){
  if(!row||now.getTime()-Date.parse(row.updatedAt)>STALE*2){await refresh(env,now).catch(()=>0);row=await load(env,kind,'')||row;}
  return row;
 }
-export async function newsGet(env,{json},now=new Date()){const row=await cached(env,'news',now,refreshNews);return json({items:row?.items||[],sources:row?.sources||NEWS_FEEDS.map(f=>({id:f.id,name:f.name})),updatedAt:row?.updatedAt||null},200,{'cache-control':'public, max-age=600'});}
+/* E415 full text only for sources the maintainer may republish: wrangler.toml NEWS_FULLTEXT_SOURCES = "moepedia,…"
+   (empty by default). Empty → the app fetches the article on the user's PC instead. */
+export const fulltextSources=env=>new Set(String(env.NEWS_FULLTEXT_SOURCES||'').split(',').map(s=>s.trim()).filter(Boolean));
+const NOINDEX={'x-robots-tag':'noindex, nofollow'};
+export async function newsGet(env,{json},now=new Date()){const row=await cached(env,'news',now,refreshNews),allow=fulltextSources(env);return json({items:(row?.items||[]).map(n=>({...n,fulltext:allow.has(n.sourceId)})),sources:row?.sources||NEWS_FEEDS.map(f=>({id:f.id,name:f.name})),updatedAt:row?.updatedAt||null},200,{'cache-control':'public, max-age=600',...NOINDEX});}
 export async function hotWordsDailyGet(env,url,{json,fail},now=new Date()){
  const day=url.searchParams.get('day')||'';if(day&&!/^\d{4}-\d{2}-\d{2}$/.test(day))return fail('INVALID_DAY',400);
  const row=day?await load(env,'hotwords',day):await cached(env,'hotwords',now,refreshWords);
@@ -117,8 +122,21 @@ export async function imageGet(env,id){
 }
 export async function cleanupImages(env,now=new Date()){
  let removed=0,cursor;
- do{const page=await env.BUCKET.list({prefix:'daily-img/',cursor,include:['customMetadata']});
+ for(const prefix of ['daily-img/','daily-article/']){cursor=undefined;do{const page=await env.BUCKET.list({prefix,cursor,include:['customMetadata']});
   for(const o of page.objects||[]){const at=Number(o.customMetadata?.at)||new Date(o.uploaded||0).getTime();if(now.getTime()-at>KEEP_DAYS*864e5){await env.BUCKET.delete(o.key);removed++;}}
-  cursor=page.truncated?page.cursor:undefined;}while(cursor);
+  cursor=page.truncated?page.cursor:undefined;}while(cursor);}
  return removed;
+}
+
+export async function articleGet(env,url,{json,fail},now=new Date(),fetcher=fetch){
+ const link=url.searchParams.get('link')||'',allow=fulltextSources(env);
+ const row=await load(env,'news','');const item=(row?.items||[]).find(n=>n.link===link);
+ if(!item||!allow.has(item.sourceId)||!env.BUCKET)return fail('NOT_AVAILABLE',404,NOINDEX);
+ const key='daily-article/'+await hex(link),hitObj=await env.BUCKET.get(key);
+ if(hitObj){try{return json(JSON.parse(await new Response(hitObj.body).text()),200,{'cache-control':'public, max-age=3600',...NOINDEX});}catch{}}
+ let html='';try{const r=await fetcher(link,{headers:{'user-agent':UA,accept:'text/html'},signal:AbortSignal.timeout(10000)});if(r.ok)html=await r.text();}catch{}
+ const x=newsArticle.extract(html,link);if(!x.paragraphs.length)return fail('FETCH_FAILED',502,NOINDEX);
+ const body={title:x.title||item.title,paragraphs:x.paragraphs,source:item.source,link};
+ await env.BUCKET.put(key,JSON.stringify(body),{httpMetadata:{contentType:'application/json'},customMetadata:{at:String(now.getTime())}});
+ return json(body,200,{'cache-control':'public, max-age=3600',...NOINDEX});
 }

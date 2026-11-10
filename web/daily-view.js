@@ -5,15 +5,15 @@
    Links open only through daily_open (the bridge accepts only links it just handed to this page). */
 export const dailyLabel={zh:'日报',ja:'日報',en:'Daily'};
 const W={
- zh:{news:'Galgame 新闻',words:'今日热词',all:'全部',updated:'更新于',refresh:'刷新',issue:'第 {n} 号',lookup:'查词',read:'阅读原文',source:'来源',
+ zh:{rdJa:'日文',rdTr:'译文',rdBi:'双语',rdOrig:'原文网页',rdClose:'关闭',rdLoading:'正在取原文…',rdFail:'原文暂时打不开，可以去原网页看',rdTrFail:'翻译暂时不可用',rdHint:'点一个词查词，拖选一段查短语',rdAnki:'加入 Anki · megulit_news',rdAnkiOk:'已加入 megulit_news',rdAnkiFail:'没加进 Anki：',rdMore:'在查词面板打开',rdNone:'词典里没查到',rdVia:{fast:'本机加速直连',direct:'本机直连',relay:'MeguLit 中转'},news:'Galgame 新闻',words:'今日热词',all:'全部',updated:'更新于',refresh:'刷新',issue:'第 {n} 号',lookup:'查词',read:'阅读原文',source:'来源',
   wordsNote:'每天从日本的热门检索里挑出 20 个词。点一个词，直接在查词面板里看释义和例句',noReading:'读音见词典',
   emptyTitle:'今天的报纸还在印刷',emptyText:'联网服务还没有送来新闻和热词。稍后再来，或者点刷新再试一次',errorTitle:'暂时连不上日报',errorText:'检查一下网络，或者稍后再刷新',
   noNews:'这一栏今天还没有新闻',noWords:'今天的热词还没整理好',more:'更多新闻',weekday:['日','一','二','三','四','五','六'],credit:'标题与摘要来自各站公开 RSS，点开阅读原文'},
- ja:{news:'ギャルゲーニュース',words:'今日の注目ワード',all:'すべて',updated:'更新',refresh:'更新',issue:'第 {n} 号',lookup:'辞書で調べる',read:'元記事を読む',source:'出典',
+ ja:{rdJa:'日本語',rdTr:'翻訳',rdBi:'対訳',rdOrig:'元のページ',rdClose:'閉じる',rdLoading:'本文を取得中…',rdFail:'本文を取得できませんでした。元のページで読めます',rdTrFail:'翻訳は今使えません',rdHint:'単語をクリックで辞書、ドラッグでフレーズ検索',rdAnki:'Anki に追加 · megulit_news',rdAnkiOk:'megulit_news に追加しました',rdAnkiFail:'Anki に追加できません：',rdMore:'辞書パネルで開く',rdNone:'辞書に見つかりません',rdVia:{fast:'高速直結',direct:'直結',relay:'MeguLit 中継'},news:'ギャルゲーニュース',words:'今日の注目ワード',all:'すべて',updated:'更新',refresh:'更新',issue:'第 {n} 号',lookup:'辞書で調べる',read:'元記事を読む',source:'出典',
   wordsNote:'日本で今日よく検索されている言葉を 20 語。クリックすると辞書パネルで意味と例文を表示します',noReading:'読みは辞書で',
   emptyTitle:'今日の紙面は印刷中です',emptyText:'オンラインサービスからニュースとワードがまだ届いていません。しばらくしてから、または更新を押してください',errorTitle:'日報に接続できません',errorText:'ネットワークを確認するか、しばらくしてから更新してください',
   noNews:'この欄のニュースはまだありません',noWords:'今日のワードはまだ準備中です',more:'その他のニュース',weekday:['日','月','火','水','木','金','土'],credit:'見出しと要約は各サイトの公開 RSS より。クリックで元記事へ'},
- en:{news:'Galgame news',words:'Words of the day',all:'All',updated:'Updated',refresh:'Refresh',issue:'No. {n}',lookup:'Look up',read:'Read the article',source:'Source',
+ en:{rdJa:'Japanese',rdTr:'Translation',rdBi:'Bilingual',rdOrig:'Original page',rdClose:'Close',rdLoading:'Fetching the article…',rdFail:'Could not load the article. You can read it on the original page',rdTrFail:'Translation is unavailable right now',rdHint:'Click a word to look it up, drag to look up a phrase',rdAnki:'Add to Anki · megulit_news',rdAnkiOk:'Added to megulit_news',rdAnkiFail:'Could not add to Anki: ',rdMore:'Open in dictionary',rdNone:'Not in the dictionary',rdVia:{fast:'accelerated direct',direct:'direct',relay:'MeguLit relay'},news:'Galgame news',words:'Words of the day',all:'All',updated:'Updated',refresh:'Refresh',issue:'No. {n}',lookup:'Look up',read:'Read the article',source:'Source',
   wordsNote:'Twenty words people in Japan are searching for today. Click one to open it in the dictionary with meanings and examples',noReading:'reading in dictionary',
   emptyTitle:'Today’s paper is still at the press',emptyText:'The online service has not delivered news or words yet. Come back later or press Refresh',errorTitle:'Cannot reach the daily',errorText:'Check your connection or refresh later',
   noNews:'No news in this column yet',noWords:'Today’s words are not ready yet',more:'More news',weekday:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],credit:'Headlines and summaries from each site’s public RSS. Click to read the original'}
@@ -64,7 +64,7 @@ export async function mountDaily(main,{api,locale,esc,toast,isCurrent=()=>true,l
  const load=async(spin)=>{if(spin)main.querySelector('[data-dl-refresh]')?.classList.add('dl-spin');try{data=await api('daily_view');}catch{data={state:'error'};}if(isCurrent())paint();};
  function bind(){
   main.querySelectorAll('[data-dl-refresh]').forEach(b=>b.onclick=()=>load(true));
-  main.querySelectorAll('[data-dl-open]').forEach(a=>a.onclick=e=>{e.preventDefault();api('daily_open',{url:a.dataset.dlOpen}).catch(()=>toast?.('…'));});
+  bindOpen(main);
   main.querySelectorAll('[data-dl-filter]').forEach(b=>b.onclick=()=>{if(b.dataset.dlFilter===filter)return;filter=b.dataset.dlFilter;
    main.querySelectorAll('[data-dl-filter]').forEach(x=>x.setAttribute('aria-selected',String(x===b)));placeInk(main);
    const body=main.querySelector('.dl-news-body'),w=W[locale]||W.zh,shown=filter==='all'?data.news.items:data.news.items.filter(n=>n.source===filter);
@@ -72,7 +72,48 @@ export async function mountDaily(main,{api,locale,esc,toast,isCurrent=()=>true,l
   main.querySelectorAll('[data-dl-word]').forEach(b=>b.onclick=()=>{const li=b.closest('.dl-word'),open=!li.classList.contains('open');main.querySelectorAll('.dl-word.open').forEach(x=>{x.classList.remove('open');x.querySelector('[aria-expanded]').setAttribute('aria-expanded','false');});if(open){li.classList.add('open');b.setAttribute('aria-expanded','true');}});
   main.querySelectorAll('[data-dl-lookup]').forEach(b=>b.onclick=()=>lookup?.(b.dataset.dlLookup));
  }
- function bindOpen(scope){scope.querySelectorAll('[data-dl-open]').forEach(a=>a.onclick=e=>{e.preventDefault();api('daily_open',{url:a.dataset.dlOpen}).catch(()=>toast?.('…'));});}
+ /* news stories open in the reader; hot-word headlines open in the browser */
+ function bindOpen(scope){scope.querySelectorAll('[data-dl-open]').forEach(a=>a.onclick=e=>{e.preventDefault();const item=a.closest('.dl-word')?null:data?.news?.items.find(n=>n.link===a.dataset.dlOpen);if(item)openReader(item,{api,locale,esc,toast,lookup});else api('daily_open',{url:a.dataset.dlOpen}).catch(()=>toast?.('…'));});}
  main.innerHTML=pageHTML(null,{locale,esc}).replace('dl-empty dl-in','dl-empty dl-in dl-loading');
  await load(false);
+}
+
+/* ---- E415 reader: 日文 / 译文 / 双语, click a word or drag a phrase to look it up, add to Anki megulit_news ---------- */
+const MODES=['ja','tr','bi'];
+function defs(v){if(Array.isArray(v))return v.map(defs).filter(Boolean).join('；');if(v&&typeof v==='object')return Object.values(v).map(defs).filter(Boolean).join('；');const t=String(v??'');if(/^[\[{]/.test(t.trim()))try{return defs(JSON.parse(t));}catch{}return t;}
+/* tokens carry a reading only when the dictionary settled it; ruby is drawn only for those */
+export function paragraphHTML(p,esc){return p.tokens?.length?p.tokens.map(t=>/^[\s\p{P}\p{S}]+$/u.test(t.s)?esc(t.s):`<span class="rd-t" data-b="${esc(t.b)}" data-r="${esc(t.r||'')}">${t.r&&/\p{sc=Han}/u.test(t.s)?`<ruby>${esc(t.s)}<rt>${esc(t.r)}</rt></ruby>`:esc(t.s)}</span>`).join(''):esc(p.text);}
+export function readerShell(item,w,esc){return `<div class="rd" role="dialog" aria-modal="true" aria-label="${esc(item.title)}"><div class="rd-scrim" data-rd-close></div><section class="rd-sheet"><header class="rd-bar"><span class="rd-src">${esc(item.source)}</span><div class="rd-modes" role="tablist">${MODES.map(m=>`<button type="button" role="tab" data-rd-mode="${m}" aria-selected="${m==='ja'}">${w[{ja:'rdJa',tr:'rdTr',bi:'rdBi'}[m]]}</button>`).join('')}<span class="rd-mode-ink" aria-hidden="true"></span></div><span class="rd-bar-end"><button type="button" class="rd-link" data-rd-orig>${w.rdOrig}</button><button type="button" class="dl-icon rd-x" data-rd-close aria-label="${w.rdClose}" title="${w.rdClose}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.4"/></svg></button></span></header><article class="rd-body"><h1>${esc(item.title)}</h1><p class="rd-meta">${esc(item.source)}${item.date?' · '+esc(new Date(item.date).toLocaleString()):''}<span class="rd-via"></span></p><p class="rd-hint">${w.rdHint}</p><div class="rd-text" data-mode="ja"><p class="rd-wait">${w.rdLoading}</p></div></article><div class="rd-pop" hidden></div></section></div>`;}
+export function openReader(item,{api,locale,esc,toast,lookup}){
+ const w=W[locale]||W.zh,host=document.createElement('div');host.innerHTML=readerShell(item,w,esc);const root=host.firstElementChild;document.body.appendChild(root);
+ requestAnimationFrame(()=>root.classList.add('rd-on'));
+ const sheet=root.querySelector('.rd-sheet'),text=root.querySelector('.rd-text'),pop=root.querySelector('.rd-pop');let data=null,tr=null,mode='ja',popTicket=0;
+ const key=e=>{if(e.key==='Escape'){if(!pop.hidden)pop.hidden=true;else close();}};
+ const close=()=>{root.classList.remove('rd-on');document.removeEventListener('keydown',key);setTimeout(()=>root.remove(),280);};
+ document.addEventListener('keydown',key);
+ root.querySelectorAll('[data-rd-close]').forEach(b=>b.onclick=close);
+ root.querySelector('[data-rd-orig]').onclick=()=>api('daily_open',{url:item.link}).catch(()=>toast?.('…'));
+ const ink=()=>{const on=root.querySelector('[data-rd-mode][aria-selected=true]'),bar=root.querySelector('.rd-mode-ink');if(on&&bar){bar.style.width=on.offsetWidth+'px';bar.style.transform=`translateX(${on.offsetLeft}px)`;}};requestAnimationFrame(ink);
+ const setMode=m=>{mode=m;root.querySelectorAll('[data-rd-mode]').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.rdMode===m)));ink();};
+ const paint=()=>{if(!data)return;text.dataset.mode=mode;text.innerHTML=data.paragraphs.map((p,i)=>`<div class="rd-p" data-i="${i}">${mode!=='tr'?`<p class="rd-ja" lang="ja">${paragraphHTML(p,esc)}</p>`:''}${mode!=='ja'?`<p class="rd-tr">${tr?esc(tr[i]||''):'<span class="rd-shimmer"></span>'}</p>`:''}</div>`).join('');};
+ const needTr=async()=>{if(tr||mode==='ja'||!data)return;try{const out=await api('daily_translate',{texts:data.paragraphs.map(p=>p.text),target:locale==='en'?'en':'zh'});if(!Array.isArray(out)||!out.some(Boolean))throw Error('empty');tr=out;}catch{toast?.(w.rdTrFail);setMode('ja');}if(root.isConnected)paint();};
+ root.querySelectorAll('[data-rd-mode]').forEach(b=>b.onclick=()=>{if(b.dataset.rdMode===mode)return;setMode(b.dataset.rdMode);text.classList.add('rd-swap');setTimeout(()=>{paint();text.classList.remove('rd-swap');needTr();},140);});
+ const show=async(query,rect,sentence)=>{
+  query=query.trim().slice(0,40);if(!query)return;const ticket=++popTicket,box=sheet.getBoundingClientRect();
+  pop.hidden=false;pop.style.left=Math.max(12,Math.min(rect.left-box.left,box.width-344))+'px';pop.style.top=(rect.bottom-box.top+sheet.scrollTop+10)+'px';
+  pop.innerHTML=`<div class="rd-pop-head"><strong>${esc(query)}</strong></div><p class="rd-wait">…</p>`;pop.classList.remove('rd-pop-in');void pop.offsetWidth;pop.classList.add('rd-pop-in');
+  let items=[];try{items=await api('dictionary',{query,source:'moji',operationId:crypto.randomUUID()});}catch{}if(!items?.length)try{items=await api('dictionary',{query,source:'local',operationId:crypto.randomUUID()});}catch{}
+  if(ticket!==popTicket)return;const top=(items||[]).slice(0,3),first=top[0],reading=first?String(first.pron||first.reading||'').split(/\s/)[0]:'';
+  pop.innerHTML=`<div class="rd-pop-head"><strong>${esc(first?.spelling||query)}</strong>${reading?`<span>${esc(reading)}</span>`:''}</div>${top.length?`<ol>${top.map(e=>`<li><b>${esc(e.spelling||'')}</b> <small>${esc(String(e.pron||e.reading||''))}</small><p>${esc(defs(e.definition).slice(0,220))}</p></li>`).join('')}</ol>`:`<p class="rd-wait">${w.rdNone}</p>`}<div class="rd-pop-actions"><button type="button" class="dl-btn" data-rd-anki ${first?'':'disabled'}>${w.rdAnki}</button><button type="button" class="rd-link" data-rd-more>${w.rdMore}</button></div>`;
+  pop.querySelector('[data-rd-more]').onclick=()=>{close();lookup?.(query);};
+  const add=pop.querySelector('[data-rd-anki]');if(first)add.onclick=async()=>{add.disabled=true;try{await api('daily_anki',{term:first.spelling||query,reading,meaning:defs(first.definition).slice(0,2000),sentence,link:item.link,title:item.title});toast?.(w.rdAnkiOk);add.textContent='✓ megulit_news';}catch(e){add.disabled=false;toast?.(w.rdAnkiFail+String(e?.message||e).replace(/^Error:\s*/,''));}};
+ };
+ const sentenceOf=node=>{const i=Number(node?.closest?.('.rd-p')?.dataset.i);return data?.paragraphs[i]?.text||'';};
+ text.addEventListener('mouseup',e=>{const sel=getSelection(),picked=String(sel||'').trim();
+  if(picked&&picked.length<=40&&text.contains(sel.anchorNode)){show(picked,sel.getRangeAt(0).getBoundingClientRect(),sentenceOf(sel.anchorNode.parentElement));return;}
+  const t=e.target.closest('.rd-t');if(t){text.querySelectorAll('.rd-t.on').forEach(x=>x.classList.remove('on'));t.classList.add('on');show(t.dataset.b||t.textContent,t.getBoundingClientRect(),sentenceOf(t));}});
+ sheet.addEventListener('mousedown',e=>{if(!pop.contains(e.target)&&!e.target.closest('.rd-text'))pop.hidden=true;});
+ const failed=()=>{text.innerHTML=`<p class="rd-wait">${w.rdFail}</p><button type="button" class="dl-btn" data-rd-orig2>${w.rdOrig}</button>`;text.querySelector('[data-rd-orig2]').onclick=()=>api('daily_open',{url:item.link}).catch(()=>{});};
+ api('daily_article',{link:item.link}).then(r=>{if(!root.isConnected)return;if(r?.state!=='ok'||!r.paragraphs?.length)return failed();data=r;root.querySelector('.rd-via').textContent=' · '+(w.rdVia[r.via]||'');paint();}).catch(()=>{if(root.isConnected)failed();});
+ return {close};
 }

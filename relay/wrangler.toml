@@ -21,6 +21,9 @@ AVATAR_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 HOT_MODEL = "@cf/meta/llama-3.1-8b-instruct"
 HOT_MIN_USERS = "3"
 REPORT_THRESHOLD = "3"
+# E415 日报 sources whose full article text the relay may cache (only with the site's permission), comma separated
+# source ids: moepedia, 4gamer, denfami. Empty = the app fetches articles on the user's PC.
+NEWS_FULLTEXT_SOURCES = ""
 
 # Workers AI: avatar moderation and the AI guesses on the hot-word awards. No token needed inside the Worker.
 [ai]
