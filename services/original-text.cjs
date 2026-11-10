@@ -34,7 +34,7 @@ function ainOf(dir,base){const files=fs.readdirSync(dir).filter(f=>/\.ain$/i.tes
 const bgi=require('./original-engines/bgi.cjs');
 const ADAPTERS={
  system4:{marker:base=>base+'.ain',locate:(dir,base)=>{const file=ainOf(dir,base);return file?{engine:'system4',target:file}:null;},read:target=>readAin(target),fingerprint:target=>sha256(target)},
- bgi:{folder:true,marker:()=>'sysprg.arc',locate:dir=>{try{const arcs=fs.readdirSync(dir).filter(f=>/^data0\d{4}\.arc$/i.test(f));if(!arcs.length)return null;const head=Buffer.alloc(12),fd=fs.openSync(path.join(dir,arcs[0]),'r');try{fs.readSync(fd,head,0,12,0);}finally{fs.closeSync(fd);}return head.toString('latin1')==='BURIKO ARC20'?{engine:'bgi',target:dir}:null;}catch{return null;}},
+ bgi:{folder:true,marker:()=>'data01000.arc',locate:dir=>{try{const arcs=fs.readdirSync(dir).filter(f=>/^data0\d{4}\.arc$/i.test(f));if(!arcs.length)return null;const head=Buffer.alloc(12),fd=fs.openSync(path.join(dir,arcs[0]),'r');try{fs.readSync(fd,head,0,12,0);}finally{fs.closeSync(fd);}return ['BURIKO ARC20','PackFile    '].includes(head.toString('latin1'))?{engine:'bgi',target:dir}:null;}catch{return null;}},
   read:dir=>{const scenes=bgi.scan(dir),lines=scenes.flatMap(x=>x.lines);return {engine:'bgi',version:0,codepage:'shift_jis',lines,structure:{messages:lines.length,functions:scenes.length,functionHash:crypto.createHash('sha256').update(scenes.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
   fingerprint:dir=>crypto.createHash('sha256').update('bgi-code-order\n'+fs.readdirSync(dir).filter(f=>/^data0\d{4}\.arc$/i.test(f)).sort().map(f=>{const st=fs.statSync(path.join(dir,f));return f+'|'+st.size+'|'+st.mtimeMs;}).join('\n')).digest('hex')}};
 // E280: engines read as scene files (KiriKiri, Artemis, Ren'Py); their script is the game folder like BGI's.
@@ -68,6 +68,9 @@ function align(runtime,original){
  const rate=kept?equal/kept:null,reliable=sameStructure&&(rate===null||rate>=.98);
  return {sameStructure,keptJapanese:kept,keptEqual:equal,keptRate:rate,reliable};
 }
+// BGI builds that differ by a few lines per scene (E3xx 穢翼のユースティア) are lined up scene by scene (bgi.alignLines).
+function realign(loc,ain,runtime,runningDir){if(loc.engine!=='bgi'||align(runtime,ain).sameStructure)return ain;
+ const lines=bgi.alignLines(bgi.scan(runningDir),bgi.scan(loc.target));return lines.length===runtime.lines.length?{...ain,lines,structure:runtime.structure}:ain;}
 function importOriginal(root,db,id,dir){
  const row=gameRow(db,id);if(typeof dir!=='string'||!path.isAbsolute(dir)||!fs.statSync(dir,{throwIfNoEntry:false})?.isDirectory())throw Error('INVALID_ORIGINAL_DIRECTORY');
  if(path.resolve(dir).toLowerCase()===path.dirname(row.executable).toLowerCase())throw Error('ORIGINAL_IS_RUNNING_COPY');
@@ -76,7 +79,7 @@ function importOriginal(root,db,id,dir){
   const state=scanRunning(root,id,row.executable);if(!state.runtime)throw Error(state.error||'NO_SUPPORTED_SCRIPT');
   const loc=locate(dir,path.parse(state.runtime.file).name);if(!loc||loc.engine!==(state.runtime.engine||'system4'))throw Error('ORIGINAL_SCRIPT_NOT_FOUND');const file=loc.target;
   const hash=fingerprint(loc);if(hash===state.runtime.sha256)throw Error('ORIGINAL_SAME_AS_RUNNING');
-  const ain=readScript(loc),runtime=readIndex(state.runtime.index),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length;
+  const runtime=readIndex(state.runtime.index),ain=realign(loc,readScript(loc),runtime,runningDirOf(state.runtime)),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length;
   // Never accept a translated file as the original: most of its lines must be Japanese.
   if(japanese<ain.lines.filter(prose).length*.5)throw Error('ORIGINAL_NOT_JAPANESE');
   const alignment=align(runtime,{...ain,structure:ain.structure});
@@ -396,8 +399,8 @@ async function discover(root,db,id,options={}){
  if(!ADAPTERS[state.runtime.engine||'system4'].marker)return {notFound:true,search:{found:0,complete:true,searched:0,checked:[]}}; // scene engines have no single file to look for
  const engine=state.runtime.engine||'system4',runningDir=runningDirOf(state.runtime),base=ADAPTERS[engine].marker(path.parse(state.runtime.file).name).replace(/\.[^.]+$/,''),exclude=runningDir.toLowerCase(),runtime=readIndex(state.runtime.index);
  writeState(root,id,{status:'scanning',error:''});
- const search=await findCandidates(base,exclude,{ext:path.extname(ADAPTERS[engine].marker(path.parse(state.runtime.file).name)),roots:options.roots||localRoots(),deadline:Date.now()+(options.timeout||30000)}),checked=[];
- for(const file of search.found){try{const loc=locate(path.dirname(file),path.parse(state.runtime.file).name);if(!loc||loc.engine!==engine){checked.push({file,result:'other-engine'});continue;}const ain=readScript(loc),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length;if(japanese<ain.lines.filter(prose).length*.5){checked.push({file,result:'not-japanese'});continue;}const a=align(runtime,ain);checked.push({file,result:a.reliable?'match':'different-version'});if(a.reliable)return {...importOriginal(root,db,id,path.dirname(file)),search:{...search,found:search.found.length,checked}};}catch(error){checked.push({file,result:String(error.message||error)});}}
+ const search=await findCandidates(base,exclude,{ext:path.extname(ADAPTERS[engine].marker(path.parse(state.runtime.file).name)),roots:options.roots||[runningDir,...localRoots()],deadline:Date.now()+(options.timeout||30000)}),checked=[];
+ for(const file of search.found){try{const loc=locate(path.dirname(file),path.parse(state.runtime.file).name);if(!loc||loc.engine!==engine){checked.push({file,result:'other-engine'});continue;}const ain=realign(loc,readScript(loc),runtime,runningDir),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length;if(japanese<ain.lines.filter(prose).length*.5){checked.push({file,result:'not-japanese'});continue;}const a=align(runtime,ain);checked.push({file,result:a.reliable?'match':'different-version'});if(a.reliable)return {...importOriginal(root,db,id,path.dirname(file)),search:{...search,found:search.found.length,checked}};}catch(error){checked.push({file,result:String(error.message||error)});}}
  const status=state.original?.index?(readState(root)[id]?.status==='scanning'?'ready':readState(root)[id].status):'awaiting-original';
  writeState(root,id,{status:state.original?.index?(state.alignment?.reliable?'ready':'unreliable'):status,lastSearch:{at:Date.now(),found:search.found.length,complete:search.complete,searched:search.searched,checked}});
  return {notFound:true,search:{found:search.found.length,complete:search.complete,searched:search.searched,checked}};
