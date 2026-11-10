@@ -1,0 +1,3 @@
+# The CSP in public/_headers allows the inline theme script by its SHA-256, so its bytes must not change on checkout.
+*.html text eol=lf
+_headers text eol=lf
