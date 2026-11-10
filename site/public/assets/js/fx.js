@@ -10,6 +10,7 @@ const KATAKANA = 'ァ-ヶ';
 
 export async function run({ reduce, finePointer }) {
   document.documentElement.classList.add('fx');
+  import('./fx2.js').then(m => m.run({ reduce, finePointer })).catch(() => {});
   if (reduce) { reveal(); parallax(true); return; }
   await playIntro();
   intro();

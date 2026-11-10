@@ -912,3 +912,105 @@ section[data-kanji]::before {
 .card-sm { grid-column: span 6; }
 @media (max-width: 60rem) { .card-spec, .card-sm { grid-column: span 12; } }
 .hp-card img { aspect-ratio: 16 / 9; }
+
+/* ---- statement: sharpens word by word with the scroll ------------------------------------------------------------- */
+.statement { padding: clamp(5rem, 12vw, 10rem) 0 clamp(2rem, 5vw, 4rem); }
+.reveal-words {
+  margin: 0; max-width: 22em; font: 600 clamp(1.7rem, 3.4vw + .4rem, 3.6rem)/1.35 var(--serif); letter-spacing: -.005em; text-wrap: pretty;
+}
+:lang(ja) .reveal-words { font-family: var(--serif-ja); }
+.reveal-words .rw { transition: color .4s; }
+.reveal-words .rw.hot { color: var(--gold); }
+
+/* ---- chapters: sticky stage + tracing beam on wide screens; stacked on phones ------------------------------------- */
+.chap-flow { position: relative; }
+.chap-stage, .chap-rail { display: none; }
+@media (min-width: 60.01rem) {
+  .chap-flow { display: grid; grid-template-columns: 2.5rem minmax(0, .78fr) minmax(0, 1.22fr); gap: 0 clamp(2rem, 4vw, 4rem); }
+  .chap-rail { display: block; position: relative; }
+  .chap-rail::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line); }
+  .chap-rail .beam {
+    position: absolute; left: calc(50% - 1px); top: 0; width: 3px; height: calc(var(--p, 0) * 100%); border-radius: 3px;
+    background: linear-gradient(180deg, transparent, var(--gold) 30%, var(--crimson-ink));
+    box-shadow: 0 0 14px color-mix(in srgb, var(--crimson) 70%, transparent);
+  }
+  .chap-rail .beam::after {
+    content: ""; position: absolute; left: 50%; bottom: -7px; width: 14px; height: 14px; translate: -50% 0; border-radius: 50%;
+    background: radial-gradient(circle, #fff3d6 0 30%, var(--gold) 45%, transparent 72%); box-shadow: 0 0 18px var(--gold);
+  }
+  .chap-list .chap { display: flex; align-items: center; min-height: 82vh; margin: 0; grid-template-columns: none; }
+  .chap-list .chap:nth-of-type(even) .chap-copy { order: 0; }
+  .chap-list .chap-copy { opacity: .28; transition: opacity .5s; }
+  .chap-list .chap.is-on .chap-copy { opacity: 1; }
+  .chap-inline { display: none; }
+  .chap-stage { display: block; position: relative; }
+  .stage-sticky { position: sticky; top: calc(50vh - min(19vw, 17rem) - 2rem); height: calc(min(38vw, 34rem) + 4rem); perspective: 1600px; }
+  .stage-item {
+    position: absolute; inset: 0 0 auto; opacity: 0; pointer-events: none; animation: none !important;
+    transform: perspective(1600px) rotateY(-18deg) rotateX(8deg) translate3d(2rem, 2rem, -6rem) scale(.92);
+    transition: opacity .6s cubic-bezier(.2, .7, .2, 1), transform .9s cubic-bezier(.2, .7, .2, 1);
+  }
+  .stage-item.on { opacity: 1; pointer-events: auto; transform: none; }
+}
+
+/* ---- Anki deck ------------------------------------------------------------------------------------------------------ */
+.deck-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(2rem, 5vw, 5rem); align-items: center; }
+.deck { position: relative; height: clamp(22rem, 34vw, 27rem); touch-action: pan-y; outline: none; }
+.deck:focus-visible { outline: 2px solid var(--gold); outline-offset: 8px; border-radius: 24px; }
+.dcard { position: absolute; left: 6%; top: 8%; width: min(26rem, 82%); aspect-ratio: 5 / 6.2; cursor: grab; perspective: 1400px; user-select: none; -webkit-user-select: none; }
+.dcard[data-top] { cursor: grab; }
+.dcard:active { cursor: grabbing; }
+.dc-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .7s cubic-bezier(.2, .8, .2, 1); }
+.dc-inner.flipped { transform: rotateY(180deg); }
+.dc-face {
+  position: absolute; inset: 0; border-radius: 24px; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden;
+  display: grid; align-content: center; justify-items: center; gap: .8rem; padding: 2rem 1.6rem; text-align: center;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 78%, var(--crimson) 22%), var(--surface));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 30px 60px -24px rgba(0, 0, 0, .7), 0 0 0 1px var(--line);
+}
+.dc-back { transform: rotateY(180deg); align-content: start; padding: 0 0 1.4rem; }
+.dc-back img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+.dc-tag { position: absolute; top: 1rem; left: 1rem; font: 600 .75rem/1 var(--sans); color: #fff; background: var(--crimson); padding: .3rem .6rem; border-radius: 999px; }
+.dc-word { margin: 0; font: 700 clamp(2.2rem, 4vw, 3rem)/1.6 var(--serif-ja); }
+.dc-word rt { font-size: .36em; color: var(--gold); }
+.dc-ex { margin: 0; color: var(--muted); font: 500 .9375rem/1.7 var(--serif-ja); max-width: 18em; }
+.dc-flip { position: absolute; bottom: 1rem; font-size: .8125rem; color: var(--faint); }
+.dc-mean { margin: .4rem 1.4rem 0; font: 600 1.25rem/1.5 var(--serif); }
+@media (max-width: 60rem) { .deck-grid { grid-template-columns: minmax(0, 1fr); } .deck { height: 26rem; } .dcard { left: 4%; } }
+
+/* ---- lamp over the download section -------------------------------------------------------------------------------- */
+.sec-dl { isolation: isolate; }
+.lamp { position: absolute; z-index: -1; left: 50%; top: 0; width: min(64rem, 100vw); height: 30rem; translate: -50% 0; pointer-events: none; }
+.lamp::before {
+  content: ""; position: absolute; inset: 0;
+  background: conic-gradient(from 148deg at 50% 0%, transparent 0deg, color-mix(in srgb, var(--crimson) 55%, transparent) 18deg, color-mix(in srgb, var(--gold) 35%, transparent) 32deg, color-mix(in srgb, var(--crimson) 55%, transparent) 46deg, transparent 64deg);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 85%); mask-image: linear-gradient(180deg, #000 0%, transparent 85%);
+  filter: blur(6px); transform-origin: 50% 0;
+}
+.lamp::after {
+  content: ""; position: absolute; left: 32%; right: 32%; top: 0; height: 3px; border-radius: 3px;
+  background: linear-gradient(90deg, transparent, #ffe3a6, transparent); box-shadow: 0 0 24px 6px color-mix(in srgb, var(--gold) 60%, transparent), 0 0 80px 20px color-mix(in srgb, var(--crimson) 40%, transparent);
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .lamp::before { animation: lamp-open linear both; animation-timeline: view(); animation-range: entry 0% cover 35%; }
+    .lamp::after { animation: lamp-bar linear both; animation-timeline: view(); animation-range: entry 0% cover 35%; }
+  }
+}
+@keyframes lamp-open { from { transform: scaleX(.35); opacity: .3; } to { transform: none; opacity: 1; } }
+@keyframes lamp-bar { from { left: 44%; right: 44%; } to { left: 30%; right: 30%; } }
+
+/* ---- glowing edge following the pointer ------------------------------------------------------------------------------ */
+.glow-edge {
+  position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 2;
+  background: conic-gradient(from calc(var(--glow-a, 0deg) - 50deg), transparent 0deg, var(--gold) 30deg, var(--crimson-ink) 50deg, var(--gold) 70deg, transparent 100deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: var(--glow-o, 0); transition: opacity .35s;
+}
+
+/* ---- ticker: driven by script when motion is on; soft edges ---------------------------------------------------------- */
+.fx-vel .tk-track { animation: none !important; will-change: transform; }
+.ticker { cursor: grab; user-select: none; -webkit-user-select: none; touch-action: pan-y; }
+.ticker:active { cursor: grabbing; }
+.tk { -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }

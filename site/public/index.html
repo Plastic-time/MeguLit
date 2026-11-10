@@ -138,58 +138,79 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
  </div>
 </section>
 
+<section class="statement" aria-label="MeguLit">
+ <div class="wrap">
+  <p class="reveal-words" data-i="st.text">Galgame 里有你最想看完的故事。MeguLit 把注音、释义、制卡和复习都放进游戏里，你只管往下读，读过的词会自己留下来。</p>
+ </div>
+</section>
+
 <section class="sec chapters" id="features" aria-labelledby="ch-title">
  <div class="wrap">
   <h2 id="ch-title" class="h2" data-i="ch.title">一边玩，一边学</h2>
   <p class="sec-lede" data-i="ch.lede">下面都是 MeguLit 在真实游戏里的录屏</p>
-  <article class="chap">
-   <div class="chap-copy" data-k="埋め込み">
+  <div class="chap-flow">
+   <div class="chap-rail" aria-hidden="true"><span class="beam"></span></div>
+   <div class="chap-list">
+   <article class="chap" data-i="0">
+    <div class="chap-copy" data-k="埋め込み">
     <p class="chap-n"><b>I</b><span lang="ja">埋め込み</span></p>
     <h3 class="h2 chap-t" data-i="ch1.t">字幕长在原版游戏里</h3>
     <p data-i="ch1.d">内嵌替换把日文原文和译文直接写进游戏自己的文本框，注音在上、译文在下，用游戏的字体和版面画出来。眼睛不用在两个窗口之间来回跳</p>
    </div>
-   <figure class="chap-media tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/embed.webp" data-src="/assets/clips/embed.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-  </article>
-  <article class="chap">
-   <div class="chap-copy" data-k="読む">
+    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/embed.webp" data-src="/assets/clips/embed.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+   </article>
+   <article class="chap" data-i="1">
+    <div class="chap-copy" data-k="読む">
     <p class="chap-n"><b>II</b><span lang="ja">読む</span></p>
     <h3 class="h2 chap-t" data-i="ch2.t">在游戏里点一下，就懂了</h3>
     <p data-i="ch2.d">点一个词看读音和释义，拖一段查短语和整句。读音优先用游戏自带的 ruby，阅读层不抢焦点，点它也不会让剧情往下走；想深究还能让 AI 讲语法和语境</p>
    </div>
-   <figure class="chap-media tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/lookup.webp" data-src="/assets/clips/lookup.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-  </article>
-  <article class="chap">
-   <div class="chap-copy" data-k="単語帳">
+    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/lookup.webp" data-src="/assets/clips/lookup.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+   </article>
+   <article class="chap" data-i="2">
+    <div class="chap-copy" data-k="単語帳">
     <p class="chap-n"><b>III</b><span lang="ja">単語帳</span></p>
     <h3 class="h2 chap-t" data-i="ch3.t">一键 Anki</h3>
     <p data-i="ch3.d">查到的词直接制成 Anki 卡片，游戏截图、例句和原声都带上，没配音的旁白用本地语音补上</p>
    </div>
-   <figure class="chap-media tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/anki.webp" data-src="/assets/clips/anki.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-  </article>
-  <article class="chap">
-   <div class="chap-copy" data-k="復習">
+    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/anki.webp" data-src="/assets/clips/anki.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+   </article>
+   <article class="chap" data-i="3">
+    <div class="chap-copy" data-k="復習">
     <p class="chap-n"><b>IV</b><span lang="ja">復習</span></p>
     <h3 class="h2 chap-t" data-i="ch4.t">翻过来，是那一幕的画面</h3>
     <p data-i="ch4.d">在 MeguLit 里直接复习，用的是 Anki 自己的卡片和调度，评分写回 Anki。每张卡的背面，就是你当时读到那句台词的游戏画面</p>
    </div>
-   <figure class="chap-media tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/review.webp" data-src="/assets/clips/review.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-  </article>
-  <article class="chap">
-   <div class="chap-copy" data-k="五十音">
+    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/review.webp" data-src="/assets/clips/review.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+   </article>
+   <article class="chap" data-i="4">
+    <div class="chap-copy" data-k="五十音">
     <p class="chap-n"><b>V</b><span lang="ja">五十音</span></p>
     <h3 class="h2 chap-t" data-i="ch5.t">零基础，从五十音开始</h3>
     <p data-i="ch5.d">25 课，笔顺动画、字源和例词，例句来自你自己玩过的游戏。学完一课，用三种假名小游戏和四档难度练到熟</p>
    </div>
-   <figure class="chap-media tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/kana.webp" data-src="/assets/clips/kana.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-  </article>
-  <article class="chap chap-duo">
-   <div class="chap-copy" data-k="記録">
+    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/kana.webp" data-src="/assets/clips/kana.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+   </article>
+   <article class="chap chap-duo" data-i="5">
+    <div class="chap-copy" data-k="記録">
     <p class="chap-n"><b>VI</b><span lang="ja">記録</span></p>
     <h3 class="h2 chap-t" data-i="ch6.t">读了多少，一眼看到</h3>
     <p data-i="ch6.d">阅读字数、时长、查词次数、阅读日历和时段分布都记着；读过的每一句原文和译文按会话存好，回头找哪句一搜就有</p>
    </div>
-   <figure class="chap-media tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/stats.webp" data-src="/assets/clips/stats.mp4" width="960" height="540" aria-hidden="true"></video><video class="clip clip-2" muted loop playsinline preload="none" poster="/assets/clips/history.webp" data-src="/assets/clips/history.mp4" width="960" height="540" aria-hidden="true"></video></figure>
-  </article>
+    <figure class="chap-media chap-inline tilt-card"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/stats.webp" data-src="/assets/clips/stats.mp4" width="960" height="540" aria-hidden="true"></video><video class="clip clip-2" muted loop playsinline preload="none" poster="/assets/clips/history.webp" data-src="/assets/clips/history.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+   </article>
+   </div>
+   <div class="chap-stage" aria-hidden="true">
+    <div class="stage-sticky">
+    <figure class="chap-media stage-item" data-i="0"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/embed.webp" data-src="/assets/clips/embed.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+    <figure class="chap-media stage-item" data-i="1"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/lookup.webp" data-src="/assets/clips/lookup.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+    <figure class="chap-media stage-item" data-i="2"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/anki.webp" data-src="/assets/clips/anki.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+    <figure class="chap-media stage-item" data-i="3"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/review.webp" data-src="/assets/clips/review.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+    <figure class="chap-media stage-item" data-i="4"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/kana.webp" data-src="/assets/clips/kana.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+    <figure class="chap-media stage-item chap-duo" data-i="5"><video class="clip" muted loop playsinline preload="none" poster="/assets/clips/stats.webp" data-src="/assets/clips/stats.mp4" width="960" height="540" aria-hidden="true"></video><video class="clip clip-2" muted loop playsinline preload="none" poster="/assets/clips/history.webp" data-src="/assets/clips/history.mp4" width="960" height="540" aria-hidden="true"></video></figure>
+    </div>
+   </div>
+  </div>
  </div>
 </section>
 
@@ -203,6 +224,74 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
     <div class="hp-row"><figure class="hp-card"><img src="/assets/img/home-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.home">首页</figcaption></figure><figure class="hp-card"><img src="/assets/clips/embed.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.embed">内嵌注音</figcaption></figure><figure class="hp-card"><img src="/assets/img/words-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.words">单词本</figcaption></figure><figure class="hp-card"><img src="/assets/clips/lookup.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.lookup">点读</figcaption></figure><figure class="hp-card"><img src="/assets/img/stats-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.stats">学习统计</figcaption></figure><figure class="hp-card"><img src="/assets/clips/anki.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.card">一键制卡</figcaption></figure><figure class="hp-card"><img src="/assets/img/kana-home-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.kana">五十音</figcaption></figure></div>
     <div class="hp-row"><figure class="hp-card"><img src="/assets/clips/review.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.anki">Anki 复习</figcaption></figure><figure class="hp-card"><img src="/assets/img/library-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.library">游戏库</figcaption></figure><figure class="hp-card"><img src="/assets/clips/kana.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.stroke">笔顺</figcaption></figure><figure class="hp-card"><img src="/assets/img/stats-trend-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.trend">字数走势</figcaption></figure><figure class="hp-card"><img src="/assets/clips/history.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.dialogue">对话记录</figcaption></figure><figure class="hp-card"><img src="/assets/img/game-detail-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.detail">作品详情</figcaption></figure><figure class="hp-card"><img src="/assets/img/auto-update-800.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.update">自动更新</figcaption></figure></div>
     <div class="hp-row"><figure class="hp-card"><img src="/assets/img/kana-lesson-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.lesson">五十音课程</figcaption></figure><figure class="hp-card"><img src="/assets/clips/detail.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.reviews">社区评价</figcaption></figure><figure class="hp-card"><img src="/assets/img/history-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.history">阅读会话</figcaption></figure><figure class="hp-card"><img src="/assets/clips/library.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.search">一搜就到</figcaption></figure><figure class="hp-card"><img src="/assets/img/anki-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.review">复习卡片</figcaption></figure><figure class="hp-card"><img src="/assets/clips/stats.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.hours">阅读时段</figcaption></figure><figure class="hp-card"><img src="/assets/img/dialogue-720.webp" width="720" height="405" loading="lazy" alt=""><figcaption data-i="hp.c.lines">原文与译文</figcaption></figure></div>
+  </div>
+ </div>
+</section>
+
+<section class="sec deck-sec" id="deck" data-kanji="復習" aria-labelledby="dk-title">
+ <div class="wrap deck-grid">
+  <div class="deck-copy">
+   <h2 id="dk-title" class="h2" data-i="dk.title">试着复习一张卡</h2>
+   <p class="sec-lede" data-i="dk.lede">点一下翻面，拖走就换下一张。MeguLit 里的卡片就是这样：正面是游戏里遇到的词，背面是释义，和你读到它的那一幕</p>
+   <p class="small" data-i="dk.hint">键盘：Enter 翻面，→ 下一张</p>
+  </div>
+  <div class="deck" tabindex="0" role="group" aria-label="Anki 卡片示例" data-i-attr="aria-label:dk.label">
+    <div class="dcard" data-i="0">
+     <div class="dc-inner">
+      <div class="dc-face dc-front">
+       <span class="dc-tag">Anki</span>
+       <p class="dc-word" lang="ja"><ruby>顔<rt>かお</rt></ruby>を<ruby>覆<rt>おお</rt></ruby>う</p>
+       <p class="dc-ex" lang="ja">彼女の顔を覆う雪を払う。</p>
+       <span class="dc-flip" data-i="dk.flip">点一下翻面</span>
+      </div>
+      <div class="dc-face dc-back">
+       <img src="/assets/clips/anki.webp" width="960" height="540" alt="" loading="lazy">
+       <p class="dc-mean" data-i="dk.m0">遮住脸；覆盖住面部</p>
+      </div>
+     </div>
+    </div>
+    <div class="dcard" data-i="1">
+     <div class="dc-inner">
+      <div class="dc-face dc-front">
+       <span class="dc-tag">Anki</span>
+       <p class="dc-word" lang="ja"><ruby>何<rt>なに</rt></ruby>かを<ruby>掴<rt>つか</rt></ruby>む</p>
+       <p class="dc-ex" lang="ja">それが、何かを掴んでいた。</p>
+       <span class="dc-flip" data-i="dk.flip">点一下翻面</span>
+      </div>
+      <div class="dc-face dc-back">
+       <img src="/assets/clips/lookup.webp" width="960" height="540" alt="" loading="lazy">
+       <p class="dc-mean" data-i="dk.m1">抓住什么东西</p>
+      </div>
+     </div>
+    </div>
+    <div class="dcard" data-i="2">
+     <div class="dc-inner">
+      <div class="dc-face dc-front">
+       <span class="dc-tag">Anki</span>
+       <p class="dc-word" lang="ja"><ruby>雪<rt>ゆき</rt></ruby>に<ruby>埋<rt>う</rt></ruby>もれる</p>
+       <p class="dc-ex" lang="ja">雪に埋もれた…僕の手。</p>
+       <span class="dc-flip" data-i="dk.flip">点一下翻面</span>
+      </div>
+      <div class="dc-face dc-back">
+       <img src="/assets/clips/embed.webp" width="960" height="540" alt="" loading="lazy">
+       <p class="dc-mean" data-i="dk.m2">被雪掩埋</p>
+      </div>
+     </div>
+    </div>
+    <div class="dcard" data-i="3">
+     <div class="dc-inner">
+      <div class="dc-face dc-front">
+       <span class="dc-tag">Anki</span>
+       <p class="dc-word" lang="ja"><ruby>空気<rt>くうき</rt></ruby>を<ruby>読<rt>よ</rt></ruby>む</p>
+       <p class="dc-ex" lang="ja">お前は本当に最後の最後まで、空気の読めないやつだな。</p>
+       <span class="dc-flip" data-i="dk.flip">点一下翻面</span>
+      </div>
+      <div class="dc-face dc-back">
+       <img src="/assets/clips/review.webp" width="960" height="540" alt="" loading="lazy">
+       <p class="dc-mean" data-i="dk.m3">察言观色，会看气氛</p>
+      </div>
+     </div>
+    </div>
   </div>
  </div>
 </section>
@@ -281,6 +370,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
 </section>
 
 <section class="sec sec-dl" id="download" data-kanji="下載" aria-labelledby="d-title">
+ <div class="lamp" aria-hidden="true"></div>
  <div class="wrap dl-grid">
   <div class="dl-main spot">
    <h2 id="d-title" class="h2" data-i="d.title">下载</h2>

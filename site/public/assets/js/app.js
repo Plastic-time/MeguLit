@@ -37,6 +37,7 @@ function applyLang(next) {
   for (const b of $$('[data-lang]')) b.setAttribute('aria-pressed', String(b.dataset.lang === lang));
   splitKinetic();
   setSoundLabel();
+  dispatchEvent(new Event('megulit:lang'));
   document.title = document.body.dataset.page === 'changelog' ? `${pick('t', 'cl.title')} · MeguLit` : d('title');
   if (release) fillRelease();
   if (engines) fillEngines(); else fillTicker();
@@ -351,7 +352,7 @@ if (!reduce) {
       else v.pause();
     }
   }, { rootMargin: '120px 0px' });
-  for (const v of $$('video.clip')) io.observe(v);
+  for (const v of $$('video.clip')) if (!v.closest('.stage-item')) io.observe(v);
 }
 
 // GMV ticker: engine names on the crimson band, game titles on the outlined band. Two copies make the loop seamless.
