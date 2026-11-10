@@ -205,7 +205,7 @@ export async function handle(request,env,now=new Date()){
   else if(path==='/api/following'&&request.method==='GET')response=await followingFeed(request,env,ip,now,social);
   else if(path==='/api/kindred'&&request.method==='GET')response=await kindred(request,env,ip,now,social);
   /* E415 每日 page (relay/src/daily.js) */
-  else if(path==='/api/news'&&request.method==='GET')response=await hit(env,'daily',ip,now.getTime())?await newsGet(env,{json},now):fail('RATE_LIMITED',429);
+  else if(path==='/api/news'&&request.method==='GET')response=await hit(env,'daily',ip,now.getTime())?await newsGet(env,{json},now,url):fail('RATE_LIMITED',429);
   else if(/^\/api\/news\/img\/[0-9a-f]{32}$/.test(path)&&request.method==='GET')response=await hit(env,'daily-img',ip,now.getTime())?await imageGet(env,path.slice(14)):fail('RATE_LIMITED',429);
   else if(path==='/api/news/article'&&request.method==='GET')response=await hit(env,'daily',ip,now.getTime())?await articleGet(env,url,{json,fail},now):fail('RATE_LIMITED',429);
   else if(path==='/api/hotwords/daily'&&request.method==='GET')response=await hit(env,'daily',ip,now.getTime())?await hotWordsDailyGet(env,url,{json,fail},now):fail('RATE_LIMITED',429);
@@ -225,7 +225,7 @@ export async function handle(request,env,now=new Date()){
 /* Cron (wrangler.toml [triggers]): Monday 00:00 UTC+8 settles last week's hot words. */
 export async function scheduled(event,env,ctx){
  /* every 30 minutes: website feedback still waiting for its GitHub issue; the weekly cron settles hot words */
- if(event?.cron==='20 */2 * * *'){const job=refreshDaily(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
+ if(event?.cron==='20 21 * * *'){const job=refreshDaily(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  if(event?.cron==='*/30 * * * *'){const job=syncPendingFeedback(env).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
 export default {fetch:(request,env)=>handle(request,env),scheduled};

@@ -61,7 +61,7 @@ function placeInk(root){const nav=root.querySelector('.dl-filters'),on=nav?.quer
 export async function mountDaily(main,{api,locale,esc,toast,isCurrent=()=>true,lookup,openSettings}){
  let data=null,filter='all',cat=(()=>{try{return localStorage.getItem('megulit-daily-cat')==='acg'?'acg':'gal';}catch{return 'gal';}})();
  const paint=()=>{main.innerHTML=pageHTML(data,{locale,esc,filter,cat});bind();requestAnimationFrame(()=>{placeInk(main);main.querySelector('.dl')?.classList.add('dl-ready');});};
- const load=async(spin)=>{if(spin)main.querySelector('[data-dl-refresh]')?.classList.add('dl-spin');try{data=await api('daily_view');}catch{data={state:'error'};}if(isCurrent())paint();};
+ const load=async(spin)=>{if(spin)main.querySelector('[data-dl-refresh]')?.classList.add('dl-spin');try{data=await api('daily_view',spin?{force:true}:{});}catch{data={state:'error'};}if(isCurrent())paint();};
  function bind(){
   main.querySelectorAll('[data-dl-refresh]').forEach(b=>b.onclick=()=>load(true));
   bindOpen(main);

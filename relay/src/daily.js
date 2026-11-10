@@ -89,21 +89,25 @@ export async function refreshWords(env,now=new Date(),fetcher=fetch){
  await save(env,'hotwords',dayKey(now),{words,source},now);return words.length;
 }
 export async function refreshDaily(env,now=new Date(),fetcher=fetch){const [news,words]=await Promise.all([refreshNews(env,now,fetcher).catch(()=>0),refreshWords(env,now,fetcher).catch(()=>0)]);const images=env.BUCKET?await cleanupImages(env,now).catch(()=>0):0;return {news,words,removed:images};}
-const STALE=3*3600e3;
-async function cached(env,kind,now,refresh){
+/* E415 (user: the sites publish once a day; refresh when I open it): the cron runs once a day; besides that the first
+   request of a new Japan day fetches inline, and the page's refresh button (?refresh=1) refetches at most every
+   FORCE_GAP so a busy page cannot hammer the source sites. */
+export const FORCE_GAP=10*60e3;
+async function cached(env,kind,now,refresh,force=false){
  let row=await load(env,kind,'');
- /* first request after deploy (or a missed cron): fetch inline once */
- if(!row||now.getTime()-Date.parse(row.updatedAt)>STALE*2){await refresh(env,now).catch(()=>0);row=await load(env,kind,'')||row;}
+ const age=row?now.getTime()-Date.parse(row.updatedAt):Infinity,stale=!row||dayKey(new Date(Date.parse(row.updatedAt)))!==dayKey(now);
+ if(stale||force&&age>FORCE_GAP){await refresh(env,now).catch(()=>0);row=await load(env,kind,'')||row;}
  return row;
 }
+const forced=url=>url?.searchParams?.get('refresh')==='1';
 /* E415 full text only for sources the maintainer may republish: wrangler.toml NEWS_FULLTEXT_SOURCES = "moepedia,…"
    (empty by default). Empty → the app fetches the article on the user's PC instead. */
 export const fulltextSources=env=>new Set(String(env.NEWS_FULLTEXT_SOURCES||'').split(',').map(s=>s.trim()).filter(Boolean));
 const NOINDEX={'x-robots-tag':'noindex, nofollow'};
-export async function newsGet(env,{json},now=new Date()){const row=await cached(env,'news',now,refreshNews),allow=fulltextSources(env);return json({items:(row?.items||[]).map(n=>({...n,fulltext:allow.has(n.sourceId)})),sources:row?.sources||NEWS_FEEDS.map(f=>({id:f.id,name:f.name})),updatedAt:row?.updatedAt||null},200,{'cache-control':'public, max-age=600',...NOINDEX});}
+export async function newsGet(env,{json},now=new Date(),url=null){const row=await cached(env,'news',now,refreshNews,forced(url)),allow=fulltextSources(env);return json({items:(row?.items||[]).map(n=>({...n,fulltext:allow.has(n.sourceId)})),sources:row?.sources||NEWS_FEEDS.map(f=>({id:f.id,name:f.name})),updatedAt:row?.updatedAt||null},200,{'cache-control':'public, max-age=600',...NOINDEX});}
 export async function hotWordsDailyGet(env,url,{json,fail},now=new Date()){
  const day=url.searchParams.get('day')||'';if(day&&!/^\d{4}-\d{2}-\d{2}$/.test(day))return fail('INVALID_DAY',400);
- const row=day?await load(env,'hotwords',day):await cached(env,'hotwords',now,refreshWords);
+ const row=day?await load(env,'hotwords',day):await cached(env,'hotwords',now,refreshWords,forced(url));
  return json({day:day||dayKey(now),words:row?.words||[],source:row?.source||'',updatedAt:row?.updatedAt||null},200,{'cache-control':'public, max-age=600'});
 }
 

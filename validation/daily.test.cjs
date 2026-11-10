@@ -36,8 +36,8 @@ test('relay routes: /api/news and /api/hotwords/daily fetch once when empty, cro
   const news=await (await handle(req('/api/news'),e)).json();assert.equal(news.items.length,3);assert.ok(news.updatedAt);assert.equal(news.items[0].source,'電ファミニコゲーマー');
   const words=await (await handle(req('/api/hotwords/daily'),e)).json();assert.equal(words.words.length,3);
   assert.equal((await handle(req('/api/hotwords/daily?day=bad'),e)).status,400);
-  assert.deepEqual(await scheduled({cron:'20 */2 * * *',scheduledTime:Date.now()},e,null),{news:3,words:3,removed:0});
-  assert.match(fs.readFileSync(path.join(relayDir,'wrangler.toml'),'utf8'),/"20 \*\/2 \* \* \*"/);
+  assert.deepEqual(await scheduled({cron:'20 21 * * *',scheduledTime:Date.now()},e,null),{news:3,words:3,removed:0});
+  assert.match(fs.readFileSync(path.join(relayDir,'wrangler.toml'),'utf8'),/"20 21 \* \* \*"/);
  }finally{globalThis.fetch=real;}
 });
 test('bridge: not-configured without relay, cleans data, dictionary readings only for exact headwords, link gate',async()=>{
@@ -201,4 +201,18 @@ test('Microsoft hint: the reader learns which engine answered (also from cache);
  const page=await import(pathToFileURL(path.join(__dirname,'..','web','daily-view.js')).href);
  const esc=s=>String(s);const html=page.pageHTML({state:'ok',news:{items:[{title:'G',link:'https://a/1',source:'A',cat:'gal'},{title:'C',link:'https://a/2',source:'B',cat:'acg'}]},words:{words:[]}},{locale:'zh',esc,cat:'acg'});
  assert.match(html,/data-dl-cat="acg" aria-selected="true"/);assert.match(html,/<h2>C<\/h2>/);assert.doesNotMatch(html,/<h2>G<\/h2>/);
+});
+
+test('refresh: once a day on its own, on the first request of a new Japan day, and on demand at most every 10 minutes',async()=>{
+ const d=await load('daily.js');const e={DB:d1()};let calls=0;const f=async u=>{if(u.startsWith('https://trends.google.com'))calls++;return fetcher(FEEDS)(u);};
+ const real=globalThis.fetch;globalThis.fetch=f;
+ try{
+  const t=iso=>new Date(iso),u=q=>new URL('https://x/api/hotwords/daily'+q),io={json:v=>v,fail:c=>c};
+  await d.hotWordsDailyGet(e,u(''),io,t('2026-11-11T00:00:00Z'));assert.equal(calls,1,'empty cache fetches');
+  await d.hotWordsDailyGet(e,u(''),io,t('2026-11-11T10:00:00Z'));assert.equal(calls,1,'same Japan day: cached');
+  await d.hotWordsDailyGet(e,u('?refresh=1'),io,t('2026-11-11T10:05:00Z'));assert.equal(calls,2,'refresh button');
+  await d.hotWordsDailyGet(e,u('?refresh=1'),io,t('2026-11-11T10:08:00Z'));assert.equal(calls,2,'not twice within 10 minutes');
+  await d.hotWordsDailyGet(e,u(''),io,t('2026-11-11T15:30:00Z'));assert.equal(calls,3,'a new Japan day (00:30 JST) fetches on open');
+ }finally{globalThis.fetch=real;}
+ const src=fs.readFileSync(path.join(__dirname,'..','web','daily-view.js'),'utf8');assert.match(src,/api\('daily_view',spin\?\{force:true\}:\{\}\)/);
 });

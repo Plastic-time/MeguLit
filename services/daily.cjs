@@ -57,7 +57,8 @@ async function translateList(root,runtime,list,goal,options={}){
 async function view(root,db,options={}){
  const base=relay.relayBase(root,options.env||process.env);if(!base)return {state:'not-configured',news:null,words:null};
  const fetcher=options.fetch||fetch;
- const [n,w]=await Promise.all([get(base+'/api/news',fetcher),get(base+'/api/hotwords/daily',fetcher)]);
+ /* force: the page's refresh button asks the relay to fetch the sources again */
+ const q=options.force?'?refresh=1':'',[n,w]=await Promise.all([get(base+'/api/news'+q,fetcher),get(base+'/api/hotwords/daily'+q,fetcher)]);
  const news=n.state==='ok'?cleanNews(n.data):null,/* thumbnails come from the relay's R2 copy and reach the page as data: URLs (the app CSP allows no remote images) */
 words=w.state==='ok'?cleanWords(w.data,db):null;
  const state=!news&&!words?'error':!(news?.items.length)&&!(words?.words.length)?'empty':'ok';
