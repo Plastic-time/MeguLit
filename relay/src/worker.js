@@ -3,10 +3,13 @@
    opt-in leaderboard. Deploy steps: relay/README.md. Bindings: DB (D1), BUCKET (R2). Secrets: GITHUB_TOKEN,
    LINK_SECRET (HMAC key for download links), optional HASH_SALT and DIAG_TOKEN. Vars: GITHUB_REPO, LINK_DAYS,
    ALLOWED_ORIGINS. Nothing here trusts the client: every body is size-capped and validated (validate.js). */
-import {LIMITS,validateLeaderboard,validateBoardQuery,validateAdaptationRecord,validateKeys,validateMeta,issueBody,INSTALL_ID,HEX64} from './validate.js';
+import {LIMITS,validateLeaderboard,validateBoardQuery,validateAdaptationRecord,validateKeys,validateMeta,issueBody,validateHot,INSTALL_ID,HEX64} from './validate.js';
+/* E379 accounts (relay/ACCOUNTS.md) and community features (avatars, hot words) */
+import {handleAccounts,isAccountsPath,authenticate} from './accounts.js';
+import {avatarUpload,avatarDelete,avatarGet,avatarReport,avatarsFor,avatarStatus,hotStatements,hotWordsGet,settleDue} from './community.js';
 
 /* requests per window; key prefix → [limit, seconds] */
-export const RATE={ip:[120,60],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[5,3600],'diag-dl':[30,3600]};
+export const RATE={ip:[120,60],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[5,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60]};
 const encoder=new TextEncoder();
 const hex=buffer=>[...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');
 export async function sha256(value){return hex(await crypto.subtle.digest('SHA-256',typeof value==='string'?encoder.encode(value):value));}
@@ -32,6 +35,12 @@ export async function hit(env,kind,subject,now=Date.now()){
  return (row?.count??1)<=limit;
 }
 async function clientKey(request,env){return (await sha256((env.HASH_SALT||'megulit-relay')+':'+(request.headers.get('cf-connecting-ip')||'unknown'))).slice(0,32);}
+/* Leaderboard identity: a logged-in account (one row across PCs) or else the install id; only hashes are stored. */
+export async function subjects(request,env,installId,now){
+ const auth=env.DB&&request.headers.get('authorization')?await authenticate(request,env,now).catch(()=>null):null;
+ const account=auth?await sha256('account:'+auth.account.id):'',install=INSTALL_ID.test(String(installId||''))?await sha256(installId):'';
+ return {primary:account||install,account,install,auth};
+}
 async function readJSON(request,max=LIMITS.body){
  const length=Number(request.headers.get('content-length')||0);if(length>max)return {error:'PAYLOAD_TOO_LARGE'};
  const text=await request.text();if(text.length>max)return {error:'PAYLOAD_TOO_LARGE'};
@@ -44,14 +53,18 @@ export async function leaderboardPost(request,env,ip,now=new Date()){
  if(!await hit(env,'lb-post',ip,now.getTime()))return fail('RATE_LIMITED',429);
  const body=await readJSON(request);if(body.error)return fail(body.error,body.error==='PAYLOAD_TOO_LARGE'?413:400);
  const checked=validateLeaderboard(body.value,now);if(!checked.ok)return fail(checked.error);
- const {id,name,keys,stats,games}=checked.value,idHash=await sha256(id),t=Math.floor(now.getTime()/1000);
+ const hot=validateHot(body.value.hot,now);if(!hot.ok)return fail(hot.error);
+ const {id,name,keys,stats,games}=checked.value,who=await subjects(request,env,id,now),idHash=who.primary,t=Math.floor(now.getTime()/1000);
  if(!await hit(env,'lb-id',idHash,now.getTime()))return fail('RATE_LIMITED',429);
  const statements=[env.DB.prepare('INSERT INTO leaderboard_users(id_hash,name,share_games,created_at,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(id_hash) DO UPDATE SET name=excluded.name,share_games=excluded.share_games,updated_at=excluded.updated_at').bind(idHash,name,games?1:0,t,t)];
  for(const period of ['week','month','all']){const s=stats[period];statements.push(env.DB.prepare('INSERT INTO leaderboard_stats(id_hash,period,period_key,characters,seconds,words,streak,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id_hash,period,period_key) DO UPDATE SET characters=excluded.characters,seconds=excluded.seconds,words=excluded.words,streak=excluded.streak,updated_at=excluded.updated_at').bind(idHash,period,keys[period],s.characters,s.seconds,s.words,s.streak,t));}
  statements.push(env.DB.prepare('DELETE FROM leaderboard_games WHERE id_hash=?').bind(idHash));
  for(const g of games||[])statements.push(env.DB.prepare('INSERT INTO leaderboard_games(id_hash,game_key,title,characters,seconds,updated_at) VALUES(?,?,?,?,?,?)').bind(idHash,g.key,g.title,g.characters,g.seconds,t));
+ statements.push(...hotStatements(env,idHash,hot.value,now));
+ /* a PC that just logged in: fold its old install-id row into the account row */
+ if(who.account&&who.install&&who.install!==who.account)for(const table of ['leaderboard_stats','leaderboard_games','leaderboard_users','hot_lookups'])statements.push(env.DB.prepare(`DELETE FROM ${table} WHERE id_hash=?`).bind(who.install));
  await env.DB.batch(statements);
- return json({ok:true});
+ return json({ok:true,account:!!who.account});
 }
 export async function leaderboardGet(url,env,ip,now=new Date()){
  if(!await hit(env,'lb-get',ip,now.getTime()))return fail('RATE_LIMITED',429);
@@ -74,14 +87,18 @@ export async function leaderboardGet(url,env,ip,now=new Date()){
   if(q.me){const r=await env.DB.prepare(`SELECT ${col} value FROM leaderboard_stats WHERE period=? AND period_key=? AND id_hash=?`).bind(q.period,q.key,q.me).first();if(r&&r.value>0)mine={value:r.value,rank:1+((await env.DB.prepare(`SELECT COUNT(*) n FROM leaderboard_stats WHERE period=? AND period_key=? AND ${col}>?`).bind(q.period,q.key,r.value).first())?.n||0)};}
  }
  /* rank = 1 + number of strictly better values, so ties share a rank; id hashes never leave the server */
- let rank=0,prev=null;const entries=rows.map((r,i)=>{if(r.value!==prev){rank=i+1;prev=r.value;}return {rank,name:r.name,value:r.value,me:!!q.me&&r.id_hash===q.me};});
+ const avatars=await avatarsFor(env,rows.map(r=>r.id_hash));
+ let rank=0,prev=null;const entries=rows.map((r,i)=>{if(r.value!==prev){rank=i+1;prev=r.value;}return {rank,name:r.name,value:r.value,me:!!q.me&&r.id_hash===q.me,avatar:avatars.get(r.id_hash)||null};});
  return json({entries,total,me:mine});
 }
-export async function leaderboardDelete(url,env,ip,now=new Date()){
+export async function leaderboardDelete(request,url,env,ip,now=new Date()){
  if(!await hit(env,'lb-post',ip,now.getTime()))return fail('RATE_LIMITED',429);
  const id=url.searchParams.get('id')||'';if(!INSTALL_ID.test(id))return fail('INVALID_ID');
- const idHash=await sha256(id);
- await env.DB.batch(['leaderboard_stats','leaderboard_games','leaderboard_users'].map(table=>env.DB.prepare(`DELETE FROM ${table} WHERE id_hash=?`).bind(idHash)));
+ return removeSubjects(env,[...new Set([(await subjects(request,env,id,now)).account,await sha256(id)])].filter(Boolean));
+}
+export async function removeSubjects(env,hashes){
+ await avatarDelete(env,hashes);
+ await env.DB.batch(hashes.flatMap(h=>['leaderboard_stats','leaderboard_games','leaderboard_users','hot_lookups'].map(table=>env.DB.prepare(`DELETE FROM ${table} WHERE id_hash=?`).bind(h))));
  return json({ok:true});
 }
 
@@ -164,7 +181,16 @@ export async function handle(request,env,now=new Date()){
  try{
   if(!await hit(env,'ip',ip,now.getTime()))response=fail('RATE_LIMITED',429);
   else if(path==='/api/health'&&request.method==='GET')response=json({ok:true,service:'megulit-relay'});
-  else if(path==='/api/leaderboard')response=request.method==='POST'?await leaderboardPost(request,env,ip,now):request.method==='GET'?await leaderboardGet(url,env,ip,now):request.method==='DELETE'?await leaderboardDelete(url,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/leaderboard')response=request.method==='POST'?await leaderboardPost(request,env,ip,now):request.method==='GET'?await leaderboardGet(url,env,ip,now):request.method==='DELETE'?await leaderboardDelete(request,url,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
+  else if(path==='/api/leaderboard/avatar'){const who=await subjects(request,env,url.searchParams.get('id'),now);
+   if(request.method==='GET')response=await avatarStatus(env,who.primary);
+   else if(!await hit(env,'avatar',who.primary||ip,now.getTime()))response=fail('RATE_LIMITED',429);
+   else response=request.method==='POST'?await avatarUpload(request,env,who.primary,now):request.method==='DELETE'?await avatarDelete(env,[who.primary]):fail('METHOD_NOT_ALLOWED',405);}
+  else if(/^\/api\/avatar\/[0-9a-f]{32}$/.test(path)&&request.method==='GET')response=await hit(env,'avatar-get',ip,now.getTime())?await avatarGet(env,path.split('/').pop()):fail('RATE_LIMITED',429);
+  else if(/^\/api\/avatar\/[0-9a-f]{32}\/report$/.test(path)&&request.method==='POST'){const who=await subjects(request,env,url.searchParams.get('id'),now);response=await hit(env,'report',who.primary||ip,now.getTime())?await avatarReport(env,path.split('/')[3],who.primary||'ip:'+ip,now):fail('RATE_LIMITED',429);}
+  else if(path==='/api/hotwords'&&request.method==='GET')response=await hit(env,'hot',ip,now.getTime())?await hotWordsGet(url,env):fail('RATE_LIMITED',429);
+  else if(path==='/api/me'&&request.method==='DELETE'){const auth=await authenticate(request,env,now).catch(()=>null);response=await handleAccounts(request,env,now);if(auth&&response.ok)await removeSubjects(env,[await sha256('account:'+auth.account.id)]);}
+  else if(isAccountsPath(path))response=await handleAccounts(request,env,now)||fail('NOT_FOUND',404);
   else if(path==='/api/adaptation')response=request.method==='POST'?await adaptationPost(request,env,ip,now):request.method==='GET'?await adaptationGet(url,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/adaptation/query')response=request.method==='POST'?await adaptationQuery(request,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/diagnostics')response=request.method==='POST'?await diagnosticsPost(request,env,ip,url,now):fail('METHOD_NOT_ALLOWED',405);
@@ -174,4 +200,6 @@ export async function handle(request,env,now=new Date()){
  for(const[k,v]of Object.entries(cors))response.headers.set(k,v);
  return response;
 }
-export default {fetch:(request,env)=>handle(request,env)};
+/* Cron (wrangler.toml [triggers]): Monday 00:00 UTC+8 settles last week's hot words. */
+export async function scheduled(event,env,ctx){const job=settleDue(env,new Date(event?.scheduledTime||Date.now()));if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
+export default {fetch:(request,env)=>handle(request,env),scheduled};

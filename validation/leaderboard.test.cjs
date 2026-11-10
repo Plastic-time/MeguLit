@@ -70,7 +70,7 @@ test('opt-in needs consent and a clean nickname; only totals are uploaded; games
  assert.equal(view.submit.state,'ok');assert.equal(view.board.entries[0].me,true);
  const post=sent.find(r=>r.method==='POST');
  assert.equal(post.url,'https://relay.test/api/leaderboard');
- assert.deepEqual(Object.keys(post.body).sort(),['id','keys','name','stats','version']);
+ assert.deepEqual(Object.keys(post.body).sort(),['hot','id','keys','name','stats','version']);assert.deepEqual(post.body.hot,{week:'2026-W46',terms:[]},'no lookups recorded');
  assert.deepEqual(post.body.stats.week,{characters:1510,seconds:910,words:1,streak:2});
  assert.equal(post.body.name,'めぐみん');assert.ok(!JSON.stringify(post.body).includes(os.hostname()),'no machine names');
  const get=sent.find(r=>r.method==='GET');assert.match(get.url,/period=week&metric=characters&key=2026-W46&me=[0-9a-f]{64}$/);
@@ -113,7 +113,7 @@ test('nickname rules match the relay; fetch output is sanitized',async t=>{
  assert.equal(lb.cleanName('  爆裂  魔法  ').name,'爆裂 魔法');assert.equal(lb.cleanName('grape lover').ok,true);
  const {root}=fixture(t);lb.join(root,{name:'Kazuma',consent:true});
  const res=await lb.fetch('all','streak',{root,env:BASE_ENV,fetch:async()=>new Response(JSON.stringify({entries:[{rank:'1',name:'x'.repeat(50),value:-5,me:'yes',extra:1}],total:3}))});
- assert.deepEqual(res.entries,[{rank:1,name:'x'.repeat(32),value:0,me:false}]);
+ assert.deepEqual(res.entries,[{rank:1,name:'x'.repeat(32),value:0,me:false,avatar:null}]);
  assert.deepEqual(await lb.fetch('week','characters',{root,env:BASE_ENV,fetch:async()=>new Response('{"ok":false,"error":"RATE_LIMITED"}',{status:429})}),{state:'error',error:'RATE_LIMITED'});
  await assert.rejects(()=>lb.fetch('year','characters',{root,env:BASE_ENV}),/LEADERBOARD_INVALID_QUERY/);
 });
@@ -133,4 +133,60 @@ test('top tab 排行榜 sits between 学习 and 工具 and the page renders the 
  assert.doesNotMatch(board,/<img>|<x>/);assert.match(board,/is-me/);
  for(const locale of ['zh','ja','en'])assert.deepEqual(Object.keys(view.leaderboardWords(locale)).sort(),Object.keys(view.leaderboardWords('zh')).sort(),locale);
  assert.equal(view.formatValue('seconds',3660,'zh'),'1 小时 1 分钟');
+});
+
+/* ---- E379 ---------------------------------------------------------------------------------------------------- */
+test('weekly lookups: UTC+8 Monday boundary, Japanese terms only, term + count only in the upload',async t=>{
+ const {root,db}=fixture(t);
+ const ins=db.prepare('INSERT INTO lookup_events(surface,occurred_at,original) VALUES(?,?,?)');
+ const s=d=>Math.floor(new Date(d).getTime()/1000);
+ for(const [surface,when]of [['仕方ない','2026-11-09T01:00:00Z'],['仕方ない','2026-11-10T01:00:00Z'],['ｼｶﾀﾅｲ','2026-11-10T01:00:00Z'],['  気をつけて ','2026-11-10T02:00:00Z'],['hello','2026-11-10T02:00:00Z'],['先週','2026-11-08T15:59:00Z'],['今週','2026-11-08T16:00:00Z']])ins.run(surface,s(when),'{}');
+ const now=new Date('2026-11-10T12:00:00Z'),hot=lb.collectLookups(db,now);
+ assert.equal(hot.week,'2026-W46');
+ assert.deepEqual(hot.terms[0],{term:'仕方ない',count:2});
+ assert.ok(!hot.terms.some(x=>x.term==='hello'||x.term==='先週'));
+ assert.deepEqual(hot.terms.map(x=>x.term).sort(),['シカタナイ','今週','仕方ない','気をつけて'].sort());
+ lb.join(root,{name:'Kazuma',consent:true});const sent=[];
+ await lb.submit(lb.collectStats(db,now),{root,env:BASE_ENV,account:null,now,fetch:async(u,i)=>{sent.push(JSON.parse(i.body));return new Response('{"ok":true}');}});
+ assert.equal(sent[0].hot.week,'2026-W46');for(const x of sent[0].hot.terms)assert.deepEqual(Object.keys(x).sort(),['count','term']);
+ const relayValidate=await import(pathToFileURL(path.join(__dirname,'..','relay','src','validate.js')).href);
+ for(const term of ['仕方ない','ｼｶﾀﾅｲ','hello','a\b語','x`語','<b>語','語'.repeat(41)])assert.equal(lb.cleanTerm(term),relayValidate.cleanTerm(term),term);
+ assert.equal(lb.hotWeekKey(now),relayValidate.hotWeekKey(now));
+});
+
+test('account identity: bearer token sent, me = sha256(account:id), rotated token saved',async t=>{
+ const {root,db}=fixture(t);lb.join(root,{name:'Kazuma',consent:true});
+ const saved=[],account={accountId:'acc9',token:()=>'mgl_'+'B'.repeat(43),save:x=>saved.push(x)},seen=[];
+ const fetch=async(url,init)=>{seen.push({url,auth:init.headers.authorization});return new Response('{"ok":true,"entries":[]}',{headers:{'x-megulit-token':'mgl_'+'C'.repeat(43)}});};
+ await lb.view(root,db,{},{env:BASE_ENV,fetch,account,now:NOW});
+ assert.equal(seen[0].auth,'Bearer mgl_'+'B'.repeat(43),'POST carries the session');assert.equal(seen[1].auth,undefined,'public reads do not');
+ assert.match(seen[1].url,new RegExp('me='+lb.publicHash('account:acc9')));
+ assert.deepEqual(saved,['mgl_'+'C'.repeat(43)]);
+ assert.equal(lb.config(root,BASE_ENV,{account:null}).me,lb.publicHash(lb.config(root,BASE_ENV,{account:null}).installId));
+});
+
+test('avatars: only small WebP goes up; pictures come back as cached data URLs; reports',async t=>{
+ const {root}=fixture(t);lb.join(root,{name:'Kazuma',consent:true});
+ await assert.rejects(lb.setAvatar(root,Buffer.from('GIF89a'.padEnd(40,'x')).toString('base64'),{env:BASE_ENV,account:null}),/LEADERBOARD_AVATAR_INVALID/);
+ const webp=Buffer.alloc(40);webp.write('RIFF',0,'latin1');webp.writeUInt32LE(32,4);webp.write('WEBP',8,'latin1');webp.write('VP8L',12,'latin1');
+ const sent=[];const fetch=async(url,init)=>{sent.push({url,method:init.method,type:init.headers['content-type'],size:init.body?.length});
+  if(url.includes('/api/leaderboard/avatar'))return new Response(JSON.stringify({ok:true,status:'rejected',reason:'NSFW',avatar:null}));
+  if(url.includes('/report'))return new Response('{"ok":true,"hidden":true}');
+  return new Response(webp);};
+ const r=await lb.setAvatar(root,'data:image/webp;base64,'+webp.toString('base64'),{env:BASE_ENV,account:null,fetch});
+ assert.deepEqual(r,{state:'ok',status:'rejected',reason:'NSFW'});assert.equal(sent[0].type,'image/webp');assert.equal(sent[0].size,40);
+ const id='a'.repeat(32),images=await lb.avatarImages(root,[id,'not-an-id',id],{env:BASE_ENV,fetch});
+ assert.deepEqual(Object.keys(images),[id]);assert.match(images[id],/^data:image\/webp;base64,/);
+ const again=await lb.avatarImages(root,[id],{env:BASE_ENV,fetch:async()=>{throw Error('cached, no fetch');}});assert.equal(again[id],images[id]);
+ const notWebp=await lb.avatarImages(root,['b'.repeat(32)],{env:BASE_ENV,fetch:async()=>new Response('<html>')});assert.deepEqual(notWebp,{});
+ assert.deepEqual(await lb.report(root,id,{env:BASE_ENV,account:null,fetch}),{state:'ok',hidden:true});
+ await assert.rejects(lb.report(root,'../x',{env:BASE_ENV}),/LEADERBOARD_INVALID_QUERY/);
+ assert.deepEqual(await lb.avatarStatus(fixture(t).root,{env:NO_ENV}),{state:'not-configured',status:'none'});
+});
+
+test('name filter also blocks R18 and abuse words on both sides',async()=>{
+ const relayValidate=await import(pathToFileURL(path.join(__dirname,'..','relay','src','validate.js')).href);
+ for(const name of ['hentai王','R18大好き','エロ魔法使い','巨乳控','智障一号','nmsl','ロリコン','ヘンタイ紳士'])assert.equal(lb.cleanName(name).error,'NAME_BLOCKED',name);
+ for(const name of ['ゆんゆん','Aqua','ダクネス','爆裂道'])assert.equal(lb.cleanName(name).ok,true,name);
+ assert.deepEqual(relayValidate.BLOCKED,lb.BLOCKED);
 });

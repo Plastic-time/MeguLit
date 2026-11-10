@@ -6,6 +6,9 @@ Settings → 账号 (`web/account-ui.js`). Nothing is deployed by this branch.
 
 ## Wiring into the relay router
 
+Done in E379 (feature/leaderboard-relay): `worker.js` routes accounts paths, uses `authenticate` for the leaderboard
+identity, and `DELETE /api/me` also removes the account's leaderboard rows and avatar. Original instructions, kept for reference:
+
 `relay/src/worker.js` (leaderboard branch) owns the router; this branch does not edit it. After the merge, add two lines:
 
 ```js
