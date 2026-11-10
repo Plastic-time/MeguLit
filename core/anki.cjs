@@ -1,7 +1,7 @@
 'use strict';
 const {createHash}=require('node:crypto'),{cleanV4}=require('./v4-config.cjs');
 const fields=['Word','Pitch','PartOfSpeech','Meaning','Sentence','Audio'];
-const extraFields=['SentenceFurigana','SentenceTranslation','SentenceAudio','Screenshot','WordReading'];
+const extraFields=['SentenceFurigana','SentenceTranslation','SentenceAudio','Screenshot','WordReading','Game','TranslationSource'];
 const CIRCLED='⓪①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
 // Answer-side reading rule (user, 2026-11-09): words with kanji get their reading in hiragana on its own line;
 // kana-only words need none. Dictionary readings may arrive in katakana.
@@ -21,7 +21,7 @@ const BACK=`<div class="tm-card">
 {{#WordReading}}<div class="tm-reading">{{WordReading}}<sup class="tm-pitch">{{Pitch}}</sup></div>{{/WordReading}}
 <div class="tm-mean">{{#PartOfSpeech}}<span class="tm-pos">[{{PartOfSpeech}}]</span>{{/PartOfSpeech}}{{Meaning}}</div></div>
 {{#Sentence}}<div class="tm-sec"><div class="tm-ex"><span class="tm-tag">[例]</span><span class="tm-jp">{{#SentenceFurigana}}{{SentenceFurigana}}{{/SentenceFurigana}}{{^SentenceFurigana}}{{Sentence}}{{/SentenceFurigana}}</span><span class="tm-play">{{SentenceAudio}}</span></div>
-{{#SentenceTranslation}}<div class="tm-tr"><span class="tm-tag">[訳]</span>{{SentenceTranslation}}</div>{{/SentenceTranslation}}</div>{{/Sentence}}
+{{#SentenceTranslation}}<div class="tm-tr"><span class="tm-tag">[訳]</span>{{SentenceTranslation}}</div>{{/SentenceTranslation}}{{#Game}}<div class="tm-src">{{Game}}{{#TranslationSource}} · {{TranslationSource}}{{/TranslationSource}}</div>{{/Game}}</div>{{/Sentence}}
 {{#Screenshot}}<div class="tm-sec tm-shot">{{Screenshot}}</div>{{/Screenshot}}
 </div>`;
 const CSS=`.card{font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Source Han Serif",serif;font-size:22px;text-align:left;color:#222;background:#fafafa}
@@ -43,6 +43,7 @@ const CSS=`.card{font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",
 .tm-tag{color:#8c8c8c;margin-right:4px;white-space:nowrap}
 .tm-tr{color:#8c8c8c;font-size:21px;line-height:1.7;margin:0 0 6px}
 .tm-hl{color:#f0883e;font-weight:600}
+.tm-src{color:#8c8c8c;font-size:15px;text-align:right;margin-top:4px}
 ruby rt{font-size:.5em;opacity:.85}
 .tm-shot img{display:block;max-width:100%;height:auto;margin:0 auto;border-radius:6px}
 .tm-hl rt{color:#f0883e}
@@ -89,7 +90,7 @@ class Anki{
  async save(word,c,audio,id,extra={}){const {available,owned}=await this.prepareModel(c);await this.call(c,'createDeck',{deck:c.ankiDeck});
   const quote=s=>'"'+s.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"',tag='tomoyo::'+id,found=await this.call(c,'findNotes',{query:'tag:'+tag+' deck:'+quote(c.ankiDeck)+' note:'+quote(c.ankiModel)});if(found.length>1)throw Error('找到多个同步词条，请先在 Anki 中消除重复笔记');
   const values={Word:html(word.base||word.surface),Pitch:circled(word.pitch),PartOfSpeech:html(word.pos),Meaning:html(word.meaning),Sentence:html(word.sentence),Audio:''};
-  if(available.includes('SentenceFurigana'))values.SentenceFurigana=extra.sentenceHtml||'';if(available.includes('SentenceTranslation'))values.SentenceTranslation=html(extra.translation||'');if(available.includes('SentenceAudio'))values.SentenceAudio='';
+  if(available.includes('SentenceFurigana'))values.SentenceFurigana=extra.sentenceHtml||'';if(available.includes('SentenceTranslation'))values.SentenceTranslation=html(extra.translation||'');{/* sentence card: game title and where the translation came from (human first) */const f=require('../services/learning-insights.cjs').ankiSentenceFields({translation:extra.translation,translationSource:extra.translationSource,gameTitle:extra.gameTitle},available);if('Game' in f)values.Game=html(f.Game);if('TranslationSource' in f)values.TranslationSource=html(f.TranslationSource);}if(available.includes('SentenceAudio'))values.SentenceAudio='';
   if(available.includes('Screenshot'))values.Screenshot='';
   // E215.6 (user): the answer shows the word's reading under the word, as common decks do.
   if(available.includes('WordReading'))values.WordReading=html(answerReading(word.base||word.surface,word.reading));
@@ -98,7 +99,7 @@ class Anki{
   // The game's own voice for the line when it was recorded, otherwise the synthesized sentence.
   if(extra.sentenceAudio&&available.includes('SentenceAudio')){const name=(extra.gameAudio?'tomoyo_g_':'tomoyo_s_')+createHash('sha256').update(extra.sentenceAudio.data).digest('hex').slice(0,16)+'.wav';await this.call(c,'storeMediaFile',{filename:name,data:extra.sentenceAudio.data});values.SentenceAudio=audioField(name,owned);}
   if(audio){const filename='tomoyo_'+id+'_'+createHash('sha256').update(audio.data).digest('hex').slice(0,12)+'.wav';await this.call(c,'storeMediaFile',{filename,data:audio.data});values.Audio=audioField(filename,owned);}
-  if(found.length){if(!audio)delete values.Audio;if(!extra.sentenceAudio)delete values.SentenceAudio;if(!extra.screenshot)delete values.Screenshot;if(!extra.translation)delete values.SentenceTranslation;await this.call(c,'updateNoteFields',{note:{id:found[0],fields:values}});return {id:found[0],updated:true,screenshotAttached:!!extra.screenshot&&available.includes('Screenshot')};}
+  if(found.length){if(!audio)delete values.Audio;if(!extra.sentenceAudio)delete values.SentenceAudio;if(!extra.screenshot)delete values.Screenshot;if(!extra.translation){delete values.SentenceTranslation;delete values.TranslationSource;}if(!extra.gameTitle)delete values.Game;await this.call(c,'updateNoteFields',{note:{id:found[0],fields:values}});return {id:found[0],updated:true,screenshotAttached:!!extra.screenshot&&available.includes('Screenshot')};}
   const note=await this.call(c,'addNote',{note:{deckName:c.ankiDeck,modelName:c.ankiModel,fields:values,options:{allowDuplicate:false},tags:['tomoyo_megumin',tag]}});if(!note)throw Error('Anki 未创建笔记');return {id:note,updated:false,screenshotAttached:!!extra.screenshot&&available.includes('Screenshot')};
  }
 }

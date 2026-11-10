@@ -38,7 +38,7 @@ function createReadingResolver(file=require('node:path').join(require('./paths.c
           const reading=choose(merged,pron,true);if(reading){best={surface:merged,reading};stop=j;}
         }
       }
-      if(best){result.push({...token,...best});i=stop;continue;}
+      if(best){result.push({...token,...best,readingSource:'dictionary'});i=stop;continue;}
       if(!hasKanji(surface)){result.push(token);continue;}
       let reading=choose(surface,expected);
       if(!reading&&typeof token.base_form==='string'){
@@ -51,7 +51,8 @@ function createReadingResolver(file=require('node:path').join(require('./paths.c
       }
       // Unknown names keep their supplied reading; an unresolved pronunciation
       // long mark on kanji is omitted instead of inventing う/お/い spellings.
-      result.push({...token,reading:reading||(String(expected).includes('ー')?'':expected)});
+      /* readingSource tells a dictionary reading from the tokenizer's own guess (sentence cards drop the guess). */
+      result.push({...token,reading:reading||(String(expected).includes('ー')?'':expected),readingSource:reading?'dictionary':'tokenizer'});
     }
     return result;
   }

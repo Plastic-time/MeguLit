@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 const path=require('node:path'),{openStore,readJSON}=require('./store.cjs'),nativeDefaults=require('./native-defaults.cjs');
 const preferences=root=>({...nativeDefaults,...readJSON(path.join(root,'data/config/native-preferences.json'))});
-function recordLookup(root,{surface,gameId=null,operationId}){if(!surface||surface.length>100)return;const prefs=preferences(root),db=openStore(root);try{db.prepare('INSERT OR IGNORE INTO lookup_events(game_id,surface,occurred_at,operation_id,original) VALUES(?,?,?,?,?)').run(gameId,surface,Math.floor(Date.now()/1000),operationId,JSON.stringify({trackUnknown:prefs.track_unknown_words!==false}));}finally{db.close();}}
+function recordLookup(root,{surface,gameId=null,operationId,sentence='',translation='',translationSource=''}){if(!surface||surface.length>100)return;const prefs=preferences(root),db=openStore(root);try{db.prepare('INSERT OR IGNORE INTO lookup_events(game_id,surface,occurred_at,operation_id,original) VALUES(?,?,?,?,?)').run(gameId,surface,Math.floor(Date.now()/1000),operationId,JSON.stringify({trackUnknown:prefs.track_unknown_words!==false,...(sentence?{sentence:String(sentence).slice(0,1000),translation:String(translation||'').slice(0,1000),translationSource}:{})}));}finally{db.close();}}
 function unknownWords(root){const prefs=preferences(root);if(prefs.track_unknown_words===false)return[];const db=openStore(root);try{return db.prepare(`
  WITH lookups AS(SELECT surface,COUNT(*) lookups,MAX(occurred_at) lastLookup FROM lookup_events WHERE COALESCE(json_extract(original,'$.trackUnknown'),1)=1 GROUP BY surface),
  words AS(SELECT spelling,MAX(status) status FROM vocabulary GROUP BY spelling)
