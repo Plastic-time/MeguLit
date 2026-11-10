@@ -89,9 +89,8 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
   // "camera" that drifts and gives a small push, shake or twist on the drum hits. The pointer scatters tokens and
   // springs pull them back. Randomness comes from a seed so the two layers that show lyrics show the same shot.
   const JA_FONT = '"Noto Serif JP","Yu Mincho","Hiragino Mincho ProN","MeguLit Serif",serif';
-  const EN_FONT = '"MeguLit Lyric","Playfair Display",Georgia,serif';
   const HUD_FONT = '"MeguLit Mono",ui-monospace,Consolas,monospace';
-  try { document.fonts?.load('italic 500 40px "MeguLit Lyric"'); document.fonts?.load('300 12px "MeguLit Mono"'); } catch {}
+  try { document.fonts?.load('300 12px "MeguLit Mono"'); } catch {}
   const INK = { red: ['#e0505c', '#a51d2d'], gold: ['#f0c36a', '#9a6a12'], white: ['#f4f1ea', '#3a1a1e'] };
   const GLOW = { red: 'rgba(224,80,92,.6)', gold: 'rgba(240,195,106,.55)', white: 'rgba(244,241,234,.5)' };
   const BLENDS_DARK = ['source-over', 'source-over', 'source-over', 'screen'];
@@ -103,8 +102,11 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
 
   // one token rendered once (with its blur and glow) to an offscreen canvas
   function tokenSprite(t) {
-    const font = t.hud ? `300 ${t.size}px ${HUD_FONT}` : t.en ? `italic 500 ${t.size * 1.08}px ${EN_FONT}` : `700 ${t.size}px ${JA_FONT}`;
+    const font = t.hud || t.en ? `300 ${t.size}px ${HUD_FONT}` : `700 ${t.size}px ${JA_FONT}`;
+    const track = t.en ? '.32em' : t.hud ? '.3em' : '0px';
+    if (t.en) t.text = t.text.toLowerCase();
     measurer.font = font;
+    try { measurer.letterSpacing = track; } catch {}
     const tw = Math.max(t.size * .5, measurer.measureText(t.text).width), pad = Math.ceil(t.blur * 2.5 + t.size * .3);
     const w = Math.ceil(tw + pad * 2), h = Math.ceil(t.size * 1.5 + pad * 2);
     const c = document.createElement('canvas'), dprS = Math.min(devicePixelRatio || 1, 2);
@@ -112,7 +114,8 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
     const g = c.getContext('2d');
     g.scale(dprS, dprS);
     g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle';
-    if (t.hud) { g.fillStyle = dark ? '#8a8a8a' : '#6b6b6b'; try { g.letterSpacing = '.3em'; } catch {} }
+    try { g.letterSpacing = track; } catch {}
+    if (t.hud) g.fillStyle = dark ? '#8a8a8a' : '#6b6b6b';
     else {
       g.fillStyle = INK[t.ink][dark ? 0 : 1];
       g.filter = t.blur > .3 ? `blur(${t.blur}px)` : 'none';
@@ -139,7 +142,12 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
     text = String(text || '').trim();
     if (!text) return;
     const r = rng(seed >>> 0);
-    const toks = tokenize(text).slice(0, 48);
+    let toks = tokenize(text).slice(0, 48);
+    // the empty margins beside the page's content column: English words play there when they are wide enough
+    const col = document.querySelector('.statement .wrap, .sec .wrap')?.getBoundingClientRect();
+    const margin = col ? Math.max(0, Math.min(col.left, W - col.right) - 16) : 0;
+    const enSide = margin >= 130 ? toks.filter(t => t.en) : [];
+    if (enSide.length) toks = toks.filter(t => !t.en).filter((t, i, a) => !(t.space && (i === 0 || a[i - 1].space)));
     const real = toks.filter(t => !t.space);
     // orderly paths: the line keeps a clear reading shape; the randomness lives in the details, not the layout
     const shapes = real.length <= 12 && H > 420 ? ['row', 'row', 'arc', 'column', 'stair'] : ['row', 'row', 'row', 'arc', 'stair'];
@@ -149,7 +157,7 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
     const lineInk = pickOf(r, ['red', 'gold', 'white']);       // one colour per line
     // tokens: size, colour, blur, blend, tilt are each random per token
     for (const t of real) {
-      t.size = Math.round(base * (.86 + r() * .3) * (t.en ? .85 : 1));
+      t.size = Math.round(base * (.86 + r() * .3) * (t.en ? .62 : 1));
       t.ink = lineInk;
       t.blur = pickOf(r, BLURS);
       t.alpha = .3 + r() * .5;                                     // random opacity per token: .3–.8
@@ -182,6 +190,20 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
       words.push({ ...t, hx: x, hy: y, x: x + Math.cos(from) * dist, y: y + Math.sin(from) * dist, vx: 0, vy: 0, rot: rot + (r() - .5) * .3, hrot: rot, vr: 0,
         zoom: 1.25 + r() * .35, pop: 1, born: now + k * (40 + r() * 50), out: now + 9000, exitDir: r() * Math.PI * 2 });
     });
+    // English words: stacked in one side margin, each one fitted to the margin's width, read top to bottom
+    if (enSide.length) {
+      const right = r() < .5, mx = right ? W - margin / 2 - 8 : margin / 2 + 8;
+      let y = H * (.18 + r() * .3);
+      enSide.forEach((t, k) => {
+        t.size = Math.round(base * (.5 + r() * .25)); t.ink = lineInk; t.blur = pickOf(r, BLURS); t.alpha = .4 + r() * .45; t.blend = pickOf(r, blends); t.tilt = 0;
+        t.spr = tokenSprite(t);
+        if (t.spr.tw > margin * .86) { t.size = Math.max(9, Math.floor(t.size * margin * .86 / t.spr.tw)); t.spr = tokenSprite(t); }
+        const from = right ? 0 : Math.PI;
+        words.push({ ...t, hx: mx, hy: y, x: mx + Math.cos(from) * 60, y, vx: 0, vy: 0, rot: 0, hrot: 0, vr: 0, zoom: 1.15, pop: 1,
+          born: now + 200 + k * 90, out: now + 9000, exitDir: from });
+        y += t.size * 1.9;
+      });
+    }
     if (hud) {
       const [t0, x0, y0] = place[0] || [null, W * .1, H * .3];
       const h = { text: hud, hud: true, size: 11, blur: 0 }; h.spr = tokenSprite(h);

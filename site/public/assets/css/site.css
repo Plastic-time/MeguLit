@@ -1605,7 +1605,6 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 .sound-ctl.floating:hover .np-line, .sound-ctl.floating:focus-within .np-line { -webkit-line-clamp: 2; }
 .sound-ctl.floating .np { cursor: default; }
 @media (max-width: 40rem) { .sound-ctl.floating .np, .sound-ctl.floating .np.has-lyrics { width: min(13rem, 58vw); } }
-@font-face { font-family: "MeguLit Lyric"; src: url("/assets/fonts/lyric-italic.woff2?v=3767be11d8") format("woff2"); font-style: italic; font-weight: 500; font-display: swap; }
 
 /* ---- now-playing label, final layout: equaliser in a narrow left column, everything else lined up in the right one;
    down the page it is one strip that opens in place on hover/focus, with every part sliding and fading, not popping -- */
