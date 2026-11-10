@@ -49,19 +49,21 @@ from fontTools.varLib import instancer
 src = Path(os.environ.get('WINDIR', 'C:/Windows')) / 'Fonts' / 'NotoSerifSC-VF.ttf'
 if not src.exists():
     sys.exit(f'missing {src}: install Noto Serif SC (OFL) or point WINDIR elsewhere')
-# Characters in serif text only: headings and the translated lines, in all three languages (keys in i18n.js and the
-# data-i texts in the pages). Body text uses system fonts, and release notes fall back to installed serifs.
-SERIF_KEY = re.compile(r'(^|\.)(t|title|tr|notes|req|smart|alt|tested)$')
+# Every character the pages can show, in all three languages: the text of the pages themselves, every string in the
+# scripts (i18n.js holds Japanese and English, the others hold dynamic text) and the song data. Subsetting only the
+# headings left body lines in the serif mixing in the visitor's own system font wherever a character was missing.
+# Release notes come from the data snapshots; notes published later may add a character or two, which then falls back.
 text = 'MeguLit v0123456789'
-for key, value in re.findall(r"'([a-z0-9.]+)': '((?:[^'\\]|\\.)*)'", (PUB / 'assets' / 'js' / 'i18n.js').read_text('utf8')):
-    if SERIF_KEY.search(key):
-        text += value
 for html in PUB.glob('*.html'):
-    for key, value in re.findall(r'data-i="([a-z0-9.]+)"[^>]*>([^<]*)<', html.read_text('utf8')):
-        if SERIF_KEY.search(key):
-            text += value
-    for value in re.findall(r'<h[1-4][^>]*>(.*?)</h[1-4]>', html.read_text('utf8'), re.S):
-        text += re.sub(r'<[^>]+>', '', value)
+    page = html.read_text('utf8')
+    page = re.sub(r'<script[^>]*>.*?</script>|<style[^>]*>.*?</style>', '', page, flags=re.S)
+    text += re.sub(r'<[^>]+>', ' ', page)
+for js in (PUB / 'assets' / 'js').glob('*.js'):
+    # the whole file: its strings plus a few extra characters from comments, which costs little
+    text += ''.join(re.findall(r'[　-ヿ㐀-鿿＀-￯]', js.read_text('utf8')))
+# release notes: the snapshots shipped with the site (their headings are set in the serif)
+for data in [*(PUB / 'data').glob('*.json'), *(PUB / 'assets' / 'audio').glob('*.json')]:
+    text += data.read_text('utf8')
 chars = set(text) | set(chr(c) for c in range(0x20, 0x7f)) | set('、。，．・「」『』（）！？〜ー…—–　')
 chars.update(chr(c) for c in range(0x3041, 0x3097))  # hiragana
 chars.update(chr(c) for c in range(0x30a1, 0x30fb))  # katakana
