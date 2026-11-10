@@ -1,3 +1,4 @@
+process.env.MEGULIT_RELAY_BASE??='off';/* tests never reach the real relay */
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* E379 relay community features: avatar moderation (fail closed), reports, account identity, weekly hot-word privacy
    threshold, settlement and the podium split on the page. Worker runs against a node:sqlite D1 stand-in. */

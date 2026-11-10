@@ -1,4 +1,5 @@
 'use strict';
+process.env.MEGULIT_RELAY_BASE??='off';/* tests never reach the real relay */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {openStore}=require('../services/store.cjs'),diag=require('../services/diagnostics.cjs');
 /* E362 adaptation overview + diagnostic package */

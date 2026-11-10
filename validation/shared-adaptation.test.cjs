@@ -1,3 +1,4 @@
+process.env.MEGULIT_RELAY_BASE??='off';/* tests never reach the real relay */
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto');

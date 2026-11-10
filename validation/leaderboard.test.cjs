@@ -1,9 +1,10 @@
+process.env.MEGULIT_RELAY_BASE??='off';/* tests never reach the real relay */
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* E377 client side of the opt-in leaderboard: local aggregation, opt-in / opt-out, the not-configured state, the shared
    relay address, nickname rules shared with the relay, and the top tab. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
 const lb=require('../services/leaderboard.cjs'),relay=require('../services/relay-config.cjs'),{SCHEMA}=require('../services/store.cjs'),{Settings}=require('../services/settings.cjs');
-const NO_ENV={},BASE_ENV={MEGULIT_RELAY_BASE:'https://relay.test'};
+const NO_ENV={MEGULIT_RELAY_BASE:'off'},BASE_ENV={MEGULIT_RELAY_BASE:'https://relay.test'};
 function fixture(t){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-lb-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const db=new DatabaseSync(':memory:');db.exec(SCHEMA);t.after(()=>db.close());return {root,db};
@@ -35,7 +36,8 @@ test('collectStats sums week / month / all time, words and streaks from local re
 
 test('relay address: env, then Settings, then the built-in default; https only except localhost',t=>{
  const {root}=fixture(t);
- assert.equal(relay.DEFAULT_RELAY_BASE,'','no relay until the domain exists');
+ assert.equal(relay.DEFAULT_RELAY_BASE,'https://api.megulit.com');
+ assert.equal(relay.relayBase(root,{}),'https://api.megulit.com');
  assert.equal(relay.relayBase(root,NO_ENV),'');
  assert.equal(relay.relayBase(root,{MEGULIT_RELAY_BASE:'https://r.example/'}),'https://r.example');
  for(const bad of ['http://r.example','https://u:p@r.example','https://r.example/?a=1','ftp://r.example','not a url'])assert.equal(relay.normalizeBase(bad),'',bad);

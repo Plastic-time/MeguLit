@@ -1,3 +1,4 @@
+process.env.MEGULIT_RELAY_BASE??='off';/* tests never reach the real relay */
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* E378 accounts + cloud sync: relay/src/accounts.js on a node:sqlite D1 stand-in, services/account.cjs against it. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
@@ -145,7 +146,7 @@ async function signIn(dev,r,email='megumin@example.com'){await dev.a.requestCode
 
 test('client: not configured / logged out stays local; login keeps the token in the vault file, not in profile.json',async t=>{
  const r=relay(),clock={now:T0.getTime()},dev=device(t,r,clock);
- const plain=new account.Account(dev.root,{env:{},vault:(a,v)=>v});
+ const plain=new account.Account(dev.root,{env:{MEGULIT_RELAY_BASE:'off'},vault:(a,v)=>v});
  const s0=plain.status();assert.equal(s0.configured,false);assert.equal(s0.loggedIn,false);
  await assert.rejects(()=>plain.requestCode('a@example.com'),/RELAY_NOT_CONFIGURED/);
  await assert.rejects(()=>dev.a.sync(),/NOT_LOGGED_IN/);

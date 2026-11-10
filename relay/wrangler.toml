@@ -5,10 +5,10 @@ main = "src/worker.js"
 compatibility_date = "2026-10-01"
 workers_dev = false
 
-# Custom domain: replace relay.example.com with the real host (its zone must be on this Cloudflare account).
+# Custom domain: replace api.megulit.com with the real host (its zone must be on this Cloudflare account).
 # Top-level key: keep it above the first [table] below.
 routes = [
-  { pattern = "relay.example.com", custom_domain = true }
+  { pattern = "api.megulit.com", custom_domain = true }
 ]
 
 [vars]
@@ -33,7 +33,7 @@ crons = ["0 16 * * SUN"]
 [[d1_databases]]
 binding = "DB"
 database_name = "megulit-relay"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "03e277c6-6923-4dd3-9e41-287a3d35bbea"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
