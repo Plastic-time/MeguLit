@@ -109,7 +109,12 @@ function separatePlan(gameDir,source,info){
 
 async function plan(gameDir,source){
  gameDir=path.resolve(String(gameDir||''));if(readManifest(gameDir))throw Error('ALREADY_IMPORTED');
- const info=await sourceRoot(gameDir,source),{root,staged}=info;if(!root)return {separate:separatePlan(gameDir,source,info)};const theirs=walk(root),ours=walk(gameDir);
+ const info=await sourceRoot(gameDir,source),{root,staged}=info;
+ /* E409: Steam Saya + the 2003 Japanese script.pak: port the Japanese script into this build's script.npk instead */
+ const saya=require('./saya-script-port.cjs').detect(gameDir,info.base);if(saya)return {gameDir,port:saya};
+ /* E409 (user 2026-11-11): Steam Saya is never switched to the old saya.exe; only the script port is offered */
+ if(!root&&require('./saya-script-port.cjs').steamArchive(gameDir))throw Error('IMPORT_SAYA_NEEDS_PAK');
+ if(!root)return {separate:separatePlan(gameDir,source,info)};const theirs=walk(root),ours=walk(gameDir);
  const mine=new Map(ours.map(r=>[r.toLowerCase(),r])),them=new Set(theirs.map(r=>r.toLowerCase()));
  const replace=[],add=[],remove=[];let addedBytes=0;
  for(const rel of theirs){const target=mine.get(rel.toLowerCase()),from=path.join(root,rel);
@@ -123,6 +128,7 @@ async function plan(gameDir,source){
 async function preview(gameDir,source){
  const p=await plan(gameDir,source),list=a=>a.map(({file,size})=>({file,size}));
  if(p.separate?.installer){const s=p.separate;if(!fs.existsSync(s.iso))await require('./disc-image.cjs').toIso(s.from,s.iso);return {state:'installer',iso:s.iso};}
+ if(p.port){const r=require('./saya-script-port.cjs').build(fs.readFileSync(p.port.steam),fs.readFileSync(p.port.pak)).report;return {state:'port',textLines:r.textLines,matched:r.matched,rate:r.rate,joined:r.joined,cut:r.originalUnused.length,unmatched:r.unmatched.slice(0,50)};}
  if(p.separate)return {state:'separate',exe:p.separate.exe,target:p.separate.target,copy:p.separate.move};
  return {state:'preview',root:p.root,replace:list(p.replace),add:list(p.add),remove:list(p.remove),exe:p.exe,changes:p.replace.length+p.add.length+p.remove.length};}
 
@@ -131,6 +137,7 @@ async function place(from,to,staged){await fsp.mkdir(path.dirname(to),{recursive
 async function apply(gameDir,source,previousExe=''){
  const p=await plan(gameDir,source);
  if(p.separate?.installer)throw Error('IMPORT_DISC_INSTALLER');
+ if(p.port)return applyPort(p.gameDir,p.port,previousExe);
  if(p.separate){const s=p.separate;
   if(s.cab){await fsp.mkdir(s.target,{recursive:true});try{await require('./installshield.cjs').extract(s.cab,s.target);}catch(error){await fsp.rm(s.target,{recursive:true,force:true});throw /^IMPORT_/.test(error?.message)?error:Object.assign(Error('IMPORT_INSTALLER_UNSUPPORTED'),{detail:String(error?.message||error).slice(0,300)});}await fsp.rm(path.join(path.resolve(gameDir),STAGING_DIR),{recursive:true,force:true});}
   else if(s.move){try{await fsp.rename(s.root,s.target);}catch{await fsp.cp(s.root,s.target,{recursive:true});}await fsp.rm(path.join(path.resolve(gameDir),STAGING_DIR),{recursive:true,force:true});}
@@ -150,6 +157,23 @@ async function apply(gameDir,source,previousExe=''){
  await fsp.rm(path.join(p.gameDir,STAGING_DIR),{recursive:true,force:true});
  return {imported:done.length,replaced:p.replace.length,added:p.add.length,removed:p.remove.length,exe:p.exe?path.join(p.gameDir,p.exe):''};}
 
+/* E409 The new script.npk is built in memory and checked before anything moves; the old one goes to the backup folder
+   (the same manifest as other imports, so restore() puts it back), with the alignment report beside it. */
+async function applyPort(gameDir,port,previousExe){
+ const original=fs.readFileSync(port.steam),originalSha=crypto.createHash('sha256').update(original).digest('hex');
+ const built=require('./saya-script-port.cjs').build(original,fs.readFileSync(port.pak));
+ const file=path.relative(gameDir,port.steam),backup=path.join(gameDir,BACKUP_DIR,'files'),keep=path.join(backup,file),tmp=port.steam+'.megulit-new';
+ await fsp.mkdir(path.dirname(keep),{recursive:true});await fsp.writeFile(tmp,built.buffer);
+ /* the backup must hold the exact original before the game file is touched */
+ await fsp.copyFile(port.steam,keep+'.check');try{if(await hashFile(keep+'.check')!==originalSha)throw Error('IMPORT_BACKUP_MISMATCH');}finally{await fsp.rm(keep+'.check',{force:true});}
+ try{await fsp.rename(port.steam,keep);try{await fsp.rename(tmp,port.steam);}catch(error){await fsp.rename(keep,port.steam);throw error;}}
+ catch(error){await fsp.rm(tmp,{force:true});await fsp.rm(path.join(gameDir,BACKUP_DIR),{recursive:true,force:true});throw error;}
+ const s=stat(port.steam),{unmatched,originalUnused,...summary}=built.report;
+ fs.writeFileSync(path.join(gameDir,BACKUP_DIR,'saya-port-report.json'),JSON.stringify({...summary,unmatched,originalUnused},null,1));
+ fs.writeFileSync(manifestPath(gameDir),JSON.stringify({version:1,adapter:ADAPTER,kind:'saya-port',at:new Date().toISOString(),exe:'',previousExe:path.basename(String(previousExe||'')),files:[{file,kind:'replace',size:s.size,mtime:s.mtimeMs,originalSha256:originalSha}]},null,1));
+ await fsp.rm(path.join(gameDir,STAGING_DIR),{recursive:true,force:true});
+ return {port:true,imported:1,replaced:1,added:0,removed:0,exe:'',rate:summary.rate,textLines:summary.textLines,matched:summary.matched,cut:originalUnused.length};}
+
 // Files changed after the import (a game update, another tool) are left alone and reported.
 function restore(gameDir){
  gameDir=path.resolve(String(gameDir||''));const m=readManifest(gameDir);if(!m||m.adapter!==ADAPTER)throw Error('NOT_APPLIED');
@@ -159,6 +183,8 @@ function restore(gameDir){
   if(!ours||(e.kind!=='add'&&!stat(keep))){skipped.push(e.file);continue;}
   if(e.kind!=='remove')fs.rmSync(target,{force:true});
   if(e.kind!=='add')fs.renameSync(keep,target);
+  /* E409: a file whose original hash was recorded must come back byte for byte */
+  if(e.originalSha256&&crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex')!==e.originalSha256)throw Error('RESTORE_HASH_MISMATCH');
   restored++;}
  if(!skipped.length)fs.rmSync(path.join(gameDir,BACKUP_DIR),{recursive:true,force:true});
  return {restored,skipped,exe:m.previousExe?path.join(gameDir,m.previousExe):''};}
