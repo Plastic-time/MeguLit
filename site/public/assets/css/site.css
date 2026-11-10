@@ -1803,3 +1803,29 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
   .sound-ctl .np .sc-frame { max-height: 0; opacity: 0; margin-top: 0; }
   .sound-ctl.open .np .sc-frame { max-height: 20px; opacity: 1; margin-top: .6rem; }
 }
+
+/* ---- player panel, round 3: wider, no empty gap, our controls first; SoundCloud's own bar is a slim source strip at
+   the bottom (left as SoundCloud draws it), separated by a rule; the credit sits right above it ------------------------ */
+.np, .np.has-lyrics { width: min(24rem, 86vw); padding: .85rem 1rem .75rem; }
+.np-title { font-size: .9375rem; }
+.np.has-lyrics .np-lyric { height: auto; min-height: 1.5em; max-height: 3em; margin-top: .4rem; }
+.np-line { position: relative; inset: auto; }
+.np-lyric .np-line.out { position: absolute; inset: 0; }
+.np-ctl { margin-top: .7rem; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 1rem; }
+.np-btns { gap: .6rem; }
+.np-bar { gap: .5rem; }
+.np-switches { margin-top: .7rem; }
+.np-credit { margin-top: .7rem; padding-top: .65rem; font-size: .6875rem; }
+.np-src { grid-column: 1 / -1; margin-top: .6rem; padding-top: .6rem; border-top: 1px solid rgba(244, 244, 242, .1); }
+.np .np-src .sc-frame { margin: 0; height: 20px; opacity: .92; transition: opacity .2s; }
+.np .np-src .sc-frame:hover { opacity: 1; }
+/* compact strip: the source strip folds away with the other extras */
+.sound-ctl.floating .np-src { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; padding-top: 0; border-top-color: transparent; transition: max-height .38s, opacity .25s, margin .38s, padding .38s; }
+.sound-ctl.floating:hover .np-src, .sound-ctl.floating:focus-within .np-src { max-height: 3rem; opacity: 1; margin-top: .6rem; padding-top: .6rem; border-top-color: rgba(244, 244, 242, .1); }
+.sound-ctl.floating .np .sc-frame { max-height: none; opacity: .92; margin: 0; }
+@media (max-width: 40rem) {
+  .sound-ctl .np-src { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; padding-top: 0; border-top-color: transparent; }
+  .sound-ctl.open .np-src { max-height: 3rem; opacity: 1; margin-top: .6rem; padding-top: .6rem; border-top-color: rgba(244, 244, 242, .1); }
+  .sound-ctl .np .sc-frame, .sound-ctl.open .np .sc-frame { max-height: none; opacity: .92; margin: 0; }
+  .np-ctl { grid-template-columns: minmax(0, 1fr); row-gap: .5rem; }
+}

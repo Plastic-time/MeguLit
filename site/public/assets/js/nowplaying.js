@@ -81,8 +81,8 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
     + '<div class="np-bar"><span class="np-now">00:00</span><input class="np-seek" type="range" min="0" max="1000" value="0"><span class="np-dur">--:--</span></div></div>'
     + '<p class="np-switches"><button type="button" class="np-sw" data-sw="lyrics"></button><button type="button" class="np-sw" data-sw="bg"></button></p><p class="np-credit"></p>';
   host.append(box);
-  // SoundCloud's own mini player sits in the label, below the controls
-  if (audio.frame) box.querySelector('.np-switches').before(audio.frame);
+  // SoundCloud's own mini player is the label's last row: the source of the music, left exactly as SoundCloud draws it
+  if (audio.frame) { const src = document.createElement('div'); src.className = 'np-src'; src.append(audio.frame); box.append(src); }
   const $ = s => box.querySelector(s);
   const title = $('.np-title'), artist = $('.np-artist'), lyric = $('.np-lyric'), credit = $('.np-credit');
   const playBtn = $('.np-play'), seek = $('.np-seek'), nowEl = $('.np-now'), durEl = $('.np-dur');
