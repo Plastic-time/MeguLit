@@ -4,17 +4,26 @@
 // game; after the last line the headline comes back. Lines are written as text with {漢字|かんじ} for ruby.
 
 const LINES = {
-  zh: ['又卡在生词上了？', '别切出去查词典了，点一下就行', '「{好|す}き」——这回看懂了吧', '读过的词它都记着，下次就认识了', '……好啦，剧情还在等你呢'],
-  ja: ['また知らない単語で止まった？', '辞書はもういいよ。クリックひとつで', '「{好|す}き」——今度は読めたでしょ', '読んだ言葉は、ちゃんと覚えておくから', '……ほら、物語の続きが待ってるよ'],
-  en: ['Stuck on a word again?', 'Skip the dictionary. Just click it', '「{好|す}き」 — you can read that now, right?', 'Every word you read, it remembers', '…Okay. The story’s waiting for you'],
+  zh: ['又卡在生词上了？', '别切出去查词典了，\n点一下就行', '「[[{好|す}き]]」……不认识也没关系，\n点一下看看', '读过的词它都记着，\n下次就认识了', '接下来，\n往下看看它还能做什么'],
+  ja: ['また知らない単語で止まった？', '辞書はもういいよ。\nクリックひとつで', '「[[{好|す}き]]」……読めなくても大丈夫、\n押してみて', '読んだ言葉は、\nちゃんと覚えておくから', '次は、\nほかにできることも見ていって'],
+  en: ['Stuck on a word again?', 'Skip the dictionary.\nJust click it', '「[[{好|す}き]]」… can’t read it? That’s fine.\nGive it a click', 'Every word you read,\nit remembers', 'Next up —\nsee what else it can do'],
+};
+// the word in [[...]] can be clicked: a small lookup card opens beside it, as MeguLit's own does in a game
+const CARD = {
+  zh: { pos: '形容动词', mean: '喜欢；喜爱', ex: 'エクスプロージョンが、一番好き！', exT: '最喜欢的，果然还是爆裂魔法！', hint: '点我', note: '在游戏里也是这样，点一下就有' },
+  ja: { pos: '形容動詞', mean: '心がひかれる。気に入っている', ex: 'エクスプロージョンが、一番好き！', exT: '爆裂魔法こそ、至高にして最強', hint: '押して', note: 'ゲームの中でも、これと同じ' },
+  en: { pos: 'na-adjective', mean: 'liked; fond of', ex: 'エクスプロージョンが、一番好き！', exT: 'Explosion magic is the best. Obviously.', hint: 'click me', note: 'It works just like this inside the game' },
 };
 const NEXT = { zh: '点击继续', ja: 'クリックで次へ', en: 'click to continue' };
 
 // "{読|よ}み" -> pieces: a ruby group or a single character, each typed as one step
 const pieces = line => {
   const out = [];
-  for (const m of line.matchAll(/\{([^|}]+)\|([^}]+)\}|./gsu)) {
+  for (const m of line.matchAll(/\[\[(.+?)\]\]|\{([^|}]+)\|([^}]+)\}|./gsu)) {
+    if (m[1]) { const w = document.createElement('span'); w.className = 'ht-word'; w.tabIndex = 0; w.setAttribute('role', 'button'); w.append(...pieces(m[1])); out.push(w); continue; }
+    m[1] = m[2]; m[2] = m[3];
     if (m[1]) { const r = document.createElement('ruby'); r.append(m[1]); const rt = document.createElement('rt'); rt.textContent = m[2]; r.append(rt); out.push(r); }
+    else if (m[0] === '\n') out.push(document.createElement('br'));
     else out.push(document.createTextNode(m[0]));
   }
   return out;
@@ -28,27 +37,65 @@ export function heroPlay(h1, { reduce = false } = {}) {
   btn.type = 'button'; btn.className = 'ht-next';
   btn.innerHTML = '<span class="ht-next-k"></span><i aria-hidden="true">▼</i>';
   h1.after(btn);
+  // the last line points down the page: an arrow that scrolls to the features
+  const down = document.createElement('a');
+  down.className = 'ht-down'; down.href = '#features'; down.hidden = true; down.setAttribute('aria-label', '↓');
+  down.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15m-6-6 6 6 6-6"/></svg>';
+  down.addEventListener('click', e => { e.preventDefault(); document.getElementById('features')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' }); });
+  btn.after(down);
   h1.classList.add('ht-play');
   const label = () => { btn.querySelector('.ht-next-k').textContent = NEXT[lang()] || NEXT.en; btn.setAttribute('aria-label', NEXT[lang()] || NEXT.en); };
   label();
-  const finish = () => { clearTimeout(timer); typing = false; const say = h1.querySelector('.ht-say'); if (say) say.append(...rest); rest = []; h1.classList.remove('typing'); };
+  const finish = () => {
+    clearTimeout(timer); typing = false; rest.forEach(n => n.classList?.remove('ht-hide')); rest = []; h1.classList.remove('typing');
+    const w = h1.querySelector('.ht-word');
+    if (w && !w.querySelector('.ht-hint')) { const h = document.createElement('span'); h.className = 'ht-hint'; h.textContent = (CARD[lang()] || CARD.en).hint; w.append(h); w.classList.add('ready'); }
+  };
   const advance = () => {
     if (typing) { finish(); return; }
+    card?.remove(); card = null;
     const lines = LINES[lang()] || LINES.en;
     idx = (idx + 1) % (lines.length + 1);
-    if (idx === 0) { h1.innerHTML = saved; h1.classList.remove('saying'); h1.style.removeProperty('min-height'); return; }
+    if (idx === 0) { down.hidden = true; h1.innerHTML = saved; h1.classList.remove('saying'); h1.style.removeProperty('min-height'); return; }
     if (!h1.classList.contains('saying')) h1.style.setProperty('min-height', `${h1.offsetHeight}px`);
     h1.classList.add('saying');
     const say = document.createElement('span'); say.className = 'ht-say'; say.lang = lang() === 'en' ? 'en' : 'ja';
     h1.replaceChildren(say);
-    rest = pieces(lines[idx - 1]);
+    // the whole line is laid out first, every piece hidden, then shown one by one: its lines never move while it types
+    rest = pieces(lines[idx - 1]).map(n => { if (n.nodeType === 3) { const sp = document.createElement('span'); sp.append(n); n = sp; } if (n.tagName !== 'BR') n.classList.add('ht-hide'); return n; });
+    say.append(...rest);
+    rest = rest.filter(n => n.tagName !== 'BR');
+    down.hidden = idx !== lines.length;
     if (reduce) { finish(); return; }
     typing = true; h1.classList.add('typing');
-    const step = () => { if (!rest.length) { finish(); return; } say.append(rest.shift()); timer = setTimeout(step, 55); };
+    const step = () => { if (!rest.length) { finish(); return; } rest.shift().classList.remove('ht-hide'); timer = setTimeout(step, 55); };
     step();
   };
-  h1.addEventListener('click', e => { if (!e.target.closest('a, button')) advance(); });
-  btn.addEventListener('click', advance);
+  // the lookup card
+  let card = null;
+  const closeCard = () => { card?.remove(); card = null; h1.querySelector('.ht-word')?.classList.remove('on'); };
+  const openCard = w => {
+    const c = CARD[lang()] || CARD.en;
+    card = document.createElement('span'); card.className = 'ht-card'; card.setAttribute('role', 'dialog');
+    card.innerHTML = '<span class="hc-head"><b lang="ja">好き</b><i lang="ja">すき</i><em></em></span><span class="hc-mean"></span><span class="hc-ex"><span lang="ja"></span><small></small></span><span class="hc-note"></span>';
+    card.querySelector('em').textContent = c.pos; card.querySelector('.hc-mean').textContent = c.mean;
+    card.querySelector('.hc-ex span').textContent = c.ex; card.querySelector('.hc-ex small').textContent = c.exT; card.querySelector('.hc-note').textContent = c.note;
+    h1.append(card);
+    // under the word, kept inside the headline's width
+    const hr = h1.getBoundingClientRect(), wr = w.getBoundingClientRect();
+    const left = Math.max(0, Math.min(wr.left - hr.left, hr.width - card.offsetWidth));
+    card.style.setProperty('left', `${left}px`); card.style.setProperty('top', `${wr.bottom - hr.top + 8}px`);
+    w.classList.add('on');
+  };
+  h1.addEventListener('click', e => {
+    if (e.target.closest('a, button, .ht-card')) return;
+    const w = e.target.closest('.ht-word');
+    if (w && !typing) { if (card) closeCard(); else openCard(w); return; }
+    if (card) { closeCard(); return; }
+    advance();
+  });
+  h1.addEventListener('keydown', e => { const w = e.target.closest?.('.ht-word'); if (w && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); if (card) closeCard(); else openCard(w); } });
+  btn.addEventListener('click', () => { if (card) { card.remove(); card = null; return; } advance(); });
   // a language change puts the headline back in the new language
-  addEventListener('megulit:lang', () => { clearTimeout(timer); typing = false; rest = []; idx = 0; saved = h1.innerHTML; h1.classList.remove('saying', 'typing'); h1.style.removeProperty('min-height'); label(); });
+  addEventListener('megulit:lang', () => { card = null; down.hidden = true; clearTimeout(timer); typing = false; rest = []; idx = 0; saved = h1.innerHTML; h1.classList.remove('saying', 'typing'); h1.style.removeProperty('min-height'); label(); });
 }
