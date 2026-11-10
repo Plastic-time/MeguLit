@@ -1923,3 +1923,12 @@ html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
    controls do that job); a strong contrast turns its grey grounds black, which the screen blend makes clear glass */
 .sc-dock { padding: 6px 10px 6px 4px; background: none; border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .sc-dock .sc-frame { width: calc(100% - 6px) !important; margin-left: -25px; /* (narrow enough that SoundCloud shows its cloud alone, no wordmark) */ filter: grayscale(1) invert(1) brightness(1.15) contrast(1.6); opacity: .8; }
+
+/* the hero leads with the games: "Galgame" is set large in Megumin's red, a headline of its own above 学日语 */
+.hero .ht-pre { font-size: clamp(2.4rem, 6.6vw, 7.5rem) !important; line-height: 1; margin: 0 0 .1em -.02em; color: #f4f4f2 !important; letter-spacing: -.01em; }
+.ht-gal { font: italic 600 1.18em/1 "MeguLit Cormorant", "Cormorant Garamond", var(--serif); letter-spacing: -.01em; padding-right: .06em;
+  background: linear-gradient(180deg, #ff6f78 0%, #e0505c 45%, #a51d2d 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 .18em rgba(224, 80, 92, .45)); }
+:lang(ja) .ht-gal { font-family: "MeguLit Han", var(--serif-ja); font-style: normal; font-weight: 700; font-size: 1em; }
+:root[data-theme="light"] .hero .ht-pre { color: inherit !important; }
+@media (max-width: 40rem) { .hero .ht-pre { font-size: 12vw !important; } }
