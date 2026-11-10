@@ -112,6 +112,8 @@ async function plan(gameDir,source){
  const info=await sourceRoot(gameDir,source),{root,staged}=info;
  /* E409: Steam Saya + the 2003 Japanese script.pak: port the Japanese script into this build's script.npk instead */
  const saya=require('./saya-script-port.cjs').detect(gameDir,info.base);if(saya)return {gameDir,port:saya};
+ /* E409 (user 2026-11-11): Steam Saya is never switched to the old saya.exe; only the script port is offered */
+ if(!root&&require('./saya-script-port.cjs').steamArchive(gameDir))throw Error('IMPORT_SAYA_NEEDS_PAK');
  if(!root)return {separate:separatePlan(gameDir,source,info)};const theirs=walk(root),ours=walk(gameDir);
  const mine=new Map(ours.map(r=>[r.toLowerCase(),r])),them=new Set(theirs.map(r=>r.toLowerCase()));
  const replace=[],add=[],remove=[];let addedBytes=0;
@@ -158,14 +160,17 @@ async function apply(gameDir,source,previousExe=''){
 /* E409 The new script.npk is built in memory and checked before anything moves; the old one goes to the backup folder
    (the same manifest as other imports, so restore() puts it back), with the alignment report beside it. */
 async function applyPort(gameDir,port,previousExe){
- const built=require('./saya-script-port.cjs').build(fs.readFileSync(port.steam),fs.readFileSync(port.pak));
+ const original=fs.readFileSync(port.steam),originalSha=crypto.createHash('sha256').update(original).digest('hex');
+ const built=require('./saya-script-port.cjs').build(original,fs.readFileSync(port.pak));
  const file=path.relative(gameDir,port.steam),backup=path.join(gameDir,BACKUP_DIR,'files'),keep=path.join(backup,file),tmp=port.steam+'.megulit-new';
  await fsp.mkdir(path.dirname(keep),{recursive:true});await fsp.writeFile(tmp,built.buffer);
+ /* the backup must hold the exact original before the game file is touched */
+ await fsp.copyFile(port.steam,keep+'.check');try{if(await hashFile(keep+'.check')!==originalSha)throw Error('IMPORT_BACKUP_MISMATCH');}finally{await fsp.rm(keep+'.check',{force:true});}
  try{await fsp.rename(port.steam,keep);try{await fsp.rename(tmp,port.steam);}catch(error){await fsp.rename(keep,port.steam);throw error;}}
  catch(error){await fsp.rm(tmp,{force:true});await fsp.rm(path.join(gameDir,BACKUP_DIR),{recursive:true,force:true});throw error;}
  const s=stat(port.steam),{unmatched,originalUnused,...summary}=built.report;
  fs.writeFileSync(path.join(gameDir,BACKUP_DIR,'saya-port-report.json'),JSON.stringify({...summary,unmatched,originalUnused},null,1));
- fs.writeFileSync(manifestPath(gameDir),JSON.stringify({version:1,adapter:ADAPTER,kind:'saya-port',at:new Date().toISOString(),exe:'',previousExe:path.basename(String(previousExe||'')),files:[{file,kind:'replace',size:s.size,mtime:s.mtimeMs}]},null,1));
+ fs.writeFileSync(manifestPath(gameDir),JSON.stringify({version:1,adapter:ADAPTER,kind:'saya-port',at:new Date().toISOString(),exe:'',previousExe:path.basename(String(previousExe||'')),files:[{file,kind:'replace',size:s.size,mtime:s.mtimeMs,originalSha256:originalSha}]},null,1));
  await fsp.rm(path.join(gameDir,STAGING_DIR),{recursive:true,force:true});
  return {port:true,imported:1,replaced:1,added:0,removed:0,exe:'',rate:summary.rate,textLines:summary.textLines,matched:summary.matched,cut:originalUnused.length};}
 
@@ -178,6 +183,8 @@ function restore(gameDir){
   if(!ours||(e.kind!=='add'&&!stat(keep))){skipped.push(e.file);continue;}
   if(e.kind!=='remove')fs.rmSync(target,{force:true});
   if(e.kind!=='add')fs.renameSync(keep,target);
+  /* E409: a file whose original hash was recorded must come back byte for byte */
+  if(e.originalSha256&&crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex')!==e.originalSha256)throw Error('RESTORE_HASH_MISMATCH');
   restored++;}
  if(!skipped.length)fs.rmSync(path.join(gameDir,BACKUP_DIR),{recursive:true,force:true});
  return {restored,skipped,exe:m.previousExe?path.join(gameDir,m.previousExe):''};}

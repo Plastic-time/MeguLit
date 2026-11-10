@@ -67,6 +67,17 @@ test('import: Steam Saya + Japanese script.pak previews a port, applies with a b
  fs.rmSync(base,{recursive:true,force:true});
 });
 
+test('Steam Saya never falls back to the old saya.exe, and restore checks the original hash',async()=>{
+ const {base,game,jp}=fixture(),crypto=require('node:crypto'),sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+ const other=path.join(base,'empty');fs.mkdirSync(other);fs.writeFileSync(path.join(other,'saya.exe'),Buffer.alloc(30000));
+ await assert.rejects(jio.preview(game,other),/IMPORT_SAYA_NEEDS_PAK/);
+ const before=sha(fs.readFileSync(path.join(game,'script.npk')));await jio.apply(game,jp,'');
+ assert.equal(jio.readManifest(game).files[0].originalSha256,before);
+ fs.writeFileSync(path.join(game,'.megulit-japanese-import','files','script.npk'),'tampered');
+ assert.throws(()=>jio.restore(game),/RESTORE_HASH_MISMATCH/);
+ fs.rmSync(base,{recursive:true,force:true});
+});
+
 test('a different NPK2 game or a source without the SAYA pak is not ported',async()=>{
  const {base,game,jp}=fixture();
  fs.rmSync(path.join(jp,'script.pak'));fs.writeFileSync(path.join(jp,'script.pak'),npk.createPak({'script/x.txt':SJ('x')},'XXXX'));
