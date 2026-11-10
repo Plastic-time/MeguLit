@@ -1913,3 +1913,6 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 html.spec-on { scrollbar-width: none; }
 html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
 .spec-scroll { position: fixed; z-index: 70; top: 0; right: 0; width: 14px; height: 100vh; cursor: default; touch-action: none; }
+
+/* the line after each version's notes: small and grey */
+.notes-caveat { margin: 1.1rem 0 0; padding-top: .7rem; border-top: 1px dashed color-mix(in srgb, currentColor 18%, transparent); font-size: .75rem; line-height: 1.6; color: var(--muted, #8a8a8a); }
