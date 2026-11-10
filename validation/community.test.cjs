@@ -122,7 +122,7 @@ test('hot lookups: validation, privacy threshold, categories, ranking, frozen re
  const sentences=await (await handle(req('GET','/api/hotwords?category=sentence'),e,monday)).json();assert.deepEqual(sentences.awards.map(a=>a.term),['よろしくお願いします、先輩']);
  assert.deepEqual(words.weeks,['2026-W46']);
  assert.ok(![words,phrases,sentences].flatMap(x=>x.awards).some(a=>a.term==='先輩'||a.term==='ヘンタイ'),'under the threshold or blocked never shows');
- assert.equal(AIcalls[0].model,'@cf/meta/llama-3.1-8b-instruct');
+ assert.equal(AIcalls[0].model,'@cf/qwen/qwen3-30b-a3b-fp8');
  /* settling again is a no-op; results stay frozen */
  const {settleWeek}=await load('community.js');assert.equal((await settleWeek(e,'2026-W46',monday)).reason,'ALREADY_SETTLED');
  assert.equal((await handle(req('GET','/api/hotwords?category=nope'),e,monday)).status,400);
@@ -190,4 +190,13 @@ test('appeal: one click opens a GitHub issue with a private, expiring review lin
  const id2=uuid(8);await handle(req('POST','/api/leaderboard',join(id2)),e,NOW);await handle(req('POST','/api/leaderboard/avatar?id='+id2,webp(),{'content-type':'image/webp'}),e,NOW);
  const before=e.BUCKET.store.size;assert.equal(await cleanupAvatars(e,new Date(NOW.getTime()+29*86400000)),0);assert.equal(await cleanupAvatars(e,new Date(NOW.getTime()+31*86400000)),1);
  assert.equal(e.BUCKET.store.size,before-1);assert.equal(e.DB.raw.prepare("SELECT status FROM avatars WHERE id_hash=?").get(sha(id2)).status,'expired');
+});
+
+test('weekly hot-word reasons: a live model (llama-3.1-8b is retired) and Qwen 3 answers in every shape',async()=>{
+ const c=await load('community.js');assert.equal(c.HOT_MODEL,'@cf/qwen/qwen3-30b-a3b-fp8');
+ assert.match(fs.readFileSync(path.join(relayDir,'wrangler.toml'),'utf8'),/HOT_MODEL = "@cf\/qwen\/qwen3-30b-a3b-fp8"/);
+ const items=[{term:'先輩',rank:1,users:3,lookups:9}];
+ for(const answer of [{response:[{term:'先輩',reason:'学园剧里天天叫'}]},{response:'<think>x</think>[{"term":"先輩","reason":"学园剧里天天叫"}]'},{choices:[{message:{content:'[{"term":"先輩","reason":"学园剧里天天叫"}]'}}]}]){
+  const r=await c.aiReasons({AI:{run:async()=>answer}},'word',items);assert.equal(r.get('先輩').ai,true,JSON.stringify(answer));
+ }
 });

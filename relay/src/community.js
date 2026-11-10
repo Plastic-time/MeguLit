@@ -15,7 +15,8 @@
 import {validateAvatar,HOT,CATEGORIES,classifyTerm,blockedTerm,hotWeekKey,BLOCKED} from './validate.js';
 
 export const AVATAR_MODEL='@cf/meta/llama-3.2-11b-vision-instruct';
-export const HOT_MODEL='@cf/meta/llama-3.1-8b-instruct';
+/* E415: llama-3.1-8b-instruct was retired on 2026-05-30, so the weekly reasons use Qwen 3 */
+export const HOT_MODEL='@cf/qwen/qwen3-30b-a3b-fp8';
 const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff',...extra}});
 const fail=(error,status=400)=>json({ok:false,error},status);
 const sec=now=>Math.floor(now.getTime()/1000);
@@ -169,9 +170,11 @@ export async function aiReasons(env,category,items,games=new Map()){
  const label={word:'词汇',phrase:'短语',sentence:'短句'}[category];
  const lines=items.map(x=>{const g=games.get(x.term)||[];return `${x.rank}. ${x.term}（${x.users} 位读者查过 ${x.lookups} 次${g.length?'；查它的读者常玩：'+g.map(v=>`${v.title}（${v.n} 人）`).join('、'):''}）`;}).join('\n');
  try{
-  const out=await env.AI.run(env.HOT_MODEL||HOT_MODEL,{messages:[{role:'system',content:REASON_SYSTEM},{role:'user',content:`类别：${label}\n${lines}`}],max_tokens:900,temperature:.4});
-  const text=String(out?.response??''),start=text.indexOf('['),end=text.lastIndexOf(']');
-  const list=start>=0&&end>start?JSON.parse(text.slice(start,end+1)):[];
+  const out=await env.AI.run(env.HOT_MODEL||HOT_MODEL,{messages:[{role:'system',content:REASON_SYSTEM+' /no_think'},{role:'user',content:`类别：${label}\n${lines}`}],max_tokens:900,temperature:.4});
+  /* {response:'…[…]…'} (Llama), {response:[…]} (Qwen 3 JSON mode) or OpenAI-style {choices:[{message:{content}}]} */
+  const raw=out?.response??out?.choices?.[0]?.message?.content??'';
+  let list=Array.isArray(raw)?raw:[];
+  if(!list.length){const text=String(raw).replace(/<think>[\s\S]*?<\/think>/g,''),start=text.indexOf('['),end=text.lastIndexOf(']');list=start>=0&&end>start?JSON.parse(text.slice(start,end+1)):[];}
   for(const item of Array.isArray(list)?list:[]){const term=typeof item?.term==='string'?item.term.normalize('NFKC').trim():'';const reason=cleanReason(item?.reason);if(result.has(term)&&reason)result.set(term,{reason,ai:true});}
  }catch{}
  return result;

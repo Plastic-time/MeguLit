@@ -168,7 +168,7 @@ test('relay glosses: Workers AI JSON list (thinking stripped), fallback model, k
  const d=await load('daily.js');
  assert.deepEqual(d.parseGlosses('<think>…</think>["退市","棒球选手"]',2),['退市','棒球选手']);assert.deepEqual(d.parseGlosses('nope',2),[]);
  const seen=[];const AI={run:async model=>{seen.push(model);if(model===d.GLOSS_MODEL)throw Error('no model');return {response:'["快餐产品","学校活动"]'};}};
- const e={DB:d1(),AI,HOT_MODEL:'@cf/meta/llama-3.1-8b-instruct'};await d.refreshWords(e,new Date('2026-11-11T00:00:00Z'),fetcher(FEEDS));
+ const e={DB:d1(),AI,HOT_MODEL:'@cf/qwen/qwen3-30b-a3b-fp8'};await d.refreshWords(e,new Date('2026-11-11T00:00:00Z'),fetcher(FEEDS));
  const r=await d.hotWordsDailyGet(e,new URL('https://x/api/hotwords/daily'),{json:v=>v,fail:c=>c},new Date('2026-11-11T00:10:00Z'));
  assert.deepEqual(r.words.slice(0,2).map(w=>w.gloss),['快餐产品','学校活动']);assert.deepEqual(seen,[d.GLOSS_MODEL,d.GLOSS_FALLBACK]);
 });
