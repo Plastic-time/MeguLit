@@ -314,7 +314,7 @@ let skyLayer = null;
 let topLayer = null;
 const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const lyricLayers = { say: text => { const pick = Math.random() * 2 ** 32, hud = text ? `\u266a ${mmss(bgm.currentTime)}` : ''; deepLayer?.say(text, pick, hud); skyLayer?.say(text, pick, hud); }, clear: () => { deepLayer?.clear(); skyLayer?.clear(); } };
-if ($('.sound-ctl')) nowPlaying(bgm, $('.sound-ctl'), { reduce, background: deepLayer ? lyricLayers : null });
+const player = $('.sound-ctl') ? nowPlaying(bgm, $('.sound-ctl'), { reduce, background: deepLayer ? lyricLayers : null }) : null;
 bgmCredit();
 notice({ t: k => d(k), lang: () => lang, after: playIntro() });
 tryIt({ lang: () => lang, reduce });
@@ -367,12 +367,13 @@ if (!reduce) {
     raf = requestAnimationFrame(tick);
   };
   bgm.addEventListener('play', async () => {
-    if (!beats) beats = await fetch(new URL('../audio/megulit-bgm.beats.json', import.meta.url)).then(r => r.json()).catch(() => null);
+    if (!beats) beats = await fetch(new URL(`../audio/${bgm.dataset.track}.beats.json`, import.meta.url)).then(r => r.json()).catch(() => null);
     if (!beats) return;
     seek(bgm.currentTime); lastT = bgm.currentTime;
     if (!raf) raf = requestAnimationFrame(tick);
   });
   bgm.addEventListener('seeked', () => { if (beats) seek(bgm.currentTime); });
+  addEventListener('megulit:track', () => { beats = null; ki = si = 0; lastT = 0; });
 }
 const soundBtn = $('.js-sound');
 function setSoundLabel() {
@@ -397,7 +398,7 @@ function setSound(on) {
   soundOn = on;
   let started = Promise.resolve(false);
   if (on) {
-    if (!bgm.getAttribute('src')) bgm.src = new URL('../audio/megulit-bgm.mp3', import.meta.url).href;
+    player?.ensureSrc();
     bgm.volume = volume();
     started = bgm.play().then(() => true, () => { soundOn = false; setSoundLabel(); floatSound(); return false; });
   } else bgm.pause();
@@ -405,6 +406,22 @@ function setSound(on) {
   floatSound();
   return started;
 }
+// switching to another tab or app pauses the music; coming back resumes it (only if it was playing before)
+let pausedByHide = false;
+const onHide = () => { if (soundOn && !bgm.paused) { pausedByHide = true; bgm.pause(); } };
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) onHide();
+  else if (pausedByHide) { pausedByHide = false; if (soundOn) bgm.play().catch(() => {}); }
+});
+addEventListener('pagehide', onHide);
+// phones: the player is a small strip; a tap on it opens the volume, switches and credit, a tap elsewhere closes them
+const soundBox = $('.sound-ctl');
+document.addEventListener('click', e => {
+  if (!soundBox || !matchMedia('(max-width: 40rem)').matches) return;
+  const inside = e.target.closest('.sound-ctl');
+  if (inside && e.target.closest('.np') && !e.target.closest('a, button, input')) soundBox.classList.toggle('open');
+  else if (!inside) soundBox.classList.remove('open');
+});
 soundBtn?.addEventListener('click', () => {
   disarm();
   store.set('megulit-sound', soundOn ? '0' : '1');   // the visitor's own choice wins from now on

@@ -1,0 +1,37 @@
+{
+  "text": {
+    "zh": {
+      "music": "背景音乐",
+      "by": "作者",
+      "from": "收录于",
+      "license": "授权"
+    },
+    "ja": {
+      "music": "BGM",
+      "by": "作者",
+      "from": "収録",
+      "license": "ライセンス"
+    },
+    "en": {
+      "music": "Background music",
+      "by": "by",
+      "from": "from",
+      "license": "License"
+    }
+  },
+  "tracks": [
+    {
+      "id": "kettenkrad-tell-me-about-the-music-that-makes-up-you",
+      "title": "Tell me about the music that makes up you",
+      "artist": "Kettenkrad",
+      "artistUrl": "https://soundcloud.com/kettenkrad8901/tell-me-about-the-music-that-makes-up-you",
+      "album": "CAR CRASH AND SIREN",
+      "label": "Lost Frog",
+      "albumUrl": "https://archive.org/details/lf231mp3",
+      "license": "CC BY-NC 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-nc/4.0/",
+      "lyrics": true,
+      "duration": 226.4
+    }
+  ]
+}

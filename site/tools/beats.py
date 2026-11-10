@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Finds the drum hits in the background song so the page can move with them.
 # Kicks: onsets in the low band (40-160 Hz); snares/claps: onsets in the 1.5-5 kHz band. Each hit gets a strength in
-# (0, 1]. Output: site/public/assets/audio/megulit-bgm.beats.json {"kick": [[t, s], ...], "snare": [[t, s], ...], "bpm": n}
-# Usage (from the repo root): python -I site/tools/beats.py [path/to/audio] (default: the site's own mp3)
+# (0, 1]. Output: {"kick": [[t, s], ...], "snare": [[t, s], ...], "bpm": n}
+# Usage (from the repo root): python -I site/tools/beats.py <audio> <out.json>   (add-song.py runs it for every song)
 import json, os, subprocess, sys
 from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / 'site' / 'public' / 'assets' / 'audio' / 'megulit-bgm.mp3'
-OUT = ROOT / 'site' / 'public' / 'assets' / 'audio' / 'megulit-bgm.beats.json'
+SRC = Path(sys.argv[1])
+OUT = Path(sys.argv[2])
 FFMPEG = os.environ.get('FFMPEG', 'ffmpeg')
 SR, HOP, N = 22050, 256, 2048
 

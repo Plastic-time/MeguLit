@@ -1,40 +1,47 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Now playing: while the background music plays, a small label beside the sound control shows the song's title and
-// artist, and the current lyric line, which arrives character by character (soft -> sharp) and leaves upward.
-// Song details and the CC BY-NC credit live in assets/audio/megulit-bgm.json; timed lyrics, when there are any, in
-// assets/audio/megulit-bgm.lrc (standard [mm:ss.xx] lines). The full credit (author, album, licence, edited) shows in the
-// label and in every element marked .js-bgm-credit (the footer), in the page language.
+// Background-music player. The library is assets/audio/playlist.json (built by site/tools/add-song.py): every track has
+// <id>.mp3 (16 dB down, 96 kbps), an optional <id>.lrc (timed lyrics, Chinese translation lines already removed) and
+// <id>.beats.json. While a song plays, a label beside the sound control shows its title, artist, the current lyric line
+// (arriving character by character), play/pause, previous/next, a seek bar, two switches and the song's credit.
+// Every element marked .js-bgm-credit (the footer) shows the current song's credit, in the page language.
 
 const pageLang = () => (document.documentElement.lang || 'zh').slice(0, 2);
+const base = new URL('../audio/', import.meta.url);
+const FALLBACK = 'kettenkrad-tell-me-about-the-music-that-makes-up-you';
 const a = (href, text) => { const el = document.createElement('a'); el.href = href; el.textContent = text; el.rel = 'noopener'; el.target = '_blank'; return el; };
-// author · album (label) · licence · edited, as nodes with links
-function creditNodes(m) {
-  const t = m.text?.[pageLang()] || m.text?.zh || {};
+const mmss = s => (Number.isFinite(s) ? `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '--:--');
+
+let listPromise = null;
+const getList = () => listPromise || (listPromise = fetch(new URL('playlist.json', base)).then(r => r.json()).catch(() => ({ text: {}, tracks: [] })));
+let current = null;   // the track playing now (or about to), shared with the footer credit
+
+// author · album (label) · licence, as nodes with links
+function creditNodes(m, text) {
+  const t = text?.[pageLang()] || text?.zh || {};
   const out = [];
   const sep = () => out.push(document.createTextNode(' · '));
-  out.push(document.createTextNode(`${t.by || 'by'} `), m.artistUrl ? a(m.artistUrl, m.artist) : document.createTextNode(m.artist));
-  if (m.album) { sep(); out.push(document.createTextNode(`${t.from || 'from'} `), m.albumUrl ? a(m.albumUrl, `${m.album}${m.label ? ` (${m.label})` : ''}`) : document.createTextNode(m.album)); }
-  if (m.license) { sep(); out.push(m.licenseUrl ? a(m.licenseUrl, m.license) : document.createTextNode(m.license)); }
-  if (m.edited && t.edited) { sep(); out.push(document.createTextNode(t.edited)); }
+  if (m.artist) out.push(document.createTextNode(`${t.by || 'by'} `), m.artistUrl ? a(m.artistUrl, m.artist) : document.createTextNode(m.artist));
+  if (m.album) { if (out.length) sep(); out.push(document.createTextNode(`${t.from || 'from'} `), m.albumUrl ? a(m.albumUrl, `${m.album}${m.label ? ` (${m.label})` : ''}`) : document.createTextNode(m.album)); }
+  if (m.license) { if (out.length) sep(); out.push(m.licenseUrl ? a(m.licenseUrl, m.license) : document.createTextNode(m.license)); }
   return out;
 }
-let metaPromise = null;
-const getMeta = base => metaPromise || (metaPromise = fetch(new URL('megulit-bgm.json', base)).then(r => r.json()).catch(() => null));
-// the footer credit: filled at once, refilled when the language changes
+
+// the footer credit: the current song, refilled on a track or language change
 export function bgmCredit() {
-  const base = new URL('../audio/', import.meta.url);
   const fill = async () => {
-    const m = await getMeta(base);
+    const pl = await getList();
+    const m = current || pl.tracks[0];
     if (!m) return;
+    const t = pl.text?.[pageLang()] || pl.text?.zh || {};
     for (const el of document.querySelectorAll('.js-bgm-credit')) {
-      const t = m.text?.[pageLang()] || m.text?.zh || {};
       const title = document.createElement('i');
       title.textContent = m.title;
-      el.replaceChildren(document.createTextNode(`${t.music || 'Music'}: `), title, document.createTextNode(' — '), ...creditNodes(m));
+      el.replaceChildren(document.createTextNode(`${t.music || 'Music'}: `), title, document.createTextNode(' — '), ...creditNodes(m, pl.text));
     }
   };
   fill();
   addEventListener('megulit:lang', fill);
+  addEventListener('megulit:track', fill);
 }
 
 const parseLrc = text => {
@@ -44,36 +51,51 @@ const parseLrc = text => {
     const words = line.replace(/\[[^\]]*\]/g, '').trim();
     for (const t of tags) out.push({ at: Number(t[1]) * 60 + Number(t[2]), text: words });
   }
-  return out.sort((a, b) => a.at - b.at);
+  return out.sort((x, y) => x.at - y.at);
 };
 
 const store = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
-const SWITCH = { zh: { lyrics: '歌词', bg: '背景歌词' }, ja: { lyrics: '歌詞', bg: '背景に歌詞' }, en: { lyrics: 'Lyrics', bg: 'Lyrics in background' } };
+const UI = {
+  zh: { lyrics: '歌词', bg: '背景歌词', play: '播放', pause: '暂停', prev: '上一首', next: '下一首', seek: '播放进度' },
+  ja: { lyrics: '歌詞', bg: '背景に歌詞', play: '再生', pause: '一時停止', prev: '前の曲', next: '次の曲', seek: '再生位置' },
+  en: { lyrics: 'Lyrics', bg: 'Lyrics in background', play: 'Play', pause: 'Pause', prev: 'Previous', next: 'Next', seek: 'Seek' },
+};
+const ICON = {
+  prev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M19 5 9 12l10 7z"/></svg>',
+  next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M5 5l10 7-10 7z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15L19.5 12z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5h3.5v15H7zM13.5 4.5H17v15h-3.5z"/></svg>',
+};
 
-// background: an object with say(text) (the bottom kana layer); it gets every lyric line while "背景歌词" is on
+// background: an object with say(text) and clear() (the kana layers); it gets every lyric line while "背景歌词" is on.
+// Returns the player: ensureSrc() points the audio at the current track (call it before the first play()).
 export function nowPlaying(audio, host, { reduce = false, background = null } = {}) {
-  const base = new URL('../audio/', import.meta.url);
   const box = document.createElement('div');
   box.className = 'np';
   box.hidden = true;
   box.setAttribute('aria-live', 'off');
-  box.innerHTML = '<span class="np-eq" aria-hidden="true"><i></i><i></i><i></i></span><span class="np-meta"><b class="np-title"></b><span class="np-artist"></span></span><p class="np-lyric" lang="ja" aria-hidden="true"></p><p class="np-switches"><button type="button" class="np-sw" data-sw="lyrics"></button><button type="button" class="np-sw" data-sw="bg"></button></p><p class="np-credit"></p>';
+  box.innerHTML = '<span class="np-eq" aria-hidden="true"><i></i><i></i><i></i></span><span class="np-meta"><b class="np-title"></b><span class="np-artist"></span></span>'
+    + '<p class="np-lyric" lang="ja" aria-hidden="true"></p>'
+    + `<div class="np-ctl"><button type="button" class="np-b" data-a="prev">${ICON.prev}</button><button type="button" class="np-b np-play" data-a="play">${ICON.pause}</button><button type="button" class="np-b" data-a="next">${ICON.next}</button>`
+    + '<input class="np-seek" type="range" min="0" max="1000" value="0"><span class="np-time">00:00 / --:--</span></div>'
+    + '<p class="np-switches"><button type="button" class="np-sw" data-sw="lyrics"></button><button type="button" class="np-sw" data-sw="bg"></button></p><p class="np-credit"></p>';
   host.append(box);
-  const title = box.querySelector('.np-title'), artist = box.querySelector('.np-artist'), lyric = box.querySelector('.np-lyric'), credit = box.querySelector('.np-credit');
-  let meta = null;
-  const paintCredit = () => { if (meta) credit.replaceChildren(...creditNodes(meta)); };
-  addEventListener('megulit:lang', paintCredit);
-  // two switches, remembered per browser: lyrics in this label, and lyrics on the page's bottom layer
+  const $ = s => box.querySelector(s);
+  const title = $('.np-title'), artist = $('.np-artist'), lyric = $('.np-lyric'), credit = $('.np-credit');
+  const playBtn = $('.np-play'), seek = $('.np-seek'), time = $('.np-time');
+  let pl = { text: {}, tracks: [] }, idx = 0, lines = [], cur = -1, hold = false, seeking = false;
+  const ui = () => UI[pageLang()] || UI.zh;
+
+  // switches, remembered per browser: lyrics in this label, and lyrics on the page's background layers
   const on = { lyrics: store.get('megulit-lyrics') !== '0', bg: store.get('megulit-bg-lyrics') !== '0' && Boolean(background) && !reduce };
   const switches = box.querySelectorAll('.np-sw');
-  const paintSwitches = () => switches.forEach(b => {
-    const k = b.dataset.sw;
-    b.textContent = (SWITCH[pageLang()] || SWITCH.zh)[k];
-    b.setAttribute('aria-pressed', String(on[k]));
-    b.hidden = k === 'bg' && (!background || reduce);
-  });
-  paintSwitches();
-  addEventListener('megulit:lang', paintSwitches);
+  const paintUi = () => {
+    switches.forEach(b => { const k = b.dataset.sw; b.textContent = ui()[k]; b.setAttribute('aria-pressed', String(on[k])); b.hidden = k === 'bg' && (!background || reduce); });
+    box.querySelectorAll('.np-b').forEach(b => b.setAttribute('aria-label', b.dataset.a === 'play' ? (audio.paused ? ui().play : ui().pause) : ui()[b.dataset.a]));
+    seek.setAttribute('aria-label', ui().seek);
+    if (current) credit.replaceChildren(...creditNodes(current, pl.text));
+  };
+  addEventListener('megulit:lang', paintUi);
   switches.forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.sw;
     on[k] = !on[k];
@@ -81,47 +103,71 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
     box.classList.toggle('lyrics-off', !on.lyrics);
     if (k === 'bg' && !on.bg) background?.clear();
     if (on[k] && cur >= 0 && lines[cur]) (k === 'bg' ? background?.say(lines[cur].text) : show(lines[cur].text));
-    paintSwitches();
+    paintUi();
   }));
   box.classList.toggle('lyrics-off', !on.lyrics);
 
-  let lines = [], cur = -1, loaded = false;
-  const load = async () => {
-    if (loaded) return;
-    loaded = true;
-    meta = await getMeta(base);
-    if (meta) {
-      title.textContent = meta.title || '';
-      artist.textContent = meta.artist || '';
-      artist.hidden = !meta.artist;
-      paintCredit();
-    }
-    try {
-      const r = await fetch(new URL('megulit-bgm.lrc', base));
-      if (r.ok) lines = parseLrc(await r.text());
-    } catch {}
-  };
-
-  // every line still on screen leaves (the old code only sent the first one away, so lines piled up on a replay);
-  // lines already leaving are dropped at once, so at most one is ever fading out
+  // every line still on screen leaves; lines already leaving are dropped at once, so at most one is ever fading out
   const show = text => {
     lyric.querySelectorAll('.np-line.out').forEach(n => n.remove());
-    lyric.querySelectorAll('.np-line').forEach(old => {
-      if (reduce) { old.remove(); return; }
-      old.classList.add('out');
-      setTimeout(() => old.remove(), 450);
-    });
+    lyric.querySelectorAll('.np-line').forEach(old => { if (reduce) { old.remove(); return; } old.classList.add('out'); setTimeout(() => old.remove(), 450); });
     if (!text || !on.lyrics) return;
     const line = document.createElement('span');
     line.className = 'np-line';
-    [...text].forEach((ch, i) => {
-      const c = document.createElement('span');
-      c.textContent = ch;
-      c.style.setProperty('--i', i);
-      line.append(c);
-    });
+    [...text].forEach((ch, i) => { const c = document.createElement('span'); c.textContent = ch; c.style.setProperty('--i', i); line.append(c); });
     lyric.append(line);
   };
+
+  // ---- tracks -------------------------------------------------------------------------------------------------------------
+  const ready = getList().then(list => { pl = list; if (!pl.tracks.length) pl.tracks = [{ id: FALLBACK, title: '', lyrics: true }]; current = pl.tracks[idx]; paintTrack(); });
+  const srcOf = t => new URL(`${t.id}.mp3`, base).href;
+  const paintTrack = () => {
+    const t = pl.tracks[idx];
+    current = t;
+    title.textContent = t.title || ''; artist.textContent = t.artist || ''; artist.hidden = !t.artist;
+    audio.loop = pl.tracks.length === 1;
+    audio.dataset.track = t.id;
+    paintUi();
+  };
+  const loadLyrics = async t => {
+    lines = []; cur = -1; show(''); background?.clear();
+    if (!t.lyrics) { box.classList.remove('has-lyrics'); return; }
+    try { const r = await fetch(new URL(`${t.id}.lrc`, base)); if (r.ok && current === t) lines = parseLrc(await r.text()); } catch {}
+    box.classList.toggle('has-lyrics', lines.length > 0);
+  };
+  let lyricsFor = null;
+  const go = (i, play = true) => {
+    idx = (i + pl.tracks.length) % pl.tracks.length;
+    paintTrack();
+    audio.src = srcOf(current);
+    loadLyrics(current); lyricsFor = current;
+    dispatchEvent(new CustomEvent('megulit:track', { detail: { id: current.id } }));
+    if (play) { hold = false; audio.play().catch(() => {}); }
+  };
+  const player = {
+    ensureSrc() { if (!audio.getAttribute('src')) { const t = pl.tracks[idx] || { id: FALLBACK }; audio.src = srcOf(t); audio.dataset.track = t.id; } },
+    next: () => go(idx + 1),
+    // "previous" restarts the song when it is a few seconds in, like any player
+    prev: () => { if (audio.currentTime > 3 || pl.tracks.length === 1) { audio.currentTime = 0; cur = -1; } else go(idx - 1); },
+  };
+  audio.addEventListener('ended', () => { if (pl.tracks.length > 1) player.next(); });
+
+  // ---- controls -----------------------------------------------------------------------------------------------------------
+  box.querySelector('.np-ctl').addEventListener('click', e => {
+    const b = e.target.closest('.np-b');
+    if (!b) return;
+    if (b.dataset.a === 'play') { if (audio.paused) { hold = false; audio.play().catch(() => {}); } else { hold = true; audio.pause(); } }
+    else player[b.dataset.a]();
+  });
+  const paintTime = () => {
+    const d = audio.duration, t = audio.currentTime;
+    if (!seeking && Number.isFinite(d) && d > 0) { seek.value = Math.round(t / d * 1000); seek.style.setProperty('--fill', `${t / d * 100}%`); }
+    time.textContent = `${mmss(t)} / ${mmss(d)}`;
+  };
+  seek.addEventListener('input', () => { seeking = true; const d = audio.duration; if (Number.isFinite(d)) { time.textContent = `${mmss(seek.value / 1000 * d)} / ${mmss(d)}`; seek.style.setProperty('--fill', `${seek.value / 10}%`); } });
+  seek.addEventListener('change', () => { const d = audio.duration; if (Number.isFinite(d)) { audio.currentTime = seek.value / 1000 * d; cur = -1; } seeking = false; });
+  audio.addEventListener('timeupdate', paintTime);
+  audio.addEventListener('loadedmetadata', paintTime);
 
   let raf = 0;
   const tick = () => {
@@ -130,15 +176,24 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
     if (lines.length) {
       const t = audio.currentTime;
       let i = cur;
-      if (i < 0 || t < lines[i].at || (lines[i + 1] && t >= lines[i + 1].at)) {
-        i = -1;
-        for (let k = 0; k < lines.length && lines[k].at <= t; k++) i = k;
-      }
+      if (i < 0 || t < lines[i].at || (lines[i + 1] && t >= lines[i + 1].at)) { i = -1; for (let k = 0; k < lines.length && lines[k].at <= t; k++) i = k; }
       if (i !== cur) { cur = i; const text = i >= 0 ? lines[i].text : ''; show(text); if (on.bg) background?.say(text); }
     }
     raf = requestAnimationFrame(tick);
   };
-  audio.addEventListener('play', async () => { await load(); box.hidden = false; box.classList.toggle('has-lyrics', lines.length > 0); cur = -1; if (!raf) raf = requestAnimationFrame(tick); });
-  audio.addEventListener('pause', () => { box.hidden = true; show(''); background?.clear(); cur = -1; });
+  audio.addEventListener('play', async () => {
+    await ready;
+    if (lyricsFor !== current) { lyricsFor = current; await loadLyrics(current); }
+    box.hidden = false; hold = false;
+    playBtn.innerHTML = ICON.pause; paintUi();
+    cur = -1; if (!raf) raf = requestAnimationFrame(tick);
+  });
+  // a pause from this label keeps it open with a play button; sound off (or leaving the page) closes it
+  audio.addEventListener('pause', () => {
+    playBtn.innerHTML = ICON.play; paintUi();
+    show(''); background?.clear(); cur = -1;
+    if (!hold) box.hidden = true;
+  });
   audio.addEventListener('seeked', () => { cur = -1; });
+  return player;
 }

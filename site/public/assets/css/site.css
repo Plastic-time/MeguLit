@@ -1719,3 +1719,51 @@ html { scrollbar-color: color-mix(in srgb, var(--crimson) 55%, var(--line)) tran
 @media (max-width: 60rem) { .try-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 40rem) { .tr-box { padding: 2% 5% 0; } .tr-line { line-height: 2.1; } .tr-scene { aspect-ratio: 4 / 3; } .tr-scene > img { object-position: 50% 100%; } .tr-box { top: 64%; } }
 @media (prefers-reduced-motion: reduce) { .tr-line.enter { animation: none; } }
+
+/* ---- phones: the player never covers the first screen. Icon-only sound button, the label is a small one-line strip
+   under it; a tap on the strip opens volume, switches and credit (.open), a tap elsewhere closes them ------------------- */
+@media (max-width: 40rem) {
+  .sound-ctl .sound-fab .label { display: none; }
+  .sound-ctl .sound-fab { width: 2.6rem; height: 2.6rem; padding: 0; justify-content: center; }
+  .sound-ctl .vol { display: none; }
+  .sound-ctl.open .vol { display: flex; }
+  .sound-ctl .np, .sound-ctl .np.has-lyrics { width: min(13.5rem, 62vw); padding: .45rem .65rem; gap: 0 .55rem; background: rgba(0, 0, 0, .55); }
+  .sound-ctl .np-artist, .sound-ctl .np-switches, .sound-ctl .np-credit {
+    display: block; max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; padding-top: 0; border-top-color: transparent;
+    transition: max-height .35s cubic-bezier(.2, .7, .2, 1), opacity .25s, margin .35s, padding .35s; }
+  .sound-ctl .np-switches { display: flex; }
+  .sound-ctl .np-title { font-size: .75rem; }
+  .sound-ctl .np.has-lyrics .np-lyric { height: 1.5em; margin-top: .15rem; font-size: .6875rem; }
+  .sound-ctl .np-line { -webkit-line-clamp: 1; }
+  .sound-ctl.open .np, .sound-ctl.open .np.has-lyrics { width: min(20rem, 86vw); padding: .7rem .85rem; }
+  .sound-ctl.open .np-artist { max-height: 1.4rem; opacity: 1; }
+  .sound-ctl.open .np-switches { max-height: 3rem; opacity: 1; margin-top: .55rem; }
+  .sound-ctl.open .np-credit { max-height: 7rem; opacity: 1; margin-top: .6rem; padding-top: .55rem; border-top-color: rgba(244, 244, 242, .12); }
+  .sound-ctl.open .np.has-lyrics .np-lyric { height: 3em; font-size: .8125rem; }
+  .sound-ctl.open .np-line { -webkit-line-clamp: 2; }
+  /* hover sticks after a tap on phones; only .open opens things there */
+  .sound-ctl.floating:hover .vol { display: none; }
+  .sound-ctl.floating.open .vol { display: flex; max-width: 20rem; opacity: 1; padding: 0 .8rem; border-width: 1px; }
+}
+
+/* player controls: previous / play-pause / next, a seek bar and the time, under the lyric line */
+.np-ctl { grid-column: 2; margin-top: .55rem; display: grid; grid-template-columns: auto auto auto minmax(0, 1fr) auto; align-items: center; gap: .35rem .45rem; }
+.np-b { width: 1.9rem; height: 1.9rem; display: grid; place-items: center; padding: 0; color: #f4f4f2; background: none; border: 1px solid rgba(244, 244, 242, .2); cursor: pointer; transition: border-color .2s, background-color .2s; }
+.np-b svg { width: .95rem; height: .95rem; fill: currentColor; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+.np-b:hover, .np-b:focus-visible { border-color: #c8323c; outline: none; }
+.np-play { background: #f4f4f2; color: #0b0b0b; border-color: #f4f4f2; }
+.np-play:hover, .np-play:focus-visible { background: #c8323c; color: #fff; border-color: #c8323c; }
+.np-seek { --fill: 0%; -webkit-appearance: none; appearance: none; width: 100%; min-width: 0; height: 2px; margin: 0 .2rem; cursor: pointer; background: linear-gradient(90deg, #c8323c var(--fill), rgba(244, 244, 242, .25) var(--fill)); }
+.np-seek::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; background: #f4f4f2; border: 0; }
+.np-seek::-moz-range-thumb { width: 10px; height: 10px; background: #f4f4f2; border: 0; border-radius: 0; }
+.np-seek:focus-visible { outline: 1px solid #f4f4f2; outline-offset: 4px; }
+.np-time { font: 300 .6875rem/1 "MeguLit Mono", var(--mono); letter-spacing: .06em; color: #9a9a9a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* compact strip (down the page, and on phones): the controls fold away with the other extras */
+.sound-ctl.floating .np-ctl { display: grid; max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; transition: max-height .38s cubic-bezier(.2, .7, .2, 1), opacity .25s, margin .38s; }
+.sound-ctl.floating:hover .np-ctl, .sound-ctl.floating:focus-within .np-ctl { max-height: 3rem; opacity: 1; margin-top: .55rem; }
+@media (max-width: 40rem) {
+  .sound-ctl .np-ctl { display: grid; max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; transition: max-height .35s, opacity .25s, margin .35s; }
+  .sound-ctl.open .np-ctl { max-height: 3rem; opacity: 1; margin-top: .55rem; }
+  .sound-ctl.floating:hover .np-ctl { max-height: 0; opacity: 0; margin-top: 0; }
+  .sound-ctl.floating.open .np-ctl { max-height: 3rem; opacity: 1; margin-top: .55rem; }
+}
