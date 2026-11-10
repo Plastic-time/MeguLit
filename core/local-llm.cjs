@@ -34,7 +34,7 @@ class LocalLlm{
        first, like the runtime packs; a source that sends nothing for 20 s is dropped for the next. SHA-256 must match. */
     let mirrors=[];try{mirrors=JSON.parse(fs.readFileSync(path.join(this.root,'setup','runtime.json'),'utf8')).mirrors||[];}catch{}
     const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'',china=['Asia/Shanghai','Asia/Chongqing','Asia/Harbin','Asia/Urumqi','PRC'].includes(tz);
-    const mirrored=mirrors.map(m=>m.replace('{url}',RUNTIME.url)),urls=china?[...mirrored,RUNTIME.url]:[RUNTIME.url,...mirrored];
+    const mirrored=mirrors.map(m=>require('./runtime-packs.cjs').mirrorUrl(m,RUNTIME.url)),urls=china?[...mirrored,RUNTIME.url]:[RUNTIME.url,...mirrored];
     let ok=false,last=null;
     for(const url of urls){
      if(controller.signal.aborted)break;
