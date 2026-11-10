@@ -7,7 +7,7 @@ const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0300-\u03
 pinyinMap.set('引','yin');
 /* E377 联网服务 / 排行榜昵称 */
 pinyinMap.set('榜','bang');pinyinMap.set('昵','ni');pinyinMap.set('联','lian');pinyinMap.set('网','wang');
-pinyinMap.set('惠','hui');pinyinMap.set('咏','yong');pinyinMap.set('唱','chang');pinyinMap.set('布','bu');pinyinMap.set('署','shu');
+pinyinMap.set('惠','hui');pinyinMap.set('咏','yong');pinyinMap.set('唱','chang');pinyinMap.set('布','bu');pinyinMap.set('署','shu');/* E370 共享适配数据（匿名） */pinyinMap.set('享','xiang');pinyinMap.set('适','shi');pinyinMap.set('据','ju');pinyinMap.set('匿','ni');
 export function searchTerms(label){const tokens=[];for(let i=0;i<label.length;i++){const special=Object.entries({'角色':['jue','se'],'重定位':['chong','ding','wei'],'重新':['chong','xin']}).find(([word])=>label.startsWith(word,i));if(special){tokens.push(...special[1]);i+=special[0].length-1;}else tokens.push(pinyinMap.get(label[i])||label[i].toLowerCase());}return[normalize(label),normalize(tokens.join('')),normalize(tokens.map(token=>token[0]).join(''))];}
 export function matchesSetting(item,query){const words=query.trim().split(/\s+/).map(normalize).filter(Boolean),haystack=[...Object.values(item.label||{}),item.key||'',...(item.aliases||[])].flatMap(searchTerms);return words.every(word=>haystack.some(term=>term.includes(word)));}
 export function globalSearchEntries(data,text){return [

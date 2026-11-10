@@ -78,6 +78,8 @@ function reconcile(root,items,{restoreRemoved=false}={}){const db=openStore(root
  const coverChanged=item.source==='steam'&&saved.vndbId!==item.vndbId&&!original.coverCustom&&!original.vndbManual;
  if(existing){db.prepare("UPDATE games SET title=?,executable=?,cover=CASE WHEN ? THEN ? WHEN cover='' AND ?!='' THEN ? ELSE cover END,source=?,original=? WHERE id=?").run(existing.title||item.title,executable,Number(coverChanged),cover,cover,cover,existing.source==='manual'?'manual':item.source||existing.source,JSON.stringify(original),existing.id);updated++;}
  else if(!item.missing){
+  /* E370: a newly added game picks up a matching shared adaptation record (stream memory, locale mode; the layout waits for its first launch) */
+  if(executable&&fs.existsSync(executable))try{require('./shared-adaptation.cjs').importFor(root,{executable,engine:item.engine||'',library:original.library,cheap:true});}catch{}
   const legacy=Number.isSafeInteger(item.mediaId)?item.mediaId:null,preferred=legacy==null?'':'game-'+legacy;
   const id=preferred&&!db.prepare('SELECT 1 FROM games WHERE id=?').get(preferred)?preferred:'game-'+crypto.randomUUID();
   db.prepare('INSERT INTO games(id,legacy_id,title,executable,cover,source,original) VALUES(?,?,?,?,?,?,?)').run(id,legacy,item.title||path.win32.basename(item.exe||''),executable,cover,item.source||'scan',JSON.stringify(original));added++;

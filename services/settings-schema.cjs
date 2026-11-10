@@ -49,6 +49,8 @@ for(const[panel,names]of Object.entries(panelNames)){
 }
 field('library','steamPath','Steam 安装目录','Steam folder','Steam フォルダ');field('library','folders','其他游戏目录（一行一个）','Other game folders (one per line)','ほかのゲームフォルダ（1行に1つ）','multiline');
 bool('library','autoSeries','自动识别游戏系列','Automatically recognize game series','ゲームシリーズを自動認識');
+/* E370: anonymous adaptation records (hook stream, embed result, calibration) shared between users; off stops both directions */
+bool('library','sharedAdaptation','共享适配数据（匿名）','Share adaptation data (anonymous)','適応データの共有（匿名）');
 for(const engine of ['ollama','lmstudio'])fields.find(f=>f.scope==='translation'&&f.key==='provider').options.push(engine==='ollama'?option(engine,'Ollama（本地模型）','Ollama','Ollama'):option(engine,'LM Studio（本地模型）','LM Studio','LM Studio'));
 choice('lookup','lookup_mode','查词触发方式','Lookup gesture','辞書を開く操作',[option('click','单击','Click','クリック'),option('hover','悬停','Hover','ホバー')]);
 for(const[key,zh,en,ja]of [['word_highlight_enabled','词汇高亮','Word highlighting','単語を色分け'],['show_related_entries','显示相关词条','Show related entries','関連項目を表示'],['underline_mined_words','标记已收录单词','Underline mined words','登録済みの単語に下線'],['track_unknown_words','记录未掌握单词','Track unknown words','未習得の単語を記録'],['treat_new_as_unknown','新单词视为未掌握','Treat new words as unknown','新出単語を未習得と扱う'],['underline_names','标记专有名词','Underline names','固有名詞に下線']])bool('lookup',key,zh,en,ja);
