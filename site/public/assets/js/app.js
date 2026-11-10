@@ -278,13 +278,18 @@ function splitKinetic() {
 // Background video: the smallest file that looks sharp on this screen; none when motion is reduced or data is saved.
 const video = $('.hero-video');
 let heroSeen = true;
+// The sound is the full theme song, a separate file fetched only when the visitor turns sound on; the video stays muted.
+const bgm = new Audio();
+bgm.loop = true;
+bgm.preload = 'none';
+let soundOn = false;
 // while the sound is on and the hero is off screen, the sound control floats in the corner so it can be turned off
 const soundCtl = $('.sound-ctl'), soundHome = soundCtl && document.createComment('sound-ctl');
 soundCtl?.before(soundHome);
 // it moves to <body> while floating: inside the hero it would sit under every later section
 const floatSound = () => {
   if (!soundCtl) return;
-  const float = Boolean(video && !video.muted && !heroSeen);
+  const float = soundOn && !heroSeen;
   if (float === soundCtl.classList.contains('floating')) return;
   if (float) document.body.append(soundCtl); else soundHome.after(soundCtl);
   soundCtl.classList.toggle('floating', float);
@@ -300,10 +305,10 @@ function startVideo() {
 }
 if (video && !reduce && !navigator.connection?.saveData) {
   startVideo();
-  // off screen the picture pauses to save power, unless the sound is on: then the music keeps playing down the page
+  // off screen the picture pauses to save power; the music is a separate track and keeps playing down the page
   new IntersectionObserver(([e]) => {
     heroSeen = e.isIntersecting;
-    if (heroSeen || !video.muted) video.play().catch(() => {}); else video.pause();
+    if (heroSeen) video.play().catch(() => {}); else video.pause();
     floatSound();
   }).observe(video);
 }
@@ -311,7 +316,7 @@ if ($('.kana-sky')) kana($('.kana-sky'), { still: reduce, hero: $('.hero'), unti
 const soundBtn = $('.js-sound');
 function setSoundLabel() {
   if (!soundBtn) return;
-  const on = Boolean(video && !video.muted);
+  const on = soundOn;
   soundBtn.setAttribute('aria-pressed', String(on));
   $('.js-sound-label').textContent = on ? d('soundOff') : d('soundOn');
   const vol = $('.vol');
@@ -321,16 +326,17 @@ function setSoundLabel() {
 const volInput = $('#hero-volume'), volOut = $('.vol-v');
 const volume = () => (volInput ? Number(volInput.value) : 5) / 100;
 volInput?.addEventListener('input', () => {
-  if (video) video.volume = volume();
+  bgm.volume = volume();
   if (volOut) volOut.textContent = `${volInput.value}%`;
   volInput.style.setProperty('--fill', `${volInput.value}%`);
 });
 soundBtn?.addEventListener('click', () => {
-  if (!video) return;
-  startVideo();
-  video.muted = !video.muted;
-  if (!video.muted) { video.volume = volume(); video.play().catch(() => {}); }
-  else if (!heroSeen) video.pause();
+  soundOn = !soundOn;
+  if (soundOn) {
+    if (!bgm.getAttribute('src')) bgm.src = new URL('../audio/megulit-bgm.mp3', import.meta.url).href;
+    bgm.volume = volume();
+    bgm.play().catch(() => { soundOn = false; setSoundLabel(); floatSound(); });
+  } else bgm.pause();
   setSoundLabel();
   floatSound();
 });
@@ -408,6 +414,31 @@ if (lang !== 'zh') applyLang(lang);
 else { splitKinetic(); fillTicker(); setSoundLabel(); }
 
 // Motion layer (anime.js). If it cannot load, a CSS fallback shows everything after a moment.
+// Warm-up: while the entrance plays (or right away when it is skipped), fetch everything below the fold so nothing pops
+// in later. Fonts and images first; the clips one after another once the hero video has a head start. Skipped when the
+// visitor asked to save data.
+function warmUp() {
+  if (navigator.connection?.saveData) return;
+  try { document.fonts.forEach(f => { if (f.status === 'unloaded') f.load().catch(() => {}); }); } catch {}
+  for (const img of $$('img[loading="lazy"]')) { img.loading = 'eager'; img.decode?.().catch(() => {}); }
+  if (reduce) return;
+  const clips = $$('video.clip').filter(v => v.dataset.src && !v.getAttribute('src'));
+  const next = () => {
+    const v = clips.shift();
+    if (!v) return;
+    if (!v.getAttribute('src')) { v.preload = 'auto'; v.src = v.dataset.src; }
+    let done = false;
+    const go = () => { if (!done) { done = true; next(); } };
+    v.addEventListener('canplaythrough', go, { once: true });
+    v.addEventListener('error', go, { once: true });
+    setTimeout(go, 2500);
+  };
+  let started = false;
+  const begin = () => { if (!started) { started = true; next(); } };
+  if (video && video.getAttribute('src') && video.readyState < 3) { video.addEventListener('canplay', begin, { once: true }); setTimeout(begin, 1500); }
+  else begin();
+}
+warmUp();
 import('./fx.js').then(m => m.run({ reduce, finePointer })).catch(() => {});
 loadRelease();
 loadEngines();

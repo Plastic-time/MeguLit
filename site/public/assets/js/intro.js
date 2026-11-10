@@ -10,7 +10,7 @@
 // Once per browser session; any click or key skips it; never shown when motion is reduced (the head script decides).
 
 const BANDS = 9, STRIPS = 10, TICK = 110;
-const CAPE_MS = 1700, GLITCH_MS = 1100;
+const CAPE_MS = 850, GLITCH_MS = 550;
 const CAPE_N = 48;                     // cloth strips
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = v => Math.max(0, Math.min(1, v));
@@ -67,12 +67,12 @@ export function playIntro() {
       removeEventListener('keydown', skip);
       resolve();
     };
-    const skip = () => { clearInterval(timer); cancelAnimationFrame(raf); el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260 }).finished.then(finish); };
+    const skip = () => { clearInterval(timer); cancelAnimationFrame(raf); el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160 }).finished.then(finish); };
     el.addEventListener('click', skip);
     addEventListener('keydown', skip);
 
     let k = 0;
-    const type = () => { if (done) return; line.textContent = full.slice(0, ++k); if (k < full.length) setTimeout(type, 34); };
+    const type = () => { if (done) return; line.textContent = full.slice(0, ++k); if (k < full.length) setTimeout(type, 17); };
 
     // beat 1 -----------------------------------------------------------------------------------------------------------
     const runCape = img => {
@@ -84,12 +84,12 @@ export function playIntro() {
       const sw = w / CAPE_N, kx = img.naturalWidth / w, ky = img.naturalHeight / h;
       const scale = w / 900;                                                         // the video's logo was 900 px wide
       let t0 = 0;
-      setTimeout(type, 600);
+      setTimeout(type, 300);
       const frame = now => {
         if (done) return;
         if (!t0) t0 = now;
-        const t = now - t0, f = t / 33.33;                                           // video frames at 30 fps
-        const unfurl = eo(t, 0, 950, 3), amp = 30 * scale * (1 - eo(t, 250, 1600, 2));
+        const t = now - t0, f = t / 16.67;                                           // the video's 30 fps timing, played at double speed
+        const unfurl = eo(t, 0, 475, 3), amp = 30 * scale * (1 - eo(t, 125, 800, 2));
         const front = unfurl * (CAPE_N + 6) - 3;
         g.setTransform(dpr, 0, 0, dpr, 0, 0);
         g.clearRect(0, 0, w + padX * 2, h + padY * 2);
@@ -106,7 +106,7 @@ export function playIntro() {
           g.drawImage(img, i * sw * kx, 0, (sw + 1) * kx, img.naturalHeight, -.5, -h * .7, sw + 1, h);
           g.restore();
         }
-        const rp = eo(t, 200, 1150, 4);
+        const rp = eo(t, 100, 575, 4);
         rest.style.opacity = clamp(rp * 1.6);
         rest.style.transform = `scale(${1.32 - .32 * rp})`;
         rest.style.filter = rp < .98 ? `blur(${((1 - rp) * 8).toFixed(1)}px)` : 'none';
@@ -125,8 +125,8 @@ export function playIntro() {
         const calm = Math.random() < .35;
         for (const b of bands) {
           const hit = !calm && Math.random() < .3;
-          b.style.transform = `translateX(${(hit ? rnd(-28, 28) : 0).toFixed(1)}px)`;
-          b.style.setProperty('--fx', `${hit ? rnd(3, 9).toFixed(1) : 0}px`); b.style.setProperty('--fa', hit ? 1 : 0);
+          b.style.transform = `translateX(${(hit ? rnd(-14, 14) : 0).toFixed(1)}px)`;
+          b.style.setProperty('--fx', `${hit ? rnd(2, 5).toFixed(1) : 0}px`); b.style.setProperty('--fa', hit ? 1 : 0);
         }
         if (performance.now() - t0 > GLITCH_MS) { clearInterval(timer); exit(); }
       }, TICK);
@@ -137,19 +137,19 @@ export function playIntro() {
       if (done) return;
       bands.forEach(b => { b.style.transform = ''; b.style.setProperty('--fa', 0); });
       const stage = el.querySelector('.gl-stage');
-      stage.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-1.5rem)' }], { duration: 380, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' });
+      stage.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-1.5rem)' }], { duration: 190, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' });
       const anims = strips.map((s, i) => s.animate(
         [{ transform: 'translateX(0)' }, { transform: `translateX(${i % 2 ? '' : '-'}105%)` }],
-        { duration: 620, delay: 180 + i * 38, easing: 'cubic-bezier(.7,0,.25,1)', fill: 'forwards' }));
+        { duration: 310, delay: 90 + i * 19, easing: 'cubic-bezier(.7,0,.25,1)', fill: 'forwards' }));
       Promise.all(anims.map(a => a.finished)).then(finish);
     };
 
     // start once the cape and the letters are decoded (never wait long: fall back to the glitch alone)
     const capeImg = load(logo.dataset.cape);
-    Promise.race([Promise.all([capeImg, load(rest.src)]), new Promise(r => setTimeout(r, 900, null))]).then(r => {
+    Promise.race([Promise.all([capeImg, load(rest.src)]), new Promise(r => setTimeout(r, 450, null))]).then(r => {
       if (done) return;
       if (r && r[0].naturalWidth && r[1].naturalWidth) runCape(r[0]);
-      else { cape.remove(); rest.remove(); setTimeout(type, 250); glitch(); }
+      else { cape.remove(); rest.remove(); setTimeout(type, 120); glitch(); }
     });
   });
 }
