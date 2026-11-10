@@ -165,22 +165,32 @@ export async function articleGet(env,url,{json,fail},now=new Date(),fetcher=fetc
 
 /* E415 a short Chinese note per hot word (退市 / 棒球选手 / 快餐产品), written once a day by Workers AI with the
    headline as context. The app prefers its own dictionary and falls back to machine translation when this is empty. */
-export const GLOSS_MODEL='@cf/qwen/qwen3-30b-a3b-fp8';
+export const GLOSS_MODEL='@cf/qwen/qwen3-30b-a3b-fp8',GLOSS_FALLBACK='@cf/qwen/qwen3.8-27b';
 export const GLOSS_PROMPT='你是日语词汇注释员。对每个日语词，结合给出的新闻标题，用简体中文写一个不超过12个字的释义：普通词写词义；人名、地名、团体、作品、商品等专有名词写「是什么」（例如：棒球选手、足球俱乐部、快餐产品）。只输出 JSON 数组，按顺序每项一个字符串，不要解释。';
+/* Models answer with a JSON array of strings, or (Qwen 3 in JSON mode) an already-parsed array of objects such as
+   {"term":"上場廃止","gloss":"退市"}: take the gloss-like field, else the first string that is not the term. */
+const GLOSS_KEYS=['gloss','释义','meaning','definition','translation','note','解释','意思'];
+function glossOf(v){
+ if(typeof v==='string')return v;
+ if(v&&typeof v==='object'){for(const k of GLOSS_KEYS)if(typeof v[k]==='string'&&v[k].trim())return v[k];const vals=Object.values(v).filter(x=>typeof x==='string');return vals.length>1?vals[vals.length-1]:vals[0]||'';}
+ return '';
+}
 export function parseGlosses(text,count){
- const raw=String(text||'').replace(/<think>[\s\S]*?<\/think>/g,'');const m=raw.match(/\[[\s\S]*\]/);if(!m)return [];
- try{const list=JSON.parse(m[0]);return Array.isArray(list)?list.slice(0,count).map(v=>typeof v==='string'?v.replace(/[\r\n]+/g,' ').trim().slice(0,24):''):[];}catch{return [];}
+ let list=Array.isArray(text)?text:null;
+ if(!list){const raw=String(text||'').replace(/<think>[\s\S]*?<\/think>/g,'');const m=raw.match(/\[[\s\S]*\]/);if(!m)return [];try{list=JSON.parse(m[0]);}catch{return [];}}
+ if(!Array.isArray(list))return [];
+ return list.slice(0,count).map(v=>glossOf(v).replace(/[\r\n]+/g,' ').trim().slice(0,24));
 }
 async function glossWords(env,words){
  if(!env.AI||typeof env.AI.run!=='function'||!words.length)return 0;
  const input=words.map((w,i)=>`${i+1}. ${w.term}${w.headline?' ｜ '+w.headline.slice(0,80):''}`).join('\n');
- for(const model of [env.DAILY_GLOSS_MODEL||GLOSS_MODEL,env.HOT_MODEL].filter(Boolean)){
+ for(const model of [...new Set([env.DAILY_GLOSS_MODEL||GLOSS_MODEL,GLOSS_FALLBACK])]){
   try{const out=await env.AI.run(model,{messages:[{role:'system',content:GLOSS_PROMPT+' /no_think'},{role:'user',content:input}],max_tokens:1200,temperature:0.2});
    /* Workers AI answers as {response} (Llama) or OpenAI-style {choices:[{message:{content}}]} (Qwen 3) */
    const raw=out?.response??out?.result?.response??out?.choices?.[0]?.message?.content??out?.result?.choices?.[0]?.message?.content??'';
-   const list=parseGlosses(typeof raw==='string'?raw:JSON.stringify(raw),words.length);if(!list.length)console.warn('gloss: no list from',model,String(JSON.stringify(out)).slice(0,300));
+   const list=parseGlosses(Array.isArray(raw)?raw:typeof raw==='string'?raw:JSON.stringify(raw),words.length);if(!list.length)console.warn('gloss: no list from',model,String(JSON.stringify(out)).slice(0,300));
    if(list.filter(Boolean).length>=Math.ceil(words.length/3)){words.forEach((w,i)=>{if(list[i])w.gloss=list[i];});return list.length;}
-   console.warn('gloss: too few from',model,list.filter(Boolean).length,'/',words.length,String(raw).slice(0,400));}catch(e){console.warn('gloss: model failed',model,String(e?.message||e).slice(0,200));}
+   console.warn('gloss: too few from',model,list.filter(Boolean).length,'/',words.length,JSON.stringify(raw).slice(0,400));}catch(e){console.warn('gloss: model failed',model,String(e?.message||e).slice(0,200));}
  }
  return 0;
 }

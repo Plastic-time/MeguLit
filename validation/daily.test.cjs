@@ -170,7 +170,7 @@ test('relay glosses: Workers AI JSON list (thinking stripped), fallback model, k
  const seen=[];const AI={run:async model=>{seen.push(model);if(model===d.GLOSS_MODEL)throw Error('no model');return {response:'["快餐产品","学校活动"]'};}};
  const e={DB:d1(),AI,HOT_MODEL:'@cf/meta/llama-3.1-8b-instruct'};await d.refreshWords(e,new Date('2026-11-11T00:00:00Z'),fetcher(FEEDS));
  const r=await d.hotWordsDailyGet(e,new URL('https://x/api/hotwords/daily'),{json:v=>v,fail:c=>c},new Date('2026-11-11T00:10:00Z'));
- assert.deepEqual(r.words.slice(0,2).map(w=>w.gloss),['快餐产品','学校活动']);assert.deepEqual(seen,[d.GLOSS_MODEL,'@cf/meta/llama-3.1-8b-instruct']);
+ assert.deepEqual(r.words.slice(0,2).map(w=>w.gloss),['快餐产品','学校活动']);assert.deepEqual(seen,[d.GLOSS_MODEL,d.GLOSS_FALLBACK]);
 });
 test('more news: Atom feeds, ACG category, stories kept for days across refreshes, capped per category',async()=>{
  const d=await load('daily.js');
@@ -225,4 +225,13 @@ test('relay glosses also read OpenAI-style answers; feeds keep old-but-listed st
  assert.deepEqual(r.words.slice(0,2).map(w=>w.gloss),['快餐产品','学校活动']);
  const old=MOE.replace('Mon, 09 Nov 2026','Fri, 30 Oct 2026'),n={DB:d1()};await d.refreshNews(n,new Date('2026-11-11T00:00:00Z'),fetcher({'https://moepedia.net':old}));
  assert.equal((await d.newsGet(n,{json:v=>v},new Date('2026-11-11T00:10:00Z'))).items.length,1,'a feed\'s own story is kept even when older than 10 days');
+});
+
+test('relay glosses: Qwen 3 JSON-mode answers (arrays of objects) are understood',async()=>{
+ const d=await load('daily.js');
+ assert.deepEqual(d.parseGlosses([{term:'上場廃止',gloss:'退市'},{term:'中村晃',释义:'棒球选手'},'鸡块',{a:'ナゲット',b:'快餐'}],4),['退市','棒球选手','鸡块','快餐']);
+ const AI={run:async()=>({response:[{term:'チキンマックナゲット',gloss:'快餐产品'},{term:'文化祭',gloss:'学校活动'}]})};
+ const e={DB:d1(),AI};await d.refreshWords(e,new Date('2026-11-11T00:00:00Z'),fetcher(FEEDS));
+ const r=await d.hotWordsDailyGet(e,new URL('https://x/api/hotwords/daily'),{json:v=>v,fail:c=>c},new Date('2026-11-11T00:10:00Z'));
+ assert.deepEqual(r.words.slice(0,2).map(w=>w.gloss),['快餐产品','学校活动']);
 });
