@@ -198,9 +198,9 @@ function exampleLine(db,key,gameId=null){
   const candidates=lineRows(db).filter(r=>r.words.some(w=>w[0]===key)).sort((a,b)=>(b.gameId===gameId)-(a.gameId===gameId)||fits(b)-fits(a)||b.readAt-a.readAt);
   for(const r of candidates){
     const hit=r.words.find(w=>w[0]===key);
-    const e=db.prepare('SELECT text,original,game_id FROM reading_events WHERE id=?').get(r.eventId);if(!e)continue;let o={};try{o=JSON.parse(e.original||'{}');}catch{}
+    const e=db.prepare('SELECT text,original,game_id,read_at FROM reading_events WHERE id=?').get(r.eventId);if(!e)continue;let o={};try{o=JSON.parse(e.original||'{}');}catch{}
     const text=plainLine(e.text);
-    return {text,gameId:e.game_id,start:hit[2],end:hit[3],...pickTranslation({human:isHuman(o.translationSource)?{text:o.translation,source:o.translationSource}:null,machine:isHuman(o.translationSource)?'':o.translation})};
+    return {text,gameId:e.game_id,readAt:e.read_at,start:hit[2],end:hit[3],...pickTranslation({human:isHuman(o.translationSource)?{text:o.translation,source:o.translationSource}:null,machine:isHuman(o.translationSource)?'':o.translation})};
   }
   return null;
 }
@@ -211,7 +211,7 @@ function saveWord(db,entry,example){
   try{
     db.prepare('INSERT OR IGNORE INTO vocabulary(id,spelling,reading,definitions,status,created_at,original) VALUES(?,?,?,?,0,?,?)').run(entry.id,entry.spellings?.[0]||'',entry.readings?.[0]||'',JSON.stringify(entry.definitions||[]),Math.floor(Date.now()/1000),JSON.stringify({entry,from:'reading'}));
     if(example?.text&&!db.prepare('SELECT 1 FROM examples WHERE word_id=? AND text=?').get(entry.id,example.text))
-      db.prepare('INSERT INTO examples(word_id,game_id,text,translation,highlight_start,highlight_end,created_at,original) VALUES(?,?,?,?,?,?,?,?)').run(entry.id,example.gameId||null,example.text,example.translation||'',example.start||0,example.end||0,Math.floor(Date.now()/1000),JSON.stringify({translationSource:example.translationSource||'',from:'reading'}));
+      db.prepare('INSERT INTO examples(word_id,game_id,text,translation,highlight_start,highlight_end,created_at,original) VALUES(?,?,?,?,?,?,?,?)').run(entry.id,example.gameId||null,example.text,example.translation||'',example.start||0,example.end||0,Math.floor(Date.now()/1000),JSON.stringify({translationSource:example.translationSource||'',from:'reading',readAt:example.readAt||null}));
     db.exec('COMMIT');
   }catch(error){db.exec('ROLLBACK');throw error;}
   return {id:entry.id,spelling:entry.spellings?.[0]||'',reading:entry.readings?.[0]||''};

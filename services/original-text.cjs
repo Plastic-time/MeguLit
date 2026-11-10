@@ -349,6 +349,20 @@ function provider(root,executable){
  if(scenes.ENGINES[entry[1].runtime?.engine]?.live||!entry[1].runtime&&liveEngines().some(e=>e.eligible(gameDir)))return liveProvider(root,entry[0],executable);
  return staticProvider(root,executable);
 }
+/* Learning (grammar examples, 2026-11-11): the imported script as index-aligned pairs, read-only (no import, no
+   rebuild). ja[i] is the Japanese line, tr[i] its human translation or '' (a patch line left in Japanese is none);
+   source is 'official' for a Chinese release with its Japanese original, 'group' for a translation group's patch. */
+function scriptPairs(root,executable){
+ const dir=path.dirname(String(executable||'')).toLowerCase();if(!dir)return null;
+ const entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file&&runningDirOf(s.runtime).toLowerCase()===dir);if(!entry)return null;const state=entry[1];
+ try{
+  if(state.status==='ready'&&state.original?.index){const tr=readIndex(state.runtime.index).lines,ja=readIndex(state.original.index).lines;return {source:'official',ja,tr:ja.map((_,i)=>typeof tr[i]==='string'&&!japaneseLine(tr[i])?tr[i]:'')};}
+  if(state.status!=='native-japanese'||!state.runtime.index)return null;const ja=readIndex(state.runtime.index).lines;
+  const patched=state.patchStatus==='ready'&&state.patch?.index&&state.patch.version===PATCH_VERSION&&(!state.patch.runtimeSha||state.patch.runtimeSha===state.runtime.sha256);
+  if(!patched)return {source:'',ja,tr:[]};const og=readIndex(state.patch.index).lines;
+  return {source:'group',ja,tr:ja.map((t,i)=>{const o=og[i];return typeof o==='string'&&o&&norm(o)!==norm(t)&&!japaneseLine(o)?o:'';})};
+ }catch{return null;}
+}
 function staticProvider(root,executable){
  // BGI's and scene engines' script is the whole game folder, AIN is a file in it.
  const entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file&&runningDirOf(s.runtime).toLowerCase()===path.dirname(String(executable)).toLowerCase());
@@ -410,4 +424,4 @@ async function discover(root,db,id,options={}){
  writeState(root,id,{status:state.original?.index?(state.alignment?.reliable?'ready':'unreliable'):status,lastSearch:{at:Date.now(),found:search.found.length,complete:search.complete,searched:search.searched,checked}});
  return {notFound:true,search:{found:search.found.length,complete:search.complete,searched:search.searched,checked}};
 }
-module.exports={brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,clearPatch,locate,readScript,ADAPTERS,readAin,align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,norm,discover,findCandidates};
+module.exports={scriptPairs,brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,clearPatch,locate,readScript,ADAPTERS,readAin,align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,norm,discover,findCandidates};
