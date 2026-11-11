@@ -8,7 +8,8 @@ export const PAGE_VEILS=[
  {key:'history',route:'history',a:.3,s:.14,b:10,label:{zh:'历史',en:'History',ja:'履歴'}}
 ];
 const PARTS=[['a',1],['s',1],['b',40]];
-export const stageFor=route=>PAGE_VEILS.find(p=>p.route===route)?.key||'';
+/* 2026-11-11 every other page (library, learning, daily, tools, settings, about) stands on the same glass at its default strength */
+export const stageFor=route=>PAGE_VEILS.find(p=>p.route===route)?.key||'page';
 export function veilOf(prefs,key){const d=PAGE_VEILS.find(p=>p.key===key);if(!d)return null;const v=(prefs?.pageVeils||{})[key]||{};const n=(x,f)=>Number.isFinite(Number(x))&&x!==''&&x!=null?Number(x):f;return {a:n(v.a,d.a),s:n(v.s,d.s),b:n(v.b,d.b)};}
 export function applyVeil(prefs,key=document.documentElement.dataset.stage){const v=veilOf(prefs,key),r=document.documentElement.style;if(!v){for(const k of ['--glass-a','--glass-s','--glass-b'])r.removeProperty(k);return;}r.setProperty('--glass-a',v.a);r.setProperty('--glass-s',v.s);r.setProperty('--glass-b',v.b+'px');}
 export function veilSettingsHTML(prefs,locale){

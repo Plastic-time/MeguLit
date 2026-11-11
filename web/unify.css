@@ -1,0 +1,201 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* 2026-11-11 one visual language for every page (after the home / detail / leaderboard / history redesign):
+   the same striped glass over the wallpaper with crop marks, hairline glass panels, serif headings, mono kickers,
+   lining numerals, one switch, one set of buttons, readable small text. Loaded after every page sheet, before
+   scrollbar.css. Only looks; no behaviour lives here. */
+
+:root{--u-mono:"IBM Plex Mono",Consolas,monospace;--u-glass:linear-gradient(160deg,rgba(24,24,30,.66),rgba(14,14,18,.54));--u-glass-solid:linear-gradient(160deg,rgba(26,22,26,.94),rgba(15,13,16,.94));--u-line:rgba(255,255,255,.09);--u-line-2:rgba(255,255,255,.16);--u-red:#c8323c;--u-red-2:#e0404a;--u-small:12px;--u-tiny:11px;--u-pad:clamp(18px,1.6vw,26px)}
+
+/* ---- top bar: the tabs give way before the logo ever does (en / ja are longer) ---- */
+.titlebar{justify-content:flex-start!important}
+@media (max-width:1500px){.titlebar .top-tab{padding-inline:clamp(6px,.62vw,12px)!important}.titlebar .top-tabs-main{margin-left:clamp(8px,1.2vw,20px)!important}}
+@media (max-width:1320px){.titlebar .top-tabs{gap:0!important}.titlebar .top-me{padding-inline:6px 10px!important}}
+
+/* ---- the stage every page stands on: crop marks like detail / history / leaderboard ---- */
+.workspace>.stage-cover .stage-marks{position:absolute;inset:22px 24px 22px 24px;pointer-events:none}
+.workspace>.stage-cover .stage-marks i{position:absolute;width:22px;height:22px;border:1px solid color-mix(in srgb,var(--g-t1,#f1e0d2) 38%,transparent)}
+.workspace>.stage-cover .stage-marks i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0}
+.workspace>.stage-cover .stage-marks i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0}
+.workspace>.stage-cover .stage-marks i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}
+.workspace>.stage-cover .stage-marks i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
+.workspace>.stage-cover .stage-marks{display:none}
+
+/* ---- numerals: lining, tabular where they line up ---- */
+.main,dialog,.game-dialog{font-variant-numeric:lining-nums}
+.main :is(time,strong,b,dd,td,.num,[class*=stat],[class*=count],[class*=metric],[class*=value]){font-variant-numeric:lining-nums tabular-nums}
+
+/* ---- no lone characters at the end of a paragraph ---- */
+.main :is(p,small,li,.settings-help,.settings-label,h1,h2,h3),dialog :is(p,li,h2,h3){text-wrap:pretty}
+.main :is(h1,h2,h3),dialog :is(h1,h2,h3){text-wrap:balance}
+
+/* ---- one glass panel (the leaderboard / history card): 2px corners, inset hairline, gold corner tick ---- */
+.main :is(.gm-hero,.gm-group,.ri-panel,section.panel.ri-panel,.stg-glass,.g-blank,.review-card,.tool-card,.about-facts,.about-links,.about-support,.about-credits,.settings-layout>.settings-nav,.settings-layout>.settings-content){
+ border:0!important;border-radius:2px!important;
+ background:linear-gradient(var(--g-gold),var(--g-gold)) 0 0/12px 2px no-repeat,linear-gradient(var(--g-gold),var(--g-gold)) 0 0/2px 12px no-repeat,var(--u-glass)!important;
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 0 0 1px var(--u-line),0 24px 50px -30px #000!important;
+ -webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3)}
+.main :is(.gm-overview,.gm-stg,.ri-level,.about-qcard,.tool-key-note,.steps){border-radius:2px!important}
+
+/* ---- learning / history sub tabs: still drop from the top bar (first tab under 首页), now a 44px band across the
+   content column with a 16px fade below; numbered like the detail tabs, 2px red underline on the current one ---- */
+.main>.tabs,.main.review-page>.tabs{display:flex!important;width:max-content!important;max-width:100%!important;box-sizing:border-box;height:44px;align-items:stretch;gap:clamp(20px,2vw,28px)!important;padding:0!important;margin:0 0 clamp(20px,2.4vw,32px)!important;
+ border:0!important;border-radius:0!important;counter-reset:utab;background:none!important;box-shadow:none!important}
+.main>.tabs::before{content:"";position:absolute;inset:0 -9999px -16px;z-index:-1;pointer-events:none;
+ background:linear-gradient(180deg,rgba(20,8,8,.92) 0,rgba(20,8,8,.92) 44px,rgba(20,8,8,0) 100%);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+ -webkit-mask:linear-gradient(#000 0 44px,rgba(0,0,0,.6) 44px,transparent 100%);mask:linear-gradient(#000 0 44px,rgba(0,0,0,.6) 44px,transparent 100%)}
+.main>.tabs::after{content:"";position:absolute;left:-9999px;right:-9999px;top:43px;height:1px;background:var(--u-line);pointer-events:none}
+.main>.tabs .tab{counter-increment:utab;display:flex;align-items:center;padding:0!important;font-size:13px!important;letter-spacing:.12em!important;color:var(--g-t3,#a08a80)!important;white-space:nowrap}
+.main>.tabs .tab::before{content:counter(utab,decimal-leading-zero);margin-right:8px;font-family:var(--u-mono);font-size:10px;letter-spacing:.08em;color:var(--g-gold);opacity:.8}
+.main>.tabs .tab:hover{color:var(--g-t1,#f1e0d2)!important}
+.main>.tabs .tab.active{color:var(--g-t1,#f1e0d2)!important}
+.main>.tabs .tab.active::after{content:""!important;position:absolute;left:0!important;right:0;bottom:0!important;width:auto!important;height:2px!important;margin:0!important;transform:none!important;background:#c82f3b!important;z-index:1}
+.main:has(>.tabs)>.page-header{top:18px!important;right:clamp(48px,4vw,64px)!important}
+.main:has(>.tabs)>.page-header{z-index:7!important}
+
+/* ---- dialogs and panels: one glass sheet below the top bar, hairline frame, gold corner tick, the app's own buttons
+   (E446 / E450 sizes kept: the 54px request row, the tall notice with room for the update list) ---- */
+html body :is(dialog.game-dialog,dialog.game-dialog.feedback-dialog,dialog.game-dialog.dev-notice,.lv-dialog,dialog.profile-panel){
+ border:0!important;border-radius:2px!important;color:var(--g-t1,#f1e0d2);
+ background:linear-gradient(var(--g-gold),var(--g-gold)) 0 0/14px 2px no-repeat,linear-gradient(var(--g-gold),var(--g-gold)) 0 0/2px 14px no-repeat,var(--u-glass-solid)!important;
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 0 0 1px var(--u-line-2),0 40px 90px -30px #000!important;
+ -webkit-backdrop-filter:blur(24px) saturate(1.2);backdrop-filter:blur(24px) saturate(1.2)}
+html body dialog.game-dialog[open]{inset:var(--titlebar-height,56px) 0 0 0;margin:auto;max-height:calc(100vh - var(--titlebar-height,56px) - 40px)!important}
+html body dialog.game-dialog.dev-notice[open]{height:min(940px,calc(100vh - var(--titlebar-height,56px) - 40px))!important}
+html body dialog.game-dialog.dev-notice[open]:not(:has(.dev-notice-updates:not([hidden]))):not(:has(.dev-notice-page:not([hidden])>.dev-notice-scroll)){height:auto!important}
+html body :is(dialog.game-dialog,dialog.profile-panel)::backdrop{background:rgba(6,5,7,.62)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+html body .lv-backdrop{padding-top:calc(var(--titlebar-height,56px) + 16px)!important;background:rgba(6,5,7,.62)!important;backdrop-filter:blur(6px)!important}
+/* kickers in every dialog: gold mono, readable */
+html body :is(.dev-notice-top,dialog.feedback-dialog .game-dialog-kicker,.lv-kicker){font-family:var(--u-mono)!important;font-size:11px!important;letter-spacing:.28em!important;color:var(--g-gold)!important}
+html body .dev-notice-top span:last-child{color:var(--g-t3,#a08a80)!important}
+/* buttons: the paper blocks become the app's own star-seal primary (e255, as on the detail page); one primary per
+   dialog, the rest are hairline secondaries */
+html body dialog.game-dialog :is(.dev-notice-form button.primary,.dialog-actions button.primary){
+ border:0!important;border-radius:10px!important;color:#fbeedd!important;text-shadow:0 0 10px rgba(255,170,120,.35)!important;letter-spacing:.08em;font-weight:600;
+ background:radial-gradient(1.2px 1.2px at 78% 28%,rgba(255,226,180,.9),transparent 70%),radial-gradient(1px 1px at 88% 66%,rgba(255,226,180,.7),transparent 70%),radial-gradient(120% 140% at 0% 50%,rgba(196,40,58,.55),transparent 62%),linear-gradient(135deg,#3a1720 0%,#2a1219 45%,#1d1016 100%)!important;
+ box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold-accent,#edb56e) 42%,transparent),inset 0 0 0 3px rgba(20,10,12,.55),inset 0 0 0 4px color-mix(in srgb,var(--gold-accent,#edb56e) 14%,transparent),0 6px 18px -6px rgba(150,20,40,.55)!important}
+html body dialog.game-dialog .dialog-actions button.primary{height:48px!important;min-width:128px}
+html body dialog.game-dialog .dev-notice-form>button.primary{border-radius:0 10px 10px 0!important}
+html body dialog.game-dialog :is(.dev-notice-form button.primary,.dialog-actions button.primary):hover{filter:brightness(1.15)}
+html body dialog.game-dialog :is(.dev-notice .dev-notice-actions button.secondary.secondary.secondary,.dialog-actions .text-button){
+ height:44px!important;min-width:96px;padding:0 22px!important;border:0!important;border-radius:2px!important;background:rgba(255,255,255,.03)!important;background-image:none!important;
+ color:var(--g-t1,#f1e0d2)!important;text-decoration:none!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important;letter-spacing:.08em;font-weight:600;text-shadow:none!important}
+html body dialog.game-dialog :is(.dev-notice .dev-notice-actions button.secondary.secondary.secondary,.dialog-actions .text-button):hover{background:rgba(255,255,255,.07)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important;color:var(--g-gold)!important}
+html body dialog.game-dialog :is(button,input,textarea):focus-visible{outline:1px solid var(--g-gold)!important;outline-offset:3px!important}
+html body dialog.game-dialog :is(button,input,textarea):focus:not(:focus-visible){outline:0!important}
+/* fields: hairline box, gold focus */
+html body .dev-notice-form>input{border:1px solid var(--u-line-2)!important;border-right:0!important;border-radius:2px 0 0 2px!important;background:rgba(10,9,12,.55)!important;border-radius:0!important}
+html body .dev-notice-form>input:focus{border-color:color-mix(in srgb,var(--g-gold) 60%,transparent)!important;outline:0}
+html body dialog.feedback-dialog :is(.feedback-text,.feedback-contact){border:1px solid var(--u-line-2)!important;border-radius:2px!important;background:rgba(10,9,12,.55)!important;resize:none!important}
+html body dialog.feedback-dialog :is(.feedback-text,.feedback-contact):focus{border-color:color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
+html body dialog.feedback-dialog .feedback-text{border-left:2px solid var(--u-red)!important}
+html body dialog.feedback-dialog .dialog-actions{margin-right:0!important;margin-left:0!important}
+.dev-notice kbd,.dev-notice .kbd{white-space:nowrap}
+
+/* ---- one switch everywhere (judge spec): 40×20 hairline track, square 14px knob, deep wine when on with a gold line
+   along the track's foot; the strap's slash read as a broken icon ---- */
+html body input.switch{width:40px!important;height:20px!important;border-radius:2px!important;border:0!important;
+ background:rgba(10,9,12,.5)!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.28)!important;transition:background .16s ease-out,box-shadow .16s}
+html body input.switch::before{top:3px!important;left:3px!important;width:14px!important;height:14px!important;border-radius:1px!important;background:rgba(232,220,200,.5)!important;box-shadow:none!important;transition:transform .16s ease-out,background-color .16s}
+html body input.switch::after{content:none!important;display:none!important}
+html body input.switch:checked{background:linear-gradient(#6e1c29,#4e1320)!important;box-shadow:inset 0 0 0 1px rgba(201,164,106,.55),inset 0 -1px 0 1px rgba(201,164,106,.75)!important}
+html body input.switch:checked::before{transform:translateX(20px)!important;background:#f1e6d3!important}
+html body input.switch:hover{box-shadow:inset 0 0 0 1px rgba(232,220,200,.5)!important}
+html body input.switch:checked:hover{background:linear-gradient(#7a2030,#561522)!important;box-shadow:inset 0 0 0 1px rgba(201,164,106,.8),inset 0 -1px 0 1px rgba(201,164,106,.9)!important}
+html body input.switch:focus-visible{outline:1px solid var(--g-gold)!important;outline-offset:3px!important}
+@media (prefers-reduced-motion:reduce){html body input.switch,html body input.switch::before{transition:none!important}}
+
+/* ---- settings: a serif title per section, a solid sticky search and preview, a wider help column, one control width,
+   a nav that fits Japanese and English ---- */
+.main .settings-layout{grid-template-columns:clamp(200px,16vw,248px) minmax(0,1fr)!important;gap:clamp(20px,2.4vw,40px)!important}
+html body .main .settings-content .settings-section-title{position:static!important;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal;display:block!important;min-height:0;
+ margin:6px 0 18px!important;padding:0!important;font-family:var(--g-serif,serif);font-size:clamp(24px,1.7vw,30px);font-weight:600;letter-spacing:.02em;color:var(--g-t1,#f1e0d2)}
+html body .main .settings-content .settings-section-title::before{content:"settings";display:block;margin-bottom:10px;font-family:var(--u-mono);font-size:11px;font-weight:400;letter-spacing:.3em;color:var(--g-gold)}
+html body .main .settings-content .settings-search{background-color:#17131a!important;border:1px solid var(--u-line-2)!important;border-radius:2px!important;box-shadow:0 14px 22px -14px rgba(0,0,0,.9)!important;z-index:8}
+html body .main .settings-content .settings-search:focus{border-color:color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html body .sp-preview{background:var(--u-glass-solid)!important;border:0!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2),0 18px 30px -18px #000!important}
+html body .main .settings-content .settings-help,html body .setting-description .settings-help{max-width:62ch!important;font-size:12.5px!important;line-height:1.7!important;color:color-mix(in srgb,var(--g-t2,#c3ab9c) 92%,transparent)!important}
+.main .settings-content .settings-row :is(.select-control,.font-control,.setting-slider,input[type=text],input[type=url],input[type=number],input:not([type]),input[type=password]):not(.switch){width:clamp(220px,22vw,300px)!important;max-width:100%;box-sizing:border-box}
+.main .settings-nav .settings-category-items button{font-size:13px!important;line-height:1.45!important;padding:8px 12px!important;white-space:normal;word-break:keep-all;overflow-wrap:anywhere}
+.main .settings-nav summary{font-size:15px!important;line-height:1.4}
+:lang(ja) .main .settings-nav .settings-category-items button,:lang(en) .main .settings-nav .settings-category-items button{font-size:12.5px!important}
+html body .sp-preview .sp-scene{background-color:#0e0c10!important}
+html body .sp-preview .sp-scene>*{background-color:transparent}
+
+/* ---- segmented switches (settings pages, translation types, library / learning filters): the leaderboard's own:
+   hairline frame, gold underline on the current one ---- */
+html body .translation-types{gap:0!important;padding:0!important;border:0!important;border-radius:2px!important;background:rgba(10,9,12,.42)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
+html body .translation-types button{border-radius:0!important;padding:9px clamp(12px,1.2vw,18px)!important;font-size:13px!important;letter-spacing:.08em;color:var(--g-t3,#a08a80)!important;background:none!important;box-shadow:none!important}
+html body .translation-types button:hover{color:var(--g-t1,#f1e0d2)!important}
+html body .translation-types button:is([aria-selected=true],[aria-pressed=true],.active){color:var(--g-t1,#f1e0d2)!important;background:color-mix(in srgb,var(--g-gold) 9%,transparent)!important;box-shadow:inset 0 -2px 0 var(--g-gold)!important}
+
+/* ---- learning (kana lab, grammar, lessons, read words, statistics): the black slabs and paper blocks become the same
+   glass; white "selected" chips become the gold underline; one highlight for the target particle ---- */
+:is(.gm-page,.v-index.mg,.ri-page,#learning-content){--mg-black:rgba(16,13,17,.6);--mg-line:rgba(255,255,255,.1);--mg-dim:rgba(242,232,218,.66)}
+html body :is(.gm-hud,.gm-group,.gm-lesson>.gm-steps,.mg-hud,.mg-lesson,.mg-board-grid,.mg-board-empty,.mg-voice,.mg-practice,.mg-tile,.mg-stage,.mg-game,.gm-stage,.gm-overview,.gm-hero,.gm-lesson-head,.gm-lesson-main,.rw-bar,.rw-card,.ri-stage,.ri-level,.gm-stg,.gm-stg.on){
+ background-color:transparent!important;
+ background:var(--u-glass)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;border-radius:2px!important;
+ -webkit-backdrop-filter:blur(16px) saturate(1.2);backdrop-filter:blur(16px) saturate(1.2)}
+html body :is(.gm-hud,.mg-hud,.gm-lesson-head){box-shadow:inset 0 0 0 1px var(--u-line),inset 0 2px 0 var(--u-red)!important;border-top:0!important}
+html body :is(.gm-stg.on,.rw-card){box-shadow:inset 0 0 0 1px var(--u-line),inset 0 2px 0 var(--u-red)!important;border-top:0!important}
+html body :is(.mg-tile,.mg-game,.gm-stg):hover{box-shadow:inset 0 0 0 1px var(--u-line-2),inset 0 2px 0 color-mix(in srgb,var(--u-red) 70%,transparent)!important}
+/* paper blocks (Megumin's line, Anki offer, N0 note, the white quote, kana word card): dark glass, gold rule, light ink */
+html body :is(.gm-lesson .gm-bubble,.gm-anki-offer,.gm-n0note,.rw-quote,.v-index.mg .mk-card){background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 10%,transparent),transparent 70%),rgba(16,13,17,.62)!important;color:var(--g-t1,#f1e0d2)!important;border-left:2px solid var(--g-gold)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;border-radius:2px!important}
+html body .gm-lesson .gm-bubble :is(b,strong){color:var(--g-gold)}
+/* white selected chips → gold underline on glass */
+html body :is(.gm-hud .gm-level.active,.gm-gtab.on,.v-index.mg .mk-lv.on,.v-index.mg .mk-lv.on.l0){background:color-mix(in srgb,var(--g-gold) 12%,transparent)!important;border-color:color-mix(in srgb,var(--g-gold) 55%,transparent)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 var(--g-gold)!important}
+html body :is(.gm-barcode i.on,.gm-stg-bar i.on){background:var(--g-gold)!important}
+html body .gm-stg.clear .gm-stg-flag{background:var(--g-gold)!important;color:#120d0c!important}
+html body .gm-lesson .gm-choice:hover:not(:disabled){background:color-mix(in srgb,var(--g-gold) 16%,rgba(16,13,17,.7))!important;color:var(--g-t1,#f1e0d2)!important}
+html body .gm-map .gm-node{background:rgba(16,13,17,.62)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
+html body :is(.gm-map .gm-node .gm-chip:hover,.v-index.mg .mk-say:hover){background:var(--g-gold)!important;color:#120d0c!important}
+html body :is(.mg-legend i.m2,.v-index.mg .mastery .m2){background:var(--g-gold)!important;color:#120d0c!important}
+html body :is(.ri-bar-met,.ri-n5){background:var(--g-gold)!important}
+/* the kickers stay mono but readable */
+html body :is(.gm-page,.v-index.mg,.ri-page) :is([class*=kicker],[class*=eyebrow],.mg-k,.gm-k){font-size:11px!important;letter-spacing:.24em!important}
+/* small print in the learning pages: at least 11–12px, a step brighter */
+html body #learning-content :is(small,.mg-legend,.gm-legend,.ri-note,.stg-foot,.gm-step-count,.mg-row-label){font-size:max(11.5px,1em)!important}
+
+/* ---- grammar lessons: hairlines instead of dashes, a glass highlight for the current step, ghost "previous",
+   one way to mark the target particle, room under the sticky band ---- */
+.workspace>.main:has(>.tabs){scroll-padding-top:96px}
+html body #learning-content :is(.gm-lesson,.gm-lesson-head,.gm-page){scroll-margin-top:96px}
+html body .gm-page :is(.gm-lead-line,.gm-pill,.gm-block,.gm-lesson-head .gm-chip,.gm-lesson .gm-lead-line,.gm-lesson .gm-widget,.gm-find){border-style:solid!important;border-color:var(--u-line)!important;border-radius:2px!important}
+html body .gm-page :is(.gm-lesson .gm-step-dot,.gm-lesson .gm-stepnav,.gm-lesson .gm-formulas li,.gm-more){border-style:solid!important;border-color:var(--u-line)!important}
+html body .gm-page .gm-hero-side{border-left-style:solid!important;border-color:var(--u-line)!important}
+html body .gm-page .gm-stage::before{border-style:solid;border-color:rgba(255,255,255,.06)}
+html body .gm-lesson .gm-step-dot{background:none!important}
+html body .gm-lesson .gm-step-dot.active{background:linear-gradient(90deg,rgba(200,50,60,.18),transparent)!important;box-shadow:inset 2px 0 0 var(--u-red)!important;color:var(--g-t1,#f1e0d2)!important}
+html body .gm-lesson .gm-step-dot span{font-size:12px!important;letter-spacing:.1em!important}
+html body .gm-lesson .gm-stepnav{gap:16px}
+html body .gm-lesson .gm-stepnav button:not(.primary){height:40px;border:0!important;border-radius:2px!important;background:transparent!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;color:var(--g-t1,#f1e0d2)!important}
+html body .gm-lesson .gm-stepnav button:not(.primary):disabled{opacity:.38}
+html body .gm-lesson .gm-stepnav :is(span,small,.gm-count){font-size:12px!important;letter-spacing:.14em;color:var(--g-t2,#c3ab9c)}
+html body .gm-page .gm-back{height:36px;border:0!important;border-radius:2px!important;background:rgba(16,13,17,.62)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;font-size:12px!important;letter-spacing:.2em!important}
+html body .gm-page .gm-back:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--u-red) 70%,transparent)!important}
+html body .gm-page :is(.gm-hl,.gm-jd-hl){background:color-mix(in srgb,var(--g-gold) 20%,transparent)!important;color:var(--g-gold)!important;box-shadow:inset 0 -1px 0 var(--g-gold);border:0!important;border-radius:1px}
+html body .gm-page .gm-blank.gm-drop{border:1px solid color-mix(in srgb,var(--g-gold) 55%,transparent)!important;border-radius:2px!important;background:color-mix(in srgb,var(--g-gold) 6%,transparent)!important;font-size:12px!important;letter-spacing:.14em!important;vertical-align:middle}
+html body .gm-page :is(.gm-choices button,.gm-palette button,.gm-word-picks button,.gm-pills button){border-radius:2px!important;background:rgba(16,13,17,.6)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;border:0!important;color:var(--g-t1,#f1e0d2)!important}
+html body .gm-page .gm-slot{border-bottom:1px solid color-mix(in srgb,var(--g-gold) 60%,transparent)!important;background:color-mix(in srgb,var(--g-gold) 6%,transparent)!important}
+html body .gm-lesson-main>:first-child{max-width:980px}
+html body .gm-page :is(.gm-link,.gm-ex-actions button,.gm-say){font-size:12px!important}
+
+/* list rows: the glass without the corner tick */
+html body .main .record.word-row{border:0!important;border-radius:2px!important;background:var(--u-glass)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+html body .main .record.word-row:hover{box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
+/* restore the star on dialog primaries */
+html body dialog.game-dialog :is(.dev-notice-form button.primary,.dialog-actions button.primary)::before{content:""!important;display:block!important}
+/* settings sub pages: underlined text tabs (grimoire), spaced, no frame, red current line like the detail tabs */
+html body .main .settings-content .settings-page-tabs{gap:clamp(18px,2vw,28px)!important;padding:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:inset 0 -1px 0 var(--u-line)!important;width:100%!important;margin-bottom:18px!important}
+html body .main .settings-content .settings-page-tabs button{padding:10px 0!important;font-size:13px!important;letter-spacing:.1em;color:var(--g-t3,#a08a80)!important;background:none!important;border-radius:0!important;box-shadow:none!important}
+html body .main .settings-content .settings-page-tabs button:hover{color:var(--g-t1,#f1e0d2)!important}
+html body .main .settings-content .settings-page-tabs button[aria-selected=true]{color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
+html body .main .settings-content .settings-page-tabs button[aria-selected=true]::after{display:none!important}
+/* live preview chips: square */
+html body .sp-preview :is(.sp-next,.sp-read,.sp-read button,.sp-scene,.sp-scene *[class*=name],.sp-tag){border-radius:2px!important}
+html body .sp-preview .sp-next{border-color:rgba(232,220,200,.22)!important;background:rgba(255,255,255,.03)!important;color:var(--g-t1,#f1e0d2)!important}
+/* word cards: the example line reads as a quote you can open, not a raw link; square icon buttons */
+html body .main .record .word-source{font-size:12.5px;color:var(--g-t3,#a08a80)}
+html body .main .record .word-source .link-button{text-decoration:none!important;color:var(--g-t2,#c3ab9c)!important;font-family:var(--g-serif-ja,serif);font-size:13px;padding:2px 0 2px 10px!important;box-shadow:inset 2px 0 0 color-mix(in srgb,var(--g-gold) 55%,transparent)}
+html body .main .record .word-source .link-button:hover{color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 2px 0 0 var(--g-gold)}
+html body .main :is(.record,.word-actions) .icon-button{border-radius:2px!important;background:transparent!important;box-shadow:inset 0 0 0 1px var(--u-line)!important}
+html body .main :is(.record,.word-actions) .icon-button:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--u-red) 70%,transparent)!important;color:#e8a0a8!important}
