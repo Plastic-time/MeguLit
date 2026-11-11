@@ -54,8 +54,10 @@ const DRAWS={
  tumble:()=>({f:[[0,at(rnd(-40,40),-200,rnd(-10,10),.9,'rotateX(720deg)')],[.42,at(0,0,0,1,'rotateX(0deg)'),'cubic-bezier(.25,.8,.3,1)']]}),
  skid:()=>{const sx=pickOne([-1,1]);return {f:[[0,at(sx*-220,8,sx*-12,1)],[.22,at(sx*24,2,sx*6,1),'cubic-bezier(.1,.8,.3,1)'],[.34,at(sx*-5,0,sx*-2,1),E3],[.44,at(0,0,0,1),E1]]};},
  heli:()=>{const k=pickOne([-1,1]);return {f:[[0,at(rnd(-30,30),-190,0,.6,UP(1.5))],[.42,at(0,0,k*1080,1),'cubic-bezier(.2,.6,.3,1)']]};}};
+const PILE_IN=480;
 function pileMotion(pile,kind,total,delay){const cards=[...pile.children],top=cards[cards.length-1],rest=cards.slice(0,-1),base=c=>c.style.transform;
- pile.getAnimations().forEach(x=>x.cancel());pile.animate([{opacity:0,translate:'0 18%'},{opacity:1,translate:'0 0',offset:.08},{opacity:1,translate:'0 0',offset:.42},{opacity:0,translate:'0 8%',offset:.6},{opacity:0}],{duration:total,delay:Math.max(0,delay-120),easing:'cubic-bezier(.2,.8,.2,1)',fill:'both'});
+ pile.getAnimations().forEach(x=>x.cancel());const inMs=PILE_IN,from=pickOne([['-70%','55%',-24],['-40%','90%',-8],['30%','80%',14]]);pile.animate([{opacity:0,translate:`${from[0]} ${from[1]}`,rotate:`${from[2]}deg`},{opacity:1,translate:'0 0',rotate:'0deg',offset:inMs/(inMs+total)*.95},{opacity:1,translate:'0 0',rotate:'0deg',offset:(inMs+total*.42)/(inMs+total)},{opacity:0,translate:'-6% 10%',rotate:'-4deg',offset:(inMs+total*.62)/(inMs+total)},{opacity:0}],{duration:inMs+total,delay:Math.max(0,delay-inMs),easing:'cubic-bezier(.22,1,.36,1)',fill:'both'});
+ cards.forEach((c,n)=>c.animate([{opacity:0,translate:'0 -26px'},{opacity:1,translate:'0 0'}],{duration:260,delay:Math.max(0,delay-inMs)+90+n*45,easing:'cubic-bezier(.2,.9,.3,1)',fill:'backwards'}));
  const hid=kind==='lift'?cards[0]:top;hid.animate([{opacity:0},{opacity:0}],{duration:total*.85,delay,fill:'backwards'});
  const wob=(c,kf,o)=>c.animate(kf,{duration:total*.5,delay,easing:E1,fill:'backwards',...o});
  if(kind==='fan')rest.forEach((c,n)=>{const k=n-(rest.length-1)/2;wob(c,[{transform:base(c)},{transform:`${base(c)} rotate(${k*9}deg) translateX(${k*6}px)`,offset:.35},{transform:`${base(c)} rotate(${k*9}deg) translateX(${k*6}px)`,offset:.6},{transform:base(c)}]);});
@@ -86,7 +88,7 @@ function deal(cover,background,animate,mode='draw'){const flip=cover.querySelect
  const track=springTrack(targets,feel),total=track[track.length-1].t*1000;
  const frames=track.map(({t,p,v})=>{const lean=Math.max(-14,Math.min(14,v.x*feel.drag)),pitch=Math.max(-12,Math.min(12,-v.y*feel.drag*.8));return {offset:Math.min(1,t*1000/total),transform:`translate(${p.x.toFixed(2)}%,${p.y.toFixed(2)}%) translateZ(${p.z.toFixed(1)}px) rotateX(${(p.rx+pitch).toFixed(2)}deg) rotate(${(p.r+lean).toFixed(2)}deg) rotateY(${p.ry.toFixed(2)}deg) scale(${p.s.toFixed(4)}) scaleX(${p.sx.toFixed(3)}) scaleY(${p.sy.toFixed(3)})`};});
  frames[0].offset=0;frames[frames.length-1]={offset:1,transform:'none'};
- const swapAt=track.find(f=>Math.abs(f.p.ry)<90)?.t*1000||total*.7,mid=Math.min(.999,swapAt/total),delay=gap*1000,timing={duration:total,delay,easing:'linear',fill:'backwards'};
+ const swapAt=track.find(f=>Math.abs(f.p.ry)<90)?.t*1000||total*.7,mid=Math.min(.999,swapAt/total),delay=gap*1000+(style.pile&&pile?PILE_IN:0),timing={duration:total,delay,easing:'linear',fill:'backwards'};
  if(pile&&style.pile){pileCards(pile);pileMotion(pile,style.pile,total,delay);}
  flip.animate(frames,timing);
  face.animate([{opacity:0},{opacity:0,offset:mid},{opacity:1,offset:Math.min(1,mid+.001)},{opacity:1}],timing);
@@ -126,10 +128,10 @@ export function renderHomeTV(main,ctx){
  main.innerHTML=`<div class="tv-home" tabindex="-1"><div class="tv-canvas">
   <div class="tv-plane" data-z="-200"><div class="tv-tl"></div></div>
   <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-index"></div><div class="tv-ring"></div></div>
-  <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div><div class="tv-heat-card tv-card"><div class="tv-face"><button class="tv-heatlink" data-go="activity"></button><div class="tv-heat"></div><div class="tv-heatsum"></div><button class="tv-daily" data-go="daily"><i aria-hidden="true"></i><span class="tv-daily-k">${w.daily}</span><span class="tv-daily-t"></span><small>→</small></button><i class="tv-glare"></i></div></div></div>
+  <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div></div>
   <div class="tv-plane" data-z="60"><div class="tv-pile" aria-hidden="true"></div><div class="tv-cover tv-card"><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""><i></i><i></i><i></i><i></i></div></div></div></div></div>
   <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div><div class="tv-scene"></div>
-  <div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div>
+  <div class="tv-left"><div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div><div class="tv-heat-card tv-card"><div class="tv-face"><button class="tv-heatlink" data-go="activity"></button><div class="tv-heat"></div><div class="tv-heatsum"></div><button class="tv-daily" data-go="daily"><i aria-hidden="true"></i><span class="tv-daily-k">${w.daily}</span><span class="tv-daily-t"></span><small>→</small></button><i class="tv-glare"></i></div></div></div>
   
   <div class="tv-figs"><button class="tv-fig" data-go="statistics"><b data-fig="time">0m</b><small>${w.figRead}</small></button><button class="tv-fig" data-go="detail"><b data-fig="chars">0</b><small>${w.figChars}</small></button><button class="tv-fig" data-go="words"><b data-fig="words">0</b><small>${w.figWords}</small></button><button class="tv-more" data-go="statistics">${w.full} →</button></div>
   <div class="tv-title"><div class="tv-ruby"></div><div class="tv-h1" role="heading" aria-level="1"></div><div class="tv-meta"></div></div>
