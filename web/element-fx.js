@@ -92,6 +92,7 @@ export function mountElementFx(canvas){
   const sc=SCENES[el];ctx.clearRect(0,0,s.W,s.H);ctx.globalCompositeOperation='lighter';
   if(s.ct>=0)s.ct+=s.dt;
   sc.spawn(s,s.I);FORMS[el]?.(s,ctx,s.I);sc.draw(s,ctx,s.I);ctx.globalCompositeOperation='lighter';
+  if(s.ps.length>800)s.ps.splice(0,s.ps.length-800);
   s.ps=s.ps.filter(p=>{p.t+=s.dt;if(p.t>p.life)return false;if(p.vx!==undefined){if(p.drag){p.vx*=1-p.drag*s.dt;p.vy*=1-p.drag*s.dt;}if(p.g)p.vy+=p.g*s.dt;p.x+=p.vx*s.dt;p.y+=p.vy*s.dt;}if(p.kind==='gust'){p.trail.push([p.x,p.y]);if(p.trail.length>7)p.trail.shift();const k=p.t/p.life;ctx.strokeStyle=`rgba(200,255,232,${(1-k)*.6})`;ctx.lineWidth=1.2;ctx.beginPath();p.trail.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();return true;}
    if(p.kind==='smoke'){const k=p.t/p.life,r=p.r*(1+k*2);ctx.save();ctx.globalCompositeOperation='source-over';const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);g.addColorStop(0,`rgba(40,18,70,${.45*(1-k)})`);g.addColorStop(1,'rgba(40,18,70,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,r,0,TAU);ctx.fill();ctx.restore();return true;}
    if(p.kind==='ember'&&el!=='fire'){return true;}

@@ -1526,3 +1526,12 @@ html body .fx-panel .fx-row:has(.switch:not(:checked)) .setting-slider{opacity:.
 html body .fx-panel .fx-all{border-bottom:1px solid var(--u-line-2);padding-bottom:18px;margin-bottom:6px}
 html body .fx-panel .fx-foot{display:flex;justify-content:flex-end;padding-top:18px}
 html body .settings-nav [data-fx-panel]{all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer}
+
+/* 花鳥風月 heal (user: fill the pit and every crack, not a circle): water fills the pit to its own outline and runs
+   along each crack; then everything fades together */
+html body svg.fx-scars .fx-heal-pit{fill:rgba(110,200,250,.82)!important;stroke:rgba(225,248,255,.9);stroke-width:1.2;filter:drop-shadow(0 0 6px rgba(120,210,255,.75))}
+html body svg.fx-scars .fx-heal-crack{fill:none;stroke:rgba(150,220,255,.95)!important;stroke-linecap:round;stroke-dasharray:1 1;stroke-dashoffset:1;filter:drop-shadow(0 0 4px rgba(120,210,255,.9))!important}
+html body svg.fx-scars g.fx-scar.is-gone :is(path.fx-pit,path.fx-rim,path.fx-pit-lip){opacity:1!important}
+html body svg.fx-scars g.fx-scar.is-gone path.fx-crack{stroke-dashoffset:0!important;stroke:rgba(14,8,10,.72)!important}
+html body svg.fx-scars g.fx-scar.is-gone path.fx-pit{fill:rgba(8,4,6,.88)!important}
+html body .fx-heal-petal{font-size:13px}

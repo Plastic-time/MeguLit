@@ -5,7 +5,7 @@
    Again / Good / Easy buttons of the review) and only reacts within a moment of the learner's own click or key. */
 import {fxPref} from './fx-prefs.js';
 import {calm,NS,scarMarkup,debris,explosion,fountain} from './burst-fx.js';
-const WRONG='.wrong,.miss,.gm-blank.bad',RIGHT='.right,.hit,.gm-blank.ok',MAX=10;
+const WRONG='.wrong,.miss,.gm-blank.bad',RIGHT='.right,.hit,.gm-blank.ok',MAX=6;
 let lastInput=0,queued=null,lastPoint=null;
 const recent=()=>performance.now()-lastInput<1600;
 addEventListener('pointerdown',e=>{lastInput=performance.now();lastPoint={x:e.clientX,y:e.clientY};},true);
@@ -32,10 +32,26 @@ async function blast(el){
  const cx=(x-b.left).toFixed(1),cy=(y-b.top).toFixed(1),gid='sc'+seed;
  g.innerHTML=scarMarkup(seed,x-b.left,y-b.top,R,R*1.6+Math.random()*30,6+Math.floor(Math.random()*3))+`<circle class="fx-water" cx="${cx}" cy="${cy}" r="0"/>`;g.classList.add('is-hot');setTimeout(()=>g.classList.remove('is-hot'),2600);
  svg.append(g);
- const all=svg.querySelectorAll('g.fx-scar:not(.is-gone)');if(all.length>MAX)mend(all[0]);
+ const all=[...svg.querySelectorAll('g.fx-scar:not(.is-gone)')];while(all.length>MAX)mend(all.shift(),true);
  debris(x,y+R*.4,{n:16,spread:1.3,up:.9,tint:'ash'});
 }
-function mend(g){const w=g.querySelector('.fx-water'),pit=g.querySelector('.fx-rim');if(w&&pit){const bb=pit.getBBox(),R=Math.max(bb.width,bb.height)/2;w.animate([{r:'0px',opacity:.9},{r:R+'px',opacity:.8,offset:.55},{r:R+'px',opacity:0}],{duration:1300,easing:'cubic-bezier(.3,.7,.2,1)',fill:'forwards'});}g.classList.add('is-gone');setTimeout(()=>g.remove(),1600);}
+/* 2026-11-12 (user: the healing must fill the pit and every crack, not a circle): water runs along each crack from the
+   pit outward, segment after segment; the pit fills to its own ragged outline from the centre; petals settle along the
+   cracks; then pit, cracks and water fade together and the surface is whole again */
+function mend(g,fast=false){
+ if(g.classList.contains('is-gone'))return;g.classList.add('is-gone');
+ const ns='http://www.w3.org/2000/svg',flow=document.createElementNS(ns,'g');flow.setAttribute('class','fx-heal');g.append(flow);
+ const pit=g.querySelector('.fx-pit'),cracks=[...g.querySelectorAll('.fx-crack')],T=fast?260:1;
+ if(pit){const fill=pit.cloneNode();fill.setAttribute('class','fx-heal-pit');flow.append(fill);const bb=pit.getBBox(),ox=bb.x+bb.width/2,oy=bb.y+bb.height/2;fill.style.transformOrigin=`${ox}px ${oy}px`;
+  fill.animate([{transform:'scale(0)',opacity:.95},{transform:'scale(1)',opacity:.95}],{duration:fast?T:520,easing:'cubic-bezier(.3,.7,.2,1)',fill:'forwards'});}
+ cracks.forEach((c,i)=>{const w=c.cloneNode();w.setAttribute('class','fx-heal-crack');w.setAttribute('stroke-width',String(Math.max(1.4,+c.getAttribute('stroke-width')*1.6)));flow.append(w);
+  w.animate([{strokeDashoffset:1},{strokeDashoffset:0}],{duration:fast?T:220,delay:fast?0:120+(i%6)*70+Math.floor(i/6)*40,easing:'ease-out',fill:'both'});});
+ if(!fast){const pts=cracks.filter((_,i)=>i%3===0).slice(0,8);for(const c of pts){const b=c.getBBox(),r=g.ownerSVGElement.getBoundingClientRect();petal(r.left+b.x+b.width,r.top+b.y+b.height);}}
+ setTimeout(()=>{g.animate([{opacity:1},{opacity:0}],{duration:fast?160:700,fill:'forwards'});setTimeout(()=>g.remove(),fast?180:720);},fast?T:1100);
+}
+function petal(x,y){if(document.querySelectorAll('.fx-petal').length>60)return;const p=document.createElement('i');p.className='fx-petal fx-heal-petal';p.textContent=['✿','❀','✾'][Math.floor(Math.random()*3)];p.style.cssText=`left:${x}px;top:${y}px`;
+ let l=document.querySelector('body>.fx-layer');if(!l){l=document.createElement('div');l.className='fx-layer';document.body.append(l);}l.append(p);
+ p.animate([{transform:'translate(-50%,-50%) scale(0) rotate(0)',opacity:0},{transform:'translate(-50%,-50%) scale(1) rotate(40deg)',opacity:1,offset:.4},{transform:`translate(calc(-50% + ${((Math.random()-.5)*30).toFixed(0)}px),calc(-50% - 18px)) scale(.7) rotate(90deg)`,opacity:0}],{duration:1200,delay:300+Math.random()*400,easing:'ease-out',fill:'both'});setTimeout(()=>p.remove(),1950);}
 function bloom(el){
  const pref=fxPref('heal');if(!pref.on)return;
  const box=scope(el),{x,y}=center(el);

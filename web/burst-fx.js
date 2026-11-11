@@ -37,7 +37,7 @@ const later=(el,ms)=>setTimeout(()=>el.remove(),ms);
 
 /* chips of the surface: small irregular flakes thrown a little and falling */
 export function debris(x,y,{n=10,spread=1,up=.6,tint='glass'}={}){
- if(calm)return;
+ if(calm)return;n=Math.max(0,Math.min(n,LIMIT.chips-document.querySelectorAll('.fx-chip').length));if(!n)return;
  const l=layer();
  for(let i=0;i<n;i++){
   const c=document.createElement('i');c.className=`fx-chip is-${tint}`;const s=2+Math.random()*5*spread;
@@ -57,9 +57,18 @@ export function debris(x,y,{n=10,spread=1,up=.6,tint='glass'}={}){
    spray of sparks under gravity, the frame shakes; then smoke climbs into a faint mushroom and embers drift up. The
    promise resolves at the impact so the caller can cut the pit and throw the chips. */
 function sparkField(){let c=document.querySelector('body>.fx-layer>canvas.fx-sparks');if(!c){c=document.createElement('canvas');c.className='fx-sparks';layer().append(c);}const dpr=Math.min(2,devicePixelRatio||1);if(c.width!==innerWidth*dpr||c.height!==innerHeight*dpr){c.width=innerWidth*dpr;c.height=innerHeight*dpr;}return {c,ctx:c.getContext('2d'),dpr};}
-let live=[],running=false;
-function runSparks(){if(running)return;running=true;let prev=performance.now();
- const step=now=>{const dt=Math.min(.04,(now-prev)/1000);prev=now;const f=sparkField();if(!f.ctx){running=false;return;}const {ctx,dpr}=f;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,innerWidth,innerHeight);ctx.globalCompositeOperation='lighter';
+/* 2026-11-12 (user: rapid clicking must never pile up): hard limits shared by every effect — at most 600 live canvas
+   particles (the oldest are dropped first), at most 3 explosions playing (a new one ends the oldest at once), at most
+   120 DOM chips and 80 fountain bits, no stacked flash or shake within 300 ms, and the canvas loop sleeps while the
+   window is hidden. */
+export const LIMIT={particles:400,blasts:3,chips:60,petals:60,gap:150};
+let lastBlast=0;
+let live=[],running=false,lastJolt=0;
+const blasts=[];
+function cap(){if(live.length>LIMIT.particles)live.splice(0,live.length-LIMIT.particles);}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&live.length)runSparks();});
+function runSparks(){cap();if(running||document.hidden)return;running=true;let prev=performance.now();
+ const step=now=>{if(document.hidden){running=false;return;}const dt=Math.min(.04,(now-prev)/1000);prev=now;const f=sparkField();if(!f.ctx){running=false;return;}const {ctx,dpr}=f;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,innerWidth,innerHeight);ctx.globalCompositeOperation='lighter';
   live=live.filter(p=>{p.t+=dt;if(p.t>p.life)return false;
    if(p.kind==='in'){const k=Math.min(1,p.t/p.life),e=k*k;p.x=p.x0+(p.tx-p.x0)*e;p.y=p.y0+(p.ty-p.y0)*e;}
    else{p.vx*=1-p.drag*dt;p.vy=p.vy*(1-p.drag*dt)+p.g*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;}
@@ -75,11 +84,14 @@ function runSparks(){if(running)return;running=true;let prev=performance.now();
 const anim=(el,frames,opts)=>el.animate(frames,{fill:'forwards',...opts});
 export function explosion(x,y,{shake,bar,k=1}={}){
  if(calm)return Promise.resolve();
+ /* clicks faster than one every 150 ms still leave their pit, but do not start another blast */
+ const t0=performance.now();if(t0-lastBlast<LIMIT.gap)return Promise.resolve();lastBlast=t0;
  const l=layer(),w=document.createElement('div');w.className='fx-explosion';w.style.cssText=`left:${x}px;top:${y}px`;
  const star=Array.from({length:5},(_,i)=>{const a=-Math.PI/2+i*Math.PI*4/5;return `${i?'L':'M'}${f1(Math.cos(a)*46)} ${f1(Math.sin(a)*46)}`;}).join(' ')+'Z';
  w.innerHTML=`<svg class="fx-seal" viewBox="-70 -70 140 140"><circle pathLength="1" r="66"/><circle pathLength="1" r="58"/><path pathLength="1" d="${star}"/><circle pathLength="1" r="22"/>${Array.from({length:12},(_,i)=>`<text transform="rotate(${i*30}) translate(0 -61.5)">${'爆裂我が名は紅き魔の焔よ'[i]}</text>`).join('')}</svg>
   <b class="fx-charge"></b><b class="fx-pillar"></b><b class="fx-core"></b><b class="fx-fire"></b><b class="fx-fire is-inner"></b><b class="fx-ring"></b><b class="fx-ring is-dust"></b>`;
- l.append(w);
+ l.append(w);blasts.push(w);while(blasts.length>LIMIT.blasts){const old=blasts.shift();old.getAnimations({subtree:true}).forEach(a=>a.finish());old.remove();}
+ const jolt=performance.now()-lastJolt>300;if(jolt)lastJolt=performance.now();
  const flash=document.createElement('b');flash.className='fx-flash';flash.style.cssText=`--x:${x}px;--y:${y}px`;l.append(flash);
  const $=s=>w.querySelector(s),T=1900;
  anim($('.fx-seal'),[{transform:'translate(-50%,-50%) scale(.55) rotate(-60deg)',opacity:0},{transform:'translate(-50%,-50%) scale(1) rotate(0deg)',opacity:1,offset:.3},{transform:'translate(-50%,-50%) scale(1.05) rotate(20deg)',opacity:1,offset:.36},{transform:'translate(-50%,-50%) scale(1.7) rotate(40deg)',opacity:0,offset:.55},{opacity:0}],{duration:T,easing:'cubic-bezier(.3,.6,.2,1)'});
@@ -91,12 +103,12 @@ export function explosion(x,y,{shake,bar,k=1}={}){
  anim($('.fx-fire.is-inner'),[{transform:'translate(-50%,-50%) scale(0)',opacity:0},{transform:'translate(-50%,-50%) scale(0)',opacity:0,offset:.37},{transform:'translate(-50%,-50%) scale(.7)',opacity:1,offset:.42},{transform:'translate(-50%,-60%) scale(.9)',opacity:0,offset:.62},{opacity:0}],{duration:T});
  anim($('.fx-ring'),[{transform:'translate(-50%,-50%) scale(.1)',opacity:0},{transform:'translate(-50%,-50%) scale(.1)',opacity:1,offset:.37},{transform:'translate(-50%,-50%) scale(5)',opacity:0,offset:.62},{opacity:0}],{duration:T,easing:'cubic-bezier(.1,.7,.3,1)'});
  anim($('.fx-ring.is-dust'),[{transform:'translate(-50%,-50%) scale(.2)',opacity:0},{transform:'translate(-50%,-50%) scale(.2)',opacity:.7,offset:.38},{transform:'translate(-50%,-50%) scale(3.2)',opacity:0,offset:.85},{opacity:0}],{duration:T,easing:'cubic-bezier(.2,.6,.3,1)'});
- anim(flash,[{opacity:0},{opacity:0,offset:.36},{opacity:.25*k,offset:.385},{opacity:.22*k,offset:.43},{opacity:0,offset:.64},{opacity:0}],{duration:T});w.style.scale=String(.6+.4*k);
+ anim(flash,[{opacity:0},{opacity:0,offset:.36},{opacity:(jolt?.25:0)*k,offset:.385},{opacity:(jolt?.22:0)*k,offset:.43},{opacity:0,offset:.64},{opacity:0}],{duration:T});w.style.scale=String(.6+.4*k);
 
  /* embers drawn in during the charge */
  for(let i=0;i<0;i++){const a=Math.random()*Math.PI*2,r=140+Math.random()*260;live.push({kind:'in',x0:x+Math.cos(a)*r,y0:y+Math.sin(a)*r,tx:x,ty:y,x:0,y:0,t:-Math.random()*.25,life:.62,s:.8+Math.random()*1.6,color:'rgb(255,120,70)'});}
  runSparks();
- later(w,T+60);later(flash,T+60);
+ setTimeout(()=>{w.remove();const i=blasts.indexOf(w);if(i>=0)blasts.splice(i,1);},T+60);later(flash,T+60);
  return new Promise(res=>setTimeout(()=>{
   for(let i=0;i<Math.round(75*k);i++){const a=Math.random()*Math.PI*2,v=(240+Math.random()*760)*.7*(.6+.4*k);live.push({kind:'spark',x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-160,g:420,drag:1.8,t:0,life:.55+Math.random()*.8,s:.8+Math.random()*1.4,trail:[]});}
   /* the fireball as layered puffs (no flat disc): hot white at the heart, orange, then dark red cooling to smoke */
@@ -104,7 +116,7 @@ export function explosion(x,y,{shake,bar,k=1}={}){
   for(let i=0;i<14;i++)live.push({kind:'ember',x:x+(Math.random()-.5)*60,y:y+(Math.random()-.5)*30,vx:(Math.random()-.5)*80,vy:-(40+Math.random()*120),g:-30,drag:.6,t:0,life:1.6+Math.random()*1.6,s:.8+Math.random()*1.4});
   runSparks();
   const kk=[[-5,2],[4,-4],[-3,3],[2,-2],[-1,1],[0,0]].map(([dx,dy])=>({transform:`translate(${dx*k}px,${dy*k}px)`}));
-  for(const el of [shake,bar].filter(Boolean))el.animate(kk,{duration:520,easing:'cubic-bezier(.2,.7,.3,1)'});
+  if(jolt)for(const el of [shake,bar].filter(Boolean))el.animate(kk,{duration:520,easing:'cubic-bezier(.2,.7,.3,1)'});
   for(let i=0;i<34;i++){const cap=i>12,a=Math.random()*Math.PI*2;live.push({kind:'smoke',x:x+(cap?Math.cos(a)*40:(Math.random()-.5)*14),y:y-(cap?70+Math.random()*30:i*5),vx:(Math.random()-.5)*(cap?50:12),vy:-(cap?18+Math.random()*24:40+Math.random()*30),g:cap?0:12,drag:.8,t:-(cap?.25:0)-Math.random()*.2,life:2.4+Math.random()*1.4,s:(cap?18:12)+Math.random()*14});}
   res();},Math.round(T*.37)));
 }
@@ -119,7 +131,7 @@ function mushroom(x,y){
 
 /* 花鳥風月: water arcs up and falls with petals and a few sparkles */
 export function fountain(x,y,k=1){
- if(calm)return;
+ if(calm)return;const room=LIMIT.petals-document.querySelectorAll('.fx-drop,.fx-petal').length;if(room<6)return;k=Math.min(k,room/26);
  const l=layer();
  for(let i=0;i<Math.round(26*k);i++){
   const flower=i%3===0,el=document.createElement('i');el.className=flower?'fx-petal':'fx-drop';
