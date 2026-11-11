@@ -62,12 +62,53 @@ function exampleHTML(e,i,{w,esc,locale,pointId,anki=true}){
  const src=sourceLabel(e,w,locale),ankiBtn=anki&&e.origin!=='builtin'?`<button type="button" class="gm-link" data-anki="${i}">${esc(w.anki)}</button>`:'';
  return `<li class="gm-ex"><p class="gm-ja" lang="ja">${highlight(e.text,e.start,e.end,esc,pointId)}</p>${tr}<div class="gm-ex-meta"><span>${esc(src)}</span><span class="gm-ex-actions"><button type="button" class="gm-link" data-speak="${esc(e.text)}">${esc(w.speak)}</button>${ankiBtn}</span></div></li>`;
 }
+/* megu-edit beats (2026-11-11, user: 用 megu-edit 做排版和特效): single-frame invert, short RGB-split glitch, expo-out push,
+   focus pull and 1 char/frame typing with a ▮ block. Only on a user action, never as filler; all off with reduced motion. */
+const EXPO='cubic-bezier(.16,1,.3,1)';
+export const fx={
+ invert:el=>{if(!el||!motion())return;el.animate([{filter:'invert(1)'},{filter:'invert(1)'},{filter:'none'}],{duration:70,easing:'steps(1,end)'});},
+ glitch:el=>{if(!el||!motion())return;el.animate([{transform:'translateX(0)',textShadow:'none'},{transform:'translateX(-3px)',textShadow:'3px 0 #c8323c,-3px 0 #fff'},{transform:'translateX(2px)',textShadow:'-2px 0 #c8323c,2px 0 #fff'},{transform:'none',textShadow:'none'}],{duration:130,easing:'steps(3,end)'});},
+ push:el=>{if(!el||!motion())return;el.animate([{transform:'scale(1.07)'},{transform:'scale(1)'}],{duration:520,easing:EXPO});},
+ focus:el=>{if(!el||!motion())return;el.animate([{filter:'blur(6px)',opacity:.3,transform:'scale(1.02)'},{filter:'none',opacity:1,transform:'none'}],{duration:420,easing:EXPO});},
+ type:(el,text)=>{if(!el)return;if(!motion()){el.textContent=text;return;}const c=[...text];let n=0;el.textContent='▮';const tick=()=>{n+=2;el.textContent=c.slice(0,n).join('')+(n<c.length?'▮':'');if(n<c.length)requestAnimationFrame(tick);};requestAnimationFrame(tick);},
+ burst:el=>{if(!el||!motion())return;const b=document.createElement('span');b.className='gm-burst';b.setAttribute('aria-hidden','true');el.appendChild(b);b.animate([{opacity:1,transform:'translate(-50%,-50%) scale(.4)'},{opacity:0,transform:'translate(-50%,-50%) scale(1.6)'}],{duration:380,easing:EXPO}).finished.then(()=>b.remove(),()=>b.remove());}
+};
 /* ---- map ---- */
+/* 2026-11-11 (user: the outline was ugly, hard to read and taught like a textbook): the system is shown inside real
+   lines. Each piece of a line is a block coloured by the part of Japanese it belongs to; tap a block and Megumin says
+   what it is doing there, with the lessons for that part. The nine parts are pills under the line. */
+export const SCENES=[
+ {label:'普通的一句',ja:'私は昨日、図書館で本を読みたくなかった。',zh:'我昨天不想在图书馆看书。',pieces:[
+  ['私','谁','classes','名词。一个字都不会变，稳如红魔之里！'],['は','话题牌','particles','贴在名词后面的角色牌：「说到我嘛……」'],['昨日','何时','order','修饰的东西全堆在前面——主角（动词）要压轴登场！'],['、','','order',''],
+  ['図書館','哪里','classes','又一个名词。名词本身从不变形。'],['で','舞台','particles','で = 动作发生的舞台。在图书馆「做」某事。'],['本','什么','classes','名词：书。'],['を','瞄准','particles','を 是魔法的瞄准镜：动作打在谁身上。'],
+  ['読み','读','conjugation','読む 换了个词尾变成 読み，后面的零件才接得上。词干不动，只换尾巴！'],['たく','想','auxiliary','零件「たい（想）」粘上来了，自己也变了形：たく。'],['なかっ','不','auxiliary','再粘一个否定零件「ない」，同样变形。'],['た','过去','aspect','た = 已经过去了。日语只有「过去」和「非过去」两种时间。'],['。','句尾','order','真正的意思藏在句尾：读到最后才知道是「不想」——所以先看句尾！']]},
+ {label:'换成敬语',ja:'先輩、明日も来ますか。',zh:'学长，明天也来吗？',plain:'对朋友就说：明日も来る？',pieces:[
+  ['先輩','称呼','classes','直接叫对方的身份，比「你」自然得多。'],['、','','order',''],['明日','何时','order','时间放前面，照旧。'],['も','也','particles','も =「也」，顶替了 は／が 的位置。'],
+  ['来','来','conjugation','来る 是三类动词，变 ます形 就成了 来（き）。'],['ます','礼貌','politeness','ます 一粘，整句就变成对前辈说的礼貌话。突然不用 ます 了？那就是关系变了！'],['か','疑问','particles','句尾的 か 把话变成问题，不用问号也行。'],['。','','order','']]},
+ {label:'拜托别人',ja:'ちょっと待ってください。',zh:'请稍等一下。',pieces:[
+  ['ちょっと','一下','order','副词放在前面，软化语气：就一下下！'],['待っ','等','conjugation','待つ 变 て形：つ → って。'],['て','て形','conjugation','て形 是万能接口，后面能接一大堆东西。'],['ください','请为我','viewpoint','请对方「为我」做。主语没写，但谁帮谁一清二楚。'],['。','','order','']]},
+ {label:'连成长句',ja:'雨が降っているから、家で待っててね。',zh:'在下雨，你就在家等着吧。',pieces:[
+  ['雨','什么','classes','名词：雨。'],['が','主语','particles','が 指出「是谁 / 是什么」——是雨在下。'],['降っ','下','conjugation','降る 变 て形：る → って。'],['ている','正在','aspect','ている = 正在进行。雨现在正下着。'],
+  ['から','因为','clauses','から 在这里切一刀：前半句是原因。长台词就在这些地方拆开读！'],['、','','order',''],['家','哪里','classes','名词：家。'],['で','舞台','particles','在家「做」某事。'],
+  ['待っ','等','conjugation','待つ → 待っ，准备接 て。'],['てて','等着','viewpoint','ていて 的口语缩写，对朋友的随口请求：「等着嘛」。'],['ね','语气','order','句尾的 ね 求认同，「好吧？」的感觉。'],['。','','order','']]}
+];
+const nodeById=id=>MAP.find(n=>n.id===id);
+const ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX'],romanOf=id=>ROMAN[MAP.findIndex(n=>n.id===id)]||'';
+const sceneOf=node=>Math.max(0,SCENES.findIndex(s=>s.pieces.some(p=>p[2]===node)));
 function nodeStats(node,prog){const pts=N5.filter(p=>nodeOf(p.id)===node.id||POINT_NODES[p.id]?.includes(node.id));return {pts,learned:pts.filter(p=>prog?.[p.id]?.learned).length};}
-export function mapHTML(data,{locale,esc,open=''}){
- const w=grammarMessages[locale]||grammarMessages.zh,prog=data?.progress||{};
- const nodes=MAP.map(n=>{const s=nodeStats(n,prog),isOpen=n.id===open;return `<li class="gm-node${isOpen?' open':''}${s.learned?' lit':''}${s.pts.length&&s.learned===s.pts.length?' full':''}" data-node="${n.id}"><button type="button" class="gm-node-head" aria-expanded="${isOpen}" data-toggle="${n.id}"><span class="gm-node-no">${esc(n.no)}</span><span class="gm-node-title">${esc(loc(n.title,locale))}</span><span class="gm-node-count">${s.pts.length?`${s.learned}/${s.pts.length}`:''}</span></button><p class="gm-node-line">${esc(loc(n.line,locale))}</p>${isOpen?`<div class="gm-node-body"><p>${esc(loc(n.body,locale))}</p>${n.demo.map(d=>`<p class="gm-ja gm-demo" lang="ja">${esc(d.ja)}</p><p class="gm-tr">${esc(d.zh)}</p>`).join('')}${s.pts.length?`<div class="gm-chips">${s.pts.map(p=>`<button type="button" class="gm-chip${prog[p.id]?.learned?' lit':''}${nodeOf(p.id)===n.id?'':' side'}" data-point="${p.id}">${esc(loc(p.title,locale).split(' —— ')[0])}</button>`).join('')}</div>`:''}</div>`:''}</li>`;}).join('');
- return `<button type="button" class="gm-link gm-back" data-back>${esc(w.back)}</button><section class="gm-map"><header><h2>${esc(w.map)}</h2><p class="gm-cap">${esc(w.mapLead)}</p></header><ol class="gm-nodes">${nodes}</ol></section>`;
+export function sentenceHTML(scene,esc,{open='',piece=-1,mini=false}={}){
+ return `<p class="gm-sentence${mini?' mini':''}${open?' focus':''}" lang="ja">${scene.pieces.map(([t,role,n],i)=>t==='、'||t==='。'||!role?`<span class="gm-punct">${esc(t)}</span>`:mini?`<span class="gm-piece n-${n}">${esc(t)}</span>`:`<button type="button" class="gm-piece n-${n}${n===open?' on':''}${i===piece?' picked':''}" data-piece="${i}" data-node="${n}" style="--i:${i}"><i class="gm-piece-no">${romanOf(n)}</i><b>${esc(t)}</b><small>${esc(role)}</small></button>`).join('')}</p>`;
+}
+export function mapHTML(data,{locale,esc,open='',scene=null,piece=-1}){
+ const w=grammarMessages[locale]||grammarMessages.zh,prog=data?.progress||{},si=scene==null?(open?sceneOf(open):0):scene,s=SCENES[si];
+ const node=nodeById(open),stats=node&&nodeStats(node,prog),said=piece>=0&&s.pieces[piece]?.[2]===open?s.pieces[piece][3]:'';
+ const panel=node?`<div class="gm-node open${stats.learned?' lit':''}" data-node="${node.id}"><div class="gm-node-head"><span class="gm-node-no n-${node.id}">${romanOf(node.id)}</span><b>${esc(loc(node.title,locale))}</b><span class="gm-node-count">${stats.pts.length?`${stats.learned}/${stats.pts.length}`:''}</span><button type="button" class="gm-link" data-toggle="${node.id}" aria-expanded="true">${esc(w.close)}</button></div>
+<div class="gm-megu"><span class="gm-megu-seal" aria-hidden="true">惠</span><p class="gm-bubble">${esc(said||loc(node.line,locale))}</p></div><p class="gm-node-say">${esc(loc(node.body,locale))}</p>
+${stats.pts.length?`<div class="gm-chips">${stats.pts.map(p=>`<button type="button" class="gm-chip${prog[p.id]?.learned?' lit':''}${nodeOf(p.id)===node.id?'':' side'}" data-point="${p.id}">${esc(loc(p.title,locale).split(' —— ')[0])} →</button>`).join('')}</div>`:''}</div>`
+ :`<div class="gm-megu gm-map-hint"><span class="gm-megu-seal" aria-hidden="true">惠</span><p class="gm-bubble">${esc(locale==='zh'?'别背目录！这是一句真台词——点任意一块，我告诉你它是日语的哪根骨头。颜色一样的，就是同一类东西。':loc(MAP[0].line,locale))}</p></div>`;
+ const pills=`<div class="gm-pills">${MAP.map(n=>{const st=nodeStats(n,prog);return `<button type="button" class="gm-pill n-${n.id}${n.id===open?' open':''}${st.learned?' lit':''}" data-toggle="${n.id}" aria-expanded="${n.id===open}"><i>${romanOf(n.id)}</i>${esc(loc(n.title,locale).split(/[：:]/)[0])}${st.pts.length?`<small>${st.learned}/${st.pts.length}</small>`:''}</button>`;}).join('')}</div>`;
+ return `<button type="button" class="gm-link gm-back" data-back>${esc(w.back)}</button><section class="gm-map"><header><h2>${esc(w.map)}</h2><div class="gm-scenes" role="tablist">${SCENES.map((x,i)=>`<button type="button" role="tab" class="gm-scene${i===si?' active':''}" data-scene="${i}" aria-selected="${i===si}">${esc(x.label)}</button>`).join('')}</div></header>
+<div class="gm-stage"><span class="gm-badge" aria-hidden="true">megulit · grammar lab</span><span class="gm-runno" aria-hidden="true">${String(si+1).padStart(2,'0')} / ${String(SCENES.length).padStart(2,'0')}</span>${sentenceHTML(s,esc,{open,piece})}<p class="gm-tr">${esc(s.zh)}${s.plain?` <span class="gm-cap">· ${esc(s.plain)}</span>`:''}</p></div>${pills}${panel}</section>`;
 }
 /* ---- list ---- */
 export function listHTML(data,{locale,esc,level='N5',userLevel=null}){
@@ -75,7 +116,7 @@ export function listHTML(data,{locale,esc,level='N5',userLevel=null}){
  const levels=`<div class="gm-levels" role="tablist">${LEVELS.map(l=>`<button type="button" role="tab" class="gm-level${l===level?' active':''}" data-level="${l}" aria-selected="${l===level}">${l}</button>`).join('')}</div>`;
  if(level!=='N5')return `${levels}<section class="gm-soon"><p>${esc(w.soon)}</p></section>`;
  const head=`<section class="gm-summary"><div><span class="gm-big">${comp?comp.learned:0}<small>/${N5.length}</small></span><span class="gm-cap">${esc(w.progress)} · ${pct(comp?.share)}</span></div><div class="gm-meter"><i style="width:${pct(comp?.share)}"></i></div><div class="gm-cap">${esc(w.accuracy)} · ${comp?.accuracy==null?esc(w.noAnswers):pct(comp.accuracy)}${data?.real?` · ${data.real} ${esc(w.real)}`:''}</div></section>`;
- const overview=`<button type="button" class="gm-overview" data-map><span class="gm-overview-kicker">${esc(w.map)}</span><span class="gm-overview-nodes">${MAP.map(n=>`<i class="${nodeStats(n,prog).learned?'lit':''}" title="${esc(loc(n.title,locale))}">${esc(n.no)}</i>`).join('')}</span><span class="gm-cap">${esc(w.mapLead)}</span></button>`;
+ const overview=`<button type="button" class="gm-overview" data-map><span class="gm-overview-kicker">${esc(w.map)}</span>${sentenceHTML(SCENES[0],esc,{mini:true})}<span class="gm-cap">${esc(locale==='zh'?'一句台词拆成九种零件——点开，一块一块戳着玩 →':w.mapLead)}</span></button>`;
  const groups=Object.keys(GROUPS).map(g=>{const items=N5.filter(p=>p.group===g);return `<section class="gm-group"><h3>${esc(loc(GROUPS[g],locale))}</h3><div class="gm-cards">${items.map(p=>{const r=prog[p.id]||{},n=data?.examples?.[p.id]?.length||0,node=MAP.find(m=>m.id===nodeOf(p.id));return `<button type="button" class="gm-card${r.learned?' learned':''}${p.id===nextId?' next':''}" data-point="${p.id}"><span class="gm-card-node">${esc(node.no)} · ${esc(loc(node.title,locale))}</span><span class="gm-card-title">${esc(loc(p.title,locale))}</span><span class="gm-card-gist">${esc(loc(p.gist,locale))}</span><span class="gm-card-meta">${r.learned?`<b>${esc(w.done)}</b>`:''}${r.attempts?`<span>${pct(r.correct/r.attempts)}</span>`:''}${n?`<span>${n} ${locale==='en'?'lines':'句'}</span>`:''}</span></button>`;}).join('')}</div></section>`;}).join('');
  return `${heroHTML(data,{locale,esc,userLevel})}${levels}${data?.pending&&data?.counting?`<p class="gm-cap gm-status">${esc(w.counting)}</p>`:''}${head}${overview}${groups}`;
 }
@@ -130,13 +171,13 @@ export function heroHTML(data,{locale,esc,userLevel=null}){
 }
 /* ---- page ---- */
 /* Kept between visits (user: going into a lesson and back reloaded everything): the report, the view, the step. */
-const memo={data:null,at:0,level:'N5',view:'list',point:'',openNode:'',step:0,userLevel:undefined};
+const memo={data:null,at:0,level:'N5',view:'list',point:'',openNode:'',scene:null,piece:-1,step:0,userLevel:undefined};
 const FRESH_MS=5*60*1000;
 export function grammarMemo(){return memo;}
 export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>true}){
- const w=grammarMessages[locale]||grammarMessages.zh;let data=memo.data,level=memo.level,view=memo.view,point=pointById(memo.point)||null,openNode=memo.openNode,step=memo.step,timer=0,audio=null;
+ const w=grammarMessages[locale]||grammarMessages.zh;let data=memo.data,level=memo.level,view=memo.view,point=pointById(memo.point)||null,openNode=memo.openNode,scene=memo.scene,piece=memo.piece,step=memo.step,timer=0,audio=null;
  if(view==='lesson'&&!point)view='list';
- const save=()=>Object.assign(memo,{data,level,view,point:point?.id||'',openNode,step});
+ const save=()=>Object.assign(memo,{data,level,view,point:point?.id||'',openNode,scene,piece,step});
  const root=document.createElement('div');root.className='gm-page';target.replaceChildren(root);
  const load=async(count=true)=>{clearTimeout(timer);const had=!!data?.progress;try{const next=await api('grammar_report',{count});if(!isCurrent())return;data=next;memo.at=Date.now();save();if(view==='list'||view==='map'||!had)render();if(next.pending&&next.counting&&count)timer=setTimeout(()=>{if(isCurrent())load(true);},2000);}catch(error){if(isCurrent()&&!data){data={};render();toast?.(String(error?.message||error));}}};
  const enter=()=>{if(!motion())return;root.animate([{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],{duration:220,easing:'cubic-bezier(.2,.7,.2,1)'});};
@@ -146,14 +187,19 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
  function render(){save();if(view==='lesson'&&point)return renderLesson();if(view==='map')return renderMap();
   root.innerHTML=listHTML(data||{},{locale,esc,level,userLevel:memo.userLevel});
   root.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>{level=b.dataset.level;render();});
-  root.querySelector('[data-map]')?.addEventListener('click',()=>{openNode='';go('map');});
+  root.querySelector('[data-map]')?.addEventListener('click',()=>{openNode='';scene=null;piece=-1;go('map');});
   root.querySelector('[data-change-level]')?.addEventListener('click',changeLevel);
   root.querySelectorAll('[data-point]').forEach(b=>b.onclick=()=>openPoint(b.dataset.point));
   if(motion())root.querySelectorAll('.gm-card').forEach((c,i)=>c.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:260,delay:Math.min(i,20)*18,easing:'cubic-bezier(.2,.7,.2,1)',fill:'backwards'}));}
- function renderMap(){
-  root.innerHTML=mapHTML(data||{},{locale,esc,open:openNode});
+ function renderMap(anim=''){
+  root.innerHTML=mapHTML(data||{},{locale,esc,open:openNode,scene,piece});save();
   root.querySelector('[data-back]').onclick=()=>go('list');
-  root.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>{openNode=openNode===b.dataset.toggle?'':b.dataset.toggle;renderMap();const body=root.querySelector('.gm-node.open .gm-node-body');if(body&&motion())body.animate([{opacity:0,transform:'translateY(-4px)'},{opacity:1,transform:'none'}],{duration:200,easing:'ease-out'});});
+  const pop=sel=>{const el=root.querySelector(sel);if(el&&motion())el.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:240,easing:'cubic-bezier(.2,.7,.2,1)'});};
+  if(anim==='scene'&&motion())root.querySelectorAll('.gm-piece').forEach((b,i)=>b.animate([{opacity:0,transform:'translateY(14px) scale(.9)'},{opacity:1,transform:'none'}],{duration:320,delay:i*45,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'}));
+  if(anim==='panel'){const card=root.querySelector('.gm-node.open');fx.focus(card);const say=card?.querySelector('.gm-bubble');if(say)fx.type(say,say.textContent);fx.push(root.querySelector('.gm-piece.picked'));fx.glitch(root.querySelector('.gm-piece.picked b'));}
+  root.querySelectorAll('[data-scene]').forEach(b=>b.onclick=()=>{scene=Number(b.dataset.scene);piece=-1;if(openNode&&!SCENES[scene].pieces.some(p=>p[2]===openNode))openNode='';renderMap('scene');fx.invert(root.querySelector('.gm-stage'));});
+  root.querySelectorAll('[data-piece]').forEach(b=>b.onclick=()=>{const i=Number(b.dataset.piece);if(piece===i){piece=-1;openNode='';}else{piece=i;openNode=b.dataset.node;}renderMap('panel');});
+  root.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>{const id=b.dataset.toggle;if(openNode===id){openNode='';piece=-1;renderMap();return;}openNode=id;piece=-1;const cur=scene??0;if(!SCENES[cur].pieces.some(p=>p[2]===id)){scene=SCENES.findIndex(s=>s.pieces.some(p=>p[2]===id));renderMap('scene');pop('.gm-node.open');}else renderMap('panel');});
   root.querySelectorAll('[data-point]').forEach(b=>b.onclick=()=>openPoint(b.dataset.point));
  }
  /* tap or hover the highlighted grammar → a small explanation */
@@ -184,14 +230,14 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
   root.querySelectorAll('[data-stepbody]').forEach(s=>s.hidden=Number(s.dataset.stepbody)!==step);
   root.querySelectorAll('[data-step]').forEach(b=>{const i=Number(b.dataset.step);b.classList.toggle('active',i===step);b.classList.toggle('passed',i<step);b.setAttribute('aria-selected',String(i===step));});
   root.querySelector('[data-prev]').disabled=step===0;root.querySelector('[data-nextstep]').hidden=step===STEPS.length-1;root.querySelector('[data-stepof]').textContent=w.stepOf.replace('{n}',step+1).replace('{t}',STEPS.length);
-  const body=root.querySelector(`[data-stepbody="${step}"]`);if(animate&&motion()&&body)body.animate([{opacity:0,transform:'translateX(16px)'},{opacity:1,transform:'none'}],{duration:260,easing:'cubic-bezier(.2,.7,.2,1)'});
+  const body=root.querySelector(`[data-stepbody="${step}"]`);if(animate&&body){fx.focus(body);fx.push(root.querySelector('.gm-step-dot.active b'));}
   if(animate&&motion()&&STEPS[step]==='form')body.querySelectorAll('.gm-formulas li').forEach((li,i)=>li.animate([{opacity:0,transform:'translateY(10px)'},{opacity:1,transform:'none'}],{duration:300,delay:60+i*90,easing:'cubic-bezier(.2,.7,.2,1)',fill:'backwards'}));
   root.querySelector('.gm-lesson')?.scrollIntoView?.({block:'nearest'});
  }
  function renderLesson(){
   root.innerHTML=lessonHTML(point,data||{},{locale,esc,step});const real=data?.examples?.[point.id]||[];
   root.querySelector('[data-back]').onclick=()=>go('list');
-  root.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{openNode=b.dataset.map;go('map');});
+  root.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{openNode=b.dataset.map;scene=null;piece=-1;go('map');});
   root.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>showStep(Number(b.dataset.step)));
   root.querySelector('[data-prev]').onclick=()=>showStep(step-1);root.querySelector('[data-nextstep]').onclick=()=>showStep(step+1);
   root.querySelector('[data-split-toggle]')?.addEventListener('click',e=>{const on=root.querySelector('.gm-splits')?.classList.toggle('apart');e.currentTarget.textContent=on?w.merge:w.split;});
@@ -201,10 +247,11 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
   root.querySelectorAll('[data-explain]').forEach(m=>{m.onclick=e=>{e.stopPropagation();explain(m);};m.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();explain(m);}};m.onmouseenter=()=>explain(m);});
   root.onclick=e=>{if(!e.target.closest('.gm-pop,[data-explain]'))root.querySelector('.gm-pop')?.remove();};
   bindConj();bindParticles(real);
+  {const say=root.querySelector('.gm-step-intro:not([hidden]) .gm-bubble');if(say)fx.type(say,say.textContent);}
   /* practice: drag (or tap) the answer into the gap; a miss shows how it attaches, then a line of the same kind */
   const pool=exercisesFor(point,real,10);let order=pool.slice(0,4),rest=pool.slice(4),i=0,answered=null,retry=false;const box=root.querySelector('[data-quiz]');
   const draw=()=>{if(!order.length){box.innerHTML=`<p class="gm-cap">${esc(w.finished)}</p>`;return;}box.innerHTML=quizHTML(point,order[i],{locale,esc,answered,index:i,total:order.length,retry});
-   const pick=async ch=>{if(answered!=null)return;answered=ch;draw();const blank=box.querySelector('.gm-blank');if(blank&&motion())blank.animate(answered===order[i].answer?[{transform:'scale(1.2)'},{transform:'none'}]:[{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'none'}],{duration:240});try{const r=await api('grammar_answer',{point:point.id,correct:answered===order[i].answer});data={...(data||{}),progress:{...(data?.progress||{}),[point.id]:r}};data.completion=completion(data.progress);save();}catch{}};
+   const pick=async ch=>{if(answered!=null)return;answered=ch;draw();const blank=box.querySelector('.gm-blank');if(answered===order[i].answer){fx.invert(blank);fx.push(blank);fx.burst(blank);}else fx.glitch(box.querySelector('.gm-q'));try{const r=await api('grammar_answer',{point:point.id,correct:answered===order[i].answer});data={...(data||{}),progress:{...(data?.progress||{}),[point.id]:r}};data.completion=completion(data.progress);save();}catch{}};
    box.querySelectorAll('[data-choice]').forEach(b=>{b.onclick=()=>pick(b.dataset.choice);b.ondragstart=e=>{e.dataTransfer?.setData('text/plain',b.dataset.choice);b.classList.add('dragging');};b.ondragend=()=>b.classList.remove('dragging');});
    const drop=box.querySelector('[data-drop]');if(drop&&answered==null){drop.ondragover=e=>{e.preventDefault();drop.classList.add('over');};drop.ondragleave=()=>drop.classList.remove('over');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');const ch=e.dataTransfer?.getData('text/plain');if(ch)pick(ch);};}
    box.querySelector('[data-next]')?.addEventListener('click',()=>{answered=null;retry=false;i=(i+1)%order.length;draw();});
