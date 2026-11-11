@@ -77,3 +77,17 @@ test('aquaplus: the voice call (char,256,0,0,n) before message k names <scene>_<
  const bnr=Buffer.alloc(w.length*4);w.forEach((v,i)=>bnr.writeInt32LE(v,i*4));
  const sj=s=>Buffer.from(new TextEncoder().encode(s));const txt=Buffer.concat([Buffer.from(',x.tga,,'),Buffer.from('\x8f\x74\x8a\xf3,\x81\x75\x82\xa0\x81\x76,\x82\xa2\x82\xa4\k,\x96\x83\x97\x9d,\x81\x75\x82\xa6\x81\x76','latin1')]);
  assert.deepEqual(a._internal.sceneVoices('2021_010',txt,bnr),[{text:'「あ」',ref:'2021_0000_00'},{text:'「え」',ref:'2021_0001_05'}]);});
+test('xp3: Yuzusoft "sen:" archives get their real names back from the name table',()=>{const xp3=require('../services/original-engines/xp3.cjs'),zlib=require('node:zlib'),crypto=require('node:crypto');
+ const real='uts001_001.ogg',md5=crypto.createHash('md5').update(Buffer.from(real,'utf16le')).digest('hex'),data=Buffer.from('OggS-data');
+ const u64=v=>{const b=Buffer.alloc(8);b.writeBigUInt64LE(BigInt(v));return b;},u32=v=>{const b=Buffer.alloc(4);b.writeUInt32LE(v>>>0);return b;},u16=v=>{const b=Buffer.alloc(2);b.writeUInt16LE(v);return b;};
+ const chunk=(tag,body)=>Buffer.concat([Buffer.from(tag,'latin1'),u64(body.length),body]);
+ const nameEntry=Buffer.concat([u32(0x12345678),Buffer.from([real.length,0]),Buffer.from(real,'utf16le')]);
+ const table=zlib.deflateSync(Buffer.concat([Buffer.from('hnfn','latin1'),u64(nameEntry.length),nameEntry]));
+ const head=11+8,dataAt=head,tableAt=dataAt+data.length,indexAt=tableAt+table.length;
+ const info=chunk('info',Buffer.concat([u32(0),u64(data.length),u64(data.length),u16(md5.length),Buffer.from(md5,'utf16le')]));
+ const segm=chunk('segm',Buffer.concat([u32(0),u64(dataAt),u64(data.length),u64(data.length)]));
+ const file=chunk('File',Buffer.concat([info,segm,chunk('adlr',u32(0x12345678))]));
+ const sen=chunk('sen:',Buffer.concat([u64(tableAt),u32(0),u32(table.length),Buffer.alloc(24)]));
+ const index=Buffer.concat([file,sen]);
+ const xp=Buffer.concat([xp3.MAGIC,u64(indexAt),data,table,Buffer.from([0]),u64(index.length),index]);const p=path.join(tmp(),'voice.xp3');fs.writeFileSync(p,xp);
+ const l=xp3.list(p);assert.equal(l.files[0].name,real);assert.equal(l.files[0].hashedName,md5);assert.deepEqual(xp3.read(p,l.files[0]),data);});
