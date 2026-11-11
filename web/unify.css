@@ -29,7 +29,7 @@ html:not(#u):not(#v) body .main :is(p,small,li,.settings-help,.settings-label,h1
 html:not(#u):not(#v) body .main :is(h1,h2,h3),html:not(#u):not(#v) body dialog :is(h1,h2,h3){text-wrap:balance}
 
 /* ---- one glass panel (the leaderboard / history card): 2px corners, inset hairline, gold corner tick ---- */
-html:not(#u):not(#v) body .main :is(.gm-hero,.gm-group,.ri-panel,section.panel.ri-panel,.stg-glass,.review-card,.tool-card,.about-facts,.about-links,.about-support,.about-credits,.settings-layout>.settings-nav,.settings-layout>.settings-content){
+html:not(#u):not(#v) body .main :is(.gm-hero,.gm-group,.stg-glass,.review-card,.tool-card,.about-facts,.about-links,.about-support,.about-credits,.settings-layout>.settings-nav,.settings-layout>.settings-content){
  border:0!important;border-radius:2px!important;
  background:var(--u-glass)!important;
  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 0 0 1px var(--u-line),0 24px 50px -30px #000!important;
@@ -748,3 +748,16 @@ html:not(#u):not(#v) body .review-page .review-card>.text-button{margin-top:14px
 html:not(#u):not(#v) body .review-page .review-card>.anki-tools{display:flex!important;justify-content:flex-start!important;gap:0!important;width:100%;margin-top:56px!important;padding-top:0!important;border-top:1px solid var(--u-line-2)!important}
 html:not(#u):not(#v) body .review-page .review-card>.anki-tools .text-button{padding:16px 28px 0 0!important;font-size:13px!important;color:var(--g-t2,#c3ab9c)!important;letter-spacing:.06em}
 html:not(#u):not(#v) body .review-page .review-card>.anki-tools .text-button:hover{color:var(--g-gold)!important}
+
+/* ---- read words, editorial: a report, not boxes — each section opens with a large gold numeral and a serif title on
+   a ruled line; JLPT coverage as five big figures divided by hairlines ---- */
+html:not(#u):not(#v) body .main .ri-panel.ri-panel.ri-panel{max-width:1080px;margin:0 auto 12px!important;padding:34px 0 26px!important;background:none!important;box-shadow:none!important;border:0!important;border-top:1px solid var(--u-line-2)!important;-webkit-backdrop-filter:none;backdrop-filter:none}
+html:not(#u):not(#v) body .main .ri-panel .ri-head{border-bottom:0!important;padding-bottom:4px!important;align-items:baseline}
+html:not(#u):not(#v) body .main .ri-panel .ri-head em{font:400 clamp(30px,2.6vw,42px)/1 var(--g-serif,serif)!important;letter-spacing:0!important;color:var(--g-gold)!important;min-width:56px}
+html:not(#u):not(#v) body .main .ri-panel .ri-head h2{font-family:var(--g-serif,serif)!important;font-size:clamp(22px,1.8vw,28px)!important;font-weight:600!important}
+html:not(#u):not(#v) body .main :is(.ri-hud,.ri-status){max-width:1080px;margin-left:auto!important;margin-right:auto!important}
+html:not(#u):not(#v) body .main .ri-hud{background:none!important;box-shadow:none!important;padding:0 0 18px!important;-webkit-backdrop-filter:none;backdrop-filter:none}
+html:not(#u):not(#v) body .main .ri-levels{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:0!important;margin-top:18px!important}
+html:not(#u):not(#v) body .main .ri-level{background:none!important;box-shadow:none!important;border:0!important;border-left:1px solid var(--u-line)!important;padding:4px 22px 6px!important;border-radius:0!important;-webkit-backdrop-filter:none;backdrop-filter:none}
+html:not(#u):not(#v) body .main .ri-level:first-child{border-left:0!important;padding-left:0!important}
+html:not(#u):not(#v) body .main .ri-level-pct{font:400 clamp(40px,3.4vw,56px)/1 var(--g-serif,serif)!important}
