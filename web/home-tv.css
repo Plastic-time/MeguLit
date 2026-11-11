@@ -170,16 +170,10 @@
 @keyframes tv-etch{from{stroke:rgba(255,255,255,.13)}}
 .tv-ring .head{r:.9;fill:#fff;filter:drop-shadow(0 0 1.2px rgba(255,255,255,.9))}
 /* the veil follows the page being opened, so it never drops out between home and a game's detail */
-.app-backdrop::after{transition:background .55s cubic-bezier(.4,0,.2,1)}
-.app-backdrop::before{transition:filter .55s cubic-bezier(.4,0,.2,1)}
 .main.g-enter>.tv-home{animation:tv-enter .32s cubic-bezier(.22,1,.36,1) both!important}
 @keyframes tv-enter{from{opacity:0}}
-html[data-stage]:not([data-stage=""]) .app-backdrop::after{background:color-mix(in srgb,var(--bg) calc(var(--veil-a,.85)*100%),transparent)!important}
-html[data-stage]:not([data-stage=""]) .app-backdrop::before{filter:blur(var(--veil-b,12px)) saturate(.85)!important}
 /* one stage layer for every styled page lives in the shell, so a page re-render never drops it */
 .main>.dtv-bg{display:none!important}
-.stage-cover{z-index:0}
-.stage-cover[hidden]{display:none}
 .workspace>.main{position:relative;z-index:1}
 
 /* E445 heat map tooltip */
@@ -190,3 +184,10 @@ html[data-stage]:not([data-stage=""]) .app-backdrop::before{filter:blur(var(--ve
 .tv-heat-tip em{font-style:normal;color:#e8b04a}
 .tv-heat-tip.zero em{color:#7d7a74}
 .tv-heat-tip::after{content:"";position:absolute;left:50%;bottom:-5px;width:8px;height:8px;background:inherit;border-right:1px solid rgba(200,50,60,.55);border-bottom:1px solid rgba(200,50,60,.55);transform:translateX(-50%) rotate(45deg)}
+/* the striped glass layer: one per window, its opacity, stripes and blur follow the page (web/page-veils.js); the wallpaper underneath is the user's own */
+.workspace>.stage-cover{position:fixed;inset:var(--titlebar-height,64px) 0 0 0;z-index:0;pointer-events:none;overflow:hidden;background:color-mix(in srgb,var(--bg) calc(var(--glass-a,.3)*100%),transparent);-webkit-backdrop-filter:blur(var(--glass-b,10px));backdrop-filter:blur(var(--glass-b,10px));transition:background .45s cubic-bezier(.4,0,.2,1),backdrop-filter .45s cubic-bezier(.4,0,.2,1)}
+.workspace>.stage-cover::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 3px,rgb(0 0 0/var(--glass-s,.14)) 3px 4px);pointer-events:none}
+.workspace>.stage-cover::after{content:none!important;display:none!important}
+.workspace>.stage-cover[hidden]{display:none}
+.workspace>.stage-cover .dtv-glyph{position:absolute;right:3%;top:2%;font-family:var(--g-serif-ja);font-style:normal;font-size:52vmin;line-height:1;color:transparent;-webkit-text-stroke:1.2px color-mix(in srgb,var(--g-t1) 16%,transparent);writing-mode:vertical-rl;user-select:none}
+.workspace>.stage-cover[data-kind~=lb-backdrop] .dtv-glyph,.workspace>.stage-cover[data-kind~=history-backdrop] .dtv-glyph{right:4%;top:6%;font-size:46vmin}
