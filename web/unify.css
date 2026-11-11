@@ -1070,3 +1070,6 @@ html:not(#u):not(#v):not(#w) body .profile-hero-fav li{counter-increment:fav;fon
 html:not(#u):not(#v):not(#w) body .profile-hero-fav li::before{content:counter(fav,decimal-leading-zero) " ";font-family:var(--u-mono);font-size:11px;color:var(--g-t3,#a08a80)}
 html:not(#u):not(#v):not(#w) body dialog.profile-panel .profile-panel-editor{margin-top:18px;border-top:1px solid var(--u-line-2)}
 html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-id h3{margin:0!important;font:600 clamp(28px,2.6vw,36px)/1.1 var(--g-serif,serif)!important;letter-spacing:.01em!important;text-transform:none!important;color:var(--g-t1,#f1e0d2)!important;padding:0!important}
+/* JLPT level on each word */
+html:not(#u):not(#v):not(#w) body .main .record.word-row .word-jlpt{display:inline-block;margin-left:10px;padding:1px 7px;border-radius:2px;font-family:var(--u-mono);font-size:10.5px;letter-spacing:.08em;color:#120d0c;background:var(--g-gold);vertical-align:1px}
+html:not(#u):not(#v):not(#w) body .main .record.word-row .word-jlpt.is-off{color:var(--g-t2,#c3ab9c);background:none;box-shadow:inset 0 0 0 1px var(--u-line-2)}
