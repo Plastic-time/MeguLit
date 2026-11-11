@@ -12,9 +12,9 @@ test('home showcase order: pinned first, picks, recent fallback, hidden never',a
  assert.deepEqual(showcaseGames(games,{mode:'pick',order:['b','a'],pinned:['c']}).map(g=>g.id),['c','b','a']);
  assert.deepEqual(showcaseGames(games,{mode:'pick',order:['a'],hidden:['a']}).map(g=>g.id),['b','c']);
 });
-test('home and detail veil defaults and clamping',()=>{
+test('page veil defaults and clamping',()=>{
  const fs=require('fs'),os=require('os'),path=require('path'),root=fs.mkdtempSync(path.join(os.tmpdir(),'veil-'));fs.mkdirSync(path.join(root,'data'),{recursive:true});
- let p=store.publicPreferences(root);assert.equal(p.homeVeil,.9);assert.equal(p.homeVeilBlur,18);assert.equal(p.detailVeil,.68);assert.equal(p.detailVeilBlur,8);
- fs.writeFileSync(path.join(root,'data','preferences.json'),JSON.stringify({homeVeil:3,homeVeilBlur:-5,detailVeil:.4,detailVeilBlur:99}));
- p=store.publicPreferences(root);assert.equal(p.homeVeil,1);assert.equal(p.homeVeilBlur,0);assert.equal(p.detailVeil,.4);assert.equal(p.detailVeilBlur,40);
+ let p=store.publicPreferences(root);assert.deepEqual(p.pageVeils,{home:{a:.9,b:18},detail:{a:.68,b:8},leaderboard:{a:.82,b:12},history:{a:.82,b:12}});
+ fs.writeFileSync(path.join(root,'data','preferences.json'),JSON.stringify({pageVeils:{home:{a:3,b:-5},history:{a:.4,b:99}}}));
+ p=store.publicPreferences(root);assert.deepEqual(p.pageVeils.home,{a:1,b:0});assert.deepEqual(p.pageVeils.history,{a:.4,b:40});assert.deepEqual(p.pageVeils.detail,{a:.68,b:8});
 });
