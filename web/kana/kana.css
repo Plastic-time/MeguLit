@@ -1049,3 +1049,8 @@ button.m0,button.m1,button.m2,button.m3{border:0;padding:0;font:inherit;cursor:p
 :is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .back:hover{border-color:#c8323c;gap:18px;background:#000;color:#fff}
 :is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .back:active{transform:scale(.97)}
 :is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .back:focus-visible{outline:2px solid #c8323c;outline-offset:2px}
+/* 2026-11-11 window-size adaptation for the 五十音 home */
+.mg-page{max-width:1680px;padding-left:clamp(16px,3vw,44px);padding-right:clamp(16px,3vw,44px)}
+.mg-board{grid-template-columns:minmax(0,1fr) clamp(260px,24vw,380px)}
+.mg-stage-kana b{font-size:clamp(140px,15vw,240px)}
+@media(max-width:1100px){.mg-board{grid-template-columns:1fr}.mg-rail{grid-template-columns:repeat(6,minmax(0,1fr))}}
