@@ -111,3 +111,7 @@ test('naninovel voices: clips align in order to lines with a speaker, never agai
  const V=[{name:'S/10.0',n:10,d:5.0},{name:'S/14.0',n:14,d:5.6}];
  const pairs=nv.align(L,V).map(([l,v])=>[l.author,v.name]);assert.deepEqual(pairs,[['Kasumi','S/10.0'],['Ayano','S/14.0']]);
  const V2=[{name:'S/10.0',n:10,d:5.0},{name:'S/10.5',n:10.5,d:5.6}];assert.ok(nv.align(L,V2).length<2,'a later line cannot take a clip numbered too close to an earlier match');});
+test('naninovel voices exact: in-order matching never lets a repeated short line take a later entry; untranslated entries give nothing',()=>{const nv=require('../services/original-engines/naninovel-voice.cjs');
+ const a=['「…………」','「行こう」','「…………」','「はい」'],b=['「…………」','「別の行」','「行こう」','「…………」','「はい」'];
+ assert.deepEqual(nv.lcs(a,b),[0,2,3,4]);assert.deepEqual(nv.lcs(['x'],['y']),[-1]);
+ assert.equal(nv.light('Kasumi: 「我剛剛發現 了一件事。」'),'「我剛剛發現了一件事。」');assert.equal(nv.light('{Me}: 「怎麼了？」'),'「怎麼了？」');});
