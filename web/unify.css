@@ -1073,3 +1073,25 @@ html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-id h3{margin:0!important
 /* JLPT level on each word */
 html:not(#u):not(#v):not(#w) body .main .record.word-row .word-jlpt{display:inline-block;margin-left:10px;padding:1px 7px;border-radius:2px;font-family:var(--u-mono);font-size:10.5px;letter-spacing:.08em;color:#120d0c;background:var(--g-gold);vertical-align:1px}
 html:not(#u):not(#v):not(#w) body .main .record.word-row .word-jlpt.is-off{color:var(--g-t2,#c3ab9c);background:none;box-shadow:inset 0 0 0 1px var(--u-line-2)}
+
+/* dictionary impact (dict-impact.js): the search slams into the bar, cracks stay until words are read; a crack
+   runs out from the hit, and when a word mends it the line glows gold and closes back from its tips */
+html:not(#u):not(#v):not(#w) body .dict-cloud.is-burst{opacity:1!important;transform:none!important;transition:none!important}
+html:not(#u):not(#v):not(#w) body .dict-cloud.is-burst i{transition:none!important}
+html body svg.dict-crack{position:absolute;z-index:3;pointer-events:none;overflow:hidden;border-radius:inherit}
+html body svg.dict-crack.is-bar{position:fixed;inset:auto;z-index:40}
+html body svg.dict-crack.is-off{display:none}
+html body svg.dict-crack.is-bar path{stroke:color-mix(in srgb,#fff4ea 34%,transparent)}
+html body svg.dict-crack path{fill:none;stroke:color-mix(in srgb,#fff4ea 62%,transparent);stroke-linecap:round;stroke-linejoin:round;
+ stroke-dasharray:1 1;stroke-dashoffset:calc(1 - var(--h,1));transition:stroke-dashoffset 1.3s cubic-bezier(.45,0,.2,1),stroke .9s;
+ filter:drop-shadow(0 1px 0 rgba(0,0,0,.7)) drop-shadow(0 0 2px rgba(255,236,220,.25));animation:crack-run .32s cubic-bezier(.1,.8,.2,1) backwards}
+html body svg.dict-crack g:nth-last-child(n+4) path{stroke:color-mix(in srgb,#fff4ea 44%,transparent)}
+html body svg.dict-crack g.is-mending path{animation:crack-mend 1.6s ease-out}
+@keyframes crack-run{from{stroke-dashoffset:1}}
+@keyframes crack-mend{0%{stroke:#ffd38a;filter:drop-shadow(0 0 3px #edb56e) drop-shadow(0 0 8px rgba(237,181,110,.6))}60%{stroke:#edb56e}100%{}}
+html body .dict-shards{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden}
+html body .dict-shards i{position:absolute;font-style:normal;font-family:var(--g-serif-ja,serif);color:var(--g-t1,#f1e0d2);text-shadow:0 2px 10px rgba(0,0,0,.5);white-space:nowrap;will-change:transform,opacity}
+html body .dict-shards i:nth-child(3n){color:var(--g-gold,#edb56e)}
+html body .dict-shards i:nth-child(7n){color:#e2423e}
+html body .dict-shards b{position:absolute;width:60px;height:60px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,244,234,.8),0 0 30px rgba(237,181,110,.5)}
+@media (prefers-reduced-motion:reduce){html body svg.dict-crack path{animation:none!important}}
