@@ -100,7 +100,7 @@ async function fillUpdates(dialog, locale, api) {
   const t = words(locale), list = dialog.querySelector('.dev-notice-updates'), note = dialog.querySelector('.dev-notice-updates-note');
   try {
     const items = await api('site_updates', {});
-    const rows = (Array.isArray(items) ? items : []).slice(0, 8);
+    const rows = (Array.isArray(items) ? items : []).slice(0, 300); /* E425 keep every update; the list scrolls */
     list.replaceChildren(...rows.map(it => {
       const [y, m, d] = String(it.date || '').split('-').map(Number), li = document.createElement('li');
       li.textContent = ((locale !== 'zh' && it['text_' + locale]) || it.text) || t.upd(y, m, d, (locale !== 'zh' && it['title_' + locale]) || it.title || '');

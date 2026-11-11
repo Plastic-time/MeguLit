@@ -63,7 +63,7 @@ export function notice({ t, lang, after }) {
   // Recently finished adaptations (assets/updates.json, newest first): "2026年11月11日 完善了《X》的内嵌使用"
   const list = box.querySelector('.nt-updates');
   if (list) fetch('/assets/updates.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).then(items => {
-    const l = lang(), rows = (Array.isArray(items) ? items : []).slice(0, 8);
+    const l = lang(), rows = (Array.isArray(items) ? items : []).slice(0, 300);
     list.replaceChildren(...rows.map(it => {
       const [y, m, d] = String(it.date || '').split('-').map(Number), li = document.createElement('li');
       const title = (l !== 'zh' && it['title_' + l]) || it.title || '';

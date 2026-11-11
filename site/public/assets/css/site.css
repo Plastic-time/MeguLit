@@ -2050,3 +2050,9 @@ html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
 @media (max-width: 40rem) { .ht-box { width: 100%; } .ht-say { font-size: 8.4vw; } .ht-say:lang(en) { font-size: 9vw; } :lang(zh) .ht-box .ht-big { font-size: 24vw; } :lang(ja) .ht-box .ht-big { font-size: 15vw; } :lang(en) .ht-box .ht-big { font-size: 13vw; } }
 :lang(ja) .ht-box .ht-big { font-size: min(10.5vw, 11rem); }
 :lang(en) .ht-box .ht-big { font-size: min(8vw, 9rem); }
+
+/* E425 the update list keeps every entry and scrolls inside a fixed-size notice */
+.nt-welcome .nt-updates { height: min(34vh, 300px); overflow-y: auto; overscroll-behavior: contain; align-content: start; padding-right: .6rem; scrollbar-width: thin; scrollbar-color: rgba(200,50,60,.6) transparent; }
+.nt-welcome .nt-updates::-webkit-scrollbar { width: 6px; }
+.nt-welcome .nt-updates::-webkit-scrollbar-thumb { background: rgba(200,50,60,.55); border-radius: 3px; }
+.nt-welcome .nt-updates::-webkit-scrollbar-thumb:hover { background: #c8323c; }
