@@ -17,18 +17,18 @@ export function readerLevel(stats,element=''){
 }
 /* 2026-11-12 (user: not so chuunibyou; think DNF and Mushoku Tensei): before 转职 the plain rank ladder — 见习 → 初级 → 中级 →
    上级魔术师 → 转职候补; at Lv.20 a DNF-style job name for the element, then its Saint / King / Emperor / God ranks
-   (火圣级魔术师 …), and at Lv.80 one title of its own; fire alone goes four ranks further, 爆裂魔法初学者 → 爆裂魔法使 at Lv.120. Each element is described by the reading style
+   (火圣级魔术师 …), and at Lv.80 one title of its own; fire alone goes four ranks further, 爆裂魔法初学者 → 爆裂魔法师 at Lv.120. Each element is described by the reading style
    it suits, plainly. No 魔导士, no 红魔族, no 练习生. */
 const BASE={zh:[[1,'见习魔术师'],[5,'初级魔术师'],[10,'中级魔术师'],[15,'上级魔术师'],[20,'转职候补']],
  ja:[[1,'見習い魔術師'],[5,'初級魔術師'],[10,'中級魔術師'],[15,'上級魔術師'],[20,'転職候補']],
  en:[[1,'Apprentice magician'],[5,'Beginner-rank magician'],[10,'Intermediate-rank magician'],[15,'Advanced-rank magician'],[20,'Class candidate']]};
 const STEPS=[20,30,40,50,65,80];
-/* 2026-11-12 (user): fire goes four ranks further than every other element — from 爆裂魔法初学者 at Lv.80 to 爆裂魔法使 at Lv.120 */
+/* 2026-11-12 (user): fire goes four ranks further than every other element — from 爆裂魔法初学者 at Lv.80 to 爆裂魔法师 at Lv.120 */
 const FIRE_STEPS=[...STEPS,90,100,110,120];
 const E=(color,glyph,name,line,zh,ja,en)=>({color,glyph,name,line,ranks:{zh,ja,en}});
 export const SCHOOLS={
  fire:E('#e2423e',{zh:'火',ja:'火',en:'火'},{zh:'火',ja:'火',en:'Fire'},{zh:'爆发型，一口气读很多',ja:'爆発型、一気にたくさん読む',en:'Burst reader: lots in one go'},
-  ['火焰术士','火圣级魔术师','火王级魔术师','火帝级魔术师','火神级魔术师','爆裂魔法初学者','爆裂魔法学徒','爆裂魔法术士','爆裂魔法师','爆裂魔法使'],['火焔術士','火聖級魔術師','火王級魔術師','火帝級魔術師','火神級魔術師','爆裂魔法の初心者','爆裂魔法見習い','爆裂魔法の術士','爆裂魔法師','爆裂魔法使い'],['Pyromancer','Fire Saint-rank magician','Fire King-rank magician','Fire Emperor-rank magician','Fire God-rank magician','Explosion beginner','Explosion apprentice','Explosion caster','Explosion mage','Explosion wizard']),
+  ['火焰术士','火圣级魔术师','火王级魔术师','火帝级魔术师','火神级魔术师','爆裂魔法初学者','爆裂魔法学徒','爆裂魔法修习者','爆裂魔法术士','爆裂魔法师'],['火焔術士','火聖級魔術師','火王級魔術師','火帝級魔術師','火神級魔術師','爆裂魔法の初心者','爆裂魔法見習い','爆裂魔法の修行者','爆裂魔法の術士','爆裂魔法師'],['Pyromancer','Fire Saint-rank magician','Fire King-rank magician','Fire Emperor-rank magician','Fire God-rank magician','Explosion beginner','Explosion apprentice','Explosion student','Explosion caster','Explosion mage']),
  ice:E('#7fd3f2',{zh:'冰',ja:'氷',en:'氷'},{zh:'冰',ja:'氷',en:'Ice'},{zh:'稳健型，读得仔细',ja:'堅実型、丁寧に読む',en:'Steady reader: careful and thorough'},
   ['冰结师','冰圣级魔术师','冰王级魔术师','冰帝级魔术师','冰神级魔术师','绝对零度'],['氷結師','氷聖級魔術師','氷王級魔術師','氷帝級魔術師','氷神級魔術師','絶対零度'],['Cryomancer','Ice Saint-rank magician','Ice King-rank magician','Ice Emperor-rank magician','Ice God-rank magician','Absolute zero']),
  thunder:E('#f2d14a',{zh:'雷',ja:'雷',en:'雷'},{zh:'雷',ja:'雷',en:'Thunder'},{zh:'速读型，追求阅读速度',ja:'速読型、読む速さを追う',en:'Speed reader: chasing pace'},

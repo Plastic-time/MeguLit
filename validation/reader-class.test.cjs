@@ -31,11 +31,11 @@ test('without an element the level holds at 20 and the rest waits; choosing one 
  const freed=rc.readerLevel(stats,'ice');assert.deepEqual([freed.level,freed.locked,freed.pending,freed.xp],[22,false,0,cap+1500]);
  const young=rc.readerLevel({characters:5000},'');assert.equal(young.locked,false);assert.equal(young.level,2);
 });
-test('the interface counts the same levels and takes fire four ranks past Lv.80 to 爆裂魔法使, with no 魔导士 / 红魔族 / 练习生',async()=>{
+test('the interface counts the same levels and takes fire four ranks past Lv.80 to 爆裂魔法师, with no 魔导士 / 红魔族 / 练习生',async()=>{
  const ui=await import('../web/reader-class.js');
  for(const stats of [{},{characters:4999},{characters:470000,seconds:3600,words:12},{characters:9e6}])for(const e of ['','fire','light']){
   const a=rc.readerLevel(stats,e),b=ui.readerLevel(stats,e);assert.deepEqual([b.level,b.into,b.need,b.pending,b.locked],[a.level,a.into,a.need,a.pending,a.locked]);}
- assert.equal(ui.rankTitle(80,'zh','fire'),'爆裂魔法初学者');assert.equal(ui.rankTitle(120,'zh','fire'),'爆裂魔法使');assert.equal(ui.rankTitle(200,'zh','fire'),'爆裂魔法使');assert.equal(ui.rankTitle(200,'zh','ice'),'绝对零度');
+ assert.equal(ui.rankTitle(80,'zh','fire'),'爆裂魔法初学者');assert.equal(ui.rankTitle(120,'zh','fire'),'爆裂魔法师');assert.equal(ui.rankTitle(200,'zh','fire'),'爆裂魔法师');assert.equal(ui.rankTitle(200,'zh','ice'),'绝对零度');
  assert.deepEqual(Object.keys(ui.SCHOOLS).sort(),[...rc.ELEMENTS].sort());
  const all=JSON.stringify(Object.values(ui.SCHOOLS).map(s=>s.ranks))+[1,5,10,15,20].map(l=>['zh','ja','en'].map(x=>ui.rankTitle(l,x,'')).join()).join();
  for(const banned of ['魔导士','红魔族','練習生','练习生'])assert.equal(all.includes(banned),false,banned);
