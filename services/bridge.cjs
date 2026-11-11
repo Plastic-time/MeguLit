@@ -398,6 +398,10 @@ async function dispatch(request,runtime=null) {
         const config=runtime?.config?.()||store.readJSON(path.join(root,'data','config','v4-preferences.json'));
         const r=await B.importDeck(f.file,{anki:new(require('../core/anki.cjs').Anki)(),config,open:file=>spawn('explorer.exe',[file],{detached:true,stdio:'ignore'}).unref()});
         return {found:true,ready:true,file:path.basename(f.file),...r};}
+      /* 学习 → 奖励: magic points, titles and the collected lines */
+      case 'learning_rewards':return require('./learning-rewards.cjs').state(db);
+      case 'learning_reward':return require('./learning-rewards.cjs').add(db,{kind:String(request.kind||''),ref:String(request.ref||''),streak:Number(request.streak)||0,line:request.line&&typeof request.line==='object'?request.line:null});
+      case 'learning_album':return require('./learning-rewards.cjs').album(db);
       case 'grammar_learned':return require('./grammar.cjs').setLearned(db,String(request.point||''),request.learned!==false);
       case 'grammar_answer':return require('./grammar.cjs').recordAnswer(db,String(request.point||''),request.correct===true);
       case 'grammar_anki':{
