@@ -364,6 +364,9 @@ async function dispatch(request,runtime=null) {
       case 'kana_game_words':return require('./kana.cjs').gameWords(db,request.words);
       case 'vocabulary':return db.prepare('SELECT id,spelling,reading,definitions,status,created_at FROM vocabulary ORDER BY created_at DESC,id DESC LIMIT 1000').all();
       case 'sentences':return db.prepare('SELECT s.id,s.game_id,s.text,s.translation,s.created_at,g.title FROM saved_sentences s LEFT JOIN games g ON s.game_id=g.id ORDER BY s.created_at DESC LIMIT 1000').all();
+      case 'sentence_save':{const r=require('./saved-sentences.cjs').save(db,{gameId:request.gameId,text:request.text,translation:request.translation});runtime?.emit?.('reader-event',{type:'sentence-saved'});return r;}
+      case 'sentence_delete':{const r=require('./saved-sentences.cjs').remove(db,{id:request.id,gameId:request.gameId,text:request.text});runtime?.emit?.('reader-event',{type:'sentence-saved'});return r;}
+      case 'sentence_state':return require('./saved-sentences.cjs').state(db,{gameId:request.gameId,text:request.text});
       case 'word_trash':return db.prepare('SELECT id,word_id,deleted_at,snapshot FROM word_trash ORDER BY deleted_at DESC,id DESC LIMIT 30').all().map(row=>{const s=JSON.parse(row.snapshot);return {id:row.id,deleted_at:row.deleted_at,spelling:s.word?.spelling || s.spelling || '',reading:s.word?.reading || s.reading || ''};});
       case 'delete_word':return deleteWord(db,Number(request.id));
       case 'restore_word':return restoreWord(db,Number(request.id));
