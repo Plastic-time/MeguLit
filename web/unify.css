@@ -1490,3 +1490,5 @@ html:not(#u):not(#v):not(#w):not(#x) body .main :is(.gm-hero,.gm-group,.stg-glas
 html:not(#u):not(#v):not(#w):not(#x) body .main :is(.gm-group,.stg-glass,.about-links,.about-credits):nth-of-type(3n+2){border-radius:22px 2px 20px 3px!important}
 html:not(#u):not(#v):not(#w):not(#x) body .main :is(.gm-group,.stg-glass,.about-support):nth-of-type(3n){border-radius:3px 3px 30px 3px!important;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 22px,100% 100%,0 100%)}
 html:not(#u):not(#v):not(#w):not(#x) body .main :is(.gm-hero,.gm-group,.stg-glass,.review-card) :is(.gm-group,.stg-glass,.review-card,.gm-stg,.gm-overview){box-shadow:none!important;background:none!important;border-radius:0!important;clip-path:none!important}
+/* the element's glyph is drawn into its own scene (element-forms.js), in its material — the plain text glyph steps aside */
+html body dialog.class-rite .class-rite-glyph{opacity:0!important}
