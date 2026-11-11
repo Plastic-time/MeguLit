@@ -21,6 +21,14 @@ function palette(game){if(palettes.has(game.id))return Promise.resolve(palettes.
 
 function detail(api,id,locale){if(!details.has(id))details.set(id,api('game_detail',{id,locale}).catch(()=>({})));return details.get(id);}
 
+function cardify(card){const face=card.querySelector('.tv-face');let pressed=false,last=null;
+ const set=(x,y)=>{const depth=pressed?1.6:1,rx=(.5-y)*20*depth,ry=(x-.5)*20*depth;face.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg) scale(${pressed?.96:1.03})`;face.style.setProperty('--px',`${x*100}%`);face.style.setProperty('--py',`${y*100}%`);face.style.setProperty('--hue',`${Math.round(x*360)}deg`);};
+ card.addEventListener('pointerenter',()=>{card.classList.add('touch');face.style.transition='transform .12s ease-out';});
+ card.addEventListener('pointermove',e=>{const r=card.getBoundingClientRect();last=[Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),Math.min(1,Math.max(0,(e.clientY-r.top)/r.height))];set(...last);});
+ card.addEventListener('pointerdown',e=>{pressed=true;card.setPointerCapture?.(e.pointerId);if(last)set(...last);});
+ const up=()=>{pressed=false;if(last)set(...last);};card.addEventListener('pointerup',up);card.addEventListener('pointercancel',up);
+ card.addEventListener('pointerleave',()=>{pressed=false;last=null;card.classList.remove('touch');face.style.transition='transform .7s cubic-bezier(.2,1.6,.4,1)';face.style.transform='';});}
+
 export function stopHomeTV(){if(!live)return;clearTimeout(live.timer);clearInterval(live.beat);clearInterval(live.typer);live.root?.removeEventListener('mousemove',live.move);live=null;}
 
 export function homeTVSignature(model){return JSON.stringify([model.games.map(g=>[g.id,g.available,g.cover?.length,g.title,g.lastPlayedAt,g.readingSeconds,g.characters,g.learnedWords]),model.stats,model.preferences.homeShowcase,model.preferences.username]);}
@@ -34,8 +42,8 @@ export function renderHomeTV(main,ctx){
  main.innerHTML=`<div class="tv-home" tabindex="-1"><div class="tv-canvas">
   <div class="tv-plane" data-z="-200"><div class="tv-band"><div class="tv-band-in"></div></div><div class="tv-tl"></div></div>
   <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-ring"></div></div>
-  <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-vocab"></div><div class="tv-heat"></div></div>
-  <div class="tv-plane" data-z="60"><div class="tv-cover"></div></div></div>
+  <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-vocab"></div><div class="tv-heat-card tv-card"><div class="tv-face"><div class="tv-heat"></div><i class="tv-glare"></i></div></div></div>
+  <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div></div></div></div>
   <div class="tv-grain"></div><div class="tv-flash"></div>
   <div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div>
   <button class="tv-heatlink" data-go="activity"></button>
@@ -59,7 +67,7 @@ export function renderHomeTV(main,ctx){
   ctx.onGame?.(g);root.style.setProperty('--tv-a',p[0]);root.style.setProperty('--tv-b',p[1]);root.style.setProperty('--tv-c',p[2]);
   const k=(g.title.length*37+i*13)%60,sentences=(d.sentences||[]).map(s=>String(s.text||'').trim()).filter(Boolean).slice(0,8),words=(d.words||[]).filter(x=>x.spelling).slice(0,10),sessions=d.sessions||[];
   $('.tv-kana').textContent=[...g.title].find(c=>/[一-鿿぀-ヿ]/.test(c))||g.title.slice(0,1);
-  $('.tv-cover').style.background=art(g,p);
+  $('.tv-art').style.background=art(g,p);
   const pct=(g.characters||0)/max,C=2*Math.PI*48,ring=$('.tv-ring');ring.style.left=(44+k%14)+'%';ring.innerHTML=`<div class="tv-disc" style="background:${art(g,p)}"></div><svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="48"/><circle class="prog" cx="50" cy="50" r="48" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg><span class="tv-pct">${number(g.characters||0)} ${w.chars}</span>`;requestAnimationFrame(()=>requestAnimationFrame(()=>{const c=ring.querySelector('.prog');if(c)c.style.strokeDashoffset=C*(1-Math.max(.04,pct));}));
   const band=(sentences.length?sentences:[g.title]).map(t=>'「'+t+'」').join('　');$('.tv-band-in').textContent=(band+'　').repeat(Math.max(2,Math.ceil(120/band.length)));$('.tv-band').style.transform=`rotate(${-14+k%20}deg)`;
   const now=Date.now(),span=40*864e5,big=Math.max(1,...sessions.map(s=>s.active_seconds||0))*.6;$('.tv-tl').innerHTML=sessions.filter(s=>now-s.started_at*1000<span).map(s=>{const y=10+((now-s.started_at*1000)/span)*70,long=(s.active_seconds||0)>=big;return `<b class="${long?'big':''}" style="top:${y}%"></b>`+(long?`<span style="top:${y}%">${new Date(s.started_at*1000).toLocaleDateString(undefined,{month:'numeric',day:'numeric'})} · ${Math.round((s.active_seconds||0)/60)}${w.min}</span>`:'');}).join('');
@@ -85,6 +93,7 @@ export function renderHomeTV(main,ctx){
  const canvas=$('.tv-canvas'),planes=[...root.querySelectorAll('.tv-plane')],reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
  live.move=e=>{if(reduced)return;const r=root.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;canvas.style.transform=`rotateY(${x*6}deg) rotateX(${-y*5}deg)`;planes.forEach(p=>p.style.transform=`translate3d(${-x*p.dataset.z*.25}px,${-y*p.dataset.z*.2}px,${p.dataset.z}px)`);};
  root.addEventListener('mousemove',live.move);
+ root.querySelectorAll('.tv-card').forEach(cardify);
  root.addEventListener('mouseenter',()=>clearTimeout(live?.timer));
  root.addEventListener('mouseleave',()=>{canvas.style.transform='';if(live&&list.length>1){clearTimeout(live.timer);live.timer=setTimeout(()=>paint((cur+1)%list.length),DUR);}});
  if(list.length)paint(0,false);
