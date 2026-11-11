@@ -6,6 +6,7 @@
    it back. The drawer has a fixed size; only its body changes, with a short fade. */
 import {mountEmailLogin} from './account-ui.js';
 import {mountProfileSettings} from './profile-settings.js';
+import {cropAvatarFile,pickImageFile} from './avatar-crop.js';
 const T={
  zh:{title:'个人主页',close:'关闭',joinTitle:'注册 / 登录 MeguLit 账号',joinText:'用邮箱收一个 6 位验证码就能登录，第一次登录就是注册，不用密码',
   perks:['公开个人主页：头像、签名、最喜欢的游戏','关注别的读者，看他们最近在玩什么，找到同好','参加排行榜，几台电脑合并成一行','云同步单词、收藏的句子和阅读记录'],
@@ -18,12 +19,12 @@ const T={
   privacy:'Your e-mail is only used to sign in and is never shown',notReady:'Online services are not ready yet, so signing in is unavailable',offline:'Cannot reach the online service right now',welcome:'Signed in'}
 };
 
-const HERO={zh:{time:'累计阅读',chars:'读过的字',words:'收录单词',streak:'最长连续',days:'天',fav:'最喜欢的游戏',noBio:'还没有签名',xp:'经验',h:'小时',m:'分'},
- ja:{time:'累計読書',chars:'読んだ文字',words:'登録単語',streak:'最長連続',days:'日',fav:'お気に入りのゲーム',noBio:'ひとことはまだありません',xp:'経験値',h:'時間',m:'分'},
- en:{time:'Time read',chars:'Characters',words:'Words saved',streak:'Best streak',days:'days',fav:'Favourite games',noBio:'No signature yet',xp:'XP',h:'h',m:'min'}};
+const HERO={zh:{time:'累计阅读',chars:'读过的字',words:'收录单词',streak:'最长连续',days:'天',fav:'最喜欢的游戏',noBio:'还没有签名',pick:'更换头像',rename:'改昵称',checking:'头像审核中',rejected:'头像没有通过审核，换一张吧',joining:'设置头像会同时参加排行榜',saved:'已保存',offline:'暂时连不上联网服务',xp:'经验',h:'小时',m:'分'},
+ ja:{time:'累計読書',chars:'読んだ文字',words:'登録単語',streak:'最長連続',days:'日',fav:'お気に入りのゲーム',noBio:'ひとことはまだありません',pick:'アイコンを変更',rename:'ニックネームを変更',checking:'アイコン審査中',rejected:'アイコンが審査を通過しませんでした',joining:'アイコンを設定するとランキングにも参加します',saved:'保存しました',offline:'オンラインサービスに接続できません',xp:'経験値',h:'時間',m:'分'},
+ en:{time:'Time read',chars:'Characters',words:'Words saved',streak:'Best streak',days:'days',fav:'Favourite games',noBio:'No signature yet',pick:'Change picture',rename:'Rename',checking:'Picture being checked',rejected:'Picture not approved; try another',joining:'Setting a picture also joins the leaderboard',saved:'Saved',offline:'Cannot reach the online service',xp:'XP',h:'h',m:'min'}};
 async function heroData(api){
- const [board,prof,view]=await Promise.all([api('leaderboard_profile',{}).catch(()=>null),api('leaderboard_profile_get',{}).catch(()=>null),api('leaderboard_view',{period:'all',metric:'seconds'}).catch(()=>null)]);
- return {name:board?.name||'',bio:prof?.state==='ok'?prof.bio:'',favorites:prof?.state==='ok'?(prof.favorites||[]):[],stats:view?.local?.stats?.all||null,streak:view?.local?.currentStreak};
+ const [board,prof,view,pic]=await Promise.all([api('leaderboard_profile',{}).catch(()=>null),api('leaderboard_profile_get',{}).catch(()=>null),api('leaderboard_view',{period:'all',metric:'seconds'}).catch(()=>null),api('leaderboard_avatar_status').catch(()=>null)]);
+ return {board,pic:pic?.state==='ok'?pic:null,name:board?.name||'',bio:prof?.state==='ok'?prof.bio:'',favorites:prof?.state==='ok'?(prof.favorites||[]):[],stats:view?.local?.stats?.all||null,streak:view?.local?.currentStreak};
 }
 
 /* 2026-11-12 (user: under the name, a rank and an experience bar instead of the signature). Experience comes from
@@ -75,9 +76,36 @@ export async function openProfilePanel({api,locale,esc,toast,onClose=()=>{},open
   const nf=new Intl.NumberFormat({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale]||'zh-CN'),st=d.stats||{},sec=Number(st.seconds)||0;
   const time=sec>=3600?`${Math.floor(sec/3600)}<small>${h.h}</small>${Math.floor(sec%3600/60)}<small>${h.m}</small>`:`${Math.floor(sec/60)}<small>${h.m}</small>`;
   const lv=readerLevel(d.stats);const initial=esc([...(d.name||'?')][0]||'?');
-  hero.innerHTML=`<div class="profile-hero-id"><span class="profile-hero-avatar" aria-hidden="true">${initial}</span><div class="profile-hero-who"><h3>${esc(d.name||'')}</h3><div class="profile-rank"><span class="profile-rank-lv">Lv.<b>${lv.level}</b></span><span class="profile-rank-name">${esc(rankTitle(lv.level,locale))}</span><span class="profile-rank-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${lv.need}" aria-valuenow="${lv.into}" aria-label="${h.xp}"><i style="--p:${(lv.into/lv.need*100).toFixed(1)}%"></i></span><span class="profile-rank-xp">${nf.format(lv.into)} / ${nf.format(lv.need)} ${h.xp}</span></div></div></div>
+  hero.innerHTML=`<div class="profile-hero-id"><button type="button" class="profile-hero-avatar" data-hero-avatar title="${h.pick}" aria-label="${h.pick}">${d.pic?.image&&d.pic.status==='approved'?`<img src="${esc(d.pic.image)}" alt="">`:initial}<span class="profile-hero-avatar-edit" aria-hidden="true">${h.pick}</span></button><div class="profile-hero-who"><h3><button type="button" class="profile-hero-name" data-hero-name title="${h.rename}">${esc(d.name||'')}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11.5V13h1.5l6.8-6.8-1.5-1.5L3 11.5zm9.7-6.2a.6.6 0 000-.9l-1-1a.6.6 0 00-.9 0l-.8.8 1.9 1.9.8-.8z"/></svg></button></h3>${d.pic&&['pending','rejected'].includes(d.pic.status)?`<small class="profile-hero-note" data-status="${esc(d.pic.status)}">${d.pic.status==='pending'?h.checking:h.rejected}</small>`:''}<div class="profile-rank"><span class="profile-rank-lv">Lv.<b>${lv.level}</b></span><span class="profile-rank-name">${esc(rankTitle(lv.level,locale))}</span><span class="profile-rank-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${lv.need}" aria-valuenow="${lv.into}" aria-label="${h.xp}"><i style="--p:${(lv.into/lv.need*100).toFixed(1)}%"></i></span><span class="profile-rank-xp">${nf.format(lv.into)} / ${nf.format(lv.need)} ${h.xp}</span></div></div></div>
 <dl class="profile-hero-figs"><div><dt>${h.time}</dt><dd>${time}</dd></div><div><dt>${h.chars}</dt><dd>${nf.format(Number(st.characters)||0)}</dd></div><div><dt>${h.words}</dt><dd>${nf.format(Number(st.words)||0)}</dd></div><div><dt>${h.streak}</dt><dd>${nf.format(Number(st.streak)||0)}<small>${h.days}</small></dd></div></dl>
 ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.favorites.map(f=>`<li>${esc(f.title||f)}</li>`).join('')}</ol></div>`:''}`;
+  bindHero(hero,d,h);
+ }
+
+ /* 2026-11-12 (user): the header is where the picture and the name change. Choosing a picture joins the leaderboard
+    when not joined yet (the picture only exists there); the name saves through leaderboard_join when joined, the
+    same name check as before, and into the local setting otherwise. */
+ function bindHero(hero,d,h){
+  const board=d.board||{},sync=v=>{const f=body.querySelector('[name=leaderboardName]');if(f)f.value=v;};
+  hero.querySelector('[data-hero-avatar]').onclick=async()=>{
+   const file=await pickImageFile();if(!file)return;let data;try{data=await cropAvatarFile(file,locale);}catch{toast(h.offline);return;}if(!data||!hero.isConnected)return;
+   const btn=hero.querySelector('[data-hero-avatar]');btn.classList.add('is-busy');
+   try{
+    if(!board.joined){toast(h.joining);await api('leaderboard_join',{name:d.name,shareGames:board.shareGames===true,consent:true});}
+    const r=await api('leaderboard_avatar_set',{data});if(r?.state&&r.state!=='ok')toast(h.offline);
+   }catch(e){toast(String(e?.message||h.offline));}
+   await paintHero(hero);
+  };
+  const nameBtn=hero.querySelector('[data-hero-name]');
+  nameBtn.onclick=()=>{
+   const input=document.createElement('input');input.type='text';input.maxLength=16;input.value=d.name||'';input.className='profile-hero-name-input';input.setAttribute('aria-label',h.rename);
+   nameBtn.replaceWith(input);input.focus();input.select();let done=false;
+   const finish=async save=>{if(done)return;done=true;const v=input.value.trim();
+    if(save&&v&&v!==d.name){try{if(board.joined)await api('leaderboard_join',{name:v,shareGames:board.shareGames===true,consent:true});else await api('settings_save',{scope:'online',values:{leaderboardName:v}});d.name=v;sync(v);toast(h.saved);}catch(e){toast(String(e?.message||h.offline));}}
+    await paintHero(hero);};
+   input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();finish(true);}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();finish(false);}};
+   input.onblur=()=>finish(true);
+  };
  }
  async function paint(){
   let state;try{state=await api('account_status',{autoSync:false});}catch{state=null;}

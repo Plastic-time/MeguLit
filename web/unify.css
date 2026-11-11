@@ -1160,3 +1160,19 @@ html body .fx-drop{width:6px;height:9px;border-radius:50% 50% 50% 50%/60% 60% 40
 html body .fx-petal{font-size:15px;line-height:1;color:#ffc6dc;text-shadow:0 0 6px rgba(255,190,220,.7)}
 html body .fx-petal:nth-child(2n){color:#fff4f8}
 html body .fx-bloom{width:140px;height:140px;border-radius:50%;background:radial-gradient(closest-side,rgba(170,230,255,.55),rgba(120,200,255,.15) 60%,transparent)}
+
+/* profile header: the picture and the name are the controls — hover shows 更换头像 over the medallion and a pen
+   by the name; the name edits in place */
+html:not(#u):not(#v):not(#w):not(#x) body button.profile-hero-avatar{position:relative;overflow:hidden;padding:0!important;border:0;cursor:pointer;font:600 38px/1 var(--g-serif-ja,serif)!important;color:#f6ece0!important;min-height:0!important;height:84px!important}
+html:not(#u):not(#v):not(#w):not(#x) body button.profile-hero-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-avatar-edit{position:absolute;inset:0;display:grid;place-items:center;border-radius:50%;background:rgba(10,6,8,.8);font:500 12px/1.2 var(--g-serif,serif);letter-spacing:.08em;color:#f6ece0;opacity:0;transition:opacity .18s}
+html:not(#u):not(#v):not(#w):not(#x) body button.profile-hero-avatar:is(:hover,:focus-visible) .profile-hero-avatar-edit{opacity:1}
+html:not(#u):not(#v):not(#w):not(#x) body button.profile-hero-avatar.is-busy{animation:hero-busy 1s ease-in-out infinite alternate}
+@keyframes hero-busy{to{filter:brightness(.6)}}
+html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-name{all:unset;cursor:text;display:inline-flex;align-items:center;gap:10px;font:inherit;color:inherit;border-bottom:1px dashed transparent;transition:border-color .15s}
+html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-name svg{width:16px;height:16px;fill:var(--g-gold,#edb56e);opacity:0;transition:opacity .15s}
+html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-name:is(:hover,:focus-visible){border-bottom-color:color-mix(in srgb,var(--g-gold) 50%,transparent)}
+html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-name:is(:hover,:focus-visible) svg{opacity:1}
+html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-name-input{width:min(320px,100%);height:auto!important;padding:0 0 2px!important;border:0!important;border-bottom:1px solid var(--g-gold,#edb56e)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;font:600 clamp(28px,2.6vw,36px)/1.1 var(--g-serif,serif)!important;color:var(--g-t1,#f1e0d2)!important;outline:0}
+html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-note{display:block;margin-top:6px;font-size:12px;color:var(--g-t3,#a08a80)}
+html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-note[data-status="rejected"]{color:#e2685e}
