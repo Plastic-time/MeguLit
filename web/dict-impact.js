@@ -25,7 +25,7 @@ function shards(x,y,power){
  const words=[...document.querySelectorAll('.g-dict-chips button')].map(b=>b.textContent.replace(/\d+/g,'').trim()).filter(Boolean);
  const fx=document.createElement('div');fx.className='dict-shards';fx.setAttribute('aria-hidden','true');
  const n=Math.round(10+power*14);let html='';
- for(let i=0;i<n;i++){const t=Math.random()<.25&&words.length?words[Math.floor(Math.random()*words.length)]:KANA[Math.floor(Math.random()*KANA.length)];const depth=i%3;html+=`<i class="d${depth}" style="left:${x}px;top:${y}px;font-size:${Math.round([rand(26,40),rand(15,24),rand(10,14)][depth])}px">${t}</i>`;}
+ const pool=[...words.join(''),...KANA];for(let i=0;i<n;i++){const t=pool[Math.floor(Math.random()*pool.length)];const depth=i%3;html+=`<i class="d${depth}" style="left:${x}px;top:${y}px;font-size:${Math.round([rand(26,40),rand(15,24),rand(10,14)][depth])}px">${t}</i>`;}
  fx.innerHTML=html;document.body.append(fx);
  for(const g of fx.querySelectorAll('i')){
   const dir=Math.random()<.5?-1:1,v=rand(180,520)*(.6+power*.6),tx=dir*v,ty=rand(-30,40),fall=rand(120,240),spin=rand(-540,540);
@@ -35,7 +35,7 @@ function shards(x,y,power){
 }
 function barHit(bar,x,power){
  if(!bar)return;const r=bar.getBoundingClientRect(),y=r.bottom;
- const wrap=document.createElement('div');wrap.className='dict-hit';wrap.setAttribute('aria-hidden','true');wrap.style.cssText=`left:${x}px;top:${y}px`;
+ const wrap=document.createElement('div');wrap.className='dict-hit';wrap.setAttribute('aria-hidden','true');wrap.style.cssText=`left:${x-360}px;top:${y}px`;
  wrap.innerHTML='<i class="dict-hit-flash"></i><i class="dict-hit-ring"></i><i class="dict-hit-line"></i>';document.body.append(wrap);
  wrap.querySelector('.dict-hit-flash').animate([{transform:'translate(-50%,-50%) scale(.3)',opacity:1},{transform:`translate(-50%,-50%) scale(${f1(1.5+power)})`,opacity:1,offset:.25},{transform:`translate(-50%,-50%) scale(${f1(1.7+power)})`,opacity:0}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
  wrap.querySelector('.dict-hit-ring').animate([{transform:'translate(-50%,-50%) scale(.2,.12)',opacity:1},{transform:`translate(-50%,-50%) scale(${f1(2.6+power*2)},${f1(.55+power*.4)})`,opacity:0}],{duration:620,easing:'cubic-bezier(.1,.7,.3,1)',fill:'forwards'});
@@ -63,7 +63,7 @@ function launch(form){
  busy=true;
  const hitX=rand(.12,.88),side=hitX<.5?-1:1,windup=rand(60,110),flight=rand(210,330)*Math.min(1.4,Math.max(.8,delta/300)),curve=rand(1.8,2.8),dip=rand(6,14);
  const leanX=rand(10,22),twist=side*rand(2,6),yaw=side*rand(4,10);
- const cam={rx:0,vrx:0,ry:0,vry:0,s:1,vs:0},CK=150,CC=15;
+ const cam={rx:0,vrx:0,ry:0,vry:0,s:1,vs:0},CK=80,CC=8;
  let sq=0,vsq=0,hit=false,flat=1,flatV=0;
  form.style.transformOrigin=`${f1(hitX*100)}% 0%`;host.style.transformOrigin='50% 30%';
  scatterCloud(end.left+end.width*hitX,start.top);

@@ -79,7 +79,7 @@ export function openRite({api,locale,esc,toast,current='',pending=0,xpTotal=0,he
   <div class="class-rite-reveal" aria-live="polite" hidden><span class="class-rite-kicker" data-r-kicker></span><h2 data-r-rank></h2><p data-r-line></p><i class="class-rite-rule" aria-hidden="true"></i><q class="class-rite-motto" data-r-motto></q><div class="class-rite-xp" data-r-xp hidden><small>${esc(w.xpWord)}</small><b data-r-num>+0</b></div><div class="class-rite-end"><button type="button" class="primary" data-finish disabled>${w.finish}</button></div></div>`;
  (document.querySelector('.main')||document.body).append(dialog);
  const fx=mountElementFx(dialog.querySelector('.class-rite-fx'));
- const draw=()=>{const s=SCHOOLS[pick];fx.setElement(pick);dialog.style.setProperty('--c',s.color);dialog.querySelector('[data-glyph]').textContent=s.glyph[l];dialog.dataset.el=pick;dialog.querySelector('[data-title]').innerHTML=`<span>${esc(s.name[l])}</span><i>${esc(s.tag[l])}</i>`;
+ const draw=()=>{const s=SCHOOLS[pick];fx.setElement(pick);dialog.style.setProperty('--c',s.color);dialog.querySelector('[data-glyph]').textContent=s.glyph[l];dialog.dataset.el=pick;dialog.querySelector('[data-title]').textContent=s.name[l];
   dialog.querySelectorAll('[data-school]').forEach(b=>{const on=b.dataset.school===pick;b.classList.toggle('is-on',on);b.setAttribute('aria-checked',String(on));});};
  dialog.querySelectorAll('[data-school]').forEach(b=>b.onclick=()=>{pick=b.dataset.school;draw();});
  const close=()=>{dialog.close();};
@@ -95,7 +95,7 @@ export function openRite({api,locale,esc,toast,current='',pending=0,xpTotal=0,he
   dialog.querySelector('[data-r-line]').textContent=`Lv.${lv} · ${s.name[l]} · ${s.tag[l]}`;dialog.querySelector('[data-r-motto]').textContent=s.desc[l].split(/(?<=[。.])/)[0];
   dialog.querySelector('[data-finish]').onclick=()=>{close();onDone(pick);};
   /* the burst plays out first; then the dialog changes shape smoothly (FLIP on its height) into the result */
-  const showReveal=()=>{const h0=dialog.getBoundingClientRect().height;if(move){const wf=document.createElement('i');wf.className='class-rite-white';dialog.append(wf);wf.animate([{opacity:0},{opacity:.9,offset:.3},{opacity:0}],{duration:420,fill:'forwards'});setTimeout(()=>wf.remove(),460);}dialog.dataset.el=pick;dialog.classList.add('is-revealed');reveal.hidden=false;const h1=dialog.getBoundingClientRect().height;if(move&&Math.abs(h1-h0)>4)dialog.animate([{height:h0+'px'},{height:h1+'px'}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)'});
+  const showReveal=()=>{const h0=dialog.getBoundingClientRect().height;if(move){const wf=document.createElement('i');wf.className='class-rite-white';dialog.append(wf);wf.style.setProperty('--c',s.color);wf.animate([{opacity:0},{opacity:1,offset:.2},{opacity:1,offset:.45},{opacity:0}],{duration:620,fill:'forwards'});setTimeout(()=>wf.remove(),660);}dialog.dataset.el=pick;dialog.classList.add('is-revealed');reveal.hidden=false;const h1=dialog.getBoundingClientRect().height;if(move&&Math.abs(h1-h0)>4)dialog.animate([{height:h0+'px'},{height:h1+'px'}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)'});
    if(pending>0){dialog.querySelector('[data-r-xp]').hidden=false;const num=dialog.querySelector('[data-r-num]');setTimeout(()=>countUp(num,pending,move?1400:0,n=>'+'+nf.format(n)),move?800:0);}
    setTimeout(()=>{const f=dialog.querySelector('[data-finish]');f.disabled=false;f.focus();},move?1000:0);};
   if(!move){showReveal();return;}

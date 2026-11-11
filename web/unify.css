@@ -1454,3 +1454,28 @@ html:not(#u):not(#v):not(#w):not(#x) body :is(.field-search,.lib-toolbar){backdr
 
 /* numbers: lining and tabular everywhere numbers are shown; zero values step back */
 html:not(#u):not(#v):not(#w):not(#x) body :is(.profile-hero-figs dd,.ri-figure,.stat-value,.lb-score,.history-metrics dd,.grimoire-kpi b,.detail-figs dd){font-variant-numeric:lining-nums tabular-nums!important;font-feature-settings:"lnum" 1,"tnum" 1!important}
+
+/* judge fx3: the dictionary hit lives in a 56px band under the bar, warm; Explosion flash warm via screen, soft core;
+   the wrong answer ringed by scorch, not hidden; rite field tinted by the element; result tighter, motto in italic */
+html body .dict-hit{width:720px!important;height:56px!important;overflow:hidden}
+html body .dict-hit>i{left:360px!important}
+html body .dict-hit-flash{width:300px!important;height:90px!important;background:radial-gradient(closest-side,rgba(255,246,220,.95),rgba(255,214,140,.6) 40%,rgba(237,181,110,.15) 70%,transparent)!important}
+html body .dict-hit-ring{-webkit-mask-image:linear-gradient(90deg,transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(90deg,transparent,#000 30%,#000 70%,transparent)}
+html body .fx-flash{background:radial-gradient(circle at var(--x) var(--y),rgba(255,248,226,1),rgba(255,214,150,.85) 16%,rgba(255,150,80,.45) 42%,rgba(200,70,40,.18) 75%,rgba(120,30,20,.08) 100%)!important;mix-blend-mode:screen!important}
+html body .fx-core{background:radial-gradient(closest-side,#fffdf6,rgba(255,240,200,.85) 35%,rgba(255,200,130,.35) 65%,transparent)!important}
+html body svg.fx-scars path.fx-crack{stroke:rgba(255,196,150,.55)!important}
+html body svg.fx-scars g.fx-scar.is-hot path.fx-crack{stroke:#ffb35a!important;filter:drop-shadow(0 0 4px rgba(255,120,50,.8))}
+html body svg.fx-scars .fx-water{fill:url(#fx-water-grad);fill:rgba(120,205,255,.55)!important;stroke:rgba(230,250,255,.9);stroke-width:1.5;filter:drop-shadow(0 0 10px rgba(120,210,255,.8))}
+html body svg.fx-scars g.fx-scar.is-gone .fx-scorch{opacity:0;transition:opacity 1.2s .3s}
+html body .class-rite-white{background:radial-gradient(circle at 30% 50%,#fff,color-mix(in srgb,var(--c) 70%,#fff) 30%,color-mix(in srgb,var(--c) 35%,transparent) 70%)!important;mix-blend-mode:screen}
+html body .class-rite-motto{font:italic 400 18px/1.7 var(--g-serif,serif)!important;margin-top:14px!important}
+html body .class-rite-xp{margin-top:18px!important}
+html body .class-rite-end{margin-top:22px!important}
+
+/* type tags (user: no tag in the header; the boxed tags looked jagged — redesign): no box and no small mono caps; the
+   type reads as smooth serif text in the element's colour after a short rule of that colour, brighter when chosen */
+html body .class-rite-tag{box-shadow:none!important;padding:0!important;background:none!important;display:flex;align-items:center;gap:8px;font:500 13px/1 var(--g-serif,serif)!important;letter-spacing:.06em!important;color:color-mix(in srgb,var(--c) 70%,var(--g-t2,#c3ab9c))!important;-webkit-font-smoothing:antialiased}
+html body .class-rite-tag::before{content:"";width:16px;height:1px;background:linear-gradient(90deg,transparent,var(--c));opacity:.7}
+html body .class-rite-school.is-on .class-rite-tag{color:var(--c)!important;text-shadow:0 0 10px color-mix(in srgb,var(--c) 50%,transparent)}
+html body .class-rite-school.is-on .class-rite-tag::before{width:26px;opacity:1}
+html body .class-rite-top h2 i{display:none}
