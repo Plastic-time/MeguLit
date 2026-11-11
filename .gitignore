@@ -31,6 +31,8 @@ cache/
 # Test output
 validation/*
 !validation/*.test.cjs
+!validation/helpers/
+!validation/helpers/*.cjs
 validation/**/results*/
 validation/**/*-profile-*/
 
