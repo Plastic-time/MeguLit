@@ -2056,3 +2056,5 @@ html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
 .nt-welcome .nt-updates::-webkit-scrollbar { width: 6px; }
 .nt-welcome .nt-updates::-webkit-scrollbar-thumb { background: rgba(200,50,60,.55); border-radius: 3px; }
 .nt-welcome .nt-updates::-webkit-scrollbar-thumb:hover { background: #c8323c; }
+
+.nt-title-2 { margin-top: .35rem; color: #e8b4b8; }

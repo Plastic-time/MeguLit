@@ -12,7 +12,7 @@ const T = {
     placeholder: '比如：打开某某游戏后没有翻译 / 点了某个按钮没反应 / 启动很慢……', contact: '联系方式（选填，QQ 或邮箱，方便回复你）',
     privacy: '日志里的 Windows 用户名和邮箱会先去掉', send: '上传', sending: '正在打包日志并上传…', sent: '已收到，谢谢！作者会尽快看',
     sentTextOnly: '日志没传上去，但你写的原因已经收到了，谢谢！', failed: '上传失败，请稍后再试', cancel: '取消', empty: '请先写一下原因，一句话也可以',
-    noticeKicker: 'notice', noticeTag: 'megulit · in development', noticeTitle: 'MeguLit 还在开发中',
+    noticeKicker: 'notice', noticeTag: 'megulit · in development', noticeTitle: 'MeguLit 还在开发中', noticeTitle2: '大部分引擎都已被吾之爆裂魔法攻克！提交游戏名之后，不妨先直接开玩试试',
     noticeText: '有些游戏现在还没适配好。想玩什么游戏，把名字写在下面点提交，快的话半天，最晚一周内就能支持',
     upd: (y, m, d, title) => `${y}年${m}月${d}日 完善了《${title}》的内嵌使用`, updNote: '以上游戏只在作者本地做过部分测试，实际游玩中如果还有问题，欢迎继续反馈，会跟进修复',
     gamePlaceholder: '想玩的游戏名字', submit: '提交', gameSent: '收到了，会尽快适配',
@@ -24,7 +24,7 @@ const T = {
     placeholder: '例：〇〇を開いても翻訳が出ない／ボタンを押しても反応しない／起動が遅い…', contact: '連絡先（任意・返信用の QQ やメール）',
     privacy: 'ログの Windows ユーザー名とメールアドレスは先に取り除きます', send: '送信', sending: 'ログをまとめて送信中…', sent: '受け取りました。ありがとうございます！',
     sentTextOnly: 'ログは送れませんでしたが、書いていただいた内容は届きました。ありがとうございます！', failed: '送信できませんでした。少し待ってからもう一度お試しください', cancel: 'キャンセル', empty: '原因をひとこと書いてください',
-    noticeKicker: 'notice', noticeTag: 'megulit · in development', noticeTitle: 'MeguLit は開発中です',
+    noticeKicker: 'notice', noticeTag: 'megulit · in development', noticeTitle: 'MeguLit は開発中です', noticeTitle2: 'ほとんどのエンジンはすでに我が爆裂魔法で攻略済み！ゲーム名を送ったら、まずはそのまま遊んでみて',
     noticeText: 'まだ対応できていないゲームもあります。遊びたいゲームの名前を下に入れて送信してください。早ければ半日、遅くとも一週間以内に対応します',
     upd: (y, m, d, title) => `${y}年${m}月${d}日 「${title}」の埋め込み表示を改善しました`, updNote: '上のゲームは作者の手元で一部しか確認していません。実際に遊んで問題があれば、引き続き知らせてください。修正していきます',
     gamePlaceholder: '遊びたいゲームの名前', submit: '送信', gameSent: '受け取りました。できるだけ早く対応します',
@@ -36,7 +36,7 @@ const T = {
     placeholder: 'For example: no translation after opening some game / a button does nothing / startup is slow…', contact: 'Contact (optional, QQ or e-mail, so we can reply)',
     privacy: 'The Windows user name and e-mail addresses are removed from the logs first', send: 'Upload', sending: 'Packing logs and uploading…', sent: 'Got it, thank you!',
     sentTextOnly: 'The logs did not go through, but what you wrote arrived. Thank you!', failed: 'Could not upload; please try again later', cancel: 'Cancel', empty: 'Please say what went wrong; one sentence is fine',
-    noticeKicker: 'notice', noticeTag: 'megulit · in development', noticeTitle: 'MeguLit is still in development',
+    noticeKicker: 'notice', noticeTag: 'megulit · in development', noticeTitle: 'MeguLit is still in development', noticeTitle2: 'Most engines have already fallen to my Explosion magic! Once you submit a game, go ahead and try playing it right away',
     noticeText: 'Some games are not supported yet. Type the name of a game you want to play and submit it; it usually takes half a day, a week at most',
     upd: (y, m, d, title) => `${new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })} · embedded mode for ${title} improved`, updNote: 'These were only partly tested on the author’s own machine. If anything still goes wrong when you play, please keep telling us and we’ll fix it',
     gamePlaceholder: 'A game you want to play', submit: 'Submit', gameSent: 'Got it; support is on the way',
@@ -117,7 +117,7 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '' })
   const t = words(locale), dialog = document.createElement('dialog');
   dialog.className = 'game-dialog dev-notice';
   dialog.innerHTML = `<div class="dev-notice-top"><span>${esc(t.noticeKicker)}</span><span>${esc(t.noticeTag)}</span></div>
-<h2>${esc(t.noticeTitle)}</h2><p class="dev-notice-text">${esc(t.noticeText)}</p>
+<h2>${esc(t.noticeTitle)}</h2><h2 class="dev-notice-title2">${esc(t.noticeTitle2)}</h2><p class="dev-notice-text">${esc(t.noticeText)}</p>
 <form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="primary">${esc(t.submit)}</button></form>
 <p class="feedback-status" role="status" aria-live="polite"></p>
 <ul class="dev-notice-updates" hidden></ul><p class="dev-notice-updates-note" hidden></p>
