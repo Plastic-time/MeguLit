@@ -126,7 +126,7 @@ html body .sp-preview .sp-scene>*{background-color:transparent}
 html body .translation-types{gap:0!important;padding:0!important;border:0!important;border-radius:2px!important;background:rgba(10,9,12,.42)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
 html body .translation-types button{border-radius:0!important;padding:9px clamp(12px,1.2vw,18px)!important;font-size:13px!important;letter-spacing:.08em;color:var(--g-t3,#a08a80)!important;background:none!important;box-shadow:none!important}
 html body .translation-types button:hover{color:var(--g-t1,#f1e0d2)!important}
-html body .translation-types button:is([aria-selected=true],[aria-pressed=true],.active){color:var(--g-t1,#f1e0d2)!important;background:color-mix(in srgb,var(--g-gold) 9%,transparent)!important;box-shadow:inset 0 -2px 0 var(--g-gold)!important}
+html body .translation-types button:is([aria-selected=true],[aria-pressed=true],.active){color:var(--g-t1,#f1e0d2)!important;background:color-mix(in srgb,var(--g-gold) 9%,transparent)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
 
 /* ---- learning (kana lab, grammar, lessons, read words, statistics): the black slabs and paper blocks become the same
    glass; white "selected" chips become the gold underline; one highlight for the target particle ---- */
@@ -142,7 +142,7 @@ html body :is(.mg-tile,.mg-game,.gm-stg):hover{box-shadow:inset 0 0 0 1px var(--
 html body :is(.gm-lesson .gm-bubble,.gm-anki-offer,.gm-n0note,.rw-quote,.v-index.mg .mk-card){background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 10%,transparent),transparent 70%),rgba(16,13,17,.62)!important;color:var(--g-t1,#f1e0d2)!important;border-left:2px solid var(--g-gold)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;border-radius:2px!important}
 html body .gm-lesson .gm-bubble :is(b,strong){color:var(--g-gold)}
 /* white selected chips → gold underline on glass */
-html body :is(.gm-hud .gm-level.active,.gm-gtab.on,.v-index.mg .mk-lv.on,.v-index.mg .mk-lv.on.l0){background:color-mix(in srgb,var(--g-gold) 12%,transparent)!important;border-color:color-mix(in srgb,var(--g-gold) 55%,transparent)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 var(--g-gold)!important}
+html body :is(.gm-hud .gm-level.active,.gm-gtab.on,.v-index.mg .mk-lv.on,.v-index.mg .mk-lv.on.l0){background:color-mix(in srgb,var(--g-gold) 12%,transparent)!important;border-color:color-mix(in srgb,var(--g-gold) 55%,transparent)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
 html body :is(.gm-barcode i.on,.gm-stg-bar i.on){background:var(--g-gold)!important}
 html body .gm-stg.clear .gm-stg-flag{background:var(--g-gold)!important;color:#120d0c!important}
 html body .gm-lesson .gm-choice:hover:not(:disabled){background:color-mix(in srgb,var(--g-gold) 16%,rgba(16,13,17,.7))!important;color:var(--g-t1,#f1e0d2)!important}
@@ -204,7 +204,7 @@ html body .main :is(.record,.word-actions) .icon-button:hover{box-shadow:inset 0
    a gold diamond instead of the red square, square calendar cells ---- */
 html body .stg .stg-rs{gap:0;padding:0;border:0!important;border-radius:2px!important;background:rgba(10,9,12,.42)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important}
 html body .stg .stg-rs button{height:24px;border-radius:0!important;background:none!important;color:var(--g-t3,#a08a80)!important;font-size:12px}
-html body .stg .stg-rs button[aria-pressed=true]{background:color-mix(in srgb,var(--g-gold) 10%,transparent)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 var(--g-gold)}
+html body .stg .stg-rs button[aria-pressed=true]{background:color-mix(in srgb,var(--g-gold) 10%,transparent)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 #c82f3b}
 html body .stg .stg-cal{--accent:#9b2a3a}
 html body .stg .stg-cal .cell{border-radius:2px}
 html body .stg .stg-cal .cell.blank{border-style:solid;border-color:rgba(255,255,255,.04)}
@@ -443,3 +443,95 @@ html body .main .settings-nav .settings-category-items button{margin-block:2px}
 html:lang(ja) body .main .settings-nav :is(summary,button){line-break:strict;word-break:keep-all}
 html body .main .settings-content input[type=color]{border:0!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;padding:3px!important}
 html body .main .settings-content .sp-preview .sp-stage{min-height:0}
+
+/* ---- round 1 fixes ---- */
+/* mono labels: Consolas before ui-monospace (Windows resolves ui-monospace to a face with old-style figures) */
+:root,.ri-page,#learning-content,.gm-page,.stg,.leaderboard-page,.dl{--ri-mono:"IBM Plex Mono",Consolas,monospace;--mg-mono:"IBM Plex Mono",Consolas,monospace;--stg-mono:"IBM Plex Mono",Consolas,monospace}
+/* learning sub tabs fit the window in every language */
+@media (max-width:1500px){.main>.tabs{gap:clamp(12px,1.4vw,22px)!important}.main>.tabs .tab{letter-spacing:.04em!important}}
+@media (max-width:1360px){html:lang(en) .main>.tabs .tab::before,html:lang(ja) .main>.tabs .tab::before{margin-right:5px}html:lang(en) .main>.tabs .tab{font-size:12.5px!important;letter-spacing:0!important}html:lang(en) .main>.tabs{gap:12px!important}}
+/* one content width for every learning tab, centred: the left edge no longer jumps */
+html body #learning-content{max-width:1400px;margin-inline:auto}
+html body #learning-content .g-blank{max-width:none!important;margin-inline:0!important}
+html body .g-blank .glyph{right:-18px!important;bottom:-70px!important;opacity:.7}
+/* word cards: the example is just the quote and the game, no extra rules */
+html body .main .record .word-source .link-button{box-shadow:none!important;padding-left:0!important}
+/* empty states: no dead gap before the action */
+html body .g-blank .acts{margin-top:22px!important}
+html body .g-blank{min-height:0!important}
+/* notice: one 54px line for the request (E446), no ring at rest; focus is shown by the gold hairline only */
+html body dialog.game-dialog .dev-notice-form>:is(input,button){height:54px!important;min-height:54px!important;max-height:54px!important}
+html body dialog.game-dialog :is(button,input,textarea):focus-visible{outline:0!important}
+html body dialog.game-dialog :is(.dev-notice-form>input,.feedback-text,.feedback-contact):focus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html body dialog.game-dialog .dev-notice-updates li{line-height:1.7;padding-block:2px}
+/* scrolled content fades out under the top bar instead of being cut */
+html body .workspace>.main:not(.home-page):not(.field-page){-webkit-mask:linear-gradient(transparent 0,#000 14px);mask:linear-gradient(transparent 0,#000 14px)}
+/* library: titles end in an ellipsis while still; the list fades under its head band */
+html body .main .mq-box:not(:hover) .mq{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transform:none!important;animation:none!important}
+html body .lib-list .library-grid{-webkit-mask:linear-gradient(transparent 0,#000 18px);mask:linear-gradient(transparent 0,#000 18px)}
+/* home: today's cell exactly one cell */
+html body .tv-heat i.today{width:12px!important;height:12px!important;transform:none!important;justify-self:auto!important}
+/* history: the tab band stays on top while the list scrolls; the font link reads as a button; glass rows */
+html body .main:has(>.history-backdrop)>.tabs{position:sticky!important;top:0!important;z-index:6!important}
+html body .main:has(>.tabs)>.page-header .text-button{height:30px;padding:0 12px!important;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22);letter-spacing:.12em!important}
+html body .main:has(>.tabs)>.page-header .text-button:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)}
+html body .main:has(>.history-backdrop) :is(.history-session,.history-dialogue){background:linear-gradient(160deg,rgba(24,22,28,.7),rgba(14,13,17,.6))!important}
+html body .main:has(>.history-backdrop) .history-metrics dd{white-space:nowrap}
+/* detail: the glyph steps back on narrow windows */
+@media (max-width:1500px){html body .workspace>.stage-cover[data-kind=""] .dtv-glyph,html body .workspace>.stage-cover:not([data-kind]) .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 5%,transparent)!important}}
+/* level picker: equal buttons, a visible but disabled primary, no dashed focus */
+html body .lv-dialog footer button{height:46px!important;min-height:46px!important;font-size:15px!important}
+html body .lv-dialog footer .primary:disabled{opacity:.6!important;filter:saturate(.5)!important}
+html body .lv-dialog .lv-opt:focus-visible:not(.active){outline:0!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html body .lv-dialog .lv-lead{text-wrap:pretty}
+/* review: square glass card, matched button sizes, room for the status line */
+html body :is(.review-card,.anki-review-panel){border-radius:2px!important}
+html body .review-card :is(button.secondary){font-size:15px!important;height:48px}
+html body .review-card .review-status,html body .review-card [data-review-status]{margin-top:16px!important}
+/* grammar list: the stage strip fades at its edge, kana and meaning sit together */
+html body .gm-page .gm-stgs{-webkit-mask:linear-gradient(90deg,#000 0,#000 calc(100% - 48px),transparent);mask:linear-gradient(90deg,#000 0,#000 calc(100% - 48px),transparent)}
+html body .gm-group .gm-card{grid-template-columns:36px 72px minmax(0,1fr) auto!important}
+html body .gm-hud .gm-level.active{border-color:rgba(200,47,59,.6)!important}
+/* lessons: the step rail stays in view, the step nav stays at one place, larger step buttons */
+html body .gm-lesson>.gm-steps{position:sticky;top:60px;align-self:start}
+html body .gm-lesson-main{min-height:calc(100vh - 360px)!important}
+html body .gm-lesson .gm-stepnav button{font-size:14px!important;height:44px}
+/* one left edge for every page: content starts at the main column's padding */
+html body .main :is(.leaderboard-page,.dl,.about-page){padding-left:0!important;padding-right:0!important}
+/* leaderboard: the ranked cards fill their row whatever the count; values never break */
+html body .leaderboard-page .lb-grimoires{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}
+html body .leaderboard-page :is(.lb-gvalue,.lb-local strong,.lb-local b,.lb-mychip span,.leaderboard-local strong){white-space:nowrap}
+/* hot words 4–10: term, reason, then the count on the right */
+html body .leaderboard-page .lb-honours li{grid-template-columns:44px minmax(160px,240px) minmax(0,1fr) auto!important}
+html body .leaderboard-page .lb-honours .lb-honour-term{display:contents}
+html body .leaderboard-page .lb-honours .lb-honour-term strong{grid-column:2}
+html body .leaderboard-page .lb-honours .lb-honour-term small{grid-column:4;justify-self:end;font-size:12px;color:var(--g-t2,#c3ab9c)}
+html body .leaderboard-page .lb-honours .leaderboard-reason,html body .leaderboard-page .lb-honours li>span:empty{grid-column:3!important;grid-row:1}
+/* follow actions: one 32px height */
+html body .leaderboard-page :is(.lb-follow-button,.lb-chip,.leaderboard-leave[data-lb-follow]){height:32px;display:inline-flex;align-items:center;padding:0 14px!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)}
+html body .leaderboard-page .lb-follow-button{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
+html body .leaderboard-page .forum-new{height:36px!important;min-height:36px!important}
+/* CJK small labels: no Latin tracking */
+html:is(:lang(zh-CN),:lang(ja-JP)) body :is(.lb-card-head small,.lb-h2 span,.tv-fig small,.tv-heatsum,.history-metrics dt,.lb-week,.stg-foot,.ri-hud-stats,.dl-head small){letter-spacing:.06em!important}
+/* daily: trend words on one line, the frame marks as on the other stages */
+html body .dl .dl-term{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:17px!important}
+html body .dl .dl-word:nth-child(1) .dl-term{font-size:19px!important}
+html body .dl .dl-term ruby{white-space:nowrap}
+html body .workspace:has(>.main .dl)>.stage-cover .stage-marks,html body .workspace:has(>.main .about-page)>.stage-cover .stage-marks{display:block}
+/* tools: the line of purpose reads as the headline, the cards use the height */
+html body .grimoire-page .tools-intro{font-family:var(--g-serif,serif);font-size:clamp(18px,1.5vw,22px);color:var(--g-t1,#f1e0d2);line-height:1.6}
+html body .grimoire-page .tools-intro .tools-kicker{font-family:var(--u-mono)}
+html body .grimoire-page .tool-card{min-height:clamp(300px,50vh,520px)!important}
+html body .grimoire-page .tool-key-note{text-wrap:pretty}
+/* about: every link row has its arrow, the thanks line follows the button's left edge */
+html body .about-page .about-link:not(:has(span))::after{content:"↗";color:var(--g-gold);margin-left:auto}
+html body .about-page .about-intl{text-align:left!important;align-items:flex-start}
+/* guide: the body never ends mid-line */
+html body .guide-panel .dev-notice-scroll{padding-bottom:36px!important}
+/* feedback: one hairline on focus, matched actions */
+html body dialog.feedback-dialog .feedback-text{border-left:0!important}
+html body dialog.feedback-dialog .feedback-text:not(:focus){box-shadow:inset 0 0 0 1px var(--u-line-2),inset 2px 0 0 var(--u-red)!important}
+html body dialog.game-dialog .dialog-actions :is(button.primary,.text-button){height:46px!important;font-size:15px!important}
+/* profile: one divider between sections */
+html body dialog.profile-panel .panel:last-child{border-bottom:0!important}
+html body dialog.profile-panel hr{display:none}
