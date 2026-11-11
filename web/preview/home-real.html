@@ -34,9 +34,10 @@
   <div id="app" aria-busy="true"></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="preview/megu-data.local.js"></script>
+  <script src="preview/megu-settings.local.js"></script>
   <script>
   (()=>{const D=window.MEGU_DATA,log=(...a)=>console.log('[mock]',...a);
-   const table={home:()=>D.home,preferences:()=>D.home.preferences,background:()=>D.background||'',game_detail:a=>D.detail[a.id]||{},learning_activity:()=>D.activity,daily_view:()=>D.daily||{},statistics:()=>({buckets:[]}),ui_state:()=>({}),settings_get:()=>({}),reader_status:()=>({ready:true}),save_preferences:a=>{Object.assign(D.home.preferences,a.values||{});return D.home.preferences;}};
+   const table={home:()=>D.home,preferences:()=>D.home.preferences,background:()=>D.background||'',game_detail:a=>D.detail[a.id]||{},learning_activity:()=>D.activity,daily_view:()=>D.daily||{},statistics:()=>({buckets:[]}),ui_state:()=>({}),settings_get:()=>window.MEGU_SETTINGS||{},reader_status:()=>({ready:true}),save_preferences:a=>{Object.assign(D.home.preferences,a.values||{});return D.home.preferences;}};
    window.__TOME_TEST_TRANSPORT__=async(command,args)=>{if(command!=='service'){return null;}const r=args.request||{},f=table[r.action];if(!f){log('unmocked',r.action);return r.action&&/s$/.test(r.action)?[]:{};}return f(r);};
   })();
   </script>
