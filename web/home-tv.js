@@ -1,9 +1,9 @@
 import {activityCells} from './learning-activity.js';
 
 const copy={
- zh:{last:'上次',coverHint:'单击查看详情 · 双击抽卡',search:'搜索作品',read:'今日阅读',words:'收录单词',lookups:'查词',full:'完整统计',play:'继续游玩',detail:'作品详情',all:'全部作品',edit:'选择首页展示的作品',title:'首页展示的作品',sub:'拖动排序 · 置顶 · 隐藏',auto:'按最近游玩',pick:'只放我挑的',pin:'置顶',hide:'隐藏',close:'关闭',hintAuto:'按最近游玩自动轮播；置顶的永远在最前，隐藏的不出现。',hintPick:'只轮播这里的顺序；一个都不剩时回到最近游玩。',chars:'字',linked:'词',total:'累计',activity:'学习活动',days:'天',min:'分',empty:'还没有作品',add:'添加游戏'},
- ja:{last:'前回',coverHint:'クリックで詳細 · ダブルクリックでガチャ',search:'作品を検索',read:'今日の読書',words:'収録単語',lookups:'辞書引き',full:'統計をすべて見る',play:'続きをプレイ',detail:'作品詳細',all:'すべての作品',edit:'ホームに表示する作品を選ぶ',title:'ホームに表示する作品',sub:'ドラッグで並べ替え · 固定 · 非表示',auto:'最近プレイ順',pick:'選んだ作品だけ',pin:'固定',hide:'非表示',close:'閉じる',hintAuto:'最近プレイ順に切り替わります。固定は常に先頭、非表示は出ません。',hintPick:'この順番だけで切り替えます。残りがなければ最近プレイ順に戻ります。',chars:'字',linked:'語',total:'累計',activity:'学習の記録',days:'日',min:'分',empty:'作品がまだありません',add:'ゲームを追加'},
- en:{last:'Last',coverHint:'Click for details · double-click to draw',search:'Search games',read:'Read today',words:'Words saved',lookups:'Lookups',full:'Full statistics',play:'Continue',detail:'Details',all:'All games',edit:'Choose games for the home screen',title:'Games on the home screen',sub:'Drag to reorder · pin · hide',auto:'Recently played',pick:'Only my picks',pin:'Pin',hide:'Hide',close:'Close',hintAuto:'Cycles through recently played games; pinned ones lead, hidden ones never show.',hintPick:'Cycles through this order only; falls back to recently played when empty.',chars:'chars',linked:'words',total:'Total',activity:'Learning activity',days:'days',min:'min',empty:'No games yet',add:'Add game'}};
+ zh:{figRead:'累计阅读',figChars:'读过的字',figWords:'关联单词',last:'上次',coverHint:'单击查看详情 · 双击抽卡',search:'搜索作品',read:'今日阅读',words:'收录单词',lookups:'查词',full:'完整统计',play:'继续游玩',detail:'作品详情',all:'全部作品',edit:'选择首页展示的作品',title:'首页展示的作品',sub:'拖动排序 · 置顶 · 隐藏',auto:'按最近游玩',pick:'只放我挑的',pin:'置顶',hide:'隐藏',close:'关闭',hintAuto:'按最近游玩自动轮播；置顶的永远在最前，隐藏的不出现。',hintPick:'只轮播这里的顺序；一个都不剩时回到最近游玩。',chars:'字',linked:'词',total:'累计',activity:'学习活动',days:'天',min:'分',empty:'还没有作品',add:'添加游戏'},
+ ja:{figRead:'累計読書',figChars:'読んだ文字',figWords:'関連単語',last:'前回',coverHint:'クリックで詳細 · ダブルクリックでガチャ',search:'作品を検索',read:'今日の読書',words:'収録単語',lookups:'辞書引き',full:'統計をすべて見る',play:'続きをプレイ',detail:'作品詳細',all:'すべての作品',edit:'ホームに表示する作品を選ぶ',title:'ホームに表示する作品',sub:'ドラッグで並べ替え · 固定 · 非表示',auto:'最近プレイ順',pick:'選んだ作品だけ',pin:'固定',hide:'非表示',close:'閉じる',hintAuto:'最近プレイ順に切り替わります。固定は常に先頭、非表示は出ません。',hintPick:'この順番だけで切り替えます。残りがなければ最近プレイ順に戻ります。',chars:'字',linked:'語',total:'累計',activity:'学習の記録',days:'日',min:'分',empty:'作品がまだありません',add:'ゲームを追加'},
+ en:{figRead:'Time read',figChars:'Characters read',figWords:'Linked words',last:'Last',coverHint:'Click for details · double-click to draw',search:'Search games',read:'Read today',words:'Words saved',lookups:'Lookups',full:'Full statistics',play:'Continue',detail:'Details',all:'All games',edit:'Choose games for the home screen',title:'Games on the home screen',sub:'Drag to reorder · pin · hide',auto:'Recently played',pick:'Only my picks',pin:'Pin',hide:'Hide',close:'Close',hintAuto:'Cycles through recently played games; pinned ones lead, hidden ones never show.',hintPick:'Cycles through this order only; falls back to recently played when empty.',chars:'chars',linked:'words',total:'Total',activity:'Learning activity',days:'days',min:'min',empty:'No games yet',add:'Add game'}};
 
 const DUR=12000,BEAT=476,LOGO=new URL('./assets/megulit-logo.svg',import.meta.url).href;
 const details=new Map(),palettes=new Map();
@@ -63,30 +63,44 @@ function pileMotion(pile,kind,total,delay){const cards=[...pile.children],top=ca
  if(kind==='riffle')rest.forEach((c,n)=>{const sx=n%2?1:-1;wob(c,[{transform:base(c)},{transform:`${base(c)} translateX(${sx*26}px) rotate(${sx*4}deg)`,offset:.2+n*.03},{transform:base(c),offset:.45+n*.04},{transform:base(c)}]);});
  if(kind==='lift')cards.slice(1).forEach(c=>wob(c,[{transform:base(c)},{transform:`${base(c)} translateY(-8px)`,offset:.3},{transform:`${base(c)} translateY(-8px)`,offset:.55},{transform:base(c)}]));
  if(kind==='bump')rest.forEach((c,n)=>{c.animate([{transform:base(c)},{transform:`${base(c)} translateY(3px)`,offset:.3},{transform:base(c)}],{duration:260,delay:delay+total*.1+n*12,easing:'ease-out'});});}
+const parsePose=(dx,dy,r,s,extra='')=>{const g=(re,d)=>{const m=extra.match(re);return m?parseFloat(m[1]):d;};return {x:dx,y:dy,r,s,z:g(/translateZ\((-?[\d.]+)px\)/,0),rx:g(/rotateX\((-?[\d.]+)deg\)/,0),sx:g(/scaleX\((-?[\d.]+)\)/,1),sy:g(/scaleY\((-?[\d.]+)\)/,1)};};
+const FEELS={soft:{k:120,c:16,lead:1.15,drag:.05},fluid:{k:190,c:21,lead:1,drag:.04},snappy:{k:320,c:27,lead:.85,drag:.03},crisp:{k:700,c:52,lead:.72,drag:.012}};
+function springTrack(targets,feel){const ch=['x','y','r','s','z','rx','ry','sx','sy'],pos={...targets[0].p},vel=Object.fromEntries(ch.map(k=>[k,0])),dt=1/240,out=[];let ti=0,t=0,settled=0;const last=targets[targets.length-1].at;
+ while(t<last+3){while(ti+1<targets.length&&targets[ti+1].at<=t)ti++;const tg=targets[ti].p,k=targets[ti].k||feel.k,c=targets[ti].c||feel.c;let moving=false;
+  for(const n of ch){const a=k*(tg[n]-pos[n])-c*vel[n];vel[n]+=a*dt;pos[n]+=vel[n]*dt;if(Math.abs(tg[n]-pos[n])>(n==='s'||n==='sx'||n==='sy'?.002:.15)||Math.abs(vel[n])>(n==='s'||n==='sx'||n==='sy'?.01:1))moving=true;}
+  if(Math.round(t/dt)%4===0)out.push({t,p:{...pos},v:{x:vel.x,y:vel.y}});
+  t+=dt;if(t>last&&!moving){if(++settled>12)break;}else settled=0;}
+ return out;}
 function deal(cover,background,animate,mode='draw'){const flip=cover.querySelector('.tv-flip'),face=cover.querySelector('.tv-face'),artEl=cover.querySelector('.tv-art'),backFace=flip.querySelector('.tv-back'),pile=cover.parentNode.querySelector('.tv-pile');cover.querySelectorAll('.tv-old,.tv-sheen').forEach(n=>n.remove());[flip,face,backFace,...(pile?[pile,...pile.children]:[])].forEach(el=>el.getAnimations().forEach(x=>x.cancel()));
  if(!animate||matchMedia('(prefers-reduced-motion:reduce)').matches||!artEl.style.background){artEl.style.background=background;return 0;}
  if(mode==='fade'){const fresh=document.createElement('div');fresh.className='tv-old';fresh.style.background=background;cover.appendChild(fresh);const a=fresh.animate([{opacity:0,filter:'blur(10px) saturate(.6)',transform:'scale(1.04)'},{opacity:1,filter:'blur(0) saturate(1)',transform:'none'}],{duration:760,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'});a.finished.then(()=>{artEl.style.background=background;fresh.remove();},()=>fresh.remove());return 260;}
- const outDir=rnd(0,Math.PI*2),outDur=rnd(380,480);
+ const outDir=rnd(0,Math.PI*2),outDur=rnd(360,460);
  const old=document.createElement('div');old.className='tv-old';old.style.background=artEl.style.background;cover.appendChild(old);
- old.animate([{transform:'none',opacity:1,filter:'blur(0)'},{transform:`translate(${Math.cos(outDir)*rnd(110,160)}%,${Math.sin(outDir)*rnd(80,120)}%) rotate(${rnd(-70,70)}deg) scale(${rnd(.6,.9)})`,opacity:0,filter:'blur(3px)'}],{duration:outDur,easing:'cubic-bezier(.45,0,.55,1)',fill:'forwards'}).finished.then(()=>old.remove(),()=>old.remove());
+ old.animate([{transform:'none',opacity:1},{transform:`translate(${Math.cos(outDir)*18}%,${Math.sin(outDir)*14}%) rotate(${rnd(-12,12)}deg) scale(.97)`,opacity:.9,offset:.35},{transform:`translate(${Math.cos(outDir)*rnd(120,160)}%,${Math.sin(outDir)*rnd(90,120)}%) rotate(${rnd(-50,50)}deg) scale(${rnd(.75,.9)})`,opacity:0}],{duration:outDur,easing:'cubic-bezier(.4,0,.6,1)',fill:'forwards'}).finished.then(()=>old.remove(),()=>old.remove());
  artEl.style.background=background;
- const names=Object.keys(DRAWS),name=names.filter(n=>n!==cover.dataset.draw)[Math.floor(Math.random()*(names.length-1))],style=DRAWS[name]();
- const side=Math.random()<.5?-1:1,turn=180*side,tilt=rnd(-5,5),lift=rnd(60,120),over=rnd(1.06,1.12),gap=outDur*rnd(.1,.3),total=rnd(1350,1650)*(style.pile?1.1:1);
- const tf=s=>s.replace('var(--turn)',turn+'deg');
- const soften=e=>!e||e==='linear'?E1:e==='cubic-bezier(.6,0,.9,.5)'?'cubic-bezier(.5,0,.75,.6)':e;const frames=style.f.map(([t,s,e])=>({transform:tf(s),offset:t,easing:soften(e)}));
- frames.push({transform:`rotate(${tilt}deg) rotateY(${turn}deg) scale(1)`,offset:.55,easing:'cubic-bezier(.45,0,.3,1)'},{transform:`translateZ(${lift}px) rotate(${tilt*.5}deg) rotateY(${turn*.5}deg) scale(${over})`,offset:.74,easing:'cubic-bezier(.22,.9,.36,1)'},{transform:`translateZ(${lift*.2}px) rotateY(${-side*rnd(4,8)}deg) scale(${1+(over-1)*.35})`,offset:.9,easing:'cubic-bezier(.4,0,.3,1)'},{transform:`rotateY(${side*rnd(1,2.5)}deg) scale(1.005)`,offset:.96,easing:'cubic-bezier(.4,0,.4,1)'},{transform:'none'});
- const mid=.74,timing={duration:total,delay:gap,easing:'linear',fill:'backwards'};
- if(pile&&style.pile){pileCards(pile);pileMotion(pile,style.pile,total,gap);}
+ const names=Object.keys(DRAWS),name=names.filter(n=>n!==cover.dataset.draw)[Math.floor(Math.random()*(names.length-1))],style=DRAWS[name](),feelName=pickOne(['soft','fluid','fluid','snappy','snappy','crisp']),feel=FEELS[feelName];
+ const side=Math.random()<.5?-1:1,turn=180*side,tilt=rnd(-4,4),lift=rnd(50,100),over=rnd(1.04,1.09),T=rnd(1.05,1.3)*feel.lead,gap=outDur*.25/1000;
+ const targets=style.f.map(([t,s])=>{const m=s.match(/translate\((-?[\d.]+)%,(-?[\d.]+)%\)\s*(.*?)\s*rotate\((-?[\d.]+)deg\)\s*rotateY\(var\(--turn\)\)\s*scale\((-?[\d.]+)\)/);const p=m?parsePose(+m[1],+m[2],+m[4],+m[5],m[3]):parsePose(0,0,0,1);p.ry=turn;return {at:t*T,p};});
+ const slot={x:0,y:0,r:tilt,s:1,z:0,rx:0,ry:turn,sx:1,sy:1},tf=.52*T;
+ targets.push({at:tf,p:{...slot}},{at:tf+.12,p:{...slot,z:lift,s:over,ry:0,r:tilt*.4},k:feel.k*.9},{at:tf+.42,p:{x:0,y:0,r:0,s:1,z:0,rx:0,ry:0,sx:1,sy:1}});
+ const track=springTrack(targets,feel),total=track[track.length-1].t*1000;
+ const frames=track.map(({t,p,v})=>{const lean=Math.max(-14,Math.min(14,v.x*feel.drag)),pitch=Math.max(-12,Math.min(12,-v.y*feel.drag*.8));return {offset:Math.min(1,t*1000/total),transform:`translate(${p.x.toFixed(2)}%,${p.y.toFixed(2)}%) translateZ(${p.z.toFixed(1)}px) rotateX(${(p.rx+pitch).toFixed(2)}deg) rotate(${(p.r+lean).toFixed(2)}deg) rotateY(${p.ry.toFixed(2)}deg) scale(${p.s.toFixed(4)}) scaleX(${p.sx.toFixed(3)}) scaleY(${p.sy.toFixed(3)})`};});
+ frames[0].offset=0;frames[frames.length-1]={offset:1,transform:'none'};
+ const swapAt=track.find(f=>Math.abs(f.p.ry)<90)?.t*1000||total*.7,mid=Math.min(.999,swapAt/total),delay=gap*1000,timing={duration:total,delay,easing:'linear',fill:'backwards'};
+ if(pile&&style.pile){pileCards(pile);pileMotion(pile,style.pile,total,delay);}
  flip.animate(frames,timing);
- face.animate([{opacity:0},{opacity:0,offset:mid},{opacity:1,offset:mid+.001},{opacity:1}],timing);
- backFace.animate([{opacity:1},{opacity:1,offset:mid},{opacity:0,offset:mid+.001},{opacity:0}],{...timing,fill:'both'}).finished.then(()=>backFace.getAnimations().forEach(x=>x.cancel()),()=>{});
+ face.animate([{opacity:0},{opacity:0,offset:mid},{opacity:1,offset:Math.min(1,mid+.001)},{opacity:1}],timing);
+ backFace.animate([{opacity:1},{opacity:1,offset:mid},{opacity:0,offset:Math.min(1,mid+.001)},{opacity:0}],{...timing,fill:'both'}).finished.then(()=>backFace.getAnimations().forEach(x=>x.cancel()),()=>{});
  const sheen=document.createElement('i');sheen.className='tv-sheen';face.appendChild(sheen);sheen.style.setProperty('--sa',rnd(95,135)+'deg');
- sheen.animate([{backgroundPosition:'120% 0',opacity:0},{opacity:1,offset:.3},{backgroundPosition:'-40% 0',opacity:0}],{duration:rnd(600,850),delay:gap+total*.8,easing:'ease-out',fill:'both'}).finished.then(()=>sheen.remove(),()=>sheen.remove());
- cover.dataset.draw=name;
- return gap+total*mid;}
+ sheen.animate([{backgroundPosition:'120% 0',opacity:0},{opacity:1,offset:.3},{backgroundPosition:'-40% 0',opacity:0}],{duration:rnd(700,950),delay:delay+swapAt,easing:'ease-out',fill:'both'}).finished.then(()=>sheen.remove(),()=>sheen.remove());
+ cover.dataset.draw=name;cover.dataset.feel=feelName;
+ return delay+swapAt;}
+
 export const DRAW_NAMES=Object.keys(DRAWS);
 
 function fitTitle(h){const max=Math.min(128,Math.max(44,innerWidth*.074));let size=max;h.style.fontSize=size+'px';const limit=()=>h.scrollHeight>size*1.12*(h.textContent.length>18?3:2)+size*.3||h.scrollWidth>h.clientWidth+2;while(limit()&&size>26){size-=4;h.style.fontSize=size+'px';}}
+
+function tweenFig(el,to,fmt){if(!el)return;const from=+el.dataset.v||0;el.dataset.v=to;cancelAnimationFrame(+el.dataset.raf||0);if(matchMedia('(prefers-reduced-motion:reduce)').matches||from===to){el.textContent=fmt(to);return;}const t0=performance.now(),dur=900;const tick=now=>{const k=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-k,4);el.textContent=fmt(from+(to-from)*e);if(k<1)el.dataset.raf=requestAnimationFrame(tick);};el.dataset.raf=requestAnimationFrame(tick);setTimeout(()=>{if(+el.dataset.v===to)el.textContent=fmt(to);},dur+80);}
 
 function cardify(card){const face=card.querySelector('.tv-face');let pressed=false,last=null;
  const set=(x,y)=>{const depth=pressed?1.6:1,rx=(.5-y)*20*depth,ry=(x-.5)*20*depth;face.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg) scale(${pressed?.96:1.03})`;face.style.setProperty('--px',`${x*100}%`);face.style.setProperty('--py',`${y*100}%`);face.style.setProperty('--hue',`${Math.round(x*360)}deg`);};
@@ -114,7 +128,7 @@ export function renderHomeTV(main,ctx){
   <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div><div class="tv-scene"></div><div class="tv-flash"></div>
   <div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div>
   <button class="tv-heatlink" data-go="activity"></button>
-  <div class="tv-figs"><button class="tv-fig" data-go="statistics"><b>${mins(model.stats.readingSeconds)}</b><small>${w.read}</small></button><button class="tv-fig" data-go="words"><b>${number(model.stats.words)}</b><small>${w.words}</small></button><button class="tv-fig" data-go="statistics"><b>${number(model.stats.lookups)}</b><small>${w.lookups}</small></button><button class="tv-more" data-go="statistics">${w.full} →</button></div>
+  <div class="tv-figs"><button class="tv-fig" data-go="statistics"><b data-fig="time">0m</b><small>${w.figRead}</small></button><button class="tv-fig" data-go="detail"><b data-fig="chars">0</b><small>${w.figChars}</small></button><button class="tv-fig" data-go="words"><b data-fig="words">0</b><small>${w.figWords}</small></button><button class="tv-more" data-go="statistics">${w.full} →</button></div>
   <div class="tv-title"><div class="tv-ruby"></div><div class="tv-h1" role="heading" aria-level="1"></div><div class="tv-meta"></div></div>
   <div class="tv-rail"></div>
   <div class="tv-dialog"><span class="tv-who"></span><span class="tv-line"></span><div class="tv-act"><button class="tv-btn primary tv-play" data-act="play"><i class="tv-play-ic" aria-hidden="true"></i><span class="tv-play-tx"><b>${w.play}</b><small class="tv-play-sub"></small></span></button><button class="tv-btn" data-act="detail">${w.detail}</button><button class="tv-btn" data-go="library">${w.all}</button></div></div>
@@ -122,7 +136,7 @@ export function renderHomeTV(main,ctx){
  const root=main.querySelector('.tv-home'),$=s=>root.querySelector(s);
  live={root,timer:0,beat:0,typer:0,move:null};
  const art=(g,p)=>g.cover?`url("${String(g.cover).replace(/"/g,'%22')}") center/cover`:`linear-gradient(160deg,${p[0]},${p[2]} 70%)`;
- root.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{const to=b.dataset.go;if(to==='words')navigate('learning','words');else if(to==='activity')navigate('statistics');else navigate(to);}));
+ root.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{const to=b.dataset.go;if(to==='detail'){if(shown)onDetail(shown.id);return;}if(to==='words')navigate('learning','words');else if(to==='activity')navigate('statistics');else navigate(to);}));
  if(!list.length){$('.tv-h1').textContent=w.empty;$('.tv-act').innerHTML=model.games.length?'':`<button class="tv-btn primary" data-act="add">${icon('plus')}${w.add}</button>`;$('[data-act="add"]')?.addEventListener('click',onAdd);root.classList.add('empty');}
  $('[data-act="play"]')?.addEventListener('click',e=>shown&&onLaunch(shown.id,e.currentTarget));
  $('[data-act="detail"]')?.addEventListener('click',()=>shown&&onDetail(shown.id));
@@ -144,7 +158,8 @@ export function renderHomeTV(main,ctx){
   const cards=words.slice(0,8).map(x=>({b:x.spelling,s:x.reading&&x.reading!==x.spelling?x.reading:'',t:String(x.definitions||'').replace(/<[^>]+>/g,'').slice(0,80)}));
   $('.tv-vocab').innerHTML=cards.map(c=>`<div class="tv-wcard tv-card" title="${esc(c.t)}"><div class="tv-face"><small>${esc(c.s)||'&nbsp;'}</small><b>${esc(c.b)}</b><i class="tv-glare"></i></div></div>`).join('');$('.tv-vocab').querySelectorAll('.tv-card').forEach(cardify);
   const no=String(Math.max(1,pool.indexOf(g)+1)).padStart(2,'0');$('.tv-index').textContent=no;$('.tv-scene').innerHTML=`SCENE <b>${no}</b> / ${String(pool.length).padStart(2,'0')}`;
-  const t=$('.tv-title');t.classList.remove('in');setTimeout(()=>{if(mine!==token)return;$('.tv-ruby').textContent=g.engine||'';let n=0;$('.tv-h1').innerHTML=(String(g.title).match(/[A-Za-z0-9À-ɏ'’:;!?.,&\-]+|\s+|./gu)||[]).map(word=>/^\s+$/.test(word)?' ':`<i class="w">${[...word].map(c=>`<span style="transition-delay:${(n++)*28}ms">${esc(c)}</span>`).join('')}</i>`).join('');$('.tv-h1').title=g.title;$('.tv-meta').innerHTML=`<span>${esc(relativeTime(g.lastPlayedAt))}</span><span>${w.total} ${esc(duration(g.readingSeconds))}</span><span>${number(g.characters||0)} ${w.chars}</span><span>${number(g.learnedWords||0)} ${w.linked}</span>`;void t.offsetWidth;fitTitle($('.tv-h1'));setTimeout(()=>t.classList.add('in'),30);},flash?Math.max(0,reveal-(performance.now()-started)):0);
+  const t=$('.tv-title');t.classList.remove('in');setTimeout(()=>{if(mine!==token)return;$('.tv-ruby').textContent=g.engine||'';let n=0;$('.tv-h1').innerHTML=(String(g.title).match(/[A-Za-z0-9À-ɏ'’:;!?.,&\-]+|\s+|./gu)||[]).map(word=>/^\s+$/.test(word)?' ':`<i class="w">${[...word].map(c=>`<span style="transition-delay:${(n++)*28}ms">${esc(c)}</span>`).join('')}</i>`).join('');$('.tv-h1').title=g.title;$('.tv-meta').innerHTML=g.lastPlayedAt?`<span>${w.last} · ${esc(relativeTime(g.lastPlayedAt))}</span>`:'';void t.offsetWidth;fitTitle($('.tv-h1'));setTimeout(()=>t.classList.add('in'),30);},flash?Math.max(0,reveal-(performance.now()-started)):0);
+  tweenFig($('[data-fig="time"]'),g.readingSeconds||0,v=>mins(v));tweenFig($('[data-fig="chars"]'),g.characters||0,v=>number(Math.round(v)));tweenFig($('[data-fig="words"]'),g.learnedWords||0,v=>number(Math.round(v)));
   $('.tv-who').textContent=g.title;type(sentences[0]||'');
   if(flash){const f=$('.tv-flash');f.classList.remove('on');void f.offsetWidth;f.classList.add('on');}
   rail();
