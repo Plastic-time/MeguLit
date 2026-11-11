@@ -571,3 +571,24 @@
 .gm-page,.gm-map,.rw-album,.gm-stepbody{align-content:start}
 
 .gm-era{font:500 11px/1 var(--mg-mono);letter-spacing:.15em;color:var(--mg-dim)}.gm-era b{color:var(--mg-red);font-weight:600}
+
+/* 2026-11-11 动手玩: pick the natural line; pointer drag ghost */
+.gm-jds{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.gm-jd{display:grid;gap:10px;padding:16px 18px;border:1px dashed var(--mg-line)}
+.gm-jd.done{border-style:solid;border-color:rgba(255,255,255,.2)}
+.gm-jd-q{margin:0;font-size:14px;color:rgba(255,255,255,.75)}.gm-jd-q em{font:500 11px var(--mg-mono);font-style:normal;color:var(--mg-red);letter-spacing:.2em;margin-right:12px}.gm-jd-q b{color:var(--mg-red);font-size:18px}
+.gm-jd-opts{display:grid;gap:6px}
+.gm-jd-opt{display:block;width:100%;text-align:left;padding:12px 16px;border:1px solid rgba(255,255,255,.18);background:#000;color:#fff;font:400 20px/1.6 var(--gm-serif-ja);cursor:pointer;transition:border-color .15s,background .15s,transform .35s var(--ease-x)}
+.gm-jd-opt:hover:not(:disabled){border-color:#fff;transform:translateX(4px)}
+.gm-jd-opt.gm-jd-who{font:600 15px/1.4 var(--gm-serif)}
+.gm-jd-opt.hit{border-color:var(--mg-red);background:rgba(200,50,60,.18)}
+.gm-jd-opt.miss{opacity:.45;text-decoration:line-through;text-decoration-color:var(--mg-red)}
+.gm-jd-opt:disabled{cursor:default}
+.gm-jd-hl{background:var(--mg-red);color:#fff;padding:0 3px}
+.gm-jd-why{margin:0;display:grid;gap:4px;font-size:14px;line-height:1.7;color:rgba(255,255,255,.8)}
+.gm-jd-yes{color:#fff;font-family:var(--gm-serif-ja)}.gm-jd-no{color:var(--mg-red)}
+.gm-choice,.gm-tile{touch-action:none;user-select:none;cursor:grab}
+.gm-choice.dragging,.gm-tile.dragging{opacity:.35}
+.drag-ghost{opacity:.95;box-shadow:0 10px 24px rgba(0,0,0,.5);cursor:grabbing}
+.gm-blank.gm-drop.over,.gm-slot.over{border-color:var(--mg-red)!important;background:rgba(200,50,60,.25)!important}
+@media(prefers-reduced-motion:reduce){.gm-jd-opt{transition:none}}
