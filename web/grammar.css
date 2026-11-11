@@ -421,3 +421,38 @@
 .gm-anki-on{margin:0;font:11px/1 var(--mg-mono);letter-spacing:.15em;color:var(--mg-dim)}
 .gm-anki-on i{display:inline-block;width:6px;height:6px;margin-right:10px;background:var(--mg-red)}
 @media(max-width:700px){.gm-anki-offer{grid-template-columns:1fr}}
+
+/* 2026-11-11 polish: back link, verdict and practice buttons, folded groups, find-the-grammar, practice clear */
+.gm-page .gm-back{display:inline-flex;align-items:center;gap:12px;height:34px;padding:0 16px 0 12px;border:1px solid var(--mg-line);background:rgba(0,0,0,.6);color:#fff;font:500 11px/1 var(--mg-mono);letter-spacing:.3em;text-decoration:none;transition:border-color .2s,gap .35s var(--ease-x),background .2s}
+.gm-page .gm-back:hover{border-color:var(--mg-red);gap:18px;background:#000}
+.gm-page .gm-back:active{transform:scale(.97)}
+.gm-page .gm-back:focus-visible{outline:2px solid var(--mg-red);outline-offset:2px}
+.gm-lesson .gm-verdict{background:#0b0b0b;border:1px solid var(--mg-line);border-left:3px solid var(--mg-red);padding:18px 20px}
+.gm-lesson .gm-verdict.ok{border-left-color:#fff}
+.gm-lesson .gm-verdict button,.gm-done button{border-radius:0;min-height:40px;padding:0 22px;letter-spacing:.2em;font-weight:600;transition:transform .4s var(--ease-x),background .15s}
+.gm-lesson .gm-verdict .primary,.gm-done .primary{background:var(--mg-red);border:0;color:#fff}
+.gm-lesson .gm-verdict .primary:hover,.gm-done .primary:hover{transform:translateX(4px)}
+.gm-more{width:100%;height:42px;border:0;border-top:1px dashed var(--mg-line);background:none;color:var(--mg-dim);font:11px/1 var(--mg-mono);letter-spacing:.25em;cursor:pointer;transition:color .2s,background .2s}
+.gm-more:hover{color:#fff;background:rgba(200,50,60,.15)}
+.gm-cards.folded .gm-card.extra{display:none}
+.gm-play-lead{margin:0;font-size:15px;color:rgba(255,255,255,.8)}
+.gm-play-lead b{color:var(--mg-red);font-size:18px}
+.gm-finds{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.gm-find{padding:16px 18px;border:1px dashed var(--mg-line)}
+.gm-find .gm-ja{display:flex;flex-wrap:wrap;gap:3px;align-items:baseline;font-size:24px}
+.gm-find-bit{border:0;border-bottom:1px solid rgba(255,255,255,.2);background:none;color:#fff;font:inherit;padding:2px 3px;cursor:pointer;transition:background .15s,border-color .15s}
+.gm-find-bit:hover{background:rgba(255,255,255,.08);border-bottom-color:#fff}
+.gm-find-bit.miss{border-bottom-color:var(--mg-red);color:rgba(255,255,255,.5)}
+.gm-find-bit.hit{background:var(--mg-red);border-bottom-color:var(--mg-red);color:#fff}
+.gm-find.done .gm-find-bit:not(.hit){cursor:default;color:rgba(255,255,255,.6)}
+.gm-find-p{color:rgba(255,255,255,.4)}
+.gm-find-msg{margin:6px 0 0;min-height:1.2em;font:12px var(--mg-mono);letter-spacing:.1em;color:var(--mg-red)}
+.gm-find.done .gm-find-msg{color:#fff}
+.gm-done{display:grid;gap:12px;justify-items:start;padding:28px;border:1px solid var(--mg-line);border-left:3px solid var(--mg-red);position:relative}
+.gm-done-score{font:600 64px/1 var(--mg-mono);color:#fff}.gm-done-score small{font-size:20px;color:var(--mg-dim);margin-left:8px}
+.gm-done p{margin:0;font-size:15px;color:rgba(255,255,255,.8)}
+.gm-anki-state{min-height:1.2em;color:var(--mg-red)!important;font-family:var(--mg-mono)}
+@media(prefers-reduced-motion:reduce){.gm-page .gm-back,.gm-more,.gm-find-bit{transition:none}}
+
+.gm-group .gm-card{grid-template-columns:36px minmax(70px,46%) 1fr auto}
+.gm-group .gm-card-title.long{font-size:18px;line-height:1.3}
