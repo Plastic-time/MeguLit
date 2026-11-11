@@ -37,6 +37,7 @@ function savePreferences(request) {
   /* v1.1.0 ships a default background: the first save turns it on once, a later toggle-off is kept */
   if(!next.defaultBackground110){if(typeof patch.homeBackground!=='boolean')next.homeBackground=next.homeBackground||'background.jpg';next.defaultBackground110=true;}
   if(['dark','black','light'].includes(patch.themeMode))next.themeMode=patch.themeMode;
+  if(patch.homeShowcase&&typeof patch.homeShowcase==='object')next.homeShowcase=store.cleanHomeShowcase(patch.homeShowcase);
   const file=path.join(root,'data','preferences.json'),temporary=file+'.'+process.pid+'.tmp';
   fs.writeFileSync(temporary,JSON.stringify(next,null,2));fs.renameSync(temporary,file);
   return next;
