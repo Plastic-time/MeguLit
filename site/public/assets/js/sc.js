@@ -52,6 +52,9 @@ export class ScAudio extends EventTarget {
     if (url === this._src) return;
     this._src = url; this._time = 0; this._duration = NaN; this._resume = 0;
     if (this._asleep) return;   // loaded on the next play
+    // every song gets a fresh player: SoundCloud's own page grows while it plays (about 90 MB to 160 MB a song), and a
+    // new frame starts small again
+    if (this._widget) { if (!this._paused) { this._paused = true; this.dispatchEvent(new Event('pause')); } this._sleep(); this._asleep = false; this._resume = 0; }
     this._ready = this._bind(url);
   }
   get paused() { return this._paused; }
