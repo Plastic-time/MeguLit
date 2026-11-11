@@ -9,6 +9,7 @@
    A line is found by its text alone, so the learning page, saved sentences, grammar examples and Anki cards all
    reach it without knowing which game it came from. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const PROVIDERS=['./original-engines/npk.cjs','./original-engines/catsystem2.cjs'];
 const AUDIO=/\.(?:ogg|opus|wav|mp3|m4a)$/i;
 const sha1=s=>crypto.createHash('sha1').update(s).digest('hex');
 // The text key: NFKC, no spaces or markup, no speaker name before a quote, no outer quote marks.
@@ -50,6 +51,8 @@ function catalog(dir){const map=new Map(),koe=new Map(),add=(name,read)=>{const 
    let cx=null;if(flagged&&!open){try{cx=require('./original-engines/cx-filter.cjs').forArchive(file);}catch{}}
    for(const e of audio)if(!e.encrypted||open||cx)add(e.name,()=>xp3.read(file,e,open?null:cx));continue;}
   if(low.endsWith('.arc')){const l=arcList(file);if(l)for(const e of l)if(AUDIO.test(e.name))add(e.name,()=>slice(file,e.offset,e.size));continue;}
+  /* archives an engine reader knows: each lists its clips as {name, read} */
+  if(/[.](?:npk|ypf|int|bin|pak|dat|pck)$/.test(low)){let l=null;for(const m of PROVIDERS){try{l=require(m).audio?.(file);}catch{}if(l&&l.length)break;}if(l)for(const e of l)add(e.name,e.read);continue;}
   if(low.endsWith('.ovk')){const m=/(\d+)\.ovk$/.exec(low),l=ovkList(file);if(m&&l)for(const e of l){const id=Number(m[1])*100000+e.id;koe.set(id,()=>slice(file,e.offset,e.size));}continue;}}
  return {map,koe,get(ref){if(/^koe:\d+$/.test(ref))return koe.get(Number(ref.slice(4)))||null;return map.get(String(ref).toLowerCase())||null;}};}
 

@@ -20,15 +20,19 @@ function cstr(d,p){const e=d.indexOf(0,p);return e<0?null:{s:d.subarray(p,e),nex
 // Inline codes (%K wait for a click, %P new page, %N new line ...) are dropped.
 const text=b=>sj.decode(b).replace(/\\n|%n/gi,'\n').replace(/%[A-Za-z]+/g,'').replace(/^[\s　]+|[\s　]+$/g,'');
 // Lines of one decoded script: a speaker name line before each spoken line, as other readers do.
-function parse(buf){const d=Buffer.isBuffer(buf)?buf:Buffer.from(buf),lines=[],anchors=[];
+/* E450 a voice name (Ash_1093) is an ASCII string between the previous line and a spoken one; the line takes the last. */
+const VOICE=/\0([A-Za-z]{1,6}_?\d{3,6}[A-Za-z]?)\0/g;
+function parse(buf){const d=Buffer.isBuffer(buf)?buf:Buffer.from(buf),lines=[],anchors=[],voices=[];
+ const marks=[...d.toString('latin1').matchAll(VOICE)].map(m=>({at:m.index,name:m[1]}));let mi=0,last=0;
+ const voiceBefore=i=>{let v=null;while(mi<marks.length&&marks[mi].at<i){if(marks[mi].at>=last)v=marks[mi].name;mi++;}last=i;return v;};
  // The id after the opcode is 3 (narration) / 4 (spoken) bytes in early scripts and one byte longer in later ones: the
  // text starts after the id's last (zero) byte, on a Shift-JIS lead byte.
  const at=(i,a)=>{for(const k of [a,a+1])if(d[i+k]>=0x81&&d[i+k-1]===0)return i+k;return -1;};
  for(let i=1;i<d.length-6;i++){if(d[i-1]!==0||(d[i]!==0x41&&d[i]!==0x42))continue;
-  if(d[i]===0x41){const p=at(i,4);if(p<0)continue;const t=cstr(d,p);if(!t||t.s.length<2)continue;const s=text(t.s);if(!s||!PROSE.test(s)||s.includes('�'))continue;lines.push(s);i=t.next-1;continue;}
+  if(d[i]===0x41){const p=at(i,4);if(p<0)continue;const t=cstr(d,p);if(!t||t.s.length<2)continue;const s=text(t.s);if(!s||!PROSE.test(s)||s.includes('�'))continue;lines.push(s);voices.push(voiceBefore(i));i=t.next-1;continue;}
   const p=at(i,5);if(p<0)continue;const name=cstr(d,p);if(!name||name.s.length<2)continue;const t=cstr(d,name.next);if(!t||t.s.length<2||t.s[0]<0x80)continue;
-  const who=text(name.s),s=text(t.s);if(!s||!PROSE.test(s)||s.includes('�')||who.length>24)continue;lines.push(who);lines.push(s);i=t.next-1;}
- return {lines,anchors};}
+  const who=text(name.s),s=text(t.s);if(!s||!PROSE.test(s)||s.includes('�')||who.length>24)continue;lines.push(who);voices.push(null);lines.push(s);voices.push(voiceBefore(i));i=t.next-1;}
+ const v=require('./voice-ref.cjs').keep(voices);return v?{lines,anchors,voices:v}:{lines,anchors};}
 function archives(dir){let names;try{names=fs.readdirSync(dir);}catch{return [];}
  return names.filter(f=>/\.arc$/i.test(f)).map(f=>path.join(dir,f)).filter(f=>{try{const fd=fs.openSync(f,'r');try{const h=Buffer.alloc(16);fs.readSync(fd,h,0,16,0);return h.readInt32LE(0)>0&&h.readInt32LE(0)<16&&/^(WSC|SCR)\0?$/i.test(h.toString('latin1',4,8).replace(/\0+$/,''));}finally{fs.closeSync(fd);}}catch{return false;}});}
 function scenesIn(file){let b;try{b=fs.readFileSync(file);}catch{return [];}const es=list(b);if(!es)return [];

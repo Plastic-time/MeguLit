@@ -33,7 +33,10 @@ function read(file,key,iv,segs){const fd=fs.openSync(file,'r');try{return Buffer
    #{・・・}text# marks emphasis dots over text. */
 function strings(d){const out=[];for(let i=0;i+8<d.length;i++){if(d.readUInt32LE(i)===0x08000010){const len=d.readUInt32LE(i+4);if(len>0&&len<8000&&i+8+len<=d.length){out.push(d.toString('utf8',i+8,i+8+len));i+=7+len;}}}return out;}
 function clean(s){return s.replace(/^\s*\/\/【[^】]*】[^\r\n]*/,'').replace(/<[^>]*>/g,'').replace(/#\{[^}]*\}([^#]*)#/g,'$1').replace(/[\r\n\t]+/g,'').trim();}
-function parse(d){const lines=[];for(const s of strings(d)){if(!s.startsWith('\r\n')&&!s.startsWith('//【'))continue;const name=(s.match(/^\s*\/\/【([^】]*)】/)||[])[1];const t=clean(s);if(!t||!/[ぁ-ゖァ-ヺ一-龯]/.test(t))continue;if(name)lines.push(name);lines.push(t);}return {lines,anchors:[]};}
+// E450 the <voice src='voice/a00/2000010c16'> of a spoken line goes with its text.
+function parse(d){const lines=[],voices=[];for(const s of strings(d)){if(!s.startsWith('\r\n')&&!s.startsWith('//【'))continue;const name=(s.match(/^\s*\/\/【([^】]*)】/)||[])[1];const t=clean(s);if(!t||!/[ぁ-ゖァ-ヺ一-龯]/.test(t))continue;if(name){lines.push(name);voices.push(null);}lines.push(t);const vs=/<voice\b[^>]*\bsrc=['"]([^'"]+)['"]/.exec(s);voices.push(vs?require('./voice-ref.cjs').clean(vs[1]):null);}const v=require('./voice-ref.cjs').keep(voices);return v?{lines,anchors:[],voices:v}:{lines,anchors:[]};}
+// E450 the voice clips of an NPK2 archive (voice.npk), for game-voice.cjs.
+function audio(file){try{if(!findKey(file))return null;return (list(file)||[]).filter(e=>/[.](?:ogg|wav|opus)$/i.test(e.name));}catch{return null;}}
 function scriptNpk(dir){for(const sub of ['.','..']){const f=path.join(dir,sub,'script.npk');try{if(fs.statSync(f).isFile()&&findKey(f))return f;}catch{}}return null;}
 const engine={
  id:'nitro-npk',hint:'script.npk',
@@ -43,4 +46,4 @@ const engine={
  parse,test:n=>/\.nut$/i.test(n),
  _internal:{strings,clean},
 };
-module.exports={KEYS,findKey,list,engine};
+module.exports={KEYS,findKey,list,engine,audio};
