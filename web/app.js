@@ -29,6 +29,8 @@ import {leaderboardLabel,mountLeaderboard} from './leaderboard-view.js';
 import {maybeFirstRun} from './first-run.js';
 let selectedGameId='',gameOrigin='library',selectedSeriesId='';
 import {renderSettings} from './settings.js';
+import {openProfilePanel} from './profile-panel.js';
+import {avatarHTML} from './leaderboard-view.js';
 import {openBackgroundCrop,backgroundGeometry} from './background-crop.js';
 
 const app=document.querySelector('#app');
@@ -176,7 +178,7 @@ function shell(){
     <header class="titlebar"><div class="grimoire-glow" aria-hidden="true"></div>
     <img class="brand-logo" src="assets/megulit-logo.svg" alt="MeguLit" width="3424" height="1452" draggable="false">
     <nav class="nav-history" aria-label="${({zh:'页面历史',ja:'ページ履歴',en:'Page history'})[locale]}"><button type="button" class="nav-step" data-nav-step="-1" disabled aria-label="${({zh:'返回上一页',ja:'前のページへ',en:'Back'})[locale]}" title="${({zh:'返回上一页',ja:'前のページへ',en:'Back'})[locale]} (Alt+←)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6.5 9 12l5.5 5.5"/></svg></button><button type="button" class="nav-step" data-nav-step="1" disabled aria-label="${({zh:'前往下一页',ja:'次のページへ',en:'Forward'})[locale]}" title="${({zh:'前往下一页',ja:'次のページへ',en:'Forward'})[locale]} (Alt+→)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6.5 15 12l-5.5 5.5"/></svg></button></nav>
-    <span class="tab-ink" aria-hidden="true"></span><nav class="top-tabs" aria-label="MeguLit">${['home','library','history','learning','leaderboard','daily','tools','settings','about'].map(item=>`<button class="top-tab" data-route="${item}" ${route===item?'aria-current="page"':''}>${item==='daily'?(dailyLabel[locale]||dailyLabel.zh)/* E415 */:item==='tools'?(grimoireWords[locale]||grimoireWords.zh).tools/* E377 */:item==='leaderboard'?(leaderboardLabel[locale]||leaderboardLabel.zh):item==='about'?(aboutLabel[locale]||aboutLabel.zh):text[item]}</button>`).join('')}</nav><div class="bar-tools" id="bar-tools"></div><div class="titlebar-end"><div class="window-actions">${[['minimize','minus'],['maximize','maximize'],['close','close']].map(([action,symbol])=>`<button class="window-action" data-window="${action}" aria-label="${text[action]}" title="${text[action]}">${icon(symbol)}</button>`).join('')}</div></div></header><aside class="reader-notice" id="reader-notice" hidden role="status"><span></span><button type="button">${{zh:'重新连接',en:'Reconnect',ja:'再接続'}[locale]}</button></aside>
+    <span class="tab-ink" aria-hidden="true"></span>${(tabButton=>`<nav class="top-tabs top-tabs-main" aria-label="MeguLit">${['home','library','history','learning'].map(tabButton).join('')}<span class="top-sep" aria-hidden="true"></span>${['leaderboard','daily'].map(tabButton).join('')}</nav>`)(item=>`<button class="top-tab" data-route="${item}" ${route===item?'aria-current="page"':''}>${item==='daily'?(dailyLabel[locale]||dailyLabel.zh)/* E415 */:item==='tools'?(grimoireWords[locale]||grimoireWords.zh).tools/* E377 */:item==='leaderboard'?(leaderboardLabel[locale]||leaderboardLabel.zh):item==='about'?(aboutLabel[locale]||aboutLabel.zh):text[item]}</button>`)}<div class="bar-tools" id="bar-tools"></div><div class="titlebar-end"><nav class="top-tabs top-tabs-util" aria-label="MeguLit">${['tools','settings','about'].map(item=>`<button class="top-tab" data-route="${item}" ${route===item?'aria-current="page"':''}>${item==='daily'?(dailyLabel[locale]||dailyLabel.zh)/* E415 */:item==='tools'?(grimoireWords[locale]||grimoireWords.zh).tools/* E377 */:item==='leaderboard'?(leaderboardLabel[locale]||leaderboardLabel.zh):item==='about'?(aboutLabel[locale]||aboutLabel.zh):text[item]}</button>`).join('')}</nav><button type="button" class="top-me" data-top-me aria-label="${({zh:'个人主页',ja:'プロフィール',en:'Profile'})[locale]}" title="${({zh:'个人主页',ja:'プロフィール',en:'Profile'})[locale]}"><span class="leaderboard-avatar is-default" aria-hidden="true"></span><span class="top-me-name">${({zh:'个人主页',ja:'プロフィール',en:'Profile'})[locale]}</span></button><div class="window-actions">${[['minimize','minus'],['maximize','maximize'],['close','close']].map(([action,symbol])=>`<button class="window-action" data-window="${action}" aria-label="${text[action]}" title="${text[action]}">${icon(symbol)}</button>`).join('')}</div></div></header><aside class="reader-notice" id="reader-notice" hidden role="status"><span></span><button type="button">${{zh:'重新连接',en:'Reconnect',ja:'再接続'}[locale]}</button></aside>
     <div class="workspace"><main class="main" id="main" tabindex="-1"></main></div></div>`;
   document.querySelectorAll('[data-window]').forEach(button=>button.addEventListener('click',async()=>{try{if(route==='settings')await flushSettings().catch(()=>{});if(button.dataset.window==='close'&&model.preferences.closeAsk!==false){const choice=await closeDialog(locale);if(!choice)return;const values={closeToTray:choice.tray};if(choice.remember)values.closeAsk=false;model.preferences=await api('save_preferences',{values});}await invoke('window_action',{action:button.dataset.window});}catch(error){toast(errorMessage(error));}}));
   document.querySelectorAll('[data-route]').forEach(button=>button.addEventListener('click',()=>{navigate(button.dataset.route);}));
@@ -186,7 +188,8 @@ function shell(){
      button and swallowed the click, and resizing is a no-op while maximized. Hide the corners while maximized. */
   {const mark=()=>document.documentElement.classList.toggle('is-maximized',outerWidth>=screen.availWidth-2&&outerHeight>=screen.availHeight-2);mark();addEventListener('resize',mark);}
   document.querySelectorAll('[data-resize]').forEach(handle=>handle.addEventListener('mousedown',event=>{if(event.button!==0)return;event.preventDefault();event.stopPropagation();invoke('window_action',{action:'resize_'+handle.dataset.resize}).catch(error=>toast(errorMessage(error)));}));
-  {const end=document.querySelector('.titlebar-end'),hist=document.querySelector('.titlebar .nav-history');if(end&&hist)end.prepend(hist);}
+  {const end=document.querySelector('.titlebar-end'),hist=document.querySelector('.titlebar .nav-history');if(end&&hist)end.insertBefore(hist,end.querySelector('.top-me'));}
+  bindTopProfile();
   bindDrag();
   moveTabInk();
   document.querySelectorAll('[data-nav-step]').forEach(button=>button.addEventListener('click',()=>stepNavigation(Number(button.dataset.navStep))));updateNavButtons();
@@ -848,6 +851,19 @@ async function statistics(token){
 
 function loading(){return '<div class="loading-screen"><span class="spinner" aria-label="'+text.loading+'"></span></div>';}
 /* v1.1.6 (user): the second-level tab bar starts under the first top tab (首页), on every page and size */
+/* the 个人主页 pill at the right of the top bar: same panel as the 排行榜 chip; shows your picture and name once known */
+async function paintTopProfile(){
+ const me=document.querySelector('[data-top-me]');if(!me)return;
+ let data;try{data=await api('leaderboard_view',{tab:'board'});}catch{return;}
+ if(!data?.name)return;
+ me.querySelector('.leaderboard-avatar')?.replaceWith(document.createRange().createContextualFragment(avatarHTML({name:data.name,avatar:data.self?.avatar||null},data.avatars||{},esc)));
+ me.querySelector('.top-me-name').textContent=data.name;me.title=data.name;
+}
+function bindTopProfile(){
+ const me=document.querySelector('[data-top-me]');if(!me)return;
+ me.addEventListener('click',()=>openProfilePanel({api,locale,esc,toast,openSettings:()=>navigate('settings'),onClose:()=>{paintTopProfile();if(route==='leaderboard')renderRoute();}}).catch(()=>toast(text.serviceFailed)));
+ paintTopProfile();
+}
 function alignSubtabs(){const bar=document.querySelector('#main>.tabs'),home=document.querySelector('.top-tabs .top-tab');if(!bar||!home)return;bar.style.setProperty('margin-left','0px','important');const first=bar.querySelector('.tab');if(!first)return;const textLeft=el=>el.getBoundingClientRect().left+(parseFloat(getComputedStyle(el).paddingLeft)||0),delta=textLeft(home)-textLeft(first);bar.style.setProperty('margin-left',Math.max(0,Math.round(delta))+'px','important'); /* the theme sets margin with !important */}
 addEventListener('resize',()=>requestAnimationFrame(alignSubtabs));
 async function renderRoute(){
