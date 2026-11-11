@@ -93,8 +93,11 @@ export function nowPlaying(audio, host, { reduce = false, background = null } = 
   if (audio.frame) {
     const slot = document.createElement('div'); slot.className = 'np-src'; box.append(slot);
     const dock = document.createElement('div'); dock.className = 'sc-dock'; dock.append(audio.frame); document.body.append(dock);
+    // the slot's opacity is read every 8th frame only (reading styles every frame makes a lot of garbage)
+    let n = 0, opaque = false;
     const place = () => {
-      const r = slot.getBoundingClientRect(), shown = !box.hidden && r.width > 40 && r.height > 12 && getComputedStyle(slot).opacity > .5;
+      if (!(n++ & 7)) opaque = getComputedStyle(slot).opacity > .5;
+      const r = slot.getBoundingClientRect(), shown = !box.hidden && r.width > 40 && r.height > 12 && opaque;
       dock.classList.toggle('away', !shown);
       if (shown) { dock.style.left = `${r.left}px`; dock.style.top = `${r.top + r.height - 32}px`; dock.style.width = `${r.width}px`; }
       requestAnimationFrame(place);

@@ -28,7 +28,7 @@ export function spectrum(audio, { reduce = false } = {}) {
   audio.addEventListener('timeupdate', onTime); audio.addEventListener('seeked', onTime); audio.addEventListener('play', onTime);
   const now = () => (audio.paused ? audio.currentTime : lastT + Math.min(1, (performance.now() - lastWall) / 1000));
 
-  let moving = false;
+  let moving = false, frame = false;
   const tick = () => {
     if (!data && audio.dataset?.track) load(audio.dataset.track);
     const playing = !audio.paused && data && !reduce;
@@ -43,7 +43,8 @@ export function spectrum(audio, { reduce = false } = {}) {
     } else {
       for (let b = 0; b < 16; b++) { if (levels[b] > .002) { levels[b] *= .85; any = true; } else levels[b] = 0; }
     }
-    if (any || moving) subs.forEach(fn => fn(levels, playing));
+    // listeners hear at most 30 times a second: the bars look the same, and the page restyles half as often (memory)
+    if ((any || moving) && (frame = !frame)) subs.forEach(fn => fn(levels, playing));
     moving = any;
     requestAnimationFrame(tick);
   };
@@ -56,11 +57,14 @@ export function eqBars(spec, el, rest = .18) {
   const bars = [...el.querySelectorAll('i')];
   if (!bars.length) return;
   el.classList.add('live');
+  const shown = bars.map(() => -1);
   spec.on(levels => {
     bars.forEach((bar, j) => {
       const a = Math.floor(j * 16 / bars.length), z = Math.floor((j + 1) * 16 / bars.length);
       let m = 0; for (let b = a; b < z; b++) m += levels[b];
-      bar.style.setProperty('--l', (rest + (1 - rest) * Math.min(1, m / (z - a) * 1.15)).toFixed(3));
+      // a bar is restyled only when its height really changes
+      const v = Math.round((rest + (1 - rest) * Math.min(1, m / (z - a) * 1.15)) * 40) / 40;
+      if (v !== shown[j]) { shown[j] = v; bar.style.setProperty('--l', String(v)); }
     });
   });
 }
