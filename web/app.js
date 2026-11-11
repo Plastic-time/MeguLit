@@ -142,7 +142,7 @@ function setAppearance(preferences=model.preferences){
   document.documentElement.style.setProperty('--accent-light',`rgb(${rgb.map(c=>Math.round(c+(255-c)*.54)).join(',')})`);
   if(preferences.fontFamily)document.documentElement.style.fontFamily=`"${preferences.fontFamily.replace(/["\\]/g,'')}","Segoe UI","Yu Gothic UI","Microsoft YaHei UI",sans-serif`;
   else document.documentElement.style.removeProperty('font-family');
-  document.documentElement.style.setProperty('--background-dim',preferences.backgroundDim??.78);applyVeil(preferences);
+  document.documentElement.style.setProperty('--background-dim',preferences.backgroundDim??.78);if(typeof applyVeil==='function')applyVeil(preferences);
   const bg=model.background||{},clamp=(value,min,max,fallback)=>Number.isFinite(Number(value))?Math.max(min,Math.min(max,Number(value))):fallback;
   document.documentElement.style.setProperty('--background-blur',clamp(bg.blur,0,40,0)+'px');
   document.documentElement.style.setProperty('--background-saturation',clamp(bg.saturate,0,200,100)+'%');
