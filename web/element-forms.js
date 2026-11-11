@@ -25,7 +25,7 @@ function glyphShape(ch,size){
  const out={mask:c,w,edges,inner};cache.set(key,out);return out;
 }
 let tmpEl=null;const tmpCanvas=()=>tmpEl||(tmpEl=document.createElement('canvas'));
-function paintGlyph(ctx,g,cx,cy,texture,{glow='',blur=0,alpha=1}={}){
+export function paintGlyph(ctx,g,cx,cy,texture,{glow='',blur=0,alpha=1}={}){
  const tmp=tmpCanvas();if(tmp.width!==g.w){tmp.width=g.w;tmp.height=g.w;}const t=tmp.getContext('2d');t.globalCompositeOperation='source-over';t.clearRect(0,0,g.w,g.w);texture(t,g.w);t.globalCompositeOperation='destination-in';t.drawImage(g.mask,0,0);
  ctx.save();ctx.globalCompositeOperation='source-over';ctx.globalAlpha=alpha;if(glow){ctx.shadowColor=glow;ctx.shadowBlur=blur;}ctx.drawImage(tmp,cx-g.w/2,cy-g.w/2);ctx.restore();
 }

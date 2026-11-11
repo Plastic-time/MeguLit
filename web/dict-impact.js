@@ -38,7 +38,7 @@ function barHit(bar,x,power){
  if(!bar)return;const r=bar.getBoundingClientRect(),y=r.bottom;
  const wrap=document.createElement('div');wrap.className='dict-hit';wrap.setAttribute('aria-hidden','true');wrap.style.cssText=`left:${x-360}px;top:${y}px`;
  wrap.innerHTML='<i class="dict-hit-flash"></i><i class="dict-hit-ring"></i><i class="dict-hit-line"></i>';document.body.append(wrap);
- wrap.querySelector('.dict-hit-flash').animate([{transform:'translate(-50%,-50%) scale(.3)',opacity:1},{transform:`translate(-50%,-50%) scale(${f1(1.5+power)})`,opacity:1,offset:.25},{transform:`translate(-50%,-50%) scale(${f1(1.7+power)})`,opacity:0}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
+ wrap.querySelector('.dict-hit-flash').animate([{transform:'translateX(-50%) scaleX(.15)',opacity:1},{transform:`translateX(-50%) scaleX(${f1(1+power*.6)})`,opacity:1,offset:.3},{transform:`translateX(-50%) scaleX(${f1(1.3+power*.8)})`,opacity:0}],{duration:620,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
  wrap.querySelector('.dict-hit-ring').animate([{transform:'translate(-50%,-50%) scale(.2,.12)',opacity:1},{transform:`translate(-50%,-50%) scale(${f1(2.6+power*2)},${f1(.55+power*.4)})`,opacity:0}],{duration:620,easing:'cubic-bezier(.1,.7,.3,1)',fill:'forwards'});
  wrap.querySelector('.dict-hit-line').animate([{transform:'translateX(-50%) scaleX(.1)',opacity:1},{transform:`translateX(-50%) scaleX(${f1(1.2+power*1.8)})`,opacity:0}],{duration:760,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
  setTimeout(()=>wrap.remove(),820);

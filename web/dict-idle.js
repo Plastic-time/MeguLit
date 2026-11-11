@@ -29,14 +29,14 @@ function make(f,anywhere){
   alpha:(.1+.3*(1-Math.abs(z-FOCUS)*1.4))*(red||word?1.3:1),ox:0,oy:0,wx:0,wy:0};
 }
 function build(host){
- const cv=document.createElement('canvas');cv.className='dict-field';cv.setAttribute('aria-hidden','true');host.prepend(cv);
+ const cv=document.createElement('canvas');cv.className='dict-field';cv.setAttribute('aria-hidden','true');(host.parentElement||host).prepend(cv);
  const f={cv,host,ctx:cv.getContext('2d'),parts:[],W:0,H:0,mx:-1e4,my:-1e4,wind:null,prev:performance.now(),raf:0,words:words()};
  f.fit=()=>{const dpr=Math.min(devicePixelRatio||1,2);f.W=innerWidth;f.H=innerHeight;cv.width=Math.round(f.W*dpr);cv.height=Math.round(f.H*dpr);f.ctx.setTransform(dpr,0,0,dpr,0,0);
   const want=Math.round(Math.min(110,f.W*f.H/14000));while(f.parts.length<want)f.parts.push(make(f,true));f.parts.length=want;};
  f.fit();field=f;return f;
 }
 function frame(now){
- const f=field;if(!f||!f.cv.isConnected){field=null;return;}
+ const f=field;if(!f||!f.cv.isConnected||!f.host.isConnected||!document.querySelector('#lookup-results')){f?.cv.remove();field=null;return;}
  const dt=Math.min(.05,(now-f.prev)/1000);f.prev=now;const ctx=f.ctx;ctx.clearRect(0,0,f.W,f.H);
  const pref=fxPref('dictField');if(!pref.on){if(!calm)f.raf=requestAnimationFrame(frame);return;}
  const res=document.querySelector('#lookup-results'),busy=res&&(res.children.length||res.textContent.trim())?1:0;f.dim=(f.dim??1)+((busy?.45:1)-(f.dim??1))*Math.min(1,dt*3);
@@ -56,11 +56,12 @@ function frame(now){
   const s=p.spr;ctx.globalAlpha=Math.min(1,p.alpha*f.dim*pref.k);ctx.save();ctx.translate(p.x+p.ox,p.y+p.oy);ctx.rotate(p.rot);ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();
  }
  ctx.globalAlpha=1;
+ ctx.save();ctx.globalCompositeOperation='destination-out';ctx.filter='blur(12px)';ctx.fillStyle='#000';for(const el of document.querySelectorAll('#lookup-results .record, #lookup-form')){const r=el.getBoundingClientRect();if(r.width)ctx.fillRect(r.left-20,r.top-20,r.width+40,r.height+40);}ctx.restore();
  if(!calm)f.raf=requestAnimationFrame(frame);
 }
 let tick=0;
 function scan(){tick=0;const results=document.querySelector('#lookup-results');if(!results)return;const host=results.closest('#learning-content')||results.parentElement;if(!host)return;
- if(field&&field.host===host&&field.cv.isConnected)return;
+ if(field&&field.host===host&&field.cv.isConnected)return;if(field){field.cv.remove();field=null;}
  build(host);requestAnimationFrame(frame);}
 new MutationObserver(()=>{if(!tick)tick=requestAnimationFrame(scan);}).observe(document.body,{childList:true,subtree:true});
 addEventListener('resize',()=>field?.fit());

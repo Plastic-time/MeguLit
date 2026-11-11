@@ -4,7 +4,7 @@
    back in full when the element is chosen. Each element has its own ranks up to Lv.80; fire's top rank is
    爆裂魔法学徒. The element can be changed again later at no cost. The numbers match services/reader-class.cjs. */
 import {fxPref} from './fx-prefs.js';
-import {mountElementFx} from './element-fx.js';
+import {mountElementFx} from './rite-stage.js';
 export const SCHOOL_LEVEL=20;
 const XP_EARLY=[100,150,200,250,300],XP_STEP=600;
 const xpOf=s=>Math.floor((Number(s?.characters)||0)/50)+Math.floor((Number(s?.seconds)||0)/60)*2+(Number(s?.words)||0)*10;
@@ -82,7 +82,8 @@ export function openRite({api,locale,esc,toast,current='',pending=0,xpTotal=0,he
  const fx=mountElementFx(dialog.querySelector('.class-rite-fx'));
  const draw=()=>{const s=SCHOOLS[pick];fx.setElement(pick,s.glyph[l]);dialog.style.setProperty('--c',s.color);dialog.querySelector('[data-glyph]').textContent=s.glyph[l];dialog.dataset.el=pick;dialog.querySelector('[data-title]').textContent=s.name[l];
   dialog.querySelectorAll('[data-school]').forEach(b=>{const on=b.dataset.school===pick;b.classList.toggle('is-on',on);b.setAttribute('aria-checked',String(on));});};
- dialog.querySelectorAll('[data-school]').forEach(b=>b.onclick=()=>{pick=b.dataset.school;draw();});
+ /* switching cross-fades the right side too: the title and the chosen row's text ease in from a few pixels */
+ dialog.querySelectorAll('[data-school]').forEach(b=>b.onclick=()=>{if(pick===b.dataset.school)return;pick=b.dataset.school;draw();if(motion()){const ease={duration:420,easing:'cubic-bezier(.2,.8,.2,1)'};dialog.querySelector('[data-title]').animate([{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],ease);b.querySelectorAll('.class-rite-text>*').forEach((el,i)=>el.animate([{opacity:0,transform:'translateY(5px)'},{opacity:1,transform:'none'}],{...ease,delay:60+i*50,fill:'backwards'}));}});
  const close=()=>{dialog.close();};
  dialog.addEventListener('close',()=>{fx.stop();dialog.remove();},{once:true});
  dialog.querySelector('[data-cancel]').onclick=close;
