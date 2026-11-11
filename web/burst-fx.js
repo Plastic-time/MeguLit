@@ -41,7 +41,7 @@ export function debris(x,y,{n=10,spread=1,up=.6,tint='glass'}={}){
  const l=layer();
  for(let i=0;i<n;i++){
   const c=document.createElement('i');c.className=`fx-chip is-${tint}`;const s=2+Math.random()*5*spread;
-  const pts=Array.from({length:4+Math.floor(Math.random()*3)},(_,k,arr)=>{const a=k/arr.length*Math.PI*2+Math.random()*.6,rr=35+Math.random()*15;return `${f1(50+Math.cos(a)*rr)}% ${f1(50+Math.sin(a)*rr)}%`;}).join(',');
+  const sides=4+Math.floor(Math.random()*3),pts=Array.from({length:sides},(_,k)=>{const a=k/sides*Math.PI*2+Math.random()*.6,rr=35+Math.random()*15;return `${f1(50+Math.cos(a)*rr)}% ${f1(50+Math.sin(a)*rr)}%`;}).join(',');
   c.style.cssText=`left:${x}px;top:${y}px;width:${f1(s)}px;height:${f1(s*(.6+Math.random()*.7))}px;clip-path:polygon(${pts})`;l.append(c);
   const vx=(Math.random()-.5)*220*spread,vy=-(Math.random()*up*260),g=900+Math.random()*500,T=.7+Math.random()*.7,spin=(Math.random()-.5)*900,frames=[];
   for(let k=0;k<=8;k++){const t=T*k/8;frames.push({transform:`translate(${f1(vx*t)}px,${f1(vy*t+g*t*t/2)}px) rotate(${f1(spin*t)}deg)`,opacity:k<6?1:(8-k)/2.5});}
