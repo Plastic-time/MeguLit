@@ -485,6 +485,6 @@ button.lb-mychip:active{transform:scale(.98)}
 @media (prefers-reduced-motion:reduce){.lb-cover img{transition:none}}
 /* the stage stays dark whatever the cover: text on top must read */
 .lb-backdrop::before{filter:blur(70px) saturate(1.2) brightness(.5)}
-.lb-backdrop::after{background:radial-gradient(120% 90% at 30% 0,transparent 0,color-mix(in srgb,var(--bg) 75%,transparent) 50%,var(--bg) 100%),linear-gradient(color-mix(in srgb,var(--bg) 35%,transparent),color-mix(in srgb,var(--bg) 35%,transparent)),repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.14) 3px 4px)}
+.lb-backdrop::after{background:radial-gradient(130% 100% at 30% 0,transparent 0,color-mix(in srgb,var(--bg) 35%,transparent) 60%,color-mix(in srgb,var(--bg) 70%,transparent) 100%),linear-gradient(color-mix(in srgb,var(--bg) 35%,transparent),color-mix(in srgb,var(--bg) 35%,transparent)),repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.14) 3px 4px)}
 .lb-grimoire{background:rgba(16,16,20,.55)}
 .leaderboard-page .lb-tabs button{color:var(--lb-ink-2)}

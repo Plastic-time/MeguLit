@@ -172,9 +172,12 @@
 /* the veil follows the page being opened, so it never drops out between home and a game's detail */
 .app-backdrop::after{transition:background .55s cubic-bezier(.4,0,.2,1)}
 .app-backdrop::before{transition:filter .55s cubic-bezier(.4,0,.2,1)}
-html[data-stage=home] .app-backdrop::after{background:color-mix(in srgb,var(--bg) calc(var(--home-veil,.9)*100%),transparent)!important}
-html[data-stage=home] .app-backdrop::before{filter:blur(var(--home-veil-blur,18px)) saturate(.8)!important}
-html[data-stage=detail] .app-backdrop::after{background:color-mix(in srgb,var(--bg) calc(var(--detail-veil,.68)*100%),transparent)!important}
-html[data-stage=detail] .app-backdrop::before{filter:blur(var(--detail-veil-blur,8px)) saturate(.9)!important}
 .main.g-enter>.tv-home{animation:tv-enter .32s cubic-bezier(.22,1,.36,1) both!important}
 @keyframes tv-enter{from{opacity:0}}
+html[data-stage]:not([data-stage=""]) .app-backdrop::after{background:color-mix(in srgb,var(--bg) calc(var(--veil-a,.85)*100%),transparent)!important}
+html[data-stage]:not([data-stage=""]) .app-backdrop::before{filter:blur(var(--veil-b,12px)) saturate(.85)!important}
+/* one stage layer for every styled page lives in the shell, so a page re-render never drops it */
+.main>.dtv-bg{display:none!important}
+.stage-cover{z-index:0}
+.stage-cover[hidden]{display:none}
+.workspace>.main{position:relative;z-index:1}

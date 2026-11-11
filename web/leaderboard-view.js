@@ -8,6 +8,7 @@ import {mountEmailLogin} from './account-ui.js';
 import {changeAvatar} from './avatar-crop.js';
 import {personButton,socialHTML,bindSocial} from './leaderboard-social.js';
 import {openProfilePanel} from './profile-panel.js';
+import {cardify} from './home-tv.js';
 export const leaderboardLabel={zh:'排行榜',ja:'ランキング',en:'Leaderboard'};
 const W={
  zh:{title:'排行榜',week:'本周',month:'本月',all:'全部',characters:'阅读字数',seconds:'阅读时长',words:'新收录单词',reviews:'复习次数',kana:'假名练习',streak:'连续天数',games:'按游戏',
@@ -117,7 +118,7 @@ const SIGIL=(()=>{const c=100,pt=(r,a)=>`${(c+r*Math.cos(a)).toFixed(1)},${(c+r*
 function headHTML(entries,metric,w,locale,esc,board){
  const f=board?.feature,word=board?.word;
  if(f?.cover&&/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(f.cover))stageCover=f.cover;
- if((metric==='seconds'||metric==='characters')&&f)return `<section class="lb-circle is-feature"><div class="lb-cover">${f.cover?`<img src="${esc(f.cover)}" alt="">`:`<span class="lb-cover-blank">${esc([...f.title][0]||'?')}</span>`}</div><div class="lb-circle-text"><small>${w.featureTitle}</small><h3 class="lb-feature-title" lang="ja">${esc(f.title)}</h3><strong>${esc(formatValue(metric,f.value,locale))}</strong><span>${esc(fill(w.featureSub,{n:f.readers}))}</span></div></section>`;
+ if((metric==='seconds'||metric==='characters')&&f)return `<section class="lb-circle is-feature"><div class="lb-cover tv-card tv-holo"><div class="tv-face">${f.cover?`<img src="${esc(f.cover)}" alt="">`:`<span class="lb-cover-blank">${esc([...f.title][0]||'?')}</span>`}<i class="tv-foil"></i><i class="tv-glare"></i></div></div><div class="lb-circle-text"><small>${w.featureTitle}</small><h3 class="lb-feature-title" lang="ja">${esc(f.title)}</h3><strong>${esc(formatValue(metric,f.value,locale))}</strong><span>${esc(fill(w.featureSub,{n:f.readers}))}</span></div></section>`;
  if(metric==='words'&&word)return `<section class="lb-circle is-word"><button type="button" class="lb-word" data-lb-lookup="${esc(word.term)}" lang="ja" title="${esc(w.wordTitle+' · '+fill(w.wordSub,{n:word.users}))}">${esc(word.term)}</button></section>`;
  const total=entries.reduce((n,e)=>n+(Number(e.value)||0),0);
  return `<section class="lb-circle"><div class="lb-circle-sigil">${SIGIL}</div><div class="lb-circle-text"><small>${w.circleTitle}</small><strong>${esc(formatValue(metric,total,locale))}</strong><span>${esc(fill(w.circleSub,{n:entries.length}))}</span></div></section>`;
@@ -215,7 +216,7 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
  const cache=new Map(),keyOf=(v=view)=>[v.tab,v.period,v.metric,v.game,v.category,v.week].join('|');
  const args=(v=view)=>({tab:v.tab,period:v.period,metric:v.metric,game:v.game,category:v.category,week:v.week});
  let seq=0,painted=false;
- const paint=data=>{last=data;const y=main.scrollTop;main.innerHTML=leaderboardHTML(data,locale,esc);main.classList.toggle('lb-instant',painted);painted=true;main.scrollTop=y;bind();};
+ const paint=data=>{last=data;const y=main.scrollTop;main.innerHTML=leaderboardHTML(data,locale,esc);main.classList.toggle('lb-instant',painted);painted=true;main.scrollTop=y;bind();main.querySelectorAll('.lb-cover.tv-holo').forEach(cardify);};
  const prefetch=()=>{if(view.tab!=='board'||view.game)return;const base={...view};
   const queue=METRICS.filter(m=>m!==base.metric).map(m=>({...base,metric:m})).filter(v=>!cache.has(keyOf(v)));
   const next=()=>{const v=queue.shift();if(!v||!isCurrent())return;api('leaderboard_view',args(v)).then(d=>{cache.set(keyOf(v),JSON.stringify(d));}).catch(()=>{}).finally(()=>setTimeout(next,120));};

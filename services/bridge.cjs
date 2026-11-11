@@ -37,7 +37,10 @@ function savePreferences(request) {
   /* v1.1.0 ships a default background: the first save turns it on once, a later toggle-off is kept */
   if(!next.defaultBackground110){if(typeof patch.homeBackground!=='boolean')next.homeBackground=next.homeBackground||'background.jpg';next.defaultBackground110=true;}
   if(['dark','black','light'].includes(patch.themeMode))next.themeMode=patch.themeMode;
-  for(const [key,max] of [['homeVeil',1],['homeVeilBlur',40],['detailVeil',1],['detailVeilBlur',40]])if(Number.isFinite(patch[key]))next[key]=Math.max(0,Math.min(max,patch[key]));
+  {const veils={...(current.pageVeils||{})};let touched=false;const take=(page,part,value)=>{if(!/^[a-z]{1,24}$/.test(page)||!Number.isFinite(value))return;veils[page]={...(veils[page]||{}),[part]:Math.max(0,Math.min(part==='a'?1:40,value))};touched=true;};
+   if(patch.pageVeils&&typeof patch.pageVeils==='object')for(const [page,v] of Object.entries(patch.pageVeils))if(v&&typeof v==='object'){take(page,'a',v.a);take(page,'b',v.b);}
+   for(const [key,value] of Object.entries(patch)){const m=/^veil_([a-z]{1,24})_(a|b)$/.exec(key);if(m)take(m[1],m[2],value);}
+   if(touched)next.pageVeils=veils;}
   if(patch.homeShowcase&&typeof patch.homeShowcase==='object')next.homeShowcase=store.cleanHomeShowcase(patch.homeShowcase);
   const file=path.join(root,'data','preferences.json'),temporary=file+'.'+process.pid+'.tmp';
   fs.writeFileSync(temporary,JSON.stringify(next,null,2));fs.renameSync(temporary,file);
