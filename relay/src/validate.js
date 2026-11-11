@@ -55,7 +55,10 @@ export function validateLeaderboard(body,now=new Date()){
    /* E397 optional last-read time (unix seconds), never in the future */
    const last=g.last===undefined?0:g.last;if(!isInt(last)||last>Math.floor(now.getTime()/1000)+86400)return {ok:false,error:'INVALID_GAMES'};
    const key=gameKey(title);if(seen.has(key))continue;seen.add(key);games.push({key,title,characters:g.characters,seconds:g.seconds,last});}}
- return {ok:true,value:{id:body.id,name:name.name,keys,stats,games}};
+ /* 2026-11-12 转职: optional element and level */
+ const element=body.element===undefined?'':body.element;if(!['','fire','ice','thunder','wind','water','earth','light','dark'].includes(element))return {ok:false,error:'INVALID_ELEMENT'};
+ const level=body.level===undefined?0:body.level;if(!isInt(level)||level>10000)return {ok:false,error:'INVALID_LEVEL'};
+ return {ok:true,value:{id:body.id,name:name.name,keys,stats,games,element,level}};
 }
 /* GET /api/leaderboard query → {ok,value} */
 export function validateBoardQuery(params,now=new Date()){

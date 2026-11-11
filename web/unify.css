@@ -1217,3 +1217,27 @@ html body .class-rite-actions{display:flex;align-items:center;gap:10px;margin-to
 html body .class-rite-actions>span{flex:1}
 @media (max-width:760px){html:not(#u):not(#v):not(#w):not(#x) body dialog.class-rite[open]{grid-template-columns:1fr}html body .class-rite-stage{min-height:200px}html body .class-rite-body{padding:8px 24px 24px}}
 @media (prefers-reduced-motion:reduce){html body .class-rite-circle{animation:none}}
+
+/* 转职 due: the bar's note in red, the class-change link emphasised, a red dot on the top-bar profile chip, the
+   one-a-launch card at the bottom right; the rite with eight elements and the paid-back experience */
+html:not(#u):not(#v):not(#w) body .profile-rank-due{font-family:var(--g-serif,serif);font-weight:500;font-size:12px;letter-spacing:.02em;color:#e2685e;white-space:normal}
+html:not(#u):not(#v):not(#w):not(#x) body .profile-class-go.is-due{padding:3px 10px;border:0;color:#fff4ea;background:#b8293c;box-shadow:0 0 0 1px rgba(255,214,190,.35),0 0 14px rgba(226,66,62,.45);animation:class-due 2.4s ease-in-out infinite}
+@keyframes class-due{50%{box-shadow:0 0 0 1px rgba(255,214,190,.5),0 0 22px rgba(226,66,62,.7)}}
+html body [data-top-me]{position:relative}
+html body [data-top-me].has-class-due::after{content:"";position:absolute;top:2px;left:22px;width:8px;height:8px;border-radius:50%;background:#e2423e;box-shadow:0 0 0 2px #1a0e12,0 0 8px #e2423e;pointer-events:none}
+html body .class-nudge{position:fixed;right:24px;bottom:24px;z-index:80;display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:center;width:min(380px,calc(100vw - 48px));padding:18px 20px 16px;
+ background:linear-gradient(160deg,rgba(30,20,24,.97),rgba(14,10,13,.97));box-shadow:0 18px 50px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,236,220,.1),inset 3px 0 0 #c8323c;animation:nudge-in .45s cubic-bezier(.2,.8,.2,1)}
+html body .class-nudge.is-out{opacity:0;transform:translateY(10px);transition:opacity .25s,transform .25s}
+@keyframes nudge-in{from{opacity:0;transform:translateY(16px)}}
+html body .class-nudge-glyph{grid-row:span 2;font:600 34px/1 var(--g-serif-ja,serif);color:#e2423e;text-shadow:0 0 14px rgba(226,66,62,.5)}
+html body .class-nudge p{margin:0;font-size:14px;line-height:1.6;color:var(--g-t1,#f1e0d2)}
+html body .class-nudge>div{display:flex;justify-content:flex-end;align-items:center;gap:14px}
+html:not(#u):not(#v):not(#w):not(#x) body .class-rite-school{grid-template-columns:40px 1fr auto}
+html body .class-rite-school>em{font-style:normal;font-family:var(--u-mono);font-size:10.5px;letter-spacing:.04em;color:var(--g-t3,#a08a80);text-align:right;max-width:150px}
+html body .class-rite-school.is-on>em{color:var(--c)}
+html body .class-rite-schools{max-height:min(470px,58vh);overflow-y:auto;scrollbar-width:thin}
+html:not(#u):not(#v):not(#w):not(#x) body .class-rite-school{padding-block:9px}
+html body .class-rite-school small{font-size:12px}
+html body .class-rite-wait{font-family:var(--u-mono);font-size:11.5px;color:var(--g-gold,#edb56e)}
+html body .class-rite-paid{position:absolute;bottom:18%;font:600 22px/1 var(--g-serif,serif);letter-spacing:.04em;color:var(--g-gold,#edb56e);text-shadow:0 0 16px rgba(237,181,110,.6);animation:rite-paid 1.4s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rite-paid{from{opacity:0;transform:translateY(16px) scale(.9)}35%{opacity:1;transform:none}to{opacity:1;transform:translateY(-6px)}}

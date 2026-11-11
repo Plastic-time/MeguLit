@@ -61,9 +61,9 @@ export async function leaderboardPost(request,env,ip,now=new Date()){
  const body=await readJSON(request);if(body.error)return fail(body.error,body.error==='PAYLOAD_TOO_LARGE'?413:400);
  const checked=validateLeaderboard(body.value,now);if(!checked.ok)return fail(checked.error);
  const hot=validateHot(body.value.hot,now);if(!hot.ok)return fail(hot.error);
- const {id,name,keys,stats,games}=checked.value,who=await subjects(request,env,id,now),idHash=who.primary,t=Math.floor(now.getTime()/1000);
+ const {id,name,keys,stats,games,element,level}=checked.value,who=await subjects(request,env,id,now),idHash=who.primary,t=Math.floor(now.getTime()/1000);
  if(!await hit(env,'lb-id',idHash,now.getTime()))return fail('RATE_LIMITED',429);
- const statements=[env.DB.prepare('INSERT INTO leaderboard_users(id_hash,name,share_games,created_at,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(id_hash) DO UPDATE SET name=excluded.name,share_games=excluded.share_games,updated_at=excluded.updated_at').bind(idHash,name,games?1:0,t,t)];
+ const statements=[env.DB.prepare('INSERT INTO leaderboard_users(id_hash,name,share_games,element,level,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id_hash) DO UPDATE SET name=excluded.name,share_games=excluded.share_games,element=excluded.element,level=excluded.level,updated_at=excluded.updated_at').bind(idHash,name,games?1:0,element,level,t,t)];
  for(const period of ['week','month','all']){const s=stats[period];statements.push(env.DB.prepare('INSERT INTO leaderboard_stats(id_hash,period,period_key,characters,seconds,words,streak,reviews,kana,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id_hash,period,period_key) DO UPDATE SET characters=excluded.characters,seconds=excluded.seconds,words=excluded.words,streak=excluded.streak,reviews=excluded.reviews,kana=excluded.kana,updated_at=excluded.updated_at').bind(idHash,period,keys[period],s.characters,s.seconds,s.words,s.streak,s.reviews,s.kana,t));}
  statements.push(env.DB.prepare('DELETE FROM leaderboard_games WHERE id_hash=?').bind(idHash));
  for(const g of games||[])statements.push(env.DB.prepare('INSERT INTO leaderboard_games(id_hash,game_key,title,characters,seconds,updated_at,last_at) VALUES(?,?,?,?,?,?,?)').bind(idHash,g.key,g.title,g.characters,g.seconds,t,g.last||0));
@@ -84,18 +84,18 @@ export async function leaderboardGet(url,env,ip,now=new Date()){
  }
  let rows,total,mine=null;
  if(q.metric==='games'){
-  ({results:rows}=await env.DB.prepare('SELECT g.id_hash,u.name,g.characters value,p.pid FROM leaderboard_games g JOIN leaderboard_users u ON u.id_hash=g.id_hash LEFT JOIN profiles p ON p.id_hash=g.id_hash AND p.public=1 AND p.hidden=0 WHERE g.game_key=? AND g.characters>0 ORDER BY g.characters DESC,g.updated_at ASC LIMIT 50').bind(q.game).all());
+  ({results:rows}=await env.DB.prepare('SELECT g.id_hash,u.name,u.element,u.level,g.characters value,p.pid FROM leaderboard_games g JOIN leaderboard_users u ON u.id_hash=g.id_hash LEFT JOIN profiles p ON p.id_hash=g.id_hash AND p.public=1 AND p.hidden=0 WHERE g.game_key=? AND g.characters>0 ORDER BY g.characters DESC,g.updated_at ASC LIMIT 50').bind(q.game).all());
   total=(await env.DB.prepare('SELECT COUNT(*) n FROM leaderboard_games WHERE game_key=? AND characters>0').bind(q.game).first())?.n||0;
   if(q.me){const r=await env.DB.prepare('SELECT characters value FROM leaderboard_games WHERE game_key=? AND id_hash=?').bind(q.game,q.me).first();if(r&&r.value>0)mine={value:r.value,rank:1+((await env.DB.prepare('SELECT COUNT(*) n FROM leaderboard_games WHERE game_key=? AND characters>?').bind(q.game,r.value).first())?.n||0)};}
  }else{
   const col=COLUMN[q.metric];
-  ({results:rows}=await env.DB.prepare(`SELECT s.id_hash,u.name,s.${col} value,p.pid FROM leaderboard_stats s JOIN leaderboard_users u ON u.id_hash=s.id_hash LEFT JOIN profiles p ON p.id_hash=s.id_hash AND p.public=1 AND p.hidden=0 WHERE s.period=? AND s.period_key=? AND s.${col}>0 ORDER BY s.${col} DESC,s.updated_at ASC LIMIT 50`).bind(q.period,q.key).all());
+  ({results:rows}=await env.DB.prepare(`SELECT s.id_hash,u.name,u.element,u.level,s.${col} value,p.pid FROM leaderboard_stats s JOIN leaderboard_users u ON u.id_hash=s.id_hash LEFT JOIN profiles p ON p.id_hash=s.id_hash AND p.public=1 AND p.hidden=0 WHERE s.period=? AND s.period_key=? AND s.${col}>0 ORDER BY s.${col} DESC,s.updated_at ASC LIMIT 50`).bind(q.period,q.key).all());
   total=(await env.DB.prepare(`SELECT COUNT(*) n FROM leaderboard_stats WHERE period=? AND period_key=? AND ${col}>0`).bind(q.period,q.key).first())?.n||0;
   if(q.me){const r=await env.DB.prepare(`SELECT ${col} value FROM leaderboard_stats WHERE period=? AND period_key=? AND id_hash=?`).bind(q.period,q.key,q.me).first();if(r&&r.value>0)mine={value:r.value,rank:1+((await env.DB.prepare(`SELECT COUNT(*) n FROM leaderboard_stats WHERE period=? AND period_key=? AND ${col}>?`).bind(q.period,q.key,r.value).first())?.n||0)};}
  }
  /* rank = 1 + number of strictly better values, so ties share a rank; id hashes never leave the server */
  const avatars=await avatarsFor(env,rows.map(r=>r.id_hash));
- let rank=0,prev=null;const entries=rows.map((r,i)=>{if(r.value!==prev){rank=i+1;prev=r.value;}return {rank,name:r.name,value:r.value,me:!!q.me&&r.id_hash===q.me,avatar:avatars.get(r.id_hash)||null,pid:r.pid||null};});
+ let rank=0,prev=null;const entries=rows.map((r,i)=>{if(r.value!==prev){rank=i+1;prev=r.value;}return {rank,name:r.name,value:r.value,me:!!q.me&&r.id_hash===q.me,avatar:avatars.get(r.id_hash)||null,pid:r.pid||null,element:r.element||'',level:r.level||0};});
  /* E420 the most-read work (all time, from readers who share game names) for 阅读时长 / 阅读字数 */
  let feature=null;
  if(q.metric==='seconds'||q.metric==='characters'){const col=q.metric;const f=await env.DB.prepare(`SELECT MAX(title) title,SUM(${col}) value,COUNT(*) readers FROM leaderboard_games WHERE ${col}>0 GROUP BY game_key ORDER BY value DESC LIMIT 1`).first();if(f&&f.value>0)feature={title:f.title,value:f.value,readers:f.readers};}
