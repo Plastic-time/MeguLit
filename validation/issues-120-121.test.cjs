@@ -26,3 +26,13 @@ test('locating resumes once the original shows again',t=>{
  f.line('一行目の台詞です。');f.hook.enabled=false;f.line('二行目の台詞です。');
  assert.deepEqual(f.located,['二行目の台詞です。']);
 });
+
+test('issue 121: the old follow-the-original switch is gone everywhere and nothing turns following off',()=>{
+ const fs=require('node:fs'),path=require('node:path'),read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
+ const {fields}=require('../services/settings-schema.cjs');
+ assert.equal((fields||[]).some(f=>f.key==='livePosition'),false,'no settings page toggle');
+ assert.doesNotMatch(read('web/settings-help.js'),/livePosition/);
+ assert.doesNotMatch(read('web/reader/modules/gal.js'),/galLivePosition|additional\.livePosition/);
+ assert.doesNotMatch(read('web/reader/modules/game-style-sync-ui.js'),/livePosition:false/);
+ assert.doesNotMatch(read('web/reader/modules/text-position.js'),/livePosition/,'following depends only on engine coordinates and a calibration map');
+});

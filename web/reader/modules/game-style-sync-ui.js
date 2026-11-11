@@ -91,7 +91,7 @@
   document.body.classList.remove('tome-style-probing');
   apply(pick(out,part));message=t('measured');aligning=part!=='text';
   const complete=()=>{if(generation!==measurementSerial||key!==session.key)return;aligning=false;
-   if(part!=='text'){const target={...r,textWidth:Number(r.style?.width)*r.width/100,samples:r.positionSamples};const map=window.__tomeTextPosition?.finishCalibration?.(target,b.galPreferences(),{persist:false});if(!map)apply({livePosition:false},null);message=t('positionReady');}
+   if(part!=='text'){const target={...r,textWidth:Number(r.style?.width)*r.width/100,samples:r.positionSamples};const map=window.__tomeTextPosition?.finishCalibration?.(target,b.galPreferences(),{persist:false});message=t('positionReady');}
    if(m.gameStyleAutomatic===true)save();paint();};
   if(part!=='text'&&Number.isFinite(r.inkLeft)&&Number.isFinite(r.inkTop)&&!b.pageTranslationActive?.())runCorrection({inkLeft:r.inkLeft,inkTop:r.inkTop,width:r.width,height:r.height},complete);else complete();
  }
