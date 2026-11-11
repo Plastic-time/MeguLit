@@ -11,10 +11,12 @@ import {feedbackPost,syncPendingFeedback} from './feedback.js';
 /* E397 public profiles, follows, 同好 */
 import {profileOwn,profileCard,followEdit,followingFeed,kindred,socialDeletes,profileReport,profileAppeal} from './social.js';
 import {avatarUpload,avatarDelete,avatarGet,avatarReport,avatarsFor,avatarStatus,avatarAppeal,avatarReview,signReview,cleanupAvatars,hotStatements,hotWordsGet,settleDue} from './community.js';
+/* #117 交流 board */
+import {forumRoute,forumDeletes} from './forum.js';
 import {newsGet,hotWordsDailyGet,refreshDaily,imageGet,articleGet} from './daily.js';
 
 /* requests per window; key prefix → [limit, seconds] */
-export const RATE={ip:[120,60],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60],daily:[60,60],'daily-img':[240,60],appeal:[3,86400],profile:[30,3600],'social-get':[120,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400]};
+export const RATE={ip:[120,60],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60],daily:[60,60],'daily-img':[240,60],appeal:[3,86400],profile:[30,3600],'social-get':[120,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400],'forum-get':[120,60],'forum-post':[5,3600],'forum-reply':[30,3600],'forum-day':[60,86400],'forum-ip':[40,3600]};
 const encoder=new TextEncoder();
 const hex=buffer=>[...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');
 export async function sha256(value){return hex(await crypto.subtle.digest('SHA-256',typeof value==='string'?encoder.encode(value):value));}
@@ -106,7 +108,7 @@ export async function leaderboardDelete(request,url,env,ip,now=new Date()){
 }
 export async function removeSubjects(env,hashes){
  await avatarDelete(env,hashes);
- await env.DB.batch([...hashes.flatMap(h=>['leaderboard_stats','leaderboard_games','leaderboard_users','hot_lookups'].map(table=>env.DB.prepare(`DELETE FROM ${table} WHERE id_hash=?`).bind(h))),...socialDeletes(env,hashes)]);
+ await env.DB.batch([...hashes.flatMap(h=>['leaderboard_stats','leaderboard_games','leaderboard_users','hot_lookups'].map(table=>env.DB.prepare(`DELETE FROM ${table} WHERE id_hash=?`).bind(h))),...socialDeletes(env,hashes),...forumDeletes(env,hashes)]);
  return json({ok:true});
 }
 
@@ -207,6 +209,8 @@ export async function handle(request,env,now=new Date()){
   else if(path.startsWith('/api/follow/'))response=await followEdit(request,env,ip,now,social,path.slice(12));
   else if(path==='/api/following'&&request.method==='GET')response=await followingFeed(request,env,ip,now,social);
   else if(path==='/api/kindred'&&request.method==='GET')response=await kindred(request,env,ip,now,social);
+  /* #117 交流 board (relay/src/forum.js) */
+  else if(path==='/api/forum'||path.startsWith('/api/forum/'))response=await forumRoute(request,env,ip,now,social,path);
   /* E415 每日 page (relay/src/daily.js) */
   else if(path==='/api/news'&&request.method==='GET')response=await hit(env,'daily',ip,now.getTime())?await newsGet(env,{json},now,url):fail('RATE_LIMITED',429);
   else if(/^\/api\/news\/img\/[0-9a-f]{32}$/.test(path)&&request.method==='GET')response=await hit(env,'daily-img',ip,now.getTime())?await imageGet(env,path.slice(14)):fail('RATE_LIMITED',429);

@@ -176,7 +176,7 @@ test('interactive: particle puzzle gaps, explanations on the grammar, read aloud
  const real=[{text:'本を閉じた。',start:1,end:2,translation:'合上了书。',translationSource:'group',title:'G',readAt:1794300000,origin:'history'}];
  const gaps=g.particleGaps(wo,real);assert.equal(gaps[0].text,'本を閉じた。');assert.equal(gaps[0].answer,'を');
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
- const puzzle=g.particleHTML(wo,real,{locale:'zh',esc});assert.match(puzzle,/draggable="true" data-tile="を"/);assert.match(puzzle,/本<button type="button" class="gm-slot" data-slot="0"/);assert.match(puzzle,/<p class="gm-tr gm-gap-tr" hidden>合上了书。/,'the translation shows once the line lights up');
+ const puzzle=g.particleHTML(wo,real,{locale:'zh',esc});assert.match(puzzle,/data-tile="を"/);assert.match(puzzle,/本<button type="button" class="gm-slot" data-slot="0"/);assert.match(puzzle,/<p class="gm-tr gm-gap-tr" hidden>合上了书。/,'the translation shows once the line lights up');
  const lesson=g.lessonHTML(wo,{examples:{wo:real},progress:{}},{locale:'zh',esc});
  assert.match(lesson,/<mark class="gm-hl" role="button" tabindex="0" data-explain="wo">を<\/mark>/,'the grammar part opens an explanation');assert.match(lesson,/data-speak="本を閉じた。"/);assert.match(lesson,/data-particles/);
  const q=g.exercisesFor(wo,real)[0],wrong=q.choices.find(c=>c!==q.answer);

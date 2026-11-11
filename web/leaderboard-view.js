@@ -9,6 +9,8 @@ import {changeAvatar} from './avatar-crop.js';
 import {personButton,socialHTML,bindSocial} from './leaderboard-social.js';
 import {openProfilePanel} from './profile-panel.js';
 import {cardify} from './home-tv.js';
+/* #117 交流 tab */
+import {mountForum,forumWords,forumSubRow} from './forum-view.js';
 export const leaderboardLabel={zh:'排行榜',ja:'ランキング',en:'Leaderboard'};
 const W={
  zh:{title:'排行榜',week:'本周',month:'本月',all:'全部',characters:'阅读字数',seconds:'阅读时长',words:'新收录单词',reviews:'复习次数',kana:'假名练习',streak:'连续天数',games:'按游戏',
@@ -75,7 +77,7 @@ const EXTRA={
  ja:{eyebrow:'読者 · 毎週更新',colRank:'順位',colReader:'読者',colTerm:'語',colWhy:'なぜこの語？',honours:'4 – 10 位',rest:'11 – 50 位',myRank:'自分の順位',myPage:'マイページ',circleTitle:'みんなで集めた魔力',circleSub:'{n} 人の読者が共鳴中',featureTitle:'いちばん読まれた作品',featureSub:'{n} 人の読者が読みました · 累計',wordTitle:'今週いちばん調べられた語',wordSub:'{n} 人が調べました · クリックで辞書へ',meTag:'我',signIn:'登録 / ログイン',follow:'フォロー',vacant:'空席',followSub:'フォロー中の人と同好',changeAvatar:'アイコンを変更',editProfile:'プロフィールを編集',uploading:'アップロードして審査中…'},
  en:{eyebrow:'Readers · updated weekly',colRank:'Rank',colReader:'Reader',colTerm:'Term',colWhy:'Why this one',honours:'Ranks 4 – 10',rest:'Ranks 11 – 50',myRank:'My rank',myPage:'My profile',circleTitle:'Mana gathered together',circleSub:'{n} readers in resonance',featureTitle:'The most-read work',featureSub:'Read by {n} readers · all time',wordTitle:'Most looked-up word this week',wordSub:'Looked up by {n} readers · click to look it up',meTag:'You',signIn:'Sign up / sign in',follow:'Following',vacant:'Open spot',followSub:'People you follow and kindred readers',changeAvatar:'Change picture',editProfile:'Edit profile',uploading:'Uploading and checking…'}
 };
-const words=locale=>({...leaderboardWords(locale),...(EXTRA[locale]||EXTRA.zh)});
+const words=locale=>({...leaderboardWords(locale),...(EXTRA[locale]||EXTRA.zh),forum:forumWords(locale).forum});
 function segmented(name,items,current,w){return `<div class="lb-seg" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
 function underline(name,items,current,w){return `<div class="lb-tabs" role="group" data-lb-group="${name}">${items.map(item=>`<button type="button" data-lb-${name}="${item}" aria-pressed="${item===current}">${w[item]}</button>`).join('')}</div>`;}
 /* E417 the place number on the block: a plain serif numeral with a short rule under it, no wreath (the old SVG wreath
@@ -173,7 +175,7 @@ function joinHTML(data,w,esc){
    2. sub row: 阅读榜 = metric tabs + period, 每周热词 = category + past weeks, 关注 = a caption
    The body below fades in. */
 function hero(){return '';}
-function topRow(w,tab,chip=''){return `<div class="lb-toprow">${segmented('tab',['board','hot','follow'],tab,w)}<div class="lb-toprow-end">${chip}</div></div>`;}
+function topRow(w,tab,chip=''){return `<div class="lb-toprow">${segmented('tab',['board','hot','follow','forum'],tab,w)}<div class="lb-toprow-end">${chip}</div></div>`;}
 function subRow(inner){return `<div class="lb-subrow">${inner}</div>`;}
 function hotControls(hot,w,esc){const weeks=hot?.weeks||[];const picker=weeks.length>1?`<label class="lb-week"><span>${w.pastWeeks}</span><select data-lb-week>${weeks.map(k=>`<option value="${esc(k)}" ${k===hot.week?'selected':''}>${esc(fill(w.weekOf,{week:k}))}</option>`).join('')}</select></label>`:'';return `${segmented('category',CATS,view.category,w)}${picker}`;}
 function boardControls(w){return `${underline('metric',METRICS,view.metric,w)}${segmented('period',PERIODS,view.period,w)}`;}
@@ -196,7 +198,7 @@ function myChip(data,w,locale,esc){
 export function leaderboardHTML(data,locale,esc){
  const w=words(locale);
  /* E393/E402 loading: the same rows as the tab being loaded, with a spinner in the body */
- if(!data){const tab=view.tab||'board';return page(topRow(w,tab),tab==='board'?boardControls(w):tab==='hot'?hotControls(null,w,esc):`<p class="lb-subrow-caption">${w.followSub}</p>`,'<div class="lb-loading"><span class="spinner"></span></div>');}
+ if(!data){const tab=view.tab||'board';return page(topRow(w,tab),tab==='board'?boardControls(w):tab==='hot'?hotControls(null,w,esc):tab==='forum'?forumSubRow(locale,esc):`<p class="lb-subrow-caption">${w.followSub}</p>`,'<div class="lb-loading"><span class="spinner"></span></div>');}
  if(!data.configured)return page(topRow(w,'board',myChip(data,w,locale,esc)),segmented('period',PERIODS,view.period,w),`<section class="lb-card leaderboard-notice"><h2 class="lb-h2">${w.notReady}</h2><p class="lb-note">${w.notReadyText}</p></section>${localHTML(data,w,locale,esc)}`);
  const tab=['hot','follow'].includes(data.tab)?data.tab:'board';
  /* E397 关注: people you follow, then 同好 */
@@ -221,7 +223,12 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
   const queue=METRICS.filter(m=>m!==base.metric).map(m=>({...base,metric:m})).filter(v=>!cache.has(keyOf(v)));
   const next=()=>{const v=queue.shift();if(!v||!isCurrent())return;api('leaderboard_view',args(v)).then(d=>{cache.set(keyOf(v),JSON.stringify(d));}).catch(()=>{}).finally(()=>setTimeout(next,120));};
   setTimeout(next,400);};
+ /* #117 交流 owns the sub row and body; the top row (and its switch) stay the same */
+ const forum=async()=>{const w2=words(locale);main.innerHTML=page(topRow(w2,'forum',last?myChip(last,w2,locale,esc):''),forumSubRow(locale,esc),'<div class="lb-loading"><span class="spinner"></span></div>');main.classList.add('lb-instant');painted=true;bind();
+  await mountForum(main.querySelector('.leaderboard-page'),{api,locale,esc,toast,isCurrent:()=>isCurrent()&&view.tab==='forum',avatarHTML,person:personButton,emptyState,
+   bindPeople:(el,images)=>bindSocial(el,{api,locale,esc,toast,images:()=>images,avatarHTML,openSettings:section=>section==='personal'?openProfilePanel({api,locale,esc,toast,openSettings}):openSettings(section),rerender:()=>{}})});};
  const render=async(action='leaderboard_view',extra={})=>{
+  if(view.tab==='forum'&&action==='leaderboard_view'){seq++;return forum();}
   const plain=action==='leaderboard_view'&&!Object.keys(extra).length,key=keyOf(),mine=++seq,hit=plain?cache.get(key):null;
   if(hit)paint(JSON.parse(hit));else main.querySelector('.lb-body')?.classList.add('is-loading');
   let data;try{data=await api(action,{...args(),...extra});}

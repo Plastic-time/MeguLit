@@ -19,6 +19,7 @@ class Immersion{
  set(visible,why=''){this.reason=visible?'':why;this.showAt=0;if(visible){this.hiddenByMarker=false;this.hiddenByAuto=false;this.resumeAt=0;}if(this.visible!==visible){this.visible=visible;this.emit(visible?{dialogVisible:true}:{dialogVisible:false,reason:why||'unknown'});}}
  // CS2 re-sends the current line's text several times per line and again on redraws: only a different line counts as
  // a new line, or a repeat would cancel every pending hide (OP, CG) right after the sprite went off.
+ input(){this.inputAt=this.now();}
  skip(held){if(!this.enabled)return;if(held){this.skipAt??=this.now();}else this.skipAt=null;}
  /* E422 (user, WoH: the layer still hid by itself; reader log: "scene changed 98%"). A scene hide that came before the first
     page line stayed: once the game was known as a page game every "scene back" was ignored. The page game is known from
@@ -67,7 +68,11 @@ class Immersion{
   // The marker has left: give the next line time to arrive (clicking on normally produces it within ~0.2 s).
   const gone=Math.max(this.markerGoneAt,this.drawnAt?this.drawnAt+1500:0);
   /* E277: 0.6 s, not 1.2 s (user: the layer stayed up well into the transition) */
-  if(gone&&this.now()-gone>=600){this.hiddenByMarker=true;this.set(false,'marker');}
+  /* #114 (user: hovering a game's own settings button, or a button outside the window, made the layer vanish): many
+     engines drop the wait marker while the pointer is over their buttons. Without a click, Space or Enter in the game
+     shortly before, a missing marker only hides after 8 s (auto mode, a long hover); after such an advance input 0.6 s. */
+  const advanced=this.inputAt!=null&&this.inputAt>=gone-2500&&this.inputAt<=gone+600;
+  if(gone&&this.now()-gone>=(advanced?600:8000)){this.hiddenByMarker=true;this.set(false,'marker');}
  }
 }
 module.exports={Immersion};

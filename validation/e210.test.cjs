@@ -83,7 +83,7 @@ test('auto-hide follows the marker quickly and a hidden layer waits for the next
  const {Immersion}=require('../core/immersion.cjs'),events=[];let now=1000;
  const im=new Immersion(e=>events.push(e.dialogVisible),()=>now);
  im.configure({immersion:true,dialogDetection:'marker'});im.bind('w');im.source('短い台詞','hook');
- now+=500;im.marker(true);im.tick();now+=2000;im.marker(false);
+ now+=500;im.marker(true);im.tick();now+=2000;im.input();im.marker(false);
  now+=500;im.tick();assert.deepEqual(events,[],'not yet');now+=150;im.tick();assert.deepEqual(events,[false],'hidden 0.6 s after the marker left');
  im.source('黒画面の独白','hook');now+=300;im.tick();assert.deepEqual(events,[false],'read but not drawn yet');
  im.marker(true);assert.deepEqual(events,[false,true],'shown once the game draws it');

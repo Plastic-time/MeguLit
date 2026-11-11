@@ -49,14 +49,14 @@ test('a lesson is six guided steps with Megumin, built from your own games when 
  assert.match(g.meguminIntro(wo,real,'zh'),/吾名惠惠/);assert.match(g.meguminIntro(wo,real,'zh'),/《魔法使いの夜》/,'names the game you met it in');
  assert.match(g.meguminIntro(wo,[],'zh'),/还没捉到它/,'falls back to built-in lines');
  assert.match(html,/<span class="gm-block" style="--i:0">名词<\/span>/,'how it attaches is drawn as blocks');
- const desu=g.lessonHTML(N5.find(p=>p.id==='kosoado'),{progress:{}},{locale:'zh',esc});assert.match(desu,/data-find="1"/,'points without a lab: find the grammar inside a line');
+ const desu=g.lessonHTML(N5.find(p=>p.id==='kosoado'),{progress:{}},{locale:'zh',esc});assert.match(desu,/data-jd/,'points without a lab: pick the natural line');assert.match(desu,/data-ok="1"/);
 });
 
 test('practice drags the answer into the gap; the list says what to learn next',async()=>{
  const {N5}=await import('../web/grammar-n5.js'),g=await import('../web/grammar.js'),wo=N5.find(p=>p.id==='wo');
  const q=g.exercisesFor(wo,[])[0],open=g.quizHTML(wo,q,{locale:'zh',esc});
- assert.match(open,/data-drop>拖到这里/);assert.match(open,/draggable="true" data-choice=/);assert.match(open,/把答案拖进空里/);
- assert.doesNotMatch(g.quizHTML(wo,q,{locale:'zh',esc,answered:q.answer}),/draggable/,'answered chips stop dragging');
+ assert.match(open,/data-drop>拖到这里/);assert.match(open,/data-choice=/);assert.doesNotMatch(open,/draggable/,'no HTML5 drag: it does not work in WebView2');assert.match(open,/把答案拖进空里/);
+ 
  assert.equal(g.nextPoint({}).id,N5[0].id);assert.equal(g.nextPoint({[N5[0].id]:{learned:true}}).id,N5[1].id);
  const list=g.listHTML({progress:{},completion:g.completion({})},{locale:'zh',esc,userLevel:'N5'});
  assert.match(list,/class="gm-hero"/);assert.match(list,/class="primary gm-hero-go" data-point="wa"/);assert.match(list,/gm-hero-level">N5</);assert.match(list,/data-change-level/);
@@ -183,4 +183,13 @@ test('the 蓝宝书 deck is detected before offering a download: profile folders
  const g=await import('../web/grammar.js');const html=g.listHTML({progress:{}},{locale:'zh',esc,level:'N0',anki:{available:false,points:[],profiles:['megumin'],decks:['蓝宝书_N1-N5_超值白金版'],errors:['megumin：EBUSY']}});
  assert.match(html,/找到了「蓝宝书_N1-N5_超值白金版」/);assert.match(html,/data-anki-reload>重试/);assert.doesNotMatch(html,/data-anki-get/,'never asks to download a deck that is already there');
  assert.match(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),/await B\.readAll\(root/);
+});
+
+test('动手玩 picks the natural line (no cutting lines into pieces), and dragging uses pointer events, not HTML5 drag',async()=>{
+ const g=await import('../web/grammar.js'),{N5}=await import('../web/grammar-n5.js'),lv=await import('../web/grammar-levels.js');
+ for(const p of [N5.find(x=>x.id==='kosoado'),lv.levelPoints('N4')[0],lv.levelPoints('N0').find(x=>x.era)]){const rs=g.judgeRounds(p);assert.ok(rs.length>=1,p.id);
+  for(const r of rs){assert.equal(r.options.filter(o=>o.ok).length,1,p.id+' one natural line');assert.ok(r.options.length>=2);assert.equal(new Set(r.options.map(o=>o.text)).size,r.options.length,p.id+' the lines differ');}}
+ const era=lv.levelPoints('N0').find(x=>x.era&&x.group==='e90');assert.match(g.lessonHTML(era,{progress:{}},{locale:'zh',esc}),/最可能是谁在说/,'N0 words ask who would say it');
+ const src=fs.readFileSync(path.join(__dirname,'..','web','grammar.js'),'utf8');assert.doesNotMatch(src,/dataTransfer|ondragstart|draggable="true"|data-find/);assert.match(src,/pointerDrag\(b,\{over:'\[data-drop\]'/);assert.match(src,/pointerDrag\(t,\{over:'\[data-slot\]'/);
+ const d=fs.readFileSync(path.join(__dirname,'..','web','drag.js'),'utf8');for(const k of ['pointerdown','pointermove','pointerup','setPointerCapture','elementFromPoint'])assert.ok(d.includes(k),k);
 });

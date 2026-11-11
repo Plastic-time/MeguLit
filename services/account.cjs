@@ -77,6 +77,48 @@ const cleanTitle=value=>{const t=String(value||'').trim();return (looksLikePath(
 /* ---- kinds: collect local records / apply remote ones ------------------------------------------------------------ */
 function gameTitles(db){const map=new Map();for(const g of db.prepare('SELECT id,title FROM games').all())map.set(g.id,cleanTitle(g.title));return map;}
 function gameByTitle(db){const map=new Map();for(const g of db.prepare('SELECT id,title FROM games WHERE removed_at IS NULL ORDER BY last_launched_at DESC').all()){const k=cleanTitle(g.title).toLowerCase();if(k&&!map.has(k))map.set(k,g.id);}return map;}
+/* #116 (user: on a new PC the games' data was gone): a synced row whose game is not in this library yet keeps the game's
+   title, so it is sent back unchanged (never as "no game", which overwrote the cloud copy) and is linked once the game
+   is added (relinkGames, run before every sync). */
+/* #116 (user: nickname, avatar and settings were gone on a new PC): besides the per-game styles the settings kind
+   carries the profile (leaderboard nickname, its switches, a small avatar) and the global reading style. Paths never
+   leave the PC (cleanSettings), and a value already set on this PC is kept when an older cloud copy arrives. */
+const EXTRA_FILES={profile:root=>[path.join(root,'data','config','online.json'),require('./assets.cjs').find(root,'avatar')].filter(Boolean),'global-style':root=>[path.join(root,'data','config','gal-preferences.json')]};
+const AVATAR_CAP=24<<10;
+function accountExtras(root){
+ const out={},online=readJSON(path.join(root,'data','config','online.json')),profile={};
+ if(typeof online.leaderboardName==='string'&&online.leaderboardName.trim())profile.nickname=online.leaderboardName.trim().slice(0,32);
+ for(const k of ['leaderboardEnabled','leaderboardShareGames'])if(typeof online[k]==='boolean')profile[k]=online[k];
+ try{const file=require('./assets.cjs').find(root,'avatar');if(file&&fs.statSync(file).size<=AVATAR_CAP*3/4-200)profile.avatar=require('./assets.cjs').get(root,'avatar');}catch{}
+ if(Object.keys(profile).length)out.profile=profile;
+ const style=cleanSettings(readJSON(path.join(root,'data','config','gal-preferences.json')));if(style&&Object.keys(style).length)out['global-style']={prefs:style};
+ return out;
+}
+function applyExtra(root,key,record){
+ if(record.deleted)return;const d=record.data||{};
+ if(key==='profile'){
+  const file=path.join(root,'data','config','online.json'),online=readJSON(file),patch={};
+  if(typeof d.nickname==='string'&&d.nickname.trim()&&!(typeof online.leaderboardName==='string'&&online.leaderboardName.trim())){patch.leaderboardName=d.nickname.trim().slice(0,32);for(const k of ['leaderboardEnabled','leaderboardShareGames'])if(typeof d[k]==='boolean')patch[k]=d[k];}
+  if(Object.keys(patch).length)atomic(file,{...online,...patch});
+  if(typeof d.avatar==='string'&&/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(d.avatar)&&!require('./assets.cjs').find(root,'avatar')){
+   const ext={png:'.png',jpeg:'.jpg',webp:'.webp',gif:'.gif'}[d.avatar.slice(11,d.avatar.indexOf(';'))],temp=path.join(root,'data','cache','synced-avatar'+ext);
+   try{fs.mkdirSync(path.dirname(temp),{recursive:true});fs.writeFileSync(temp,Buffer.from(d.avatar.slice(d.avatar.indexOf(',')+1),'base64'));require('./assets.cjs').set(root,'avatar',temp);}catch{}finally{fs.rmSync(temp,{force:true});}
+  }
+ }else if(key==='global-style'){
+  const file=path.join(root,'data','config','gal-preferences.json'),old=readJSON(file),kept=Object.fromEntries(Object.entries(old).filter(([k])=>PATH_KEY.test(k)||k==='gameProcess'||k==='bindEnabled'));
+  atomic(file,{...kept,...cleanSettings(d.prefs||{})});
+ }
+}
+const syncOriginal=title=>JSON.stringify({sync:true,...(cleanTitle(title)?{game:cleanTitle(title)}:{})});
+const syncedTitle=original=>{const v=parse(original);return typeof v.game==='string'?cleanTitle(v.game):'';};
+function relinkGames(db){
+ const games=gameByTitle(db);if(!games.size)return 0;let linked=0;
+ for(const table of ['examples','saved_sentences']){const update=db.prepare(`UPDATE ${table} SET game_id=? WHERE id=?`);
+  for(const r of db.prepare(`SELECT id,original FROM ${table} WHERE game_id IS NULL AND original LIKE '%"game"%'`).all()){const id=games.get(syncedTitle(r.original).toLowerCase());if(id!=null){update.run(id,r.id);linked++;}}}
+ const update=db.prepare('UPDATE reading_sessions SET game_id=? WHERE id=?');
+ for(const r of db.prepare(`SELECT id,original FROM reading_sessions WHERE game_id IS NULL AND original LIKE '%"sync"%'`).all()){const v=parse(r.original).sync,id=v&&typeof v.game==='string'?games.get(cleanTitle(v.game).toLowerCase()):null;if(id!=null){update.run(id,r.id);linked++;}}
+ return linked;
+}
 const parse=text=>{try{const v=JSON.parse(text||'{}');return v&&typeof v==='object'?v:{};}catch{return {};}};
 const wordKey=(spelling,reading)=>String(spelling)+'\t'+String(reading);
 function fitExamples(data,cap){while(data.examples.length&&bytes(data)>cap)data.examples.pop();if(bytes(data)>cap)delete data.entry;return data;}
@@ -86,9 +128,9 @@ const kinds={
  words:{
   collect(db){
    const titles=gameTitles(db),out=new Map(),examples=new Map();
-   for(const e of db.prepare('SELECT word_id,game_id,text,translation,highlight_start,highlight_end,created_at FROM examples ORDER BY created_at DESC,id DESC').all()){
+   for(const e of db.prepare('SELECT word_id,game_id,text,translation,highlight_start,highlight_end,created_at,original FROM examples ORDER BY created_at DESC,id DESC').all()){
     if(!examples.has(e.word_id))examples.set(e.word_id,[]);
-    examples.get(e.word_id).push({text:e.text,translation:e.translation||'',start:e.highlight_start??0,end:e.highlight_end??0,created_at:e.created_at||0,game:titles.get(e.game_id)||''});
+    examples.get(e.word_id).push({text:e.text,translation:e.translation||'',start:e.highlight_start??0,end:e.highlight_end??0,created_at:e.created_at||0,game:titles.get(e.game_id)||syncedTitle(e.original)});
    }
    for(const w of db.prepare('SELECT id,spelling,reading,definitions,status,created_at,original FROM vocabulary ORDER BY id').all()){
     const key=wordKey(w.spelling,w.reading),old=out.get(key),entry=parse(w.original).entry;
@@ -118,13 +160,13 @@ const kinds={
    }else db.prepare('UPDATE vocabulary SET definitions=?,status=? WHERE id=?').run(definitions,status,id);
    const games=gameByTitle(db),have=new Set(db.prepare('SELECT text FROM examples WHERE word_id IN ('+[id,...rows.slice(1).map(r=>r.id)].join(',')+')').all().map(r=>r.text));
    for(const e of Array.isArray(d.examples)?d.examples:[]){if(typeof e?.text!=='string'||have.has(e.text))continue;have.add(e.text);
-    db.prepare('INSERT INTO examples(word_id,game_id,text,translation,highlight_start,highlight_end,created_at,original) VALUES(?,?,?,?,?,?,?,?)').run(id,games.get(String(e.game||'').toLowerCase())||null,e.text.slice(0,4000),String(e.translation||''),Number(e.start)||0,Number(e.end)||0,Number(e.created_at)||Math.floor(ctx.now()/1000),'{"sync":true}');}
+    db.prepare('INSERT INTO examples(word_id,game_id,text,translation,highlight_start,highlight_end,created_at,original) VALUES(?,?,?,?,?,?,?,?)').run(id,games.get(String(e.game||'').toLowerCase())||null,e.text.slice(0,4000),String(e.translation||''),Number(e.start)||0,Number(e.end)||0,Number(e.created_at)||Math.floor(ctx.now()/1000),syncOriginal(e.game));}
   }
  },
  sentences:{
   collect(db){
    const titles=gameTitles(db),out=new Map();
-   for(const s of db.prepare('SELECT game_id,text,translation,created_at,source FROM saved_sentences ORDER BY created_at,id').all()){const key='s:'+sha(s.text,32);if(!out.has(key))out.set(key,{text:s.text.slice(0,3000),translation:String(s.translation||'').slice(0,3000),created_at:s.created_at,game:titles.get(s.game_id)||'',/* only auto rows carry it, so older (manual) records keep their hash */...(s.source==='auto'?{source:'auto'}:{})});}
+   for(const s of db.prepare('SELECT game_id,text,translation,created_at,source,original FROM saved_sentences ORDER BY created_at,id').all()){const key='s:'+sha(s.text,32);if(!out.has(key))out.set(key,{text:s.text.slice(0,3000),translation:String(s.translation||'').slice(0,3000),created_at:s.created_at,game:titles.get(s.game_id)||syncedTitle(s.original),/* only auto rows carry it, so older (manual) records keep their hash */...(s.source==='auto'?{source:'auto'}:{})});}
    return out;
   },
   apply(db,key,record){
@@ -132,7 +174,7 @@ const kinds={
    if(record.deleted){for(const r of rows)db.prepare('DELETE FROM saved_sentences WHERE id=?').run(r.id);return;}
    const d=record.data;
    if(rows.length)db.prepare('UPDATE saved_sentences SET translation=?,source=? WHERE id=?').run(String(d.translation||''),source,rows[0].id);
-   else db.prepare('INSERT INTO saved_sentences(game_id,text,translation,created_at,original,source) VALUES(?,?,?,?,?,?)').run(gameByTitle(db).get(String(d.game||'').toLowerCase())||null,String(d.text),String(d.translation||''),Number(d.created_at)||0,'{"sync":true}',source);
+   else db.prepare('INSERT INTO saved_sentences(game_id,text,translation,created_at,original,source) VALUES(?,?,?,?,?,?)').run(gameByTitle(db).get(String(d.game||'').toLowerCase())||null,String(d.text),String(d.translation||''),Number(d.created_at)||0,syncOriginal(d.game),source);
   }
  },
  reading:{
@@ -159,10 +201,12 @@ const kinds={
   collect(db,root){
    const out=new Map(),entries=readJSON(path.join(root,'data','config','game-style-profiles.json')).entries||{};
    for(const[key,entry]of Object.entries(entries)){if(!/^[a-f0-9]{64}$/.test(key)||!entry||typeof entry!=='object')continue;const data={name:cleanTitle(entry.name),prefs:cleanSettings(entry.prefs||{})||{}};if(bytes(data)<=RECORD_CAP.settings)out.set(key,data);}
+   for(const[key,data]of Object.entries(accountExtras(root)))if(data&&bytes(data)<=RECORD_CAP.settings)out.set(key,data);
    return out;
   },
-  times(db,root){return new Map(Object.entries(readJSON(path.join(root,'data','config','game-style-profiles.json')).entries||{}).map(([k,e])=>[k,Number(e?.savedAt)||0]));},
+  times(db,root){const t=new Map(Object.entries(readJSON(path.join(root,'data','config','game-style-profiles.json')).entries||{}).map(([k,e])=>[k,Number(e?.savedAt)||0]));for(const[k,files]of Object.entries(EXTRA_FILES))t.set(k,Math.max(0,...files(root).map(f=>{try{return fs.statSync(f).mtimeMs;}catch{return 0;}})));return t;},
   apply(db,key,record,root){
+   if(key in EXTRA_FILES){applyExtra(root,key,record);return;}
    if(!/^[a-f0-9]{64}$/.test(key))return;const file=path.join(root,'data','config','game-style-profiles.json'),doc=readJSON(file);doc.entries=doc.entries&&typeof doc.entries==='object'?doc.entries:{};
    if(record.deleted){if(!doc.entries[key])return;delete doc.entries[key];}
    else{const old=doc.entries[key]||{},kept=Object.fromEntries(Object.entries(old.prefs||{}).filter(([k])=>PATH_KEY.test(k)||k==='gameProcess'||k==='bindEnabled'));
@@ -287,7 +331,7 @@ class Account{
   const chosen=this.kinds(),summary={};const db=this.openDb();
   const ctx={now:this.now,deviceId:()=>this.deviceId()};
   try{
-   ensureState(db);
+   ensureState(db);try{relinkGames(db);}catch{}
    const active=KINDS.filter(kind=>chosen[kind]&&!(only&&!only.includes(kind)));
    /* scan every kind first, without network, so offline changes are all queued even when the relay is unreachable */
    for(const kind of active){
@@ -339,4 +383,4 @@ async function handle(root,request,options){
 }
 function status(root){return accountFor(root).status();}
 function token(root){return accountFor(root).token();}
-module.exports={Account,handle,status,token,relayBase,normalizeBase,normalizeEmail,newerRecord,cleanSettings,looksLikePath,hashData,stable,kinds,scan,applyRemote,pendingRecords,ensureState,chunks,KINDS,DEFAULT_KINDS,RECORD_CAP};
+module.exports={relinkGames,accountExtras,Account,handle,status,token,relayBase,normalizeBase,normalizeEmail,newerRecord,cleanSettings,looksLikePath,hashData,stable,kinds,scan,applyRemote,pendingRecords,ensureState,chunks,KINDS,DEFAULT_KINDS,RECORD_CAP};

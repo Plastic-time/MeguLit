@@ -217,7 +217,7 @@ test('E411: on a full-screen page the layer is not hidden when the wait marker l
  assert.ok(!events.some(e=>e[0]===false),'never hidden by the marker or a box probe: '+JSON.stringify(events));
  im.skip(true);now+=400;im.tick();assert.equal(events.at(-1)[0],false,'held fast-forward still hides');
  const other=[],im2=new Immersion(e=>other.push(e.dialogVisible),()=>now);im2.configure({immersion:true,dialogDetection:'marker'});im2.bind('adv');
- im2.source('普通の台詞。','krkr');im2.marker(true);now+=2000;im2.tick();im2.marker(false);now+=1000;im2.tick();assert.equal(other.at(-1),false,'ADV games keep the marker rule');
+ im2.source('普通の台詞。','krkr');im2.marker(true);now+=2000;im2.tick();im2.input();im2.marker(false);now+=1000;im2.tick();assert.equal(other.at(-1),false,'ADV games keep the marker rule');
 });
 
 // E414 (user: ファタモルガーナの館 / The House in Fata Morgana, "做成通用解法"): multilingual KiriKiri scripts, and page games
