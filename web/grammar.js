@@ -162,7 +162,7 @@ ${stats.pts.length?`<div class="gm-chips">${stats.pts.map(p=>`<button type="butt
 /* ---- list ---- */
 const FOLD=12;
 /* stage nicknames: what the category does for you, not its textbook name */
-const STAGE_NICK={particle:'名词的角色牌',form:'动词变身',adj:'形容一切',word:'指来指去',pattern:'万能句型',cond:'如果线',perm:'能不能做',give:'谁为谁做',aspect:'进度条',guess:'读心术',voice:'主被动反转',link:'因为所以',stance:'话里有话',time:'时间轴',formal:'正经咏唱',speech:'嘴瓢缩写',ending:'句尾语气',slang:'日常黑话',net:'网络冲浪',trend:'当下最火',misc:'杂项技能'};
+const STAGE_NICK={particle:'属性标签',form:'变身Bank',adj:'立绘描写',word:'视线诱导',pattern:'定番台词',cond:'if线',perm:'BAD END 回避',give:'好感度事件',aspect:'存档进度',guess:'伏笔回收',voice:'攻守逆转',link:'共通线',stance:'傲娇翻译',time:'轮回时间轴',formal:'中二咏唱',speech:'口癖',ending:'语尾属性',slang:'圈内黑话',net:'弹幕',trend:'本季新番',misc:'隐藏要素'};
 export function listHTML(data,opts){const {locale,esc,level='N5',userLevel=null}=opts;
  const w=grammarMessages[locale]||grammarMessages.zh,prog=data?.progress||{},pts=pointsOf(level),comp=level==='N5'&&data?.completion||completion(prog,pts),nextId=nextPoint(prog,pts)?.id;
  const levels=`<div class="gm-levels" role="tablist">${LEVELS.map(l=>`<button type="button" role="tab" class="gm-level${l===level?' active':''}" data-level="${l}" aria-selected="${l===level}">${l}</button>`).join('')}</div>`;
