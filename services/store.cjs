@@ -77,6 +77,7 @@ function openStore(root) {
   if(!db.prepare('PRAGMA table_info(games)').all().some(column=>column.name==='hidden_at'))db.exec('ALTER TABLE games ADD COLUMN hidden_at INTEGER');
   require('./saved-sentences.cjs').migrate(db);
   require('./series-migration.cjs').migrateSeries(db,root);
+  try{require('./wait-marker-migration.cjs').migrateWaitMarker(db,root);}catch(error){console.warn('wait marker migration',error.message);}
   reconcileRemovedGames(db);
   return db;
 }

@@ -225,6 +225,8 @@ async function dispatch(request,runtime=null) {
       case 'game_synopsis':return await require('./game-detail.cjs').refreshSynopsis(db,root,String(request.id),request.locale);
       case 'unknown_words':return require('./unknown-words.cjs').unknownWords(root);
       case 'preferences':return store.publicPreferences(root);
+      /* Settings → 重置所有设置 (services/settings-reset.cjs): back up, reset, then push the defaults to an open reader */
+      case 'settings_reset':case 'settings_reset_undo':{const r=require('./settings-reset.cjs'),result=request.action==='settings_reset'?r.reset(root):r.undo(root,String(request.id||''));for(const scope of ['text','panels'])try{runtime?.settingsSaved({scope});}catch{}return result;}
       case 'settings_get':return new(require('./settings.cjs').Settings)(root).get(String(request.profile||''));
       case 'settings_save':{const leaving=request.scope==='online'&&request.values?.leaderboardEnabled===false&&require('./leaderboard.cjs').config(root).enabled;const result=new(require('./settings.cjs').Settings)(root).save({scope:request.scope,values:request.values,profile:String(request.profile||'')});runtime?.settingsSaved(request);if(leaving)await require('./leaderboard.cjs').leave(root).catch(()=>{});return leaving?new(require('./settings.cjs').Settings)(root).get(String(request.profile||'')):result;}
       /* E415 每日 page: Galgame news and hot words from the relay (services/daily.cjs) */
