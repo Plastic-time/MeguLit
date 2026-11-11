@@ -179,8 +179,6 @@ function buildPatch(runningState,source){
     return scene;});
   }
   list=list.map((scene,i)=>scene.patched?{...scene,lines:scene.lines.map((t,k)=>japaneseLine(t)?base[i].lines[k]:t)}:scene);
-  // E449 lines the patch keeps in Japanese (or scenes it never touched) take the filled translation, marked as ours.
-  let filledLines=0;list=list.map((scene,i)=>{const own=base[i];if(!own)return scene;const src=[];const out=scene.lines.map((t,k)=>{const ja=own.lines[k];if(t!==ja||!japaneseLine(ja)){src[k]=scene.patched&&t!==ja?'release':'';return t;}const f=fillLines.lookup(ja);if(f&&f.zh){filledLines++;src[k]='filled';return f.zh;}src[k]=f?f.source:'';return t;});return {...scene,lines:out,zhSource:src};});
   const lines=list.flatMap(x=>x.lines);patched=list.filter(x=>x.patched).length;if(!patched)throw Error('PATCH_SCRIPT_NOT_FOUND');
   translated=list.filter(x=>x.patched).flatMap(x=>x.lines);
   script={engine,version:0,codepage:'text',lines,structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};
@@ -405,6 +403,9 @@ function staticProvider(root,executable){
   const api={kind:'patch',patch:!!patched,fill,drawable,tableDrawable,flowLayout,flowGame,
    resolve:text=>withRuby(resolveLine(text))};
   function resolveLine(text){const r=m.match(text);if(r.japanese===undefined)return r;
+    // E449 lines the release leaves in Japanese take the filled translation written for them (fill.cjs), marked filled.
+    if(r.indices.some(untranslated)){const parts=r.indices.map(i=>{if(!untranslated(i))return m.og[i];const f=fillLines.lookup(rt[i]);return f&&f.zh?f.zh:null;});
+     if(parts.every(p=>p!=null))return {...r,translation:parts.join(''),japanese:undefined,filled:true,source:'filled'};}
     if(r.indices.some(untranslated)){const t=fill.get(r.indices.map(i=>rt[i]).join(''));return t?{...r,translation:t,japanese:undefined,machine:true}:{status:'none',method:'untranslated',indices:r.indices};}
     return {...r,translation:r.japanese,japanese:undefined};}
   return {...api,
