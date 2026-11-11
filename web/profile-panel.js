@@ -32,9 +32,9 @@ async function heroData(api){
    five levels come quickly (100, 150, 200, 250, 300), then every level costs the same 600 and there is no top level;
    the rank title moves up with the level. */
 const XP_EARLY=[100,150,200,250,300],XP_STEP=600;
-const RANKS={zh:[[1,'见习读者'],[5,'初级魔导士'],[10,'魔导士'],[20,'上级魔导士'],[35,'大魔导士'],[50,'红魔族'],[80,'爆裂魔法学徒']],
- ja:[[1,'見習い読者'],[5,'初級魔導士'],[10,'魔導士'],[20,'上級魔導士'],[35,'大魔導士'],[50,'紅魔族'],[80,'爆裂魔法見習い']],
- en:[[1,'Apprentice reader'],[5,'Novice mage'],[10,'Mage'],[20,'High mage'],[35,'Archmage'],[50,'Crimson demon'],[80,'Explosion apprentice']]};
+const RANKS={zh:[[1,'魔法见习生'],[3,'识字咒学徒'],[5,'魔法书抄写员'],[10,'咏唱练习生'],[15,'魔法阵描绘者'],[20,'元素见习术士'],[30,'咒文研究员'],[40,'高阶咏唱者'],[50,'大魔法使候补'],[65,'禁咒研读者'],[80,'爆裂魔法学徒']],
+ ja:[[1,'魔法見習い'],[3,'文字呪文の徒弟'],[5,'魔導書の写字生'],[10,'詠唱の練習生'],[15,'魔法陣の描き手'],[20,'元素術の見習い'],[30,'呪文研究員'],[40,'高位詠唱者'],[50,'大魔法使い候補'],[65,'禁呪の読み手'],[80,'爆裂魔法見習い']],
+ en:[[1,'Magic novice'],[3,'Rune-reading pupil'],[5,'Grimoire copyist'],[10,'Chant trainee'],[15,'Circle drawer'],[20,'Elemental apprentice'],[30,'Spell scholar'],[40,'High chanter'],[50,'Archmage candidate'],[65,'Forbidden-spell reader'],[80,'Explosion apprentice']]};
 export function readerLevel(stats){
  const st=stats||{};let xp=Math.floor((Number(st.characters)||0)/50)+Math.floor((Number(st.seconds)||0)/60)*2+(Number(st.words)||0)*10;
  const total=xp;let level=1;
