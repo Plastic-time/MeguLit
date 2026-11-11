@@ -406,6 +406,8 @@ const nscripter=require('./nscripter.cjs');
 // E340 Unity TextAssets with 日本語※简体※繁體 lines (月に寄りそう乙女の作法): unity-text.cjs. E341 07th Expansion Unity
 // (ひぐらし 奉, StreamingAssets/Scripts OutputLine): higurashi.cjs. E342 MAGES. script.mpk SC3 (STEINS;GATE): mages.cjs.
 // E343 Capcom Unity Ace Attorney collections (逆転検事 1&2, scriptmessage bundles): capcom-msg.cjs.
+// E451 Capcom Unity Ace Attorney Trilogy (逆転裁判123, encrypted GS<n>/scenario/*.mdt): pwaat.cjs.
+const pwaat=require('./pwaat.cjs');
 // E375 RPG Maker MV/MZ (www/data JSON) and WOLF RPG Editor (Data/*.mps, CommonEvent.dat, plain .wolf): rpgmaker.cjs, wolf.cjs.
 const rpgmaker=require('./rpgmaker.cjs'),wolf=require('./wolf.cjs');
 // E403 DDLC Plus (StreamingAssets/AssetBundles/Windows/lang*.cy): vgprompter.cjs.
@@ -415,7 +417,7 @@ const voiceRef=require('./voice-ref.cjs');
 const catsystem2=require('./catsystem2.cjs'),naninovel=require('./naninovel.cjs'),unityText=require('./unity-text.cjs'),higurashi=require('./higurashi.cjs'),mages=require('./mages.cjs'),capcomMsg=require('./capcom-msg.cjs');
 // E409 Nitroplus N4 (Steam The Song of Saya, script.npk NPK2): nitroplus-n4.cjs.
 const nitroplusN4=require('./nitroplus-n4.cjs');
-const ENGINES={'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak,fvp,advhd,reallive,vgprompter};
+const ENGINES={'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,pwaat,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak,fvp,advhd,reallive,vgprompter};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,64)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
