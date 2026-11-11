@@ -363,13 +363,21 @@
     }
     const context=document.createElement('canvas').getContext?.('2d');
     if(context){
-      const japanese=spans.find(span=>!span.hasAttribute('data-tomoyo-leading-space')&&span.textContent.trim());
-      for(const [name,node,text] of [['jp',document.querySelector('.sentence-text'),japanese?.textContent],['cn',document.querySelector('.tomoyo-cn-output'),document.querySelector('.tomoyo-cn-output')?.textContent?.trimStart()]]){
-        if(!node||!text)continue;const s=getComputedStyle(node);context.font=s.fontWeight+' '+s.fontSize+' '+s.fontFamily;
-        const left=context.measureText(Array.from(text)[0]).actualBoundingBoxLeft;
-        if(Number.isFinite(left))document.documentElement.style.setProperty('--tomoyo-'+name+'-indent',Math.max(-60,Math.min(5,left))+'px');
-        if(name==='jp'){const open=japanese&&/^[「『（“‘〈《【(]$/.test(japanese.textContent.trim());document.documentElement.style.setProperty('--megulit-jp-hang',open?japanese.getBoundingClientRect().width+'px':'0px');}
+      /* E416 (user 2026-11-11: one rule for every engine): each line is aligned by its OWN first character. The indent and
+         the hanging opening bracket used to be measured on the first sentence only and applied to every line, so a name
+         row, a 「…」 line and a narration line drawn together could not all sit on the game's text (穢翼のユースティア:
+         spoken lines off, narration on). The root values stay as the fallback for elements measured before layout. */
+      const measure=(node,text)=>{if(!node||!text)return null;const s=getComputedStyle(node);context.font=s.fontWeight+' '+s.fontSize+' '+s.fontFamily;const left=context.measureText(Array.from(text)[0]).actualBoundingBoxLeft;return Number.isFinite(left)?Math.max(-60,Math.min(5,left))+'px':null;};
+      let first=true;
+      for(const sentence of document.querySelectorAll('.sentence-text')){
+        const japanese=[...sentence.querySelectorAll('.char-token')].find(span=>!span.hasAttribute('data-tomoyo-leading-space')&&span.textContent.trim());
+        const indent=measure(sentence,japanese?.textContent),open=japanese&&/^[「『（“‘〈《【〔［(]$/.test(japanese.textContent.trim()),hang=open?japanese.getBoundingClientRect().width+'px':'0px';
+        if(indent){sentence.style.setProperty('--tomoyo-jp-indent',indent);if(first)document.documentElement.style.setProperty('--tomoyo-jp-indent',indent);}
+        sentence.style.setProperty('--megulit-jp-hang',hang);if(first)document.documentElement.style.setProperty('--megulit-jp-hang',hang);
+        if(japanese)first=false;
       }
+      let firstCn=true;
+      for(const cn of document.querySelectorAll('.tomoyo-cn-output')){const indent=measure(cn,cn.textContent?.trimStart());if(!indent)continue;cn.style.setProperty('--tomoyo-cn-indent',indent);if(firstCn){document.documentElement.style.setProperty('--tomoyo-cn-indent',indent);firstCn=false;}}
     }
   }
   bridge.alignText=alignText;
@@ -425,7 +433,7 @@
     root.setProperty('--tomoyo-jp-weight', preferences.japaneseBold?'700':'400');
     root.setProperty('--tomoyo-cn-weight', preferences.chineseBold?'700':'400');
     /* Immersive mode (#79): the translation stays blurred until the pointer is over it */
-    if(!document.getElementById('megulit-translation-blur-style')){const st=document.createElement('style');st.id='megulit-translation-blur-style';/* E416: the outline rule (filter:var(--tomoyo-gal-cn-filter)!important on body.tomoyo-gal-bound) overrode a plain blur, so this one is !important and more specific, and restores the outline on hover (blur(7px) none would be invalid CSS) */st.textContent='html.megulit-translation-blur body .tomoyo-cn-output,html.megulit-translation-blur body.tomoyo-gal-bound .tomoyo-cn-output{filter:blur(7px)!important;transition:filter .18s ease!important}html.megulit-translation-blur body .tomoyo-cn-output:hover,html.megulit-translation-blur body.tomoyo-gal-bound .tomoyo-cn-output:hover{filter:var(--tomoyo-gal-cn-filter,none)!important}';document.head.append(st);}
+    /* E416 (user 2026-11-11: every display mode). Translations are blurred wherever MeguLit draws them (dialogue, full page, choices); the rule is !important and more specific than the outline filter that overrode it. Overlays let clicks through (pointer-events:none), so :hover never fires there: the pointer position decides, from mousemove on the document. When the game itself draws the translation, hook-native stops that while blur is on, since the game's pixels cannot be blurred. */if(!document.getElementById('megulit-translation-blur-style')){const st=document.createElement('style');st.id='megulit-translation-blur-style';const T=['.tomoyo-cn-output','.megulit-choice-cn'],on=T.map(t=>'html.megulit-translation-blur body '+t+',html.megulit-translation-blur body.tomoyo-gal-bound '+t).join(','),shown=T.map(t=>'html.megulit-translation-blur body '+t+'.megulit-reveal,html.megulit-translation-blur body.tomoyo-gal-bound '+t+'.megulit-reveal,html.megulit-translation-blur body.tomoyo-gal-bound '+t+':hover').join(',');st.textContent=on+'{filter:blur(7px)!important;transition:filter .18s ease!important}'+shown+'{filter:var(--tomoyo-gal-cn-filter,none)!important}';document.head.append(st);document.addEventListener('mousemove',e=>{if(!document.documentElement.classList.contains('megulit-translation-blur'))return;for(const n of document.querySelectorAll(T.join(','))){const r=n.getBoundingClientRect(),inside=r.width>0&&e.clientX>=r.left-6&&e.clientX<=r.right+6&&e.clientY>=r.top-6&&e.clientY<=r.bottom+6;n.classList.toggle('megulit-reveal',inside);}},{passive:true});}
     document.documentElement.classList.toggle('megulit-translation-blur',preferences.translationBlur===true);
     const translated=document.querySelector('.tomoyo-cn-output');if(translated){translated.style.setProperty('font-weight',preferences.chineseBold?'700':'400','important');translated.style.setProperty('font-synthesis','weight','important');}
     root.setProperty('--tomoyo-gal-color', preferences.textColor);root.setProperty('--tomoyo-gal-read-color', preferences.readTextColor||preferences.textColor);
