@@ -78,4 +78,34 @@ const aquaplus={
   return any?list:null;},
  _internal:{kcapList,kcapRead,lzss,clean,cell,patchDecode,fonMatches},
 };
+/* E450 voices (WHITE ALBUM2). A scene's compiled script (<n>.bnr, u32 words) pushes ints as 5 3 <v> and calls
+   engine functions as 4 <id>. The message call takes the message number first (0, 1, 2 … in order); the voice call
+   takes (character, 256, 0, 0, voice number) and comes before its message. Message k is the k-th text of <n>.txt
+   that is not a speaker name; the clip is <n>_<number:4>_<character:2>.OGG in VOICE.PAK. Function ids are found by
+   these argument shapes, not fixed. */
+function calls(bnr){const w=[];for(let i=0;i+4<=bnr.length;i+=4)w.push(bnr.readInt32LE(i));const out=[];
+ for(let i=1;i<w.length-1;i++)if(w[i]===4&&w[i+1]>0&&w[i+1]<1024){const args=[];let j=i-1;while(j>=2&&w[j-2]===5&&w[j-1]===3){args.unshift(w[j]);j-=3;}out.push({id:w[i+1],args});}
+ return out;}
+function voiceFns(list){const by=new Map();for(const c of list){if(!c.args.length)continue;const a=by.get(c.id)||[];a.push(c.args);by.set(c.id,a);}
+ const rising=(rows,k)=>rows.length>=2&&rows.every((r,i)=>r.length>k&&r[k]===(i===0?r[k]:rows[i-1][k]+1))&&rows[0][k]===0;
+ // voice numbers mostly go up but may start anywhere and skip (a scene shares numbering with its branches)
+ const upward=(rows,k)=>{let up=0;for(let i=1;i<rows.length;i++)if(rows[i][k]>=rows[i-1][k])up++;return rows.length===1||up>=(rows.length-1)*0.9;};
+ let message=null,voice=null,most=0,mostM=0;for(const [id,rows] of by){if(rows.length>mostM&&rows.every(r=>r.length===2)&&rows[0][0]===0&&upward(rows,0)){message=id;mostM=rows.length;}if(rows.length>most&&rows.every(r=>r.length===5)&&upward(rows,4)){voice=id;most=rows.length;}}
+ return {message,voice};}
+const isName=(t,next)=>!!next&&/^[「『（]/.test(next)&&!/^[「『（]/.test(t)&&[...t].length<=12;
+function sceneVoices(stem,txt,bnr){const toks=sjis.decode(txt).split(',').filter(t=>t&&!/^[\x20-\x7e]*$/.test(t)),msgs=[];
+ for(let i=0;i<toks.length;i++)if(!isName(toks[i],toks[i+1]))msgs.push(clean(toks[i]));
+ const list=calls(bnr),{message,voice}=voiceFns(list);if(message===null||voice===null)return [];const out=[];let pending=[];
+ // several voices before one message (people talking at once) all go with it
+ for(const c of list){if(c.id===voice&&c.args.length===5)pending.push(stem.split('_')[0]+'_'+String(c.args[4]).padStart(4,'0')+'_'+String(c.args[0]).padStart(2,'0'));
+  else if(c.id===message&&c.args.length===2){if(msgs[c.args[0]])for(const ref of pending)out.push({text:msgs[c.args[0]].replace(/\\[a-z]/gi,''),ref});pending=[];}}
+ return out;}
+aquaplus.voiceLines=dir=>{const f=scriptPak(dir);if(!f)return [];const l=kcapList(f),byName=new Map(l.map(e=>[e.name.toLowerCase(),e]));const out=[];
+ for(const e of l){if(!TXT(e.name))continue;const stem=e.name.replace(/\.[^.]+$/,''),b=byName.get(stem.toLowerCase()+'.bnr');if(!b)continue;try{out.push(...sceneVoices(stem,kcapRead(f,e),kcapRead(f,b)));}catch{}}
+ return out;};
+// LAC archives (VOICE.PAK): "LAC\0", count, then {name XOR 0xFF (32), size, offset} per clip.
+aquaplus.audio=file=>{if(!/\.pak$/i.test(file))return null;let fd;try{fd=fs.openSync(file,'r');const h=Buffer.alloc(8);fs.readSync(fd,h,0,8,0);if(h.toString('latin1',0,4)!=='LAC\0')return null;const n=h.readUInt32LE(4),size=fs.fstatSync(fd).size;if(!n||n>500000||8+n*40>size)return null;
+ const t=Buffer.alloc(n*40);fs.readSync(fd,t,0,t.length,8);const out=[];for(let i=0;i<n;i++){const raw=t.subarray(i*40,i*40+32),z0=raw.findIndex(c=>c===0||c===0xff),nb=Buffer.from(raw.subarray(0,z0<0?32:z0)).map(c=>c^0xff),z=-1;const name=nb.toString('latin1',0,z<0?32:z),s=t.readUInt32LE(i*40+32),o=t.readUInt32LE(i*40+36);if(o+s>size)return null;
+  out.push({name,read:()=>{const d=Buffer.alloc(s),g=fs.openSync(file,'r');try{fs.readSync(g,d,0,s,o);}finally{fs.closeSync(g);}return d;}});}return out;}catch{return null;}finally{if(fd!==undefined)try{fs.closeSync(fd);}catch{}}};
+aquaplus._internal.sceneVoices=sceneVoices;aquaplus._internal.calls=calls;
 module.exports=aquaplus;

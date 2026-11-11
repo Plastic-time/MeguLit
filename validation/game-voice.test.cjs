@@ -71,3 +71,9 @@ test('siglus: KOE calls go with the next message, branches give one line several
  const src=['@KOE(000100000,008)','@mes(16000020,【美佐枝】,「おのれはっ…」)@RET','@mes(16000030, ,怒りに任せて。)@RET','if(a){','@KOE(100600060,000)','}else{','@KOE(100600080,000)','}','		@SIZE(20)@mes(00060630,【杏】,（勝てば官軍）)@SIZE@RET','//@KOE(1,0)','「地の文の台詞」'].join('\n');
  assert.deepEqual(s.voiced(src),[{text:'「おのれはっ…」',koe:100000},{text:'怒りに任せて。',koe:null},{text:'（勝てば官軍）',koe:100600060},{text:'（勝てば官軍）',koe:100600080},{text:'「地の文の台詞」',koe:null}]);
  assert.equal(s._internal.smd5(Buffer.from('abc')).toString('hex'),'900150983cd24fb0d6963f7d28e17f72');});
+test('aquaplus: the voice call (char,256,0,0,n) before message k names <scene>_<n>_<char> for the k-th non-name text',()=>{const a=require('../services/original-engines/aquaplus.cjs');
+ const w=[];const push=v=>w.push(5,3,v),call=id=>w.push(4,id);w.push(0,0,0);
+ push(0);push(256);push(0);push(0);push(0);call(138);push(0);push(1);call(131);push(1);push(1);call(131);push(5);push(256);push(0);push(0);push(1);call(138);push(2);push(1);call(131);
+ const bnr=Buffer.alloc(w.length*4);w.forEach((v,i)=>bnr.writeInt32LE(v,i*4));
+ const sj=s=>Buffer.from(new TextEncoder().encode(s));const txt=Buffer.concat([Buffer.from(',x.tga,,'),Buffer.from('\x8f\x74\x8a\xf3,\x81\x75\x82\xa0\x81\x76,\x82\xa2\x82\xa4\k,\x96\x83\x97\x9d,\x81\x75\x82\xa6\x81\x76','latin1')]);
+ assert.deepEqual(a._internal.sceneVoices('2021_010',txt,bnr),[{text:'「あ」',ref:'2021_0000_00'},{text:'「え」',ref:'2021_0001_05'}]);});
