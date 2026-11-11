@@ -181,3 +181,12 @@ html[data-stage]:not([data-stage=""]) .app-backdrop::before{filter:blur(var(--ve
 .stage-cover{z-index:0}
 .stage-cover[hidden]{display:none}
 .workspace>.main{position:relative;z-index:1}
+
+/* E445 heat map tooltip */
+.tv-heat-tip{position:fixed;z-index:9999;transform:translate(-50%,-100%) translateY(4px);display:flex;align-items:baseline;gap:8px;padding:8px 12px;background:rgba(13,14,18,.94);border:1px solid rgba(200,50,60,.55);box-shadow:0 10px 30px rgba(0,0,0,.5);color:#e8e6e1;font-size:12px;letter-spacing:.04em;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s,transform .12s}
+.tv-heat-tip.on{opacity:1;transform:translate(-50%,-100%)}
+.tv-heat-tip b{font-family:var(--g-serif,serif);font-size:14px;font-weight:600}
+.tv-heat-tip span{color:#9a958c;font-size:11px}
+.tv-heat-tip em{font-style:normal;color:#e8b04a}
+.tv-heat-tip.zero em{color:#7d7a74}
+.tv-heat-tip::after{content:"";position:absolute;left:50%;bottom:-5px;width:8px;height:8px;background:inherit;border-right:1px solid rgba(200,50,60,.55);border-bottom:1px solid rgba(200,50,60,.55);transform:translateX(-50%) rotate(45deg)}

@@ -188,7 +188,7 @@ export function renderHomeTV(main,ctx){
  $('.tv-search').addEventListener('input',filter);
  $('.tv-close').addEventListener('click',()=>$('.tv-drawer').classList.remove('open'));
  api('daily_view',{}).then(v=>{if(!live||live.root!==root)return;const n=v?.news?.items?.[0],h=v?.words?.words?.[0],t=$('.tv-daily-t');if(n){t.textContent=n.title;t.title=n.title+(n.source?' · '+n.source:'');}else if(h){t.textContent=h.term+(h.gloss?' · '+h.gloss:'');}}).catch(()=>{});
- api('learning_activity',{range:'year'}).then(records=>{if(!live||live.root!==root)return;const all=activityCells(Array.isArray(records)?records:[]);let from=Math.max(0,all.length-20*7);while(from>0&&all[from].weekday!==0)from--;const cells=all.slice(from),active=cells.filter(c=>c.level).length;$('.tv-heat').innerHTML=cells.map((c,i)=>`<i style="grid-row:${c.weekday+1};grid-column:${Math.floor(i/7)+1}" class="${i===cells.length-1?'today':c.level?'l'+Math.min(3,c.level):''}" title="${esc(c.day)} · ${Math.round((c.seconds||0)/60)} ${w.min}"></i>`).join('');$('.tv-heatlink').textContent=`${w.activity} · ${active} ${w.days} →`;let run=0,best=0;for(const c of cells){run=c.level?run+1:0;best=Math.max(best,run);}const secs=cells.reduce((a,c)=>a+(c.seconds||0),0);$('.tv-heatsum').innerHTML=`<span><b>${active}</b>${w.days}</span><span><b>${esc(duration(secs))}</b>${w.total}</span><span><b>${best}</b>${w.streak}</span>`;}).catch(()=>{});
+ api('learning_activity',{range:'year'}).then(records=>{if(!live||live.root!==root)return;const all=activityCells(Array.isArray(records)?records:[]);let from=Math.max(0,all.length-20*7);while(from>0&&all[from].weekday!==0)from--;const cells=all.slice(from),active=cells.filter(c=>c.level).length;$('.tv-heat').innerHTML=cells.map((c,i)=>`<i style="grid-row:${c.weekday+1};grid-column:${Math.floor(i/7)+1}" class="${i===cells.length-1?'today':c.level?'l'+Math.min(3,c.level):''}" data-day="${esc(c.day)}" data-min="${Math.round((c.seconds||0)/60)}"></i>`).join('');$('.tv-heatlink').textContent=`${w.activity} · ${active} ${w.days} →`;let run=0,best=0;for(const c of cells){run=c.level?run+1:0;best=Math.max(best,run);}const secs=cells.reduce((a,c)=>a+(c.seconds||0),0);$('.tv-heatsum').innerHTML=`<span><b>${active}</b>${w.days}</span><span><b>${esc(duration(secs))}</b>${w.total}</span><span><b>${best}</b>${w.streak}</span>`;}).catch(()=>{});
  const canvas=$('.tv-canvas'),planes=[...root.querySelectorAll('.tv-plane')],reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
  live.move=e=>{if(reduced)return;const r=root.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;canvas.style.transform=`rotateY(${x*6}deg) rotateX(${-y*5}deg)`;planes.forEach(p=>p.style.transform=`translate3d(${-x*p.dataset.z*.25}px,${-y*p.dataset.z*.2}px,${p.dataset.z}px)`);};
  root.addEventListener('mousemove',live.move);
@@ -199,3 +199,16 @@ export function renderHomeTV(main,ctx){
  if(list.length)paint(0,false);
  return stopHomeTV;
 }
+
+/* E445 heat map tooltip: a styled card instead of the browser's title box (date, weekday, minutes read) */
+(()=>{if(typeof document==='undefined')return;let tip=null;const WD={zh:['周日','周一','周二','周三','周四','周五','周六'],ja:['日','月','火','水','木','金','土'],en:['Sun','Mon','Tue','Wed','Thu','Fri','Sat']};
+ const lang=()=>{const l=document.documentElement.lang||'zh';return l.startsWith('ja')?'ja':l.startsWith('en')?'en':'zh';};
+ const hide=()=>{if(tip)tip.classList.remove('on');};
+ document.addEventListener('mouseover',e=>{const cell=e.target.closest?.('i[data-day]');if(!cell||!cell.closest('.tv-heat-card')){hide();return;}
+  if(!tip){tip=document.createElement('div');tip.className='tv-heat-tip';document.body.append(tip);}
+  const d=new Date(cell.dataset.day+'T00:00:00'),l=lang(),min=Number(cell.dataset.min)||0;
+  const date=l==='en'?d.toLocaleDateString('en',{month:'short',day:'numeric'}):`${d.getMonth()+1}月${d.getDate()}日`;
+  const read=min?(l==='en'?`${min} min read`:l==='ja'?`${min} 分読んだ`:`读了 ${min} 分钟`):(l==='en'?'No reading':l==='ja'?'読書なし':'没有阅读');
+  tip.innerHTML=`<b></b><span></span><em></em>`;tip.querySelector('b').textContent=date;tip.querySelector('span').textContent=WD[l][d.getDay()];tip.querySelector('em').textContent=read;tip.classList.toggle('zero',!min);
+  const r=cell.getBoundingClientRect();tip.style.left=Math.round(r.left+r.width/2)+'px';tip.style.top=Math.round(r.top-10)+'px';tip.classList.add('on');});
+ document.addEventListener('scroll',hide,true);})();
