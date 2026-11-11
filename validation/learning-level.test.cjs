@@ -174,3 +174,13 @@ test('rewards: magic points, titles, the line collection, and 惠惠\'s real lin
  const w=await import('../web/rewards.js');for(const k of ['praise','clear','cheer'])for(const [line,src] of w.QUOTES[k]){assert.ok([...line].length<=30,line);assert.match(src,/^(TV \d期 \d+話|映画 紅伝説)$/,line+' says where it is from');}
  const g=await import('../web/grammar.js');assert.match(g.listHTML({progress:{}},{locale:'zh',esc,level:'N5',rewards:{mana:12,album:3,rank:1,title:'见习魔法使',floor:0,next:150}}),/战利品 <b>3<\/b>/);
 });
+
+test('the 蓝宝书 deck is detected before offering a download: profile folders, AnkiConnect, and the reason when it cannot be read',async()=>{
+ const B=require('../services/bluebook.cjs');
+ const none=B.fromFiles(temp(),{APPDATA:path.join(temp(),'nope')});assert.equal(none.available,false);assert.ok(none.errors.length);
+ const anki={call:async(c,action,params)=>action==='deckNames'?['默认','蓝宝书_N1-N5_超值白金版','蓝宝书_N1-N5_超值白金版::文法カード']:action==='findNotes'?[7]:[{noteId:7,modelName:'双类型文法卡组Note',fields:{Level:{value:'蓝宝书【N3】'},Word:{value:' ～ばかり'},Explain1:{value:'光……'},Example1:{value:'嘘<b>ばかり</b>だ。'},Chinese1:{value:'净是谎话。'}}}]};
+ const r=await B.fromAnkiConnect(anki,{});assert.equal(r.available,true);assert.equal(r.points[0].id,'bb-7');assert.equal(r.points[0].level,'N3');assert.deepEqual(r.decks.length,2);
+ const g=await import('../web/grammar.js');const html=g.listHTML({progress:{}},{locale:'zh',esc,level:'N0',anki:{available:false,points:[],profiles:['megumin'],decks:['蓝宝书_N1-N5_超值白金版'],errors:['megumin：EBUSY']}});
+ assert.match(html,/找到了「蓝宝书_N1-N5_超值白金版」/);assert.match(html,/data-anki-reload>重试/);assert.doesNotMatch(html,/data-anki-get/,'never asks to download a deck that is already there');
+ assert.match(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),/await B\.readAll\(root/);
+});
