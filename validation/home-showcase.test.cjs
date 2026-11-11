@@ -12,3 +12,9 @@ test('home showcase order: pinned first, picks, recent fallback, hidden never',a
  assert.deepEqual(showcaseGames(games,{mode:'pick',order:['b','a'],pinned:['c']}).map(g=>g.id),['c','b','a']);
  assert.deepEqual(showcaseGames(games,{mode:'pick',order:['a'],hidden:['a']}).map(g=>g.id),['b','c']);
 });
+test('home and detail veil defaults and clamping',()=>{
+ const fs=require('fs'),os=require('os'),path=require('path'),root=fs.mkdtempSync(path.join(os.tmpdir(),'veil-'));fs.mkdirSync(path.join(root,'data'),{recursive:true});
+ let p=store.publicPreferences(root);assert.equal(p.homeVeil,.9);assert.equal(p.homeVeilBlur,18);assert.equal(p.detailVeil,.68);assert.equal(p.detailVeilBlur,8);
+ fs.writeFileSync(path.join(root,'data','preferences.json'),JSON.stringify({homeVeil:3,homeVeilBlur:-5,detailVeil:.4,detailVeilBlur:99}));
+ p=store.publicPreferences(root);assert.equal(p.homeVeil,1);assert.equal(p.homeVeilBlur,0);assert.equal(p.detailVeil,.4);assert.equal(p.detailVeilBlur,40);
+});
