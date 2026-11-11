@@ -102,11 +102,14 @@ function fitTitle(h){const max=Math.min(128,Math.max(44,innerWidth*.074));let si
 
 function tweenFig(el,to,fmt){if(!el)return;const from=+el.dataset.v||0;el.dataset.v=to;cancelAnimationFrame(+el.dataset.raf||0);if(matchMedia('(prefers-reduced-motion:reduce)').matches||from===to){el.textContent=fmt(to);return;}const t0=performance.now(),dur=900;const tick=now=>{const k=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-k,4);el.textContent=fmt(from+(to-from)*e);if(k<1)el.dataset.raf=requestAnimationFrame(tick);};el.dataset.raf=requestAnimationFrame(tick);setTimeout(()=>{if(+el.dataset.v===to)el.textContent=fmt(to);},dur+80);}
 
+let glowTimer=0;
+function glowTo(fn,g){if(!fn)return;const layer=document.querySelector('.grimoire-glow');if(!layer||!layer.classList.contains('ready')){fn(g);return;}clearTimeout(glowTimer);layer.style.transition='opacity .45s cubic-bezier(.4,0,.2,1)';layer.style.opacity='0';glowTimer=setTimeout(()=>{fn(g);layer.style.transition='opacity 1.1s cubic-bezier(.22,1,.36,1)';layer.style.opacity='';},460);}
+
 function cardify(card){const face=card.querySelector('.tv-face');let pressed=false,last=null;
  const set=(x,y)=>{const depth=pressed?1.6:1,rx=(.5-y)*20*depth,ry=(x-.5)*20*depth;face.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg) scale(${pressed?.96:1.03})`;face.style.setProperty('--px',`${x*100}%`);face.style.setProperty('--py',`${y*100}%`);face.style.setProperty('--hue',`${Math.round(x*360)}deg`);};
  card.addEventListener('pointerenter',()=>{card.classList.add('touch');face.style.transition='transform .12s ease-out';});
  card.addEventListener('pointermove',e=>{const r=card.getBoundingClientRect();last=[Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),Math.min(1,Math.max(0,(e.clientY-r.top)/r.height))];set(...last);});
- card.addEventListener('pointerdown',e=>{pressed=true;card.setPointerCapture?.(e.pointerId);if(last)set(...last);});
+ card.addEventListener('pointerdown',()=>{pressed=true;if(last)set(...last);});
  const up=()=>{pressed=false;if(last)set(...last);};card.addEventListener('pointerup',up);card.addEventListener('pointercancel',up);
  card.addEventListener('pointerleave',()=>{pressed=false;last=null;card.classList.remove('touch');face.style.transition='transform .7s cubic-bezier(.2,1.6,.4,1)';face.style.transform='';});}
 
@@ -123,15 +126,15 @@ export function renderHomeTV(main,ctx){
  main.innerHTML=`<div class="tv-home" tabindex="-1"><div class="tv-canvas">
   <div class="tv-plane" data-z="-200"><div class="tv-tl"></div></div>
   <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-index"></div><div class="tv-ring"></div></div>
-  <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div><div class="tv-heat-card tv-card"><div class="tv-face"><div class="tv-heat"></div><div class="tv-heatsum"></div><i class="tv-glare"></i></div></div></div>
+  <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div><div class="tv-heat-card tv-card"><div class="tv-face"><button class="tv-heatlink" data-go="activity"></button><div class="tv-heat"></div><div class="tv-heatsum"></div><button class="tv-daily" data-go="daily"><i aria-hidden="true"></i><span class="tv-daily-k">${w.daily}</span><span class="tv-daily-t"></span><small>→</small></button><i class="tv-glare"></i></div></div></div>
   <div class="tv-plane" data-z="60"><div class="tv-pile" aria-hidden="true"></div><div class="tv-cover tv-card"><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""><i></i><i></i><i></i><i></i></div></div></div></div></div>
   <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div><div class="tv-scene"></div>
   <div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div>
-  <button class="tv-heatlink" data-go="activity"></button>
+  
   <div class="tv-figs"><button class="tv-fig" data-go="statistics"><b data-fig="time">0m</b><small>${w.figRead}</small></button><button class="tv-fig" data-go="detail"><b data-fig="chars">0</b><small>${w.figChars}</small></button><button class="tv-fig" data-go="words"><b data-fig="words">0</b><small>${w.figWords}</small></button><button class="tv-more" data-go="statistics">${w.full} →</button></div>
   <div class="tv-title"><div class="tv-ruby"></div><div class="tv-h1" role="heading" aria-level="1"></div><div class="tv-meta"></div></div>
   <div class="tv-rail"></div>
-  <div class="tv-dialog"><button class="tv-daily" data-go="daily"><i aria-hidden="true"></i><span>${w.daily}</span><small>DAILY →</small></button><span class="tv-who"></span><span class="tv-line"></span><div class="tv-act"><button class="tv-btn primary tv-play" data-act="play"><i class="tv-play-ic" aria-hidden="true"></i><span class="tv-play-tx"><b>${w.play}</b><small class="tv-play-sub"></small></span></button><button class="tv-btn" data-act="detail">${w.detail}</button><button class="tv-btn" data-go="library">${w.all}</button></div></div>
+  <div class="tv-dialog"><span class="tv-who"></span><span class="tv-line"></span><div class="tv-act"><button class="tv-btn primary tv-play" data-act="play"><i class="tv-play-ic" aria-hidden="true"></i><span class="tv-play-tx"><b>${w.play}</b><small class="tv-play-sub"></small></span></button><button class="tv-btn" data-act="detail">${w.detail}</button><button class="tv-btn" data-go="library">${w.all}</button></div></div>
   <section class="tv-drawer" aria-label="${w.title}"><h2>${w.title} <small>${w.sub}</small></h2><button class="tv-close">${w.close} ✕</button><div class="tv-mode"><button data-m="auto">${w.auto}</button><button data-m="pick">${w.pick}</button><input class="tv-search" type="search" placeholder="${w.search}" aria-label="${w.search}"></div><div class="tv-list"></div><div class="tv-hint"></div></section></div>`;
  const root=main.querySelector('.tv-home'),$=s=>root.querySelector(s);
  live={root,timer:0,beat:0,typer:0,move:null};
@@ -147,7 +150,7 @@ export function renderHomeTV(main,ctx){
   const started=performance.now(),reveal=deal($('.tv-cover'),art(g,['#3b2a26','#3b2a26','#1a1110']),flash,mode);
   const [p,d]=await Promise.all([palette(g),detail(api,g.id,locale)]);if(mine!==token||!live||live.root!==root)return;
   const wait=flash?Math.max(0,reveal-(performance.now()-started)):0;if(wait){await new Promise(r=>setTimeout(r,wait));if(mine!==token||!live||live.root!==root)return;}
-  ctx.onGame?.(g);root.style.setProperty('--tv-a',p[0]);root.style.setProperty('--tv-b',p[1]);root.style.setProperty('--tv-c',p[2]);
+  glowTo(ctx.onGame,g);root.style.setProperty('--tv-a',p[0]);root.style.setProperty('--tv-b',p[1]);root.style.setProperty('--tv-c',p[2]);
   const k=(g.title.length*37+pool.indexOf(g)*13)%60,saved=(d.sentences||[]).map(s=>String(s.text||'').trim()).filter(Boolean),sentences=(saved.length?saved:(d.recentLines||[]).map(s=>String(s.text||'').trim()).filter(Boolean).slice(-6)).slice(0,8),words=(d.words||[]).filter(x=>x.spelling).slice(0,10),sessions=d.sessions||[];
   $('.tv-kana').textContent=[...g.title].find(c=>/[一-鿿぀-ヿ]/.test(c))||([...g.title].find(c=>/[A-Za-z0-9]/.test(c))||g.title.slice(0,1)).toUpperCase();
   if(!g.cover)$('.tv-art').style.background=art(g,p);$('.tv-play-sub').textContent=g.lastPlayedAt?`${w.last} · ${relativeTime(g.lastPlayedAt)}`:'';
@@ -177,7 +180,8 @@ export function renderHomeTV(main,ctx){
  root.querySelectorAll('.tv-mode button').forEach(b=>b.addEventListener('click',()=>{setting.mode=b.dataset.m;commit();}));
  $('.tv-search').addEventListener('input',filter);
  $('.tv-close').addEventListener('click',()=>$('.tv-drawer').classList.remove('open'));
- api('learning_activity',{range:'year'}).then(records=>{if(!live||live.root!==root)return;const all=activityCells(Array.isArray(records)?records:[]);let from=Math.max(0,all.length-26*7);while(from>0&&all[from].weekday!==0)from--;const cells=all.slice(from),active=cells.filter(c=>c.level).length;$('.tv-heat').innerHTML=cells.map((c,i)=>`<i style="grid-row:${c.weekday+1};grid-column:${Math.floor(i/7)+1}" class="${i===cells.length-1?'today':c.level?'l'+Math.min(3,c.level):''}" title="${esc(c.day)} · ${Math.round((c.seconds||0)/60)} ${w.min}"></i>`).join('');$('.tv-heatlink').textContent=`${w.activity} · ${active} ${w.days} →`;let run=0,best=0;for(const c of cells){run=c.level?run+1:0;best=Math.max(best,run);}const secs=cells.reduce((a,c)=>a+(c.seconds||0),0);$('.tv-heatsum').innerHTML=`<span><b>${active}</b>${w.days}</span><span><b>${esc(duration(secs))}</b>${w.total}</span><span><b>${best}</b>${w.streak}</span>`;}).catch(()=>{});
+ api('daily_view',{}).then(v=>{if(!live||live.root!==root)return;const n=v?.news?.items?.[0],h=v?.words?.words?.[0],t=$('.tv-daily-t');if(n){t.textContent=n.title;t.title=n.title+(n.source?' · '+n.source:'');}else if(h){t.textContent=h.term+(h.gloss?' · '+h.gloss:'');}}).catch(()=>{});
+ api('learning_activity',{range:'year'}).then(records=>{if(!live||live.root!==root)return;const all=activityCells(Array.isArray(records)?records:[]);let from=Math.max(0,all.length-20*7);while(from>0&&all[from].weekday!==0)from--;const cells=all.slice(from),active=cells.filter(c=>c.level).length;$('.tv-heat').innerHTML=cells.map((c,i)=>`<i style="grid-row:${c.weekday+1};grid-column:${Math.floor(i/7)+1}" class="${i===cells.length-1?'today':c.level?'l'+Math.min(3,c.level):''}" title="${esc(c.day)} · ${Math.round((c.seconds||0)/60)} ${w.min}"></i>`).join('');$('.tv-heatlink').textContent=`${w.activity} · ${active} ${w.days} →`;let run=0,best=0;for(const c of cells){run=c.level?run+1:0;best=Math.max(best,run);}const secs=cells.reduce((a,c)=>a+(c.seconds||0),0);$('.tv-heatsum').innerHTML=`<span><b>${active}</b>${w.days}</span><span><b>${esc(duration(secs))}</b>${w.total}</span><span><b>${best}</b>${w.streak}</span>`;}).catch(()=>{});
  const canvas=$('.tv-canvas'),planes=[...root.querySelectorAll('.tv-plane')],reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
  live.move=e=>{if(reduced)return;const r=root.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;canvas.style.transform=`rotateY(${x*6}deg) rotateX(${-y*5}deg)`;planes.forEach(p=>p.style.transform=`translate3d(${-x*p.dataset.z*.25}px,${-y*p.dataset.z*.2}px,${p.dataset.z}px)`);};
  root.addEventListener('mousemove',live.move);
