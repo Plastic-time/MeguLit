@@ -121,3 +121,9 @@ test('naninovel reader: Japanese and Chinese meet by source line, an untranslate
  const zh={script:true,name:'k.nani',src:'zh-tw',dst:'zh-cn',text:'',entries:[E('K: 「一」','「一简」'),E('K: 「二」','「二简」'),E('K: 「三」','「三简」'),E('K: 「四」','')]};
  const docs=n._internal.combine([ja,zh]);const p=n.parse(Buffer.from(docs[0].text));
  assert.deepEqual(p.lines,['「いち」','「さん」','「よん」']);assert.deepEqual(p.zh,['「一简」','「三简」','「四」']);});
+test('xp3 encrypted name tables (dls:, Riddle yuz:): a table under a known YuzKey is opened, a plain one stays plain',()=>{const y=require('../services/original-engines/yuz-names.cjs'),zlib=require('node:zlib');
+ const plain=zlib.deflateSync(Buffer.from('hnfn'.repeat(200),'latin1')),schemes=require('../services/original-engines/cx-schemes.json').schemes.filter(s=>s.yuz);assert.equal(schemes.length,5);
+ const nanaKey=schemes.find(s=>s.type==='NanaCxCrypt'),riddle=schemes.find(s=>s.type==='RiddleCxCrypt'),cbBuf=Buffer.from(riddle.cb,'base64'),cb=Array.from({length:cbBuf.length>>2},(_,i)=>cbBuf.readUInt32LE(i*4));
+ const n=y.nana(nanaKey.yuz,Buffer.from(plain));assert.notDeepEqual(n,plain);assert.deepEqual(y.inflateNames(n,'dls:'),zlib.inflateSync(plain));
+ const r=y.yuzc(cb,riddle.yuz,Buffer.from(plain));assert.notDeepEqual(r,plain);assert.deepEqual(y.inflateNames(r,'yuz:'),zlib.inflateSync(plain));
+ assert.deepEqual(y.inflateNames(plain,'sen:'),zlib.inflateSync(plain));assert.equal(y.inflateNames(Buffer.from('nope'),'dls:'),null);});

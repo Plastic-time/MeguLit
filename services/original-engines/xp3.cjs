@@ -32,9 +32,9 @@ function list(file){
   return {files};
  }finally{fs.closeSync(fd);}
 }
-function yuzNames(fd,index){const c=chunks(index,0,index.length).find(c=>/^(?:sen|yuz|cbg):$/.test(c.tag));if(!c||c.end-c.start<16)return null;
+function yuzNames(fd,index){const c=chunks(index,0,index.length).find(c=>/^(?:sen|yuz|cbg|dls):$/.test(c.tag));if(!c||c.end-c.start<16)return null;
  try{const offset=Number(index.readBigUInt64LE(c.start)),size=index.readUInt32LE(c.start+12);if(!offset||size<=0||size>(64<<20))return null;
-  const raw=Buffer.alloc(size);fs.readSync(fd,raw,0,size,offset);const t=zlib.inflateSync(raw),md5=new Map(),hash=new Map(),crypto=require('node:crypto');
+  const raw=Buffer.alloc(size);fs.readSync(fd,raw,0,size,offset);const t=require('./yuz-names.cjs').inflateNames(raw,c.tag);if(!t)return null;const md5=new Map(),hash=new Map(),crypto=require('node:crypto');
   for(let p=0;p+12<=t.length;){const sz=Number(t.readBigInt64LE(p+4));if(sz<0)break;const at=p+12;p=at+sz;if(at+6>t.length)break;const h=t.readUInt32LE(at),n=t.readInt16LE(at+4);
    if(n>0&&at+6+n*2<=t.length){const name=t.toString('utf16le',at+6,at+6+n*2);if(!hash.has(h))hash.set(h,name);md5.set(crypto.createHash('md5').update(Buffer.from(name.toLowerCase(),'utf16le')).digest('hex'),name);}}
   return md5.size?{md5,hash}:null;}catch{return null;}}
