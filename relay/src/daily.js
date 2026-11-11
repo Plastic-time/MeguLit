@@ -56,7 +56,9 @@ export function parseNews(xml,feed){
 const KANA=/^[ぁ-ゟ゠-ヿー・\s]+$/;
 export function parseTrends(xml){
  return items(xml).map(it=>{const term=text(tag(it,'title')).slice(0,40),news=tag(it,'ht:news_item');
-  return {term,reading:KANA.test(term)?term:'',traffic:text(tag(it,'ht:approx_traffic')).slice(0,12),headline:text(tag(news,'ht:news_item_title')).slice(0,160),url:safeUrl(tag(news,'ht:news_item_url')),source:text(tag(news,'ht:news_item_source')).slice(0,40)};})
+  /* every related headline (up to 3): the AI note reads who someone is from them instead of guessing */
+  const context=[...it.matchAll(/<ht:news_item_title>([\s\S]*?)<\/ht:news_item_title>/g)].map(m=>text(m[1]).slice(0,120)).filter(Boolean).slice(0,3);
+  return {term,context,reading:KANA.test(term)?term:'',traffic:text(tag(it,'ht:approx_traffic')).slice(0,12),headline:text(tag(news,'ht:news_item_title')).slice(0,160),url:safeUrl(tag(news,'ht:news_item_url')),source:text(tag(news,'ht:news_item_source')).slice(0,40)};})
   .filter(w=>w.term&&/[぀-ヿ一-鿿]/.test(w.term));
 }
 /* NHK fallback: terms in 「」 from today's headlines (names of laws, events, catchphrases) */
@@ -169,7 +171,7 @@ export const GLOSS_MODEL='@cf/qwen/qwen3-30b-a3b-fp8',GLOSS_FALLBACK='@cf/qwen/q
 /* E415 (user: 「ゴリ = 网红」 reads as if the word meant 网红): every note says what kind of thing the word is.
    type: 词语 (an ordinary word: note = its meaning) or 人名 / 组织 / 作品 / 地名 / 商品 / 事件 (a proper noun: note =
    who or what it is, never the name itself). The page shows the type as a small tag beside the note. */
-export const GLOSS_PROMPT='你是给中国读者看的日语词汇注释员。对每个日语词，结合给出的新闻标题，先判断类型，再写不超过16个字的简体中文说明。类型只能是：词语、人名、组织、作品、地名、商品、事件。词语：说明写中文词义（例：上場廃止→退市）。人名：说明写这个人是谁，国籍或领域加身份（例：ゴリ→日本网红（YouTuber），岡本和真→日本职业棒球选手），绝对不能只写名字本身或它的中文写法。组织、作品、地名、商品、事件：说明写它是什么（例：海ほたる→东京湾跨海公路的休息站）。必须全部使用简体中文，不能出现日文假名。只输出 JSON 数组，顺序与输入一致，每项形如 {"type":"人名","note":"日本网红（YouTuber）"}，不要输出其他内容。';
+export const GLOSS_PROMPT='你是给中国读者看的日语词汇注释员。对每个日语词，结合给出的新闻标题，先判断类型，再写不超过16个字的简体中文说明。类型只能是：词语、人名、组织、作品、地名、商品、事件。词语：说明写中文词义（例：上場廃止→退市）。人名：说明写这个人是谁，国籍或领域加身份（例：ゴリ→日本网红（YouTuber），岡本和真→日本职业棒球选手），绝对不能只写名字本身或它的中文写法。组织、作品、地名、商品、事件：说明写它是什么（例：海ほたる→东京湾跨海公路的休息站）。身份和类型以给出的新闻标题为准（标题写「経済評論家の○○氏」就写经济评论家）；标题里没有线索又不确定时，人名只写「日本人物」，不要猜职业。必须全部使用简体中文，不能出现日文假名。只输出 JSON 数组，顺序与输入一致，每项形如 {"type":"人名","note":"日本网红（YouTuber）"}，不要输出其他内容。';
 export const GLOSS_RETRY='上一次的说明只重复了名字，没有说明是什么。请重新判断类型并写说明：人名写国籍或领域加身份（例：日本职业棒球选手、日本女演员、日本网红（YouTuber）），其他专有名词写它是什么。绝对不能只写名字本身、它的中文写法或音译。必须用简体中文。只输出 JSON 数组，每项形如 {"type":"人名","note":"日本职业棒球选手"}。';
 const KINDS={'词语':'word','普通词':'word','词汇':'word','人名':'person','人物':'person','组织':'org','团体':'org','公司':'org','企业':'org','作品':'work','地名':'place','地点':'place','设施':'place','商品':'product','产品':'product','事件':'event'};
 export const KIND_IDS=['word','person','org','work','place','product','event'];
@@ -202,7 +204,7 @@ export function repeatsTerm(term,note,kind=''){
  return false;
 }
 async function askNotes(env,model,prompt,words){
- const input=words.map((w,i)=>`${i+1}. ${w.term}${w.headline?' ｜ '+w.headline.slice(0,80):''}`).join('\n');
+ const input=words.map((w,i)=>{const ctx=(w.context?.length?w.context:[w.headline]).filter(Boolean).map(h=>h.slice(0,120)).join(' ／ ');return `${i+1}. ${w.term}${ctx?'\n   新闻：'+ctx:''}`;}).join('\n');
  const out=await env.AI.run(model,{messages:[{role:'system',content:prompt+' /no_think'},{role:'user',content:input}],max_tokens:1400,temperature:0.2});
  /* Workers AI answers as {response} (Llama), {response:[…]} (Qwen 3 JSON mode) or OpenAI-style {choices:[{message:{content}}]} */
  const raw=out?.response??out?.result?.response??out?.choices?.[0]?.message?.content??out?.result?.choices?.[0]?.message?.content??'';

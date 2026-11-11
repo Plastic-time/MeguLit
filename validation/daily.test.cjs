@@ -263,3 +263,13 @@ test('hot-word notes by type: proper nouns say who or what, names restated are r
  assert.match(html,/<small class="dl-gloss"><b class="dl-kind" data-kind="person">人名<\/b>日本网红（YouTuber）<\/small>/);
  assert.match(html,/<dd>人名，日本网红（YouTuber）<em>/);assert.match(html,/<small class="dl-gloss"><b class="dl-kind" data-kind="person">人名<\/b><\/small>/);
 });
+
+test('hot-word notes read every related headline as context',async()=>{
+ const d=await load('daily.js');
+ const xml='<rss><item><title>豊島逸夫</title><ht:news_item><ht:news_item_title>経済評論家の豊島逸夫氏が金価格を解説</ht:news_item_title></ht:news_item><ht:news_item><ht:news_item_title>金相場、最高値更新</ht:news_item_title></ht:news_item></item></rss>';
+ const w=d.parseTrends(xml);assert.deepEqual(w[0].context,['経済評論家の豊島逸夫氏が金価格を解説','金相場、最高値更新']);
+ let prompt='',user='';const AI={run:async(m,input)=>{prompt=input.messages[0].content;user=input.messages[1].content;return {response:[{type:'人名',note:'日本经济评论家'}]};}};
+ const e={DB:d1(),AI};const real=globalThis.fetch;globalThis.fetch=async u=>u.startsWith('https://trends.google.com')?{ok:true,text:async()=>xml}:{ok:false,text:async()=>''};
+ try{const r=await d.hotWordsDailyGet(e,new URL('https://x/api/hotwords/daily'),{json:v=>v,fail:c=>c},new Date('2026-11-11T00:10:00Z'));assert.equal(r.words[0].gloss,'日本经济评论家');}finally{globalThis.fetch=real;}
+ assert.match(user,/経済評論家の豊島逸夫氏が金価格を解説 ／ 金相場、最高値更新/);assert.match(prompt,/以给出的新闻标题为准/);
+});

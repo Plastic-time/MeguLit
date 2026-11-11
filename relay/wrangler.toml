@@ -26,6 +26,7 @@ REPORT_THRESHOLD = "3"
 NEWS_FULLTEXT_SOURCES = ""
 # E415 one-line Chinese notes for the daily hot words (falls back to @cf/qwen/qwen3.8-27b)
 DAILY_GLOSS_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+# to compare: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b" (slower, thinks first) or "@cf/qwen/qwq-32b"
 
 # Workers AI: avatar moderation and the AI guesses on the hot-word awards. No token needed inside the Worker.
 [ai]
