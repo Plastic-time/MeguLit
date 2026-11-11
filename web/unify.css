@@ -199,3 +199,95 @@ html body .main .record .word-source .link-button{text-decoration:none!important
 html body .main .record .word-source .link-button:hover{color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 2px 0 0 var(--g-gold)}
 html body .main :is(.record,.word-actions) .icon-button{border-radius:2px!important;background:transparent!important;box-shadow:inset 0 0 0 1px var(--u-line)!important}
 html body .main :is(.record,.word-actions) .icon-button:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--u-red) 70%,transparent)!important;color:#e8a0a8!important}
+
+/* ---- learning statistics: one quiet range switch (hairline, gold underline), wine heat instead of signal red,
+   a gold diamond instead of the red square, square calendar cells ---- */
+html body .stg .stg-rs{gap:0;padding:0;border:0!important;border-radius:2px!important;background:rgba(10,9,12,.42)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important}
+html body .stg .stg-rs button{height:24px;border-radius:0!important;background:none!important;color:var(--g-t3,#a08a80)!important;font-size:12px}
+html body .stg .stg-rs button[aria-pressed=true]{background:color-mix(in srgb,var(--g-gold) 10%,transparent)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 var(--g-gold)}
+html body .stg .stg-cal{--accent:#9b2a3a}
+html body .stg .stg-cal .cell{border-radius:2px}
+html body .stg .stg-cal .cell.blank{border-style:solid;border-color:rgba(255,255,255,.04)}
+html body .stg .stg-head h2::before{width:5px;height:5px;background:var(--g-gold);transform:rotate(45deg);margin-right:12px}
+html body .stg .stg-tabs button[aria-pressed=true]::after{background:#c82f3b}
+html body .stg :is(.stg-foot,.stg-legend,.stg-note,.stg-more,.stg-cal .wd){font-size:12px!important;color:var(--g-t2,#c3ab9c)!important}
+/* read words: the hud on the glass, the status as a note, readable small print */
+html body .ri-hud{background:var(--u-glass)!important;border-top:0!important;box-shadow:inset 0 0 0 1px var(--u-line),inset 0 2px 0 var(--u-red)!important;border-radius:2px;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+html body .ri-hud-stats{font-size:11.5px!important;letter-spacing:.1em!important;color:var(--g-t2,#c3ab9c)!important}
+html body .ri-status{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:2px;background:color-mix(in srgb,var(--g-gold) 7%,transparent);box-shadow:inset 2px 0 0 var(--g-gold);font-size:12.5px!important;letter-spacing:.06em!important;color:var(--g-t1,#f1e0d2)!important}
+html body :is(.ri-help,.ri-sub,.ri-meta,.ri-level-sub,.ri-legend){font-size:12px!important;color:var(--g-t2,#c3ab9c)!important}
+html body .ri-level{box-shadow:inset 0 0 0 1px var(--u-line)!important}
+/* empty states: the star-seal primary and a hairline secondary, readable steps, the card sits in the visual centre */
+html body .g-blank{margin:clamp(28px,8vh,96px) auto 28px!important}
+html body .g-blank .acts button.go{height:44px;padding:0 22px;border:0;border-radius:10px;color:#fbeedd;letter-spacing:.08em;font-weight:600;text-shadow:0 0 10px rgba(255,170,120,.35);
+ background:radial-gradient(1.2px 1.2px at 78% 28%,rgba(255,226,180,.9),transparent 70%),radial-gradient(120% 140% at 0% 50%,rgba(196,40,58,.55),transparent 62%),linear-gradient(135deg,#3a1720 0%,#2a1219 45%,#1d1016 100%)!important;
+ box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold-accent,#edb56e) 42%,transparent),inset 0 0 0 3px rgba(20,10,12,.55),inset 0 0 0 4px color-mix(in srgb,var(--gold-accent,#edb56e) 14%,transparent),0 6px 18px -6px rgba(150,20,40,.55)!important}
+html body .g-blank .acts button.go:hover{filter:brightness(1.15)}
+html body .g-blank .acts button.alt{height:44px;padding:0 20px;border:0;border-radius:2px;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important;color:var(--g-t1,#f1e0d2)}
+html body .g-blank .steps div{font-size:12.5px!important;color:var(--g-t2,#c3ab9c)!important;line-height:1.6}
+html body .g-blank .steps b{display:block;margin-bottom:2px;font-size:13.5px;color:var(--g-t1,#f1e0d2)}
+html body .g-blank .lede{font-size:13.5px!important}
+html body .g-blank .glyph{right:18px!important;bottom:-24px!important;font-size:200px!important;color:color-mix(in srgb,var(--g-gold) 7%,transparent)!important}
+/* dictionary at rest: a quiet watermark instead of an empty field */
+html body #lookup-results:empty{position:relative;min-height:46vh}
+html body #lookup-results:empty::before{content:"辞";position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);font:400 min(34vh,300px)/1 var(--g-serif-ja,serif);color:transparent;-webkit-text-stroke:1px color-mix(in srgb,var(--g-t1,#f1e0d2) 14%,transparent);pointer-events:none}
+html body .main .lookup-form input{border-radius:2px!important}
+html body .main :is(.lookup-form,.moji-account) button:not(.primary){border-radius:2px!important}
+html body .main :is(.lookup-chips,.lookup-recent) :is(button,a){border-radius:2px!important}
+/* lining figures survive any later font-variant-numeric:tabular-nums (a separate property) */
+html,body,dialog{font-feature-settings:"lnum" 1}
+html body .g-dict-chips :is(button,a,span[role=button]){border-radius:2px!important}
+html body .main .lookup-form .secondary{border-radius:2px!important;height:44px}
+html body .main .lookup-form input{border-color:var(--u-line-2)!important}
+html body .main .lookup-form input:focus{border-color:color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+
+/* ---- home: the activity card hides the canvas line behind it, heat cells lean to the brand wine (still tinted by the
+   cover), today's cell stays inside the grid, outside pictures are toned down until hovered, figures get a halo ---- */
+html body .tv-heat-card .tv-face{background:color-mix(in srgb,var(--bg) 82%,transparent)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+html body .tv-heat i.l2{background:color-mix(in srgb,var(--tv-b) 35%,#8f2534)!important}
+html body .tv-heat i.l3{background:color-mix(in srgb,var(--tv-a) 35%,#c8323c)!important}
+html body .tv-heat i.today{outline:0!important;box-shadow:inset 0 0 0 1px var(--g-gold);background:color-mix(in srgb,var(--g-gold) 70%,transparent)!important}
+html body .tv-daily-pic{filter:saturate(.35) brightness(.78) contrast(1.05);transition:filter .3s,border-color .2s}
+html body .tv-daily-pic:hover{filter:none}
+html body .tv-fig b{text-shadow:0 0 18px rgba(8,6,9,.9),0 0 3px rgba(8,6,9,.9)}
+html body .tv-fig small,html body .tv-heatsum{font-size:11.5px!important;color:var(--g-t2,#c3ab9c)!important}
+
+/* ---- library: the toolbar is one glass bar (2px corners, hairline) — at the top in the list, at the foot of the wall
+   so it never sits on a row of titles; the list's head band is clear glass with a hairline; captions fade at the edge,
+   meta a step larger and brighter, status dots in the brand palette ---- */
+html body .main .field-search{border-radius:2px!important;border:0!important;background:linear-gradient(160deg,rgba(28,22,26,.94),rgba(16,13,17,.94))!important;box-shadow:inset 0 0 0 1px var(--u-line-2),0 18px 40px -16px #000!important;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+html body .main .field-search .icon-button{border-radius:2px!important}
+html body .main .field-search input{border-radius:2px!important}
+html body .main:not(.field-list)>.field-search{top:auto!important;bottom:28px!important;transform:translateX(-50%)!important}
+html body .lib-list:not(.lib-selecting)::before{background:none!important;border-bottom-color:var(--u-line)!important}
+html body .main .game-caption.mq-box{-webkit-mask:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent);mask:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent)}
+html body .lib-list .game-caption{height:auto!important;min-height:0!important;padding:12px 2px 4px!important;font-size:13px!important}
+html body .lib-list .library-card-meta{gap:6px!important;padding:4px 2px 0!important;font-size:12px!important;color:var(--g-t2,#c3ab9c)!important}
+html body .lib-list .library-card-meta *{font-size:12px!important;color:inherit}
+html body .hook-support.supported::before{background:var(--g-gold)!important}
+html body .hook-support::before{border-radius:1px!important;transform:rotate(45deg)}
+html body .main .cover-frame{border-radius:2px!important}
+html body .main .cover-frame img.cover{border-radius:2px!important}
+html body .main.field-page:not(.field-list)>.field-search{bottom:18px!important}
+html body .main.field-page:not(.field-list)::after{content:"";position:fixed;left:0;right:0;bottom:0;height:120px;z-index:3;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(9,7,10,.88) 70%)}
+
+/* ---- history: fixed metric columns (they no longer drift with the digits), readable labels, the 史 watermark stays
+   behind the rows, the font link keeps clear of the frame ---- */
+html body .main:has(>.history-backdrop) .history-metrics{grid-template-columns:repeat(3,clamp(96px,8.6vw,140px))!important}
+html body .main:has(>.history-backdrop) .history-metrics>div{padding:0 0 0 clamp(14px,1.4vw,22px)!important}
+html body .main:has(>.history-backdrop) .history-metrics>div:first-child{border-left:1px solid rgba(255,255,255,.08)!important;padding-left:clamp(14px,1.4vw,22px)!important}
+html body .main:has(>.history-backdrop) .history-metrics dt{font-size:11px!important;letter-spacing:.16em!important;color:var(--g-t2,#c3ab9c)!important}
+html body .workspace>.stage-cover[data-kind~=history-backdrop] .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1) 7%,transparent)}
+html body .main:has(>.history-backdrop) :is(.history-session,.history-dialogue){background:linear-gradient(160deg,rgba(24,22,28,.84),rgba(14,13,17,.78))!important}
+html body .main:has(>.history-backdrop) :is(.dialogue-translation.is-missing,.history-dialogue .retry,.history-dialogue [data-retry]){font-size:12px!important;letter-spacing:.08em!important}
+
+/* ---- detail: every panel has the same inner padding (titles no longer touch the frame or the gold tick), the two
+   columns start on one line, an unavailable rating reads as a quiet empty state ---- */
+html body .main:has(>.dtv-bg) .game-detail-content .panel{padding:clamp(20px,1.8vw,28px)!important;box-sizing:border-box}
+html body .main:has(>.dtv-bg) .game-detail-content details.panel.detail-technical>summary{padding:0 0 12px!important}
+html body .main:has(>.dtv-bg) .detail-aside{padding-top:0!important}
+html body .main:has(>.dtv-bg) .review-platform.is-unavailable{opacity:.62}
+html body .main:has(>.dtv-bg) .review-platform :is(small,.review-region,.review-state){font-size:11.5px!important}
+html body .main:has(>.dtv-bg) .detail-info-row :is(dt,span:first-child,small){font-size:11.5px!important;letter-spacing:.14em!important;color:var(--g-t2,#c3ab9c)!important}
+.main:has(>.tabs)>.page-header{top:0!important;height:44px;display:flex!important;align-items:center}
+html body .workspace>.stage-cover:not([data-stage=leaderboard]) .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 9%,transparent)}
