@@ -25,3 +25,4 @@ This is an inventory, not a claim that the complete project's license audit is f
 No existing third-party license was deleted from the preservation checkpoint.
 
 E194: pip 26.3 (MIT), verified official PyPI wheel bundled under runtime/wheels; SHA256 f3b60b20ffaadd4415ed7957212a38ac63fa4c5fa375bd0f4a797777940fad13. Its license is included inside the wheel. No system Python installation is modified.
+- siglus-ssu (Jirehlov, https://pypi.org/project/siglus-ssu/, Unlicense OR 0BSD): SiglusEngine Scene.pck original-source decoding (source_angou constants, tile scramble, MD5 variant, LZSS) reimplemented in JavaScript in services/original-engines/siglus-source.cjs for game voices (E450); no siglus-ssu code or binaries bundled.

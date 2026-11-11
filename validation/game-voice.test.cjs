@@ -67,3 +67,7 @@ test('voice-cold: a game the player has open is not started again',async()=>{
  const finished=new Promise(r=>{const off=vc.onDone((job,result)=>{off();r(result);});});
  vc.consider(root,{executable:exe,dir,engine:'kirikiri'},['x1']);assert.equal(await finished,'running');assert.equal(started,0);assert.ok(fs.existsSync(path.join(out,'want.txt')),'the DLL in the open game reads the names');
  Object.assign(hook,saved);vc.consider.anyPlatform=false;});
+test('siglus: KOE calls go with the next message, branches give one line several voices, wrapped @mes is found',()=>{const s=require('../services/original-engines/siglus-source.cjs');
+ const src=['@KOE(000100000,008)','@mes(16000020,【美佐枝】,「おのれはっ…」)@RET','@mes(16000030, ,怒りに任せて。)@RET','if(a){','@KOE(100600060,000)','}else{','@KOE(100600080,000)','}','		@SIZE(20)@mes(00060630,【杏】,（勝てば官軍）)@SIZE@RET','//@KOE(1,0)','「地の文の台詞」'].join('\n');
+ assert.deepEqual(s.voiced(src),[{text:'「おのれはっ…」',koe:100000},{text:'怒りに任せて。',koe:null},{text:'（勝てば官軍）',koe:100600060},{text:'（勝てば官軍）',koe:100600080},{text:'「地の文の台詞」',koe:null}]);
+ assert.equal(s._internal.smd5(Buffer.from('abc')).toString('hex'),'900150983cd24fb0d6963f7d28e17f72');});

@@ -73,6 +73,9 @@ function scan(root,dir,{engine,scenes}={}){const sc=require('./original-engines/
  for(const s of list){const v=s.voices||[];for(let i=0;i<(s.lines||[]).length;i++){total++;if(!v[i])continue;voiced++;if(!cat.get(v[i])){if(!/^koe:/.test(v[i]))missing.add(v[i]);continue;}found++;const k=keyOf(s.lines[i]);if(!k)continue;if(!data.lines[k])data.lines[k]=[g,v[i]];
   /* a speech spread over several script lines (an open 「 closed later) is shown as one: key the whole of it too */
   let whole=s.lines[i];for(let j=i+1;j<s.lines.length&&j<i+8&&!v[j]&&/^[「『]/.test(whole)&&!/[」』]$/.test(whole);j++)whole+=s.lines[j];if(whole!==s.lines[i]){const kw=keyOf(whole);if(kw&&!data.lines[kw])data.lines[kw]=[g,v[i]];}}}
+ /* engines whose voices are numbered in a separate source (Siglus Scene.pck) give text and voice pairs directly */
+ let extra=[];try{extra=sc.ENGINES[id]?.voiceLines?.(dir)||[];}catch{}
+ for(const x of extra){voiced++;if(!cat.get(x.ref)){missing.add(x.ref);continue;}found++;const k=keyOf(x.text);if(k&&!data.lines[k])data.lines[k]=[g,x.ref];}
  data.games[g]={...data.games[g],dir:path.resolve(dir),engine:id,scanned:Date.now(),lines:total,voiced,found,missing:missing.size};save(root);return {engine:id,lines:total,voiced,found,missing:[...missing]};}
 // A game folder as the player picks it: the game may sit one or two folders down (an unpacked release).
 function gameDir(dir,depth=2){const sc=require('./original-engines/scenes.cjs');let id=null;try{id=sc.detect(dir);}catch{}if(id)return {dir,engine:id};if(depth<=0)return null;

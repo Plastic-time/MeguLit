@@ -194,6 +194,8 @@ const siglus={
  scenes(dir){const d=siglusDat(dir);if(!d)return [];return fs.readdirSync(d).filter(DBS).sort().map(f=>({name:f,read:()=>fs.readFileSync(path.join(d,f))}));},
  archives:()=>[],sources:dir=>{const d=siglusDat(dir);return d?fs.readdirSync(d).filter(DBS).map(f=>path.join(d,f)):[];},
  parse:parseDbs,test:DBS,
+ // E450 voices: the release's Scene.pck keeps its original sources, where a KOE call comes before each spoken line
+ voiceLines:dir=>require('./siglus-source.cjs').voiceLines(dir),
  patchLines(base,found){
   const dirs=[...new Set(found.dirs.flatMap(d=>[d,path.join(d,'.megulit-japanese','dat'),path.join(d,'dat')]))];let any=false;
   const list=base.map(scene=>{const stem=scene.name.replace(/\.dbs$/i,'');
