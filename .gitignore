@@ -56,3 +56,4 @@ ENGINE-ADAPTATION-NOTES.md
 preserved/ENGINE-ADAPTATION-NOTES.md
 .impeccable/
 .claude/
+web/preview/*.local.js

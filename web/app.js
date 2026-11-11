@@ -8,6 +8,7 @@ import {mountStatistics} from './statistics-grimoire.js';
 import {mountHistoryTranslations} from './history-translation.js';
 import {updateHomeOverview,createHomeRefresh} from './home-refresh.js';
 import {recentGames} from './home-library.js';
+import {renderHomeTV,homeTVSignature} from './home-tv.js';
 import {historyHTML} from './history-view.js';
 import {readTime} from './read-time.js';
 import {createSeriesLibrary} from './series-library.js';
@@ -229,47 +230,15 @@ function card(game,library=false){
  return `<div class="${library?'library-card':''}"><button class="game-card" data-game="${esc(game.id)}" aria-label="${esc(game.title)}"><span class="cover-frame">${cover(game)}${library?`<span class="game-hover"><strong>${esc(game.title)}</strong>${game.engine?`<span>${copy.engine} · ${esc(game.engine)}</span>`:''}<span>${copy.last} · ${relativeTime(game.lastPlayedAt)}</span><span>${copy.reading} · ${duration(game.readingSeconds)}</span><span>${copy.words} · ${number(game.learnedWords||0)}</span><small>${copy.details} →</small></span>`:''}</span><span class="game-caption mq-box"><span class="mq">${esc(game.title)}</span></span>${library?`<span class="library-card-meta"><span class="hook-support ${embed.kind==='verified'||embed.kind==='supported'?'supported':embed.kind==='unsupported'?'unsupported':'pending'}" title="${esc(embed.tooltip)}">${game.available?hook:({zh:"游戏已删除或移动",ja:"削除または移動済み",en:"Game deleted or moved"})[locale]}</span><span class="library-card-numbers"><span title="${copy.reading}">${icon('clock')}${duration(game.readingSeconds)}</span><span title="${copy.words}">${icon('word')}${number(game.learnedWords||0)}</span></span></span>`:''}</button></div>`;
 }
 
-let stopShelf=()=>{};
+let stopShelf=()=>{},homeSignature='';
 function home(){
-  const main=document.querySelector('#main'),hour=new Date().getHours(),w=grimoireWords[locale]||grimoireWords.zh;
-  const scroll=main.scrollTop;
-  const greeting=(hour>=5&&hour<12?text.morning:hour>=12&&hour<18?text.afternoon:text.evening).split(/[，,、]/)[0];
-  const available=model.games.filter(game=>game.available!==false),played=recentGames(available),game=played[0];
-  // The shelf fills the window: recently played first, then the rest of the library by last play time.
-  const recent=[...played,...available.filter(g=>!played.includes(g)).sort((a,b)=>(b.lastLaunchedAt||b.lastPlayedAt||0)-(a.lastLaunchedAt||a.lastPlayedAt||0))].slice(0,16);
-  const date=new Date().toLocaleDateString(locales[locale],{month:'long',day:'numeric',weekday:'long'});
-  const greet=`<p class="greet"><b class="greet-hello">${esc(greeting)}${model.preferences.username?`${locale==='en'?', ':locale==='ja'?'、':'，'}<span class="greet-name">${esc(model.preferences.username)}</span>`:''}</b><span class="greet-date">${esc(date)}</span></p>`;
-  const parts=seconds=>{const m=Math.floor((seconds||0)/60);return m>=60?[number(Math.floor(m/60)),`${w.hour} ${m%60} ${w.min}`]:[number(m),w.min];};
-  const [rn,ru]=parts(model.stats.readingSeconds);
-  const today=`<aside class="today" aria-label="${w.today}">${greet}<div class="today-head">${w.today}</div>
-    <button class="fig" data-stats><span class="fig-value">${rn}<small>${ru}</small></span><span class="fig-label">${w.read}</span></button>
-    <button class="fig" id="view-words"><span class="fig-value">${number(model.stats.words)}<small>${w.unitWord}</small></span><span class="fig-label">${w.words}</span></button>
-    <button class="fig" data-stats><span class="fig-value">${number(model.stats.lookups)}<small>${w.unitTimes}</small></span><span class="fig-label">${w.lookups}</span></button>
-    <button class="g-link" id="view-statistics">${w.full}${icon('arrow')}</button></aside>`;
-  let hero;
-  if(game){const embed=embedStatus(game,locale),kind=embed.kind==='verified'||embed.kind==='supported'?'ok':embed.kind==='unsupported'||embed.kind==='readonly'?'bad':'wait',[gn,gu]=parts(game.readingSeconds);
-   hero=`<section class="g-hero" data-hero="${esc(game.id)}"><div class="jacket">${cover(game,'jacket-img')}<span class="ribbon" aria-hidden="true"></span></div>
-    <div class="hero-copy"><p class="kicker">${w.kicker}</p><div role="heading" aria-level="1" class="hero-title" title="${esc(game.title)}">${esc(game.title)}</div>
-     <div class="hero-meta"><span>${relativeTime(game.lastPlayedAt)}</span>${game.engine?`<span>${esc(game.engine)}</span>`:''}<span title="${esc(embed.tooltip)}"><i class="status-dot ${kind}"></i>${esc(embed.label)}</span></div>
-     <div class="hero-figs"><div><b>${gn}<small>${gu}</small></b><span>${w.total}</span></div><div><b>${number(game.characters||0)}</b><span>${w.chars}</span></div><div><b>${number(game.learnedWords||0)}</b><span>${w.linked}</span></div></div>
-     <div class="hero-actions"><button class="g-btn primary" data-launch="${esc(game.id)}">${icon('play')}${text.continue}</button><button class="g-btn quiet" data-game="${esc(game.id)}">${text.detail}</button></div></div>${today}</section>`;}
-  else hero=`<section class="g-hero empty"><div class="hero-copy"><div role="heading" aria-level="1" class="hero-title">${w.empty}</div><div class="hero-meta">${w.emptySub}</div><div class="hero-actions">${model.games.length?'':`<button class="g-btn primary" id="home-add">${icon('plus')}${text.addGame}</button>`}</div></div>${today}</section>`;
-  const shelf=recent.map(g=>`<div class="book"><div class="jk"><button class="cover-btn" data-game="${esc(g.id)}" title="${esc(g.title)}">${cover(g,'book-img')}</button></div><span class="mq-box"><span class="mq">${esc(g.title)}</span></span><span class="sub">${relativeTime(g.lastPlayedAt)}</span></div>`).join('');
-  const markup=`<div class="home-overview grimoire-home">${hero}
-   <section class="home-library-section"><div class="g-head"><h2>${w.recent}</h2><button class="g-link" id="view-library">${w.all}${icon('arrow')}</button></div>${recent.length?`<div class="shelf">${shelf}</div>`:''}</section></div><div id="home-activity"></div>`;
-  const changed=updateHomeOverview(main,markup);
-  refreshHomeActivity().catch(()=>{});
-  paintGlow(game?.cover||'');
-  if(!changed)return;
-  main.querySelector('#view-library')?.addEventListener('click',()=>navigate('library'));
-  main.querySelector('#home-add')?.addEventListener('click',()=>editGame());
+  const main=document.querySelector('#main'),hour=new Date().getHours();
+  const greeting=(hour>=5&&hour<12?text.morning:hour>=12&&hour<18?text.afternoon:text.evening).split(/[，,、]/)[0]+(model.preferences.username?`${locale==='en'?', ':locale==='ja'?'、':'，'}${model.preferences.username}`:'');
+  const signature=homeTVSignature(model)+locale+greeting;
+  if(main.querySelector('.tv-home')&&signature===homeSignature)return;
+  homeSignature=signature;stopShelf();stopShelf=()=>{};
+  renderHomeTV(main,{model,api,locale,esc,icon,number,duration,relativeTime,greeting,navigate,onLaunch:(id,button)=>startGame(id,button),onDetail:id=>gameDetail(id),onAdd:()=>editGame(),onGame:g=>paintGlow(g.cover||''),savePreferences:values=>api('save_preferences',{values}).catch(error=>toast(errorMessage(error)))});
   maybeFirstRun({gamesCount:model.games.length,api,invoke,locale,esc,toast,onDone:()=>renderRoute()});
-  main.querySelector('#view-words')?.addEventListener('click',()=>navigate('learning','words'));
-  main.querySelector('#view-statistics')?.addEventListener('click',()=>navigate('statistics'));
-  main.querySelectorAll('[data-stats]').forEach(b=>b.addEventListener('click',()=>navigate('statistics')));
-  attachGameActions(main);stopShelf();stopShelf=fitShelf(main.querySelector('.shelf'));watchHomeFade(main);
-  requestAnimationFrame(()=>matchJacket(main));
-  main.scrollTop=scroll;
 }
 const homeView=()=>route==='home'?pageToken:null;
 const refreshHomeActivity=createHomeRefresh({load:()=>{const target=document.querySelector('#home-activity'),date=target?.dataset.activityDate,range=target?.dataset.activityRange;return range==='day'?api('statistics',{range,date}).then(data=>data.buckets):api('learning_activity',{range,date});},view:()=>route==='home'?pageToken+':'+(document.querySelector('#home-activity')?.dataset.activityRange||'year')+':'+(document.querySelector('#home-activity')?.dataset.activityDate||''):null,apply:records=>{const target=document.querySelector('#home-activity');if(target)renderActivity(target,records,{locale,esc,duration,number},api);}});
