@@ -761,3 +761,23 @@ html:not(#u):not(#v) body .main .ri-levels{grid-template-columns:repeat(5,minmax
 html:not(#u):not(#v) body .main .ri-level{background:none!important;box-shadow:none!important;border:0!important;border-left:1px solid var(--u-line)!important;padding:4px 22px 6px!important;border-radius:0!important;-webkit-backdrop-filter:none;backdrop-filter:none}
 html:not(#u):not(#v) body .main .ri-level:first-child{border-left:0!important;padding-left:0!important}
 html:not(#u):not(#v) body .main .ri-level-pct{font:400 clamp(40px,3.4vw,56px)/1 var(--g-serif,serif)!important}
+
+/* ---- hot words, editorial: the words are the podium — the first term set very large, second and third smaller,
+   each standing on a short metal rule with its rank instead of an empty box ---- */
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms{align-items:end;gap:clamp(24px,3vw,56px)!important;padding:20px 0 8px}
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms .lb-block{height:auto!important;min-height:0!important;padding:12px 0 0!important;background:none!important;box-shadow:none!important;border:0!important;border-top:2px solid var(--m-a)!important;border-radius:0!important;display:flex!important;justify-content:flex-start}
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms .lb-block *{font-size:22px!important}
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms .lb-block svg,html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms .lb-block::after{display:none!important}
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms .lb-who{align-items:flex-start!important;text-align:left!important}
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms .lb-term{font-family:var(--g-serif-ja,serif)!important;font-size:clamp(34px,3vw,48px)!important;line-height:1.1}
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms [data-rank="1"] .lb-term{font-size:clamp(56px,5.6vw,92px)!important}
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms .lb-crown{display:none}
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms .leaderboard-reason{text-align:left!important}
+
+/* ---- follow, editorial: no boxes; the two lists as ruled columns with serif headings ---- */
+html:not(#u):not(#v) body .leaderboard-page .lb-card:has(.lb-people,.lb-empty-action){background:none!important;box-shadow:none!important;padding:28px 0 8px!important;border-top:1px solid var(--u-line-2);-webkit-backdrop-filter:none;backdrop-filter:none}
+html:not(#u):not(#v) body .leaderboard-page .lb-card:has(.lb-people,.lb-empty-action)::before{display:none!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-card:has(.lb-people,.lb-empty-action) .lb-h2{font-size:clamp(26px,2.2vw,34px)!important;font-family:var(--g-serif,serif)!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-people li{padding:16px 0!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-people .leaderboard-avatar{width:40px!important;height:40px!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-people .leaderboard-name{font-family:var(--g-serif,serif);font-size:17px}
