@@ -347,20 +347,29 @@ function videoSrc() {
   const w = Math.max(innerWidth, innerHeight) * Math.min(devicePixelRatio || 1, 2);
   // a portrait screen (phones) gets the vertical cut of the promo
   if (innerHeight > innerWidth && video.dataset.psm) return w <= 1400 ? video.dataset.psm : video.dataset.pmd;
-  return w <= 900 ? video.dataset.sm : w <= 1700 ? video.dataset.md : video.dataset.lg;
+  // the hero video sits dimmed and grey behind the title: 720p is enough up to 1920 wide (half the decoder memory of 1080p)
+  return w <= 900 ? video.dataset.sm : w <= 2200 ? video.dataset.md : video.dataset.lg;
 }
 function startVideo() {
   if (!video || video.getAttribute('src')) return;
   video.src = videoSrc();
+  const t = Number(video.dataset.at || 0);
+  if (t) video.addEventListener('loadedmetadata', () => { video.currentTime = t; }, { once: true });
   video.play().catch(() => {});
 }
+// Memory: a video that has been off screen for a few seconds drops its file and decoder (the poster stays, so it
+// looks the same); it loads again from the browser cache when it comes back
+const releaseVideo = v => { if (!v.getAttribute('src')) return; v.dataset.at = String(v.currentTime || 0); v.pause(); v.removeAttribute('src'); v.load(); };
+const releaseLater = (v, ms = 4000) => { clearTimeout(v._rel); v._rel = setTimeout(() => releaseVideo(v), ms); };
+let introDone = false;
 if (video && !reduce && !navigator.connection?.saveData) {
   // the background video starts once the entrance logo is up, so the two never compete for the first bytes
-  introShown.then(startVideo);
+  introShown.then(() => { introDone = true; if (heroSeen) startVideo(); });
   // off screen the picture pauses to save power; the music is a separate track and keeps playing down the page
   new IntersectionObserver(([e]) => {
     heroSeen = e.isIntersecting;
-    if (heroSeen) video.play().catch(() => {}); else video.pause();
+    if (heroSeen) { clearTimeout(video._rel); if (video.getAttribute('src')) video.play().catch(() => {}); else if (introDone) startVideo(); }
+    else { video.pause(); releaseLater(video, 6000); }
     floatSound();
   }).observe(video);
 }
@@ -600,8 +609,8 @@ if (!reduce) {
   const io = new IntersectionObserver(entries => {
     for (const e of entries) {
       const v = e.target;
-      if (e.isIntersecting) { if (!v.getAttribute('src')) v.src = v.dataset.src; v.play().catch(() => {}); }
-      else v.pause();
+      if (e.isIntersecting) { clearTimeout(v._rel); if (!v.getAttribute('src')) v.src = v.dataset.src; v.play().catch(() => {}); }
+      else { v.pause(); releaseLater(v); }
     }
   }, { rootMargin: '120px 0px' });
   for (const v of $$('video.clip')) if (!v.closest('.feat-item')) io.observe(v);
@@ -642,16 +651,12 @@ function warmUp() {
   try { document.fonts.forEach(f => { if (f.status === 'unloaded') f.load().catch(() => {}); }); } catch {}
   for (const img of $$('img[loading="lazy"]')) { img.loading = 'eager'; img.decode?.().catch(() => {}); }
   if (reduce) return;
-  const clips = $$('video.clip').filter(v => v.dataset.src && !v.getAttribute('src'));
+  // the clips go into the browser cache only (a video element holding a file keeps it, and a decoder, in memory)
+  const clips = [...new Set($$('video.clip').map(v => v.dataset.src).filter(Boolean))];
   const next = () => {
-    const v = clips.shift();
-    if (!v) return;
-    if (!v.getAttribute('src')) { v.preload = 'auto'; v.src = v.dataset.src; }
-    let done = false;
-    const go = () => { if (!done) { done = true; next(); } };
-    v.addEventListener('canplaythrough', go, { once: true });
-    v.addEventListener('error', go, { once: true });
-    setTimeout(go, 2500);
+    const url = clips.shift();
+    if (!url) return;
+    fetch(url, { priority: 'low' }).then(r => r.blob()).catch(() => {}).finally(next);
   };
   let started = false;
   const begin = () => { if (!started) { started = true; next(); } };

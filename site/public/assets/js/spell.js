@@ -61,7 +61,8 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
     };
   };
   const fit = () => {
-    dpr = Math.min(devicePixelRatio || 1, 2);
+    // the near layer holds only large out-of-focus glyphs: half resolution looks the same and needs a quarter of the memory
+    dpr = Math.min(devicePixelRatio || 1, 2) * (near ? .5 : 1);
     W = innerWidth; H = innerHeight;
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     const want = near ? Math.max(5, Math.round(Math.min(16, W * H / 80000))) : deep ? Math.max(8, Math.round(Math.min(40, W * H / 32000))) : Math.round(Math.min(90, W * H / 15000));
@@ -246,7 +247,8 @@ export function kana(canvas, { still = false, hero = null, until = null, near = 
     camHit(kind, s);
   };
   const drawWords = (now, dt, dy, layerVis) => {
-    words = words.filter(w => now < w.out + 1100);
+    // tokens that have gone give their bitmaps back at once (a canvas's pixels are only freed late by the GC)
+    words = words.filter(w => { if (now < w.out + 1100) return true; if (w.spr?.c) w.spr.c.width = w.spr.c.height = 0; return false; });
     // camera: springs back to rest, plus the line's slow dolly/roll and a gentle breathing zoom
     if (!still) {
       const life = Math.min(1, (now - cam.t0) / 9000), d = cam.drift;

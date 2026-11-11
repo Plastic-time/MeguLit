@@ -27,14 +27,16 @@ function featureSwitcher(reduce) {
   const show = (i, focus) => {
     tabs.forEach((t, k) => { const on = k === i; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; t.style.setProperty('--p', '0'); });
     items.forEach((it, k) => it.classList.toggle('on', k === i));
-    items.forEach((_, k) => { if (k !== i) vids(k).forEach(v => v.pause()); });
+    // the other tabs' videos pause, then drop their file once the cross-fade is over (memory)
+    items.forEach((_, k) => { if (k !== i) vids(k).forEach(v => { v.pause(); clearTimeout(v._rel); v._rel = setTimeout(() => { if (cur !== k && v.getAttribute('src')) { v.removeAttribute('src'); v.load(); } }, 900); }); });
     cur = i; start = performance.now();
     if (focus) tabs[i].focus();
     if (!reduce && visible) vids(i).forEach(v => { if (!v.getAttribute('src')) v.src = v.dataset.src; v.currentTime = 0; v.play().catch(() => {}); });
   };
   const tick = now => {
+    if (!visible) { raf = 0; return; }
     raf = requestAnimationFrame(tick);
-    if (!visible || !auto) return;
+    if (!auto) return;
     const v = vids(cur)[0];
     const dur = Math.max(MIN, (v && v.duration ? v.duration * 1000 : MIN));
     const p = Math.min(1, (now - start) / dur);
@@ -52,7 +54,11 @@ function featureSwitcher(reduce) {
   new IntersectionObserver(([e]) => {
     visible = e.isIntersecting;
     if (visible) { start = performance.now() - 0; show(cur); if (!raf && !reduce) raf = requestAnimationFrame(tick); }
-    else vids(cur).forEach(v => v.pause());
+    else {
+      // off screen: the loop stops, and after a few seconds the shown video drops its file (memory; the poster stays)
+      cancelAnimationFrame(raf); raf = 0;
+      vids(cur).forEach(v => { v.pause(); clearTimeout(v._rel); v._rel = setTimeout(() => { if (!visible && v.getAttribute('src')) { v.removeAttribute('src'); v.load(); } }, 4000); });
+    }
   }, { threshold: .35 }).observe(root);
   show(0);
 }

@@ -117,8 +117,9 @@ function sparks() {
   const ctx = c.getContext('2d');
   let bursts = [], raf = 0;
   const size = () => { const d = Math.min(devicePixelRatio || 1, 2); c.width = innerWidth * d; c.height = innerHeight * d; ctx.setTransform(d, 0, 0, d, 0, 0); };
-  size();
-  addEventListener('resize', size);
+  // pixels only while a burst plays (a full-screen canvas costs memory even when empty)
+  c.width = c.height = 0;
+  addEventListener('resize', () => { if (raf) size(); });
   const draw = now => {
     ctx.clearRect(0, 0, innerWidth, innerHeight);
     bursts = bursts.filter(b => now - b.t < 520);
@@ -136,10 +137,11 @@ function sparks() {
       }
     }
     raf = bursts.length ? requestAnimationFrame(draw) : 0;
+    if (!raf) c.width = c.height = 0;
   };
   addEventListener('pointerdown', e => {
     bursts.push({ x: e.clientX, y: e.clientY, t: performance.now(), a: Math.random() });
-    if (!raf) raf = requestAnimationFrame(draw);
+    if (!raf) { size(); raf = requestAnimationFrame(draw); }
   }, { passive: true });
 }
 
