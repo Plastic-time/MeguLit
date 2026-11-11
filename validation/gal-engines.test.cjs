@@ -42,3 +42,9 @@ test('paz: colour and break codes are dropped',()=>{
 test('bgi: <R よみ>漢字</R> splits into text and ruby',()=>{
  const {splitRuby}=require('../services/original-engines/bgi.cjs');
  assert.deepEqual(splitRuby(['<R しゅんげん>峻厳</R>な崖','x']),{lines:['峻厳な崖','x'],ruby:[[['峻厳','しゅんげん']],null]});});
+test('fvp: 0x0E pushes with NUL are lines, ASCII names and commands are dropped',()=>{
+ const {parse}=require('../services/original-engines/fvp.cjs');
+ const push=s=>{const b=Buffer.concat([s,Buffer.from([0])]);return Buffer.concat([Buffer.from([0x0E,b.length]),b]);};
+ const code=Buffer.concat([Buffer.from([0x02,0,0]),push(SJ('「あい」')),Buffer.from([0x0E,4]),Buffer.from('bg1\0','latin1'),push(SJ('うあ')),Buffer.from([0x0E,9,0x82])]);
+ const head=Buffer.alloc(4);head.writeUInt32LE(4+code.length,0);
+ assert.deepEqual(parse(Buffer.concat([head,code,Buffer.from('sysdesc')])).lines,['「あい」','うあ']);});
