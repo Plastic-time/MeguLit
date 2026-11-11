@@ -226,6 +226,8 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
    <li><h3 data-i="s.4.t">启动游戏，用窗口模式玩</h3><p data-i-html="s.4.d">点作品，再点「启动游戏」，阅读层会自己接上。按 <kbd>Alt</kbd> + <kbd>T</kbd> 打开菜单</p></li>
    <li><h3 data-i="s.5.t">零基础先学五十音</h3><p data-i="s.5.d">学习 → 五十音：25 课、五十音图，再加三个假名小游戏，例句都来自你自己玩过的游戏</p></li>
   </ol>
+  <h3 class="gd-after js-gd-after"></h3>
+  <ol class="gd-cards js-guide-cards"></ol>
  </div>
 </section>
 <section class="sec deck-sec" id="deck" data-kanji="復習" aria-labelledby="dk-title">
@@ -539,6 +541,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
   <p class="nt-hud" aria-hidden="true"><span>notice</span><span>megulit · in development</span></p>
   <h2 id="nt-title" class="nt-title" data-i="nt.title">MeguLit 还在开发中</h2>
   <h2 class="nt-title nt-title-2" data-i="nt.title2">大部分引擎都已经适配好啦，提交游戏名之后可以先直接开玩试试</h2>
+  <p class="nt-ok js-guide-ok"></p>
   <p class="nt-lede" data-i-html="nt.lede">有些游戏现在还没适配好。想玩什么游戏，把名字写在下面点提交，快的话半天，最晚一周内就能支持</p>
   <div class="nt-row">
    <input class="nt-input" name="text" type="text" maxlength="200" autocomplete="off" required placeholder="想玩的游戏名字" data-i-attr="placeholder:nt.game.ph;aria-label:nt.game.ph" aria-label="想玩的游戏名字">
@@ -550,9 +553,20 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
   <p class="nt-more" data-i-html="nt.more">用的时候遇到问题，点顶部的「问题反馈」填一下就行；在游戏里也可以一键反馈。有什么问题、建议，或者只是想留句话，都很欢迎。谢谢支持！</p>
   <div class="nt-actions">
    <button type="button" class="nt-link js-open-feedback" data-i="nt.toFeedback">问题反馈</button>
-   <button type="button" class="nt-close" data-i="nt.close">知道了</button>
+   <span class="nt-act-r"><button type="button" class="nt-guide-btn js-open-guide"></button><button type="button" class="nt-close" data-i="nt.close">知道了</button></span>
   </div>
  </form>
+ <div class="nt-pane nt-guide" hidden>
+  <p class="nt-hud" aria-hidden="true"><span>guide</span><span class="js-gd-count">1 / 6</span></p>
+  <h2 class="nt-title js-gd-head"></h2>
+  <ol class="gd-dots js-gd-dots"></ol>
+  <h3 class="gd-title js-gd-title"></h3>
+  <ul class="gd-body js-gd-body"></ul>
+  <div class="nt-actions">
+   <button type="button" class="nt-link js-gd-prev"></button>
+   <button type="button" class="nt-submit js-gd-next"></button>
+  </div>
+ </div>
  <form class="nt-pane nt-feedback" data-kind="feedback" hidden novalidate>
   <p class="nt-hud" aria-hidden="true"><span>feedback</span><span>goes to github issues</span></p>
   <h2 class="nt-title" data-i="fb.title">问题反馈</h2>

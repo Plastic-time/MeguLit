@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import { STEPS, OK, LABEL, pick, guideCards } from './guide.js';
 // The welcome notice and the feedback form. The notice opens on every visit once the entrance is over: MeguLit is in
 // development, here is where to ask for a game; its second pane (also opened by every .js-open-feedback link) takes
 // free-form feedback. Both post to the relay (api.megulit.com/api/feedback), which turns them into GitHub issues.
@@ -9,10 +10,12 @@ const ISSUES = 'https://github.com/ilynthn/MeguLit/issues/new';
 export function notice({ t, lang, after }) {
   const box = document.querySelector('.notice');
   if (!box || typeof box.showModal !== 'function') return;
-  const welcome = box.querySelector('.nt-welcome'), feedback = box.querySelector('.nt-feedback');
+  const welcome = box.querySelector('.nt-welcome'), feedback = box.querySelector('.nt-feedback'), guide = box.querySelector('.nt-guide');
   const pane = which => {
     welcome.hidden = which !== 'welcome';
     feedback.hidden = which !== 'feedback';
+    if (guide) guide.hidden = which !== 'guide';
+    if (which === 'guide') { step(0); guide.querySelector('.js-gd-next')?.focus({ preventScroll: true }); return; }
     (which === 'feedback' ? feedback : welcome).querySelector('.nt-input')?.focus({ preventScroll: true });
   };
   const open = which => { pane(which); if (!box.open) box.showModal(); };
@@ -53,6 +56,36 @@ export function notice({ t, lang, after }) {
 
   box.querySelector('.nt-close').addEventListener('click', () => box.close());
   box.querySelector('.js-back').addEventListener('click', () => pane('welcome'));
+  // the usage guide: a few steps, one at a time (guide.js holds the words, also shown in the Get started section)
+  let at = 0;
+  const q = s => box.querySelector(s);
+  const step = i => {
+    if (!guide) return;
+    const l = lang(); at = Math.max(0, Math.min(STEPS.length - 1, i));
+    const s = STEPS[at];
+    q('.js-gd-head').textContent = pick(LABEL.guide, l);
+    q('.js-gd-count').textContent = `${at + 1} / ${STEPS.length}`;
+    q('.js-gd-title').textContent = pick(s.t, l);
+    q('.js-gd-body').innerHTML = pick(s.d, l).map(x => `<li>${x}</li>`).join('');
+    q('.js-gd-dots').replaceChildren(...STEPS.map((x, k) => { const li = document.createElement('li'); const b = document.createElement('button'); b.type = 'button'; b.textContent = pick(x.t, l); b.setAttribute('aria-current', String(k === at)); b.addEventListener('click', () => step(k)); li.append(b); return li; }));
+    q('.js-gd-prev').textContent = at ? pick(LABEL.prev, l) : pick(LABEL.prev, l);
+    q('.js-gd-prev').style.visibility = at ? 'visible' : 'hidden';
+    q('.js-gd-next').textContent = at === STEPS.length - 1 ? pick(LABEL.done, l) : pick(LABEL.next, l);
+  };
+  q('.js-gd-prev')?.addEventListener('click', () => step(at - 1));
+  q('.js-gd-next')?.addEventListener('click', () => { if (at === STEPS.length - 1) box.close(); else step(at + 1); });
+  q('.js-open-guide')?.addEventListener('click', () => pane('guide'));
+  // the words that change with the language: the "how to tell it works" box, the guide button, the Get started cards
+  const paintGuide = () => {
+    const l = lang();
+    const ok = q('.js-guide-ok'); if (ok) ok.innerHTML = pick(OK, l);
+    const gb = q('.js-open-guide'); if (gb) gb.textContent = pick(LABEL.more, l);
+    const cards = document.querySelector('.js-guide-cards'); if (cards) guideCards(cards, l);
+    const after = document.querySelector('.js-gd-after'); if (after) after.textContent = pick(LABEL.adv, l);
+    if (guide && !guide.hidden) step(at);
+  };
+  paintGuide();
+  addEventListener('megulit:lang', paintGuide);
   box.addEventListener('click', e => { if (e.target === box) box.close(); });
   document.addEventListener('click', e => {
     const link = e.target.closest('.js-open-feedback');
