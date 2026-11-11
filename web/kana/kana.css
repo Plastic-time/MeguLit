@@ -1043,3 +1043,9 @@ button.m0,button.m1,button.m2,button.m3{border:0;padding:0;font:inherit;cursor:p
 .v-lesson .dots>*{border-radius:0}
 .v-lesson .learn-foot .btn{min-height:48px;padding:0 30px}
 @media(prefers-reduced-motion:reduce){:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .sheet,.v-lesson .kana-line .ja{animation:none}:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .btn{transition:none}}
+
+/* 2026-11-11 the 「← 学习」 back link inside 五十音: same square mono button as the grammar page */
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .back{display:inline-flex;align-items:center;gap:12px;height:34px;padding:0 16px 0 12px;margin-bottom:12px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.6);color:#fff;font:500 11px/1 "IBM Plex Mono",ui-monospace,Consolas,monospace;letter-spacing:.3em;text-decoration:none;transition:border-color .2s,gap .35s cubic-bezier(.16,1,.3,1),background .2s}
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .back:hover{border-color:#c8323c;gap:18px;background:#000;color:#fff}
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .back:active{transform:scale(.97)}
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .back:focus-visible{outline:2px solid #c8323c;outline-offset:2px}
