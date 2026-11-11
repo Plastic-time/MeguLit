@@ -99,3 +99,12 @@ test('the map takes apart lines you read in your games, cut by the tokenizer and
   assert.match(g.mapHTML({progress:{}},{locale:'zh',esc}),/普通的一句/,'built-in lines only before anything is read');
  }finally{db.close?.();}
 });
+
+test('假名游戏 is part of 五十音: no own tab, old links open the practice block',()=>{
+ const app=fs.readFileSync(path.join(__dirname,'..','web','app.js'),'utf8');
+ assert.doesNotMatch(app.match(/const LEARNING_TABS=\[[^\]]*\]/)[0],/kanagames/);
+ assert.match(app,/if\(subtab==='kanagames'\)\{subtab='kana';kanaFocus='practice';\}/);
+ const kana=fs.readFileSync(path.join(__dirname,'..','web','kana','kana.js'),'utf8');assert.doesNotMatch(kana,/openTab\('kanagames'\)/);
+ const idx=fs.readFileSync(path.join(__dirname,'..','web','kana','views','index.js'),'utf8');
+ for(const g of ['pos','seq','conv'])assert.ok(idx.includes(`['${g}',`),g);assert.match(idx,/id="practice"/);assert.match(idx,/ctx\.go\(`play\.html\?g=\$\{b\.dataset\.game\}&d=\$\{diff\}/);
+});

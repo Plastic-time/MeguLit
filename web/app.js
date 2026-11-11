@@ -635,7 +635,7 @@ async function history(token){
   target.innerHTML=historyHTML(items,{mode:subtab,locale,text,esc,icon,duration,datetime,number,games:model.games,cover,empty});attachGameActions(target);if(subtab==='dialogue')stopHistoryTranslations=mountHistoryTranslations({root:target,viewport:main,api,isCurrent:()=>token===pageToken,locale});
 }
 const tabs=names=>`<div class="tabs">${names.map(k=>`<button class="tab ${subtab===k?'active':''}" data-tab="${k}">${text[k]}</button>`).join('')}</div>`;
-const LEARNING_TABS=['review','kana','kanagames','grammar','words','sentences','readwords','dictionary','trash','statistics'];
+const LEARNING_TABS=['review','kana','grammar','words','sentences','readwords','dictionary','trash','statistics'];
 const ACCENT_DEFAULTS=['#ad1539','#9d314d','#7b5ba7','#347b91','#398775'];
 function accentChipsHTML(prefs){return [...new Set([...(prefs.accentPresets||[]),...ACCENT_DEFAULTS])].map(color=>`<button type="button" class="swatch ${color===String(prefs.accent).toLowerCase()?'active':''}" data-color="${color}" style="--swatch:${color}" aria-label="${color}" title="${color.toUpperCase()}"></button>`).join('');}
 /* E272 (user: the sub-tab bar should drop down, retract when leaving, and retract then drop again between pages):
@@ -665,7 +665,9 @@ function definitions(value){
   catch{}return String(value||'');
 }
 async function learning(token){
-  if(!['review','kana','kanagames','grammar','words','sentences','readwords','dictionary','trash'].includes(subtab))subtab='review';
+  /* 2026-11-11 假名游戏 is no longer its own tab: old links open 五十音 at its practice block */
+  let kanaFocus='';if(subtab==='kanagames'){subtab='kana';kanaFocus='practice';}
+  if(!['review','kana','grammar','words','sentences','readwords','dictionary','trash'].includes(subtab))subtab='review';
   const tab=subtab,slot=learningSlot(),target=document.createElement('div');
   /* 2026-11-11 first visit: ask the Japanese level once (learning-level.js); the answer opens the tab to start from */
   import('./learning-level.js').then(m=>m.ensureLevel({api,esc,toast,openTab:t=>navigate('learning',t)})).catch(()=>{});
@@ -675,7 +677,7 @@ async function learning(token){
   /* 语法: N5 → N0 lessons with examples and exercises from the lines you read */
   if(subtab==='grammar'){commit();try{const {mountGrammar}=await import('./grammar.js');if(token===pageToken)await mountGrammar(target,{api,locale,esc,toast,isCurrent:()=>token===pageToken});}catch(error){target.textContent=String(error?.message||error);}return;}
   if(subtab==='readwords'){commit();try{const {mountReadingInsights}=await import('./reading-insights.js');if(token===pageToken)await mountReadingInsights(target,{api,locale,esc,number,toast,isCurrent:()=>token===pageToken,enhance:enhanceSelects});}catch(error){target.textContent=String(error?.message||error);}return;}
-  if(subtab==='kana'||subtab==='kanagames'){commit();try{const {mountKana}=await import('./kana/kana.js');if(token===pageToken)await mountKana(target,{api,invoke,toast,start:subtab==='kanagames'?'games':'index',openTab:tab=>navigate('learning',tab)});}catch(error){target.textContent=String(error?.message||error);}return;}
+  if(subtab==='kana'){commit();try{const {mountKana}=await import('./kana/kana.js');if(token===pageToken)await mountKana(target,{api,invoke,toast,start:'index',focus:kanaFocus,openTab:tab=>navigate('learning',tab)});}catch(error){target.textContent=String(error?.message||error);}return;}
   if(subtab==='review'){await review(token,target);if(token===pageToken){enhanceSelects(target);commit();}return;}
   if(subtab==='sentences'){try{const {mountSentences}=await import('./sentences-page.js');if(token!==pageToken)return;await mountSentences(target,{api,locale,esc,toast,errorMessage,empty,emptyLabel:text.emptySentences,readTime,datetime,icon,isCurrent:()=>token===pageToken,rerender:()=>renderRoute(),lookup:word=>{pendingDictionaryQuery=word;navigate('learning','dictionary');},openGame:id=>{gameOrigin='library';selectedGameId=id;navigate('game');}});}catch(error){target.textContent=String(error?.message||error);}if(token===pageToken)commit();return;}
   const [items,pending]=await Promise.all([api(subtab==='words'?'vocabulary':subtab==='trash'?'word_trash':'sentences'),subtab==='words'?api('unknown_words').catch(()=>[]):[]]);if(token!==pageToken)return;
