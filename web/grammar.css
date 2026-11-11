@@ -566,3 +566,6 @@
  .gm-hero-side{padding:20px 18px}.gm-hero-side .gm-cap{font-size:12px;line-height:1.6}
  .gm-hero h2{align-items:center}
 }
+/* 2026-11-11 (user: after the switch animation the page stalled and stretched): a min-height kept for smooth switching
+   must not be shared out between the grid rows; rows keep their own height and the extra room stays at the bottom */
+.gm-page,.gm-map,.rw-album,.gm-stepbody{align-content:start}

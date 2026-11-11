@@ -3,7 +3,7 @@
    content scroller (.workspace>.main) and never the home page; app.css still hides every other scrollbar, so the
    in-game reader and popups are untouched. The 16px gutter is the hit area; the thumb is drawn thin inside it with a
    transparent border, and grows to the full width, turns red and gets a rule when hovered or dragged. */
-.workspace>.main:not(.home-page){scrollbar-width:auto;-ms-overflow-style:auto;scrollbar-gutter:stable}
+.workspace>.main:not(.home-page){overflow-y:scroll;scrollbar-width:auto;-ms-overflow-style:auto}
 .workspace>.main:not(.home-page)::-webkit-scrollbar{display:block;width:16px;height:0;background:transparent}
 .workspace>.main:not(.home-page)::-webkit-scrollbar-track{background:linear-gradient(90deg,transparent 7px,rgba(255,255,255,.08) 7px,rgba(255,255,255,.08) 9px,transparent 9px)}
 .workspace>.main:not(.home-page)::-webkit-scrollbar-thumb{min-height:56px;border:5px solid transparent;border-radius:0;background:rgba(255,255,255,.42) padding-box;box-shadow:inset 0 2px 0 #c8323c}
