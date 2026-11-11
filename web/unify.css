@@ -1081,12 +1081,12 @@ html:not(#u):not(#v):not(#w) body .dict-cloud.is-burst i{transition:none!importa
 html body svg.dict-crack{position:absolute;z-index:3;pointer-events:none;overflow:hidden;border-radius:inherit}
 html body svg.dict-crack.is-bar{position:fixed;inset:auto;z-index:40}
 html body svg.dict-crack.is-off{display:none}
-html body svg.dict-crack.is-bar path{stroke:color-mix(in srgb,#fff4ea 34%,transparent)}
-html body svg.dict-crack path{fill:none;stroke:color-mix(in srgb,#fff4ea 62%,transparent);stroke-linecap:round;stroke-linejoin:round;
+html body svg.dict-crack.is-bar path.fx-crack{stroke:color-mix(in srgb,#fff4ea 34%,transparent)}
+html body :is(svg.dict-crack,svg.fx-scars) path.fx-crack{fill:none;stroke:color-mix(in srgb,#fff4ea 62%,transparent);stroke-linecap:round;stroke-linejoin:round;
  stroke-dasharray:1 1;stroke-dashoffset:calc(1 - var(--h,1));transition:stroke-dashoffset 1.3s cubic-bezier(.45,0,.2,1),stroke .9s;
  filter:drop-shadow(0 1px 0 rgba(0,0,0,.7)) drop-shadow(0 0 2px rgba(255,236,220,.25));animation:crack-run .32s cubic-bezier(.1,.8,.2,1) backwards}
-html body svg.dict-crack g:nth-last-child(n+4) path{stroke:color-mix(in srgb,#fff4ea 44%,transparent)}
-html body svg.dict-crack g.is-mending path{animation:crack-mend 1.6s ease-out}
+html body svg.dict-crack g:nth-last-child(n+4) path.fx-crack{stroke:color-mix(in srgb,#fff4ea 44%,transparent)}
+html body svg.dict-crack g.is-mending path.fx-crack{animation:crack-mend 1.6s ease-out}
 @keyframes crack-run{from{stroke-dashoffset:1}}
 @keyframes crack-mend{0%{stroke:#ffd38a;filter:drop-shadow(0 0 3px #edb56e) drop-shadow(0 0 8px rgba(237,181,110,.6))}60%{stroke:#edb56e}100%{}}
 html body .dict-shards{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden}
@@ -1094,7 +1094,7 @@ html body .dict-shards i{position:absolute;font-style:normal;font-family:var(--g
 html body .dict-shards i:nth-child(3n){color:var(--g-gold,#edb56e)}
 html body .dict-shards i:nth-child(7n){color:#e2423e}
 html body .dict-shards b{position:absolute;width:60px;height:60px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,244,234,.8),0 0 30px rgba(237,181,110,.5)}
-@media (prefers-reduced-motion:reduce){html body svg.dict-crack path{animation:none!important}}
+@media (prefers-reduced-motion:reduce){html body :is(svg.dict-crack,svg.fx-scars) path{animation:none!important}}
 
 /* start-up notice: the request field and its button share one baseline — the field's gold rule runs into the
    button's red foot — and the button keeps the field's height */
@@ -1126,3 +1126,37 @@ html:not(#u):not(#v):not(#w) body .profile-rank-bar i{position:absolute;inset:0 
 html:not(#u):not(#v):not(#w) body .profile-rank-bar i::after{content:"";position:absolute;right:0;top:-2px;bottom:-2px;width:2px;background:#fff4ea;box-shadow:0 0 8px var(--g-gold,#edb56e)}
 @keyframes rank-fill{from{width:0}}
 @media (prefers-reduced-motion:reduce){html body .profile-rank-bar i{animation:none}}
+
+/* pits (burst-fx.js): a dark hole with a lit lower rim and a shadowed upper lip, as if knocked into the surface;
+   the dictionary's pits fade with --h as words are read; practice pits mend in water when a right answer comes */
+html body :is(svg.dict-crack,svg.fx-scars) path.fx-rim{fill:rgba(255,236,220,.10);stroke:none;opacity:var(--h,1);transition:opacity 1.3s}
+html body :is(svg.dict-crack,svg.fx-scars) path.fx-pit{fill:#060407;opacity:calc(var(--h,1)*.92);transition:opacity 1.3s,fill .9s}
+html body :is(svg.dict-crack,svg.fx-scars) path.fx-pit-lip{fill:none;stroke:rgba(0,0,0,.75);stroke-width:2.2;opacity:var(--h,1);transform:translateY(-1px);transition:opacity 1.3s;
+ filter:drop-shadow(0 1.5px 0 rgba(255,236,220,.28))}
+html body svg.dict-crack g.is-mending path.fx-pit{animation:pit-mend 1.6s ease-out}
+@keyframes pit-mend{0%{fill:#a8721e}100%{}}
+html body svg.fx-scars{position:absolute;left:0;top:0;z-index:6;pointer-events:none;overflow:visible}
+html body .has-fx-scars{position:relative}
+html body svg.fx-scars path.fx-crack{stroke-dashoffset:0}
+html body svg.fx-scars g.fx-scar.is-gone path.fx-crack{stroke-dashoffset:1;stroke:#9fe3ff;transition:stroke-dashoffset 1.2s cubic-bezier(.45,0,.2,1),stroke .3s}
+html body svg.fx-scars g.fx-scar.is-gone :is(path.fx-pit,path.fx-rim,path.fx-pit-lip){opacity:0;transition:opacity 1.2s .2s}
+html body svg.fx-scars g.fx-scar.is-gone path.fx-pit{fill:#5cc8f0}
+/* flying bits */
+html body .fx-layer{position:fixed;inset:0;z-index:70;pointer-events:none;overflow:hidden}
+html body .fx-layer>*{position:absolute}
+html body .fx-chip{display:block;margin:0;background:linear-gradient(160deg,#4a3b40,#140d11);box-shadow:inset 0 1px 0 rgba(255,236,220,.35)}
+html body .fx-chip.is-ash{background:linear-gradient(160deg,#5a4448,#1a1013)}
+html body .fx-chip:nth-child(4n){background:linear-gradient(160deg,#cdb7a6,#6a5552)}
+html body .fx-dust{width:46px;height:30px;border-radius:50%;background:radial-gradient(closest-side,rgba(210,190,175,.35),transparent);filter:blur(3px)}
+html body .fx-explosion{width:0;height:0}
+html body .fx-explosion>*{position:absolute;left:0;top:0}
+html body .fx-seal{width:190px;height:190px;fill:none;stroke:#ff4a3a;stroke-width:1.6;filter:drop-shadow(0 0 6px #ff3a2a)}
+html body .fx-seal text{fill:#ff6a4a;stroke:none;font:600 9px var(--g-serif-ja,serif);text-anchor:middle}
+html body .fx-core{width:70px;height:70px;border-radius:50%;background:radial-gradient(closest-side,#fff,#fff6d8 40%,rgba(255,200,120,0))}
+html body .fx-fire{width:300px;height:300px;border-radius:50%;background:radial-gradient(closest-side,#fff3c8 0,#ffb347 22%,#ff5a2a 48%,rgba(160,20,30,.55) 70%,transparent);mix-blend-mode:screen}
+html body .fx-ring{width:80px;height:80px;border-radius:50%;box-shadow:0 0 0 3px rgba(255,230,200,.9),0 0 24px 6px rgba(255,120,60,.5)}
+html body .fx-spark{width:4px;height:4px;border-radius:50%;background:#ffd38a;box-shadow:0 0 6px #ff8a3a}
+html body .fx-drop{width:6px;height:9px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;background:radial-gradient(circle at 35% 30%,#fff,#9fe3ff 45%,#3fa9e0);box-shadow:0 0 6px rgba(120,210,255,.6)}
+html body .fx-petal{font-size:15px;line-height:1;color:#ffc6dc;text-shadow:0 0 6px rgba(255,190,220,.7)}
+html body .fx-petal:nth-child(2n){color:#fff4f8}
+html body .fx-bloom{width:140px;height:140px;border-radius:50%;background:radial-gradient(closest-side,rgba(170,230,255,.55),rgba(120,200,255,.15) 60%,transparent)}

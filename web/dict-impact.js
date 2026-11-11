@@ -4,6 +4,7 @@
    each search adds more. Opening words heals them, about ten words per search, the newest repair glowing gold
    (kintsugi) as the line closes from its tips back to the impact point. Presentation only: the state is a short list
    of impact points in localStorage, nothing in the app's data changes. */
+import {scarMarkup,debris} from './burst-fx.js';
 const KEY='megulit.dict.cracks.v1',MAX=12,STEP=.1,NS='http://www.w3.org/2000/svg';
 const calm=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const KANA='あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソ';
@@ -12,20 +13,6 @@ const save=list=>{try{localStorage.setItem(KEY,JSON.stringify(list));}catch{}};
 let cracks=load();
 const rng=seed=>{let s=(seed>>>0)%2147483647||1;return ()=>{s=(s*16807)%2147483647;return s/2147483647;};};
 
-/* one crack: jagged rays from the impact point with a few branches and a broken ring; same seed, same shape */
-function shape(seed,w,h,x,y,down){
- const r=rng(seed),paths=[],rays=down?5+Math.floor(r()*4):3+Math.floor(r()*3),reach=down?Math.min(w*.4,320):70+r()*90;
- for(let i=0;i<rays;i++){
-  let a=(down?0:Math.PI)+(.04+r()*.92)*Math.PI,px=x,py=y,d=`M${x.toFixed(1)} ${y.toFixed(1)}`;
-  const len=reach*(.25+r()*.75),seg=4+Math.floor(r()*4);
-  for(let k=0;k<seg;k++){a+=(r()-.5)*.7;const l=len/seg*(.6+r()*.8);px+=Math.cos(a)*l;py+=Math.sin(a)*l;d+=` L${px.toFixed(1)} ${py.toFixed(1)}`;
-   if(r()<.3){let ba=a+(r()<.5?-1:1)*(.5+r()*.6),bx=px,by=py,bd=`M${px.toFixed(1)} ${py.toFixed(1)}`;for(let j=0;j<2+Math.floor(r()*2);j++){ba+=(r()-.5)*.6;const bl=len/seg*(.4+r()*.5);bx+=Math.cos(ba)*bl;by+=Math.sin(ba)*bl;bd+=` L${bx.toFixed(1)} ${by.toFixed(1)}`;}paths.push({d:bd,w:.6});}}
-  paths.push({d,w:1.1});
- }
- const rr=6+r()*10,a0=r()*Math.PI*2;let ring='';for(let i=0;i<7;i++){if(r()<.35)continue;const a1=a0+i*.9,a2=a1+.5+r()*.3;ring+=`M${(x+Math.cos(a1)*rr).toFixed(1)} ${(y+Math.sin(a1)*rr).toFixed(1)} L${(x+Math.cos(a2)*rr*1.1).toFixed(1)} ${(y+Math.sin(a2)*rr*1.1).toFixed(1)} `;}
- if(ring)paths.push({d:ring,w:.8});
- return paths;
-}
 function layer(host,cls){
  let svg=host.querySelector(`:scope>svg.${cls}`);
  if(!svg){svg=document.createElementNS(NS,'svg');svg.setAttribute('class',`dict-crack ${cls}`);svg.setAttribute('aria-hidden','true');host.append(svg);}
@@ -38,7 +25,10 @@ function paint(svg,w,h,which){
   const id=`${which}${c.s}`;keep.add(id);let g=svg.querySelector(`[data-c="${id}"]`);
   if(!g){g=document.createElementNS(NS,'g');g.dataset.c=id;
    const x=which==='f'?c.x*w:c.vx*w,y=which==='f'?1:h-1;
-   g.innerHTML=shape(c.s+(which==='f'?0:977),w,h,x,y,which==='f').map(p=>`<path pathLength="1" d="${p.d}" stroke-width="${p.w}"/>`).join('');
+   /* 2026-11-12 (user: 75% weaker, a dent knocked out with chips falling): a small pit on the struck edge and
+      two or three short cracks out of it */
+   const sd=c.s+(which==='f'?0:977),rr=((sd%1000)/1000);
+   g.innerHTML=which==='f'?scarMarkup(sd,x,y,6+rr*4,26+rr*16,2+(sd%2),0,Math.PI):scarMarkup(sd,x,y,4+rr*3,16+rr*14,1+(sd%3),Math.PI,Math.PI);
    svg.append(g);}
   g.style.setProperty('--h',Math.max(0,Math.min(1,c.h)).toFixed(2));
  }
@@ -97,6 +87,7 @@ function impact(){
   cracks.push({s:Math.floor(Math.random()*2147483646)+1,x:+fxr.toFixed(3),vx:+vx.toFixed(3),h:1});
   if(cracks.length>MAX)cracks=cracks.slice(-MAX);save(cracks);
   scatter(ix,iy);jolt(form,-6);jolt(bar,-3);
+  debris(ix,iy+2,{n:9,spread:.8,up:.3});if(bar){const br=bar.getBoundingClientRect();debris(br.left+vx*br.width,br.bottom-1,{n:6,spread:.6,up:.1});}
   requestAnimationFrame(render);
  };
  if(rising&&!calm){
