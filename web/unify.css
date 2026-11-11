@@ -1048,3 +1048,25 @@ html:not(#u):not(#v):not(#w) body .review-page .review-card .select-control::bef
 html:not(#u):not(#v):not(#w) body .review-page #review-content{min-height:calc(100vh - 300px)!important}
 /* detail: the launch action is the page's hero action */
 html:not(#u):not(#v):not(#w):not(#x) body .main .detail-actions>button.primary:not(.icon-button){height:52px!important;min-height:52px!important;padding:0 52px 0 26px!important;font-size:17px!important}
+
+/* ---- profile panel, rebuilt as a profile (user): the person first — a large initial medallion, name and signature,
+   four lifetime figures on a ruled row, favourite games as a serif list — then the settings ---- */
+html:not(#u):not(#v):not(#w) body dialog.profile-panel{width:min(620px,calc(100vw - 24px))!important}
+html:not(#u):not(#v):not(#w) body .profile-hero{padding:28px 22px 8px}
+html:not(#u):not(#v):not(#w) body .profile-hero-id{display:flex;align-items:center;gap:20px}
+html:not(#u):not(#v):not(#w) body .profile-hero-avatar{flex:none;display:grid;place-items:center;width:84px;height:84px;border-radius:50%;font:600 38px/1 var(--g-serif-ja,serif);color:#f6ece0;background:radial-gradient(circle at 35% 30%,#7a2433,#2a1218);box-shadow:0 0 0 1px #1a1013,0 0 0 2px color-mix(in srgb,var(--g-gold) 55%,transparent)}
+html:not(#u):not(#v):not(#w) body .profile-hero-id h3{margin:0;font:600 clamp(28px,2.6vw,36px)/1.1 var(--g-serif,serif);color:var(--g-t1,#f1e0d2)}
+html:not(#u):not(#v):not(#w) body .profile-hero-id p{margin:8px 0 0;font-size:14px;color:var(--g-t2,#c3ab9c)}
+html:not(#u):not(#v):not(#w) body .profile-hero-figs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:26px 0 0;border-top:1px solid var(--u-line-2);border-bottom:1px solid var(--u-line)}
+html:not(#u):not(#v):not(#w) body .profile-hero-figs>div{padding:14px 0 14px 14px;border-left:1px solid var(--u-line)}
+html:not(#u):not(#v):not(#w) body .profile-hero-figs>div:first-child{border-left:0;padding-left:0}
+html:not(#u):not(#v):not(#w) body .profile-hero-figs dt{font-family:var(--u-mono);font-size:10.5px;letter-spacing:.16em;color:var(--g-gold)}
+html:not(#u):not(#v):not(#w) body .profile-hero-figs dd{margin:8px 0 0;font:400 26px/1 var(--g-serif,serif);color:var(--g-t1,#f1e0d2);white-space:nowrap}
+html:not(#u):not(#v):not(#w) body .profile-hero-figs dd small{font-size:13px;margin:0 3px 0 2px;color:var(--g-t2,#c3ab9c)}
+html:not(#u):not(#v):not(#w) body .profile-hero-fav{margin-top:22px}
+html:not(#u):not(#v):not(#w) body .profile-hero-fav h4{margin:0 0 10px;font-family:var(--u-mono);font-size:10.5px;font-weight:400;letter-spacing:.2em;color:var(--g-gold)}
+html:not(#u):not(#v):not(#w) body .profile-hero-fav ol{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0;padding:0;list-style:none;counter-reset:fav}
+html:not(#u):not(#v):not(#w) body .profile-hero-fav li{counter-increment:fav;font:500 17px/1.4 var(--g-serif,serif);color:var(--g-t1,#f1e0d2)}
+html:not(#u):not(#v):not(#w) body .profile-hero-fav li::before{content:counter(fav,decimal-leading-zero) " ";font-family:var(--u-mono);font-size:11px;color:var(--g-t3,#a08a80)}
+html:not(#u):not(#v):not(#w) body dialog.profile-panel .profile-panel-editor{margin-top:18px;border-top:1px solid var(--u-line-2)}
+html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-id h3{margin:0!important;font:600 clamp(28px,2.6vw,36px)/1.1 var(--g-serif,serif)!important;letter-spacing:.01em!important;text-transform:none!important;color:var(--g-t1,#f1e0d2)!important;padding:0!important}
