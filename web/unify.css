@@ -1413,3 +1413,44 @@ html body .class-rite-top{display:flex;align-items:baseline;justify-content:spac
 html body .class-rite-top h2{display:flex;align-items:baseline;gap:12px;margin:0!important;font-size:30px!important}
 html body .class-rite-top h2 i{font-style:normal;font-family:var(--u-mono);font-size:11px;letter-spacing:.12em;padding:2px 8px;color:var(--c);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 45%,transparent)}
 html body .class-rite-body .class-rite-sub{margin-top:10px!important}
+
+/* ===== round 8 (judge): components first ===== */
+/* tabs: two kinds only. Second-level / segmented tabs (leaderboard sections, metrics, periods, statistics range,
+   grammar levels) are plain text with a 2px red underline when current; one hairline under the row; no boxes */
+html:not(#u):not(#v):not(#w):not(#x) body :is(.lb-seg,.lb-tabs,.stg-tabs,.gm-levels){display:flex!important;flex-wrap:wrap;gap:0 22px!important;padding:0!important;border:0!important;border-bottom:1px solid var(--u-line-2)!important;border-radius:0!important;background:none!important;box-shadow:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body :is(.lb-seg,.lb-tabs,.stg-tabs,.gm-levels)>button{position:relative;height:40px!important;min-height:0!important;padding:0 2px!important;margin:0 0 -1px!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;font-size:14px!important;font-weight:500!important;letter-spacing:.04em!important;color:color-mix(in srgb,var(--g-t1,#f1e0d2) 60%,transparent)!important;transition:color .15s}
+html:not(#u):not(#v):not(#w):not(#x) body :is(.lb-seg,.lb-tabs,.stg-tabs,.gm-levels)>button:hover{color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v):not(#w):not(#x) body :is(.lb-seg,.lb-tabs,.stg-tabs,.gm-levels)>button:is([aria-pressed=true],[aria-selected=true],.active,.on){color:#fff4ea!important}
+html:not(#u):not(#v):not(#w):not(#x) body :is(.lb-seg,.lb-tabs,.stg-tabs,.gm-levels)>button::after{content:""!important;position:absolute!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;height:2px!important;width:auto!important;background:#c8323c!important;transform:scaleX(0);transition:transform .2s cubic-bezier(.2,.8,.2,1);border:0!important;clip-path:none!important;display:block!important}
+html:not(#u):not(#v):not(#w):not(#x) body :is(.lb-seg,.lb-tabs,.stg-tabs,.gm-levels)>button:is([aria-pressed=true],[aria-selected=true],.active,.on)::after{transform:scaleX(1)}
+
+/* ghost (secondary) buttons that looked disabled: 1px 30% frame, 85% text, 44px */
+html:not(#u):not(#v):not(#w):not(#x) body :is(.leaderboard-leave,.lb-unfollow,[data-follow].is-on,[data-profile-logout],[data-logout],[data-account-logout]){height:40px!important;padding:0 16px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.3)!important;color:rgba(255,244,234,.85)!important;font-size:13px!important;opacity:1!important}
+html:not(#u):not(#v):not(#w):not(#x) body :is(.leaderboard-leave,.lb-unfollow,[data-profile-logout],[data-logout],[data-account-logout]):hover{box-shadow:inset 0 0 0 1px rgba(255,236,220,.6)!important;color:#fff!important}
+/* no rounded capsule secondary buttons anywhere */
+html:not(#u):not(#v):not(#w):not(#x) body .main button:is(.secondary,.text-button,.g-btn):not(.switch):not(.icon-button){border-radius:0!important}
+
+/* status lines: errors / failures read as a status — a dot, the sentence and its action */
+html:not(#u):not(#v):not(#w):not(#x) body :is(.leaderboard-error,.settings-error,.form-error,.error-text,.status-error,[data-status=error],[data-state=error]):not(:empty){display:flex!important;align-items:center;gap:10px;font-size:13px!important;font-weight:400!important;color:#ff9c8e!important}
+html:not(#u):not(#v):not(#w):not(#x) body :is(.leaderboard-error,.settings-error,.form-error,.error-text,.status-error,[data-status=error],[data-state=error]):not(:empty)::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:#e2423e;box-shadow:0 0 8px rgba(226,66,62,.6)}
+/* info blocks: one style — a 2px gold rule on the left, plain text, no fill */
+html:not(#u):not(#v):not(#w):not(#x) body .main :is(.settings-callout,.settings-note,.tool-key-note,.dict-note,.translation-note){border:0!important;border-left:2px solid var(--g-gold,#edb56e)!important;border-radius:0!important;background:none!important;box-shadow:none!important;padding:2px 0 2px 14px!important;font-size:13px!important}
+
+/* slider: a real handle and a 2px track */
+html:not(#u):not(#v):not(#w):not(#x) body .setting-slider input[type=range]{height:18px!important;background:transparent!important}
+html:not(#u):not(#v):not(#w):not(#x) body .setting-slider input[type=range]::-webkit-slider-runnable-track{height:2px!important;background:linear-gradient(90deg,#c8323c var(--fill,0%),rgba(255,236,220,.15) var(--fill,0%))!important;border:0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .setting-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px!important;height:12px!important;margin-top:-5px!important;border:0!important;border-radius:1px!important;background:#f6ece0!important;box-shadow:0 0 0 3px rgba(200,50,60,.0),0 1px 4px rgba(0,0,0,.6)!important;transform:rotate(45deg);transition:background .15s,box-shadow .15s}
+html:not(#u):not(#v):not(#w):not(#x) body .setting-slider input[type=range]:hover::-webkit-slider-thumb,html:not(#u):not(#v):not(#w):not(#x) body .setting-slider input[type=range]:focus-visible::-webkit-slider-thumb{background:#e2423e!important;box-shadow:0 0 0 4px rgba(226,66,62,.25)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .settings-content .setting-slider input[type=number]{width:56px!important}
+
+/* settings: label and control close together — the content column is at most 960px */
+html:not(#u):not(#v):not(#w):not(#x) body .settings-layout>.settings-content>*{max-width:960px}
+
+/* hard faults: the grammar step bar is solid down to the window edge; the scroller fades at its top edge so headings
+   are not cut; the library's floating bar is frosted so it reads above the wall */
+html:not(#u):not(#v):not(#w):not(#x) body .gm-lesson .gm-stepnav{box-shadow:0 120px 0 0 #140f12,0 -18px 24px -12px rgba(0,0,0,.6)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .workspace>.main:not(.home-page){-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 22px);mask-image:linear-gradient(to bottom,transparent 0,#000 22px)}
+html:not(#u):not(#v):not(#w):not(#x) body :is(.field-search,.lib-toolbar){backdrop-filter:blur(14px) saturate(1.2);background:rgba(18,12,15,.82)!important;box-shadow:0 14px 34px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,236,220,.12)!important}
+
+/* numbers: lining and tabular everywhere numbers are shown; zero values step back */
+html:not(#u):not(#v):not(#w):not(#x) body :is(.profile-hero-figs dd,.ri-figure,.stat-value,.lb-score,.history-metrics dd,.grimoire-kpi b,.detail-figs dd){font-variant-numeric:lining-nums tabular-nums!important;font-feature-settings:"lnum" 1,"tnum" 1!important}
