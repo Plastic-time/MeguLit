@@ -21,6 +21,14 @@ function palette(game){if(palettes.has(game.id))return Promise.resolve(palettes.
 
 function detail(api,id,locale){if(!details.has(id))details.set(id,api('game_detail',{id,locale}).catch(()=>({})));return details.get(id);}
 
+function deal(cover,background,animate){const face=cover.querySelector('.tv-face'),artEl=cover.querySelector('.tv-art');if(!animate||matchMedia('(prefers-reduced-motion:reduce)').matches||!artEl.style.background){artEl.style.background=background;return;}
+ cover.querySelectorAll('.tv-ghost,.tv-old').forEach(n=>n.remove());
+ const old=document.createElement('div');old.className='tv-old';old.style.background=artEl.style.background;cover.appendChild(old);
+ old.animate([{transform:'none',opacity:1},{transform:'translate(70%,-35%) rotate(28deg) scale(.9)',opacity:0}],{duration:520,easing:'cubic-bezier(.6,0,.9,.4)',fill:'forwards'}).finished.then(()=>old.remove(),()=>old.remove());
+ const ghosts=[0,1,2].map(n=>{const d=document.createElement('div');d.className='tv-ghost';cover.insertBefore(d,face);const side=n%2?1:-1;d.animate([{transform:'translate(0,0) rotate(0)',opacity:0},{transform:`translate(${side*42}%,${-6*n}%) rotate(${side*9}deg)`,opacity:1,offset:.45},{transform:`translate(${-side*8}%,0) rotate(${-side*3}deg)`,opacity:1,offset:.8},{transform:'translate(0,0) rotate(0)',opacity:0}],{duration:760,delay:120+n*70,easing:'cubic-bezier(.3,.7,.2,1)',fill:'both'}).finished.then(()=>d.remove(),()=>d.remove());return d;});
+ face.animate([{transform:'translateY(18%) rotateY(-180deg) scale(.86)',opacity:0},{transform:'translateY(-6%) rotateY(-80deg) scale(1.04)',opacity:1,offset:.55},{transform:'none',opacity:1}],{duration:720,delay:520,easing:'cubic-bezier(.2,.9,.2,1)',fill:'backwards'});
+ setTimeout(()=>{artEl.style.background=background;},520+300);}
+
 function cardify(card){const face=card.querySelector('.tv-face');let pressed=false,last=null;
  const set=(x,y)=>{const depth=pressed?1.6:1,rx=(.5-y)*20*depth,ry=(x-.5)*20*depth;face.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg) scale(${pressed?.96:1.03})`;face.style.setProperty('--px',`${x*100}%`);face.style.setProperty('--py',`${y*100}%`);face.style.setProperty('--hue',`${Math.round(x*360)}deg`);};
  card.addEventListener('pointerenter',()=>{card.classList.add('touch');face.style.transition='transform .12s ease-out';});
@@ -41,10 +49,10 @@ export function renderHomeTV(main,ctx){
  const mins=s=>{const m=Math.floor((s||0)/60);return m>=60?`${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`:`${m}m`;};
  main.innerHTML=`<div class="tv-home" tabindex="-1"><div class="tv-canvas">
   <div class="tv-plane" data-z="-200"><div class="tv-band"><div class="tv-band-in"></div></div><div class="tv-tl"></div></div>
-  <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-ring"></div></div>
+  <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-index"></div><div class="tv-ring"></div></div>
   <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-vocab"></div><div class="tv-heat-card tv-card"><div class="tv-face"><div class="tv-heat"></div><i class="tv-glare"></i></div></div></div>
   <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div></div></div></div>
-  <div class="tv-grain"></div><div class="tv-flash"></div>
+  <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div><div class="tv-scene"></div><div class="tv-flash"></div>
   <div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div>
   <button class="tv-heatlink" data-go="activity"></button>
   <div class="tv-figs"><button class="tv-fig" data-go="statistics"><b>${mins(model.stats.readingSeconds)}</b><small>${w.read}</small></button><button class="tv-fig" data-go="words"><b>${number(model.stats.words)}</b><small>${w.words}</small></button><button class="tv-fig" data-go="statistics"><b>${number(model.stats.lookups)}</b><small>${w.lookups}</small></button><button class="tv-more" data-go="statistics">${w.full} →</button></div>
@@ -67,12 +75,14 @@ export function renderHomeTV(main,ctx){
   ctx.onGame?.(g);root.style.setProperty('--tv-a',p[0]);root.style.setProperty('--tv-b',p[1]);root.style.setProperty('--tv-c',p[2]);
   const k=(g.title.length*37+i*13)%60,sentences=(d.sentences||[]).map(s=>String(s.text||'').trim()).filter(Boolean).slice(0,8),words=(d.words||[]).filter(x=>x.spelling).slice(0,10),sessions=d.sessions||[];
   $('.tv-kana').textContent=[...g.title].find(c=>/[一-鿿぀-ヿ]/.test(c))||g.title.slice(0,1);
-  $('.tv-art').style.background=art(g,p);
+  deal($('.tv-cover'),art(g,p),flash);
   const pct=(g.characters||0)/max,C=2*Math.PI*48,ring=$('.tv-ring');ring.style.left=(44+k%14)+'%';ring.innerHTML=`<div class="tv-disc" style="background:${art(g,p)}"></div><svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="48"/><circle class="prog" cx="50" cy="50" r="48" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg><span class="tv-pct">${number(g.characters||0)} ${w.chars}</span>`;requestAnimationFrame(()=>requestAnimationFrame(()=>{const c=ring.querySelector('.prog');if(c)c.style.strokeDashoffset=C*(1-Math.max(.04,pct));}));
-  const band=(sentences.length?sentences:[g.title]).map(t=>'「'+t+'」').join('　');$('.tv-band-in').textContent=(band+'　').repeat(Math.max(2,Math.ceil(120/band.length)));$('.tv-band').style.transform=`rotate(${-14+k%20}deg)`;
+  const band=(sentences.length?sentences:[g.title]).map(t=>'「'+t+'」').join('　');$('.tv-band-in').textContent=(band+'　').repeat(Math.max(2,Math.ceil(80/band.length)));
   const now=Date.now(),span=40*864e5,big=Math.max(1,...sessions.map(s=>s.active_seconds||0))*.6;$('.tv-tl').innerHTML=sessions.filter(s=>now-s.started_at*1000<span).map(s=>{const y=10+((now-s.started_at*1000)/span)*70,long=(s.active_seconds||0)>=big;return `<b class="${long?'big':''}" style="top:${y}%"></b>`+(long?`<span style="top:${y}%">${new Date(s.started_at*1000).toLocaleDateString(undefined,{month:'numeric',day:'numeric'})} · ${Math.round((s.active_seconds||0)/60)}${w.min}</span>`:'');}).join('');
   $('.tv-slices').innerHTML=Array.from({length:5},(_,j)=>`<i style="background:${art(g,p)};background-size:500% 100%;background-position:${j*25}% 0;transform:translateZ(${j%2?40:-20}px) translateY(${(j-2)*12}px)"></i>`).join('');
-  $('.tv-vocab').innerHTML=words.map(x=>`<ruby title="${esc(String(x.definitions||'').replace(/<[^>]+>/g,'').slice(0,80))}">${esc(x.spelling)}${x.reading&&x.reading!==x.spelling?`<rt>${esc(x.reading)}</rt>`:''}</ruby>`).join('');
+  const cards=words.length?words.slice(0,8).map(x=>({b:x.spelling,s:x.reading&&x.reading!==x.spelling?x.reading:'',t:String(x.definitions||'').replace(/<[^>]+>/g,'').slice(0,80)})):[...new Set([...g.title].filter(c=>c.trim()&&!/[*＊!！?？.。・\-]/.test(c)))].slice(0,6).map(c=>({b:c,s:'',t:''}));
+  $('.tv-vocab').innerHTML=cards.map(c=>`<div class="tv-wcard tv-card" title="${esc(c.t)}"><div class="tv-face"><small>${esc(c.s)||'&nbsp;'}</small><b>${esc(c.b)}</b><i class="tv-glare"></i></div></div>`).join('');$('.tv-vocab').querySelectorAll('.tv-card').forEach(cardify);
+  $('.tv-index').textContent=String(i+1).padStart(2,'0');$('.tv-scene').innerHTML=`SCENE <b>${String(i+1).padStart(2,'0')}</b> / ${String(list.length).padStart(2,'0')}`;
   const t=$('.tv-title');t.classList.remove('in');setTimeout(()=>{if(mine!==token)return;$('.tv-ruby').textContent=g.engine||'';let n=0;$('.tv-h1').innerHTML=String(g.title).split(' ').map(word=>`<i class="w">${[...word].map(c=>`<span style="transition-delay:${(n++)*28}ms">${esc(c)}</span>`).join('')}</i>`).join(' ');$('.tv-h1').title=g.title;$('.tv-meta').innerHTML=`<span>${esc(relativeTime(g.lastPlayedAt))}</span><span>${w.total} ${esc(duration(g.readingSeconds))}</span><span>${number(g.characters||0)} ${w.chars}</span><span>${number(g.learnedWords||0)} ${w.linked}</span>`;void t.offsetWidth;setTimeout(()=>t.classList.add('in'),30);},flash?180:0);
   $('.tv-who').textContent=g.title;type(sentences[0]||'');
   if(flash){const f=$('.tv-flash');f.classList.remove('on');void f.offsetWidth;f.classList.add('on');}
@@ -93,7 +103,7 @@ export function renderHomeTV(main,ctx){
  const canvas=$('.tv-canvas'),planes=[...root.querySelectorAll('.tv-plane')],reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
  live.move=e=>{if(reduced)return;const r=root.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;canvas.style.transform=`rotateY(${x*6}deg) rotateX(${-y*5}deg)`;planes.forEach(p=>p.style.transform=`translate3d(${-x*p.dataset.z*.25}px,${-y*p.dataset.z*.2}px,${p.dataset.z}px)`);};
  root.addEventListener('mousemove',live.move);
- root.querySelectorAll('.tv-card').forEach(cardify);
+ root.querySelectorAll('.tv-cover,.tv-heat-card').forEach(cardify);
  root.addEventListener('mouseenter',()=>clearTimeout(live?.timer));
  root.addEventListener('mouseleave',()=>{canvas.style.transform='';if(live&&list.length>1){clearTimeout(live.timer);live.timer=setTimeout(()=>paint((cur+1)%list.length),DUR);}});
  if(list.length)paint(0,false);

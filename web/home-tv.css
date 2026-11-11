@@ -2,7 +2,7 @@
 .tv-home button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .tv-canvas{position:absolute;inset:-6%;z-index:0;transform-style:preserve-3d;transition:transform 1.2s cubic-bezier(.2,.8,.2,1)}
 .tv-plane{position:absolute;inset:0;transform-style:preserve-3d;pointer-events:none}
-.tv-card,.tv-vocab,.tv-heat i{pointer-events:auto}
+.tv-card,.tv-heat i{pointer-events:auto}
 .tv-kana{position:absolute;right:-4%;top:-8%;font-family:var(--g-serif-ja);font-size:44vmin;line-height:1;color:transparent;-webkit-text-stroke:1px color-mix(in srgb,var(--g-t1) 20%,transparent);writing-mode:vertical-rl;user-select:none}
 .tv-ring{position:absolute;left:50%;top:6%;width:64vmin;height:64vmin;transition:left 1.4s cubic-bezier(.7,0,.2,1)}
 .tv-disc{position:absolute;inset:7%;border-radius:50%;opacity:.85;background-size:cover!important;background-position:center!important}
@@ -11,9 +11,9 @@
 .tv-ring .track{stroke:color-mix(in srgb,var(--g-t1) 14%,transparent)}
 .tv-ring .prog{stroke:var(--g-gold);stroke-width:2.4;transition:stroke-dashoffset 1.6s cubic-bezier(.7,0,.2,1)}
 .tv-pct{position:absolute;left:4%;top:2%;font-family:var(--tv-mono);font-size:11px;letter-spacing:.3em;color:var(--g-gold)}
-.tv-band{position:absolute;left:-18%;top:50%;width:64%;height:8vmin;background:var(--tv-b);transform:rotate(-14deg);overflow:hidden;opacity:.9;transition:transform 1.4s cubic-bezier(.7,0,.2,1),background 1.4s}
-.tv-band-in{display:inline-block;white-space:nowrap;font-family:var(--g-serif-ja);font-size:4.6vmin;line-height:8vmin;color:var(--tv-c);animation:tv-mq 60s linear infinite}
-@keyframes tv-mq{to{transform:translateX(-50%)}}
+.tv-band{position:absolute;left:37%;top:-12%;width:9vmin;height:130%;background:var(--tv-b);transform:rotate(6deg);overflow:hidden;opacity:.92;box-shadow:0 0 0 1px color-mix(in srgb,var(--g-t1) 10%,transparent);transition:background 1.4s}
+.tv-band-in{display:block;writing-mode:vertical-rl;white-space:nowrap;font-family:var(--g-serif-ja);font-size:5vmin;line-height:9vmin;letter-spacing:.12em;color:var(--tv-c);animation:tv-mqv 90s linear infinite}
+@keyframes tv-mqv{to{transform:translateY(-50%)}}
 .tv-tl{position:absolute;left:44%;top:-20%;width:1px;height:140vh;background:color-mix(in srgb,var(--g-t1) 30%,transparent);transform:rotate(24deg);transform-origin:top}
 .tv-tl b{position:absolute;left:-4px;width:9px;height:1px;background:var(--g-t1)}
 .tv-tl b.big{left:-10px;width:21px;height:2px;background:var(--g-gold)}
@@ -31,14 +31,18 @@
 .tv-glare{background:radial-gradient(circle at var(--px) var(--py),rgba(255,255,255,.55),rgba(255,255,255,.08) 28%,transparent 55%);mix-blend-mode:overlay}
 .tv-foil{background:linear-gradient(115deg,transparent 20%,hsl(var(--hue) 90% 70% / .55) 38%,hsl(calc(var(--hue) + 90deg) 90% 70% / .5) 50%,hsl(calc(var(--hue) + 180deg) 90% 70% / .45) 62%,transparent 80%);background-size:220% 220%;background-position:var(--px) var(--py);mix-blend-mode:color-dodge}
 .tv-card.touch .tv-glare{opacity:1}.tv-card.touch .tv-foil{opacity:.55}
-.tv-vocab{position:absolute;left:30%;top:22%;height:30vh;display:flex;flex-direction:column;flex-wrap:wrap;gap:6px 22px;z-index:2}
-.tv-vocab ruby{font-family:var(--g-serif-ja);font-size:20px;color:var(--g-t1);opacity:.7;display:inline-block;cursor:default;transition:transform .25s cubic-bezier(.2,.8,.2,1),color .25s,opacity .25s}
-.tv-vocab ruby rt{font-size:11px;color:var(--g-t2)}
-.tv-vocab ruby:hover{opacity:1;color:var(--g-gold);transform:translateY(-4px) scale(1.15)}
-.tv-heat-card{position:absolute;left:9%;top:36%;padding:14px;transform:rotate(-8deg) skewX(-10deg);transform-origin:left top}
+.tv-vocab{position:absolute;left:calc(5vw + 6%);top:calc(31% + 170px);display:flex;gap:12px;max-width:30vw;flex-wrap:wrap;z-index:2}
+.tv-wcard{width:64px;height:86px}
+.tv-wcard .tv-face{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:6px;overflow:hidden;background:color-mix(in srgb,var(--surface) 80%,transparent);outline:1px solid color-mix(in srgb,var(--g-t1) 14%,transparent);box-shadow:0 14px 24px -14px #000}
+.tv-wcard b{font-family:var(--g-serif-ja);font-weight:400;font-size:22px;line-height:1;white-space:nowrap;max-width:58px;overflow:hidden;text-overflow:clip}.tv-wcard small{font-family:var(--g-serif-ja);font-size:11px;color:var(--g-t2);white-space:nowrap;max-width:58px;overflow:hidden}.tv-wcard.touch .tv-face{outline-color:var(--g-gold)}
+.tv-marks i{position:absolute;width:22px;height:22px;border:1px solid color-mix(in srgb,var(--g-t1) 40%,transparent);z-index:4;pointer-events:none}.tv-marks i:nth-child(1){left:2.4vw;top:2.4vh;border-right:0;border-bottom:0}.tv-marks i:nth-child(2){right:2.4vw;top:2.4vh;border-left:0;border-bottom:0}.tv-marks i:nth-child(3){left:2.4vw;bottom:2.4vh;border-right:0;border-top:0}.tv-marks i:nth-child(4){right:2.4vw;bottom:2.4vh;border-left:0;border-top:0}
+.tv-scene{position:absolute;right:4vw;bottom:calc(15vh + 100px);z-index:6;font-family:var(--tv-mono);font-size:11px;letter-spacing:.35em;color:var(--g-t2)}.tv-scene b{color:var(--g-gold);font-weight:400}
+.tv-index{position:absolute;left:4%;bottom:4%;font-family:var(--g-serif);font-size:34vmin;line-height:.8;color:transparent;-webkit-text-stroke:1px color-mix(in srgb,var(--g-t1) 12%,transparent);user-select:none}
+.tv-scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.18) 3px 4px);opacity:.35;z-index:1}
+.tv-heat-card{position:absolute;left:calc(5vw + 6%);top:31%;width:max-content;height:max-content}
 .tv-heat-card .tv-face{padding:12px;background:color-mix(in srgb,var(--bg) 55%,transparent);outline:1px solid color-mix(in srgb,var(--g-t1) 10%,transparent)}
-.tv-heat{position:relative;display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,11px);gap:3px}
-.tv-heat i{width:11px;height:11px;background:var(--g-t1);opacity:.06;transition:opacity .6s,background .6s,transform .2s}
+.tv-heat{position:relative;display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,13px);gap:3px}
+.tv-heat i{width:13px;height:13px;background:var(--g-t1);opacity:.06;transition:opacity .6s,background .6s,transform .2s}
 .tv-heat i:hover{transform:scale(1.6)}
 .tv-heat i.l1{opacity:.22}.tv-heat i.l2{opacity:.45;background:var(--tv-b)}.tv-heat i.l3{opacity:.8;background:var(--tv-a)}
 .tv-heat i.today{outline:1px solid var(--g-gold);outline-offset:2px;opacity:1;background:var(--g-gold)}
@@ -47,8 +51,8 @@
 .tv-flash.on{animation:tv-fl .14s steps(1)}@keyframes tv-fl{0%{opacity:.5}100%{opacity:0}}
 .tv-clock{position:absolute;left:5vw;top:5vh;z-index:6;font-family:var(--tv-mono);font-size:12px;letter-spacing:.3em;color:var(--g-t2)}
 .tv-clock b{display:block;margin-top:6px;font-family:var(--g-serif);font-weight:400;font-size:clamp(30px,3.4vw,52px);letter-spacing:0;color:var(--g-t1)}
-.tv-heatlink{position:absolute;left:9%;top:calc(36% - 34px);z-index:6;font-family:var(--tv-mono);font-size:11px!important;letter-spacing:.3em;color:var(--g-t3)!important;opacity:0;transition:opacity .3s;transform:rotate(-8deg);transform-origin:left}
-.tv-home:hover .tv-heatlink{opacity:1}.tv-heatlink:hover{color:var(--g-gold)!important}
+.tv-heatlink{position:absolute;left:5vw;top:calc(31% - 30px);z-index:6;font-family:var(--tv-mono);font-size:11px!important;letter-spacing:.3em;color:var(--g-t2)!important;opacity:.75;transition:opacity .3s,color .2s}
+.tv-heatlink:hover{opacity:1;color:var(--g-gold)!important}
 .tv-figs{position:absolute;right:4vw;top:6vh;z-index:6;display:grid;gap:2.2vh;text-align:right}
 .tv-fig{display:block;text-align:right}
 .tv-fig b{display:block;font-family:var(--g-serif);font-weight:400;font-size:clamp(34px,4.6vw,72px);line-height:.9;font-variant-numeric:tabular-nums lining-nums;transition:color .2s}
@@ -107,3 +111,7 @@
 .tv-hint{font-family:var(--tv-mono);font-size:11px;letter-spacing:.1em;color:var(--g-t3)}
 :root[data-theme=light] .tv-h1{text-shadow:none}
 @media (prefers-reduced-motion:reduce){.tv-home *{transition:none!important;animation:none!important}}
+
+.tv-old,.tv-ghost{position:absolute;inset:0;border-radius:10px;pointer-events:none}
+.tv-old{z-index:4;box-shadow:0 40px 80px -30px #000;background-size:cover!important;background-position:center!important}
+.tv-ghost{background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--g-gold) 22%,var(--bg)) 0 6px,var(--bg) 6px 12px);outline:1px solid color-mix(in srgb,var(--g-gold) 60%,transparent);outline-offset:-8px;box-shadow:0 30px 60px -30px #000}
