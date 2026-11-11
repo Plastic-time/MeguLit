@@ -300,3 +300,110 @@
 .gm-choice{border-radius:0}
 :root[data-theme=light] .gm-overview,:root[data-theme=light] .gm-stage{background-color:#000}
 @media(prefers-reduced-motion:reduce){.gm-piece{transition:none}}
+/* 2026-11-11 grammar list + lesson rebuilt (user: 推翻现有排版): HUD strip, black stage, tracklist of lessons, and a
+   lesson with a left step rail and one stage per step. Black / paper, one red, tracked mono, Roman numerals. */
+.gm-page{--mg-black:rgba(0,0,0,.84);--mg-line:rgba(255,255,255,.12);--mg-dim:rgba(255,255,255,.55);--ease-x:cubic-bezier(.16,1,.3,1);gap:14px;color:#fff}
+.gm-tag{display:inline-flex;align-items:center;gap:10px;font:500 10px/1 var(--mg-mono);letter-spacing:.45em;text-transform:lowercase;color:var(--mg-dim);white-space:nowrap}
+.gm-tag i{width:6px;height:6px;background:var(--mg-red)}
+.gm-corner{position:absolute;width:18px;height:18px;border:1px solid rgba(255,255,255,.5);pointer-events:none}.gm-corner.tl{left:14px;top:14px;border-right:0;border-bottom:0}.gm-corner.br{right:14px;bottom:14px;border-left:0;border-top:0}
+/* HUD */
+.gm-hud{display:flex;align-items:center;gap:22px;padding:12px 18px;background:var(--mg-black);border-top:1px solid var(--mg-red);flex-wrap:wrap}
+.gm-hud .gm-levels{gap:2px}
+.gm-hud .gm-level{min-height:28px;padding:0 12px;border-radius:0;border:1px solid var(--mg-line);font:500 11px/1 var(--mg-mono);letter-spacing:.15em;color:var(--mg-dim)}
+.gm-hud .gm-level.active{background:#fff;border-color:#fff;color:#0b0b0b}
+.gm-hud-stats{display:flex;gap:24px;margin-left:auto;font:10px/1 var(--mg-mono);letter-spacing:.15em;color:var(--mg-dim)}
+.gm-hud-stats b{font:600 15px/1 var(--mg-mono);color:#fff;margin-right:6px}
+/* stage */
+.gm-hero{position:relative;overflow:hidden;grid-template-columns:minmax(0,1fr) 230px;gap:0;padding:0;border:0;border-radius:0;background:#000;background-image:linear-gradient(transparent calc(100% - 1px),rgba(255,255,255,.05) 0),linear-gradient(90deg,transparent calc(100% - 1px),rgba(255,255,255,.05) 0);background-size:100% 32px,32px 100%}
+.gm-hero-ghost{position:absolute;left:-2%;top:50%;transform:translateY(-50%);font:400 340px/1 var(--gm-serif-ja);color:#fff;opacity:.06;pointer-events:none}
+.gm-hero-main{position:relative;padding:44px 46px 36px;display:grid;gap:12px;align-content:center;min-height:270px}
+.gm-kicker{font:500 11px/1 var(--mg-mono);letter-spacing:.45em;color:var(--mg-dim)}
+.gm-kicker::before{content:'▮ ';color:var(--mg-red)}
+.gm-hero h2{margin:0;display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
+.gm-hero-ja{font:500 78px/1 var(--gm-serif-ja);color:var(--mg-red)}
+.gm-hero h2 small{font:600 26px/1.2 var(--gm-serif);color:#fff}
+.gm-hero-gist{color:rgba(255,255,255,.72);font-size:15px;max-width:52ch;margin:0}
+.gm-hero-row{display:flex;align-items:center;gap:24px;margin-top:8px;flex-wrap:wrap}
+.gm-hero-go{display:inline-flex;align-items:center;gap:14px;height:48px;padding:0 28px;border-radius:0;background:var(--mg-red);border:0;color:#fff;font-weight:600;letter-spacing:.2em;transition:gap .3s var(--ease-x),transform .4s var(--ease-x)}
+.gm-hero-go:hover{gap:26px}.gm-hero-go:active{transform:scale(.96)}
+.gm-barcode{display:grid;grid-template-columns:repeat(21,1fr);gap:3px;width:240px;height:22px}
+.gm-barcode i{background:rgba(255,255,255,.14);transform-origin:bottom}.gm-barcode i.on{background:#fff}.gm-barcode i.cur{background:var(--mg-red)}
+.gm-hero-side{position:relative;border-left:1px dashed var(--mg-line);padding:44px 24px;justify-content:center;gap:8px}
+.gm-hero-level{font:600 36px/1 var(--mg-mono);color:#fff}
+.gm-hero-side .gm-link{color:var(--mg-red);font:11px var(--mg-mono);letter-spacing:.2em;text-decoration:none}
+.gm-hero-side .gm-cap{color:var(--mg-dim)}
+/* overview strip */
+.gm-overview{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;align-items:center;gap:6px 28px;padding:20px 24px;border-radius:0;background:#000;border:0;border-left:3px solid var(--mg-red);transition:transform .45s var(--ease-x)}
+.gm-overview .gm-overview-kicker{grid-row:1/3}
+.gm-overview:hover{transform:translateX(6px)}
+/* tracklist */
+.gm-tracks{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.gm-group{background:var(--mg-black);padding:18px 0 6px}
+.gm-group h3{display:flex;align-items:baseline;gap:12px;padding:0 20px 12px;margin:0;border-bottom:1px solid var(--mg-line);font:600 16px/1 var(--gm-serif);letter-spacing:.06em;color:#fff}
+.gm-group h3 em{font:500 11px/1 var(--mg-mono);font-style:normal;letter-spacing:.2em;color:var(--mg-red)}
+.gm-group h3 small{margin-left:auto;font:11px/1 var(--mg-mono);color:var(--mg-dim)}
+.gm-group .gm-cards{display:block}
+.gm-group .gm-card{position:relative;display:grid;grid-template-columns:36px minmax(70px,auto) 1fr auto;grid-template-rows:auto auto;align-items:center;gap:2px 14px;width:100%;min-height:0;padding:14px 20px;border:0;border-bottom:1px dashed var(--mg-line);border-radius:0;background:none;color:#fff;overflow:hidden;transition:background .2s}
+.gm-group .gm-card::before{content:'';position:absolute;inset:0;background:var(--mg-red);transform:scaleX(0);transform-origin:left;transition:transform .45s var(--ease-x);z-index:0}
+.gm-group .gm-card>*{position:relative;z-index:1}
+.gm-group .gm-card:hover::before{transform:scaleX(1)}
+.gm-group .gm-card:hover .gm-card-no,.gm-group .gm-card:hover .gm-card-node,.gm-group .gm-card:hover .gm-card-gist,.gm-group .gm-card:hover .gm-card-meta{color:#fff}
+.gm-group .gm-card:active{transform:none}
+.gm-card-no{grid-row:1/3;font:500 12px/1 var(--mg-mono);letter-spacing:.1em;color:var(--mg-dim)}
+.gm-group .gm-card-title{grid-row:1/3;font:500 28px/1 var(--gm-serif-ja)}
+.gm-group .gm-card-gist{font-size:14px;color:#fff;line-height:1.4}
+.gm-card-node{grid-column:3;font:10px/1 var(--mg-mono);letter-spacing:.15em;color:var(--mg-dim)}
+.gm-group .gm-card-meta{grid-row:1/3;grid-column:4;flex-direction:column;align-items:flex-end;gap:4px;font:10px/1 var(--mg-mono);letter-spacing:.1em;color:var(--mg-dim)}
+.gm-group .gm-card-meta b{color:#fff;font-weight:600}
+.gm-group .gm-card.learned .gm-card-title{color:rgba(255,255,255,.45)}
+.gm-group .gm-card.learned .gm-card-no::after{content:' ✓';color:#fff}
+.gm-group .gm-card.next{box-shadow:none;background:rgba(200,50,60,.18)}
+.gm-group .gm-card.next .gm-card-no,.gm-group .gm-card.next .gm-card-meta b{color:var(--mg-red)}
+.gm-group .gm-card.next:hover .gm-card-no,.gm-group .gm-card.next:hover .gm-card-meta b{color:#fff}
+/* lesson: header band, left step rail, stage */
+.gm-lesson{display:grid;grid-template-columns:200px minmax(0,1fr);grid-template-areas:"head head" "rail main";gap:0;padding:0;border:0;border-radius:0;background:none}
+.gm-lesson-head{grid-area:head;position:relative;display:grid;gap:10px;padding:26px 30px 22px;background:#000;border-top:1px solid var(--mg-red)}
+.gm-lesson-head h2{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin:0}
+.gm-lesson-head h2 span{font:500 64px/1 var(--gm-serif-ja);color:var(--mg-red)}
+.gm-lesson-head h2 small{font:600 24px/1.2 var(--gm-serif);color:#fff}
+.gm-lesson-head .gm-onmap{order:3}
+.gm-lesson-head .gm-chip{border-radius:0;border:1px dashed var(--mg-line);font:11px var(--mg-mono);letter-spacing:.1em}
+.gm-lesson>.gm-steps{grid-area:rail;display:flex;flex-direction:column;gap:0;margin:0;padding:0;background:var(--mg-black);border-right:1px solid var(--mg-line)}
+.gm-lesson>.gm-steps li{display:block}
+.gm-lesson .gm-step-dot{flex-direction:row;justify-content:flex-start;gap:14px;padding:18px 20px;border-radius:0;border-bottom:1px dashed var(--mg-line);position:relative;font-size:13px}
+.gm-lesson .gm-step-dot b{width:auto;height:auto;border:0;background:none;font:500 12px/1 var(--mg-mono);color:var(--mg-dim);transform:none}
+.gm-lesson .gm-step-dot b::before{content:'0'}
+.gm-lesson .gm-step-dot span{font:500 13px/1.2 var(--gm-serif);letter-spacing:.04em}
+.gm-lesson .gm-step-dot::after{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--mg-red);transform:scaleY(0);transition:transform .35s var(--ease-x)}
+.gm-lesson .gm-step-dot.active{background:#000;color:#fff}
+.gm-lesson .gm-step-dot.active::after{transform:none}
+.gm-lesson .gm-step-dot.active b{background:none;color:var(--mg-red);transform:none}
+.gm-lesson .gm-step-dot.passed b{color:#fff;border:0}
+.gm-lesson .gm-step-dot.passed span::after{content:' ✓';color:var(--mg-dim)}
+.gm-lesson-main{grid-area:main;display:grid;grid-template-rows:1fr auto;background:#000;min-height:420px}
+.gm-lesson .gm-stepbody{padding:32px 36px;gap:20px;min-height:0;align-content:start}
+.gm-lesson .gm-stepnav{padding:16px 36px;border-top:1px dashed var(--mg-line)}
+.gm-lesson .gm-stepnav button{border-radius:0;letter-spacing:.15em}
+.gm-lesson .gm-stepnav .primary{background:var(--mg-red);border:0;transition:transform .4s var(--ease-x)}
+.gm-lesson .gm-stepnav .primary:hover{transform:translateX(4px)}
+.gm-lesson [data-stepof]{font:11px var(--mg-mono);letter-spacing:.3em;color:var(--mg-dim)}
+.gm-lesson .gm-megu{gap:0}
+.gm-lesson .gm-bubble{background:var(--mg-paper);color:var(--mg-ink);border:0;font-size:16px;line-height:1.9;padding:18px 22px}
+.gm-lesson .gm-gist{font-size:24px}
+.gm-lesson .gm-lead-line{border:1px dashed var(--mg-line);border-radius:0;padding:22px}
+.gm-lesson .gm-lead-line .gm-ja{font-size:26px}
+.gm-lesson .gm-formulas li{border-radius:0;background:none;border-bottom:1px dashed var(--mg-line);padding:16px 0}
+.gm-lesson .gm-block{font-size:17px;padding:8px 14px}
+.gm-lesson .gm-formula-ex{font-size:24px;border-radius:0}
+.gm-lesson .gm-uses li{border-left:3px solid var(--mg-red);padding-left:16px}
+.gm-lesson .gm-examples .gm-ex,.gm-lesson .gm-split,.gm-lesson .gm-widget{border-radius:0}
+.gm-lesson .gm-widget{background:none;border:1px dashed var(--mg-line)}
+.gm-lesson .gm-q{font-size:30px}
+.gm-lesson .gm-choice{font-size:22px;min-width:72px;min-height:52px;background:none;border:1px solid rgba(255,255,255,.35);transition:transform .35s var(--ease-x),background .15s}
+.gm-lesson .gm-choice:hover:not(:disabled){background:#fff;color:#0b0b0b;transform:translateY(-3px)}
+.gm-lesson .gm-verdict{border-radius:0}
+@media(max-width:860px){.gm-lesson{grid-template-columns:1fr;grid-template-areas:"head" "rail" "main"}.gm-lesson>.gm-steps{flex-direction:row;overflow-x:auto}.gm-lesson .gm-step-dot span{display:none}.gm-hero{grid-template-columns:1fr}.gm-hero-side{border-left:0;border-top:1px dashed var(--mg-line);padding:20px 46px}.gm-hud-stats{margin-left:0}}
+@media(prefers-reduced-motion:reduce){.gm-group .gm-card::before,.gm-lesson .gm-step-dot::after,.gm-hero-go,.gm-overview,.gm-lesson .gm-choice{transition:none}}
+.gm-lesson .gm-step-dot b{white-space:nowrap;min-width:2.2em;text-align:left}
+.gm-lesson .gm-actions button{border-radius:0;letter-spacing:.12em}
+.gm-lesson .gm-actions .primary{background:var(--mg-red);border:0}
