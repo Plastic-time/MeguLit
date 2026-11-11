@@ -15,34 +15,34 @@ export function readerLevel(stats,element=''){
  if(SCHOOLS[element]||xp<cap)return {...levelOf(xp),xp,pending:0,locked:false};
  return {level:SCHOOL_LEVEL,into:0,need:XP_STEP,xp:cap,pending:xp-cap,locked:true};
 }
-/* 2026-11-12 (user: not so chuunibyou; think DNF and Mushoku Tensei): before 转职 the plain rank ladder — 见习 → 初级 → 中级 →
-   上级魔术师 (which it stays at until 转职); at Lv.20 a DNF-style job name for the element, then its Saint / King / Emperor / God ranks
-   (火圣级魔术师 …), and at Lv.80 one title of its own; fire alone goes four ranks further, 爆裂魔法初学者 → 爆裂魔法师 at Lv.120. Each element is described by the reading style
-   it suits, plainly. No 魔导士, no 红魔族, no 练习生. */
+/* 2026-11-12 (user: not so chuunibyou; think DNF and Mushoku Tensei; the top is just 神级): before 转职 见习 / 初级 / 中级 /
+   上级魔术师 (staying 上级 until 转职); then a DNF-style job name for the element at Lv.20 and its Saint / King / Emperor /
+   God ranks at Lv.35 / 50 / 65 / 80 — 神级 is the top. Fire alone goes on past it, 爆裂魔法初学者 → 爆裂魔法师 (Lv.90–130).
+   Each element is described by the reading style it suits, plainly. No 魔导士, no 红魔族, no 练习生. */
 const BASE={zh:[[1,'见习魔术师'],[5,'初级魔术师'],[10,'中级魔术师'],[15,'上级魔术师']],
  ja:[[1,'見習い魔術師'],[5,'初級魔術師'],[10,'中級魔術師'],[15,'上級魔術師']],
  en:[[1,'Apprentice magician'],[5,'Beginner-rank magician'],[10,'Intermediate-rank magician'],[15,'Advanced-rank magician']]};
-const STEPS=[20,30,40,50,65,80];
-/* 2026-11-12 (user): fire goes four ranks further than every other element — from 爆裂魔法初学者 at Lv.80 to 爆裂魔法师 at Lv.120 */
-const FIRE_STEPS=[...STEPS,90,100,110,120];
+const STEPS=[20,35,50,65,80];
+/* 2026-11-12 (user): fire goes four ranks further than every other element — past 火神级魔术师 (Lv.80, the top for everyone else): 爆裂魔法初学者 at Lv.90 up to 爆裂魔法师 at Lv.130 */
+const FIRE_STEPS=[...STEPS,90,100,110,120,130];
 const E=(color,glyph,name,line,zh,ja,en)=>({color,glyph,name,line,ranks:{zh,ja,en}});
 export const SCHOOLS={
  fire:E('#e2423e',{zh:'火',ja:'火',en:'火'},{zh:'火',ja:'火',en:'Fire'},{zh:'爆发型，一口气读很多',ja:'爆発型、一気にたくさん読む',en:'Burst reader: lots in one go'},
   ['火焰术士','火圣级魔术师','火王级魔术师','火帝级魔术师','火神级魔术师','爆裂魔法初学者','爆裂魔法学徒','爆裂魔法修习者','爆裂魔法术士','爆裂魔法师'],['火焔術士','火聖級魔術師','火王級魔術師','火帝級魔術師','火神級魔術師','爆裂魔法の初心者','爆裂魔法見習い','爆裂魔法の修行者','爆裂魔法の術士','爆裂魔法師'],['Pyromancer','Fire Saint-rank magician','Fire King-rank magician','Fire Emperor-rank magician','Fire God-rank magician','Explosion beginner','Explosion apprentice','Explosion student','Explosion caster','Explosion mage']),
  ice:E('#7fd3f2',{zh:'冰',ja:'氷',en:'氷'},{zh:'冰',ja:'氷',en:'Ice'},{zh:'稳健型，读得仔细',ja:'堅実型、丁寧に読む',en:'Steady reader: careful and thorough'},
-  ['冰结师','冰圣级魔术师','冰王级魔术师','冰帝级魔术师','冰神级魔术师','绝对零度'],['氷結師','氷聖級魔術師','氷王級魔術師','氷帝級魔術師','氷神級魔術師','絶対零度'],['Cryomancer','Ice Saint-rank magician','Ice King-rank magician','Ice Emperor-rank magician','Ice God-rank magician','Absolute zero']),
+  ['冰结师','冰圣级魔术师','冰王级魔术师','冰帝级魔术师','冰神级魔术师'],['氷結師','氷聖級魔術師','氷王級魔術師','氷帝級魔術師','氷神級魔術師'],['Cryomancer','Ice Saint-rank magician','Ice King-rank magician','Ice Emperor-rank magician','Ice God-rank magician']),
  thunder:E('#f2d14a',{zh:'雷',ja:'雷',en:'雷'},{zh:'雷',ja:'雷',en:'Thunder'},{zh:'速读型，追求阅读速度',ja:'速読型、読む速さを追う',en:'Speed reader: chasing pace'},
-  ['引雷师','雷圣级魔术师','雷王级魔术师','雷帝级魔术师','雷神级魔术师','万雷'],['引雷師','雷聖級魔術師','雷王級魔術師','雷帝級魔術師','雷神級魔術師','万雷'],['Bolt caller','Thunder Saint-rank magician','Thunder King-rank magician','Thunder Emperor-rank magician','Thunder God-rank magician','Myriad thunder']),
+  ['引雷师','雷圣级魔术师','雷王级魔术师','雷帝级魔术师','雷神级魔术师'],['引雷師','雷聖級魔術師','雷王級魔術師','雷帝級魔術師','雷神級魔術師'],['Bolt caller','Thunder Saint-rank magician','Thunder King-rank magician','Thunder Emperor-rank magician','Thunder God-rank magician']),
  wind:E('#8fe0c0',{zh:'风',ja:'風',en:'風'},{zh:'风',ja:'風',en:'Wind'},{zh:'杂食型，几部作品轮着读',ja:'雑食型、何作も並行して読む',en:'Wide reader: several stories at once'},
-  ['御风师','风圣级魔术师','风王级魔术师','风帝级魔术师','风神级魔术师','天穹'],['御風師','風聖級魔術師','風王級魔術師','風帝級魔術師','風神級魔術師','天穹'],['Aeromancer','Wind Saint-rank magician','Wind King-rank magician','Wind Emperor-rank magician','Wind God-rank magician','Firmament']),
+  ['御风师','风圣级魔术师','风王级魔术师','风帝级魔术师','风神级魔术师'],['御風師','風聖級魔術師','風王級魔術師','風帝級魔術師','風神級魔術師'],['Aeromancer','Wind Saint-rank magician','Wind King-rank magician','Wind Emperor-rank magician','Wind God-rank magician']),
  water:E('#4f9de8',{zh:'水',ja:'水',en:'水'},{zh:'水',ja:'水',en:'Water'},{zh:'坚持型，每天读一点',ja:'継続型、毎日少しずつ読む',en:'Daily reader: a little every day'},
-  ['潮汐师','水圣级魔术师','水王级魔术师','水帝级魔术师','水神级魔术师','沧海'],['潮汐師','水聖級魔術師','水王級魔術師','水帝級魔術師','水神級魔術師','滄海'],['Tidecaller','Water Saint-rank magician','Water King-rank magician','Water Emperor-rank magician','Water God-rank magician','Open sea']),
+  ['潮汐师','水圣级魔术师','水王级魔术师','水帝级魔术师','水神级魔术师'],['潮汐師','水聖級魔術師','水王級魔術師','水帝級魔術師','水神級魔術師'],['Tidecaller','Water Saint-rank magician','Water King-rank magician','Water Emperor-rank magician','Water God-rank magician']),
  earth:E('#c08a52',{zh:'土',ja:'土',en:'土'},{zh:'土',ja:'土',en:'Earth'},{zh:'积累型，多查词多收录',ja:'積み上げ型、よく調べて語彙を増やす',en:'Builder: looks words up, grows vocabulary'},
-  ['岩石术士','土圣级魔术师','土王级魔术师','土帝级魔术师','土神级魔术师','坤舆'],['岩石術士','土聖級魔術師','土王級魔術師','土帝級魔術師','土神級魔術師','坤輿'],['Geomancer','Earth Saint-rank magician','Earth King-rank magician','Earth Emperor-rank magician','Earth God-rank magician','Terra']),
+  ['岩石术士','土圣级魔术师','土王级魔术师','土帝级魔术师','土神级魔术师'],['岩石術士','土聖級魔術師','土王級魔術師','土帝級魔術師','土神級魔術師'],['Geomancer','Earth Saint-rank magician','Earth King-rank magician','Earth Emperor-rank magician','Earth God-rank magician']),
  light:E('#fff1b8',{zh:'光',ja:'光',en:'光'},{zh:'光',ja:'光',en:'Light'},{zh:'理解型，每句都读懂',ja:'理解型、一文ずつ意味をつかむ',en:'Understander: gets every line'},
-  ['圣光师','光圣级魔术师','光王级魔术师','光帝级魔术师','光神级魔术师','永昼'],['聖光師','光聖級魔術師','光王級魔術師','光帝級魔術師','光神級魔術師','永昼'],['Lightbringer','Light Saint-rank magician','Light King-rank magician','Light Emperor-rank magician','Light God-rank magician','Endless day']),
+  ['圣光师','光圣级魔术师','光王级魔术师','光帝级魔术师','光神级魔术师'],['聖光師','光聖級魔術師','光王級魔術師','光帝級魔術師','光神級魔術師'],['Lightbringer','Light Saint-rank magician','Light King-rank magician','Light Emperor-rank magician','Light God-rank magician']),
  dark:E('#a07ae0',{zh:'暗',ja:'闇',en:'闇'},{zh:'暗',ja:'闇',en:'Dark'},{zh:'夜猫型，深夜里读',ja:'夜型、深夜に読む',en:'Night owl: reads late at night'},
-  ['暗影师','暗圣级魔术师','暗王级魔术师','暗帝级魔术师','暗神级魔术师','永夜'],['暗影師','闇聖級魔術師','闇王級魔術師','闇帝級魔術師','闇神級魔術師','永夜'],['Shadowmancer','Dark Saint-rank magician','Dark King-rank magician','Dark Emperor-rank magician','Dark God-rank magician','Endless night'])
+  ['暗影师','暗圣级魔术师','暗王级魔术师','暗帝级魔术师','暗神级魔术师'],['暗影師','闇聖級魔術師','闇王級魔術師','闇帝級魔術師','闇神級魔術師'],['Shadowmancer','Dark Saint-rank magician','Dark King-rank magician','Dark Emperor-rank magician','Dark God-rank magician'])
 };
 const lang=locale=>locale==='ja'||locale==='en'?locale:'zh';
 export const elementName=(element,locale)=>SCHOOLS[element]?.name[lang(locale)]||'';
