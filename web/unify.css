@@ -1547,3 +1547,7 @@ html body .dict-hit-line{height:1px!important;top:0!important}
 html body input:is(:-webkit-autofill,:-webkit-autofill:hover,:-webkit-autofill:focus,:autofill){-webkit-box-shadow:0 0 0 1000px #150f13 inset!important;box-shadow:0 0 0 1000px #150f13 inset!important;-webkit-text-fill-color:var(--g-t1,#f1e0d2)!important;caret-color:var(--g-t1,#f1e0d2);transition:background-color 9999s ease-out 0s}
 /* the launch never pushes out a scrollbar */
 html body:has(.dict-launch),html:not(#u):not(#v):not(#w):not(#x) body .main:has(.dict-launch){overflow:hidden!important}
+/* (user: the box disappeared behind the field mid-flight) the dictionary column is its own stacking context, always
+   above the field; 3D only happens inside it */
+html:not(#u):not(#v):not(#w):not(#x) body #learning-content:has(#lookup-results){position:relative;z-index:2;isolation:isolate}
+html:not(#u):not(#v):not(#w):not(#x) body .dict-field{z-index:0!important}
