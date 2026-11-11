@@ -69,11 +69,15 @@ function textOp(insts){const count=new Map();
  for(const x of insts)if(x.args.length===1&&x.args[0].type===0&&x.args[0].data.length&&x.args[0].data[0]>=0x81)count.set(x.op,(count.get(x.op)||0)+1);
  let best=-1,n=0;for(const [op,c] of count)if(c>n){best=op;n=c;}return best;}
 // Raw text lines in order, plus the anchors a translation keeps: ASCII string literals of the other commands.
-function words(buf){const insts=ystb(buf);if(!insts)return {raw:[],anchors:[]};const op=textOp(insts),raw=[],anchors=[];
- for(const x of insts){if(x.op===op&&x.args.length===1){raw.push(x.args[0].data);continue;}
-  for(const arg of x.args){const s=arg.data.toString('latin1'),re=/"([\x20-\x21\x23-\x7e]*)"/g;let m;while((m=re.exec(s)))if(m[1])anchors.push(m[1]);}}
- return {raw,anchors};}
-const parse=buf=>{const w=words(buf);return {lines:w.raw.map(b=>sjis.decode(b)),anchors:w.anchors};};
+/* E450 a sound command's file name (es.SND "NEM_M03_0390") before a text command is that line's voice; sound effects and
+   music (SE_*, BGM_*) are not voices. */
+const VOICE_NAME=/^(?!(?:se|bgm?|sys|me)(?:_|\d))(?:[A-Za-z]{2,6}_[A-Za-z0-9]+_\d{3,6}|[A-Za-z]{1,4}\d{3,6})$/i;
+function words(buf){const insts=ystb(buf);if(!insts)return {raw:[],anchors:[],voices:[]};const op=textOp(insts),raw=[],anchors=[],voices=[];let pending=null;
+ for(const x of insts){if(x.op===op&&x.args.length===1){raw.push(x.args[0].data);voices.push(pending);pending=null;continue;}
+  const strs=[];for(const arg of x.args){const s=arg.data.toString('latin1'),re=/"([\x20-\x21\x23-\x7e]*)"/g;let m;while((m=re.exec(s)))if(m[1]){anchors.push(m[1]);strs.push(m[1]);}}
+  if(strs.length>1&&/snd|voice|^vo$|koe/i.test(strs[0])&&VOICE_NAME.test(strs[1]))pending=strs[1];}
+ return {raw,anchors,voices};}
+const parse=buf=>{const w=words(buf),v=require('./voice-ref.cjs').keep(w.voices);return v?{lines:w.raw.map(b=>sjis.decode(b)),anchors:w.anchors,voices:v}:{lines:w.raw.map(b=>sjis.decode(b)),anchors:w.anchors};};
 
 // ---- rioLoader code table + font --------------------------------------------------------------------------------
 // UPX (NRV2E, the method rioLoader builds use) unpacking of the program image.
@@ -279,4 +283,6 @@ const yuris={
  },
  _internal:{ypfList,ypfScenes,ystb,words,loaderCodec,codecFor,unpackUpx,amanoPack,moleBox},
 };
+// E450 the voice clips of a YPF archive (vo.ypf), for game-voice.cjs.
+yuris.audio=file=>{if(!/\.ypf$/i.test(file))return null;const l=ypfList(file);return l?l.filter(e=>/\.(?:ogg|wav)$/i.test(e.name)).map(e=>({name:e.name,read:()=>ypfRead(file,e)})):null;};
 module.exports=yuris;
