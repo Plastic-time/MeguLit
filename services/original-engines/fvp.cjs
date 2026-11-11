@@ -55,7 +55,12 @@ function parse(buf){let b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),z=null,cn=nu
  const v=require('./voice-ref.cjs').keep(voices),out=z||cn?{lines,anchors:[],zh}:{lines,anchors:[]};if(v)out.voices=v;return out;}
 /* E450 a spoken line's voice: the int the script pushes (0x0A, u32) just before the text, then the voice call's
    argument shuffles (0x08); voice.bin names the clip with that number in nine digits (10024540 -> 010024540). */
-function voiceAt(b,at,from){for(let q=at-6;q>=Math.max(from,at-32);q--)if(b[q]===0x0A&&b[q+5]===0x08){const id=b.readUInt32LE(q+1);return id>0&&id<1e9?String(id).padStart(9,'0'):null;}return null;}
+/* A number whose low byte is itself 0x0A (20000010 = 0a 2d 31 01) reads "0a 0a 2d 31 01 08": the push is the first 0x0A,
+   the second is the number's own byte (いろとりどりのヒカリ: 94 lines were read as 134295853 before). */
+/* A 0x0A that is an operand byte is not a push: the address of a call (02 0a0b0200), the operand of a 0x0C
+   (0c 0a). */
+function operand(b,q,from){if(q-1>=from&&(b[q-1]===0x02||b[q-1]===0x0C))return true;return false;}
+function voiceAt(b,at,from){for(let q=at-6;q>=Math.max(from,at-32);q--)if(b[q]===0x0A&&b[q+5]===0x08){while(q-1>=from&&b[q-1]===0x0A&&b[q+4]===0x08)q--;if(operand(b,q,from))continue;const id=b.readUInt32LE(q+1);return id>0&&id<1e9?String(id).padStart(9,'0'):null;}return null;}
 // E450 the clips of an FVP .bin archive (voice.bin): u32 count, u32 name bytes, {name offset, offset, size} per entry, names.
 function audio(file){if(!/\.bin$/i.test(file))return null;let fd;try{fd=fs.openSync(file,'r');const size=fs.fstatSync(fd).size,h=Buffer.alloc(8);fs.readSync(fd,h,0,8,0);const n=h.readUInt32LE(0),ns=h.readUInt32LE(4);if(!n||n>200000||8+n*12+ns>size)return null;
  const t=Buffer.alloc(n*12+ns);fs.readSync(fd,t,0,t.length,8);const out=[];for(let i=0;i<n;i++){const no=t.readUInt32LE(i*12),o=t.readUInt32LE(i*12+4),s=t.readUInt32LE(i*12+8),at=n*12+no,z=t.indexOf(0,at);if(z<0||o+s>size)return null;

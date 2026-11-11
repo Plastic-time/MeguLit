@@ -91,3 +91,8 @@ test('xp3: Yuzusoft "sen:" archives get their real names back from the name tabl
  const index=Buffer.concat([file,sen]);
  const xp=Buffer.concat([xp3.MAGIC,u64(indexAt),data,table,Buffer.from([0]),u64(index.length),index]);const p=path.join(tmp(),'voice.xp3');fs.writeFileSync(p,xp);
  const l=xp3.list(p);assert.equal(l.files[0].name,real);assert.equal(l.files[0].hashedName,md5);assert.deepEqual(xp3.read(p,l.files[0]),data);});
+test('fvp: a voice number whose low byte is 0x0A is read from the first 0x0A; a 0x0A that is a call address is not a push',()=>{const fvp=require('../services/original-engines/fvp.cjs');
+ const sj=Buffer.from([0x82,0xa0,0x82,0xa2]),text=Buffer.concat([Buffer.from([0x0e,sj.length+1]),sj,Buffer.from([0])]);
+ const mk=code=>{const b=Buffer.concat([Buffer.alloc(4),code,text]);b.writeUInt32LE(b.length,0);return fvp.parse(b).voices;};
+ assert.deepEqual(mk(Buffer.from([0x02,0x62,0x03,0x02,0x00,0x0a,0x0a,0x2d,0x31,0x01,0x08,0x08,0x02,0xbb,0x03,0x00,0x00])),['020000010']);
+ assert.equal(mk(Buffer.from([0x08,0x08,0x02,0x0a,0x0b,0x02,0x00,0x08,0x08,0x08,0x02,0x69,0x1d,0x00,0x00])),undefined);});
