@@ -517,3 +517,23 @@ dialog.game-dialog.dev-notice .dev-notice-actions button.secondary.secondary.sec
  .dev-notice-page>.dev-notice-updates{min-height:64px;margin-top:14px;padding-top:10px}
  .dev-notice-actions{margin-top:14px}
 }
+/* E444 the problem report matches the notice and the website: square, a thin red frame, paper submit, no gradients */
+dialog.game-dialog.feedback-dialog{width:min(600px,92vw);padding:34px 40px 28px;border:1px solid color-mix(in srgb,var(--accent) 55%,transparent)!important;border-radius:6px!important;background:#0d0e12!important;box-shadow:0 30px 80px rgba(0,0,0,.6)!important}
+dialog.feedback-dialog .game-dialog-head{padding:0!important;margin:0 0 18px;background:none!important;border:0!important}
+dialog.feedback-dialog .game-dialog-kicker{font:11px/1 ui-monospace,Consolas,monospace;letter-spacing:.32em;color:var(--accent-light,var(--accent))}
+dialog.feedback-dialog .game-dialog-head h2{margin:16px 0 10px;font-family:var(--g-serif,serif);font-size:30px;font-weight:700;color:var(--text)}
+dialog.feedback-dialog .game-dialog-head p{margin:0;font-size:14px;line-height:1.8;color:var(--muted)}
+dialog.feedback-dialog .feedback-text,dialog.feedback-dialog .feedback-contact{width:100%;box-sizing:border-box;border-radius:0!important;border:1px solid rgba(255,255,255,.14)!important;background:#14151a!important;box-shadow:none!important;padding:12px 14px;font-size:14px;color:var(--text)}
+dialog.feedback-dialog .feedback-text{min-height:150px;resize:vertical;margin-bottom:12px;border-color:#c8323c!important}
+dialog.feedback-dialog .feedback-text:focus,dialog.feedback-dialog .feedback-contact:focus{outline:none;border-color:#e0505c!important}
+dialog.feedback-dialog .feedback-privacy{margin:10px 0 0;font-size:12px;color:var(--muted)}
+dialog.feedback-dialog .dialog-actions{display:flex;justify-content:flex-end;align-items:center;gap:18px;margin:22px 0 0;padding:0!important;background:none!important;border:0!important}
+dialog.feedback-dialog .dialog-actions .text-button{color:var(--muted);text-decoration:underline;text-underline-offset:4px}
+dialog.feedback-dialog .dialog-actions button.primary{height:46px;min-width:110px;padding:0 24px;border:0!important;border-radius:0!important;background:#f2efe9!important;background-image:none!important;color:#14151a!important;box-shadow:none!important;text-shadow:none!important;letter-spacing:.1em}
+dialog.feedback-dialog .dialog-actions button.primary::before,dialog.feedback-dialog .dialog-actions button.primary::after{content:none!important;display:none!important}
+dialog.feedback-dialog .dialog-actions button.primary:hover{background:#fff!important}
+/* E444 every game-request form (notice and Guide panel) lines the box and the button up at one height */
+.dev-notice-form{display:flex!important;align-items:stretch!important;gap:0!important}
+.dev-notice-form input{height:56px!important;box-sizing:border-box!important;margin:0!important;border-radius:0!important;border:1px solid #c8323c!important;border-right:0!important;background:#14151a!important;box-shadow:none!important}
+.dev-notice-form button.primary{height:56px!important;box-sizing:border-box!important;margin:0!important;min-width:86px;padding:0 22px!important;border:0!important;border-radius:0!important;background:#f2efe9!important;background-image:none!important;color:#14151a!important;box-shadow:none!important;text-shadow:none!important;transform:none!important}
+.dev-notice-form button.primary::before,.dev-notice-form button.primary::after{content:none!important;display:none!important}

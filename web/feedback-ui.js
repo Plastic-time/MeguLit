@@ -76,7 +76,7 @@ export function openFeedback({ api, locale = 'zh', esc, toast, version = '' }) {
   const t = words(locale), dialog = document.createElement('dialog');
   dialog.className = 'game-dialog feedback-dialog';
   dialog.innerHTML = `<div class="game-dialog-head"><span class="game-dialog-kicker">${esc(t.kicker)}</span><h2>${esc(t.title)}</h2><p>${esc(t.hint)}</p></div>
-<textarea class="feedback-text" rows="6" maxlength="1800" placeholder="${esc(t.placeholder)}" required></textarea>
+<textarea class="feedback-text" rows="6" maxlength="1800" placeholder="${esc(t.placeholder)}"></textarea>
 <input class="feedback-contact" maxlength="120" placeholder="${esc(t.contact)}">
 <p class="feedback-privacy">${esc(t.privacy)}</p>
 <p class="feedback-status" role="status" aria-live="polite"></p>
