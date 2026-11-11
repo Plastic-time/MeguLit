@@ -796,3 +796,17 @@ html:not(#u):not(#v) body .main .settings-content .settings-row{padding-block:18
 html:not(#u):not(#v) body .main .settings-content .settings-row .settings-label{font-family:var(--g-serif,serif);font-size:15.5px!important;font-weight:600!important}
 html:not(#u):not(#v) body .main .settings-content .panel{background:none!important;box-shadow:none!important;border:0!important}
 html:not(#u):not(#v) body .main .settings-content input.settings-search{background-color:#120e12!important}
+
+/* ---- r5 fixes ---- */
+/* settings: the section title leads even when a page puts a panel before its form (speech, background) */
+html:not(#u):not(#v) body .main .settings-content.settings-content{display:flex!important;flex-direction:column}
+html:not(#u):not(#v) body .main .settings-content>form{display:contents!important}
+html:not(#u):not(#v) body .main .settings-content>:is(.settings-search,.settings-search-results){order:-3}
+html:not(#u):not(#v) body .main .settings-content>form>.settings-section-title{order:-2}
+html:not(#u):not(#v) body .main .settings-content>*{flex:none}
+html:not(#u):not(#v) body .main .settings-content>form>*{max-width:1180px;width:100%;box-sizing:border-box}
+html:not(#u):not(#v) body .main .settings-content>form>.settings-section-title{margin:18px 0 28px!important;position:relative}
+html:not(#u):not(#v) body .main .settings-content>:is(.speech-choices,.background-tools){margin-top:0!important;padding-top:0!important}
+html:not(#u):not(#v) body .main .settings-content>:is(.speech-choices,.background-tools)>:first-child{margin-top:0!important}
+html:not(#u):not(#v) body .main .settings-content .settings-section-title.settings-section-title{height:auto!important;max-height:none!important;overflow:visible!important;flex:none!important;clip:auto!important;clip-path:none!important}
+html:not(#u):not(#v) body .main .settings-content>div>.panel:first-child>h2.panel-title{font-family:var(--g-serif,serif)!important;font-size:clamp(36px,3.2vw,52px)!important;font-weight:600!important;letter-spacing:.02em!important;text-transform:none!important;color:var(--g-t1,#f1e0d2)!important;margin:18px 0 22px!important;line-height:1.1!important;min-height:0!important}
