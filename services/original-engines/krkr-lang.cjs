@@ -24,8 +24,11 @@ function scripts(file){const t=list(file);if(!t)return [];return t.files.filter(
 const INLINE_IF=/\[if exp="[^"]*"\]([^\[]*)\[endif\](?:\[if exp="[^"]*"\][^\[]*\[endif\])+/gi;
 const ascii=t=>/^[\x20-\x7e]*$/.test(t);
 // Blocks of one script: {key, rows:[[sentence,…],…]}; anchors: ASCII command/label lines.
-function blocks(text){const out=[],anchors=[];let rows=[];const close=key=>{if(rows.length)out.push({key,rows});rows=[];};
- for(const raw of String(text||'').split(/\r?\n/)){const t=raw.trim();if(!t||t[0]===';')continue;
+function blocks(text){const out=[],anchors=[];let rows=[],code=false;const close=key=>{if(rows.length)out.push({key,rows});rows=[];};
+ for(const raw of String(text||'').split(/\r?\n/)){const t=raw.trim();
+  // E449 TJS between [iscript] / @iscript and [endscript] / @endscript is code, not text (config.ks).
+  if(/^(?:@iscript\b|\[iscript\])/i.test(t)){code=true;continue;}if(code){if(/^(?:@endscript\b|\[endscript\])/i.test(t))code=false;continue;}
+  if(!t||t[0]===';')continue;
   if(t[0]==='*'){if(ascii(t))anchors.push(t);close(t.includes('|')?t:null);continue;}
   if(t[0]==='@'){if(ascii(t))anchors.push(t);continue;}
   const line=t.replace(INLINE_IF,'$1'),parts=line.split(/\[l\]/i).map(s=>s.replace(/\[[^\]]*\]/g,'').trim()).filter(Boolean);

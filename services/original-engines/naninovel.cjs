@@ -37,9 +37,23 @@ const HEAD=/^(?:; )?(?:.*?<([A-Za-z-]+)>\s+to\s+.*?<([A-Za-z-]+)>\s+)?.*?localiz
 // PrintText commands after them: type name, namespace, assembly, script name, then the text. Their texts, in order.
 const U8=new TextDecoder('utf-8',{fatal:true});
 function printed(b,from,to){const out=[];let p=from&~3;const str=q=>{if(q+4>to)return null;const n=b.readUInt32LE(q);if(n<1||n>20000||q+4+n>to)return null;const raw=b.subarray(q+4,q+4+n);for(const c of raw)if(c<9||(c>13&&c<32))return null;try{return {s:U8.decode(raw),next:(q+4+n+3)&~3};}catch{return null;}};
- const toks=[];while(p<to){const r=str(p);if(r){toks.push(r.s);p=r.next;}else p+=4;}
- for(let i=0;i+4<toks.length;i++)if(toks[i]==='PrintText'&&toks[i+1]==='Naninovel.Commands')out.push(toks[i+4]);
- return out;}
+ const toks=[],at=[],ends=[];while(p<to){const r=str(p);if(r){toks.push(r.s);at.push(p);ends.push(r.next);p=r.next;}else p+=4;}
+ const comments=[],lines=new Map(),texts=[],registry=[];let firstRid=-1;
+ const u32=q=>q+4<=to?b.readUInt32LE(q):-1;
+ for(let i=0;i+4<toks.length;i++){
+  if(toks[i+1]==='Naninovel.Commands'&&toks[i+2]==='Elringus.Naninovel.Runtime'){if(firstRid<0&&at[i]>=8)firstRid=u32(at[i]-8);registry.push(toks[i]==='PrintText'?toks[i+4]:null);if(toks[i]==='PrintText')out.push(toks[i+4]);continue;}
+  if(toks[i+1]!=='Naninovel'||toks[i+2]!=='Elringus.Naninovel.Runtime')continue;
+  const line=u32(ends[i+2]);
+  // The source line of each block ("Author: text"), after the CommentScriptLine type, its line number and its hash.
+  if(toks[i]==='CommentScriptLine'){const k=/^[0-9a-f]{8}$/.test(toks[i+3])?i+4:i+3;comments.push(toks[k]||'');lines.set(line,{comment:toks[k]||''});}
+  // A text line: line number, hash, then how many commands it plays and their reference ids.
+  // Read from the bytes, not the strings: u32 line, u32 hash length + hash (aligned), u32 command count.
+  else if(toks[i]==='GenericTextScriptLine'){const q=ends[i+2],hl=u32(q+4);if(hl<0||hl>64)continue;const n=u32(q+8+((hl+3)&~3));if(n<0||n>64)continue;texts.push({line,count:n});}}
+ // Each text line: what it prints (through its command references) and the comment just before it.
+ // The commands are stored in the order of the lines that play them, so each text line takes its count in turn.
+ const byLine=[];let next=0;for(const x of texts.sort((a,c)=>a.line-c.line)){const t=registry.slice(next,next+x.count).filter(s=>typeof s==='string');next+=x.count;const c=lines.get(x.line-1);byLine.push({line:x.line,text:t.join(''),comment:c&&c.comment!=null?c.comment:null});}
+ if(next!==registry.length)byLine.length=0;
+ out.comments=comments;out.byLine=byLine.sort((a,c)=>a.line-c.line);return out;}
 function scan(b,out){let at=0;
  while((at=b.indexOf(DOC,at))>=0){let start=at;while(start>0&&b[start-1]>=0x20)start--;at+=DOC.length;
   if(start<4)continue;const n=b.readUInt32LE(start-4);if(n<DOC.length||start+n>b.length)continue;
@@ -71,7 +85,17 @@ function combine(docs){const byName=new Map();for(const d of docs){if(!d.script)
   const zhDoc=list.filter(d=>isZh(d.dst)).sort((a,b)=>zhRank(a.dst)-zhRank(b.dst))[0];
   // Parsed-asset documents: the printed texts, paired with the Chinese document's when both have as many.
   if(ja.prints){const zp=zhDoc&&zhDoc.prints&&zhDoc.prints.length===ja.prints.length?zhDoc.prints:null;
-   const parts=ja.prints.map((t,i)=>'# p'+i+'\n'+t.split('\n').map(l=>'; '+l).join('\n')+(zp&&zp[i]?'\n'+zp[i]:''));
+   // A line the Chinese document left blank falls back to the source when that is Chinese (one block per printed line).
+   // The source of each print comes from the Japanese document's own line map (comment before each text line) when
+   // every text line there plays one print; else from the comments in order when they are as many as the prints.
+   const bl=ja.prints.byLine||[],strip=c=>String(c||'').replace(/^[^\s:：]{1,24}[:：]\s*/,'');
+   const src=!isZh(ja.src)?null:bl.length===ja.prints.length&&bl.every(x=>x.comment!=null)?bl.map(x=>strip(x.comment)):ja.prints.comments&&ja.prints.comments.length===ja.prints.length?ja.prints.comments.map(strip):null;
+   // A print the Japanese split off a sentence the Chinese keeps whole is blank in the Chinese document (a lone tab or
+   // line feed): the neighbouring print holds that sentence's translation.
+   const zhAt=i=>zp&&tidy(zp[i]||'')?zp[i]:'';
+   const zhOf=i=>zhAt(i)||(src&&tidy(src[i]||'')?src[i]:'')||(zp?zhAt(i-1)||zhAt(i+1):'');
+   // Prints that are only whitespace are not lines.
+   const parts=ja.prints.map((t,i)=>tidy(t)?'# p'+i+'\n'+t.split('\n').map(l=>'; '+l).join('\n')+(zhOf(i)?'\n'+zhOf(i):''):'').filter(Boolean);
    if(parts.length)out.push({name:ja.name,text:parts.join('\n\n')});continue;}
   const jb=blocks(ja.text),zb=zhDoc?blocks(zhDoc.text):null,useSrc=!zhDoc&&isZh(ja.src);const parts=[];
   for(const [id,b] of jb){if(!b.dst.length)continue;const z=zb?zb.get(id):null;const zh=z?z.dst:useSrc?b.src:[];

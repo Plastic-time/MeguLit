@@ -18,13 +18,41 @@ function pushes(b){const out=[];if(b.length<8)return out;const end=Math.min(b.re
  return out;}
 const tidy=s=>s.replace(/\r?\n/g,'\n').replace(/^[\s　]+|[\s　]+$/g,'');
 // The translated string at the same place in the patched file (up to its first NUL), or ''.
-function twin(z,p){if(!z||p.at+2+p.n>z.length||z[p.at]!==0x0E||z[p.at+1]!==p.n)return '';const raw=z.subarray(p.at+2,p.at+1+p.n),cut=raw.indexOf(0);
- const s=tidy(gbk.decode(cut>=0?raw.subarray(0,cut):raw));return HAN.test(s)&&!PROSE.test(s)?s:'';}
-function parse(buf){let b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),z=null;
+// A string too long for its place is moved: the push is replaced by a jump (0x06, u32 target) into code the patch
+// appends after the original, which pushes the translation and jumps back.
+function twin(z,p){if(!z||p.at+6>z.length)return '';let at=p.at;
+ if(z[at]===0x06){const to=z.readUInt32LE(at+1);at=-1;for(let i=to;i<Math.min(z.length-2,to+48);i++)if(z[i]===0x0E){const n=z[i+1];if(n>=2&&i+2+n<=z.length&&z[i+1+n]===0){at=i;break;}}if(at<0)return '';}
+ else if(z[at]!==0x0E||z[at+1]!==p.n)return '';
+ const n=z[at+1],raw=z.subarray(at+2,at+1+n),cut=raw.indexOf(0);
+ // What the patched game shows, kana and all (speaker labels it kept, a line left in Japanese): it is the translation.
+ const s=tidy(gbk.decode(cut>=0?raw.subarray(0,cut):raw));return s&&!s.includes('�')?s:'';}
+/* E449 Chinese patches that leave the .hcb alone and serve the text from a "cnpack" next to it (五彩斑斓的曙光,
+   loaded by its chn.dll): u32 count, then records {u32 key, u16 size, bytes}. A record is AES-128-ECB (zero padded);
+   the key is picked by bits 16-17 of the record key k: MD5 of String(k) (raw), the first 16 hex digits of that MD5,
+   ((k % 97) * (i+1)) & 255, or (byte(k, i&3)^2 * (i+7)) & 255 for i < 16. The text (GBK) follows 4 leading bytes.
+   The record key is the address the game hands the patch, byte-swapped: the length byte of a 0x0E push, or the operand
+   of the call before one (the push follows within a few bytes). */
+// Image and sprite names pushed for the engine ("_エプロン_吹出L", "graph_bs/CHR_あ", one-letter ids), not text.
+const ASSET=s=>/^[_A-Za-z0-9]/.test(s)||s.includes('/')||[...s].length===1;
+const CN=Buffer.from('FVP+CN\0\0','latin1');
+function cnpack(pack,b){const crypto=require('node:crypto'),out=new Map();if(pack.length<4)return out;const cnt=pack.readUInt32LE(0);let p=4;
+ const md5=s=>crypto.createHash('md5').update(s).digest();
+ const keyOf=k=>{const a=(k&0x30000)>>>16;if(a===0)return md5(String(k));if(a===1)return Buffer.from(md5(String(k)).toString('hex').slice(0,16),'latin1');
+  const c=Buffer.alloc(16);for(let i=0;i<16;i++){if(a===2)c[i]=((k%97)*(i+1))&255;else{const q=(k>>>((i&3)*8))&255;c[i]=(q*q*(i+7))&255;}}return c;};
+ const swap=v=>(((v&255)<<24)|((v>>>8&255)<<16)|((v>>>16&255)<<8)|(v>>>24))>>>0;
+ const end=Math.min(b.readUInt32LE(0),b.length);
+ const pushAt=x=>{if(x>=1&&x<end&&b[x-1]===0x0E)return x-1;for(let i=x;i<Math.min(end-2,x+16);i++)if(b[i]===0x0E){const n=b[i+1];if(n>=2&&i+2+n<=end&&b[i+1+n]===0)return i;}return -1;};
+ for(let i=0;i<cnt&&p+6<=pack.length;i++){const k=pack.readUInt32LE(p),size=pack.readUInt16LE(p+4),data=pack.subarray(p+6,p+6+size);p+=6+size;
+  const at=pushAt(swap(k));if(at<0||out.has(at))continue;
+  try{const d=crypto.createDecipheriv('aes-128-ecb',keyOf(k),null);d.setAutoPadding(false);const n=data.length&~15;const plain=Buffer.concat([d.update(data.subarray(0,n)),d.final()]);
+   let e=plain.length;while(e>4&&plain[e-1]===0)e--;const cut=plain.indexOf(0,4);const s=tidy(gbk.decode(plain.subarray(4,cut>=4&&cut<e?cut:e)));if(s&&!s.includes('�'))out.set(at,s);}catch{}}
+ return out;}
+function parse(buf){let b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),z=null,cn=null;
  if(b.subarray(0,8).equals(MAGIC)){const n=b.readUInt32LE(8);z=b.subarray(12+n);b=b.subarray(12,12+n);}
+ else if(b.subarray(0,8).equals(CN)){const n=b.readUInt32LE(8);const pack=b.subarray(12+n);b=b.subarray(12,12+n);cn=cnpack(pack,b);}
  const lines=[],zh=[];
- for(const p of pushes(b)){const s=tidy(sj.decode(b.subarray(p.at+2,p.at+1+p.n)));if(!s||!PROSE.test(s)||s.includes('�'))continue;lines.push(s);zh.push(twin(z,p));}
- return z?{lines,anchors:[],zh}:{lines,anchors:[]};}
+ for(const p of pushes(b)){const s=tidy(sj.decode(b.subarray(p.at+2,p.at+1+p.n)));if(!s||!PROSE.test(s)||s.includes('�')||ASSET(s))continue;lines.push(s);zh.push(cn?cn.get(p.at)||'':twin(z,p));}
+ return z||cn?{lines,anchors:[],zh}:{lines,anchors:[]};}
 // The scenario (the .hcb with the most Japanese) and a Chinese twin with the same header, if any.
 function files(dir){let names;try{names=fs.readdirSync(dir).filter(f=>/\.hcb$/i.test(f));}catch{return null;}if(!names.length)return null;
  const info=names.map(f=>{const file=path.join(dir,f);let b;try{b=fs.readFileSync(file);}catch{return null;}const ps=pushes(b);
@@ -32,12 +60,16 @@ function files(dir){let names;try{names=fs.readdirSync(dir).filter(f=>/\.hcb$/i.
   return {file,b,head:b.length>=4?b.readUInt32LE(0):-1,jp,cn};}).filter(Boolean);
  const main=info.filter(x=>x.jp>0).sort((a,b)=>b.jp-a.jp)[0];if(!main)return null;
  const twinFile=info.filter(x=>x!==main&&x.head===main.head&&x.cn>x.jp).sort((a,b)=>b.cn-a.cn)[0];
- return {main:main.file,zh:twinFile?twinFile.file:null};}
-function read(f){const b=fs.readFileSync(f.main);if(!f.zh)return b;const z=fs.readFileSync(f.zh),n=Buffer.alloc(4);n.writeUInt32LE(b.length);return Buffer.concat([MAGIC,n,b,z]);}
+ const pack=path.join(dir,'cnpack');
+ return {main:main.file,zh:twinFile?twinFile.file:null,pack:!twinFile&&fs.existsSync(pack)?pack:null};}
+function read(f){const b=fs.readFileSync(f.main),n=Buffer.alloc(4);n.writeUInt32LE(b.length);
+ if(f.zh)return Buffer.concat([MAGIC,n,b,fs.readFileSync(f.zh)]);
+ if(f.pack)return Buffer.concat([CN,n,b,fs.readFileSync(f.pack)]);
+ return b;}
 const engine={
  id:'fvp',hint:'<游戏>.hcb',
  scenes(dir){const f=files(dir);return f?[{name:path.basename(f.main),read:()=>read(f)}]:[];},
- archives:()=>[],sources:dir=>{const f=files(dir);return f?[f.main,f.zh].filter(Boolean):[];},
+ archives:()=>[],sources:dir=>{const f=files(dir);return f?[f.main,f.zh,f.pack].filter(Boolean):[];},
  parse,test:n=>/\.hcb$/i.test(n),
  patchLines(base){let any=false;const list=base.map(scene=>{const zh=scene.zh||[];if(!zh.some(Boolean))return scene;any=true;return {...scene,patched:true,lines:scene.lines.map((t,k)=>zh[k]||t)};});return any?list:null;},
 };
