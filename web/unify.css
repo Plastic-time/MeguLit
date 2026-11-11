@@ -1551,3 +1551,14 @@ html body:has(.dict-launch),html:not(#u):not(#v):not(#w):not(#x) body .main:has(
    above the field; 3D only happens inside it */
 html:not(#u):not(#v):not(#w):not(#x) body #learning-content:has(#lookup-results){position:relative;z-index:2;isolation:isolate}
 html:not(#u):not(#v):not(#w):not(#x) body .dict-field{z-index:0!important}
+/* 2026-11-12 (user: blend the released sub-bar with this one, no numbers in front). The released bar's plain names and
+   gold diamond, on this version's full-width band and hairline: 14px warm names, no counters; the current tab lifts to
+   ivory over a short red line that fades out at both ends, with the gold diamond from the release sitting on the hairline. */
+html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs{gap:clamp(6px,1vw,14px)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab{position:relative;padding:0 12px!important;font-size:14px!important;letter-spacing:.04em!important;color:#b39b8d!important;transition:color .18s}
+html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab::before{content:none!important;display:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab:hover{color:#f1e0d2!important}
+html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab.active{color:#fff3e2!important;text-shadow:0 0 14px rgba(237,181,110,.25)}
+html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab.active::after{content:""!important;position:absolute;left:4px!important;right:4px!important;bottom:0!important;width:auto!important;height:2px!important;margin:0!important;transform:none!important;z-index:1;
+ background:linear-gradient(90deg,rgba(200,47,59,0),#c82f3b 30%,#c82f3b 70%,rgba(200,47,59,0))!important;box-shadow:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab.active::before{content:""!important;display:block!important;position:absolute;left:50%;bottom:-3px;width:5px;height:5px;margin:0!important;transform:translateX(-50%) rotate(45deg);background:#edb56e;box-shadow:0 0 6px rgba(237,181,110,.7);z-index:2;opacity:1}
