@@ -58,7 +58,11 @@
   /* E410: o.pageStart = the game's script clears the page before this line; o.index = its script line: a line already on
      the page (same script line, or the same longer text) is that line again, not another copy below it. */
   flow(text,sequence,o={}){const index=Number.isSafeInteger(o.index)&&o.index>=0?o.index:null;
-   if(o.pageStart===true){const last=this.records.at(-1);if(!(last&&last.source===text&&(index===null||last.index===index)&&this.records.length===1)){this.records=[];this.epoch++;}}
+   /* E423 (issue #97, WoH: "中文字幕会反复播放"). When the game redraws the page it is on (back from a menu, the backlog, a
+     window switch) the hook hands the page's lines over again from the first one. That first line starts a page in the
+     script, so the page was cleared and every line built anew: each translation typed itself out again. A page start
+     whose script line is already on the page is that page being redrawn: nothing is cleared, nothing is typed again. */
+   if(o.pageStart===true){const shown=index!==null?this.records.find(p=>p.index===index):null;if(shown)return shown;const last=this.records.at(-1);if(!(last&&last.source===text&&(index===null||last.index===index)&&this.records.length===1)){this.records=[];this.epoch++;}}
    else{const letters=s=>String(s||'').replace(/[^\p{L}\p{N}]/gu,'');const shown=this.records.find(p=>index!==null&&p.index!==undefined&&p.index!==null?p.index===index:p.source===text&&letters(text).length>=6);if(shown)return shown;}
    const r=this.source(text,sequence,0);if(index!==null)r.index=index;if(o.row==='continue'||o.row==='new')r.row=o.row;if(!r.obsolete){r.settled=true;r.at=Date.now();if(this.records.length>24)this.records=this.records.slice(-24);}return r;}
   turn(){const top=this.current();if(!top||this.records.length<2)return false;this.records=[top];this.epoch++;return true;}

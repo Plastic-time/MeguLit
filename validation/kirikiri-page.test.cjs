@@ -279,3 +279,21 @@ test('E411 a line of only symbols (『■■■■■―――』) is shown as i
  say('　甲高い悲鳴が響く。',17,false);assert.deepEqual(shown().sort(),['　甲高い悲鳴が響く。','『■■■■■―――』'].sort());
  const sym=b.islandPage.model.records.find(r=>r.source==='『■■■■■―――』');t.mock.timers.tick(1500);assert.equal(sym.state,'ready');assert.equal(sym.translation,'');
 });
+
+test('E423 a page the game redraws (its lines handed over again from the first) is not cleared and nothing is typed again',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const saved=global.MutationObserver;global.MutationObserver=class{observe(){}};t.after(()=>{global.MutationObserver=saved;});
+ const file=require.resolve('../web/reader/modules/island-page.js');delete require.cache[file];const IslandPage=require(file);
+ const {w,b,doc}=fakeWindow({clientX:58,clientY:85,clientWidth:1546,clientHeight:870,readerX:900,readerY:500,readerWidth:600,readerHeight:100});
+ const typed=[];w.TomeTypewriter={text:(el,v)=>typed.push(v),reveal(){},stop(){}};
+ IslandPage.install(w);let seq=0;const say=(text,index,pageStart)=>b.islandPage.accept({hookSource:text,hookSourceEngine:'nvl',hookFlowGrid:'woh',hookSequence:++seq,hookSourceLine:0,hookFlowPageStart:pageStart,hookSourceIndex:index,hookFlowRow:'new'});
+ const page=[['　彼女の家は山の中腹にあった。',2,true],['　まわりは何もない荒れ地。',3,false],['　おとなりに住む幼馴染みなんて望むべくもなく。',4,false]];
+ for(const l of page)say(...l);
+ const records=[...b.islandPage.model.records],nodes=doc.querySelectorAll('.tome-island-pair');
+ for(const l of page)say(...l);
+ assert.deepEqual(b.islandPage.model.records,records,'the same records: the page was not cleared');
+ assert.equal(doc.querySelectorAll('.tome-island-pair').length,nodes.length,'no new line nodes');
+ assert.ok(records.every(r=>b.islandPage.model.records.includes(r)));
+ say('　けれど水も星も綺麗な、思い出の家だった。',5,false);say('　もっとも、それは夏だけの話。',6,true);
+ assert.deepEqual(b.islandPage.model.records.map(r=>r.index),[6],'a real next page still clears it');
+});
