@@ -887,3 +887,22 @@ html:not(#u):not(#v):not(#w):not(#x) body :is(button.primary,.g-btn.primary,.her
 @keyframes u-hit{0%{filter:brightness(2.2) saturate(.3)}100%{filter:none}}
 @media (prefers-reduced-motion:reduce){html body :is(button.primary,.g-btn.primary)::after{animation:none!important}}
 html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-form>button.primary{height:54px!important;min-height:54px!important}
+
+/* level picker: each level glows in its own colour on hover, rising from pale dawn to deep red and, at native, to
+   black; the glow eases in and out */
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt{position:relative;transition:background .45s ease,box-shadow .45s ease!important}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .5s ease;background:radial-gradient(120% 220% at 0% 50%,var(--lv-glow,#edb56e) 0,transparent 62%)}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt:is(:hover,:focus-visible)::after{opacity:.38}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt.active::after{opacity:.28}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt[data-level-pick=none]{--lv-glow:#f3e7c9}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt[data-level-pick=kana]{--lv-glow:#f2c98a}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt[data-level-pick=N5]{--lv-glow:#eda36a}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt[data-level-pick=N4]{--lv-glow:#e57a5a}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt[data-level-pick=N3]{--lv-glow:#d4504f}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt[data-level-pick=N2]{--lv-glow:#b02a44}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt[data-level-pick=N1]{--lv-glow:#7a1a3a}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt[data-level-pick=N0]{--lv-glow:#000}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt[data-level-pick=N0]:is(:hover,:focus-visible)::after{opacity:.9;background:radial-gradient(140% 260% at 0% 50%,#000 0,rgba(0,0,0,.6) 45%,transparent 80%)}
+html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt>*{position:relative;z-index:1}
+/* settings the user retired: follow-the-original-position (always on now) and history retention days */
+html:not(#u):not(#v):not(#w) body .main .settings-content .settings-row:has([name=livePosition],[name=history_span]){display:none!important}

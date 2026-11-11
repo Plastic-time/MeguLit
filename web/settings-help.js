@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 const hints={
+ word_review_count:['「学习 → 复习」里一轮最多出多少张单词卡；到期的卡会优先，做完这一轮再开下一轮','How many word cards one review round in Learning → Review holds; due cards come first','「学習 → 復習」で 1 回に出す単語カードの上限。期限の来たカードが先に出ます'],
+ sentence_review_count:['一轮最多复习多少条收藏的句子（句子页里的台词）','How many saved lines (from Sentences) one review round holds','1 回に復習する保存済みの文（セリフ）の上限'],
+ word_sentence_count:['单词卡和单词页里，每个词最多附带几条你在游戏里读到的例句','How many lines from your games are shown with each word on cards and in Words','カードや単語ページで、1 語につき表示するゲーム中の例文の数'],
+ only_review_translated:['打开后，只复习带有译文的句子，看不懂的生句不会出现','Only review saved lines that have a translation','訳のある文だけを復習します'],
+ default_dictionary_sort:['单词页的默认排列方式','Default order of the Words page','単語ページの既定の並び順'],
  leaderboardEnabled:['只上传阅读字数、时长、收录单词数、复习次数、假名练习题数和连续天数的汇总；参加要先用邮箱登录 MeguLit 账号，邮箱不会出现在榜上；关闭后会删除服务器上的记录','Uploads only totals (characters, time, words saved, reviews, kana practice, streak). Joining needs a MeguLit account signed in with your email, which never shows on the board. Turning it off deletes your entry on the server','読んだ文字数・時間・登録単語数・復習回数・かな練習の問題数・連続日数の合計だけを送ります。参加にはメールアドレスで MeguLit アカウントにログインする必要があり、アドレスはランキングに表示されません。オフにするとサーバーの記録を削除します'],
  leaderboardName:['排行榜上显示的名字，2–16 个字，不能含网址或不雅词','Name shown on the leaderboard, 2–16 characters, no links or offensive words','ランキングに表示される名前。2〜16 文字、URL や不適切な語は使えません'],
  leaderboardShareGames:['打开后会公开你读过的游戏名称和各自字数，用于“按游戏”排行','Shares the titles you read and their character counts for the per-game boards','読んだゲーム名と文字数を公開し、ゲーム別ランキングに参加します'],
