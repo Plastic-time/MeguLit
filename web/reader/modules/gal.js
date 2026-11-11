@@ -368,16 +368,17 @@
          row, a 「…」 line and a narration line drawn together could not all sit on the game's text (穢翼のユースティア:
          spoken lines off, narration on). The root values stay as the fallback for elements measured before layout. */
       const measure=(node,text)=>{if(!node||!text)return null;const s=getComputedStyle(node);context.font=s.fontWeight+' '+s.fontSize+' '+s.fontFamily;const left=context.measureText(Array.from(text)[0]).actualBoundingBoxLeft;return Number.isFinite(left)?Math.max(-60,Math.min(5,left))+'px':null;};
-      let first=true;
-      for(const sentence of document.querySelectorAll('.sentence-text')){
+      /* only where the hook cannot hide the game's text (its own text stays under ours); every other game keeps the page-wide measure */
+      const perLine=document.body.classList.contains('megulit-readonly-hook');let first=true;
+      for(const sentence of document.querySelectorAll('.sentence-text')){if(!perLine){sentence.style.removeProperty('--tomoyo-jp-indent');sentence.style.removeProperty('--megulit-jp-hang');}
         const japanese=[...sentence.querySelectorAll('.char-token')].find(span=>!span.hasAttribute('data-tomoyo-leading-space')&&span.textContent.trim());
-        const indent=measure(sentence,japanese?.textContent),open=japanese&&/^[「『（“‘〈《【〔［(]$/.test(japanese.textContent.trim()),hang=open?japanese.getBoundingClientRect().width+'px':'0px';
-        if(indent){sentence.style.setProperty('--tomoyo-jp-indent',indent);if(first)document.documentElement.style.setProperty('--tomoyo-jp-indent',indent);}
-        sentence.style.setProperty('--megulit-jp-hang',hang);if(first)document.documentElement.style.setProperty('--megulit-jp-hang',hang);
+        const indent=measure(sentence,japanese?.textContent),open=japanese&&(perLine?/^[「『（“‘〈《【〔［(]$/:/^[「『（“‘〈《【(]$/).test(japanese.textContent.trim()),hang=open?japanese.getBoundingClientRect().width+'px':'0px';
+        if(indent){if(perLine)sentence.style.setProperty('--tomoyo-jp-indent',indent);if(first)document.documentElement.style.setProperty('--tomoyo-jp-indent',indent);}
+        if(perLine)sentence.style.setProperty('--megulit-jp-hang',hang);if(first)document.documentElement.style.setProperty('--megulit-jp-hang',hang);
         if(japanese)first=false;
       }
       let firstCn=true;
-      for(const cn of document.querySelectorAll('.tomoyo-cn-output')){const indent=measure(cn,cn.textContent?.trimStart());if(!indent)continue;cn.style.setProperty('--tomoyo-cn-indent',indent);if(firstCn){document.documentElement.style.setProperty('--tomoyo-cn-indent',indent);firstCn=false;}}
+      for(const cn of document.querySelectorAll('.tomoyo-cn-output')){const indent=measure(cn,cn.textContent?.trimStart());if(!indent)continue;if(perLine)cn.style.setProperty('--tomoyo-cn-indent',indent);else cn.style.removeProperty('--tomoyo-cn-indent');if(firstCn){document.documentElement.style.setProperty('--tomoyo-cn-indent',indent);firstCn=false;}}
     }
   }
   bridge.alignText=alignText;

@@ -115,7 +115,7 @@ public static class GameStyleProbe{
   if((long)width*height>36000000)throw new Exception("capture budget exceeded");
   using(var full=OpaqueBitmap(width,height)){
    if(scanUi){if(!GameCapture.Into(target,full,3,false))throw new Exception("capture deferred");return Measure(full,region,"",width,height,false,true);}
-   /* E416 (every engine): colours are sampled from the game window alone (BitBlt/PrintWindow never contain MeguLit's overlays); the screen, which shows MeguLit's own text and masks, is read only when the window gives a blank picture. */if(!GameCapture.Into(target,full,3,false)&&!(Convert.ToString(d.ContainsKey("captureMode")?d["captureMode"]:null)=="visible-client"&&GameCapture.ScreenInto(target,full))&&!GameCapture.Into(target,full,3,true))throw new Exception("capture deferred");
+   if(!(Convert.ToString(d.ContainsKey("captureMode")?d["captureMode"]:null)=="visible-client"&&GameCapture.ScreenInto(target,full))&&!GameCapture.Into(target,full,3,true))throw new Exception("capture deferred");
    return Measure(full,region,source,width,height,true);
   }
  }
