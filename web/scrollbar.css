@@ -1,0 +1,16 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* 2026-11-11 (user: every page except home gets a megu-edit vertical scrollbar, easy to grab and drag): only the main
+   content scroller (.workspace>.main) and never the home page; app.css still hides every other scrollbar, so the
+   in-game reader and popups are untouched. The 16px gutter is the hit area; the thumb is drawn thin inside it with a
+   transparent border, and grows to the full width, turns red and gets a rule when hovered or dragged. */
+.workspace>.main:not(.home-page){scrollbar-width:auto;-ms-overflow-style:auto;scrollbar-gutter:stable}
+.workspace>.main:not(.home-page)::-webkit-scrollbar{display:block;width:16px;height:0;background:transparent}
+.workspace>.main:not(.home-page)::-webkit-scrollbar-track{background:linear-gradient(90deg,transparent 7px,rgba(255,255,255,.08) 7px,rgba(255,255,255,.08) 9px,transparent 9px)}
+.workspace>.main:not(.home-page)::-webkit-scrollbar-thumb{min-height:56px;border:5px solid transparent;border-radius:0;background:rgba(255,255,255,.42) padding-box;box-shadow:inset 0 2px 0 #c8323c}
+.workspace>.main:not(.home-page)::-webkit-scrollbar-thumb:hover{border-width:2px;background:#c8323c padding-box;box-shadow:inset 0 2px 0 #fff}
+.workspace>.main:not(.home-page)::-webkit-scrollbar-thumb:active{border-width:1px;background:#e0404a padding-box;box-shadow:inset 0 2px 0 #fff,inset 0 -2px 0 #fff}
+.workspace>.main:not(.home-page)::-webkit-scrollbar-button{display:none}
+.workspace>.main:not(.home-page)::-webkit-scrollbar-corner{background:transparent}
+:root[data-theme=light] .workspace>.main:not(.home-page)::-webkit-scrollbar-track{background:linear-gradient(90deg,transparent 7px,rgba(0,0,0,.1) 7px,rgba(0,0,0,.1) 9px,transparent 9px)}
+:root[data-theme=light] .workspace>.main:not(.home-page)::-webkit-scrollbar-thumb{background:rgba(0,0,0,.38) padding-box}
+:root[data-theme=light] .workspace>.main:not(.home-page)::-webkit-scrollbar-thumb:hover{background:#c8323c padding-box}
