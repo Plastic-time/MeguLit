@@ -45,7 +45,7 @@
   if(cal){if(Number.isSafeInteger(m.token)&&m.token>=0)cal.lines.set(m.token,{...m});cal.engine=m.engine;cal.x0=Math.min(cal.x0,m.x0);cal.y0=Math.min(cal.y0,m.y0);cal.x1=Math.max(cal.x1,m.x1);cal.y1=Math.max(cal.y1,m.y1);cal.size=Math.max(cal.size,m.size||0);}
   if(b.islandPage?.position(m)){repaint();return;}
   if(b.pagePositionReady?.()===false)return;const currentToken=b.currentPageToken?.();if(currentToken!=null&&m.token!==currentToken)return;
-  const p=b.galPreferences?.();const active=!!(p?.livePosition&&map&&map.engine===m.engine);
+  const active=!!(map&&map.engine===m.engine); /* E422 follows automatically once calibrated; no switch */
   if(!active){if(following||firstSource){following=false;repaint();}return;}
   // The game window may have been resized since calibration: the mapping scales with the client size.
   const layout=b.galLayoutInfo?.(),cw=layout?.clientWidth||map.cw,ch=layout?.clientHeight||map.ch,kx=cw/map.cw,ky=ch/map.ch;

@@ -556,7 +556,7 @@
       <small class="tomoyo-hotkey-hint" data-gal-bind-hint>内嵌没生效，或译文、对话框位置乱跑（部分紫社等作品自动识别不准）：展开「窗口绑定（高级）」，选中游戏窗口，点「绑定此窗口」手动绑定即可</small>
       <div class="tomoyo-cn-grid"><label>文本框左边距<input type="number" name="galX" min="0" max="95" step="0.1"></label><label>文本框上边距<input type="number" name="galY" min="0" max="95" step="0.1"></label><label>文字换行宽度<input type="number" name="galWidth" min="20" max="100" step="0.1"></label><input type="hidden" name="galHeight"><small class="tome-manual-region-hint">显示区域随实际文字增长，高度自动调整</small><small class="tome-island-layout-hint">按原文位置排布，文字可自然延伸到游戏窗口外</small></div>
       <button type="button" data-gal-drag>拖动文本框</button>
-      <div class="tome-position-sync"><button type="button" data-gal-position-sync>同步位置</button><label class="tome-live-position"><input type="checkbox" name="galLivePosition">实时同步原文坐标</label><small data-position-state></small></div>
+      <div class="tome-position-sync"><button type="button" data-gal-position-sync>同步位置</button><label class="tome-live-position" hidden><input type="checkbox" name="galLivePosition">实时同步原文坐标</label><small data-position-state></small></div>
       <div class="tome-game-style-sync"><label class="tome-auto-style-switch"><input type="checkbox" name="galAutoGameStyle">自动同步游戏原文样式</label><button type="button" data-game-style-sync>从游戏同步</button><small data-game-style-state></small></div>
       <label>原文替换方式<select name="galMaskMode"><option value="hook">Hook 引擎与原文替换内嵌（优先）</option><option value="local">OCR 覆盖原文（最后兜底）</option></select></label>
       <label class="tome-auto-style-switch" data-embed-translation><input type="checkbox" name="galEmbedTranslation">译文由游戏自己显示（写回游戏文本框）</label>
