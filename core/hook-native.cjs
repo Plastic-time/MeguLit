@@ -232,7 +232,9 @@ class HookNative{
     line is sent there (gal-native sets this.locate) unless a native page engine (krkr / renpy) reported in the last
     10 minutes; ISLAND lines never get here. The OCR answer takes up to ~3.5 s, so on an OCR page a held hook line waits
     5 s, and one the picture never showed is delivered as an ordinary line instead of dropped (OCR may simply miss it). */
- locatePage(text,origin){if(this.flowPage||typeof this.locate!=='function'||(origin&&origin!=='live'))return;const P=this.pageState;if(P&&P.engine!=='ocr'&&this.now()-(this.pageMode?.at||0)<600000)return;try{this.locate(text);}catch{}}
+ locatePage(text,origin){if(this.flowPage||typeof this.locate!=='function'||(origin&&origin!=='live'))return;const P=this.pageState;if(P&&P.engine!=='ocr'&&this.now()-(this.pageMode?.at||0)<600000)return;if(this.originalReplaced()){if(!this.locateSkipLogged){this.locateSkipLogged=true;this.trace('ocr page skipped: the game draws the replaced line, not the original');}return;}this.locateSkipLogged=false;try{this.locate(text);}catch{}}
+ /* Issue 120/121 (Pal, no engine coordinates): while the selected stream's text is replaced the game never draws the original, so reading the screen for it only misses (34 of 34 lines) and spends four OCR passes a line. The fallback runs on lines where the original is on screen: read-only, the baseline line, a calibration line, or an unhidden profile. */
+ originalReplaced(){return this.enabled===true&&this.preferences?.hookHide!==false&&['clear-requested','callback-acknowledged','user-verified'].includes(this.state?.replacementState);}
  // "A。A。" (also with the game's leading ideographic spaces) -> "A。"; anything else unchanged.
  static undouble(text){const n=text.replace(/[\s\u3000]/g,'');if(n.length<12||n.length%2||n.slice(0,n.length/2)!==n.slice(n.length/2)||!/[。！？!?」』…―）)]$/.test(n))return text;
   let seen=0;for(let i=0;i<text.length;i++){if(!/[\s\u3000]/.test(text[i])&&++seen===n.length/2)return text.slice(0,i+1);}return text;}
