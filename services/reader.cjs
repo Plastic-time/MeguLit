@@ -44,7 +44,7 @@ class Reader{
   }
   /* E322: every whole-layer hide or show is logged with its cause (user: the layer faded out by itself in several games). */if(message.type==='dialogScene'||message.type==='dialogSceneKept')this.logVisibility({type:message.type,visible:message.visible,reason:message.reason});if(message.type==='dialogScene')this.immersion.scene(message.visible,'scene '+(message.reason||''));
   if(message.type==='dialogAuto')this.immersion.autoBox(message.visible);
-  if(message.type==='readerInput'){this.immersion.skip(message.skipHeld);if(typeof message.skipHeld==='boolean')this.gal?.hooks?.skipHeld?.(message.skipHeld);}
+  if(message.type==='readerInput'){if(message.complete===true)this.immersion.input?.();this.immersion.skip(message.skipHeld);if(typeof message.skipHeld==='boolean')this.gal?.hooks?.skipHeld?.(message.skipHeld);}
   if(message.type==='hookDialog')this.immersion.engine(message.visible,message.engine);
   if(message.type==='markerPresence')this.immersion.marker(message.present===true);
   if(message.type==='waitMarkerDrawn'){this.immersion.markerDrawn();this.gal?.send({type:'markerHookDrawn'});}
@@ -267,7 +267,9 @@ class Reader{
    const image=await this.gal?.gameFrame(bounds);
    if(!image)return {};
    const id=require('node:crypto').randomUUID();
-   this.cardScreenshot={id,image,expires:Date.now()+15000};
+   /* #115: a picture taken when the lookup card opens is used when + Anki is clicked later, so keep a few for 3 min */
+   this.cardScreenshots??=new Map();for(const [k,v] of this.cardScreenshots)if(v.expires<=Date.now())this.cardScreenshots.delete(k);while(this.cardScreenshots.size>=4)this.cardScreenshots.delete(this.cardScreenshots.keys().next().value);
+   this.cardScreenshots.set(id,{id,image,expires:Date.now()+180000});
    return {id};
   }
   if(action==='modelDelete')return this.runtime.models().remove(String(args.id));
@@ -295,9 +297,9 @@ class Reader{
    for(let i=0;i<40;i++){await new Promise(resolve=>setTimeout(resolve,750));try{return {launched:true,...await anki.status(config)};}catch{}}throw Error('ANKI_OFFLINE');
   }
   if(['word','speak','prefetch','anki'].includes(action)){
-   const captured=action==='anki'&&this.cardScreenshot;
-   const screenshot=captured&&captured.id===args.screenshotId&&captured.expires>Date.now()?captured.image:'';
-   if(screenshot)this.cardScreenshot=null;
+   const captured=action==='anki'&&typeof args.screenshotId==='string'&&this.cardScreenshots?.get(args.screenshotId);
+   const screenshot=captured&&captured.expires>Date.now()?captured.image:'';
+   if(captured)this.cardScreenshots.delete(args.screenshotId);
    const word=await this.runtime.learning().word(args,args.entryId),reading=this.gal?.gameRuby?.dict(this.gal?.styleSync?.profileKey)?.[word.surface];if(reading){word.reading=reading;word.ambiguous=false;word.pitch=[];}
    if(args.pitchChoice!==undefined){if(!word.pitch.includes(args.pitchChoice))throw Error('INVALID_PITCH');word.pitch=[args.pitchChoice];}
    if(action==='word')return word;let audio;

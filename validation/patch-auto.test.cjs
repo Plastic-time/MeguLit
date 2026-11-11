@@ -61,7 +61,7 @@ test('素晴らしき日々: patch found next to the game and decoded through it
 // E282 (爱上火车): repeated redraws of one line do not keep the reading layer up.
 test('immersion: the same line handed over again does not restart the hide timers',()=>{
  const {Immersion}=require('../core/immersion.cjs');let t=0;const shown=[];const im=new Immersion(e=>shown.push(e.dialogVisible),()=>t);
- im.configure({immersion:true,dialogDetection:'marker'});im.bind('g');im.source('「テスト」','krkr');t=500;im.marker(true);t=900;im.marker(false);
+ im.configure({immersion:true,dialogDetection:'marker'});im.bind('g');im.source('「テスト」','krkr');t=500;im.marker(true);t=900;im.input();im.marker(false);
  for(t=1000;t<=2000;t+=100){im.source('「テスト」','krkr');im.tick();}
  assert.strictEqual(shown.at(-1),false);
 });
