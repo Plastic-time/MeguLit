@@ -24,3 +24,8 @@ assert.equal(cleanV4({ankiPath:'C:\\x\\evil.exe'}).ankiPath,'');
  assert.deepEqual(await new AnkiProcess({config:()=>cleanV4({ankiAutoStart:false}),anki,windowControl}).auto(),{skipped:true});
  console.log('anki-process ok');
 })().catch(e=>{console.error(e);process.exit(1);});
+// E451: windows hidden with Anki are recorded and a blocking dialog is shown again with Anki
+{
+ const src=require('fs').readFileSync(require('path').join(__dirname,'..','core','anki-process.cjs'),'utf8');
+ assert.match(src,/Save\(hid\);return k;\}/);assert.match(src,/if\(show\)RestoreBlocked\(\);return n;\}/);assert.match(src,/IsWindowEnabled\(m\)/);
+}
