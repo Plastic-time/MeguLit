@@ -137,7 +137,7 @@
 .tv-play-tx b{font-weight:600;font-size:14px;letter-spacing:.2em}
 .tv-play-sub{font-family:var(--tv-mono);font-size:11px;letter-spacing:.08em;opacity:.7}
 .tv-play-sub:empty{display:none}
-.tv-pile{position:absolute;left:58%;top:19%;width:29vmin;aspect-ratio:3/4;transform:translateZ(80px) rotate(-4deg) translate(-82%,44%) rotate(-11deg) scale(.74);transform-style:preserve-3d;pointer-events:none;opacity:0;z-index:2;transition:transform .35s cubic-bezier(.2,.8,.2,1),filter .3s;outline:none}
+.tv-pile{position:absolute;left:58%;top:19%;width:29vmin;aspect-ratio:3/4;transform:translateZ(80px) rotate(-4deg) translate(-82%,44%) rotate(-11deg) scale(.74);transform-style:flat;pointer-events:none;opacity:0;z-index:2;transition:transform .35s cubic-bezier(.2,.8,.2,1),filter .3s;outline:none}
 .tv-pile .tv-back{opacity:1;backface-visibility:visible;transform-origin:20% 90%}
 .tv-pile::after{content:"";position:absolute;inset:6% -2% -6% 6%;z-index:-1;background:#000;filter:blur(18px);opacity:.55;border-radius:12px}
 .tv-heatsum{display:flex;gap:28px;margin-top:12px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--g-t1) 10%,transparent);font-family:var(--tv-mono);font-size:11px;letter-spacing:.2em;color:var(--g-t3)}

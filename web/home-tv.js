@@ -35,7 +35,7 @@ const DRAWS={
  cut:()=>({pile:'cut',f:[[0,P0()],[.18,P0(),'linear'],[.27,at(PILE.x+2,PILE.y-24,PILE.r-6,PILE.s*1.04),E1],[.4,at(PILE.x*.4,PILE.y*.15-16,PILE.r*.3,.97,UP(.7)),E2]]}),
  peel:()=>({pile:'none',f:[[0,P0()],[.15,at(PILE.x,PILE.y-4,PILE.r,PILE.s,'rotateX(38deg)'),E1],[.24,at(PILE.x+3,PILE.y-12,PILE.r+6,PILE.s*1.04,'rotateX(10deg)'),E1],[.4,at(PILE.x*.4,PILE.y*.15-18,PILE.r*.2,.97,UP(.7)),E2]]}),
  riffle:()=>({pile:'riffle',f:[[0,P0()],[.22,P0(),'linear'],[.3,at(PILE.x-4,PILE.y-18,PILE.r-10,PILE.s*1.03),E1],[.42,at(PILE.x*.4,PILE.y*.1-20,PILE.r*.2,.97,UP(.8)),E2]]}),
- bottom:()=>({pile:'lift',f:[[0,at(PILE.x,PILE.y,PILE.r,PILE.s,'translateZ(-30px)')],[.16,at(PILE.x+20,PILE.y+6,PILE.r+6,PILE.s,'translateZ(-30px)'),E1],[.28,at(PILE.x+30,PILE.y-6,PILE.r+4,PILE.s*1.02,UP(.4)),E1],[.42,at(PILE.x*.3,PILE.y*.1-12,PILE.r*.2,.98,UP(.7)),E2]]}),
+ bottom:()=>({pile:'lift',f:[[0,at(PILE.x,PILE.y,PILE.r,PILE.s,'translateZ(-30px)')],[.2,at(PILE.x+78,PILE.y+8,PILE.r+8,PILE.s,'translateZ(-30px)'),E1],[.3,at(PILE.x+84,PILE.y-4,PILE.r+5,PILE.s*1.02,UP(.4)),E1],[.42,at(PILE.x*.3,PILE.y*.1-12,PILE.r*.2,.98,UP(.7)),E2]]}),
  fromLeft:()=>({f:[[0,at(-190,rnd(-30,30),-25,.9)],[.42,at(6,0,4,1.01),E2]]}),
  fromRight:()=>({f:[[0,at(190,rnd(-30,30),25,.9)],[.42,at(-6,0,-4,1.01),E2]]}),
  slam:()=>({f:[[0,at(0,-170,rnd(-8,8),1.25,UP(2.5))],[.3,at(0,3,0,.97),'cubic-bezier(.6,0,.9,.5)'],[.38,at(0,-4,0,1.02),E1],[.45,at(0,1,0,1),E1]]}),
@@ -83,6 +83,7 @@ function deal(cover,background,animate,mode='draw'){const flip=cover.querySelect
  const names=Object.keys(DRAWS),name=names.filter(n=>n!==cover.dataset.draw)[Math.floor(Math.random()*(names.length-1))],style=DRAWS[name](),feelName=pickOne(['soft','fluid','fluid','snappy','snappy','crisp']),feel=FEELS[feelName];
  const side=Math.random()<.5?-1:1,turn=180*side,tilt=rnd(-4,4),lift=rnd(50,100),over=rnd(1.04,1.09),T=rnd(1.05,1.3)*feel.lead,gap=outDur*.25/1000;
  const targets=style.f.map(([t,s])=>{const m=s.match(/translate\((-?[\d.]+)%,(-?[\d.]+)%\)\s*(.*?)\s*rotate\((-?[\d.]+)deg\)\s*rotateY\(var\(--turn\)\)\s*scale\((-?[\d.]+)\)/);const p=m?parsePose(+m[1],+m[2],+m[4],+m[5],m[3]):parsePose(0,0,0,1);p.ry=turn;return {at:t*T,p};});
+ if(style.pile&&style.pile!=='lift')targets.forEach(x=>{x.p.z=Math.max(x.p.z,18);});
  const slot={x:0,y:0,r:tilt,s:1,z:0,rx:0,ry:turn,sx:1,sy:1},tf=.52*T;
  const R=360*Math.round(targets[targets.length-1].p.r/360);slot.r+=R;targets.push({at:tf,p:{...slot}},{at:tf+.12,p:{...slot,z:lift,s:over,ry:0,r:R+tilt*.4},k:feel.k*.9},{at:tf+.42,p:{x:0,y:0,r:R,s:1,z:0,rx:0,ry:0,sx:1,sy:1}});
  const spin=targets.reduce((m,x,i)=>i?Math.max(m,Math.abs(x.p.r-targets[i-1].p.r)+Math.abs(x.p.rx-targets[i-1].p.rx)):m,0),stretch=1+Math.min(.6,spin/1000);targets.forEach(x=>{if(x.at<tf)x.at*=stretch;});const shift=tf*(stretch-1);targets.forEach(x=>{if(x.at>=tf)x.at+=shift;});
