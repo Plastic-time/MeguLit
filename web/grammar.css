@@ -556,3 +556,13 @@
  .gm-group{padding-top:10px}.gm-group h3{padding:0 18px 8px}
  .gm-group .gm-card{padding:10px 16px}.gm-group .gm-card-title{font-size:24px}
 }
+/* 2026-11-11 compact hero fixes (user: 语法这一面是不是有点 bug): in the one-screen layout the corner mark sat on the
+   kicker, the ghost glyph ran over the title and the side column was squeezed */
+@media(min-width:1200px){
+ .gm-hero{grid-template-columns:minmax(0,1fr) clamp(170px,14vw,220px)}
+ .gm-hero .gm-corner.tl{display:none}
+ .gm-hero-main{padding:24px 28px 22px 32px}
+ .gm-hero-ghost{left:auto;right:calc(clamp(170px,14vw,220px) + 3%);font-size:200px;opacity:.05}
+ .gm-hero-side{padding:20px 18px}.gm-hero-side .gm-cap{font-size:12px;line-height:1.6}
+ .gm-hero h2{align-items:center}
+}
