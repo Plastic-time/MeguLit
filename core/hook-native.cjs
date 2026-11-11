@@ -44,7 +44,7 @@ class HookNative{
   if(!this.wanted||!this.target){this.stop(false);return;}if(this.process&&(this.pid!==pid||this.started!==this.target.started))this.stop(false);
   /* E285 (user: Alt+H also switched off the translation the game draws itself): Alt+H hides MeguLit's own layers; the
      game keeps drawing the written-back translation until its own switch is turned off. */
-  const enabled=preferences.hookProfile!=='read'&&!this.preflight&&state.bound===true&&(state.coverEnabled!==false||preferences.embedTranslation===true);const route=enabled?(preferences.hookProfile==='embed'?'embed':'custom'):'read';if(this.process&&(enabled!==this.enabled||route!==this.route)){
+  const enabled=preferences.hookProfile!=='read'&&!this.preflight&&state.bound===true&&(state.coverEnabled!==false||preferences.embedTranslation===true&&preferences.translationBlur!==true);const route=enabled?(preferences.hookProfile==='embed'?'embed':'custom'):'read';if(this.process&&(enabled!==this.enabled||route!==this.route)){
    // Every engine toggles hiding in place (E215): the bridge only flips its replacement switch. Detaching and
    // re-injecting the same game process on each mode change (calibration, preflight) made the overlay flicker and
    // crashed CLANNAD HD (Siglus) without an error; it also dropped the first line after calibration.
@@ -54,8 +54,8 @@ class HookNative{
  /* E352 (user: perfect original-style embed for every game). A full-screen page has no box MeguLit could cover cleanly; when
     the game's own translation table (official Chinese or an imported patch) answers every line at once, the game draws
     the translation itself in its own layout. Unmatched lines get the usual translation within the bridge's wait. */
- autoTranslateEmbed(){return this.flowPage===true&&this.scriptAllowed?.()!==false&&this.originalText?.kind==='patch'&&/* E358: only when the game's font can draw its translation table */this.originalText?.tableDrawable?.()===true;/* E414: only when the game's own glyphs are known to cover the table */}
- syncEmbedMode(){const want=!!(this.process&&this.enabled&&(this.preferences?.embedTranslation===true||this.autoTranslateEmbed()));if(!this.process){this.embedModeSent=undefined;return;}if(want===this.embedModeSent)return;this.embedModeSent=want;if(!want&&this.state?.embedTranslating)this.notify({embedTranslating:false});this.trace('embed mode '+(want?'translate':'hide'));this.send({type:'embedMode',mode:want?'translate':'hide'});}
+ autoTranslateEmbed(){return this.flowPage===true&&/* E415: a blurred translation must be MeguLit's own, the game's pixels cannot be blurred */this.preferences?.translationBlur!==true&&this.scriptAllowed?.()!==false&&this.originalText?.kind==='patch'&&/* E358: only when the game's font can draw its translation table */this.originalText?.tableDrawable?.()===true;/* E414: only when the game's own glyphs are known to cover the table */}
+ syncEmbedMode(){const want=!!(this.process&&this.enabled&&(this.preferences?.embedTranslation===true&&this.preferences?.translationBlur!==true||this.autoTranslateEmbed()));if(!this.process){this.embedModeSent=undefined;return;}if(want===this.embedModeSent)return;this.embedModeSent=want;if(!want&&this.state?.embedTranslating)this.notify({embedTranslating:false});this.trace('embed mode '+(want?'translate':'hide'));this.send({type:'embedMode',mode:want?'translate':'hide'});}
  /* E358: hide:true = the game's font cannot draw this translation: the bridge hides the line, the overlay draws it (per line). */
  embedReply(id,trans,o={}){if(!this.process||!Number.isSafeInteger(id))return;const hide=o?.hide===true;this.send({type:'embedReply',id,trans:hide?'':String(trans||'').slice(0,4000),...(hide?{hide:true}:{})});if(!this.embedModeSent||!(hide||trans))return;
   if(hide&&!this.glyphNoted){this.glyphNoted=true;this.trace?.('embed fallback: the game font has no glyphs for the translation; the game hides the line and MeguLit draws it');}
