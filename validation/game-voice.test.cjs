@@ -33,3 +33,16 @@ test('catalog: RealLive/Siglus .ovk clips are numbered file*100000+id',()=>{
  const dir=tmp();const h=Buffer.alloc(4+16);h.writeUInt32LE(1,0);h.writeUInt32LE(OGG.length,4);h.writeUInt32LE(20,8);h.writeUInt32LE(7,12);
  fs.writeFileSync(path.join(dir,'z0414.ovk'),Buffer.concat([h,OGG]));const c=gv.catalog(dir);assert.deepEqual(c.get('koe:41400007')(),OGG);assert.equal(c.get('koe:1'),null);});
 test('kind: only clips a browser plays',()=>{assert.equal(gv.kind(OGG).ext,'.ogg');assert.equal(gv.kind(Buffer.alloc(20)),null);});
+test('npk: <voice src> goes with the spoken line',()=>{const npk=require('../services/original-engines/npk.cjs');
+ const s="\r\n//【女】\r\n<voice name='a' src='voice/a00/2000010c16'>\r\n「起立」\r\n",b=Buffer.alloc(8+Buffer.byteLength(s));b.writeUInt32LE(0x08000010,0);b.writeUInt32LE(Buffer.byteLength(s),4);b.write(s,8);
+ assert.deepEqual(npk.engine.parse(b).voices,[null,'2000010c16']);});
+test('fvp: the number pushed before a spoken line names its clip in nine digits',()=>{const fvp=require('../services/original-engines/fvp.cjs');
+ const sj=Buffer.from([0x82,0xa0,0x82,0xa2,0x82,0xa4]);const code=Buffer.concat([Buffer.from([0x0a]),Buffer.from([0x5c,0xf6,0x98,0x00]),Buffer.from([8,8,8,2,0x8d,1,0,0]),Buffer.from([0x0e,sj.length+1]),sj,Buffer.from([0])]);
+ const b=Buffer.concat([Buffer.alloc(4),code]);b.writeUInt32LE(b.length,0);assert.deepEqual(fvp.parse(b).voices,['010024540']);});
+test('catsystem2: KIF entry names decipher with the passphrase key',()=>{const c=require('../services/original-engines/catsystem2.cjs')._internal;
+ const plain='KUO_kar04_001.ogg',key=0x12345678,ALPHA='zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA';let k=((key>>>24)+(key>>>16)+(key>>>8)+key)&255;
+ const enc=Buffer.alloc(0x40);for(let i=0;i<plain.length;i++,k++){const ch=plain[i],j=ALPHA.indexOf(ch);enc[i]=j<0?ch.charCodeAt(0):ALPHA.charCodeAt((0x33-j+k%0x34)%0x34);}
+ assert.equal(c.decipherName(enc,key),plain);});
+test('iga: the clip name before a line is its voice, music is not',()=>{const iga=require('../services/original-engines/iga.cjs');
+ const t=Buffer.from([0x82,0xa0,0x82,0xa2,0x82,0xa4,0]);const b=Buffer.concat([Buffer.from('\x05bgm03\x07aok0003','latin1'),Buffer.from([0x04,0x00,t.length+1]),t,Buffer.from([0])]);
+ assert.deepEqual(iga.parse(b).voices,['aok0003']);});
