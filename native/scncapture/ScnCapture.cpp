@@ -50,6 +50,9 @@ struct Pending { std::wstring name, full; char *data; DWORD size; bool asked; };
 std::vector<Pending> Queue;
 HHOOK MessageHook;
 DWORD LastAsk;
+// E297 cold run (native/ColdCapture.cs): MEGULIT_COLD=1 in the game's environment. The archives are read at once and the
+// outcome goes to cold-done.txt, which ColdCapture waits for before it ends the game.
+bool Cold;
 
 std::string Utf8(const std::wstring &s) {
  int n = WideCharToMultiByte(CP_UTF8, 0, s.c_str(), (int)s.size(), NULL, 0, NULL, NULL);
@@ -76,6 +79,8 @@ void Log(const std::string &line) {
  char stamp[32]; sprintf_s(stamp, "%02d:%02d:%02d.%03d ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
  Append(L"capture.log", stamp + line + "\r\n", 1 << 20);
 }
+bool WriteWhole(const std::wstring &path, const void *data, DWORD size);
+void Report(const char *word) { if (Cold) WriteWhole(std::wstring(Out) + L"cold-done.txt", word, (DWORD)strlen(word)); }
 bool WriteWhole(const std::wstring &path, const void *data, DWORD size) {
  std::wstring tmp = path + L".tmp";
  HANDLE h = CreateFileW(tmp.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
@@ -343,6 +348,10 @@ void DumpHx() {
  std::vector<std::wstring> names;
  do if (!MediaArchive(f.cFileName)) names.push_back(f.cFileName); while (FindNextFileW(h, &f));
  FindClose(h);
+ // The scene files live in scn*.xp3 when there are such archives: read only those (fast enough for the cold run).
+ std::vector<std::wstring> scn;
+ for (auto &n : names) if (!_wcsnicmp(n.c_str(), L"scn", 3)) scn.push_back(n);
+ if (!scn.empty()) names.swap(scn);
  std::wstring appPath(app);
  for (auto &n : names) DumpArchive(game, appPath, n);
 }
@@ -380,7 +389,7 @@ void AskText(const std::wstring &name) {
 LRESULT CALLBACK OnMessage(int code, WPARAM wp, LPARAM lp) {
  if (code >= 0 && wp == PM_REMOVE && GetTickCount() - LastAsk >= 120) {
 #if defined(_M_IX86)
-  if (InterlockedExchange(&HxWanted, 0)) { LastAsk = GetTickCount(); DumpHx(); return CallNextHookEx(NULL, code, wp, lp); }
+  if (InterlockedExchange(&HxWanted, 0)) { LastAsk = GetTickCount(); DumpHx(); Report("done"); return CallNextHookEx(NULL, code, wp, lp); }
 #endif
   std::wstring next;
   EnterCriticalSection(&Gate);
@@ -507,6 +516,7 @@ DWORD GameThread() { DWORD tid = 0; EnumWindows(OwnWindow, (LPARAM)&tid); return
 DWORD Started;
 DWORD WINAPI Run(void *) {
  Started = GetTickCount();
+ { wchar_t v[8]; Cold = GetEnvironmentVariableW(L"MEGULIT_COLD", v, 8) > 0 && v[0] == L'1'; }
  // Output folder: <MeguLit>\cache\kirikiri-scn\<FNV-1a of the lower-case game folder>\ (this DLL is <MeguLit>\native\).
  wchar_t self[1024], game[1024];
  if (!GetModuleFileNameW(Self, self, 1024) || !GetModuleFileNameW(NULL, game, 1024)) return 0;
@@ -527,12 +537,12 @@ DWORD WINAPI Run(void *) {
  LoadDone();
  void *exporter = NULL;
  for (int tries = 0; tries < 30 && !exporter; tries++) { exporter = FindExporter(); if (!exporter) Sleep(2000); }
- if (!exporter) { Log("no KiriKiri function exporter; nothing hooked"); return 0; }
+ if (!exporter) { Log("no KiriKiri function exporter; nothing hooked"); Report("no-exporter"); return 0; }
  void *fn = NULL, *exists = NULL, *text = NULL;
  QueryGuarded(exporter, "IStream * ::TVPCreateIStream(const ttstr &,tjs_uint32)", &fn);
  if (QueryGuarded(exporter, "bool ::TVPIsExistentStorage(const ttstr &)", &exists)) Exists = (ExistsFn)exists;
  if (QueryGuarded(exporter, "iTJSTextReadStream * ::TVPCreateTextStreamForRead(const ttstr &,const ttstr &)", &text)) TextStream = (TextStreamFn)text;
- if (MH_Initialize() != MH_OK || MH_CreateHook(fn, (void *)&HookCreateIStream, (void **)&Original) != MH_OK || MH_EnableHook(fn) != MH_OK) { Log("hook failed"); return 0; }
+ if (MH_Initialize() != MH_OK || MH_CreateHook(fn, (void *)&HookCreateIStream, (void **)&Original) != MH_OK || MH_EnableHook(fn) != MH_OK) { Log("hook failed"); Report("failed"); return 0; }
  Target = (CreateIStreamFn)fn;
  Log("hooked TVPCreateIStream; " + std::to_string(Done.size()) + " scenes already saved");
 #if defined(_M_IX86)
@@ -541,14 +551,16 @@ DWORD WINAPI Run(void *) {
   if (QueryGuarded(exporter, "ttstr ::TVPGetAppPath()", &app)) AppPath = (AppPathFn)app;
   if (QueryGuarded(exporter, "ttstr ::TVPNormalizeStorageName(const ttstr &)", &norm)) Normalize = (NormalizeFn)norm;
   if (AppPath && Normalize && FindCxFunctions()) { InterlockedExchange(&HxWanted, 1); Log("hx: cxdec index and stream functions found"); }
-  else Log("hx: no cxdec v2 plug-in functions");
+  else { Log("hx: no cxdec v2 plug-in functions"); Report("no-hx"); }
  }
+#else
+ Report("no-hx");
 #endif
  for (;;) {
   WaitForSingleObject(Wake, 1000);
   Flush();
   if (!Exists) continue;
-  if (!MainThread && GetTickCount() - Started > 8000) { DWORD t = GameThread(); if (t) { InterlockedExchange(&MainThread, (LONG)t); Log("game thread from its window"); } }
+  if (!MainThread && GetTickCount() - Started > (Cold ? 1500u : 8000u)) { DWORD t = GameThread(); if (t) { InterlockedExchange(&MainThread, (LONG)t); Log("game thread from its window"); } }
   if (!MainThread) continue;
   ReadWants();
   EnterCriticalSection(&Gate); bool more = !Wanted.empty(); LeaveCriticalSection(&Gate);

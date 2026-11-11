@@ -147,7 +147,8 @@ foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and -not $e.FullNa
 foreach($f in (git ls-files --cached --others --exclude-standard core services web setup)){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
 # Prebuilt native helpers added after the previous package (not tracked: *.dll is ignored); E293 scene capture.
 # E301 Ren'Py positions: the DLLs run native/MeguLitRenpy.py, which must ship next to them.
-foreach($f in 'native/MeguLitScn32.dll','native/MeguLitScn64.dll','native/MeguLitKrkr32.dll','native/MeguLitKrkr64.dll','native/MeguLitRenpy32.dll','native/MeguLitRenpy64.dll','native/MeguLitRenpy.py','native/megulithook/MeguLitHook32.dll'){if(Test-Path -LiteralPath (Join-Path $Root $f)){[void]$names.Add($f)}}
+# E297 cold run helpers (built by Build.ps1, *.exe is not tracked).
+foreach($f in 'native/ColdCapture32.exe','native/ColdCapture64.exe','native/MeguLitScn32.dll','native/MeguLitScn64.dll','native/MeguLitKrkr32.dll','native/MeguLitKrkr64.dll','native/MeguLitRenpy32.dll','native/MeguLitRenpy64.dll','native/MeguLitRenpy.py','native/megulithook/MeguLitHook32.dll'){if(Test-Path -LiteralPath (Join-Path $Root $f)){[void]$names.Add($f)}}
 $zipPath=Join-Path $work $Asset
 $out=[IO.Compression.ZipFile]::Open($zipPath,'Create')
 try{
