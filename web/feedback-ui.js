@@ -6,6 +6,8 @@
    - mountDevNotice: the "MeguLit 还在开发中" notice from the website, every start on the home page, with its recent adaptations, with a
      "想玩的游戏" box and the same report button. */
 
+import { successHTML, guideHTML, GUIDE } from './guide-content.js';
+
 const T = {
   zh: {
     kicker: '一键上传问题反馈', title: '遇到什么问题了？', hint: '写一下原因，简短或详细都可以。会和最近的日志一起直接发给作者，不需要打开 GitHub',
@@ -17,7 +19,8 @@ const T = {
     upd: (y, m, d, title) => `${y}年${m}月${d}日 完善了《${title}》的内嵌使用`, updNote: '以上游戏只在作者本地做过部分测试，实际游玩中如果还有问题，欢迎继续反馈，会跟进修复',
     gamePlaceholder: '想玩的游戏名字', submit: '提交', gameSent: '收到了，会尽快适配',
     noticeMore: '遇到问题了，可以在「关于」页点「一键上传问题反馈」，写一下原因，简短或详细都可以，日志会一起发过来。有什么建议，或者只是想留句话，也都很欢迎。谢谢支持！',
-    report: '一键上传问题反馈', ok: '知道了',
+    report: '一键上传问题反馈', ok: '知道了', next: '下一步：使用教程', back: '上一步', done: '完成', guideKicker: 'guide', guide: '指南',
+    tabUpdates: '更新日志', tabGuide: '使用教程', tabReport: '问题反馈', tabGame: '想玩的游戏', reportText: '写一下原因，简短或详细都可以，最近的日志会一起发给作者。', gameText: '想玩什么游戏，把名字写在下面点提交，快的话半天，最晚一周内就能支持', close: '关闭', noUpdates: '暂时读不到更新日志，联网后再试',
   },
   ja: {
     kicker: '不具合をまとめて送る', title: 'どんな問題がありましたか？', hint: '原因をひとこと書いてください（短くても詳しくても OK）。最近のログと一緒に作者へ直接届きます。GitHub は不要です',
@@ -29,7 +32,8 @@ const T = {
     upd: (y, m, d, title) => `${y}年${m}月${d}日 「${title}」の埋め込み表示を改善しました`, updNote: '上のゲームは作者の手元で一部しか確認していません。実際に遊んで問題があれば、引き続き知らせてください。修正していきます',
     gamePlaceholder: '遊びたいゲームの名前', submit: '送信', gameSent: '受け取りました。できるだけ早く対応します',
     noticeMore: '困ったときは「について」ページの「不具合をまとめて送る」から、原因をひとこと書いて送ってください（短くても詳しくても OK）。ログも一緒に届きます。ご意見やひとことも大歓迎です',
-    report: '不具合をまとめて送る', ok: 'わかった',
+    report: '不具合をまとめて送る', ok: 'わかった', next: '次へ：使い方', back: '戻る', done: '完了', guideKicker: 'guide', guide: 'ガイド',
+    tabUpdates: '更新履歴', tabGuide: '使い方', tabReport: '不具合を送る', tabGame: '遊びたいゲーム', reportText: '原因をひとこと書いてください。最近のログも一緒に作者へ届きます。', gameText: '遊びたいゲームの名前を入れて送信してください。早ければ半日、遅くとも一週間以内に対応します', close: '閉じる', noUpdates: '更新履歴を読み込めません。オンラインで再度お試しください',
   },
   en: {
     kicker: 'Report a problem', title: 'What went wrong?', hint: 'Say what happened, briefly or in detail. It goes to the author together with recent logs; no GitHub needed',
@@ -41,7 +45,8 @@ const T = {
     upd: (y, m, d, title) => `${new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })} · embedded mode for ${title} improved`, updNote: 'These were only partly tested on the author’s own machine. If anything still goes wrong when you play, please keep telling us and we’ll fix it',
     gamePlaceholder: 'A game you want to play', submit: 'Submit', gameSent: 'Got it; support is on the way',
     noticeMore: 'If something goes wrong, open About and use Report a problem: say what happened, briefly or in detail, and the logs come along. Ideas or just a hello are welcome too. Thanks for the support!',
-    report: 'Report a problem', ok: 'Got it',
+    report: 'Report a problem', ok: 'Got it', next: 'Next: how to use', back: 'Back', done: 'Done', guideKicker: 'guide', guide: 'Guide',
+    tabUpdates: 'Updates', tabGuide: 'How to use', tabReport: 'Report', tabGame: 'Request a game', reportText: 'Say what went wrong, briefly or in detail; recent logs go to the author with it.', gameText: 'Type a game you want to play and submit it; it usually takes half a day, a week at most', close: 'Close', noUpdates: 'Could not load the updates; try again when online',
   },
 };
 const words = locale => T[locale] || T.zh;
@@ -116,13 +121,16 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '' })
   shownThisLaunch = true;
   const t = words(locale), dialog = document.createElement('dialog');
   dialog.className = 'game-dialog dev-notice';
-  dialog.innerHTML = `<div class="dev-notice-top"><span>${esc(t.noticeKicker)}</span><span>${esc(t.noticeTag)}</span></div>
-<h2>${esc(t.noticeTitle)}</h2><h2 class="dev-notice-title2">${esc(t.noticeTitle2)}</h2><p class="dev-notice-text">${esc(t.noticeText)}</p>
+  dialog.innerHTML = `<div class="dev-notice-page" data-page="1"><div class="dev-notice-top"><span>${esc(t.noticeKicker)}</span><span>${esc(t.noticeTag)}</span></div>
+<h2>${esc(t.noticeTitle)}</h2><h2 class="dev-notice-title2">${esc(t.noticeTitle2)}</h2>${successHTML(locale, esc)}<p class="dev-notice-text">${esc(t.noticeText)}</p>
 <form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="primary">${esc(t.submit)}</button></form>
 <p class="feedback-status" role="status" aria-live="polite"></p>
 <ul class="dev-notice-updates" hidden></ul><p class="dev-notice-updates-note" hidden></p>
 <p class="dev-notice-more">${esc(t.noticeMore)}</p>
-<div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="secondary" data-ok>${esc(t.ok)}</button></div>`;
+<div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="secondary" data-next>${esc(t.next)}</button></div></div>
+<div class="dev-notice-page" data-page="2" hidden><div class="dev-notice-top"><span>${esc(t.guideKicker)}</span><span>2 / 2</span></div>
+<h2>${esc((GUIDE[locale] || GUIDE.zh).title)}</h2><div class="dev-notice-scroll">${guideHTML(locale, esc)}</div>
+<div class="dev-notice-actions"><button type="button" class="text-button" data-back>${esc(t.back)}</button><button type="button" class="secondary" data-ok>${esc(t.done)}</button></div></div>`;
   document.body.append(dialog);
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
   fillUpdates(dialog, locale, api);
@@ -137,7 +145,50 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '' })
     status.dataset.state = result?.ok ? 'ok' : 'bad'; status.textContent = result?.ok ? t.gameSent : t.failed;
     if (result?.ok) game.value = '';
   };
+  const [one, two] = dialog.querySelectorAll('.dev-notice-page');
+  const page = n => { one.hidden = n !== 1; two.hidden = n !== 2; (n === 1 ? one : two).querySelector('.secondary').focus(); };
+  dialog.querySelector('[data-next]').onclick = () => page(2);
+  dialog.querySelector('[data-back]').onclick = () => page(1);
   dialog.querySelector('[data-ok]').onclick = () => dialog.close();
   dialog.querySelector('[data-report]').onclick = () => { dialog.close(); openFeedback({ api, locale, esc, toast, version }); };
   dialog.showModal();
+}
+
+/* E458 top bar 指南: everything from the start notice, any time (updates, the tutorial, a report, a game request) */
+export function openGuide({ api, locale = 'zh', esc, toast, version = '', tab = 'guide' }) {
+  document.querySelector('dialog.guide-panel')?.close();
+  const t = words(locale), dialog = document.createElement('dialog'), tabs = [['updates', t.tabUpdates], ['guide', t.tabGuide], ['report', t.tabReport], ['game', t.tabGame]];
+  dialog.className = 'game-dialog dev-notice guide-panel';
+  dialog.innerHTML = `<div class="dev-notice-top"><span>${esc(t.guideKicker)}</span><span>megulit</span></div>
+<h2>${esc(t.guide)}</h2>
+<nav class="guide-tabs" role="tablist">${tabs.map(([k, v]) => `<button type="button" role="tab" data-tab="${k}">${esc(v)}</button>`).join('')}</nav>
+<div class="dev-notice-scroll" data-pane="updates"><ul class="dev-notice-updates" hidden></ul><p class="dev-notice-updates-note" hidden></p><p class="guide-empty">${esc(t.noUpdates)}</p></div>
+<div class="dev-notice-scroll" data-pane="guide">${guideHTML(locale, esc)}</div>
+<div class="dev-notice-scroll" data-pane="report"><p class="dev-notice-text">${esc(t.reportText)}</p><p class="dev-notice-more">${esc(t.noticeMore)}</p><div class="dev-notice-actions"><button type="button" class="secondary" data-report>${esc(t.report)}</button></div></div>
+<div class="dev-notice-scroll" data-pane="game"><p class="dev-notice-text">${esc(t.gameText)}</p><form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="primary">${esc(t.submit)}</button></form><p class="feedback-status" role="status" aria-live="polite"></p></div>
+<div class="dev-notice-actions"><button type="button" class="secondary" data-ok>${esc(t.close)}</button></div>`;
+  document.body.append(dialog);
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  const show = key => {
+    dialog.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === key)));
+    dialog.querySelectorAll('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== key; });
+  };
+  dialog.querySelectorAll('[data-tab]').forEach(b => { b.onclick = () => show(b.dataset.tab); });
+  show(tabs.some(([k]) => k === tab) ? tab : 'guide');
+  fillUpdates(dialog, locale, api).then(() => { dialog.querySelector('.guide-empty').hidden = !dialog.querySelector('.dev-notice-updates').hidden; });
+  const form = dialog.querySelector('form'), game = dialog.querySelector('.dev-notice-game'), status = dialog.querySelector('.feedback-status');
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if (!game.value.trim()) { game.focus(); return; }
+    const button = form.querySelector('button'); button.disabled = true;
+    const result = await sendFeedback({ api, kind: 'game', text: game.value, locale, version });
+    button.disabled = false;
+    if (!dialog.isConnected) return;
+    status.dataset.state = result?.ok ? 'ok' : 'bad'; status.textContent = result?.ok ? t.gameSent : t.failed;
+    if (result?.ok) game.value = '';
+  };
+  dialog.querySelector('[data-ok]').onclick = () => dialog.close();
+  dialog.querySelector('[data-report]').onclick = () => { dialog.close(); openFeedback({ api, locale, esc, toast, version }); };
+  dialog.showModal();
+  return dialog;
 }
