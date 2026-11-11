@@ -68,9 +68,13 @@ export function heroPlay(h1, { reduce = false } = {}) {
   // the box's height follows each line, sliding from the old size to the new one
   let sizeTimer = 0;
   const resize = swap => {
-    const from = box.getBoundingClientRect().height;
+    // heights in the box's own CSS pixels: the box may be scaled (CSS zoom), and a measured height set back as a style
+    // would be scaled again, so the slide ended on a different height and then jumped
+    const z = parseFloat(getComputedStyle(box).zoom) || 1;
+    const h = () => box.getBoundingClientRect().height / z;
+    const from = h();
     box.style.removeProperty('height'); swap();
-    const to = box.getBoundingClientRect().height;
+    const to = h();
     if (reduce || Math.abs(to - from) < 2) return;
     clearTimeout(sizeTimer);
     box.classList.add('resizing'); box.style.setProperty('height', `${from}px`);
