@@ -493,3 +493,37 @@
 .gm-stg.clear .gm-stg-flag{background:#fff;color:#000}
 .gm-stg.clear .gm-stg-glyph{color:rgba(255,255,255,.4)}
 @media(prefers-reduced-motion:reduce){.gm-stg{transition:none}}
+
+/* 2026-11-11 rewards: title bar, floating 魔力, 惠惠's stamp, stage clear, 台词收藏册 */
+.rw-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 18px;background:#000;border-bottom:1px solid var(--mg-line)}
+.rw-rank{font:500 10px/1 var(--mg-mono);letter-spacing:.3em;color:var(--mg-red)}
+.rw-title{font:600 15px/1 var(--gm-serif);color:#fff}
+.rw-meter{flex:1;min-width:120px;height:6px;background:rgba(255,255,255,.1)}.rw-meter i{display:block;height:100%;background:var(--mg-red);transition:width .8s var(--ease-x)}
+.rw-mana{font:11px var(--mg-mono);letter-spacing:.1em;color:var(--mg-dim)}
+.rw-album-btn{height:30px;padding:0 14px;border:1px solid rgba(255,255,255,.3);background:none;color:#fff;font:600 12px/1 var(--gm-serif);cursor:pointer;transition:border-color .2s,background .2s}
+.rw-album-btn b{color:var(--mg-red);font-family:var(--mg-mono);margin-left:6px}
+.rw-album-btn:hover{border-color:var(--mg-red);background:rgba(200,50,60,.15)}
+.rw-float{position:fixed;z-index:30;transform:translate(-50%,0);pointer-events:none;font:700 15px/1 "IBM Plex Mono",ui-monospace,monospace;color:#fff;background:#c8323c;padding:5px 9px;letter-spacing:.06em;white-space:nowrap}
+.rw-src{display:block;margin-top:4px;font:10px "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.15em;color:rgba(255,255,255,.55);font-weight:400}
+.rw-fx{position:fixed;inset:0;z-index:40;display:grid;place-items:center;cursor:pointer}
+.rw-bg{position:absolute;inset:0;background:rgba(0,0,0,.88)}
+.rw-lines{position:absolute;left:50%;top:50%;width:160vmax;height:160vmax;transform:translate(-50%,-50%);background:repeating-conic-gradient(rgba(255,255,255,.9) 0 .6deg,transparent .6deg 7deg);-webkit-mask:radial-gradient(circle,transparent 18%,#000 19%,transparent 60%);mask:radial-gradient(circle,transparent 18%,#000 19%,transparent 60%)}
+.rw-core{position:relative;display:grid;justify-items:center;gap:14px;text-align:center;padding:0 24px}
+.rw-no{font:500 12px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.4em;color:rgba(255,255,255,.7)}
+.rw-big{font:800 clamp(52px,10vw,130px)/.9 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.06em;color:#fff}.rw-big em{font-style:normal;color:#c8323c}
+.rw-stamp{display:grid;place-items:center;width:140px;height:140px;border:6px solid #c8323c;color:#c8323c;font:900 42px/1 "Noto Serif JP","Yu Mincho",serif;transform:rotate(-14deg);background:rgba(0,0,0,.4)}
+.rw-fx.big .rw-stamp{position:absolute;right:-50px;top:-40px}
+.rw-quote{max-width:600px;padding:16px 22px;background:#f4f4f2;color:#0b0b0b;font:600 20px/1.6 "Noto Serif JP","Yu Mincho",serif;border-left:6px solid #c8323c}
+.rw-quote small{display:block;margin-top:6px;font:11px "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.15em;color:#666}
+.rw-gain{font:13px/1.8 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.1em;color:rgba(255,255,255,.8)}.rw-gain b{color:#c8323c}
+.rw-sub{font-size:14px;color:rgba(255,255,255,.7)}
+.rw-hint{position:absolute;bottom:26px;font:11px "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.3em;color:rgba(255,255,255,.4)}
+.rw-album{display:grid;gap:16px;padding:26px 28px;background:rgba(0,0,0,.84);border-top:1px solid var(--mg-red)}
+.rw-album h2{margin:8px 0 4px;font:600 26px/1.2 var(--gm-serif)}
+.rw-cards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:2px}
+.rw-card{position:relative;display:grid;gap:6px;padding:18px 18px 14px;background:#000;border-top:2px solid var(--mg-red)}
+.rw-card-no{font:500 10px/1 var(--mg-mono);letter-spacing:.3em;color:var(--mg-red)}
+.rw-card .gm-ja{font-size:20px;margin:0}
+.rw-card-meta{font:10px var(--mg-mono);letter-spacing:.08em;color:var(--mg-dim)}
+.rw-empty{margin:0;color:var(--mg-dim);font-size:14px}
+@media(prefers-reduced-motion:reduce){.rw-meter i{transition:none}}

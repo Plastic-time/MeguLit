@@ -160,3 +160,17 @@ test('the 五十音 voice choice (女声 / 男声 / AI 合成) can be changed an
  const K=require('../services/kana.cjs');assert.equal(K.clean({prefs:{voice:'male'}}).prefs.voice,'male');assert.equal(K.clean({prefs:{voice:'ai'}}).prefs.voice,'ai');assert.equal(K.clean({prefs:{voice:'x'}}).prefs.voice,'female');
  const src=fs.readFileSync(path.join(__dirname,'..','web','kana','kana.js'),'utf8');assert.match(src,/ctx\.store\.put\(KEY\.p,\{\.\.\.p,voice:b\.dataset\.voice\}\)/);assert.doesNotMatch(src,/ctx\.store\.set\(/,'the store has get/put, no set');
 });
+
+test('rewards: magic points, titles, the line collection, and 惠惠\'s real lines',async()=>{
+ const R=require('../services/learning-rewards.cjs'),root=temp(),db=openStore(path.join(root,'r.sqlite'));
+ try{assert.deepEqual([R.state(db).mana,R.state(db).title],[0,'见习魔法使']);
+  let r=R.add(db,{kind:'answer',ref:'wa',streak:1,line:{text:'私はずっと待っていた。',title:'G',origin:'history',readAt:1}});assert.equal(r.gained,5);assert.equal(r.collected,true);
+  r=R.add(db,{kind:'answer',ref:'wa',streak:4,line:{text:'私はずっと待っていた。',title:'G',origin:'history'}});assert.equal(r.bonus,6,'streak bonus');assert.equal(r.collected,false,'a line is collected once');
+  R.add(db,{kind:'answer',ref:'wa',line:{text:'内置',origin:'builtin'}});assert.equal(R.album(db).length,1,'only lines from your games');
+  for(let k=0;k<3;k++)r=R.add(db,{kind:'learned',ref:'x'});assert.equal(r.title,'红魔族学徒');
+  assert.throws(()=>R.add(db,{kind:'cheat'}),/INVALID_REWARD/);
+  const b=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');for(const c of ['learning_rewards','learning_reward','learning_album'])assert.match(b,new RegExp(`case '${c}'`));
+ }finally{db.close?.();}
+ const w=await import('../web/rewards.js');for(const k of ['praise','clear','cheer'])for(const [line,src] of w.QUOTES[k]){assert.ok([...line].length<=30,line);assert.match(src,/^(TV \d期 \d+話|映画 紅伝説)$/,line+' says where it is from');}
+ const g=await import('../web/grammar.js');assert.match(g.listHTML({progress:{}},{locale:'zh',esc,level:'N5',rewards:{mana:12,album:3,rank:1,title:'见习魔法使',floor:0,next:150}}),/台词收藏册 <b>3<\/b>/);
+});
