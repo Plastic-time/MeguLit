@@ -61,3 +61,8 @@ test('orderByGoal pulls goal categories first and keeps the rest in order',async
   assert.deepEqual(orderByGoal(['a','b','c','d'],{groups:['c','x','a']}),['c','a','b','d']);
   assert.deepEqual(orderByGoal(['a','b'],null),['a','b']);
 });
+test('EJU 400 band is marked full marks with the scoring note, three languages',async()=>{
+  const {goalPickerHTML,goalBarHTML}=await import('../web/learning-goal.js'),esc=x=>String(x);
+  const g={goals:['eju'],eju:{subjects:['ja'],band:400,parts:['read'],month:6,year:2027}};
+  for(const [l,full,note] of [['zh','400（满分）','几乎不可能'],['ja','400（満点）','ほぼ取れません'],['en','400 (full marks)','almost impossible']]){const h=goalPickerHTML(g,{locale:l,esc});assert.ok(h.includes(full)&&h.includes(note)&&h.includes('/400'),l);assert.ok(goalBarHTML({goal:g},{locale:l,esc}).includes(full),l);}
+});

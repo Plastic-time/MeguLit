@@ -612,3 +612,4 @@
 .gm-stg.goal::before{content:'GOAL';position:absolute;top:6px;right:8px;font:500 10px var(--mg-mono,monospace);letter-spacing:.2em;color:var(--mg-red,#c8323c)}
 .lg-settings{margin:18px 0;display:grid;gap:8px}.lg-settings h3{margin:0}
 @media(prefers-reduced-motion:reduce){.lg-more{animation:none}}
+.lg-row .lg-band-note{flex-basis:100%;margin-left:104px;line-height:1.6}

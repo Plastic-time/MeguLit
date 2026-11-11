@@ -7,7 +7,7 @@ export const GOAL_TEXT={
   goals:{jlpt:['JLPT','日本语能力考试','検'],eju:['EJU','日本留学考试','留'],fun:['娱乐','看懂 gal 和动画','遊'],talk:['交流','日常会话','話']},
   level:'想考到',score:'目标分数',full:'追求满分',sitting:'考试时间',jul:'7 月',dec:'12 月',jun:'6 月',nov:'11 月',
   subjects:'科目',subj:{ja:'日本語',sci:'理科',hum:'综合科目（文科）',math1:'数学 コース1',math2:'数学 コース2'},subjNote:'日本語之外的科目只记录，不出题',
-  band:'日本語目标分数',parts:'重点部分',part:{read:'读解',listen:'听解·听读解',write:'记述'},
+  band:'日本語目标分数',bandFull:'（满分）',bandNote:'EJU 用等化后的标准分（读解＋听解·听读解 0–400，记述 0–50 另计），按计分规则几乎不可能拿到整 400，选这一档表示以冲顶为目标',parts:'重点部分',part:{read:'读解',listen:'听解·听读解',write:'记述'},
   focus:'想重点提高',fun:{story:'读懂剧情',voice:'听懂语音',shadow:'跟读口语',slang:'看懂梗和黑话'},talk:{daily:'日常常用表达',shadow:'跟读口语',slang:'年轻人流行语',polite:'敬语分寸'},
   later:'以后再说',cancel:'取消',ok:'定下目标！',none:'还没设学习目标',set:'设定目标',edit:'改目标',days:n=>n===0?'就是今天！':`还有 ${n} 天`,past:'这次考试已经过去了——改一下目标吧',
   bar:'目标',first:'按目标排在前面',saved:'目标已保存',settings:'学习目标',settingsLead:'决定学习页的倒计时和课程顺序，随账号同步'},
@@ -15,7 +15,7 @@ export const GOAL_TEXT={
   goals:{jlpt:['JLPT','日本語能力試験','検'],eju:['EJU','日本留学試験','留'],fun:['エンタメ','ギャルゲ・アニメを楽しむ','遊'],talk:['会話','日常会話','話']},
   level:'目標レベル',score:'目標点数',full:'満点を目指す',sitting:'受験時期',jul:'7 月',dec:'12 月',jun:'6 月',nov:'11 月',
   subjects:'科目',subj:{ja:'日本語',sci:'理科',hum:'総合科目',math1:'数学コース1',math2:'数学コース2'},subjNote:'日本語以外は記録のみ',
-  band:'日本語の目標点',parts:'重点',part:{read:'読解',listen:'聴解・聴読解',write:'記述'},
+  band:'日本語の目標点',bandFull:'（満点）',bandNote:'EJU は等化された標準得点（読解＋聴解・聴読解 0〜400、記述 0〜50 は別）で、採点の仕組み上ちょうど 400 はほぼ取れません。この段は最高点を狙うという意味です',parts:'重点',part:{read:'読解',listen:'聴解・聴読解',write:'記述'},
   focus:'伸ばしたいところ',fun:{story:'ストーリー読解',voice:'ボイス聞き取り',shadow:'シャドーイング',slang:'ネタ・スラング'},talk:{daily:'日常表現',shadow:'シャドーイング',slang:'若者言葉',polite:'敬語の加減'},
   later:'あとで',cancel:'キャンセル',ok:'これで決まり！',none:'学習目標が未設定',set:'目標を決める',edit:'目標を変更',days:n=>n===0?'今日が本番！':`あと ${n} 日`,past:'この試験は終わりました。目標を更新しましょう',
   bar:'目標',first:'目標に合わせて先頭に',saved:'目標を保存しました',settings:'学習目標',settingsLead:'学習ページのカウントダウンとレッスン順を決めます。アカウントと同期'},
@@ -23,7 +23,7 @@ export const GOAL_TEXT={
   goals:{jlpt:['JLPT','Japanese-Language Proficiency Test','検'],eju:['EJU','Exam for Japanese University Admission','留'],fun:['Fun','Understand visual novels and anime','遊'],talk:['Talk','Everyday conversation','話']},
   level:'Target level',score:'Target score',full:'Aim for full marks',sitting:'Sitting',jul:'July',dec:'December',jun:'June',nov:'November',
   subjects:'Subjects',subj:{ja:'Japanese',sci:'Science',hum:'Japan and the World',math1:'Math Course 1',math2:'Math Course 2'},subjNote:'Subjects other than Japanese are only recorded',
-  band:'Japanese target score',parts:'Focus parts',part:{read:'Reading',listen:'Listening',write:'Writing'},
+  band:'Japanese target score',bandFull:' (full marks)',bandNote:'EJU uses equated scaled scores (Reading + Listening / Listening-Reading 0–400, Writing 0–50 counted separately); the scoring makes an exact 400 almost impossible, so this band means aiming for the top',parts:'Focus parts',part:{read:'Reading',listen:'Listening',write:'Writing'},
   focus:'What to push',fun:{story:'Follow the story',voice:'Understand voices',shadow:'Shadowing',slang:'Memes and slang'},talk:{daily:'Everyday phrases',shadow:'Shadowing',slang:'Youth slang',polite:'Politeness'},
   later:'Later',cancel:'Cancel',ok:'Set my goal!',none:'No learning goal yet',set:'Set a goal',edit:'Change goal',days:n=>n===0?'Today is the day!':`${n} days left`,past:'That sitting has passed. Update your goal',
   bar:'Goal',first:'Put first for your goal',saved:'Goal saved',settings:'Learning goal',settingsLead:'Sets the countdown and lesson order on the learning page; synced with your account'}
@@ -35,7 +35,7 @@ export function goalPickerHTML(goal,{locale='zh',esc,now=Date.now()}={}){
  const j=g.jlpt||{level:'N3',score:120,full:false,month:7,year:y},e=g.eju||{subjects:['ja'],band:300,parts:['read','listen','write'],month:6,year:y};
  const year=(name,v)=>`<select name="${name}">${years.map(x=>`<option value="${x}"${x===v?' selected':''}>${x}</option>`).join('')}</select>`;
  const jlpt=`<fieldset class="lg-more" data-more="jlpt"${has('jlpt')?'':' hidden'}><legend>JLPT</legend><div class="lg-row"><span>${esc(t.level)}</span>${['N5','N4','N3','N2','N1'].map(l=>chip('jlpt-level',l,l,j.level===l,'radio')).join('')}</div><div class="lg-row"><span>${esc(t.score)}</span><input type="range" name="jlpt-score" min="80" max="180" step="5" value="${j.score}"><output data-score>${j.score}</output><b>/180</b>${chip('jlpt-full','1',esc(t.full),j.full)}</div><div class="lg-row"><span>${esc(t.sitting)}</span>${chip('jlpt-month','7',esc(t.jul),j.month===7,'radio')}${chip('jlpt-month','12',esc(t.dec),j.month===12,'radio')}${year('jlpt-year',j.year)}</div></fieldset>`;
- const eju=`<fieldset class="lg-more" data-more="eju"${has('eju')?'':' hidden'}><legend>EJU</legend><div class="lg-row"><span>${esc(t.subjects)}</span>${Object.entries(t.subj).map(([k,v])=>chip('eju-subj',k,esc(v),k==='ja'||e.subjects.includes(k))).join('')}<small>${esc(t.subjNote)}</small></div><div class="lg-row"><span>${esc(t.band)}</span>${[250,300,350,400].map(b=>chip('eju-band',b,`${b}+`,e.band===b,'radio')).join('')}<b>/450</b></div><div class="lg-row"><span>${esc(t.parts)}</span>${Object.entries(t.part).map(([k,v])=>chip('eju-part',k,esc(v),e.parts.includes(k))).join('')}</div><div class="lg-row"><span>${esc(t.sitting)}</span>${chip('eju-month','6',esc(t.jun),e.month===6,'radio')}${chip('eju-month','11',esc(t.nov),e.month===11,'radio')}${year('eju-year',e.year)}</div></fieldset>`;
+ const eju=`<fieldset class="lg-more" data-more="eju"${has('eju')?'':' hidden'}><legend>EJU</legend><div class="lg-row"><span>${esc(t.subjects)}</span>${Object.entries(t.subj).map(([k,v])=>chip('eju-subj',k,esc(v),k==='ja'||e.subjects.includes(k))).join('')}<small>${esc(t.subjNote)}</small></div><div class="lg-row"><span>${esc(t.band)}</span>${[250,300,350,400].map(b=>chip('eju-band',b,b===400?`400${esc(t.bandFull)}`:`${b}+`,e.band===b,'radio')).join('')}<b>/400</b><small class="lg-band-note">${esc(t.bandNote)}</small></div><div class="lg-row"><span>${esc(t.parts)}</span>${Object.entries(t.part).map(([k,v])=>chip('eju-part',k,esc(v),e.parts.includes(k))).join('')}</div><div class="lg-row"><span>${esc(t.sitting)}</span>${chip('eju-month','6',esc(t.jun),e.month===6,'radio')}${chip('eju-month','11',esc(t.nov),e.month===11,'radio')}${year('eju-year',e.year)}</div></fieldset>`;
  const focus=k=>`<fieldset class="lg-more" data-more="${k}"${has(k)?'':' hidden'}><legend>${esc(t.goals[k][0])}</legend><div class="lg-row"><span>${esc(t.focus)}</span>${Object.entries(t[k]).map(([f,v])=>chip(k+'-focus',f,esc(v),(g[k]?.focus||[]).includes(f))).join('')}</div></fieldset>`;
  return `<div class="lv-dialog lg-dialog" role="dialog" aria-modal="true" aria-labelledby="lg-title"><header><p class="lv-kicker">${esc(t.kicker)}</p><h2 id="lg-title">${esc(t.title)}</h2><p class="lv-lead">${esc(t.lead)}</p></header><form class="lg-form"><div class="lv-grid lg-goals">${Object.entries(t.goals).map(([k,[name,sub,seal]],i)=>`<label class="lv-opt lg-goal${has(k)?' active':''}" style="--i:${i}"><input type="checkbox" name="goal" value="${k}"${has(k)?' checked':''}><span class="lv-seal" aria-hidden="true">${seal}</span><b>${esc(name)}</b><small>${esc(sub)}</small></label>`).join('')}</div>${jlpt}${eju}${focus('fun')}${focus('talk')}</form><footer><p class="lv-note"></p><button type="button" class="secondary" data-lg-later>${esc(g.goals?.length?t.cancel:t.later)}</button><button type="button" class="primary" data-lg-ok${g.goals?.length?'':' disabled'}>${esc(t.ok)}</button></footer></div>`;
 }
@@ -70,7 +70,7 @@ export function goalBarHTML(state,{locale='zh',esc}){
  const cd=Object.fromEntries((state.countdown||[]).map(c=>[c.kind,c])),when=c=>c?`<em class="${c.past?'past':''}">${esc(c.past?t.past:t.days(c.days))}</em>`:'';
  const item=k=>{const name=t.goals[k][0];
   if(k==='jlpt'){const j=g.jlpt;return `<li><b>${esc(name)} ${esc(j.level)}</b><small>${j.full?esc(t.full):`${j.score}/180`} · ${j.year}.${j.month}</small>${when(cd.jlpt)}</li>`;}
-  if(k==='eju'){const e=g.eju;return `<li><b>${esc(name)} ${esc(t.subj.ja)} ${e.band}+</b><small>${e.parts.map(p=>esc(t.part[p])).join(' · ')} · ${e.year}.${e.month}</small>${when(cd.eju)}</li>`;}
+  if(k==='eju'){const e=g.eju;return `<li><b>${esc(name)} ${esc(t.subj.ja)} ${e.band===400?`400${esc(t.bandFull)}`:`${e.band}+`}</b><small>${e.parts.map(p=>esc(t.part[p])).join(' · ')} · ${e.year}.${e.month}</small>${when(cd.eju)}</li>`;}
   return `<li><b>${esc(name)}</b><small>${(g[k]?.focus||[]).map(f=>esc(t[k][f])).join(' · ')||esc(t.goals[k][1])}</small></li>`;};
  return `<aside class="lg-bar"><span class="lg-bar-k">${esc(t.bar)}</span><ul>${g.goals.map(item).join('')}</ul><button type="button" class="gm-link" data-goal-edit>${esc(t.edit)}</button></aside>`;
 }
