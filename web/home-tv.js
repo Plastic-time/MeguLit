@@ -5,7 +5,7 @@ const copy={
  ja:{coverHint:'クリックで詳細 · ダブルクリックでガチャ',search:'作品を検索',read:'今日の読書',words:'収録単語',lookups:'辞書引き',full:'統計をすべて見る',play:'続きをプレイ',detail:'作品詳細',all:'すべての作品',edit:'ホームに表示する作品を選ぶ',title:'ホームに表示する作品',sub:'ドラッグで並べ替え · 固定 · 非表示',auto:'最近プレイ順',pick:'選んだ作品だけ',pin:'固定',hide:'非表示',close:'閉じる',hintAuto:'最近プレイ順に切り替わります。固定は常に先頭、非表示は出ません。',hintPick:'この順番だけで切り替えます。残りがなければ最近プレイ順に戻ります。',chars:'字',linked:'語',total:'累計',activity:'学習の記録',days:'日',min:'分',empty:'作品がまだありません',add:'ゲームを追加'},
  en:{coverHint:'Click for details · double-click to draw',search:'Search games',read:'Read today',words:'Words saved',lookups:'Lookups',full:'Full statistics',play:'Continue',detail:'Details',all:'All games',edit:'Choose games for the home screen',title:'Games on the home screen',sub:'Drag to reorder · pin · hide',auto:'Recently played',pick:'Only my picks',pin:'Pin',hide:'Hide',close:'Close',hintAuto:'Cycles through recently played games; pinned ones lead, hidden ones never show.',hintPick:'Cycles through this order only; falls back to recently played when empty.',chars:'chars',linked:'words',total:'Total',activity:'Learning activity',days:'days',min:'min',empty:'No games yet',add:'Add game'}};
 
-const DUR=12000,BEAT=476;
+const DUR=12000,BEAT=476,LOGO=new URL('./assets/megulit-logo.svg',import.meta.url).href;
 const details=new Map(),palettes=new Map();
 let live=null;
 
@@ -23,20 +23,28 @@ function detail(api,id,locale){if(!details.has(id))details.set(id,api('game_deta
 
 const rnd=(a,b)=>a+Math.random()*(b-a),pickOne=list=>list[Math.floor(Math.random()*list.length)];
 const EASES=['cubic-bezier(.2,.8,.2,1)','cubic-bezier(.16,1,.3,1)','cubic-bezier(.34,1.56,.64,1)','cubic-bezier(.7,0,.2,1)'];
-function deal(cover,background,animate){const face=cover.querySelector('.tv-face'),artEl=cover.querySelector('.tv-art');cover.querySelectorAll('.tv-ghost,.tv-old,.tv-sheen').forEach(n=>n.remove());face.getAnimations().forEach(x=>x.cancel());
+const backCard=()=>{const d=document.createElement('div');d.className='tv-back tv-loose';d.innerHTML=`<img src="${LOGO}" alt="">`;return d;};
+function deal(cover,background,animate){const flip=cover.querySelector('.tv-flip'),face=cover.querySelector('.tv-face'),artEl=cover.querySelector('.tv-art');cover.querySelectorAll('.tv-old,.tv-sheen,.tv-deck').forEach(n=>n.remove());flip.getAnimations().forEach(x=>x.cancel());
  if(!animate||matchMedia('(prefers-reduced-motion:reduce)').matches||!artEl.style.background){artEl.style.background=background;return;}
  const outDir=rnd(0,Math.PI*2),outDur=rnd(260,380);
  const old=document.createElement('div');old.className='tv-old';old.style.background=artEl.style.background;cover.appendChild(old);
  old.animate([{transform:'none',opacity:1,filter:'blur(0)'},{transform:`scale(${rnd(1.02,1.06)}) rotate(${rnd(-3,3)}deg)`,opacity:1,offset:.18},{transform:`translate(${Math.cos(outDir)*rnd(110,160)}%,${Math.sin(outDir)*rnd(80,120)}%) rotate(${rnd(-70,70)}deg) scale(${rnd(.6,.9)})`,opacity:0,filter:'blur(6px)'}],{duration:outDur,easing:'cubic-bezier(.5,0,.9,.5)',fill:'forwards'}).finished.then(()=>old.remove(),()=>old.remove());
  artEl.style.background=background;
- const inDir=rnd(0,Math.PI*2),dist=rnd(90,170),spin=pickOne([0,rnd(-200,200),rnd(-560,-300),rnd(300,560)]),start=rnd(.45,1.35),tilt=rnd(-8,8),over=rnd(1.02,1.09),axis=pickOne(['Y','Y','X']),flipSign=Math.random()<.5?-1:1,inDur=rnd(460,720),flipDur=rnd(380,560),ease=pickOne(EASES),gap=outDur*rnd(.55,.85);
- const back=document.createElement('div');back.className='tv-ghost';back.innerHTML='<span>め</span>';cover.insertBefore(back,face);
- back.animate([{transform:`translate(${Math.cos(inDir)*dist}%,${Math.sin(inDir)*dist}%) rotate(${spin}deg) scale(${start})`,opacity:0,filter:'blur(8px)'},{opacity:1,filter:'blur(2px)',offset:.35},{transform:`rotate(${tilt}deg) scale(${over})`,opacity:1,filter:'blur(0)',offset:.78},{transform:`rotate${axis}(${90*flipSign}deg) scale(${(over+1)/2})`,opacity:1,filter:'blur(0)'}],{duration:inDur,delay:gap,easing:ease,fill:'both'}).finished.then(()=>back.remove(),()=>back.remove());
- const at=gap+inDur;
- face.animate([{opacity:0},{opacity:0}],{duration:at});
- face.animate([{transform:`rotate${axis}(${-90*flipSign}deg) scale(${(over+1)/2})`},{transform:`rotate${axis}(${rnd(4,12)*flipSign}deg) scale(${over})`,offset:.55},{transform:'none'}],{duration:flipDur,delay:at,easing:'cubic-bezier(.2,.9,.2,1)',fill:'backwards'});
- const sheen=document.createElement('i');sheen.className='tv-sheen';face.appendChild(sheen);const sa=rnd(95,135);sheen.style.setProperty('--sa',sa+'deg');
- sheen.animate([{backgroundPosition:'120% 0',opacity:0},{opacity:1,offset:.3},{backgroundPosition:'-40% 0',opacity:0}],{duration:rnd(600,900),delay:at+flipDur*.4,easing:'ease-out',fill:'both'}).finished.then(()=>sheen.remove(),()=>sheen.remove());}
+ const side=Math.random()<.5?-1:1,turn=180*side,tilt=rnd(-6,6),lift=rnd(50,110),over=rnd(1.06,1.14),gap=outDur*rnd(.5,.8),travel=rnd(520,760),flipDur=rnd(520,720),ease=pickOne(EASES);let frames;
+ if(Math.random()<.5){
+  const deck=document.createElement('div');deck.className='tv-deck';const dx=pickOne([-1,1])*rnd(70,105),dy=rnd(-20,45),dr=rnd(-14,14);deck.style.transform=`translate(${dx}%,${dy}%) rotate(${dr}deg) scale(.82)`;for(let n=0;n<5;n++){const c=backCard();c.style.transform=`translate(${n*-1.2}px,${n*-1.6}px)`;deck.appendChild(c);}cover.insertBefore(deck,flip);
+  deck.animate([{opacity:0,transform:`translate(${dx}%,${dy+20}%) rotate(${dr}deg) scale(.7)`},{opacity:1,transform:`translate(${dx}%,${dy}%) rotate(${dr}deg) scale(.82)`,offset:.25},{opacity:1,transform:`translate(${dx}%,${dy}%) rotate(${dr}deg) scale(.82)`,offset:.8},{opacity:0,transform:`translate(${dx}%,${dy+10}%) rotate(${dr}deg) scale(.78)`}],{duration:gap+travel+flipDur,easing:'ease-out',fill:'both'}).finished.then(()=>deck.remove(),()=>deck.remove());
+  const arcY=Math.min(dy,0)-rnd(25,55);
+  frames=[{transform:`translate(${dx}%,${dy}%) rotate(${dr}deg) rotateY(${turn}deg) scale(.82)`},{transform:`translate(${dx}%,${dy}%) rotate(${dr}deg) rotateY(${turn}deg) scale(.86) translateY(-6%)`,offset:.12},{transform:`translate(${dx*.45}%,${arcY}%) rotate(${dr*.3+rnd(-10,10)}deg) rotateY(${turn}deg) scale(1)`,offset:.32},{transform:`rotate(${tilt}deg) rotateY(${turn}deg) scale(1)`,offset:.5}];
+ }else{
+  const dir=rnd(0,Math.PI*2),dist=rnd(100,170),spin=pickOne([0,rnd(-180,180),rnd(-420,-240),rnd(240,420)]);
+  frames=[{transform:`translate(${Math.cos(dir)*dist}%,${Math.sin(dir)*dist}%) rotate(${spin}deg) rotateY(${turn}deg) scale(${rnd(.5,1.3)})`,opacity:0},{opacity:1,offset:.2},{transform:`rotate(${tilt}deg) rotateY(${turn}deg) scale(1)`,opacity:1,offset:.5}];
+ }
+ frames.push({transform:`translateZ(${lift}px) rotate(${tilt*.5}deg) rotateY(${turn*.5}deg) scale(${over})`,offset:.74},{transform:`translateZ(${lift*.3}px) rotateY(${-side*rnd(6,14)}deg) scale(${(over+1)/2})`,offset:.88},{transform:'none',opacity:1});
+ const cut=frames.findIndex(f=>f.offset===.5);frames.forEach((f,n)=>{f.easing=n<cut?ease:'cubic-bezier(.3,0,.2,1)';});flip.animate(frames,{duration:travel+flipDur,delay:gap,easing:'linear',fill:'backwards'});
+ const total=travel+flipDur,mid=.74,timing={duration:total,delay:gap,easing:'linear',fill:'backwards'},backFace=flip.querySelector('.tv-back');face.animate([{opacity:0},{opacity:0,offset:mid},{opacity:1,offset:mid+.001},{opacity:1}],timing);backFace.animate([{opacity:1},{opacity:1,offset:mid},{opacity:0,offset:mid+.001},{opacity:0}],{...timing,fill:'both'}).finished.then(()=>backFace.getAnimations().forEach(x=>x.cancel()),()=>{});
+ const sheen=document.createElement('i');sheen.className='tv-sheen';face.appendChild(sheen);sheen.style.setProperty('--sa',rnd(95,135)+'deg');
+ sheen.animate([{backgroundPosition:'120% 0',opacity:0},{opacity:1,offset:.3},{backgroundPosition:'-40% 0',opacity:0}],{duration:rnd(600,900),delay:gap+travel+flipDur*.7,easing:'ease-out',fill:'both'}).finished.then(()=>sheen.remove(),()=>sheen.remove());}
 
 function cardify(card){const face=card.querySelector('.tv-face');let pressed=false,last=null;
  const set=(x,y)=>{const depth=pressed?1.6:1,rx=(.5-y)*20*depth,ry=(x-.5)*20*depth;face.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg) scale(${pressed?.96:1.03})`;face.style.setProperty('--px',`${x*100}%`);face.style.setProperty('--py',`${y*100}%`);face.style.setProperty('--hue',`${Math.round(x*360)}deg`);};
@@ -60,7 +68,7 @@ export function renderHomeTV(main,ctx){
   <div class="tv-plane" data-z="-200"><div class="tv-tl"></div></div>
   <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-index"></div><div class="tv-ring"></div></div>
   <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div><div class="tv-vocab"></div><div class="tv-heat-card tv-card"><div class="tv-face"><div class="tv-heat"></div><i class="tv-glare"></i></div></div></div>
-  <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div></div></div></div>
+  <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""></div></div></div></div></div>
   <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div><div class="tv-scene"></div><div class="tv-flash"></div>
   <div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div>
   <button class="tv-heatlink" data-go="activity"></button>
