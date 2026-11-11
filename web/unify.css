@@ -1176,3 +1176,6 @@ html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-name:is(:hover,:focus-vi
 html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-name-input{width:min(320px,100%);height:auto!important;padding:0 0 2px!important;border:0!important;border-bottom:1px solid var(--g-gold,#edb56e)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;font:600 clamp(28px,2.6vw,36px)/1.1 var(--g-serif,serif)!important;color:var(--g-t1,#f1e0d2)!important;outline:0}
 html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-note{display:block;margin-top:6px;font-size:12px;color:var(--g-t3,#a08a80)}
 html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-note[data-status="rejected"]{color:#e2685e}
+html body .fx-mushroom{width:0;height:0}
+html body .fx-mushroom i{position:absolute;border-radius:50%;background:radial-gradient(closest-side,rgba(200,180,170,.3),rgba(140,120,115,.12) 60%,transparent);filter:blur(6px)}
+html body .fx-mushroom i.is-cap{background:radial-gradient(closest-side,rgba(215,190,175,.32),rgba(150,120,110,.12) 60%,transparent)}

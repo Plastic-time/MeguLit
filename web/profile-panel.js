@@ -32,9 +32,9 @@ async function heroData(api){
    five levels come quickly (100, 150, 200, 250, 300), then every level costs the same 600 and there is no top level;
    the rank title moves up with the level. */
 const XP_EARLY=[100,150,200,250,300],XP_STEP=600;
-const RANKS={zh:[[1,'见习读者'],[5,'初级魔导士'],[10,'魔导士'],[20,'上级魔导士'],[35,'大魔导士'],[50,'红魔族'],[80,'爆裂魔法使']],
- ja:[[1,'見習い読者'],[5,'初級魔導士'],[10,'魔導士'],[20,'上級魔導士'],[35,'大魔導士'],[50,'紅魔族'],[80,'爆裂魔法使い']],
- en:[[1,'Apprentice reader'],[5,'Novice mage'],[10,'Mage'],[20,'High mage'],[35,'Archmage'],[50,'Crimson demon'],[80,'Explosion mage']]};
+const RANKS={zh:[[1,'见习读者'],[5,'初级魔导士'],[10,'魔导士'],[20,'上级魔导士'],[35,'大魔导士'],[50,'红魔族'],[80,'爆裂魔法学徒']],
+ ja:[[1,'見習い読者'],[5,'初級魔導士'],[10,'魔導士'],[20,'上級魔導士'],[35,'大魔導士'],[50,'紅魔族'],[80,'爆裂魔法見習い']],
+ en:[[1,'Apprentice reader'],[5,'Novice mage'],[10,'Mage'],[20,'High mage'],[35,'Archmage'],[50,'Crimson demon'],[80,'Explosion apprentice']]};
 export function readerLevel(stats){
  const st=stats||{};let xp=Math.floor((Number(st.characters)||0)/50)+Math.floor((Number(st.seconds)||0)/60)*2+(Number(st.words)||0)*10;
  const total=xp;let level=1;

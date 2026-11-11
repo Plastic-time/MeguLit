@@ -65,6 +65,13 @@ export function explosion(x,y,{shake}={}){
  for(let i=0;i<16;i++){const s=document.createElement('i');s.className='fx-spark';w.append(s);const a=Math.random()*Math.PI*2,d=60+Math.random()*120;
   s.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:0},{opacity:1,offset:.5,transform:'translate(-50%,-50%) scale(1)'},{transform:`translate(calc(-50% + ${f1(Math.cos(a)*d)}px),calc(-50% + ${f1(Math.sin(a)*d+30)}px)) scale(.3)`,opacity:0}],{duration:900+Math.random()*300,easing:'cubic-bezier(.1,.7,.3,1)',fill:'forwards'});}
  later(w,1400);
+ /* the aftermath: a faint mushroom of smoke climbs from the blast and drifts apart */
+ const m=document.createElement('div');m.className='fx-mushroom';m.style.cssText=`left:${x}px;top:${y}px`;
+ const puffs=[[0,0,34,30,'stem'],[0,-26,30,34,'stem'],[0,-58,26,30,'stem'],[-34,-92,62,46,'cap'],[30,-94,66,48,'cap'],[0,-108,80,54,'cap'],[-62,-80,44,34,'cap'],[60,-80,46,34,'cap']];
+ m.innerHTML=puffs.map(([px,py,pw,ph,k])=>`<i class="is-${k}" style="left:${px}px;top:${py}px;width:${pw}px;height:${ph}px"></i>`).join('');l.append(m);
+ m.querySelectorAll('i').forEach((p,i)=>{const cap=p.classList.contains('is-cap'),dx=(Math.random()-.5)*(cap?70:24);
+  p.animate([{transform:'translate(-50%,-50%) translateY(40px) scale(.3)',opacity:0},{transform:'translate(-50%,-50%) scale(1)',opacity:1,offset:.3},{transform:`translate(calc(-50% + ${f1(dx)}px),calc(-50% - ${cap?60:40}px)) scale(${cap?1.9:1.5})`,opacity:0}],{duration:2600+Math.random()*900,delay:420+i*40,easing:'cubic-bezier(.25,.6,.3,1)',fill:'both'});});
+ later(m,4200);
  return new Promise(res=>setTimeout(()=>{
   if(shake)shake.animate([{transform:'none'},{transform:'translate(-6px,3px)'},{transform:'translate(5px,-4px)'},{transform:'translate(-3px,2px)'},{transform:'none'}],{duration:320,easing:'ease-out'});
   res();},320));
