@@ -249,7 +249,6 @@ html:not(#u):not(#v) body .tv-fig small,html:not(#u):not(#v) body .tv-heatsum{fo
 html:not(#u):not(#v) body .main .field-search{border-radius:2px!important;border:0!important;background:linear-gradient(160deg,rgba(28,22,26,.94),rgba(16,13,17,.94))!important;box-shadow:inset 0 0 0 1px var(--u-line-2),0 18px 40px -16px #000!important;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
 html:not(#u):not(#v) body .main .field-search .icon-button{border-radius:2px!important}
 html:not(#u):not(#v) body .main .field-search input{border-radius:2px!important}
-html:not(#u):not(#v) body .main:not(.field-list)>.field-search{top:auto!important;bottom:28px!important;transform:translateX(-50%)!important}
 html:not(#u):not(#v) body .lib-list:not(.lib-selecting)::before{background:none!important;border-bottom-color:var(--u-line)!important}
 html:not(#u):not(#v) body .main .game-caption.mq-box{-webkit-mask:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent);mask:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent)}
 html:not(#u):not(#v) body .lib-list .game-caption{height:auto!important;min-height:0!important;padding:12px 2px 4px!important;font-size:13px!important}
@@ -259,8 +258,6 @@ html:not(#u):not(#v) body .hook-support.supported::before{background:var(--g-gol
 html:not(#u):not(#v) body .hook-support::before{border-radius:1px!important;transform:rotate(45deg)}
 html:not(#u):not(#v) body .main .cover-frame{border-radius:2px!important}
 html:not(#u):not(#v) body .main .cover-frame img.cover{border-radius:2px!important}
-html:not(#u):not(#v) body .main.field-page:not(.field-list)>.field-search{bottom:18px!important}
-html:not(#u):not(#v) body .main.field-page:not(.field-list)::after{content:"";position:fixed;left:0;right:0;bottom:0;height:120px;z-index:3;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(9,7,10,.88) 70%)}
 
 /* ---- history: fixed metric columns (they no longer drift with the digits), readable labels, the 史 watermark stays
    behind the rows, the font link keeps clear of the frame ---- */
@@ -921,3 +918,13 @@ html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts l
 html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts{margin-left:52px!important}
 html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts li{grid-template-columns:minmax(0,1fr) auto!important}
 html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts li .history-metrics{justify-self:end}
+
+/* infinite wall: the search back in the middle (user); covers tilt toward the pointer like a trading card, with a
+   moving sheen (card-tilt.js sets --rx / --ry / --mx / --my) */
+html:not(#u):not(#v):not(#w) body .lib-field .cover-frame{perspective:700px}
+html:not(#u):not(#v):not(#w) body .lib-field .cover-frame img.cover{transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateZ(0);transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s;transform-style:preserve-3d}
+html:not(#u):not(#v):not(#w) body .lib-field .cover-frame.is-tilting img.cover{transition:transform .06s linear;box-shadow:0 26px 40px -18px #000,0 0 0 1px rgba(255,236,214,.18)}
+html:not(#u):not(#v):not(#w) body .lib-field .cover-frame::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;border-radius:2px;mix-blend-mode:screen;
+ background:radial-gradient(60% 50% at var(--mx,50%) var(--my,50%),rgba(255,240,220,.38),transparent 60%),linear-gradient(115deg,transparent 35%,rgba(255,170,190,.16) 45%,rgba(160,210,255,.14) 55%,transparent 65%) 0 0/250% 250%;background-position:center,var(--mx,50%) var(--my,50%)}
+html:not(#u):not(#v):not(#w) body .lib-field .cover-frame.is-tilting::after{opacity:1}
+@media (prefers-reduced-motion:reduce){html body .lib-field .cover-frame img.cover{transform:none!important}}
