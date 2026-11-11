@@ -13,7 +13,7 @@ function clean(data){
  const runs=(Array.isArray(o.runs)?o.runs:[]).filter(r=>r&&typeof r==='object'&&Number.isFinite(r.id)&&Array.isArray(r.log)).slice(-200);
  const applied=(Array.isArray(o.applied)?o.applied:[]).filter(Number.isFinite).slice(-300);
  const lessons={};for(const [k,v] of Object.entries(obj(o.lessons)))if(/^[a-z]\d{1,2}$/.test(k)&&Number.isFinite(v))lessons[k]=v;
- const p=obj(o.prefs),prefs={volume:Number.isFinite(p.volume)?Math.min(1,Math.max(0,p.volume)):0.4,romaji:p.romaji!==false,speaker:Number.isSafeInteger(p.speaker)?p.speaker:null,speed:Number.isFinite(p.speed)?Math.min(1.3,Math.max(0.7,p.speed)):0.9};
+ const p=obj(o.prefs),prefs={volume:Number.isFinite(p.volume)?Math.min(1,Math.max(0,p.volume)):0.4,romaji:p.romaji!==false,speaker:Number.isSafeInteger(p.speaker)?p.speaker:null,speed:Number.isFinite(p.speed)?Math.min(1.3,Math.max(0.7,p.speed)):0.9,voice:['female','male','ai'].includes(p.voice)?p.voice:'female'};
  return {version:1,mastery,boxes,runs,applied,lessons,prefs};
 }
 function read(root){try{return clean(JSON.parse(fs.readFileSync(FILE(root),'utf8')));}catch{return clean({});}}

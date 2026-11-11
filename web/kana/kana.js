@@ -13,7 +13,7 @@ export const VOICES=[['female','女声'],['male','男声'],['ai','AI 合成']];
 export function voicePicker(ctx,{note=true}={}){
  const box=document.createElement('div');box.className='kn-voice';
  const draw=()=>{const cur=(ctx.store.get(KEY.p,{}).voice)||'female';box.innerHTML='<span class="kn-voice-label">发音</span><div class="kn-voice-seg" role="radiogroup" aria-label="发音">'+VOICES.map(([v,l])=>'<button type="button" role="radio" data-voice="'+v+'" aria-checked="'+(v===cur)+'">'+l+'</button>').join('')+'</div>'+(note?'<small class="kn-voice-note">清音、浊音播放母语者真人录音（来自 Wikimedia Commons）；拗音暂无真人录音，统一用 AI 合成</small>':'');
-  box.querySelectorAll('[data-voice]').forEach(b=>b.onclick=()=>{const p=ctx.store.get(KEY.p,{});ctx.store.set(KEY.p,{...p,voice:b.dataset.voice});draw();ctx.speech.say(b.dataset.voice==='male'?'お':'あ');});};
+  box.querySelectorAll('[data-voice]').forEach(b=>b.onclick=()=>{const p=ctx.store.get(KEY.p,{});ctx.store.put(KEY.p,{...p,voice:b.dataset.voice});draw();ctx.speech.say(b.dataset.voice==='male'?'お':'あ');});};
  draw();return box;
 }
 const KEY={m:'megulit.kana.mastery',b:'megulit.kana.boxes',r:'megulit.kana.runs',a:'megulit.kana.applied',l:'megulit.kana.lessons',p:'megulit.kana.prefs'};

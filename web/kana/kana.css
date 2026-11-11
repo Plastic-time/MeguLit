@@ -1000,3 +1000,46 @@ button.m0,button.m1,button.m2,button.m3{border:0;padding:0;font:inherit;cursor:p
 @media(max-width:980px){.mg-stage{grid-template-columns:1fr}.mg-stage-kana{border-right:0;min-height:200px}.mg-board{grid-template-columns:1fr}.mg-rail{grid-template-columns:repeat(6,minmax(0,1fr))}.mg-games{grid-template-columns:1fr}.mg-hud-stats{display:none}}
 @media(prefers-reduced-motion:reduce){.mg-cta,.mg-lesson,.mg-lesson::after,.mg-game,.mg-game::before,.mg-go,.mg-tile,.v-index.mg .mastery button{transition:none}}
 .v-index.mg [hidden]{display:none!important}
+
+/* 2026-11-11 megu-edit for every page inside 五十音 (lesson, chart, games, play, results, records, kanji): the theme
+   tokens are switched to black stage / paper / one red, corners go square, labels become tracked mono, and the main
+   sheet gets the blueprint grid, corner marks and a focus-pull entrance. Layout stays; it reads the same tokens. */
+.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji{
+  --mg-red:#c8323c;--mg-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;--mg-line:rgba(255,255,255,.12);--ease-x:cubic-bezier(.16,1,.3,1);
+  --paper:#000;--paper-ink:#fff;--paper-2:rgba(255,255,255,.72);--paper-3:rgba(255,255,255,.5);--paper-label:rgba(255,255,255,.55);
+  --paper-rule:rgba(255,255,255,.12);--paper-line:rgba(255,255,255,.2);--paper-ghost:rgba(255,255,255,.08);--paper-tint:rgba(200,50,60,.1);
+  --ink-accent:var(--mg-red);--ribbon:var(--mg-red);--accent:var(--mg-red);--accent-soft:rgba(200,50,60,.18);
+  --raise:rgba(0,0,0,.82);--raise-2:#141414;--rule:rgba(255,255,255,.1);--rule-strong:rgba(255,255,255,.22);
+  --t1:#fff;--t2:rgba(255,255,255,.72);--t3:rgba(255,255,255,.5);--gold:rgba(255,255,255,.62);
+  --m1:rgba(255,255,255,.35);--m2:#f4f4f2;--m3:var(--mg-red);
+  --r-sm:0;--r-md:0;--r-lg:0;--r-paper:0;--shadow-paper:none;color:var(--t1);
+}
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .sheet{position:relative;border-radius:0;box-shadow:none;border:0;border-top:1px solid var(--mg-red);background-color:#000;background-image:linear-gradient(transparent calc(100% - 1px),rgba(255,255,255,.045) 0),linear-gradient(90deg,transparent calc(100% - 1px),rgba(255,255,255,.045) 0);background-size:100% 32px,32px 100%;animation:mgk-in .6s var(--ease-x) both}
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .sheet::after{content:'';position:absolute;right:14px;bottom:14px;width:18px;height:18px;border:1px solid rgba(255,255,255,.45);border-left:0;border-top:0;pointer-events:none}
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .ribbon{display:none}
+@keyframes mgk-in{from{opacity:0;filter:blur(8px);transform:translateY(14px)}to{opacity:1;filter:none;transform:none}}
+/* labels and small caps: tracked mono */
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) :is(.eyebrow,.label,.d-label,.sec-title span,.q-meta,.legend,.kbd-hint){font-family:var(--mg-mono);letter-spacing:.3em;text-transform:lowercase}
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) :is(.eyebrow,.label)::before{content:'▮ ';color:var(--mg-red)}
+/* buttons: square, red primary, push on hover */
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .btn{border-radius:0;background:var(--mg-red);color:#fff;letter-spacing:.15em;transition:transform .45s var(--ease-x),filter .1s}
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .btn:hover{transform:translateX(4px)}
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .btn:active{transform:scale(.96);filter:invert(1)}
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) :is(.pill,.chip,.sound,.ghost-btn,.tab,.opt,.choice,button.cell,.kbd,kbd){border-radius:0}
+:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .back,:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) a[data-go="index.html"]{font-family:var(--mg-mono);letter-spacing:.25em}
+/* lesson: header, steps, the kana */
+.v-lesson .lesson-head h1{font-size:40px;letter-spacing:.02em}
+.v-lesson .lesson-head h1 small{font-family:var(--mg-mono);letter-spacing:.2em;font-size:11px}
+.v-lesson .steps{border-bottom:1px solid var(--mg-line);gap:2px}
+.v-lesson .steps>*{border-radius:0;font-family:var(--mg-mono);letter-spacing:.15em;font-size:12px}
+.v-lesson .grid-box{border-color:var(--mg-line);background-color:#050505}
+.v-lesson .grid-box .st{stroke:#fff}.v-lesson .grid-box .st.cur{stroke:var(--mg-red)}
+.v-lesson .kana-line .ja{font-size:110px;animation:mgk-kana .7s var(--ease-x) both}
+.v-lesson .kana-line .kata{font-size:34px}
+.v-lesson .kana-line .romaji{font-family:var(--mg-mono);font-size:28px;letter-spacing:.1em}
+@keyframes mgk-kana{from{opacity:0;filter:blur(12px);transform:scale(1.3)}to{opacity:1;filter:none;transform:none}}
+.v-lesson .info-col p{font-size:15px;line-height:1.9}
+.v-lesson .origin{font-size:44px}
+.v-lesson .dots>*{border-radius:0}
+.v-lesson .learn-foot .btn{min-height:48px;padding:0 30px}
+@media(prefers-reduced-motion:reduce){:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .sheet,.v-lesson .kana-line .ja{animation:none}:is(.v-lesson,.v-gojuon,.v-games,.v-play,.v-results,.v-records,.v-kanji) .btn{transition:none}}
