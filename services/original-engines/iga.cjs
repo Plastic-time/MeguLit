@@ -8,12 +8,14 @@
    "＃名前"; ruby is written <漢字<よみ>. */
 const fs=require('node:fs'),path=require('node:path');
 const sj=new TextDecoder('shift_jis');
-function list(file){let b;try{b=fs.readFileSync(file);}catch{return null;}if(b.toString('latin1',0,4)!=='IGA0')return null;let p=0x10;
+// E450 only the index is read up front (voice.iga is over a gigabyte); each entry is read from the file when asked for.
+function list(file){let fd,size,b;try{fd=fs.openSync(file,'r');size=fs.fstatSync(fd).size;b=Buffer.alloc(Math.min(size,16<<20));fs.readSync(fd,b,0,b.length,0);}catch{return null;}finally{if(fd!==undefined)try{fs.closeSync(fd);}catch{}}
+ if(b.toString('latin1',0,4)!=='IGA0')return null;let p=0x10;
  const u=()=>{let v=0;while((v&1)===0){if(p>=b.length)throw Error('IGA_TRUNCATED');v=(v*128+b[p++])>>>0;}return v>>>1;};
  try{const len=u(),end=p+len,dir=[];while(p<end)dir.push({nameAt:u(),offset:u(),size:u()});
   const names=u(),data=p+names;
-  for(let i=0;i<dir.length;i++){const n=(i+1<dir.length?dir[i+1].nameAt:names)-dir[i].nameAt,bytes=Buffer.alloc(n);for(let k=0;k<n;k++)bytes[k]=u();dir[i].name=sj.decode(bytes);dir[i].offset+=data;if(dir[i].offset+dir[i].size>b.length)return null;}
-  return dir.map(e=>({name:e.name,read:()=>{const d=Buffer.from(b.subarray(e.offset,e.offset+e.size)),key=/\.s$/i.test(e.name)?0xff:0;for(let i=0;i<d.length;i++)d[i]^=((i+2)^key)&255;return d;}}));
+  for(let i=0;i<dir.length;i++){const n=(i+1<dir.length?dir[i+1].nameAt:names)-dir[i].nameAt,bytes=Buffer.alloc(n);for(let k=0;k<n;k++)bytes[k]=u();dir[i].name=sj.decode(bytes);dir[i].offset+=data;if(dir[i].offset+dir[i].size>size)return null;}
+  return dir.map(e=>({name:e.name,read:()=>{const d=Buffer.alloc(e.size),g=fs.openSync(file,'r');try{fs.readSync(g,d,0,e.size,e.offset);}finally{fs.closeSync(g);}const key=/\.s$/i.test(e.name)?0xff:0;for(let i=0;i<d.length;i++)d[i]^=((i+2)^key)&255;return d;}}));
  }catch{return null;}}
 /* E450 the voice of a line: the last clip name (aok0003, no extension) the script names between the previous line and
    this one; voice.iga holds the clips. Music and effects (bgm03, se012) are not voices. */

@@ -24,7 +24,7 @@ const text=b=>sj.decode(b).replace(/\\n|%n/gi,'\n').replace(/%[A-Za-z]+/g,'').re
 const VOICE=/\0([A-Za-z]{1,6}_?\d{3,6}[A-Za-z]?)\0/g;
 function parse(buf){const d=Buffer.isBuffer(buf)?buf:Buffer.from(buf),lines=[],anchors=[],voices=[];
  const marks=[...d.toString('latin1').matchAll(VOICE)].map(m=>({at:m.index,name:m[1]}));let mi=0,last=0;
- const voiceBefore=i=>{let v=null;while(mi<marks.length&&marks[mi].at<i){if(marks[mi].at>=last)v=marks[mi].name;mi++;}last=i;return v;};
+ const voiceBefore=i=>{let v=null;while(mi<marks.length&&marks[mi].at<i){if(marks[mi].at>=last&&!/^(?:EV|BG|ST|CG|SE|BGM|TEF|FG|SD)/i.test(marks[mi].name))v=marks[mi].name;mi++;}last=i;return v;};
  // The id after the opcode is 3 (narration) / 4 (spoken) bytes in early scripts and one byte longer in later ones: the
  // text starts after the id's last (zero) byte, on a Shift-JIS lead byte.
  const at=(i,a)=>{for(const k of [a,a+1])if(d[i+k]>=0x81&&d[i+k-1]===0)return i+k;return -1;};

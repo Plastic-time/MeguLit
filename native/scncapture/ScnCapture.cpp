@@ -386,14 +386,41 @@ void AskText(const std::wstring &name) {
  bool saved = WriteWhole(std::wstring(RunDir) + BaseOf(name.c_str()), body.data(), (DWORD)(body.size() * sizeof(wchar_t)));
  Log(std::string(saved ? "read " : "save failed ") + Utf8(name) + " " + std::to_string(n) + " chars");
 }
+// E450 voices (user: example sentences must play the game's own voice): names in want.txt ending in an audio extension
+// are opened through the game's storage (its own archives and decryption, hashed names included) and the bytes saved as
+// they are to voice\ in the same folder. Many per message: a game has thousands of voice files.
+bool IsAudio(const wchar_t *name) { size_t n = wcslen(name); const wchar_t *e = n > 4 ? name + n - 4 : L""; return !_wcsicmp(e, L".ogg") || !_wcsicmp(e, L".wav") || !_wcsicmp(e, L".m4a") || (n > 5 && !_wcsicmp(name + n - 5, L".opus")); }
+std::wstring VoiceDir() { return std::wstring(Out) + L"voice\\"; }
+bool HaveAudio(const std::wstring &name) { return GetFileAttributesW((VoiceDir() + BaseOf(name.c_str())).c_str()) != INVALID_FILE_ATTRIBUTES; }
+volatile LONG AudioAsked, AudioSaved;
+void AskAudio(const std::wstring &name) {
+ if (HaveAudio(name)) return;
+ VariantString *v = (VariantString *)calloc(1, sizeof(VariantString)); // kept for good: the engine may hold on to it
+ VariantString **ref = (VariantString **)malloc(sizeof(void *));
+ if (!v || !ref || !(v->LongString = _wcsdup(name.c_str()))) return;
+ v->RefCount = 0x3fffffff; v->Length = (int)name.size(); *ref = v;
+ TlsSetValue(Tls, (void *)1);
+ IStream *s = OpenGuarded(ref);
+ TlsSetValue(Tls, NULL);
+ if (!s) return;
+ DWORD size = 0; char *data = ReadAll(s, &size);
+ if (data && size > 12 && size <= (32u << 20)) { CreateDirectoryW(VoiceDir().c_str(), NULL); if (WriteWhole(VoiceDir() + BaseOf(name.c_str()), data, size)) InterlockedIncrement(&AudioSaved); }
+ free(data);
+ ReleaseGuarded(s);
+}
 LRESULT CALLBACK OnMessage(int code, WPARAM wp, LPARAM lp) {
  if (code >= 0 && wp == PM_REMOVE && GetTickCount() - LastAsk >= 120) {
 #if defined(_M_IX86)
-  if (InterlockedExchange(&HxWanted, 0)) { LastAsk = GetTickCount(); DumpHx(); Report("done"); return CallNextHookEx(NULL, code, wp, lp); }
+  if (InterlockedExchange(&HxWanted, 0)) { LastAsk = GetTickCount(); DumpHx(); if (!AudioAsked) Report("done"); return CallNextHookEx(NULL, code, wp, lp); }
 #endif
+  std::vector<std::wstring> voices;
+  EnterCriticalSection(&Gate);
+  while (!Wanted.empty() && voices.size() < 48 && IsAudio(Wanted.front().c_str())) { voices.push_back(Wanted.front()); Wanted.pop_front(); }
+  LeaveCriticalSection(&Gate);
+  if (!voices.empty()) { for (auto &v : voices) AskAudio(v); LastAsk = GetTickCount(); return CallNextHookEx(NULL, code, wp, lp); }
   std::wstring next;
   EnterCriticalSection(&Gate);
-  while (!Wanted.empty() && next.empty()) { next = Wanted.front(); Wanted.pop_front(); if (IsScene(next.c_str()) ? Done.count(Lower(BaseOf(next.c_str()))) > 0 : HaveText(next)) next.clear(); }
+  while (!Wanted.empty() && next.empty()) { next = Wanted.front(); Wanted.pop_front(); if (IsAudio(next.c_str())) { Wanted.push_front(next); next.clear(); break; } if (IsScene(next.c_str()) ? Done.count(Lower(BaseOf(next.c_str()))) > 0 : HaveText(next)) next.clear(); }
   LeaveCriticalSection(&Gate);
   if (!next.empty()) { LastAsk = GetTickCount(); if (IsScene(next.c_str())) AskOne(next); else AskText(next); }
  }
@@ -422,8 +449,10 @@ void ReadWants() {
   bool scene = IsScene(w.c_str());
   // Scene files wait until a game-opened scene has confirmed the string layout; the list is read again then.
   if (scene && !LayoutOk) { deferred = true; continue; }
-  if (scene ? Done.count(Lower(BaseOf(w.c_str()))) > 0 : (!TextStream || HaveText(w))) continue;
+  bool audio = IsAudio(w.c_str());
+  if (audio ? HaveAudio(w) : scene ? Done.count(Lower(BaseOf(w.c_str()))) > 0 : (!TextStream || HaveText(w))) continue;
   if (!Asked.insert(Lower(w)).second) continue;
+  if (audio) InterlockedIncrement(&AudioAsked);
   Wanted.push_back(w); added++;
  }
  LeaveCriticalSection(&Gate);
@@ -569,7 +598,9 @@ DWORD WINAPI Run(void *) {
 #endif
   if (more && !MessageHook) { MessageHook = SetWindowsHookExW(WH_GETMESSAGE, OnMessage, NULL, (DWORD)MainThread); if (MessageHook) Log("asking on the game thread"); }
   if (more && MessageHook) PostThreadMessageW((DWORD)MainThread, WM_NULL, 0, 0);
-  if (!more && MessageHook) { UnhookWindowsHookEx(MessageHook); MessageHook = NULL; Log("asked scenes done"); }
+  if (!more && MessageHook) { UnhookWindowsHookEx(MessageHook); MessageHook = NULL; Log("asked scenes done");
+   // E450 a cold run for voices ends when every asked voice was tried
+   if (AudioAsked) { Log("voices " + std::to_string(AudioSaved) + " of " + std::to_string(AudioAsked)); Report("done"); } }
  }
 }
 } // namespace

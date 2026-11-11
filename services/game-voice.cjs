@@ -9,15 +9,15 @@
    A line is found by its text alone, so the learning page, saved sentences, grammar examples and Anki cards all
    reach it without knowing which game it came from. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const PROVIDERS=['./original-engines/npk.cjs','./original-engines/catsystem2.cjs','./original-engines/yuris.cjs','./original-engines/fvp.cjs','./original-engines/iga.cjs'];
+const PROVIDERS=['./original-engines/npk.cjs','./original-engines/catsystem2.cjs','./original-engines/yuris.cjs','./original-engines/fvp.cjs','./original-engines/iga.cjs','./original-engines/paz.cjs'];
 const AUDIO=/\.(?:ogg|opus|wav|mp3|m4a)$/i;
 const sha1=s=>crypto.createHash('sha1').update(s).digest('hex');
 // The text key: NFKC, no spaces or markup, no speaker name before a quote, no outer quote marks.
 function norm(text){let t=String(text||'').replace(/<[^>]*>/g,'').normalize('NFKC').replace(/[\s　]+/g,'');
  const q=/^[^「『（(]{1,16}?[「『（(](.+)[」』）)]$/.exec(t);if(q)t=q[1];else{const w=/^[「『（(](.+)[」』）)]$/.exec(t);if(w)t=w[1];}
  t=t.replace(/^[^「『（(]{1,16}?[「『](?!.*[」』])/,'').replace(/^[「『（(]/,'').replace(/[」』）)]$/,'');
- return t.replace(/[。、！？!?…‥・〜～ー―─\-♪☆★]+$/,'');}
-const keyOf=text=>{const n=norm(text);return n.length>=2?sha1(n):null;};
+ return t.replace(/[。、！？!?…‥・〜～ー―─\-♪☆★.]+$/,'');}
+const keyOf=text=>{const n=norm(text);return n.length>=1?sha1(n):null;};
 const cacheDir=root=>path.join(root,'data','voice-cache');
 function readJSON(file,fallback){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return fallback;}}
 function writeJSON(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(value));fs.renameSync(file+'.tmp',file);}
@@ -43,6 +43,9 @@ function slice(file,offset,size){const fd=fs.openSync(file,'r');try{const b=Buff
 // Every voice clip a folder holds: name (no extension, lower case) -> a reader. Archives are listed once.
 function catalog(dir){const map=new Map(),koe=new Map(),add=(name,read)=>{const k=base(name);if(k&&!map.has(k))map.set(k,read);};
  const xp3=require('./original-engines/xp3.cjs');
+ // clips a cold run read through the game (voice-cold.cjs) come first: they are what the game itself plays
+ let cold=[];try{cold=require('./voice-cold.cjs').outDirs(dir);}catch{}
+ for(const d of cold)for(const file of walk(d,0))if(AUDIO.test(file))add(file,()=>fs.readFileSync(file));
  for(const file of walk(dir)){const low=file.toLowerCase();
   if(AUDIO.test(low)){add(file,()=>fs.readFileSync(file));continue;}
   if(low.endsWith('.xp3')){let t;try{t=xp3.list(file);}catch{}if(!t)continue;const audio=t.files.filter(e=>AUDIO.test(e.name));if(!audio.length)continue;
@@ -66,11 +69,11 @@ function save(root){writeJSON(linesFile(root),lines(root));}
 // Scan one game: every line whose script names a voice that the folder really holds. Returns counts per engine.
 function scan(root,dir,{engine,scenes}={}){const sc=require('./original-engines/scenes.cjs');
  const id=engine||sc.detect(dir);if(!id)return {engine:null,lines:0,voiced:0,found:0};
- const list=scenes||sc.read(id,dir),cat=catalogFor(dir),g=gameKey(dir),data=lines(root);let total=0,voiced=0,found=0;
- for(const s of list){const v=s.voices||[];for(let i=0;i<(s.lines||[]).length;i++){total++;if(!v[i])continue;voiced++;if(!cat.get(v[i]))continue;const k=keyOf(s.lines[i]);if(!k)continue;found++;if(!data.lines[k])data.lines[k]=[g,v[i]];
+ const list=scenes||sc.read(id,dir),cat=catalogFor(dir),g=gameKey(dir),data=lines(root),missing=new Set();let total=0,voiced=0,found=0;
+ for(const s of list){const v=s.voices||[];for(let i=0;i<(s.lines||[]).length;i++){total++;if(!v[i])continue;voiced++;if(!cat.get(v[i])){if(!/^koe:/.test(v[i]))missing.add(v[i]);continue;}found++;const k=keyOf(s.lines[i]);if(!k)continue;if(!data.lines[k])data.lines[k]=[g,v[i]];
   /* a speech spread over several script lines (an open 「 closed later) is shown as one: key the whole of it too */
   let whole=s.lines[i];for(let j=i+1;j<s.lines.length&&j<i+8&&!v[j]&&/^[「『]/.test(whole)&&!/[」』]$/.test(whole);j++)whole+=s.lines[j];if(whole!==s.lines[i]){const kw=keyOf(whole);if(kw&&!data.lines[kw])data.lines[kw]=[g,v[i]];}}}
- data.games[g]={dir:path.resolve(dir),engine:id,scanned:Date.now(),lines:total,voiced,found};save(root);return {engine:id,lines:total,voiced,found};}
+ data.games[g]={...data.games[g],dir:path.resolve(dir),engine:id,scanned:Date.now(),lines:total,voiced,found,missing:missing.size};save(root);return {engine:id,lines:total,voiced,found,missing:[...missing]};}
 // A game folder as the player picks it: the game may sit one or two folders down (an unpacked release).
 function gameDir(dir,depth=2){const sc=require('./original-engines/scenes.cjs');let id=null;try{id=sc.detect(dir);}catch{}if(id)return {dir,engine:id};if(depth<=0)return null;
  let list=[];try{list=fs.readdirSync(dir,{withFileTypes:true}).filter(e=>e.isDirectory()&&!/^(?:savedata|save|\.megulit)/i.test(e.name));}catch{}
@@ -86,7 +89,10 @@ function find(root,text){const k=keyOf(text);if(!k)return null;const hit=lines(r
  try{fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,sha1(ref)+t.ext),data);}catch{}return {data,mime:t.mime,source:'scan'};}
 // Scan a game when it starts (its folder from the executable), once a week at most, off the start-up path.
 const running=new Set();
-function scanLater(root,executable,delay=8000){if(!executable)return;const start=path.dirname(String(executable)),k=gameKey(start);if(running.has(k))return;const seen=Object.values(lines(root).games).find(g=>g.from===k);if(seen&&Date.now()-seen.scanned<7*864e5)return;running.add(k);
- const t=setTimeout(()=>{try{const g=gameDir(start,1);if(g){scan(root,g.dir,{engine:g.engine});const e=lines(root).games[gameKey(g.dir)];if(e){e.from=k;save(root);}}}catch{}finally{running.delete(k);}},delay);t.unref?.();}
+/* Voices the scan could not open go to a cold run (voice-cold.cjs) when the setting allows it; the game is scanned again
+   once that run ends, so the clips it read count. */
+function scanLater(root,executable,delay=8000,{cold=false}={}){if(!executable)return;const start=path.dirname(String(executable)),k=gameKey(start);if(running.has(k))return;const seen=Object.values(lines(root).games).find(g=>g.from===k);if(seen&&Date.now()-seen.scanned<7*864e5)return;running.add(k);
+ const t=setTimeout(()=>{try{const g=gameDir(start,1);if(g){const r=scan(root,g.dir,{engine:g.engine});const e=lines(root).games[gameKey(g.dir)];if(e){e.from=k;save(root);}
+   if(cold&&r.missing?.length){const vc=require('./voice-cold.cjs');const off=vc.onDone(job=>{if(job.game.dir===g.dir){off();catalogs.delete(gameKey(g.dir));try{scan(root,g.dir,{engine:g.engine});}catch{}}});vc.consider(root,{executable:String(executable),dir:g.dir,engine:g.engine},r.missing);}}}catch{}finally{running.delete(k);}},delay);t.unref?.();}
 const has=(root,text)=>{const k=keyOf(text);return !!(k&&lines(root).lines[k]);};
 module.exports={scanLater,norm,keyOf,kind,catalog,arcList,ovkList,scan,gameDir,remember,find,has,gameKey,_reset(){memo=null;catalogs.clear();}};

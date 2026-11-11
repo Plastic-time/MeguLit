@@ -18,7 +18,7 @@ test('paz: the voice column goes with its text',()=>{
  const p=paz.parse(Buffer.from('.message\t40\tsk\\sk1042.ogg\tA\tabc\n.message\t50\t\t\tdef','latin1'));
  assert.deepEqual(p.lines,['A','abc','def']);assert.deepEqual(p.voices,[null,'sk1042',null]);});
 test('norm: speaker names, quotes, spaces and end marks do not change the key',()=>{
- assert.equal(gv.keyOf('桜乃「兄さんと過ごす時間」'),gv.keyOf('「兄さんと 過ごす時間。」'));assert.equal(gv.keyOf('あ'),null);});
+ assert.equal(gv.keyOf('桜乃「兄さんと過ごす時間」'),gv.keyOf('「兄さんと 過ごす時間。」'));assert.equal(gv.keyOf('「……」'),null);});
 test('scan and find: a voice in a folder is copied out once, a runtime clip never replaces it',()=>{
  const root=tmp(),dir=tmp();gv._reset();fs.mkdirSync(path.join(dir,'voice'));fs.writeFileSync(path.join(dir,'voice','A001.ogg'),OGG);
  const list=[{name:'s.ks',lines:['「こんにちは、','元気？」','ひとり言'],voices:['a001',null,'zz9']}];

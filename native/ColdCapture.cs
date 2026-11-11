@@ -38,7 +38,7 @@ public static class ColdCapture {
   string word="failed";PROCESS_INFORMATION pi=new PROCESS_INFORMATION();
   try{
    if(args.Length!=4)throw new Exception("Expected game exe, capture DLL, report file and seconds");
-   string exe=Path.GetFullPath(args[0]),dll=Path.GetFullPath(args[1]),report=Path.GetFullPath(args[2]);int seconds=Math.Max(10,Math.Min(120,Int32.Parse(args[3])));
+   string exe=Path.GetFullPath(args[0]),dll=Path.GetFullPath(args[1]),report=Path.GetFullPath(args[2]);int seconds=Math.Max(10,Math.Min(1200,Int32.Parse(args[3])));
    if(!File.Exists(exe)||!File.Exists(dll))throw new Exception("Missing game or capture DLL");
    string name=Path.GetFileName(dll);if(name!=(IntPtr.Size==8?"MeguLitScn64.dll":"MeguLitScn32.dll"))throw new Exception("Only the MeguLit scene capture DLL is loaded");
    try{File.Delete(report);}catch{}

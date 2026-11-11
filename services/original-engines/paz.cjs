@@ -9,14 +9,18 @@
 const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
 const {Blowfish}=require('./blowfish.cjs');
 const SCHEMES={
- mashiroiro:{title:'Mashiro Iro Symphony',version:1,scr:{index:'f423a8c4a322f6fdf976c34674b634e775802d382c06aa1085dccf0ce987e6ee',data:'85a52bbacf893da5b1da1a24a1d458243f4854edecb2c4afdecdd966b751b42a'},sc:'rytKRa38'},
+ mashiroiro:{title:'Mashiro Iro Symphony',version:1,scr:{index:'f423a8c4a322f6fdf976c34674b634e775802d382c06aa1085dccf0ce987e6ee',data:'85a52bbacf893da5b1da1a24a1d458243f4854edecb2c4afdecdd966b751b42a'},
+  voice:{index:'e8f193099447008c77b43bba74e4f563b7392e6721d68d1628e051996f978098',data:'40a02109b3b4f74dc41af9adc30328d2cd61b79ae265f50a4e9ce8c23cc89625'},sc:'rytKRa38',ogg:'cQ5jhgpb'},
 };
 function rc4(key){const S=new Uint8Array(256);for(let i=0;i<256;i++)S[i]=i;let j=0;for(let i=0;i<256;i++){j=(j+S[i]+key[i%key.length])&255;const t=S[i];S[i]=S[j];S[j]=t;}let a=0,b=0;
  return buf=>{for(let i=0;i<buf.length;i++){a=(a+1)&255;b=(b+S[a])&255;const t=S[a];S[a]=S[b];S[b]=t;buf[i]^=S[(S[a]+S[b])&255];}return buf;};}
 function schemeOf(file){let head;try{const fd=fs.openSync(file,'r');try{head=Buffer.alloc(32);fs.readSync(fd,head,0,32,0);}finally{fs.closeSync(fd);}}catch{return null;}
  const name=head.toString('latin1',0,head.indexOf(0)>0?head.indexOf(0):0);return SCHEMES[name]||null;}
 function list(file){const scheme=schemeOf(file),arc=path.parse(file).name.toLowerCase();if(!scheme||!scheme[arc])return null;
- const b=fs.readFileSync(file),start=scheme.version>0?0x20:0;let size=b.readUInt32LE(start);const xor=size>>>24;if(xor)size=(size^(xor*0x01010101))>>>0;
+ // E450 the index is read, entries are read from the file when asked for (voice.dat is two gigabytes)
+ const total=fs.statSync(file).size,at=(o,n)=>{const d=Buffer.alloc(n),fd=fs.openSync(file,'r');try{fs.readSync(fd,d,0,n,o);}finally{fs.closeSync(fd);}return d;};
+ const start=scheme.version>0?0x20:0;let size=at(start,4).readUInt32LE(0);const xor=size>>>24;if(xor)size=(size^(xor*0x01010101))>>>0;
+ const b={length:total,subarray:(s,e)=>at(s,e-s)};
  if(size&7||start+4+size>b.length)return null;const raw=Buffer.from(b.subarray(start+4,start+4+size));if(xor)for(let i=0;i<raw.length;i++)raw[i]^=xor;
  const idx=new Blowfish(Buffer.from(scheme[arc].index,'hex')).decryptBuffer(raw),count=idx.readUInt32LE(0),out=[];let p=4;
  if(count<=0||count>100000)return null;const dataKey=Buffer.from(scheme[arc].data,'hex');
@@ -24,7 +28,8 @@ function list(file){const scheme=schemeOf(file),arc=path.parse(file).name.toLowe
   const e={name,offset:Number(idx.readBigInt64LE(p)),unpacked:idx.readUInt32LE(p+8),size:idx.readUInt32LE(p+12),aligned:idx.readUInt32LE(p+16),packed:idx.readInt32LE(p+20)!==0};p+=24;
   if(e.offset+e.aligned>b.length)return null;
   out.push({name,read:()=>{let d=Buffer.from(b.subarray(e.offset,e.offset+e.aligned));if(xor)for(let k=0;k<d.length;k++)d[k]^=xor;d=new Blowfish(dataKey).decryptBuffer(d);
-   const pw=!e.packed&&/\.sc$/i.test(name)?scheme.sc:'';if(scheme.version>0&&pw)rc4(Buffer.from(name.toLowerCase()+' '+e.unpacked.toString(16).toUpperCase().padStart(8,'0')+' '+pw,'latin1'))(d);
+   /* E450 the type password: .sc scripts, and every entry of an audio archive (voice.dat) as GARbro GetTypePassword */
+   const pw=e.packed?'':/\.sc$/i.test(name)?scheme.sc:(/\.ogg$/i.test(name)||/^(?:voice|bgm|se)$/.test(arc))?scheme.ogg||'':'';if(scheme.version>0&&pw)rc4(Buffer.from(name.toLowerCase()+' '+e.unpacked.toString(16).toUpperCase().padStart(8,'0')+' '+pw,'latin1'))(d);
    d=d.subarray(0,e.size);return e.packed?zlib.inflateSync(d):d;}});}
  return out;}
 const voiceRef=require('./voice-ref.cjs');
@@ -40,4 +45,6 @@ const engine={
  archives:()=>[],sources:dir=>{const f=scrDat(dir);return f?[f]:[];},
  parse,test:n=>/\.sc$/i.test(n),
 };
-module.exports={SCHEMES,list,parse,engine};
+// E450 the clips of voice.dat, for game-voice.cjs.
+function audio(file){if(!/[\\/]voice\.dat$/i.test(file))return null;const l=list(file);return l?l.map(e=>({name:/\.\w{2,4}$/.test(e.name)?e.name:e.name+'.ogg',read:e.read})):null;}
+module.exports={SCHEMES,list,parse,engine,audio};
