@@ -169,7 +169,9 @@ export async function articleGet(env,url,{json,fail},now=new Date(),fetcher=fetc
    headline as context. The app prefers its own dictionary and falls back to machine translation when this is empty. */
 /* E415: big models first (Qwen3 30B-A3B, 3B active, guessed jobs); DeepSeek V4 needs the paid Workers plan, so the
    chain tries the larger models the Free plan serves and ends with the one known to work. The first good answer wins. */
-export const GLOSS_CHAIN=['@cf/moonshotai/kimi-k2.6','@cf/zai-org/glm-5.3','@cf/openai/gpt-oss-120b','@cf/meta/llama-3.3-70b-instruct-fp8-fast','@cf/qwen/qwen3-30b-a3b-fp8'];
+/* live check 2026-11-11 on the Free plan: Kimi K2.6 and GLM-5.3 need the paid plan, gpt-oss-120b returns no list,
+   Llama 3.3 70B answers all ten well */
+export const GLOSS_CHAIN=['@cf/meta/llama-3.3-70b-instruct-fp8-fast','@cf/qwen/qwen3-30b-a3b-fp8'];
 export const GLOSS_MODEL=GLOSS_CHAIN[0],GLOSS_FALLBACK=GLOSS_CHAIN[1];
 /* E415 (user: 「ゴリ = 网红」 reads as if the word meant 网红): every note says what kind of thing the word is.
    type: 词语 (an ordinary word: note = its meaning) or 人名 / 组织 / 作品 / 地名 / 商品 / 事件 (a proper noun: note =
