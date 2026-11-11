@@ -811,3 +811,36 @@ html:not(#u):not(#v) body .main .settings-content>:is(.speech-choices,.backgroun
 html:not(#u):not(#v) body .main .settings-content .settings-section-title.settings-section-title{height:auto!important;max-height:none!important;overflow:visible!important;flex:none!important;clip:auto!important;clip-path:none!important}
 html:not(#u):not(#v) body .main .settings-content>div>.panel:first-child>h2.panel-title{font-family:var(--g-serif,serif)!important;font-size:clamp(36px,3.2vw,52px)!important;font-weight:600!important;letter-spacing:.02em!important;text-transform:none!important;color:var(--g-t1,#f1e0d2)!important;margin:18px 0 22px!important;line-height:1.1!important;min-height:0!important}
 html:not(#u):not(#v) body .main .settings-content>div>.panel:first-child>h2:first-of-type{font-family:var(--g-serif,serif)!important;font-size:clamp(36px,3.2vw,52px)!important;font-weight:600!important;letter-spacing:.02em!important;text-transform:none!important;color:var(--g-t1,#f1e0d2)!important;margin:18px 0 22px!important;line-height:1.1!important;min-height:0!important}
+
+/* ---- r5 AI-feel: the remaining ornament goes (corner ticks, outline watermarks, the star on primaries), the
+   leaderboard grids become ruled lists ---- */
+html:not(#u):not(#v) body .workspace>.stage-cover .dtv-glyph{display:none!important}
+html:not(#u):not(#v) body :is(.leaderboard-page .lb-card,.main:has(>.dtv-bg) .game-detail-content .panel,.about-qcard)::before{display:none!important}
+html:not(#u):not(#v) body :is(dialog.game-dialog,.lv-dialog,dialog.profile-panel){background:var(--u-glass-solid)!important}
+html:not(#u):not(#v) body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button)::before{display:none!important}
+html:not(#u):not(#v) body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button){padding:0 26px!important;gap:0!important}
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-ai{background:none!important;box-shadow:none!important;padding:0!important;font-size:11px;color:var(--g-t3,#a08a80)!important}
+/* reading board: ranked readers as ruled rows (rank, avatar and name, value) instead of six medallion cards */
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoires{display:block!important;border-top:1px solid var(--u-line-2)}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoire{position:relative!important;display:grid!important;grid-template-columns:64px minmax(0,1fr) auto;align-items:center;gap:16px;min-height:0!important;height:auto!important;padding:12px 4px!important;margin:0!important;background:none!important;box-shadow:none!important;border:0!important;border-bottom:1px solid var(--u-line)!important;border-radius:0!important;text-align:left!important;-webkit-backdrop-filter:none;backdrop-filter:none;clip-path:none!important;transform:none!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoire::before,html:not(#u):not(#v) body .leaderboard-page .lb-grimoire::after{display:none!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-code{grid-column:1;grid-row:1;position:static!important;font-family:var(--g-serif,serif);font-size:15px!important;letter-spacing:.06em!important;color:var(--g-t3,#a08a80)!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-person{grid-column:2;grid-row:1;display:flex!important;flex-direction:row!important;align-items:center;gap:14px;position:static!important;padding:0!important;background:none!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-gem{position:relative!important;width:40px!important;height:40px!important;flex:none;transform:none!important;background:none!important;box-shadow:none!important;clip-path:none!important;border:0!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-gem::before,html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-gem::after{display:none!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .leaderboard-avatar{width:40px!important;height:40px!important;transform:none!important;clip-path:none!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-gname{font-family:var(--g-serif,serif);font-size:17px!important;max-width:none!important;overflow:visible!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-gvalue{grid-column:3;grid-row:1;justify-self:end;font-family:var(--g-serif,serif);font-size:20px!important;color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-me-tag{position:absolute!important;left:-2px;top:50%;transform:translateY(-50%)!important;width:3px;height:60%;padding:0!important;font-size:0!important;background:#c82f3b!important;border-radius:0!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoire:has(.lb-me-tag){background:linear-gradient(90deg,color-mix(in srgb,var(--u-red) 12%,transparent),transparent 60%)!important}
+/* about: the QR cards without ticks and markers */
+html:not(#u):not(#v) body .about-page .about-qcard{box-shadow:inset 0 0 0 1px var(--u-line)!important;background:none!important}
+html:not(#u):not(#v) body .about-page .about-eyebrow::before{content:none!important}
+/* profile: kicker titles without tracking */
+html:not(#u):not(#v) body dialog.profile-panel .panel-title{letter-spacing:.02em!important}
+/* my data: a ruled figure table (four per line, hairlines between), not eight boxes */
+html:not(#u):not(#v) body .leaderboard-page .lb-tiles{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:0!important;border-top:1px solid var(--u-line-2)}
+html:not(#u):not(#v) body .leaderboard-page .lb-tile{background:none!important;box-shadow:none!important;border:0!important;border-bottom:1px solid var(--u-line)!important;border-left:1px solid var(--u-line)!important;border-radius:0!important;padding:16px 20px 18px!important;clip-path:none!important;-webkit-backdrop-filter:none;backdrop-filter:none}
+html:not(#u):not(#v) body .leaderboard-page .lb-tile:nth-child(4n+1){border-left:0!important;padding-left:0!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-tile::before{display:none!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-tile strong{font-family:var(--g-serif,serif);font-size:clamp(22px,1.8vw,28px)!important;white-space:nowrap}
