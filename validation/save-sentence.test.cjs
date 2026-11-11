@@ -54,29 +54,52 @@ function loadModule(){
  return {b:window.__tomoyoChinese,sent,listeners};
 }
 
-test('a short word or phrase inside a longer line counts as a phrase; whole lines and sentence ends do not',()=>{
- const {b}=loadModule(),p=b.isPhraseSelection,line='今日はとても良い天気ですね。';
- assert.equal(p(line,3,6),true);
- assert.equal(p(line,0,[...line].length),false);
- assert.equal(p(line,8,14),false);
- assert.equal(p(line,0,12),false);
- assert.equal(p('',0,1),false);assert.equal(p(line,5,5),false);
- assert.equal(p('𠮷野家に行こう',0,3),true);
+test('source: manual upgrades an auto row, auto never downgrades, and old tables migrate to manual',t=>{
+ const root=temp(t);
+ const db=openStore(root);try{
+  assert.ok(db.prepare('PRAGMA table_info(saved_sentences)').all().some(c=>c.name==='source'));
+  db.exec('ALTER TABLE saved_sentences DROP COLUMN source');
+  db.prepare("INSERT INTO saved_sentences(game_id,text,translation,created_at,original) VALUES('g1','古い文','',1,'{}')").run();
+  saved.migrate(db);
+  assert.equal(db.prepare('SELECT source FROM saved_sentences').get().source,'manual');
+  assert.equal(saved.save(db,{gameId:'g1',text:'新しい文',source:'auto'}).source,'auto');
+  assert.equal(saved.save(db,{gameId:'g1',text:'新しい文',source:'manual'}).source,'manual');
+  assert.equal(saved.save(db,{gameId:'g1',text:'新しい文',source:'auto'}).source,'manual');
+  assert.equal(saved.save(db,{gameId:'g1',text:'別の文',source:'bogus'}).source,'manual');
+ }finally{db.close();}
 });
 
-test('Anki from a drag-selected phrase saves its line once; whole-line selections are left alone',async()=>{
- const {b,sent}=loadModule(),keep=b.savedSentences,line='今日はとても良い天気ですね。';
- assert.deepEqual({...await keep.autoSave({text:line,start:0,end:[...line].length})},{saved:false,created:false});
- assert.equal(sent.length,0);
- const first=keep.autoSave({text:line,start:3,end:6});
- assert.equal(sent.at(-1).type,'sentenceSave');assert.equal(sent.at(-1).text,line);
- b.sentenceState(line,true,'',true);
- assert.deepEqual({...await first},{saved:true,created:true});
- assert.deepEqual({...await keep.autoSave({text:line,start:6,end:8})},{saved:true,created:false});
- assert.equal(sent.length,1);
+test('every Anki card keeps its line as auto once, and the sentences list carries the words added from it',async t=>{
+ const root=temp(t);
+ const runtime={root,folder:path.join(root,'data','config'),emit:()=>{},config:()=>({}),learning:()=>({installed:()=>true})};
+ const reader=new Reader(runtime);reader.gameId='g1';
+ {const db=openStore(root);db.prepare("INSERT INTO games(id,title) VALUES('g1','Fixture')").run();db.close();}
+ const line='言葉を覚える';
+ assert.deepEqual(await reader.mine({entry:{id:1,spellings:['言葉'],readings:['ことば'],definitions:['word']},args:{text:line,start:0,end:2,translation:'记住词语'},noteId:7}),{sentenceSaved:true});
+ assert.deepEqual(await reader.mine({entry:{id:2,spellings:['覚える'],readings:['おぼえる'],definitions:['remember']},args:{text:line,start:3,end:6},noteId:8}),{sentenceSaved:false});
+ const db=openStore(root);try{
+  const rows=saved.list(db);assert.equal(rows.length,1);
+  assert.equal(rows[0].source,'auto');assert.equal(rows[0].translation,'记住词语');assert.equal(rows[0].title,'Fixture');
+  assert.deepEqual(rows[0].words.map(w=>w.spelling),['言葉','覚える']);
+  assert.equal(saved.list(db,{source:'manual'}).length,0);assert.equal(saved.list(db,{source:'auto'}).length,1);
+  /* account sync: auto rows say so; manual rows keep the old record shape (no re-push of every sentence) */
+  let rec=[...kinds.sentences.collect(db).values()][0];assert.equal(rec.source,'auto');
+  saved.save(db,{gameId:'g1',text:line,source:'manual'});
+  rec=[...kinds.sentences.collect(db).values()][0];assert.equal('source' in rec,false);
+  /* a synced auto record lands as auto on the other PC */
+  db.exec('DELETE FROM saved_sentences');
+  kinds.sentences.apply(db,'s:'+require('node:crypto').createHash('sha256').update(line).digest('hex').slice(0,32),{data:{text:line,translation:'',created_at:5,game:'Fixture',source:'auto'}});
+  assert.deepEqual(db.prepare('SELECT game_id,source FROM saved_sentences').all().map(r=>({...r})),[{game_id:'g1',source:'auto'}]);
+ }finally{db.close();}
+});
+
+test('the drag card learns about an auto-kept line without asking again',async()=>{
+ const {b,sent}=loadModule(),keep=b.savedSentences,line='今日はいい天気。';
+ let changed=0;keep.onChange(()=>changed++);
+ keep.markSaved(line);assert.equal(keep.isSaved(line),true);assert.equal(changed,1);assert.equal(sent.length,0);
  const off=keep.remove(line);assert.equal(sent.at(-1).type,'sentenceDelete');b.sentenceState(line,false,'',false);
  assert.deepEqual({...await off},{saved:false,created:false});assert.equal(keep.isSaved(line),false);
- const bad=keep.save(line);b.sentenceState(line,false,'INVALID_SENTENCE');await assert.rejects(bad,/INVALID_SENTENCE/);
+ const bad=keep.save(line);assert.equal(sent.at(-1).type,'sentenceSave');b.sentenceState(line,false,'INVALID_SENTENCE');await assert.rejects(bad,/INVALID_SENTENCE/);
 });
 
 test('the bridge, drag-selection card and sentences page are wired to the same save path',()=>{
@@ -87,9 +110,9 @@ test('the bridge, drag-selection card and sentences page are wired to the same s
  const selection=fs.readFileSync(path.join(ROOT,'web/reader/modules/selection.js'),'utf8');
  assert.match(selection,/const drag=!result;/);assert.match(selection,/decorateWordActions\?\.\(card,args,result,\{drag\}\)/);
  const v4=fs.readFileSync(path.join(ROOT,'web/reader/modules/v4.js'),'utf8');
- assert.match(v4,/if\(opts\.drag&&keep\)\{/);assert.match(v4,/keep\.autoSave\(args\)/);
+ assert.match(v4,/if\(opts\.drag&&keep\)\{/);assert.match(v4,/value\.sentenceSaved&&keep/);
  assert.doesNotMatch(fs.readFileSync(path.join(ROOT,'web/reader/modules/save-sentence.js'),'utf8'),/tomoyo-menu-header|keydown/);
  const app=fs.readFileSync(path.join(ROOT,'web/app.js'),'utf8');
  assert.match(app,/拖动选取一段文字/);assert.match(app,/ドラッグして選択/);assert.match(app,/Drag to select/);
- assert.match(app,/sentence_delete/);
+ assert.match(fs.readFileSync(path.join(ROOT,'web/sentences-page.js'),'utf8'),/sentence_delete/);assert.match(app,/data-word-sentence/);
 });

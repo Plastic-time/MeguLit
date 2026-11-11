@@ -124,15 +124,15 @@ const kinds={
  sentences:{
   collect(db){
    const titles=gameTitles(db),out=new Map();
-   for(const s of db.prepare('SELECT game_id,text,translation,created_at FROM saved_sentences ORDER BY created_at,id').all()){const key='s:'+sha(s.text,32);if(!out.has(key))out.set(key,{text:s.text.slice(0,3000),translation:String(s.translation||'').slice(0,3000),created_at:s.created_at,game:titles.get(s.game_id)||''});}
+   for(const s of db.prepare('SELECT game_id,text,translation,created_at,source FROM saved_sentences ORDER BY created_at,id').all()){const key='s:'+sha(s.text,32);if(!out.has(key))out.set(key,{text:s.text.slice(0,3000),translation:String(s.translation||'').slice(0,3000),created_at:s.created_at,game:titles.get(s.game_id)||'',/* only auto rows carry it, so older (manual) records keep their hash */...(s.source==='auto'?{source:'auto'}:{})});}
    return out;
   },
   apply(db,key,record){
-   const rows=db.prepare('SELECT id,text FROM saved_sentences').all().filter(r=>'s:'+sha(r.text,32)===key);
+   const rows=db.prepare('SELECT id,text FROM saved_sentences').all().filter(r=>'s:'+sha(r.text,32)===key),source=record.data?.source==='auto'?'auto':'manual';
    if(record.deleted){for(const r of rows)db.prepare('DELETE FROM saved_sentences WHERE id=?').run(r.id);return;}
    const d=record.data;
-   if(rows.length)db.prepare('UPDATE saved_sentences SET translation=? WHERE id=?').run(String(d.translation||''),rows[0].id);
-   else db.prepare('INSERT INTO saved_sentences(game_id,text,translation,created_at,original) VALUES(?,?,?,?,?)').run(gameByTitle(db).get(String(d.game||'').toLowerCase())||null,String(d.text),String(d.translation||''),Number(d.created_at)||0,'{"sync":true}');
+   if(rows.length)db.prepare('UPDATE saved_sentences SET translation=?,source=? WHERE id=?').run(String(d.translation||''),source,rows[0].id);
+   else db.prepare('INSERT INTO saved_sentences(game_id,text,translation,created_at,original,source) VALUES(?,?,?,?,?,?)').run(gameByTitle(db).get(String(d.game||'').toLowerCase())||null,String(d.text),String(d.translation||''),Number(d.created_at)||0,'{"sync":true}',source);
   }
  },
  reading:{

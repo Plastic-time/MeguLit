@@ -2,7 +2,7 @@
 // 收藏句子: the shared save path for the drag-selection lookup card (v4.js adds the button there). It saves the whole
 // line the selection sits in, that line's translation, and the game the reader is attached to (decided by the
 // service). Same on every engine and in both layouts: the line is the one the reader drew (.sentence-text).
-// A short word/phrase sent to Anki from a drag selection also saves its line (autoSave), once.
+// Every Anki card also keeps its line (source auto); the service does that and v4.js shows the hint via markSaved.
 (function installSaveSentence(){
  'use strict';
  const b=window.__tomoyoChinese;if(!b){setTimeout(installSaveSentence,200);return;}if(b.saveSentenceInstalled)return;b.saveSentenceInstalled=true;
@@ -14,17 +14,6 @@
  const t=()=>T[window.__tomeI18n?.get?.()]||T.zh;
  const send=m=>{try{window.__tomoyoTranslateRequest(JSON.stringify(m));}catch{}};
  const known=new Map(),waiting=new Map();
- /* A selection is a short word/phrase (not the whole line) when it is clearly shorter than its line and holds no
-    sentence-ending punctuation. Character counts, so surrogate pairs count once. */
- const END=/[。．！？!?…‥」』）)]/;
- function isPhraseSelection(text,start,end){
-  const chars=[...String(text||'')],line=chars.join('').trim();if(!line)return false;
-  const s=Math.max(0,Number(start)||0),e=Math.min(chars.length,Number(end)||0);if(e<=s)return false;
-  const part=chars.slice(s,e).join('').trim(),length=[...part].length,lineLength=[...line].length;
-  if(!length||END.test(part))return false;
-  return length<lineLength&&length<=Math.max(1,Math.floor(lineLength*0.6));
- }
- b.isPhraseSelection=isPhraseSelection;
  function plain(node){const chars=node.querySelectorAll('.char-token');if(chars.length)return Array.from(chars,c=>c.textContent).join('').trim();const copy=node.cloneNode(true);for(const r of copy.querySelectorAll('rt,rp'))r.remove();return copy.textContent.trim();}
  function translationNear(node){let p=node.parentElement;for(let i=0;p&&i<4;i++,p=p.parentElement){const out=p.querySelector('.tomoyo-cn-output');if(out){if(['pending','error'].includes(out.dataset.state)||out.hidden)return '';const v=out.textContent.trim();return v==='翻译中…'?'':v;}}return '';}
  /* the translation drawn beside the line whose text is `text` */
@@ -40,13 +29,12 @@
  };
  const listeners=new Set();
  const api={
-  t,isPhraseSelection,translationOf,
+  t,translationOf,
   isSaved:text=>known.get(String(text||'').trim()),
   state:text=>request('sentenceState',text,''),
   save:(text,translation)=>request('sentenceSave',text,translation),
   remove:text=>request('sentenceDelete',text,''),
-  /* Anki from a drag selection: save the line too when the selection is a short word/phrase; never twice */
-  async autoSave(args){if(!args||!isPhraseSelection(args.text,args.start,args.end))return {saved:false,created:false};if(known.get(String(args.text).trim())===true)return {saved:true,created:false};return api.save(args.text);},
+  markSaved:text=>{known.set(String(text||'').trim(),true);for(const f of listeners)try{f(text);}catch{}},
   onChange:f=>{listeners.add(f);return()=>listeners.delete(f);}
  };
  b.savedSentences=api;

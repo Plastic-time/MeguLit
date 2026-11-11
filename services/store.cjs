@@ -75,6 +75,7 @@ function openStore(root) {
   }
   if(!db.prepare('PRAGMA table_info(games)').all().some(column=>column.name==='removed_at'))db.exec('ALTER TABLE games ADD COLUMN removed_at INTEGER');
   if(!db.prepare('PRAGMA table_info(games)').all().some(column=>column.name==='hidden_at'))db.exec('ALTER TABLE games ADD COLUMN hidden_at INTEGER');
+  require('./saved-sentences.cjs').migrate(db);
   require('./series-migration.cjs').migrateSeries(db,root);
   reconcileRemovedGames(db);
   return db;
@@ -139,7 +140,7 @@ function migrate(root, snapshot = path.join(root, 'migration', 'baseline-2026110
       for (const w of rows('words')) word.run(w.id,w.spelling,w.reading,w.definitions,w.status || 0,w.created_at,w.image_path || null,jsonify(w));
       const example = db.prepare('INSERT INTO examples VALUES (?,?,?,?,?,?,?,?,?)');
       for (const e of rows('word_sentences')) example.run(e.id,e.word_id,gameId(e.media_id),e.sentence_text,e.translation,e.highlight_start,e.highlight_end,e.created_at,jsonify(e));
-      const sentence = db.prepare('INSERT INTO saved_sentences VALUES (?,?,?,?,?,?)');
+      const sentence = db.prepare('INSERT INTO saved_sentences(id,game_id,text,translation,created_at,original) VALUES (?,?,?,?,?,?)');
       for (const s of rows('sentences')) sentence.run(s.id,gameId(s.media_id),s.sentence_text,s.translation,s.created_at,jsonify(s));
       const session = db.prepare('INSERT INTO reading_sessions VALUES (?,?,?,?,?,?,?,?)');
       for (const s of rows('sessions')) session.run(s.id,gameId(s.media_id),s.started_at,s.ended_at,Math.max(0,(s.ended_at ?? s.started_at)-s.started_at),s.moji_read,s.sentences_read,jsonify(s));

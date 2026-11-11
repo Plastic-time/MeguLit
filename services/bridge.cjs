@@ -362,9 +362,9 @@ async function dispatch(request,runtime=null) {
       case 'kana_progress':return require('./kana.cjs').read(root);
       case 'kana_progress_save':return require('./kana.cjs').save(root,request.data);
       case 'kana_game_words':return require('./kana.cjs').gameWords(db,request.words);
-      case 'vocabulary':return db.prepare('SELECT id,spelling,reading,definitions,status,created_at FROM vocabulary ORDER BY created_at DESC,id DESC LIMIT 1000').all();
-      case 'sentences':return db.prepare('SELECT s.id,s.game_id,s.text,s.translation,s.created_at,g.title FROM saved_sentences s LEFT JOIN games g ON s.game_id=g.id ORDER BY s.created_at DESC LIMIT 1000').all();
-      case 'sentence_save':{const r=require('./saved-sentences.cjs').save(db,{gameId:request.gameId,text:request.text,translation:request.translation});runtime?.emit?.('reader-event',{type:'sentence-saved'});return r;}
+      case 'vocabulary':return db.prepare('SELECT v.id,v.spelling,v.reading,v.definitions,v.status,v.created_at,e.text AS example_text,e.game_id AS example_game_id,g.title AS example_title FROM vocabulary v LEFT JOIN examples e ON e.id=(SELECT id FROM examples WHERE word_id=v.id ORDER BY id DESC LIMIT 1) LEFT JOIN games g ON g.id=e.game_id ORDER BY v.created_at DESC,v.id DESC LIMIT 1000').all();
+      case 'sentences':return require('./saved-sentences.cjs').list(db,{source:request.source});
+      case 'sentence_save':{const r=require('./saved-sentences.cjs').save(db,{gameId:request.gameId,text:request.text,translation:request.translation,source:request.source});runtime?.emit?.('reader-event',{type:'sentence-saved'});return r;}
       case 'sentence_delete':{const r=require('./saved-sentences.cjs').remove(db,{id:request.id,gameId:request.gameId,text:request.text});runtime?.emit?.('reader-event',{type:'sentence-saved'});return r;}
       case 'sentence_state':return require('./saved-sentences.cjs').state(db,{gameId:request.gameId,text:request.text});
       case 'word_trash':return db.prepare('SELECT id,word_id,deleted_at,snapshot FROM word_trash ORDER BY deleted_at DESC,id DESC LIMIT 30').all().map(row=>{const s=JSON.parse(row.snapshot);return {id:row.id,deleted_at:row.deleted_at,spelling:s.word?.spelling || s.spelling || '',reading:s.word?.reading || s.reading || ''};});
