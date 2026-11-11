@@ -59,7 +59,9 @@ function scan(b,out){let at=0;
   if(start<4)continue;const n=b.readUInt32LE(start-4);if(n<DOC.length||start+n>b.length)continue;
   const text=b.toString('utf8',start,start+n),m=HEAD.exec(text);if(!m)continue;
   const doc={name:path.basename(m[3])+'.nani',src:(m[1]||'ja').toLowerCase(),dst:(m[2]||'').toLowerCase(),script:!/managed text/i.test(m[4]),text};
-  if(doc.script&&!/\n# /.test(text)){const next=b.indexOf(DOC,at);doc.prints=printed(b,start+n,next<0?Math.min(b.length,start+n+4e6):next);}
+  if(doc.script&&!/\n# /.test(text)){const next=b.indexOf(DOC,at),end=next<0?Math.min(b.length,start+n+4e6):next;doc.prints=printed(b,start+n,end);
+   // E450 entries by document line (source comment at L, translation at L + 1), so pairing never shifts at a gap
+   try{doc.entries=require('./naninovel-voice.cjs').docEntries(b,start+n,end);}catch{doc.entries=null;}}
   out.push(doc);}
  return out;}
 function docsIn(file){const key=file+'|'+stat(file);if(memo.has(key))return memo.get(key);const out=[];
@@ -83,6 +85,14 @@ function combine(docs){const byName=new Map();for(const d of docs){if(!d.script)
   if(jaSrc){out.push({name:jaSrc.name,text:jaSrc.text});continue;}
   const ja=list.find(d=>isJa(d.dst));if(!ja)continue;
   const zhDoc=list.filter(d=>isZh(d.dst)).sort((a,b)=>zhRank(a.dst)-zhRank(b.dst))[0];
+  /* E450 Parsed-asset documents with their entries: each Japanese entry (its source line and the Japanese printed on the
+     next document line) meets the Chinese document's entry for the same source line, matched in order as the longest
+     common subsequence of the source lines. The Chinese is that entry's translation, else the source line itself when
+     the source is Chinese. Pairing by position (below) shifted every later line after an untranslated entry. */
+  if(ja.entries&&ja.entries.length){const nv=require('./naninovel-voice.cjs'),je=ja.entries,ze=zhDoc&&zhDoc.entries||[],m=nv.lcs(je.map(e=>e.key),ze.map(e=>e.key));
+   const strip=c=>String(c||'').replace(/^[^:：「『（]{1,24}[:：]\s*/,'');
+   const parts=je.map((e,i)=>{if(!tidy(e.text))return '';const z=m[i]>=0&&tidy(ze[m[i]].text)?ze[m[i]].text:isZh(ja.src)?strip(e.source):'';return '# e'+i+'\n'+e.text.split('\n').map(l=>'; '+l).join('\n')+(z?'\n'+z:'');}).filter(Boolean);
+   if(parts.length){out.push({name:ja.name,text:parts.join('\n\n')});continue;}}
   // Parsed-asset documents: the printed texts, paired with the Chinese document's when both have as many.
   if(ja.prints){const zp=zhDoc&&zhDoc.prints&&zhDoc.prints.length===ja.prints.length?zhDoc.prints:null;
    // A line the Chinese document left blank falls back to the source when that is Chinese (one block per printed line).

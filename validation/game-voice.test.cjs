@@ -115,3 +115,9 @@ test('naninovel voices exact: in-order matching never lets a repeated short line
  const a=['「…………」','「行こう」','「…………」','「はい」'],b=['「…………」','「別の行」','「行こう」','「…………」','「はい」'];
  assert.deepEqual(nv.lcs(a,b),[0,2,3,4]);assert.deepEqual(nv.lcs(['x'],['y']),[-1]);
  assert.equal(nv.light('Kasumi: 「我剛剛發現 了一件事。」'),'「我剛剛發現了一件事。」');assert.equal(nv.light('{Me}: 「怎麼了？」'),'「怎麼了？」');});
+test('naninovel reader: Japanese and Chinese meet by source line, an untranslated entry shifts nothing, a blank Chinese falls back to the source',()=>{const n=require('../services/original-engines/naninovel.cjs');
+ const E=(source,text)=>({source,key:require('../services/original-engines/naninovel-voice.cjs').light(source),text});
+ const ja={script:true,name:'k.nani',src:'zh-tw',dst:'ja-jp',text:'',entries:[E('K: 「一」','「いち」'),E('K: 「二」',''),E('K: 「三」','「さん」'),E('K: 「四」','「よん」')]};
+ const zh={script:true,name:'k.nani',src:'zh-tw',dst:'zh-cn',text:'',entries:[E('K: 「一」','「一简」'),E('K: 「二」','「二简」'),E('K: 「三」','「三简」'),E('K: 「四」','')]};
+ const docs=n._internal.combine([ja,zh]);const p=n.parse(Buffer.from(docs[0].text));
+ assert.deepEqual(p.lines,['「いち」','「さん」','「よん」']);assert.deepEqual(p.zh,['「一简」','「三简」','「四」']);});
