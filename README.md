@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-8b1e2d?style=flat-square)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/%E2%99%A1-Sponsor-c8323c?style=flat-square)](https://github.com/sponsors/ilynthn)
 
-**[下载 v1.4.0](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; **[官网 megulit.com](https://megulit.com)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [更新日志](https://github.com/ilynthn/MeguLit/releases) &nbsp;·&nbsp; [♡ 赞赏](#support)
+**[下载 v1.4.1](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; **[官网 megulit.com](https://megulit.com)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [更新日志](https://github.com/ilynthn/MeguLit/releases) &nbsp;·&nbsp; [♡ 赞赏](#support)
 
 <br>
 
@@ -44,7 +44,7 @@
 | **社区评价** | Steam 评论可选语言区，长评在 MeguLit 里直接展开全文 |
 
 > [!NOTE]
-> v1.1.0 和 v1.1.1 的自动更新有 bug：点「重启并更新」后打开的还是旧版本。请手动下载 v1.4.0 覆盖安装一次，从 v1.1.2 开始就能正常自动更新了
+> v1.1.0 和 v1.1.1 的自动更新有 bug：点「重启并更新」后打开的还是旧版本。请手动下载 v1.4.1 覆盖安装一次，从 v1.1.2 开始就能正常自动更新了
 
 <br>
 
@@ -228,7 +228,7 @@ MeguLit 想做的只有一件事：让你在游戏里直接读懂日语。原文
 > [!IMPORTANT]
 > **游戏剧情必须是日文原文**。MeguLit 读的是游戏正在显示的台词，剧情被汉化后读到的就不是日文。只汉化了菜单、剧情仍是日文的游戏不受影响；汉化版可以先试试「工具 → 日文原版恢复」
 
-1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.4.0-win-x64.zip`（约 18 MB），解压后运行 `MeguLit.exe`
+1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.4.1-win-x64.zip`（约 18 MB），解压后运行 `MeguLit.exe`
 2. 第一次启动会弹出安装窗口，二选一
    - **完整版**：下载约 565 MB，一次装齐注音词典和 AivisSpeech 语音引擎，需要约 1.8 GB 空间（推荐）
    - **精简版**：下载约 107 MB，能用阅读层、翻译和查词，其余组件以后在设置里补装
@@ -379,7 +379,7 @@ From then on MeguLit checks for a new release on every start and downloads it in
 
 ### Install
 
-1. Download `MeguLit-v1.4.0-win-x64.zip` (about 18 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`
+1. Download `MeguLit-v1.4.1-win-x64.zip` (about 18 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`
 2. Pick **Full** (about 565 MB, furigana dictionaries and the AivisSpeech voice engine) or **Lite** (about 107 MB)
 3. Choose your game folder, pick a game and press *Launch*. Press <kbd>Alt</kbd> + <kbd>T</kbd> for the overlay menu
 
@@ -424,7 +424,7 @@ v1.1.0 と v1.1.1 の自動更新には不具合があるため、今回だけ�
 
 ### インストール
 
-1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.4.0-win-x64.zip`（約 18 MB）をダウンロードして展開し、`MeguLit.exe` を起動
+1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.4.1-win-x64.zip`（約 18 MB）をダウンロードして展開し、`MeguLit.exe` を起動
 2. 初回セットアップで **完全版**（約 565 MB）か **軽量版**（約 107 MB）を選択
 3. ゲームフォルダを選び、作品を選んで「ゲーム起動」。<kbd>Alt</kbd> + <kbd>T</kbd> でメニュー
 
