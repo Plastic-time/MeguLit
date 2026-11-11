@@ -906,3 +906,18 @@ html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt[data-level-pick=N0]:is(:hov
 html:not(#u):not(#v):not(#w) body .lv-dialog .lv-opt>*{position:relative;z-index:1}
 /* settings the user retired: follow-the-original-position (always on now) and history retention days */
 html:not(#u):not(#v):not(#w) body .main .settings-content .settings-row:has([name=livePosition],[name=history_span]){display:none!important}
+/* grouped reading sessions: the span and count under the title, the single sessions folded underneath */
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-session.is-group{grid-template-rows:auto auto}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts{grid-column:1/-1;margin:10px 0 0 52px}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts summary{cursor:pointer;width:max-content;font-family:var(--u-mono);font-size:11.5px;letter-spacing:.14em;color:var(--g-gold);list-style:none}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts summary::-webkit-details-marker{display:none}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts summary::before{content:"▸ ";display:inline-block;transition:transform .2s}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts[open] summary::before{transform:rotate(90deg)}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts ol{list-style:none;margin:10px 0 0;padding:0}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts li{display:grid;grid-template-columns:90px 1fr;align-items:center;padding:8px 0;border-top:1px solid var(--u-line)}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts li time{font-family:var(--u-mono);font-size:12px;color:var(--g-t2,#c3ab9c)}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts li .history-metrics dd{font-size:16px!important}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts li .history-metrics dt{display:none}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts{margin-left:52px!important}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts li{grid-template-columns:minmax(0,1fr) auto!important}
+html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts li .history-metrics{justify-self:end}
