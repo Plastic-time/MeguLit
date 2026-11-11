@@ -3,8 +3,7 @@
    starts from the centre — slamming into the top bar and bouncing back to its place, different every time).
    When a search starts from the empty, centred dictionary, the box is kicked upward: the camera tilts and pulls back,
    the box flies up tilting in 3D, hits the top bar (the bar jolts, a line of light flares where it was struck, shards of
-   kana burst out), rebounds and settles on a spring into its normal place at the top while the camera springs back.
-   Mass, stiffness, damping, launch speed, bounce and the point of impact are random each time. Presentation only:
+   kana burst out), and stops there (see launch()). Presentation only:
    the layout is the app's; this only animates the box from where it was to where the layout puts it. */
 const calm=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const KANA='あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソ';
@@ -43,6 +42,11 @@ function barHit(bar,x,power){
  bar.animate([{transform:'none'},{transform:`translateY(${f1(-k)}px) rotate(${f1(side*k*.12)}deg)`},{transform:`translateY(${f1(k*.45)}px) rotate(${f1(-side*k*.06)}deg)`},{transform:`translateY(${f1(-k*.15)}px)`},{transform:'none'}],{duration:460,easing:'cubic-bezier(.3,.7,.2,1)'});
 }
 
+/* 2026-11-12 (user: the top bar is a wall — it is hit once, there is no bounce, no gravity pulls it back). The box
+   gives a small wind-up, then accelerates straight up with its own lean and twist; the moment it reaches its place
+   under the bar it stops dead: it squashes against the wall and recovers, the wall slaps its 3D angles flat, the bar
+   and the view jolt, light flares along the bar and kana shards burst out. The camera (tilt, swing, dolly) rides the
+   flight and settles on its own spring. Speed, curve, lean, twist and the point of impact are random each time. */
 function launch(form){
  const host=form.closest('#learning-content'),bar=document.querySelector('header.titlebar');if(!host)return;
  const start=form.getBoundingClientRect();
@@ -50,37 +54,36 @@ function launch(form){
  const end=form.getBoundingClientRect(),delta=start.top-end.top;
  if(delta<40){host.classList.remove('dict-launch');return;}
  busy=true;
- const gap=Math.max(6,end.top-(bar?bar.getBoundingClientRect().bottom:0)-2);
- /* the random temperament of this kick */
- const m=rand(.8,1.4),k=rand(110,190),c=rand(7,13),e=rand(.35,.6),hitX=rand(.12,.88),side=hitX<.5?-1:1;
- let y=delta,v=-rand(1500,2200)/Math.sqrt(m),rz=rand(-1.5,1.5),vz=rand(-20,20),hit=false;
- /* the camera: tilt, side swing and dolly, each on its own spring */
- const cam={rx:0,vrx:rand(55,90),ry:0,vry:rand(-30,30),s:1,vs:-rand(.5,.8)},CK=170,CC=16;
- scatterCloud(end.left+end.width*hitX,start.top);
+ const hitX=rand(.12,.88),side=hitX<.5?-1:1,windup=rand(60,110),flight=rand(210,330)*Math.min(1.4,Math.max(.8,delta/300)),curve=rand(1.8,2.8),dip=rand(6,14);
+ const leanX=rand(10,22),twist=side*rand(2,6),yaw=side*rand(4,10);
+ const cam={rx:0,vrx:0,ry:0,vry:0,s:1,vs:0},CK=150,CC=15;
+ let sq=0,vsq=0,hit=false,flat=1,flatV=0;
  form.style.transformOrigin=`${f1(hitX*100)}% 0%`;host.style.transformOrigin='50% 30%';
- let prev=performance.now(),quiet=0;
+ scatterCloud(end.left+end.width*hitX,start.top);
+ const t0=performance.now();let prev=t0,quiet=0;
  const frame=now=>{
-  const dt=Math.min(.05,(now-prev)/1000);prev=now;
-  for(let s=0;s<6;s++){const h=dt/6;
-   const a=(-k*y-c*v)/m;v+=a*h;y+=v*h;
-   if(y<-gap){y=-gap;const speed=Math.abs(v);v=speed*e;
-    if(!hit){hit=true;const power=Math.min(1.4,speed/2400),ix=end.left+end.width*hitX;
-     vz+=side*speed*rand(.012,.02);
-     cam.vrx-=rand(70,120)*power;cam.vry+=side*rand(40,80)*power;cam.vs+=rand(.6,1)*power;
-     barHit(bar,ix,power);shards(ix,end.top-gap+2,power);}}
-   const az=(-260*rz-14*vz);vz+=az*h;rz+=vz*h;
-   for(const [p,vp,target] of [['rx','vrx',0],['ry','vry',0],['s','vs',1]]){const ac=-CK*(cam[p]-target)-CC*cam[vp];cam[vp]+=ac*h;cam[p]+=cam[vp]*h;}
-  }
-  const pitch=Math.max(-28,Math.min(28,v*.008));
-  form.style.transform=`translate3d(0,${f1(y)}px,${f1(Math.min(0,v)*-.02)}px) rotateX(${f1(pitch)}deg) rotateZ(${f1(rz)}deg)`;
+  const dt=Math.min(.05,(now-prev)/1000);prev=now;const t=now-t0;let y,tilt=0;
+  if(t<windup){const k=t/windup;y=delta+dip*Math.sin(k*Math.PI*.5);tilt=-k*.3;cam.rx+=(-2*k-cam.rx)*.2;}
+  else if(!hit){const k=Math.min(1,(t-windup)/flight),e=Math.pow(k,curve);y=(delta+dip)*(1-e);tilt=Math.min(1,k*1.6);
+   cam.rx=6*Math.sin(Math.min(1,k)*Math.PI*.5);cam.s=1-.035*k;cam.ry=side*-2.5*k;
+   if(k>=1){hit=true;y=0;const speed=(delta+dip)*curve/flight*1000,power=Math.min(1.4,speed/2600),ix=end.left+end.width*hitX;
+    vsq=-rand(9,14)*power;sq=0;flat=0;flatV=0;
+    cam.vrx=-rand(60,100)*power;cam.vry=side*rand(30,60)*power;cam.vs=rand(.5,.9)*power;
+    barHit(bar,ix,power);shards(ix,end.top,power);
+    host.animate([{translate:'0 0'},{translate:`${f1(side*-3*power)}px ${f1(-5*power)}px`},{translate:`${f1(side*2*power)}px ${f1(2*power)}px`},{translate:'0 0'}],{duration:300,easing:'cubic-bezier(.3,.7,.2,1)',composite:'add'});}}
+  else y=0;
+  if(hit){for(let s=0;s<4;s++){const h=dt/4;const a=-420*sq-22*vsq;vsq+=a*h;sq+=vsq*h;
+    for(const [p,vp,target] of [['rx','vrx',0],['ry','vry',0],['s','vs',1]]){const ac=-CK*(cam[p]-target)-CC*cam[vp];cam[vp]+=ac*h;cam[p]+=cam[vp]*h;}}}
+  const lean=hit?0:tilt,squash=hit?Math.max(-.2,Math.min(.06,sq*.25)):0;
+  form.style.transform=`translate3d(0,${f1(y)}px,0) rotateX(${f1(-leanX*lean)}deg) rotateY(${f1(yaw*lean)}deg) rotateZ(${f1(twist*lean)}deg) scale(${(1-squash*.35).toFixed(3)},${(1+squash).toFixed(3)})`;
   host.style.transform=`perspective(1400px) rotateX(${f1(cam.rx)}deg) rotateY(${f1(cam.ry)}deg) scale(${cam.s.toFixed(4)})`;
-  const still=Math.abs(y)<.4&&Math.abs(v)<6&&Math.abs(rz)<.05&&Math.abs(cam.rx)<.05&&Math.abs(cam.ry)<.05&&Math.abs(cam.s-1)<.001;
+  const still=hit&&Math.abs(sq)<.02&&Math.abs(vsq)<.2&&Math.abs(cam.rx)<.05&&Math.abs(cam.ry)<.05&&Math.abs(cam.s-1)<.001;
   quiet=still?quiet+1:0;
   if(quiet>4||!form.isConnected){form.style.transform='';form.style.transformOrigin='';host.style.transform='';host.style.transformOrigin='';busy=false;
    const done=()=>{const r=document.querySelector('#lookup-results');if(!r||r.children.length||r.textContent.trim()||!host.isConnected)host.classList.remove('dict-launch');else setTimeout(done,200);};done();return;}
   requestAnimationFrame(frame);
  };
- form.style.transform=`translate3d(0,${f1(y)}px,0)`;
+ form.style.transform=`translate3d(0,${f1(delta)}px,0)`;
  requestAnimationFrame(frame);
 }
 document.addEventListener('submit',e=>{
