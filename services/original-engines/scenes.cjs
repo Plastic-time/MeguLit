@@ -408,11 +408,11 @@ const nscripter=require('./nscripter.cjs');
 const rpgmaker=require('./rpgmaker.cjs'),wolf=require('./wolf.cjs');
 // E403 DDLC Plus (StreamingAssets/AssetBundles/Windows/lang*.cy): vgprompter.cjs.
 const vgprompter=require('./vgprompter.cjs');
-const fill=require('./fill.cjs'),avg32=require('./avg32.cjs'),nitroNpk=require('./npk.cjs').engine,nitroPak=require('./nitro-pak.cjs').engine,iga=require('./iga.cjs').engine,paz=require('./paz.cjs').engine,bruns=require('./bruns.cjs').engine,rePak=require('./re-pak.cjs').engine,fvp=require('./fvp.cjs').engine,advhd=require('./advhd.cjs').engine;
+const fill=require('./fill.cjs'),avg32=require('./avg32.cjs'),nitroNpk=require('./npk.cjs').engine,nitroPak=require('./nitro-pak.cjs').engine,iga=require('./iga.cjs').engine,paz=require('./paz.cjs').engine,bruns=require('./bruns.cjs').engine,rePak=require('./re-pak.cjs').engine,fvp=require('./fvp.cjs').engine,advhd=require('./advhd.cjs').engine,reallive=require('./reallive.cjs').engine;
 const catsystem2=require('./catsystem2.cjs'),naninovel=require('./naninovel.cjs'),unityText=require('./unity-text.cjs'),higurashi=require('./higurashi.cjs'),mages=require('./mages.cjs'),capcomMsg=require('./capcom-msg.cjs');
 // E409 Nitroplus N4 (Steam The Song of Saya, script.npk NPK2): nitroplus-n4.cjs.
 const nitroplusN4=require('./nitroplus-n4.cjs');
-const ENGINES={'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak,fvp,advhd,vgprompter};
+const ENGINES={'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak,fvp,advhd,reallive,vgprompter};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,64)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
