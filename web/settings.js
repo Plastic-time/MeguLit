@@ -47,7 +47,7 @@ export async function renderSettings({main,api,invoke,text,locale,esc,toast,head
  if(!section)return;
  main.querySelector('.settings-autosave-status')?.remove();
  const saveStatus=document.createElement('span');saveStatus.className='settings-autosave-status';saveStatus.hidden=true;saveStatus.setAttribute('role','status');saveStatus.setAttribute('aria-live','polite');main.querySelector('.page-tools').append(saveStatus);
- if(section==='general'){const body=document.createElement('div');content.append(body);basicSettings(body);body.querySelector('.page-header')?.remove();enhanceSelects(body);try{mountGlassSettings({body,data,locale,esc,api,toast,text,main,onSaved});}catch(error){console.warn('glass settings',error);}return;}
+ if(section==='general'){const body=document.createElement('div');content.append(body);basicSettings(body);import('./learning-goal.js').then(m=>m.mountGoalSettings({target:content,api,esc,toast,locale})).catch(()=>{});body.querySelector('.page-header')?.remove();enhanceSelects(body);try{mountGlassSettings({body,data,locale,esc,api,toast,text,main,onSaved});}catch(error){console.warn('glass settings',error);}return;}
  if(section==='data'){const body=document.createElement('div');content.append(body);renderBackup({target:body,api,invoke,locale,esc,toast,onSaved});mountSettingsReset({target:body,api,locale,esc,toast,onSaved:async detail=>{delete main.__settingsData;await onSaved(detail);}});return;}
  /* E378 账号 page (web/account-ui.js) */
  if(section==='account'){const body=document.createElement('div');content.append(body);renderAccount({target:body,api,locale,esc,toast}).catch(()=>toast(text.serviceFailed));return;}

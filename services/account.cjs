@@ -83,7 +83,7 @@ function gameByTitle(db){const map=new Map();for(const g of db.prepare('SELECT i
 /* #116 (user: nickname, avatar and settings were gone on a new PC): besides the per-game styles the settings kind
    carries the profile (leaderboard nickname, its switches, a small avatar) and the global reading style. Paths never
    leave the PC (cleanSettings), and a value already set on this PC is kept when an older cloud copy arrives. */
-const EXTRA_FILES={profile:root=>[path.join(root,'data','config','online.json'),require('./assets.cjs').find(root,'avatar')].filter(Boolean),'global-style':root=>[path.join(root,'data','config','gal-preferences.json')]};
+const EXTRA_FILES={'learning-goal':root=>[path.join(root,'data','config','learning-goal.json')],profile:root=>[path.join(root,'data','config','online.json'),require('./assets.cjs').find(root,'avatar')].filter(Boolean),'global-style':root=>[path.join(root,'data','config','gal-preferences.json')]};
 const AVATAR_CAP=24<<10;
 function accountExtras(root){
  const out={},online=readJSON(path.join(root,'data','config','online.json')),profile={};
@@ -91,11 +91,13 @@ function accountExtras(root){
  for(const k of ['leaderboardEnabled','leaderboardShareGames'])if(typeof online[k]==='boolean')profile[k]=online[k];
  try{const file=require('./assets.cjs').find(root,'avatar');if(file&&fs.statSync(file).size<=AVATAR_CAP*3/4-200)profile.avatar=require('./assets.cjs').get(root,'avatar');}catch{}
  if(Object.keys(profile).length)out.profile=profile;
+ const goal=require('./learning-goal.cjs').synced(root);if(goal)out['learning-goal']=goal;
  const style=cleanSettings(readJSON(path.join(root,'data','config','gal-preferences.json')));if(style&&Object.keys(style).length)out['global-style']={prefs:style};
  return out;
 }
 function applyExtra(root,key,record){
  if(record.deleted)return;const d=record.data||{};
+ if(key==='learning-goal'){require('./learning-goal.cjs').applySynced(root,d);return;}
  if(key==='profile'){
   const file=path.join(root,'data','config','online.json'),online=readJSON(file),patch={};
   if(typeof d.nickname==='string'&&d.nickname.trim()&&!(typeof online.leaderboardName==='string'&&online.leaderboardName.trim())){patch.leaderboardName=d.nickname.trim().slice(0,32);for(const k of ['leaderboardEnabled','leaderboardShareGames'])if(typeof d[k]==='boolean')patch[k]=d[k];}
