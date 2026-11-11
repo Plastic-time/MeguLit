@@ -412,3 +412,34 @@ html body .lv-dialog .lv-seal{font-family:var(--g-serif-ja,serif);color:var(--g-
 html body .lv-dialog .lv-opt small{font-size:12.5px!important;line-height:1.6;color:var(--g-t2,#c3ab9c)!important}
 html body .lv-dialog h2{font-family:var(--g-serif,serif)}
 html body .lv-dialog footer .primary:disabled{opacity:.45;filter:grayscale(.4)}
+
+/* ---- settings, second pass: group headings as gold kickers, one input box (hairline, square, left text, numbers
+   right), textareas framed on all sides, readable buttons in left-aligned action rows, danger actions that look
+   dangerous, error lines with a red rule, tutorial cards with a kicker badge and a visible arrow, the content
+   column held to a readable width, the nav fading at its edges ---- */
+html body .main .settings-content :is(h3,.settings-group-title,.panel>h2.panel-title){font-family:var(--u-mono)!important;font-size:11px!important;font-weight:500!important;letter-spacing:.28em!important;text-transform:uppercase;color:var(--g-gold)!important;margin:28px 0 6px!important;padding:0!important;min-height:0!important}
+html body .main .settings-content form>:is(h3):first-child,html body .main .settings-content .panel>h3:first-child{margin-top:8px!important}
+html body .main .settings-content :is(input[type=text],input[type=url],input[type=number],input[type=password],input:not([type])):not(.settings-search){height:38px;box-sizing:border-box;padding:0 12px!important;border:0!important;border-radius:2px!important;background:rgba(10,9,12,.5)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;text-align:left!important;text-overflow:ellipsis}
+html body .main .settings-content input[type=number]{width:88px!important;text-align:right!important;font-variant-numeric:lining-nums tabular-nums}
+html body .main .settings-content :is(input[type=text],input[type=url],input[type=number],input[type=password],input:not([type])):not(.settings-search):focus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important;outline:0}
+html body .main .settings-content textarea{border:0!important;border-radius:2px!important;background:rgba(10,9,12,.5)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;resize:none!important}
+html body .main .settings-content textarea:focus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
+html body .main .settings-content .select-trigger{border-radius:2px!important;justify-content:space-between!important;text-align:left!important}
+html body .main .settings-content .select-trigger .select-name{text-align:left!important;margin-right:auto}
+html body .main .settings-content button:not(.switch):not(.select-trigger):not(.icon-button):not(.primary){font-size:13px!important}
+html body .main .settings-content :is(.review-controls,.settings-actions,.anki-tools,.library-actions,.backup-actions){justify-content:flex-start!important}
+html body .main .settings-content :is(.danger-outline,button.danger,.text-button.danger){color:#f0a3ab!important;box-shadow:inset 0 0 0 1px rgba(200,50,60,.6)!important;background:rgba(200,50,60,.06)!important;border-radius:2px!important}
+html body .main .settings-content :is(.danger-outline,button.danger,.text-button.danger):hover{background:rgba(200,50,60,.85)!important;color:#fff!important}
+html body .main .settings-content :is(.model-error,.settings-error,[role=alert]){padding:10px 14px!important;border-radius:2px;background:rgba(200,50,60,.08);box-shadow:inset 2px 0 0 #c82f3b;color:#f0c4c8!important;font-weight:400!important;font-size:13px!important}
+html body .main .settings-content .settings-guide{border:0!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 6%,transparent),transparent 60%)!important}
+html body .main .settings-content .settings-guide .guide-badge{border-radius:2px!important;background:none!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important;color:var(--g-gold)!important;font-family:var(--u-mono);font-size:11px!important;letter-spacing:.2em}
+html body .main .settings-content .settings-guide .guide-title b{font-size:15px!important}
+html body .main .settings-content .settings-guide .guide-caret{font-size:0!important;width:14px;height:14px;transform:none!important;background:no-repeat center/14px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 3l5 5-5 5' fill='none' stroke='%23edb56e' stroke-width='1.4'/%3E%3C/svg%3E");transition:transform .25s}
+html body .main .settings-content .settings-guide.open .guide-caret{transform:rotate(90deg)!important}
+html body .main .settings-content .settings-guide:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html body .main .settings-content>*:not(.settings-search):not(.settings-search-results){max-width:1180px}
+html body .main .settings-nav{-webkit-mask:linear-gradient(transparent 0,#000 14px,#000 calc(100% - 22px),transparent);mask:linear-gradient(transparent 0,#000 14px,#000 calc(100% - 22px),transparent)}
+html body .main .settings-nav .settings-category-items button{margin-block:2px}
+html:lang(ja) body .main .settings-nav :is(summary,button){line-break:strict;word-break:keep-all}
+html body .main .settings-content input[type=color]{border:0!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;padding:3px!important}
+html body .main .settings-content .sp-preview .sp-stage{min-height:0}
