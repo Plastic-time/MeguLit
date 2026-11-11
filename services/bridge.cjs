@@ -391,6 +391,8 @@ async function dispatch(request,runtime=null) {
         const result=await grammar.report(db,{root,scriptPairs:require('./original-text.cjs').scriptPairs,tokenize:ready&&request.count!==false?text=>learning.tokenize(text):null,deadline:Date.now()+8000});
         return {...result,counting:ready};
       }
+      /* 学习 → 语法: grammar cards from the learner's own Anki decks (read here, never shipped), with lines read that contain them */
+      case 'grammar_bluebook':{const B=require('./bluebook.cjs'),r=B.read(root);return r.available?{...r,examples:B.examplesFor(r.points,require('./grammar.cjs').candidates(db,{root,scriptPairs:require('./original-text.cjs').scriptPairs}))}:r;}
       case 'grammar_learned':return require('./grammar.cjs').setLearned(db,String(request.point||''),request.learned!==false);
       case 'grammar_answer':return require('./grammar.cjs').recordAnswer(db,String(request.point||''),request.correct===true);
       case 'grammar_anki':{

@@ -9,9 +9,10 @@
 import {N5,LEVELS,GROUPS,blankOf,choicesFor} from './grammar-n5.js';
 import {LEVEL_LIST,LEVEL_GROUPS,levelPoints,findHit} from './grammar-levels.js';
 /* N4 → N0 (2026-11-11): every level is a list of points; N5 keeps its own file, the others are in grammar-levels.js */
-export const pointsOf=level=>level==='N5'?N5:levelPoints(level);
+const basePoints=level=>level==='N5'?N5:levelPoints(level);
+export const pointsOf=level=>[...basePoints(level),...ankiPoints(level)];
 export const ALL_POINTS=[...N5,...LEVEL_LIST.flatMap(levelPoints)];
-export const levelOf=point=>N5.includes(point)?'N5':LEVEL_LIST.find(l=>levelPoints(l).includes(point))||'N5';
+export const levelOf=point=>point.level||(N5.includes(point)?'N5':LEVEL_LIST.find(l=>levelPoints(l).includes(point))||'N5');
 const nodeFor=p=>p.node||nodeOf(p.id),nodesFor=p=>POINT_NODES[p.id]||[p.node].filter(Boolean);
 import {MAP,POINT_NODES,nodeOf} from './grammar-map.js';
 import {WORDS,FORMS,FORM_LABEL,conjugate} from './conjugate.js';
@@ -49,7 +50,7 @@ const CONJ_FORM={masu:'masu',te:'te',nai:'nai',ta:'ta',iadj:'nai',naadj:'nai'};
 const pct=v=>`${Math.round((Number(v)||0)*100)}%`;
 const loc=(o,l)=>o?.[l]||o?.zh||'';
 const motion=()=>typeof matchMedia!=='function'||!matchMedia('(prefers-reduced-motion: reduce)').matches;
-const pointById=id=>ALL_POINTS.find(p=>p.id===id);
+const pointById=id=>ALL_POINTS.find(p=>p.id===id)||LEVELS.flatMap(ankiPoints).find(p=>p.id===id);
 /* A line with the point highlighted; the highlight is a button that opens the explanation. */
 export function highlight(text,start,end,esc,pointId=''){const c=[...String(text||'')];return esc(c.slice(0,start).join(''))+`<mark class="gm-hl"${pointId?` role="button" tabindex="0" data-explain="${esc(pointId)}"`:''}>`+esc(c.slice(start,end).join(''))+'</mark>'+esc(c.slice(end).join(''));}
 export function builtinExamples(point){return point.builtin.map(b=>{const h=[...b.hl],at=b.ja.indexOf(b.hl),start=at<0?0:[...b.ja.slice(0,at)].length;return {text:b.ja,start,end:start+h.length,translation:b.zh,translationSource:'',origin:'builtin',title:'',readAt:null};});}
@@ -81,6 +82,33 @@ export const fx={
  type:(el,text)=>{if(!el)return;if(!motion()){el.textContent=text;return;}const c=[...text];let n=0;el.textContent='▮';const tick=()=>{n+=2;el.textContent=c.slice(0,n).join('')+(n<c.length?'▮':'');if(n<c.length)requestAnimationFrame(tick);};requestAnimationFrame(tick);},
  burst:el=>{if(!el||!motion())return;const b=document.createElement('span');b.className='gm-burst';b.setAttribute('aria-hidden','true');el.appendChild(b);b.animate([{opacity:1,transform:'translate(-50%,-50%) scale(.4)'},{opacity:0,transform:'translate(-50%,-50%) scale(1.6)'}],{duration:380,easing:EXPO}).finished.then(()=>b.remove(),()=>b.remove());}
 };
+/* Grammar cards from the learner's own Anki (蓝宝书 and decks with the same fields), read at run time by
+   services/bluebook.cjs and never shipped. A card whose form is already a lesson is merged into it (its explanation,
+   attachment and example lines join that lesson); the others become lessons of their own in a 「来自你的 Anki」 group,
+   taught the same way: six steps, your own lines first, drag the form into the gap. */
+let ANKI=[];
+export const ANKI_GROUP={zh:'蓝宝书 · 来自你的 Anki',ja:'Anki の文法カード',en:'From your Anki'};
+const short=s=>{const t=String(s||''),q=t.match(/[“"「]([^”"」]{1,24})[”"」]/);return (q?q[1]:t.split(/[。；;]/)[0]).slice(0,30);};
+export function useAnkiCards(cards){
+ for(const p of [...N5,...LEVEL_LIST.flatMap(levelPoints)])delete p.anki;ANKI=[];
+ const list=(cards||[]).filter(c=>c&&/^N[1-5]$/.test(c.level));
+ for(const c of list){
+  const base=basePoints(c.level),word=c.word.replace(/^[～~〜]/,'');
+  const twin=base.find(p=>(p.hits||[]).some(h=>c.hits.includes(h))||loc(p.title,'zh').split(/\s*——\s*/)[0].split(/\s*[／/]\s*/).some(h=>h&&h===word));
+  if(twin){(twin.anki||(twin.anki=[])).push(c);continue;}
+  const builtin=c.examples.filter(e=>e.ja).slice(0,4).map(e=>({ja:e.ja,hl:e.hl||c.hits.find(h=>e.ja.includes(h))||'',zh:e.zh}));
+  const others=list.filter(o=>o.level===c.level&&o!==c).map(o=>o.hits[0]).filter(h=>h&&!c.hits.includes(h));
+  const wrong=[0,7,19].map(k=>others[(c.order+k)%Math.max(1,others.length)]).filter((v,i,a)=>v&&a.indexOf(v)===i);
+  const title=`${word} —— ${short(c.explain[0])}`,gist=c.explain[0]||'';
+  ANKI.push({id:c.id,level:c.level,group:'anki',node:'clauses',source:'anki',title:{zh:title,ja:word,en:word},gist:{zh:gist,ja:gist,en:gist},
+   form:(c.form.length?c.form:[word]).map(f=>[f.replace(/[＋+]/g,' + '),'']),uses:builtin.slice(0,3).map(e=>({t:'',ja:e.ja,zh:e.zh})),pitfalls:c.notes.length?c.notes:c.explain.slice(1),
+   builtin,hits:c.hits,wrong:wrong.length?wrong:['のに','ので','ために'],choices:[...c.hits,...wrong]});
+ }
+ return {merged:list.length-ANKI.length,own:ANKI.length};
+}
+export const ankiPoints=level=>ANKI.filter(p=>p.level===level);
+/* The merged cards' example lines, used as extra lines for a lesson's examples and exercises. */
+export const ankiLines=point=>(point.anki||[]).flatMap(c=>c.examples.map(e=>{const h=e.hl||c.hits.find(x=>e.ja.includes(x))||'',at=h?e.ja.indexOf(h):-1,start=at<0?0:[...e.ja.slice(0,at)].length;return {text:e.ja,start,end:start+[...h].length,translation:e.zh,translationSource:'anki',origin:'anki',title:'蓝宝书'};}));
 /* ---- map ---- */
 /* 2026-11-11 (user: the outline was ugly, hard to read and taught like a textbook): the system is shown inside real
    lines. Each piece of a line is a block coloured by the part of Japanese it belongs to; tap a block and Megumin says
@@ -128,7 +156,7 @@ export function listHTML(data,{locale,esc,level='N5',userLevel=null}){
  if(!pts.length)return `${hud}<section class="gm-soon"><p>${esc(w.soon)}</p></section>`;
  const overview=`<button type="button" class="gm-overview" data-map><span class="gm-overview-kicker">${esc(w.map)}</span>${sentenceHTML(scenesOf(data)[0],esc,{mini:true})}<span class="gm-cap">${esc(locale==='zh'?'一句你读过的台词，拆成九种零件——点开，一块一块戳着玩 →':w.mapLead)}</span></button>`;
  let no=0;
- const G=level==='N5'?GROUPS:LEVEL_GROUPS;const groups=Object.keys(G).filter(g=>pts.some(p=>p.group===g)).map((g,gi)=>{const items=pts.filter(p=>p.group===g);return `<section class="gm-group"><h3><em>${ROMAN[gi]}</em>${esc(loc(G[g],locale))}<small>${items.filter(p=>prog[p.id]?.learned).length}/${items.length}</small></h3><div class="gm-cards">${items.map(p=>{no++;const r=prog[p.id]||{},n=data?.examples?.[p.id]?.length||0,node=MAP.find(m=>m.id===nodeFor(p)),[head,tail]=loc(p.title,locale).split(/\s*——\s*/);return `<button type="button" class="gm-card${r.learned?' learned':''}${p.id===nextId?' next':''}" data-point="${p.id}"><span class="gm-card-no">${String(no).padStart(2,'0')}</span><span class="gm-card-title" lang="ja">${esc(head)}</span><span class="gm-card-gist">${esc(tail||loc(p.gist,locale))}</span><span class="gm-card-node">${romanOf(node.id)} · ${esc(loc(node.title,locale).split(/[：:]/)[0])}</span><span class="gm-card-meta">${r.learned?`<b>${esc(w.done)}</b>`:p.id===nextId?`<b>${esc(w.nextLesson)}</b>`:''}${r.attempts?`<span>${pct(r.correct/r.attempts)}</span>`:''}${n?`<span>${n} ${locale==='en'?'lines':'句'}</span>`:''}</span></button>`;}).join('')}</div></section>`;}).join('');
+ const G={...(level==='N5'?GROUPS:LEVEL_GROUPS),anki:ANKI_GROUP};const groups=Object.keys(G).filter(g=>pts.some(p=>p.group===g)).map((g,gi)=>{const items=pts.filter(p=>p.group===g);return `<section class="gm-group"><h3><em>${ROMAN[gi]}</em>${esc(loc(G[g],locale))}<small>${items.filter(p=>prog[p.id]?.learned).length}/${items.length}</small></h3><div class="gm-cards">${items.map(p=>{no++;const r=prog[p.id]||{},n=data?.examples?.[p.id]?.length||0,node=MAP.find(m=>m.id===nodeFor(p)),[head,tail]=loc(p.title,locale).split(/\s*——\s*/);return `<button type="button" class="gm-card${r.learned?' learned':''}${p.id===nextId?' next':''}" data-point="${p.id}"><span class="gm-card-no">${String(no).padStart(2,'0')}</span><span class="gm-card-title" lang="ja">${esc(head)}</span><span class="gm-card-gist">${esc(tail||loc(p.gist,locale))}</span><span class="gm-card-node">${romanOf(node.id)} · ${esc(loc(node.title,locale).split(/[：:]/)[0])}</span><span class="gm-card-meta">${r.learned?`<b>${esc(w.done)}</b>`:p.id===nextId?`<b>${esc(w.nextLesson)}</b>`:''}${r.attempts?`<span>${pct(r.correct/r.attempts)}</span>`:''}${n?`<span>${n} ${locale==='en'?'lines':'句'}</span>`:''}</span></button>`;}).join('')}</div></section>`;}).join('');
  return `${hud}${data?.pending&&data?.counting?`<p class="gm-cap gm-status">${esc(w.counting)}</p>`:''}${heroHTML(data,{locale,esc,userLevel,level})}${overview}<div class="gm-tracks">${groups}</div>`;
 }
 /* ---- widgets ---- */
@@ -153,10 +181,11 @@ export function lessonHTML(point,data,{locale,esc,step=0}){
  const nodes=nodesFor(point).map(id=>MAP.find(n=>n.id===id)).filter(Boolean);
  const lead=real[0]||builtinExamples(point)[0];
  const intro=`<div class="gm-megu"><span class="gm-megu-seal" aria-hidden="true">惠</span><p class="gm-bubble">${esc(meguminIntro(point,real,locale))}</p></div><p class="gm-gist">${esc(loc(point.gist,locale))}</p>${lead?`<div class="gm-lead-line"><p class="gm-ja" lang="ja">${highlight(lead.text,lead.start,lead.end,esc,point.id)}</p>${lead.translation?`<p class="gm-tr">${esc(lead.translation)}</p>`:''}${lead.title?`<p class="gm-cap">${esc(sourceLabel(lead,w,locale))}</p>`:''}<button type="button" class="gm-link" data-speak="${esc(lead.text)}">${esc(w.speak)}</button></div>`:''}`;
- const form=`<ol class="gm-formulas">${point.form.map(([a,b],i)=>`<li style="--row:${i}"><div class="gm-formula">${formulaHTML(a,esc)}</div><span class="gm-arrow" aria-hidden="true">→</span><button type="button" class="gm-formula-ex" data-speak="${esc(b)}" lang="ja">${esc(b)}</button></li>`).join('')}</ol>`;
+ const form=`<ol class="gm-formulas">${point.form.map(([a,b],i)=>`<li style="--row:${i}"><div class="gm-formula">${formulaHTML(a,esc)}</div>${b?`<span class="gm-arrow" aria-hidden="true">→</span><button type="button" class="gm-formula-ex" data-speak="${esc(b)}" lang="ja">${esc(b)}</button>`:''}</li>`).join('')}</ol>`;
  const widget=CONJ_POINTS[point.id]?conjHTML(point.id,{locale,esc}):point.group==='particle'?particleHTML(point,real,{locale,esc}):'';
  const play=widget||`<p class="gm-cap">${esc(w.splitLead)}</p><div class="gm-splits">${builtinExamples(point).map(e=>splitHTML(e,esc,point,locale)).join('')}</div><button type="button" class="secondary" data-split-toggle>${esc(w.split)}</button>`;
- const uses=`<ol class="gm-uses">${point.uses.map(u=>`<li><p>${esc(u.t)}</p><p class="gm-ja" lang="ja">${esc(u.ja)}</p><p class="gm-tr">${esc(u.zh)}</p></li>`).join('')}</ol><h4>${esc(w.pitfalls)}</h4><ul class="gm-pitfalls">${point.pitfalls.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>`;
+ const ankiMore=(point.anki||[]).map(c=>`<section class="gm-anki"><h4>${esc(ANKI_GROUP.zh)} · ${esc(c.word)}</h4>${c.form.length?`<div class="gm-formula">${formulaHTML(c.form[0].replace(/[＋+]/g,' + '),esc)}</div>`:''}${c.explain.map(x=>`<p>${esc(x)}</p>`).join('')}${c.examples.slice(0,2).map(e=>`<p class="gm-ja" lang="ja">${esc(e.ja)}</p><p class="gm-tr">${esc(e.zh)}</p>`).join('')}</section>`).join('');
+ const uses=`<ol class="gm-uses">${point.uses.map(u=>`<li><p>${esc(u.t)}</p><p class="gm-ja" lang="ja">${esc(u.ja)}</p><p class="gm-tr">${esc(u.zh)}</p></li>`).join('')}</ol><h4>${esc(w.pitfalls)}</h4><ul class="gm-pitfalls">${point.pitfalls.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>${ankiMore}`;
  const games=real.length?`<p class="gm-cap">${esc(w.fromGames)}</p><ul class="gm-examples">${real.map((e,i)=>exampleHTML(e,i,{w,esc,locale,pointId:point.id})).join('')}</ul>`:`<p class="gm-cap">${esc(w.builtin)} · ${esc(w.builtinHelp)}</p><ul class="gm-examples">${builtinExamples(point).map((e,i)=>exampleHTML(e,i,{w,esc,locale,pointId:point.id,anki:false})).join('')}</ul>`;
  const practice=`<div data-quiz aria-live="polite"></div><div class="gm-actions"><button type="button" class="${r.learned?'secondary':'primary'}" data-learned="${r.learned?'0':'1'}">${esc(r.learned?w.unmark:w.finishStep)}</button></div>`;
  const bodies={intro,form,play,uses,games,practice},s=Math.max(0,Math.min(STEPS.length-1,step));
@@ -194,7 +223,7 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
  if(view==='lesson'&&!point)view='list';
  const save=()=>Object.assign(memo,{data,level,view,point:point?.id||'',openNode,scene,piece,step});
  const root=document.createElement('div');root.className='gm-page';target.replaceChildren(root);
- const load=async(count=true)=>{clearTimeout(timer);const had=!!data?.progress;try{const next=await api('grammar_report',{count});if(!isCurrent())return;data=next;memo.at=Date.now();save();if(view==='list'||view==='map'||!had)render();if(next.pending&&next.counting&&count)timer=setTimeout(()=>{if(isCurrent())load(true);},2000);}catch(error){if(isCurrent()&&!data){data={};render();toast?.(String(error?.message||error));}}};
+ const load=async(count=true)=>{clearTimeout(timer);const had=!!data?.progress;try{const next=await api('grammar_report',{count});if(!isCurrent())return;data=memo.anki?.examples?{...next,examples:{...memo.anki.examples,...next.examples}}:next;memo.at=Date.now();save();if(view==='list'||view==='map'||!had)render();if(next.pending&&next.counting&&count)timer=setTimeout(()=>{if(isCurrent())load(true);},2000);}catch(error){if(isCurrent()&&!data){data={};render();toast?.(String(error?.message||error));}}};
  const enter=()=>{if(!motion())return;root.animate([{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],{duration:220,easing:'cubic-bezier(.2,.7,.2,1)'});};
  const go=next=>{view=next;save();render();enter();root.scrollIntoView?.({block:'start'});};
  const openPoint=id=>{point=pointById(id);step=0;go('lesson');};
@@ -265,7 +294,7 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
   bindConj();bindParticles(real);
   {const say=root.querySelector('.gm-step-intro:not([hidden]) .gm-bubble');if(say)fx.type(say,say.textContent);}
   /* practice: drag (or tap) the answer into the gap; a miss shows how it attaches, then a line of the same kind */
-  const pool=exercisesFor(point,real,10);let order=pool.slice(0,4),rest=pool.slice(4),i=0,answered=null,retry=false;const box=root.querySelector('[data-quiz]');
+  const pool=exercisesFor(point,[...real,...ankiLines(point)],10);let order=pool.slice(0,4),rest=pool.slice(4),i=0,answered=null,retry=false;const box=root.querySelector('[data-quiz]');
   const draw=()=>{if(!order.length){box.innerHTML=`<p class="gm-cap">${esc(w.finished)}</p>`;return;}box.innerHTML=quizHTML(point,order[i],{locale,esc,answered,index:i,total:order.length,retry});
    const pick=async ch=>{if(answered!=null)return;answered=ch;draw();const blank=box.querySelector('.gm-blank');if(answered===order[i].answer){fx.invert(blank);fx.push(blank);fx.burst(blank);}else fx.glitch(box.querySelector('.gm-q'));try{const r=await api('grammar_answer',{point:point.id,correct:answered===order[i].answer});data={...(data||{}),progress:{...(data?.progress||{}),[point.id]:r}};data.completion=completion(data.progress);save();}catch{}};
    box.querySelectorAll('[data-choice]').forEach(b=>{b.onclick=()=>pick(b.dataset.choice);b.ondragstart=e=>{e.dataTransfer?.setData('text/plain',b.dataset.choice);b.classList.add('dragging');};b.ondragend=()=>b.classList.remove('dragging');});
@@ -274,6 +303,8 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
    box.querySelector('[data-retry]')?.addEventListener('click',()=>{const missed=order[i],next=rest.shift()||order.find((q,k)=>k!==i&&q.text!==missed.text)||missed;rest.push(missed);order.splice(i+1,0,next);answered=null;retry=true;i=i+1;draw();});};
   draw();
  }
+ if(memo.anki===undefined){memo.anki=null;api('grammar_bluebook').then(r=>{if(!r?.available)return;memo.anki=r;useAnkiCards(r.points);if(data)data={...data,examples:{...(r.examples||{}),...(data.examples||{})}};memo.data=data;if(isCurrent()&&view!=='lesson')render();}).catch(()=>{});}
+ else if(memo.anki?.points)useAnkiCards(memo.anki.points);
  if(memo.userLevel===undefined)api('learning_level').then(r=>{memo.userLevel=r?.level||null;if(!memo.levelPicked){level=startLevel(memo.userLevel);save();}if(isCurrent()&&view==='list')render();}).catch(()=>{memo.userLevel=null;});
  render();
  if(!data)await load(false);

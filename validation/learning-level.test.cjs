@@ -127,3 +127,22 @@ test('N4 → N0: lessons, hits found in lines you read, drag-in exercises, and p
  assert.ok(G.validPoint('n4-tara'));assert.ok(!G.validPoint('n9-x'));
  const root=temp(),db=openStore(path.join(root,'t.sqlite'));try{await L.set(db,root,{level:'N3',kana:[]});const pr=G.progress(db);assert.ok(pr.wa.learned&&pr['n4-tara'].learned,'N3 marks N5 and N4');}finally{db.close?.();}
 });
+
+test('grammar cards from the learner\'s own Anki are read at run time and merged into the lessons',async()=>{
+ const B=require('../services/bluebook.cjs'),{DatabaseSync}=require('node:sqlite');
+ const db=new DatabaseSync(':memory:');db.exec('CREATE TABLE notetypes(id INTEGER,name TEXT);CREATE TABLE fields(ntid INTEGER,ord INTEGER,name TEXT);CREATE TABLE notes(id INTEGER,mid INTEGER,flds TEXT);');
+ const names=['Level','Word','ConnectiveType1','Explain1','Example1','Chinese1','Example2','Chinese2','Note1','TotalOrder'];db.prepare('INSERT INTO notetypes VALUES(1,?)').run('文法');names.forEach((n,i)=>db.prepare('INSERT INTO fields VALUES(1,?,?)').run(i,n));
+ const note=(id,vals)=>db.prepare('INSERT INTO notes VALUES(?,1,?)').run(id,names.map(n=>vals[n]||'').join('\x1f'));
+ note(11,{Level:'蓝宝书【N4】',Word:' ～たら',ConnectiveType1:'动词た形＋ら',Explain1:'表示假定条件，“如果……的话”。',Example1:'雨が 降[ふ]っ<b>たら</b>行かない。',Chinese1:'下雨就不去。',TotalOrder:'5'});
+ note(12,{Level:'蓝宝书【N2】',Word:' ～あげく（に）',ConnectiveType1:'动词た形＋あげく',Explain1:'表示“最后……”。',Example1:'さんざん迷った<b>あげく</b>、やめた。',Chinese1:'犹豫了半天，最后放弃了。',Example2:'喧嘩した<b>あげく</b>、別れた。',Chinese2:'吵到最后分手了。',Note1:'多用于不好的结果。',TotalOrder:'9'});
+ const cards=B.parse(db);assert.equal(cards.length,2);const ageku=cards.find(c=>c.level==='N2');
+ assert.equal(cards.find(c=>c.level==='N4').examples[0].ja,'雨が降ったら行かない。','furigana is removed');assert.ok(ageku.hits.includes('あげく'));assert.equal(ageku.examples[0].hl,'あげく');
+ const ex=B.examplesFor(cards,[{text:'悩んだあげく、告白した。',title:'G',gameId:'g',origin:'history'}]);assert.equal(ex[ageku.id][0].title,'G');
+ const g=await import('../web/grammar.js'),r=g.useAnkiCards(cards);assert.deepEqual(r,{merged:1,own:1},'たら joins the N4 lesson, あげく gets its own');
+ const tara=g.pointsOf('N4').find(p=>p.id==='n4-tara');assert.equal(tara.anki.length,1);assert.match(g.lessonHTML(tara,{progress:{}},{locale:'zh',esc}),/蓝宝书 · 来自你的 Anki · ～たら|蓝宝书 · 来自你的 Anki · たら/);
+ const own=g.pointsOf('N2').find(p=>p.id==='bb-12');assert.ok(own);assert.match(g.listHTML({progress:{}},{locale:'zh',esc,level:'N2'}),/蓝宝书 · 来自你的 Anki/);
+ assert.ok(g.exercisesFor(own,[],2).every(q=>q.choices.includes(q.answer)));
+ assert.ok(G.validPoint('bb-12'));g.useAnkiCards([]);
+ const bridge=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');assert.match(bridge,/case 'grammar_bluebook'/);
+ assert.equal(fs.readdirSync(path.join(__dirname,'..','web')).some(f=>/bluebook|蓝宝书/i.test(f)),false,'no card text ships with MeguLit');
+});
