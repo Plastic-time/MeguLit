@@ -114,7 +114,7 @@ function examples(db,list,{max=5}={}){
 }
 /* ---- progress ---- */
 function progress(db){ensure(db);const rows=db.prepare('SELECT * FROM grammar_progress').all();return Object.fromEntries(rows.map(r=>[r.point,{learned:r.learned_at!=null,attempts:r.attempts,correct:r.correct}]));}
-const validPoint=p=>POINTS.includes(p)||/^n[0-4]-[a-z0-9-]{1,40}$/.test(p);
+const validPoint=p=>POINTS.includes(p)||/^n[0-4]-[a-z0-9-]{1,40}$/.test(p)||/^bb-\d{1,20}$/.test(p);
 function setLearned(db,point,learned=true){if(!validPoint(point))throw Error('INVALID_GRAMMAR_POINT');ensure(db);const now=Math.floor(Date.now()/1000);
   db.prepare('INSERT INTO grammar_progress(point,learned_at,updated_at) VALUES(?,?,?) ON CONFLICT(point) DO UPDATE SET learned_at=excluded.learned_at,updated_at=excluded.updated_at').run(point,learned?now:null,now);return progress(db)[point];}
 function recordAnswer(db,point,correct){if(!validPoint(point))throw Error('INVALID_GRAMMAR_POINT');ensure(db);const now=Math.floor(Date.now()/1000);
