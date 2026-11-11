@@ -17,16 +17,18 @@ export function readerLevel(stats,element=''){
 }
 /* 2026-11-12 (user: not so chuunibyou; think DNF and Mushoku Tensei): before 转职 the plain rank ladder — 见习 → 初级 → 中级 →
    上级魔术师 → 转职候补; at Lv.20 a DNF-style job name for the element, then its Saint / King / Emperor / God ranks
-   (火圣级魔术师 …), and at Lv.80 one title of its own (fire: 爆裂魔法学徒). Each element is described by the reading style
+   (火圣级魔术师 …), and at Lv.80 one title of its own; fire alone goes four ranks further, 爆裂魔法初学者 → 爆裂魔法使 at Lv.120. Each element is described by the reading style
    it suits, plainly. No 魔导士, no 红魔族, no 练习生. */
 const BASE={zh:[[1,'见习魔术师'],[5,'初级魔术师'],[10,'中级魔术师'],[15,'上级魔术师'],[20,'转职候补']],
  ja:[[1,'見習い魔術師'],[5,'初級魔術師'],[10,'中級魔術師'],[15,'上級魔術師'],[20,'転職候補']],
  en:[[1,'Apprentice magician'],[5,'Beginner-rank magician'],[10,'Intermediate-rank magician'],[15,'Advanced-rank magician'],[20,'Class candidate']]};
 const STEPS=[20,30,40,50,65,80];
+/* 2026-11-12 (user): fire goes four ranks further than every other element — from 爆裂魔法初学者 at Lv.80 to 爆裂魔法使 at Lv.120 */
+const FIRE_STEPS=[...STEPS,90,100,110,120];
 const E=(color,glyph,name,line,zh,ja,en)=>({color,glyph,name,line,ranks:{zh,ja,en}});
 export const SCHOOLS={
- fire:E('#e2423e',{zh:'火',ja:'火',en:'火'},{zh:'火 · 爆裂',ja:'火・爆裂',en:'Fire · Explosion'},{zh:'爆发型，一口气读很多',ja:'爆発型、一気にたくさん読む',en:'Burst reader: lots in one go'},
-  ['火焰术士','火圣级魔术师','火王级魔术师','火帝级魔术师','火神级魔术师','爆裂魔法学徒'],['火焔術士','火聖級魔術師','火王級魔術師','火帝級魔術師','火神級魔術師','爆裂魔法見習い'],['Pyromancer','Fire Saint-rank magician','Fire King-rank magician','Fire Emperor-rank magician','Fire God-rank magician','Explosion apprentice']),
+ fire:E('#e2423e',{zh:'火',ja:'火',en:'火'},{zh:'火',ja:'火',en:'Fire'},{zh:'爆发型，一口气读很多',ja:'爆発型、一気にたくさん読む',en:'Burst reader: lots in one go'},
+  ['火焰术士','火圣级魔术师','火王级魔术师','火帝级魔术师','火神级魔术师','爆裂魔法初学者','爆裂魔法学徒','爆裂魔法术士','爆裂魔法师','爆裂魔法使'],['火焔術士','火聖級魔術師','火王級魔術師','火帝級魔術師','火神級魔術師','爆裂魔法の初心者','爆裂魔法見習い','爆裂魔法の術士','爆裂魔法師','爆裂魔法使い'],['Pyromancer','Fire Saint-rank magician','Fire King-rank magician','Fire Emperor-rank magician','Fire God-rank magician','Explosion beginner','Explosion apprentice','Explosion caster','Explosion mage','Explosion wizard']),
  ice:E('#7fd3f2',{zh:'冰',ja:'氷',en:'氷'},{zh:'冰',ja:'氷',en:'Ice'},{zh:'稳健型，读得仔细',ja:'堅実型、丁寧に読む',en:'Steady reader: careful and thorough'},
   ['冰结师','冰圣级魔术师','冰王级魔术师','冰帝级魔术师','冰神级魔术师','绝对零度'],['氷結師','氷聖級魔術師','氷王級魔術師','氷帝級魔術師','氷神級魔術師','絶対零度'],['Cryomancer','Ice Saint-rank magician','Ice King-rank magician','Ice Emperor-rank magician','Ice God-rank magician','Absolute zero']),
  thunder:E('#f2d14a',{zh:'雷',ja:'雷',en:'雷'},{zh:'雷',ja:'雷',en:'Thunder'},{zh:'速读型，追求阅读速度',ja:'速読型、読む速さを追う',en:'Speed reader: chasing pace'},
@@ -46,7 +48,7 @@ const lang=locale=>locale==='ja'||locale==='en'?locale:'zh';
 export const elementName=(element,locale)=>SCHOOLS[element]?.name[lang(locale)]||'';
 export function rankTitle(level,locale,school=''){
  const l=lang(locale),s=SCHOOLS[school];
- if(s&&level>=SCHOOL_LEVEL){let t=s.ranks[l][0];STEPS.forEach((at,i)=>{if(level>=at)t=s.ranks[l][i];});return t;}
+ if(s&&level>=SCHOOL_LEVEL){let t=s.ranks[l][0];(school==='fire'?FIRE_STEPS:STEPS).forEach((at,i)=>{if(level>=at)t=s.ranks[l][i];});return t;}
  let t=BASE[l][0][1];for(const [at,name] of BASE[l])if(level>=at)t=name;return t;
 }
 const W={zh:{open:'转职',again:'重新转职',locked:n=>`Lv.${n} 转职`,title:'转职',sub:'选一个元素。转职后才能继续获得经验，之前攒下的经验会一次补发；以后还能换',subAgain:'换一个元素。等级和经验都不会变',confirm:'确认转职',cancel:'稍后',done:n=>`转职完成：${n}`,paid:n=>`补发 +${n} 经验`,fail:'转职没有成功，请稍后再试',top:'最高段位',
@@ -65,7 +67,7 @@ export function openRite({api,locale,esc,toast,current='',pending=0,headline='',
  let pick=SCHOOLS[current]?current:'fire';
  const ring=`<svg class="class-rite-circle" viewBox="-100 -100 200 200" aria-hidden="true"><circle r="92"/><circle r="78"/><circle r="40"/>${[0,1].map(k=>`<path d="${Array.from({length:6},(_,i)=>{const a=-Math.PI/2+k*Math.PI/6+i*Math.PI*2/6*2;return `${i?'L':'M'}${(Math.cos(a)*78).toFixed(1)} ${(Math.sin(a)*78).toFixed(1)}`;}).join(' ')}Z"/>`).join('')}${Array.from({length:16},(_,i)=>`<text transform="rotate(${i*22.5}) translate(0 -84)">${'火氷雷風水土光闇読む学ぶ詠う描く'[i]}</text>`).join('')}</svg>`;
  dialog.innerHTML=`<div class="class-rite-stage">${ring}<b class="class-rite-glyph" data-glyph></b><span class="class-rite-paid" data-paid hidden></span></div><div class="class-rite-body"><span class="class-rite-kicker">${headline?esc(headline)+' · ':''}${w.title}</span><h2 data-title></h2><p class="class-rite-sub">${current?w.subAgain:w.sub}</p>
-  <div class="class-rite-schools" role="radiogroup">${Object.entries(SCHOOLS).map(([k,s])=>`<button type="button" role="radio" class="class-rite-school" data-school="${k}" style="--c:${s.color}"><b>${s.glyph[l]}</b><span><strong>${esc(s.name[l])}</strong><small>${esc(s.line[l])}</small></span><em>${esc(s.ranks[l][5])}</em></button>`).join('')}</div>
+  <div class="class-rite-schools" role="radiogroup">${Object.entries(SCHOOLS).map(([k,s])=>`<button type="button" role="radio" class="class-rite-school" data-school="${k}" style="--c:${s.color}"><b>${s.glyph[l]}</b><span><strong>${esc(s.name[l])}</strong><small>${esc(s.line[l])}</small></span><em>${esc(s.ranks[l][s.ranks[l].length-1])}</em></button>`).join('')}</div>
   <div class="class-rite-actions"><span>${pending>0?`<small class="class-rite-wait">${esc(w.paid(nf.format(pending)))}</small>`:''}</span><button type="button" class="secondary" data-cancel>${w.cancel}</button><button type="button" class="primary" data-go>${w.confirm}</button></div></div>`;
  (document.querySelector('.main')||document.body).append(dialog);
  const draw=()=>{const s=SCHOOLS[pick];dialog.style.setProperty('--c',s.color);dialog.querySelector('[data-glyph]').textContent=s.glyph[l];dialog.querySelector('[data-title]').textContent=s.name[l];
