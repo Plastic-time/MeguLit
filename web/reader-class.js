@@ -24,21 +24,21 @@ const BASE={zh:[[1,'启灵者'],[5,'书咒师'],[10,'御灵法师'],[15,'玄阶�
 const STEPS=[20,30,40,50,65,80];
 const E=(color,glyph,name,line,zh,ja,en)=>({color,glyph,name,line,ranks:{zh,ja,en}});
 export const SCHOOLS={
- fire:E('#e2423e',{zh:'火',ja:'火',en:'火'},{zh:'火 · 爆裂',ja:'火・爆裂',en:'Fire · Explosion'},{zh:'一天一发，全力以赴',ja:'一日一発、全力で',en:'One cast a day, everything in it'},
+ fire:E('#e2423e',{zh:'火',ja:'火',en:'火'},{zh:'火 · 爆裂',ja:'火・爆裂',en:'Fire · Explosion'},{zh:'以全部魔力，换一声惊天轰鸣',ja:'全魔力を一撃に、天を揺るがす轟音を',en:'All your magic for one earth-shaking roar'},
   ['燃星术士','赤焰咒主','焚天者','业火君王','炎狱贤者','爆裂魔法学徒'],['燃星の術士','赤焔の呪主','焚天者','業火の君王','炎獄の賢者','爆裂魔法見習い'],['Star-kindler','Crimson hex lord','Sky burner','Hellfire monarch','Sage of the flame abyss','Explosion apprentice']),
- ice:E('#7fd3f2',{zh:'冰',ja:'氷',en:'氷'},{zh:'冰',ja:'氷',en:'Ice'},{zh:'冷静地读，一字不差',ja:'冷静に、一字も違えず',en:'Read calmly, every word exact'},
+ ice:E('#7fd3f2',{zh:'冰',ja:'氷',en:'氷'},{zh:'冰',ja:'氷',en:'Ice'},{zh:'万籁俱寂，唯余霜雪与真言',ja:'万物沈黙し、残るは霜と真言のみ',en:'All falls silent but frost and true words'},
   ['霜华术士','寒渊咒主','冰魄行者','雪域君王','极寒圣者','绝对零度'],['霜華の術士','寒淵の呪主','氷魄の行者','雪域の君王','極寒の聖者','絶対零度'],['Frost-bloom mage','Lord of the cold deep','Ice-soul wanderer','Monarch of the snow realm','Saint of the bitter cold','Absolute zero']),
- thunder:E('#f2d14a',{zh:'雷',ja:'雷',en:'雷'},{zh:'雷',ja:'雷',en:'Thunder'},{zh:'读得飞快，一闪而过',ja:'稲妻のように速く',en:'Fast as a flash'},
+ thunder:E('#f2d14a',{zh:'雷',ja:'雷',en:'雷'},{zh:'雷',ja:'雷',en:'Thunder'},{zh:'一念之间，九霄雷落',ja:'一念の間に、九天より雷落つ',en:'In a single thought, lightning from the ninth sky'},
   ['掌雷者','惊雷咒主','九霄雷使','天罚审判','雷殛君王','万雷之主'],['掌雷者','驚雷の呪主','九霄の雷使','天罰の審判者','雷殛の君王','万雷の主'],['Thunder holder','Lord of the sudden storm','Envoy of the ninth sky','Judge of divine wrath','Thunderstrike monarch','Lord of a thousand thunders']),
- wind:E('#8fe0c0',{zh:'风',ja:'風',en:'風'},{zh:'风',ja:'風',en:'Wind'},{zh:'一部接一部，随风而行',ja:'次から次へ、風のままに',en:'One story to the next, with the wind'},
+ wind:E('#8fe0c0',{zh:'风',ja:'風',en:'風'},{zh:'风',ja:'風',en:'Wind'},{zh:'无形无相，行于万里长空',ja:'形なく、万里の空を往く',en:'Formless, crossing ten thousand miles of sky'},
   ['御风者','流岚术士','逐云行者','苍穹风主','九天风圣','风神使徒'],['御風者','流嵐の術士','逐雲の行者','蒼穹の風主','九天の風聖','風神の使徒'],['Wind rider','Drifting-mist mage','Cloud chaser','Lord of the azure winds','Saint of the nine heavens','Apostle of the wind god']),
- water:E('#4f9de8',{zh:'水',ja:'水',en:'水'},{zh:'水',ja:'水',en:'Water'},{zh:'每天一点，细水长流',ja:'毎日少しずつ、絶えず',en:'A little every day, never dry'},
+ water:E('#4f9de8',{zh:'水',ja:'水',en:'水'},{zh:'水',ja:'水',en:'Water'},{zh:'上善若水，润物无声',ja:'上善は水のごとく、静かに潤す',en:'Like water, the highest good nourishes without a sound'},
   ['听潮者','沧澜术士','镜湖占星师','怒涛君王','沧海圣者','水神眷属'],['聴潮者','滄瀾の術士','鏡湖の占星師','怒涛の君王','滄海の聖者','水神の眷属'],['Tide listener','Mage of the vast waves','Mirror-lake astrologer','Monarch of the raging sea','Saint of the boundless sea','Kin of the water goddess']),
- earth:E('#c08a52',{zh:'土',ja:'土',en:'土'},{zh:'土',ja:'土',en:'Earth'},{zh:'一个词一个词，打牢根基',ja:'一語ずつ、地固めを',en:'Word by word, a solid ground'},
+ earth:E('#c08a52',{zh:'土',ja:'土',en:'土'},{zh:'土',ja:'土',en:'Earth'},{zh:'不动如山，根深者方能致远',ja:'動かざること山のごとし',en:'Unmoving as the mountain, deep roots reach far'},
   ['执岩者','磐石术士','地脉行者','镇岳君王','坤舆圣者','撼地之王'],['執岩者','磐石の術士','地脈の行者','鎮岳の君王','坤輿の聖者','撼地の王'],['Stone bearer','Bedrock mage','Ley-line walker','Mountain-binding monarch','Saint of the great earth','King who shakes the earth']),
- light:E('#fff1b8',{zh:'光',ja:'光',en:'光'},{zh:'光',ja:'光',en:'Light'},{zh:'读懂的那一刻，眼前一亮',ja:'わかった瞬間、光が差す',en:'The moment it clicks, light'},
+ light:E('#fff1b8',{zh:'光',ja:'光',en:'光'},{zh:'光',ja:'光',en:'Light'},{zh:'破晓之刻，照见文字的真意',ja:'夜明けの刻、言葉の真意を照らす',en:'At daybreak, the true meaning of words comes to light'},
   ['执灯者','曦光术士','圣辉祭司','天穹审判','光耀圣者','永昼之主'],['執燈者','曦光の術士','聖輝の祭司','天穹の審判者','光耀の聖者','永昼の主'],['Lamp bearer','Dawnlight mage','Priest of holy radiance','Judge of the firmament','Saint of glory','Lord of the endless day']),
- dark:E('#a07ae0',{zh:'暗',ja:'闇',en:'闇'},{zh:'暗',ja:'闇',en:'Dark'},{zh:'深夜一个人，读到天亮',ja:'深夜ひとり、夜明けまで',en:'Alone at night, until dawn'},
+ dark:E('#a07ae0',{zh:'暗',ja:'闇',en:'闇'},{zh:'暗',ja:'闇',en:'Dark'},{zh:'长夜为幕，独守未尽的篇章',ja:'長き夜を帳に、終わらぬ物語を守る',en:'Night as the curtain, keeping the unfinished story'},
   ['夜行者','影缚术士','深渊凝视者','月蚀咒主','冥府司书','永夜之主'],['夜行者','影縛の術士','深淵を視る者','月蝕の呪主','冥府の司書','永夜の主'],['Night walker','Shadow binder','Abyss gazer','Eclipse hex lord','Librarian of the underworld','Lord of the endless night'])
 };
 const lang=locale=>locale==='ja'||locale==='en'?locale:'zh';
