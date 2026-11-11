@@ -116,6 +116,7 @@ const SIGIL=(()=>{const c=100,pt=(r,a)=>`${(c+r*Math.cos(a)).toFixed(1)},${(c+r*
    the week's top word, a button into the dictionary; the other metrics keep the magic circle with everyone's total */
 function headHTML(entries,metric,w,locale,esc,board){
  const f=board?.feature,word=board?.word;
+ if(f?.cover&&/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(f.cover))stageCover=f.cover;
  if((metric==='seconds'||metric==='characters')&&f)return `<section class="lb-circle is-feature"><div class="lb-cover">${f.cover?`<img src="${esc(f.cover)}" alt="">`:`<span class="lb-cover-blank">${esc([...f.title][0]||'?')}</span>`}</div><div class="lb-circle-text"><small>${w.featureTitle}</small><h3 class="lb-feature-title" lang="ja">${esc(f.title)}</h3><strong>${esc(formatValue(metric,f.value,locale))}</strong><span>${esc(fill(w.featureSub,{n:f.readers}))}</span></div></section>`;
  if(metric==='words'&&word)return `<section class="lb-circle is-word"><button type="button" class="lb-word" data-lb-lookup="${esc(word.term)}" lang="ja" title="${esc(w.wordTitle+' · '+fill(w.wordSub,{n:word.users}))}">${esc(word.term)}</button></section>`;
  const total=entries.reduce((n,e)=>n+(Number(e.value)||0),0);
@@ -175,7 +176,11 @@ function topRow(w,tab,chip=''){return `<div class="lb-toprow">${segmented('tab',
 function subRow(inner){return `<div class="lb-subrow">${inner}</div>`;}
 function hotControls(hot,w,esc){const weeks=hot?.weeks||[];const picker=weeks.length>1?`<label class="lb-week"><span>${w.pastWeeks}</span><select data-lb-week>${weeks.map(k=>`<option value="${esc(k)}" ${k===hot.week?'selected':''}>${esc(fill(w.weekOf,{week:k}))}</option>`).join('')}</select></label>`:'';return `${segmented('category',CATS,view.category,w)}${picker}`;}
 function boardControls(w){return `${underline('metric',METRICS,view.metric,w)}${segmented('period',PERIODS,view.period,w)}`;}
-function page(top,sub,body){return `<div class="leaderboard-page">${top}${subRow(sub)}<div class="lb-body">${body}</div></div>`;}
+/* E457 the stage of the home / game detail: blurred cover of the most-read work behind everything, a big outline glyph,
+   crop marks at the window corners (styles in web/detail-tv.css, layout in web/leaderboard.css) */
+let stageCover='';
+const stage=()=>`<div class="dtv-bg lb-backdrop" aria-hidden="true" style="--dtv-cover:${stageCover?`url(&quot;${stageCover}&quot;)`:'none'}"><i class="dtv-glyph">読</i></div><div class="dtv-marks" aria-hidden="true"><i></i><i></i><i></i><i></i></div>`;
+function page(top,sub,body){return `${stage()}<div class="leaderboard-page">${top}${subRow(sub)}<div class="lb-body">${body}</div></div>`;}
 /* E388 your own avatar is the way to change it: click → pick → crop window → upload. */
 const camera='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 3.2 6.5 2h3l.9 1.2H13a1.5 1.5 0 0 1 1.5 1.5v7.1A1.5 1.5 0 0 1 13 13.3H3a1.5 1.5 0 0 1-1.5-1.5V4.7A1.5 1.5 0 0 1 3 3.2zM8 11a2.9 2.9 0 1 0 0-5.8A2.9 2.9 0 0 0 8 11z"/></svg>';
 function avatarButton(entry,data,w,esc){return `<button type="button" class="lb-avatar-edit" data-lb-avatar title="${esc(w.changeAvatar)}" aria-label="${esc(w.changeAvatar)}">${avatarHTML(entry,data.avatars||{},esc)}<span class="lb-avatar-badge">${camera}</span></button>`;}
@@ -203,16 +208,35 @@ export function leaderboardHTML(data,locale,esc){
 export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>true,openSettings=()=>{},lookup=null}){
  const w=leaderboardWords(locale);
  let last=null;
+ /* E457 switching was slow: every click waited for the relay (and the local stats, avatars, cover) before
+    anything changed. Now each view is cached by its key: a cached view paints at once, then is refreshed in the
+    background and repainted only if it changed; an uncached one marks the new switch at once and dims the body. After
+    the first paint the other metrics of the same period are fetched quietly so the next switches are instant. */
+ const cache=new Map(),keyOf=(v=view)=>[v.tab,v.period,v.metric,v.game,v.category,v.week].join('|');
+ const args=(v=view)=>({tab:v.tab,period:v.period,metric:v.metric,game:v.game,category:v.category,week:v.week});
+ let seq=0,painted=false;
+ const paint=data=>{last=data;const y=main.scrollTop;main.innerHTML=leaderboardHTML(data,locale,esc);main.classList.toggle('lb-instant',painted);painted=true;main.scrollTop=y;bind();};
+ const prefetch=()=>{if(view.tab!=='board'||view.game)return;const base={...view};
+  const queue=METRICS.filter(m=>m!==base.metric).map(m=>({...base,metric:m})).filter(v=>!cache.has(keyOf(v)));
+  const next=()=>{const v=queue.shift();if(!v||!isCurrent())return;api('leaderboard_view',args(v)).then(d=>{cache.set(keyOf(v),JSON.stringify(d));}).catch(()=>{}).finally(()=>setTimeout(next,120));};
+  setTimeout(next,400);};
  const render=async(action='leaderboard_view',extra={})=>{
-  let data;try{data=await api(action,{tab:view.tab,period:view.period,metric:view.metric,game:view.game,category:view.category,week:view.week,...extra});}
-  catch(error){const code=String(error?.message||error).replace(/^LEADERBOARD_/,'');const box=main.querySelector('[data-lb-error]');if(box&&w[code]){box.textContent=w[code];box.hidden=false;return;}toast(w.offline);return;}
-  if(!isCurrent())return;last=data;main.innerHTML=leaderboardHTML(data,locale,esc);bind();
+  const plain=action==='leaderboard_view'&&!Object.keys(extra).length,key=keyOf(),mine=++seq,hit=plain?cache.get(key):null;
+  if(hit)paint(JSON.parse(hit));else main.querySelector('.lb-body')?.classList.add('is-loading');
+  let data;try{data=await api(action,{...args(),...extra});}
+  catch(error){main.querySelector('.lb-body')?.classList.remove('is-loading');if(hit)return;const code=String(error?.message||error).replace(/^LEADERBOARD_/,'');const box=main.querySelector('[data-lb-error]');if(box&&w[code]){box.textContent=w[code];box.hidden=false;return;}toast(w.offline);return;}
+  if(!isCurrent()||mine!==seq)return;
+  const json=JSON.stringify(data);if(plain||action==='leaderboard_view')cache.set(key,json);else cache.clear();
+  if(json!==hit)paint(data);
+  if(plain)prefetch();
  };
+ /* marks the pressed switch before the data arrives */
+ const press=(attr,value)=>main.querySelectorAll(`[data-lb-${attr}]`).forEach(x=>x.setAttribute('aria-pressed',String(x.dataset['lb'+attr[0].toUpperCase()+attr.slice(1)]===value)));
  const bind=()=>{
-  main.querySelectorAll('[data-lb-tab]').forEach(b=>b.onclick=()=>{view.tab=b.dataset.lbTab;render();});
-  main.querySelectorAll('[data-lb-period]').forEach(b=>b.onclick=()=>{view.period=b.dataset.lbPeriod;render();});
-  main.querySelectorAll('[data-lb-metric]').forEach(b=>b.onclick=()=>{view.metric=b.dataset.lbMetric;view.game='';render();});
-  main.querySelectorAll('[data-lb-category]').forEach(b=>b.onclick=()=>{view.category=b.dataset.lbCategory;render();});
+  main.querySelectorAll('[data-lb-tab]').forEach(b=>b.onclick=()=>{view.tab=b.dataset.lbTab;press('tab',view.tab);render();});
+  main.querySelectorAll('[data-lb-period]').forEach(b=>b.onclick=()=>{view.period=b.dataset.lbPeriod;press('period',view.period);render();});
+  main.querySelectorAll('[data-lb-metric]').forEach(b=>b.onclick=()=>{view.metric=b.dataset.lbMetric;view.game='';press('metric',view.metric);render();});
+  main.querySelectorAll('[data-lb-category]').forEach(b=>b.onclick=()=>{view.category=b.dataset.lbCategory;press('category',view.category);render();});
   main.querySelector('[data-lb-week]')?.addEventListener('change',event=>{view.week=event.currentTarget.value;render();});
   main.querySelectorAll('[data-lb-game]').forEach(b=>b.onclick=()=>{view.game=b.dataset.lbGame;render();});
   main.querySelectorAll('[data-lb-report]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('leaderboard_report',{avatar:b.dataset.lbReport});toast(r?.hidden?w.reportHidden:w.reported);}catch{toast(w.offline);b.disabled=false;}});

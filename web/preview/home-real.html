@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark"><title>MeguLit 真实外壳预览</title>
+  <base href="../">
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="about.css">
+  <link rel="stylesheet" href="background-crop.css">
+  <link rel="stylesheet" href="controls.css"><link rel="stylesheet" href="series.css">
+  <link rel="stylesheet" href="anki-layout.css">
+  <link rel="stylesheet" href="home-layout.css">
+  <link rel="stylesheet" href="statistics.css">
+  <link rel="stylesheet" href="reading-insights.css">
+  <link rel="stylesheet" href="grammar.css">
+<link rel="stylesheet" href="reception.css">
+<link rel="stylesheet" href="moji.css">
+<link rel="stylesheet" href="grimoire.css">
+<link rel="stylesheet" href="home-tv.css">
+<link rel="stylesheet" href="grimoire-controls.css">
+<link rel="stylesheet" href="detail.css">
+<link rel="stylesheet" href="detail-tv.css">
+<link rel="stylesheet" href="e255-polish.css">
+<link rel="stylesheet" href="statistics-grimoire.css">
+<link rel="stylesheet" href="update-notice.css">
+<link rel="stylesheet" href="settings-grimoire.css">
+<link rel="stylesheet" href="game-dialog.css">
+<link rel="stylesheet" href="leaderboard.css">
+<link rel="stylesheet" href="daily.css">
+<link rel="stylesheet" href="diagnostics.css">
+<link rel="stylesheet" href="scrollbar.css">
+</head>
+<body>
+  <div id="app" aria-busy="true"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="preview/megu-data.local.js"></script>
+  <script>
+  (()=>{const D=window.MEGU_DATA,log=(...a)=>console.log('[mock]',...a);
+   const table={home:()=>D.home,preferences:()=>D.home.preferences,background:()=>D.background||'',game_detail:a=>D.detail[a.id]||{},learning_activity:()=>D.activity,daily_view:()=>D.daily||{},statistics:()=>({buckets:[]}),ui_state:()=>({}),settings_get:()=>({}),reader_status:()=>({ready:true}),save_preferences:a=>{Object.assign(D.home.preferences,a.values||{});return D.home.preferences;}};
+   window.__TOME_TEST_TRANSPORT__=async(command,args)=>{if(command!=='service'){return null;}const r=args.request||{},f=table[r.action];if(!f){log('unmocked',r.action);return r.action&&/s$/.test(r.action)?[]:{};}return f(r);};
+  })();
+  </script>
+  <script type="module" src="app.js"></script>
+  <script type="module" src="range-fill.js"></script>
+<script src="reader/modules/color-picker.js"></script>
+<script src="reader/modules/game-style.js"></script>
+</body>
+</html>

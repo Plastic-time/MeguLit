@@ -422,3 +422,69 @@ button.lb-mychip:active{transform:scale(.98)}
 .lb-word:hover{color:var(--lb-gold);background:color-mix(in srgb,var(--lb-gold) 10%,var(--lb-raise-2))}
 .lb-word:focus-visible{outline:2px solid var(--lb-gold);outline-offset:3px}
 @media (max-width:640px){.lb-circle.is-feature,.lb-circle.is-word{grid-template-columns:1fr;justify-items:center}}
+
+/* E457 instant switching: a repaint from the cache skips the entrance animations; a view still loading is dimmed */
+.lb-instant .lb-grimoire,.lb-instant .lb-place{animation:none}
+.lb-body{transition:opacity .15s}
+.lb-body.is-loading{opacity:.5;pointer-events:none}
+
+/* E457 the home / game detail language: blurred cover stage, mono letter-spaced labels, light serif numerals, glass
+   panels with a gold corner tick, numbered tabs, thin outline switches. Fluid from 1024 px to 4K. */
+.main:has(>.lb-backdrop){position:relative;isolation:isolate}
+.lb-backdrop .dtv-glyph{right:4%;top:6%;font-size:46vmin}
+.leaderboard-page{--lb-mono:"IBM Plex Mono",Consolas,monospace;--lb-glass:linear-gradient(160deg,rgba(24,24,30,.66),rgba(14,14,18,.54));--lb-glass-line:rgba(255,255,255,.09);
+ max-width:min(1360px,100%);width:100%;padding:clamp(14px,2.4vw,40px) clamp(16px,3.2vw,56px) 48px;gap:clamp(14px,1.6vw,24px);box-sizing:border-box;position:relative;z-index:1}
+/* switches: thin outline, numbered metrics */
+.leaderboard-page .lb-seg{clip-path:none;padding:0;gap:0;background:color-mix(in srgb,var(--bg,#111) 45%,transparent);box-shadow:inset 0 0 0 1px var(--lb-glass-line);backdrop-filter:blur(10px)}
+.leaderboard-page .lb-seg button{clip-path:none;padding:9px clamp(12px,1.4vw,20px);font-size:13px;letter-spacing:.16em;color:var(--lb-ink-3)}
+.leaderboard-page .lb-seg button[aria-pressed=true]{background:none;color:var(--lb-ink);font-weight:500;box-shadow:inset 0 -2px 0 var(--lb-gold);clip-path:none}
+.leaderboard-page .lb-tabs{counter-reset:lbt;gap:clamp(14px,2vw,30px);flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.1)}
+.leaderboard-page .lb-tabs button{counter-increment:lbt;letter-spacing:.14em;color:var(--lb-ink-3)}
+.leaderboard-page .lb-tabs button::before{content:counter(lbt,decimal-leading-zero);margin-right:7px;font-family:var(--lb-mono);font-size:10px;color:var(--lb-gold);opacity:.7}
+.leaderboard-page .lb-tabs button[aria-pressed=true]{color:var(--lb-ink);box-shadow:none;background:linear-gradient(90deg,var(--lb-gold),transparent) left bottom/100% 2px no-repeat}
+.leaderboard-page .lb-mychip{clip-path:none;border-radius:999px;padding:6px 18px 6px 6px;background:color-mix(in srgb,var(--bg,#111) 45%,transparent);box-shadow:inset 0 0 0 1px var(--lb-glass-line);backdrop-filter:blur(10px)}
+.leaderboard-page .lb-mychip .leaderboard-avatar{clip-path:none;border-radius:50%}
+.leaderboard-page .lb-mychip small{font-family:var(--lb-mono);letter-spacing:.24em}
+/* glass panels */
+.leaderboard-page .lb-card{clip-path:none;border-radius:2px;background:var(--lb-glass);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 0 0 1px var(--lb-glass-line),0 24px 50px -30px #000;backdrop-filter:blur(18px) saturate(1.3);-webkit-backdrop-filter:blur(18px) saturate(1.3);padding:clamp(18px,2.2vw,36px)}
+.leaderboard-page .lb-card::before{top:-1px;left:-1px;right:auto;width:12px;height:12px;background:none;border-left:2px solid var(--lb-gold);border-top:2px solid var(--lb-gold)}
+.leaderboard-page .lb-h2{font-weight:400;font-size:clamp(20px,1.7vw,26px);letter-spacing:.04em}
+.leaderboard-page .lb-h2::before{display:none}
+.leaderboard-page .lb-h2 span,.leaderboard-page .lb-card-head small{font-family:var(--lb-mono);font-size:11px;letter-spacing:.24em;color:var(--lb-ink-3)}
+/* head: tilted cover card, huge serif title */
+.lb-circle.is-feature{grid-template-columns:clamp(130px,14vw,220px) 1fr;gap:clamp(20px,3vw,48px);perspective:900px}
+.lb-cover{border:0;padding:0;background:none;width:auto}
+.lb-cover::before,.lb-cover::after{display:none}
+.lb-cover img,.lb-cover-blank{border-radius:10px;transform:rotate(-3deg);box-shadow:0 40px 70px -30px #000,0 0 0 1px color-mix(in srgb,var(--lb-gold) 25%,transparent);transition:transform .7s cubic-bezier(.22,1,.36,1)}
+.lb-cover:hover img{transform:rotate(0) rotateY(-8deg) rotateX(4deg) translateY(-6px) scale(1.02)}
+.lb-circle-text small{font-family:var(--lb-mono);font-size:11px;letter-spacing:.35em;text-transform:uppercase}
+.lb-feature-title{font-weight:400;font-size:clamp(28px,3.4vw,60px);line-height:1.1;text-shadow:0 6px 40px #000a}
+.lb-circle-text strong,.is-feature .lb-circle-text strong{font-family:var(--g-serif,serif);font-weight:400;font-size:clamp(30px,2.8vw,48px);font-variant-numeric:tabular-nums lining-nums}
+.lb-circle-text span{font-family:var(--lb-mono);font-size:11px;letter-spacing:.2em}
+.lb-circle{border-bottom-color:rgba(255,255,255,.08)}
+.leaderboard-page .lb-word{font-weight:400;font-size:clamp(44px,5vw,88px);border:1px solid rgba(255,255,255,.14);background:var(--lb-glass);clip-path:none;border-radius:2px;backdrop-filter:blur(12px)}
+/* reader cards: glass, fluid columns */
+.lb-grimoires{grid-template-columns:repeat(auto-fill,minmax(clamp(160px,13vw,220px),1fr));gap:clamp(10px,1vw,16px)}
+.lb-grimoire{clip-path:none;border-radius:2px;background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.lb-grimoire::after{display:none}
+.lb-grimoire::before{top:-1px;left:-1px;width:10px;height:10px;border-width:2px}
+.lb-grimoire:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--lb-gold) 45%,transparent)}
+.lb-grimoire.is-me{background:linear-gradient(180deg,color-mix(in srgb,var(--lb-gold) 12%,transparent),rgba(255,255,255,.02))}
+.lb-gname{font-weight:400;font-size:16px}
+.lb-gvalue{font-family:var(--g-serif,serif);font-weight:400;font-size:17px}
+.lb-code{font-family:var(--lb-mono)}
+/* my data tiles: numbers like the detail statistics */
+.lb-tiles{grid-template-columns:repeat(auto-fit,minmax(clamp(150px,14vw,240px),1fr))!important}
+.leaderboard-page .lb-tile{clip-path:none;border-radius:2px;background:var(--lb-glass);box-shadow:inset 0 0 0 1px var(--lb-glass-line);backdrop-filter:blur(14px)}
+.leaderboard-page .lb-tile small{font-family:var(--lb-mono);font-size:10.5px;letter-spacing:.28em;color:var(--lb-ink-3)}
+.leaderboard-page .lb-tile strong{font-family:var(--g-serif,serif);font-weight:400;font-size:clamp(22px,1.9vw,32px);font-variant-numeric:tabular-nums lining-nums}
+/* hot-word podium and follow panels share the glass */
+.leaderboard-page .lb-block{clip-path:none;border-radius:2px;background:var(--lb-glass)}
+@media (max-width:900px){.lb-toprow{flex-wrap:wrap;gap:12px}.lb-subrow{flex-wrap:wrap;gap:10px}.lb-circle.is-feature{grid-template-columns:110px 1fr}}
+@media (max-width:640px){.lb-circle.is-feature{grid-template-columns:1fr;justify-items:center;text-align:center}}
+@media (prefers-reduced-motion:reduce){.lb-cover img{transition:none}}
+/* the stage stays dark whatever the cover: text on top must read */
+.lb-backdrop::before{filter:blur(70px) saturate(1.2) brightness(.5)}
+.lb-backdrop::after{background:radial-gradient(120% 90% at 30% 0,transparent 0,color-mix(in srgb,var(--bg) 75%,transparent) 50%,var(--bg) 100%),linear-gradient(color-mix(in srgb,var(--bg) 35%,transparent),color-mix(in srgb,var(--bg) 35%,transparent)),repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.14) 3px 4px)}
+.lb-grimoire{background:rgba(16,16,20,.55)}
+.leaderboard-page .lb-tabs button{color:var(--lb-ink-2)}

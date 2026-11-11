@@ -467,3 +467,9 @@ dialog.game-dialog.dev-notice[open]{display:flex}
 .dev-notice>.dev-notice-updates{flex:1 1 auto}
 .dev-notice h2.dev-notice-title2{margin:4px 0 12px;color:color-mix(in srgb,var(--accent-light,var(--accent)) 70%,#fff)}
 .dev-notice h2.dev-notice-title2{font-size:17px;font-weight:500;line-height:1.55}
+/* E442 the notice's game box and submit match the website: a square input with a red rule, joined to a flat paper button */
+dialog.dev-notice .dev-notice-form{gap:0}
+dialog.dev-notice .dev-notice-form input{height:56px;border-radius:0!important;border:1px solid #c8323c!important;border-right:0!important;background:#14151a!important;box-shadow:none!important}
+dialog.dev-notice .dev-notice-form button.primary{height:56px;min-width:86px;padding:0 22px;border:0!important;border-radius:0!important;background:#f2efe9!important;background-image:none!important;color:#14151a!important;box-shadow:none!important;font-weight:500;letter-spacing:.08em;text-shadow:none!important;filter:none!important}
+dialog.dev-notice .dev-notice-form button.primary::before,dialog.dev-notice .dev-notice-form button.primary::after{content:none!important;display:none!important}
+dialog.dev-notice .dev-notice-form button.primary:hover{background:#fff!important}

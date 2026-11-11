@@ -166,7 +166,8 @@ async function dispatch(request,runtime=null) {
   /* E378 account + cloud sync (services/account.cjs); opens the store itself */
   if(String(request.action).startsWith('account_'))return await require('./account.cjs').handle(root,request);
   const db=store.openStore(root);
-  try {
+  /* E456 (2026-11-11): every action is awaited before the database closes; a handler that returned its promise unawaited (learning_level_set) ran on a closed database ("database is not open") */
+  try {return await (async()=>{
     if(String(request.action).startsWith('series_'))return require('./series.cjs').handle(db,root,request);
     switch(request.action) {
       case 'anki_sync':{
@@ -395,7 +396,7 @@ async function dispatch(request,runtime=null) {
         return {...result,counting:ready};
       }
       /* 学习 → 语法: grammar cards from the learner's own Anki decks (read here, never shipped), with lines read that contain them */
-      case 'grammar_bluebook':{const B=require('./bluebook.cjs'),r=B.read(root);return r.available?{...r,examples:B.examplesFor(r.points,require('./grammar.cjs').candidates(db,{root,scriptPairs:require('./original-text.cjs').scriptPairs}))}:r;}
+      case 'grammar_bluebook':{const B=require('./bluebook.cjs'),r=await B.readAll(root,{anki:new(require('../core/anki.cjs').Anki)(),config:runtime?.config?.()||store.readJSON(path.join(root,'data','config','v4-preferences.json'))});return r.available?{...r,examples:B.examplesFor(r.points,require('./grammar.cjs').candidates(db,{root,scriptPairs:require('./original-text.cjs').scriptPairs}))}:r;}
       case 'grammar_bluebook_import':{const B=require('./bluebook.cjs'),since=Number(request.since)||0,f=B.newDeck(since);if(!f)return {found:false};
         const prev=Number(request.size)||-1;if(f.size!==prev||Date.now()-f.mtime<1500)return {found:true,ready:false,size:f.size,file:path.basename(f.file)};
         const config=runtime?.config?.()||store.readJSON(path.join(root,'data','config','v4-preferences.json'));
@@ -427,7 +428,7 @@ async function dispatch(request,runtime=null) {
       case 'migration_status':return store.readJSON(path.join(root,'migration','migration-report.json'));
       default:throw Error('UNKNOWN_ACTION');
     }
-  }finally{db.close();}
+  })();}finally{db.close();}
 }
 if(require.main===module) {
   let input='';
