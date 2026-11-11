@@ -291,3 +291,124 @@ html body .main:has(>.dtv-bg) .review-platform :is(small,.review-region,.review-
 html body .main:has(>.dtv-bg) .detail-info-row :is(dt,span:first-child,small){font-size:11.5px!important;letter-spacing:.14em!important;color:var(--g-t2,#c3ab9c)!important}
 .main:has(>.tabs)>.page-header{top:0!important;height:44px;display:flex!important;align-items:center}
 html body .workspace>.stage-cover:not([data-stage=leaderboard]) .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 9%,transparent)}
+
+/* ---- avatars: one round medallion with a hairline ring everywhere (the podium keeps its diamond frame around it);
+   the default face is the wine of the brand, not a magenta block ---- */
+html body .leaderboard-avatar{border-radius:50%!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--g-gold) 35%,transparent)}
+html body .leaderboard-avatar.is-default{background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--avatar-color,#ad1539) 55%,#2a1418),#1a0f12)!important;color:#f1e6d3!important;font-family:var(--g-serif,serif)}
+
+/* ---- profile panel: slides out below the top bar (window buttons stay reachable), solid glass, serif section titles,
+   square buttons, one divider per section ---- */
+html body dialog.profile-panel{inset:var(--titlebar-height,56px) 0 0 auto!important;height:calc(100vh - var(--titlebar-height,56px))!important;border-radius:0!important;
+ background:linear-gradient(var(--g-gold),var(--g-gold)) 0 0/14px 2px no-repeat,linear-gradient(var(--g-gold),var(--g-gold)) 0 0/2px 14px no-repeat,linear-gradient(160deg,rgba(28,22,26,.97),rgba(14,12,15,.97))!important}
+html body dialog.profile-panel .profile-panel-head h2,html body dialog.profile-panel .panel-title{font-family:var(--g-serif,serif)!important;font-weight:600!important;letter-spacing:.02em}
+html body dialog.profile-panel .panel-title{font-size:18px!important}
+html body dialog.profile-panel .panel{background:none!important;box-shadow:none!important;border:0!important;border-bottom:1px solid var(--u-line)!important;border-radius:0!important}
+html body dialog.profile-panel .panel+.panel{border-top:0!important}
+html body dialog.profile-panel :is(button.secondary,.profile-leave,.profile-objection){border-radius:2px!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important;border:0!important}
+html body dialog.profile-panel :is(button.secondary,.profile-leave,.profile-objection)::after{display:none!important}
+html body dialog.profile-panel input[type=text]{text-align:left!important;border:1px solid var(--u-line-2)!important;border-radius:2px!important;background:rgba(10,9,12,.55)!important;padding:0 12px!important}
+html body dialog.profile-panel .profile-panel-close{border-radius:2px!important}
+
+/* ---- guide: the current tab is the only marked one, keycaps on hairlines, body text regular weight, the scroll area
+   fades at the foot ---- */
+html body .guide-panel .guide-tabs button:focus-visible{outline:0!important;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
+html body .guide-panel .guide-tabs button[aria-selected=true]:focus-visible{box-shadow:none!important}
+html body :is(.guide-panel,.dev-notice) kbd{border:1px solid color-mix(in srgb,var(--g-gold) 45%,transparent)!important;border-radius:2px!important;background:rgba(237,181,110,.06)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--g-gold) 45%,transparent)!important;padding:1px 6px!important;white-space:nowrap}
+html body :is(.guide-panel,.dev-notice) .guide-section li{font-weight:400!important;color:var(--g-t1,#f1e0d2)}
+html body :is(.guide-panel,.dev-notice) .dev-notice-scroll{-webkit-mask:linear-gradient(#000 calc(100% - 28px),transparent);mask:linear-gradient(#000 calc(100% - 28px),transparent);padding-bottom:22px}
+html body :is(.dev-notice-top,.game-dialog-kicker){text-transform:uppercase}
+
+/* ---- secondary buttons everywhere: the detail page's own (hairline frame, square, glass, gold on hover) ---- */
+html body :is(button.secondary,.g-btn:not(.primary)):not(.icon-button):not(.switch):not(.select-trigger):not(.tab):not(.text-button){
+ border:0!important;border-radius:2px!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+html body :is(button.secondary,.g-btn:not(.primary)):not(.icon-button):not(.switch):not(.select-trigger):not(.tab):not(.text-button)::after{display:none!important}
+html body :is(button.secondary,.g-btn:not(.primary)):not(.icon-button):not(.switch):not(.select-trigger):not(.tab):not(.text-button):hover:not(:disabled){background:rgba(255,255,255,.07)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important;color:var(--g-gold)!important}
+html body .main .icon-button{border-radius:2px}
+
+/* ---- tools: a mono kicker and one line of purpose, two cards across the page, an explicit "open" action, the
+   watermark glyph whole inside its card, badges on one line ---- */
+html body .grimoire-page .tools-intro{display:flex;flex-direction:column;gap:12px;max-width:68ch;margin:clamp(12px,2vh,28px) 0 clamp(22px,3vh,36px);font-size:14px;line-height:1.8;color:var(--g-t2,#c3ab9c)}
+html body .grimoire-page .tools-kicker{font-family:var(--u-mono);font-size:11px;letter-spacing:.3em;color:var(--g-gold)}
+html body .grimoire-page .tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:clamp(16px,1.6vw,24px)!important;max-width:1320px}
+@media (max-width:900px){html body .grimoire-page .tools-grid{grid-template-columns:1fr!important}}
+html body .grimoire-page .tool-card{position:relative;overflow:hidden;min-height:clamp(260px,34vh,340px);padding:clamp(22px,2vw,32px)!important;gap:12px!important}
+html body .grimoire-page .tool-card::before{display:none!important}
+html body .grimoire-page .tool-card::after{right:22px!important;bottom:6px!important;font-size:clamp(120px,12vw,170px)!important;line-height:1!important}
+html body .grimoire-page .tool-card:hover{transform:none!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 45%,transparent),0 30px 56px -30px #000!important}
+html body .grimoire-page .tool-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+html body .grimoire-page .tool-top b{font-family:var(--g-serif,serif);font-size:clamp(20px,1.6vw,26px);font-weight:600;line-height:1.3}
+html body .grimoire-page .tool-top em{flex:none;white-space:nowrap;font-style:normal;font-family:var(--u-mono);font-size:11px;letter-spacing:.16em;padding:4px 10px;border-radius:2px!important;border:0!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 45%,transparent);color:var(--g-gold);background:none!important}
+html body .grimoire-page .tool-desc{font-size:14px;line-height:1.8;color:var(--g-t1,#f1e0d2);max-width:56ch}
+html body .grimoire-page .tool-key-note{font-weight:400!important;font-size:13px!important;line-height:1.7!important;padding:12px 14px 12px 16px!important;border:0!important;border-radius:2px!important;background:color-mix(in srgb,var(--g-gold) 7%,transparent)!important;box-shadow:inset 2px 0 0 var(--g-gold)!important;max-width:60ch}
+html body .grimoire-page .tool-meta{margin-top:auto;padding-top:14px;border-top:1px solid var(--u-line);font-size:12.5px;color:var(--g-t2,#c3ab9c)}
+html body .grimoire-page .tool-go{align-self:flex-start;display:inline-flex;align-items:center;height:38px;padding:0 18px;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22);background:rgba(255,255,255,.03);font-size:13px;letter-spacing:.12em;color:var(--g-t1,#f1e0d2);transition:color .2s,box-shadow .2s}
+html body .grimoire-page .tool-card:hover .tool-go{color:var(--g-gold);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)}
+html body .grimoire-page .tool-key-note{padding-left:30px!important}
+
+/* ---- about: hairline link rows with the same arrow, facts as label/value on one baseline, kicker headings,
+   the sponsor action at its natural width, payment marks in the brand gold, the watermark kept inside ---- */
+html body .about-page .about-link{border:0!important;border-radius:2px!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;min-height:46px}
+html body .about-page .about-link:hover{background:rgba(255,255,255,.06)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html body .about-page .about-link span{color:var(--g-gold)!important}
+html body .about-page .about-facts{align-content:start}
+html body .about-page .about-facts div{align-items:center;min-height:48px;padding:0!important;border-bottom:1px solid var(--u-line)!important}
+html body .about-page .about-facts div:last-child{border-bottom:0!important}
+html body .about-page :is(.about-links h3,.about-cn h3,.about-intl h3,.about-credits h3){font-family:var(--u-mono);font-size:11px!important;letter-spacing:.28em!important;color:var(--g-gold)!important;text-transform:uppercase}
+html body .about-page .about-support{overflow:hidden}
+html body .about-page .about-intl{display:flex;flex-direction:column;justify-content:center;gap:18px}
+html body .about-page .about-intl :is(button,a.primary){align-self:flex-start;width:auto!important;min-width:0!important;padding:0 28px!important}
+html body .about-page .dot{border-radius:1px!important;transform:rotate(45deg);background:var(--g-gold)!important}
+html body .about-page .about-credits p{font-size:13px;line-height:1.9}
+html body .about-page .about-support-text{max-width:60ch}
+html body .about-page :is(.about-support-text,.about-support-strong){text-wrap:pretty}
+
+/* ---- leaderboard hot words 4–10: hairline rows, no grey blocks; the reason sits in its own column ---- */
+html body .leaderboard-page .lb-honours{gap:0!important}
+html body .leaderboard-page .lb-honours li{grid-template-columns:44px minmax(160px,240px) 1fr!important;border-radius:0!important;background:none!important;box-shadow:none!important;border-bottom:1px solid var(--u-line);padding:14px 4px!important}
+html body .leaderboard-page .lb-honours li:first-child{border-top:1px solid var(--u-line)}
+html body .leaderboard-page .lb-honours .leaderboard-reason{grid-column:3!important;margin:0}
+html body .leaderboard-page .lb-honours li:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 6%,transparent),transparent)!important}
+html body .leaderboard-page :is(.lb-h3,.lb-card-head small,.lb-note){font-size:max(11.5px,1em)!important}
+/* leaderboard: follow actions on one ladder (follow = gold hairline, following = quiet hairline, unfollow = text),
+   podium tags in the metal colours as hairline labels, a styled week picker, the 読 watermark quieter on narrow windows */
+html body .leaderboard-page .lb-follow-button{border-radius:2px!important;background:color-mix(in srgb,var(--g-gold) 10%,transparent)!important;color:var(--g-gold)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent);padding:7px 16px!important;letter-spacing:.1em}
+html body .leaderboard-page .lb-follow-button:hover{background:color-mix(in srgb,var(--g-gold) 18%,transparent)!important}
+html body .leaderboard-page .lb-chip{border-radius:2px!important;border:0!important;box-shadow:inset 0 0 0 1px var(--u-line-2);color:var(--g-t2,#c3ab9c);padding:6px 14px!important}
+html body .leaderboard-page .leaderboard-leave{text-decoration:none!important;color:var(--g-t3,#a08a80)!important;letter-spacing:.08em;font-size:12.5px}
+html body .leaderboard-page .leaderboard-leave:hover{color:var(--g-t1,#f1e0d2)!important;text-decoration:underline!important;text-underline-offset:4px}
+html body .leaderboard-page .lb-score{clip-path:none!important;border-radius:2px!important;background:color-mix(in srgb,var(--m-a) 12%,rgba(14,12,15,.7))!important;color:var(--m-a)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--m-a) 60%,transparent)!important;font-weight:600!important}
+html body .leaderboard-page .lb-week select{appearance:none;-webkit-appearance:none;height:34px;padding:0 30px 0 12px!important;border-radius:2px!important;border:0!important;box-shadow:inset 0 0 0 1px var(--u-line-2);background:rgba(10,9,12,.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%23edb56e' stroke-width='1.3'/%3E%3C/svg%3E") no-repeat right 10px center/12px!important;color:var(--g-t1,#f1e0d2)!important}
+html body .workspace>.stage-cover .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 9%,transparent)!important}
+@media (max-width:1500px){html body .workspace>.stage-cover[data-kind~=lb-backdrop] .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 5%,transparent)!important}}
+html body .leaderboard-page .forum-tag,html body .leaderboard-page [class*=forum-tag]{border-radius:2px!important}
+/* forum: tags in the brand palette (the blue Hook tag was the only cold colour), no letter-spacing on mixed text */
+html body .forum-tag.is-hook{color:#e8a0a8!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,#c8323c 55%,transparent)!important}
+html body .leaderboard-page [data-forum-tags] button{letter-spacing:.06em!important}
+html body .leaderboard-page .forum-list .lb-card-head small{font-family:inherit!important;letter-spacing:.04em!important;font-size:12px!important}
+
+/* ---- daily: a hairline masthead, three news columns of one width with hairline dividers, trend words that wrap
+   between words and leave room for their furigana ---- */
+html body .dl .dl-strip{border-top:1px solid color-mix(in srgb,var(--g-t1,#f1e0d2) 55%,transparent)!important}
+html body .dl .dl-cols{column-gap:40px}
+html body .dl .dl-col{position:relative;padding:0!important;border:0!important}
+html body .dl .dl-col+.dl-col::before{content:"";position:absolute;left:-20px;top:0;bottom:0;width:1px;background:var(--dl-hair,rgba(255,255,255,.08))}
+html body .dl .dl-term{font-size:18px!important;line-height:1.5!important;word-break:keep-all;overflow-wrap:anywhere;text-wrap:balance}
+html body .dl .dl-word:nth-child(1) .dl-term{font-size:21px!important}
+html body .dl .dl-term ruby{ruby-position:over}
+html body .dl .dl-word-main{padding-top:14px!important;padding-bottom:12px!important}
+html body .dl :is(.dl-head small,.dl-meta,.dl-note,.dl-credit){font-size:12px!important}
+html body .dl .dl-kind{border-radius:2px!important}
+@media (max-width:1500px){html body .leaderboard-page .lb-subrow .lb-seg button{letter-spacing:.06em!important;padding-inline:clamp(8px,.9vw,14px)!important}}
+@media (max-width:1500px){html body .leaderboard-page .lb-tabs{gap:clamp(12px,1.3vw,25px)!important}html body .leaderboard-page .lb-tabs button{letter-spacing:.06em!important}}
+@media (max-width:1360px){html:lang(en) body .leaderboard-page .lb-tabs button,html:lang(ja) body .leaderboard-page .lb-tabs button{font-size:12.5px!important;letter-spacing:.02em!important}html:lang(en) body .leaderboard-page .lb-tabs,html:lang(ja) body .leaderboard-page .lb-tabs{gap:12px!important}}
+
+/* ---- level picker: option cards on the glass, the chosen one in brand red, focus kept distinct from choice ---- */
+html body .lv-dialog .lv-opt{border:0!important;border-radius:2px!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;min-height:118px;align-content:start}
+html body .lv-dialog .lv-opt:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html body .lv-dialog .lv-opt.active{background:linear-gradient(180deg,rgba(200,50,60,.16),rgba(200,50,60,.04))!important;box-shadow:inset 0 0 0 1px rgba(200,50,60,.75),inset 0 2px 0 #c82f3b!important}
+html body .lv-dialog .lv-opt:focus-visible:not(.active){outline:1px dashed rgba(232,220,200,.45)!important;outline-offset:-5px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
+html body .lv-dialog .lv-seal{font-family:var(--g-serif-ja,serif);color:var(--g-gold)}
+html body .lv-dialog .lv-opt small{font-size:12.5px!important;line-height:1.6;color:var(--g-t2,#c3ab9c)!important}
+html body .lv-dialog h2{font-family:var(--g-serif,serif)}
+html body .lv-dialog footer .primary:disabled{opacity:.45;filter:grayscale(.4)}
