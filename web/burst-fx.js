@@ -91,7 +91,7 @@ export function explosion(x,y,{shake,bar}={}){
  anim($('.fx-fire.is-inner'),[{transform:'translate(-50%,-50%) scale(0)',opacity:0},{transform:'translate(-50%,-50%) scale(0)',opacity:0,offset:.37},{transform:'translate(-50%,-50%) scale(.7)',opacity:1,offset:.42},{transform:'translate(-50%,-60%) scale(.9)',opacity:0,offset:.62},{opacity:0}],{duration:T});
  anim($('.fx-ring'),[{transform:'translate(-50%,-50%) scale(.1)',opacity:0},{transform:'translate(-50%,-50%) scale(.1)',opacity:1,offset:.37},{transform:'translate(-50%,-50%) scale(5)',opacity:0,offset:.62},{opacity:0}],{duration:T,easing:'cubic-bezier(.1,.7,.3,1)'});
  anim($('.fx-ring.is-dust'),[{transform:'translate(-50%,-50%) scale(.2)',opacity:0},{transform:'translate(-50%,-50%) scale(.2)',opacity:.7,offset:.38},{transform:'translate(-50%,-50%) scale(3.2)',opacity:0,offset:.85},{opacity:0}],{duration:T,easing:'cubic-bezier(.2,.6,.3,1)'});
- anim(flash,[{opacity:0},{opacity:0,offset:.36},{opacity:.5,offset:.385},{opacity:.45,offset:.43},{opacity:0,offset:.64},{opacity:0}],{duration:T});
+ anim(flash,[{opacity:0},{opacity:0,offset:.36},{opacity:.25,offset:.385},{opacity:.22,offset:.43},{opacity:0,offset:.64},{opacity:0}],{duration:T});
 
  /* embers drawn in during the charge */
  for(let i=0;i<0;i++){const a=Math.random()*Math.PI*2,r=140+Math.random()*260;live.push({kind:'in',x0:x+Math.cos(a)*r,y0:y+Math.sin(a)*r,tx:x,ty:y,x:0,y:0,t:-Math.random()*.25,life:.62,s:.8+Math.random()*1.6,color:'rgb(255,120,70)'});}

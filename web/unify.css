@@ -1508,3 +1508,9 @@ html body svg.fx-scars path.fx-crack{stroke:rgba(14,8,10,.72)!important;filter:d
 html body svg.fx-scars g.fx-scar.is-hot path.fx-crack{stroke:rgba(14,8,10,.72)!important;filter:drop-shadow(0 1px 0 rgba(255,236,220,.12))!important}
 html body svg.fx-scars path.fx-pit{fill:rgba(8,4,6,.88)!important}
 html body svg.fx-scars path.fx-rim{fill:rgba(255,236,220,.06)!important}
+
+/* the dictionary's drifting field (dict-idle.js) is one canvas behind the page; it stays through searches */
+html:not(#u):not(#v):not(#w):not(#x) body #learning-content:has(#lookup-results){position:relative}
+html:not(#u):not(#v):not(#w):not(#x) body .dict-field{position:absolute;left:0;top:0;z-index:0;pointer-events:none}
+html:not(#u):not(#v):not(#w):not(#x) body #learning-content:has(.dict-field)>*:not(.dict-field){position:relative;z-index:1}
+html body .dict-cloud{display:none!important}

@@ -66,7 +66,6 @@ function launch(form){
  const cam={rx:0,vrx:0,ry:0,vry:0,s:1,vs:0},CK=80,CC=8;
  let sq=0,vsq=0,hit=false,flat=1,flatV=0;
  form.style.transformOrigin=`${f1(hitX*100)}% 0%`;host.style.transformOrigin='50% 30%';
- scatterCloud(end.left+end.width*hitX,start.top);
  const t0=performance.now();let prev=t0,quiet=0;
  const frame=now=>{
   const dt=Math.min(.05,(now-prev)/1000);prev=now;const t=now-t0;let y,tilt=0;
@@ -76,11 +75,12 @@ function launch(form){
    if(k>=1){hit=true;y=0;const speed=(delta+dip)*curve/flight*1000,power=Math.min(1.4,speed/2600),ix=end.left+end.width*hitX;
     vsq=-rand(9,14)*power;sq=0;flat=0;flatV=0;
     cam.vrx=-rand(60,100)*power;cam.vry=side*rand(30,60)*power;cam.vs=rand(.5,.9)*power;
-    barHit(bar,ix,power);shards(ix,end.top,power);host.classList.add('dict-landed');dropResults();
+    barHit(bar,ix,power);host.classList.add('dict-landed');dropResults();
     host.animate([{translate:'0 0'},{translate:`${f1(side*-3*power)}px ${f1(-5*power)}px`},{translate:`${f1(side*2*power)}px ${f1(2*power)}px`},{translate:'0 0'}],{duration:300,easing:'cubic-bezier(.3,.7,.2,1)',composite:'add'});}}
   else y=0;
   if(hit){for(let s=0;s<4;s++){const h=dt/4;const a=-420*sq-22*vsq;vsq+=a*h;sq+=vsq*h;
     for(const [p,vp,target] of [['rx','vrx',0],['ry','vry',0],['s','vs',1]]){const ac=-CK*(cam[p]-target)-CC*cam[vp];cam[vp]+=ac*h;cam[p]+=cam[vp]*h;}}}
+  if(!hit&&t>=windup){const k=Math.min(1,(t-windup)/flight),vy=-(delta+dip)*curve*Math.pow(k,curve-1)/flight*1000;document.dispatchEvent(new CustomEvent('megulit:dict-wind',{detail:{x:end.left+end.width*hitX,y:end.top+y+end.height/2,vx:twist*40,vy}}));}
   const lean=hit?0:tilt,squash=hit?Math.max(-.2,Math.min(.06,sq*.25)):0;
   form.style.transform=`translate3d(0,${f1(y)}px,0) rotateX(${f1(-leanX*lean)}deg) rotateY(${f1(yaw*lean)}deg) rotateZ(${f1(twist*lean)}deg) scale(${(1-squash*.35).toFixed(3)},${(1+squash).toFixed(3)})`;
   host.style.transform=`perspective(1400px) rotateX(${f1(cam.rx)}deg) rotateY(${f1(cam.ry)}deg) scale(${cam.s.toFixed(4)})`;
