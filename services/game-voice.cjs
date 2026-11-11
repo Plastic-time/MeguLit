@@ -9,7 +9,7 @@
    A line is found by its text alone, so the learning page, saved sentences, grammar examples and Anki cards all
    reach it without knowing which game it came from. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const PROVIDERS=['./original-engines/npk.cjs','./original-engines/catsystem2.cjs','./original-engines/yuris.cjs'];
+const PROVIDERS=['./original-engines/npk.cjs','./original-engines/catsystem2.cjs','./original-engines/yuris.cjs','./original-engines/fvp.cjs'];
 const AUDIO=/\.(?:ogg|opus|wav|mp3|m4a)$/i;
 const sha1=s=>crypto.createHash('sha1').update(s).digest('hex');
 // The text key: NFKC, no spaces or markup, no speaker name before a quote, no outer quote marks.

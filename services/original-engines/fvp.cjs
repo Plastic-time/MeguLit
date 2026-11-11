@@ -50,9 +50,17 @@ function cnpack(pack,b){const crypto=require('node:crypto'),out=new Map();if(pac
 function parse(buf){let b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),z=null,cn=null;
  if(b.subarray(0,8).equals(MAGIC)){const n=b.readUInt32LE(8);z=b.subarray(12+n);b=b.subarray(12,12+n);}
  else if(b.subarray(0,8).equals(CN)){const n=b.readUInt32LE(8);const pack=b.subarray(12+n);b=b.subarray(12,12+n);cn=cnpack(pack,b);}
- const lines=[],zh=[];
- for(const p of pushes(b)){const s=tidy(sj.decode(b.subarray(p.at+2,p.at+1+p.n)));if(!s||!PROSE.test(s)||s.includes('�')||ASSET(s))continue;lines.push(s);zh.push(cn?cn.get(p.at)||'':twin(z,p));}
- return z||cn?{lines,anchors:[],zh}:{lines,anchors:[]};}
+ const lines=[],zh=[],voices=[];let prevEnd=0;
+ for(const p of pushes(b)){const s=tidy(sj.decode(b.subarray(p.at+2,p.at+1+p.n)));const from=prevEnd;prevEnd=p.at+2+p.n;if(!s||!PROSE.test(s)||s.includes('�')||ASSET(s))continue;lines.push(s);zh.push(cn?cn.get(p.at)||'':twin(z,p));voices.push(voiceAt(b,p.at,from));}
+ const v=require('./voice-ref.cjs').keep(voices),out=z||cn?{lines,anchors:[],zh}:{lines,anchors:[]};if(v)out.voices=v;return out;}
+/* E450 a spoken line's voice: the int the script pushes (0x0A, u32) just before the text, then the voice call's
+   argument shuffles (0x08); voice.bin names the clip with that number in nine digits (10024540 -> 010024540). */
+function voiceAt(b,at,from){for(let q=at-6;q>=Math.max(from,at-32);q--)if(b[q]===0x0A&&b[q+5]===0x08){const id=b.readUInt32LE(q+1);return id>0&&id<1e9?String(id).padStart(9,'0'):null;}return null;}
+// E450 the clips of an FVP .bin archive (voice.bin): u32 count, u32 name bytes, {name offset, offset, size} per entry, names.
+function audio(file){if(!/\.bin$/i.test(file))return null;let fd;try{fd=fs.openSync(file,'r');const size=fs.fstatSync(fd).size,h=Buffer.alloc(8);fs.readSync(fd,h,0,8,0);const n=h.readUInt32LE(0),ns=h.readUInt32LE(4);if(!n||n>200000||8+n*12+ns>size)return null;
+ const t=Buffer.alloc(n*12+ns);fs.readSync(fd,t,0,t.length,8);const out=[];for(let i=0;i<n;i++){const no=t.readUInt32LE(i*12),o=t.readUInt32LE(i*12+4),s=t.readUInt32LE(i*12+8),at=n*12+no,z=t.indexOf(0,at);if(z<0||o+s>size)return null;
+  const name=t.toString('latin1',at,z);out.push({name:/\.\w{2,4}$/.test(name)?name:name+'.ogg',read:()=>{const g=fs.openSync(file,'r');try{const d=Buffer.alloc(s);fs.readSync(g,d,0,s,o);return d;}finally{fs.closeSync(g);}}});}
+ return out;}catch{return null;}finally{if(fd!==undefined)try{fs.closeSync(fd);}catch{}}}
 // The scenario (the .hcb with the most Japanese) and a Chinese twin with the same header, if any.
 function files(dir){let names;try{names=fs.readdirSync(dir).filter(f=>/\.hcb$/i.test(f));}catch{return null;}if(!names.length)return null;
  const info=names.map(f=>{const file=path.join(dir,f);let b;try{b=fs.readFileSync(file);}catch{return null;}const ps=pushes(b);
@@ -73,4 +81,4 @@ const engine={
  parse,test:n=>/\.hcb$/i.test(n),
  patchLines(base){let any=false;const list=base.map(scene=>{const zh=scene.zh||[];if(!zh.some(Boolean))return scene;any=true;return {...scene,patched:true,lines:scene.lines.map((t,k)=>zh[k]||t)};});return any?list:null;},
 };
-module.exports={parse,engine,pushes,files};
+module.exports={parse,engine,pushes,files,audio};
