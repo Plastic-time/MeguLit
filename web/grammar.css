@@ -408,3 +408,16 @@
 .gm-lesson .gm-actions button{border-radius:0;letter-spacing:.12em}
 .gm-lesson .gm-actions .primary{background:var(--mg-red);border:0}
 .gm-lesson .gm-step-dot b{display:inline-block}
+
+/* 2026-11-11 offer to add the 蓝宝书 deck from AnkiWeb (the learner downloads and imports it) */
+.gm-anki-offer{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;padding:20px 24px;background:var(--mg-paper);color:var(--mg-ink);border-left:4px solid var(--mg-red)}
+.gm-anki-offer b{font:600 17px/1.4 var(--gm-serif)}
+.gm-anki-offer p{margin:6px 0 0;font-size:13px;line-height:1.8;color:#333}
+.gm-anki-offer .gm-anki-note{font-size:11px;color:#777}
+.gm-anki-actions{display:flex;flex-direction:column;gap:8px}
+.gm-anki-actions button{border-radius:0;min-height:38px;padding:0 18px;letter-spacing:.1em}
+.gm-anki-actions .primary{background:var(--mg-red);border:0;color:#fff}
+.gm-anki-actions .secondary{background:none;border:1px solid var(--mg-ink);color:var(--mg-ink)}
+.gm-anki-on{margin:0;font:11px/1 var(--mg-mono);letter-spacing:.15em;color:var(--mg-dim)}
+.gm-anki-on i{display:inline-block;width:6px;height:6px;margin-right:10px;background:var(--mg-red)}
+@media(max-width:700px){.gm-anki-offer{grid-template-columns:1fr}}
