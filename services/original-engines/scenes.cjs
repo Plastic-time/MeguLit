@@ -60,7 +60,9 @@ function xp3Scenes(file,test){let t;try{t=xp3.list(file);}catch{return [];}if(!t
  // flagged ones when it reads as a script (UTF-16 BOM, or no control bytes at the start).
  const plain=e=>{try{const d=xp3.read(file,e);if(d[0]===0xff&&d[1]===0xfe)return true;for(let i=0;i<Math.min(d.length,512);i++)if(d[i]<9||(d[i]>13&&d[i]<32&&d[i]!==27))return false;return d.length>0;}catch{return false;}};
  const flagged=t.files.filter(e=>e.encrypted&&test(e.name)),open=flagged.length>0&&plain(flagged[0]);
- return t.files.filter(e=>(!e.encrypted||open)&&test(e.name)).map(e=>({name:path.basename(e.name.replace(/\\/g,'/')),read:()=>xp3.read(file,e)}));}
+ // E449 a cx archive of a title GARbro knows is decrypted with that title's filter (cx-filter.cjs).
+ const cx=flagged.length&&!open?require('./cx-filter.cjs').forArchive(file):null;
+ return t.files.filter(e=>(!e.encrypted||open||cx)&&test(e.name)).map(e=>({name:path.basename(e.name.replace(/\\/g,'/')),read:()=>xp3.read(file,e,open?null:cx)}));}
 const KS=n=>/\.ks$/i.test(n);
 const kirikiri={
  id:'kirikiri',hint:'*.ks（或 patch.xp3）',

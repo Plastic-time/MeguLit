@@ -28,9 +28,10 @@ function list(file){
   return {files};
  }finally{fs.closeSync(fd);}
 }
-function read(file,entry){
+// decrypt: a cx filter (cx-filter.cjs) applied to an encrypted entry's whole unpacked data.
+function read(file,entry,decrypt){
  const fd=fs.openSync(file,'r');
- try{const parts=entry.segments.map(s=>{const b=Buffer.alloc(s.packed);fs.readSync(fd,b,0,s.packed,s.offset);return s.zlib?zlib.inflateSync(b):b;});return Buffer.concat(parts);}finally{fs.closeSync(fd);}
+ try{const parts=entry.segments.map(s=>{const b=Buffer.alloc(s.packed);fs.readSync(fd,b,0,s.packed,s.offset);return s.zlib?zlib.inflateSync(b):b;});const out=Buffer.concat(parts);if(decrypt&&entry.encrypted)decrypt(entry.hash>>>0,0,out);return out;}finally{fs.closeSync(fd);}
 }
 // Text of a script file: UTF-16LE with BOM, UTF-8 with BOM, or Shift-JIS / GBK guessed by the caller.
 function decodeText(buf){
