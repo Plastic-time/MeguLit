@@ -733,3 +733,18 @@ html:not(#u):not(#v) body .g-blank .steps i{display:block;margin:0 0 10px!import
 html:not(#u):not(#v) body .g-blank .steps b{font-family:var(--g-serif,serif);font-size:16px!important;margin-bottom:6px!important}
 html:not(#u):not(#v) body .g-blank .acts{margin-top:48px!important;display:flex;gap:14px}
 @media (max-width:900px){html:not(#u):not(#v) body .g-blank .steps{grid-template-columns:1fr!important}}
+
+/* ---- review, editorial: no centred card — a left-aligned statement (status, serif title, lede) and the deck with
+   its actions on one line below it, the Anki tools as a ruled row at the foot; all in the optical centre ---- */
+html:not(#u):not(#v) body .review-page #review-content{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 220px)}
+html:not(#u):not(#v) body .review-page #review-content>.review-card{width:min(1080px,100%)!important;max-width:none!important;margin:0!important;padding:0!important;background:none!important;box-shadow:none!important;border:0!important;-webkit-backdrop-filter:none;backdrop-filter:none;text-align:left!important;display:grid!important;grid-template-columns:minmax(0,1fr);justify-items:start;overflow:visible}
+html:not(#u):not(#v) body .review-page .review-card::before,html:not(#u):not(#v) body .review-page .review-card::after{display:none!important}
+html:not(#u):not(#v) body .review-page .review-card>.eyebrow{margin:0!important;padding:0!important;background:none!important;box-shadow:none!important;font-family:var(--u-mono);font-size:11px!important;letter-spacing:.24em;color:var(--g-gold)!important}
+html:not(#u):not(#v) body .review-page .review-card>h2{margin:16px 0 0!important;font-family:var(--g-serif,serif)!important;font-size:clamp(44px,4.4vw,72px)!important;font-weight:600!important;line-height:1.05!important}
+html:not(#u):not(#v) body .review-page .review-card>p.muted{margin:16px 0 0!important;font-size:15px!important;line-height:1.8;color:var(--g-t2,#c3ab9c)!important;max-width:40em}
+html:not(#u):not(#v) body .review-page .review-card>.review-controls:not(.anki-tools){display:flex!important;flex-wrap:wrap;justify-content:flex-start!important;align-items:center;gap:14px!important;margin-top:44px!important;width:100%}
+html:not(#u):not(#v) body .review-page .review-card>.review-controls:not(.anki-tools) .select-control{width:300px!important}
+html:not(#u):not(#v) body .review-page .review-card>.text-button{margin-top:14px!important;font-size:12.5px!important;color:var(--g-t3,#a08a80)!important}
+html:not(#u):not(#v) body .review-page .review-card>.anki-tools{display:flex!important;justify-content:flex-start!important;gap:0!important;width:100%;margin-top:56px!important;padding-top:0!important;border-top:1px solid var(--u-line-2)!important}
+html:not(#u):not(#v) body .review-page .review-card>.anki-tools .text-button{padding:16px 28px 0 0!important;font-size:13px!important;color:var(--g-t2,#c3ab9c)!important;letter-spacing:.06em}
+html:not(#u):not(#v) body .review-page .review-card>.anki-tools .text-button:hover{color:var(--g-gold)!important}
