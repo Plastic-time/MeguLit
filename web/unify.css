@@ -1095,3 +1095,21 @@ html body .dict-shards i:nth-child(3n){color:var(--g-gold,#edb56e)}
 html body .dict-shards i:nth-child(7n){color:#e2423e}
 html body .dict-shards b{position:absolute;width:60px;height:60px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,244,234,.8),0 0 30px rgba(237,181,110,.5)}
 @media (prefers-reduced-motion:reduce){html body svg.dict-crack path{animation:none!important}}
+
+/* start-up notice: the request field and its button share one baseline — the field's gold rule runs into the
+   button's red foot — and the button keeps the field's height */
+html:not(#u):not(#v):not(#w):not(#x) body dialog.dev-notice .dev-notice-form{display:flex!important;align-items:flex-end!important;gap:0!important}
+html:not(#u):not(#v):not(#w):not(#x) body dialog.dev-notice .dev-notice-form>input{height:46px!important;min-height:46px!important;max-height:46px!important;margin:0!important;box-sizing:border-box}
+html:not(#u):not(#v):not(#w):not(#x) body dialog.dev-notice .dev-notice-form>button.primary.primary{height:46px!important;clip-path:none!important;min-height:46px!important;max-height:46px!important;margin:0!important;align-self:flex-end;flex:none}
+/* the update ledger (notice-ledger.js): no native bar; a thin draggable rail in the gutter; the rows stretch when
+   scrolled past an end */
+html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-updates[data-ledger]{scrollbar-width:none;padding-right:22px!important;overscroll-behavior:contain}
+html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-updates[data-ledger]::-webkit-scrollbar{display:none}
+html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-updates[data-ledger]>li{translate:0 var(--over,0px)}
+html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail{grid-area:upd;justify-self:end;align-self:start;position:relative;z-index:2;width:14px;margin-top:26px;cursor:pointer;touch-action:none;
+ background:linear-gradient(90deg,transparent 6px,var(--u-line-2,rgba(255,255,255,.12)) 6px,var(--u-line-2,rgba(255,255,255,.12)) 7px,transparent 7px)}
+html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail[hidden]{display:none}
+html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail>i{position:absolute;top:0;left:4px;width:5px;background:color-mix(in srgb,var(--g-gold,#edb56e) 70%,transparent);cursor:grab;transition:left .15s,width .15s,background .15s}
+html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail:hover>i,html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail.is-drag>i{left:2px;width:9px;background:var(--g-gold,#edb56e)}
+html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail.is-drag>i{cursor:grabbing;background:#c8323c}
+@media (max-width:900px){html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail{grid-area:upd}}
