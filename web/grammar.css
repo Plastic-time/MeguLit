@@ -468,3 +468,8 @@
 .gm-tracks.one{grid-template-columns:1fr}
 .gm-tracks.one .gm-cards:not(.folded){display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr))}
 .gm-tracks.one .gm-cards.folded{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr))}
+
+.gm-n0note{display:flex;gap:12px;align-items:flex-start;margin:0;padding:14px 18px;background:var(--mg-paper);color:var(--mg-ink);font-size:13px;line-height:1.8;border-left:4px solid var(--mg-red)}
+.gm-n0note i{flex:none;width:8px;height:8px;margin-top:8px;background:var(--mg-red);animation:gm-blink 1.2s steps(1,end) infinite}
+@keyframes gm-blink{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.gm-n0note i{animation:none}}
