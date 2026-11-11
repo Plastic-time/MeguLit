@@ -26,19 +26,18 @@ function shards(x,y,power){
  const fx=document.createElement('div');fx.className='dict-shards';fx.setAttribute('aria-hidden','true');
  const n=Math.round(10+power*14);let html='';
  for(let i=0;i<n;i++){const t=Math.random()<.25&&words.length?words[Math.floor(Math.random()*words.length)]:KANA[Math.floor(Math.random()*KANA.length)];const depth=i%3;html+=`<i class="d${depth}" style="left:${x}px;top:${y}px;font-size:${Math.round([rand(26,40),rand(15,24),rand(10,14)][depth])}px">${t}</i>`;}
- fx.innerHTML=html+`<b style="left:${x}px;top:${y}px"></b>`;document.body.append(fx);
+ fx.innerHTML=html;document.body.append(fx);
  for(const g of fx.querySelectorAll('i')){
-  const a=rand(.05,.95)*Math.PI,v=rand(140,460)*(.6+power*.6),tx=Math.cos(a)*v*(Math.random()<.5?-1:1),ty=Math.sin(a)*v*.5,spin=rand(-540,540);
-  g.animate([{transform:'translate(-50%,-50%) scale(.3)',opacity:0},{transform:`translate(calc(-50% + ${f1(tx*.3)}px),calc(-50% + ${f1(ty*.3)}px)) rotate(${f1(spin*.3)}deg) scale(1)`,opacity:1,offset:.15},{transform:`translate(calc(-50% + ${f1(tx)}px),calc(-50% + ${f1(ty+rand(160,280))}px)) rotate(${f1(spin)}deg) scale(.6)`,opacity:0}],{duration:rand(700,1400),easing:'cubic-bezier(.1,.7,.35,1)',fill:'forwards'});
+  const dir=Math.random()<.5?-1:1,v=rand(180,520)*(.6+power*.6),tx=dir*v,ty=rand(-30,40),fall=rand(120,240),spin=rand(-540,540);
+  g.animate([{transform:'translate(-50%,-50%) scale(.3)',opacity:0},{transform:`translate(calc(-50% + ${f1(tx*.3)}px),calc(-50% + ${f1(ty*.3)}px)) rotate(${f1(spin*.3)}deg) scale(1)`,opacity:1,offset:.15},{transform:`translate(calc(-50% + ${f1(tx*.75)}px),calc(-50% + ${f1(ty+fall*.35)}px)) rotate(${f1(spin*.7)}deg) scale(.85)`,opacity:.6,offset:.6},{transform:`translate(calc(-50% + ${f1(tx)}px),calc(-50% + ${f1(ty+fall)}px)) rotate(${f1(spin)}deg) scale(.6)`,opacity:0}],{duration:rand(560,720),easing:'cubic-bezier(.15,.6,.5,1)',fill:'forwards'});
  }
- fx.querySelector('b').animate([{transform:'translate(-50%,-50%) scale(.2)',opacity:.9},{transform:`translate(-50%,-50%) scale(${f1(2.2+power*2)})`,opacity:0}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
- setTimeout(()=>fx.remove(),1600);
+  setTimeout(()=>fx.remove(),1600);
 }
 function barHit(bar,x,power){
  if(!bar)return;const r=bar.getBoundingClientRect(),y=r.bottom;
  const wrap=document.createElement('div');wrap.className='dict-hit';wrap.setAttribute('aria-hidden','true');wrap.style.cssText=`left:${x}px;top:${y}px`;
  wrap.innerHTML='<i class="dict-hit-flash"></i><i class="dict-hit-ring"></i><i class="dict-hit-line"></i>';document.body.append(wrap);
- wrap.querySelector('.dict-hit-flash').animate([{transform:'translate(-50%,-50%) scale(.3)',opacity:1},{transform:`translate(-50%,-50%) scale(${f1(1.4+power)})`,opacity:0}],{duration:420,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
+ wrap.querySelector('.dict-hit-flash').animate([{transform:'translate(-50%,-50%) scale(.3)',opacity:1},{transform:`translate(-50%,-50%) scale(${f1(1.5+power)})`,opacity:1,offset:.25},{transform:`translate(-50%,-50%) scale(${f1(1.7+power)})`,opacity:0}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
  wrap.querySelector('.dict-hit-ring').animate([{transform:'translate(-50%,-50%) scale(.2,.12)',opacity:1},{transform:`translate(-50%,-50%) scale(${f1(2.6+power*2)},${f1(.55+power*.4)})`,opacity:0}],{duration:620,easing:'cubic-bezier(.1,.7,.3,1)',fill:'forwards'});
  wrap.querySelector('.dict-hit-line').animate([{transform:'translateX(-50%) scaleX(.1)',opacity:1},{transform:`translateX(-50%) scaleX(${f1(1.2+power*1.8)})`,opacity:0}],{duration:760,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
  setTimeout(()=>wrap.remove(),820);

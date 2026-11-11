@@ -1384,3 +1384,20 @@ html body .dict-hit-line{width:360px;height:2px;transform-origin:50% 50%;backgro
 html body .dict-bar-hit{display:none}
 html body .dict-shards i.d0{filter:blur(1.5px);opacity:.85}
 html body .dict-shards i.d2{filter:blur(.6px);opacity:.7}
+
+/* judge fx2: warm kana shards by depth; no dust-ring blur (it read as halftone); the wrong answer glows scorched above
+   the pit; result card fuller — a motto line, gold Lv line, larger right-aligned XP, a 168×48 完成; a white field
+   between the burst and the result; the light glyph keeps a dark outline */
+html body .dict-shards i{color:#f3d9a4!important;text-shadow:0 0 8px rgba(237,181,110,.45)!important}
+html body .dict-shards i.d1{color:#c9a46a!important}
+html body .dict-shards i.d2{color:#a8404a!important}
+html body .fx-ring.is-dust{filter:none!important}
+html body :is(.gm-jd-opt.miss,.gm-choice.wrong){box-shadow:inset 0 0 0 2px #e2423e,0 0 16px rgba(226,66,62,.45)!important;color:#ffd2a8!important;text-shadow:0 0 6px #ff7a2a,0 0 14px rgba(255,90,40,.6)}
+html body .class-rite-white{position:absolute;inset:0;z-index:5;background:#fff;pointer-events:none;opacity:0}
+html body .class-rite-motto{display:block;margin:18px 0 0;max-width:30em;font-size:14px;line-height:1.8;color:var(--g-t2,#c3ab9c);quotes:none}
+html body .class-rite-reveal p{font-size:15px!important;color:var(--g-gold,#edb56e)!important}
+html body .class-rite-xp{align-items:flex-end!important;text-align:right}
+html body .class-rite-xp b{font-size:40px!important}
+html body .class-rite-end [data-finish]{min-width:168px;height:48px!important}
+html body .class-rite-reveal h2{text-shadow:0 0 34px color-mix(in srgb,var(--c) 75%,transparent)!important}
+html body dialog.class-rite[data-el="light"] .class-rite-glyph{color:#5a3f10!important;text-shadow:0 0 2px #fff8e0,0 0 16px #fff1b8,0 0 30px rgba(255,241,184,.7)!important}
