@@ -43,6 +43,8 @@ function frame(now){
  const order=f.parts;
  for(const p of order){
   p.sway+=dt*.6;p.x+=(p.vx+Math.sin(p.sway)*4)*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;
+  /* a gust moves the glyph itself; air drag slows it; out of the frame it drifts back in later as a new glyph */
+  p.x+=(p.wx||0)*dt;p.y+=(p.wy||0)*dt;p.rot+=(p.wr||0)*dt;const drag=Math.exp(-1.4*dt);p.wx=(p.wx||0)*drag;p.wy=(p.wy||0)*drag;p.wr=(p.wr||0)*Math.exp(-1.2*dt);
   /* (user: the turbulence must be visible) the flying box leaves a wake: glyphs near its path are carried along its
      motion and rolled outward into small eddies on either side, spun a little; strongest nearest the box (up to ~40-80 px
      and ~15-30 degrees), a gentle sway further off; springs bring them back to their drift within a second or two */
@@ -52,9 +54,14 @@ function frame(now){
   if(dm<reach){const k=(1-dm/reach)*(200+p.z*600);ax+=ddx/(dm||1)*k;ay+=ddy/(dm||1)*k;}
   p.ovx=((p.ovx||0)+ax*dt)*(1-Math.min(1,3.2*dt));p.ovy=((p.ovy||0)+ay*dt)*(1-Math.min(1,3.2*dt));p.ox+=p.ovx*dt;p.oy+=p.ovy*dt;
   p.ospin=((p.ospin||0)+aspin*dt)*(1-Math.min(1,3*dt));p.orot=(p.orot||0)+p.ospin*dt;
-  if(p.y<-80||p.x<-120||p.x>f.W+120){Object.assign(p,make(f,false),{x:Math.random()*f.W});}
+  if(p.y<-80||p.x<-120||p.x>f.W+120){const n=make(f,false),e=Math.random(),edge=e<.35?'l':e<.7?'r':'b';
+   /* back into the frame from an edge, carried in on a breeze and fading up, so the field fills again in 2-4 s */
+   Object.assign(p,n,edge==='l'?{x:-60,y:R(.15,.9)*f.H,wx:R(180,320),wy:R(-60,20)}:edge==='r'?{x:f.W+60,y:R(.15,.9)*f.H,wx:-R(180,320),wy:R(-60,20)}:{x:R(.05,.95)*f.W,y:f.H+50,wx:R(-40,40),wy:-R(160,280)},{wr:0,fade:0});}
+  p.fade=Math.min(1,(p.fade??1)+dt*1.4);
   if(p.y>f.H+120)p.y=-60;
-  const s=p.spr;ctx.globalAlpha=Math.min(1,p.alpha*f.dim*pref.k);ctx.save();ctx.translate(p.x+p.ox,p.y+p.oy);ctx.rotate(p.rot+(p.orot||0));ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();
+  const s=p.spr,base=Math.min(1,p.alpha*f.dim*pref.k)*(p.fade??1),sp=Math.hypot(p.wx||0,p.wy||0);
+  if(sp>260){for(let k=3;k>=1;k--){ctx.globalAlpha=base*.18*(4-k)/3;ctx.save();ctx.translate(p.x+p.ox-p.wx*.014*k,p.y+p.oy-p.wy*.014*k);ctx.rotate(p.rot+(p.orot||0));ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();}}
+  ctx.globalAlpha=base;ctx.save();ctx.translate(p.x+p.ox,p.y+p.oy);ctx.rotate(p.rot+(p.orot||0));ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();
  }
  ctx.globalAlpha=1;
  if(!calm)f.raf=requestAnimationFrame(frame);
@@ -67,8 +74,14 @@ new MutationObserver(()=>{if(!tick)tick=requestAnimationFrame(scan);}).observe(d
 addEventListener('resize',()=>field?.fit());
 if(!calm)document.addEventListener('pointermove',e=>{if(!field)return;field.mx=e.clientX;field.my=e.clientY;},{passive:true});
 /* the wake is given by how far the box actually moved since its last report, so it is as strong at any frame rate */
+/* (user: a real wind that blows the glyphs away, the nearer the harder) the rushing box throws the field: glyphs are
+   flung along its motion and outward, spinning, out to about half the screen's width with a smooth fall-off; the
+   push is by how far the box moved since its last report, so it is as strong at any frame rate */
 document.addEventListener('megulit:dict-wind',e=>{if(!field)return;const d=e.detail,now=performance.now(),w=field.wind;const prevY=w&&now-w.at<400?w.y:d.y+40;field.wind={x:d.x,y:d.y,at:now};const moved=d.y-prevY;if(moved>=0)return;
- for(const p of field.parts){const px=p.x+p.ox,py=p.y+p.oy,dxr=Math.max(0,Math.abs(px-d.x)-(d.hw||200)),dyr=py-d.y,dist=Math.hypot(dxr,dyr),fall=Math.exp(-dist/170)*(.55+p.z*.7);if(fall<.02)continue;const side=px<d.x?-1:1,m=-moved;
-  p.ovy=(p.ovy||0)+moved*4.2*fall;p.ovx=(p.ovx||0)+side*m*3*fall*(dyr>0?1:.4)+(Math.random()-.5)*m*2.4*fall;p.ospin=(p.ospin||0)+side*m*.022*fall;}});
+ const R0=field.W*.5,m=-moved;
+ for(const p of field.parts){const px=p.x+p.ox,py=p.y+p.oy,dxr=Math.max(0,Math.abs(px-d.x)-(d.hw||200)*.6),dyr=py-d.y,dist=Math.hypot(dxr,dyr),fall=Math.exp(-(dist/R0)*2.2)*(.6+p.z*.6);if(fall<.01)continue;
+  const side=px<d.x?-1:1,ox=(px-d.x)/(Math.hypot(px-d.x,dyr)||1),oy=dyr/(Math.hypot(px-d.x,dyr)||1);
+  p.wx=(p.wx||0)+(side*m*4+ox*m*2.4+(Math.random()-.5)*m*2.4)*fall;p.wy=(p.wy||0)+(moved*5.5+oy*m*1.6)*fall;p.wr=(p.wr||0)+side*m*.035*fall*(.5+Math.random());}});
 /* the hit itself: one outward gust from the point of impact */
-document.addEventListener('megulit:dict-gust',e=>{if(!field)return;const {x,y}=e.detail;for(const p of field.parts){const dx=p.x+p.ox-x,dy=p.y+p.oy-y,d=Math.hypot(dx,dy)||1,k=Math.exp(-d/240)*(.5+p.z*.8);p.ovx=(p.ovx||0)+dx/d*520*k;p.ovy=(p.ovy||0)+dy/d*520*k;p.ospin=(p.ospin||0)+(Math.random()-.5)*6*k;}});
+/* the hit: a second, outward blast from the point of impact */
+document.addEventListener('megulit:dict-gust',e=>{if(!field)return;const {x,y}=e.detail,R0=field.W*.55;for(const p of field.parts){const dx=p.x+p.ox-x,dy=p.y+p.oy-y,d=Math.hypot(dx,dy)||1,k=Math.exp(-(d/R0)*2)*(.6+p.z*.6);p.wx=(p.wx||0)+dx/d*1500*k;p.wy=(p.wy||0)+dy/d*1500*k;p.wr=(p.wr||0)+(Math.random()-.5)*10*k;}});
