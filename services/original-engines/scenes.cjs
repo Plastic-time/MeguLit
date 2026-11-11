@@ -63,7 +63,8 @@ function xp3Scenes(file,test){let t;try{t=xp3.list(file);}catch{return [];}if(!t
  // E449 a cx archive of a title GARbro knows is decrypted with that title's filter (cx-filter.cjs).
  const cx=flagged.length&&!open?require('./cx-filter.cjs').forArchive(file):null;
  return t.files.filter(e=>(!e.encrypted||open||cx)&&test(e.name)).map(e=>({name:path.basename(e.name.replace(/\\/g,'/')),read:()=>xp3.read(file,e,open?null:cx)}));}
-const KS=n=>/\.ks$/i.test(n);
+// E449 KAG scenarios kept as .txt under a scenario folder (赤ずきんと迷いの森: scenario/<route>/r04_23.txt); "!" files are lists.
+const KS=n=>/\.ks$/i.test(n)||/(?:^|[\\/])scenario[\\/](?:[^\\/]+[\\/])*[^!\\/][^\\/]*\.txt$/i.test(n);
 const kirikiri={
  id:'kirikiri',hint:'*.ks（或 patch.xp3）',
  // Later archives override earlier ones, as the engine loads them (data < patch < patch2 ...).
