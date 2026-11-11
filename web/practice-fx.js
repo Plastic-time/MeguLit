@@ -5,9 +5,9 @@
    Again / Good / Easy buttons of the review) and only reacts within a moment of the learner's own click or key. */
 import {calm,NS,scarMarkup,debris,explosion,fountain} from './burst-fx.js';
 const WRONG='.wrong,.miss,.gm-blank.bad',RIGHT='.right,.hit,.gm-blank.ok',MAX=10;
-let lastInput=0,queued=null;
+let lastInput=0,queued=null,lastPoint=null;
 const recent=()=>performance.now()-lastInput<1600;
-addEventListener('pointerdown',()=>{lastInput=performance.now();},true);
+addEventListener('pointerdown',e=>{lastInput=performance.now();lastPoint={x:e.clientX,y:e.clientY};},true);
 addEventListener('keydown',()=>{lastInput=performance.now();},true);
 
 const hostOf=el=>{const root=el.getRootNode();return root instanceof ShadowRoot?root.host:el;};
@@ -21,19 +21,19 @@ function scarsOf(box){
 }
 function center(el){const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};}
 async function blast(el){
- const box=scope(el),{x,y}=center(el);
+ const box=scope(el),c0=center(el),er0=el.getBoundingClientRect(),hitP=lastPoint&&lastPoint.x>=er0.left-4&&lastPoint.x<=er0.right+4&&lastPoint.y>=er0.top-4&&lastPoint.y<=er0.bottom+4?lastPoint:c0,{x,y}=hitP;
  await explosion(x,y,{shake:box,bar:document.querySelector('header.titlebar')});
  if(!box.isConnected)return;
  const svg=scarsOf(box),b=box.getBoundingClientRect(),seed=Math.floor(Math.random()*2147483646)+1;
  const g=document.createElementNS(NS,'g');g.setAttribute('class','fx-scar');
- const er=el.getBoundingClientRect(),R=Math.max(er.width,er.height)*.62;
+ const R=18+Math.random()*10;
  const cx=(x-b.left).toFixed(1),cy=(y-b.top).toFixed(1),gid='sc'+seed;
- g.innerHTML=`<defs><radialGradient id="${gid}"><stop offset="45%" stop-color="#1a0806" stop-opacity=".0"/><stop offset="62%" stop-color="#2a0c06" stop-opacity=".85"/><stop offset="80%" stop-color="#5a1a0a" stop-opacity=".45"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></radialGradient></defs><ellipse class="fx-scorch" cx="${cx}" cy="${cy}" rx="${(er.width*.78).toFixed(1)}" ry="${(er.height*1.3).toFixed(1)}" fill="url(#${gid})"/>`+scarMarkup(seed,x-b.left,y-b.top,R,R*.7+Math.random()*24,5+Math.floor(Math.random()*3)).replace(/<path class="fx-(rim|pit|pit-lip)"[^>]*\/>/g,'')+`<ellipse class="fx-water" cx="${cx}" cy="${cy}" rx="0" ry="0"/>`;g.classList.add('is-hot');setTimeout(()=>g.classList.remove('is-hot'),2600);
+ g.innerHTML=scarMarkup(seed,x-b.left,y-b.top,R,R*1.6+Math.random()*30,6+Math.floor(Math.random()*3))+`<circle class="fx-water" cx="${cx}" cy="${cy}" r="0"/>`;g.classList.add('is-hot');setTimeout(()=>g.classList.remove('is-hot'),2600);
  svg.append(g);
  const all=svg.querySelectorAll('g.fx-scar:not(.is-gone)');if(all.length>MAX)mend(all[0]);
  debris(x,y+R*.4,{n:16,spread:1.3,up:.9,tint:'ash'});
 }
-function mend(g){const w=g.querySelector('.fx-water'),sc=g.querySelector('.fx-scorch');if(w&&sc){const rx=+sc.getAttribute('rx'),ry=+sc.getAttribute('ry');w.animate([{rx:'0px',ry:'0px',opacity:.9},{rx:rx+'px',ry:ry+'px',opacity:.75,offset:.55},{rx:rx+'px',ry:ry+'px',opacity:0}],{duration:1300,easing:'cubic-bezier(.3,.7,.2,1)',fill:'forwards'});}g.classList.add('is-gone');setTimeout(()=>g.remove(),1600);}
+function mend(g){const w=g.querySelector('.fx-water'),pit=g.querySelector('.fx-rim');if(w&&pit){const bb=pit.getBBox(),R=Math.max(bb.width,bb.height)/2;w.animate([{r:'0px',opacity:.9},{r:R+'px',opacity:.8,offset:.55},{r:R+'px',opacity:0}],{duration:1300,easing:'cubic-bezier(.3,.7,.2,1)',fill:'forwards'});}g.classList.add('is-gone');setTimeout(()=>g.remove(),1600);}
 function bloom(el){
  const box=scope(el),{x,y}=center(el);
  fountain(x,y);
