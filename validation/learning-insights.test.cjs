@@ -135,6 +135,10 @@ test('the counting pass tokenizes each read line once, and the report, example a
  const saved=db.prepare('SELECT v.spelling,e.text,e.translation,e.original FROM vocabulary v JOIN examples e ON e.word_id=v.id').get();
  assert.deepEqual([saved.spelling,saved.text,saved.translation,JSON.parse(saved.original).translationSource],['払う','雪を払う。','拂去雪。','group']);
  assert.ok(!I.report(db,{now,jlpt:I.jlptIndex({levels:{}})}).frequent.some(w=>w.key==='払う'),'a saved word leaves the list');
+ /* E426 Known: saved already mastered (status 3) and gone from the weekly list */
+ assert.equal(I.saveWord(db,{id:2,spellings:['降る'],readings:['ふる'],definitions:['下']},null,{status:3}).status,3);
+ assert.equal(db.prepare('SELECT status FROM vocabulary WHERE id=2').get().status,3);
+ assert.ok(!I.report(db,{now,jlpt:I.jlptIndex({levels:{}})}).weekly.some(w=>w.key==='降る'),'a known word leaves the weekly list');
 });
 
 test('lookups keep the game line they were made in',t=>{

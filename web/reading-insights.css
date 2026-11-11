@@ -41,3 +41,6 @@
 .ri-beyond{background:color-mix(in srgb,var(--text) 22%,transparent)}
 .ri-credit{margin-top:16px;font-size:11px}
 @media(max-width:620px){.ri-level{grid-template-columns:30px minmax(0,1fr)}.ri-level-num{grid-column:1/-1}.ri-lean-row{grid-template-columns:minmax(0,1fr) auto}.ri-stack{grid-column:1/-1;grid-row:2}}
+.ri-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.ri-known{white-space:nowrap;min-height:30px;padding:4px 12px;font-size:12px}
+.ri-known:hover{border-color:color-mix(in srgb,#88d2b0 55%,transparent);color:#88d2b0}

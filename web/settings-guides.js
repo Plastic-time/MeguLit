@@ -32,57 +32,63 @@ const ACTIONS = {
 
 const GUIDES = {
   translation: {
-    title: T('翻译怎么选？第一次用先看这里', 'Which translation? Start here', '翻訳の選び方（はじめての方へ）'),
+    title: T('翻译怎么选？', 'Which translation?', '翻訳の選び方'),
+    summary: T('3 种方式 · 零延迟汉化 · 5 步接入 DeepSeek', '3 options · zero-latency · DeepSeek in 5 steps', '3 つの方式・ゼロ遅延・DeepSeek 5 ステップ'),
     blocks: [
       {
-        head: T('零延迟翻译是什么？', 'What is zero-latency translation?', 'ゼロ遅延翻訳とは？'),
+        icon: '⚡',
+        head: T('有汉化？用零延迟', 'Have a translation patch? Go zero-latency', '翻訳パッチがあればゼロ遅延'),
         steps: [
-          T('游戏装了汉化补丁，或者自带官方中文时，MeguLit 会提前读出整部剧本，把每句日文和汉化组或官方的中文对好', 'When a game has a fan translation patch or an official Chinese version, MeguLit reads the whole script in advance and pairs every Japanese line with its human Chinese translation', 'ゲームに中国語パッチや公式中国語がある場合、MeguLit は事前に台本を読み込み、日本語の各文と人による中国語訳を対応づけます'),
-          T('玩的时候游戏显示日文，下面立刻出现对应的人工译文，不用等翻译引擎，也不花钱、不用联网', 'While you play, the game shows Japanese and the matching human translation appears instantly: no waiting for an engine, no cost, no network', 'プレイ中は日本語が表示され、対応する人の訳がすぐに出ます。翻訳エンジンを待たず、費用もネットも不要です'),
-          T('没自动找到汉化？在作品页「汉化脚本 · 零延迟双语」里点「手动选择」，选你手上的汉化补丁或汉化版游戏的文件就行', 'No translation found automatically? On the game page, under Translation script · zero-latency bilingual, click Choose manually and pick the translation patch or a file of the translated game you have', '自動で見つからない場合は、作品ページの「翻訳スクリプト · ゼロ遅延」で「手動で選択」を押し、手元の翻訳パッチや翻訳版ゲームのファイルを選んでください'),
-          T('在「翻译」页打开「零延迟翻译（汉化脚本）」即可；作品页「技术资料」里能看到这部作品支不支持。只有极少数对不上的句子才会交给下面选的翻译方式', 'Turn on Zero-latency translation on this page; the game page technical details say whether a game supports it. Only the rare line that does not match goes to the translation method chosen below', 'このページで「ゼロ遅延翻訳」をオンにします。対応状況は作品ページの技術情報で確認できます。対応しない少数の文だけが下で選んだ翻訳方式に回ります'),
+          T('游戏有汉化或官方中文时，日文一出，人工译文立刻出现，免费不联网', 'With a fan or official Chinese version, the human translation appears instantly, free and offline', '中国語版があれば、人の訳が即表示。無料・オフライン'),
+          T('在本页打开「零延迟翻译」', 'Turn on Zero-latency translation on this page', 'このページで「ゼロ遅延翻訳」をオン'),
+          T('没自动找到？作品页「汉化脚本」→「手动选择」汉化文件', 'Not found? Game page → Translation script → Choose manually', '見つからない時は作品ページ「翻訳スクリプト」→「手動で選択」'),
         ],
       },
       {
-        head: T('三种方式，按需选一个', 'Three ways, pick one', '3 つの方式から 1 つ選ぶ'),
+        icon: '🧭',
+        head: T('其余句子：三选一', 'Everything else: pick one', 'それ以外は 3 つから選ぶ'),
         steps: [
-          T('「免费在线机翻」：什么都不用设置，打开就能用。质量一般，适合先试试', 'Free online MT: nothing to set up, works right away. Fair quality, good for a first try', '無料オンライン翻訳：設定不要ですぐ使えます。品質はそこそこ。まずはお試しに'),
-          T('「API 翻译」：用 AI 大模型翻译，质量最好，最懂 Galgame 的语气。要先在 AI 平台注册，拿一个 API Key，按字数付很少的钱', 'API translation: an AI model translates, best quality and the best feel for galgame dialogue. You sign up on an AI platform, get an API key and pay a little per character', 'API 翻訳：AI モデルが翻訳。品質が一番よく、ゲームの口調も自然です。AI サービスに登録して API キーを取得し、文字数に応じて少額を支払います'),
-          T('「本地模型」：用你自己的显卡翻译，免费、断网也能用。需要 6 GB 以上显存的独立显卡', 'Local model: your own graphics card translates, free and offline. Needs a graphics card with 6 GB of video memory or more', 'ローカルモデル：自分の GPU で翻訳。無料でオフラインでも使えます。VRAM 6 GB 以上の GPU が必要です'),
+          T('🌐 免费机翻：不用设置，质量一般', '🌐 Free MT: no setup, fair quality', '🌐 無料翻訳：設定不要、品質そこそこ'),
+          T('✨ API 翻译：质量最好，要 API Key，按字数付少量钱', '✨ API: best quality, needs an API key, a little per character', '✨ API 翻訳：最高品質、API キーと少額の料金'),
+          T('💻 本地模型：免费离线，要 6 GB 以上显存', '💻 Local model: free and offline, needs 6 GB+ VRAM', '💻 ローカル：無料・オフライン、VRAM 6 GB 以上'),
         ],
       },
       {
-        head: T('API Key 和余额是什么？', 'What are an API key and credits?', 'API キーやクレジットとは？'),
+        icon: '🔑',
+        head: T('API Key 是什么？', 'What is an API key?', 'API キーとは？'),
         steps: [
-          T('API Key 是 AI 平台发给你的一串密码，MeguLit 用它替你调用 AI 翻译，平台按用量从你的余额里扣钱', 'An API key is a password-like string the AI platform gives you. MeguLit uses it to ask the AI to translate, and the platform charges your balance by usage', 'API キーは AI サービスが発行するパスワードのような文字列です。MeguLit はこれで AI に翻訳を頼み、使った分だけ残高から引かれます'),
-          T('「余额」就是你在平台上充的钱，或者平台送的免费额度。翻译按字数计费，读一整部游戏一般只要几块钱；很多平台新用户还送免费额度', 'Credits or balance is the money you top up, or the free allowance you get. Translation is billed by characters; a whole game usually costs very little, and many platforms give new users free credit', 'クレジット・残高はチャージした金額や無料枠のことです。文字数課金で、1 本読み切っても多くの場合わずかな金額です。新規登録で無料枠がもらえることも多いです'),
-          T('API Key 只保存在你电脑上（加密），不要发给别人', 'The key is stored only on your PC, encrypted. Never share it', 'キーはこの PC にだけ暗号化して保存されます。他人に渡さないでください'),
+          T('AI 平台给你的一串密码，用多少扣多少余额', 'A password-like string from the AI platform; usage is taken from your balance', 'AI サービスの合言葉。使った分だけ残高から引かれます'),
+          T('读完一部游戏通常只要几块钱，新用户常送免费额度', 'A whole game usually costs very little; new users often get free credit', '1 本読んでもわずかな金額。新規は無料枠も'),
+          T('Key 加密存在本机，别发给别人', 'Stored encrypted on this PC; never share it', 'この PC に暗号化保存。人に渡さないで'),
         ],
       },
       {
-        head: T('国内推荐：DeepSeek（5 步搞定）', 'Recommended in China: DeepSeek (5 steps)', 'おすすめ：DeepSeek（5 ステップ）'),
+        icon: '🚀',
+        head: T('推荐：DeepSeek 5 步', 'Recommended: DeepSeek in 5 steps', 'おすすめ：DeepSeek 5 ステップ'),
         steps: [
-          T('点下面按钮打开 DeepSeek 开放平台，用手机号注册登录 {link:deepseek}', 'Open the DeepSeek platform and sign up {link:deepseek}', 'DeepSeek を開いて登録 {link:deepseek}'),
-          T('左侧「充值」，先充 10 元就够用很久', 'Top up a small amount under Top up', '「チャージ」で少額を入金'),
-          T('左侧「API keys」→「创建 API key」，名字随便填，复制生成的那串字符（只显示一次）', 'API keys → Create API key, then copy the key (it is shown once)', '「API keys」→「作成」でキーをコピー（表示は一度だけ）'),
-          T('回到这一页：「翻译方式」选「API 翻译」，服务选「DeepSeek」，把 Key 粘贴到「API Key」，点保存', 'Back here: set the method to API translation, the service to DeepSeek, paste the key into API Key and save', 'このページで「API 翻訳」→「DeepSeek」を選び、キーを貼り付けて保存'),
-          T('开一个游戏试试，译文出来就成功了。报错 401 = Key 填错；402 或「余额不足」= 要充值；429 = 太快或额度用完，稍等再试', 'Start a game. 401 means a wrong key, 402 or insufficient balance means top up, 429 means too fast or out of quota', 'ゲームで確認。401＝キー誤り、402・残高不足＝チャージ、429＝速すぎ／上限'),
+          T('注册登录 {link:deepseek}', 'Sign up {link:deepseek}', '登録 {link:deepseek}'),
+          T('「充值」先充 10 元', 'Top up a small amount', '少額をチャージ'),
+          T('「API keys」→ 创建，复制 Key（只显示一次）', 'API keys → Create, copy the key (shown once)', '「API keys」→ 作成してコピー（一度だけ表示）'),
+          T('本页选「API 翻译」→「DeepSeek」，粘贴 Key，保存', 'Here: API translation → DeepSeek, paste, save', 'ここで「API 翻訳」→「DeepSeek」、貼り付けて保存'),
+          T('开游戏试试。401 Key 错，402 余额不足，429 稍等再试', 'Try a game. 401 wrong key, 402 top up, 429 wait', '試す。401 キー誤り、402 残高不足、429 少し待つ'),
         ],
       },
       {
-        head: T('其他可选平台', 'Other platforms', 'その他のサービス'),
+        icon: '🗂',
+        head: T('其他平台', 'Other platforms', 'その他'),
         steps: [
-          T('硅基流动：新用户送免费额度，模型多 {link:siliconflow}', 'SiliconFlow: free credit for new users, many models {link:siliconflow}', 'SiliconFlow：新規無料枠あり {link:siliconflow}'),
-          T('通义千问（阿里云百炼）：用阿里云账号就能开通 {link:bailian}', 'Qwen (Alibaba Bailian): sign in with an Alibaba Cloud account {link:bailian}', 'Qwen（Alibaba Bailian） {link:bailian}'),
-          T('海外用户：Google Gemini 有免费额度 {link:gemini}', 'Outside China: Google Gemini has a free tier {link:gemini}', '海外の方：Google Gemini は無料枠あり {link:gemini}'),
+          T('硅基流动：新用户送额度 {link:siliconflow}', 'SiliconFlow: free credit {link:siliconflow}', 'SiliconFlow：無料枠 {link:siliconflow}'),
+          T('通义千问（阿里云百炼） {link:bailian}', 'Qwen (Alibaba Bailian) {link:bailian}', 'Qwen（Alibaba Bailian） {link:bailian}'),
+          T('海外：Google Gemini 有免费额度 {link:gemini}', 'Outside China: Google Gemini free tier {link:gemini}', '海外：Google Gemini 無料枠 {link:gemini}'),
         ],
       },
       {
-        head: T('本地模型怎么装', 'Setting up a local model', 'ローカルモデルの導入'),
+        icon: '💻',
+        head: T('本地模型 3 步', 'Local model in 3 steps', 'ローカルモデル 3 ステップ'),
         steps: [
-          T('「翻译方式」选「本地模型」，下面先点「下载并安装」本地服务程序（约 37 MB）', 'Set the method to Local model, then click Download and install for the local server (about 37 MB)', '「ローカルモデル」を選び、ローカルサーバーを「ダウンロードしてインストール」（約 37 MB）'),
-          T('再挑一个模型下载：6–8 GB 显存选「GalTransl v4 4B」，12 GB 以上可以选 14B，质量更高', 'Then download a model: GalTransl v4 4B for 6–8 GB of video memory, a 14B model with 12 GB or more', 'モデルを選んでダウンロード：VRAM 6–8 GB なら GalTransl v4 4B、12 GB 以上なら 14B'),
-          T('下载完点「使用此模型」。翻译时会自动启动，不用管它。国内会自动走 MeguLit 的国内线路和镜像下载', 'Click Use this model. It starts by itself when needed. In China, downloads go through MeguLit\'s own mirror', '「このモデルを使う」を押せば完了。必要なときに自動で起動します'),
+          T('选「本地模型」→「下载并安装」服务（约 37 MB）', 'Pick Local model → Download and install (about 37 MB)', '「ローカルモデル」→「インストール」（約 37 MB）'),
+          T('下载模型：6–8 GB 显存选 4B，12 GB 以上选 14B', 'Get a model: 4B for 6–8 GB VRAM, 14B for 12 GB+', 'モデル取得：6–8 GB は 4B、12 GB 以上は 14B'),
+          T('点「使用此模型」，之后自动启动', 'Click Use this model; it starts by itself', '「このモデルを使う」で完了、自動起動'),
         ],
       },
     ],
@@ -148,29 +154,32 @@ const GUIDES = {
   },
 };
 
-const STORE = 'megulit-guide-folded';
-function folded() { try { return JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch { return {}; } }
-function remember(section, value) { try { const all = folded(); all[section] = value; localStorage.setItem(STORE, JSON.stringify(all)); } catch { /* storage unavailable */ } }
+const STORE = 'megulit-guide-open';
+function opened() { try { return JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch { return {}; } }
+function remember(section, value) { try { const all = opened(); all[section] = value; localStorage.setItem(STORE, JSON.stringify(all)); } catch { /* storage unavailable */ } }
 
 export function guideSections() { return Object.keys(GUIDES); }
 export function guideText(section, locale = 'zh') {
   const g = GUIDES[section]; if (!g) return '';
   const pick = v => v[locale] || v.zh;
-  return [pick(g.title), ...g.blocks.flatMap(b => [pick(b.head), ...b.steps.map(pick)])].join('\n');
+  return [pick(g.title), ...(g.summary ? [pick(g.summary)] : []), ...g.blocks.flatMap(b => [pick(b.head), ...b.steps.map(pick)])].join('\n');
 }
 
+/* E426 Guides start folded as one short card under the real settings; opening animates the height (grid 0fr to 1fr) and each block is a step card with an icon. */
 export function mountGuide({ content, section, locale = 'zh', esc, api, toast, actions = {} }) {
   const g = GUIDES[section]; if (!g || !content) return () => {};
   const pick = v => v[locale] || v.zh;
   const step = text => esc(pick(text)).replace(/\{(link|act):([a-zA-Z]+)\}/g, (_, kind, id) => kind === 'link'
     ? `<button type="button" class="guide-chip" data-guide-link="${esc(id)}">${esc(pick(LINK_LABEL[id] || T(id, id, id)))} ↗</button>`
     : `<button type="button" class="guide-chip guide-act" data-guide-act="${esc(id)}">${esc(pick(ACTIONS[id] || T(id, id, id)))}</button>`);
-  const card = document.createElement('details');
+  const card = document.createElement('section');
   card.className = 'panel settings-guide';
-  card.open = !folded()[section];
-  card.innerHTML = `<summary><span class="guide-badge">${esc(pick(T('教程', 'Guide', 'ガイド')))}</span>${esc(pick(g.title))}</summary>`
-    + g.blocks.map(b => `<div class="guide-block"><h3>${esc(pick(b.head))}</h3><ol>${b.steps.map(s => `<li>${step(s)}</li>`).join('')}</ol></div>`).join('');
-  card.addEventListener('toggle', () => remember(section, !card.open));
+  const open = !!opened()[section];
+  card.classList.toggle('open', open);
+  card.innerHTML = `<button type="button" class="guide-head" aria-expanded="${open}"><span class="guide-badge">${esc(pick(T('教程', 'Guide', 'ガイド')))}</span><span class="guide-title"><b>${esc(pick(g.title))}</b>${g.summary ? `<small>${esc(pick(g.summary))}</small>` : ''}</span><span class="guide-caret" aria-hidden="true">▾</span></button>`
+    + `<div class="guide-body"><div class="guide-inner">${g.blocks.map((b, i) => `<div class="guide-block"><div class="guide-icon" aria-hidden="true">${esc(b.icon || String(i + 1))}</div><div class="guide-main"><h3>${esc(pick(b.head))}</h3><ol>${b.steps.map(s => `<li>${step(s)}</li>`).join('')}</ol></div></div>`).join('')}</div></div>`;
+  const head = card.querySelector('.guide-head');
+  head.addEventListener('click', () => { const next = !card.classList.contains('open'); card.classList.toggle('open', next); head.setAttribute('aria-expanded', String(next)); remember(section, next); });
   card.querySelectorAll('[data-guide-link]').forEach(button => button.addEventListener('click', () => {
     const url = LINKS[button.dataset.guideLink]; if (!url) return;
     api('open_source', { url }).catch(() => toast && toast(url));
@@ -180,6 +189,6 @@ export function mountGuide({ content, section, locale = 'zh', esc, api, toast, a
     button.disabled = true;
     try { await run(button); } finally { button.disabled = false; }
   }));
-  content.prepend(card);
+  content.append(card);
   return () => card.remove();
 }
