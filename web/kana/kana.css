@@ -1054,3 +1054,15 @@ button.m0,button.m1,button.m2,button.m3{border:0;padding:0;font:inherit;cursor:p
 .mg-board{grid-template-columns:minmax(0,1fr) clamp(260px,24vw,380px)}
 .mg-stage-kana b{font-size:clamp(140px,15vw,240px)}
 @media(max-width:1100px){.mg-board{grid-template-columns:1fr}.mg-rail{grid-template-columns:repeat(6,minmax(0,1fr))}}
+/* 2026-11-11 one screen at full size: the stage, lesson rail and the whole kana board fit; cells follow the height */
+@media(min-width:1200px){
+ .mg-page{gap:10px;padding-top:18px}
+ .mg-hud{padding:8px 16px}
+ .mg-stage{min-height:0;grid-template-columns:minmax(220px,30%) 1fr}
+ .mg-stage-kana b{font-size:clamp(110px,10vw,170px)}.mg-ghost{font-size:300px}
+ .mg-stage-copy{padding:22px 34px;gap:8px}.mg-stage h1{font-size:40px}.mg-cta{height:42px}
+ .mg-rail .mg-lesson{padding:8px 4px 8px;gap:3px}.mg-lesson b{font-size:24px}
+ .mg-board-grid{padding:14px 18px}.mg-board-grid header{margin-bottom:10px}
+ .v-index.mg .mastery{max-width:calc((100vh - 420px) / 5 * 11 + 40px)}
+ .v-index.mg .mastery button{font-size:clamp(16px,2.2vh,24px)}
+}
