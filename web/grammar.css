@@ -326,7 +326,7 @@
 .gm-hero-row{display:flex;align-items:center;gap:24px;margin-top:8px;flex-wrap:wrap}
 .gm-hero-go{display:inline-flex;align-items:center;gap:14px;height:48px;padding:0 28px;border-radius:0;background:var(--mg-red);border:0;color:#fff;font-weight:600;letter-spacing:.2em;transition:gap .3s var(--ease-x),transform .4s var(--ease-x)}
 .gm-hero-go:hover{gap:26px}.gm-hero-go:active{transform:scale(.96)}
-.gm-barcode{display:grid;grid-template-columns:repeat(21,1fr);gap:3px;width:240px;height:22px}
+.gm-barcode{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;width:240px;height:22px}
 .gm-barcode i{background:rgba(255,255,255,.14);transform-origin:bottom}.gm-barcode i.on{background:#fff}.gm-barcode i.cur{background:var(--mg-red)}
 .gm-hero-side{position:relative;border-left:1px dashed var(--mg-line);padding:44px 24px;justify-content:center;gap:8px}
 .gm-hero-level{font:600 36px/1 var(--mg-mono);color:#fff}
@@ -407,3 +407,4 @@
 .gm-lesson .gm-step-dot b{white-space:nowrap;min-width:2.2em;text-align:left}
 .gm-lesson .gm-actions button{border-radius:0;letter-spacing:.12em}
 .gm-lesson .gm-actions .primary{background:var(--mg-red);border:0}
+.gm-lesson .gm-step-dot b{display:inline-block}

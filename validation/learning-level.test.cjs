@@ -15,18 +15,18 @@ test('levels: none → N0, unset at first, and where each one starts',()=>{
  assert.equal(L.recommend('N2').grammar,'N1');assert.equal(L.recommend('N0').reason,'native');
 });
 
-test('choosing a level marks what lies below it as known, and never lowers anything',()=>{
+test('choosing a level marks what lies below it as known, and never lowers anything',async()=>{
  const root=temp(),db=openStore(path.join(root,'test.sqlite'));
  try{
   K.save(root,{mastery:{'あ':1}});
-  let r=L.set(db,root,{level:'kana',kana:['あ','い']});assert.deepEqual(r.applied,{kana:0,grammar:0},'partial kana marks nothing');
+  let r=await L.set(db,root,{level:'kana',kana:['あ','い']});assert.deepEqual(r.applied,{kana:0,grammar:0},'partial kana marks nothing');
   assert.equal(L.get(root).level,'kana');
-  r=L.set(db,root,{level:'N5',kana:['あ','い','ア','きゃ','bad!']});assert.equal(r.applied.kana,4);assert.equal(r.applied.grammar,0,'N5 itself is still to learn');
+  r=await L.set(db,root,{level:'N5',kana:['あ','い','ア','きゃ','bad!']});assert.equal(r.applied.kana,4);assert.equal(r.applied.grammar,0,'N5 itself is still to learn');
   assert.deepEqual(K.read(root).mastery,{'あ':3,'い':3,'ア':3,'きゃ':3});
-  r=L.set(db,root,{level:'N4',kana:[]});assert.equal(r.applied.grammar,G.POINTS.length,'from N4 up every N5 point is learned');
+  r=await L.set(db,root,{level:'N4',kana:[]});assert.equal(r.applied.grammar,G.POINTS.length,'from N4 up every N5 point is learned');
   assert.ok(G.POINTS.every(p=>G.progress(db)[p].learned));
-  r=L.set(db,root,{level:'none',kana:['あ']});assert.equal(K.read(root).mastery['あ'],3,'a lower level later erases nothing');assert.ok(G.progress(db).wa.learned);
-  assert.throws(()=>L.set(db,root,{level:'N9'}),/INVALID_LEARNING_LEVEL/);
+  r=await L.set(db,root,{level:'none',kana:['あ']});assert.equal(K.read(root).mastery['あ'],3,'a lower level later erases nothing');assert.ok(G.progress(db).wa.learned);
+  await assert.rejects(()=>L.set(db,root,{level:'N9'}),/INVALID_LEARNING_LEVEL/);
   const bridge=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');assert.match(bridge,/case 'learning_level':/);assert.match(bridge,/case 'learning_level_set':/);
  }finally{db.close?.();}
 });
@@ -107,4 +107,23 @@ test('假名游戏 is part of 五十音: no own tab, old links open the practice
  const kana=fs.readFileSync(path.join(__dirname,'..','web','kana','kana.js'),'utf8');assert.doesNotMatch(kana,/openTab\('kanagames'\)/);
  const idx=fs.readFileSync(path.join(__dirname,'..','web','kana','views','index.js'),'utf8');
  for(const g of ['pos','seq','conv'])assert.ok(idx.includes(`['${g}',`),g);assert.match(idx,/id="practice"/);assert.match(idx,/ctx\.go\(`play\.html\?g=\$\{b\.dataset\.game\}&d=\$\{diff\}/);
+});
+
+test('N4 → N0: lessons, hits found in lines you read, drag-in exercises, and picking a level marks the ones below',async()=>{
+ const lv=await import('../web/grammar-levels.js'),g=await import('../web/grammar.js');
+ for(const level of lv.LEVEL_LIST)for(const p of lv.levelPoints(level)){
+  assert.match(p.id,/^n[0-4]-[a-z0-9-]+$/);assert.ok(lv.LEVEL_GROUPS[p.group],p.id+' group');assert.ok(['order','particles','classes','conjugation','auxiliary','politeness','aspect','viewpoint','clauses'].includes(p.node),p.id+' node');
+  for(const l of ['zh','ja','en'])assert.ok(p.title[l]&&p.gist[l],p.id+' '+l);
+  assert.ok(p.form.length&&p.uses.length>=2&&p.pitfalls.length>=2&&p.builtin.length>=3,p.id+' content');
+  for(const b of p.builtin)assert.ok(lv.findHit(p,b.ja),p.id+' finds itself in 「'+b.ja+'」');
+  assert.ok(!p.wrong.some(x=>p.hits.includes(x)),p.id+' distractors are not its own forms');
+  const q=g.exercisesFor(p,[],3);assert.ok(q.length>=2,p.id+' has exercises');for(const x of q)assert.ok(x.choices.includes(x.answer)&&x.choices.filter(c=>p.hits.includes(c)).length===1,p.id+' one right answer');
+ }
+ const ba=lv.levelPoints('N4').find(p=>p.id==='n4-ba');assert.equal(lv.findHit(ba,'ばかじゃない'),null,'ば needs a verb before it');assert.equal(lv.findHit(ba,'行けばいい').text,'ば');
+ const list=[{text:'雨が止んだら、外に出よう。',title:'G',gameId:'g',origin:'history',translation:'雨停了就出去。',translationSource:'group'}];
+ const ex=G.levelExamples(list,await G.levels());assert.equal(ex['n4-tara'][0].title,'G');assert.deepEqual([ex['n4-tara'][0].start,ex['n4-tara'][0].end],[4,6]);
+ assert.equal(g.startLevel('N5'),'N4');assert.equal(g.startLevel('none'),'N5');assert.equal(g.startLevel('N0'),'N0');
+ const html=g.listHTML({progress:{}},{locale:'zh',esc,level:'N4'});assert.match(html,/data-point="n4-tara"/);assert.match(html,/N4 · 01 \/ /);
+ assert.ok(G.validPoint('n4-tara'));assert.ok(!G.validPoint('n9-x'));
+ const root=temp(),db=openStore(path.join(root,'t.sqlite'));try{await L.set(db,root,{level:'N3',kana:[]});const pr=G.progress(db);assert.ok(pr.wa.learned&&pr['n4-tara'].learned,'N3 marks N5 and N4');}finally{db.close?.();}
 });

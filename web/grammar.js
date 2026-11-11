@@ -7,6 +7,12 @@
    - exercises: instant feedback; a wrong answer shows how it attaches and gives another line of the same kind
    Every line from a game says the game and the minute it was read. */
 import {N5,LEVELS,GROUPS,blankOf,choicesFor} from './grammar-n5.js';
+import {LEVEL_LIST,LEVEL_GROUPS,levelPoints,findHit} from './grammar-levels.js';
+/* N4 → N0 (2026-11-11): every level is a list of points; N5 keeps its own file, the others are in grammar-levels.js */
+export const pointsOf=level=>level==='N5'?N5:levelPoints(level);
+export const ALL_POINTS=[...N5,...LEVEL_LIST.flatMap(levelPoints)];
+export const levelOf=point=>N5.includes(point)?'N5':LEVEL_LIST.find(l=>levelPoints(l).includes(point))||'N5';
+const nodeFor=p=>p.node||nodeOf(p.id),nodesFor=p=>POINT_NODES[p.id]||[p.node].filter(Boolean);
 import {MAP,POINT_NODES,nodeOf} from './grammar-map.js';
 import {WORDS,FORMS,FORM_LABEL,conjugate} from './conjugate.js';
 import {readTime} from './read-time.js';
@@ -36,20 +42,22 @@ export function meguminIntro(point,real,locale){
  return `${open}${GROUP_FLAVOR[point.group]||'这是拼出一句话的基础魔法阵之一，记住它，台词会突然好懂很多！'}${hook}`;
 }
 /* The lesson to start from: the first N5 point not learned yet. */
-export function nextPoint(prog){return N5.find(p=>!prog?.[p.id]?.learned)||null;}
+export function nextPoint(prog,points=N5){return points.find(p=>!prog?.[p.id]?.learned)||null;}
 const PARTICLES=['は','が','を','に','で','へ','と','も','の'],PARTICLE_POINT={'は':'wa','が':'ga','を':'wo','に':'ni','で':'de','へ':'he','と':'to','も':'mo','の':'no'};
 const CONJ_POINTS={masu:['godan','ichidan','suru','kuru'],te:['godan','ichidan','suru','kuru'],nai:['godan','ichidan','suru','kuru'],ta:['godan','ichidan','suru','kuru'],iadj:['i'],naadj:['na']};
 const CONJ_FORM={masu:'masu',te:'te',nai:'nai',ta:'ta',iadj:'nai',naadj:'nai'};
 const pct=v=>`${Math.round((Number(v)||0)*100)}%`;
 const loc=(o,l)=>o?.[l]||o?.zh||'';
 const motion=()=>typeof matchMedia!=='function'||!matchMedia('(prefers-reduced-motion: reduce)').matches;
-const pointById=id=>N5.find(p=>p.id===id);
+const pointById=id=>ALL_POINTS.find(p=>p.id===id);
 /* A line with the point highlighted; the highlight is a button that opens the explanation. */
 export function highlight(text,start,end,esc,pointId=''){const c=[...String(text||'')];return esc(c.slice(0,start).join(''))+`<mark class="gm-hl"${pointId?` role="button" tabindex="0" data-explain="${esc(pointId)}"`:''}>`+esc(c.slice(start,end).join(''))+'</mark>'+esc(c.slice(end).join(''));}
 export function builtinExamples(point){return point.builtin.map(b=>{const h=[...b.hl],at=b.ja.indexOf(b.hl),start=at<0?0:[...b.ja.slice(0,at)].length;return {text:b.ja,start,end:start+h.length,translation:b.zh,translationSource:'',origin:'builtin',title:'',readAt:null};});}
 /* Exercises: blanks cut from real lines first (only where the blank is one of the point's choices), built-in after. */
 export function exercisesFor(point,real,count=4){
- const out=[];for(const e of [...(real||[]),...builtinExamples(point)]){if(out.length>=count)break;const b=blankOf(point,e.text,e.start,e.end);if(!point.choices.includes(b.answer))continue;if(out.some(x=>x.text===e.text))continue;
+ const out=[];for(const e of [...(real||[]),...builtinExamples(point)]){if(out.length>=count)break;
+  if(point.hits){const h=findHit(point,e.text);if(!h||out.some(x=>x.text===e.text))continue;const n=[...e.text].length+out.length;out.push({...e,start:h.start,end:h.end,blankStart:h.start,blankEnd:h.end,answer:h.text,choices:choicesFor({choices:[h.text,...point.wrong]},h.text,n)});continue;}
+  const b=blankOf(point,e.text,e.start,e.end);if(!point.choices.includes(b.answer))continue;if(out.some(x=>x.text===e.text))continue;
   out.push({...e,blankStart:b.start,blankEnd:b.end,answer:b.answer,choices:choicesFor(point,b.answer,[...e.text].length+out.length)});}
  return out;
 }
@@ -97,7 +105,7 @@ const nodeById=id=>MAP.find(n=>n.id===id);
 export const scenesOf=data=>data?.scenes?.length?data.scenes:SCENES;
 const ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX'],romanOf=id=>ROMAN[MAP.findIndex(n=>n.id===id)]||'';
 const sceneOf=(node,list=SCENES)=>Math.max(0,list.findIndex(s=>s.pieces.some(p=>p[2]===node)));
-function nodeStats(node,prog){const pts=N5.filter(p=>nodeOf(p.id)===node.id||POINT_NODES[p.id]?.includes(node.id));return {pts,learned:pts.filter(p=>prog?.[p.id]?.learned).length};}
+function nodeStats(node,prog){const pts=N5.filter(p=>nodeFor(p)===node.id||nodesFor(p).includes(node.id));return {pts,learned:pts.filter(p=>prog?.[p.id]?.learned).length};}
 export function sentenceHTML(scene,esc,{open='',piece=-1,mini=false}={}){
  return `<p class="gm-sentence${mini?' mini':''}${open?' focus':''}" lang="ja">${scene.pieces.map(([t,role,n],i)=>t==='、'||t==='。'||!role?`<span class="gm-punct">${esc(t)}</span>`:mini?`<span class="gm-piece n-${n}">${esc(t)}</span>`:`<button type="button" class="gm-piece n-${n}${n===open?' on':''}${i===piece?' picked':''}" data-piece="${i}" data-node="${n}" style="--i:${i}"><i class="gm-piece-no">${romanOf(n)}</i><b>${esc(t)}</b><small>${esc(role)}</small></button>`).join('')}</p>`;
 }
@@ -114,14 +122,14 @@ ${stats.pts.length?`<div class="gm-chips">${stats.pts.map(p=>`<button type="butt
 }
 /* ---- list ---- */
 export function listHTML(data,{locale,esc,level='N5',userLevel=null}){
- const w=grammarMessages[locale]||grammarMessages.zh,prog=data?.progress||{},comp=data?.completion||completion(prog),nextId=nextPoint(prog)?.id;
+ const w=grammarMessages[locale]||grammarMessages.zh,prog=data?.progress||{},pts=pointsOf(level),comp=level==='N5'&&data?.completion||completion(prog,pts),nextId=nextPoint(prog,pts)?.id;
  const levels=`<div class="gm-levels" role="tablist">${LEVELS.map(l=>`<button type="button" role="tab" class="gm-level${l===level?' active':''}" data-level="${l}" aria-selected="${l===level}">${l}</button>`).join('')}</div>`;
- const hud=`<header class="gm-hud"><span class="gm-tag"><i></i>megulit · grammar lab</span>${levels}<span class="gm-hud-stats"><span><b>${String(comp.learned).padStart(2,'0')}</b>/${N5.length} ${esc(w.done)}</span><span><b>${comp.accuracy==null?'—':pct(comp.accuracy)}</b>${esc(w.accuracy)}</span><span><b>${data?.real||0}</b>${esc(w.real)}</span></span></header>`;
- if(level!=='N5')return `${hud}<section class="gm-soon"><p>${esc(w.soon)}</p></section>`;
+ const hud=`<header class="gm-hud"><span class="gm-tag"><i></i>megulit · grammar lab</span>${levels}<span class="gm-hud-stats"><span><b>${String(comp.learned).padStart(2,'0')}</b>/${pts.length} ${esc(w.done)}</span><span><b>${comp.accuracy==null?'—':pct(comp.accuracy)}</b>${esc(w.accuracy)}</span><span><b>${data?.real||0}</b>${esc(w.real)}</span></span></header>`;
+ if(!pts.length)return `${hud}<section class="gm-soon"><p>${esc(w.soon)}</p></section>`;
  const overview=`<button type="button" class="gm-overview" data-map><span class="gm-overview-kicker">${esc(w.map)}</span>${sentenceHTML(scenesOf(data)[0],esc,{mini:true})}<span class="gm-cap">${esc(locale==='zh'?'一句你读过的台词，拆成九种零件——点开，一块一块戳着玩 →':w.mapLead)}</span></button>`;
  let no=0;
- const groups=Object.keys(GROUPS).map((g,gi)=>{const items=N5.filter(p=>p.group===g);return `<section class="gm-group"><h3><em>${ROMAN[gi]}</em>${esc(loc(GROUPS[g],locale))}<small>${items.filter(p=>prog[p.id]?.learned).length}/${items.length}</small></h3><div class="gm-cards">${items.map(p=>{no++;const r=prog[p.id]||{},n=data?.examples?.[p.id]?.length||0,node=MAP.find(m=>m.id===nodeOf(p.id)),[head,tail]=loc(p.title,locale).split(/\s*——\s*/);return `<button type="button" class="gm-card${r.learned?' learned':''}${p.id===nextId?' next':''}" data-point="${p.id}"><span class="gm-card-no">${String(no).padStart(2,'0')}</span><span class="gm-card-title" lang="ja">${esc(head)}</span><span class="gm-card-gist">${esc(tail||loc(p.gist,locale))}</span><span class="gm-card-node">${romanOf(node.id)} · ${esc(loc(node.title,locale).split(/[：:]/)[0])}</span><span class="gm-card-meta">${r.learned?`<b>${esc(w.done)}</b>`:p.id===nextId?`<b>${esc(w.nextLesson)}</b>`:''}${r.attempts?`<span>${pct(r.correct/r.attempts)}</span>`:''}${n?`<span>${n} ${locale==='en'?'lines':'句'}</span>`:''}</span></button>`;}).join('')}</div></section>`;}).join('');
- return `${hud}${data?.pending&&data?.counting?`<p class="gm-cap gm-status">${esc(w.counting)}</p>`:''}${heroHTML(data,{locale,esc,userLevel})}${overview}<div class="gm-tracks">${groups}</div>`;
+ const G=level==='N5'?GROUPS:LEVEL_GROUPS;const groups=Object.keys(G).filter(g=>pts.some(p=>p.group===g)).map((g,gi)=>{const items=pts.filter(p=>p.group===g);return `<section class="gm-group"><h3><em>${ROMAN[gi]}</em>${esc(loc(G[g],locale))}<small>${items.filter(p=>prog[p.id]?.learned).length}/${items.length}</small></h3><div class="gm-cards">${items.map(p=>{no++;const r=prog[p.id]||{},n=data?.examples?.[p.id]?.length||0,node=MAP.find(m=>m.id===nodeFor(p)),[head,tail]=loc(p.title,locale).split(/\s*——\s*/);return `<button type="button" class="gm-card${r.learned?' learned':''}${p.id===nextId?' next':''}" data-point="${p.id}"><span class="gm-card-no">${String(no).padStart(2,'0')}</span><span class="gm-card-title" lang="ja">${esc(head)}</span><span class="gm-card-gist">${esc(tail||loc(p.gist,locale))}</span><span class="gm-card-node">${romanOf(node.id)} · ${esc(loc(node.title,locale).split(/[：:]/)[0])}</span><span class="gm-card-meta">${r.learned?`<b>${esc(w.done)}</b>`:p.id===nextId?`<b>${esc(w.nextLesson)}</b>`:''}${r.attempts?`<span>${pct(r.correct/r.attempts)}</span>`:''}${n?`<span>${n} ${locale==='en'?'lines':'句'}</span>`:''}</span></button>`;}).join('')}</div></section>`;}).join('');
+ return `${hud}${data?.pending&&data?.counting?`<p class="gm-cap gm-status">${esc(w.counting)}</p>`:''}${heroHTML(data,{locale,esc,userLevel,level})}${overview}<div class="gm-tracks">${groups}</div>`;
 }
 /* ---- widgets ---- */
 export function conjHTML(pointId,{locale,esc,wordIndex=null,form=null}){
@@ -142,7 +150,7 @@ function splitHTML(e,esc,point,locale){const c=[...e.text],name=loc(point.title,
 /* A lesson: six short steps, one shown at a time; every step is in the page so returning to it is instant. */
 export function lessonHTML(point,data,{locale,esc,step=0}){
  const w=grammarMessages[locale]||grammarMessages.zh,real=data?.examples?.[point.id]||[],r=data?.progress?.[point.id]||{};
- const nodes=(POINT_NODES[point.id]||[]).map(id=>MAP.find(n=>n.id===id)).filter(Boolean);
+ const nodes=nodesFor(point).map(id=>MAP.find(n=>n.id===id)).filter(Boolean);
  const lead=real[0]||builtinExamples(point)[0];
  const intro=`<div class="gm-megu"><span class="gm-megu-seal" aria-hidden="true">惠</span><p class="gm-bubble">${esc(meguminIntro(point,real,locale))}</p></div><p class="gm-gist">${esc(loc(point.gist,locale))}</p>${lead?`<div class="gm-lead-line"><p class="gm-ja" lang="ja">${highlight(lead.text,lead.start,lead.end,esc,point.id)}</p>${lead.translation?`<p class="gm-tr">${esc(lead.translation)}</p>`:''}${lead.title?`<p class="gm-cap">${esc(sourceLabel(lead,w,locale))}</p>`:''}<button type="button" class="gm-link" data-speak="${esc(lead.text)}">${esc(w.speak)}</button></div>`:''}`;
  const form=`<ol class="gm-formulas">${point.form.map(([a,b],i)=>`<li style="--row:${i}"><div class="gm-formula">${formulaHTML(a,esc)}</div><span class="gm-arrow" aria-hidden="true">→</span><button type="button" class="gm-formula-ex" data-speak="${esc(b)}" lang="ja">${esc(b)}</button></li>`).join('')}</ol>`;
@@ -153,7 +161,7 @@ export function lessonHTML(point,data,{locale,esc,step=0}){
  const practice=`<div data-quiz aria-live="polite"></div><div class="gm-actions"><button type="button" class="${r.learned?'secondary':'primary'}" data-learned="${r.learned?'0':'1'}">${esc(r.learned?w.unmark:w.finishStep)}</button></div>`;
  const bodies={intro,form,play,uses,games,practice},s=Math.max(0,Math.min(STEPS.length-1,step));
  const nav=`<ol class="gm-steps" role="tablist">${STEPS.map((k,i)=>`<li><button type="button" role="tab" class="gm-step-dot${i===s?' active':''}${i<s?' passed':''}" data-step="${i}" aria-selected="${i===s}"><b>${i+1}</b><span>${esc(w.steps[k])}</span></button></li>`).join('')}</ol>`;
- return `<button type="button" class="gm-link gm-back" data-back>${esc(w.back)}</button><article class="gm-lesson"><header class="gm-lesson-head"><span class="gm-tag"><i></i>megulit · lesson ${String(N5.indexOf(point)+1).padStart(2,'0')}</span><div class="gm-onmap"><span class="gm-cap">${esc(w.onMap)}</span>${nodes.map(n=>`<button type="button" class="gm-chip" data-map="${n.id}">${esc(n.no)} · ${esc(loc(n.title,locale))}</button>`).join('')}</div><h2><span lang="ja">${esc(loc(point.title,locale).split(/\s*——\s*/)[0])}</span><small>${esc(loc(point.title,locale).split(/\s*——\s*/)[1]||'')}</small></h2></header>
+ return `<button type="button" class="gm-link gm-back" data-back>${esc(w.back)}</button><article class="gm-lesson"><header class="gm-lesson-head"><span class="gm-tag"><i></i>megulit · ${levelOf(point).toLowerCase()} · lesson ${String(pointsOf(levelOf(point)).indexOf(point)+1).padStart(2,'0')}</span><div class="gm-onmap"><span class="gm-cap">${esc(w.onMap)}</span>${nodes.map(n=>`<button type="button" class="gm-chip" data-map="${n.id}">${esc(n.no)} · ${esc(loc(n.title,locale))}</button>`).join('')}</div><h2><span lang="ja">${esc(loc(point.title,locale).split(/\s*——\s*/)[0])}</span><small>${esc(loc(point.title,locale).split(/\s*——\s*/)[1]||'')}</small></h2></header>
 ${nav}<div class="gm-lesson-main">${STEPS.map((k,i)=>`<section class="gm-stepbody gm-step-${k}" data-stepbody="${i}"${i===s?'':' hidden'}>${bodies[k]}</section>`).join('')}
 <footer class="gm-stepnav"><button type="button" class="secondary" data-prev${s===0?' disabled':''}>${esc(w.prev)}</button><span class="gm-cap" data-stepof>${esc(w.stepOf.replace('{n}',s+1).replace('{t}',STEPS.length))}</span><button type="button" class="primary" data-nextstep${s===STEPS.length-1?' hidden':''}>${esc(w.nextStep)}</button></footer></div></article>`;
 }
@@ -165,15 +173,17 @@ export function quizHTML(point,q,{locale,esc,answered=null,index=0,total=1,retry
   :`<div class="gm-verdict bad"><b>${esc(w.wrongQuip||'')} ${esc(`${w.wrong}「${q.answer}」`)}</b><p class="gm-cap">${esc(w.correctForm)}</p><table class="gm-form gm-form-mini"><tbody>${point.form.slice(0,3).map(([a,b])=>`<tr><th>${esc(a)}</th><td lang="ja">${esc(b)}</td></tr>`).join('')}</tbody></table>${point.pitfalls[0]?`<p class="gm-cap">${esc(point.pitfalls[0])}</p>`:''}${q.translation?`<p class="gm-tr">${esc(q.translation)}</p>`:''}<button type="button" class="primary" data-retry>${esc(w.retry)}</button></div>`;
  return `<p class="gm-cap">${esc(w.check)} · ${index+1}/${total}${retry?' · '+esc(w.retry):''}</p><p class="gm-ja gm-q" lang="ja">${line}</p>${src?`<p class="gm-cap">${esc(src)}</p>`:''}<div class="gm-choices">${q.choices.map(ch=>`<button type="button" class="gm-choice gm-drag${answered!=null&&ch===q.answer?' right':''}${answered===ch&&!ok?' wrong':''}"${answered==null?' draggable="true"':''} data-choice="${esc(ch)}"${answered!=null?' disabled':''} lang="ja">${esc(ch)}</button>`).join('')}</div>${verdict}`;
 }
-export function completion(prog){let learned=0,attempts=0,correct=0;for(const p of N5){const r=prog?.[p.id];if(r?.learned)learned++;attempts+=r?.attempts||0;correct+=r?.correct||0;}return {learned,total:N5.length,share:learned/N5.length,accuracy:attempts?correct/attempts:null};}
+export function completion(prog,points=N5){let learned=0,attempts=0,correct=0;for(const p of points){const r=prog?.[p.id];if(r?.learned)learned++;attempts+=r?.attempts||0;correct+=r?.correct||0;}return {learned,total:points.length,share:points.length?learned/points.length:0,accuracy:attempts?correct/attempts:null};}
 /* The hero on top of the list: the lesson to take next, and your level (changeable here). */
-export function heroHTML(data,{locale,esc,userLevel=null}){
- const w=grammarMessages[locale]||grammarMessages.zh,prog=data?.progress||{},p=nextPoint(prog),i=p?N5.indexOf(p):N5.length;
+export function heroHTML(data,{locale,esc,userLevel=null,level='N5'}){
+ const w=grammarMessages[locale]||grammarMessages.zh,prog=data?.progress||{},pts=pointsOf(level),p=nextPoint(prog,pts),i=p?pts.indexOf(p):pts.length;
  const [head,tail]=p?loc(p.title,locale).split(/\s*——\s*/):[w.allDone,''];
- const bars=`<div class="gm-barcode" aria-hidden="true">${N5.map(x=>`<i class="${prog[x.id]?.learned?'on':x===p?'cur':''}"></i>`).join('')}</div>`;
- const main=p?`<span class="gm-kicker">${esc(w.nextLesson)} · ${String(i+1).padStart(2,'0')} / ${N5.length}</span><h2><span class="gm-hero-ja" lang="ja" data-type>${esc(head)}</span>${tail?`<small>${esc(tail)}</small>`:''}</h2><p class="gm-hero-gist">${esc(loc(p.gist,locale))}</p><div class="gm-hero-row"><button type="button" class="primary gm-hero-go" data-point="${p.id}">${esc(w.continueLesson)} <span aria-hidden="true">→</span></button>${bars}</div>`:`<h2>${esc(w.allDone)}</h2>${bars}`;
+ const bars=`<div class="gm-barcode" aria-hidden="true">${pts.map(x=>`<i class="${prog[x.id]?.learned?'on':x===p?'cur':''}"></i>`).join('')}</div>`;
+ const main=p?`<span class="gm-kicker">${esc(w.nextLesson)} · ${level} · ${String(i+1).padStart(2,'0')} / ${pts.length}</span><h2><span class="gm-hero-ja" lang="ja" data-type>${esc(head)}</span>${tail?`<small>${esc(tail)}</small>`:''}</h2><p class="gm-hero-gist">${esc(loc(p.gist,locale))}</p><div class="gm-hero-row"><button type="button" class="primary gm-hero-go" data-point="${p.id}">${esc(w.continueLesson)} <span aria-hidden="true">→</span></button>${bars}</div>`:`<h2>${esc(w.allDone)}</h2>${bars}`;
  return `<section class="gm-hero"><span class="gm-hero-ghost" aria-hidden="true" lang="ja">${esc([...head][0]||'文')}</span><div class="gm-hero-main">${main}</div><div class="gm-hero-side"><span class="gm-cap">${esc(w.myLevel)}</span><b class="gm-hero-level">${esc(userLevel?levelName(userLevel):w.noLevel)}</b><button type="button" class="gm-link" data-change-level>${esc(w.changeLevel)}</button><p class="gm-cap">${esc(w.pathLead)}</p></div><span class="gm-corner tl"></span><span class="gm-corner br"></span></section>`;
 }
+/* The level to open: the one above yours (N5 for beginners, N0 stays N0). */
+export function startLevel(user){if(!user||user==='none'||user==='kana')return 'N5';const i=LEVELS.indexOf(user);return i<0?'N5':LEVELS[Math.min(LEVELS.length-1,i+1)];}
 /* ---- page ---- */
 /* Kept between visits (user: going into a lesson and back reloaded everything): the report, the view, the step. */
 const memo={data:null,at:0,level:'N5',view:'list',point:'',openNode:'',scene:null,piece:-1,step:0,userLevel:undefined};
@@ -188,10 +198,10 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
  const enter=()=>{if(!motion())return;root.animate([{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],{duration:220,easing:'cubic-bezier(.2,.7,.2,1)'});};
  const go=next=>{view=next;save();render();enter();root.scrollIntoView?.({block:'start'});};
  const openPoint=id=>{point=pointById(id);step=0;go('lesson');};
- async function changeLevel(){const {openLevelPicker}=await import('./learning-level.js');const r=await openLevelPicker({api,esc,toast,current:memo.userLevel||null});if(!r||!isCurrent())return;memo.userLevel=r.level;await load(false);render();}
+ async function changeLevel(){const {openLevelPicker}=await import('./learning-level.js');const r=await openLevelPicker({api,esc,toast,current:memo.userLevel||null});if(!r||!isCurrent())return;memo.userLevel=r.level;level=startLevel(r.level);await load(false);render();}
  function render(){save();if(view==='lesson'&&point)return renderLesson();if(view==='map')return renderMap();
   root.innerHTML=listHTML(data||{},{locale,esc,level,userLevel:memo.userLevel});
-  root.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>{level=b.dataset.level;render();});
+  root.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>{level=b.dataset.level;memo.levelPicked=true;render();fx.focus(root.querySelector('.gm-hero'));});
   root.querySelector('[data-map]')?.addEventListener('click',()=>{openNode='';scene=null;piece=-1;go('map');});
   root.querySelector('[data-change-level]')?.addEventListener('click',changeLevel);
   {const t=root.querySelector('[data-type]');if(t)fx.type(t,t.textContent);fx.focus(root.querySelector('.gm-hero-main'));if(motion())root.querySelectorAll('.gm-barcode i').forEach((b,i)=>b.animate([{transform:'scaleY(0)'},{transform:'none'}],{duration:320,delay:200+i*22,easing:'cubic-bezier(.16,1,.3,1)',fill:'backwards'}));}
@@ -247,7 +257,7 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
   root.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>showStep(Number(b.dataset.step)));
   root.querySelector('[data-prev]').onclick=()=>showStep(step-1);root.querySelector('[data-nextstep]').onclick=()=>showStep(step+1);
   root.querySelector('[data-split-toggle]')?.addEventListener('click',e=>{const on=root.querySelector('.gm-splits')?.classList.toggle('apart');e.currentTarget.textContent=on?w.merge:w.split;});
-  root.querySelector('[data-learned]').onclick=async event=>{const on=event.currentTarget.dataset.learned==='1';try{const r=await api('grammar_learned',{point:point.id,learned:on});data={...(data||{}),progress:{...(data?.progress||{}),[point.id]:r}};data.completion=completion(data.progress);const n=on?nextPoint(data.progress):null;if(n){toast?.(`${loc(point.title,locale)} ✓ · ${w.nextLesson}：${loc(n.title,locale)}`);openPoint(n.id);}else renderLesson();}catch(error){toast?.(String(error?.message||error));}};
+  root.querySelector('[data-learned]').onclick=async event=>{const on=event.currentTarget.dataset.learned==='1';try{const r=await api('grammar_learned',{point:point.id,learned:on});data={...(data||{}),progress:{...(data?.progress||{}),[point.id]:r}};data.completion=completion(data.progress);const n=on?nextPoint(data.progress,pointsOf(levelOf(point))):null;if(n){toast?.(`${loc(point.title,locale)} ✓ · ${w.nextLesson}：${loc(n.title,locale)}`);openPoint(n.id);}else renderLesson();}catch(error){toast?.(String(error?.message||error));}};
   root.querySelectorAll('[data-anki]').forEach(b=>b.onclick=async()=>{const e=real[Number(b.dataset.anki)];b.disabled=true;try{await api('grammar_anki',{point:point.id,title:loc(point.title,'zh'),gist:loc(point.gist,'zh'),example:e});b.textContent=w.ankiDone;}catch{b.disabled=false;toast?.(w.ankiFail);}});
   root.querySelectorAll('[data-speak]').forEach(b=>b.onclick=()=>speak(b.dataset.speak,b));
   root.querySelectorAll('[data-explain]').forEach(m=>{m.onclick=e=>{e.stopPropagation();explain(m);};m.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();explain(m);}};m.onmouseenter=()=>explain(m);});
@@ -264,7 +274,7 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
    box.querySelector('[data-retry]')?.addEventListener('click',()=>{const missed=order[i],next=rest.shift()||order.find((q,k)=>k!==i&&q.text!==missed.text)||missed;rest.push(missed);order.splice(i+1,0,next);answered=null;retry=true;i=i+1;draw();});};
   draw();
  }
- if(memo.userLevel===undefined)api('learning_level').then(r=>{memo.userLevel=r?.level||null;if(isCurrent()&&view==='list')render();}).catch(()=>{memo.userLevel=null;});
+ if(memo.userLevel===undefined)api('learning_level').then(r=>{memo.userLevel=r?.level||null;if(!memo.levelPicked){level=startLevel(memo.userLevel);save();}if(isCurrent()&&view==='list')render();}).catch(()=>{memo.userLevel=null;});
  render();
  if(!data)await load(false);
  if(isCurrent()&&(Date.now()-memo.at>FRESH_MS||data?.pending))load(true);

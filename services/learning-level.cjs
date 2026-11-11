@@ -15,7 +15,7 @@ function recommend(level){
   if(level==='N0')return {tab:'readwords',grammar:'N0',reason:'native'};
   return {tab:'grammar',grammar:LEVELS[rank(level)+1],reason:'grammar'};
 }
-function set(db,root,{level,kana=[]}={}){
+async function set(db,root,{level,kana=[]}={}){
   if(!LEVELS.includes(level))throw Error('INVALID_LEARNING_LEVEL');
   const file=FILE(root);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify({level,setAt:Date.now()}));
   const applied={kana:0,grammar:0};
@@ -26,7 +26,7 @@ function set(db,root,{level,kana=[]}={}){
   }
   if(rank(level)>=rank('N4')&&db){
     const g=require('./grammar.cjs'),prog=g.progress(db);
-    for(const p of g.POINTS)if(!prog[p]?.learned){g.setLearned(db,p,true);applied.grammar++;}
+    for(const p of await g.pointsBelow(level==='N0'?'N0':level))if(!prog[p]?.learned){g.setLearned(db,p,true);applied.grammar++;}
   }
   return {level,applied,recommend:recommend(level)};
 }

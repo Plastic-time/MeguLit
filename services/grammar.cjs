@@ -114,9 +114,10 @@ function examples(db,list,{max=5}={}){
 }
 /* ---- progress ---- */
 function progress(db){ensure(db);const rows=db.prepare('SELECT * FROM grammar_progress').all();return Object.fromEntries(rows.map(r=>[r.point,{learned:r.learned_at!=null,attempts:r.attempts,correct:r.correct}]));}
-function setLearned(db,point,learned=true){if(!POINTS.includes(point))throw Error('INVALID_GRAMMAR_POINT');ensure(db);const now=Math.floor(Date.now()/1000);
+const validPoint=p=>POINTS.includes(p)||/^n[0-4]-[a-z0-9-]{1,40}$/.test(p);
+function setLearned(db,point,learned=true){if(!validPoint(point))throw Error('INVALID_GRAMMAR_POINT');ensure(db);const now=Math.floor(Date.now()/1000);
   db.prepare('INSERT INTO grammar_progress(point,learned_at,updated_at) VALUES(?,?,?) ON CONFLICT(point) DO UPDATE SET learned_at=excluded.learned_at,updated_at=excluded.updated_at').run(point,learned?now:null,now);return progress(db)[point];}
-function recordAnswer(db,point,correct){if(!POINTS.includes(point))throw Error('INVALID_GRAMMAR_POINT');ensure(db);const now=Math.floor(Date.now()/1000);
+function recordAnswer(db,point,correct){if(!validPoint(point))throw Error('INVALID_GRAMMAR_POINT');ensure(db);const now=Math.floor(Date.now()/1000);
   db.prepare('INSERT INTO grammar_progress(point,attempts,correct,updated_at) VALUES(?,1,?,?) ON CONFLICT(point) DO UPDATE SET attempts=attempts+1,correct=correct+excluded.correct,updated_at=excluded.updated_at').run(point,correct?1:0,now);return progress(db)[point];}
 /* Completion of a level: a point counts once it is marked learned; accuracy over all answers. */
 function completion(prog,points=POINTS){let learned=0,attempts=0,correct=0;for(const p of points){const r=prog[p];if(r?.learned)learned++;attempts+=r?.attempts||0;correct+=r?.correct||0;}return {learned,total:points.length,share:points.length?learned/points.length:0,accuracy:attempts?correct/attempts:null};}
@@ -174,17 +175,32 @@ async function scenes(db,list,tokenize,{max=4,budget=12}={}){
   for(const f of found.sort((a,b)=>b.kinds-a.kinds||(b.c.translation?1:0)-(a.c.translation?1:0))){if(pick.length>=max)break;if(games.has(f.c.gameId)&&found.some(x=>!pick.includes(x)&&!games.has(x.c.gameId)))continue;pick.push(f);games.add(f.c.gameId);}
   return pick.map(({c,pieces})=>({label:c.title||'',ja:c.text,zh:c.translation||'',translationSource:c.translationSource||'',origin:c.origin,readAt:c.readAt,readBy:c.readBy,real:true,pieces}));
 }
+/* ---- N4 → N0 (2026-11-11) ----
+   Those lessons live in web/grammar-levels.js (shared with the page). Each point lists the surface forms that mark it;
+   the lines you read are searched for them directly (no tokenizer needed), the best few become its examples. */
+let levelsMod=null;
+async function levels(){if(!levelsMod){try{levelsMod=await import(require('url').pathToFileURL(require('path').join(__dirname,'..','web','grammar-levels.js')).href);}catch{levelsMod={LEVEL_LIST:[],levelPoints:()=>[],findHit:()=>null};}}return levelsMod;}
+function levelExamples(list,mod,{max=5}={}){
+  const out={},score=e=>(insights.isHuman(e.translationSource)?4:e.translation?1:0)+(e.origin==='history'?2:0)+([...e.text].length<=40?1:0);
+  for(const level of mod.LEVEL_LIST)for(const p of mod.levelPoints(level)){const found=[];
+    for(const c of list){if(found.length>=40)break;const h=mod.findHit(p,c.text);if(h)found.push({text:c.text,origin:c.origin,gameId:c.gameId,title:c.title,translation:c.translation,translationSource:c.translationSource,start:h.start,end:h.end,ruby:c.ruby,readAt:c.readAt,readBy:c.readBy});}
+    const pick=[],games=new Map();for(const e of found.sort((a,b)=>score(b)-score(a))){if(pick.length>=max)break;if((games.get(e.gameId)||0)>=2&&found.some(x=>!pick.includes(x)&&(games.get(x.gameId)||0)<2))continue;pick.push(e);games.set(e.gameId,(games.get(e.gameId)||0)+1);}
+    out[p.id]=pick;}
+  return out;
+}
+/* Ids of every point below a level: N5 first, then N4 → N1 (used when the learner picks a level). */
+async function pointsBelow(level){const mod=await levels(),order=['N5',...mod.LEVEL_LIST],i=order.indexOf(level);return i<0?[]:order.slice(0,i).flatMap(l=>l==='N5'?POINTS:mod.levelPoints(l).map(p=>p.id));}
 /* The page's data: examples per point from your reading, progress and completion. */
 async function report(db,{root=null,scriptPairs=null,tokenize=null,deadline}={}){
   /* one tokenizer cache per report: the line cutter for the map reuses what the grammar scan already tokenized */
   const seen=new Map(),tk=tokenize&&(text=>{if(!seen.has(text))seen.set(text,tokenize(text));return seen.get(text);});
   const list=candidates(db,{root,scriptPairs});const state=await refresh(db,list,tk,{deadline});
-  const ex=examples(db,list),prog=progress(db),sc=await scenes(db,list,tk);
-  return {scenes:sc,level:'N5',points:POINTS,examples:ex,progress:prog,completion:completion(prog),pending:state.pending,lines:{history:list.filter(c=>c.origin==='history').length,script:list.filter(c=>c.origin==='script').length},real:Object.values(ex).reduce((n,l)=>n+l.length,0)};
+  const ex=examples(db,list),prog=progress(db),sc=await scenes(db,list,tk),lx=levelExamples(list,await levels());
+  return {scenes:sc,level:'N5',points:POINTS,examples:{...ex,...lx},progress:prog,completion:completion(prog),pending:state.pending,lines:{history:list.filter(c=>c.origin==='history').length,script:list.filter(c=>c.origin==='script').length},real:Object.values({...ex,...lx}).reduce((n,l)=>n+l.length,0)};
 }
 /* An Anki note for a grammar line, through the existing card flow (one note per point and line). */
 function ankiWord(point,title,gist,example){
   const label=String(title||point);
   return {surface:label,base:label,reading:label,noReading:true,cardKey:'grammar:'+point+':'+example.text,meaning:String(gist||''),pos:'N5 语法',pitch:[],sentence:example.text};
 }
-module.exports={cutLine,scenes,POINTS,PREFILTER,matchPoints,rubyPairs,ensure,candidates,refresh,examples,progress,setLearned,recordAnswer,completion,report,ankiWord};
+module.exports={levels,levelExamples,pointsBelow,validPoint,cutLine,scenes,POINTS,PREFILTER,matchPoints,rubyPairs,ensure,candidates,refresh,examples,progress,setLearned,recordAnswer,completion,report,ankiWord};
