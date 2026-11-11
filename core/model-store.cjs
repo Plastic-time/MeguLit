@@ -14,7 +14,8 @@ const MODELS=[
  {id:'qwen3_8b',label:'Qwen3 8B（通用模型）',repo:'Qwen/Qwen3-8B-GGUF',file:'Qwen3-8B-Q4_K_M.gguf',size:4.68,vram:8},
 ];
 // HuggingFace, or its mainland China mirror.
-const SOURCES={hf:'https://huggingface.co',mirror:'https://hf-mirror.com'};
+/* E448 every source is tried in turn (the chosen one first), then MeguLit's own relay; a source that sends nothing for 30 s is dropped */
+const SOURCES={hf:'https://huggingface.co',mirror:'https://hf-mirror.com',megulit:'https://dl.megulit.com/hf'};
 
 class ModelStore{
  constructor(root){this.dir=path.join(root,'models');this.jobs={};}
@@ -27,13 +28,21 @@ class ModelStore{
   const target=this.file(m),part=target+'.part';
   (async()=>{try{
     fs.mkdirSync(this.dir,{recursive:true});
-    const res=await fetch(base+'/'+m.repo+'/resolve/main/'+encodeURIComponent(m.file)+'?download=true',{redirect:'follow',signal:controller.signal});
-    if(!res.ok||!res.body)throw Error('下载失败 HTTP '+res.status);job.total=Number(res.headers.get('content-length'))||Math.round(m.size*1073741824);
-    const out=fs.createWriteStream(part);
-    try{for await(const chunk of res.body){job.received+=chunk.length;if(!out.write(chunk))await new Promise(r=>out.once('drain',r));}}finally{await new Promise(r=>out.end(r));}
-    if(job.total&&job.received<job.total)throw Error('下载不完整，请重试');
+    const order=[base,...Object.values(SOURCES).filter(x=>x!==base)];let last=null,done=false;
+    for(const src of order){if(controller.signal.aborted)break;
+     const attempt=new AbortController(),stop=()=>attempt.abort();controller.signal.addEventListener('abort',stop,{once:true});let idle=setTimeout(stop,30000);
+     try{let have=0;try{have=fs.statSync(part).size;}catch{}
+      const res=await fetch(src+'/'+m.repo+'/resolve/main/'+encodeURIComponent(m.file)+(src.includes('dl.megulit.com')?'':'?download=true'),{redirect:'follow',signal:attempt.signal,headers:have?{Range:'bytes='+have+'-'}:{}});
+      if(!res.ok||!res.body)throw Error('HTTP '+res.status);const resumed=have>0&&res.status===206;if(!resumed)have=0;
+      job.total=have+(Number(res.headers.get('content-length'))||0)||Math.round(m.size*1073741824);job.received=have;
+      const out=fs.createWriteStream(part,{flags:resumed?'a':'w'});
+      try{for await(const chunk of res.body){clearTimeout(idle);idle=setTimeout(stop,30000);job.received+=chunk.length;if(!out.write(chunk))await new Promise(r=>out.once('drain',r));}}finally{await new Promise(r=>out.end(r));}
+      if(job.total&&job.received<job.total)throw Error('incomplete');done=true;break;
+     }catch(e){last=e;}finally{clearTimeout(idle);controller.signal.removeEventListener('abort',stop);}
+    }
+    if(!done&&!controller.signal.aborted)throw Error('下载失败：HuggingFace、国内镜像和 MeguLit 中转都连不上（'+String(last?.message||last||'')+'），请检查网络后重试');
     fs.renameSync(part,target);job.state='done';
-   }catch(e){try{fs.rmSync(part,{force:true});}catch{}job.state=controller.signal.aborted?'cancelled':'error';job.error=controller.signal.aborted?'':String(e.message||e);}})();
+   }catch(e){job.state=controller.signal.aborted?'cancelled':'error';job.error=controller.signal.aborted?'':String(e.message||e);}})();
   return this.status();
  }
  cancel(id){this.jobs[id]?.controller.abort();return this.status();}

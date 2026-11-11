@@ -193,7 +193,19 @@ function hex(buf) {
 }
 
 const HF_REPOS = new Set(['tsukumijima/deberta-v2-large-japanese-char-wwm-onnx']);
+/* E448 offline translation models (GGUF, up to ~8 GB, too large to keep in R2): streamed straight from Hugging Face,
+   Range passed through so the app can resume. Only these repositories. */
+const HF_PROXY = new Set(['SakuraLLM/GalTransl-v4-4B-2601','SakuraLLM/Sakura-GalTransl-7B-v3.7','SakuraLLM/Sakura-7B-Qwen2.5-v1.0-GGUF','SakuraLLM/Sakura-GalTransl-14B-v3.8','SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF','Qwen/Qwen3-8B-GGUF']);
 async function serveModel(request, env, ctx, rest) {
+  const p = /^([\w.-]+\/[\w.-]+)\/resolve\/main\/([\w.%-]+\.gguf)$/.exec(rest);
+  if (p && HF_PROXY.has(p[1])) {
+    const headers = new Headers();
+    const range = request.headers.get('range'); if (range) headers.set('range', range);
+    const up = await fetch(`https://huggingface.co/${p[1]}/resolve/main/${p[2]}?download=true`, { headers, redirect: 'follow' });
+    const out = new Headers(cors());
+    for (const h of ['content-length', 'content-range', 'accept-ranges', 'content-type', 'etag']) { const v = up.headers.get(h); if (v) out.set(h, v); }
+    return new Response(request.method === 'HEAD' ? null : up.body, { status: up.status, headers: out });
+  }
   const m = /^([\w.-]+\/[\w.-]+)\/resolve\/([0-9a-f]{40})\/([\w.-]+)$/.exec(rest);
   if (!m || !HF_REPOS.has(m[1])) return new Response('not found', { status: 404 });
   const key = `files/hf/${m[1]}/${m[2]}/${m[3]}`;
