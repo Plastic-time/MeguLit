@@ -55,6 +55,7 @@ const DRAWS={
  skid:()=>{const sx=pickOne([-1,1]);return {f:[[0,at(sx*-220,8,sx*-12,1)],[.22,at(sx*24,2,sx*6,1),'cubic-bezier(.1,.8,.3,1)'],[.34,at(sx*-5,0,sx*-2,1),E3],[.44,at(0,0,0,1),E1]]};},
  heli:()=>{const k=pickOne([-1,1]);return {f:[[0,at(rnd(-30,30),-190,0,.6,UP(1.5))],[.42,at(0,0,k*720,1),'cubic-bezier(.2,.6,.3,1)']]};}};
 const PILE_IN=620;
+function placePile(pile,cover){const home=cover.closest('.tv-home').getBoundingClientRect(),r=cover.getBoundingClientRect(),w=cover.offsetWidth*1.06,h=w*4/3;pile.style.width=w+'px';pile.style.left=(r.left+r.width/2-home.left-w/2)+'px';pile.style.top=(r.top+r.height/2-home.top-h/2)+'px';}
 function pileMotion(pile,kind,total,delay){const cards=[...pile.children],top=cards[cards.length-1],rest=cards.slice(0,-1),base=c=>c.style.transform;
  pile.getAnimations().forEach(x=>x.cancel());const inMs=PILE_IN,from=pickOne([['-120%','70%',-28],['-50%','130%',-10],['60%','110%',18]]);pile.animate([{opacity:0,translate:`${from[0]} ${from[1]}`,rotate:`${from[2]}deg`,scale:'.85',easing:'cubic-bezier(.3,.75,.3,1)'},{opacity:1,translate:'0 0',rotate:'0deg',scale:'1',offset:inMs/(inMs+total),easing:'linear'},{opacity:1,translate:'0 0',rotate:'0deg',scale:'1',offset:(inMs+total*.42)/(inMs+total),easing:'cubic-bezier(.4,0,.6,1)'},{opacity:0,translate:'-8% 14%',rotate:'-6deg',scale:'.94',offset:(inMs+total*.62)/(inMs+total),easing:'linear'},{opacity:0,translate:'-8% 14%',rotate:'-6deg',scale:'.94'}],{duration:inMs+total,delay:Math.max(0,delay-inMs),easing:'linear',fill:'both'});
  cards.forEach((c,n)=>c.animate([{opacity:0,translate:'0 -34px',rotate:`${(n%2?1:-1)*6}deg`},{opacity:1,translate:'0 0',rotate:'0deg'}],{duration:320,delay:Math.max(0,delay-inMs)+180+n*55,easing:'cubic-bezier(.2,.9,.3,1)',fill:'backwards'}));
@@ -73,7 +74,7 @@ function springTrack(targets,feel){const ch=['x','y','r','s','z','rx','ry','sx',
   if(Math.round(t/dt)%4===0)out.push({t,p:{...pos},v:{x:vel.x,y:vel.y}});
   t+=dt;if(t>last&&!moving){if(++settled>12)break;}else settled=0;}
  return out;}
-function deal(cover,background,animate,mode='draw'){const flip=cover.querySelector('.tv-flip'),face=cover.querySelector('.tv-face'),artEl=cover.querySelector('.tv-art'),backFace=flip.querySelector('.tv-back'),pile=cover.parentNode.querySelector('.tv-pile');cover.querySelectorAll('.tv-old,.tv-sheen').forEach(n=>n.remove());[flip,face,artEl,backFace,...(pile?[pile,...pile.children]:[])].forEach(el=>el.getAnimations().forEach(x=>x.cancel()));
+function deal(cover,background,animate,mode='draw'){const flip=cover.querySelector('.tv-flip'),face=cover.querySelector('.tv-face'),artEl=cover.querySelector('.tv-art'),backFace=flip.querySelector('.tv-back'),pile=cover.closest('.tv-home')?.querySelector(':scope>.tv-pile');cover.querySelectorAll('.tv-old,.tv-sheen').forEach(n=>n.remove());[flip,face,artEl,backFace,...(pile?[pile,...pile.children]:[])].forEach(el=>el.getAnimations().forEach(x=>x.cancel()));
  if(!animate||matchMedia('(prefers-reduced-motion:reduce)').matches||!artEl.style.background){artEl.style.background=background;return 0;}
  if(mode==='fade'){const fresh=document.createElement('div');fresh.className='tv-old';fresh.style.background=background;cover.appendChild(fresh);const a=fresh.animate([{opacity:0,filter:'blur(10px) saturate(.6)',transform:'scale(1.04)'},{opacity:1,filter:'blur(0) saturate(1)',transform:'none'}],{duration:760,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'});a.finished.then(()=>{artEl.style.background=background;fresh.remove();},()=>fresh.remove());return 260;}
  const outDir=rnd(0,Math.PI*2),outDur=rnd(360,460);
@@ -91,7 +92,7 @@ function deal(cover,background,animate,mode='draw'){const flip=cover.querySelect
  const frames=track.map(({t,p,v})=>{const lean=Math.max(-14,Math.min(14,v.x*feel.drag)),pitch=Math.max(-12,Math.min(12,-v.y*feel.drag*.8));return {offset:Math.min(1,t*1000/total),transform:`translate(${p.x.toFixed(2)}%,${p.y.toFixed(2)}%) translateZ(${p.z.toFixed(1)}px) rotateX(${(p.rx+pitch).toFixed(2)}deg) rotate(${(p.r+lean).toFixed(2)}deg) rotateY(${p.ry.toFixed(2)}deg) scale(${p.s.toFixed(4)}) scaleX(${p.sx.toFixed(3)}) scaleY(${p.sy.toFixed(3)})`};});
  frames[0].offset=0;frames[frames.length-1]={offset:1,transform:`translate(0%,0%) translateZ(0px) rotateX(0deg) rotate(${R}deg) rotateY(0deg) scale(1) scaleX(1) scaleY(1)`};
  const swapAt=track.find(f=>Math.abs(f.p.ry)<90)?.t*1000||total*.7,mid=Math.min(.999,swapAt/total),delay=gap*1000+(style.pile&&pile?PILE_IN:0),timing={duration:total,delay,easing:'linear',fill:'backwards'};
- if(pile&&style.pile){pileCards(pile);pileMotion(pile,style.pile,total,delay);}
+ if(pile&&style.pile){placePile(pile,cover);pileCards(pile);pileMotion(pile,style.pile,total,delay);}
  flip.animate(frames,timing);
  const dof=track.map(({t,p})=>{const near=p.s*Math.max(.5,700/Math.max(120,700-p.z)),b=Math.min(9,Math.max(0,(near-1.18)*7));return {offset:Math.min(1,t*1000/total),filter:`blur(${b.toFixed(2)}px)`};});dof[0].offset=0;dof[dof.length-1]={offset:1,filter:'blur(0px)'};if(dof.some(k=>k.filter!=='blur(0.00px)'&&k.filter!=='blur(0px)'))[artEl,backFace].forEach(el=>el.animate(dof,{...timing,fill:'backwards'}));
  face.animate([{opacity:0},{opacity:0,offset:mid},{opacity:1,offset:Math.min(1,mid+.001)},{opacity:1}],timing);
@@ -130,11 +131,11 @@ export function renderHomeTV(main,ctx){
  let setting=cleanShowcase(model.preferences.homeShowcase),list=showcaseGames(model.games,setting),cur=0,token=0,shown=null;const pool=model.games.filter(g=>g.available!==false),randomGame=()=>{const rest=pool.filter(g=>g!==shown);return rest[Math.floor(Math.random()*rest.length)]||pool[0];};
  const date=new Date().toLocaleDateString({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale],{month:'long',day:'numeric',weekday:'long'});
  const mins=s=>{const m=Math.floor((s||0)/60);return m>=60?`${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`:`${m}m`;};
- main.innerHTML=`<div class="tv-home" tabindex="-1"><div class="tv-canvas">
+ main.innerHTML=`<div class="tv-home" tabindex="-1"><div class="tv-pile" aria-hidden="true"></div><div class="tv-canvas">
   <div class="tv-plane" data-z="-200"><div class="tv-tl"></div></div>
   <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-index"></div><div class="tv-ring"></div></div>
   <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div></div>
-  <div class="tv-plane" data-z="60"><div class="tv-pile" aria-hidden="true"></div><div class="tv-cover tv-card"><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""><i></i><i></i><i></i><i></i></div></div></div></div></div>
+  <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""><i></i><i></i><i></i><i></i></div></div></div></div></div>
   <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div><div class="tv-scene"></div>
   <div class="tv-left"><div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div><div class="tv-heat-card tv-card"><div class="tv-face"><button class="tv-heatlink" data-go="activity"></button><div class="tv-heat"></div><div class="tv-heatsum"></div><button class="tv-daily" data-go="daily"><i aria-hidden="true"></i><span class="tv-daily-k">${w.daily}</span><span class="tv-daily-t"></span><small>→</small></button><i class="tv-glare"></i></div></div></div>
   
