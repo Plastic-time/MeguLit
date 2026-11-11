@@ -1,9 +1,9 @@
 import {activityCells} from './learning-activity.js';
 
 const copy={
- zh:{coverHint:'单击查看详情 · 双击抽卡',search:'搜索作品',read:'今日阅读',words:'收录单词',lookups:'查词',full:'完整统计',play:'继续游玩',detail:'作品详情',all:'全部作品',edit:'选择首页展示的作品',title:'首页展示的作品',sub:'拖动排序 · 置顶 · 隐藏',auto:'按最近游玩',pick:'只放我挑的',pin:'置顶',hide:'隐藏',close:'关闭',hintAuto:'按最近游玩自动轮播；置顶的永远在最前，隐藏的不出现。',hintPick:'只轮播这里的顺序；一个都不剩时回到最近游玩。',chars:'字',linked:'词',total:'累计',activity:'学习活动',days:'天',min:'分',empty:'还没有作品',add:'添加游戏'},
- ja:{coverHint:'クリックで詳細 · ダブルクリックでガチャ',search:'作品を検索',read:'今日の読書',words:'収録単語',lookups:'辞書引き',full:'統計をすべて見る',play:'続きをプレイ',detail:'作品詳細',all:'すべての作品',edit:'ホームに表示する作品を選ぶ',title:'ホームに表示する作品',sub:'ドラッグで並べ替え · 固定 · 非表示',auto:'最近プレイ順',pick:'選んだ作品だけ',pin:'固定',hide:'非表示',close:'閉じる',hintAuto:'最近プレイ順に切り替わります。固定は常に先頭、非表示は出ません。',hintPick:'この順番だけで切り替えます。残りがなければ最近プレイ順に戻ります。',chars:'字',linked:'語',total:'累計',activity:'学習の記録',days:'日',min:'分',empty:'作品がまだありません',add:'ゲームを追加'},
- en:{coverHint:'Click for details · double-click to draw',search:'Search games',read:'Read today',words:'Words saved',lookups:'Lookups',full:'Full statistics',play:'Continue',detail:'Details',all:'All games',edit:'Choose games for the home screen',title:'Games on the home screen',sub:'Drag to reorder · pin · hide',auto:'Recently played',pick:'Only my picks',pin:'Pin',hide:'Hide',close:'Close',hintAuto:'Cycles through recently played games; pinned ones lead, hidden ones never show.',hintPick:'Cycles through this order only; falls back to recently played when empty.',chars:'chars',linked:'words',total:'Total',activity:'Learning activity',days:'days',min:'min',empty:'No games yet',add:'Add game'}};
+ zh:{drawPile:'单击牌堆抽卡',coverHint:'单击查看详情 · 双击抽卡',search:'搜索作品',read:'今日阅读',words:'收录单词',lookups:'查词',full:'完整统计',play:'继续游玩',detail:'作品详情',all:'全部作品',edit:'选择首页展示的作品',title:'首页展示的作品',sub:'拖动排序 · 置顶 · 隐藏',auto:'按最近游玩',pick:'只放我挑的',pin:'置顶',hide:'隐藏',close:'关闭',hintAuto:'按最近游玩自动轮播；置顶的永远在最前，隐藏的不出现。',hintPick:'只轮播这里的顺序；一个都不剩时回到最近游玩。',chars:'字',linked:'词',total:'累计',activity:'学习活动',days:'天',min:'分',empty:'还没有作品',add:'添加游戏'},
+ ja:{drawPile:'山札をクリックでドロー',coverHint:'クリックで詳細 · ダブルクリックでガチャ',search:'作品を検索',read:'今日の読書',words:'収録単語',lookups:'辞書引き',full:'統計をすべて見る',play:'続きをプレイ',detail:'作品詳細',all:'すべての作品',edit:'ホームに表示する作品を選ぶ',title:'ホームに表示する作品',sub:'ドラッグで並べ替え · 固定 · 非表示',auto:'最近プレイ順',pick:'選んだ作品だけ',pin:'固定',hide:'非表示',close:'閉じる',hintAuto:'最近プレイ順に切り替わります。固定は常に先頭、非表示は出ません。',hintPick:'この順番だけで切り替えます。残りがなければ最近プレイ順に戻ります。',chars:'字',linked:'語',total:'累計',activity:'学習の記録',days:'日',min:'分',empty:'作品がまだありません',add:'ゲームを追加'},
+ en:{drawPile:'Click the deck to draw',coverHint:'Click for details · double-click to draw',search:'Search games',read:'Read today',words:'Words saved',lookups:'Lookups',full:'Full statistics',play:'Continue',detail:'Details',all:'All games',edit:'Choose games for the home screen',title:'Games on the home screen',sub:'Drag to reorder · pin · hide',auto:'Recently played',pick:'Only my picks',pin:'Pin',hide:'Hide',close:'Close',hintAuto:'Cycles through recently played games; pinned ones lead, hidden ones never show.',hintPick:'Cycles through this order only; falls back to recently played when empty.',chars:'chars',linked:'words',total:'Total',activity:'Learning activity',days:'days',min:'min',empty:'No games yet',add:'Add game'}};
 
 const DUR=12000,BEAT=476,LOGO=new URL('./assets/megulit-logo.svg',import.meta.url).href;
 const details=new Map(),palettes=new Map();
@@ -24,31 +24,41 @@ function detail(api,id,locale){if(!details.has(id))details.set(id,api('game_deta
 const rnd=(a,b)=>a+Math.random()*(b-a),pickOne=list=>list[Math.floor(Math.random()*list.length)];
 const EASES=['cubic-bezier(.2,.8,.2,1)','cubic-bezier(.16,1,.3,1)','cubic-bezier(.34,1.56,.64,1)','cubic-bezier(.7,0,.2,1)'];
 const backCard=()=>{const d=document.createElement('div');d.className='tv-back tv-loose';d.innerHTML=`<img src="${LOGO}" alt="">`;return d;};
-function deal(cover,background,animate){const flip=cover.querySelector('.tv-flip'),face=cover.querySelector('.tv-face'),artEl=cover.querySelector('.tv-art'),backFace=flip.querySelector('.tv-back');cover.querySelectorAll('.tv-old,.tv-sheen,.tv-deck').forEach(n=>n.remove());[flip,face,backFace].forEach(el=>el.getAnimations().forEach(x=>x.cancel()));
+const PILE={x:-82,y:44,r:-11,s:.74,n:6};
+function pileCards(pile){if(pile.childElementCount)return;for(let n=0;n<PILE.n;n++){const c=backCard();c.style.transform=`translate(${(PILE.n-1-n)*1.6}px,${(PILE.n-1-n)*2}px) rotate(${((n*37)%7-3)*.5}deg)`;pile.appendChild(c);}}
+const at=(dx,dy,r,s,extra='')=>`translate(${dx}%,${dy}%) ${extra} rotate(${r}deg) rotateY(var(--turn)) scale(${s})`;
+const DRAW_STYLES={
+ slide(sx){return {frames:[{t:0,tf:at(PILE.x,PILE.y,PILE.r,PILE.s)},{t:.14,tf:at(PILE.x-12,PILE.y+2,PILE.r-5,PILE.s),e:'cubic-bezier(.3,0,.2,1)'},{t:.36,tf:at(PILE.x*.45,PILE.y*.25-rnd(12,22),PILE.r*.3,.96,`translateZ(${rnd(40,80)}px)`),e:'cubic-bezier(.2,.7,.3,1)'}],pile:null};},
+ flick(){const spin=pickOne([-1,1])*360;return {frames:[{t:0,tf:at(PILE.x,PILE.y,PILE.r,PILE.s)},{t:.1,tf:at(PILE.x,PILE.y-3,PILE.r+4,PILE.s*.97),e:'cubic-bezier(.5,0,.5,1)'},{t:.34,tf:at(PILE.x*.5,PILE.y*.1-rnd(30,45),PILE.r+spin*.8,.9,`translateZ(${rnd(80,130)}px)`),e:'cubic-bezier(.15,.7,.3,1)'},{t:.46,tf:at(0,-4,spin,1.02),e:'cubic-bezier(.3,0,.4,1)'}],pile:'bump'};},
+ fan(){return {frames:[{t:0,tf:at(PILE.x,PILE.y,PILE.r,PILE.s)},{t:.16,tf:at(PILE.x+4,PILE.y-6,PILE.r+18,PILE.s),e:'cubic-bezier(.3,0,.2,1)'},{t:.26,tf:at(PILE.x+6,PILE.y-30,PILE.r+12,PILE.s*1.05),e:'cubic-bezier(.3,0,.2,1)'},{t:.4,tf:at(PILE.x*.35,PILE.y*.1-14,PILE.r*.2,.97,`translateZ(${rnd(50,90)}px)`),e:'cubic-bezier(.2,.7,.3,1)'}],pile:'fan'};},
+ cut(){return {frames:[{t:0,tf:at(PILE.x,PILE.y,PILE.r,PILE.s)},{t:.18,tf:at(PILE.x,PILE.y,PILE.r,PILE.s),e:'linear'},{t:.27,tf:at(PILE.x+2,PILE.y-24,PILE.r-6,PILE.s*1.04),e:'cubic-bezier(.3,0,.2,1)'},{t:.4,tf:at(PILE.x*.4,PILE.y*.15-16,PILE.r*.3,.97,`translateZ(${rnd(50,90)}px)`),e:'cubic-bezier(.2,.7,.3,1)'}],pile:'cut'};},
+ peel(){return {frames:[{t:0,tf:at(PILE.x,PILE.y,PILE.r,PILE.s)},{t:.15,tf:at(PILE.x,PILE.y-4,PILE.r,PILE.s,'rotateX(38deg)'),e:'cubic-bezier(.3,0,.2,1)'},{t:.24,tf:at(PILE.x+3,PILE.y-12,PILE.r+6,PILE.s*1.04,'rotateX(10deg)'),e:'cubic-bezier(.3,0,.2,1)'},{t:.4,tf:at(PILE.x*.4,PILE.y*.15-18,PILE.r*.2,.97,`translateZ(${rnd(50,90)}px)`),e:'cubic-bezier(.2,.7,.3,1)'}],pile:null};}};
+function pileMotion(pile,kind,total,delay){const cards=[...pile.children],top=cards[cards.length-1],rest=cards.slice(0,-1),base=c=>c.style.transform;
+ top.animate([{opacity:0},{opacity:0}],{duration:total*.85,delay,fill:'backwards'});
+ top.animate([{transform:base(top)+' translateY(-14px)',opacity:0},{transform:base(top),opacity:1}],{duration:260,delay:delay+total*.85,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});
+ const pivot='translate(0,0)';
+ if(kind==='fan')rest.forEach((c,n)=>{const k=n-(rest.length-1)/2;c.animate([{transform:base(c)},{transform:`${base(c)} rotate(${k*9}deg) translateX(${k*6}px)`,offset:.35},{transform:`${base(c)} rotate(${k*9}deg) translateX(${k*6}px)`,offset:.6},{transform:base(c)}],{duration:total*.5,delay,easing:'cubic-bezier(.3,0,.2,1)',fill:'backwards'});});
+ if(kind==='cut')rest.forEach((c,n)=>{const up=n>=rest.length/2;c.animate([{transform:base(c)},{transform:`${base(c)} translate(${up?-22:22}px,${up?-6:4}px) rotate(${up?-6:5}deg)`,offset:.4},{transform:`${base(c)} translate(${up?-22:22}px,${up?-6:4}px) rotate(${up?-6:5}deg)`,offset:.6},{transform:base(c)}],{duration:total*.55,delay,easing:'cubic-bezier(.3,0,.2,1)',fill:'backwards'});});
+ if(kind==='bump')rest.forEach((c,n)=>{c.animate([{transform:base(c)},{transform:`${base(c)} translateY(3px)`,offset:.3},{transform:base(c)}],{duration:260,delay:delay+total*.1+n*12,easing:'ease-out'});});
+ return pivot;}
+function deal(cover,background,animate){const flip=cover.querySelector('.tv-flip'),face=cover.querySelector('.tv-face'),artEl=cover.querySelector('.tv-art'),backFace=flip.querySelector('.tv-back'),pile=cover.parentNode.querySelector('.tv-pile');cover.querySelectorAll('.tv-old,.tv-sheen').forEach(n=>n.remove());[flip,face,backFace,...(pile?[...pile.children]:[])].forEach(el=>el.getAnimations().forEach(x=>x.cancel()));
  if(!animate||matchMedia('(prefers-reduced-motion:reduce)').matches||!artEl.style.background){artEl.style.background=background;return 0;}
- const outDir=rnd(0,Math.PI*2),outDur=rnd(220,320);
+ const outDir=rnd(0,Math.PI*2),outDur=rnd(220,300);
  const old=document.createElement('div');old.className='tv-old';old.style.background=artEl.style.background;cover.appendChild(old);
  old.animate([{transform:'none',opacity:1,filter:'blur(0)'},{transform:`translate(${Math.cos(outDir)*rnd(110,160)}%,${Math.sin(outDir)*rnd(80,120)}%) rotate(${rnd(-70,70)}deg) scale(${rnd(.6,.9)})`,opacity:0,filter:'blur(6px)'}],{duration:outDur,easing:'cubic-bezier(.5,0,.9,.5)',fill:'forwards'}).finished.then(()=>old.remove(),()=>old.remove());
  artEl.style.background=background;
- const side=Math.random()<.5?-1:1,turn=180*side,tilt=rnd(-5,5),lift=rnd(60,120),over=rnd(1.06,1.12),gap=outDur*rnd(.25,.45),ease=pickOne(EASES),flipDur=rnd(380,500);let frames,travel;
- if(Math.random()<.5){
-  travel=rnd(520,680);const sx=pickOne([-1,-1,1]),dx=sx>0?rnd(55,70):-rnd(72,92),dy=rnd(18,38),dr=sx*rnd(4,12);
-  const deck=document.createElement('div');deck.className='tv-deck';
-  for(let n=4;n>=1;n--){const c=backCard();c.style.transform=`translate(${n*2.2}px,${n*2.6}px) rotate(${(n-2)*.8}deg)`;deck.appendChild(c);}cover.insertBefore(deck,flip);
-  const life=gap+travel+flipDur;
-  deck.animate([{opacity:0,transform:`translate(${dx}%,${dy+14}%) rotate(${dr}deg) scale(.86)`},{opacity:1,transform:`translate(${dx}%,${dy}%) rotate(${dr}deg) scale(.9)`,offset:Math.min(.3,gap/life+.1)},{opacity:1,transform:`translate(${dx}%,${dy}%) rotate(${dr}deg) scale(.9)`,offset:.75},{opacity:0,transform:`translate(${dx+sx*6}%,${dy+6}%) rotate(${dr}deg) scale(.88)`}],{duration:life,easing:'ease-out',fill:'both'}).finished.then(()=>deck.remove(),()=>deck.remove());
-  frames=[{transform:`translate(${dx}%,${dy}%) rotate(${dr}deg) rotateY(${turn}deg) scale(.9)`,easing:'cubic-bezier(.4,0,.6,1)'},{transform:`translate(${dx-sx*10}%,${dy-4}%) rotate(${dr*.6}deg) rotateY(${turn}deg) scale(.93)`,offset:.16,easing:'cubic-bezier(.3,0,.2,1)'},{transform:`translate(${dx*.4}%,${dy*.2-rnd(12,24)}%) translateZ(${lift*.6}px) rotate(${dr*.2}deg) rotateY(${turn}deg) scale(1.02)`,offset:.38,easing:'cubic-bezier(.2,.7,.3,1)'},{transform:`rotate(${tilt}deg) rotateY(${turn}deg) scale(1)`,offset:.55,easing:'cubic-bezier(.5,0,.4,1)'}];
- }else{
-  travel=rnd(380,520);const dir=rnd(0,Math.PI*2),dist=rnd(100,160),spin=pickOne([0,0,rnd(-160,160),rnd(-380,-220),rnd(220,380)]);
-  frames=[{transform:`translate(${Math.cos(dir)*dist}%,${Math.sin(dir)*dist}%) rotate(${spin}deg) rotateY(${turn}deg) scale(${rnd(.6,1.25)})`,opacity:0,easing:ease},{opacity:1,offset:.15,easing:ease},{transform:`rotate(${tilt}deg) rotateY(${turn}deg) scale(1)`,opacity:1,offset:.5,easing:'cubic-bezier(.5,0,.4,1)'}];
- }
- frames.push({transform:`translateZ(${lift}px) rotate(${tilt*.5}deg) rotateY(${turn*.5}deg) scale(${over})`,offset:.74,easing:'cubic-bezier(.2,.8,.3,1)'},{transform:`translateZ(${lift*.25}px) rotateY(${-side*rnd(5,12)}deg) scale(${(over+1)/2})`,offset:.88,easing:'cubic-bezier(.3,0,.3,1)'},{transform:'none',opacity:1});
- const total=travel+flipDur,mid=.74,timing={duration:total,delay:gap,easing:'linear',fill:'backwards'};
+ const side=Math.random()<.5?-1:1,turn=180*side,tilt=rnd(-5,5),lift=rnd(60,120),over=rnd(1.06,1.12),gap=outDur*rnd(.1,.3),name=pickOne(Object.keys(DRAW_STYLES)),style=DRAW_STYLES[name](side),total=rnd(900,1150);
+ const tf=s=>s.replace('var(--turn)',turn+'deg');
+ const frames=style.frames.map(f=>({transform:tf(f.tf),offset:f.t,easing:f.e||'cubic-bezier(.3,0,.2,1)'}));
+ frames.push({transform:`rotate(${tilt}deg) rotateY(${turn}deg) scale(1)`,offset:.55,easing:'cubic-bezier(.5,0,.4,1)'},{transform:`translateZ(${lift}px) rotate(${tilt*.5}deg) rotateY(${turn*.5}deg) scale(${over})`,offset:.74,easing:'cubic-bezier(.2,.8,.3,1)'},{transform:`translateZ(${lift*.25}px) rotateY(${-side*rnd(5,12)}deg) scale(${(over+1)/2})`,offset:.88,easing:'cubic-bezier(.3,0,.3,1)'},{transform:'none'});
+ const mid=.74,timing={duration:total,delay:gap,easing:'linear',fill:'backwards'};
+ if(pile){pileCards(pile);pileMotion(pile,style.pile,total,gap);}
  flip.animate(frames,timing);
  face.animate([{opacity:0},{opacity:0,offset:mid},{opacity:1,offset:mid+.001},{opacity:1}],timing);
  backFace.animate([{opacity:1},{opacity:1,offset:mid},{opacity:0,offset:mid+.001},{opacity:0}],{...timing,fill:'both'}).finished.then(()=>backFace.getAnimations().forEach(x=>x.cancel()),()=>{});
  const sheen=document.createElement('i');sheen.className='tv-sheen';face.appendChild(sheen);sheen.style.setProperty('--sa',rnd(95,135)+'deg');
  sheen.animate([{backgroundPosition:'120% 0',opacity:0},{opacity:1,offset:.3},{backgroundPosition:'-40% 0',opacity:0}],{duration:rnd(600,850),delay:gap+total*.8,easing:'ease-out',fill:'both'}).finished.then(()=>sheen.remove(),()=>sheen.remove());
+ cover.dataset.draw=name;
  return gap+total*mid;}
 
 function cardify(card){const face=card.querySelector('.tv-face');let pressed=false,last=null;
@@ -73,7 +83,7 @@ export function renderHomeTV(main,ctx){
   <div class="tv-plane" data-z="-200"><div class="tv-tl"></div></div>
   <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-index"></div><div class="tv-ring"></div></div>
   <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div><div class="tv-vocab"></div><div class="tv-heat-card tv-card"><div class="tv-face"><div class="tv-heat"></div><i class="tv-glare"></i></div></div></div>
-  <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""></div></div></div></div></div>
+  <div class="tv-plane" data-z="60"><div class="tv-pile" role="button" tabindex="0" aria-label="${w.drawPile}" title="${w.drawPile}"></div><div class="tv-cover tv-card"><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""></div></div></div></div></div>
   <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div><div class="tv-scene"></div><div class="tv-flash"></div>
   <div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div>
   <button class="tv-heatlink" data-go="activity"></button>
@@ -131,7 +141,7 @@ export function renderHomeTV(main,ctx){
  root.addEventListener('mousemove',live.move);
  root.querySelectorAll('.tv-cover,.tv-heat-card').forEach(cardify);
  root.addEventListener('mouseleave',()=>{canvas.style.transform='';});
- const coverEl=$('.tv-cover');let clickTimer=0;coverEl.title=w.coverHint;coverEl.addEventListener('click',()=>{clearTimeout(clickTimer);clickTimer=setTimeout(()=>shown&&onDetail(shown.id),260);});coverEl.addEventListener('dblclick',e=>{e.preventDefault();clearTimeout(clickTimer);if(pool.length>1)paint(randomGame());});
+ const coverEl=$('.tv-cover');let clickTimer=0;coverEl.title=w.coverHint;coverEl.addEventListener('click',()=>{clearTimeout(clickTimer);clickTimer=setTimeout(()=>shown&&onDetail(shown.id),260);});const pileEl=$('.tv-pile');pileCards(pileEl);const drawNow=()=>{if(pool.length>1)paint(randomGame());};pileEl.addEventListener('click',drawNow);pileEl.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();drawNow();}});coverEl.addEventListener('dblclick',e=>{e.preventDefault();clearTimeout(clickTimer);if(pool.length>1)paint(randomGame());});
  if(list.length)paint(0,false);
  return stopHomeTV;
 }
