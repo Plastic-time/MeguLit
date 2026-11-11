@@ -20,11 +20,24 @@ function sprite(text,size,blur,color){
  return {c,w,h};
 }
 let field=null;
-function words(){return [...document.querySelectorAll('.g-dict-chips button')].map(b=>b.textContent.replace(/\d+/g,'').trim()).filter(Boolean).slice(0,10);}
+function words(){return [...document.querySelectorAll('.g-dict-chips button')].map(b=>b.textContent.replace(/\d+/g,'').trim()).filter(Boolean).slice(0,12);}
+/* (user: the words and short phrases come from my own reading) through the app's existing service calls only: short
+   phrases cut from recent dialogue, the saved words (what goes to Anki), the words looked up most; kana fill the gaps,
+   and a small default list only when there is nothing yet */
+const call=(action,params={})=>{const req={request:{action,...params}};if(window.__TOME_TEST_TRANSPORT__)return window.__TOME_TEST_TRANSPORT__('service',req);const n=window.__TAURI_INTERNALS__?.invoke;return n?n('service',req):Promise.reject(Error('DESKTOP_REQUIRED'));};
+const FALLBACK=['言葉','物語','約束','記憶','魔法','世界','夢','光'];
+async function loadPool(f){
+ const [lines,vocab]=await Promise.all([call('dialogue').catch(()=>[]),call('vocabulary').catch(()=>[])]);
+ const phrases=[];for(const row of (Array.isArray(lines)?lines:[]).slice(0,80)){for(const seg of String(row?.text||'').split(/[、。！？!?「」『』（）()…\s]+/)){const t=seg.trim();if(t.length>=2&&t.length<=9&&/[぀-ヿ一-鿿]/.test(t))phrases.push(t);}if(phrases.length>60)break;}
+ const saved=(Array.isArray(vocab)?vocab:[]).map(v=>String(v?.spelling||'').trim()).filter(t=>t&&t.length<=8).slice(0,60);
+ f.pool={phrases,saved,looked:f.words};
+}
+function pickText(f){const P=f.pool||{phrases:[],saved:[],looked:f.words},r=Math.random(),pick=a=>a[Math.floor(Math.random()*a.length)];
+ if(r<.22&&P.phrases.length)return {t:pick(P.phrases),kind:'phrase'};if(r<.42&&P.saved.length)return {t:pick(P.saved),kind:'word'};if(r<.55&&P.looked.length)return {t:pick(P.looked),kind:'word'};
+ if(r<.6&&!P.phrases.length&&!P.saved.length&&!P.looked.length)return {t:pick(FALLBACK),kind:'word'};return {t:KANA[Math.floor(Math.random()*KANA.length)],kind:'kana'};}
 function make(f,anywhere){
- const ws=f.words,word=ws.length&&Math.random()<.1,z=Math.pow(Math.random(),1.3),size=(word?.7:1)*(13+z*62),blur=Math.abs(z-FOCUS)*(z>FOCUS?16:7);
- const red=!word&&Math.random()<.14,text=word?ws[Math.floor(Math.random()*ws.length)]:KANA[Math.floor(Math.random()*KANA.length)];
- const color=word?'#f0c36a':red?'#d23a48':'#eceae6';
+ const pk=pickText(f),word=pk.kind!=='kana',text=pk.t,z=Math.pow(Math.random(),1.3),shrink=pk.kind==='kana'?1:Math.max(.42,.85-text.length*.05),size=shrink*(13+z*62),blur=Math.abs(z-FOCUS)*(z>FOCUS?16:7);
+ const red=Math.random()<.14,color=pk.kind==='word'?'#f0c36a':red?'#d23a48':'#eceae6';
  return {z,spr:sprite(text,size,blur,color),x:Math.random()*f.W,y:anywhere?Math.random()*f.H:f.H+60,vx:(Math.random()-.5)*6,vy:-(4+Math.random()*10)*(.4+z),rot:(Math.random()-.5)*.5,vr:(Math.random()-.5)*.12,sway:Math.random()*Math.PI*2,
   alpha:(.1+.3*(1-Math.abs(z-FOCUS)*1.4))*(red||word?1.3:1),ox:0,oy:0,wx:0,wy:0};
 }
@@ -33,27 +46,22 @@ function build(host){
  const f={cv,host,ctx:cv.getContext('2d'),parts:[],W:0,H:0,mx:-1e4,my:-1e4,wind:null,prev:performance.now(),raf:0,words:words()};
  f.fit=()=>{const dpr=Math.min(devicePixelRatio||1,2);f.W=innerWidth;f.H=innerHeight;cv.width=Math.round(f.W*dpr);cv.height=Math.round(f.H*dpr);f.ctx.setTransform(dpr,0,0,dpr,0,0);
   const want=Math.round(Math.min(110,f.W*f.H/14000));while(f.parts.length<want)f.parts.push(make(f,true));f.parts.length=want;};
- f.fit();field=f;return f;
+ f.fit();field=f;loadPool(f).then(()=>{f.parts=f.parts.map(p=>Object.assign(make(f,true),{x:p.x,y:p.y,wx:p.wx,wy:p.wy}));}).catch(()=>{});return f;
 }
 function frame(now){
  const f=field;if(!f||!f.cv.isConnected||!f.host.isConnected||!document.querySelector('#lookup-results')){f?.cv.remove();field=null;return;}
  const dt=Math.min(.05,(now-f.prev)/1000);f.prev=now;const ctx=f.ctx;ctx.clearRect(0,0,f.W,f.H);
  const pref=fxPref('dictField');if(!pref.on){if(!calm)f.raf=requestAnimationFrame(frame);return;}
  const res=document.querySelector('#lookup-results'),busy=res&&(res.children.length||res.textContent.trim())?1:0;f.dim=(f.dim??1)+((busy?.45:1)-(f.dim??1))*Math.min(1,dt*3);
- const order=f.parts;
+ const order=f.parts;f.pvx=(f.pvx||0)*Math.exp(-8*dt);f.pvy=(f.pvy||0)*Math.exp(-8*dt);
  for(const p of order){
   p.sway+=dt*.6;p.x+=(p.vx+Math.sin(p.sway)*4)*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;
   /* a gust moves the glyph itself; air drag slows it; out of the frame it drifts back in later as a new glyph */
   p.x+=(p.wx||0)*dt;p.y+=(p.wy||0)*dt;p.rot+=(p.wr||0)*dt;const drag=Math.exp(-1.4*dt);p.wx=(p.wx||0)*drag;p.wy=(p.wy||0)*drag;p.wr=(p.wr||0)*Math.exp(-1.2*dt);
-  /* (user: the turbulence must be visible) the flying box leaves a wake: glyphs near its path are carried along its
-     motion and rolled outward into small eddies on either side, spun a little; strongest nearest the box (up to ~40-80 px
-     and ~15-30 degrees), a gentle sway further off; springs bring them back to their drift within a second or two */
-  let ax=-30*p.ox,ay=-30*p.oy,aspin=-24*(p.orot||0);
-  /* the pointer pushes the nearer glyphs aside */
-  const ddx=p.x+p.ox-f.mx,ddy=p.y+p.oy-f.my,dm=Math.hypot(ddx,ddy),reach=90+p.z*120;
-  if(dm<reach){const k=(1-dm/reach)*(200+p.z*600);ax+=ddx/(dm||1)*k;ay+=ddy/(dm||1)*k;}
-  p.ovx=((p.ovx||0)+ax*dt)*(1-Math.min(1,3.2*dt));p.ovy=((p.ovy||0)+ay*dt)*(1-Math.min(1,3.2*dt));p.ox+=p.ovx*dt;p.oy+=p.ovy*dt;
-  p.ospin=((p.ospin||0)+aspin*dt)*(1-Math.min(1,3*dt));p.orot=(p.orot||0)+p.ospin*dt;
+  /* (user: the field has no fixed places — the pointer pushes it about like water; a click pushes harder) the pointer's own
+     motion is handed to the glyphs it passes, nearer and nearer-depth more; nothing pulls them back, they just drift on */
+  const ddx=p.x-f.mx,ddy=p.y-f.my,dm=Math.hypot(ddx,ddy),reach=110+p.z*140;
+  if(dm<reach&&(f.pvx||f.pvy)){const k=(1-dm/reach)*(.5+p.z*.8);p.wx=(p.wx||0)+(f.pvx*1.6+ddx/(dm||1)*60)*k*dt*6;p.wy=(p.wy||0)+(f.pvy*1.6+ddy/(dm||1)*60)*k*dt*6;p.wr=(p.wr||0)+(Math.random()-.5)*k*dt*8;}
   if(p.y<-80||p.x<-120||p.x>f.W+120){const n=make(f,false),e=Math.random(),edge=e<.35?'l':e<.7?'r':'b';
    /* back into the frame from an edge, carried in on a breeze and fading up, so the field fills again in 2-4 s */
    Object.assign(p,n,edge==='l'?{x:-60,y:R(.15,.9)*f.H,wx:R(180,320),wy:R(-60,20)}:edge==='r'?{x:f.W+60,y:R(.15,.9)*f.H,wx:-R(180,320),wy:R(-60,20)}:{x:R(.05,.95)*f.W,y:f.H+50,wx:R(-40,40),wy:-R(160,280)},{wr:0,fade:0});}
@@ -72,7 +80,9 @@ function scan(){tick=0;const results=document.querySelector('#lookup-results');i
  build(host);requestAnimationFrame(frame);}
 new MutationObserver(()=>{if(!tick)tick=requestAnimationFrame(scan);}).observe(document.body,{childList:true,subtree:true});
 addEventListener('resize',()=>field?.fit());
-if(!calm)document.addEventListener('pointermove',e=>{if(!field)return;field.mx=e.clientX;field.my=e.clientY;},{passive:true});
+if(!calm){document.addEventListener('pointermove',e=>{if(!field)return;const now=performance.now(),dt=Math.max(8,now-(field.pt||now-16))/1000;if(field.pt){field.pvx=(e.clientX-field.mx)/dt;field.pvy=(e.clientY-field.my)/dt;}field.mx=e.clientX;field.my=e.clientY;field.pt=now;},{passive:true});
+ /* a click (not on a control) sends a ring of force out from the pointer */
+ document.addEventListener('pointerdown',e=>{if(!field||e.target.closest?.('input,button,a,select,textarea,[role=button],.record,label'))return;for(const p of field.parts){const dx=p.x-e.clientX,dy=p.y-e.clientY,d=Math.hypot(dx,dy)||1,k=Math.exp(-d/240)*(.5+p.z*.8);p.wx=(p.wx||0)+dx/d*1100*k;p.wy=(p.wy||0)+dy/d*1100*k;p.wr=(p.wr||0)+(Math.random()-.5)*8*k;}},{passive:true});}
 /* the wake is given by how far the box actually moved since its last report, so it is as strong at any frame rate */
 /* (user: a real wind that blows the glyphs away, the nearer the harder) the rushing box throws the field: glyphs are
    flung along its motion and outward, spinning, out to about half the screen's width with a smooth fall-off; the
