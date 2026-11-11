@@ -781,3 +781,18 @@ html:not(#u):not(#v) body .leaderboard-page .lb-card:has(.lb-people,.lb-empty-ac
 html:not(#u):not(#v) body .leaderboard-page .lb-people li{padding:16px 0!important}
 html:not(#u):not(#v) body .leaderboard-page .lb-people .leaderboard-avatar{width:40px!important;height:40px!important}
 html:not(#u):not(#v) body .leaderboard-page .lb-people .leaderboard-name{font-family:var(--g-serif,serif);font-size:17px}
+
+/* ---- settings, editorial: a document, not two boxes — the nav as a plain index, the section opens with a large
+   serif title, rows ruled with the label in serif; the sticky search sits on the page colour ---- */
+html:not(#u):not(#v) body .main .settings-layout>.settings-nav.settings-nav,html:not(#u):not(#v) body .main .settings-layout>.settings-content.settings-content{background:none!important;box-shadow:none!important;border:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html:not(#u):not(#v) body .main .settings-layout>.settings-nav{border-right:1px solid var(--u-line)!important;padding-right:18px!important}
+html:not(#u):not(#v) body .main .settings-nav summary{font-family:var(--g-serif,serif);font-size:16px!important;padding-left:0!important}
+html:not(#u):not(#v) body .main .settings-nav .settings-category-items button{border-radius:0!important;background:none!important;padding-left:14px!important;box-shadow:none!important}
+html:not(#u):not(#v) body .main .settings-nav .settings-category-items button.active{color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 2px 0 0 #c82f3b!important}
+html:not(#u):not(#v) body .main .settings-nav .settings-category-items button.active::before{display:none!important}
+html:not(#u):not(#v) body .main .settings-content .settings-section-title{font-size:clamp(36px,3.2vw,52px)!important;margin:18px 0 26px!important;line-height:1.1}
+html:not(#u):not(#v) body .main .settings-content>div>.panel:first-child>h2.panel-title:first-child{font-size:clamp(36px,3.2vw,52px)!important}
+html:not(#u):not(#v) body .main .settings-content .settings-row{padding-block:18px!important;border-bottom:1px solid var(--u-line)!important}
+html:not(#u):not(#v) body .main .settings-content .settings-row .settings-label{font-family:var(--g-serif,serif);font-size:15.5px!important;font-weight:600!important}
+html:not(#u):not(#v) body .main .settings-content .panel{background:none!important;box-shadow:none!important;border:0!important}
+html:not(#u):not(#v) body .main .settings-content input.settings-search{background-color:#120e12!important}
