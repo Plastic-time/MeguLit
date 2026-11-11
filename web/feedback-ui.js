@@ -53,12 +53,17 @@ export async function sendFeedback({ api, kind, text, contact = '', locale = 'zh
 /* reason + whole-app logs; resolves 'full', 'text' (logs failed, reason sent) or '' (nothing sent) */
 async function report({ api, reason, contact, locale, version }) {
   const note = (contact ? `${reason}\n\n联系方式：${contact}` : reason).slice(0, 2000);
+  let why = '';
   try {
     const pack = await api('diagnostics_build_all', { version });
     const result = await api('diagnostics_upload', { path: pack.path, meta: { version, game: { id: '', title: 'MeguLit', engine: '' }, note } });
     if (result?.state === 'uploaded') return 'full';
-  } catch { /* fall through to the text-only report */ }
-  const text = await sendFeedback({ api, kind: 'feedback', text: reason, contact, locale, version });
+    why = 'upload ' + String(result?.state || '') + ' ' + String(result?.error || '');
+  } catch (error) { why = 'build ' + String(error?.message || error || '').slice(0, 120); /* fall through to the text-only report */ }
+  /* E423 say why the logs did not go up, so a text-only report can still be diagnosed */
+  const text = await sendFeedback({ api, kind: 'feedback', text: `${reason}
+
+[日志未上传：${why.trim()}]`, contact, locale, version });
   return text?.ok ? 'text' : '';
 }
 
