@@ -264,6 +264,8 @@ const yuris={
   // So does a MoleBox program's own file system.
   for(const s of dirs.flatMap(moleScenes))if(!byName.has(s.name.toLowerCase()))byName.set(s.name.toLowerCase(),s);
   for(const d of found.dirs)for(const file of updates(d).reverse())for(const s of ypfScenes(file))if(!byName.has(s.name.toLowerCase()))byName.set(s.name.toLowerCase(),s);
+  // E449 loose .ybn files a patch carries, also inside an Enigma pack (2030汉化组's 2030.xp), never the running game's own.
+  for(const [key,f] of found.files||[]){if(!/\.ybn$/i.test(key)||byName.has(key)||!base.some(s=>s.name.toLowerCase()===key))continue;if(f.path&&base.dir&&path.dirname(f.path).toLowerCase()===String(base.dir).toLowerCase())continue;byName.set(key,{name:f.name,read:f.read});}
   if(!byName.size)return null;
   const parsed=new Map();for(const scene of base){const s=byName.get(scene.name.toLowerCase());if(!s)continue;try{parsed.set(scene.name.toLowerCase(),words(s.read()));}catch{}}
   if(!parsed.size)return null;

@@ -111,6 +111,7 @@ function isEvb(file){
    return false;}finally{fs.closeSync(fd);}
  }catch{return false;}
 }
+function evbData(file){try{const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(4);return fs.readSync(fd,b,0,4,0)===4&&b.toString('latin1')==='EVB\0';}finally{fs.closeSync(fd);}}catch{return false;}}
 // Everything a patch offers: loose files by lower-case name (read lazily), fonts, folders, packed programs.
 function collect(source,depth=3){
  const out={files:new Map(),fonts:[],dirs:[],sources:[]};
@@ -121,6 +122,8 @@ function collect(source,depth=3){
    if(e.isDirectory()){if(d>0&&!SKIP_DIR.test(e.name))walk(full,d-1);continue;}
    if(!e.isFile())continue;
    if(/\.exe$/i.test(e.name)){if(isEvb(full))addEvb(full);continue;}
+   // E449 a bare Enigma Virtual Box container next to the game (2030汉化组's 2030.xp, loaded by its own exe).
+   if(evbData(full)){addEvb(full);continue;}
    if(FONT.test(e.name)){try{if(fs.statSync(full).size<64<<20)out.fonts.push(fs.readFileSync(full));}catch{}continue;}
    const key=e.name.toLowerCase();if(!out.files.has(key))out.files.set(key,{name:e.name,path:full,read:()=>fs.readFileSync(full)});}};
  const st=fs.statSync(source,{throwIfNoEntry:false});
