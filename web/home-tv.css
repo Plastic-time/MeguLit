@@ -15,8 +15,8 @@
 .tv-card{perspective:700px;cursor:grab;touch-action:none;z-index:3}
 .tv-card:active{cursor:grabbing}
 .tv-face{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.2,1.6,.4,1);will-change:transform;--px:50%;--py:50%;--hue:0deg}
-.tv-cover .tv-face{border-radius:10px;overflow:hidden;box-shadow:0 40px 80px -30px #000;transition:transform .7s cubic-bezier(.2,1.6,.4,1),box-shadow .3s}
-.tv-cover.touch .tv-face{box-shadow:0 22px 40px -18px #000,0 0 0 1px color-mix(in srgb,var(--g-gold) 50%,transparent)}
+.tv-cover .tv-face,.tv-holo .tv-face{border-radius:10px;overflow:hidden;box-shadow:0 40px 80px -30px #000;transition:transform .7s cubic-bezier(.2,1.6,.4,1),box-shadow .3s}
+.tv-cover.touch .tv-face,.tv-holo.touch .tv-face{box-shadow:0 22px 40px -18px #000,0 0 0 1px color-mix(in srgb,var(--g-gold) 50%,transparent)}
 .tv-art{position:absolute;inset:0}
 .tv-glare,.tv-foil{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s}
 .tv-glare{background:radial-gradient(circle at var(--px) var(--py),rgba(255,255,255,.55),rgba(255,255,255,.08) 28%,transparent 55%);mix-blend-mode:overlay}

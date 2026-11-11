@@ -13,8 +13,6 @@ body:has(.dtv-bg) .app-backdrop::after{background:color-mix(in srgb,var(--bg) 93
 .main:has(>.dtv-bg) .game-detail-hero{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important}
 .main:has(>.dtv-bg) .game-detail-hero::after{display:none}
 .main:has(>.dtv-bg) .detail-cover{perspective:900px;border:0!important;background:none!important;box-shadow:none!important}
-.main:has(>.dtv-bg) .detail-cover .cover,.main:has(>.dtv-bg) .detail-cover img{border-radius:10px!important;transform:rotate(-3deg);box-shadow:0 40px 70px -30px #000,0 0 0 1px color-mix(in srgb,var(--g-gold) 25%,transparent);transition:transform .7s cubic-bezier(.22,1,.36,1),box-shadow .4s}
-.main:has(>.dtv-bg) .detail-cover:hover .cover,.main:has(>.dtv-bg) .detail-cover:hover img{transform:rotate(0) rotateY(-8deg) rotateX(4deg) translateY(-6px) scale(1.02);box-shadow:0 50px 80px -30px #000,0 0 0 1px var(--g-gold)}
 .main:has(>.dtv-bg) .detail-engine{font-family:var(--dtv-mono)!important;font-size:12px!important;letter-spacing:.35em!important;text-transform:uppercase;color:var(--g-gold)!important}
 .main:has(>.dtv-bg) .detail-title h1{font-family:var(--g-serif-ja)!important;font-weight:400!important;font-size:clamp(44px,5.6vw,96px)!important;line-height:1.08!important;letter-spacing:-.01em;text-shadow:0 6px 40px #000a}
 .main:has(>.dtv-bg) .detail-title>.settings-help{font-family:var(--dtv-mono);font-size:12px;letter-spacing:.14em;color:var(--g-t2)}
@@ -44,3 +42,7 @@ body:has(.dtv-bg) .app-backdrop::after{background:color-mix(in srgb,var(--bg) 93
 .main:has(>.dtv-bg) .record{border-radius:2px!important;background:rgba(255,255,255,.03)!important;border:1px solid rgba(255,255,255,.07)!important}
 .main:has(>.dtv-bg) .record:hover{border-color:color-mix(in srgb,var(--g-gold) 45%,transparent)!important}
 @media (prefers-reduced-motion:reduce){.main:has(>.dtv-bg) .detail-cover .cover,.main:has(>.dtv-bg) .detail-cover img{transition:none}}
+.main:has(>.dtv-bg) .detail-cover::after{display:none!important}
+.main:has(>.dtv-bg) .detail-cover.tv-holo{transform:rotate(-3deg);cursor:pointer}
+.main:has(>.dtv-bg) .detail-cover.tv-holo .tv-face{aspect-ratio:3/4;height:auto}
+.main:has(>.dtv-bg) .detail-cover.tv-holo .cover,.main:has(>.dtv-bg) .detail-cover.tv-holo img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0!important;box-shadow:none!important;transform:none!important}

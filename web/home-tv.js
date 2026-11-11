@@ -112,7 +112,7 @@ function glowTo(fn,g){if(!fn)return;const layer=document.querySelector('.grimoir
 
 function fitLeft(root){const left=root.querySelector('.tv-left'),title=root.querySelector('.tv-title');if(!left||!title)return;const parts=['.tv-heatsum','.tv-daily','.tv-heat-card'].map(s=>left.querySelector(s)).filter(Boolean);parts.forEach(p=>p.style.display='');for(const p of parts){if(left.getBoundingClientRect().bottom<=title.getBoundingClientRect().top-14)break;p.style.display='none';}}
 
-function cardify(card){const face=card.querySelector('.tv-face');let pressed=false,last=null;
+export function cardify(card){const face=card.querySelector('.tv-face');let pressed=false,last=null;
  const set=(x,y)=>{const depth=pressed?1.6:1,rx=(.5-y)*20*depth,ry=(x-.5)*20*depth;face.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg) scale(${pressed?.96:1.03})`;face.style.setProperty('--px',`${x*100}%`);face.style.setProperty('--py',`${y*100}%`);face.style.setProperty('--hue',`${Math.round(x*360)}deg`);};
  card.addEventListener('pointerenter',()=>{card.classList.add('touch');face.style.transition='transform .12s ease-out';});
  card.addEventListener('pointermove',e=>{const r=card.getBoundingClientRect();last=[Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),Math.min(1,Math.max(0,(e.clientY-r.top)/r.height))];set(...last);});
