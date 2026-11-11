@@ -323,6 +323,31 @@ The profile stays hidden until you decide; a new report after a restore allows a
 npx wrangler d1 execute megulit-relay --remote --command "SELECT r.kind,r.reason,p.pid,datetime(r.created_at,'unixepoch') FROM profile_reports r JOIN profiles p ON p.id_hash=r.target WHERE p.hidden=1"
 ```
 
+### 交流 board (#117, `src/forum.js`, migration `0010_forum.sql`)
+
+Anyone can read; writing needs a signed-in account (Bearer token). Shown name = the leaderboard nickname, else `#` and
+four hex characters of the account hash (never the e-mail).
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/forum?game=&engine=&tag=&mine=1&page=` | 20 per page, most recently active first; `tag` ∈ question / hook / guide / share / other |
+| GET | `/api/forum/:id` | the post and up to 200 replies (deleted replies keep only `{id,deleted,created}`) |
+| POST | `/api/forum` | `{title 2–60, body 1–4000, tag, game?, engine?}` |
+| POST | `/api/forum/:id/replies` | `{body 1–2000}` |
+| DELETE | `/api/forum/:id`, `/api/forum/:id/replies/:rid` | the author, or the maintainer with header `x-megulit-admin: $ADMIN_TOKEN` |
+
+Checks, in order: limits (`forum-post` 5/h and `forum-reply` 30/h per account, `forum-day` 60/day per account,
+`forum-ip` 40/h per IP), lengths, a local filter (links, e-mail, QQ/微信 handles, invisible characters, the shared
+blocked-word list), then Workers AI (`FORUM_MODEL`, default Qwen 3) answering SAFE / ADULT / ABUSE / SPAM. A named
+reason is returned as `422 MODERATION_ADULT|ABUSE|SPAM`; if the model is missing or errors, the local filter decides.
+Deleting blanks the text in D1 (`deleted` 1 = author, 2 = maintainer); deleting the account blanks everything it wrote.
+
+Maintainer delete (set the key once with `npx wrangler secret put ADMIN_TOKEN`; without it LINK_SECRET is accepted):
+
+```
+curl -X DELETE https://api.megulit.com/api/forum/<id> -H "x-megulit-admin: $ADMIN_TOKEN"
+```
+
 ## Rate limits
 
 Fixed windows in D1 (`RATE` in `src/worker.js`): 120 requests/min per IP overall; leaderboard writes 6 per 10 min per IP

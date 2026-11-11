@@ -261,6 +261,13 @@ async function dispatch(request,runtime=null) {
       case 'leaderboard_follow':return await require('./leaderboard.cjs').followSet(root,String(request.pid||''),request.on===true);
       case 'leaderboard_report_profile':return await require('./leaderboard.cjs').reportProfile(root,String(request.pid||''),{kind:String(request.kind||''),reason:typeof request.reason==='string'?request.reason:''});
       case 'leaderboard_profile_appeal':return await require('./leaderboard.cjs').appealProfile(root,{reason:typeof request.reason==='string'?request.reason:''});
+      /* #117 交流 board (services/forum.cjs) */
+      case 'forum_status':return require('./forum.cjs').status(root);
+      case 'forum_list':return await require('./forum.cjs').list(root,{game:String(request.game||''),engine:String(request.engine||''),tag:String(request.tag||''),mine:request.mine===true,page:Number(request.page)||0});
+      case 'forum_get':return await require('./forum.cjs').get(root,String(request.id||''));
+      case 'forum_post':return await require('./forum.cjs').create(root,{title:String(request.title||''),body:String(request.body||''),tag:String(request.tag||''),game:String(request.game||''),engine:String(request.engine||'')});
+      case 'forum_reply':return await require('./forum.cjs').reply(root,String(request.id||''),String(request.body||''));
+      case 'forum_delete':return await require('./forum.cjs').remove(root,String(request.id||''),String(request.reply||''));
       case 'leaderboard_library':return require('./leaderboard.cjs').libraryTitles(db);
       case 'leaderboard_leave':return await require('./leaderboard.cjs').leave(root);
       case 'save_key':return new(require('./settings.cjs').Settings)(root).saveKey({provider:request.provider,baseUrl:request.baseUrl,apiKey:request.apiKey});
