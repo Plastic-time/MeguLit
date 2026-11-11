@@ -19,9 +19,9 @@ export function crackPaths(r,x,y,R,reach,rays,from=0,span=Math.PI*2){
  for(let i=0;i<rays;i++){
   let a=from+(i+.2+r()*.6)/rays*span,px=x+Math.cos(a)*R*.8,py=y+Math.sin(a)*R*.8,d=`M${f1(px)} ${f1(py)}`;
   const len=reach*(.45+r()*.55),seg=3+Math.floor(r()*3);
-  for(let k=0;k<seg;k++){a+=(r()-.5)*.8;const l=len/seg*(.6+r()*.8);px+=Math.cos(a)*l;py+=Math.sin(a)*l;d+=` L${f1(px)} ${f1(py)}`;
+  for(let k=0;k<seg;k++){a+=(r()-.5)*.8;const l=len/seg*(.6+r()*.8),qx=px,qy=py;px+=Math.cos(a)*l;py+=Math.sin(a)*l;d+=` L${f1(px)} ${f1(py)}`;out.push({d:`M${f1(qx)} ${f1(qy)} L${f1(px)} ${f1(py)}`,w:Math.max(.35,1.6*(1-k/seg))});
    if(r()<.25){let ba=a+(r()<.5?-1:1)*(.6+r()*.5),bx=px,by=py,bd=`M${f1(px)} ${f1(py)}`;for(let j=0;j<2;j++){ba+=(r()-.5)*.6;const bl=len/seg*(.35+r()*.4);bx+=Math.cos(ba)*bl;by+=Math.sin(ba)*bl;bd+=` L${f1(bx)} ${f1(by)}`;}out.push({d:bd,w:.45});}}
-  out.push({d,w:.7});
+
  }
  return out;
 }
@@ -98,7 +98,7 @@ export function explosion(x,y,{shake,bar}={}){
  return new Promise(res=>setTimeout(()=>{
   for(let i=0;i<160;i++){const a=Math.random()*Math.PI*2,v=260+Math.random()*900;live.push({kind:'spark',x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-200,g:900,drag:2.2,t:0,life:.5+Math.random()*.7,s:1+Math.random()*1.6});}
   /* the fireball as layered puffs (no flat disc): hot white at the heart, orange, then dark red cooling to smoke */
-  for(let i=0;i<70;i++){const a=Math.random()*Math.PI*2,v=40+Math.random()*260;live.push({kind:'fire',x:x+Math.cos(a)*6,y:y+Math.sin(a)*6,vx:Math.cos(a)*v,vy:Math.sin(a)*v*.8-60,g:-40,drag:3.2,t:0,life:.7+Math.random()*.9,s:10+Math.random()*22});}
+  for(let i=0;i<90;i++){const a=Math.random()*Math.PI*2,v=60+Math.random()*340;live.push({kind:'fire',x:x+Math.cos(a)*8,y:y+Math.sin(a)*8,vx:Math.cos(a)*v*1.25,vy:Math.sin(a)*v*.7-70,g:-60,drag:3,t:0,life:.8+Math.random()*1,s:24+Math.random()*30});}
   for(let i=0;i<40;i++)live.push({kind:'ember',x:x+(Math.random()-.5)*60,y:y+(Math.random()-.5)*30,vx:(Math.random()-.5)*80,vy:-(40+Math.random()*120),g:-30,drag:.6,t:0,life:1.6+Math.random()*1.6,s:.8+Math.random()*1.4});
   runSparks();
   const k=[[-11,5],[9,-8],[-7,6],[5,-4],[-3,2],[0,0]].map(([dx,dy])=>({transform:`translate(${dx}px,${dy}px)`}));

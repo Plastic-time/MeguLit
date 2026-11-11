@@ -1346,3 +1346,41 @@ html body .fx-charge{width:34px!important;height:34px!important;background:radia
 html body .fx-core{width:56px!important;height:56px!important}
 html body .fx-seal{filter:drop-shadow(0 0 3px #ff5a3a) drop-shadow(0 0 10px rgba(255,90,40,.45))!important}
 html body .fx-seal circle:nth-of-type(2){stroke-width:.6}
+
+/* rite result (judge r-fx1): editorial — the rank big and left, a gold rule drawing under it, the XP a step smaller in
+   tabular figures, 完成 wide at the bottom right; the backdrop deeper and blurred; the light glyph keeps a dark edge */
+html body dialog.class-rite::backdrop{background:rgba(4,2,4,.82)!important;backdrop-filter:blur(8px)!important}
+html body .class-rite-reveal{padding:44px 48px 36px 12px!important}
+html body .class-rite-reveal h2{font-size:clamp(56px,5.4vw,78px)!important;margin:14px 0 14px!important;text-align:left}
+html body .class-rite-rule{display:block;height:1px;margin:2px 0 0;background:linear-gradient(90deg,var(--g-gold,#edb56e),transparent);transform-origin:0 50%;animation:rite-rule .9s .55s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rite-rule{from{transform:scaleX(0)}}
+html body .class-rite-reveal p{margin-top:14px!important}
+html body .class-rite-xp{flex-direction:column;align-items:flex-start!important;gap:4px!important;border-top:0!important;margin-top:26px!important;padding-top:0!important}
+html body .class-rite-xp b{font:500 30px/1 var(--u-mono,monospace)!important;letter-spacing:.02em;font-variant-numeric:tabular-nums lining-nums}
+html body .class-rite-end{display:flex;justify-content:flex-end;margin-top:36px}
+html body .class-rite-end [data-finish]{min-width:180px;justify-content:center;animation:rite-char .5s 1s both}
+html body dialog.class-rite .class-rite-glyph{text-shadow:0 0 18px var(--c),0 0 3px var(--c),0 1px 2px rgba(0,0,0,.9)!important}
+
+/* 爆裂魔法 (judge r-fx1): the flash takes the whole window and lifts the page for a beat; the pit is 90–120px with
+   cracks tapering outward; the answer that was wrong stays readable above it with its red edge; the right answer is
+   outlined in gold; healing floods the pit with water from its centre */
+html body .fx-flash{background:radial-gradient(circle at var(--x) var(--y),rgba(255,252,240,1),rgba(255,226,190,.75) 22%,rgba(255,200,150,.35) 55%,rgba(255,190,140,.12) 100%)!important;mix-blend-mode:screen}
+html body svg.fx-scars{z-index:4!important}
+html body :is(.gm-jd-opt.miss,.gm-choice.wrong,.gm-blank.bad,.kana-host){position:relative;z-index:5}
+html body svg.fx-scars path.fx-crack{stroke-linecap:round}
+html body svg.fx-scars .fx-water{fill:rgba(110,200,255,.85);filter:drop-shadow(0 0 8px rgba(120,210,255,.8))}
+html:not(#u):not(#v):not(#w):not(#x) body :is(.gm-jd-opt.hit,.gm-choice.right,.gm-blank.ok){box-shadow:inset 0 0 0 2px var(--g-gold,#edb56e),0 0 18px rgba(237,181,110,.35)!important;color:#fff4dc!important}
+
+/* dictionary launch (judge r-fx1): the moving layer has no fill of its own (no hard edge when the camera tilts); the
+   results stay hidden until the hit, then drop in one by one; the hit is a gold-white flash, a flattened gold ring and
+   a line of light along the bar; the kana shards come in three depths */
+html:not(#u):not(#v):not(#w):not(#x) body #learning-content.dict-launch{background:transparent!important;box-shadow:none!important;border-color:transparent!important}
+html:not(#u):not(#v):not(#w):not(#x) body #learning-content.dict-launch:not(.dict-landed) #lookup-results{opacity:0!important}
+html body .dict-hit{position:fixed;z-index:60;width:0;height:0;pointer-events:none}
+html body .dict-hit>i{position:absolute;left:0;top:0;display:block}
+html body .dict-hit-flash{width:160px;height:160px;border-radius:50%;background:radial-gradient(closest-side,#fffaf0,rgba(255,226,160,.7) 35%,rgba(237,181,110,.2) 65%,transparent);mix-blend-mode:screen}
+html body .dict-hit-ring{width:120px;height:120px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,226,160,.95),0 0 16px 3px rgba(237,181,110,.6)}
+html body .dict-hit-line{width:360px;height:2px;transform-origin:50% 50%;background:linear-gradient(90deg,transparent,#fff4ea 30%,#ffd38a 50%,#fff4ea 70%,transparent);box-shadow:0 0 14px 3px rgba(255,211,138,.6)}
+html body .dict-bar-hit{display:none}
+html body .dict-shards i.d0{filter:blur(1.5px);opacity:.85}
+html body .dict-shards i.d2{filter:blur(.6px);opacity:.7}

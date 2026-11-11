@@ -26,13 +26,13 @@ async function blast(el){
  if(!box.isConnected)return;
  const svg=scarsOf(box),b=box.getBoundingClientRect(),seed=Math.floor(Math.random()*2147483646)+1;
  const g=document.createElementNS(NS,'g');g.setAttribute('class','fx-scar');
- const R=13+Math.random()*9;
- g.innerHTML=scarMarkup(seed,x-b.left,y-b.top,R,R*2.2+Math.random()*30,4+Math.floor(Math.random()*3));g.classList.add('is-hot');setTimeout(()=>g.classList.remove('is-hot'),2600);
+ const R=44+Math.random()*16;
+ g.innerHTML=scarMarkup(seed,x-b.left,y-b.top,R,R*1.4+Math.random()*40,6+Math.floor(Math.random()*3))+`<circle class="fx-water" cx="${(x-b.left).toFixed(1)}" cy="${(y-b.top).toFixed(1)}" r="0"/>`;g.classList.add('is-hot');setTimeout(()=>g.classList.remove('is-hot'),2600);
  svg.append(g);
  const all=svg.querySelectorAll('g.fx-scar:not(.is-gone)');if(all.length>MAX)mend(all[0]);
  debris(x,y+R*.4,{n:16,spread:1.3,up:.9,tint:'ash'});
 }
-function mend(g){g.classList.add('is-gone');setTimeout(()=>g.remove(),1500);}
+function mend(g){const w=g.querySelector('.fx-water'),pit=g.querySelector('.fx-rim');if(w&&pit){const R=pit.getBBox?Math.max(pit.getBBox().width,pit.getBBox().height)/2:50;w.animate([{r:0,opacity:.95},{r:R,opacity:.95,offset:.55},{r:R,opacity:0}],{duration:1300,easing:'cubic-bezier(.3,.7,.2,1)',fill:'forwards'});}g.classList.add('is-gone');setTimeout(()=>g.remove(),1600);}
 function bloom(el){
  const box=scope(el),{x,y}=center(el);
  fountain(x,y);

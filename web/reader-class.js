@@ -76,7 +76,7 @@ export function openRite({api,locale,esc,toast,current='',pending=0,xpTotal=0,he
   <div class="class-rite-body"><span class="class-rite-kicker">${headline?esc(headline)+' · ':''}${w.title}</span><h2 data-title></h2><p class="class-rite-sub">${current?w.subAgain:w.sub}</p>
   <div class="class-rite-schools" role="radiogroup">${Object.entries(SCHOOLS).map(([k,s])=>`<button type="button" role="radio" class="class-rite-school" data-school="${k}" style="--c:${s.color}"><b>${s.glyph[l]}</b><span class="class-rite-text"><span class="class-rite-head"><strong>${esc(s.name[l])}</strong><i>${esc(s.tag[l])}</i></span><small>${esc(s.desc[l])}</small><em>${esc(s.feat[l])}</em></span></button>`).join('')}</div>
   <div class="class-rite-actions"><span>${pending>0?`<small class="class-rite-wait">${esc(w.paid(nf.format(pending)))}</small>`:''}</span><button type="button" class="secondary" data-cancel>${w.cancel}</button><button type="button" class="primary" data-go>${w.confirm}</button></div></div>
-  <div class="class-rite-reveal" aria-live="polite" hidden><span class="class-rite-kicker" data-r-kicker></span><h2 data-r-rank></h2><p data-r-line></p><div class="class-rite-xp" data-r-xp hidden><b data-r-num>+0</b><small>${esc(w.xpWord)}</small></div><button type="button" class="primary" data-finish disabled>${w.finish}</button></div>`;
+  <div class="class-rite-reveal" aria-live="polite" hidden><span class="class-rite-kicker" data-r-kicker></span><h2 data-r-rank></h2><p data-r-line></p><i class="class-rite-rule" aria-hidden="true"></i><div class="class-rite-xp" data-r-xp hidden><small>${esc(w.xpWord)}</small><b data-r-num>+0</b></div><div class="class-rite-end"><button type="button" class="primary" data-finish disabled>${w.finish}</button></div></div>`;
  (document.querySelector('.main')||document.body).append(dialog);
  const fx=mountElementFx(dialog.querySelector('.class-rite-fx'));
  const draw=()=>{const s=SCHOOLS[pick];fx.setElement(pick);dialog.style.setProperty('--c',s.color);dialog.querySelector('[data-glyph]').textContent=s.glyph[l];dialog.querySelector('[data-title]').textContent=s.name[l];
@@ -94,12 +94,13 @@ export function openRite({api,locale,esc,toast,current='',pending=0,xpTotal=0,he
   dialog.querySelector('[data-r-rank]').innerHTML=[...rank].map((ch,i)=>`<span style="--i:${i}">${esc(ch)}</span>`).join('');
   dialog.querySelector('[data-r-line]').textContent=`Lv.${lv} · ${s.name[l]} · ${s.tag[l]}`;
   dialog.querySelector('[data-finish]').onclick=()=>{close();onDone(pick);};
-  const showReveal=()=>{dialog.classList.add('is-revealed');reveal.hidden=false;
+  /* the burst plays out first; then the dialog changes shape smoothly (FLIP on its height) into the result */
+  const showReveal=()=>{const h0=dialog.getBoundingClientRect().height;dialog.classList.add('is-revealed');reveal.hidden=false;const h1=dialog.getBoundingClientRect().height;if(move&&Math.abs(h1-h0)>4)dialog.animate([{height:h0+'px'},{height:h1+'px'}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)'});
    if(pending>0){dialog.querySelector('[data-r-xp]').hidden=false;const num=dialog.querySelector('[data-r-num]');setTimeout(()=>countUp(num,pending,move?1400:0,n=>'+'+nf.format(n)),move?800:0);}
    setTimeout(()=>{const f=dialog.querySelector('[data-finish]');f.disabled=false;f.focus();},move?1000:0);};
   if(!move){showReveal();return;}
   dialog.classList.add('is-casting');
-  fx.cast(()=>{dialog.classList.add('is-burst');setTimeout(showReveal,650);});};
+  fx.cast(()=>{dialog.classList.add('is-burst');setTimeout(showReveal,950);});};
  draw();dialog.showModal();
  return dialog;
 }
