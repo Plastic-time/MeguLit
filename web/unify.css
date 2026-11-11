@@ -1479,3 +1479,14 @@ html body .class-rite-tag::before{content:"";width:16px;height:1px;background:li
 html body .class-rite-school.is-on .class-rite-tag{color:var(--c)!important;text-shadow:0 0 10px color-mix(in srgb,var(--c) 50%,transparent)}
 html body .class-rite-school.is-on .class-rite-tag::before{width:26px;opacity:1}
 html body .class-rite-top h2 i{display:none}
+
+/* irregular glass (user: keep the glass, but irregular — some of it is beautiful): each glass card takes its own
+   asymmetric shape — one sharp corner, one long soft one, a clipped corner on some — so a page of cards stops reading
+   as a uniform grid; a light edge catches only the top-left; cards inside cards lose their frame */
+html:not(#u):not(#v):not(#w):not(#x) body .main :is(.gm-hero,.gm-group,.stg-glass,.review-card,.about-facts,.about-links,.about-support,.about-credits){
+ border-radius:2px 26px 4px 18px!important;
+ box-shadow:inset 1px 1px 0 rgba(255,244,234,.14),inset -1px -1px 0 rgba(0,0,0,.25),0 28px 60px -34px #000!important;
+ background:linear-gradient(135deg,rgba(255,236,220,.075),rgba(255,236,220,.025) 38%,rgba(20,12,16,.28))!important}
+html:not(#u):not(#v):not(#w):not(#x) body .main :is(.gm-group,.stg-glass,.about-links,.about-credits):nth-of-type(3n+2){border-radius:22px 2px 20px 3px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .main :is(.gm-group,.stg-glass,.about-support):nth-of-type(3n){border-radius:3px 3px 30px 3px!important;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 22px,100% 100%,0 100%)}
+html:not(#u):not(#v):not(#w):not(#x) body .main :is(.gm-hero,.gm-group,.stg-glass,.review-card) :is(.gm-group,.stg-glass,.review-card,.gm-stg,.gm-overview){box-shadow:none!important;background:none!important;border-radius:0!important;clip-path:none!important}
