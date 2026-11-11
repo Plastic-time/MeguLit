@@ -928,3 +928,22 @@ html:not(#u):not(#v):not(#w) body .lib-field .cover-frame::after{content:"";posi
  background:radial-gradient(60% 50% at var(--mx,50%) var(--my,50%),rgba(255,240,220,.38),transparent 60%),linear-gradient(115deg,transparent 35%,rgba(255,170,190,.16) 45%,rgba(160,210,255,.14) 55%,transparent 65%) 0 0/250% 250%;background-position:center,var(--mx,50%) var(--my,50%)}
 html:not(#u):not(#v):not(#w) body .lib-field .cover-frame.is-tilting::after{opacity:1}
 @media (prefers-reduced-motion:reduce){html body .lib-field .cover-frame img.cover{transform:none!important}}
+
+/* grammar lessons (user: the white formula box and the plain particle boxes were ugly, 朗读 looked bare, the space
+   after each line was wasted) */
+html:not(#u):not(#v):not(#w) body .gm-page .gm-formula{border:0!important;border-left:2px solid var(--g-gold)!important;background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 8%,transparent),transparent 70%)!important;padding:12px 18px!important;border-radius:0!important;box-shadow:none!important}
+html:not(#u):not(#v):not(#w) body .gm-page .gm-block{border:0!important;border-bottom:1px solid color-mix(in srgb,var(--g-gold) 55%,transparent)!important;border-radius:0!important;background:none!important;padding:4px 6px!important;font-size:18px!important}
+html:not(#u):not(#v):not(#w) body .gm-page .gm-block:nth-child(n+3){color:var(--g-gold)!important}
+html:not(#u):not(#v):not(#w) body .gm-page .gm-particles :is(button,.gm-chip){min-width:46px;height:46px!important;padding:0!important;border:0!important;border-radius:2px!important;background:rgba(255,255,255,.04)!important;box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--g-gold) 60%,transparent)!important;font:400 20px/1 var(--g-serif-ja,serif)!important;color:var(--g-t1,#f1e0d2)!important;transition:transform .18s,background .18s}
+html:not(#u):not(#v):not(#w) body .gm-page .gm-particles :is(button,.gm-chip):hover{transform:translateY(-3px);background:color-mix(in srgb,var(--g-gold) 14%,transparent)!important}
+html:not(#u):not(#v):not(#w) body .gm-page .gm-particles :is(button,.gm-chip).lit{background:color-mix(in srgb,var(--u-red) 30%,transparent)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
+html:not(#u):not(#v):not(#w) body .gm-page .gm-link[data-speak]{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 14px 0 10px;border-radius:15px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 45%,transparent);color:var(--g-gold)!important;text-decoration:none!important;font-size:12.5px!important;letter-spacing:.08em}
+html:not(#u):not(#v):not(#w) body .gm-page .gm-link[data-speak]::before{content:"";width:0;height:0;border-left:8px solid currentColor;border-top:5px solid transparent;border-bottom:5px solid transparent}
+html:not(#u):not(#v):not(#w) body .gm-page .gm-link[data-speak]:hover{background:color-mix(in srgb,var(--g-gold) 14%,transparent)}
+html:not(#u):not(#v):not(#w) body .gm-page :is(.gm-ex,.gm-lead-line){position:relative}
+html:not(#u):not(#v):not(#w) body .gm-page .gm-lead-line .gm-link[data-speak],html:not(#u):not(#v):not(#w) body .gm-page .gm-ex .gm-ex-actions{position:absolute;right:18px;top:50%;transform:translateY(-50%)}
+/* grammar overview: readable */
+html:not(#u):not(#v):not(#w) body .gm-overview :is(.gm-overview-kicker,p,small){font-size:13px!important}
+html:not(#u):not(#v):not(#w) body .gm-overview .gm-piece{font-size:22px!important}
+/* words: larger meanings */
+html:not(#u):not(#v):not(#w) body .main .record.word-row .word-def{font-size:16.5px!important;line-height:1.8!important}
