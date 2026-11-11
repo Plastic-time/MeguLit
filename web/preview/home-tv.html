@@ -85,8 +85,8 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .devtip h3{margin:0 0 8px;font-weight:400}.devtip p{color:var(--t2);font-size:14px;line-height:1.7}
 .tips{position:absolute;left:5vw;top:calc(5vh + 80px);z-index:6;font-family:var(--mono);font-size:11px;letter-spacing:.3em;color:var(--t3)}
 .tips:hover{color:var(--gold)}
-.activity{position:absolute;left:5vw;right:5vw;bottom:calc(4vh + 7.5vh + 18px);height:16px;z-index:5;display:flex;gap:3px;align-items:flex-end;opacity:.0;transition:.4s}
-.tv:hover .activity{opacity:.0}
+.heat{position:absolute;left:9%;top:36%;display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,11px);gap:3px;transform:rotate(-8deg) skewX(-10deg);transform-origin:left top}.heat i{width:11px;height:11px;background:var(--t1);opacity:.06;transition:opacity .6s,background .6s}.heat i.l1{opacity:.22}.heat i.l2{opacity:.45;background:var(--b)}.heat i.l3{opacity:.8;background:var(--a)}.heat i.today{outline:1px solid var(--gold);outline-offset:2px;opacity:1;background:var(--gold)}.heatlink{position:absolute;left:9%;top:calc(36% - 34px);z-index:6;font-family:var(--mono);font-size:11px;letter-spacing:.3em;color:var(--t3);opacity:0;transition:.3s;transform:rotate(-8deg);transform-origin:left}.tv:hover .heatlink{opacity:1}.heatlink:hover{color:var(--gold)}.activity{position:absolute;left:5vw;right:5vw;bottom:calc(4vh + 7.5vh + 18px);height:16px;z-index:5;display:flex;gap:3px;align-items:flex-end;opacity:.0;transition:.4s}
+.tv:hover .heat{position:absolute;left:9%;top:36%;display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,11px);gap:3px;transform:rotate(-8deg) skewX(-10deg);transform-origin:left top}.heat i{width:11px;height:11px;background:var(--t1);opacity:.06;transition:opacity .6s,background .6s}.heat i.l1{opacity:.22}.heat i.l2{opacity:.45;background:var(--b)}.heat i.l3{opacity:.8;background:var(--a)}.heat i.today{outline:1px solid var(--gold);outline-offset:2px;opacity:1;background:var(--gold)}.heatlink{position:absolute;left:9%;top:calc(36% - 34px);z-index:6;font-family:var(--mono);font-size:11px;letter-spacing:.3em;color:var(--t3);opacity:0;transition:.3s;transform:rotate(-8deg);transform-origin:left}.tv:hover .heatlink{opacity:1}.heatlink:hover{color:var(--gold)}.activity{opacity:.0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style></head><body>
 <div class="topbar"><b>MEGULIT</b><span>首页</span><span>游戏库</span><span>学习</span><span>统计</span><span>设置</span><span style="margin-left:auto;font-family:var(--mono);font-size:11px">顶部栏不改 · 预览</span></div>
@@ -94,11 +94,12 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
  <div class="canvas" id="canvas">
   <div class="plane" data-z="-200"><div class="shape s2"></div><div class="shape s5"></div></div>
   <div class="plane" data-z="-80"><div class="kana" id="kana">夏</div><div class="shape s1"></div></div>
-  <div class="plane" data-z="0"><div class="shape s4"></div><div class="shape s3"></div><div class="dots" id="dots"></div></div>
+  <div class="plane" data-z="0"><div class="shape s4"></div><div class="shape s3"></div><div class="dots" id="dots"></div><div class="heat" id="heat"></div></div>
   <div class="plane" data-z="60"><div class="cover" id="cover"><div></div></div></div>
  </div>
  <div class="grain"></div><div class="flash" id="flash"></div>
  <div class="clock"><span id="date"></span><b id="greet"></b></div>
+ <button class="heatlink" data-go="learning-activity" id="heatlink"></button>
  <button class="tips" id="tipsBtn">开发提示 ↗</button>
  <div class="figs">
   <button class="fig" data-go="statistics"><b id="fRead"></b><small>今日阅读</small></button>
@@ -161,6 +162,8 @@ document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>alert('跳转：
 const h=new Date().getHours();$('#greet').textContent=(h<12?'早上好':h<18?'下午好':'晚上好')+'，'+model.preferences.username;
 $('#date').textContent=new Date().toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'long'});
 $('#fRead').textContent=fmt(model.stats.readingSeconds);$('#fWords').textContent=model.stats.words;$('#fLook').textContent=model.stats.lookups;
+const act=Array.from({length:26*7},(_,i)=>{const r=Math.sin(i*12.9898)*43758.5453%1;const v=Math.abs(r)*(0.4+i/(26*7));return v<.25?0:v<.5?1:v<.75?2:3;});$('#heat').innerHTML=act.map((v,i)=>`<i class="${i===act.length-1?'today':v?'l'+v:''}" title="${Math.round(v*23)} 分钟"></i>`).join('');$('#heatlink').textContent='学习活动 · 近半年 '+act.filter(Boolean).length+' 天 →';
+setInterval(()=>{const c=document.querySelectorAll('#heat i');const k=(beat*7)%c.length;for(let j=0;j<7;j++)c[(k+j)%c.length]?.animate([{transform:'scale(1.6)'},{transform:'scale(1)'}],{duration:420});},476*4);
 $('#dots').innerHTML='<i></i>'.repeat(28);
 let beat=0;setInterval(()=>{beat++;document.querySelectorAll('#dots i').forEach((d,i)=>d.style.transform=(i+beat)%7===0?'scale(1.9)':'scale(1)');},476);
 const tv=$('#tv'),cv=$('#canvas');tv.onmousemove=e=>{const x=e.clientX/innerWidth-.5,y=e.clientY/innerHeight-.5;cv.style.transform=`rotateY(${x*6}deg) rotateX(${-y*5}deg)`;document.querySelectorAll('.plane').forEach(p=>p.style.transform=`translate3d(${-x*p.dataset.z*.25}px,${-y*p.dataset.z*.2}px,${p.dataset.z}px)`);};
