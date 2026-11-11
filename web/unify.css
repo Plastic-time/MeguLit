@@ -1009,3 +1009,28 @@ html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]:not([hidden]){
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>*{min-height:auto}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-updates{flex:none!important;height:auto!important}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-updates{-webkit-mask:linear-gradient(#000 calc(100% - 26px),transparent);mask:linear-gradient(#000 calc(100% - 26px),transparent)}
+
+/* ---- tutorial (notice page 2 and the Guide panel), editorial: the sections as a two-column spread, each opening
+   with a large gold numeral and a serif heading, steps on ruled lines; updates as the same dated ledger ---- */
+html:not(#u):not(#v):not(#w) body dialog.game-dialog.guide-panel[open]{width:min(1040px,94vw)!important;padding:40px 48px 30px!important}
+html:not(#u):not(#v):not(#w) body :is(.guide-panel,.dev-notice-page[data-page="2"])>h2{font-size:clamp(34px,3.2vw,48px)!important;margin:6px 0 18px!important}
+html:not(#u):not(#v):not(#w) body .guide-steps{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 48px}
+html:not(#u):not(#v):not(#w) body .guide-steps .guide-section{margin:0!important;padding:18px 0 14px!important;border:0!important;border-top:1px solid var(--u-line-2)!important;background:none!important}
+html:not(#u):not(#v):not(#w) body .guide-steps .guide-section h3{display:flex;align-items:baseline;gap:14px;margin:0 0 10px!important;font-family:var(--g-serif,serif)!important;font-size:19px!important;font-weight:600!important}
+html:not(#u):not(#v):not(#w) body .guide-steps .guide-no{font:400 30px/1 var(--g-serif,serif)!important;color:var(--g-gold)!important;letter-spacing:0!important}
+html:not(#u):not(#v):not(#w) body .guide-steps ol{margin:0!important;padding:0!important;list-style:none;counter-reset:gs}
+html:not(#u):not(#v):not(#w) body .guide-steps ol li{counter-increment:gs;position:relative;padding:7px 0 7px 26px!important;border-bottom:1px solid var(--u-line);font-size:13.5px!important;font-weight:400!important;line-height:1.7}
+html:not(#u):not(#v):not(#w) body .guide-steps ol li::before{content:counter(gs);position:absolute;left:0;top:7px;font-family:var(--u-mono);font-size:11.5px;color:var(--g-t3,#a08a80)}
+html:not(#u):not(#v):not(#w) body .guide-steps ol li::marker{content:none}
+html:not(#u):not(#v):not(#w) body .guide-steps .guide-keys>div{display:grid;grid-template-columns:110px 1fr;padding:7px 0;border-bottom:1px solid var(--u-line);font-size:13.5px}
+html:not(#u):not(#v):not(#w) body .guide-panel .dev-notice-updates{list-style:none!important;padding:0!important;border-top:1px solid var(--u-line-2)!important}
+html:not(#u):not(#v):not(#w) body .guide-panel .dev-notice-updates li{display:grid;grid-template-columns:56px 1fr;padding:9px 0!important;border-bottom:1px solid var(--u-line);font-size:13.5px!important;font-weight:400!important}
+html:not(#u):not(#v):not(#w) body .guide-panel .dev-notice-updates li::marker{content:none}
+html:not(#u):not(#v):not(#w) body .guide-panel .dev-notice-updates time{font-family:var(--u-mono);font-size:12px;color:var(--g-gold)}
+html:not(#u):not(#v):not(#w) body .guide-panel .guide-tabs{gap:28px!important;border-bottom:1px solid var(--u-line)!important;margin-bottom:18px!important}
+html:not(#u):not(#v):not(#w) body .guide-panel .guide-tabs button{padding:10px 0!important;font-size:14px!important;background:none!important;border:0!important;color:var(--g-t3,#a08a80)!important}
+html:not(#u):not(#v):not(#w) body .guide-panel .guide-tabs button[aria-selected=true]{color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
+/* the Guide's Close is a secondary, not the dialogue-box primary */
+html:not(#u):not(#v):not(#w):not(#x) body .guide-panel .dev-notice-actions button[data-ok]:not(.icon-button):not(.x){clip-path:none!important;padding:0 22px!important;font-family:inherit!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .guide-panel .dev-notice-actions button[data-ok]:not(.icon-button):not(.x)::after{display:none!important}
+@media (max-width:900px){html:not(#u):not(#v):not(#w) body .guide-steps{grid-template-columns:1fr}}
