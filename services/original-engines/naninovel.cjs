@@ -114,6 +114,8 @@ const naninovel={
  archives:()=>[],
  sources:sourcesOf,
  parse,test:()=>false,
+ // E450 voices: auto-voice clips aligned to the printed lines (naninovel-voice.cjs)
+ voiceLines:dir=>require('./naninovel-voice.cjs').voiceLines(dir),
  patchLines(base){let any=false;const list=base.map(scene=>{const zh=scene.zh||[];if(!zh.some(Boolean))return scene;any=true;return {...scene,patched:true,lines:scene.lines.map((t,k)=>zh[k]||t)};});return any?list:null;},
  _internal:{documents,localizationBundles,tidy,combine,scan},
 };

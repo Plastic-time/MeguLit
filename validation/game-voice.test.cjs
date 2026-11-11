@@ -96,3 +96,18 @@ test('fvp: a voice number whose low byte is 0x0A is read from the first 0x0A; a 
  const mk=code=>{const b=Buffer.concat([Buffer.alloc(4),code,text]);b.writeUInt32LE(b.length,0);return fvp.parse(b).voices;};
  assert.deepEqual(mk(Buffer.from([0x02,0x62,0x03,0x02,0x00,0x0a,0x0a,0x2d,0x31,0x01,0x08,0x08,0x02,0xbb,0x03,0x00,0x00])),['020000010']);
  assert.equal(mk(Buffer.from([0x08,0x08,0x02,0x0a,0x0b,0x02,0x00,0x08,0x08,0x08,0x02,0x69,0x1d,0x00,0x00])),undefined);});
+test('fsb5: every setup header in the table parses to a mode list; a Vorbis sample becomes Ogg pages with the right granule end; PCM16 becomes WAV',()=>{const f=require('../services/original-engines/fsb5.cjs'),zlib=require('node:zlib');
+ const b=zlib.inflateRawSync(fs.readFileSync(path.join(__dirname,'..','services','original-engines','fsb-vorbis-setups.bin')));let n=0;
+ for(let p=0;p+8<=b.length;){const c=b.readUInt32LE(p),len=b.readUInt32LE(p+4),setup=b.subarray(p+8,p+8+len);assert.equal(zlib.crc32(setup)>>>0,c);const flags=f.modeFlags(setup,2);assert.ok(flags.length>=1&&flags.every(x=>x===0||x===1));p+=8+len;n++;}
+ assert.equal(n,161);
+ const crc=b.readUInt32LE(0),setup=f.setupFor(crc),flags=f.modeFlags(setup,2),mb=Math.max(0,Math.ceil(Math.log2(flags.length)));
+ const pk=mode=>Buffer.from([(mode<<1)&0xff,1,2,3]),data=Buffer.concat([0,0,0].map(()=>{const p=pk(flags.indexOf(1)>=0?flags.indexOf(1):0),h=Buffer.alloc(2);h.writeUInt16LE(p.length);return Buffer.concat([h,p]);}));
+ const ogg=f.toOgg({channels:2,rate:44100,samples:100000,crc,data});assert.equal(ogg.toString('latin1',0,4),'OggS');
+ const pages=[];for(let i=0;i<ogg.length;){assert.equal(ogg.toString('latin1',i,i+4),'OggS');const segs=ogg[i+26];let len=27+segs;for(let k=0;k<segs;k++)len+=ogg[i+27+k];pages.push({flags:ogg[i+5],granule:Number(ogg.readBigInt64LE(i+6))});i+=len;}
+ assert.equal(pages[0].flags,2);assert.equal(pages.at(-1).flags,4);const bs=flags[(pk(0)[0]>>1)&((1<<mb)-1)]?2048:256;assert.ok(pages.at(-1).granule>0);
+ const wav=f.toWav({channels:1,rate:22050,data:Buffer.alloc(100)});assert.equal(wav.toString('latin1',0,4),'RIFF');assert.equal(wav.readUInt32LE(24),22050);});
+test('naninovel voices: clips align in order to lines with a speaker, never against the line-number order, and only when the length fits',()=>{const nv=require('../services/original-engines/naninovel-voice.cjs');
+ const L=[{text:'地の文。',author:'',idx:0},{text:'「おはよう、今日はいい天気だね」',author:'Kasumi',idx:1},{text:'「うん」',author:'',idx:2},{text:'「行こうか、みんなで一緒に海まで」',author:'Ayano',idx:3}];
+ const V=[{name:'S/10.0',n:10,d:5.0},{name:'S/14.0',n:14,d:5.6}];
+ const pairs=nv.align(L,V).map(([l,v])=>[l.author,v.name]);assert.deepEqual(pairs,[['Kasumi','S/10.0'],['Ayano','S/14.0']]);
+ const V2=[{name:'S/10.0',n:10,d:5.0},{name:'S/10.5',n:10.5,d:5.6}];assert.ok(nv.align(L,V2).length<2,'a later line cannot take a clip numbered too close to an earlier match');});

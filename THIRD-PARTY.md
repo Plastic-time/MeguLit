@@ -26,3 +26,4 @@ No existing third-party license was deleted from the preservation checkpoint.
 
 E194: pip 26.3 (MIT), verified official PyPI wheel bundled under runtime/wheels; SHA256 f3b60b20ffaadd4415ed7957212a38ac63fa4c5fa375bd0f4a797777940fad13. Its license is included inside the wheel. No system Python installation is modified.
 - siglus-ssu (Jirehlov, https://pypi.org/project/siglus-ssu/, Unlicense OR 0BSD): SiglusEngine Scene.pck original-source decoding (source_angou constants, tile scramble, MD5 variant, LZSS) reimplemented in JavaScript in services/original-engines/siglus-source.cjs for game voices (E450); no siglus-ssu code or binaries bundled.
+- fsbex (https://crates.io/crates/fsbex, MIT OR Apache-2.0): the FMOD FSB5 Vorbis setup headers (src/encode/vorbis_lookup.rs, 161 entries, each checked against its CRC-32) stored as services/original-engines/fsb-vorbis-setups.bin; the FSB5 to Ogg remux in fsb5.cjs is MeguLit's own (E450).
