@@ -107,7 +107,7 @@ import {launchCopy,launchReason} from './launch-feedback.js';
 import {stageFor,applyVeil,veilSettingsHTML,veilsFromForm} from './page-veils.js';
 const quickActions=new Set(['settings_get','vocabulary','unknown_words','home','preferences','ui_state','history','dialogue','sentences','word_trash','statistics','game_detail','reader_status']);
 /* E459: the learning pages' heavier reads get a longer limit, so a page never waits on them for good */
-const slowReads=new Set(['reading_insights','grammar_report','grammar_bluebook','learning_rewards','learning_level','learning_activity','sentences_page']);
+const slowReads=new Set(['reading_insights','grammar_report','grammar_bluebook','learning_rewards','learning_level','learning_goal','learning_activity','sentences_page']);
 const api=(action,params={})=>{const request=invoke('service',{request:{action,...params}});if(!quickActions.has(action)&&!slowReads.has(action)&&action!=='launch')return request;let timer;return Promise.race([request,new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(Error('SERVICE_TIMEOUT')),action==='launch'?48000:slowReads.has(action)?40000:12000);})]).finally(()=>clearTimeout(timer));};
 const number=value=>new Intl.NumberFormat(locales[locale]).format(value||0);
 const cover=(game,cls='cover')=>game.cover?`<img class="${cls}" src="${esc(game.cover)}" alt="" loading="lazy">`:`<div class="${cls} hero-placeholder">${icon('game')}</div>`;
@@ -652,7 +652,7 @@ async function learning(token){
   if(!['review','kana','grammar','words','sentences','readwords','dictionary','trash'].includes(subtab))subtab='review';
   const tab=subtab,slot=learningSlot(),target=document.createElement('div');
   /* 2026-11-11 first visit: ask the Japanese level once (learning-level.js); the answer opens the tab to start from */
-  import('./learning-level.js').then(m=>m.ensureLevel({api,esc,toast,openTab:t=>navigate('learning',t)})).catch(()=>{});
+  import('./learning-level.js').then(m=>m.ensureLevel({api,esc,toast,openTab:t=>navigate('learning',t)})).then(()=>import('./learning-goal.js')).then(m=>m.ensureGoal({api,esc,toast,locale})).catch(()=>{});
  const commit=()=>{slot.closest('.main').classList.toggle('review-page',tab==='review');slot.replaceChildren(target);};
   /* E459: switching tabs shows the new tab's loading state at once, never the previous tab's content */
   if(slot.dataset.tab!==tab){slot.innerHTML=loading();slot.dataset.tab=tab;}

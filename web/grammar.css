@@ -592,3 +592,24 @@
 .drag-ghost{opacity:.95;box-shadow:0 10px 24px rgba(0,0,0,.5);cursor:grabbing}
 .gm-blank.gm-drop.over,.gm-slot.over{border-color:var(--mg-red)!important;background:rgba(200,50,60,.25)!important}
 @media(prefers-reduced-motion:reduce){.gm-jd-opt{transition:none}}
+
+/* 2026-11-12 学习目标: the goal strip with its countdown, the picker's detail rows, the settings card */
+.lg-bar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:0 0 14px;padding:10px 16px;border:1px solid rgba(255,255,255,.14);border-left:3px solid var(--mg-red,#c8323c);background:#000;color:#fff}
+.lg-bar.empty{border-left-style:dashed;color:rgba(255,255,255,.65)}
+.lg-bar-k{font:500 11px var(--mg-mono,monospace);letter-spacing:.24em;text-transform:uppercase;color:var(--mg-red,#c8323c)}
+.lg-bar ul{display:flex;gap:22px;flex-wrap:wrap;margin:0;padding:0;list-style:none;flex:1}
+.lg-bar li{display:grid;gap:2px}.lg-bar li b{font-size:15px}.lg-bar li small{font:400 11px var(--mg-mono,monospace);letter-spacing:.08em;color:rgba(255,255,255,.6)}
+.lg-bar li em{font:600 13px var(--mg-mono,monospace);font-style:normal;color:var(--mg-red,#c8323c)}.lg-bar li em.past{color:rgba(255,255,255,.55)}
+.lg-goals .lg-goal{position:relative}.lg-goal input{position:absolute;opacity:0;pointer-events:none}
+.lg-goal.active{border-color:var(--mg-red,#c8323c);box-shadow:inset 0 0 0 1px var(--mg-red,#c8323c)}
+.lg-goal:focus-within{outline:2px solid var(--mg-red,#c8323c);outline-offset:2px}
+.lg-more{margin:14px 0 0;padding:12px 14px;border:1px dashed rgba(255,255,255,.2);display:grid;gap:10px;animation:lv-rise .25s cubic-bezier(.2,.8,.2,1)}
+.lg-more legend{padding:0 6px;font:500 11px var(--mg-mono,monospace);letter-spacing:.24em;color:var(--mg-red,#c8323c)}
+.lg-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.lg-row>span{min-width:96px;font-size:13px;color:rgba(255,255,255,.7)}.lg-row small{font-size:12px;color:rgba(255,255,255,.5)}
+.lg-row input[type=range]{width:180px;accent-color:var(--mg-red,#c8323c)}.lg-row output{font:600 14px var(--mg-mono,monospace)}.lg-row select{padding:4px 8px}
+.lg-chip{position:relative;cursor:pointer}.lg-chip input{position:absolute;opacity:0}.lg-chip span{display:inline-block;padding:5px 12px;border:1px solid rgba(255,255,255,.2);font-size:13px;transition:border-color .15s,background .15s}
+.lg-chip input:checked+span{border-color:var(--mg-red,#c8323c);background:rgba(200,50,60,.22)}.lg-chip input:focus-visible+span{outline:2px solid var(--mg-red,#c8323c)}.lg-chip input:disabled+span{opacity:.75;cursor:default}
+.gm-stg.goal::before{content:'GOAL';position:absolute;top:6px;right:8px;font:500 10px var(--mg-mono,monospace);letter-spacing:.2em;color:var(--mg-red,#c8323c)}
+.lg-settings{margin:18px 0;display:grid;gap:8px}.lg-settings h3{margin:0}
+@media(prefers-reduced-motion:reduce){.lg-more{animation:none}}
+.lg-row .lg-band-note{flex-basis:100%;margin-left:104px;line-height:1.6}
