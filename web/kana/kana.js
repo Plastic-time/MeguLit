@@ -101,7 +101,7 @@ function createSpeech(api,store){
 }
 
 /* ---------- 入口 ---------- */
-export async function mountKana(target,{api,invoke,toast,start='index',openTab}={}){
+export async function mountKana(target,{api,invoke,toast,start='index',openTab,focus=''}={}){
  /* 两个子标签（五十音 / 假名游戏）共用一份进度：先把上一个页面没写完的保存掉 */
  if(liveStore)await liveStore.flush();await saving;
  addFonts();
@@ -120,8 +120,6 @@ export async function mountKana(target,{api,invoke,toast,start='index',openTab}=
   if(url==='@reload'){show(current.name,current.params);return;}
   /* 在「假名游戏」标签里，回到学习主页就切去「五十音」标签；反之亦然 */
   const target0=String(url).split('?')[0].replace(/\.html$/,'')||'index';
-  if(openTab&&start==='games'&&target0==='index'){openTab('kana');return;}
-  if(openTab&&start==='index'&&target0==='games'){openTab('kanagames');return;}
   const [file,query='']=String(url).split('?'),name=file.replace(/\.html$/,'')||'index';
   if(!VIEWS.includes(name))return;
   show(name,Object.fromEntries(new URLSearchParams(query)));
@@ -162,6 +160,6 @@ export async function mountKana(target,{api,invoke,toast,start='index',openTab}=
  root.addEventListener('change',event=>{if(event.target.classList?.contains('kn-ruler'))speech.say('あ');});
  document.addEventListener('keydown',onKey,true);
  window.addEventListener('beforeunload',()=>store.flush());
- await show(start,{});
+ await show(start==='games'?'index':start,focus||start==='games'?{focus:'practice'}:{});
  return {flush:()=>store.flush()};
 }

@@ -363,6 +363,8 @@ async function dispatch(request,runtime=null) {
       case 'update_install':return await require('./update.cjs').install(root);
       case 'kana_progress':return require('./kana.cjs').read(root);
       case 'kana_progress_save':return require('./kana.cjs').save(root,request.data);
+      case 'learning_level':return require('./learning-level.cjs').get(root);
+      case 'learning_level_set':return require('./learning-level.cjs').set(db,root,{level:String(request.level||''),kana:request.kana});
       case 'kana_game_words':return require('./kana.cjs').gameWords(db,request.words);
       case 'vocabulary':return db.prepare('SELECT v.id,v.spelling,v.reading,v.definitions,v.status,v.created_at,e.text AS example_text,e.game_id AS example_game_id,g.title AS example_title FROM vocabulary v LEFT JOIN examples e ON e.id=(SELECT id FROM examples WHERE word_id=v.id ORDER BY id DESC LIMIT 1) LEFT JOIN games g ON g.id=e.game_id ORDER BY v.created_at DESC,v.id DESC LIMIT 1000').all();
       case 'sentences':return require('./saved-sentences.cjs').list(db,{source:request.source});
