@@ -297,3 +297,20 @@ test('E423 a page the game redraws (its lines handed over again from the first) 
  say('　けれど水も星も綺麗な、思い出の家だった。',5,false);say('　もっとも、それは夏だけの話。',6,true);
  assert.deepEqual(b.islandPage.model.records.map(r=>r.index),[6],'a real next page still clears it');
 });
+
+test('E426 a translation shown changed on the page grid (the grid sets the indent) types out once, not again at every status message',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const saved=global.MutationObserver;global.MutationObserver=class{observe(){}};t.after(()=>{global.MutationObserver=saved;});
+ const file=require.resolve('../web/reader/modules/island-page.js');delete require.cache[file];const IslandPage=require(file);
+ const {w,b,doc,sent}=fakeWindow({clientX:58,clientY:85,clientWidth:1546,clientHeight:870,readerX:900,readerY:500,readerWidth:600,readerHeight:100});
+ const typed=[];w.TomeTypewriter={text:(el,v)=>{typed.push(v);el.textContent=v;},reveal(){},stop(){}};
+ IslandPage.install(w);let seq=0;const say=(text,index,pageStart)=>b.islandPage.accept({hookSource:text,hookSourceEngine:'nvl',hookFlowGrid:'woh',hookSequence:++seq,hookSourceLine:0,hookFlowPageStart:pageStart,hookSourceIndex:index,hookFlowRow:'new'});
+ say('　けれど水も星も綺麗な、思い出の家だった。',5,true);
+ const req=sent.find(m=>m.text==='　けれど水も星も綺麗な、思い出の家だった。');assert.ok(req,'translation asked');
+ b.deliverPageTranslation(req.id,'虽然有些许的不满，但那里美丽的河川还有星空却能给人莫大安慰。');/* no indent of its own: the grid adds one */
+ const once=typed.length;assert.ok(once>=1,'typed once');
+ for(let i=0;i<6;i++){b.islandPage.accept({hookVisual:true,hookCheckState:'checking'});b.islandPage.refresh();}
+ assert.equal(typed.length,once,'status messages and relayouts do not type it again: '+JSON.stringify(typed));
+ b.refreshPageTranslations();const r=b.islandPage.model.records[0];const again=sent.filter(m=>m.text===r.source).at(-1);b.deliverPageTranslation(again.id,'　另一个译文。');
+ assert.equal(typed.length,once+1,'a new translation types out once');
+});
