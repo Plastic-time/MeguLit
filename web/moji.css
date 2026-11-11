@@ -52,3 +52,40 @@
 .moji-ex[open]>summary::before{transform:rotate(45deg)}
 .moji-ex>summary b{font-weight:500;color:var(--gold-accent,#edb56e)}
 .moji-ex>summary:hover{color:var(--gold-hi,#ffd7a0);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold-hi,#ffd7a0) 35%,transparent)}
+
+/* E426 Dictionary readability: one row of equal-height controls, larger result cards and a roomy entry page */
+.lookup-form{display:flex;align-items:stretch;gap:10px}
+.lookup-form>input,.lookup-form>button{box-sizing:border-box;height:46px!important;min-height:46px!important;margin:0!important}
+.lookup-form>input{flex:1;min-width:0;font-size:15px!important;padding:0 16px!important}
+.lookup-form>button{flex:none;display:inline-flex;align-items:center;justify-content:center;padding:0 20px!important;font-size:14px!important;line-height:1;border-radius:12px!important;white-space:nowrap}
+.main .dict-entry .word-spelling{font-size:28px!important;line-height:1.25}
+.main .dict-entry .word-reading{font-size:15px!important;margin:6px 0 10px}
+.main .dict-entry .word-def{font-size:15px!important;line-height:1.8}
+.dict-senses{margin:6px 0 0;padding:0;list-style:none;counter-reset:sense;display:grid;gap:8px}
+.dict-senses>li{counter-increment:sense;display:grid;grid-template-columns:26px minmax(0,1fr);column-gap:10px;align-items:baseline;font-size:15.5px;line-height:1.75;color:var(--g-t1,var(--text))}
+.dict-senses>li::before{content:counter(sense);grid-row:span 2;display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;font-size:12px;font-weight:650;color:var(--g-gold,var(--gold-accent,#edb56e));border:1px solid color-mix(in srgb,var(--g-gold,#edb56e) 45%,transparent)}
+.dict-sense-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:2px}
+.dict-sep{color:var(--g-t3,var(--muted));margin:0 2px}
+.moji-detail header{padding:14px 0 20px;margin-bottom:18px}
+.moji-detail .word-spelling{font-size:44px!important;line-height:1.15;font-weight:700;font-family:var(--g-serif-ja,serif)}
+.moji-detail .word-reading{font-size:18px!important;margin:10px 0 12px!important;letter-spacing:.04em}
+.moji-detail .moji-tags{margin:0}
+.moji-detail .moji-tag{font-size:13px;padding:5px 9px;border-radius:6px}
+.moji-detail .moji-play{width:40px;height:40px}
+.moji-detail .moji-meanings{gap:14px!important}
+.moji-detail .moji-meanings>li{padding:18px 22px!important;border-radius:14px!important}
+.moji-detail .moji-meaning{font-size:18px;line-height:1.7;font-weight:550}
+.moji-detail .moji-meaning-ja{font-size:16px;line-height:1.8;margin-top:6px;padding-left:12px;border-left:2px solid color-mix(in srgb,var(--g-gold,#edb56e) 40%,transparent)}
+.moji-detail .moji-ex{margin-top:12px}
+.moji-detail .moji-ex>summary{font-size:13px;padding:5px 14px 5px 12px}
+.moji-detail .moji-examples{gap:12px;margin-top:12px}
+.moji-detail .moji-examples span{font-size:16.5px}
+.moji-detail .moji-examples small{font-size:14px;margin-top:2px}
+.moji-detail .moji-notes{margin-top:30px;padding-top:20px}
+.moji-detail .moji-notes h3{font-size:17px;opacity:1;margin-bottom:14px}
+.moji-detail .moji-note{padding:16px 20px;margin-bottom:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.03);font-size:15px}
+.moji-detail .moji-note.mine{border-left:3px solid #e8c48a;padding-left:20px}
+.moji-detail .moji-note-title{font-size:16px}
+.moji-detail .moji-note-body{line-height:1.8}
+.moji-detail .moji-note-meta{font-size:14px;margin-bottom:8px}
+.moji-detail .moji-note-replies{font-size:14px;margin-top:10px;gap:6px}

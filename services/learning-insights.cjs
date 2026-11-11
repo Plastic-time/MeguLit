@@ -205,15 +205,16 @@ function exampleLine(db,key,gameId=null){
   return null;
 }
 /* Saves a word met in reading: dictionary entry, plus its line as the example. */
-function saveWord(db,entry,example){
+function saveWord(db,entry,example,{status=null}={}){
   if(!entry?.id)throw Error('WORD_NOT_FOUND');
   db.exec('BEGIN IMMEDIATE');
   try{
     db.prepare('INSERT OR IGNORE INTO vocabulary(id,spelling,reading,definitions,status,created_at,original) VALUES(?,?,?,?,0,?,?)').run(entry.id,entry.spellings?.[0]||'',entry.readings?.[0]||'',JSON.stringify(entry.definitions||[]),Math.floor(Date.now()/1000),JSON.stringify({entry,from:'reading'}));
     if(example?.text&&!db.prepare('SELECT 1 FROM examples WHERE word_id=? AND text=?').get(entry.id,example.text))
       db.prepare('INSERT INTO examples(word_id,game_id,text,translation,highlight_start,highlight_end,created_at,original) VALUES(?,?,?,?,?,?,?,?)').run(entry.id,example.gameId||null,example.text,example.translation||'',example.start||0,example.end||0,Math.floor(Date.now()/1000),JSON.stringify({translationSource:example.translationSource||'',from:'reading',readAt:example.readAt||null}));
+    if(Number.isInteger(status)&&status>=0&&status<=4)db.prepare('UPDATE vocabulary SET status=? WHERE id=?').run(status,entry.id);
     db.exec('COMMIT');
   }catch(error){db.exec('ROLLBACK');throw error;}
-  return {id:entry.id,spelling:entry.spellings?.[0]||'',reading:entry.readings?.[0]||''};
+  return {id:entry.id,status:Number.isInteger(status)&&status>=0&&status<=4?status:undefined,spelling:entry.spellings?.[0]||'',reading:entry.readings?.[0]||''};
 }
 module.exports={plainLine,entryMatches,readableLine,isHuman,usable,humanFromResolve,pickTranslation,SOURCE_LABEL,applyGameRuby,ANKI_EXTRA,ankiSentenceFields,lineWords,savedForms,countWords,weekStart,loadJlpt,jlptIndex,jlptCoverage,gameLevels,LEVELS,ensure,refresh,pending,lineRows,describe,report,exampleLine,saveWord};

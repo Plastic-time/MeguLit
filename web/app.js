@@ -1,4 +1,5 @@
 import {fitLibraryGrid} from './library-grid-fit.js';
+import {definitionHtml} from './dictionary-format.js';
 import './primary-buttons.js';
 import {embedStatus} from './embed-status.js';
 import {statisticsHTML,statisticsResultsHTML,bindStatistics,bindStatisticsCharts} from './statistics-view.js';
@@ -732,7 +733,7 @@ function dictionary(target){
   }
   const tags=w=>[...(w.partOfSpeech||[]),w.verbType,w.verbGroup].filter(Boolean).map(t=>`<span class="moji-tag">${esc(t)}</span>`).join('');
   const renderList=()=>{
-    results.innerHTML=lastItems.length?`${lastOnline?'<small class="muted">MOJi 辞書</small>':''}<div class="record-list">${lastItems.map((w,i)=>{const link=lastOnline&&w.id;return `<article class="record${link?' moji-entry':''}"${link?` tabindex="0" role="button" data-moji-index="${i}"`:''}><div class="word-spelling">${esc(w.spelling)}</div><div class="word-reading">${esc(w.reading)}</div>${lastOnline&&tags(w)?`<div class="moji-tags">${tags(w)}</div>`:''}<div class="word-def">${esc(w.definition)}</div></article>`;}).join('')}</div>`:empty(text.noDefinition,'word');
+    results.innerHTML=lastItems.length?`${lastOnline?'<small class="muted">MOJi 辞書</small>':''}<div class="record-list">${lastItems.map((w,i)=>{const link=lastOnline&&w.id;return `<article class="record dict-entry${link?' moji-entry':''}"${link?` tabindex="0" role="button" data-moji-index="${i}"`:''}><div class="word-spelling">${esc(w.spelling)}</div><div class="word-reading">${esc(w.reading)}</div>${lastOnline&&tags(w)?`<div class="moji-tags">${tags(w)}</div>`:''}${lastOnline?`<div class="word-def">${esc(w.definition)}</div>`:(definitionHtml(w.definition,esc)||`<div class="word-def">${esc(w.definition)}</div>`)}</article>`;}).join('')}</div>`:empty(text.noDefinition,'word');
     results.querySelectorAll('[data-moji-index]').forEach(card=>{const open=()=>openDetail(lastItems[Number(card.dataset.mojiIndex)]);card.onclick=open;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
   };
   async function openDetail(item){

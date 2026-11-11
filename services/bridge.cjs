@@ -402,7 +402,7 @@ async function dispatch(request,runtime=null) {
       }
       case 'reading_save_word':{
         if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');const insights=require('./learning-insights.cjs'),key=String(request.key||'').slice(0,40),base=String(request.base||key).slice(0,40);if(!key)throw Error('WORD_NOT_FOUND');
-        const entry=await lookupEntry(runtime.learning(),base,key);const saved=insights.saveWord(db,entry,insights.exampleLine(db,key,typeof request.gameId==='string'?request.gameId:null));
+        const entry=await lookupEntry(runtime.learning(),base,key);const saved=insights.saveWord(db,entry,insights.exampleLine(db,key,typeof request.gameId==='string'?request.gameId:null),{status:Number.isInteger(request.status)?request.status:null});
         runtime.emit?.('reader-event',{type:'word-status-changed'});return saved;
       }
       case 'statistics':return require('./statistics.cjs').statistics(db,request);
