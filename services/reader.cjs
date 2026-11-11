@@ -74,7 +74,7 @@ class Reader{
   const layout={...require('../core/layout.cjs'),overlayHwnd:String(hwnd)};
   this.immersion=new(require('../core/immersion.cjs').Immersion)(message=>{this.logVisibility({type:'dialogVisibility',visible:message.dialogVisible,reason:message.reason});this.runtime.emit('reader-event',{type:'dialogVisibility',visible:message.dialogVisible});clearTimeout(this.hideTimer);if(message.dialogVisible===false)this.hideTimer=setTimeout(()=>this.gal?.send({type:'dialogVisibility',visible:false}),140);else this.gal?.send({type:'dialogVisibility',visible:message.dialogVisible});this.runtime.emit('reader-event',message);});this.immersion.configure(this.runtime.config());/* E422: a page game is known before its first line */this.immersion.flowGame=()=>this.gal?.hooks?.flowPage===true;this.tick=setInterval(()=>this.immersion.tick(),100);this.tick.unref();
   this.fonts=new(require('../core/game-fonts.cjs').GameFonts)(layout,()=>{this.runtime.emit('reader-event',{type:'fonts',fonts:this.fonts.payload(true)});});
-  this.gal=new(require('../core/gal-native.cjs').GalNative)(layout,pid,message=>this.event(message),this.runtime.spawnReaderNative);
+  this.gal=new(require('../core/gal-native.cjs').GalNative)(layout,pid,message=>this.event(message),this.runtime.spawnReaderNative);this.gal.onLineVoice=(text,wav)=>{try{require('./game-voice.cjs').remember(this.root,text,wav);}catch{}};
   if(!this.gal.process){this.stop();throw Error('READER_NATIVE_MISSING');}
   this.gal.process.once('error',()=>{this.runtime.call({action:'reader_health',phase:'native-launch',error:'READER_NATIVE_START_FAILED'}).catch(()=>{});});
   if(this.runtime.pendingGame)this.selectGame(this.runtime.pendingGame,this.runtime.pendingGameEnter,this.runtime.pendingExecutable);
@@ -122,7 +122,7 @@ class Reader{
  sentenceTranslation(text,machine){const insights=require('./learning-insights.cjs'),human=this.humanLine(text);return insights.pickTranslation({human,machine:human&&insights.usable(machine)&&machine.trim()===human.text?'':machine});}
  refreshTextSource(){try{const hooks=this.gal?.hooks;if(!hooks)return;/* E330 the 零延迟翻译 switch in the translation settings */hooks.scriptAllowed=()=>this.prefs().scriptTranslation!==false;hooks.originalText=this.gameExe?require('./original-text.cjs').provider(this.root,this.gameExe):null;}catch{}}
  // E280: a Japanese game started without a patch set up: look for one on this computer in the background.
- findTextSource(gameId){const hooks=this.gal?.hooks;if(!gameId||hooks?.originalText)return;require('./original-text.cjs').autoPatchLater(this.root,gameId,()=>this.refreshTextSource());}
+ findTextSource(gameId){/* E450 the game's own voices for its lines */try{const db=require('./store.cjs').openStore(this.root);try{const row=db.prepare('SELECT executable FROM games WHERE id=?').get(String(gameId));require('./game-voice.cjs').scanLater(this.root,row?.executable);}finally{db.close();}}catch{}const hooks=this.gal?.hooks;if(!gameId||hooks?.originalText)return;require('./original-text.cjs').autoPatchLater(this.root,gameId,()=>this.refreshTextSource());}
  /* E370 shared adaptation: a game with nothing saved on this PC starts from a matching shared record (local store, then
     the relay when one is configured); the reader says 已套用共享适配设置 once. Settings the user saved are never replaced. */
  sharedImport(game){const exe=this.gameExe;if(!exe)return;setTimeout(()=>{try{if(this.gameExe!==exe)return;const shared=require('./shared-adaptation.cjs');if(!shared.enabled(this.root))return;let original={};try{original=JSON.parse(game?.original||'{}')||{};}catch{}const lib=original.library||{};
@@ -309,6 +309,8 @@ class Reader{
     const media=await this.gal?.gameMedia(args.text,Date.now(),false).catch(()=>null);
     extra.screenshot=screenshot;
     if(media?.audio){extra.sentenceAudio=media.audio;extra.gameAudio=true;}
+    /* E450 the voice the script names for this line, or one kept while the game ran */
+    if(!extra.sentenceAudio){try{const v=require('./game-voice.cjs').find(this.root,args.text);if(v){extra.sentenceAudio={data:v.data.toString('base64'),ext:require('./game-voice.cjs').kind(v.data).ext};extra.gameAudio=true;}}catch{}}
     try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'ankiGameAudio',matched:!!media?.matched,recording:!!media?.recording,voiced:!!media?.audio,error:media?.error||''})+'\n');}catch{}
    }
    if(config.ankiAudio){

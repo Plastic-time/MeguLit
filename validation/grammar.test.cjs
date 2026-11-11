@@ -182,5 +182,5 @@ test('interactive: particle puzzle gaps, explanations on the grammar, read aloud
  const q=g.exercisesFor(wo,real)[0],wrong=q.choices.find(c=>c!==q.answer);
  const miss=g.quizHTML(wo,q,{locale:'zh',esc,answered:wrong});assert.match(miss,/正确答案是「を」/);assert.match(miss,/正确的接法/);assert.match(miss,/data-retry/);assert.match(miss,/名词 \+ を \+ 他动词/,'shows how it attaches');
  const hit=g.quizHTML(wo,q,{locale:'zh',esc,answered:'を'});assert.match(hit,/答对了/);assert.match(hit,/data-next/);
- const src=fs.readFileSync(path.join(__dirname,'..','web','grammar.js'),'utf8');assert.match(src,/api\('speech_preview'/,'read aloud uses the existing voice engine');assert.match(src,/prefers-reduced-motion/);
+ const src=fs.readFileSync(path.join(__dirname,'..','web','grammar.js'),'utf8');assert.match(src,/playSentence\(api,/,'read aloud plays the game voice first, then the voice engine');assert.match(src,/prefers-reduced-motion/);
 });

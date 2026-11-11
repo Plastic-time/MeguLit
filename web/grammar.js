@@ -327,7 +327,7 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
   const a=mark.getBoundingClientRect(),h=host.getBoundingClientRect();pop.style.left=Math.max(0,Math.min(a.left-h.left,h.width-260))+'px';pop.style.top=(a.bottom-h.top+6)+'px';
   if(motion())pop.animate([{opacity:0,transform:'translateY(-3px)'},{opacity:1,transform:'none'}],{duration:150,easing:'ease-out'});
  }
- async function speak(text,button){button.disabled=true;try{const r=await api('speech_preview',{text:String(text).slice(0,200)});audio?.pause();audio=new Audio(URL.createObjectURL(new Blob([Uint8Array.from(atob(r.data),c=>c.charCodeAt(0))],{type:'audio/wav'})));await audio.play();}catch{toast?.(w.speakFail);}finally{button.disabled=false;}}
+ async function speak(text,button){button.disabled=true;try{audio?.pause();await (await import('./sentence-voice.js')).playSentence(api,text,button);}catch{toast?.(w.speakFail);}finally{button.disabled=false;}}
  function bindConj(){const box=root.querySelector('[data-conj]');if(!box)return;let wordIndex=0,form=CONJ_FORM[point.id]||'masu';
   const redraw=(animate)=>{const box=root.querySelector('[data-conj]');if(!box)return;const old=box.querySelector('.gm-ending')?.textContent;box.outerHTML=conjHTML(point.id,{locale,esc,wordIndex,form});const next=root.querySelector('[data-conj]');bindConjButtons(next);
    const end=next.querySelector('.gm-ending');if(animate&&motion()&&end&&end.textContent!==old)end.animate([{opacity:0,transform:'translateY(.4em)',filter:'blur(2px)'},{opacity:1,transform:'none',filter:'none'}],{duration:260,easing:'cubic-bezier(.2,.7,.2,1)'});};

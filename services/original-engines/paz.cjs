@@ -27,10 +27,12 @@ function list(file){const scheme=schemeOf(file),arc=path.parse(file).name.toLowe
    const pw=!e.packed&&/\.sc$/i.test(name)?scheme.sc:'';if(scheme.version>0&&pw)rc4(Buffer.from(name.toLowerCase()+' '+e.unpacked.toString(16).toUpperCase().padStart(8,'0')+' '+pw,'latin1'))(d);
    d=d.subarray(0,e.size);return e.packed?zlib.inflateSync(d):d;}});}
  return out;}
-function parse(data){const lines=[];
+const voiceRef=require('./voice-ref.cjs');
+// E450 the voice column (sk\sk1042.ogg) goes with the text of its row.
+function parse(data){const lines=[],voices=[];
  for(const row of new TextDecoder('shift_jis').decode(data).split(/\r?\n/)){if(!row.startsWith('.message'))continue;const f=row.split('\t');const name=f[3]||'',text=(f.slice(4).join('\t')||'').replace(/\\#[0-9A-Fa-f]{6}/g,'').replace(/\\n/g,'').replace(/\\[-+*A-Za-z]/g,'').trim();/* \#RRGGBB colour, \n break, \+ etc. */
-  if(!text)continue;if(name)lines.push(name);lines.push(text);}
- return {lines,anchors:[]};}
+  if(!text)continue;if(name){lines.push(name);voices.push(null);}lines.push(text);voices.push(voiceRef.clean(f[2]));}
+ const v=voiceRef.keep(voices);return v?{lines,anchors:[],voices:v}:{lines,anchors:[]};}
 function scrDat(dir){const f=path.join(dir,'scr.dat');return schemeOf(f)?f:null;}
 const engine={
  id:'paz',hint:'scr.dat',

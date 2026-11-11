@@ -39,21 +39,21 @@ function walk(dir,depth,test,out=[]){let entries;try{entries=fs.readdirSync(dir,
 // Text lines are what is left of a line after its tags; command lines (@...), labels (*...) and tag-only lines are
 // anchors when they hold no text a translation would change.
 function parseKs(buf){
- const lines=[],anchors=[],ruby=[];let script=false,cont=false;
+ const lines=[],anchors=[],ruby=[],voices=[],vt=voiceRef.tracker();let script=false,cont=false;
  for(const raw of decode(buf).split(/\r?\n/)){const t=raw.trim();if(!t||t[0]===';')continue;
   // a command whose line ends in "\" goes on to the next line (女王蜂の王房 window positions)
-  if(cont){cont=t.endsWith('\\');continue;}if((t[0]==='@'||t[0]==='[')&&t.endsWith('\\')){cont=true;continue;}
+  if(cont){vt.see(t);cont=t.endsWith('\\');continue;}if((t[0]==='@'||t[0]==='[')&&t.endsWith('\\')){vt.see(t);cont=true;continue;}
   // TJS between [iscript] and [endscript] is code, not text (女王蜂の王房 staff roll)
   if(/^[@[]iscript\b/i.test(t)){script=true;continue;}if(script){if(/^[@[]endscript\b/i.test(t))script=false;continue;}
-  if(t[0]==='@'||t[0]==='*'){if(ascii(t))anchors.push(t);continue;}
+  if(t[0]==='@'||t[0]==='*'){vt.see(t);if(ascii(t))anchors.push(t);continue;}
   // A tag whose name is Japanese is a macro that prints that word (女王蜂の王房: [輝夜] [めのう] for character names,
   // [輝夜ruby] with its reading, [漢字'よみ] for ruby); keep the word, drop the reading.
   const text=t.replace(/\[([぀-ヿ一-鿿々ー]+)(?:ruby|'[^\]]*)?\]/g,'$1').replace(/\[[^\]]*\]/g,'').trim();
-  if(!text){if(ascii(t))anchors.push(t);continue;}
+  if(!text){vt.see(t);if(ascii(t))anchors.push(t);continue;}vt.see(t);/* E450 a speaker label line (【名前】) passes its voice on to the speech after it */if(!/^【[^】]*】$/.test(text))voices[lines.length]=vt.take();
   const pairs=[...t.matchAll(/\[([぀-ヿ一-鿿々ー]+)'([^\]]+)\]/g)].map(m=>[m[1],m[2]]);if(pairs.length)ruby[lines.length]=pairs;
   lines.push(text);}
  // the game's own readings ([漢字'よみ]), only when the script has any
- return ruby.length?{lines,anchors,ruby:lines.map((_,i)=>ruby[i]||null)}:{lines,anchors};
+ const out=ruby.length?{lines,anchors,ruby:lines.map((_,i)=>ruby[i]||null)}:{lines,anchors};const v=voiceRef.keep(lines.map((_,i)=>voices[i]||null));if(v)out.voices=v;return out;
 }
 function xp3Scenes(file,test){let t;try{t=xp3.list(file);}catch{return [];}if(!t)return [];
  // An entry flagged "protected" can still be stored as plain text (女王蜂の王房): try the first one and keep the
@@ -213,7 +213,7 @@ const siglus={
 const os=require('node:os');
 const MEDIA_XP3=/^(?:bg|fg|ev|sd)?image|^(?:bgm|voice|sound|se|movie|video|thum|emote|font|sysse)/i;
 const cxArchives=dir=>{try{return fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)&&!MEDIA_XP3.test(f)).map(f=>path.join(dir,f));}catch{return [];}};
-const cxCache=file=>{const st=fs.statSync(file);return path.join(os.tmpdir(),'megulit-cx',crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+'|3').digest('hex').slice(0,24)+'.json');};
+const cxCache=file=>{const st=fs.statSync(file);return path.join(os.tmpdir(),'megulit-cx',crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+'|4').digest('hex').slice(0,24)+'.json');};
 const cxBuilds=new Map(),cxMemo=new Map(),cxQueue=[],cxStarted=new Map();let cxRunning=false;
 function cxDocs(file){
  let out;try{out=cxCache(file);}catch{return null;}
@@ -241,9 +241,9 @@ const kirikiriCx={
  archives:()=>[],
  sources:dir=>cxArchives(dir).flatMap(f=>{let c='';try{c=cxCache(f);}catch{}return c?[f,c]:[f];}),
  // ruby: the game's own readings for each Japanese line ([base, reading] pairs), used before any dictionary reading.
- parse(buf){const doc=JSON.parse(buf.toString('utf8')),lines=[],zh=[],ruby=[];
-  for(const scene of doc.scenes)scene.rows.forEach((row,k)=>{lines.push(row[0]||'');zh.push(row[2]||row[3]||'');ruby.push(scene.ruby?.[k]?.length?scene.ruby[k]:null);});
-  return {lines,anchors:[],zh,ruby};},
+ parse(buf){const doc=JSON.parse(buf.toString('utf8')),lines=[],zh=[],ruby=[],voices=[];
+  for(const scene of doc.scenes)scene.rows.forEach((row,k)=>{lines.push(row[0]||'');zh.push(row[2]||row[3]||'');ruby.push(scene.ruby?.[k]?.length?scene.ruby[k]:null);voices.push(scene.voices?.[k]||null);});
+  const v=voiceRef.keep(voices);return v?{lines,anchors:[],zh,ruby,voices:v}:{lines,anchors:[],zh,ruby};},
  test:()=>false,
  // The release's own Simplified (else Traditional) Chinese slot is the translation of each Japanese line.
  patchLines(base){let any=false;const list=base.map(scene=>{const zh=scene.zh||[];if(!zh.some(Boolean))return scene;any=true;return {...scene,patched:true,lines:scene.lines.map((t,k)=>zh[k]||t)};});return any?list:null;},
@@ -409,6 +409,7 @@ const rpgmaker=require('./rpgmaker.cjs'),wolf=require('./wolf.cjs');
 // E403 DDLC Plus (StreamingAssets/AssetBundles/Windows/lang*.cy): vgprompter.cjs.
 const vgprompter=require('./vgprompter.cjs');
 const fill=require('./fill.cjs'),avg32=require('./avg32.cjs'),nitroNpk=require('./npk.cjs').engine,nitroPak=require('./nitro-pak.cjs').engine,iga=require('./iga.cjs').engine,paz=require('./paz.cjs').engine,bruns=require('./bruns.cjs').engine,rePak=require('./re-pak.cjs').engine,fvp=require('./fvp.cjs').engine,advhd=require('./advhd.cjs').engine,reallive=require('./reallive.cjs').engine;
+const voiceRef=require('./voice-ref.cjs');
 const catsystem2=require('./catsystem2.cjs'),naninovel=require('./naninovel.cjs'),unityText=require('./unity-text.cjs'),higurashi=require('./higurashi.cjs'),mages=require('./mages.cjs'),capcomMsg=require('./capcom-msg.cjs');
 // E409 Nitroplus N4 (Steam The Song of Saya, script.npk NPK2): nitroplus-n4.cjs.
 const nitroplusN4=require('./nitroplus-n4.cjs');

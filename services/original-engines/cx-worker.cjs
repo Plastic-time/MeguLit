@@ -27,11 +27,11 @@ function rubyOf(s){
 function textsOf(doc){
  const scenes=[];
  for(const scene of Array.isArray(doc.root?.scenes)?doc.root.scenes:[]){
-  const rows=[],ruby=[];
-  for(const t of Array.isArray(scene?.texts)?scene.texts:[]){if(!Array.isArray(t))continue;const slots=t[2];
-   if(Array.isArray(slots)){rows.push(slots.map(s=>Array.isArray(s)?clean(s[1]):''));ruby.push(rubyOf(Array.isArray(slots[0])?slots[0][1]:''));}
-   else if(typeof slots==='string'){rows.push([clean(slots)]);ruby.push(rubyOf(slots));}}
-  if(rows.length)scenes.push({label:typeof scene.label==='string'?scene.label:'',rows,ruby});
+  const rows=[],ruby=[],voices=[];
+  for(const t of Array.isArray(scene?.texts)?scene.texts:[]){if(!Array.isArray(t))continue;const slots=t[2],vo=Array.isArray(t[3])?t[3].find(v=>v&&typeof v.voice==='string')?.voice:null;
+   if(Array.isArray(slots)){rows.push(slots.map(s=>Array.isArray(s)?clean(s[1]):''));voices.push(vo||null);ruby.push(rubyOf(Array.isArray(slots[0])?slots[0][1]:''));}
+   else if(typeof slots==='string'){rows.push([clean(slots)]);voices.push(vo||null);ruby.push(rubyOf(slots));}}
+  if(rows.length)scenes.push({label:typeof scene.label==='string'?scene.label:'',rows,ruby,...(voices.some(Boolean)?{voices}:{})});
  }
  return scenes;
 }
