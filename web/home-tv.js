@@ -53,7 +53,7 @@ const DRAWS={
  slots:()=>({f:[[0,at(0,-320,0,1)],[.1,at(0,-140,0,1),'linear'],[.2,at(0,-30,0,1),'linear'],[.32,at(0,8,0,1),'cubic-bezier(.2,.8,.3,1)'],[.42,at(0,0,0,1),E1]]}),
  tumble:()=>({f:[[0,at(rnd(-40,40),-200,rnd(-10,10),.9,'rotateX(720deg)')],[.42,at(0,0,0,1,'rotateX(0deg)'),'cubic-bezier(.25,.8,.3,1)']]}),
  skid:()=>{const sx=pickOne([-1,1]);return {f:[[0,at(sx*-220,8,sx*-12,1)],[.22,at(sx*24,2,sx*6,1),'cubic-bezier(.1,.8,.3,1)'],[.34,at(sx*-5,0,sx*-2,1),E3],[.44,at(0,0,0,1),E1]]};},
- heli:()=>{const k=pickOne([-1,1]);return {f:[[0,at(rnd(-30,30),-190,0,.6,UP(1.5))],[.42,at(0,0,k*1080,1),'cubic-bezier(.2,.6,.3,1)']]};}};
+ heli:()=>{const k=pickOne([-1,1]);return {f:[[0,at(rnd(-30,30),-190,0,.6,UP(1.5))],[.42,at(0,0,k*720,1),'cubic-bezier(.2,.6,.3,1)']]};}};
 const PILE_IN=620;
 function pileMotion(pile,kind,total,delay){const cards=[...pile.children],top=cards[cards.length-1],rest=cards.slice(0,-1),base=c=>c.style.transform;
  pile.getAnimations().forEach(x=>x.cancel());const inMs=PILE_IN,from=pickOne([['-120%','70%',-28],['-50%','130%',-10],['60%','110%',18]]);pile.animate([{opacity:0,translate:`${from[0]} ${from[1]}`,rotate:`${from[2]}deg`,scale:'.85',easing:'cubic-bezier(.3,.75,.3,1)'},{opacity:1,translate:'0 0',rotate:'0deg',scale:'1',offset:inMs/(inMs+total),easing:'linear'},{opacity:1,translate:'0 0',rotate:'0deg',scale:'1',offset:(inMs+total*.42)/(inMs+total),easing:'cubic-bezier(.4,0,.6,1)'},{opacity:0,translate:'-8% 14%',rotate:'-6deg',scale:'.94',offset:(inMs+total*.62)/(inMs+total),easing:'linear'},{opacity:0,translate:'-8% 14%',rotate:'-6deg',scale:'.94'}],{duration:inMs+total,delay:Math.max(0,delay-inMs),easing:'linear',fill:'both'});
@@ -68,7 +68,7 @@ function pileMotion(pile,kind,total,delay){const cards=[...pile.children],top=ca
 const parsePose=(dx,dy,r,s,extra='')=>{const g=(re,d)=>{const m=extra.match(re);return m?parseFloat(m[1]):d;};return {x:dx,y:dy,r,s,z:g(/translateZ\((-?[\d.]+)px\)/,0),rx:g(/rotateX\((-?[\d.]+)deg\)/,0),sx:g(/scaleX\((-?[\d.]+)\)/,1),sy:g(/scaleY\((-?[\d.]+)\)/,1)};};
 const FEELS={soft:{k:120,c:16,lead:1.15,drag:.05},fluid:{k:190,c:21,lead:1,drag:.04},snappy:{k:320,c:27,lead:.85,drag:.03},crisp:{k:700,c:52,lead:.72,drag:.012}};
 function springTrack(targets,feel){const ch=['x','y','r','s','z','rx','ry','sx','sy'],pos={...targets[0].p},vel=Object.fromEntries(ch.map(k=>[k,0])),dt=1/240,out=[];let ti=0,t=0,settled=0;const last=targets[targets.length-1].at;
- while(t<last+3){while(ti+1<targets.length&&targets[ti+1].at<=t)ti++;const tg=targets[ti].p,k=targets[ti].k||feel.k,c=targets[ti].c||feel.c;let moving=false;
+ while(t<last+3){while(ti+1<targets.length&&targets[ti+1].at<=t)ti++;const nx=targets[ti+1],cu=targets[ti],u=nx?Math.min(1,Math.max(0,(t-cu.at)/Math.max(.001,nx.at-cu.at))):1,sm=u*u*u*(u*(u*6-15)+10),tg=nx?Object.fromEntries(ch.map(n=>[n,cu.p[n]+(nx.p[n]-cu.p[n])*sm])):cu.p,k=targets[ti].k||feel.k,c=targets[ti].c||feel.c;let moving=false;
   for(const n of ch){const a=k*(tg[n]-pos[n])-c*vel[n];vel[n]+=a*dt;pos[n]+=vel[n]*dt;if(Math.abs(tg[n]-pos[n])>(n==='s'||n==='sx'||n==='sy'?.002:.15)||Math.abs(vel[n])>(n==='s'||n==='sx'||n==='sy'?.01:1))moving=true;}
   if(Math.round(t/dt)%4===0)out.push({t,p:{...pos},v:{x:vel.x,y:vel.y}});
   t+=dt;if(t>last&&!moving){if(++settled>12)break;}else settled=0;}
@@ -84,7 +84,8 @@ function deal(cover,background,animate,mode='draw'){const flip=cover.querySelect
  const side=Math.random()<.5?-1:1,turn=180*side,tilt=rnd(-4,4),lift=rnd(50,100),over=rnd(1.04,1.09),T=rnd(1.05,1.3)*feel.lead,gap=outDur*.25/1000;
  const targets=style.f.map(([t,s])=>{const m=s.match(/translate\((-?[\d.]+)%,(-?[\d.]+)%\)\s*(.*?)\s*rotate\((-?[\d.]+)deg\)\s*rotateY\(var\(--turn\)\)\s*scale\((-?[\d.]+)\)/);const p=m?parsePose(+m[1],+m[2],+m[4],+m[5],m[3]):parsePose(0,0,0,1);p.ry=turn;return {at:t*T,p};});
  const slot={x:0,y:0,r:tilt,s:1,z:0,rx:0,ry:turn,sx:1,sy:1},tf=.52*T;
- targets.push({at:tf,p:{...slot}},{at:tf+.12,p:{...slot,z:lift,s:over,ry:0,r:tilt*.4},k:feel.k*.9},{at:tf+.42,p:{x:0,y:0,r:0,s:1,z:0,rx:0,ry:0,sx:1,sy:1}});
+ const R=360*Math.round(targets[targets.length-1].p.r/360);slot.r+=R;targets.push({at:tf,p:{...slot}},{at:tf+.12,p:{...slot,z:lift,s:over,ry:0,r:R+tilt*.4},k:feel.k*.9},{at:tf+.42,p:{x:0,y:0,r:R,s:1,z:0,rx:0,ry:0,sx:1,sy:1}});
+ const spin=targets.reduce((m,x,i)=>i?Math.max(m,Math.abs(x.p.r-targets[i-1].p.r)+Math.abs(x.p.rx-targets[i-1].p.rx)):m,0),stretch=1+Math.min(.6,spin/1000);targets.forEach(x=>{if(x.at<tf)x.at*=stretch;});const shift=tf*(stretch-1);targets.forEach(x=>{if(x.at>=tf)x.at+=shift;});
  const track=springTrack(targets,feel),total=track[track.length-1].t*1000;
  const frames=track.map(({t,p,v})=>{const lean=Math.max(-14,Math.min(14,v.x*feel.drag)),pitch=Math.max(-12,Math.min(12,-v.y*feel.drag*.8));return {offset:Math.min(1,t*1000/total),transform:`translate(${p.x.toFixed(2)}%,${p.y.toFixed(2)}%) translateZ(${p.z.toFixed(1)}px) rotateX(${(p.rx+pitch).toFixed(2)}deg) rotate(${(p.r+lean).toFixed(2)}deg) rotateY(${p.ry.toFixed(2)}deg) scale(${p.s.toFixed(4)}) scaleX(${p.sx.toFixed(3)}) scaleY(${p.sy.toFixed(3)})`};});
  frames[0].offset=0;frames[frames.length-1]={offset:1,transform:'none'};
