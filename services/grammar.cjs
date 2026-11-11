@@ -64,31 +64,50 @@ CREATE TABLE IF NOT EXISTS grammar_progress(point TEXT PRIMARY KEY,learned_at IN
 }
 const fitLength=t=>{const n=[...t].length;return n>=6&&n<=60;};
 /* Lines to look in: recorded lines first (newest first), then the script up to the furthest line reached. */
-function candidates(db,{root=null,scriptPairs=null,limitScript=4000}={}){
+/* E459: built in steps so the service can answer other pages in between; candidates() runs them all at once */
+function candidates(db,opts={}){const it=candidateSteps(db,opts);for(;;){const s=it.next();if(s.done)return s.value;}}
+async function candidatesAsync(db,opts={}){const it=candidateSteps(db,opts),breathe=require('./cooperative.cjs').breather();for(;;){const s=it.next();if(s.done)return s.value;await breathe();}}
+function* candidateSteps(db,{root=null,scriptPairs=null,limitScript=4000}={}){
   const titles=new Map(db.prepare('SELECT id,title,executable FROM games').all().map(g=>[g.id,g]));const out=[],seen=new Set();
   const rows=db.prepare('SELECT id,game_id,text,original,read_at FROM reading_events ORDER BY id DESC LIMIT 5000').all();
-  for(const r of rows){const text=insights.plainLine(r.text);if(!fitLength(text)||!insights.readableLine(text)||seen.has(text))continue;seen.add(text);let o={};try{o=JSON.parse(r.original||'{}');}catch{}
+  let n=0;for(const r of rows){if(++n%200===0)yield;const text=insights.plainLine(r.text);if(!fitLength(text)||!insights.readableLine(text)||seen.has(text))continue;seen.add(text);let o={};try{o=JSON.parse(r.original||'{}');}catch{}
     const human=insights.isHuman(o.translationSource),picked=insights.pickTranslation({human:human?{text:o.translation,source:o.translationSource}:null,machine:human?'':o.translation});
     out.push({text,origin:'history',gameId:r.game_id,title:titles.get(r.game_id)?.title||'',ruby:rubyPairs(r.text),readAt:r.read_at,readBy:false,...picked});}
   if(root&&scriptPairs){
     const byGame=new Map();for(const r of rows)if(r.game_id){if(!byGame.has(r.game_id))byGame.set(r.game_id,[]);byGame.get(r.game_id).push({text:insights.plainLine(r.text),at:r.read_at});}
-    for(const [gameId,read] of byGame){const game=titles.get(gameId);if(!game?.executable)continue;let pairs=null;try{pairs=scriptPairs(root,game.executable);}catch{}if(!pairs?.ja?.length)continue;
+    for(const [gameId,read] of byGame){yield;const game=titles.get(gameId);if(!game?.executable)continue;let pairs=null;try{pairs=scriptPairs(root,game.executable);}catch{}if(!pairs?.ja?.length)continue;
       /* the furthest script line matching a recorded line is the reading position */
       const key=t=>String(t||'').replace(/[\s「」『』（）()、。…―ー！？!?♪〜～]/g,''),want=new Map();for(const r of read){const k=key(r.text);if(k.length>=4&&(!want.has(k)||r.at<want.get(k)))want.set(k,r.at);}let last=-1;const seenAt=new Map();
-      pairs.ja.forEach((t,i)=>{const k=key(insights.plainLine(t));if(k.length>=4&&want.has(k)){last=i;seenAt.set(i,want.get(k));}});
+      yield;for(let i=0;i<pairs.ja.length;i++){if(i%2000===0)yield;const k=key(insights.plainLine(pairs.ja[i]));if(k.length>=4&&want.has(k)){last=i;seenAt.set(i,want.get(k));}}
       /* a script line that was not recorded itself was read by the time of the next recorded line after it */
       let nextAt=null;const byTime=new Map();for(let i=last;i>=0;i--){if(seenAt.has(i))nextAt=nextAt==null?seenAt.get(i):Math.min(nextAt,seenAt.get(i));byTime.set(i,nextAt);}
-      let added=0;for(let i=last;i>=0&&added<limitScript;i--){const text=insights.plainLine(pairs.ja[i]);if(!fitLength(text)||!insights.readableLine(text)||seen.has(text))continue;seen.add(text);added++;
+      let added=0;for(let i=last;i>=0&&added<limitScript;i--){if(i%500===0)yield;const text=insights.plainLine(pairs.ja[i]);if(!fitLength(text)||!insights.readableLine(text)||seen.has(text))continue;seen.add(text);added++;
         const tr=pairs.tr?.[i]||'';out.push({text,origin:'script',gameId,title:game.title,ruby:[],readAt:byTime.get(i)||null,readBy:true,translation:tr,translationSource:tr?pairs.source:''});}}
   }
   return out;
 }
+/* E459: the candidate list is built once per change of the recorded lines or the imported scripts (the page asks again
+   every few seconds while lines are still being checked), and building it lets other requests run in between. */
+const candidateCache=new Map(),reportCache=new Map();
+function candidateStamp(db,root){
+  const r=db.prepare('SELECT COALESCE(MAX(id),0) m,COUNT(*) n FROM reading_events').get();let s=0;
+  try{s=require('fs').statSync(require('path').join(String(root||''),'data','config','original-text.json')).mtimeMs;}catch{}
+  return r.m+':'+r.n+':'+s;
+}
+async function candidatesCached(db,{root=null,scriptPairs=null}={}){
+  const key=String(root)+'|'+(scriptPairs?1:0),stamp=candidateStamp(db,root),hit=candidateCache.get(key);
+  if(hit&&hit.stamp===stamp)return hit.list;
+  const list=await candidatesAsync(db,{root,scriptPairs});candidateCache.set(key,{stamp,list});return list;
+}
+/* Every checked line's hits in one query (instead of one query per line, twice per report). */
+function checkedLines(db){ensure(db);const map=new Map();for(const r of db.prepare('SELECT text,hits FROM grammar_lines').all())map.set(r.text,r.hits);return map;}
 /* Tokenizes candidate lines not checked yet, until every point has `want` confirmed lines or the deadline. */
 async function refresh(db,list,tokenize,{want=8,deadline=Date.now()+8000}={}){
-  ensure(db);const get=db.prepare('SELECT hits FROM grammar_lines WHERE text=?'),put=db.prepare('INSERT OR REPLACE INTO grammar_lines(text,hits,checked_at) VALUES(?,?,?)');
+  ensure(db);const breathe=require('./cooperative.cjs').breather(),known=checkedLines(db),get={get:text=>known.has(text)?{hits:known.get(text)}:undefined},put0=db.prepare('INSERT OR REPLACE INTO grammar_lines(text,hits,checked_at) VALUES(?,?,?)'),put={run:(text,hits,at)=>{put0.run(text,hits,at);known.set(text,hits);}};
   const found=Object.fromEntries(POINTS.map(p=>[p,0]));let checked=0,pending=0;
-  for(const c of list){const row=get.get(c.text);if(row){let hits={};try{hits=JSON.parse(row.hits);}catch{}for(const p of Object.keys(hits))if(found[p]!==undefined)found[p]++;}}
+  for(const c of list){await breathe();const row=get.get(c.text);if(row){let hits={};try{hits=JSON.parse(row.hits);}catch{}for(const p of Object.keys(hits))if(found[p]!==undefined)found[p]++;}}
   for(const c of list){
+    await breathe();
     if(POINTS.every(p=>found[p]>=want))break;
     if(get.get(c.text))continue;
     if(!POINTS.some(p=>found[p]<want&&PREFILTER[p].test(c.text)))continue;
@@ -100,9 +119,9 @@ async function refresh(db,list,tokenize,{want=8,deadline=Date.now()+8000}={}){
 }
 /* Up to `max` examples per point: human translation first, recorded lines before script lines, different games,
    lines of sentence length. */
-function examples(db,list,{max=5}={}){
-  ensure(db);const get=db.prepare('SELECT hits FROM grammar_lines WHERE text=?'),by=Object.fromEntries(POINTS.map(p=>[p,[]]));
-  for(const c of list){const row=get.get(c.text);if(!row)continue;let hits={};try{hits=JSON.parse(row.hits);}catch{}
+function examples(db,list,{max=5,known=checkedLines(db)}={}){
+  const by=Object.fromEntries(POINTS.map(p=>[p,[]]));
+  for(const c of list){const row=known.has(c.text)?{hits:known.get(c.text)}:null;if(!row)continue;let hits={};try{hits=JSON.parse(row.hits);}catch{}
     for(const [p,spans] of Object.entries(hits))if(by[p]&&spans.length)by[p].push({...c,start:spans[0][0],end:spans[0][1]});}
   const score=e=>(insights.isHuman(e.translationSource)?4:e.translation?1:0)+(e.origin==='history'?2:0)+([...e.text].length<=40?1:0);
   const out={};
@@ -180,13 +199,18 @@ async function scenes(db,list,tokenize,{max=4,budget=12}={}){
    the lines you read are searched for them directly (no tokenizer needed), the best few become its examples. */
 let levelsMod=null;
 async function levels(){if(!levelsMod){try{levelsMod=await import(require('url').pathToFileURL(require('path').join(__dirname,'..','web','grammar-levels.js')).href);}catch{levelsMod={LEVEL_LIST:[],levelPoints:()=>[],findHit:()=>null};}}return levelsMod;}
-function levelExamples(list,mod,{max=5}={}){
+/* E459: sync for the tests; the report uses levelExamplesAsync, which lets other requests run between points */
+function levelExamples(list,mod,opts={}){let out;const it=levelExamplesSteps(list,mod,opts);for(let s=it.next();!s.done;s=it.next())out=s.value;return out;}
+async function levelExamplesAsync(list,mod,opts={}){const breathe=require('./cooperative.cjs').breather();let out;for(const s of levelExamplesSteps(list,mod,opts)){out=s;await breathe();}return out;}
+function* levelExamplesSteps(list,mod,{max=5}={}){
   const out={},score=e=>(insights.isHuman(e.translationSource)?4:e.translation?1:0)+(e.origin==='history'?2:0)+([...e.text].length<=40?1:0);
-  for(const level of mod.LEVEL_LIST)for(const p of mod.levelPoints(level)){const found=[];
-    for(const c of list){if(found.length>=40)break;const h=mod.findHit(p,c.text);if(h)found.push({text:c.text,origin:c.origin,gameId:c.gameId,title:c.title,translation:c.translation,translationSource:c.translationSource,start:h.start,end:h.end,ruby:c.ruby,readAt:c.readAt,readBy:c.readBy});}
+  for(const level of mod.LEVEL_LIST)for(const p of mod.levelPoints(level)){const found=[];yield out;
+    /* a line without any of the point's forms cannot hit: skip it before the full check */
+    const forms=[...(p.hits||[])];
+    for(const c of list){if(found.length>=40)break;if(forms.length&&!forms.some(f=>c.text.includes(f)))continue;const h=mod.findHit(p,c.text);if(h)found.push({text:c.text,origin:c.origin,gameId:c.gameId,title:c.title,translation:c.translation,translationSource:c.translationSource,start:h.start,end:h.end,ruby:c.ruby,readAt:c.readAt,readBy:c.readBy});}
     const pick=[],games=new Map();for(const e of found.sort((a,b)=>score(b)-score(a))){if(pick.length>=max)break;if((games.get(e.gameId)||0)>=2&&found.some(x=>!pick.includes(x)&&(games.get(x.gameId)||0)<2))continue;pick.push(e);games.set(e.gameId,(games.get(e.gameId)||0)+1);}
     out[p.id]=pick;}
-  return out;
+  yield out;
 }
 /* Ids of every point below a level: N5 first, then N4 → N1 (used when the learner picks a level). */
 async function pointsBelow(level){const mod=await levels(),order=['N5',...mod.LEVEL_LIST],i=order.indexOf(level);return i<0?[]:order.slice(0,i).flatMap(l=>l==='N5'?POINTS:mod.levelPoints(l).map(p=>p.id));}
@@ -194,8 +218,11 @@ async function pointsBelow(level){const mod=await levels(),order=['N5',...mod.LE
 async function report(db,{root=null,scriptPairs=null,tokenize=null,deadline}={}){
   /* one tokenizer cache per report: the line cutter for the map reuses what the grammar scan already tokenized */
   const seen=new Map(),tk=tokenize&&(text=>{if(!seen.has(text))seen.set(text,tokenize(text));return seen.get(text);});
-  const list=candidates(db,{root,scriptPairs});const state=await refresh(db,list,tk,{deadline});
-  const ex=examples(db,list),prog=progress(db),sc=await scenes(db,list,tk),lx=levelExamples(list,await levels());
+  const list=await candidatesCached(db,{root,scriptPairs});const state=await refresh(db,list,tk,{deadline});
+  /* E459: examples only change when lines were checked or recorded; the page polls while lines are pending */
+  const stamp=candidateStamp(db,root)+':'+db.prepare('SELECT COUNT(*) n FROM grammar_lines').get().n,key=String(root)+'|'+(scriptPairs?1:0);
+  let cached=reportCache.get(key);if(!cached||cached.stamp!==stamp){const breathe=require('./cooperative.cjs').breather();await breathe();const ex=examples(db,list);await breathe();cached={stamp,ex,lx:await levelExamplesAsync(list,await levels())};reportCache.set(key,cached);}
+  const {ex,lx}=cached,prog=progress(db),sc=await scenes(db,list,tk);
   return {scenes:sc,level:'N5',points:POINTS,examples:{...ex,...lx},progress:prog,completion:completion(prog),pending:state.pending,lines:{history:list.filter(c=>c.origin==='history').length,script:list.filter(c=>c.origin==='script').length},real:Object.values({...ex,...lx}).reduce((n,l)=>n+l.length,0)};
 }
 /* An Anki note for a grammar line, through the existing card flow (one note per point and line). */
@@ -203,4 +230,4 @@ function ankiWord(point,title,gist,example){
   const label=String(title||point);
   return {surface:label,base:label,reading:label,noReading:true,cardKey:'grammar:'+point+':'+example.text,meaning:String(gist||''),pos:'N5 语法',pitch:[],sentence:example.text};
 }
-module.exports={levels,levelExamples,pointsBelow,validPoint,cutLine,scenes,POINTS,PREFILTER,matchPoints,rubyPairs,ensure,candidates,refresh,examples,progress,setLearned,recordAnswer,completion,report,ankiWord};
+module.exports={candidatesCached,levelExamplesAsync,checkedLines,levels,levelExamples,pointsBelow,validPoint,cutLine,scenes,POINTS,PREFILTER,matchPoints,rubyPairs,ensure,candidates,refresh,examples,progress,setLearned,recordAnswer,completion,report,ankiWord};

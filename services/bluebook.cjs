@@ -64,6 +64,15 @@ async function readAll(root,{env=process.env,anki=null,config=null}={}){
 }
 function read(root,opts){return fromFiles(root,opts?.env);}
 /* The lines you read that contain each card's forms (at most 4 per card, recorded lines and human translations first). */
+/* E459: the page's version lets other requests run between cards (763 cards × 20 000 lines held the service for seconds)
+   and is cached until the cards or the lines change */
+const exampleCache={key:null,value:null};
+async function examplesForAsync(points,list,opts={}){
+  const key=points.length+':'+(points[0]?.id||'')+':'+(points.at(-1)?.id||'')+'|'+list.length+':'+(list[0]?.text||'');if(exampleCache.key===key)return exampleCache.value;
+  const breathe=require('./cooperative.cjs').breather(),out={};
+  for(let i=0;i<points.length;i+=25){Object.assign(out,examplesFor(points.slice(i,i+25),list,opts));await breathe();}
+  exampleCache.key=key;exampleCache.value=out;return out;
+}
 function examplesFor(points,list,{max=4}={}){
   const score=e=>(e.translationSource==='group'||e.translationSource==='official'?4:e.translation?1:0)+(e.origin==='history'?2:0);
   const out={};for(const p of points){const hits=[...p.hits].sort((a,b)=>b.length-a.length),found=[];
@@ -83,4 +92,4 @@ async function importDeck(file,{anki=null,config=null,open=null}={}){
   if(open){open(file);return {imported:false,via:'open'};}
   return {imported:false,via:'none'};
 }
-module.exports={newDeck,importDeck,read,readAll,fromFiles,fromAnkiConnect,cardOf,parse,profiles,examplesFor,noRuby,hitsOf};
+module.exports={examplesForAsync,newDeck,importDeck,read,readAll,fromFiles,fromAnkiConnect,cardOf,parse,profiles,examplesFor,noRuby,hitsOf};
