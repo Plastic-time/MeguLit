@@ -2,6 +2,8 @@
 'use strict';
 const path=require('node:path');
 const {readJSON}=require('./store.cjs');
+// Text sizes changed on the home settings page also apply to the work that is running: its saved settings would hide them (issue 119).
+const SIZE_KEYS=['japaneseSize','translationSize','englishSize'];
 class Runtime {
  constructor(root,emit=()=>{}){this.root=root;this.folder=path.join(root,'data','config');this.emit=emit;this.stopped=false;}
  config(){return require('../core/v4-config.cjs').cleanV4(readJSON(path.join(this.folder,'v4-preferences.json')));}
@@ -28,7 +30,7 @@ class Runtime {
  metadata(){const {machine}=require('../core/library.cjs');return this.gameEnrichment??=new(require('./game-enrichment.cjs').GameEnrichment)(this.root,this.emit,fetch,async(text,lang)=>(await machine(text,lang))||(lang!=='ja'?String(await this.reviewTranslate(text,lang,'follow').catch(()=>'')||'').trim():''));}
  settingsSaved(request){if(request.scope==='library'){const db=require('./store.cjs').openStore(this.root);try{require('./series.cjs').autoGroup(db,this.root);}finally{db.close();}}const reader=this.reader,g=reader?.gal;if(!g)return;const settings=new(require('./settings.cjs').Settings)(this.root);
   if(['background','panels'].includes(request.scope))this.emit('reader-event',{type:'panelAppearance',values:settings.ui()});
-  if(['text','embedding','position'].includes(request.scope)&&(!request.profile||request.profile===g.styleSync.profileKey)){const global=require('../core/game-style.js').clean(readJSON(path.join(this.folder,'gal-preferences.json'))),profile=readJSON(path.join(this.folder,'game-style-profiles.json')).entries?.[g.styleSync.profileKey]?.prefs||{};const effective={...global,...profile,gameProcess:g.preferences.gameProcess,bindEnabled:g.preferences.bindEnabled};g.preferences=require('../core/game-style.js').clean(effective);g.preview(g.preferences);this.emit('reader-event',{type:'call',method:'restoreGalSettings',args:[g.preferences]});}
+  if(['text','embedding','position'].includes(request.scope)&&(!request.profile||request.profile===g.styleSync.profileKey)){const active=g.styleSync.profileKey,entries=readJSON(path.join(this.folder,'game-style-profiles.json')).entries||{},sizes=Object.keys(request.values||{}).filter(k=>SIZE_KEYS.includes(k));if(request.scope==='text'&&!request.profile&&active&&entries[active]&&sizes.length)try{settings.save({scope:'text',profile:active,values:Object.fromEntries(sizes.map(k=>[k,request.values[k]]))});}catch{}const global=settings.read('text'),profile=readJSON(path.join(this.folder,'game-style-profiles.json')).entries?.[active]?.prefs||{};const effective={...global,...profile,gameProcess:g.preferences.gameProcess,bindEnabled:g.preferences.bindEnabled};g.preferences=require('../core/game-style.js').clean(effective);g.preview(g.preferences);this.emit('reader-event',{type:'call',method:'restoreGalSettings',args:[g.preferences]});}
   reader.immersion?.configure(this.config());g.setGameAudio(this.config().ankiGameMedia!==false);this.emit('reader-event',{type:'call',method:'restoreSettings',args:[reader.prefs()]});this.emit('reader-event',{type:'word-status-changed'});
  }
  /* Antivirus quarantine shows up as missing native files: name it instead of a generic timeout */readerMissing(){const fs=require('node:fs');return ['GalWindowBridge.exe','HookBridge.exe','HookInjector32.exe','HookInjector64.exe'].filter(n=>!fs.existsSync(path.join(this.root,'native',n)));}
