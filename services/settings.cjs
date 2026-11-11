@@ -68,15 +68,16 @@ class Settings{
     if(/(?:Url|baseUrl)$/.test(key)&&value){let url;try{url=new URL(value);}catch{throw Error('SETTINGS_INVALID_URL');}if(url.username||url.password||url.search||url.hash||!['http:','https:'].includes(url.protocol))throw Error('SETTINGS_INVALID_URL');if((scope==='anki'||scope==='speech')&&!['127.0.0.1','localhost','[::1]'].includes(url.hostname))throw Error('SETTINGS_INVALID_URL');}
     setPath(next,key,value);
   }
+  const written=Object.keys(values||{});if(scope==='text'&&written.some(k=>['japaneseSize','translationSize','englishSize'].includes(k))){next.sizeSource='user';written.push('sizeSource');}
   if(gameScopes.has(scope)){
     const cleaned=gameStyle.clean(next);
     if(profile){
       if(!/^[a-f0-9]{64}$/.test(profile))throw Error('SETTINGS_PROFILE_INVALID');
       const document=readJSON(this.file('game-style-profiles.json'));const entry=document.entries?.[profile];if(!entry)throw Error('SETTINGS_PROFILE_INVALID');
-      const saved={...entry.prefs};for(const key of Object.keys(values||{}))saved[key]=cleaned[key];const now=Date.now();
+      const saved={...entry.prefs};for(const key of written)saved[key]=cleaned[key];const now=Date.now();
       document.entries[profile]={...entry,prefs:saved,savedAt:now,textSavedAt:scope==='position'?entry.textSavedAt:now,positionSavedAt:scope==='position'?now:entry.positionSavedAt,history:[{id:String(now),savedAt:now,prefs:saved,positionMap:entry.positionMap||null},...(entry.history||[])].slice(0,7)};document.version=3;atomic(this.file('game-style-profiles.json'),document);
     }else if(scope==='text'){
-      const presets=require('../core/text-defaults.cjs'),keys=Object.keys(values||{}),style=Object.fromEntries(keys.filter(presets.isTextKey).map(k=>[k,cleaned[k]])),rest=Object.fromEntries(keys.filter(k=>!presets.isTextKey(k)).map(k=>[k,cleaned[k]]));
+      const presets=require('../core/text-defaults.cjs'),keys=written,style=Object.fromEntries(keys.filter(presets.isTextKey).map(k=>[k,cleaned[k]])),rest=Object.fromEntries(keys.filter(k=>!presets.isTextKey(k)).map(k=>[k,cleaned[k]]));
       if(Object.keys(style).length)presets.write(this.folder,style);if(Object.keys(rest).length)atomic(this.file('gal-preferences.json'),{...readJSON(this.file('gal-preferences.json')),...rest});
     }else atomic(this.file('gal-preferences.json'),{...readJSON(this.file('gal-preferences.json')),...cleaned});
   }else if(nativeScopes.has(scope))atomic(this.file('native-preferences.json'),{...readJSON(this.file('native-preferences.json')),...next});

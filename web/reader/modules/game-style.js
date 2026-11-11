@@ -71,6 +71,8 @@ if(typeof value.rubyRowOffsetsX==='string')result.rubyRowOffsetsX=value.rubyRowO
     result.maskModeSource = value.maskModeSource === 'user' ? 'user' : '';
     if (result.maskMode === 'local' && result.maskModeSource !== 'user') result.maskMode = 'hook';
     result.mask = false;
+    // 'user' once the user set a text size by hand: automatic calibration then keeps it (issue 119).
+    result.sizeSource = value.sizeSource === 'user' ? 'user' : '';
     if (value.layoutVersion !== 22) {
       result.japaneseSize = Math.max(34, result.japaneseSize);
       result.translationSize = Math.max(30, result.translationSize);
