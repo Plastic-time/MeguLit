@@ -63,7 +63,8 @@ function launch(form){
  if(delta<40){host.classList.remove('dict-launch');return;}
  busy=true;
  const hitX=rand(.12,.88),side=hitX<.5?-1:1,windup=rand(60,110),flight=rand(210,330)*Math.min(1.4,Math.max(.8,delta/300)),curve=rand(1.8,2.8),dip=rand(6,14);
- const leanX=rand(10,22),twist=side*rand(2,6),yaw=side*rand(4,10);
+ /* the bar is wide: a small roll keeps the field and its button reading as one block */
+ const leanX=rand(10,20),twist=side*rand(.4,1.1),yaw=side*rand(3,7);
  const cam={rx:0,vrx:0,ry:0,vry:0,s:1,vs:0},CK=80,CC=8;
  let sq=0,vsq=0,hit=false,flat=1,flatV=0;
  form.style.transformOrigin=`${f1(hitX*100)}% 0%`;host.style.transformOrigin='50% 30%';

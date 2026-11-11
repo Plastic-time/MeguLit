@@ -56,8 +56,11 @@ function bloom(el){
  const pref=fxPref('heal');if(!pref.on)return;
  const box=scope(el),{x,y}=center(el);
  fountain(x,y,pref.k);
- const scar=box.querySelector(':scope>svg.fx-scars g.fx-scar:not(.is-gone)');
- if(scar)setTimeout(()=>mend(scar),380);
+ /* (user: one right answer mends every pit at once) all pits heal together, starting a little later the farther they
+    are from the answer (a ripple, at most 300 ms apart) */
+ const scars=[...box.querySelectorAll(':scope>svg.fx-scars g.fx-scar:not(.is-gone)')];if(!scars.length)return;
+ const far=scars.map(g=>{const r=g.getBoundingClientRect();return Math.hypot(r.left+r.width/2-x,r.top+r.height/2-y);}),max=Math.max(1,...far);
+ scars.forEach((g,i)=>setTimeout(()=>mend(g),300+far[i]/max*300));
 }
 function react(kind,el){
  if(!queued){queued={};requestAnimationFrame(()=>{const q=queued;queued=null;if(q.wrong)blast(q.wrong);else if(q.right)bloom(q.right);});}

@@ -1541,3 +1541,9 @@ html body .class-rite-school.is-on>b{text-shadow:0 0 6px color-mix(in srgb,var(-
 html body .dict-hit-flash{width:420px!important;height:14px!important;border-radius:0!important;top:0!important;transform-origin:50% 0!important;background:linear-gradient(180deg,rgba(255,214,150,.55),rgba(255,180,110,0))!important;mix-blend-mode:screen;-webkit-mask-image:linear-gradient(90deg,transparent,#000 35%,#000 65%,transparent);mask-image:linear-gradient(90deg,transparent,#000 35%,#000 65%,transparent)}
 html body .dict-hit-ring{display:none!important}
 html body .dict-hit-line{height:1px!important;top:0!important}
+
+/* every input keeps the dark theme when the browser autofills it (user saw a white-blue field after picking from the
+   history dropdown) */
+html body input:is(:-webkit-autofill,:-webkit-autofill:hover,:-webkit-autofill:focus,:autofill){-webkit-box-shadow:0 0 0 1000px #150f13 inset!important;box-shadow:0 0 0 1000px #150f13 inset!important;-webkit-text-fill-color:var(--g-t1,#f1e0d2)!important;caret-color:var(--g-t1,#f1e0d2);transition:background-color 9999s ease-out 0s}
+/* the launch never pushes out a scrollbar */
+html body:has(.dict-launch),html:not(#u):not(#v):not(#w):not(#x) body .main:has(.dict-launch){overflow:hidden!important}
