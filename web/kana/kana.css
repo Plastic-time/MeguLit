@@ -899,3 +899,78 @@ button.m0,button.m1,button.m2,button.m3{border:0;padding:0;font:inherit;cursor:p
 .mk-lv.on.l0{background:var(--raise-2);color:var(--t1)}.mk-lv.on.l1{background:var(--m1);color:#fff;border-color:var(--m1)}.mk-lv.on.l2{background:var(--m2);color:#1b1210;border-color:var(--m2)}.mk-lv.on.l3{background:var(--m3);color:#fff;border-color:var(--m3)}
 .mk-go{background:none;border:0;padding:0;text-align:left;color:var(--m2);font-size:11px;cursor:pointer}
 @media (prefers-reduced-motion:reduce){.mk-card{animation:none}.mastery button{transition:none}}
+/* megu-edit layer for the 五十音 home (2026-11-11, user: 按 megu edit 全面重新设计): black stage / paper poles, one red,
+   Roman chapter numbers, tracked mono labels, blueprint dashes, barcode progress, square cells. */
+.v-index{--mg-red:#c8323c;--mg-paper:#f4f4f2;--mg-ink:#0b0b0b;--mg-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;--mg-black:rgba(0,0,0,.78)}
+.v-index .eyebrow{font:500 11px/1 var(--mg-mono);letter-spacing:.5em;text-transform:lowercase;color:rgba(255,255,255,.55)}
+.v-index .eyebrow::before{content:'▮ ';color:var(--mg-red)}
+.v-index .kn-beta{border-radius:0;border:1px dashed rgba(255,255,255,.3);font-family:var(--mg-mono);letter-spacing:.2em}
+.v-index h1{font-size:44px;letter-spacing:.02em}
+.v-index h1 .ja{font:400 13px/1 var(--mg-mono);letter-spacing:.5em;color:rgba(255,255,255,.45)}
+.v-index .lede{color:rgba(255,255,255,.72);font-size:14px;line-height:1.9}
+.v-index .folio{position:relative;overflow:hidden;background:#000;color:#fff;border:0;border-radius:2px;box-shadow:none;background-image:linear-gradient(transparent calc(100% - 1px),rgba(255,255,255,.05) 0),linear-gradient(90deg,transparent calc(100% - 1px),rgba(255,255,255,.05) 0);background-size:100% 28px,28px 100%}
+.v-index .folio::before{left:12px;right:12px;top:12px;bottom:12px;border:1px dashed rgba(255,255,255,.14)}
+.v-index .ribbon{display:none}
+.v-index .mg-badge,.v-index .mg-runno{position:absolute;top:22px;font:500 10px/1 var(--mg-mono);letter-spacing:.45em;color:rgba(255,255,255,.45);z-index:1}
+.v-index .mg-badge{left:26px}.v-index .mg-badge::before{content:'';display:inline-block;width:6px;height:6px;margin-right:10px;background:var(--mg-red);vertical-align:1px}
+.v-index .mg-runno{right:26px;letter-spacing:.25em}
+.v-index .folio-kana{font-size:110px;color:var(--mg-red);padding-top:18px}
+.v-index .folio-body{padding:46px 34px 30px}
+.v-index .folio-body .eyebrow{color:rgba(255,255,255,.5)}
+.v-index .folio-body h2{font-size:26px;color:#fff;min-height:1.3em}
+.v-index .folio-body p{color:rgba(255,255,255,.65)}
+.v-index .folio-row small{font-family:var(--mg-mono);letter-spacing:.2em;color:rgba(255,255,255,.5)}
+.v-index .btn{border-radius:0;background:var(--mg-red);letter-spacing:.08em;transition:transform .5s cubic-bezier(.16,1,.3,1),filter .15s}
+.v-index .btn:hover{transform:translateX(3px)}
+.v-index .btn:active{transform:scale(.96);filter:invert(1)}
+.v-index .barcode{display:grid;grid-template-columns:repeat(46,1fr);gap:2px;height:16px;max-width:260px;background:none;border-radius:0;overflow:visible}
+.v-index .barcode i{height:100%;background:rgba(255,255,255,.14);transform-origin:bottom}
+.v-index .barcode i.on{background:var(--mg-red)}
+.v-index .toc-head{border-bottom:1px solid rgba(255,255,255,.2)}
+.v-index .toc-head h3{font:500 11px/1 var(--mg-mono);letter-spacing:.5em;text-transform:lowercase;color:rgba(255,255,255,.6)}
+.v-index .toc-head span{font-family:var(--mg-mono);letter-spacing:.15em}
+.v-index .chapter{position:relative;background:var(--mg-black);border-bottom:1px dashed rgba(255,255,255,.12);padding:22px 16px;margin-top:6px;overflow:hidden;transition:transform .5s cubic-bezier(.16,1,.3,1)}
+.v-index .chapter::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--mg-red);transform:scaleY(0);transform-origin:top;transition:transform .35s cubic-bezier(.16,1,.3,1)}
+.v-index .chapter:hover{background:var(--mg-black);transform:translateX(6px)}
+.v-index .chapter:hover::before{transform:none}
+.v-index .chapter:active{transform:scale(.99)}
+.v-index .roman{font:500 22px/1 "Cinzel","Sitka Display",serif;letter-spacing:.08em;color:rgba(255,255,255,.35)}
+.v-index .chapter:hover .roman{color:var(--mg-red)}
+.v-index .chapter h4{font-size:20px;color:#fff}
+.v-index .chapter h4 em{font-family:var(--mg-mono);letter-spacing:.3em;text-transform:lowercase;font-size:11px}
+.v-index .chapter p{color:rgba(255,255,255,.65);font-size:13px}
+.v-index .chip{border-radius:0;border:1px dashed rgba(255,255,255,.25);color:rgba(255,255,255,.7)}
+.v-index .chapter .meta b{font-family:var(--mg-mono);font-size:22px;letter-spacing:.05em}
+.v-index .chapter .meta{font-family:var(--mg-mono);letter-spacing:.15em;font-size:10px}
+.v-index .side{background:var(--mg-black);border-left:0;padding:20px 22px;position:relative}
+.v-index .side::before{content:'';position:absolute;left:0;top:20px;width:3px;height:14px;background:var(--mg-red)}
+.v-index .side + .side{margin-top:12px}
+.v-index .side h5{font:500 10px/1 var(--mg-mono);letter-spacing:.5em;color:rgba(255,255,255,.55)}
+.v-index .mastery{gap:3px;max-width:none}
+.v-index .mastery button,.v-index .mastery span{border-radius:0;font-size:15px}
+.v-index .mastery .m0{background:none;color:rgba(255,255,255,.4);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.v-index .mastery .m1{background:rgba(255,255,255,.14);color:#fff}
+.v-index .mastery .m2{background:var(--mg-paper);color:var(--mg-ink)}
+.v-index .mastery .m3{background:var(--mg-red);color:#fff}
+.v-index .mastery button:hover{box-shadow:inset 0 0 0 1px #fff;transform:none}
+.v-index .mastery button.sel{box-shadow:inset 0 0 0 2px var(--mg-red),0 0 0 1px #fff}
+.v-index .legend{font-family:var(--mg-mono);letter-spacing:.1em}
+.v-index .legend i{border-radius:0}
+.v-index .legend span:nth-child(1) i{background:none!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
+.v-index .legend span:nth-child(2) i{background:rgba(255,255,255,.3)!important}
+.v-index .legend span:nth-child(3) i{background:var(--mg-paper)!important}
+.v-index .legend span:nth-child(4) i{background:var(--mg-red)!important}
+.v-index .mk-card{background:var(--mg-paper);color:var(--mg-ink);border-radius:0;max-width:none;border-left:3px solid var(--mg-red)}
+.v-index .mk-kana,.v-index .mk-roma{color:var(--mg-ink)}
+.v-index .mk-head small{color:#666}
+.v-index .mk-say,.v-index .mk-lv{border-radius:0;border-color:rgba(0,0,0,.25);color:#333}
+.v-index .mk-lv.on.l0{background:#ddd;color:#000}.v-index .mk-lv.on.l1{background:#888;border-color:#888;color:#fff}.v-index .mk-lv.on.l2{background:var(--mg-ink);border-color:var(--mg-ink);color:#fff}.v-index .mk-lv.on.l3{background:var(--mg-red);border-color:var(--mg-red);color:#fff}
+.v-index .mk-go{color:var(--mg-red);font-family:var(--mg-mono);letter-spacing:.1em}
+.v-index .stats b{font-family:var(--mg-mono);font-size:26px;color:#fff}
+.v-index .stats span{font-family:var(--mg-mono);letter-spacing:.15em;font-size:10px;color:rgba(255,255,255,.5)}
+.v-index .seal{border-radius:0;border:0;background:var(--mg-red);color:#fff;transform:none}
+.v-index .weak button{border-radius:0;border:1px dashed rgba(255,255,255,.25)}
+.v-index .link{color:var(--mg-red);font-family:var(--mg-mono);letter-spacing:.1em}
+.v-index .note{color:rgba(255,255,255,.75)}
+:root[data-theme=light] .v-index,.kana-root.light .v-index{--mg-black:rgba(0,0,0,.82)}
+@media (prefers-reduced-motion:reduce){.v-index .chapter,.v-index .chapter::before,.v-index .btn{transition:none}}

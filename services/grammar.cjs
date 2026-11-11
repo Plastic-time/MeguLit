@@ -120,15 +120,71 @@ function recordAnswer(db,point,correct){if(!POINTS.includes(point))throw Error('
   db.prepare('INSERT INTO grammar_progress(point,attempts,correct,updated_at) VALUES(?,1,?,?) ON CONFLICT(point) DO UPDATE SET attempts=attempts+1,correct=correct+excluded.correct,updated_at=excluded.updated_at').run(point,correct?1:0,now);return progress(db)[point];}
 /* Completion of a level: a point counts once it is marked learned; accuracy over all answers. */
 function completion(prog,points=POINTS){let learned=0,attempts=0,correct=0;for(const p of points){const r=prog[p];if(r?.learned)learned++;attempts+=r?.attempts||0;correct+=r?.correct||0;}return {learned,total:points.length,share:points.length?learned/points.length:0,accuracy:attempts?correct/attempts:null};}
+/* ---- 体系图的台词 (2026-11-11, user: every example comes from the games you played, the part you reached) ----
+   A few lines you read are cut into pieces, each tagged with the part of Japanese it belongs to, so the map takes
+   apart your own lines. Pieces are cached per line in grammar_scenes. */
+const PIECE_SAY={
+  classes:'名词这类词不变形，稳如红魔之里！',particles:'贴在名词后面的角色牌，说明它在句子里演什么。',order:'修饰的、语气的，都围着谓语摆好位置。',
+  conjugation:'动词换了词尾，好让后面的零件接上来。词干不动，只换尾巴！',auxiliary:'粘在词尾后面的小零件：想、不、被、让……',politeness:'です・ます 一粘，就是对前辈的礼貌话。',
+  aspect:'时间和状态：已经发生了，还是正在进行？',viewpoint:'谁为谁做——主语不写，靠这些词判断。',clauses:'在这里切一刀，长台词就拆成了短句。'};
+const ROLE={'名詞':'名词','代名詞':'代词','形容詞':'形容词','形状詞':'な形容','副詞':'副词','連体詞':'连体','接続詞':'接续','感動詞':'感叹','接頭辞':'前缀','接尾辞':'后缀'};
+function pieceOf(t,prev,next){
+  const s=t.surface,b=t.base_form||s,n=t.normalized||b,p=pos(t),q=sub(t);
+  if(p==='補助記号'||p==='空白')return [s,'','order',''];
+  if(p==='助詞'){
+    if(q==='接続助詞'&&(s==='て'||s==='で'))return [s,'て形','conjugation','て形 是万能接口，后面能接一大堆东西。'];
+    if(q==='接続助詞')return [s,'连接','clauses',PIECE_SAY.clauses];
+    if(q==='終助詞')return [s,'语气','order','句尾的小尾巴，带出说话人的语气。'];
+    return [s,'助词','particles',PIECE_SAY.particles];}
+  if(p==='助動詞'){
+    if(b==='ます'||b==='です')return [s,'礼貌','politeness',PIECE_SAY.politeness];
+    if(n==='た')return [s,'过去','aspect','た = 已经过去。日语只有「过去」和「非过去」。'];
+    if(b==='だ')return [s,'是','order','句尾的 だ：断定「就是这样」。'];
+    return [s,b==='ない'||b==='ぬ'||b==='ん'?'不':b==='たい'?'想':'零件','auxiliary',PIECE_SAY.auxiliary];}
+  if(p==='動詞'){
+    if(prev&&pos(prev)==='助詞'&&(prev.surface==='て'||prev.surface==='で')){
+      if(b==='いる'||n==='居る')return [s,'正在','aspect','ている = 正在进行，或保持着某个状态。'];
+      if(/^(くれる|あげる|もらう|くださる|下さる|呉れる|貰う)$/.test(b)||/^(くれる|あげる|もらう|下さる)$/.test(n))return [s,'为谁','viewpoint',PIECE_SAY.viewpoint];}
+    if(/^(くださる|下さる)$/.test(b)||n==='下さる')return [s,'请','viewpoint',PIECE_SAY.viewpoint];
+    return [s,'动作','conjugation',PIECE_SAY.conjugation];}
+  if(p==='形容詞'&&q==='非自立可能')return [s,'零件','auxiliary',PIECE_SAY.auxiliary];
+  if(p==='副詞'||p==='連体詞'||p==='感動詞'||p==='接続詞')return [s,ROLE[p],'order','这类词不变形，放在前面给后面的话定调子。'];
+  return [s,ROLE[p]||'词','classes',PIECE_SAY.classes];
+}
+function cutLine(tokens){
+  const T=(tokens||[]).filter(t=>t&&typeof t.surface==='string'),out=[];
+  T.forEach((t,i)=>{const pc=pieceOf(t,T[i-1],T[i+1]),last=out[out.length-1];
+    /* a noun run (名詞 + 接尾辞, 図書 + 館) reads as one block */
+    if(last&&pc[2]==='classes'&&last[2]==='classes'&&(pos(t)==='接尾辞'||pos(T[i-1])==='接頭辞'||pos(t)==='名詞'&&pos(T[i-1])==='名詞')){last[0]+=pc[0];return;}
+    out.push(pc);});
+  return out;
+}
+function ensureScenes(db){db.exec('CREATE TABLE IF NOT EXISTS grammar_scenes(text TEXT PRIMARY KEY,pieces TEXT NOT NULL)');}
+/* Up to `max` lines from what you read: recorded lines first, different games, 8–30 characters, with the most kinds
+   of pieces; tokenizes at most a few new lines per call. */
+async function scenes(db,list,tokenize,{max=4,budget=12}={}){
+  ensureScenes(db);const get=db.prepare('SELECT pieces FROM grammar_scenes WHERE text=?'),put=db.prepare('INSERT OR REPLACE INTO grammar_scenes(text,pieces) VALUES(?,?)');
+  const pool=list.filter(c=>{const n=[...c.text].length;return n>=8&&n<=30;}).slice(0,400),found=[];let spent=0;
+  for(const c of pool){let pieces=null;const row=get.get(c.text);
+    if(row){try{pieces=JSON.parse(row.pieces);}catch{}}
+    else if(tokenize&&spent<budget){spent++;try{pieces=cutLine(await tokenize(c.text));put.run(c.text,JSON.stringify(pieces));}catch{}}
+    if(pieces&&pieces.map(p=>p[0]).join('')===c.text)found.push({c,pieces,kinds:new Set(pieces.filter(p=>p[1]).map(p=>p[2])).size});
+    if(found.length>=40)break;}
+  const pick=[],games=new Set();
+  for(const f of found.sort((a,b)=>b.kinds-a.kinds||(b.c.translation?1:0)-(a.c.translation?1:0))){if(pick.length>=max)break;if(games.has(f.c.gameId)&&found.some(x=>!pick.includes(x)&&!games.has(x.c.gameId)))continue;pick.push(f);games.add(f.c.gameId);}
+  return pick.map(({c,pieces})=>({label:c.title||'',ja:c.text,zh:c.translation||'',translationSource:c.translationSource||'',origin:c.origin,readAt:c.readAt,readBy:c.readBy,real:true,pieces}));
+}
 /* The page's data: examples per point from your reading, progress and completion. */
 async function report(db,{root=null,scriptPairs=null,tokenize=null,deadline}={}){
-  const list=candidates(db,{root,scriptPairs});const state=await refresh(db,list,tokenize,{deadline});
-  const ex=examples(db,list),prog=progress(db);
-  return {level:'N5',points:POINTS,examples:ex,progress:prog,completion:completion(prog),pending:state.pending,lines:{history:list.filter(c=>c.origin==='history').length,script:list.filter(c=>c.origin==='script').length},real:Object.values(ex).reduce((n,l)=>n+l.length,0)};
+  /* one tokenizer cache per report: the line cutter for the map reuses what the grammar scan already tokenized */
+  const seen=new Map(),tk=tokenize&&(text=>{if(!seen.has(text))seen.set(text,tokenize(text));return seen.get(text);});
+  const list=candidates(db,{root,scriptPairs});const state=await refresh(db,list,tk,{deadline});
+  const ex=examples(db,list),prog=progress(db),sc=await scenes(db,list,tk);
+  return {scenes:sc,level:'N5',points:POINTS,examples:ex,progress:prog,completion:completion(prog),pending:state.pending,lines:{history:list.filter(c=>c.origin==='history').length,script:list.filter(c=>c.origin==='script').length},real:Object.values(ex).reduce((n,l)=>n+l.length,0)};
 }
 /* An Anki note for a grammar line, through the existing card flow (one note per point and line). */
 function ankiWord(point,title,gist,example){
   const label=String(title||point);
   return {surface:label,base:label,reading:label,noReading:true,cardKey:'grammar:'+point+':'+example.text,meaning:String(gist||''),pos:'N5 语法',pitch:[],sentence:example.text};
 }
-module.exports={POINTS,PREFILTER,matchPoints,rubyPairs,ensure,candidates,refresh,examples,progress,setLearned,recordAnswer,completion,report,ankiWord};
+module.exports={cutLine,scenes,POINTS,PREFILTER,matchPoints,rubyPairs,ensure,candidates,refresh,examples,progress,setLearned,recordAnswer,completion,report,ankiWord};

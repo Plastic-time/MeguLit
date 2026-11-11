@@ -86,3 +86,16 @@ test('the system map is real lines to take apart, covering all nine parts, in th
  for(const k of ['invert','glitch','push','focus','type','burst'])assert.equal(typeof g.fx[k],'function');
  assert.match(fs.readFileSync(path.join(__dirname,'..','web','grammar.css'),'utf8'),/--mg-red:#c8323c/);
 });
+
+test('the map takes apart lines you read in your games, cut by the tokenizer and cached',async()=>{
+ const T=spec=>{let at=0;return spec.map(([surface,base,p1,p2,norm])=>{const t={surface,base_form:base,normalized:norm||base,pos:p1,grammar:[p1,p2||'*'],start:at,end:at+[...surface].length};at=t.end;return t;});};
+ const line=T([['雨','雨','名詞','普通名詞'],['が','が','助詞','格助詞'],['降っ','降る','動詞','一般'],['て','て','助詞','接続助詞'],['いる','いる','動詞','非自立可能','居る'],['から','から','助詞','接続助詞'],['、','、','補助記号','読点'],['待ち','待つ','動詞','一般'],['ます','ます','助動詞'],['。','。','補助記号','句点']]);
+ const cut=G.cutLine(line);assert.deepEqual(cut.map(p=>[p[0],p[2]]),[['雨','classes'],['が','particles'],['降っ','conjugation'],['て','conjugation'],['いる','aspect'],['から','clauses'],['、','order'],['待ち','conjugation'],['ます','politeness'],['。','order']]);
+ const root=temp(),db=openStore(path.join(root,'t.sqlite'));
+ try{let calls=0;const list=[{text:'雨が降っているから、待ちます。',title:'サクラノ詩',gameId:'g1',origin:'history',translation:'在下雨，我等着。'}];
+  const sc=await G.scenes(db,list,async()=>{calls++;return line;});assert.equal(sc.length,1);assert.equal(sc[0].label,'サクラノ詩');assert.equal(sc[0].real,true);
+  await G.scenes(db,list,async()=>{calls++;return line;});assert.equal(calls,1,'a cut line is cached');
+  const g=await import('../web/grammar.js');const html=g.mapHTML({progress:{},scenes:sc},{locale:'zh',esc});assert.match(html,/title="サクラノ詩"/);assert.match(html,/data-piece="4" data-node="aspect"/);
+  assert.match(g.mapHTML({progress:{}},{locale:'zh',esc}),/普通的一句/,'built-in lines only before anything is read');
+ }finally{db.close?.();}
+});

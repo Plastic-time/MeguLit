@@ -29,7 +29,7 @@ el.innerHTML=`<main class="page">
     <h1>从五十音开始<span class="ja">はじめの一歩</span></h1>
     <p class="lede">先认得每一个假名，再在游戏里读出来。按章节推进，每一章都记得你走到哪里</p>
 
-    <article class="folio">
+    <article class="folio"><span class="mg-badge" aria-hidden="true">megulit · kana lab</span><span class="mg-runno" aria-hidden="true">${String(known).padStart(2,"0")} / ${seionH.length}</span>
       <div class="ribbon" aria-hidden="true"></div>
       <div class="folio-kana">${esc(nextUnknown)}</div>
       <div class="folio-body">
@@ -38,7 +38,7 @@ el.innerHTML=`<main class="page">
         <p>${started?`这一课有 ${next.kana.filter(k=>lv(k)<2).length} 个假名还不熟悉`:'认识 → 辨认 → 回忆 → 混合，四步学完一行'}${confuseIn&&confuseIn.tip?`：${esc(confuseIn.g.join(' / '))} 容易混淆`:''}</p>
         <div class="folio-row">
           <button class="btn" data-go="lesson.html?id=${next.id}">${started?'继续学习':'开始学习'} →</button>
-          <div class="bar"><i style="width:${Math.round(known/seionH.length*100)}%"></i></div>
+          <div class="bar barcode" aria-hidden="true">${seionH.map(k=>`<i class="${lv(k)>=2?'on':''}"></i>`).join('')}</div>
           <small class="num">${known} / ${seionH.length}</small>
         </div>
       </div>
@@ -47,24 +47,24 @@ el.innerHTML=`<main class="page">
     <div class="toc-head"><h3>目录</h3><span>基础 46 音 · 浊音 25 · 拗音 33</span></div>
 
     <button class="chapter" data-go="gojuon.html">
-      <div class="roman">壱</div>
+      <div class="roman">I</div>
       <div><h4>五十音图<em>Gojūon</em></h4><p>平假名 / 片假名对照，点开每个假名看读音、例词与记忆提示</p>
         <div class="chips"><span class="chip">清音</span><span class="chip">浊音 · 半浊音</span><span class="chip">拗音</span><span class="chip">易混对比</span></div></div>
       <div class="meta"><b class="num">${known} / ${seionH.length}</b>已熟悉</div>
     </button>
     <button class="chapter" data-go="games.html">
-      <div class="roman">弐</div>
+      <div class="roman">II</div>
       <div><h4>练习<em>Renshū</em></h4><p>三种小游戏，四档难度：入门、标准、进阶、挑战</p>
         <div class="chips"><span class="chip">行段识别</span><span class="chip">前后假名</span><span class="chip">平片转换</span></div></div>
       <div class="meta"><b class="num">${bestAcc?D.fmtPct(bestAcc):'—'}</b>最佳达成率</div>
     </button>
     <button class="chapter" data-go="records.html">
-      <div class="roman">参</div>
+      <div class="roman">III</div>
       <div><h4>复习<em>Fukushū</em></h4><p>到期复习、错题再挑战与薄弱假名专项</p></div>
       <div class="meta"><b class="num">${due.length}</b>今日待复习</div>
     </button>
     <button class="chapter" data-go="kanji.html">
-      <div class="roman">肆</div>
+      <div class="roman">IV</div>
       <div><h4>汉字读音<em>Kanji</em></h4><p>在 MeguLit 里打开《漢字でGO!》官方网页（作者 Micelle · PLiCy，含广告），需要联网</p>
         <div class="chips"><span class="chip">外部网站</span><span class="chip">plicy.net</span></div></div>
       <div class="meta"><b style="font-size:14px;font-family:var(--sans)">打开 →</b></div>
@@ -101,6 +101,16 @@ el.innerHTML=`<main class="page">
   </aside>
 </main>`;
  /* voice choice under the kana chart (user, 2026-11-09) */el.querySelector('.legend')?.after(ctx.voicePicker({note:false}));
+ /* megu-edit motion (2026-11-11): focus-pull entrance, typed lesson title with a ▮ block, single-frame invert + push on
+    a familiarity change; only on load or a click, none with reduced motion */
+ const calm=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches,EXPO='cubic-bezier(.16,1,.3,1)';
+ if(!calm){
+  el.querySelector('.folio-kana')?.animate([{filter:'blur(8px)',opacity:0,transform:'scale(1.25)'},{filter:'none',opacity:1,transform:'none'}],{duration:620,easing:EXPO});
+  el.querySelectorAll('.chapter,.side').forEach((c,i)=>c.animate([{opacity:0,transform:'translateY(12px)',filter:'blur(4px)'},{opacity:1,transform:'none',filter:'none'}],{duration:480,delay:120+i*60,easing:EXPO,fill:'backwards'}));
+  el.querySelectorAll('.barcode i.on').forEach((b,i)=>b.animate([{transform:'scaleY(0)'},{transform:'none'}],{duration:300,delay:300+i*18,easing:EXPO,fill:'backwards'}));
+  const h=el.querySelector('.folio-body h2');if(h){const c=[...h.textContent];let n=0;h.textContent='▮';const tick=()=>{n++;h.textContent=c.slice(0,n).join('')+(n<c.length?'▮':'');if(n<c.length)setTimeout(tick,34);};setTimeout(tick,240);}
+ }
+ const beat=b=>{if(calm||!b)return;b.animate([{filter:'invert(1)'},{filter:'invert(1)'},{filter:'none'}],{duration:70,easing:'steps(1,end)'});b.animate([{transform:'scale(1.18)'},{transform:'none'}],{duration:480,easing:EXPO});};
  /* 2026-11-11 (user: the familiarity chart should be usable): a cell opens a card to hear it and set 未学/见过/熟悉/掌握 */
  const card=el.querySelector('[data-mk-card]');let open='';
  const drawCard=k=>{const l=lv(k),w=D.wordOf?D.wordOf(k):null;card.hidden=false;
@@ -108,7 +118,7 @@ el.innerHTML=`<main class="page">
 <div class="mk-levels" role="radiogroup" aria-label="熟悉度">${LV.map((t,i)=>`<button type="button" role="radio" class="mk-lv l${i}${i===l?' on':''}" aria-checked="${i===l}" data-mk-lv="${i}">${t}</button>`).join('')}</div>
 <button type="button" class="mk-go" data-go="gojuon.html?k=${encodeURIComponent(k)}">在五十音图里看笔顺 →</button>`;
   card.querySelector('[data-mk-say]').onclick=()=>ctx.speech.say(k);
-  card.querySelectorAll('[data-mk-lv]').forEach(b=>b.onclick=()=>{m[k]=+b.dataset.mkLv;S.put(KEY.m,m);const cell=el.querySelector(`[data-mk="${k}"]`);if(cell){cell.className='m'+m[k]+' sel';cell.title=k+' · '+LV[m[k]];cell.animate?.([{transform:'scale(1.25)'},{transform:'scale(1)'}],{duration:220,easing:'cubic-bezier(.2,.8,.2,1)'});}drawCard(k);});};
- el.querySelectorAll('[data-mk]').forEach(b=>b.onclick=()=>{const k=b.dataset.mk;el.querySelectorAll('[data-mk]').forEach(x=>x.classList.toggle('sel',x===b&&open!==k));if(open===k){open='';card.hidden=true;return;}open=k;drawCard(k);ctx.speech.say(k);});
+  card.querySelectorAll('[data-mk-lv]').forEach(b=>b.onclick=()=>{m[k]=+b.dataset.mkLv;S.put(KEY.m,m);const cell=el.querySelector(`[data-mk="${k}"]`);if(cell){cell.className='m'+m[k]+' sel';cell.title=k+' · '+LV[m[k]];beat(cell);}drawCard(k);});};
+ el.querySelectorAll('[data-mk]').forEach(b=>b.onclick=()=>{const k=b.dataset.mk;beat(b);el.querySelectorAll('[data-mk]').forEach(x=>x.classList.toggle('sel',x===b&&open!==k));if(open===k){open='';card.hidden=true;return;}open=k;drawCard(k);ctx.speech.say(k);});
 
 }
