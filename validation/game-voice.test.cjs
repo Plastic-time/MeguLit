@@ -46,3 +46,24 @@ test('catsystem2: KIF entry names decipher with the passphrase key',()=>{const c
 test('iga: the clip name before a line is its voice, music is not',()=>{const iga=require('../services/original-engines/iga.cjs');
  const t=Buffer.from([0x82,0xa0,0x82,0xa2,0x82,0xa4,0]);const b=Buffer.concat([Buffer.from('\x05bgm03\x07aok0003','latin1'),Buffer.from([0x04,0x00,t.length+1]),t,Buffer.from([0])]);
  assert.deepEqual(iga.parse(b).voices,['aok0003']);});
+test('voice-cold: a KiriKiri game with voices the scan could not open is started once with the names to read',async()=>{
+ const vc=require('../services/voice-cold.cjs'),root=tmp(),dir=tmp();const exe=path.join(dir,'game.exe');
+ const pe=Buffer.alloc(4096);pe.writeUInt32LE(0x80,0x3c);pe.writeUInt16LE(0x14c,0x84);fs.writeFileSync(exe,pe);
+ const out=path.join(tmp(),'cap');const hook=vc.HOOKS.kirikiri,saved={...hook};hook.wantFile=()=>path.join(out,'want.txt');hook.outDir=()=>path.join(out,'voice');hook.report=()=>path.join(out,'cold-done.txt');
+ vc.consider.anyPlatform=true;const calls=[];
+ vc._setRunner((job,seconds,done)=>{calls.push({job,seconds,want:fs.readFileSync(path.join(out,'want.txt'),'utf8')});fs.mkdirSync(path.join(out,'voice'),{recursive:true});fs.writeFileSync(path.join(out,'voice','uts001_001.ogg'),OGG);done('done');},()=>false);
+ const finished=new Promise(r=>{const off=vc.onDone((job,result)=>{off();r(result);});});
+ assert.equal(vc.consider(root,{executable:exe,dir,engine:'kirikiri-cx'},['uts001_001','uts001_002']),true);
+ assert.equal(await finished,'done');assert.equal(calls.length,1);assert.match(calls[0].want,/uts001_001\.ogg\n/);assert.ok(calls[0].seconds>=60);
+ assert.equal(vc.consider(root,{executable:exe,dir,engine:'kirikiri-cx'},['uts001_001','uts001_002']),false,'not again for the same gap');
+ assert.equal(vc.consider(root,{executable:exe,dir,engine:'yuris'},['a']),false,'an engine without a hook is never started');
+ assert.deepEqual(vc.outDirs(dir),[path.join(out,'voice')]);
+ const c=gv.catalog(dir);assert.deepEqual(c.get('uts001_001')(),OGG,'clips a cold run read join the catalog');
+ Object.assign(hook,saved);vc.consider.anyPlatform=false;});
+test('voice-cold: a game the player has open is not started again',async()=>{
+ const vc=require('../services/voice-cold.cjs'),root=tmp(),dir=tmp();const exe=path.join(dir,'g.exe');const pe=Buffer.alloc(4096);pe.writeUInt32LE(0x80,0x3c);pe.writeUInt16LE(0x8664,0x84);fs.writeFileSync(exe,pe);
+ const out=path.join(tmp(),'cap'),hook=vc.HOOKS.kirikiri,saved={...hook};hook.wantFile=()=>path.join(out,'want.txt');hook.outDir=()=>path.join(out,'voice');vc.consider.anyPlatform=true;
+ let started=0;vc._setRunner((j,s,done)=>{started++;done('done');},()=>true);
+ const finished=new Promise(r=>{const off=vc.onDone((job,result)=>{off();r(result);});});
+ vc.consider(root,{executable:exe,dir,engine:'kirikiri'},['x1']);assert.equal(await finished,'running');assert.equal(started,0);assert.ok(fs.existsSync(path.join(out,'want.txt')),'the DLL in the open game reads the names');
+ Object.assign(hook,saved);vc.consider.anyPlatform=false;});
