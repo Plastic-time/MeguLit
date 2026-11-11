@@ -7,7 +7,9 @@ const fs=require('fs'),path=require('path');
 const LEVELS=['none','kana','N5','N4','N3','N2','N1','N0'];
 const FILE=root=>path.join(root,'data','learning-level.json');
 const rank=l=>LEVELS.indexOf(l);
-function get(root){try{const o=JSON.parse(fs.readFileSync(FILE(root),'utf8'));return LEVELS.includes(o.level)?{level:o.level,setAt:Number(o.setAt)||0}:{level:null,setAt:0};}catch{return {level:null,setAt:0};}}
+/* v1.4.3 saved the level before marking and the marking of N4 and above always failed (database closed early), so such
+   a record without done is treated as unset: the picker shows again and the choice is applied properly. */
+function get(root){try{const o=JSON.parse(fs.readFileSync(FILE(root),'utf8'));if(o.done!==true&&rank(o.level)>=rank('N4'))return {level:null,setAt:0};return LEVELS.includes(o.level)?{level:o.level,setAt:Number(o.setAt)||0}:{level:null,setAt:0};}catch{return {level:null,setAt:0};}}
 /* Where to start for a level: kana first for beginners, the first grammar level above the chosen one otherwise. */
 function recommend(level){
   if(level==='none')return {tab:'kana',grammar:'N5',reason:'kana'};
@@ -17,7 +19,6 @@ function recommend(level){
 }
 async function set(db,root,{level,kana=[]}={}){
   if(!LEVELS.includes(level))throw Error('INVALID_LEARNING_LEVEL');
-  const file=FILE(root);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify({level,setAt:Date.now()}));
   const applied={kana:0,grammar:0};
   if(rank(level)>=rank('N5')){
     const k=require('./kana.cjs'),data=k.read(root);
@@ -28,6 +29,8 @@ async function set(db,root,{level,kana=[]}={}){
     const g=require('./grammar.cjs'),prog=g.progress(db);
     for(const p of await g.pointsBelow(level==='N0'?'N0':level))if(!prog[p]?.learned){g.setLearned(db,p,true);applied.grammar++;}
   }
+  /* saved last: if marking fails, no level is stored and the picker comes back next time */
+  const file=FILE(root);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify({level,setAt:Date.now(),done:true}));
   return {level,applied,recommend:recommend(level)};
 }
 module.exports={LEVELS,get,set,recommend,rank};
