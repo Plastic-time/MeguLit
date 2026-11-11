@@ -5,6 +5,7 @@ const {store:S,data:D,go}=ctx,KEY=S.KEY;
 const m=S.get(KEY.m,{}),boxes=S.get(KEY.b,{}),runs=S.get(KEY.r,[]),lessons=S.get(KEY.l,{}),now=Date.now();
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const lv=k=>m[k]||0;
+const LV=['未学','见过','熟悉','掌握'];
 const seionH=D.SEION_LIST,known=seionH.filter(k=>lv(k)>=2).length;
 const next=D.LESSONS.find(l=>!lessons[l.id])||D.LESSONS[0],started=Object.keys(lessons).length>0;
 const nextUnknown=next.kana.find(k=>lv(k)<2)||next.kana[0];
@@ -73,7 +74,8 @@ el.innerHTML=`<main class="page">
   <aside>
     <div class="side">
       <h5>平假名熟悉度</h5>
-      <div class="mastery">${[...grid].map(c=>c==='　'?'<span class="gap"></span>':`<span class="m${lv(c)}" title="${c}">${c}</span>`).join('')}</div>
+      <div class="mastery" role="grid" aria-label="平假名熟悉度，点格子查看">${[...grid].map(c=>c==='　'?'<span class="gap"></span>':`<button type="button" class="m${lv(c)}" data-mk="${c}" title="${c} · ${LV[lv(c)]}" aria-label="${c} ${D.romaOf(c)} ${LV[lv(c)]}">${c}</button>`).join('')}</div>
+      <div class="mk-card" data-mk-card hidden></div>
       <div class="legend"><span><i style="background:var(--raise)"></i>未学</span><span><i style="background:var(--raise-2)"></i>见过</span><span><i style="background:color-mix(in srgb,var(--gold-accent,#edb56e) 30%,transparent)"></i>熟悉</span><span><i style="background:var(--accent)"></i>掌握</span></div>
     </div>
     <div class="side">
@@ -99,5 +101,14 @@ el.innerHTML=`<main class="page">
   </aside>
 </main>`;
  /* voice choice under the kana chart (user, 2026-11-09) */el.querySelector('.legend')?.after(ctx.voicePicker({note:false}));
+ /* 2026-11-11 (user: the familiarity chart should be usable): a cell opens a card to hear it and set 未学/见过/熟悉/掌握 */
+ const card=el.querySelector('[data-mk-card]');let open='';
+ const drawCard=k=>{const l=lv(k),w=D.wordOf?D.wordOf(k):null;card.hidden=false;
+  card.innerHTML=`<div class="mk-head"><b class="mk-kana">${esc(k)}</b><div><span class="mk-roma">${esc(D.romaOf(k))}</span><small>${esc(D.toKata(k))}${w&&w[0]?' · '+esc(w[0])+(w[1]?'（'+esc(w[1])+'）':''):''}</small></div><button type="button" class="mk-say" data-mk-say aria-label="发音">▶ 发音</button></div>
+<div class="mk-levels" role="radiogroup" aria-label="熟悉度">${LV.map((t,i)=>`<button type="button" role="radio" class="mk-lv l${i}${i===l?' on':''}" aria-checked="${i===l}" data-mk-lv="${i}">${t}</button>`).join('')}</div>
+<button type="button" class="mk-go" data-go="gojuon.html?k=${encodeURIComponent(k)}">在五十音图里看笔顺 →</button>`;
+  card.querySelector('[data-mk-say]').onclick=()=>ctx.speech.say(k);
+  card.querySelectorAll('[data-mk-lv]').forEach(b=>b.onclick=()=>{m[k]=+b.dataset.mkLv;S.put(KEY.m,m);const cell=el.querySelector(`[data-mk="${k}"]`);if(cell){cell.className='m'+m[k]+' sel';cell.title=k+' · '+LV[m[k]];cell.animate?.([{transform:'scale(1.25)'},{transform:'scale(1)'}],{duration:220,easing:'cubic-bezier(.2,.8,.2,1)'});}drawCard(k);});};
+ el.querySelectorAll('[data-mk]').forEach(b=>b.onclick=()=>{const k=b.dataset.mk;el.querySelectorAll('[data-mk]').forEach(x=>x.classList.toggle('sel',x===b&&open!==k));if(open===k){open='';card.hidden=true;return;}open=k;drawCard(k);ctx.speech.say(k);});
 
 }

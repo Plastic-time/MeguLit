@@ -878,3 +878,24 @@ td.none{color:var(--t3)}
 .kn-voice-seg button[aria-checked="true"]{background:var(--accent);color:var(--on-accent)}
 .kn-voice-seg button:hover:not([aria-checked="true"]){color:var(--t1)}
 .kn-voice-note{flex-basis:100%;color:var(--t3);font-size:11px;line-height:1.5}
+
+/* 2026-11-11 平假名熟悉度 cells are buttons: click to hear it and set the level */
+button.m0,button.m1,button.m2,button.m3{border:0;padding:0;font:inherit;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease}
+.mastery button:hover{transform:translateY(-1px);box-shadow:0 0 0 1px var(--m2)}
+.mastery button:active{transform:scale(.94)}
+.mastery button.sel{box-shadow:0 0 0 2px var(--m3)}
+.mastery button:focus-visible{outline:2px solid var(--m2);outline-offset:1px}
+.mk-card{margin-top:12px;max-width:220px;padding:12px;border-radius:8px;background:var(--raise);display:flex;flex-direction:column;gap:10px;animation:mk-in .18s ease-out}
+@keyframes mk-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.mk-head{display:flex;align-items:center;gap:10px}
+.mk-kana{font-family:"MJP Serif",serif;font-size:34px;line-height:1;color:var(--t1)}
+.mk-head>div{display:flex;flex-direction:column;flex:1;min-width:0}
+.mk-roma{font-size:15px;color:var(--t1);letter-spacing:.06em}
+.mk-head small{font-size:11px;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mk-say{border:1px solid var(--rule);background:none;color:var(--t2);border-radius:999px;padding:4px 9px;font-size:11px;cursor:pointer}
+.mk-say:hover{color:var(--t1);border-color:var(--m2)}
+.mk-levels{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.mk-lv{border:1px solid var(--rule);background:none;color:var(--t2);border-radius:5px;padding:5px 0;font-size:11px;cursor:pointer}
+.mk-lv.on.l0{background:var(--raise-2);color:var(--t1)}.mk-lv.on.l1{background:var(--m1);color:#fff;border-color:var(--m1)}.mk-lv.on.l2{background:var(--m2);color:#1b1210;border-color:var(--m2)}.mk-lv.on.l3{background:var(--m3);color:#fff;border-color:var(--m3)}
+.mk-go{background:none;border:0;padding:0;text-align:left;color:var(--m2);font-size:11px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.mk-card{animation:none}.mastery button{transition:none}}

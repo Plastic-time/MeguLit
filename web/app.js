@@ -667,6 +667,8 @@ function definitions(value){
 async function learning(token){
   if(!['review','kana','kanagames','grammar','words','sentences','readwords','dictionary','trash'].includes(subtab))subtab='review';
   const tab=subtab,slot=learningSlot(),target=document.createElement('div');
+  /* 2026-11-11 first visit: ask the Japanese level once (learning-level.js); the answer opens the tab to start from */
+  import('./learning-level.js').then(m=>m.ensureLevel({api,esc,toast,openTab:t=>navigate('learning',t)})).catch(()=>{});
  const commit=()=>{slot.closest('.main').classList.toggle('review-page',tab==='review');slot.replaceChildren(target);};
   if(subtab==='dictionary'){dictionary(target);commit();return;}
   /* 读过的词: frequency, this week's new words and JLPT coverage from the lines read */
