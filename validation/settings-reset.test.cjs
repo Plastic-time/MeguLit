@@ -75,3 +75,14 @@ test('reset UI and wait hint are wired in three languages',()=>{
  const i18n=fs.readFileSync(path.join(__dirname,'..','web','reader','modules','i18n.js'),'utf8');
  assert.ok(i18n.includes(hint)&&i18n.includes('Subahibi')&&i18n.includes('素晴らしき日々'));
 });
+
+test('Alt+T menu has the same reset entry, wording and safeguards as the settings page',()=>{
+ const read=p=>fs.readFileSync(path.join(__dirname,'..',...p.split('/')),'utf8');
+ const page=read('web/settings-reset.js'),menu=read('web/reader/modules/settings-reset.js');
+ const block=s=>s.match(/zh:\{zone:[\s\S]*?failed:'[^']*'\}\}/)[0];
+ assert.equal(block(menu).replace(/\s+/g,''),block(page).replace(/\s+/g,''));
+ for(const need of ['autofocus','cancel.focus()','data-reset-confirm','#c43c3c','settingsReset','settingsResetUndo','let left=10','[data-menu-category=misc]'])assert.ok(menu.includes(need),need);
+ assert.ok(JSON.parse(read('web/reader/modules.json')).includes('settings-reset'));
+ assert.match(read('web/reader/module-list.js'),/"settings-reset"/);
+ assert.match(read('services/reader.cjs'),/case 'settingsReset':case 'settingsResetUndo':\{try\{const lib=require\('\.\/settings-reset\.cjs'\)/);
+});
