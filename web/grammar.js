@@ -87,6 +87,12 @@ export const fx={
    attachment and example lines join that lesson); the others become lessons of their own in a 「来自你的 Anki」 group,
    taught the same way: six steps, your own lines first, drag the form into the gap. */
 let ANKI=[];
+export const ANKI_DECK='https://ankiweb.net/shared/info/1748349244';
+/* The offer under the hero: where to get the deck (AnkiWeb, the learner downloads it), or what was read from it. */
+export function ankiBannerHTML(anki,{esc}){
+ if(anki?.available)return `<p class="gm-anki-on"><i></i>已读取你的 Anki：蓝宝书等语法卡 ${anki.points.length} 条，已并进各级课程</p>`;
+ return `<section class="gm-anki-offer"><div><b>想要更多课？把蓝宝书 N5–N1 语法（约 760 条）加进来</b><p>在 AnkiWeb 下载共享牌组「【超值白金版】蓝宝书语法 N1–N5」，双击导入你的 Anki 后回到这里点「刷新」，每一条都会变成和这里一样的互动课。</p><p class="gm-anki-note">该牌组由 AnkiWeb 用户分享，内容来自已出版的蓝宝书，版权归原作者和出版方；MeguLit 不提供也不保存这些内容，只读取你自己 Anki 里的卡片。下载和使用请自行确认来源与授权，责任由你自己承担。</p></div><div class="gm-anki-actions"><button type="button" class="primary" data-anki-get>去 AnkiWeb 下载</button><button type="button" class="secondary" data-anki-reload>我已导入，刷新</button></div></section>`;
+}
 export const ANKI_GROUP={zh:'蓝宝书 · 来自你的 Anki',ja:'Anki の文法カード',en:'From your Anki'};
 const short=s=>{const t=String(s||''),q=t.match(/[“"「]([^”"」]{1,24})[”"」]/);return (q?q[1]:t.split(/[。；;]/)[0]).slice(0,30);};
 export function useAnkiCards(cards){
@@ -149,7 +155,7 @@ ${stats.pts.length?`<div class="gm-chips">${stats.pts.map(p=>`<button type="butt
 <div class="gm-stage"><span class="gm-badge" aria-hidden="true">megulit · grammar lab</span><span class="gm-runno" aria-hidden="true">${String(si+1).padStart(2,'0')} / ${String(list.length).padStart(2,'0')}</span>${sentenceHTML(s,esc,{open,piece})}<p class="gm-tr">${esc(s.zh||'')}${s.real?` <span class="gm-cap">· ${esc(sourceLabel({title:s.label,origin:s.origin,readAt:s.readAt,readBy:s.readBy},w,locale))}</span>`:''}${s.plain?` <span class="gm-cap">· ${esc(s.plain)}</span>`:''}</p></div>${pills}${panel}</section>`;
 }
 /* ---- list ---- */
-export function listHTML(data,{locale,esc,level='N5',userLevel=null}){
+export function listHTML(data,opts){const {locale,esc,level='N5',userLevel=null}=opts;
  const w=grammarMessages[locale]||grammarMessages.zh,prog=data?.progress||{},pts=pointsOf(level),comp=level==='N5'&&data?.completion||completion(prog,pts),nextId=nextPoint(prog,pts)?.id;
  const levels=`<div class="gm-levels" role="tablist">${LEVELS.map(l=>`<button type="button" role="tab" class="gm-level${l===level?' active':''}" data-level="${l}" aria-selected="${l===level}">${l}</button>`).join('')}</div>`;
  const hud=`<header class="gm-hud"><span class="gm-tag"><i></i>megulit · grammar lab</span>${levels}<span class="gm-hud-stats"><span><b>${String(comp.learned).padStart(2,'0')}</b>/${pts.length} ${esc(w.done)}</span><span><b>${comp.accuracy==null?'—':pct(comp.accuracy)}</b>${esc(w.accuracy)}</span><span><b>${data?.real||0}</b>${esc(w.real)}</span></span></header>`;
@@ -157,7 +163,7 @@ export function listHTML(data,{locale,esc,level='N5',userLevel=null}){
  const overview=`<button type="button" class="gm-overview" data-map><span class="gm-overview-kicker">${esc(w.map)}</span>${sentenceHTML(scenesOf(data)[0],esc,{mini:true})}<span class="gm-cap">${esc(locale==='zh'?'一句你读过的台词，拆成九种零件——点开，一块一块戳着玩 →':w.mapLead)}</span></button>`;
  let no=0;
  const G={...(level==='N5'?GROUPS:LEVEL_GROUPS),anki:ANKI_GROUP};const groups=Object.keys(G).filter(g=>pts.some(p=>p.group===g)).map((g,gi)=>{const items=pts.filter(p=>p.group===g);return `<section class="gm-group"><h3><em>${ROMAN[gi]}</em>${esc(loc(G[g],locale))}<small>${items.filter(p=>prog[p.id]?.learned).length}/${items.length}</small></h3><div class="gm-cards">${items.map(p=>{no++;const r=prog[p.id]||{},n=data?.examples?.[p.id]?.length||0,node=MAP.find(m=>m.id===nodeFor(p)),[head,tail]=loc(p.title,locale).split(/\s*——\s*/);return `<button type="button" class="gm-card${r.learned?' learned':''}${p.id===nextId?' next':''}" data-point="${p.id}"><span class="gm-card-no">${String(no).padStart(2,'0')}</span><span class="gm-card-title" lang="ja">${esc(head)}</span><span class="gm-card-gist">${esc(tail||loc(p.gist,locale))}</span><span class="gm-card-node">${romanOf(node.id)} · ${esc(loc(node.title,locale).split(/[：:]/)[0])}</span><span class="gm-card-meta">${r.learned?`<b>${esc(w.done)}</b>`:p.id===nextId?`<b>${esc(w.nextLesson)}</b>`:''}${r.attempts?`<span>${pct(r.correct/r.attempts)}</span>`:''}${n?`<span>${n} ${locale==='en'?'lines':'句'}</span>`:''}</span></button>`;}).join('')}</div></section>`;}).join('');
- return `${hud}${data?.pending&&data?.counting?`<p class="gm-cap gm-status">${esc(w.counting)}</p>`:''}${heroHTML(data,{locale,esc,userLevel,level})}${overview}<div class="gm-tracks">${groups}</div>`;
+ return `${hud}${opts.anki?ankiBannerHTML(opts.anki,{esc}):''}${data?.pending&&data?.counting?`<p class="gm-cap gm-status">${esc(w.counting)}</p>`:''}${heroHTML(data,{locale,esc,userLevel,level})}${overview}<div class="gm-tracks">${groups}</div>`;
 }
 /* ---- widgets ---- */
 export function conjHTML(pointId,{locale,esc,wordIndex=null,form=null}){
@@ -229,7 +235,9 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
  const openPoint=id=>{point=pointById(id);step=0;go('lesson');};
  async function changeLevel(){const {openLevelPicker}=await import('./learning-level.js');const r=await openLevelPicker({api,esc,toast,current:memo.userLevel||null});if(!r||!isCurrent())return;memo.userLevel=r.level;level=startLevel(r.level);await load(false);render();}
  function render(){save();if(view==='lesson'&&point)return renderLesson();if(view==='map')return renderMap();
-  root.innerHTML=listHTML(data||{},{locale,esc,level,userLevel:memo.userLevel});
+  root.innerHTML=listHTML(data||{},{locale,esc,level,userLevel:memo.userLevel,anki:memo.anki});
+  root.querySelector('[data-anki-get]')?.addEventListener('click',()=>api('open_source',{url:ANKI_DECK}).catch(()=>toast?.('无法打开浏览器')));
+  root.querySelector('[data-anki-reload]')?.addEventListener('click',e=>{e.currentTarget.disabled=true;memo.anki=undefined;loadAnki(true);});
   root.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>{level=b.dataset.level;memo.levelPicked=true;render();fx.focus(root.querySelector('.gm-hero'));});
   root.querySelector('[data-map]')?.addEventListener('click',()=>{openNode='';scene=null;piece=-1;go('map');});
   root.querySelector('[data-change-level]')?.addEventListener('click',changeLevel);
@@ -303,7 +311,8 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
    box.querySelector('[data-retry]')?.addEventListener('click',()=>{const missed=order[i],next=rest.shift()||order.find((q,k)=>k!==i&&q.text!==missed.text)||missed;rest.push(missed);order.splice(i+1,0,next);answered=null;retry=true;i=i+1;draw();});};
   draw();
  }
- if(memo.anki===undefined){memo.anki=null;api('grammar_bluebook').then(r=>{if(!r?.available)return;memo.anki=r;useAnkiCards(r.points);if(data)data={...data,examples:{...(r.examples||{}),...(data.examples||{})}};memo.data=data;if(isCurrent()&&view!=='lesson')render();}).catch(()=>{});}
+ function loadAnki(tell){memo.anki=null;api('grammar_bluebook').then(r=>{memo.anki=r?.available?r:{available:false,points:[]};if(!r?.available){if(tell)toast?.('还没在你的 Anki 里找到蓝宝书语法牌组：导入后先关掉再打开一次 Anki 试试');if(isCurrent()&&view==='list')render();return;}if(tell)toast?.(`读到 ${r.points.length} 条语法卡，已并进课程`);useAnkiCards(r.points);if(data)data={...data,examples:{...(r.examples||{}),...(data.examples||{})}};memo.data=data;if(isCurrent()&&view!=='lesson')render();}).catch(()=>{memo.anki={available:false,points:[]};});}
+ if(memo.anki===undefined)loadAnki(false);
  else if(memo.anki?.points)useAnkiCards(memo.anki.points);
  if(memo.userLevel===undefined)api('learning_level').then(r=>{memo.userLevel=r?.level||null;if(!memo.levelPicked){level=startLevel(memo.userLevel);save();}if(isCurrent()&&view==='list')render();}).catch(()=>{memo.userLevel=null;});
  render();

@@ -146,3 +146,12 @@ test('grammar cards from the learner\'s own Anki are read at run time and merged
  const bridge=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');assert.match(bridge,/case 'grammar_bluebook'/);
  assert.equal(fs.readdirSync(path.join(__dirname,'..','web')).some(f=>/bluebook|蓝宝书/i.test(f)),false,'no card text ships with MeguLit');
 });
+
+test('without the deck the grammar page offers it on AnkiWeb, with a notice that the learner is responsible',async()=>{
+ const g=await import('../web/grammar.js');
+ const off=g.listHTML({progress:{}},{locale:'zh',esc,level:'N5',anki:{available:false,points:[]}});
+ assert.match(off,/data-anki-get/);assert.match(off,/data-anki-reload/);assert.match(off,/责任由你自己承担/);assert.equal(g.ANKI_DECK,'https://ankiweb.net/shared/info/1748349244');
+ assert.match(g.listHTML({progress:{}},{locale:'zh',esc,level:'N5',anki:{available:true,points:[1,2]}}),/已读取你的 Anki：蓝宝书等语法卡 2 条/);
+ assert.doesNotMatch(g.listHTML({progress:{}},{locale:'zh',esc,level:'N5',anki:null}),/data-anki-get/,'nothing while still reading');
+ assert.match(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),/'ankiweb\.net'\]\.includes\(url\.hostname\)/,'the page may open AnkiWeb');
+});
