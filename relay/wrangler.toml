@@ -25,8 +25,7 @@ REPORT_THRESHOLD = "3"
 # source ids: moepedia, 4gamer, denfami. Empty = the app fetches articles on the user's PC.
 NEWS_FULLTEXT_SOURCES = ""
 # E415 one-line Chinese notes for the daily hot words
-DAILY_GLOSS_MODEL = "@cf/deepseek-ai/deepseek-v4-pro-0813"
-# others to compare: "@cf/moonshotai/kimi-k2.6", "@cf/zai-org/glm-5.3"; falls back to deepseek-v4.1-flash, then qwen3.8-27b
+# DAILY_GLOSS_MODEL = "…" would be tried before the built-in chain (src/daily.js GLOSS_CHAIN). DeepSeek V4 needs the paid Workers plan.
 
 # Workers AI: avatar moderation and the AI guesses on the hot-word awards. No token needed inside the Worker.
 [ai]

@@ -167,8 +167,10 @@ export async function articleGet(env,url,{json,fail},now=new Date(),fetcher=fetc
 
 /* E415 a short Chinese note per hot word (退市 / 棒球选手 / 快餐产品), written once a day by Workers AI with the
    headline as context. The app prefers its own dictionary and falls back to machine translation when this is empty. */
-/* E415: DeepSeek V4 Pro knows Japanese people and things far better than Qwen3 30B-A3B (3B active), which guessed jobs */
-export const GLOSS_MODEL='@cf/deepseek-ai/deepseek-v4-pro-0813',GLOSS_FALLBACK='@cf/deepseek-ai/deepseek-v4.1-flash-1017',GLOSS_LAST='@cf/qwen/qwen3.8-27b';
+/* E415: big models first (Qwen3 30B-A3B, 3B active, guessed jobs); DeepSeek V4 needs the paid Workers plan, so the
+   chain tries the larger models the Free plan serves and ends with the one known to work. The first good answer wins. */
+export const GLOSS_CHAIN=['@cf/moonshotai/kimi-k2.6','@cf/zai-org/glm-5.3','@cf/openai/gpt-oss-120b','@cf/meta/llama-3.3-70b-instruct-fp8-fast','@cf/qwen/qwen3-30b-a3b-fp8'];
+export const GLOSS_MODEL=GLOSS_CHAIN[0],GLOSS_FALLBACK=GLOSS_CHAIN[1];
 /* E415 (user: 「ゴリ = 网红」 reads as if the word meant 网红): every note says what kind of thing the word is.
    type: 词语 (an ordinary word: note = its meaning) or 人名 / 组织 / 作品 / 地名 / 商品 / 事件 (a proper noun: note =
    who or what it is, never the name itself). The page shows the type as a small tag beside the note. */
@@ -216,13 +218,14 @@ async function askNotes(env,model,prompt,words){
 }
 async function glossWords(env,words){
  if(!env.AI||typeof env.AI.run!=='function'||!words.length)return 0;
- for(const model of [...new Set([env.DAILY_GLOSS_MODEL||GLOSS_MODEL,GLOSS_FALLBACK,GLOSS_LAST])]){
+ for(const model of [...new Set([...(env.DAILY_GLOSS_MODEL?[env.DAILY_GLOSS_MODEL]:[]),...GLOSS_CHAIN])]){
   try{const list=await askNotes(env,model,GLOSS_PROMPT,words);
    if(list.filter(n=>n.gloss).length<Math.ceil(words.length/3)){console.warn('gloss: too few from',model,list.filter(n=>n.gloss).length,'/',words.length);continue;}
    words.forEach((w,i)=>{const n=list[i];if(!n)return;if(n.kind)w.kind=n.kind;if(n.gloss&&!repeatsTerm(w.term,n.gloss,n.kind))w.gloss=n.gloss;});
    /* notes that only restated the name: ask once more for just those */
    const redo=words.filter((w,i)=>list[i]?.gloss&&!w.gloss);
    if(redo.length)try{const again=await askNotes(env,model,GLOSS_RETRY,redo);redo.forEach((w,i)=>{const n=again[i];if(n?.kind&&!w.kind)w.kind=n.kind;if(n?.gloss&&!repeatsTerm(w.term,n.gloss,w.kind))w.gloss=n.gloss;});}catch{}
+   console.log('gloss: model',model,list.filter(n=>n.gloss).length,'/',words.length);
    return list.length;}
   catch(e){console.warn('gloss: model failed',model,String(e?.message||e).slice(0,200));}
  }
