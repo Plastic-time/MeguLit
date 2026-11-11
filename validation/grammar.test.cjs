@@ -89,7 +89,7 @@ test('a grammar line becomes its own Anki note with the sentence, translation, g
  assert.deepEqual(G.rubyPairs('車の窓は<rしも>霜</r>だらけ'),[['霜','しも']]);
 });
 
-test('N5 lessons: every point is complete, exercises are answerable, levels N4–N0 are placeholders',async()=>{
+test('N5 lessons: every point is complete, exercises are answerable, levels N4–N0 have their own lessons',async()=>{
  const {N5,LEVELS,blankOf,choicesFor}=await import('../web/grammar-n5.js'),g=await import('../web/grammar.js');
  assert.deepEqual(LEVELS,['N5','N4','N3','N2','N1','N0']);assert.equal(N5.length,21);assert.deepEqual(N5.map(p=>p.id),G.POINTS,'lessons and the matcher cover the same points');
  for(const p of N5){
@@ -106,7 +106,7 @@ test('N5 lessons: every point is complete, exercises are answerable, levels N4�
  const real=[{text:'一段と厳しかった。',start:3,end:7,title:'G',readAt:1},{text:'外は寒い。',start:2,end:4,title:'G',readAt:1794300000}];
  assert.equal(g.exercisesFor(N5.find(p=>p.id==='iadj'),real)[0].text,'外は寒い。');
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
- assert.match(g.listHTML({progress:{},completion:G.completion({}),examples:{}},{locale:'zh',esc,level:'N0'}),/还在写/);
+ assert.match(g.listHTML({progress:{},completion:G.completion({}),examples:{}},{locale:'zh',esc,level:'N0'}),/data-point="n0-jan"/,'N0 has its own lessons now');
  const list=g.listHTML({progress:{wa:{learned:true,attempts:2,correct:1}},completion:G.completion({wa:{learned:true,attempts:2,correct:1}}),examples:{wa:[{}]},real:1},{locale:'zh',esc});
  assert.match(list,/data-point="wa"/);assert.match(list,/已学完/);assert.match(list,/50%/);
  for(const l of ['zh','ja','en'])assert.deepEqual(Object.keys(g.grammarMessages[l]).sort(),Object.keys(g.grammarMessages.zh).sort(),l);
