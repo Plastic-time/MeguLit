@@ -2059,13 +2059,7 @@ html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
 
 .nt-title-2 { margin-top: .35rem; color: #e8b4b8; }
 
-/* the text box, a size smaller; while it changes height only its bottom edge clips (the name tag stays whole) */
-.ht-box { width: min(100%, calc(38vw + 2 * clamp(1rem, 2vw, 2.4rem))); padding: clamp(1.2rem, 1.8vw, 2.1rem) clamp(1rem, 2vw, 2.4rem) clamp(2.4rem, 3vw, 3.2rem); }
-.ht-box.resizing { overflow: visible; clip-path: inset(-4rem -40vw 0 -4rem); }
-:lang(zh) .ht-box .ht-big { font-size: min(12.4vw, 12.5rem); }
-:lang(ja) .ht-box .ht-big { font-size: min(8.8vw, 9rem); }
-:lang(en) .ht-box .ht-big { font-size: min(6.8vw, 7.5rem); }
-.hero .ht-pre { font-size: clamp(2rem, 4.6vw, 5.2rem) !important; }
-.ht-say { font-size: clamp(1.7rem, 3.2vw, 3.8rem); }
-.ht-say:lang(en) { font-size: clamp(1.8rem, 3.5vw, 4.1rem); }
-@media (max-width: 40rem) { .ht-box { width: 100%; } }
+.nt-title-2 { font-size: clamp(1rem, 1.4vw, 1.2rem); font-weight: 500; line-height: 1.5; }
+/* the name tag sits inside the box so a resized window never cuts it in half; the box is a little smaller */
+.ht-box { padding-top: calc(clamp(1.4rem, 2.2vw, 2.6rem) + 1.6rem); zoom: .88; }
+.ht-name { translate: 0 0; }
