@@ -24,9 +24,9 @@ function glyphShape(ch,size){
  for(let j=1;j<w-1;j+=2)for(let i=1;i<w-1;i+=2){if(at(i,j)<128)continue;if(at(i-2,j)<128||at(i+2,j)<128||at(i,j-2)<128||at(i,j+2)<128)edges.push([i-w/2,j-w/2]);else if(Math.random()<.25)inner.push([i-w/2,j-w/2]);}
  const out={mask:c,w,edges,inner};cache.set(key,out);return out;
 }
-const tmp=document.createElement('canvas');
+let tmpEl=null;const tmpCanvas=()=>tmpEl||(tmpEl=document.createElement('canvas'));
 function paintGlyph(ctx,g,cx,cy,texture,{glow='',blur=0,alpha=1}={}){
- if(tmp.width!==g.w){tmp.width=g.w;tmp.height=g.w;}const t=tmp.getContext('2d');t.globalCompositeOperation='source-over';t.clearRect(0,0,g.w,g.w);texture(t,g.w);t.globalCompositeOperation='destination-in';t.drawImage(g.mask,0,0);
+ const tmp=tmpCanvas();if(tmp.width!==g.w){tmp.width=g.w;tmp.height=g.w;}const t=tmp.getContext('2d');t.globalCompositeOperation='source-over';t.clearRect(0,0,g.w,g.w);texture(t,g.w);t.globalCompositeOperation='destination-in';t.drawImage(g.mask,0,0);
  ctx.save();ctx.globalCompositeOperation='source-over';ctx.globalAlpha=alpha;if(glow){ctx.shadowColor=glow;ctx.shadowBlur=blur;}ctx.drawImage(tmp,cx-g.w/2,cy-g.w/2);ctx.restore();
 }
 const pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -43,7 +43,7 @@ export const GLYPH={
   if(Math.random()<.08+I*.2){const [x,y]=pick(g.edges),a=Math.atan2(y,x),L=R(14,34)*(s.u||1);ctx.beginPath();ctx.moveTo(s.cx+x,s.cy+y);ctx.lineTo(s.cx+x+Math.cos(a+R(-.4,.4))*L*.5+R(-4,4),s.cy+y+Math.sin(a)*L*.5);ctx.lineTo(s.cx+x+Math.cos(a)*L,s.cy+y+Math.sin(a)*L);ctx.stroke();}ctx.restore();},
  wind(s,ctx,g,I){paintGlyph(ctx,g,s.cx,s.cy,(t,w)=>{t.fillStyle='rgba(200,255,232,.9)';t.fillRect(0,0,w,w);const o=(s.age*120)%w;const gr=t.createLinearGradient(o-w,0,o,0);gr.addColorStop(0,'rgba(120,210,180,0)');gr.addColorStop(.5,'rgba(90,190,160,.75)');gr.addColorStop(1,'rgba(120,210,180,0)');t.fillStyle=gr;t.fillRect(0,0,w,w);},{glow:'#8fe0c0',blur:10+I*10,alpha:.95});
   if(Math.random()<.7+I)for(let i=0;i<2;i++){const [x,y]=pick(g.edges);s.ps.push({x:s.cx+x,y:s.cy+y,vx:R(60,140)*(Math.random()<.5?1:-1),vy:R(-30,10),drag:1.6,life:R(.5,1),t:0,kind:'gust',trail:[]});}},
- water(s,ctx,g,I){const w=g.w;if(tmp.width!==w){tmp.width=w;tmp.height=w;}
+ water(s,ctx,g,I){const w=g.w,tmp=tmpCanvas();if(tmp.width!==w){tmp.width=w;tmp.height=w;}
   ctx.save();ctx.shadowColor='#5fb0f0';ctx.shadowBlur=12+I*10;const slices=Math.round(w/3);
   paintGlyph({save(){},restore(){},drawImage(){},set globalCompositeOperation(v){},set globalAlpha(v){},set shadowColor(v){},set shadowBlur(v){}},g,0,0,(t,ww)=>{const gr=t.createLinearGradient(0,0,0,ww);gr.addColorStop(0,'#e8f6ff');gr.addColorStop(.4,'#7cc4f4');gr.addColorStop(1,'#1d5fa8');t.fillStyle=gr;t.fillRect(0,0,ww,ww);const yb=((s.age*.4)%1)*ww;t.fillStyle='rgba(255,255,255,.45)';t.fillRect(0,yb,ww,ww*.05);});
   for(let i=0;i<slices;i++){const sy=i*3,off=Math.sin(sy*.09+s.age*3)*(1.5+I*2);ctx.drawImage(tmp,0,sy,w,3,s.cx-w/2+off,s.cy-w/2+sy,w,3);}ctx.restore();
