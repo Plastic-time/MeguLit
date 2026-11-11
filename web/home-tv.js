@@ -89,7 +89,7 @@ function deal(cover,background,animate,mode='draw'){const flip=cover.querySelect
  const spin=targets.reduce((m,x,i)=>i?Math.max(m,Math.abs(x.p.r-targets[i-1].p.r)+Math.abs(x.p.rx-targets[i-1].p.rx)):m,0),stretch=1+Math.min(.6,spin/1000);targets.forEach(x=>{if(x.at<tf)x.at*=stretch;});const shift=tf*(stretch-1);targets.forEach(x=>{if(x.at>=tf)x.at+=shift;});
  const track=springTrack(targets,feel),total=track[track.length-1].t*1000;
  const frames=track.map(({t,p,v})=>{const lean=Math.max(-14,Math.min(14,v.x*feel.drag)),pitch=Math.max(-12,Math.min(12,-v.y*feel.drag*.8));return {offset:Math.min(1,t*1000/total),transform:`translate(${p.x.toFixed(2)}%,${p.y.toFixed(2)}%) translateZ(${p.z.toFixed(1)}px) rotateX(${(p.rx+pitch).toFixed(2)}deg) rotate(${(p.r+lean).toFixed(2)}deg) rotateY(${p.ry.toFixed(2)}deg) scale(${p.s.toFixed(4)}) scaleX(${p.sx.toFixed(3)}) scaleY(${p.sy.toFixed(3)})`};});
- frames[0].offset=0;frames[frames.length-1]={offset:1,transform:'none'};
+ frames[0].offset=0;frames[frames.length-1]={offset:1,transform:`translate(0%,0%) translateZ(0px) rotateX(0deg) rotate(${R}deg) rotateY(0deg) scale(1) scaleX(1) scaleY(1)`};
  const swapAt=track.find(f=>Math.abs(f.p.ry)<90)?.t*1000||total*.7,mid=Math.min(.999,swapAt/total),delay=gap*1000+(style.pile&&pile?PILE_IN:0),timing={duration:total,delay,easing:'linear',fill:'backwards'};
  if(pile&&style.pile){pileCards(pile);pileMotion(pile,style.pile,total,delay);}
  flip.animate(frames,timing);
