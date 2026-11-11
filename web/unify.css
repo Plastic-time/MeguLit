@@ -1514,3 +1514,5 @@ html:not(#u):not(#v):not(#w):not(#x) body #learning-content:has(#lookup-results)
 html:not(#u):not(#v):not(#w):not(#x) body .dict-field{position:absolute;left:0;top:0;z-index:0;pointer-events:none}
 html:not(#u):not(#v):not(#w):not(#x) body #learning-content:has(.dict-field)>*:not(.dict-field){position:relative;z-index:1}
 html body .dict-cloud{display:none!important}
+/* the field covers the whole window behind the dictionary (fixed), like the website hero */
+html:not(#u):not(#v):not(#w):not(#x) body .dict-field{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:0}
