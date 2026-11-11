@@ -3,6 +3,7 @@
    chips fall out of it and fine cracks run from it — and a right answer brings Aqua's 花鳥風月 fountain, which mends the
    oldest pit. It only watches what the practices already show (the right / wrong marks on kana and grammar answers, the
    Again / Good / Easy buttons of the review) and only reacts within a moment of the learner's own click or key. */
+import {fxPref} from './fx-prefs.js';
 import {calm,NS,scarMarkup,debris,explosion,fountain} from './burst-fx.js';
 const WRONG='.wrong,.miss,.gm-blank.bad',RIGHT='.right,.hit,.gm-blank.ok',MAX=10;
 let lastInput=0,queued=null,lastPoint=null;
@@ -21,8 +22,9 @@ function scarsOf(box){
 }
 function center(el){const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};}
 async function blast(el){
+ const pref=fxPref('explosion');if(!pref.on)return;
  const box=scope(el),c0=center(el),er0=el.getBoundingClientRect(),hitP=lastPoint&&lastPoint.x>=er0.left-4&&lastPoint.x<=er0.right+4&&lastPoint.y>=er0.top-4&&lastPoint.y<=er0.bottom+4?lastPoint:c0,{x,y}=hitP;
- await explosion(x,y,{shake:box,bar:document.querySelector('header.titlebar')});
+ await explosion(x,y,{shake:box,bar:document.querySelector('header.titlebar'),k:pref.k});
  if(!box.isConnected)return;
  const svg=scarsOf(box),b=box.getBoundingClientRect(),seed=Math.floor(Math.random()*2147483646)+1;
  const g=document.createElementNS(NS,'g');g.setAttribute('class','fx-scar');
@@ -35,8 +37,9 @@ async function blast(el){
 }
 function mend(g){const w=g.querySelector('.fx-water'),pit=g.querySelector('.fx-rim');if(w&&pit){const bb=pit.getBBox(),R=Math.max(bb.width,bb.height)/2;w.animate([{r:'0px',opacity:.9},{r:R+'px',opacity:.8,offset:.55},{r:R+'px',opacity:0}],{duration:1300,easing:'cubic-bezier(.3,.7,.2,1)',fill:'forwards'});}g.classList.add('is-gone');setTimeout(()=>g.remove(),1600);}
 function bloom(el){
+ const pref=fxPref('heal');if(!pref.on)return;
  const box=scope(el),{x,y}=center(el);
- fountain(x,y);
+ fountain(x,y,pref.k);
  const scar=box.querySelector(':scope>svg.fx-scars g.fx-scar:not(.is-gone)');
  if(scar)setTimeout(()=>mend(scar),380);
 }

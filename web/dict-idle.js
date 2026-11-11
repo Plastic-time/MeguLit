@@ -7,6 +7,7 @@
    the box flies (dict-impact.js sends 'megulit:dict-wind') each glyph feels a push along its motion, falling off with
    distance and scaled by depth, with a little turbulence, and drifts on. The words you look up most are among them,
    in gold. One still frame when motion is reduced. Presentation only. */
+import {fxPref} from './fx-prefs.js';
 const calm=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const KANA='あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエカキクサシスタチツナニ読物語言葉魔導書続空気夢花月星雪風声心光影';
 const FONT='"Noto Serif JP","Yu Mincho","MeguLit Serif",serif',FOCUS=.42;
@@ -37,6 +38,7 @@ function build(host){
 function frame(now){
  const f=field;if(!f||!f.cv.isConnected){field=null;return;}
  const dt=Math.min(.05,(now-f.prev)/1000);f.prev=now;const ctx=f.ctx;ctx.clearRect(0,0,f.W,f.H);
+ const pref=fxPref('dictField');if(!pref.on){if(!calm)f.raf=requestAnimationFrame(frame);return;}
  const res=document.querySelector('#lookup-results'),busy=res&&(res.children.length||res.textContent.trim())?1:0;f.dim=(f.dim??1)+((busy?.45:1)-(f.dim??1))*Math.min(1,dt*3);
  const wind=f.wind&&now-f.wind.at<120?f.wind:null;
  const order=f.parts;
@@ -51,7 +53,7 @@ function frame(now){
   p.ovx=((p.ovx||0)+ax*dt)*(1-Math.min(1,5*dt));p.ovy=((p.ovy||0)+ay*dt)*(1-Math.min(1,5*dt));p.ox+=p.ovx*dt;p.oy+=p.ovy*dt;
   if(p.y<-80||p.x<-120||p.x>f.W+120){Object.assign(p,make(f,false),{x:Math.random()*f.W});}
   if(p.y>f.H+120)p.y=-60;
-  const s=p.spr;ctx.globalAlpha=p.alpha*f.dim;ctx.save();ctx.translate(p.x+p.ox,p.y+p.oy);ctx.rotate(p.rot);ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();
+  const s=p.spr;ctx.globalAlpha=Math.min(1,p.alpha*f.dim*pref.k);ctx.save();ctx.translate(p.x+p.ox,p.y+p.oy);ctx.rotate(p.rot);ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();
  }
  ctx.globalAlpha=1;
  if(!calm)f.raf=requestAnimationFrame(frame);

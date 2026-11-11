@@ -5,12 +5,13 @@
    the box flies up tilting in 3D, hits the top bar (the bar jolts, a line of light flares where it was struck, shards of
    kana burst out), and stops there (see launch()). Presentation only:
    the layout is the app's; this only animates the box from where it was to where the layout puts it. */
+import {fxPref} from './fx-prefs.js';
 const calm=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const KANA='あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソ';
 try{localStorage.removeItem('megulit.dict.cracks.v1');}catch{}
 const rand=(a,b)=>a+Math.random()*(b-a);
 const f1=n=>n.toFixed(2);
-let busy=false;
+let busy=false,fxK=1;
 
 function scatterCloud(ix,iy){
  const cloud=document.querySelector('.dict-cloud');if(!cloud||getComputedStyle(cloud).opacity==='0')return;
@@ -41,7 +42,7 @@ function barHit(bar,x,power){
  wrap.querySelector('.dict-hit-ring').animate([{transform:'translate(-50%,-50%) scale(.2,.12)',opacity:1},{transform:`translate(-50%,-50%) scale(${f1(2.6+power*2)},${f1(.55+power*.4)})`,opacity:0}],{duration:620,easing:'cubic-bezier(.1,.7,.3,1)',fill:'forwards'});
  wrap.querySelector('.dict-hit-line').animate([{transform:'translateX(-50%) scaleX(.1)',opacity:1},{transform:`translateX(-50%) scaleX(${f1(1.2+power*1.8)})`,opacity:0}],{duration:760,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
  setTimeout(()=>wrap.remove(),820);
- const k=power*8,side=(x-r.left)/r.width-.5,frames=[];
+ power*=fxK;const k=power*8,side=(x-r.left)/r.width-.5,frames=[];
  for(let i=0;i<=10;i++){const d=Math.exp(-i*.45),sgn=i%2?1:-1;frames.push({transform:i===10?'none':`translateY(${f1(sgn*k*d)}px) rotate(${f1(sgn*side*k*.1*d)}deg)`,filter:i===10?'none':`brightness(${f1(1+.6*power*d)})`});}
  bar.animate(frames,{duration:560,easing:'linear'});
 }
@@ -95,6 +96,7 @@ function launch(form){
 }
 document.addEventListener('submit',e=>{
  const form=e.target;if(calm||busy||form?.id!=='lookup-form')return;
+ const pref=fxPref('dictImpact');if(!pref.on)return;fxK=pref.k;
  const results=document.querySelector('#lookup-results');
  /* only from the empty, centred state */
  if(!results||results.children.length||results.textContent.trim())return;

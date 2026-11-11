@@ -1516,3 +1516,13 @@ html:not(#u):not(#v):not(#w):not(#x) body #learning-content:has(.dict-field)>*:n
 html body .dict-cloud{display:none!important}
 /* the field covers the whole window behind the dictionary (fixed), like the website hero */
 html:not(#u):not(#v):not(#w):not(#x) body .dict-field{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:0}
+
+/* 特效 panel (fx-settings.js): each effect a settings row with its strength slider and its switch side by side */
+html body .fx-panel .fx-controls{display:flex;align-items:center;gap:18px;flex:none}
+html body .fx-panel .setting-slider{width:220px;display:flex;align-items:center;gap:10px}
+html body .fx-panel .setting-slider output{width:44px;text-align:right;font-family:var(--u-mono);font-size:12px;color:var(--g-t2,#c3ab9c);font-variant-numeric:tabular-nums}
+html body .fx-panel .fx-row.is-off{opacity:.45}
+html body .fx-panel .fx-row:has(.switch:not(:checked)) .setting-slider{opacity:.4}
+html body .fx-panel .fx-all{border-bottom:1px solid var(--u-line-2);padding-bottom:18px;margin-bottom:6px}
+html body .fx-panel .fx-foot{display:flex;justify-content:flex-end;padding-top:18px}
+html body .settings-nav [data-fx-panel]{all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer}

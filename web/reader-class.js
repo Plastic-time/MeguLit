@@ -3,6 +3,7 @@
    an element to keep levelling: until then the level holds at 20 and the experience gathered meanwhile waits, paid
    back in full when the element is chosen. Each element has its own ranks up to Lv.80; fire's top rank is
    爆裂魔法学徒. The element can be changed again later at no cost. The numbers match services/reader-class.cjs. */
+import {fxPref} from './fx-prefs.js';
 import {mountElementFx} from './element-fx.js';
 export const SCHOOL_LEVEL=20;
 const XP_EARLY=[100,150,200,250,300],XP_STEP=600;
@@ -88,7 +89,7 @@ export function openRite({api,locale,esc,toast,current='',pending=0,xpTotal=0,he
  dialog.querySelector('[data-go]').onclick=async()=>{const buttons=[...dialog.querySelectorAll('.class-rite-body button')];buttons.forEach(b=>b.disabled=true);
   try{await api('reader_class_set',{element:pick});}catch{buttons.forEach(b=>b.disabled=false);toast(w.fail);return;}
   document.dispatchEvent(new CustomEvent('megulit:reader-class',{detail:{element:pick}}));
-  const s=SCHOOLS[pick],lv=Math.max(SCHOOL_LEVEL,levelOf(xpTotal||xpToReach(SCHOOL_LEVEL)).level),rank=rankTitle(lv,l,pick),move=motion();
+  const s=SCHOOLS[pick],lv=Math.max(SCHOOL_LEVEL,levelOf(xpTotal||xpToReach(SCHOOL_LEVEL)).level),rank=rankTitle(lv,l,pick),pref=fxPref('rite'),move=motion()&&pref.on;
   const reveal=dialog.querySelector('.class-rite-reveal');
   dialog.querySelector('[data-r-kicker]').textContent=w.doneKicker;
   dialog.querySelector('[data-r-rank]').innerHTML=[...rank].map((ch,i)=>`<span style="--i:${i}">${esc(ch)}</span>`).join('');

@@ -73,7 +73,7 @@ function runSparks(){if(running)return;running=true;let prev=performance.now();
   if(live.length)requestAnimationFrame(step);else{ctx.clearRect(0,0,innerWidth,innerHeight);running=false;}};
  requestAnimationFrame(step);}
 const anim=(el,frames,opts)=>el.animate(frames,{fill:'forwards',...opts});
-export function explosion(x,y,{shake,bar}={}){
+export function explosion(x,y,{shake,bar,k=1}={}){
  if(calm)return Promise.resolve();
  const l=layer(),w=document.createElement('div');w.className='fx-explosion';w.style.cssText=`left:${x}px;top:${y}px`;
  const star=Array.from({length:5},(_,i)=>{const a=-Math.PI/2+i*Math.PI*4/5;return `${i?'L':'M'}${f1(Math.cos(a)*46)} ${f1(Math.sin(a)*46)}`;}).join(' ')+'Z';
@@ -91,20 +91,20 @@ export function explosion(x,y,{shake,bar}={}){
  anim($('.fx-fire.is-inner'),[{transform:'translate(-50%,-50%) scale(0)',opacity:0},{transform:'translate(-50%,-50%) scale(0)',opacity:0,offset:.37},{transform:'translate(-50%,-50%) scale(.7)',opacity:1,offset:.42},{transform:'translate(-50%,-60%) scale(.9)',opacity:0,offset:.62},{opacity:0}],{duration:T});
  anim($('.fx-ring'),[{transform:'translate(-50%,-50%) scale(.1)',opacity:0},{transform:'translate(-50%,-50%) scale(.1)',opacity:1,offset:.37},{transform:'translate(-50%,-50%) scale(5)',opacity:0,offset:.62},{opacity:0}],{duration:T,easing:'cubic-bezier(.1,.7,.3,1)'});
  anim($('.fx-ring.is-dust'),[{transform:'translate(-50%,-50%) scale(.2)',opacity:0},{transform:'translate(-50%,-50%) scale(.2)',opacity:.7,offset:.38},{transform:'translate(-50%,-50%) scale(3.2)',opacity:0,offset:.85},{opacity:0}],{duration:T,easing:'cubic-bezier(.2,.6,.3,1)'});
- anim(flash,[{opacity:0},{opacity:0,offset:.36},{opacity:.25,offset:.385},{opacity:.22,offset:.43},{opacity:0,offset:.64},{opacity:0}],{duration:T});
+ anim(flash,[{opacity:0},{opacity:0,offset:.36},{opacity:.25*k,offset:.385},{opacity:.22*k,offset:.43},{opacity:0,offset:.64},{opacity:0}],{duration:T});w.style.scale=String(.6+.4*k);
 
  /* embers drawn in during the charge */
  for(let i=0;i<0;i++){const a=Math.random()*Math.PI*2,r=140+Math.random()*260;live.push({kind:'in',x0:x+Math.cos(a)*r,y0:y+Math.sin(a)*r,tx:x,ty:y,x:0,y:0,t:-Math.random()*.25,life:.62,s:.8+Math.random()*1.6,color:'rgb(255,120,70)'});}
  runSparks();
  later(w,T+60);later(flash,T+60);
  return new Promise(res=>setTimeout(()=>{
-  for(let i=0;i<75;i++){const a=Math.random()*Math.PI*2,v=(240+Math.random()*760)*.7;live.push({kind:'spark',x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-160,g:420,drag:1.8,t:0,life:.55+Math.random()*.8,s:.8+Math.random()*1.4,trail:[]});}
+  for(let i=0;i<Math.round(75*k);i++){const a=Math.random()*Math.PI*2,v=(240+Math.random()*760)*.7*(.6+.4*k);live.push({kind:'spark',x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-160,g:420,drag:1.8,t:0,life:.55+Math.random()*.8,s:.8+Math.random()*1.4,trail:[]});}
   /* the fireball as layered puffs (no flat disc): hot white at the heart, orange, then dark red cooling to smoke */
-  for(let i=0;i<24;i++){const a=Math.random()*Math.PI*2,v=(60+Math.random()*320)*.7;live.push({kind:'fire',dim:.1,x:x+Math.cos(a)*8,y:y+Math.sin(a)*8,vx:Math.cos(a)*v*1.3,vy:Math.sin(a)*v*.7-80,g:-70,drag:2.6,t:0,life:1.6+Math.random()*.9,s:(30+Math.random()*34)*.7,wob:Math.random()*6});}
+  for(let i=0;i<Math.round(24*k);i++){const a=Math.random()*Math.PI*2,v=(60+Math.random()*320)*.7;live.push({kind:'fire',dim:.1,x:x+Math.cos(a)*8,y:y+Math.sin(a)*8,vx:Math.cos(a)*v*1.3,vy:Math.sin(a)*v*.7-80,g:-70,drag:2.6,t:0,life:1.6+Math.random()*.9,s:(30+Math.random()*34)*.7,wob:Math.random()*6});}
   for(let i=0;i<14;i++)live.push({kind:'ember',x:x+(Math.random()-.5)*60,y:y+(Math.random()-.5)*30,vx:(Math.random()-.5)*80,vy:-(40+Math.random()*120),g:-30,drag:.6,t:0,life:1.6+Math.random()*1.6,s:.8+Math.random()*1.4});
   runSparks();
-  const k=[[-5,2],[4,-4],[-3,3],[2,-2],[-1,1],[0,0]].map(([dx,dy])=>({transform:`translate(${dx}px,${dy}px)`}));
-  for(const el of [shake,bar].filter(Boolean))el.animate(k,{duration:520,easing:'cubic-bezier(.2,.7,.3,1)'});
+  const kk=[[-5,2],[4,-4],[-3,3],[2,-2],[-1,1],[0,0]].map(([dx,dy])=>({transform:`translate(${dx*k}px,${dy*k}px)`}));
+  for(const el of [shake,bar].filter(Boolean))el.animate(kk,{duration:520,easing:'cubic-bezier(.2,.7,.3,1)'});
   for(let i=0;i<34;i++){const cap=i>12,a=Math.random()*Math.PI*2;live.push({kind:'smoke',x:x+(cap?Math.cos(a)*40:(Math.random()-.5)*14),y:y-(cap?70+Math.random()*30:i*5),vx:(Math.random()-.5)*(cap?50:12),vy:-(cap?18+Math.random()*24:40+Math.random()*30),g:cap?0:12,drag:.8,t:-(cap?.25:0)-Math.random()*.2,life:2.4+Math.random()*1.4,s:(cap?18:12)+Math.random()*14});}
   res();},Math.round(T*.37)));
 }
@@ -118,10 +118,10 @@ function mushroom(x,y){
 }
 
 /* 花鳥風月: water arcs up and falls with petals and a few sparkles */
-export function fountain(x,y){
+export function fountain(x,y,k=1){
  if(calm)return;
  const l=layer();
- for(let i=0;i<26;i++){
+ for(let i=0;i<Math.round(26*k);i++){
   const flower=i%3===0,el=document.createElement('i');el.className=flower?'fx-petal':'fx-drop';
   el.style.cssText=`left:${x}px;top:${y}px`;if(flower)el.textContent=['✿','❀','✾'][Math.floor(Math.random()*3)];l.append(el);
   const vx=(Math.random()-.5)*260,vy=-(260+Math.random()*260),g=900,T=1+Math.random()*.6,spin=(Math.random()-.5)*360,frames=[];
