@@ -73,7 +73,7 @@ function springTrack(targets,feel){const ch=['x','y','r','s','z','rx','ry','sx',
   if(Math.round(t/dt)%4===0)out.push({t,p:{...pos},v:{x:vel.x,y:vel.y}});
   t+=dt;if(t>last&&!moving){if(++settled>12)break;}else settled=0;}
  return out;}
-function deal(cover,background,animate,mode='draw'){const flip=cover.querySelector('.tv-flip'),face=cover.querySelector('.tv-face'),artEl=cover.querySelector('.tv-art'),backFace=flip.querySelector('.tv-back'),pile=cover.parentNode.querySelector('.tv-pile');cover.querySelectorAll('.tv-old,.tv-sheen').forEach(n=>n.remove());[flip,face,backFace,...(pile?[pile,...pile.children]:[])].forEach(el=>el.getAnimations().forEach(x=>x.cancel()));
+function deal(cover,background,animate,mode='draw'){const flip=cover.querySelector('.tv-flip'),face=cover.querySelector('.tv-face'),artEl=cover.querySelector('.tv-art'),backFace=flip.querySelector('.tv-back'),pile=cover.parentNode.querySelector('.tv-pile');cover.querySelectorAll('.tv-old,.tv-sheen').forEach(n=>n.remove());[flip,face,artEl,backFace,...(pile?[pile,...pile.children]:[])].forEach(el=>el.getAnimations().forEach(x=>x.cancel()));
  if(!animate||matchMedia('(prefers-reduced-motion:reduce)').matches||!artEl.style.background){artEl.style.background=background;return 0;}
  if(mode==='fade'){const fresh=document.createElement('div');fresh.className='tv-old';fresh.style.background=background;cover.appendChild(fresh);const a=fresh.animate([{opacity:0,filter:'blur(10px) saturate(.6)',transform:'scale(1.04)'},{opacity:1,filter:'blur(0) saturate(1)',transform:'none'}],{duration:760,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'});a.finished.then(()=>{artEl.style.background=background;fresh.remove();},()=>fresh.remove());return 260;}
  const outDir=rnd(0,Math.PI*2),outDur=rnd(360,460);
@@ -92,6 +92,7 @@ function deal(cover,background,animate,mode='draw'){const flip=cover.querySelect
  const swapAt=track.find(f=>Math.abs(f.p.ry)<90)?.t*1000||total*.7,mid=Math.min(.999,swapAt/total),delay=gap*1000+(style.pile&&pile?PILE_IN:0),timing={duration:total,delay,easing:'linear',fill:'backwards'};
  if(pile&&style.pile){pileCards(pile);pileMotion(pile,style.pile,total,delay);}
  flip.animate(frames,timing);
+ const dof=track.map(({t,p})=>{const near=p.s*Math.max(.5,700/Math.max(120,700-p.z)),b=Math.min(9,Math.max(0,(near-1.18)*7));return {offset:Math.min(1,t*1000/total),filter:`blur(${b.toFixed(2)}px)`};});dof[0].offset=0;dof[dof.length-1]={offset:1,filter:'blur(0px)'};if(dof.some(k=>k.filter!=='blur(0.00px)'&&k.filter!=='blur(0px)'))[artEl,backFace].forEach(el=>el.animate(dof,{...timing,fill:'none'}));
  face.animate([{opacity:0},{opacity:0,offset:mid},{opacity:1,offset:Math.min(1,mid+.001)},{opacity:1}],timing);
  backFace.animate([{opacity:1},{opacity:1,offset:mid},{opacity:0,offset:Math.min(1,mid+.001)},{opacity:0}],{...timing,fill:'both'}).finished.then(()=>backFace.getAnimations().forEach(x=>x.cancel()),()=>{});
  const sheen=document.createElement('i');sheen.className='tv-sheen';face.appendChild(sheen);sheen.style.setProperty('--sa',rnd(95,135)+'deg');
