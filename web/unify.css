@@ -844,3 +844,11 @@ html:not(#u):not(#v) body .leaderboard-page .lb-tile{background:none!important;b
 html:not(#u):not(#v) body .leaderboard-page .lb-tile:nth-child(4n+1){border-left:0!important;padding-left:0!important}
 html:not(#u):not(#v) body .leaderboard-page .lb-tile::before{display:none!important}
 html:not(#u):not(#v) body .leaderboard-page .lb-tile strong{font-family:var(--g-serif,serif);font-size:clamp(22px,1.8vw,28px)!important;white-space:nowrap}
+/* level picker: a ladder from zero to native, one ruled line per level, not a 4×2 card grid */
+html:not(#u):not(#v) body .lv-dialog .lv-grid{display:grid!important;grid-template-columns:1fr!important;gap:0!important;border-top:1px solid var(--u-line-2)}
+html:not(#u):not(#v) body .lv-dialog .lv-opt{display:grid!important;grid-template-columns:56px 200px minmax(0,1fr);align-items:baseline;gap:16px;min-height:0!important;padding:12px 14px!important;border-radius:0!important;background:none!important;box-shadow:none!important;border-bottom:1px solid var(--u-line)!important;text-align:left}
+html:not(#u):not(#v) body .lv-dialog .lv-opt:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 7%,transparent),transparent 70%)!important;box-shadow:none!important}
+html:not(#u):not(#v) body .lv-dialog .lv-opt.active{background:linear-gradient(90deg,rgba(200,47,59,.18),transparent 70%)!important;box-shadow:inset 3px 0 0 #c82f3b!important}
+html:not(#u):not(#v) body .lv-dialog .lv-seal{font-size:26px!important;line-height:1}
+html:not(#u):not(#v) body .lv-dialog .lv-opt b{font-family:var(--g-serif,serif);font-size:16px}
+html:not(#u):not(#v) body .lv-dialog .lv-opt small{margin:0!important}
