@@ -1,5 +1,5 @@
 @echo off
-rem MeguLitHook32.dll from E:\Apps\work\megulithook\src (LunaHook + MeguLit changes; BGI.cpp, Siglus.cpp and Yuris.cpp
+rem MeguLitHook32.dll from E:\Apps\work\megulithook\src (LunaHook + MeguLit changes; BGI.cpp, Siglus.cpp, Yuris.cpp and Pal.cpp
 rem here are the changed engine files). Toolchain: the VS 2022 build tools in E:\Apps\build-tools, ATL headers and the
 rem x86 atls.lib from get-atl-x64.py / get-atl-x86.py (Microsoft's VS package feed, SHA-256 checked), MinHook from
 rem preserved\source\lunahoook-adapted\third_party. The DLL lands in src\NativeImpl\LunaHook\builds\Release_win10.
