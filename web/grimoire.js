@@ -325,8 +325,10 @@ export function fieldify(grid,filtered=false){
   lastLayout=now;layoutX=x;layoutY=y;layoutZoom=z;plane.style.transform='';
   const firstCol=Math.max(filtered?0:-Infinity,Math.floor((x-cx/z)/cw)-1);
   const lastCol=Math.min(filtered?cols-1:Infinity,Math.ceil((x+cx/z)/cw)+1);
-  const firstRow=Math.max(filtered?0:-Infinity,Math.floor((y-cy/z)/ch)-1);
-  const lastRow=Math.min(filtered?rows-1:Infinity,Math.ceil((y+cy/z)/ch)+1);
+  const firstRow=Math.max(filtered?0:-Infinity,Math.floor((y-Math.max(cy,height-cy)/z)/ch)-1);
+  /* E426 (player: simple -> wall drew only the top two rows): rows below the capsule run to the host's bottom edge, not
+    to a mirror of the space above it; mid-switch the capsule is still gliding up and podY was small */
+ const lastRow=Math.min(filtered?rows-1:Infinity,Math.ceil((y+Math.max(cy,height-cy)/z)/ch)+1);
   const radius=Math.hypot(cx,cy)||1,pw=podWidth/2+cardWidth*z*.55,ph=podHeight/2+cardHeight*z*.6;
   for(const [key,cell] of cells){
    if(cell.col>=firstCol&&cell.col<=lastCol&&cell.row>=firstRow&&cell.row<=lastRow)continue;
@@ -463,8 +465,11 @@ export function fieldify(grid,filtered=false){
  // E218 (user): on first open the search bar sits in the gap just above the most recent games, which run centred under it.
  if(!filtered&&!fieldState.placed){const across=Math.max(1,Math.floor(width/cw));fieldState.x=(Math.min(across,cols)-1)*cw/2;fieldState.y=-ch/2;fieldState.placed=true;}
  paint(performance.now());
+ /* E426 measure again once layout has settled: two frames after mounting, and when the capsule's switch glide ends */
+ let settle=requestAnimationFrame(()=>{settle=requestAnimationFrame(()=>{settle=0;measure();queue();});});
+ pod?.addEventListener('transitionend',()=>{measure();queue();},{signal});
  fieldStop=()=>{
-  events.abort();ro.disconnect();cancelAnimationFrame(raf);
+  events.abort();ro.disconnect();cancelAnimationFrame(raf);cancelAnimationFrame(settle);
   host.classList.remove('dragging','field-fast','field-moving');plane.style.filter='';
   fieldStop=()=>{};
  };

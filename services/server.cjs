@@ -22,4 +22,5 @@ setTimeout(()=>{if(!closing)runtime.ankiProcess().auto().catch(()=>{});},1500).u
 /* E361 read library games' scripts in a worker thread, a while after start */
 try{require('./script-prewarm.cjs').start(root,{onDone:()=>{if(!closing)reply({event:'library-updated',data:{}});}});}catch{}
 input.on('line',line=>{handle(line).catch(()=>{});});
-input.on('close',()=>{closing=true;runtime.stop().finally(()=>process.exit(0));});
+/* E426 the host is gone once stdin closes: a stop that never settles must not leave node.exe and its bridges behind */
+input.on('close',()=>{closing=true;setTimeout(()=>process.exit(0),6000).unref();runtime.stop().finally(()=>process.exit(0));});
