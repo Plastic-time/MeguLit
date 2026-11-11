@@ -42,7 +42,7 @@ const ADAPTERS={
   read:dir=>{const scenes=bgi.scan(dir),lines=scenes.flatMap(x=>x.lines),ruby=scenes.some(x=>x.ruby?.some(Boolean))?scenes.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;return {engine:'bgi',version:0,codepage:'shift_jis',lines,ruby,structure:{messages:lines.length,functions:scenes.length,functionHash:crypto.createHash('sha256').update(scenes.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
   fingerprint:dir=>crypto.createHash('sha256').update('bgi-code-order\n'+fs.readdirSync(dir).filter(f=>/^data0\d{4}\.arc$/i.test(f)).sort().map(f=>{const st=fs.statSync(path.join(dir,f));return f+'|'+st.size+'|'+st.mtimeMs;}).join('\n')).digest('hex')}};
 // E280: engines read as scene files (KiriKiri, Artemis, Ren'Py); their script is the game folder like BGI's.
-const scenes=require('./original-engines/scenes.cjs');
+const scenes=require('./original-engines/scenes.cjs'),fillLines=require('./original-engines/fill.cjs');
 for(const id of Object.keys(scenes.ENGINES))ADAPTERS[id]={folder:true,scene:true,locate:dir=>scenes.readable(id,dir)?{engine:id,target:dir}:null,
  read:dir=>{const list=scenes.read(id,dir),lines=list.flatMap(x=>x.lines),ruby=list.some(x=>x.ruby)?list.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;return {engine:id,version:0,codepage:'text',lines,ruby,structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
  fingerprint:dir=>scenes.fingerprint(id,dir)};
@@ -179,6 +179,8 @@ function buildPatch(runningState,source){
     return scene;});
   }
   list=list.map((scene,i)=>scene.patched?{...scene,lines:scene.lines.map((t,k)=>japaneseLine(t)?base[i].lines[k]:t)}:scene);
+  // E449 lines the patch keeps in Japanese (or scenes it never touched) take the filled translation, marked as ours.
+  let filledLines=0;list=list.map((scene,i)=>{const own=base[i];if(!own)return scene;const src=[];const out=scene.lines.map((t,k)=>{const ja=own.lines[k];if(t!==ja||!japaneseLine(ja)){src[k]=scene.patched&&t!==ja?'release':'';return t;}const f=fillLines.lookup(ja);if(f&&f.zh){filledLines++;src[k]='filled';return f.zh;}src[k]=f?f.source:'';return t;});return {...scene,lines:out,zhSource:src};});
   const lines=list.flatMap(x=>x.lines);patched=list.filter(x=>x.patched).length;if(!patched)throw Error('PATCH_SCRIPT_NOT_FOUND');
   translated=list.filter(x=>x.patched).flatMap(x=>x.lines);
   script={engine,version:0,codepage:'text',lines,structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};
