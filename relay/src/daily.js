@@ -171,7 +171,7 @@ export const GLOSS_MODEL='@cf/qwen/qwen3-30b-a3b-fp8',GLOSS_FALLBACK='@cf/qwen/q
 /* E415 (user: 「ゴリ = 网红」 reads as if the word meant 网红): every note says what kind of thing the word is.
    type: 词语 (an ordinary word: note = its meaning) or 人名 / 组织 / 作品 / 地名 / 商品 / 事件 (a proper noun: note =
    who or what it is, never the name itself). The page shows the type as a small tag beside the note. */
-export const GLOSS_PROMPT='你是给中国读者看的日语词汇注释员。对每个日语词，结合给出的新闻标题，先判断类型，再写不超过16个字的简体中文说明。类型只能是：词语、人名、组织、作品、地名、商品、事件。词语：说明写中文词义（例：上場廃止→退市）。人名：说明写这个人是谁，国籍或领域加身份（例：ゴリ→日本网红（YouTuber），岡本和真→日本职业棒球选手），绝对不能只写名字本身或它的中文写法。组织、作品、地名、商品、事件：说明写它是什么（例：海ほたる→东京湾跨海公路的休息站）。身份和类型以给出的新闻标题为准（标题写「経済評論家の○○氏」就写经济评论家）；标题里没有线索又不确定时，人名只写「日本人物」，不要猜职业。必须全部使用简体中文，不能出现日文假名。只输出 JSON 数组，顺序与输入一致，每项形如 {"type":"人名","note":"日本网红（YouTuber）"}，不要输出其他内容。';
+export const GLOSS_PROMPT='你是给中国读者看的日语词汇注释员。对每个日语词，结合给出的新闻标题，先判断类型，再写不超过16个字的简体中文说明。类型只能是：词语、人名、组织、作品、地名、商品、事件。词语：说明写中文词义（例：上場廃止→退市）。人名：说明写这个人是谁，国籍或领域加身份（例：ゴリ→日本网红（YouTuber），岡本和真→日本职业棒球选手），绝对不能只写名字本身或它的中文写法。组织、作品、地名、商品、事件：说明写它是什么（例：海ほたる→东京湾跨海公路的休息站）。身份和类型以给出的新闻标题为准，要充分利用标题里的线索：标题写「経済評論家の○○氏」就写经济评论家；标题里出现比赛、项目或行业（MotoGP、F1、NPB、独立リーグ、オーナー、YouTuber、芥川賞 等）就据此写具体身份（例：日本摩托车赛车手、F1车队老板、日本职业棒球选手）。只有标题里完全没有线索又不确定时，人名才写「日本人物」，不要凭空猜职业。类型必须和说明一致：说明是球队、公司、机构、团体就选组织；是人就选人名；是动画、漫画、游戏、电影、歌曲就选作品。必须全部使用简体中文，不能出现日文假名。只输出 JSON 数组，顺序与输入一致，每项形如 {"type":"人名","note":"日本网红（YouTuber）"}，不要输出其他内容。';
 export const GLOSS_RETRY='上一次的说明只重复了名字，没有说明是什么。请重新判断类型并写说明：人名写国籍或领域加身份（例：日本职业棒球选手、日本女演员、日本网红（YouTuber）），其他专有名词写它是什么。绝对不能只写名字本身、它的中文写法或音译。必须用简体中文。只输出 JSON 数组，每项形如 {"type":"人名","note":"日本职业棒球选手"}。';
 const KINDS={'词语':'word','普通词':'word','词汇':'word','人名':'person','人物':'person','组织':'org','团体':'org','公司':'org','企业':'org','作品':'work','地名':'place','地点':'place','设施':'place','商品':'product','产品':'product','事件':'event'};
 export const KIND_IDS=['word','person','org','work','place','product','event'];
@@ -188,12 +188,15 @@ const KANA_RE=/[\u3040-\u309f\u30a0-\u30ff]/;
 function kindOf(v){const t=v&&typeof v==='object'?String(v.type??v['类型']??v.kind??'').trim():'';return KINDS[t]||(KIND_IDS.includes(t)?t:'');}
 /* [{kind,gloss}] from any answer shape; notes with kana are dropped (Japanese, not a Chinese gloss), a leading
    「人名，」 is cut because the type is shown as a tag */
+/* the type must agree with the note (金沢ドラゴンクロス: 作品 + 棒球队 → 组织) */
+const KIND_BY_NOTE=[['org',/(球队|俱乐部|公司|企业|集团|机构|团体|组织|协会|联盟|政党|党$|大学|学校|医院|银行|事务所|乐队|组合$)/],['person',/(选手|演员|艺人|歌手|偶像|政治家|议员|大臣|首相|作家|漫画家|主播|网红|评论家|运动员|车手|教练|导演|社长|老板|模特|声优|主持人)/],['work',/(动画|漫画|游戏|电影|电视剧|剧集|小说|歌曲|专辑|作品)$/]];
+export function fixKind(kind,note){if(!note||kind==='word')return kind;for(const [k,re] of KIND_BY_NOTE)if(re.test(note))return k;return kind;}
 export function parseNotes(text,count){
  let list=Array.isArray(text)?text:null;
  if(!list){const raw=String(text||'').replace(/<think>[\s\S]*?<\/think>/g,'');const m=raw.match(/\[[\s\S]*\]/);if(!m)return [];try{list=JSON.parse(m[0]);}catch{return [];}}
  if(!Array.isArray(list))return [];
  return list.slice(0,count).map(v=>{const kind=kindOf(v);let g=glossOf(typeof v==='object'&&v?{...v,type:undefined,'类型':undefined,kind:undefined}:v).replace(/[\r\n]+/g,' ').trim();
-  g=g.replace(/^(?:词语|人名|人物|组织|团体|作品|地名|地点|商品|产品|事件)\s*[，,：:]\s*/,'').slice(0,30);return {kind,gloss:KANA_RE.test(g)?'':g};});
+  g=g.replace(/^(?:词语|人名|人物|组织|团体|作品|地名|地点|商品|产品|事件)\s*[，,：:]\s*/,'').slice(0,30);if(KANA_RE.test(g))g='';return {kind:fixKind(kind,g),gloss:g};});
 }
 export function parseGlosses(text,count){return parseNotes(text,count).map(n=>n.gloss);}
 /* a note that only restates the name (岡本和真 → 冈本和真) says nothing: it shares most of its characters with the

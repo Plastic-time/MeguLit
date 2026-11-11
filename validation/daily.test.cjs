@@ -273,3 +273,10 @@ test('hot-word notes read every related headline as context',async()=>{
  try{const r=await d.hotWordsDailyGet(e,new URL('https://x/api/hotwords/daily'),{json:v=>v,fail:c=>c},new Date('2026-11-11T00:10:00Z'));assert.equal(r.words[0].gloss,'日本经济评论家');}finally{globalThis.fetch=real;}
  assert.match(user,/経済評論家の豊島逸夫氏が金価格を解説 ／ 金相場、最高値更新/);assert.match(prompt,/以给出的新闻标题为准/);
 });
+
+test('hot-word notes: the type follows the note, the prompt asks to use headline clues',async()=>{
+ const d=await load('daily.js');
+ assert.equal(d.fixKind('work','日本棒球独立联盟球队'),'org');assert.equal(d.fixKind('org','日本摩托车赛车手'),'person');assert.equal(d.fixKind('person','日本人物'),'person');assert.equal(d.fixKind('word','棒球队'),'word');
+ assert.deepEqual(d.parseNotes([{type:'作品',note:'日本棒球独立联盟球队'}],1),[{kind:'org',gloss:'日本棒球独立联盟球队'}]);
+ assert.match(d.GLOSS_PROMPT,/MotoGP、F1/);assert.match(d.GLOSS_PROMPT,/类型必须和说明一致/);
+});
