@@ -155,3 +155,8 @@ test('without the deck the grammar page offers it on AnkiWeb, with a notice that
  assert.doesNotMatch(g.listHTML({progress:{}},{locale:'zh',esc,level:'N5',anki:null}),/data-anki-get/,'nothing while still reading');
  assert.match(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),/'ankiweb\.net'\]\.includes\(url\.hostname\)/,'the page may open AnkiWeb');
 });
+
+test('the 五十音 voice choice (女声 / 男声 / AI 合成) can be changed and is kept',()=>{
+ const K=require('../services/kana.cjs');assert.equal(K.clean({prefs:{voice:'male'}}).prefs.voice,'male');assert.equal(K.clean({prefs:{voice:'ai'}}).prefs.voice,'ai');assert.equal(K.clean({prefs:{voice:'x'}}).prefs.voice,'female');
+ const src=fs.readFileSync(path.join(__dirname,'..','web','kana','kana.js'),'utf8');assert.match(src,/ctx\.store\.put\(KEY\.p,\{\.\.\.p,voice:b\.dataset\.voice\}\)/);assert.doesNotMatch(src,/ctx\.store\.set\(/,'the store has get/put, no set');
+});
