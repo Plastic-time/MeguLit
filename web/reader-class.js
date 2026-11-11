@@ -16,12 +16,12 @@ export function readerLevel(stats,element=''){
  return {level:SCHOOL_LEVEL,into:0,need:XP_STEP,xp:cap,pending:xp-cap,locked:true};
 }
 /* 2026-11-12 (user: not so chuunibyou; think DNF and Mushoku Tensei): before 转职 the plain rank ladder — 见习 → 初级 → 中级 →
-   上级魔术师 → 转职候补; at Lv.20 a DNF-style job name for the element, then its Saint / King / Emperor / God ranks
+   上级魔术师 (which it stays at until 转职); at Lv.20 a DNF-style job name for the element, then its Saint / King / Emperor / God ranks
    (火圣级魔术师 …), and at Lv.80 one title of its own; fire alone goes four ranks further, 爆裂魔法初学者 → 爆裂魔法师 at Lv.120. Each element is described by the reading style
    it suits, plainly. No 魔导士, no 红魔族, no 练习生. */
-const BASE={zh:[[1,'见习魔术师'],[5,'初级魔术师'],[10,'中级魔术师'],[15,'上级魔术师'],[20,'转职候补']],
- ja:[[1,'見習い魔術師'],[5,'初級魔術師'],[10,'中級魔術師'],[15,'上級魔術師'],[20,'転職候補']],
- en:[[1,'Apprentice magician'],[5,'Beginner-rank magician'],[10,'Intermediate-rank magician'],[15,'Advanced-rank magician'],[20,'Class candidate']]};
+const BASE={zh:[[1,'见习魔术师'],[5,'初级魔术师'],[10,'中级魔术师'],[15,'上级魔术师']],
+ ja:[[1,'見習い魔術師'],[5,'初級魔術師'],[10,'中級魔術師'],[15,'上級魔術師']],
+ en:[[1,'Apprentice magician'],[5,'Beginner-rank magician'],[10,'Intermediate-rank magician'],[15,'Advanced-rank magician']]};
 const STEPS=[20,30,40,50,65,80];
 /* 2026-11-12 (user): fire goes four ranks further than every other element — from 爆裂魔法初学者 at Lv.80 to 爆裂魔法师 at Lv.120 */
 const FIRE_STEPS=[...STEPS,90,100,110,120];
