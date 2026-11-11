@@ -256,6 +256,10 @@ async function dispatch(request,runtime=null) {
       case 'leaderboard_report':return await require('./leaderboard.cjs').report(root,String(request.avatar||''));
       case 'leaderboard_join':{const lb=require('./leaderboard.cjs');lb.join(root,{name:request.name,shareGames:request.shareGames===true,consent:request.consent===true,requireAccount:true});return await lb.view(root,db,{period:String(request.period||''),metric:String(request.metric||''),submit:true});}
       /* E394 Settings → 个人主页 reads the switch, nickname and sharing without fetching the board */
+      /* 2026-11-12 转职: the reader's chosen school of magic (from Lv.20), kept in data/config/reader-class.json; changing
+         it again is allowed and touches nothing else */
+      case 'reader_class_get':{try{const v=JSON.parse(fs.readFileSync(path.join(root,'data','config','reader-class.json'),'utf8'));return {school:typeof v.school==='string'?v.school:'',at:Number(v.at)||0};}catch{return {school:'',at:0};}}
+      case 'reader_class_set':{const school=String(request.school||'');if(!['','explosion','frost','healing','summon'].includes(school))throw new Error('READER_CLASS_INVALID');const dir=path.join(root,'data','config');fs.mkdirSync(dir,{recursive:true});const file=path.join(dir,'reader-class.json'),tmp=file+'.tmp';fs.writeFileSync(tmp,JSON.stringify({school,at:Math.floor(Date.now()/1000)}));fs.renameSync(tmp,file);return {school};}
       case 'leaderboard_profile':{const c=require('./leaderboard.cjs').config(root);return {configured:c.configured,joined:c.joined,enabled:c.enabled,name:c.name,shareGames:c.shareGames,account:c.account};}
       /* E397 profiles, follows, 同好, reports */
       case 'leaderboard_profile_get':return await require('./leaderboard.cjs').profileGet(root);

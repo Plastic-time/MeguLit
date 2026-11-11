@@ -7,6 +7,7 @@
 import {mountEmailLogin} from './account-ui.js';
 import {mountProfileSettings} from './profile-settings.js';
 import {cropAvatarFile,pickImageFile} from './avatar-crop.js';
+import {rankTitle,SCHOOLS,SCHOOL_LEVEL,classWords,openRite} from './reader-class.js';
 const T={
  zh:{title:'个人主页',close:'关闭',joinTitle:'注册 / 登录 MeguLit 账号',joinText:'用邮箱收一个 6 位验证码就能登录，第一次登录就是注册，不用密码',
   perks:['公开个人主页：头像、签名、最喜欢的游戏','关注别的读者，看他们最近在玩什么，找到同好','参加排行榜，几台电脑合并成一行','云同步单词、收藏的句子和阅读记录'],
@@ -23,8 +24,8 @@ const HERO={zh:{time:'累计阅读',chars:'读过的字',words:'收录单词',st
  ja:{time:'累計読書',chars:'読んだ文字',words:'登録単語',streak:'最長連続',days:'日',fav:'お気に入りのゲーム',noBio:'ひとことはまだありません',pick:'アイコンを変更',rename:'ニックネームを変更',checking:'アイコン審査中',rejected:'アイコンが審査を通過しませんでした',joining:'アイコンを設定するとランキングにも参加します',saved:'保存しました',offline:'オンラインサービスに接続できません',xp:'経験値',h:'時間',m:'分'},
  en:{time:'Time read',chars:'Characters',words:'Words saved',streak:'Best streak',days:'days',fav:'Favourite games',noBio:'No signature yet',pick:'Change picture',rename:'Rename',checking:'Picture being checked',rejected:'Picture not approved; try another',joining:'Setting a picture also joins the leaderboard',saved:'Saved',offline:'Cannot reach the online service',xp:'XP',h:'h',m:'min'}};
 async function heroData(api){
- const [board,prof,view,pic]=await Promise.all([api('leaderboard_profile',{}).catch(()=>null),api('leaderboard_profile_get',{}).catch(()=>null),api('leaderboard_view',{period:'all',metric:'seconds'}).catch(()=>null),api('leaderboard_avatar_status').catch(()=>null)]);
- return {board,pic:pic?.state==='ok'?pic:null,name:board?.name||'',bio:prof?.state==='ok'?prof.bio:'',favorites:prof?.state==='ok'?(prof.favorites||[]):[],stats:view?.local?.stats?.all||null,streak:view?.local?.currentStreak};
+ const [board,prof,view,pic,cls]=await Promise.all([api('leaderboard_profile',{}).catch(()=>null),api('leaderboard_profile_get',{}).catch(()=>null),api('leaderboard_view',{period:'all',metric:'seconds'}).catch(()=>null),api('leaderboard_avatar_status').catch(()=>null),api('reader_class_get').catch(()=>null)]);
+ return {board,school:SCHOOLS[cls?.school]?cls.school:'',pic:pic?.state==='ok'?pic:null,name:board?.name||'',bio:prof?.state==='ok'?prof.bio:'',favorites:prof?.state==='ok'?(prof.favorites||[]):[],stats:view?.local?.stats?.all||null,streak:view?.local?.currentStreak};
 }
 
 /* 2026-11-12 (user: under the name, a rank and an experience bar instead of the signature). Experience comes from
@@ -32,16 +33,13 @@ async function heroData(api){
    five levels come quickly (100, 150, 200, 250, 300), then every level costs the same 600 and there is no top level;
    the rank title moves up with the level. */
 const XP_EARLY=[100,150,200,250,300],XP_STEP=600;
-const RANKS={zh:[[1,'魔法见习生'],[3,'识字咒学徒'],[5,'魔法书抄写员'],[10,'咏唱练习生'],[15,'魔法阵描绘者'],[20,'元素见习术士'],[30,'咒文研究员'],[40,'高阶咏唱者'],[50,'大魔法使候补'],[65,'禁咒研读者'],[80,'爆裂魔法学徒']],
- ja:[[1,'魔法見習い'],[3,'文字呪文の徒弟'],[5,'魔導書の写字生'],[10,'詠唱の練習生'],[15,'魔法陣の描き手'],[20,'元素術の見習い'],[30,'呪文研究員'],[40,'高位詠唱者'],[50,'大魔法使い候補'],[65,'禁呪の読み手'],[80,'爆裂魔法見習い']],
- en:[[1,'Magic novice'],[3,'Rune-reading pupil'],[5,'Grimoire copyist'],[10,'Chant trainee'],[15,'Circle drawer'],[20,'Elemental apprentice'],[30,'Spell scholar'],[40,'High chanter'],[50,'Archmage candidate'],[65,'Forbidden-spell reader'],[80,'Explosion apprentice']]};
+
 export function readerLevel(stats){
  const st=stats||{};let xp=Math.floor((Number(st.characters)||0)/50)+Math.floor((Number(st.seconds)||0)/60)*2+(Number(st.words)||0)*10;
  const total=xp;let level=1;
  for(const cost of XP_EARLY){if(xp<cost)return {level,xp:total,into:xp,need:cost};xp-=cost;level++;}
  const more=Math.floor(xp/XP_STEP);return {level:level+more,xp:total,into:xp-more*XP_STEP,need:XP_STEP};
 }
-const rankTitle=(level,locale)=>{const list=RANKS[locale]||RANKS.zh;let t=list[0][1];for(const [at,name] of list)if(level>=at)t=name;return t;};
 export const panelWords=locale=>T[locale]||T.zh;
 let current=null;
 /* opens (or brings back) the panel; onClose runs once when it closes, e.g. to refresh the 排行榜 page */
@@ -76,7 +74,7 @@ export async function openProfilePanel({api,locale,esc,toast,onClose=()=>{},open
   const nf=new Intl.NumberFormat({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale]||'zh-CN'),st=d.stats||{},sec=Number(st.seconds)||0;
   const time=sec>=3600?`${Math.floor(sec/3600)}<small>${h.h}</small>${Math.floor(sec%3600/60)}<small>${h.m}</small>`:`${Math.floor(sec/60)}<small>${h.m}</small>`;
   const lv=readerLevel(d.stats);const initial=esc([...(d.name||'?')][0]||'?');
-  hero.innerHTML=`<div class="profile-hero-id"><button type="button" class="profile-hero-avatar" data-hero-avatar title="${h.pick}" aria-label="${h.pick}">${d.pic?.image&&d.pic.status==='approved'?`<img src="${esc(d.pic.image)}" alt="">`:initial}<span class="profile-hero-avatar-edit" aria-hidden="true">${h.pick}</span></button><div class="profile-hero-who"><h3><button type="button" class="profile-hero-name" data-hero-name title="${h.rename}">${esc(d.name||'')}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11.5V13h1.5l6.8-6.8-1.5-1.5L3 11.5zm9.7-6.2a.6.6 0 000-.9l-1-1a.6.6 0 00-.9 0l-.8.8 1.9 1.9.8-.8z"/></svg></button></h3>${d.pic&&['pending','rejected'].includes(d.pic.status)?`<small class="profile-hero-note" data-status="${esc(d.pic.status)}">${d.pic.status==='pending'?h.checking:h.rejected}</small>`:''}<div class="profile-rank"><span class="profile-rank-lv">Lv.<b>${lv.level}</b></span><span class="profile-rank-name">${esc(rankTitle(lv.level,locale))}</span><span class="profile-rank-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${lv.need}" aria-valuenow="${lv.into}" aria-label="${h.xp}"><i style="--p:${(lv.into/lv.need*100).toFixed(1)}%"></i></span><span class="profile-rank-xp">${nf.format(lv.into)} / ${nf.format(lv.need)} ${h.xp}</span></div></div></div>
+  hero.innerHTML=`<div class="profile-hero-id"><button type="button" class="profile-hero-avatar" data-hero-avatar title="${h.pick}" aria-label="${h.pick}">${d.pic?.image&&d.pic.status==='approved'?`<img src="${esc(d.pic.image)}" alt="">`:initial}<span class="profile-hero-avatar-edit" aria-hidden="true">${h.pick}</span></button><div class="profile-hero-who"><h3><button type="button" class="profile-hero-name" data-hero-name title="${h.rename}">${esc(d.name||'')}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11.5V13h1.5l6.8-6.8-1.5-1.5L3 11.5zm9.7-6.2a.6.6 0 000-.9l-1-1a.6.6 0 00-.9 0l-.8.8 1.9 1.9.8-.8z"/></svg></button></h3>${d.pic&&['pending','rejected'].includes(d.pic.status)?`<small class="profile-hero-note" data-status="${esc(d.pic.status)}">${d.pic.status==='pending'?h.checking:h.rejected}</small>`:''}<div class="profile-rank"><span class="profile-rank-lv">Lv.<b>${lv.level}</b></span><span class="profile-rank-name">${d.school&&lv.level>=SCHOOL_LEVEL?`<i class="profile-school" style="--c:${SCHOOLS[d.school].color}">${esc(SCHOOLS[d.school].name[locale]||SCHOOLS[d.school].name.zh)}</i>`:''}${esc(rankTitle(lv.level,locale,d.school))}${lv.level>=SCHOOL_LEVEL?`<button type="button" class="profile-class-go" data-class-go>${d.school?classWords(locale).again:classWords(locale).open}</button>`:`<small class="profile-class-locked">${classWords(locale).locked(SCHOOL_LEVEL)}</small>`}</span><span class="profile-rank-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${lv.need}" aria-valuenow="${lv.into}" aria-label="${h.xp}"><i style="--p:${(lv.into/lv.need*100).toFixed(1)}%"></i></span><span class="profile-rank-xp">${nf.format(lv.into)} / ${nf.format(lv.need)} ${h.xp}</span></div></div></div>
 <dl class="profile-hero-figs"><div><dt>${h.time}</dt><dd>${time}</dd></div><div><dt>${h.chars}</dt><dd>${nf.format(Number(st.characters)||0)}</dd></div><div><dt>${h.words}</dt><dd>${nf.format(Number(st.words)||0)}</dd></div><div><dt>${h.streak}</dt><dd>${nf.format(Number(st.streak)||0)}<small>${h.days}</small></dd></div></dl>
 ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.favorites.map(f=>`<li>${esc(f.title||f)}</li>`).join('')}</ol></div>`:''}`;
   bindHero(hero,d,h);
@@ -96,6 +94,7 @@ ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.fav
    }catch(e){toast(String(e?.message||h.offline));}
    await paintHero(hero);
   };
+  hero.querySelector('[data-class-go]')?.addEventListener('click',()=>openRite({api,locale,esc,toast,current:d.school,onDone:()=>paintHero(hero)}));
   const nameBtn=hero.querySelector('[data-hero-name]');
   nameBtn.onclick=()=>{
    const input=document.createElement('input');input.type='text';input.maxLength=16;input.value=d.name||'';input.className='profile-hero-name-input';input.setAttribute('aria-label',h.rename);
