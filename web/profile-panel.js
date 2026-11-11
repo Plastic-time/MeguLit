@@ -85,7 +85,7 @@ ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.fav
    await paintHero(hero);
   };
   const lv0=readerLevel(d.stats,d.school);
-  hero.querySelector('[data-class-go]')?.addEventListener('click',()=>openRite({api,locale,esc,toast,current:d.school,pending:lv0.pending,onDone:()=>paintHero(hero)}));
+  hero.querySelector('[data-class-go]')?.addEventListener('click',()=>openRite({api,locale,esc,toast,current:d.school,pending:lv0.pending,xpTotal:lv0.xp+lv0.pending,onDone:()=>paintHero(hero)}));
   const nameBtn=hero.querySelector('[data-hero-name]');
   nameBtn.onclick=()=>{
    const input=document.createElement('input');input.type='text';input.maxLength=16;input.value=d.name||'';input.className='profile-hero-name-input';input.setAttribute('aria-label',h.rename);

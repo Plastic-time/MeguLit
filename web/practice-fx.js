@@ -22,12 +22,12 @@ function scarsOf(box){
 function center(el){const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};}
 async function blast(el){
  const box=scope(el),{x,y}=center(el);
- await explosion(x,y,{shake:box});
+ await explosion(x,y,{shake:box,bar:document.querySelector('header.titlebar')});
  if(!box.isConnected)return;
  const svg=scarsOf(box),b=box.getBoundingClientRect(),seed=Math.floor(Math.random()*2147483646)+1;
  const g=document.createElementNS(NS,'g');g.setAttribute('class','fx-scar');
  const R=13+Math.random()*9;
- g.innerHTML=scarMarkup(seed,x-b.left,y-b.top,R,R*2.2+Math.random()*30,4+Math.floor(Math.random()*3));
+ g.innerHTML=scarMarkup(seed,x-b.left,y-b.top,R,R*2.2+Math.random()*30,4+Math.floor(Math.random()*3));g.classList.add('is-hot');setTimeout(()=>g.classList.remove('is-hot'),2600);
  svg.append(g);
  const all=svg.querySelectorAll('g.fx-scar:not(.is-gone)');if(all.length>MAX)mend(all[0]);
  debris(x,y+R*.4,{n:16,spread:1.3,up:.9,tint:'ash'});

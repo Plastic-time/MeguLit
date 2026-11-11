@@ -12,7 +12,7 @@ const toast=text=>{const t=document.getElementById('toast');if(!t)return;t.textC
 let due=false,nudged=false,state=null;
 function dot(){for(const b of document.querySelectorAll('[data-top-me]'))b.classList.toggle('has-class-due',due);}
 function rite(headline=''){
- openRite({api:call,locale:loc(),esc,toast,current:state?.element||'',pending:state?.pending||0,headline,onDone:()=>{due=false;dot();document.querySelector('.class-nudge')?.remove();}});
+ openRite({api:call,locale:loc(),esc,toast,current:state?.element||'',pending:state?.pending||0,xpTotal:(state?.xp||0)+(state?.pending||0),headline,onDone:()=>{due=false;dot();document.querySelector('.class-nudge')?.remove();}});
 }
 function nudge(){
  if(nudged||document.querySelector('.class-nudge'))return;nudged=true;

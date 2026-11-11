@@ -51,30 +51,68 @@ export function debris(x,y,{n=10,spread=1,up=.6,tint='glass'}={}){
  dust.animate([{transform:'translate(-50%,-50%) scale(.3)',opacity:.55},{transform:'translate(-50%,-30%) scale(1.8)',opacity:0}],{duration:900,easing:'cubic-bezier(.2,.7,.3,1)',fill:'forwards'});later(dust,950);
 }
 
-/* 爆裂魔法: a red seal draws itself, a white core flash, a fireball, the shock ring and sparks; the frame shakes */
-export function explosion(x,y,{shake}={}){
+/* 爆裂魔法, refined (user: too rough). Beats: 0–650 ms a seal charges — three rings and a star draw themselves while
+   embers are drawn in from all around and the glow grows; 600 ms a thin pillar of light drops from the top of the
+   window onto the point; 700 ms impact — a white flash, the fireball, a sharp shock ring and a slower dust ring, a
+   spray of sparks under gravity, the frame shakes; then smoke climbs into a faint mushroom and embers drift up. The
+   promise resolves at the impact so the caller can cut the pit and throw the chips. */
+function sparkField(){let c=document.querySelector('body>.fx-layer>canvas.fx-sparks');if(!c){c=document.createElement('canvas');c.className='fx-sparks';layer().append(c);}const dpr=Math.min(2,devicePixelRatio||1);if(c.width!==innerWidth*dpr||c.height!==innerHeight*dpr){c.width=innerWidth*dpr;c.height=innerHeight*dpr;}return {c,ctx:c.getContext('2d'),dpr};}
+let live=[],running=false;
+function runSparks(){if(running)return;running=true;let prev=performance.now();
+ const step=now=>{const dt=Math.min(.04,(now-prev)/1000);prev=now;const f=sparkField();if(!f.ctx){running=false;return;}const {ctx,dpr}=f;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,innerWidth,innerHeight);ctx.globalCompositeOperation='lighter';
+  live=live.filter(p=>{p.t+=dt;if(p.t>p.life)return false;
+   if(p.kind==='in'){const k=Math.min(1,p.t/p.life),e=k*k;p.x=p.x0+(p.tx-p.x0)*e;p.y=p.y0+(p.ty-p.y0)*e;}
+   else{p.vx*=1-p.drag*dt;p.vy=p.vy*(1-p.drag*dt)+p.g*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;}
+   const k=p.t/p.life,a=p.kind==='in'?Math.min(1,k*4)*(1-k*.3):1-k,hot=1-k;
+   ctx.globalAlpha=a;ctx.fillStyle=p.kind==='ember'?`rgb(255,${Math.round(120+110*hot)},${Math.round(60*hot)})`:p.kind==='in'?p.color:`rgb(255,${Math.round(180+75*hot)},${Math.round(120+120*hot)})`;
+   if(p.kind==='fire'){const r=p.s*(1+k*2.6),c=k<.15?[255,250,230]:k<.35?[255,214,140]:k<.6?[255,130,60]:k<.8?[170,50,40]:[70,50,50];const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);g.addColorStop(0,`rgba(${c},${.55*Math.pow(1-k,1.3)})`);g.addColorStop(1,`rgba(${c},0)`);ctx.globalAlpha=1;ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();return true;}
+   if(p.kind==='spark'){ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=p.s;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.vx*.03,p.y-p.vy*.03);ctx.stroke();}
+   else{ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,Math.PI*2);ctx.fill();ctx.globalAlpha=a*.25;ctx.beginPath();ctx.arc(p.x,p.y,p.s*4,0,Math.PI*2);ctx.fill();}
+   return true;});
+  if(live.length)requestAnimationFrame(step);else{ctx.clearRect(0,0,innerWidth,innerHeight);running=false;}};
+ requestAnimationFrame(step);}
+const anim=(el,frames,opts)=>el.animate(frames,{fill:'forwards',...opts});
+export function explosion(x,y,{shake,bar}={}){
  if(calm)return Promise.resolve();
  const l=layer(),w=document.createElement('div');w.className='fx-explosion';w.style.cssText=`left:${x}px;top:${y}px`;
- w.innerHTML=`<svg class="fx-seal" viewBox="-60 -60 120 120"><circle r="54"/><circle r="44"/><path d="${Array.from({length:5},(_,i)=>{const a=-Math.PI/2+i*Math.PI*4/5;return `${i?'L':'M'}${f1(Math.cos(a)*44)} ${f1(Math.sin(a)*44)}`;}).join(' ')}Z"/>${Array.from({length:12},(_,i)=>`<text transform="rotate(${i*30}) translate(0 -49)">${'爆裂紅魔我が名はめぐみん'[i]}</text>`).join('')}</svg><b class="fx-core"></b><b class="fx-fire"></b><b class="fx-ring"></b>`;
+ const star=Array.from({length:5},(_,i)=>{const a=-Math.PI/2+i*Math.PI*4/5;return `${i?'L':'M'}${f1(Math.cos(a)*46)} ${f1(Math.sin(a)*46)}`;}).join(' ')+'Z';
+ w.innerHTML=`<svg class="fx-seal" viewBox="-70 -70 140 140"><circle pathLength="1" r="66"/><circle pathLength="1" r="58"/><path pathLength="1" d="${star}"/><circle pathLength="1" r="22"/>${Array.from({length:12},(_,i)=>`<text transform="rotate(${i*30}) translate(0 -61.5)">${'爆裂我が名は紅き魔の焔よ'[i]}</text>`).join('')}</svg>
+  <b class="fx-charge"></b><b class="fx-pillar"></b><b class="fx-core"></b><b class="fx-fire"></b><b class="fx-fire is-inner"></b><b class="fx-ring"></b><b class="fx-ring is-dust"></b>`;
  l.append(w);
- const seal=w.querySelector('.fx-seal'),core=w.querySelector('.fx-core'),fire=w.querySelector('.fx-fire'),ring=w.querySelector('.fx-ring');
- seal.animate([{transform:'translate(-50%,-50%) scale(.4) rotate(-40deg)',opacity:0},{transform:'translate(-50%,-50%) scale(1) rotate(0)',opacity:1,offset:.55},{transform:'translate(-50%,-50%) scale(1.25) rotate(25deg)',opacity:0}],{duration:620,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
- core.animate([{transform:'translate(-50%,-50%) scale(0)',opacity:0},{transform:'translate(-50%,-50%) scale(0)',opacity:0,offset:.42},{transform:'translate(-50%,-50%) scale(1.4)',opacity:1,offset:.5},{transform:'translate(-50%,-50%) scale(2.2)',opacity:0}],{duration:760,easing:'ease-out',fill:'forwards'});
- fire.animate([{transform:'translate(-50%,-50%) scale(0)',opacity:0},{transform:'translate(-50%,-50%) scale(0)',opacity:0,offset:.44},{transform:'translate(-50%,-50%) scale(1)',opacity:1,offset:.6},{transform:'translate(-50%,-50%) scale(1.5)',opacity:0}],{duration:980,easing:'cubic-bezier(.2,.8,.3,1)',fill:'forwards'});
- ring.animate([{transform:'translate(-50%,-50%) scale(.1)',opacity:0},{transform:'translate(-50%,-50%) scale(.1)',opacity:.9,offset:.46},{transform:'translate(-50%,-50%) scale(3.4)',opacity:0}],{duration:900,easing:'cubic-bezier(.1,.7,.3,1)',fill:'forwards'});
- for(let i=0;i<16;i++){const s=document.createElement('i');s.className='fx-spark';w.append(s);const a=Math.random()*Math.PI*2,d=60+Math.random()*120;
-  s.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:0},{opacity:1,offset:.5,transform:'translate(-50%,-50%) scale(1)'},{transform:`translate(calc(-50% + ${f1(Math.cos(a)*d)}px),calc(-50% + ${f1(Math.sin(a)*d+30)}px)) scale(.3)`,opacity:0}],{duration:900+Math.random()*300,easing:'cubic-bezier(.1,.7,.3,1)',fill:'forwards'});}
- later(w,1400);
- /* the aftermath: a faint mushroom of smoke climbs from the blast and drifts apart */
- const m=document.createElement('div');m.className='fx-mushroom';m.style.cssText=`left:${x}px;top:${y}px`;
- const puffs=[[0,0,34,30,'stem'],[0,-26,30,34,'stem'],[0,-58,26,30,'stem'],[-34,-92,62,46,'cap'],[30,-94,66,48,'cap'],[0,-108,80,54,'cap'],[-62,-80,44,34,'cap'],[60,-80,46,34,'cap']];
- m.innerHTML=puffs.map(([px,py,pw,ph,k])=>`<i class="is-${k}" style="left:${px}px;top:${py}px;width:${pw}px;height:${ph}px"></i>`).join('');l.append(m);
- m.querySelectorAll('i').forEach((p,i)=>{const cap=p.classList.contains('is-cap'),dx=(Math.random()-.5)*(cap?70:24);
-  p.animate([{transform:'translate(-50%,-50%) translateY(40px) scale(.3)',opacity:0},{transform:'translate(-50%,-50%) scale(1)',opacity:1,offset:.3},{transform:`translate(calc(-50% + ${f1(dx)}px),calc(-50% - ${cap?60:40}px)) scale(${cap?1.9:1.5})`,opacity:0}],{duration:2600+Math.random()*900,delay:420+i*40,easing:'cubic-bezier(.25,.6,.3,1)',fill:'both'});});
- later(m,4200);
+ const flash=document.createElement('b');flash.className='fx-flash';flash.style.cssText=`--x:${x}px;--y:${y}px`;l.append(flash);
+ const $=s=>w.querySelector(s),T=1900;
+ anim($('.fx-seal'),[{transform:'translate(-50%,-50%) scale(.55) rotate(-60deg)',opacity:0},{transform:'translate(-50%,-50%) scale(1) rotate(0deg)',opacity:1,offset:.3},{transform:'translate(-50%,-50%) scale(1.05) rotate(20deg)',opacity:1,offset:.36},{transform:'translate(-50%,-50%) scale(1.7) rotate(40deg)',opacity:0,offset:.55},{opacity:0}],{duration:T,easing:'cubic-bezier(.3,.6,.2,1)'});
+ w.querySelectorAll('.fx-seal circle,.fx-seal path').forEach((p,i)=>anim(p,[{strokeDashoffset:1},{strokeDashoffset:0}],{duration:360,delay:60+i*90,easing:'cubic-bezier(.4,0,.2,1)'}));
+ anim($('.fx-charge'),[{transform:'translate(-50%,-50%) scale(.2)',opacity:0},{transform:'translate(-50%,-50%) scale(1)',opacity:.9,offset:.33},{transform:'translate(-50%,-50%) scale(.6)',opacity:1,offset:.36},{opacity:0,offset:.42},{opacity:0}],{duration:T});
+ anim($('.fx-pillar'),[{transform:'translateX(-50%) scaleY(0)',opacity:0},{transform:'translateX(-50%) scaleY(0)',opacity:0,offset:.31},{transform:'translateX(-50%) scaleY(1)',opacity:1,offset:.37},{transform:'translateX(-50%) scaleY(1) scaleX(2.2)',opacity:0,offset:.5},{opacity:0}],{duration:T,easing:'ease-out'});
+ anim($('.fx-core'),[{transform:'translate(-50%,-50%) scale(0)',opacity:0},{transform:'translate(-50%,-50%) scale(0)',opacity:0,offset:.36},{transform:'translate(-50%,-50%) scale(1.6)',opacity:1,offset:.39},{transform:'translate(-50%,-50%) scale(2.6)',opacity:0,offset:.55},{opacity:0}],{duration:T});
+ anim($('.fx-fire'),[{transform:'translate(-50%,-50%) scale(0)',opacity:0},{transform:'translate(-50%,-50%) scale(0)',opacity:0,offset:.36},{transform:'translate(-50%,-50%) scale(1)',opacity:1,offset:.44},{transform:'translate(-50%,-50%) scale(1.35)',opacity:.5,offset:.6},{transform:'translate(-50%,-56%) scale(1.5)',opacity:0}],{duration:T,easing:'cubic-bezier(.2,.8,.3,1)'});
+ anim($('.fx-fire.is-inner'),[{transform:'translate(-50%,-50%) scale(0)',opacity:0},{transform:'translate(-50%,-50%) scale(0)',opacity:0,offset:.37},{transform:'translate(-50%,-50%) scale(.7)',opacity:1,offset:.42},{transform:'translate(-50%,-60%) scale(.9)',opacity:0,offset:.62},{opacity:0}],{duration:T});
+ anim($('.fx-ring'),[{transform:'translate(-50%,-50%) scale(.1)',opacity:0},{transform:'translate(-50%,-50%) scale(.1)',opacity:1,offset:.37},{transform:'translate(-50%,-50%) scale(5)',opacity:0,offset:.62},{opacity:0}],{duration:T,easing:'cubic-bezier(.1,.7,.3,1)'});
+ anim($('.fx-ring.is-dust'),[{transform:'translate(-50%,-50%) scale(.2)',opacity:0},{transform:'translate(-50%,-50%) scale(.2)',opacity:.7,offset:.38},{transform:'translate(-50%,-50%) scale(3.2)',opacity:0,offset:.85},{opacity:0}],{duration:T,easing:'cubic-bezier(.2,.6,.3,1)'});
+ anim(flash,[{opacity:0},{opacity:0,offset:.36},{opacity:.85,offset:.38},{opacity:0,offset:.5},{opacity:0}],{duration:T});
+ /* embers drawn in during the charge */
+ for(let i=0;i<70;i++){const a=Math.random()*Math.PI*2,r=140+Math.random()*260;live.push({kind:'in',x0:x+Math.cos(a)*r,y0:y+Math.sin(a)*r,tx:x,ty:y,x:0,y:0,t:-Math.random()*.25,life:.62,s:.8+Math.random()*1.6,color:'rgb(255,120,70)'});}
+ runSparks();
+ later(w,T+60);later(flash,T+60);
  return new Promise(res=>setTimeout(()=>{
-  if(shake)shake.animate([{transform:'none'},{transform:'translate(-6px,3px)'},{transform:'translate(5px,-4px)'},{transform:'translate(-3px,2px)'},{transform:'none'}],{duration:320,easing:'ease-out'});
-  res();},320));
+  for(let i=0;i<160;i++){const a=Math.random()*Math.PI*2,v=260+Math.random()*900;live.push({kind:'spark',x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-200,g:900,drag:2.2,t:0,life:.5+Math.random()*.7,s:1+Math.random()*1.6});}
+  /* the fireball as layered puffs (no flat disc): hot white at the heart, orange, then dark red cooling to smoke */
+  for(let i=0;i<70;i++){const a=Math.random()*Math.PI*2,v=40+Math.random()*260;live.push({kind:'fire',x:x+Math.cos(a)*6,y:y+Math.sin(a)*6,vx:Math.cos(a)*v,vy:Math.sin(a)*v*.8-60,g:-40,drag:3.2,t:0,life:.7+Math.random()*.9,s:10+Math.random()*22});}
+  for(let i=0;i<40;i++)live.push({kind:'ember',x:x+(Math.random()-.5)*60,y:y+(Math.random()-.5)*30,vx:(Math.random()-.5)*80,vy:-(40+Math.random()*120),g:-30,drag:.6,t:0,life:1.6+Math.random()*1.6,s:.8+Math.random()*1.4});
+  runSparks();
+  const k=[[-11,5],[9,-8],[-7,6],[5,-4],[-3,2],[0,0]].map(([dx,dy])=>({transform:`translate(${dx}px,${dy}px)`}));
+  for(const el of [shake,bar].filter(Boolean))el.animate(k,{duration:520,easing:'cubic-bezier(.2,.7,.3,1)'});
+  mushroom(x,y);
+  res();},Math.round(T*.37)));
+}
+function mushroom(x,y){
+ const l=layer(),m=document.createElement('div');m.className='fx-mushroom';m.style.cssText=`left:${x}px;top:${y}px`;
+ const puffs=[[0,0,40,34,'stem'],[0,-28,34,38,'stem'],[0,-62,30,34,'stem'],[-38,-98,70,52,'cap'],[34,-100,74,54,'cap'],[0,-116,92,60,'cap'],[-70,-84,50,38,'cap'],[68,-84,52,38,'cap']];
+ m.innerHTML=puffs.map(([px,py,pw,ph,k])=>`<i class="is-${k}" style="left:${px}px;top:${py}px;width:${pw}px;height:${ph}px"></i>`).join('');l.append(m);
+ m.querySelectorAll('i').forEach((p,i)=>{const cap=p.classList.contains('is-cap'),dx=(Math.random()-.5)*(cap?80:26);
+  p.animate([{transform:'translate(-50%,-50%) translateY(40px) scale(.3)',opacity:0},{transform:'translate(-50%,-50%) scale(1)',opacity:1,offset:.3},{transform:`translate(calc(-50% + ${f1(dx)}px),calc(-50% - ${cap?70:46}px)) scale(${cap?2:1.6})`,opacity:0}],{duration:2800+Math.random()*900,delay:200+i*45,easing:'cubic-bezier(.25,.6,.3,1)',fill:'both'});});
+ later(m,4300);
 }
 
 /* 花鳥風月: water arcs up and falls with petals and a few sparkles */
