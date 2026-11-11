@@ -456,3 +456,15 @@
 
 .gm-group .gm-card{grid-template-columns:36px minmax(70px,46%) 1fr auto}
 .gm-group .gm-card-title.long{font-size:18px;line-height:1.3}
+
+/* 2026-11-11 one category at a time (user: 太长了，滚得我要死了) */
+.gm-gtabs{display:flex;flex-wrap:wrap;gap:2px;padding:10px;background:rgba(0,0,0,.84);position:sticky;top:0;z-index:3}
+.gm-gtab{display:inline-flex;align-items:baseline;gap:8px;height:34px;padding:0 14px;border:1px solid var(--mg-line);background:none;color:var(--mg-dim);font-size:13px;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
+.gm-gtab em{font:500 10px/1 var(--mg-mono);font-style:normal;letter-spacing:.15em;color:var(--mg-red)}
+.gm-gtab small{font:10px var(--mg-mono);color:var(--mg-dim)}
+.gm-gtab:hover{color:#fff;border-color:rgba(255,255,255,.4)}
+.gm-gtab.on{background:#fff;border-color:#fff;color:#0b0b0b}.gm-gtab.on small{color:#555}
+.gm-gtab.has-next:not(.on){border-color:var(--mg-red)}
+.gm-tracks.one{grid-template-columns:1fr}
+.gm-tracks.one .gm-cards:not(.folded){display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr))}
+.gm-tracks.one .gm-cards.folded{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr))}
