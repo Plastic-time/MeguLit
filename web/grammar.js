@@ -280,7 +280,7 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
  async function renderAlbum(){root.innerHTML=albumHTML([],{esc,readTime});root.querySelector('[data-back]').onclick=()=>go('list');let rows=[];try{rows=await api('learning_album');}catch{}if(!isCurrent()||view!=='album')return;root.innerHTML=albumHTML(rows,{esc,readTime});root.querySelector('[data-back]').onclick=()=>go('list');
   if(motion())root.querySelectorAll('.rw-card').forEach((c,i)=>c.animate([{opacity:0,transform:'translateY(14px) rotate(-1deg)',filter:'blur(4px)'},{opacity:1,transform:'none',filter:'none'}],{duration:420,delay:Math.min(i,24)*40,easing:'cubic-bezier(.16,1,.3,1)',fill:'backwards'}));}
  /* rewards: every gain goes through here (the server keeps the total) */
- async function reward(kind,{ref='',streak=0,line=null,anchor=null}={}){try{const r=await api('learning_reward',{kind,ref,streak,line});memo.rewards=r;if(anchor)floatGain(anchor,r);if(r.collected)toast?.('收进台词收藏册：'+[...line.text].slice(0,18).join('')+'…');return r;}catch{return null;}}
+ async function reward(kind,{ref='',streak=0,line=null,anchor=null}={}){try{const r=await api('learning_reward',{kind,ref,streak,line});memo.rewards=r;if(anchor)floatGain(anchor,r);if(r.collected)toast?.('收进战利品：'+[...line.text].slice(0,18).join('')+'…');return r;}catch{return null;}}
  function renderMap(anim=''){
   root.innerHTML=mapHTML(data||{},{locale,esc,open:openNode,scene,piece});save();
   root.querySelector('[data-back]').onclick=()=>go('list');

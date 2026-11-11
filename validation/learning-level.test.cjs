@@ -172,5 +172,5 @@ test('rewards: magic points, titles, the line collection, and 惠惠\'s real lin
   const b=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');for(const c of ['learning_rewards','learning_reward','learning_album'])assert.match(b,new RegExp(`case '${c}'`));
  }finally{db.close?.();}
  const w=await import('../web/rewards.js');for(const k of ['praise','clear','cheer'])for(const [line,src] of w.QUOTES[k]){assert.ok([...line].length<=30,line);assert.match(src,/^(TV \d期 \d+話|映画 紅伝説)$/,line+' says where it is from');}
- const g=await import('../web/grammar.js');assert.match(g.listHTML({progress:{}},{locale:'zh',esc,level:'N5',rewards:{mana:12,album:3,rank:1,title:'见习魔法使',floor:0,next:150}}),/台词收藏册 <b>3<\/b>/);
+ const g=await import('../web/grammar.js');assert.match(g.listHTML({progress:{}},{locale:'zh',esc,level:'N5',rewards:{mana:12,album:3,rank:1,title:'见习魔法使',floor:0,next:150}}),/战利品 <b>3<\/b>/);
 });

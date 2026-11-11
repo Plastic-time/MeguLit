@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* 学习 → 奖励 (2026-11-11, user: 多给点正向反馈，惠惠的夸奖要真实出现过): 惠惠's stamp when a lesson is learned or a stage
-   is cleared, floating +魔力 on every right answer, a title bar, and the 台词收藏册. The quoted lines are short lines
+   is cleared, floating +魔力 on every right answer, a title bar, and the 战利品. The quoted lines are short lines
    Megumin says in この素晴らしい世界に祝福を！ (TV series and the film 紅伝説), each with where it is from, drawn at
    random so they do not repeat often. */
 export const QUOTES={
@@ -34,6 +34,6 @@ export function stamp({kind='praise',title='',sub='',r=null,esc=s=>String(s)}={}
 }
 /* the title bar under the HUD */
 export function manaHTML(r,esc){if(!r)return '';const span=r.next?Math.max(1,r.next-r.floor):1,pct=r.next?Math.min(100,Math.round((r.mana-r.floor)/span*100)):100;
- return `<div class="rw-bar"><span class="rw-rank">RANK ${String(r.rank).padStart(2,'0')}</span><b class="rw-title">${esc(r.title)}</b><span class="rw-meter"><i style="width:${pct}%"></i></span><span class="rw-mana">${r.mana}${r.next?` / ${r.next}`:''} 魔力</span><button type="button" class="rw-album-btn" data-album>台词收藏册 <b>${r.album}</b></button></div>`;}
+ return `<div class="rw-bar"><span class="rw-rank">RANK ${String(r.rank).padStart(2,'0')}</span><b class="rw-title">${esc(r.title)}</b><span class="rw-meter"><i style="width:${pct}%"></i></span><span class="rw-mana">${r.mana}${r.next?` / ${r.next}`:''} 魔力</span><button type="button" class="rw-album-btn" data-album>战利品 <b>${r.album}</b></button></div>`;}
 export function albumHTML(rows,{esc,readTime}){
- return `<button type="button" class="gm-link gm-back" data-back>← 课程列表</button><section class="rw-album"><header><span class="gm-tag"><i></i>megulit · line collection</span><h2>台词收藏册</h2><p class="gm-cap">你在练习里答对过的、来自自己游戏的台词。每一句都是你亲手拿下的战利品。</p></header>${rows.length?`<ol class="rw-cards">${rows.map((x,i)=>`<li class="rw-card" style="--i:${i}"><span class="rw-card-no">No.${String(rows.length-i).padStart(3,'0')}</span><p class="gm-ja" lang="ja">${esc(x.text)}</p>${x.translation?`<p class="gm-tr">${esc(x.translation)}</p>`:''}<span class="rw-card-meta">${esc(x.title||'')}${x.readAt?` · ${esc(readTime(x.readAt,'zh'))}`:''}</span></li>`).join('')}</ol>`:'<p class="rw-empty">还没有收藏。练习里答对一句来自你游戏的台词，它就会出现在这里。</p>'}</section>`;}
+ return `<button type="button" class="gm-link gm-back" data-back>← 课程列表</button><section class="rw-album"><header><span class="gm-tag"><i></i>megulit · line collection</span><h2>战利品</h2><p class="gm-cap">你在练习里答对过的、来自自己游戏的台词。每一句都是你亲手拿下的战利品。</p></header>${rows.length?`<ol class="rw-cards">${rows.map((x,i)=>`<li class="rw-card" style="--i:${i}"><span class="rw-card-no">No.${String(rows.length-i).padStart(3,'0')}</span><p class="gm-ja" lang="ja">${esc(x.text)}</p>${x.translation?`<p class="gm-tr">${esc(x.translation)}</p>`:''}<span class="rw-card-meta">${esc(x.title||'')}${x.readAt?` · ${esc(readTime(x.readAt,'zh'))}`:''}</span></li>`).join('')}</ol>`:'<p class="rw-empty">还没有收藏。练习里答对一句来自你游戏的台词，它就会出现在这里。</p>'}</section>`;}
