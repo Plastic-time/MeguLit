@@ -1113,3 +1113,16 @@ html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail>i{posi
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail:hover>i,html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail.is-drag>i{left:2px;width:9px;background:var(--g-gold,#edb56e)}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail.is-drag>i{cursor:grabbing;background:#c8323c}
 @media (max-width:900px){html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.u-rail{grid-area:upd}}
+
+/* profile: rank and experience under the name — level numeral, rank title, a thin bar that fills on open */
+html:not(#u):not(#v):not(#w) body .profile-hero-who{flex:1;min-width:0}
+html:not(#u):not(#v):not(#w) body .profile-rank{display:grid;grid-template-columns:auto 1fr auto;align-items:baseline;column-gap:12px;row-gap:8px;margin-top:10px;max-width:520px}
+html:not(#u):not(#v):not(#w) body .profile-rank-lv{font-family:var(--u-mono);font-size:11px;letter-spacing:.12em;color:var(--g-gold,#edb56e)}
+html:not(#u):not(#v):not(#w) body .profile-rank-lv b{font:600 22px/1 var(--g-serif,serif);letter-spacing:0;margin-left:3px;color:var(--g-gold,#edb56e)}
+html:not(#u):not(#v):not(#w) body .profile-rank-name{font:500 15px/1.2 var(--g-serif-ja,var(--g-serif,serif));color:var(--g-t1,#f1e0d2);letter-spacing:.06em}
+html:not(#u):not(#v):not(#w) body .profile-rank-xp{font-family:var(--u-mono);font-size:11px;color:var(--g-t3,#a08a80);white-space:nowrap}
+html:not(#u):not(#v):not(#w) body .profile-rank-bar{grid-column:1/-1;grid-row:2;position:relative;height:4px;background:rgba(255,255,255,.08);overflow:hidden}
+html:not(#u):not(#v):not(#w) body .profile-rank-bar i{position:absolute;inset:0 auto 0 0;width:var(--p);background:linear-gradient(90deg,#9a1f30,#c8323c 55%,var(--g-gold,#edb56e));animation:rank-fill 1.1s cubic-bezier(.2,.8,.2,1) .15s backwards}
+html:not(#u):not(#v):not(#w) body .profile-rank-bar i::after{content:"";position:absolute;right:0;top:-2px;bottom:-2px;width:2px;background:#fff4ea;box-shadow:0 0 8px var(--g-gold,#edb56e)}
+@keyframes rank-fill{from{width:0}}
+@media (prefers-reduced-motion:reduce){html body .profile-rank-bar i{animation:none}}

@@ -18,13 +18,29 @@ const T={
   privacy:'Your e-mail is only used to sign in and is never shown',notReady:'Online services are not ready yet, so signing in is unavailable',offline:'Cannot reach the online service right now',welcome:'Signed in'}
 };
 
-const HERO={zh:{time:'累计阅读',chars:'读过的字',words:'收录单词',streak:'最长连续',days:'天',fav:'最喜欢的游戏',noBio:'还没有签名',h:'小时',m:'分'},
- ja:{time:'累計読書',chars:'読んだ文字',words:'登録単語',streak:'最長連続',days:'日',fav:'お気に入りのゲーム',noBio:'ひとことはまだありません',h:'時間',m:'分'},
- en:{time:'Time read',chars:'Characters',words:'Words saved',streak:'Best streak',days:'days',fav:'Favourite games',noBio:'No signature yet',h:'h',m:'min'}};
+const HERO={zh:{time:'累计阅读',chars:'读过的字',words:'收录单词',streak:'最长连续',days:'天',fav:'最喜欢的游戏',noBio:'还没有签名',xp:'经验',h:'小时',m:'分'},
+ ja:{time:'累計読書',chars:'読んだ文字',words:'登録単語',streak:'最長連続',days:'日',fav:'お気に入りのゲーム',noBio:'ひとことはまだありません',xp:'経験値',h:'時間',m:'分'},
+ en:{time:'Time read',chars:'Characters',words:'Words saved',streak:'Best streak',days:'days',fav:'Favourite games',noBio:'No signature yet',xp:'XP',h:'h',m:'min'}};
 async function heroData(api){
  const [board,prof,view]=await Promise.all([api('leaderboard_profile',{}).catch(()=>null),api('leaderboard_profile_get',{}).catch(()=>null),api('leaderboard_view',{period:'all',metric:'seconds'}).catch(()=>null)]);
  return {name:board?.name||'',bio:prof?.state==='ok'?prof.bio:'',favorites:prof?.state==='ok'?(prof.favorites||[]):[],stats:view?.local?.stats?.all||null,streak:view?.local?.currentStreak};
 }
+
+/* 2026-11-12 (user: under the name, a rank and an experience bar instead of the signature). Experience comes from
+   what the profile already shows — characters read, minutes read, words saved — so nothing new is stored. The first
+   five levels come quickly (100, 150, 200, 250, 300), then every level costs the same 600 and there is no top level;
+   the rank title moves up with the level. */
+const XP_EARLY=[100,150,200,250,300],XP_STEP=600;
+const RANKS={zh:[[1,'见习读者'],[5,'初级魔导士'],[10,'魔导士'],[20,'上级魔导士'],[35,'大魔导士'],[50,'红魔族'],[80,'爆裂魔法使']],
+ ja:[[1,'見習い読者'],[5,'初級魔導士'],[10,'魔導士'],[20,'上級魔導士'],[35,'大魔導士'],[50,'紅魔族'],[80,'爆裂魔法使い']],
+ en:[[1,'Apprentice reader'],[5,'Novice mage'],[10,'Mage'],[20,'High mage'],[35,'Archmage'],[50,'Crimson demon'],[80,'Explosion mage']]};
+export function readerLevel(stats){
+ const st=stats||{};let xp=Math.floor((Number(st.characters)||0)/50)+Math.floor((Number(st.seconds)||0)/60)*2+(Number(st.words)||0)*10;
+ const total=xp;let level=1;
+ for(const cost of XP_EARLY){if(xp<cost)return {level,xp:total,into:xp,need:cost};xp-=cost;level++;}
+ const more=Math.floor(xp/XP_STEP);return {level:level+more,xp:total,into:xp-more*XP_STEP,need:XP_STEP};
+}
+const rankTitle=(level,locale)=>{const list=RANKS[locale]||RANKS.zh;let t=list[0][1];for(const [at,name] of list)if(level>=at)t=name;return t;};
 export const panelWords=locale=>T[locale]||T.zh;
 let current=null;
 /* opens (or brings back) the panel; onClose runs once when it closes, e.g. to refresh the 排行榜 page */
@@ -58,8 +74,8 @@ export async function openProfilePanel({api,locale,esc,toast,onClose=()=>{},open
   const h=HERO[locale]||HERO.zh,d=await heroData(api);if(!hero.isConnected)return;
   const nf=new Intl.NumberFormat({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale]||'zh-CN'),st=d.stats||{},sec=Number(st.seconds)||0;
   const time=sec>=3600?`${Math.floor(sec/3600)}<small>${h.h}</small>${Math.floor(sec%3600/60)}<small>${h.m}</small>`:`${Math.floor(sec/60)}<small>${h.m}</small>`;
-  const initial=esc([...(d.name||'?')][0]||'?');
-  hero.innerHTML=`<div class="profile-hero-id"><span class="profile-hero-avatar" aria-hidden="true">${initial}</span><div><h3>${esc(d.name||'')}</h3><p>${d.bio?esc(d.bio):`<span class="is-muted">${h.noBio}</span>`}</p></div></div>
+  const lv=readerLevel(d.stats);const initial=esc([...(d.name||'?')][0]||'?');
+  hero.innerHTML=`<div class="profile-hero-id"><span class="profile-hero-avatar" aria-hidden="true">${initial}</span><div class="profile-hero-who"><h3>${esc(d.name||'')}</h3><div class="profile-rank"><span class="profile-rank-lv">Lv.<b>${lv.level}</b></span><span class="profile-rank-name">${esc(rankTitle(lv.level,locale))}</span><span class="profile-rank-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${lv.need}" aria-valuenow="${lv.into}" aria-label="${h.xp}"><i style="--p:${(lv.into/lv.need*100).toFixed(1)}%"></i></span><span class="profile-rank-xp">${nf.format(lv.into)} / ${nf.format(lv.need)} ${h.xp}</span></div></div></div>
 <dl class="profile-hero-figs"><div><dt>${h.time}</dt><dd>${time}</dd></div><div><dt>${h.chars}</dt><dd>${nf.format(Number(st.characters)||0)}</dd></div><div><dt>${h.words}</dt><dd>${nf.format(Number(st.words)||0)}</dd></div><div><dt>${h.streak}</dt><dd>${nf.format(Number(st.streak)||0)}<small>${h.days}</small></dd></div></dl>
 ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.favorites.map(f=>`<li>${esc(f.title||f)}</li>`).join('')}</ol></div>`:''}`;
  }
