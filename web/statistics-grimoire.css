@@ -173,3 +173,26 @@
 @media (max-width:700px){.g-blank{padding:26px 20px}.g-blank .steps{grid-template-columns:1fr}.g-blank .steps div+div{padding-left:0;border-left:0;border-top:1px solid color-mix(in srgb,var(--gold-accent,#edb56e) 11%,transparent)}}
 
 /* v1.0.6：作品详情里的「只能窗口化」提示 */
+
+/* 2026-11-11 medium alignment with the megu-edit learning pages (user: 中幅度调整，不要和整体设计冲突): layout kept;
+   panels become square black glass with a red top rule, headings lose the gold diamond for a red block, labels and
+   numbers go tracked mono, switches and nav buttons go square, the accent is the one red. */
+.stg{--stg-red:#c8323c;--stg-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;--accent:var(--stg-red)}
+.stg-glass{border-radius:0;border:0;border-top:1px solid var(--stg-red);background:rgba(0,0,0,.78)}
+.stg-glass::before{display:none}
+:root[data-theme=light] .stg-glass{background:rgba(0,0,0,.78)}
+.stg-head{border-bottom-color:rgba(255,255,255,.12)}
+.stg-head h2::before{content:'';display:inline-block;width:6px;height:6px;background:var(--stg-red);vertical-align:2px;margin-right:10px}
+.stg-keys span,.stg-sub,.stg-note,.stg-legend,.stg-axis{font-family:var(--stg-mono);letter-spacing:.2em}
+.stg-keys b,.stg-keys strong,.stg .num{font-family:var(--stg-mono)}
+.stg-keys div+div{border-left-color:rgba(255,255,255,.12)}
+.stg-tabs button{font-family:var(--stg-mono);letter-spacing:.2em;font-size:13px}
+.stg-nav button{border-radius:0;border-color:rgba(255,255,255,.2)}
+.stg-nav button:hover{border-color:var(--stg-red)}
+.stg-rs{border-radius:0;background:none;border-color:rgba(255,255,255,.14)}
+.stg-rs button{border-radius:0;font-family:var(--stg-mono)}
+.stg-rs button[aria-pressed=true]{background:var(--stg-red);color:#fff}
+.stg-rule{border-top-color:rgba(255,255,255,.14)}
+.stg-cal .cell,.stg-cal [class*=cell]{border-radius:0}
+.stg-book img,.stg-books img{border-radius:0}
+.stg-more{font-family:var(--stg-mono);letter-spacing:.15em}

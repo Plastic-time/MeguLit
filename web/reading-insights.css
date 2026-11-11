@@ -44,3 +44,35 @@
 .ri-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .ri-known{white-space:nowrap;min-height:30px;padding:4px 12px;font-size:12px}
 .ri-known:hover{border-color:color-mix(in srgb,#88d2b0 55%,transparent);color:#88d2b0}
+
+/* 2026-11-11 megu-edit (user: 读过的词 一样 megu edit): each section is a black stage with a red top rule and a
+   tracked mono kicker; words are a dense grid of black tiles, the word big, the JLPT level a red square, counts in
+   mono; 收录 is a square red button; hovering a tile wipes a red bar in from the left. */
+.ri-panel{--mg-red:#c8323c;--mg-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;--mg-line:rgba(255,255,255,.12);--mg-dim:rgba(255,255,255,.55);--ease-x:cubic-bezier(.16,1,.3,1);position:relative;border-radius:0!important;border:0!important;border-top:1px solid var(--mg-red)!important;background:rgba(0,0,0,.84)!important;box-shadow:none!important;padding:26px 28px!important;animation:ri-in .55s var(--ease-x) both}
+.ri-panel+.ri-panel{margin-top:14px}
+.ri-panel:nth-of-type(2){animation-delay:.08s}.ri-panel:nth-of-type(3){animation-delay:.16s}
+@keyframes ri-in{from{opacity:0;filter:blur(6px);transform:translateY(12px)}to{opacity:1;filter:none;transform:none}}
+.ri-panel .section-header h2{font:600 24px/1.2 var(--g-serif,serif);color:#fff;letter-spacing:.02em}
+.ri-panel .section-header h2::before{content:'▮';display:block;margin-bottom:10px;font:500 10px/1 var(--mg-mono);color:var(--mg-red);letter-spacing:.4em}
+.ri-panel>.settings-help{font:11px/1.8 var(--mg-mono);letter-spacing:.12em;color:var(--mg-dim)}
+.ri-panel .ri-words{gap:2px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.ri-panel .ri-word{position:relative;overflow:hidden;border-radius:0;background:#000;border:0;border-bottom:1px dashed var(--mg-line);padding:16px 16px 14px;transition:transform .45s var(--ease-x)}
+.ri-panel .ri-word::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--mg-red);transform:scaleY(0);transform-origin:top;transition:transform .35s var(--ease-x)}
+.ri-panel .ri-word:hover{transform:translateY(-3px)}.ri-panel .ri-word:hover::before{transform:none}
+.ri-panel .ri-word .word-spelling{font-size:26px;color:#fff;letter-spacing:.02em}
+.ri-panel .ri-word .word-reading{font:12px var(--mg-mono);letter-spacing:.15em;color:var(--mg-red)}
+.ri-panel .ri-word .word-def{color:rgba(255,255,255,.78);font-size:13px;line-height:1.7}
+.ri-panel .ri-badge{border-radius:0;background:var(--mg-red);color:#fff;font:600 10px/1.6 var(--mg-mono);letter-spacing:.1em;padding:0 6px}
+.ri-panel .ri-count{font:11px var(--mg-mono);letter-spacing:.1em;color:var(--mg-dim)}
+.ri-panel .ri-games,.ri-panel .ri-sub,.ri-panel .muted{font-family:var(--mg-mono);letter-spacing:.05em}
+.ri-panel .ri-save{border-radius:0;background:none;border:1px solid rgba(255,255,255,.35);color:#fff;font:600 11px/1 var(--mg-mono);letter-spacing:.2em;min-height:30px;transition:background .15s,border-color .15s,transform .35s var(--ease-x)}
+.ri-panel .ri-save:hover{background:var(--mg-red);border-color:var(--mg-red)}
+.ri-panel .ri-save:active{transform:scale(.94);filter:invert(1)}
+.ri-panel .ri-bar{border-radius:0;height:12px;background:rgba(255,255,255,.08)}
+.ri-panel .ri-bar i{border-radius:0}
+.ri-panel .ri-bar-met{background:#f4f4f2!important}.ri-panel .ri-bar-saved{background:var(--mg-red)!important}
+.ri-panel .ri-level-name{font:600 13px var(--mg-mono);letter-spacing:.1em}
+.ri-panel .ri-level-num{font-family:var(--mg-mono)}
+.ri-panel select,.ri-panel .select-control,.ri-panel .select-trigger{border-radius:0!important}
+@media(prefers-reduced-motion:reduce){.ri-panel,.ri-panel .ri-word,.ri-panel .ri-word::before{animation:none;transition:none}}
+.ri-panel .ri-word button{border-radius:0;font-family:var(--mg-mono);letter-spacing:.15em}
