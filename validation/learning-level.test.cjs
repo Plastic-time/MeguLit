@@ -140,7 +140,7 @@ test('grammar cards from the learner\'s own Anki are read at run time and merged
  const ex=B.examplesFor(cards,[{text:'悩んだあげく、告白した。',title:'G',gameId:'g',origin:'history'}]);assert.equal(ex[ageku.id][0].title,'G');
  const g=await import('../web/grammar.js'),r=g.useAnkiCards(cards);assert.deepEqual(r,{merged:1,own:1},'たら joins the N4 lesson, あげく gets its own');
  const tara=g.pointsOf('N4').find(p=>p.id==='n4-tara');assert.equal(tara.anki.length,1);assert.match(g.lessonHTML(tara,{progress:{}},{locale:'zh',esc}),/蓝宝书 · 来自你的 Anki · ～たら|蓝宝书 · 来自你的 Anki · たら/);
- const own=g.pointsOf('N2').find(p=>p.id==='bb-12');assert.ok(own);assert.match(g.listHTML({progress:{}},{locale:'zh',esc,level:'N2'}),/· 蓝宝书<small>/,'cards are sorted into kinds');
+ const own=g.pointsOf('N2').find(p=>p.id==='bb-12');assert.ok(own);assert.match(g.listHTML({progress:{}},{locale:'zh',esc,level:'N2'}),/class="gm-stg[^"]*" data-gtab="[a-z]+"/,'cards join the same kinds as the lessons, shown as stages');
  assert.ok(g.exercisesFor(own,[],2).every(q=>q.choices.includes(q.answer)));
  assert.ok(G.validPoint('bb-12'));g.useAnkiCards([]);
  const bridge=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');assert.match(bridge,/case 'grammar_bluebook'/);
