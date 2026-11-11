@@ -57,7 +57,7 @@ export async function switchLibrary(toWall,render){
   {const r=now?.getBoundingClientRect();if(r)spots[toWall?'wall':'list']={x:r.left+r.width/2,y:r.top+r.height/2};}
   if(now&&seen){const to=now.getBoundingClientRect(),dx=seen.left+seen.width/2-(to.left+to.width/2),dy=seen.top+seen.height/2-(to.top+to.height/2);
    now.style.transition='none';
-   if(Math.abs(dx)+Math.abs(dy)>1){const m=now.animate([{translate:`${dx}px ${dy}px`},{translate:'0 0'}],{duration:left||240,easing:'cubic-bezier(.22,.9,.24,1)'});m.finished.catch(()=>{}).finally(()=>{now.style.transition='';});}else now.style.transition='';}
+   if(Math.abs(dx)+Math.abs(dy)>1){const m=now.animate([{translate:`${dx}px ${dy}px`},{translate:'0 0'}],{duration:left||240,easing:'cubic-bezier(.22,.9,.24,1)'});m.finished.catch(()=>{}).finally(()=>{now.style.transition='';if(toWall)remeasure();});}else now.style.transition='';}
   const pending=host();pending?.classList.add('lib-entering');
   await frame();
   if(toWall){remeasure();await frame();}
@@ -71,6 +71,7 @@ export async function switchLibrary(toWall,render){
    wallIn(next,incoming);
   }
  next.classList.remove('lib-entering');
+  if(toWall)setTimeout(remeasure,760);
   // safety: once everything has played, no animation may keep holding a card or cover
   setTimeout(()=>{for(const el of document.querySelectorAll('#library-results .library-card,#library-results .cover-frame img,#library-results .cover-frame .cover'))for(const a of el.getAnimations())if(a.playState==='finished'||a.effect?.getComputedTiming?.().fill==='forwards')a.cancel();},1600);
  }finally{busy=false;host()?.classList.remove('lib-entering');}
