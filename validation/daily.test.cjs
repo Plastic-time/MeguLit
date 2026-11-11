@@ -244,7 +244,7 @@ test('relay glosses: Japanese notes (with kana) are dropped, the prompt asks for
 test('hot-word notes by type: proper nouns say who or what, names restated are rewritten once, the page tags the type',async()=>{
  const d=await load('daily.js');
  assert.deepEqual(d.parseNotes([{type:'人名',note:'人名，日本网红（YouTuber）'},{type:'词语',note:'退市'},{type:'作品',note:'动画作品'}],3),[{kind:'person',gloss:'日本网红（YouTuber）'},{kind:'word',gloss:'退市'},{kind:'work',gloss:'动画作品'}]);
- assert.equal(d.repeatsTerm('岡本和真','冈本和真','person'),true);assert.equal(d.repeatsTerm('アイザック ハジャー','艾萨克·哈贾尔','person'),true);
+ assert.equal(d.repeatsTerm('岡本和真','冈本和真','person'),true);assert.equal(d.repeatsTerm('東出昌大','日本演员','person'),false,'a short description is not a repeat');assert.equal(d.repeatsTerm('髙木悠未','日本女艺人','person'),false);
  assert.equal(d.repeatsTerm('岡本和真','日本职业棒球选手','person'),false);assert.equal(d.repeatsTerm('上場廃止','退市','word'),false);
  const asked=[];const AI={run:async(model,input)=>{const retry=input.messages[0].content.startsWith(d.GLOSS_RETRY);asked.push(retry);
   return retry?{response:[{type:'人名',note:'日本职业棒球选手'}]}:{response:[{type:'人名',note:'冈本和真'},{type:'词语',note:'学校活动'}]};}};

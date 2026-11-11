@@ -194,12 +194,12 @@ export function parseNotes(text,count){
   g=g.replace(/^(?:词语|人名|人物|组织|团体|作品|地名|地点|商品|产品|事件)\s*[，,：:]\s*/,'').slice(0,30);return {kind,gloss:KANA_RE.test(g)?'':g};});
 }
 export function parseGlosses(text,count){return parseNotes(text,count).map(n=>n.gloss);}
-/* a note that only restates the name (岡本和真 → 冈本和真) says nothing: share most characters with the term, or a
-   proper noun's note no longer than the name with no description in it */
+/* a note that only restates the name (岡本和真 → 冈本和真) says nothing: it shares most of its characters with the
+   term. Short descriptions such as 日本演员 are fine (a length rule rejected them, E415 补 8). */
 export function repeatsTerm(term,note,kind=''){
  const a=String(term||'').replace(/[\s・·.]/g,''),b=String(note||'').replace(/[\s・·.]/g,'');if(!b)return false;if(a===b)return true;
  const shared=[...b].filter(c=>a.includes(c)).length;if(shared/Math.max(1,b.length)>=0.5)return true;
- return kind&&kind!=='word'&&b.length<=a.length+1&&!/[，,（(的]/.test(b);
+ return false;
 }
 async function askNotes(env,model,prompt,words){
  const input=words.map((w,i)=>`${i+1}. ${w.term}${w.headline?' ｜ '+w.headline.slice(0,80):''}`).join('\n');
@@ -216,7 +216,7 @@ async function glossWords(env,words){
    words.forEach((w,i)=>{const n=list[i];if(!n)return;if(n.kind)w.kind=n.kind;if(n.gloss&&!repeatsTerm(w.term,n.gloss,n.kind))w.gloss=n.gloss;});
    /* notes that only restated the name: ask once more for just those */
    const redo=words.filter((w,i)=>list[i]?.gloss&&!w.gloss);
-   if(redo.length)try{const again=await askNotes(env,model,GLOSS_RETRY,redo);redo.forEach((w,i)=>{const n=again[i];if(n?.kind)w.kind=n.kind;if(n?.gloss&&!repeatsTerm(w.term,n.gloss,n.kind||w.kind))w.gloss=n.gloss;});}catch{}
+   if(redo.length)try{const again=await askNotes(env,model,GLOSS_RETRY,redo);redo.forEach((w,i)=>{const n=again[i];if(n?.kind&&!w.kind)w.kind=n.kind;if(n?.gloss&&!repeatsTerm(w.term,n.gloss,w.kind))w.gloss=n.gloss;});}catch{}
    return list.length;}
   catch(e){console.warn('gloss: model failed',model,String(e?.message||e).slice(0,200));}
  }
