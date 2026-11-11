@@ -87,7 +87,7 @@
  function receivedMeasurement(m){
   if(m.gameStyleOwner&&m.gameStyleOwner!==owner)return;
   if(!m.gameStyleOwner&&!document.body.classList.contains('tomoyo-ui-translation'))return;
-  const r=m.gameStyle,out=convert(r);if(!out)return;const part=m.gameStylePurpose||'all',generation=++measurementSerial,key=session.key;
+  const r=m.gameStyle,out=convert(r);if(!out)return;/* Issue 119: automatic calibration keeps a size the user set by hand; a sync the user starts measures it again */if(m.gameStyleAutomatic===true&&b.galPreferences().sizeSource==='user'){for(const k of ['japaneseSize','translationSize','japaneseSpacingPx'])delete out[k];}else if(m.gameStyleAutomatic!==true)out.sizeSource='';const part=m.gameStylePurpose||'all',generation=++measurementSerial,key=session.key;
   document.body.classList.remove('tome-style-probing');
   apply(pick(out,part));message=t('measured');aligning=part!=='text';
   const complete=()=>{if(generation!==measurementSerial||key!==session.key)return;aligning=false;
