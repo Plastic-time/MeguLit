@@ -84,37 +84,62 @@ function lockup(el,ch,size){
  const out={c,W,g,size};LOCK.set(key,out);return out;
 }
 function drawLockup(s,c,el){
- const size=Math.round(Math.min(s.W,s.H)*.3),lk=lockup(el,s.glyph,size),x=s.cx-lk.W/2,y=s.cy-lk.W/2;
- c.save();c.globalCompositeOperation='source-over';
- let dx=0,dy=0,al=1;if(el==='thunder'&&Math.random()<.06){dx=Math.random()*3-1.5;}if(el==='fire')al=.9+.1*Math.sin(s.t*9);if(el==='wind')dx=Math.sin(s.t*1.4)*2;if(el==='light')al=.85+.15*Math.sin(s.t*2);
- const glow={fire:'#ff4a24',ice:'#7fd3f2',thunder:'#ffe36a',wind:'#8fe0c0',water:'#5fb0f0',earth:'rgba(0,0,0,.8)',light:'#fff1b8',dark:'#6a46b0'}[el];
- c.globalAlpha*=al;c.shadowColor=glow;c.shadowBlur=el==='earth'?6:14;c.drawImage(lk.c,x+dx,y+dy);c.shadowBlur=0;
- if(el==='water'){const sy=s.sy||s.cy+60;for(let yy=0;yy<lk.W*.7;yy+=2){const off=Math.sin(yy*.18+s.t*3)*(1+yy*.03);c.globalAlpha=.32*(1-yy/(lk.W*.7));c.drawImage(lk.c,0,lk.W-yy-2,lk.W,2,x+off,sy+6+yy,lk.W,2);}}
- c.globalAlpha=.7;c.fillStyle=glow==='rgba(0,0,0,.8)'?'#d8b890':glow;c.font='500 11px "IBM Plex Mono",Consolas,monospace';c.textAlign='center';c.textBaseline='middle';try{c.letterSpacing='.4em';}catch{}c.fillText(ROMAJI[el],s.cx+4,s.cy+size*.8);try{c.letterSpacing='0px';}catch{}
- c.restore();
+ /* (user: the redesigned lettering was ugly) one clean serif face for every element, a quiet gradient of its colour
+    and a soft glow of the same colour; the element is told by the scene, not by distorting the character */
+ const size=Math.round(Math.min(s.W,s.H)*.28),g=glyphFor(s.glyph,size),pal={fire:['#fff1d6','#ff9a5a'],ice:['#ffffff','#a8e4fa'],thunder:['#fffbe6','#ffd86a'],wind:['#f2fff9','#9fe6c8'],water:['#f4fbff','#8cc8f2'],earth:['#f6e6cc','#c8a070'],light:['#fffdf4','#ffe6a6'],dark:['#efe6ff','#a88ae0']}[el];
+ paintGlyph(c,g,s.cx,s.cy,(t,w)=>{const gr=t.createLinearGradient(0,w*.2,0,w*.8);gr.addColorStop(0,pal[0]);gr.addColorStop(1,pal[1]);t.fillStyle=gr;t.fillRect(0,0,w,w);},{glow:rgba(COLOR[el],.75),blur:18});
 }
+
+/* ---------- the fire vortex disc (original geometry; style only after the user's references) ---------- */
+const DISC=new Map();
+function fireDisc(r){
+ if(DISC.has(r))return DISC.get(r);const pad=30,W=(r+pad)*2,cv=document.createElement('canvas');cv.width=cv.height=W;const c=cv.getContext('2d');c.translate(W/2,W/2);c.globalCompositeOperation='lighter';c.lineCap='round';
+ const stroke=(w,col,blur)=>{c.lineWidth=w;c.strokeStyle=col;c.shadowColor='#ff4a1a';c.shadowBlur=blur;c.stroke();};
+ const ri=r*.22,K=11;
+ /* swept blades: from the inner ring out to the rim, each curling the same way */
+ for(let pass=0;pass<2;pass++)for(let i=0;i<K;i++){const a=i/K*Math.PI*2+pass*.18,sweep=pass?1.25:1.6,x0=Math.cos(a)*ri,y0=Math.sin(a)*ri,x3=Math.cos(a+sweep)*r*.94,y3=Math.sin(a+sweep)*r*.94,
+  x1=Math.cos(a+.35)*r*.62,y1=Math.sin(a+.35)*r*.62,x2=Math.cos(a+sweep-.25)*r*1.02,y2=Math.sin(a+sweep-.25)*r*1.02;c.beginPath();c.moveTo(x0,y0);c.bezierCurveTo(x1,y1,x2,y2,x3,y3);
+  if(pass===0){stroke(r*.035,'rgba(226,60,30,.85)',18);stroke(r*.012,'rgba(255,214,140,.9)',6);}else{stroke(r*.012,'rgba(255,120,60,.7)',10);}}
+ /* heavy outer rim and its inner line */
+ c.beginPath();c.arc(0,0,r,0,Math.PI*2);stroke(r*.06,'rgba(220,50,30,.9)',22);stroke(r*.018,'rgba(255,220,150,.95)',8);
+ c.beginPath();c.arc(0,0,r*.9,0,Math.PI*2);stroke(r*.008,'rgba(255,150,80,.6)',6);
+ /* the small inner ring with a scalloped edge */
+ c.beginPath();for(let i=0;i<=72;i++){const q=i/72*Math.PI*2,rr=ri*(1+Math.sin(q*12)*.06);c[i?'lineTo':'moveTo'](Math.cos(q)*rr,Math.sin(q)*rr);}stroke(r*.02,'rgba(255,170,90,.9)',10);
+ c.beginPath();c.arc(0,0,ri*.35,0,Math.PI*2);stroke(r*.012,'rgba(255,220,160,.8)',6);
+ /* warm wash across the disc */
+ c.globalCompositeOperation='lighter';const g=c.createRadialGradient(0,0,ri,0,0,r);g.addColorStop(0,'rgba(255,120,60,.10)');g.addColorStop(.8,'rgba(226,60,30,.08)');g.addColorStop(1,'rgba(226,60,30,0)');c.fillStyle=g;c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.fill();
+ DISC.set(r,cv);return cv;
+}
+const layerY=(s,i,L)=>s.cy+s.H*(.3-i*(.62/(L-1)));
+function layerBurst(s,i,L,base){const y=layerY(s,i,L),sc=.95-i*.09;for(let k=0;k<26;k++){const a=R(0,TAU),v=R(160,380)*sc;s.add({type:'spark',x:s.cx+Math.cos(a)*base*sc*.5,y:y+Math.sin(a)*base*sc*.17,vx:Math.cos(a)*v,vy:Math.sin(a)*v*.34-40,drag:1.6,g:40,life:R(.5,.9),r:R(1,1.8),trail:[]});}for(let k=0;k<6;k++)s.add({type:'flame',x:s.cx+R(-1,1)*base*sc*.4,y:y+R(-6,6),vx:R(-60,60),vy:R(-60,-10),drag:2,life:R(.4,.7),r:R(14,22)});}
+function columnBurst(s,base){for(let k=0;k<50;k++){const a=R(0,TAU),v=R(220,560);s.add({type:'spark',x:s.cx,y:s.cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v*.6-60,drag:1.4,g:60,life:R(.8,1.4),r:R(1.2,2.2),trail:[]});}for(let k=0;k<18;k++){const a=R(0,TAU),v=R(60,200);s.add({type:'flame',x:s.cx,y:s.cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-50,drag:2,life:R(.6,1.1),r:R(18,32)});}s.flash=.4;}
 
 /* ---------- scenes ---------- */
 const SC={
  fire:{
-  bg(s,c){const Rr=Math.min(s.W,s.H)*.44,hum=.75+.25*Math.sin(s.t*(s.ct<0?2.2:9)),burst=s.burst||0,sc=burst>0?(burst<.18?1-burst*.8:1+(burst-.18)*.5):1,al=burst>0?Math.max(0,1-(burst-.18)*1.1):1;
-   if(al<=0)return;c.save();c.translate(s.cx,s.cy);c.scale(sc,sc);c.globalAlpha=al;c.lineCap='round';
-   const col=(a)=>`rgba(${Math.round(226+29*hum*.2)},${Math.round(66+80*hum*.3)},${Math.round(62*hum)},${a})`,gold=a=>`rgba(240,195,106,${a})`;
-   c.shadowColor='#ff3a24';c.shadowBlur=6+10*hum;const t=s.t,on=s.ct<0?.9:1;
-   /* outer twin rings + rune band A (clockwise) */
-   c.strokeStyle=col(.85*on);c.lineWidth=1.4;arcP(c,0,0,Rr,stage(s,.75,.35),t*.05);c.lineWidth=.7;arcP(c,0,0,Rr*.95,stage(s,.7,.35),-t*.05);
-   c.strokeStyle=gold(.75*on*stage(s,.85,.3));c.lineWidth=.9;for(let i=0;i<RUNES_A.length;i++){const q=t*.06+i/RUNES_A.length*TAU;drawRune(c,RUNES_A[i],Math.cos(q)*Rr*.975,Math.sin(q)*Rr*.975,Rr*.035,q+Math.PI/2);}
-   /* tick ring */
-   c.strokeStyle=col(.6*on);c.lineWidth=.7;const tp=stage(s,.6,.3);for(let i=0;i<120*tp;i++){const q=-t*.04+i/120*TAU,L=i%10?Rr*.015:Rr*.04;c.beginPath();c.moveTo(Math.cos(q)*Rr*.9,Math.sin(q)*Rr*.9);c.lineTo(Math.cos(q)*(Rr*.9-L),Math.sin(q)*(Rr*.9-L));c.stroke();}
-   /* (user: just a pentagram, not so much) one ring and one five-pointed star inside, a small ring at the heart */
-   c.strokeStyle=col(.85*on);c.lineWidth=1.1;arcP(c,0,0,Rr*.72,stage(s,.4,.3),-t*.08);
-   const gp=stage(s,.1,.35);if(gp>0){c.lineWidth=1.5;const pts=Array.from({length:5},(_,i)=>{const q=t*.07-Math.PI/2+i*TAU/5;return [Math.cos(q)*Rr*.72,Math.sin(q)*Rr*.72];});c.beginPath();const order=[0,2,4,1,3,0];for(let k=0;k<5;k++){const f=Math.min(1,Math.max(0,gp*5-k));if(f<=0)break;const [x0,y0]=pts[order[k]],[x1,y1]=pts[order[k+1]];c.moveTo(x0,y0);c.lineTo(x0+(x1-x0)*f,y0+(y1-y0)*f);}c.stroke();
-    c.strokeStyle=gold(.55*gp);c.lineWidth=.8;arcP(c,0,0,Rr*.2,gp);}
-   c.restore();c.shadowBlur=0;},
-  spawn(s){if(s.count('spark')<26+(s.ct>=0?40:0))s.add({type:'spark',x:s.cx+R(-1,1)*s.W*.35,y:s.cy+R(.1,.45)*s.H,vx:R(-12,12),vy:-R(40,110),g:-10,life:R(1.2,2.2),r:R(.8,1.6),trail:[]});
-   if(!s.reform&&s.ct>.9&&s.ct<1.3&&s.count('flame')<40)for(let i=0;i<5;i++){const q=s.t*.07-Math.PI/2+i*TAU/5,Rr=Math.min(s.W,s.H)*.44*.72,x=s.cx+Math.cos(q)*Rr,y=s.cy+Math.sin(q)*Rr;s.add({type:'flame',x,y,vx:(s.cx-x)*2.2,vy:(s.cy-y)*2.2,drag:1,life:.45,r:R(12,20)});}},
-  burst(s){s.burst=.001;for(let i=0;i<70;i++){const a=R(0,TAU),v=R(160,520);s.add({type:'spark',x:s.cx,y:s.cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v,drag:1.4,g:60,life:R(.8,1.5),r:R(1,2.2),trail:[]});}for(let i=0;i<24;i++){const a=R(0,TAU),v=R(60,200);s.add({type:'flame',x:s.cx,y:s.cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-40,drag:2,life:R(.6,1.1),r:R(16,30)});}s.flash=.45;},
-  glyph(s,c,g){paintGlyph(c,g,s.cx,s.cy,(t,w)=>{const gr=t.createLinearGradient(0,w*.8,0,w*.2);gr.addColorStop(0,'#ffe9b0');gr.addColorStop(.4,'#ff9a3a');gr.addColorStop(.8,'#c8281c');gr.addColorStop(1,'#4a0a08');t.fillStyle=gr;t.fillRect(0,0,w,w);},{glow:'#ff4a24',blur:14});}
+  /* (user: far more striking — many layers stacked, chain explosions) an original vortex circle: swept blade arcs
+     curling from a small inner ring to a heavy outer ring, burning orange-red to gold. Several of them stand in
+     perspective as a column, rising one by one from the bottom, each its own size and turning against its
+     neighbour; they charge and pulse, then burst one after another up the column, the whole column erupts, the
+     afterglow fades and the column builds again. The disc is pre-rendered once to a sprite, so a layer is one
+     drawImage. */
+  bg(s,c){
+   const L=5,base=Math.min(s.W,s.H)*.46,cyc=s.cycT??=0;s.cycT+=s.dt;const T=s.cycT;
+   const APPEAR=.32,CHARGE=L*APPEAR+.9,CHAIN=.2,BOOM=CHARGE+L*CHAIN+.05,END=BOOM+1.4;
+   if(T>END){s.cycT=0;s.boomed=0;s.chain=0;}
+   const spr=fireDisc(Math.round(base));
+   for(let i=0;i<L;i++){
+    const appear=Math.min(1,Math.max(0,(T-i*APPEAR)/.45)),blown=T>CHARGE+i*CHAIN;
+    if(blown&&s.chain<=i){s.chain=i+1;layerBurst(s,i,L,base);}
+    let a=appear;if(blown)a=Math.max(0,1-(T-(CHARGE+i*CHAIN))/.25);if(a<=0)continue;
+    const pulse=T>L*APPEAR?.85+.15*Math.sin(T*(T>CHARGE-.6?22:8)+i):1,sc=(.9-i*.1)*(.7+.3*appear),y=layerY(s,i,L);
+    c.save();c.globalAlpha*=a*pulse;c.translate(s.cx,y);c.scale(1,.34);c.rotate((i%2?-1:1)*T*(.6+i*.25));c.scale(sc,sc);c.drawImage(spr,-spr.width/2,-spr.height/2);c.restore();}
+   if(T>BOOM&&!s.boomed){s.boomed=1;columnBurst(s,base);}
+   if(T>BOOM&&T<BOOM+1.2){const k=(T-BOOM)/1.2,g=c.createRadialGradient(s.cx,s.cy,0,s.cx,s.cy,base*(.6+k*1.2));g.addColorStop(0,`rgba(255,220,150,${.35*(1-k)})`);g.addColorStop(.5,`rgba(226,66,40,${.18*(1-k)})`);g.addColorStop(1,'rgba(120,20,10,0)');c.fillStyle=g;c.fillRect(0,0,s.W,s.H);}
+  },
+  spawn(s){if(s.count('spark')<18)s.add({type:'spark',x:s.cx+R(-1,1)*s.W*.3,y:s.cy+R(.2,.45)*s.H,vx:R(-10,10),vy:-R(50,120),g:-10,life:R(1.2,2),r:R(.8,1.5),trail:[]});},
+  burst(s){/* the cast skips straight to the chain of explosions, then a bigger eruption */const L=5,APPEAR=.32;s.cycT=Math.max(s.cycT||0,L*APPEAR+.9-.05);s.chain=0;s.boomed=0;s.flash=.35;},
+  glyph(){}
  },
  ice:{
   bg(s,c){const Rr=Math.min(s.W,s.H)*.42*(s.big||1),grow=Math.min(1,s.t/1.4),rot=s.t*.06;if(s.shattered)return;
@@ -229,10 +254,14 @@ export function mountElementFx(canvas){
  const size=()=>{const dpr=Math.min(2,devicePixelRatio||1),W=canvas.clientWidth,H=canvas.clientHeight;if(W&&(canvas.width!==Math.round(W*dpr)||canvas.height!==Math.round(H*dpr))){canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);for(const s of [cur,old])if(s){s.W=W;s.H=H;s.cx=W/2;s.cy=H/2;}};
  const frame=now=>{if(stopped||!canvas.isConnected)return;const dt=Math.min(.05,(now-prev)/1000);prev=now;size();ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
   if(document.hidden){raf=requestAnimationFrame(frame);return;}
-  switchT=Math.min(1,switchT+dt/.52);const e=switchT*switchT*(3-2*switchT);
-  if(old&&switchT<1){step(old,dt);render(ctx,old,1-e,1-.12*e);}else old=null;
-  if(cur){if(!calm){SC[cur.el].spawn(cur);step(cur,dt);}render(ctx,cur,old?e:1,old?.88+.12*e:1);
-   if(old&&switchT<1){/* a short wash of the new element's colour bridges the two */const W=canvas.clientWidth,H=canvas.clientHeight,g=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*.6*e);g.addColorStop(0,rgba(COLOR[cur.el],.18*(1-e)));g.addColorStop(1,rgba(COLOR[cur.el],0));ctx.globalCompositeOperation='lighter';ctx.fillStyle=g;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';}}
+  /* (user: the old transition was ugly) out: the old scene shrinks, blurs and fades in ~200 ms; in: the new one grows
+     from 92% and sharpens over ~360 ms, starting a beat later; one thin light sweep crosses once */
+  switchT=Math.min(1,switchT+dt);const W=canvas.clientWidth,H=canvas.clientHeight;
+  if(old&&switchT<.2){const k=switchT/.2,e=k*k;step(old,dt);ctx.save();ctx.filter=`blur(${(e*8).toFixed(1)}px)`;render(ctx,old,1-e,1-.12*e);ctx.restore();}else old=null;
+  if(cur){if(!calm){SC[cur.el].spawn(cur);step(cur,dt);}const k=Math.min(1,Math.max(0,(switchT-.08)/.36)),e=1-Math.pow(1-k,3);
+   if(k<1){ctx.save();ctx.filter=`blur(${((1-e)*6).toFixed(1)}px)`;render(ctx,cur,e,.92+.08*e);ctx.restore();
+    const sx=-W*.3+(W*1.6)*e,gr=ctx.createLinearGradient(sx-60,0,sx+60,H);gr.addColorStop(0,'rgba(255,255,255,0)');gr.addColorStop(.5,`rgba(255,250,240,${.12*(1-e)})`);gr.addColorStop(1,'rgba(255,255,255,0)');ctx.globalCompositeOperation='lighter';ctx.fillStyle=gr;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';}
+   else render(ctx,cur,1,1);}
   if(!calm)raf=requestAnimationFrame(frame);};
  raf=requestAnimationFrame(frame);
  return {
