@@ -608,20 +608,19 @@ img{-webkit-user-drag:none}
 .main.field-page:not(.field-single,.field-list)>.field-search{top:42%}
 /* E426 top bar regrouped: logo, back / forward, then 首页 / 游戏库 / 历史 / 学习 | 排行榜 / 日报; on the right 工具 / 设置 / 关于,
    a divider, the 个人主页 pill (picture + name) and, well apart from it, the window buttons */
-.titlebar>.nav-history{align-self:center;display:flex;gap:2px;margin:0 0 0 clamp(6px,1vw,14px)!important;padding:2px!important;height:32px;border-radius:9px;background:#1f1614}
+.titlebar>.nav-history{top:auto!important;left:auto!important;transform:none!important;align-self:center;display:flex;gap:2px;margin:0 0 0 clamp(6px,1vw,14px)!important;padding:2px!important;height:32px;border-radius:9px;background:#1f1614}
 .titlebar>.nav-history .nav-step{width:30px;height:28px;border-radius:7px}
 .titlebar>.nav-history .nav-step svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .top-sep{align-self:center;width:1px;height:16px;margin:0 8px;background:#4d3832;flex:none}
 .titlebar-end{align-items:flex-start}
-.titlebar-end .top-tabs-util{margin:0!important;height:40px;align-self:flex-start;gap:2px}
-.top-tabs-util .top-tab{padding:0 12px;font-size:13px;min-width:44px}
-.top-tabs-util .top-tab[aria-current=page]::after{bottom:3px}
+.titlebar-end .top-tabs-util{margin:0!important;height:auto;align-self:stretch;gap:4px}
+.top-tabs-util .top-tab{min-width:44px}
 .titlebar-end .top-tabs-util::after{content:"";align-self:center;width:1px;height:18px;margin:0 14px 0 10px;background:#4d3832}
-.top-me{align-self:flex-start;display:flex;align-items:center;gap:9px;height:32px;margin:4px clamp(22px,2.4vw,36px) 0 0;padding:0 14px 0 4px;max-width:160px;border:1px solid #3a2b27;border-radius:99px;background:#221816;color:#e8d5c6;font-size:13px;cursor:pointer;transition:background-color 140ms,border-color 140ms,color 140ms}
+.top-me{align-self:center;display:flex;align-items:center;gap:9px;height:32px;margin:0 clamp(22px,2.4vw,36px) 0 0;padding:0 14px 0 4px;max-width:160px;border:1px solid #3a2b27;border-radius:99px;background:#221816;color:#e8d5c6;font-size:13px;cursor:pointer;transition:background-color 140ms,border-color 140ms,color 140ms}
 .top-me:hover{background:#2e211f;border-color:#6a4a3e;color:#f1e0d2}
 .top-me:active{transform:scale(.97)}
 .top-me .leaderboard-avatar{width:24px;height:24px;border-radius:50%;flex:none;object-fit:cover;display:grid;place-items:center;font-size:11px;color:#fff;background:var(--avatar-color,#ad1539);box-shadow:0 0 0 1px #0006}
 .top-me-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 @media (max-width:980px){.top-me{padding:0 4px;gap:0}.top-me-name{display:none}.titlebar-end .top-tabs-util::after{margin:0 10px 0 6px}}
-@media (max-width:760px){.top-sep{margin:0 4px}.top-tabs-util .top-tab{padding:0 8px;min-width:0}}
+@media (max-width:760px){.top-sep{margin:0 4px}.top-tabs-util .top-tab{min-width:0}}
 @media (max-width:600px){.titlebar>.nav-history{display:none}}
