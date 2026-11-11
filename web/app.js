@@ -605,6 +605,9 @@ async function history(token){
   main.innerHTML=heading(text.history,`<button class="text-button" data-history-font>${({zh:'字体与排版',en:'Font and spacing',ja:'フォントと行間'})[locale]}</button>`)+tabs(['sessions','dialogue'])+`<div id="history-content">${loading()}</div>`;bindTabs('history');main.querySelector('[data-history-font]').onclick=()=>{settingsSection='reader';navigate('settings');};
   const items=await api(subtab==='sessions'?'history':'dialogue');if(token!==pageToken)return;
   const target=main.querySelector('#history-content');
+  /* E458 历史 in the home / detail language: the latest game's blurred cover as the stage, a big outline 史, crop marks */
+  {const latest=items.map(i=>model.games.find(g=>g.id===i.game_id)).find(g=>g?.cover);main.querySelector('.dtv-bg')?.remove();main.querySelector('.dtv-marks')?.remove();
+   main.insertAdjacentHTML('afterbegin',`<div class="dtv-bg history-backdrop" aria-hidden="true" style="--dtv-cover:${latest?`url(&quot;${esc(latest.cover)}&quot;)`:'none'}"><i class="dtv-glyph">史</i></div><div class="dtv-marks" aria-hidden="true"><i></i><i></i><i></i><i></i></div>`);}
   target.innerHTML=historyHTML(items,{mode:subtab,locale,text,esc,icon,duration,datetime,number,games:model.games,cover,empty});attachGameActions(target);if(subtab==='dialogue')stopHistoryTranslations=mountHistoryTranslations({root:target,viewport:main,api,isCurrent:()=>token===pageToken,locale});
 }
 const tabs=names=>`<div class="tabs">${names.map(k=>`<button class="tab ${subtab===k?'active':''}" data-tab="${k}">${text[k]}</button>`).join('')}</div>`;
