@@ -54,395 +54,395 @@
 
 /* ---- dialogs and panels: one glass sheet below the top bar, hairline frame, gold corner tick, the app's own buttons
    (E446 / E450 sizes kept: the 54px request row, the tall notice with room for the update list) ---- */
-html body :is(dialog.game-dialog,dialog.game-dialog.feedback-dialog,dialog.game-dialog.dev-notice,.lv-dialog,dialog.profile-panel){
+html:not(#u):not(#v) body :is(dialog.game-dialog,dialog.game-dialog.feedback-dialog,dialog.game-dialog.dev-notice,.lv-dialog,dialog.profile-panel){
  border:0!important;border-radius:2px!important;color:var(--g-t1,#f1e0d2);
  background:linear-gradient(var(--g-gold),var(--g-gold)) 0 0/14px 2px no-repeat,linear-gradient(var(--g-gold),var(--g-gold)) 0 0/2px 14px no-repeat,var(--u-glass-solid)!important;
  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 0 0 1px var(--u-line-2),0 40px 90px -30px #000!important;
  -webkit-backdrop-filter:blur(24px) saturate(1.2);backdrop-filter:blur(24px) saturate(1.2)}
-html body dialog.game-dialog[open]{inset:var(--titlebar-height,56px) 0 0 0;margin:auto;max-height:calc(100vh - var(--titlebar-height,56px) - 40px)!important}
-html body dialog.game-dialog.dev-notice[open]{height:min(940px,calc(100vh - var(--titlebar-height,56px) - 40px))!important}
-html body dialog.game-dialog.dev-notice[open]:not(:has(.dev-notice-updates:not([hidden]))):not(:has(.dev-notice-page:not([hidden])>.dev-notice-scroll)){height:auto!important}
-html body :is(dialog.game-dialog,dialog.profile-panel)::backdrop{background:rgba(6,5,7,.62)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-html body .lv-backdrop{padding-top:calc(var(--titlebar-height,56px) + 16px)!important;background:rgba(6,5,7,.62)!important;backdrop-filter:blur(6px)!important}
+html:not(#u):not(#v) body dialog.game-dialog[open]{inset:var(--titlebar-height,56px) 0 0 0;margin:auto;max-height:calc(100vh - var(--titlebar-height,56px) - 40px)!important}
+html:not(#u):not(#v) body dialog.game-dialog.dev-notice[open]{height:min(940px,calc(100vh - var(--titlebar-height,56px) - 40px))!important}
+html:not(#u):not(#v) body dialog.game-dialog.dev-notice[open]:not(:has(.dev-notice-updates:not([hidden]))):not(:has(.dev-notice-page:not([hidden])>.dev-notice-scroll)){height:auto!important}
+html:not(#u):not(#v) body :is(dialog.game-dialog,dialog.profile-panel)::backdrop{background:rgba(6,5,7,.62)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+html:not(#u):not(#v) body .lv-backdrop{padding-top:calc(var(--titlebar-height,56px) + 16px)!important;background:rgba(6,5,7,.62)!important;backdrop-filter:blur(6px)!important}
 /* kickers in every dialog: gold mono, readable */
-html body :is(.dev-notice-top,dialog.feedback-dialog .game-dialog-kicker,.lv-kicker){font-family:var(--u-mono)!important;font-size:11px!important;letter-spacing:.28em!important;color:var(--g-gold)!important}
-html body .dev-notice-top span:last-child{color:var(--g-t3,#a08a80)!important}
+html:not(#u):not(#v) body :is(.dev-notice-top,dialog.feedback-dialog .game-dialog-kicker,.lv-kicker){font-family:var(--u-mono)!important;font-size:11px!important;letter-spacing:.28em!important;color:var(--g-gold)!important}
+html:not(#u):not(#v) body .dev-notice-top span:last-child{color:var(--g-t3,#a08a80)!important}
 /* buttons: the paper blocks become the app's own star-seal primary (e255, as on the detail page); one primary per
    dialog, the rest are hairline secondaries */
-html body dialog.game-dialog :is(.dev-notice-form button.primary,.dialog-actions button.primary){
+html:not(#u):not(#v) body dialog.game-dialog :is(.dev-notice-form button.primary,.dialog-actions button.primary){
  border:0!important;border-radius:10px!important;color:#fbeedd!important;text-shadow:0 0 10px rgba(255,170,120,.35)!important;letter-spacing:.08em;font-weight:600;
  background:radial-gradient(1.2px 1.2px at 78% 28%,rgba(255,226,180,.9),transparent 70%),radial-gradient(1px 1px at 88% 66%,rgba(255,226,180,.7),transparent 70%),radial-gradient(120% 140% at 0% 50%,rgba(196,40,58,.55),transparent 62%),linear-gradient(135deg,#3a1720 0%,#2a1219 45%,#1d1016 100%)!important;
  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold-accent,#edb56e) 42%,transparent),inset 0 0 0 3px rgba(20,10,12,.55),inset 0 0 0 4px color-mix(in srgb,var(--gold-accent,#edb56e) 14%,transparent),0 6px 18px -6px rgba(150,20,40,.55)!important}
-html body dialog.game-dialog .dialog-actions button.primary{height:48px!important;min-width:128px}
-html body dialog.game-dialog .dev-notice-form>button.primary{border-radius:0 10px 10px 0!important}
-html body dialog.game-dialog :is(.dev-notice-form button.primary,.dialog-actions button.primary):hover{filter:brightness(1.15)}
-html body dialog.game-dialog :is(.dev-notice .dev-notice-actions button.secondary.secondary.secondary,.dialog-actions .text-button){
+html:not(#u):not(#v) body dialog.game-dialog .dialog-actions button.primary{height:48px!important;min-width:128px}
+html:not(#u):not(#v) body dialog.game-dialog .dev-notice-form>button.primary{border-radius:0 10px 10px 0!important}
+html:not(#u):not(#v) body dialog.game-dialog :is(.dev-notice-form button.primary,.dialog-actions button.primary):hover{filter:brightness(1.15)}
+html:not(#u):not(#v) body dialog.game-dialog :is(.dev-notice .dev-notice-actions button.secondary.secondary.secondary,.dialog-actions .text-button){
  height:44px!important;min-width:96px;padding:0 22px!important;border:0!important;border-radius:2px!important;background:rgba(255,255,255,.03)!important;background-image:none!important;
  color:var(--g-t1,#f1e0d2)!important;text-decoration:none!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important;letter-spacing:.08em;font-weight:600;text-shadow:none!important}
-html body dialog.game-dialog :is(.dev-notice .dev-notice-actions button.secondary.secondary.secondary,.dialog-actions .text-button):hover{background:rgba(255,255,255,.07)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important;color:var(--g-gold)!important}
-html body dialog.game-dialog :is(button,input,textarea):focus-visible{outline:1px solid var(--g-gold)!important;outline-offset:3px!important}
-html body dialog.game-dialog :is(button,input,textarea):focus:not(:focus-visible){outline:0!important}
+html:not(#u):not(#v) body dialog.game-dialog :is(.dev-notice .dev-notice-actions button.secondary.secondary.secondary,.dialog-actions .text-button):hover{background:rgba(255,255,255,.07)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important;color:var(--g-gold)!important}
+html:not(#u):not(#v) body dialog.game-dialog :is(button,input,textarea):focus-visible{outline:1px solid var(--g-gold)!important;outline-offset:3px!important}
+html:not(#u):not(#v) body dialog.game-dialog :is(button,input,textarea):focus:not(:focus-visible){outline:0!important}
 /* fields: hairline box, gold focus */
-html body .dev-notice-form>input{border:1px solid var(--u-line-2)!important;border-right:0!important;border-radius:2px 0 0 2px!important;background:rgba(10,9,12,.55)!important;border-radius:0!important}
-html body .dev-notice-form>input:focus{border-color:color-mix(in srgb,var(--g-gold) 60%,transparent)!important;outline:0}
-html body dialog.feedback-dialog :is(.feedback-text,.feedback-contact){border:1px solid var(--u-line-2)!important;border-radius:2px!important;background:rgba(10,9,12,.55)!important;resize:none!important}
-html body dialog.feedback-dialog :is(.feedback-text,.feedback-contact):focus{border-color:color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
-html body dialog.feedback-dialog .feedback-text{border-left:2px solid var(--u-red)!important}
-html body dialog.feedback-dialog .dialog-actions{margin-right:0!important;margin-left:0!important}
+html:not(#u):not(#v) body .dev-notice-form>input{border:1px solid var(--u-line-2)!important;border-right:0!important;border-radius:2px 0 0 2px!important;background:rgba(10,9,12,.55)!important;border-radius:0!important}
+html:not(#u):not(#v) body .dev-notice-form>input:focus{border-color:color-mix(in srgb,var(--g-gold) 60%,transparent)!important;outline:0}
+html:not(#u):not(#v) body dialog.feedback-dialog :is(.feedback-text,.feedback-contact){border:1px solid var(--u-line-2)!important;border-radius:2px!important;background:rgba(10,9,12,.55)!important;resize:none!important}
+html:not(#u):not(#v) body dialog.feedback-dialog :is(.feedback-text,.feedback-contact):focus{border-color:color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
+html:not(#u):not(#v) body dialog.feedback-dialog .feedback-text{border-left:2px solid var(--u-red)!important}
+html:not(#u):not(#v) body dialog.feedback-dialog .dialog-actions{margin-right:0!important;margin-left:0!important}
 .dev-notice kbd,.dev-notice .kbd{white-space:nowrap}
 
 /* ---- one switch everywhere (judge spec): 40×20 hairline track, square 14px knob, deep wine when on with a gold line
    along the track's foot; the strap's slash read as a broken icon ---- */
-html body input.switch{width:40px!important;height:20px!important;border-radius:2px!important;border:0!important;
+html:not(#u):not(#v) body input.switch{width:40px!important;height:20px!important;border-radius:2px!important;border:0!important;
  background:rgba(10,9,12,.5)!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.28)!important;transition:background .16s ease-out,box-shadow .16s}
-html body input.switch::before{top:3px!important;left:3px!important;width:14px!important;height:14px!important;border-radius:1px!important;background:rgba(232,220,200,.5)!important;box-shadow:none!important;transition:transform .16s ease-out,background-color .16s}
-html body input.switch::after{content:none!important;display:none!important}
-html body input.switch:checked{background:linear-gradient(#6e1c29,#4e1320)!important;box-shadow:inset 0 0 0 1px rgba(201,164,106,.55),inset 0 -1px 0 1px rgba(201,164,106,.75)!important}
-html body input.switch:checked::before{transform:translateX(20px)!important;background:#f1e6d3!important}
-html body input.switch:hover{box-shadow:inset 0 0 0 1px rgba(232,220,200,.5)!important}
-html body input.switch:checked:hover{background:linear-gradient(#7a2030,#561522)!important;box-shadow:inset 0 0 0 1px rgba(201,164,106,.8),inset 0 -1px 0 1px rgba(201,164,106,.9)!important}
-html body input.switch:focus-visible{outline:1px solid var(--g-gold)!important;outline-offset:3px!important}
-@media (prefers-reduced-motion:reduce){html body input.switch,html body input.switch::before{transition:none!important}}
+html:not(#u):not(#v) body input.switch::before{top:3px!important;left:3px!important;width:14px!important;height:14px!important;border-radius:1px!important;background:rgba(232,220,200,.5)!important;box-shadow:none!important;transition:transform .16s ease-out,background-color .16s}
+html:not(#u):not(#v) body input.switch::after{content:none!important;display:none!important}
+html:not(#u):not(#v) body input.switch:checked{background:linear-gradient(#6e1c29,#4e1320)!important;box-shadow:inset 0 0 0 1px rgba(201,164,106,.55),inset 0 -1px 0 1px rgba(201,164,106,.75)!important}
+html:not(#u):not(#v) body input.switch:checked::before{transform:translateX(20px)!important;background:#f1e6d3!important}
+html:not(#u):not(#v) body input.switch:hover{box-shadow:inset 0 0 0 1px rgba(232,220,200,.5)!important}
+html:not(#u):not(#v) body input.switch:checked:hover{background:linear-gradient(#7a2030,#561522)!important;box-shadow:inset 0 0 0 1px rgba(201,164,106,.8),inset 0 -1px 0 1px rgba(201,164,106,.9)!important}
+html:not(#u):not(#v) body input.switch:focus-visible{outline:1px solid var(--g-gold)!important;outline-offset:3px!important}
+@media (prefers-reduced-motion:reduce){html:not(#u):not(#v) body input.switch,html:not(#u):not(#v) body input.switch::before{transition:none!important}}
 
 /* ---- settings: a serif title per section, a solid sticky search and preview, a wider help column, one control width,
    a nav that fits Japanese and English ---- */
 .main .settings-layout{grid-template-columns:clamp(200px,16vw,248px) minmax(0,1fr)!important;gap:clamp(20px,2.4vw,40px)!important}
-html body .main .settings-content .settings-section-title{position:static!important;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal;display:block!important;min-height:0;
+html:not(#u):not(#v) body .main .settings-content .settings-section-title{position:static!important;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal;display:block!important;min-height:0;
  margin:6px 0 18px!important;padding:0!important;font-family:var(--g-serif,serif);font-size:clamp(24px,1.7vw,30px);font-weight:600;letter-spacing:.02em;color:var(--g-t1,#f1e0d2)}
-html body .main .settings-content .settings-section-title::before{content:"settings";display:block;margin-bottom:10px;font-family:var(--u-mono);font-size:11px;font-weight:400;letter-spacing:.3em;color:var(--g-gold)}
-html body .main .settings-content .settings-search{background-color:#17131a!important;border:1px solid var(--u-line-2)!important;border-radius:2px!important;box-shadow:0 14px 22px -14px rgba(0,0,0,.9)!important;z-index:8}
-html body .main .settings-content .settings-search:focus{border-color:color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
-html body .sp-preview{background:var(--u-glass-solid)!important;border:0!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2),0 18px 30px -18px #000!important}
-html body .main .settings-content .settings-help,html body .setting-description .settings-help{max-width:62ch!important;font-size:12.5px!important;line-height:1.7!important;color:color-mix(in srgb,var(--g-t2,#c3ab9c) 92%,transparent)!important}
+html:not(#u):not(#v) body .main .settings-content .settings-section-title::before{content:"settings";display:block;margin-bottom:10px;font-family:var(--u-mono);font-size:11px;font-weight:400;letter-spacing:.3em;color:var(--g-gold)}
+html:not(#u):not(#v) body .main .settings-content .settings-search{background-color:#17131a!important;border:1px solid var(--u-line-2)!important;border-radius:2px!important;box-shadow:0 14px 22px -14px rgba(0,0,0,.9)!important;z-index:8}
+html:not(#u):not(#v) body .main .settings-content .settings-search:focus{border-color:color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html:not(#u):not(#v) body .sp-preview{background:var(--u-glass-solid)!important;border:0!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2),0 18px 30px -18px #000!important}
+html:not(#u):not(#v) body .main .settings-content .settings-help,html:not(#u):not(#v) body .setting-description .settings-help{max-width:62ch!important;font-size:12.5px!important;line-height:1.7!important;color:color-mix(in srgb,var(--g-t2,#c3ab9c) 92%,transparent)!important}
 .main .settings-content .settings-row :is(.select-control,.font-control,.setting-slider,input[type=text],input[type=url],input[type=number],input:not([type]),input[type=password]):not(.switch){width:clamp(220px,22vw,300px)!important;max-width:100%;box-sizing:border-box}
 .main .settings-nav .settings-category-items button{font-size:13px!important;line-height:1.45!important;padding:8px 12px!important;white-space:normal;word-break:keep-all;overflow-wrap:anywhere}
 .main .settings-nav summary{font-size:15px!important;line-height:1.4}
 :lang(ja) .main .settings-nav .settings-category-items button,:lang(en) .main .settings-nav .settings-category-items button{font-size:12.5px!important}
-html body .sp-preview .sp-scene{background-color:#0e0c10!important}
-html body .sp-preview .sp-scene>*{background-color:transparent}
+html:not(#u):not(#v) body .sp-preview .sp-scene{background-color:#0e0c10!important}
+html:not(#u):not(#v) body .sp-preview .sp-scene>*{background-color:transparent}
 
 /* ---- segmented switches (settings pages, translation types, library / learning filters): the leaderboard's own:
    hairline frame, gold underline on the current one ---- */
-html body .translation-types{gap:0!important;padding:0!important;border:0!important;border-radius:2px!important;background:rgba(10,9,12,.42)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
-html body .translation-types button{border-radius:0!important;padding:9px clamp(12px,1.2vw,18px)!important;font-size:13px!important;letter-spacing:.08em;color:var(--g-t3,#a08a80)!important;background:none!important;box-shadow:none!important}
-html body .translation-types button:hover{color:var(--g-t1,#f1e0d2)!important}
-html body .translation-types button:is([aria-selected=true],[aria-pressed=true],.active){color:var(--g-t1,#f1e0d2)!important;background:color-mix(in srgb,var(--g-gold) 9%,transparent)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
+html:not(#u):not(#v) body .translation-types{gap:0!important;padding:0!important;border:0!important;border-radius:2px!important;background:rgba(10,9,12,.42)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
+html:not(#u):not(#v) body .translation-types button{border-radius:0!important;padding:9px clamp(12px,1.2vw,18px)!important;font-size:13px!important;letter-spacing:.08em;color:var(--g-t3,#a08a80)!important;background:none!important;box-shadow:none!important}
+html:not(#u):not(#v) body .translation-types button:hover{color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v) body .translation-types button:is([aria-selected=true],[aria-pressed=true],.active){color:var(--g-t1,#f1e0d2)!important;background:color-mix(in srgb,var(--g-gold) 9%,transparent)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
 
 /* ---- learning (kana lab, grammar, lessons, read words, statistics): the black slabs and paper blocks become the same
    glass; white "selected" chips become the gold underline; one highlight for the target particle ---- */
 :is(.gm-page,.v-index.mg,.ri-page,#learning-content){--mg-black:rgba(16,13,17,.6);--mg-line:rgba(255,255,255,.1);--mg-dim:rgba(242,232,218,.66)}
-html body :is(.gm-hud,.gm-group,.gm-lesson>.gm-steps,.mg-hud,.mg-lesson,.mg-board-grid,.mg-board-empty,.mg-voice,.mg-practice,.mg-tile,.mg-stage,.mg-game,.gm-stage,.gm-overview,.gm-hero,.gm-lesson-head,.gm-lesson-main,.rw-bar,.rw-card,.ri-stage,.ri-level,.gm-stg,.gm-stg.on){
+html:not(#u):not(#v) body :is(.gm-hud,.gm-group,.gm-lesson>.gm-steps,.mg-hud,.mg-lesson,.mg-board-grid,.mg-board-empty,.mg-voice,.mg-practice,.mg-tile,.mg-stage,.mg-game,.gm-stage,.gm-overview,.gm-hero,.gm-lesson-head,.gm-lesson-main,.rw-bar,.rw-card,.ri-stage,.ri-level,.gm-stg,.gm-stg.on){
  background-color:transparent!important;
  background:var(--u-glass)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;border-radius:2px!important;
  -webkit-backdrop-filter:blur(16px) saturate(1.2);backdrop-filter:blur(16px) saturate(1.2)}
-html body :is(.gm-hud,.mg-hud,.gm-lesson-head){box-shadow:inset 0 0 0 1px var(--u-line),inset 0 2px 0 var(--u-red)!important;border-top:0!important}
-html body :is(.gm-stg.on,.rw-card){box-shadow:inset 0 0 0 1px var(--u-line),inset 0 2px 0 var(--u-red)!important;border-top:0!important}
-html body :is(.mg-tile,.mg-game,.gm-stg):hover{box-shadow:inset 0 0 0 1px var(--u-line-2),inset 0 2px 0 color-mix(in srgb,var(--u-red) 70%,transparent)!important}
+html:not(#u):not(#v) body :is(.gm-hud,.mg-hud,.gm-lesson-head){box-shadow:inset 0 0 0 1px var(--u-line),inset 0 2px 0 var(--u-red)!important;border-top:0!important}
+html:not(#u):not(#v) body :is(.gm-stg.on,.rw-card){box-shadow:inset 0 0 0 1px var(--u-line),inset 0 2px 0 var(--u-red)!important;border-top:0!important}
+html:not(#u):not(#v) body :is(.mg-tile,.mg-game,.gm-stg):hover{box-shadow:inset 0 0 0 1px var(--u-line-2),inset 0 2px 0 color-mix(in srgb,var(--u-red) 70%,transparent)!important}
 /* paper blocks (Megumin's line, Anki offer, N0 note, the white quote, kana word card): dark glass, gold rule, light ink */
-html body :is(.gm-lesson .gm-bubble,.gm-anki-offer,.gm-n0note,.rw-quote,.v-index.mg .mk-card){background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 10%,transparent),transparent 70%),rgba(16,13,17,.62)!important;color:var(--g-t1,#f1e0d2)!important;border-left:2px solid var(--g-gold)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;border-radius:2px!important}
-html body .gm-lesson .gm-bubble :is(b,strong){color:var(--g-gold)}
+html:not(#u):not(#v) body :is(.gm-lesson .gm-bubble,.gm-anki-offer,.gm-n0note,.rw-quote,.v-index.mg .mk-card){background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 10%,transparent),transparent 70%),rgba(16,13,17,.62)!important;color:var(--g-t1,#f1e0d2)!important;border-left:2px solid var(--g-gold)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;border-radius:2px!important}
+html:not(#u):not(#v) body .gm-lesson .gm-bubble :is(b,strong){color:var(--g-gold)}
 /* white selected chips → gold underline on glass */
-html body :is(.gm-hud .gm-level.active,.gm-gtab.on,.v-index.mg .mk-lv.on,.v-index.mg .mk-lv.on.l0){background:color-mix(in srgb,var(--g-gold) 12%,transparent)!important;border-color:color-mix(in srgb,var(--g-gold) 55%,transparent)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
-html body :is(.gm-barcode i.on,.gm-stg-bar i.on){background:var(--g-gold)!important}
-html body .gm-stg.clear .gm-stg-flag{background:var(--g-gold)!important;color:#120d0c!important}
-html body .gm-lesson .gm-choice:hover:not(:disabled){background:color-mix(in srgb,var(--g-gold) 16%,rgba(16,13,17,.7))!important;color:var(--g-t1,#f1e0d2)!important}
-html body .gm-map .gm-node{background:rgba(16,13,17,.62)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
-html body :is(.gm-map .gm-node .gm-chip:hover,.v-index.mg .mk-say:hover){background:var(--g-gold)!important;color:#120d0c!important}
-html body :is(.mg-legend i.m2,.v-index.mg .mastery .m2){background:var(--g-gold)!important;color:#120d0c!important}
-html body :is(.ri-bar-met,.ri-n5){background:var(--g-gold)!important}
+html:not(#u):not(#v) body :is(.gm-hud .gm-level.active,.gm-gtab.on,.v-index.mg .mk-lv.on,.v-index.mg .mk-lv.on.l0){background:color-mix(in srgb,var(--g-gold) 12%,transparent)!important;border-color:color-mix(in srgb,var(--g-gold) 55%,transparent)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
+html:not(#u):not(#v) body :is(.gm-barcode i.on,.gm-stg-bar i.on){background:var(--g-gold)!important}
+html:not(#u):not(#v) body .gm-stg.clear .gm-stg-flag{background:var(--g-gold)!important;color:#120d0c!important}
+html:not(#u):not(#v) body .gm-lesson .gm-choice:hover:not(:disabled){background:color-mix(in srgb,var(--g-gold) 16%,rgba(16,13,17,.7))!important;color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v) body .gm-map .gm-node{background:rgba(16,13,17,.62)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
+html:not(#u):not(#v) body :is(.gm-map .gm-node .gm-chip:hover,.v-index.mg .mk-say:hover){background:var(--g-gold)!important;color:#120d0c!important}
+html:not(#u):not(#v) body :is(.mg-legend i.m2,.v-index.mg .mastery .m2){background:var(--g-gold)!important;color:#120d0c!important}
+html:not(#u):not(#v) body :is(.ri-bar-met,.ri-n5){background:var(--g-gold)!important}
 /* the kickers stay mono but readable */
-html body :is(.gm-page,.v-index.mg,.ri-page) :is([class*=kicker],[class*=eyebrow],.mg-k,.gm-k){font-size:11px!important;letter-spacing:.24em!important}
+html:not(#u):not(#v) body :is(.gm-page,.v-index.mg,.ri-page) :is([class*=kicker],[class*=eyebrow],.mg-k,.gm-k){font-size:11px!important;letter-spacing:.24em!important}
 /* small print in the learning pages: at least 11–12px, a step brighter */
-html body #learning-content :is(small,.mg-legend,.gm-legend,.ri-note,.stg-foot,.gm-step-count,.mg-row-label){font-size:max(11.5px,1em)!important}
+html:not(#u):not(#v) body #learning-content :is(small,.mg-legend,.gm-legend,.ri-note,.stg-foot,.gm-step-count,.mg-row-label){font-size:max(11.5px,1em)!important}
 
 /* ---- grammar lessons: hairlines instead of dashes, a glass highlight for the current step, ghost "previous",
    one way to mark the target particle, room under the sticky band ---- */
 .workspace>.main:has(>.tabs){scroll-padding-top:96px}
-html body #learning-content :is(.gm-lesson,.gm-lesson-head,.gm-page){scroll-margin-top:96px}
-html body .gm-page :is(.gm-lead-line,.gm-pill,.gm-block,.gm-lesson-head .gm-chip,.gm-lesson .gm-lead-line,.gm-lesson .gm-widget,.gm-find){border-style:solid!important;border-color:var(--u-line)!important;border-radius:2px!important}
-html body .gm-page :is(.gm-lesson .gm-step-dot,.gm-lesson .gm-stepnav,.gm-lesson .gm-formulas li,.gm-more){border-style:solid!important;border-color:var(--u-line)!important}
-html body .gm-page .gm-hero-side{border-left-style:solid!important;border-color:var(--u-line)!important}
-html body .gm-page .gm-stage::before{border-style:solid;border-color:rgba(255,255,255,.06)}
-html body .gm-lesson .gm-step-dot{background:none!important}
-html body .gm-lesson .gm-step-dot.active{background:linear-gradient(90deg,rgba(200,50,60,.18),transparent)!important;box-shadow:inset 2px 0 0 var(--u-red)!important;color:var(--g-t1,#f1e0d2)!important}
-html body .gm-lesson .gm-step-dot span{font-size:12px!important;letter-spacing:.1em!important}
-html body .gm-lesson .gm-stepnav{gap:16px}
-html body .gm-lesson .gm-stepnav button:not(.primary){height:40px;border:0!important;border-radius:2px!important;background:transparent!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;color:var(--g-t1,#f1e0d2)!important}
-html body .gm-lesson .gm-stepnav button:not(.primary):disabled{opacity:.38}
-html body .gm-lesson .gm-stepnav :is(span,small,.gm-count){font-size:12px!important;letter-spacing:.14em;color:var(--g-t2,#c3ab9c)}
-html body .gm-page .gm-back{height:36px;border:0!important;border-radius:2px!important;background:rgba(16,13,17,.62)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;font-size:12px!important;letter-spacing:.2em!important}
-html body .gm-page .gm-back:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--u-red) 70%,transparent)!important}
-html body .gm-page :is(.gm-hl,.gm-jd-hl){background:color-mix(in srgb,var(--g-gold) 20%,transparent)!important;color:var(--g-gold)!important;box-shadow:inset 0 -1px 0 var(--g-gold);border:0!important;border-radius:1px}
-html body .gm-page .gm-blank.gm-drop{border:1px solid color-mix(in srgb,var(--g-gold) 55%,transparent)!important;border-radius:2px!important;background:color-mix(in srgb,var(--g-gold) 6%,transparent)!important;font-size:12px!important;letter-spacing:.14em!important;vertical-align:middle}
-html body .gm-page :is(.gm-choices button,.gm-palette button,.gm-word-picks button,.gm-pills button){border-radius:2px!important;background:rgba(16,13,17,.6)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;border:0!important;color:var(--g-t1,#f1e0d2)!important}
-html body .gm-page .gm-slot{border-bottom:1px solid color-mix(in srgb,var(--g-gold) 60%,transparent)!important;background:color-mix(in srgb,var(--g-gold) 6%,transparent)!important}
-html body .gm-lesson-main>:first-child{max-width:980px}
-html body .gm-page :is(.gm-link,.gm-ex-actions button,.gm-say){font-size:12px!important}
+html:not(#u):not(#v) body #learning-content :is(.gm-lesson,.gm-lesson-head,.gm-page){scroll-margin-top:96px}
+html:not(#u):not(#v) body .gm-page :is(.gm-lead-line,.gm-pill,.gm-block,.gm-lesson-head .gm-chip,.gm-lesson .gm-lead-line,.gm-lesson .gm-widget,.gm-find){border-style:solid!important;border-color:var(--u-line)!important;border-radius:2px!important}
+html:not(#u):not(#v) body .gm-page :is(.gm-lesson .gm-step-dot,.gm-lesson .gm-stepnav,.gm-lesson .gm-formulas li,.gm-more){border-style:solid!important;border-color:var(--u-line)!important}
+html:not(#u):not(#v) body .gm-page .gm-hero-side{border-left-style:solid!important;border-color:var(--u-line)!important}
+html:not(#u):not(#v) body .gm-page .gm-stage::before{border-style:solid;border-color:rgba(255,255,255,.06)}
+html:not(#u):not(#v) body .gm-lesson .gm-step-dot{background:none!important}
+html:not(#u):not(#v) body .gm-lesson .gm-step-dot.active{background:linear-gradient(90deg,rgba(200,50,60,.18),transparent)!important;box-shadow:inset 2px 0 0 var(--u-red)!important;color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v) body .gm-lesson .gm-step-dot span{font-size:12px!important;letter-spacing:.1em!important}
+html:not(#u):not(#v) body .gm-lesson .gm-stepnav{gap:16px}
+html:not(#u):not(#v) body .gm-lesson .gm-stepnav button:not(.primary){height:40px;border:0!important;border-radius:2px!important;background:transparent!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v) body .gm-lesson .gm-stepnav button:not(.primary):disabled{opacity:.38}
+html:not(#u):not(#v) body .gm-lesson .gm-stepnav :is(span,small,.gm-count){font-size:12px!important;letter-spacing:.14em;color:var(--g-t2,#c3ab9c)}
+html:not(#u):not(#v) body .gm-page .gm-back{height:36px;border:0!important;border-radius:2px!important;background:rgba(16,13,17,.62)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;font-size:12px!important;letter-spacing:.2em!important}
+html:not(#u):not(#v) body .gm-page .gm-back:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--u-red) 70%,transparent)!important}
+html:not(#u):not(#v) body .gm-page :is(.gm-hl,.gm-jd-hl){background:color-mix(in srgb,var(--g-gold) 20%,transparent)!important;color:var(--g-gold)!important;box-shadow:inset 0 -1px 0 var(--g-gold);border:0!important;border-radius:1px}
+html:not(#u):not(#v) body .gm-page .gm-blank.gm-drop{border:1px solid color-mix(in srgb,var(--g-gold) 55%,transparent)!important;border-radius:2px!important;background:color-mix(in srgb,var(--g-gold) 6%,transparent)!important;font-size:12px!important;letter-spacing:.14em!important;vertical-align:middle}
+html:not(#u):not(#v) body .gm-page :is(.gm-choices button,.gm-palette button,.gm-word-picks button,.gm-pills button){border-radius:2px!important;background:rgba(16,13,17,.6)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;border:0!important;color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v) body .gm-page .gm-slot{border-bottom:1px solid color-mix(in srgb,var(--g-gold) 60%,transparent)!important;background:color-mix(in srgb,var(--g-gold) 6%,transparent)!important}
+html:not(#u):not(#v) body .gm-lesson-main>:first-child{max-width:980px}
+html:not(#u):not(#v) body .gm-page :is(.gm-link,.gm-ex-actions button,.gm-say){font-size:12px!important}
 
 /* list rows: the glass without the corner tick */
-html body .main .record.word-row{border:0!important;border-radius:2px!important;background:var(--u-glass)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
-html body .main .record.word-row:hover{box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
+html:not(#u):not(#v) body .main .record.word-row{border:0!important;border-radius:2px!important;background:var(--u-glass)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+html:not(#u):not(#v) body .main .record.word-row:hover{box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
 /* restore the star on dialog primaries */
-html body dialog.game-dialog :is(.dev-notice-form button.primary,.dialog-actions button.primary)::before{content:""!important;display:block!important}
+html:not(#u):not(#v) body dialog.game-dialog :is(.dev-notice-form button.primary,.dialog-actions button.primary)::before{content:""!important;display:block!important}
 /* settings sub pages: underlined text tabs (grimoire), spaced, no frame, red current line like the detail tabs */
-html body .main .settings-content .settings-page-tabs{gap:clamp(18px,2vw,28px)!important;padding:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:inset 0 -1px 0 var(--u-line)!important;width:100%!important;margin-bottom:18px!important}
-html body .main .settings-content .settings-page-tabs button{padding:10px 0!important;font-size:13px!important;letter-spacing:.1em;color:var(--g-t3,#a08a80)!important;background:none!important;border-radius:0!important;box-shadow:none!important}
-html body .main .settings-content .settings-page-tabs button:hover{color:var(--g-t1,#f1e0d2)!important}
-html body .main .settings-content .settings-page-tabs button[aria-selected=true]{color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
-html body .main .settings-content .settings-page-tabs button[aria-selected=true]::after{display:none!important}
+html:not(#u):not(#v) body .main .settings-content .settings-page-tabs{gap:clamp(18px,2vw,28px)!important;padding:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:inset 0 -1px 0 var(--u-line)!important;width:100%!important;margin-bottom:18px!important}
+html:not(#u):not(#v) body .main .settings-content .settings-page-tabs button{padding:10px 0!important;font-size:13px!important;letter-spacing:.1em;color:var(--g-t3,#a08a80)!important;background:none!important;border-radius:0!important;box-shadow:none!important}
+html:not(#u):not(#v) body .main .settings-content .settings-page-tabs button:hover{color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v) body .main .settings-content .settings-page-tabs button[aria-selected=true]{color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
+html:not(#u):not(#v) body .main .settings-content .settings-page-tabs button[aria-selected=true]::after{display:none!important}
 /* live preview chips: square */
-html body .sp-preview :is(.sp-next,.sp-read,.sp-read button,.sp-scene,.sp-scene *[class*=name],.sp-tag){border-radius:2px!important}
-html body .sp-preview .sp-next{border-color:rgba(232,220,200,.22)!important;background:rgba(255,255,255,.03)!important;color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v) body .sp-preview :is(.sp-next,.sp-read,.sp-read button,.sp-scene,.sp-scene *[class*=name],.sp-tag){border-radius:2px!important}
+html:not(#u):not(#v) body .sp-preview .sp-next{border-color:rgba(232,220,200,.22)!important;background:rgba(255,255,255,.03)!important;color:var(--g-t1,#f1e0d2)!important}
 /* word cards: the example line reads as a quote you can open, not a raw link; square icon buttons */
-html body .main .record .word-source{font-size:12.5px;color:var(--g-t3,#a08a80)}
-html body .main .record .word-source .link-button{text-decoration:none!important;color:var(--g-t2,#c3ab9c)!important;font-family:var(--g-serif-ja,serif);font-size:13px;padding:2px 0 2px 10px!important;box-shadow:inset 2px 0 0 color-mix(in srgb,var(--g-gold) 55%,transparent)}
-html body .main .record .word-source .link-button:hover{color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 2px 0 0 var(--g-gold)}
-html body .main :is(.record,.word-actions) .icon-button{border-radius:2px!important;background:transparent!important;box-shadow:inset 0 0 0 1px var(--u-line)!important}
-html body .main :is(.record,.word-actions) .icon-button:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--u-red) 70%,transparent)!important;color:#e8a0a8!important}
+html:not(#u):not(#v) body .main .record .word-source{font-size:12.5px;color:var(--g-t3,#a08a80)}
+html:not(#u):not(#v) body .main .record .word-source .link-button{text-decoration:none!important;color:var(--g-t2,#c3ab9c)!important;font-family:var(--g-serif-ja,serif);font-size:13px;padding:2px 0 2px 10px!important;box-shadow:inset 2px 0 0 color-mix(in srgb,var(--g-gold) 55%,transparent)}
+html:not(#u):not(#v) body .main .record .word-source .link-button:hover{color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 2px 0 0 var(--g-gold)}
+html:not(#u):not(#v) body .main :is(.record,.word-actions) .icon-button{border-radius:2px!important;background:transparent!important;box-shadow:inset 0 0 0 1px var(--u-line)!important}
+html:not(#u):not(#v) body .main :is(.record,.word-actions) .icon-button:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--u-red) 70%,transparent)!important;color:#e8a0a8!important}
 
 /* ---- learning statistics: one quiet range switch (hairline, gold underline), wine heat instead of signal red,
    a gold diamond instead of the red square, square calendar cells ---- */
-html body .stg .stg-rs{gap:0;padding:0;border:0!important;border-radius:2px!important;background:rgba(10,9,12,.42)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important}
-html body .stg .stg-rs button{height:24px;border-radius:0!important;background:none!important;color:var(--g-t3,#a08a80)!important;font-size:12px}
-html body .stg .stg-rs button[aria-pressed=true]{background:color-mix(in srgb,var(--g-gold) 10%,transparent)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 #c82f3b}
-html body .stg .stg-cal{--accent:#9b2a3a}
-html body .stg .stg-cal .cell{border-radius:2px}
-html body .stg .stg-cal .cell.blank{border-style:solid;border-color:rgba(255,255,255,.04)}
-html body .stg .stg-head h2::before{width:5px;height:5px;background:var(--g-gold);transform:rotate(45deg);margin-right:12px}
-html body .stg .stg-tabs button[aria-pressed=true]::after{background:#c82f3b}
-html body .stg :is(.stg-foot,.stg-legend,.stg-note,.stg-more,.stg-cal .wd){font-size:12px!important;color:var(--g-t2,#c3ab9c)!important}
+html:not(#u):not(#v) body .stg .stg-rs{gap:0;padding:0;border:0!important;border-radius:2px!important;background:rgba(10,9,12,.42)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important}
+html:not(#u):not(#v) body .stg .stg-rs button{height:24px;border-radius:0!important;background:none!important;color:var(--g-t3,#a08a80)!important;font-size:12px}
+html:not(#u):not(#v) body .stg .stg-rs button[aria-pressed=true]{background:color-mix(in srgb,var(--g-gold) 10%,transparent)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -2px 0 #c82f3b}
+html:not(#u):not(#v) body .stg .stg-cal{--accent:#9b2a3a}
+html:not(#u):not(#v) body .stg .stg-cal .cell{border-radius:2px}
+html:not(#u):not(#v) body .stg .stg-cal .cell.blank{border-style:solid;border-color:rgba(255,255,255,.04)}
+html:not(#u):not(#v) body .stg .stg-head h2::before{width:5px;height:5px;background:var(--g-gold);transform:rotate(45deg);margin-right:12px}
+html:not(#u):not(#v) body .stg .stg-tabs button[aria-pressed=true]::after{background:#c82f3b}
+html:not(#u):not(#v) body .stg :is(.stg-foot,.stg-legend,.stg-note,.stg-more,.stg-cal .wd){font-size:12px!important;color:var(--g-t2,#c3ab9c)!important}
 /* read words: the hud on the glass, the status as a note, readable small print */
-html body .ri-hud{background:var(--u-glass)!important;border-top:0!important;box-shadow:inset 0 0 0 1px var(--u-line),inset 0 2px 0 var(--u-red)!important;border-radius:2px;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
-html body .ri-hud-stats{font-size:11.5px!important;letter-spacing:.1em!important;color:var(--g-t2,#c3ab9c)!important}
-html body .ri-status{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:2px;background:color-mix(in srgb,var(--g-gold) 7%,transparent);box-shadow:inset 2px 0 0 var(--g-gold);font-size:12.5px!important;letter-spacing:.06em!important;color:var(--g-t1,#f1e0d2)!important}
-html body :is(.ri-help,.ri-sub,.ri-meta,.ri-level-sub,.ri-legend){font-size:12px!important;color:var(--g-t2,#c3ab9c)!important}
-html body .ri-level{box-shadow:inset 0 0 0 1px var(--u-line)!important}
+html:not(#u):not(#v) body .ri-hud{background:var(--u-glass)!important;border-top:0!important;box-shadow:inset 0 0 0 1px var(--u-line),inset 0 2px 0 var(--u-red)!important;border-radius:2px;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+html:not(#u):not(#v) body .ri-hud-stats{font-size:11.5px!important;letter-spacing:.1em!important;color:var(--g-t2,#c3ab9c)!important}
+html:not(#u):not(#v) body .ri-status{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:2px;background:color-mix(in srgb,var(--g-gold) 7%,transparent);box-shadow:inset 2px 0 0 var(--g-gold);font-size:12.5px!important;letter-spacing:.06em!important;color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v) body :is(.ri-help,.ri-sub,.ri-meta,.ri-level-sub,.ri-legend){font-size:12px!important;color:var(--g-t2,#c3ab9c)!important}
+html:not(#u):not(#v) body .ri-level{box-shadow:inset 0 0 0 1px var(--u-line)!important}
 /* empty states: the star-seal primary and a hairline secondary, readable steps, the card sits in the visual centre */
-html body .g-blank{margin:clamp(28px,8vh,96px) auto 28px!important}
-html body .g-blank .acts button.go{height:44px;padding:0 22px;border:0;border-radius:10px;color:#fbeedd;letter-spacing:.08em;font-weight:600;text-shadow:0 0 10px rgba(255,170,120,.35);
+html:not(#u):not(#v) body .g-blank{margin:clamp(28px,8vh,96px) auto 28px!important}
+html:not(#u):not(#v) body .g-blank .acts button.go{height:44px;padding:0 22px;border:0;border-radius:10px;color:#fbeedd;letter-spacing:.08em;font-weight:600;text-shadow:0 0 10px rgba(255,170,120,.35);
  background:radial-gradient(1.2px 1.2px at 78% 28%,rgba(255,226,180,.9),transparent 70%),radial-gradient(120% 140% at 0% 50%,rgba(196,40,58,.55),transparent 62%),linear-gradient(135deg,#3a1720 0%,#2a1219 45%,#1d1016 100%)!important;
  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold-accent,#edb56e) 42%,transparent),inset 0 0 0 3px rgba(20,10,12,.55),inset 0 0 0 4px color-mix(in srgb,var(--gold-accent,#edb56e) 14%,transparent),0 6px 18px -6px rgba(150,20,40,.55)!important}
-html body .g-blank .acts button.go:hover{filter:brightness(1.15)}
-html body .g-blank .acts button.alt{height:44px;padding:0 20px;border:0;border-radius:2px;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important;color:var(--g-t1,#f1e0d2)}
-html body .g-blank .steps div{font-size:12.5px!important;color:var(--g-t2,#c3ab9c)!important;line-height:1.6}
-html body .g-blank .steps b{display:block;margin-bottom:2px;font-size:13.5px;color:var(--g-t1,#f1e0d2)}
-html body .g-blank .lede{font-size:13.5px!important}
-html body .g-blank .glyph{right:18px!important;bottom:-24px!important;font-size:200px!important;color:color-mix(in srgb,var(--g-gold) 7%,transparent)!important}
+html:not(#u):not(#v) body .g-blank .acts button.go:hover{filter:brightness(1.15)}
+html:not(#u):not(#v) body .g-blank .acts button.alt{height:44px;padding:0 20px;border:0;border-radius:2px;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important;color:var(--g-t1,#f1e0d2)}
+html:not(#u):not(#v) body .g-blank .steps div{font-size:12.5px!important;color:var(--g-t2,#c3ab9c)!important;line-height:1.6}
+html:not(#u):not(#v) body .g-blank .steps b{display:block;margin-bottom:2px;font-size:13.5px;color:var(--g-t1,#f1e0d2)}
+html:not(#u):not(#v) body .g-blank .lede{font-size:13.5px!important}
+html:not(#u):not(#v) body .g-blank .glyph{right:18px!important;bottom:-24px!important;font-size:200px!important;color:color-mix(in srgb,var(--g-gold) 7%,transparent)!important}
 /* dictionary at rest: a quiet watermark instead of an empty field */
-html body #lookup-results:empty{position:relative;min-height:46vh}
-html body #lookup-results:empty::before{content:"辞";position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);font:400 min(34vh,300px)/1 var(--g-serif-ja,serif);color:transparent;-webkit-text-stroke:1px color-mix(in srgb,var(--g-t1,#f1e0d2) 14%,transparent);pointer-events:none}
-html body .main .lookup-form input{border-radius:2px!important}
-html body .main :is(.lookup-form,.moji-account) button:not(.primary){border-radius:2px!important}
-html body .main :is(.lookup-chips,.lookup-recent) :is(button,a){border-radius:2px!important}
+html:not(#u):not(#v) body #lookup-results:empty{position:relative;min-height:46vh}
+html:not(#u):not(#v) body #lookup-results:empty::before{content:"辞";position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);font:400 min(34vh,300px)/1 var(--g-serif-ja,serif);color:transparent;-webkit-text-stroke:1px color-mix(in srgb,var(--g-t1,#f1e0d2) 14%,transparent);pointer-events:none}
+html:not(#u):not(#v) body .main .lookup-form input{border-radius:2px!important}
+html:not(#u):not(#v) body .main :is(.lookup-form,.moji-account) button:not(.primary){border-radius:2px!important}
+html:not(#u):not(#v) body .main :is(.lookup-chips,.lookup-recent) :is(button,a){border-radius:2px!important}
 /* lining figures survive any later font-variant-numeric:tabular-nums (a separate property) */
 html,body,dialog{font-feature-settings:"lnum" 1}
-html body .g-dict-chips :is(button,a,span[role=button]){border-radius:2px!important}
-html body .main .lookup-form .secondary{border-radius:2px!important;height:44px}
-html body .main .lookup-form input{border-color:var(--u-line-2)!important}
-html body .main .lookup-form input:focus{border-color:color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html:not(#u):not(#v) body .g-dict-chips :is(button,a,span[role=button]){border-radius:2px!important}
+html:not(#u):not(#v) body .main .lookup-form .secondary{border-radius:2px!important;height:44px}
+html:not(#u):not(#v) body .main .lookup-form input{border-color:var(--u-line-2)!important}
+html:not(#u):not(#v) body .main .lookup-form input:focus{border-color:color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
 
 /* ---- home: the activity card hides the canvas line behind it, heat cells lean to the brand wine (still tinted by the
    cover), today's cell stays inside the grid, outside pictures are toned down until hovered, figures get a halo ---- */
-html body .tv-heat-card .tv-face{background:color-mix(in srgb,var(--bg) 82%,transparent)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
-html body .tv-heat i.l2{background:color-mix(in srgb,var(--tv-b) 35%,#8f2534)!important}
-html body .tv-heat i.l3{background:color-mix(in srgb,var(--tv-a) 35%,#c8323c)!important}
-html body .tv-heat i.today{outline:0!important;box-shadow:inset 0 0 0 1px var(--g-gold);background:color-mix(in srgb,var(--g-gold) 70%,transparent)!important}
-html body .tv-daily-pic{filter:saturate(.35) brightness(.78) contrast(1.05);transition:filter .3s,border-color .2s}
-html body .tv-daily-pic:hover{filter:none}
-html body .tv-fig b{text-shadow:0 0 18px rgba(8,6,9,.9),0 0 3px rgba(8,6,9,.9)}
-html body .tv-fig small,html body .tv-heatsum{font-size:11.5px!important;color:var(--g-t2,#c3ab9c)!important}
+html:not(#u):not(#v) body .tv-heat-card .tv-face{background:color-mix(in srgb,var(--bg) 82%,transparent)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+html:not(#u):not(#v) body .tv-heat i.l2{background:color-mix(in srgb,var(--tv-b) 35%,#8f2534)!important}
+html:not(#u):not(#v) body .tv-heat i.l3{background:color-mix(in srgb,var(--tv-a) 35%,#c8323c)!important}
+html:not(#u):not(#v) body .tv-heat i.today{outline:0!important;box-shadow:inset 0 0 0 1px var(--g-gold);background:color-mix(in srgb,var(--g-gold) 70%,transparent)!important}
+html:not(#u):not(#v) body .tv-daily-pic{filter:saturate(.35) brightness(.78) contrast(1.05);transition:filter .3s,border-color .2s}
+html:not(#u):not(#v) body .tv-daily-pic:hover{filter:none}
+html:not(#u):not(#v) body .tv-fig b{text-shadow:0 0 18px rgba(8,6,9,.9),0 0 3px rgba(8,6,9,.9)}
+html:not(#u):not(#v) body .tv-fig small,html:not(#u):not(#v) body .tv-heatsum{font-size:11.5px!important;color:var(--g-t2,#c3ab9c)!important}
 
 /* ---- library: the toolbar is one glass bar (2px corners, hairline) — at the top in the list, at the foot of the wall
    so it never sits on a row of titles; the list's head band is clear glass with a hairline; captions fade at the edge,
    meta a step larger and brighter, status dots in the brand palette ---- */
-html body .main .field-search{border-radius:2px!important;border:0!important;background:linear-gradient(160deg,rgba(28,22,26,.94),rgba(16,13,17,.94))!important;box-shadow:inset 0 0 0 1px var(--u-line-2),0 18px 40px -16px #000!important;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
-html body .main .field-search .icon-button{border-radius:2px!important}
-html body .main .field-search input{border-radius:2px!important}
-html body .main:not(.field-list)>.field-search{top:auto!important;bottom:28px!important;transform:translateX(-50%)!important}
-html body .lib-list:not(.lib-selecting)::before{background:none!important;border-bottom-color:var(--u-line)!important}
-html body .main .game-caption.mq-box{-webkit-mask:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent);mask:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent)}
-html body .lib-list .game-caption{height:auto!important;min-height:0!important;padding:12px 2px 4px!important;font-size:13px!important}
-html body .lib-list .library-card-meta{gap:6px!important;padding:4px 2px 0!important;font-size:12px!important;color:var(--g-t2,#c3ab9c)!important}
-html body .lib-list .library-card-meta *{font-size:12px!important;color:inherit}
-html body .hook-support.supported::before{background:var(--g-gold)!important}
-html body .hook-support::before{border-radius:1px!important;transform:rotate(45deg)}
-html body .main .cover-frame{border-radius:2px!important}
-html body .main .cover-frame img.cover{border-radius:2px!important}
-html body .main.field-page:not(.field-list)>.field-search{bottom:18px!important}
-html body .main.field-page:not(.field-list)::after{content:"";position:fixed;left:0;right:0;bottom:0;height:120px;z-index:3;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(9,7,10,.88) 70%)}
+html:not(#u):not(#v) body .main .field-search{border-radius:2px!important;border:0!important;background:linear-gradient(160deg,rgba(28,22,26,.94),rgba(16,13,17,.94))!important;box-shadow:inset 0 0 0 1px var(--u-line-2),0 18px 40px -16px #000!important;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+html:not(#u):not(#v) body .main .field-search .icon-button{border-radius:2px!important}
+html:not(#u):not(#v) body .main .field-search input{border-radius:2px!important}
+html:not(#u):not(#v) body .main:not(.field-list)>.field-search{top:auto!important;bottom:28px!important;transform:translateX(-50%)!important}
+html:not(#u):not(#v) body .lib-list:not(.lib-selecting)::before{background:none!important;border-bottom-color:var(--u-line)!important}
+html:not(#u):not(#v) body .main .game-caption.mq-box{-webkit-mask:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent);mask:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent)}
+html:not(#u):not(#v) body .lib-list .game-caption{height:auto!important;min-height:0!important;padding:12px 2px 4px!important;font-size:13px!important}
+html:not(#u):not(#v) body .lib-list .library-card-meta{gap:6px!important;padding:4px 2px 0!important;font-size:12px!important;color:var(--g-t2,#c3ab9c)!important}
+html:not(#u):not(#v) body .lib-list .library-card-meta *{font-size:12px!important;color:inherit}
+html:not(#u):not(#v) body .hook-support.supported::before{background:var(--g-gold)!important}
+html:not(#u):not(#v) body .hook-support::before{border-radius:1px!important;transform:rotate(45deg)}
+html:not(#u):not(#v) body .main .cover-frame{border-radius:2px!important}
+html:not(#u):not(#v) body .main .cover-frame img.cover{border-radius:2px!important}
+html:not(#u):not(#v) body .main.field-page:not(.field-list)>.field-search{bottom:18px!important}
+html:not(#u):not(#v) body .main.field-page:not(.field-list)::after{content:"";position:fixed;left:0;right:0;bottom:0;height:120px;z-index:3;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(9,7,10,.88) 70%)}
 
 /* ---- history: fixed metric columns (they no longer drift with the digits), readable labels, the 史 watermark stays
    behind the rows, the font link keeps clear of the frame ---- */
-html body .main:has(>.history-backdrop) .history-metrics{grid-template-columns:repeat(3,clamp(96px,8.6vw,140px))!important}
-html body .main:has(>.history-backdrop) .history-metrics>div{padding:0 0 0 clamp(14px,1.4vw,22px)!important}
-html body .main:has(>.history-backdrop) .history-metrics>div:first-child{border-left:1px solid rgba(255,255,255,.08)!important;padding-left:clamp(14px,1.4vw,22px)!important}
-html body .main:has(>.history-backdrop) .history-metrics dt{font-size:11px!important;letter-spacing:.16em!important;color:var(--g-t2,#c3ab9c)!important}
-html body .workspace>.stage-cover[data-kind~=history-backdrop] .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1) 7%,transparent)}
-html body .main:has(>.history-backdrop) :is(.history-session,.history-dialogue){background:linear-gradient(160deg,rgba(24,22,28,.84),rgba(14,13,17,.78))!important}
-html body .main:has(>.history-backdrop) :is(.dialogue-translation.is-missing,.history-dialogue .retry,.history-dialogue [data-retry]){font-size:12px!important;letter-spacing:.08em!important}
+html:not(#u):not(#v) body .main:has(>.history-backdrop) .history-metrics{grid-template-columns:repeat(3,clamp(96px,8.6vw,140px))!important}
+html:not(#u):not(#v) body .main:has(>.history-backdrop) .history-metrics>div{padding:0 0 0 clamp(14px,1.4vw,22px)!important}
+html:not(#u):not(#v) body .main:has(>.history-backdrop) .history-metrics>div:first-child{border-left:1px solid rgba(255,255,255,.08)!important;padding-left:clamp(14px,1.4vw,22px)!important}
+html:not(#u):not(#v) body .main:has(>.history-backdrop) .history-metrics dt{font-size:11px!important;letter-spacing:.16em!important;color:var(--g-t2,#c3ab9c)!important}
+html:not(#u):not(#v) body .workspace>.stage-cover[data-kind~=history-backdrop] .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1) 7%,transparent)}
+html:not(#u):not(#v) body .main:has(>.history-backdrop) :is(.history-session,.history-dialogue){background:linear-gradient(160deg,rgba(24,22,28,.84),rgba(14,13,17,.78))!important}
+html:not(#u):not(#v) body .main:has(>.history-backdrop) :is(.dialogue-translation.is-missing,.history-dialogue .retry,.history-dialogue [data-retry]){font-size:12px!important;letter-spacing:.08em!important}
 
 /* ---- detail: every panel has the same inner padding (titles no longer touch the frame or the gold tick), the two
    columns start on one line, an unavailable rating reads as a quiet empty state ---- */
-html body .main:has(>.dtv-bg) .game-detail-content .panel{padding:clamp(20px,1.8vw,28px)!important;box-sizing:border-box}
-html body .main:has(>.dtv-bg) .game-detail-content details.panel.detail-technical>summary{padding:0 0 12px!important}
-html body .main:has(>.dtv-bg) .detail-aside{padding-top:0!important}
-html body .main:has(>.dtv-bg) .review-platform.is-unavailable{opacity:.62}
-html body .main:has(>.dtv-bg) .review-platform :is(small,.review-region,.review-state){font-size:11.5px!important}
-html body .main:has(>.dtv-bg) .detail-info-row :is(dt,span:first-child,small){font-size:11.5px!important;letter-spacing:.14em!important;color:var(--g-t2,#c3ab9c)!important}
+html:not(#u):not(#v) body .main:has(>.dtv-bg) .game-detail-content .panel{padding:clamp(20px,1.8vw,28px)!important;box-sizing:border-box}
+html:not(#u):not(#v) body .main:has(>.dtv-bg) .game-detail-content details.panel.detail-technical>summary{padding:0 0 12px!important}
+html:not(#u):not(#v) body .main:has(>.dtv-bg) .detail-aside{padding-top:0!important}
+html:not(#u):not(#v) body .main:has(>.dtv-bg) .review-platform.is-unavailable{opacity:.62}
+html:not(#u):not(#v) body .main:has(>.dtv-bg) .review-platform :is(small,.review-region,.review-state){font-size:11.5px!important}
+html:not(#u):not(#v) body .main:has(>.dtv-bg) .detail-info-row :is(dt,span:first-child,small){font-size:11.5px!important;letter-spacing:.14em!important;color:var(--g-t2,#c3ab9c)!important}
 .main:has(>.tabs)>.page-header{top:0!important;height:44px;display:flex!important;align-items:center}
-html body .workspace>.stage-cover:not([data-stage=leaderboard]) .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 9%,transparent)}
+html:not(#u):not(#v) body .workspace>.stage-cover:not([data-stage=leaderboard]) .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 9%,transparent)}
 
 /* ---- avatars: one round medallion with a hairline ring everywhere (the podium keeps its diamond frame around it);
    the default face is the wine of the brand, not a magenta block ---- */
-html body .leaderboard-avatar{border-radius:50%!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--g-gold) 35%,transparent)}
-html body .leaderboard-avatar.is-default{background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--avatar-color,#ad1539) 55%,#2a1418),#1a0f12)!important;color:#f1e6d3!important;font-family:var(--g-serif,serif)}
+html:not(#u):not(#v) body .leaderboard-avatar{border-radius:50%!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--g-gold) 35%,transparent)}
+html:not(#u):not(#v) body .leaderboard-avatar.is-default{background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--avatar-color,#ad1539) 55%,#2a1418),#1a0f12)!important;color:#f1e6d3!important;font-family:var(--g-serif,serif)}
 
 /* ---- profile panel: slides out below the top bar (window buttons stay reachable), solid glass, serif section titles,
    square buttons, one divider per section ---- */
-html body dialog.profile-panel{inset:var(--titlebar-height,56px) 0 0 auto!important;height:calc(100vh - var(--titlebar-height,56px))!important;border-radius:0!important;
+html:not(#u):not(#v) body dialog.profile-panel{inset:var(--titlebar-height,56px) 0 0 auto!important;height:calc(100vh - var(--titlebar-height,56px))!important;border-radius:0!important;
  background:linear-gradient(var(--g-gold),var(--g-gold)) 0 0/14px 2px no-repeat,linear-gradient(var(--g-gold),var(--g-gold)) 0 0/2px 14px no-repeat,linear-gradient(160deg,rgba(28,22,26,.97),rgba(14,12,15,.97))!important}
-html body dialog.profile-panel .profile-panel-head h2,html body dialog.profile-panel .panel-title{font-family:var(--g-serif,serif)!important;font-weight:600!important;letter-spacing:.02em}
-html body dialog.profile-panel .panel-title{font-size:18px!important}
-html body dialog.profile-panel .panel{background:none!important;box-shadow:none!important;border:0!important;border-bottom:1px solid var(--u-line)!important;border-radius:0!important}
-html body dialog.profile-panel .panel+.panel{border-top:0!important}
-html body dialog.profile-panel :is(button.secondary,.profile-leave,.profile-objection){border-radius:2px!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important;border:0!important}
-html body dialog.profile-panel :is(button.secondary,.profile-leave,.profile-objection)::after{display:none!important}
-html body dialog.profile-panel input[type=text]{text-align:left!important;border:1px solid var(--u-line-2)!important;border-radius:2px!important;background:rgba(10,9,12,.55)!important;padding:0 12px!important}
-html body dialog.profile-panel .profile-panel-close{border-radius:2px!important}
+html:not(#u):not(#v) body dialog.profile-panel .profile-panel-head h2,html:not(#u):not(#v) body dialog.profile-panel .panel-title{font-family:var(--g-serif,serif)!important;font-weight:600!important;letter-spacing:.02em}
+html:not(#u):not(#v) body dialog.profile-panel .panel-title{font-size:18px!important}
+html:not(#u):not(#v) body dialog.profile-panel .panel{background:none!important;box-shadow:none!important;border:0!important;border-bottom:1px solid var(--u-line)!important;border-radius:0!important}
+html:not(#u):not(#v) body dialog.profile-panel .panel+.panel{border-top:0!important}
+html:not(#u):not(#v) body dialog.profile-panel :is(button.secondary,.profile-leave,.profile-objection){border-radius:2px!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important;border:0!important}
+html:not(#u):not(#v) body dialog.profile-panel :is(button.secondary,.profile-leave,.profile-objection)::after{display:none!important}
+html:not(#u):not(#v) body dialog.profile-panel input[type=text]{text-align:left!important;border:1px solid var(--u-line-2)!important;border-radius:2px!important;background:rgba(10,9,12,.55)!important;padding:0 12px!important}
+html:not(#u):not(#v) body dialog.profile-panel .profile-panel-close{border-radius:2px!important}
 
 /* ---- guide: the current tab is the only marked one, keycaps on hairlines, body text regular weight, the scroll area
    fades at the foot ---- */
-html body .guide-panel .guide-tabs button:focus-visible{outline:0!important;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
-html body .guide-panel .guide-tabs button[aria-selected=true]:focus-visible{box-shadow:none!important}
-html body :is(.guide-panel,.dev-notice) kbd{border:1px solid color-mix(in srgb,var(--g-gold) 45%,transparent)!important;border-radius:2px!important;background:rgba(237,181,110,.06)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--g-gold) 45%,transparent)!important;padding:1px 6px!important;white-space:nowrap}
-html body :is(.guide-panel,.dev-notice) .guide-section li{font-weight:400!important;color:var(--g-t1,#f1e0d2)}
-html body :is(.guide-panel,.dev-notice) .dev-notice-scroll{-webkit-mask:linear-gradient(#000 calc(100% - 28px),transparent);mask:linear-gradient(#000 calc(100% - 28px),transparent);padding-bottom:22px}
-html body :is(.dev-notice-top,.game-dialog-kicker){text-transform:uppercase}
+html:not(#u):not(#v) body .guide-panel .guide-tabs button:focus-visible{outline:0!important;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
+html:not(#u):not(#v) body .guide-panel .guide-tabs button[aria-selected=true]:focus-visible{box-shadow:none!important}
+html:not(#u):not(#v) body :is(.guide-panel,.dev-notice) kbd{border:1px solid color-mix(in srgb,var(--g-gold) 45%,transparent)!important;border-radius:2px!important;background:rgba(237,181,110,.06)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--g-gold) 45%,transparent)!important;padding:1px 6px!important;white-space:nowrap}
+html:not(#u):not(#v) body :is(.guide-panel,.dev-notice) .guide-section li{font-weight:400!important;color:var(--g-t1,#f1e0d2)}
+html:not(#u):not(#v) body :is(.guide-panel,.dev-notice) .dev-notice-scroll{-webkit-mask:linear-gradient(#000 calc(100% - 28px),transparent);mask:linear-gradient(#000 calc(100% - 28px),transparent);padding-bottom:22px}
+html:not(#u):not(#v) body :is(.dev-notice-top,.game-dialog-kicker){text-transform:uppercase}
 
 /* ---- secondary buttons everywhere: the detail page's own (hairline frame, square, glass, gold on hover) ---- */
-html body :is(button.secondary,.g-btn:not(.primary)):not(.icon-button):not(.switch):not(.select-trigger):not(.tab):not(.text-button){
+html:not(#u):not(#v) body :is(button.secondary,.g-btn:not(.primary)):not(.icon-button):not(.switch):not(.select-trigger):not(.tab):not(.text-button){
  border:0!important;border-radius:2px!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
-html body :is(button.secondary,.g-btn:not(.primary)):not(.icon-button):not(.switch):not(.select-trigger):not(.tab):not(.text-button)::after{display:none!important}
-html body :is(button.secondary,.g-btn:not(.primary)):not(.icon-button):not(.switch):not(.select-trigger):not(.tab):not(.text-button):hover:not(:disabled){background:rgba(255,255,255,.07)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important;color:var(--g-gold)!important}
-html body .main .icon-button{border-radius:2px}
+html:not(#u):not(#v) body :is(button.secondary,.g-btn:not(.primary)):not(.icon-button):not(.switch):not(.select-trigger):not(.tab):not(.text-button)::after{display:none!important}
+html:not(#u):not(#v) body :is(button.secondary,.g-btn:not(.primary)):not(.icon-button):not(.switch):not(.select-trigger):not(.tab):not(.text-button):hover:not(:disabled){background:rgba(255,255,255,.07)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important;color:var(--g-gold)!important}
+html:not(#u):not(#v) body .main .icon-button{border-radius:2px}
 
 /* ---- tools: a mono kicker and one line of purpose, two cards across the page, an explicit "open" action, the
    watermark glyph whole inside its card, badges on one line ---- */
-html body .grimoire-page .tools-intro{display:flex;flex-direction:column;gap:12px;max-width:68ch;margin:clamp(12px,2vh,28px) 0 clamp(22px,3vh,36px);font-size:14px;line-height:1.8;color:var(--g-t2,#c3ab9c)}
-html body .grimoire-page .tools-kicker{font-family:var(--u-mono);font-size:11px;letter-spacing:.3em;color:var(--g-gold)}
-html body .grimoire-page .tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:clamp(16px,1.6vw,24px)!important;max-width:1320px}
-@media (max-width:900px){html body .grimoire-page .tools-grid{grid-template-columns:1fr!important}}
-html body .grimoire-page .tool-card{position:relative;overflow:hidden;min-height:clamp(260px,34vh,340px);padding:clamp(22px,2vw,32px)!important;gap:12px!important}
-html body .grimoire-page .tool-card::before{display:none!important}
-html body .grimoire-page .tool-card::after{right:22px!important;bottom:6px!important;font-size:clamp(120px,12vw,170px)!important;line-height:1!important}
-html body .grimoire-page .tool-card:hover{transform:none!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 45%,transparent),0 30px 56px -30px #000!important}
-html body .grimoire-page .tool-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-html body .grimoire-page .tool-top b{font-family:var(--g-serif,serif);font-size:clamp(20px,1.6vw,26px);font-weight:600;line-height:1.3}
-html body .grimoire-page .tool-top em{flex:none;white-space:nowrap;font-style:normal;font-family:var(--u-mono);font-size:11px;letter-spacing:.16em;padding:4px 10px;border-radius:2px!important;border:0!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 45%,transparent);color:var(--g-gold);background:none!important}
-html body .grimoire-page .tool-desc{font-size:14px;line-height:1.8;color:var(--g-t1,#f1e0d2);max-width:56ch}
-html body .grimoire-page .tool-key-note{font-weight:400!important;font-size:13px!important;line-height:1.7!important;padding:12px 14px 12px 16px!important;border:0!important;border-radius:2px!important;background:color-mix(in srgb,var(--g-gold) 7%,transparent)!important;box-shadow:inset 2px 0 0 var(--g-gold)!important;max-width:60ch}
-html body .grimoire-page .tool-meta{margin-top:auto;padding-top:14px;border-top:1px solid var(--u-line);font-size:12.5px;color:var(--g-t2,#c3ab9c)}
-html body .grimoire-page .tool-go{align-self:flex-start;display:inline-flex;align-items:center;height:38px;padding:0 18px;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22);background:rgba(255,255,255,.03);font-size:13px;letter-spacing:.12em;color:var(--g-t1,#f1e0d2);transition:color .2s,box-shadow .2s}
-html body .grimoire-page .tool-card:hover .tool-go{color:var(--g-gold);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)}
-html body .grimoire-page .tool-key-note{padding-left:30px!important}
+html:not(#u):not(#v) body .grimoire-page .tools-intro{display:flex;flex-direction:column;gap:12px;max-width:68ch;margin:clamp(12px,2vh,28px) 0 clamp(22px,3vh,36px);font-size:14px;line-height:1.8;color:var(--g-t2,#c3ab9c)}
+html:not(#u):not(#v) body .grimoire-page .tools-kicker{font-family:var(--u-mono);font-size:11px;letter-spacing:.3em;color:var(--g-gold)}
+html:not(#u):not(#v) body .grimoire-page .tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:clamp(16px,1.6vw,24px)!important;max-width:1320px}
+@media (max-width:900px){html:not(#u):not(#v) body .grimoire-page .tools-grid{grid-template-columns:1fr!important}}
+html:not(#u):not(#v) body .grimoire-page .tool-card{position:relative;overflow:hidden;min-height:clamp(260px,34vh,340px);padding:clamp(22px,2vw,32px)!important;gap:12px!important}
+html:not(#u):not(#v) body .grimoire-page .tool-card::before{display:none!important}
+html:not(#u):not(#v) body .grimoire-page .tool-card::after{right:22px!important;bottom:6px!important;font-size:clamp(120px,12vw,170px)!important;line-height:1!important}
+html:not(#u):not(#v) body .grimoire-page .tool-card:hover{transform:none!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 45%,transparent),0 30px 56px -30px #000!important}
+html:not(#u):not(#v) body .grimoire-page .tool-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+html:not(#u):not(#v) body .grimoire-page .tool-top b{font-family:var(--g-serif,serif);font-size:clamp(20px,1.6vw,26px);font-weight:600;line-height:1.3}
+html:not(#u):not(#v) body .grimoire-page .tool-top em{flex:none;white-space:nowrap;font-style:normal;font-family:var(--u-mono);font-size:11px;letter-spacing:.16em;padding:4px 10px;border-radius:2px!important;border:0!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 45%,transparent);color:var(--g-gold);background:none!important}
+html:not(#u):not(#v) body .grimoire-page .tool-desc{font-size:14px;line-height:1.8;color:var(--g-t1,#f1e0d2);max-width:56ch}
+html:not(#u):not(#v) body .grimoire-page .tool-key-note{font-weight:400!important;font-size:13px!important;line-height:1.7!important;padding:12px 14px 12px 16px!important;border:0!important;border-radius:2px!important;background:color-mix(in srgb,var(--g-gold) 7%,transparent)!important;box-shadow:inset 2px 0 0 var(--g-gold)!important;max-width:60ch}
+html:not(#u):not(#v) body .grimoire-page .tool-meta{margin-top:auto;padding-top:14px;border-top:1px solid var(--u-line);font-size:12.5px;color:var(--g-t2,#c3ab9c)}
+html:not(#u):not(#v) body .grimoire-page .tool-go{align-self:flex-start;display:inline-flex;align-items:center;height:38px;padding:0 18px;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22);background:rgba(255,255,255,.03);font-size:13px;letter-spacing:.12em;color:var(--g-t1,#f1e0d2);transition:color .2s,box-shadow .2s}
+html:not(#u):not(#v) body .grimoire-page .tool-card:hover .tool-go{color:var(--g-gold);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)}
+html:not(#u):not(#v) body .grimoire-page .tool-key-note{padding-left:30px!important}
 
 /* ---- about: hairline link rows with the same arrow, facts as label/value on one baseline, kicker headings,
    the sponsor action at its natural width, payment marks in the brand gold, the watermark kept inside ---- */
-html body .about-page .about-link{border:0!important;border-radius:2px!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;min-height:46px}
-html body .about-page .about-link:hover{background:rgba(255,255,255,.06)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
-html body .about-page .about-link span{color:var(--g-gold)!important}
-html body .about-page .about-facts{align-content:start}
-html body .about-page .about-facts div{align-items:center;min-height:48px;padding:0!important;border-bottom:1px solid var(--u-line)!important}
-html body .about-page .about-facts div:last-child{border-bottom:0!important}
-html body .about-page :is(.about-links h3,.about-cn h3,.about-intl h3,.about-credits h3){font-family:var(--u-mono);font-size:11px!important;letter-spacing:.28em!important;color:var(--g-gold)!important;text-transform:uppercase}
-html body .about-page .about-support{overflow:hidden}
-html body .about-page .about-intl{display:flex;flex-direction:column;justify-content:center;gap:18px}
-html body .about-page .about-intl :is(button,a.primary){align-self:flex-start;width:auto!important;min-width:0!important;padding:0 28px!important}
-html body .about-page .dot{border-radius:1px!important;transform:rotate(45deg);background:var(--g-gold)!important}
-html body .about-page .about-credits p{font-size:13px;line-height:1.9}
-html body .about-page .about-support-text{max-width:60ch}
-html body .about-page :is(.about-support-text,.about-support-strong){text-wrap:pretty}
+html:not(#u):not(#v) body .about-page .about-link{border:0!important;border-radius:2px!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important;min-height:46px}
+html:not(#u):not(#v) body .about-page .about-link:hover{background:rgba(255,255,255,.06)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html:not(#u):not(#v) body .about-page .about-link span{color:var(--g-gold)!important}
+html:not(#u):not(#v) body .about-page .about-facts{align-content:start}
+html:not(#u):not(#v) body .about-page .about-facts div{align-items:center;min-height:48px;padding:0!important;border-bottom:1px solid var(--u-line)!important}
+html:not(#u):not(#v) body .about-page .about-facts div:last-child{border-bottom:0!important}
+html:not(#u):not(#v) body .about-page :is(.about-links h3,.about-cn h3,.about-intl h3,.about-credits h3){font-family:var(--u-mono);font-size:11px!important;letter-spacing:.28em!important;color:var(--g-gold)!important;text-transform:uppercase}
+html:not(#u):not(#v) body .about-page .about-support{overflow:hidden}
+html:not(#u):not(#v) body .about-page .about-intl{display:flex;flex-direction:column;justify-content:center;gap:18px}
+html:not(#u):not(#v) body .about-page .about-intl :is(button,a.primary){align-self:flex-start;width:auto!important;min-width:0!important;padding:0 28px!important}
+html:not(#u):not(#v) body .about-page .dot{border-radius:1px!important;transform:rotate(45deg);background:var(--g-gold)!important}
+html:not(#u):not(#v) body .about-page .about-credits p{font-size:13px;line-height:1.9}
+html:not(#u):not(#v) body .about-page .about-support-text{max-width:60ch}
+html:not(#u):not(#v) body .about-page :is(.about-support-text,.about-support-strong){text-wrap:pretty}
 
 /* ---- leaderboard hot words 4–10: hairline rows, no grey blocks; the reason sits in its own column ---- */
-html body .leaderboard-page .lb-honours{gap:0!important}
-html body .leaderboard-page .lb-honours li{grid-template-columns:44px minmax(160px,240px) 1fr!important;border-radius:0!important;background:none!important;box-shadow:none!important;border-bottom:1px solid var(--u-line);padding:14px 4px!important}
-html body .leaderboard-page .lb-honours li:first-child{border-top:1px solid var(--u-line)}
-html body .leaderboard-page .lb-honours .leaderboard-reason{grid-column:3!important;margin:0}
-html body .leaderboard-page .lb-honours li:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 6%,transparent),transparent)!important}
-html body .leaderboard-page :is(.lb-h3,.lb-card-head small,.lb-note){font-size:max(11.5px,1em)!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-honours{gap:0!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-honours li{grid-template-columns:44px minmax(160px,240px) 1fr!important;border-radius:0!important;background:none!important;box-shadow:none!important;border-bottom:1px solid var(--u-line);padding:14px 4px!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-honours li:first-child{border-top:1px solid var(--u-line)}
+html:not(#u):not(#v) body .leaderboard-page .lb-honours .leaderboard-reason{grid-column:3!important;margin:0}
+html:not(#u):not(#v) body .leaderboard-page .lb-honours li:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 6%,transparent),transparent)!important}
+html:not(#u):not(#v) body .leaderboard-page :is(.lb-h3,.lb-card-head small,.lb-note){font-size:max(11.5px,1em)!important}
 /* leaderboard: follow actions on one ladder (follow = gold hairline, following = quiet hairline, unfollow = text),
    podium tags in the metal colours as hairline labels, a styled week picker, the 読 watermark quieter on narrow windows */
-html body .leaderboard-page .lb-follow-button{border-radius:2px!important;background:color-mix(in srgb,var(--g-gold) 10%,transparent)!important;color:var(--g-gold)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent);padding:7px 16px!important;letter-spacing:.1em}
-html body .leaderboard-page .lb-follow-button:hover{background:color-mix(in srgb,var(--g-gold) 18%,transparent)!important}
-html body .leaderboard-page .lb-chip{border-radius:2px!important;border:0!important;box-shadow:inset 0 0 0 1px var(--u-line-2);color:var(--g-t2,#c3ab9c);padding:6px 14px!important}
-html body .leaderboard-page .leaderboard-leave{text-decoration:none!important;color:var(--g-t3,#a08a80)!important;letter-spacing:.08em;font-size:12.5px}
-html body .leaderboard-page .leaderboard-leave:hover{color:var(--g-t1,#f1e0d2)!important;text-decoration:underline!important;text-underline-offset:4px}
-html body .leaderboard-page .lb-score{clip-path:none!important;border-radius:2px!important;background:color-mix(in srgb,var(--m-a) 12%,rgba(14,12,15,.7))!important;color:var(--m-a)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--m-a) 60%,transparent)!important;font-weight:600!important}
-html body .leaderboard-page .lb-week select{appearance:none;-webkit-appearance:none;height:34px;padding:0 30px 0 12px!important;border-radius:2px!important;border:0!important;box-shadow:inset 0 0 0 1px var(--u-line-2);background:rgba(10,9,12,.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%23edb56e' stroke-width='1.3'/%3E%3C/svg%3E") no-repeat right 10px center/12px!important;color:var(--g-t1,#f1e0d2)!important}
-html body .workspace>.stage-cover .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 9%,transparent)!important}
-@media (max-width:1500px){html body .workspace>.stage-cover[data-kind~=lb-backdrop] .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 5%,transparent)!important}}
-html body .leaderboard-page .forum-tag,html body .leaderboard-page [class*=forum-tag]{border-radius:2px!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-follow-button{border-radius:2px!important;background:color-mix(in srgb,var(--g-gold) 10%,transparent)!important;color:var(--g-gold)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent);padding:7px 16px!important;letter-spacing:.1em}
+html:not(#u):not(#v) body .leaderboard-page .lb-follow-button:hover{background:color-mix(in srgb,var(--g-gold) 18%,transparent)!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-chip{border-radius:2px!important;border:0!important;box-shadow:inset 0 0 0 1px var(--u-line-2);color:var(--g-t2,#c3ab9c);padding:6px 14px!important}
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-leave{text-decoration:none!important;color:var(--g-t3,#a08a80)!important;letter-spacing:.08em;font-size:12.5px}
+html:not(#u):not(#v) body .leaderboard-page .leaderboard-leave:hover{color:var(--g-t1,#f1e0d2)!important;text-decoration:underline!important;text-underline-offset:4px}
+html:not(#u):not(#v) body .leaderboard-page .lb-score{clip-path:none!important;border-radius:2px!important;background:color-mix(in srgb,var(--m-a) 12%,rgba(14,12,15,.7))!important;color:var(--m-a)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--m-a) 60%,transparent)!important;font-weight:600!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-week select{appearance:none;-webkit-appearance:none;height:34px;padding:0 30px 0 12px!important;border-radius:2px!important;border:0!important;box-shadow:inset 0 0 0 1px var(--u-line-2);background:rgba(10,9,12,.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%23edb56e' stroke-width='1.3'/%3E%3C/svg%3E") no-repeat right 10px center/12px!important;color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v) body .workspace>.stage-cover .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 9%,transparent)!important}
+@media (max-width:1500px){html:not(#u):not(#v) body .workspace>.stage-cover[data-kind~=lb-backdrop] .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 5%,transparent)!important}}
+html:not(#u):not(#v) body .leaderboard-page .forum-tag,html:not(#u):not(#v) body .leaderboard-page [class*=forum-tag]{border-radius:2px!important}
 /* forum: tags in the brand palette (the blue Hook tag was the only cold colour), no letter-spacing on mixed text */
-html body .forum-tag.is-hook{color:#e8a0a8!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,#c8323c 55%,transparent)!important}
-html body .leaderboard-page [data-forum-tags] button{letter-spacing:.06em!important}
-html body .leaderboard-page .forum-list .lb-card-head small{font-family:inherit!important;letter-spacing:.04em!important;font-size:12px!important}
+html:not(#u):not(#v) body .forum-tag.is-hook{color:#e8a0a8!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,#c8323c 55%,transparent)!important}
+html:not(#u):not(#v) body .leaderboard-page [data-forum-tags] button{letter-spacing:.06em!important}
+html:not(#u):not(#v) body .leaderboard-page .forum-list .lb-card-head small{font-family:inherit!important;letter-spacing:.04em!important;font-size:12px!important}
 
 /* ---- daily: a hairline masthead, three news columns of one width with hairline dividers, trend words that wrap
    between words and leave room for their furigana ---- */
-html body .dl .dl-strip{border-top:1px solid color-mix(in srgb,var(--g-t1,#f1e0d2) 55%,transparent)!important}
-html body .dl .dl-cols{column-gap:40px}
-html body .dl .dl-col{position:relative;padding:0!important;border:0!important}
-html body .dl .dl-col+.dl-col::before{content:"";position:absolute;left:-20px;top:0;bottom:0;width:1px;background:var(--dl-hair,rgba(255,255,255,.08))}
-html body .dl .dl-term{font-size:18px!important;line-height:1.5!important;word-break:keep-all;overflow-wrap:anywhere;text-wrap:balance}
-html body .dl .dl-word:nth-child(1) .dl-term{font-size:21px!important}
-html body .dl .dl-term ruby{ruby-position:over}
-html body .dl .dl-word-main{padding-top:14px!important;padding-bottom:12px!important}
-html body .dl :is(.dl-head small,.dl-meta,.dl-note,.dl-credit){font-size:12px!important}
-html body .dl .dl-kind{border-radius:2px!important}
-@media (max-width:1500px){html body .leaderboard-page .lb-subrow .lb-seg button{letter-spacing:.06em!important;padding-inline:clamp(8px,.9vw,14px)!important}}
-@media (max-width:1500px){html body .leaderboard-page .lb-tabs{gap:clamp(12px,1.3vw,25px)!important}html body .leaderboard-page .lb-tabs button{letter-spacing:.06em!important}}
-@media (max-width:1360px){html:lang(en) body .leaderboard-page .lb-tabs button,html:lang(ja) body .leaderboard-page .lb-tabs button{font-size:12.5px!important;letter-spacing:.02em!important}html:lang(en) body .leaderboard-page .lb-tabs,html:lang(ja) body .leaderboard-page .lb-tabs{gap:12px!important}}
+html:not(#u):not(#v) body .dl .dl-strip{border-top:1px solid color-mix(in srgb,var(--g-t1,#f1e0d2) 55%,transparent)!important}
+html:not(#u):not(#v) body .dl .dl-cols{column-gap:40px}
+html:not(#u):not(#v) body .dl .dl-col{position:relative;padding:0!important;border:0!important}
+html:not(#u):not(#v) body .dl .dl-col+.dl-col::before{content:"";position:absolute;left:-20px;top:0;bottom:0;width:1px;background:var(--dl-hair,rgba(255,255,255,.08))}
+html:not(#u):not(#v) body .dl .dl-term{font-size:18px!important;line-height:1.5!important;word-break:keep-all;overflow-wrap:anywhere;text-wrap:balance}
+html:not(#u):not(#v) body .dl .dl-word:nth-child(1) .dl-term{font-size:21px!important}
+html:not(#u):not(#v) body .dl .dl-term ruby{ruby-position:over}
+html:not(#u):not(#v) body .dl .dl-word-main{padding-top:14px!important;padding-bottom:12px!important}
+html:not(#u):not(#v) body .dl :is(.dl-head small,.dl-meta,.dl-note,.dl-credit){font-size:12px!important}
+html:not(#u):not(#v) body .dl .dl-kind{border-radius:2px!important}
+@media (max-width:1500px){html:not(#u):not(#v) body .leaderboard-page .lb-subrow .lb-seg button{letter-spacing:.06em!important;padding-inline:clamp(8px,.9vw,14px)!important}}
+@media (max-width:1500px){html:not(#u):not(#v) body .leaderboard-page .lb-tabs{gap:clamp(12px,1.3vw,25px)!important}html:not(#u):not(#v) body .leaderboard-page .lb-tabs button{letter-spacing:.06em!important}}
+@media (max-width:1360px){html:not(#u):not(#v):lang(en) body .leaderboard-page .lb-tabs button,html:not(#u):not(#v):lang(ja) body .leaderboard-page .lb-tabs button{font-size:12.5px!important;letter-spacing:.02em!important}html:not(#u):not(#v):lang(en) body .leaderboard-page .lb-tabs,html:not(#u):not(#v):lang(ja) body .leaderboard-page .lb-tabs{gap:12px!important}}
 
 /* ---- level picker: option cards on the glass, the chosen one in brand red, focus kept distinct from choice ---- */
-html body .lv-dialog .lv-opt{border:0!important;border-radius:2px!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;min-height:118px;align-content:start}
-html body .lv-dialog .lv-opt:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
-html body .lv-dialog .lv-opt.active{background:linear-gradient(180deg,rgba(200,50,60,.16),rgba(200,50,60,.04))!important;box-shadow:inset 0 0 0 1px rgba(200,50,60,.75),inset 0 2px 0 #c82f3b!important}
-html body .lv-dialog .lv-opt:focus-visible:not(.active){outline:1px dashed rgba(232,220,200,.45)!important;outline-offset:-5px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
-html body .lv-dialog .lv-seal{font-family:var(--g-serif-ja,serif);color:var(--g-gold)}
-html body .lv-dialog .lv-opt small{font-size:12.5px!important;line-height:1.6;color:var(--g-t2,#c3ab9c)!important}
-html body .lv-dialog h2{font-family:var(--g-serif,serif)}
-html body .lv-dialog footer .primary:disabled{opacity:.45;filter:grayscale(.4)}
+html:not(#u):not(#v) body .lv-dialog .lv-opt{border:0!important;border-radius:2px!important;background:rgba(255,255,255,.03)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;min-height:118px;align-content:start}
+html:not(#u):not(#v) body .lv-dialog .lv-opt:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html:not(#u):not(#v) body .lv-dialog .lv-opt.active{background:linear-gradient(180deg,rgba(200,50,60,.16),rgba(200,50,60,.04))!important;box-shadow:inset 0 0 0 1px rgba(200,50,60,.75),inset 0 2px 0 #c82f3b!important}
+html:not(#u):not(#v) body .lv-dialog .lv-opt:focus-visible:not(.active){outline:1px dashed rgba(232,220,200,.45)!important;outline-offset:-5px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
+html:not(#u):not(#v) body .lv-dialog .lv-seal{font-family:var(--g-serif-ja,serif);color:var(--g-gold)}
+html:not(#u):not(#v) body .lv-dialog .lv-opt small{font-size:12.5px!important;line-height:1.6;color:var(--g-t2,#c3ab9c)!important}
+html:not(#u):not(#v) body .lv-dialog h2{font-family:var(--g-serif,serif)}
+html:not(#u):not(#v) body .lv-dialog footer .primary:disabled{opacity:.45;filter:grayscale(.4)}
 
 /* ---- settings, second pass: group headings as gold kickers, one input box (hairline, square, left text, numbers
    right), textareas framed on all sides, readable buttons in left-aligned action rows, danger actions that look
    dangerous, error lines with a red rule, tutorial cards with a kicker badge and a visible arrow, the content
    column held to a readable width, the nav fading at its edges ---- */
-html body .main .settings-content :is(h3,.settings-group-title,.panel>h2.panel-title){font-family:var(--u-mono)!important;font-size:11px!important;font-weight:500!important;letter-spacing:.28em!important;text-transform:uppercase;color:var(--g-gold)!important;margin:28px 0 6px!important;padding:0!important;min-height:0!important}
-html body .main .settings-content form>:is(h3):first-child,html body .main .settings-content .panel>h3:first-child{margin-top:8px!important}
-html body .main .settings-content :is(input[type=text],input[type=url],input[type=number],input[type=password],input:not([type])):not(.settings-search){height:38px;box-sizing:border-box;padding:0 12px!important;border:0!important;border-radius:2px!important;background:rgba(10,9,12,.5)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;text-align:left!important;text-overflow:ellipsis}
-html body .main .settings-content input[type=number]{width:88px!important;text-align:right!important;font-variant-numeric:lining-nums tabular-nums}
-html body .main .settings-content :is(input[type=text],input[type=url],input[type=number],input[type=password],input:not([type])):not(.settings-search):focus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important;outline:0}
-html body .main .settings-content textarea{border:0!important;border-radius:2px!important;background:rgba(10,9,12,.5)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;resize:none!important}
-html body .main .settings-content textarea:focus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
-html body .main .settings-content .select-trigger{border-radius:2px!important;justify-content:space-between!important;text-align:left!important}
-html body .main .settings-content .select-trigger .select-name{text-align:left!important;margin-right:auto}
-html body .main .settings-content button:not(.switch):not(.select-trigger):not(.icon-button):not(.primary){font-size:13px!important}
-html body .main .settings-content :is(.review-controls,.settings-actions,.anki-tools,.library-actions,.backup-actions){justify-content:flex-start!important}
-html body .main .settings-content :is(.danger-outline,button.danger,.text-button.danger){color:#f0a3ab!important;box-shadow:inset 0 0 0 1px rgba(200,50,60,.6)!important;background:rgba(200,50,60,.06)!important;border-radius:2px!important}
-html body .main .settings-content :is(.danger-outline,button.danger,.text-button.danger):hover{background:rgba(200,50,60,.85)!important;color:#fff!important}
-html body .main .settings-content :is(.model-error,.settings-error,[role=alert]){padding:10px 14px!important;border-radius:2px;background:rgba(200,50,60,.08);box-shadow:inset 2px 0 0 #c82f3b;color:#f0c4c8!important;font-weight:400!important;font-size:13px!important}
-html body .main .settings-content .settings-guide{border:0!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 6%,transparent),transparent 60%)!important}
-html body .main .settings-content .settings-guide .guide-badge{border-radius:2px!important;background:none!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important;color:var(--g-gold)!important;font-family:var(--u-mono);font-size:11px!important;letter-spacing:.2em}
-html body .main .settings-content .settings-guide .guide-title b{font-size:15px!important}
-html body .main .settings-content .settings-guide .guide-caret{font-size:0!important;width:14px;height:14px;transform:none!important;background:no-repeat center/14px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 3l5 5-5 5' fill='none' stroke='%23edb56e' stroke-width='1.4'/%3E%3C/svg%3E");transition:transform .25s}
-html body .main .settings-content .settings-guide.open .guide-caret{transform:rotate(90deg)!important}
-html body .main .settings-content .settings-guide:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
-html body .main .settings-content>*:not(.settings-search):not(.settings-search-results){max-width:1180px}
-html body .main .settings-nav{-webkit-mask:linear-gradient(transparent 0,#000 14px,#000 calc(100% - 22px),transparent);mask:linear-gradient(transparent 0,#000 14px,#000 calc(100% - 22px),transparent)}
-html body .main .settings-nav .settings-category-items button{margin-block:2px}
-html:lang(ja) body .main .settings-nav :is(summary,button){line-break:strict;word-break:keep-all}
-html body .main .settings-content input[type=color]{border:0!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;padding:3px!important}
-html body .main .settings-content .sp-preview .sp-stage{min-height:0}
+html:not(#u):not(#v) body .main .settings-content :is(h3,.settings-group-title,.panel>h2.panel-title){font-family:var(--u-mono)!important;font-size:11px!important;font-weight:500!important;letter-spacing:.28em!important;text-transform:uppercase;color:var(--g-gold)!important;margin:28px 0 6px!important;padding:0!important;min-height:0!important}
+html:not(#u):not(#v) body .main .settings-content form>:is(h3):first-child,html:not(#u):not(#v) body .main .settings-content .panel>h3:first-child{margin-top:8px!important}
+html:not(#u):not(#v) body .main .settings-content :is(input[type=text],input[type=url],input[type=number],input[type=password],input:not([type])):not(.settings-search){height:38px;box-sizing:border-box;padding:0 12px!important;border:0!important;border-radius:2px!important;background:rgba(10,9,12,.5)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;text-align:left!important;text-overflow:ellipsis}
+html:not(#u):not(#v) body .main .settings-content input[type=number]{width:88px!important;text-align:right!important;font-variant-numeric:lining-nums tabular-nums}
+html:not(#u):not(#v) body .main .settings-content :is(input[type=text],input[type=url],input[type=number],input[type=password],input:not([type])):not(.settings-search):focus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important;outline:0}
+html:not(#u):not(#v) body .main .settings-content textarea{border:0!important;border-radius:2px!important;background:rgba(10,9,12,.5)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;resize:none!important}
+html:not(#u):not(#v) body .main .settings-content textarea:focus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
+html:not(#u):not(#v) body .main .settings-content .select-trigger{border-radius:2px!important;justify-content:space-between!important;text-align:left!important}
+html:not(#u):not(#v) body .main .settings-content .select-trigger .select-name{text-align:left!important;margin-right:auto}
+html:not(#u):not(#v) body .main .settings-content button:not(.switch):not(.select-trigger):not(.icon-button):not(.primary){font-size:13px!important}
+html:not(#u):not(#v) body .main .settings-content :is(.review-controls,.settings-actions,.anki-tools,.library-actions,.backup-actions){justify-content:flex-start!important}
+html:not(#u):not(#v) body .main .settings-content :is(.danger-outline,button.danger,.text-button.danger){color:#f0a3ab!important;box-shadow:inset 0 0 0 1px rgba(200,50,60,.6)!important;background:rgba(200,50,60,.06)!important;border-radius:2px!important}
+html:not(#u):not(#v) body .main .settings-content :is(.danger-outline,button.danger,.text-button.danger):hover{background:rgba(200,50,60,.85)!important;color:#fff!important}
+html:not(#u):not(#v) body .main .settings-content :is(.model-error,.settings-error,[role=alert]){padding:10px 14px!important;border-radius:2px;background:rgba(200,50,60,.08);box-shadow:inset 2px 0 0 #c82f3b;color:#f0c4c8!important;font-weight:400!important;font-size:13px!important}
+html:not(#u):not(#v) body .main .settings-content .settings-guide{border:0!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 6%,transparent),transparent 60%)!important}
+html:not(#u):not(#v) body .main .settings-content .settings-guide .guide-badge{border-radius:2px!important;background:none!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important;color:var(--g-gold)!important;font-family:var(--u-mono);font-size:11px!important;letter-spacing:.2em}
+html:not(#u):not(#v) body .main .settings-content .settings-guide .guide-title b{font-size:15px!important}
+html:not(#u):not(#v) body .main .settings-content .settings-guide .guide-caret{font-size:0!important;width:14px;height:14px;transform:none!important;background:no-repeat center/14px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 3l5 5-5 5' fill='none' stroke='%23edb56e' stroke-width='1.4'/%3E%3C/svg%3E");transition:transform .25s}
+html:not(#u):not(#v) body .main .settings-content .settings-guide.open .guide-caret{transform:rotate(90deg)!important}
+html:not(#u):not(#v) body .main .settings-content .settings-guide:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html:not(#u):not(#v) body .main .settings-content>*:not(.settings-search):not(.settings-search-results){max-width:1180px}
+html:not(#u):not(#v) body .main .settings-nav{-webkit-mask:linear-gradient(transparent 0,#000 14px,#000 calc(100% - 22px),transparent);mask:linear-gradient(transparent 0,#000 14px,#000 calc(100% - 22px),transparent)}
+html:not(#u):not(#v) body .main .settings-nav .settings-category-items button{margin-block:2px}
+html:not(#u):not(#v):lang(ja) body .main .settings-nav :is(summary,button){line-break:strict;word-break:keep-all}
+html:not(#u):not(#v) body .main .settings-content input[type=color]{border:0!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important;padding:3px!important}
+html:not(#u):not(#v) body .main .settings-content .sp-preview .sp-stage{min-height:0}
 
 /* ---- round 1 fixes ---- */
 /* mono labels: Consolas before ui-monospace (Windows resolves ui-monospace to a face with old-style figures) */
@@ -451,106 +451,117 @@ html body .main .settings-content .sp-preview .sp-stage{min-height:0}
 @media (max-width:1500px){.main>.tabs{gap:clamp(12px,1.4vw,22px)!important}.main>.tabs .tab{letter-spacing:.04em!important}}
 @media (max-width:1360px){html:lang(en) .main>.tabs .tab::before,html:lang(ja) .main>.tabs .tab::before{margin-right:5px}html:lang(en) .main>.tabs .tab{font-size:12.5px!important;letter-spacing:0!important}html:lang(en) .main>.tabs{gap:12px!important}}
 /* one content width for every learning tab, centred: the left edge no longer jumps */
-html body #learning-content{max-width:1400px;margin-inline:auto}
-html body #learning-content .g-blank{max-width:none!important;margin-inline:0!important}
-html body .g-blank .glyph{right:-18px!important;bottom:-70px!important;opacity:.7}
+html:not(#u):not(#v) body #learning-content{max-width:1400px;margin-inline:auto}
+html:not(#u):not(#v) body #learning-content .g-blank{max-width:none!important;margin-inline:0!important}
+html:not(#u):not(#v) body .g-blank .glyph{right:-18px!important;bottom:-70px!important;opacity:.7}
 /* word cards: the example is just the quote and the game, no extra rules */
-html body .main .record .word-source .link-button{box-shadow:none!important;padding-left:0!important}
+html:not(#u):not(#v) body .main .record .word-source .link-button{box-shadow:none!important;padding-left:0!important}
 /* empty states: no dead gap before the action */
-html body .g-blank .acts{margin-top:22px!important}
-html body .g-blank{min-height:0!important}
+html:not(#u):not(#v) body .g-blank .acts{margin-top:22px!important}
+html:not(#u):not(#v) body .g-blank{min-height:0!important}
 /* notice: one 54px line for the request (E446), no ring at rest; focus is shown by the gold hairline only */
-html body dialog.game-dialog .dev-notice-form>:is(input,button){height:54px!important;min-height:54px!important;max-height:54px!important}
-html body dialog.game-dialog :is(button,input,textarea):focus-visible{outline:0!important}
-html body dialog.game-dialog :is(.dev-notice-form>input,.feedback-text,.feedback-contact):focus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
-html body dialog.game-dialog .dev-notice-updates li{line-height:1.7;padding-block:2px}
+html:not(#u):not(#v) body dialog.game-dialog .dev-notice-form>:is(input,button){height:54px!important;min-height:54px!important;max-height:54px!important}
+html:not(#u):not(#v) body dialog.game-dialog :is(button,input,textarea):focus-visible{outline:0!important}
+html:not(#u):not(#v) body dialog.game-dialog :is(.dev-notice-form>input,.feedback-text,.feedback-contact):focus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html:not(#u):not(#v) body dialog.game-dialog .dev-notice-updates li{line-height:1.7;padding-block:2px}
 /* scrolled content fades out under the top bar instead of being cut */
-html body .workspace>.main:not(.home-page):not(.field-page){-webkit-mask:linear-gradient(transparent 0,#000 14px);mask:linear-gradient(transparent 0,#000 14px)}
+html:not(#u):not(#v) body .workspace>.main:not(.home-page):not(.field-page){-webkit-mask:linear-gradient(transparent 0,#000 14px);mask:linear-gradient(transparent 0,#000 14px)}
 /* library: titles end in an ellipsis while still; the list fades under its head band */
-html body .main .mq-box:not(:hover) .mq{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transform:none!important;animation:none!important}
-html body .lib-list .library-grid{-webkit-mask:linear-gradient(transparent 0,#000 18px);mask:linear-gradient(transparent 0,#000 18px)}
+html:not(#u):not(#v) body .main .mq-box:not(:hover) .mq{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transform:none!important;animation:none!important}
+html:not(#u):not(#v) body .lib-list .library-grid{-webkit-mask:linear-gradient(transparent 0,#000 18px);mask:linear-gradient(transparent 0,#000 18px)}
 /* home: today's cell exactly one cell */
-html body .tv-heat i.today{width:12px!important;height:12px!important;transform:none!important;justify-self:auto!important}
+html:not(#u):not(#v) body .tv-heat i.today{width:12px!important;height:12px!important;transform:none!important;justify-self:auto!important}
 /* history: the tab band stays on top while the list scrolls; the font link reads as a button; glass rows */
-html body .main:has(>.history-backdrop)>.tabs{position:sticky!important;top:0!important;z-index:6!important}
-html body .main:has(>.tabs)>.page-header .text-button{height:30px;padding:0 12px!important;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22);letter-spacing:.12em!important}
-html body .main:has(>.tabs)>.page-header .text-button:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)}
-html body .main:has(>.history-backdrop) :is(.history-session,.history-dialogue){background:linear-gradient(160deg,rgba(24,22,28,.7),rgba(14,13,17,.6))!important}
-html body .main:has(>.history-backdrop) .history-metrics dd{white-space:nowrap}
+html:not(#u):not(#v) body .main:has(>.history-backdrop)>.tabs{position:sticky!important;top:0!important;z-index:6!important}
+html:not(#u):not(#v) body .main:has(>.tabs)>.page-header .text-button{height:30px;padding:0 12px!important;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22);letter-spacing:.12em!important}
+html:not(#u):not(#v) body .main:has(>.tabs)>.page-header .text-button:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)}
+html:not(#u):not(#v) body .main:has(>.history-backdrop) :is(.history-session,.history-dialogue){background:linear-gradient(160deg,rgba(24,22,28,.7),rgba(14,13,17,.6))!important}
+html:not(#u):not(#v) body .main:has(>.history-backdrop) .history-metrics dd{white-space:nowrap}
 /* detail: the glyph steps back on narrow windows */
-@media (max-width:1500px){html body .workspace>.stage-cover[data-kind=""] .dtv-glyph,html body .workspace>.stage-cover:not([data-kind]) .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 5%,transparent)!important}}
+@media (max-width:1500px){html:not(#u):not(#v) body .workspace>.stage-cover[data-kind=""] .dtv-glyph,html:not(#u):not(#v) body .workspace>.stage-cover:not([data-kind]) .dtv-glyph{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 5%,transparent)!important}}
 /* level picker: equal buttons, a visible but disabled primary, no dashed focus */
-html body .lv-dialog footer button{height:46px!important;min-height:46px!important;font-size:15px!important}
-html body .lv-dialog footer .primary:disabled{opacity:.6!important;filter:saturate(.5)!important}
-html body .lv-dialog .lv-opt:focus-visible:not(.active){outline:0!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
-html body .lv-dialog .lv-lead{text-wrap:pretty}
+html:not(#u):not(#v) body .lv-dialog footer button{height:46px!important;min-height:46px!important;font-size:15px!important}
+html:not(#u):not(#v) body .lv-dialog footer .primary:disabled{opacity:.6!important;filter:saturate(.5)!important}
+html:not(#u):not(#v) body .lv-dialog .lv-opt:focus-visible:not(.active){outline:0!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 55%,transparent)!important}
+html:not(#u):not(#v) body .lv-dialog .lv-lead{text-wrap:pretty}
 /* review: square glass card, matched button sizes, room for the status line */
-html body :is(.review-card,.anki-review-panel){border-radius:2px!important}
-html body .review-card :is(button.secondary){font-size:15px!important;height:48px}
-html body .review-card .review-status,html body .review-card [data-review-status]{margin-top:16px!important}
+html:not(#u):not(#v) body :is(.review-card,.anki-review-panel){border-radius:2px!important}
+html:not(#u):not(#v) body .review-card :is(button.secondary){font-size:15px!important;height:48px}
+html:not(#u):not(#v) body .review-card .review-status,html:not(#u):not(#v) body .review-card [data-review-status]{margin-top:16px!important}
 /* grammar list: the stage strip fades at its edge, kana and meaning sit together */
-html body .gm-page .gm-stgs{-webkit-mask:linear-gradient(90deg,#000 0,#000 calc(100% - 48px),transparent);mask:linear-gradient(90deg,#000 0,#000 calc(100% - 48px),transparent)}
-html body .gm-group .gm-card{grid-template-columns:36px 72px minmax(0,1fr) auto!important}
-html body .gm-hud .gm-level.active{border-color:rgba(200,47,59,.6)!important}
+html:not(#u):not(#v) body .gm-page .gm-stgs{-webkit-mask:linear-gradient(90deg,#000 0,#000 calc(100% - 48px),transparent);mask:linear-gradient(90deg,#000 0,#000 calc(100% - 48px),transparent)}
+html:not(#u):not(#v) body .gm-group .gm-card{grid-template-columns:36px 72px minmax(0,1fr) auto!important}
+html:not(#u):not(#v) body .gm-hud .gm-level.active{border-color:rgba(200,47,59,.6)!important}
 /* lessons: the step rail stays in view, the step nav stays at one place, larger step buttons */
-html body .gm-lesson>.gm-steps{position:sticky;top:60px;align-self:start}
-html body .gm-lesson-main{min-height:calc(100vh - 360px)!important}
-html body .gm-lesson .gm-stepnav button{font-size:14px!important;height:44px}
+html:not(#u):not(#v) body .gm-lesson>.gm-steps{position:sticky;top:60px;align-self:start}
+html:not(#u):not(#v) body .gm-lesson-main{min-height:calc(100vh - 360px)!important}
+html:not(#u):not(#v) body .gm-lesson .gm-stepnav button{font-size:14px!important;height:44px}
 /* one left edge for every page: content starts at the main column's padding */
-html body .main :is(.leaderboard-page,.dl,.about-page){padding-left:0!important;padding-right:0!important}
+html:not(#u):not(#v) body .main :is(.leaderboard-page,.dl,.about-page){padding-left:0!important;padding-right:0!important}
 /* leaderboard: the ranked cards fill their row whatever the count; values never break */
-html body .leaderboard-page .lb-grimoires{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}
-html body .leaderboard-page :is(.lb-gvalue,.lb-local strong,.lb-local b,.lb-mychip span,.leaderboard-local strong){white-space:nowrap}
+html:not(#u):not(#v) body .leaderboard-page .lb-grimoires{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}
+html:not(#u):not(#v) body .leaderboard-page :is(.lb-gvalue,.lb-local strong,.lb-local b,.lb-mychip span,.leaderboard-local strong){white-space:nowrap}
 /* hot words 4–10: term, reason, then the count on the right */
-html body .leaderboard-page .lb-honours li{grid-template-columns:44px minmax(160px,240px) minmax(0,1fr) auto!important}
-html body .leaderboard-page .lb-honours .lb-honour-term{display:contents}
-html body .leaderboard-page .lb-honours .lb-honour-term strong{grid-column:2}
-html body .leaderboard-page .lb-honours .lb-honour-term small{grid-column:4;justify-self:end;font-size:12px;color:var(--g-t2,#c3ab9c)}
-html body .leaderboard-page .lb-honours .leaderboard-reason,html body .leaderboard-page .lb-honours li>span:empty{grid-column:3!important;grid-row:1}
+html:not(#u):not(#v) body .leaderboard-page .lb-honours li{grid-template-columns:44px minmax(160px,240px) minmax(0,1fr) auto!important}
+html:not(#u):not(#v) body .leaderboard-page .lb-honours .lb-honour-term{display:contents}
+html:not(#u):not(#v) body .leaderboard-page .lb-honours .lb-honour-term strong{grid-column:2}
+html:not(#u):not(#v) body .leaderboard-page .lb-honours .lb-honour-term small{grid-column:4;justify-self:end;font-size:12px;color:var(--g-t2,#c3ab9c)}
+html:not(#u):not(#v) body .leaderboard-page .lb-honours .leaderboard-reason,html:not(#u):not(#v) body .leaderboard-page .lb-honours li>span:empty{grid-column:3!important;grid-row:1}
 /* follow actions: one 32px height */
-html body .leaderboard-page :is(.lb-follow-button,.lb-chip,.leaderboard-leave[data-lb-follow]){height:32px;display:inline-flex;align-items:center;padding:0 14px!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)}
-html body .leaderboard-page .lb-follow-button{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
-html body .leaderboard-page .forum-new{height:36px!important;min-height:36px!important}
+html:not(#u):not(#v) body .leaderboard-page :is(.lb-follow-button,.lb-chip,.leaderboard-leave[data-lb-follow]){height:32px;display:inline-flex;align-items:center;padding:0 14px!important;border-radius:2px!important;box-shadow:inset 0 0 0 1px var(--u-line-2)}
+html:not(#u):not(#v) body .leaderboard-page .lb-follow-button{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
+html:not(#u):not(#v) body .leaderboard-page .forum-new{height:36px!important;min-height:36px!important}
 /* CJK small labels: no Latin tracking */
 html:is(:lang(zh-CN),:lang(ja-JP)) body :is(.lb-card-head small,.lb-h2 span,.tv-fig small,.tv-heatsum,.history-metrics dt,.lb-week,.stg-foot,.ri-hud-stats,.dl-head small){letter-spacing:.06em!important}
 /* daily: trend words on one line, the frame marks as on the other stages */
-html body .dl .dl-term{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:17px!important}
-html body .dl .dl-word:nth-child(1) .dl-term{font-size:19px!important}
-html body .dl .dl-term ruby{white-space:nowrap}
-html body .workspace:has(>.main .dl)>.stage-cover .stage-marks,html body .workspace:has(>.main .about-page)>.stage-cover .stage-marks{display:block}
+html:not(#u):not(#v) body .dl .dl-term{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:17px!important}
+html:not(#u):not(#v) body .dl .dl-word:nth-child(1) .dl-term{font-size:19px!important}
+html:not(#u):not(#v) body .dl .dl-term ruby{white-space:nowrap}
+html:not(#u):not(#v) body .workspace:has(>.main .dl)>.stage-cover .stage-marks,html:not(#u):not(#v) body .workspace:has(>.main .about-page)>.stage-cover .stage-marks{display:block}
 /* tools: the line of purpose reads as the headline, the cards use the height */
-html body .grimoire-page .tools-intro{font-family:var(--g-serif,serif);font-size:clamp(18px,1.5vw,22px);color:var(--g-t1,#f1e0d2);line-height:1.6}
-html body .grimoire-page .tools-intro .tools-kicker{font-family:var(--u-mono)}
-html body .grimoire-page .tool-card{min-height:clamp(300px,50vh,520px)!important}
-html body .grimoire-page .tool-key-note{text-wrap:pretty}
+html:not(#u):not(#v) body .grimoire-page .tools-intro{font-family:var(--g-serif,serif);font-size:clamp(18px,1.5vw,22px);color:var(--g-t1,#f1e0d2);line-height:1.6}
+html:not(#u):not(#v) body .grimoire-page .tools-intro .tools-kicker{font-family:var(--u-mono)}
+html:not(#u):not(#v) body .grimoire-page .tool-card{min-height:clamp(300px,50vh,520px)!important}
+html:not(#u):not(#v) body .grimoire-page .tool-key-note{text-wrap:pretty}
 /* about: every link row has its arrow, the thanks line follows the button's left edge */
-html body .about-page .about-link:not(:has(span))::after{content:"↗";color:var(--g-gold);margin-left:auto}
-html body .about-page .about-intl{text-align:left!important;align-items:flex-start}
+html:not(#u):not(#v) body .about-page .about-link:not(:has(span))::after{content:"↗";color:var(--g-gold);margin-left:auto}
+html:not(#u):not(#v) body .about-page .about-intl{text-align:left!important;align-items:flex-start}
 /* guide: the body never ends mid-line */
-html body .guide-panel .dev-notice-scroll{padding-bottom:36px!important}
+html:not(#u):not(#v) body .guide-panel .dev-notice-scroll{padding-bottom:36px!important}
 /* feedback: one hairline on focus, matched actions */
-html body dialog.feedback-dialog .feedback-text{border-left:0!important}
-html body dialog.feedback-dialog .feedback-text:not(:focus){box-shadow:inset 0 0 0 1px var(--u-line-2),inset 2px 0 0 var(--u-red)!important}
-html body dialog.game-dialog .dialog-actions :is(button.primary,.text-button){height:46px!important;font-size:15px!important}
+html:not(#u):not(#v) body dialog.feedback-dialog .feedback-text{border-left:0!important}
+html:not(#u):not(#v) body dialog.feedback-dialog .feedback-text:not(:focus){box-shadow:inset 0 0 0 1px var(--u-line-2),inset 2px 0 0 var(--u-red)!important}
+html:not(#u):not(#v) body dialog.game-dialog .dialog-actions :is(button.primary,.text-button){height:46px!important;font-size:15px!important}
 /* profile: one divider between sections */
-html body dialog.profile-panel .panel:last-child{border-bottom:0!important}
-html body dialog.profile-panel hr{display:none}
+html:not(#u):not(#v) body dialog.profile-panel .panel:last-child{border-bottom:0!important}
+html:not(#u):not(#v) body dialog.profile-panel hr{display:none}
 
 /* ---- settings, round 1 fixes ---- */
 /* the sticky search and preview cover what scrolls beneath them, gaps included */
-html body .main .settings-content .settings-search{box-shadow:inset 0 0 0 1px var(--u-line-2),0 -30px 0 6px #141116,0 14px 0 4px #141116,0 30px 16px 0 #141116!important}
-html body .sp-preview{box-shadow:inset 0 0 0 1px var(--u-line-2),0 0 0 14px #141116,0 22px 18px 6px #141116!important}
+html:not(#u):not(#v) body .main .settings-content .settings-search{box-shadow:inset 0 0 0 1px var(--u-line-2),0 -30px 0 6px #141116,0 14px 0 4px #141116,0 30px 16px 0 #141116!important}
+html:not(#u):not(#v) body .sp-preview{box-shadow:inset 0 0 0 1px var(--u-line-2),0 0 0 14px #141116,0 22px 18px 6px #141116!important}
 /* the per-game picker sits on the title line, at the right */
-html body .main .settings-content{position:relative}
-html body .main .settings-content>.profile-selector{position:absolute;right:clamp(20px,2vw,32px);top:86px;z-index:3;margin:0!important}
+html:not(#u):not(#v) body .main .settings-content{position:relative}
+html:not(#u):not(#v) body .main .settings-content>.profile-selector{position:absolute;right:clamp(20px,2vw,32px);top:86px;z-index:3;margin:0!important}
 /* data / account pages: their first heading is the page title, not a group kicker */
-html body .main .settings-content>div>.panel:first-child>h2.panel-title:first-child{font-family:var(--g-serif,serif)!important;font-size:clamp(24px,1.7vw,30px)!important;font-weight:600!important;letter-spacing:.02em!important;text-transform:none;color:var(--g-t1,#f1e0d2)!important;margin:6px 0 14px!important}
-html body .main .settings-content>div>.panel:first-child>h2.panel-title:first-child::before{content:"settings";display:block;margin-bottom:10px;font-family:var(--u-mono);font-size:11px;font-weight:400;letter-spacing:.3em;color:var(--g-gold)}
+html:not(#u):not(#v) body .main .settings-content>div>.panel:first-child>h2.panel-title:first-child{font-family:var(--g-serif,serif)!important;font-size:clamp(24px,1.7vw,30px)!important;font-weight:600!important;letter-spacing:.02em!important;text-transform:none;color:var(--g-t1,#f1e0d2)!important;margin:6px 0 14px!important}
+html:not(#u):not(#v) body .main .settings-content>div>.panel:first-child>h2.panel-title:first-child::before{content:"settings";display:block;margin-bottom:10px;font-family:var(--u-mono);font-size:11px;font-weight:400;letter-spacing:.3em;color:var(--g-gold)}
 /* danger: red kicker, red actions */
-html body .main .settings-content .settings-danger-zone{box-shadow:inset 0 0 0 1px rgba(200,50,60,.35)!important;padding:4px 18px 14px!important;border-radius:2px}
-html body .main .settings-content .settings-danger-zone>h3{color:#e8838c!important}
-html body .main .settings-content [data-remove]{color:#f0a3ab!important;box-shadow:inset 0 0 0 1px rgba(200,50,60,.6)!important;background:rgba(200,50,60,.06)!important}
-html body .main .settings-content [data-remove]:hover{background:rgba(200,50,60,.85)!important;color:#fff!important}
+html:not(#u):not(#v) body .main .settings-content .settings-danger-zone{box-shadow:inset 0 0 0 1px rgba(200,50,60,.35)!important;padding:4px 18px 14px!important;border-radius:2px}
+html:not(#u):not(#v) body .main .settings-content .settings-danger-zone>h3{color:#e8838c!important}
+html:not(#u):not(#v) body .main .settings-content [data-remove]{color:#f0a3ab!important;box-shadow:inset 0 0 0 1px rgba(200,50,60,.6)!important;background:rgba(200,50,60,.06)!important}
+html:not(#u):not(#v) body .main .settings-content [data-remove]:hover{background:rgba(200,50,60,.85)!important;color:#fff!important}
 /* names never break inside a word */
-html body .main .settings-content .settings-row :is(input,.select-name,.font-control *){word-break:keep-all}
-html body .main .settings-content .settings-help{max-width:72ch!important}
+html:not(#u):not(#v) body .main .settings-content .settings-row :is(input,.select-name,.font-control *){word-break:keep-all}
+html:not(#u):not(#v) body .main .settings-content .settings-help{max-width:72ch!important}
+
+/* ---- round 2 fixes ---- */
+/* lining figures on every element: the font shorthand used across the sheets resets them per element */
+html:not(#u):not(#v) body *:not(svg):not(svg *){font-feature-settings:"lnum" 1}
+html:not(#u):not(#v) body :is(.detail-statistics strong,.detail-statistics b,.stat-card strong){font-feature-settings:"lnum" 1,"tnum" 1!important}
+/* the sticky search is truly solid (beats the home-glass 88% rule) and covers the strip under it */
+html:not(#u):not(#v) body .main .settings-content input.settings-search,html:not(#u):not(#v) body .main .settings-content input.settings-search{background-color:#16121a!important;opacity:1!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+ box-shadow:inset 0 0 0 1px var(--u-line-2),0 -30px 0 6px #16121a,0 14px 0 4px #16121a,0 28px 14px 0 #16121a!important}
+html:not(#u):not(#v) body .sp-preview,html:not(#u):not(#v) body .sp-preview{background:#16121a!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;box-shadow:inset 0 0 0 1px var(--u-line-2),0 0 0 16px #16121a,0 24px 18px 8px #16121a!important}
+html:not(#u):not(#v) body .tv-heat i.today{max-width:12px!important;min-width:0!important;padding:0!important;margin:0!important;flex:none!important;grid-column:auto!important}
+html:not(#u):not(#v) body .gm-group .gm-card{grid-template-columns:36px fit-content(220px) minmax(0,1fr) auto!important}
