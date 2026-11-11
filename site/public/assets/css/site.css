@@ -2058,3 +2058,8 @@ html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
 .nt-welcome .nt-updates::-webkit-scrollbar-thumb:hover { background: #c8323c; }
 
 .nt-title-2 { margin-top: .35rem; color: #e8b4b8; }
+
+.nt-title-2 { font-size: clamp(1rem, 1.4vw, 1.2rem); font-weight: 500; line-height: 1.5; }
+/* the name tag sits inside the box so a resized window never cuts it in half; the box is a little smaller */
+.ht-box { padding-top: calc(clamp(1.4rem, 2.2vw, 2.6rem) + 1.6rem); zoom: .88; }
+.ht-name { translate: 0 0; }

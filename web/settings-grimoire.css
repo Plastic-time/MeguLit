@@ -466,3 +466,4 @@ dialog.game-dialog.dev-notice[open]{display:flex}
 .dev-notice-updates li{margin-bottom:6px}
 .dev-notice>.dev-notice-updates{flex:1 1 auto}
 .dev-notice h2.dev-notice-title2{margin:4px 0 12px;color:color-mix(in srgb,var(--accent-light,var(--accent)) 70%,#fff)}
+.dev-notice h2.dev-notice-title2{font-size:17px;font-weight:500;line-height:1.55}
