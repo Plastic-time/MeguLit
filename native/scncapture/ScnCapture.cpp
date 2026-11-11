@@ -50,6 +50,9 @@ struct Pending { std::wstring name, full; char *data; DWORD size; bool asked; };
 std::vector<Pending> Queue;
 HHOOK MessageHook;
 DWORD LastAsk;
+// E297 cold run (native/ColdCapture.cs): MEGULIT_COLD=1 in the game's environment. The archives are read at once and the
+// outcome goes to cold-done.txt, which ColdCapture waits for before it ends the game.
+bool Cold;
 
 std::string Utf8(const std::wstring &s) {
  int n = WideCharToMultiByte(CP_UTF8, 0, s.c_str(), (int)s.size(), NULL, 0, NULL, NULL);
@@ -76,6 +79,8 @@ void Log(const std::string &line) {
  char stamp[32]; sprintf_s(stamp, "%02d:%02d:%02d.%03d ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
  Append(L"capture.log", stamp + line + "\r\n", 1 << 20);
 }
+bool WriteWhole(const std::wstring &path, const void *data, DWORD size);
+void Report(const char *word) { if (Cold) WriteWhole(std::wstring(Out) + L"cold-done.txt", word, (DWORD)strlen(word)); }
 bool WriteWhole(const std::wstring &path, const void *data, DWORD size) {
  std::wstring tmp = path + L".tmp";
  HANDLE h = CreateFileW(tmp.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
@@ -189,6 +194,169 @@ IStream *__stdcall HookCreateIStream(const void *name, unsigned flags) {
  return s;
 }
 
+// ---- E297 whole Hxv4 archives (cxdec v2: PackinOne and the like), once per game ---------------------------------------
+// The scenes a game has not opened cannot be asked for by name in Hxv4 archives (their names are hashes). The cxdec
+// plug-in itself has a function that reads an archive's index (hash, key, ordinal for every file) and one that opens a
+// file from its key; both are found in the plug-in's code by their byte patterns (the ones the open-source Hxv4
+// extractors match) and called on the game thread. Every PSB / mdf file of the non-media archives is saved as
+// hx-<archive>-<ordinal>.scn next to the scenes captured above; kirikiri-dump reads them all the same.
+#if defined(_M_IX86)
+#pragma pack(push, 4)
+struct TjsVariant { union { struct { void *Object, *ObjThis; } o; long long Integer; double Real; VariantString *String; void *Octet; }; int vt; };
+#pragma pack(pop)
+struct TjsOctet { unsigned Length; int RefCount; unsigned char *Data; };
+typedef int(__cdecl *CxIndexFn)(TjsVariant *ret, const TjsVariant *name);
+typedef IStream *(__cdecl *CxStreamFn)(const void *name, long long key, unsigned mode);
+typedef void **(__stdcall *AppPathFn)(void **ret);
+typedef void **(__stdcall *NormalizeFn)(void **ret, const void *name);
+typedef int(__cdecl *PropGetFn)(void *self, unsigned flag, const wchar_t *member, unsigned *hint, TjsVariant *result, void *objthis);
+typedef int(__cdecl *PropGetNumFn)(void *self, unsigned flag, int num, TjsVariant *result, void *objthis);
+CxIndexFn CxIndex; CxStreamFn CxStream; AppPathFn AppPath; NormalizeFn Normalize;
+volatile LONG HxWanted;
+const char HxStreamPattern[] = "\x55\x8B\xEC\x6A\xFF\x68\x2A\x2A\x2A\x2A\x64\xA1\x00\x00\x00\x00\x50\x51\xA1\x2A\x2A\x2A\x2A\x33\xC5\x50\x8D\x45\xF4\x64\xA3\x00\x00\x00\x00\xA1\x2A\x2A\x2A\x2A\x85\xC0\x75\x32\x68\xB0\x30\x00\x00";
+const char HxIndexPattern[] = "\x55\x8B\xEC\x6A\xFF\x68\x2A\x2A\x2A\x2A\x64\xA1\x00\x00\x00\x00\x50\x83\xEC\x14\x57\xA1\x2A\x2A\x2A\x2A\x33\xC5\x50\x8D\x45\xF4\x64\xA3\x00\x00\x00\x00\x83\x7D\x08\x00\x0F\x84\x2A\x2A\x00\x00\xA1\x2A\x2A\x2A\x2A\x85\xC0\x75\x12\x68\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x83\xC4\x04\xA3\x2A\x2A\x2A\x2A\xFF\x75\x0C\x8D\x4D\xF0\x51\xFF\xD0\xA1\x2A\x2A\x2A\x2A\xC7\x45\xFC\x00\x00\x00\x00\x85\xC0";
+// 0x2A is a wildcard byte, as in the published patterns.
+const unsigned char *FindPattern(const unsigned char *at, size_t size, const char *pattern, size_t length) {
+ __try {
+  for (size_t i = 0; i + length <= size; i++) {
+   size_t k = 0;
+   while (k < length && (pattern[k] == '\x2A' || at[i + k] == (unsigned char)pattern[k])) k++;
+   if (k == length) return at + i;
+  }
+ } __except (EXCEPTION_EXECUTE_HANDLER) {}
+ return NULL;
+}
+bool FindCxFunctions() {
+ HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, GetCurrentProcessId());
+ if (snap == INVALID_HANDLE_VALUE) return false;
+ MODULEENTRY32W me; me.dwSize = sizeof me;
+ for (BOOL ok = Module32FirstW(snap, &me); ok && !(CxIndex && CxStream); ok = Module32NextW(snap, &me)) {
+  HMODULE m = me.hModule;
+  if (m == Self || !GetProcAddress(m, "V2Link")) continue;
+  __try {
+   auto dos = (IMAGE_DOS_HEADER *)m; auto nt = (IMAGE_NT_HEADERS *)((char *)m + dos->e_lfanew);
+   auto sec = IMAGE_FIRST_SECTION(nt);
+   for (int i = 0; i < nt->FileHeader.NumberOfSections; i++, sec++) {
+    if (!(sec->Characteristics & IMAGE_SCN_MEM_EXECUTE)) continue;
+    const unsigned char *code = (const unsigned char *)m + sec->VirtualAddress;
+    const unsigned char *s = FindPattern(code, sec->Misc.VirtualSize, HxStreamPattern, sizeof HxStreamPattern - 1);
+    const unsigned char *x = FindPattern(code, sec->Misc.VirtualSize, HxIndexPattern, sizeof HxIndexPattern - 1);
+    if (s && x) { CxStream = (CxStreamFn)s; CxIndex = (CxIndexFn)x; break; }
+   }
+  } __except (EXCEPTION_EXECUTE_HANDLER) {}
+ }
+ CloseHandle(snap);
+ return CxIndex && CxStream;
+}
+VariantString *MakeString(const wchar_t *text) { // kept for good, like the names asked for above
+ VariantString *v = (VariantString *)calloc(1, sizeof(VariantString));
+ if (!v || !(v->LongString = _wcsdup(text))) return NULL;
+ v->RefCount = 0x3fffffff; v->Length = (int)wcslen(text);
+ return v;
+}
+const wchar_t *TextOf(VariantString *v) { return !v ? NULL : v->LongString ? v->LongString : v->ShortString; }
+bool GetCount(void *obj, long long *count) {
+ __try {
+  TjsVariant r; ZeroMemory(&r, sizeof r);
+  if (((PropGetFn)(*(void ***)obj)[4])(obj, 0, L"count", NULL, &r, obj) < 0 || r.vt != 4) return false;
+  *count = r.Integer; return true;
+ } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool GetItem(void *obj, int i, TjsVariant *r) {
+ __try { ZeroMemory(r, sizeof *r); return ((PropGetNumFn)(*(void ***)obj)[5])(obj, 0, i, r, obj) >= 0; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool CallIndex(VariantString *arc, TjsVariant *out) {
+ __try { TjsVariant name; ZeroMemory(&name, sizeof name); name.vt = 2; name.String = arc; ZeroMemory(out, sizeof *out); CxIndex(out, &name); return out->vt == 1 && out->o.Object; }
+ __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+IStream *CallStream(VariantString **path, long long key, unsigned mode) {
+ __try { return CxStream(path, key, mode); } __except (EXCEPTION_EXECUTE_HANDLER) { return NULL; }
+}
+VariantString *CallNormalize(VariantString *name) {
+ __try { void *out = NULL; VariantString *in = name; Normalize(&out, &in); return (VariantString *)out; } __except (EXCEPTION_EXECUTE_HANDLER) { return NULL; }
+}
+VariantString *CallAppPath() {
+ __try { void *out = NULL; AppPath(&out); return (VariantString *)out; } __except (EXCEPTION_EXECUTE_HANDLER) { return NULL; }
+}
+bool ReadHead(IStream *s, unsigned char *head) {
+ __try { ULONG got = 0; LARGE_INTEGER zero; zero.QuadPart = 0; if (FAILED(s->Read(head, 4, &got)) || got != 4) return false; s->Seek(zero, STREAM_SEEK_SET, NULL); return true; }
+ __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool MediaArchive(const std::wstring &n) {
+ static const wchar_t *media[] = {L"bgimage", L"fgimage", L"evimage", L"image", L"bgm", L"voice", L"sound", L"se.", L"movie", L"video", L"thum", L"emote", L"font", L"sysse"};
+ std::wstring l = Lower(n);
+ for (auto m : media) if (l.find(m) != std::wstring::npos) return true;
+ return false;
+}
+// The fake name the index uses for a file: its ordinal in 14-bit steps from U+5000 (as the Hxv4 archives name them).
+std::wstring FakeName(unsigned ordinal) { std::wstring r; do { r += (wchar_t)((ordinal & 0x3fff) + 0x5000); ordinal >>= 14; } while (ordinal); return r; }
+void DumpArchive(const std::wstring &dir, const std::wstring &app, const std::wstring &file) {
+ std::wstring marker = std::wstring(Out) + L"hx-done-" + Lower(file) + L".txt";
+ if (GetFileAttributesW(marker.c_str()) != INVALID_FILE_ATTRIBUTES) return;
+ VariantString *arc = CallNormalize(MakeString((app + file).c_str()));
+ if (!arc) { Log("hx: name not normalized " + Utf8(file)); return; }
+ TjsVariant index;
+ TlsSetValue(Tls, (void *)1);
+ bool ok = CallIndex(arc, &index);
+ TlsSetValue(Tls, NULL);
+ if (!ok) { Log("hx: no index for " + Utf8(file)); return; }
+ long long dirs = 0, saved = 0, files = 0;
+ if (!GetCount(index.o.Object, &dirs)) { Log("hx: index without count " + Utf8(file)); return; }
+ std::wstring arcName = TextOf(arc) ? TextOf(arc) : L"";
+ for (int d = 1; d < dirs; d += 2) {
+  TjsVariant entries; long long n = 0;
+  if (!GetItem(index.o.Object, d, &entries) || entries.vt != 1 || !GetCount(entries.o.Object, &n)) continue;
+  for (int e = 1; e < n; e += 2) {
+   TjsVariant info, ord, key; long long parts = 0;
+   if (!GetItem(entries.o.Object, e, &info) || info.vt != 1 || !GetCount(info.o.Object, &parts) || parts < 2) continue;
+   if (!GetItem(info.o.Object, 0, &ord) || !GetItem(info.o.Object, 1, &key) || ord.vt != 4 || key.vt != 4 || ord.Integer < 0) continue;
+   files++;
+   std::wstring path = arcName + L">" + FakeName((unsigned)(ord.Integer & 0xffffffff));
+   VariantString *name = MakeString(path.c_str());
+   VariantString **ref = (VariantString **)malloc(sizeof(void *));
+   if (!name || !ref) continue;
+   *ref = name;
+   TlsSetValue(Tls, (void *)1);
+   IStream *s = CallStream(ref, key.Integer, (unsigned)((ord.Integer >> 32) & 0xffff));
+   TlsSetValue(Tls, NULL);
+   if (!s) continue;
+   unsigned char head[4];
+   if (ReadHead(s, head) && (!memcmp(head, "PSB\0", 4) || !memcmp(head, "mdf\0", 4))) {
+    DWORD size = 0; char *data = ReadAll(s, &size);
+    if (data && size <= (16u << 20)) {
+     wchar_t out[96]; swprintf_s(out, L"hx-%s-%llu.scn", Lower(file).c_str(), (unsigned long long)(ord.Integer & 0xffffffff));
+     if (WriteWhole(std::wstring(Out) + out, data, size)) saved++;
+    }
+    free(data);
+   }
+   ReleaseGuarded(s);
+  }
+ }
+ Log("hx: " + Utf8(file) + " " + std::to_string(files) + " files, " + std::to_string(saved) + " PSB saved");
+ WriteWhole(marker, "done", 4);
+}
+void DumpHx() {
+ if (!CxIndex || !CxStream || !AppPath || !Normalize) return;
+ VariantString *appv = CallAppPath();
+ const wchar_t *app = TextOf(appv);
+ if (!app) { Log("hx: no app path"); return; }
+ wchar_t game[1024]; if (!GetModuleFileNameW(NULL, game, 1024)) return;
+ wchar_t *g = wcsrchr(game, L'\\'); if (!g) return; g[1] = 0;
+ WIN32_FIND_DATAW f;
+ HANDLE h = FindFirstFileW((std::wstring(game) + L"*.xp3").c_str(), &f);
+ if (h == INVALID_HANDLE_VALUE) return;
+ std::vector<std::wstring> names;
+ do if (!MediaArchive(f.cFileName)) names.push_back(f.cFileName); while (FindNextFileW(h, &f));
+ FindClose(h);
+ // The scene files live in scn*.xp3 when there are such archives: read only those (fast enough for the cold run).
+ std::vector<std::wstring> scn;
+ for (auto &n : names) if (!_wcsnicmp(n.c_str(), L"scn", 3)) scn.push_back(n);
+ if (!scn.empty()) names.swap(scn);
+ std::wstring appPath(app);
+ for (auto &n : names) DumpArchive(game, appPath, n);
+}
+#endif
+
 // ---- scenes MeguLit asks for (want.txt), opened on the game's own thread between its messages ----------------------
 bool HaveText(const std::wstring &name) { return GetFileAttributesW((std::wstring(RunDir) + BaseOf(name.c_str())).c_str()) != INVALID_FILE_ATTRIBUTES; }
 void AskOne(const std::wstring &name) {
@@ -220,6 +388,9 @@ void AskText(const std::wstring &name) {
 }
 LRESULT CALLBACK OnMessage(int code, WPARAM wp, LPARAM lp) {
  if (code >= 0 && wp == PM_REMOVE && GetTickCount() - LastAsk >= 120) {
+#if defined(_M_IX86)
+  if (InterlockedExchange(&HxWanted, 0)) { LastAsk = GetTickCount(); DumpHx(); Report("done"); return CallNextHookEx(NULL, code, wp, lp); }
+#endif
   std::wstring next;
   EnterCriticalSection(&Gate);
   while (!Wanted.empty() && next.empty()) { next = Wanted.front(); Wanted.pop_front(); if (IsScene(next.c_str()) ? Done.count(Lower(BaseOf(next.c_str()))) > 0 : HaveText(next)) next.clear(); }
@@ -345,6 +516,7 @@ DWORD GameThread() { DWORD tid = 0; EnumWindows(OwnWindow, (LPARAM)&tid); return
 DWORD Started;
 DWORD WINAPI Run(void *) {
  Started = GetTickCount();
+ { wchar_t v[8]; Cold = GetEnvironmentVariableW(L"MEGULIT_COLD", v, 8) > 0 && v[0] == L'1'; }
  // Output folder: <MeguLit>\cache\kirikiri-scn\<FNV-1a of the lower-case game folder>\ (this DLL is <MeguLit>\native\).
  wchar_t self[1024], game[1024];
  if (!GetModuleFileNameW(Self, self, 1024) || !GetModuleFileNameW(NULL, game, 1024)) return 0;
@@ -365,22 +537,36 @@ DWORD WINAPI Run(void *) {
  LoadDone();
  void *exporter = NULL;
  for (int tries = 0; tries < 30 && !exporter; tries++) { exporter = FindExporter(); if (!exporter) Sleep(2000); }
- if (!exporter) { Log("no KiriKiri function exporter; nothing hooked"); return 0; }
+ if (!exporter) { Log("no KiriKiri function exporter; nothing hooked"); Report("no-exporter"); return 0; }
  void *fn = NULL, *exists = NULL, *text = NULL;
  QueryGuarded(exporter, "IStream * ::TVPCreateIStream(const ttstr &,tjs_uint32)", &fn);
  if (QueryGuarded(exporter, "bool ::TVPIsExistentStorage(const ttstr &)", &exists)) Exists = (ExistsFn)exists;
  if (QueryGuarded(exporter, "iTJSTextReadStream * ::TVPCreateTextStreamForRead(const ttstr &,const ttstr &)", &text)) TextStream = (TextStreamFn)text;
- if (MH_Initialize() != MH_OK || MH_CreateHook(fn, (void *)&HookCreateIStream, (void **)&Original) != MH_OK || MH_EnableHook(fn) != MH_OK) { Log("hook failed"); return 0; }
+ if (MH_Initialize() != MH_OK || MH_CreateHook(fn, (void *)&HookCreateIStream, (void **)&Original) != MH_OK || MH_EnableHook(fn) != MH_OK) { Log("hook failed"); Report("failed"); return 0; }
  Target = (CreateIStreamFn)fn;
  Log("hooked TVPCreateIStream; " + std::to_string(Done.size()) + " scenes already saved");
+#if defined(_M_IX86)
+ {
+  void *app = NULL, *norm = NULL;
+  if (QueryGuarded(exporter, "ttstr ::TVPGetAppPath()", &app)) AppPath = (AppPathFn)app;
+  if (QueryGuarded(exporter, "ttstr ::TVPNormalizeStorageName(const ttstr &)", &norm)) Normalize = (NormalizeFn)norm;
+  if (AppPath && Normalize && FindCxFunctions()) { InterlockedExchange(&HxWanted, 1); Log("hx: cxdec index and stream functions found"); }
+  else { Log("hx: no cxdec v2 plug-in functions"); Report("no-hx"); }
+ }
+#else
+ Report("no-hx");
+#endif
  for (;;) {
   WaitForSingleObject(Wake, 1000);
   Flush();
   if (!Exists) continue;
-  if (!MainThread && GetTickCount() - Started > 8000) { DWORD t = GameThread(); if (t) { InterlockedExchange(&MainThread, (LONG)t); Log("game thread from its window"); } }
+  if (!MainThread && GetTickCount() - Started > (Cold ? 1500u : 8000u)) { DWORD t = GameThread(); if (t) { InterlockedExchange(&MainThread, (LONG)t); Log("game thread from its window"); } }
   if (!MainThread) continue;
   ReadWants();
   EnterCriticalSection(&Gate); bool more = !Wanted.empty(); LeaveCriticalSection(&Gate);
+#if defined(_M_IX86)
+  if (HxWanted) more = true;
+#endif
   if (more && !MessageHook) { MessageHook = SetWindowsHookExW(WH_GETMESSAGE, OnMessage, NULL, (DWORD)MainThread); if (MessageHook) Log("asking on the game thread"); }
   if (more && MessageHook) PostThreadMessageW((DWORD)MainThread, WM_NULL, 0, 0);
   if (!more && MessageHook) { UnhookWindowsHookEx(MessageHook); MessageHook = NULL; Log("asked scenes done"); }

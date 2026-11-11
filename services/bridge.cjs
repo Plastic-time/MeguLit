@@ -195,7 +195,10 @@ async function dispatch(request,runtime=null) {
       // E280: opening the dialog also looks for a Chinese patch already on this computer (never downloads anything).
       // Read-only: how much of the work is read, {total, read, ratio, source} (services/read-progress.cjs); ids for several at once.
       case 'read_progress':{const rp=require('./read-progress.cjs');if(Array.isArray(request.ids))return {items:request.ids.map(i=>{try{return rp.progress(root,db,i);}catch(e){return {id:String(i),total:null,read:null,ratio:null,source:null,error:String(e.message||e)};}})};return rp.progress(root,db,request.id);}
-      case 'text_source_status':{const ot=require('./original-text.cjs'),id=String(request.id);ot.autoPatchLater(root,id,()=>runtime?.reader?.refreshTextSource?.(),{force:!!request.search});return ot.status(root,db,id);}
+      case 'text_source_status':{const ot=require('./original-text.cjs'),id=String(request.id);ot.autoPatchLater(root,id,()=>runtime?.reader?.refreshTextSource?.(),{force:!!request.search});
+        /* E297 Hxv4 KiriKiri games: the cold run reads the scripts through the game; 重新查找 retries a failed one */
+        const cold=require('./kirikiri-cold.cjs'),row=db.prepare('SELECT id,executable FROM games WHERE id=? AND removed_at IS NULL').get(id),coldOn=require('../core/preferences.cjs').cleanPreferences(require('./store.cjs').readJSON?.(path.join(root,'data','config','preferences.json'))||{}).scriptColdRun!==false;
+        if(row)cold.consider(root,row,{enabled:coldOn,force:!!request.search});return {...ot.status(root,db,id),cold:row?cold.status(root,row.executable):null};}
       case 'text_source_import':{const ot=require('./original-text.cjs'),id=String(request.id),dir=String(request.dir||'');
         if(request.kind==='patch'){const r=ot.importPatch(root,db,id,dir);if(r.patchStatus!=='ready'){runtime?.reader?.refreshTextSource?.();return ot.status(root,db,id);}}else if(request.kind==='original')ot.importOriginal(root,db,id,dir);else throw Error('INVALID_TEXT_SOURCE');
         runtime?.reader?.refreshTextSource?.();return ot.status(root,db,id);}

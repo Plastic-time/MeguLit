@@ -9,7 +9,7 @@ set SRC=ScnCapture.cpp minhook\src\hook.c minhook\src\buffer.c minhook\src\tramp
 set FLAGS=/nologo /O2 /MT /EHsc /LD /W3 /utf-8 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN
 if not exist obj32 mkdir obj32
 if not exist obj64 mkdir obj64
-call "%MEGULIT_VS_X86%" || exit /b 1
+if exist "%MEGULIT_VS_X86%" (call "%MEGULIT_VS_X86%" || exit /b 1) else (call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo || exit /b 1)
 cl %FLAGS% /Foobj32\ %SRC% /Fe:..\MeguLitScn32.dll /link user32.lib || exit /b 1
 endlocal & setlocal
 cd /d "%~dp0"

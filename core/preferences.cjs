@@ -13,6 +13,7 @@ function cleanPreferences(value = {}) {
   if (['free','pro'].includes(value.deeplTier)) result.deeplTier = value.deeplTier;
   if (typeof value.contextEnabled === 'boolean') result.contextEnabled = value.contextEnabled;
   if (typeof value.scriptTranslation === 'boolean') result.scriptTranslation = value.scriptTranslation;
+  if (typeof value.scriptColdRun === 'boolean') result.scriptColdRun = value.scriptColdRun;
   if (['zh','en'].includes(value.learnerLanguage)) result.learnerLanguage=value.learnerLanguage;
   if (['machine','follow','local'].includes(value.reviewEngine)) result.reviewEngine=value.reviewEngine;
   if (['sudachi','unidic'].includes(value.readingEngine)) result.readingEngine=value.readingEngine;

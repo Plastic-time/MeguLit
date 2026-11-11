@@ -40,4 +40,7 @@ function decodeText(buf){
  if(buf[0]===0xfe&&buf[1]===0xfe&&buf[2]<=2)return null; // KiriKiri's own scrambled text (mode 0-2): not handled
  return {buffer:buf,encoding:''};
 }
-module.exports={list,read,decodeText,MAGIC};
+// E297: the index's top-level chunk tags. An "Hxv4" chunk marks KiriKiri Z archives whose files only the game's cxdec v2
+// plug-in can open (the cold run in services/kirikiri-cold.cjs reads them through the game).
+function indexTags(file){let fd;try{fd=fs.openSync(file,'r');const index=readIndex(fd,fs.fstatSync(fd).size);return index?[...new Set(chunks(index,0,index.length).map(c=>c.tag))]:[];}catch{return [];}finally{if(fd!==undefined)try{fs.closeSync(fd);}catch{}}}
+module.exports={list,read,decodeText,MAGIC,indexTags};
