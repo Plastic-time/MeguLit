@@ -540,3 +540,19 @@
 @media(max-width:1100px){.gm-hero{grid-template-columns:1fr}.gm-hero-side{border-left:0;border-top:1px dashed var(--mg-line);padding:18px 46px}}
 @media(max-width:760px){.gm-hud{gap:12px}.gm-hud-stats{width:100%;margin-left:0;justify-content:space-between}.gm-stg{flex-basis:160px}.gm-lesson{grid-template-columns:1fr;grid-template-areas:"head" "rail" "main"}}
 .gm-page{overflow-anchor:none}
+/* 2026-11-11 one screen at full size (user: 全屏时不用上下滚动就能看完整): on wide windows the hero and the sentence
+   map share a row, the HUD, magic bar and stage cards get thinner, so stages and the first rows of lessons fit */
+@media(min-width:1200px){
+ .gm-page{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:10px;align-items:stretch}
+ .gm-page>*{grid-column:1/-1;margin:0}
+ .gm-page>.gm-hero{grid-column:1}.gm-page>.gm-overview{grid-column:2;align-content:center}
+ .gm-hud{padding:8px 16px}.rw-bar{padding:6px 16px}.gm-anki-on{display:none}
+ .gm-hero{min-height:0}.gm-hero-main{min-height:0;padding:22px 30px 20px;gap:8px}.gm-hero-ja{font-size:clamp(48px,4.2vw,72px)}.gm-hero h2 small{font-size:20px}
+ .gm-hero-ghost{font-size:240px}.gm-hero-side{padding:22px 20px;gap:4px}.gm-hero-level{font-size:26px}.gm-hero-go{height:42px}
+ .gm-overview{grid-template-columns:1fr;grid-template-rows:auto;gap:10px;padding:18px 20px}.gm-overview .gm-overview-kicker{grid-row:auto}
+ .gm-n0note{padding:8px 14px;font-size:12px;line-height:1.6}
+ .gm-stg{padding:10px 14px 10px;gap:3px}.gm-stg-glyph{font-size:26px}.gm-stg-nick{font-size:14px}
+ .gm-stgs{padding-bottom:6px}
+ .gm-group{padding-top:10px}.gm-group h3{padding:0 18px 8px}
+ .gm-group .gm-card{padding:10px 16px}.gm-group .gm-card-title{font-size:24px}
+}
