@@ -21,33 +21,48 @@ const LOAD_OPTS = { ...Object.fromEntries(Object.entries(OPTS).map(([k, v]) => [
 const playerUrl = url => 'https://w.soundcloud.com/player/?' + new URLSearchParams({ url, ...OPTS });
 
 export class ScAudio extends EventTarget {
+  static _makeFrame() {
+    const f = document.createElement('iframe');
+    f.className = 'sc-frame';
+    f.title = 'SoundCloud';
+    f.allow = 'autoplay; encrypted-media';
+    f.height = '20'; f.scrolling = 'no'; f.frameBorder = '0';
+    return f;
+  }
   constructor() {
     super();
-    this.frame = document.createElement('iframe');
-    this.frame.className = 'sc-frame';
-    this.frame.title = 'SoundCloud';
-    this.frame.allow = 'autoplay; encrypted-media';
-    this.frame.height = '20'; this.frame.scrolling = 'no'; this.frame.frameBorder = '0';
+    this.frame = ScAudio._makeFrame();
     this.dataset = {};
     this._src = ''; this._paused = true; this._time = 0; this._duration = NaN; this._volume = 1; this.loop = false;
-    this._widget = null; this._ready = null; this._wantPlay = false;
+    this._widget = null; this._ready = null; this._wantPlay = false; this._asleep = false; this._resume = 0; this._nap = 0;
   }
+  // Memory: SoundCloud's player is a whole page in its own process (about 90 MB). Paused for a while (sound off, the
+  // tab hidden, a pause), it is unloaded; the next play loads it again and goes on from the same place.
+  _sleepLater() { clearTimeout(this._nap); this._nap = setTimeout(() => { if (this._paused && this._widget) this._sleep(); }, 15000); }
+  _sleep() {
+    this._resume = this._time; this._asleep = true;
+    this._widget = null; this._ready = null;
+    // the frame goes away entirely (SoundCloud's widget object belongs to it); a new one takes its place on waking
+    this._parent = this.frame.parentNode; this._next = this.frame.nextSibling; this.frame.remove();
+  }
+  _wake() { if (this._asleep && this._src) { this._asleep = false; this._ready = this._bind(this._src); } }
   getAttribute(n) { return n === 'src' ? this._src || null : null; }
   get src() { return this._src; }
   set src(url) {
     if (url === this._src) return;
-    this._src = url; this._time = 0; this._duration = NaN;
+    this._src = url; this._time = 0; this._duration = NaN; this._resume = 0;
+    if (this._asleep) return;   // loaded on the next play
     this._ready = this._bind(url);
   }
   get paused() { return this._paused; }
   get currentTime() { return this._time; }
-  set currentTime(t) { this._time = t; this._ready?.then(w => { w.seekTo(Math.max(0, t) * 1000); this.dispatchEvent(new Event('seeked')); }); }
+  set currentTime(t) { this._time = t; if (this._asleep) { this._resume = t; return; } this._ready?.then(w => { w.seekTo(Math.max(0, t) * 1000); this.dispatchEvent(new Event('seeked')); }); }
   get duration() { return this._duration; }
   get seekable() { const d = this._duration; return Number.isFinite(d) ? { length: 1, start: () => 0, end: () => d } : { length: 0, start: () => 0, end: () => 0 }; }
   get volume() { return this._volume; }
   set volume(v) { this._volume = v; this._ready?.then(w => w.setVolume(Math.round(v * GAIN * 100))); }
   play() {
-    this._wantPlay = true;
+    this._wantPlay = true; clearTimeout(this._nap); this._wake();
     this._ready?.then(w => w.setVolume(Math.round(this._volume * GAIN * 100)));
     if (!this._ready) return Promise.reject(new Error('no source'));
     return this._ready.then(w => new Promise((res, rej) => {
@@ -57,16 +72,20 @@ export class ScAudio extends EventTarget {
       w.play();
     }));
   }
-  pause() { this._wantPlay = false; this._ready?.then(w => w.pause()); }
+  pause() { this._wantPlay = false; this._ready?.then(w => w.pause()); this._sleepLater(); }
 
   async _bind(url) {
     const SC = await loadApi();
     if (!this._widget) {
+      const resume = this._resume; this._resume = 0;
+      if (this._parent && !this.frame.isConnected) { this.frame = ScAudio._makeFrame(); this._parent.insertBefore(this.frame, this._next?.parentNode === this._parent ? this._next : null); }
       this.frame.src = playerUrl(url);
       if (!this.frame.isConnected) document.body.append(this.frame);
       const w = SC.Widget(this.frame);
       const E = SC.Widget.Events;
       await new Promise(res => w.bind(E.READY, res));
+      // waking up: back to where it was, once it plays
+      if (resume > 1) { let once = true; w.bind(E.PLAY, () => { if (once) { once = false; w.seekTo(resume * 1000); } }); }
       w.bind(E.PLAY, () => {
         // SoundCloud resets its volume to 100% on a reload or a new song: ours goes back on at every start
         w.setVolume(Math.round(this._volume * GAIN * 100));
@@ -74,7 +93,7 @@ export class ScAudio extends EventTarget {
         w.getDuration(ms => { if (ms > 0 && ms / 1000 !== this._duration) { this._duration = ms / 1000; this.dispatchEvent(new Event('loadedmetadata')); } });
         if (this._paused) { this._paused = false; this.dispatchEvent(new Event('play')); }
       });
-      w.bind(E.PAUSE, () => { if (!this._paused) { this._paused = true; this.dispatchEvent(new Event('pause')); } });
+      w.bind(E.PAUSE, () => { if (!this._paused) { this._paused = true; this.dispatchEvent(new Event('pause')); this._sleepLater(); } });
       w.bind(E.FINISH, () => {
         this._paused = true; this.dispatchEvent(new Event('pause'));
         if (this.loop) { w.seekTo(0); w.play(); } else this.dispatchEvent(new Event('ended'));
