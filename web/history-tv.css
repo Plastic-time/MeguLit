@@ -11,11 +11,6 @@
 /* header row and the two sub tabs: numbered, gold underline */
 .main:has(>.history-backdrop) .page-tools .text-button{font-family:var(--htv-mono);font-size:11px;letter-spacing:.24em;color:var(--g-t2)}
 .main:has(>.history-backdrop) .page-tools .text-button:hover{color:var(--g-gold)}
-.main:has(>.history-backdrop) .tabs{counter-reset:htv;gap:clamp(18px,2vw,30px);background:none!important;border:0!important;box-shadow:none!important;border-bottom:1px solid rgba(255,255,255,.1)!important;border-radius:0!important;padding:0!important}
-.main:has(>.history-backdrop) .tabs .tab{counter-increment:htv;background:none!important;border-radius:0!important;padding:10px 0!important;letter-spacing:.16em;color:var(--g-t2)!important;box-shadow:none!important}
-.main:has(>.history-backdrop) .tabs .tab::before{content:counter(htv,decimal-leading-zero);margin-right:8px;font-family:var(--htv-mono);font-size:10px;color:var(--g-gold);opacity:.7}
-.main:has(>.history-backdrop) .tabs .tab.active{color:var(--g-t1)!important;background:linear-gradient(90deg,var(--g-gold),transparent) left bottom/100% 2px no-repeat!important}
-.main:has(>.history-backdrop) .tabs .tab.active::after{display:none}
 
 /* the journal: fluid column, day headings as mono labels on a hairline */
 .main:has(>.history-backdrop) .history-journal{max-width:min(1360px,100%);width:100%;box-sizing:border-box;padding:0 clamp(0px,1vw,16px) 48px}
