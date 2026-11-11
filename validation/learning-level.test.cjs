@@ -49,7 +49,7 @@ test('a lesson is six guided steps with Megumin, built from your own games when 
  assert.match(g.meguminIntro(wo,real,'zh'),/吾名惠惠/);assert.match(g.meguminIntro(wo,real,'zh'),/《魔法使いの夜》/,'names the game you met it in');
  assert.match(g.meguminIntro(wo,[],'zh'),/还没捉到它/,'falls back to built-in lines');
  assert.match(html,/<span class="gm-block" style="--i:0">名词<\/span>/,'how it attaches is drawn as blocks');
- const desu=g.lessonHTML(N5.find(p=>p.id==='kosoado'),{progress:{}},{locale:'zh',esc});assert.match(desu,/data-split-toggle/,'points without a lab take a line apart');
+ const desu=g.lessonHTML(N5.find(p=>p.id==='kosoado'),{progress:{}},{locale:'zh',esc});assert.match(desu,/data-find="1"/,'points without a lab: find the grammar inside a line');
 });
 
 test('practice drags the answer into the gap; the list says what to learn next',async()=>{
@@ -140,7 +140,7 @@ test('grammar cards from the learner\'s own Anki are read at run time and merged
  const ex=B.examplesFor(cards,[{text:'悩んだあげく、告白した。',title:'G',gameId:'g',origin:'history'}]);assert.equal(ex[ageku.id][0].title,'G');
  const g=await import('../web/grammar.js'),r=g.useAnkiCards(cards);assert.deepEqual(r,{merged:1,own:1},'たら joins the N4 lesson, あげく gets its own');
  const tara=g.pointsOf('N4').find(p=>p.id==='n4-tara');assert.equal(tara.anki.length,1);assert.match(g.lessonHTML(tara,{progress:{}},{locale:'zh',esc}),/蓝宝书 · 来自你的 Anki · ～たら|蓝宝书 · 来自你的 Anki · たら/);
- const own=g.pointsOf('N2').find(p=>p.id==='bb-12');assert.ok(own);assert.match(g.listHTML({progress:{}},{locale:'zh',esc,level:'N2'}),/蓝宝书 · 来自你的 Anki/);
+ const own=g.pointsOf('N2').find(p=>p.id==='bb-12');assert.ok(own);assert.match(g.listHTML({progress:{}},{locale:'zh',esc,level:'N2'}),/· 蓝宝书<small>/,'cards are sorted into kinds');
  assert.ok(g.exercisesFor(own,[],2).every(q=>q.choices.includes(q.answer)));
  assert.ok(G.validPoint('bb-12'));g.useAnkiCards([]);
  const bridge=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');assert.match(bridge,/case 'grammar_bluebook'/);

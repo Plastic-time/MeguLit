@@ -50,4 +50,15 @@ function examplesFor(points,list,{max=4}={}){
     if(found.length)out[p.id]=found.sort((a,b)=>score(b)-score(a)).slice(0,max);}
   return out;
 }
-module.exports={read,parse,profiles,examplesFor,noRuby,hitsOf};
+/* 「下载并自动导入」: after the learner clicks Download on AnkiWeb, the newest .apkg that appeared in Downloads since
+   `since` (and stopped growing) is imported: through AnkiConnect when it answers, otherwise opened with Anki. */
+function newDeck(since,{dir=path.join(os.homedir(),'Downloads')}={}){
+  let best=null;try{for(const f of fs.readdirSync(dir)){if(!/\.apkg$/i.test(f))continue;const file=path.join(dir,f),st=fs.statSync(file);if(st.mtimeMs>=since&&(!best||st.mtimeMs>best.mtime))best={file,mtime:st.mtimeMs,size:st.size};}}catch{}
+  return best;
+}
+async function importDeck(file,{anki=null,config=null,open=null}={}){
+  if(anki&&config){try{await anki.call(config,'importPackage',{path:file});return {imported:true,via:'ankiconnect'};}catch{}}
+  if(open){open(file);return {imported:false,via:'open'};}
+  return {imported:false,via:'none'};
+}
+module.exports={newDeck,importDeck,read,parse,profiles,examplesFor,noRuby,hitsOf};

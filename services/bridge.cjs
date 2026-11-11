@@ -393,6 +393,11 @@ async function dispatch(request,runtime=null) {
       }
       /* 学习 → 语法: grammar cards from the learner's own Anki decks (read here, never shipped), with lines read that contain them */
       case 'grammar_bluebook':{const B=require('./bluebook.cjs'),r=B.read(root);return r.available?{...r,examples:B.examplesFor(r.points,require('./grammar.cjs').candidates(db,{root,scriptPairs:require('./original-text.cjs').scriptPairs}))}:r;}
+      case 'grammar_bluebook_import':{const B=require('./bluebook.cjs'),since=Number(request.since)||0,f=B.newDeck(since);if(!f)return {found:false};
+        const prev=Number(request.size)||-1;if(f.size!==prev||Date.now()-f.mtime<1500)return {found:true,ready:false,size:f.size,file:path.basename(f.file)};
+        const config=runtime?.config?.()||store.readJSON(path.join(root,'data','config','v4-preferences.json'));
+        const r=await B.importDeck(f.file,{anki:new(require('../core/anki.cjs').Anki)(),config,open:file=>spawn('explorer.exe',[file],{detached:true,stdio:'ignore'}).unref()});
+        return {found:true,ready:true,file:path.basename(f.file),...r};}
       case 'grammar_learned':return require('./grammar.cjs').setLearned(db,String(request.point||''),request.learned!==false);
       case 'grammar_answer':return require('./grammar.cjs').recordAnswer(db,String(request.point||''),request.correct===true);
       case 'grammar_anki':{
