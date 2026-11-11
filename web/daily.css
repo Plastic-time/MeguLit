@@ -228,3 +228,5 @@ a:hover .dl-plate i:nth-child(2){transform:translate(8%,-6%) rotate(45deg)}
 .rd .dl-btn[disabled]{opacity:.45;cursor:default}
 @media (max-width:760px){.rd-body{padding:24px 18px 60px}.rd-bar{grid-template-columns:1fr auto;padding:10px 16px}.rd-src{display:none}.rd-pop{width:calc(100% - 24px)}}
 @media (prefers-reduced-motion:reduce){.rd *,.rd *::before,.rd *::after{transition-duration:0s!important;animation:none!important}}
+
+.dl-focus{outline:1px solid var(--g-gold,#edb56e);outline-offset:6px;transition:outline-color 1.2s}

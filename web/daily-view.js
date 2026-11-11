@@ -58,9 +58,11 @@ export function pageHTML(data,{locale,esc,filter='all',cat='gal'}){
   +`<aside class="dl-rail" aria-label="${w.words}"><div class="dl-head"><h3>${w.words}</h3>${data.words?.source?`<small>${esc(data.words.source)}</small>`:''}</div><p class="dl-note">${w.wordsNote}</p>${wordsHTML(words,{esc,w,locale})}</aside></div></div>`;
 }
 function placeInk(root){const nav=root.querySelector('.dl-filters'),on=nav?.querySelector('[aria-selected=true]'),ink=nav?.querySelector('.dl-filter-ink');if(!on||!ink)return;ink.style.width=on.offsetWidth+'px';ink.style.transform=`translateX(${on.offsetLeft}px)`;}
+/* the home's news thumbnails open the daily page on that article */
+function focusFromHome(main){let link='';try{link=sessionStorage.getItem('megulit-daily-focus')||'';sessionStorage.removeItem('megulit-daily-focus');}catch{}if(!link)return;const hit=[...main.querySelectorAll('[data-dl-open]')].find(e=>e.dataset.dlOpen===link);const item=hit?.closest('article,li')||hit;if(!item)return;requestAnimationFrame(()=>{item.scrollIntoView({block:'center',behavior:'smooth'});item.classList.add('dl-focus');setTimeout(()=>item.classList.remove('dl-focus'),2200);});}
 export async function mountDaily(main,{api,locale,esc,toast,isCurrent=()=>true,lookup,openSettings}){
  let data=null,filter='all',cat=(()=>{try{return localStorage.getItem('megulit-daily-cat')==='acg'?'acg':'gal';}catch{return 'gal';}})();
- const paint=()=>{main.innerHTML=pageHTML(data,{locale,esc,filter,cat});bind();requestAnimationFrame(()=>{placeInk(main);main.querySelector('.dl')?.classList.add('dl-ready');});};
+ const paint=()=>{main.innerHTML=pageHTML(data,{locale,esc,filter,cat});bind();focusFromHome(main);requestAnimationFrame(()=>{placeInk(main);main.querySelector('.dl')?.classList.add('dl-ready');});};
  const load=async(spin)=>{if(spin)main.querySelector('[data-dl-refresh]')?.classList.add('dl-spin');try{data=await api('daily_view',spin?{force:true}:{});}catch{data={state:'error'};}if(isCurrent())paint();};
  function bind(){
   main.querySelectorAll('[data-dl-refresh]').forEach(b=>b.onclick=()=>load(true));
