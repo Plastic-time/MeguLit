@@ -166,7 +166,13 @@ export async function articleGet(env,url,{json,fail},now=new Date(),fetcher=fetc
 /* E415 a short Chinese note per hot word (退市 / 棒球选手 / 快餐产品), written once a day by Workers AI with the
    headline as context. The app prefers its own dictionary and falls back to machine translation when this is empty. */
 export const GLOSS_MODEL='@cf/qwen/qwen3-30b-a3b-fp8',GLOSS_FALLBACK='@cf/qwen/qwen3.8-27b';
-export const GLOSS_PROMPT='你是给中国读者看的日语词汇注释员。对每个日语词，结合给出的新闻标题，写一个不超过12个字的简体中文释义。必须全部使用简体中文，不能出现任何日文假名。普通词写中文词义（例：上場廃止→退市）；人名写身份并尽量具体（例：棒球选手、演员、政治家）；地名、团体、作品、商品写它是什么（例：足球俱乐部、动画作品、快餐产品）。只输出 JSON 字符串数组，顺序与输入一致，例如 ["退市","棒球选手"]，不要输出其他内容。';
+/* E415 (user: 「ゴリ = 网红」 reads as if the word meant 网红): every note says what kind of thing the word is.
+   type: 词语 (an ordinary word: note = its meaning) or 人名 / 组织 / 作品 / 地名 / 商品 / 事件 (a proper noun: note =
+   who or what it is, never the name itself). The page shows the type as a small tag beside the note. */
+export const GLOSS_PROMPT='你是给中国读者看的日语词汇注释员。对每个日语词，结合给出的新闻标题，先判断类型，再写不超过16个字的简体中文说明。类型只能是：词语、人名、组织、作品、地名、商品、事件。词语：说明写中文词义（例：上場廃止→退市）。人名：说明写这个人是谁，国籍或领域加身份（例：ゴリ→日本网红（YouTuber），岡本和真→日本职业棒球选手），绝对不能只写名字本身或它的中文写法。组织、作品、地名、商品、事件：说明写它是什么（例：海ほたる→东京湾跨海公路的休息站）。必须全部使用简体中文，不能出现日文假名。只输出 JSON 数组，顺序与输入一致，每项形如 {"type":"人名","note":"日本网红（YouTuber）"}，不要输出其他内容。';
+export const GLOSS_RETRY='上一次的说明只重复了名字，没有说明是什么。请重新判断类型并写说明：人名写国籍或领域加身份（例：日本职业棒球选手、日本女演员、日本网红（YouTuber）），其他专有名词写它是什么。绝对不能只写名字本身、它的中文写法或音译。必须用简体中文。只输出 JSON 数组，每项形如 {"type":"人名","note":"日本职业棒球选手"}。';
+const KINDS={'词语':'word','普通词':'word','词汇':'word','人名':'person','人物':'person','组织':'org','团体':'org','公司':'org','企业':'org','作品':'work','地名':'place','地点':'place','设施':'place','商品':'product','产品':'product','事件':'event'};
+export const KIND_IDS=['word','person','org','work','place','product','event'];
 /* Models answer with a JSON array of strings, or (Qwen 3 in JSON mode) an already-parsed array of objects such as
    {"term":"上場廃止","gloss":"退市"}: take the gloss-like field, else the first string that is not the term. */
 const GLOSS_KEYS=['gloss','释义','meaning','definition','translation','note','解释','意思'];
@@ -177,22 +183,42 @@ function glossOf(v){
 }
 /* a note with kana is Japanese, not a Chinese gloss: drop it so the app falls back to machine translation */
 const KANA_RE=/[\u3040-\u309f\u30a0-\u30ff]/;
-export function parseGlosses(text,count){
+function kindOf(v){const t=v&&typeof v==='object'?String(v.type??v['类型']??v.kind??'').trim():'';return KINDS[t]||(KIND_IDS.includes(t)?t:'');}
+/* [{kind,gloss}] from any answer shape; notes with kana are dropped (Japanese, not a Chinese gloss), a leading
+   「人名，」 is cut because the type is shown as a tag */
+export function parseNotes(text,count){
  let list=Array.isArray(text)?text:null;
  if(!list){const raw=String(text||'').replace(/<think>[\s\S]*?<\/think>/g,'');const m=raw.match(/\[[\s\S]*\]/);if(!m)return [];try{list=JSON.parse(m[0]);}catch{return [];}}
  if(!Array.isArray(list))return [];
- return list.slice(0,count).map(v=>{const g=glossOf(v).replace(/[\r\n]+/g,' ').trim().slice(0,24);return KANA_RE.test(g)?'':g;});
+ return list.slice(0,count).map(v=>{const kind=kindOf(v);let g=glossOf(typeof v==='object'&&v?{...v,type:undefined,'类型':undefined,kind:undefined}:v).replace(/[\r\n]+/g,' ').trim();
+  g=g.replace(/^(?:词语|人名|人物|组织|团体|作品|地名|地点|商品|产品|事件)\s*[，,：:]\s*/,'').slice(0,30);return {kind,gloss:KANA_RE.test(g)?'':g};});
+}
+export function parseGlosses(text,count){return parseNotes(text,count).map(n=>n.gloss);}
+/* a note that only restates the name (岡本和真 → 冈本和真) says nothing: share most characters with the term, or a
+   proper noun's note no longer than the name with no description in it */
+export function repeatsTerm(term,note,kind=''){
+ const a=String(term||'').replace(/[\s・·.]/g,''),b=String(note||'').replace(/[\s・·.]/g,'');if(!b)return false;if(a===b)return true;
+ const shared=[...b].filter(c=>a.includes(c)).length;if(shared/Math.max(1,b.length)>=0.5)return true;
+ return kind&&kind!=='word'&&b.length<=a.length+1&&!/[，,（(的]/.test(b);
+}
+async function askNotes(env,model,prompt,words){
+ const input=words.map((w,i)=>`${i+1}. ${w.term}${w.headline?' ｜ '+w.headline.slice(0,80):''}`).join('\n');
+ const out=await env.AI.run(model,{messages:[{role:'system',content:prompt+' /no_think'},{role:'user',content:input}],max_tokens:1400,temperature:0.2});
+ /* Workers AI answers as {response} (Llama), {response:[…]} (Qwen 3 JSON mode) or OpenAI-style {choices:[{message:{content}}]} */
+ const raw=out?.response??out?.result?.response??out?.choices?.[0]?.message?.content??out?.result?.choices?.[0]?.message?.content??'';
+ return parseNotes(Array.isArray(raw)?raw:typeof raw==='string'?raw:JSON.stringify(raw),words.length);
 }
 async function glossWords(env,words){
  if(!env.AI||typeof env.AI.run!=='function'||!words.length)return 0;
- const input=words.map((w,i)=>`${i+1}. ${w.term}${w.headline?' ｜ '+w.headline.slice(0,80):''}`).join('\n');
  for(const model of [...new Set([env.DAILY_GLOSS_MODEL||GLOSS_MODEL,GLOSS_FALLBACK])]){
-  try{const out=await env.AI.run(model,{messages:[{role:'system',content:GLOSS_PROMPT+' /no_think'},{role:'user',content:input}],max_tokens:1200,temperature:0.2});
-   /* Workers AI answers as {response} (Llama) or OpenAI-style {choices:[{message:{content}}]} (Qwen 3) */
-   const raw=out?.response??out?.result?.response??out?.choices?.[0]?.message?.content??out?.result?.choices?.[0]?.message?.content??'';
-   const list=parseGlosses(Array.isArray(raw)?raw:typeof raw==='string'?raw:JSON.stringify(raw),words.length);if(!list.length)console.warn('gloss: no list from',model,String(JSON.stringify(out)).slice(0,300));
-   if(list.filter(Boolean).length>=Math.ceil(words.length/3)){words.forEach((w,i)=>{if(list[i])w.gloss=list[i];});return list.length;}
-   console.warn('gloss: too few from',model,list.filter(Boolean).length,'/',words.length,JSON.stringify(raw).slice(0,400));}catch(e){console.warn('gloss: model failed',model,String(e?.message||e).slice(0,200));}
+  try{const list=await askNotes(env,model,GLOSS_PROMPT,words);
+   if(list.filter(n=>n.gloss).length<Math.ceil(words.length/3)){console.warn('gloss: too few from',model,list.filter(n=>n.gloss).length,'/',words.length);continue;}
+   words.forEach((w,i)=>{const n=list[i];if(!n)return;if(n.kind)w.kind=n.kind;if(n.gloss&&!repeatsTerm(w.term,n.gloss,n.kind))w.gloss=n.gloss;});
+   /* notes that only restated the name: ask once more for just those */
+   const redo=words.filter((w,i)=>list[i]?.gloss&&!w.gloss);
+   if(redo.length)try{const again=await askNotes(env,model,GLOSS_RETRY,redo);redo.forEach((w,i)=>{const n=again[i];if(n?.kind)w.kind=n.kind;if(n?.gloss&&!repeatsTerm(w.term,n.gloss,n.kind||w.kind))w.gloss=n.gloss;});}catch{}
+   return list.length;}
+  catch(e){console.warn('gloss: model failed',model,String(e?.message||e).slice(0,200));}
  }
  return 0;
 }

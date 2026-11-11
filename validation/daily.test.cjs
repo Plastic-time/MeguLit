@@ -241,3 +241,25 @@ test('relay glosses: Japanese notes (with kana) are dropped, the prompt asks for
  assert.deepEqual(d.parseGlosses(['建設会社','ブナの実の収穫量','棒球选手','人名'],4),['建設会社','','棒球选手','人名']);
  assert.match(d.GLOSS_PROMPT,/必须全部使用简体中文/);
 });
+test('hot-word notes by type: proper nouns say who or what, names restated are rewritten once, the page tags the type',async()=>{
+ const d=await load('daily.js');
+ assert.deepEqual(d.parseNotes([{type:'人名',note:'人名，日本网红（YouTuber）'},{type:'词语',note:'退市'},{type:'作品',note:'动画作品'}],3),[{kind:'person',gloss:'日本网红（YouTuber）'},{kind:'word',gloss:'退市'},{kind:'work',gloss:'动画作品'}]);
+ assert.equal(d.repeatsTerm('岡本和真','冈本和真','person'),true);assert.equal(d.repeatsTerm('アイザック ハジャー','艾萨克·哈贾尔','person'),true);
+ assert.equal(d.repeatsTerm('岡本和真','日本职业棒球选手','person'),false);assert.equal(d.repeatsTerm('上場廃止','退市','word'),false);
+ const asked=[];const AI={run:async(model,input)=>{const retry=input.messages[0].content.startsWith(d.GLOSS_RETRY);asked.push(retry);
+  return retry?{response:[{type:'人名',note:'日本职业棒球选手'}]}:{response:[{type:'人名',note:'冈本和真'},{type:'词语',note:'学校活动'}]};}};
+ const words=[{term:'岡本和真',headline:'巨人の岡本和真がメジャー挑戦'},{term:'文化祭',headline:''}];
+ const e={DB:d1(),AI};
+ const real=globalThis.fetch;globalThis.fetch=async u=>u.startsWith('https://trends.google.com')?{ok:true,text:async()=>'<rss>'+words.map(w=>`<item><title>${w.term}</title><ht:news_item><ht:news_item_title>${w.headline}</ht:news_item_title></ht:news_item></item>`).join('')+'</rss>'}:{ok:false,text:async()=>''};
+ try{const r=await d.hotWordsDailyGet(e,new URL('https://x/api/hotwords/daily'),{json:v=>v,fail:c=>c},new Date('2026-11-11T00:10:00Z'));
+  assert.deepEqual(r.words.map(w=>[w.term,w.kind,w.gloss]),[['岡本和真','person','日本职业棒球选手'],['文化祭','word','学校活动']]);assert.deepEqual(asked,[false,true]);}
+ finally{globalThis.fetch=real;}
+ const daily=require('../services/daily.cjs');const mt=[];
+ const f=async url=>url.endsWith('/api/news')?{ok:true,json:async()=>({items:[]})}:{ok:true,json:async()=>({words:[{term:'ゴリ',kind:'person',gloss:'日本网红（YouTuber）'},{term:'中村晃',kind:'person'},{term:'ナゲット'}]})};
+ const v=await daily.view('',null,{env:{MEGULIT_RELAY_BASE:'https://relay.test'},fetch:f,translateFree:async t=>{mt.push(t);return t==='ナゲット'?'鸡块':t;}});
+ assert.deepEqual(v.words.words.map(w=>[w.term,w.kind,w.gloss]),[['ゴリ','person','日本网红（YouTuber）'],['中村晃','person',''],['ナゲット','','鸡块']]);assert.ok(!mt.includes('中村晃'),'no machine translation for a name');
+ const view=await import(pathToFileURL(path.join(__dirname,'..','web','daily-view.js')).href);
+ const esc=s=>String(s);const html=view.pageHTML({state:'ok',news:{items:[]},words:v.words},{locale:'zh',esc});
+ assert.match(html,/<small class="dl-gloss"><b class="dl-kind" data-kind="person">人名<\/b>日本网红（YouTuber）<\/small>/);
+ assert.match(html,/<dd>人名，日本网红（YouTuber）<em>/);assert.match(html,/<small class="dl-gloss"><b class="dl-kind" data-kind="person">人名<\/b><\/small>/);
+});

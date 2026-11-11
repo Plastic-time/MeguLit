@@ -30,7 +30,9 @@ function cleanWords(d,db){
  const words=(Array.isArray(d?.words)?d.words:[]).slice(0,20).map(w=>{const term=str(w?.term,40).trim(),dict=dictFor(db,term);
   /* gloss: dictionary first, then the relay's one-line note (Workers AI, with the headline as context); machine translation fills the rest in view() */
   const gloss=dict?.gloss?{gloss:dict.gloss,glossFrom:'dict'}:str(w?.gloss,40).trim()?{gloss:str(w.gloss,40).trim(),glossFrom:'ai'}:{gloss:'',glossFrom:''};
-  return {term,reading:str(w?.reading,40)||dict?.reading||'',...gloss,traffic:str(w?.traffic,12),headline:str(w?.headline,160),url:link(w?.url),source:str(w?.source,40)};}).filter(w=>w.term);
+  /* kind (relay AI): word, or a proper noun (person, org, work, place, product, event) shown as a tag; a dictionary hit is a word */
+  const kind=dict?.gloss?'word':['word','person','org','work','place','product','event'].includes(w?.kind)?w.kind:'';
+  return {term,kind,reading:str(w?.reading,40)||dict?.reading||'',...gloss,traffic:str(w?.traffic,12),headline:str(w?.headline,160),url:link(w?.url),source:str(w?.source,40)};}).filter(w=>w.term);
  return {day:/^\d{4}-\d{2}-\d{2}$/.test(String(d?.day||''))?d.day:null,source:str(d?.source,60),words,updatedAt:str(d?.updatedAt,30)||null};
 }
 /* ---- E415 translation for the 日报: the user's engine first; when it cannot run (local model not downloaded, no API
@@ -63,7 +65,8 @@ async function view(root,db,options={}){
 words=w.state==='ok'?cleanWords(w.data,db):null;
  const state=!news&&!words?'error':!(news?.items.length)&&!(words?.words.length)?'empty':'ok';
  if(news)await thumbnails(root,base,news.items,fetcher);
- const bare=(words?.words||[]).filter(w=>!w.gloss);
+ /* machine translation of a proper noun only repeats the name, so it fills ordinary words only */
+ const bare=(words?.words||[]).filter(w=>!w.gloss&&(!w.kind||w.kind==='word'));
  if(bare.length)try{const r=await translateList(root,options.runtime,bare.map(w=>w.term),'zh-CN',options);bare.forEach((w,i)=>{const t=String(r.texts[i]||'').trim();if(t&&t!==w.term){w.gloss=t.slice(0,30);w.glossFrom='mt';}});}catch{}
  for(const n of news?.items||[])if(n.fulltext)fulltext.add(n.link);
  for(const u of [...(news?.items||[]).map(x=>x.link),...(words?.words||[]).map(x=>x.url)])if(u&&u.startsWith('https:'))shown.add(u);
