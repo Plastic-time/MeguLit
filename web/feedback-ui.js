@@ -108,7 +108,9 @@ async function fillUpdates(dialog, locale, api) {
     const rows = (Array.isArray(items) ? items : []).slice(0, 300); /* E425 keep every update; the list scrolls */
     list.replaceChildren(...rows.map(it => {
       const [y, m, d] = String(it.date || '').split('-').map(Number), li = document.createElement('li');
-      li.textContent = ((locale !== 'zh' && it['text_' + locale]) || it.text) || t.upd(y, m, d, (locale !== 'zh' && it['title_' + locale]) || it.title || '');
+      const line = ((locale !== 'zh' && it['text_' + locale]) || it.text) || t.upd(y, m, d, (locale !== 'zh' && it['title_' + locale]) || it.title || '');
+      /* 2026-11-12 a ledger line: the date in its own column, then what changed */
+      if (y && m && d) { const when = document.createElement('time'), what = document.createElement('span'); when.textContent = `${String(m).padStart(2, '0')}.${String(d).padStart(2, '0')}`; what.textContent = line.replace(/^\d{4}年\d{1,2}月\d{1,2}日\s*|^[A-Z][a-z]{2} \d{1,2}, \d{4} · /, ''); li.append(when, what); } else li.textContent = line;
       return li;
     }));
     note.textContent = t.updNote;
