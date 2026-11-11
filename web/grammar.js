@@ -162,7 +162,7 @@ ${stats.pts.length?`<div class="gm-chips">${stats.pts.map(p=>`<button type="butt
 /* ---- list ---- */
 const FOLD=12;
 /* stage nicknames: what the category does for you, not its textbook name */
-const STAGE_NICK={particle:'名词的角色牌',form:'动词变身',adj:'形容一切',word:'指来指去',pattern:'万能句型',cond:'如果线',perm:'能不能做',give:'谁为谁做',aspect:'进度条',guess:'读心术',voice:'主被动反转',link:'因为所以',stance:'话里有话',time:'时间轴',formal:'正经咏唱',speech:'嘴瓢缩写',ending:'句尾语气',slang:'日常黑话',net:'网络冲浪',trend:'当下最火',misc:'杂项技能'};
+const STAGE_NICK={particle:'属性标签',form:'变身Bank',adj:'立绘描写',word:'视线诱导',pattern:'定番台词',cond:'if线',perm:'BAD END 回避',give:'好感度事件',aspect:'存档进度',guess:'伏笔回收',voice:'攻守逆转',link:'共通线',stance:'傲娇翻译',time:'轮回时间轴',formal:'中二咏唱',speech:'口癖',ending:'语尾属性',slang:'圈内黑话',net:'弹幕',trend:'本季新番',misc:'隐藏要素'};
 export function listHTML(data,opts){const {locale,esc,level='N5',userLevel=null}=opts;
  const w=grammarMessages[locale]||grammarMessages.zh,prog=data?.progress||{},pts=pointsOf(level),comp=level==='N5'&&data?.completion||completion(prog,pts),nextId=nextPoint(prog,pts)?.id;
  const levels=`<div class="gm-levels" role="tablist">${LEVELS.map(l=>`<button type="button" role="tab" class="gm-level${l===level?' active':''}" data-level="${l}" aria-selected="${l===level}">${l}</button>`).join('')}</div>`;
@@ -251,20 +251,29 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
  const root=document.createElement('div');root.className='gm-page';target.replaceChildren(root);
  const load=async(count=true)=>{clearTimeout(timer);const had=!!data?.progress;try{const next=await api('grammar_report',{count});if(!isCurrent())return;data=memo.anki?.examples?{...next,examples:{...memo.anki.examples,...next.examples}}:next;memo.at=Date.now();save();if(view==='list'||view==='map'||!had)render();if(next.pending&&next.counting&&count)timer=setTimeout(()=>{if(isCurrent())load(true);},2000);}catch(error){if(isCurrent()&&!data){data={};render();toast?.(String(error?.message||error));}}};
  const enter=()=>{if(!motion())return;root.animate([{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],{duration:220,easing:'cubic-bezier(.2,.7,.2,1)'});};
- const go=next=>{view=next;save();render();enter();root.scrollIntoView?.({block:'start'});};
+ let switching=false;
+ const go=next=>{view=next;root.style.minHeight='';save();render();enter();root.scrollIntoView?.({block:'start'});};
  const openPoint=id=>{point=pointById(id);step=0;go('lesson');};
  async function changeLevel(){const {openLevelPicker}=await import('./learning-level.js');const r=await openLevelPicker({api,esc,toast,current:memo.userLevel||null});if(!r||!isCurrent())return;memo.userLevel=r.level;level=startLevel(r.level);await load(false);render();}
  function render(){save();if(view==='lesson'&&point)return renderLesson();if(view==='map')return renderMap();if(view==='album')return renderAlbum();
   root.innerHTML=listHTML(data||{},{locale,esc,level,userLevel:memo.userLevel,anki:memo.anki,group:(memo.groupOf||{})[level],rewards:memo.rewards});
   root.querySelector('[data-album]')?.addEventListener('click',()=>go('album'));
-  root.querySelectorAll('[data-gtab]').forEach(b=>b.onclick=()=>{memo.groupOf={...(memo.groupOf||{}),[level]:b.dataset.gtab};const strip=root.querySelector('.gm-stgs'),x=strip?.scrollLeft||0;render();const s2=root.querySelector('.gm-stgs');if(s2){s2.scrollLeft=x;s2.querySelector('.gm-stg.on')?.scrollIntoView?.({block:'nearest',inline:'nearest'});fx.push(s2.querySelector('.gm-stg.on'));}fx.focus(root.querySelector('.gm-tracks'));});
-  {const on=root.querySelector('.gm-stg.on');on?.scrollIntoView?.({block:'nearest',inline:'center'});}
+  root.querySelectorAll('[data-gtab]').forEach(b=>b.onclick=()=>{
+   /* 2026-11-11 (user: a shorter category made the page jump up): the strip stays put on screen, and the list keeps its
+      old height while it morphs to the new one, so nothing is yanked from under the reader */
+   memo.groupOf={...(memo.groupOf||{}),[level]:b.dataset.gtab};const strip=root.querySelector('.gm-stgs'),x=strip?.scrollLeft||0,top=strip?.getBoundingClientRect().top,oldH=root.querySelector('.gm-tracks')?.offsetHeight||0;
+   const sc=root.closest('.main')||document.scrollingElement,y=sc?.scrollTop||0;root.style.minHeight=root.offsetHeight+'px';switching=true;render();switching=false;if(sc)sc.scrollTop=y;
+   {const s3=root.querySelector('.gm-stgs');if(s3&&top!=null){const need=s3.getBoundingClientRect().top-root.getBoundingClientRect().top+Math.max(0,innerHeight-top);root.style.minHeight=Math.max(root.offsetHeight,need)+'px';}}
+   const s2=root.querySelector('.gm-stgs'),list=root.querySelector('.gm-tracks');if(s2){s2.scrollLeft=x;const on=s2.querySelector('.gm-stg.on');if(on){const r=on.getBoundingClientRect(),sr=s2.getBoundingClientRect();if(r.left<sr.left||r.right>sr.right)s2.scrollBy({left:r.left-sr.left-(sr.width-r.width)/2,behavior:motion()?'smooth':'auto'});}fx.push(s2.querySelector('.gm-stg.on'));
+    const until=performance.now()+700,hold=()=>{if(sc&&sc.scrollTop!==y)sc.scrollTop=y;if(performance.now()<until)requestAnimationFrame(hold);};requestAnimationFrame(hold);}
+   if(list&&motion()){const newH=list.offsetHeight;list.style.overflow='hidden';const a=list.animate([{height:oldH+'px'},{height:newH+'px'}],{duration:420,easing:'cubic-bezier(.16,1,.3,1)'});list.querySelectorAll('.gm-card:not(.extra)').forEach((c,i)=>c.animate([{opacity:0,transform:'translateY(10px)'},{opacity:1,transform:'none'}],{duration:320,delay:60+Math.min(i,16)*22,easing:'cubic-bezier(.16,1,.3,1)',fill:'backwards'}));a.finished.then(()=>{list.style.overflow='';},()=>{});}});
+  {const on=root.querySelector('.gm-stg.on'),strip=root.querySelector('.gm-stgs');if(on&&strip)strip.scrollLeft=Math.max(0,on.offsetLeft-strip.offsetLeft-(strip.clientWidth-on.offsetWidth)/2);}
   root.querySelector('[data-anki-get]')?.addEventListener('click',e=>{e.currentTarget.disabled=true;api('open_source',{url:ANKI_DECK}).catch(()=>toast?.('无法打开浏览器'));watchDownload();});
   root.querySelector('[data-anki-reload]')?.addEventListener('click',e=>{e.currentTarget.disabled=true;memo.anki=undefined;loadAnki(true);});
   root.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>{level=b.dataset.level;memo.levelPicked=true;render();fx.focus(root.querySelector('.gm-hero'));});
   root.querySelector('[data-map]')?.addEventListener('click',()=>{openNode='';scene=null;piece=-1;go('map');});
   root.querySelector('[data-change-level]')?.addEventListener('click',changeLevel);
-  {const t=root.querySelector('[data-type]');if(t)fx.type(t,t.textContent);fx.focus(root.querySelector('.gm-hero-main'));if(motion())root.querySelectorAll('.gm-barcode i').forEach((b,i)=>b.animate([{transform:'scaleY(0)'},{transform:'none'}],{duration:320,delay:200+i*22,easing:'cubic-bezier(.16,1,.3,1)',fill:'backwards'}));}
+  if(!switching){const t=root.querySelector('[data-type]');if(t)fx.type(t,t.textContent);fx.focus(root.querySelector('.gm-hero-main'));if(motion())root.querySelectorAll('.gm-barcode i').forEach((b,i)=>b.animate([{transform:'scaleY(0)'},{transform:'none'}],{duration:320,delay:200+i*22,easing:'cubic-bezier(.16,1,.3,1)',fill:'backwards'}));}
   root.querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{const box=root.querySelector(`[data-group="${b.dataset.more}"]`),open=box.classList.toggle('folded')===false;b.textContent=open?'收起 ↑':`展开全部 ${box.children.length} 课 ↓`;if(open&&motion())box.querySelectorAll('.extra').forEach((c,i)=>c.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:280,delay:Math.min(i,20)*20,easing:'cubic-bezier(.16,1,.3,1)',fill:'backwards'}));});
   root.querySelectorAll('[data-point]').forEach(b=>b.onclick=()=>openPoint(b.dataset.point));
   if(motion())root.querySelectorAll('.gm-card:not(.extra)').forEach((c,i)=>c.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:260,delay:Math.min(i,20)*18,easing:'cubic-bezier(.2,.7,.2,1)',fill:'backwards'}));}
