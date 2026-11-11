@@ -71,7 +71,7 @@ class HookControl{
   /* E285 (user: CLANNAD got blocks over the credits and scenery): with the translation written back into the game, a line
      still in Japanese is the intended fallback while its translation is on the way, and OCR reads the drawn Chinese kanji as
      the original; no OCR cover then. */
-  if(m.matched&&h.preferences?.embedTranslation===true&&h.preferences?.translationBlur!==true){this.status({hookCheckState:'replaced',hookVisualVerified:false,hookCheckMessage:'译文由游戏自己显示'});return;}
+  if(m.matched&&h.preferences?.embedTranslation===true&&h.preferences?.translationBlur!==true&&!(h.hooks?.state?.hookThreads||[]).some(t=>t.selected&&t.hideOnly===true)){this.status({hookCheckState:'replaced',hookVisualVerified:false,hookCheckMessage:'译文由游戏自己显示'});return;}
   if(m.matched){if(h.hooks.lastSource)h.send({type:'maskAssist',source:h.hooks.lastSource});this.status({hookCheckState:'visible',hookVisualVerified:false,hookCheckMessage:'游戏原文仍然可见，本句已临时用遮罩盖住'});return;}
   if(m.sample<2)return;
   const drawFresh=(h.hooks.state.hookDrawAt||0)>=this.sourceAt-1800;

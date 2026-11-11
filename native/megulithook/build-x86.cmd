@@ -1,7 +1,11 @@
 @echo off
-call "E:\Apps\work\euphoria-test-build\toolchain\msvc\setup_x86.bat"
-set "INCLUDE=%VCToolsInstallDir%atlmfc\include;%INCLUDE%"
-set "LIB=%VCToolsInstallDir%atlmfc\lib\x86;%LIB%"
-set "PATH=E:\Apps\work\euphoria-test-build\build-deps\bin;%PATH%"
-"E:\Apps\work\euphoria-test-build\build-deps\cmake\data\bin\cmake.exe" -S "E:\Apps\work\megulithook\src\src\NativeImpl\LunaHook" -B "E:\Apps\work\megulithook\build-x86" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_HOST=OFF -DBUILD_HOOK=ON -DWIN10ABOVE=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_MAKE_PROGRAM="E:\Apps\work\euphoria-test-build\build-deps\bin\ninja.exe" -DFETCHCONTENT_SOURCE_DIR_MINHOOK="E:\Apps\work\euphoria-test-build\build-x86\_deps\minhook-src" -DFETCHCONTENT_FULLY_DISCONNECTED=ON || exit /b 1
-"E:\Apps\work\euphoria-test-build\build-deps\cmake\data\bin\cmake.exe" --build "E:\Apps\work\megulithook\build-x86" --target LunaHook --parallel 8
+rem MeguLitHook32.dll from E:\Apps\work\megulithook\src (LunaHook + MeguLit changes; BGI.cpp, Siglus.cpp and Yuris.cpp
+rem here are the changed engine files). Toolchain: the VS 2022 build tools in E:\Apps\build-tools, ATL headers and the
+rem x86 atls.lib from get-atl-x64.py / get-atl-x86.py (Microsoft's VS package feed, SHA-256 checked), MinHook from
+rem preserved\source\lunahoook-adapted\third_party. The DLL lands in src\NativeImpl\LunaHook\builds\Release_win10.
+set PATH=E:\Apps\build-tools\vs2022\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;E:\Apps\build-tools\vs2022\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%
+call "E:\Apps\build-tools\vs2022\Common7\Tools\VsDevCmd.bat" -arch=x86 -no_logo >nul 2>nul
+set "INCLUDE=E:\Apps\work\megulithook\atl\VC\Tools\MSVC\14.44.35207\atlmfc\include;%INCLUDE%"
+set "LIB=E:\Apps\work\megulithook\atl\VC\Tools\MSVC\14.44.35207\atlmfc\lib\x86;%LIB%"
+if not exist "E:\Apps\work\megulithook\build-x86-vs\build.ninja" cmake -S "E:\Apps\work\megulithook\src\src\NativeImpl\LunaHook" -B "E:\Apps\work\megulithook\build-x86-vs" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_HOST=OFF -DBUILD_HOOK=ON -DWIN10ABOVE=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DFETCHCONTENT_SOURCE_DIR_MINHOOK="%~dp0..\..\preserved\source\lunahoook-adapted\third_party\minhook" -DFETCHCONTENT_FULLY_DISCONNECTED=ON || exit /b 1
+cmake --build "E:\Apps\work\megulithook\build-x86-vs" --target LunaHook --parallel 8
