@@ -15,31 +15,32 @@ export function readerLevel(stats,element=''){
  if(SCHOOLS[element]||xp<cap)return {...levelOf(xp),xp,pending:0,locked:false};
  return {level:SCHOOL_LEVEL,into:0,need:XP_STEP,xp:cap,pending:xp-cap,locked:true};
 }
-/* 2026-11-12 (user: names a Chinese reader finds cool, not plain or templated): before 转职 a short ladder of
-   titles (启灵者 → 书咒师 → 御灵法师 → 玄阶法师 → 问道者); after it every element has six titles of its own, fire topping
-   out, in Megumin's spirit, at 爆裂魔法学徒. No 魔导士, no 红魔族, no 练习生. */
-const BASE={zh:[[1,'启灵者'],[5,'书咒师'],[10,'御灵法师'],[15,'玄阶法师'],[20,'问道者']],
- ja:[[1,'啓霊者'],[5,'書呪師'],[10,'御霊の法師'],[15,'玄階の法師'],[20,'問道者']],
- en:[[1,'Awakened'],[5,'Spell scribe'],[10,'Spirit-binding mage'],[15,'Mystic-rank mage'],[20,'Seeker at the gate']]};
+/* 2026-11-12 (user: not so chuunibyou; think DNF and Mushoku Tensei): before 转职 the plain rank ladder — 见习 → 初级 → 中级 →
+   上级魔术师 → 转职候补; at Lv.20 a DNF-style job name for the element, then its Saint / King / Emperor / God ranks
+   (火圣级魔术师 …), and at Lv.80 one title of its own (fire: 爆裂魔法学徒). Each element is described by the reading style
+   it suits, plainly. No 魔导士, no 红魔族, no 练习生. */
+const BASE={zh:[[1,'见习魔术师'],[5,'初级魔术师'],[10,'中级魔术师'],[15,'上级魔术师'],[20,'转职候补']],
+ ja:[[1,'見習い魔術師'],[5,'初級魔術師'],[10,'中級魔術師'],[15,'上級魔術師'],[20,'転職候補']],
+ en:[[1,'Apprentice magician'],[5,'Beginner-rank magician'],[10,'Intermediate-rank magician'],[15,'Advanced-rank magician'],[20,'Class candidate']]};
 const STEPS=[20,30,40,50,65,80];
 const E=(color,glyph,name,line,zh,ja,en)=>({color,glyph,name,line,ranks:{zh,ja,en}});
 export const SCHOOLS={
- fire:E('#e2423e',{zh:'火',ja:'火',en:'火'},{zh:'火 · 爆裂',ja:'火・爆裂',en:'Fire · Explosion'},{zh:'以全部魔力，换一声惊天轰鸣',ja:'全魔力を一撃に、天を揺るがす轟音を',en:'All your magic for one earth-shaking roar'},
-  ['燃星术士','赤焰咒主','焚天者','业火君王','炎狱贤者','爆裂魔法学徒'],['燃星の術士','赤焔の呪主','焚天者','業火の君王','炎獄の賢者','爆裂魔法見習い'],['Star-kindler','Crimson hex lord','Sky burner','Hellfire monarch','Sage of the flame abyss','Explosion apprentice']),
- ice:E('#7fd3f2',{zh:'冰',ja:'氷',en:'氷'},{zh:'冰',ja:'氷',en:'Ice'},{zh:'万籁俱寂，唯余霜雪与真言',ja:'万物沈黙し、残るは霜と真言のみ',en:'All falls silent but frost and true words'},
-  ['霜华术士','寒渊咒主','冰魄行者','雪域君王','极寒圣者','绝对零度'],['霜華の術士','寒淵の呪主','氷魄の行者','雪域の君王','極寒の聖者','絶対零度'],['Frost-bloom mage','Lord of the cold deep','Ice-soul wanderer','Monarch of the snow realm','Saint of the bitter cold','Absolute zero']),
- thunder:E('#f2d14a',{zh:'雷',ja:'雷',en:'雷'},{zh:'雷',ja:'雷',en:'Thunder'},{zh:'一念之间，九霄雷落',ja:'一念の間に、九天より雷落つ',en:'In a single thought, lightning from the ninth sky'},
-  ['掌雷者','惊雷咒主','九霄雷使','天罚审判','雷殛君王','万雷之主'],['掌雷者','驚雷の呪主','九霄の雷使','天罰の審判者','雷殛の君王','万雷の主'],['Thunder holder','Lord of the sudden storm','Envoy of the ninth sky','Judge of divine wrath','Thunderstrike monarch','Lord of a thousand thunders']),
- wind:E('#8fe0c0',{zh:'风',ja:'風',en:'風'},{zh:'风',ja:'風',en:'Wind'},{zh:'无形无相，行于万里长空',ja:'形なく、万里の空を往く',en:'Formless, crossing ten thousand miles of sky'},
-  ['御风者','流岚术士','逐云行者','苍穹风主','九天风圣','风神使徒'],['御風者','流嵐の術士','逐雲の行者','蒼穹の風主','九天の風聖','風神の使徒'],['Wind rider','Drifting-mist mage','Cloud chaser','Lord of the azure winds','Saint of the nine heavens','Apostle of the wind god']),
- water:E('#4f9de8',{zh:'水',ja:'水',en:'水'},{zh:'水',ja:'水',en:'Water'},{zh:'上善若水，润物无声',ja:'上善は水のごとく、静かに潤す',en:'Like water, the highest good nourishes without a sound'},
-  ['听潮者','沧澜术士','镜湖占星师','怒涛君王','沧海圣者','水神眷属'],['聴潮者','滄瀾の術士','鏡湖の占星師','怒涛の君王','滄海の聖者','水神の眷属'],['Tide listener','Mage of the vast waves','Mirror-lake astrologer','Monarch of the raging sea','Saint of the boundless sea','Kin of the water goddess']),
- earth:E('#c08a52',{zh:'土',ja:'土',en:'土'},{zh:'土',ja:'土',en:'Earth'},{zh:'不动如山，根深者方能致远',ja:'動かざること山のごとし',en:'Unmoving as the mountain, deep roots reach far'},
-  ['执岩者','磐石术士','地脉行者','镇岳君王','坤舆圣者','撼地之王'],['執岩者','磐石の術士','地脈の行者','鎮岳の君王','坤輿の聖者','撼地の王'],['Stone bearer','Bedrock mage','Ley-line walker','Mountain-binding monarch','Saint of the great earth','King who shakes the earth']),
- light:E('#fff1b8',{zh:'光',ja:'光',en:'光'},{zh:'光',ja:'光',en:'Light'},{zh:'破晓之刻，照见文字的真意',ja:'夜明けの刻、言葉の真意を照らす',en:'At daybreak, the true meaning of words comes to light'},
-  ['执灯者','曦光术士','圣辉祭司','天穹审判','光耀圣者','永昼之主'],['執燈者','曦光の術士','聖輝の祭司','天穹の審判者','光耀の聖者','永昼の主'],['Lamp bearer','Dawnlight mage','Priest of holy radiance','Judge of the firmament','Saint of glory','Lord of the endless day']),
- dark:E('#a07ae0',{zh:'暗',ja:'闇',en:'闇'},{zh:'暗',ja:'闇',en:'Dark'},{zh:'长夜为幕，独守未尽的篇章',ja:'長き夜を帳に、終わらぬ物語を守る',en:'Night as the curtain, keeping the unfinished story'},
-  ['夜行者','影缚术士','深渊凝视者','月蚀咒主','冥府司书','永夜之主'],['夜行者','影縛の術士','深淵を視る者','月蝕の呪主','冥府の司書','永夜の主'],['Night walker','Shadow binder','Abyss gazer','Eclipse hex lord','Librarian of the underworld','Lord of the endless night'])
+ fire:E('#e2423e',{zh:'火',ja:'火',en:'火'},{zh:'火 · 爆裂',ja:'火・爆裂',en:'Fire · Explosion'},{zh:'爆发型，一口气读很多',ja:'爆発型、一気にたくさん読む',en:'Burst reader: lots in one go'},
+  ['火焰术士','火圣级魔术师','火王级魔术师','火帝级魔术师','火神级魔术师','爆裂魔法学徒'],['火焔術士','火聖級魔術師','火王級魔術師','火帝級魔術師','火神級魔術師','爆裂魔法見習い'],['Pyromancer','Fire Saint-rank magician','Fire King-rank magician','Fire Emperor-rank magician','Fire God-rank magician','Explosion apprentice']),
+ ice:E('#7fd3f2',{zh:'冰',ja:'氷',en:'氷'},{zh:'冰',ja:'氷',en:'Ice'},{zh:'稳健型，读得仔细',ja:'堅実型、丁寧に読む',en:'Steady reader: careful and thorough'},
+  ['冰结师','冰圣级魔术师','冰王级魔术师','冰帝级魔术师','冰神级魔术师','绝对零度'],['氷結師','氷聖級魔術師','氷王級魔術師','氷帝級魔術師','氷神級魔術師','絶対零度'],['Cryomancer','Ice Saint-rank magician','Ice King-rank magician','Ice Emperor-rank magician','Ice God-rank magician','Absolute zero']),
+ thunder:E('#f2d14a',{zh:'雷',ja:'雷',en:'雷'},{zh:'雷',ja:'雷',en:'Thunder'},{zh:'速读型，追求阅读速度',ja:'速読型、読む速さを追う',en:'Speed reader: chasing pace'},
+  ['引雷师','雷圣级魔术师','雷王级魔术师','雷帝级魔术师','雷神级魔术师','万雷'],['引雷師','雷聖級魔術師','雷王級魔術師','雷帝級魔術師','雷神級魔術師','万雷'],['Bolt caller','Thunder Saint-rank magician','Thunder King-rank magician','Thunder Emperor-rank magician','Thunder God-rank magician','Myriad thunder']),
+ wind:E('#8fe0c0',{zh:'风',ja:'風',en:'風'},{zh:'风',ja:'風',en:'Wind'},{zh:'杂食型，几部作品轮着读',ja:'雑食型、何作も並行して読む',en:'Wide reader: several stories at once'},
+  ['御风师','风圣级魔术师','风王级魔术师','风帝级魔术师','风神级魔术师','天穹'],['御風師','風聖級魔術師','風王級魔術師','風帝級魔術師','風神級魔術師','天穹'],['Aeromancer','Wind Saint-rank magician','Wind King-rank magician','Wind Emperor-rank magician','Wind God-rank magician','Firmament']),
+ water:E('#4f9de8',{zh:'水',ja:'水',en:'水'},{zh:'水',ja:'水',en:'Water'},{zh:'坚持型，每天读一点',ja:'継続型、毎日少しずつ読む',en:'Daily reader: a little every day'},
+  ['潮汐师','水圣级魔术师','水王级魔术师','水帝级魔术师','水神级魔术师','沧海'],['潮汐師','水聖級魔術師','水王級魔術師','水帝級魔術師','水神級魔術師','滄海'],['Tidecaller','Water Saint-rank magician','Water King-rank magician','Water Emperor-rank magician','Water God-rank magician','Open sea']),
+ earth:E('#c08a52',{zh:'土',ja:'土',en:'土'},{zh:'土',ja:'土',en:'Earth'},{zh:'积累型，多查词多收录',ja:'積み上げ型、よく調べて語彙を増やす',en:'Builder: looks words up, grows vocabulary'},
+  ['岩石术士','土圣级魔术师','土王级魔术师','土帝级魔术师','土神级魔术师','坤舆'],['岩石術士','土聖級魔術師','土王級魔術師','土帝級魔術師','土神級魔術師','坤輿'],['Geomancer','Earth Saint-rank magician','Earth King-rank magician','Earth Emperor-rank magician','Earth God-rank magician','Terra']),
+ light:E('#fff1b8',{zh:'光',ja:'光',en:'光'},{zh:'光',ja:'光',en:'Light'},{zh:'理解型，每句都读懂',ja:'理解型、一文ずつ意味をつかむ',en:'Understander: gets every line'},
+  ['圣光师','光圣级魔术师','光王级魔术师','光帝级魔术师','光神级魔术师','永昼'],['聖光師','光聖級魔術師','光王級魔術師','光帝級魔術師','光神級魔術師','永昼'],['Lightbringer','Light Saint-rank magician','Light King-rank magician','Light Emperor-rank magician','Light God-rank magician','Endless day']),
+ dark:E('#a07ae0',{zh:'暗',ja:'闇',en:'闇'},{zh:'暗',ja:'闇',en:'Dark'},{zh:'夜猫型，深夜里读',ja:'夜型、深夜に読む',en:'Night owl: reads late at night'},
+  ['暗影师','暗圣级魔术师','暗王级魔术师','暗帝级魔术师','暗神级魔术师','永夜'],['暗影師','闇聖級魔術師','闇王級魔術師','闇帝級魔術師','闇神級魔術師','永夜'],['Shadowmancer','Dark Saint-rank magician','Dark King-rank magician','Dark Emperor-rank magician','Dark God-rank magician','Endless night'])
 };
 const lang=locale=>locale==='ja'||locale==='en'?locale:'zh';
 export const elementName=(element,locale)=>SCHOOLS[element]?.name[lang(locale)]||'';
@@ -48,11 +49,11 @@ export function rankTitle(level,locale,school=''){
  if(s&&level>=SCHOOL_LEVEL){let t=s.ranks[l][0];STEPS.forEach((at,i)=>{if(level>=at)t=s.ranks[l][i];});return t;}
  let t=BASE[l][0][1];for(const [at,name] of BASE[l])if(level>=at)t=name;return t;
 }
-const W={zh:{open:'转职',again:'重新转职',locked:n=>`Lv.${n} 转职`,title:'转职仪式',sub:'选一个元素。转职后才能继续获得经验，之前攒下的经验会一次补发；以后还能换',subAgain:'换一个元素。等级和经验都不会变',confirm:'就决定是你了',cancel:'稍后',done:n=>`转职完成：${n}`,paid:n=>`补发 +${n} 经验`,fail:'转职没有成功，请稍后再试',top:'最高段位',
+const W={zh:{open:'转职',again:'重新转职',locked:n=>`Lv.${n} 转职`,title:'转职',sub:'选一个元素。转职后才能继续获得经验，之前攒下的经验会一次补发；以后还能换',subAgain:'换一个元素。等级和经验都不会变',confirm:'确认转职',cancel:'稍后',done:n=>`转职完成：${n}`,paid:n=>`补发 +${n} 经验`,fail:'转职没有成功，请稍后再试',top:'最高段位',
   due:'需要转职才能继续获得经验（转职后补发）',reached:'到达 Lv.20！',nudge:'你已经 Lv.20 了，转职后才能继续获得经验',nudgeGo:'去转职',nudgeLater:'稍后'},
- ja:{open:'転職',again:'もう一度転職',locked:n=>`Lv.${n} で転職`,title:'転職の儀',sub:'元素をひとつ選びます。転職すると経験値がまた貯まり、それまでの分はまとめて支給されます。あとで選び直せます',subAgain:'元素を選び直します。レベルと経験値はそのままです',confirm:'これに決めた',cancel:'あとで',done:n=>`転職しました：${n}`,paid:n=>`経験値 +${n} を支給`,fail:'転職できませんでした。しばらくしてからお試しください',top:'最高位',
+ ja:{open:'転職',again:'もう一度転職',locked:n=>`Lv.${n} で転職`,title:'転職',sub:'元素をひとつ選びます。転職すると経験値がまた貯まり、それまでの分はまとめて支給されます。あとで選び直せます',subAgain:'元素を選び直します。レベルと経験値はそのままです',confirm:'転職する',cancel:'あとで',done:n=>`転職しました：${n}`,paid:n=>`経験値 +${n} を支給`,fail:'転職できませんでした。しばらくしてからお試しください',top:'最高位',
   due:'転職すると経験値がまた貯まります（それまでの分は後で支給）',reached:'Lv.20 到達！',nudge:'Lv.20 になりました。転職すると経験値がまた貯まります',nudgeGo:'転職する',nudgeLater:'あとで'},
- en:{open:'Change class',again:'Change class again',locked:n=>`Class change at Lv.${n}`,title:'Class-change rite',sub:'Choose an element. XP only grows again after a class change; what you gathered meanwhile is paid back at once. You can switch later',subAgain:'Switch to another element. Level and XP stay',confirm:'This one',cancel:'Later',done:n=>`Class changed: ${n}`,paid:n=>`+${n} XP paid back`,fail:'The class change did not go through; try again later',top:'Top rank',
+ en:{open:'Change class',again:'Change class again',locked:n=>`Class change at Lv.${n}`,title:'Class change',sub:'Choose an element. XP only grows again after a class change; what you gathered meanwhile is paid back at once. You can switch later',subAgain:'Switch to another element. Level and XP stay',confirm:'Change class',cancel:'Later',done:n=>`Class changed: ${n}`,paid:n=>`+${n} XP paid back`,fail:'The class change did not go through; try again later',top:'Top rank',
   due:'Change class to keep earning XP (paid back afterwards)',reached:'Lv.20 reached!',nudge:'You are Lv.20. Change class to keep earning XP',nudgeGo:'Change class',nudgeLater:'Later'}};
 export const classWords=locale=>W[lang(locale)];
 
