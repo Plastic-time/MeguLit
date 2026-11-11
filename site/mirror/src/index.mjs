@@ -42,6 +42,10 @@ export default {
       });
     }
 
+    /* E443 Hugging Face model files (speech model) for networks that reach neither huggingface.co nor hf-mirror.com:
+       /hf/<owner>/<repo>/resolve/<40-hex revision>/<file> is served from R2, filled from Hugging Face on the first miss.
+       Only the allow-listed repositories; the client still checks every byte against its SHA-256. */
+    if (path.startsWith('/hf/')) return serveModel(request, env, ctx, path.slice(4));
     if (path.startsWith('/files/')) return serveFile(request, env, ctx, path.slice(1));
     if (path === '/') return Response.redirect(`${SITE}/#download`, 302);
     return new Response('not found', { status: 404 });
@@ -186,4 +190,30 @@ function cors() {
 
 function hex(buf) {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+const HF_REPOS = new Set(['tsukumijima/deberta-v2-large-japanese-char-wwm-onnx']);
+async function serveModel(request, env, ctx, rest) {
+  const m = /^([\w.-]+\/[\w.-]+)\/resolve\/([0-9a-f]{40})\/([\w.-]+)$/.exec(rest);
+  if (!m || !HF_REPOS.has(m[1])) return new Response('not found', { status: 404 });
+  const key = `files/hf/${m[1]}/${m[2]}/${m[3]}`;
+  let obj = await env.BUCKET.head(key);
+  if (!obj) {
+    const up = await fetch(`https://huggingface.co/${m[1]}/resolve/${m[2]}/${m[3]}`, { redirect: 'follow' });
+    if (!up.ok || !up.body) return new Response('upstream ' + up.status, { status: 502 });
+    const len = Number(up.headers.get('content-length') || 0), encoded = up.headers.has('content-encoding');
+    const body = len > 8e6 && !encoded ? up.body.pipeThrough(new FixedLengthStream(len)) : await up.arrayBuffer();
+    await env.BUCKET.put(key, body, { httpMetadata: { contentType: 'application/octet-stream' } });
+  }
+  const ranged = request.headers.has('range');
+  obj = await env.BUCKET.get(key, ranged ? { range: request.headers } : {});
+  if (!obj) return new Response('missing', { status: 404 });
+  const headers = new Headers(cors());
+  obj.writeHttpMetadata(headers);
+  headers.set('etag', obj.httpEtag);
+  headers.set('accept-ranges', 'bytes');
+  headers.set('cache-control', 'public, max-age=31536000, immutable');
+  const status = ranged && obj.range ? 206 : 200;
+  if (status === 206) headers.set('content-range', `bytes ${obj.range.offset}-${obj.range.offset + obj.range.length - 1}/${obj.size}`);
+  return new Response(request.method === 'HEAD' ? null : obj.body, { status, headers });
 }

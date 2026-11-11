@@ -2063,3 +2063,30 @@ html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
 /* the name tag sits inside the box so a resized window never cuts it in half; the box is a little smaller */
 .ht-box { padding-top: calc(clamp(1.4rem, 2.2vw, 2.6rem) + 1.6rem); zoom: .88; }
 .ht-name { translate: 0 0; }
+
+/* ---- usage guide: the "how to tell it works" box in the notice, the guide pane, and the cards under Get started -- */
+.nt-ok { margin: .2rem 0 0; padding: .85rem 1rem; border: 1px solid rgba(240, 195, 106, .45); border-left: 3px solid #f0c36a; background: rgba(240, 195, 106, .07);
+  font-size: .9375rem; line-height: 1.7; color: #ece7dc; }
+.nt-ok b { color: #f0c36a; font-weight: 600; }
+.nt-ok b:first-child { display: block; margin-bottom: .2rem; }
+.nt-ok kbd, .gd-body kbd, .gd-card kbd { padding: .05em .4em; border: 1px solid rgba(244, 244, 242, .35); border-bottom-width: 2px; font: 500 .85em/1.4 "MeguLit Mono", var(--mono); color: #fff; background: rgba(255, 255, 255, .06); }
+.nt-act-r { display: inline-flex; gap: .6rem; align-items: center; }
+.nt-guide-btn { padding: .55rem 1rem; border: 1px solid #f0c36a; background: rgba(240, 195, 106, .12); color: #f0c36a; font: 600 .8125rem/1 "MeguLit Han", var(--sans); letter-spacing: .08em; cursor: pointer; transition: background-color .2s, color .2s; }
+.nt-guide-btn:hover, .nt-guide-btn:focus-visible { background: #f0c36a; color: #120d09; outline: none; }
+.gd-dots { display: flex; flex-wrap: wrap; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+.gd-dots button { padding: .4rem .7rem; border: 1px solid rgba(244, 244, 242, .18); background: none; color: #9a9a9a; font: 400 .75rem/1 "MeguLit Han", var(--sans); cursor: pointer; }
+.gd-dots button[aria-current="true"] { border-color: #c8323c; background: rgba(200, 50, 60, .2); color: #fff; }
+.gd-dots button:hover { color: #fff; }
+.gd-title { margin: .6rem 0 0; font: 600 1.25rem/1.3 "MeguLit Han", var(--serif); color: #f4f4f2; }
+.gd-body { margin: 0; padding-left: 1.2rem; display: grid; gap: .55rem; font-size: .9375rem; line-height: 1.7; color: #d9d6cf; min-height: 11rem; }
+.gd-body b { color: #f0c36a; font-weight: 600; }
+.gd-body li::marker { color: #c8323c; }
+.gd-after { margin: 3rem 0 1rem; font: 600 1.3rem/1.3 var(--serif); }
+.gd-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: 1rem; margin: 0; padding: 0; list-style: none; }
+.gd-card { padding: 1.1rem 1.2rem; border: 1px solid var(--line, rgba(244, 244, 242, .15)); }
+.gd-card h3 { margin: 0 0 .6rem; display: flex; gap: .6rem; align-items: baseline; font: 600 1.05rem/1.3 var(--serif); }
+.gd-no { font: 300 .75rem/1 "MeguLit Mono", var(--mono); color: #c8323c; letter-spacing: .1em; }
+.gd-card ul { margin: 0; padding-left: 1.1rem; display: grid; gap: .4rem; font-size: .875rem; line-height: 1.65; color: var(--muted, #b8b5ae); }
+.gd-card b { color: var(--text, #f4f4f2); }
+.gd-card kbd { color: inherit; border-color: currentColor; }
+@media (max-width: 30rem) { .nt-actions { flex-wrap: wrap; } }

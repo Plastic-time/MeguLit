@@ -3,7 +3,8 @@ const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node
 // Hugging Face is slow or unreachable from many networks in mainland China (user, 2026-11-08). Try the official host,
 // then the hf-mirror.com mirror; a stalled connection (no data for 30 s) moves on to the next source, and a partial
 // download resumes with an HTTP Range request instead of starting over. Every byte is still checked against SHA-256.
-const SOURCES=['https://huggingface.co','https://hf-mirror.com'];let preferred=0;
+/* E443 dl.megulit.com/hf mirrors the same files from R2 (Cloudflare), for players who reach neither Hugging Face nor hf-mirror */
+const SOURCES=['https://huggingface.co','https://hf-mirror.com','https://dl.megulit.com/hf'];let preferred=0;
 async function download(item,tmp,log){
  let lastError;
  for(let attempt=0;attempt<SOURCES.length*2;attempt++){
@@ -23,7 +24,7 @@ async function download(item,tmp,log){
   }catch(error){lastError=error;log('Speech model source failed: '+source+' '+(controller.signal.aborted?'stalled':error.message));}
   finally{clearTimeout(idle);}
  }
- throw Error('语音模型下载失败：'+item.name+'（官方源和国内镜像都不可用：'+(lastError?.message||'')+'）');
+ throw Error('语音模型下载失败：'+item.name+'（官方源、国内镜像和 MeguLit 镜像都不可用，请检查网络后重试：'+(lastError?.message||'')+'）');
 }
 async function prepareSpeechModel(log=()=>{}){
  const base=path.join(process.env.APPDATA||path.join(process.env.USERPROFILE,'AppData/Roaming'),'AivisSpeech-Engine/BertModelCaches/models--'+manifest.repository.replace('/','--')),snapshot=path.join(base,'snapshots',manifest.revision);
