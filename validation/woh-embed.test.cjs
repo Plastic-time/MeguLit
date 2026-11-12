@@ -51,7 +51,7 @@ test('hiding rules: HuneX ruby lines are blanked with their tags, skip bursts go
  assert.match(policy,/public const int Version = 2;/);
  assert.match(policy,/if \(Ruby\.IsMatch\(value\)\) return HideRuby\(value\);\r?\n\s+if \(Resource\.IsMatch\(value\) \|\| Container\(value\)\) return "";/,'ruby is handled before the path check that "</r>" tripped');
  assert.match(policy,/Hide\("　彼女がはじめて命に<rふ>触<\/r>れた、<rしず>厳<\/r>かな朝の出来事だ。"\) == "　+<r　>　<\/r>　+<r　　>　<\/r>　+"/,'self-test covers a two-ruby line');
- assert.match(bridge,/burst&&candidate\.name=="typemoon"&&replacement\.Length>0\)\{replacement="";/);
+ assert.match(bridge,/if\(burst&&replacement\.Length>0\)\{replacement="";/,'every engine goes back unchanged while skipping (E463)');
  assert.match(bridge,/text!=LastEmbedText/,'a redraw of the same line is still hidden');
  assert.match(bridge,/\{"policy",EmbedTextPolicy\.Version\}/);
  assert.match(bridge,/Convert\.ToInt32\(p\)>=EmbedTextPolicy\.Version/);
