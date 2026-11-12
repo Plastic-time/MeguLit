@@ -32,7 +32,8 @@ function kcapRead(file,e){const fd=fs.openSync(file,'r');try{const b=Buffer.allo
 const TXT=n=>/^\d[\w]*\.txt$/i.test(n);
 const sjis=new TextDecoder('shift_jis');
 const RUBY=/<R([^|>]*)\|([^>]*)>/g;
-function clean(t){return t.replace(RUBY,'$1').replace(/<[A-Za-z]+>/g,'').replace(/\\n/g,'\n');}
+// E461 <F16…> and <W10…> wrap text (font size, wait): the tag and its closing > are dropped, the text kept
+function clean(t){return t.replace(RUBY,'$1').replace(/<[A-Za-z]+\d*>?/g,'').replace(/>/g,'').replace(/\\n/g,'\n');}
 function parse(buf,decode=b=>sjis.decode(b)){const lines=[],anchors=[],ruby=[];
  for(const tok of decode(buf).split(',')){if(!tok)continue;if(/^[\x20-\x7e]*$/.test(tok)){anchors.push(tok);continue;}
   const pairs=[];for(const m of tok.matchAll(RUBY))if(m[1]&&m[2])pairs.push([m[1],m[2]]);
@@ -84,7 +85,10 @@ const aquaplus={
    that is not a speaker name; the clip is <n>_<number:4>_<character:2>.OGG in VOICE.PAK. Function ids are found by
    these argument shapes, not fixed. */
 function calls(bnr){const w=[];for(let i=0;i+4<=bnr.length;i+=4)w.push(bnr.readInt32LE(i));const out=[];
- for(let i=1;i<w.length-1;i++)if(w[i]===4&&w[i+1]>0&&w[i+1]<1024){const args=[];let j=i-1;while(j>=2&&w[j-2]===5&&w[j-1]===3){args.unshift(w[j]);j-=3;}out.push({id:w[i+1],args});}
+ for(let i=1;i<w.length-1;i++)if(w[i]===4&&w[i+1]>0&&w[i+1]<1024){const args=[];let j=i-1;while(j>=2&&w[j-2]===5&&w[j-1]===3){args.unshift(w[j]);j-=3;}
+  /* E461 a message call is preceded by 3 <n>: n is the index of the string it shows among all comma-separated strings of
+     <n>.txt (names, anchors and choices included), so the message's text is read from there, not counted out */
+  const str=j>=1&&j<i-1&&w[j-1]===3&&w[j]>=0?w[j]:null;out.push({id:w[i+1],args,str});}
  return out;}
 function voiceFns(list){const by=new Map();for(const c of list){if(!c.args.length)continue;const a=by.get(c.id)||[];a.push(c.args);by.set(c.id,a);}
  const rising=(rows,k)=>rows.length>=2&&rows.every((r,i)=>r.length>k&&r[k]===(i===0?r[k]:rows[i-1][k]+1))&&rows[0][k]===0;
@@ -93,12 +97,14 @@ function voiceFns(list){const by=new Map();for(const c of list){if(!c.args.lengt
  let message=null,voice=null,most=0,mostM=0;for(const [id,rows] of by){if(rows.length>mostM&&rows.every(r=>r.length===2)&&rows[0][0]===0&&upward(rows,0)){message=id;mostM=rows.length;}if(rows.length>most&&rows.every(r=>r.length===5)&&upward(rows,4)){voice=id;most=rows.length;}}
  return {message,voice};}
 const isName=(t,next)=>!!next&&/^[「『（]/.test(next)&&!/^[「『（]/.test(t)&&[...t].length<=12;
-function sceneVoices(stem,txt,bnr){const toks=sjis.decode(txt).split(',').filter(t=>t&&!/^[\x20-\x7e]*$/.test(t)),msgs=[];
+function sceneVoices(stem,txt,bnr){const raw=sjis.decode(txt).split(','),toks=raw.filter(t=>t&&!/^[\x20-\x7e]*$/.test(t)),msgs=[];
  for(let i=0;i<toks.length;i++)if(!isName(toks[i],toks[i+1]))msgs.push(clean(toks[i]));
  const list=calls(bnr),{message,voice}=voiceFns(list);if(message===null||voice===null)return [];const out=[];let pending=[];
  // several voices before one message (people talking at once) all go with it
  for(const c of list){if(c.id===voice&&c.args.length===5)pending.push(stem.split('_')[0]+'_'+String(c.args[4]).padStart(4,'0')+'_'+String(c.args[0]).padStart(2,'0'));
-  else if(c.id===message&&c.args.length===2){if(msgs[c.args[0]])for(const ref of pending)out.push({text:msgs[c.args[0]].replace(/\\[a-z]/gi,''),ref});pending=[];}}
+  else if(c.args.length===2&&(c.id===message||(c.str!==null&&c.args[1]===1&&pending.length))){
+   const t=c.str!==null&&raw[c.str]&&!/^[\x20-\x7e]*$/.test(raw[c.str])?clean(raw[c.str]):c.id===message?msgs[c.args[0]]:null;
+   if(t)for(const ref of pending)out.push({text:t.replace(/\\[a-z]/gi,''),ref});pending=[];}}
  return out;}
 aquaplus.voiceLines=dir=>{const f=scriptPak(dir);if(!f)return [];const l=kcapList(f),byName=new Map(l.map(e=>[e.name.toLowerCase(),e]));const out=[];
  for(const e of l){if(!TXT(e.name))continue;const stem=e.name.replace(/\.[^.]+$/,''),b=byName.get(stem.toLowerCase()+'.bnr');if(!b)continue;try{out.push(...sceneVoices(stem,kcapRead(f,e),kcapRead(f,b)));}catch{}}
