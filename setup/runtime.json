@@ -28,6 +28,7 @@
               },
     "mirrors":  [
                     "https://dl.megulit.com/files/{tag}/{file}",
+                    "https://cn-dl.megulit.com/files/{tag}/{file}",
                     "https://gh-proxy.com/{url}",
                     "https://ghproxy.net/{url}"
                 ]

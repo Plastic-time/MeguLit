@@ -24,8 +24,10 @@ const HEADERS={'User-Agent':'MeguLit-Updater','Accept':'application/vnd.github+j
    release JSON also comes from MeguLit's relay (api.megulit.com/api/release/..., GitHub's own answer cached 5 minutes);
    China-looking systems ask the relay first. The package itself is still checked against GitHub's sha256 digest. */
 const RELAY_RELEASE='https://api.megulit.com/api/release/';
+/* the relay host that answered fastest (api.megulit.com or its EdgeOne copy cn-api.megulit.com, see relay-config.cjs) */
+function relayReleaseBase(){try{const base=require('./relay-config.cjs').relayBase(null);return base?base+'/api/release/':RELAY_RELEASE;}catch{return RELAY_RELEASE;}}
 async function releaseFetch(fetcher,which,timeout,china=inChina()){
- const urls=[REPO+'/'+which,RELAY_RELEASE+which];if(china)urls.reverse();let last;
+ const relayed=[...new Set([relayReleaseBase(),RELAY_RELEASE])].map(u=>u+which);const urls=china?[...relayed,REPO+'/'+which]:[REPO+'/'+which,...relayed];let last;
  for(const url of urls){try{const r=await fetcher(url,{headers:HEADERS,signal:AbortSignal.timeout(timeout)});if(r.ok||r.status===404)return r;last=r;}catch(e){last=e;}}
  if(last instanceof Error)throw last;return last;}
 /* Hotfix letters (user 2026-11-10: 1.2.8a, 1.2.8b ...) are a display label only: the GitHub tag and the package name stay

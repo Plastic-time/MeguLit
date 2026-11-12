@@ -7,7 +7,7 @@
 const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node:crypto'),{execFile}=require('node:child_process'),{Readable,Transform}=require('node:stream'),{pipeline}=require('node:stream/promises');
 const MODEL={repository:'LeeAeron/uvr_mdx-net',revision:'aec129801d2f6d8c44e27d1524991dddfb0988ab',name:'UVR-MDX-NET-Voc_FT.onnx',size:66762490,sha256:'534b2070fcc7df514b13ef660dc8cbb328679c2374d04354a5c42bb14ecce111'};
 const PACKAGES=['numpy==2.5.4','onnxruntime==1.31.1'];
-const HF=['https://huggingface.co','https://hf-mirror.com','https://dl.megulit.com/hf'];
+const HF=['https://huggingface.co','https://hf-mirror.com','https://dl.megulit.com/hf','https://cn-dl.megulit.com/hf'];
 const PYPI=[null,'https://pypi.tuna.tsinghua.edu.cn/simple','https://mirrors.aliyun.com/pypi/simple/'];
 const dir=root=>path.join(root,'data','vocal-sep'),modelPath=root=>path.join(dir(root),MODEL.name),pylib=root=>path.join(dir(root),'pylib');
 const pythonExe=()=>{if(process.env.MEGULIT_VOCAL_PYTHON)return process.env.MEGULIT_VOCAL_PYTHON;try{const own=require('../core/layout.cjs').python;if(fs.existsSync(own))return own;}catch{}return null;};

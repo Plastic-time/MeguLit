@@ -8,7 +8,7 @@
    index is pointed at the Tsinghua PyPI mirror. One job at a time; status() reports where it is. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{spawn}=require('node:child_process'),{Readable,Transform}=require('node:stream'),{pipeline}=require('node:stream/promises');
 const PACKAGE={version:'26.09.4',name:'anki-26.09.4-win-x64.msi',size:201621504,sha256:'c35e7b90acf2929a71d70ac755a3dd0685f9fbe1a89d2f9edabb6fe7c0d91cba'};
-const SOURCES=['https://dl.megulit.com/files/anki/'+PACKAGE.name,'https://github.com/ankitects/anki/releases/download/'+PACKAGE.version+'/'+PACKAGE.name];
+const SOURCES=['https://dl.megulit.com/files/anki/'+PACKAGE.name,'https://cn-dl.megulit.com/files/anki/'+PACKAGE.name,'https://github.com/ankitects/anki/releases/download/'+PACKAGE.version+'/'+PACKAGE.name];
 const inChina=()=>{try{const o=Intl.DateTimeFormat().resolvedOptions();return o.timeZone==='Asia/Shanghai'||o.timeZone==='Asia/Urumqi'||/^zh-CN/i.test(o.locale||'');}catch{return false;}};
 let state={phase:'idle',received:0,total:PACKAGE.size,error:''},job=null;
 const status=()=>({...state,version:PACKAGE.version});

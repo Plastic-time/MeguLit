@@ -4,7 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node
 // then the hf-mirror.com mirror; a stalled connection (no data for 30 s) moves on to the next source, and a partial
 // download resumes with an HTTP Range request instead of starting over. Every byte is still checked against SHA-256.
 /* E443 dl.megulit.com/hf mirrors the same files from R2 (Cloudflare), for players who reach neither Hugging Face nor hf-mirror */
-const SOURCES=['https://huggingface.co','https://hf-mirror.com','https://dl.megulit.com/hf'];let preferred=0;
+const SOURCES=['https://huggingface.co','https://hf-mirror.com','https://dl.megulit.com/hf','https://cn-dl.megulit.com/hf'];let preferred=0;
 async function download(item,tmp,log){
  let lastError;
  for(let attempt=0;attempt<SOURCES.length*2;attempt++){

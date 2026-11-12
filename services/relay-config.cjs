@@ -24,11 +24,30 @@ function normalizeBase(value){
  if(!(url.protocol==='https:'||url.protocol==='http:'&&LOCAL.includes(url.hostname)))return '';
  return url.href.replace(/\/+$/,'');
 }
+/* 2026-11-12 China speed test (chinaz, 29 mainland nodes): api.megulit.com / megulit.com on Cloudflare's free network timed out
+   on 12 nodes and took 2.8 s on average for 14 KB. The same Workers are also served through Tencent EdgeOne (Hong Kong /
+   Asia edges, no ICP filing) on cn-*.megulit.com. With no address set by the user, both relay hosts are raced on
+   /api/health now and then (at most every 30 min, in the background) and the faster one is used; until a race has
+   answered, or when the EdgeOne host is down, it stays api.megulit.com. Same Worker and database behind both. */
+const CN_RELAY_BASE='https://cn-api.megulit.com';
+const DEFAULT_CANDIDATES=[DEFAULT_RELAY_BASE,CN_RELAY_BASE];
+let chosen=DEFAULT_RELAY_BASE,raceAt=0,racing=null;
+async function timeHealth(base,fetcher,timeout){const t=Date.now();const r=await fetcher(base+'/api/health',{cache:'no-store',signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json().catch(()=>null);if(!j||j.ok!==true)throw new Error('BAD_HEALTH');return Date.now()-t;}
+async function raceDefault(options={}){
+ const fetcher=options.fetch||fetch,timeout=options.timeout||5000,list=options.candidates||DEFAULT_CANDIDATES;
+ const timed=await Promise.all(list.map(base=>timeHealth(base,fetcher,timeout).then(ms=>({base,ms}),()=>null)));
+ const ok=timed.filter(Boolean).sort((a,b)=>a.ms-b.ms);
+ if(ok.length)chosen=ok[0].base;raceAt=Date.now();return {chosen,results:timed};
+}
+function maybeRace(env){
+ if(env!==process.env||process.env.NODE_TEST_CONTEXT||racing||Date.now()-raceAt<30*60*1000)return;
+ raceAt=Date.now();racing=raceDefault().catch(()=>null).finally(()=>{racing=null;});
+}
 function relayBase(root,env=process.env){
  const off=String(env.MEGULIT_RELAY_BASE||'').trim().toLowerCase()==='off';
  const fromEnv=normalizeBase(env.MEGULIT_RELAY_BASE||'');if(fromEnv)return fromEnv;
  const saved=root?normalizeBase(readJSON(onlineFile(root)).relayUrl||''):'';if(saved)return saved;
- return off?'':normalizeBase(DEFAULT_RELAY_BASE);
+ if(off)return '';maybeRace(env);return normalizeBase(chosen);
 }
 function endpoint(root,route,env=process.env){const base=relayBase(root,env);return base?base+route:'';}
-module.exports={DEFAULT_RELAY_BASE,relayBase,endpoint,normalizeBase,onlineFile,readJSON};
+module.exports={DEFAULT_RELAY_BASE,CN_RELAY_BASE,raceDefault,relayBase,endpoint,normalizeBase,onlineFile,readJSON};

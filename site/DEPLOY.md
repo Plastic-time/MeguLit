@@ -190,3 +190,24 @@ node --test validation/*.test.cjs
 Cloudflare's normal network serves China from nearby regions without an ICP filing; it is usually far faster than
 GitHub's release CDN but not guaranteed. If the mirror is slow for many users, the GitHub proxy fallbacks still
 work, and a domestic object store (with an ICP filing) can be added as a fourth source in `downloadSources()`.
+
+### EdgeOne relay (2026-11-12)
+
+Measured from 29 mainland nodes (chinaz): `megulit.com` timed out on 12 and averaged 2.8 s for 14 KB; ping averaged
+231 ms (China Telecom) to 298 ms (China Unicom). The same three Workers are put behind Tencent EdgeOne's free plan
+(international edition, Hong Kong / Asia edges, no ICP filing, up to 200 sub-domains per site) under `cn-*` names:
+
+| EdgeOne domain | Origin (HTTPS, origin Host header = origin domain) | Cache |
+|---|---|---|
+| `cn.megulit.com` | `megulit.com` | follow origin |
+| `cn-api.megulit.com` | `api.megulit.com` | **no cache**, all methods, keep `authorization` / `x-megulit-token` headers |
+| `cn-dl.megulit.com` | `dl.megulit.com` | follow origin (large files, cache on) |
+
+Steps: sign up at edgeone.ai → add site `megulit.com` in **CNAME mode** (nameservers stay at Cloudflare) → verify the
+TXT record in Cloudflare DNS → add the three domains above → turn on the free edge certificate for each → in Cloudflare
+DNS add `CNAME cn / cn-api / cn-dl → <the *.eo.dnse*.com target EdgeOne shows>`, **DNS only (grey cloud)**.
+Check: `curl https://cn-api.megulit.com/api/health` must answer `{"ok":true,"service":"megulit-relay"}`.
+
+The app races `api.megulit.com` and `cn-api.megulit.com` on `/api/health` (`services/relay-config.cjs`) and uses the
+faster one; `cn-dl` is an extra mirror for runtime packs, Anki and Hugging Face files; the notice list also tries
+`cn.megulit.com`. Until the `cn-*` names resolve, everything quietly stays on Cloudflare.

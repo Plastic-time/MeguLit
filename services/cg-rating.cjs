@@ -12,7 +12,7 @@ const MODELS=[
  {name:'rating-small.onnx',file:'mobilenetv3_v1_pruned_ls0.1/model.onnx',size:16827558,sha256:'76e5c44704421e2b6431a2dbb395f8943e205e59f415a5614b16f0601b55544d'},
  {name:'rating-large.onnx',file:'caformer_s36_plus/model.onnx',size:149582900,sha256:'fd5fdea9a8b610aa26a513df7e2e588a3fa0f641ba3408e5c67501663f501287'}];
 const PACKAGES=['numpy==2.5.4','onnxruntime==1.31.1','pillow==12.3.0'];
-const HF=['https://huggingface.co','https://hf-mirror.com','https://dl.megulit.com/hf'];
+const HF=['https://huggingface.co','https://hf-mirror.com','https://dl.megulit.com/hf','https://cn-dl.megulit.com/hf'];
 const PYPI=[null,'https://pypi.tuna.tsinghua.edu.cn/simple','https://mirrors.aliyun.com/pypi/simple/'];
 const dir=root=>path.join(root,'data','cg-rating'),pylib=root=>path.join(dir(root),'pylib'),modelPath=(root,m)=>path.join(dir(root),m.name);
 const pythonExe=()=>{if(process.env.MEGULIT_RATING_PYTHON)return process.env.MEGULIT_RATING_PYTHON;try{const own=require('../core/layout.cjs').python;if(fs.existsSync(own))return own;}catch{}return null;};
