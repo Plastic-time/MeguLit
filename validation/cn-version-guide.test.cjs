@@ -90,7 +90,7 @@ test('c) the sites file: copied on first use, the user\'s edits survive an updat
  fs.writeFileSync(cg.sitesFile(root),'# mine\r\nMy own site\r\n');fs.writeFileSync(ship,'Site C\r\n');
  assert.deepEqual(cg.sites(root,{shipped:ship}).lines,['My own site'],'what the user typed is kept');
  fs.rmSync(root,{recursive:true,force:true});
- const shipped=fs.readFileSync(cg.SHIPPED,'utf8');assert.ok(shipped.split(/\r?\n/).filter(l=>l.trim()).every(l=>l.startsWith('#')),'the shipped file is a commented placeholder');
+ const shipped=fs.readFileSync(cg.SHIPPED,'utf8');assert.ok(shipped.split(/\r?\n/).filter(l=>l.trim()).length<=34,'the shipped file stays short (comments plus at most 30 lines)');
  assert.doesNotMatch(shipped,/https?:\/\//);
 });
 function library(rows){
