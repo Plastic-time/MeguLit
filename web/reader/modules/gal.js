@@ -451,7 +451,7 @@
       root.setProperty('--tomoyo-gal-jp-font', appearance.fonts[preferences.style].ja);
       root.setProperty('--tomoyo-gal-cn-font', appearance.fonts[preferences.style].zh);
     }
-    root.setProperty('--tomoyo-gal-jp-font',appearance.japaneseFonts[preferences.japaneseFont]||(/^engine:/.test(preferences.japaneseFont||'')?'"'+preferences.japaneseFont.slice(7)+'","MS Mincho","ＭＳ 明朝",serif':appearance.japaneseFonts.originalGothic));
+    root.setProperty('--tomoyo-gal-jp-font',appearance.japaneseFonts[preferences.japaneseFont]||(/^engine:/.test(preferences.japaneseFont||'')?(/ゴシック|gothic|sans|meiryo|メイリオ/i.test(preferences.japaneseFont)?'"'+preferences.japaneseFont.slice(7)+'","MS Gothic","ＭＳ ゴシック",sans-serif':'"'+preferences.japaneseFont.slice(7)+'","MS Mincho","ＭＳ 明朝",serif'):appearance.japaneseFonts.originalGothic));
     root.setProperty('--tomoyo-gal-cn-font',appearance.chineseFonts[preferences.chineseFont]);
     root.setProperty('--tomoyo-ruby-font',appearance.japaneseFonts[preferences.rubyFont]|| (preferences.rubyFont==='round'?'Meiryo,\"Yu Gothic UI\",sans-serif':preferences.rubyFont==='inherit'?appearance.japaneseFonts[preferences.japaneseFont]:appearance.japaneseFonts[preferences.rubyFont==='mincho'?'originalMincho':'originalGothic']));
     document.body.classList.toggle('tomoyo-game-style', preferences.interfaceMode==='translation' && preferences.style !== 'custom');

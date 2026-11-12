@@ -65,10 +65,10 @@ class Reader{
   }if(!message.hookRecovering&&message.hookSourceOrigin!=='history'&&message.hookSource)this.lastLine=message.hookSource;const line={gameId:this.gameId,text:message.hookSource,sequence:message.hookSequence,active:message.hookActive,recovering:message.hookRecovering,origin:message.hookSourceOrigin};if(this.pendingLines){if(this.pendingLines.length<40)this.pendingLines.push(line);}else this.stats.line(line);}
   this.runtime.emit('reader-event',message);if(typeof message.hotkey==='boolean')this.runtime.emit('reader-health',this.runtime.readerStatus?.()||{});
  }
- engineFont(message){try{const g=this.gal,face=String(message.face||'').trim().slice(0,64);if(!g||!face||/["\<>;{}]/.test(face)||g.preferences?.autoGameStyle===false)return;
+ engineFont(message){try{const g=this.gal;if(!g||g.preferences?.autoGameStyle===false)return;
   const cur=String(g.preferences?.japaneseFont||'');if(cur&&!/^(engine:|game:)/.test(cur)&&!['originalGothic','originalMincho'].includes(cur))return;
-  const flat=v=>String(v||'').replace(/[\s　]/g,'').toLowerCase(),hit=(this.fonts?.current?.fonts||[]).find(f=>f.lang!=='zh'&&flat(f.family)===flat(face));
-  const key=hit?'game:'+hit.id:'engine:'+face;if(cur!==key)g.save({...g.preferences,japaneseFont:key});this.runtime.emit('reader-event',{type:'enginePreferences',values:{japaneseFont:key}});this.gal.hooks?.trace?.('engine font '+JSON.stringify(face)+' -> '+key);}catch{}}
+  const choice=require('../core/engine-font.cjs').pick({face:message.face,prerendered:message.prerendered,fonts:this.fonts?.current?.fonts});if(!choice)return;const key=choice.key;
+  if(cur!==key)g.save({...g.preferences,japaneseFont:key});this.runtime.emit('reader-event',{type:'enginePreferences',values:{japaneseFont:key}});this.gal.hooks?.trace?.('engine font '+JSON.stringify(choice.face)+(message.prerendered?' pfont='+message.prerendered:'')+' -> '+key+' ('+choice.reason+')');}catch{}}
 
  logVisibility(entry){try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),...entry})+'\n');}catch{}}
  selectGame(processName,enter=true,executable=''){
