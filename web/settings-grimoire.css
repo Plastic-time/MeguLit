@@ -217,7 +217,7 @@ input.switch:checked{background:repeating-linear-gradient(90deg,rgba(255,224,206
 
 /* v1.1.6 (user: the left menu floats with margins but the right sheet ran into the top and bottom edges): both columns
    are full-height cards with the same insets; the right one scrolls inside, with the search field pinned at its top */
-.main:has(>.settings-layout),.main:has(.settings-layout){overflow:hidden!important}
+.main:has(>.settings-layout){overflow:hidden!important}
 .main .settings-layout{height:100%;box-sizing:border-box;padding:6px 0 14px;align-items:stretch!important}
 .main .settings-layout>.settings-nav{position:relative!important;top:auto!important;max-height:none!important;height:auto;overflow:auto}
 .main .settings-layout>.settings-content{min-height:0;overflow-y:auto!important;overscroll-behavior:contain;scrollbar-width:thin}

@@ -61,7 +61,7 @@ export async function switchLibrary(toWall,render){
   const pending=host();pending?.classList.add('lib-entering');
   await frame();
   if(toWall){remeasure();await frame();}
-  const next=host(),incoming=next?[...next.querySelectorAll('.library-card')].slice(0,400):[];if(!next){pending?.classList.remove('lib-entering');return;}
+  const next=host(),incoming=next?[...next.querySelectorAll('.library-card')].filter(el=>!el.closest('[data-parked]')).slice(0,400):[];if(!next){pending?.classList.remove('lib-entering');return;}
   if(!toWall){
    const tops=incoming.map(el=>el.getBoundingClientRect().top),minTop=Math.min(...tops);
    incoming.forEach((el,i)=>{const r=el.getBoundingClientRect(),delay=Math.min(220,(tops[i]-minTop)*.3+(r.left-next.getBoundingClientRect().left)*.06);
@@ -80,7 +80,7 @@ export async function switchLibrary(toWall,render){
 /* v1.1.6 (user: switching back to the wall, and opening the library, must gather from the outside in, not spread out
    from the centre): cards start further out from the centre, a little larger and transparent, and settle inward; the
    outer ring arrives first. Also played when the library opens straight into the wall. */
-export function wallIn(next,incoming=next?[...next.querySelectorAll('.library-card')].slice(0,400):[]){
+export function wallIn(next,incoming=next?[...next.querySelectorAll('.library-card')].filter(el=>!el.closest('[data-parked]')).slice(0,400):[]){
  if(!next||!incoming.length||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
  const [cx,cy]=centre(next);let far=1;const d=incoming.map(el=>{const r=el.getBoundingClientRect(),dx=(r.left+r.width/2)-cx,dy=(r.top+r.height/2)-cy,h=Math.hypot(dx,dy);far=Math.max(far,h);return {el,dx,dy,h};});
  for(const {el,dx,dy,h} of d){const delay=Math.round((1-h/far)*240);

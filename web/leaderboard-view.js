@@ -211,6 +211,11 @@ export function leaderboardHTML(data,locale,esc){
  return page(topRow(w,tab,myChip(data,w,locale,esc)),boardControls(w),body+localHTML(data,w,locale,esc));
 }
 /* Mounts the page into main; isCurrent() guards against a late reply after the user moved on. */
+/* 2026-11-12 (user video: every switch of 阅读榜 / 每周热词 / 关注 / 交流 and of the metric tabs waited about a second and
+   the page blinked). The cache now outlives the page, so coming back paints at once; after a paint the other tabs, the
+   other metrics and the other periods are fetched quietly one by one; a repaint keeps the top row and, when it did not
+   change, the sub row in place and crossfades only the body. */
+const viewCache=new Map(),inflight=new Map(),FRESH_MS=60000;
 export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>true,openSettings=()=>{},lookup=null}){
  const w=leaderboardWords(locale);
  let last=null;
@@ -218,23 +223,62 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
     anything changed. Now each view is cached by its key: a cached view paints at once, then is refreshed in the
     background and repainted only if it changed; an uncached one marks the new switch at once and dims the body. After
     the first paint the other metrics of the same period are fetched quietly so the next switches are instant. */
- const cache=new Map(),keyOf=(v=view)=>[v.tab,v.period,v.metric,v.game,v.category,v.week].join('|');
+ const cache={get:key=>viewCache.get(key)?.json,set:(key,json)=>viewCache.set(key,{json,at:Date.now()}),has:key=>Date.now()-(viewCache.get(key)?.at||0)<FRESH_MS,clear:()=>viewCache.clear()};
+ /* 每周热词 does not depend on the period or metric, 关注 on nothing: one cache entry each */
+ const keyOf=(v=view)=>(v.tab==='hot'?[v.tab,v.category,v.week]:v.tab==='follow'?[v.tab]:[v.tab,v.period,v.metric,v.game]).join('|');
  const args=(v=view)=>({tab:v.tab,period:v.period,metric:v.metric,game:v.game,category:v.category,week:v.week});
  let seq=0,painted=false;
- const paint=data=>{last=data;const y=main.scrollTop;main.innerHTML=leaderboardHTML(data,locale,esc);main.classList.toggle('lb-instant',painted);painted=true;main.scrollTop=y;bind();main.querySelectorAll('.lb-cover.tv-holo').forEach(cardify);};
- const prefetch=()=>{if(view.tab!=='board'||view.game)return;const base={...view};
-  const queue=METRICS.filter(m=>m!==base.metric).map(m=>({...base,metric:m})).filter(v=>!cache.has(keyOf(v)));
-  const next=()=>{const v=queue.shift();if(!v||!isCurrent())return;api('leaderboard_view',args(v)).then(d=>{cache.set(keyOf(v),JSON.stringify(d));}).catch(()=>{}).finally(()=>setTimeout(next,120));};
-  setTimeout(next,400);};
+ const calm=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+ /* repaint in place: the top row stays, the sub row is swapped only when it changed, the body crossfades */
+ const soft=html=>{
+  const page=main.querySelector(':scope>.leaderboard-page');if(!page)return false;
+  const tpl=document.createElement('template');tpl.innerHTML=html;
+  const kids=[...tpl.content.children],next=kids.find(el=>el.classList.contains('leaderboard-page')),bg=kids.find(el=>el.classList.contains('dtv-bg')),oldBg=main.querySelector(':scope>.dtv-bg');
+  if(!next)return false;
+  const part=sel=>[page.querySelector(':scope>'+sel),next.querySelector(':scope>'+sel)];
+  const [topOld,topNew]=part('.lb-toprow'),[subOld,subNew]=part('.lb-subrow'),[bodyOld,bodyNew]=part('.lb-body');
+  if(!topOld||!topNew||!subOld||!subNew||!bodyOld||!bodyNew)return false;
+  if(bg&&oldBg&&bg.getAttribute('style')!==oldBg.getAttribute('style'))oldBg.replaceWith(bg);
+  topNew.querySelectorAll('[aria-pressed]').forEach(nb=>{const k=[...nb.attributes].find(a=>a.name.startsWith('data-lb-'));const ob=k&&topOld.querySelector(`[${k.name}="${CSS.escape(k.value)}"]`);if(ob)ob.setAttribute('aria-pressed',nb.getAttribute('aria-pressed'));});
+  const endOld=topOld.querySelector('.lb-toprow-end'),endNew=topNew.querySelector('.lb-toprow-end');
+  if(endOld&&endNew&&endNew.innerHTML.trim()&&endOld.innerHTML!==endNew.innerHTML)endOld.replaceWith(endNew);
+  if(subOld.innerHTML!==subNew.innerHTML)subOld.replaceWith(subNew);
+  if(bodyOld.innerHTML===bodyNew.innerHTML)return true;
+  if(calm()){bodyOld.replaceWith(bodyNew);return true;}
+  /* the old body fades out on top while the new one rises in under it */
+  const pr=page.getBoundingClientRect(),br=bodyOld.getBoundingClientRect();
+  if(getComputedStyle(page).position==='static')page.style.position='relative';
+  bodyOld.classList.remove('is-loading');bodyOld.inert=true;bodyOld.setAttribute('aria-hidden','true');
+  Object.assign(bodyOld.style,{position:'absolute',left:(br.left-pr.left)+'px',top:(br.top-pr.top)+'px',width:br.width+'px',margin:'0',pointerEvents:'none',zIndex:'1'});
+  bodyOld.before(bodyNew);
+  bodyOld.animate([{opacity:1},{opacity:0}],{duration:150,easing:'cubic-bezier(.4,0,1,1)',fill:'forwards'}).finished.then(()=>bodyOld.remove(),()=>bodyOld.remove());
+  bodyNew.animate([{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],{duration:240,delay:60,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});
+  return true;
+ };
+ const paint=data=>{last=data;const y=main.scrollTop,html=leaderboardHTML(data,locale,esc);
+  if(!soft(html))main.innerHTML=html;
+  main.dataset.lbTab=view.tab;main.classList.toggle('lb-instant',painted);painted=true;main.scrollTop=y;bind();main.querySelectorAll('.lb-cover.tv-holo').forEach(cardify);};
+ /* quiet prefetch, two requests at a time: the other tabs first, then the other metrics, then the other periods */
+ /* one request per view at a time: a click on a view that is being prefetched waits for that request */
+ const load=(v=view)=>{const k=keyOf(v);let p=inflight.get(k);if(!p){p=api('leaderboard_view',args(v)).finally(()=>inflight.delete(k));inflight.set(k,p);}return p;};
+ let prefetching=0;
+ const prefetch=()=>{if(view.game)return;const base={...view,game:''},token=++prefetching;
+  const views=[{...base,tab:'board'},{...base,tab:'hot'},{...base,tab:'follow'},...METRICS.map(m=>({...base,tab:'board',metric:m})),...PERIODS.map(p=>({...base,tab:'board',period:p}))];
+  const seen=new Set([keyOf()]),queue=views.filter(v=>{const k=keyOf(v);if(seen.has(k)||cache.has(k))return false;seen.add(k);return true;});
+  const next=()=>{const v=queue.shift();if(!v||token!==prefetching||!isCurrent())return;load(v).then(d=>{if(!cache.has(keyOf(v)))cache.set(keyOf(v),JSON.stringify(d));}).catch(()=>{}).finally(()=>setTimeout(next,120));};
+  setTimeout(next,300);setTimeout(next,450);};
  /* #117 交流 owns the sub row and body; the top row (and its switch) stay the same */
- const forum=async()=>{const w2=words(locale);main.innerHTML=page(topRow(w2,'forum',last?myChip(last,w2,locale,esc):''),forumSubRow(locale,esc),'<div class="lb-loading"><span class="spinner"></span></div>');main.classList.add('lb-instant');painted=true;bind();
+ const forum=async()=>{const w2=words(locale),html=page(topRow(w2,'forum',last?myChip(last,w2,locale,esc):''),forumSubRow(locale,esc),'<div class="lb-loading"><span class="spinner"></span></div>');if(!soft(html))main.innerHTML=html;main.dataset.lbTab='forum';main.classList.add('lb-instant');painted=true;bind();
   await mountForum(main.querySelector('.leaderboard-page'),{api,locale,esc,toast,isCurrent:()=>isCurrent()&&view.tab==='forum',avatarHTML,person:personButton,emptyState,
    bindPeople:(el,images)=>bindSocial(el,{api,locale,esc,toast,images:()=>images,avatarHTML,openSettings:section=>section==='personal'?openProfilePanel({api,locale,esc,toast,openSettings}):openSettings(section),rerender:()=>{}})});};
  const render=async(action='leaderboard_view',extra={})=>{
   if(view.tab==='forum'&&action==='leaderboard_view'){seq++;return forum();}
   const plain=action==='leaderboard_view'&&!Object.keys(extra).length,key=keyOf(),mine=++seq,hit=plain?cache.get(key):null;
-  if(hit)paint(JSON.parse(hit));else main.querySelector('.lb-body')?.classList.add('is-loading');
-  let data;try{data=await api(action,{...args(),...extra});}
+  if(hit)paint(JSON.parse(hit));
+  /* another tab with nothing cached yet: its own sub row and a spinner at once (the chip stays), not the old tab dimmed */
+  else if(plain&&main.dataset.lbTab&&main.dataset.lbTab!==view.tab&&soft(leaderboardHTML(null,locale,esc))){main.dataset.lbTab=view.tab;bind();}
+  else main.querySelector('.lb-body')?.classList.add('is-loading');
+  let data;try{data=await(plain?load():api(action,{...args(),...extra}));}
   catch(error){main.querySelector('.lb-body')?.classList.remove('is-loading');if(hit)return;const code=String(error?.message||error).replace(/^LEADERBOARD_/,'');const box=main.querySelector('[data-lb-error]');if(box&&w[code]){box.textContent=w[code];box.hidden=false;return;}toast(w.offline);return;}
   if(!isCurrent()||mine!==seq)return;
   const json=JSON.stringify(data);if(plain||action==='leaderboard_view')cache.set(key,json);else cache.clear();
@@ -248,7 +292,7 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
   main.querySelectorAll('[data-lb-period]').forEach(b=>b.onclick=()=>{view.period=b.dataset.lbPeriod;press('period',view.period);render();});
   main.querySelectorAll('[data-lb-metric]').forEach(b=>b.onclick=()=>{view.metric=b.dataset.lbMetric;view.game='';press('metric',view.metric);render();});
   main.querySelectorAll('[data-lb-category]').forEach(b=>b.onclick=()=>{view.category=b.dataset.lbCategory;press('category',view.category);render();});
-  main.querySelector('[data-lb-week]')?.addEventListener('change',event=>{view.week=event.currentTarget.value;render();});
+  {const week=main.querySelector('[data-lb-week]');if(week)week.onchange=event=>{view.week=event.currentTarget.value;render();};}
   main.querySelectorAll('[data-lb-game]').forEach(b=>b.onclick=()=>{view.game=b.dataset.lbGame;render();});
   main.querySelectorAll('[data-lb-report]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('leaderboard_report',{avatar:b.dataset.lbReport});toast(r?.hidden?w.reportHidden:w.reported);}catch{toast(w.offline);b.disabled=false;}});
   main.querySelectorAll('[data-lb-avatar]').forEach(b=>b.onclick=async()=>{const buttons=[...main.querySelectorAll('[data-lb-avatar]')];

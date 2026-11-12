@@ -230,11 +230,6 @@ const modulo=(value,period)=>((value%period)+period)%period;
 export const wallStride=(cols,n)=>{for(let k=0;k<n;k++){const sd=modulo(cols+k,n);if(sd>1&&sd<n-1)return cols+k;}return cols;};
 const fieldActions='[data-game],[data-edit],[data-launch],[data-series]';
 
-function fieldBlurFilters(){
- if(document.getElementById('field-blur-defs'))return;
- const steps=[.35,.7,1.05,1.4],f=(d,i)=>`<filter id="field-blur-${d}${i+1}" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="${d==='x'?steps[i]+' '+steps[i]*.15:steps[i]*.15+' '+steps[i]}"/></filter>`;
- document.body.insertAdjacentHTML('beforeend',`<svg id="field-blur-defs" width="0" height="0" aria-hidden="true" style="position:absolute">${steps.map((_,i)=>f('x',i)+f('y',i)).join('')}</svg>`);
-}
 // E245 (user): a search with 2+ matches puts them on an ellipse around the search capsule, slowly
 // circling (about one turn a minute). Lower covers read nearer: a little larger, brighter and on top. Hovering a cover
 // pauses the orbit so it can be clicked; reduced motion keeps the ring still. One match keeps the single-focus layout.
@@ -270,7 +265,7 @@ function orbit(host,main,plane,items,pod){
  fieldStop=()=>{events.abort();ro.disconnect();cancelAnimationFrame(raf);host.classList.remove('field-orbit');fieldStop=()=>{};};
 }
 export function fieldify(grid,filtered=false){
- fieldStop();fieldBlurFilters();
+ fieldStop();
  if(!grid)return;
  const host=grid.closest('#library-results'),main=grid.closest('.main');
  if(!host||!main)return;
@@ -281,6 +276,7 @@ export function fieldify(grid,filtered=false){
  const plane=document.createElement('div');
  plane.className='field-plane';
  grid.replaceChildren(plane);
+ host.querySelector(':scope > .field-shield')?.remove();
  if(filtered&&items.length>=2){orbit(host,main,plane,items,pod);return;}
 
  const cw=200,ch=300,cardWidth=168,cardHeight=250;
@@ -293,8 +289,18 @@ export function fieldify(grid,filtered=false){
  const state=filtered?{x:cx0,y:cy0,z:1}:fieldState;
  const events=new AbortController(),signal=events.signal;
  let drag=null,raf=0,suppressClick=false;
- let vx=0,vy=0,lastMove=0,coastAt=0,coastEnd=0,lastLayout=-Infinity;
- let layoutX=0,layoutY=0,layoutZoom=0,blur="0",zoomTarget=state.z,zoomAt=0;
+ let vx=0,vy=0,lastMove=0,coastAt=0,coastEnd=0,zoomTarget=state.z,zoomAt=0,painted='';
+ /* 2026-11-12 (user: dragging the wall still lagged): covers that scroll out are parked off-screen and reused when the
+    same game scrolls back in, and once the wall is idle enough spare covers for the widest zoom are made in one batch.
+    Dragging and zooming then never insert DOM: with this page's :has() rules one inserted cover re-ran style for the
+    whole document (about 30 ms each time). */
+ const pool=new Map(),shield=document.createElement('i');
+ shield.className='field-shield';shield.setAttribute('aria-hidden','true');host.append(shield);
+ /* the capsule drops its backdrop blur while the wall moves; toggled on the capsule itself, since a :has() on .main
+    restyled the whole page on every start and stop */
+ const moving=on=>{if(host.classList.contains('field-moving')===on)return;
+  if(on)for(const el of host.querySelectorAll('.cover-frame.is-tilting')){el.classList.replace('is-tilting','tilt-out');el.style.setProperty('--rx','0deg');el.style.setProperty('--ry','0deg');}
+  host.classList.toggle('field-moving',on);pod?.classList.toggle('wall-moving',on);};
  let width,height,podWidth,podHeight,podY;
  function constrain(){
   if(!filtered)return;
@@ -303,41 +309,59 @@ export function fieldify(grid,filtered=false){
   state.x=Math.max(cx0-rangeX,Math.min(cx0+rangeX,state.x));
   state.y=Math.max(cy0-rangeY,Math.min(cy0+rangeY,state.y));
  }
- function paint(now){
+ function take(index){
+  const list=pool.get(index);
+  if(list?.length){const node=list.pop();node.removeAttribute('data-parked');return node;}
+  return make(index);
+ }
+ function make(index){
+  const source=items[index],node=source.cloneNode(true);
+  node.draggable=false;node.classList.add('field-cell');
+  node.querySelectorAll('img').forEach(img=>{img.draggable=false;img.decoding='async';});
+  sources.set(node,source);return node;
+ }
+ function park(cell){parkNode(cell.node,cell.index);}
+ function parkNode(node,index){
+  node.style.transform='translate(-300vw,-300vh)';node.style.opacity='0';node.setAttribute('data-parked','');
+  let list=pool.get(index);if(!list)pool.set(index,list=[]);
+  list.push(node);
+ }
+ /* spare covers per game: enough for the window at the smallest zoom, plus two */
+ function warm(){
+  warmIdle=0;
+  if(filtered||!host.isConnected||!width)return;
+  const most=(Math.ceil(width/(cw*.55))+4)*(Math.ceil(height/(ch*.55))+4),per=Math.ceil(most/items.length)+2;
+  const have=new Map();for(const cell of cells.values())have.set(cell.index,(have.get(cell.index)||0)+1);
+  const spare=document.createDocumentFragment();
+  for(let index=0;index<items.length;index++)for(let n=(have.get(index)||0)+(pool.get(index)?.length||0);n<per;n++){const node=make(index);parkNode(node,index);spare.append(node);}
+  if(spare.childNodes.length)plane.append(spare);
+ }
+ /* after the entrance has played, in an idle slot */
+ let warmId=0,warmIdle=0;
+ const idle=window.requestIdleCallback||(fn=>setTimeout(fn,0)),unidle=window.cancelIdleCallback||clearTimeout;
+ const warmLater=()=>{if(filtered||warmId||warmIdle)return;warmId=setTimeout(()=>{warmId=0;warmIdle=idle(warm,{timeout:1500});},1400);};
+ function paint(){
   constrain();
   const {x,y,z}=state,cx=width/2,cy=podY;
   {const zoom=z>1.05?'large':z<.85?'tiny':'small';if(host.dataset.zoom!==zoom)host.dataset.zoom=zoom;}
-  const speed=reduceMotion.matches?0:Math.hypot(vx,vy);
-  const fast=speed>.75;
-  host.classList.toggle('field-fast',fast);
-  // E221 (user: jagged covers while dragging a small window): light directional blur along the drag, from one shared
-  // SVG filter. Quantised to 4 levels so the filter only changes when the speed band does, and off when still.
-  const level=reduceMotion.matches?0:Math.min(4,Math.floor(speed/.45));
-  const dir=level?(Math.abs(vx)>=Math.abs(vy)?'x':'y'):'';
-  /* (user 2026-11-12: the infinite wall still stuttered) the directional blur was an SVG filter over the whole plane,
-     rasterised on the CPU every frame while dragging; the plane is never filtered now */
-  if(level+dir!==blur){blur=level+dir;}
-  const dxSinceLayout=(layoutX-x)*z,dySinceLayout=(layoutY-y)*z;
-  // Shift the existing plane between layout frames. Overscan covers the shift.
-  // E222 (user: still laggy): any drag or coast moves only the plane; covers are re-laid at most every 90ms.
-  // E222: plane-only frames only while flinging fast; the ring around the capsule needs per-cover layout otherwise.
-  if(speed>.05&&z===layoutZoom&&now-lastLayout<90&&Math.hypot(dxSinceLayout,dySinceLayout)<160){
-   plane.style.transform='translate('+dxSinceLayout.toFixed(1)+'px,'+dySinceLayout.toFixed(1)+'px)';
-   return;
-  }
-  lastLayout=now;layoutX=x;layoutY=y;layoutZoom=z;plane.style.transform='';
+  /* 2026-11-12 (user: dragging the wall still lagged): every cover is placed on every frame, from transform and opacity
+     only (each cover is its own compositor layer, so no paint). The old 90 ms plane-shift frames made the lens snap in
+     steps, and the speed classes it toggled restyled every cover mid-drag; both are gone. */
+  const stamp=x.toFixed(2)+' '+y.toFixed(2)+' '+z.toFixed(4)+' '+width+' '+height+' '+cy;
+  if(stamp===painted)return;
+  painted=stamp;
   const firstCol=Math.max(filtered?0:-Infinity,Math.floor((x-cx/z)/cw)-1);
   const lastCol=Math.min(filtered?cols-1:Infinity,Math.ceil((x+cx/z)/cw)+1);
   const firstRow=Math.max(filtered?0:-Infinity,Math.floor((y-Math.max(cy,height-cy)/z)/ch)-1);
   /* E426 (player: simple -> wall drew only the top two rows): rows below the capsule run to the host's bottom edge, not
     to a mirror of the space above it; mid-switch the capsule is still gliding up and podY was small */
- const lastRow=Math.min(filtered?rows-1:Infinity,Math.ceil((y+Math.max(cy,height-cy)/z)/ch)+1);
-  const radius=Math.hypot(cx,cy)||1,pw=podWidth/2+cardWidth*z*.55,ph=podHeight/2+cardHeight*z*.6;
+  const lastRow=Math.min(filtered?rows-1:Infinity,Math.ceil((y+Math.max(cy,height-cy)/z)/ch)+1);
+  const radius=Math.hypot(cx,cy)||1;
   for(const [key,cell] of cells){
    if(cell.col>=firstCol&&cell.col<=lastCol&&cell.row>=firstRow&&cell.row<=lastRow)continue;
-   cell.node.remove();cells.delete(key);
+   park(cell);cells.delete(key);
   }
-  const added=document.createDocumentFragment();
+  let added=null;
   for(let row=firstRow;row<=lastRow;row++)for(let col=firstCol;col<=lastCol;col++){
    /* E279 (user report 2026-11-09: the same game twice, side by side): a cols x ceil(n/cols) tile has more cells than
       games and refilled the spare ones from the start, right next to the originals. The open wall is one running
@@ -347,24 +371,19 @@ export function fieldify(grid,filtered=false){
    const key=row+':'+col;
    let cell=cells.get(key);
    if(!cell){
-    const source=items[index%items.length];
-    const node=source.cloneNode(true);
-    node.draggable=false;
-    node.querySelectorAll('img').forEach(img=>{img.draggable=false;img.decoding='async';});
-    sources.set(node,source);added.append(node);
-    cell={node,col,row};cells.set(key,cell);
+    const game=index%items.length,node=take(game);
+    if(!node.isConnected)(added||=document.createDocumentFragment()).append(node);
+    cell={node,col,row,index:game,t:'',o:''};cells.set(key,cell);
    }
    const dx=(col*cw-x)*z,dy=(row*ch-y)*z;
    const d=Math.min(1,Math.hypot(dx,dy)/radius);
-   const scale=z*(1-.22*d*d);
-   // E222 (user: the push looked terrible): covers stay on the grid. Where a cover passes under the search bar it
-   // fades out, measured against the bar's full rectangle, so nothing jumps or orbits.
-   // E223 (user): no push at all; the wall is a plain background behind the search capsule.
-   const px=cx+dx-cardWidth/2,py=cy+dy-cardHeight/2;
-   cell.node.style.transform='translate('+px.toFixed(1)+'px,'+py.toFixed(1)+'px) scale('+scale.toFixed(3)+')';
-   cell.node.style.opacity=(1-.35*d*d).toFixed(2);
+   // E222/E223 (user): covers stay on the grid; the wall is a plain background behind the search capsule.
+   const t='translate('+(cx+dx-cardWidth/2).toFixed(1)+'px,'+(cy+dy-cardHeight/2).toFixed(1)+'px) scale('+(z*(1-.22*d*d)).toFixed(3)+')';
+   const o=(1-.35*d*d).toFixed(2);
+   if(cell.t!==t){cell.node.style.transform=t;cell.t=t;}
+   if(cell.o!==o){cell.node.style.opacity=o;cell.o=o;}
   }
-  plane.append(added);
+  if(added)plane.append(added);
  }
  function frame(now){
   raf=0;
@@ -386,8 +405,8 @@ export function fieldify(grid,filtered=false){
    if(Math.abs(zoomTarget-state.z)<.0008)state.z=zoomTarget;else zooming=true;
   }
   zoomAt=zooming?now:0;
-  paint(now);
-  if(!coastEnd&&!drag?.active&&!zooming)host.classList.remove('field-moving');
+  paint();
+  if(!coastEnd&&!drag?.active&&!zooming)moving(false);
   if(coastEnd||zooming||(drag?.active&&Math.hypot(vx,vy)>.75))queue();
  }
  const queue=()=>{if(!raf)raf=requestAnimationFrame(frame);};
@@ -412,7 +431,7 @@ export function fieldify(grid,filtered=false){
   if(!drag.active){
    if(Math.hypot(dx,dy)<6)return;
    drag.active=suppressClick=true;
-   host.classList.add('dragging','field-moving');host.setPointerCapture(e.pointerId);
+   host.classList.add('dragging');moving(true);host.setPointerCapture(e.pointerId);
   }
   const now=performance.now(),dt=Math.max(4,now-lastMove);
   const x=state.x,y=state.y;
@@ -458,22 +477,23 @@ export function fieldify(grid,filtered=false){
   const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?host.clientHeight:1);
   zoomTarget=Math.max(.55,Math.min(1.8,zoomTarget*Math.exp(-delta*.0015)));
   if(!zoomAt)zoomAt=performance.now();
-  host.classList.add('field-moving');
+  moving(true);
   queue();
  },{passive:false,signal});
- const ro=new ResizeObserver(()=>{measure();queue();});
+ const ro=new ResizeObserver(()=>{measure();queue();warmLater();});
  addEventListener('megulit-field-measure',()=>{measure();queue();},{signal});
  ro.observe(host);if(pod)ro.observe(pod);
  measure();
  // E218 (user): on first open the search bar sits in the gap just above the most recent games, which run centred under it.
  if(!filtered&&!fieldState.placed){const across=Math.max(1,Math.floor(width/cw));fieldState.x=(Math.min(across,cols)-1)*cw/2;fieldState.y=-ch/2;fieldState.placed=true;}
- paint(performance.now());
+ paint();
+ warmLater();
  /* E426 measure again once layout has settled: two frames after mounting, and when the capsule's switch glide ends */
  let settle=requestAnimationFrame(()=>{settle=requestAnimationFrame(()=>{settle=0;measure();queue();});});
  pod?.addEventListener('transitionend',()=>{measure();queue();},{signal});
  fieldStop=()=>{
-  events.abort();ro.disconnect();cancelAnimationFrame(raf);cancelAnimationFrame(settle);
-  host.classList.remove('dragging','field-fast','field-moving');plane.style.filter='';
+  events.abort();ro.disconnect();cancelAnimationFrame(raf);cancelAnimationFrame(settle);clearTimeout(warmId);if(warmIdle)unidle(warmIdle);
+  host.classList.remove('dragging','field-moving');pod?.classList.remove('wall-moving');shield.remove();
   fieldStop=()=>{};
  };
 }

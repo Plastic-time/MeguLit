@@ -343,7 +343,7 @@ function renderGames(){
   if(gameTransition){gameTransition.cancel();gameTransition=null;}
   const animate=!matchMedia('(prefers-reduced-motion: reduce)').matches,plane=host.querySelector('.field-plane');
   const orbit=host.classList.contains('field-orbit'),wall=!!plane&&!orbit&&!host.querySelector('.field-feature'),filtered=!!search.trim();
-  const cells=plane?[...plane.children]:[];
+  const cells=plane?[...plane.children].filter(c=>!c.hasAttribute('data-parked')):[];
   if(!animate||!cells.length||!((wall&&filtered)||(orbit&&!filtered)))return renderGamesNow();
   const b=host.getBoundingClientRect(),cx=b.left+b.width/2,cy=b.top+b.height/2;
   const dist=cells.map(c=>{const r=c.getBoundingClientRect();return Math.hypot(r.left+r.width/2-cx,r.top+r.height/2-cy);}),max=Math.max(1,...dist);
@@ -359,7 +359,7 @@ function renderGamesNow(mode=''){
   const animate=!matchMedia('(prefers-reduced-motion: reduce)').matches;
   const oldSingle=host.querySelector('.field-feature > [data-member-id]');
   const oldRect=oldSingle?.getBoundingClientRect();
-  const wallCards=animate&&!oldSingle?[...host.querySelectorAll('.field-plane > [data-member-id]')].map(card=>({card,rect:card.getBoundingClientRect()})):[];
+  const wallCards=animate&&!oldSingle?[...host.querySelectorAll('.field-plane > [data-member-id]:not([data-parked])')].map(card=>({card,rect:card.getBoundingClientRect()})):[];
   // E245.3: covers that stay on screen fly from where they were (orbit <-> orbit, orbit <-> single); the orbit skips its
   // grow-from-centre entrance when it inherits covers.
   const wasOrbit=host.classList.contains('field-orbit');
@@ -372,7 +372,7 @@ function renderGamesNow(mode=''){
        covers finished decoding. Hold them invisible until the covers decode (at most 160 ms), then let them grow in from
        the centre outward, mirroring the wall that just left. The orbit keeps its own entrance. */
     if(host.classList.contains('field-orbit'))return;
-    const cards=[...host.querySelectorAll('.field-plane > [data-member-id], .field-feature > [data-member-id]')];if(!cards.length)return;
+    const cards=[...host.querySelectorAll('.field-plane > [data-member-id]:not([data-parked]), .field-feature > [data-member-id]')];if(!cards.length)return;
     const inners=cards.map(c=>c.firstElementChild||c);inners.forEach(n=>{n.style.opacity='0';});
     const imgs=[...host.querySelectorAll('img')].slice(0,80);
     Promise.race([Promise.all(imgs.map(i=>i.decode?.().catch(()=>{}))),new Promise(r=>setTimeout(r,160))]).then(()=>requestAnimationFrame(()=>{
@@ -395,7 +395,7 @@ function renderGamesNow(mode=''){
     // E245.4: entering the orbit, covers that did not match scatter out of the window as ghosts; matches fly into place.
     const before=oldSingle?[{card:oldSingle,rect:oldRect}]:wallCards,kept=new Set();
     const cx0=bounds.left+bounds.width/2,cy0=bounds.top+bounds.height/2,far0=Math.max(innerWidth,innerHeight)*.55;let fresh=0;
-    for(const card of host.querySelectorAll('.field-plane > [data-member-id]')){const from=matching(card.dataset.memberId,before);if(from){kept.add(from.card);flyInner(card,from.rect);continue;}
+    for(const card of host.querySelectorAll('.field-plane > [data-member-id]:not([data-parked])')){const from=matching(card.dataset.memberId,before);if(from){kept.add(from.card);flyInner(card,from.rect);continue;}
       /* E276 (user): a cover that comes back into the results flies in from outside onto the orbit */
       const inner=card.firstElementChild;if(!inner)continue;const r=card.getBoundingClientRect(),dx=r.left+r.width/2-cx0,dy=r.top+r.height/2-cy0,l=Math.hypot(dx,dy)||1;
       inner.animate([{transform:`translate(${dx/l*far0}px,${dy/l*far0}px) scale(1.05)`,opacity:0},{transform:'none',opacity:1}],{duration:640,delay:Math.min(240,fresh++*45),easing:'cubic-bezier(.16,.84,.3,1)',fill:'backwards'});}
@@ -405,7 +405,7 @@ function renderGamesNow(mode=''){
     // leaving the orbit: orbit covers fly out, then the wall returns from the edges inwards like dominoes
     dominoIn(host,bounds);
   }else if(oldSingle){
-    const match=matching(oldSingle.dataset.memberId,[...host.querySelectorAll('.field-plane > [data-member-id]')].map(card=>({card,rect:card.getBoundingClientRect()})));
+    const match=matching(oldSingle.dataset.memberId,[...host.querySelectorAll('.field-plane > [data-member-id]:not([data-parked])')].map(card=>({card,rect:card.getBoundingClientRect()})));
     if(match)animateFeatureCard(match.card,oldRect,bounds);
     else host.querySelector('.field-plane')?.animate([{opacity:.35},{opacity:1}],{duration:250,easing:'ease-out'});
   }
@@ -418,7 +418,7 @@ function scatterGhosts(cards,bounds){
    g.animate([{transform:'none',opacity:1},{transform:`translate(${dx/len*push}px,${dy/len*push}px) scale(.85)`,opacity:0}],{duration:460+Math.random()*120,easing:'cubic-bezier(.55,0,.8,.3)',fill:'forwards'}).onfinish=()=>{if(++done>=Math.min(80,cards.length))layer.remove();};}
 }
 function dominoIn(host,bounds){
-  const cx=bounds.left+bounds.width/2,cy=bounds.top+bounds.height/2,cards=[...host.querySelectorAll('.field-plane > [data-member-id]')].map(card=>{const r=card.getBoundingClientRect(),dx=r.left+r.width/2-cx,dy=r.top+r.height/2-cy;return {card,dx,dy,d:Math.hypot(dx,dy)};});
+  const cx=bounds.left+bounds.width/2,cy=bounds.top+bounds.height/2,cards=[...host.querySelectorAll('.field-plane > [data-member-id]:not([data-parked])')].map(card=>{const r=card.getBoundingClientRect(),dx=r.left+r.width/2-cx,dy=r.top+r.height/2-cy;return {card,dx,dy,d:Math.hypot(dx,dy)};});
   const max=Math.max(1,...cards.map(c=>c.d));
   for(const {card,dx,dy,d} of cards){const inner=card.firstElementChild;if(!inner)continue;const len=d||1,out=Math.max(innerWidth,innerHeight)*.5;
    /* E272: a short settle from just outside instead of a long flight, no idle lead-in */const k=Math.min(70,out*.12);inner.animate([{transform:`translate(${dx/len*k}px,${dy/len*k}px) scale(.9)`,opacity:0},{transform:'none',opacity:1}],{duration:560,delay:(1-d/max)*380,easing:'cubic-bezier(.16,.84,.3,1)',fill:'backwards'});}
