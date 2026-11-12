@@ -1,0 +1,177 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+/* 2026-11-12 (user: the detail card's back shows a random CG the game's own saves record as seen). Engine image formats
+   the browser cannot show, decoded to RGBA and written out as PNG (zlib + CRC). Independent implementations; format
+   descriptions credited where they come from. Every decoder returns {width,height,rgba:Buffer}. */
+const zlib=require('node:zlib');
+
+const CRC=(()=>{const t=new Int32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xedb88320^(c>>>1):c>>>1;t[n]=c;}return t;})();
+function crc32(buf,c=-1){for(let i=0;i<buf.length;i++)c=CRC[(c^buf[i])&255]^(c>>>8);return c;}
+function chunk(type,data){const head=Buffer.alloc(8);head.writeUInt32BE(data.length,0);head.write(type,4,'latin1');const crc=Buffer.alloc(4);crc.writeInt32BE(~crc32(data,crc32(head.subarray(4)))|0,0);return Buffer.concat([head,data,crc]);}
+/* RGBA (or RGB when every alpha is 255) -> PNG */
+function png({width,height,rgba}){
+ let opaque=true;for(let i=3;i<rgba.length;i+=4)if(rgba[i]!==255){opaque=false;break;}
+ const ch=opaque?3:4,stride=width*ch+1,raw=Buffer.alloc(stride*height);
+ for(let y=0;y<height;y++){let o=y*stride+1,s=y*width*4;for(let x=0;x<width;x++,s+=4){raw[o++]=rgba[s];raw[o++]=rgba[s+1];raw[o++]=rgba[s+2];if(ch===4)raw[o++]=rgba[s+3];}}
+ const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(width,0);ihdr.writeUInt32BE(height,4);ihdr[8]=8;ihdr[9]=opaque?2:6;
+ return Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]),chunk('IHDR',ihdr),chunk('IDAT',zlib.deflateSync(raw,{level:6})),chunk('IEND',Buffer.alloc(0))]);
+}
+
+/* ---- HuneX MZX0 / MZP ("mrgd00"), format as described by loicfrance/mahoyo_tools (mzx.py, mzp.py) ----
+   MZX0: "MZX0" + u32 size, then commands; the low 2 bits of each byte: 0 repeat the last 2-byte word (arg+1) times,
+   1 copy (arg+1) words from (next byte+1) words back, 2 a word from a 64-word ring of literals, 3 (arg+1) literal words.
+   Every 0x1000 words the "last word" for a repeat resets to the filler. */
+function mzx(src,invert=false){
+ if(src.length<8||src.toString('latin1',0,4)!=='MZX0')throw Error('MZX_MAGIC');
+ const size=src.readUInt32LE(4);if(size>64<<20)throw Error('MZX_SIZE');
+ const out=Buffer.alloc(size+256),fill=invert?0xff:0,ring=Buffer.alloc(128,fill);let ringAt=0,p=8,q=0,clear=0;
+ while(q<size&&p<src.length){const f=src[p++],cmd=f&3,arg=f>>2;if(clear<=0)clear=0x1000;
+  if(cmd===0){let a=fill,b=fill;if(clear!==0x1000&&q>=2){a=out[q-2];b=out[q-1];}for(let k=0;k<=arg;k++){out[q++]=a;out[q++]=b;}}
+  else if(cmd===1){const d=2*(src[p++]+1),len=2*(arg+1);for(let k=0;k<len;k++,q++)out[q]=q-d>=0?out[q-d]:0;}
+  else if(cmd===2){out[q++]=ring[arg*2];out[q++]=ring[arg*2+1];}
+  else{for(let k=0;k<(arg+1)*2;k++){const v=invert?src[p++]^0xff:src[p++];out[q++]=v;ring[ringAt]=v;ringAt=(ringAt+1)&127;}}
+  clear-=cmd===2?1:arg+1;}
+ return out.subarray(0,size);
+}
+function mrg(buf){
+ if(buf.length<8||buf.toString('latin1',0,6)!=='mrgd00')throw Error('MZP_MAGIC');
+ const n=buf.readUInt16LE(6),base=8+n*8,out=[];
+ for(let i=0;i<n;i++){const h=8+i*8,off=buf.readUInt16LE(h)*0x800+buf.readUInt16LE(h+2),sectors=buf.readUInt16LE(h+4);let size=buf.readUInt16LE(h+6);
+  const span=s=>Math.ceil((off+s)/0x800)-Math.floor(off/0x800);while(span(size)<sectors)size+=0x10000;
+  out.push(buf.subarray(base+off,Math.min(buf.length,base+off+size)));}
+ return out;
+}
+function mzp(buf){
+ const ent=mrg(buf),h=ent[0];if(!h||h.length<16)throw Error('MZP_HEADER');
+ const W=h.readUInt16LE(0),H=h.readUInt16LE(2),tw=h.readUInt16LE(4),th=h.readUInt16LE(6),tx=h.readUInt16LE(8),ty=h.readUInt16LE(10),type=h.readUInt16LE(12),depth=h[14],crop=h[15];
+ let bpp;if(type===1)bpp=(depth&0xf)===0?4:8;else if(type===8&&depth===0x14)bpp=24;else if(type===0xb&&depth===0x14)bpp=32;else if(type===0xc)bpp=-1;else throw Error('MZP_TYPE_'+type.toString(16)+'_'+depth.toString(16));
+ if(tx*ty+1>ent.length||!W||!H||W>16384||H>16384)throw Error('MZP_TILES');
+ let pal=null;
+ if(type===1){const n=bpp===4?16:256;pal=Buffer.alloc(256*4);for(let i=0;i<n;i++){const s=16+i*4;pal[i*4]=h[s];pal[i*4+1]=h[s+1];pal[i*4+2]=h[s+2];const a=h[s+3];pal[i*4+3]=a&0x80?255:((a<<1)|(a>>6))&255;}
+  if(depth===0x11||depth===0x91)for(let i=0;i<n;i+=32){const b=Buffer.from(pal.subarray((i+8)*4,(i+16)*4));pal.copy(pal,(i+8)*4,(i+16)*4,(i+24)*4);b.copy(pal,(i+16)*4);}}
+ let opaque=bpp===-1;const extra=type===1?1:0,width=W-(tx-1)*crop*2+extra,height=H-(ty-1)*crop*2+extra,rgba=Buffer.alloc(width*height*4),ts=tw*th;
+ for(let y=0;y<ty;y++)for(let x=0;x<tx;x++){
+  const t=mzx(ent[1+y*tx+x]),px=Buffer.alloc(ts*4);
+  if(bpp===-1){/* HEP tile: "HEP\0" header (0x20), w*h palette indices, 256 RGBA entries */
+   if(t.length<0x20||t.readUInt32LE(0)!==0x504548)throw Error('HEP_MAGIC');const w=t.readUInt32LE(0x14),hh=t.readUInt32LE(0x18);if(w!==tw||hh!==th)throw Error('HEP_SIZE');
+   if(t.readUInt32LE(0x1c)!==2)opaque=false;const pp=0x20+ts;for(let i=0;i<ts;i++){const v=t[0x20+i]*4,a=t[pp+v+3];px[i*4]=t[pp+v];px[i*4+1]=t[pp+v+1];px[i*4+2]=t[pp+v+2];px[i*4+3]=a&0x80?255:((a<<1)|(a>>6))&255;}}
+  else if(bpp===4)for(let i=0;i<ts;i++){const v=(t[i>>1]>>((i&1)*4))&15;pal.copy(px,i*4,v*4,v*4+4);}
+  else if(bpp===8)for(let i=0;i<ts;i++){const v=t[i];pal.copy(px,i*4,v*4,v*4+4);}
+  else for(let i=0;i<ts;i++){const c=t.readUInt16LE(i*2),o=t[ts*2+i];px[i*4]=((c&0xf800)>>8)|((o>>5)&7);px[i*4+1]=((c&0x7e0)>>3)|((o>>3)&3);px[i*4+2]=((c&0x1f)<<3)|(o&7);px[i*4+3]=bpp===32?t[ts*3+i]:255;}
+  const row0=y*(th-crop*2),sy=crop&&y>0?crop:0,ey=crop&&y<ty-1?th-crop:th,rows=Math.min(height-row0-sy,ey-sy);
+  const col0=x*(tw-crop*2),sx=crop&&x>0?crop:0,ex=crop&&x<tx-1?tw-crop:tw,cols=Math.min(width-col0-sx,ex-sx);
+  for(let r=0;r<rows;r++)px.copy(rgba,((row0+sy+r)*width+col0+sx)*4,((sy+r)*tw+sx)*4,((sy+r)*tw+sx+cols)*4);}
+ return opaque?trimPadding({width,height,rgba}):{width,height,rgba};
+}
+/* an opaque picture laid on a tile grid larger than itself: drop the empty (alpha 0) right and bottom margins */
+function trimPadding(img){const {width,height,rgba}=img;let w=width,h=height;
+ const colEmpty=x=>{for(let y=0;y<h;y++)if(rgba[(y*width+x)*4+3])return false;return true;},rowEmpty=y=>{for(let x=0;x<w;x++)if(rgba[(y*width+x)*4+3])return false;return true;};
+ while(w>1&&colEmpty(w-1))w--;while(h>1&&rowEmpty(h-1))h--;if(w===width&&h===height)return img;
+ const out=Buffer.alloc(w*h*4);for(let y=0;y<h;y++)rgba.copy(out,y*w*4,y*width*4,(y*width+w)*4);return {width:w,height:h,rgba:out};}
+
+/* halve (2x2 box) until the picture fits a card back comfortably; keeps the IPC payload small */
+function fit(img,max=1600){while(img.width>max||img.height>max){const w=img.width>>1,h=img.height>>1,src=img.rgba,W=img.width,o=Buffer.alloc(w*h*4);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const a=((2*y)*W+2*x)*4,b=a+W*4;for(let c=0;c<4;c++)o[(y*w+x)*4+c]=(src[a+c]+src[a+4+c]+src[b+c]+src[b+4+c]+2)>>2;}
+  img={width:w,height:h,rgba:o};}return img;}
+/* ---- Siglus ----
+   The engine's LZSS (Scene.pck, mode.cgm, saves, g00): u32 packed size (with this 8-byte head), u32 size, then flag
+   bytes LSB first: 1 = literal, 0 = u16 back-reference (distance w>>4, length (w&15)+2). g00 type 0 pictures use it
+   with 3-byte BGR literals that become 4-byte pixels and distances/lengths counted in pixels (length (w&15)+1). */
+function siglusLz(src,p=0,rgb=false){
+ if(p+8>src.length)throw Error('LZ_HEAD');const ds=src.readUInt32LE(p+4),end=Math.min(src.length,p+src.readUInt32LE(p));if(ds>256<<20)throw Error('LZ_SIZE');
+ const o=Buffer.alloc(ds);let i=p+8,q=0;
+ while(q<ds&&i<end){let f=src[i++];for(let k=0;k<8&&q<ds&&i<end;k++,f>>=1){
+  if(f&1){if(rgb){o[q++]=src[i++];o[q++]=src[i++];o[q++]=src[i++];o[q++]=255;}else o[q++]=src[i++];}
+  else{const w=src.readUInt16LE(i);i+=2;const d=rgb?(w>>4)*4:w>>4,n=rgb?((w&15)+1)*4:(w&15)+2;if(!d||d>q)throw Error('LZ_DIST');for(let c=0;c<n&&q<ds;c++,q++)o[q]=o[q-d];}}}
+ return o;}
+const bgra=(src,at,dst,to,n)=>{for(let k=0;k<n;k++,at+=4,to+=4){dst[to]=src[at+2];dst[to+1]=src[at+1];dst[to+2]=src[at];dst[to+3]=src[at+3];}};
+/* g00: u8 type, u16 width, u16 height. 0: LZ of BGR pixels. 1: LZ of u16 colour count, BGRA palette, an index per pixel.
+   2: u32 region count, 24-byte regions (x1,y1,x2,y2,ox,oy), then LZ of: u32 count, {u32 offset,u32 size} per region;
+   each region block: u16 type, u16 chunk count, a 0x74-byte head; each chunk u16 x,y,?,w,h in a 0x5C-byte head, then
+   w*h BGRA. The first region is the picture. */
+function g00(buf){
+ if(buf.length<9)throw Error('G00_SHORT');const type=buf[0],W=buf.readUInt16LE(1),H=buf.readUInt16LE(3);if(!W||!H||W>8192||H>8192)throw Error('G00_SIZE');
+ if(type===0){const u=siglusLz(buf,5,true);if(u.length<W*H*4)throw Error('G00_DATA');const rgba=Buffer.alloc(W*H*4);bgra(u,0,rgba,0,W*H);return {width:W,height:H,rgba};}
+ if(type===1){const u=siglusLz(buf,5),n=u.readUInt16LE(0),px=2+n*4;if(px+W*H>u.length)throw Error('G00_DATA');const rgba=Buffer.alloc(W*H*4);
+  for(let i=0;i<W*H;i++){const c=2+u[px+i]*4;rgba[i*4]=u[c+2];rgba[i*4+1]=u[c+1];rgba[i*4+2]=u[c];rgba[i*4+3]=u[c+3];}return {width:W,height:H,rgba};}
+ if(type===2){const n=buf.readUInt32LE(5);if(!n||n>4096)throw Error('G00_REGIONS');const x1=buf.readInt32LE(9),y1=buf.readInt32LE(13),x2=buf.readInt32LE(17),y2=buf.readInt32LE(21);
+  const u=siglusLz(buf,9+n*24),off=u.readUInt32LE(4),size=u.readUInt32LE(8);if(!size||off+size>u.length)throw Error('G00_DATA');
+  const width=Math.min(W,x2-x1+1),height=Math.min(H,y2-y1+1),rgba=Buffer.alloc(width*height*4),cnt=u.readUInt16LE(off+2);let p=off+0x74;
+  for(let c=0;c<cnt&&p+0x5c<=off+size;c++){let x=u.readUInt16LE(p),y=u.readUInt16LE(p+2);const w=u.readUInt16LE(p+6),h=u.readUInt16LE(p+8);p+=0x5c;
+   if(x>=x1)x-=x1;if(y>=y1)y-=y1;for(let r=0;r<h;r++){const yy=y+r;if(yy>=height)break;const cols=Math.max(0,Math.min(w,width-x));bgra(u,p+r*w*4,rgba,(yy*width+x)*4,cols);}p+=w*h*4;}
+  return {width,height,rgba};}
+ throw Error('G00_TYPE_'+type);
+}
+
+/* ---- KiriKiri TLG (TLG5, TLG6, and the TLG0 "sds" wrapper), after the format of the KiriKiri 2 engine's own
+   decoder (W.Dee, modified BSD; also described by GARbro's ImageTLG.cs). Pixels come out BGRA, as the engine keeps them. */
+function tlgLzss(src,p,end,out,o,text,r){let flags=0;
+ while(p<end){flags>>>=1;if(!(flags&0x100))flags=src[p++]|0xff00;
+  if(flags&1){let pos=src[p]|((src[p+1]&15)<<8),len=(src[p+1]>>4)+3;p+=2;if(len===18)len+=src[p++];
+   while(len--){const c=text[pos];out[o++]=c;text[r]=c;r=(r+1)&0xfff;pos=(pos+1)&0xfff;}}
+  else{const c=src[p++];out[o++]=c;text[r]=c;r=(r+1)&0xfff;}}
+ return r;}
+function tlg5(b,p){
+ const colors=b[p],W=b.readUInt32LE(p+1),H=b.readUInt32LE(p+5),bh=b.readUInt32LE(p+9);if(colors!==3&&colors!==4)throw Error('TLG5_COLORS');
+ p+=13+4*Math.ceil(H/bh);const text=Buffer.alloc(4096);let r=0;const out=Buffer.alloc(W*H*4),chan=[...Array(colors)].map(()=>Buffer.alloc(W*bh+16));
+ for(let y0=0;y0<H;y0+=bh){const rows=Math.min(bh,H-y0);
+  for(let c=0;c<colors;c++){const mark=b[p],size=b.readUInt32LE(p+1);p+=5;if(mark===0)r=tlgLzss(b,p,p+size,chan[c],0,text,r);else b.copy(chan[c],0,p,p+size);p+=size;}
+  for(let y=0;y<rows;y++){const row=(y0+y)*W*4,up=row-W*4;let cb=0,cg=0,cr=0,ca=0;
+   for(let x=0;x<W;x++){const i=y*W+x;let B=chan[0][i],G=chan[1][i],R=chan[2][i];const A=colors===4?chan[3][i]:0;B=(B+G)&255;R=(R+G)&255;cb=(cb+B)&255;cg=(cg+G)&255;cr=(cr+R)&255;ca=(ca+A)&255;
+    const o=row+x*4;if(y0+y>0){out[o]=(out[up+x*4]+cb)&255;out[o+1]=(out[up+x*4+1]+cg)&255;out[o+2]=(out[up+x*4+2]+cr)&255;out[o+3]=colors===4?(out[up+x*4+3]+ca)&255:255;}
+    else{out[o]=cb;out[o+1]=cg;out[o+2]=cr;out[o+3]=colors===4?ca:255;}}}}
+ return {width:W,height:H,bgra:out};}
+const GOLOMB=(()=>{const c=[[3,7,15,27,63,108,223,448,130],[3,5,13,24,51,95,192,384,257],[2,5,12,21,39,86,155,320,384],[2,3,9,18,33,61,129,258,511]],t=[...Array(1024)].map(()=>new Uint8Array(4));
+ for(let n=0;n<4;n++){let a=0;for(let i=0;i<9;i++)for(let j=0;j<c[n][i];j++)t[a++][n]=i;}return t;})();
+function golomb(px,off,count,pool){/* px: Uint8Array of pixel bytes (4 per pixel); channel at off */
+ let n=3,a=0,bp=0,bit=1;const fetch=()=>(pool[bp]|(pool[bp+1]<<8)|(pool[bp+2]<<16)|(pool[bp+3]<<24))>>>0;
+ const tz=t=>{if(!t)return 0;let k=1;while(!(t&1)){t>>>=1;k++;}return k;};/* lowest set bit position, 1-based */
+ let zero=(pool[0]&1)?0:1,i=off;const limit=off+count*4;
+ while(i<limit){
+  let t=fetch()>>>bit,b=tz(t&0xfff),bc=b;
+  while(!b){bc+=12;bit+=12;bp+=bit>>3;bit&=7;t=fetch()>>>bit;b=tz(t&0xfff);bc+=b;}
+  bit+=b;bp+=bit>>3;bit&=7;bc--;let run=1<<bc;run+=(fetch()>>>bit)&(run-1);bit+=bc;bp+=bit>>3;bit&=7;
+  if(zero){do{px[i]=0;i+=4;}while(--run&&i<limit);zero=0;}
+  else{do{const k=GOLOMB[a][n];let t2=fetch()>>>bit,bb,cnt;
+    if(t2){bb=tz(t2&0xfff);cnt=bb;while(!bb){cnt+=12;bit+=12;bp+=bit>>3;bit&=7;t2=fetch()>>>bit;bb=tz(t2&0xfff);cnt+=bb;}cnt--;}
+    else{bp+=5;cnt=pool[bp-1];bit=0;t2=fetch();bb=0;}
+    let v=(cnt<<k)+((t2>>>bb)&((1<<k)-1));const sign=(v&1)-1;v>>=1;a+=v;px[i]=((v^sign)+sign+1)&255;i+=4;
+    bit+=bb+k;bp+=bit>>3;bit&=7;if(--n<0){a>>=1;n=3;}}while(--run&&i<limit);zero=1;}}}
+const med=(a,b,c)=>{const mx=a>b?a:b,mn=a>b?b:a;return c>=mx?mn:c<=mn?mx:a+b-c;};
+function tlg6(b,p){
+ const colors=b[p];if(colors!==1&&colors!==3&&colors!==4)throw Error('TLG6_COLORS');const W=b.readUInt32LE(p+4),H=b.readUInt32LE(p+8);p+=16;
+ const xb=Math.ceil(W/8),yb=Math.ceil(H/8),main=W>>3,frac=W-main*8;
+ const ftLen=b.readUInt32LE(p);p+=4;const text=Buffer.alloc(4096);{let q=0;for(let i=0;i<32;i++)for(let j=0;j<16;j++){for(let k=0;k<4;k++)text[q++]=i;for(let k=0;k<4;k++)text[q++]=j;}}
+ const ft=Buffer.alloc(xb*yb+64);tlgLzss(b,p,p+ftLen,ft,0,text,0);p+=ftLen;
+ const out=Buffer.alloc(W*H*4),px=new Uint8Array(W*8*4),zeroLine=new Uint8Array(W*4);const initA=colors===3?255:0;
+ for(let y=0;y<H;y+=8){const ylim=Math.min(y+8,H),pc=(ylim-y)*W;px.fill(0);
+  for(let c=0;c<colors;c++){let bl=b.readUInt32LE(p);p+=4;const method=(bl>>>30)&3;bl&=0x3fffffff;const len=(bl+7)>>3;if(method!==0)throw Error('TLG6_METHOD');
+   const pool=new Uint8Array(len+16);pool.set(b.subarray(p,p+len));p+=len;golomb(px,c,pc,pool);}
+  if(colors===1)for(let i=0;i<pc;i++){px[i*4+1]=px[i*4];px[i*4+2]=px[i*4];}
+  const fb=(y>>3)*xb,skip=(ylim-y)*8;
+  for(let yy=y;yy<ylim;yy++){const cur=yy*W*4,prev=yy?cur-W*4:-1,dir=(yy&1)^1,odd=(ylim-yy-1)-(yy-y);
+   const line=(start,limit,inStart)=>{let pB,pG,pR,pA,uB,uG,uR,uA;
+    if(start){const q=cur+(start*8-1)*4,u=prev<0?-1:prev+(start*8-1)*4;pB=out[q];pG=out[q+1];pR=out[q+2];pA=out[q+3];if(u<0){uB=uG=uR=uA=0;}else{uB=out[u];uG=out[u+1];uR=out[u+2];uA=out[u+3];}}
+    else{pB=pG=pR=0;pA=initA;uB=uG=uR=0;uA=initA;}
+    let inp=inStart+skip*start;const step=dir&1?1:-1;
+    for(let i=start;i<limit;i++){let w=Math.min(8,W-i*8);const ww=w;if(step===-1)inp+=ww-1;if(i&1)inp+=odd*ww;const f=ft[fb+i],tr=f>>1,avg=f&1;let x=i*8;
+     while(w--){const q=inp*4;let IB=px[q],IG=px[q+1],IR=px[q+2];const IA=px[q+3];let B,G,R;
+      switch(tr){case 0:B=IB;G=IG;R=IR;break;case 1:B=IB+IG;G=IG;R=IR+IG;break;case 2:B=IB;G=IG+IB;R=IR+IB+IG;break;case 3:B=IB+IR+IG;G=IG+IR;R=IR;break;
+       case 4:B=IB+IR;G=IG+IB+IR;R=IR+IB+IR+IG;break;case 5:B=IB+IR;G=IG+IB+IR;R=IR;break;case 6:B=IB+IG;G=IG;R=IR;break;case 7:B=IB;G=IG+IB;R=IR;break;
+       case 8:B=IB;G=IG;R=IR+IG;break;case 9:B=IB+IG+IR+IB;G=IG+IR+IB;R=IR+IB;break;case 10:B=IB+IR;G=IG+IR;R=IR;break;case 11:B=IB;G=IG+IB;R=IR+IB;break;
+       case 12:B=IB;G=IG+IR+IB;R=IR+IB;break;case 13:B=IB+IG;G=IG+IR+IB+IG;R=IR+IB+IG;break;case 14:B=IB+IG+IR;G=IG+IR;R=IR+IB+IG+IR;break;default:B=IB;G=IG+(IB<<1);R=IR+(IB<<1);}
+      const o=cur+x*4;let qB,qG,qR,qA;if(prev<0){qB=qG=qR=qA=0;}else{const u=prev+x*4;qB=out[u];qG=out[u+1];qR=out[u+2];qA=out[u+3];}
+      if(avg){pB=(((pB+qB+1)>>1)+B)&255;pG=(((pG+qG+1)>>1)+G)&255;pR=(((pR+qR+1)>>1)+R)&255;pA=(((pA+qA+1)>>1)+IA)&255;}
+      else{pB=(med(pB,qB,uB)+B)&255;pG=(med(pG,qG,uG)+G)&255;pR=(med(pR,qR,uR)+R)&255;pA=(med(pA,qA,uA)+IA)&255;}
+      uB=qB;uG=qG;uR=qR;uA=qA;out[o]=pB;out[o+1]=pG;out[o+2]=pR;out[o+3]=pA;x++;inp+=step;}
+     inp+=step===1?skip-ww:skip+1;if(i&1)inp-=odd*ww;}};
+   if(main)line(0,main,Math.min(W,8)*(yy-y));
+   if(main!==xb)line(main,xb,Math.min(frac,8)*(yy-y));}}
+ return {width:W,height:H,bgra:out};}
+function tlg(buf){let p=0;
+ if(buf.toString('latin1',0,11)==='TLG0.0\0sds\x1a')p=15;
+ const m=buf.toString('latin1',p,p+11);let r;
+ if(m==='TLG5.0\0raw\x1a')r=tlg5(buf,p+11);else if(m==='TLG6.0\0raw\x1a')r=tlg6(buf,p+11);else throw Error('TLG_MAGIC');
+ const rgba=r.bgra;for(let i=0;i<rgba.length;i+=4){const t=rgba[i];rgba[i]=rgba[i+2];rgba[i+2]=t;}return {width:r.width,height:r.height,rgba};}
+
+module.exports={png,fit,crc32,mzx,mrg,mzp,siglusLz,g00,tlg};
