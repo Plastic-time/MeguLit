@@ -46,12 +46,12 @@ const bgi=require('./original-engines/bgi.cjs');
 const ADAPTERS={
  system4:{marker:base=>base+'.ain',locate:(dir,base)=>{const file=ainOf(dir,base);return file?{engine:'system4',target:file}:null;},read:target=>readAin(target),fingerprint:target=>sha256(target)},
  bgi:{folder:true,marker:()=>'data01000.arc',locate:dir=>{try{const arcs=fs.readdirSync(dir).filter(f=>/^data0\d{4}\.arc$/i.test(f));if(!arcs.length)return null;const head=Buffer.alloc(12),fd=fs.openSync(path.join(dir,arcs[0]),'r');try{fs.readSync(fd,head,0,12,0);}finally{fs.closeSync(fd);}return ['BURIKO ARC20','PackFile    '].includes(head.toString('latin1'))?{engine:'bgi',target:dir}:null;}catch{return null;}},
-  read:dir=>{const scenes=bgi.scan(dir),lines=scenes.flatMap(x=>x.lines),ruby=scenes.some(x=>x.ruby?.some(Boolean))?scenes.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;return {engine:'bgi',version:0,codepage:'shift_jis',lines,ruby,structure:{messages:lines.length,functions:scenes.length,functionHash:crypto.createHash('sha256').update(scenes.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
+  read:dir=>{const scenes=bgi.scan(dir),lines=scenes.flatMap(x=>x.lines),ruby=scenes.some(x=>x.ruby?.some(Boolean))?scenes.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;return {engine:'bgi',version:0,codepage:'shift_jis',lines,ruby,sizes:scenes.map(x=>x.lines.length),structure:{messages:lines.length,functions:scenes.length,functionHash:crypto.createHash('sha256').update(scenes.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
   fingerprint:dir=>crypto.createHash('sha256').update('bgi-code-order\n'+fs.readdirSync(dir).filter(f=>/^data0\d{4}\.arc$/i.test(f)).sort().map(f=>{const st=fs.statSync(path.join(dir,f));return f+'|'+st.size+'|'+st.mtimeMs;}).join('\n')).digest('hex')}};
 // E280: engines read as scene files (KiriKiri, Artemis, Ren'Py); their script is the game folder like BGI's.
 const scenes=require('./original-engines/scenes.cjs'),fillLines=require('./original-engines/fill.cjs');
 for(const id of Object.keys(scenes.ENGINES))ADAPTERS[id]={folder:true,scene:true,locate:dir=>scenes.readable(id,dir)?{engine:id,target:dir}:null,
- read:dir=>{const list=scenes.read(id,dir),lines=list.flatMap(x=>x.lines),ruby=list.some(x=>x.ruby)?list.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;return {engine:id,version:0,codepage:'text',lines,ruby,structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
+ read:dir=>{const list=scenes.read(id,dir),lines=list.flatMap(x=>x.lines),ruby=list.some(x=>x.ruby)?list.flatMap(x=>x.ruby||x.lines.map(()=>null)):undefined;return {engine:id,version:0,codepage:'text',lines,ruby,sizes:list.map(x=>x.lines.length),structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};},
  fingerprint:dir=>scenes.fingerprint(id,dir)};
 const runningDirOf=runtime=>ADAPTERS[runtime.engine||'system4']?.folder?runtime.file:path.dirname(runtime.file);
 function locate(dir,base){for(const adapter of Object.values(ADAPTERS)){const found=adapter.locate(dir,base);if(found)return found;}return null;}
@@ -65,7 +65,7 @@ function scanRunning(root,id,executable){
  const ain=readScript(loc),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length,nonEmpty=ain.lines.filter(prose).length,zhOnly=chineseOnly(ain.lines);
  // An English (or other) original read by a scene engine is neither the Japanese game nor a Chinese build: nothing to do.
  if(ADAPTERS[loc.engine].scene&&!zhOnly){const chinese=ain.lines.filter(t=>prose(t)&&!japaneseLine(t)&&/[一-鿿]{2}/.test(t)).length;if(!nonEmpty||japanese<nonEmpty*.5&&chinese<nonEmpty*.3)return writeState(root,id,{status:'unsupported',error:'SCRIPT_NOT_JAPANESE',runtime:null,gameDir:dir});}
- const index=writeIndex(root,id,'runtime-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'runtime',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash},structure:ain.structure,lines:ain.lines,...(ain.ruby?{ruby:ain.ruby}:{})});
+ const index=writeIndex(root,id,'runtime-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'runtime',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash},structure:ain.structure,lines:ain.lines,...(ain.ruby?{ruby:ain.ruby}:{}),...(ain.sizes?{sizes:ain.sizes}:{})});
  const original=current?.original;const runtime={file,engine:loc.engine,sha256:hash,index,codepage:ain.codepage,version:ain.version,structure:ain.structure,lines:nonEmpty,japaneseLines:japanese};
  // A changed game build invalidates the earlier alignment; the original index itself stays.
  return writeState(root,id,{engine:loc.engine,runtime,status:zhOnly&&!original?.index?'chinese-only':!zhOnly&&japanese>=nonEmpty*.5?'native-japanese':original?.index&&current?.runtime?.sha256===hash?current.status:original?.index?'needs-recheck':'awaiting-original'});
@@ -83,6 +83,16 @@ function align(runtime,original){
 function realign(loc,ain,runtime,runningDir){if(loc.engine!=='bgi'||align(runtime,ain).sameStructure)return ain;
  const run=bgi.scan(runningDir),own=bgi.scan(loc.target),lines=bgi.alignLines(run,own),ruby=bgi.alignLines(run,own,'ruby');
  return lines.length===runtime.lines.length?{...ain,lines,ruby:ruby.some(Boolean)?ruby:undefined,structure:runtime.structure}:ain;}
+/* E496 (user, 2026-11-12: translated games must pair 100%, always say total/paired/unpaired and why): the structure check
+   above proves the layout; align-sample.cjs samples ~100 translated lines over the whole script and checks that each
+   Chinese line says what its Japanese line says and that the timeline holds. A failing sample is lined up again scene by
+   scene and sampled again; only a passing pairing is reliable. zh/ja are the two line lists, into says which list's order
+   the realigned lines follow ('zh': Japanese lines for the Chinese build, 'ja': Chinese lines for the Japanese build). */
+const sampler=require('./align-sample.cjs');
+function pairCheck(zh,ja,{into='zh',zhSizes,jaSizes,ruby,structureOk=true}={}){
+ const v=sampler.verify(zh,ja,{into,zhSizes,jaSizes,ruby,force:!structureOk});
+ return {verdict:v,report:sampler.report(v)};
+}
 function importOriginal(root,db,id,dir){
  const row=gameRow(db,id);if(typeof dir!=='string'||!path.isAbsolute(dir)||!fs.statSync(dir,{throwIfNoEntry:false})?.isDirectory())throw Error('INVALID_ORIGINAL_DIRECTORY');
  if(path.resolve(dir).toLowerCase()===path.dirname(row.executable).toLowerCase())throw Error('ORIGINAL_IS_RUNNING_COPY');
@@ -91,10 +101,13 @@ function importOriginal(root,db,id,dir){
   const state=scanRunning(root,id,row.executable);if(!state.runtime)throw Error(state.error||'NO_SUPPORTED_SCRIPT');
   const loc=locate(dir,path.parse(state.runtime.file).name);if(!loc||loc.engine!==(state.runtime.engine||'system4'))throw Error('ORIGINAL_SCRIPT_NOT_FOUND');const file=loc.target;
   const hash=fingerprint(loc);if(hash===state.runtime.sha256)throw Error('ORIGINAL_SAME_AS_RUNNING');
-  const runtime=readIndex(state.runtime.index),ain=realign(loc,readScript(loc),runtime,runningDirOf(state.runtime)),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length;
+  const runtime=readIndex(state.runtime.index);let ain=realign(loc,readScript(loc),runtime,runningDirOf(state.runtime));const japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length;
   // Never accept a translated file as the original: most of its lines must be Japanese.
   if(japanese<ain.lines.filter(prose).length*.5)throw Error('ORIGINAL_NOT_JAPANESE');
-  const alignment=align(runtime,{...ain,structure:ain.structure});
+  let alignment=align(runtime,{...ain,structure:ain.structure});
+  const pc=pairCheck(runtime.lines,ain.lines,{zhSizes:runtime.sizes,jaSizes:ain.sizes,ruby:ain.ruby,structureOk:alignment.sameStructure});
+  if(pc.verdict.lines){ain={...ain,lines:pc.verdict.lines,ruby:pc.verdict.ruby?.some(Boolean)?pc.verdict.ruby:undefined,structure:runtime.structure,sizes:runtime.sizes};alignment=align(runtime,ain);}
+  alignment={...alignment,reliable:alignment.reliable&&pc.verdict.ok,pairing:pc.report};
   const index=writeIndex(root,id,'original-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'original',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash,dir},structure:ain.structure,lines:ain.lines,...(Array.isArray(ain.ruby)?{ruby:ain.ruby}:{})});
   const exe=fs.readdirSync(dir).find(f=>/\.exe$/i.test(f)&&path.parse(f).name.toLowerCase()===path.parse(row.executable).name.toLowerCase());
   return writeState(root,id,{original:{dir,file,sha256:hash,index,codepage:ain.codepage,lines:ain.lines.length,executable:exe?path.join(dir,exe):''},alignment,status:alignment.reliable?'ready':'unreliable',mode:readState(root)[id]?.mode||(alignment.reliable?'original':'off'),error:''});
@@ -168,7 +181,7 @@ function buildPatch(runningState,source){
    return {...scene,lines:scene.lines.map((t,k)=>japaneseLine(t)?own.lines[k]:t)};});
   const lines=scenes.flatMap(x=>x.lines);patched=scenes.filter(x=>x.patched).length;if(!patched)throw Error('PATCH_SCRIPT_NOT_FOUND');
   translated=scenes.filter(x=>x.patched).flatMap(x=>x.lines);
-  script={engine:'bgi',version:0,codepage:'mixed',lines,structure:{messages:lines.length,functions:scenes.length,functionHash:crypto.createHash('sha256').update(scenes.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};
+  script={engine:'bgi',version:0,codepage:'mixed',lines,sizes:scenes.map(x=>x.lines.length),structure:{messages:lines.length,functions:scenes.length,functionHash:crypto.createHash('sha256').update(scenes.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};
  }else if(scenes.ENGINES[engine]){
   const eng=scenes.ENGINES[engine],base=scenes.read(engine,runningDir);let list;
   if(eng.patchLines)list=eng.patchLines(base,found);
@@ -188,7 +201,7 @@ function buildPatch(runningState,source){
   list=list.map((scene,i)=>scene.patched?{...scene,lines:scene.lines.map((t,k)=>japaneseLine(t)?base[i].lines[k]:t)}:scene);
   const lines=list.flatMap(x=>x.lines);patched=list.filter(x=>x.patched).length;if(!patched)throw Error('PATCH_SCRIPT_NOT_FOUND');
   translated=list.filter(x=>x.patched).flatMap(x=>x.lines);
-  script={engine,version:0,codepage:'text',lines,structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};
+  script={engine,version:0,codepage:'text',lines,sizes:list.map(x=>x.lines.length),structure:{messages:lines.length,functions:list.length,functionHash:crypto.createHash('sha256').update(list.map(x=>x.name+':'+x.lines.length).join('\n')).digest('hex').slice(0,16)}};
  }else throw Error('NO_SUPPORTED_SCRIPT');
  // Remapped-font ports: decode with the fonts the patch ships, or the ones it put next to the game.
  const fonts=[...found.fonts];if(!fonts.length){try{for(const f of fs.readdirSync(runningDir))if(FONT.test(f))fonts.push(fs.readFileSync(path.join(runningDir,f)));}catch{}}
@@ -208,9 +221,13 @@ function importPatch(root,db,id,source,{auto=false,executable}={}){
  let built;try{built=buildPatch(state,source);}catch(error){
   // Nothing besides the game itself in its own folder: say that the game's folder was picked.
   if(error.message==='PATCH_SCRIPT_NOT_FOUND'&&fs.statSync(source).isDirectory()&&sameDir(source,path.dirname(row.executable)))throw Error('PATCH_IS_RUNNING_COPY');throw error;}
- const {script,patched,sources}=built,runtime=readIndex(state.runtime.index);
+ let {script}=built;const {patched,sources}=built,runtime=readIndex(state.runtime.index);
  // Lines the patch left in Japanese must equal the running script at the same index (same measure as the original import).
- const alignment=align({...script,structure:script.structure},runtime),hash=patchFingerprint(source),isDir=fs.statSync(source).isDirectory();
+ let alignment=align({...script,structure:script.structure},runtime);
+ const pc=pairCheck(script.lines,runtime.lines,{into:'ja',zhSizes:script.sizes,jaSizes:runtime.sizes,structureOk:alignment.sameStructure});
+ if(pc.verdict.lines){script={...script,lines:pc.verdict.lines};alignment=align({...script,structure:script.structure},runtime);}
+ alignment={...alignment,reliable:alignment.reliable&&pc.verdict.ok,pairing:pc.report};
+ const hash=patchFingerprint(source),isDir=fs.statSync(source).isDirectory();
  const index=writeIndex(root,id,'patch-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'patch',engine:script.engine,version:script.version,codepage:script.codepage,source:{file:source,sha256:hash,sources},structure:script.structure,lines:script.lines});
  return writeState(root,id,{patch:{dir:isDir?source:path.dirname(source),source,file:source,sha256:hash,index,lines:script.lines.length,scenes:patched,fontMapped:!!script.fontMapped,auto,runtimeSha:state.runtime.sha256,version:PATCH_VERSION},patchAlignment:alignment,patchStatus:alignment.reliable?'ready':'unreliable',patchSearch:{...state.patchSearch,running:false,declined:false},error:''});
 }
@@ -348,11 +365,14 @@ function pruneIndexes(root,id){const s=readState(root)[id],keep=new Set([s?.runt
 // The Japanese script the engine lines up with the running (translated) one, kept as the original: the same import as a
 // picked Japanese copy (importOriginal), from what the engine read. Original mode is chosen unless it was turned off.
 function adoptOriginal(root,id,state,dir){
- const eng=scenes.ENGINES[state.runtime.engine],runtime=readIndex(state.runtime.index),lines=eng.originalLines(dir);
+ const eng=scenes.ENGINES[state.runtime.engine],runtime=readIndex(state.runtime.index);let lines=eng.originalLines(dir);
  if(!Array.isArray(lines)||lines.length!==runtime.lines.length||!lines.some(t=>t&&japaneseLine(t)))return state;
  const hash=crypto.createHash('sha256').update('original\n'+state.runtime.sha256).digest('hex');
  if(state.original?.sha256===hash&&state.original.index&&fs.existsSync(state.original.index)&&state.status==='ready')return state;
- const alignment=align(runtime,{lines,structure:runtime.structure});
+ let alignment=align(runtime,{lines,structure:runtime.structure});
+ const pc=pairCheck(runtime.lines,lines,{zhSizes:runtime.sizes,jaSizes:runtime.sizes});
+ if(pc.verdict.lines){lines=pc.verdict.lines;alignment=align(runtime,{lines,structure:runtime.structure});}
+ alignment={...alignment,reliable:alignment.reliable&&pc.verdict.ok,pairing:pc.report};
  const index=writeIndex(root,id,'original-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'original',engine:runtime.engine,version:0,codepage:'text',source:{file:dir,sha256:hash,dir},structure:runtime.structure,lines});
  return writeState(root,id,{original:{dir,file:dir,sha256:hash,index,codepage:'text',lines:lines.length,executable:'',auto:true},alignment,status:alignment.reliable?'ready':'unreliable',mode:state.mode||(alignment.reliable?'original':'off'),error:''});
 }
