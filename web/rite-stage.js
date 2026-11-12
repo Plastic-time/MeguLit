@@ -21,6 +21,7 @@
    - dark: an eclipse, smoke wisps seeping and circling, violet shards drawn in, a slow dark mist, a light-eating pulse.
    Reduced motion draws a still frame. Presentation only. */
 import {glyphFor,paintGlyph} from './element-forms.js';
+import {cornerArt,cornerBlend} from './element-corners.js';
 const calm=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TAU=Math.PI*2,R=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)];
 const CAP=260;
@@ -145,7 +146,7 @@ function snowFlake(size,blur,v){const key=Math.round(size*2)+'|'+Math.round(blur
  FLAKE.set(key,cv);return cv;}
 /* frost ferns growing in from the corners and edges, drawn once per stage size */
 const FROST=new Map();
-function frostField(W,H){const key=W+'x'+H;if(FROST.has(key))return FROST.get(key);const cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');c.lineCap='round';c.shadowColor='#bfeaff';c.shadowBlur=4;
+export function frostField(W,H){const key=W+'x'+H;if(FROST.has(key))return FROST.get(key);const cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');c.lineCap='round';c.shadowColor='#bfeaff';c.shadowBlur=4;
  let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
  const fern=(x,y,a,len,w,depth)=>{if(depth>4||len<3)return;const steps=Math.max(3,Math.round(len/7));let px=x,py=y,aa=a;for(let i=1;i<=steps;i++){aa+=(rnd()-.5)*.18;const nx=px+Math.cos(aa)*len/steps,ny=py+Math.sin(aa)*len/steps;c.strokeStyle=`rgba(225,245,255,${.55-depth*.08})`;c.lineWidth=Math.max(.5,w*(1-i/steps*.6));c.beginPath();c.moveTo(px,py);c.lineTo(nx,ny);c.stroke();
    if(rnd()<.55){const side=rnd()<.5?1:-1;fern(nx,ny,aa+side*(.9+rnd()*.3),len*(.32+rnd()*.18)*(1-i/steps*.5),w*.6,depth+1);}px=nx;py=ny;}};
@@ -234,7 +235,9 @@ function edgeOwn(el,W,H,c,rnd){const M=Math.min(W,H),corners=[[0,0,.78],[W,0,2.3
 }
 /* edge patterns, one per element, drawn once per size */
 const EDGE=new Map();
-function edgeField(el,W,H){if(el==='ice')return frostField(W,H);const key=el+W+'x'+H;if(EDGE.has(key))return EDGE.get(key);
+function edgeField(el,W,H){if(el==='ice')return frostField(W,H);return cornerArt(el,W,H);
+}
+function edgeFieldOld(el,W,H){const key=el+W+'x'+H;if(EDGE.has(key))return EDGE.get(key);
  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');c.lineCap='round';c.lineJoin='round';
  let seed=11;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
  if(el!=='earth'){edgeOwn(el,W,H,c,rnd);EDGE.set(key,cv);return cv;}
@@ -289,14 +292,17 @@ function weatherScene(el){const X=WX[el];return {
    const a=el==='thunder'?.05+(s.lit||0)*.3:.08;g.addColorStop(0,`rgba(${el==='dark'?'40,14,70':X.col},${el==='dark'?.18:a})`);g.addColorStop(1,`rgba(${X.col},0)`);c.fillStyle=g;c.fillRect(0,0,W,H);}
   if(el==='thunder'){s.lit=Math.max(0,(s.lit||0)-dt*3);if(Math.random()<dt*.5)s.lit=R(.4,1);if(Math.random()<dt*.06*(1+cast*10)){const x=s.cx+R(-.4,.4)*W0;s.add({type:'arc',pts:bolt(x,s.cy-H0*.55,x+R(-60,60),s.cy+R(-.1,.3)*H0,12,30),life:.22,r:2});s.lit=1;s.flash=Math.max(s.flash,.15);}}
   if(el==='water'){c.save();c.globalCompositeOperation='lighter';c.strokeStyle='rgba(170,220,255,.08)';c.lineWidth=2;for(let k=0;k<6;k++){c.beginPath();for(let x=0;x<=W0;x+=10){const y=s.cy-H0*.4+k*H0*.14+Math.sin(x*.02+t*1.4+k)*8;c[x?'lineTo':'moveTo'](s.cx-W0/2+x,y);}c.stroke();}c.restore();}
+  /* (user: light's halo is on the whole card, not the corners) a broad soft bloom over the card face, breathing */
+  if(el==='light'){const R0=Math.max(W0,H0)*.8,g=c.createRadialGradient(s.cx,s.cy-H0*.05,0,s.cx,s.cy,R0);const a=.16+.05*Math.sin(t*.9)+cast*.12;g.addColorStop(0,`rgba(255,244,214,${a})`);g.addColorStop(.45,`rgba(255,226,170,${a*.45})`);g.addColorStop(1,'rgba(255,226,170,0)');c.save();c.globalCompositeOperation='lighter';c.fillStyle=g;c.fillRect(s.cx-W0,s.cy-H0,W0*2,H0*2);c.restore();}
   floor(el,s,c,W0,H0,t);
   /* (user: the three arcs go) only a soft halo of the element's light behind the glyph; the weather itself swirls round it */
   const vr=Math.min(W0,H0)*.26;{const g=c.createRadialGradient(s.cx,s.cy,0,s.cx,s.cy,vr*1.25);g.addColorStop(0,`rgba(${X.col},${.14+cast*.2})`);g.addColorStop(1,`rgba(${X.col},0)`);c.save();c.globalCompositeOperation='lighter';c.fillStyle=g;c.fillRect(s.cx-vr*1.3,s.cy-vr*1.3,vr*2.6,vr*2.6);c.restore();}
   /* the edge pattern, breathing; in the cast it bursts across everything, then breaks */
   let reach=(el==='ice'?.2:el==='earth'?.3:.4)+.06*Math.sin(t*.55);if(fz!=null)reach=fz<.25?.3+(fz/.25)*.8:fz<.6?1.1:Math.max(0,1.1-(fz-.6)*2.2);
-  if(reach>.01){const f=edgeField(el,Math.round(W),Math.round(H)),tmp=frostTmp(f.width,f.height),tc=tmp.getContext('2d');tc.clearRect(0,0,tmp.width,tmp.height);tc.globalCompositeOperation='source-over';tc.drawImage(f,0,0);tc.globalCompositeOperation='destination-in';
+  const f0=reach>.01?edgeField(el,Math.round(W),Math.round(H)):null;
+  if(f0){const f=f0,tmp=frostTmp(f.width,f.height),tc=tmp.getContext('2d');tc.clearRect(0,0,tmp.width,tmp.height);tc.globalCompositeOperation='source-over';tc.drawImage(f,0,0);tc.globalCompositeOperation='destination-in';
    const cx=s.cx,cy=s.cy,dia=Math.hypot(Math.max(cx,W-cx),Math.max(cy,H-cy)),r1=Math.max(0,dia*(1-reach)),g=tc.createRadialGradient(cx,cy,Math.max(0,r1-dia*.18),cx,cy,r1+dia*.02);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'#000');tc.fillStyle=g;tc.fillRect(0,0,tmp.width,tmp.height);
-   c.save();c.globalCompositeOperation=el==='ice'||el==='thunder'||el==='light'||el==='wind'?'lighter':'source-over';c.globalAlpha*=fz!=null&&fz>.6?Math.max(0,1-(fz-.6)/.5):.85;c.drawImage(tmp,0,0);c.restore();}
+   c.save();c.globalCompositeOperation=el==='ice'?'lighter':cornerBlend(el);c.globalAlpha*=fz!=null&&fz>.6?Math.max(0,1-(fz-.6)/.5):.85;c.drawImage(tmp,0,0);c.restore();}
   if(fz!=null){s.freezeT+=dt;if(fz<.25)s.flash=Math.max(s.flash,.35*(1-fz/.25));
    if(fz>=.6&&!s.broke){s.broke=1;for(const p of s.ps)if(p.type==='wx'&&!p.free){const dx=p.x-s.cx,dy=p.y-s.cy,d=Math.hypot(dx,dy)||1;p.vx=dx/d*R(160,420);p.vy=dy/d*R(160,420);p.blown=1;p.drag=1.2;p.life=p.t+R(.8,1.4);}
     if(el==='thunder')strike(s,W,H);
