@@ -343,7 +343,7 @@ export function fieldify(grid,filtered=false){
  function paint(){
   constrain();
   const {x,y,z}=state,cx=width/2,cy=podY;
-  {const zoom=z>1.05?'large':z<.85?'tiny':'small';if(host.dataset.zoom!==zoom)host.dataset.zoom=zoom;}
+  /* 2026-11-13 (user: zooming the wall is very laggy): the zoom tier restyles every cover (captions, shadows, hover); while the wheel zoom is still gliding it waits, and changes once when the zoom settles */{const zoom=z>1.05?'large':z<.85?'tiny':'small';if(!zoomBusy&&host.dataset.zoom!==zoom)host.dataset.zoom=zoom;}
   /* 2026-11-12 (user: dragging the wall still lagged): every cover is placed on every frame, from transform and opacity
      only (each cover is its own compositor layer, so no paint). The old 90 ms plane-shift frames made the lens snap in
      steps, and the speed classes it toggled restyled every cover mid-drag; both are gone. */
@@ -385,7 +385,8 @@ export function fieldify(grid,filtered=false){
   }
   if(added)plane.append(added);
  }
- function frame(now){
+ /* 2026-11-13 (user: dragging is smooth now but wants a little motion blur): a directional blur along the movement, only when the wall moves fast, in half-pixel steps so the filter is not rebuilt every frame; none with reduced motion */let zoomBusy=false,blurKey='0 0';const blurNode=(()=>{let svg=document.getElementById('mg-wall-blur-svg');if(!svg){svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id='mg-wall-blur-svg';svg.setAttribute('width','0');svg.setAttribute('height','0');svg.setAttribute('aria-hidden','true');svg.style.cssText='position:absolute;width:0;height:0;pointer-events:none';svg.innerHTML='<filter id="mg-wall-blur" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0 0"/></filter>';document.body.append(svg);}return svg.querySelector('feGaussianBlur');})();const motionBlur=(sx,sy)=>{const step=v=>reduceMotion.matches?0:Math.min(6,Math.max(0,Math.round((Math.abs(v)-.35)*4)))/2;const key=step(sx)+' '+step(sy);if(key===blurKey)return;blurKey=key;blurNode?.setAttribute('stdDeviation',key);plane.style.filter=key==='0 0'?'':'url(#mg-wall-blur)';};
+  function frame(now){
   raf=0;
   if(coastEnd){
    const dt=Math.min(32,Math.max(0,now-coastAt)),decay=Math.exp(-dt/105);
@@ -404,10 +405,10 @@ export function fieldify(grid,filtered=false){
    state.z+=(zoomTarget-state.z)*(zoomAt?k:0);
    if(Math.abs(zoomTarget-state.z)<.0008)state.z=zoomTarget;else zooming=true;
   }
-  zoomAt=zooming?now:0;
-  paint();
+  zoomAt=zooming?now:0;zoomBusy=zooming;
+  paint();{const fast=drag?.active||coastEnd;motionBlur(fast?vx:0,fast?vy:0);}
   if(!coastEnd&&!drag?.active&&!zooming)moving(false);
-  if(coastEnd||zooming||(drag?.active&&Math.hypot(vx,vy)>.75))queue();
+  if(coastEnd||zooming||(drag?.active&&Math.hypot(vx,vy)>.75)||blurKey!=='0 0')queue();
  }
  const queue=()=>{if(!raf)raf=requestAnimationFrame(frame);};
  const measure=()=>{
