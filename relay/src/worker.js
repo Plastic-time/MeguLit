@@ -212,7 +212,7 @@ export async function diagnosticsDownload(url,env,ip,now=new Date()){
 
 /* ---- router ---------------------------------------------------------------------------------------------------- */
 const social={json,fail,readJSON,hit,sha256,authenticate,avatarsFor,signReview};
-export async function handle(request,env,now=new Date()){
+export async function handle(request,env,now=new Date(),ctx=null){
  const url=new URL(request.url),cors=corsHeaders(request,env),path=url.pathname.replace(/\/+$/,'')||'/';
  if(request.method==='OPTIONS')return new Response(null,{status:Object.keys(cors).length?204:403,headers:cors});
  const ip=await clientKey(request,env);
@@ -249,7 +249,7 @@ export async function handle(request,env,now=new Date()){
   else if(path==='/api/hotwords/daily'&&request.method==='GET')response=await hit(env,'daily',ip,now.getTime())?await hotWordsDailyGet(env,url,{json,fail},now):fail('RATE_LIMITED',429);
   else if(path==='/api/hotwords'&&request.method==='GET')response=await hit(env,'hot',ip,now.getTime())?await hotWordsGet(url,env):fail('RATE_LIMITED',429);
   else if(path==='/api/me'&&request.method==='DELETE'){const auth=await authenticate(request,env,now).catch(()=>null);response=await handleAccounts(request,env,now);if(auth&&response.ok)await removeSubjects(env,[await sha256('account:'+auth.account.id)]);}
-  else if(isAccountsPath(path))response=await handleAccounts(request,env,now)||fail('NOT_FOUND',404);
+  else if(isAccountsPath(path))response=await handleAccounts(request,env,now,ctx)||fail('NOT_FOUND',404);
   else if(path==='/api/adaptation')response=request.method==='POST'?await adaptationPost(request,env,ip,now):request.method==='GET'?await adaptationGet(url,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/adaptation/query')response=request.method==='POST'?await adaptationQuery(request,env,ip,now):fail('METHOD_NOT_ALLOWED',405);
   else if(path==='/api/feedback')response=request.method==='POST'?await feedbackPost(request,env,{readJSON,fail,json,hit},ip,now):fail('METHOD_NOT_ALLOWED',405);
@@ -267,4 +267,4 @@ export async function scheduled(event,env,ctx){
  if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0)]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
 /* a token rotated while answering any request goes back on that answer, whichever endpoint it was */
-export default {fetch:async(request,env)=>{const response=await handle(request,env);const token=ROTATED.get(request);if(!token||response.headers.get('x-megulit-token'))return response;const copy=new Response(response.body,response);copy.headers.set('x-megulit-token',token);return copy;},scheduled};
+export default {fetch:async(request,env,ctx)=>{const response=await handle(request,env,new Date(),ctx);const token=ROTATED.get(request);if(!token||response.headers.get('x-megulit-token'))return response;const copy=new Response(response.body,response);copy.headers.set('x-megulit-token',token);return copy;},scheduled};

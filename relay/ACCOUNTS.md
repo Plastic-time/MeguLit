@@ -41,9 +41,12 @@ app calls from Node with no Origin, so no CORS change is needed.
 
 | Method | Path | Body / query | Answer |
 |---|---|---|---|
-| POST | `/api/auth/code` | `{email}` | `{ok,expiresIn:600}`; 429 `RATE_LIMITED` (1/min and 5/h per email, 20/h per IP) |
+| POST | `/api/auth/code` | `{email}` | `{ok,expiresIn:600}`; 429 `RATE_LIMITED` (1/min and 5/h per email, 20/h per IP); `502 EMAIL_SEND_FAILED`. Waits for Resend at most 1.5 s (`SEND_WAIT`, `MAIL_WAIT_MS`), then answers `{ok,expiresIn,sending:true}` and finishes in `ctx.waitUntil`; a late failure deletes the code, so verify says `NO_CODE` |
+| POST | `/api/auth/password` | `{login,password,device}` | login = e-mail or user name; same answer as verify; `WRONG_PASSWORD` for every failure, 429 `RATE_LIMITED` |
+| POST | `/api/me/username` | `{username}` | once only: `USERNAME_INVALID`, `USERNAME_TAKEN`, `USERNAME_LOCKED` |
+| POST | `/api/me/password` | `{password,current?}` | 8–128; `current` needed unless the session is <10 min old: `WRONG_PASSWORD`, `PASSWORD_LENGTH`, `PASSWORD_WEAK` |
 | POST | `/api/auth/verify` | `{email,code,device}` | `{token,accountId,email,sessionId,expiresAt}`; `WRONG_CODE` (+`triesLeft`), `CODE_EXPIRED`, `TOO_MANY_TRIES`, `NO_CODE` |
-| GET | `/api/me` | Bearer | `{accountId,email,createdAt,sessionId,devices[],usage,limits}` |
+| GET | `/api/me` | Bearer | `{accountId,email,createdAt,sessionId,username,hasPassword,devices[],usage,limits}` |
 | POST | `/api/auth/logout` | `{sessionId?}` | revokes this device, or another device of the same account |
 | DELETE | `/api/me` | Bearer | deletes the account, all sessions, all synced records |
 | GET | `/api/sync/:kind` | `?since=<seq>&limit=` | `{records:[{key,updated_at,deleted,data}],cursor,more}` |

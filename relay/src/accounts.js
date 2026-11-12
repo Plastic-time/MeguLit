@@ -178,7 +178,8 @@ export async function authenticate(request, env, now = new Date()) {
 const withToken = (response, auth) => { if (auth?.token) response.headers.set('x-megulit-token', auth.token); return response; };
 
 /* ---- endpoints --------------------------------------------------------------------------------------------- */
-async function requestCode(request, env, ip, now) {
+export const SEND_WAIT = 1500;
+async function requestCode(request, env, ip, now, ctx) {
   const body = await readJSON(request, 2048); if (body.error) return bodyError(body.error);
   const email = normalizeEmail(body.value.email); if (!email) return fail('EMAIL_INVALID');
   if (!env.RESEND_API_KEY) return fail('EMAIL_NOT_CONFIGURED', 503);
@@ -189,7 +190,18 @@ async function requestCode(request, env, ip, now) {
   const code = generateCode(), t = seconds(now);
   await env.DB.prepare('INSERT INTO auth_codes(email_hash,code_hash,expires_at,tries,created_at) VALUES(?,?,?,0,?) ON CONFLICT(email_hash) DO UPDATE SET code_hash=excluded.code_hash,expires_at=excluded.expires_at,tries=0,created_at=excluded.created_at')
     .bind(key, await hashCode(pepper(env), email, code), t + CODE_TTL, t).run();
-  if (!await sendCode(env, email, code)) { await env.DB.prepare('DELETE FROM auth_codes WHERE email_hash=?').bind(key).run(); return fail('EMAIL_SEND_FAILED', 502); }
+  /* 2026-11-12 (user: the code mail is slow): wait for Resend at most SEND_WAIT ms. A failure inside that window is still
+     reported (EMAIL_SEND_FAILED); a slower send carries on after the answer (ctx.waitUntil), and if it fails the code
+     is removed, so verifying answers NO_CODE and the app asks for a new one. */
+  const sending = sendCode(env, email, code).catch(() => false).then(async ok => {
+    if (!ok) await env.DB.prepare('DELETE FROM auth_codes WHERE email_hash=? AND created_at=?').bind(key, t).run().catch(() => null);
+    return ok;
+  });
+  let timer = null;
+  const early = ctx?.waitUntil ? await Promise.race([sending, new Promise(resolve => { timer = setTimeout(() => resolve(null), Number(env.MAIL_WAIT_MS) || SEND_WAIT); })]) : await sending;
+  if (timer) clearTimeout(timer);
+  if (early === null) { ctx.waitUntil(sending); return json({ ok: true, expiresIn: CODE_TTL, sending: true }); }
+  if (!early) return fail('EMAIL_SEND_FAILED', 502);
   return json({ ok: true, expiresIn: CODE_TTL });
 }
 async function verifyCode(request, env, ip, now) {
@@ -341,12 +353,12 @@ async function syncPush(request, env, auth, kind, now) {
 
 /* ---- entry --------------------------------------------------------------------------------------------------- */
 export function isAccountsPath(path) { return path === '/api/me' || path.startsWith('/api/me/') || path.startsWith('/api/auth/') || path.startsWith('/api/sync/'); }
-export async function handleAccounts(request, env, now = new Date()) {
+export async function handleAccounts(request, env, now = new Date(), ctx = null) {
   const url = new URL(request.url), path = url.pathname.replace(/\/+$/, '') || '/', method = request.method;
   if (!isAccountsPath(path)) return null;
   try {
     const ip = await clientKey(request, env);
-    if (path === '/api/auth/code') return method === 'POST' ? await requestCode(request, env, ip, now) : fail('METHOD_NOT_ALLOWED', 405);
+    if (path === '/api/auth/code') return method === 'POST' ? await requestCode(request, env, ip, now, ctx) : fail('METHOD_NOT_ALLOWED', 405);
     if (path === '/api/auth/verify') return method === 'POST' ? await verifyCode(request, env, ip, now) : fail('METHOD_NOT_ALLOWED', 405);
     if (path === '/api/auth/password') return method === 'POST' ? await passwordLogin(request, env, ip, now) : fail('METHOD_NOT_ALLOWED', 405);
     const auth = await authenticate(request, env, now);

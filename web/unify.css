@@ -1893,3 +1893,12 @@ html:not(#u):not(#v) body dialog.guide-panel [data-pane="report"] :is(.feedback-
 
 /* 2026-11-12 (user video: the whole UI jerked left once after the search animation) the main scroller always keeps room for its scrollbar, so content growing past the window never shifts the layout */
 html:not(#u) body .main{scrollbar-gutter:stable}
+
+/* 2026-11-12 sign-in modes (web/account-ui.js): code / password tabs, same look on every page that shows the sign-in form */
+.login-modes{display:flex;gap:20px;border-bottom:1px solid var(--g-rule,#ffffff1a);margin:0 0 4px}
+.login-modes [role=tab]{background:none;border:0;border-bottom:1px solid transparent;border-radius:0;padding:6px 0;color:var(--g-t2,var(--muted));cursor:pointer;margin-bottom:-1px}
+.login-modes [role=tab][aria-selected=true]{color:var(--g-t1,var(--text));border-bottom-color:var(--g-gold,var(--accent))}
+.login-modes [role=tab]:focus-visible{outline:1px solid var(--g-gold,var(--accent));outline-offset:2px}
+.login-forgot{padding:0;font-size:inherit;text-align:left}
+.account-username{margin:-4px 0 6px}
+.account-password{max-width:420px;margin:0 0 10px}
