@@ -2,6 +2,7 @@
 /* 学习 → 日语水平 (2026-11-11). The first visit to the learning page asks how much Japanese you know; the choice marks
    what lies below it as known (kana, N5 grammar) and says where to start. Changeable from the grammar page any time. */
 import {SEION_LIST,DAKU_LIST,YOON_LIST,toKata} from './kana/data.js';
+import {LEVEL_TIPS} from './guide-levels.js';
 /* 2026-11-11 the picker speaks the interface language (it was Chinese under every language) */
 const loc=()=>{const l=String(globalThis.document?.documentElement?.lang||'zh');return l.startsWith('ja')?'ja':l.startsWith('en')?'en':'zh';};
 const TEXT={
@@ -39,9 +40,20 @@ export function openLevelPicker({api,esc,toast,current=null}){
    const r=['none','kana'].includes(pick)?'':pick==='N5'?T().noteN5:T().noteUp;note.textContent=r;});
   back.querySelector('[data-lv-later]').onclick=()=>close(null);
   back.addEventListener('click',e=>{if(e.target===back)close(null);});
-  ok.onclick=async()=>{ok.disabled=true;try{const r=await api('learning_level_set',{level:pick,kana:allKana()});toast?.(`${T().set(levelName(pick))} · ${RECOMMEND[r.recommend.reason]||''}`);close(r);}catch(error){ok.disabled=false;toast?.(String(error?.message||error));}};
+  ok.onclick=async()=>{ok.disabled=true;try{const r=await api('learning_level_set',{level:pick,kana:allKana()});toast?.(`${T().set(levelName(pick))} · ${RECOMMEND[r.recommend.reason]||''}`);close(r);setTimeout(()=>showLevelTips(pick,esc),200);}catch(error){ok.disabled=false;toast?.(String(error?.message||error));}};
   back.querySelector('.lv-opt.active,.lv-opt')?.focus();
  });
+}
+/* 2026-11-12 (user: after choosing a level, say how to use MeguLit at that level) the plan for the chosen level, the same
+   text the guide shows (web/guide-levels.js) */
+const TIPS_OK={zh:'开始学习',ja:'はじめる',en:'Start learning'},TIPS_KICKER={zh:'学习 · 适合你的用法',ja:'学習 · あなたに合った使い方',en:'Learning · Your plan'};
+export function showLevelTips(level,esc){
+ const l=loc(),t=LEVEL_TIPS[l]||LEVEL_TIPS.zh;if(!t.tips[level])return;
+ const back=document.createElement('div');back.className='lv-backdrop';
+ back.innerHTML=`<div class="lv-dialog lv-tips" role="dialog" aria-modal="true" aria-labelledby="lv-tips-title"><header><p class="lv-kicker">${esc(TIPS_KICKER[l])}</p><h2 id="lv-tips-title">${esc(t.head(t.names[level]))}</h2></header><ol class="lv-tips-list">${t.tips[level].map(x=>`<li>${esc(x).replace(/\[\[(.+?)\]\]/g,'<kbd>$1</kbd>')}</li>`).join('')}</ol><p class="lv-note">${esc(t.change)}</p><footer><button type="button" class="primary" data-lv-tips-ok>${esc(TIPS_OK[l])}</button></footer></div>`;
+ document.body.appendChild(back);const close=()=>{document.removeEventListener('keydown',key);back.classList.add('out');setTimeout(()=>back.remove(),160);};
+ const key=e=>{if(e.key==='Escape'||e.key==='Enter')close();};document.addEventListener('keydown',key);
+ back.addEventListener('click',e=>{if(e.target===back)close();});back.querySelector('[data-lv-tips-ok]').onclick=close;back.querySelector('[data-lv-tips-ok]').focus();
 }
 export const recommendText=r=>RECOMMEND[r?.recommend?.reason]||'';
 /* Called each time the learning page opens: asks once per session while no level is set. */

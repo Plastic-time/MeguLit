@@ -1867,3 +1867,11 @@ html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-n
 @media (max-width:900px){html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]:not([hidden]){grid-template-areas:"top" "title" "sub" "text" "form" "rule" "status" "succ" "upd" "note" "more" "act"!important;grid-template-rows:none}html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-updates:not([hidden]){height:auto!important;min-height:0!important;max-height:min(240px,26vh)!important}}
 /* (user 2026-11-12: "别让框被选中") a dialog takes focus when it opens; its own frame never shows a focus ring */
 html:not(#u):not(#v):not(#w):not(#x) body :is(dialog,.lv-dialog):is(:focus,:focus-visible){outline:none!important}
+/* 2026-11-12 (user) the plan for the chosen level: in the guide and right after picking a level */
+html:not(#u):not(#v):not(#w):not(#x) body .guide-level-note{margin:8px 0 0;font-size:12.5px;color:var(--g-t3,#a08a80)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lv-tips{width:min(560px,94vw)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-tips-list{counter-reset:tip;list-style:none;margin:6px 0 0;padding:0;border-top:1px solid var(--u-line-2,rgba(255,255,255,.12))}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-tips-list li{counter-increment:tip;position:relative;padding:12px 0 12px 40px;border-bottom:1px solid var(--u-line,rgba(255,255,255,.07));font-size:14px;line-height:1.75;color:var(--g-t1,#f1e0d2)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-tips-list li::before{content:counter(tip,decimal-leading-zero);position:absolute;left:0;top:12px;font:400 20px/1.2 var(--g-serif,serif);color:var(--g-gold,#edb56e)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-tips .lv-note{margin:12px 0 0;font-size:12.5px}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-tips footer{display:flex;justify-content:flex-end;margin-top:16px}

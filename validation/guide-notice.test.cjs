@@ -7,7 +7,11 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 
 test('tutorial exists in zh / ja / en with the same sections', async () => {
   const g = await import(pathToFileURL(path.join(web, 'guide-content.js')).href);
-  const shape = l => g.GUIDE[l].sections.map(s => (s.keys || s.steps).length).join(',');
+  const shape = l => g.GUIDE[l].sections.map(s => s.level ? 'level' : (s.keys || s.steps).length).join(',');
+  /* 2026-11-12 the by-level section is the plan for the chosen level: every level has the same number of tips in each language */
+  const lv = await import(pathToFileURL(path.join(web, 'guide-levels.js')).href);
+  for (const id of lv.LEVEL_IDS) for (const l of ['ja', 'en']) assert.strictEqual(lv.LEVEL_TIPS[l].tips[id].length, lv.LEVEL_TIPS.zh.tips[id].length, l + ' ' + id);
+  assert.match(lv.levelSectionHTML('zh', 'N3', esc), /你的水平：N3/);assert.match(lv.levelSectionHTML('en', null, esc), /No level yet/);
   assert.strictEqual(shape('ja'), shape('zh'));
   assert.strictEqual(shape('en'), shape('zh'));
   for (const l of ['zh', 'ja', 'en']) {

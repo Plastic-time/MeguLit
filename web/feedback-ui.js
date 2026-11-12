@@ -7,6 +7,7 @@
      "想玩的游戏" box and the same report button. */
 
 import { successHTML, guideHTML, GUIDE } from './guide-content.js';
+import { fillGuideLevel } from './guide-levels.js';
 
 const T = {
   zh: {
@@ -156,6 +157,7 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '' })
   dialog.querySelector('[data-ok]').onclick = () => dialog.close();
   dialog.querySelector('[data-report]').onclick = () => { dialog.close(); openFeedback({ api, locale, esc, toast, version }); };
   dialog.showModal();
+  fillGuideLevel(dialog, { api, locale, esc }); /* the by-level part of the guide follows the chosen level */
 }
 
 /* E458 top bar 指南: everything from the start notice, any time (updates, the tutorial, a report, a game request) */
@@ -196,5 +198,6 @@ export function openGuide({ api, locale = 'zh', esc, toast, version = '', tab = 
   dialog.querySelector('[data-ok]').onclick = () => dialog.close();
   dialog.querySelector('[data-report]').onclick = () => { dialog.close(); openFeedback({ api, locale, esc, toast, version }); };
   dialog.showModal();
+  fillGuideLevel(dialog, { api, locale, esc }); /* the by-level part of the guide follows the chosen level */
   return dialog;
 }
