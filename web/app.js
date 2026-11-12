@@ -164,7 +164,7 @@ function setAppearance(preferences=model.preferences){
 const READER_HINTS={
  READER_NATIVE_MISSING:{zh:'MeguLit 的游戏组件不见了，多半被杀毒软件隔离：从隔离区恢复，并把 MeguLit 文件夹加入信任后重开',en:'MeguLit game components are missing, most likely quarantined by antivirus: restore them and trust the MeguLit folder, then reopen',ja:'ゲーム用コンポーネントが見つかりません。ウイルス対策ソフトの隔離を解除し、MeguLit フォルダーを除外に追加して再起動してください'},
  READER_NATIVE_EXITED:{zh:'游戏组件启动后被关闭，多半是杀毒软件拦截：把 MeguLit 文件夹加入信任后点「重新连接」',en:'The game component was stopped right after starting, usually by antivirus: trust the MeguLit folder and press Reconnect',ja:'ゲーム用コンポーネントが停止されました。ウイルス対策ソフトで MeguLit フォルダーを除外して「再接続」を押してください'},
- READER_HOTKEY_IN_USE:{zh:'Alt+T 被别的程序占用，或开了两个 MeguLit：关掉多余的再点「重新连接」',en:'Alt+T is taken by another program or a second MeguLit: close it and press Reconnect',ja:'Alt+T が他のアプリか 2 つ目の MeguLit に使われています。閉じてから「再接続」を押してください'},
+ READER_HOTKEY_IN_USE:{zh:'Alt+T 快捷键暂时被别的程序占着，MeguLit 会自动关掉多开的旧 MeguLit 并每隔 2 秒重试，通常几秒内就好；一直不好的话，重启电脑后只打开一个 MeguLit',en:'Alt+T is held by another program for now. MeguLit closes any older MeguLit left running and retries every 2 s, usually fixed in seconds; if it stays, restart the PC and open only one MeguLit',ja:'Alt+T が他のアプリか 2 つ目の MeguLit に使われています。閉じてから「再接続」を押してください'},
  READER_START_TIMEOUT:{zh:'游戏组件启动太慢（第一次启动或电脑较忙时常见）：稍等后点「重新连接」',en:'The game component is slow to start (common on first launch): wait a moment and press Reconnect',ja:'ゲーム用コンポーネントの起動が遅れています。少し待ってから「再接続」を押してください'}};
 let readerFailures=0;
 function readerNotice(error){const panel=document.querySelector('#reader-notice');if(!panel)return;panel.hidden=!error;if(!error){readerFailures=0;return;}
