@@ -125,11 +125,11 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '' })
   dialog.className = 'game-dialog dev-notice';
   dialog.innerHTML = `<div class="dev-notice-page" data-page="1"><div class="dev-notice-top"><span>${esc(t.noticeKicker)}</span><span>${esc(t.noticeTag)}</span></div>
 <h2>${esc(t.noticeTitle)}</h2><h2 class="dev-notice-title2">${esc(t.noticeTitle2)}</h2>${successHTML(locale, esc)}<p class="dev-notice-text">${esc(t.noticeText)}</p>
-<form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="primary">${esc(t.submit)}</button></form>
+<form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="secondary">${esc(t.submit)}</button></form>
 <p class="feedback-status" role="status" aria-live="polite"></p>
 <ul class="dev-notice-updates" hidden></ul><p class="dev-notice-updates-note" hidden></p>
 <p class="dev-notice-more">${esc(t.noticeMore)}</p>
-<div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="secondary" data-next>${esc(t.next)}</button></div></div>
+<div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="primary" data-next>${esc(t.next)}</button></div></div>
 <div class="dev-notice-page" data-page="2" hidden><div class="dev-notice-top"><span>${esc(t.guideKicker)}</span><span>2 / 2</span></div>
 <h2>${esc((GUIDE[locale] || GUIDE.zh).title)}</h2><div class="dev-notice-scroll">${guideHTML(locale, esc)}</div>
 <div class="dev-notice-actions"><button type="button" class="text-button" data-back>${esc(t.back)}</button><button type="button" class="secondary" data-ok>${esc(t.done)}</button></div></div>`;

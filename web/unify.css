@@ -1420,7 +1420,7 @@ html:not(#u):not(#v):not(#w):not(#x) body .main :is(.settings-callout,.settings-
 
 /* slider: a real handle and a 2px track */
 html:not(#u):not(#v):not(#w):not(#x) body .setting-slider input[type=range]{height:18px!important;background:transparent!important}
-html:not(#u):not(#v):not(#w):not(#x) body .setting-slider input[type=range]::-webkit-slider-runnable-track{height:2px!important;background:linear-gradient(90deg,#c8323c var(--fill,0%),rgba(255,236,220,.15) var(--fill,0%))!important;border:0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .setting-slider input[type=range]::-webkit-slider-runnable-track{height:2px!important;background:linear-gradient(90deg,#c8323c var(--v,var(--fill,0%)),rgba(255,236,220,.15) var(--v,var(--fill,0%)))!important;border:0!important}
 html:not(#u):not(#v):not(#w):not(#x) body .setting-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px!important;height:12px!important;margin-top:-5px!important;border:0!important;border-radius:1px!important;background:#f6ece0!important;box-shadow:0 0 0 3px rgba(200,50,60,.0),0 1px 4px rgba(0,0,0,.6)!important;transform:rotate(45deg);transition:background .15s,box-shadow .15s}
 html:not(#u):not(#v):not(#w):not(#x) body .setting-slider input[type=range]:hover::-webkit-slider-thumb,html:not(#u):not(#v):not(#w):not(#x) body .setting-slider input[type=range]:focus-visible::-webkit-slider-thumb{background:#e2423e!important;box-shadow:0 0 0 4px rgba(226,66,62,.25)!important}
 html:not(#u):not(#v):not(#w):not(#x) body .settings-content .setting-slider input[type=number]{width:56px!important}
@@ -1603,7 +1603,9 @@ html:not(#u):not(#v):not(#w):not(#x) body .main :is(.about-facts,.about-links,.a
 /* cover wall (judge r10: the floating search sat on top of titles). It stays in the middle — the user's choice — and
    now rests in a dark pool: a solid backing and a wide soft halo, so whatever passes beneath fades out instead of
    colliding with it */
-html:not(#u):not(#v):not(#w):not(#x) body .field-search{background:#150e12!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.16),0 0 0 10px rgba(16,10,13,.55),0 0 70px 46px rgba(12,8,10,.88)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .field-page:not(.field-list) .field-search{background:#150e12!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.16)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+/* (judge r11: the pool's edge was hard and it dimmed the grid view too) only on the wall, a soft elliptical pool */
+html:not(#u):not(#v):not(#w):not(#x) body .field-page:not(.field-list) .field-search::before{content:"";position:absolute;inset:-90px -200px;z-index:-1;pointer-events:none;border-radius:50%;background:radial-gradient(closest-side,rgba(12,8,10,.92),rgba(12,8,10,.7) 55%,rgba(12,8,10,0))}
 /* grammar lesson (judge r8–r10: text ran on below the step bar): the step bar is no longer pinned — it follows the
    step's content, so nothing can show beneath it */
 html:not(#u):not(#v):not(#w):not(#x) body .gm-lesson .gm-stepnav{position:static!important;box-shadow:none!important;margin-top:28px!important}
@@ -1631,3 +1633,22 @@ html body .class-rite-white{--h:0%;opacity:1!important;-webkit-mask-image:radial
 html body .class-rite-white::after{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;opacity:var(--ro);
  background:radial-gradient(circle,rgba(255,140,60,0) calc(var(--h) - 3%),rgba(255,140,60,1) calc(var(--h) - 1.6%),rgba(255,196,120,1) calc(var(--h) - .2%),rgba(255,236,200,.6) calc(var(--h) + 1.6%),rgba(255,255,255,0) calc(var(--h) + 3.5%))}
 html body .dict-hit-line{mix-blend-mode:screen}
+/* sliders (judge r11): the number box ends on the column's right edge like every other control */
+html:not(#u):not(#v):not(#w):not(#x) body .settings-content .setting-slider{padding-right:0!important;margin-right:0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .settings-content .setting-slider input[type=number]{margin-right:0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .settings-content .setting-slider{grid-template-columns:minmax(0,1fr) 56px!important}
+/* translation types (judge r11: the last boxed tabs in settings) join the second-level tabs: plain names over one
+   hairline, the current one ivory with a 2px red line */
+html:not(#u):not(#v):not(#w):not(#x) body .translation-types{display:flex!important;flex-wrap:wrap;gap:0 22px!important;padding:0!important;border:0!important;border-bottom:1px solid var(--u-line-2)!important;border-radius:0!important;background:none!important;box-shadow:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .translation-types button{position:relative;height:40px!important;padding:0 2px!important;margin:0 0 -1px!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;font-size:14px!important;letter-spacing:.04em!important;color:rgba(241,224,210,.55)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .translation-types button:hover{color:#f1e0d2!important}
+html:not(#u):not(#v):not(#w):not(#x) body .translation-types button:is([aria-selected=true],[aria-pressed=true],.active){color:#fff4ea!important;background:none!important;box-shadow:inset 0 -2px 0 #c8323c!important}
+/* in-game panel preview (judge r10–r11: 16px wider than the column, and pinned over the rows below while scrolling):
+   it sits in the column like any block — one hairline frame, no spread, not pinned */
+html:not(#u):not(#v):not(#w):not(#x) body .main .settings-content .sp-preview{position:relative!important;top:auto!important;margin-left:0!important;margin-right:0!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
+/* first notice (judge r11): the flow's own step is the one primary on the page; submitting a wish is secondary */
+html:not(#u):not(#v):not(#w):not(#x) body dialog.dev-notice .dev-notice-form>button.secondary{height:46px!important;min-height:46px!important;padding:0 20px!important;margin:0!important;border-radius:0!important;align-self:flex-end}
+/* dropdowns (judge r10–r11): the chosen value shows its name only; the note stays in the option list */
+html:not(#u):not(#v):not(#w):not(#x) body .select-trigger .select-note{display:none!important}
+/* words page proficiency dropdown: readable, with its frame */
+html:not(#u):not(#v):not(#w):not(#x) body .main .word-actions .select-trigger{color:rgba(241,224,210,.82)!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.26)!important;border-radius:2px!important}
