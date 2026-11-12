@@ -15,7 +15,7 @@
    text boxes match one for one in nearly every message; where a translation splits or joins boxes they are aligned by
    length (1:1, 1:2, 2:1 ... 3:3), so every Japanese box gets the Chinese of the boxes it was aligned with. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const stat=file=>{try{const s=fs.statSync(file);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 let keyIv=null;const kv=()=>keyIv??=crypto.pbkdf2Sync('u8DurGE2','6BBGizHE',1000,32,'sha1');
 function decrypt(buf){const k=kv(),d=crypto.createDecipheriv('aes-128-cbc',k.subarray(0,16),k.subarray(16,32));return Buffer.concat([d.update(buf),d.final()]);}
 const ARGS=[0,0,0,1,1,2,2,0,2,3,1,1,1,0,1,2,1,0,3,1,0,0,0,1,1,2,4,1,1,1,3,0,1,0,2,2,0,1,1,2,1,1,3,0,1,0,0,2,1,2,2,5,1,2,1,2,1,1,3,2,1,1,1,0,0,0,1,1,1,0,1,2,2,0,1,1,0,2,1,7,1,2,1,0,2,1,2,1,0,1,1,2,3,0,0,3,4,3,0,0,1,2,3,0,0,2,1,3,0,1,1,1,3,3,0,0,2,4,2,2,1,0,1,2,0,1,1,1,0];

@@ -16,22 +16,38 @@ const unityfs=require('./unityfs.cjs'),fsb5=require('./fsb5.cjs');
 const VOICE=/Assets\/Naninovel\/Game\/Voice\/([^\0]*?)\.ogg/;
 const dataDirs=dir=>{try{return fs.readdirSync(dir,{withFileTypes:true}).filter(e=>e.isDirectory()&&/_Data$/i.test(e.name)).map(e=>path.join(dir,e.name));}catch{return [];}};
 function bundleDir(dir){for(const d of dataDirs(dir)){const b=path.join(d,'StreamingAssets','aa','StandaloneWindows64');if(fs.existsSync(b))return b;}return '';}
-const cacheFile=d=>{let n=0;try{n=fs.readdirSync(d).length;}catch{}return path.join(os.tmpdir(),'megulit-unity-voice',crypto.createHash('sha256').update(path.resolve(d).toLowerCase()+'|'+n+'|2').digest('hex').slice(0,24)+'.json');};
+const cacheFile=d=>{let n=0;try{n=fs.readdirSync(d).length;}catch{}return path.join(os.tmpdir(),'megulit-unity-voice',crypto.createHash('sha256').update(path.resolve(d).toLowerCase()+'|'+n+'|3').digest('hex').slice(0,24)+'.json');};
 // A bundle's nodes; one too large to load whole gives its serialized node only.
 function nodesOf(file){try{return unityfs.read(file);}catch{try{const n=unityfs.readNode(file);return n?[n]:[];}catch{return [];}}}
 /* {clips: name ("Kasumi_10/44.0") -> {file, duration}, scripts: bundles holding compiled scripts (PrintText)}; every
    bundle is opened once, then the result is cached next to MeguLit's other caches. */
+/* E452 AudioClips named by Naninovel text id (魔法少女ノ魔女裁判: "0101Adv31_Sherry001" in general-voice-* bundles). In
+   the serialized file a clip is m_Name, format fields, then m_Resource: the .resource path, u64 offset, u64 size. The
+   name is the length-prefixed string that ends 16-48 bytes before the path's length. */
+function namedClips(buf){const out=[],seen=new Set(),t=buf.toString('latin1'),re=/\.resource\0?/g;let m;
+ while((m=re.exec(t))){const end=m.index+9;let start=-1;for(let q=(end-8)&~3;q>=Math.max(0,end-200);q-=4){const n=buf.readUInt32LE(q);if(q+4+n===end){start=q;break;}}if(start<0)continue;
+  const at=(end+3)&~3;if(at+16>buf.length)continue;const off=Number(buf.readBigUInt64LE(at)),size=Number(buf.readBigUInt64LE(at+8));if(!size||size>(64<<20))continue;
+  let name=null;for(let back=16;back<=48&&!name;back+=4){const e=start-back;for(let q=e-8;q>=Math.max(0,e-140);q-=4){const n=buf.readUInt32LE(q);if(n>=1&&n<=128&&((q+4+n+3)&~3)===e){const v=buf.toString('utf8',q+4,q+4+n);if(/^[\w.\-]+$/.test(v))name=v;break;}}}
+  if(!name||seen.has(name.toLowerCase()))continue;seen.add(name.toLowerCase());out.push({name,off,size});}
+ return out;}
 function catalogOf(dir){const d=bundleDir(dir);if(!d)return null;const cf=cacheFile(d);try{return JSON.parse(fs.readFileSync(cf,'utf8'));}catch{}
- const clips={},scripts=[];let files=[];try{files=fs.readdirSync(d).filter(f=>/\.bundle$/i.test(f));}catch{}
+ const clips={},named={},scripts=[];let files=[];try{files=fs.readdirSync(d).filter(f=>/\.bundle$/i.test(f));}catch{}
  for(const f of files){let name=null,duration=null,script=false;
+  /* E452 the serialized file alone first, so bundles of pictures are never loaded whole */
+  let head=null;try{head=unityfs.readNode(path.join(d,f),0,256<<20);}catch{}
+  if(head&&!VOICE.test(head.data.toString('latin1',0,Math.min(head.data.length,1<<20)))){const b=head.data;if(b.indexOf('PrintText')>=0)scripts.push(f);
+   if(b.indexOf('.resource')>=0)for(const c of namedClips(b))named[c.name]={file:f,off:c.off,size:c.size};continue;}
   for(const x of nodesOf(path.join(d,f))){const m=VOICE.exec(x.data.toString('latin1',0,Math.min(x.data.length,1<<20)));if(m)name=m[1];const i=x.data.indexOf('FSB5');if(i>=0)duration=fsb5.duration(x.data,i);if(!m&&x.data.indexOf('PrintText')>=0)script=true;}
   if(name&&duration!==null)clips[name]={file:f,duration};if(script)scripts.push(f);}
- const out={clips,scripts};if(Object.keys(clips).length){try{fs.mkdirSync(path.dirname(cf),{recursive:true});fs.writeFileSync(cf,JSON.stringify(out));}catch{}}
+ const out={clips,named,scripts};if(Object.keys(clips).length||Object.keys(named).length){try{fs.mkdirSync(path.dirname(cf),{recursive:true});fs.writeFileSync(cf,JSON.stringify(out));}catch{}}
  return out;}
 const index=dir=>catalogOf(dir)?.clips||null;
 // The clips as catalog entries: {key, read} where read gives Ogg.
-function audioDir(dir){const ix=index(dir);if(!ix)return null;const d=bundleDir(dir);
- return Object.entries(ix).map(([key,v])=>({key,read:()=>{for(const x of nodesOf(path.join(d,v.file))){const i=x.data.indexOf('FSB5');if(i>=0)return fsb5.playable(x.data,i);}return null;}}));}
+function audioDir(dir){const c=catalogOf(dir);if(!c)return null;const ix=c.clips||{},d=bundleDir(dir);
+ const out=Object.entries(ix).map(([key,v])=>({key,read:()=>{for(const x of nodesOf(path.join(d,v.file))){const i=x.data.indexOf('FSB5');if(i>=0)return fsb5.playable(x.data,i);}return null;}}));
+ /* E452 clips named by text id: only that range of the bundle's .resource node is read */
+ for(const [key,v] of Object.entries(c.named||{}))out.push({key,read:()=>{const n=unityfs.readNode(path.join(d,v.file),1,1<<30,{off:v.off,len:v.size});if(!n)return null;const i=n.data.indexOf('FSB5');return i>=0?fsb5.playable(n.data,i):null;}});
+ return out.length?out:null;}
 // PrintText commands in one serialized file: {script, line, inl, text, author}.
 // from / to: a byte range of b (records are 4-byte aligned to the file, so the buffer is never sliced)
 function spotsIn(b,out=[],from=0,to=b.length){const U8=new TextDecoder('utf-8',{fatal:true});
@@ -95,4 +111,4 @@ function estimatedLines(dir,ix){const byScript=new Map();
  return out;}
 // [{text, ref, estimated?}] for the Japanese lines that take a clip.
 function voiceLines(dir){const ix=index(dir);if(!ix||!Object.keys(ix).length)return [];return exactLines(dir,ix)||estimatedLines(dir,ix);}
-module.exports={docHeads,docEntries,lcs,jaDocs,light,index,catalogOf,audioDir,voiceLines,exactLines,estimatedLines,sourceSpots,spots,spotsIn,align,bundleDir};
+module.exports={namedClips,docHeads,docEntries,lcs,jaDocs,light,index,catalogOf,audioDir,voiceLines,exactLines,estimatedLines,sourceSpots,spots,spotsIn,align,bundleDir};

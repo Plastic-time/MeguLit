@@ -10,7 +10,7 @@
    The messages of the Japanese and the Chinese scene line up one for one (same count, same order), so the release's
    Simplified (else Traditional) Chinese message is the translation of each Japanese one. Trial bundles are left out. */
 const fs=require('node:fs'),path=require('node:path');
-const stat=file=>{try{const s=fs.statSync(file);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 function lz4(src,outLen){const out=Buffer.alloc(outLen);let s=0,o=0;
  while(s<src.length){const tok=src[s++];let lit=tok>>4;if(lit===15){let b;do{b=src[s++];lit+=b;}while(b===255&&s<src.length);}
   src.copy(out,o,s,s+lit);s+=lit;o+=lit;if(s>=src.length)break;const off=src[s]|src[s+1]<<8;s+=2;if(!off||off>o)throw Error('LZ4');

@@ -13,7 +13,7 @@ function decode(buf){
  try{return new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch{}
  const score=enc=>{const t=new TextDecoder(enc).decode(buf);return {t,bad:(t.match(/�/g)||[]).length,kana:(t.match(KANA)||[]).length};};
  const sj=score('shift_jis'),gbk=score('gbk');return sj.bad<gbk.bad||sj.bad===gbk.bad&&sj.kana>=gbk.kana?sj.t:gbk.t;}
-const stat=file=>{try{const s=fs.statSync(file);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 const TXT=n=>/^\d{1,2}\.txt$/i.test(n);
 function scriptFiles(dir){let names;try{names=fs.readdirSync(dir);}catch{return [];}
  const txt=names.filter(TXT).sort((a,b)=>parseInt(a,10)-parseInt(b,10)||a.length-b.length).map(f=>path.join(dir,f));

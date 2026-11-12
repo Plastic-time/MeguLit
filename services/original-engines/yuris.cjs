@@ -10,7 +10,7 @@
    readme next to it; the font's glyphs are SimHei's, so font-unmap gives the real character for each code point. */
 const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib'),crypto=require('node:crypto');
 const fontUnmap=require('./font-unmap.cjs');
-const stat=file=>{try{const s=fs.statSync(file);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 const memo=(map,key,make)=>{if(map.has(key))return map.get(key);const v=make();map.set(key,v);if(map.size>64)map.delete(map.keys().next().value);return v;};
 
 // ---- YPF --------------------------------------------------------------------------------------------------------

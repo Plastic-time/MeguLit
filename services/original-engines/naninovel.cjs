@@ -16,7 +16,7 @@
    Traditional) Chinese, or the source itself when that is Chinese; blocks are matched by their "# id". */
 const fs=require('node:fs'),path=require('node:path'),unityfs=require('./unityfs.cjs');
 const memo=new Map();
-const stat=f=>{try{const s=fs.statSync(f);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 function dataDirs(dir){let names;try{names=fs.readdirSync(dir,{withFileTypes:true});}catch{return [];}return names.filter(e=>e.isDirectory()&&/_Data$/i.test(e.name)).map(e=>path.join(dir,e.name));}
 function bundleDir(dir){for(const d of dataDirs(dir)){const b=path.join(d,'StreamingAssets','aa','StandaloneWindows64');if(fs.existsSync(b))return b;}return '';}
 function localizationBundles(dir){const d=bundleDir(dir);if(!d)return [];let files;try{files=fs.readdirSync(d);}catch{return [];}
@@ -71,8 +71,8 @@ const tidy=t=>t.replace(/<br>\s*/gi,'\n').replace(/<\/?[a-z][^>]*>/gi,'').replac
 // Blocks of a document: Map id -> {src:[...], dst:[...]}.
 function blocks(text){const out=new Map();
  for(const block of text.replace(/\r/g,'').split(/\n(?=# )/)){const m=/^# (\S+)/.exec(block);if(!m)continue;const src=[],dst=[];
-  for(const l of block.split('\n').slice(1)){if(!l.trim()||l.startsWith('; >'))continue;if(l.startsWith('; '))src.push(l.slice(2));else if(!l.startsWith(';'))dst.push(l);}
-  out.set(m[1],{src,dst});}
+  let voice=null;for(const l of block.split('\n').slice(1)){if(!l.trim())continue;if(l.startsWith('; >')){const v=/^; >\s*[^@\s:][^:]*:\s*\|#([\w.\-]+)\|/.exec(l); /* "> Name: |#id|" only, not "> @choice |#id|" */if(v)voice=v[1];continue;}if(l.startsWith('; '))src.push(l.slice(2));else if(!l.startsWith(';'))dst.push(l);}
+  out.set(m[1],{src,dst,voice});}
  return out;}
 const isJa=l=>/^ja/.test(l),isZh=l=>/^zh/.test(l);
 const ZH=['zh-cn','zh-hans','zh','zh-sg','zh-tw','zh-hant','zh-hk'];
@@ -112,9 +112,11 @@ function combine(docs){const byName=new Map();for(const d of docs){if(!d.script)
    parts.push('# '+id+'\n'+b.dst.map(l=>'; '+l).join('\n')+(zh.length?'\n'+zh.join('\n'):''));}
   if(parts.length)out.push({name:ja.name,text:parts.join('\n\n')});}
  return out;}
-function parse(buf){const text=Buffer.isBuffer(buf)?buf.toString('utf8'):String(buf),lines=[],zh=[],anchors=[];
- for(const [id,b] of blocks(text)){anchors.push(id);if(!b.src.length)continue;lines.push(tidy(b.src.join('\n')));zh.push(tidy(b.dst.join('\n')));}
- return {lines,anchors,zh};}
+/* E452 a spoken line names its text id in the source comment ("> Ema: |#0101Adv31_Ema001|"); voices by text id play the
+   AudioClip of that name (naninovel-voice.cjs namedClips) */
+function parse(buf){const text=Buffer.isBuffer(buf)?buf.toString('utf8'):String(buf),lines=[],zh=[],anchors=[],voices=[];
+ for(const [id,b] of blocks(text)){anchors.push(id);if(!b.src.length)continue;lines.push(tidy(b.src.join('\n')));zh.push(tidy(b.dst.join('\n')));voices.push(b.voice||null);}
+ return voices.some(Boolean)?{lines,anchors,zh,voices}:{lines,anchors,zh};}
 function documents(file){return docsIn(file).filter(d=>d.script);}
 const sourcesOf=dir=>{const b=localizationBundles(dir);return b.length?b:assetFiles(dir);};
 const naninovel={

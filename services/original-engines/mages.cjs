@@ -11,7 +11,7 @@
    There is no Chinese in these releases; zero-latency translation machine-translates ahead. */
 const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
 const KANA=/[ぁ-ゖァ-ヺ]/;
-const stat=file=>{try{const s=fs.statSync(file);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 let charsetMemo=null;
 const charset=()=>charsetMemo||(charsetMemo=fs.readFileSync(path.join(__dirname,'mages-charset-sghd.txt'),'utf8').replace(/[\r\n]/g,''));
 // MPK v2: "MPK\0", version 2.0, entry count (u64), index at 0x40 of 256-byte entries (compression, id, offset, size,
@@ -41,13 +41,34 @@ function decodeString(b,q,cs){let text='',name='',miss=0;const ruby=[];
    if(b[q]===0x0b)q++;text+=base;if(base&&reading)ruby.push([base,reading]);}
  }
  return {name,text,miss,ruby};}
-function parse(buf){const lines=[],ruby=[],anchors=[];let miss=0,glyphs=0;
+/* MAGES voices. An expression is a run of tokens ending in the two bytes 00 00: a byte with 0x80 set is a number of
+   1, 2, 3 or 5 bytes ((b & 0x60) >> 5 picks the size), any other token is an operator and its priority (2 bytes).
+   Mes (01 0C type ...) shows string lineId: type 0 = character expression, u16 lineId; types 1 and 3 put the voice
+   expression first (voice, character, u16 lineId). A voice is an index into USRDIR/voice.mpk (STEINS;GATE: 7159 ->
+   OKA_0102.OGG), so a line's voice reference is "mpkvoice_<index>" and audio() lists voice.mpk under those names. */
+function expr(b,q,end){const vals=[];for(let n=0;n<64&&q+1<end;n++){const t=b[q];
+  if(t&0x80){const len=[1,2,3,5][(t&0x60)>>5];if(q+len>end)return null;let v=t&0x1f;if(len===2)v=b[q+1]|(t&0x1f)<<8;else if(len===3)v=b[q+1]|b[q+2]<<8|(t&0x1f)<<16;else if(len===5)v=b.readInt32LE(q+1);vals.push(v);q+=len;}
+  else{if(t===0&&b[q+1]===0)return {q:q+2,vals};q+=2;}}
+ return null;}
+function mesVoices(b,so,nstr){const out=new Map();if(so<16)return out;const code=b.readUInt32LE(12);if(code<12||code>=so)return out;
+ for(let i=code;i+3<so;i++){if(b[i]!==1||b[i+1]!==0x0c)continue;const type=b[i+2];if(type>3)continue;
+  /* the lineId is the u16 after the expressions, followed by the next instruction (01 xx) */
+  for(let k=type&1?2:1;k<=3;k++){let q=i+3,first=null,ok=true;for(let j=0;j<k;j++){const r=expr(b,q,so);if(!r){ok=false;break;}if(j===0)first=r.vals;q=r.q;}
+   if(!ok||q+3>so)continue;const id=b.readUInt16LE(q);if(id>=nstr||b[q+2]!==1)continue;
+   if(type&1&&first&&first.length===1&&first[0]>=0&&!out.has(id))out.set(id,'mpkvoice_'+first[0]);i=q+1;break;}}
+ return out;}
+function parse(buf){const lines=[],ruby=[],anchors=[],voices=[];let miss=0,glyphs=0;
  if(buf.length<12||buf.toString('latin1',0,4)!=='SC3\0')return {lines,anchors,ruby,miss};
  const so=buf.readUInt32LE(4),ro=buf.readUInt32LE(8),cs=charset();if(so<12||ro<so||ro>buf.length)return {lines,anchors,ruby,miss};
+ let vm=new Map();try{vm=mesVoices(buf,so,(ro-so)>>2);}catch{}
  for(let s=so;s+4<=ro;s+=4){const at=buf.readUInt32LE(s);if(at>=buf.length)continue;const d=decodeString(buf,at,cs);miss+=d.miss;glyphs+=d.name.length+d.text.length;
   if(d.name){lines.push('【'+d.name+'】');ruby.push(null);}
-  const t=d.text.replace(/^\n+|\n+$/g,'');if(t){lines.push(t);ruby.push(d.ruby.length?d.ruby:null);}}
- return {lines,anchors,ruby,miss,glyphs};}
+  const t=d.text.replace(/^\n+|\n+$/g,'');if(t){voices[lines.length]=vm.get((s-so)>>2)||null;lines.push(t);ruby.push(d.ruby.length?d.ruby:null);}}
+ const out={lines,anchors,ruby,miss,glyphs};if(voices.some(Boolean))out.voices=lines.map((_,i)=>voices[i]||null);return out;}
+const voiceMpk=file=>/(^|[\\/])voice[^\\/]*\.mpk$/i.test(file);
+/* voice.mpk clips under "mpkvoice_<index>" (what the script plays) and under their own names */
+function audio(file){if(!voiceMpk(file))return null;const l=mpkList(file);if(!l)return null;const out=[];
+ l.forEach((e,i)=>{if(!/\.(?:ogg|wav|opus)$/i.test(e.name))return;const read=()=>mpkRead(file,e);out.push({name:'mpkvoice_'+i+'.ogg',read},{name:e.name,read});});return out;}
 const scriptMpk=dir=>{for(const f of [path.join(dir,'USRDIR','script.mpk'),path.join(dir,'script.mpk')])if(fs.existsSync(f)&&mpkList(f))return f;return null;};
 const SCX=n=>/\.scx$/i.test(n);
 // Japanese and decodable with this character list: most strings of a sample of scenes have kana, few glyphs unknown.
@@ -63,10 +84,11 @@ const mages={
   return mpkList(f).filter(e=>SCX(e.name)).map(e=>({name:e.name,read:()=>mpkRead(f,e)})).sort((a,b)=>a.name.localeCompare(b.name));},
  archives:()=>[],
  sources:dir=>{const f=scriptMpk(dir);return f?[f]:[];},
- parse:buf=>{const p=parse(buf);return {lines:p.lines,anchors:p.anchors,ruby:p.ruby};},
+ parse:buf=>{const p=parse(buf),o={lines:p.lines,anchors:p.anchors,ruby:p.ruby};if(p.voices)o.voices=p.voices;return o;},
+ audio,
  test:()=>false,
  // No Chinese in these releases (zero-latency translation translates ahead).
  patchLines:()=>null,
- _internal:{mpkList,mpkRead,decodeString,parseSc3:parse,charset},
+ _internal:{mpkList,mpkRead,decodeString,parseSc3:parse,charset,expr,mesVoices},
 };
 module.exports=mages;

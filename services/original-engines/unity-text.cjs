@@ -10,7 +10,7 @@ const fs=require('node:fs'),path=require('node:path');
 const SEP='※',MARK=Buffer.from(SEP);
 const KANA=/[ぁ-ゖァ-ヺ]/;
 const HANS=/[们这说话时个来对没还让门见问题电车为样边过东华爱头间学认长听写书钱后于]/g,HANT=/[們這說話時個來對沒還讓門見問題電車為樣邊過東華愛頭間學認長聽寫書錢後於]/g;
-const stat=file=>{try{const s=fs.statSync(file);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 // <name>_Data folders beside the program that hold a resources.assets.
 function dataFiles(dir){let names;try{names=fs.readdirSync(dir,{withFileTypes:true});}catch{return [];}
  const out=[];for(const e of names)if(e.isDirectory()&&/_Data$/i.test(e.name)){const d=path.join(dir,e.name);let files;try{files=fs.readdirSync(d);}catch{continue;}

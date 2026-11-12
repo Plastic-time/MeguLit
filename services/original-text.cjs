@@ -24,11 +24,22 @@ const NAME_LINE=/^[【\[［(（]?[^「『（(\s。、]{1,16}[】\]］)）]$/;
 function chineseOnly(lines){let k=0,h=0;for(const t of lines){if(!prose(t)||NAME_LINE.test(String(t).trim()))continue;k+=(t.match(KANA)||[]).length;h+=(t.match(HAN)||[]).length;}return h>=200&&k<(k+h)*.05;}
 
 // ---- System4 AIN -----------------------------------------------------------------------------
-function inflateAin(file){const b=Buffer.isBuffer(file)?file:fs.readFileSync(file);if(b.subarray(0,4).toString('latin1')!=='AI2\0')throw Error('UNSUPPORTED_AIN_CONTAINER');const size=b.readUInt32LE(8),packed=b.readUInt32LE(12),d=zlib.inflateSync(b.subarray(16,16+packed));if(d.length!==size)throw Error('AIN_SIZE_MISMATCH');return d;}
-function strings(d,tag){const at=d.indexOf(tag);if(at<0)return null;let p=at+4;const n=d.readUInt32LE(p);p+=4;const out=[];for(let i=0;i<n;i++){const e=d.indexOf(0,p);if(e<0)throw Error('AIN_TRUNCATED_'+tag);out.push(d.subarray(p,e));p=e+1;}return out;}
+/* #136 older System4 games (戦国ランス, ランス・クエスト and others of that era) store the AIN without the "AI2" zlib
+   wrapper: the whole file is XORed with the low byte of each MT19937 output (Knuth 69069 seeding, seed 0x5D3E3) and
+   decrypts to "VERS" + version (as libsys4's ain_decrypt). */
+function mtXor(src,seed){const b=Buffer.from(src),N=624,M=397,st=new Uint32Array(N);st[0]=seed>>>0;for(let i=1;i<N;i++)st[i]=Math.imul(69069,st[i-1])>>>0;let k=N;
+ for(let i=0;i<b.length;i++){if(k>=N){for(let j=0;j<N;j++){const y=(st[j]&0x80000000)|(st[(j+1)%N]&0x7fffffff);st[j]=st[(j+M)%N]^(y>>>1)^(y&1?0x9908b0df:0);}k=0;}
+  let y=st[k++];y^=y>>>11;y^=(y<<7)&0x9d2c5680;y^=(y<<15)&0xefc60000;y^=y>>>18;b[i]^=y&255;}
+ return b;}
+const AIN_SEED=0x5D3E3;
+function plainAin(b){if(b.length<8)return null;const h=mtXor(b.subarray(0,8),AIN_SEED);if(h.toString('latin1',0,4)!=='VERS'||h[5]||h[6]||h[7])return null;return mtXor(b,AIN_SEED);}
+function inflateAin(file){const b=Buffer.isBuffer(file)?file:fs.readFileSync(file);if(b.subarray(0,4).toString('latin1')==='VERS')return b;if(b.subarray(0,4).toString('latin1')!=='AI2\0'){const p=plainAin(b);if(p)return p;throw Error('UNSUPPORTED_AIN_CONTAINER');}const size=b.readUInt32LE(8),packed=b.readUInt32LE(12),d=zlib.inflateSync(b.subarray(16,16+packed));if(d.length!==size)throw Error('AIN_SIZE_MISMATCH');return d;}
+/* A tag can also occur inside the code or another table: take the first occurrence whose table reads to its end. */
+function section(d,tag,read){let last=null;for(let at=d.indexOf(tag);at>=0;at=d.indexOf(tag,at+1)){if(at+8>d.length)break;try{const out=read(at);if(out)return out;}catch(e){last=e;}}if(last)throw last;return null;}
+function strings(d,tag){return section(d,tag,at=>{let p=at+4;const n=d.readUInt32LE(p);p+=4;if(n>4e6)return null;const out=[];for(let i=0;i<n;i++){const e=d.indexOf(0,p);if(e<0)throw Error('AIN_TRUNCATED_'+tag);out.push(d.subarray(p,e));p=e+1;}return out;});}
 // One code page per file: a Chinese patch stores everything (its leftover Japanese too) as GBK, an original as Shift-JIS.
 function codepage(buffers){const sample=buffers.filter(b=>b.length>3).slice(0,4000),score=enc=>{const dec=new TextDecoder(enc);let bad=0,kana=0;for(const b of sample){const t=dec.decode(b);bad+=(t.match(/�/g)||[]).length;kana+=(t.match(KANA)||[]).length;}return {enc,bad,kana};};const [sj,gbk]=[score('shift_jis'),score('gbk')];return sj.bad<gbk.bad||sj.bad===gbk.bad&&sj.kana>=gbk.kana?'shift_jis':'gbk';}
-function msg1(d){const at=d.indexOf('MSG1');if(at<0)return null;let p=at+4;const n=d.readUInt32LE(p);p+=8;const out=[];for(let i=0;i<n;i++){const len=d.readUInt32LE(p);p+=4;if(p+len>d.length)throw Error('AIN_TRUNCATED_MSG1');const b=Buffer.from(d.subarray(p,p+len));for(let k=0;k<len;k++)b[k]=(b[k]-k-0x60)&255;out.push(b);p+=len;}return out;}
+function msg1(d){return section(d,'MSG1',at=>{let p=at+4;const n=d.readUInt32LE(p);p+=8;if(n>4e6)return null;const out=[];for(let i=0;i<n;i++){if(p+4>d.length)throw Error('AIN_TRUNCATED_MSG1');const len=d.readUInt32LE(p);p+=4;if(p+len>d.length)throw Error('AIN_TRUNCATED_MSG1');const b=Buffer.from(d.subarray(p,p+len));for(let k=0;k<len;k++)b[k]=(b[k]-k-0x60)&255;out.push(b);p+=len;}return out;});}
 function readAin(file){
  const d=inflateAin(file),version=d.subarray(0,4).toString('latin1')==='VERS'?d.readUInt32LE(4):0,raw=strings(d,'MSG0')||msg1(d);if(!raw)throw Error('AIN_MESSAGES_MISSING');
  const enc=codepage(raw),dec=new TextDecoder(enc),lines=raw.map(b=>dec.decode(b)),names=(strings(d,'FNAM')||[]).map(b=>b.toString('latin1'));
@@ -465,4 +476,4 @@ async function discover(root,db,id,options={}){
  writeState(root,id,{status:state.original?.index?(state.alignment?.reliable?'ready':'unreliable'):status,lastSearch:{at:Date.now(),found:search.found.length,complete:search.complete,searched:search.searched,checked}});
  return {notFound:true,search:{found:search.found.length,complete:search.complete,searched:search.searched,checked}};
 }
-module.exports={scriptPairs,brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,clearPatch,locate,readScript,ADAPTERS,readAin,align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,chineseOnly,norm,discover,findCandidates};
+module.exports={scriptPairs,brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,clearPatch,locate,readScript,ADAPTERS,readAin,_ain:{mtXor,inflateAin},align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,chineseOnly,norm,discover,findCandidates};
