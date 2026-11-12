@@ -82,7 +82,7 @@ class HookNative{
    }
    if(m.type==='hookEngineLine'&&PAGE_ENGINES.has(m.engine)){this.pageLine(m);return;}
    if(m.type==='hookTextPos'&&m.engine==='pal_sprite_v1'){this.palPosition(m);return;}
-   if(m.type==='hookTextPos'||m.type==='hookPage'||m.type==='hookDialog'||m.type==='hookGameUi'){this.emit(m);if(m.type==='hookPage')this.islandPage(m);return;}
+   if(m.type==='hookTextPos'||m.type==='hookPage'||m.type==='hookDialog'||m.type==='hookGameUi'||m.type==='hookFont'){this.emit(m);if(m.type==='hookPage')this.islandPage(m);return;}
    /* Translation written back into the game: the bridge holds a dialogue line and asks for its translation. */
    if(m.type==='embedRequest'&&Number.isSafeInteger(m.id)&&typeof m.text==='string'&&m.text.length<=4000){this.emit({type:'hookEmbedRequest',id:m.id,text:m.text});return;}
    if(m.type==='hookRender'){this.notify({hookDrawCount:Number(m.count)||0,hookDrawAt:Number(m.at)||0});return;}

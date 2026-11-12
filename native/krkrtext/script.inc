@@ -20,7 +20,7 @@ LR"MGLT((function(){
      KiriKiri builds; typeof does not */
   var st=(typeof global.__megulitKrkrState=='Object')?global.__megulitKrkrState:void;
   if(st===void) {
-   st=%['art'=>0,'artText'=>'','artSeen'=>[],'calls'=>0,'hid'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
+   st=%['lastFont'=>'','art'=>0,'artText'=>'','artSeen'=>[],'calls'=>0,'hid'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
    st.screen=function(){
     var sw=+this.kag.scWidth,sh=+this.kag.scHeight;
     if(!(sw>0) || !(sh>0)) {sw=+this.kag.primaryLayer.width;sh=+this.kag.primaryLayer.height;}
@@ -57,6 +57,7 @@ LR"MGLT((function(){
     }
     var a=this.abs(L);cx+=a[0];cy+=a[1];
     if(rec.n==0) {
+     try {var f=L.font,face=''+f.face,fk=face+'|'+int(Math.abs(+f.height))+'|'+(f.bold?1:0);if(face!='' && fk!=this.lastFont) {this.lastFont=fk;this.report('ToMe_KRKR font size='+int(Math.abs(+f.height))+' bold='+(f.bold?1:0)+' face='+face);}} catch(e) {}
      rec.line=++this.line;this.active=rec;rec.x0=cx;rec.y0=cy;rec.x1=cx;rec.y1=cy;rec.size=size;rec.text='';rec.sw=sw;rec.sh=sh;
      rec.nvl=L.height>=sh*0.45?1:0;rec.same=rec.cleared?0:1;rec.cleared=false;
      var right=a[0]+L.width-(+L.marginR)-size;

@@ -46,6 +46,10 @@ class Reader{
   if(message.type==='dialogAuto')this.immersion.autoBox(message.visible);
   if(message.type==='readerInput'){if(message.complete===true)this.immersion.input?.();this.immersion.skip(message.skipHeld);if(typeof message.skipHeld==='boolean')this.gal?.hooks?.skipHeld?.(message.skipHeld);}
   if(message.type==='hookDialog')this.immersion.engine(message.visible,message.engine);
+  /* 2026-11-12 (user: "自动校准的同时直接替换成游戏原生字体"): the engine names the face it draws the text with (KiriKiri
+     MessageLayer.font.face). Our Japanese text takes it: the game's own font file when the folder scan found that family,
+     else the installed face by name. A font the user picked by hand is kept. */
+  if(message.type==='hookFont')this.engineFont(message);
   if(message.type==='markerPresence')this.immersion.marker(message.present===true);
   if(message.type==='waitMarkerDrawn'){this.immersion.markerDrawn();this.gal?.send({type:'markerHookDrawn'});}
   /* Issue 127: Alt+H and its hotkey registration reach the log, so a report shows whether the cover was really switched */if(message.type==='ready')this.logVisibility({type:'readerHotkeys',menu:message.hotkey,cover:message.coverHotkey,mode:message.modeHotkey});if(message.type==='cover'&&typeof message.coverEnabled==='boolean')this.logVisibility({type:'cover',enabled:message.coverEnabled});
@@ -60,6 +64,11 @@ class Reader{
   }if(!message.hookRecovering&&message.hookSourceOrigin!=='history'&&message.hookSource)this.lastLine=message.hookSource;const line={gameId:this.gameId,text:message.hookSource,sequence:message.hookSequence,active:message.hookActive,recovering:message.hookRecovering,origin:message.hookSourceOrigin};if(this.pendingLines){if(this.pendingLines.length<40)this.pendingLines.push(line);}else this.stats.line(line);}
   this.runtime.emit('reader-event',message);if(typeof message.hotkey==='boolean')this.runtime.emit('reader-health',this.runtime.readerStatus?.()||{});
  }
+ engineFont(message){try{const g=this.gal,face=String(message.face||'').trim().slice(0,64);if(!g||!face||/["\<>;{}]/.test(face)||g.preferences?.autoGameStyle===false)return;
+  const cur=String(g.preferences?.japaneseFont||'');if(cur&&!/^(engine:|game:)/.test(cur)&&!['originalGothic','originalMincho'].includes(cur))return;
+  const flat=v=>String(v||'').replace(/[\s　]/g,'').toLowerCase(),hit=(this.fonts?.current?.fonts||[]).find(f=>f.lang!=='zh'&&flat(f.family)===flat(face));
+  const key=hit?'game:'+hit.id:'engine:'+face;if(cur===key)return;g.save({...g.preferences,japaneseFont:key});this.gal.hooks?.trace?.('engine font '+JSON.stringify(face)+' -> '+key);}catch{}}
+
  logVisibility(entry){try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),...entry})+'\n');}catch{}}
  selectGame(processName,enter=true,executable=''){
   if(!this.gal)return;

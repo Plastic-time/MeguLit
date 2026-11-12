@@ -58,7 +58,7 @@ if(typeof value.rubyRowOffsetsX==='string')result.rubyRowOffsetsX=value.rubyRowO
     result.englishBold = value.englishBold === true;
     for(const key of ['japaneseOutline','chineseOutline','englishOutline'])result[key]=value[key]!==false;
     for(const key of ['japaneseFont','chineseFont','rubyFont','englishFont']){
-      if(fontOptions[key].some(([id])=>id===value[key])||key!=='englishFont'&&/^game:[0-9a-f]{10}$/.test(value[key]))result[key]=value[key];
+      if(fontOptions[key].some(([id])=>id===value[key])||key!=='englishFont'&&/^game:[0-9a-f]{10}$/.test(value[key])||(key==='japaneseFont'||key==='rubyFont')&&/^engine:[^"\<>;{}]{1,64}$/.test(value[key]))result[key]=value[key];
     }
     if(value.maskVersion!==26&&value.rubyFont==='gothic')result.rubyFont='round';
     if(value.japaneseSpacingPx==null&&Number.isFinite(Number(value.japaneseSpacing)))result.japaneseSpacingPx=Math.max(-15,Math.min(25,Number(value.japaneseSpacing)*result.japaneseSize));
