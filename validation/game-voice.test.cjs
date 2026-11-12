@@ -7,7 +7,7 @@ const gv=require('../services/game-voice.cjs');
 const OGG=Buffer.concat([Buffer.from('OggS','latin1'),Buffer.alloc(40,1)]);
 const tmp=()=>fs.mkdtempSync(path.join(os.tmpdir(),'megulit-voice-'));
 test('voice-ref: KAG voice tags and name macros give the voice name',()=>{
- assert.equal(ref.fromTag('@voice storage=a001'),'a001');assert.equal(ref.fromTag('[vo s="voice/b02.ogg"]'),'b02');
+ assert.equal(ref.fromTag('@voice storage=a001'),'a001');assert.equal(ref.fromTag('[vo s="voice/b02.ogg"]'),'voice/b02');
  assert.equal(ref.fromTag('[playvoice file=MENO_00001.ogg]'),'MENO_00001');assert.equal(ref.fromTag('[nm t="名" s=c03]'),'c03');
  assert.equal(ref.fromTag('[bg storage=room]'),null);assert.equal(ref.fromTag('@playse storage=door'),null);});
 test('KAG: the voice goes to the speech after it, through a speaker label line',()=>{
@@ -16,7 +16,7 @@ test('KAG: the voice goes to the speech after it, through a speaker label line',
  assert.equal(scenes.parseKs(Buffer.from('あいう\n')).voices,undefined);});
 test('paz: the voice column goes with its text',()=>{
  const p=paz.parse(Buffer.from('.message\t40\tsk\\sk1042.ogg\tA\tabc\n.message\t50\t\t\tdef','latin1'));
- assert.deepEqual(p.lines,['A','abc','def']);assert.deepEqual(p.voices,[null,'sk1042',null]);});
+ assert.deepEqual(p.lines,['A','abc','def']);assert.deepEqual(p.voices,[null,'sk/sk1042',null]);});
 test('norm: speaker names, quotes, spaces and end marks do not change the key',()=>{
  assert.equal(gv.keyOf('桜乃「兄さんと過ごす時間」'),gv.keyOf('「兄さんと 過ごす時間。」'));assert.equal(gv.keyOf('「……」'),null);});
 test('scan and find: a voice in a folder is copied out once, a runtime clip never replaces it',()=>{
@@ -35,7 +35,7 @@ test('catalog: RealLive/Siglus .ovk clips are numbered file*100000+id',()=>{
 test('kind: only clips a browser plays',()=>{assert.equal(gv.kind(OGG).ext,'.ogg');assert.equal(gv.kind(Buffer.alloc(20)),null);});
 test('npk: <voice src> goes with the spoken line',()=>{const npk=require('../services/original-engines/npk.cjs');
  const s="\r\n//【女】\r\n<voice name='a' src='voice/a00/2000010c16'>\r\n「起立」\r\n",b=Buffer.alloc(8+Buffer.byteLength(s));b.writeUInt32LE(0x08000010,0);b.writeUInt32LE(Buffer.byteLength(s),4);b.write(s,8);
- assert.deepEqual(npk.engine.parse(b).voices,[null,'2000010c16']);});
+ assert.deepEqual(npk.engine.parse(b).voices,[null,'a00/2000010c16']);});
 test('fvp: the number pushed before a spoken line names its clip in nine digits',()=>{const fvp=require('../services/original-engines/fvp.cjs');
  const sj=Buffer.from([0x82,0xa0,0x82,0xa2,0x82,0xa4]);const code=Buffer.concat([Buffer.from([0x0a]),Buffer.from([0x5c,0xf6,0x98,0x00]),Buffer.from([8,8,8,2,0x8d,1,0,0]),Buffer.from([0x0e,sj.length+1]),sj,Buffer.from([0])]);
  const b=Buffer.concat([Buffer.alloc(4),code]);b.writeUInt32LE(b.length,0);assert.deepEqual(fvp.parse(b).voices,['010024540']);});

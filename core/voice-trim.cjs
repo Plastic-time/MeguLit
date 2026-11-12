@@ -19,12 +19,16 @@ function wav(samples,rate){const bytes=samples.length*2,out=Buffer.alloc(44+byte
  out.write('data',36,'ascii');out.writeUInt32LE(bytes,40);for(let i=0;i<samples.length;i++)out.writeInt16LE(samples[i],44+i*2);return out;}
 // Longest a line can take to say: about 0.17 s a character plus room for breaths, never under 2 s or over 20 s.
 function spokenLimit(text){const n=[...String(text||'').replace(/[\s「」『』（）()…―ー・、。！？!?,.]/g,'')].length;return Math.min(20,Math.max(2,1.2+n*0.17)*1.35);}
-function trimWav(input,text,{gap=0.6}={}){
+function trimWav(input,text,{gap=0.6,carry=false}={}){
  const buf=Buffer.isBuffer(input)?input:Buffer.from(String(input||''),'base64');const p=parse(buf);if(!p)return null;
  const {rate,samples}=p,frame=Math.max(1,Math.round(rate/50)),n=Math.floor(samples.length/frame);if(n<8)return null;
  const db=new Float64Array(n);for(let f=0;f<n;f++){let sum=0;for(let i=f*frame+1;i<(f+1)*frame;i++){const d=samples[i]-samples[i-1];sum+=d*d;}db[f]=10*Math.log10(sum/frame+1);}
  const floor=[...db].sort((a,b)=>a-b)[Math.floor(n/5)],loud=f=>db[f]>floor+12;
  let first=-1;for(let f=0;f<n;f++)if(loud(f)){first=f;break;}if(first<0)return null;
+ /* E461 (user: a sentence's voice was another sentence's) the clip starts 0.45 s before its line appeared; sound already
+    loud in its first 60 ms is the line before still speaking. Skip that run (to a 0.2 s pause); with nothing spoken after
+    it this line has no voice of its own: {data:null, carried:true}, never the other line's voice. */
+ if(first<=2&&carry){let f=first,q=0;for(;f<n;f++){if(loud(f))q=0;else if(++q>=10)break;}first=-1;for(;f<n;f++)if(loud(f)){first=f;break;}if(first<0)return {data:null,carried:true,seconds:0,cut:samples.length/rate};}
  const maxGap=Math.round(gap*50),limit=first+Math.round(spokenLimit(text)*50);let last=first,quiet=0;
  for(let f=first+1;f<n&&f<=limit;f++){if(loud(f)){last=f;quiet=0;}else if(++quiet>maxGap)break;}
  const a=Math.max(0,(first-8)*frame),b=Math.min(samples.length,(last+15)*frame),out=samples.slice(a,b),fade=Math.min(out.length,Math.round(rate*0.04));

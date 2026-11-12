@@ -62,13 +62,15 @@ const decode=raw=>{if(raw[0]===0xff&&raw[1]===0xfe)return raw.toString('utf16le'
 /* Lines with their voice from source text: a KOE / koe / exkoe call sets the voice of the next message
    (@mes(id,name,text), or a plain 「…」 line). Comment lines (;) are skipped. */
 // The text argument of @mes(id,name,text) anywhere on a line (other tags may wrap it: @SIZE(20)@mes(...)@SIZE@RET).
-function mesText(t){const at=t.search(/@mes\s*\(/i);if(at<0)return null;let i=t.indexOf('(',at)+1,depth=1,commas=0,start=-1;
- for(;i<t.length;i++){const c=t[i];if(c==='(')depth++;else if(c===')'){if(--depth===0)break;}else if(c===','&&depth===1&&commas<2){commas++;if(commas===2)start=i+1;}}
- return start>0?t.slice(start,i).trim():null;}
+// E461 Summer Pockets writes the speaker before the call: 【しろは】@mes(id,「…」), two arguments, the text second.
+function mesText(t){const at=t.search(/@mes\s*\(/i);if(at<0)return null;let i=t.indexOf('(',at)+1,depth=1,commas=0,first=-1,start=-1;
+ for(;i<t.length;i++){const c=t[i];if(c==='(')depth++;else if(c===')'){if(--depth===0)break;}else if(c===','&&depth===1&&commas<2){commas++;if(commas===1)first=i+1;if(commas===2)start=i+1;}}
+ return start>0?t.slice(start,i).trim():first>0?t.slice(first,i).trim():null;}
 /* Every voice call since the last message goes with the next one: if/else branches give one line two voices
    (@KOE(…060) in one branch, @KOE(…080) in the other, one shared @mes after). */
+// E461 a /* … */ block is a comment (Summer Pockets keeps staff notes with 「…」 lines in them): no line, no voice.
 function voiced(text){const out=[];let pending=[];
- for(const raw of String(text).split(/\r?\n/)){const t=raw.replace(/\/\/.*$/,'').trim();if(!t||t[0]===';')continue;
+ for(const raw of String(text).replace(/\/\*[\s\S]*?\*\//g,m=>m.replace(/[^\n]/g,'')).split(/\r?\n/)){const t=raw.replace(/\/\/.*$/,'').trim();if(!t||t[0]===';')continue;
   for(const k of t.matchAll(/(?:^|[^\w])(?:ex)?koe\s*\(\s*0*(\d+)/gi))pending.push(Number(k[1]));
   const m=mesText(t)??(/^[「『（]/.test(t)?t:null);
   if(m){if(pending.length)for(const koe of pending)out.push({text:m,koe});else out.push({text:m,koe:null});pending=[];}}

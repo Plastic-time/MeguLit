@@ -6,7 +6,13 @@
 const VOICE_TAG=/^(?:voice|vo|v|cv|pv|playvoice|voiceplay|vplay|ps|playse_v|seplay_v|koe|talk|nm|name|ch|chara|char|n)$/i;
 const VOICE_ATTR=/^(?:voice|vo|v|cv|vf|voicefile|koe)$/i;
 const NAME_TAG=/^(?:nm|name|ch|chara|char|n|talk)$/i;
-const clean=v=>{v=String(v||'').trim().replace(/^["']|["']$/g,'').replace(/\\/g,'/');v=v.slice(v.lastIndexOf('/')+1).replace(/\.(?:ogg|opus|wav|mp3|m4a|nwa|ovk|at3|aac|flac)$/i,'');return /^[\w.\-+~#!$]{1,80}$/.test(v)&&!/^(?:true|false|0|1|none|null|stop)$/i.test(v)?v:null;};
+/* E461 (user: a sentence played another sentence's voice; みにくいモジカの子 has voice/b10/5000440a03 and voice/d30/5000440a03)
+   a voice written with folders keeps its last folder ("b10/5000440a03"): the same file name in two folders is two clips.
+   game-voice.cjs finds a clip by folder and name first, then by name alone. */
+const clean=v=>{v=String(v||'').trim().replace(/^["']|["']$/g,'').replace(/\\/g,'/').replace(/^\.?\//,'');const parts=v.split('/').filter(Boolean),name=(parts.pop()||'').replace(/\.(?:ogg|opus|wav|mp3|m4a|nwa|ovk|at3|aac|flac)$/i,''),dir=parts.pop();
+ if(!/^[\w.\-+~#!$]{1,80}$/.test(name)||/^(?:true|false|0|1|none|null|stop)$/i.test(name))return null;return dir&&/^[\w.\-]{1,40}$/.test(dir)&&!/^\.+$/.test(dir)?dir+'/'+name:name;};
+// The file name of a reference, without its folder.
+const bare=ref=>String(ref||'').slice(String(ref||'').lastIndexOf('/')+1);
 function attrs(body){const out=[];for(const m of body.matchAll(/([A-Za-z_][\w]*)\s*=\s*("[^"]*"|'[^']*'|[^\s\]]+)/g))out.push([m[1],m[2]]);return out;}
 // One KAG tag ("@voice storage=a01" or "[vo s=a01]") -> the voice name, or null.
 function fromTag(tag){const m=/^[@[]\s*([^\s\]=]+)\s*([^\]]*)/.exec(String(tag).trim());if(!m)return null;const name=m[1],list=attrs(m[2]);
@@ -20,4 +26,4 @@ function inLine(line){let found=null;for(const m of String(line).matchAll(/\[[^\
 function tracker(){let pending=null;return {see(cmd){const v=typeof cmd==='string'?inLine(cmd):null;if(v)pending=v;return v;},set(v){if(v)pending=v;},take(){const v=pending;pending=null;return v;}};}
 // A voices array is kept only when some line has one.
 const keep=v=>v&&v.some(Boolean)?v:undefined;
-module.exports={fromTag,inLine,tracker,clean,keep,VOICE_TAG};
+module.exports={fromTag,inLine,tracker,clean,bare,keep,VOICE_TAG};
