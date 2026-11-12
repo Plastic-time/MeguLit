@@ -312,7 +312,7 @@ img{-webkit-user-drag:none}
 .g-hero .hero-actions{margin-top:28px}
 .g-hero .hero-actions .g-btn{height:46px;padding:0 22px;font-size:15px}
 /* settings: content not cut off, sliders don't squeeze the label, smooth section scrolling */
-.main:has(.settings-layout){padding-bottom:0!important}
+.main:has(>.settings-layout){padding-bottom:0!important}
 .main .settings-layout{height:100%;min-height:0}
 .main .settings-content{padding-bottom:64px!important;scroll-behavior:smooth}
 .main .settings-nav{scroll-behavior:smooth}
@@ -361,16 +361,16 @@ img{-webkit-user-drag:none}
 .main.field-page{overflow:hidden!important;padding:0!important}
 .main.field-page>*{max-width:none}
 .lib-field{position:relative;height:calc(100vh - var(--titlebar-height));overflow:hidden;cursor:grab;touch-action:none;user-select:none}
-.lib-field.dragging,.lib-field.dragging *{cursor:grabbing!important}
+/* 2026-11-12: a `.dragging *` rule restyled the whole page when a drag began and ended (75 ms each); one shield over the
+   wall carries the grabbing cursor instead, and keeps hover and hit tests off the moving covers */
+.lib-field.dragging{cursor:grabbing!important}
+.lib-field>.field-shield{position:absolute;inset:0;z-index:5;display:none;cursor:grabbing}
+.lib-field.dragging>.field-shield{display:block}
 .lib-field .field-grid{position:absolute;inset:0;display:block!important;margin:0!important;padding:0!important;overflow:hidden}
 .field-plane{position:absolute;inset:0}
 .lib-field .field-plane>*{position:absolute!important;top:0;left:0;width:168px;translate:none!important}
-.lib-field.field-fast .field-plane{will-change:transform}
-.lib-field.field-fast .field-plane :is(.game-hover,.edit-button){visibility:hidden}
-/* E218: titles fade out while the wall moves, fade back once it settles (container state, opacity only) */
-.lib-field .field-plane .game-caption{transition:opacity 320ms var(--g-ease) 60ms}
-.lib-field.field-moving .field-plane .game-caption{opacity:0;transition:opacity 160ms ease-out}
-@media (prefers-reduced-motion:reduce){.lib-field .field-plane .game-caption,.lib-field.field-moving .field-plane .game-caption{transition:none}}
+ /* 2026-11-12 (user: dragging the wall still lagged): titles, info rows and shadows no longer switch off while the wall
+   moves; every cover is its own layer, so they cost nothing to move, while switching them repainted every cover twice */
 .lib-field .field-feature{position:absolute;inset:0;display:block!important;margin:0!important;padding:0!important;z-index:3}
 .main.field-single{--field-focus-axis:50%;--field-feature-width:clamp(150px,min(25vw,46vh),340px)}
 .lib-field .field-feature>[data-member-id]{position:absolute;left:28%;top:var(--field-focus-axis);translate:-50% 0;width:var(--field-feature-width);margin-top:calc(var(--field-feature-width) / -1.5);user-select:none}
@@ -384,6 +384,11 @@ img{-webkit-user-drag:none}
 .lib-field::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:radial-gradient(ellipse 75% 70% at 50% 50%,transparent 55%,color-mix(in srgb,var(--bg) 92%,transparent) 100%)}
 .lib-field::before{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity 260ms var(--g-ease);background:radial-gradient(ellipse 42% 36% at 50% 50%,transparent 22%,color-mix(in srgb,var(--bg) 58%,transparent) 100%)}
 .main.searching .lib-field::before{opacity:1}
+/* 2026-11-12 (user video: opening the library, the vignette snapped on): it is clear while the wall is still hidden and
+   fades in with the covers gathering (wallIn, 520 ms on the same curve) */
+.lib-field::after{transition:opacity 560ms cubic-bezier(.2,.8,.2,1)}
+.lib-field.lib-entering::after{opacity:0;transition:none}
+@media (prefers-reduced-motion:reduce){.lib-field::after{transition:none}}
 /* jacket: as tall as the greeting + figures column (or the copy, whichever is taller); top aligned with the greeting */
 .g-hero{align-items:start!important}
 .g-hero .jacket{align-self:start!important;height:var(--jh,320px)!important;width:auto!important;aspect-ratio:2/3}
@@ -587,18 +592,16 @@ img{-webkit-user-drag:none}
 
 /* E218: covers paint in isolation so moving one never repaints its neighbours; the bar drops its blur while the wall moves */
 .lib-field .field-plane>*{contain:layout style}
-.lib-field.field-moving~.field-search,.main.field-page:has(.lib-field.field-moving)>.field-search{backdrop-filter:none!important}
+.main.field-page>.field-search.wall-moving{backdrop-filter:none!important}
 
 /* E222 perf: covers on the field skip the per-card mask layer and shadow, the two costliest paints while dragging */
 .lib-field .field-plane .library-card .cover-frame{-webkit-mask-image:none!important;box-shadow:0 6px 14px -8px rgba(0,0,0,.8)!important;transition:none!important}
-.lib-field.field-moving .field-plane .library-card .cover-frame{box-shadow:none!important}
 
 /* E224 (user: smooth when zoomed in, laggy when zoomed out): every cover gets its own compositor layer, so moving,
    scaling or fading a cover never repaints the others. Captions and the info row stop painting while the wall moves. */
 .lib-field .field-plane>*{backface-visibility:hidden}
 /* E225 (user: blurry after zooming out then in): layers are promoted only while moving; at rest they re-raster at the real scale */
-.lib-field.field-moving .field-plane,.lib-field.field-moving .field-plane>*{will-change:transform}
-.lib-field.field-moving .field-plane :is(.game-caption,.library-card-meta,.game-hover){visibility:hidden}
+.lib-field.field-moving .field-plane>.field-cell:not([data-parked]){will-change:transform}
 /* E224: the search field sits at the exact centre of the capsule; both button groups take the same width */
 .field-search .side{flex:0 0 112px;display:flex;align-items:center}
 .field-search>.side:first-child{justify-content:flex-start}

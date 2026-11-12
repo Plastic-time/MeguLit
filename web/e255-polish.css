@@ -42,10 +42,10 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):disabled{fi
 
 /* ---------- 2. 设置页：分区切换时位置不动 ---------- */
 /* 保存状态会塞进页头，原规则让页头从隐藏变显示把整页下推；改为浮在右上，不占位 */
-.main:has(.settings-layout){position:relative}
-.main:has(.settings-layout) .page-header{display:flex!important;position:absolute!important;top:0;right:clamp(16px,3vw,40px);height:0;min-height:0!important;margin:0!important;padding:0!important;border:0!important;overflow:visible;pointer-events:none;z-index:4}
-.main:has(.settings-layout) .page-header>:not(.page-tools){display:none!important}
-.main:has(.settings-layout) .page-header .page-tools{position:absolute;right:0;top:6px}
+.main:has(>.settings-layout){position:relative}
+.main:has(>.settings-layout) .page-header{display:flex!important;position:absolute!important;top:0;right:clamp(16px,3vw,40px);height:0;min-height:0!important;margin:0!important;padding:0!important;border:0!important;overflow:visible;pointer-events:none;z-index:4}
+.main:has(>.settings-layout) .page-header>:not(.page-tools){display:none!important}
+.main:has(>.settings-layout) .page-header .page-tools{position:absolute;right:0;top:6px}
 .settings-autosave-status[hidden]{display:none!important}
 .main .settings-content .settings-search{margin-top:0!important}
 
@@ -185,13 +185,15 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button) .primary-la
 /* E269 无限墙放大时清晰：静止时不让封面成为独立合成层（否则按原尺寸栅格化再被放大而发糊）；拖动/缩放中才提升图层保流畅 */
 .lib-field .library-card .cover-frame{will-change:auto!important;backface-visibility:visible!important}
 .lib-field .library-card .cover-frame:hover{will-change:transform!important}
-.lib-field.field-moving .field-plane>*,.lib-field.field-fast .field-plane>*{will-change:transform}
-.lib-field:not(.field-moving):not(.field-fast) .field-plane,.lib-field:not(.field-moving):not(.field-fast) .field-plane>*{will-change:auto!important}
+.lib-field.field-moving .field-plane>.field-cell:not([data-parked]){will-change:transform}
+.lib-field:not(.field-moving) .field-plane,.lib-field:not(.field-moving) .field-plane>.field-cell{will-change:auto!important}
 .lib-field .field-plane img{image-rendering:auto}
 /* E270 覆盖 E269：默认保留合成层（流畅，缩小时略软可接受）；只有放大且静止时才取消图层，按实际尺寸清晰重绘 */
 .lib-field .field-plane>*{will-change:transform!important}
-.lib-field[data-zoom=large]:not(.field-moving):not(.field-fast) .field-plane>*{will-change:auto!important}
-.lib-field:not(.field-moving):not(.field-fast) .field-plane{will-change:auto!important}
+.lib-field[data-zoom=large]:not(.field-moving) .field-plane>.field-cell{will-change:auto!important}
+.lib-field:not(.field-moving) .field-plane{will-change:auto!important}
+/* 2026-11-12 spare covers parked off-screen never take a layer */
+.lib-field .field-plane>.field-cell[data-parked]{will-change:auto!important}
 /* E272 缩得很小时：作品名渐隐（不再绘制文字），封面降采样，减轻绘制 */
 .lib-field .game-caption,.lib-field .library-card-meta{transition:opacity .25s ease,visibility 0s linear 0s}
 .lib-field[data-zoom=tiny] .game-caption,.lib-field[data-zoom=tiny] .library-card-meta{opacity:0;visibility:hidden;transition:opacity .25s ease,visibility 0s linear .25s}
@@ -216,4 +218,4 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button) .primary-la
 .library-card .game-card{overflow:visible!important}
 .lib-field .field-plane .library-card .cover-frame,.library-card .cover-frame{background:transparent!important;clip-path:none!important;overflow:hidden;border-radius:6px!important;box-shadow:0 12px 20px -14px rgba(0,0,0,.75),0 3px 6px -4px rgba(0,0,0,.45)!important}
 .library-card .cover-frame>:is(img,.cover){clip-path:none!important;border-radius:6px!important}
-.lib-field.field-moving .field-plane .library-card .cover-frame,.lib-field[data-zoom=tiny] .field-plane .library-card .cover-frame{box-shadow:none!important}
+.lib-field[data-zoom=tiny] .field-plane .library-card .cover-frame{box-shadow:none!important}
