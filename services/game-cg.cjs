@@ -175,9 +175,10 @@ function yurisGallery(dir,archives){
  for(const a of archives)for(const sc of y.ypfScenes(a)){const k=sc.name.toLowerCase();if(done.has(k))continue;done.add(k);let insts;try{insts=y.ystb(sc.read());}catch{continue;}if(!insts)continue;
   const calls=[];for(const x of insts){if(!x.args.length)continue;const n=str(x.args[0]);const m=n&&/^es\.CGMODE\.(CG|DEF)\.SET$/i.exec(n);if(m)calls.push(m[1].toUpperCase()==='CG'?(x.args[1]&&str(x.args[1])||''):null);}
   if(calls.length&&(!best||calls.length>best.length))best=calls;}
- let value=null;
- if(best){const slots=new Map(),heads=new Set();let slot=1,pending=[];for(const c of best){if(c!==null){pending.push(c);continue;}heads.add(slot++);for(const p of pending)slots.set(slot++,p);pending=[];}value={slots,heads,size:slot};}
+ const value=best?esSlots(best):null;
  yurisMemo.set(dir,{key,value});return value;}
+/* calls in order: a picture name for CG.SET, null for DEF.SET (which closes the entry): the entry's slot, then its pictures */
+function esSlots(calls){const slots=new Map(),heads=new Set();let slot=1,pending=[];for(const c of calls){if(c!==null){pending.push(c);continue;}heads.add(slot++);for(const p of pending)slots.set(slot++,p);pending=[];}return {slots,heads,size:slot};}
 function yurisSaves(dir){const out=[];let l=[];try{l=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
  for(const e of l)if(e.isDirectory()&&/^save/i.test(e.name)){const f=path.join(dir,e.name,'gsd.sd');if(fs.existsSync(f))out.push(f);}return out;}
 function yuris(dir){
@@ -221,4 +222,4 @@ function image(root,executable,name){
  try{fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,it.name+{'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp','image/bmp':'.bmp'}[mime]),buf);}catch{}
  return {mime,data:buf.toString('base64')};
 }
-module.exports={list,image,scan,ksdText,tokens,kbad,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};
+module.exports={list,image,scan,ksdText,tokens,kbad,esSlots,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};
