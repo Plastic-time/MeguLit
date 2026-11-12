@@ -243,7 +243,8 @@ function nearbyPatchSources(executable){
  return out;
 }
 // Bumped when the way patches are read changes; older stored patches are rebuilt before use.
-const PATCH_VERSION=2;
+/* 3: KiriKiri cx Chinese slot found by its text, ASCII-quoted slots take the Japanese brackets (2026-11-13) */
+const PATCH_VERSION=3;
 const autoRuns=new Map();
 // Fire and forget, with its own database handle (callers' handles close when their request ends).
 function autoPatchLater(root,id,done,options={}){
