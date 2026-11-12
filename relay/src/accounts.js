@@ -27,8 +27,29 @@ export const PULL_LIMIT = 500;
 /* requests per window: [limit, seconds] */
 export const AUTH_RATE = {
   'code-email': [5, 3600], 'code-email-gap': [1, 60], 'code-ip': [20, 3600],
-  'verify-ip': [30, 600], 'verify-email': [15, 3600], 'acct': [600, 3600]
+  'verify-ip': [30, 600], 'verify-email': [15, 3600], 'acct': [600, 3600],
+  'pw-ip': [30, 600], 'pw-login': [10, 3600]
 };
+/* ---- user name and password (2026-11-12) ------------------------------------------------------------------- */
+export const PBKDF2_ROUNDS = 100000;
+const RESERVED = new Set(['admin', 'administrator', 'root', 'system', 'support', 'megulit', 'moderator', 'official', 'staff', 'null', 'undefined']);
+/* 3-20 characters, a letter first, then letters, digits and _ ; compared without case */
+export function normalizeUsername(value) {
+  const name = String(value ?? '').trim();
+  if (!/^[A-Za-z][A-Za-z0-9_]{2,19}$/.test(name)) return null;
+  return RESERVED.has(name.toLowerCase()) ? null : name;
+}
+export function checkPassword(value) {
+  const p = String(value ?? '');
+  if (p.length < 8 || p.length > 128) return 'PASSWORD_LENGTH';
+  if (/^(.)\1*$/.test(p)) return 'PASSWORD_WEAK';
+  return '';
+}
+export async function hashPassword(password, saltHex, rounds = PBKDF2_ROUNDS) {
+  const salt = Uint8Array.from(saltHex.match(/../g).map(h => parseInt(h, 16)));
+  const key = await crypto.subtle.importKey('raw', encoder.encode(String(password)), 'PBKDF2', false, ['deriveBits']);
+  return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: rounds }, key, 256));
+}
 
 const encoder = new TextEncoder();
 const hex = buffer => [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -191,18 +212,65 @@ async function verifyCode(request, env, ip, now) {
     await env.DB.prepare('INSERT INTO accounts(id,email,created_at,last_login_at,sync_seq) VALUES(?,?,?,?,0) ON CONFLICT(email) DO NOTHING').bind(account.id, email, t, t).run();
     account = await env.DB.prepare('SELECT id,email,created_at FROM accounts WHERE email=?').bind(email).first();
   } else await env.DB.prepare('UPDATE accounts SET last_login_at=? WHERE id=?').bind(t, account.id).run();
+  return await openSession(env, account, body.value.device, t);
+}
+async function openSession(env, account, device, t) {
   const token = newToken(), sessionId = hex(crypto.getRandomValues(new Uint8Array(8)));
   await env.DB.prepare('INSERT INTO account_sessions(id,account_id,token_hash,prev_hash,prev_until,device,created_at,last_used_at,rotated_at,expires_at) VALUES(?,?,?,NULL,0,?,?,?,?,?)')
-    .bind(sessionId, account.id, await sha256(token), cleanDevice(body.value.device), t, t, t, t + SESSION_DAYS * 86400).run();
+    .bind(sessionId, account.id, await sha256(token), cleanDevice(device), t, t, t, t + SESSION_DAYS * 86400).run();
   /* at most 20 devices: drop the least recently used beyond that */
   await env.DB.prepare('DELETE FROM account_sessions WHERE account_id=? AND id NOT IN (SELECT id FROM account_sessions WHERE account_id=? ORDER BY last_used_at DESC LIMIT 20)').bind(account.id, account.id).run();
   return json({ ok: true, token, accountId: account.id, email: account.email, sessionId, expiresAt: t + SESSION_DAYS * 86400 });
 }
+/* e-mail or user name + password. One answer for every failure, so nobody can probe which names exist. */
+async function passwordLogin(request, env, ip, now) {
+  const body = await readJSON(request, 2048); if (body.error) return bodyError(body.error);
+  const login = String(body.value.login ?? '').trim(), password = String(body.value.password ?? ''), ms = now.getTime(), t = seconds(now);
+  if (!login || !password || password.length > 128) return fail('WRONG_PASSWORD');
+  const email = login.includes('@') ? normalizeEmail(login) : null, key = email ? 'e:' + await emailKey(pepper(env), email) : 'u:' + login.toLowerCase();
+  if (!await hitAuth(env, 'pw-ip', ip, ms) || !await hitAuth(env, 'pw-login', await sha256(key), ms)) return fail('RATE_LIMITED', 429);
+  const account = email
+    ? await env.DB.prepare('SELECT id,email,created_at,pass_hash,pass_salt FROM accounts WHERE email=?').bind(email).first()
+    : await env.DB.prepare('SELECT id,email,created_at,pass_hash,pass_salt FROM accounts WHERE username_key=?').bind(login.toLowerCase()).first();
+  if (!account?.pass_hash || !account.pass_salt) { await hashPassword(password, '00'.repeat(16)); return fail('WRONG_PASSWORD'); }
+  if (!sameText(await hashPassword(password, account.pass_salt), account.pass_hash)) return fail('WRONG_PASSWORD');
+  await env.DB.prepare('UPDATE accounts SET last_login_at=? WHERE id=?').bind(t, account.id).run();
+  return await openSession(env, { id: account.id, email: account.email, created_at: account.created_at }, body.value.device, t);
+}
+/* the user name is chosen once and never changed */
+async function setUsername(request, env, auth) {
+  const body = await readJSON(request, 1024); if (body.error) return bodyError(body.error);
+  const name = normalizeUsername(body.value.username); if (!name) return fail('USERNAME_INVALID');
+  const row = await env.DB.prepare('SELECT username FROM accounts WHERE id=?').bind(auth.account.id).first();
+  if (row?.username) return fail('USERNAME_LOCKED', 409);
+  const taken = await env.DB.prepare('SELECT 1 FROM accounts WHERE username_key=? LIMIT 1').bind(name.toLowerCase()).first();
+  if (taken) return fail('USERNAME_TAKEN', 409);
+  try { await env.DB.prepare('UPDATE accounts SET username=?,username_key=? WHERE id=? AND username IS NULL').bind(name, name.toLowerCase(), auth.account.id).run(); }
+  catch { return fail('USERNAME_TAKEN', 409); }
+  return withToken(json({ ok: true, username: name }), auth);
+}
+/* set or change the password: changing needs the current one, unless this session signed in with an e-mail code in the
+   last 10 minutes (that is how a forgotten password is reset) */
+async function setPassword(request, env, auth, now) {
+  const body = await readJSON(request, 2048); if (body.error) return bodyError(body.error);
+  const password = String(body.value.password ?? ''), bad = checkPassword(password); if (bad) return fail(bad);
+  const row = await env.DB.prepare('SELECT pass_hash,pass_salt FROM accounts WHERE id=?').bind(auth.account.id).first(), t = seconds(now);
+  const fresh = t - (auth.session.created_at || 0) <= 600;
+  if (row?.pass_hash && !fresh) {
+    const current = String(body.value.current ?? '');
+    if (!current || !sameText(await hashPassword(current, row.pass_salt), row.pass_hash)) return fail('WRONG_PASSWORD');
+  }
+  const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
+  await env.DB.prepare('UPDATE accounts SET pass_hash=?,pass_salt=?,pass_set_at=? WHERE id=?').bind(await hashPassword(password, salt), salt, t, auth.account.id).run();
+  return withToken(json({ ok: true, hasPassword: true }), auth);
+}
 async function me(env, auth, now) {
   const { results: sessions } = await env.DB.prepare('SELECT id,device,created_at,last_used_at FROM account_sessions WHERE account_id=? AND expires_at>? ORDER BY last_used_at DESC').bind(auth.account.id, seconds(now)).all();
   const { results: usage } = await env.DB.prepare('SELECT kind,COUNT(*) records,COALESCE(SUM(LENGTH(CAST(data AS BLOB))),0) bytes FROM sync_records WHERE account_id=? AND deleted=0 GROUP BY kind').bind(auth.account.id).all();
+  let extra = null; try { extra = await env.DB.prepare('SELECT username,pass_set_at FROM accounts WHERE id=?').bind(auth.account.id).first(); } catch { extra = null; }
   return withToken(json({
     ok: true, accountId: auth.account.id, email: auth.account.email, createdAt: auth.account.created_at, sessionId: auth.session.id,
+    username: extra?.username || null, hasPassword: !!extra?.pass_set_at,
     devices: sessions.map(s => ({ id: s.id, device: s.device, createdAt: s.created_at, lastUsedAt: s.last_used_at, current: s.id === auth.session.id })),
     usage: Object.fromEntries(usage.map(u => [u.kind, { records: u.records, bytes: u.bytes }])), limits: KIND_CAP
   }), auth);
@@ -272,7 +340,7 @@ async function syncPush(request, env, auth, kind, now) {
 }
 
 /* ---- entry --------------------------------------------------------------------------------------------------- */
-export function isAccountsPath(path) { return path === '/api/me' || path.startsWith('/api/auth/') || path.startsWith('/api/sync/'); }
+export function isAccountsPath(path) { return path === '/api/me' || path.startsWith('/api/me/') || path.startsWith('/api/auth/') || path.startsWith('/api/sync/'); }
 export async function handleAccounts(request, env, now = new Date()) {
   const url = new URL(request.url), path = url.pathname.replace(/\/+$/, '') || '/', method = request.method;
   if (!isAccountsPath(path)) return null;
@@ -280,11 +348,14 @@ export async function handleAccounts(request, env, now = new Date()) {
     const ip = await clientKey(request, env);
     if (path === '/api/auth/code') return method === 'POST' ? await requestCode(request, env, ip, now) : fail('METHOD_NOT_ALLOWED', 405);
     if (path === '/api/auth/verify') return method === 'POST' ? await verifyCode(request, env, ip, now) : fail('METHOD_NOT_ALLOWED', 405);
+    if (path === '/api/auth/password') return method === 'POST' ? await passwordLogin(request, env, ip, now) : fail('METHOD_NOT_ALLOWED', 405);
     const auth = await authenticate(request, env, now);
     if (!auth) return fail('UNAUTHORIZED', 401);
     if (!await hitAuth(env, 'acct', auth.account.id, now.getTime())) return fail('RATE_LIMITED', 429);
     if (path === '/api/auth/logout') return method === 'POST' ? await logout(request, env, auth) : fail('METHOD_NOT_ALLOWED', 405);
     if (path === '/api/me') return method === 'GET' ? await me(env, auth, now) : method === 'DELETE' ? await deleteAccount(env, auth) : fail('METHOD_NOT_ALLOWED', 405);
+    if (path === '/api/me/username') return method === 'POST' ? await setUsername(request, env, auth) : fail('METHOD_NOT_ALLOWED', 405);
+    if (path === '/api/me/password') return method === 'POST' ? await setPassword(request, env, auth, now) : fail('METHOD_NOT_ALLOWED', 405);
     const kind = path.slice('/api/sync/'.length);
     if (!KINDS.includes(kind)) return fail('NOT_FOUND', 404);
     return method === 'GET' ? await syncPull(url, env, auth, kind) : method === 'PUT' ? await syncPush(request, env, auth, kind, now) : fail('METHOD_NOT_ALLOWED', 405);
