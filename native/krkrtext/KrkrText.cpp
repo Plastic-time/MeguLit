@@ -53,6 +53,34 @@ void SetStatus(const std::string &value) {
  if (changed) Push("ToMe_KRKR status " + value);
 }
 
+// 2026-11-12 (user: "the game thinks it draws, but the output is ours"): __megulitKrkrHide() is 1 while HookBridge asks for
+// the game's own text to be drawn invisible (event Local\MeguLitKrkrHide-<pid> set) AND the pipe to it is connected, so the
+// game draws its text again the moment MeguLit goes away. The script then draws every message glyph at opacity 0: the
+// engine lays out, wraps and waits as always, and MeguLit draws the readable text where the game put it.
+HANDLE HideEvent;
+DWORD HideTried;
+class HideFunction : public tTJSDispatch {
+public:
+ tjs_error TJS_INTF_METHOD FuncCall(tjs_uint32 flag, const tjs_char *membername, tjs_uint32 *hint, tTJSVariant *result,
+  tjs_int numparams, tTJSVariant **param, iTJSDispatch2 *objthis) {
+  if (membername) return TJS_E_MEMBERNOTFOUND;
+  tjs_int v = 0;
+  if (!HideEvent) {
+   DWORD now = GetTickCount();
+   if (now - HideTried > 1000) {
+    HideTried = now;
+    wchar_t name[64];
+    swprintf(name, 64, L"Local\\MeguLitKrkrHide-%lu", GetCurrentProcessId());
+    HideEvent = OpenEventW(SYNCHRONIZE, FALSE, name);
+   }
+  }
+  if (Connected && HideEvent && WaitForSingleObject(HideEvent, 0) == WAIT_OBJECT_0) v = 1;
+  if (result) *result = v;
+  return TJS_S_OK;
+ }
+};
+iTJSDispatch2 *HideFn;
+
 // The TJS function the script reports through: one string argument, one protocol line.
 class ReportFunction : public tTJSDispatch {
 public:
@@ -220,6 +248,10 @@ void TJS_USERENTRY EvalTry(void *data) {
   tTJSVariant fn(ReportFn, ReportFn);
   global->PropSet(TJS_MEMBERENSURE, L"__megulitKrkrReport", NULL, &fn, global);
  }
+ if (HideFn) {
+  tTJSVariant hide(HideFn, HideFn);
+  global->PropSet(TJS_MEMBERENSURE, L"__megulitKrkrHide", NULL, &hide, global);
+ }
  tTJSVariant scripts;
  if (TJS_FAILED(global->PropGet(0, L"Scripts", NULL, &scripts, global)) || scripts.Type() != tvtObject) { global->Release(); *c->error = L"no Scripts"; return; }
  iTJSDispatch2 *s = scripts.AsObjectNoAddRef();
@@ -237,7 +269,7 @@ bool TJS_USERENTRY EvalCatch(void *data, const tTVPExceptionDesc &desc) {
 }
 void Tick() {
  std::wstring result, error;
- EvalCall call{Installed ? L"(global.__megulitKrkrState!==void)?global.__megulitKrkrState.refresh():'lost'" : Script, &result, &error};
+ EvalCall call{Installed ? L"(typeof global.__megulitKrkrState=='Object'&&global.__megulitKrkrState!==void)?global.__megulitKrkrState.refresh():'lost'" : Script, &result, &error};
  TVPDoTryBlock(EvalTry, EvalCatch, NULL, &call);
  std::string status = Utf8((error.empty() ? result : error).c_str());
  if (error.empty() && result.compare(0, 3, L"ok ") == 0) Installed = true;
@@ -297,6 +329,7 @@ DWORD WINAPI Run(void *) {
  if (!exporter) { SetStatus("off: " + why); return 0; }
  if (!TVPInitImportStub((iTVPFunctionExporter *)exporter)) { SetStatus("off: stub"); return 0; }
  ReportFn = new ReportFunction();
+ HideFn = new HideFunction();
  TickMessage = RegisterWindowMessageW(L"MeguLitKrkrTick-v1");
  for (;;) {
   Sleep(Installed ? 3000 : 1000);

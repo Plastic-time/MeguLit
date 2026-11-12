@@ -31,9 +31,13 @@ class HookNative{
     [cm]/[l]). Every page rule (page clears, no duplicates, row continuation, no marker/box auto-hide, no preflight) follows. */
  /* E422: the reader's skip key (Ctrl / the game's skip held), for the bridge's skip-burst rule. */
  skipHeld(v){const held=v===true;if(held===this.skipKey)return;this.skipKey=held;if(this.process)this.send({type:'skipHeld',held});}
- get flowPage(){return this._flowPage===true||this.originalText?.flowGame?.()===true;}
+ /* 2026-11-12 (user, ファタモルガーナの館: "这死馆也没有上一句渐暗"): the script guess (flowGame: many multi-sentence pages) is
+    overruled by the engine itself: once its page DLL reports lines (with their real places, box or full page), the game is not laid out as a flow page */
+ get flowPage(){if(this._flowPage===true)return true;if(this.pageMode&&this.pageMode.engine!=='ocr')return false;return this.originalText?.flowGame?.()===true;}
  set flowPage(v){this._flowPage=v===true;}
- get preflight(){return this._preflight===true&&this.flowPage!==true;}
+ /* 2026-11-12 a KiriKiri page DLL draws the game's own text invisible itself (MeguLitKrkr __megulitKrkrHide): nothing to look at
+    before hiding, so the preflight that shows the original first (and stayed in read mode when its check was cancelled) is skipped */
+ get preflight(){return this._preflight===true&&this.flowPage!==true&&this.pageMode?.engine!=='krkr';}
  set preflight(v){this._preflight=v===true;}
  /* E410: where a flow line sits on the page, from the game's own scripts (null when unknown). */
  flowLayout(text){try{const provider=this.originalText;if(!provider?.flowLayout)return null;const r=this.resolveSource(text);if(!r||!(r.status==='exact'||r.status==='high'||r.method==='untranslated'))return null;return provider.flowLayout(r.indices)||null;}catch{return null;}}
