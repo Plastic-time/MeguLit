@@ -9,7 +9,7 @@
    substitutions stay as written (the game fills in the player's name). */
 const fs=require('node:fs'),path=require('node:path'),unityfs=require('./unityfs.cjs');
 const KEY=0x28;
-const stat=f=>{try{const s=fs.statSync(f);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 function bundleDir(dir){let names;try{names=fs.readdirSync(dir,{withFileTypes:true});}catch{return '';}
  for(const e of names)if(e.isDirectory()&&/_Data$/i.test(e.name)){const d=path.join(dir,e.name,'StreamingAssets','AssetBundles','Windows');if(fs.existsSync(path.join(d,'langja.cy')))return d;}
  return '';}

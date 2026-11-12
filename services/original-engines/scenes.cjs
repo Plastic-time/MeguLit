@@ -32,7 +32,7 @@ function decode(buf){
  const sj=score('shift_jis'),gbk=score('gbk');return sj.bad<gbk.bad||sj.bad===gbk.bad&&sj.kana>=gbk.kana?sj.t:gbk.t;
 }
 const ascii=t=>/^[\x20-\x7e]*$/.test(t);
-const stat=file=>{try{const s=fs.statSync(file);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 function walk(dir,depth,test,out=[]){let entries;try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
  for(const e of entries){const full=path.join(dir,e.name);if(e.isDirectory()){if(depth>0&&!/^(save|savedata|\.megulit)/i.test(e.name))walk(full,depth-1,test,out);}else if(e.isFile()&&test(e.name,full))out.push(full);}return out;}
 

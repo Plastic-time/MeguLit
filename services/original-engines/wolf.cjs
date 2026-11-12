@@ -15,7 +15,7 @@
    Archives the engine encrypts (any DXArchive whose header is not plain, WOLF RPG Pro / 3.x protected data) are not
    read: unsupported(dir) says why. No key is ever searched for. */
 const fs=require('node:fs'),path=require('node:path');
-const stat=f=>{try{const s=fs.statSync(f);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 const KANA=/[ぁ-ゖァ-ヺ]/g;
 
 // ---- DXArchive (DxLib), unencrypted only ------------------------------------------------------------------------

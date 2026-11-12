@@ -16,7 +16,7 @@
    Traditional) Chinese, or the source itself when that is Chinese; blocks are matched by their "# id". */
 const fs=require('node:fs'),path=require('node:path'),unityfs=require('./unityfs.cjs');
 const memo=new Map();
-const stat=f=>{try{const s=fs.statSync(f);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 function dataDirs(dir){let names;try{names=fs.readdirSync(dir,{withFileTypes:true});}catch{return [];}return names.filter(e=>e.isDirectory()&&/_Data$/i.test(e.name)).map(e=>path.join(dir,e.name));}
 function bundleDir(dir){for(const d of dataDirs(dir)){const b=path.join(d,'StreamingAssets','aa','StandaloneWindows64');if(fs.existsSync(b))return b;}return '';}
 function localizationBundles(dir){const d=bundleDir(dir);if(!d)return [];let files;try{files=fs.readdirSync(d);}catch{return [];}

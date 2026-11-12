@@ -12,7 +12,7 @@
    another folder) pairs by script name and string index. An English-only install has no Japanese and is left out. */
 const fs=require('node:fs'),path=require('node:path');
 const KANA=/[ぁ-ゖァ-ヺ]/,HAN=/[一-鿿]/;
-const stat=file=>{try{const s=fs.statSync(file);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 const listMemo=new Map();
 function wadList(file){const key=file+'|'+stat(file);if(listMemo.has(key))return listMemo.get(key);let out=null,fd;
  try{fd=fs.openSync(file,'r');const size=fs.fstatSync(fd).size;let cap=Math.min(size,4<<20),h=null;

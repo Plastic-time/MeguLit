@@ -15,7 +15,7 @@
    it unverified (hook:null) and live text reaches MeguLit only if the hook layer gets some or through OCR. This adapter
    reads the script itself, so whatever text does arrive is matched to its Japanese line and the patch's Chinese. */
 const fs=require('node:fs'),path=require('node:path');
-const stat=f=>{try{const s=fs.statSync(f);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 const DATA_FILE=n=>/^(?:map\d+|commonevents|troops)\.json$/i.test(n);
 // The data folder of a game folder: www/data (MV) or data (MZ), recognised by System.json and MapInfos.json.
 function dataDir(dir){for(const rel of ['www/data','data','www/Data','Data']){const d=path.join(dir,rel);if(fs.existsSync(path.join(d,'System.json'))&&fs.existsSync(path.join(d,'MapInfos.json')))return d;}return '';}

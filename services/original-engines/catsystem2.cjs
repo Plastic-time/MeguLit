@@ -13,7 +13,7 @@ const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
 const {Blowfish}=require('./blowfish.cjs');
 const sjis=new TextDecoder('shift_jis'),gbk=new TextDecoder('gbk');
 const memo=new Map();
-const stat=f=>{try{const s=fs.statSync(f);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 
 function twister(seed){const mt=new Array(624);seed>>>=0;for(let i=0;i<624;i++){mt[i]=seed&0xffff0000;seed=(Math.imul(69069,seed)+1)>>>0;mt[i]=(mt[i]|((seed&0xffff0000)>>>16))>>>0;seed=(Math.imul(69069,seed)+1)>>>0;}let idx=624;
  return ()=>{if(idx>=624){for(let k=0;k<624;k++){const y=(mt[k]&0x80000000)|(mt[(k+1)%624]&0x7fffffff);mt[k]=(mt[(k+397)%624]^(y>>>1)^(y&1?0x9908b0df:0))>>>0;}idx=0;}let y=mt[idx++];y^=y>>>11;y^=(y<<7)&0x9d2c5680;y^=(y<<15)&0xefc60000;y^=y>>>18;return y>>>0;};}

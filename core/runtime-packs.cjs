@@ -18,7 +18,9 @@ class RuntimePacks{
  /* one store per install root, so Settings and the readers that fetch a pack on demand see the same jobs */
  static shared(root){const k=path.resolve(root).toLowerCase();if(!SHARED.has(k))SHARED.set(k,new RuntimePacks(root));return SHARED.get(k);}
  constructor(root){this.root=root;this.jobs={};}
- manifest(){try{return JSON.parse(fs.readFileSync(path.join(this.root,'setup','runtime.json'),'utf8').replace(/^﻿/,''));}catch{return {packs:{}};}}
+ /* parsed once per change of runtime.json: installed() and status() ask for it on every reader and Settings poll */
+ manifest(){const f=path.join(this.root,'setup','runtime.json');let k='';try{const s=fs.statSync(f);k=s.size+'|'+s.mtimeMs;}catch{}if(k&&this.manifestKey===k)return this.manifestCache;
+  let m;try{m=JSON.parse(fs.readFileSync(f,'utf8').replace(/^﻿/,''));}catch{m={packs:{}};}this.manifestKey=k;this.manifestCache=m;return m;}
  installed(id){const marker=MARKERS[id];if(!marker||!fs.existsSync(path.join(this.root,marker)))return false;const dest=this.manifest().packs?.[id]?.dest;return !dest||ON_DEMAND_FILES.every(f=>fs.existsSync(path.join(this.root,dest,f)));}
  onDemand(id){return !!this.manifest().packs?.[id]?.onDemand;}
  status(){const m=this.manifest();return {version:m.version||'',packs:Object.entries(m.packs||{}).map(([id,p])=>{const j=this.jobs[id];return {id,size:p.size||0,unpacked:p.unpacked||0,onDemand:!!p.onDemand,license:p.license||'',installed:this.installed(id),job:j?{state:j.state,stage:j.stage,received:j.received,total:j.total,error:j.error}:null};})};}
@@ -31,9 +33,10 @@ class RuntimePacks{
  }
  /* Resolve once the pack is installed (downloading it if needed); rejects with the job's error. Used by readers that need a pack now. */
  async ensure(id,{timeout=15*60000}={}){if(this.installed(id))return true;if(!this.manifest().packs?.[id])throw Error('PACK_UNKNOWN');
-  const start=Date.now();for(;;){const job=this.jobs[id];if(!this.running&&(!job||!['queued','downloading'].includes(job.state)))this.download([id]);
-   await new Promise(r=>setTimeout(r,300));if(this.installed(id))return true;const j=this.jobs[id];
-   if(j&&['error','cancelled'].includes(j.state)&&!this.running)throw Error(j.error||'PACK_'+j.state.toUpperCase());if(Date.now()-start>timeout)throw Error('PACK_TIMEOUT');}}
+  const start=Date.now();let asked=false;for(;;){const job=this.jobs[id];
+   /* our own download failing or being cancelled ends the wait; it is not restarted every 300 ms (offline: one try, not hundreds) */
+   if(!this.running&&(!job||!['queued','downloading'].includes(job.state))){if(asked&&job&&['error','cancelled'].includes(job.state))throw Error(job.error||'PACK_'+job.state.toUpperCase());this.download([id]);asked=true;}
+   await new Promise(r=>setTimeout(r,300));if(this.installed(id))return true;if(Date.now()-start>timeout)throw Error('PACK_TIMEOUT');}}
  /* Only on-demand packs can be removed; a running download of it is cancelled first. */
  uninstall(id){const p=this.manifest().packs?.[id];if(!p?.onDemand||!p.dest)throw Error('PACK_NOT_REMOVABLE');const job=this.jobs[id];if(job&&['queued','downloading'].includes(job.state)){job.state='cancelled';job.controller?.abort();}
   const dest=path.resolve(this.root,p.dest);if(!dest.startsWith(path.resolve(this.root,'runtime')+path.sep))throw Error('PACK_DEST_OUTSIDE');fs.rmSync(dest,{recursive:true,force:true});delete this.jobs[id];return this.status();}

@@ -22,7 +22,7 @@ function schemes(){if(catalog)return catalog;catalog=Object.values(SCHEMES);let 
 function rc4(key,skip=0){const S=new Uint8Array(256);for(let i=0;i<256;i++)S[i]=i;let j=0;for(let i=0;i<256;i++){j=(j+S[i]+key[i%key.length])&255;const t=S[i];S[i]=S[j];S[j]=t;}let a=0,b=0;
  for(let k=0;k<skip;k++){a=(a+1)&255;b=(b+S[a])&255;const t=S[a];S[a]=S[b];S[b]=t;} /* version 2: GARbro skips (crc32(key)>>12)&255 bytes */
  return buf=>{for(let i=0;i<buf.length;i++){a=(a+1)&255;b=(b+S[a])&255;const t=S[a];S[a]=S[b];S[b]=t;buf[i]^=S[(S[a]+S[b])&255];}return buf;};}
-const readAt=(file,o,n)=>{const d=Buffer.alloc(n),fd=fs.openSync(file,'r');try{fs.readSync(fd,d,0,n,o);}finally{fs.closeSync(fd);}return d;};
+const {readAt}=require('./file-key.cjs');
 /* the scheme whose index key opens this archive's index (count sane, first name readable) */
 function opens(file,scheme,arc,total){if(!scheme[arc])return false;const start=scheme.version>0?0x20:0;if(total<start+12)return false;
  let size=readAt(file,start,4).readUInt32LE(0);const xor=size>>>24;if(xor)size=(size^(xor*0x01010101))>>>0;if(size&7||size<16||start+4+size>total)return false;

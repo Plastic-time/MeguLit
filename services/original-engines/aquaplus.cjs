@@ -10,7 +10,7 @@
    characters. GLYPHS is what those cells show, matched against 方正准圆 GBK (the font they were drawn with); other cells
    are the game's own and read as Shift-JIS. Only used when fon.pak is that exact build (its atlas entry sizes). */
 const fs=require('node:fs'),path=require('node:path');
-const stat=file=>{try{const s=fs.statSync(file);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 const listMemo=new Map();
 // Index: "KCAP", 2 words, count, then 44-byte entries (compressed flag, 24-byte name, crc, unpacked size, offset, size).
 function kcapList(file){const key=file+'|'+stat(file);if(listMemo.has(key))return listMemo.get(key);let out=null,fd;

@@ -11,7 +11,7 @@
    There is no Chinese in these releases; zero-latency translation machine-translates ahead. */
 const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
 const KANA=/[ぁ-ゖァ-ヺ]/;
-const stat=file=>{try{const s=fs.statSync(file);return s.size+'|'+s.mtimeMs;}catch{return '';}};
+const {stat}=require('./file-key.cjs');
 let charsetMemo=null;
 const charset=()=>charsetMemo||(charsetMemo=fs.readFileSync(path.join(__dirname,'mages-charset-sghd.txt'),'utf8').replace(/[\r\n]/g,''));
 // MPK v2: "MPK\0", version 2.0, entry count (u64), index at 0x40 of 256-byte entries (compression, id, offset, size,
