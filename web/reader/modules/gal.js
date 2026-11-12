@@ -395,7 +395,7 @@
   }
   function apply() {
     preferences = appearance.clean(preferences);
-    if (!document.querySelector('.tomoyo-cn-dialog[open]')) gameScale = appearance.scaleForViewport(layoutInfo ? (layoutInfo.clientWidth>0?layoutInfo.clientWidth*preferences.width/100:layoutInfo.readerWidth)/(Number(window.devicePixelRatio)||1) : window.innerWidth, preferences, bound);
+    gameScale = appearance.gameScaleFor({settings:preferences,layout:layoutInfo,bound,dpr:window.devicePixelRatio,innerWidth:window.innerWidth,dialogOpen:!!document.querySelector('.tomoyo-cn-dialog[open]'),previous:gameScale}); /* E477 */
     placeLayers();
     const root = document.documentElement.style;
     const scaled = value => (value * gameScale).toFixed(2) + 'px';

@@ -118,6 +118,20 @@ if(typeof value.rubyRowOffsetsX==='string')result.rubyRowOffsetsX=value.rubyRowO
     const scale=width / (settings.width / 100) / 1280;
     return settings.autoGameStyle!==false?Math.max(.05,Math.min(16,scale)):Math.max(.6,Math.min(2,scale));
   }
+  /* E477 (player, small ~470x350 window: MeguLit's embedded line came out ~30 px over the game's ~13 px and every re-fit
+     kept it). The scale froze while the Alt+T menu was open and started at 1 (a desktop-sized font): binding and calibrating
+     both happen with the menu open, so a re-fit re-used the stale scale. The game client size never depends on the menu,
+     so the scale follows it whenever it is known; only the reader-width fallback is held while the menu is open. An
+     automatic size is also capped by the client height, so the whole block stays inside a small game window. */
+  function gameScaleFor(o) {
+    const s=o.settings||defaults,layout=o.layout,dpr=Math.max(.5,Number(o.dpr)||1),previous=Number.isFinite(o.previous)&&o.previous>0?o.previous:1;
+    const cw=Number(layout?.clientWidth),ch=Number(layout?.clientHeight);let scale;
+    if(layout&&cw>0)scale=scaleForViewport(cw*s.width/100/dpr,s,o.bound);
+    else if(o.dialogOpen)return previous;
+    else scale=scaleForViewport(layout?Number(layout.readerWidth)/dpr:o.innerWidth,s,o.bound);
+    if(o.bound&&ch>0&&s.sizeSource!=='user'){const largest=Math.max(Number(s.japaneseSize)||0,s.display==='japanese'?0:Number(s.translationSize)||0);if(largest>0)scale=Math.min(scale,ch/dpr*.06/largest);}
+    return Math.max(.05,scale);
+  }
   const fonts = {
     classic: { ja:'"MS Mincho","ＭＳ 明朝","Yu Mincho","Noto Serif JP",serif', zh:'"TomoyoSubahibiCN","SubahibiFont","素晴字体","SimHei","Microsoft YaHei",sans-serif' },
     clean: { ja:'"MS Gothic","ＭＳ ゴシック","Yu Gothic","Meiryo",sans-serif', zh:'"TomoyoSubahibiCN","SubahibiFont","素晴字体","SimHei","Microsoft YaHei",sans-serif' }
@@ -188,5 +202,5 @@ if(typeof value.rubyRowOffsetsX==='string')result.rubyRowOffsetsX=value.rubyRowO
     if (!dark) return shadows[kind] || shadows.outline;
     return kind === 'soft' ? '0 1px 3px #fff9' : '-1px 0 0 #fff9,1px 0 0 #fff9,0 -1px 0 #fff9,0 1px 0 #fff9';
   }
-  return { defaults, clean, paintFor, paintVariables, lineHeightFor, insets, scaleForViewport, fonts, shadows, shadowFor, japaneseFonts,chineseFonts,englishFonts,fontOptions,outlineFor };
+  return { defaults, clean, paintFor, paintVariables, lineHeightFor, insets, scaleForViewport, gameScaleFor, fonts, shadows, shadowFor, japaneseFonts,chineseFonts,englishFonts,fontOptions,outlineFor };
 });

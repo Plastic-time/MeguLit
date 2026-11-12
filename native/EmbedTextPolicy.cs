@@ -107,6 +107,19 @@ internal static class EmbedTextPolicy {
         return lead + t + tail;
     }
 
+    /* E477 (player: embed replacement never hid the original of a newly added game). A stream learned unsafe was keyed by the
+       process name alone, and many engines ship the same executable name (SiglusEngine, BGI, AdvHD, game, start...): an error
+       in one game switched writeback off for every other game with that name. The key now carries the game's folder too, so
+       each game gets its own try; the error guard still turns writeback off at the first engine error. */
+    public static string UnsafeKey(string process, string exe, string name, int role) {
+        string scope = "";
+        try {
+            string dir = String.IsNullOrEmpty(exe) ? "" : System.IO.Path.GetDirectoryName(exe);
+            if (!String.IsNullOrEmpty(dir)) { uint h = 2166136261; foreach (char c in dir.ToLowerInvariant().TrimEnd('\\', '/')) { h ^= c; h *= 16777619; } scope = h.ToString("x8") + "|"; }
+        } catch { }
+        return (process ?? "").ToLowerInvariant() + "|" + scope + name + "|" + role;
+    }
+
     public static bool SelfTest() {
         const string mixed = "そう、雪だ。♪【$名前＿渚】【$名前＿渚】%A";
         return Role(true, 3) == 3 && Role(true, 1) == 1 && Role(false, 3) == 0 && Role(true, 0xe9a0f05) == 0 &&
@@ -127,6 +140,9 @@ internal static class EmbedTextPolicy {
             Writeback("　彼女がはじめて命に<rふ>触</r>れた。", "她第一次触碰到生命。") == "　她第一次触碰到生命。" &&
             Writeback("「またね」<wait>", "「再见」") == "「再见」<wait>" && Writeback("「またね」\u0001", "「再见」") == "「再见」\u0001" &&
             Writeback("あ。", "<b>%A$x译文\u0002") == "〈b〉A x译文".Replace(" ", "") && Writeback("あ。", "  ") == "" &&
-            Hide("<rふ>触</r>【＄名前】") == "" && Hide(@"<rx>data\a</r>") == "";
+            Hide("<rふ>触</r>【＄名前】") == "" && Hide(@"<rx>data\a</r>") == "" &&
+            UnsafeKey("SiglusEngine", @"D:\Games\A\SiglusEngine.exe", "EmbedSiglus", 1) != UnsafeKey("SiglusEngine", @"D:\Games\B\SiglusEngine.exe", "EmbedSiglus", 1) &&
+            UnsafeKey("SiglusEngine", @"D:\Games\A\SiglusEngine.exe", "EmbedSiglus", 1) == UnsafeKey("siglusengine", @"d:\games\a\SiglusEngine.exe", "EmbedSiglus", 1) &&
+            UnsafeKey("game", "", "Embed", 1) == "game|Embed|1";
     }
 }
