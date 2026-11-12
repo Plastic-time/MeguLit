@@ -11,7 +11,10 @@ const norm=s=>String(s||'').replace(/[\s　]+/g,'');
 /* E408: scripts (YU-RIS 女装山脈, 9 043 of 13 696 lines) keep the speaker in the line, 行人「…」, while the game shows the name
    in its own box and the hook captures only 「…」. Lines match without the leading name and with ruby ≪何処／どこ≫ read as its base text; masked letters (●○◯＊) fold together. */
 const SPEAKER=/^[^「『（(\s。、…―]{1,16}(?=[「『（(])/u;
-const matchKey=s=>norm(s).replace(/≪([^≪≫／]*)／[^≪≫]*≫/g,'$1').replace(SPEAKER,'').replace(/[●○◯〇＊*■□]/g,'●');
+/* KiriKiri scripts keep inline text commands the game never shows: font and pitch for a dash (%p-1;%fＭＳ ゴシック;――%p;%fuser;,
+   9-nine, 351 lines) and voice sync (%D$vl1;). Lines match, and pair, without them. */
+const inlineTags=s=>String(s||'').replace(/%[A-Za-z][^;%\n「」]{0,24};/g,'');
+const matchKey=s=>norm(inlineTags(s)).replace(/≪([^≪≫／]*)／[^≪≫]*≫/g,'$1').replace(SPEAKER,'').replace(/[●○◯〇＊*■□]/g,'●');
 const japaneseLine=t=>{const k=(t.match(KANA)||[]).length,h=(t.match(HAN)||[]).length;return k>=2&&k>=h*.2;};
 // Lines that carry language at all (not file names, labels or numbers): what the Japanese / translated share is measured on.
 const prose=t=>/[^\x00-\x7f]/.test(t)&&!!String(t).trim();
@@ -306,6 +309,9 @@ function brief(root,id){const s=readState(root)[String(id)];if(!s)return 'unknow
 function status(root,db,id){
  const row=gameRow(db,id),saved=readState(root)[id];let state=saved;
  try{if(!saved?.runtime||!fs.existsSync(saved.runtime.file)||saved.runtime.sha256!==fingerprint({engine:saved.runtime.engine||'system4',target:saved.runtime.file}))state=scanRunning(root,id,row.executable);}catch(error){state={...saved,status:'failed',error:String(error.message||error)};}
+ /* Live test 2026-11-13 (Summer Pockets, 魔法少女ノ魔女裁判, DDLC Plus): patches aligned before E496 had no pairing report, so the
+    game page could not say total/paired/unpaired. Sample it once from the saved indexes; the verdict is reported, the state kept. */
+ try{if(state?.patchStatus==='ready'&&state.patch?.index&&state.runtime?.index&&state.patchAlignment&&!state.patchAlignment.pairing){const z=readIndex(state.patch.index),j=readIndex(state.runtime.index);if(z.lines.length===j.lines.length){const pc=pairCheck(z.lines,j.lines,{into:'ja',zhSizes:z.sizes,jaSizes:j.sizes,structureOk:state.patchAlignment.sameStructure!==false});state=writeState(root,id,{patchAlignment:{...state.patchAlignment,pairing:pc.report}});}}}catch{}
  const {index:_a,...runtime}=state?.runtime||{},{index:_b,...original}=state?.original||{};
  const patchInfo=state?.patch?{dir:state.patch.dir,file:state.patch.file,source:state.patch.source||state.patch.file,lines:state.patch.lines,auto:!!state.patch.auto,fontMapped:!!state.patch.fontMapped}:null;
  /* E288 (user: the dialog stayed on 正在查找 for good after removing a patch): every status poll starts autoPatchLater, so
@@ -327,7 +333,7 @@ class Matcher{
   let pick,method,status;
   if(found.length===1){pick=found[0];method='unique';status='exact';}
   else{const ahead=found.filter(c=>c[0]>this.last&&c[0]-this.last<=400).sort((a,b)=>a[0]-b[0]);if(this.last>=0&&ahead.length){pick=ahead[0];method='position';status='high';}else return {status:'uncertain',method:'repeated',candidates:found.length};}
-  this.last=pick.at(-1);const named=SPEAKER.test(norm(text)),original=pick.map((i,k)=>{const o=this.og[i]??'';return k||named||!SPEAKER.test(norm(this.rt[i]))?o:o.replace(/^s*/,'').replace(SPEAKER,'');}),already=pick.every(i=>japaneseLine(this.rt[i]));
+  this.last=pick.at(-1);const named=SPEAKER.test(norm(text)),original=pick.map((i,k)=>{const o=inlineTags(this.og[i]??'');return k||named||!SPEAKER.test(norm(this.rt[i]))?o:o.replace(/^s*/,'').replace(SPEAKER,'');}),already=pick.every(i=>japaneseLine(this.rt[i]));
   if(original.some(t=>!t.trim()))return {status:'uncertain',method:'empty-original',indices:pick};
   return {status,method,indices:pick,japanese:original.join('\n'),captured:text,alreadyJapanese:already};
  }
@@ -405,7 +411,7 @@ function scriptPairs(root,executable){
   if(state.status!=='native-japanese'||!state.runtime.index)return null;const ja=readIndex(state.runtime.index).lines;
   const patched=state.patchStatus==='ready'&&state.patch?.index&&state.patch.version===PATCH_VERSION&&(!state.patch.runtimeSha||state.patch.runtimeSha===state.runtime.sha256);
   if(!patched)return {source:'',ja,tr:[]};const og=readIndex(state.patch.index).lines;
-  return {source:'group',ja,tr:ja.map((t,i)=>{const o=og[i];return typeof o==='string'&&o&&norm(o)!==norm(t)&&!japaneseLine(o)?o:'';})};
+  return {source:'group',ja,tr:ja.map((t,i)=>{const o=inlineTags(og[i]);return o&&norm(o)!==norm(inlineTags(t))&&!japaneseLine(o)?o:'';})};
  }catch{return null;}
 }
 function staticProvider(root,executable){
