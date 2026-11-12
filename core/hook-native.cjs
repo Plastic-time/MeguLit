@@ -6,6 +6,22 @@ function cleanSource(text,name='',code=''){if(code.endsWith(':JIT:UNITY'))text=t
 /* A speaker name from a name stream: brackets and control marks stripped; anything that reads like a sentence is not a name. */
 function speakerName(raw){const n=String(raw||'').replace(/[\x00-\x1f]/g,'').replace(/^[\s【\[「『(（]+|[\s】\]」』)）:：]+$/gu,'').trim();if(n.length%2===0&&n.length>=4&&n.slice(0,n.length/2)===n.slice(n.length/2))return speakerName(n.slice(0,n.length/2)); /* a name stream that sends the name twice (時雨時雨) */
  return n&&n.length<=16&&(/^[?？]+$/.test(n)||!/[。、！？!?…]/.test(n))?n:'';}
+/* #141 (CLANNAD, v1.4.9-beta.1: speaker names showed up in the text flow). Many engines (RealLive/Siglus, KiriKiri, BGI,
+   YU-RIS …) send the name box in the same stream as the line, either as its own string or glued to the front of the line.
+   Whatever the engine, a name is split off into the speaker field: 【名前】 / ［名前］ alone or before the line, a name before
+   a quote with a line break, ideographic space or colon in between, and – for names already seen – 名前「…」 and a bare
+   名前 line. Returns {name,text}; text is '' when the string was only a name. */
+const QUOTE_OPEN='「『（(',QUOTE_CLOSE='」』）)';
+function splitSpeaker(raw,known){const s=String(raw||'');const t=s.replace(/^[\s　]+/,'');if(!t)return {name:'',text:s};
+ const kn=n=>!!known&&typeof known.has==='function'&&known.has(n);
+ let m=/^[【［\[]([^【】［］\[\]\n]{1,16})[】］\]](?:[\s　]*)([\s\S]*)$/.exec(t);
+ if(m){const n=speakerName(m[1]),rest=m[2].trim()?m[2]:'';if(n&&(!rest||/^[「『（(]/.test(rest)||kn(n)))return {name:n,text:rest};}
+ m=/^([^\s　「『（(【［\[。、！？!?…]{1,12})(?:[ 　]*\n[\s　]*|　+|[ 　]*[:：][\s　]*)([「『（(][\s\S]*)$/.exec(t);
+ if(m){const n=speakerName(m[1]);if(n)return {name:n,text:m[2]};}
+ m=/^([^\s　「『（(【［\[。、！？!?…]{1,12})([「『（(][\s\S]*[」』）)])$/.exec(t.trimEnd());
+ if(m&&kn(m[1]))return {name:m[1],text:m[2]};
+ if(kn(t.trim()))return {name:t.trim(),text:''};
+ return {name:'',text:s};}
 function scriptSource(text){
  // Script VM syntax left in a hooked string (variable references, ％Ａ/＊Ｂ commands); "50％OFF" is ordinary text (E215).
  const marker=/[【《\[][\$＄]|[%％*＊][A-ZＡ-Ｚ](?![A-Za-zＡ-Ｚａ-ｚ])|[\$＄][\p{L}_＿]/u.exec(text);
@@ -96,7 +112,7 @@ class HookNative{
    if(m.type==='hookSource'&&typeof m.text==='string'&&m.text.length<=4000){this.source(m,name);return;}
    // v1.1.4: speaker names from a name-role stream, for every engine that reports one (user: the log showed every line as narration).
    if(m.type==='hookAuxText'&&typeof m.text==='string'&&m.text.length<=400){this.auxText(m);return;}
-   if(m.type==='hookName'&&typeof m.text==='string'){const n=speakerName(m.text);if(n)this.speaker={text:n,at:this.now()};return;}
+   if(m.type==='hookName'&&typeof m.text==='string'){const n=speakerName(m.text);if(n){this.speaker={text:n,at:this.now()};this.noteSpeaker(n);}return;}
    if(m.type==='hookThreads'&&Array.isArray(m.hookThreads)){// Unity games create a stream per String-method call site (often 100+); keep the selected and embeddable ones
    // ahead of the cut so a late dialogue stream such as Naninovel's printer is never dropped.
    const rank=t=>(t&&t.selected===true?2:0)+(t&&t.embeddable===true?1:0);this.notify({hookAvailable:true,hookThreads:m.hookThreads.slice().sort((a,b)=>rank(b)-rank(a)).slice(0,100).filter(t=>typeof t.id==='string'&&t.id.length<100).map(t=>({id:t.id,name:String(t.name||'').slice(0,100),code:String(t.code||'').slice(0,1000),sample:String(t.sample||'').slice(0,110),selected:t.selected===true,embeddable:t.embeddable===true,...(t.hideOnly===true?{hideOnly:true}:{})}))});this.syncEmbedMode();if(this.preferredThread&&this.state.hookThreads.some(t=>t.id===this.preferredThread)){const id=this.preferredThread;this.preferredThread=null;this.select(id);}else this.flowStreamCheck();return;}
@@ -375,6 +391,7 @@ class HookNative{
     650 ms so a script that repeats them still advances. */
  sameAsLast(text){const k=s=>String(s||'').replace(/\s+/g,''),key=k(text);if(!key||key!==k(this.lastSource))return false;const age=this.now()-(this.lastSourceAt||0);/* E408: the same line from another stream (two hooks on one line) within 2.5 s is the same line; from the same stream a short line is a real repeat after 650 ms */return key.length>=6||age<650||!!this.sourceStream&&!!this.lastSourceStream&&this.sourceStream!==this.lastSourceStream&&age<2500;}
  emitSource(text,origin,engine='',nativeLine=0){
+  {const sp=splitSpeaker(text,this.knownSpeakers);if(sp.name){this.speaker={text:sp.name,at:this.now()};this.noteSpeaker(sp.name);if(!sp.text.trim()){this.trace('speaker name split from the text flow');return;}text=sp.text;}}
   if(!engine&&!nativeLine&&this.flowPage)engine='nvl';
   if((origin==='history'&&this.state.receivedText)||(!nativeLine&&this.sameAsLast(text)&&this.state.hookActive&&this.state.receivedText&&!this.state.hookRecovering)){this.trace('source duplicate ignored chars='+text.length);return;}
   // E247 (user: a game settings screen looped its prompts into the text bar): when lines already shown in the last
@@ -385,6 +402,8 @@ class HookNative{
    L.seen.push({text,at:now});if(L.seen.length>12)L.seen.shift();}
   const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;/* E416 the choice detector learns every dialogue line and speaker, whatever the engine */(this.choice||(this.choice=new ChoiceCapture(()=>this.now()))).noteDialogue(text,speaker);/* E407 a new dialogue line ends the choice screen */if(text.replace(/\s+/g,'')!==String(this.lastSource||'').replace(/\s+/g,''))this.clearChoices('new dialogue line');this.lastSource=text;this.lastSourceAt=this.now();this.palFlush?.();this.lastSourceStream=this.sourceStream||'';this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.notify({hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookFlowGrid:engine==='nvl'?(this.flowGridName||''):'',...(()=>{const f=engine==='nvl'?this.flowLayout(text):null;/* E410 */return {hookFlowPageStart:f?.pageStart===true,hookFlowRow:f?.row||'',hookSourceIndex:Number.isSafeInteger(f?.index)?f.index:-1};})(),hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
  }
+ /* #141 names seen in a name stream or split from a line; at most 200 are kept. */
+ noteSpeaker(n){const K=this.knownSpeakers||(this.knownSpeakers=new Set());if(!n||n.length>12)return;K.delete(n);K.add(n);if(K.size>200)K.delete(K.values().next().value);}
  markerTarget(v){this.waitTarget=v;this.syncMarker();this.flowMarker(v);}
  /* E323 (user: WoH kept the old page's lines when the game cleared the page). A full-screen page has no clear signal in
     the text hook, but the game's wait marker sits after the newest line and only ever moves DOWN the page; the one time
@@ -403,4 +422,4 @@ class HookNative{
  send(v){if(this.process?.stdin.writable)this.process.stdin.write(JSON.stringify(v)+'\n');}
  stop(dispose=true){this.embedModeSent=undefined;if(this.state?.scriptSource)this.notify({scriptSource:false});if(this.state?.embedTranslating)this.notify({embedTranslating:false});clearTimeout(this.skipBurst?.timer);this.skipBurst=null;this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.retryAt=0;this.attempt=0;this.markerKey='';this.waitTarget=null;if(this.process){const old=this.process;this.send({type:'quit'});old.stdin.end();this.process=null;++this.serial;const timer=setTimeout(()=>{if(old.exitCode===null)old.kill();},2000);timer.unref?.();}this.enabled=false;this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'disabled',hookSource:null,hookThreads:[],hookDrawCount:0,hookDrawAt:0});if(dispose){this.lastSource='';this.identity='';this.wanted=false;clearInterval(this.timer);}}
 }
-module.exports={FLOW_PAGE_EXES,HookNative,PAGE_ENGINES,cleanSource,scriptSource,identifierNoise};
+module.exports={FLOW_PAGE_EXES,HookNative,PAGE_ENGINES,cleanSource,scriptSource,identifierNoise,splitSpeaker,speakerName};
