@@ -16,7 +16,7 @@ import {forumRoute,forumDeletes} from './forum.js';
 import {newsGet,hotWordsDailyGet,refreshDaily,imageGet,articleGet} from './daily.js';
 
 /* requests per window; key prefix → [limit, seconds] */
-export const RATE={ip:[120,60],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60],daily:[60,60],'daily-img':[240,60],appeal:[3,86400],profile:[30,3600],'social-get':[120,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400],'forum-get':[120,60],'forum-post':[5,3600],'forum-reply':[30,3600],'forum-day':[60,86400],'forum-ip':[40,3600]};
+export const RATE={ip:[120,60],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60],daily:[60,60],'daily-img':[240,60],release:[30,60],appeal:[3,86400],profile:[30,3600],'social-get':[120,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400],'forum-get':[120,60],'forum-post':[5,3600],'forum-reply':[30,3600],'forum-day':[60,86400],'forum-ip':[40,3600]};
 const encoder=new TextEncoder();
 const hex=buffer=>[...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');
 export async function sha256(value){return hex(await crypto.subtle.digest('SHA-256',typeof value==='string'?encoder.encode(value):value));}
@@ -35,6 +35,22 @@ function json(data,status=200,extra={}){return new Response(JSON.stringify(data)
 const fail=(error,status=400,extra)=>json({ok:false,error},status,extra);
 
 /* ---- rate limiting (fixed windows in D1) ----------------------------------------------------------------------- */
+async function releaseGet(which,env){
+ const now=Math.floor(Date.now()/1000);let row=null;try{row=await env.DB.prepare('SELECT body,fetched_at FROM release_cache WHERE which=?').bind(which).first();}catch{}
+ const out=(body,age)=>new Response(body,{status:200,headers:{'content-type':'application/json; charset=utf-8','cache-control':'public, max-age=120','x-release-age':String(age)}});
+ if(row&&now-row.fetched_at<600)return out(row.body,now-row.fetched_at);
+ const fresh=await refreshRelease(env,which).catch(()=>null);if(fresh)return out(fresh,0);
+ if(row)return out(row.body,now-row.fetched_at);
+ return new Response(JSON.stringify({error:'RELEASE_UNAVAILABLE'}),{status:503,headers:{'content-type':'application/json; charset=utf-8'}});
+}
+/* GitHub's answer is stored only when it is a real release (GitHub rate-limits the shared Cloudflare egress now and then) */
+async function refreshRelease(env,which){
+ const headers={'User-Agent':'MeguLit-Relay','Accept':'application/vnd.github+json'};if(env.GITHUB_TOKEN)headers.Authorization='Bearer '+env.GITHUB_TOKEN;
+ const up=await fetch('https://api.github.com/repos/ilynthn/MeguLit/releases/'+which,{headers});if(!up.ok)return null;
+ const body=await up.text();let rel;try{rel=JSON.parse(body);}catch{return null;}if(!rel?.tag_name||!Array.isArray(rel.assets))return null;
+ await env.DB.prepare('INSERT INTO release_cache(which,body,fetched_at) VALUES(?,?,?) ON CONFLICT(which) DO UPDATE SET body=excluded.body,fetched_at=excluded.fetched_at').bind(which,body,Math.floor(Date.now()/1000)).run();
+ return body;
+}
 export async function hit(env,kind,subject,now=Date.now()){
  const [limit,seconds]=RATE[kind],windowStart=Math.floor(now/1000/seconds)*seconds,bucket=`${kind}:${subject}:${windowStart}`;
  const row=await env.DB.prepare('INSERT INTO rate_limits(bucket,count,reset_at) VALUES(?,1,?) ON CONFLICT(bucket) DO UPDATE SET count=count+1 RETURNING count').bind(bucket,windowStart+seconds).first();
@@ -211,6 +227,9 @@ export async function handle(request,env,now=new Date()){
   else if(path==='/api/kindred'&&request.method==='GET')response=await kindred(request,env,ip,now,social);
   /* #117 交流 board (relay/src/forum.js) */
   else if(path==='/api/forum'||path.startsWith('/api/forum/'))response=await forumRoute(request,env,ip,now,social,path);
+  /* E461 (user: players in mainland China cannot reach api.github.com, so the update check failed) GitHub's release
+     JSON for MeguLit only, cached 5 minutes at the edge; the app still checks the package against GitHub's digest */
+  else if(/^\/api\/release\/(latest|tags\/v\d+\.\d+\.\d+[a-z]?)$/.test(path)&&request.method==='GET')response=await hit(env,'release',ip,now.getTime())?await releaseGet(path.slice(13),env):fail('RATE_LIMITED',429);
   /* E415 每日 page (relay/src/daily.js) */
   else if(path==='/api/news'&&request.method==='GET')response=await hit(env,'daily',ip,now.getTime())?await newsGet(env,{json},now,url):fail('RATE_LIMITED',429);
   else if(/^\/api\/news\/img\/[0-9a-f]{32}$/.test(path)&&request.method==='GET')response=await hit(env,'daily-img',ip,now.getTime())?await imageGet(env,path.slice(14)):fail('RATE_LIMITED',429);
@@ -233,6 +252,6 @@ export async function handle(request,env,now=new Date()){
 export async function scheduled(event,env,ctx){
  /* every 30 minutes: website feedback still waiting for its GitHub issue; the weekly cron settles hot words */
  if(event?.cron==='20 21 * * *'){const job=refreshDaily(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
- if(event?.cron==='*/30 * * * *'){const job=syncPendingFeedback(env).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
+ if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null)]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
 export default {fetch:(request,env)=>handle(request,env),scheduled};

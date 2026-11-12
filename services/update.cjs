@@ -20,6 +20,14 @@ const inChina=()=>{try{const o=Intl.DateTimeFormat().resolvedOptions();return o.
 function sources(rel,china=inChina()){const direct=[rel.url];if(!rel.digest)return direct;const fresh=rel.url+(rel.url.includes('?')?'&':'?')+'v='+String(rel.digest).slice(0,12);const relayed=MIRRORS.map(m=>m.replace('{url}',fresh));return china?[...relayed,...direct]:[...direct,...relayed];}
 const updateLog=(root,line)=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','update.log'),new Date().toISOString()+' '+line+'\n');}catch{}};
 const HEADERS={'User-Agent':'MeguLit-Updater','Accept':'application/vnd.github+json'};
+/* E461 (user: players in mainland China, update_check "fetch failed"): api.github.com is often unreachable there, so the
+   release JSON also comes from MeguLit's relay (api.megulit.com/api/release/..., GitHub's own answer cached 5 minutes);
+   China-looking systems ask the relay first. The package itself is still checked against GitHub's sha256 digest. */
+const RELAY_RELEASE='https://api.megulit.com/api/release/';
+async function releaseFetch(fetcher,which,timeout,china=inChina()){
+ const urls=[REPO+'/'+which,RELAY_RELEASE+which];if(china)urls.reverse();let last;
+ for(const url of urls){try{const r=await fetcher(url,{headers:HEADERS,signal:AbortSignal.timeout(timeout)});if(r.ok||r.status===404)return r;last=r;}catch(e){last=e;}}
+ if(last instanceof Error)throw last;return last;}
 /* Hotfix letters (user 2026-11-10: 1.2.8a, 1.2.8b ...) are a display label only: the GitHub tag and the package name stay
    numeric (v1.2.8, MeguLit-v1.2.8-win-x64.zip) so every installed updater keeps working; a lettered hotfix is found by the
    package digest like any hotfix. The letter is dropped before comparing. */
@@ -36,14 +44,14 @@ function asset(rel){
  return a;
 }
 async function latest(fetcher=fetch){
- const r=await fetcher(REPO+'/latest',{headers:HEADERS,signal:AbortSignal.timeout(15000)});
+ const r=await releaseFetch(fetcher,'latest',15000);
  if(!r.ok)throw Error('UPDATE_CHECK_FAILED');
  const rel=await r.json(),a=asset(rel);
  return {version:String(rel.tag_name||'').replace(/^v/,''),name:a.name,size:a.size,url:a.browser_download_url,digest:/^sha256:[a-f0-9]{64}$/i.test(a.digest||'')?a.digest.slice(7).toLowerCase():'',notes:String(rel.body||'').replace(/^> \*\*\[⬇[^\n]*\n*/m,'').slice(0,6000),page:rel.html_url,published:rel.published_at||''};
 }
 /* Size of the package the user is running, for "bigger / smaller than now". Unknown is fine. */
 async function installedSize(current,fetcher=fetch){
- try{let r=await fetcher(REPO+'/tags/v'+String(current).replace(/^v/,''),{headers:HEADERS,signal:AbortSignal.timeout(10000)});if(!r.ok&&base(current)!==String(current).replace(/^v/,''))r=await fetcher(REPO+'/tags/v'+base(current),{headers:HEADERS,signal:AbortSignal.timeout(10000)});if(!r.ok)return 0;return asset(await r.json()).size||0;}catch{return 0;}
+ try{let r=await releaseFetch(fetcher,'tags/v'+String(current).replace(/^v/,''),10000);if(!r.ok&&base(current)!==String(current).replace(/^v/,''))r=await releaseFetch(fetcher,'tags/v'+base(current),10000);if(!r.ok)return 0;return asset(await r.json()).size||0;}catch{return 0;}
 }
 
 let state={phase:'idle'},job=null,found=null;

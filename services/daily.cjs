@@ -87,7 +87,13 @@ async function thumbnail(root,base,ref,fetcher){
   return 'data:'+type+';base64,'+bytes.toString('base64');}catch{return '';}
 }
 function pruneImages(root,now=Date.now()){const dir=imgDir(root);if(!dir)return;try{for(const name of fs.readdirSync(dir)){const f=path.join(dir,name);if(now-fs.statSync(f).mtimeMs>KEEP_DAYS*864e5)fs.rmSync(f,{force:true});}}catch{}}
-async function thumbnails(root,base,items,fetcher){pruneImages(root);await Promise.all(items.map(async n=>{n.image=n.image?await thumbnail(root,base,n.image,fetcher):'';}));}
+/* E461 (user: the 日报 still hung for players in China) a slow link to the relay held the page until every thumbnail of
+   ~100 items had arrived; now the page waits at most THUMB_BUDGET, items whose picture is not back show without it, and
+   the downloads go on into the cache for the next visit */
+const THUMB_BUDGET=2500;
+async function thumbnails(root,base,items,fetcher){pruneImages(root);const want=items.map(n=>n.image);items.forEach(n=>{n.image='';});
+ const jobs=items.map(async(n,i)=>{if(!want[i])return;const img=await thumbnail(root,base,want[i],fetcher).catch(()=>'');n.image=img;});
+ let timer;await Promise.race([Promise.all(jobs),new Promise(r=>{timer=setTimeout(r,THUMB_BUDGET);timer.unref?.();})]);clearTimeout(timer);}
 /* only links the page was just given (news articles and hot-word headlines) open in the browser */
 const shown=new Set();
 function canOpen(url){return shown.has(String(url||''));}
