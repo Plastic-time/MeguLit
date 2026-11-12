@@ -12,10 +12,28 @@ const SCHEMES={
  mashiroiro:{title:'Mashiro Iro Symphony',version:1,scr:{index:'f423a8c4a322f6fdf976c34674b634e775802d382c06aa1085dccf0ce987e6ee',data:'85a52bbacf893da5b1da1a24a1d458243f4854edecb2c4afdecdd966b751b42a'},
   voice:{index:'e8f193099447008c77b43bba74e4f563b7392e6721d68d1628e051996f978098',data:'40a02109b3b4f74dc41af9adc30328d2cd61b79ae265f50a4e9ce8c23cc89625'},sc:'rytKRa38',ogg:'cQ5jhgpb'},
 };
-function rc4(key){const S=new Uint8Array(256);for(let i=0;i<256;i++)S[i]=i;let j=0;for(let i=0;i<256;i++){j=(j+S[i]+key[i%key.length])&255;const t=S[i];S[i]=S[j];S[j]=t;}let a=0,b=0;
+/* E452 every PazScheme GARbro knows (paz-schemes.json, from its Formats.dat: minori eden*, ef, Trinoline, Musica titles ...).
+   A Steam build names itself in the header ("eden_en") but GARbro keys schemes by title, so an archive whose header has
+   no built-in scheme takes the first scheme whose index key decrypts a sane index of that archive. */
+let catalog=null;
+function schemes(){if(catalog)return catalog;catalog=Object.values(SCHEMES);let raw={};try{raw=JSON.parse(fs.readFileSync(path.join(__dirname,'paz-schemes.json'),'utf8'));}catch{}
+ for(const [title,s] of Object.entries(raw)){const o={title,version:s.version|0,sc:s.type?.sc||'',ogg:s.type?.ogg||''};for(const [a,k] of Object.entries(s.arc||{}))if(k&&k[0]&&k[1])o[a]={index:k[0],data:k[1]};catalog.push(o);}
+ return catalog;}
+function rc4(key,skip=0){const S=new Uint8Array(256);for(let i=0;i<256;i++)S[i]=i;let j=0;for(let i=0;i<256;i++){j=(j+S[i]+key[i%key.length])&255;const t=S[i];S[i]=S[j];S[j]=t;}let a=0,b=0;
+ for(let k=0;k<skip;k++){a=(a+1)&255;b=(b+S[a])&255;const t=S[a];S[a]=S[b];S[b]=t;} /* version 2: GARbro skips (crc32(key)>>12)&255 bytes */
  return buf=>{for(let i=0;i<buf.length;i++){a=(a+1)&255;b=(b+S[a])&255;const t=S[a];S[a]=S[b];S[b]=t;buf[i]^=S[(S[a]+S[b])&255];}return buf;};}
-function schemeOf(file){let head;try{const fd=fs.openSync(file,'r');try{head=Buffer.alloc(32);fs.readSync(fd,head,0,32,0);}finally{fs.closeSync(fd);}}catch{return null;}
- const name=head.toString('latin1',0,head.indexOf(0)>0?head.indexOf(0):0);return SCHEMES[name]||null;}
+const readAt=(file,o,n)=>{const d=Buffer.alloc(n),fd=fs.openSync(file,'r');try{fs.readSync(fd,d,0,n,o);}finally{fs.closeSync(fd);}return d;};
+/* the scheme whose index key opens this archive's index (count sane, first name readable) */
+function opens(file,scheme,arc,total){if(!scheme[arc])return false;const start=scheme.version>0?0x20:0;if(total<start+12)return false;
+ let size=readAt(file,start,4).readUInt32LE(0);const xor=size>>>24;if(xor)size=(size^(xor*0x01010101))>>>0;if(size&7||size<16||start+4+size>total)return false;
+ const raw=readAt(file,start+4,16);if(xor)for(let i=0;i<16;i++)raw[i]^=xor;const d=new Blowfish(Buffer.from(scheme[arc].index,'hex')).decryptBuffer(raw),count=d.readUInt32LE(0);
+ if(!count||count>100000)return false;for(let i=4;i<16;i++){const c=d[i];if(c===0)return i>4;if(c<0x20||c===0x7f)return false;}return true;}
+const chosen=new Map();
+function schemeOf(file){let head,total;try{total=fs.statSync(file).size;head=readAt(file,0,32);}catch{return null;}
+ const arc=path.parse(file).name.toLowerCase(),key=file+'|'+total;if(chosen.has(key))return chosen.get(key);
+ const name=head.toString('latin1',0,head.indexOf(0)>0?head.indexOf(0):0);let found=SCHEMES[name]&&SCHEMES[name][arc]?SCHEMES[name]:null;
+ if(!found&&/\.(?:paz|dat)$/i.test(file))found=schemes().find(s=>{try{return opens(file,s,arc,total);}catch{return false;}})||null;
+ chosen.set(key,found);return found;}
 function list(file){const scheme=schemeOf(file),arc=path.parse(file).name.toLowerCase();if(!scheme||!scheme[arc])return null;
  // E450 the index is read, entries are read from the file when asked for (voice.dat is two gigabytes)
  const total=fs.statSync(file).size,at=(o,n)=>{const d=Buffer.alloc(n),fd=fs.openSync(file,'r');try{fs.readSync(fd,d,0,n,o);}finally{fs.closeSync(fd);}return d;};
@@ -29,22 +47,33 @@ function list(file){const scheme=schemeOf(file),arc=path.parse(file).name.toLowe
   if(e.offset+e.aligned>b.length)return null;
   out.push({name,read:()=>{let d=Buffer.from(b.subarray(e.offset,e.offset+e.aligned));if(xor)for(let k=0;k<d.length;k++)d[k]^=xor;d=new Blowfish(dataKey).decryptBuffer(d);
    /* E450 the type password: .sc scripts, and every entry of an audio archive (voice.dat) as GARbro GetTypePassword */
-   const pw=e.packed?'':/\.sc$/i.test(name)?scheme.sc:(/\.ogg$/i.test(name)||/^(?:voice|bgm|se)$/.test(arc))?scheme.ogg||'':'';if(scheme.version>0&&pw)rc4(Buffer.from(name.toLowerCase()+' '+e.unpacked.toString(16).toUpperCase().padStart(8,'0')+' '+pw,'latin1'))(d);
+   const pw=e.packed?'':/\.sc$/i.test(name)?scheme.sc:(/\.ogg$/i.test(name)||/^(?:pm)?(?:voice|bgm|se)$/.test(arc))?scheme.ogg||'':'';
+   if(scheme.version>0&&pw){const k=Buffer.from(name.toLowerCase()+' '+e.unpacked.toString(16).toUpperCase().padStart(8,'0')+' '+pw,'latin1');rc4(k,scheme.version>=2?(zlib.crc32(k)>>>12)&255:0)(d);}
    d=d.subarray(0,e.size);return e.packed?zlib.inflateSync(d):d;}});}
  return out;}
 const voiceRef=require('./voice-ref.cjs');
 // E450 the voice column (sk\sk1042.ogg) goes with the text of its row.
-function parse(data){const lines=[],voices=[];
- for(const row of new TextDecoder('shift_jis').decode(data).split(/\r?\n/)){if(!row.startsWith('.message'))continue;const f=row.split('\t');const name=f[3]||'',text=(f.slice(4).join('\t')||'').replace(/\\#[0-9A-Fa-f]{6}/g,'').replace(/\\n/g,'').replace(/\\[-+*A-Za-z]/g,'').trim();/* \#RRGGBB colour, \n break, \+ etc. */
+/* E452 a script is Japanese unless its messages have no kana and are either not plain ASCII (a Chinese patch in GBK
+   over scr.paz, eden* on Steam) or many and all ASCII (an English release): those are not offered as originals. */
+const KANA=/[぀-ヿ]/;
+function japanese(data){const text=new TextDecoder('shift_jis').decode(data),rows=text.split(/\r?\n/).filter(r=>r.startsWith('.message'));
+ if(rows.some(r=>KANA.test(r)))return text;const ascii=rows.every(r=>/^[\x00-\x7f]*$/.test(r));return ascii&&rows.length<20?text:null;}
+function parse(data){const lines=[],voices=[];const text=japanese(data);if(text==null)return {lines,anchors:[]};
+ for(const row of text.split(/\r?\n/)){if(!row.startsWith('.message'))continue;const f=row.split('\t');const name=f[3]||'',text=(f.slice(4).join('\t')||'').replace(/\\#[0-9A-Fa-f]{6}/g,'').replace(/\\n/g,'').replace(/\\[-+*A-Za-z]/g,'').trim();/* \#RRGGBB colour, \n break, \+ etc. */
   if(!text)continue;if(name){lines.push(name);voices.push(null);}lines.push(text);voices.push(voiceRef.clean(f[2]));}
  const v=voiceRef.keep(voices);return v?{lines,anchors:[],voices:v}:{lines,anchors:[]};}
-function scrDat(dir){const f=path.join(dir,'scr.dat');return schemeOf(f)?f:null;}
+/* scr.dat (Musica) or scr.paz / pmscr.paz (minori) */
+function scrDat(dir){for(const n of ['scr.dat','scr.paz']){const f=path.join(dir,n);if(fs.existsSync(f)&&schemeOf(f))return f;}return null;}
 const engine={
- id:'paz',hint:'scr.dat',
+ id:'paz',hint:'scr.dat 或 scr.paz',
  scenes(dir){const f=scrDat(dir);if(!f)return [];return (list(f)||[]).filter(e=>/\.sc$/i.test(e.name));},
  archives:()=>[],sources:dir=>{const f=scrDat(dir);return f?[f]:[];},
  parse,test:n=>/\.sc$/i.test(n),
+ /* E452 the scenario opens but holds no Japanese (English Steam build, Chinese patch over scr.paz) */
+ unsupported(dir){const f=scrDat(dir);if(!f)return '';const sc=(list(f)||[]).filter(e=>/\.sc$/i.test(e.name));if(!sc.length)return '';
+  for(const e of sc){try{if(new TextDecoder('shift_jis').decode(e.read()).split(/\r?\n/).some(r=>r.startsWith('.message')&&KANA.test(r)))return '';}catch{}}return 'PAZ_NO_JAPANESE';},
+ REASONS:{PAZ_NO_JAPANESE:'这个版本的剧本里没有日文原文（英文版或装了汉化补丁），需要日文版的 scr 文件'},
 };
 // E450 the clips of voice.dat, for game-voice.cjs.
-function audio(file){if(!/[\\/]voice\.dat$/i.test(file))return null;const l=list(file);return l?l.map(e=>({name:/\.\w{2,4}$/.test(e.name)?e.name:e.name+'.ogg',read:e.read})):null;}
+function audio(file){if(!/[\\/](?:pm)?voice\.(?:dat|paz)$/i.test(file))return null;const l=list(file);return l?l.map(e=>({name:/\.\w{2,4}$/.test(e.name)?e.name:e.name+'.ogg',read:e.read})):null;}
 module.exports={SCHEMES,list,parse,engine,audio};
