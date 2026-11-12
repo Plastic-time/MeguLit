@@ -20,7 +20,7 @@ LR"MGLT((function(){
      KiriKiri builds; typeof does not */
   var st=(typeof global.__megulitKrkrState=='Object')?global.__megulitKrkrState:void;
   if(st===void) {
-   st=%['lastFont'=>'','art'=>0,'artText'=>'','artSeen'=>[],'calls'=>0,'hid'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
+   st=%['skipped'=>0,'skippedCls'=>'','lastFont'=>'','art'=>0,'artText'=>'','artSeen'=>[],'calls'=>0,'hid'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
    st.screen=function(){
     var sw=+this.kag.scWidth,sh=+this.kag.scHeight;
     if(!(sw>0) || !(sh>0)) {sw=+this.kag.primaryLayer.width;sh=+this.kag.primaryLayer.height;}
@@ -109,6 +109,14 @@ LR"MGLT((function(){
     try {
      if(o===void || o===null || !isvalid o || typeof o.drawText!='Object') return;
      if(typeof o.__mgKind=='String') {if(kind=='msg') o.__mgKind='msg';return;}
+     /* 2026-11-12 (千恋＊万花: "Member checkUpdate does not exist" at start.ks 43 after a custom message-layer class got our
+        drawText): only the plain Layer a message layer draws its line on (lineLayer, new Layer in KAG) is touched, never a
+        message-layer class (a game's own subclass keeps its methods; such a game is embedded the other ways). */
+     var isL=0,isK=0,isM=0;
+     try {isL=(o instanceof "Layer")?1:0;} catch(e) {isL=2;}
+     try {isK=(o instanceof "KAGLayer")?1:0;} catch(e) {isK=2;}
+     try {isM=(o instanceof "MessageLayer")?1:0;} catch(e) {isM=2;}
+     if(isL!=1 || isM!=0) {this.skipped++;this.skippedCls='L'+isL+'K'+isK+'M'+isM;return;}
      o.__mgOld=o.drawText;o.__mgKind=kind;
      o.drawText=(global.__megulitDraw incontextof o);
      if(kind=='msg') this.wrapped.add(o); else this.artSeen.add(o);
@@ -125,7 +133,7 @@ LR"MGLT((function(){
    } incontextof st;
 )MGLT" LR"MGLT(
    st.install=function(L){
-    try {this.wrapDraw(L);if(typeof L.lineLayer=='Object') this.wrapDraw(L.lineLayer);} catch(e) {}
+    try {if(typeof L.lineLayer=='Object') this.wrapDraw(L.lineLayer);} catch(e) {}
     for(var i=0;i<this.recs.count;i++) if(this.recs[i].target===L) return;
     if(typeof L.processCh!='Object') return;
     var rec=%['target'=>L,'st'=>this,'oldCh'=>L.processCh,'oldClear'=>void,'n'=>0,'text'=>'','line'=>0,'same'=>0,'cleared'=>true,'nvl'=>0,'x0'=>0,'y0'=>0,'x1'=>0,'y1'=>0,'size'=>0,'sw'=>0,'sh'=>0,'ly'=>0,'color'=>-1];
@@ -196,15 +204,13 @@ LR"MGLT((function(){
      for(var i=this.recs.count-1;i>=0;i--) if(!isvalid this.recs[i].target) this.recs.erase(i);
      for(var i=this.wrapped.count-1;i>=0;i--) if(!isvalid this.wrapped[i]) this.wrapped.erase(i);
      for(var i=this.artSeen.count-1;i>=0;i--) if(!isvalid this.artSeen[i]) this.artSeen.erase(i);
-     try {this.artWalk(k.primaryLayer,0);} catch(e) {}
-     try {this.artWalk(k.fore.base,0);this.artWalk(k.back.base,0);} catch(e) {}
      var pages=[k.fore,k.back];
      for(var i=0;i<pages.count;i++) {
       var ms=pages[i].messages;
       if(typeof ms!='Object' || ms===void || ms===null) continue;
       for(var j=0;j<ms.count && j<32;j++) this.install(ms[j]);
      }
-     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' draws='+this.calls+' hidden='+this.hid+' art='+this.art+' artLayers='+this.artSeen.count+' font='+this.fontNow();
+     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' draws='+this.calls+' hidden='+this.hid+' art='+this.art+' artLayers='+this.artSeen.count+' font='+this.fontNow()+' skipped='+this.skipped+(this.skippedCls!=''?'('+this.skippedCls+')':'');
     } catch(e) {return 'error '+e.message;}
    } incontextof st;
    global.__megulitKrkrState=st;
