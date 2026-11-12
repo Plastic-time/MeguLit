@@ -273,6 +273,11 @@ async function startGame(id,button){
   const [failure,close]=launchCopy(locale),title=started?({zh:'游戏已启动，MeguLit 连接失败',ja:'ゲームは起動済みです。MeguLit の接続に失敗しました',en:'Game started. MeguLit could not connect.'})[locale]:failure,reason=launchReason(code,locale)||errorMessage(error);
   const dialog=modal('<h2>'+title+'</h2><p>'+esc(reason)+'</p><div class="dialog-actions"><button class="secondary" data-launch-close>'+close+'</button></div>');
   dialog.querySelector('[data-launch-close]').onclick=()=>dialog.close();
+  /* 2026-11-12 the game imports DirectPlay and Windows has none: install it here (no restart), then launch again */
+  if((code==='DIRECTPLAY_REQUIRED'||code==='WINDOWS_FEATURE_REQUIRED')&&dialog.open){const dp=code==='DIRECTPLAY_REQUIRED',words=({zh:[dp?'安装 DirectPlay':'安装所需组件','正在安装…','没有装上（权限请求被取消，或安装失败）'],ja:[dp?'DirectPlay をインストール':'必要なコンポーネントをインストール','インストール中…','インストールできませんでした（許可が取り消されたか、失敗しました）'],en:[dp?'Install DirectPlay':'Install the component','Installing…','It was not installed (the permission prompt was cancelled, or it failed)']})[locale]||['Install','Installing…','It was not installed'];
+   const add=document.createElement('button');add.className='primary';add.textContent=words[0];
+   add.onclick=async()=>{add.disabled=true;add.textContent=words[1];try{await api('windows_feature_install',{id});dialog.close();startGame(id,button);}catch{add.disabled=false;add.textContent=words[0];const p=dialog.querySelector('p');if(p)p.textContent=words[2];}};
+   dialog.querySelector('.dialog-actions').append(add);}
   if(code==='JAPANESE_EXECUTABLE_REQUIRED'){
    const {gameLanguageLabel,openGameLanguage}=await import('./game-language.js');
    if(dialog.open){const choose=document.createElement('button');choose.className='secondary';choose.textContent=gameLanguageLabel(locale);choose.onclick=()=>{dialog.close();openGameLanguage({id,api,invoke,locale,esc,toast,onChanged:async()=>{model=await api('home');renderRoute();}}).catch(()=>toast(text.serviceFailed));};dialog.querySelector('.dialog-actions').append(choose);}

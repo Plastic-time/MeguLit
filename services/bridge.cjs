@@ -46,11 +46,13 @@ function savePreferences(request) {
   fs.writeFileSync(temporary,JSON.stringify(next,null,2));fs.renameSync(temporary,file);
   return next;
 }
-async function launch(db,id,runtime=null,windowsLaunch=false) {
+/* 2026-11-12 the Windows feature a game could not start without, per game, for the install button (windows_feature_install) */
+const neededFeature=new Map();
+async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false}={}) {
   const game=db.prepare('SELECT * FROM games WHERE id=? AND removed_at IS NULL').get(id);
   if(!game)throw Error('GAME_NOT_FOUND');
    const trace=(stage,extra={})=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','game-launch.log'),JSON.stringify({at:new Date().toISOString(),gameId:id,stage,...extra})+'\n');}catch{}};
-  let stage='launch-preflight';
+  let stage='launch-preflight',featureWatch=null;
   try{
   if(!game.executable||!fs.existsSync(game.executable))throw Error('EXECUTABLE_MISSING');
   const original=JSON.parse(game.original),profile=original.library || {};
@@ -63,6 +65,13 @@ async function launch(db,id,runtime=null,windowsLaunch=false) {
   try{const fix=require('../core/japanese-restore.cjs').repairShared(path.dirname(game.executable));if(fix.repaired||fix.skipped)trace('japanese-restore-repaired',fix);}catch(error){trace('japanese-restore-repair-failed',{error:String(error?.message||error).slice(0,200)});}
   /* E333 (user 2026-11-10, 女装山脈): a YU-RIS Chinese patch (update*.ypf) is still in place while the Japanese program is started: the game shows the Chinese text as garbage. Say so instead of launching. */
   {let plan=null;try{plan=require('../core/japanese-restore.cjs')._internal.yurisPlan(path.dirname(game.executable));}catch{}const exeName=path.basename(game.executable);if(plan?.updates?.length&&!/(cn\d|chs|汉化|中文)/i.test(exeName)&&require('../core/launcher-language.cjs').languageHint(exeName)!=='zh')throw Error('CHINESE_PATCH_ACTIVE');}
+  /* 2026-11-12 (user: 沙耶の唄 opened a Windows DirectPlay install window that then wanted a restart) the game's own folder
+     gets what it loads from DirectPlay, so no Windows window and no restart (core/directplay.cjs) */
+  stage='windows-features';
+  const gameDir=path.dirname(game.executable);
+  {let dp=null;try{dp=require('../core/directplay.cjs').prepare(gameDir,{root,exe:game.executable});if(dp.copied.length||dp.declined.length||dp.missing.length)trace('directplay',dp);}catch(error){trace('directplay-failed',{error:String(error?.message||error).slice(0,160)});}
+   try{const configs=require('../core/windows-features.cjs').prepareDotnet(gameDir);if(configs.length)trace('dotnet-runtime-config',{files:configs});}catch(error){trace('dotnet-config-failed',{error:String(error?.message||error).slice(0,160)});}
+   if(dp?.missing?.length){neededFeature.set(id,'DirectPlay');throw Object.assign(Error('DIRECTPLAY_REQUIRED'),{detail:dp.missing.join(',')});}}
   stage='process-check';
   const {gameProcesses}=require('./game-process.cjs');
   const ready=()=>require('./game-readiness.cjs').waitForVisibleGame(()=>gameProcesses(root,game.executable));
@@ -77,6 +86,9 @@ async function launch(db,id,runtime=null,windowsLaunch=false) {
     runtime?.prepareGame(game.executable);runtime?.bindLaunched?.(readyState?.pid);return {action:focused,connected:false};
   }
   trace('launch-request',{windowsLaunch});
+  /* a Windows feature install window the game still opens is closed at once (the game goes on as if it was cancelled);
+     DirectPlay is prepared while the game runs, anything else is remembered for this folder */
+  featureWatch=require('../core/windows-features.cjs').watch(gameDir,{trace,onFeature:feature=>{if(/^directplay$/i.test(feature)){const dp=require('../core/directplay.cjs').prepare(gameDir,{root,exe:game.executable,all:true});trace('directplay',dp);}}});
   let state;
   // "Japanese system environment": non-Unicode Japanese games (WA2) show their own dialogs garbled under a Chinese locale.
   if(!elevation&&!windowsLaunch&&profile.localeMode==='japanese'&&profile.source!=='steam'&&require('../core/locale-emulator.cjs').x86(game.executable)){
@@ -114,9 +126,17 @@ async function launch(db,id,runtime=null,windowsLaunch=false) {
    }
   }
   trace('new-window-ready',state);
+  {const watch=featureWatch;featureWatch=null;setTimeout(()=>watch.stop(),30000).unref?.();}
   db.prepare('UPDATE games SET last_launched_at=? WHERE id=?').run(Math.floor(Date.now()/1000),id);
   runtime?.prepareGame(game.executable);runtime?.bindLaunched?.(state?.pid);return {action:'launched',connected:false};
   }catch(error){
+   /* a game that quit after asking Windows for a feature: DirectPlay is placed now, so try once more; anything else is
+      offered as an install (no restart) */
+   if(featureWatch){featureWatch.stop();const asked=featureWatch.found;featureWatch=null;
+    if(asked.length&&['GAME_PROCESS_EXITED','GAME_WINDOW_NOT_READY','GAME_LAUNCH_FAILED'].includes(error.message)){
+     const feature=asked[0];trace('windows-feature-needed',{feature,retried});
+     if(/^directplay$/i.test(feature)&&!retried){const dp=require('../core/directplay.cjs').prepare(path.dirname(game.executable),{root,exe:game.executable,all:true});if(!dp.missing.length)return launch(db,id,runtime,windowsLaunch,{retried:true});}
+     neededFeature.set(id,feature);error=Object.assign(Error(/^directplay$/i.test(feature)?'DIRECTPLAY_REQUIRED':'WINDOWS_FEATURE_REQUIRED'),{detail:feature});}}
    /* E299: a boxed release whose protection plug-in wants the original DVD quits on start; say so (disc-check.cjs). */
    if(['GAME_PROCESS_EXITED','GAME_WINDOW_NOT_READY'].includes(error.message)&&game.executable&&require('./disc-check.cjs').discProtected(path.dirname(game.executable)))error=Object.assign(Error('GAME_DISC_REQUIRED'),{detail:error.message});
    trace('launch-failed',{phase:stage,error:error.message,detail:error.detail||error.code});throw error;}
@@ -296,6 +316,7 @@ async function dispatch(request,runtime=null) {
       case 'anki_find':return {path:runtime.ankiProcess().find()};
       /* 2026-11-12 one-click Anki: download the official installer, install it, add AnkiConnect, start and connect */
       case 'anki_install':return require('../core/anki-installer.cjs').start(root,{runtime,find:()=>runtime?runtime.ankiProcess().find():require('../core/anki-process.cjs').find('',process.env)});
+      case 'windows_feature_install':{const feature=neededFeature.get(String(request.id||''))||'DirectPlay';const r=await require('../core/windows-features.cjs').install(feature);neededFeature.delete(String(request.id||''));return r;}
       case 'anki_install_status':return require('../core/anki-installer.cjs').status();
       case 'anki_install_connect':return await require('../core/anki-process.cjs').installAnkiConnect(process.env,runtime?{locate:()=>runtime.ankiProcess().find()}:{});
       case 'anki_connect_status':return {installed:require('../core/anki-process.cjs').ankiConnectInstalled()};
