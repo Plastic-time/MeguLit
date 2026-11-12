@@ -37,7 +37,9 @@ const base=v=>String(v||'').trim().replace(/^v/,'').replace(/[a-z]+$/i,'');
 /* E350 (user 2026-11-10: "修改以后的自动更新识别规则"): versions compare as major.minor.patch plus the hotfix letter
    (1.2.8 < 1.2.8a < 1.2.8b < 1.2.9), and a package named MeguLit-v1.2.8b-win-x64.zip is accepted, so later releases
    may carry the letter in the tag itself. */
-const parse=v=>{const m=/^(\d+)\.(\d+)\.(\d+)([a-z]?)$/i.exec(String(v||'').trim().replace(/^v/,''));if(!m)return base(v).split('.').map(n=>Number(n)||0).concat(0);return [+m[1],+m[2],+m[3],m[4]?m[4].toLowerCase().charCodeAt(0)-96:0];};
+/* Beta builds (user 2026-11-13: 1.4.9-beta.1 on branch beta, GitHub prereleases) sort below their stable release and
+   above the one before it, so the stable 1.4.9 replaces a beta and 1.4.8 never pulls a beta user back. */
+const parse=v=>{const s=String(v||'').trim().replace(/^v/,''),b=/^(\d+)\.(\d+)\.(\d+)-beta\.(\d+)$/i.exec(s);if(b)return [+b[1],+b[2],+b[3],-1000+ +b[4]];const m=/^(\d+)\.(\d+)\.(\d+)([a-z]?)$/i.exec(s);if(!m)return base(v).split('.').map(n=>Number(n)||0).concat(0);return [+m[1],+m[2],+m[3],m[4]?m[4].toLowerCase().charCodeAt(0)-96:0];};
 const newer=(a,b)=>{const x=parse(a),y=parse(b);for(let i=0;i<4;i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)>(y[i]||0);}return false;};
 
 function asset(rel){

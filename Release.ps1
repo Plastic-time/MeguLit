@@ -6,6 +6,7 @@
 #   .\Release.ps1 -Version 1.1.6 -Prepare                 # bump, build and test now; then release with -SkipBuild
 #   .\Release.ps1 -Version 1.1.6 -Notes notes.md -SkipBuild  # skips the build when nothing changed since
 #   .\Release.ps1 -Version 1.1.8 -Notes notes.md -Hotfix -IncludeWorkingChanges  # fix the latest release in place
+#   .\Release.ps1 -Version 1.4.9-beta.1 -Notes notes.md -Beta  # beta: branch beta, GitHub prerelease, not on the site
 #   -IncludeWorkingChanges                                 # also commit the uncommitted changes in this release
 #
 # notes.md: Chinese first, then a line with only ---, then English (the in-app update card shows the reader's half).
@@ -19,7 +20,9 @@ param(
  [switch]$Prepare,   # bump + build + test only, and remember this tree so a later -SkipBuild can reuse the build
  [switch]$SkipBuild, # reuse the last -Prepare (or release) build when the tree and MeguLit.exe are unchanged since
  [switch]$Hotfix,    # replace the package of the latest release (same version); installs from v1.1.8 on pick it up
- [switch]$IncludeWorkingChanges  # ship uncommitted changes in the release commit instead of refusing
+ [switch]$IncludeWorkingChanges, # ship uncommitted changes in the release commit instead of refusing
+ [switch]$Beta      # user 2026-11-13: commit to branch beta and publish a GitHub prerelease. The site, the mirror and the
+                    # in-app updater read releases/latest, which skips prereleases, so only stable releases reach them
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version 2
@@ -37,11 +40,12 @@ function WriteText($p,$t){[IO.File]::WriteAllText((Join-Path $Root $p),$t,(Utf8N
 function Swap($p,$pattern,$replacement){$t=ReadText $p;$n=[regex]::Replace($t,$pattern,$replacement);if($n -eq $t -and -not ($t -match [regex]::Escape($Version))){throw "version not found in $p"};if($n -ne $t){WriteText $p $n}}
 
 # ---------- checks ----------
-if($Version -notmatch '^\d+\.\d+\.\d+[a-z]?$'){throw 'Version must look like 1.2.3 or 1.2.3a'}
+if($Beta){if($Version -notmatch '^\d+\.\d+\.\d+-beta\.\d+$'){throw 'Beta version must look like 1.2.3-beta.1'};if($Hotfix){throw '-Beta cannot be a -Hotfix; bump the beta number'}}
+elseif($Version -notmatch '^\d+\.\d+\.\d+[a-z]?$'){throw 'Version must look like 1.2.3 or 1.2.3a'}
 # Hotfix letters (1.2.8a, 1.2.8b ...): shown in the app and on the release page; the tag, package name and Cargo/Tauri
 # version stay numeric so installed updaters keep finding the package. A lettered version is a hotfix of its base when
 # that release exists, otherwise the first release of the base.
-$Label=$Version;$Version=$Version -replace '[a-z]$','';$LabelPrefix=if($Label -ne $Version){"v$Label · "}else{''}
+$Label=$Version;$Version=$Version -replace '-beta\.\d+$','' -replace '[a-z]$','';$LabelPrefix=if($Label -ne $Version){"v$Label · "}else{''}
 if($Label -ne $Version -and -not $Hotfix){try{$null=Invoke-RestMethod -Uri "https://api.github.com/repos/ilynthn/MeguLit/releases/tags/v$Version" -Headers @{'User-Agent'='MeguLit-release'};$Hotfix=[switch]$true}catch{}}
 $Body=''
 if(-not $Prepare){
@@ -50,7 +54,7 @@ if(-not $Prepare){
  $Body=[IO.File]::ReadAllText($NotesPath,[Text.Encoding]::UTF8)
  if($Body -notmatch "(?m)^---\s*$"){throw 'Notes need a --- line between the Chinese and English halves'}
 }
-$Tag="v$Version";$Asset="MeguLit-$Tag-win-x64.zip"
+$Tag="v$Version";if($Beta){$Tag="v$Label"};$Branch=if($Beta){'beta'}else{'main'};$Asset="MeguLit-$Tag-win-x64.zip"
 # One click to the package at the top of the release page, however many hotfix sections follow (user, 2026-11-09).
 # The in-app update card drops this line (services/update.cjs).
 $DownloadLine="> **[⬇ 下载 MeguLit $Tag 安装包 / Download $Asset](https://github.com/ilynthn/MeguLit/releases/download/$Tag/$Asset)**"
@@ -79,30 +83,40 @@ Step 'sync main'
 if(-not $DryRun -and -not $Prepare){
  $dirty=git status --porcelain --untracked-files=no
  if($dirty -and -not $IncludeWorkingChanges){throw "Working tree has uncommitted changes (add -IncludeWorkingChanges to ship them):`n$dirty"}
- G checkout -q main
  G fetch -q origin
- G merge -q --ff-only origin/main
+ if($Beta){
+  # beta follows main: start from origin/beta, then take everything new on main
+  & git.exe show-ref --verify --quiet refs/heads/beta;if($LASTEXITCODE -ne 0){G branch -q beta origin/beta}
+  G checkout -q beta
+  G merge -q --ff-only origin/beta
+  G -c "user.name=$Author" -c "user.email=$Email" merge -q --no-edit origin/main
+ }else{
+  G checkout -q main
+  G merge -q --ff-only origin/main
+ }
 }
 $latest=Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $Headers
 $prev=$latest.tag_name -replace '^v',''
 $prevAsset=$latest.assets | Where-Object {$_.name -match '^MeguLit-v\d+\.\d+\.\d+-win-x64\.zip$'} | Select-Object -First 1
 if(-not $prevAsset){throw 'Previous release has no package to take the file list from'}
 if($Hotfix){if($Version -ne $prev){throw "-Hotfix replaces the latest release ($prev); pass -Version $prev"}}
-elseif([version]$Version -le [version]$prev){throw "Version $Version is not newer than the latest release $prev"}
+elseif([version]$Version -le [version]$prev){if($Beta){throw "Beta $Label must be for a version after the latest stable release $prev"};throw "Version $Version is not newer than the latest release $prev"}
 # E392 the labels people see (1.3.1a), not only the numeric tags: the progress band and the log read this line
 $prevLabelShown=$prev;$aboutNow=git show HEAD:web/about.js 2>$null|Out-String;if($aboutNow -match "VERSION='(\d+\.\d+\.\d+[a-z]?)'"){$prevLabelShown=$matches[1]}
 Write-Host "previous release v$prevLabelShown -> v$Label ($Tag)"
 
 # ---------- version ----------
 Step 'bump version'
-Swap 'web/about.js' "export const VERSION='\d+\.\d+\.\d+[a-z]?';" "export const VERSION='$Label';"
+Swap 'web/about.js' "export const VERSION='\d+\.\d+\.\d+(?:[a-z]|-beta\.\d+)?';" "export const VERSION='$Label';"
 Swap 'desktop/Cargo.toml' '(?m)^version = "\d+\.\d+\.\d+"' "version = `"$Version`""
 Swap 'desktop/tauri.conf.json' '"version": "\d+\.\d+\.\d+"' "`"version`": `"$Version`""
 Swap 'desktop/Cargo.lock' '(name = "megulit"\r?\nversion = )"\d+\.\d+\.\d+"' "`${1}`"$Version`""
+if(-not $Beta){ # README download links stay on the stable release
 $readme=ReadText 'README.md'
 $readme=[regex]::Replace($readme,'MeguLit-v\d+\.\d+\.\d+-win-x64\.zip',$Asset)
 $readme=[regex]::Replace($readme,'\u4e0b\u8f7d v\d+\.\d+\.\d+',"$([char]0x4e0b)$([char]0x8f7d) $Tag")
 if($readme -ne (ReadText 'README.md')){WriteText 'README.md' $readme}
+}
 
 # ---------- build ----------
 Step 'build and test'
@@ -172,15 +186,15 @@ if($DryRun){& git.exe checkout -- web/about.js desktop/Cargo.toml desktop/tauri.
 # ---------- commit ----------
 # Direct commit on main, no pull request (user 2026-11-10: PRs opened through the GitHub integration list the bot as a
 # contributor). The commit carries only the author's own identity.
-Step 'commit and push to main'
-if((G rev-parse --abbrev-ref HEAD) -ne 'main'){G checkout -q main}
+Step "commit and push to $Branch"
+if((G rev-parse --abbrev-ref HEAD) -ne $Branch){G checkout -q $Branch}
 G add -A
 # E400 a hotfix of the same version may change nothing tracked (the fix was committed before): push what is there
 & git.exe diff --cached --quiet
 if($LASTEXITCODE -ne 0){G -c "user.name=$Author" -c "user.email=$Email" commit -q -m $(if($Label -ne $Version){"v$Label"}elseif($Hotfix){"$Tag hotfix"}else{"$Tag"})}else{Write-Host '  nothing new to commit'}
-G push -q origin main
+G push -q origin $Branch
 $merged=@{sha=(G rev-parse HEAD)}
-Write-Host "pushed to main at $($merged.sha)"
+Write-Host "pushed to $Branch at $($merged.sha)"
 
 # ---------- release ----------
 Step 'publish release'
@@ -193,6 +207,8 @@ if($Hotfix){
  $stamp=Get-Date -Format 'yyyy-MM-dd HH:mm'
  $section="<details>`n<summary><b>🔧 ${LabelPrefix}Hotfix $stamp</b>（点击展开 / click to expand）</summary>`n`n"+(LangBlocks $Zh $En $false)+"`n`n</details>"
  $rel=Api PATCH "/releases/$($rel.id)" @{body=($old+"`n`n---`n`n"+$section)}
+}elseif($Beta){
+ $rel=Api POST '/releases' @{tag_name=$Tag;target_commitish=$merged.sha;name="MeguLit v$Label (beta)";body=($DownloadLine+"`n`n## MeguLit v$Label (beta)`n`n"+(LangBlocks $Zh $En $false));prerelease=$true;make_latest='false'}
 }else{
  $rel=Api POST '/releases' @{tag_name=$Tag;target_commitish=$merged.sha;name="MeguLit v$Label";body=($DownloadLine+"`n`n## MeguLit v$Label`n`n"+(LangBlocks $Zh $En $false));make_latest='true'}
 }
@@ -216,6 +232,7 @@ $back=Join-Path $work 'check.zip'
 $ok=$false;try{Invoke-WebRequest -Uri $a.browser_download_url -OutFile $back -UseBasicParsing -TimeoutSec 120;$ok=(Get-FileHash $back -Algorithm SHA256).Hash.ToLower() -eq $hash;if(-not $ok){throw 'Downloaded package hash differs'}}catch{if($_.Exception.Message -eq 'Downloaded package hash differs'-and -not ($Hotfix -and $a.digest -eq "sha256:$hash")){throw};Write-Host "  download check skipped (slow network): $($_.Exception.Message)";if(-not $a.digest){throw 'No GitHub digest and no download to check'}}
 # An installed copy of the previous package (its version label and package digest recorded as after an update) must see
 # this release as an update: a new version by number, a hotfix by package digest (E358: 1.2.8a slipped through).
+if($Beta){Remove-Item $work -Recurse -Force;Step "beta released (prerelease, not on the site or in app updates) $($rel.html_url)";return}
 $prevDigest=(Get-FileHash $prevZip -Algorithm SHA256).Hash.ToLower();$probeRoot=Join-Path $work 'probe';New-Item -ItemType Directory (Join-Path $probeRoot 'data') -Force | Out-Null
 $prevLabel=if($Hotfix){(Select-String -Path (Join-Path $Root 'web/about.js') -Pattern "VERSION='([^']+)'" | Select-Object -First 1).Matches[0].Groups[1].Value}else{$prev}
 if($Hotfix){$prevLabel=(& git.exe show "HEAD~1:web/about.js" | Select-String -Pattern "VERSION='([^']+)'" | Select-Object -First 1).Matches[0].Groups[1].Value}
