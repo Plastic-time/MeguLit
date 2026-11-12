@@ -1829,3 +1829,10 @@ html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row:has(input
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row:has(input[name$="-focus"]){display:grid!important;grid-template-columns:100px repeat(2,minmax(0,1fr));gap:8px!important;padding-left:16px!important;align-items:center}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row:has(input[name$="-focus"])>span{grid-column:1;grid-row:1/3;align-self:start;margin:8px 0 0!important;flex:none!important}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row:has(input[name$="-focus"]) .lg-chip span{display:flex!important;justify-content:center;width:100%;box-sizing:border-box;padding:0 8px!important}
+
+/* grammar home, next-lesson card (recording: a long pattern title such as 名词1＋は＋名词2＋でした/ではありませんでした
+   filled half the card in four lines over the gist): a long title steps down in size and stays within two lines; a short
+   word such as じゃん keeps its large red type */
+html:not(#u):not(#v):not(#w):not(#x) body .gm-hero-ja[data-len=l]{font-size:clamp(36px,3vw,52px)!important;line-height:1.12!important}
+html:not(#u):not(#v):not(#w):not(#x) body .gm-hero-ja[data-len=xl]{font-size:clamp(26px,2.1vw,36px)!important;line-height:1.25!important}
+html:not(#u):not(#v):not(#w):not(#x) body .gm-hero-ja:is([data-len=l],[data-len=xl]){display:-webkit-box!important;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;flex:1 1 100%;min-width:0}
