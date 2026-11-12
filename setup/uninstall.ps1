@@ -33,7 +33,7 @@ $here = Split-Path -Parent $self
 $lang = 'zh'
 try { $p = Get-Content -Raw -Encoding UTF8 (Join-Path $Root 'data\preferences.json') | ConvertFrom-Json; if ($p.language -in @('zh','en','ja')) { $lang = $p.language } } catch {}
 $T = @{
- zh = @{ title='卸载 MeguLit'; sub='会先关闭 MeguLit 和它的辅助程序（HookBridge、GalWindowBridge、语音引擎等）。请先关掉正在玩的游戏，游戏开着时它的文件没法还原'
+ zh = @{ loading='正在检查 MeguLit 在这台电脑上放过的东西（游戏文件夹、快捷方式、注册表），大约要几秒…'; title='卸载 MeguLit'; sub='会先关闭 MeguLit 和它的辅助程序（HookBridge、GalWindowBridge、语音引擎等）。请先关掉正在玩的游戏，游戏开着时它的文件没法还原'
   keep='保留本地账户数据'; keepWhat='保留：账户登录（data\config\secrets.dpapi 登录令牌）、游戏库与阅读记录（data\megulit.sqlite）、生词本、设置（data\config）、自定义封面（data\assets）、台词与场景截图，以及 secrets\。它们留在 {0}，以后把 MeguLit 装回这个文件夹就能接着用'
   noKeep='不保留：账户登录、游戏库、阅读记录、生词本和设置会全部删除，无法恢复'
   go='卸载'; cancel='取消'; done='完成'; working='正在卸载…'; closing='正在关闭 MeguLit 和辅助程序…'; restoring='正在还原游戏文件、清理快捷方式和注册表…'; removing='正在删除程序文件…'
@@ -44,7 +44,7 @@ $T = @{
   w_app='程序的 WebView 用户数据（{0}）'; w_temp='MeguLit 的临时文件'; r_key='「应用和功能」里的 MeguLit 卸载项'; r_val='Windows 记录的 MeguLit 程序路径'
   okKept='MeguLit 已卸载。你的数据保留在：'; okAll='MeguLit 已完全卸载'; failed='下面这些没能处理，可以手动看看：'; skippedGame='（这些文件在 MeguLit 修改后又被改过，为安全起见没有动，备份留在游戏文件夹里）'
   noNode='没找到 MeguLit 的运行组件，游戏文件夹里的改动无法自动还原（如果你用过「恢复日文」「切换日文原版」，请先装回 MeguLit 在里面撤销）'; notFound='这里不是 MeguLit 的文件夹：' }
- en = @{ title='Uninstall MeguLit'; sub='MeguLit and its helpers (HookBridge, GalWindowBridge, the voice engine, ...) are closed first. Close any game you are playing: its files cannot be restored while it runs'
+ en = @{ loading='Checking what MeguLit placed on this PC (game folders, shortcuts, registry); this takes a few seconds…'; title='Uninstall MeguLit'; sub='MeguLit and its helpers (HookBridge, GalWindowBridge, the voice engine, ...) are closed first. Close any game you are playing: its files cannot be restored while it runs'
   keep='Keep local account data'; keepWhat='Kept: account sign-in (sign-in token data\config\secrets.dpapi), library and reading history (data\megulit.sqlite), vocabulary, settings (data\config), custom covers (data\assets), saved lines and scene shots, and secrets\. They stay in {0}; install MeguLit into this folder again to continue'
   noKeep='Not kept: account sign-in, library, reading history, vocabulary and settings are all deleted for good'
   go='Uninstall'; cancel='Cancel'; done='Done'; working='Uninstalling…'; closing='Closing MeguLit and its helpers…'; restoring='Restoring game files, removing shortcuts and registry entries…'; removing='Removing program files…'
@@ -55,7 +55,7 @@ $T = @{
   w_app='WebView user data ({0})'; w_temp='MeguLit temporary files'; r_key='MeguLit entry in Apps & features'; r_val='MeguLit program paths recorded by Windows'
   okKept='MeguLit was uninstalled. Your data is kept in:'; okAll='MeguLit was removed completely'; failed='These could not be handled; you may want to check them:'; skippedGame='(changed again after MeguLit changed them, so they were left alone; the backup stays in the game folder)'
   noNode='MeguLit''s runtime is missing, so changes in game folders cannot be undone automatically (if you used Restore Japanese or the Japanese original switch, reinstall MeguLit and undo them there first)'; notFound='This is not a MeguLit folder: ' }
- ja = @{ title='MeguLit をアンインストール'; sub='最初に MeguLit と補助プログラム（HookBridge、GalWindowBridge、音声エンジンなど）を終了します。ゲームを起動中なら閉じてください（起動中はファイルを戻せません）'
+ ja = @{ loading='MeguLit がこの PC に置いたもの（ゲームフォルダー・ショートカット・レジストリ）を確認しています。数秒かかります…'; title='MeguLit をアンインストール'; sub='最初に MeguLit と補助プログラム（HookBridge、GalWindowBridge、音声エンジンなど）を終了します。ゲームを起動中なら閉じてください（起動中はファイルを戻せません）'
   keep='ローカルのアカウントデータを残す'; keepWhat='残すもの：アカウントのログイン情報（data\config\secrets.dpapi）、ライブラリと読書履歴（data\megulit.sqlite）、単語帳、設定（data\config）、カスタムカバー（data\assets）、保存したセリフとシーン画像、secrets\。{0} に残り、同じフォルダーに MeguLit を入れ直せば続きから使えます'
   noKeep='残さない：ログイン情報・ライブラリ・読書履歴・単語帳・設定はすべて削除され、元に戻せません'
   go='アンインストール'; cancel='キャンセル'; done='完了'; working='アンインストール中…'; closing='MeguLit と補助プログラムを終了しています…'; restoring='ゲームファイルの復元、ショートカットとレジストリの整理中…'; removing='プログラムファイルを削除しています…'
@@ -267,7 +267,7 @@ function Start-Cleanup {
 $go.add_Click({ Run-Uninstall })
 $cancel.add_Click({ $form.Close() })
 $keepBox.add_CheckedChanged({ Plan-Text })
-$form.add_Shown({ $box.Text = '…'; $go.Enabled = $false; Pump; $script:plan = Get-Plan; Plan-Text; $go.Enabled = $true })
+$form.add_Shown({ $box.Text = $t.loading; $keepBox.Enabled = $false; $go.Enabled = $false; Pump; $script:plan = Get-Plan; Plan-Text; $go.Enabled = $true; $keepBox.Enabled = $true })
 $plan = $null
 # MEGULIT_UNINSTALL_AUTO=keep|all (end-to-end test on a copied install): runs without the confirm box, off screen, then closes.
 if ($env:MEGULIT_UNINSTALL_AUTO) { $form.StartPosition = 'Manual'; $form.Location = New-Object Drawing.Point(-20000,-20000); $form.ShowInTaskbar = $false; $form.add_Shown({ $keepBox.Checked = ($env:MEGULIT_UNINSTALL_AUTO -ne 'all'); Run-Uninstall $true; if ($env:MEGULIT_UNINSTALL_RESULT) { [IO.File]::WriteAllText($env:MEGULIT_UNINSTALL_RESULT, $box.Text, (New-Object Text.UTF8Encoding $false)) }; $form.Close() }) }
