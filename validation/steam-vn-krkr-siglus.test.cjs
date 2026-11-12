@@ -65,3 +65,11 @@ test('D: game voices found for the scripts',{skip:!(have('ATRI -My Dear Moments-
   const s=gv.scan(root,steam+'Summer Pockets');assert.equal(s.found,s.voiced);assert.ok(s.voiced>27000);}
  finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+test('E: a translation slot quoted with ASCII quotes takes the Japanese brackets',()=>{
+ const {unquoteSlot}=require('../services/original-engines/scenes.cjs');
+ assert.equal(unquoteSlot('"救救我——"','「誰か助けて――」'),'「救救我——」');
+ assert.equal(unquoteSlot('"（虽然是下定决心了）"','（色々決意したはいいが）'),'（虽然是下定决心了）');
+ assert.equal(unquoteSlot('"这颗星球正在沉没——"','この星は沈みゆこうとしている――'),'这颗星球正在沉没——');
+ assert.equal(unquoteSlot('他说""好""','「x」'),'他说""好""');
+ assert.equal(unquoteSlot('"a""b"','「x」'),'「a"b」');
+});
