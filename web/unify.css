@@ -468,7 +468,6 @@ html:not(#u):not(#v) body .gm-lesson .gm-stepnav button{font-size:14px!important
 /* one left edge for every page: content starts at the main column's padding */
 html:not(#u):not(#v) body .main :is(.leaderboard-page,.dl,.about-page){padding-left:0!important;padding-right:0!important}
 /* leaderboard: the ranked cards fill their row whatever the count; values never break */
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoires{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}
 html:not(#u):not(#v) body .leaderboard-page :is(.lb-gvalue,.lb-local strong,.lb-local b,.lb-mychip span,.leaderboard-local strong){white-space:nowrap}
 /* hot words 4–10: term, reason, then the count on the right */
 html:not(#u):not(#v) body .leaderboard-page .lb-honours li{grid-template-columns:44px minmax(160px,240px) minmax(0,1fr) auto!important}
@@ -785,30 +784,11 @@ html:not(#u):not(#v) body :is(dialog.game-dialog,.lv-dialog,dialog.profile-panel
 html:not(#u):not(#v) body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button)::before{display:none!important}
 html:not(#u):not(#v) body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button){padding:0 26px!important;gap:0!important}
 html:not(#u):not(#v) body .leaderboard-page .leaderboard-ai{background:none!important;box-shadow:none!important;padding:0!important;font-size:11px;color:var(--g-t3,#a08a80)!important}
-/* reading board: ranked readers as ruled rows (rank, avatar and name, value) instead of six medallion cards */
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoires{display:block!important;border-top:1px solid var(--u-line-2)}
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoire{position:relative!important;display:grid!important;grid-template-columns:64px minmax(0,1fr) auto;align-items:center;gap:16px;min-height:0!important;height:auto!important;padding:12px 4px!important;margin:0!important;background:none!important;box-shadow:none!important;border:0!important;border-bottom:1px solid var(--u-line)!important;border-radius:0!important;text-align:left!important;-webkit-backdrop-filter:none;backdrop-filter:none;clip-path:none!important;transform:none!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoire::before,html:not(#u):not(#v) body .leaderboard-page .lb-grimoire::after{display:none!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-code{grid-column:1;grid-row:1;position:static!important;font-family:var(--g-serif,serif);font-size:15px!important;letter-spacing:.06em!important;color:var(--g-t3,#a08a80)!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-person{grid-column:2;grid-row:1;display:flex!important;flex-direction:row!important;align-items:center;gap:14px;position:static!important;padding:0!important;background:none!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-gem{position:relative!important;width:40px!important;height:40px!important;flex:none;transform:none!important;background:none!important;box-shadow:none!important;clip-path:none!important;border:0!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-gem::before,html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-gem::after{display:none!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .leaderboard-avatar{width:40px!important;height:40px!important;transform:none!important;clip-path:none!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-gname{font-family:var(--g-serif,serif);font-size:17px!important;max-width:none!important;overflow:visible!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-gvalue{grid-column:3;grid-row:1;justify-self:end;font-family:var(--g-serif,serif);font-size:20px!important;color:var(--g-t1,#f1e0d2)!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoire .lb-me-tag{position:absolute!important;left:-2px;top:50%;transform:translateY(-50%)!important;width:3px;height:60%;padding:0!important;font-size:0!important;background:#c82f3b!important;border-radius:0!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-grimoire:has(.lb-me-tag){background:linear-gradient(90deg,color-mix(in srgb,var(--u-red) 12%,transparent),transparent 60%)!important}
 /* about: the QR cards without ticks and markers */
 html:not(#u):not(#v) body .about-page .about-qcard{box-shadow:inset 0 0 0 1px var(--u-line)!important;background:none!important}
 html:not(#u):not(#v) body .about-page .about-eyebrow::before{content:none!important}
 /* profile: kicker titles without tracking */
 html:not(#u):not(#v) body dialog.profile-panel .panel-title{letter-spacing:.02em!important}
-/* my data: a ruled figure table (four per line, hairlines between), not eight boxes */
-html:not(#u):not(#v) body .leaderboard-page .lb-tiles{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:0!important;border-top:1px solid var(--u-line-2)}
-html:not(#u):not(#v) body .leaderboard-page .lb-tile{background:none!important;box-shadow:none!important;border:0!important;border-bottom:1px solid var(--u-line)!important;border-left:1px solid var(--u-line)!important;border-radius:0!important;padding:16px 20px 18px!important;clip-path:none!important;-webkit-backdrop-filter:none;backdrop-filter:none}
-html:not(#u):not(#v) body .leaderboard-page .lb-tile:nth-child(4n+1){border-left:0!important;padding-left:0!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-tile::before{display:none!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-tile strong{font-family:var(--g-serif,serif);font-size:clamp(22px,1.8vw,28px)!important;white-space:nowrap}
 /* level picker: a ladder from zero to native, one ruled line per level, not a 4×2 card grid */
 html:not(#u):not(#v) body .lv-dialog .lv-grid{display:grid!important;grid-template-columns:1fr!important;gap:0!important;border-top:1px solid var(--u-line-2)}
 html:not(#u):not(#v) body .lv-dialog .lv-opt{display:grid!important;grid-template-columns:56px 200px minmax(0,1fr);align-items:baseline;gap:16px;min-height:0!important;padding:12px 14px!important;border-radius:0!important;background:none!important;box-shadow:none!important;border-bottom:1px solid var(--u-line)!important;text-align:left}
@@ -1653,3 +1633,15 @@ html:not(#u):not(#v):not(#w) body .lib-field .cover-frame::after{content:"";posi
  background:radial-gradient(60% 50% at var(--mx,50%) var(--my,50%),rgba(255,240,220,.38),transparent 60%),linear-gradient(115deg,transparent 35%,rgba(255,170,190,.16) 45%,rgba(160,210,255,.14) 55%,transparent 65%) 0 0/250% 250%;background-position:center,var(--mx,50%) var(--my,50%)}
 html:not(#u):not(#v):not(#w) body .lib-field .cover-frame.is-tilting::after{opacity:1}
 @media (prefers-reduced-motion:reduce){html body .lib-field .cover-frame img.cover{transform:none!important}}
+/* reading sessions: the list folds open and shut (details-motion.js animates it); the marker turns with it */
+html:not(#u):not(#v):not(#w):not(#x) body details.history-parts{overflow:hidden}
+html:not(#u):not(#v):not(#w):not(#x) body details.history-parts>summary::marker{content:""}
+html:not(#u):not(#v):not(#w):not(#x) body details.history-parts>summary{list-style:none;cursor:pointer}
+html:not(#u):not(#v):not(#w):not(#x) body details.history-parts>summary::before{content:"";display:inline-block;width:0;height:0;margin-right:8px;border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .25s cubic-bezier(.2,.8,.2,1);vertical-align:1px}
+html:not(#u):not(#v):not(#w):not(#x) body details.history-parts[open]>summary::before{transform:rotate(90deg)}
+/* dialogue speaker (dialogue-speaker.js): a quiet label in the line's header — gold for a name, grey for narration —
+   that turns into a small field when clicked */
+html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker{margin:0 12px 0 auto;height:22px;padding:0 8px;border:0;background:none;box-shadow:inset 0 -1px 0 transparent;color:var(--g-gold,#edb56e);font-size:12px;letter-spacing:.06em;cursor:text;transition:box-shadow .15s,color .15s}
+html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker[data-kind=narr],html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker[data-kind=line]{color:rgba(241,224,210,.55)}
+html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker:hover{box-shadow:inset 0 -1px 0 currentColor;color:#fff4ea}
+html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker-input{margin:0 12px 0 auto;width:150px;height:24px;padding:0 8px;border:0;border-radius:2px;background:#120d10;box-shadow:inset 0 0 0 1px var(--g-gold,#edb56e);color:#fff4ea;font-size:12px}
