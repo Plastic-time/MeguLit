@@ -82,6 +82,8 @@ class HookNative{
    }
    if(m.type==='hookEngineLine'&&PAGE_ENGINES.has(m.engine)){this.pageLine(m);return;}
    if(m.type==='hookTextPos'&&m.engine==='pal_sprite_v1'){this.palPosition(m);return;}
+   /* 2026-11-12 the engine's own text window state (KiriKiri ToMe_DIALOG): a line arriving while it is hidden is art text */
+   if(m.type==='hookDialog'&&typeof m.visible==='boolean'){this.engineDialog=m.visible;this.engineDialogAt=this.now();}
    if(m.type==='hookTextPos'||m.type==='hookPage'||m.type==='hookDialog'||m.type==='hookGameUi'||m.type==='hookFont'){this.emit(m);if(m.type==='hookPage')this.islandPage(m);return;}
    /* Translation written back into the game: the bridge holds a dialogue line and asks for its translation. */
    if(m.type==='embedRequest'&&Number.isSafeInteger(m.id)&&typeof m.text==='string'&&m.text.length<=4000){this.emit({type:'hookEmbedRequest',id:m.id,text:m.text});return;}
@@ -150,6 +152,10 @@ class HookNative{
   else if(this.choice?.active)this.clearChoices('choices no longer on screen');}
  clearChoices(why){clearTimeout(this.choiceTimer);const shown=!!this.choice?.active||!!this.state.hookChoices;this.choice?.reset();this.choiceOptions=null;if(!shown)return;this.trace('choice cleared: '+why);this.notify({hookChoices:null});}
  source(m,name){
+  /* 2026-11-12 (ファタモルガーナの館: "……けれど……", drawn large in the middle of the opening, was hidden and shown as a subtitle
+     at the bottom): while the engine says its text window is hidden, a line is art text. HookBridge leaves it to the game;
+     here it goes to the art layer (invisible readable copy + translation where the game drew it), not to the subtitles. */
+  if(this.engineDialog===false&&typeof m.text==='string'&&m.text.trim()){this.trace('art text (text window hidden) '+JSON.stringify(m.text.slice(0,40)));this.artSeen?.delete(HookNative.flat(m.text.trim()));this.artCandidate(m.text);return;}
   // The game's own ruby readings ride after the line as \x1d base \x1c reading pairs (ISLAND hook): split them off
   // before anything else sees the text, and attach them when this line is delivered (user, 2026-11-03).
   const extracted=require('./source-ruby.cjs').extractSourceRuby(m.text);let ruby=extracted.ruby;m={...m,text:extracted.text};this.languageCheck(m.text);
