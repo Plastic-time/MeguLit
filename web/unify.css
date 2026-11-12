@@ -1890,3 +1890,6 @@ html:not(#u):not(#v) body dialog.guide-panel [data-pane="report"] :is(.feedback-
 html:not(#u):not(#v) body dialog.guide-panel [data-pane="report"] .feedback-text{min-height:180px;margin-top:14px;border-left:2px solid var(--u-red)!important}
 html:not(#u):not(#v) body dialog.guide-panel [data-pane="report"] .feedback-contact{margin-top:10px}
 html:not(#u):not(#v) body dialog.guide-panel [data-pane="report"] :is(.feedback-text,.feedback-contact):focus{outline:none;border-color:color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
+
+/* 2026-11-12 (user video: the whole UI jerked left once after the search animation) the main scroller always keeps room for its scrollbar, so content growing past the window never shifts the layout */
+html:not(#u) body .main{scrollbar-gutter:stable}
