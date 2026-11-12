@@ -43,7 +43,7 @@ public class GalWindowBridge {
         if(sr<=sl||sb<=st||dr<=dl||db<=dt)return false;
         double kx=(dr-dl)/(double)(sr-sl),ky=(db-dt)/(double)(sb-st);
         Func<int,int> mx=x=>dl+(int)Math.Round((x-sl)*kx);Func<int,int> my=y=>dt+(int)Math.Round((y-st)*ky);
-        scaled=new Rect(mx(area.Left),my(area.Top),mx(area.Right),my(area.Bottom));MagpieWindow=magpie;return true;
+        scaled=new Rect(mx(area.Left),my(area.Top),mx(area.Right),my(area.Bottom));MagpieWindow=magpie;NativeMaskLayer.Scale(true,sl,st,dl,dt,kx,ky,Overlay);return true;
     }
     static IntPtr MagpieWindow;static DateTime MagpieRaisedAt;
     static string LastCoverNote="";
@@ -527,7 +527,7 @@ public class GalWindowBridge {
         // so the later Alt+M switch left the title bar in place and the hit region was applied offset, cutting glyphs apart.
         if(!Captured){Capture();HasLastRect=false;RegionKey="";}
         Rect client;if(!GetClientRect(Target,out client))return;Point origin=new Point();if(!ClientToScreen(Target,ref origin))return;
-        Rect area=new Rect(origin.X,origin.Y,origin.X+client.Right,origin.Y+client.Bottom);Rect scaledArea;bool magpie=MagpieArea(GetAncestor(Target,2),area,out scaledArea);if(magpie)area=scaledArea;else MagpieWindow=IntPtr.Zero;
+        Rect area=new Rect(origin.X,origin.Y,origin.X+client.Right,origin.Y+client.Bottom);Rect scaledArea;bool magpie=MagpieArea(GetAncestor(Target,2),area,out scaledArea);if(magpie)area=scaledArea;else{MagpieWindow=IntPtr.Zero;NativeMaskLayer.Scale(false,0,0,0,0,1,1,IntPtr.Zero);}
         Rect reader=Place(area,X,Y,W,H),box=reader;int layoutX=area.Left,layoutY=area.Top,layoutW=area.Right-area.Left,layoutH=area.Bottom-area.Top;
         
         
