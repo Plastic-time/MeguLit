@@ -15,6 +15,13 @@ const matchKey=s=>norm(s).replace(/≪([^≪≫／]*)／[^≪≫]*≫/g,'$1').re
 const japaneseLine=t=>{const k=(t.match(KANA)||[]).length,h=(t.match(HAN)||[]).length;return k>=2&&k>=h*.2;};
 // Lines that carry language at all (not file names, labels or numbers): what the Japanese / translated share is measured on.
 const prose=t=>/[^\x00-\x7f]/.test(t)&&!!String(t).trim();
+/* E452 (#108 小红帽与迷失森林 Kirikiroid2 package): a translation group can replace the script text outright, leaving
+   Japanese only in speaker tags (【ティアナ】), stage names and system screens. Per line such a script still looks a
+   quarter Japanese, so the whole script is measured instead: kana as a share of kana + Han over the prose lines that
+   are not a bare speaker name. Below 5 % (with enough Han to judge) the script is Chinese only, for every engine:
+   小红帽 0.6 %, Japanese scripts far above (逆転裁判123 81 %). */
+const NAME_LINE=/^[【\[［(（]?[^「『（(\s。、]{1,16}[】\]］)）]$/;
+function chineseOnly(lines){let k=0,h=0;for(const t of lines){if(!prose(t)||NAME_LINE.test(String(t).trim()))continue;k+=(t.match(KANA)||[]).length;h+=(t.match(HAN)||[]).length;}return h>=200&&k<(k+h)*.05;}
 
 // ---- System4 AIN -----------------------------------------------------------------------------
 function inflateAin(file){const b=Buffer.isBuffer(file)?file:fs.readFileSync(file);if(b.subarray(0,4).toString('latin1')!=='AI2\0')throw Error('UNSUPPORTED_AIN_CONTAINER');const size=b.readUInt32LE(8),packed=b.readUInt32LE(12),d=zlib.inflateSync(b.subarray(16,16+packed));if(d.length!==size)throw Error('AIN_SIZE_MISMATCH');return d;}
@@ -55,13 +62,13 @@ function gameRow(db,id){const row=db.prepare('SELECT * FROM games WHERE id=? AND
 function scanRunning(root,id,executable){
  const dir=path.dirname(executable),loc=locate(dir,path.parse(executable).name);if(!loc){const waiting=scenes.preparing(dir);return writeState(root,id,waiting?{status:'preparing',error:'SCRIPT_PREPARING',preparing:waiting,runtime:null,gameDir:dir}:(()=>{const why=scenes.unsupportedReason(dir);return why?{status:'unsupported',error:why.code,detail:why.detail,engine:why.engine,preparing:null,runtime:null,gameDir:dir}:{status:'unsupported',error:'NO_SUPPORTED_SCRIPT',detail:'',preparing:null,runtime:null,gameDir:dir};})());}const file=loc.target;
  const hash=fingerprint(loc),current=readState(root)[id];if(current?.runtime?.sha256===hash&&current.runtime.index&&fs.existsSync(current.runtime.index))return current;
- const ain=readScript(loc),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length,nonEmpty=ain.lines.filter(prose).length;
+ const ain=readScript(loc),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length,nonEmpty=ain.lines.filter(prose).length,zhOnly=chineseOnly(ain.lines);
  // An English (or other) original read by a scene engine is neither the Japanese game nor a Chinese build: nothing to do.
- if(ADAPTERS[loc.engine].scene){const chinese=ain.lines.filter(t=>prose(t)&&!japaneseLine(t)&&/[一-鿿]{2}/.test(t)).length;if(!nonEmpty||japanese<nonEmpty*.5&&chinese<nonEmpty*.3)return writeState(root,id,{status:'unsupported',error:'SCRIPT_NOT_JAPANESE',runtime:null,gameDir:dir});}
+ if(ADAPTERS[loc.engine].scene&&!zhOnly){const chinese=ain.lines.filter(t=>prose(t)&&!japaneseLine(t)&&/[一-鿿]{2}/.test(t)).length;if(!nonEmpty||japanese<nonEmpty*.5&&chinese<nonEmpty*.3)return writeState(root,id,{status:'unsupported',error:'SCRIPT_NOT_JAPANESE',runtime:null,gameDir:dir});}
  const index=writeIndex(root,id,'runtime-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'runtime',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash},structure:ain.structure,lines:ain.lines,...(ain.ruby?{ruby:ain.ruby}:{})});
  const original=current?.original;const runtime={file,engine:loc.engine,sha256:hash,index,codepage:ain.codepage,version:ain.version,structure:ain.structure,lines:nonEmpty,japaneseLines:japanese};
  // A changed game build invalidates the earlier alignment; the original index itself stays.
- return writeState(root,id,{engine:loc.engine,runtime,status:japanese>=nonEmpty*.5?'native-japanese':original?.index&&current?.runtime?.sha256===hash?current.status:original?.index?'needs-recheck':'awaiting-original'});
+ return writeState(root,id,{engine:loc.engine,runtime,status:zhOnly&&!original?.index?'chinese-only':!zhOnly&&japanese>=nonEmpty*.5?'native-japanese':original?.index&&current?.runtime?.sha256===hash?current.status:original?.index?'needs-recheck':'awaiting-original'});
 }
 // ---- Original import and alignment -------------------------------------------------------------
 function align(runtime,original){
@@ -266,7 +273,7 @@ function clearPatch(root,id){const s=readState(root)[id];return writeState(root,
    needs-japanese = a Chinese build (restore or import the Japanese release), preparing, none, unknown (not checked yet). */
 function brief(root,id){const s=readState(root)[String(id)];if(!s)return 'unknown';
  if(s.status==='native-japanese')return s.patchStatus==='ready'?'patch':'machine';
- if(s.status==='ready')return 'patch';if(s.status==='awaiting-original'||s.status==='needs-recheck')return 'needs-japanese';
+ if(s.status==='ready')return 'patch';if(s.status==='awaiting-original'||s.status==='chinese-only'||s.status==='needs-recheck')return 'needs-japanese';
  if(s.status==='preparing')return 'preparing';return 'none';}
 function status(root,db,id){
  const row=gameRow(db,id),saved=readState(root)[id];let state=saved;
@@ -434,8 +441,8 @@ async function discover(root,db,id,options={}){
  writeState(root,id,{status:'scanning',error:''});
  const search=await findCandidates(base,exclude,{ext:path.extname(ADAPTERS[engine].marker(path.parse(state.runtime.file).name)),roots:options.roots||[runningDir,...localRoots()],deadline:Date.now()+(options.timeout||30000)}),checked=[];
  for(const file of search.found){try{const loc=locate(path.dirname(file),path.parse(state.runtime.file).name);if(!loc||loc.engine!==engine){checked.push({file,result:'other-engine'});continue;}const ain=realign(loc,readScript(loc),runtime,runningDir),japanese=ain.lines.filter(t=>prose(t)&&japaneseLine(t)).length;if(japanese<ain.lines.filter(prose).length*.5){checked.push({file,result:'not-japanese'});continue;}const a=align(runtime,ain);checked.push({file,result:a.reliable?'match':'different-version'});if(a.reliable)return {...importOriginal(root,db,id,path.dirname(file)),search:{...search,found:search.found.length,checked}};}catch(error){checked.push({file,result:String(error.message||error)});}}
- const status=state.original?.index?(readState(root)[id]?.status==='scanning'?'ready':readState(root)[id].status):'awaiting-original';
+ const status=state.original?.index?(readState(root)[id]?.status==='scanning'?'ready':readState(root)[id].status):state.status==='chinese-only'?'chinese-only':'awaiting-original';
  writeState(root,id,{status:state.original?.index?(state.alignment?.reliable?'ready':'unreliable'):status,lastSearch:{at:Date.now(),found:search.found.length,complete:search.complete,searched:search.searched,checked}});
  return {notFound:true,search:{found:search.found.length,complete:search.complete,searched:search.searched,checked}};
 }
-module.exports={scriptPairs,brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,clearPatch,locate,readScript,ADAPTERS,readAin,align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,norm,discover,findCandidates};
+module.exports={scriptPairs,brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,clearPatch,locate,readScript,ADAPTERS,readAin,align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,chineseOnly,norm,discover,findCandidates};
