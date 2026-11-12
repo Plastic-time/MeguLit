@@ -26,6 +26,8 @@ export function notice({ t, lang, after }) {
     const text = field('text').trim();
     status.classList.remove('err', 'ok');
     if (!text) { status.textContent = t('ntEmpty'); status.classList.add('err'); form.elements.text.focus(); return; }
+    /* E456 a very short game name may be an abbreviation (夏天, GG): ask once, a second Send goes through */
+    if (form.dataset.kind === 'game' && [...text].length <= 3 && form.dataset.shortOk !== text) { form.dataset.shortOk = text; status.textContent = t('ntShort'); status.classList.add('err'); form.elements.text.focus(); return; }
     button.disabled = true;
     status.textContent = t('ntSending');
     try {

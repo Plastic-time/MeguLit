@@ -544,10 +544,11 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
   <p class="nt-ok js-guide-ok"></p>
   <p class="nt-lede" data-i-html="nt.lede">有些游戏现在还没适配好。想玩什么游戏，把名字写在下面点提交，快的话半天，最晚一周内就能支持</p>
   <div class="nt-row">
-   <input class="nt-input" name="text" type="text" maxlength="200" autocomplete="off" required placeholder="想玩的游戏名字" data-i-attr="placeholder:nt.game.ph;aria-label:nt.game.ph" aria-label="想玩的游戏名字">
+   <input class="nt-input" name="text" type="text" maxlength="200" autocomplete="off" required placeholder="完整的游戏名（日文原名或商店里的名字）" data-i-attr="placeholder:nt.game.ph;aria-label:nt.game.ph" aria-label="完整的游戏名（日文原名或商店里的名字）">
    <input class="nt-hp" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
    <button class="nt-submit" type="submit" data-i="nt.submit">提交</button>
   </div>
+  <p class="nt-req" data-i="nt.req">请写完整、准确的游戏名：日文原名，或 Steam、DLsite 商店里的名字都可以。不要写缩写、简称或昵称（比如「夏天」「GG」），缩写很难找到是哪部游戏</p>
   <p class="nt-status" role="status" aria-live="polite"></p>
   <ul class="nt-updates" hidden></ul>
   <p class="nt-more" data-i-html="nt.more">用的时候遇到问题，点顶部的「问题反馈」填一下就行；在游戏里也可以一键反馈。有什么问题、建议，或者只是想留句话，都很欢迎。谢谢支持！</p>
@@ -571,7 +572,7 @@ document.documentElement.classList.add('js');try{var t=localStorage.getItem('meg
   <p class="nt-hud" aria-hidden="true"><span>feedback</span><span>goes to github issues</span></p>
   <h2 class="nt-title" data-i="fb.title">问题反馈</h2>
   <p class="nt-lede" data-i="fb.lede">遇到的问题、想要的功能，或者想说的话，都可以写在这里。提交后会在 GitHub 上生成一条 Issue，作者会直接看到</p>
-  <textarea class="nt-input nt-area" name="text" rows="5" maxlength="2000" required placeholder="哪个游戏、做了什么、看到了什么" data-i-attr="placeholder:fb.text.ph;aria-label:fb.title" aria-label="问题反馈"></textarea>
+  <textarea class="nt-input nt-area" name="text" rows="5" maxlength="2000" required placeholder="完整的游戏名（不要缩写）、做了什么、看到了什么" data-i-attr="placeholder:fb.text.ph;aria-label:fb.title" aria-label="问题反馈"></textarea>
   <input class="nt-input" name="contact" type="text" maxlength="120" autocomplete="off" placeholder="联系方式（选填：QQ、邮箱、B 站、GitHub）" data-i-attr="placeholder:fb.contact.ph;aria-label:fb.contact.ph" aria-label="联系方式（选填）">
   <input class="nt-hp" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
   <p class="nt-status" role="status" aria-live="polite"></p>

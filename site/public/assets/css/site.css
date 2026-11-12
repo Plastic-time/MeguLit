@@ -2090,3 +2090,5 @@ html.spec-on::-webkit-scrollbar { width: 0; height: 0; }
 .gd-card b { color: var(--text, #f4f4f2); }
 .gd-card kbd { color: inherit; border-color: currentColor; }
 @media (max-width: 30rem) { .nt-actions { flex-wrap: wrap; } }
+/* E456 game-request rule under the field: full exact title, no abbreviations */
+.nt-req { margin: .8rem 0 0; padding: .7rem .95rem; border-left: 3px solid #c8323c; background: rgba(200, 50, 60, .1); color: #f4f4f2; font-size: 1.02rem; font-weight: 600; line-height: 1.7; }
