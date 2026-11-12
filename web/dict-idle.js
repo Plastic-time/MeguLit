@@ -54,13 +54,15 @@ function frame(now){
  const pref=fxPref('dictField');if(!pref.on){if(!calm)f.raf=requestAnimationFrame(frame);return;}
  const res=document.querySelector('#lookup-results'),busy=res&&(res.children.length||res.textContent.trim())?1:0;f.dim=(f.dim??1)+((busy?.45:1)-(f.dim??1))*Math.min(1,dt*3);
  const order=f.parts;f.pvx=(f.pvx||0)*Math.exp(-8*dt);f.pvy=(f.pvy||0)*Math.exp(-8*dt);
- /* (judge fx7: blown glyphs piled up at the sides and the middle stayed empty) a coarse density grid: every glyph drifts
-    gently from crowded cells toward emptier neighbours, so the field spreads out again by itself — no fixed places */
+ /* (user: the field has no fixed places — a pushed glyph stays where it was pushed; the whole only rebalances, slowly)
+    a coarse density grid drives two gentle things over tens of seconds: a very slow drift from crowded cells toward
+    emptier ones, and in an over-full cell a glyph now and then fades out and fades up again in the emptiest cell.
+    Nothing is ever pulled back to a place of its own. */
  const GX=8,GY=5,cw=f.W/GX,ch=f.H/GY,cnt=new Float32Array(GX*GY),cell=(x,y)=>Math.min(GX-1,Math.max(0,Math.floor(x/cw)))+Math.min(GY-1,Math.max(0,Math.floor(y/ch)))*GX;
  for(const p of order)if(p.y>-40&&p.y<f.H+40&&p.x>-40&&p.x<f.W+40)cnt[cell(p.x,p.y)]+=1;f.cnt=cnt;f.cellOf=cell;f.grid=[GX,GY,cw,ch];
  const at=(i,j)=>i<0||j<0||i>=GX||j>=GY?cnt[Math.min(GX-1,Math.max(0,i))+Math.min(GY-1,Math.max(0,j))*GX]+2:cnt[i+j*GX];
  for(const p of order){
-  {const i=Math.min(GX-1,Math.max(0,Math.floor(p.x/cw))),j=Math.min(GY-1,Math.max(0,Math.floor(p.y/ch))),K=40;p.wx=(p.wx||0)+(at(i-1,j)-at(i+1,j))*K*dt;p.wy=(p.wy||0)+(at(i,j-1)-at(i,j+1))*K*.6*dt;}
+  {const i=Math.min(GX-1,Math.max(0,Math.floor(p.x/cw))),j=Math.min(GY-1,Math.max(0,Math.floor(p.y/ch))),K=5;p.wx=(p.wx||0)+(at(i-1,j)-at(i+1,j))*K*dt;p.wy=(p.wy||0)+(at(i,j-1)-at(i,j+1))*K*.6*dt;}
   p.sway+=dt*.6;p.x+=(p.vx+Math.sin(p.sway)*4)*dt;p.y+=p.vy*dt;
   /* (judge fx8: blown glyphs stayed upside down) each glyph eases back to its own resting tilt once the spin dies down */
   p.rot0??=(Math.random()-.5)*.42;p.rot+=((p.rot0+Math.sin(p.sway*.7)*.06)-p.rot)*Math.min(1,dt*1.6/(1+Math.abs(p.wr||0)*.6));
@@ -75,7 +77,9 @@ function frame(now){
    if(Math.random()<.5){let bi=0;for(let q=1;q<cnt.length;q++)if(cnt[q]<cnt[bi])bi=q;cnt[bi]+=1;Object.assign(p,n,{x:(bi%GX+Math.random())*cw,y:(Math.floor(bi/GX)+Math.random())*ch,wx:0,wy:0,wr:0,fade:0});continue;}
    /* back into the frame from an edge, carried in on a breeze and fading up, so the field fills again in 2-4 s */
    Object.assign(p,n,edge==='l'?{x:-60,y:R(.15,.9)*f.H,wx:R(180,320),wy:R(-60,20)}:edge==='r'?{x:f.W+60,y:R(.15,.9)*f.H,wx:-R(180,320),wy:R(-60,20)}:{x:R(.05,.95)*f.W,y:f.H+50,wx:R(-40,40),wy:-R(160,280)},{wr:0,fade:0});}
-  p.fade=Math.min(1,(p.fade??1)+dt*1.4);
+  {const mean=order.length/(GX*GY),ci=cell(p.x,p.y);if(!p.leaving&&(p.fade??1)>=1&&cnt[ci]>mean*1.8&&Math.random()<dt*.12){p.leaving=1;cnt[ci]-=1;}}
+  if(p.leaving){p.fade=Math.max(0,(p.fade??1)-dt*.7);if(p.fade<=0){let bi=0;for(let q=1;q<cnt.length;q++)if(cnt[q]<cnt[bi])bi=q;cnt[bi]+=1;Object.assign(p,make(f,true),{x:(bi%GX+Math.random())*cw,y:(Math.floor(bi/GX)+Math.random())*ch,wx:0,wy:0,wr:0,fade:0,leaving:0});}}
+  else p.fade=Math.min(1,(p.fade??1)+dt*.5);
   if(p.y>f.H+120)p.y=-60;
   const s=p.spr,base=Math.min(1,p.alpha*f.dim*pref.k)*(p.fade??1),sp=Math.hypot(p.wx||0,p.wy||0);
   /* (judge fx7: the trail read as stepped copies) one smear instead: the sprite stretched along its velocity, behind it */
