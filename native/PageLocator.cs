@@ -120,6 +120,7 @@ public sealed class PageLocator : IDisposable {
    if (found != null) break;
   }
   if (found == null) { Emit(new { type = "pageLocateStatus", status = "art miss chars=" + text.Length }); return; }
+  lock (Gate) ArtActive = text;
   ArtEmit(serial, text, found, rows, w, h, true);
   int misses = 0;
   for (int i = 0; i < 43 && !Stale(serial); i++) {
@@ -131,12 +132,179 @@ public sealed class PageLocator : IDisposable {
    if (f2 == null) { if (++misses >= 2) break; continue; }
    misses = 0;
   }
+  lock (Gate) if (ArtActive == text) ArtActive = null;
   ArtEmit(serial, text, null, null, w, h, false);
  }
  void ArtEmit(int id, string text, Found f, List<Row> rows, int w, int h, bool visible) {
   var parts = new List<object>();
   if (f != null) for (int i = f.First; i <= f.Last; i++) { var b = rows[i].Box; string t = i - f.First < f.Parts.Count ? f.Parts[i - f.First] : rows[i].Text; parts.Add(new { text = t, x = b.Left, y = b.Top, w = b.Width, h = b.Height }); }
   Emit(new { type = "artText", id = id, text = text, visible = visible, rows = parts, sw = w, sh = h, at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
+ }
+
+ // ---- art scan: the OCR read path (2026-11-12) ----------------------------------------------------------------------
+ /* User: opening titles, credits and chapter cards must be bilingual in every game, also when no hook stream carries them
+    (ファタモルガーナの館: 館がある / 寝起きざまのように are pictures, no drawText at all). While MeguLit asks for it (the engine
+    says its text window is hidden, or no hook line arrived for 2 s) the bound game's client area is read every 0.7 s; only
+    when the picture changed (a 64x36 grey thumbnail differs) does the system's Japanese OCR run. Japanese rows that are not
+    the current dialogue line, its name or the text-box band go out as artText with the recognised text; the game keeps
+    drawing them (OCR reads, never covers: MeguLit lays only its invisible readable copy and the translation). A group is
+    shown once two reads agree and hidden after two reads without it. Nothing is ever written to the game. */
+ public sealed class ScanItem { public int Id; public string Text; public List<Row> Rows; public int Seen, Misses; public bool Shown; public DateTime Since; }
+ volatile bool ScanOn; IntPtr ScanTarget; string ScanDialog, ScanSpeaker; bool ScanBand; Thread Scanner; string ArtActive;
+ readonly List<ScanItem> ScanItems = new List<ScanItem>(); int ScanId = 1000000;
+ public void Scan(IntPtr target, bool on, string dialog, string speaker, bool band) {
+  lock (Gate) { ScanTarget = target; ScanDialog = String.IsNullOrWhiteSpace(dialog) ? null : dialog; ScanSpeaker = String.IsNullOrWhiteSpace(speaker) ? null : speaker; ScanBand = band; }
+  ScanOn = on && target != IntPtr.Zero;
+  if (ScanOn && Scanner == null) { Scanner = new Thread(ScanRun) { IsBackground = true, Name = "MeguLit art scan", Priority = ThreadPriority.BelowNormal }; Scanner.Start(); }
+ }
+ void ScanRun() {
+  byte[] last = null; int idle = 0; DateTime lastOcr = DateTime.MinValue;
+  while (!Disposed) {
+   Thread.Sleep(700);
+   if (!ScanOn) { ScanClear(); last = null; continue; }
+   try {
+    IntPtr target; string dialog, speaker; bool band;
+    lock (Gate) { target = ScanTarget; dialog = ScanDialog; speaker = ScanSpeaker; band = ScanBand; }
+    if (!EngineTried) { EngineTried = true; try { Engine = OcrEngine.TryCreateFromLanguage(new Language("ja")); } catch { Engine = null; } }
+    if (Engine == null || GameCapture.Busy(target)) continue;
+    RECT rect; if (!GetClientRect(target, out rect) || rect.Right < 64 || rect.Bottom < 64 || rect.Right > 7680 || rect.Bottom > 4320) continue;
+    int w = rect.Right, h = rect.Bottom; List<Row> rows; byte[] thumb;
+    using (var image = new Bitmap(w, h, PixelFormat.Format24bppRgb)) {
+     if (!GameCapture.Into(target, image, 3)) continue;
+     thumb = Thumb(image);
+     bool pending = false; foreach (var it in ScanItems) if (!it.Shown || it.Misses > 0) pending = true;
+     // The same picture: what is shown stays; a candidate seen once (or missed once) is read again to settle it.
+     if (last != null && Differ(last, thumb) < 1.2 && !pending) continue;
+     // A picture that keeps moving with no Japanese on it (video, particles) is read every 2.1 s instead of 0.7 s.
+     if (idle >= 4 && (DateTime.UtcNow - lastOcr).TotalMilliseconds < 2000) continue;
+     last = thumb; lastOcr = DateTime.UtcNow;
+     lock (OcrLock) rows = Read(image, w, h);
+    }
+    if (!ScanOn) continue;
+    string active; lock (Gate) active = ArtActive;
+    var groups = ScanGroups(rows, w, h, dialog, speaker, band, active);
+    idle = groups.Count == 0 ? Math.Min(idle + 1, 8) : 0;
+    ScanReconcile(groups, w, h);
+   } catch (Exception e) { Emit(new { type = "pageLocateStatus", status = "art scan error " + e.Message }); Thread.Sleep(2000); }
+  }
+ }
+ static byte[] Thumb(Bitmap image) {
+  using (var small = new Bitmap(64, 36, PixelFormat.Format24bppRgb)) {
+   using (var g = Graphics.FromImage(small)) { g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear; g.DrawImage(image, 0, 0, 64, 36); }
+   var o = new byte[64 * 36];
+   for (int y = 0; y < 36; y++) for (int x = 0; x < 64; x++) { var c = small.GetPixel(x, y); o[y * 64 + x] = (byte)((c.R * 3 + c.G * 6 + c.B) / 10); }
+   return o;
+  }
+ }
+ public static double Differ(byte[] a, byte[] b) { if (a == null || b == null || a.Length != b.Length) return 255; long s = 0; for (int i = 0; i < a.Length; i++) s += Math.Abs(a[i] - b[i]); return (double)s / a.Length; }
+
+ // OCR puts spaces between Japanese characters; they are dropped next to CJK characters.
+ public static string Tidy(string s) {
+  var o = new StringBuilder(); s = (s ?? "").Trim();
+  for (int i = 0; i < s.Length; i++) {
+   if (Char.IsWhiteSpace(s[i])) { int j = i; while (j < s.Length && Char.IsWhiteSpace(s[j])) j++; bool cjk = o.Length > 0 && j < s.Length && (Cjk(o[o.Length - 1]) || Cjk(s[j])); if (!cjk) o.Append(' '); i = j - 1; continue; }
+   o.Append(s[i]);
+  }
+  return o.ToString();
+ }
+ static bool Cjk(char c) { return (c >= '　' && c <= 'ヿ') || (c >= '㐀' && c <= '鿿') || (c >= '＀' && c <= '￯'); }
+ static bool Kana(char c) { return (c >= 'ぁ' && c <= 'ゟ') || (c >= 'ァ' && c <= 'ヺ'); }
+ static bool Kanji(char c) { return (c >= '㐀' && c <= '鿿'); }
+ // Japanese a reader would want: kana in it (Chinese text, a translation the game draws, has none), or a short kanji card
+ // (第一章, 序幕); mostly Japanese characters; at least two of them.
+ public static bool Japanese(string text) {
+  string t = Tidy(text); int kana = 0, kanji = 0, letters = 0;
+  foreach (char c in t) { if (Kana(c)) kana++; else if (Kanji(c)) kanji++; if (Char.IsLetterOrDigit(c)) letters++; }
+  int jp = kana + kanji;
+  if (jp < 2 || jp < letters * 0.6) return false;
+  return kana >= 1 || (kanji >= 2 && kanji <= 8);
+ }
+ // Rows to groups: Japanese rows outside the dialogue, then neighbours (gap under 1.3 rows, similar height, overlapping
+ // or sharing a centre line) joined into one item, a poem's lines read as one.
+ public static List<List<Row>> ScanGroups(List<Row> rows, int w, int h, string dialog, string speaker, bool band, string active) {
+  var skip = new bool[rows.Count];
+  foreach (string known in new[] { dialog, active }) {
+   if (known == null) continue; var f = Find(rows, known); if (f == null) continue;
+   int top = rows[f.First].Box.Top, bottom = rows[f.Last].Box.Bottom, size = Math.Max(8, rows[f.First].Box.Height);
+   for (int i = 0; i < rows.Count; i++) { var b = rows[i].Box; if (i >= f.First && i <= f.Last) skip[i] = true; else if (known == dialog && b.Bottom > top - size * 3 && b.Top < bottom + size) skip[i] = true; }
+  }
+  if (speaker != null) { string sp = Plain(speaker, null); for (int i = 0; i < rows.Count; i++) { string p = Plain(rows[i].Text, null); if (p.Length > 0 && p.Length <= sp.Length + 2 && Lcs(p, sp) >= Math.Max(1, p.Length - 1)) skip[i] = true; } }
+  var keep = new List<Row>();
+  for (int i = 0; i < rows.Count; i++) {
+   if (skip[i]) continue; var b = rows[i].Box;
+   if (band && b.Top + b.Height / 2 > h * 0.6) continue;
+   if (b.Height < Math.Max(6, h / 90) || !Japanese(rows[i].Text)) continue;
+   keep.Add(new Row(Tidy(rows[i].Text), b));
+  }
+  keep.Sort((a, c) => a.Box.Top.CompareTo(c.Box.Top));
+  var groups = new List<List<Row>>();
+  foreach (var r in keep) {
+   List<Row> into = null;
+   foreach (var g in groups) {
+    var p = g[g.Count - 1].Box; var q = r.Box;
+    double hh = Math.Max(p.Height, q.Height), gap = q.Top - p.Bottom;
+    bool near = gap < hh * 1.3 && gap > -hh * 0.5 && Math.Min(p.Height, q.Height) >= hh * 0.6;
+    bool aligned = Math.Min(p.Right, q.Right) > Math.Max(p.Left, q.Left) || Math.Abs((p.Left + p.Right) - (q.Left + q.Right)) / 2 < hh * 2;
+    if (near && aligned) { into = g; break; }
+   }
+   if (into == null) { into = new List<Row>(); groups.Add(into); }
+   into.Add(r);
+  }
+  return groups;
+ }
+ public static string GroupText(List<Row> g) { var s = new StringBuilder(); foreach (var r in g) s.Append(r.Text); return s.ToString(); }
+ static bool Same(string a, string b) { string p = Plain(a, null), q = Plain(b, null); if (p.Length == 0 || q.Length == 0) return false; return Lcs(p, q) >= Math.Max(p.Length, q.Length) * 0.6; }
+ static bool Overlap(List<Row> a, List<Row> b) {
+  Rectangle u = a[0].Box, v = b[0].Box; foreach (var r in a) u = Rectangle.Union(u, r.Box); foreach (var r in b) v = Rectangle.Union(v, r.Box);
+  return u.IntersectsWith(v);
+ }
+ void ScanReconcile(List<List<Row>> groups, int w, int h) {
+  var matched = new HashSet<ScanItem>();
+  foreach (var g in groups) {
+   string text = GroupText(g); ScanItem it = null;
+   foreach (var x in ScanItems) if (!matched.Contains(x) && (Same(x.Text, text) || (Overlap(x.Rows, g) && (text.Contains(x.Text) || x.Text.Contains(text))))) { it = x; break; }
+   if (it == null) { it = new ScanItem { Id = ++ScanId, Text = text, Rows = g, Since = DateTime.UtcNow }; ScanItems.Add(it); }
+   matched.Add(it); it.Misses = 0; it.Seen++;
+   bool changed = it.Text != text || it.Rows.Count != g.Count || Math.Abs(it.Rows[0].Box.Top - g[0].Box.Top) > g[0].Box.Height / 2 || Math.Abs(it.Rows[0].Box.Left - g[0].Box.Left) > g[0].Box.Height;
+   it.Text = text; it.Rows = g;
+   if (it.Seen >= 2 && (!it.Shown || changed)) { it.Shown = true; ScanEmit(it, w, h, true); }
+  }
+  for (int i = ScanItems.Count - 1; i >= 0; i--) {
+   var x = ScanItems[i]; if (matched.Contains(x)) continue;
+   if (++x.Misses >= 2 || !x.Shown) { if (x.Shown) ScanEmit(x, w, h, false); ScanItems.RemoveAt(i); }
+  }
+ }
+ void ScanEmit(ScanItem it, int w, int h, bool visible) {
+  var parts = new List<object>();
+  if (visible) foreach (var r in it.Rows) parts.Add(new { text = r.Text, x = r.Box.Left, y = r.Box.Top, w = r.Box.Width, h = r.Box.Height });
+  Emit(new { type = "artText", id = it.Id, text = it.Text, visible = visible, source = "ocr", rows = parts, sw = w, sh = h, at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
+ }
+ void ScanClear() { foreach (var x in ScanItems) if (x.Shown) ScanEmit(x, 0, 0, false); ScanItems.Clear(); }
+
+ public static string ScanSelfTest() {
+  Func<string, int, int, int, Row> row = (t, x, y, hh) => new Row(t, new Rectangle(x, y, 40 * t.Length, hh));
+  if (Tidy("館 が あ る") != "館がある" || Tidy("Save  Load") != "Save Load") return "tidy";
+  if (!Japanese("館がある") || !Japanese("第一章") || Japanese("这是中文翻译文本内容") || Japanese("SAVE") || Japanese("あ")) return "japanese";
+  // A centred two-line card, the dialogue line with its name above it in the box, and a menu row: only the card is art.
+  var rows = new List<Row> { row("館がある", 560, 300, 40), row("寝起きざまのように", 460, 352, 40), row("メル", 120, 560, 28), row("「おはようございます」と彼女は言った。", 120, 600, 32), row("セーブ ロード", 900, 690, 20) };
+  var g = ScanGroups(rows, 1280, 720, "「おはようございます」と彼女は言った。", "メル", true, null);
+  if (g.Count != 1 || GroupText(g[0]) != "館がある寝起きざまのように" || g[0].Count != 2) return "groups " + g.Count;
+  // No dialogue (an opening): rows far apart are separate items.
+  var o = ScanGroups(new List<Row> { row("館がある", 560, 120, 40), row("寝起きざまのように", 460, 500, 40) }, 1280, 720, null, null, false, null);
+  if (o.Count != 2) return "separate " + o.Count;
+  // A line the hook already placed (art mode) is not read twice.
+  var a = ScanGroups(new List<Row> { row("館がある", 560, 300, 40) }, 1280, 720, null, null, false, "館がある");
+  if (a.Count != 0) return "active";
+  // Reconcile: shown once two reads agree, kept while seen, hidden after two reads without it.
+  var sent = new List<string>(); var loc = new PageLocator(m => { var t = m.GetType(); sent.Add(t.GetProperty("visible").GetValue(m, null) + ":" + t.GetProperty("text").GetValue(m, null)); });
+  var card = new List<List<Row>> { new List<Row> { row("館がある", 560, 300, 40) } }; var none = new List<List<Row>>();
+  loc.ScanReconcile(card, 1280, 720); if (sent.Count != 0) return "shown too early";
+  loc.ScanReconcile(card, 1280, 720); if (sent.Count != 1 || sent[0] != "True:館がある") return "not shown " + String.Join(",", sent.ToArray());
+  loc.ScanReconcile(card, 1280, 720); if (sent.Count != 1) return "re-sent";
+  loc.ScanReconcile(none, 1280, 720); if (sent.Count != 1) return "hidden after one miss";
+  loc.ScanReconcile(none, 1280, 720); if (sent.Count != 2 || sent[1] != "False:館がある") return "not hidden";
+  if (Differ(new byte[] { 1, 2 }, new byte[] { 1, 2 }) != 0) return "differ";
+  return "0";
  }
 
  void Report(Found f, List<Row> rows, string text, int w, int h) {
@@ -357,6 +525,40 @@ public sealed class PageLocator : IDisposable {
     if (got != want) return "breaks paragraph " + p + ": " + got.Replace("\n", "/");
     if (rows[f.First].Box.Left < 100 || rows[f.First].Box.Left > 160) return "box paragraph " + p + " left=" + rows[f.First].Box.Left;
    }
+  }
+  return "0";
+ }
+
+ // Real OCR on a drawn opening (no game): two centred mincho lines on a dark gradient (fata's 館がある / 寝起きざまのように)
+ // and a text box with a name and the current dialogue line at the bottom. The scan must give the two art lines and
+ // nothing from the box. Returns "0", the failing step, or "skip" without Japanese OCR.
+ public static string ScanOcrSelfTest(string save) {
+  var locator = new PageLocator(o => { });
+  try { locator.Engine = OcrEngine.TryCreateFromLanguage(new Language("ja")); } catch { }
+  if (locator.Engine == null) return "skip no Japanese OCR";
+  string dialog = "「おはようございます」と彼女は静かに言った。";
+  using (var image = new Bitmap(1280, 720, PixelFormat.Format24bppRgb)) {
+   using (var g = Graphics.FromImage(image))
+   using (var big = new Font("MS Mincho", 40, FontStyle.Regular, GraphicsUnit.Pixel))
+   using (var small = new Font("MS Gothic", 28, FontStyle.Regular, GraphicsUnit.Pixel)) {
+    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+    for (int y = 0; y < 720; y += 4) g.FillRectangle(new SolidBrush(Color.FromArgb(10 + y / 30, 12 + y / 40, 25 + y / 20)), 0, y, 1280, 4);
+    var centre = new StringFormat { Alignment = StringAlignment.Center };
+    g.DrawString("館がある", big, new SolidBrush(Color.FromArgb(225, 220, 205)), new RectangleF(0, 150, 1280, 60), centre);
+    g.DrawString("寝起きざまのように", big, new SolidBrush(Color.FromArgb(225, 220, 205)), new RectangleF(0, 330, 1280, 60), centre);
+    g.FillRectangle(new SolidBrush(Color.FromArgb(20, 20, 30)), 40, 520, 1200, 180);
+    g.DrawString("メル", small, Brushes.White, 80, 535);
+    g.DrawString(dialog, small, Brushes.White, 80, 590);
+   }
+   if (!String.IsNullOrEmpty(save)) image.Save(save, ImageFormat.Png);
+   var rows = locator.Read(image, 1280, 720);
+   string seen = String.Join(" | ", rows.ConvertAll(r => r.Text).ToArray());
+   var open = ScanGroups(rows, 1280, 720, null, null, false, null);
+   bool a = false, b = false; foreach (var gr in open) { string t = GroupText(gr); if (Same(t, "館がある")) a = true; if (Same(t, "寝起きざまのように")) b = true; }
+   if (!a || !b) return "opening lines not found [" + seen + "]";
+   var play = ScanGroups(rows, 1280, 720, dialog, "メル", true, null);
+   if (play.Count != 2) return "with dialogue: " + play.Count + " groups [" + String.Join(" | ", play.ConvertAll(GroupText).ToArray()) + "]";
+   foreach (var gr in play) { var box = gr[0].Box; if (Math.Abs(box.Left + box.Width / 2 - 640) > 40) return "not centred " + GroupText(gr) + " x=" + box.Left; }
   }
   return "0";
  }

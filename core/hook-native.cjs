@@ -140,6 +140,14 @@ class HookNative{
   if(this.lastSource&&(HookNative.flat(this.lastSource).includes(flat)||flat.includes(HookNative.flat(this.lastSource))))return;
   const now=this.now(),seen=this.artSeen||(this.artSeen=new Map());const last=seen.get(flat);if(last!=null&&now-last<20000)return;seen.set(flat,now);if(seen.size>200)seen.delete(seen.keys().next().value);
   this.trace('art text located '+JSON.stringify(t.slice(0,40)));this.artLocate(t);}catch{}}
+ /* 2026-11-12 art scan, the OCR read path (user: opening titles, credits, chapter cards bilingual in every game, also when
+    no hook stream carries them; ファタモルガーナの館's opening lines are pictures). Wanted while the engine says its text window
+    is hidden, or no hook line arrived for 2 s: PageLocator then reads the picture when it changes and sends Japanese rows
+    that are not the current dialogue line (dialog, speaker; band = the lower text-box band is skipped while a line is
+    current) as artText. OCR only reads; the game keeps drawing the text. */
+ artScanState(now=this.now()){const hidden=this.engineDialog===false,line=String(this.lastSource||'').trim(),current=!!line&&!hidden;
+  const on=hidden||!line||now-(this.lastSourceAt||0)>2000;
+  return {on,dialog:current?line.slice(0,600):'',speaker:current?String(this.state?.hookSpeaker||'').slice(0,40):'',band:current};}
  auxText(m){this.artCandidate(m.text);const C=this.choice||(this.choice=new ChoiceCapture(()=>this.now()));const added=C.add(m.text,this.lastSource,this.speaker?.text);
   this.trace('choice aux '+String(m.sourceName||'').slice(0,40)+' role='+(m.role??'')+' added='+JSON.stringify(added)+' text='+JSON.stringify(String(m.text).slice(0,80)));
   if(!added.length)return;clearTimeout(this.choiceTimer);this.choiceTimer=setTimeout(()=>this.requestChoices(0),450);this.choiceTimer.unref?.();}
