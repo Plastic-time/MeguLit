@@ -498,6 +498,8 @@
   const styleOnly = values => { const { interfaceMode, bindEnabled, gameProcess, ...rest } = values || {}; return rest; };
   bridge.applyGalPreferences = (values = {}, options = {}) => { values = styleOnly(values); preferences = appearance.clean({ ...preferences, ...values }); const applied = {}; for (const key of Object.keys(values)) if (preferences[key] !== undefined) applied[key] = preferences[key]; if (!options.preview&&commitSynchronizedStyle) commitSynchronizedStyle(applied); syncOpenForm(applied); if(!options.preview)localStorage.setItem('tomoyo-gal-settings', JSON.stringify({...preferences,translationPrompt:undefined})); if(options.preview)send({type:'galPreview',settings:preferences});else if(options.persist!==false)send({ type:'galConfigure', settings:preferences }); apply(); return { ...preferences }; };
   bridge.galPreferences = () => ({ ...preferences });
+  /* 2026-11-12 values the engine told us (its own font): applied and kept like a choice in the menu */
+  bridge.enginePreferences=m=>{try{if(m&&m.values&&typeof m.values==='object')bridge.applyGalPreferences(m.values,{persist:true});}catch{}};
   bridge.workTranslationPrompt=(key,prompt)=>{bridge.workPromptKey=key;bridge.applyGalPreferences({translationPrompt:prompt},{persist:false});};
   bridge.workPromptSaveFailed=()=>{const hint=document.querySelector('[name=galTranslationPrompt]')?.parentElement.querySelector('small');if(hint)hint.textContent=({zh:'提示词保存失败，请重试',ja:'追加指示を保存できませんでした',en:'Could not save the prompt. Try again'})[document.documentElement.lang.slice(0,2)];};
   // Live position tracking (text-position.js): moves the text box for the current line without saving each move.

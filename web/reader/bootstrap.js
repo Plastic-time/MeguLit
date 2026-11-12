@@ -43,7 +43,7 @@ function event(message){if(!loaded){queued.push(message);return;}if(message.type
  if(message.type==='panelAppearance'){for(const[key,value]of Object.entries(message.values||{}))if(['tome-background','tome-menu-background'].includes(key))localStorage.setItem(key,value);b.hostRefreshAppearance?.().catch(error=>{status.textContent=String(error);});return;}
  if(message.type==='language'){window.__tomeI18n?.set?.(message.language);return;}
  if(message.type==='call'){deliver({replies:[message]});return;}
- const method={glassFrame:'glassFrame',gameStyleStatus:'gameStyleStatus',hookTextPos:'textPosition',artText:'artText',hookPage:'hookPage',waitMarkerFrame:'waitMarkerFrame',maskFrame:'galMaskFrame'}[message.type];
+ const method={glassFrame:'glassFrame',gameStyleStatus:'gameStyleStatus',hookTextPos:'textPosition',artText:'artText',enginePreferences:'enginePreferences',hookPage:'hookPage',waitMarkerFrame:'waitMarkerFrame',maskFrame:'galMaskFrame'}[message.type];
  if(method){b[method]?.(message);return;}
  if(message.type==='workTranslationPrompt'){b.workTranslationPrompt?.(message.key,message.prompt);return;}
  if(typeof message.hookNativeLog==='boolean'){document.body.classList.toggle('megulit-native-log',message.hookNativeLog);window.__tomoyoHitRegionsRefresh?.(true);}

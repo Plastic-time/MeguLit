@@ -68,7 +68,7 @@ class Reader{
  engineFont(message){try{const g=this.gal,face=String(message.face||'').trim().slice(0,64);if(!g||!face||/["\<>;{}]/.test(face)||g.preferences?.autoGameStyle===false)return;
   const cur=String(g.preferences?.japaneseFont||'');if(cur&&!/^(engine:|game:)/.test(cur)&&!['originalGothic','originalMincho'].includes(cur))return;
   const flat=v=>String(v||'').replace(/[\s　]/g,'').toLowerCase(),hit=(this.fonts?.current?.fonts||[]).find(f=>f.lang!=='zh'&&flat(f.family)===flat(face));
-  const key=hit?'game:'+hit.id:'engine:'+face;if(cur===key)return;g.save({...g.preferences,japaneseFont:key});this.gal.hooks?.trace?.('engine font '+JSON.stringify(face)+' -> '+key);}catch{}}
+  const key=hit?'game:'+hit.id:'engine:'+face;if(cur!==key)g.save({...g.preferences,japaneseFont:key});this.runtime.emit('reader-event',{type:'enginePreferences',values:{japaneseFont:key}});this.gal.hooks?.trace?.('engine font '+JSON.stringify(face)+' -> '+key);}catch{}}
 
  logVisibility(entry){try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),...entry})+'\n');}catch{}}
  selectGame(processName,enter=true,executable=''){
