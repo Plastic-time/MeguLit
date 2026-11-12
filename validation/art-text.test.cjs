@@ -60,3 +60,7 @@ test('the bridge self-test of the art scan passes (when GalWindowBridge.exe is b
  const r=require('node:child_process').spawnSync(path.join(__dirname,'..','native','GalWindowBridge.exe'),['--art-scan-self-test'],{encoding:'utf8',timeout:20000});
  assert.equal(r.status,0,r.stdout+r.stderr);
 });
+test('real Japanese OCR reads a drawn fata-like opening and leaves the text box out (when GalWindowBridge.exe is built)',{skip:!fs.existsSync(path.join(__dirname,'..','native','GalWindowBridge.exe'))},()=>{
+ const r=require('node:child_process').spawnSync(path.join(__dirname,'..','native','GalWindowBridge.exe'),['--art-scan-ocr-test'],{encoding:'utf8',timeout:30000});
+ assert.equal(r.status,0,r.stdout+r.stderr);assert.match(r.stdout,/^(PASS|SKIP)/);
+});

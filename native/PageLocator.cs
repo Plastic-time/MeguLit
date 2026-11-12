@@ -529,5 +529,39 @@ public sealed class PageLocator : IDisposable {
   return "0";
  }
 
+ // Real OCR on a drawn opening (no game): two centred mincho lines on a dark gradient (fata's 館がある / 寝起きざまのように)
+ // and a text box with a name and the current dialogue line at the bottom. The scan must give the two art lines and
+ // nothing from the box. Returns "0", the failing step, or "skip" without Japanese OCR.
+ public static string ScanOcrSelfTest(string save) {
+  var locator = new PageLocator(o => { });
+  try { locator.Engine = OcrEngine.TryCreateFromLanguage(new Language("ja")); } catch { }
+  if (locator.Engine == null) return "skip no Japanese OCR";
+  string dialog = "「おはようございます」と彼女は静かに言った。";
+  using (var image = new Bitmap(1280, 720, PixelFormat.Format24bppRgb)) {
+   using (var g = Graphics.FromImage(image))
+   using (var big = new Font("MS Mincho", 40, FontStyle.Regular, GraphicsUnit.Pixel))
+   using (var small = new Font("MS Gothic", 28, FontStyle.Regular, GraphicsUnit.Pixel)) {
+    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+    for (int y = 0; y < 720; y += 4) g.FillRectangle(new SolidBrush(Color.FromArgb(10 + y / 30, 12 + y / 40, 25 + y / 20)), 0, y, 1280, 4);
+    var centre = new StringFormat { Alignment = StringAlignment.Center };
+    g.DrawString("館がある", big, new SolidBrush(Color.FromArgb(225, 220, 205)), new RectangleF(0, 150, 1280, 60), centre);
+    g.DrawString("寝起きざまのように", big, new SolidBrush(Color.FromArgb(225, 220, 205)), new RectangleF(0, 330, 1280, 60), centre);
+    g.FillRectangle(new SolidBrush(Color.FromArgb(20, 20, 30)), 40, 520, 1200, 180);
+    g.DrawString("メル", small, Brushes.White, 80, 535);
+    g.DrawString(dialog, small, Brushes.White, 80, 590);
+   }
+   if (!String.IsNullOrEmpty(save)) image.Save(save, ImageFormat.Png);
+   var rows = locator.Read(image, 1280, 720);
+   string seen = String.Join(" | ", rows.ConvertAll(r => r.Text).ToArray());
+   var open = ScanGroups(rows, 1280, 720, null, null, false, null);
+   bool a = false, b = false; foreach (var gr in open) { string t = GroupText(gr); if (Same(t, "館がある")) a = true; if (Same(t, "寝起きざまのように")) b = true; }
+   if (!a || !b) return "opening lines not found [" + seen + "]";
+   var play = ScanGroups(rows, 1280, 720, dialog, "メル", true, null);
+   if (play.Count != 2) return "with dialogue: " + play.Count + " groups [" + String.Join(" | ", play.ConvertAll(GroupText).ToArray()) + "]";
+   foreach (var gr in play) { var box = gr[0].Box; if (Math.Abs(box.Left + box.Width / 2 - 640) > 40) return "not centred " + GroupText(gr) + " x=" + box.Left; }
+  }
+  return "0";
+ }
+
  public void Dispose() { Disposed = true; Wake.Set(); }
 }
