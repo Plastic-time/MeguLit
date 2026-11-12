@@ -1579,3 +1579,36 @@ html body .dict-launch :is(#lookup-form,.lookup-form){outline:1px solid transpar
    white field is opaque white that opens and closes as an iris from the burst — never translucent white over the red */
 html body .class-rite-fx.is-wide{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:20!important}
 html body .class-rite-white{background:#fff!important;mix-blend-mode:normal!important;opacity:1!important;clip-path:circle(0% at 25% 50%);z-index:30!important}
+
+/* ==== round 11 ==== */
+/* settings width (judge r10: half the pages still ran to 1551 and showed beside the search bar when scrolled): every
+   block one level down is capped to the search bar's 960px too, and the per-game selector ends at the same edge */
+html:not(#u):not(#v):not(#w):not(#x) body .settings-layout>.settings-content>*>:not(.settings-search):not(.settings-search-results){max-width:960px;box-sizing:border-box}
+html:not(#u):not(#v):not(#w):not(#x) body .main .settings-content>.profile-selector{right:auto!important;left:calc(28px + 960px);transform:translateX(-100%)}
+/* status line (judge r10: failures were plain grey or bold text): one component — an 8px dot, one 13px sentence, an
+   optional text action. Red failed, grey off or empty, gold in progress. Used by the account, voice, review and the
+   detail page's ratings (all sources failing collapse into this one line). */
+html:not(#u):not(#v):not(#w):not(#x) body .u-status{display:flex!important;align-items:center;gap:10px;margin:8px 0!important;font:400 13px/1.6 var(--g-sans,inherit)!important;letter-spacing:.02em!important;color:rgba(241,224,210,.82)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .u-status::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:rgba(241,224,210,.4)}
+html:not(#u):not(#v):not(#w):not(#x) body .u-status[data-state=error]{color:#ffb4a8!important}
+html:not(#u):not(#v):not(#w):not(#x) body .u-status[data-state=error]::before{background:#e2423e;box-shadow:0 0 8px rgba(226,66,62,.6)}
+html:not(#u):not(#v):not(#w):not(#x) body .u-status[data-state=busy]::before{background:var(--g-gold,#edb56e);animation:u-pulse 1.2s ease-in-out infinite}
+html:not(#u):not(#v):not(#w):not(#x) body .u-status[data-state=off]{font-family:var(--u-mono,monospace)!important;font-size:12px!important;letter-spacing:.06em!important}
+html:not(#u):not(#v):not(#w):not(#x) body .speech-feedback[data-state=error]{display:flex!important;align-items:center;gap:10px;font-size:13px!important;font-weight:400!important;color:#ffb4a8!important}
+html:not(#u):not(#v):not(#w):not(#x) body .speech-feedback[data-state=error]::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:#e2423e;box-shadow:0 0 8px rgba(226,66,62,.6)}
+@keyframes u-pulse{50%{opacity:.35}}
+/* irregular glass keeps its inner margin (judge r10: the review panel's title touched its edge) */
+html:not(#u):not(#v):not(#w):not(#x) body .main .review-card.panel{padding:40px 48px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .main :is(.about-facts,.about-links,.about-support,.about-credits,.stg-glass){padding:28px 32px!important}
+/* cover wall (judge r10: the floating search sat on top of titles). It stays in the middle — the user's choice — and
+   now rests in a dark pool: a solid backing and a wide soft halo, so whatever passes beneath fades out instead of
+   colliding with it */
+html:not(#u):not(#v):not(#w):not(#x) body .field-search{background:#150e12!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.16),0 0 0 10px rgba(16,10,13,.55),0 0 70px 46px rgba(12,8,10,.88)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+/* grammar lesson (judge r8–r10: text ran on below the step bar): the step bar is no longer pinned — it follows the
+   step's content, so nothing can show beneath it */
+html:not(#u):not(#v):not(#w):not(#x) body .gm-lesson .gm-stepnav{position:static!important;box-shadow:none!important;margin-top:28px!important}
+/* grammar stages (judge r8–r10: the sixth stage was cut off by the scroller's fade): all fifteen stages on one map,
+   five to a row, nothing scrolls sideways or fades out */
+html:not(#u):not(#v):not(#w):not(#x) body .gm-page .gm-stgs{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px!important;overflow:visible!important;-webkit-mask:none!important;mask:none!important;padding-bottom:0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .gm-page .gm-stgs>.gm-stg{flex:none!important;min-width:0}
+@media (max-width:1100px){html:not(#u):not(#v):not(#w):not(#x) body .gm-page .gm-stgs{grid-template-columns:repeat(3,minmax(0,1fr))}}

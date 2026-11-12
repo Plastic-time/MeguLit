@@ -26,7 +26,7 @@ export function mountEmailLogin(box,{api,locale,esc,toast,kinds=()=>null,onDone=
 export async function renderAccount({target,api,locale,esc,toast}){
  const t=T[locale]||T.zh,fill=(s,v)=>s.replace(/\{(\w+)\}/g,(_,k)=>esc(String(v[k]??'')));
  const when=ms=>ms?new Date(ms).toLocaleString(locale==='zh'?'zh-CN':locale==='ja'?'ja-JP':'en-US'):t.never;
- let status;try{status=await api('account_status',{});}catch(error){target.innerHTML=`<section class="panel"><h2>${t.title}</h2><p class="settings-help">${esc(errorText(t,error))}</p></section>`;return;}
+ let status;try{status=await api('account_status',{});}catch(error){target.innerHTML=`<section class="panel"><h2>${t.title}</h2><p class="settings-help u-status" data-state="error">${esc(errorText(t,error))}</p></section>`;return;}
  const kindRows=kinds=>KINDS.map(k=>`<label class="settings-row"><span class="settings-label">${t[k]}</span><input class="switch" type="checkbox" data-kind="${k}" ${kinds[k]?'checked':''}></label>`).join('');
  const busy=(on,root=target)=>root.querySelectorAll('button,input').forEach(el=>el.disabled=on);
  const fail=error=>{toast(errorText(t,error));if(String(error?.message||'').includes('UNAUTHORIZED'))paint().catch(()=>{});};
@@ -62,7 +62,7 @@ export async function renderAccount({target,api,locale,esc,toast}){
    const me=await api('account_me',{}),box=target.querySelector('[data-devices]');if(!box)return;
    box.innerHTML=(me.devices||[]).map(d=>`<div class="settings-row"><span><span class="settings-label">${esc(d.device)}${d.current?` · ${t.thisDevice}`:''}</span><p class="settings-help">${esc(when((d.lastUsedAt||0)*1000))}</p></span>${d.current?'':`<button class="secondary" data-revoke="${esc(d.id)}">${t.revoke}</button>`}</div>`).join('');
    box.querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('account_logout',{sessionId:b.dataset.revoke});b.closest('.settings-row').remove();}catch(error){b.disabled=false;fail(error);}});
-  }catch(error){const box=target.querySelector('[data-devices]');if(box)box.innerHTML=`<p class="settings-help">${esc(errorText(t,error))}</p>`;}
+  }catch(error){const box=target.querySelector('[data-devices]');if(box)box.innerHTML=`<p class="settings-help u-status" data-state="error">${esc(errorText(t,error))}</p>`;}
  }
  /* the first account_status above also starts a background sync when the last one is older than 15 minutes */
  await paint();
