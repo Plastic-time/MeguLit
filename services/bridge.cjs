@@ -418,6 +418,7 @@ async function dispatch(request,runtime=null) {
         if(entries.length&&typeof request.operationId==='string'&&request.operationId.length<100)require('./unknown-words.cjs').recordLookup(root,{surface:query,operationId:request.operationId});
         return entries;
       }
+      case 'dictionary_related':{/* 2026-11-13 related words for the dictionary field (services/dict-related.cjs) */const vocab=db.prepare('SELECT spelling,status,definitions FROM vocabulary ORDER BY created_at DESC LIMIT 2000').all();return require('./dict-related.cjs').related({query:String(request.query||'').slice(0,40),reading:String(request.reading||'').slice(0,40),definition:String(request.definition||'').slice(0,400)},{vocab});}
       case 'moji_status':return require('./moji-dictionary.cjs').status({root});
       case 'moji_login_start':return await require('./moji-dictionary.cjs').loginStart({root});
       case 'moji_login_poll':return await require('./moji-dictionary.cjs').loginPoll(String(request.qrcodeId||''),{root});

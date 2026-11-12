@@ -29,22 +29,33 @@ const FALLBACK=['言葉','物語','約束','記憶','魔法','世界','夢','光
 async function loadPool(f){
  const [lines,vocab]=await Promise.all([call('dialogue').catch(()=>[]),call('vocabulary').catch(()=>[])]);
  const phrases=[];for(const row of (Array.isArray(lines)?lines:[]).slice(0,80)){for(const seg of String(row?.text||'').split(/[、。！？!?「」『』（）()…\s]+/)){const t=seg.trim();if(t.length>=2&&t.length<=9&&/[぀-ヿ一-鿿]/.test(t))phrases.push(t);}if(phrases.length>60)break;}
- const saved=(Array.isArray(vocab)?vocab:[]).map(v=>String(v?.spelling||'').trim()).filter(t=>t&&t.length<=8).slice(0,60);
+ const rows=(Array.isArray(vocab)?vocab:[]).filter(v=>{const t=String(v?.spelling||'').trim();return t&&t.length<=8;});
+ /* (user 2026-11-13: colour by proficiency) the saved words keep their status: 0 new, 1 learning, 2+ known */
+ for(const v of rows)f.status.set(String(v.spelling).trim(),Number(v.status)||0);
+ const saved=rows.map(v=>String(v.spelling).trim()).slice(0,60);
  f.pool={phrases,saved,looked:f.words};
 }
 function pickText(f){const P=f.pool||{phrases:[],saved:[],looked:f.words},r=Math.random(),pick=a=>a[Math.floor(Math.random()*a.length)];
  if(r<.22&&P.phrases.length)return {t:pick(P.phrases),kind:'phrase'};if(r<.42&&P.saved.length)return {t:pick(P.saved),kind:'word'};if(r<.55&&P.looked.length)return {t:pick(P.looked),kind:'word'};
  if(r<.6&&!P.phrases.length&&!P.saved.length&&!P.looked.length)return {t:pick(FALLBACK),kind:'word'};return {t:KANA[Math.floor(Math.random()*KANA.length)],kind:'kana'};}
-function make(f,anywhere){
- const pk=pickText(f),word=pk.kind!=='kana',text=pk.t,z=Math.pow(Math.random(),1.3),shrink=pk.kind==='kana'?1:Math.max(.42,.85-text.length*.05),size=shrink*(13+z*62),blur=Math.abs(z-FOCUS)*(z>FOCUS?16:7);
- const red=Math.random()<.14,color=pk.kind==='word'?'#f0c36a':red?'#d23a48':'#eceae6';
+/* (user 2026-11-13) a word glyph is coloured by how well it is known: new (and the ones you keep looking up) red, learning
+   gold, known pale and quieter; kana and phrases stay neutral white */
+const TONE={fresh:'#e2505c',learning:'#f0c36a',known:'#c9ced8',plain:'#eceae6',stranger:'#ef8a92'};
+export function toneOf(text,kind,status,looked){
+ if(kind!=='word'&&kind!=='related')return 'plain';
+ const st=status.get(text);if(st===undefined)return looked.includes(text)?'fresh':kind==='related'?'stranger':'fresh';
+ return st<=0?'fresh':st===1?'learning':'known';
+}
+function make(f,anywhere,given){
+ const pk=given||pickText(f),word=pk.kind!=='kana',text=pk.t,z=pk.z??Math.pow(Math.random(),1.3),shrink=pk.kind==='kana'?1:Math.max(.42,.85-text.length*.05),size=shrink*(13+z*62),blur=Math.abs(z-FOCUS)*(z>FOCUS?16:7);
+ const tone=toneOf(text,pk.kind,f.status,f.words),color=TONE[tone],red=tone==='fresh',quiet=tone==='known'?.7:1;
  return {z,spr:sprite(text,size,blur,color),x:Math.random()*f.W,y:anywhere?Math.random()*f.H:f.H+60,vx:(Math.random()-.5)*6,vy:-(4+Math.random()*10)*(.4+z),rot:0,rot0:(Math.random()-.5)*.42,vr:0,sway:Math.random()*Math.PI*2,
-  alpha:(.1+.3*(1-Math.abs(z-FOCUS)*1.4))*(red||word?1.3:1),ox:0,oy:0,wx:0,wy:0};
+  alpha:(.1+.3*(1-Math.abs(z-FOCUS)*1.4))*(red||word?1.3:1)*quiet,tone,text,ox:0,oy:0,wx:0,wy:0};
 }
 function build(host){
  const cv=document.createElement('canvas');cv.className='dict-field';cv.setAttribute('aria-hidden','true');(host.parentElement||host).prepend(cv);
- const f={cv,host,ctx:cv.getContext('2d'),parts:[],W:0,H:0,mx:-1e4,my:-1e4,wind:null,prev:performance.now(),raf:0,words:words()};
- f.fit=()=>{const dpr=Math.min(devicePixelRatio||1,2);f.W=innerWidth;f.H=innerHeight;cv.width=Math.round(f.W*dpr);cv.height=Math.round(f.H*dpr);f.ctx.setTransform(dpr,0,0,dpr,0,0);
+ const f={cv,host,ctx:cv.getContext('2d'),status:new Map(),parts:[],W:0,H:0,mx:-1e4,my:-1e4,wind:null,prev:performance.now(),raf:0,words:words()};
+ f.fit=()=>{const dpr=Math.min(devicePixelRatio||1,1.5);f.W=innerWidth;f.H=innerHeight;cv.width=Math.round(f.W*dpr);cv.height=Math.round(f.H*dpr);f.ctx.setTransform(dpr,0,0,dpr,0,0);
   const want=Math.round(Math.min(110,f.W*f.H/14000));while(f.parts.length<want)f.parts.push(make(f,true));f.parts.length=want;};
  f.fit();field=f;loadPool(f).then(()=>{f.parts=f.parts.map(p=>Object.assign(make(f,true),{x:p.x,y:p.y,wx:p.wx,wy:p.wy}));}).catch(()=>{});return f;
 }
@@ -87,7 +98,7 @@ function frame(now){
   if(p.y>f.H+120)p.y=-60;
   const s=p.spr,base=Math.min(1,p.alpha*f.dim*pref.k)*(p.fade??1),sp=Math.hypot(p.wx||0,p.wy||0);
   /* (judge fx7: the trail read as stepped copies) one smear instead: the sprite stretched along its velocity, behind it */
-  if(sp>220){const a=Math.atan2(p.wy,p.wx),len=Math.min(220,sp*.05),st=1+len/Math.max(24,s.w);ctx.globalAlpha=base*.34;ctx.save();ctx.filter=`blur(${Math.min(6,1.5+len*.04).toFixed(1)}px)`;ctx.translate(p.x+p.ox-Math.cos(a)*len*.5,p.y+p.oy-Math.sin(a)*len*.5);ctx.rotate(a);ctx.scale(st,1/(1+len/400));ctx.rotate(p.rot+(p.orot||0)-a);ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();}
+  if(sp>220){const a=Math.atan2(p.wy,p.wx),len=Math.min(220,sp*.05),st=1+len/Math.max(24,s.w);ctx.globalAlpha=base*.22;ctx.save();ctx.translate(p.x+p.ox-Math.cos(a)*len*.5,p.y+p.oy-Math.sin(a)*len*.5);ctx.rotate(a);ctx.scale(st,1/(1+len/400));ctx.rotate(p.rot+(p.orot||0)-a);ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();}
   ctx.globalAlpha=base;ctx.save();ctx.translate(p.x+p.ox,p.y+p.oy);ctx.rotate(p.rot+(p.orot||0));ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();
  }
  ctx.globalAlpha=1;
@@ -114,3 +125,23 @@ document.addEventListener('megulit:dict-wind',e=>{if(!field)return;const d=e.det
 /* the hit itself: one outward gust from the point of impact */
 /* the hit: a second, outward blast from the point of impact */
 document.addEventListener('megulit:dict-gust',e=>{if(!field)return;const {x,y}=e.detail,R0=field.W*.55;for(const p of field.parts){const dx=p.x+p.ox-x,dy=p.y+p.oy-y,d=Math.hypot(dx,dy)||1,k=Math.exp(-(d/R0)*2)*(.6+p.z*.6);p.wx=(p.wx||0)+dx/d*1500*k;p.wy=(p.wy||0)+dy/d*1500*k;p.wr=(p.wr||0)+(Math.random()-.5)*10*k;}});
+
+/* 2026-11-13 (user): after a search, words related to it (same kanji, same reading, near meaning — local dictionary
+   and saved words, services/dict-related.cjs) float into the field out of the search box, in focus, coloured by how
+   well they are known. They replace kana glyphs, so the field never grows. */
+export function relatedParts(f,list,from){
+ const out=[];for(const r of list.slice(0,14)){if(r.status!==null&&r.status!==undefined)f.status.set(r.t,r.status);
+  const p=Object.assign(make(f,true,{t:r.t,kind:'related',z:FOCUS+(Math.random()-.5)*.16}),{x:from.x+(Math.random()-.5)*from.w*.6,y:from.y,fade:0,related:r.why});
+  const a=Math.random()*Math.PI*2,v=260+Math.random()*320;p.wx=Math.cos(a)*v;p.wy=Math.sin(a)*v*.7+120;p.wr=(Math.random()-.5)*3;out.push(p);}
+ return out;
+}
+document.addEventListener('submit',e=>{const form=e.target;if(!(form instanceof HTMLFormElement)||form.id!=='lookup-form'||calm)return;
+ const q=String(form.querySelector('#lookup-input')?.value||'').trim();if(!q)return;const t0=performance.now();
+ const wait=()=>{const f=field,res=document.querySelector('#lookup-results');if(!f||!res)return;if(!res.textContent.trim()&&performance.now()-t0<4000){setTimeout(wait,150);return;}
+  const text=res.textContent.slice(0,600),reading=(text.match(/[\u3041-\u309f]{2,}/)||[''])[0];
+  call('dictionary_related',{query:q,reading,definition:text}).then(list=>{if(!Array.isArray(list)||!list.length||field!==f)return;
+   const box=document.querySelector('#lookup-form')?.getBoundingClientRect()||{left:f.W/2,top:f.H/3,width:200,height:40},from={x:box.left+box.width/2,y:box.top+box.height,w:box.width};
+   const fresh=relatedParts(f,list,from);const kana=f.parts.map((p,i)=>[p,i]).filter(([p])=>!p.related&&!p.tone||p.tone==='plain');
+   fresh.forEach((p,k)=>{const slot=kana[k]?kana[k][1]:-1;if(slot>=0)f.parts[slot]=p;else f.parts.push(p);});
+   for(const p of f.parts)if(p.related&&!fresh.includes(p)&&Math.random()<.6)p.leaving=1;}).catch(()=>{});};
+ setTimeout(wait,200);},true);

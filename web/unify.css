@@ -1906,3 +1906,9 @@ html:not(#u) body .main{scrollbar-gutter:stable}
 .login-forgot{padding:0;font-size:inherit;text-align:left}
 .account-username{margin:-4px 0 6px}
 .account-password{max-width:420px;margin:0 0 10px}
+
+/* 2026-11-13 (user: the dictionary search box impact drops frames): no blend modes over the live glyph canvas, no blur
+   filters on flying shards — both forced a full repaint under them every frame */
+html body :is(.dict-hit-flash,.dict-hit-line){mix-blend-mode:normal!important}
+html body .dict-shards i,html body .dict-shards i.d0,html body .dict-shards i.d2{filter:none!important}
+html body .dict-shards i.d0{opacity:.6!important}

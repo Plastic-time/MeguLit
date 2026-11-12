@@ -219,3 +219,8 @@ body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button) .primary-la
 .lib-field .field-plane .library-card .cover-frame,.library-card .cover-frame{background:transparent!important;clip-path:none!important;overflow:hidden;border-radius:6px!important;box-shadow:0 12px 20px -14px rgba(0,0,0,.75),0 3px 6px -4px rgba(0,0,0,.45)!important}
 .library-card .cover-frame>:is(img,.cover){clip-path:none!important;border-radius:6px!important}
 .lib-field[data-zoom=tiny] .field-plane .library-card .cover-frame{box-shadow:none!important}
+
+/* 2026-11-13 (user: wall drag/zoom still lags): cover layers stay promoted while the wall is up, instead of being
+   created at every drag start and dropped at every stop; parked covers hold none */
+.lib-field .field-plane>.field-cell:not([data-parked]){will-change:transform!important}
+.lib-field[data-zoom=large]:not(.field-moving) .field-plane>.field-cell:not([data-parked]){will-change:transform!important}

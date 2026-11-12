@@ -212,7 +212,7 @@ ${stats.pts.length?`<div class="gm-chips">${stats.pts.map(p=>`<button type="butt
 const FOLD=12;
 /* stage nicknames: what the category does for you, not its textbook name */
 const STAGE_NICK={particle:'属性标签',form:'变身Bank',adj:'立绘描写',word:'视线诱导',pattern:'定番台词',cond:'if线',perm:'BAD END 回避',give:'好感度事件',aspect:'存档进度',guess:'伏笔回收',voice:'攻守逆转',
- link:'共通线',stance:'傲娇翻译',time:'轮回时间轴',formal:'中二咏唱',speech:'口癖',ending:'语尾属性',slang:'圈内黑话',net:'弹幕',trend:'本季新番',e80:'昭和泡沫',e90:'辣妹时代',e00:'2ch 黄金期',e10:'SNS 元年',
+ link:'共通线',stance:'傲娇翻译',time:'轮回时间轴',formal:'中二咏唱',speech:'口癖',ending:'语尾属性',slang:'圈内黑话',net:'弹幕',trend:'本季新番',d_kansai:'浪速之魂',d_kago:'萨摩隼人',d_shikoku:'四国遍路',d_okinawa:'海风岛语',d_hakata:'屋台之夜',d_nagoya:'金鯱之城',d_tohoku:'雪国乡音',d_hokkaido:'北国之春',d_chugoku:'濑户内',e80:'昭和泡沫',e90:'辣妹时代',e00:'2ch 黄金期',e10:'SNS 元年',
  e20:'Z 世代',misc:'隐藏要素'};
 export function listHTML(data,opts){const {locale,esc,level='N5',userLevel=null}=opts;
  const w=grammarMessages[locale]||grammarMessages.zh,prog=data?.progress||{},pts=pointsOf(level),comp=level==='N5'&&data?.completion||completion(prog,pts),nextId=nextPoint(prog,

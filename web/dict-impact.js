@@ -45,7 +45,7 @@ function barHit(bar,x,power){
  wrap.querySelector('.dict-hit-line').animate([{transform:'translateX(-50%) scaleX(.06)',opacity:1,easing:'cubic-bezier(.2,.8,.2,1)'},{transform:`translateX(-50%) scaleX(${f1(.7+power*.5)})`,opacity:1,offset:.24},{transform:`translateX(-50%) scaleX(${f1(.8+power*.6)})`,opacity:1,offset:.44,easing:'cubic-bezier(.4,0,.6,1)'},{transform:`translateX(-50%) scaleX(${f1(1.2+power*.9)})`,opacity:0}],{duration:1000,fill:'forwards'});
  setTimeout(()=>wrap.remove(),1040);
  power*=fxK;const k=power*8,side=(x-r.left)/r.width-.5,frames=[];
- for(let i=0;i<=10;i++){const d=Math.exp(-i*.45),sgn=i%2?1:-1;frames.push({transform:i===10?'none':`translateY(${f1(sgn*k*d)}px) rotate(${f1(sgn*side*k*.1*d)}deg)`,filter:i===10?'none':`brightness(${f1(1+.6*power*d)})`});}
+ for(let i=0;i<=10;i++){const d=Math.exp(-i*.45),sgn=i%2?1:-1;frames.push({transform:i===10?'none':`translateY(${f1(sgn*k*d)}px) rotate(${f1(sgn*side*k*.1*d)}deg)`});}
  bar.animate(frames,{duration:560,easing:'linear'});
 }
 /* 2026-11-12 (user: the top bar is a wall — it is hit once, there is no bounce, no gravity pulls it back). The box
