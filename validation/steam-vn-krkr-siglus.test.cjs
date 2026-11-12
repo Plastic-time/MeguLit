@@ -94,3 +94,12 @@ test('G: Summer Pockets re-pairs after its old pairing source vanished',{skip:!h
   const p=ot.scriptPairs(data,exe);assert.ok(p.tr.filter(Boolean).length>60000,String(p.tr.filter(Boolean).length));
  }finally{fs.rmSync(data,{recursive:true,force:true});}
 });
+/* H (live test 2026-11-13, ATRI): the embed call also carries each line's Simplified and Traditional Chinese slot; the
+   reader leaves those as the game has them instead of machine-translating Chinese. */
+test('H: Chinese language slots in the embed call are not translated',async()=>{
+ const {notJapanese,Reader}=require('../services/reader.cjs');
+ for(const t of ['"我吗？\n这个嘛……算他的情妇吧？"','"我嗎？\n這個嘛……算他的情婦吧？"','只是个非法入室的陌生人'])assert.ok(notJapanese(t),t);
+ for(const t of ['「あ・い・じ・ん！！？」','東京大学','完了','目的地','会議室','「……」','人間'])assert.ok(!notJapanese(t),t);
+ const replies=[];const r=Object.create(Reader.prototype);r.gal={hooks:{embedReply:(id,trans)=>replies.push([id,trans])}};r.embedCached=()=>{throw new Error('no lookup for a Chinese slot');};
+ await r.embedTranslate(7,'"我吗？这个嘛……算他的情妇吧？"');assert.deepEqual(replies,[[7,'']]);
+});
