@@ -108,10 +108,13 @@ internal sealed class ReaderPointerGate {
             return false;
         }
         if(gesture.Owner==null){
-            if(!context.Hit(point.X,point.Y)||!IsWindowVisible(context.Overlay))return false;
-            var foreground=GetAncestor(GetForegroundWindow(),2);
-            if(foreground!=context.Game&&foreground!=context.Overlay)return false;
+            /* (user, issue #133: the speaker button still advanced the game) a click Windows delivers to the overlay is
+               MeguLit's, whether or not the page listed that control among its hit regions; it never reaches a game
+               that polls the mouse button. */
             var under=GetAncestor(WindowFromPoint(mouse.Position),2);
+            if(!IsWindowVisible(context.Overlay)||!(context.Hit(point.X,point.Y)||under==context.Overlay))return false;
+            var foreground=GetAncestor(GetForegroundWindow(),2);
+            if(foreground!=context.Game&&foreground!=context.Overlay&&under!=context.Overlay)return false;
             if(under!=context.Overlay&&under!=context.Game)return false;
         }
         if(!gesture.Accept(index,up,moving,context))return false;

@@ -437,7 +437,7 @@ public class GalWindowBridge {
         /* Issue #133 (WHITE ALBUM2: clicking a word went to the next line). The overlay floated unbound (Target zero), the
            gate was off, and the game, which polls the mouse button, took the click as well. Unbound, the gate still owns
            clicks on MeguLit's own text regions (never the whole overlay), so a polling game under it never sees them. */
-        if(Target==IntPtr.Zero){if(HitRegions.Count==0){PointerGate.Current=null;return;}PointerGate.Current=new ReaderPointerGate.Context(Overlay,IntPtr.Zero,client,false,HitRegions.ConvertAll(h=>h.Bounds).ToArray());return;}
+        if(Target==IntPtr.Zero){PointerGate.Current=new ReaderPointerGate.Context(Overlay,IntPtr.Zero,client,false,HitRegions.ConvertAll(h=>h.Bounds).ToArray());return;}
         PointerGate.Current=new ReaderPointerGate.Context(Overlay,GetAncestor(Target,2),client,LookupOpen,HitRegions.ConvertAll(h=>h.Bounds).ToArray());
     }
     static void ReaderInputTick(bool foregroundGame){ReaderActivationPolicy();RefreshReaderPointer();
