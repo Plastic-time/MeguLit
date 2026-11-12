@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const source=fs.readFileSync(path.join(__dirname,'../web/app.js'),'utf8').match(/^async function applyBackground\(image\)\{.+$/m)[0];
+const source=require('./flat-source.cjs')(path.join(__dirname,'../web/app.js')).match(/^async function applyBackground\(image\)\{.+$/m)[0];
 async function render(enabled,preview=null){const styles={},context={cssImage:x=>x,backgroundRequest:0,currentBackgroundSrc:'',model:{preferences:{homeBackground:enabled}},backgroundPreview:preview,homeImageDimensions:null,document:{querySelector:()=>({isConnected:true,style:{setProperty:(key,value)=>styles[key]=value}})},Image:class{set src(value){this.naturalWidth=1920;this.naturalHeight=1080;this.onload();}},placeBackground(){}};vm.createContext(context);vm.runInContext(source+'\nresult=applyBackground("data:image/png;base64,fixture");',context);await context.result;return styles['--home-image'];}
 test('disabled background clears the image immediately even if a stale image request returns',async()=>assert.equal(await render(false),'none'));
 test('enabled image and an explicit crop preview can display independently of glass',async()=>{assert.match(await render(true),/^url\(/);assert.match(await render(false,{crop:{x:50}}),/^url\(/);});

@@ -195,7 +195,7 @@ test('Microsoft hint: the reader learns which engine answered (also from cache);
  const fine={reviews:()=>({translate:async list=>list.map(t=>'引擎:'+t)})};assert.equal((await daily.translate(root,fine,['乙。'],'zh',{withEngine:true})).engine,'app');
  const view=fs.readFileSync(path.join(__dirname,'..','web','daily-view.js'),'utf8');
  assert.match(view,/当前为微软机器翻译，效果一般。想要更好的译文，可以在设置 › 翻译里接入自己的 AI API/);assert.match(view,/openSettings\?\.\('translation'\)/);assert.match(view,/data-rd-mt-x/);
- assert.match(fs.readFileSync(path.join(__dirname,'..','web','app.js'),'utf8'),/route==='daily'\)await mountDaily\(main,.*?openSettings:section=>\{settingsSection=section/);
+ assert.match(require('./flat-source.cjs')(path.join(__dirname,'..','web','app.js')),/route==='daily'\)await mountDaily\(main,.*?openSettings:section=>\{settingsSection=section/);
  const inject=fs.readFileSync(path.join(__dirname,'..','web','reader','modules','inject.js'),'utf8');assert.match(inject,/bridge\.mtNotice = \(\) => \{\s*if \(bridge\.mtNoticed\) return;/);
  assert.match(fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8'),/if\(!this\.mtNoticed\)\{this\.mtNoticed=true;this\.runtime\.emit\('reader-event',\{type:'call',method:'mtNotice'/);
  const page=await import(pathToFileURL(path.join(__dirname,'..','web','daily-view.js')).href);

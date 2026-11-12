@@ -1,7 +1,7 @@
 'use strict';
 // Issue 119: changing the Japanese text size had no effect.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const root=path.join(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'utf8');
+const root=path.join(__dirname,'..'),read=f=>require('./flat-source.cjs')(path.join(root,f));
 const style=require('../core/game-style.js'),profile=require('../core/game-profile.js'),{Settings}=require('../services/settings.cjs');
 
 test('a hand-set size is remembered as such and travels with a work\'s settings',()=>{

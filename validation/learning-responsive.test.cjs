@@ -38,7 +38,7 @@ test('new recorded lines refresh the cached report',async()=>{
 });
 
 test('the learning pages show an error with retry instead of the previous tab, and slow reads time out',()=>{
- const app=fs.readFileSync(path.join(__dirname,'..','web','app.js'),'utf8');
+ const app=require('./flat-source.cjs')(path.join(__dirname,'..','web','app.js'));
  assert.match(app,/function learningFailed\(target,error,token\)/);
  assert.match(app,/catch\(error\)\{learningFailed\(target,error,token\);if\(token===pageToken\)commit\(\);return;\}/,'单词 / 回收站');
  assert.match(app,/catch\(error\)\{learningFailed\(target,error,token\);\}if\(token===pageToken\)commit\(\);return;\}/,'句子');
