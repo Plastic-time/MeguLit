@@ -63,14 +63,22 @@ function scrambleScript(script,lines,onPick){if(!script)return;const esc2=t=>Str
  const paint=texts=>{script.innerHTML=texts.map((t,n)=>`<p class="${n?'':'on'}" data-n="${n}"><span class="tv-sno">${String(n+1).padStart(2,'0')}</span><span class="tv-stxt">${esc2(t)}</span></p>`).join('');};
  script.classList.remove('is-empty','is-fading');
  if(matchMedia('(prefers-reduced-motion:reduce)').matches||!cols){paint(next);script.classList.toggle('is-empty',!next.length);bind();return;}
+ /* (user 2026-11-12: the background lines' transition stuttered) the noise comes from a small pool (kana and the coming
+    lines' own characters) so no new glyph is rasterised per frame; frames are paced by requestAnimationFrame at about 20
+    a second, a column is written only when its text changes, settled columns stop, and the script is layout-contained */
+ const pool=[...new Set([...'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン',...next.join('').replace(/\s/g,'')])],noise=n=>{let o='';for(let i=0;i<n;i++)o+=pool[(Math.random()*pool.length)|0];return o;};
  const len=k=>Math.max((old[k]||'').length,(next[k]||'').length,6),start=performance.now(),SCR=160,STEP=12;
  const settleAt=k=>SCR+k*50,done=k=>settleAt(k)+(next[k]||'').length*STEP;
  const end=Math.max(...Array.from({length:cols},(_,k)=>next[k]?done(k):SCR+260));
  paint(Array.from({length:cols},(_,k)=>' '.repeat(len(k))));
- const spans=[...script.querySelectorAll('.tv-stxt')];
- const tick=()=>{const t=performance.now()-start;spans.forEach((sp,k)=>{const target=next[k]||'',L=len(k);if(t<settleAt(k)||!target){sp.textContent=Array.from({length:target?L:Math.min(L,(old[k]||'').length||6)},rndGlyph).join('');return;}const fixed=Math.min(target.length,Math.floor((t-settleAt(k))/STEP));sp.textContent=target.slice(0,fixed)+Array.from({length:Math.max(0,Math.min(L,target.length+2)-fixed)},rndGlyph).join('').slice(0,Math.max(0,target.length-fixed));});
-  if(t>=end){clearInterval(+script.dataset.timer);if(!next.length){script.classList.add('is-fading');setTimeout(()=>{paint([]);script.classList.remove('is-fading');script.classList.add('is-empty');},420);}else{paint(next);bind();}}};
- script.dataset.timer=setInterval(tick,45);tick();}
+ const spans=[...script.querySelectorAll('.tv-stxt')],shown=spans.map(()=>'');let last=0,raf=0;
+ const write=(k,text)=>{if(shown[k]!==text){shown[k]=text;spans[k].textContent=text;}};
+ const tick=now=>{raf=0;if(script.dataset.timer!==token)return;if(now-last<48){raf=requestAnimationFrame(tick);return;}last=now;const t=now-start;
+  spans.forEach((sp,k)=>{const target=next[k]||'',L=len(k);if(t<settleAt(k)||!target){write(k,noise(target?L:Math.min(L,(old[k]||'').length||6)));return;}
+   const fixed=Math.min(target.length,Math.floor((t-settleAt(k))/STEP));write(k,fixed>=target.length?target:target.slice(0,fixed)+noise(target.length-fixed));});
+  if(t>=end){delete script.dataset.timer;if(!next.length){script.classList.add('is-fading');setTimeout(()=>{paint([]);script.classList.remove('is-fading');script.classList.add('is-empty');},420);}else{paint(next);bind();}return;}
+  raf=requestAnimationFrame(tick);};
+ const token=String(Math.random());script.dataset.timer=token;raf=requestAnimationFrame(tick);}
 
 function busy(cover,ms){cover.dataset.busy='1';cover.classList.remove('touch');const face=cover.querySelector('.tv-face');if(face){face.style.transition='transform .25s ease-out';face.style.transform='';}clearTimeout(+cover.dataset.busyTimer||0);cover.dataset.busyTimer=setTimeout(()=>{delete cover.dataset.busy;},ms);}
 function outLayer(cover){const home=cover.closest('.tv-home');let layer=home.querySelector(':scope>.tv-outgoing');if(!layer){layer=document.createElement('div');layer.className='tv-outgoing';layer.setAttribute('aria-hidden','true');home.insertBefore(layer,home.querySelector(':scope>.tv-canvas'));}const h=home.getBoundingClientRect(),r=cover.getBoundingClientRect(),w=cover.offsetWidth*1.06;layer.style.width=w+'px';layer.style.left=(r.left+r.width/2-h.left-w/2)+'px';layer.style.top=(r.top+r.height/2-h.top-w*2/3)+'px';layer.querySelectorAll('.tv-old').forEach(n=>n.remove());return layer;}
