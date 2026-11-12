@@ -268,6 +268,8 @@ async function dispatch(request,runtime=null) {
       case 'feedback_send':return require('./feedback.cjs').send(root,{kind:String(request.kind||''),text:String(request.text||''),contact:String(request.contact||''),lang:String(request.lang||'zh'),version:String(request.version||'')}); /* E394 in-app feedback through the relay */
       case 'diagnostics_upload':{const file=require('./diagnostics.cjs').ownPackage(root,request.path),m=request.meta||{};return require('./diagnostics-upload.cjs').upload(file,{version:m.version,game:m.game,note:m.note},{root});}
       case 'game_detail':return require('./game-detail.cjs').detail(db,root,String(request.id),request.locale);
+      case 'home_lines':return require('./home-lines.cjs').list(db,root,String(request.id),{query:request.query,limit:request.limit});
+      case 'home_lines_save':return {chosen:require('./home-lines.cjs').save(root,String(request.id),request.lines)};
       case 'game_synopsis':return await require('./game-detail.cjs').refreshSynopsis(db,root,String(request.id),request.locale);
       case 'unknown_words':return require('./unknown-words.cjs').unknownWords(root);
       case 'preferences':return store.publicPreferences(root);

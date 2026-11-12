@@ -1,0 +1,63 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* (user 2026-11-12) home lines picker: the add game dialog's palette, the lines in the Japanese serif, a strip of five
+   numbered slots that fill in pick order, a soft rise on open and a sink on close */
+dialog.game-dialog.lines-picker{width:min(720px,calc(100vw - 48px));display:flex;flex-direction:column;overflow:hidden}
+dialog.game-dialog.lines-picker[open]{display:flex;animation:lp-in .34s cubic-bezier(.2,.9,.25,1) both}
+dialog.game-dialog.lines-picker[open]::backdrop{animation:lp-fade .3s ease both}
+dialog.game-dialog.lines-picker.closing{animation:lp-out .22s cubic-bezier(.4,0,1,1) both}
+dialog.game-dialog.lines-picker.closing::backdrop{animation:lp-fade .22s ease reverse both}
+@keyframes lp-in{from{opacity:0;transform:translateY(14px) scale(.975);filter:blur(3px)}}
+@keyframes lp-out{to{opacity:0;transform:translateY(8px) scale(.985);filter:blur(2px)}}
+@keyframes lp-fade{from{opacity:0}}
+.lines-picker .game-dialog-head h2{font-family:var(--g-serif-ja,var(--g-serif,serif));font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lines-picker .lp-tools{display:flex;align-items:center;gap:14px;padding:18px 28px 0}
+.lines-picker .lp-search{flex:1;position:relative;display:block}
+.lines-picker .lp-search svg{position:absolute;left:13px;top:50%;width:16px;height:16px;transform:translateY(-50%);fill:none;stroke:#a8978a;stroke-width:1.8;stroke-linecap:round;pointer-events:none}
+.lines-picker .lp-search input{box-sizing:border-box;width:100%;height:40px;padding:0 14px 0 38px;border:1px solid rgba(255,236,214,.1);border-radius:10px;background:rgba(0,0,0,.24);color:#f1e4d8;font-size:14px;transition:border-color .18s ease,background-color .18s ease}
+.lines-picker .lp-search input:hover{border-color:rgba(255,236,214,.2)}
+.lines-picker .lp-search input:focus{border-color:rgba(217,139,132,.7);background:rgba(0,0,0,.32);outline:none}
+.lines-picker .lp-search input::placeholder{color:#7d6f66}
+.lines-picker .lp-count{display:flex;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums;color:#a8978a;font-size:12px;letter-spacing:.08em;white-space:nowrap}
+.lines-picker .lp-count b{font:600 22px/1 var(--g-serif,serif);color:#ecb2aa;transition:color .2s}
+.lines-picker.is-full .lp-count b{color:#f0c987}
+.lines-picker .lp-auto{height:32px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,236,214,.14);background:none;color:#cdbcae;font-size:12px;cursor:pointer;white-space:nowrap;transition:border-color .18s,color .18s,background-color .18s}
+.lines-picker .lp-auto:hover{border-color:rgba(217,139,132,.55);color:#f1e4d8;background:rgba(200,48,60,.08)}
+.lines-picker .lp-auto:active{transform:scale(.96)}
+.lines-picker .lp-picked{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:14px 28px 0;padding:0;list-style:none}
+.lines-picker .lp-picked li{display:flex;align-items:center;gap:6px;min-width:0;height:28px;padding:0 9px;border-radius:7px;border:1px dashed rgba(255,236,214,.12);font-size:11px;color:#7d6f66;transition:border-color .25s,background-color .25s,color .25s}
+.lines-picker .lp-picked li span{font:600 10px/1 Consolas,"Cascadia Mono",monospace;letter-spacing:.06em}
+.lines-picker .lp-picked li em{font-style:normal;font-family:var(--g-serif-ja,var(--g-serif,serif));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lines-picker .lp-picked li.on{border-style:solid;border-color:rgba(217,139,132,.35);background:rgba(200,48,60,.1);color:#f1e4d8}
+.lines-picker .lp-picked li.on span{color:#f0c987}
+.lines-picker .lp-list{flex:1;min-height:180px;max-height:min(46vh,440px);overflow-y:auto;overscroll-behavior:contain;margin:14px 0 0;padding:4px 18px 8px 28px;scrollbar-width:thin;scrollbar-color:rgba(255,236,214,.18) transparent;mask-image:linear-gradient(180deg,transparent,#000 10px,#000 calc(100% - 18px),transparent)}
+.lines-picker .lp-row{display:grid;grid-template-columns:26px minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;margin:0 0 4px;padding:10px 12px;border:1px solid transparent;border-radius:10px;background:rgba(0,0,0,.14);color:#d9c8b9;text-align:left;cursor:pointer;transition:background-color .16s,border-color .16s,color .16s}
+.lines-picker .lp-row:hover{background:rgba(255,236,214,.05);border-color:rgba(255,236,214,.1);color:#f1e4d8}
+.lines-picker .lp-row:active{transform:scale(.995)}
+.lines-picker .lp-row:focus-visible{outline:2px solid #d98b84;outline-offset:1px}
+.lines-picker .lp-row.on{background:linear-gradient(90deg,rgba(200,48,60,.16),rgba(200,48,60,.05));border-color:rgba(217,139,132,.38);color:#fbefe3}
+.lines-picker .lp-mark{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1px solid rgba(255,236,214,.22);font:600 10px/1 Consolas,"Cascadia Mono",monospace;color:#1b1517;transition:background-color .18s,border-color .18s,transform .18s cubic-bezier(.2,1.6,.4,1)}
+.lines-picker .lp-row.on .lp-mark{background:#ecb2aa;border-color:#ecb2aa;transform:scale(1.06)}
+.lines-picker.is-full .lp-row:not(.on){color:#8f8075}
+.lines-picker .lp-row.deny{animation:lp-deny .32s ease}
+@keyframes lp-deny{25%{transform:translateX(-4px)}50%{transform:translateX(3px)}75%{transform:translateX(-2px)}}
+.lines-picker .lp-text{font-family:var(--g-serif-ja,var(--g-serif,serif));font-size:15px;line-height:1.65;letter-spacing:.03em;overflow-wrap:anywhere}
+.lines-picker .lp-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:#8f8075;white-space:nowrap}
+.lines-picker .lp-meta i{font-style:normal;padding:2px 7px;border-radius:999px;background:rgba(240,201,135,.12);color:#f0c987;font-size:10px;letter-spacing:.06em}
+.lines-picker .lp-empty{margin:42px 0;text-align:center;font-size:13px;color:#8f8075}
+.lines-picker .dialog-actions{margin:0;align-items:center}
+.lines-picker .lp-note{margin-right:auto;font-size:12px;color:#f0c987;opacity:0;transform:translateY(4px);transition:opacity .2s,transform .2s}
+.lines-picker .lp-note.on{opacity:1;transform:none}
+:root[data-theme=light] .lines-picker .lp-search input{background:rgba(255,255,255,.6);border-color:rgba(60,30,20,.14);color:#2a1d18}
+:root[data-theme=light] .lines-picker .lp-row{background:rgba(120,60,50,.04);color:#4a3a32}
+:root[data-theme=light] .lines-picker .lp-row.on{background:rgba(200,48,60,.1);color:#2a1d18}
+:root[data-theme=light] .lines-picker .lp-picked li.on{color:#2a1d18}
+@media (prefers-reduced-motion:reduce){dialog.game-dialog.lines-picker[open],dialog.game-dialog.lines-picker.closing,dialog.game-dialog.lines-picker[open]::backdrop{animation:none}}
+
+/* the affordance on the home page, under the vertical lines */
+.tv-lines-edit{position:absolute;left:41%;top:calc(67% + 44px);display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 11px 0 9px;border-radius:999px;border:1px solid color-mix(in srgb,var(--g-t1,#f1e4d8) 14%,transparent);background:color-mix(in srgb,#000 28%,transparent);color:color-mix(in srgb,var(--g-t1,#f1e4d8) 55%,transparent);font-size:11px;letter-spacing:.14em;pointer-events:auto;cursor:pointer;z-index:3;opacity:.62;transition:opacity .22s,color .22s,border-color .22s,background-color .22s}
+.tv-lines-edit svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tv-plane:hover .tv-lines-edit,.tv-lines-edit:focus-visible{opacity:1}
+.tv-lines-edit:hover{color:var(--g-gold,#f0c987);border-color:color-mix(in srgb,var(--g-gold,#f0c987) 45%,transparent);background:color-mix(in srgb,#000 42%,transparent)}
+.tv-lines-edit:active{transform:scale(.96)}
+.tv-lines-edit.custom::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--g-gold,#f0c987)}
+.tv-home.empty .tv-lines-edit{display:none}
