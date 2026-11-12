@@ -86,6 +86,25 @@ public sealed class GameAudio:IDisposable{
     var codec=Array.Find(ImageCodecInfo.GetImageEncoders(),c=>c.MimeType=="image/jpeg");var ps=new EncoderParameters(1);ps.Param[0]=new EncoderParameter(System.Drawing.Imaging.Encoder.Quality,85L);
     using(var m=new MemoryStream()){small.Save(m,codec,ps);return Convert.ToBase64String(m.ToArray());}}}}
 
+ /* 2026-11-12 (user: MeguLit quietly keeps the game's good-looking scenes for the card back, adult scenes included).
+    One capture of the game window alone (never MeguLit's layer), with a looks score from the small copy: colourfulness
+    (Hasler-Suesstrunk), contrast and detail; near-black, near-white or flat frames (fades, menus, loading) score 0.
+    The 64-bit difference hash lets the caller keep only scenes that differ. */
+ public static string SceneShot(IntPtr target,int width,int height,out double score,out string hash){score=0;hash="";if(target==IntPtr.Zero||width<64||height<64)return "";
+  using(var image=new Bitmap(width,height,PixelFormat.Format32bppRgb)){if(!GameCapture.Into(target,image,2))return "";double k=Math.Min(1,1280.0/width);int w=Math.Max(1,(int)(width*k)),h=Math.Max(1,(int)(height*k));
+   using(var small=new Bitmap(w,h,PixelFormat.Format24bppRgb)){using(var g=Graphics.FromImage(small)){g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.DrawImage(image,0,0,w,h);}
+    using(var probe=new Bitmap(96,54,PixelFormat.Format24bppRgb)){using(var g=Graphics.FromImage(probe)){g.InterpolationMode=InterpolationMode.HighQualityBilinear;g.DrawImage(small,0,0,96,54);}
+     var data=probe.LockBits(new Rectangle(0,0,96,54),ImageLockMode.ReadOnly,PixelFormat.Format24bppRgb);var px=new byte[data.Stride*54];System.Runtime.InteropServices.Marshal.Copy(data.Scan0,px,0,px.Length);probe.UnlockBits(data);
+     double n=0,sl=0,sl2=0,srg=0,srg2=0,syb=0,syb2=0,edge=0;var lum=new double[96*54];
+     for(int y=0;y<54;y++)for(int x=0;x<96;x++){int o=y*data.Stride+x*3;double b=px[o],gg=px[o+1],r=px[o+2],l=.299*r+.587*gg+.114*b,rg=r-gg,yb=.5*(r+gg)-b;lum[y*96+x]=l;n++;sl+=l;sl2+=l*l;srg+=rg;srg2+=rg*rg;syb+=yb;syb2+=yb*yb;}
+     for(int y=0;y<54;y++)for(int x=1;x<96;x++)edge+=Math.Abs(lum[y*96+x]-lum[y*96+x-1]);edge/=54*95;
+     double ml=sl/n,sd=Math.Sqrt(Math.Max(0,sl2/n-ml*ml)),mrg=srg/n,myb=syb/n,colour=Math.Sqrt(Math.Max(0,srg2/n-mrg*mrg)+Math.Max(0,syb2/n-myb*myb))+.3*Math.Sqrt(mrg*mrg+myb*myb);
+     score=(ml<22||ml>238||sd<16||edge<2.5)?0:Math.Round(colour*.55+sd*.35+Math.Min(edge,30)*1.2,1);
+     ulong bits=0;int bit=0;for(int y=0;y<8;y++)for(int x=0;x<8;x++){double a=0,c=0;for(int yy=0;yy<6;yy++)for(int xx=0;xx<10;xx++){a+=lum[(y*6+yy+3)*96+x*10+xx];c+=lum[(y*6+yy+3)*96+x*10+xx+10];}if(a<c)bits|=1UL<<bit;bit++;}
+     hash=bits.ToString("x16");}
+    var codec=Array.Find(ImageCodecInfo.GetImageEncoders(),c=>c.MimeType=="image/jpeg");var ps=new EncoderParameters(1);ps.Param[0]=new EncoderParameter(System.Drawing.Imaging.Encoder.Quality,90L);
+    using(var m=new MemoryStream()){small.Save(m,codec,ps);return Convert.ToBase64String(m.ToArray());}}}}
+
  // Offline check used by --audio-self-test: speech-like bursts over a steady tone are detected and trimmed, a steady
  // tone alone is not speech, and the WAV header is valid.
  public static bool SelfTest(){var rnd=new Random(1);var bgm=new short[Rate*4];for(int i=0;i<bgm.Length;i++)bgm[i]=(short)(1500*Math.Sin(i*2*Math.PI*110/Rate));

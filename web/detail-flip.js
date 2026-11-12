@@ -2,11 +2,12 @@
 /* 2026-11-12 (user: the detail page's card turns over on a click, with a fine card-flip animation; the back shows a
    random CG this computer has already unlocked). The unlock state comes from the game's own saves (services/game-cg);
    a game whose saves cannot be read yet shows the card's own back: a crest with the title's first character.
+   It also draws from the good-looking scenes MeguLit kept while the game was read (adult scenes included).
    The flip: the card lifts toward the viewer, turns on a slight diagonal, a light runs across the face at the edge-on
    moment, it overshoots and settles. It keeps turning the same way (0 -> 180 -> 360), so it reads as one card.
    A long press or a drag only plays with the card (the tilt); it never flips. */
 const reduce=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
-const words={zh:{cg:'CG',back:'卡背',flip:'点击翻面'},ja:{cg:'CG',back:'カードの裏',flip:'クリックで裏返す'},en:{cg:'CG',back:'Card back',flip:'Click to turn over'}};
+const words={zh:{cg:'CG',shot:'场景',back:'卡背',flip:'点击翻面'},ja:{cg:'CG',shot:'場面',back:'カードの裏',flip:'クリックで裏返す'},en:{cg:'CG',shot:'Scene',back:'Card back',flip:'Click to turn over'}};
 export function flipCard(card,{api,id,esc,game,locale='zh'}){
  const flip=card.querySelector('.dtv-flip'),art=card.querySelector('.dtv-back-art');if(!flip||!art)return;
  const w=words[locale]||words.zh;card.setAttribute('aria-label',w.flip);
@@ -14,13 +15,16 @@ export function flipCard(card,{api,id,esc,game,locale='zh'}){
  let angle=0,busy=null,list=null,last='',pressAt=0,pressXY=[0,0];
  const crest=()=>{art.className='dtv-back-art is-crest';art.innerHTML=`<i class="dtv-ring"></i><i class="dtv-ring is-inner"></i><b>${esc(glyph)}</b><span>MeguLit</span><small>${esc(game?.title||'')}</small>`;};
  crest();
- async function cgs(){if(list)return list;try{const r=await api('game_cgs',{id});list=Array.isArray(r?.items)?r.items:[];}catch{list=[];}return list;}
+ /* 2026-11-12 (user) the pool: CGs the game's saves record as seen, and the scenes MeguLit kept while you read
+    (services/scene-shots.cjs) */
+ async function cgs(){if(list)return list;const [a,b]=await Promise.all([api('game_cgs',{id}).catch(()=>null),api('game_shots',{id}).catch(()=>null)]);
+  list=[...(Array.isArray(a?.items)?a.items.map(name=>({kind:'cg',name})):[]),...(Array.isArray(b?.items)?b.items.map(it=>({kind:'shot',name:it.file})):[])];return list;}
  /* a new random unlocked CG for this turn (never the same one twice in a row); decoded before the card turns */
  async function prepareBack(){
   const items=await cgs();if(!items.length){crest();return;}
-  const pool=items.length>1?items.filter(n=>n!==last):items,name=pool[Math.floor(Math.random()*pool.length)];
-  try{const r=await api('game_cg',{id,name});if(!r?.data)throw 0;const img=new Image();img.src='data:'+r.mime+';base64,'+r.data;await img.decode().catch(()=>{});
-   last=name;art.className='dtv-back-art is-cg';art.replaceChildren(img);const tag=document.createElement('span');tag.className='dtv-cg-tag';tag.textContent=`${w.cg} · ${items.indexOf(name)+1} / ${items.length}`;art.append(tag);
+  const pool=items.length>1?items.filter(n=>n.name!==last):items,pick=pool[Math.floor(Math.random()*pool.length)];
+  try{const r=pick.kind==='cg'?await api('game_cg',{id,name:pick.name}):await api('game_shot',{id,file:pick.name});if(!r?.data)throw 0;const img=new Image();img.src='data:'+r.mime+';base64,'+r.data;await img.decode().catch(()=>{});
+   last=pick.name;art.className='dtv-back-art is-cg';art.replaceChildren(img);const same=items.filter(n=>n.kind===pick.kind),tag=document.createElement('span');tag.className='dtv-cg-tag';tag.textContent=`${pick.kind==='cg'?w.cg:w.shot} · ${same.indexOf(pick)+1} / ${same.length}`;art.append(tag);
    img.animate([{objectPosition:'0% 50%'},{objectPosition:'100% 50%'}],{duration:16000,iterations:Infinity,direction:'alternate',easing:'ease-in-out'});
   }catch{crest();}
  }

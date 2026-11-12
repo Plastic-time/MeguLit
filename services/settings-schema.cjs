@@ -50,6 +50,8 @@ for(const[panel,names]of Object.entries(panelNames)){
 field('library','steamPath','Steam 安装目录','Steam folder','Steam フォルダ');field('library','folders','其他游戏目录（一行一个）','Other game folders (one per line)','ほかのゲームフォルダ（1行に1つ）','multiline');
 bool('library','autoSeries','自动识别游戏系列','Automatically recognize game series','ゲームシリーズを自動認識');
 /* E370: anonymous adaptation records (hook stream, embed result, calibration) shared between users; off stops both directions */
+/* 2026-11-12 the game's good-looking scenes, captured quietly for the detail card's back (scene-shots.cjs) */
+bool('library','sceneShots','后台截下好看的场景','Keep good-looking scenes in the background','きれいな場面をバックグラウンドで保存');
 bool('library','sharedAdaptation','共享适配数据（匿名）','Share adaptation data (anonymous)','適応データの共有（匿名）');
 for(const engine of ['ollama','lmstudio'])fields.find(f=>f.scope==='translation'&&f.key==='provider').options.push(engine==='ollama'?option(engine,'Ollama（本地模型）','Ollama','Ollama'):option(engine,'LM Studio（本地模型）','LM Studio','LM Studio'));
 choice('lookup','lookup_mode','查词触发方式','Lookup gesture','辞書を開く操作',[option('click','单击','Click','クリック'),option('hover','悬停','Hover','ホバー')]);

@@ -31,6 +31,7 @@ class GalNative {
       if(this.stopped)return;let message; try { message = JSON.parse(line); } catch { return; }
       if(message.type==='hookVisual'){this.controller.visual(message);return;}
       if(message.type==='readerPointer'||message.type==='hostFrame'){this.onEvent(message);return;}
+      if(message.type==='sceneShot'){const pending=this.mediaPending?.get('s'+message.id);if(pending){this.mediaPending.delete('s'+message.id);pending(message);}return;}
       if(message.type==='mediaClip'){const pending=this.mediaPending?.get(String(message.id));if(pending){this.mediaPending.delete(String(message.id));pending(message);}return;}
       if (message.type === 'ready') { this.onEvent(message);this.send({ type: 'configure', ...this.preferences });this.send({type:'gameAudio',enabled:!!this.gameAudioWanted}); this.notify({ hotkey:message.hotkey, coverHotkey:message.coverHotkey, modeHotkey:message.modeHotkey, coverEnabled:message.coverEnabled, message:message.hotkey?'全局 Alt+T 已就绪，可选择并绑定游戏窗口':'全局 Alt+T 被占用，可在 ToMe 窗口内按 Alt+T' }); return; }
       if(['normal','translation'].includes(message.interfaceMode)){if(this.pending)this.pending.interfaceMode=message.interfaceMode;this.save({...this.preferences,interfaceMode:message.interfaceMode},false);}
@@ -103,6 +104,8 @@ class GalNative {
     map.set(id,m=>{clearTimeout(timer);/* E454 keep only the spoken run, not the music after it */let wav=i>=0&&m.voiced&&m.wav?m.wav:'';if(wav){try{const t=require('./voice-trim.cjs').trimWav(wav,lines[i].text,{carry:i>0});if(t)wav=t.data?t.data.toString('base64'):'';}catch{}}resolve({audio:wav?{data:wav}:null,screenshot:m.jpeg||null,matched:i>=0,recording:!!m.recording,error:m.audioError||''});});
     this.send({type:'mediaClip',id,from,to,screenshot});});}
   // Frosted-glass panels: a single frame of the game window only (ToMe's overlay is a separate window, not captured).
+  /* 2026-11-12 one clean capture of the game window with its looks score and difference hash (scene-shots.cjs) */
+  sceneShot(){const id=String(++this.mediaSerial||(this.mediaSerial=1));return new Promise(resolve=>{const map=this.mediaPending||(this.mediaPending=new Map());const timer=setTimeout(()=>{map.delete('s'+id);resolve(null);},5000);timer.unref?.();map.set('s'+id,m=>{clearTimeout(timer);resolve(m.jpeg?{jpeg:m.jpeg,score:Number(m.score)||0,hash:String(m.hash||'')}:null);});this.send({type:'sceneShot',id});});}
   gameFrame(readerBounds){const now=Date.now(),id=String(++this.mediaSerial||(this.mediaSerial=1));return new Promise(resolve=>{const map=this.mediaPending||(this.mediaPending=new Map());const timer=setTimeout(()=>{map.delete(id);resolve('');},4000);timer.unref?.();map.set(id,m=>{clearTimeout(timer);resolve(m.jpeg||'');});this.send({type:'mediaClip',id,from:now,to:now,screenshot:true,...(readerBounds&&{readerScreenshot:true,...readerBounds})});});}
   stop() {clearTimeout(this.controller.styleTimer);this.stopped=true;this.styleSync.stop();this.hooks.stop(); this.send({ type: 'quit' }); this.process?.stdin.end(); }
 }
