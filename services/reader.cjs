@@ -74,7 +74,7 @@ class Reader{
   const layout={...require('../core/layout.cjs'),overlayHwnd:String(hwnd)};
   this.immersion=new(require('../core/immersion.cjs').Immersion)(message=>{this.logVisibility({type:'dialogVisibility',visible:message.dialogVisible,reason:message.reason});this.runtime.emit('reader-event',{type:'dialogVisibility',visible:message.dialogVisible});clearTimeout(this.hideTimer);if(message.dialogVisible===false)this.hideTimer=setTimeout(()=>this.gal?.send({type:'dialogVisibility',visible:false}),140);else this.gal?.send({type:'dialogVisibility',visible:message.dialogVisible});this.runtime.emit('reader-event',message);});this.immersion.configure(this.runtime.config());/* E422: a page game is known before its first line */this.immersion.flowGame=()=>this.gal?.hooks?.flowPage===true;this.tick=setInterval(()=>this.immersion.tick(),100);this.tick.unref();
   this.fonts=new(require('../core/game-fonts.cjs').GameFonts)(layout,()=>{this.runtime.emit('reader-event',{type:'fonts',fonts:this.fonts.payload(true)});});
-  this.gal=new(require('../core/gal-native.cjs').GalNative)(layout,pid,message=>this.event(message),this.runtime.spawnReaderNative);this.gal.onLineVoice=(text,wav)=>{try{require('./game-voice.cjs').remember(this.root,text,wav);}catch{}};
+  this.gal=new(require('../core/gal-native.cjs').GalNative)(layout,pid,message=>this.event(message),this.runtime.spawnReaderNative);this.gal.onLineVoice=(text,wav)=>{/* E455 a kept clip loses its music first when separation is on and ready */const keep=v=>{try{require('./game-voice.cjs').remember(this.root,text,v);}catch{}};if(this.runtime.config().ankiVoiceIsolate===false)return keep(wav);require('./vocal-sep.cjs').isolate(this.root,wav).then(clean=>keep(clean||wav),()=>keep(wav));};
   if(!this.gal.process){this.stop();throw Error('READER_NATIVE_MISSING');}
   this.gal.process.once('error',()=>{this.runtime.call({action:'reader_health',phase:'native-launch',error:'READER_NATIVE_START_FAILED'}).catch(()=>{});});
   if(this.runtime.pendingGame)this.selectGame(this.runtime.pendingGame,this.runtime.pendingGameEnter,this.runtime.pendingExecutable);
@@ -314,7 +314,7 @@ class Reader{
     let voice=null;try{voice=require('./game-voice.cjs').find(this.root,args.text);}catch{}
     const asAudio=v=>({data:v.data.toString('base64'),ext:require('./game-voice.cjs').kind(v.data).ext});
     if(voice?.source==='scan'){extra.sentenceAudio=asAudio(voice);extra.gameAudio=true;}
-    else if(media?.audio){extra.sentenceAudio=media.audio;extra.gameAudio=true;}
+    else if(media?.audio){extra.sentenceAudio=media.audio;extra.gameAudio=true;extra.recorded=true;}
     else if(voice){extra.sentenceAudio=asAudio(voice);extra.gameAudio=true;}
     try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'ankiGameAudio',matched:!!media?.matched,recording:!!media?.recording,voiced:!!media?.audio,error:media?.error||''})+'\n');}catch{}
    }
@@ -328,6 +328,11 @@ class Reader{
    await this.prepareMiningModel(config);const result=await new(require('../core/anki.cjs').Anki)().sync(word,config,audio,extra);const entries=(await this.invoke('lookup_exact',args)).entries||[];const mined=await this.mine({entry:entries.find(e=>e.id===args.entryId)||entries[0],args,noteId:result.id});if(mined?.sentenceSaved)result.sentenceSaved=true;
    if(config.ankiGameMedia!==false&&!result.screenshotAttached)result.mediaWarning='SCREENSHOT_UNAVAILABLE';
    result.sentenceAudioSource=extra.gameAudio?'game':extra.sentenceAudio?'synthesized':'';
+   /* E455 a recorded clip on the card is replaced by its voice alone once separated (same media file name, so the
+      card keeps pointing at it); the card is not held up while the model runs */
+   if(extra.recorded&&config.ankiVoiceIsolate!==false&&extra.sentenceAudio?.data){const data=extra.sentenceAudio.data,name='tomoyo_g_'+require('node:crypto').createHash('sha256').update(data).digest('hex').slice(0,16)+(extra.sentenceAudio.ext||'.wav');
+    require('./vocal-sep.cjs').isolate(this.root,data).then(clean=>clean&&new(require('../core/anki.cjs').Anki)().call(config,'storeMediaFile',{filename:name,data:clean.toString('base64')})).then(done=>{if(done!==undefined)try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'ankiVoiceIsolated',file:name})+'\n');}catch{}}).catch(()=>{});
+    result.voiceIsolation=require('./vocal-sep.cjs').ready(this.root)?'pending':'preparing';}
    return result;
   }
   throw Error('UNKNOWN_LEARNING_ACTION');

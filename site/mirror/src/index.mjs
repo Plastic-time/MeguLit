@@ -192,7 +192,7 @@ function hex(buf) {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-const HF_REPOS = new Set(['tsukumijima/deberta-v2-large-japanese-char-wwm-onnx']);
+const HF_REPOS = new Set(['tsukumijima/deberta-v2-large-japanese-char-wwm-onnx', 'LeeAeron/uvr_mdx-net']);
 /* E448 offline translation models (GGUF, up to ~8 GB, too large to keep in R2): streamed straight from Hugging Face,
    Range passed through so the app can resume. Only these repositories. */
 const HF_PROXY = new Set(['SakuraLLM/GalTransl-v4-4B-2601','SakuraLLM/Sakura-GalTransl-7B-v3.7','SakuraLLM/Sakura-7B-Qwen2.5-v1.0-GGUF','SakuraLLM/Sakura-GalTransl-14B-v3.8','SakuraLLM/Sakura-14B-Qwen2.5-v1.0-GGUF','Qwen/Qwen3-8B-GGUF']);
