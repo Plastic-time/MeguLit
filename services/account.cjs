@@ -20,6 +20,7 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const KINDS=['words','sentences','reading','settings'];
 const DEFAULT_KINDS={words:true,sentences:true,reading:true,settings:true};
 const RECORD_CAP={words:32<<10,sentences:8<<10,reading:1<<10,settings:32<<10};
+const USERNAME=/^[A-Za-z][A-Za-z0-9_]{2,19}$/;
 const PUSH_RECORDS=200,PUSH_BYTES=1500<<10,TIMEOUT=20000;
 
 /* ---- relay base: the leaderboard branch's services/relay-config.cjs when present, same rules otherwise ---------- */
@@ -305,21 +306,52 @@ class Account{
  status(){
   const p=this.profile(),loggedIn=!!(p.email&&this.token()),base=this.base();let pending={};
   if(loggedIn)try{const db=this.openDb();try{ensureState(db);pending=Object.fromEntries(db.prepare('SELECT kind,COUNT(*) n FROM account_sync WHERE pending=1 GROUP BY kind').all().map(r=>[r.kind,r.n]));}finally{db.close();}}catch{}
-  return {configured:!!base,loggedIn,email:loggedIn?p.email:'',accountId:loggedIn?p.accountId||'':'',sessionId:loggedIn?p.sessionId||'':'',lastSyncAt:p.lastSyncAt||0,lastError:p.lastError||'',kinds:this.kinds(),pending,syncing:!!this.running};
+  return {configured:!!base,loggedIn,email:loggedIn?p.email:'',accountId:loggedIn?p.accountId||'':'',sessionId:loggedIn?p.sessionId||'':'',lastSyncAt:p.lastSyncAt||0,lastError:p.lastError||'',kinds:this.kinds(),pending,syncing:!!this.running,
+  username:loggedIn?p.username||'':'',hasPassword:loggedIn?!!p.hasPassword:false,passwordKnown:loggedIn&&typeof p.hasPassword==='boolean',
+  /* a code sign-in in the last 10 minutes may set a new password without the current one (relay rule) */
+  codeFresh:loggedIn&&p.signInMethod==='code'&&this.now()-(Number(p.signedInAt)||0)<9.5*60000};
  }
  async requestCode(email){const clean=normalizeEmail(email);if(!clean)throw Object.assign(Error('EMAIL_INVALID'),{code:'EMAIL_INVALID'});await this.call('POST','/api/auth/code',{email:clean},{auth:false});this.saveProfile({pendingEmail:clean});return {sent:true,email:clean,expiresIn:600};}
  async verify(email,code,kindChoice){
   const clean=normalizeEmail(email||this.profile().pendingEmail);if(!clean)throw Object.assign(Error('EMAIL_INVALID'),{code:'EMAIL_INVALID'});
   const digits=String(code||'').replace(/\s+/g,'');if(!/^\d{6}$/.test(digits))throw Object.assign(Error('WRONG_CODE'),{code:'WRONG_CODE'});
-  const device='Windows · '+this.deviceId().slice(0,4);
-  const data=await this.call('POST','/api/auth/verify',{email:clean,code:digits,device},{auth:false});
+  const data=await this.call('POST','/api/auth/verify',{email:clean,code:digits,device:this.deviceName()},{auth:false});
+  return this.signedIn(data,kindChoice,'code');
+ }
+ deviceName(){return 'Windows · '+this.deviceId().slice(0,4);}
+ /* code and password sign-in store the answer the same way: token in the vault, ids in profile.json */
+ signedIn(data,kindChoice,method){
+  if(!data||typeof data.token!=='string'||!data.accountId)throw Object.assign(Error('SERVER_ERROR'),{code:'SERVER_ERROR'});
   const previous=this.profile();if(previous.accountId&&previous.accountId!==data.accountId)this.forget();
   this.setToken(data.token);
-  this.saveProfile({email:data.email,accountId:data.accountId,sessionId:data.sessionId,pendingEmail:undefined,cursors:previous.accountId===data.accountId?previous.cursors:{},lastError:'',...(kindChoice?{kinds:cleanKinds(kindChoice)}:{})});
+  const same=previous.accountId===data.accountId;
+  this.saveProfile({email:data.email,accountId:data.accountId,sessionId:data.sessionId,pendingEmail:undefined,cursors:same?previous.cursors:{},lastError:'',
+   signInMethod:method,signedInAt:this.now(),username:same?previous.username:undefined,hasPassword:method==='password'?true:same?previous.hasPassword:undefined,...(kindChoice?{kinds:cleanKinds(kindChoice)}:{})});
   return this.status();
  }
+ /* 2026-11-12 password sign-in with the e-mail or the user name (relay: POST /api/auth/password) */
+ async passwordLogin(login,password,kindChoice){
+  const raw=String(login||'').trim(),secret=String(password||''),mail=raw.includes('@');
+  const value=mail?normalizeEmail(raw):USERNAME.test(raw)?raw:'';
+  if(!value){const code=mail?'EMAIL_INVALID':'LOGIN_INVALID';throw Object.assign(Error(code),{code});}
+  if(!secret||secret.length>128)throw Object.assign(Error('WRONG_PASSWORD'),{code:'WRONG_PASSWORD'});
+  const data=await this.call('POST','/api/auth/password',{login:value,password:secret,device:this.deviceName()},{auth:false});
+  return this.signedIn(data,kindChoice,'password');
+ }
+ /* the user name is chosen once; the relay refuses any later change (USERNAME_LOCKED) */
+ async setUsername(name){
+  const clean=String(name||'').trim();if(!USERNAME.test(clean))throw Object.assign(Error('USERNAME_INVALID'),{code:'USERNAME_INVALID'});
+  try{const data=await this.call('POST','/api/me/username',{username:clean});this.saveProfile({username:data.username||clean});}
+  catch(error){if(error.code==='USERNAME_LOCKED')await this.me().catch(()=>{});throw error;}
+  return this.status();
+ }
+ async setPassword(password,current){
+  const secret=String(password||'');if(secret.length<8||secret.length>128)throw Object.assign(Error('PASSWORD_LENGTH'),{code:'PASSWORD_LENGTH'});
+  await this.call('POST','/api/me/password',{password:secret,...(current?{current:String(current)}:{})});
+  this.saveProfile({hasPassword:true});return this.status();
+ }
  setKinds(choice){this.saveProfile({kinds:cleanKinds({...this.kinds(),...choice})});return this.status();}
- async me(){return this.call('GET','/api/me');}
+ async me(){const data=await this.call('GET','/api/me');if(data&&typeof data==='object'&&this.profile().accountId===data.accountId)this.saveProfile({username:data.username||undefined,hasPassword:!!data.hasPassword});return data;}
  async logout(sessionId){
   if(sessionId&&sessionId!==this.profile().sessionId){await this.call('POST','/api/auth/logout',{sessionId});return this.status();}
   try{await this.call('POST','/api/auth/logout',{});}catch(error){if(!['NETWORK','UNAUTHORIZED','RELAY_NOT_CONFIGURED','NOT_LOGGED_IN'].includes(error.code))throw error;}
@@ -367,7 +399,8 @@ function cleanKinds(choice){const out={};for(const k of KINDS)out[k]=typeof choi
 
 const accounts=new Map();
 function accountFor(root,options){const key=path.resolve(root);if(options)return new Account(key,options);if(!accounts.has(key))accounts.set(key,new Account(key));return accounts.get(key);}
-/* bridge entry: account_status / account_code / account_verify / account_sync / account_kinds / account_me /
+/* bridge entry: account_status / account_code / account_verify / account_password_login / account_username /
+   account_password / account_sync / account_kinds / account_me /
    account_logout / account_delete. A stale sync (>15 min) starts in the background when the page asks for status. */
 async function handle(root,request,options){
  const a=accountFor(root,options),action=String(request.action);
@@ -375,6 +408,9 @@ async function handle(root,request,options){
   case 'account_status':{const s=a.status();if(s.loggedIn&&s.configured&&!s.syncing&&a.now()-s.lastSyncAt>15*60000&&request.autoSync!==false)a.sync().catch(()=>{});return s;}
   case 'account_code':return a.requestCode(String(request.email||''));
   case 'account_verify':{const s=await a.verify(String(request.email||''),String(request.code||''),request.kinds&&typeof request.kinds==='object'?request.kinds:null);a.sync().catch(()=>{});return s;}
+  case 'account_password_login':{const s=await a.passwordLogin(String(request.login||''),String(request.password||''),request.kinds&&typeof request.kinds==='object'?request.kinds:null);a.sync().catch(()=>{});return s;}
+  case 'account_username':return a.setUsername(String(request.username||''));
+  case 'account_password':return a.setPassword(String(request.password||''),typeof request.current==='string'?request.current:'');
   case 'account_sync':return a.sync();
   case 'account_kinds':return a.setKinds(request.kinds&&typeof request.kinds==='object'?request.kinds:{});
   case 'account_me':return a.me();
