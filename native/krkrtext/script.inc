@@ -20,7 +20,7 @@ LR"MGLT((function(){
      KiriKiri builds; typeof does not */
   var st=(typeof global.__megulitKrkrState=='Object')?global.__megulitKrkrState:void;
   if(st===void) {
-   st=%['calls'=>0,'hid'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
+   st=%['art'=>0,'artText'=>'','artSeen'=>[],'calls'=>0,'hid'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
    st.screen=function(){
     var sw=+this.kag.scWidth,sh=+this.kag.scHeight;
     if(!(sw>0) || !(sh>0)) {sw=+this.kag.primaryLayer.width;sh=+this.kag.primaryLayer.height;}
@@ -80,28 +80,46 @@ LR"MGLT((function(){
    /* 2026-11-12 (user: the game must think it draws its text while the output is ours): while MeguLit asks for it
       (__megulitKrkrHide()==1, only with HookBridge connected), a message layer draws its glyphs, ruby and shadows at opacity
       0. Layout, wrapping and the click wait are the engine's own; MeguLit draws the readable text at the reported place.
-      Any failure calls the game's method with its own arguments. */
+      Never break the game (a probe that wrapped a layer twice once raised "メンバ old が見つかりません"): each layer is
+      wrapped once, its own method is kept on the layer (__mgOld), the wrapper is bound to that layer, and when it is called
+      on anything else, or anything fails, the engine's native Layer.drawText draws with the game's own arguments. */
    st.hideOn=function(){try {return typeof global.__megulitKrkrHide=='Object' && global.__megulitKrkrHide()==1;} catch(e) {return false;}} incontextof st;
-   st.wrapDraw=function(o){
+   if(typeof global.__megulitDraw!='Object') global.__megulitDraw=function(args*){
+    var self=this,old=void;
+    try {if(typeof self.__mgOld=='Object') old=self.__mgOld;} catch(e) {}
+    if(old===void) old=global.Layer.drawText;
     try {
-     if(o===void || o===null || typeof o.drawText!='Object') return;
-     for(var i=0;i<this.wrapped.count;i++) if(this.wrapped[i].o===o) return;
-     var w=%['o'=>o,'old'=>o.drawText,'st'=>this];
-     w.fn=function(args*){
-      try {
-       this.st.calls++;
-       if(this.st.hideOn()) {
-        this.st.hid++;
+     var st=global.__megulitKrkrState;
+     if(typeof st=='Object' && st!==void) {
+      if(self.__mgKind=='msg') {
+       st.calls++;
+       if(st.hideOn()) {
         var a=[];a.assign(args);
         while(a.count<7) a.add(a.count==4?255:(a.count==5?true:0));
-        a[4]=0;a[6]=0;
-        return (this.old incontextof this.o)(a*);
+        a[4]=0;a[6]=0;st.hid++;
+        return (old incontextof self)(a*);
        }
-      } catch(e) {}
-      return (this.old incontextof this.o)(args*);
-     } incontextof w;
-     o.drawText=w.fn;
-     this.wrapped.add(w);
+      } else st.art++;
+     }
+    } catch(e) {}
+    return (old incontextof self)(args*);
+   };
+   st.wrapAs=function(o,kind){
+    try {
+     if(o===void || o===null || !isvalid o || typeof o.drawText!='Object') return;
+     if(typeof o.__mgKind=='String') {if(kind=='msg') o.__mgKind='msg';return;}
+     o.__mgOld=o.drawText;o.__mgKind=kind;
+     o.drawText=(global.__megulitDraw incontextof o);
+     if(kind=='msg') this.wrapped.add(o); else this.artSeen.add(o);
+    } catch(e) {}
+   } incontextof st;
+   st.wrapDraw=function(o){this.wrapAs(o,'msg');} incontextof st;
+   st.artWalk=function(L,d){
+    try {
+     if(L===void || L===null || d>8 || !isvalid L) return;
+     this.wrapAs(L,'art');
+     var c=L.children;if(typeof c!='Object' || c===void) return;
+     for(var i=0;i<c.count && i<64;i++) this.artWalk(c[i],d+1);
     } catch(e) {}
    } incontextof st;
 )MGLT" LR"MGLT(
@@ -117,21 +135,23 @@ LR"MGLT((function(){
       if(typeof L.lineLayer=='Object' && L.lineLayer!==void && L.lineLayer!==null && (t=='Integer' || t=='Real')) {lm=true;p0=+L.lineLayerPos;oy=+L.lineLayerOriginY;}
       else {p0=+L.x;oy=+L.y;}
      } catch(e) {}
+     if(typeof this.oldCh!='Object') return (global.MessageLayer.processCh incontextof this)(...);
      var result=(this.oldCh incontextof L)(...);
      try {this.st.track(this,ch,lm,p0,oy);} catch(e) {}
      return result;
     } incontextof rec;
     rec.clr=function(){
      try {this.st.flush(this);this.cleared=true;} catch(e) {}
+     if(typeof this.oldClear!='Object') return (global.MessageLayer.clear incontextof this)(...);
      return (this.oldClear incontextof this.target)(...);
     } incontextof rec;
     L.processCh=rec.ch;
     if(typeof L.clear=='Object') {rec.oldClear=L.clear;L.clear=rec.clr;}
     this.recs.add(rec);
    } incontextof st;
-   st.lb=function(){try {this.flushAll();} catch(e) {} return (this.oldLB incontextof this.kag)(...);} incontextof st;
-   st.pb=function(){try {this.flushAll();} catch(e) {} return (this.oldPB incontextof this.kag)(...);} incontextof st;
-   st.pbc=function(){try {this.flushAll();} catch(e) {} return (this.oldPBC incontextof this.kag)(...);} incontextof st;
+   st.lb=function(){if(typeof this.oldLB!='Object') return (global.KAGWindow.showLineBreak incontextof this)(...);try {this.flushAll();} catch(e) {} return (this.oldLB incontextof this.kag)(...);} incontextof st;
+   st.pb=function(){if(typeof this.oldPB!='Object') return (global.KAGWindow.showPageBreak incontextof this)(...);try {this.flushAll();} catch(e) {} return (this.oldPB incontextof this.kag)(...);} incontextof st;
+   st.pbc=function(){if(typeof this.oldPBC!='Object') return (global.KAGWindow.showPageBreakAndClear incontextof this)(...);try {this.flushAll();} catch(e) {} return (this.oldPBC incontextof this.kag)(...);} incontextof st;
    /* 2026-11-12 (user, ファタモルガーナの館: the last line stayed on screen through the opening, where the game had hidden its
       text window): every 100 ms the layer of the latest sentence is checked on the front page, itself and every parent
       visible and not transparent; a change is reported as ToMe_DIALOG engine=krkr visible=0|1. */
@@ -170,14 +190,17 @@ LR"MGLT((function(){
       try {this.timer=new global.Timer(this.vis,'');this.timer.interval=100;this.timer.enabled=true;} catch(e) {this.timer=null;}
      }
      for(var i=this.recs.count-1;i>=0;i--) if(!isvalid this.recs[i].target) this.recs.erase(i);
-     for(var i=this.wrapped.count-1;i>=0;i--) if(!isvalid this.wrapped[i].o) this.wrapped.erase(i);
+     for(var i=this.wrapped.count-1;i>=0;i--) if(!isvalid this.wrapped[i]) this.wrapped.erase(i);
+     for(var i=this.artSeen.count-1;i>=0;i--) if(!isvalid this.artSeen[i]) this.artSeen.erase(i);
+     try {this.artWalk(k.primaryLayer,0);} catch(e) {}
+     try {this.artWalk(k.fore.base,0);this.artWalk(k.back.base,0);} catch(e) {}
      var pages=[k.fore,k.back];
      for(var i=0;i<pages.count;i++) {
       var ms=pages[i].messages;
       if(typeof ms!='Object' || ms===void || ms===null) continue;
       for(var j=0;j<ms.count && j<32;j++) this.install(ms[j]);
      }
-     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' draws='+this.calls+' hidden='+this.hid;
+     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' draws='+this.calls+' hidden='+this.hid+' art='+this.art+' artLayers='+this.artSeen.count+' artText='+this.artText;
     } catch(e) {return 'error '+e.message;}
    } incontextof st;
    global.__megulitKrkrState=st;
