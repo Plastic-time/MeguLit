@@ -46,7 +46,7 @@ function slice(file,offset,size){const fd=fs.openSync(file,'r');try{const b=Buff
 // Every voice clip a folder holds: name (no extension, lower case) -> a reader. Archives are listed once.
 /* E461 a clip is listed under its name and under "folder/name" (its last folder): scripts that name a folder find that
    folder's clip even when another folder holds a file of the same name; a bare name still finds the first one. */
-function catalog(dir){const map=new Map(),koe=new Map(),add=(name,read)=>{const k=base(name);if(!k)return;if(!map.has(k))map.set(k,read);
+function catalog(dir){const map=new Map(),koe=new Map(),hashed=new Map(),add=(name,read)=>{const k=base(name);if(!k)return;if(!map.has(k))map.set(k,read);
   const parts=String(name).replace(/\\/g,'/').split('/');if(parts.length>1){const fk=parts[parts.length-2].toLowerCase()+'/'+k;if(!map.has(fk))map.set(fk,read);}};
  const xp3=require('./original-engines/xp3.cjs');
  // clips a cold run read through the game (voice-cold.cjs) come first: they are what the game itself plays
@@ -56,7 +56,12 @@ function catalog(dir){const map=new Map(),koe=new Map(),add=(name,read)=>{const 
  for(const m of DIR_PROVIDERS){let l=null;try{l=require(m).audioDir?.(dir);}catch{}if(l)for(const e of l){const k=String(e.key).toLowerCase();if(!map.has(k))map.set(k,e.read);}}
  for(const file of walk(dir)){const low=file.toLowerCase();
   if(AUDIO.test(low)){add(file,()=>fs.readFileSync(file));continue;}
-  if(low.endsWith('.xp3')){let t;try{t=xp3.list(file);}catch{}if(!t)continue;const audio=t.files.filter(e=>AUDIO.test(e.name));if(!audio.length)continue;
+  if(low.endsWith('.xp3')){let t;try{t=xp3.list(file);}catch{}if(!t)continue;
+   /* KiriKiri Z Steam releases (9-nine-, ATRI) name each entry by the MD5 of its lower-case UTF-16LE path (sf/sf0001.ogg,
+      CAT_b101_001.opus); the script's voice names are looked up through that hash in get() */
+   const named=t.files.filter(e=>/^[0-9a-f]{32}$/.test(e.name));if(named.length){let cx;const filter=()=>{if(cx===undefined){cx=null;try{cx=require('./original-engines/cx-filter.cjs').forArchive(file);}catch{}}return cx;};
+    for(const e of named)if(!hashed.has(e.name))hashed.set(e.name,()=>xp3.read(file,e,e.encrypted?filter():null));}
+   const audio=t.files.filter(e=>AUDIO.test(e.name));if(!audio.length)continue;
    /* an entry flagged protected can still be stored plain (女王蜂の王房, 赤ずきん): read one and look */
    const flagged=audio.find(e=>e.encrypted);let open=false;if(flagged){try{open=!!kind(xp3.read(file,flagged));}catch{}}
    let cx=null;if(flagged&&!open){try{cx=require('./original-engines/cx-filter.cjs').forArchive(file);}catch{}}
@@ -65,7 +70,13 @@ function catalog(dir){const map=new Map(),koe=new Map(),add=(name,read)=>{const 
   /* archives an engine reader knows: each lists its clips as {name, read} */
   if(/[.](?:npk|ypf|int|bin|pak|dat|pck|iga)$/.test(low)){let l=null;for(const m of PROVIDERS){try{l=require(m).audio?.(file);}catch{}if(l&&l.length)break;}if(l)for(const e of l)add(e.name,e.read);continue;}
   if(low.endsWith('.ovk')){const m=/(\d+)\.ovk$/.exec(low),l=ovkList(file);if(m&&l)for(const e of l){const id=Number(m[1])*100000+e.id;koe.set(id,()=>slice(file,e.offset,e.size));}continue;}}
- return {map,koe,get(ref){if(/^koe:\d+$/.test(ref))return koe.get(Number(ref.slice(4)))||null;const r=String(ref).toLowerCase();return map.get(r)||(r.includes('/')?map.get(r.slice(r.lastIndexOf('/')+1)):null)||null;}};}
+ return {map,koe,hashed,get(ref){if(/^koe:\d+$/.test(ref))return koe.get(Number(ref.slice(4)))||null;const r=String(ref).toLowerCase();return map.get(r)||(r.includes('/')?map.get(r.slice(r.lastIndexOf('/')+1)):null)||(hashed.size?hashedClip(hashed,r):null)||null;}};}
+/* the paths a voice name may be stored under: as written, or in a folder named by its prefix (sf0001 -> sf/sf0001,
+   CAT_b101_001 -> cat/CAT_b101_001, kr0085_ep1 -> ep1/kr0085_ep1), with or without its audio extension */
+function hashedPaths(ref){const r=String(ref).replace(/\\/g,'/').toLowerCase(),name=r.slice(r.lastIndexOf('/')+1),stem=AUDIO.test(name)?name.replace(/\.[^.]+$/,''):name;
+ const dirs=new Set([r.includes('/')?r.slice(0,r.lastIndexOf('/')+1):'','']);const letters=/^[a-z]+/.exec(stem),head=/^([^_]+)_/.exec(stem);if(letters)dirs.add(letters[0]+'/');const tail=/_([^_]+)$/.exec(stem);if(head)dirs.add(head[1]+'/');if(tail)dirs.add(tail[1]+'/');dirs.add('voice/');
+ const exts=AUDIO.test(name)?[name.slice(stem.length)]:['.ogg','.opus','.wav','.m4a','.mp3'];const out=[];for(const d of dirs)for(const x of exts)out.push(d+stem+x);return out;}
+function hashedClip(hashed,ref){const crypto=require('node:crypto');for(const p of hashedPaths(ref)){const k=crypto.createHash('md5').update(Buffer.from(p,'utf16le')).digest('hex');const read=hashed.get(k);if(read)return read;}return null;}
 
 /* ---- the line index ---- */
 const catalogs=new Map();
@@ -121,4 +132,4 @@ function scanLater(root,executable,delay=8000,{cold=false}={}){if(!executable)re
  const t=setTimeout(()=>scanInWorker(root,start,({g,r})=>{running.delete(k);if(!g||!r)return;const e=lines(root).games[gameKey(g.dir)];if(e){e.from=k;save(root);}
    if(cold&&r.missing?.length){const vc=require('./voice-cold.cjs');const off=vc.onDone(job=>{if(job.game.dir===g.dir){off();scanInWorker(root,g.dir,()=>{});}});vc.consider(root,{executable:String(executable),dir:g.dir,engine:g.engine},r.missing);}}),delay);t.unref?.();}
 const has=(root,text)=>{const k=keyOf(text);return !!(k&&lines(root).lines[k]);};
-module.exports={scanLater,norm,keyOf,kind,catalog,arcList,ovkList,scan,gameDir,remember,find,has,gameKey,_reset(){memo=null;catalogs.clear();}};
+module.exports={hashedPaths,scanLater,norm,keyOf,kind,catalog,arcList,ovkList,scan,gameDir,remember,find,has,gameKey,_reset(){memo=null;catalogs.clear();}};

@@ -76,7 +76,12 @@ function restoreTool(dir,patched){const names=listing(dir).names,want=String(pat
  for(const n of names){if(!/\.exe$/i.test(n)||/^unins\d*\.exe$/i.test(n))continue;if(/(uninst|卸载|卸載|还原|還原|restore|remove|恢复)/i.test(n)&&/(patch|补丁|補丁|汉化|漢化|中文|chs|cht|eng|english|翻訳|translation)/i.test(n))return {file:n,kind:'program'};}
  return null;}
 const isTranslated=p=>String(p||'').split(/[\\/]+/).some(n=>TRANSLATED.test(n.replace(/\.exe$/i,''))||launcher.languageHint(n)==='zh');
-const ENGINE_EXE=/^(BGI|SiglusEngine|RealLive|AdvHD|cs2|malie|Game|nscr|LiveMaker|lightvn|renpy|nw)\.exe$/i;
+const ENGINE_EXE=/^(BGI|SiglusEngine|RealLive|AdvHD|cs2|malie|Game|nscr|LiveMaker|lightvn|renpy|nw)(?:[_-]steam)?\.exe$/i;
+/* A Steam folder ships the steam_api DLL of the bitness its game is built for; an exe of the other bitness there (Summer
+   Pockets: a stray x64 SummerPocketsRB.exe beside SiglusEngine_Steam.exe and a 32-bit steam_api.dll) cannot start, so the
+   hook would attach to nothing and embedding fell back to read only. */
+function peBits(file){try{const fd=fs.openSync(file,'r'),b=Buffer.alloc(0x400);try{fs.readSync(fd,b,0,b.length,0);}finally{fs.closeSync(fd);}const o=b.readUInt32LE(0x3c);if(o+6>b.length||b.toString('latin1',o,o+4)!=='PE\0\0')return 0;const m=b.readUInt16LE(o+4);return m===0x14c?32:m===0x8664||m===0xaa64?64:0;}catch{return 0;}}
+function steamBits(names){const has=re=>names.some(n=>re.test(n)),a32=has(/^steam_api\.dll$/i),a64=has(/^steam_api64\.dll$/i);return a32&&!a64?32:a64&&!a32?64:0;}
 const SKIP_EXE=/^(unins|uninstall|setup|install|config|settings?|launcher_?config|crashpad|crash|unitycrashhandler|dxsetup|vcredist|dotnet|redist|notification_helper|steamerrorreporter|easyanticheat|ue4prereq|update|patch|register|cefsharp|7z|reg|eosbootstrapper|vc_redist)/i;
 
 function listing(dir){let names=[];try{names=fs.readdirSync(dir);}catch{}const cache={};
@@ -92,7 +97,8 @@ function mainExe(dir,translatedDir=false){
  // launchers (BGI-CHS.exe, euphoria_sc.exe, BGI_patch.exe) last, the larger file among equals.
  const variant=/([-_ .](chs|cht|cn|sc|tc|zh|chinese|patch|\d{6,8})|中文|汉化|漢化|简体|繁體|补丁|パッチ)/i,folder=path.basename(dir).toLowerCase();
  let best='',score=-1,size=0;
- for(const n of listing(dir).names){if(!launcher.isLauncher(n)||SKIP_EXE.test(n)||SKIP_EXE_ANY.test(n)||isTranslated(n))continue;let s;try{s=fs.statSync(path.join(dir,n));}catch{continue;}if(!s.isFile()||s.size<200000)continue;
+  const names=listing(dir).names,bits=steamBits(names);
+ for(const n of names){if(!launcher.isLauncher(n)||SKIP_EXE.test(n)||SKIP_EXE_ANY.test(n)||isTranslated(n))continue;let s;try{s=fs.statSync(path.join(dir,n));}catch{continue;}if(!s.isFile()||s.size<200000)continue;if(bits){const b=peBits(path.join(dir,n));if(b&&b!==bits)continue;}
   const base=n.replace(/\.exe$/i,'').toLowerCase(),sc=(ENGINE_EXE.test(n)?3:0)+(base===folder?2:0)+(variant.test(base)?0:1);
   if(sc>score||(sc===score&&s.size>size)){best=n;score=sc;size=s.size;}}
  if(!best)for(const n of listing(dir).names){if(!launcher.isLauncher(n)||SKIP_EXE.test(n)||SKIP_EXE_ANY.test(n)||isTranslated(n)||/^(python|pythonw|zsync|zsyncmake)\.exe$/i.test(n))continue;let st;try{st=fs.statSync(path.join(dir,n));}catch{continue;}if(st.isFile()&&st.size>=20000&&st.size>size){best=n;size=st.size;}}
