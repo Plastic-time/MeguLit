@@ -16,7 +16,7 @@ class HookControl{
   if(profile==='euphoria474'&&h.state.hookExact474!==true){this.status({hookCheckState:'unsupported',hookCheckMessage:'此游戏版本不匹配，YU-RIS 0.474 隐藏没有启动'});return;}
   if(profile==='embed'&&!h.hooks.state.hookThreads.some(t=>t.embeddable)){this.status({hookCheckState:'unsupported',hookCheckMessage:'还没有支持内嵌的文本流，先启动通用读取并推进一句'});return;}
   if(this.styleCalibration&&this.styleTimer)this.finishStyleSync(false,true);
-  this.running=profile!=='off';this.plan=profile;this.baseline=false;this.baselineMisses=0;this.seq=0;const styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleCalibration=!!(force&&h.preferences.autoGameStyle!==false&&h.styleSync&&!h.styleSync.latest&&this.styleCalibrationIdentity!==styleIdentity);if(this.styleCalibration)force=false;h.hooks.preflight=this.running&&profile!=='read'&&!force;
+  this.running=profile!=='off';this.plan=profile;this.baseline=false;this.baselineMisses=0;this.missSequence=null;this.seq=0;const styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleCalibration=!!(force&&h.preferences.autoGameStyle!==false&&h.styleSync&&!h.styleSync.latest&&this.styleCalibrationIdentity!==styleIdentity);if(this.styleCalibration)force=false;h.hooks.preflight=this.running&&profile!=='read'&&!force;
   h.send({type:'hookVerifyCancel'});
   this.autoOcr=false;const userOcr=false;/* 2026-11-12 (user) OCR never covers the original */
   h.save({...h.preferences,bindEnabled:true,maskMode:userOcr?'local':'hook',maskModeSource:userOcr?'user':'',hookProfile:profile});
@@ -54,7 +54,10 @@ class HookControl{
  visual(m){
   if(!this.running||m.sequence!==this.seq||m.stage!==this.stage)return;
   const h=this.host;h.hooks.trace?.('visual '+JSON.stringify(m));
-  if(!m.valid){this.status({hookCheckState:'unverified',hookVisualVerified:false,hookCheckMessage:'画面未确认：'+String(m.error||'画面读取失败')});return;}
+  /* E477 (player: a new game in a small window kept its original under MeguLit's text after many tries). A baseline screen check that
+     fails outright (capture or OCR error, a window too small to read) returned here without counting, so preflight (original shown,
+     writeback off) never ended. It now counts as a miss for its line, like a check that found nothing. */
+  if(!m.valid){if(m.stage==='baseline'&&!this.styleCalibration){this.baselineMiss(m.sequence);if(this.stage==='switching')return;}this.status({hookCheckState:'unverified',hookVisualVerified:false,hookCheckMessage:'画面未确认：'+String(m.error||'画面读取失败')});return;}
   if(m.sourceCharacters<4){this.status({hookCheckState:'waiting',hookCheckMessage:'台词太短，等待下一句较长台词完成画面检查'});return;}
   if(m.stage==='baseline'){
    if(this.styleCalibration&&!m.matched)return; // Mask OCR failure must not cancel the independent style probe
@@ -62,7 +65,7 @@ class HookControl{
    if(m.matched){this.baseline=true;h.hooks.preflight=false;this.stage='switching';h.hooks.configure(h.preferences,h.state);this.status({hookBaselineVerified:true,hookCheckState:'switching',hookCheckMessage:'原文位置已确认，正在启动隐藏；等约 3 秒后推进下一句'});}
    // A screen check that never recognises the original (stylised fonts, busy art: manosaba) must not keep an
    // embeddable stream read-only forever: after two lines without a match, hide through the selected stream anyway.
-   else if(m.sample===2){this.baselineMisses=(this.baselineMisses||0)+1;if(this.baselineMisses>=2&&(h.hooks.state.hookThreads||[]).some(t=>t.selected&&t.embeddable)){if(this.styleCalibration){this.styleGiveUp=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.finishStyleSync(false,true);}h.hooks.preflight=false;this.stage='switching';h.hooks.configure(h.preferences,h.state);this.status({hookBaselineVerified:false,hookCheckState:'switching',hookCheckMessage:'屏幕上未能识别原文，已按可内嵌文本流开启隐藏'});}else this.status({hookCheckState:'unverified',hookCheckMessage:'没在扫描区找到原文，尚未自动启动隐藏；检查下方扫描范围或推进下一句'});}
+   else if(m.sample===2&&!this.baselineMiss(m.sequence))this.status({hookCheckState:'unverified',hookCheckMessage:'没在扫描区找到原文，尚未自动启动隐藏；检查下方扫描范围或推进下一句'});
    return;
   }
   if(m.stage==='read'){this.status({hookCheckState:m.matched?'captured':'unverified',hookVisualVerified:false,hookCheckMessage:m.matched?'捕捉成功，游戏原文可见（当前仅读取）':'捕捉成功，画面未匹配到本句原文'});return;}
@@ -108,6 +111,12 @@ class HookControl{
   if(!explicit&&!(h.state.bound&&h.state.coverEnabled!==false))return;
   h.hooks.preferredThread=t.id;this.start(/DrawHide/.test(t.name)?'euphoria474':'embed',p.hookFast!==false);
  }
+ /* One miss per line: two lines whose original could not be confirmed on screen hide through the selected embeddable stream anyway.
+    The engine error guard (error dialog / crash after a replacement -> writeback off and remembered) still applies. */
+ baselineMiss(sequence){const h=this.host;if(this.missSequence===sequence)return false;this.missSequence=sequence;this.baselineMisses=(this.baselineMisses||0)+1;
+  if(!(this.baselineMisses>=2&&(h.hooks.state.hookThreads||[]).some(t=>t.selected&&t.embeddable)))return false;
+  if(this.styleCalibration){this.styleGiveUp=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.finishStyleSync(false,true);}
+  h.hooks.preflight=false;this.stage='switching';h.hooks.configure(h.preferences,h.state);this.status({hookBaselineVerified:false,hookCheckState:'switching',hookCheckMessage:'屏幕上未能识别原文，已按可内嵌文本流开启隐藏'});return true;}
  modeChanged(){const h=this.host,active=h.state.bound&&h.state.coverEnabled!==false;if(!active&&this.styleCalibration)this.finishStyleSync(false,true);if(this.running&&this.plan!=='read'&&!active){this.baseline=false;this.status({hookBaselineVerified:false,hookVisualVerified:false,hookCheckState:'reading',hookCheckMessage:'隐藏已关闭，约 3 秒后换下一句恢复原文'});}else if(this.running&&this.plan!=='read'&&active&&!this.baseline){
    // Style sampling already ran (or timed out) for this game process: do not gate hiding on the visual baseline
    // again, or games whose text OCR never matches would stay unhidden after every mode switch.
