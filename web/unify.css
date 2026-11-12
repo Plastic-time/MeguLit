@@ -1466,6 +1466,9 @@ html:not(#u):not(#v):not(#w):not(#x) body #learning-content:has(.dict-field)>*:n
 html body .dict-cloud{display:none!important}
 /* the field covers the whole window behind the dictionary (fixed), like the website hero */
 html:not(#u):not(#v):not(#w):not(#x) body .dict-field{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:0}
+/* E458 (user: the field was squeezed to the content column) main's children get max-width 1400px with auto margins, so the
+   1920-wide bitmap was drawn into a 1400px box; the field is never limited by the column */
+html:not(#u):not(#v):not(#w):not(#x) body .dict-field{max-width:none!important;max-height:none!important;margin:0!important}
 
 /* 特效 panel (fx-settings.js): each effect a settings row with its strength slider and its switch side by side */
 html body .fx-panel .fx-controls{display:flex;align-items:center;gap:18px;flex:none}
