@@ -16,7 +16,7 @@ class Runtime {
  services(){return this.serviceManager??=new(require('../core/services.cjs').Services)(this.root);}
  speech(){return this.speechEngine??=new(require('../core/speech.cjs').Speech)(path.join(this.root,'cache'));}
  models(){return this.modelStore??=new(require('../core/model-store.cjs').ModelStore)(this.root);}
- packs(){return this.packStore??=new(require('../core/runtime-packs.cjs').RuntimePacks)(this.root);}
+ packs(){return this.packStore??=require('../core/runtime-packs.cjs').RuntimePacks.shared(this.root);}
  local(){return this.localEngine??=new(require('../core/local-llm.cjs').LocalLlm)({root:this.root,models:this.models(),logs:path.join(this.root,'logs')});}
  library(){return this.libraryManager??=new(require('../core/library.cjs').Library)(require('../core/layout.cjs'));}
  history(){return this.historyTranslations??=new(require('./history-view.cjs').HistoryTranslations)(this.root,async text=>{if(this.stopped)throw Error('RUNTIME_STOPPED');const {createTranslationService,resolveOptions}=require('../core/providers.cjs'),preferences=require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json'))),options=resolveOptions(preferences),translator=createTranslationService();if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless){const {SecretStore}=require('../core/secrets.cjs');for(const[base,key]of new SecretStore(this.folder,undefined,path.join(this.root,'native','KeyVault.exe')).entries())translator.setKey(base,key);}await this.local().ensure(options);return translator.translate(text,options);});}
@@ -58,6 +58,7 @@ class Runtime {
    case 'pack_status':return this.packs().status();
    case 'pack_download':return this.packs().download(request.ids);
    case 'pack_cancel':return this.packs().cancel();
+   case 'pack_uninstall':return this.packs().uninstall(String(request.id||''));
    case 'model_cancel':return this.models().cancel(String(request.id));
    case 'local_start':{const options=require('../core/providers.cjs').resolveOptions(require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json'))));if(!this.local().local(options))throw Error('LOCAL_ENGINE_REQUIRED');await this.local().ensure(options);return this.local().status();}
    case 'local_stop':await this.local().stop();return this.local().status();
