@@ -1,6 +1,12 @@
 [
  {
   "date": "2026-11-12",
+  "text": "1.4.6 紧急修复（光敏安全）：启动游戏后前 15–30 秒画面整屏闪黑/闪白的问题已修复（STEINS;GATE（命运石之门）等 DirectX 游戏），对闪烁敏感的玩家请尽快更新。仅在开发者本地测试过，如还有问题请在「关于 → 一键上传问题反馈」告诉我们，会持续跟进修复",
+  "text_en": "1.4.6 urgent fix (photosensitivity): the whole game picture no longer flashes black or white for the first 15–30 seconds after launch (STEINS;GATE and other DirectX games). Please update right away if you are sensitive to flashing. Tested only on the developer's machine so far; if anything still goes wrong, tell us via About → Report a problem",
+  "text_ja": "1.4.6 緊急修正（光過敏への配慮）：ゲーム起動後 15〜30 秒ほど画面全体が黒や白に点滅する問題を修正しました（STEINS;GATE などの DirectX ゲーム）。点滅に敏感な方はすぐに更新してください。開発者の環境でのみテスト済みです。問題があれば「About → 問題を報告」からお知らせください"
+ },
+ {
+  "date": "2026-11-12",
   "text": "1.4.4：新支持 逆転裁判123 成歩堂セレクション（逆转裁判123 成步堂精选集）、夏色四叶草、いじわるMyMaster（我的坏心主人）；有配音的句子一律播放游戏原声（CLANNAD、千恋＊万花（千恋万花）、WHITE ALBUM2（白色相簿2）等）；Anki 录音去掉背景音乐、AI 归纳义项可加进卡片；Lv.20 转职与段位；词典和练习题特效，可在设置里关掉；界面全面打磨",
   "text_en": "1.4.4: new support for 逆転裁判123 成歩堂セレクション (Ace Attorney Trilogy), 夏色四叶草 (Summer Clover) and いじわるMyMaster; voiced lines always play the game's own voice (CLANNAD, Senren Banka, WHITE ALBUM2 and more); Anki recordings lose their music and AI sense summaries go on cards; Lv.20 class change and ranks; dictionary and practice effects, switchable in Settings; a full interface pass",
   "text_ja": "1.4.4：逆転裁判123 成歩堂セレクション、夏色四叶草、いじわるMyMaster に対応。ボイスのあるセリフは必ずゲーム本来のボイスで再生（CLANNAD、千恋＊万花、WHITE ALBUM2 など）。Anki の録音から BGM を除去、AI の語義まとめをカードに追加。Lv.20 の転職と段位。辞書と練習問題のエフェクト（設定でオフ可）。インターフェースを全面的に調整"
