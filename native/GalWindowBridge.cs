@@ -365,7 +365,7 @@ public class GalWindowBridge {
         else if(type=="dialogVisibility"){DialogVisible=Bool(d,"visible");}
         else if(type=="hookVerify"){if(HookVerifier!=null)HookVerifier.Request(Target,d);}
         else if(type=="choiceLocate"){object list;var options=new List<string>();if(d.TryGetValue("options",out list)&&list is System.Collections.ArrayList)foreach(object o in (System.Collections.ArrayList)list){string t=Convert.ToString(o);if(!String.IsNullOrWhiteSpace(t)&&t.Length<=120&&options.Count<12)options.Add(t);}if(PageLocate!=null&&Target!=IntPtr.Zero)PageLocate.RequestChoices(Target,options);}
-        else if(type=="pageLocate"){if(PageLocate!=null&&Target!=IntPtr.Zero)PageLocate.Request(Target,Str(d,"text"));}
+        else if(type=="pageLocate"){if(PageLocate!=null&&Target!=IntPtr.Zero)PageLocate.Request(Target,Str(d,"text"),Bool(d,"art"));}
         else if(type=="maskAssist"){if(TextMask!=null)TextMask.Assist(Str(d,"source"));}
         else if(type=="hookVerifyCancel"){if(HookVerifier!=null)HookVerifier.Cancel();}
         else if(type=="gameAudio"){AudioWanted=Bool(d,"enabled");uint pid=0;if(AudioWanted&&Target!=IntPtr.Zero)GetWindowThreadProcessId(Target,out pid);if(AudioWanted&&pid!=0)Audio.Start(pid);else if(!AudioWanted)Audio.Stop();}

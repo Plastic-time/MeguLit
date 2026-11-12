@@ -13,6 +13,7 @@ class Reader{
   if(message.type==='homeHotkey'){this.runtime.emit('home-toggle',null);return;}
   if(message.type==='readerPointer'){this.runtime.emit('reader-pointer-input',message);return;}
   if(message.type==='hookEmbedRequest'){this.embedTranslate(message.id,message.text);return;}
+  if(message.type==='artText'){this.artText(message);return;}
   /* A Chinese-patched game read in Japanese: the patch's line is the translation, cached before the page asks. */
   if(message.type==='hookPatchTranslation'){if(typeof message.japanese==='string'&&typeof message.chinese==='string'&&message.chinese.length<=4000){this.embedCached(message.japanese,message.chinese.trim());/* learning: remember which lines carry a human translation (group patch / official Chinese) */if(message.machine!==true){const source=this.gal?.hooks?.originalText?.kind==='original'?'official':'group';this.humanLine(message.japanese,{text:message.chinese.trim(),source});if(this.gameId)this.stats.translation(this.gameId,message.japanese,message.chinese.trim(),source);}}return;}
   if(message.type==='hostFrame'){
@@ -149,6 +150,13 @@ class Reader{
  langOptions(o){const lang=this.displayLanguage();return lang?{...o,learnerLanguage:lang}:o;}
  embedKey(text){return (this.displayLanguage()==='en'?'en|':'')+String(text||'').replace(/\s+/g,'');}
  embedCached(text,value){this.embedCache??=new Map();const key=this.embedKey(text);if(!key)return undefined;if(value===undefined)return this.embedCache.get(key);this.embedCache.delete(key);this.embedCache.set(key,value);if(this.embedCache.size>800)this.embedCache.delete(this.embedCache.keys().next().value);return value;}
+ /* 2026-11-12 art text (PageLocator art mode): the page gets the place and the translation; the game keeps drawing the line */
+ async artText(message){let translation='';const text=String(message.text||'').slice(0,600);
+  if(message.visible===true&&text.trim()){try{translation=this.embedCached(text)||'';
+   if(!translation&&this.displayLanguage()!=='en'){translation=this.gal?.hooks?.scriptTranslation?.(text)||'';if(translation)this.embedCached(text,translation);}
+   if(!translation){const options=this.langOptions(require('../core/providers.cjs').resolveOptions({...this.prefs(),translationPrompt:this.workPrompt||''}));if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();
+    const until=Date.now()+4000,inTime=()=>Date.now()<until;await this.localReady(options,null,inTime);translation=normalizeTranslation(await this.translator().translate(text,options,()=>true));if(translation)this.embedCached(text,translation);}}catch{}}
+  this.runtime.emit('reader-event',{...message,text,translation});}
  async embedTranslate(id,text){
   let trans='';
   /* E352: the engine's string still carries its ruby markup (HuneX <rふ>触</r>, ISLAND \x1d pairs): translate the text the player reads. */

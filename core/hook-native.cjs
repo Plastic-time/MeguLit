@@ -127,7 +127,15 @@ class HookNative{
  /* E407 choices (every engine): text from the hook's non-dialogue streams is collected (never written back), OCR finds
     each choice's row on screen, and the reader draws ruby and translation over the buttons. Every step is logged to
     hook-events.log under "choice". */
- auxText(m){const C=this.choice||(this.choice=new ChoiceCapture(()=>this.now()));const added=C.add(m.text,this.lastSource,this.speaker?.text);
+ /* 2026-11-12 (user: art text in the opening and during play must be readable, the game keeps drawing it and MeguLit lays an
+    invisible copy and the translation over it): a Japanese line from another stream that is not the current dialogue line
+    is looked for on the picture (PageLocator art mode); once per text within 20 s. */
+ artCandidate(text){try{const t=String(text||'').trim(),flat=HookNative.flat(t);if(typeof this.artLocate!=='function'||[...flat].length<2||[...flat].length>60)return;
+  if(!/[぀-ヿ㐀-鿿]/.test(flat)||/[\/:]/.test(t)||/[<>{}\[\]=@]/.test(t))return;
+  if(this.lastSource&&(HookNative.flat(this.lastSource).includes(flat)||flat.includes(HookNative.flat(this.lastSource))))return;
+  const now=this.now(),seen=this.artSeen||(this.artSeen=new Map());const last=seen.get(flat);if(last!=null&&now-last<20000)return;seen.set(flat,now);if(seen.size>200)seen.delete(seen.keys().next().value);
+  this.trace('art text located '+JSON.stringify(t.slice(0,40)));this.artLocate(t);}catch{}}
+ auxText(m){this.artCandidate(m.text);const C=this.choice||(this.choice=new ChoiceCapture(()=>this.now()));const added=C.add(m.text,this.lastSource,this.speaker?.text);
   this.trace('choice aux '+String(m.sourceName||'').slice(0,40)+' role='+(m.role??'')+' added='+JSON.stringify(added)+' text='+JSON.stringify(String(m.text).slice(0,80)));
   if(!added.length)return;clearTimeout(this.choiceTimer);this.choiceTimer=setTimeout(()=>this.requestChoices(0),450);this.choiceTimer.unref?.();}
  requestChoices(round){const options=round>0&&this.choiceOptions?this.choiceOptions:this.choice?.options();

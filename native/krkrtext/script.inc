@@ -177,6 +177,7 @@ LR"MGLT((function(){
      if(v!=this.lastVis) {this.lastVis=v;this.report('ToMe_DIALOG engine=krkr visible='+v);}
     } catch(e) {}
    } incontextof st;
+   st.fontNow=function(){try {var r=this.active;if(r===void || r===null) return '-';var f=r.target.font;return ''+f.face+'/'+(+f.height)+(this.lastFont==''?' unreported':'');} catch(e) {return 'err '+e.message;}} incontextof st;
    st.refresh=function(){
     try {
      var k=this.kag;
@@ -201,7 +202,7 @@ LR"MGLT((function(){
       if(typeof ms!='Object' || ms===void || ms===null) continue;
       for(var j=0;j<ms.count && j<32;j++) this.install(ms[j]);
      }
-     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' draws='+this.calls+' hidden='+this.hid+' art='+this.art+' artLayers='+this.artSeen.count+' artText='+this.artText;
+     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' draws='+this.calls+' hidden='+this.hid+' art='+this.art+' artLayers='+this.artSeen.count+' font='+this.fontNow();
     } catch(e) {return 'error '+e.message;}
    } incontextof st;
    global.__megulitKrkrState=st;

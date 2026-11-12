@@ -34,15 +34,21 @@ public sealed class PageLocator : IDisposable {
  readonly AutoResetEvent Wake = new AutoResetEvent(false);
  Thread Worker;
  volatile bool Disposed;
- IntPtr Target; string Text; DateTime At; int Serial;
+ IntPtr Target; string Text; DateTime At; int Serial; bool Art;
  string PreviousText; bool PreviousNvl; long Line; int AdvRun, Skipped;
  OcrEngine Engine; bool EngineTried;
 
  public PageLocator(Action<object> emit) { Emit = emit; }
 
- public void Request(IntPtr target, string text) {
+ /* 2026-11-12 (user: art text, opening titles and credits, must be readable too, with MeguLit drawing over it): art=true
+    locates a line that is not in the text window. The game keeps drawing it; MeguLit lays an invisible, selectable copy
+    and the translation over it (artText), and hides them when the picture no longer shows the line. */
+ public void Request(IntPtr target, string text) { Request(target, text, false); }
+ public void Request(IntPtr target, string text, bool art) {
   if (target == IntPtr.Zero || String.IsNullOrWhiteSpace(text) || text.Length > 600) return;
   lock (Gate) {
+   if (art) { Target = target; Text = text; At = DateTime.UtcNow; Serial++; Art = true; if (Worker == null) { Worker = new Thread(Run) { IsBackground = true, Name = "MeguLit page locator" }; Worker.Start(); } Wake.Set(); return; }
+   Art = false;
    // After 12 ADV lines in a row only every fourth line is read; a page found again restores every line.
    if (AdvRun >= 12 && ++Skipped % 4 != 0) return;
    Target = target; Text = text; At = DateTime.UtcNow; Serial++;
@@ -55,11 +61,11 @@ public sealed class PageLocator : IDisposable {
   int done = 0;
   while (!Disposed) {
    Wake.WaitOne(1000);
-   IntPtr target; string text; DateTime at; int serial;
-   lock (Gate) { target = Target; text = Text; at = At; serial = Serial; }
+   IntPtr target; string text; DateTime at; int serial; bool art;
+   lock (Gate) { target = Target; text = Text; at = At; serial = Serial; art = Art; }
    if (serial == done || text == null) continue;
    done = serial;
-   try { Locate(target, text, at, serial); } catch (Exception e) { Emit(new { type = "pageLocateStatus", status = "error " + e.Message }); }
+   try { if (art) LocateArt(target, text, at, serial); else Locate(target, text, at, serial); } catch (Exception e) { Emit(new { type = "pageLocateStatus", status = "error " + e.Message }); }
   }
  }
 
@@ -88,6 +94,49 @@ public sealed class PageLocator : IDisposable {
   }
   Emit(new { type = "pageLocateStatus", status = "miss chars=" + text.Length });
   lock (Gate) { if (AdvRun < 12) AdvRun++; }
+ }
+
+ bool Capture(IntPtr target, out List<Row> rows, out int w, out int h) {
+  rows = null; w = h = 0;
+  RECT rect; if (!GetClientRect(target, out rect) || rect.Right < 64 || rect.Bottom < 64 || rect.Right > 7680 || rect.Bottom > 4320) return false;
+  w = rect.Right; h = rect.Bottom;
+  using (var image = new Bitmap(w, h, PixelFormat.Format24bppRgb)) {
+   if (!GameCapture.Into(target, image, 3)) return false;
+   lock (OcrLock) rows = Read(image, w, h);
+  }
+  return true;
+ }
+ // Art text: found within 3 s of the hook line, then followed every 0.7 s for up to 30 s; hidden when the picture lost it.
+ void LocateArt(IntPtr target, string text, DateTime at, int serial) {
+  if (!EngineTried) { EngineTried = true; try { Engine = OcrEngine.TryCreateFromLanguage(new Language("ja")); } catch { Engine = null; } }
+  if (Engine == null) return;
+  Found found = null; List<Row> rows = null; int w = 0, h = 0;
+  foreach (int ms in new[] { 250, 800, 1600, 3000 }) {
+   int wait = (int)(at.AddMilliseconds(ms) - DateTime.UtcNow).TotalMilliseconds;
+   if (wait > 0) Thread.Sleep(wait);
+   if (Stale(serial)) return;
+   if (!Capture(target, out rows, out w, out h)) return;
+   found = Find(rows, text);
+   if (found != null) break;
+  }
+  if (found == null) { Emit(new { type = "pageLocateStatus", status = "art miss chars=" + text.Length }); return; }
+  ArtEmit(serial, text, found, rows, w, h, true);
+  int misses = 0;
+  for (int i = 0; i < 43 && !Stale(serial); i++) {
+   Thread.Sleep(700);
+   if (Stale(serial)) break;
+   List<Row> again; int w2, h2;
+   if (!Capture(target, out again, out w2, out h2)) break;
+   var f2 = Find(again, text);
+   if (f2 == null) { if (++misses >= 2) break; continue; }
+   misses = 0;
+  }
+  ArtEmit(serial, text, null, null, w, h, false);
+ }
+ void ArtEmit(int id, string text, Found f, List<Row> rows, int w, int h, bool visible) {
+  var parts = new List<object>();
+  if (f != null) for (int i = f.First; i <= f.Last; i++) { var b = rows[i].Box; string t = i - f.First < f.Parts.Count ? f.Parts[i - f.First] : rows[i].Text; parts.Add(new { text = t, x = b.Left, y = b.Top, w = b.Width, h = b.Height }); }
+  Emit(new { type = "artText", id = id, text = text, visible = visible, rows = parts, sw = w, sh = h, at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
  }
 
  void Report(Found f, List<Row> rows, string text, int w, int h) {
