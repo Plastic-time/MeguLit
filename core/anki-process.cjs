@@ -194,12 +194,15 @@ function ankiRunning(){if(ankiProcesses().length)return true;try{return /^"?(ank
 function ankiProcesses(){try{const out=require('node:child_process').execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',"Get-Process -ErrorAction SilentlyContinue|Where-Object{$_.Path -and ($_.ProcessName -match '^ankiw?$' -or $_.Path -match 'AnkiProgramFiles')}|ForEach-Object{$_.Id}"],{encoding:'utf8',windowsHide:true,timeout:15000});return out.split(/\r?\n/).map(Number).filter(n=>n>4);}catch{return [];}}
 // locate: the Anki program MeguLit can find (the configured path first). Without Anki2 that tells "never started"
 // from "not installed", which needs a different hint.
-async function installAnkiConnect(env=process.env,{locate=()=>find('',env)}={}){
+/* fresh: Anki was just installed and has not started yet (one-click install): the add-on goes in before its first start,
+   which loads it, instead of failing with ANKI_NEVER_STARTED */
+async function installAnkiConnect(env=process.env,{locate=()=>find('',env),fresh=false}={}){
  if(!env.APPDATA)throw Error('ANKI_ADDON_FOLDER_MISSING');
  const base=path.join(env.APPDATA,'Anki2','addons21'),target=path.join(base,ANKICONNECT_CODE);
  if(ankiConnectInstalled(env))return {installed:true,already:true};
- if(!fs.existsSync(path.join(env.APPDATA,'Anki2')))throw Error(locate()?'ANKI_NEVER_STARTED':'ANKI_NOT_INSTALLED');
- if(ankiRunning())throw Error('ANKI_RUNNING');
+ let created=false;if(!fs.existsSync(path.join(env.APPDATA,'Anki2'))){if(!locate())throw Error('ANKI_NOT_INSTALLED');if(!fresh)throw Error('ANKI_NEVER_STARTED');fs.mkdirSync(base,{recursive:true});created=true;}
+ /* a folder made just now is not in use by any running Anki */
+ if(!created&&ankiRunning())throw Error('ANKI_RUNNING');
  const response=await fetch('https://ankiweb.net/shared/download/'+ANKICONNECT_CODE+'?v=2.1&p=250900',{redirect:'follow',signal:AbortSignal.timeout(60000),headers:{'User-Agent':'MeguLit'}});
  if(!response.ok)throw Error('ANKICONNECT_DOWNLOAD_FAILED: HTTP '+response.status);
  const bytes=Buffer.from(await response.arrayBuffer());if(bytes.length<4096||bytes.length>5<<20||bytes.readUInt32LE(0)!==0x04034b50)throw Error('ANKICONNECT_DOWNLOAD_FAILED: not an add-on package');

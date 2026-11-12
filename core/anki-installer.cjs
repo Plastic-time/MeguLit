@@ -32,15 +32,15 @@ async function download(root,fetcher){
 function runInstaller(root,file){return new Promise((resolve,reject)=>{const child=spawn(path.join(process.env.SystemRoot||'C:\\Windows','System32','msiexec.exe'),['/i',file,'/passive','/norestart'],{windowsHide:false,stdio:'ignore'});
  child.on('error',reject);child.on('exit',code=>{log(root,'msiexec exit '+code);if(code===0||code===3010)resolve();else reject(Error(code===1602||code===1223?'ANKI_INSTALL_CANCELLED':'ANKI_INSTALL_FAILED '+code));});});}
 /* start(root,{runtime,fetcher}) begins (or joins) the job: download, install, AnkiConnect, start and connect */
-function start(root,{runtime=null,fetcher=fetch,find=()=>require('./anki-process.cjs').find('',process.env)}={}){
+function start(root,{runtime=null,fetcher=fetch,find=()=>require('./anki-process.cjs').find('',process.env),install=runInstaller,china=inChina()}={}){
  if(job)return status();
  state={phase:'downloading',received:0,total:PACKAGE.size,error:''};
  job=(async()=>{try{
-   if(!find()){const file=await download(root,fetcher);state.phase='installing';await runInstaller(root,file);}
+   if(!find()){const file=await download(root,fetcher);state.phase='installing';await install(root,file);}
    state.phase='connecting';
    if(!find())throw Error('ANKI_EXECUTABLE_MISSING');
-   await require('./anki-process.cjs').installAnkiConnect(process.env,{locate:find}).catch(e=>log(root,'ankiconnect '+e.message));
-   if(inChina()){process.env.UV_DEFAULT_INDEX??='https://pypi.tuna.tsinghua.edu.cn/simple';process.env.UV_INDEX_URL??='https://pypi.tuna.tsinghua.edu.cn/simple';}
+   await require('./anki-process.cjs').installAnkiConnect(process.env,{locate:find,fresh:true}).then(r=>log(root,'ankiconnect '+(r.already?'already there':'installed'))).catch(e=>log(root,'ankiconnect '+e.message));
+   if(china){process.env.UV_DEFAULT_INDEX??='https://pypi.tuna.tsinghua.edu.cn/simple';process.env.UV_INDEX_URL??='https://pypi.tuna.tsinghua.edu.cn/simple';}
    if(runtime?.ankiProcess)await runtime.ankiProcess().start({hide:false}).catch(e=>log(root,'start '+e.message));
    state.phase='done';log(root,'done');
   }catch(e){state.phase='error';state.error=String(e.message||e).slice(0,120);log(root,'error '+state.error);}finally{job=null;}})();
