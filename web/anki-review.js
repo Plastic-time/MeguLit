@@ -32,11 +32,23 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
  let mix={};
  try{mix=JSON.parse(localStorage.getItem(mixKey))||{};}catch{}
  mix=Object.fromEntries(mixChannels.map(key=>[key,Number.isFinite(mix[key])?Math.min(100,Math.max(0,Math.round(mix[key]))):100]));
+ /* (user 2026-11-12) what plays by itself after turning a card and on the next one; per viewer in localStorage */
+ let auto={flip:'off',next:'off'};try{const a=JSON.parse(localStorage.getItem(autoKey))||{};for(const k of ['flip','next'])if(autoModes.includes(a[k]))auto[k]=a[k];}catch{}
+ function mountAutoplay(toolbar){
+  const L=autoLabels[locale]||autoLabels.zh,box=document.createElement('details');box.className='anki-mixer anki-autoplay';
+  const group=(key,label)=>'<fieldset><legend>'+label+'</legend><div class="anki-seg" role="radiogroup">'+autoModes.map((m,i)=>'<button type="button" role="radio" data-auto="'+key+'" data-mode="'+m+'" aria-checked="'+(auto[key]===m)+'">'+L[3][i]+'</button>').join('')+'</div></fieldset>';
+  box.innerHTML='<summary>'+L[0]+'</summary><div class="anki-mixer-controls">'+group('flip',L[1])+group('next',L[2])+'<small>'+L[4]+'</small></div>';
+  toolbar.prepend(box);
+  box.addEventListener('click',event=>{const b=event.target.closest('[data-auto]');if(!b)return;auto[b.dataset.auto]=b.dataset.mode;box.querySelectorAll('[data-auto="'+b.dataset.auto+'"]').forEach(x=>x.setAttribute('aria-checked',String(x===b)));try{localStorage.setItem(autoKey,JSON.stringify(auto));}catch{}});
+  box.addEventListener('keydown',event=>{if(event.key==='Escape'){box.open=false;box.querySelector('summary').focus();}});
+  box.addEventListener('toggle',()=>{if(box.open)toolbar.querySelectorAll('details[open]').forEach(d=>{if(d!==box)d.open=false;});});
+ }
  function mountMixer(){
   const toolbar=target.querySelector('.anki-toolbar'),labels=mixLabels[locale];
   const mixer=document.createElement('details');mixer.className='anki-mixer';
   mixer.innerHTML='<summary>'+labels[0]+'</summary><div class="anki-mixer-controls">'+mixChannels.map((key,i)=>'<label><span>'+labels[i+1]+'</span><input type="range" min="0" max="100" step="1" data-mix="'+key+'" value="'+mix[key]+'"><output>'+mix[key]+'%</output></label>').join('')+'<small>'+labels[5]+'</small></div>';
-  toolbar.prepend(mixer);
+  toolbar.prepend(mixer);try{mountAutoplay(toolbar);}catch{}
+  mixer.addEventListener('toggle',()=>{if(mixer.open)toolbar.querySelectorAll('details[open]').forEach(d=>{if(d!==mixer)d.open=false;});});
   mixer.addEventListener('input',event=>{
    const input=event.target,key=input.dataset.mix;if(!key)return;
    mix[key]=Number(input.value);input.nextElementSibling.value=input.value+'%';
@@ -71,7 +83,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
  function frame(card){
   const iframe=document.createElement('iframe'),nonce=crypto.randomUUID();iframe.className='anki-card-frame';iframe.title=text.ankiReview;iframe.sandbox='allow-scripts';iframe.allow='autoplay';iframe.referrerPolicy='no-referrer';
   iframe.src='anki-card.html#'+nonce;iframe.dataset.nonce=nonce;
-  const play=card.when?auto[card.when]:'off';iframe.onload=()=>{if(isCurrent()&&currentFrame===iframe)iframe.contentWindow.postMessage({type:'tome-anki-card',nonce,html:card.html,fit,copy,mix,auto:play},'*');};return iframe;
+  const play=card.when&&typeof auto==='object'?auto[card.when]||'off':'off';iframe.onload=()=>{if(isCurrent()&&currentFrame===iframe)iframe.contentWindow.postMessage({type:'tome-anki-card',nonce,html:card.html,fit,copy,mix,auto:play},'*');};return iframe;
  }
  const messages=event=>{if(!isCurrent()){window.removeEventListener('message',messages);return;}if(currentFrame&&event.source===currentFrame.contentWindow&&event.data?.nonce===currentFrame.dataset.nonce&&event.data.type==='tome-anki-replay')replay(currentCard,target.querySelector('[data-replay]'));};
  window.addEventListener('message',messages);
