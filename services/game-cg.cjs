@@ -8,7 +8,7 @@
    Yuzusoft) or as the bare name. Saved as UTF-16 text, its simple bit-swap obfuscation (mode 1) or zlib (mode 2). The
    images are loose files or entries of plain (or cx-filtered) .xp3 archives; only browser-readable formats are used. */
 const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib'),crypto=require('node:crypto');
-const IMG=/\.(?:png|jpe?g|webp|bmp)$/i;
+const IMG=/\.(?:png|jpe?g|webp|bmp|tlg)$/i;
 const CGISH=/(?:^|[\\/_])(?:ev|cg|event|evcg|ecg)[\w-]*|^e\d/i;
 
 function ksdText(buf){
@@ -34,16 +34,54 @@ function tokens(text){const set=new Set();
 function looseImages(dir,depth=3,out=[]){let list;try{list=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
  for(const e of list){const p=path.join(dir,e.name);if(e.isDirectory()){if(depth>0&&!/^(?:save|savedata|movie|bgm|voice|sound|se)$/i.test(e.name)&&!/全cg/i.test(e.name))looseImages(p,depth-1,out);}else if(IMG.test(e.name))out.push(p);}return out;}
 
+/* KiriKiri Z binary saves and data ("KBAD100"): MessagePack with little-endian counts and UTF-16 strings whose
+   lengths count code units; 0xC1 is TJS void. */
+function kbad(buf){
+ if(buf.length<8||buf.toString('latin1',0,7)!=='KBAD100')return undefined;let p=8;
+ const str=n=>{const s=buf.toString('utf16le',p,p+n*2);p+=n*2;return s;};
+ function v(){if(p>=buf.length)throw Error('EOF');const t=buf[p++];
+  if(t<0x80)return t;if(t>=0xe0)return t-256;
+  if(t>=0x80&&t<=0x8f)return map(t&15);if(t>=0x90&&t<=0x9f)return arr(t&15);if(t>=0xa0&&t<=0xbf)return str(t&31);
+  switch(t){case 0xc0:case 0xc1:return null;case 0xc2:return false;case 0xc3:return true;
+   case 0xc4:case 0xd9:{const n=buf[p];p+=1;return str(n);}case 0xc5:case 0xda:{const n=buf.readUInt16LE(p);p+=2;return str(n);}case 0xc6:case 0xdb:{const n=buf.readUInt32LE(p);p+=4;return str(n);}
+   case 0xca:p+=4;return buf.readFloatLE(p-4);case 0xcb:p+=8;return buf.readDoubleLE(p-8);
+   case 0xcc:return buf[p++];case 0xcd:p+=2;return buf.readUInt16LE(p-2);case 0xce:p+=4;return buf.readUInt32LE(p-4);case 0xcf:p+=8;return Number(buf.readBigUInt64LE(p-8));
+   case 0xd0:return buf.readInt8(p++);case 0xd1:p+=2;return buf.readInt16LE(p-2);case 0xd2:p+=4;return buf.readInt32LE(p-4);case 0xd3:p+=8;return Number(buf.readBigInt64LE(p-8));
+   case 0xdc:{const n=buf.readUInt16LE(p);p+=2;return arr(n);}case 0xdd:{const n=buf.readUInt32LE(p);p+=4;return arr(n);}
+   case 0xde:{const n=buf.readUInt16LE(p);p+=2;return map(n);}case 0xdf:{const n=buf.readUInt32LE(p);p+=4;return map(n);}
+   case 0xc7:{const n=buf[p];p+=2+n;return {ext:true};}case 0xc8:{const n=buf.readUInt16LE(p);p+=3+n;return {ext:true};}case 0xc9:{const n=buf.readUInt32LE(p);p+=5+n;return {ext:true};}
+  }
+  throw Error('TAG_'+t.toString(16)+'@'+(p-1));}
+ function arr(n){const a=[];for(let i=0;i<n;i++)a.push(v());return a;}
+ function map(n){const m={};for(let i=0;i<n;i++){const k=v();m[k]=v();}return m;}
+ const out=v();return {value:out,end:p,len:buf.length};}
+const kbadValue=buf=>{try{return kbad(buf)?.value;}catch{return undefined;}};
+function kirikiriSeen(buf){
+ const v=kbadValue(buf);
+ if(v&&typeof v==='object'){const out=new Set();for(const k of Object.keys(v)){const m=/^cg_(.+)$/i.exec(k);if(m)out.add(base(m[1]));}return out;}
+ return tokens(ksdText(buf));}
+/* xp3 archives next to the exe and one folder down (女王蜂の王房: arc\*.xp3) */
+function xp3Archives(dir){const out=[];const add=d=>{try{for(const f of fs.readdirSync(d))if(/\.xp3$/i.test(f))out.push(path.join(d,f));}catch{}};add(dir);
+ try{for(const e of fs.readdirSync(dir,{withFileTypes:true}))if(e.isDirectory()&&!/^(?:save|savedata|movie|bgm|voice|sound|se|plugin)$/i.test(e.name)&&!/全cg/i.test(e.name))add(path.join(dir,e.name));}catch{}
+ return out;}
+const PLAIN=/^(?:\x89PNG|\xff\xd8\xff|BM|TLG[056]\.0|RIFF|KBAD|TJS2|\xff\xfe|\xef\xbb\xbf|[\t\r\n\x20-\x7e]{12})/;
+/* an archive whose entries carry the "encrypted" flag but whose bytes are plain (some KiriKiri 2 releases): the first
+   few flagged pictures, scripts or tables must all start like what they are */
+function plainDespiteFlag(xp3,file,list){const probe=list.filter(e=>e.encrypted&&/\.(?:png|jpe?g|tlg|bmp|tjs|ks|csv)$/i.test(e.name)).slice(0,3);if(!probe.length)return false;
+ try{return probe.every(e=>PLAIN.test(xp3.read(file,e,null).toString('latin1',0,12)));}catch{return false;}}
 function kirikiri(dir){
  const saves=kirikiriSaves(dir);if(!saves.length)return null;
- const seen=new Set();for(const f of saves){try{for(const t of tokens(ksdText(fs.readFileSync(f))))seen.add(t);}catch{}}
- const items=new Map();
- for(const p of looseImages(dir)){const rel=path.relative(dir,p);if(!CGISH.test(rel))continue;const b=base(p);if(seen.has(b)&&!items.has(b))items.set(b,{name:b,file:p});}
- const xp3=require('./original-engines/xp3.cjs');let archives=[];try{archives=fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f));}catch{}
- for(const a of archives){const file=path.join(dir,a);let list;try{list=xp3.list(file)?.files||[];}catch{continue;}
-  let cx;const flagged=list.some(e=>e.encrypted);if(flagged){try{cx=require('./original-engines/cx-filter.cjs').forArchive(file);}catch{}if(!cx)continue;}
-  for(const e of list){if(!IMG.test(e.name))continue;const b=base(e.name);if(!seen.has(b)||items.has(b))continue;if(!CGISH.test(a+'/'+e.name))continue;items.set(b,{name:b,archive:file,entry:e,cx});}}
- return {engine:'KiriKiri',supported:true,items};
+ const seen=new Set();for(const f of saves){try{for(const t of kirikiriSeen(fs.readFileSync(f)))seen.add(t);}catch{}}
+ const items=new Map(),add=(b,item)=>{if(!items.has(b))items.set(b,{...item,decode:/\.tlg$/i.test(item.file||item.entry.name)?'tlg':undefined});};
+ for(const p of looseImages(dir)){const rel=path.relative(dir,p);if(!CGISH.test(rel))continue;const b=base(p);if(seen.has(b))add(b,{name:b,file:p});}
+ const xp3=require('./original-engines/xp3.cjs'),gallery=new Set();
+ for(const file of xp3Archives(dir)){let list;try{list=xp3.list(file)?.files||[];}catch{continue;}const a=path.basename(file);
+  let cx=null;if(list.some(e=>e.encrypted)){try{cx=require('./original-engines/cx-filter.cjs').forArchive(file);}catch{}if(!cx&&!plainDespiteFlag(xp3,file,list))continue;}
+  for(const e of list){
+   if(/cg/i.test(e.name)&&/\.(?:tjs|csv)$/i.test(e.name)&&(e.size||0)<1<<20){try{const v=kbadValue(xp3.read(file,e,cx));if(Array.isArray(v))for(const x of v)for(const ev of (x&&Array.isArray(x.events)?x.events:[]))if(typeof ev==='string')gallery.add(base(ev));}catch{}}
+   if(!IMG.test(e.name))continue;const b=base(e.name);if(!seen.has(b)||items.has(b))continue;if(!CGISH.test(a+'/'+e.name))continue;add(b,{name:b,archive:file,entry:e,cx});}}
+ if(gallery.size)for(const k of [...items.keys()])if(!gallery.has(k))items.delete(k);
+ return {engine:'KiriKiri',supported:true,items,total:gallery.size};
 }
 
 /* ---- HuneX (魔法使いの夜 Steam): the global save <Title>.gdb is "SDC FORMAT 1.00": u32 seed, u32 packed size, u32 size,
@@ -73,7 +111,8 @@ function hunex(dir,exe){
  const saves=hunexSaves(dir);if(!saves.length)return null;let hfa=[];try{hfa=fs.readdirSync(dir).filter(f=>/\.hfa$/i.test(f)).sort();}catch{}if(!hfa.length)return null;
  const seen=new Set();let ok=false;for(const f of saves){try{const raw=sdcUnpack(fs.readFileSync(f));if(raw){ok=true;for(const n of mzpNameSets(raw))seen.add(n);}}catch{}}
  if(!ok)return null;
- const gallery=hunexGallery(exe),{hfaList}=require('./original-engines/hunex.cjs'),items=new Map();
+ let gallery=hunexGallery(exe);if(!gallery){let l=[];try{l=fs.readdirSync(dir).filter(f=>/\.exe$/i.test(f));}catch{}for(const f of l){gallery=hunexGallery(path.join(dir,f));if(gallery)break;}}
+ const {hfaList}=require('./original-engines/hunex.cjs'),items=new Map();
  for(const a of hfa){const file=path.join(dir,a);let list;try{list=hfaList(file)||[];}catch{continue;}
   for(const e of list){if(!/\.mzp$/i.test(e.name))continue;const b=base(e.name);if(!seen.has(b)||items.has(b)||(gallery&&!gallery.has(b)))continue;items.set(b,{name:b,archive:file,entry:e,decode:'mzp'});}}
  return {engine:'HuneX',supported:true,items,total:gallery?gallery.size:0};
@@ -182,4 +221,4 @@ function image(root,executable,name){
  try{fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,it.name+{'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp','image/bmp':'.bmp'}[mime]),buf);}catch{}
  return {mime,data:buf.toString('base64')};
 }
-module.exports={list,image,scan,ksdText,tokens,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};
+module.exports={list,image,scan,ksdText,tokens,kbad,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};
