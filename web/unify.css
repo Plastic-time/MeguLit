@@ -925,7 +925,7 @@ html:not(#u):not(#v):not(#w) body #learning-content .moji-account .text-button{h
    dated ledger; no boxes, no callout frame ---- */
 html:not(#u):not(#v):not(#w) body dialog.game-dialog.dev-notice[open]{width:min(1040px,94vw)!important;height:auto!important;max-height:calc(100vh - var(--titlebar-height,56px) - 40px)!important;padding:40px 48px 34px!important;overflow-y:auto!important}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]:not([hidden]){display:grid!important;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);column-gap:56px;
- grid-template-areas:"top top" "title text" "title form" "sub status" "succ upd" "succ note" "succ more" "succ act";align-items:start}
+ grid-template-areas:"top top" "title text" "title form" "sub rule" "sub status" "succ upd" "succ note" "succ more" "succ act";align-items:start}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-top{grid-area:top;margin-bottom:22px}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>h2:not(.dev-notice-title2){grid-area:title;margin:0!important;font-size:clamp(40px,4vw,58px)!important;line-height:1.08!important;letter-spacing:.01em}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-title2{grid-area:sub;margin:14px 0 0!important;font-size:17px!important;font-weight:400!important;line-height:1.7;color:var(--g-t2,#c3ab9c)!important}
@@ -949,7 +949,7 @@ html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-ac
 html:not(#u):not(#v):not(#w) body .dev-notice-form>input{border:0!important;border-bottom:1px solid color-mix(in srgb,var(--g-gold) 55%,transparent)!important;background:transparent!important;border-radius:0!important;box-shadow:none!important;font-size:16px!important;padding-left:2px!important}
 html:not(#u):not(#v):not(#w) body .dev-notice-form>input:focus{border-bottom-color:var(--g-gold)!important}
 html:not(#u):not(#v):not(#w) body dialog.game-dialog.dev-notice{background:linear-gradient(160deg,rgba(26,20,24,.97),rgba(13,11,14,.97))!important}
-@media (max-width:900px){html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]:not([hidden]){grid-template-columns:1fr;grid-template-areas:"top" "title" "sub" "text" "form" "status" "succ" "upd" "note" "more" "act"}}
+@media (max-width:900px){html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]:not([hidden]){grid-template-columns:1fr;grid-template-areas:"top" "title" "sub" "text" "form" "rule" "status" "succ" "upd" "note" "more" "act"}}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.guide-success li{display:block!important;position:relative;padding-left:44px!important}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.guide-success li::before{position:absolute;left:0;top:12px}
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>h2:not(.dev-notice-title2){word-break:keep-all}
@@ -1670,3 +1670,5 @@ html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer .lv-note{m
 @media (prefers-reduced-motion:reduce){html body .lv-dialog.lg-dialog .lg-goal{transition:none}html body .lv-dialog.lg-dialog .lg-goal:hover{transform:none}}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:focus-within{outline:none!important}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:has(input:focus-visible){outline:1px dashed rgba(var(--gc),.55)!important;outline-offset:4px}
+/* the game-name rule (1.4.4) sits right under the name field, in the field's column */
+html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-rule{grid-area:rule;margin:10px 0 0!important}
