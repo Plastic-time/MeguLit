@@ -310,7 +310,10 @@ async function report(db,{root=null,scriptPairs=null,tokenize=null,deadline}={})
   /* E459: examples only change when lines were checked or recorded; the page polls while lines are pending */
   const stamp=candidateStamp(db,root)+':'+db.prepare('SELECT COUNT(*) n FROM grammar_lines').get().n,key=String(root)+'|'+(scriptPairs?1:0);
   let cached=reportCache.get(key);if(!cached||cached.stamp!==stamp){const breathe=require('./cooperative.cjs').breather();await breathe();const ex=examples(db,list);await breathe();const lx=await levelExamplesAsync(list,await levels(),{tokenize:tk,db,deadline:deadline||Date.now()+8000});cached={stamp,ex,lx};if(!lx.pending)reportCache.set(key,cached);}
-  const {ex,lx}=cached,prog=progress(db),sc=await scenes(db,list,tk);
+  /* E460 (user: an all-ages switch) with 全年龄例句 on (the default) explicit lines never appear as examples */
+  let safe=true;try{safe=!root||require('./store.cjs').readJSON(require('node:path').join(root,'data','config','native-preferences.json')).safe_examples!==false;}catch{}
+  const clean=o=>safe?Object.fromEntries(Object.entries(o).map(([k,v])=>[k,Array.isArray(v)?Object.assign(v.filter(e=>!isExplicit(e?.text)),v.total!==undefined?{total:v.total}:{}):v])):o;
+  const {ex:ex0,lx:lx0}=cached,ex=clean(ex0),lx=clean(lx0),prog=progress(db),sc0=await scenes(db,list,tk),sc=safe&&Array.isArray(sc0)?sc0.filter(x=>!isExplicit(x?.ja??x?.text)):sc0;
   return {scenes:sc,level:'N5',points:POINTS,examples:{...ex,...lx},progress:prog,completion:completion(prog),pending:state.pending||!!cached.lx.pending,lines:{history:list.filter(c=>c.origin==='history').length,script:list.filter(c=>c.origin==='script').length},real:Object.values({...ex,...lx}).reduce((n,l)=>n+l.length,0)};
 }
 /* An Anki note for a grammar line, through the existing card flow (one note per point and line). */
