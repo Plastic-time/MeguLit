@@ -7,14 +7,14 @@ const lb=require('./leaderboard.cjs');
 const TAGS=['question','hook','guide','share','other'];
 const ID=/^[0-9a-f]{16}$/,AVATAR=/^[0-9a-f]{32}$/,PID=/^[0-9a-f]{16}$/,PIC=/^[0-9a-f]{32}$/;
 const fs=require('node:fs'),path=require('node:path');
-const pics=v=>Array.isArray(v)?[...new Set(v.filter(x=>PIC.test(String(x))))].slice(0,4):[];
+const pics=v=>Array.isArray(v)?[...new Set(v.filter(x=>PIC.test(String(x))))].slice(0,16):[];
 const str=(v,n)=>String(v??'').slice(0,n);
 const int=v=>Math.max(0,Math.min(Number.MAX_SAFE_INTEGER,Math.round(Number(v)||0)));
 const person=a=>({name:str(a?.name,32)||'?',avatar:AVATAR.test(String(a?.avatar||''))?a.avatar:null,pid:PID.test(String(a?.pid||''))?a.pid:null,mine:a?.mine===true});
 const signedIn=(root,options={})=>!!lb.identity(root,options);
 function cleanPost(p,full=false){
  if(!p||!ID.test(String(p.id||'')))return null;
- return {id:p.id,title:str(p.title,60),...(full?{body:str(p.body,4000),images:pics(p.images)}:{excerpt:str(p.excerpt,130),pictures:Math.min(4,int(p.pictures))}),tag:TAGS.includes(p.tag)?p.tag:'other',game:str(p.game,120),engine:str(p.engine,24),replies:int(p.replies),created:int(p.created),active:int(p.active),author:person(p.author)};
+ return {id:p.id,title:str(p.title,60),...(full?{body:str(p.body,4000),images:pics(p.images)}:{excerpt:str(p.excerpt,130),pictures:Math.min(16,int(p.pictures))}),tag:TAGS.includes(p.tag)?p.tag:'other',game:str(p.game,120),engine:str(p.engine,24),replies:int(p.replies),created:int(p.created),active:int(p.active),author:person(p.author)};
 }
 async function images(root,people,options){const ids=people.map(p=>p?.avatar).filter(Boolean);return ids.length?await lb.avatarImages(root,ids,options).catch(()=>({})):{};}
 
@@ -61,7 +61,7 @@ async function uploadImage(root,data,options={}){
 const PICTURE_CACHE=300;
 async function pictures(root,ids,options={}){
  const c=lb.config(root,options.env,options),out={},dir=path.join(root,'data','cache','forum-images');if(!c.configured)return out;
- const wanted=[...new Set(ids.filter(id=>PIC.test(String(id||''))))].slice(0,120),missing=[];
+ const wanted=[...new Set(ids.filter(id=>PIC.test(String(id||''))))].slice(0,400),missing=[];
  for(const id of wanted){try{out[id]='data:image/webp;base64,'+fs.readFileSync(path.join(dir,id+'.webp')).toString('base64');}catch{missing.push(id);}}
  for(let i=0;i<missing.length;i+=6)await Promise.all(missing.slice(i,i+6).map(async id=>{const res=await lb.relayCall(c.base+'/api/forum/images/'+id,{method:'GET'},options.fetch||fetch,null,true);
   if(res.state!=='ok'||res.bytes.length>700*1024||res.bytes.toString('latin1',8,12)!=='WEBP')return;out[id]='data:image/webp;base64,'+res.bytes.toString('base64');

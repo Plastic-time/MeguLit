@@ -10,7 +10,7 @@
    ctx carries the worker helpers (json, fail, readJSON, hit, sha256, authenticate, avatarsFor). */
 import {BLOCKED,NAME_ONLY,gameKey} from './validate.js';
 
-export const FORUM={title:[2,60],body:[1,4000],reply:[1,2000],engine:24,game:120,page:20,replies:200,images:4,imageBytes:700*1024,imageSide:4096};
+export const FORUM={title:[2,60],body:[1,4000],reply:[1,2000],engine:24,game:120,page:20,replies:200,images:16,imageBytes:700*1024,imageSide:4096};
 export const TAGS=['question','hook','guide','share','other'];
 export const FORUM_MODEL='@cf/qwen/qwen3-30b-a3b-fp8';
 const ID=/^[0-9a-f]{16}$/,IMG=/^[0-9a-f]{32}$/;
@@ -53,7 +53,7 @@ export function validateReply(body){
 /* 2026-11-12 (user: upload, paste or drop pictures into a post). The app encodes a WebP; the relay checks it with the
    vision model when it arrives and stores it in R2 only on a clean SAFE (no model, no picture). It belongs to its
    uploader until a post or reply names it; a cron removes the ones never used within a day and those of deleted posts. */
-/* the list a post names: at most four distinct picture ids, or null when malformed */
+/* the list a post names: at most sixteen distinct picture ids, or null when malformed */
 export function imageList(v){if(v===undefined||v===null)return [];if(!Array.isArray(v)||v.length>FORUM.images)return null;const out=[...new Set(v)];return out.every(x=>typeof x==='string'&&IMG.test(x))?out:null;}
 /* WebP only; width and height from the VP8 / VP8L / VP8X header */
 export function webpSize(b){
