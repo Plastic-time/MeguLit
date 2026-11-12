@@ -69,19 +69,25 @@ const PLAIN=/^(?:\x89PNG|\xff\xd8\xff|BM|TLG[056]\.0|RIFF|KBAD|TJS2|\xff\xfe|\xe
    few flagged pictures, scripts or tables must all start like what they are */
 function plainDespiteFlag(xp3,file,list){const probe=list.filter(e=>e.encrypted&&/\.(?:png|jpe?g|tlg|bmp|tjs|ks|csv)$/i.test(e.name)).slice(0,3);if(!probe.length)return false;
  try{return probe.every(e=>PLAIN.test(xp3.read(file,e,null).toString('latin1',0,12)));}catch{return false;}}
+/* pictures the game itself read for MeguLit (voice-cold.cjs 'kirikiri-cg', the capture DLL): <capture>\cg */
+function kirikiriCapture(dir){try{const d=path.join(require('./original-engines/scenes.cjs').ENGINES['kirikiri-dump'].captureDir(dir),'cg');return fs.existsSync(d)?[d]:[];}catch{return [];}}
+const CGNAME=/^(?:ev|cg|e\d)/i;
 function kirikiri(dir){
  const saves=kirikiriSaves(dir);if(!saves.length)return null;
  const seen=new Set();for(const f of saves){try{for(const t of kirikiriSeen(fs.readFileSync(f)))seen.add(t);}catch{}}
  const items=new Map(),add=(b,item)=>{if(!items.has(b))items.set(b,{...item,decode:/\.tlg$/i.test(item.file||item.entry.name)?'tlg':undefined});};
  for(const p of looseImages(dir)){const rel=path.relative(dir,p);if(!CGISH.test(rel))continue;const b=base(p);if(seen.has(b))add(b,{name:b,file:p});}
- const xp3=require('./original-engines/xp3.cjs'),gallery=new Set();
+ for(const d of kirikiriCapture(dir))try{for(const f of fs.readdirSync(d))if(IMG.test(f)){const b=base(f);if(seen.has(b))add(b,{name:b,file:path.join(d,f)});}}catch{}
+ const xp3=require('./original-engines/xp3.cjs'),gallery=new Set();let closed=false;
  for(const file of xp3Archives(dir)){let list;try{list=xp3.list(file)?.files||[];}catch{continue;}const a=path.basename(file);
-  let cx=null;if(list.some(e=>e.encrypted)){try{cx=require('./original-engines/cx-filter.cjs').forArchive(file);}catch{}if(!cx&&!plainDespiteFlag(xp3,file,list))continue;}
+  let cx=null;if(list.some(e=>e.encrypted)){try{cx=require('./original-engines/cx-filter.cjs').forArchive(file);}catch{}if(!cx&&!plainDespiteFlag(xp3,file,list)){closed=true;continue;}}
   for(const e of list){
    if(/cg/i.test(e.name)&&/\.(?:tjs|csv)$/i.test(e.name)&&(e.size||0)<1<<20){try{const v=kbadValue(xp3.read(file,e,cx));if(Array.isArray(v))for(const x of v)for(const ev of (x&&Array.isArray(x.events)?x.events:[]))if(typeof ev==='string')gallery.add(base(ev));}catch{}}
    if(!IMG.test(e.name))continue;const b=base(e.name);if(!seen.has(b)||items.has(b))continue;if(!CGISH.test(a+'/'+e.name))continue;add(b,{name:b,archive:file,entry:e,cx});}}
  if(gallery.size)for(const k of [...items.keys()])if(!gallery.has(k))items.delete(k);
- return {engine:'KiriKiri',supported:true,items,total:gallery.size};
+ /* seen CGs no archive MeguLit can open holds: the game reads them itself (list() hands them to the cold run) */
+ const wanted=closed?[...seen].filter(b=>!items.has(b)&&(gallery.size?gallery.has(b):CGNAME.test(b))):[];
+ return {engine:'KiriKiri',supported:true,items,total:gallery.size,wanted};
 }
 
 /* ---- HuneX (魔法使いの夜 Steam): the global save <Title>.gdb is "SDC FORMAT 1.00": u32 seed, u32 packed size, u32 size,
@@ -192,7 +198,7 @@ function yuris(dir){
  return {engine:'YU-RIS',supported:true,items,total:names.size};
 }
 
-const READERS=[{read:kirikiri,saves:kirikiriSaves},{read:hunex,saves:hunexSaves},{read:siglus,saves:siglusSaves},{read:yuris,saves:yurisSaves}];
+const READERS=[{read:kirikiri,saves:dir=>[...kirikiriSaves(dir),...kirikiriCapture(dir)]},{read:hunex,saves:hunexSaves},{read:siglus,saves:siglusSaves},{read:yuris,saves:yurisSaves}];
 const cache=new Map();
 function stamp(dir){let s='';for(const r of READERS)for(const f of r.saves(dir)){try{s+=f+fs.statSync(f).mtimeMs;}catch{}}return s;}
 function scan(executable){
@@ -201,7 +207,15 @@ function scan(executable){
  let result={supported:false,items:new Map()};for(const r of READERS){try{const got=r.read(dir,String(executable));if(got){result=got;break;}}catch{}}
  cache.set(key,{stamp:st,result});return result;
 }
-function list(executable){const r=scan(executable);return {supported:!!r.supported,engine:r.engine||'',total:r.total||0,items:[...r.items.keys()]};}
+const cacheDirOf=(root,executable)=>path.join(root,'data','cg-cache',crypto.createHash('sha1').update(path.dirname(String(executable)).toLowerCase()).digest('hex').slice(0,16));
+/* opts: root; cold (the cold-run setting: the game may be started in the background to read CGs only it can open);
+   safe (the R18 filter: only CGs the local rating model called safe, the rest rated in the background, cg-rating.cjs) */
+function list(executable,opts={}){
+ const r=scan(executable),{root}=opts;let items=[...r.items.keys()],pending=0;
+ if(root&&opts.cold&&r.wanted?.length){try{const dir=path.dirname(String(executable));require('./voice-cold.cjs').consider(root,{executable:String(executable),dir,engine:'kirikiri-cg'},r.wanted,{enabled:true});}catch{}}
+ if(root&&opts.safe&&items.length){const rating=require('./cg-rating.cjs'),cacheDir=cacheDirOf(root,executable),known=rating.ratings(cacheDir),todo=items.filter(n=>!known[n]);
+  pending=todo.length;if(todo.length)rating.rateLater(root,cacheDir,todo,name=>pictureFile(root,executable,name));items=items.filter(n=>rating.isSafe(known[n]));}
+ return {supported:!!r.supported,engine:r.engine||'',total:r.total||0,items,pending};}
 function mimeOf(b){if(b.length<12)return null;if(b[0]===0x89&&b.toString('latin1',1,4)==='PNG')return 'image/png';if(b[0]===0xff&&b[1]===0xd8)return 'image/jpeg';
  if(b.toString('latin1',0,4)==='RIFF'&&b.toString('latin1',8,12)==='WEBP')return 'image/webp';if(b[0]===0x42&&b[1]===0x4d)return 'image/bmp';return null;}
 /* the raw bytes of an item, engine formats decoded to PNG */
@@ -213,13 +227,16 @@ function bytesOf(it){
  else buf=require('./original-engines/xp3.cjs').read(it.archive,it.entry,it.cx||null);
  if(it.decode&&dec[it.decode])return dec.png(dec.fit(dec[it.decode](buf)));
  return buf;}
-function image(root,executable,name){
+const EXT={'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp','image/bmp':'.bmp'};
+/* the CG as a browser picture in the card back's cache (read and decoded once) */
+function pictureFile(root,executable,name){
  const r=scan(executable),it=r.items.get(String(name||'').toLowerCase());if(!it)throw Error('CG_NOT_FOUND');
- const dir=path.join(root,'data','cg-cache',crypto.createHash('sha1').update(path.dirname(executable).toLowerCase()).digest('hex').slice(0,16));
- for(const ext of ['.png','.jpg','.webp','.bmp']){const f=path.join(dir,it.name+ext);if(fs.existsSync(f)){const b=fs.readFileSync(f);return {mime:mimeOf(b),data:b.toString('base64')};}}
- const buf=bytesOf(it);
- const mime=mimeOf(buf);if(!mime||buf.length>24<<20)throw Error('CG_UNREADABLE');
- try{fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,it.name+{'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp','image/bmp':'.bmp'}[mime]),buf);}catch{}
- return {mime,data:buf.toString('base64')};
+ const dir=cacheDirOf(root,executable);
+ for(const ext of Object.values(EXT)){const f=path.join(dir,it.name+ext);if(fs.existsSync(f))return f;}
+ const buf=bytesOf(it),mime=mimeOf(buf);if(!mime||buf.length>24<<20)throw Error('CG_UNREADABLE');
+ const f=path.join(dir,it.name+EXT[mime]);fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(f,buf);return f;}
+function image(root,executable,name,opts={}){
+ if(opts.safe&&!require('./cg-rating.cjs').isSafe(require('./cg-rating.cjs').ratings(cacheDirOf(root,executable))[String(name||'').toLowerCase()]))throw Error('CG_HIDDEN');
+ const b=fs.readFileSync(pictureFile(root,executable,name));return {mime:mimeOf(b),data:b.toString('base64')};
 }
 module.exports={list,image,scan,ksdText,tokens,kbad,esSlots,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};

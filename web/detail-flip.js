@@ -2,6 +2,8 @@
 /* 2026-11-12 (user: the detail page's card turns over on a click, with a fine card-flip animation; the back shows a
    random CG this computer has already unlocked). The unlock state comes from the game's own saves (services/game-cg);
    a game whose saves cannot be read yet shows the card's own back: a crest with the title's first character.
+   With the R18 filter on (setting safe_cg) the list holds only CGs already rated safe; while others are still being
+   rated in the background (pending) the list is asked for again at each turn.
    The flip: the card lifts toward the viewer, turns on a slight diagonal, a light runs across the face at the edge-on
    moment, it overshoots and settles. It keeps turning the same way (0 -> 180 -> 360), so it reads as one card.
    A long press or a drag only plays with the card (the tilt); it never flips. */
@@ -14,7 +16,8 @@ export function flipCard(card,{api,id,esc,game,locale='zh'}){
  let angle=0,busy=null,list=null,last='',pressAt=0,pressXY=[0,0];
  const crest=()=>{art.className='dtv-back-art is-crest';art.innerHTML=`<i class="dtv-ring"></i><i class="dtv-ring is-inner"></i><b>${esc(glyph)}</b><span>MeguLit</span><small>${esc(game?.title||'')}</small>`;};
  crest();
- async function cgs(){if(list)return list;try{const r=await api('game_cgs',{id});list=Array.isArray(r?.items)?r.items:[];}catch{list=[];}return list;}
+ let pending=0;
+ async function cgs(){if(list&&!pending)return list;try{const r=await api('game_cgs',{id});list=Array.isArray(r?.items)?r.items:[];pending=Number(r?.pending)||0;}catch{list=list||[];pending=0;}return list;}
  /* a new random unlocked CG for this turn (never the same one twice in a row); decoded before the card turns */
  async function prepareBack(){
   const items=await cgs();if(!items.length){crest();return;}

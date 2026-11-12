@@ -389,9 +389,11 @@ void AskText(const std::wstring &name) {
 // E450 voices (user: example sentences must play the game's own voice): names in want.txt ending in an audio extension
 // are opened through the game's storage (its own archives and decryption, hashed names included) and the bytes saved as
 // they are to voice\ in the same folder. Many per message: a game has thousands of voice files.
-bool IsAudio(const wchar_t *name) { size_t n = wcslen(name); const wchar_t *e = n > 4 ? name + n - 4 : L""; return !_wcsicmp(e, L".ogg") || !_wcsicmp(e, L".wav") || !_wcsicmp(e, L".m4a") || (n > 5 && !_wcsicmp(name + n - 5, L".opus")); }
-std::wstring VoiceDir() { return std::wstring(Out) + L"voice\\"; }
-bool HaveAudio(const std::wstring &name) { return GetFileAttributesW((VoiceDir() + BaseOf(name.c_str())).c_str()) != INVALID_FILE_ATTRIBUTES; }
+// 2026-11-12 card back CGs: pictures (png, jpg, tlg, bmp, webp) go the same way, saved to cg\ (services/game-cg.cjs).
+bool IsPicture(const wchar_t *name) { size_t n = wcslen(name); const wchar_t *e = n > 4 ? name + n - 4 : L""; return !_wcsicmp(e, L".png") || !_wcsicmp(e, L".jpg") || !_wcsicmp(e, L".tlg") || !_wcsicmp(e, L".bmp") || (n > 5 && (!_wcsicmp(name + n - 5, L".webp") || !_wcsicmp(name + n - 5, L".jpeg"))); }
+bool IsAudio(const wchar_t *name) { size_t n = wcslen(name); const wchar_t *e = n > 4 ? name + n - 4 : L""; return !_wcsicmp(e, L".ogg") || !_wcsicmp(e, L".wav") || !_wcsicmp(e, L".m4a") || (n > 5 && !_wcsicmp(name + n - 5, L".opus")) || IsPicture(name); }
+std::wstring VoiceDir(const std::wstring &name) { return std::wstring(Out) + (IsPicture(name.c_str()) ? L"cg\\" : L"voice\\"); }
+bool HaveAudio(const std::wstring &name) { return GetFileAttributesW((VoiceDir(name) + BaseOf(name.c_str())).c_str()) != INVALID_FILE_ATTRIBUTES; }
 volatile LONG AudioAsked, AudioSaved;
 void AskAudio(const std::wstring &name) {
  if (HaveAudio(name)) return;
@@ -404,7 +406,7 @@ void AskAudio(const std::wstring &name) {
  TlsSetValue(Tls, NULL);
  if (!s) return;
  DWORD size = 0; char *data = ReadAll(s, &size);
- if (data && size > 12 && size <= (32u << 20)) { CreateDirectoryW(VoiceDir().c_str(), NULL); if (WriteWhole(VoiceDir() + BaseOf(name.c_str()), data, size)) InterlockedIncrement(&AudioSaved); }
+ if (data && size > 12 && size <= (32u << 20)) { CreateDirectoryW(VoiceDir(name).c_str(), NULL); if (WriteWhole(VoiceDir(name) + BaseOf(name.c_str()), data, size)) InterlockedIncrement(&AudioSaved); }
  free(data);
  ReleaseGuarded(s);
 }

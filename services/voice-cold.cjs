@@ -12,15 +12,22 @@ const fs=require('node:fs'),path=require('node:path'),{execFile}=require('node:c
 const nativeDir=()=>path.join(__dirname,'..','native');
 const dump=()=>require('./original-engines/scenes.cjs').ENGINES['kirikiri-dump'];
 const HOOKS={
- kirikiri:{engines:/^kirikiri/,helper:'ColdCapture',dll:'MeguLitScn',
+ kirikiri:{engines:/^kirikiri(?!-cg)/,helper:'ColdCapture',dll:'MeguLitScn',
   want:ref=>[ref+'.ogg',ref+'.opus'],
   wantFile:dir=>path.join(dump().captureDir(dir),'want.txt'),
   report:dir=>path.join(dump().captureDir(dir),'cold-done.txt'),
   outDir:dir=>path.join(dump().captureDir(dir),'voice')},
+ /* 2026-11-12 card back CGs (game-cg.cjs): pictures the game's save records as seen but MeguLit cannot open (an
+    archive only the game can decrypt) are read the same way and land in cg\ */
+ 'kirikiri-cg':{engines:/^kirikiri-cg$/,kind:'cg',helper:'ColdCapture',dll:'MeguLitScn',
+  want:ref=>[ref+'.png',ref+'.tlg',ref+'.jpg'],
+  wantFile:dir=>path.join(dump().captureDir(dir),'want.txt'),
+  report:dir=>path.join(dump().captureDir(dir),'cold-done.txt'),
+  outDir:dir=>path.join(dump().captureDir(dir),'cg')},
 };
 const hookFor=engine=>Object.values(HOOKS).find(h=>h.engines.test(String(engine||'')))||null;
 // Folders where a cold run left clips for a game folder (game-voice.cjs adds them to the catalog).
-function outDirs(dir){const out=[];for(const h of Object.values(HOOKS)){try{const d=h.outDir(dir);if(fs.existsSync(d))out.push(d);}catch{}}return out;}
+function outDirs(dir){const out=[];for(const h of Object.values(HOOKS)){if(h.kind)continue;try{const d=h.outDir(dir);if(fs.existsSync(d))out.push(d);}catch{}}return out;}
 const stateFile=root=>path.join(root,'data','voice-cache','cold.json');
 function readState(root){try{return JSON.parse(fs.readFileSync(stateFile(root),'utf8'))||{};}catch{return {};}}
 function writeState(root,key,value){const all=readState(root);all[key]={...value,at:Date.now()};try{fs.mkdirSync(path.dirname(stateFile(root)),{recursive:true});fs.writeFileSync(stateFile(root)+'.tmp',JSON.stringify(all,null,1));fs.renameSync(stateFile(root)+'.tmp',stateFile(root));}catch{}}
@@ -32,7 +39,7 @@ const secondsFor=n=>Math.min(1200,60+Math.ceil(n/40));
 function consider(root,game,missing,{enabled=true,force=false}={}){
  if(!enabled||!game?.executable||!missing?.length||process.platform!=='win32'&&!consider.anyPlatform)return false;
  const hook=hookFor(game.engine);if(!hook)return false;
- const key=String(path.resolve(game.dir)).toLowerCase(),prior=readState(root)[key];
+ const key=String(path.resolve(game.dir)).toLowerCase()+(hook.kind?'|'+hook.kind:''),prior=readState(root)[key];
  if(queue.some(j=>j.key===key))return true;
  if(prior&&!force&&prior.missing<=missing.length)return false;
  const bit=bitness(game.executable),helper=path.join(nativeDir(),hook.helper+bit+'.exe'),dll=path.join(nativeDir(),hook.dll+bit+'.dll');
