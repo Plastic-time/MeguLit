@@ -16,7 +16,9 @@ function templateSounds(template,fields){
  return {safe,names:sounds(rendered)};
 }
 function playMap(card,templates,html){
- const template=templates?.[typeof card.template==='string'?card.template:card.template?.name];if(!template)return new Map();
+ /* (user 2026-11-12: an example's play button failed in practice) cardsInfo gives no template name, only its ord: the
+    model's templates come back in that order */
+ const named=templates?.[typeof card.template==='string'?card.template:card.template?.name],template=named||(Number.isInteger(card.ord)&&templates?Object.values(templates)[card.ord]:null);if(!template)return new Map();
  const result=new Map();for(const[side,key]of [['q','Front'],['a','Back']]){
   const markers=[...html.matchAll(new RegExp('\\[anki:play:'+side+':(\\d+)\\]','g'))].map(m=>Number(m[1]));if(!markers.length)continue;
   const audio=templateSounds(template[key],card.fields||{});if(!audio.safe||audio.names.length!==Math.max(...markers)+1)continue;
