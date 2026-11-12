@@ -1,8 +1,9 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert'),fs=require('fs'),path=require('path'),os=require('os'),cp=require('child_process');
+/* the release build runs tests without git on PATH: the check needs git, so it is skipped there */
 /* Release.ps1 builds the package from the previous zip; files deleted from the repository must not be carried over,
    while files git never tracked (prebuilt native helpers) still are. */
-test('release package drops files deleted from the repository',{skip:process.platform!=='win32'},()=>{
+test('release package drops files deleted from the repository',{skip:process.platform!=='win32'||cp.spawnSync('git',['--version']).status!==0},()=>{
  const rel=fs.readFileSync(path.join(__dirname,'..','Release.ps1'),'utf8');
  const fn=rel.split(/\r?\n/).find(l=>l.startsWith('function Get-DroppedPaths'));
  assert.ok(fn,'Get-DroppedPaths is defined on one line');
