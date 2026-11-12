@@ -250,7 +250,9 @@ const kirikiriCx={
  sources:dir=>cxArchives(dir).flatMap(f=>{let c='';try{c=cxCache(f);}catch{}return c?[f,c]:[f];}),
  // ruby: the game's own readings for each Japanese line ([base, reading] pairs), used before any dictionary reading.
  parse(buf){const doc=JSON.parse(buf.toString('utf8')),lines=[],zh=[],ruby=[],voices=[];
-  for(const scene of doc.scenes)scene.rows.forEach((row,k)=>{lines.push(row[0]||'');zh.push(unquoteSlot(row[2]||row[3]||'',row[0]||''));ruby.push(scene.ruby?.[k]?.length?scene.ruby[k]:null);voices.push(scene.voices?.[k]||null);});
+  /* the Chinese slot is found by its text (ATRI: ja/en/zh-Hans/zh-Hant; PureStation: ja/zh-Hans/zh-Hant; 9-nine-: ja/en/zh-Hant) */
+  const slot=chineseSlot(doc.scenes.flatMap(s=>s.rows)),order=slot>0?[slot]:[2,3];
+  for(const scene of doc.scenes)scene.rows.forEach((row,k)=>{lines.push(row[0]||'');zh.push(unquoteSlot(order.map(i=>row[i]).find(Boolean)||'',row[0]||''));ruby.push(scene.ruby?.[k]?.length?scene.ruby[k]:null);voices.push(scene.voices?.[k]||null);});
   const v=voiceRef.keep(voices);return v?{lines,anchors:[],zh,ruby,voices:v}:{lines,anchors:[],zh,ruby};},
  test:()=>false,
  // The release's own Simplified (else Traditional) Chinese slot is the translation of each Japanese line.

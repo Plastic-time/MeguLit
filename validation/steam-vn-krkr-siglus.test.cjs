@@ -103,3 +103,12 @@ test('H: Chinese language slots in the embed call are not translated',async()=>{
  const replies=[];const r=Object.create(Reader.prototype);r.gal={hooks:{embedReply:(id,trans)=>replies.push([id,trans])}};r.embedCached=()=>{throw new Error('no lookup for a Chinese slot');};
  await r.embedTranslate(7,'"我吗？这个嘛……算他的情妇吧？"');assert.deepEqual(replies,[[7,'']]);
 });
+/* I (live test 2026-11-13, PureStation): the slot after the Japanese is the release's own order (ja/zh-Hans/zh-Hant
+   there, ja/en/zh-Hans/zh-Hant in ATRI); the game showed Traditional Chinese where its own UI is Simplified. */
+test('I: KiriKiri cx takes the Simplified slot wherever it sits',()=>{
+ const e=require('../services/original-engines/scenes.cjs').ENGINES['kirikiri-cx'];
+ const rows=n=>Array.from({length:n},(_,k)=>['「これは'+k+'です」','「这是第'+k+'个，我们说过」','「這是第'+k+'個，我們說過」']);
+ const r=e.parse(Buffer.from(JSON.stringify({scenes:[{rows:rows(10)}]})));assert.equal(r.zh[3],'「这是第3个，我们说过」');
+ const en=Array.from({length:10},(_,k)=>['「これは'+k+'です」','"This is '+k+'"','「這是第'+k+'個，我們說過」']);
+ assert.equal(e.parse(Buffer.from(JSON.stringify({scenes:[{rows:en}]}))).zh[2],'「這是第2個，我們說過」');
+});
