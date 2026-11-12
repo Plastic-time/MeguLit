@@ -45,3 +45,31 @@
 .main:has(>.dtv-bg) .detail-cover.tv-holo{transform:rotate(-3deg);cursor:pointer}
 .main:has(>.dtv-bg) .detail-cover.tv-holo .tv-face{aspect-ratio:3/4;height:auto}
 .main:has(>.dtv-bg) .detail-cover.tv-holo .cover,.main:has(>.dtv-bg) .detail-cover.tv-holo img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0!important;box-shadow:none!important;transform:none!important}
+/* 2026-11-12 (user) the detail card turns over: the tilt layer holds a flipping pair of faces; each face carries its own
+   rounding, shadow, foil and glare, so the 3D turn is never flattened by an overflow clip */
+.main:has(>.dtv-bg) .detail-cover.dtv-flipcard .tv-face.dtv-tilt{overflow:visible!important;border-radius:0!important;box-shadow:none!important;background:none!important;transform-style:preserve-3d}
+.dtv-flipcard:focus-visible{outline:none}.dtv-flipcard:focus-visible .dtv-side{box-shadow:0 0 0 2px var(--g-gold),0 40px 80px -30px #000}
+.dtv-flip{position:relative;width:100%;height:100%;transform-style:preserve-3d;will-change:transform}
+.dtv-side{position:absolute;inset:0;border-radius:10px;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 40px 80px -30px #000;transition:box-shadow .3s}
+
+.dtv-back{transform:rotateY(180deg);background:#120d10}
+.dtv-flipcard.touch .dtv-side{box-shadow:0 22px 40px -18px #000,0 0 0 1px color-mix(in srgb,var(--g-gold) 50%,transparent)}
+.dtv-flipcard.is-flipping .dtv-side{box-shadow:0 60px 90px -30px rgba(0,0,0,.9)}
+.dtv-sweep{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;mix-blend-mode:screen;background:linear-gradient(105deg,transparent 30%,rgba(255,236,206,.0) 38%,rgba(255,236,206,.55) 48%,rgba(255,255,255,.85) 50%,rgba(255,236,206,.5) 52%,transparent 64%) 0 0/260% 100% no-repeat}
+.dtv-back-art{position:absolute;inset:0}
+.dtv-back-art.is-cg img{display:block;width:100%;height:100%;object-fit:cover;object-position:0% 50%}
+.dtv-back-art.is-cg::after{content:"";position:absolute;inset:8px;border:1px solid rgba(244,206,142,.45);border-radius:5px;pointer-events:none;box-shadow:inset 0 0 40px rgba(0,0,0,.35)}
+.dtv-cg-tag{position:absolute;left:50%;bottom:16px;translate:-50% 0;padding:4px 12px;font:500 11px/1 var(--u-mono,monospace);letter-spacing:.2em;color:#f4d9a8;background:rgba(14,10,12,.62);border:1px solid rgba(244,206,142,.35);border-radius:2px;white-space:nowrap}
+/* the card's own back: lacquer, a fine guilloché, two gold rings and the title's first character */
+.dtv-back-art.is-crest{display:grid;place-items:center;background:
+ radial-gradient(120% 90% at 50% 40%,rgba(120,30,44,.55),transparent 70%),
+ repeating-radial-gradient(circle at 50% 46%,rgba(244,206,142,.07) 0 1px,transparent 1px 7px),
+ repeating-conic-gradient(from 0deg at 50% 46%,rgba(244,206,142,.05) 0 2deg,transparent 2deg 6deg),
+ linear-gradient(160deg,#1d1216,#0c080a)}
+.dtv-back-art.is-crest::before{content:"";position:absolute;inset:10px;border:1px solid rgba(244,206,142,.4);border-radius:6px;box-shadow:inset 0 0 0 4px rgba(12,8,10,.6),inset 0 0 0 5px rgba(244,206,142,.18)}
+.dtv-ring{position:absolute;left:50%;top:46%;width:62%;aspect-ratio:1;translate:-50% -50%;border-radius:50%;border:1px solid rgba(244,206,142,.5);box-shadow:0 0 30px rgba(244,206,142,.08),inset 0 0 30px rgba(244,206,142,.08)}
+.dtv-ring.is-inner{width:48%;border-style:dashed;border-color:rgba(244,206,142,.3)}
+.dtv-back-art.is-crest b{position:absolute;left:50%;top:46%;translate:-50% -52%;font:400 clamp(60px,9vw,128px)/1 var(--g-serif-ja,serif);color:transparent;background:linear-gradient(170deg,#ffe6b8,#c8924a 60%,#7d5226);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 2px 10px rgba(0,0,0,.6))}
+.dtv-back-art.is-crest span{position:absolute;left:50%;bottom:15%;translate:-50% 0;font:500 11px/1 var(--u-mono,monospace);letter-spacing:.42em;color:rgba(244,206,142,.75)}
+.dtv-back-art.is-crest small{position:absolute;left:12%;right:12%;bottom:9%;text-align:center;font-size:11px;color:rgba(241,224,210,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (prefers-reduced-motion:reduce){.dtv-flip{will-change:auto}}
