@@ -686,11 +686,11 @@ async function learning(token){
   target.querySelectorAll('[data-restore]').forEach(button=>button.addEventListener('click',async()=>{try{await api('restore_word',{id:Number(button.dataset.restore)});model=await api('home');renderRoute();toast(text.restoreDone);}catch(error){toast(errorMessage(error));}}));
   enhanceSelects(target);commit();
 }
-function confirmDelete(word){
+function confirmDelete(word){if(!word)return;
   const dialog=modal(`<h2>${text.deleteTitle}</h2><p>${text.deleteHint}</p><p class="dialog-word">${esc(word.spelling)}</p><p>${esc(word.reading)}</p><div class="dialog-actions"><button class="secondary" id="cancel-delete">${text.cancel}</button><button class="primary" id="confirm-delete">${text.deleteConfirm}</button></div>`);
   dialog.classList.add('word-delete');
   dialog.querySelector('#cancel-delete').addEventListener('click',()=>dialog.close());
-  dialog.querySelector('#confirm-delete').addEventListener('click',async event=>{event.currentTarget.disabled=true;try{await api('delete_word',{id:word.id});dialog.close();model=await api('home');renderRoute();toast(text.deleteDone);}catch(error){event.currentTarget.disabled=false;toast(errorMessage(error));}});
+  dialog.querySelector('#confirm-delete').addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{await api('delete_word',{id:word.id});dialog.close();model=await api('home');renderRoute();toast(text.deleteDone);}catch(error){button.disabled=false;toast(errorMessage(error));}});
 }
 function dictionary(target){
   const L={zh:{online:'MOJi 联网查词',local:'本地查词',play:'播放 MOJi 发音',audioFail:'发音暂时无法播放',notes:'MOJi 用户笔记',noNotes:'暂无笔记',likes:'赞',fail:'MOJi 暂时无法查询',login:'扫码登录 MOJi',logout:'退出登录',signed:'已登录 MOJi',anon:'未登录 · 匿名查询',scan:'用 MOJi 辞書 App「我的 → 扫一扫」扫码',scanned:'已扫描，请在手机上确认',expired:'二维码已过期',refresh:'刷新二维码',bind:'该账号需先在 MOJi App 绑定手机',cancel:'取消',back:'返回结果',examples:'例句',detailFail:'详情暂时无法打开',expiredSession:'MOJi 登录已过期，请重新扫码'},

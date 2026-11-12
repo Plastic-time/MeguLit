@@ -30,11 +30,11 @@ export function mountSettingsReset({target,api,locale,esc,toast,onSaved}){
   };
  };
  function showUndo({id}){
-  document.querySelector('.settings-reset-undo')?.remove();
+  {const old=document.querySelector('.settings-reset-undo');if(old){clearInterval(old._t);old.remove();}}
   const bar=document.createElement('div');bar.className='settings-reset-undo';bar.setAttribute('role','status');
   bar.innerHTML=`<span>${esc(t.done)}</span><button type="button" class="secondary" data-undo>${esc(t.undo)} <b data-seconds>10</b></button>`;
   document.body.append(bar);let left=10;
-  const timer=setInterval(()=>{left-=1;const s=bar.querySelector('[data-seconds]');if(s)s.textContent=String(left);if(left<=0){clearInterval(timer);bar.remove();}},1000);
+  const timer=bar._t=setInterval(()=>{left-=1;const s=bar.querySelector('[data-seconds]');if(s)s.textContent=String(left);if(left<=0){clearInterval(timer);bar.remove();}},1000);
   bar.querySelector('[data-undo]').onclick=async event=>{event.currentTarget.disabled=true;clearInterval(timer);try{await api('settings_reset_undo',{id});bar.remove();await refresh();toast(t.undone);}catch{bar.remove();toast(t.failed);}};
  }
 }
