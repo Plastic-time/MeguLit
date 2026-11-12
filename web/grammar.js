@@ -209,7 +209,7 @@ export function judgeRounds(point,real=[]){
  const out=[],max=point.era?1:3;
  for(const e of lines){if(out.length>=max)break;
   let start=e.start,end=e.end,answer=[...e.text].slice(start,end).join(''),others=[];
-  if(point.hits){const h=findHit(point,e.text);if(!h)continue;start=h.start;end=h.end;answer=h.text;others=point.wrong||[];}
+  if(point.hits){const h=e.conf!=null&&e.end>e.start?{start:e.start,end:e.end,text:[...e.text].slice(e.start,e.end).join('')}:findHit(point,e.text);if(!h)continue;start=h.start;end=h.end;answer=h.text;others=point.wrong||[];}
   else{const b=blankOf(point,e.text,e.start,e.end);if(!point.choices.includes(b.answer))continue;start=b.start;end=b.end;answer=b.answer;others=point.choices.filter(c=>c!==b.answer);}
   const c=[...e.text],wrong=others.filter(x=>x!==answer).slice(0,24),n=[...e.text].length+out.length,pick=[wrong[n%Math.max(1,wrong.length)],wrong[(n+3)%Math.max(1,wrong.length)]].filter((x,i,a)=>x&&a.indexOf(x)===i);
   if(!pick.length)continue;
