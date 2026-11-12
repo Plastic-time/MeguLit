@@ -61,7 +61,7 @@
 }
 @media(prefers-reduced-motion:reduce){.main .detail-tabs>button::after,.detail-main .review-platform::after{transition:none}}
 /* E238 全屏适配：页签与正文同一 1400px 居中列 */
-.main>.detail-tabs,.main .detail-tabs,.main>.cn-guide{box-sizing:border-box;width:100%!important;max-width:1400px!important;margin-left:auto!important;margin-right:auto!important}
+.main>.detail-tabs,.main .detail-tabs,.main .cn-guide{box-sizing:border-box;width:100%!important;max-width:1400px!important;margin-left:auto!important;margin-right:auto!important}
 .main .detail-tabs>button::after,.main .detail-tabs>button[aria-selected="true"]::after{content:none!important;display:none!important}
 /* E238 详情页头部：与主页一致 — 封面 | 标题与按钮 | 右侧数据栏（替代主页“今日阅读”位置） */
 .main .game-detail-hero{grid-template-columns:clamp(170px,16vw,230px) minmax(0,1fr)!important;align-items:center!important;gap:clamp(28px,3.5vw,56px)!important;border-bottom:0!important}
