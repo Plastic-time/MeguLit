@@ -15,7 +15,63 @@ extern "system"{
  fn TerminateProcess(h:*mut std::ffi::c_void,code:u32)->i32;
  fn WaitForSingleObject(h:*mut std::ffi::c_void,ms:u32)->u32;
  fn QueryFullProcessImageNameW(h:*mut std::ffi::c_void,flags:u32,name:*mut u16,size:*mut u32)->i32;
+ fn CreateToolhelp32Snapshot(flags:u32,pid:u32)->*mut std::ffi::c_void;
+ fn Process32FirstW(h:*mut std::ffi::c_void,entry:*mut ProcessEntry)->i32;
+ fn Process32NextW(h:*mut std::ffi::c_void,entry:*mut ProcessEntry)->i32;
 }
+#[cfg(windows)]
+#[repr(C)]
+struct ProcessEntry{size:u32,usage:u32,pid:u32,heap:usize,module:u32,threads:u32,parent:u32,priority:i32,flags:u32,exe:[u16;260]}
+/* E476 (player report 2026-11-12: could not find the first download, downloaded MeguLit again, and the new copy kept saying
+   "Alt+T is taken or two MeguLit are open"): the single-instance mutex is per installation folder, so a copy in another
+   folder kept running unseen (tray, closed window) with Alt+T and its helpers. The copy the player opens now wins: every
+   other installation's MeguLit.exe is asked to exit through its own command file, ended if it does not within 4 s, and
+   the helper programs still running from that folder (GalWindowBridge, HookBridge, node, python...) are ended too. Only
+   processes whose program file lies inside another MeguLit folder (one that holds MeguLit.exe) are touched. */
+#[cfg(windows)]
+fn processes()->Vec<(u32,String)>{unsafe{
+ let mut list=Vec::new();let snap=CreateToolhelp32Snapshot(0x2,0);if snap.is_null()||snap as isize==-1{return list;}
+ let mut e:ProcessEntry=std::mem::zeroed();e.size=std::mem::size_of::<ProcessEntry>() as u32;
+ let mut ok=Process32FirstW(snap,&mut e)!=0;
+ while ok{let n=e.exe.iter().position(|c|*c==0).unwrap_or(260);list.push((e.pid,String::from_utf16_lossy(&e.exe[..n]).to_lowercase()));ok=Process32NextW(snap,&mut e)!=0;}
+ CloseHandle(snap);list
+}}
+#[cfg(windows)]
+fn image_of(pid:u32)->Option<PathBuf>{unsafe{
+ let h=OpenProcess(0x1000,0,pid);if h.is_null(){return None;}
+ let mut buffer=vec![0u16;1024];let mut size=buffer.len() as u32;let ok=QueryFullProcessImageNameW(h,0,buffer.as_mut_ptr(),&mut size)!=0;CloseHandle(h);
+ if ok{Some(PathBuf::from(String::from_utf16_lossy(&buffer[..size as usize])))}else{None}
+}}
+#[cfg(windows)]
+fn end_pid(pid:u32,wait_ms:u32)->bool{unsafe{
+ let h=OpenProcess(0x0001|0x00100000,0,pid);if h.is_null(){return false;}
+ if wait_ms>0&&WaitForSingleObject(h,wait_ms)==0{CloseHandle(h);return true;}
+ let ended=TerminateProcess(h,1)!=0;if ended{WaitForSingleObject(h,3000);}CloseHandle(h);ended
+}}
+fn norm(p:&Path)->String{let s=p.to_string_lossy().replace('/',"\\").to_lowercase();s.trim_start_matches("\\\\?\\").trim_end_matches('\\').to_string()}
+#[cfg(windows)]
+pub fn retire_other_installations(root:&Path){
+ let own=norm(&root.canonicalize().unwrap_or_else(|_|root.to_path_buf()));let me=std::process::id();
+ let mut others:Vec<PathBuf>=Vec::new();
+ for (pid,name) in processes(){
+  if pid==me||name!="megulit.exe"{continue;}
+  let Some(image)=image_of(pid)else{continue};let Some(dir)=image.parent()else{continue};
+  if norm(dir)==own{continue;}
+  let _=send(dir,"exit");
+  let ended=end_pid(pid,4000);
+  log(root,"other-installation",json!({"pid":pid,"root":dir,"ended":ended}));
+  if !others.iter().any(|o|norm(o)==norm(dir)){others.push(dir.to_path_buf());}
+ }
+ if others.is_empty(){return;}
+ std::thread::sleep(Duration::from_millis(300));
+ for (pid,_) in processes(){
+  if pid==me{continue;}
+  let Some(image)=image_of(pid)else{continue};let path=norm(&image);
+  if let Some(dir)=others.iter().find(|o|{let d=norm(o);path.starts_with(&(d+"\\"))}){let ended=end_pid(pid,0);log(root,"other-installation-helper",json!({"pid":pid,"image":image,"root":dir,"ended":ended}));}
+ }
+}
+#[cfg(not(windows))]
+pub fn retire_other_installations(_root:&Path){}
 #[cfg(windows)]
 pub struct Lease(*mut std::ffi::c_void);
 #[cfg(windows)]
