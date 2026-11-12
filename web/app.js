@@ -209,6 +209,12 @@ function bindDrag(){
  const drag=event=>{if(event.button!==0||event.detail>1||event.target.closest('button,input,select,textarea,a,summary'))return;event.preventDefault();window.__TAURI_INTERNALS__?.invoke('plugin:window|start_dragging',{label:'main'}).catch(error=>toast(errorMessage(error)));};
  const titlebar=document.querySelector('.titlebar');titlebar.addEventListener('mousedown',drag);titlebar.addEventListener('dblclick',event=>{if(!event.target.closest('button'))invoke('window_action',{action:'maximize'}).catch(error=>toast(errorMessage(error)));});
  document.querySelector('.app-frame').addEventListener('mousedown',event=>{if(event.target.matches('.app-frame,.workspace,.main'))drag(event);});
+ /* 2026-11-12 (user: the start notice stopped the whole window from moving or resizing) a modal dialog makes the rest of the page inert and its backdrop takes every press: over a resize handle the window still resizes, over a title-bar button that button still works, anywhere else on the title bar the window still moves. Every dialog, not only the notice. */
+ document.addEventListener('mousedown',event=>{const d=event.target;if(!(d instanceof HTMLDialogElement)||!d.open||event.button!==0)return;const x=event.clientX,y=event.clientY,r=d.getBoundingClientRect();if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom)return;const inside=q=>q.width>0&&x>=q.left&&x<=q.right&&y>=q.top&&y<=q.bottom;
+  for(const h of document.querySelectorAll('[data-resize]'))if(inside(h.getBoundingClientRect())){event.preventDefault();event.stopPropagation();invoke('window_action',{action:'resize_'+h.dataset.resize}).catch(()=>{});return;}
+  const bar=document.querySelector('.titlebar');if(!bar||!inside(bar.getBoundingClientRect()))return;event.preventDefault();event.stopPropagation();
+  const button=[...bar.querySelectorAll('button')].find(b=>inside(b.getBoundingClientRect()));if(button){button.click();return;}
+  window.__TAURI_INTERNALS__?.invoke('plugin:window|start_dragging',{label:'main'}).catch(()=>{});},true);
 }
 
 function empty(label,symbol='library',sub=''){const kind={[text.emptyWords]:'words',[text.emptySentences]:'sentences',[text.emptyTrash]:'trash',[text.emptyHistory]:'history',[text.emptyDialogue]:'history'}[label];if(kind)return blankPage(kind);return `<div class="empty-state">${icon(symbol)}<h2>${esc(label)}</h2>${sub?`<p>${esc(sub)}</p>`:''}</div>`;}

@@ -62,7 +62,14 @@ async function clientKey(request,env){return (await sha256((env.HASH_SALT||'megu
 export async function subjects(request,env,installId,now){
  const auth=env.DB&&request.headers.get('authorization')?await authenticate(request,env,now).catch(()=>null):null;
  const account=auth?await sha256('account:'+auth.account.id):'',install=INSTALL_ID.test(String(installId||''))?await sha256(installId):'';
- return {primary:account||install,account,install,auth};
+ /* 2026-11-12 (user: one player showed twice, once as the install and once as the account): an install that posted
+    signed in is linked to that account, and counts for it from then on, signed in or not. */
+ let linked='';
+ if(env.DB&&install){try{
+  if(account)await env.DB.prepare('INSERT INTO install_links(install_hash,account_hash,linked_at) VALUES(?,?,?) ON CONFLICT(install_hash) DO UPDATE SET account_hash=excluded.account_hash,linked_at=excluded.linked_at').bind(install,account,Math.floor((now?.getTime?.()||Date.now())/1000)).run();
+  else linked=(await env.DB.prepare('SELECT account_hash FROM install_links WHERE install_hash=?').bind(install).first())?.account_hash||'';
+ }catch{}}
+ return {primary:account||linked||install,account,install,auth,linked};
 }
 async function readJSON(request,max=LIMITS.body){
  const length=Number(request.headers.get('content-length')||0);if(length>max)return {error:'PAYLOAD_TOO_LARGE'};
@@ -79,6 +86,9 @@ export async function leaderboardPost(request,env,ip,now=new Date()){
  const hot=validateHot(body.value.hot,now);if(!hot.ok)return fail(hot.error);
  const {id,name,keys,stats,games,element,level}=checked.value,who=await subjects(request,env,id,now),idHash=who.primary,t=Math.floor(now.getTime()/1000);
  if(!await hit(env,'lb-id',idHash,now.getTime()))return fail('RATE_LIMITED',429);
+ /* 2026-11-12 the board rows an install kept before it was linked to the account are the same player: removed, the
+    account's rows (just posted with the full totals) are the only ones */
+ if(who.install&&idHash!==who.install){try{await env.DB.batch(['leaderboard_stats','leaderboard_games','leaderboard_users'].map(t=>env.DB.prepare(`DELETE FROM ${t} WHERE id_hash=?`).bind(who.install)));}catch{}}
  /* 2026-11-12 (user: two players named the same mixed the board up) a name another player already uses is refused */
  {const taken=await env.DB.prepare('SELECT 1 FROM leaderboard_users WHERE lower(trim(name))=lower(trim(?)) AND id_hash<>? LIMIT 1').bind(name,idHash).first();if(taken)return fail('NAME_TAKEN',409);}
  const statements=[env.DB.prepare('INSERT INTO leaderboard_users(id_hash,name,share_games,element,level,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id_hash) DO UPDATE SET name=excluded.name,share_games=excluded.share_games,element=excluded.element,level=excluded.level,updated_at=excluded.updated_at').bind(idHash,name,games?1:0,element,level,t,t)];
