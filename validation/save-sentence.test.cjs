@@ -110,7 +110,7 @@ test('the bridge, drag-selection card and sentences page are wired to the same s
  const selection=fs.readFileSync(path.join(ROOT,'web/reader/modules/selection.js'),'utf8');
  assert.match(selection,/const drag=!result;/);assert.match(selection,/decorateWordActions\?\.\(card,args,result,\{drag\}\)/);
  const v4=fs.readFileSync(path.join(ROOT,'web/reader/modules/v4.js'),'utf8');
- assert.match(v4,/if\(opts\.drag&&keep\)\{/);assert.match(v4,/value\.sentenceSaved&&keep/);
+ assert.match(v4,/if\(keep\)\{/,'收藏句子 shows on every lookup card, click lookups too');assert.match(v4,/value\.sentenceSaved&&keep/);
  assert.doesNotMatch(fs.readFileSync(path.join(ROOT,'web/reader/modules/save-sentence.js'),'utf8'),/tomoyo-menu-header|keydown/);
  const app=fs.readFileSync(path.join(ROOT,'web/app.js'),'utf8');
  assert.match(app,/拖动选取一段文字/);assert.match(app,/ドラッグして選択/);assert.match(app,/Drag to select/);
