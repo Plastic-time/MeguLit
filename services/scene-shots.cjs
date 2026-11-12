@@ -4,8 +4,9 @@
    detail card). While a game is read, a clean capture of the game window alone (never MeguLit's own layer) is taken at
    most every 30 s on a new line, and at once (5 s apart) when the dialogue box leaves the screen, where CGs and cut-ins
    usually are. The native side scores its looks (colour, contrast, detail; fades, menus and loading screens score 0)
-   and gives a difference hash. Only scenes that look different are kept, a near-duplicate replaces the weaker one, and
-   each game keeps its best 48. Everything stays on this computer under data/scene-shots; Settings › Library
+   and gives a difference hash; only the card's 3:4 face is stored (the upright window with the most detail, where the
+   characters usually are, at most 720x960), the rest of the frame is never written. Only scenes that look different are kept, a near-duplicate replaces the weaker one, and
+   each game keeps its best 48: a weaker near-duplicate or anything pushed out of the 48 is deleted at once. Everything stays on this computer under data/scene-shots; Settings › Library
    (library.json sceneShots:false) stops it. Nothing is filtered by content: the user asked for adult scenes too. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const KEEP=48,MIN_SCORE=38,SAME=10,LINE_GAP=30000,HIDE_GAP=5000;
