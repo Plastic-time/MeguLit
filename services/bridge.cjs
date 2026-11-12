@@ -235,7 +235,12 @@ async function dispatch(request,runtime=null) {
       case 'diagnostics_build':return require('./diagnostics.cjs').build(root,db,String(request.id),{version:String(request.version||'').slice(0,40)});
       case 'diagnostics_reveal':{const file=require('./diagnostics.cjs').ownPackage(root,request.path);const child=spawn('explorer.exe',['/select,'+file],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {ok:true};}
       case 'diagnostics_build_all':return require('./diagnostics.cjs').buildAll(root,db,{version:String(request.version||'').slice(0,40)}); /* E394 whole-app package from About */
-      case 'site_updates':return (async()=>{try{const r=await fetch('https://megulit.com/assets/updates.json',{cache:'no-store',signal:AbortSignal.timeout(10000)});const j=r.ok?await r.json():[];return Array.isArray(j)?j.slice(0,300):[];}catch{return [];}})(); /* E421 start-up notice list, through the service because the WebView CSP blocks megulit.com */
+      case 'site_updates':return (async()=>{/* E421 start-up notice list, through the service because the WebView CSP blocks megulit.com.
+        (user 2026-11-12: the list sometimes took a while to appear) the last copy is kept in data/cache and shown at once;
+        a fresh copy is fetched behind it for the next time, and waited for only when there is no copy yet */
+        const file=path.join(root,'data','cache','site-updates.json');let cached=null;try{const v=JSON.parse(fs.readFileSync(file,'utf8'));if(Array.isArray(v))cached=v;}catch{}
+        const fresh=(async()=>{try{const r=await fetch('https://megulit.com/assets/updates.json',{cache:'no-store',signal:AbortSignal.timeout(10000)});const j=r.ok?await r.json():null;if(!Array.isArray(j))return null;const list=j.slice(0,300);try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(list));fs.renameSync(file+'.tmp',file);}catch{}return list;}catch{return null;}})();
+        if(cached){fresh.catch(()=>{});return cached;}return (await fresh)||[];})();
       case 'feedback_send':return require('./feedback.cjs').send(root,{kind:String(request.kind||''),text:String(request.text||''),contact:String(request.contact||''),lang:String(request.lang||'zh'),version:String(request.version||'')}); /* E394 in-app feedback through the relay */
       case 'diagnostics_upload':{const file=require('./diagnostics.cjs').ownPackage(root,request.path),m=request.meta||{};return require('./diagnostics-upload.cjs').upload(file,{version:m.version,game:m.game,note:m.note},{root});}
       case 'game_detail':return require('./game-detail.cjs').detail(db,root,String(request.id),request.locale);
