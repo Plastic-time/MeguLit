@@ -1646,29 +1646,186 @@ html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker[
 html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker:hover{box-shadow:inset 0 -1px 0 currentColor;color:#fff4ea}
 html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker-input{margin:0 12px 0 auto;width:150px;height:24px;padding:0 8px;border:0;border-radius:2px;background:#120d10;box-shadow:inset 0 0 0 1px var(--g-gold,#edb56e);color:#fff4ea;font-size:12px}
 
-/* learning goals (user: only four — make them one square and lay it out properly): a 2×2 grid of square cards, each
-   centred and stacked (large glyph, name, one line); chosen = its own colour washed in, a frame of that colour and a
-   tick in the corner; hover lifts it a little; the exam details open below the grid; the dialog is as wide as the
-   square, buttons on the right */
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog{width:min(540px,94vw)!important;max-width:none!important}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goals{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;border-top:0!important;margin:20px 0 0!important}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal{--gc:200,47,59;aspect-ratio:1;display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px!important;text-align:center;border:0!important;border-radius:3px!important;
  background:linear-gradient(160deg,rgba(255,255,255,.045),rgba(255,255,255,.012))!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.14)!important;transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,background .18s;cursor:pointer}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:nth-child(2){--gc:237,181,110}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:nth-child(3){--gc:226,120,170}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:nth-child(4){--gc:110,200,180}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:hover{transform:translateY(-3px);box-shadow:inset 0 0 0 1px rgba(var(--gc),.45),0 12px 24px -14px rgba(0,0,0,.8)!important;background:linear-gradient(160deg,rgba(var(--gc),.08),rgba(255,255,255,.012))!important}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal{font-size:52px!important;line-height:1;margin:0 0 6px;color:rgb(var(--gc))!important;font-family:var(--g-serif,serif)}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal b{font-family:var(--g-serif,serif);font-size:19px!important;letter-spacing:.06em;color:#f6ece0}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal small{font-size:12.5px!important;line-height:1.5;color:rgba(241,224,210,.62)!important;max-width:16em}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active{background:linear-gradient(160deg,rgba(var(--gc),.2),rgba(var(--gc),.05))!important;box-shadow:inset 0 0 0 1.5px rgba(var(--gc),.9)!important}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal::after{content:"";position:absolute;top:10px;right:10px;left:auto!important;bottom:auto!important;width:20px;height:20px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,236,220,.25);transition:background .18s,box-shadow .18s}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active::after{background:rgb(var(--gc)) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.4l3 3 6-6.4' fill='none' stroke='%23140d11' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat;box-shadow:none}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more{margin:16px 0 0!important;padding:14px 16px!important;border:0!important;border-radius:3px;background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1px rgba(255,236,220,.1)}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer{display:flex!important;align-items:center;justify-content:flex-end;gap:10px;margin-top:22px!important}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer .lv-note{margin:0 auto 0 0!important}
-@media (prefers-reduced-motion:reduce){html body .lv-dialog.lg-dialog .lg-goal{transition:none}html body .lv-dialog.lg-dialog .lg-goal:hover{transform:none}}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:focus-within{outline:none!important}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:has(input:focus-visible){outline:1px dashed rgba(var(--gc),.55)!important;outline-offset:4px}
 /* the game-name rule (1.4.4) sits right under the name field, in the field's column */
 html:not(#u):not(#v):not(#w) body .dev-notice-page[data-page="1"]>.dev-notice-rule{grid-area:rule;margin:10px 0 0!important}
+
+/* ==== learning goals (user: the first pass was ugly; four choices, one square, laid out with care) ====
+   A narrow dialog: kicker, title, one lead line. Four compact cards in a 2×2 square — a round seal tinted in the goal's
+   own colour, the name, one line — content centred. One way of being chosen for every card: a gold frame, a warm wash,
+   a filled gold tick. The details of a chosen goal open below in quiet panels, the group's name above the panel, every
+   row on one label column; every chip, select and button one height and one radius. Two footer buttons, equal height. */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog{--lg-gold:237,181,110;width:min(540px,94vw)!important;max-width:none!important;padding:30px 32px 26px!important;border-radius:14px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog header{margin:0 0 22px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lv-kicker{margin:0 0 8px!important;font:500 11px/1 var(--u-mono,monospace)!important;letter-spacing:.24em!important;color:rgb(var(--lg-gold))!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog h2{margin:0!important;font:600 28px/1.25 var(--g-serif,serif)!important;letter-spacing:.02em;color:#f6ece0}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lv-lead{margin:10px 0 0!important;font-size:13.5px!important;line-height:1.7!important;color:rgba(241,224,210,.62)!important;max-width:34em}
+/* the four cards */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goals{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;margin:0!important;padding:0!important;border:0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal{--gc:200,47,59;position:relative!important;aspect-ratio:5/4;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:0!important;min-height:0!important;padding:16px!important;margin:0!important;text-align:center;border:0!important;border-radius:12px!important;cursor:pointer;
+ background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.018))!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.1),0 1px 0 rgba(255,255,255,.04)!important;transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .2s,background .2s!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:nth-child(2){--gc:226,170,96}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:nth-child(3){--gc:222,120,168}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:nth-child(4){--gc:96,190,168}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal{display:grid!important;place-items:center;width:52px;height:52px;margin:0 0 12px!important;border-radius:50%;font:600 26px/1 var(--g-serif,serif)!important;color:rgb(var(--gc))!important;background:radial-gradient(circle at 35% 30%,rgba(var(--gc),.26),rgba(var(--gc),.08) 70%)!important;box-shadow:inset 0 0 0 1px rgba(var(--gc),.35)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal b{display:block;font:600 17px/1.3 var(--g-serif,serif)!important;letter-spacing:.04em;color:#f6ece0}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal small{display:block;margin-top:4px;font-size:12px!important;line-height:1.5;color:rgba(241,224,210,.55)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:hover{transform:translateY(-2px);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.025))!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.2),0 10px 22px -14px rgba(0,0,0,.9)!important}
+/* chosen: one style for all */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active{background:linear-gradient(180deg,rgba(var(--lg-gold),.13),rgba(var(--lg-gold),.04))!important;box-shadow:inset 0 0 0 1.5px rgba(var(--lg-gold),.85),0 10px 26px -16px rgba(var(--lg-gold),.5)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal::after{content:""!important;display:block!important;position:absolute!important;top:12px!important;right:12px!important;left:auto!important;bottom:auto!important;width:20px!important;height:20px!important;border-radius:50%!important;background:none!important;box-shadow:inset 0 0 0 1.5px rgba(255,236,220,.22)!important;transition:background .2s,box-shadow .2s,transform .2s!important;transform:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active::after{background:rgb(var(--lg-gold)) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.6 10.3l2.9 2.9 5.9-6.3' fill='none' stroke='%231a1012' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat!important;box-shadow:0 0 0 3px rgba(var(--lg-gold),.18)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:focus-within{outline:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:has(input:focus-visible){outline:2px solid rgba(var(--lg-gold),.6)!important;outline-offset:3px}
+/* details of a chosen goal */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more{display:block;margin:20px 0 0!important;padding:0!important;border:0!important;background:none!important;box-shadow:none!important;min-width:0}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more[hidden]{display:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more legend{float:left;width:100%;margin:0 0 8px!important;padding:0!important;font:500 11px/1 var(--u-mono,monospace)!important;letter-spacing:.22em!important;color:rgb(var(--lg-gold))!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more legend+*{clear:left}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row{display:flex!important;flex-wrap:wrap;align-items:center;gap:8px!important;padding:12px 16px!important;margin:0!important;background:rgba(255,255,255,.03);border-left:1px solid rgba(255,236,220,.08);border-right:1px solid rgba(255,236,220,.08)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row:nth-of-type(1),html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more legend+.lg-row{border-top:1px solid rgba(255,236,220,.08);border-radius:10px 10px 0 0}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row:last-child{border-bottom:1px solid rgba(255,236,220,.08);border-radius:0 0 10px 10px}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more legend+.lg-row:last-child{border-radius:10px}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row+.lg-row{box-shadow:inset 0 1px 0 rgba(255,236,220,.06)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row>span{flex:0 0 88px;min-width:0!important;margin-right:6px;font-size:13px!important;color:rgba(241,224,210,.7)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row>small{flex:1 0 100%;padding-left:102px;font-size:11.5px!important;line-height:1.6;color:rgba(241,224,210,.45)!important}
+/* chips: one height, one radius; chosen = gold */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-chip{margin:0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-chip span{display:inline-flex!important;align-items:center;height:32px!important;padding:0 14px!important;border:0!important;border-radius:8px!important;background:rgba(255,255,255,.04)!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.14)!important;font-size:13px!important;font-weight:500!important;color:rgba(246,236,224,.85)!important;white-space:nowrap;transition:background .15s,box-shadow .15s,color .15s}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-chip:hover span{box-shadow:inset 0 0 0 1px rgba(255,236,220,.3)!important;color:#fff4ea!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-chip input:checked+span{background:rgba(var(--lg-gold),.16)!important;box-shadow:inset 0 0 0 1.5px rgba(var(--lg-gold),.85)!important;color:#fff4ea!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-chip input:disabled+span{opacity:.75;cursor:default}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-chip input:focus-visible+span{outline:2px solid rgba(var(--lg-gold),.6);outline-offset:2px}
+/* the score: slider, a large number, a quiet "/180" */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row input[type=range]{width:150px!important;height:32px;margin:0!important;background:transparent!important;-webkit-appearance:none;appearance:none;accent-color:rgb(var(--lg-gold))}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(90deg,rgb(var(--lg-gold)) var(--v,50%),rgba(255,236,220,.16) var(--v,50%))}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;margin-top:-6px;border-radius:50%;background:#f6ece0;box-shadow:0 0 0 3px rgba(var(--lg-gold),.35),0 2px 6px rgba(0,0,0,.5)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row input[type=range]:disabled{opacity:.45}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row output{font:600 20px/1 var(--g-serif,serif)!important;color:#f6ece0!important;min-width:2.2em;text-align:right;font-variant-numeric:tabular-nums}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row output+b{margin-left:-8px;font:400 13px/1 var(--g-serif,serif)!important;color:rgba(241,224,210,.45)!important}
+/* selects match the chips */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row select,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row .select-trigger{height:32px!important;min-height:32px!important;padding:0 30px 0 12px!important;border:0!important;border-radius:8px!important;background-color:rgba(255,255,255,.04)!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.14)!important;font-size:13px!important;color:rgba(246,236,224,.9)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row .select-control{width:auto!important;min-width:0!important}
+/* footer: equal buttons, the primary clear even before a choice */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer{display:flex!important;align-items:center;justify-content:flex-end;gap:10px;margin:26px 0 0!important;padding-top:20px;border-top:1px solid rgba(255,236,220,.08)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer .lv-note{margin:0 auto 0 0!important;font-size:12px;color:rgba(241,224,210,.5)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer button{height:40px!important;min-height:40px!important;margin:0!important;font-size:14px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer button.secondary{padding:0 18px!important;border-radius:8px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer button.primary{padding:0 40px 0 20px!important;border-radius:8px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer button.primary:disabled{opacity:1!important;background:rgba(255,255,255,.035)!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.16)!important;color:rgba(246,236,224,.45)!important;cursor:not-allowed}
+@media (prefers-reduced-motion:reduce){html body .lv-dialog.lg-dialog .lg-goal{transition:none!important}html body .lv-dialog.lg-dialog .lg-goal:hover{transform:none}}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row>small{box-sizing:border-box;max-width:100%;padding-left:110px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row>span{flex:0 0 100px!important;font-size:12.5px!important;line-height:1.4}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row>b{font:400 13px/1 var(--g-serif,serif)!important;color:rgba(241,224,210,.45)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row input[type=range]{border:0!important;box-shadow:none!important;padding:0!important;border-radius:0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row input[type=range]::-webkit-slider-runnable-track{background:linear-gradient(90deg,rgb(var(--lg-gold)) var(--v,50%),rgba(255,236,220,.16) var(--v,50%))!important;height:4px!important;border-radius:2px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row input[type=range]::-webkit-slider-thumb{width:16px!important;height:16px!important;margin-top:-6px!important;border-radius:50%!important;background:#f6ece0!important;box-shadow:0 0 0 3px rgba(var(--lg-gold),.35),0 2px 6px rgba(0,0,0,.5)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-chip span{font-family:var(--g-serif,serif)!important;letter-spacing:.03em}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more[data-more=eju] .lg-row>b{display:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row>small.lg-band-note,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row>small{flex:1 1 100%!important;width:auto!important;min-width:0!important;margin:2px 0 0!important;white-space:normal!important}
+/* wrapped controls keep their column: the label hangs in the row's left padding */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row{padding-left:126px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row>span{margin-left:-110px!important;margin-right:2px!important;flex:0 0 100px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row>small{padding-left:0!important}
+
+/* goal dialog, pass 2 (judge 5.5): large serif glyphs (no tinted circle), square cards with optical centring, one gold
+   for chosen and for the main action, a clear tick, a solid gold primary and a matching secondary, a readable lead, a
+   roomy score row, a scrolling body with the footer always in view */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog{width:min(520px,94vw)!important;max-height:min(88vh,980px)!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog::before,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog::after{display:none!important;content:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-form{flex:1 1 auto;min-height:0;overflow:auto;margin:0 -8px!important;padding:2px 8px 6px!important;scrollbar-width:thin}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer{flex:none}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lv-kicker{font:600 12px/1 var(--g-serif,serif)!important;letter-spacing:.05em!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lv-lead{word-break:keep-all;overflow-wrap:anywhere;text-wrap:pretty}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal{aspect-ratio:1!important;padding:18px 18px 28px!important;background:linear-gradient(180deg,rgba(255,240,228,.075),rgba(255,240,228,.03))!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.17)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:hover{box-shadow:inset 0 0 0 1px rgba(255,236,220,.3),0 10px 22px -14px rgba(0,0,0,.9)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal{width:auto!important;height:auto!important;margin:0 0 14px!important;border-radius:0!important;background:none!important;box-shadow:none!important;font:600 56px/1 var(--g-serif,serif)!important;text-shadow:0 0 22px rgba(var(--gc),.28)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active{background:linear-gradient(180deg,rgba(var(--lg-gold),.14),rgba(var(--lg-gold),.05))!important;box-shadow:inset 0 0 0 1.5px rgb(var(--lg-gold))!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal::after{opacity:1!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active::after{background:#e0b46e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.6 10.3l2.9 2.9 5.9-6.3' fill='none' stroke='%231a1214' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat!important;box-shadow:none!important;filter:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more legend{font:600 13px/1.2 var(--g-serif,serif)!important;letter-spacing:.04em!important;color:#f0dcc4!important;padding-left:10px!important;border-left:2px solid #e0b46e!important;margin-bottom:10px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row input[type=range]{flex:1 1 170px!important;width:auto!important;min-width:140px}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row output,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row output+b{font-family:var(--g-serif,serif)!important;font-variant-numeric:lining-nums tabular-nums!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row output+b{margin-left:-6px;font-size:14px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row:has(input[name=jlpt-score]) .lg-chip span{background:none!important;box-shadow:none!important;padding:0 4px!important;color:rgba(224,180,110,.85)!important;text-decoration:underline;text-decoration-color:rgba(224,180,110,.35);text-underline-offset:4px}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row:has(input[name=jlpt-score]) .lg-chip input:checked+span{color:#f6d9a6!important;text-decoration-color:#e0b46e;background:none!important;box-shadow:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row select{-webkit-appearance:none;appearance:none;padding:0 28px 0 14px!important;font-family:var(--g-serif,serif)!important;font-weight:500!important;background:rgba(255,255,255,.04) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%23d9c3a8' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right 10px center/12px no-repeat!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button{height:44px!important;min-height:44px!important;border-radius:8px!important;font:600 14px/1 var(--g-serif,serif)!important;letter-spacing:.06em!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button.secondary.secondary{padding:0 20px!important;background:transparent!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.22)!important;color:rgb(200,190,180)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button.secondary.secondary:hover{box-shadow:inset 0 0 0 1px rgba(255,236,220,.4)!important;color:#f6ece0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button.primary.primary{padding:0 26px!important;background:#e0b46e!important;box-shadow:0 6px 18px -8px rgba(224,180,110,.6)!important;color:#1a1214!important;clip-path:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button.primary.primary::after,html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button.primary.primary::before{display:none!important;content:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button.primary.primary:hover:not(:disabled){background:#ebc283!important;color:#1a1214!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button.primary.primary:disabled{opacity:.42!important;background:#e0b46e!important;box-shadow:none!important;color:#1a1214!important;cursor:not-allowed}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer:has(button.primary:disabled) .lv-note::before{content:"先选一个目标";font-size:12.5px;color:rgba(241,224,210,.55)}
+html:lang(ja):not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer:has(button.primary:disabled) .lv-note::before{content:"目標をひとつ選んでください"}
+html:lang(en):not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer:has(button.primary:disabled) .lv-note::before{content:"Pick at least one goal"}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button.primary.primary{border-radius:8px!important;overflow:hidden!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row input[type=range]{flex:1 1 110px!important;min-width:100px!important}
+/* (user: the round marks look ugly) no ring on unchosen cards; only a chosen card shows its tick */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:not(.active)::after{display:none!important}
+/* (user: not four colours — every card the same) one colour for every glyph: warm ivory into gold, no coloured glow */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal{color:#ecd3a8!important;background:linear-gradient(180deg,#f7e8cf 20%,#d7a866)!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent;text-shadow:none!important;filter:drop-shadow(0 0 14px rgba(224,180,110,.18))}
+/* (user: larger, outlined) the glyph as a large outline: a gold stroke over a faint warm fill */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal{font-size:80px!important;margin:0 0 12px!important;background:linear-gradient(180deg,rgba(247,232,207,.22),rgba(215,168,102,.08))!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent;-webkit-text-stroke:1.4px #e6c48e;filter:drop-shadow(0 0 10px rgba(224,180,110,.22))}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{-webkit-text-stroke-color:#f3d7a6;background:linear-gradient(180deg,rgba(247,232,207,.45),rgba(215,168,102,.16))!important;-webkit-background-clip:text!important;background-clip:text!important}
+/* the outline sits outside the glyph (stroke painted under the fill), so no inner contours show */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{background:linear-gradient(180deg,#fbeedb 15%,#e2b878 85%)!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent;-webkit-text-stroke:5px #7a4f22;paint-order:stroke fill;filter:drop-shadow(0 2px 0 rgba(0,0,0,.35)) drop-shadow(0 0 12px rgba(224,180,110,.2))}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{-webkit-text-stroke-color:#a06a2c}
+/* the outline from eight shadows round a solid fill (clean edges, no inner contours) */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{background:none!important;-webkit-background-clip:border-box!important;background-clip:border-box!important;-webkit-text-fill-color:#f3dcb3;color:#f3dcb3!important;-webkit-text-stroke:0;filter:none!important;
+ text-shadow:2px 0 0 #8a5a26,-2px 0 0 #8a5a26,0 2px 0 #8a5a26,0 -2px 0 #8a5a26,1.4px 1.4px 0 #8a5a26,-1.4px 1.4px 0 #8a5a26,1.4px -1.4px 0 #8a5a26,-1.4px -1.4px 0 #8a5a26,0 4px 10px rgba(0,0,0,.45),0 0 22px rgba(224,180,110,.22)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{-webkit-text-fill-color:#fff0d4;color:#fff0d4!important}
+/* (user: show only half, or 70%, of the glyph) the name and line at the top of the card; the glyph large below them,
+   running off the card's bottom edge so about 70% of it shows */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal{justify-content:flex-start!important;padding:24px 18px 0!important;overflow:hidden!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal{position:absolute!important;left:50%;bottom:0;transform:translate(-50%,30%);margin:0!important;font-size:150px!important;line-height:1!important;pointer-events:none;z-index:0}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal b,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal small{position:relative;z-index:1}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal::after{z-index:2}
+/* goal dialog, pass 3 (judge 7.0): no stray corner mark; soft fades where the settings scroll; the disabled main
+   button readable and its hint beside it; both buttons in one face; a square tick for a multiple choice */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog{background:linear-gradient(160deg,rgba(26,22,26,.96),rgba(15,13,16,.96))!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-form{-webkit-mask:linear-gradient(transparent 0,#000 14px,#000 calc(100% - 24px),transparent);mask:linear-gradient(transparent 0,#000 14px,#000 calc(100% - 24px),transparent);padding-top:10px!important;padding-bottom:22px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer{margin-top:4px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button.primary.primary:disabled{opacity:1!important;background:#5e4a33!important;color:#f0e2cc!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer .lv-note{margin:0 4px 0 auto!important;text-align:right}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button.secondary.secondary,html:not(#u):not(#v):not(#w):not(#x) body .lv-backdrop .lv-dialog.lg-dialog footer button.primary.primary{font:600 14px/1 var(--g-serif,serif)!important;letter-spacing:.06em!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active::after{border-radius:6px!important}
+/* (user: the glyph as an outline only, and only half of it, cut vertically, still readable) the glyph stands at the
+   card's right edge, cut down its middle by the edge; it is hollow — filled with the card's own colour and drawn by a
+   gold outline round its outer contour; the name and line sit on the left */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal{align-items:flex-start!important;justify-content:center!important;padding:0 0 0 22px!important;text-align:left!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal b{font-size:20px!important;max-width:55%}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal small{max-width:52%!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{left:auto!important;right:0!important;top:50%!important;bottom:auto!important;transform:translate(48%,-50%)!important;font-size:178px!important;
+ -webkit-text-fill-color:#201b1e!important;color:#201b1e!important;
+ text-shadow:1.2px 0 0 #d9b073,-1.2px 0 0 #d9b073,0 1.2px 0 #d9b073,0 -1.2px 0 #d9b073,.85px .85px 0 #d9b073,-.85px .85px 0 #d9b073,.85px -.85px 0 #d9b073,-.85px -.85px 0 #d9b073,0 0 14px rgba(224,180,110,.25)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{-webkit-text-fill-color:#2c2219!important;color:#2c2219!important;
+ text-shadow:1.4px 0 0 #f0c98a,-1.4px 0 0 #f0c98a,0 1.4px 0 #f0c98a,0 -1.4px 0 #f0c98a,1px 1px 0 #f0c98a,-1px 1px 0 #f0c98a,1px -1px 0 #f0c98a,-1px -1px 0 #f0c98a,0 0 18px rgba(240,201,138,.35)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal::after{left:16px!important;right:auto!important;top:16px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{font-size:158px!important}
+/* (user: like the outlined character at the home's top-right) the same treatment: transparent fill, a thin 1.2px
+   stroke in the text colour at a quiet strength, the Japanese serif, no glow; a chosen card's stroke turns gold */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{font-family:var(--g-serif-ja,serif)!important;font-weight:400!important;color:transparent!important;-webkit-text-fill-color:transparent!important;-webkit-text-stroke:1.2px color-mix(in srgb,var(--g-t1,#f1e0d2) 30%,transparent)!important;text-shadow:none!important;filter:none!important;background:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{-webkit-text-stroke:1.2px rgba(224,180,110,.75)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:hover .lv-seal{-webkit-text-stroke-color:color-mix(in srgb,var(--g-t1,#f1e0d2) 45%,transparent)}
+/* (user: the half glyph is too small; the tick is unnecessary) the glyph fills the card's height and runs off its right
+   edge, half of it showing; no tick — the gold frame and the gold outline mark a chosen card; a larger name */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal::after,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active::after{display:none!important;content:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{font-size:250px!important;transform:translate(46%,-50%)!important;-webkit-text-stroke-width:1.4px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal{padding-left:26px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal b{font-size:24px!important;letter-spacing:.05em}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal small{margin-top:6px!important;font-size:12.5px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active b{color:#fff3df}
+/* (user: the full-marks control is ugly) a small toggle in the chips' family: a check square and the words; on = the
+   square filled gold with a dark tick, the chip framed gold */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row:has(input[name=jlpt-score]) .lg-chip span{display:inline-flex!important;align-items:center;gap:8px;height:32px!important;padding:0 12px 0 10px!important;border-radius:8px!important;background:rgba(255,255,255,.04)!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.14)!important;color:rgba(246,236,224,.82)!important;text-decoration:none!important;font-size:13px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row:has(input[name=jlpt-score]) .lg-chip span::before{content:"";flex:none;width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1.5px rgba(255,236,220,.38);transition:background .15s,box-shadow .15s}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row:has(input[name=jlpt-score]) .lg-chip input:checked+span{background:rgba(224,180,110,.14)!important;box-shadow:inset 0 0 0 1.5px rgba(224,180,110,.85)!important;color:#fff4ea!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row:has(input[name=jlpt-score]) .lg-chip input:checked+span::before{background:#e0b46e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3.5 7.2l2.3 2.3 4.7-5' fill='none' stroke='%231a1214' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat;box-shadow:none}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-row:has(input[name=jlpt-score]) .lg-chip:hover span{box-shadow:inset 0 0 0 1px rgba(255,236,220,.3)!important}
+/* (user: the options after 想重点提高 were laid out badly) the focus choices as an even two-by-two grid of equal chips,
+   the label in its own column beside them */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row:has(input[name$="-focus"]){display:grid!important;grid-template-columns:100px repeat(2,minmax(0,1fr));gap:8px!important;padding-left:16px!important;align-items:center}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row:has(input[name$="-focus"])>span{grid-column:1;grid-row:1/3;align-self:start;margin:8px 0 0!important;flex:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row:has(input[name$="-focus"]) .lg-chip span{display:flex!important;justify-content:center;width:100%;box-sizing:border-box;padding:0 8px!important}

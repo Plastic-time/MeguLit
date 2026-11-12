@@ -58,6 +58,8 @@ export function openGoalPicker({api,esc,toast,locale='zh',current=null}){
    const s=form.querySelector('[name="jlpt-score"]'),full=form.querySelector('[name="jlpt-full"]');if(s){if(full?.checked)s.value=180;s.disabled=!!full?.checked;back.querySelector('[data-score]').textContent=s.value;}
    const ja=form.querySelector('[name="eju-subj"][value="ja"]');if(ja){ja.checked=true;ja.disabled=true;}};
   form.addEventListener('input',sync);form.addEventListener('change',sync);sync();
+  /* a goal just chosen: bring its settings into view */
+  form.addEventListener('change',e=>{if(e.target.name==='goal'&&e.target.checked)requestAnimationFrame(()=>back.querySelector(`[data-more="${e.target.value}"]`)?.scrollIntoView({block:'nearest',behavior:'smooth'}));});
   back.querySelector('[data-lg-later]').onclick=()=>close(null);back.addEventListener('click',e=>{if(e.target===back)close(null);});
   ok.onclick=async()=>{ok.disabled=true;const ja=form.querySelector('[name="eju-subj"][value="ja"]');if(ja)ja.disabled=false;try{const r=await api('learning_goal_set',{goal:readGoalForm(form)});toast?.(t.saved);close(r);}catch(error){ok.disabled=false;toast?.(String(error?.message||error));}};
   back.querySelector('.lg-goal input')?.focus();
