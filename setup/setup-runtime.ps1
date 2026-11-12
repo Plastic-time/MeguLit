@@ -3,8 +3,12 @@
 # The release zip ships without runtime\. This window lets the user pick:
 #   Lite  = base pack only (Node, Python, hooks, JMdict). Other packs can be added later in Settings.
 #   Full  = base + furigana dictionaries + voice engine, all at once.
-# Everything is installed straight into this MeguLit folder (runtime\ next to MeguLit.exe), so a fresh
+# Everything is installed into the chosen MeguLit folder (runtime\ next to MeguLit.exe), so a fresh
 # PC needs nothing preinstalled except the WebView2 Runtime (built into Windows 11).
+# Since 1.4.6 the window also asks where MeguLit lives and whether to put shortcuts on the desktop / Start menu.
+# Group report (2026-11-12): a player opened MeguLit.exe straight from the archive viewer, so it ran from
+# %TEMP%\Rar$EXa..., installed onto a nearly full C: drive and left no shortcut. When the chosen folder is not
+# this one, the whole MeguLit folder is copied there first, then the new copy is started (exit 3 = moved).
 # Packs, URLs, SHA-256 and sizes come from setup\runtime.json. Exit 0 = runtime ready.
 param([Parameter(Mandatory=$true)][string]$Root)
 $ErrorActionPreference = 'Stop'
@@ -75,7 +79,7 @@ function Draw-Book($g, $x, $y, $color) {
 # An own AppUserModelID gives the window its own taskbar entry with the MeguLit icon set below.
 try { Add-Type -Namespace MeguLit -Name Shell -MemberDefinition '[DllImport("shell32.dll")] public static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string id);'; [void][MeguLit.Shell]::SetCurrentProcessExplicitAppUserModelID('app.megulit.setup') } catch {}
 $form = New-Object Windows.Forms.Form
-$form.Text = 'MeguLit'; $form.ClientSize = New-Object Drawing.Size(720,650); $form.StartPosition = 'CenterScreen'
+$form.Text = 'MeguLit'; $form.ClientSize = New-Object Drawing.Size(720,700); $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.BackColor = $C.bg; $form.ForeColor = $C.cream
 $exe = Join-Path $Root 'MeguLit.exe'; if (Test-Path $exe) { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon($exe) }
 
@@ -98,12 +102,27 @@ $stage.add_Paint({ param($s,$e)
 $form.Controls.Add($stage)
 
 # ---- choice page ----
-$choice = New-Object Windows.Forms.Panel; $choice.Location = New-Object Drawing.Point(0,124); $choice.Size = New-Object Drawing.Size(720,526); $choice.BackColor = [Drawing.Color]::Transparent
+$choice = New-Object Windows.Forms.Panel; $choice.Location = New-Object Drawing.Point(0,124); $choice.Size = New-Object Drawing.Size(720,576); $choice.BackColor = [Drawing.Color]::Transparent
 $stage.Controls.Add($choice)
 [void](Label '第一次使用 MeguLit' 32 12 560 30 14 $true $C.cream $choice)
 [void](Label '先下载运行组件。它们都会装进 MeguLit 自己的文件夹，电脑上不用预先安装 Node.js、Python 或其他软件' 32 44 656 20 9 $false $C.muted $choice)
 [void](Label '组件包放在 MeguLit 的 GitHub Releases，里面是 Node.js、Python、LunaHook、AivisSpeech 等项目官方发布的原版文件，下载后逐个校验 SHA-256，被改动过的文件不会安装' 32 66 656 34 8 $false $C.muted $choice)
-$free = (Get-Item $Root).PSDrive.Free
+# ---- install location ----
+$sourceRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+$tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+$fromArchive = ($sourceRoot + '\').StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or $sourceRoot -match '\\(Rar\$|7z[A-Z0-9]|wz[A-Z0-9])'
+function Default-Target {
+  if (-not $fromArchive) { return $sourceRoot }
+  # Opened from inside an archive: suggest the roomiest non-system fixed drive, else the per-user Programs folder.
+  $sys = $env:SystemDrive.TrimEnd('\').ToUpper()
+  $best = [IO.DriveInfo]::GetDrives() | Where-Object { $_.DriveType -eq 'Fixed' -and $_.IsReady -and $_.Name.TrimEnd('\').ToUpper() -ne $sys -and $_.AvailableFreeSpace -gt 3GB } | Sort-Object AvailableFreeSpace -Descending | Select-Object -First 1
+  if ($best) { return (Join-Path $best.RootDirectory.FullName 'MeguLit') }
+  return (Join-Path $env:LOCALAPPDATA 'Programs\MeguLit')
+}
+function Drive-Free($path) {
+  try { $q = [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($path)); (New-Object IO.DriveInfo $q).AvailableFreeSpace } catch { 0 }
+}
+$free = Drive-Free (Default-Target)
 
 function Option($x, $title, $sub, $items, $pros, $cons, $ids, $primary, $badge) {
   $p = New-Object GrimoirePanel; $p.Location = New-Object Drawing.Point($x,106); $p.Size = New-Object Drawing.Size(316,346); $p.BackColor = $C.card
@@ -141,20 +160,42 @@ Option 32 '完整版' 'FULL · 一次装齐，开箱即用' @('精简版的全�
 Option 372 '精简版' 'LITE · 先用起来' $baseItems @('下载最小，几分钟就能开始玩','读取台词、点读查词、在线翻译都能用') @('第一次显示注音时才补装词典，要等一下','没有语音：朗读、配音要以后在「设置 → 语音 / 词典」补装') $lite $false ''
 
 $runtimeDir = Join-Path $Root 'runtime'
-# A long path wrapped to a second line that the 20px label cut in half; keep it on one line and end it with … instead
-$where = Label ('装进 MeguLit 自己的文件夹，不会写到别处：' + $runtimeDir) 32 466 656 20 8 $false $C.muted $choice
-$where.AutoEllipsis = $true; (New-Object Windows.Forms.ToolTip).SetToolTip($where, $runtimeDir)
-[void](Label ('所在磁盘可用 ' + (MB $free) + '   ·   以后移动 MeguLit 文件夹，组件会跟着一起走') 32 486 656 20 8 $false $C.muted $choice)
+[void](Label '安装位置' 32 465 70 20 9 $true $C.cream $choice)
+$pathBox = New-Object Windows.Forms.TextBox; $pathBox.Location = New-Object Drawing.Point(104,462); $pathBox.Size = New-Object Drawing.Size(452,24)
+$pathBox.Font = New-Object Drawing.Font($ui, 9); $pathBox.BackColor = $C.card; $pathBox.ForeColor = $C.cream; $pathBox.BorderStyle = 'FixedSingle'
+$pathBox.Text = Default-Target; $choice.Controls.Add($pathBox)
+$browse = New-Object Windows.Forms.Button; $browse.Text = '更改… Browse'; $browse.Location = New-Object Drawing.Point(566,461); $browse.Size = New-Object Drawing.Size(122,26)
+$browse.Font = New-Object Drawing.Font($ui, 9); Style-Button $browse $false; $browse.FlatAppearance.BorderColor = $C.line; $choice.Controls.Add($browse)
+function Check($text, $x, $w) {
+  $cb = New-Object Windows.Forms.CheckBox; $cb.Text = $text; $cb.Checked = $true; $cb.Location = New-Object Drawing.Point($x,494); $cb.Size = New-Object Drawing.Size($w,22)
+  $cb.Font = New-Object Drawing.Font($ui, 9); $cb.ForeColor = $C.cream; $cb.BackColor = [Drawing.Color]::Transparent; $cb.FlatStyle = 'Flat'; $cb.Cursor = 'Hand'
+  $choice.Controls.Add($cb); $cb
+}
+$deskCheck = Check '在桌面创建快捷方式' 32 190
+$menuCheck = Check '添加到开始菜单' 226 170
+$freeLabel = Label '' 400 496 288 20 8 $false $C.muted $choice; $freeLabel.TextAlign = 'MiddleRight'
+function Update-Free { $f = Drive-Free $pathBox.Text; $freeLabel.Text = '所在磁盘可用 ' + (MB $f); $freeLabel.ForeColor = $(if ($f -lt ((Sum $full 'unpacked') + $appSize) * 1.1) { $C.red } else { $C.muted }) }
+$pathBox.add_TextChanged({ Update-Free }); Update-Free
+$browse.add_Click({
+  $d = New-Object Windows.Forms.FolderBrowserDialog; $d.Description = '选择 MeguLit 的安装位置（会在里面建 MeguLit 文件夹）'; $d.ShowNewFolderButton = $true
+  if ($d.ShowDialog($form) -eq 'OK') {
+    $picked = $d.SelectedPath
+    if ((Split-Path $picked -Leaf) -ne 'MeguLit' -and -not (Test-Path (Join-Path $picked 'MeguLit.exe'))) { $picked = Join-Path $picked 'MeguLit' }
+    $pathBox.Text = $picked
+  }
+})
+$noteText = if ($fromArchive) { '你是在压缩包里直接打开的：选好安装位置后，MeguLit 会整个复制过去再安装，以后从快捷方式打开就行' } else { '运行组件装进安装位置下的 runtime 文件夹，不会写到别处 · 以后移动 MeguLit 文件夹，组件会跟着一起走' }
+$note = Label $noteText 32 524 656 20 8 $fromArchive $(if ($fromArchive) { $C.gold } else { $C.muted }) $choice; $note.AutoEllipsis = $true
 if (-not $webview) {
   $link = New-Object Windows.Forms.LinkLabel; $link.Text = '这台电脑缺少 Microsoft Edge WebView2 运行时，MeguLit 的界面需要它：点这里去微软官网下载安装'
-  $link.Location = New-Object Drawing.Point(32,506); $link.Size = New-Object Drawing.Size(656,20); $link.Font = New-Object Drawing.Font($ui, 8, [Drawing.FontStyle]::Bold)
+  $link.Location = New-Object Drawing.Point(32,548); $link.Size = New-Object Drawing.Size(656,20); $link.Font = New-Object Drawing.Font($ui, 8, [Drawing.FontStyle]::Bold)
   $link.LinkColor = $C.red; $link.ActiveLinkColor = $C.gold; $link.BackColor = [Drawing.Color]::Transparent
   $link.add_LinkClicked({ Start-Process 'https://developer.microsoft.com/microsoft-edge/webview2/' })
   $choice.Controls.Add($link)
 }
 
 # ---- progress page ----
-$progress = New-Object Windows.Forms.Panel; $progress.Location = New-Object Drawing.Point(0,124); $progress.Size = New-Object Drawing.Size(720,526); $progress.BackColor = [Drawing.Color]::Transparent; $progress.Visible = $false
+$progress = New-Object Windows.Forms.Panel; $progress.Location = New-Object Drawing.Point(0,124); $progress.Size = New-Object Drawing.Size(720,576); $progress.BackColor = [Drawing.Color]::Transparent; $progress.Visible = $false
 $stage.Controls.Add($progress)
 $title = Label '正在下载运行组件…' 32 40 640 32 14 $true $C.cream $progress
 $status = Label '' 32 84 656 44 9 $false $C.muted $progress
@@ -193,7 +234,7 @@ $shimmer = New-Object Windows.Forms.Timer; $shimmer.Interval = 30
 $shimmer.add_Tick({ $script:barPhase = ($script:barPhase + 0.012) % 1.0; $bar.Invalidate() })
 function Set-Bar([int]$value) { $script:barBusy = $false; $shimmer.Stop(); $script:barValue = [math]::Max(0, [math]::Min(1000, $value)); $percent.Text = if ($value -gt 0) { ('{0:N0}%' -f ($script:barValue / 10)) } else { '' }; $bar.Invalidate() }
 function Set-Busy { $script:barBusy = $true; $percent.Text = ''; $shimmer.Start(); $bar.Invalidate() }
-[void](Label ('安装位置：' + $runtimeDir) 32 160 656 20 8 $false $C.muted $progress)
+$whereLabel = Label ('安装位置：' + $runtimeDir) 32 160 656 20 8 $false $C.muted $progress; $whereLabel.AutoEllipsis = $true
 $button = New-Object Windows.Forms.Button; $button.Text = '取消 Cancel'; $button.FlatStyle = 'Flat'; $button.ForeColor = $C.cream
 $button.Font = New-Object Drawing.Font($ui, 9, [Drawing.FontStyle]::Bold); Style-Button $button $false; $button.FlatAppearance.BorderColor = $C.red; $button.Location = New-Object Drawing.Point(568,200); $button.Size = New-Object Drawing.Size(120,34); $button.Cursor = 'Hand'
 $progress.Controls.Add($button)
@@ -236,7 +277,48 @@ function Order-Sources($id) {
   return $ok + $bad
 }
 
+# Resolve the chosen folder; copy MeguLit there when it is not this folder. Returns $false (and says why) when it cannot.
+$script:moved = $false
+function Use-Target {
+  $raw = $pathBox.Text.Trim().Trim('"')
+  try { $target = [IO.Path]::GetFullPath($raw).TrimEnd('\') } catch { $target = $null }
+  if (-not $raw -or -not $target -or -not [IO.Path]::IsPathRooted($raw)) { [void][Windows.Forms.MessageBox]::Show($form, '请填写完整的安装位置，例如 D:\MeguLit', 'MeguLit'); return $false }
+  if ($target -ieq $sourceRoot) { return $true }
+  if ($target.StartsWith($sourceRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { [void][Windows.Forms.MessageBox]::Show($form, '安装位置不能放在当前 MeguLit 文件夹里面，换一个位置吧', 'MeguLit'); return $false }
+  if ((Test-Path $target) -and -not (Test-Path (Join-Path $target 'MeguLit.exe')) -and @(Get-ChildItem -Force $target -ErrorAction SilentlyContinue).Count -gt 0) { $target = Join-Path $target 'MeguLit' }
+  try {
+    New-Item -ItemType Directory -Force $target -ErrorAction Stop | Out-Null
+    $probe = Join-Path $target ('.megulit-write-' + $PID); [IO.File]::WriteAllText($probe, 'ok'); Remove-Item $probe -Force
+  } catch { [void][Windows.Forms.MessageBox]::Show($form, ('这个位置不能写入：' + $target + "`n换一个位置吧，例如 D:\MeguLit（Program Files 需要管理员权限）"), 'MeguLit'); return $false }
+  $choice.Visible = $false; $progress.Visible = $true; $button.Enabled = $false
+  $title.Text = '正在复制 MeguLit…'; $status.ForeColor = $C.muted; $status.Text = ('正在把 MeguLit 复制到 ' + $target); $whereLabel.Text = '安装位置：' + $target; Set-Busy; $form.Refresh()
+  $copyArgs = @("`"$sourceRoot`"", "`"$target`"", '/E', '/R:2', '/W:1', '/NP', '/NFL', '/NDL', '/NJH', '/NJS', '/XD', "`"$sourceRoot\logs`"", "`"$sourceRoot\cache`"", 'runtime-*.unpack', '/XF', 'runtime-*.part')
+  $copy = Start-Process -FilePath "$env:SystemRoot\System32\robocopy.exe" -ArgumentList $copyArgs -WindowStyle Hidden -PassThru
+  $null = $copy.Handle
+  while (-not $copy.HasExited) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 30 }
+  $copy.WaitForExit(); $button.Enabled = $true
+  if ($copy.ExitCode -ge 8 -or -not (Test-Path (Join-Path $target 'MeguLit.exe'))) {
+    Set-Bar 0; $choice.Visible = $true; $progress.Visible = $false
+    [void][Windows.Forms.MessageBox]::Show($form, ('复制到 ' + $target + ' 没成功（robocopy ' + $copy.ExitCode + '），检查磁盘空间后再试一次'), 'MeguLit'); return $false
+  }
+  $script:Root = $target; $script:runtimeDir = Join-Path $target 'runtime'; $script:moved = $true
+  return $true
+}
+function Make-Shortcuts {
+  $exePath = Join-Path $Root 'MeguLit.exe'
+  if (-not (Test-Path $exePath)) { return }
+  $places = @(); if ($deskCheck.Checked) { $places += [Environment]::GetFolderPath('Desktop') }; if ($menuCheck.Checked) { $places += [Environment]::GetFolderPath('Programs') }
+  foreach ($dir in $places) {
+    if (-not $dir) { continue }
+    try {
+      $sh = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $dir 'MeguLit.lnk'))
+      $sh.TargetPath = $exePath; $sh.WorkingDirectory = $Root; $sh.IconLocation = $exePath + ',0'; $sh.Description = 'MeguLit'; $sh.Save()
+    } catch {}
+  }
+}
 function Start-Install($ids) {
+  if (-not (Use-Target)) { return }
+  $whereLabel.Text = '安装位置：' + $runtimeDir
   $script:queue = @($ids | Where-Object { $id = $_; @($markers[$id] | Where-Object { -not (Test-Path (Join-Path $Root $_)) }).Count -gt 0 })
   $script:index = 0; $choice.Visible = $false; $progress.Visible = $true; Next-Pack
 }
@@ -337,4 +419,9 @@ if ($env:MEGULIT_SETUP_PREVIEW) { $form.add_Shown({ if ($env:MEGULIT_SETUP_PREVI
 $client.Dispose()
 Get-ChildItem $Root -Filter 'runtime-*.part' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 Get-ChildItem $Root -Directory -Filter 'runtime-*.unpack' -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-if ($script:done -and (Test-Path (Join-Path $Root 'runtime\node.exe'))) { exit 0 } else { exit 1 }
+if ($script:done -and (Test-Path (Join-Path $Root 'runtime\node.exe'))) {
+  Make-Shortcuts
+  # Installed somewhere else: start that copy (its own single-instance lock) and tell this exe to quit (exit 3 = not ready here).
+  if ($script:moved) { Start-Process -FilePath (Join-Path $Root 'MeguLit.exe') -WorkingDirectory $Root; exit 3 }
+  exit 0
+} else { exit 1 }
