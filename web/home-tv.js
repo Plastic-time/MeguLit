@@ -58,13 +58,13 @@ const PILE_IN=620;
 const GLYPHS='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンぁぃぅぇぉゃゅょっ亜唖娃阿哀愛挨姶逢葵茜穐悪握渥旭葦芦鯵梓圧斡扱宛姐虻飴絢綾鮎或粟袷安庵按暗案闇鞍杏以伊位依偉囲夷委威尉惟意慰易椅為畏異移維緯胃萎衣謂違遺医井亥域育郁磯一壱溢逸稲茨芋鰯允印咽員因姻引飲淫胤蔭';
 const rndGlyph=()=>GLYPHS[Math.floor(Math.random()*GLYPHS.length)];
 function scrambleScript(script,lines,onPick){if(!script)return;const esc2=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);clearInterval(+script.dataset.timer||0);
- const old=[...script.querySelectorAll('p .tv-stxt')].map(e=>e.textContent),next=lines.map(t=>/^[「『（("]/.test(t)?t:'「'+t+'」'),cols=Math.max(old.length,next.length);
+ lines=lines.slice(-5);const old=[...script.querySelectorAll('p .tv-stxt')].map(e=>e.textContent).slice(0,5),next=lines.map(t=>/^[「『（("]/.test(t)?t:'「'+t+'」'),cols=Math.max(old.length,next.length);
  const bind=()=>script.querySelectorAll('p').forEach(el=>el.addEventListener('pointerenter',()=>{const n=+el.dataset.n;if(!lines[n])return;script.querySelectorAll('p').forEach(x=>x.classList.toggle('on',x===el));onPick(lines[n]);}));
  const paint=texts=>{script.innerHTML=texts.map((t,n)=>`<p class="${n?'':'on'}" data-n="${n}"><span class="tv-sno">${String(n+1).padStart(2,'0')}</span><span class="tv-stxt">${esc2(t)}</span></p>`).join('');};
  script.classList.remove('is-empty','is-fading');
  if(matchMedia('(prefers-reduced-motion:reduce)').matches||!cols){paint(next);script.classList.toggle('is-empty',!next.length);bind();return;}
- const len=k=>Math.max((old[k]||'').length,(next[k]||'').length,6),start=performance.now(),SCR=320,STEP=28;
- const settleAt=k=>SCR+k*90,done=k=>settleAt(k)+(next[k]||'').length*STEP;
+ const len=k=>Math.max((old[k]||'').length,(next[k]||'').length,6),start=performance.now(),SCR=160,STEP=12;
+ const settleAt=k=>SCR+k*50,done=k=>settleAt(k)+(next[k]||'').length*STEP;
  const end=Math.max(...Array.from({length:cols},(_,k)=>next[k]?done(k):SCR+260));
  paint(Array.from({length:cols},(_,k)=>' '.repeat(len(k))));
  const spans=[...script.querySelectorAll('.tv-stxt')];

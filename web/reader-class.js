@@ -104,7 +104,8 @@ export function openRite({api,locale,esc,toast,current='',pending=0,xpTotal=0,he
    const apply=()=>{const h0=dialog.getBoundingClientRect().height;dialog.dataset.el=pick;dialog.classList.add('is-revealed');reveal.hidden=false;const h1=dialog.getBoundingClientRect().height;if(move&&Math.abs(h1-h0)>4)dialog.animate([{height:h0+'px'},{height:h1+'px'}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)'});
     if(pending>0){dialog.querySelector('[data-r-xp]').hidden=false;const num=dialog.querySelector('[data-r-num]');setTimeout(()=>countUp(num,pending,move?1400:0,n=>'+'+nf.format(n)),move?800:0);}
     setTimeout(()=>{const f=dialog.querySelector('[data-finish]');f.disabled=false;f.focus();},move?1000:0);};
-   if(!move){apply();return;}
+   /* (user: no full-screen flash in the class change) the result comes in on its own, no white over the window */
+   apply();return;
    const st=dialog.querySelector('.class-rite-stage').getBoundingClientRect(),wf=document.createElement('i');wf.className='class-rite-white';wf.style.left=Math.round(st.left+st.width/2)+'px';wf.style.top=Math.round(st.top+st.height/2)+'px';dialog.append(wf);
    wf.animate([{transform:'translate(-50%,-50%) scale(.24)','--h':'0%','--ro':0,easing:'cubic-bezier(.2,.7,.2,1)'},{transform:'translate(-50%,-50%) scale(1)','--h':'0%','--ro':0,offset:.3},{transform:'translate(-50%,-50%) scale(1)','--h':'0%','--ro':0,offset:.5,easing:'cubic-bezier(.5,0,.3,1)'},{transform:'translate(-50%,-50%) scale(1)','--h':'6%','--ro':1,offset:.56},{transform:'translate(-50%,-50%) scale(1)','--h':'80%','--ro':1}],{duration:820,fill:'forwards'});
    setTimeout(apply,250);setTimeout(()=>wf.remove(),860);};

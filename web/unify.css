@@ -233,9 +233,6 @@ html:not(#u):not(#v) body .tv-fig small,html:not(#u):not(#v) body .tv-heatsum{fo
 /* ---- library: the toolbar is one glass bar (2px corners, hairline) — at the top in the list, at the foot of the wall
    so it never sits on a row of titles; the list's head band is clear glass with a hairline; captions fade at the edge,
    meta a step larger and brighter, status dots in the brand palette ---- */
-html:not(#u):not(#v) body .main .field-search{border-radius:2px!important;border:0!important;background:linear-gradient(160deg,rgba(28,22,26,.94),rgba(16,13,17,.94))!important;box-shadow:inset 0 0 0 1px var(--u-line-2),0 18px 40px -16px #000!important;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
-html:not(#u):not(#v) body .main .field-search .icon-button{border-radius:2px!important}
-html:not(#u):not(#v) body .main .field-search input{border-radius:2px!important}
 html:not(#u):not(#v) body .lib-list:not(.lib-selecting)::before{background:none!important;border-bottom-color:var(--u-line)!important}
 html:not(#u):not(#v) body .main .game-caption.mq-box{-webkit-mask:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent);mask:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent)}
 html:not(#u):not(#v) body .lib-list .game-caption{height:auto!important;min-height:0!important;padding:12px 2px 4px!important;font-size:13px!important}
@@ -609,8 +606,6 @@ html:not(#u):not(#v) body dialog.profile-panel .profile-account button.secondary
 html:not(#u):not(#v) body dialog.game-dialog.dev-notice .dev-notice-actions button[data-ok].secondary.secondary.secondary{border-radius:10px!important;color:#fbeedd!important;background:radial-gradient(120% 140% at 0% 50%,rgba(196,40,58,.5),transparent 62%),linear-gradient(135deg,#3a1720 0%,#2a1219 45%,#1d1016 100%)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold-accent,#edb56e) 42%,transparent),inset 0 0 0 3px rgba(20,10,12,.55),inset 0 0 0 4px color-mix(in srgb,var(--gold-accent,#edb56e) 12%,transparent)!important}
 html:not(#u):not(#v) body dialog.game-dialog .dev-notice-updates li{font-weight:400!important}
 /* library: the search is a hairline field with left-aligned text; the wall fades at its sides */
-html:not(#u):not(#v) body .main .field-search input{background:transparent!important;text-align:left!important;box-shadow:none!important;border:0!important}
-html:not(#u):not(#v) body .main.field-page:not(.field-list) .lib-field{-webkit-mask:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
 /* history: the font button sits fully inside the band */
 html:not(#u):not(#v) body .main:has(>.tabs)>.page-header{top:7px!important;height:30px!important}
 
@@ -903,13 +898,6 @@ html:not(#u):not(#v):not(#w) body .main:has(>.history-backdrop) .history-parts l
 
 /* infinite wall: the search back in the middle (user); covers tilt toward the pointer like a trading card, with a
    moving sheen (card-tilt.js sets --rx / --ry / --mx / --my) */
-html:not(#u):not(#v):not(#w) body .lib-field .cover-frame{perspective:700px}
-html:not(#u):not(#v):not(#w) body .lib-field .cover-frame img.cover{transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateZ(0);transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s;transform-style:preserve-3d}
-html:not(#u):not(#v):not(#w) body .lib-field .cover-frame.is-tilting img.cover{transition:transform .06s linear;box-shadow:0 26px 40px -18px #000,0 0 0 1px rgba(255,236,214,.18)}
-html:not(#u):not(#v):not(#w) body .lib-field .cover-frame::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;border-radius:2px;mix-blend-mode:screen;
- background:radial-gradient(60% 50% at var(--mx,50%) var(--my,50%),rgba(255,240,220,.38),transparent 60%),linear-gradient(115deg,transparent 35%,rgba(255,170,190,.16) 45%,rgba(160,210,255,.14) 55%,transparent 65%) 0 0/250% 250%;background-position:center,var(--mx,50%) var(--my,50%)}
-html:not(#u):not(#v):not(#w) body .lib-field .cover-frame.is-tilting::after{opacity:1}
-@media (prefers-reduced-motion:reduce){html body .lib-field .cover-frame img.cover{transform:none!important}}
 
 /* grammar lessons (user: the white formula box and the plain particle boxes were ugly, 朗读 looked bare, the space
    after each line was wasted) */
@@ -1432,7 +1420,7 @@ html:not(#u):not(#v):not(#w):not(#x) body .settings-layout>.settings-content>*{m
    are not cut; the library's floating bar is frosted so it reads above the wall */
 html:not(#u):not(#v):not(#w):not(#x) body .gm-lesson .gm-stepnav{box-shadow:0 120px 0 0 #140f12,0 -18px 24px -12px rgba(0,0,0,.6)!important}
 html:not(#u):not(#v):not(#w):not(#x) body .workspace>.main:not(.home-page){-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 22px);mask-image:linear-gradient(to bottom,transparent 0,#000 22px)}
-html:not(#u):not(#v):not(#w):not(#x) body :is(.field-search,.lib-toolbar){backdrop-filter:blur(14px) saturate(1.2);background:rgba(18,12,15,.82)!important;box-shadow:0 14px 34px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,236,220,.12)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lib-toolbar{backdrop-filter:blur(14px) saturate(1.2);background:rgba(18,12,15,.82)!important;box-shadow:0 14px 34px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,236,220,.12)!important}
 
 /* numbers: lining and tabular everywhere numbers are shown; zero values step back */
 html:not(#u):not(#v):not(#w):not(#x) body :is(.profile-hero-figs dd,.ri-figure,.stat-value,.lb-score,.history-metrics dd,.grimoire-kpi b,.detail-figs dd){font-variant-numeric:lining-nums tabular-nums!important;font-feature-settings:"lnum" 1,"tnum" 1!important}
@@ -1603,9 +1591,7 @@ html:not(#u):not(#v):not(#w):not(#x) body .main :is(.about-facts,.about-links,.a
 /* cover wall (judge r10: the floating search sat on top of titles). It stays in the middle — the user's choice — and
    now rests in a dark pool: a solid backing and a wide soft halo, so whatever passes beneath fades out instead of
    colliding with it */
-html:not(#u):not(#v):not(#w):not(#x) body .field-page:not(.field-list) .field-search{background:#150e12!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.16)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 /* (judge r11: the pool's edge was hard and it dimmed the grid view too) only on the wall, a soft elliptical pool */
-html:not(#u):not(#v):not(#w):not(#x) body .field-page:not(.field-list) .field-search::before{content:"";position:absolute;inset:-90px -200px;z-index:-1;pointer-events:none;border-radius:50%;background:radial-gradient(closest-side,rgba(12,8,10,.92),rgba(12,8,10,.7) 55%,rgba(12,8,10,0))}
 /* grammar lesson (judge r8–r10: text ran on below the step bar): the step bar is no longer pinned — it follows the
    step's content, so nothing can show beneath it */
 html:not(#u):not(#v):not(#w):not(#x) body .gm-lesson .gm-stepnav{position:static!important;box-shadow:none!important;margin-top:28px!important}
@@ -1652,3 +1638,18 @@ html:not(#u):not(#v):not(#w):not(#x) body dialog.dev-notice .dev-notice-form>but
 html:not(#u):not(#v):not(#w):not(#x) body .select-trigger .select-note{display:none!important}
 /* words page proficiency dropdown: readable, with its frame */
 html:not(#u):not(#v):not(#w):not(#x) body .main .word-actions .select-trigger{color:rgba(241,224,210,.82)!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.26)!important;border-radius:2px!important}
+
+/* ==== user review 2026-11-12 ==== */
+/* tools (user: no 01 02; one open button only): no counters, no second "open" on hover; the text takes the freed column */
+html:not(#u):not(#v):not(#w):not(#x) body .grimoire-page .tool-card::before{content:none!important;display:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .grimoire-page .tool-meta::after{content:none!important;display:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .grimoire-page .tool-card{grid-template-columns:minmax(0,1fr) 300px!important;grid-template-areas:"top side" "desc side" "note side"!important}
+
+/* the wall's cover tilt (user: like Steam trading cards) stays */
+html:not(#u):not(#v):not(#w) body .lib-field .cover-frame{perspective:700px}
+html:not(#u):not(#v):not(#w) body .lib-field .cover-frame img.cover{transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateZ(0);transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s;transform-style:preserve-3d}
+html:not(#u):not(#v):not(#w) body .lib-field .cover-frame.is-tilting img.cover{transition:transform .06s linear;box-shadow:0 26px 40px -18px #000,0 0 0 1px rgba(255,236,214,.18)}
+html:not(#u):not(#v):not(#w) body .lib-field .cover-frame::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;border-radius:2px;mix-blend-mode:screen;
+ background:radial-gradient(60% 50% at var(--mx,50%) var(--my,50%),rgba(255,240,220,.38),transparent 60%),linear-gradient(115deg,transparent 35%,rgba(255,170,190,.16) 45%,rgba(160,210,255,.14) 55%,transparent 65%) 0 0/250% 250%;background-position:center,var(--mx,50%) var(--my,50%)}
+html:not(#u):not(#v):not(#w) body .lib-field .cover-frame.is-tilting::after{opacity:1}
+@media (prefers-reduced-motion:reduce){html body .lib-field .cover-frame img.cover{transform:none!important}}
