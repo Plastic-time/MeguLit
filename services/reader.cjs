@@ -48,6 +48,7 @@ class Reader{
   if(message.type==='hookDialog')this.immersion.engine(message.visible,message.engine);
   if(message.type==='markerPresence')this.immersion.marker(message.present===true);
   if(message.type==='waitMarkerDrawn'){this.immersion.markerDrawn();this.gal?.send({type:'markerHookDrawn'});}
+  /* Issue 127: Alt+H and its hotkey registration reach the log, so a report shows whether the cover was really switched */if(message.type==='ready')this.logVisibility({type:'readerHotkeys',menu:message.hotkey,cover:message.coverHotkey,mode:message.modeHotkey});if(message.type==='cover'&&typeof message.coverEnabled==='boolean')this.logVisibility({type:'cover',enabled:message.coverEnabled});
   if(message.type==='ready'){this.gal?.send({type:'dialogConfig',scene:config.immersion===true,auto:config.immersion===true,active:config.immersion&&config.dialogDetection==='visual',marker:config.immersion&&config.dialogDetection==='marker'});this.gal?.setGameAudio(config.ankiGameMedia!==false);}
   if(message.type==='gameClosed'||message.bound===false)this.immersion.bind('');else if(message.gameHwnd)this.immersion.bind(message.gameHwnd+'|'+message.gameProcessId+'|'+message.gameStarted);
   if(typeof message.hookSource==='string'){this.gal?.send({type:'markerSource',text:message.hookSource});if(!message.hookRecovering&&message.hookSourceOrigin!=='history'){
@@ -195,6 +196,7 @@ class Reader{
    case 'hookReselect':g?.reselectStream?.(r.onlyIfBad===true);break;
    case 'hookSelect':g?.hooks.select(r.id);break;
    case 'hookCheck':g?.controller.check();break;
+   case 'readerReading':this.immersion?.reading?.();break;
    case 'hookRescan':g?.hooks.rescan();break;
    case 'hookReplacementConfirm':g?.hooks.confirmReplacement();break;
    case 'gameStyleProfileRequest':g?.styleSync.replay();break;

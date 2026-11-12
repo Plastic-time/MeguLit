@@ -1839,3 +1839,6 @@ html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more .lg-row:
 html:not(#u):not(#v):not(#w):not(#x) body .gm-hero-ja[data-len=l]{font-size:clamp(36px,3vw,52px)!important;line-height:1.12!important}
 html:not(#u):not(#v):not(#w):not(#x) body .gm-hero-ja[data-len=xl]{font-size:clamp(26px,2.1vw,36px)!important;line-height:1.25!important}
 html:not(#u):not(#v):not(#w):not(#x) body .gm-hero-ja:is([data-len=l],[data-len=xl]){display:-webkit-box!important;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;flex:1 1 100%;min-width:0}
+/* Issue 128 (user: the Anki window in 学习 › 复习 became very small): #review-content centres its landing card, so the
+   card panel shrank to its content and the card frame to an iframe's default 300px. The panel always fills the column. */
+html:not(#u):not(#v) body .review-page #review-content>.anki-review-panel{align-self:stretch;width:100%;box-sizing:border-box}

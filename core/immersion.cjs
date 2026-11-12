@@ -20,6 +20,10 @@ class Immersion{
  // CS2 re-sends the current line's text several times per line and again on redraws: only a different line counts as
  // a new line, or a repeat would cancel every pending hide (OP, CG) right after the sprite went off.
  input(){this.inputAt=this.now();}
+ /* Issue 127 (user: with blurred translations, hovering back and forth over them sometimes lost the subtitles). The pointer on
+    MeguLit's own text means the line is being read: a marker that left meanwhile (many engines drop it while the pointer
+    moves) does not hide the layer, and a marker hide already in place is lifted. */
+ reading(){this.readingAt=this.now();if(this.enabled&&this.hiddenByMarker&&!this.visible&&!this.sceneHidden&&this.skipAt==null){this.hiddenByMarker=false;this.markerGoneAt=0;this.set(true);}}
  skip(held){if(!this.enabled)return;if(held){this.skipAt??=this.now();}else this.skipAt=null;}
  /* E422 (user, WoH: the layer still hid by itself; reader log: "scene changed 98%"). A scene hide that came before the first
     page line stayed: once the game was known as a page game every "scene back" was ignored. The page game is known from
@@ -72,6 +76,7 @@ class Immersion{
      engines drop the wait marker while the pointer is over their buttons. Without a click, Space or Enter in the game
      shortly before, a missing marker only hides after 8 s (auto mode, a long hover); after such an advance input 0.6 s. */
   const advanced=this.inputAt!=null&&this.inputAt>=gone-2500&&this.inputAt<=gone+600;
+  if(this.readingAt!=null&&this.now()-this.readingAt<3000)return;
   if(gone&&this.now()-gone>=(advanced?600:8000)){this.hiddenByMarker=true;this.set(false,'marker');}
  }
 }

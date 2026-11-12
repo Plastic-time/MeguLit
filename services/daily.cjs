@@ -6,7 +6,7 @@
    exactly the term (never a tokenizer guess). No relay / no data → {state:'not-configured'|'error'|'empty'}. */
 const fs=require('node:fs'),path=require('node:path');
 const relay=require('./relay-config.cjs');
-const TIMEOUT=8000;
+const TIMEOUT=8000,GLOSS_BUDGET=4000;
 const str=(v,n)=>typeof v==='string'?v.slice(0,n):'';
 const link=v=>{try{const u=new URL(String(v||''));return u.protocol==='https:'||u.protocol==='http:'?u.href:'';}catch{return '';}};
 async function get(url,fetcher){
@@ -67,7 +67,10 @@ words=w.state==='ok'?cleanWords(w.data,db):null;
  if(news)await thumbnails(root,base,news.items,fetcher);
  /* machine translation of a proper noun only repeats the name, so it fills ordinary words only */
  const bare=(words?.words||[]).filter(w=>!w.gloss&&(!w.kind||w.kind==='word'));
- if(bare.length)try{const r=await translateList(root,options.runtime,bare.map(w=>w.term),'zh-CN',options);bare.forEach((w,i)=>{const t=String(r.texts[i]||'').trim();if(t&&t!==w.term){w.gloss=t.slice(0,30);w.glossFrom='mt';}});}catch{}
+ /* Issue 129: glosses are a nicety. Offline or with the translator unreachable, one call per word waited out its own
+    timeout and the page sat on its loading card for minutes. They get GLOSS_BUDGET; whatever is not back by then is left
+    out (the calls go on and fill the cache for the next visit). */
+ if(bare.length){const glossing=translateList(root,options.runtime,bare.map(w=>w.term),'zh-CN',options).then(r=>{bare.forEach((w,i)=>{const t=String(r.texts[i]||'').trim();if(t&&t!==w.term){w.gloss=t.slice(0,30);w.glossFrom='mt';}});}).catch(()=>{});let timer;await Promise.race([glossing,new Promise(r=>{timer=setTimeout(r,options.glossBudget??GLOSS_BUDGET);})]);clearTimeout(timer);}
  for(const n of news?.items||[])if(n.fulltext)fulltext.add(n.link);
  for(const u of [...(news?.items||[]).map(x=>x.link),...(words?.words||[]).map(x=>x.url)])if(u&&u.startsWith('https:'))shown.add(u);
  return {state,error:state==='error'?n.error||w.error:undefined,news,words};

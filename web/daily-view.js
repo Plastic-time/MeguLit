@@ -18,6 +18,7 @@ const W={
   emptyTitle:'Today’s paper is still at the press',emptyText:'The online service has not delivered news or words yet. Come back later or press Refresh',errorTitle:'Cannot reach the daily',errorText:'Check your connection or refresh later',
   noNews:'No news in this column yet',noWords:'Today’s words are not ready yet',more:'More news',weekday:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],credit:'Headlines and summaries from each site’s public RSS. Click to read the original'}
 };
+const LOAD_LIMIT=25000;
 const pad=n=>String(n).padStart(2,'0');
 function dateline(locale,w,now=new Date()){
  const y=now.getFullYear(),m=now.getMonth()+1,d=now.getDate(),wd=w.weekday[now.getDay()];
@@ -63,7 +64,8 @@ function focusFromHome(main){let link='';try{link=sessionStorage.getItem('meguli
 export async function mountDaily(main,{api,locale,esc,toast,isCurrent=()=>true,lookup,openSettings}){
  let data=null,filter='all',cat=(()=>{try{return localStorage.getItem('megulit-daily-cat')==='acg'?'acg':'gal';}catch{return 'gal';}})();
  const paint=()=>{main.innerHTML=pageHTML(data,{locale,esc,filter,cat});bind();focusFromHome(main);requestAnimationFrame(()=>{placeInk(main);main.querySelector('.dl')?.classList.add('dl-ready');});};
- const load=async(spin)=>{if(spin)main.querySelector('[data-dl-refresh]')?.classList.add('dl-spin');try{data=await api('daily_view',spin?{force:true}:{});}catch{data={state:'error'};}if(isCurrent())paint();};
+ const load=async(spin)=>{if(spin)main.querySelector('[data-dl-refresh]')?.classList.add('dl-spin');/* Issue 129: never sit on the loading card. The service answers within ~12 s (8 s per relay request, 4 s for glosses); past LOAD_LIMIT the page shows the error card with its refresh button, and it reloads by itself when the connection comes back */let timer;try{data=await Promise.race([api('daily_view',spin?{force:true}:{}),new Promise((_,no)=>{timer=setTimeout(()=>no(Error('DAILY_TIMEOUT')),LOAD_LIMIT);})]);}catch(e){data={state:'error',error:/TIMEOUT/.test(String(e?.message||''))?'TIMEOUT':'NETWORK'};}finally{clearTimeout(timer);}if(isCurrent())paint();};
+  window.addEventListener('online',function back(){if(!isCurrent()){window.removeEventListener('online',back);return;}if(data?.state==='error')load(false);});
  function bind(){
   main.querySelectorAll('[data-dl-refresh]').forEach(b=>b.onclick=()=>load(true));
   bindOpen(main);
