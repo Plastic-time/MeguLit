@@ -36,7 +36,7 @@ function schemeOf(file){let head,total;try{total=fs.statSync(file).size;head=rea
  chosen.set(key,found);return found;}
 function list(file){const scheme=schemeOf(file),arc=path.parse(file).name.toLowerCase();if(!scheme||!scheme[arc])return null;
  // E450 the index is read, entries are read from the file when asked for (voice.dat is two gigabytes)
- const total=fs.statSync(file).size,at=(o,n)=>{const d=Buffer.alloc(n),fd=fs.openSync(file,'r');try{fs.readSync(fd,d,0,n,o);}finally{fs.closeSync(fd);}return d;};
+ const total=fs.statSync(file).size,at=(o,n)=>readAt(file,o,n);
  const start=scheme.version>0?0x20:0;let size=at(start,4).readUInt32LE(0);const xor=size>>>24;if(xor)size=(size^(xor*0x01010101))>>>0;
  const b={length:total,subarray:(s,e)=>at(s,e-s)};
  if(size&7||start+4+size>b.length)return null;const raw=Buffer.from(b.subarray(start+4,start+4+size));if(xor)for(let i=0;i<raw.length;i++)raw[i]^=xor;

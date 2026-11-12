@@ -45,7 +45,7 @@ function run(args,{timeout=10*60000}={}){
   const ps=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
   const p=spawn(ps,['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',HOST,'-GarbroDir',DIR(),...args],{windowsHide:true});
   let out='',err='';const timer=setTimeout(()=>{try{p.kill();}catch{}reject(Error('GARBRO_TIMEOUT'));},timeout);
-  p.stdout.on('data',d=>out+=d);p.stderr.on('data',d=>err+=d);p.on('error',e=>{clearTimeout(timer);reject(e);});
+  /* one decoder per stream: a Japanese file name split across two chunks stays whole */p.stdout.setEncoding('utf8');p.stderr.setEncoding('utf8');p.stdout.on('data',d=>out+=d);p.stderr.on('data',d=>err+=d);p.on('error',e=>{clearTimeout(timer);reject(e);});
   p.on('exit',()=>{clearTimeout(timer);const line=out.trim().split(/\r?\n/).pop()||'';let json=null;try{json=JSON.parse(line);}catch{}
    if(!json)return reject(Error('GARBRO_BAD_OUTPUT '+(err||out).slice(0,300)));if(json.error)return reject(Error(json.error));resolve(json);});
  });
