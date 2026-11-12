@@ -5,10 +5,10 @@ import {launchReason} from './launch-feedback.js';
 const SET={zh:'在游戏「设置 / 选项」里找「语言」或「文本语言」，切成日语（分主要 / 次要语言时，把「主要」设成日语）',en:'In the game\'s Settings / Options, find Language or Text language and choose Japanese (when there is a main and a sub language, set the main one to Japanese)',ja:'ゲームの「設定 / オプション」で「言語」または「テキスト言語」を日本語にしてください（主 / 副の言語がある場合は「主」を日本語に）'};
 const W={
  zh:{eyebrow:'汉化版向导',title:'这是汉化版：先换回日文原版，MeguLit 才能读日文',sub:'MeguLit 读的是游戏的日文原文，汉化组的译文之后会自动配上。下面是自动检查的结果，按顺序看就行',
-  s1:'① 游戏自己能不能切成日文',s2:'② 本机的日文原版资源',s3:'③ 网上的日文化补丁',s4:'去找日文原版',none1:'没发现游戏自带的语言切换',none2:'本机没找到日文原版或备份',
-  recheck:'重新检查',language:'日文原版与语言环境',reveal:'显示位置',swap:'切换到日文版',restore:'恢复日文',exe:'改用日文程序启动',nearbyBtn:'改用这份日文原版',working:'处理中…',done:'已换成日文原版',failed:'没能完成，请看上面的说明',checking:'正在检查这部作品…',
+  s1:'游戏自己能不能切成日文',s2:'本机的日文原版资源',s3:'网上的日文化补丁',s4:'去找日文原版',none1:'没发现游戏自带的语言切换',none2:'本机没找到日文原版或备份',
+  recheck:'重新检查',fold:'收起',unfold:'展开',language:'日文原版与语言环境',reveal:'显示位置',swap:'切换到日文版',restore:'恢复日文',exe:'改用日文程序启动',nearbyBtn:'改用这份日文原版',working:'处理中…',done:'已换成日文原版',failed:'没能完成，请看上面的说明',checking:'正在检查这部作品…',
   'config-key':x=>'配置文件 '+x.rel+' 里有语言设置 '+x.key+' = '+x.value+(x.japanese?'，已经是日语':'：关掉游戏后把它改成日语（常见写法 ja / jp / japanese），改之前先复制一份备份'),
-  'lang-folder':x=>'游戏带日文资源文件夹 '+x.rel+(x.multi?'，还有其他语言的文件夹，是多语言版：'+SET.zh:'：先在游戏设置里找语言选项；找不到就点下面第②步的修复'),
+  'lang-folder':x=>'游戏带日文资源文件夹 '+x.rel+(x.multi?'，还有其他语言的文件夹，是多语言版：'+SET.zh:'：先在游戏设置里找语言选项；找不到就点下面「本机的日文原版资源」里的修复'),
   'lang-archive':x=>'游戏带日文数据文件 '+x.rel+'：'+SET.zh,
   'config-tool':x=>'游戏带设置程序 '+x.rel+'：打开它看看有没有「语言 / Language」选项，选日本語',
   steam:(x,o)=>o.steamJapanese===true?'Steam 商店页写着这部作品支持日语：在 Steam 库里右键这部作品 → 属性 → 语言，选「日本語」，等 Steam 更新完再启动'+(x.current?'（现在是 '+x.current+'）':''):o.steamJapanese===false?'Steam 商店页没有列出日语，Steam 里切换不了':'这是 Steam 版：在 Steam 库里右键这部作品 → 属性 → 语言，看看有没有「日本語」',
@@ -26,10 +26,10 @@ const W={
   patch:p=>'网上有这部作品的日文化补丁：「'+p.title+'」'+(p.fromEnglish?'。这类补丁通常是给英文版用的：如果你的汉化版是在英文版（比如 Steam 国际版）上做的，先装回英文版、打上这个日文补丁，再到「工具 → 日文原版恢复 → 从日文原版导入」选它':''),
   sitesLead:'本机和网上都没找到能直接用的日文资源。可以到下面这些地方搜索这部作品的日文原版（生肉），装好后点「日文原版与语言环境」选它的程序：',sitesEmpty:'本机和网上都没找到能直接用的日文资源。可以到常用的游戏资源站搜索这部作品的日文原名（生肉），装好后点「日文原版与语言环境」选它的程序'},
  en:{eyebrow:'Chinese build guide',title:'This is a Chinese build: switch back to the Japanese original so MeguLit can read Japanese',sub:'MeguLit reads the game\'s Japanese text; the group\'s translation is paired in afterwards. These are the results of the automatic checks, in order',
-  s1:'1. Can the game switch to Japanese itself',s2:'2. Japanese originals on this PC',s3:'3. Japanese patches online',s4:'Find the Japanese original',none1:'No built-in language switch found',none2:'No Japanese original or backup found on this PC',
-  recheck:'Check again',language:'Japanese version & locale',reveal:'Show in folder',swap:'Switch to Japanese',restore:'Restore Japanese',exe:'Start the Japanese program',nearbyBtn:'Use this Japanese copy',working:'Working…',done:'Switched to the Japanese original',failed:'Could not finish; see the notes above',checking:'Checking this game…',
+  s1:'Can the game switch to Japanese itself',s2:'Japanese originals on this PC',s3:'Japanese patches online',s4:'Find the Japanese original',none1:'No built-in language switch found',none2:'No Japanese original or backup found on this PC',
+  recheck:'Check again',fold:'Collapse',unfold:'Expand',language:'Japanese version & locale',reveal:'Show in folder',swap:'Switch to Japanese',restore:'Restore Japanese',exe:'Start the Japanese program',nearbyBtn:'Use this Japanese copy',working:'Working…',done:'Switched to the Japanese original',failed:'Could not finish; see the notes above',checking:'Checking this game…',
   'config-key':x=>'The config file '+x.rel+' has a language setting '+x.key+' = '+x.value+(x.japanese?', already Japanese':': with the game closed, set it to Japanese (usually ja / jp / japanese); copy the file first'),
-  'lang-folder':x=>'The game has a Japanese folder '+x.rel+(x.multi?' next to other languages, so it is multilingual: '+SET.en:': look for a language option in the game settings first; if there is none, use the fix in step 2'),
+  'lang-folder':x=>'The game has a Japanese folder '+x.rel+(x.multi?' next to other languages, so it is multilingual: '+SET.en:': look for a language option in the game settings first; if there is none, use the fix under Japanese originals on this PC'),
   'lang-archive':x=>'The game has Japanese data '+x.rel+': '+SET.en,
   'config-tool':x=>'The game has a settings program '+x.rel+': open it and look for a Language option',
   steam:(x,o)=>o.steamJapanese===true?'The Steam store lists Japanese: in your Steam library, right-click the game → Properties → Language, choose Japanese and let Steam update'+(x.current?' (now '+x.current+')':''):o.steamJapanese===false?'The Steam store does not list Japanese, so Steam cannot switch it':'Steam build: right-click the game in your Steam library → Properties → Language and look for Japanese',
@@ -47,10 +47,10 @@ const W={
   patch:p=>'A Japanese patch for this game circulates online: "'+p.title+'"'+(p.fromEnglish?'. Such patches are usually for the English release: if your Chinese build was made on the English (Steam) release, reinstall the English release, apply the Japanese patch, then pick it under Tools → Restore Japanese original → Import':''),
   sitesLead:'No usable Japanese resource was found on this PC or online. Search for the Japanese original of this game here, install it and pick its program under Japanese version & locale:',sitesEmpty:'No usable Japanese resource was found on this PC or online. Search the usual game sites for the Japanese title, install it and pick its program under Japanese version & locale'},
  ja:{eyebrow:'中国語版ガイド',title:'中国語版です。日本語版に戻すと MeguLit が日本語を読めます',sub:'MeguLit はゲームの日本語原文を読み、翻訳はあとから自動で組み合わせます。自動チェックの結果を順に確認してください',
-  s1:'① ゲーム自体で日本語に切り替えられるか',s2:'② この PC にある日本語版の資源',s3:'③ ネット上の日本語化パッチ',s4:'日本語版を探す',none1:'ゲーム内の言語切替は見つかりませんでした',none2:'この PC に日本語版やバックアップは見つかりませんでした',
-  recheck:'再確認',language:'日本語版と言語環境',reveal:'場所を表示',swap:'日本語版に切り替え',restore:'日本語に戻す',exe:'日本語版で起動する',nearbyBtn:'この日本語版を使う',working:'処理中…',done:'日本語版に切り替えました',failed:'完了できませんでした。上の説明を確認してください',checking:'この作品を確認しています…',
+  s1:'ゲーム自体で日本語に切り替えられるか',s2:'この PC にある日本語版の資源',s3:'ネット上の日本語化パッチ',s4:'日本語版を探す',none1:'ゲーム内の言語切替は見つかりませんでした',none2:'この PC に日本語版やバックアップは見つかりませんでした',
+  recheck:'再確認',fold:'たたむ',unfold:'開く',language:'日本語版と言語環境',reveal:'場所を表示',swap:'日本語版に切り替え',restore:'日本語に戻す',exe:'日本語版で起動する',nearbyBtn:'この日本語版を使う',working:'処理中…',done:'日本語版に切り替えました',failed:'完了できませんでした。上の説明を確認してください',checking:'この作品を確認しています…',
   'config-key':x=>'設定ファイル '+x.rel+' に言語設定 '+x.key+' = '+x.value+' があります'+(x.japanese?'（すでに日本語）':'。ゲームを閉じて日本語（ja / jp / japanese など）に変えてください。先にコピーを取ってください'),
-  'lang-folder':x=>'日本語のフォルダ '+x.rel+' があります'+(x.multi?'。他の言語もある多言語版です：'+SET.ja:'。まずゲームの設定で言語を探し、なければ ② の修正を使ってください'),
+  'lang-folder':x=>'日本語のフォルダ '+x.rel+' があります'+(x.multi?'。他の言語もある多言語版です：'+SET.ja:'。まずゲームの設定で言語を探し、なければ 「この PC にある日本語版の資源」の修正を使ってください'),
   'lang-archive':x=>'日本語データ '+x.rel+' があります：'+SET.ja,
   'config-tool':x=>'設定プログラム '+x.rel+' があります。「言語 / Language」の項目がないか確認してください',
   steam:(x,o)=>o.steamJapanese===true?'Steam ストアに日本語対応とあります：Steam ライブラリで右クリック → プロパティ → 言語 で「日本語」を選び、更新を待ってください'+(x.current?'（現在 '+x.current+'）':''):o.steamJapanese===false?'Steam ストアに日本語の記載はなく、Steam では切り替えられません':'Steam 版です：ライブラリで右クリック → プロパティ → 言語 に「日本語」がないか確認してください',
@@ -87,22 +87,27 @@ export function mountCnGuide({host,id,api,locale,esc,toast,isCurrent=()=>true,on
  if(!host)return;const w=W[locale]||W.zh;let tries=0,timer=0;
  const box=document.createElement('section');box.className='cn-guide';box.hidden=true;box.setAttribute('aria-live','polite');host.after(box);
  const item=(x,i)=>`<li class="cn-guide-item${x.strong?' is-strong':''}${x.muted?' is-muted':''}"><p>${esc(x.text)}</p>${x.fix?`<button type="button" class="${x.fix==='reveal'?'secondary':'primary'}" data-cn-fix="${x.fix}" data-cn-i="${i}">${esc(x.label||(x.fix==='reveal'?w.reveal:w[FIX_LABEL[x.fix]]))}</button>`:''}</li>`;
- const step=(title,items,empty,base)=>`<div class="cn-guide-step"><h3>${title}</h3><ul>${items.length?items.map((x,i)=>item(x,base+i)).join(''):`<li class="cn-guide-item is-muted"><p>${esc(empty)}</p></li>`}</ul></div>`;
+ /* 2026-11-13 user: tidy the card. A step with nothing found folds into one quiet line; sites open in the browser */
+ const step=(title,items,empty,base)=>{const real=items.filter(x=>!x.muted);if(!real.length){const t=items[0]?.text||empty;return `<div class="cn-guide-step is-empty${items[0]?.pending?' is-pending':''}"><h3>${title}</h3><p>${esc(t)}</p></div>`;}return `<div class="cn-guide-step"><h3>${title}</h3><ul>${items.map((x,i)=>item(x,base+i)).join('')}</ul></div>`;};
+ const site=l=>{const m=String(l).match(/^\s*((?:https?:\/\/)?[\w.-]+\.[a-z]{2,}(?:\/\S*)?)\s*(.*)$/i);if(!m)return `<li><span class="cn-site-note">${esc(l)}</span></li>`;const url=/^https?:/i.test(m[1])?m[1]:'https://'+m[1],note=m[2].replace(/^[（(]/,'').replace(/[）)]$/,'');return `<li><button type="button" class="cn-site" data-cn-open="${esc(url)}"><b>${esc(m[1].replace(/^https?:\/\//,''))}</b>${note?`<span class="cn-site-note">${esc(note)}</span>`:''}<i aria-hidden="true">↗</i></button></li>`;};
+ const foldKey='megulit.cnGuide.fold.'+id;let folded=false;try{folded=localStorage.getItem(foldKey)==='1';}catch{}
  function paint(g){
   if(!isCurrent()||!g?.chinese){box.hidden=true;return;}
   const v=guideItems(g,locale),all=[...v.switchItems,...v.restoreItems,...v.onlineItems];
-  box.hidden=false;box.innerHTML=`<header class="cn-guide-head"><span class="cn-guide-eyebrow">${w.eyebrow}</span><h2>${w.title}</h2><p>${w.sub}</p></header><div class="cn-guide-steps">${step(w.s1,v.switchItems,w.none1,0)}${step(w.s2,v.restoreItems,w.none2,v.switchItems.length)}${step(w.s3,v.onlineItems,'',v.switchItems.length+v.restoreItems.length)}${v.sites?`<div class="cn-guide-step cn-guide-sites"><h3>${w.s4}</h3><p>${esc(v.sites.lead)}</p>${v.sites.lines.length?`<ul>${v.sites.lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}</div>`:''}</div><footer class="cn-guide-actions"><p class="settings-help" role="status" data-cn-status></p><button type="button" class="secondary" data-cn-recheck>${w.recheck}</button><button type="button" class="secondary" data-cn-language>${w.language}</button></footer>`;
+  box.hidden=false;box.innerHTML=`<header class="cn-guide-head"><span class="cn-guide-eyebrow">${w.eyebrow}</span><h2>${w.title}</h2><p>${w.sub}</p><button type="button" class="cn-guide-fold" data-cn-fold aria-expanded="${!folded}">${folded?w.unfold:w.fold}</button></header><div class="cn-guide-body"><div class="cn-guide-steps">${step(w.s1,v.switchItems,w.none1,0)}${step(w.s2,v.restoreItems,w.none2,v.switchItems.length)}${step(w.s3,v.onlineItems,'',v.switchItems.length+v.restoreItems.length)}${v.sites?`<div class="cn-guide-step cn-guide-sites"><h3>${w.s4}</h3><p>${esc(v.sites.lead)}</p>${v.sites.lines.length?`<ul class="cn-sites">${v.sites.lines.map(site).join('')}</ul>`:''}</div>`:''}</div><footer class="cn-guide-actions"><p class="settings-help" role="status" data-cn-status></p><button type="button" class="secondary" data-cn-recheck>${w.recheck}</button><button type="button" class="secondary" data-cn-language>${w.language}</button></footer></div>`;box.classList.toggle('is-folded',folded);
   const status=box.querySelector('[data-cn-status]');
   box.querySelector('[data-cn-recheck]').onclick=()=>{tries=0;status.textContent=w.checking;load();};
+  box.querySelector('[data-cn-fold]').onclick=e=>{folded=!folded;try{localStorage.setItem(foldKey,folded?'1':'0');}catch{}box.classList.toggle('is-folded',folded);e.currentTarget.textContent=folded?w.unfold:w.fold;e.currentTarget.setAttribute('aria-expanded',String(!folded));};
+  box.querySelectorAll('[data-cn-open]').forEach(b=>b.onclick=()=>api('open_source',{url:b.dataset.cnOpen}).catch(()=>{}));
   box.querySelector('[data-cn-language]').onclick=()=>openLanguage?.();
   box.querySelectorAll('[data-cn-fix]').forEach(button=>button.onclick=async()=>{const x=all[Number(button.dataset.cnI)];if(!x)return;
-   box.querySelectorAll('button').forEach(b=>b.disabled=true);status.textContent=w.working;
+   box.querySelectorAll('[data-cn-fix],[data-cn-recheck]').forEach(b=>b.disabled=true);status.textContent=w.working;
    try{
     if(x.fix==='reveal'){await api('cn_guide_fix',{id,kind:'reveal',path:x.path});status.textContent='';}
     else{if(x.fix==='swap')await api('cn_guide_fix',{id,kind:'swap'});else if(x.fix==='restore')await api('jp_restore_apply',{id});else if(x.fix==='exe')await api('game_original_executable',{id,mode:'select',executable:x.path});
      toast?.(w.done);await onChanged?.();if(isCurrent())load();return;}
    }catch(error){const code=String(error?.message||error).match(/[A-Z][A-Z0-9_]{4,}/)?.[0]||'';status.textContent=launchReason(code,locale)||w.failed;}
-   finally{box.querySelectorAll('button').forEach(b=>b.disabled=false);}});
+   finally{box.querySelectorAll('[data-cn-fix],[data-cn-recheck]').forEach(b=>b.disabled=false);}});
   /* the online check runs in the background: ask again a few times while it is pending */
   clearTimeout(timer);if(g.online?.state==='pending'&&tries++<8)timer=setTimeout(()=>{if(isCurrent()&&box.isConnected)load();},2500);
  }
