@@ -409,6 +409,88 @@ namespace Yuris6Embed
     ReleaseSRWLockExclusive(&lock);
     buffer->from(src, n);
   }
+  /* MeguLit (user 2026-11-12, サイコロジック・ラブコメディ: "テキスト内部エラーです。テキストサイズ情報を正しく格納できませ
+   * んでした" while skipping, then the game closed). The text sent out is cleaned (Yuris6Clean drops ruby markup
+   * ＜base／ruby＞ / ≪…≫ and the engine's \xEF\xF0-\xF5 / \x81\x98 codes), so a replacement written back was shorter and
+   * without those codes, and the engine's size table for the line no longer matched. A raw line that carries any of
+   * them is now only ever blanked in place: every code and markup byte stays where it was and the length is exactly
+   * the original; anything other than a blank reply leaves such a line untouched. */
+  static bool Construct(const char *s, size_t n, size_t at, UINT cp, size_t *len)
+  {
+    unsigned char a = s[at], b = at + 1 < n ? (unsigned char)s[at + 1] : 0;
+    if (cp == CP_UTF8)
+    {
+      // ≪ ≫ ＜ ＞ ／ (3 bytes each)
+      static const char *marks[] = {"\xE2\x89\xAA", "\xE2\x89\xAB", "\xEF\xBC\x9C", "\xEF\xBC\x9E", "\xEF\xBC\x8F"};
+      for (auto m : marks)
+        if (at + 3 <= n && memcmp(s + at, m, 3) == 0)
+          return *len = 3, true;
+      return false;
+    }
+    if (a == 0xEF && b >= 0xF0 && b <= 0xF5)
+      return *len = 2, true;
+    if (a == 0x81 && (b == 0x98 || b == 0x83 || b == 0x84 || b == 0x5E || b == 0xE1 || b == 0xE2))
+      return *len = 2, true;
+    return false;
+  }
+  static bool HasConstructs(const char *s, size_t n, UINT cp)
+  {
+    for (size_t at = 0; at < n;)
+    {
+      size_t len = 0;
+      if (Construct(s, n, at, cp, &len))
+        return true;
+      unsigned char c = s[at];
+      at += cp == CP_UTF8 ? (c >= 0xf0 ? 4 : c >= 0xe0 ? 3 : c >= 0xc0 ? 2 : 1) : (IsDBCSLeadByteEx(932, c) ? 2 : 1);
+    }
+    return false;
+  }
+  static bool Blank(const std::string &t)
+  {
+    for (size_t i = 0; i < t.size();)
+    {
+      if (t[i] == ' ')
+        i++;
+      else if (i + 1 < t.size() && (unsigned char)t[i] == 0x81 && (unsigned char)t[i + 1] == 0x40)
+        i += 2;
+      else if (i + 2 < t.size() && memcmp(t.data() + i, "\xE3\x80\x80", 3) == 0)
+        i += 3;
+      else
+        return false;
+    }
+    return !t.empty();
+  }
+  static std::string BlankInPlace(const char *s, size_t n, UINT cp)
+  {
+    std::string out;
+    out.reserve(n);
+    for (size_t at = 0; at < n;)
+    {
+      size_t len = 0;
+      if (Construct(s, n, at, cp, &len))
+      {
+        out.append(s + at, len);
+        at += len;
+        continue;
+      }
+      unsigned char c = s[at];
+      size_t step = cp == CP_UTF8 ? (c >= 0xf0 ? 4 : c >= 0xe0 ? 3 : c >= 0xc0 ? 2 : 1) : (IsDBCSLeadByteEx(932, c) ? 2 : 1);
+      if (at + step > n)
+        step = n - at;
+      if (c < 0x20)
+        out.append(s + at, step);
+      else if (step == 1)
+        out.push_back(' ');
+      else if (cp == CP_UTF8 && step == 3)
+        out.append("\xE3\x80\x80");
+      else if (cp != CP_UTF8 && step == 2)
+        out.append("\x81\x40");
+      else
+        out.append(step, ' ');
+      at += step;
+    }
+    return out;
+  }
   static void Embed(hook_context *context, TextBuffer buffer, HookParam *hp)
   {
     const char *src = nullptr;
@@ -418,6 +500,14 @@ namespace Yuris6Embed
       return;
     std::string text((const char *)buffer.data, buffer.size);
     std::string source(src, n);
+    if (HasConstructs(src, n, hp->codepage))
+    {
+      if (!Blank(text))
+        return;
+      text = BlankInPlace(src, n, hp->codepage);
+      if (text.size() != n)
+        return;
+    }
     Write(dest, n, text, hp->codepage);
     AcquireSRWLockExclusive(&lock);
     lastSource = source;

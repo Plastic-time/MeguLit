@@ -154,7 +154,9 @@ static volatile bool SkipHeld;static int BurstRun;const int BurstSkipLines=8;sta
    string replacement=printer?HideNaninovel(text):EmbedTextPolicy.Hide(text);
    /* E320 (魔法使いの夜): the game stopped with "Micro Thread ... [0x80000012]" right after a skip burst that was written back line by line (several lines within 2-40 ms). While the game skips, its lines go back unchanged; hiding resumes at the first line read at normal speed; a redraw of the same line is not a burst. */
    DateTime embedNow=DateTime.UtcNow;bool quick=(embedNow-LastEmbedAt).TotalMilliseconds<250&&text!=LastEmbedText;BurstRun=quick?BurstRun+1:0;bool burst=quick&&(SkipHeld||BurstRun>=BurstSkipLines);LastEmbedAt=embedNow;LastEmbedText=text;
-   if(burst&&candidate.name=="typemoon"&&replacement.Length>0){replacement="";if(!SkipNoted){SkipNoted=true;Diagnostic("typemoon skip burst: lines go back unchanged until the game stops skipping");}}else if(!burst)SkipNoted=false;
+   /* (user 2026-11-12: サイコロジック closed with a text-size error while skipping; "never let this reach other games") the skip
+      guard is no longer typemoon-only: while any game skips, its lines go back unchanged and nothing is written. */
+   if(burst&&replacement.Length>0){replacement="";if(!SkipNoted){SkipNoted=true;Diagnostic(candidate.name+" skip burst: lines go back unchanged until the game stops skipping");}}else if(!burst)SkipNoted=false;
    if(!printer&&replacement.Length>0&&IsSharedResourceStream(candidate.name)&&!IsCurrentDialogue(text))replacement="";
    if(TranslateMode&&!printer&&replacement.Length>0&&replacement!=text){
     long id=++EmbedSerial;var pending=new PendingEmbed{tp=tp,text=text,hidden=replacement};PendingEmbeds[id]=pending;
@@ -199,7 +201,11 @@ static volatile bool SkipHeld;static int BurstRun;const int BurstSkipLines=8;sta
  delegate bool EnumChildProc(IntPtr hwnd,IntPtr lparam);
  [DllImport("user32.dll")]static extern bool EnumChildWindows(IntPtr parent,EnumChildProc callback,IntPtr lparam);
  static string DialogText(IntPtr dialog){var all=new System.Text.StringBuilder();var title=new System.Text.StringBuilder(256);GetWindowText(dialog,title,256);all.Append(title).Append(' ');EnumChildProc child=(h,l)=>{var t=new System.Text.StringBuilder(512);GetWindowText(h,t,512);if(t.Length>0)all.Append(t).Append(' ');return true;};EnumChildWindows(dialog,child,IntPtr.Zero);GC.KeepAlive(child);return all.ToString().Trim();}
- internal static bool IsErrorDialog(string text){return System.Text.RegularExpressions.Regex.IsMatch(text??"",@"エラー|不正|失敗|例外|異常|短すぎ|長すぎ|見つかりません|できません|致命|错误|異常終了|error|exception|fail|invalid|too long|access violation|runtime",System.Text.RegularExpressions.RegexOptions.IgnoreCase);}
+ /* A Shift-JIS game on a Chinese-locale system shows its message box as GBK mojibake ("僥僉僗僩撪晹僄儔乕" is テキスト内部エラー):
+    the text is also read back through code page 936 -> 932 before matching. */
+ internal static string Unmojibake(string text){try{if(String.IsNullOrEmpty(text))return "";var gbk=System.Text.Encoding.GetEncoding(936,System.Text.EncoderFallback.ExceptionFallback,System.Text.DecoderFallback.ReplacementFallback);return System.Text.Encoding.GetEncoding(932).GetString(gbk.GetBytes(text));}catch{return "";}}
+ internal static bool IsErrorDialog(string text){return ErrorWords(text)||ErrorWords(Unmojibake(text));}
+ static bool ErrorWords(string text){return System.Text.RegularExpressions.Regex.IsMatch(text??"",@"エラー|不正|失敗|例外|異常|短すぎ|長すぎ|見つかりません|できません|致命|错误|異常終了|error|exception|fail|invalid|too long|access violation|runtime",System.Text.RegularExpressions.RegexOptions.IgnoreCase);}
  static string UnsafeFile(){return Under("cache","embed-unsafe.json");}
  static string UnsafeKey(string name,int role){return (BoundProcess??"").ToLowerInvariant()+"|"+name+"|"+role;}
  static Dictionary<string,object> LoadUnsafe(){try{string f=UnsafeFile();if(File.Exists(f)){var v=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(f));if(v!=null)return v;}}catch{}return new Dictionary<string,object>();}
