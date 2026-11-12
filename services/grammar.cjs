@@ -199,18 +199,106 @@ async function scenes(db,list,tokenize,{max=4,budget=12}={}){
    the lines you read are searched for them directly (no tokenizer needed), the best few become its examples. */
 let levelsMod=null;
 async function levels(){if(!levelsMod){try{levelsMod=await import(require('url').pathToFileURL(require('path').join(__dirname,'..','web','grammar-levels.js')).href);}catch{levelsMod={LEVEL_LIST:[],levelPoints:()=>[],findHit:()=>null};}}return levelsMod;}
-/* E459: sync for the tests; the report uses levelExamplesAsync, which lets other requests run between points */
-function levelExamples(list,mod,opts={}){let out;const it=levelExamplesSteps(list,mod,opts);for(let s=it.next();!s.done;s=it.next())out=s.value;return out;}
-async function levelExamplesAsync(list,mod,opts={}){const breathe=require('./cooperative.cjs').breather();let out;for(const s of levelExamplesSteps(list,mod,opts)){out=s;await breathe();}return out;}
-function* levelExamplesSteps(list,mod,{max=5}={}){
-  const out={},score=e=>(insights.isHuman(e.translationSource)?4:e.translation?1:0)+(e.origin==='history'?2:0)+([...e.text].length<=40?1:0);
-  for(const level of mod.LEVEL_LIST)for(const p of mod.levelPoints(level)){const found=[];yield out;
-    /* a line without any of the point's forms cannot hit: skip it before the full check */
-    const forms=[...(p.hits||[])];
-    for(const c of list){if(found.length>=40)break;if(forms.length&&!forms.some(f=>c.text.includes(f)))continue;const h=mod.findHit(p,c.text);if(h)found.push({text:c.text,origin:c.origin,gameId:c.gameId,title:c.title,translation:c.translation,translationSource:c.translationSource,start:h.start,end:h.end,ruby:c.ruby,readAt:c.readAt,readBy:c.readBy});}
-    const pick=[],games=new Map();for(const e of found.sort((a,b)=>score(b)-score(a))){if(pick.length>=max)break;if((games.get(e.gameId)||0)>=2&&found.some(x=>!pick.includes(x)&&(games.get(x.gameId)||0)<2))continue;pick.push(e);games.set(e.gameId,(games.get(e.gameId)||0)+1);}
-    out[p.id]=pick;}
-  yield out;
+/* E462 (2026-11-12, user: 语法自动匹配的句子根本就不是这个语法 — N0 じゃん showed 由良「やんっ……！」, a moan): a form found in
+   the text is only a candidate. The tokenizer then has to agree: the found span sits on word boundaries (not inside
+   じゃんけん), none of its words is an interjection, filler or a name, and a sentence-ending point really ends the
+   clause after a word it can attach to. Each match gets a confidence; below MIN it is not an example (one line fewer
+   beats a wrong one). Without the tokenizer only long, clearly bounded forms pass. Results are kept per line in
+   grammar_level_lines so each line is tokenized once. */
+const MATCH_V=1,MIN_CONF=0.6;
+const CONTENT=new Set(['名詞','代名詞','感動詞','副詞','接続詞','連体詞','形状詞']);
+const ATTACH=new Set(['名詞','代名詞','動詞','形容詞','形状詞','助動詞','接尾辞']);
+const FINAL_GROUPS=new Set(['ending']);
+/* word lessons (slang, net words, era words) are words; every other lesson is grammar and must land on grammar */
+const WORD_GROUPS=new Set(['slang','net','trend','e80','e90','e00','e10','e20']);
+const BENDS=new Set(['動詞','形容詞','助動詞']);
+const LONE=new Set(['副詞','代名詞','感動詞','接続詞','連体詞']);
+/* lessons with their own conditions on top of the general ones */
+const form=t=>Array.isArray(t?.grammar)?t.grammar[5]||'':'';
+/* lessons that open a sentence on their own (てか、…) */
+const START_OK=new Set(['n0-teka']);
+const POINT_RULES={
+  /* じゃん／やん: a sentence particle or auxiliary after a word it can follow, not 救ってやんねー (やる) or a moan */
+  'n0-jan':({core,prev,P})=>(P(core)==='助詞'||P(core)==='助動詞')&&!!prev&&ATTACH.has(P(prev)),
+  /* ってば／ったら as the topic-calling particle, not the conditional だったら */
+  'n0-tteba':({core,P})=>P(core)==='助詞',
+  /* として, not 〜ようとして (trying to) */
+  'n2-toshite':({prev})=>!/意志推量形/.test(form(prev))&&!(prev&&/^(う|よう)$/.test(prev.surface)),
+  /* ので／んで: の or ん followed by the auxiliary で (したいので, 途中なんで), not a te-form (痛んで) or なんで (why) */
+  'n4-node':({core,after,P})=>core.surface==='ので'||['の','ん'].includes(core.surface)&&P(core)!=='動詞'&&after?.surface==='で'&&P(after)==='助動詞',
+  /* そう (looks like / I hear) after a stem or a plain form, not the adverb そう (そうだそうだ, そりゃそうだ) */
+  'n4-sou':({prev,P})=>!!prev&&['動詞','形容詞','形状詞','助動詞'].includes(P(prev)),
+};
+/* lines whose explicit wording should not open a lesson (they can still be examples further down) */
+const EXPLICIT=/[●○〇◯]{1,}|ちんぽ|チンポ|おちんちん|オチンチン|まんこ|マンコ|精液|ザーメン|膣|子宮|クリトリス|乳首|おっぱい|フェラ|射精|中出し|勃起|ペニス|♡/;
+const isExplicit=t=>EXPLICIT.test(String(t||''));
+const MOAN=/^[っッー〜~…・！!♡❤]*[…♡❤]|^っ[！!]/;
+function confirmHit(point,text,hit,tokens){
+  const chars=[...String(text||'')],before=chars.slice(0,hit.start).join(''),after=chars.slice(hit.end).join('');
+  const final=FINAL_GROUPS.has(point.group)||point.final===true;
+  if(!Array.isArray(tokens)||!tokens.length){
+    /* no tokenizer: the form must follow a word and, for an ending, close the clause; a lone short ending (やん, わ, ぞ)
+       is too easy to mistake and waits for the tokenizer */
+    const len=hit.end-hit.start,kanaOnly=/^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u.test(hit.text||'');
+    if(MOAN.test(after)||/[「『（(]$/.test(before)||!before)return 0;
+    if(final&&!/^($|[。！？!?、…」』）)\s]|[よねなさぞわか])/.test(after))return 0;
+    if(!/[\p{L}]$/u.test(before))return 0;
+    return kanaOnly&&len<=2&&(final||WORD_GROUPS.has(point.group))?0.4:0.6;
+  }
+  const T=tokens.filter(t=>t&&typeof t.surface==='string'&&Number.isFinite(t.start)),cov=T.filter(t=>t.end>hit.start&&t.start<hit.end);
+  if(!cov.length)return 0;
+  const g=t=>Array.isArray(t.grammar)?t.grammar:[],P=t=>t.pos||g(t)[0]||'';
+  if(cov.some(t=>P(t)==='感動詞'||g(t)[1]==='フィラー'||g(t)[1]==='固有名詞'))return 0;
+  const first=cov[0],last=cov[cov.length-1];let conf=0.9;
+  /* the core: the first word that starts inside the span (いぞ → ぞ after うるさい); a span may begin inside the word
+     before it only when its core is a sentence particle or an auxiliary (うるさいぞ, 作ら|れる), never inside くん or じゃんけん;
+     で after 痛ん is the te-form, not ので (n4-node), たら after だっ is a condition, not ってば (n0-tteba) */
+  const core=cov.find(t=>t.start>=hit.start)||first;
+  if(first.start<hit.start){if(!BENDS.has(P(first))||!WORD_GROUPS.has(point.group)&&!(P(core)==='助動詞'||P(core)==='助詞'&&['終助詞','副助詞'].includes(g(core)[1])))return 0;conf-=0.15;}
+  if(last.end>hit.end){if(!BENDS.has(P(last))||WORD_GROUPS.has(point.group)&&cov.length>1)return 0;conf-=0.15;}
+  const rule=POINT_RULES[point.id];if(rule&&!rule({core,after:T[T.indexOf(core)+1],prev:T[T.indexOf(core)-1],next:T[T.indexOf(last)+1],P,g}))return 0;
+  if(cov.every(t=>P(t)==='補助記号'))return 0;
+  const prev=T[T.indexOf(core)-1],next=T[T.indexOf(last)+1];
+  if(MOAN.test(after)&&cov.some(t=>!ATTACH.has(P(t))&&P(t)!=='助詞'))return 0;
+  if(!WORD_GROUPS.has(point.group)){
+    /* grammar, not a word that looks like it: そりゃそうだ (adverb), どうでもいい (どう + でも) */
+    if(point.group!=='speech'&&cov.every(t=>['副詞','代名詞','感動詞'].includes(P(t))))return 0;
+    if(['助詞','助動詞'].includes(P(first))&&first.start>=hit.start&&(!prev||LONE.has(P(prev))||P(prev)==='補助記号')&&!/^[なだ]/.test(hit.text||'')&&!START_OK.has(point.id))return 0;
+  }
+  if(final){
+    if(!prev||P(prev)==='補助記号'||P(prev)==='感動詞')return 0;
+    if(!ATTACH.has(P(prev))&&!(P(prev)==='助詞'&&/^(の|ん|か|よ|ね)$/.test(prev.surface)))conf-=0.3;
+    if(next&&!(P(next)==='補助記号'||P(next)==='助詞'&&['終助詞','副助詞'].includes(g(next)[1])||P(next)==='助動詞'))conf-=0.3;
+    if(!cov.some(t=>P(t)==='助詞'||P(t)==='助動詞'||P(t)==='接尾辞'))conf-=0.2;
+  }
+  return Math.max(0,Math.round(conf*100)/100);
+}
+function cacheTable(db){if(!db)return null;db.exec('CREATE TABLE IF NOT EXISTS grammar_level_lines(point TEXT NOT NULL,text TEXT NOT NULL,v INTEGER NOT NULL,conf REAL NOT NULL,start INTEGER NOT NULL,end INTEGER NOT NULL,PRIMARY KEY(point,text))');
+  return {get:db.prepare('SELECT conf,start,end FROM grammar_level_lines WHERE point=? AND text=? AND v=?'),put:db.prepare('INSERT OR REPLACE INTO grammar_level_lines(point,text,v,conf,start,end) VALUES(?,?,?,?,?,?)')};}
+/* for the tests (no tokenizer): the same choice as the report makes without one */
+function levelExamples(list,mod,opts={}){const out={};for(const level of mod.LEVEL_LIST)for(const p of mod.levelPoints(level)){const found=[];for(const c of list){if(found.length>=40)break;if(p.hits?.length&&!p.hits.some(f=>c.text.includes(f)))continue;const h=mod.findHit(p,c.text);if(!h)continue;const conf=confirmHit(p,c.text,h,null);if(conf>=MIN_CONF)found.push(entry(c,h,conf));}out[p.id]=pickExamples(found,opts.max||5);}return out;}
+const entry=(c,h,conf)=>({text:c.text,origin:c.origin,gameId:c.gameId,title:c.title,translation:c.translation,translationSource:c.translationSource,start:h.start,end:h.end,ruby:c.ruby,readAt:c.readAt,readBy:c.readBy,conf});
+function pickExamples(found,max){
+  const score=e=>(insights.isHuman(e.translationSource)?4:e.translation?1:0)+(e.origin==='history'?2:0)+([...e.text].length<=40?1:0)+(e.conf>=0.85?1:0)-(isExplicit(e.text)?3:0);
+  /* the same line recorded with and without its speaker (軽音部員「…」 and 「…」) is one line */
+  const key=e=>String(e.text).replace(/[\u0000-\u001f]/g,'').replace(/^(【[^】]{1,16}】|[^「『\s]{1,12})(?=[「『])/,''),seen=new Set();
+  const pick=[],games=new Map();for(const e of found.sort((a,b)=>score(b)-score(a))){if(pick.length>=max)break;if(seen.has(key(e)))continue;seen.add(key(e));if((games.get(e.gameId)||0)>=2&&found.some(x=>!pick.includes(x)&&(games.get(x.gameId)||0)<2))continue;pick.push(e);games.set(e.gameId,(games.get(e.gameId)||0)+1);}
+  /* the first example opens the lesson (认识它): a non-explicit one when there is any */
+  const clean=pick.findIndex(e=>!isExplicit(e.text));if(clean>0)pick.unshift(...pick.splice(clean,1));
+  return pick;
+}
+/* The report's version: tokenizer-confirmed, cached per line, stops at the deadline (pending lines come next poll). */
+async function levelExamplesAsync(list,mod,{max=5,tokenize=null,db=null,deadline=Infinity,all=false}={}){
+  const breathe=require('./cooperative.cjs').breather(),cache=cacheTable(db),out={};let pending=false;
+  for(const level of mod.LEVEL_LIST)for(const p of mod.levelPoints(level)){const found=[];let total=0;await breathe();
+    for(const c of list){if(!all&&found.length>=40)break;if(p.hits?.length&&!p.hits.some(f=>c.text.includes(f)))continue;const h=mod.findHit(p,c.text);if(!h)continue;
+      let row=cache?.get.get(p.id,c.text,MATCH_V);
+      if(!row){let tokens=null;if(tokenize){if(Date.now()>deadline){pending=true;continue;}try{tokens=await tokenize(c.text);}catch{tokens=null;}}
+        row={conf:confirmHit(p,c.text,h,tokens),start:h.start,end:h.end};if(tokens&&cache)cache.put.run(p.id,c.text,MATCH_V,row.conf,row.start,row.end);}
+      if(row.conf>=MIN_CONF){total++;found.push(entry(c,{start:row.start,end:row.end},row.conf));}}
+    const pick=pickExamples(found,max);if(all)pick.total=total;out[p.id]=pick;}
+  Object.defineProperty(out,'pending',{value:pending,enumerable:false});
+  return out;
 }
 /* Ids of every point below a level: N5 first, then N4 → N1 (used when the learner picks a level). */
 async function pointsBelow(level){const mod=await levels(),order=['N5',...mod.LEVEL_LIST],i=order.indexOf(level);return i<0?[]:order.slice(0,i).flatMap(l=>l==='N5'?POINTS:mod.levelPoints(l).map(p=>p.id));}
@@ -221,13 +309,13 @@ async function report(db,{root=null,scriptPairs=null,tokenize=null,deadline}={})
   const list=await candidatesCached(db,{root,scriptPairs});const state=await refresh(db,list,tk,{deadline});
   /* E459: examples only change when lines were checked or recorded; the page polls while lines are pending */
   const stamp=candidateStamp(db,root)+':'+db.prepare('SELECT COUNT(*) n FROM grammar_lines').get().n,key=String(root)+'|'+(scriptPairs?1:0);
-  let cached=reportCache.get(key);if(!cached||cached.stamp!==stamp){const breathe=require('./cooperative.cjs').breather();await breathe();const ex=examples(db,list);await breathe();cached={stamp,ex,lx:await levelExamplesAsync(list,await levels())};reportCache.set(key,cached);}
+  let cached=reportCache.get(key);if(!cached||cached.stamp!==stamp){const breathe=require('./cooperative.cjs').breather();await breathe();const ex=examples(db,list);await breathe();const lx=await levelExamplesAsync(list,await levels(),{tokenize:tk,db,deadline:deadline||Date.now()+8000});cached={stamp,ex,lx};if(!lx.pending)reportCache.set(key,cached);}
   const {ex,lx}=cached,prog=progress(db),sc=await scenes(db,list,tk);
-  return {scenes:sc,level:'N5',points:POINTS,examples:{...ex,...lx},progress:prog,completion:completion(prog),pending:state.pending,lines:{history:list.filter(c=>c.origin==='history').length,script:list.filter(c=>c.origin==='script').length},real:Object.values({...ex,...lx}).reduce((n,l)=>n+l.length,0)};
+  return {scenes:sc,level:'N5',points:POINTS,examples:{...ex,...lx},progress:prog,completion:completion(prog),pending:state.pending||!!cached.lx.pending,lines:{history:list.filter(c=>c.origin==='history').length,script:list.filter(c=>c.origin==='script').length},real:Object.values({...ex,...lx}).reduce((n,l)=>n+l.length,0)};
 }
 /* An Anki note for a grammar line, through the existing card flow (one note per point and line). */
 function ankiWord(point,title,gist,example){
   const label=String(title||point);
   return {surface:label,base:label,reading:label,noReading:true,cardKey:'grammar:'+point+':'+example.text,meaning:String(gist||''),pos:'N5 语法',pitch:[],sentence:example.text};
 }
-module.exports={candidatesCached,levelExamplesAsync,checkedLines,levels,levelExamples,pointsBelow,validPoint,cutLine,scenes,POINTS,PREFILTER,matchPoints,rubyPairs,ensure,candidates,refresh,examples,progress,setLearned,recordAnswer,completion,report,ankiWord};
+module.exports={confirmHit,isExplicit,MIN_CONF,candidatesCached,levelExamplesAsync,checkedLines,levels,levelExamples,pointsBelow,validPoint,cutLine,scenes,POINTS,PREFILTER,matchPoints,rubyPairs,ensure,candidates,refresh,examples,progress,setLearned,recordAnswer,completion,report,ankiWord};
