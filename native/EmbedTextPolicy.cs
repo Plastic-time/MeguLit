@@ -33,7 +33,7 @@ internal static class EmbedTextPolicy {
     public static bool Container(string value) { return value != null && (TrackSeparator.IsMatch(value) || InlineTrack.IsMatch(value)); }
 
     // Bumped when the rules change, so a stream remembered as unsafe under older rules gets one more try (E320).
-    public const int Version = 2;
+    public const int Version = 3; // 3: E465 labels and file names are never written back (ファタモルガーナの館 unsafe under 2)
 
     // E320 HuneX ruby (魔法使いの夜: <rふ>触</r>): the closing tag's "/" read as a path and each ruby counted as two
     // constructs, so every line with furigana went back unchanged and its original stayed under MeguLit's text. A ruby
