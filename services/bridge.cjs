@@ -188,7 +188,9 @@ async function dispatch(request,runtime=null) {
       case 'game_shots':case 'game_shot':{const game=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(String(request.id));if(!game)throw Error('GAME_NOT_FOUND');const shots=require('./scene-shots.cjs');
         return request.action==='game_shots'?{items:shots.list(root,game.executable)}:shots.read(root,game.executable,String(request.file||''));}
       case 'game_cgs':case 'game_cg':{const game=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(String(request.id));if(!game)throw Error('GAME_NOT_FOUND');const cg=require('./game-cg.cjs');
-        return request.action==='game_cgs'?cg.list(game.executable):cg.image(root,game.executable,String(request.name||''));}
+        /* the R18 filter (native pref safe_cg) and the cold-run setting (scriptColdRun) for CGs only the game can open */
+        const native=store.readJSON(path.join(root,'data','config','native-preferences.json'))||{},opts={root,safe:native.safe_cg===true,cold:require('../core/preferences.cjs').cleanPreferences(store.readJSON(path.join(root,'data','config','preferences.json'))||{}).scriptColdRun!==false};
+        return request.action==='game_cgs'?cg.list(game.executable,opts):cg.image(root,game.executable,String(request.name||''),opts);}
       case 'game_enrich':if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');return runtime.metadata().ensure(String(request.id),request.locale,request.refresh===true);
       case 'game_reviews_summary':if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');return runtime.reviews().summary(String(request.id));
       case 'review_full':if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');return runtime.reviews().full(String(request.platform),String(request.url||''));

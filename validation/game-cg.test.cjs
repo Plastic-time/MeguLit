@@ -150,3 +150,27 @@ test('KiriKiri folder: KBAD save + loose event picture',()=>{
 });
 
 test('a folder with no reader stays unsupported',()=>{assert.equal(cg.list(path.join(tmp(),'x.exe')).supported,false);});
+
+test('R18 filter: only CGs rated safe are listed or served; the rest wait for the background rating',()=>{
+ process.env.MEGULIT_RATING_NO_FETCH='1';
+ const dir=tmp(),root=tmp();fs.mkdirSync(path.join(dir,'savedata'));fs.mkdirSync(path.join(dir,'evimage'));
+ const s=t=>Buffer.concat([Buffer.from([0xa0|t.length]),Buffer.from(t,'utf16le')]);
+ fs.writeFileSync(path.join(dir,'savedata','datasu.ksd'),Buffer.concat([Buffer.from('KBAD100\0'),Buffer.from([0x83]),s('cg_EV001'),Buffer.from([1]),s('cg_EV002'),Buffer.from([1]),s('cg_EV003'),Buffer.from([1])]));
+ for(const n of ['ev001','ev002','ev003'])fs.writeFileSync(path.join(dir,'evimage',n+'.png'),dec.png({width:1,height:1,rgba:Buffer.from([1,2,3,255])}));
+ const exe=path.join(dir,'game.exe'),cacheDir=path.join(root,'data','cg-cache',require('node:crypto').createHash('sha1').update(dir.toLowerCase()).digest('hex').slice(0,16));
+ fs.mkdirSync(cacheDir,{recursive:true});fs.writeFileSync(path.join(cacheDir,'ratings.json'),JSON.stringify({ev001:{label:'safe'},ev002:{label:'r18'}}));
+ const l=cg.list(exe,{root,safe:true});assert.deepEqual(l.items,['ev001']);assert.equal(l.pending,1,'ev003 is not rated yet');
+ assert.deepEqual(cg.list(exe,{root}).items.sort(),['ev001','ev002','ev003'],'switch off: every seen CG');
+ assert.equal(cg.image(root,exe,'ev001',{safe:true}).mime,'image/png');
+ assert.throws(()=>cg.image(root,exe,'ev002',{safe:true}),/CG_HIDDEN/);assert.throws(()=>cg.image(root,exe,'ev003',{safe:true}),/CG_HIDDEN/);
+ const {fields}=require('../services/settings-schema.cjs');assert.ok(fields.some(f=>f.key==='safe_cg'&&f.type==='boolean'));
+ assert.equal(require('../services/native-defaults.cjs').safe_cg,false);
+ assert.equal(require('../services/cg-rating.cjs').MODELS.length,2);
+});
+
+test('cold run for CGs: the kirikiri-cg hook asks the game for pictures into cg\, apart from voices',()=>{
+ const vc=require('../services/voice-cold.cjs');
+ assert.equal(vc.hookFor('kirikiri'),vc.HOOKS.kirikiri);assert.equal(vc.hookFor('kirikiri-cg'),vc.HOOKS['kirikiri-cg']);
+ assert.deepEqual(vc.HOOKS['kirikiri-cg'].want('ev101a'),['ev101a.png','ev101a.tlg','ev101a.jpg']);
+ const src=fs.readFileSync(path.join(__dirname,'..','native','scncapture','ScnCapture.cpp'),'utf8');assert.match(src,/IsPicture\(name\.c_str\(\)\) \? L"cg\\\\"/);
+});
