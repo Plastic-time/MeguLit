@@ -45,3 +45,7 @@ test('borrowed-code Chinese patch text is recognised; Japanese and real Chinese 
  assert.equal(borrowedCode('東京、大阪、名古屋'),false);
  assert.equal(borrowedCode('从抵达机场时起，那片随时都可能哭出来的天空，稍稍逞强了一下'),false,'plain Chinese is handled by foreignLine');
 });
+test('9-nine: a Chinese track starting on the Japanese closing row is cut with its next row',()=>{
+ assert.equal(japaneseTrack('「ハァイ、こんにちは。\n　それともこんばんはかしら」「嗨，午安啊。\n　还是说，该说晚上好呢？」'),'「ハァイ、こんにちは。\n　それともこんばんはかしら」');
+ assert.equal(japaneseTrack('「そうか」「了解」\n次の行です'),'「そうか」「了解」\n次の行です');
+});
