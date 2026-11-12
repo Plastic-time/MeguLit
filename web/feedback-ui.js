@@ -170,7 +170,7 @@ export function openGuide({ api, locale = 'zh', esc, toast, version = '', tab = 
 <nav class="guide-tabs" role="tablist">${tabs.map(([k, v]) => `<button type="button" role="tab" data-tab="${k}">${esc(v)}</button>`).join('')}</nav>
 <div class="dev-notice-scroll" data-pane="updates"><ul class="dev-notice-updates" hidden></ul><p class="dev-notice-updates-note" hidden></p><p class="guide-empty">${esc(t.noUpdates)}</p></div>
 <div class="dev-notice-scroll" data-pane="guide">${guideHTML(locale, esc)}</div>
-<div class="dev-notice-scroll" data-pane="report"><p class="dev-notice-text">${esc(t.reportText)}</p><p class="dev-notice-more">${esc(t.noticeMore)}</p><div class="dev-notice-actions"><button type="button" class="secondary" data-report>${esc(t.report)}</button></div></div>
+<div class="dev-notice-scroll" data-pane="report"><p class="dev-notice-text">${esc(t.reportText)}</p><textarea class="feedback-text" rows="6" maxlength="1800" placeholder="${esc(t.placeholder)}"></textarea><input class="feedback-contact" maxlength="120" placeholder="${esc(t.contact)}"><p class="feedback-privacy">${esc(t.privacy)}</p><p class="feedback-status" role="status" aria-live="polite"></p><div class="dev-notice-actions"><button type="button" class="primary" data-report>${esc(t.send)}</button></div></div>
 <div class="dev-notice-scroll" data-pane="game"><p class="dev-notice-text">${esc(t.gameText)}</p><form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="primary">${esc(t.submit)}</button></form><p class="dev-notice-rule">${esc(t.gameRule)}</p><p class="feedback-status" role="status" aria-live="polite"></p></div>
 <div class="dev-notice-actions"><button type="button" class="secondary" data-ok>${esc(t.close)}</button></div>`;
   document.body.append(dialog);
@@ -182,7 +182,7 @@ export function openGuide({ api, locale = 'zh', esc, toast, version = '', tab = 
   dialog.querySelectorAll('[data-tab]').forEach(b => { b.onclick = () => show(b.dataset.tab); });
   show(tabs.some(([k]) => k === tab) ? tab : 'guide');
   fillUpdates(dialog, locale, api).then(() => { dialog.querySelector('.guide-empty').hidden = !dialog.querySelector('.dev-notice-updates').hidden; });
-  const form = dialog.querySelector('form'), game = dialog.querySelector('.dev-notice-game'), status = dialog.querySelector('.feedback-status');
+  const form = dialog.querySelector('[data-pane="game"] form'), game = dialog.querySelector('.dev-notice-game'), status = dialog.querySelector('[data-pane="game"] .feedback-status');
   form.onsubmit = async event => {
     event.preventDefault();
     if (!game.value.trim()) { game.focus(); return; }
@@ -196,7 +196,18 @@ export function openGuide({ api, locale = 'zh', esc, toast, version = '', tab = 
     if (result?.ok) game.value = '';
   };
   dialog.querySelector('[data-ok]').onclick = () => dialog.close();
-  dialog.querySelector('[data-report]').onclick = () => { dialog.close(); openFeedback({ api, locale, esc, toast, version }); };
+  /* 2026-11-12 (user: "我这里的输入栏呢") the report tab has its own text box and sends from here, no second dialog */
+  const pane = dialog.querySelector('[data-pane="report"]'), reason = pane.querySelector('.feedback-text'), reach = pane.querySelector('.feedback-contact'), said = pane.querySelector('.feedback-status'), send = pane.querySelector('[data-report]');
+  send.onclick = async () => {
+    const value = reason.value.trim();
+    if (!value) { said.textContent = t.empty; said.dataset.state = 'bad'; reason.focus(); return; }
+    send.disabled = true; send.textContent = t.sending; said.textContent = ''; delete said.dataset.state;
+    const outcome = await report({ api, reason: value, contact: reach.value.trim(), locale, version });
+    if (!dialog.isConnected) return;
+    send.disabled = false; send.textContent = t.send;
+    if (outcome) { said.dataset.state = 'ok'; said.textContent = outcome === 'full' ? t.sent : t.sentTextOnly; reason.value = ''; toast && toast(said.textContent); return; }
+    said.textContent = t.failed; said.dataset.state = 'bad';
+  };
   dialog.showModal();
   fillGuideLevel(dialog, { api, locale, esc }); /* the by-level part of the guide follows the chosen level */
   return dialog;

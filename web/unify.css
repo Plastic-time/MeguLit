@@ -998,6 +998,9 @@ html:not(#u):not(#v):not(#w) body .review-page .review-card .select-control::bef
 html:not(#u):not(#v):not(#w) body .review-page #review-content{min-height:calc(100vh - 300px)!important}
 /* detail: the launch action is the page's hero action */
 html:not(#u):not(#v):not(#w):not(#x) body .main .detail-actions>button.primary:not(.icon-button){height:52px!important;min-height:52px!important;padding:0 52px 0 26px!important;font-size:17px!important}
+/* 2026-11-12 (user: the launch button sat lower than its neighbours) every button in the row has the launch button's height */
+html:not(#u):not(#v):not(#w):not(#x) body .main .detail-actions{align-items:center!important}
+html:not(#u):not(#v):not(#w):not(#x) body .main .detail-actions>button:not(.primary){height:52px!important;min-height:52px!important;box-sizing:border-box!important}
 
 /* ---- profile panel, rebuilt as a profile (user): the person first — a large initial medallion, name and signature,
    four lifetime figures on a ruled row, favourite games as a serif list — then the settings ---- */
@@ -1881,3 +1884,9 @@ html:not(#u):not(#v):not(#w):not(#x):not(#y) body .settings-layout>.settings-con
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .settings-layout>.settings-content>*>:not(.settings-search):not(.settings-search-results){max-width:1360px}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .settings-content input.settings-search{max-width:min(1360px,100%)}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .settings-content>.profile-selector{left:calc(28px + min(1360px,100% - 56px))!important}
+
+/* 2026-11-12 (user) the guide's report tab has its own text box, styled like the report dialog */
+html:not(#u):not(#v) body dialog.guide-panel [data-pane="report"] :is(.feedback-text,.feedback-contact){display:block;width:100%;box-sizing:border-box;padding:12px 14px;font:inherit;font-size:14px;line-height:1.7;color:var(--g-t1,var(--text));border:1px solid var(--u-line-2)!important;border-radius:2px!important;background:rgba(10,9,12,.55)!important;box-shadow:none!important;resize:none!important}
+html:not(#u):not(#v) body dialog.guide-panel [data-pane="report"] .feedback-text{min-height:180px;margin-top:14px;border-left:2px solid var(--u-red)!important}
+html:not(#u):not(#v) body dialog.guide-panel [data-pane="report"] .feedback-contact{margin-top:10px}
+html:not(#u):not(#v) body dialog.guide-panel [data-pane="report"] :is(.feedback-text,.feedback-contact):focus{outline:none;border-color:color-mix(in srgb,var(--g-gold) 60%,transparent)!important}
