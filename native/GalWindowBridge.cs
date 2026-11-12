@@ -366,6 +366,8 @@ public class GalWindowBridge {
         else if(type=="hookVerify"){if(HookVerifier!=null)HookVerifier.Request(Target,d);}
         else if(type=="choiceLocate"){object list;var options=new List<string>();if(d.TryGetValue("options",out list)&&list is System.Collections.ArrayList)foreach(object o in (System.Collections.ArrayList)list){string t=Convert.ToString(o);if(!String.IsNullOrWhiteSpace(t)&&t.Length<=120&&options.Count<12)options.Add(t);}if(PageLocate!=null&&Target!=IntPtr.Zero)PageLocate.RequestChoices(Target,options);}
         else if(type=="pageLocate"){if(PageLocate!=null&&Target!=IntPtr.Zero)PageLocate.Request(Target,Str(d,"text"),Bool(d,"art"));}
+        /* 2026-11-12 art scan (OCR read path): MeguLit asks for it while no hook line is current; PageLocator reads the picture and emits artText */
+        else if(type=="artScan"){if(PageLocate!=null)PageLocate.Scan(Target,Bool(d,"on")&&Target!=IntPtr.Zero,Str(d,"dialog"),Str(d,"speaker"),Bool(d,"band"));}
         else if(type=="maskAssist"){if(TextMask!=null)TextMask.Assist(Str(d,"source"));}
         else if(type=="hookVerifyCancel"){if(HookVerifier!=null)HookVerifier.Cancel();}
         else if(type=="gameAudio"){AudioWanted=Bool(d,"enabled");uint pid=0;if(AudioWanted&&Target!=IntPtr.Zero)GetWindowThreadProcessId(Target,out pid);if(AudioWanted&&pid!=0)Audio.Start(pid);else if(!AudioWanted)Audio.Stop();}
@@ -569,6 +571,7 @@ public class GalWindowBridge {
             }
         }
         if(args.Length>=1&&args[0]=="--page-locator-ocr-test"){string r=PageLocator.OcrSelfTest(args.Length>1?args[1]:null);Console.WriteLine(r=="0"?"PASS page locator OCR: three drawn paragraphs found, wrapped where they were drawn, boxes at the drawn margin":(r.StartsWith("skip")?"SKIP "+r:"FAIL page locator OCR: "+r));return r=="0"||r.StartsWith("skip")?0:13;}
+        if(args.Length==1&&args[0]=="--art-scan-self-test"){string r=PageLocator.ScanSelfTest();Console.WriteLine(r=="0"?"PASS art scan: Japanese rows outside the dialogue grouped, shown after two reads, hidden after two misses":"FAIL art scan: "+r);return r=="0"?0:14;}
         if(args.Length==1&&args[0]=="--page-locator-self-test"){bool passed=PageLocator.SelfTest();Console.WriteLine(passed?"PASS page locator: hook line aligned to OCR rows, split where the game wrapped, OCR mistakes tolerated, punctuation kept on its row":"FAIL page locator");return passed?0:12;}
         if(args.Length==1&&args[0]=="--wait-page-marker-self-test"){bool passed=WaitPageMarker.SelfTest();Emit(new{type="wait-page-marker-selftest",passed=passed});return passed?0:10;}
         if(args.Length==1&&args[0]=="--reader-pointer-self-test"){bool passed=ReaderPointerGate.SelfTest();Emit(new{type="reader-pointer-selftest",passed=passed});return passed?0:11;}

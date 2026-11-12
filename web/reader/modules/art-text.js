@@ -20,8 +20,9 @@
  const items=new Map();
  const scale=m=>{const sw=+m.sw||1,sh=+m.sh||1;return {x:innerWidth/sw,y:innerHeight/sh};};
  function remove(id){const it=items.get(id);if(!it)return;items.delete(id);it.classList.remove('is-shown');setTimeout(()=>it.remove(),500);}
+ /* an item read again (OCR art scan: a poem growing line by line, a better read) is replaced in place, without a new fade */
  function show(m){
-  remove(m.id);
+  const old=items.get(m.id);if(old){items.delete(m.id);old.remove();}
   const rows=Array.isArray(m.rows)?m.rows.filter(r=>r&&typeof r.text==='string'&&r.text.trim()&&Number.isFinite(r.x)&&Number.isFinite(r.y)):[];
   if(!rows.length)return;
   const k=scale(m),item=document.createElement('div');item.className='megulit-art-item';item.dataset.artId=String(m.id);
@@ -42,7 +43,7 @@
    cn.style.left=Math.max(4,left-40)+'px';cn.style.width=Math.max(120,right-left+80)+'px';cn.style.top=(bottom+size*0.35)+'px';
    item.append(cn);
   }
-  layer.append(item);items.set(m.id,item);requestAnimationFrame(()=>item.classList.add('is-shown'));
+  if(old)item.classList.add('is-shown');layer.append(item);items.set(m.id,item);if(!old)requestAnimationFrame(()=>item.classList.add('is-shown'));
  }
  b.artText=m=>{try{if(!m||m.id==null)return;if(m.visible===true)show(m);else remove(m.id);}catch{}};
 })();
