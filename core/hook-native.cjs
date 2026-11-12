@@ -36,8 +36,11 @@ class HookNative{
  get flowPage(){if(this._flowPage===true)return true;if(this.pageMode&&this.pageMode.engine!=='ocr')return false;return this.originalText?.flowGame?.()===true;}
  set flowPage(v){this._flowPage=v===true;}
  /* 2026-11-12 a KiriKiri page DLL draws the game's own text invisible itself (MeguLitKrkr __megulitKrkrHide): nothing to look at
-    before hiding, so the preflight that shows the original first (and stayed in read mode when its check was cancelled) is skipped */
- get preflight(){return this._preflight===true&&this.flowPage!==true&&this.pageMode?.engine!=='krkr';}
+    before hiding, so the preflight that shows the original first (and stayed in read mode when its check was cancelled) is skipped.
+    E472: except while the game style is being calibrated: the probe samples the game's own glyphs, so the game must draw them. */
+ get preflight(){return this._preflight===true&&this.flowPage!==true&&(this.pageMode?.engine!=='krkr'||this.calibrating===true);}
+ /* E472: the game itself draws the current line invisible (KiriKiri page DLL): calibration has to wait for the next line. */
+ get drawsHidden(){return this.enabled===true&&this.pageMode?.engine==='krkr';}
  set preflight(v){this._preflight=v===true;}
  /* E410: where a flow line sits on the page, from the game's own scripts (null when unknown). */
  flowLayout(text){try{const provider=this.originalText;if(!provider?.flowLayout)return null;const r=this.resolveSource(text);if(!r||!(r.status==='exact'||r.status==='high'||r.method==='untranslated'))return null;return provider.flowLayout(r.indices)||null;}catch{return null;}}

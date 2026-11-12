@@ -270,7 +270,11 @@ static volatile bool SkipHeld;static int BurstRun;const int BurstSkipLines=8;sta
  /* 2026-11-12 while the engine has hidden its text window, a line it draws elsewhere (an opening title) is art text: written back unchanged */
  static volatile bool EngineDialogHidden; static volatile bool KrkrHideBroken;
  static void StartKrkrHide(){if(KrkrHide!=null)return;try{KrkrHide=new System.Threading.EventWaitHandle(false,System.Threading.EventResetMode.ManualReset,"Local\\MeguLitKrkrHide-"+Pid);}catch(Exception e){Diagnostic("krkr hide event "+e.Message);return;}
-  new Thread(()=>{bool last=false;while(!Quit){bool want=ReplacementEnabled&&!KrkrHideBroken;if(want!=last){last=want;try{if(want)KrkrHide.Set();else KrkrHide.Reset();}catch{}Diagnostic("krkr draws its text "+(want?"invisible (MeguLit draws it)":"itself"));}Thread.Sleep(200);}try{KrkrHide.Reset();}catch{}}){IsBackground=true}.Start();}
+  /* E472 (user: fullscreen ファタモルガーナの館 showed no text at all): the game's text may only be invisible while MeguLit's own
+     text is on screen. MeguLit's reading layer has to be a visible window above the game (exclusive fullscreen, a hidden or
+     unbound layer, a layer under a fullscreen game all fail); 0.6 s shown before hiding, 0.4 s missing before the game draws again. */
+  new Thread(()=>{bool last=false,over=false;int ok=0,bad=0;string why="";while(!Quit){string reason;int seen=OverlayGate.Check(GameWindow,out reason);if(seen==1){bad=0;if(++ok>=3&&!over){over=true;why="";}}else if(seen==0){ok=0;if(++bad>=2&&over){over=false;why=reason;}else if(!over)why=reason;}
+   bool want=ReplacementEnabled&&!KrkrHideBroken&&over;if(want!=last){last=want;try{if(want)KrkrHide.Set();else KrkrHide.Reset();}catch{}Diagnostic("krkr draws its text "+(want?"invisible (MeguLit draws it)":"itself"+(ReplacementEnabled&&!KrkrHideBroken&&why!=""?" ("+why+")":"")));}Thread.Sleep(200);}try{KrkrHide.Reset();}catch{}}){IsBackground=true}.Start();}
  static void PagePipe(string name,string tag){string label=tag.ToLowerInvariant(),status="ToMe_"+tag+" status ";if(tag=="KRKR")StartKrkrHide();new Thread(()=>{while(!Quit){try{using(var pipe=new System.IO.Pipes.NamedPipeServerStream(name+Pid,System.IO.Pipes.PipeDirection.In,1)){pipe.WaitForConnection();Diagnostic(label+" positions connected");using(var reader=new StreamReader(pipe,new System.Text.UTF8Encoding(false))){string line;while((line=reader.ReadLine())!=null){if(line.Length>12000)continue;if(line.StartsWith(status,StringComparison.Ordinal)){Diagnostic(label+" "+line.Substring(status.Length));continue;}var info=PageInfo(line);if(info!=null)Emit(info);else{var dialog=System.Text.RegularExpressions.Regex.Match(line,@"^ToMe_DIALOG engine=(\w+) visible=([01])$");if(dialog.Success){EngineDialogHidden=dialog.Groups[2].Value=="0";Diagnostic(label+" dialog visible="+dialog.Groups[2].Value);Emit(new{type="hookDialog",engine=dialog.Groups[1].Value,visible=dialog.Groups[2].Value=="1"});}else{var font=System.Text.RegularExpressions.Regex.Match(line,@"^ToMe_KRKR font size=(\d+) bold=([01]) face=(.{1,64})$");if(font.Success){/* a Japanese game on a Chinese system reads its own font name through code page 936: read it back as 932 */string face=font.Groups[3].Value,back=Unmojibake(face);if(back.Length>0&&back!=face&&System.Text.RegularExpressions.Regex.IsMatch(back,"[ぁ-ヿＡ-Ｚ]|ゴシック|明朝"))face=back;Diagnostic(label+" font "+face+" "+font.Groups[1].Value+"px");Emit(new{type="hookFont",engine=label,face=face,size=Int32.Parse(font.Groups[1].Value),bold=font.Groups[2].Value=="1"});}}}}}}}catch(Exception e){Diagnostic(label+" pipe "+e.Message);Thread.Sleep(1000);}}}){IsBackground=true}.Start();}
  static string BoundExe(){string exe="";IntPtr h=OpenProcess(0x1000,false,Pid);if(h==IntPtr.Zero)return "";try{var sb=new System.Text.StringBuilder(32768);int size=sb.Capacity;if(QueryFullProcessImageName(h,0,sb,ref size))exe=sb.ToString();}finally{CloseHandle(h);}return exe;}
  static void PageDll(string dll,string pipe,string tag,string loader,string[] args){string label=tag.ToLowerInvariant();PagePipe(pipe,tag);var start=new ProcessStartInfo(loader,Pid+" "+args[1]+" \""+args[2]+"\" "+args[3]+" \""+dll+"\""){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true};
@@ -336,5 +340,37 @@ static volatile bool SkipHeld;static int BurstRun;const int BurstSkipLines=8;sta
    new Thread(Input){IsBackground=true}.Start();DateTime until=DateTime.UtcNow.AddSeconds(15);while(!Quit){if(!Connected&&DateTime.UtcNow>until)throw new Exception("LunaHook 未连接当前游戏");if(WaitHook!=null)WaitHook.Tick();Heartbeat();Thread.Sleep(40);}return 0;
   }catch(Exception e){Emit(new{type="hookError",hookActive=false,hookMessage=e.Message});return 1;}
   finally{if(WaitHook!=null)WaitHook.Dispose();if(Started){try{Deactivate("bridge-shutdown");Luna_DetachProcess(Pid);}catch{}}GC.KeepAlive(Keep);/* Keep loaded native code alive until process exit: native worker callbacks may still be returning. */}
+ }
+}
+
+/* E472: is MeguLit's reading layer actually on screen above the game? 1 yes, 0 no, -1 unknown (game minimised or gone: keep
+   the current state). A visible, uncloaked MeguLit top-level window that covers at least a quarter of the game and sits
+   above the game's top-level window in z-order. Windows reports any monitor-covering Direct3D window as "D3D fullscreen"
+   (ファタモルガーナの館 borderless, MeguLit shown over it), so that only names the reason; the z-order decides. */
+static class OverlayGate {
+ [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr h,uint flags);
+ [DllImport("user32.dll")] static extern IntPtr GetTopWindow(IntPtr h);
+ [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h,uint cmd);
+ [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
+ [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+ [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+ [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h,out Box r);
+ [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h,out uint pid);
+ [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h,int attribute,out int value,int size);
+ [DllImport("shell32.dll")] static extern int SHQueryUserNotificationState(out int state);
+ [StructLayout(LayoutKind.Sequential)] struct Box {public int l,t,r,b;}
+ static readonly Dictionary<uint,bool> Ours=new Dictionary<uint,bool>();
+ static bool IsOurs(uint pid){bool v;if(Ours.TryGetValue(pid,out v))return v;try{using(var p=Process.GetProcessById((int)pid))v=p.ProcessName.StartsWith("MeguLit",StringComparison.OrdinalIgnoreCase);}catch{v=false;}if(Ours.Count>512)Ours.Clear();Ours[pid]=v;return v;}
+ public static int Check(IntPtr game,out string why){
+  why="";try{
+   IntPtr root=GetAncestor(game,2);if(root==IntPtr.Zero||!IsWindow(root)||IsIconic(root))return -1;
+   Box g;if(!GetWindowRect(root,out g)||g.r<=g.l||g.b<=g.t)return -1;long area=(long)(g.r-g.l)*(g.b-g.t);
+   int steps=0;for(IntPtr h=GetTopWindow(IntPtr.Zero);h!=IntPtr.Zero&&h!=root&&steps<4000;h=GetWindow(h,2),steps++){
+    if(!IsWindowVisible(h)||IsIconic(h))continue;uint pid;GetWindowThreadProcessId(h,out pid);if(pid==0||!IsOurs(pid))continue;
+    int cloaked;if(DwmGetWindowAttribute(h,14,out cloaked,4)==0&&cloaked!=0)continue;
+    Box w;if(!GetWindowRect(h,out w))continue;long x=Math.Max(0,(long)Math.Min(w.r,g.r)-Math.Max(w.l,g.l)),y=Math.Max(0,(long)Math.Min(w.b,g.b)-Math.Max(w.t,g.t));
+    if(x*y*4>=area)return 1;}
+   int q;why=SHQueryUserNotificationState(out q)==0&&q==3?"fullscreen game above MeguLit's reading layer":"MeguLit's reading layer is not shown above the game";return 0;
+  }catch(Exception e){why=e.Message;return -1;}
  }
 }
