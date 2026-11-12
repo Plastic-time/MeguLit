@@ -27,6 +27,25 @@ public class GalWindowBridge {
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr h,uint flags);
     [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h,uint cmd);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode,EntryPoint="FindWindowW")] static extern IntPtr FindWindowByClass(string cls,IntPtr title);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode,EntryPoint="GetPropW")] static extern IntPtr GetProp(IntPtr h,string name);
+    /* Issue #135 (user: with embedded subtitles Magpie upscaling no longer works). Magpie draws the game, scaled, in its own
+       window and publishes where (docs: "Interact with Magpie programmatically": class name and the window properties
+       Magpie.SrcHWND / Src* / Dest*, physical pixels; this process is per-monitor-v2 aware). While Magpie scales the bound
+       game, the reader lays its text out over Magpie's picture, not over the hidden-behind original window, and stays above
+       Magpie's window. */
+    static bool MagpieArea(IntPtr gameRoot,Rect area,out Rect scaled){
+        scaled=area;IntPtr magpie=FindWindowByClass("Window_Magpie_967EB565-6F73-4E94-AE53-00CC42592A22",IntPtr.Zero);
+        if(magpie==IntPtr.Zero||!IsWindowVisible(magpie))return false;IntPtr src=GetProp(magpie,"Magpie.SrcHWND");
+        if(src==IntPtr.Zero||(src!=gameRoot&&src!=Target))return false;
+        Func<string,int> p=n=>(int)(long)GetProp(magpie,"Magpie."+n);
+        int sl=p("SrcLeft"),st=p("SrcTop"),sr=p("SrcRight"),sb=p("SrcBottom"),dl=p("DestLeft"),dt=p("DestTop"),dr=p("DestRight"),db=p("DestBottom");
+        if(sr<=sl||sb<=st||dr<=dl||db<=dt)return false;
+        double kx=(dr-dl)/(double)(sr-sl),ky=(db-dt)/(double)(sb-st);
+        Func<int,int> mx=x=>dl+(int)Math.Round((x-sl)*kx);Func<int,int> my=y=>dt+(int)Math.Round((y-st)*ky);
+        scaled=new Rect(mx(area.Left),my(area.Top),mx(area.Right),my(area.Bottom));MagpieWindow=magpie;return true;
+    }
+    static IntPtr MagpieWindow;static DateTime MagpieRaisedAt;
     static string LastCoverNote="";
     // True when no real application window lies over the middle of the game, even if the game does not have focus
     // (e.g. right after Tomoyo was restarted from Explorer). Walks the z-order above the game and ignores windows that
@@ -508,7 +527,8 @@ public class GalWindowBridge {
         // so the later Alt+M switch left the title bar in place and the hit region was applied offset, cutting glyphs apart.
         if(!Captured){Capture();HasLastRect=false;RegionKey="";}
         Rect client;if(!GetClientRect(Target,out client))return;Point origin=new Point();if(!ClientToScreen(Target,ref origin))return;
-        Rect area=new Rect(origin.X,origin.Y,origin.X+client.Right,origin.Y+client.Bottom),reader=Place(area,X,Y,W,H),box=reader;
+        Rect area=new Rect(origin.X,origin.Y,origin.X+client.Right,origin.Y+client.Bottom);Rect scaledArea;bool magpie=MagpieArea(GetAncestor(Target,2),area,out scaledArea);if(magpie)area=scaledArea;else MagpieWindow=IntPtr.Zero;
+        Rect reader=Place(area,X,Y,W,H),box=reader;int layoutX=area.Left,layoutY=area.Top,layoutW=area.Right-area.Left,layoutH=area.Bottom-area.Top;
         
         
         /* The window always covers the whole game client area. Opening the menu or a word card used to resize and move
@@ -520,13 +540,14 @@ public class GalWindowBridge {
         // One pixel short of the desktop: a monitor-sized window that becomes foreground (Alt+T, a selection) is treated as a
         // fullscreen game by Wallpaper Engine and similar tools, which then pause or black out the wallpaper.
         Rect localReader=new Rect(reader.Left-box.Left,reader.Top-box.Top,reader.Right-box.Left,reader.Bottom-box.Top);
-        if(!HasLastRect||localReader.Left!=LastReaderRect.Left||localReader.Top!=LastReaderRect.Top||localReader.Right!=LastReaderRect.Right||localReader.Bottom!=LastReaderRect.Bottom||box.Right-box.Left!=LastRect.Right-LastRect.Left||box.Bottom-box.Top!=LastRect.Bottom-LastRect.Top){var scan=TextMask!=null?TextMask.SurfaceRegion(client.Right,client.Bottom):System.Drawing.Rectangle.Empty;Emit(new{type="layout",clientWidth=client.Right,clientHeight=client.Bottom,clientX=origin.X-box.Left,clientY=origin.Y-box.Top,readerX=localReader.Left,readerY=localReader.Top,readerWidth=localReader.Right-localReader.Left,readerHeight=localReader.Bottom-localReader.Top,surfaceWidth=box.Right-box.Left,surfaceHeight=box.Bottom-box.Top,maskX=scan.X-(box.Left-origin.X),maskY=scan.Y-(box.Top-origin.Y)});LastReaderRect=localReader;}
+        if(!HasLastRect||localReader.Left!=LastReaderRect.Left||localReader.Top!=LastReaderRect.Top||localReader.Right!=LastReaderRect.Right||localReader.Bottom!=LastReaderRect.Bottom||box.Right-box.Left!=LastRect.Right-LastRect.Left||box.Bottom-box.Top!=LastRect.Bottom-LastRect.Top){var scan=TextMask!=null?TextMask.SurfaceRegion(client.Right,client.Bottom):System.Drawing.Rectangle.Empty;Emit(new{type="layout",clientWidth=layoutW,clientHeight=layoutH,clientX=layoutX-box.Left,clientY=layoutY-box.Top,magpie=magpie,readerX=localReader.Left,readerY=localReader.Top,readerWidth=localReader.Right-localReader.Left,readerHeight=localReader.Bottom-localReader.Top,surfaceWidth=box.Right-box.Left,surfaceHeight=box.Bottom-box.Top,maskX=scan.X-(box.Left-origin.X),maskY=scan.Y-(box.Top-origin.Y)});LastReaderRect=localReader;}
         ApplyRegion(box.Right-box.Left,box.Bottom-box.Top);
         if(!HasLastRect||!IsShown||box.Left!=LastRect.Left||box.Top!=LastRect.Top||box.Right!=LastRect.Right||box.Bottom!=LastRect.Bottom){SetWindowPos(Overlay,homeOwned?fg:gameOwned?new IntPtr(-1):IntPtr.Zero,box.Left,box.Top,box.Right-box.Left,box.Bottom-box.Top,(uint)(0x0010|0x0040|(!HasLastRect?0x0020:0)));LastRect=box;HasLastRect=true;}IsShown=true;AckRegion();
         FocusMenuOnce();
         if(homeOwned&&LastHomeForeground!=fg)SetWindowPos(Overlay,fg,0,0,0,0,0x0001|0x0002|0x0010);
         LastHomeForeground=homeOwned?fg:IntPtr.Zero;
         KeepAboveGame(gameRoot,contextActive&&!homeOwned);
+        if(magpie&&contextActive&&!homeOwned&&(DateTime.UtcNow-MagpieRaisedAt).TotalMilliseconds>250){MagpieRaisedAt=DateTime.UtcNow;SetWindowPos(Overlay,new IntPtr(-1),0,0,0,0,0x0001|0x0002|0x0010);}
         MaskLayer.Origin(Overlay,Target,box.Left,box.Top);
         if(TextMask!=null)TextMask.Tick(Target,origin.X,origin.Y,client.Right,client.Bottom,CoverEnabled,box.Left-origin.X,box.Top-origin.Y);
         if(WaitMarker!=null){WaitMarker.ProbeOnly=false;WaitMarker.ScreenX=origin.X;WaitMarker.ScreenY=origin.Y;WaitMarker.Tick(Target,client.Right,client.Bottom,CoverEnabled,box.Left-origin.X,box.Top-origin.Y);}
