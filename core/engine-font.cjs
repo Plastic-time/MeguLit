@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+// E472: which Japanese font the reader uses for a game, from what the engine reports it draws with (hookFont).
+// face: the font the game's text layer uses (KiriKiri: the KAG lineLayer's font.face). prerendered: a pre-rendered glyph
+// file mapped over it ([mappfont storage=mincho2.tft]); its glyphs win over the face, so when its name says another
+// family (mincho / gothic) than the face, the reader takes that family instead of the face.
+// fonts: the game's own bundled fonts (core/game-fonts.cjs scan); one of the same family is used before the system face.
+function flat(v){return String(v||'').replace(/[\s　]/g,'').normalize('NFKC').toLowerCase();}
+function familyClass(name){const n=flat(name);if(!n)return '';
+ if(/mincho|明朝|minchou|serif|ming|song|宋|ｍｉｎ/.test(n)||/(^|[^a-z])min(\d|[^a-z]|$)/.test(n))return 'mincho';
+ if(/gothic|ゴシック|goth|sans|meiryo|メイリオ|hei|黑|丸ゴ|round/.test(n))return 'gothic';
+ return '';}
+function pick({face,prerendered,fonts}={}){
+ face=String(face||'').trim().slice(0,64);if(!face||/["\<>;{}]/.test(face))return null;
+ const want=familyClass(String(prerendered||'').replace(/\.[a-z0-9]+$/i,'')),have=familyClass(face);
+ if(want&&have&&want!==have)return {key:want==='mincho'?'originalMincho':'originalGothic',face,reason:'prerendered '+prerendered};
+ const hit=(fonts||[]).find(f=>f&&f.lang!=='zh'&&flat(f.family)===flat(face));
+ return {key:hit?'game:'+hit.id:'engine:'+face,face,reason:hit?'bundled':'face'};}
+module.exports={pick,familyClass};
