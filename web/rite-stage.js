@@ -29,6 +29,7 @@ const rgba=(hex,a)=>{const n=parseInt(hex.slice(1),16);return `rgba(${n>>16&255}
 
 /* ---------- shaped particles ---------- */
 const DRAW={
+ ember(c,p,k){const a=Math.sin(Math.PI*Math.min(1,k))*(.6+.4*Math.sin(p.t*14+p.r*9)),r=p.r*3;const g=c.createRadialGradient(p.x,p.y,0,p.x,p.y,r);g.addColorStop(0,`rgba(255,226,170,${a})`);g.addColorStop(.35,`rgba(255,130,60,${a*.6})`);g.addColorStop(1,'rgba(200,40,20,0)');c.fillStyle=g;c.globalAlpha=1;c.fillRect(p.x-r,p.y-r,r*2,r*2);},
  spark(c,p,k){p.trail.push([p.x,p.y]);if(p.trail.length>7)p.trail.shift();c.lineCap='round';for(let i=1;i<p.trail.length;i++){c.globalAlpha=(1-k)*i/p.trail.length;c.strokeStyle=k<.5?'#ffe2a0':'#ff8a3a';c.lineWidth=p.r*i/p.trail.length;c.beginPath();c.moveTo(...p.trail[i-1]);c.lineTo(...p.trail[i]);c.stroke();}},
  flake(c,p,k){c.save();c.translate(p.x,p.y);c.rotate(p.a+p.t*p.spin);c.globalAlpha=Math.sin(Math.PI*Math.min(1,k))*p.al;c.strokeStyle='#eaf8ff';c.lineWidth=p.r>5?1.2:.8;if(p.blur)c.filter=`blur(${p.blur}px)`;c.beginPath();for(let i=0;i<6;i++){const q=i*TAU/6,x=Math.sin(q)*p.r,y=-Math.cos(q)*p.r;c.moveTo(0,0);c.lineTo(x,y);const m=.55;c.moveTo(x*m,y*m);c.lineTo(x*m+Math.sin(q+.6)*p.r*.3,y*m-Math.cos(q+.6)*p.r*.3);c.moveTo(x*m,y*m);c.lineTo(x*m+Math.sin(q-.6)*p.r*.3,y*m-Math.cos(q-.6)*p.r*.3);}c.stroke();c.restore();},
  needle(c,p,k){c.save();c.translate(p.x,p.y);c.rotate(p.a+p.t*p.spin);c.globalAlpha=(1-k)*.85;c.fillStyle='#dff6ff';c.beginPath();c.moveTo(0,-p.r*2.2);c.lineTo(p.r*.35,0);c.lineTo(0,p.r*2.2);c.lineTo(-p.r*.35,0);c.closePath();c.fill();c.restore();},
@@ -96,12 +97,17 @@ function fireDisc(r){
  if(DISC.has(r))return DISC.get(r);const pad=30,W=(r+pad)*2,cv=document.createElement('canvas');cv.width=cv.height=W;const c=cv.getContext('2d');c.translate(W/2,W/2);c.globalCompositeOperation='lighter';c.lineCap='round';
  const stroke=(w,col,blur)=>{c.lineWidth=w;c.strokeStyle=col;c.shadowColor='#ff4a1a';c.shadowBlur=blur;c.stroke();};
  const ri=r*.22,K=11;
- /* swept blades: from the inner ring out to the rim, each curling the same way */
- for(let pass=0;pass<2;pass++)for(let i=0;i<K;i++){const a=i/K*Math.PI*2+pass*.18,sweep=pass?1.25:1.6,x0=Math.cos(a)*ri,y0=Math.sin(a)*ri,x3=Math.cos(a+sweep)*r*.94,y3=Math.sin(a+sweep)*r*.94,
-  x1=Math.cos(a+.35)*r*.62,y1=Math.sin(a+.35)*r*.62,x2=Math.cos(a+sweep-.25)*r*1.02,y2=Math.sin(a+sweep-.25)*r*1.02;c.beginPath();c.moveTo(x0,y0);c.bezierCurveTo(x1,y1,x2,y2,x3,y3);
-  if(pass===0){stroke(r*.035,'rgba(226,60,30,.85)',18);stroke(r*.012,'rgba(255,214,140,.9)',6);}else{stroke(r*.012,'rgba(255,120,60,.7)',10);}}
+ /* (judge fx7: the arms were even neon tubes) each arm is a crescent: thick at the inner ring, drawn to a point at the
+    rim — a filled shape with a hot core of its own, so the disc reads as blades of flame, not tubing */
+ const blade=(a,sweep,w0,col,core)=>{const P=(t)=>{const q=1-t,x0=Math.cos(a)*ri,y0=Math.sin(a)*ri,x1=Math.cos(a+.35)*r*.62,y1=Math.sin(a+.35)*r*.62,x2=Math.cos(a+sweep-.25)*r*1.02,y2=Math.sin(a+sweep-.25)*r*1.02,x3=Math.cos(a+sweep)*r*.94,y3=Math.sin(a+sweep)*r*.94;
+   return [q*q*q*x0+3*q*q*t*x1+3*q*t*t*x2+t*t*t*x3,q*q*q*y0+3*q*q*t*y1+3*q*t*t*y2+t*t*t*y3];};
+  const N=28,L=[],Rr=[];for(let i=0;i<=N;i++){const t=i/N,[x,y]=P(t),[x2,y2]=P(Math.min(1,t+.01)),[x1,y1]=P(Math.max(0,t-.01)),dx=x2-x1,dy=y2-y1,d=Math.hypot(dx,dy)||1,w=w0*Math.pow(1-t,1.15)*(t<.08?.55+t*5.6:1);L.push([x-dy/d*w,y+dx/d*w]);Rr.push([x+dy/d*w*.45,y-dx/d*w*.45]);}
+  const fill=(k,col,blur)=>{c.beginPath();L.forEach(([x,y],i)=>{const [cx,cy]=P(i/N);c[i?'lineTo':'moveTo'](cx+(x-cx)*k,cy+(y-cy)*k);});for(let i=N;i>=0;i--){const [x,y]=Rr[i],[cx,cy]=P(i/N);c.lineTo(cx+(x-cx)*k,cy+(y-cy)*k);}c.closePath();c.shadowColor='#ff4a1a';c.shadowBlur=blur;c.fillStyle=col;c.fill();};
+  fill(1,col,16);if(core)fill(.32,core,5);};
+ for(let i=0;i<K;i++)blade(i/K*Math.PI*2,1.6,r*.075,'rgba(214,52,28,.78)','rgba(255,222,160,.95)');
+ for(let i=0;i<K;i++)blade(i/K*Math.PI*2+.2,1.25,r*.03,'rgba(255,120,60,.55)',null);
  /* heavy outer rim and its inner line */
- c.beginPath();c.arc(0,0,r,0,Math.PI*2);stroke(r*.06,'rgba(220,50,30,.9)',22);stroke(r*.018,'rgba(255,220,150,.95)',8);
+ c.beginPath();c.arc(0,0,r,0,Math.PI*2);stroke(r*.05,'rgba(214,44,26,.92)',22);stroke(r*.014,'rgba(255,176,96,.95)',8);
  c.beginPath();c.arc(0,0,r*.9,0,Math.PI*2);stroke(r*.008,'rgba(255,150,80,.6)',6);
  /* the small inner ring with a scalloped edge */
  c.beginPath();for(let i=0;i<=72;i++){const q=i/72*Math.PI*2,rr=ri*(1+Math.sin(q*12)*.06);c[i?'lineTo':'moveTo'](Math.cos(q)*rr,Math.sin(q)*rr);}stroke(r*.02,'rgba(255,170,90,.9)',10);
@@ -110,6 +116,9 @@ function fireDisc(r){
  c.globalCompositeOperation='lighter';const g=c.createRadialGradient(0,0,ri,0,0,r);g.addColorStop(0,'rgba(255,120,60,.10)');g.addColorStop(.8,'rgba(226,60,30,.08)');g.addColorStop(1,'rgba(226,60,30,0)');c.fillStyle=g;c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.fill();
  DISC.set(r,cv);return cv;
 }
+/* (judge fx7: the glyph sat on top of every line) the idle disc lies tilted at about 0.58 and is drawn in two halves:
+   the far half before the glyph, the near half after it, so the character stands inside the ring */
+function fireHalf(s,c,spr,side){const br=(.88+.12*Math.sin(s.t*2.2))*(side>0?.8:1);c.save();c.globalAlpha*=br;c.translate(s.cx,s.cy+(s.H0||s.H)*.11);c.rotate(-.1);c.scale(1,.58);c.beginPath();c.rect(-spr.width,side<0?-spr.height:0,spr.width*2,spr.height);c.clip();c.rotate(s.t*.35);c.drawImage(spr,-spr.width/2,-spr.height/2);c.restore();}
 const layerY=(s,i,L)=>s.cy+s.H*(.3-i*(.62/(L-1)));
 function layerBurst(s,i,L,base){const y=layerY(s,i,L),sc=.95-i*.09;for(let k=0;k<26;k++){const a=R(0,TAU),v=R(160,380)*sc;s.add({type:'spark',x:s.cx+Math.cos(a)*base*sc*.5,y:y+Math.sin(a)*base*sc*.17,vx:Math.cos(a)*v,vy:Math.sin(a)*v*.34-40,drag:1.6,g:40,life:R(.5,.9),r:R(1,1.8),trail:[]});}for(let k=0;k<6;k++)s.add({type:'flame',x:s.cx+R(-1,1)*base*sc*.4,y:y+R(-6,6),vx:R(-60,60),vy:R(-60,-10),drag:2,life:R(.4,.7),r:R(14,22)});}
 function tunnelBurst(s,r){for(let k=0;k<22;k++){const a=R(0,TAU),v=R(160,420)*(r/200);s.add({type:'spark',x:s.cx+Math.cos(a)*r*.4,y:s.cy+Math.sin(a)*r*.4,vx:Math.cos(a)*v,vy:Math.sin(a)*v,drag:1.6,g:30,life:R(.4,.8),r:R(1,2),trail:[]});}s.flash=Math.max(s.flash,.18);}
@@ -123,26 +132,27 @@ const SC={
      rising. Cast: concentric discs fill the depth along the view axis — near ones large, far ones small, each turning
      against the next — lighting from the far end, then bursting one after another from the depths toward you, and
      the last becomes a full-frame eruption. */
-  bg(s,c){const base=Math.min(s.W,s.H)*.44,spr=fireDisc(Math.round(base));
-   if(s.ct<0||s.ct>4.2){const br=.88+.12*Math.sin(s.t*2.2);c.save();c.globalAlpha*=br;c.translate(s.cx,s.cy);c.scale(1,.9);c.rotate(-.12);c.scale(1,1/.9);c.transform(1,0,0,.86,0,0);c.rotate(s.t*.35);c.drawImage(spr,-spr.width/2,-spr.height/2);c.restore();if(s.ct>4.2)s.ct=-1;return;}
+  bg(s,c){const base=Math.min(s.W0||s.W,s.H0||s.H)*.44,spr=fireDisc(Math.round(base));
+   if(s.ct<0||s.ct>4.2){fireHalf(s,c,spr,-1);if(s.ct>4.2)s.ct=-1;return;}
    const T=s.ct,L=6,LIGHT=.16,BOOM0=1.25,STEP=.16;
    for(let i=L-1;i>=0;i--){/* i=0 nearest, i=L-1 deepest */const d=i/(L-1),sc=1.25-d*.95,lit=Math.min(1,Math.max(0,(T-(L-1-i)*LIGHT)/.3)),boomAt=BOOM0+(L-1-i)*STEP;
     if(T>boomAt&&!(s.blown??=new Set()).has(i)){s.blown.add(i);tunnelBurst(s,base*sc);}
     let a=lit*(.35+.65*(1-d));if(T>boomAt)a*=Math.max(0,1-(T-boomAt)/.22);if(a<=0)continue;
-    c.save();c.globalAlpha*=a*(.8+.2*Math.sin(T*18+i));c.translate(s.cx,s.cy);c.rotate((i%2?-1:1)*T*(1.1+i*.3));c.scale(sc,sc);c.drawImage(spr,-spr.width/2,-spr.height/2);c.restore();}
+    c.save();c.globalAlpha*=a*(.8+.2*Math.sin(T*18+i));if(d>.05)c.filter=`blur(${(d*3).toFixed(1)}px) brightness(${(1-d*.5).toFixed(2)}) hue-rotate(${(-d*14).toFixed(0)}deg)`;c.translate(s.cx,s.cy);c.rotate((i%2?-1:1)*T*(1.1+i*.3));c.scale(sc,sc);c.drawImage(spr,-spr.width/2,-spr.height/2);c.restore();}
    const END=BOOM0+L*STEP;if(T>END&&!s.erupted){s.erupted=1;columnBurst(s,base);s.flash=.6;}
    if(T>END&&T<END+1.3){const k=(T-END)/1.3,g=c.createRadialGradient(s.cx,s.cy,0,s.cx,s.cy,Math.max(s.W,s.H)*(.3+k));g.addColorStop(0,`rgba(255,226,160,${.4*(1-k)})`);g.addColorStop(.5,`rgba(226,66,40,${.22*(1-k)})`);g.addColorStop(1,'rgba(120,20,10,0)');c.fillStyle=g;c.fillRect(0,0,s.W,s.H);}
    if(T>END+1.4){s.blown=null;s.erupted=0;}
   },
-  spawn(s){if(s.count('spark')<20)s.add({type:'spark',x:s.cx+R(-1,1)*s.W*.3,y:s.cy+R(.15,.4)*s.H,vx:R(-10,10),vy:-R(50,120),g:-10,life:R(1.2,2),r:R(.8,1.5),trail:[]});},
+  spawn(s){if(s.count('ember')<22)s.add({type:'ember',x:s.cx+R(-1,1)*(s.W0||s.W)*.3,y:s.cy+R(.05,.35)*(s.H0||s.H),vx:R(-14,14),vy:-R(20,55),drag:.3,life:R(1.6,2.8),r:R(.8,1.6)});},
   burst(s){s.blown=null;s.erupted=0;s.flash=.3;},
+  fg(s,c){if(s.ct<0||s.ct>4.2)fireHalf(s,c,fireDisc(Math.round(Math.min(s.W0||s.W,s.H0||s.H)*.44)),1);},
   glyph(){}
  },
  ice:{
   /* one finely cut ice crystal at the heart: a hexagonal gem with facets and a moving highlight; frost grows out from
      it in fine dendrites; cold mist drifts along the floor; a few needles fall */
   bg(s,c){const r=Math.min(s.W,s.H)*.22*(s.big||1),rot=Math.sin(s.t*.3)*.08;
-   for(let i=0;i<4;i++){const x=s.W*(((i/4+s.t*.012*(i%2?1:-1))%1)+1)%1,g=c.createRadialGradient(x,s.H*.88,0,x,s.H*.88,s.W*.4);g.addColorStop(0,'rgba(170,220,240,.08)');g.addColorStop(1,'rgba(170,220,240,0)');c.fillStyle=g;c.fillRect(0,s.H*.5,s.W,s.H*.5);}
+   for(let i=0;i<4;i++){const x=s.W*(((i/4+s.t*.012*(i%2?1:-1))%1)+1)%1,g=c.createRadialGradient(x,s.H*.88,0,x,s.H*.88,s.W*.4);g.addColorStop(0,'rgba(170,220,240,.08)');g.addColorStop(1,'rgba(170,220,240,0)');c.fillStyle=g;c.fillRect(0,0,s.W,s.H);}
    if(s.shattered)return;
    /* frost dendrites growing from the gem's corners */
    if(!s.den)s.den=Array.from({length:12},(_,i)=>({a:i/12*TAU+R(-.15,.15),L:R(.7,1.2),br:Array.from({length:4},()=>[R(.2,.85),R(.4,.8)*(Math.random()<.5?1:-1)])}));
@@ -244,36 +254,47 @@ function step(s,dt){
  /* after its burst the fire circle's afterglow fades, then the circle draws itself again ring by ring and keeps turning */
 
 }
-function render(c,s,alpha,scale){
+function render(c,s,alpha,scale,ga=alpha){
  const sc=SC[s.el];c.save();c.globalAlpha=1;c.translate(s.cx,s.cy);c.scale(scale,scale);c.translate(-s.cx,-s.cy);
  c.globalCompositeOperation='lighter';const a0=alpha;
  c.globalAlpha=a0;sc.bg(s,c);
  for(const p of s.ps){c.globalAlpha=a0;DRAW[p.type]?.(c,p,p.t/p.life,s);}
- c.globalAlpha=a0;c.globalCompositeOperation='source-over';if(s.glyph)drawLockup(s,c,s.el);
+ c.globalAlpha=ga;c.globalCompositeOperation='source-over';if(s.glyph&&ga>.01)drawLockup(s,c,s.el);
+ if(sc.fg){c.globalCompositeOperation='lighter';c.globalAlpha=a0;sc.fg(s,c);}
  if(s.flash>0){c.globalCompositeOperation='lighter';const fr=Math.max(s.W,s.H)*.7,g=c.createRadialGradient(s.cx,s.cy,0,s.cx,s.cy,fr);g.addColorStop(0,rgba(COLOR[s.el],Math.min(.55,s.flash*.6)*a0));g.addColorStop(.35,rgba(COLOR[s.el],s.flash*.18*a0));g.addColorStop(1,rgba(COLOR[s.el],0));c.fillStyle=g;c.fillRect(0,0,s.W,s.H);s.flash=Math.max(0,s.flash-s.dt*2);}
  c.restore();
 }
 
 export function mountElementFx(canvas){
  const ctx=canvas.getContext('2d');if(!ctx)return {setElement(){},cast(cb){cb?.();},stop(){}};
- let cur=null,old=null,switchT=1,stopped=false,raf=0,prev=performance.now(),target=.4;
- const size=()=>{const dpr=Math.min(2,devicePixelRatio||1),W=canvas.clientWidth,H=canvas.clientHeight;if(W&&(canvas.width!==Math.round(W*dpr)||canvas.height!==Math.round(H*dpr))){canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);for(const s of [cur,old])if(s){s.W=W;s.H=H;s.cx=W/2;s.cy=H/2;}};
- const frame=now=>{if(stopped||!canvas.isConnected)return;const dt=Math.min(.05,(now-prev)/1000);prev=now;size();ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
+ let cur=null,old=null,switchT=1,stopped=false,raf=0,prev=performance.now(),target=.4,wide=null;
+ /* (judge fx7: the burst was cut off at the panel's edge) for the cast the canvas leaves its panel and covers the whole
+    window, still centred where the panel was; what reaches past the panel fades out with distance, and once the
+    eruption has settled the canvas goes back into its panel */
+ const shift=(dx,dy)=>{for(const s of [cur,old])if(s)for(const q of s.ps){q.x+=dx;q.y+=dy;}};
+ const goWide=()=>{if(wide)return;const r=canvas.getBoundingClientRect();wide={x:r.left,y:r.top,w:r.width,h:r.height};canvas.classList.add('is-wide');shift(r.left,r.top);};
+ const goBack=()=>{if(!wide)return;shift(-wide.x,-wide.y);canvas.classList.remove('is-wide');wide=null;};
+ const size=()=>{const dpr=Math.min(2,devicePixelRatio||1),W=canvas.clientWidth,H=canvas.clientHeight;if(W&&(canvas.width!==Math.round(W*dpr)||canvas.height!==Math.round(H*dpr))){canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);for(const s of [cur,old])if(s){s.W=W;s.H=H;if(wide){s.cx=wide.x+wide.w/2;s.cy=wide.y+wide.h/2;s.W0=wide.w;s.H0=wide.h;}else{s.cx=W/2;s.cy=H/2;s.W0=W;s.H0=H;}}};
+ const frame=now=>{if(stopped||!canvas.isConnected)return;const raw=(now-prev)/1000,dt=Math.min(.05,raw);prev=now;
+  /* the cast keeps wall-clock time, so it stays in step with the reveal even when frames are slow */
+  if(cur&&cur.ct>=0&&raw>dt)cur.ct+=Math.min(.5,raw-dt);size();ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
   if(document.hidden){raf=requestAnimationFrame(frame);return;}
   /* (user: the old transition was ugly) out: the old scene shrinks, blurs and fades in ~200 ms; in: the new one grows
      from 92% and sharpens over ~360 ms, starting a beat later; one thin light sweep crosses once */
   switchT=Math.min(1,switchT+dt);const W=canvas.clientWidth,H=canvas.clientHeight;
   if(old&&switchT<.2){const k=switchT/.2,e=k*k;step(old,dt);ctx.save();ctx.filter=`blur(${(e*8).toFixed(1)}px)`;render(ctx,old,1-e,1-.12*e);ctx.restore();}else old=null;
   if(cur){if(!calm){SC[cur.el].spawn(cur);step(cur,dt);}const k=Math.min(1,Math.max(0,(switchT-.08)/.36)),e=1-Math.pow(1-k,3);
-   if(k<1){ctx.save();ctx.filter=`blur(${((1-e)*6).toFixed(1)}px)`;render(ctx,cur,e,.92+.08*e);ctx.restore();
+   if(k<1){ctx.save();ctx.filter=`blur(${((1-e)*6).toFixed(1)}px)`;render(ctx,cur,e,.92+.08*e,Math.max(0,(k-.45)/.55));ctx.restore();
     const sx=-W*.3+(W*1.6)*e,gr=ctx.createLinearGradient(sx-60,0,sx+60,H);gr.addColorStop(0,'rgba(255,255,255,0)');gr.addColorStop(.5,`rgba(255,250,240,${.12*(1-e)})`);gr.addColorStop(1,'rgba(255,255,255,0)');ctx.globalCompositeOperation='lighter';ctx.fillStyle=gr;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';}
-   else render(ctx,cur,1,1);}
+   else render(ctx,cur,1,1);
+   if(wide){const R0=Math.max(wide.w,wide.h),g=ctx.createRadialGradient(cur.cx,cur.cy,R0*.45,cur.cx,cur.cy,R0*1.25);g.addColorStop(0,'#000');g.addColorStop(1,'rgba(0,0,0,0)');ctx.globalCompositeOperation='destination-in';ctx.fillStyle=g;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';
+    if(cur.ct<0||cur.ct>3.8)goBack();}}
   if(!calm)raf=requestAnimationFrame(frame);};
  raf=requestAnimationFrame(frame);
  return {
   setElement(el,glyph){if(!SC[el])return;if(cur&&cur.el===el){if(glyph)cur.glyph=glyph;return;}
    old=cur&&switchT>=1?cur:(cur||null);switchT=cur?0:1;cur=newScene(el,glyph);size();if(calm)requestAnimationFrame(frame);},
-  cast(onBurst){if(!cur){onBurst?.();return;}cur.ct=0;setTimeout(()=>{if(cur){SC[cur.el].burst(cur);}onBurst?.();},calm?0:1300);},
-  stop(){stopped=true;cancelAnimationFrame(raf);}
+  cast(onBurst){if(!cur){onBurst?.();return;}if(!calm)goWide();cur.ct=0;setTimeout(()=>{if(cur){SC[cur.el].burst(cur);}onBurst?.();},calm?0:1300);},
+  stop(){stopped=true;cancelAnimationFrame(raf);goBack();}
  };
 }

@@ -1575,3 +1575,7 @@ html body .dict-hit{width:1200px!important}
 html body .dict-hit>i{left:600px!important}
 html body .dict-hit-line{width:1100px!important;height:2px!important;top:0!important;background:linear-gradient(90deg,transparent,rgba(255,226,170,.9) 25%,#fff6e6 50%,rgba(255,226,170,.9) 75%,transparent)!important;box-shadow:0 0 10px 2px rgba(255,200,130,.55)!important}
 html body .dict-launch :is(#lookup-form,.lookup-form){outline:1px solid transparent;backface-visibility:hidden;will-change:transform}
+/* 转职 (judge fx7): the cast leaves the panel and covers the window (rite-stage.js fades it out with distance); the
+   white field is opaque white that opens and closes as an iris from the burst — never translucent white over the red */
+html body .class-rite-fx.is-wide{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:20!important}
+html body .class-rite-white{background:#fff!important;mix-blend-mode:normal!important;opacity:1!important;clip-path:circle(0% at 25% 50%);z-index:30!important}
