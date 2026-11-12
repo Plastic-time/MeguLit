@@ -87,3 +87,12 @@ test('YU-RIS 女装山脈: speaker-prefixed script lines, ruby and masked letter
  assert.equal(m.match('「いい大人が、年下の男の娘にチ○ポを拘束されてるのよ？　まさか本気で\n逃げられないわけないわよね？」').japanese,zh[2].slice(2));
  assert.equal(new ot.Matcher(rt,zh).match('行人「ここは何処だ……」').japanese,'行人「这里是哪里……」');
 });
+/* #136 戦国ランス / ランス・クエスト era: the AIN is MT19937-XOR encrypted (seed 0x5D3E3) instead of zlib wrapped.
+   28b050e9 / 0d a8 are the keystream bytes 0-3, 1250 and 1299 from a line-by-line port of libsys4's mt19937int.c. */
+test('MT19937-encrypted AIN files decrypt and read; a stray tag in the code is skipped',()=>{
+ const ks=ot._ain.mtXor(Buffer.alloc(1300),0x5D3E3);assert.equal(ks.subarray(0,4).toString('hex'),'28b050e9');assert.equal(ks[1250],0x0d);assert.equal(ks[1299],0xa8);
+ const packed=ain(original,'sjis',['main'],true),body=zlib.inflateSync(packed.subarray(16));
+ const code=Buffer.concat([Buffer.from('CODE','latin1'),Buffer.from([16,0,0,0]),Buffer.from('MSG1','latin1'),Buffer.from([255,255,255,127]),Buffer.alloc(8)]);
+ const plain=Buffer.concat([body.subarray(0,8),code,body.subarray(8)]);
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-ainx-'));fs.writeFileSync(path.join(dir,'x.ain'),ot._ain.mtXor(plain,0x5D3E3));
+ const r=ot.readAin(path.join(dir,'x.ain'));assert.equal(r.version,6);assert.deepEqual(r.lines,original);fs.rmSync(dir,{recursive:true,force:true});});
