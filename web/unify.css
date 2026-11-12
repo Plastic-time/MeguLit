@@ -36,19 +36,6 @@ html:not(#u):not(#v) body .main :is(.gm-hero,.gm-group,.stg-glass,.review-card,.
  -webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3)}
 html:not(#u):not(#v) body .main :is(.gm-overview,.gm-stg,.ri-level,.about-qcard,.tool-key-note,.steps){border-radius:2px!important}
 
-/* ---- learning / history sub tabs: still drop from the top bar (first tab under 首页), now a 44px band across the
-   content column with a 16px fade below; numbered like the detail tabs, 2px red underline on the current one ---- */
-html:not(#u):not(#v) body .main>.tabs,html:not(#u):not(#v) body .main.review-page>.tabs{display:flex!important;width:max-content!important;max-width:100%!important;box-sizing:border-box;height:44px;align-items:stretch;gap:clamp(20px,2vw,28px)!important;padding:0!important;margin:0 0 clamp(20px,2.4vw,32px)!important;
- border:0!important;border-radius:0!important;counter-reset:utab;background:none!important;box-shadow:none!important}
-html:not(#u):not(#v) body .main>.tabs::before{content:"";position:absolute;inset:0 -9999px -16px;z-index:-1;pointer-events:none;
- background:linear-gradient(180deg,rgba(20,8,8,.92) 0,rgba(20,8,8,.92) 44px,rgba(20,8,8,0) 100%);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
- -webkit-mask:linear-gradient(#000 0 44px,rgba(0,0,0,.6) 44px,transparent 100%);mask:linear-gradient(#000 0 44px,rgba(0,0,0,.6) 44px,transparent 100%)}
-html:not(#u):not(#v) body .main>.tabs::after{content:"";position:absolute;left:-9999px;right:-9999px;top:43px;height:1px;background:var(--u-line);pointer-events:none}
-html:not(#u):not(#v) body .main>.tabs .tab{counter-increment:utab;display:flex;align-items:center;padding:0!important;font-size:13px!important;letter-spacing:.12em!important;color:var(--g-t3,#a08a80)!important;white-space:nowrap}
-html:not(#u):not(#v) body .main>.tabs .tab::before{content:counter(utab,decimal-leading-zero);margin-right:8px;font-family:var(--u-mono);font-size:10px;letter-spacing:.08em;color:var(--g-gold);opacity:.8}
-html:not(#u):not(#v) body .main>.tabs .tab:hover{color:var(--g-t1,#f1e0d2)!important}
-html:not(#u):not(#v) body .main>.tabs .tab.active{color:var(--g-t1,#f1e0d2)!important}
-html:not(#u):not(#v) body .main>.tabs .tab.active::after{content:""!important;position:absolute;left:0!important;right:0;bottom:0!important;width:auto!important;height:2px!important;margin:0!important;transform:none!important;background:#c82f3b!important;z-index:1}
 html:not(#u):not(#v) body .main:has(>.tabs)>.page-header{top:18px!important;right:clamp(48px,4vw,64px)!important}
 html:not(#u):not(#v) body .main:has(>.tabs)>.page-header{z-index:7!important}
 
@@ -436,8 +423,6 @@ html:not(#u):not(#v) body .main .settings-content .sp-preview .sp-stage{min-heig
 /* mono labels: Consolas before ui-monospace (Windows resolves ui-monospace to a face with old-style figures) */
 :root,html:not(#u):not(#v) body .ri-page,html:not(#u):not(#v) body #learning-content,html:not(#u):not(#v) body .gm-page,html:not(#u):not(#v) body .stg,html:not(#u):not(#v) body .leaderboard-page,html:not(#u):not(#v) body .dl{--ri-mono:"IBM Plex Mono",Consolas,monospace;--mg-mono:"IBM Plex Mono",Consolas,monospace;--stg-mono:"IBM Plex Mono",Consolas,monospace}
 /* learning sub tabs fit the window in every language */
-@media (max-width:1500px){html:not(#u):not(#v) body .main>.tabs{gap:clamp(12px,1.4vw,22px)!important}html:not(#u):not(#v) body .main>.tabs .tab{letter-spacing:.04em!important}}
-@media (max-width:1360px){html:lang(en) .main>.tabs .tab::before,html:lang(ja) .main>.tabs .tab::before{margin-right:5px}html:lang(en) .main>.tabs .tab{font-size:12.5px!important;letter-spacing:0!important}html:lang(en) .main>.tabs{gap:12px!important}}
 /* one content width for every learning tab, centred: the left edge no longer jumps */
 html:not(#u):not(#v) body #learning-content{max-width:1400px;margin-inline:auto}
 html:not(#u):not(#v) body #learning-content .g-blank{max-width:none!important;margin-inline:0!important}
@@ -460,7 +445,6 @@ html:not(#u):not(#v) body .lib-list .library-grid{-webkit-mask:linear-gradient(t
 /* home: today's cell exactly one cell */
 html:not(#u):not(#v) body .tv-heat i.today{width:12px!important;height:12px!important;transform:none!important;justify-self:auto!important}
 /* history: the tab band stays on top while the list scrolls; the font link reads as a button; glass rows */
-html:not(#u):not(#v) body .main:has(>.history-backdrop)>.tabs{position:sticky!important;top:0!important;z-index:6!important}
 html:not(#u):not(#v) body .main:has(>.tabs)>.page-header .text-button{height:30px;padding:0 12px!important;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22);letter-spacing:.12em!important}
 html:not(#u):not(#v) body .main:has(>.tabs)>.page-header .text-button:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold) 60%,transparent)}
 html:not(#u):not(#v) body .main:has(>.history-backdrop) :is(.history-session,.history-dialogue){background:linear-gradient(160deg,rgba(24,22,28,.7),rgba(14,13,17,.6))!important}
@@ -582,8 +566,6 @@ html:not(#u):not(#v) body .main .settings-content .settings-row .settings-label{
 html:not(#u):not(#v) body .main .revisit-words{border-radius:2px!important;background:var(--u-glass)!important;border:0!important;box-shadow:inset 0 0 0 1px var(--u-line)!important}
 html:not(#u):not(#v) body .main .word-actions{align-items:center}
 html:not(#u):not(#v) body .main .word-actions .select-trigger{font-family:inherit!important;height:36px}
-/* sub tab band fully solid, short fade */
-html:not(#u):not(#v) body .main>.tabs::before{background:linear-gradient(180deg,#160d0e 0,#160d0e 44px,rgba(22,13,14,0) 100%)!important;inset:0 -9999px -12px!important}
 /* empty states: readable measure, action close to the text */
 html:not(#u):not(#v) body .g-blank .lede{max-width:62ch!important}
 html:not(#u):not(#v) body .g-blank .acts{margin-top:20px!important}
@@ -1551,14 +1533,38 @@ html body:has(.dict-launch),html:not(#u):not(#v):not(#w):not(#x) body .main:has(
    above the field; 3D only happens inside it */
 html:not(#u):not(#v):not(#w):not(#x) body #learning-content:has(#lookup-results){position:relative;z-index:2;isolation:isolate}
 html:not(#u):not(#v):not(#w):not(#x) body .dict-field{z-index:0!important}
-/* 2026-11-12 (user: blend the released sub-bar with this one, no numbers in front). The released bar's plain names and
-   gold diamond, on this version's full-width band and hairline: 14px warm names, no counters; the current tab lifts to
-   ivory over a short red line that fades out at both ends, with the gold diamond from the release sitting on the hairline. */
-html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs{gap:clamp(6px,1vw,14px)!important}
-html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab{position:relative;padding:0 12px!important;font-size:14px!important;letter-spacing:.04em!important;color:#b39b8d!important;transition:color .18s}
-html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab::before{content:none!important;display:none!important}
-html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab:hover{color:#f1e0d2!important}
-html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab.active{color:#fff3e2!important;text-shadow:0 0 14px rgba(237,181,110,.25)}
-html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab.active::after{content:""!important;position:absolute;left:4px!important;right:4px!important;bottom:0!important;width:auto!important;height:2px!important;margin:0!important;transform:none!important;z-index:1;
- background:linear-gradient(90deg,rgba(200,47,59,0),#c82f3b 30%,#c82f3b 70%,rgba(200,47,59,0))!important;box-shadow:none!important}
-html:not(#u):not(#v):not(#w):not(#x) body .main>.tabs .tab.active::before{content:""!important;display:block!important;position:absolute;left:50%;bottom:-3px;width:5px;height:5px;margin:0!important;transform:translateX(-50%) rotate(45deg);background:#edb56e;box-shadow:0 0 6px rgba(237,181,110,.7);z-index:2;opacity:1}
+
+/* ==== round 9 · components ==== */
+/* primary button (judge r8: the ▼ reads as a dropdown and drops to the corner in some buttons; four looks; heights differ).
+   One button everywhere: the dialogue-box look stays, its "continue" mark now points onward (▸) and is centred with a
+   transform so no parent rule can drop it; four states — rest, hover (red ink sweep, mark slides right), press (1px down
+   plus the one-frame hit), disabled (40%, no rule, no ink). The tools page's solid "open" and the kana start join it. */
+html:not(#u):not(#v):not(#w):not(#x) body :is(button.primary,.g-btn.primary,.hero-play,.g-blank .acts button.go,.v-index .mg-cta,.dialog-actions button.primary,.dev-notice-form>button.primary,.dev-notice-actions button[data-ok]):not(.icon-button)::after{
+ width:6px!important;height:9px!important;margin:0!important;top:50%!important;inset:50% 18px auto auto!important;transform:translateY(-50%)!important;clip-path:polygon(0 0,100% 50%,0 100%)!important}
+html:not(#u):not(#v):not(#w):not(#x) body :is(button.primary,.g-btn.primary,.hero-play,.g-blank .acts button.go,.v-index .mg-cta,.dialog-actions button.primary,.dev-notice-form>button.primary,.dev-notice-actions button[data-ok]):not(.icon-button):hover:not(:disabled)::after{animation:u-onward .8s ease-in-out infinite!important}
+@keyframes u-onward{50%{translate:3px 0}}
+html:not(#u):not(#v):not(#w):not(#x) body :is(button.primary,.g-btn.primary,.hero-play,.g-blank .acts button.go,.v-index .mg-cta,.dialog-actions button.primary,.dev-notice-form>button.primary,.dev-notice-actions button[data-ok]):not(.icon-button):disabled{
+ opacity:.4!important;filter:none!important;cursor:not-allowed!important;background:#140d11!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.22)!important}
+html:not(#u):not(#v):not(#w):not(#x) body :is(button.primary,.g-btn.primary,.hero-play,.dialog-actions button.primary):not(.icon-button):disabled::after{background:rgba(232,220,200,.5)!important;animation:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body :is(button.primary,.g-btn.primary,.hero-play,.g-blank .acts button.go,.v-index .mg-cta,.dialog-actions button.primary):not(.icon-button)>span[aria-hidden="true"]:last-child{display:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .v-index.mg .mg-cta{border-radius:0!important;gap:0!important;text-shadow:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .grimoire-page .tool-go,html:not(#u):not(#v):not(#w):not(#x) body .grimoire-page .tool-card:first-child .tool-go{
+ position:relative;height:44px!important;padding:0 44px 0 20px!important;border-radius:0!important;color:#f6ece0!important;font:600 15px/1 var(--g-serif,serif)!important;letter-spacing:.08em!important;
+ background:linear-gradient(90deg,#b8293c,#9a1f30) no-repeat 0 0/0% 100%,#140d11!important;box-shadow:inset 0 0 0 1px rgba(232,220,200,.34),inset 0 -2px 0 #c8323c!important;transition:background-size .38s cubic-bezier(.2,.8,.2,1),box-shadow .2s!important}
+html:not(#u):not(#v):not(#w):not(#x) body .grimoire-page .tool-go::after{content:"";position:absolute;right:18px;top:50%;width:6px;height:9px;transform:translateY(-50%);background:#c8323c;clip-path:polygon(0 0,100% 50%,0 100%)}
+html:not(#u):not(#v):not(#w):not(#x) body .grimoire-page .tool-card:hover .tool-go{background-size:100% 100%,auto!important;box-shadow:inset 0 0 0 1px rgba(255,214,190,.5),inset 0 -2px 0 #f2b8a0!important;color:#fff!important}
+html:not(#u):not(#v):not(#w):not(#x) body .grimoire-page .tool-card:hover .tool-go::after{background:#fff}
+/* ghost button (judge r8: round pills and grey "disabled-looking" buttons). Every remaining pill button goes square:
+   1px frame at 30% warm white, text at 85%, hover lifts the frame to gold and the text to full; one text-button too:
+   13px, 85% white, a 1px underline that grows in on hover. */
+html:not(#u):not(#v):not(#w):not(#x) body :is(.about-update,.lb-mychip,.gm-pill,.gm-scene,.gm-level,.v-kanji .kg-btn,.pill){
+ border-radius:2px!important;border:0!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.3)!important;background:transparent!important;color:rgba(255,244,234,.85)!important;transition:box-shadow .18s,color .18s,background .18s!important}
+html:not(#u):not(#v):not(#w):not(#x) body :is(.about-update,.lb-mychip,.gm-pill,.gm-scene,.gm-level,.v-kanji .kg-btn,.pill):hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold,#edb56e) 70%,transparent)!important;color:#fff4ea!important;background:rgba(255,255,255,.04)!important}
+html:not(#u):not(#v):not(#w):not(#x) body :is(.gm-level,.gm-scene,.gm-pill):is(.active,[aria-pressed=true],[aria-current],.on){box-shadow:inset 0 0 0 1px rgba(255,236,220,.3),inset 0 -2px 0 #c82f3b!important;color:#fff4ea!important}
+html:not(#u):not(#v):not(#w):not(#x) body .about-update{height:32px!important;padding:0 14px!important;font-size:13px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .about-update.ready{box-shadow:inset 0 0 0 1px rgba(232,220,200,.34),inset 0 -2px 0 #c8323c!important;color:#f6ece0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .kn-voice-seg{border-radius:2px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .kn-voice-seg button{border-radius:1px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .main :is(.text-button,.link-button):not(.icon-button){font-size:13px!important;color:rgba(255,244,234,.85)!important;background:none!important;box-shadow:none!important;text-decoration:none!important;
+ background-image:linear-gradient(currentColor,currentColor)!important;background-repeat:no-repeat!important;background-position:0 100%!important;background-size:0 1px!important;transition:background-size .2s,color .2s!important}
+html:not(#u):not(#v):not(#w):not(#x) body .main :is(.text-button,.link-button):not(.icon-button):hover{background-size:100% 1px!important;color:#fff4ea!important}
