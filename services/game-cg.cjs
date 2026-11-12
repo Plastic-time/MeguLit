@@ -79,7 +79,39 @@ function hunex(dir,exe){
  return {engine:'HuneX',supported:true,items,total:gallery?gallery.size:0};
 }
 
-const READERS=[{read:kirikiri,saves:kirikiriSaves},{read:hunex,saves:hunexSaves}];
+/* ---- Siglus (CLANNAD, Summer Pockets): dat/mode.cgm ("CGTABLE2") is the gallery: after a 0x20 head, bytes XORed
+   with a 256-byte table the engine keeps (the same in every Siglus exe seen), then Siglus LZSS; 0x3C-byte records of
+   a 32-byte g00 name and the record's flag number. savedata_*global.sav (u32 version, u32, u32 size, then the same
+   XOR + LZSS) holds the global tables as {u32 next offset, u32 count, count u32 values}; the CG table is the one
+   long enough for every flag number whose set entries are all gallery flags. Images: g00/<name>.g00. */
+const SIGLUS_KEY=Buffer.from('8be55dc3a1e030440085c074095f5e33c05b8be55dc38b450c85c075148b55ec83c220526a00e8f528010083c40889450c8b45e46a006a005053ff1534b143008b451085c074058b4dec89088a45f084c07578a1e03044008b7de88b750c85c075448b1dd0b0430085ff763781ff000004006a0076438b45f88d55fc5268000004005650ff152cb143006a05ffd3a1e030440081ef0000040081c60000040085c074c58b5df853e8f4fbffff8b450c83c4045f5e5b8be55dc38b55f88d4dfc51575652ff152cb14300ebd88b45e883c020506a00e8472801008b7de88945f48bf0a1e030440083c40885c075568b1dd0b0430085ff764981ff000004006a0076','hex');
+const unxor=(b,from)=>{const o=Buffer.from(b.subarray(from));for(let i=0;i<o.length;i++)o[i]^=SIGLUS_KEY[i&255];return o;};
+function siglusTable(buf){
+ if(buf.length<0x28||!/^CGTABLE/.test(buf.toString('latin1',0,8)))return null;const {siglusLz}=require('./cg-decoders.cjs');
+ let raw;try{raw=siglusLz(unxor(buf,0x20));}catch{try{raw=siglusLz(buf,0x20);}catch{return null;}}
+ const out=new Map();for(let i=0;i+0x3c<=raw.length;i+=0x3c){const name=raw.toString('latin1',i,i+32).replace(/\0[\s\S]*$/,'').trim();if(name)out.set(name.toLowerCase(),raw.readInt32LE(i+32));}
+ return out;}
+function siglusGlobalTables(buf){
+ if(buf.length<20)return [];let raw;try{raw=require('./cg-decoders.cjs').siglusLz(unxor(buf,12));}catch{return [];}
+ const out=[];let p=8;
+ while(p+8<=raw.length){const next=raw.readUInt32LE(p),n=raw.readUInt32LE(p+4);
+  if(next<=p||next>raw.length){p+=4;continue;}
+  if(next-p-8===n*4){const set=[];for(let i=0;i<n;i++)if(raw.readInt32LE(p+8+i*4))set.push(i);out.push({count:n,set});}
+  p=next;}
+ return out;}
+function siglusSaves(dir){const out=[];let l=[];try{l=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
+ for(const e of l)if(e.isDirectory()&&/^savedata/i.test(e.name)){const f=path.join(dir,e.name,'global.sav');if(fs.existsSync(f))out.push(f);}return out;}
+function siglus(dir){
+ const cgm=path.join(dir,'dat','mode.cgm');if(!fs.existsSync(cgm))return null;const table=siglusTable(fs.readFileSync(cgm));if(!table||!table.size)return null;
+ const flags=new Set(table.values()),top=Math.max(...flags),on=new Set();
+ for(const f of siglusSaves(dir)){let tabs;try{tabs=siglusGlobalTables(fs.readFileSync(f));}catch{continue;}
+  const fit=tabs.filter(t=>t.count>top&&t.set.every(i=>flags.has(i))).sort((a,b)=>b.set.length-a.set.length)[0];if(fit)for(const i of fit.set)on.add(i);}
+ const g00=path.join(dir,'g00'),files=new Map();try{for(const f of fs.readdirSync(g00))if(/\.g00$/i.test(f))files.set(base(f),path.join(g00,f));}catch{}
+ const items=new Map();for(const [name,flag] of table){if(!on.has(flag))continue;const file=files.get(name);if(file&&!items.has(name))items.set(name,{name,file,decode:'g00'});}
+ return {engine:'Siglus',supported:true,items,total:table.size};
+}
+
+const READERS=[{read:kirikiri,saves:kirikiriSaves},{read:hunex,saves:hunexSaves},{read:siglus,saves:siglusSaves}];
 const cache=new Map();
 function stamp(dir){let s='';for(const r of READERS)for(const f of r.saves(dir)){try{s+=f+fs.statSync(f).mtimeMs;}catch{}}return s;}
 function scan(executable){
@@ -108,4 +140,4 @@ function image(root,executable,name){
  try{fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,it.name+{'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp','image/bmp':'.bmp'}[mime]),buf);}catch{}
  return {mime,data:buf.toString('base64')};
 }
-module.exports={list,image,scan,ksdText,tokens,sdcUnpack,mzpNameSets};
+module.exports={list,image,scan,ksdText,tokens,sdcUnpack,mzpNameSets,siglusTable,siglusGlobalTables,SIGLUS_KEY};
