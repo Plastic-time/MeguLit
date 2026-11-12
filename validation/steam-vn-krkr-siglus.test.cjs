@@ -112,3 +112,14 @@ test('I: KiriKiri cx takes the Simplified slot wherever it sits',()=>{
  const en=Array.from({length:10},(_,k)=>['「これは'+k+'です」','"This is '+k+'"','「這是第'+k+'個，我們說過」']);
  assert.equal(e.parse(Buffer.from(JSON.stringify({scenes:[{rows:en}]}))).zh[2],'「這是第2個，我們說過」');
 });
+/* J (live test 2026-11-13, サノバウィッチ): a folder run through SmartSteamEmu starts the launcher's Target; the original
+   exe beside it quits without Steam. */
+test('J: SmartSteamEmu launcher target is the game program',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-sse-')),dir=path.join(root,'Witch');fs.mkdirSync(path.join(dir,'SmartSteamEmu'),{recursive:true});
+ try{pe(path.join(dir,'Witch.exe'),0x14c,400000);pe(path.join(dir,'Witch_crack.exe'),0x14c,300000);fs.writeFileSync(path.join(dir,'data.xp3'),'XP3');
+  const ini='# generated\r\n[Launcher]\r\nTarget = C:\Games\Witch\Witch_crack.exe\r\nStartIn = C:\Games\Witch\\r\n';
+  fs.writeFileSync(path.join(dir,'SmartSteamEmu','launcher.ini'),Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(ini,'utf16le')]));
+  const lib=require('../core/library.cjs');assert.equal(path.basename(lib.findGame(dir).exe),'Witch_crack.exe');
+  fs.rmSync(path.join(dir,'SmartSteamEmu'),{recursive:true});assert.equal(path.basename(lib.findGame(dir).exe),'Witch.exe');}
+ finally{fs.rmSync(root,{recursive:true,force:true});}
+});
