@@ -1645,3 +1645,28 @@ html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker{
 html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker[data-kind=narr],html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker[data-kind=line]{color:rgba(241,224,210,.55)}
 html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker:hover{box-shadow:inset 0 -1px 0 currentColor;color:#fff4ea}
 html:not(#u):not(#v):not(#w):not(#x) body .history-dialogue header .dlg-speaker-input{margin:0 12px 0 auto;width:150px;height:24px;padding:0 8px;border:0;border-radius:2px;background:#120d10;box-shadow:inset 0 0 0 1px var(--g-gold,#edb56e);color:#fff4ea;font-size:12px}
+
+/* learning goals (user: only four — make them one square and lay it out properly): a 2×2 grid of square cards, each
+   centred and stacked (large glyph, name, one line); chosen = its own colour washed in, a frame of that colour and a
+   tick in the corner; hover lifts it a little; the exam details open below the grid; the dialog is as wide as the
+   square, buttons on the right */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog{width:min(540px,94vw)!important;max-width:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goals{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;border-top:0!important;margin:20px 0 0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal{--gc:200,47,59;aspect-ratio:1;display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px!important;text-align:center;border:0!important;border-radius:3px!important;
+ background:linear-gradient(160deg,rgba(255,255,255,.045),rgba(255,255,255,.012))!important;box-shadow:inset 0 0 0 1px rgba(255,236,220,.14)!important;transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,background .18s;cursor:pointer}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:nth-child(2){--gc:237,181,110}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:nth-child(3){--gc:226,120,170}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:nth-child(4){--gc:110,200,180}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:hover{transform:translateY(-3px);box-shadow:inset 0 0 0 1px rgba(var(--gc),.45),0 12px 24px -14px rgba(0,0,0,.8)!important;background:linear-gradient(160deg,rgba(var(--gc),.08),rgba(255,255,255,.012))!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal{font-size:52px!important;line-height:1;margin:0 0 6px;color:rgb(var(--gc))!important;font-family:var(--g-serif,serif)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal b{font-family:var(--g-serif,serif);font-size:19px!important;letter-spacing:.06em;color:#f6ece0}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal small{font-size:12.5px!important;line-height:1.5;color:rgba(241,224,210,.62)!important;max-width:16em}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active{background:linear-gradient(160deg,rgba(var(--gc),.2),rgba(var(--gc),.05))!important;box-shadow:inset 0 0 0 1.5px rgba(var(--gc),.9)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal::after{content:"";position:absolute;top:10px;right:10px;left:auto!important;bottom:auto!important;width:20px;height:20px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,236,220,.25);transition:background .18s,box-shadow .18s}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active::after{background:rgb(var(--gc)) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.4l3 3 6-6.4' fill='none' stroke='%23140d11' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat;box-shadow:none}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-more{margin:16px 0 0!important;padding:14px 16px!important;border:0!important;border-radius:3px;background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1px rgba(255,236,220,.1)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer{display:flex!important;align-items:center;justify-content:flex-end;gap:10px;margin-top:22px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog footer .lv-note{margin:0 auto 0 0!important}
+@media (prefers-reduced-motion:reduce){html body .lv-dialog.lg-dialog .lg-goal{transition:none}html body .lv-dialog.lg-dialog .lg-goal:hover{transform:none}}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:focus-within{outline:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:has(input:focus-visible){outline:1px dashed rgba(var(--gc),.55)!important;outline-offset:4px}
