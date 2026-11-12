@@ -161,6 +161,8 @@ function restoreWord(db,id) {
   return {restored:w.id};
 }
 /* The JMdict entry for a word met in reading: its dictionary form first, then the normalized form. */
+// E457 lookup_exact entries as dictionary-page rows: first spelling, all readings, one definition per line.
+function localEntries(result,query){return (result?.entries||[]).slice(0,20).map(e=>({spelling:e.spellings?.[0]||e.readings?.[0]||query,reading:(e.readings||[]).join(' · '),definition:(Array.isArray(e.definition_groups)&&e.definition_groups.length?e.definition_groups.map(g=>g.text):(e.definitions||[])).map(String).join('\n')})).filter(e=>e.definition);}
 async function lookupEntry(learning,base,key){for(const text of [...new Set([base,key].filter(Boolean))]){const result=await learning.request('lookup_exact',{text,start:0,end:[...text].length},'zh');const entry=result?.entries?.find(e=>require('./learning-insights.cjs').entryMatches(e,base,key));if(entry)return entry;}return null;}
 async function dispatch(request,runtime=null) {
   if(request.action==='backup_export')return require('./backup.cjs').exportBackup(root,request.path);
@@ -361,7 +363,10 @@ async function dispatch(request,runtime=null) {
       case 'dictionary':{
         const query=String(request.query||'').trim().slice(0,100);
         if(!query)return [];
-        const entries=request.source==='moji'?await require('./moji-dictionary.cjs').lookupMoji(query,fetch,{root}):db.prepare('SELECT DISTINCT e.spelling,e.reading,e.definition FROM dictionary_entries e JOIN dictionary_forms f ON e.id=f.entry_id WHERE f.form=? ORDER BY e.frequency LIMIT 20').all(query);
+        let entries=request.source==='moji'?await require('./moji-dictionary.cjs').lookupMoji(query,fetch,{root}):db.prepare('SELECT DISTINCT e.spelling,e.reading,e.definition FROM dictionary_entries e JOIN dictionary_forms f ON e.id=f.entry_id WHERE f.form=? ORDER BY e.frequency LIMIT 20').all(query);
+        /* E457 (user, 2026-11-12: 本地查词 found nothing for 爆裂 or 夢): the dictionary_entries table is only filled by a
+           developer tool, so it is empty on every install. The local search now asks the same JMdict the lookup card uses. */
+        if(!entries.length&&request.source!=='moji'&&runtime){try{const r=await runtime.learning().request('lookup_exact',{text:query,start:0,end:[...query].length},'zh');entries=localEntries(r,query);}catch{}}
         if(entries.length&&typeof request.operationId==='string'&&request.operationId.length<100)require('./unknown-words.cjs').recordLookup(root,{surface:query,operationId:request.operationId});
         return entries;
       }
@@ -466,4 +471,4 @@ if(require.main===module) {
     }
   });
 }
-module.exports={dispatch,deleteWord,restoreWord,launch,cleanUiState};
+module.exports={dispatch,deleteWord,restoreWord,launch,cleanUiState,localEntries};
