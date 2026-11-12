@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+/* Steam VN adaptation (KiriKiri Z cx: 9-nine- Episode 4, ATRI -My Dear Moments-; Siglus multi-language: Summer Pockets).
+   A: the cx program generator keeps its random state from one stage to the next (GARbro CxProgram.Clear keeps m_seed);
+      restarting it decoded about half the entries of a cx archive wrong.
+   B: KiriKiri Z Steam archives name entries by MD5 of the lower-case UTF-16LE path; a script's voice name is found
+      under its own name, a folder named by its prefix or its last _part (sf/sf0001.ogg, ep1/kr0085_ep1.ogg).
+   C: the library picks the program a Steam folder can start: SiglusEngine_Steam.exe is the engine's program, and an
+      exe whose bitness has no steam_api DLL beside it is not the game.
+   D (local copies, read only): pairing and voice counts on the installed games. */
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto');
+const cx=require('../services/original-engines/cx-filter.cjs');
+
+test('A: cx decoding of ATRI entries over many program seeds',()=>{
+ const scheme=cx.schemes().find(s=>s.titles.includes('ATRI -My Dear Moments-'));assert.ok(scheme&&scheme.cb,'ATRI scheme known');
+ const dec=cx.filter(scheme);
+ /* [adlr hash, first four encrypted bytes] of Ogg clips in ATRI's vol1.xp3, one per program seed (hash & 0x7f) */
+ const vectors=[[2241691665,"8fa7a793"],[137479504,"cae2e2d6"],[2234533133,"4e666652"],[2819668052,"f5666652"],[993368455,"89a1a195"],[1062025600,"4e666652"],[3361174438,"a68e8eba"],[3706497954,"351d1d29"],[282358836,"557d7d49"],[3100929264,"99b1b185"],[379205837,"4e666652"],[3043211990,"95bdbd89"],[2603921241,"4e666652"],[4150001948,"2109093d"],[31761804,"e3d3cbff"],[786933422,"cfe7e7d3"],[4186596469,"6c444470"],[1190919730,"6f474773"],[3002061624,"58707044"],[1485033620,"8ca4a490"],[4167833526,"a58d8db9"],[1424741440,"270f0f3b"],[4075176826,"4e666652"],[771132175,"78505064"],[1672548837,"a98181b5"],[1624749631,"220a0a3e"],[2521935050,"90b8b88c"],[4280845694,"4169695d"],[2120244491,"7a525266"],[944009938,"9cb4b480"],[2949890582,"d2faface"],[1491834849,"6f474773"],[540015992,"b39b9baf"],[757910419,"2008083c"],[873762926,"7c545460"],[3547013836,"3f171723"],[2234974759,"259c9ca8"],[1711306783,"fbd3d3e7"],[3934426319,"4e666652"],[2071550854,"daf2f2c6"]];
+ assert.ok(new Set(vectors.map(v=>v[0]&0x7f)).size>=30);
+ for(const [hash,hex] of vectors)assert.equal(dec(hash,0,Buffer.from(hex,'hex')).toString('latin1'),'OggS','hash '+hash);
+ const src=fs.readFileSync(path.join(__dirname,'..','services','original-engines','cx-filter.cjs'),'utf8');
+ const gen=src.slice(src.indexOf('function generate('),src.indexOf('function run('));
+ assert.ok(gen.indexOf('lcg(seed)')<gen.indexOf('for(let stage=5'),'random made once, before the stage loop');
+});
+
+test('B: hashed KiriKiri voice paths',()=>{
+ const gv=require('../services/game-voice.cjs');
+ assert.ok(gv.hashedPaths('sf0001').includes('sf/sf0001.ogg'));
+ assert.ok(gv.hashedPaths('CAT_b101_001').includes('cat_b101_001.opus'));
+ assert.ok(gv.hashedPaths('kr0085_ep1').includes('ep1/kr0085_ep1.ogg'));
+ assert.deepEqual(gv.hashedPaths('voice/a01.wav').filter(p=>p.endsWith('a01.wav')).length>0,true);
+ const md=s=>crypto.createHash('md5').update(Buffer.from(s,'utf16le')).digest('hex');
+ /* a catalog's hashed map: md5 -> reader; a voice name resolves through it */
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-hx-'));
+ try{const c=gv.catalog(dir);c.hashed.set(md('sf/sf0001.ogg'),()=>Buffer.from('OggS'));assert.equal(c.get('sf0001')().toString(),'OggS');assert.equal(c.get('zz9999'),null);}
+ finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+function pe(file,machine,size=210000){const b=Buffer.alloc(size);b.write('MZ',0,'latin1');b.writeUInt32LE(0x80,0x3c);b.write('PE\0\0',0x80,'latin1');b.writeUInt16LE(machine,0x84);fs.writeFileSync(file,b);}
+test('C: Steam Siglus folder: SiglusEngine_Steam.exe, not a larger exe of the other bitness',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-exe-')),dir=path.join(root,'Summer Game');fs.mkdirSync(dir);
+ try{pe(path.join(dir,'SiglusEngine_Steam.exe'),0x14c);pe(path.join(dir,'SummerGameRB.exe'),0x8664,400000);fs.writeFileSync(path.join(dir,'steam_api.dll'),'x');fs.writeFileSync(path.join(dir,'Scene.pck'),'x');
+  const lib=require('../core/library.cjs');assert.equal(path.basename(lib.findGame(dir).exe),'SiglusEngine_Steam.exe');
+  /* with the 64-bit steam_api the 64-bit program is the game */
+  fs.rmSync(path.join(dir,'steam_api.dll'));fs.writeFileSync(path.join(dir,'steam_api64.dll'),'x');fs.renameSync(path.join(dir,'SiglusEngine_Steam.exe'),path.join(dir,'helper.exe'));
+  assert.equal(path.basename(lib.findGame(dir).exe),'SummerGameRB.exe');}
+ finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+const steam='e:/steam/steamapps/common/',have=n=>fs.existsSync(steam+n);
+const sc=()=>require('../services/original-engines/scenes.cjs');
+function cxPairs(dir){const e=sc().ENGINES['kirikiri-cx'];let total=0,paired=0;for(const s of e.scenes(dir)){const r=e.parse(s.read());r.lines.forEach((l,i)=>{if(!l.trim())return;total++;if((r.zh[i]||'').trim())paired++;});}return {total,paired};}
+for(const [name,min] of [['9-nine-Episode 4',11690],['ATRI -My Dear Moments-',11201]])
+ test('D: '+name+' Japanese lines paired with the release Chinese',{skip:!have(name)&&'no local copy'},()=>{
+  const dir=steam+name;assert.equal(sc().detect(dir),'kirikiri-cx');const r=cxPairs(dir);if(!r.total)return;/* cache still building */assert.ok(r.paired>=min,JSON.stringify(r));});
+test('D: Summer Pockets (Siglus dat tables): every story line has its Chinese column',{skip:!have('Summer Pockets')&&'no local copy'},()=>{
+ const dir=steam+'Summer Pockets',e=sc().ENGINES.siglus,base=e.scenes(dir).filter(s=>/^\d\d_/.test(s.name)).map(s=>({name:s.name,lines:e.parse(s.read()).lines}));
+ const p=e.patchLines(base,{dirs:[dir]});assert.ok(p);let total=0,paired=0;
+ p.forEach((s,i)=>s.lines.forEach((t,j)=>{const ja=base[i].lines[j];if(!ja.trim())return;total++;if(t!==ja||!/[\u3040-\u30ff]/.test(ja)||/^[「]?『?[a-z]/i.test(ja.replace(/^「『/,'')))paired++;}));
+ assert.ok(total>65000&&total-paired<=4,JSON.stringify({total,paired}));
+});
+test('D: game voices found for the scripts',{skip:!(have('ATRI -My Dear Moments-')&&have('Summer Pockets'))&&'no local copy'},()=>{
+ const gv=require('../services/game-voice.cjs'),root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-gv-'));
+ try{const a=gv.scan(root,steam+'ATRI -My Dear Moments-');if(a.voiced)assert.ok(a.found>=a.voiced-1,JSON.stringify(a));
+  const s=gv.scan(root,steam+'Summer Pockets');assert.equal(s.found,s.voiced);assert.ok(s.voiced>27000);}
+ finally{fs.rmSync(root,{recursive:true,force:true});}
+});

@@ -16,8 +16,12 @@ const LIMIT=0x80;
 function lcg(seed){let s=seed>>>0;return ()=>{const old=s;s=(Math.imul(1103515245,old)+12345)>>>0;return (s^(old<<16)^(old>>>16))>>>0;};}
 function nana(seed,random){let s=seed>>>0,r=random>>>0;return ()=>{let x=(s^(s<<17))>>>0;x=(x^((x<<18)|(x>>>15)))>>>0;s=(~x)>>>0;let y=(r^(r<<13))>>>0;y=(y^(y>>>17))>>>0;r=(y^(y<<5))>>>0;return (s^r)>>>0;};}
 function generate(scheme,seed){
+ /* the generator keeps its state across stages, as GARbro's CxProgram.Clear() keeps m_seed: a seed whose stage-5
+    program is too long goes on with the numbers after it (restarting it decoded about half of the entries wrong:
+    9-nine- Episode 4 / ATRI voices) */
+ const random=scheme.random==null?lcg(seed):nana(seed,scheme.random);
  for(let stage=5;stage>0;stage--){
-  const random=scheme.random==null?lcg(seed):nana(seed,scheme.random),code=[];let len=0;
+  const code=[];let len=0;
   const nop=n=>{if(len+n>LIMIT)return false;len+=n;return true;};
   const emit=(c,n=1)=>{if(len+n>LIMIT)return false;len+=n;code.push(c);return true;};
   const u32=x=>{if(len+4>LIMIT)return false;len+=4;code.push(x>>>0);return true;};

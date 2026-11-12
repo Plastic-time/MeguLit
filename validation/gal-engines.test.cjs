@@ -51,8 +51,8 @@ test('fvp: 0x0E pushes with NUL are lines, ASCII names and commands are dropped'
 test('cx filter: generated programs are stable, the filter undoes itself, wrong schemes are not picked from one-byte heads',()=>{
  const cx=require('../services/original-engines/cx-filter.cjs');
  const s=cx.schemes().find(s=>s.titles.includes('ATRI -My Dear Moments-'));assert.ok(s&&s.cb&&s.cb.length===0x400);
- const d=cx.filter(s),a=Buffer.alloc(24);d(0x12345678,0,a);assert.equal(a.toString('hex'),'1a'.repeat(24));
- const b=Buffer.alloc(24);d(0x9abcdef0,1000,b);assert.equal(b.toString('hex'),'3b'.repeat(24));
+ const d=cx.filter(s),a=Buffer.alloc(24);d(0x12345678,0,a);assert.equal(a.toString('hex'),'4a'.repeat(24));
+ const b=Buffer.alloc(24);d(0x9abcdef0,1000,b);assert.equal(b.toString('hex'),'1e'.repeat(24));
  const plain=Buffer.from('TJS2100\0some bytecode here','latin1'),c=Buffer.from(plain);d(0x2468ace0,0,c);assert.notDeepEqual(c,plain);d(0x2468ace0,0,c);assert.deepEqual(c,plain);
  assert.ok(cx.looks(Buffer.from('OggS....','latin1')));assert.ok(!cx.looks(Buffer.from(';abc','latin1')));
  assert.ok(cx.schemes().length>=100);});
