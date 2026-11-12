@@ -15,19 +15,22 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 /* E297: notes from 1.2.4 on wrap each language in <details><summary>中文|English</summary> and every hotfix in a collapsed
    block of its own. The card keeps the reader's language of every block; a hotfix title stays as a heading. */
 function blockText(body,locale){
- const want=locale==='zh'?'zh':'en',out=[];let mode='both';
+ /* (user 2026-11-12: the card showed a cut "<su") hotfix sections come first, newest first, so a same-version update
+    says what changed now; any stray tag line is dropped */
+ const want=locale==='zh'?'zh':'en',groups=[[]];let mode='both';
  for(const raw of String(body||'').split(/\r?\n/)){const line=raw.trim();
   const sum=/<summary>(.*?)<\/summary>/i.exec(line);
-  if(sum){const label=sum[1].replace(/<[^>]+>/g,'').trim();if(/^中文/.test(label))mode='zh';else if(/^English/i.test(label))mode='en';else{mode='both';out.push('### '+label.replace(/[（(].*$/,'').trim());}continue;}
-  if(/^<\/?details[^>]*>$/i.test(line)){if(/^<\/details>$/i.test(line))mode='both';continue;}
-  if(/^-{3,}$/.test(line))continue;
-  if(mode==='both'||mode===want)out.push(raw);}
- return out.join('\n');
+  if(sum){const label=sum[1].replace(/<[^>]+>/g,'').trim();if(/^中文/.test(label))mode='zh';else if(/^English/i.test(label))mode='en';else{mode='both';groups.push(['### '+label.replace(/[（(].*$/,'').trim()]);}continue;}
+  if(/^<\/details>$/i.test(line)){mode='both';continue;}
+  if(/^</.test(line)||/^-{3,}$/.test(line))continue;
+  if(mode==='both'||mode===want)groups[groups.length-1].push(raw);}
+ return [...groups.slice(1).reverse(),groups[0]].flat().join('\n');
 }
+
 function notesFor(body,locale){
  const halves=String(body||'').split(/\r?\n-{3,}\r?\n/),text=/<summary>/i.test(String(body||''))?blockText(body,locale):locale==='zh'||halves.length<2?halves[0]:halves[1];
  return text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l&&!/^\[.*\]\(.*\)$|^>|^!\[/.test(l)&&!/MeguLit-v[\d.]+-win-x64\.zip/.test(l))
-  .map(l=>({head:/^#{1,6}\s/.test(l),text:l.replace(/^#{1,6}\s*|^[-*]\s+/g,'').replace(/\*\*(.*?)\*\*/g,'$1').replace(/`([^`]*)`/g,'$1').replace(/\[([^\]]+)\]\([^)]*\)/g,'$1')})).slice(0,40);
+  .map(l=>({head:/^#{1,6}\s/.test(l),text:l.replace(/^#{1,6}\s*|^[-*]\s+/g,'').replace(/\*\*(.*?)\*\*/g,'$1').replace(/`([^`]*)`/g,'$1').replace(/\[([^\]]+)\]\([^)]*\)/g,'$1')})).slice(0,80);
 }
 
 let card=null,poll=0;

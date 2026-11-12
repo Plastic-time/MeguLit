@@ -47,7 +47,7 @@ async function latest(fetcher=fetch){
  const r=await releaseFetch(fetcher,'latest',15000);
  if(!r.ok)throw Error('UPDATE_CHECK_FAILED');
  const rel=await r.json(),a=asset(rel);
- return {version:String(rel.tag_name||'').replace(/^v/,''),name:a.name,size:a.size,url:a.browser_download_url,digest:/^sha256:[a-f0-9]{64}$/i.test(a.digest||'')?a.digest.slice(7).toLowerCase():'',notes:String(rel.body||'').replace(/^> \*\*\[⬇[^\n]*\n*/m,'').slice(0,6000),page:rel.html_url,published:rel.published_at||''};
+ return {version:String(rel.tag_name||'').replace(/^v/,''),name:a.name,size:a.size,url:a.browser_download_url,digest:/^sha256:[a-f0-9]{64}$/i.test(a.digest||'')?a.digest.slice(7).toLowerCase():'',notes:String(rel.body||'').replace(/^> \*\*\[⬇[^\n]*\n*/m,'').slice(0,60000),page:rel.html_url,published:rel.published_at||''};
 }
 /* Size of the package the user is running, for "bigger / smaller than now". Unknown is fine. */
 async function installedSize(current,fetcher=fetch){

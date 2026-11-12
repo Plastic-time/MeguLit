@@ -1816,6 +1816,11 @@ html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:hover .l
    edge, half of it showing; no tick — the gold frame and the gold outline mark a chosen card; a larger name */
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal::after,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active::after{display:none!important;content:none!important}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{font-size:250px!important;transform:translate(46%,-50%)!important;-webkit-text-stroke-width:1.4px!important}
+/* (user 2026-11-12: "锯齿感和像素太低了") a thin stroke on a 250px CJK glyph shows the font's overlapping contours and
+   aliases on a 1x screen; the half glyph is a soft gradient fill instead, smooth at any scale, gold when chosen */
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal .lv-seal,html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{-webkit-text-stroke:0!important;color:transparent!important;-webkit-text-fill-color:transparent!important;background:linear-gradient(160deg,color-mix(in srgb,var(--g-t1,#f1e0d2) 16%,transparent) 0%,color-mix(in srgb,var(--g-t1,#f1e0d2) 5%,transparent) 70%)!important;-webkit-background-clip:text!important;background-clip:text!important;transform:translate3d(46%,-50%,0)!important;backface-visibility:hidden;transition:opacity .25s,filter .25s}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal:hover .lv-seal{filter:brightness(1.5)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal.active .lv-seal{background:linear-gradient(160deg,rgba(244,206,142,.42) 0%,rgba(214,160,90,.16) 75%)!important;-webkit-background-clip:text!important;background-clip:text!important}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal{padding-left:26px!important}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal b{font-size:24px!important;letter-spacing:.05em}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lg-dialog .lg-goal small{margin-top:6px!important;font-size:12.5px!important}
@@ -1842,3 +1847,16 @@ html:not(#u):not(#v):not(#w):not(#x) body .gm-hero-ja:is([data-len=l],[data-len=
 /* Issue 128 (user: the Anki window in 学习 › 复习 became very small): #review-content centres its landing card, so the
    card panel shrank to its content and the card frame to an iframe's default 300px. The panel always fills the column. */
 html:not(#u):not(#v) body .review-page #review-content>.anki-review-panel{align-self:stretch;width:100%;box-sizing:border-box}
+
+/* (user 2026-11-12: "这里太空了") the dialog is pinned top and bottom, so height:auto stretched it to the window and left
+   a blank band under the buttons: it now fits its content. The columns are balanced: the left takes the problem-report
+   line under the steps, the right keeps the ledger and the buttons */
+html:not(#u):not(#v):not(#w):not(#x) body dialog.game-dialog.dev-notice[open]:not(.guide-panel){height:fit-content!important;margin:auto!important}
+html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]:not([hidden]){grid-template-areas:"top top" "title text" "title form" "sub rule" "sub status" "succ upd" "more upd" ". note" ". act"!important;}
+html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-more{margin:22px 0 0!important}
+html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-actions{align-self:start;margin-top:22px!important}
+html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-updates:not([hidden]){align-self:start;height:auto!important;min-height:0!important;max-height:min(330px,34vh)!important}
+html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-updates-note{align-self:end;margin-top:14px!important}
+@media (max-width:900px){html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]:not([hidden]){grid-template-areas:"top" "title" "sub" "text" "form" "rule" "status" "succ" "upd" "note" "more" "act"!important;grid-template-rows:none}html:not(#u):not(#v):not(#w):not(#x) body .dev-notice-page[data-page="1"]>.dev-notice-updates:not([hidden]){height:auto!important;min-height:0!important;max-height:min(240px,26vh)!important}}
+/* (user 2026-11-12: "别让框被选中") a dialog takes focus when it opens; its own frame never shows a focus ring */
+html:not(#u):not(#v):not(#w):not(#x) body :is(dialog,.lv-dialog):is(:focus,:focus-visible){outline:none!important}
