@@ -79,6 +79,8 @@ export async function leaderboardPost(request,env,ip,now=new Date()){
  const hot=validateHot(body.value.hot,now);if(!hot.ok)return fail(hot.error);
  const {id,name,keys,stats,games,element,level}=checked.value,who=await subjects(request,env,id,now),idHash=who.primary,t=Math.floor(now.getTime()/1000);
  if(!await hit(env,'lb-id',idHash,now.getTime()))return fail('RATE_LIMITED',429);
+ /* 2026-11-12 (user: two players named the same mixed the board up) a name another player already uses is refused */
+ {const taken=await env.DB.prepare('SELECT 1 FROM leaderboard_users WHERE lower(trim(name))=lower(trim(?)) AND id_hash<>? LIMIT 1').bind(name,idHash).first();if(taken)return fail('NAME_TAKEN',409);}
  const statements=[env.DB.prepare('INSERT INTO leaderboard_users(id_hash,name,share_games,element,level,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id_hash) DO UPDATE SET name=excluded.name,share_games=excluded.share_games,element=excluded.element,level=excluded.level,updated_at=excluded.updated_at').bind(idHash,name,games?1:0,element,level,t,t)];
  for(const period of ['week','month','all']){const s=stats[period];statements.push(env.DB.prepare('INSERT INTO leaderboard_stats(id_hash,period,period_key,characters,seconds,words,streak,reviews,kana,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id_hash,period,period_key) DO UPDATE SET characters=excluded.characters,seconds=excluded.seconds,words=excluded.words,streak=excluded.streak,reviews=excluded.reviews,kana=excluded.kana,updated_at=excluded.updated_at').bind(idHash,period,keys[period],s.characters,s.seconds,s.words,s.streak,s.reviews,s.kana,t));}
  statements.push(env.DB.prepare('DELETE FROM leaderboard_games WHERE id_hash=?').bind(idHash));

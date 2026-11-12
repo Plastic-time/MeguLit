@@ -27,7 +27,7 @@ const W={
   board:'阅读榜',hot:'每周热词',word:'词汇',phrase:'短语',sentence:'短句',weekOf:'{week} 周',pastWeeks:'往期',
   hotPending:'本周热词会在周一 00:00（北京时间）揭晓',hotEmpty:'这一周还没有达到上榜门槛的词',hotRule:'至少 3 位读者查过才会上榜，只统计参加排行榜的读者',
   lookedUp:'{users} 人查过 · {n} 次',times:'{n} 次',aiGuess:'AI 推测',participants:'{n} 位读者参与',
-  NAME_REQUIRED:'请填写昵称',NAME_LENGTH:'昵称需要 2–16 个字',NAME_INVALID:'昵称不能包含网址、引号或特殊字符',NAME_BLOCKED:'这个昵称不能使用，换一个吧',CONSENT_REQUIRED:'请先勾选同意',BIO_LENGTH:'签名最多 60 字',BIO_INVALID:'签名不能包含网址或特殊字符',BIO_BLOCKED:'签名里有不能使用的内容',NOT_JOINED:'请先参加排行榜',INVALID_FAVORITES:'最喜欢的游戏有误'},
+  NAME_REQUIRED:'请填写昵称',NAME_LENGTH:'昵称需要 2–16 个字',NAME_INVALID:'昵称不能包含网址、引号或特殊字符',NAME_BLOCKED:'这个昵称不能使用，换一个吧',NAME_TAKEN:'这个昵称已经有人在用了，换一个吧',CONSENT_REQUIRED:'请先勾选同意',BIO_LENGTH:'签名最多 60 字',BIO_INVALID:'签名不能包含网址或特殊字符',BIO_BLOCKED:'签名里有不能使用的内容',NOT_JOINED:'请先参加排行榜',INVALID_FAVORITES:'最喜欢的游戏有误'},
  ja:{title:'ランキング',week:'今週',month:'今月',all:'全期間',characters:'読んだ文字数',seconds:'読書時間',words:'新しく登録した単語',reviews:'復習回数',kana:'かな練習',streak:'連続日数',games:'ゲーム別',
   notReady:'オンラインサービスは準備中です',notReadyText:'公開後、ランキングはここに表示されます。下はこの PC だけで計算した個人の記録で、送信されません',
   mine:'自分の記録',currentStreak:'現在の連続',days:'日',unitChars:'字',unitWords:'語',unitReviews:'回',unitKana:'問',totalWords:'登録単語の合計',hours:'時間',minutes:'分',
@@ -39,7 +39,7 @@ const W={
   board:'読書ランキング',hot:'今週の注目語',word:'単語',phrase:'フレーズ',sentence:'短文',weekOf:'{week} 週',pastWeeks:'過去の週',
   hotPending:'今週の注目語は月曜 0:00（UTC+8）に発表されます',hotEmpty:'この週は掲載基準に達した語がありません',hotRule:'3 人以上が調べた語だけを掲載します。ランキング参加者のみ集計',
   lookedUp:'{users} 人が {n} 回調べました',times:'{n} 回',aiGuess:'AI の推測',participants:'{n} 人が参加',
-  NAME_REQUIRED:'ニックネームを入力してください',NAME_LENGTH:'ニックネームは 2〜16 文字です',NAME_INVALID:'URL・引用符・特殊文字は使えません',NAME_BLOCKED:'このニックネームは使えません',CONSENT_REQUIRED:'同意にチェックしてください',BIO_LENGTH:'ひとことは 60 文字までです',BIO_INVALID:'URL や特殊文字は使えません',BIO_BLOCKED:'使えない内容が含まれています',NOT_JOINED:'先にランキングに参加してください',INVALID_FAVORITES:'好きなゲームの指定が正しくありません'},
+  NAME_REQUIRED:'ニックネームを入力してください',NAME_LENGTH:'ニックネームは 2〜16 文字です',NAME_INVALID:'URL・引用符・特殊文字は使えません',NAME_BLOCKED:'このニックネームは使えません',NAME_TAKEN:'このニックネームはすでに使われています。別の名前にしてください',CONSENT_REQUIRED:'同意にチェックしてください',BIO_LENGTH:'ひとことは 60 文字までです',BIO_INVALID:'URL や特殊文字は使えません',BIO_BLOCKED:'使えない内容が含まれています',NOT_JOINED:'先にランキングに参加してください',INVALID_FAVORITES:'好きなゲームの指定が正しくありません'},
  en:{title:'Leaderboard',week:'This week',month:'This month',all:'All time',characters:'Characters read',seconds:'Reading time',words:'New words saved',reviews:'Reviews',kana:'Kana practice',streak:'Streak days',games:'By game',
   notReady:'Online services are still being set up',notReadyText:'The leaderboard will appear here once it is live. Below are your own numbers, computed on this PC and not uploaded',
   mine:'My numbers',currentStreak:'Current streak',days:'days',unitChars:'chars',unitWords:'words',unitReviews:'reviews',unitKana:'questions',totalWords:'Words saved in all',hours:'h',minutes:'min',
@@ -51,7 +51,7 @@ const W={
   board:'Reading',hot:'Weekly hot words',word:'Words',phrase:'Phrases',sentence:'Sentences',weekOf:'Week {week}',pastWeeks:'Past weeks',
   hotPending:'This week\'s hot words are announced Monday 00:00 (UTC+8)',hotEmpty:'No term reached the threshold this week',hotRule:'A term needs at least 3 different readers; only people who joined the leaderboard count',
   lookedUp:'{users} readers · {n} lookups',times:'{n}×',aiGuess:'AI guess',participants:'{n} readers took part',
-  NAME_REQUIRED:'Enter a nickname',NAME_LENGTH:'Nicknames are 2–16 characters',NAME_INVALID:'No links, quotes or special characters',NAME_BLOCKED:'That nickname is not allowed',CONSENT_REQUIRED:'Please tick the agreement first',BIO_LENGTH:'Signatures are up to 60 characters',BIO_INVALID:'No links or special characters',BIO_BLOCKED:'That signature is not allowed',NOT_JOINED:'Join the leaderboard first',INVALID_FAVORITES:'Those favourite games are not valid'}
+  NAME_REQUIRED:'Enter a nickname',NAME_LENGTH:'Nicknames are 2–16 characters',NAME_INVALID:'No links, quotes or special characters',NAME_BLOCKED:'That nickname is not allowed',NAME_TAKEN:'Someone already uses this name; pick another',CONSENT_REQUIRED:'Please tick the agreement first',BIO_LENGTH:'Signatures are up to 60 characters',BIO_INVALID:'No links or special characters',BIO_BLOCKED:'That signature is not allowed',NOT_JOINED:'Join the leaderboard first',INVALID_FAVORITES:'Those favourite games are not valid'}
 };
 const PERIODS=['week','month','all'],METRICS=['seconds','characters','words','reviews','kana','streak','games'],CATS=['word','phrase','sentence'];
 let view={tab:'board',period:'week',metric:'seconds',game:'',category:'word',week:''};
