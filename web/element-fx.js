@@ -57,7 +57,7 @@ const SCENES={
   part(p,ctx){const k=p.t/p.life;ctx.fillStyle=`rgba(190,230,255,${1-k*.8})`;ctx.beginPath();ctx.ellipse(p.x,p.y,p.r*.8,p.r*1.3,Math.atan2(p.vy,p.vx)+Math.PI/2,0,TAU);ctx.fill();},
   burst(s){for(let i=0;i<110;i++){const a=R(-Math.PI*.98,-Math.PI*.02),v=R(160,560);s.ps.push({x:s.cx+R(-10,10),y:s.cy+18,vx:Math.cos(a)*v*.7,vy:Math.sin(a)*v,g:620,life:R(1,1.8),t:0,r:R(1.5,3.6),kind:'drop'});}for(let i=0;i<3;i++)s.rings.push({t:-i*.15,life:2.2});s.flash=.3;}},
  earth:{color:'#d0a070',
-  spawn(s,I){if(s.ps.filter(p=>p.kind==='rock').length<10+I*8){const a=R(0,TAU),rad=R(60,Math.min(s.W,s.H)*.4);const pts=Array.from({length:6},(_,i)=>{const b=i/6*TAU+R(-.3,.3),r=R(.6,1);return [Math.cos(b)*r,Math.sin(b)*r];});s.ps.push({kind:'rock',a,rad,size:R(5,14)*s.u,pts,rot:R(0,TAU),spin:R(-.6,.6),bob:R(0,TAU),life:R(4,7),t:0});}
+  spawn(s,I){let rocks=0;for(const p of s.ps)if(p.kind==='rock')rocks++;if(rocks<10+I*8){const a=R(0,TAU),rad=R(60,Math.min(s.W,s.H)*.4);const pts=Array.from({length:6},(_,i)=>{const b=i/6*TAU+R(-.3,.3),r=R(.6,1);return [Math.cos(b)*r,Math.sin(b)*r];});s.ps.push({kind:'rock',a,rad,size:R(5,14)*s.u,pts,rot:R(0,TAU),spin:R(-.6,.6),bob:R(0,TAU),life:R(4,7),t:0});}
    if(Math.random()<.3+I)s.ps.push({x:s.cx+R(-120,120),y:s.cy+R(40,90),vx:R(-8,8),vy:-R(8,26),life:R(1.5,3),t:0,r:R(.6,1.6),kind:'dust'});},
   draw(){},
   part(p,ctx,s){if(p.kind==='dust'){ctx.fillStyle=`rgba(210,170,130,${(1-p.t/p.life)*.6})`;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,TAU);ctx.fill();return;}
@@ -88,7 +88,7 @@ export function mountElementFx(canvas){
  s.boltAt=(x0,y0,x1,y1,w)=>SCENES.thunder.bolt(s,x0,y0,x1,y1,w);
  let el='fire',raf=0,prev=performance.now(),stopped=false;
  const size=()=>{const dpr=Math.min(2,devicePixelRatio||1),W=canvas.clientWidth,H=canvas.clientHeight;if(W&&(canvas.width!==Math.round(W*dpr)||canvas.height!==Math.round(H*dpr))){canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);s.W=W;s.H=H;s.cx=W/2;s.cy=H/2;s.u=Math.max(1,Math.min(W,H)/240);};
- const frame=now=>{if(stopped||!canvas.isConnected)return;s.dt=Math.min(.05,(now-prev)/1000);prev=now;s.age+=s.dt;s.I+=(s.target-s.I)*Math.min(1,s.dt*3);size();
+ const frame=now=>{if(stopped||!canvas.isConnected)return;if(document.hidden){prev=now;raf=requestAnimationFrame(frame);return;}s.dt=Math.min(.05,(now-prev)/1000);prev=now;s.age+=s.dt;s.I+=(s.target-s.I)*Math.min(1,s.dt*3);size();
   const sc=SCENES[el];ctx.clearRect(0,0,s.W,s.H);ctx.globalCompositeOperation='lighter';
   if(s.ct>=0)s.ct+=s.dt;
   sc.spawn(s,s.I);FORMS[el]?.(s,ctx,s.I);sc.draw(s,ctx,s.I);ctx.globalCompositeOperation='lighter';

@@ -279,7 +279,7 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
   else if(plain&&main.dataset.lbTab&&main.dataset.lbTab!==view.tab&&soft(leaderboardHTML(null,locale,esc))){main.dataset.lbTab=view.tab;bind();}
   else main.querySelector('.lb-body')?.classList.add('is-loading');
   let data;try{data=await(plain?load():api(action,{...args(),...extra}));}
-  catch(error){main.querySelector('.lb-body')?.classList.remove('is-loading');if(hit)return;const code=String(error?.message||error).replace(/^LEADERBOARD_/,'');const box=main.querySelector('[data-lb-error]');if(box&&w[code]){box.textContent=w[code];box.hidden=false;return;}toast(w.offline);return;}
+  catch(error){if(!isCurrent()||mine!==seq)return;main.querySelector('.lb-body')?.classList.remove('is-loading');if(hit)return;const code=String(error?.message||error).replace(/^LEADERBOARD_/,'');const box=main.querySelector('[data-lb-error]');if(box&&w[code]){box.textContent=w[code];box.hidden=false;return;}toast(w.offline);return;}
   if(!isCurrent()||mine!==seq)return;
   const json=JSON.stringify(data);if(plain||action==='leaderboard_view')cache.set(key,json);else cache.clear();
   if(json!==hit)paint(data);
