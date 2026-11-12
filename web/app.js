@@ -464,7 +464,7 @@ function showLibraryResults(grid,selecting){
 // E237 Tools → restore Japanese: list library games that ship Japanese data, check one, then apply or undo.
 /* Where to look for a game's Japanese release: fill in the site name or address between the quotes.
    Left empty, no search suggestion is shown. */
-const JP_SOURCE_SITE='www.shinnku.com';
+const JP_SOURCE_SITE='www.shinnku.com、lzacg.cc、www.touchgal.ink';
 const jpSourceNote=()=>JP_SOURCE_SITE?({zh:'。建议去（'+JP_SOURCE_SITE+'）搜索这部作品的日文原版(资源左下角会提示是生肉/熟肉,但有时候熟肉也会被判断成生肉,MeguLit只分享平台,不承担任何法律责任。)',en:'. Suggested place to search for the Japanese release: ('+JP_SOURCE_SITE+')',ja:'。日本語版は（'+JP_SOURCE_SITE+'）で探すことをおすすめします'})[locale]||'':'';
 function japaneseRestore(){
  const w={zh:{title:'日文原版恢复',search:'搜索游戏',nomatch:'没有匹配的游戏',sub:'游戏自带日文数据时，把显示的文字换回日文。会先备份，可以随时还原。请先关闭游戏',pick:'选择游戏',none:'游戏库里没有找到带日文数据的游戏',check:'检测中…',apply:'恢复日文',undo:'还原',close:'关闭',working:'处理中…',
