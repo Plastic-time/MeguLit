@@ -357,6 +357,7 @@ function openFill(file){let map=new Map(),timer=null;
 // running script and its counterpart when the capture folder changes, so a new scene reads from its first line. A miss
 // re-checks at once; otherwise the rebuild runs between lines. Until something is saved every line goes the usual way.
 const liveEngines=()=>Object.values(scenes.ENGINES).filter(e=>e.live);
+const foreignKey=t=>String(t||'').replace(/<[^>]*>/g,'').replace(/[\s\u3000"'“”‘’.,!?…—–-]+/g,'').toLowerCase();
 function liveProvider(root,id,executable){
  const engine=liveEngines()[0],dir=path.dirname(String(executable));let inner=null,stamp=null,checked=0,timer=null;
  const rebuild=()=>{const now=engine.stamp(dir);if(now===stamp)return false;stamp=now;
@@ -374,6 +375,7 @@ function liveProvider(root,id,executable){
  return {live:true,get kind(){return inner?.kind||'patch';},get patch(){return !!inner?.patch;},get fill(){return inner?.fill;},
   resolve(text){if(Date.now()-checked>300&&changed())later();let r=inner?inner.resolve(text):{status:'none',method:'no-scenes'};
    if(r.status==='none'&&r.method!=='empty'&&changed()&&rebuild()&&inner)r=inner.resolve(text);return r;},
+  foreign(text){return inner?.foreign?inner.foreign(text):'';},
   upcoming(count){return inner?.upcoming?inner.upcoming(count):[];}};
 }
 // Each rebuild writes indexes under new names; only the ones in use are kept.
@@ -444,7 +446,10 @@ function staticProvider(root,executable){
   const flowLayout=indices=>{const P=pageInfo(),i=Array.isArray(indices)?indices[0]:undefined;if(!P||!Number.isSafeInteger(i)||!P.known.has(i))return null;return {index:i,pageStart:P.starts.has(i),row:P.cont.has(i)?'continue':'new'};};
   /* E414: a page game by its own script: at least 15 % of its pages hold more than one line (WoH 70 %, Fata Morgana 20 %). */
   let flowOk;const flowGame=()=>{if(flowOk===undefined){const P=pageInfo();if(!P||!P.starts.size)flowOk=false;else{let multi=0;for(const i of P.starts)if(P.known.has(i+1)&&!P.starts.has(i+1))multi++;flowOk=multi/P.starts.size>=.15;}}return flowOk;};
-  const api={kind:'patch',patch:!!patched,fill,drawable,tableDrawable,flowLayout,flowGame,
+  /* 2026-11-13 the same script in the game's other languages (scene engines with parallel tables): a captured line in one
+     of them gives back its Japanese line; built on first use, never when the engine has none */
+  let foreignMap;const foreign=text=>{if(foreignMap===undefined){foreignMap=null;try{const f=scenes.ENGINES[state.runtime.engine]?.foreign;if(f){const map=f(path.dirname(String(executable)));if(map&&map.size)foreignMap=map;}}catch{}}if(!foreignMap)return '';return foreignMap.get(foreignKey(text))||'';};
+  const api={kind:'patch',patch:!!patched,fill,drawable,tableDrawable,flowLayout,flowGame,foreign,
    resolve:text=>withRuby(resolveLine(text))};
   function resolveLine(text){const r=m.match(text);if(r.japanese===undefined)return r;
     // E449 lines the release leaves in Japanese take the filled translation written for them (fill.cjs), marked filled.
@@ -482,4 +487,4 @@ async function discover(root,db,id,options={}){
  writeState(root,id,{status:state.original?.index?(state.alignment?.reliable?'ready':'unreliable'):status,lastSearch:{at:Date.now(),found:search.found.length,complete:search.complete,searched:search.searched,checked}});
  return {notFound:true,search:{found:search.found.length,complete:search.complete,searched:search.searched,checked}};
 }
-module.exports={scriptPairs,brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,clearPatch,locate,readScript,ADAPTERS,readAin,_ain:{mtXor,inflateAin},align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,chineseOnly,norm,discover,findCandidates};
+module.exports={foreignKey,scriptPairs,brief,autoPatchLater,autoPatch,buildPatch,collect,nearbyPatchSources,patchHint,importPatch,clearPatch,locate,readScript,ADAPTERS,readAin,_ain:{mtXor,inflateAin},align,Matcher,importOriginal,status,setMode,provider,scanRunning,japaneseLine,chineseOnly,norm,discover,findCandidates};

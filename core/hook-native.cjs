@@ -136,7 +136,15 @@ class HookNative{
  /* E294 (user: a friend's Steam CLANNAD was read as Japanese while the game showed Simplified Chinese, furigana and all):
     three lines in a row with no kana and several characters no Japanese font has (际 无 尽 这 们) mean the game is
     running a Chinese script; the status says so once, so the user restores Japanese instead of reading Chinese. */
+ /* 2026-11-13 a line without any Japanese (the game set to English, French, ...): its Japanese line from the script's own
+    parallel language tables when the engine has them (any engine whose scene reader offers foreign(), e.g. DDLC Plus). */
+ foreignJapanese(text){try{const t=String(text||'').trim();if(!t||/[\u3040-\u30ff\u4e00-\u9fff]/.test(t)||!/[A-Za-z\u00c0-\u024f\uac00-\ud7af]{2}/.test(t))return '';const p=this.originalText;if(!p||typeof p.foreign!=='function')return '';const ja=p.foreign(t);if(ja){this.trace('foreign line -> japanese');if(this.state?.sourceForeign)this.notify({sourceForeign:false});return ja;}return '';}catch{return '';}}
  languageCheck(text){try{const t=String(text||'').replace(/%l[^;%]*;[^%]*%l;/g,'');if(!t.trim())return;
+  /* 2026-11-13 (user: DDLC Plus in English showed nothing and said nothing): three story-length lines in a row with no
+     Japanese and no Chinese, that the script could not map back to Japanese, raise a notice to switch the game to Japanese */
+  {const latin=!/[\u3040-\u30ff\u4e00-\u9fff]/.test(t)&&(t.match(/[A-Za-z\u00c0-\u024f\uac00-\ud7af]/g)||[]).length>=12&&/\s|[\uac00-\ud7af]/.test(t.trim());const mapped=latin&&!!this.foreignJapanese(t);this.foreignRun=latin&&!mapped?(this.foreignRun||0)+1:0;
+   if(this.foreignRun>=3&&!this.state?.sourceForeign){this.trace('source looks like a non-Japanese language');this.notify({sourceForeign:true,hookMessage:'检测到游戏目前显示的不是日文（例如英文），MeguLit 需要日文原文。请在游戏自己的设置或 Steam（游戏属性 → 语言）里切换成日文后继续'});}
+   else if(/[\u3040-\u30ff]/.test(t)&&this.state?.sourceForeign)this.notify({sourceForeign:false});}
   if(!HookNative.sjis){const dec=new TextDecoder('shift_jis'),set=new Set();for(let a=0x81;a<=0xfc;a++)for(let b=0x40;b<=0xfc;b++){const c=dec.decode(Buffer.from([a,b]));if(c.length===1&&c!=='�')set.add(c);}HookNative.sjis=set;}
   const han=t.match(/[一-鿿]/g)||[],kana=/[぀-ヿ]/.test(t),foreign=han.filter(c=>!HookNative.sjis.has(c)).length;
   /* E347 (user 2026-11-10, Steam 沙耶の唄 with a Chinese patch): Chinese text read as Shift-JIS comes out as kanji mixed
@@ -188,7 +196,10 @@ class HookNative{
   const extracted=require('./source-ruby.cjs').extractSourceRuby(m.text);let ruby=extracted.ruby;m={...m,text:extracted.text};this.languageCheck(m.text);
   // Multilingual containers keep only the Japanese track (E243); streams that deliver every line several times (or every character doubled) are learned and undone per stream (E215).
   this.repeats=this.repeats||new (require('./repeat-normalizer.cjs').RepeatNormalizer)();
-  this.attempt=0;let text=this.originalTextFor(this.repeats.normalize(String(m.sourceCode||m.sourceName||name||''),require('./language-tracks.cjs').japaneseTrack(scriptSource(cleanSource(m.text,name,String(m.sourceCode||''))))).replace(/\n+$/,''));
+  this.attempt=0;/* 2026-11-13 (user: DDLC Plus set to English showed nothing): a line in another language is first looked up in the
+     game's own parallel language tables (foreignJapanese, original-text.cjs), so the reader gets the Japanese line */
+  {const raw=scriptSource(cleanSource(m.text,name,String(m.sourceCode||'')));const ja=this.foreignJapanese(raw);if(ja){m={...m,text:ja};}}
+  let text=this.originalTextFor(this.repeats.normalize(String(m.sourceCode||m.sourceName||name||''),require('./language-tracks.cjs').japaneseTrack(scriptSource(cleanSource(m.text,name,String(m.sourceCode||''))))).replace(/\n+$/,''));
   if(!text.trim())return;
   /* E408 one frame holding the line twice (redraw), collapsed only on same-stream evidence */{const stream=String(m.sourceCode||m.sourceName||name||'');this.sourceStream=stream;const dbl=(this.doubles||(this.doubles=new DoubleLine(()=>this.now()))).fix(stream,text,this.lastSource);if(dbl.collapsed){this.trace('source doubled collapsed ('+dbl.reason+') chars='+text.length+'->'+dbl.text.length);text=dbl.text;}}
   /* E320 WITCH ON THE HOLY NIGHT (flow page): its title-screen help ("Change text display speed.Change auto-scroll speed." ...) came through the dialogue hook

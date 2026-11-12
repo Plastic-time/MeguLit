@@ -39,6 +39,12 @@ const vgprompter={
  scenes(dir){const ja=readLang(langFile(dir,['ja']));if(!ja.length)return [];
   const zhMap=new Map();for(const l of readLang(langFile(dir,['zh-cn','zh-tw'])))l.hashes.forEach((h,k)=>zhMap.set(h,l.lines[k]));
   return ja.filter(l=>l.lines.length).map(l=>({name:l.name,read:()=>Buffer.from(JSON.stringify({lines:l.lines,zh:l.hashes.map(h=>zhMap.get(h)||'')}),'utf8')}));},
+ /* 2026-11-13 (user: DDLC Plus set to English showed nothing): every other language bundle (lang*.cy), line by line hash,
+    keyed by its normalized text -> the Japanese line. Used when the hook captures a line in a language other than Japanese. */
+ foreign(dir){const d=bundleDir(dir);if(!d)return null;const ja=new Map();for(const l of readLang(langFile(dir,['ja'])))l.hashes.forEach((h,k)=>ja.set(h,tidy(l.lines[k])));if(!ja.size)return null;
+  const key=require('../original-text.cjs').foreignKey,out=new Map();let files=[];try{files=fs.readdirSync(d).filter(f=>/^lang.+\.cy$/i.test(f)&&!/^lang(ja|zh-cn|zh-tw|pyc|uage)?\.cy$/i.test(f)&&!/^supported/i.test(f));}catch{}
+  for(const f of files)for(const l of readLang(path.join(d,f)))l.hashes.forEach((h,k)=>{const j=ja.get(h),t=key(tidy(l.lines[k]||''));if(j&&t&&t.length>=2&&!out.has(t))out.set(t,j);});
+  return out;},
  archives:()=>[],
  sources:dir=>[langFile(dir,['ja']),langFile(dir,['zh-cn','zh-tw'])].filter(Boolean),
  parse,test:()=>false,

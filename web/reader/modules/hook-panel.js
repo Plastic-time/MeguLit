@@ -13,12 +13,13 @@
   return;}}catch{}try{navigator.clipboard.writeText(FEEDBACK_URL);}catch{}};
  /* E347: a Chinese build (or Chinese text read as garbage) is said where the user is looking, once per game run */
  const chineseShown=new Set();
- function chineseNotice(){const id=String(state.gameProcessId||'')+'|'+String(state.gameStarted||'');if(chineseShown.has(id))return;chineseShown.add(id);document.querySelector('.megulit-chinese-notice')?.remove();
-  const copy=({zh:'检测到游戏剧本目前是中文，MeguLit 需要日文原文。请先在游戏设置或 Steam（游戏属性 → 语言）里改成日文；游戏本身不支持日文的话，用「工具 → 日文原版恢复」；如果游戏目录里没有检测到日文剧本，需要先自行获取日文原版资源，再选「从日文原版导入」，支持直接导入生肉压缩包，自动恢复成日文',
+ function chineseNotice(kind){const id=String(state.gameProcessId||'')+'|'+String(state.gameStarted||'')+'|'+(kind||'');if(chineseShown.has(id))return;chineseShown.add(id);document.querySelector('.megulit-chinese-notice')?.remove();
+  /* 2026-11-13 a game showing English (or another language) that MeguLit could not map back to Japanese */
+  const copy=(kind==='foreign'?{zh:'检测到游戏目前显示的不是日文（例如英文），MeguLit 需要日文原文。请在游戏自己的设置或 Steam（游戏属性 → 语言）里切换成日文后继续',ja:'ゲームが日本語以外（英語など）で表示されています。MeguLit には日本語の原文が必要です。ゲームの設定か Steam（プロパティ → 言語）で日本語に切り替えてください',en:'The game is showing a language other than Japanese (English, for example). MeguLit needs the Japanese original: switch the game to Japanese in its own settings or in Steam (Properties → Language)'}:{zh:'检测到游戏剧本目前是中文，MeguLit 需要日文原文。请先在游戏设置或 Steam（游戏属性 → 语言）里改成日文；游戏本身不支持日文的话，用「工具 → 日文原版恢复」；如果游戏目录里没有检测到日文剧本，需要先自行获取日文原版资源，再选「从日文原版导入」，支持直接导入生肉压缩包，自动恢复成日文',
    ja:'ゲームのシナリオが中国語になっています。MeguLit には日本語の原文が必要です。まずゲームの設定か Steam（プロパティ → 言語）で日本語に切り替えてください。ゲームが日本語に対応していなければ「ツール → 日本語原版に戻す」を使ってください。ゲームフォルダに日本語のシナリオが見つからない場合は、日本語版の素材を用意してから「日本語原版から取り込む」を選んでください（日本語版の圧縮ファイルをそのまま取り込めます）',
    en:'The game script is currently in Chinese, but MeguLit needs the Japanese original. First switch the game to Japanese in its own settings or in Steam (Properties → Language). If the game has no Japanese, use Tools → Restore Japanese original. If no Japanese script is found in the game folder, get the Japanese release yourself, then choose Import from the Japanese original; a Japanese release archive can be imported directly'})[(document.documentElement.lang||'zh').slice(0,
    2)]||'';
-  const n=document.createElement('div');n.className='megulit-chinese-notice';n.setAttribute('role','alert');n.textContent=copy;
+  const n=document.createElement('div');n.className='megulit-chinese-notice'+(kind==='foreign'?' is-foreign':'');n.setAttribute('role','alert');n.textContent=copy;
   n.style.cssText='font:13px/1.6 Meiryo,"Microsoft YaHei",sans-serif;color:#ffe2c2;background:rgba(70,16,16,.85);border:1px solid rgba(255,140,120,.45);border-radius:8px;padding:8px 12px;margin-top:8px;text-shadow:none;-webkit-text-stroke:0;cursor:pointer;transition:opacity .6s ease;';
   const host=document.querySelector('.sentence-window');if(host)host.appendChild(n);else{n.style.cssText+='position:fixed;z-index:2147481500;left:50%;bottom:24px;transform:translateX(-50%);max-width:min(640px,calc(100vw - 32px));';
    document.body.appendChild(n);}
@@ -40,7 +41,7 @@
   const close=()=>{n.style.opacity='0';setTimeout(()=>n.remove(),650);};n.addEventListener('click',e=>{e.stopPropagation();close();},{capture:true});setTimeout(close,
    8000);}
  const previous=b.galStatus;b.galStatus=m=>{previous(m);state={...state,...m};/* E416: the reader knows when the hook can only read (the game's text stays visible); fallbacks key off this class only */if('hookEmbedUnsupported' in m||'hookProfile' in m)document.body.classList.toggle('megulit-readonly-hook',
-  state.hookEmbedUnsupported===true&&state.hookProfile!=='off');if(m.sourceChinese===true)chineseNotice();else if(m.sourceChinese===false)document.querySelector('.megulit-chinese-notice')?.remove();
+  state.hookEmbedUnsupported===true&&state.hookProfile!=='off');if(m.sourceChinese===true)chineseNotice();else if(m.sourceChinese===false)document.querySelector('.megulit-chinese-notice')?.remove();if(m.sourceForeign===true)chineseNotice('foreign');else if(m.sourceForeign===false)document.querySelector('.megulit-chinese-notice.is-foreign')?.remove();
   if(Number.isFinite(m.sharedAdaptation)&&m.sharedAdaptation>0)sharedNotice(m.sharedAdaptation);if(m.hookEmbedUnsupported===true)captionFeedback();else if(m.hookEmbedUnsupported===false)document.querySelector('.megulit-embed-feedback')?.remove();
   if(m.hookProfile)b.restoreGalSettings?.({hookProfile:m.hookProfile,maskMode:m.hookAutoOcr?'local':'hook',bindEnabled:true});for(const p of panels)if(p.isConnected)paint(p);
   else panels.delete(p);};

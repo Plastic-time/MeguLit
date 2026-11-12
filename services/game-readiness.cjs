@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 const {spawn}=require('node:child_process');
-async function startProcess(file,args,cwd,errorCode,spawnProcess=spawn){
- const child=spawnProcess(file,args,{cwd,detached:true,stdio:'ignore',windowsHide:false});
+async function startProcess(file,args,cwd,errorCode,spawnProcess=spawn,env=null){
+ const child=spawnProcess(file,args,{cwd,detached:true,stdio:'ignore',windowsHide:false,...(env?{env}:{})});
  const state={pid:child.pid,exit:null};
  child.once('exit',(code,signal)=>{state.exit={code,signal};});
  await new Promise((resolve,reject)=>{

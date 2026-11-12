@@ -104,15 +104,21 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
    stage='window-wait';state=await ready();
   }else{
    stage='process-start';
-   const steam=profile.source==='steam'&&/^\d+$/.test(String(profile.appid||''));
+   const steamApp=profile.source==='steam'&&/^\d+$/.test(String(profile.appid||''));
+   /* 2026-11-13 (user: STEINS;GATE from MeguLit first pops Steam's launcher): an app with several Steam launch options
+      (game + Launcher.exe config tool) makes steam://rungameid show a chooser, and Steam then ran Launcher.exe. When the
+      install folder holds such a companion launcher, the recorded program is started directly with SteamAppId set, so
+      steam_api accepts it without a restart through Steam (Steam itself still has to be running). Generic, any engine. */
+   const companion=steamApp&&!/^(launcher|config)/i.test(path.basename(game.executable))&&(()=>{try{return fs.readdirSync(path.dirname(game.executable)).some(f=>/^(launcher|config(uration)?|settings?|gameconfig)[^\\/]*\.exe$/i.test(f));}catch{return false;}})();
+   const steam=steamApp&&!companion;
    const {startProcess,waitForVisibleGame}=require('./game-readiness.cjs');
-   const child=await startProcess(steam?'explorer.exe':game.executable,steam?['steam://rungameid/'+profile.appid]:[],path.dirname(game.executable),'GAME_LAUNCH_FAILED');
-   trace('launch-process-started',{pid:child.pid,steam});
+   const child=await startProcess(steam?'explorer.exe':game.executable,steam?['steam://rungameid/'+profile.appid]:[],path.dirname(game.executable),'GAME_LAUNCH_FAILED',undefined,companion?{...process.env,SteamAppId:String(profile.appid),SteamGameId:String(profile.appid),SteamOverlayGameId:String(profile.appid)}:null);
+   trace('launch-process-started',{pid:child.pid,steam,steamDirect:companion||undefined});
    stage='window-wait';
    /* Steam may start another program in the install folder than the one on record (Summer Pockets: the library has
       SummerPocketsRB.exe, Steam runs SiglusEngine_Steam.exe; user 2026-11-09: the game was up and MeguLit said the launch
       failed). For Steam launches a game process from any program in that folder counts. */
-   const siblings=steam?(()=>{try{return fs.readdirSync(path.dirname(game.executable)).filter(f=>/\.exe$/i.test(f)&&!/^(unins|setup|install|config|crash|unitycrash|vc_?redist|dxsetup|launcher_?config)/i.test(f)).map(f=>path.join(path.dirname(game.executable),f)).filter(f=>f.toLowerCase()!==game.executable.toLowerCase()&&fs.statSync(f).size>200000).slice(0,8);}catch{return [];}})():[];
+   const siblings=steam?(()=>{try{return fs.readdirSync(path.dirname(game.executable)).filter(f=>/\.exe$/i.test(f)&&!/^(unins|setup|install|config|crash|unitycrash|vc_?redist|dxsetup|launcher)/i.test(f)).map(f=>path.join(path.dirname(game.executable),f)).filter(f=>f.toLowerCase()!==game.executable.toLowerCase()&&fs.statSync(f).size>200000).slice(0,8);}catch{return [];}})():[];
    const anyProcess=async()=>{const own=await gameProcesses(root,game.executable);if(own.length||!siblings.length)return own;for(const exe of siblings){const found=await gameProcesses(root,exe).catch(()=>[]);if(found.length){trace('steam-runs-other-program',{exe:path.basename(exe)});return found;}}return own;};
    /* E303: Steam may prepare a first start (cloud sync, install scripts) for longer than 15 s; wait up to 45 s for its window. */
    const startedAt=Date.now();
