@@ -186,7 +186,7 @@ LR"MGLT((function(){
     } catch(e) {}
    } incontextof st;
    /* the face the latest sentence was drawn with, reported when it changes (checked with every refresh) */
-   /* E472: the font that draws is the KAG lineLayer's (MessageLayer.userFace, e.g. ＭＳ Ｐ明朝), not the message layer's own
+   /* E475: the font that draws is the KAG lineLayer's (MessageLayer.userFace, e.g. ＭＳ Ｐ明朝), not the message layer's own
       (ＭＳ Ｐゴシック in ファタモルガーナの館); a game may also map pre-rendered glyphs over it with [mappfont storage=x.tft]
       (KAGWindow.mapPrerenderedFont), found read-only in first.ks. Nothing is wrapped or written. */
    st.drawFont=function(L){var f=void;try {if(typeof L.lineLayer=='Object' && L.lineLayer!==void && L.lineLayer!==null) f=L.lineLayer.font;} catch(e) {f=void;}if(f===void || f===null) f=L.font;return f;} incontextof st;

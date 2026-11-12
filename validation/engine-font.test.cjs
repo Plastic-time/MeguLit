@@ -1,6 +1,6 @@
 process.env.MEGULIT_RELAY_BASE??='off';/* tests never reach the real relay */
 // SPDX-License-Identifier: GPL-3.0-or-later
-/* E472 engine font: the face KiriKiri's lineLayer draws with, overridden by a pre-rendered glyph file of another family. */
+/* E475 engine font: the face KiriKiri's lineLayer draws with, overridden by a pre-rendered glyph file of another family. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {pick,familyClass}=require('../core/engine-font.cjs');
 test('family class of face and .tft names',()=>{

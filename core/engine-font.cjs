@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-// E472: which Japanese font the reader uses for a game, from what the engine reports it draws with (hookFont).
+// E475: which Japanese font the reader uses for a game, from what the engine reports it draws with (hookFont).
 // face: the font the game's text layer uses (KiriKiri: the KAG lineLayer's font.face). prerendered: a pre-rendered glyph
 // file mapped over it ([mappfont storage=mincho2.tft]); its glyphs win over the face, so when its name says another
 // family (mincho / gothic) than the face, the reader takes that family instead of the face.
