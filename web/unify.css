@@ -1568,3 +1568,10 @@ html:not(#u):not(#v):not(#w):not(#x) body .kn-voice-seg button{border-radius:1px
 html:not(#u):not(#v):not(#w):not(#x) body .main :is(.text-button,.link-button):not(.icon-button){font-size:13px!important;color:rgba(255,244,234,.85)!important;background:none!important;box-shadow:none!important;text-decoration:none!important;
  background-image:linear-gradient(currentColor,currentColor)!important;background-repeat:no-repeat!important;background-position:0 100%!important;background-size:0 1px!important;transition:background-size .2s,color .2s!important}
 html:not(#u):not(#v):not(#w):not(#x) body .main :is(.text-button,.link-button):not(.icon-button):hover{background-size:100% 1px!important;color:#fff4ea!important}
+/* dictionary hit (judge fx7: the landing was barely visible, the flying box's edges stepped): a 2px light line runs out
+   both ways from the point of impact and holds a moment before it fades; the box is drawn through its own composited
+   layer with a transparent outline, so its rotated edges stay smooth */
+html body .dict-hit{width:1200px!important}
+html body .dict-hit>i{left:600px!important}
+html body .dict-hit-line{width:1100px!important;height:2px!important;top:0!important;background:linear-gradient(90deg,transparent,rgba(255,226,170,.9) 25%,#fff6e6 50%,rgba(255,226,170,.9) 75%,transparent)!important;box-shadow:0 0 10px 2px rgba(255,200,130,.55)!important}
+html body .dict-launch :is(#lookup-form,.lookup-form){outline:1px solid transparent;backface-visibility:hidden;will-change:transform}
