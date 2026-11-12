@@ -108,7 +108,9 @@ async function fillUpdates(dialog, locale, api) {
     const rows = (Array.isArray(items) ? items : []).slice(0, 300); /* E425 keep every update; the list scrolls */
     list.replaceChildren(...rows.map(it => {
       const [y, m, d] = String(it.date || '').split('-').map(Number), li = document.createElement('li');
-      li.textContent = ((locale !== 'zh' && it['text_' + locale]) || it.text) || t.upd(y, m, d, (locale !== 'zh' && it['title_' + locale]) || it.title || '');
+      const line = ((locale !== 'zh' && it['text_' + locale]) || it.text) || t.upd(y, m, d, (locale !== 'zh' && it['title_' + locale]) || it.title || '');
+      /* 2026-11-12 a ledger line: the date in its own column, then what changed */
+      if (y && m && d) { const when = document.createElement('time'), what = document.createElement('span'); when.textContent = `${String(m).padStart(2, '0')}.${String(d).padStart(2, '0')}`; what.textContent = line.replace(/^\d{4}年\d{1,2}月\d{1,2}日\s*|^[A-Z][a-z]{2} \d{1,2}, \d{4} · /, ''); li.append(when, what); } else li.textContent = line;
       return li;
     }));
     note.textContent = t.updNote;
@@ -123,11 +125,11 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '' })
   dialog.className = 'game-dialog dev-notice';
   dialog.innerHTML = `<div class="dev-notice-page" data-page="1"><div class="dev-notice-top"><span>${esc(t.noticeKicker)}</span><span>${esc(t.noticeTag)}</span></div>
 <h2>${esc(t.noticeTitle)}</h2><h2 class="dev-notice-title2">${esc(t.noticeTitle2)}</h2>${successHTML(locale, esc)}<p class="dev-notice-text">${esc(t.noticeText)}</p>
-<form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="primary">${esc(t.submit)}</button></form><p class="dev-notice-rule">${esc(t.gameRule)}</p>
+<form class="dev-notice-form"><input class="dev-notice-game" maxlength="200" placeholder="${esc(t.gamePlaceholder)}"><button type="submit" class="secondary">${esc(t.submit)}</button></form><p class="dev-notice-rule">${esc(t.gameRule)}</p>
 <p class="feedback-status" role="status" aria-live="polite"></p>
 <ul class="dev-notice-updates" hidden></ul><p class="dev-notice-updates-note" hidden></p>
 <p class="dev-notice-more">${esc(t.noticeMore)}</p>
-<div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="secondary" data-next>${esc(t.next)}</button></div></div>
+<div class="dev-notice-actions"><button type="button" class="text-button" data-report>${esc(t.report)}</button><button type="button" class="primary" data-next>${esc(t.next)}</button></div></div>
 <div class="dev-notice-page" data-page="2" hidden><div class="dev-notice-top"><span>${esc(t.guideKicker)}</span><span>2 / 2</span></div>
 <h2>${esc((GUIDE[locale] || GUIDE.zh).title)}</h2><div class="dev-notice-scroll">${guideHTML(locale, esc)}</div>
 <div class="dev-notice-actions"><button type="button" class="text-button" data-back>${esc(t.back)}</button><button type="button" class="secondary" data-ok>${esc(t.done)}</button></div></div>`;

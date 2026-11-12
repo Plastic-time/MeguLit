@@ -256,6 +256,11 @@ async function dispatch(request,runtime=null) {
       case 'leaderboard_report':return await require('./leaderboard.cjs').report(root,String(request.avatar||''));
       case 'leaderboard_join':{const lb=require('./leaderboard.cjs');lb.join(root,{name:request.name,shareGames:request.shareGames===true,consent:request.consent===true,requireAccount:true});return await lb.view(root,db,{period:String(request.period||''),metric:String(request.metric||''),submit:true});}
       /* E394 Settings → 个人主页 reads the switch, nickname and sharing without fetching the board */
+      /* 2026-11-12 转职: the reader's element (data/config/reader-class.json, services/reader-class.cjs) */
+      case 'reader_class_get':return require('./reader-class.cjs').read(root);
+      /* the level as this PC counts it, with whether 转职 is due and how much experience waits for it */
+      case 'reader_level':{const rc=require('./reader-class.cjs'),cls=rc.read(root),all=require('./leaderboard.cjs').collectStats(db,new Date(),root).stats?.all||{};return {element:cls.element,...rc.readerLevel(all,cls.element)};}
+      case 'reader_class_set':return require('./reader-class.cjs').write(root,String(request.element||''));
       case 'leaderboard_profile':{const c=require('./leaderboard.cjs').config(root);return {configured:c.configured,joined:c.joined,enabled:c.enabled,name:c.name,shareGames:c.shareGames,account:c.account};}
       /* E397 profiles, follows, 同好, reports */
       case 'leaderboard_profile_get':return await require('./leaderboard.cjs').profileGet(root);
@@ -386,7 +391,7 @@ async function dispatch(request,runtime=null) {
       case 'learning_level':return require('./learning-level.cjs').get(root);
       case 'learning_level_set':return require('./learning-level.cjs').set(db,root,{level:String(request.level||''),kana:request.kana});
       case 'kana_game_words':return require('./kana.cjs').gameWords(db,request.words);
-      case 'vocabulary':return db.prepare('SELECT v.id,v.spelling,v.reading,v.definitions,v.status,v.created_at,e.text AS example_text,e.game_id AS example_game_id,g.title AS example_title FROM vocabulary v LEFT JOIN examples e ON e.id=(SELECT id FROM examples WHERE word_id=v.id ORDER BY id DESC LIMIT 1) LEFT JOIN games g ON g.id=e.game_id ORDER BY v.created_at DESC,v.id DESC LIMIT 1000').all();
+      case 'vocabulary':{/* 2026-11-12 each saved word carries its JLPT level (N5–N1) when the open JLPT list has it */const rows=db.prepare('SELECT v.id,v.spelling,v.reading,v.definitions,v.status,v.created_at,e.text AS example_text,e.game_id AS example_game_id,g.title AS example_title FROM vocabulary v LEFT JOIN examples e ON e.id=(SELECT id FROM examples WHERE word_id=v.id ORDER BY id DESC LIMIT 1) LEFT JOIN games g ON g.id=e.game_id ORDER BY v.created_at DESC,v.id DESC LIMIT 1000').all();let jlpt=null;try{jlpt=require('./learning-insights.cjs').loadJlpt();}catch{}return jlpt?rows.map(r=>({...r,jlpt:(jlpt.byForm.get(r.spelling)||jlpt.byForm.get(r.reading)||null)?.level||null})):rows;}
       case 'sentences':return require('./saved-sentences.cjs').list(db,{source:request.source});
       case 'sentence_save':{const r=require('./saved-sentences.cjs').save(db,{gameId:request.gameId,text:request.text,translation:request.translation,source:request.source});runtime?.emit?.('reader-event',{type:'sentence-saved'});return r;}
       case 'sentence_delete':{const r=require('./saved-sentences.cjs').remove(db,{id:request.id,gameId:request.gameId,text:request.text});runtime?.emit?.('reader-event',{type:'sentence-saved'});return r;}

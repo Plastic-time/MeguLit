@@ -8,6 +8,9 @@ import {mountEmailLogin} from './account-ui.js';
 import {changeAvatar} from './avatar-crop.js';
 import {personButton,socialHTML,bindSocial} from './leaderboard-social.js';
 import {openProfilePanel} from './profile-panel.js';
+import {rankTitle,SCHOOLS,elementName} from './reader-class.js';
+/* 2026-11-12 转职: each reader's level, element and rank under the name, as the relay reports them */
+const rankTag=(e,esc)=>{if(!(e?.level>0))return '';const l=String(document.documentElement.lang||'zh'),loc=l.startsWith('ja')?'ja':l.startsWith('en')?'en':'zh',el=SCHOOLS[e.element]?e.element:'';return `<small class="lb-rank-tag"${el?` style="--c:${SCHOOLS[el].color}"`:''}>Lv.${e.level} · ${el?esc(elementName(el,loc))+' · ':''}${esc(rankTitle(e.level,loc,el))}</small>`;};
 import {cardify} from './home-tv.js';
 /* #117 交流 tab */
 import {mountForum,forumWords,forumSubRow} from './forum-view.js';
@@ -101,13 +104,13 @@ const reportButton=(e,w,esc)=>e.avatar&&!e.me?`<button type="button" class="lead
 function podiumPeople(entries,metric,w,locale,esc,images){
  /* the first three entries by position (ties keep their shared rank number); shown 2 · 1 · 3 */
  const order=[1,0,2].map(i=>({e:entries[i],place:i+1}));
- return `<div class="lb-stage" role="list">${order.map(({e,place})=>!e?vacantPlace(place,w):`<div class="lb-place medal-${MEDAL[place]}${e.me?' is-me':''}" role="listitem" data-rank="${place}" style="--delay:${({1:2,2:1,3:0})[place]*140}ms"><div class="lb-who">${place===1?crown:''}${personButton(e,`<span class="lb-ring">${avatarHTML(e,images,esc)}</span><span class="lb-name">${esc(e.name)}</span>`,esc)}<span class="lb-score">${esc(formatValue(metric,e.value,locale))}</span>${reportButton(e,w,esc)}</div><div class="lb-block">${laurel(e.rank)}</div><span class="lb-ghost" aria-hidden="true">${e.rank}</span></div>`).join('')}</div>`;
+ return `<div class="lb-stage" role="list">${order.map(({e,place})=>!e?vacantPlace(place,w):`<div class="lb-place medal-${MEDAL[place]}${e.me?' is-me':''}" role="listitem" data-rank="${place}" style="--delay:${({1:2,2:1,3:0})[place]*140}ms"><div class="lb-who">${place===1?crown:''}${personButton(e,`<span class="lb-ring">${avatarHTML(e,images,esc)}</span><span class="lb-name">${esc(e.name)}</span>${rankTag(e,esc)}`,esc)}<span class="lb-score">${esc(formatValue(metric,e.value,locale))}</span>${reportButton(e,w,esc)}</div><div class="lb-block">${laurel(e.rank)}</div><span class="lb-ghost" aria-hidden="true">${e.rank}</span></div>`).join('')}</div>`;
 }
 function tableRows(entries,metric,w,locale,esc,images,max=0){
  if(!entries.length)return '';
  /* E418 each row carries its share of the leader's value as a bar */
  const pct=e=>max>0?Math.max(2,Math.min(100,Math.round((Number(e.value)||0)/max*100))):0;
- return `<div class="lb-table"><div class="lb-thead" aria-hidden="true"><span>${w.colRank}</span><span>${w.colReader}</span><span>${w[metric]}</span></div><ol class="leaderboard-list lb-rows">${entries.map(e=>`<li class="${e.me?'is-me':''}" style="--pct:${pct(e)}%"><span class="leaderboard-rank">${e.rank}</span>${personButton(e,`${avatarHTML(e,images,esc)}<span class="leaderboard-name">${esc(e.name)}</span>`,esc)}${reportButton(e,w,esc)}<strong>${esc(formatValue(metric,e.value,locale))}</strong></li>`).join('')}</ol></div>`;
+ return `<div class="lb-table"><div class="lb-thead" aria-hidden="true"><span>${w.colRank}</span><span>${w.colReader}</span><span>${w[metric]}</span></div><ol class="leaderboard-list lb-rows">${entries.map(e=>`<li class="${e.me?'is-me':''}" style="--pct:${pct(e)}%"><span class="leaderboard-rank">${e.rank}</span>${personButton(e,`${avatarHTML(e,images,esc)}<span class="leaderboard-name">${esc(e.name)}</span>${rankTag(e,esc)}`,esc)}${reportButton(e,w,esc)}<strong>${esc(formatValue(metric,e.value,locale))}</strong></li>`).join('')}</ol></div>`;
 }
 /* E419 readers as equals: no podium, no rank ladder. A magic circle shows what everyone gathered together, then one
    grimoire card per reader, all the same size; the order is kept but the number is only a small sigil code. */
@@ -128,7 +131,7 @@ function headHTML(entries,metric,w,locale,esc,board){
 function circleHTML(entries,metric,w,locale,esc,images,board){
  const code=n=>'No.'+String(n).padStart(2,'0');
  return `${headHTML(entries,metric,w,locale,esc,board)}
- <ol class="lb-grimoires" role="list">${entries.map((e,i)=>`<li class="lb-grimoire${e.me?' is-me':''}" style="--i:${i}">${e.me?`<em class="lb-me-tag">${w.meTag}</em>`:''}<span class="lb-code">${code(e.rank)}</span>${personButton(e,`<span class="lb-gem">${avatarHTML(e,images,esc)}</span><span class="lb-gname">${esc(e.name)}</span>`,esc)}<strong class="lb-gvalue">${esc(formatValue(metric,e.value,locale))}</strong>${reportButton(e,w,esc)}</li>`).join('')}</ol>`;
+ <ol class="lb-grimoires" role="list">${entries.map((e,i)=>`<li class="lb-grimoire${e.me?' is-me':''}" style="--i:${i}">${e.me?`<em class="lb-me-tag">${w.meTag}</em>`:''}<span class="lb-code">${code(e.rank)}</span>${personButton(e,`<span class="lb-gem">${avatarHTML(e,images,esc)}</span><span class="lb-gname">${esc(e.name)}</span>${rankTag(e,esc)}`,esc)}<strong class="lb-gvalue">${esc(formatValue(metric,e.value,locale))}</strong>${reportButton(e,w,esc)}</li>`).join('')}</ol>`;
 }
 export function boardHTML(data,w,locale,esc){
  w={...words(locale),...w};

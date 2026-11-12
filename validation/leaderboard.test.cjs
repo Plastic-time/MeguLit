@@ -75,7 +75,8 @@ test('opt-in needs consent and a clean nickname; only totals are uploaded; games
  assert.equal(view.submit.state,'ok');assert.equal(view.board.entries[0].me,true);
  const post=sent.find(r=>r.method==='POST');
  assert.equal(post.url,'https://relay.test/api/leaderboard');
- assert.deepEqual(Object.keys(post.body).sort(),['hot','id','keys','name','stats','version']);assert.deepEqual(post.body.hot,{week:'2026-W46',terms:[]},'no lookups recorded');
+ /* 2026-11-12 转职: the level (and the element once chosen) ride along */
+ assert.deepEqual(Object.keys(post.body).sort(),['hot','id','keys','level','name','stats','version']);assert.equal(typeof post.body.level,'number');assert.deepEqual(post.body.hot,{week:'2026-W46',terms:[]},'no lookups recorded');
  assert.deepEqual(post.body.stats.week,{characters:1510,seconds:910,words:1,streak:2,reviews:0,kana:0});
  assert.equal(post.body.name,'めぐみん');assert.ok(!JSON.stringify(post.body).includes(os.hostname()),'no machine names');
  const get=sent.find(r=>r.method==='GET');assert.match(get.url,/period=week&metric=characters&key=2026-W46&me=[0-9a-f]{64}$/);
@@ -118,7 +119,7 @@ test('nickname rules match the relay; fetch output is sanitized',async t=>{
  assert.equal(lb.cleanName('  爆裂  魔法  ').name,'爆裂 魔法');assert.equal(lb.cleanName('grape lover').ok,true);
  const {root}=fixture(t);lb.join(root,{name:'Kazuma',consent:true});
  const res=await lb.fetch('all','streak',{root,env:BASE_ENV,fetch:async()=>new Response(JSON.stringify({entries:[{rank:'1',name:'x'.repeat(50),value:-5,me:'yes',extra:1}],total:3}))});
- assert.deepEqual(res.entries,[{rank:1,name:'x'.repeat(32),value:0,me:false,avatar:null,pid:null}]);
+ assert.deepEqual(res.entries,[{rank:1,name:'x'.repeat(32),value:0,me:false,avatar:null,pid:null,element:'',level:0}]);
  assert.deepEqual(await lb.fetch('week','characters',{root,env:BASE_ENV,fetch:async()=>new Response('{"ok":false,"error":"RATE_LIMITED"}',{status:429})}),{state:'error',error:'RATE_LIMITED'});
  await assert.rejects(()=>lb.fetch('year','characters',{root,env:BASE_ENV}),/LEADERBOARD_INVALID_QUERY/);
 });

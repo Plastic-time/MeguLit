@@ -1067,3 +1067,37 @@ button.m0,button.m1,button.m2,button.m3{border:0;padding:0;font:inherit;cursor:p
  .v-index.mg .mastery button{font-size:clamp(16px,2.2vh,24px)}
 }
 .mg-page{align-content:start}
+
+/* 2026-11-11 the kana lab on the app's glass (unify.css cannot reach this shadow tree): glass panels instead of black
+   slabs, hairline frames, the app's red primary with a gold inner rule, gold for "familiar", readable small print */
+.v-index.mg :is(.mg-hud,.mg-stage,.mg-lesson,.mg-board-grid,.mg-board-empty,.mg-voice,.mg-practice,.mg-game,.mg-tile){background:linear-gradient(160deg,rgba(24,24,30,.66),rgba(14,14,18,.54))!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.09)!important;border-radius:2px;-webkit-backdrop-filter:blur(16px) saturate(1.2);backdrop-filter:blur(16px) saturate(1.2)}
+.v-index.mg .mg-hud{border-top:0!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.09),inset 0 2px 0 #c8323c!important}
+.v-index.mg .mg-stage{background-image:linear-gradient(160deg,rgba(24,24,30,.66),rgba(14,14,18,.54))!important}
+.v-index.mg .mg-lesson.cur{background:linear-gradient(180deg,rgba(200,50,60,.28),rgba(200,50,60,.1))!important;box-shadow:inset 0 0 0 1px rgba(200,50,60,.55),inset 0 -2px 0 #c8323c!important}
+.v-index.mg .mg-lesson:hover{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)!important}
+.v-index.mg :is(.mg-tile,.mg-game):hover{box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),inset 0 2px 0 rgba(200,50,60,.7)!important}
+.v-index.mg .mg-cta{height:44px;padding:0 24px;border-radius:2px;background:#b72a36;box-shadow:inset 0 1px 0 rgba(255,215,200,.22),inset 0 0 0 1px rgba(237,181,110,.45);letter-spacing:.12em}
+.v-index.mg .mg-cta:hover{background:#c8303c}
+.v-index.mg .mastery .m2,.v-index.mg .mg-legend i.m2{background:color-mix(in srgb,var(--g-gold,#edb56e) 70%,#000)!important;color:#140e0c!important}
+.v-index.mg .mastery .m1{background:rgba(242,232,218,.14)}
+.v-index.mg .mk-card{background:linear-gradient(90deg,rgba(237,181,110,.1),transparent 70%),rgba(16,13,17,.62)!important;color:var(--g-t1,#f1e0d2)!important;border-left:2px solid var(--g-gold,#edb56e)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.09)}
+.v-index.mg .mk-lv{border-radius:2px;border-color:rgba(255,255,255,.16);color:var(--g-t2,#c3ab9c)}
+.v-index.mg .mk-lv.on:is(.l0,.l1,.l2,.l3){background:rgba(237,181,110,.12);border-color:rgba(237,181,110,.55);color:var(--g-t1,#f1e0d2);box-shadow:inset 0 -2px 0 #c82f3b}
+.v-index.mg .mk-say:hover{background:var(--g-gold,#edb56e);color:#140e0c}
+.v-index.mg :is(.mg-kicker,.mg-tag){font-size:11px;letter-spacing:.26em;color:rgba(242,232,218,.7)}
+.v-index.mg :is(.mg-lesson small,.mg-legend,.mg-sub,.mg-hud-stats small){font-size:11.5px}
+.v-index.mg [aria-pressed=true]{background:rgba(237,181,110,.12)!important;color:var(--g-t1,#f1e0d2)!important;border-color:rgba(237,181,110,.55)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
+.v-index.mg .mg-diffs button{border-radius:2px}
+.v-index.mg .mg-board{align-items:start}
+.v-index.mg .mg-board>*,.v-index.mg .mg-board-side>:first-child{margin-top:0!important}
+.v-index.mg .mg-rail{gap:4px}
+.v-index.mg .mg-lesson{min-height:86px;justify-content:flex-start}
+.v-index.mg .mg-lesson small{line-height:1.35;text-wrap:balance}
+
+/* round 1: Consolas for the lab's mono labels (lining figures), the star-seal primary, selection in the brand red */
+.v-index.mg{--mg-mono:"IBM Plex Mono",Consolas,monospace}
+.v-index.mg .mg-cta{height:46px;border-radius:10px;color:#fbeedd;text-shadow:0 0 10px rgba(255,170,120,.35);background:radial-gradient(1.2px 1.2px at 78% 28%,rgba(255,226,180,.9),transparent 70%),radial-gradient(120% 140% at 0% 50%,rgba(196,40,58,.55),transparent 62%),linear-gradient(135deg,#3a1720 0%,#2a1219 45%,#1d1016 100%);box-shadow:inset 0 0 0 1px rgba(237,181,110,.42),inset 0 0 0 3px rgba(20,10,12,.55),inset 0 0 0 4px rgba(237,181,110,.14),0 6px 18px -6px rgba(150,20,40,.55)}
+.v-index.mg .mg-cta:hover{background:radial-gradient(1.2px 1.2px at 78% 28%,rgba(255,226,180,.9),transparent 70%),radial-gradient(120% 140% at 0% 50%,rgba(196,40,58,.7),transparent 62%),linear-gradient(135deg,#46202a 0%,#2f141c 45%,#1f1117 100%);filter:none}
+.v-index.mg :is(.mg-diffs button.on,.mg-diffs button.active,.mg-diffs [aria-checked=true]){background:rgba(200,47,59,.14)!important;color:var(--g-t1,#f1e0d2)!important;border-color:rgba(200,47,59,.6)!important;box-shadow:inset 0 -2px 0 #c82f3b!important}
+.v-index.mg .mg-board{align-items:stretch}
+.v-index.mg .mg-board-side{align-self:stretch}

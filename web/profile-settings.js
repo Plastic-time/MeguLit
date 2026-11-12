@@ -41,13 +41,14 @@ export async function mountProfileSettings({content,api,locale,esc,toast,openSec
  const t=T[locale]||T.zh,lw=leaderboardWords(locale),root=document.createElement('div');root.className='profile-settings';content.append(root);
  /* order: account, picture, leaderboard. The leaderboard block is the page's only <form>, so settings search finds
     its fields (leaderboardName …) by name */
- root.innerHTML=`<section class="panel profile-account" data-profile-account><h2 class="panel-title">${t.account}</h2><p class="settings-help">…</p></section><div data-profile-avatar></div><form class="panel profile-board" data-profile-board autocomplete="off"><h2 class="panel-title">${t.board}</h2><p class="settings-help">…</p></form><section class="panel profile-public" data-profile-public><h2 class="panel-title">${t.publicTitle}</h2><p class="settings-help">…</p></section>`;
+ root.innerHTML=`<section class="panel profile-account" data-profile-account><h2 class="panel-title">${t.account}</h2><p class="settings-help">…</p></section><form class="panel profile-board" data-profile-board autocomplete="off"><h2 class="panel-title">${t.board}</h2><p class="settings-help">…</p></form><section class="panel profile-public" data-profile-public><h2 class="panel-title">${t.publicTitle}</h2><p class="settings-help">…</p></section>`;
  const publicBox=root.querySelector('[data-profile-public]'),accountBox=root.querySelector('[data-profile-account]'),avatarBox=root.querySelector('[data-profile-avatar]'),form=root.querySelector('[data-profile-board]');
  let account={configured:false,loggedIn:false},board=null;
  /* E400 the bridge error may arrive as an Error or a plain string, sometimes with a prefix: pick the code out of it */
  const errorCode=error=>{const text=String(error?.message||error||'');return (text.match(/LEADERBOARD_([A-Z_]+)/)||text.match(/\b([A-Z][A-Z_]{3,})\b/)||[])[1]||'';};
  const errorText=error=>{const code=errorCode(error);return code==='UNAUTHORIZED'?t.publicLogin:lw[code]||(code?t.offline+' ('+code+')':t.offline);};
- async function paintAvatar(){avatarBox.replaceChildren();await mountAvatarSettings({content:avatarBox,api,locale,esc,toast}).catch(()=>{});}
+ /* 2026-11-12 (user): the picture and the nickname are edited on the profile header (profile-panel.js) */
+ async function paintAvatar(){if(!avatarBox)return;avatarBox.replaceChildren();await mountAvatarSettings({content:avatarBox,api,locale,esc,toast}).catch(()=>{});}
  async function paintAccount(){
   try{account=await api('account_status',{autoSync:false});}catch{account={configured:false,loggedIn:false};}
   if(!account.configured){accountBox.innerHTML=`<h2 class="panel-title">${t.account}</h2><p class="settings-help">${t.notReady}</p>`;return;}
@@ -114,7 +115,7 @@ export async function mountProfileSettings({content,api,locale,esc,toast,openSec
   form.innerHTML=`<h2 class="panel-title">${t.board}</h2>${!board.configured?`<p class="settings-help">${t.notReady}</p>`:''}
    <label class="settings-row"><span class="setting-description"><span class="settings-label">${t.joined}</span><small class="settings-help">${needsLogin?t.loginHint:t.joinedHint}</small></span><input class="switch" type="checkbox" name="leaderboardEnabled" ${joined?'checked':''} ${!board.configured||needsLogin?'disabled':''}></label>
    <div class="profile-leave" data-profile-leave hidden role="alert"><p>${t.leaveAsk}</p><div class="review-controls"><button type="button" class="secondary" data-leave-no>${t.leaveNo}</button><button type="button" class="danger primary" data-leave-yes>${t.leaveYes}</button></div></div>
-   <label class="settings-row"><span class="setting-description"><span class="settings-label">${t.nickname}</span><small class="settings-help">${t.nicknameHint}</small></span><input name="leaderboardName" type="text" maxlength="16" value="${esc(board.name||'')}" placeholder="${esc(lw.nicknameHint||'')}" ${!board.configured?'disabled':''}></label>
+   <input type="hidden" name="leaderboardName" value="${esc(board.name||'')}">
    <label class="settings-row"><span class="setting-description"><span class="settings-label">${t.share}</span><small class="settings-help">${t.shareHint}</small></span><input class="switch" type="checkbox" name="leaderboardShareGames" ${board.shareGames?'checked':''} ${!board.configured?'disabled':''}></label>
    <div class="profile-join" data-profile-join hidden><label class="leaderboard-check"><input type="checkbox" class="switch" data-profile-consent><span>${lw.consent}</span></label><button type="button" class="primary" data-profile-join-go>${t.joinNow}</button></div>
    <p class="leaderboard-error" data-profile-error hidden></p>`;

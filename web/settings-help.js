@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 const hints={
+ word_review_count:['「学习 → 复习」里一轮最多出多少张单词卡；到期的卡会优先，做完这一轮再开下一轮','How many word cards one review round in Learning → Review holds; due cards come first','「学習 → 復習」で 1 回に出す単語カードの上限。期限の来たカードが先に出ます'],
+ sentence_review_count:['一轮最多复习多少条收藏的句子（句子页里的台词）','How many saved lines (from Sentences) one review round holds','1 回に復習する保存済みの文（セリフ）の上限'],
+ word_sentence_count:['单词卡和单词页里，每个词最多附带几条你在游戏里读到的例句','How many lines from your games are shown with each word on cards and in Words','カードや単語ページで、1 語につき表示するゲーム中の例文の数'],
+ only_review_translated:['打开后，只复习带有译文的句子，看不懂的生句不会出现','Only review saved lines that have a translation','訳のある文だけを復習します'],
+ default_dictionary_sort:['单词页的默认排列方式','Default order of the Words page','単語ページの既定の並び順'],
  leaderboardEnabled:['只上传阅读字数、时长、收录单词数、复习次数、假名练习题数和连续天数的汇总；参加要先用邮箱登录 MeguLit 账号，邮箱不会出现在榜上；关闭后会删除服务器上的记录','Uploads only totals (characters, time, words saved, reviews, kana practice, streak). Joining needs a MeguLit account signed in with your email, which never shows on the board. Turning it off deletes your entry on the server','読んだ文字数・時間・登録単語数・復習回数・かな練習の問題数・連続日数の合計だけを送ります。参加にはメールアドレスで MeguLit アカウントにログインする必要があり、アドレスはランキングに表示されません。オフにするとサーバーの記録を削除します'],
  leaderboardName:['排行榜上显示的名字，2–16 个字，不能含网址或不雅词','Name shown on the leaderboard, 2–16 characters, no links or offensive words','ランキングに表示される名前。2〜16 文字、URL や不適切な語は使えません'],
  leaderboardShareGames:['打开后会公开你读过的游戏名称和各自字数，用于“按游戏”排行','Shares the titles you read and their character counts for the per-game boards','読んだゲーム名と文字数を公開し、ゲーム別ランキングに参加します'],
- relayUrl:['诊断上传、共享适配和排行榜共用的服务地址；一般留空即可','Address shared by diagnostic upload, shared adaptation and the leaderboard; normally leave empty','診断アップロード・共有設定・ランキング共通のサーバーアドレス。通常は空欄のままで構いません'],
+ relayUrl:['MeguLit 的所有在线功能——排行榜、交流区、一键上传问题反馈、共享的游戏适配数据——都连到这台服务器。留空就是官方服务器，绝大多数人不用改；只有自己架服务器时才填','Every online feature of MeguLit — the leaderboard, Community, one-click problem reports and shared game adaptation data — talks to this server. Leave it empty for the official server; only fill it in if you run your own','ランキング・交流・ワンクリック不具合報告・共有ゲーム設定など、MeguLit のオンライン機能はすべてこのサーバーにつながります。空欄なら公式サーバーです。自分でサーバーを立てる場合だけ入力してください'],
  history_font_family:['填写电脑上已安装的字体名称，仅影响历史中的对话正文；推荐 Yu Gothic 或 Noto Sans JP','Enter an installed font name for dialogue history, such as Yu Gothic or Noto Sans JP','会話履歴の本文に使うインストール済みフォント名を指定します'],
  history_font_size:['调整对话记录的正文大小，单位为像素','Dialogue history text size in pixels','会話履歴の本文サイズ（px）'],
  history_line_height:['每行文字的高度倍数，数值越大越疏朗','Line height multiplier for dialogue history','会話履歴の行の高さの倍率'],
