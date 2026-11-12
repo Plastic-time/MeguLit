@@ -40,8 +40,10 @@ function barHit(bar,x,power){
  wrap.innerHTML='<i class="dict-hit-flash"></i><i class="dict-hit-ring"></i><i class="dict-hit-line"></i>';document.body.append(wrap);
  wrap.querySelector('.dict-hit-flash').animate([{transform:'translateX(-50%) scaleX(.15)',opacity:1},{transform:`translateX(-50%) scaleX(${f1(1+power*.6)})`,opacity:1,offset:.3},{transform:`translateX(-50%) scaleX(${f1(1.3+power*.8)})`,opacity:0}],{duration:620,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
  wrap.querySelector('.dict-hit-ring').animate([{transform:'translate(-50%,-50%) scale(.2,.12)',opacity:1},{transform:`translate(-50%,-50%) scale(${f1(2.6+power*2)},${f1(.55+power*.4)})`,opacity:0}],{duration:620,easing:'cubic-bezier(.1,.7,.3,1)',fill:'forwards'});
- wrap.querySelector('.dict-hit-line').animate([{transform:'translateX(-50%) scaleX(.06)',opacity:1},{transform:`translateX(-50%) scaleX(${f1(.7+power*.6)})`,opacity:1,offset:.3},{transform:`translateX(-50%) scaleX(${f1(1.3+power*1.2)})`,opacity:0}],{duration:960,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
- setTimeout(()=>wrap.remove(),1000);
+ /* the line runs out from the hit, holds a moment at full strength, then fades as it spreads further (easing per
+    segment, so the hold really holds) */
+ wrap.querySelector('.dict-hit-line').animate([{transform:'translateX(-50%) scaleX(.06)',opacity:1,easing:'cubic-bezier(.2,.8,.2,1)'},{transform:`translateX(-50%) scaleX(${f1(.7+power*.5)})`,opacity:1,offset:.24},{transform:`translateX(-50%) scaleX(${f1(.8+power*.6)})`,opacity:1,offset:.44,easing:'cubic-bezier(.4,0,.6,1)'},{transform:`translateX(-50%) scaleX(${f1(1.2+power*.9)})`,opacity:0}],{duration:1000,fill:'forwards'});
+ setTimeout(()=>wrap.remove(),1040);
  power*=fxK;const k=power*8,side=(x-r.left)/r.width-.5,frames=[];
  for(let i=0;i<=10;i++){const d=Math.exp(-i*.45),sgn=i%2?1:-1;frames.push({transform:i===10?'none':`translateY(${f1(sgn*k*d)}px) rotate(${f1(sgn*side*k*.1*d)}deg)`,filter:i===10?'none':`brightness(${f1(1+.6*power*d)})`});}
  bar.animate(frames,{duration:560,easing:'linear'});

@@ -24,6 +24,7 @@ import {glyphFor,paintGlyph} from './element-forms.js';
 const calm=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TAU=Math.PI*2,R=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)];
 const CAP=260;
+const FLASH={fire:'#ff8a3c',earth:'#d8a060',dark:'#8a5ad0'};
 const COLOR={fire:'#e2423e',ice:'#9fe3ff',thunder:'#ffe36a',wind:'#8fe0c0',water:'#5fb0f0',earth:'#c08a52',light:'#fff1b8',dark:'#a07ae0'};
 const rgba=(hex,a)=>{const n=parseInt(hex.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;};
 
@@ -316,7 +317,7 @@ function render(c,s,alpha,scale,ga=alpha){
  for(const p of s.ps){c.globalAlpha=a0;DRAW[p.type]?.(c,p,p.t/p.life,s);}
  c.globalAlpha=ga;c.globalCompositeOperation='source-over';if(s.glyph&&ga>.01)drawLockup(s,c,s.el);
  if(sc.fg){c.globalCompositeOperation='lighter';c.globalAlpha=a0;sc.fg(s,c);}
- if(s.flash>0){c.globalCompositeOperation='lighter';const fr=Math.max(s.W,s.H)*.7,g=c.createRadialGradient(s.cx,s.cy,0,s.cx,s.cy,fr);g.addColorStop(0,rgba(COLOR[s.el],Math.min(.55,s.flash*.6)*a0));g.addColorStop(.35,rgba(COLOR[s.el],s.flash*.18*a0));g.addColorStop(1,rgba(COLOR[s.el],0));c.fillStyle=g;c.fillRect(0,0,s.W,s.H);s.flash=Math.max(0,s.flash-s.dt*2);}
+ if(s.flash>0){/* (judge fx9: a pink-white glow lingered on the glyph) the flash is the element's warm light, gone in ~200 ms */const fc=FLASH[s.el]||COLOR[s.el];c.globalCompositeOperation='lighter';const fr=Math.max(s.W0||s.W,s.H0||s.H)*.7,g=c.createRadialGradient(s.cx,s.cy,0,s.cx,s.cy,fr);g.addColorStop(0,rgba(fc,Math.min(.5,s.flash*.55)*a0));g.addColorStop(.35,rgba(fc,s.flash*.16*a0));g.addColorStop(1,rgba(fc,0));c.fillStyle=g;c.fillRect(0,0,s.W,s.H);s.flash=Math.max(0,s.flash-s.dt*4.5);}
  c.restore();
 }
 
@@ -338,9 +339,9 @@ export function mountElementFx(canvas){
      from 92% and sharpens over ~360 ms, starting a beat later; one thin light sweep crosses once */
   switchT=Math.min(1,switchT+dt);const W=canvas.clientWidth,H=canvas.clientHeight;
   if(old&&switchT<.2){const k=switchT/.2,e=k*k;step(old,dt);ctx.save();ctx.filter=`blur(${(e*8).toFixed(1)}px)`;render(ctx,old,1-e,1-.12*e);ctx.restore();}else old=null;
-  if(cur){if(!calm){SC[cur.el].spawn(cur);step(cur,dt);}const k=Math.min(1,Math.max(0,(switchT-.08)/.36)),e=1-Math.pow(1-k,3);
+  if(cur){if(!calm){SC[cur.el].spawn(cur);step(cur,dt);}const k=Math.min(1,Math.max(0,(switchT-.1)/.5)),e=1-Math.pow(1-k,3);
    if(k<1){ctx.save();ctx.filter=`blur(${((1-e)*6).toFixed(1)}px)`;render(ctx,cur,e,.92+.08*e,Math.max(0,(k-.45)/.55));ctx.restore();
-    const sx=-W*.3+(W*1.6)*e,gr=ctx.createLinearGradient(sx-60,0,sx+60,H);gr.addColorStop(0,'rgba(255,255,255,0)');gr.addColorStop(.5,`rgba(255,250,240,${.12*(1-e)})`);gr.addColorStop(1,'rgba(255,255,255,0)');ctx.globalCompositeOperation='lighter';ctx.fillStyle=gr;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';}
+    const sx=-W*.3+(W*1.6)*Math.min(1,k*1.15),gr=ctx.createLinearGradient(sx-60,0,sx+60,H);gr.addColorStop(0,'rgba(255,255,255,0)');gr.addColorStop(.5,rgba(COLOR[cur.el],.34*Math.sin(Math.PI*Math.min(1,k*1.15))));gr.addColorStop(1,'rgba(255,255,255,0)');ctx.globalCompositeOperation='lighter';ctx.fillStyle=gr;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';}
    else render(ctx,cur,1,1);
    if(wide){const R0=Math.max(wide.w,wide.h),g=ctx.createRadialGradient(cur.cx,cur.cy,R0*.45,cur.cx,cur.cy,R0*1.25);g.addColorStop(0,'#000');g.addColorStop(1,'rgba(0,0,0,0)');ctx.globalCompositeOperation='destination-in';ctx.fillStyle=g;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';
     if(cur.ct<0||cur.ct>3.8)goBack();}}

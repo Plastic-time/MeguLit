@@ -1622,5 +1622,12 @@ html body .class-rite-white{position:fixed!important;right:auto;bottom:auto;widt
  background:radial-gradient(circle,#fff 0,#fff 52%,rgba(255,255,255,0) 68%)!important;z-index:30!important;pointer-events:none;will-change:transform,opacity}
 /* the white lifts as an iris opening from its centre (a hole with a soft edge), not by fading — no frame lays
    translucent white over the dark card */
-@property --h{syntax:'<percentage>';inherits:false;initial-value:0%}
-html body .class-rite-white{--h:0%;opacity:1!important;-webkit-mask-image:radial-gradient(circle,transparent calc(var(--h) - 6%),#000 var(--h));mask-image:radial-gradient(circle,transparent calc(var(--h) - 6%),#000 var(--h))}
+@property --h{syntax:'<percentage>';inherits:true;initial-value:0%}
+html body .class-rite-white{--h:0%;opacity:1!important;-webkit-mask-image:radial-gradient(circle,transparent calc(var(--h) - 2.5%),#000 var(--h));mask-image:radial-gradient(circle,transparent calc(var(--h) - 2.5%),#000 var(--h))}
+
+/* (judge fx9: the opening iris left a grey band) its edge burns warm: a thin orange-gold ring rides just inside the
+   white as it opens, so the white meets the card through warm light, never through grey */
+@property --ro{syntax:'<number>';inherits:true;initial-value:0}
+html body .class-rite-white::after{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;opacity:var(--ro);
+ background:radial-gradient(circle,rgba(255,140,60,0) calc(var(--h) - 3%),rgba(255,140,60,1) calc(var(--h) - 1.6%),rgba(255,196,120,1) calc(var(--h) - .2%),rgba(255,236,200,.6) calc(var(--h) + 1.6%),rgba(255,255,255,0) calc(var(--h) + 3.5%))}
+html body .dict-hit-line{mix-blend-mode:screen}

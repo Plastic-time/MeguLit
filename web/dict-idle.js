@@ -61,6 +61,10 @@ function frame(now){
  const GX=8,GY=5,cw=f.W/GX,ch=f.H/GY,cnt=new Float32Array(GX*GY),cell=(x,y)=>Math.min(GX-1,Math.max(0,Math.floor(x/cw)))+Math.min(GY-1,Math.max(0,Math.floor(y/ch)))*GX;
  for(const p of order)if(p.y>-40&&p.y<f.H+40&&p.x>-40&&p.x<f.W+40)cnt[cell(p.x,p.y)]+=1;f.cnt=cnt;f.cellOf=cell;f.grid=[GX,GY,cw,ch];
  const at=(i,j)=>i<0||j<0||i>=GX||j>=GY?cnt[Math.min(GX-1,Math.max(0,i))+Math.min(GY-1,Math.max(0,j))*GX]+2:cnt[i+j*GX];
+ /* (judge fx9: sharp glyphs of one layer piled into each other) glyphs near the focal plane gently make room for a
+    neighbour that overlaps them — only when touching, never toward any place */
+ const sharp=order.filter(q=>Math.abs(q.z-FOCUS)<.2&&(q.fade??1)>.5);
+ for(let a=0;a<sharp.length;a++){const A=sharp[a];for(let b=a+1;b<sharp.length;b++){const B=sharp[b],dx=B.x-A.x,dy=B.y-A.y,need=(A.spr.w+B.spr.w)*.32,d2=dx*dx+dy*dy;if(d2>need*need||d2<1e-3)continue;const d=Math.sqrt(d2),k=(1-d/need)*60*dt,ux=dx/d,uy=dy/d;A.wx-=ux*k;A.wy-=uy*k*.6;B.wx+=ux*k;B.wy+=uy*k*.6;}}
  for(const p of order){
   {const i=Math.min(GX-1,Math.max(0,Math.floor(p.x/cw))),j=Math.min(GY-1,Math.max(0,Math.floor(p.y/ch))),K=5;p.wx=(p.wx||0)+(at(i-1,j)-at(i+1,j))*K*dt;p.wy=(p.wy||0)+(at(i,j-1)-at(i,j+1))*K*.6*dt;}
   p.sway+=dt*.6;p.x+=(p.vx+Math.sin(p.sway)*4)*dt;p.y+=p.vy*dt;
@@ -83,7 +87,7 @@ function frame(now){
   if(p.y>f.H+120)p.y=-60;
   const s=p.spr,base=Math.min(1,p.alpha*f.dim*pref.k)*(p.fade??1),sp=Math.hypot(p.wx||0,p.wy||0);
   /* (judge fx7: the trail read as stepped copies) one smear instead: the sprite stretched along its velocity, behind it */
-  if(sp>220){const a=Math.atan2(p.wy,p.wx),len=Math.min(220,sp*.05),st=1+len/Math.max(24,s.w);ctx.globalAlpha=base*.38;ctx.save();ctx.translate(p.x+p.ox-Math.cos(a)*len*.5,p.y+p.oy-Math.sin(a)*len*.5);ctx.rotate(a);ctx.scale(st,1/(1+len/400));ctx.rotate(p.rot+(p.orot||0)-a);ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();}
+  if(sp>220){const a=Math.atan2(p.wy,p.wx),len=Math.min(220,sp*.05),st=1+len/Math.max(24,s.w);ctx.globalAlpha=base*.34;ctx.save();ctx.filter=`blur(${Math.min(6,1.5+len*.04).toFixed(1)}px)`;ctx.translate(p.x+p.ox-Math.cos(a)*len*.5,p.y+p.oy-Math.sin(a)*len*.5);ctx.rotate(a);ctx.scale(st,1/(1+len/400));ctx.rotate(p.rot+(p.orot||0)-a);ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();}
   ctx.globalAlpha=base;ctx.save();ctx.translate(p.x+p.ox,p.y+p.oy);ctx.rotate(p.rot+(p.orot||0));ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();
  }
  ctx.globalAlpha=1;
