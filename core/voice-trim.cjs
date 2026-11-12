@@ -31,4 +31,7 @@ function trimWav(input,text,{gap=0.6}={}){
  for(let i=0;i<fade;i++)out[out.length-1-i]=Math.round(out[out.length-1-i]*i/fade);
  return {data:wav(out,rate),seconds:out.length/rate,cut:(samples.length-out.length)/rate};
 }
-module.exports={trimWav,spokenLimit,parse,wav};
+/* (user 2026-11-12: an example on a card played nothing) a clip whose loudest sample stays under limit of full scale
+   holds no voice: the music recorded under an unvoiced line, separated, leaves near-silence */
+function quiet(buf,limit=0.05){const w=parse(buf);if(!w||!w.samples.length)return false;let peak=0;for(const v of w.samples){const a=v<0?-v:v;if(a>peak)peak=a;}return peak<limit*32768;}
+module.exports={trimWav,spokenLimit,parse,wav,quiet};

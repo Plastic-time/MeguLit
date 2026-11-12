@@ -33,3 +33,14 @@
 /* grimoire.css sets .main .anki-tools{gap:0!important} for the review page's dot-separated links; the settings row of
    buttons keeps its own spacing. */
 .main .settings-row.anki-tools{gap:8px!important}
+
+/* (user 2026-11-12) Anki settings: what plays by itself, as two segmented rows */
+.anki-autoplay .anki-mixer-controls{width:300px}
+.anki-autoplay fieldset{margin:0 0 10px;padding:0;border:0;min-width:0}
+.anki-autoplay legend{margin-bottom:6px;font-size:11.5px;color:var(--g-t1,var(--text))}
+.anki-seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--g-rule-strong,var(--line));border-radius:6px;overflow:hidden}
+.anki-seg button{appearance:none;border:0;border-left:1px solid var(--g-rule,var(--line));background:transparent;color:var(--g-t2,var(--muted));font:inherit;font-size:11px;padding:6px 2px;cursor:pointer;white-space:nowrap;transition:background-color .15s,color .15s}
+.anki-seg button:first-child{border-left:0}
+.anki-seg button:hover{background:var(--surface-hover);color:var(--g-t1,var(--text))}
+.anki-seg button[aria-checked="true"]{background:color-mix(in srgb,var(--g-gold,var(--accent)) 22%,transparent);color:var(--g-t1,var(--text))}
+.anki-seg button:focus-visible{outline:1px solid var(--g-gold,var(--accent));outline-offset:-1px}

@@ -3,7 +3,7 @@
 const crypto=require('node:crypto');
 const {cleanV4}=require('../core/v4-config.cjs');
 class AnkiReviewer{
- constructor({config={},db,fetcher=fetch}){this.config=cleanV4(config);this.db=db;this.fetch=fetcher;db.exec(`CREATE TABLE IF NOT EXISTS anki_actions(operation_id TEXT PRIMARY KEY,card_id INTEGER NOT NULL,ease INTEGER NOT NULL,status TEXT NOT NULL,result TEXT,created_at INTEGER NOT NULL);CREATE TABLE IF NOT EXISTS anki_review_events(operation_id TEXT PRIMARY KEY,card_id INTEGER NOT NULL,ease INTEGER NOT NULL,reviewed_at INTEGER NOT NULL);CREATE UNIQUE INDEX IF NOT EXISTS anki_one_pending_rating ON anki_actions(card_id) WHERE status='pending';`);}
+ constructor({config={},db,fetcher=fetch,speak=null}){this.config=cleanV4(config);this.db=db;this.fetch=fetcher;this.speak=speak;db.exec(`CREATE TABLE IF NOT EXISTS anki_actions(operation_id TEXT PRIMARY KEY,card_id INTEGER NOT NULL,ease INTEGER NOT NULL,status TEXT NOT NULL,result TEXT,created_at INTEGER NOT NULL);CREATE TABLE IF NOT EXISTS anki_review_events(operation_id TEXT PRIMARY KEY,card_id INTEGER NOT NULL,ease INTEGER NOT NULL,reviewed_at INTEGER NOT NULL);CREATE UNIQUE INDEX IF NOT EXISTS anki_one_pending_rating ON anki_actions(card_id) WHERE status='pending';`);}
  async call(action,params={}){
   let response;
   try{response=await this.fetch(this.config.ankiUrl,{method:'POST',redirect:'error',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,version:6,params}),signal:AbortSignal.timeout(10000)});}catch(error){const code=error.cause?.code||error.name;throw Error(code==='ECONNREFUSED'?'ANKI_OFFLINE':code==='TimeoutError'?'ANKI_TIMEOUT':'ANKI_UNAVAILABLE');}
@@ -64,6 +64,13 @@ class AnkiReviewer{
   const names=new Set([...play.values()].filter(name=>name&&!/[\\/]/.test(name)));for(const match of html.matchAll(/\[sound:([^\]\r\n]+)\]|(?:src|href)\s*=\s*["']([^"']+)["']/gi)){const name=match[1]||match[2];if(name&&!/^(?:https?:|data:|javascript:|#)/i.test(name)&&!/[\\/]/.test(name))names.add(name);}
   const media=new Map();
   for(const name of [...names].slice(0,12)){try{const data=await this.call('retrieveMediaFile',{filename:name});if(typeof data!=='string'||data.length>12*1024*1024)continue;const ext=name.split('.').pop().toLowerCase(),mime={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',mp3:'audio/mpeg',wav:'audio/wav',ogg:'audio/ogg',mp4:'video/mp4',woff:'font/woff',woff2:'font/woff2'}[ext];if(mime)media.set(name,'data:'+mime+';base64,'+data);}catch{}}
+  /* (user 2026-11-12) a game-voice clip that is silent (music recorded under an unvoiced line, then separated) is
+     replaced, once, by the synthesized sentence under the same media name, so the card plays the line again */
+  if(this.speak)for(const [name,src] of media){if(!/^tomoyo_g_[a-f0-9]+\.wav$/.test(name))continue;try{
+   const buf=Buffer.from(src.slice(src.indexOf(',')+1),'base64');if(!require('../core/voice-trim.cjs').quiet(buf))continue;
+   const at=html.indexOf(name),before=at<0?'':html.slice(Math.max(0,at-4000),at),m=[...before.matchAll(/<span class="tm-jp">([\s\S]*?)<\/span><span class="tm-play">/g)].pop();
+   const text=m?m[1].replace(/<rt>[\s\S]*?<\/rt>|<rp>[\s\S]*?<\/rp>/g,'').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').trim():'';if(!text||text.length>400)continue;
+   const voice=await this.speak(text);if(!voice?.data)continue;await this.call('storeMediaFile',{filename:name,data:voice.data});media.set(name,'data:audio/wav;base64,'+voice.data);}catch{}}
   return html.replace(/<audio controls preload="none" src="(tomoyo_[a-f0-9_gs]+\.wav)"><\/audio>/gi,(all,name)=>media.has(name)?audio.player(media.get(name),name):all)
    .replace(/\[anki:play:([qa]):(\d+)\]/g,(_,side,index)=>{const name=play.get(side+':'+index),src=media.get(name);return src?audio.player(src,name):audio.replay();}).replace(/\[sound:([^\]\r\n]+)\]/g,(_,name)=>media.has(name)?audio.player(media.get(name),name):'').replace(/\b(src|href)\s*=\s*(["'])([^"']+)\2/gi,(all,key,quote,name)=>media.has(name)?key+'='+quote+media.get(name)+quote:all);
  }

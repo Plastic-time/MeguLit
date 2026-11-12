@@ -7,6 +7,13 @@ const mixLabels={
  en:['Volume mixer','Master','Word pronunciation','Synthesized example','Original game voice','Controls audio played in MeguLit cards'],
  ja:['音量ミキサー','全体','単語の発音','合成例文','ゲーム音声','MeguLit のカード内で再生する音声を調整']
 };
+/* (user 2026-11-12) what plays by itself: after the card turns to its answer, and when the next card comes up */
+const autoKey='megulit-anki-autoplay',autoModes=['off','word','sentence','both'];
+const autoLabels={
+ zh:['Anki 设置','翻面后自动播放','下一张自动播放',['不播放','读音','例句','读音和例句'],'只在 MeguLit 里复习时生效'],
+ en:['Anki settings','Play after turning the card','Play when the next card comes',['Nothing','Word','Example','Word and example'],'Applies when reviewing in MeguLit'],
+ ja:['Anki 設定','裏面を表示したら自動再生','次のカードで自動再生',['再生しない','読み','例文','読みと例文'],'MeguLit で復習するときのみ']
+};
 export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quiet=false}){
  stopMessages();
  const landing=target.firstElementChild?.matches('.review-card')?target.firstElementChild:document.createElement('section');
@@ -50,7 +57,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
  function frame(card){
   const iframe=document.createElement('iframe'),nonce=crypto.randomUUID();iframe.className='anki-card-frame';iframe.title=text.ankiReview;iframe.sandbox='allow-scripts';iframe.allow='autoplay';iframe.referrerPolicy='no-referrer';
   iframe.src='anki-card.html#'+nonce;iframe.dataset.nonce=nonce;
-  iframe.onload=()=>{if(isCurrent()&&currentFrame===iframe)iframe.contentWindow.postMessage({type:'tome-anki-card',nonce,html:card.html,fit,copy,mix},'*');};return iframe;
+  const play=card.when?auto[card.when]:'off';iframe.onload=()=>{if(isCurrent()&&currentFrame===iframe)iframe.contentWindow.postMessage({type:'tome-anki-card',nonce,html:card.html,fit,copy,mix,auto:play},'*');};return iframe;
  }
  const messages=event=>{if(!isCurrent()){window.removeEventListener('message',messages);return;}if(currentFrame&&event.source===currentFrame.contentWindow&&event.data?.nonce===currentFrame.dataset.nonce&&event.data.type==='tome-anki-replay')replay(currentCard,target.querySelector('[data-replay]'));};
  window.addEventListener('message',messages);
@@ -59,7 +66,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
   if(!isCurrent())return;currentCard=card;currentFrame=null;
   if(card.done){drawDone(card);return;}
   target.innerHTML='<section class="panel anki-review-panel"><div class="record-meta"><span>Anki · '+esc(card.deck)+'</span><div class="anki-toolbar">'+(card.hasAudio?'<button class="text-button" data-replay>'+copy.play+'</button>':'')+'<button class="text-button" data-fit aria-pressed="'+fit+'">'+(fit?copy.fit:copy.original)+'</button><button class="text-button" data-reload>'+text.ankiRefresh+'</button><button class="text-button" data-stop>'+copy.stop+'</button></div></div><div data-card></div><div class="review-controls" data-controls></div></section>';
-  currentFrame=frame(card);target.querySelector('[data-card]').append(currentFrame);target.querySelector('[data-reload]').onclick=reload;target.querySelector('[data-stop]').onclick=stopStudy;
+  currentFrame=frame({...card,when:card.answerShown?'flip':'next'});target.querySelector('[data-card]').append(currentFrame);target.querySelector('[data-reload]').onclick=reload;target.querySelector('[data-stop]').onclick=stopStudy;
   mountMixer();
   const play=target.querySelector('[data-replay]');if(play)play.onclick=()=>card.manualAudio?playCardAudio(card):replay(card,play);
   target.querySelector('[data-fit]').onclick=event=>{fit=!fit;event.currentTarget.textContent=fit?copy.fit:copy.original;event.currentTarget.setAttribute('aria-pressed',String(fit));currentFrame.contentWindow.postMessage({type:'tome-anki-fit',nonce:currentFrame.dataset.nonce,fit},'*');};
@@ -101,7 +108,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
  function drawPractice(card){
   if(!isCurrent())return;currentCard=card;let shown=false;
   target.innerHTML='<section class="panel anki-review-panel"><div class="record-meta"><span>'+esc(copy.practiceTag)+' · '+esc(card.deck)+' · '+card.position+'/'+card.total+'</span><div class="anki-toolbar"><button class="text-button" data-stop>'+copy.endPractice+'</button></div></div><div data-card></div><div class="review-controls" data-controls></div></section>';
-  const show=()=>{currentFrame=frame({html:shown?card.answer:card.question});target.querySelector('[data-card]').replaceChildren(currentFrame);const controls=target.querySelector('[data-controls]');controls.replaceChildren();const button=document.createElement('button');button.className='primary';button.textContent=shown?copy.next:text.showAnswer;button.onclick=()=>{if(shown)practice(card.deck,true);else{shown=true;show();}};controls.append(button);};
+  const show=()=>{currentFrame=frame({html:shown?card.answer:card.question,when:shown?'flip':'next'});target.querySelector('[data-card]').replaceChildren(currentFrame);const controls=target.querySelector('[data-controls]');controls.replaceChildren();const button=document.createElement('button');button.className='primary';button.textContent=shown?copy.next:text.showAnswer;button.onclick=()=>{if(shown)practice(card.deck,true);else{shown=true;show();}};controls.append(button);};
   target.querySelector('[data-stop]').onclick=async()=>{try{await api('anki_practice',{end:true});}catch{}drawDecks();};mountMixer();show();
  }
  async function drawLimits(deck,back){

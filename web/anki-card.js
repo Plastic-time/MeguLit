@@ -43,7 +43,7 @@
  }
  addEventListener('message',event=>{
   if(event.source!==parent||event.data?.nonce!==nonce||!nonce)return;
-  if(event.data.type==='tome-anki-card'){fit=event.data.fit!==false;copy=event.data.copy||copy;mix=event.data.mix||{};content(event.data.html);}
+  if(event.data.type==='tome-anki-card'){fit=event.data.fit!==false;copy=event.data.copy||copy;mix=event.data.mix||{};content(event.data.html);autoplay(event.data.auto);}
   else if(event.data.type==='tome-anki-fit'){fit=event.data.fit!==false;viewport.scrollTop=0;schedule();}
   else if(event.data.type==='tome-anki-mix'){mix=event.data.mix||{};applyMix();}
   else if(event.data.type==='tome-anki-play-all'){
@@ -58,6 +58,12 @@
    next(0);
   }
  });
+ /* (user 2026-11-12) play the card's own clips by themselves: word = the word's reading; sentence = the example
+    (synthesized or the game's voice); both = the word, then the example */
+ function autoplay(mode){if(!mode||mode==='off')return;const want=mode==='word'?['word']:mode==='sentence'?['sentence','game']:['word','sentence','game'];
+  const tracks=[...root.querySelectorAll('audio[src]')].filter(a=>want.includes(a.dataset.ankiChannel||'')).sort((a,b)=>(a.dataset.ankiChannel==='word'?0:1)-(b.dataset.ankiChannel==='word'?0:1));if(!tracks.length)return;
+  stopAudio();const ticket=playback;const next=i=>{if(ticket!==playback||!tracks[i])return;const audio=tracks[i],button=audio.parentElement.querySelector('[data-anki-play]');audio.currentTime=0;audio.addEventListener('ended',()=>{button?.setAttribute('aria-pressed','false');setTimeout(()=>next(i+1),250);},{once:true});audio.play().then(()=>button?.setAttribute('aria-pressed','true')).catch(()=>{});};
+  setTimeout(()=>next(0),180);}
  root.addEventListener('click',async event=>{
   const button=event.target.closest('button[data-anki-play],button[data-anki-replay]');if(!button)return;event.preventDefault();
   if(button.hasAttribute('data-anki-replay')){parent.postMessage({type:'tome-anki-replay',nonce},'*');return;}
