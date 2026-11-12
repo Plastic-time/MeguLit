@@ -156,13 +156,30 @@ if(-not $got -and $want){try{Invoke-WebRequest -Uri "https://dl.megulit.com/file
 if(-not $got){Invoke-WebRequest -Uri $prevAsset.browser_download_url -OutFile $prevZip -UseBasicParsing -TimeoutSec 1800;if($want -and (Get-FileHash $prevZip -Algorithm SHA256).Hash.ToLower() -ne $want){throw 'Previous package hash differs from GitHub digest'}}
 $old=[IO.Compression.ZipFile]::OpenRead($prevZip)
 $names=New-Object 'System.Collections.Generic.SortedSet[string]' ([StringComparer]::Ordinal)
-foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and -not $e.FullName.EndsWith('/') -and $e.FullName -notmatch '\.(lib|obj|pdb|exp|ilk|iobj|ipdb)$' -and $e.FullName -notmatch '/build/'){[void]$names.Add($e.FullName.Substring(8))}}
+foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and $e.FullName -ne 'MeguLit/build-shell.txt' -and -not $e.FullName.EndsWith('/') -and $e.FullName -notmatch '\.(lib|obj|pdb|exp|ilk|iobj|ipdb)$' -and $e.FullName -notmatch '/build/'){[void]$names.Add($e.FullName.Substring(8))}}
 # --others: files added in this release are not tracked yet when the list is built (-IncludeWorkingChanges)
 foreach($f in (git ls-files --cached --others --exclude-standard core services web setup)){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
 # Prebuilt native helpers added after the previous package (not tracked: *.dll is ignored); E293 scene capture.
 # E301 Ren'Py positions: the DLLs run native/MeguLitRenpy.py, which must ship next to them.
 # E297 cold run helpers (built by Build.ps1, *.exe is not tracked).
 foreach($f in 'native/ColdCapture32.exe','native/ColdCapture64.exe','native/MeguLitScn32.dll','native/MeguLitScn64.dll','native/MeguLitDpDecline32.dll','native/MeguLitDpDecline64.dll','native/MeguLitKrkr32.dll','native/MeguLitKrkr64.dll','native/MeguLitRenpy32.dll','native/MeguLitRenpy64.dll','native/MeguLitRenpy.py','native/megulithook/MeguLitHook32.dll'){if(Test-Path -LiteralPath (Join-Path $Root $f)){[void]$names.Add($f)}}
+# Hot updates (services/hot-update.cjs, user 2026-11-13: 不重启装更新): build-shell.txt fingerprints what MeguLit.exe is made of
+# apart from the page scripts it serves from the web folder after a hot update: its Rust code and config (version lines
+# left out), the HTML (CSP hashes) and the fonts (not shipped as files). Equal fingerprints = the old exe can run the new files.
+function Sha256Text($t){([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($t)))).Replace('-','').ToLower()}
+function ShellHash{
+ $files=@(git ls-files --cached --others --exclude-standard desktop/src desktop/build.rs desktop/Cargo.toml desktop/Cargo.lock desktop/tauri.conf.json desktop/capabilities desktop/icons)+@(git ls-files --cached --others --exclude-standard web | Where-Object {$_ -match '\.html?$' -or $_ -like 'web/fonts/*'})
+ $sb=New-Object Text.StringBuilder
+ foreach($f in ($files | Sort-Object -Unique)){$p=Join-Path $Root $f;if(-not (Test-Path -LiteralPath $p -PathType Leaf)){continue}
+  if($f -match '\.(toml|lock|json|rs)$'){$t=[IO.File]::ReadAllText($p) -replace "`r`n","`n"
+   if($f -eq 'desktop/Cargo.toml'){$t=$t -replace '(?m)^version = "[^"]+"',''}
+   if($f -eq 'desktop/tauri.conf.json'){$t=$t -replace '"version": "[^"]+"',''}
+   if($f -eq 'desktop/Cargo.lock'){$t=$t -replace '(name = "megulit"\nversion = )"[^"]+"','$1'}
+   $h=Sha256Text $t}else{$h=(Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLower()}
+  [void]$sb.Append("$f $h`n")}
+ Sha256Text $sb.ToString()
+}
+$Shell=ShellHash;$shellFile=Join-Path $work 'build-shell.txt';[IO.File]::WriteAllText($shellFile,$Shell,(Utf8NoBom))
 $zipPath=Join-Path $work $Asset
 $out=[IO.Compression.ZipFile]::Open($zipPath,'Create')
 try{
@@ -176,12 +193,44 @@ try{
    Write-Host "  carried over $n"
   }
  }
+ [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($out,$shellFile,'MeguLit/build-shell.txt',[IO.Compression.CompressionLevel]::Optimal)
 }finally{$out.Dispose();$old.Dispose()}
 $check=[IO.Compression.ZipFile]::OpenRead($zipPath)
 try{if(-not $check.GetEntry('MeguLit/MeguLit.exe')){throw 'Package has no MeguLit.exe'};foreach($u in 'MeguLit/setup/uninstall.ps1','MeguLit/services/uninstall.cjs'){if(-not $check.GetEntry($u)){throw "Package has no $u (uninstaller)"}};if($check.Entries | Where-Object {$_.FullName -like 'MeguLit/data/*'}){throw 'Package contains data/'};$count=$check.Entries.Count}finally{$check.Dispose()}
 $hash=(Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower();$size=(Get-Item $zipPath).Length
 Write-Host "$Asset  $count files  $size bytes  sha256 $hash"
-if($DryRun){& git.exe checkout -- web/about.js desktop/Cargo.toml desktop/tauri.conf.json desktop/Cargo.lock README.md;Step "dry run finished; package at $zipPath (version files restored)";return}
+
+# ---------- hot package ----------
+# Only the changed files, for installs running exactly the previous package (name carries its version and digest).
+# Offered when MeguLit.exe's own code is unchanged (build-shell.txt) and every changed file is under web/, services/,
+# core/ or setup/ and is not HTML. Betas are prereleases the updater never reads, so they get none.
+$HotPath=$null;$HotAsset=$null
+if(-not $Beta){
+ $prevDigestHot=(Get-FileHash $prevZip -Algorithm SHA256).Hash.ToLower()
+ $za=[IO.Compression.ZipFile]::OpenRead($prevZip);$zb=[IO.Compression.ZipFile]::OpenRead($zipPath);$why='';$changed=@()
+ function EntryHash($e){$st=$e.Open();try{([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($st))).Replace('-','').ToLower()}finally{$st.Dispose()}}
+ try{
+  $oldShell=$za.GetEntry('MeguLit/build-shell.txt')
+  if(-not $oldShell){$why='previous package has no build-shell.txt'}
+  else{$rd=New-Object IO.StreamReader($oldShell.Open());$prevShell=$rd.ReadToEnd().Trim();$rd.Dispose();if($prevShell -ne $Shell){$why='MeguLit.exe code, HTML or fonts changed'}}
+  if(-not $why){foreach($e in $zb.Entries){$n=$e.FullName;if($n.EndsWith('/') -or $n -eq 'MeguLit/MeguLit.exe' -or $n -eq 'MeguLit/build-shell.txt'){continue}
+   $h=EntryHash $e;$o=$za.GetEntry($n);if($o -and $o.Length -eq $e.Length -and (EntryHash $o) -eq $h){continue}
+   $rel=$n.Substring(8);if($rel -notmatch '^(web|services|core|setup)/' -or $rel -match '\.html?$'){$why="$rel changed";break}
+   $changed+=[pscustomobject]@{path=$rel;sha256=$h;entry=$e}}}
+  if(-not $why -and -not $changed.Count){$why='no file changed'}
+  if(-not $why){
+   $HotAsset="MeguLit-v$Label-hot-from-v$prevLabelShown-$($prevDigestHot.Substring(0,12)).zip";$HotPath=Join-Path $work $HotAsset
+   $hz=[IO.Compression.ZipFile]::Open($HotPath,'Create')
+   try{
+    foreach($c in $changed){$dst=$hz.CreateEntry("MeguLit/$($c.path)",[IO.Compression.CompressionLevel]::Optimal);$i=$c.entry.Open();$o=$dst.Open();try{$i.CopyTo($o)}finally{$o.Dispose();$i.Dispose()}}
+    $manifest=@{version=$Label;from=$prevLabelShown;files=@($changed | ForEach-Object {@{path=$_.path;sha256=$_.sha256}})} | ConvertTo-Json -Depth 4
+    $dst=$hz.CreateEntry('MeguLit/hot.json');$o=$dst.Open();try{$bytes=(Utf8NoBom).GetBytes($manifest);$o.Write($bytes,0,$bytes.Length)}finally{$o.Dispose()}
+   }finally{$hz.Dispose()}
+  }
+ }finally{$za.Dispose();$zb.Dispose()}
+ if($HotPath){Write-Host "$HotAsset  $($changed.Count) files  $((Get-Item $HotPath).Length) bytes (hot update from v$prevLabelShown)"}else{Write-Host "  no hot package: $why"}
+}
+if($DryRun){if($HotPath){Write-Host "  hot package at $HotPath"};& git.exe checkout -- web/about.js desktop/Cargo.toml desktop/tauri.conf.json desktop/Cargo.lock README.md;Step "dry run finished; package at $zipPath (version files restored)";return}
 
 # ---------- commit ----------
 # Direct commit on main, no pull request (user 2026-11-10: PRs opened through the GitHub integration list the bot as a
@@ -223,6 +272,16 @@ $a=(Api GET "/releases/$($rel.id)").assets | Where-Object {$_.name -eq $Asset} |
 if(-not $a){throw 'Uploaded asset not found on the release'}
 if($a.size -ne $size){throw "Uploaded size $($a.size) differs from $size"}
 if($a.digest -and $a.digest -ne "sha256:$hash"){throw "GitHub digest $($a.digest) differs from sha256:$hash"}
+# the hot package goes up after the full one; any older hot package on this release (an earlier hotfix) is removed,
+# since it would bring installs to files this release no longer has
+if($HotPath){
+ $job=Start-Job -ScriptBlock {param($gh,$tag,$zip,$repo) & $gh release upload $tag $zip -R $repo --clobber 2>&1} -ArgumentList $ghExe,$Tag,$HotPath,$Repo
+ if(-not (Wait-Job $job -Timeout 600)){Stop-Job $job;throw 'Hot package upload did not finish in 10 minutes'};Receive-Job $job | Out-Host;Remove-Job $job
+ $hotHash=(Get-FileHash $HotPath -Algorithm SHA256).Hash.ToLower()
+ $all=(Api GET "/releases/$($rel.id)").assets;$h=$all | Where-Object {$_.name -eq $HotAsset} | Select-Object -First 1
+ if(-not $h -or ($h.digest -and $h.digest -ne "sha256:$hotHash")){throw 'Hot package missing or its digest differs'}
+ foreach($stale in @($all | Where-Object {$_.name -match '-hot-from-' -and $_.name -ne $HotAsset})){Api DELETE "/releases/assets/$($stale.id)" | Out-Null}
+}elseif($Hotfix){foreach($stale in @((Api GET "/releases/$($rel.id)").assets | Where-Object {$_.name -match '-hot-from-'})){Api DELETE "/releases/assets/$($stale.id)" | Out-Null}}
 
 Step 'verify download'
 $back=Join-Path $work 'check.zip'

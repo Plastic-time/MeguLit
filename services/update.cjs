@@ -51,7 +51,7 @@ async function latest(fetcher=fetch){
  const r=await releaseFetch(fetcher,'latest',15000);
  if(!r.ok)throw Error('UPDATE_CHECK_FAILED');
  const rel=await r.json(),a=asset(rel);
- return {version:String(rel.tag_name||'').replace(/^v/,''),name:a.name,size:a.size,url:a.browser_download_url,digest:/^sha256:[a-f0-9]{64}$/i.test(a.digest||'')?a.digest.slice(7).toLowerCase():'',notes:String(rel.body||'').replace(/^> \*\*\[⬇[^\n]*\n*/m,'').slice(0,60000),page:rel.html_url,published:rel.published_at||''};
+ return {version:String(rel.tag_name||'').replace(/^v/,''),name:a.name,size:a.size,url:a.browser_download_url,digest:/^sha256:[a-f0-9]{64}$/i.test(a.digest||'')?a.digest.slice(7).toLowerCase():'',hot:require('./hot-update.cjs').asset(rel),notes:String(rel.body||'').replace(/^> \*\*\[⬇[^\n]*\n*/m,'').slice(0,60000),page:rel.html_url,published:rel.published_at||''};
 }
 /* Size of the package the user is running, for "bigger / smaller than now". Unknown is fine. */
 async function installedSize(current,fetcher=fetch){
@@ -83,10 +83,12 @@ function refreshIcons(root,current,run=(file,args)=>require('node:child_process'
 }
 async function check(current,fetcher=fetch,root=''){current=String(current||'').trim().replace(/^v/,'');tidyRollback(root);refreshIcons(root,current);try{require('./uninstall.cjs').registerSoon(root,current);}catch{}
  const rel=await latest(fetcher),hotfix=isHotfix(root,rel,current),isNewer=newer(rel.version,current)||hotfix;
- found=isNewer?{...rel,hotfix}:null;
- const previous=isNewer?await installedSize(current,fetcher):0;
- if(isNewer&&!['downloading','ready'].includes(state.phase))state={phase:'available',version:rel.version,total:rel.size,received:0};
- return {current,latest:rel.version,newer:isNewer,hotfix,size:rel.size,previousSize:previous,delta:previous?rel.size-previous:null,notes:rel.notes,page:rel.page,published:rel.published,phase:state.phase};
+ /* a small package of only the changed files, when this install is exactly the one it was made from (hot-update.cjs) */
+ const hot=isNewer&&root&&require('./hot-update.cjs').fits(rel.hot,current,readInstalled(root))?rel.hot:null;
+ found=isNewer?{...rel,hotfix,useHot:!!hot}:null;
+ const previous=isNewer&&!hot?await installedSize(current,fetcher):0;
+ if(isNewer&&!['downloading','ready'].includes(state.phase))state={phase:'available',version:rel.version,total:hot?hot.size:rel.size,received:0,hot:!!hot};
+ return {current,latest:rel.version,newer:isNewer,hotfix,hot:!!hot,hotSize:hot?hot.size:0,size:rel.size,previousSize:previous,delta:previous?rel.size-previous:null,notes:rel.notes,page:rel.page,published:rel.published,phase:state.phase};
 }
 
 /* Writes zip + script; resolves when the package is verified and ready to install.
@@ -119,8 +121,9 @@ function start(root,current,fetcher=fetch){current=String(current||'').trim().re
   try{
    let rel=found&&(newer(found.version,current)||found.hotfix)?found:await latest(fetcher);if(!newer(rel.version,current)&&!rel.hotfix)throw Error('ALREADY_LATEST');
    const dir=path.join(root,'cache','update');fs.mkdirSync(dir,{recursive:true});
+   const full=rel.digest;if(rel.useHot&&rel.hot)rel={...rel.hot,version:rel.version,isHot:true};
    const zip=path.join(dir,rel.name),ps1=path.join(dir,'apply-update.ps1');
-   state={phase:'downloading',version:rel.version,total:rel.size||0,received:0};
+   state={phase:'downloading',version:rel.version,total:rel.size||0,received:0,hot:!!rel.isHot};
    let data=null;
    /* A package downloaded earlier (user chose "later") is reused when it still verifies. */
    if(fs.existsSync(zip)){const old=fs.readFileSync(zip);if((!rel.size||old.length===rel.size)&&(!rel.digest||crypto.createHash('sha256').update(old).digest('hex')===rel.digest))data=old;}
@@ -129,6 +132,7 @@ function start(root,current,fetcher=fetch){current=String(current||'').trim().re
       release is read again once and the download repeated. */
    let pick=rel;
    for(let round=0;!data&&round<2;round++){
+    if(round&&pick.isHot)break;
     if(round){try{const fresh=await latest(fetcher);if(fresh.digest===pick.digest&&fresh.size===pick.size)break;pick=fresh;state.total=fresh.size||0;}catch{break;}}
     const part={chunks:[],length:0};
     for(const url of sources(pick)){
@@ -143,10 +147,12 @@ function start(root,current,fetcher=fetch){current=String(current||'').trim().re
    }
    if(!data)throw Error('UPDATE_DOWNLOAD_FAILED');
    rel=pick;const hash=crypto.createHash('sha256').update(data).digest('hex');
-   fs.writeFileSync(zip,data);fs.writeFileSync(ps1,'﻿'+script(),'utf8');
+   fs.writeFileSync(zip,data);
+   if(rel.isHot){state={phase:'ready',version:rel.version,total:data.length,received:data.length,sha256:full,zip,hot:true};return status();}
+   fs.writeFileSync(ps1,'﻿'+script(),'utf8');
    state={phase:'ready',version:rel.version,total:data.length,received:data.length,sha256:hash,zip,ps1};
    return status();
-  }catch(error){state={...state,phase:'error',error:/^[A-Z_]+$/.test(error.message)?error.message:'UPDATE_DOWNLOAD_FAILED'};job=null;throw Error(state.error);}
+  }catch(error){if(found)found.useHot=false;/* a failed hot download falls back to the full package on retry */state={...state,phase:'error',error:/^[A-Z_]+$/.test(error.message)?error.message:'UPDATE_DOWNLOAD_FAILED'};job=null;throw Error(state.error);}
  })();
  job.catch(()=>{});
  return job;
@@ -171,6 +177,13 @@ function launchScript(root,{run=spawn}={}){
 }
 async function install(root,options){
  if(state.phase!=='ready'||!state.zip||!fs.existsSync(state.zip))throw Error('UPDATE_NOT_READY');
+ if(state.hot){
+  /* written in place while MeguLit runs; the page then calls hot_reload. A failure leaves the old files and offers the full package. */
+  try{require('./hot-update.cjs').apply(root,state.zip,options);}catch(error){updateLog(root,'hot update failed '+error.message);if(found)found.useHot=false;job=null;state={...state,phase:'error',hot:false,error:/^[A-Z_]+$/.test(error.message)?error.message:'HOT_APPLY_FAILED'};throw Error(state.error);}
+  writeInstalled(root,{version:state.version,digest:state.sha256||''});updateLog(root,'hot update applied '+state.version);
+  try{fs.rmSync(state.zip,{force:true});}catch{}
+  state={...state,phase:'installed'};job=null;return {...status(),hot:true};
+ }
  fs.mkdirSync(path.join(root,'logs'),{recursive:true});
  if(!/^[^"]+$/.test(root+state.ps1+state.zip))throw Error('UPDATE_PATH_REJECTED');
  if(!await launchScript(root,options))throw Error('UPDATE_LAUNCH_FAILED');
