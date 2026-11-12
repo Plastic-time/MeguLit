@@ -220,3 +220,7 @@
 .tv-daily-pic.is-sensitive{background-clip:padding-box}
 .tv-sensitive{position:absolute;left:50%;top:50%;translate:-50% -50%;z-index:2;padding:4px 10px;font:500 11px/1.2 var(--u-mono,monospace);letter-spacing:.12em;white-space:nowrap;color:#fff;background:rgba(160,28,44,.72);border:1px solid rgba(255,200,200,.35);pointer-events:none}
 .tv-hot-news .tv-sensitive{top:42%}
+
+/* 2026-11-12 the top news cover when the left column is short: a lower picture */
+.tv-hot-news.is-compact .tv-hot-img{aspect-ratio:auto;height:92px}
+.tv-hot-news.is-compact .tv-hot-meta{padding-top:18px}
