@@ -77,7 +77,7 @@ function isHotfix(root,rel,current){/* a lettered app (1.2.8a) under a numeric t
 function tidyRollback(root){if(!root)return false;const old=path.join(root,'MeguLit.rollback-update.exe');try{if(!fs.existsSync(old))return false;const dir=path.join(root,'migration','update-rollback');fs.mkdirSync(dir,{recursive:true});const dest=path.join(dir,'MeguLit.exe');if(!fs.existsSync(dest))fs.renameSync(old,dest);else fs.rmSync(old,{force:true});return true;}catch{return false;}}
 // A new version may bring a new icon; Windows keeps showing the old one from its icon cache until that is refreshed.
 // Done once per installed version, also when the update itself was run by an older version's script.
-function refreshIcons(root,current,run=(file,args)=>require('node:child_process').spawn(file,args,{detached:true,stdio:'ignore',windowsHide:true}).unref()){
+function refreshIcons(root,current,run=(file,args)=>{const c=require('node:child_process').spawn(file,args,{detached:true,stdio:'ignore',windowsHide:true});c.on('error',()=>{});c.unref();}){
  if(!root||!current)return false;const mark=path.join(root,'data','icon-refresh.json');let seen='';try{seen=JSON.parse(fs.readFileSync(mark,'utf8')).version||'';}catch{}
  if(seen===String(current))return false;try{run(path.join(process.env.SystemRoot||'C:\Windows','System32','ie4uinit.exe'),['-show']);fs.mkdirSync(path.dirname(mark),{recursive:true});fs.writeFileSync(mark,JSON.stringify({version:String(current)}));return true;}catch{return false;}
 }
