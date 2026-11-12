@@ -281,7 +281,7 @@ const yuris={
    any=true;return {...scene,patched:true,lines:w.raw.map(b=>codec.decode(b))};});
   return any?list:null;
  },
- _internal:{ypfList,ypfScenes,ystb,words,loaderCodec,codecFor,unpackUpx,amanoPack,moleBox},
+ _internal:{ypfList,ypfRead,ypfScenes,ystb,words,loaderCodec,codecFor,unpackUpx,amanoPack,moleBox},
 };
 // E450 the voice clips of a YPF archive (vo.ypf), for game-voice.cjs.
 yuris.audio=file=>{if(!/\.ypf$/i.test(file))return null;const l=ypfList(file);return l?l.filter(e=>/\.(?:ogg|wav)$/i.test(e.name)).map(e=>({name:e.name,read:()=>ypfRead(file,e)})):null;};

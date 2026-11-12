@@ -111,7 +111,48 @@ function siglus(dir){
  return {engine:'Siglus',supported:true,items,total:table.size};
 }
 
-const READERS=[{read:kirikiri,saves:kirikiriSaves},{read:hunex,saves:hunexSaves},{read:siglus,saves:siglusSaves}];
+/* ---- YU-RIS (euphoria, サイコロジック・ラブコメディ, 女装山脈): the gallery is the engine's stock "es" system. A
+   script registers it with calls of es.CGMODE.CG.SET "<image>" (one per picture), THUMB.SET and DEF.SET (closing an
+   entry); the flag array gives each entry one slot and then one per picture, from slot 1. The global save
+   save/gsd.sd ("YSSD") keeps every global variable as a zlib section {u32 id, u32, u32 packed, u32 size}; an integer
+   array is {u32 type 1, u32 dims, dims*u32, u32 bytes, int64 values}. The CG array is the one long enough for every
+   slot whose set entries all fall on picture slots (never on an entry's own slot). Images: bmp/png in the ypf archives. */
+function yssdArrays(buf){
+ const out=[];if(buf.length<0x40||buf.toString('latin1',0,4)!=='YSSD')return out;const offs=new Set();
+ for(let k=8;k+4<=0x40;k+=4){const o=buf.readUInt32LE(k);if(o>=0x40&&o+16<=buf.length)offs.add(o);}
+ for(const o of offs){const packed=buf.readUInt32LE(o+8);if(o+16+packed>buf.length)continue;let d;try{d=zlib.inflateSync(buf.subarray(o+16,o+16+packed));}catch{continue;}
+  if(d.length<16||d.readUInt32LE(0)!==1)continue;const dims=d.readUInt32LE(4);if(dims!==1)continue;const n=d.readUInt32LE(8),bytes=d.readUInt32LE(12);if(bytes!==n*8||16+bytes>d.length)continue;
+  const set=[];for(let i=0;i<n;i++)if(d.readBigInt64LE(16+i*8))set.push(i);out.push({id:buf.readUInt32LE(o),count:n,set});}
+ return out;}
+function yurisArchives(dir){const out=[];for(const d of [dir,path.join(dir,'pac')]){let l=[];try{l=fs.readdirSync(d).filter(f=>/\.ypf$/i.test(f));}catch{}
+  /* update*.ypf overrides the base archives, newest first */
+  l.sort((a,b)=>(/^update/i.test(b)-/^update/i.test(a))||b.localeCompare(a,undefined,{numeric:true}));for(const f of l)out.push(path.join(d,f));}return out;}
+const yurisMemo=new Map();
+function yurisGallery(dir,archives){
+ const key=archives.map(a=>{try{return a+fs.statSync(a).mtimeMs;}catch{return a;}}).join('|');if(yurisMemo.get(dir)?.key===key)return yurisMemo.get(dir).value;
+ const y=require('./original-engines/yuris.cjs')._internal,dec=new TextDecoder('shift_jis');
+ const str=a=>{const d=a.data;return d.length>=3&&d[0]===0x4d?dec.decode(d.subarray(3,3+d.readUInt16LE(1))).replace(/^"|"$/g,''):null;};
+ let best=null;const done=new Set();
+ for(const a of archives)for(const sc of y.ypfScenes(a)){const k=sc.name.toLowerCase();if(done.has(k))continue;done.add(k);let insts;try{insts=y.ystb(sc.read());}catch{continue;}if(!insts)continue;
+  const calls=[];for(const x of insts){if(!x.args.length)continue;const n=str(x.args[0]);const m=n&&/^es\.CGMODE\.(CG|DEF)\.SET$/i.exec(n);if(m)calls.push(m[1].toUpperCase()==='CG'?(x.args[1]&&str(x.args[1])||''):null);}
+  if(calls.length&&(!best||calls.length>best.length))best=calls;}
+ let value=null;
+ if(best){const slots=new Map(),heads=new Set();let slot=1,pending=[];for(const c of best){if(c!==null){pending.push(c);continue;}heads.add(slot++);for(const p of pending)slots.set(slot++,p);pending=[];}value={slots,heads,size:slot};}
+ yurisMemo.set(dir,{key,value});return value;}
+function yurisSaves(dir){const out=[];let l=[];try{l=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
+ for(const e of l)if(e.isDirectory()&&/^save/i.test(e.name)){const f=path.join(dir,e.name,'gsd.sd');if(fs.existsSync(f))out.push(f);}return out;}
+function yuris(dir){
+ const saves=yurisSaves(dir);if(!saves.length)return null;const archives=yurisArchives(dir);if(!archives.length)return null;
+ const g=yurisGallery(dir,archives);if(!g||!g.slots.size)return null;const on=new Set();
+ for(const f of saves){let arrays;try{arrays=yssdArrays(fs.readFileSync(f));}catch{continue;}
+  const fit=arrays.filter(a=>a.count>=g.size&&a.set.every(i=>g.slots.has(i))).sort((a,b)=>b.set.length-a.set.length)[0];if(fit)for(const i of fit.set)on.add(base(g.slots.get(i)));}
+ const names=new Set([...g.slots.values()].map(base)),items=new Map(),{ypfList}=require('./original-engines/yuris.cjs')._internal;
+ for(const a of archives){let l;try{l=ypfList(a)||[];}catch{continue;}
+  for(const e of l){if(!/\.(?:png|bmp|jpe?g)$/i.test(e.name))continue;const b=base(e.name);if(!on.has(b)||items.has(b))continue;items.set(b,{name:b,archive:a,entry:e});}}
+ return {engine:'YU-RIS',supported:true,items,total:names.size};
+}
+
+const READERS=[{read:kirikiri,saves:kirikiriSaves},{read:hunex,saves:hunexSaves},{read:siglus,saves:siglusSaves},{read:yuris,saves:yurisSaves}];
 const cache=new Map();
 function stamp(dir){let s='';for(const r of READERS)for(const f of r.saves(dir)){try{s+=f+fs.statSync(f).mtimeMs;}catch{}}return s;}
 function scan(executable){
@@ -128,6 +169,7 @@ function bytesOf(it){
  const dec=require('./cg-decoders.cjs');
  let buf;if(it.file)buf=fs.readFileSync(it.file);
  else if(/\.hfa$/i.test(it.archive))buf=require('./original-engines/hunex.cjs').hfaRead(it.archive,it.entry);
+ else if(/\.ypf$/i.test(it.archive)){const y=require('./original-engines/yuris.cjs')._internal;buf=y.ypfRead?y.ypfRead(it.archive,it.entry):null;}
  else buf=require('./original-engines/xp3.cjs').read(it.archive,it.entry,it.cx||null);
  if(it.decode&&dec[it.decode])return dec.png(dec.fit(dec[it.decode](buf)));
  return buf;}
@@ -140,4 +182,4 @@ function image(root,executable,name){
  try{fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,it.name+{'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp','image/bmp':'.bmp'}[mime]),buf);}catch{}
  return {mime,data:buf.toString('base64')};
 }
-module.exports={list,image,scan,ksdText,tokens,sdcUnpack,mzpNameSets,siglusTable,siglusGlobalTables,SIGLUS_KEY};
+module.exports={list,image,scan,ksdText,tokens,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};
