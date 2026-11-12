@@ -78,6 +78,8 @@ test('fallback reader: text scan, archive pick, media skipped, registered last',
  assert.match(fs.readFileSync(path.join(repo,'web','game-language.js'),'utf8'),/kind==='garbro'[\s\S]*garbroDownload/);
 });
 
+test('host loads the Formats.dat key database and tries every scheme GARbro lists',()=>{const h=fs.readFileSync(path.join(repo,'services','garbro-host.ps1'),'utf8');assert.match(h,/DeserializeScheme/);assert.match(h,/GetAccessWidget()/);assert.match(h,/NEEDS_SCHEME/);});
+
 const live=process.env.MEGULIT_GARBRO_TEST_DIR;
 test('live: real GARbro opens and extracts a zip through garbro-host.ps1',{skip:!live&&'set MEGULIT_GARBRO_TEST_DIR to an unpacked GARbro release'},async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'gbl-'));fs.mkdirSync(path.join(root,'runtime'),{recursive:true});fs.cpSync(live,path.join(root,'runtime','garbro'),{recursive:true});
