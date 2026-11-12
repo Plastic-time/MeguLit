@@ -46,3 +46,11 @@ test('127: the page reports pointer activity over its text, the service passes i
 test('128: the Anki card panel fills the review column even though the landing card is centred',()=>{
  assert.match(read('web/unify.css'),/html:not\(#u\):not\(#v\) body \.review-page #review-content>\.anki-review-panel\{align-self:stretch;width:100%;box-sizing:border-box\}/);
 });
+
+test('127: Alt+H says the current line returns with the next one and points to Alt+T for original-only or translation-only',()=>{
+ const g=read('web/reader/modules/gal.js');
+ assert.match(g,/tip\.className='megulit-cover-hint'/);
+ assert.match(g,/if \(!message\.coverEnabled && was!=='false'\)/);
+ for(const s of ['原文要从下一句起才由游戏显示','按 Alt+T，在「显示内容」里切换','press Alt+T and change “Show”','Alt+T の「表示内容」'])assert.ok(g.includes(s),s);
+ assert.match(g,/pointer-events:none/);
+});
