@@ -1,4 +1,5 @@
 import {activityCells} from './learning-activity.js';
+import {openLinesPicker} from './home-lines.js';
 
 const copy={
  zh:{tipClick:'单击',tipDetail:'作品详情',tipDbl:'双击',tipDraw:'抽一张',daily:'每日热点',streak:'最长连续',figRead:'累计阅读',figChars:'读过的字',figWords:'关联单词',last:'上次',coverHint:'单击查看详情 · 双击抽卡',search:'搜索作品',read:'今日阅读',words:'收录单词',lookups:'查词',full:'完整统计',play:'继续游玩',detail:'作品详情',all:'全部作品',edit:'选择首页展示的作品',title:'首页展示的作品',sub:'拖动排序 · 置顶 · 隐藏',auto:'按最近游玩',pick:'只放我挑的',pin:'置顶',hide:'隐藏',close:'关闭',hintAuto:'按最近游玩自动轮播；置顶的永远在最前，隐藏的不出现。',hintPick:'只轮播这里的顺序；一个都不剩时回到最近游玩。',chars:'字',linked:'词',total:'累计',activity:'学习活动',days:'天',min:'分',empty:'还没有作品',add:'添加游戏'},
@@ -7,6 +8,9 @@ const copy={
 
 const DUR=12000,BEAT=476,LOGO=new URL('./assets/megulit-logo.svg',import.meta.url).href;
 const details=new Map(),palettes=new Map();
+const LINES_EDIT={zh:'选择台词',ja:'セリフを選ぶ',en:'Choose lines'};
+/* (user 2026-11-12) the lines chosen for this game in the picker, else the automatic ones (saved sentences, else the latest read) */
+export function homeLinesFor(d){const own=(d?.homeLines||[]).map(t=>String(t||'').trim()).filter(Boolean);if(own.length)return {lines:own.slice(0,5),custom:true};if(Array.isArray(d?.homeAuto))return {lines:d.homeAuto.map(t=>String(t||'').trim()).filter(Boolean).slice(0,8),custom:false};const saved=(d?.sentences||[]).map(s=>String(s.text||'').trim()).filter(Boolean);return {lines:(saved.length?saved:(d?.recentLines||[]).map(s=>String(s.text||'').trim()).filter(Boolean).slice(-6)).slice(0,8),custom:false};}
 let live=null;
 
 export function cleanShowcase(value){const v=value&&typeof value==='object'?value:{},ids=list=>Array.isArray(list)?[...new Set(list.filter(x=>typeof x==='string'&&x.length<200))].slice(0,500):[];return {mode:v.mode==='pick'?'pick':'auto',order:ids(v.order),pinned:ids(v.pinned),hidden:ids(v.hidden)};}
@@ -55,30 +59,24 @@ const DRAWS={
  skid:()=>{const sx=pickOne([-1,1]);return {f:[[0,at(sx*-220,8,sx*-12,1)],[.22,at(sx*24,2,sx*6,1),'cubic-bezier(.1,.8,.3,1)'],[.34,at(sx*-5,0,sx*-2,1),E3],[.44,at(0,0,0,1),E1]]};},
  heli:()=>{const k=pickOne([-1,1]);return {f:[[0,at(rnd(-30,30),-190,0,.6,UP(1.5))],[.42,at(0,0,k*720,1),'cubic-bezier(.2,.6,.3,1)']]};}};
 const PILE_IN=620;
-const GLYPHS='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンぁぃぅぇぉゃゅょっ亜唖娃阿哀愛挨姶逢葵茜穐悪握渥旭葦芦鯵梓圧斡扱宛姐虻飴絢綾鮎或粟袷安庵按暗案闇鞍杏以伊位依偉囲夷委威尉惟意慰易椅為畏異移維緯胃萎衣謂違遺医井亥域育郁磯一壱溢逸稲茨芋鰯允印咽員因姻引飲淫胤蔭';
-const rndGlyph=()=>GLYPHS[Math.floor(Math.random()*GLYPHS.length)];
-function scrambleScript(script,lines,onPick){if(!script)return;const esc2=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);clearInterval(+script.dataset.timer||0);
- lines=lines.slice(-5);const old=[...script.querySelectorAll('p .tv-stxt')].map(e=>e.textContent).slice(0,5),next=lines.map(t=>/^[「『（("]/.test(t)?t:'「'+t+'」'),cols=Math.max(old.length,next.length);
+/* (user 2026-11-12: "no code transition for the background lines") the columns change like ink: the old ones lift and
+   fade one after another from the right, then the new ones rise into place with a soft stagger; only opacity and
+   transform animate (Web Animations, on the compositor), the text is written once per change */
+function swapScript(script,lines,onPick){if(!script)return;const esc2=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+ (script._anims||[]).forEach(x=>{try{x.cancel();}catch{}});script._anims=[];
+ lines=lines.slice(-5);const next=lines.map(t=>/^[「『（("]/.test(t)?t:'「'+t+'」'),olds=[...script.querySelectorAll('p')];
  const bind=()=>script.querySelectorAll('p').forEach(el=>el.addEventListener('pointerenter',()=>{const n=+el.dataset.n;if(!lines[n])return;script.querySelectorAll('p').forEach(x=>x.classList.toggle('on',x===el));onPick(lines[n]);}));
- const paint=texts=>{script.innerHTML=texts.map((t,n)=>`<p class="${n?'':'on'}" data-n="${n}"><span class="tv-sno">${String(n+1).padStart(2,'0')}</span><span class="tv-stxt">${esc2(t)}</span></p>`).join('');};
- script.classList.remove('is-empty','is-fading');
- if(matchMedia('(prefers-reduced-motion:reduce)').matches||!cols){paint(next);script.classList.toggle('is-empty',!next.length);bind();return;}
- /* (user 2026-11-12: the background lines' transition stuttered) the noise comes from a small pool (kana and the coming
-    lines' own characters) so no new glyph is rasterised per frame; frames are paced by requestAnimationFrame at about 20
-    a second, a column is written only when its text changes, settled columns stop, and the script is layout-contained */
- const pool=[...new Set([...'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン',...next.join('').replace(/\s/g,'')])],noise=n=>{let o='';for(let i=0;i<n;i++)o+=pool[(Math.random()*pool.length)|0];return o;};
- const len=k=>Math.max((old[k]||'').length,(next[k]||'').length,6),start=performance.now(),SCR=160,STEP=12;
- const settleAt=k=>SCR+k*50,done=k=>settleAt(k)+(next[k]||'').length*STEP;
- const end=Math.max(...Array.from({length:cols},(_,k)=>next[k]?done(k):SCR+260));
- paint(Array.from({length:cols},(_,k)=>' '.repeat(len(k))));
- const spans=[...script.querySelectorAll('.tv-stxt')],shown=spans.map(()=>'');let last=0,raf=0;
- const write=(k,text)=>{if(shown[k]!==text){shown[k]=text;spans[k].textContent=text;}};
- const tick=now=>{raf=0;if(script.dataset.timer!==token)return;if(now-last<48){raf=requestAnimationFrame(tick);return;}last=now;const t=now-start;
-  spans.forEach((sp,k)=>{const target=next[k]||'',L=len(k);if(t<settleAt(k)||!target){write(k,noise(target?L:Math.min(L,(old[k]||'').length||6)));return;}
-   const fixed=Math.min(target.length,Math.floor((t-settleAt(k))/STEP));write(k,fixed>=target.length?target:target.slice(0,fixed)+noise(target.length-fixed));});
-  if(t>=end){delete script.dataset.timer;if(!next.length){script.classList.add('is-fading');setTimeout(()=>{paint([]);script.classList.remove('is-fading');script.classList.add('is-empty');},420);}else{paint(next);bind();}return;}
-  raf=requestAnimationFrame(tick);};
- const token=String(Math.random());script.dataset.timer=token;raf=requestAnimationFrame(tick);}
+ const paint=texts=>{script.innerHTML=texts.map((t,n)=>`<p class="${n?'':'on'}" data-n="${n}"><span class="tv-sno">${String(n+1).padStart(2,'0')}</span><span class="tv-stxt">${esc2(t)}</span></p>`).join('');script.classList.toggle('is-empty',!texts.length);bind();};
+ script.classList.remove('is-fading');const token=String(Math.random());script.dataset.timer=token;
+ if(olds.length===next.length&&olds.every((el,k)=>el.querySelector('.tv-stxt')?.textContent===next[k]))return;
+ if(matchMedia('(prefers-reduced-motion:reduce)').matches||typeof Element.prototype.animate!=='function'){paint(next);return;}
+ const OUT=300,GAP=45,keep=x=>(script._anims.push(x),x);
+ /* start after the frame that paints the new cover and ring, so the first frames of the fade are not swallowed by it */
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{if(script.dataset.timer!==token)return;
+ const outs=olds.map((el,k)=>keep(el.animate([{opacity:1,transform:'translate3d(0,0,0)'},{opacity:0,transform:'translate3d(0,-16px,0)'}],{duration:OUT,delay:k*GAP,easing:'cubic-bezier(.4,0,.7,.4)',fill:'forwards'})).finished);
+ Promise.all(outs).then(()=>{if(script.dataset.timer!==token)return;script._anims=[];paint(next);
+  script.querySelectorAll('p').forEach((el,k)=>{keep(el.animate([{opacity:0,transform:'translate3d(0,28px,0)'},{opacity:1,transform:'translate3d(0,0,0)'}],{duration:720,delay:k*90,easing:'cubic-bezier(.16,1,.3,1)',fill:'backwards'}));
+   const no=el.querySelector('.tv-sno');if(no)keep(no.animate([{opacity:0},{opacity:1}],{duration:420,delay:k*90+260,easing:'ease-out',fill:'backwards'}));});}).catch(()=>{});}));}
 
 function busy(cover,ms){cover.dataset.busy='1';cover.classList.remove('touch');const face=cover.querySelector('.tv-face');if(face){face.style.transition='transform .25s ease-out';face.style.transform='';}clearTimeout(+cover.dataset.busyTimer||0);cover.dataset.busyTimer=setTimeout(()=>{delete cover.dataset.busy;},ms);}
 function outLayer(cover){const home=cover.closest('.tv-home');let layer=home.querySelector(':scope>.tv-outgoing');if(!layer){layer=document.createElement('div');layer.className='tv-outgoing';layer.setAttribute('aria-hidden','true');home.insertBefore(layer,home.querySelector(':scope>.tv-canvas'));}const h=home.getBoundingClientRect(),r=cover.getBoundingClientRect(),w=cover.offsetWidth*1.06;layer.style.width=w+'px';layer.style.left=(r.left+r.width/2-h.left-w/2)+'px';layer.style.top=(r.top+r.height/2-h.top-w*2/3)+'px';layer.querySelectorAll('.tv-old').forEach(n=>n.remove());return layer;}
@@ -156,13 +154,13 @@ export function homeTVSignature(model){return JSON.stringify([model.games.map(g=
 export function renderHomeTV(main,ctx){
  stopHomeTV();
  const {model,api,locale,esc,icon,number,duration,relativeTime,navigate,onLaunch,onDetail,onAdd,greeting,savePreferences}=ctx,w=copy[locale]||copy.zh;
- let setting=cleanShowcase(model.preferences.homeShowcase),list=showcaseGames(model.games,setting),cur=0,token=0,shown=null;const pool=model.games.filter(g=>g.available!==false),randomGame=()=>{const rest=pool.filter(g=>g!==shown);return rest[Math.floor(Math.random()*rest.length)]||pool[0];};
+ let shownLines=[],setting=cleanShowcase(model.preferences.homeShowcase),list=showcaseGames(model.games,setting),cur=0,token=0,shown=null;const pool=model.games.filter(g=>g.available!==false),randomGame=()=>{const rest=pool.filter(g=>g!==shown);return rest[Math.floor(Math.random()*rest.length)]||pool[0];};
  const date=new Date().toLocaleDateString({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale],{month:'long',day:'numeric',weekday:'long'});
  const mins=s=>{const m=Math.floor((s||0)/60);return m>=60?`${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`:`${m}m`;};
  main.innerHTML=`<div class="tv-home" tabindex="-1"><div class="tv-pile" aria-hidden="true"></div><div class="tv-canvas">
   <div class="tv-plane" data-z="-200"><div class="tv-tl"></div></div>
   <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-index"></div><div class="tv-ring"></div></div>
-  <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div></div>
+  <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div><button type="button" class="tv-lines-edit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span></span></button></div>
   <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""><i></i><i></i><i></i><i></i></div></div></div></div></div>
   <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div><div class="tv-scene"></div>
   <div class="tv-left"><div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div><div class="tv-heat-card tv-card"><div class="tv-face"><button class="tv-heatlink" data-go="activity"></button><div class="tv-heat"></div><div class="tv-heatsum"></div><button class="tv-daily" data-go="daily"><i aria-hidden="true"></i><span class="tv-daily-k">${w.daily}</span><span class="tv-daily-t"></span><small>→</small></button><div class="tv-daily-pics"></div><i class="tv-glare"></i></div></div></div>
@@ -177,6 +175,8 @@ export function renderHomeTV(main,ctx){
  const art=(g,p)=>g.cover?`url("${String(g.cover).replace(/"/g,'%22')}") center/cover`:`linear-gradient(160deg,${p[0]},${p[2]} 70%)`;
  root.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{const to=b.dataset.go;if(to==='detail'){if(shown)onDetail(shown.id);return;}if(to==='words')navigate('learning','words');else if(to==='activity')navigate('statistics');else navigate(to);}));
  if(!list.length){$('.tv-h1').textContent=w.empty;$('.tv-act').innerHTML=model.games.length?'':`<button class="tv-btn primary" data-act="add">${icon('plus')}${w.add}</button>`;$('[data-act="add"]')?.addEventListener('click',onAdd);root.classList.add('empty');}
+ {const b=$('.tv-lines-edit'),label=LINES_EDIT[locale]||LINES_EDIT.zh;b.querySelector('span').textContent=label;b.title=label;b.setAttribute('aria-label',label);
+  b.addEventListener('click',()=>{const g=shown;if(!g)return;openLinesPicker({api,locale,esc,game:g,shown:shownLines,relativeTime,onSave:async chosen=>{const d=await detail(api,g.id,locale);d.homeLines=chosen;if(shown!==g||!live||live.root!==root)return;const pick=homeLinesFor(d);shownLines=pick.lines.slice(-5);b.classList.toggle('custom',pick.custom);swapScript($('.tv-script'),shownLines,type);type(pick.lines[0]||'');}});});}
  $('[data-act="play"]')?.addEventListener('click',e=>shown&&onLaunch(shown.id,e.currentTarget));
  $('[data-act="detail"]')?.addEventListener('click',()=>shown&&onDetail(shown.id));
  const type=s=>{clearInterval(live.typer);let n=0;const line=$('.tv-line');line.textContent='';if(!s)return;live.typer=setInterval(()=>{line.textContent='「'+s.slice(0,++n)+(n<s.length?'':'」');if(n>=s.length)clearInterval(live.typer);},55);};
@@ -187,12 +187,12 @@ export function renderHomeTV(main,ctx){
   const [p,d]=await Promise.all([palette(g),detail(api,g.id,locale)]);if(mine!==token||!live||live.root!==root)return;
   const wait=flash?Math.max(0,reveal-(performance.now()-started)):0;if(wait){await new Promise(r=>setTimeout(r,wait));if(mine!==token||!live||live.root!==root)return;}
   glowTo(ctx.onGame,g);root.style.setProperty('--tv-a',p[0]);root.style.setProperty('--tv-b',p[1]);root.style.setProperty('--tv-c',p[2]);
-  const k=(g.title.length*37+pool.indexOf(g)*13)%60,saved=(d.sentences||[]).map(s=>String(s.text||'').trim()).filter(Boolean),sentences=(saved.length?saved:(d.recentLines||[]).map(s=>String(s.text||'').trim()).filter(Boolean).slice(-6)).slice(0,8),words=(d.words||[]).filter(x=>x.spelling).slice(0,10),sessions=d.sessions||[];
+  const k=(g.title.length*37+pool.indexOf(g)*13)%60,picked=homeLinesFor(d),sentences=picked.lines,words=(d.words||[]).filter(x=>x.spelling).slice(0,10),sessions=d.sessions||[];
   $('.tv-kana').textContent=[...g.title].find(c=>/[一-鿿぀-ヿ]/.test(c))||([...g.title].find(c=>/[A-Za-z0-9]/.test(c))||g.title.slice(0,1)).toUpperCase();
   if(!g.cover)$('.tv-art').style.background=art(g,p);$('.tv-play').title=g.lastPlayedAt?`${w.last} · ${relativeTime(g.lastPlayedAt)}`:'';
   const pct=Math.max(.02,Math.min(1,(g.characters||0)/max)),ring=$('.tv-ring');ring.style.left=(44+k%14)+'%';const C=2*Math.PI*44,N=60;
   ring.innerHTML=`<svg viewBox="0 0 100 100"><defs><linearGradient id="tvgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff6e4"/><stop offset=".45" stop-color="var(--g-gold)"/><stop offset="1" stop-color="var(--tv-a)"/></linearGradient><filter id="tvglow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.4"/></filter></defs>${Array.from({length:N},(_,t)=>{const a=t/N*2*Math.PI-Math.PI/2,big=t%5===0,r1=big?38.6:39.4,r2=40.4;return `<line class="etch${big?' big':''}${t<Math.round(pct*N)?' on':''}" style="--d:${t*18}ms" x1="${(50+r1*Math.cos(a)).toFixed(2)}" y1="${(50+r1*Math.sin(a)).toFixed(2)}" x2="${(50+r2*Math.cos(a)).toFixed(2)}" y2="${(50+r2*Math.sin(a)).toFixed(2)}"/>`;}).join('')}<circle class="track" cx="50" cy="50" r="44"/><g transform="rotate(-90 50 50)"><circle class="glow" cx="50" cy="50" r="44" stroke-dasharray="${C}" stroke-dashoffset="${C}" filter="url(#tvglow)"/><circle class="prog" cx="50" cy="50" r="44" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></g><circle class="head" cx="50" cy="8.4" r=".9" style="transform-origin:50px 50px;transform:rotate(0deg)"/></svg>`;requestAnimationFrame(()=>requestAnimationFrame(()=>{const off=C*(1-pct);ring.querySelectorAll('.prog,.glow').forEach(c=>c.style.strokeDashoffset=off);const h=ring.querySelector('.head');if(h)h.style.transform=`rotate(${pct*360}deg)`;}));
-  scrambleScript($('.tv-script'),sentences.slice(-5),type);
+  swapScript($('.tv-script'),sentences.slice(-5),type);shownLines=sentences.slice(-5);$('.tv-lines-edit').classList.toggle('custom',picked.custom);
   const now=Date.now(),span=40*864e5,big=Math.max(1,...sessions.map(s=>s.active_seconds||0))*.6;$('.tv-tl').innerHTML=sessions.filter(s=>now-s.started_at*1000<span).map(s=>{const y=10+((now-s.started_at*1000)/span)*70,long=(s.active_seconds||0)>=big;return `<b class="${long?'big':''}" style="top:${y}%"></b>`+(long?`<span style="top:${y}%">${new Date(s.started_at*1000).toLocaleDateString(undefined,{month:'numeric',day:'numeric'})} · ${Math.round((s.active_seconds||0)/60)}${w.min}</span>`:'');}).join('');
   $('.tv-slices').innerHTML=Array.from({length:5},(_,j)=>`<i style="background:${art(g,p)};background-size:500% 100%;background-position:${j*25}% 0;transform:translateZ(${j%2?40:-20}px) translateY(${(j-2)*12}px)"></i>`).join('');
 
