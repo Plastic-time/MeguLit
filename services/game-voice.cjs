@@ -63,7 +63,7 @@ function catalog(dir){const map=new Map(),koe=new Map(),add=(name,read)=>{const 
    for(const e of audio)if(!e.encrypted||open||cx)add(e.name,()=>xp3.read(file,e,open?null:cx));continue;}
   if(low.endsWith('.arc')){const l=arcList(file);if(l)for(const e of l)if(AUDIO.test(e.name))add(e.name,()=>slice(file,e.offset,e.size));continue;}
   /* archives an engine reader knows: each lists its clips as {name, read} */
-  if(/[.](?:npk|ypf|int|bin|pak|dat|pck|iga)$/.test(low)){let l=null;for(const m of PROVIDERS){try{l=require(m).audio?.(file);}catch{}if(l&&l.length)break;}if(l)for(const e of l)add(e.name,e.read);continue;}
+  if(/[.](?:npk|ypf|int|bin|pak|dat|pck|iga|paz)$/.test(low)){let l=null;for(const m of PROVIDERS){try{l=require(m).audio?.(file);}catch{}if(l&&l.length)break;}if(l)for(const e of l)add(e.name,e.read);continue;}
   if(low.endsWith('.ovk')){const m=/(\d+)\.ovk$/.exec(low),l=ovkList(file);if(m&&l)for(const e of l){const id=Number(m[1])*100000+e.id;koe.set(id,()=>slice(file,e.offset,e.size));}continue;}}
  return {map,koe,get(ref){if(/^koe:\d+$/.test(ref))return koe.get(Number(ref.slice(4)))||null;const r=String(ref).toLowerCase();return map.get(r)||(r.includes('/')?map.get(r.slice(r.lastIndexOf('/')+1)):null)||null;}};}
 
