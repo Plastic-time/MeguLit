@@ -560,7 +560,7 @@
       <button type="button" data-gal-drag>拖动文本框</button>
       <div class="tome-position-sync"><button type="button" data-gal-position-sync>同步位置</button><small data-position-state></small></div>
       <div class="tome-game-style-sync"><label class="tome-auto-style-switch"><input type="checkbox" name="galAutoGameStyle">自动同步游戏原文样式</label><button type="button" data-game-style-sync>从游戏同步</button><small data-game-style-state></small></div>
-      <label>原文替换方式<select name="galMaskMode"><option value="hook">Hook 引擎与原文替换内嵌（优先）</option><option value="local">OCR 覆盖原文（最后兜底）</option></select></label>
+      <label>原文替换方式<select name="galMaskMode"><option value="hook">Hook 引擎与原文替换内嵌</option></select></label>
       <label class="tome-auto-style-switch" data-embed-translation><input type="checkbox" name="galEmbedTranslation">译文由游戏自己显示（写回游戏文本框）</label>
       <small class="tomoyo-hotkey-hint">开启后游戏文本框直接显示译文，位置和字体都由游戏自己处理；Alt+H 只开关 MeguLit 自己的显示，不影响游戏写回的译文</small>
       <small class="tomoyo-hotkey-hint" data-mask-hotkey><kbd>Alt+H</kbd> 随时一键关闭 / 恢复内嵌（连同全部 MeguLit 覆盖），用来对比游戏原文；开着「译文由游戏自己显示」时，游戏里的译文不受 Alt+H 影响，只由这个开关控制</small>

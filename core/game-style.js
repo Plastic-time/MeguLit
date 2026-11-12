@@ -69,7 +69,8 @@ if(typeof value.rubyRowOffsetsX==='string')result.rubyRowOffsetsX=value.rubyRowO
     if (['local','hook'].includes(value.maskMode)) result.maskMode = value.maskMode;
     // OCR cover only by the user's own choice (user, 2026-11-05). Older automatic writes carry no source and revert to Hook.
     result.maskModeSource = value.maskModeSource === 'user' ? 'user' : '';
-    if (result.maskMode === 'local' && result.maskModeSource !== 'user') result.maskMode = 'hook';
+    /* 2026-11-12 (user: "禁止使用ocr遮盖") the original is never covered by OCR, not even by an older saved choice */
+    if (result.maskMode === 'local') { result.maskMode = 'hook'; result.maskModeSource = ''; }
     result.mask = false;
     // 'user' once the user set a text size by hand: automatic calibration then keeps it (issue 119).
     result.sizeSource = value.sizeSource === 'user' ? 'user' : '';

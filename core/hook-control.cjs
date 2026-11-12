@@ -18,7 +18,7 @@ class HookControl{
   if(this.styleCalibration&&this.styleTimer)this.finishStyleSync(false,true);
   this.running=profile!=='off';this.plan=profile;this.baseline=false;this.baselineMisses=0;this.seq=0;const styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleCalibration=!!(force&&h.preferences.autoGameStyle!==false&&h.styleSync&&!h.styleSync.latest&&this.styleCalibrationIdentity!==styleIdentity);if(this.styleCalibration)force=false;h.hooks.preflight=this.running&&profile!=='read'&&!force;
   h.send({type:'hookVerifyCancel'});
-  this.autoOcr=false;const userOcr=h.preferences.maskMode==='local'&&h.preferences.maskModeSource==='user';
+  this.autoOcr=false;const userOcr=false;/* 2026-11-12 (user) OCR never covers the original */
   h.save({...h.preferences,bindEnabled:true,maskMode:userOcr?'local':'hook',maskModeSource:userOcr?'user':'',hookProfile:profile});
   if(this.styleCalibration)this.beginStyleSync(false);
   if(profile!=='off'&&profile!=='read'&&!h.state.bound)h.send({type:'toggleMode'});
