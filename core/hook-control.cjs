@@ -28,14 +28,14 @@ class HookControl{
  beginStyleSync(manual=false,purpose='all',owner=''){
   const h=this.host;if(!h.styleSync||!h.state.bound){this.styleCalibration=false;h.styleSync?.status('waiting');return;}
   this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');clearTimeout(this.styleTimer);this.styleManual=manual;this.styleAwaitLive=false;this.styleCalibration=true;this.styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleRestore=['embed','euphoria474'].includes(this.plan)&&h.preferences.hookHide!==false;
-  h.styleSync.calibrating=true;h.styleSync.waitNext=this.styleRestore; // E246.1: embedding cleared the current line, so measure the next original line
+  h.styleSync.calibrating=true;h.styleSync.waitNext=this.styleRestore||h.hooks.drawsHidden===true;h.hooks.calibrating=true; // E246.1: embedding cleared the current line, so measure the next original line
    h.hooks.preflight=true;h.hooks.configure?.(h.preferences,h.state);h.onEvent?.({gameStylePreview:false});h.styleSync.automatic=!manual;h.styleSync.owner=owner;if(!h.styleSync.source){const source=h.state.hookSource||h.hooks.lastSource;if(source?.trim()){h.styleSync.source=source;h.styleSync.sourceRead=h.state.hookSourceRead===true;}}h.styleSync.status('revealing');
   h.styleSync.begin?.(purpose);h.styleSync.request(true);
   // A visible current sentence completes calibration; a bounded deadline restores normal reading on failure.
   this.styleTimer=setTimeout(()=>{if(!this.styleCalibration)return;if(!h.styleSync.publish?.()){this.styleFailures=(this.styleFailures||0)+1;if(this.styleFailures>=(manual?2:1))this.styleGiveUp=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.finishStyleSync(false);this.styleRetryAt=this.now()+60000;}},manual?(h.styleSync.waitNext?90000:25000):12000); /* automatic calibration pauses embedding: keep that pause short (user: ISLAND showed the original for 90 s after every launch) */this.styleTimer.unref?.();
  }
  finishStyleSync(success,cancel=false){
-  if(!this.styleCalibration)return;clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;const h=this.host;h.hooks.preflight=false;h.styleSync.calibrating=false;clearTimeout(h.styleSync.timer);if(cancel)h.styleSync.cancel?.();h.onEvent?.({gameStylePreview:false});
+  if(!this.styleCalibration)return;clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;const h=this.host;h.hooks.calibrating=false;h.hooks.preflight=false;h.styleSync.calibrating=false;clearTimeout(h.styleSync.timer);if(cancel)h.styleSync.cancel?.();h.onEvent?.({gameStylePreview:false});
   const same=this.styleIdentity===String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleRetryAt=this.now()+15000;
   if(same&&!cancel){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);this.styleAwaitLive=false;h.styleSync.status(success?'applied':'retrying');}
   if(!same||cancel||!this.styleRestore){this.styleAwaitLive=false;h.onEvent?.({gameStylePreview:false});}

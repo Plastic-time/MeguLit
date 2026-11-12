@@ -317,12 +317,16 @@ public class GalWindowBridge {
     static void KeepAboveGame(IntPtr gameRoot,bool front){
         bool menu=MenuOpen&&MenuRegionReady;
         if((DateTime.UtcNow-LastZCheck).TotalMilliseconds<(menu?100:250))return;LastZCheck=DateTime.UtcNow;
-        bool below=false;int steps=0;for(IntPtr h=GetWindow(Overlay,3);h!=IntPtr.Zero&&steps<400;h=GetWindow(h,3),steps++)if(h==gameRoot){below=true;break;}
+        /* E472 (user: fullscreen ファタモルガーナの館 showed no text): a game window owned by a hidden application window (KiriKiri 2:
+           TVPWindowForm owned by TApplication) has that hidden window as its root owner, so the visible form going topmost
+           fullscreen above the layer was never seen. Both the root owner and the game's own top-level window count. */
+        IntPtr gameTop=Target!=IntPtr.Zero?GetAncestor(Target,2):IntPtr.Zero;if(gameTop==IntPtr.Zero)gameTop=gameRoot;
+        bool below=false;int steps=0;for(IntPtr h=GetWindow(Overlay,3);h!=IntPtr.Zero&&steps<400;h=GetWindow(h,3),steps++)if(h==gameRoot||h==gameTop){below=true;break;}
         // Raise only over the foreground game. Menus and foreign applications always use ordinary z-order.
         // Some game renderers draw over an inactive ordinary window even after HWND_TOP.
         // Menu open: made topmost at once (not only after the game got above it), so a click on the game cannot cover it.
         // Another application in front (Alt+Tab): the layer stays directly above the game, below that application.
-        if(!front){if(!below)return;IntPtr above=GetWindow(gameRoot,3);if(above==Overlay)return;SetWindowPos(Overlay,above==IntPtr.Zero?IntPtr.Zero:above,0,0,0,0,0x0001|0x0002|0x0010);
+        if(!front){if(!below)return;IntPtr above=GetWindow(gameTop,3);if(above==Overlay)return;SetWindowPos(Overlay,above==IntPtr.Zero?IntPtr.Zero:above,0,0,0,0,0x0001|0x0002|0x0010);
             Emit(new{type="coverDebug",text="Alt+T 菜单打开、前台是其他程序：阅读层放回游戏正上方"});return;}
         if(menu&&(GetWindowLong(Overlay,-20)&8)==0)below=true;
         if(!below)return;
