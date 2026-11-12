@@ -164,7 +164,7 @@ try{
  }
 }finally{$out.Dispose();$old.Dispose()}
 $check=[IO.Compression.ZipFile]::OpenRead($zipPath)
-try{if(-not $check.GetEntry('MeguLit/MeguLit.exe')){throw 'Package has no MeguLit.exe'};if($check.Entries | Where-Object {$_.FullName -like 'MeguLit/data/*'}){throw 'Package contains data/'};$count=$check.Entries.Count}finally{$check.Dispose()}
+try{if(-not $check.GetEntry('MeguLit/MeguLit.exe')){throw 'Package has no MeguLit.exe'};foreach($u in 'MeguLit/setup/uninstall.ps1','MeguLit/services/uninstall.cjs'){if(-not $check.GetEntry($u)){throw "Package has no $u (uninstaller)"}};if($check.Entries | Where-Object {$_.FullName -like 'MeguLit/data/*'}){throw 'Package contains data/'};$count=$check.Entries.Count}finally{$check.Dispose()}
 $hash=(Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower();$size=(Get-Item $zipPath).Length
 Write-Host "$Asset  $count files  $size bytes  sha256 $hash"
 if($DryRun){& git.exe checkout -- web/about.js desktop/Cargo.toml desktop/tauri.conf.json desktop/Cargo.lock README.md;Step "dry run finished; package at $zipPath (version files restored)";return}
