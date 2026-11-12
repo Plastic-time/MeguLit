@@ -5,7 +5,7 @@
    ALLOWED_ORIGINS. Nothing here trusts the client: every body is size-capped and validated (validate.js). */
 import {LIMITS,validateLeaderboard,validateBoardQuery,validateAdaptationRecord,validateKeys,validateMeta,issueBody,validateHot,INSTALL_ID,HEX64} from './validate.js';
 /* E379 accounts (relay/ACCOUNTS.md) and community features (avatars, hot words) */
-import {handleAccounts,isAccountsPath,authenticate} from './accounts.js';
+import {handleAccounts,isAccountsPath,authenticate,ROTATED} from './accounts.js';
 /* website game-request and feedback forms → GitHub issues */
 import {feedbackPost,syncPendingFeedback} from './feedback.js';
 /* E397 public profiles, follows, 同好 */
@@ -266,4 +266,5 @@ export async function scheduled(event,env,ctx){
  if(event?.cron==='20 21 * * *'){const job=refreshDaily(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0)]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
-export default {fetch:(request,env)=>handle(request,env),scheduled};
+/* a token rotated while answering any request goes back on that answer, whichever endpoint it was */
+export default {fetch:async(request,env)=>{const response=await handle(request,env);const token=ROTATED.get(request);if(!token||response.headers.get('x-megulit-token'))return response;const copy=new Response(response.body,response);copy.headers.set('x-megulit-token',token);return copy;},scheduled};

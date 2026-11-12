@@ -13,7 +13,11 @@ export const CODE_TTL = 600;            /* seconds a login code stays valid */
 export const CODE_TRIES = 5;            /* wrong guesses before the code is burned */
 export const SESSION_DAYS = 180;        /* sliding session lifetime */
 export const ROTATE_AFTER = 86400;      /* rotate the token on use at most once a day */
-export const ROTATE_GRACE = 86400;      /* the previous token keeps working this long after a rotation */
+/* 2026-11-12 (user: signed out of the forum and the follow list, and a second leaderboard row appeared): a token rotated
+   during a request whose answer did not carry it was lost; the client kept the old one until the grace ran out. The new
+   token now rides on every answer (worker.js), and the old one keeps working for 30 days. */
+export const ROTATE_GRACE = 30 * 86400; /* the previous token keeps working this long after a rotation */
+export const ROTATED = new WeakMap();   /* request -> the token issued while answering it */
 export const KINDS = ['words', 'sentences', 'reading', 'settings'];
 export const KIND_CAP = { words: 8 << 20, sentences: 4 << 20, reading: 1 << 20, settings: 512 << 10 };
 export const RECORD_CAP = { words: 32 << 10, sentences: 8 << 10, reading: 1 << 10, settings: 32 << 10 };
@@ -147,6 +151,7 @@ export async function authenticate(request, env, now = new Date()) {
   } else if (t - session.last_used_at > 300) {
     await env.DB.prepare('UPDATE account_sessions SET last_used_at=?,expires_at=? WHERE id=?').bind(t, t + SESSION_DAYS * 86400, session.id).run();
   }
+  if (rotated) ROTATED.set(request, rotated);
   return { account, session, token: rotated };
 }
 const withToken = (response, auth) => { if (auth?.token) response.headers.set('x-megulit-token', auth.token); return response; };
