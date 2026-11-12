@@ -263,6 +263,8 @@ async function dispatch(request,runtime=null) {
       /* E362 adaptation overview + one-click diagnostic package (built locally; shown to the user before any upload) */
       case 'adaptation_overview':return require('./adaptation-overview.cjs').overview(db,root);
       case 'diagnostics_build':return require('./diagnostics.cjs').build(root,db,String(request.id),{version:String(request.version||'').slice(0,40)});
+      /* 2026-11-12 About > Uninstall MeguLit: the uninstaller window runs on its own (it closes MeguLit itself) */
+      case 'uninstall_open':{const script=path.join(root,'setup','uninstall.ps1');if(!fs.existsSync(script))throw Error('UNINSTALLER_MISSING');const ps=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');const child=spawn(ps,['-NoProfile','-ExecutionPolicy','Bypass','-STA','-WindowStyle','Hidden','-File',script,'-Root',root],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {opened:true};}
       case 'diagnostics_reveal':{const file=require('./diagnostics.cjs').ownPackage(root,request.path);const child=spawn('explorer.exe',['/select,'+file],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {ok:true};}
       case 'diagnostics_build_all':return require('./diagnostics.cjs').buildAll(root,db,{version:String(request.version||'').slice(0,40)}); /* E394 whole-app package from About */
       case 'site_updates':return (async()=>{/* E421 start-up notice list, through the service because the WebView CSP blocks megulit.com.

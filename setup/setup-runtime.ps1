@@ -315,6 +315,31 @@ function Make-Shortcuts {
       $sh.TargetPath = $exePath; $sh.WorkingDirectory = $Root; $sh.IconLocation = $exePath + ',0'; $sh.Description = 'MeguLit'; $sh.Save()
     } catch {}
   }
+  # The uninstaller sits next to the app's Start menu entry (only when the user asked for one).
+  $un = Join-Path $Root 'setup\uninstall.ps1'
+  if ($menuCheck.Checked -and (Test-Path $un)) {
+    try {
+      $sh = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath('Programs')) 'Uninstall MeguLit.lnk'))
+      $sh.TargetPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+      $sh.Arguments = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$un`" -Root `"$Root`""
+      $sh.WorkingDirectory = $Root; $sh.IconLocation = $exePath + ',0'; $sh.Description = 'Uninstall MeguLit / 卸载 MeguLit'; $sh.WindowStyle = 7; $sh.Save()
+    } catch {}
+  }
+}
+# Apps & features entry (HKCU, no admin). setup\uninstall.ps1 removes it again; MeguLit refreshes it after a move or update.
+function Register-Uninstall {
+  $un = Join-Path $Root 'setup\uninstall.ps1'; $exePath = Join-Path $Root 'MeguLit.exe'
+  if (-not (Test-Path $un) -or -not (Test-Path $exePath)) { return }
+  try {
+    $version = ''; $about = Join-Path $Root 'web\about.js'; if (Test-Path $about) { $m = [regex]::Match((Get-Content -Raw -Encoding UTF8 $about), "VERSION='([^']+)'"); if ($m.Success) { $version = $m.Groups[1].Value } }
+    $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\MeguLit'
+    New-Item -Path $k -Force | Out-Null
+    $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $vals = @{ DisplayName = 'MeguLit'; DisplayIcon = $exePath + ',0'; DisplayVersion = $version; Publisher = 'ilynthn'; InstallLocation = $Root; URLInfoAbout = 'https://megulit.com'
+      UninstallString = "`"$ps`" -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$un`" -Root `"$Root`"" }
+    foreach ($n in $vals.Keys) { Set-ItemProperty -Path $k -Name $n -Value $vals[$n] }
+    foreach ($n in 'NoModify','NoRepair') { New-ItemProperty -Path $k -Name $n -Value 1 -PropertyType DWord -Force | Out-Null }
+  } catch {}
 }
 function Start-Install($ids) {
   if (-not (Use-Target)) { return }
@@ -421,6 +446,7 @@ Get-ChildItem $Root -Filter 'runtime-*.part' -ErrorAction SilentlyContinue | Rem
 Get-ChildItem $Root -Directory -Filter 'runtime-*.unpack' -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 if ($script:done -and (Test-Path (Join-Path $Root 'runtime\node.exe'))) {
   Make-Shortcuts
+  Register-Uninstall
   # Installed somewhere else: start that copy (its own single-instance lock) and tell this exe to quit (exit 3 = not ready here).
   if ($script:moved) { Start-Process -FilePath (Join-Path $Root 'MeguLit.exe') -WorkingDirectory $Root; exit 3 }
   exit 0

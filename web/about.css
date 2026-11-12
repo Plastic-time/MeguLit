@@ -52,6 +52,7 @@
 .about-update:hover{border-color:var(--g-gold,var(--gold-accent,#edb56e));color:var(--g-t1,#f1e0d2)}
 .about-update.ready{background:var(--accent);border-color:var(--accent);color:#fbefe6}
 .about-update[disabled]{opacity:.6;cursor:default}
+.about-uninstall{margin-left:0}
 .about-update-state{display:block;margin-top:6px;font-size:12px;color:var(--g-t3,#8a746b);line-height:1.6}
 
 /* v1.1.0 support panel: grimoire x glass, same language as the statistics and empty pages */

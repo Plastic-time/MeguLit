@@ -25,6 +25,7 @@ export function aboutHTML(locale,esc){
     <div><dt>${esc(t.version)}</dt><dd>v${VERSION} <button type="button" class="about-update" data-update>${esc(U[locale]?.check||U.zh.check)}</button><span class="about-update-state" data-update-state></span></dd></div>
     <div><dt>${esc(t.license)}</dt><dd>GPL-3.0-or-later</dd></div>
     <div><dt>${esc(t.author)}</dt><dd>魚魚棟 · ilynthn</dd></div>
+    <div><dt>${esc(UN[locale]?.label||UN.zh.label)}</dt><dd><button type="button" class="about-update about-uninstall" data-uninstall>${esc(UN[locale]?.button||UN.zh.button)}</button><span class="about-update-state">${esc(UN[locale]?.hint||UN.zh.hint)}</span></dd></div>
    </dl>
    <div class="about-links"><h3>${esc(t.links)}</h3>${link('https://megulit.com',({zh:'官网',ja:'公式サイト',en:'Website'})[locale]||'Website')}${link(REPO,t.repo)}${link(REPO+'#faq',({zh:'常见问题',ja:'よくある質問',en:'FAQ'})[locale]||'FAQ')}<button type="button" class="about-link about-report" data-feedback>${esc(({zh:'一键上传问题反馈',ja:'不具合をまとめて送る',en:'Report a problem'})[locale]||'Report a problem')}</button>${link(REPO+'/releases',t.releases)}</div>
   </div>
@@ -49,6 +50,10 @@ export function aboutHTML(locale,esc){
   <section class="about-credits"><h3>${esc(t.credits)}</h3><p>${esc(t.creditsText)}</p></section>
  </section>`;
 }
+/* 2026-11-12 the uninstaller (setup/uninstall.ps1) lists what goes and can keep the account data on this PC */
+const UN={zh:{label:'卸载',button:'卸载 MeguLit',hint:'会列出要删除的内容，可以选择保留本地账户数据',opened:'卸载程序已打开',failed:'没能打开卸载程序：'},
+ ja:{label:'アンインストール',button:'MeguLit をアンインストール',hint:'削除する内容を確認でき、ローカルのアカウントデータを残すこともできます',opened:'アンインストーラーを開きました',failed:'アンインストーラーを開けませんでした：'},
+ en:{label:'Uninstall',button:'Uninstall MeguLit',hint:'Shows what will be removed; you can keep your local account data',opened:'The uninstaller is open',failed:'Could not open the uninstaller: '}};
 const U={zh:{check:'检查更新',checking:'正在检查…',latest:'已经是最新版',found:v=>`有新版本 v${v}`,install:v=>`下载并更新到 v${v}`,downloading:'正在下载…',restart:'下载完成，MeguLit 即将关闭并自动更新，完成后会重新打开',failed:'更新失败：',keep:'只替换程序文件，你的游戏库、学习记录和设置都会保留'},
  ja:{check:'アップデートを確認',checking:'確認中…',latest:'最新版です',found:v=>`新しいバージョン v${v}`,install:v=>`v${v} に更新`,downloading:'ダウンロード中…',restart:'ダウンロード完了。MeguLit を閉じて自動で更新し、再起動します',failed:'更新に失敗しました：',keep:'プログラムだけを置き換えます。ライブラリ・学習記録・設定はそのまま残ります'},
  en:{check:'Check for updates',checking:'Checking…',latest:'You are up to date',found:v=>`v${v} is available`,install:v=>`Update to v${v}`,downloading:'Downloading…',restart:'Downloaded. MeguLit will close, update itself and reopen',failed:'Update failed: ',keep:'Only program files are replaced. Your library, study records and settings stay'}};
@@ -60,5 +65,6 @@ export function mountAbout(main,api,toast){
  main.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>api('open_source',{url:b.dataset.open}).catch(()=>toast&&toast('…'))));
  /* E394 feedback and logs go through MeguLit's relay, not a GitHub page many users cannot open */
  const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+ main.querySelector('[data-uninstall]')?.addEventListener('click',async e=>{const u=UN[locale]||UN.zh,b=e.currentTarget;b.disabled=true;try{await api('uninstall_open',{});toast&&toast(u.opened);}catch(err){toast&&toast(u.failed+(err?.message||err));b.disabled=false;}});
  main.querySelector('[data-feedback]')?.addEventListener('click',()=>openFeedback({api,locale,esc:escHTML,toast,version:VERSION}));
 }
