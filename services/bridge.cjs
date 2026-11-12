@@ -294,6 +294,9 @@ async function dispatch(request,runtime=null) {
       case 'leaderboard_leave':return await require('./leaderboard.cjs').leave(root);
       case 'save_key':return new(require('./settings.cjs').Settings)(root).saveKey({provider:request.provider,baseUrl:request.baseUrl,apiKey:request.apiKey});
       case 'anki_find':return {path:runtime.ankiProcess().find()};
+      /* 2026-11-12 one-click Anki: download the official installer, install it, add AnkiConnect, start and connect */
+      case 'anki_install':return require('../core/anki-installer.cjs').start(root,{runtime,find:()=>runtime?runtime.ankiProcess().find():require('../core/anki-process.cjs').find('',process.env)});
+      case 'anki_install_status':return require('../core/anki-installer.cjs').status();
       case 'anki_install_connect':return await require('../core/anki-process.cjs').installAnkiConnect(process.env,runtime?{locate:()=>runtime.ankiProcess().find()}:{});
       case 'anki_connect_status':return {installed:require('../core/anki-process.cjs').ankiConnectInstalled()};
       case 'anki_launch':{const runner=runtime.ankiProcess(),hide=!!runtime.config().ankiHidden;if(String(request.reason||'')==='ANKI_PORT_TAKEN')return await runner.repair({hide});return await runner.start({hide});}

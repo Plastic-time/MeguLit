@@ -44,3 +44,8 @@
 .anki-seg button:hover{background:var(--surface-hover);color:var(--g-t1,var(--text))}
 .anki-seg button[aria-checked="true"]{background:color-mix(in srgb,var(--g-gold,var(--accent)) 22%,transparent);color:var(--g-t1,var(--text))}
 .anki-seg button:focus-visible{outline:1px solid var(--g-gold,var(--accent));outline-offset:-1px}
+/* 2026-11-12 one-click Anki install */
+.anki-install-tips{margin:10px 0 14px;padding-left:20px;font-size:13px;line-height:1.85;color:var(--g-t2,var(--muted))}
+.anki-install-bar{height:4px;margin:6px 0 8px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden}
+.anki-install-bar i{display:block;height:100%;width:0;background:var(--g-gold,var(--accent));transition:width .4s ease}
+.anki-install-ask{margin:10px 0 0}

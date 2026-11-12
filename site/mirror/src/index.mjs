@@ -55,7 +55,7 @@ export default {
 // Content-addressed files never change, so they cache forever at the edge. Range requests resume broken downloads.
 // E383 runtime packs and the llama.cpp build are mirrored by hand (Release / docs); prune never touches them.
 const INSTALLER = /^files\/[0-9a-f]{64}\/MeguLit-v[\d.]+-win-x64\.zip$/;
-const RUNTIME_FILE = /^files\/(runtime-v[\d.]+\/MeguLit-runtime-(base|reading|voice)-v[\d.]+\.zip|b\d+\/llama-b\d+-bin-win-vulkan-x64\.zip)$/;
+const RUNTIME_FILE = /^files\/(runtime-v[\d.]+\/MeguLit-runtime-(base|reading|voice)-v[\d.]+\.zip|b\d+\/llama-b\d+-bin-win-vulkan-x64\.zip|anki\/anki-[\d.]+-win-x64\.msi)$/; // anki: the official installer (ankitects/anki, GitHub release digest checked), for one-click install
 async function serveFile(request, env, ctx, key) {
   if (!INSTALLER.test(key) && !RUNTIME_FILE.test(key)) return new Response('not found', { status: 404 });
   const cache = caches.default;
