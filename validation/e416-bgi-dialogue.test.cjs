@@ -42,7 +42,7 @@ test('alignment: per-line measure only where the hook cannot hide the game text;
 test('blur: only with the opt-in setting; every MeguLit translation layer, revealed by pointer position',()=>{
  const g=read('web/reader/modules/gal.js');
  assert.match(g,/const T=\['\.tomoyo-cn-output','\.megulit-choice-cn'\]/);assert.match(g,/\{filter:blur\(7px\)!important/);
- assert.match(g,/document\.addEventListener\('mousemove',e=>\{if\(!document\.documentElement\.classList\.contains\('megulit-translation-blur'\)\)return;/);
+ assert.match(g,/document\.addEventListener\('mousemove',e=>\{.*?if\(!document\.documentElement\.classList\.contains\('megulit-translation-blur'\)\)return;/);
  assert.ok(g.includes(",on=T.map(t=>'html.megulit-translation-blur body "),'every rule is scoped to the blur class');});
 test('colour sampling is unchanged (window/screen order as before E416)',()=>{
  assert.doesNotMatch(read('native/GameStyleProbe.cs'),/E416/);});
