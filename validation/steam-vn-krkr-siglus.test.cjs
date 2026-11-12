@@ -73,3 +73,9 @@ test('E: a translation slot quoted with ASCII quotes takes the Japanese brackets
  assert.equal(unquoteSlot('他说""好""','「x」'),'他说""好""');
  assert.equal(unquoteSlot('"a""b"','「x」'),'「a"b」');
 });
+/* F (live test 2026-11-13, Summer Pockets + CLANNAD): Siglus draws and wraps Chinese itself, so the embed hooks no longer
+   put a space after each character Shift-JIS lacks ("连 成一片", "几间 民房"). */
+test('F: Siglus embed hooks insert no spaces into translations',()=>{
+ for(const f of ['megulithook','siglus']){const src=fs.readFileSync(path.join(__dirname,'..','native',f,'Siglus.cpp'),'utf8');
+  assert.ok(!/EMBED_INSERT_SPACE_AFTER_UNENCODABLE/.test(src),f);assert.ok((src.match(/EMBED_ABLE \| CODEC_UTF16/g)||[]).length>=4,f);}
+});
