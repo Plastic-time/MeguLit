@@ -1,5 +1,11 @@
 [
  {
+  "date": "2026-11-12",
+  "text": "1.4.4：新支持 逆転裁判123 成歩堂セレクション（逆转裁判123 成步堂精选集）、夏色四叶草、いじわるMyMaster（我的坏心主人）；有配音的句子一律播放游戏原声（CLANNAD、千恋＊万花（千恋万花）、WHITE ALBUM2（白色相簿2）等）；Anki 录音去掉背景音乐、AI 归纳义项可加进卡片；Lv.20 转职与段位；词典和练习题特效，可在设置里关掉；界面全面打磨",
+  "text_en": "1.4.4: new support for 逆転裁判123 成歩堂セレクション (Ace Attorney Trilogy), 夏色四叶草 (Summer Clover) and いじわるMyMaster; voiced lines always play the game's own voice (CLANNAD, Senren Banka, WHITE ALBUM2 and more); Anki recordings lose their music and AI sense summaries go on cards; Lv.20 class change and ranks; dictionary and practice effects, switchable in Settings; a full interface pass",
+  "text_ja": "1.4.4：逆転裁判123 成歩堂セレクション、夏色四叶草、いじわるMyMaster に対応。ボイスのあるセリフは必ずゲーム本来のボイスで再生（CLANNAD、千恋＊万花、WHITE ALBUM2 など）。Anki の録音から BGM を除去、AI の語義まとめをカードに追加。Lv.20 の転職と段位。辞書と練習問題のエフェクト（設定でオフ可）。インターフェースを全面的に調整"
+ },
+ {
   "date": "2026-11-11",
   "text": "今晚更新：首页全面重新设计，可以自己挑选首页展示的作品；顶部栏重新排版，新增个人主页入口；语法课从 N5 一路做到 N0（含 2025–2026 流行语），第一次进入先选日语水平，例句来自你读过的台词；五十音表可以点；读过的词可以标「已掌握」；设置和 Alt+T 都能一键重置设置；所有滚动条换成新设计",
   "text_en": "Tonight: a redesigned home page where you choose which games to show; a regrouped top bar with a profile entry; grammar lessons from N5 to N0 (including 2025–2026 slang), a level picker on first visit and examples from lines you have read; a clickable kana chart; mark read words as known; reset all settings from Settings or Alt+T; a new scrollbar everywhere",
