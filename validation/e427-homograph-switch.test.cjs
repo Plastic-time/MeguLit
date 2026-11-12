@@ -2,7 +2,7 @@
 /* E427 Lookup card: choosing another homograph in the styled dropdown (rendered on <body>) keeps the card open and swaps the entry */
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const src=fs.readFileSync(path.join(__dirname,'..','web','reader','modules','selection.js'),'utf8');
+const src=require('./flat-source.cjs')(path.join(__dirname,'..','web','reader','modules','selection.js'));
 test('the dropdown list counts as part of the lookup card',()=>{
  const m=src.match(/const inOwn=node=>node\?\.closest\?\.\('([^']+)'\)/);assert.ok(m,'inOwn found');
  const own=m[1].split(',');assert.ok(own.includes('.mg-select-pop'),'mg-select-pop is own');assert.ok(own.includes('.tomoyo-selection-card'));

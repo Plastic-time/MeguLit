@@ -3,7 +3,7 @@
 // E416 (player diagnostics #91 and #95, 穢翼のユースティア on 1.3.9). User 2026-11-11: fix for every engine, but never change
 // a path that already works: fallbacks only where the hook cannot write back, and regression cases for adapted engines.
 const test=require('node:test'),assert=require('node:assert'),fs=require('node:fs'),path=require('node:path');
-const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
+const read=f=>require('./flat-source.cjs')(path.join(__dirname,'..',f));
 const {ChoiceCapture}=require('../core/choice-capture.cjs');
 test('choices: a bracketed name and a quoted fragment of the current line are not choices',()=>{
  const c=new ChoiceCapture(),d='「こいつです、間違いありません」';

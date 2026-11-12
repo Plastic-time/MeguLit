@@ -156,7 +156,11 @@ if(-not $got -and $want){try{Invoke-WebRequest -Uri "https://dl.megulit.com/file
 if(-not $got){Invoke-WebRequest -Uri $prevAsset.browser_download_url -OutFile $prevZip -UseBasicParsing -TimeoutSec 1800;if($want -and (Get-FileHash $prevZip -Algorithm SHA256).Hash.ToLower() -ne $want){throw 'Previous package hash differs from GitHub digest'}}
 $old=[IO.Compression.ZipFile]::OpenRead($prevZip)
 $names=New-Object 'System.Collections.Generic.SortedSet[string]' ([StringComparer]::Ordinal)
-foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and -not $e.FullName.EndsWith('/') -and $e.FullName -notmatch '\.(lib|obj|pdb|exp|ilk|iobj|ipdb)$' -and $e.FullName -notmatch '/build/'){[void]$names.Add($e.FullName.Substring(8))}}
+# E-pkg: carry over only files the repository never tracked (prebuilt native helpers, fonts); a file git deleted stays deleted.
+function Get-DroppedPaths([string[]]$Paths){$gone=@{};foreach($f in (git log --diff-filter=D --name-only --format= -- core services web setup native)){if($f){$gone[$f]=1}};$live=@{};foreach($f in (git ls-files)){$live[$f]=1};@($Paths | Where-Object {$gone.ContainsKey($_) -and -not $live.ContainsKey($_) -and -not (Test-Path -LiteralPath (Join-Path $Root ($_ -replace '/','\')))})}
+$prevNames=@(foreach($e in $old.Entries){if($e.FullName -like 'MeguLit/*' -and -not $e.FullName.EndsWith('/') -and $e.FullName -notmatch '\.(lib|obj|pdb|exp|ilk|iobj|ipdb)$' -and $e.FullName -notmatch '/build/'){$e.FullName.Substring(8)}})
+$dropped=Get-DroppedPaths $prevNames
+foreach($n in $prevNames){if($dropped -contains $n){Write-Host "  dropped deleted $n"}else{[void]$names.Add($n)}}
 # --others: files added in this release are not tracked yet when the list is built (-IncludeWorkingChanges)
 foreach($f in (git ls-files --cached --others --exclude-standard core services web setup)){if($f -notlike 'web/fonts/*'){[void]$names.Add($f)}}
 # Prebuilt native helpers added after the previous package (not tracked: *.dll is ignored); E293 scene capture.

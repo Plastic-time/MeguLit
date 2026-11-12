@@ -16,16 +16,24 @@ const T={
   perks:['プロフィールを公開：アイコン・ひとこと・好きなゲーム','ほかの読者をフォローして最近読んでいるゲームを見たり、同好を探したり','ランキングに参加（複数の PC を 1 行にまとめます）','単語・保存した文・読書記録をクラウド同期'],
   privacy:'メールアドレスはログインにのみ使い、どこにも表示されません',notReady:'オンラインサービスは準備中のため、まだログインできません',offline:'オンラインサービスに接続できません',welcome:'ログインしました'},
  en:{title:'Profile',close:'Close',joinTitle:'Sign up / sign in to MeguLit',joinText:'Sign in with a 6-digit code sent to your e-mail; the first sign-in creates your account. No password',
-  perks:['A public profile: picture, signature, favourite games','Follow readers, see what they read lately, find kindred ones','Join the leaderboard, all your PCs as one row','Cloud sync for words, saved sentences and reading records'],
-  privacy:'Your e-mail is only used to sign in and is never shown',notReady:'Online services are not ready yet, so signing in is unavailable',offline:'Cannot reach the online service right now',welcome:'Signed in'}
+  perks:['A public profile: picture, signature, favourite games','Follow readers, see what they read lately, find kindred ones','Join the leaderboard, all your PCs as one row',
+   'Cloud sync for words, saved sentences and reading records'],
+  privacy:'Your e-mail is only used to sign in and is never shown',notReady:'Online services are not ready yet, so signing in is unavailable',offline:'Cannot reach the online service right now',
+   welcome:'Signed in'}
 };
 
-const HERO={zh:{time:'累计阅读',chars:'读过的字',words:'收录单词',streak:'最长连续',days:'天',fav:'最喜欢的游戏',noBio:'还没有签名',pick:'更换头像',rename:'改昵称',checking:'头像审核中',rejected:'头像没有通过审核，换一张吧',joining:'设置头像会同时参加排行榜',saved:'已保存',offline:'暂时连不上联网服务',xp:'经验',h:'小时',m:'分'},
- ja:{time:'累計読書',chars:'読んだ文字',words:'登録単語',streak:'最長連続',days:'日',fav:'お気に入りのゲーム',noBio:'ひとことはまだありません',pick:'アイコンを変更',rename:'ニックネームを変更',checking:'アイコン審査中',rejected:'アイコンが審査を通過しませんでした',joining:'アイコンを設定するとランキングにも参加します',saved:'保存しました',offline:'オンラインサービスに接続できません',xp:'経験値',h:'時間',m:'分'},
- en:{time:'Time read',chars:'Characters',words:'Words saved',streak:'Best streak',days:'days',fav:'Favourite games',noBio:'No signature yet',pick:'Change picture',rename:'Rename',checking:'Picture being checked',rejected:'Picture not approved; try another',joining:'Setting a picture also joins the leaderboard',saved:'Saved',offline:'Cannot reach the online service',xp:'XP',h:'h',m:'min'}};
+const HERO={zh:{time:'累计阅读',chars:'读过的字',words:'收录单词',streak:'最长连续',days:'天',fav:'最喜欢的游戏',noBio:'还没有签名',pick:'更换头像',rename:'改昵称',checking:'头像审核中',rejected:'头像没有通过审核，换一张吧',
+ joining:'设置头像会同时参加排行榜',saved:'已保存',offline:'暂时连不上联网服务',xp:'经验',h:'小时',m:'分'},
+ ja:{time:'累計読書',chars:'読んだ文字',words:'登録単語',streak:'最長連続',days:'日',fav:'お気に入りのゲーム',noBio:'ひとことはまだありません',pick:'アイコンを変更',rename:'ニックネームを変更',checking:'アイコン審査中',rejected:'アイコンが審査を通過しませんでした',
+  joining:'アイコンを設定するとランキングにも参加します',saved:'保存しました',offline:'オンラインサービスに接続できません',xp:'経験値',h:'時間',m:'分'},
+ en:{time:'Time read',chars:'Characters',words:'Words saved',streak:'Best streak',days:'days',fav:'Favourite games',noBio:'No signature yet',pick:'Change picture',
+  rename:'Rename',checking:'Picture being checked',rejected:'Picture not approved; try another',joining:'Setting a picture also joins the leaderboard',saved:'Saved',
+  offline:'Cannot reach the online service',xp:'XP',h:'h',m:'min'}};
 async function heroData(api){
- const [board,prof,view,pic,cls]=await Promise.all([api('leaderboard_profile',{}).catch(()=>null),api('leaderboard_profile_get',{}).catch(()=>null),api('leaderboard_view',{period:'all',metric:'seconds'}).catch(()=>null),api('leaderboard_avatar_status').catch(()=>null),api('reader_class_get').catch(()=>null)]);
- return {board,school:SCHOOLS[cls?.element]?cls.element:'',pic:pic?.state==='ok'?pic:null,name:board?.name||'',bio:prof?.state==='ok'?prof.bio:'',favorites:prof?.state==='ok'?(prof.favorites||[]):[],stats:view?.local?.stats?.all||null,streak:view?.local?.currentStreak};
+ const [board,prof,view,pic,cls]=await Promise.all([api('leaderboard_profile',{}).catch(()=>null),api('leaderboard_profile_get',{}).catch(()=>null),api('leaderboard_view',
+  {period:'all',metric:'seconds'}).catch(()=>null),api('leaderboard_avatar_status').catch(()=>null),api('reader_class_get').catch(()=>null)]);
+ return {board,school:SCHOOLS[cls?.element]?cls.element:'',pic:pic?.state==='ok'?pic:null,name:board?.name||'',bio:prof?.state==='ok'?prof.bio:'',favorites:prof?.state==='ok'?(prof.favorites||[]):[],
+  stats:view?.local?.stats?.all||null,streak:view?.local?.currentStreak};
 }
 
 /* the level, ranks and 转职 live in reader-class.js */
@@ -85,13 +93,16 @@ ${d.favorites.length?`<div class="profile-hero-fav"><h4>${h.fav}</h4><ol>${d.fav
    await paintHero(hero);
   };
   const lv0=readerLevel(d.stats,d.school);
-  hero.querySelector('[data-class-go]')?.addEventListener('click',()=>openRite({api,locale,esc,toast,current:d.school,pending:lv0.pending,xpTotal:lv0.xp+lv0.pending,onDone:()=>paintHero(hero)}));
+  hero.querySelector('[data-class-go]')?.addEventListener('click',()=>openRite({api,locale,esc,toast,current:d.school,pending:lv0.pending,xpTotal:lv0.xp+lv0.pending,
+   onDone:()=>paintHero(hero)}));
   const nameBtn=hero.querySelector('[data-hero-name]');
   nameBtn.onclick=()=>{
-   const input=document.createElement('input');input.type='text';input.maxLength=16;input.value=d.name||'';input.className='profile-hero-name-input';input.setAttribute('aria-label',h.rename);
+   const input=document.createElement('input');input.type='text';input.maxLength=16;input.value=d.name||'';input.className='profile-hero-name-input';input.setAttribute('aria-label',
+    h.rename);
    nameBtn.replaceWith(input);input.focus();input.select();let done=false;
    const finish=async save=>{if(done)return;done=true;const v=input.value.trim();
-    if(save&&v&&v!==d.name){try{if(board.joined)await api('leaderboard_join',{name:v,shareGames:board.shareGames===true,consent:true});else await api('settings_save',{scope:'online',values:{leaderboardName:v}});d.name=v;sync(v);toast(h.saved);}catch(e){toast(String(e?.message||h.offline));}}
+    if(save&&v&&v!==d.name){try{if(board.joined)await api('leaderboard_join',{name:v,shareGames:board.shareGames===true,consent:true});else await api('settings_save',
+     {scope:'online',values:{leaderboardName:v}});d.name=v;sync(v);toast(h.saved);}catch(e){toast(String(e?.message||h.offline));}}
     await paintHero(hero);};
    input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();finish(true);}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();finish(false);}};
    input.onblur=()=>finish(true);
