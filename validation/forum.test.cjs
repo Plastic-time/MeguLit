@@ -34,7 +34,8 @@ test('forum validation: lengths, links, blocked words, tags, game and engine',as
  assert.equal(validatePost(post({title:'あ'.repeat(61)})).error,'TITLE_LENGTH');
  assert.equal(validatePost(post({body:'あ'.repeat(4001)})).error,'BODY_LENGTH');
  assert.equal(validatePost(post({body:'  '})).error,'BODY_REQUIRED');
- for(const bad of ['看 https://x.cn','加我 www.example.com','ｗｗｗ．ｅｘａｍｐｌｅ．ｃｏｍ','mail a@b.cn','加 qq: 12345678','vx：abcdef1'])assert.equal(validatePost(post({body:bad})).error,'TEXT_LINK',bad);
+ /* 2026-11-12 (user: fewer rules) links and handles are no longer refused by the text check; the automatic review decides */
+ for(const ok of ['看 https://x.cn','加我 www.example.com'])assert.equal(validatePost(post({body:ok})).error,undefined,ok);
  for(const bad of ['你这个傻逼','约炮吗','fuck you'])assert.equal(validatePost(post({body:bad})).error,'TEXT_BLOCKED',bad);
  assert.equal(validatePost(post({body:'a​b'})).error,'TEXT_INVALID');
  assert.equal(validatePost(post({tag:'x'})).error,'INVALID_TAG');
@@ -70,7 +71,7 @@ test('forum: anyone reads, only accounts write; AI verdict reasons; replies bump
  assert.equal((await call(handle,e,'GET','/api/forum')).data.posts.length,2);
  for(const[answer,reason]of [['ADULT','MODERATION_ADULT'],['abuse.','MODERATION_ABUSE'],['SPAM','MODERATION_SPAM']]){e.AI=ai(answer);const x=await call(handle,e,'POST','/api/forum',post({title:'再问 '+answer}),B);assert.equal(x.status,422);assert.equal(x.data.error,reason);}
  e.AI={run:async()=>{throw Error('down');}};assert.equal((await call(handle,e,'POST',`/api/forum/${id}/replies`,{body:'模型挂了也能回复'},A)).status,201,'model down: local filter decides');
- e.AI=ai('SAFE');assert.equal((await call(handle,e,'POST',`/api/forum/${id}/replies`,{body:'加我 qq 12345678'},A)).data.error,'TEXT_LINK');
+ e.AI=ai('SAFE');assert.notEqual((await call(handle,e,'POST',`/api/forum/${id}/replies`,{body:'加我 qq 12345678'},A)).data.error,'TEXT_LINK');
 });
 
 test('forum: authors delete their own, the admin key deletes anything, others cannot',async()=>{

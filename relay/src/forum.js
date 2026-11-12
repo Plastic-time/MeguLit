@@ -28,7 +28,7 @@ export function cleanText(value,[min,max],multiline,prefix){
  const n=[...text].length;if(n<min||n>max)return {ok:false,error:prefix+'_LENGTH'};
  if([...text].some(invisible))return {ok:false,error:'TEXT_INVALID'};
  const folded=text.normalize('NFKC');
- if(LINK.test(folded))return {ok:false,error:'TEXT_LINK'};
+ /* 2026-11-12 (user: fewer rules, just be kind; nothing illegal, nothing private): links are allowed, the automatic review still turns away ads and spam */
  const lower=folded.toLowerCase(),flat=lower.replace(/[\s._\-*·・]/g,''),tokens=lower.split(/[^a-z]+/).filter(Boolean);
  if(BLOCKED.some(w=>!NAME_ONLY.includes(w)&&!(/^[a-z]{1,2}$/.test(w))&&(/^[a-z]+$/.test(w)?tokens.some(t=>t.startsWith(w)):flat.includes(w))))return {ok:false,error:'TEXT_BLOCKED'};
  return {ok:true,text};

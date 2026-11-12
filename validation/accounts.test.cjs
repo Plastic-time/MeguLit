@@ -93,7 +93,9 @@ test('sessions: /api/me, daily rotation with grace, device revoke, logout, accou
  const day=new Date(T0.getTime()+86400e3+1000),res=await handleAccounts(req('GET','/api/me',undefined,auth(a.token)),r.env,day),fresh=res.headers.get('x-megulit-token');
  assert.match(fresh,/^mgl_/);assert.notEqual(fresh,a.token);
  assert.equal((await handleAccounts(req('GET','/api/me',undefined,auth(a.token)),r.env,new Date(day.getTime()+3600e3))).status,200);
- assert.equal((await handleAccounts(req('GET','/api/me',undefined,auth(a.token)),r.env,new Date(day.getTime()+86401e3))).status,401);
+ /* 2026-11-12 the previous token keeps working 30 days (a rotation an answer did not carry was lost) */
+ assert.equal((await handleAccounts(req('GET','/api/me',undefined,auth(a.token)),r.env,new Date(day.getTime()+29*86400e3))).status,200);
+ assert.equal((await handleAccounts(req('GET','/api/me',undefined,auth(a.token)),r.env,new Date(day.getTime()+30*86400e3+1000))).status,401);
  assert.equal((await handleAccounts(req('GET','/api/me',undefined,auth(fresh)),r.env,new Date(day.getTime()+86401e3))).status,200);
  /* sessions expire after 180 idle days */
  assert.equal((await handleAccounts(req('GET','/api/me',undefined,auth(fresh)),r.env,new Date(day.getTime()+86401e3+181*86400e3))).status,401);
