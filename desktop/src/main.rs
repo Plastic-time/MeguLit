@@ -11,6 +11,7 @@ mod window_policy;
 mod window_memory;
 mod home_transition;
 mod tray_menu;
+mod hot_assets;
 #[cfg(windows)]
 mod reader_pointer;
 use serde_json::{json, Value};
@@ -127,6 +128,18 @@ async fn kanji_go_hide(app:tauri::AppHandle)->Result<(),String>{
 }
 
 /// 关于 → 更新：更新脚本已在后台等待，主窗口发起退出，让脚本替换程序文件。
+// Hot update (services/hot-update.cjs): not while a game is being read, since the service restart would drop it. With
+// dry_run the caller only asks whether now is fine; otherwise the service restarts and every MeguLit page reloads.
+#[tauri::command]
+async fn hot_reload(app:tauri::AppHandle,dry_run:Option<bool>)->Result<bool,String>{
+    if let Some(reader)=app.get_webview_window("reader"){if reader.is_visible().unwrap_or(false){return Err("READER_OPEN".into());}}
+    if dry_run==Some(true){return Ok(true);}
+    let root=app.state::<DesktopState>().root.clone();
+    let on=hot_assets::refresh(&root);
+    tauri::async_runtime::spawn_blocking(broker::shutdown).await.map_err(|e|e.to_string())?;
+    for label in ["reader","tray-menu","main"]{if let Some(window)=app.get_webview_window(label){let _=window.eval("location.reload()");}}
+    Ok(on)
+}
 #[tauri::command]
 fn app_exit_for_update(window:tauri::WebviewWindow){
     if window.label()!="main"{return;}
@@ -444,6 +457,7 @@ fn main() {
      if log_on||!extra.is_empty(){let log=root.join(if headless{"logs/webview2-headless.log"}else{"logs/webview2-browser.log"});let logging=if log_on{format!(" --enable-logging --log-file=\"{}\" --log-level=1",log.display())}else{String::new()};std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",format!("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection{logging} {extra}"));}}
     let mut context=tauri::generate_context!();
     for window in &mut context.config_mut().app.windows {window.data_directory=Some(profile.clone());window.create=false;}
+    hot_assets::wrap(&mut context,&root);
     let splash=if !headless && root.join("native/StartupIsland.exe").is_file() {
         let flag=cache.join(format!("splash-{}.flag",std::process::id()));
         let preferences=run_service(root.clone(),json!({"action":"preferences"})).unwrap_or(json!({}));
@@ -455,7 +469,7 @@ fn main() {
     let window_memory=window_memory::WindowMemory::new(&root);
     let state = DesktopState { root, exiting: AtomicBool::new(false), headless, splash,window_memory,reader_background:AtomicBool::new(true),home_transition:home_transition::HomeTransition::default() };
     tauri::Builder::default().manage(state).plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![service, tray_menu::tray_menu_action, window_action, pick_executable, pick_patch_file, pick_image, pick_directories, pick_backup, set_tray_language, reader_open, reader_connect, reader_restart, read_clipboard, moji_login, kanji_go_open, kanji_go_embed, kanji_go_hide, app_exit_for_update])
+        .invoke_handler(tauri::generate_handler![service, tray_menu::tray_menu_action, window_action, pick_executable, pick_patch_file, pick_image, pick_directories, pick_backup, set_tray_language, reader_open, reader_connect, reader_restart, read_clipboard, moji_login, kanji_go_open, kanji_go_embed, kanji_go_hide, app_exit_for_update, hot_reload])
         .setup(move |app| {
             broker::attach(app.handle().clone());
             if !headless{single_instance::watch(app.handle().clone(),app.state::<DesktopState>().root.clone());}
