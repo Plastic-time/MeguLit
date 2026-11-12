@@ -314,7 +314,9 @@ export function fieldify(grid,filtered=false){
   // SVG filter. Quantised to 4 levels so the filter only changes when the speed band does, and off when still.
   const level=reduceMotion.matches?0:Math.min(4,Math.floor(speed/.45));
   const dir=level?(Math.abs(vx)>=Math.abs(vy)?'x':'y'):'';
-  if(level+dir!==blur){blur=level+dir;plane.style.filter=level?'url(#field-blur-'+dir+level+')':'';}
+  /* (user 2026-11-12: the infinite wall still stuttered) the directional blur was an SVG filter over the whole plane,
+     rasterised on the CPU every frame while dragging; the plane is never filtered now */
+  if(level+dir!==blur){blur=level+dir;}
   const dxSinceLayout=(layoutX-x)*z,dySinceLayout=(layoutY-y)*z;
   // Shift the existing plane between layout frames. Overscan covers the shift.
   // E222 (user: still laggy): any drag or coast moves only the plane; covers are re-laid at most every 90ms.
@@ -348,7 +350,7 @@ export function fieldify(grid,filtered=false){
     const source=items[index%items.length];
     const node=source.cloneNode(true);
     node.draggable=false;
-    node.querySelectorAll('img').forEach(img=>{img.draggable=false;});
+    node.querySelectorAll('img').forEach(img=>{img.draggable=false;img.decoding='async';});
     sources.set(node,source);added.append(node);
     cell={node,col,row};cells.set(key,cell);
    }

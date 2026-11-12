@@ -1875,3 +1875,9 @@ html:not(#u):not(#v):not(#w):not(#x) body .lv-tips-list li{counter-increment:tip
 html:not(#u):not(#v):not(#w):not(#x) body .lv-tips-list li::before{content:counter(tip,decimal-leading-zero);position:absolute;left:0;top:12px;font:400 20px/1.2 var(--g-serif,serif);color:var(--g-gold,#edb56e)}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-tips .lv-note{margin:12px 0 0;font-size:12.5px}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-tips footer{display:flex;justify-content:flex-end;margin-top:16px}
+/* 2026-11-12 (user: every settings page left a band empty on the right when maximised) the column, the search bar and the
+   blocks one level down grow to 1360px (still never wider than the space beside the side menu) */
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .settings-layout>.settings-content>*{max-width:min(1360px,100%)}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .settings-layout>.settings-content>*>:not(.settings-search):not(.settings-search-results){max-width:1360px}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .settings-content input.settings-search{max-width:min(1360px,100%)}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .settings-content>.profile-selector{left:calc(28px + min(1360px,100% - 56px))!important}

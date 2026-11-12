@@ -52,9 +52,19 @@ internal static class EmbedTextPolicy {
         return output.Append(Blank(value.Substring(at))).ToString();
     }
 
+    /* E465 (user 2026-11-12, ファタモルガーナの館: "first.ks 行 78 タグ image ... dtjp.xp3>" at start, every game must be safe).
+       A generic string stream (Krkr2wcs) also carries the engine's storage names, and KAG names its images in Japanese
+       ("注意書き"); blanking one emptied the image tag's file name. A short string with no sentence punctuation, no space
+       and no line break is a name, a label or a button, never written back; a very short spoken line may show its
+       original for a moment, which is far better than an engine error. */
+    static readonly Regex Sentence = new Regex(@"[、。，．！？!?…‥「」『』（）()―—\s]");
+    public static bool Label(string value) {
+        string plain = Ruby.Replace(Construct.Replace(value ?? "", ""), m => m.Groups[2].Value).Trim();
+        return plain.Length > 0 && plain.Length <= 12 && !Sentence.IsMatch(plain);
+    }
     public static string Hide(string value) {
         // An empty reply tells LunaHook to skip writeback entirely, including its own re-encoding.
-        if (String.IsNullOrWhiteSpace(value) || value.Length > 600) return "";
+        if (String.IsNullOrWhiteSpace(value) || value.Length > 600 || Label(value)) return "";
         if (Ruby.IsMatch(value)) return HideRuby(value);
         if (Resource.IsMatch(value) || Container(value)) return "";
         // A dialogue line that carries a few script constructs used to be skipped whole, so its original stayed under
@@ -76,7 +86,7 @@ internal static class EmbedTextPolicy {
     // command (control characters, tags, %A/$x/@x/^ prefixes). Ruby is dropped: the translation has no ruby of its own.
     static readonly Regex Trailing = new Regex("(?:" + Construct.ToString() + ")+$");
     public static string Writeback(string original, string translation) {
-        if (String.IsNullOrWhiteSpace(translation)) return "";
+        if (String.IsNullOrWhiteSpace(translation) || Label(original)) return "";
         string t = translation.Replace("\r\n", "\n").Replace('\r', '\n');
         t = Regex.Replace(t, @"[\x00-\x08\x0b\x0c\x0e-\x1f]", "");
         t = t.Replace("<", "〈").Replace(">", "〉");
@@ -96,7 +106,7 @@ internal static class EmbedTextPolicy {
             Hide(mixed) == "" && Hide("そう、雪だ。♪【＄名前＿渚】％Ａ") == "　　　　　　　【＄名前＿渚】％Ａ" &&
             Hide("％Ａ《渚の名前》％Ｂ《秋生の名前》％Ｃ《＊Ｂから渚への呼称》プロローグ") == "" &&
             Hide("＊Ａ崎岡岡崎") == "" && Hide("全品50％OFFだって！").Length == "全品50％OFFだって！".Length &&
-            Hide("grp.pak") == "" && Hide("grp,bg001") == "" && Hide(@"data\grp\背景.tga") == "" &&
+            Hide("grp.pak") == "" && Hide("注意書き") == "" && Hide("タイトル画面") == "" && Writeback("注意書き", "注意") == "" && Hide("grp,bg001") == "" && Hide(@"data\grp\背景.tga") == "" &&
             Hide("トーンカーブ.dat") == "" && Hide("「またね」<wait>") == "　　　　　<wait>" &&
             Hide("名前%Q") == "" && Hide("「またね」\u0001") == "　　　　　\u0001" &&
             Hide("「やっと来たね」\r\nそうですね……") == "　　　　　　　　\r\n　　　　　　　" &&
@@ -108,7 +118,7 @@ internal static class EmbedTextPolicy {
             Hide("　車の窓は<rしも>霜</r>だらけで、\n　走りだせない。") == "　　　　　<r　　>　</r>　　　　　\n　　　　　　　　" &&
             Writeback("　彼女がはじめて命に<rふ>触</r>れた。", "她第一次触碰到生命。") == "　她第一次触碰到生命。" &&
             Writeback("「またね」<wait>", "「再见」") == "「再见」<wait>" && Writeback("「またね」\u0001", "「再见」") == "「再见」\u0001" &&
-            Writeback("あ", "<b>%A$x译文\u0002") == "〈b〉A x译文".Replace(" ", "") && Writeback("あ", "  ") == "" &&
+            Writeback("あ。", "<b>%A$x译文\u0002") == "〈b〉A x译文".Replace(" ", "") && Writeback("あ。", "  ") == "" &&
             Hide("<rふ>触</r>【＄名前】") == "" && Hide(@"<rx>data\a</r>") == "";
     }
 }
