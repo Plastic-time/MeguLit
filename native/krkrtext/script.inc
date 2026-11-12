@@ -177,6 +177,8 @@ LR"MGLT((function(){
      if(v!=this.lastVis) {this.lastVis=v;this.report('ToMe_DIALOG engine=krkr visible='+v);}
     } catch(e) {}
    } incontextof st;
+   /* the face the latest sentence was drawn with, reported when it changes (checked with every refresh) */
+   st.fontCheck=function(){try {var r=this.active;if(r===void || r===null) return;var f=r.target.font,face=''+f.face,size=Math.abs(+f.height),fk=face+'|'+size+'|'+(f.bold?1:0);if(face!='' && fk!=this.lastFont) {this.lastFont=fk;this.report('ToMe_KRKR font size='+size+' bold='+(f.bold?1:0)+' face='+face);}} catch(e) {}} incontextof st;
    st.fontNow=function(){try {var r=this.active;if(r===void || r===null) return '-';var f=r.target.font;return ''+f.face+'/'+(+f.height)+(this.lastFont==''?' unreported':'');} catch(e) {return 'err '+e.message;}} incontextof st;
    st.refresh=function(){
     try {
@@ -194,6 +196,7 @@ LR"MGLT((function(){
      for(var i=this.recs.count-1;i>=0;i--) if(!isvalid this.recs[i].target) this.recs.erase(i);
      for(var i=this.wrapped.count-1;i>=0;i--) if(!isvalid this.wrapped[i]) this.wrapped.erase(i);
      for(var i=this.artSeen.count-1;i>=0;i--) if(!isvalid this.artSeen[i]) this.artSeen.erase(i);
+     this.fontCheck();
      try {this.artWalk(k.primaryLayer,0);} catch(e) {}
      try {this.artWalk(k.fore.base,0);this.artWalk(k.back.base,0);} catch(e) {}
      var pages=[k.fore,k.back];
