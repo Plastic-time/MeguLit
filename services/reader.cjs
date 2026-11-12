@@ -304,13 +304,18 @@ class Reader{
    if(args.pitchChoice!==undefined){if(!word.pitch.includes(args.pitchChoice))throw Error('INVALID_PITCH');word.pitch=[args.pitchChoice];}
    if(action==='word')return word;let audio;
    if(['speak','prefetch'].includes(action)){await this.runtime.services().ensureSpeech(config.aivisUrl,config.aivisGpu);const audio=await this.runtime.speech().synthesize(word,config,{prefetch:action==='prefetch'});return action==='prefetch'?{ready:true}:audio;}
-   const picked=this.sentenceTranslation(args.text,String(args.translation||'').slice(0,1000));args.translation=picked.translation;args.translationSource=picked.translationSource;const extra={translation:picked.translation.slice(0,1000),translationSource:picked.translationSource,gameTitle:this.gameTitle()};try{const insights=require('./learning-insights.cjs'),learning=this.runtime.learning(),resolved=learning.readings.resolve(await learning.tokenize(args.text));let pairs=[];try{pairs=this.gal?.hooks?.resolveSource?.(args.text)?.ruby||[];}catch{}extra.sentenceHtml=require('../core/sentence-html.cjs').furiganaHtml(args.text,insights.applyGameRuby(resolved,this.gal?.gameRuby?.dict(this.gal?.styleSync?.profileKey)||{},pairs),args.start,args.end);}catch{}
+   const picked=this.sentenceTranslation(args.text,String(args.translation||'').slice(0,1000));args.translation=picked.translation;args.translationSource=picked.translationSource;const extra={aiNote:args.aiNote&&typeof args.aiNote.text==='string'?{kind:args.aiNote.kind==='summary'?'summary':'explain',text:args.aiNote.text.slice(0,2000)}:null,translation:picked.translation.slice(0,1000),translationSource:picked.translationSource,gameTitle:this.gameTitle()};try{const insights=require('./learning-insights.cjs'),learning=this.runtime.learning(),resolved=learning.readings.resolve(await learning.tokenize(args.text));let pairs=[];try{pairs=this.gal?.hooks?.resolveSource?.(args.text)?.ruby||[];}catch{}extra.sentenceHtml=require('../core/sentence-html.cjs').furiganaHtml(args.text,insights.applyGameRuby(resolved,this.gal?.gameRuby?.dict(this.gal?.styleSync?.profileKey)||{},pairs),args.start,args.end);}catch{}
    if(config.ankiGameMedia!==false){
     const media=await this.gal?.gameMedia(args.text,Date.now(),false).catch(()=>null);
     extra.screenshot=screenshot;
-    if(media?.audio){extra.sentenceAudio=media.audio;extra.gameAudio=true;}
-    /* E450 the voice the script names for this line, or one kept while the game ran */
-    if(!extra.sentenceAudio){try{const v=require('./game-voice.cjs').find(this.root,args.text);if(v){extra.sentenceAudio={data:v.data.toString('base64'),ext:require('./game-voice.cjs').kind(v.data).ext};extra.gameAudio=true;}}catch{}}
+    /* E454 (player: the card's voice carried long stretches of BGM): the voice file the script names for this line comes
+       first, it is the clean voice alone; the clip recorded from the game's sound (trimmed to the spoken run) is next,
+       then one kept while the game ran */
+    let voice=null;try{voice=require('./game-voice.cjs').find(this.root,args.text);}catch{}
+    const asAudio=v=>({data:v.data.toString('base64'),ext:require('./game-voice.cjs').kind(v.data).ext});
+    if(voice?.source==='scan'){extra.sentenceAudio=asAudio(voice);extra.gameAudio=true;}
+    else if(media?.audio){extra.sentenceAudio=media.audio;extra.gameAudio=true;}
+    else if(voice){extra.sentenceAudio=asAudio(voice);extra.gameAudio=true;}
     try{fs.appendFileSync(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'ankiGameAudio',matched:!!media?.matched,recording:!!media?.recording,voiced:!!media?.audio,error:media?.error||''})+'\n');}catch{}
    }
    if(config.ankiAudio){

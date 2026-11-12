@@ -89,7 +89,7 @@ class Anki{
  }
  async save(word,c,audio,id,extra={}){const {available,owned}=await this.prepareModel(c);await this.call(c,'createDeck',{deck:c.ankiDeck});
   const quote=s=>'"'+s.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"',tag='tomoyo::'+id,found=await this.call(c,'findNotes',{query:'tag:'+tag+' deck:'+quote(c.ankiDeck)+' note:'+quote(c.ankiModel)});if(found.length>1)throw Error('找到多个同步词条，请先在 Anki 中消除重复笔记');
-  const values={Word:html(word.base||word.surface),Pitch:circled(word.pitch),PartOfSpeech:html(word.pos),Meaning:html(word.meaning),Sentence:html(word.sentence),Audio:''};
+  const values={Word:html(word.base||word.surface),Pitch:circled(word.pitch),PartOfSpeech:html(word.pos),Meaning:html(word.meaning)+(extra.aiNote?.text?'<div class="megulit-ai-note"><br><b>'+(extra.aiNote.kind==='summary'?'AI 归纳义项':'AI 上下文解释')+'</b><br>'+html(extra.aiNote.text)+'</div>':''),Sentence:html(word.sentence),Audio:''};
   if(available.includes('SentenceFurigana'))values.SentenceFurigana=extra.sentenceHtml||'';if(available.includes('SentenceTranslation'))values.SentenceTranslation=html(extra.translation||'');{/* sentence card: game title and where the translation came from (human first) */const f=require('../services/learning-insights.cjs').ankiSentenceFields({translation:extra.translation,translationSource:extra.translationSource,gameTitle:extra.gameTitle},available);if('Game' in f)values.Game=html(f.Game);if('TranslationSource' in f)values.TranslationSource=html(f.TranslationSource);}if(available.includes('SentenceAudio'))values.SentenceAudio='';
   if(available.includes('Screenshot'))values.Screenshot='';
   // E215.6 (user): the answer shows the word's reading under the word, as common decks do.
