@@ -35,7 +35,7 @@ function auto(db,id){id=String(id||'');const ok=storyOnly(db,id);
 function chosen(root,id){const all=store.readJSON(file(root),{});return cleanList(all&&typeof all==='object'?all[String(id)]:[]);}
 function save(root,id,lines){id=String(id||'');if(!id)throw Error('GAME_NOT_FOUND');const f=file(root),all=store.readJSON(f,{}),next=all&&typeof all==='object'&&!Array.isArray(all)?all:{},list=cleanList(lines);
  if(list.length)next[id]=list;else delete next[id];fs.mkdirSync(path.dirname(f),{recursive:true});const tmp=f+'.tmp';fs.writeFileSync(tmp,JSON.stringify(next,null,1));fs.renameSync(tmp,f);return list;}
-function list(db,root,id,{query='',limit=400}={}){id=String(id||'');const q=clean(query),lim=Math.max(1,Math.min(1000,Number(limit)||400)),like='%'+q.replace(/[!%_]/g,c=>'!'+c)+'%';
+function list(db,root,id,{query='',limit=400}={}){id=String(id||'');const q=clean(query),lim=Math.max(1,Math.min(5000,Number(limit)||400)),like='%'+q.replace(/[!%_]/g,c=>'!'+c)+'%';
  const saved=db.prepare("SELECT text,created_at at FROM saved_sentences WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!' ORDER BY created_at DESC LIMIT ?").all(id,like,lim);
  const read=db.prepare("SELECT text,MAX(read_at) at FROM reading_events WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!' GROUP BY text ORDER BY at DESC LIMIT ?").all(id,like,lim);
  const ok=storyOnly(db,id),ms=v=>{v=Number(v)||0;return v&&v<1e12?v*1000:v;},rows=new Map();for(const r of saved){const t=clean(r.text);if(t&&ok(t)&&!rows.has(t))rows.set(t,{text:t,at:ms(r.at),saved:true});}

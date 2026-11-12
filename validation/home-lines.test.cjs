@@ -13,6 +13,7 @@ test('lists the lines read in one game, newest first, one row per text, saved on
  assert.deepEqual(lines.list(db,root,'g1',{query:'目覚め'}).lines.map(r=>r.text),['「まあ……、やっと、お目覚めになられましたのね。」']);
  assert.deepEqual(lines.list(db,root,'g1',{query:'%_'}).lines.map(r=>r.text),['100%_の確率'],'LIKE wildcards are literal');
  assert.equal(lines.list(db,root,'g1',{limit:2}).lines.length,2);
+ {const many=db.prepare("INSERT INTO reading_events(game_id,text,read_at) VALUES('g3',?,?)");for(let i=0;i<3200;i++)many.run('台詞その'+i+'だよね',i+1);const all=lines.list(db,root,'g3',{limit:5000}).lines;assert.equal(all.length,3200,'every line read, not a short page');assert.equal(all[0].text,'台詞その3199だよね');}
 });
 
 test('the choice is kept per game, at most five distinct lines, and an empty choice means automatic',t=>{
@@ -34,6 +35,7 @@ test('picker helpers: toggle with a cap of five, shown lines pre-checked even wh
  const rows=mergeLines([{text:'新しい',at:2},{text:'古い',at:1}],['「古い」','見えない行']);
  assert.deepEqual(rows.map(r=>r.text),['見えない行','新しい','古い']);
  assert.deepEqual(pickedFrom(rows,['「古い」','見えない行']),['古い','見えない行']);
+ const {visibleRange}=await import('../web/home-lines.js');assert.deepEqual(visibleRange(0,480,3000),{first:0,last:16});assert.deepEqual(visibleRange(48*1000,480,3000),{first:994,last:1016});assert.deepEqual(visibleRange(48*2995,480,3000),{first:2989,last:3000});
 });
 
 test('home shows the chosen lines and falls back to the automatic ones',async()=>{

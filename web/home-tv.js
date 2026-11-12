@@ -71,10 +71,12 @@ function swapScript(script,lines,onPick){if(!script)return;const esc2=t=>String(
  if(olds.length===next.length&&olds.every((el,k)=>el.querySelector('.tv-stxt')?.textContent===next[k]))return;
  if(matchMedia('(prefers-reduced-motion:reduce)').matches||typeof Element.prototype.animate!=='function'){paint(next);return;}
  const OUT=300,GAP=45,keep=x=>(script._anims.push(x),x);
+ /* start after the frame that paints the new cover and ring, so the first frames of the fade are not swallowed by it */
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{if(script.dataset.timer!==token)return;
  const outs=olds.map((el,k)=>keep(el.animate([{opacity:1,transform:'translate3d(0,0,0)'},{opacity:0,transform:'translate3d(0,-16px,0)'}],{duration:OUT,delay:k*GAP,easing:'cubic-bezier(.4,0,.7,.4)',fill:'forwards'})).finished);
  Promise.all(outs).then(()=>{if(script.dataset.timer!==token)return;script._anims=[];paint(next);
   script.querySelectorAll('p').forEach((el,k)=>{keep(el.animate([{opacity:0,transform:'translate3d(0,28px,0)'},{opacity:1,transform:'translate3d(0,0,0)'}],{duration:720,delay:k*90,easing:'cubic-bezier(.16,1,.3,1)',fill:'backwards'}));
-   const no=el.querySelector('.tv-sno');if(no)keep(no.animate([{opacity:0},{opacity:1}],{duration:420,delay:k*90+260,easing:'ease-out',fill:'backwards'}));});}).catch(()=>{});}
+   const no=el.querySelector('.tv-sno');if(no)keep(no.animate([{opacity:0},{opacity:1}],{duration:420,delay:k*90+260,easing:'ease-out',fill:'backwards'}));});}).catch(()=>{});}));}
 
 function busy(cover,ms){cover.dataset.busy='1';cover.classList.remove('touch');const face=cover.querySelector('.tv-face');if(face){face.style.transition='transform .25s ease-out';face.style.transform='';}clearTimeout(+cover.dataset.busyTimer||0);cover.dataset.busyTimer=setTimeout(()=>{delete cover.dataset.busy;},ms);}
 function outLayer(cover){const home=cover.closest('.tv-home');let layer=home.querySelector(':scope>.tv-outgoing');if(!layer){layer=document.createElement('div');layer.className='tv-outgoing';layer.setAttribute('aria-hidden','true');home.insertBefore(layer,home.querySelector(':scope>.tv-canvas'));}const h=home.getBoundingClientRect(),r=cover.getBoundingClientRect(),w=cover.offsetWidth*1.06;layer.style.width=w+'px';layer.style.left=(r.left+r.width/2-h.left-w/2)+'px';layer.style.top=(r.top+r.height/2-h.top-w*2/3)+'px';layer.querySelectorAll('.tv-old').forEach(n=>n.remove());return layer;}
