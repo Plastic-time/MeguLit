@@ -79,3 +79,18 @@ test('F: Siglus embed hooks insert no spaces into translations',()=>{
  for(const f of ['megulithook','siglus']){const src=fs.readFileSync(path.join(__dirname,'..','native',f,'Siglus.cpp'),'utf8');
   assert.ok(!/EMBED_INSERT_SPACE_AFTER_UNENCODABLE/.test(src),f);assert.ok((src.match(/EMBED_ABLE \| CODEC_UTF16/g)||[]).length>=4,f);}
 });
+/* G: a pairing made for another running script whose source folder is gone (Summer Pockets: paired from
+   .megulit-japanese\dat, then the Japanese restore was undone) is searched for again instead of pairing nothing. */
+test('G: Summer Pockets re-pairs after its old pairing source vanished',{skip:!have('Summer Pockets')&&'no local copy'},async()=>{
+ const {DatabaseSync}=require('node:sqlite'),db=new DatabaseSync(':memory:');db.exec('CREATE TABLE games(id TEXT,executable TEXT,removed_at TEXT)');
+ const exe=path.join(steam+'Summer Pockets','SiglusEngine_Steam.exe');db.prepare('INSERT INTO games VALUES(?,?,NULL)').run('1',exe);
+ const ot=require('../services/original-text.cjs'),data=fs.mkdtempSync(path.join(os.tmpdir(),'ot-sp-'));
+ try{
+  const first=await ot.autoPatch(data,db,'1',{drives:false,force:true});assert.ok(first.found,JSON.stringify(first));
+  const file=path.join(data,'data','config','original-text.json'),s=JSON.parse(fs.readFileSync(file,'utf8'));
+  s['1'].patch={...s['1'].patch,source:path.join(data,'gone','dat'),dir:path.join(data,'gone','dat'),runtimeSha:'0'.repeat(64)};s['1'].patchSearch={...s['1'].patchSearch,at:Date.now(),runtimeSha:s['1'].runtime.sha256};fs.writeFileSync(file,JSON.stringify(s));
+  assert.equal((ot.scriptPairs(data,exe)?.tr||[]).filter(Boolean).length,0,'stale pairing pairs nothing');
+  const again=await ot.autoPatch(data,db,'1',{drives:false});assert.ok(again.found,JSON.stringify(again));
+  const p=ot.scriptPairs(data,exe);assert.ok(p.tr.filter(Boolean).length>60000,String(p.tr.filter(Boolean).length));
+ }finally{fs.rmSync(data,{recursive:true,force:true});}
+});
