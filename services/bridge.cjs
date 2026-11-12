@@ -48,9 +48,11 @@ function savePreferences(request) {
 }
 /* 2026-11-12 the Windows feature a game could not start without, per game, for the install button (windows_feature_install) */
 const neededFeature=new Map();
-async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false}={}) {
+async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redirected=false}={}) {
   const game=db.prepare('SELECT * FROM games WHERE id=? AND removed_at IS NULL').get(id);
   if(!game)throw Error('GAME_NOT_FOUND');
+  /* 2026-11-12 a folder used as another game's Japanese original starts that game (services/import-source.cjs) */
+  {let target='';try{const sources=require('./import-source.cjs');sources.backfill(db);target=sources.targetOf(db,db.prepare('SELECT original FROM games WHERE id=?').get(id));}catch{}if(target&&target!==id&&!redirected)return launch(db,target,runtime,windowsLaunch,{redirected:true});}
    const trace=(stage,extra={})=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','game-launch.log'),JSON.stringify({at:new Date().toISOString(),gameId:id,stage,...extra})+'\n');}catch{}};
   let stage='launch-preflight',featureWatch=null;
   try{
@@ -204,7 +206,7 @@ async function dispatch(request,runtime=null) {
       case 'library_scan':case 'library_find_steam':case 'reader_bootstrap':if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');return runtime.call(request);
       case 'reader_status':case 'reader_health':case 'reader_detach':case 'reader_attach':case 'reader_message':case 'reader_invoke':case 'model_status':case 'model_download':case 'model_cancel':case 'pack_status':case 'pack_download':case 'pack_cancel':case 'local_start':case 'local_stop':case 'runtime_download':case 'runtime_cancel':case 'speakers':case 'speakers_cached':case 'speech_preview':case 'sentence_voice':case 'kana_speak':case 'tokenize':case 'translate_preview':
         if(!runtime)throw Error('PERSISTENT_RUNTIME_REQUIRED');return await runtime.call(request);
-      case 'home': return store.home(db,root);
+      case 'home': try{require('./import-source.cjs').backfill(db);}catch{}return store.home(db,root);
       case 'game_shots':case 'game_shot':{const game=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(String(request.id));if(!game)throw Error('GAME_NOT_FOUND');const shots=require('./scene-shots.cjs');
         return request.action==='game_shots'?{items:shots.list(root,game.executable)}:shots.read(root,game.executable,String(request.file||''));}
       case 'game_cgs':case 'game_cg':{const game=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(String(request.id));if(!game)throw Error('GAME_NOT_FOUND');const cg=require('./game-cg.cjs');
@@ -245,10 +247,10 @@ async function dispatch(request,runtime=null) {
        if(request.action==='jp_import_cancel'){jio.cleanup(dir);return {ok:true};}
        /* E339: show the .iso made from an installer disc in Explorer (selected, not opened) */
        if(request.action==='jp_import_reveal'){const file=require('node:path').resolve(String(request.path||''));if(!/\.iso$/i.test(file)||!fs.existsSync(file))throw Error('IMPORT_SOURCE_MISSING');const child=spawn('explorer.exe',['/select,'+file],{windowsHide:true,detached:true,stdio:'ignore'});child.unref();return {ok:true};}
-       if(request.action==='jp_import_apply'&&imported?.state!=='importable'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');return jio.apply(dir,String(request.source||''),row.executable).then(r=>{if(r.separate){importedExecutable(db,id,r.exe,'ja');return r;}if(r.exe&&require('node:path').basename(r.exe).toLowerCase()!==require('node:path').basename(row.executable).toLowerCase())importedExecutable(db,id,r.exe,'ja');return withPatch(r);});}
+       if(request.action==='jp_import_apply'&&imported?.state!=='importable'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');return jio.apply(dir,String(request.source||''),row.executable).then(r=>{try{r.sourceHidden=require('./import-source.cjs').link(db,id,String(request.source||'')).length;}catch{}if(r.separate){importedExecutable(db,id,r.exe,'ja');return r;}if(r.exe&&require('node:path').basename(r.exe).toLowerCase()!==require('node:path').basename(row.executable).toLowerCase())importedExecutable(db,id,r.exe,'ja');return withPatch(r);});}
        if(request.action==='jp_restore_undo'&&generic){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=jio.restore(dir);if(!r.skipped.length&&r.exe&&r.exe.toLowerCase()!==row.executable.toLowerCase())importedExecutable(db,id,r.exe,'zh');return r;}
        if(request.action==='jp_restore_detect'){const r=jr.detect(dir);return imported&&(imported.state==='imported'||['none','unsupported'].includes(r.state))?imported:r;}
-       if(request.action==='jp_import_apply'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=ji.apply(dir,row.executable,request.source);importedExecutable(db,id,r.exe,'ja');return withPatch(r);}
+       if(request.action==='jp_import_apply'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=ji.apply(dir,row.executable,request.source);importedExecutable(db,id,r.exe,'ja');try{r.sourceHidden=require('./import-source.cjs').link(db,id,String(request.source||'')).length;}catch{}return withPatch(r);}
        if(request.action==='jp_restore_undo'&&imported?.state==='imported'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=ji.restore(dir);if(!r.skipped.length)importedExecutable(db,id,r.exe,'zh');return r;}
        return request.action==='jp_restore_apply'?withPatch(jr.apply(dir)):jr.restore(dir);}
       case 'game_cover':return require('./game-cover.cjs').setCover(db,root,String(request.id),request.path);

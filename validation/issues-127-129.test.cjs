@@ -54,3 +54,12 @@ test('127: Alt+H says the current line returns with the next one and points to A
  for(const s of ['原文要从下一句起才由游戏显示','按 Alt+T，在「显示内容」里切换','press Alt+T and change “Show”','Alt+T の「表示内容」'])assert.ok(g.includes(s),s);
  assert.match(g,/pointer-events:none/);
 });
+test('134: an open look-up or selection card keeps the reader reading, so the marker rule cannot hide the subtitles under it',()=>{
+ const gal=read('web/reader/modules/gal.js');
+ assert.match(gal,/querySelectorAll\('\.tomoyo-selection-card,\.tooltip-entries'\)[\s\S]{0,260}type:'readerReading'/);
+ let now=0;const events=[];const im=new Immersion(e=>events.push(e.dialogVisible),()=>now);
+ im.configure({immersion:true,dialogDetection:'marker'});im.bind('g');im.source('「長い台詞」','pal');
+ now=500;im.marker(true);im.tick();now=2000;im.marker(false);
+ for(let t=2500;t<=30000;t+=500){now=t;if(t%1000===0)im.reading();im.tick();}
+ assert.notEqual(events.at(-1),false,'30 s on the context explanation with the marker out of sight: still shown');
+});

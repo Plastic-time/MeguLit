@@ -57,6 +57,14 @@ internal static class EmbedTextPolicy {
        ("注意書き"); blanking one emptied the image tag's file name. A short string with no sentence punctuation, no space
        and no line break is a name, a label or a button, never written back; a very short spoken line may show its
        original for a moment, which is far better than an engine error. */
+    /* 2026-11-12 (user, 沙耶の唄 2003: the subtitles showed "E:\GAL\[031226][Nitro+] ...\data.pakE:\GAL\...\image.pak"): a generic
+       stream such as lstrlenA also carries the file paths the game opens. A full path (drive or UNC, \ / or the yen sign a
+       Japanese font draws for it, ending in a file extension) is never text to read; a frame that is only paths is dropped. */
+    static readonly Regex FilePath = new Regex(@"(?:[A-Za-z]:|\\\\)[\\/¥￥](?:[^\\/¥￥\r\n:*?""<>|]+[\\/¥￥])*[^\\/¥￥\r\n:*?""<>|]*?\.[A-Za-z0-9]{1,4}?(?=$|[^A-Za-z0-9]|[A-Za-z]:[\\/¥￥])");
+    public static string StripPaths(string value) {
+        if (string.IsNullOrEmpty(value) || value.IndexOf(':') < 0 && value.IndexOf(@"\\", StringComparison.Ordinal) < 0) return value ?? "";
+        return FilePath.IsMatch(value) ? FilePath.Replace(value, "").Trim() : value;
+    }
     static readonly Regex Sentence = new Regex(@"[、。，．！？!?…‥「」『』（）()―—\s]");
     public static bool Label(string value) {
         string plain = Ruby.Replace(Construct.Replace(value ?? "", ""), m => m.Groups[2].Value).Trim();
@@ -106,7 +114,7 @@ internal static class EmbedTextPolicy {
             Hide(mixed) == "" && Hide("そう、雪だ。♪【＄名前＿渚】％Ａ") == "　　　　　　　【＄名前＿渚】％Ａ" &&
             Hide("％Ａ《渚の名前》％Ｂ《秋生の名前》％Ｃ《＊Ｂから渚への呼称》プロローグ") == "" &&
             Hide("＊Ａ崎岡岡崎") == "" && Hide("全品50％OFFだって！").Length == "全品50％OFFだって！".Length &&
-            Hide("grp.pak") == "" && Hide("注意書き") == "" && Hide("タイトル画面") == "" && Writeback("注意書き", "注意") == "" && Hide("grp,bg001") == "" && Hide(@"data\grp\背景.tga") == "" &&
+            StripPaths(@"E:\GAL\[031226][Nitro+] ﾉｳﾒｮ､ﾎ・\data.pakE:\GAL\[031226][Nitro+] ﾉｳﾒｮ､ﾎ・\image.pak") == "" && StripPaths("E:¥GAL¥a b¥script.pak") == "" && StripPaths(@"「ここは：C:\Windows\a.txt」") == "「ここは：」" && StripPaths("「時刻は10:30だ」") == "「時刻は10:30だ」" && Hide("grp.pak") == "" && Hide("注意書き") == "" && Hide("タイトル画面") == "" && Writeback("注意書き", "注意") == "" && Hide("grp,bg001") == "" && Hide(@"data\grp\背景.tga") == "" &&
             Hide("トーンカーブ.dat") == "" && Hide("「またね」<wait>") == "　　　　　<wait>" &&
             Hide("名前%Q") == "" && Hide("「またね」\u0001") == "　　　　　\u0001" &&
             Hide("「やっと来たね」\r\nそうですね……") == "　　　　　　　　\r\n　　　　　　　" &&
