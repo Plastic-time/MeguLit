@@ -45,7 +45,7 @@ public class GalWindowBridge {
         Func<int,int> mx=x=>dl+(int)Math.Round((x-sl)*kx);Func<int,int> my=y=>dt+(int)Math.Round((y-st)*ky);
         scaled=new Rect(mx(area.Left),my(area.Top),mx(area.Right),my(area.Bottom));MagpieWindow=magpie;NativeMaskLayer.Scale(true,sl,st,dl,dt,kx,ky,Overlay);return true;
     }
-    static IntPtr MagpieWindow;static DateTime MagpieRaisedAt;
+    static IntPtr MagpieWindow;static DateTime MagpieRaisedAt,MagpieFocusAt;
     static string LastCoverNote="";
     // True when no real application window lies over the middle of the game, even if the game does not have focus
     // (e.g. right after Tomoyo was restarted from Explorer). Walks the z-order above the game and ignores windows that
@@ -548,6 +548,8 @@ public class GalWindowBridge {
         LastHomeForeground=homeOwned?fg:IntPtr.Zero;
         KeepAboveGame(gameRoot,contextActive&&!homeOwned);
         if(magpie&&contextActive&&!homeOwned&&(DateTime.UtcNow-MagpieRaisedAt).TotalMilliseconds>250){MagpieRaisedAt=DateTime.UtcNow;SetWindowPos(Overlay,new IntPtr(-1),0,0,0,0,0x0001|0x0002|0x0010);}
+        /* Magpie pauses while its source window is not in front: outside the Alt+T menu (which needs the keyboard and hands focus back when it closes) the reading layer never keeps the foreground from the scaled game. */
+        if(magpie&&!MenuOpen&&fg==overlayRoot&&(DateTime.UtcNow-MagpieFocusAt).TotalMilliseconds>400){MagpieFocusAt=DateTime.UtcNow;SetForegroundWindow(gameRoot);}
         MaskLayer.Origin(Overlay,Target,box.Left,box.Top);
         if(TextMask!=null)TextMask.Tick(Target,origin.X,origin.Y,client.Right,client.Bottom,CoverEnabled,box.Left-origin.X,box.Top-origin.Y);
         if(WaitMarker!=null){WaitMarker.ProbeOnly=false;WaitMarker.ScreenX=origin.X;WaitMarker.ScreenY=origin.Y;WaitMarker.Tick(Target,client.Right,client.Bottom,CoverEnabled,box.Left-origin.X,box.Top-origin.Y);}
