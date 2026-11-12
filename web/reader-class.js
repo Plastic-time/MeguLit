@@ -97,9 +97,17 @@ export function openRite({api,locale,esc,toast,current='',pending=0,xpTotal=0,he
   dialog.querySelector('[data-r-line]').textContent=`Lv.${lv} · ${s.name[l]} · ${s.tag[l]}`;dialog.querySelector('[data-r-motto]').textContent=s.desc[l].split(/(?<=[。.])/)[0];
   dialog.querySelector('[data-finish]').onclick=()=>{close();onDone(pick);};
   /* the burst plays out first; then the dialog changes shape smoothly (FLIP on its height) into the result */
-  const showReveal=()=>{const h0=dialog.getBoundingClientRect().height;if(move){const wf=document.createElement('i');wf.className='class-rite-white';dialog.append(wf);wf.style.setProperty('--c',s.color);wf.animate([{clipPath:'circle(0% at 25% 50%)'},{clipPath:'circle(150% at 25% 50%)',offset:.3},{clipPath:'circle(150% at 25% 50%)',offset:.5},{clipPath:'circle(0% at 25% 50%)'}],{duration:700,easing:'cubic-bezier(.6,0,.3,1)',fill:'forwards'});setTimeout(()=>wf.remove(),740);}dialog.dataset.el=pick;dialog.classList.add('is-revealed');reveal.hidden=false;const h1=dialog.getBoundingClientRect().height;if(move&&Math.abs(h1-h0)>4)dialog.animate([{height:h0+'px'},{height:h1+'px'}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)'});
-   if(pending>0){dialog.querySelector('[data-r-xp]').hidden=false;const num=dialog.querySelector('[data-r-num]');setTimeout(()=>countUp(num,pending,move?1400:0,n=>'+'+nf.format(n)),move?800:0);}
-   setTimeout(()=>{const f=dialog.querySelector('[data-finish]');f.disabled=false;f.focus();},move?1000:0);};
+  /* (judge fx8: a small hard white ball, the result card already showing under it) the white comes from the burst
+     point as a large soft-edged bloom that fills the window at once; the result card is swapped in under the full
+     white, then the white lifts */
+  const showReveal=()=>{
+   const apply=()=>{const h0=dialog.getBoundingClientRect().height;dialog.dataset.el=pick;dialog.classList.add('is-revealed');reveal.hidden=false;const h1=dialog.getBoundingClientRect().height;if(move&&Math.abs(h1-h0)>4)dialog.animate([{height:h0+'px'},{height:h1+'px'}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)'});
+    if(pending>0){dialog.querySelector('[data-r-xp]').hidden=false;const num=dialog.querySelector('[data-r-num]');setTimeout(()=>countUp(num,pending,move?1400:0,n=>'+'+nf.format(n)),move?800:0);}
+    setTimeout(()=>{const f=dialog.querySelector('[data-finish]');f.disabled=false;f.focus();},move?1000:0);};
+   if(!move){apply();return;}
+   const st=dialog.querySelector('.class-rite-stage').getBoundingClientRect(),wf=document.createElement('i');wf.className='class-rite-white';wf.style.left=Math.round(st.left+st.width/2)+'px';wf.style.top=Math.round(st.top+st.height/2)+'px';dialog.append(wf);
+   wf.animate([{transform:'translate(-50%,-50%) scale(.24)','--h':'0%',easing:'cubic-bezier(.2,.7,.2,1)'},{transform:'translate(-50%,-50%) scale(1)','--h':'0%',offset:.3},{transform:'translate(-50%,-50%) scale(1)','--h':'0%',offset:.5,easing:'cubic-bezier(.5,0,.3,1)'},{transform:'translate(-50%,-50%) scale(1)','--h':'80%'}],{duration:820,fill:'forwards'});
+   setTimeout(apply,250);setTimeout(()=>wf.remove(),860);};
   if(!move){showReveal();return;}
   dialog.classList.add('is-casting');
   fx.cast(()=>{dialog.classList.add('is-burst');setTimeout(showReveal,950);});};

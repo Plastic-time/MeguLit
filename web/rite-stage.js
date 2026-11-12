@@ -29,6 +29,7 @@ const rgba=(hex,a)=>{const n=parseInt(hex.slice(1),16);return `rgba(${n>>16&255}
 
 /* ---------- shaped particles ---------- */
 const DRAW={
+ wedge(c,p,k){const sp=Math.hypot(p.vx,p.vy),len=Math.min(70,8+sp*.09)*(1-k*.5),w=p.r*(1-k*.6),a=Math.atan2(p.vy,p.vx),al=(1-k)*(k<.08?k/.08:1);c.save();c.translate(p.x,p.y);c.rotate(a);const g=c.createLinearGradient(-len,0,w,0);g.addColorStop(0,'rgba(200,40,20,0)');g.addColorStop(.6,`rgba(255,120,50,${al*.7})`);g.addColorStop(1,`rgba(255,230,180,${al})`);c.fillStyle=g;c.beginPath();c.moveTo(-len,0);c.quadraticCurveTo(-len*.4,-w,0,-w);c.arc(0,0,w,-Math.PI/2,Math.PI/2);c.quadraticCurveTo(-len*.4,w,-len,0);c.fill();c.restore();},
  ember(c,p,k){const a=Math.sin(Math.PI*Math.min(1,k))*(.6+.4*Math.sin(p.t*14+p.r*9)),r=p.r*3;const g=c.createRadialGradient(p.x,p.y,0,p.x,p.y,r);g.addColorStop(0,`rgba(255,226,170,${a})`);g.addColorStop(.35,`rgba(255,130,60,${a*.6})`);g.addColorStop(1,'rgba(200,40,20,0)');c.fillStyle=g;c.globalAlpha=1;c.fillRect(p.x-r,p.y-r,r*2,r*2);},
  spark(c,p,k){p.trail.push([p.x,p.y]);if(p.trail.length>7)p.trail.shift();c.lineCap='round';for(let i=1;i<p.trail.length;i++){c.globalAlpha=(1-k)*i/p.trail.length;c.strokeStyle=k<.5?'#ffe2a0':'#ff8a3a';c.lineWidth=p.r*i/p.trail.length;c.beginPath();c.moveTo(...p.trail[i-1]);c.lineTo(...p.trail[i]);c.stroke();}},
  flake(c,p,k){c.save();c.translate(p.x,p.y);c.rotate(p.a+p.t*p.spin);c.globalAlpha=Math.sin(Math.PI*Math.min(1,k))*p.al;c.strokeStyle='#eaf8ff';c.lineWidth=p.r>5?1.2:.8;if(p.blur)c.filter=`blur(${p.blur}px)`;c.beginPath();for(let i=0;i<6;i++){const q=i*TAU/6,x=Math.sin(q)*p.r,y=-Math.cos(q)*p.r;c.moveTo(0,0);c.lineTo(x,y);const m=.55;c.moveTo(x*m,y*m);c.lineTo(x*m+Math.sin(q+.6)*p.r*.3,y*m-Math.cos(q+.6)*p.r*.3);c.moveTo(x*m,y*m);c.lineTo(x*m+Math.sin(q-.6)*p.r*.3,y*m-Math.cos(q-.6)*p.r*.3);}c.stroke();c.restore();},
@@ -110,7 +111,7 @@ function fireDisc(r){
  c.beginPath();c.arc(0,0,r,0,Math.PI*2);stroke(r*.05,'rgba(214,44,26,.92)',22);stroke(r*.014,'rgba(255,176,96,.95)',8);
  c.beginPath();c.arc(0,0,r*.9,0,Math.PI*2);stroke(r*.008,'rgba(255,150,80,.6)',6);
  /* the small inner ring with a scalloped edge */
- c.beginPath();for(let i=0;i<=72;i++){const q=i/72*Math.PI*2,rr=ri*(1+Math.sin(q*12)*.06);c[i?'lineTo':'moveTo'](Math.cos(q)*rr,Math.sin(q)*rr);}stroke(r*.02,'rgba(255,170,90,.9)',10);
+ c.beginPath();c.arc(0,0,ri,0,Math.PI*2);stroke(r*.016,'rgba(255,150,80,.85)',10);
  c.beginPath();c.arc(0,0,ri*.35,0,Math.PI*2);stroke(r*.012,'rgba(255,220,160,.8)',6);
  /* warm wash across the disc */
  c.globalCompositeOperation='lighter';const g=c.createRadialGradient(0,0,ri,0,0,r);g.addColorStop(0,'rgba(255,120,60,.10)');g.addColorStop(.8,'rgba(226,60,30,.08)');g.addColorStop(1,'rgba(226,60,30,0)');c.fillStyle=g;c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.fill();
@@ -119,10 +120,14 @@ function fireDisc(r){
 /* (judge fx7: the glyph sat on top of every line) the idle disc lies tilted at about 0.58 and is drawn in two halves:
    the far half before the glyph, the near half after it, so the character stands inside the ring */
 function fireHalf(s,c,spr,side){const br=(.88+.12*Math.sin(s.t*2.2))*(side>0?.8:1);c.save();c.globalAlpha*=br;c.translate(s.cx,s.cy+(s.H0||s.H)*.11);c.rotate(-.1);c.scale(1,.58);c.beginPath();c.rect(-spr.width,side<0?-spr.height:0,spr.width*2,spr.height);c.clip();c.rotate(s.t*.35);c.drawImage(spr,-spr.width/2,-spr.height/2);c.restore();}
+/* (judge fx8: the tunnel read as one ball of yarn) every layer but the deepest is only its rim and the outer ends of
+   its blades, so the rings stand apart and can be counted down the shaft */
+const RING=new Map();
+function fireRing(r){if(RING.has(r))return RING.get(r);const disc=fireDisc(r),W=disc.width,cv=document.createElement('canvas');cv.width=cv.height=W;const c=cv.getContext('2d');c.drawImage(disc,0,0);c.globalCompositeOperation='destination-in';const g=c.createRadialGradient(W/2,W/2,r*.62,W/2,W/2,r*.82);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'#000');c.fillStyle=g;c.fillRect(0,0,W,W);RING.set(r,cv);return cv;}
 const layerY=(s,i,L)=>s.cy+s.H*(.3-i*(.62/(L-1)));
 function layerBurst(s,i,L,base){const y=layerY(s,i,L),sc=.95-i*.09;for(let k=0;k<26;k++){const a=R(0,TAU),v=R(160,380)*sc;s.add({type:'spark',x:s.cx+Math.cos(a)*base*sc*.5,y:y+Math.sin(a)*base*sc*.17,vx:Math.cos(a)*v,vy:Math.sin(a)*v*.34-40,drag:1.6,g:40,life:R(.5,.9),r:R(1,1.8),trail:[]});}for(let k=0;k<6;k++)s.add({type:'flame',x:s.cx+R(-1,1)*base*sc*.4,y:y+R(-6,6),vx:R(-60,60),vy:R(-60,-10),drag:2,life:R(.4,.7),r:R(14,22)});}
-function tunnelBurst(s,r){for(let k=0;k<22;k++){const a=R(0,TAU),v=R(160,420)*(r/200);s.add({type:'spark',x:s.cx+Math.cos(a)*r*.4,y:s.cy+Math.sin(a)*r*.4,vx:Math.cos(a)*v,vy:Math.sin(a)*v,drag:1.6,g:30,life:R(.4,.8),r:R(1,2),trail:[]});}s.flash=Math.max(s.flash,.18);}
-function columnBurst(s,base){for(let k=0;k<50;k++){const a=R(0,TAU),v=R(220,560);s.add({type:'spark',x:s.cx,y:s.cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v*.6-60,drag:1.4,g:60,life:R(.8,1.4),r:R(1.2,2.2),trail:[]});}for(let k=0;k<18;k++){const a=R(0,TAU),v=R(60,200);s.add({type:'flame',x:s.cx,y:s.cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-50,drag:2,life:R(.6,1.1),r:R(18,32)});}s.flash=.4;}
+function tunnelBurst(s,r){/* (judge fx8: 1px rays read as a sea urchin) filled tongues of flame and embers */for(let k=0;k<12;k++){const a=R(0,TAU),v=R(180,420)*(r/200);s.add({type:'wedge',x:s.cx+Math.cos(a)*r*.5,y:s.cy+Math.sin(a)*r*.5,vx:Math.cos(a)*v,vy:Math.sin(a)*v,drag:1.8,life:R(.4,.7),r:R(2.5,4.5)});}for(let k=0;k<10;k++){const a=R(0,TAU),v=R(60,200);s.add({type:'ember',x:s.cx+Math.cos(a)*r*.5,y:s.cy+Math.sin(a)*r*.5,vx:Math.cos(a)*v,vy:Math.sin(a)*v,drag:1.4,life:R(.6,1.2),r:R(.8,1.6)});}s.flash=Math.max(s.flash,.18);}
+function columnBurst(s,base){for(let k=0;k<14;k++){const a=k/14*TAU+R(-.15,.15),v=R(320,620);s.add({type:'wedge',x:s.cx,y:s.cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v,drag:1.5,life:R(.6,1),r:R(4,7)});}for(let k=0;k<30;k++){const a=R(0,TAU),v=R(80,320);s.add({type:'ember',x:s.cx,y:s.cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-30,drag:1.2,g:20,life:R(.9,1.6),r:R(.9,1.8)});}for(let k=0;k<18;k++){const a=R(0,TAU),v=R(60,200);s.add({type:'flame',x:s.cx,y:s.cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-50,drag:2,life:R(.6,1.1),r:R(18,32)});}s.flash=.4;}
 
 /* ---------- scenes ---------- */
 const SC={
@@ -135,10 +140,10 @@ const SC={
   bg(s,c){const base=Math.min(s.W0||s.W,s.H0||s.H)*.44,spr=fireDisc(Math.round(base));
    if(s.ct<0||s.ct>4.2){fireHalf(s,c,spr,-1);if(s.ct>4.2)s.ct=-1;return;}
    const T=s.ct,L=6,LIGHT=.16,BOOM0=1.25,STEP=.16;
-   for(let i=L-1;i>=0;i--){/* i=0 nearest, i=L-1 deepest */const d=i/(L-1),sc=1.25-d*.95,lit=Math.min(1,Math.max(0,(T-(L-1-i)*LIGHT)/.3)),boomAt=BOOM0+(L-1-i)*STEP;
+   for(let i=L-1;i>=0;i--){/* i=0 nearest, i=L-1 deepest */const d=i/(L-1),sc=1.25*Math.pow(.74,i),lit=Math.min(1,Math.max(0,(T-(L-1-i)*LIGHT)/.3)),boomAt=BOOM0+(L-1-i)*STEP;
     if(T>boomAt&&!(s.blown??=new Set()).has(i)){s.blown.add(i);tunnelBurst(s,base*sc);}
     let a=lit*(.35+.65*(1-d));if(T>boomAt)a*=Math.max(0,1-(T-boomAt)/.22);if(a<=0)continue;
-    c.save();c.globalAlpha*=a*(.8+.2*Math.sin(T*18+i));if(d>.05)c.filter=`blur(${(d*3).toFixed(1)}px) brightness(${(1-d*.5).toFixed(2)}) hue-rotate(${(-d*14).toFixed(0)}deg)`;c.translate(s.cx,s.cy);c.rotate((i%2?-1:1)*T*(1.1+i*.3));c.scale(sc,sc);c.drawImage(spr,-spr.width/2,-spr.height/2);c.restore();}
+    c.save();c.globalAlpha*=a*(.8+.2*Math.sin(T*18+i));if(d>.05)c.filter=`blur(${(d*3).toFixed(1)}px) brightness(${(1-d*.5).toFixed(2)}) hue-rotate(${(-d*14).toFixed(0)}deg)`;c.translate(s.cx,s.cy);c.rotate((i%2?-1:1)*T*(1.1+i*.3));c.scale(sc,sc);const im=i===L-1?spr:fireRing(Math.round(base));c.drawImage(im,-im.width/2,-im.height/2);c.restore();}
    const END=BOOM0+L*STEP;if(T>END&&!s.erupted){s.erupted=1;columnBurst(s,base);s.flash=.6;}
    if(T>END&&T<END+1.3){const k=(T-END)/1.3,g=c.createRadialGradient(s.cx,s.cy,0,s.cx,s.cy,Math.max(s.W,s.H)*(.3+k));g.addColorStop(0,`rgba(255,226,160,${.4*(1-k)})`);g.addColorStop(.5,`rgba(226,66,40,${.22*(1-k)})`);g.addColorStop(1,'rgba(120,20,10,0)');c.fillStyle=g;c.fillRect(0,0,s.W,s.H);}
    if(T>END+1.4){s.blown=null;s.erupted=0;}

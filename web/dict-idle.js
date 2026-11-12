@@ -38,7 +38,7 @@ function pickText(f){const P=f.pool||{phrases:[],saved:[],looked:f.words},r=Math
 function make(f,anywhere){
  const pk=pickText(f),word=pk.kind!=='kana',text=pk.t,z=Math.pow(Math.random(),1.3),shrink=pk.kind==='kana'?1:Math.max(.42,.85-text.length*.05),size=shrink*(13+z*62),blur=Math.abs(z-FOCUS)*(z>FOCUS?16:7);
  const red=Math.random()<.14,color=pk.kind==='word'?'#f0c36a':red?'#d23a48':'#eceae6';
- return {z,spr:sprite(text,size,blur,color),x:Math.random()*f.W,y:anywhere?Math.random()*f.H:f.H+60,vx:(Math.random()-.5)*6,vy:-(4+Math.random()*10)*(.4+z),rot:(Math.random()-.5)*.5,vr:(Math.random()-.5)*.12,sway:Math.random()*Math.PI*2,
+ return {z,spr:sprite(text,size,blur,color),x:Math.random()*f.W,y:anywhere?Math.random()*f.H:f.H+60,vx:(Math.random()-.5)*6,vy:-(4+Math.random()*10)*(.4+z),rot:0,rot0:(Math.random()-.5)*.42,vr:0,sway:Math.random()*Math.PI*2,
   alpha:(.1+.3*(1-Math.abs(z-FOCUS)*1.4))*(red||word?1.3:1),ox:0,oy:0,wx:0,wy:0};
 }
 function build(host){
@@ -60,8 +60,10 @@ function frame(now){
  for(const p of order)if(p.y>-40&&p.y<f.H+40&&p.x>-40&&p.x<f.W+40)cnt[cell(p.x,p.y)]+=1;f.cnt=cnt;f.cellOf=cell;f.grid=[GX,GY,cw,ch];
  const at=(i,j)=>i<0||j<0||i>=GX||j>=GY?cnt[Math.min(GX-1,Math.max(0,i))+Math.min(GY-1,Math.max(0,j))*GX]+2:cnt[i+j*GX];
  for(const p of order){
-  {const i=Math.min(GX-1,Math.max(0,Math.floor(p.x/cw))),j=Math.min(GY-1,Math.max(0,Math.floor(p.y/ch))),K=22;p.wx=(p.wx||0)+(at(i-1,j)-at(i+1,j))*K*dt;p.wy=(p.wy||0)+(at(i,j-1)-at(i,j+1))*K*.6*dt;}
-  p.sway+=dt*.6;p.x+=(p.vx+Math.sin(p.sway)*4)*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;
+  {const i=Math.min(GX-1,Math.max(0,Math.floor(p.x/cw))),j=Math.min(GY-1,Math.max(0,Math.floor(p.y/ch))),K=40;p.wx=(p.wx||0)+(at(i-1,j)-at(i+1,j))*K*dt;p.wy=(p.wy||0)+(at(i,j-1)-at(i,j+1))*K*.6*dt;}
+  p.sway+=dt*.6;p.x+=(p.vx+Math.sin(p.sway)*4)*dt;p.y+=p.vy*dt;
+  /* (judge fx8: blown glyphs stayed upside down) each glyph eases back to its own resting tilt once the spin dies down */
+  p.rot0??=(Math.random()-.5)*.42;p.rot+=((p.rot0+Math.sin(p.sway*.7)*.06)-p.rot)*Math.min(1,dt*1.6/(1+Math.abs(p.wr||0)*.6));
   /* a gust moves the glyph itself; air drag slows it; out of the frame it drifts back in later as a new glyph */
   p.x+=(p.wx||0)*dt;p.y+=(p.wy||0)*dt;p.rot+=(p.wr||0)*dt;const drag=Math.exp(-1.4*dt);p.wx=(p.wx||0)*drag;p.wy=(p.wy||0)*drag;p.wr=(p.wr||0)*Math.exp(-1.2*dt);
   /* (user: the field has no fixed places — the pointer pushes it about like water; a click pushes harder) the pointer's own
@@ -91,7 +93,7 @@ new MutationObserver(()=>{if(!tick)tick=requestAnimationFrame(scan);}).observe(d
 addEventListener('resize',()=>field?.fit());
 if(!calm){document.addEventListener('pointermove',e=>{if(!field)return;const now=performance.now(),dt=Math.max(8,now-(field.pt||now-16))/1000;if(field.pt){field.pvx=(e.clientX-field.mx)/dt;field.pvy=(e.clientY-field.my)/dt;}field.mx=e.clientX;field.my=e.clientY;field.pt=now;},{passive:true});
  /* a click (not on a control) sends a ring of force out from the pointer */
- document.addEventListener('pointerdown',e=>{if(!field||e.target.closest?.('input,button,a,select,textarea,[role=button],.record,label'))return;for(const p of field.parts){const dx=p.x-e.clientX,dy=p.y-e.clientY,d=Math.hypot(dx,dy)||1,k=Math.exp(-d/240)*(.5+p.z*.8);p.wx=(p.wx||0)+dx/d*1100*k;p.wy=(p.wy||0)+dy/d*1100*k;p.wr=(p.wr||0)+(Math.random()-.5)*8*k;}},{passive:true});}
+ document.addEventListener('pointerdown',e=>{if(!field||e.target.closest?.('input,button,a,select,textarea,[role=button],.record,label'))return;for(const p of field.parts){const dx=p.x-e.clientX,dy=p.y-e.clientY,d=Math.hypot(dx,dy)||1,k=Math.exp(-d/240)*(.5+p.z*.8);p.wx=(p.wx||0)+dx/d*850*k;p.wy=(p.wy||0)+dy/d*850*k;p.wr=(p.wr||0)+(Math.random()-.5)*8*k;}},{passive:true});}
 /* the wake is given by how far the box actually moved since its last report, so it is as strong at any frame rate */
 /* (user: a real wind that blows the glyphs away, the nearer the harder) the rushing box throws the field: glyphs are
    flung along its motion and outward, spinning, out to about half the screen's width with a smooth fall-off; the

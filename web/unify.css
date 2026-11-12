@@ -1578,7 +1578,7 @@ html body .dict-launch :is(#lookup-form,.lookup-form){outline:1px solid transpar
 /* 转职 (judge fx7): the cast leaves the panel and covers the window (rite-stage.js fades it out with distance); the
    white field is opaque white that opens and closes as an iris from the burst — never translucent white over the red */
 html body .class-rite-fx.is-wide{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:20!important}
-html body .class-rite-white{background:#fff!important;mix-blend-mode:normal!important;opacity:1!important;clip-path:circle(0% at 25% 50%);z-index:30!important}
+html body .class-rite-white{background:#fff;mix-blend-mode:normal!important;z-index:30!important}
 
 /* ==== round 11 ==== */
 /* settings width (judge r10: half the pages still ran to 1551 and showed beside the search bar when scrolled): every
@@ -1612,3 +1612,15 @@ html:not(#u):not(#v):not(#w):not(#x) body .gm-lesson .gm-stepnav{position:static
 html:not(#u):not(#v):not(#w):not(#x) body .gm-page .gm-stgs{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px!important;overflow:visible!important;-webkit-mask:none!important;mask:none!important;padding-bottom:0!important}
 html:not(#u):not(#v):not(#w):not(#x) body .gm-page .gm-stgs>.gm-stg{flex:none!important;min-width:0}
 @media (max-width:1100px){html:not(#u):not(#v):not(#w):not(#x) body .gm-page .gm-stgs{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* the landing line (judge fx8: grey-pink, cut off hard at one end): gold, feathered over its outer quarters, never
+   clipped by its box */
+html body .dict-hit{overflow:visible!important}
+html body .dict-hit-line{background:linear-gradient(90deg,rgba(232,196,138,0),rgba(232,196,138,.85) 26%,#fff0d2 50%,rgba(232,196,138,.85) 74%,rgba(232,196,138,0))!important;box-shadow:0 0 12px 2px rgba(232,196,138,.5)!important}
+/* the white bloom (reader-class.js places it on the burst point): a disc three window-widths across, pure white to
+   past half its radius and feathered beyond, so no frame shows a small hard white shape */
+html body .class-rite-white{position:fixed!important;right:auto;bottom:auto;width:300vmax!important;height:300vmax!important;border-radius:50%;clip-path:none!important;
+ background:radial-gradient(circle,#fff 0,#fff 52%,rgba(255,255,255,0) 68%)!important;z-index:30!important;pointer-events:none;will-change:transform,opacity}
+/* the white lifts as an iris opening from its centre (a hole with a soft edge), not by fading — no frame lays
+   translucent white over the dark card */
+@property --h{syntax:'<percentage>';inherits:false;initial-value:0%}
+html body .class-rite-white{--h:0%;opacity:1!important;-webkit-mask-image:radial-gradient(circle,transparent calc(var(--h) - 6%),#000 var(--h));mask-image:radial-gradient(circle,transparent calc(var(--h) - 6%),#000 var(--h))}
