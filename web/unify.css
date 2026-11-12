@@ -125,6 +125,11 @@ html:not(#u):not(#v) body :is(.gm-barcode i.on,.gm-stg-bar i.on){background:var(
 html:not(#u):not(#v) body .gm-stg.clear .gm-stg-flag{background:var(--g-gold)!important;color:#120d0c!important}
 html:not(#u):not(#v) body .gm-lesson .gm-choice:hover:not(:disabled){background:color-mix(in srgb,var(--g-gold) 16%,rgba(16,13,17,.7))!important;color:var(--g-t1,#f1e0d2)!important}
 html:not(#u):not(#v) body .gm-map .gm-node{background:rgba(16,13,17,.62)!important;color:var(--g-t1,#f1e0d2)!important;box-shadow:inset 0 0 0 1px var(--u-line-2)!important}
+html:not(#u):not(#v) body .gm-map .gm-node{background-image:none!important}
+html:not(#u):not(#v) body .gm-map .gm-node-head b{color:var(--g-t1,#f1e0d2)!important}
+html:not(#u):not(#v) body :is(.gm-map .gm-node-count,.gm-map .gm-node .gm-link){color:var(--g-t2,#bfae9f)!important}
+html:not(#u):not(#v) body .gm-map .gm-node .gm-bubble{background:linear-gradient(90deg,color-mix(in srgb,var(--g-gold) 10%,transparent),transparent 70%),rgba(16,13,17,.62)!important;color:var(--g-t1,#f1e0d2)!important;border:0!important;border-left:2px solid var(--g-gold)!important;box-shadow:inset 0 0 0 1px var(--u-line)!important}
+html:not(#u):not(#v) body .gm-map .gm-node-say{color:var(--g-t2,#bfae9f)!important}
 html:not(#u):not(#v) body :is(.gm-map .gm-node .gm-chip:hover,.v-index.mg .mk-say:hover){background:var(--g-gold)!important;color:#120d0c!important}
 html:not(#u):not(#v) body :is(.mg-legend i.m2,.v-index.mg .mastery .m2){background:var(--g-gold)!important;color:#120d0c!important}
 html:not(#u):not(#v) body :is(.ri-bar-met,.ri-n5){background:var(--g-gold)!important}
