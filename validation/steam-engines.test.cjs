@@ -121,3 +121,58 @@ test('real data: 逆転検事 1&2 (Steam) pairs Japanese with Simplified Chinese
  assert.ok(lines.length>20000);const k=lines.indexOf('どういう意味だろうか？');assert.ok(k>=0);assert.strictEqual(zh[k],'这句话是什么意思？');
  assert.ok(!lines.some(t=>/[\x21-\x7e]/.test(t)&&/[ぁ-ん]/.test(t)&&/[\]\[W%^\\]/.test(t)),'command arguments leaked into the text');
 });
+
+// MAGES voices: a label table pointing at code whose Mes instructions name the voice.mpk index and the string.
+function sc3Voiced(strings,mes){const cs=mages._internal.charset(),enc=t=>Buffer.concat(Array.from(t,ch=>{const i=cs.indexOf(ch);const b=Buffer.alloc(2);b.writeUInt16BE(0x8000|i);return b;}));
+ const code=Buffer.concat(mes.map(([type,voice,line])=>{const id=Buffer.alloc(2);id.writeUInt16LE(line);
+  const v=voice===null?[]:[0xc0|(voice>>16&0x1f),voice&0xff,voice>>8&0xff,0,0];/* type 0: character only; 1/3: voice, character */
+  return Buffer.from([1,0x0c,type,...v,0x28,0x0a,0x85,0x14,0x00,0x86,0,0,...id,1,0x0d,0]);}));
+ const bodies=strings.map(s=>Buffer.concat([...s.map(p=>typeof p==='string'?enc(p):Buffer.from(p)),Buffer.from([0xff])]));
+ const codeAt=16,so=codeAt+code.length,ro=so+bodies.length*4,head=Buffer.alloc(16);head.write('SC3\0',0,'latin1');head.writeUInt32LE(so,4);head.writeUInt32LE(ro,8);head.writeUInt32LE(codeAt,12);
+ const table=Buffer.alloc(bodies.length*4+4);let at=so+table.length;bodies.forEach((b,i)=>{table.writeUInt32LE(at,i*4);at+=b.length;});
+ return Buffer.concat([head,code,table,...bodies]);}
+test('MAGES: Mes voice indexes give each spoken line its voice.mpk clip; narration has none',()=>{
+ const scx=sc3Voiced([[[0x01],'倫太郎',[0x02],'「おい」'],['地の文だ'],[[0x01],'まゆり',[0x02],'「トゥットゥルー」']],[[3,7159,0],[0,null,1],[1,2,2]]);
+ const p=mages.parse(scx);
+ assert.deepStrictEqual(p.lines,['【倫太郎】','「おい」','地の文だ','【まゆり】','「トゥットゥルー」']);
+ assert.deepStrictEqual(p.voices,[null,'mpkvoice_7159',null,null,'mpkvoice_2']);
+ const dir=tmp('mgv-');put(dir,{'USRDIR/voice.mpk':mpk([['_NOVOICE.OGG',Buffer.from('OggS-novoice')],['OKA_0000.OGG',Buffer.from('OggS-okabe')]])});
+ const a=mages.audio(path.join(dir,'USRDIR','voice.mpk'));const by=new Map(a.map(e=>[e.name,e]));
+ assert.strictEqual(by.get('mpkvoice_1.ogg').read().toString(),'OggS-okabe');assert.strictEqual(by.get('OKA_0000.OGG').read().toString(),'OggS-okabe');
+ assert.strictEqual(mages.audio(path.join(dir,'USRDIR','script.mpk')),null);
+ fs.rmSync(dir,{recursive:true,force:true});
+});
+
+// Spike Chunsoft AGAR .wad holding .lin scripts.
+const spike=require('../services/original-engines/spike-wad.cjs');
+function lin(strings,{lastZero=false}={}){const code=Buffer.from([0x70,0x00,0x00,0x01,0x70,0x02,0x00,0x00]);const bodies=strings.map(s=>Buffer.from('\ufeff'+s+'\0','utf16le'));
+ const n=strings.length,offs=Buffer.alloc(4+(n+1)*4);offs.writeUInt32LE(n,0);let at=offs.length;bodies.forEach((b,i)=>{offs.writeUInt32LE(at,4+i*4);at+=b.length;});offs.writeUInt32LE(lastZero?0:at,4+n*4);
+ const text=Buffer.concat([offs,...bodies]),head=Buffer.alloc(16);head.writeUInt32LE(2,0);head.writeUInt32LE(16,4);head.writeUInt32LE(16+code.length,8);head.writeUInt32LE(16+code.length+text.length,12);
+ return Buffer.concat([head,code,text]);}
+function wad(files){const ents=Object.entries(files),parts=[Buffer.from('AGAR','latin1'),u32(1),u32(1),u32(0),u32(ents.length)];let off=0;
+ for(const [name,data] of ents){const nb=Buffer.from(name,'utf8'),s=Buffer.alloc(16);s.writeBigUInt64LE(BigInt(data.length),0);s.writeBigUInt64LE(BigInt(off),8);parts.push(u32(nb.length),nb,s);off+=data.length;}
+ parts.push(u32(0));return Buffer.concat([...parts,...ents.map(e=>e[1])]);}
+test('Spike .wad: the Japanese .lin set gives the lines, a Chinese set pairs by script and string; English alone is left out',()=>{
+ const dir=tmp('dr-');
+ put(dir,{'DR1_us.exe':'x','dr1_data_us.wad':wad({'Dr1/data/us/script/e00_001_000.lin':lin(['<CLT 4>希望ヶ峰学園…\n<CLT>','','「よろしくな」']),'Dr1/data/us/script/e00_002_000.lin':lin(['こんにちは','さようなら'],{lastZero:true})}),
+  'dr1_data_ch.wad':wad({'Dr1/data/ch/script/e00_001_000.lin':lin(['<CLT 4>希望之峰学园……\n<CLT>','','「请多关照」']),'Dr1/data/ch/script/e00_002_000.lin':lin(['只有一句'])})});
+ assert.strictEqual(scenes.detect(dir),'spike-wad');
+ const list=scenes.read('spike-wad',dir);assert.deepStrictEqual(list.map(s=>s.name),['e00_001_000.lin','e00_002_000.lin']);
+ assert.deepStrictEqual(list[0].lines,['希望ヶ峰学園…','「よろしくな」']);assert.deepStrictEqual(list[0].zh,['希望之峰学园……','「请多关照」']);
+ assert.deepStrictEqual(list[1].lines,['こんにちは','さようなら']);assert.deepStrictEqual(list[1].zh,['','']);/* string counts differ: not paired */
+ assert.strictEqual(spike.patchLines(list)[0].lines[1],'「请多关照」');
+ const en=tmp('dr-en-');put(en,{'dr1_data_us.wad':wad({'Dr1/data/us/script/e00_001_000.lin':lin(['Hope\'s Peak Academy...','Nice to meet you.'])})});
+ assert.deepStrictEqual(spike.scenes(en),[]);
+ for(const d of [dir,en])fs.rmSync(d,{recursive:true,force:true});
+});
+test('real data: STEINS;GATE (Steam) spoken lines carry their voice.mpk clip',{skip:!fs.existsSync(path.join(sg,'USRDIR','voice.mpk'))&&'not installed'},()=>{
+ const list=scenes.read('mages',sg),s=list.find(x=>x.name==='SG01_01.SCX');assert.strictEqual(s.voices[1],'mpkvoice_7159');
+ const names=mages._internal.mpkList(path.join(sg,'USRDIR','voice.mpk'));assert.strictEqual(names[7159].name,'OKA_0102.OGG');
+ let spoken=0,voiced=0;for(const x of list)for(let i=1;i<x.lines.length;i++)if(/^【.*】$/.test(x.lines[i-1])){spoken++;if(x.voices?.[i])voiced++;}
+ assert.ok(spoken>14000&&voiced>=spoken*.99,voiced+'/'+spoken);
+});
+for(const [title,exe] of [['Danganronpa Trigger Happy Havoc','dr1_data_us.wad'],['Danganronpa 2 Goodbye Despair','dr2_data_us.wad']]){const d=path.join(STEAM,title);
+ test('real data: '+title+' (Steam, English text) reads its .lin scripts but is not taken for Japanese',{skip:!fs.existsSync(path.join(d,exe))&&'not installed'},()=>{
+  const sets=spike._internal.sets(d);assert.ok(sets.length>=1);let n=0;for(const s of sets){assert.strictEqual(s.lang,'other');for(const [,r] of s.scripts)n+=(spike._internal.linStrings(r())||[]).length;}
+  assert.ok(n>40000,String(n));assert.deepStrictEqual(spike.scenes(d),[]);
+ });}
