@@ -101,3 +101,31 @@ test('forum: per-account post limit, page size, account deletion wipes the text'
  assert.equal((await call(handle,e,'DELETE','/api/me',undefined,A)).status,200);
  assert.equal(e.DB.raw.prepare("SELECT COUNT(*) n FROM forum_posts WHERE author=? AND body<>''").get(sha('account:acc1')).n,0);
 });
+
+/* 2026-11-12 pictures: checked on upload, stored only when SAFE, attached by the post that names them, served only
+   then, never claimable by someone else, removed with their post; unused ones are cleaned up after a day */
+const webp=(w=40,h=30)=>{const b=new Uint8Array(64);b.set([...'RIFF'].map(c=>c.charCodeAt(0)),0);b.set([...'WEBPVP8X'].map(c=>c.charCodeAt(0)),8);const W=w-1,H=h-1;b[24]=W&255;b[25]=W>>8&255;b[26]=W>>16&255;b[27]=H&255;b[28]=H>>8&255;b[29]=H>>16&255;return b;};
+const upload=async(handle,e,auth,bytes=webp())=>{const r=await handle(new Request('https://relay.test/api/forum/images',{method:'POST',headers:{'cf-connecting-ip':'10.9.0.'+(ipN++&255),'content-type':'image/webp',...auth},body:bytes}),e,NOW);return {status:r.status,data:await r.json()};};
+test('forum pictures: vision check, attach on post, serve, ownership, delete and cleanup',async()=>{
+ const {handle}=await load('worker.js'),{webpSize,cleanupForumImages}=await load('forum.js');const e=env();e.AI=ai('SAFE');
+ assert.deepEqual(webpSize(webp(1920,1080)),{width:1920,height:1080});assert.equal(webpSize(new Uint8Array(40)),null);
+ const A=account(e,1),B=account(e,2);
+ assert.equal((await upload(handle,e,{})).status,401);
+ const up=await upload(handle,e,A);assert.equal(up.status,201);const pic=up.data.id;assert.match(pic,/^[0-9a-f]{32}$/);assert.ok(e.BUCKET.store.has(`forum/${pic}.webp`));
+ assert.equal((await call(handle,e,'GET','/api/forum/images/'+pic)).status,404,'not served before a post names it');
+ e.AI=ai('ADULT');const bad=await upload(handle,e,A);assert.equal(bad.status,422);assert.equal(bad.data.error,'IMAGE_ADULT');assert.equal(e.BUCKET.store.size,1,'a rejected picture is never stored');
+ delete e.AI;assert.equal((await upload(handle,e,A)).data.error,'IMAGE_UNAVAILABLE','no model, no picture');e.AI=ai('SAFE');
+ assert.equal((await call(handle,e,'POST','/api/forum',post({images:[pic]}),B)).data.error,'INVALID_IMAGES','someone else cannot use it');
+ const made=await call(handle,e,'POST','/api/forum',post({images:[pic]}),A);assert.equal(made.status,201);
+ const got=await handle(req('GET','/api/forum/images/'+pic),e,NOW);assert.equal(got.status,200);assert.equal(got.headers.get('content-type'),'image/webp');
+ const thread=await call(handle,e,'GET','/api/forum/'+made.data.id);assert.deepEqual(thread.data.post.images,[pic]);
+ assert.equal((await call(handle,e,'GET','/api/forum')).data.posts[0].pictures,1);
+ assert.equal((await call(handle,e,'POST','/api/forum',post({images:[pic]}),A)).data.error,'INVALID_IMAGES','a picture belongs to one post');
+ const rp=(await upload(handle,e,B)).data.id;const reply=await call(handle,e,'POST',`/api/forum/${made.data.id}/replies`,{body:'看图',images:[rp]},B);assert.equal(reply.status,201);
+ assert.deepEqual((await call(handle,e,'GET','/api/forum/'+made.data.id)).data.replies[0].images,[rp]);
+ assert.equal((await call(handle,e,'DELETE','/api/forum/'+made.data.id,undefined,A)).status,200);
+ assert.equal(e.BUCKET.store.has(`forum/${pic}.webp`),false);assert.equal(e.BUCKET.store.has(`forum/${rp}.webp`),false,'the replies\' pictures go with the post');
+ const stale=(await upload(handle,e,A)).data.id;assert.equal(await cleanupForumImages(e,new Date(NOW.getTime()+3600e3)),0);
+ assert.equal(await cleanupForumImages(e,new Date(NOW.getTime()+90000e3)),1);assert.equal(e.BUCKET.store.has(`forum/${stale}.webp`),false);
+ assert.equal((await call(handle,e,'POST','/api/forum',post({images:['x']}),A)).data.error,'INVALID_IMAGES');
+});

@@ -12,11 +12,11 @@ import {feedbackPost,syncPendingFeedback} from './feedback.js';
 import {profileOwn,profileCard,followEdit,followingFeed,kindred,socialDeletes,profileReport,profileAppeal} from './social.js';
 import {avatarUpload,avatarDelete,avatarGet,avatarReport,avatarsFor,avatarStatus,avatarAppeal,avatarReview,signReview,cleanupAvatars,hotStatements,hotWordsGet,settleDue} from './community.js';
 /* #117 交流 board */
-import {forumRoute,forumDeletes} from './forum.js';
+import {forumRoute,forumDeletes,cleanupForumImages} from './forum.js';
 import {newsGet,hotWordsDailyGet,refreshDaily,imageGet,articleGet} from './daily.js';
 
 /* requests per window; key prefix → [limit, seconds] */
-export const RATE={ip:[120,60],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60],daily:[60,60],'daily-img':[240,60],release:[30,60],appeal:[3,86400],profile:[30,3600],'social-get':[120,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400],'forum-get':[120,60],'forum-post':[5,3600],'forum-reply':[30,3600],'forum-day':[60,86400],'forum-ip':[40,3600]};
+export const RATE={ip:[120,60],feedback:[4,3600],'feedback-day':[12,86400],'lb-post':[6,600],'lb-id':[20,3600],'lb-get':[60,60],'adapt-post':[30,3600],'adapt-get':[120,3600],diag:[20,3600],'diag-dl':[30,3600],avatar:[5,3600],'avatar-get':[600,60],report:[20,3600],hot:[60,60],daily:[60,60],'daily-img':[240,60],release:[30,60],appeal:[3,86400],profile:[30,3600],'social-get':[120,60],follow:[60,3600],'profile-report':[3,86400],'profile-appeal':[3,86400],'forum-get':[120,60],'forum-post':[5,3600],'forum-reply':[30,3600],'forum-day':[60,86400],'forum-ip':[40,3600],'forum-img':[20,3600]};
 const encoder=new TextEncoder();
 const hex=buffer=>[...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');
 export async function sha256(value){return hex(await crypto.subtle.digest('SHA-256',typeof value==='string'?encoder.encode(value):value));}
@@ -252,6 +252,6 @@ export async function handle(request,env,now=new Date()){
 export async function scheduled(event,env,ctx){
  /* every 30 minutes: website feedback still waiting for its GitHub issue; the weekly cron settles hot words */
  if(event?.cron==='20 21 * * *'){const job=refreshDaily(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
- if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null)]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
+ if(event?.cron==='*/30 * * * *'){const job=Promise.all([syncPendingFeedback(env).catch(()=>0),refreshRelease(env,'latest').catch(()=>null),cleanupForumImages(env,new Date(event?.scheduledTime||Date.now())).catch(()=>0)]);if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
  const when=new Date(event?.scheduledTime||Date.now());const job=settleDue(env,when).then(async done=>{await cleanupAvatars(env,when).catch(()=>0);return done;});if(ctx?.waitUntil)ctx.waitUntil(job);return job;}
 export default {fetch:(request,env)=>handle(request,env),scheduled};

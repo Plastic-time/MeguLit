@@ -279,8 +279,9 @@ async function dispatch(request,runtime=null) {
       case 'forum_status':return require('./forum.cjs').status(root);
       case 'forum_list':return await require('./forum.cjs').list(root,{game:String(request.game||''),engine:String(request.engine||''),tag:String(request.tag||''),mine:request.mine===true,page:Number(request.page)||0});
       case 'forum_get':return await require('./forum.cjs').get(root,String(request.id||''));
-      case 'forum_post':return await require('./forum.cjs').create(root,{title:String(request.title||''),body:String(request.body||''),tag:String(request.tag||''),game:String(request.game||''),engine:String(request.engine||'')});
-      case 'forum_reply':return await require('./forum.cjs').reply(root,String(request.id||''),String(request.body||''));
+      case 'forum_post':return await require('./forum.cjs').create(root,{title:String(request.title||''),body:String(request.body||''),tag:String(request.tag||''),game:String(request.game||''),engine:String(request.engine||''),images:Array.isArray(request.images)?request.images:[]});
+      case 'forum_image':return await require('./forum.cjs').uploadImage(root,String(request.data||''));
+      case 'forum_reply':return await require('./forum.cjs').reply(root,String(request.id||''),String(request.body||''),{},Array.isArray(request.images)?request.images:[]);
       case 'forum_delete':return await require('./forum.cjs').remove(root,String(request.id||''),String(request.reply||''));
       case 'leaderboard_library':return require('./leaderboard.cjs').libraryTitles(db);
       case 'leaderboard_leave':return await require('./leaderboard.cjs').leave(root);

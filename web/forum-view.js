@@ -5,6 +5,7 @@
    with its replies, and the new-post form. A post can name a work; the game detail page opens this tab filtered to that
    work (这部作品的讨论). Data: bridge forum_* (services/forum.cjs → relay/src/forum.js). */
 import {mountEmailLogin} from './account-ui.js';
+import {trayHTML,mountTray,galleryHTML,bindGallery,pictureWords} from './forum-pictures.js';
 
 const W={
  zh:{forum:'交流',all:'全部',question:'求助',hook:'Hook 适配',guide:'教程',share:'分享',other:'闲聊',newPost:'发帖',mine:'我的帖子',
@@ -48,7 +49,7 @@ const fill=(t,v)=>t.replace(/\{(\w+)\}/g,(_,k)=>v[k]??'');
 let filter={tag:'',game:'',engine:'',mine:false},screen={name:'list',id:''};
 export function setForumFilter(patch){filter={...filter,...patch};screen={name:'list',id:''};}
 export const forumFilter=()=>({...filter});
-export function errorText(error,locale){const w=forumWords(locale),code=String(error?.message||error||'').replace(/^FORUM_/,'');return w[code]||w.offline;}
+export function errorText(error,locale){const w=forumWords(locale),code=String(error?.message||error||'').replace(/^FORUM_/,'');return w[code]||pictureWords(locale)[code]||w.offline;}
 function when(t,locale){if(!t)return '';const d=new Date(t*1000),diff=(Date.now()-d.getTime())/1000,rtf=new Intl.RelativeTimeFormat(locale==='zh'?'zh-CN':locale==='ja'?'ja-JP':'en',{numeric:'auto'});
  if(diff<3600)return rtf.format(-Math.max(1,Math.round(diff/60)),'minute');if(diff<86400)return rtf.format(-Math.round(diff/3600),'hour');if(diff<86400*30)return rtf.format(-Math.round(diff/86400),'day');
  return d.toLocaleDateString(locale==='zh'?'zh-CN':locale==='ja'?'ja-JP':'en-US');}
@@ -64,28 +65,28 @@ function author(a,ctx){return ctx.person(a,`${ctx.avatarHTML(a,ctx.images,ctx.es
 function listHTML(data,ctx,append=false){
  const {w,esc,locale}=ctx;
  const rows=data.posts.map(p=>`<li class="forum-row"><button type="button" class="forum-open" data-forum-open="${esc(p.id)}"><span class="forum-row-head">${tagChip(p.tag,w)}<strong class="forum-row-title">${esc(p.title)}</strong></span><span class="forum-row-excerpt">${esc(p.excerpt)}</span></button>
-  <div class="forum-row-meta">${author(p.author,ctx)}<span>· ${esc(when(p.created,locale))}</span>${p.game?`<button type="button" class="forum-meta-chip" data-forum-game="${esc(p.game)}">${esc(p.game)}</button>`:''}${p.engine?`<button type="button" class="forum-meta-chip" data-forum-engine="${esc(p.engine)}">${esc(p.engine)}</button>`:''}<span class="forum-row-count">${esc(fill(w.replies,{n:p.replies}))}</span></div></li>`).join('');
+  <div class="forum-row-meta">${author(p.author,ctx)}<span>· ${esc(when(p.created,locale))}</span>${p.game?`<button type="button" class="forum-meta-chip" data-forum-game="${esc(p.game)}">${esc(p.game)}</button>`:''}${p.engine?`<button type="button" class="forum-meta-chip" data-forum-engine="${esc(p.engine)}">${esc(p.engine)}</button>`:''}${p.pictures?`<span class="forum-row-pics" aria-label="${p.pictures}"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="1.6" fill="currentColor"/><path d="M5 17l5-5 4 4 2-2 3 3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>${p.pictures}</span>`:''}<span class="forum-row-count">${esc(fill(w.replies,{n:p.replies}))}</span></div></li>`).join('');
  if(append)return rows;
  const empty=!data.posts.length?ctx.emptyState('empty',w.empty,w.emptyHint):'';
  return `<section class="lb-card forum-list"><div class="lb-card-head"><h2 class="lb-h2">${w.forum}${filter.tag?` <span>· ${w[filter.tag]}</span>`:''}</h2><small>${w.sub}</small></div>${empty}<ol class="forum-rows">${rows}</ol>${data.more?`<button type="button" class="leaderboard-leave forum-more" data-forum-more>${w.more}</button>`:''}</section>`;
 }
 function writeBox(signedIn,inner,w){return signedIn?inner:`<div class="forum-login"><h3 class="lb-h2">${w.loginTitle}</h3><p class="lb-note">${w.loginText}</p><div data-forum-login></div></div>`;}
 function threadHTML(data,ctx){
- const {w,esc,locale}=ctx,p=data.post;
+ const {w,esc,locale}=ctx,p=data.post;data.pictures=data.pictures||{};
  const del=(id,reply='')=>`<button type="button" class="forum-delete" data-forum-delete="${esc(id)}" data-reply="${esc(reply)}">${w.del}</button>`;
- const replies=data.replies.map(r=>r.deleted?`<li class="forum-reply is-deleted"><p class="lb-note">${w.replyDeleted}</p></li>`:`<li class="forum-reply"><div class="forum-row-meta">${author(r.author,ctx)}<span>· ${esc(when(r.created,locale))}</span>${r.author.mine?del(p.id,r.id):''}</div><div class="forum-text">${paragraphs(r.body,esc)}</div></li>`).join('');
+ const replies=data.replies.map(r=>r.deleted?`<li class="forum-reply is-deleted"><p class="lb-note">${w.replyDeleted}</p></li>`:`<li class="forum-reply"><div class="forum-row-meta">${author(r.author,ctx)}<span>· ${esc(when(r.created,locale))}</span>${r.author.mine?del(p.id,r.id):''}</div><div class="forum-text">${paragraphs(r.body,esc)}</div>${galleryHTML(r.images,data.pictures)}</li>`).join('');
  return `<button type="button" class="text-button forum-back" data-forum-back><span aria-hidden="true">←</span> ${w.back}</button>
   <article class="lb-card forum-thread"><div class="forum-row-head">${tagChip(p.tag,w)}${p.game?`<button type="button" class="forum-meta-chip" data-forum-game="${esc(p.game)}">${esc(p.game)}</button>`:''}${p.engine?`<button type="button" class="forum-meta-chip" data-forum-engine="${esc(p.engine)}">${esc(p.engine)}</button>`:''}</div>
-  <h1 class="forum-title">${esc(p.title)}</h1><div class="forum-row-meta">${author(p.author,ctx)}<span>· ${esc(when(p.created,locale))}</span>${p.author.mine?del(p.id):''}</div><div class="forum-text">${paragraphs(p.body,esc)}</div></article>
+  <h1 class="forum-title">${esc(p.title)}</h1><div class="forum-row-meta">${author(p.author,ctx)}<span>· ${esc(when(p.created,locale))}</span>${p.author.mine?del(p.id):''}</div><div class="forum-text">${paragraphs(p.body,esc)}</div>${galleryHTML(p.images,data.pictures)}</article>
   <section class="lb-card forum-replies"><div class="lb-card-head"><h2 class="lb-h2">${w.reply} <span>· ${p.replies}</span></h2></div>${replies?`<ol class="forum-reply-list">${replies}</ol>`:`<p class="lb-note">${w.noReplies}</p>`}
-  ${writeBox(data.signedIn,`<div class="forum-compose"><textarea data-forum-reply-body maxlength="2000" rows="4" placeholder="${w.replyHint}"></textarea><p class="leaderboard-error" data-forum-error hidden></p><div class="forum-actions"><small class="lb-note">${w.rules}</small><button type="button" class="primary" data-forum-send>${w.send}</button></div></div>`,w)}</section>`;
+  ${writeBox(data.signedIn,`<div class="forum-compose"><textarea data-forum-reply-body maxlength="2000" rows="4" placeholder="${w.replyHint}"></textarea>${trayHTML(locale)}<p class="leaderboard-error" data-forum-error hidden></p><div class="forum-actions"><small class="lb-note">${w.rules}</small><button type="button" class="primary" data-forum-send>${w.send}</button></div></div>`,w)}</section>`;
 }
 function composeHTML(signedIn,ctx){
  const {w,esc}=ctx;
  return `<button type="button" class="text-button forum-back" data-forum-back><span aria-hidden="true">←</span> ${w.back}</button><section class="lb-card forum-form"><div class="lb-card-head"><h2 class="lb-h2">${w.newPost}</h2></div>${writeBox(signedIn,`
   <div class="forum-field"><span>${w.tag}</span><div class="lb-seg" role="group">${TAGS.map((t,i)=>`<button type="button" data-forum-pick="${t}" aria-pressed="${(filter.tag||'question')===t}">${w[t]}</button>`).join('')}</div></div>
   <label class="leaderboard-field forum-field"><span>${w.title}</span><input type="text" data-forum-title maxlength="60" placeholder="${w.titleHint}" autocomplete="off"></label>
-  <label class="leaderboard-field forum-field"><span>${w.body}</span><textarea data-forum-body maxlength="4000" rows="9" placeholder="${w.bodyHint}"></textarea></label>
+  <label class="leaderboard-field forum-field"><span>${w.body}</span><textarea data-forum-body maxlength="4000" rows="9" placeholder="${w.bodyHint}"></textarea></label>${trayHTML(ctx.locale)}
   <div class="forum-field-row"><label class="leaderboard-field forum-field"><span>${w.game}</span><input type="text" data-forum-game-input maxlength="120" value="${esc(filter.game)}" placeholder="${w.gameHint}" autocomplete="off"></label>
   <label class="leaderboard-field forum-field"><span>${w.engine}</span><input type="text" data-forum-engine-input maxlength="24" value="${esc(filter.engine)}" placeholder="${w.engineHint}" autocomplete="off" spellcheck="false"></label></div>
   <p class="leaderboard-error" data-forum-error hidden></p><div class="forum-actions"><small class="lb-note">${w.rules}</small><button type="button" class="secondary" data-forum-back>${w.cancel}</button><button type="button" class="primary" data-forum-publish>${w.publish}</button></div>`,w)}</section>`;
@@ -120,7 +121,7 @@ export async function mountForum(page,{api,locale,esc,toast,isCurrent=()=>true,a
     if(mine!==seq||!isCurrent())return;body.innerHTML=composeHTML(signedIn,ctx);bindCompose();common();return;}
    if(screen.name==='thread'){const data=await api('forum_get',{id:screen.id});if(mine!==seq||!isCurrent())return;
     if(data.state!=='ok'){if(data.error==='NOT_FOUND'){toast(w.NOT_FOUND);go('list');return;}failed(data);return;}
-    ctx.images=data.avatars||{};body.innerHTML=threadHTML(data,ctx);bindThread(data);common();return;}
+    ctx.images=data.avatars||{};body.innerHTML=threadHTML(data,ctx);bindThread(data);bindGallery(body,data.pictures,locale);common();return;}
    listPage=0;const data=await api('forum_list',{...filter,page:0});if(mine!==seq||!isCurrent())return;
    if(data.state!=='ok'){failed(data);return;}
    ctx.images=data.avatars||{};body.innerHTML=listHTML(data,ctx);bindMore(data);common();
@@ -135,20 +136,20 @@ export async function mountForum(page,{api,locale,esc,toast,isCurrent=()=>true,a
  const bindThread=data=>{
   body.querySelectorAll('[data-forum-delete]').forEach(b=>b.onclick=async()=>{if(!confirmDelete(b))return;b.disabled=true;
    try{await api('forum_delete',{id:b.dataset.forumDelete,reply:b.dataset.reply||''});toast(w.deleted);if(b.dataset.reply)show();else go('list');}catch(error){b.disabled=false;toast(errorText(error,locale));}});
-  const send=body.querySelector('[data-forum-send]');if(!send)return;
+  const send=body.querySelector('[data-forum-send]');if(!send)return;const tray=mountTray(body.querySelector('.forum-compose'),{api,locale,toast,esc});
   send.onclick=async()=>{const text=body.querySelector('[data-forum-reply-body]').value,box=body.querySelector('[data-forum-error]');box.hidden=true;
-   if(!text.trim()){showError('BODY_REQUIRED');return;}send.disabled=true;send.textContent=w.sending;
-   try{await api('forum_reply',{id:data.post.id,body:text});toast(w.replied);show();}catch(error){send.disabled=false;send.textContent=w.send;showError(error);}};
+   if(!text.trim()){showError('BODY_REQUIRED');return;}if(tray.busy()){box.textContent=tray.busyText;box.hidden=false;return;}send.disabled=true;send.textContent=w.sending;
+   try{await api('forum_reply',{id:data.post.id,body:text,images:tray.ids()});toast(w.replied);show();}catch(error){send.disabled=false;send.textContent=w.send;showError(error);}};
  };
  const bindCompose=()=>{
   let tag=filter.tag||'question';
   body.querySelectorAll('[data-forum-pick]').forEach(b=>b.onclick=()=>{tag=b.dataset.forumPick;body.querySelectorAll('[data-forum-pick]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));});
-  const publish=body.querySelector('[data-forum-publish]');if(!publish)return;
+  const publish=body.querySelector('[data-forum-publish]');if(!publish)return;const tray=mountTray(body.querySelector('.forum-form'),{api,locale,toast,esc});
   publish.onclick=async()=>{const val=s=>body.querySelector(s).value,box=body.querySelector('[data-forum-error]');box.hidden=true;
    const title=val('[data-forum-title]').trim(),text=val('[data-forum-body]');
    if([...title].length<2){showError(title?'TITLE_LENGTH':'TITLE_REQUIRED');return;}if(!text.trim()){showError('BODY_REQUIRED');return;}
-   publish.disabled=true;publish.textContent=w.sending;
-   try{const r=await api('forum_post',{title,body:text,tag,game:val('[data-forum-game-input]').trim(),engine:val('[data-forum-engine-input]').trim()});toast(w.posted);if(r?.id)go('thread',r.id);else go('list');}
+   if(tray.busy()){box.textContent=tray.busyText;box.hidden=false;return;}publish.disabled=true;publish.textContent=w.sending;
+   try{const r=await api('forum_post',{title,body:text,tag,game:val('[data-forum-game-input]').trim(),engine:val('[data-forum-engine-input]').trim(),images:tray.ids()});toast(w.posted);if(r?.id)go('thread',r.id);else go('list');}
    catch(error){publish.disabled=false;publish.textContent=w.publish;showError(error);}};
  };
  paintSub();await show();
