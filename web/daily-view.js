@@ -33,7 +33,7 @@ function ago(iso,locale){
 }
 /* geometric placeholder when a story has no picture: deterministic per title */
 function plate(seed){let h=0;for(const c of seed)h=(h*31+c.charCodeAt(0))>>>0;return `<span class="dl-plate" data-v="${h%4}" aria-hidden="true"><i></i><i></i><i></i></span>`;}
-function figure(n,esc){return n.image?`<span class="dl-fig"><img src="${esc(n.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('dl-fig-fail')">${plate(n.title)}</span>`:`<span class="dl-fig dl-fig-fail">${plate(n.title)}</span>`;}
+function figure(n,esc){return n.image?`<span class="dl-fig${n.sensitive?' is-sensitive':''}"><img src="${esc(n.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('dl-fig-fail')">${plate(n.title)}</span>`:`<span class="dl-fig dl-fig-fail">${plate(n.title)}</span>`;}
 function meta(n,locale,esc){return `<span class="dl-meta"><b>${esc(n.source)}</b>${n.date?`<time datetime="${esc(n.date)}">${esc(ago(n.date,locale))}</time>`:''}</span>`;}
 export function newsHTML(items,{locale,esc,w}){
  if(!items.length)return `<p class="dl-none">${w.noNews}</p>`;

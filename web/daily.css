@@ -230,3 +230,10 @@ a:hover .dl-plate i:nth-child(2){transform:translate(8%,-6%) rotate(45deg)}
 @media (prefers-reduced-motion:reduce){.rd *,.rd *::before,.rd *::after{transition-duration:0s!important;animation:none!important}}
 
 .dl-focus{outline:1px solid var(--g-gold,#edb56e);outline-offset:6px;transition:outline-color 1.2s}
+
+/* 2026-11-12 (user) an adult news picture is blurred with a note until the article is opened */
+.dl-fig.is-sensitive{position:relative;overflow:hidden}
+.dl-fig.is-sensitive img{filter:blur(16px) saturate(.6) brightness(.7);transform:scale(1.08)}
+.dl-fig.is-sensitive::after{content:"敏感内容";position:absolute;left:50%;top:50%;translate:-50% -50%;padding:4px 12px;font:500 12px/1.2 var(--u-mono,monospace);letter-spacing:.12em;color:#fff;background:rgba(160,28,44,.72);border:1px solid rgba(255,200,200,.35)}
+html[lang^="ja"] .dl-fig.is-sensitive::after{content:"センシティブな内容"}
+html[lang^="en"] .dl-fig.is-sensitive::after{content:"Sensitive content"}

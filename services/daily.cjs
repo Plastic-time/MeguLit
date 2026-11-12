@@ -8,13 +8,19 @@ const fs=require('node:fs'),path=require('node:path');
 const relay=require('./relay-config.cjs');
 const TIMEOUT=8000,GLOSS_BUDGET=4000;
 const str=(v,n)=>typeof v==='string'?v.slice(0,n):'';
-const link=v=>{try{const u=new URL(String(v||''));return u.protocol==='https:'||u.protocol==='http:'?u.href:'';}catch{return '';}};
+/* (user 2026-11-12: a Game*Spark article would not open) a source may still give http:// links: they are upgraded to
+   https, which every news site here serves, so the reader and the browser accept them */
+const link=v=>{try{const u=new URL(String(v||''));if(u.protocol==='http:')u.protocol='https:';return u.protocol==='https:'?u.href:'';}catch{return '';}};
 async function get(url,fetcher){
  try{const r=await fetcher(url,{method:'GET',headers:{'user-agent':'MeguLit'},signal:AbortSignal.timeout(TIMEOUT)});if(!r.ok)return {state:'error',error:'HTTP_'+r.status};return {state:'ok',data:await r.json()};}
  catch(e){return {state:'error',error:e?.name==='TimeoutError'?'TIMEOUT':'NETWORK'};}
 }
+/* 2026-11-12 (user: an adult news picture gets a blur and a "sensitive content" note) an item whose title or summary
+   reads as adult content is marked; the page blurs its picture until it is opened */
+const SENSITIVE=/R-?18|18禁|18歳未満|成人向け|成人指定|アダルト|エロ|官能|NTR|抜きゲ|ヌード|全裸|下着姿|脱衣|H(?:シーン|な)|R18|色情|裸体/i;
+const sensitive=n=>SENSITIVE.test(String(n.title||'')+' '+String(n.summary||''));
 function cleanNews(d){
- const items=(Array.isArray(d?.items)?d.items:[]).slice(0,120).map(n=>({fulltext:n?.fulltext===true,cat:n?.cat==='acg'?'acg':'gal',title:str(n?.title,160),link:link(n?.link),date:str(n?.date,30),source:str(n?.source,40),sourceId:str(n?.sourceId,20),summary:str(n?.summary,160),image:/^\/api\/news\/img\/[0-9a-f]{32}$/.test(String(n?.image||''))?n.image:''})).filter(n=>n.title&&n.link);
+ const items=(Array.isArray(d?.items)?d.items:[]).slice(0,120).map(n=>({sensitive:sensitive({title:n?.title,summary:n?.summary}),fulltext:n?.fulltext===true,cat:n?.cat==='acg'?'acg':'gal',title:str(n?.title,160),link:link(n?.link),date:str(n?.date,30),source:str(n?.source,40),sourceId:str(n?.sourceId,20),summary:str(n?.summary,160),image:/^\/api\/news\/img\/[0-9a-f]{32}$/.test(String(n?.image||''))?n.image:''})).filter(n=>n.title&&n.link);
  return {items,sources:(Array.isArray(d?.sources)?d.sources:[]).slice(0,10).map(s=>({id:str(s?.id,20),name:str(s?.name,40)})),updatedAt:str(d?.updatedAt,30)||null};
 }
 /* the local dictionary is Chinese: its first line, first two senses, make the short gloss beside a hot word.
@@ -144,4 +150,4 @@ async function anki(root,runtime,{term,reading,meaning,sentence,link,title}={}){
  const at=word.sentence.indexOf(term),html=at<0?h(word.sentence):h(word.sentence.slice(0,at))+'<b class="tm-hl">'+h(term)+'</b>'+h(word.sentence.slice(at+term.length));
  return await new(require('../core/anki.cjs').Anki)().sync(word,config,null,{sentenceHtml:html,gameTitle:str(title,200)});
 }
-module.exports={view,canOpen,article,translate,translateList,dictFor,anki,NEWS_DECK,cleanNews,cleanWords,readingFor};
+module.exports={sensitive,view,canOpen,article,translate,translateList,dictFor,anki,NEWS_DECK,cleanNews,cleanWords,readingFor};
