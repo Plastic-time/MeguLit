@@ -30,7 +30,7 @@ async function check(first){
  if(first)nudge();
 }
 document.addEventListener('megulit:reader-class',()=>{due=false;dot();});
-new MutationObserver(()=>{if(due&&document.querySelector('[data-top-me]:not(.has-class-due)'))dot();}).observe(document.body,{childList:true,subtree:true});
+let q=0;new MutationObserver(()=>{if(!due||q)return;q=requestAnimationFrame(()=>{q=0;if(due&&document.querySelector('[data-top-me]:not(.has-class-due)'))dot();});}).observe(document.body,{childList:true,subtree:true});
 /* after the app has settled (and any start-up notice had its moment), then every ten minutes for a level reached mid-session */
 setTimeout(()=>{const wait=()=>document.querySelector('dialog[open]')?setTimeout(wait,4000):check(true);wait();},6000);
 setInterval(()=>check(false),600000);

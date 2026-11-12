@@ -63,7 +63,7 @@ function render(info,{api,invoke,locale}){
   else if(s.phase==='error'){if(info.hot&&!s.hot){/* the hot package failed: the retry fetches the full one */info.hot=false;card.querySelector('[data-upd-keep]').textContent=t.keep;}clearInterval(poll);bar.classList.add('fail');state.textContent=t.failed+(s.error?' · '+s.error:'');go.disabled=false;go.textContent=t.retry;go.dataset.mode='retry';}
  };
  const begin=async()=>{bar.classList.remove('fail','done');go.disabled=true;try{show(await api('update_start',{current:info.current}));}catch(e){show({phase:'error',error:String(e?.message||e)});return;}
-  clearInterval(poll);poll=setInterval(async()=>{if(!card){clearInterval(poll);return;}try{show(await api('update_status'));}catch{}},250);};
+  clearInterval(poll);let inflight=false;poll=setInterval(async()=>{if(!card){clearInterval(poll);return;}if(inflight)return;inflight=true;try{show(await api('update_status'));}catch{}finally{inflight=false;}},250);};
  go.addEventListener('click',async()=>{
   if(go.dataset.mode==='retry'){begin();return;}
   if(go.dataset.mode==='hot'){

@@ -70,7 +70,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
   const paint=r=>{bar.hidden=false;line.hidden=false;const pct=r.total?Math.min(100,Math.round(r.received/r.total*100)):0;fill.style.width=(r.phase==='downloading'?pct:100)+'%';
    line.textContent=r.phase==='downloading'?t.downloading+' · '+pct+'% · '+(r.received/1048576).toFixed(0)+' / '+(r.total/1048576).toFixed(0)+' MB':r.phase==='installing'?t.installing:r.phase==='connecting'?t.connecting:r.phase==='done'?t.done:r.phase==='error'?(/CANCELLED/.test(r.error)?t.cancelled:t.failed+'（'+r.error+'）'):'';};
   go.onclick=async()=>{go.disabled=true;go.hidden=true;try{paint(await api('anki_install'));}catch(error){go.disabled=false;go.hidden=false;toast(reason(error));return;}
-   const tick=setInterval(async()=>{if(!isCurrent()){clearInterval(tick);return;}let r;try{r=await api('anki_install_status');}catch{return;}paint(r);
+   let busy=false;const tick=setInterval(async()=>{if(busy)return;if(!isCurrent()){clearInterval(tick);return;}let r;busy=true;try{r=await api('anki_install_status');}catch{busy=false;return;}busy=false;paint(r);
     if(r.phase==='done'){clearInterval(tick);for(let i=0;i<40&&isCurrent();i++){status=await api('anki_status').catch(()=>status);if(status.connected)break;await new Promise(z=>setTimeout(z,3000));}if(isCurrent())drawDecks();}
     else if(r.phase==='error'){clearInterval(tick);go.textContent=t.retry;go.disabled=false;go.hidden=false;}},700);};}
  function failed(error){const code=typeof error==='string'?error:error?.message;if(code==='ANKI_EXECUTABLE_MISSING'){if(INST&&isCurrent())showInstall();else toast(copy.missing);return;}toast(reason(error));if(code==='ANKI_OFFLINE'&&isCurrent()){status={connected:false,reason:code};drawDecks();}}

@@ -37,14 +37,14 @@ impl WindowMemory {
   std::thread::spawn(move||while let Ok(mut window)=capture_receiver.recv(){while let Ok(latest)=capture_receiver.recv_timeout(Duration::from_millis(60)){window=latest;}if let Some((width,height,maximized,minimized))=window_dimensions(&window){if let Ok(mut value)=capture_current.lock(){let before=value.clone();value.record(width,height,maximized,minimized);if *value!=before{let _=capture_write.send(());}}}});
   Self{path,current,signal,capture_signal,enabled:AtomicBool::new(false)}
  }
- pub fn snapshot(&self)->Snapshot{self.current.lock().unwrap().clone()}
- pub fn prepare(&self,value:Snapshot){*self.current.lock().unwrap()=value;}
+ pub fn snapshot(&self)->Snapshot{self.current.lock().unwrap_or_else(|e|e.into_inner()).clone()}
+ pub fn prepare(&self,value:Snapshot){*self.current.lock().unwrap_or_else(|e|e.into_inner())=value;}
  pub fn enable(&self){self.enabled.store(true,Ordering::SeqCst);}
  pub fn queue_capture(&self,window:tauri::Window){if self.enabled.load(Ordering::SeqCst)&&window.label()=="main"{let _=self.capture_signal.send(window);}}
  pub fn capture(&self,window:&tauri::Window){
   if !self.enabled.load(Ordering::SeqCst)||window.label()!="main"{return;}
   if let(Ok(size),Ok(scale),Ok(maximized),Ok(minimized))=(window.inner_size(),window.scale_factor(),window.is_maximized(),window.is_minimized()){
-   let logical=size.to_logical::<f64>(scale);let mut value=self.current.lock().unwrap();let before=value.clone();value.record(logical.width,logical.height,maximized,minimized);
+   let logical=size.to_logical::<f64>(scale);let mut value=self.current.lock().unwrap_or_else(|e|e.into_inner());let before=value.clone();value.record(logical.width,logical.height,maximized,minimized);
    if *value!=before{let _=self.signal.send(());}
   }
  }

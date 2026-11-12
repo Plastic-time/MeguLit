@@ -47,11 +47,11 @@ function startWorker(root){
  const py=spawn(pythonExe(),['-I',script,pylib(root),...MODELS.map(m=>modelPath(root,m))],{windowsHide:true,stdio:['pipe','pipe','pipe']});
  try{os.setPriority(py.pid,os.constants.priority.PRIORITY_BELOW_NORMAL);}catch{}
  const w={py,buf:'',waiting:[],ready:false,timer:null};
- py.stdout.on('data',d=>{w.buf+=d;let i;while((i=w.buf.indexOf('\n'))>=0){const line=w.buf.slice(0,i);w.buf=w.buf.slice(i+1);let msg;try{msg=JSON.parse(line);}catch{continue;}if(msg.ready){w.ready=true;continue;}const cb=w.waiting.shift();if(cb)cb(msg);}});
+ py.stdout.setEncoding('utf8');py.stdout.on('data',d=>{w.buf+=d;let i;while((i=w.buf.indexOf('\n'))>=0){const line=w.buf.slice(0,i);w.buf=w.buf.slice(i+1);let msg;try{msg=JSON.parse(line);}catch{continue;}if(msg.ready){w.ready=true;continue;}const cb=w.waiting.shift();if(cb)cb(msg);}});
  py.stderr.on('data',d=>log(root,'py '+String(d).slice(0,300)));
- py.on('exit',()=>{for(const cb of w.waiting.splice(0))cb({error:'exited'});if(worker===w)worker=null;});
+ py.on('exit',()=>{for(const cb of w.waiting.splice(0))cb({error:'exited'});if(worker===w)worker=null;});const fail=()=>{for(const cb of w.waiting.splice(0))cb({error:'exited'});if(worker===w)worker=null;};py.on('error',fail);py.stdin.on('error',()=>{});
  return w;}
-function ask(root,file){return new Promise(resolve=>{if(!worker)worker=startWorker(root);const w=worker;clearTimeout(w.timer);w.waiting.push(msg=>{w.timer=setTimeout(()=>{try{w.py.stdin.end();}catch{}},60000);w.timer.unref?.();resolve(msg);});try{w.py.stdin.write(file+'\n');}catch{resolve({error:'write'});}});}
+function ask(root,file){return new Promise(resolve=>{if(!worker)worker=startWorker(root);const w=worker;clearTimeout(w.timer);w.waiting.push(msg=>{clearTimeout(w.timer);w.timer=setTimeout(()=>{try{w.py.stdin.end();}catch{}},60000);w.timer.unref?.();resolve(msg);});try{w.py.stdin.write(file+'\n');}catch{resolve({error:'write'});}});}
 
 /* ---- ratings per game ---- */
 const ratingsFile=cacheDir=>path.join(cacheDir,'ratings.json');

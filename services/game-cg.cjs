@@ -182,7 +182,7 @@ function yurisGallery(dir,archives){
   const calls=[];for(const x of insts){if(!x.args.length)continue;const n=str(x.args[0]);const m=n&&/^es\.CGMODE\.(CG|DEF)\.SET$/i.exec(n);if(m)calls.push(m[1].toUpperCase()==='CG'?(x.args[1]&&str(x.args[1])||''):null);}
   if(calls.length&&(!best||calls.length>best.length))best=calls;}
  const value=best?esSlots(best):null;
- yurisMemo.set(dir,{key,value});return value;}
+ yurisMemo.delete(dir);yurisMemo.set(dir,{key,value});if(yurisMemo.size>8)yurisMemo.delete(yurisMemo.keys().next().value);return value;}
 /* calls in order: a picture name for CG.SET, null for DEF.SET (which closes the entry): the entry's slot, then its pictures */
 function esSlots(calls){const slots=new Map(),heads=new Set();let slot=1,pending=[];for(const c of calls){if(c!==null){pending.push(c);continue;}heads.add(slot++);for(const p of pending)slots.set(slot++,p);pending=[];}return {slots,heads,size:slot};}
 function yurisSaves(dir){const out=[];let l=[];try{l=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
@@ -205,7 +205,7 @@ function scan(executable){
  const dir=path.dirname(String(executable||''));if(!dir||!fs.existsSync(dir))return {supported:false,items:new Map()};
  const key=dir.toLowerCase(),st=stamp(dir),hit=cache.get(key);if(hit&&hit.stamp===st)return hit.result;
  let result={supported:false,items:new Map()};for(const r of READERS){try{const got=r.read(dir,String(executable));if(got){result=got;break;}}catch{}}
- cache.set(key,{stamp:st,result});return result;
+ cache.delete(key);cache.set(key,{stamp:st,result});if(cache.size>8)cache.delete(cache.keys().next().value);return result;
 }
 const cacheDirOf=(root,executable)=>path.join(root,'data','cg-cache',crypto.createHash('sha1').update(path.dirname(String(executable)).toLowerCase()).digest('hex').slice(0,16));
 /* opts: root; cold (the cold-run setting: the game may be started in the background to read CGs only it can open);

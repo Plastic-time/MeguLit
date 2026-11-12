@@ -2,8 +2,9 @@
 // Layout coordinates never include an in-flight animation or page scroll.
 export function gridLayout(grid){
  const nodes=[...grid.children],tops=[...new Set(nodes.map(node=>node.offsetTop))].sort((a,b)=>a-b);
+ const rows=new Map();for(const n of nodes){const t=n.offsetTop;if(!rows.has(t))rows.set(t,[]);rows.get(t).push(n);}for(const r of rows.values())r.sort((a,b)=>a.offsetLeft-b.offsetLeft);
  return new Map(nodes.map(node=>{const top=node.offsetTop,left=node.offsetLeft;
-  const rowNodes=nodes.filter(other=>other.offsetTop===top).sort((a,b)=>a.offsetLeft-b.offsetLeft);
+  const rowNodes=rows.get(top);
   return[node,{left,top,row:tops.indexOf(top),column:rowNodes.indexOf(node)}];
  }));
 }

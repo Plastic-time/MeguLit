@@ -51,7 +51,7 @@ function build(host){
 function frame(now){
  const f=field;if(!f||!f.cv.isConnected||!f.host.isConnected||!document.querySelector('#lookup-results')){f?.cv.remove();field=null;return;}
  const dt=Math.min(.05,(now-f.prev)/1000);f.prev=now;const ctx=f.ctx;ctx.clearRect(0,0,f.W,f.H);
- const pref=fxPref('dictField');if(!pref.on){if(!calm)f.raf=requestAnimationFrame(frame);return;}
+ const pref=fxPref('dictField');if(!pref.on){if(!calm)setTimeout(()=>{if(field===f)f.raf=requestAnimationFrame(frame);},250);return;}
  const res=document.querySelector('#lookup-results'),busy=res&&(res.children.length||res.textContent.trim())?1:0;f.dim=(f.dim??1)+((busy?.45:1)-(f.dim??1))*Math.min(1,dt*3);
  const order=f.parts;f.pvx=(f.pvx||0)*Math.exp(-8*dt);f.pvy=(f.pvy||0)*Math.exp(-8*dt);
  /* (user: the field has no fixed places — a pushed glyph stays where it was pushed; the whole only rebalances, slowly)

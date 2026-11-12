@@ -4,12 +4,12 @@ pub const EXIT_MILLIS:u64=280;
 #[derive(Default)]struct State{generation:u64,leaving:bool}
 #[derive(Default)]pub struct HomeTransition(Mutex<State>);
 impl HomeTransition{
- pub fn begin(&self)->Option<u64>{let mut s=self.0.lock().unwrap();if s.leaving{return None;}s.generation+=1;s.leaving=true;Some(s.generation)}
- pub fn cancel(&self)->bool{let mut s=self.0.lock().unwrap();let leaving=s.leaving;s.generation+=1;s.leaving=false;leaving}
- pub fn generation(&self)->u64{self.0.lock().unwrap().generation}
- pub fn is_leaving(&self)->bool{self.0.lock().unwrap().leaving}
- pub fn current(&self,ticket:u64)->bool{self.0.lock().unwrap().generation==ticket}
- pub fn commit(&self,ticket:u64)->bool{let mut s=self.0.lock().unwrap();if !s.leaving||s.generation!=ticket{return false;}s.leaving=false;true}
+ pub fn begin(&self)->Option<u64>{let mut s=self.0.lock().unwrap_or_else(|e|e.into_inner());if s.leaving{return None;}s.generation+=1;s.leaving=true;Some(s.generation)}
+ pub fn cancel(&self)->bool{let mut s=self.0.lock().unwrap_or_else(|e|e.into_inner());let leaving=s.leaving;s.generation+=1;s.leaving=false;leaving}
+ pub fn generation(&self)->u64{self.0.lock().unwrap_or_else(|e|e.into_inner()).generation}
+ pub fn is_leaving(&self)->bool{self.0.lock().unwrap_or_else(|e|e.into_inner()).leaving}
+ pub fn current(&self,ticket:u64)->bool{self.0.lock().unwrap_or_else(|e|e.into_inner()).generation==ticket}
+ pub fn commit(&self,ticket:u64)->bool{let mut s=self.0.lock().unwrap_or_else(|e|e.into_inner());if !s.leaving||s.generation!=ticket{return false;}s.leaving=false;true}
 }
 #[cfg(test)]mod tests{
  use super::*;

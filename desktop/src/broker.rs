@@ -17,8 +17,9 @@ impl Broker {
   command.arg(self.root.join("services/server.cjs")).current_dir(&self.root).env("MEGULIT_ROOT",&self.root).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
   #[cfg(windows)] command.creation_flags(0x08000000);
   let mut child=command.spawn().map_err(|_|"SERVICE_START_FAILED")?;
+  #[cfg(windows)] kill_with_app(&child);
   let input=child.stdin.take().ok_or("SERVICE_PIPE_FAILED")?;let output=child.stdout.take().ok_or("SERVICE_PIPE_FAILED")?;
-  for(_,sender)in self.pending.lock().unwrap().drain(){let _=sender.send(Err("SERVICE_DISCONNECTED".into()));}
+  for(_,sender)in self.pending.lock().unwrap_or_else(|e|e.into_inner()).drain(){let _=sender.send(Err("SERVICE_DISCONNECTED".into()));}
   let generation=self.generation.clone();let epoch=generation.fetch_add(1,Ordering::SeqCst)+1;let pending=self.pending.clone();
   std::thread::spawn(move||{
    for line in BufReader::new(output).lines(){let Ok(line)=line else{break};let Ok(value)=serde_json::from_str::<Value>(&line)else{continue};
@@ -31,21 +32,33 @@ impl Broker {
      }
      continue;
     }
-    if let Some(id)=value["id"].as_u64(){if let Some(sender)=pending.lock().unwrap().remove(&id){let result=if value["ok"]==true{Ok(value["data"].clone())}else{Err(value["error"].as_str().unwrap_or("SERVICE_FAILED").to_string())};let _=sender.send(result);}}
+    if let Some(id)=value["id"].as_u64(){if let Some(sender)=pending.lock().unwrap_or_else(|e|e.into_inner()).remove(&id){let result=if value["ok"]==true{Ok(value["data"].clone())}else{Err(value["error"].as_str().unwrap_or("SERVICE_FAILED").to_string())};let _=sender.send(result);}}
    }
-   if generation.load(Ordering::SeqCst)==epoch{for(_,sender)in pending.lock().unwrap().drain(){let _=sender.send(Err("SERVICE_DISCONNECTED".into()));}}
+   if generation.load(Ordering::SeqCst)==epoch{for(_,sender)in pending.lock().unwrap_or_else(|e|e.into_inner()).drain(){let _=sender.send(Err("SERVICE_DISCONNECTED".into()));}}
   });
   *slot=Some(Process{child,input});Ok(())
  }
  fn request(&self,request:Value)->Reply{
   let id=self.serial.fetch_add(1,Ordering::Relaxed);let(tx,rx)=mpsc::channel();
   {let mut process=self.process.lock().map_err(|_|"SERVICE_LOCK_FAILED")?;self.start(&mut process)?;
-   self.pending.lock().unwrap().insert(id,tx);let encoded=json!({"id":id,"request":request}).to_string()+"\n";
-   if process.as_mut().unwrap().input.write_all(encoded.as_bytes()).is_err(){self.pending.lock().unwrap().remove(&id);return Err("SERVICE_DISCONNECTED".into());}
+   self.pending.lock().unwrap_or_else(|e|e.into_inner()).insert(id,tx);let encoded=json!({"id":id,"request":request}).to_string()+"\n";
+   if process.as_mut().unwrap().input.write_all(encoded.as_bytes()).is_err(){self.pending.lock().unwrap_or_else(|e|e.into_inner()).remove(&id);return Err("SERVICE_DISCONNECTED".into());}
   }
-  match rx.recv_timeout(Duration::from_secs(240)){Ok(result)=>result,Err(_)=>{self.pending.lock().unwrap().remove(&id);Err("SERVICE_TIMEOUT".into())}}
+  match rx.recv_timeout(Duration::from_secs(240)){Ok(result)=>result,Err(_)=>{self.pending.lock().unwrap_or_else(|e|e.into_inner()).remove(&id);Err("SERVICE_TIMEOUT".into())}}
  }
 }
 pub fn shutdown(){if let Some(broker)=BROKER.get(){
  if let Ok(mut slot)=broker.process.lock(){if let Some(mut process)=slot.take(){let _=process.input.write_all(b"{\"id\":0,\"request\":{\"action\":\"__shutdown\"}}\n");drop(process.input);let deadline=Instant::now()+Duration::from_secs(8);loop{if process.child.try_wait().ok().flatten().is_some(){break;}if Instant::now()>=deadline{let _=process.child.kill();let _=process.child.wait();break;}std::thread::sleep(Duration::from_millis(50));}}}
 }}
+/* Ties the Node service to this process: when MeguLit exits or is killed, Windows closes the job and ends node.exe too. */
+#[cfg(windows)]
+fn kill_with_app(child:&Child){
+ use std::os::windows::io::AsRawHandle;use std::ffi::c_void;
+ #[repr(C)] #[derive(Default)] struct Basic{a:i64,b:i64,flags:u32,c:usize,d:usize,e:u32,f:usize,g:u32,h:u32}
+ #[repr(C)] #[derive(Default)] struct Io{v:[u64;6]}
+ #[repr(C)] #[derive(Default)] struct Extended{basic:Basic,io:Io,p:usize,j:usize,pp:usize,pj:usize}
+ #[link(name="kernel32")] extern "system"{fn CreateJobObjectW(a:*mut c_void,n:*const u16)->*mut c_void;fn SetInformationJobObject(j:*mut c_void,class:i32,info:*const c_void,len:u32)->i32;fn AssignProcessToJobObject(j:*mut c_void,p:*mut c_void)->i32;}
+ static JOB:OnceLock<usize>=OnceLock::new();
+ let job=*JOB.get_or_init(||unsafe{let j=CreateJobObjectW(std::ptr::null_mut(),std::ptr::null());if j.is_null(){return 0;}let mut info=Extended::default();info.basic.flags=0x2000;if SetInformationJobObject(j,9,&info as *const _ as *const c_void,std::mem::size_of::<Extended>() as u32)==0{return 0;}j as usize});
+ if job!=0{unsafe{AssignProcessToJobObject(job as *mut c_void,child.as_raw_handle() as *mut c_void);}}
+}

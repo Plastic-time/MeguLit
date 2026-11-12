@@ -524,7 +524,7 @@ fn main() {
             if window.label()=="main"&&matches!(event,WindowEvent::Focused(true)){if let Some(home)=window.app_handle().get_webview_window("main"){if !window.state::<DesktopState>().home_transition.is_leaving(){window_policy::ensure_home_opaque(&home);}window_policy::round_home_frame(&home);}}
             if let WindowEvent::CloseRequested { api,.. }=event {
             let state=window.state::<DesktopState>();
-            if window.label()=="reader"{let root=state.root.clone();std::thread::spawn(move||{let _=run_service(root,json!({"action":"reader_detach"}));});return;}
+            if window.label()=="reader"{let root=state.root.clone();tauri::async_runtime::spawn_blocking(move||{let _=run_service(root,json!({"action":"reader_detach"}));});return;}
             if window.label()!="main"{return;}
             if !state.exiting.load(Ordering::SeqCst) {
                 state.window_memory.queue_capture(window.clone());state.window_memory.flush();

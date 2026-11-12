@@ -57,7 +57,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   let stage='launch-preflight',featureWatch=null;
   try{
   if(!game.executable||!fs.existsSync(game.executable))throw Error('EXECUTABLE_MISSING');
-  const original=JSON.parse(game.original),profile=original.library || {};
+  let original={};try{original=JSON.parse(game.original||'{}')||{};}catch{}const profile=original.library || {};
   if(require('./game-language.cjs').originalExecutable(db,id,root).blocked)throw Error('JAPANESE_EXECUTABLE_REQUIRED');
   const elevation=require('./locale-launch.cjs').requiresAdministrator(game.executable);
   runtime?.prepareGame(game.executable,{enter:false});
