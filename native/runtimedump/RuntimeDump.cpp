@@ -40,7 +40,7 @@ MEGULIT_DUMP_MODULES
 static DumpSinkFn SinkList[8]; static volatile LONG SinkCount;
 void DumpSink(DumpSinkFn fn) { LONG i = InterlockedIncrement(&SinkCount) - 1; if (i < 8) SinkList[i] = fn; }
 static void SinkOne(DumpSinkFn fn, const char *source, const char *how, const unsigned char *p, DWORD n) { __try { fn(source, how, p, n); } __except (EXCEPTION_EXECUTE_HANDLER) {} }
-static void Sinks(const std::string &source, const char *how, const unsigned char *p, DWORD n) { LONG k = SinkCount < 8 ? SinkCount : 8; for (LONG i = 0; i < k; i++) if (SinkList[i]) SinkOne(SinkList[i], source.c_str(), how, p, n); }
+static void Sinks(const std::string &source, const char *how, const unsigned char *p, DWORD n) { DWORD e = GetLastError(); LONG k = SinkCount < 8 ? SinkCount : 8; for (LONG i = 0; i < k; i++) if (SinkList[i]) SinkOne(SinkList[i], source.c_str(), how, p, n); SetLastError(e); }
 // Pack contract version, read by tests and by MeguLit to tell pack builds apart.
 extern "C" __declspec(dllexport) int MeguLitDumpVersion() { return 2; }
 
