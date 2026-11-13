@@ -27,3 +27,14 @@ test('landing: no fade, the real card replaces the flying one in the same task, 
  assert.ok(tv.includes('live?.depth?.hold(true)')&&tv.includes('live?.depth?.hold(false)'),'the scene settles flat for the flight and follows the pointer again after');
  assert.ok(!/\.tv-canvas\{[^}]*transition/.test(css),'no CSS transition on the tilted canvas (it made the real card lag behind the measured pose)');
 });
+
+test('random draw is tied to the hand; the field card stays centred over the fan',()=>{
+ const W=path.join(__dirname,'..','web'),tv=fs.readFileSync(path.join(W,'home-tv.js'),'utf8'),hand=fs.readFileSync(path.join(W,'home-hand.js'),'utf8');
+ assert.ok(tv.includes('if(pool.length>1)draw(randomGame());'),'double-click goes through draw()');
+ assert.ok(tv.includes('if(list.includes(g)){hand.play(g.id);return;}'),'a drawn game that is in the hand is played out of it with a flight');
+ assert.ok(tv.includes("hand.stow(prev.id,g.id))$('.tv-cover').dataset.stow='1'"),'otherwise the field card flies back into its slot');
+ assert.ok(tv.includes("if(!stowed)outLayer(cover).appendChild(old);"),'a stowed field card is not also thrown off the table');
+ assert.ok(hand.includes('function stow(oldId,newId)')&&hand.includes('function extent()'),'hand exposes stow and its fan extent');
+ assert.ok(tv.includes('function placeCover()')&&tv.includes('fan.cx-(r.left+r.width/2-rr.left)'),'(user: 展示的卡要一直在手牌上方居中) field card centred on the fan');
+ assert.ok(/onResize=\(\)=>\{if\(live&&live\.root===root\)\{fitLeft\(root\);hand\.relayout\(\);placeCover\(\);/.test(tv),'re-centred on resize');
+});

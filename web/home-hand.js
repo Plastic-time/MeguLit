@@ -113,8 +113,16 @@ export function createHand(opts){const {root,box,layer,cover,art,back='',onPlay,
   if(old){const el=st.cards.get(old.id);el?.classList.add('is-wait');const to=slotPose(old.id,W);/* the card going home slides in under its neighbours, the one coming out stays on top */if(to)fly(old.id,old,fromOld,to,kind,Math.round((FLIGHT_MS[kind]||760)*.88),0,()=>{el?.classList.remove('is-wait');}).el.style.zIndex='6';else el?.classList.remove('is-wait');}
   /* the landing pose is the field card as it sits with the scene flat (the scene settles flat during the flight, see home-depth hold) */
   if(fromPick)fly(id,g,fromPick,(opts.neutral||(fn=>fn()))(coverPose),kind,FLIGHT_MS[kind]||760,old?120:0,()=>onLand?.(g)).el.style.zIndex='8';else onLand?.(g);}
- /* the field card changed some other way (double-click draw): take it out of the hand without a flight */
+ /* the field card goes back into its hand slot because a card from outside the hand is coming onto the field (random draw off the deck) */
+ function stow(oldId,newId){const old=st.games.find(x=>x.id===oldId);if(reduced||!old||!cover.offsetWidth)return false;const W=cover.offsetWidth,
+  from=(st.flights.has(oldId)&&currentPose(st.flights.get(oldId)))||coverPose();st.out=newId;st.hover=-1;render(st.games,newId);const el=st.cards.get(oldId),to=slotPose(oldId,W);
+  if(!to)return false;el?.classList.add('is-wait');const kind=globalThis.__forceKind||pickVariant(st.last);st.last=kind;
+  fly(oldId,old,from,to,kind,Math.round((FLIGHT_MS[kind]||760)*.88),0,()=>el?.classList.remove('is-wait')).el.style.zIndex='6';return true;}
+ /* the field card changed some other way: take it out of the hand without a flight */
  function sync(id){if(id===st.out||st.flights.has(id))return;st.out=id;render(st.games,id);}
  const onResize=()=>relayout();addEventListener('resize',onResize);
  function stop(){removeEventListener('resize',onResize);st.flights.forEach(f=>{f.anims.forEach(a=>a.cancel());f.el.remove();f.trails.forEach(t=>t.remove());});st.flights.clear();}
- return {render,setExtras,play,sync,stop,relayout,state:st,flying:()=>st.flights.size>0};}
+ /* the fan's horizontal centre and top edge in root pixels, from the resting layout (no hover lift) */
+ function extent(){const m=metrics(),n=inHand().length+st.extras.length;if(!n||!m.W)return null;const pos=handLayout(n,{...m,hover:-1}),xs=pos.map(p=>p.x),
+  br=box.getBoundingClientRect(),rr=root.getBoundingClientRect();return {cx:br.left-rr.left+(Math.min(...xs)+Math.max(...xs))/2,top:br.top-rr.top+Math.min(...pos.map(p=>p.y))-m.ch/2};}
+ return {render,setExtras,play,stow,sync,stop,relayout,extent,state:st,flying:()=>st.flights.size>0};}

@@ -172,8 +172,9 @@ function deal(cover,background,animate,mode='draw'){const flip=cover.querySelect
   transform:'none'}],{duration:760,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'});a.finished.then(()=>{artEl.style.background=background;fresh.remove();},
   ()=>fresh.remove());return 260;}
  const outDir=rnd(0,Math.PI*2),outDur=rnd(360,460);
- const old=document.createElement('div');old.className='tv-old';old.style.background=artEl.style.background;outLayer(cover).appendChild(old);
- old.animate([{transform:'none',opacity:1},{transform:`translate(${Math.cos(outDir)*18}%,${Math.sin(outDir)*14}%) rotate(${rnd(-12,12)}deg) scale(.97)`,opacity:.9,
+ /* a field card that goes back into the hand (cover.dataset.stow, set by the draw) flies there itself; only a card that is not in the hand is thrown off */
+ const stowed=cover.dataset.stow==='1';delete cover.dataset.stow;const old=document.createElement('div');old.className='tv-old';old.style.background=artEl.style.background;if(!stowed)outLayer(cover).appendChild(old);
+ if(!stowed)old.animate([{transform:'none',opacity:1},{transform:`translate(${Math.cos(outDir)*18}%,${Math.sin(outDir)*14}%) rotate(${rnd(-12,12)}deg) scale(.97)`,opacity:.9,
   offset:.35},{transform:`translate(${Math.cos(outDir)*rnd(120,160)}%,${Math.sin(outDir)*rnd(90,120)}%) rotate(${rnd(-50,50)}deg) scale(${rnd(.75,.9)})`,opacity:0}],
   {duration:outDur,easing:'cubic-bezier(.4,0,.6,1)',fill:'forwards'}).finished.then(()=>old.remove(),()=>old.remove());
  artEl.style.background=background;
@@ -329,7 +330,13 @@ export function renderHomeTV(main,ctx){
   rail();
  }
  /* 2026-11-13 (user) the cover strip became a hand of cards; picking one plays it onto the field (see home-hand.js) */
- function rail(){hand.render(list.map(g=>({id:g.id,title:g.title,cover:g.cover,pinned:setting.pinned.includes(g.id),g})),shown?.id||null);}
+ function rail(){hand.render(list.map(g=>({id:g.id,title:g.title,cover:g.cover,pinned:setting.pinned.includes(g.id),g})),shown?.id||null);placeCover();}
+ /* 2026-11-13 (user: "你要保证展示的卡要一直在手牌上方居中") the field card is centred over the fan of cards at every window size, measured on the
+    untilted scene; if it would reach into the fan it moves up. Never while a card is in flight (its landing pose is already fixed). */
+ function placeCover(){const c=$('.tv-cover'),face=c?.querySelector('.tv-face');if(!c||!face||!live||live.root!==root||hand.flying())return;const fan=hand.extent();if(!fan)return;
+  const run=fn=>live.depth?live.depth.neutral(fn):fn();run(()=>{c.style.left='';c.style.top='';const rr=root.getBoundingClientRect();
+   for(let i=0;i<4;i++){const r=face.getBoundingClientRect(),k=r.width/(c.offsetWidth||1)||1,dx=(fan.cx-(r.left+r.width/2-rr.left))/k;if(Math.abs(dx)<.5)break;c.style.left=(c.offsetLeft+dx)+'px';}
+   const r=face.getBoundingClientRect(),over=r.bottom-rr.top-(fan.top-14);if(over>0)c.style.top=(c.offsetTop-over/(r.height/(c.offsetHeight||1)||1))+'px';});}
  function commit(){model.preferences.homeShowcase=setting;savePreferences({homeShowcase:setting});const id=shown?.id;list=showcaseGames(model.games,setting);
   paint(Math.max(0,list.findIndex(g=>g.id===id)),false);}
  /* 2026-11-13 (user: "不要全部作品 … 把＋卡移到最右边 不要是卡牌了 鼠标放上去再出来") the hand editor is a tab docked on the right edge that slides out
@@ -363,12 +370,13 @@ export function renderHomeTV(main,ctx){
   back:`<img src="${LOGO}" alt="">`,art:h=>art(h.g||h,['#3b2a26','#5a3a30','#1a1110']),neutral:fn=>live?.depth?live.depth.neutral(fn):fn(),
   onPlay:(h,kind,ms)=>{if(kind!=='plain'){root.classList.add('tv-fly');live?.depth?.hold(true);/* the field card's table shadow grows in as the flying card comes down onto it */
    $('.tv-cshadow')?.animate([{opacity:0},{opacity:0,offset:.55},{opacity:1}],{duration:ms||800,easing:'cubic-bezier(.3,0,.2,1)'});}paint(h.g,kind==='plain','fade');},
-  onLand:()=>{root.classList.remove('tv-fly');live?.depth?.hold(false);}});live.hand=hand;
+  onLand:()=>{root.classList.remove('tv-fly');live?.depth?.hold(false);placeCover();}});live.hand=hand;
+ hand.state&&requestAnimationFrame(()=>placeCover());
  const canvas=$('.tv-canvas'),planes=[...root.querySelectorAll('.tv-plane')],reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
  /* 2026-11-13 (user) every layer has its own depth: the far headline picture drifts against the pointer, near ones (cards, figures, rail, bottom bar) lead it */
  {const L=(sel,z)=>{const el=$(sel);return el?{el,z}:null;};live.depth=createDepth(root,{canvas,planes,layers:[L('.tv-left',7),L('.tv-figs',8),
   L('.tv-hand',24),L('.tv-dialog',5),L('.tv-title',9),L('.tv-marks',3),L('.tv-cshadow',-22)].filter(Boolean)});}
- const onResize=()=>{if(live&&live.root===root){fitLeft(root);}else removeEventListener('resize',onResize);};addEventListener('resize',onResize);
+ const onResize=()=>{if(live&&live.root===root){fitLeft(root);hand.relayout();placeCover();}else removeEventListener('resize',onResize);};addEventListener('resize',onResize);
  root.querySelectorAll('.tv-cover,.tv-heat-card').forEach(cardify);
  const coverEl=$('.tv-cover');let clickTimer=0,pressAt=0,pressXY=[0,0];coverEl.setAttribute('aria-label',w.coverHint);const pop=document.createElement('div');pop.className='tv-pop';
   pop.innerHTML=`<p><i class="m1"></i><b>${w.tipClick}</b><span>${w.tipDetail}</span></p><p><i class="m2"></i><b>${w.tipDbl}</b><span>${w.tipDraw}</span></p>`;root.appendChild(pop);
@@ -377,7 +385,11 @@ export function renderHomeTV(main,ctx){
   520);}});coverEl.addEventListener('pointerleave',hidePop);coverEl.addEventListener('pointerdown',hidePop);coverEl.addEventListener('pointerdown',e=>{pressAt=performance.now();
   pressXY=[e.clientX,e.clientY];});coverEl.addEventListener('click',e=>{/* (user 2026-11-12) a long press or a drag only plays with the card; letting go never opens the detail */if(e.detail&&(performance.now()-pressAt>350||Math.hypot(e.clientX-pressXY[0],
   e.clientY-pressXY[1])>6))return;clearTimeout(clickTimer);clickTimer=setTimeout(()=>shown&&onDetail(shown.id),260);});coverEl.addEventListener('dblclick',e=>{e.preventDefault();
-  clearTimeout(clickTimer);if(pool.length>1)paint(randomGame());});
+  clearTimeout(clickTimer);if(pool.length>1)draw(randomGame());});
+ /* 2026-11-13 (user: "再补一个随机抽卡出来的封面 和手牌选取的过渡动画") a random draw is tied to the hand: a game that is in the hand is played out of it like a
+    picked card (the field card flies home); any other game is drawn off the deck while the field card flies back into its slot in the hand */
+ function draw(g){if(!g||!live||live.root!==root)return;if(list.includes(g)){hand.play(g.id);return;}const prev=shown;
+  if(prev&&list.includes(prev)&&!matchMedia('(prefers-reduced-motion:reduce)').matches&&hand.stow(prev.id,g.id))$('.tv-cover').dataset.stow='1';paint(g);}
  if(list.length)paint(0,false);
  return stopHomeTV;
 }
