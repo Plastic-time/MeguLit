@@ -4,4 +4,5 @@
 #define MEGULIT_SELFTEST_CASES \
  CASE(Example) \
  CASE(Safety) \
- CASE(Voice)
+ CASE(Voice) \
+ CASE(VoiceSafety)
