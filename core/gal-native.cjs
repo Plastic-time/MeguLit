@@ -88,7 +88,7 @@ class GalNative {
   // Anki: the game's own sound and picture. Lines are remembered with the time they arrived; a card's sentence is cut
   // from its line's start to the next line's start (or now) out of the bridge's in-memory recording of the game.
   setGameAudio(enabled){this.gameAudioWanted=!!enabled;this.send({type:'gameAudio',enabled:this.gameAudioWanted});}
-  rememberLine(text){if(typeof text!=='string'||!text.trim())return;const lines=this.lines||(this.lines=[]);if(String(lines.at(-1)?.text||'').replace(/\s+/g,'')===text.replace(/\s+/g,''))return; /* E270: a re-sent line with other breaks is the same line */lines.push({text,at:Date.now()});this.keepVoice(lines.at(-2));if(lines.length>300)lines.splice(0,lines.length-300);}
+  rememberLine(text){if(typeof text!=='string'||!text.trim())return;const lines=this.lines||(this.lines=[]);if(String(lines.at(-1)?.text||'').replace(/\s+/g,'')===text.replace(/\s+/g,''))return; /* E270: a re-sent line with other breaks is the same line */lines.push({text,at:Date.now()});this.keepVoice(lines.at(-2));try{this.onLine?.(text);}catch{}/* voice-harvest.cjs: line times for the game's own voice clips */if(lines.length>300)lines.splice(0,lines.length-300);}
   /* E450 runtime source of the game's own voice: when the next line arrives, the clip recorded for the line before it is
      handed to onLineVoice (game-voice.cjs keeps it for that line). Only with the game sound capture on. */
   keepVoice(line){if(!line||!this.gameAudioWanted||typeof this.onLineVoice!=='function'||line.voiceKept)return;line.voiceKept=true;const text=line.text;setTimeout(()=>{this.gameMedia(text,Date.now(),false).then(m=>{if(m?.matched&&m.audio?.data)this.onLineVoice(text,m.audio.data);}).catch(()=>{});},300).unref?.();}
