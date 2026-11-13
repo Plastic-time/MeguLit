@@ -8,3 +8,4 @@ EXPORT void __cdecl alSourcePlay(unsigned s) { Touched[2] += (int)s; }
 EXPORT void __cdecl alSourcePlayv(int n, const unsigned *s) { Touched[3] += n + (s != 0); }
 EXPORT void __cdecl alSourceStop(unsigned s) { Touched[4] += (int)s; }
 EXPORT void __cdecl alSourceQueueBuffers(unsigned s, int n, const unsigned *b) { Touched[5] += (int)s + n + (b != 0); }
+EXPORT void __cdecl alDeleteBuffers(int n, const unsigned *b) { Touched[6] += n + (b != 0); }
