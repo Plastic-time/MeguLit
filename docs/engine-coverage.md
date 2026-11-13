@@ -91,7 +91,7 @@ MeguLit 对一款游戏的支持分三层：
 | Leaf / AQUAPLUS | 5 | 5 | 5 | ✅ | ✅ KCAP script.pak | ✅ |  |
 | HuneX | 1 | 1 | 1 | 🆕 | ✅ .hfa 多语言 ctd 表 | ⚪ | 原来有读取器但库里是未知引擎；乙女移植常见 |
 | Adobe AIR / Flash | — | — | — | 🆕 | ❌ | ⚪ | 老乙女同人常见（43 款） |
-| Kaleido ADV Workshop | — | — | — | ❌ | ❌ | ⚪ | MAGES/Spike 新移植 |
+| Kaleido ADV Workshop | — | — | — | ✅ | ❌ | ⚪ | MAGES/Spike 新移植 |
 | DDSystem | — | — | — | ❌ | ❌ | ⚪ | Daisy2（乙女） |
 | Escude | — | — | — | ✅ | 🟡 GARbro（script.bin ACPX） | ✅ |  |
 | minori (PAZ) | — | — | — | ✅ | ✅ scr.paz | ✅ |  |
@@ -122,7 +122,7 @@ MeguLit 对一款游戏的支持分三层：
 | Ren'Py | 63 | ✅（本轮补上无源码版） |
 | RPG Maker | 62 | ✅ MV/MZ |
 | Unity | 60 | 按框架 |
-| Comic Maker 1/2/3 | 114 | ❌ 老同人工具 |
+| Comic Maker 1/2/3 | 114 | ❌ 老同人工具（F2 查不到格式，需实物） |
 | Adobe AIR / Flash | 47 | 🆕 只检测 |
 | System-NNN | 24 | 🆕 读取（E570） |
 | BGI | 11 | ✅ |
@@ -214,3 +214,20 @@ MeguLit 对一款游戏的支持分三层：
 | Defold | 需实物 | 只做检测 + game.arcd 里未压缩的 UTF-8 串扫描（条目是 LZ4 压缩） |
 | Visual Novel Maker | 半成品 | NW.js 内 MZ 格式 data → rpgmaker.cjs；VNM 自有场景格式未核对，其余 data\*.json 走 JSON 串扫描 |
 | HTML5 / Electron / NW.js、O2 / Novelsphere、HTMLVN、Phaser / PixiJS、NVLMaker、CloudNovel | 半成品（通用扫描） | 脚本格式未知，只做检测 + js / json / html 通用串扫描（跳过 jquery / pixi 等库） |
+
+## 第二轮 F2 纯文本脚本（E620，plaintext.cjs）
+
+一个读取器 + 每个引擎一份语法配置（`services/original-engines/plaintext-profiles.json`，纯数据：注释 / 标签 / 命令前缀、带文本的命令、说话人、选项、行内标记与注音、代码块、容器、编码、检测指纹）。注册表条目由配置生成；只含一条文本规则的简单配置可用 `packGrammar()` 转成适配包 `grammar:lines` 下发。合成夹具 + 日文原版 / 中文补丁 1:1 配对测试：`validation/e620-plaintext.test.cjs`。均未碰过真游戏。
+
+| 引擎 | 状态 | 说明 |
+|---|---|---|
+| Suika 2（含 OpenNovel / Polaris Engine） | 完整（按源码） | txt\*.txt 散文件或 data01.arc；2.x 起的混淆用默认密钥解开；改了密钥的作品只检测 |
+| NVList | 完整（按规格） | res\*.lvn（或 res.zip）；`@` / `@@` Lua、`#` / `##` 注释、`[ ]` 行内代码、`@choice` 选项 |
+| VNDS | 完整（按规格） | script\*.scr 或 script.zip；`text`、`choice a\|b` |
+| PyMO | 完整（按源码） | script\*.txt；`#say`、`#text`、`#title`、`#sel` 后续行、`#select_text` |
+| PyWright | 半成品 | games\…\*.txt 引号行、`nt` 名牌、`li` 选项；宏和交叉询问未细分 |
+| INSTEAD | 半成品 | main3.lua / main.lua（或 zip）里含非 ASCII 的字符串字面量；跨行 `[[ ]]` 与 .idf 不读 |
+| AIRNovel | 半成品 | config.anprj + mat\*.an，KAG 类标签；说话人 / 选项 / 注音标签无资料；打进 package.nw 的版本先被 TyranoScript 指纹拿走 |
+| Kaleido ADV Workshop | 需实物 | 只检测（`*_info.psb.m` + `*_body.bin`，M2 PSB 加密，密钥在 exe） |
+| Yuuki! Novel、Comic Maker 1/2/3、Scenario-kun、novelty、Kamishibai、Super Videotome / Videotome / Videotome:ADV、DNML、Adventure Creator (Tlaero)、Nejii、Famous Writer、恋愛シミュレーションツクール 1/2、Love Simulation Maker、NekoNovel、iFVN、Ark Script、ransel、LemoNovel | 需实物 | 查不到剧本格式也查不到可靠指纹：不检测，走 GARbro + 通用扫描；给一份目录清单（`dir /s /b`）即可先做检测 |
+| Kocho、Tadasu Novel Maker、Sandbox Adventure Engine | 不在范围 | 只有手机版 / 浏览器版，没有 Windows 版 |

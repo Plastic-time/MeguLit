@@ -96,6 +96,8 @@ const ENGINES=[
  {name:'NEKOPACK',hook:null,test:f=>f.magicAny(/\.(dat|pak)$/i,'NEKOPACK')},
  {name:'Marble',hook:null,test:f=>f.has(/\.mbl$/i)},
  {name:'rUGP (age)',hook:null,test:f=>f.has(/^rugp.*\.exe$/i)||f.has(/\.rio$/i)&&f.has(/\.rio\.ini$/i)},
+ /* E620 the F2 plain-text script family (Suika 2, NVList, VNDS, PyMO …): fingerprints are data in plaintext-profiles.json */
+ ...require('./plaintext.cjs').RAW.profiles.filter(p=>p.match).map(p=>({name:p.engine,hook:null,test:f=>require('./plaintext.cjs').matches(f,p.id)})),
  {name:'Godot',hook:null,generic:true,test:f=>f.magicAny(/\.pck$/i,'GDPC')},
  {name:'Unreal Engine',hook:null,generic:true,test:f=>f.has(/^engine$/i)&&f.names.some(n=>/\.exe$/i.test(n))&&f.sub('engine',/^(binaries|content)$/i)},
  /* E601 Capcom RE Engine (逆転裁判456 王泥喜セレクション): read by re-pak.cjs but had no fingerprint, so it showed as unknown */
@@ -214,6 +216,7 @@ const READERS={"BGI / Ethornell":["bgi"],
  "Corona / Solar2D":["solar2d"],
  "O2 Engine / Novelsphere":["html5"],"NVLMaker":["html5"],"CloudNovel":["html5"],"HTMLVN":["html5"],"HTML5 / Electron / NW.js":["html5"],
  "RE Engine (Capcom)":["re-pak"],"Unity":["unity-text","naninovel","higurashi","capcom-msg","vgprompter","pwaat"]};
+for(const p of require('./plaintext.cjs').RAW.profiles)READERS[p.engine]=p.detectOnly?[]:['plaintext'];
 for(const e of ENGINES)e.readers=READERS[e.name]||[];
 
 function listing(dir){let names=[];try{names=fs.readdirSync(dir);}catch{}const cache={};
