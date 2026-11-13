@@ -90,7 +90,8 @@ const ENGINES=[
  /* E375 RPG Maker MV (www/js, www/data) and MZ (js/rmmz_core.js, data/System.json) run in NW.js. hook:null: LunaHook has no
     reliable hook for Chromium's V8 strings; the script (data JSON) is still read for zero-latency translation. */
  {name:'RPG Maker MV/MZ',hook:null,generic:true,test:f=>f.sub('js',/^(rpg_core|rmmz_core)\.js$/i)||f.sub('www',/^js$/i)&&f.has(/^package\.json$/i)||f.sub('data',/^MapInfos\.json$/i)&&f.sub('data',/^System\.json$/i)&&f.has(/^(game|nw)\.exe$/i)},
- {name:'RPG Maker VX/XP',hook:true,generic:true,test:f=>f.has(/\.rgss(3a|2a|ad)$/i)},
+ /* E574 also an unpacked XP / VX / VX Ace game: Data\*.rxdata / .rvdata / .rvdata2 beside Game.exe */
+ {name:'RPG Maker VX/XP',hook:true,generic:true,test:f=>f.has(/\.rgss(3a|2a|ad)$/i)||f.sub('Data',/^(?:map\d+|system)\.r(?:x|v)data2?$/i)&&f.has(/^game\.exe$/i)},
  // Visual-novel frameworks inside Unity, named so the library and the hook choice can tell them apart.
  {name:'Unity (Utage)',hook:null,test:f=>f.managed(/^Utage/i)},
  {name:'Unity (Naninovel)',hook:null,test:f=>f.managed(/^Naninovel/i)},
