@@ -22,59 +22,74 @@ const capsule=()=>document.querySelector('.field-search');
 const remeasure=()=>dispatchEvent(new Event('megulit-field-measure'));
 const vignette=(el,out)=>el?.animate(out?[{scale:'1 1',opacity:1},{scale:'1.7 1',opacity:0}]:[{scale:'1.7 1',opacity:0},{scale:'1 1',opacity:1}],{pseudoElement:'::after',duration:out?300:560,easing:out?'cubic-bezier(.55,0,.75,.2)':'cubic-bezier(.2,.8,.2,1)',fill:out?'forwards':'backwards'});
 export const isBusy=()=>busy;
-export async function switchLibrary(toWall,render){
- if(busy)return;busy=true;
+/* 2026-11-13 (user: the three views must switch like a top Apple motion designer made it): a shared-element morph.
+   Every cover visible before and after flies from its old frame to its new one on a critically damped spring, as a
+   ghost on its own pre-warmed compositor layer; the real layouts only cross-fade underneath. Reads happen in one batch
+   before the render and one batch after it, writes go out together, and every animation is transform/opacity only
+   (WAAPI, so the compositor runs it even while the main thread builds the new layout). */
+const SPRING='linear(0,.009,.035 2.1%,.141 4.4%,.723 12.9%,.938 16.7%,1.017 19.4%,1.067,1.099 24.3%,1.108 26%,1.1,1.077 30.5%,1.024 35.4%,.996 39.8%,.987 42.6%,.987 46.2%,.997 54%,1.003 61.8%,1)';
+const SOFT='linear(0,.012,.048 3%,.188 6.6%,.588 15%,.778 20.4%,.9 26.1%,.966 32.3%,.994 39.6%,1.005 49%,1.003 62%,1)';
+const MORPH=620,GHOSTS=56;
+const coverBox=el=>el.querySelector('.cover-frame')||el;
+function snapshot(root){
+ const out=new Map();if(!root)return out;const b=root.getBoundingClientRect(),cx=b.left+b.width/2,cy=Math.max(0,b.top)+Math.min(innerHeight,b.bottom)/2;
+ for(const el of root.querySelectorAll('.library-card[data-member-id]')){if(el.closest('[data-parked]'))continue;const box=coverBox(el),r=box.getBoundingClientRect();
+  if(!r.width||r.bottom<0||r.top>innerHeight||r.right<0||r.left>innerWidth)continue;const d=Math.hypot(r.left+r.width/2-cx,r.top+r.height/2-cy),id=el.dataset.memberId,prev=out.get(id);
+  if(!prev||d<prev.d)out.set(id,{el,r,d,src:box.querySelector('img')?.currentSrc||''});}
+ return out;}
+function ghostLayer(){const layer=document.createElement('div');layer.className='lib-morph';layer.setAttribute('aria-hidden','true');
+ layer.style.cssText='position:fixed;inset:0;z-index:5;pointer-events:none;contain:strict';document.body.append(layer);return layer;}
+function ghost(layer,from){const g=document.createElement('img');g.decoding='sync';g.src=from.src;const r=from.r;
+ g.style.cssText=`position:absolute;left:0;top:0;width:${r.width}px;height:${r.height}px;object-fit:cover;border-radius:6px;will-change:transform,opacity;transform:translate(${r.left}px,${r.top}px);box-shadow:0 18px 40px -18px #000`;
+ layer.append(g);return g;}
+export async function switchLibrary(view,render,from=''){
+ if(busy)return;busy=true;const toWall=view!=='list';
  try{
-  if(reduce()){await render();return;}
-  const root=host(),cards=visible(root),anims=[];
-  // E269: capsule glides on its own 50ms after the click, toward the spot it last had in the other layout (remembered,
-  // never measured by toggling classes, which flashed the page)
-  let capAnim=null;
-  const capTimer=setTimeout(()=>{const cap=capsule(),target=spots[toWall?'wall':'list'];if(!cap||!target)return;const a=cap.getBoundingClientRect();
-   const dx=target.x-(a.left+a.width/2),dy=target.y-(a.top+a.height/2);cap.style.transition='none';
-   if(Math.abs(dx)+Math.abs(dy)>1)capAnim=cap.animate([{translate:'0 0'},{translate:`${dx}px ${dy}px`}],{duration:480,easing:'cubic-bezier(.22,.9,.24,1)',fill:'forwards'});},50);
-  {const c=capsule()?.getBoundingClientRect();if(c)spots[toWall?'list':'wall']={x:c.left+c.width/2,y:c.top+c.height/2};}
-  if(root&&!toWall){
-   const v=vignette(root,true);if(v)anims.push(v);
-   const [cx,cy]=centre(root);
-   for(const el of cards){const r=el.getBoundingClientRect(),dx=cx-(r.left+r.width/2),dy=cy-(r.top+r.height/2),d=Math.hypot(dx,dy);
-    anims.push(el.animate([{translate:'0 0',scale:1,opacity:1},{translate:`${dx*.75}px ${dy*.75}px`,scale:.5,opacity:0}],{duration:300,delay:Math.max(0,180-d*.22),easing:'cubic-bezier(.55,0,.75,.2)',fill:'forwards'}));}
-  }else if(root){
-   const tops=cards.map(el=>el.getBoundingClientRect().top),minTop=Math.min(...tops);
-   cards.forEach((el,i)=>{const r=el.getBoundingClientRect(),order=(tops[i]-minTop)*.5+r.left*.06;
-    anims.push(el.animate([{clipPath:'inset(0 0 0 0)',translate:'0 0',opacity:1},{clipPath:'inset(0 0 100% 0)',translate:'0 -16px',opacity:0}],{duration:240,delay:Math.max(0,160-order*.4),easing:'cubic-bezier(.55,0,.75,.2)',fill:'forwards'}));});
-  }
-  // E273: overlap — the new layout starts while the old one is still leaving, so the background never stands empty
-  await Promise.race([settle(anims),new Promise(r=>setTimeout(r,200))]);
-  // FLIP the whole capsule synchronously (render is synchronous), with its own transform transition paused, so it
-  // never jumps first and then slides
-  clearTimeout(capTimer);
-  const cap=capsule(),seen=cap?.getBoundingClientRect(),left=capAnim&&capAnim.playState!=='finished'?Math.max(120,480-(capAnim.currentTime||0)):0;
-  if(cap)cap.style.transition='none';capAnim?.cancel();
-  render();
-  if(toWall){remeasure();vignette(host(),false);}
-  const now=capsule();
-  {const r=now?.getBoundingClientRect();if(r)spots[toWall?'wall':'list']={x:r.left+r.width/2,y:r.top+r.height/2};}
-  if(now&&seen){const to=now.getBoundingClientRect(),dx=seen.left+seen.width/2-(to.left+to.width/2),dy=seen.top+seen.height/2-(to.top+to.height/2);
-   now.style.transition='none';
-   if(Math.abs(dx)+Math.abs(dy)>1){const m=now.animate([{translate:`${dx}px ${dy}px`},{translate:'0 0'}],{duration:left||240,easing:'cubic-bezier(.22,.9,.24,1)'});m.finished.catch(()=>{}).finally(()=>{now.style.transition='';if(toWall)remeasure();});}else now.style.transition='';}
-  const pending=host();pending?.classList.add('lib-entering');
+  if(reduce()){render();if(toWall)remeasure();return;}
+  const root=host(),before=snapshot(root),cap=capsule(),capFrom=cap?.getBoundingClientRect();
+  /* one ghost per shared cover, nearest the centre first; painted on this frame, before the heavy render */
+  const picked=[...before.values()].filter(v=>v.src).sort((a,b)=>a.d-b.d).slice(0,GHOSTS);
+  const layer=ghostLayer(),ghosts=new Map(picked.map(v=>[v.el.dataset.memberId,{from:v,g:ghost(layer,v)}]));
+  await Promise.race([Promise.all([...ghosts.values()].map(x=>x.g.decode?.().catch(()=>{}))),new Promise(r=>setTimeout(r,90))]);
+  /* old layout recedes as one compositor layer (no per-card work): a touch smaller and gone */
+  const leave=root?.animate([{opacity:1,scale:1},{opacity:0,scale:.985}],{duration:300,easing:'cubic-bezier(.3,0,.8,.15)',fill:'forwards'});
+  /* pick-up: shared covers lift a hair toward the viewer while the old layout recedes. Both run on the compositor, so the
+     heavy render below (new DOM, style, layout) happens under motion that keeps playing at full rate */
+  for(const {g} of ghosts.values())g.animate([{scale:1,opacity:1},{scale:1.035,opacity:1}],{duration:460,easing:SOFT,fill:'forwards'});
   await frame();
-  if(toWall){remeasure();await frame();}
-  const next=host(),incoming=next?[...next.querySelectorAll('.library-card')].filter(el=>!el.closest('[data-parked]')).slice(0,400):[];if(!next){pending?.classList.remove('lib-entering');return;}
-  if(!toWall){
-   const tops=incoming.map(el=>el.getBoundingClientRect().top),minTop=Math.min(...tops);
-   incoming.forEach((el,i)=>{const r=el.getBoundingClientRect(),delay=Math.min(220,(tops[i]-minTop)*.3+(r.left-next.getBoundingClientRect().left)*.06);
-    el.animate([{clipPath:'inset(0 0 100% 0)',translate:'0 -14px',opacity:0},{clipPath:'inset(0 0 0 0)',translate:'0 0',opacity:1}],{duration:420,delay,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});
-    cover(el)?.animate([{scale:1.18,translate:'0 -5%'},{scale:1,translate:'0 0'}],{duration:640,delay,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});});
-  }else{
-   wallIn(next,incoming);
-  }
- next.classList.remove('lib-entering');
-  if(toWall)setTimeout(remeasure,760);
-  // safety: once everything has played, no animation may keep holding a card or cover
-  setTimeout(()=>{for(const el of document.querySelectorAll('#library-results .library-card,#library-results .cover-frame img,#library-results .cover-frame .cover'))for(const a of el.getAnimations())if(a.playState==='finished'||a.effect?.getComputedTiming?.().fill==='forwards')a.cancel();},1600);
- }finally{busy=false;host()?.classList.remove('lib-entering');}
+  if(cap)cap.style.transition='none';
+  window.__megulitOrbitWarm=true; /* tracks: no fly-in of its own, the ghosts are the entrance */
+  render();if(toWall)remeasure();
+  const next=host();
+  if(next){next.animate([{opacity:0},{opacity:0}],{duration:1,fill:'forwards',id:'lib-hold'});}
+  await frame();
+  /* after: one batch of reads */
+  const after=snapshot(next),capTo=capsule()?.getBoundingClientRect();
+  const now=capsule();
+  if(now&&capFrom&&capTo){const dx=capFrom.left+capFrom.width/2-(capTo.left+capTo.width/2),dy=capFrom.top+capFrom.height/2-(capTo.top+capTo.height/2);
+   if(Math.abs(dx)+Math.abs(dy)>1)now.animate([{translate:`${dx}px ${dy}px`},{translate:'0 0'}],{duration:MORPH,easing:SPRING}).finished.catch(()=>{}).finally(()=>{now.style.transition='';if(toWall)remeasure();});else now.style.transition='';}
+  /* then all writes: ghosts spring to their new frames, staggered a hair by distance from the centre */
+  const runs=[];let i=0;
+  for(const [id,{from:f,g}] of ghosts){const t=after.get(id);
+   if(!t){runs.push(g.animate([{opacity:1,transform:g.style.transform},{opacity:0,transform:`${g.style.transform} scale(.92)`}],{duration:220,easing:'cubic-bezier(.4,0,1,1)',fill:'forwards'}).finished);continue;}
+   const sx=t.r.width/f.r.width,sy=t.r.height/f.r.height,delay=Math.min(70,i++*1.6);
+   g.getAnimations().forEach(a=>{if(a.effect?.getKeyframes?.()[1]?.scale)a.commitStyles?.();a.cancel();});g.style.scale='1';
+   runs.push(g.animate([{transform:`translate(${f.r.left}px,${f.r.top}px) scale(1.035)`,transformOrigin:'0 0'},{transform:`translate(${t.r.left}px,${t.r.top}px) scale(${sx},${sy})`,transformOrigin:'0 0'}],{duration:MORPH,delay,easing:SPRING,fill:'forwards'}).finished);
+   t.el.animate([{opacity:0},{opacity:0,offset:.8},{opacity:1}],{duration:MORPH+delay,easing:'linear',fill:'backwards'});}
+  /* the new layout fades up underneath; covers without a ghost rise in softly (opacity + translate only, no scale on cells
+     that already carry a positioning transform) */
+  next?.getAnimations().forEach(a=>{if(a.id==='lib-hold')a.cancel();});
+  next?.animate([{opacity:0},{opacity:1}],{duration:260,easing:SOFT});
+  if(next){const b=next.getBoundingClientRect(),cy=b.top+b.height/2;let k=0;
+   for(const [id,t] of after){if(ghosts.has(id))continue;const lift=(t.r.top+t.r.height/2-cy)*.06;
+    (t.el.closest('mg-cell')||t.el).animate([{opacity:0,translate:`0 ${lift}px`},{opacity:1,translate:'0 0'}],{duration:520,delay:Math.min(160,40+k++*3),easing:SOFT,fill:'backwards'});}}
+  leave?.cancel();
+  await Promise.race([Promise.all(runs).catch(()=>{}),new Promise(r=>setTimeout(r,MORPH+200))]);
+  /* hand over: ghosts dissolve onto the real covers */
+  await layer.animate([{opacity:1},{opacity:0}],{duration:140,easing:'linear',fill:'forwards'}).finished.catch(()=>{});
+  layer.remove();
+  if(toWall)setTimeout(remeasure,200);
+ }finally{busy=false;window.__megulitOrbitWarm=false;document.querySelectorAll('body > .lib-morph').forEach(n=>n.remove());host()?.classList.remove('lib-entering');}
 }
 
 /* v1.1.6 (user: switching back to the wall, and opening the library, must gather from the outside in, not spread out

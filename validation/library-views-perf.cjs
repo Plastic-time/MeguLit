@@ -69,7 +69,7 @@ async function main(){fs.mkdirSync(OUT,{recursive:true});const temp=fs.mkdtempSy
  const web=await startWeb(service),port=web.address().port,cdp=await startEdge(path.join(temp,'edge'));const report={rounds:[]};
  try{await cdp.send('Page.navigate',{url:`http://127.0.0.1:${port}/#%7B%7D`});
   for(let i=0;i<80;i++){await sleep(250);if(await cdp.evaluate('!!(window.__megulitTest&&document.querySelector("#main"))').catch(()=>false))break;}await sleep(2000);
-  await cdp.evaluate(`(()=>{document.querySelectorAll('dialog').forEach(d=>{try{d.close();}catch{}d.remove();});localStorage.setItem('megulit-library-view','tracks');localStorage.setItem('tome-library-wall','on');const st=document.createElement('style');st.textContent='.toast,.toast-stack,[class*=toast]{display:none!important}';document.head.append(st);return 1;})()`);
+  await cdp.evaluate(`(()=>{document.querySelectorAll('dialog').forEach(d=>{try{d.close();}catch{}d.remove();});localStorage.setItem('megulit-library-view','tracks');const st=document.createElement('style');st.textContent='.toast,.toast-stack,[class*=toast]{display:none!important}';document.head.append(st);return 1;})()`);
   await cdp.evaluate(`(async()=>{await window.__megulitTest.navigate('library');return 1;})()`);await sleep(3000);
   const shoot=async name=>{const r=await cdp.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(OUT,name+'.png'),Buffer.from(r.data,'base64'));};
   await shoot('view-'+await cdp.evaluate(VIEW));

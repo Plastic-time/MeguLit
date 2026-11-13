@@ -400,6 +400,13 @@ img{-webkit-user-drag:none}
 .library-wall-toggle::before{content:"";position:absolute;left:3px;top:3px;width:10px;height:10px;border-radius:50%;background:currentColor;transition:transform 180ms var(--g-ease)}
 .library-wall-toggle[aria-checked=true]{color:var(--g-gold);border-color:color-mix(in srgb,var(--gold-accent,#edb56e) 55%,transparent);background:color-mix(in srgb,var(--gold-accent,#edb56e) 12%,transparent)}
 .library-wall-toggle[aria-checked=true]::before{transform:translateX(12px)}
+/* 2026-11-13 (user): three LEDs instead of the knob; lit count = view (1 tracks, 2 wall, 3 grid) */
+.field-search .library-wall-toggle.library-view-leds{width:42px;display:inline-flex;align-items:center;justify-content:center;gap:5px}
+.library-view-leds::before{content:none}
+.library-view-leds i{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.28;transform:scale(.8);transition:opacity 260ms var(--g-ease),transform 420ms linear(0,.25 8%,.7 18%,1.08 30%,1.14 40%,1.05 55%,.99 70%,1),box-shadow 260ms var(--g-ease)}
+.library-view-leds[data-lit="1"] i:nth-child(-n+1),.library-view-leds[data-lit="2"] i:nth-child(-n+2),.library-view-leds[data-lit="3"] i{opacity:1;transform:scale(1);box-shadow:0 0 6px color-mix(in srgb,var(--accent,#ad1539) 70%,transparent)}
+.field-search .library-wall-toggle.library-view-leds{color:var(--accent,#ad1539);border-color:var(--g-rule-strong);background:var(--g-raise)}
+@media(prefers-reduced-motion:reduce){.library-view-leds i{transition:none}}
 .field-search .library-wall-toggle:focus-visible{outline:2px solid var(--g-gold);outline-offset:3px}
 .field-search .icon-button{width:34px;height:34px;border-radius:17px;border:0;background:none;color:var(--g-t2);display:grid;place-items:center}
 .field-search .icon-button:hover{color:var(--g-t1);background:color-mix(in srgb,var(--gold-accent,#edb56e) 10%,transparent)}

@@ -281,7 +281,7 @@ export function spreadTwins(items){
  for(const el of wait){const at=out.findIndex((e,i)=>key(e)!==key(el)&&(i===0||key(out[i-1])!==key(el)));out.splice(at<0?out.length:at,0,el);}
  return out;
 }
-export function fieldify(grid,filtered=false){
+export function fieldify(grid,filtered=false,tracks=false){
  fieldStop();
  if(!grid)return;
  const host=grid.closest('#library-results'),main=grid.closest('.main');
@@ -294,7 +294,7 @@ export function fieldify(grid,filtered=false){
  plane.className='field-plane';
  grid.replaceChildren(plane);
  host.querySelector(':scope > .field-shield')?.remove();
- if(filtered&&items.length>=2){orbit(host,main,plane,items,pod);return;}
+ if((filtered||tracks)&&items.length>=2){orbit(host,main,plane,items,pod);return;}
 
  const cw=200,ch=352,cardWidth=168,cardHeight=250; /* 2026-11-13 judges round 2: taller row pitch so the search capsule sits in a clear gap between two rows */
  const count=filtered?items.length*(items.length===2?3:items.length<=5?2:1):items.length;
