@@ -166,12 +166,20 @@ export function guideText(section, locale = 'zh') {
 }
 
 /* E426 Guides start folded as one short card under the real settings; opening animates the height (grid 0fr to 1fr) and each block is a step card with an icon. */
-export function mountGuide({ content, section, locale = 'zh', esc, api, toast, actions = {} }) {
+/* 2026-11-13 (user: the dictionary guide offered 「一键下载注音词典」 while the dictionary was already installed and the click
+   faked a re-download). A download CTA reads the real install state: installed → a quiet ✓ 已就绪 mark, never a button. */
+const READY = T('已就绪', 'Ready', '準備完了');
+export function guideActionMarkup(id, { installed = {}, locale = 'zh', esc = s => String(s) } = {}) {
+  const pick = v => v[locale] || v.zh;
+  if (installed[id]) return `<span class="guide-chip guide-ready" data-guide-ready="${esc(id)}">✓ ${esc(pick(READY))}</span>`;
+  return `<button type="button" class="guide-chip guide-act" data-guide-act="${esc(id)}">${esc(pick(ACTIONS[id] || T(id, id, id)))}</button>`;
+}
+export function mountGuide({ content, section, locale = 'zh', esc, api, toast, actions = {}, installed = {} }) {
   const g = GUIDES[section]; if (!g || !content) return () => {};
   const pick = v => v[locale] || v.zh;
   const step = text => esc(pick(text)).replace(/\{(link|act):([a-zA-Z]+)\}/g, (_, kind, id) => kind === 'link'
     ? `<button type="button" class="guide-chip" data-guide-link="${esc(id)}">${esc(pick(LINK_LABEL[id] || T(id, id, id)))} ↗</button>`
-    : `<button type="button" class="guide-chip guide-act" data-guide-act="${esc(id)}">${esc(pick(ACTIONS[id] || T(id, id, id)))}</button>`);
+    : guideActionMarkup(id, { installed, locale, esc }));
   const card = document.createElement('section');
   card.className = 'panel settings-guide';
   const open = !!opened()[section];
