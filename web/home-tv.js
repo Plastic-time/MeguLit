@@ -1,5 +1,7 @@
 import {activityCells} from './learning-activity.js';
 import {openLinesPicker} from './home-lines.js';
+import {createDepth,markFlat,cachedDaily,rememberDaily,dailyIsFresh,dailySignature,cachedActivity,rememberActivity} from './home-depth.js';
+import {createHand} from './home-hand.js';
 
 const copy={
  zh:{tipClick:'单击',tipDetail:'作品详情',tipDbl:'双击',tipDraw:'抽一张',daily:'每日热点',streak:'最长连续',figRead:'累计阅读',figChars:'读过的字',figWords:'关联单词',last:'上次',coverHint:'单击查看详情 · 双击抽卡',
@@ -245,8 +247,7 @@ export function cardify(card){const face=card.querySelector('.tv-face');let pres
  card.addEventListener('pointerleave',()=>{pressed=false;last=null;card.classList.remove('touch');face.style.transition='transform .7s cubic-bezier(.2,1.6,.4,1)';
   face.style.transform='';});}
 
-export function stopHomeTV(){if(!live)return;clearTimeout(live.timer);clearInterval(live.beat);clearInterval(live.typer);live.root?.removeEventListener('mousemove',
- live.move);live=null;}
+export function stopHomeTV(){if(!live)return;clearTimeout(live.timer);clearInterval(live.beat);clearInterval(live.typer);live.depth?.stop();live.hand?.stop();live=null;}
 
 export function homeTVSignature(model){return JSON.stringify([model.games.map(g=>[g.id,g.available,g.cover?.length,g.title,g.lastPlayedAt,g.readingSeconds,g.characters,
  g.learnedWords]),model.stats,model.preferences.homeShowcase,model.preferences.username]);}
@@ -260,20 +261,20 @@ export function renderHomeTV(main,ctx){
  const mins=s=>{const m=Math.floor((s||0)/60);return m>=60?`${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`:`${m}m`;};
  main.innerHTML=`<div class="tv-home" tabindex="-1"><div class="tv-hero" aria-hidden="true"></div><div class="tv-pile" aria-hidden="true"></div><div class="tv-canvas">
   <div class="tv-plane" data-z="-200"><div class="tv-tl"></div></div>
-  <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-index"></div><div class="tv-ring"></div></div>
+  <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-ring"></div></div>
   <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div><button type="button" class="tv-lines-edit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span></span></button></div>
-  <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""><i></i><i></i><i></i><i></i></div></div></div></div></div>
-  <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div><div class="tv-scene"></div>
+  <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><i class="tv-cshadow" aria-hidden="true"></i><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""><i></i><i></i><i></i><i></i></div></div><button type="button" class="tv-cover-play tv-play" data-act="play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg><span>${w.play}</span></button></div></div></div>
+  <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div>
   <div class="tv-left"><div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div><div class="tv-heat-card tv-card"><div class="tv-face"><button class="tv-heatlink" data-go="activity"></button><div class="tv-heat"></div><div class="tv-heatsum"></div><button class="tv-daily" data-go="daily"><i aria-hidden="true"></i><span class="tv-daily-k">${w.daily}</span><span class="tv-daily-t"></span><small>→</small></button><div class="tv-daily-pics"></div><i class="tv-glare"></i></div></div></div>
   
   <div class="tv-figs"><button class="tv-fig" data-go="statistics"><b data-fig="time">0m</b><small>${w.figRead}</small></button><button class="tv-fig" data-go="detail"><b data-fig="chars">0</b><small>${w.figChars}</small></button><button class="tv-fig" data-go="words"><b data-fig="words">0</b><small>${w.figWords}</small></button><button class="tv-more" data-go="statistics">${w.full} →</button></div>
   <div class="tv-title"><div class="tv-h1" role="heading" aria-level="1"></div><div class="tv-meta"></div></div>
   <button type="button" class="tv-hl" hidden><small class="tv-hl-k"></small><b class="tv-hl-t" lang="ja"></b></button>
-  <div class="tv-rail"></div>
-  <div class="tv-dialog"><span class="tv-who"></span><div class="tv-act"><button class="tv-btn primary tv-play" data-act="play" title="">${w.play}</button><button class="tv-btn" data-act="detail">${w.detail}</button><button class="tv-btn" data-go="library">${w.all}</button></div></div>
+  <div class="tv-hand"></div><div class="tv-ghosts" aria-hidden="true"></div>
+  <div class="tv-dialog"><span class="tv-who"></span><div class="tv-act"></div></div>
   <section class="tv-drawer" aria-label="${w.title}"><h2>${w.title} <small>${w.sub}</small></h2><button class="tv-close">${w.close} ✕</button><div class="tv-mode"><button data-m="auto">${w.auto}</button><button data-m="pick">${w.pick}</button><input class="tv-search" type="search" placeholder="${w.search}" aria-label="${w.search}"></div><div class="tv-list"></div><div class="tv-hint"></div></section></div>`;
  const root=main.querySelector('.tv-home'),$=s=>root.querySelector(s);
- live={root,timer:0,beat:0,typer:0,move:null};
+ live={root,timer:0,beat:0,typer:0,depth:null};
  const art=(g,p)=>g.cover?`url("${String(g.cover).replace(/"/g,'%22')}") center/cover`:`linear-gradient(160deg,${p[0]},${p[2]} 70%)`;
  root.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{const to=b.dataset.go;if(to==='detail'){if(shown)onDetail(shown.id);return;}if(to==='words')navigate('learning',
   'words');else if(to==='activity')navigate('statistics');else navigate(to);}));
@@ -283,7 +284,8 @@ export function renderHomeTV(main,ctx){
   b.addEventListener('click',()=>{const g=shown;if(!g)return;openLinesPicker({api,locale,esc,game:g,shown:shownLines,relativeTime,onSave:async chosen=>{const d=await detail(api,
    g.id,locale);d.homeLines=chosen;if(shown!==g||!live||live.root!==root)return;const pick=homeLinesFor(d);shownLines=pick.lines.slice(-5);b.classList.toggle('custom',
    pick.custom);swapScript($('.tv-script'),shownLines,type);type(pick.lines[0]||'');}});});}
- $('[data-act="play"]')?.addEventListener('click',e=>shown&&onLaunch(shown.id,e.currentTarget));
+ $('[data-act="play"]')?.addEventListener('click',e=>{e.stopPropagation();if(shown)onLaunch(shown.id,e.currentTarget);});
+ ['pointerdown','dblclick'].forEach(t=>$('[data-act="play"]')?.addEventListener(t,e=>e.stopPropagation()));
  $('[data-act="detail"]')?.addEventListener('click',()=>shown&&onDetail(shown.id));
  /* 2026-11-13 (user) the typed line along the bottom is gone; the daily headline takes the bottom-left corner instead */const type=()=>{};
  const max=Math.max(1,...model.games.map(g=>g.characters||0));
@@ -309,7 +311,7 @@ export function renderHomeTV(main,ctx){
    }).join('');
   $('.tv-slices').innerHTML=Array.from({length:5},(_,j)=>`<i style="background:${art(g,p)};background-size:500% 100%;background-position:${j*25}% 0;transform:translateZ(${j%2?40:-20}px) translateY(${(j-2)*12}px)"></i>`).join('');
 
-  const no=String(Math.max(1,pool.indexOf(g)+1)).padStart(2,'0');$('.tv-index').textContent=no;$('.tv-scene').innerHTML=`SCENE <b>${no}</b> / ${String(pool.length).padStart(2,'0')}`;
+  const no=String(Math.max(1,pool.indexOf(g)+1)).padStart(2,'0');
   const t=$('.tv-title');t.classList.remove('in');setTimeout(()=>{if(mine!==token)return;let n=0;const [mainTitle,subTitle]=splitTitle(g.title);$('.tv-h1').innerHTML=(String(mainTitle).match(/[A-Za-z0-9À-ɏ'’:;!?.,&\-]+|\s+|./gu)||[]).map(word=>/^\s+$/.test(word)?' ':`<i class="w">${[...word].map(c=>`<span style="transition-delay:${(n++)*28}ms">${esc(c)}</span>`).join('')}</i>`).join('');
    $('.tv-h1').title=g.title;$('.tv-meta').innerHTML=(subTitle?`<span class="tv-sub" lang="ja">${esc(subTitle)}</span>`:'')+(g.lastPlayedAt?`<span>${w.last} · ${esc(relativeTime(g.lastPlayedAt))}</span>`:'');void t.offsetWidth;fitTitle($('.tv-h1'));
    fitLeft(root);setTimeout(()=>t.classList.add('in'),30);/* measure again once the new title has settled, so a block hidden mid-change comes back */setTimeout(()=>{
@@ -320,9 +322,8 @@ export function renderHomeTV(main,ctx){
   
   rail();
  }
- function rail(){const r=$('.tv-rail');r.innerHTML=list.map((g,i)=>`<button class="tv-chip${i===cur?' on':''}" data-i="${i}" title="${esc(g.title)}" style="--dur:${DUR}ms">${g.cover?`<img src="${esc(g.cover)}" alt="">`:''}${setting.pinned.includes(g.id)?'<span class="pin"></span>':''}<span class="bar"></span></button>`).join('')+`<button class="tv-edit" title="${w.edit}" aria-label="${w.edit}">＋</button>`;
-  r.querySelectorAll('.tv-chip').forEach(b=>b.addEventListener('click',()=>paint(+b.dataset.i,true,'fade')));r.querySelector('.tv-edit').addEventListener('click',
-   ()=>{drawer();$('.tv-drawer').classList.add('open');});}
+ /* 2026-11-13 (user) the cover strip became a hand of cards; picking one plays it onto the field (see home-hand.js) */
+ function rail(){hand.render(list.map(g=>({id:g.id,title:g.title,cover:g.cover,pinned:setting.pinned.includes(g.id),g})),shown?.id||null);}
  function drawer(){const all=model.games.filter(g=>g.available!==false),when=g=>g.lastLaunchedAt||g.lastPlayedAt||0,ids=[...setting.order.filter(id=>all.some(g=>g.id===id)),
   ...[...all].sort((a,b)=>when(b)-when(a)).map(g=>g.id).filter(id=>!setting.order.includes(id))];setting.order=ids;
   root.querySelectorAll('.tv-mode button').forEach(b=>b.classList.toggle('on',b.dataset.m===setting.mode));
@@ -341,35 +342,45 @@ export function renderHomeTV(main,ctx){
  root.querySelectorAll('.tv-mode button').forEach(b=>b.addEventListener('click',()=>{setting.mode=b.dataset.m;commit();}));
  $('.tv-search').addEventListener('input',filter);
  $('.tv-close').addEventListener('click',()=>$('.tv-drawer').classList.remove('open'));
- api('daily_view',{}).then(v=>{if(!live||live.root!==root)return;const n=v?.news?.items?.[0],h=v?.words?.words?.[0],t=$('.tv-daily-t'),pics=(v?.news?.items||[]).filter(x=>/^data:image\//.test(x.image||'')&&x.link).slice(0,
+ /* 2026-11-13 (user: "每次回到首页都重新加载、卡一下") the daily block paints at once from the cached copy without replaying its entrance, then refreshes
+    quietly and repaints only when the news really changed; flat one-colour pictures are never shown (user: "缩略图不要展示纯色图") */
+ let dailySig='';const showDaily=(v,instant)=>{if(!live||live.root!==root)return;const sig=dailySignature(v);if(sig===dailySig)return;dailySig=sig;if(instant)root.classList.add('tv-instant');const n=(v?.news?.items||[]).find(x=>!x.flat)||v?.news?.items?.[0],h=v?.words?.words?.[0],t=$('.tv-daily-t'),pics=(v?.news?.items||[]).filter(x=>/^data:image\//.test(x.image||'')&&x.link&&!x.flat).slice(0,
   3),box=$('.tv-daily-pics');if(box){box.innerHTML=pics.map(x=>`<button type="button" class="tv-daily-pic${x.sensitive?' is-sensitive':''}" data-link="${esc(x.link)}" title="${esc(x.title)}" style="background-image:url(&quot;${x.image}&quot;)">${x.sensitive?`<span class="tv-sensitive">${esc(SENSITIVE_WORD())}</span>`:''}</button>`).join('');
   box.querySelectorAll('[data-link]').forEach(b=>b.addEventListener('click',()=>{try{sessionStorage.setItem('megulit-daily-focus',b.dataset.link);}catch{}navigate('daily');
   }));}if(n){t.textContent=n.title;t.title=n.title+(n.source?' · '+n.source:'');}else if(h){t.textContent=h.term+(h.gloss?' · '+h.gloss:'');}/* 2026-11-12 (user) the empty space under the activity card shows the day's top news with its picture; an adult one is
      blurred with a "sensitive content" note */
   /* 2026-11-13 (user: "左侧大封面用这个网站的头条，然后标题直接放在左下角") the headline of the daily page's current tab becomes the large picture
      behind the left half, and its title sits bottom-left; without daily data the game card and its name stay as before */
-  {const cat=(()=>{try{return localStorage.getItem('megulit-daily-cat')==='acg'?'acg':'gal';}catch{return 'gal';}})(),items=(v?.news?.items||[]).filter(x=>/^data:image\//.test(x.image||'')&&x.link),
+  {const cat=(()=>{try{return localStorage.getItem('megulit-daily-cat')==='acg'?'acg':'gal';}catch{return 'gal';}})(),items=(v?.news?.items||[]).filter(x=>/^data:image\//.test(x.image||'')&&x.link&&!x.flat),
     top=items.find(x=>(x.cat||'gal')===cat)||items[0],hero=$('.tv-hero'),hl=$('.tv-hl');left0:{if(!top||!hero||!hl)break left0;
     const pic=document.createElement('i');pic.className=top.sensitive?'is-sensitive':'';pic.style.backgroundImage=`url("${String(top.image).replace(/"/g,'%22')}")`;
-    const old=[...hero.children];hero.appendChild(pic);old.forEach(o=>{o.classList.remove('on');setTimeout(()=>o.remove(),1000);});
-    const ready=()=>requestAnimationFrame(()=>requestAnimationFrame(()=>pic.classList.add('on')));const probe=new Image();probe.onload=ready;probe.onerror=ready;probe.src=top.image;
+    const old=[...hero.children];hero.appendChild(pic);old.forEach(o=>{o.classList.remove('on');setTimeout(()=>o.remove(),instant?0:1000);});
+    const ready=instant?()=>pic.classList.add('on'):()=>requestAnimationFrame(()=>requestAnimationFrame(()=>pic.classList.add('on')));const probe=new Image();probe.onload=ready;probe.onerror=ready;if(instant)ready();else probe.src=top.image;
     hl.querySelector('.tv-hl-k').textContent=[HOT_WORD(),top.source,Date.parse(top.date||'')?relativeTime(Date.parse(top.date)/1000):''].filter(Boolean).join(' · ');
     hl.querySelector('.tv-hl-t').textContent=top.title;hl.title=top.title;hl.hidden=false;root.classList.add('has-hl');
     hl.onclick=()=>{try{sessionStorage.setItem('megulit-daily-focus',top.link);}catch{}navigate('daily');};
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{hl.classList.add('in');fitLeft(root);}));}}}).catch(()=>{});
- api('learning_activity',{range:'year'}).then(records=>{if(!live||live.root!==root)return;const all=activityCells(Array.isArray(records)?records:[]);let from=Math.max(0,
+    if(instant){hl.classList.add('in');fitLeft(root);}else requestAnimationFrame(()=>requestAnimationFrame(()=>{hl.classList.add('in');fitLeft(root);}));}}
+  if(instant)requestAnimationFrame(()=>requestAnimationFrame(()=>root.classList.remove('tv-instant')));};
+ {const c=cachedDaily();if(c)showDaily(c,true);if(!c||!dailyIsFresh())api('daily_view',{}).then(v=>markFlat(v)).then(v=>{if(v)showDaily(rememberDaily(v),false);}).catch(()=>{});}
+
+ const showActivity=records=>{if(!live||live.root!==root)return;const all=activityCells(Array.isArray(records)?records:[]);let from=Math.max(0,
   all.length-20*7);while(from>0&&all[from].weekday!==0)from--;const cells=all.slice(from),active=cells.filter(c=>c.level).length;$('.tv-heat').innerHTML=cells.map((c,
   i)=>`<i style="grid-row:${c.weekday+1};grid-column:${Math.floor(i/7)+1}" class="${i===cells.length-1?'today':c.level?'l'+Math.min(3,c.level):''}" data-day="${esc(c.day)}" data-min="${Math.round((c.seconds||0)/60)}"></i>`).join('');
   $('.tv-heatlink').textContent=`${w.activity} · ${active} ${w.days} →`;let run=0,best=0;for(const c of cells){run=c.level?run+1:0;best=Math.max(best,run);}const secs=cells.reduce((a,
   c)=>a+(c.seconds||0),0);$('.tv-heatsum').innerHTML=`<span><b>${active}</b>${w.days}</span><span><b>${esc(duration(secs))}</b>${w.total}</span><span><b>${best}</b>${w.streak}</span>`;
-  }).catch(()=>{});
+  };
+ {let actSig=JSON.stringify(cachedActivity()||null);if(cachedActivity())showActivity(cachedActivity());api('learning_activity',{range:'year'}).then(r=>{rememberActivity(r);const n=JSON.stringify(r||null);if(n!==actSig){actSig=n;showActivity(r);}}).catch(()=>{});}
+ const hand=createHand({root,box:$('.tv-hand'),layer:$('.tv-ghosts'),cover:$('.tv-cover'),reduced:matchMedia('(prefers-reduced-motion:reduce)').matches,
+  back:`<img src="${LOGO}" alt="">`,art:h=>art(h.g||h,['#3b2a26','#5a3a30','#1a1110']),onPlay:(h,kind)=>{if(kind!=='plain')root.classList.add('tv-fly');paint(h.g,kind==='plain','fade');},
+  onLand:()=>root.classList.remove('tv-fly')});live.hand=hand;
+ hand.setExtras([{cls:'tv-hc-add',title:w.edit,html:'<b>＋</b>',onClick:()=>{drawer();$('.tv-drawer').classList.add('open');}},
+  {cls:'tv-hc-all',title:w.all,html:`<b>${esc(w.all)}</b>`,onClick:()=>navigate('library')}]);
  const canvas=$('.tv-canvas'),planes=[...root.querySelectorAll('.tv-plane')],reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
- live.move=e=>{if(reduced)return;const r=root.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;canvas.style.transform=`rotateY(${x*6}deg) rotateX(${-y*5}deg)`;
-  planes.forEach(p=>p.style.transform=`translate3d(${-x*p.dataset.z*.25}px,${-y*p.dataset.z*.2}px,${p.dataset.z}px)`);};
- root.addEventListener('mousemove',live.move);
+ /* 2026-11-13 (user) every layer has its own depth: the far headline picture drifts against the pointer, near ones (cards, figures, rail, bottom bar) lead it */
+ {const L=(sel,z)=>{const el=$(sel);return el?{el,z}:null;};live.depth=createDepth(root,{canvas,planes,layers:[L('.tv-hero',-40),L('.tv-left',7),L('.tv-hl',9),L('.tv-figs',8),
+  L('.tv-hand',24),L('.tv-dialog',5),L('.tv-title',9),L('.tv-marks',3),L('.tv-cshadow',-22)].filter(Boolean)});}
  const onResize=()=>{if(live&&live.root===root)fitLeft(root);else removeEventListener('resize',onResize);};addEventListener('resize',onResize);
  root.querySelectorAll('.tv-cover,.tv-heat-card').forEach(cardify);
- root.addEventListener('mouseleave',()=>{canvas.style.transform='';});
  const coverEl=$('.tv-cover');let clickTimer=0,pressAt=0,pressXY=[0,0];coverEl.setAttribute('aria-label',w.coverHint);const pop=document.createElement('div');pop.className='tv-pop';
   pop.innerHTML=`<p><i class="m1"></i><b>${w.tipClick}</b><span>${w.tipDetail}</span></p><p><i class="m2"></i><b>${w.tipDbl}</b><span>${w.tipDraw}</span></p>`;root.appendChild(pop);
   let popT=0;const hidePop=()=>{clearTimeout(popT);pop.classList.remove('on');};coverEl.addEventListener('pointermove',e=>{const r=root.getBoundingClientRect();
