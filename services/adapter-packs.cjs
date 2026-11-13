@@ -7,7 +7,7 @@
    loose files, a declared index table, XP3 or PFS archives), how to turn the stored bytes into plain script (transforms:
    xor, xor-index, add/sub, not, rotate, zlib, raw deflate, LZSS, skip/take), how to cut that script into lines (grammar:
    text lines with safe regular expressions, or length-prefixed / NUL-terminated strings in bytecode), how to pair it
-   (pairing hints) and extra decrypt parameters for readers MeguLit already has (params: cx-scheme, paz-scheme).
+   (pairing hints) and extra decrypt parameters for readers MeguLit already has (params: cx-scheme, paz-scheme, malie-scheme, and the per-title keys qlie-key / entis-key / marble-key, and warc-scheme).
 
    Safety. Every pack is signed (Ed25519 over its canonical JSON) with a key listed in services/adapter-pack-keys.json;
    a pack that is unsigned, signed by an unknown key, altered, invalid, or needs a capability this app lacks is skipped,
@@ -24,7 +24,16 @@ const SCHEMA='megulit.adapter-pack',FORMAT=1,FORMATS=[1];
 /* Every capability a format-1 pack may require. Adding one is fine; removing or changing one is a new format. */
 const CAPABILITIES=Object.freeze(['container:loose','container:table','container:xp3','container:pfs',
  'transform:xor','transform:xor-index','transform:add','transform:sub','transform:not','transform:rol','transform:ror','transform:zlib','transform:deflate-raw','transform:lzss','transform:skip','transform:take',
- 'grammar:lines','grammar:strings','params:cx-scheme','params:paz-scheme','match:exe','match:files']);
+ 'grammar:lines','grammar:strings','params:cx-scheme','params:paz-scheme','match:exe','match:files',
+ /* E578 per-title keys for the Malie reader (malie.cjs) */
+ 'params:malie-scheme',
+ /* E581–E584 per-title keys for QLIE 3.0 game keys, Entis NOA passwords, Marble passphrases */
+ 'params:qlie-key','params:entis-key','params:marble-key',
+ /* E596 runtime findings: an index recovered from the running game, the block ciphers whose keys it held, xor keys
+    that line up with the file offset */
+ 'container:index','transform:blowfish','transform:tea','transform:xtea','transform:camellia','transform:xor-file',
+ /* E602 per-title keys for the ShiinaRio WARC reader (shiinario.cjs / shiinario-crypt.cjs) */
+ 'params:warc-scheme']);
 const LIMITS=Object.freeze({packBytes:256*1024,files:20000,fileBytes:64<<20,totalBytes:512<<20,inflated:64<<20,lineChars:4096,regex:300,strip:16,entries:200000,scenes:20000});
 const ID=/^[a-z0-9][a-z0-9-]{2,63}$/,HEX=/^(?:[0-9a-f]{2})+$/i,SEMVER=/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const ENCODINGS=['shift_jis','utf-8','utf-16le','gbk','euc-jp','big5'];
@@ -75,7 +84,11 @@ function safeRegex(src,flags=''){
 const isObj=v=>v&&typeof v==='object'&&!Array.isArray(v);
 const int=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const TRANSFORMS={
- xor:t=>typeof t.key==='string'&&HEX.test(t.key)&&t.key.length<=512&&(t.start===undefined||int(t.start,0,1<<30)),
+ xor:t=>typeof t.key==='string'&&HEX.test(t.key)&&t.key.length<=512&&(t.start===undefined||int(t.start,0,1<<30))&&(t.phase===undefined||['entry','file'].includes(t.phase)),
+ blowfish:t=>(typeof t.key==='string'&&HEX.test(t.key)&&t.key.length>=8&&t.key.length<=112&&t.state===undefined||t.key===undefined&&typeof t.state==='string'&&/^[A-Za-z0-9+/]+=*$/.test(t.state)&&Buffer.from(t.state,'base64').length===4168)&&(t.words===undefined||['le','be'].includes(t.words)),
+ tea:t=>typeof t.key==='string'&&/^[0-9a-f]{32}$/i.test(t.key)&&(t.rounds===undefined||[16,32,64].includes(t.rounds))&&(t.words===undefined||['le','be'].includes(t.words)),
+ xtea:t=>TRANSFORMS.tea(t),
+ camellia:t=>typeof t.key==='string'&&/^[0-9a-f]{32}$/i.test(t.key),
  'xor-index':t=>int(t.base,0,255)&&int(t.step,0,255)&&(t.mult===undefined||int(t.mult,0,255)),
  add:t=>int(t.value,0,255),sub:t=>int(t.value,0,255),not:()=>true,rol:t=>int(t.bits,1,7),ror:t=>int(t.bits,1,7),
  zlib:()=>true,'deflate-raw':()=>true,lzss:t=>t.window===undefined||[4096].includes(t.window),
@@ -96,10 +109,18 @@ function validMatch(m){if(!isObj(m))return false;const files=m.files||[];
  if(!Array.isArray(files)||files.length>16||!files.every(f=>isObj(f)&&glob(f.path)&&(f.minSize===undefined||int(f.minSize,0,2**40))&&(f.magic===undefined||isObj(f.magic)&&int(f.magic.offset||0,0,1<<20)&&HEX.test(String(f.magic.hex||''))&&f.magic.hex.length<=64)))return false;
  if(m.exe!==undefined&&!(isObj(m.exe)&&(m.exe.name===undefined||typeof m.exe.name==='string'&&/^[^\\/:]{1,120}\.exe$/i.test(m.exe.name))&&(m.exe.size===undefined||int(m.exe.size,1,2**40))&&(m.exe.head===undefined||/^[a-f0-9]{64}$/.test(m.exe.head))))return false;
  return files.length>0||!!m.exe;}
-function validSource(s){if(!isObj(s)||!['loose','table','xp3','pfs'].includes(s.container))return false;
+/* an index the running game held (E596): three u32 words per entry (offset, size, unpacked), base64; select: the entries
+   that are scripts (u32 numbers, base64); trim: cut each entry to its unpacked size after the transforms; size: the
+   archive's exact size (an archive of any other size is not read) */
+function validIndex(x){if(!isObj(x)||!int(x.size,1,2**40)||!int(x.count,1,65536)||x.words!==3||typeof x.entries!=='string'||x.entries.length>360000||!/^[A-Za-z0-9+/]*=*$/.test(x.entries))return false;
+ if(Buffer.from(x.entries,'base64').length!==x.count*12)return false;
+ if(x.select!==undefined&&!(typeof x.select==='string'&&/^[A-Za-z0-9+/]*=*$/.test(x.select)&&Buffer.from(x.select,'base64').length%4===0&&Buffer.from(x.select,'base64').length/4<=x.count))return false;
+ return x.trim===undefined||x.trim==='unpacked';}
+function validSource(s){if(!isObj(s)||!['loose','table','xp3','pfs','index'].includes(s.container))return false;
  const list=s.container==='loose'?s.files:s.archives;if(!Array.isArray(list)||!list.length||list.length>32||!list.every(glob))return false;
  if(s.entries!==undefined&&!(typeof s.entries==='string'&&s.entries.length<=120))return false;
  if(s.container==='table'&&!validTable(s.table))return false;
+ if(s.container==='index'&&!validIndex(s.index))return false;
  if(s.maxFiles!==undefined&&!int(s.maxFiles,1,LIMITS.files))return false;return true;}
 function validGrammar(g){if(!isObj(g)||!['lines','strings'].includes(g.mode))return false;if(g.flags!==undefined&&!(typeof g.flags==='string'&&/^[imsu]{0,4}$/.test(g.flags)))return false;
  if(g.encoding!==undefined&&!ENCODINGS.includes(g.encoding)&&g.encoding!=='auto')return false;
@@ -108,10 +129,11 @@ function validGrammar(g){if(!isObj(g)||!['lines','strings'].includes(g.mode))ret
  else{if(!(typeof g.opcode==='string'&&HEX.test(g.opcode)&&g.opcode.length<=16))return false;if(!['u8','u16le','u32le','zero'].includes(g.length))return false;}
  if(g.minChars!==undefined&&!int(g.minChars,1,64))return false;return true;}
 function validPairing(p){return p===undefined||isObj(p)&&(p.by===undefined||['order','text'].includes(p.by))&&(p.dropNames===undefined||typeof p.dropNames==='boolean')&&(p.minChars===undefined||int(p.minChars,1,64));}
-function validParams(list){return list===undefined||Array.isArray(list)&&list.length<=16&&list.every(p=>isObj(p)&&['cx-scheme','paz-scheme'].includes(p.target)&&isObj(p.value)&&JSON.stringify(p.value).length<=64*1024);}
+const PARAM_TARGETS=['cx-scheme','paz-scheme','malie-scheme','qlie-key','entis-key','marble-key','warc-scheme'];
+function validParams(list){return list===undefined||Array.isArray(list)&&list.length<=16&&list.every(p=>isObj(p)&&PARAM_TARGETS.includes(p.target)&&isObj(p.value)&&JSON.stringify(p.value).length<=64*1024);}
 /* what a pack needs, computed from its content (its `requires` must list at least these) */
 function needs(p){const out=new Set();if(p.match?.exe)out.add('match:exe');if(p.match?.files?.length)out.add('match:files');
- if(p.source)out.add('container:'+p.source.container);for(const t of [...(p.transforms||[]),...(p.source?.table?.indexTransforms||[])])out.add('transform:'+t.op);
+ if(p.source)out.add('container:'+p.source.container);for(const t of [...(p.transforms||[]),...(p.source?.table?.indexTransforms||[])]){out.add('transform:'+t.op);if(t.op==='xor'&&t.phase==='file')out.add('transform:xor-file');}
  if(p.grammar)out.add('grammar:'+p.grammar.mode);for(const x of p.params||[])out.add('params:'+x.target);return [...out].sort();}
 const TOP=new Set(['schema','format','id','version','minApp','maxApp','requires','title','engine','note','match','source','transforms','grammar','pairing','params','signature','createdAt']);
 /* validate(pack) → {ok:true,pack} | {ok:false,error}. Unknown top-level fields are refused unless they start with "x-". */
@@ -207,7 +229,8 @@ function expand(dir,g,limit=LIMITS.files){const parts=g.replace(/\\/g,'/').split
  if(parts.length>3)return out;walk(dir,0);return out.sort();}
 const headMemo=new Map();
 function exeHead(file){const st=fs.statSync(file);const k=file+'|'+st.size+'|'+st.mtimeMs;if(headMemo.has(k))return headMemo.get(k);const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(Math.min(1<<20,st.size));fs.readSync(fd,b,0,b.length,0);const h=crypto.createHash('sha256').update(b).digest('hex');headMemo.set(k,h);return h;}finally{fs.closeSync(fd);}}
-function readAt(file,offset,length){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(length);const n=fs.readSync(fd,b,0,length,offset);return b.subarray(0,n);}finally{fs.closeSync(fd);}}
+/* E573 packs and built-in readers share one runtime for file reads and LZSS (original-engines/kit.cjs) */
+const kit=require('./original-engines/kit.cjs'),readAt=kit.readAt;
 /* match(pack,dir) → specificity score (0 = no match): exe head 100, exe size 40, exe name 10, each file 5, magic 10 */
 function match(pack,dir){try{const m=pack.match;let score=0;
  if(m.exe){const exes=m.exe.name?[path.join(dir,m.exe.name)].filter(f=>fs.existsSync(f)):fs.readdirSync(dir).filter(f=>/\.exe$/i.test(f)).map(f=>path.join(dir,f));
@@ -224,14 +247,14 @@ function params(target,root=ROOT()){try{const list=active(root);if(!list.length)
 /* the same array while nothing changed: callers memoise on its identity */
 
 /* ---- runtime: transforms ---------------------------------------------------------------------------------------- */
-function lzss(src,cap=LIMITS.inflated){const win=new Uint8Array(4096);let r=0xfee,flags=0,i=0;const out=[];
- while(i<src.length&&out.length<cap){flags>>=1;if(!(flags&0x100)){flags=src[i++]|0xff00;if(i>src.length)break;}
-  if(flags&1){if(i>=src.length)break;const c=src[i++];out.push(c);win[r]=c;r=(r+1)&0xfff;}
-  else{if(i+1>=src.length)break;const a=src[i++],b=src[i++];const off=a|((b&0xf0)<<4),len=(b&0x0f)+3;for(let k=0;k<len;k++){const c=win[(off+k)&0xfff];out.push(c);win[r]=c;r=(r+1)&0xfff;}}}
- return Buffer.from(out.slice(0,cap));}
-function transform(buf,list){let b=Buffer.from(buf);
+const lzss=(src,cap=LIMITS.inflated)=>kit.lzss(src,undefined,{cap});
+/* ctx.offset: where the entry starts in its archive (an xor key with phase "file" lines up with that) */
+function transform(buf,list,ctx={}){let b=Buffer.from(buf);
  for(const t of list||[]){switch(t.op){
-  case 'xor':{const k=Buffer.from(t.key,'hex'),s=t.start||0;for(let i=0;i<b.length;i++)b[i]^=k[(i+s)%k.length];break;}
+  case 'xor':{const k=Buffer.from(t.key,'hex'),s=(t.start||0)+(t.phase==='file'?(ctx.offset||0)%k.length:0);for(let i=0;i<b.length;i++)b[i]^=k[(i+s)%k.length];break;}
+  case 'blowfish':{const S=require('./runtime-harvest-scan.cjs');b=S.blowfishStateDecrypt(b,t.state?Buffer.from(t.state,'base64'):S.blowfishState(Buffer.from(t.key,'hex')),{words:t.words||'le'});break;}
+  case 'tea':case 'xtea':b=require('./runtime-harvest-scan.cjs').teaDecrypt(b,{key:t.key,variant:t.op,rounds:t.rounds||32,words:t.words||'le'});break;
+  case 'camellia':{const n=b.length&~15,dc=crypto.createDecipheriv('camellia-128-ecb',Buffer.from(t.key,'hex'),null);dc.setAutoPadding(false);b=Buffer.concat([dc.update(b.subarray(0,n)),dc.final(),b.subarray(n)]);break;}
   case 'xor-index':{const m=t.mult??1;for(let i=0;i<b.length;i++)b[i]^=(t.base+Math.imul(i,t.step)*m)&255;break;}
   case 'add':for(let i=0;i<b.length;i++)b[i]=(b[i]+t.value)&255;break;
   case 'sub':for(let i=0;i<b.length;i++)b[i]=(b[i]-t.value)&255;break;
@@ -268,8 +291,13 @@ function scenesOf(pack,dir){const s=pack.source,entryRe=s.entries?globRe(path.po
  const guard=b=>{total+=b.length;if(b.length>LIMITS.fileBytes||total>LIMITS.totalBytes)throw Error('PACK_LIMIT');return b;};
  const nameOk=n=>!entryRe||entryRe.test(path.basename(String(n).replace(/\\/g,'/')));
  if(s.container==='loose'){for(const g of s.files)for(const f of expand(dir,g,limit)){if(out.length>=limit)break;const rel=path.relative(dir,f).replace(/\\/g,'/');out.push({name:rel,read:()=>guard(transform(fs.readFileSync(f),pack.transforms))});}}
+ else if(s.container==='index'){const x=s.index,e=Buffer.from(x.entries,'base64'),sel=x.select?Buffer.from(x.select,'base64'):null;
+  for(const g of s.archives)for(const file of expand(dir,g,32)){let size=0;try{size=fs.statSync(file).size;}catch{}if(size!==x.size)continue;
+   const list=sel?Array.from({length:sel.length/4},(_,i)=>sel.readUInt32LE(i*4)).filter(i=>i<x.count):Array.from({length:x.count},(_,i)=>i);
+   for(const i of list){if(out.length>=limit)break;const offset=e.readUInt32LE(i*12),length=e.readUInt32LE(i*12+4),unpacked=e.readUInt32LE(i*12+8);if(!length||offset+length>size||length>LIMITS.fileBytes)continue;
+    out.push({name:'#'+String(i).padStart(5,'0'),read:()=>{let b=transform(readAt(file,offset,length),pack.transforms,{offset});if(x.trim==='unpacked'&&unpacked&&unpacked<=b.length)b=b.subarray(0,unpacked);return guard(b);}});}}}
  else for(const g of s.archives)for(const file of expand(dir,g,32)){
-  if(s.container==='table'){for(const e of tableList(file,s.table)){if(out.length>=limit)break;if(!nameOk(e.name))continue;out.push({name:e.name,read:()=>guard(transform(readAt(file,e.offset,e.size),pack.transforms))});}}
+  if(s.container==='table'){for(const e of tableList(file,s.table)){if(out.length>=limit)break;if(!nameOk(e.name))continue;out.push({name:e.name,read:()=>guard(transform(readAt(file,e.offset,e.size),pack.transforms,{offset:e.offset}))});}}
   else if(s.container==='xp3'){const t=require('./original-engines/xp3.cjs').list(file);for(const e of t?.files||[]){if(out.length>=limit)break;if(!nameOk(e.name))continue;out.push({name:e.name,read:()=>guard(transform(require('./original-engines/xp3.cjs').read(file,e),pack.transforms))});}}
   else if(s.container==='pfs'){const sc=require('./original-engines/scenes.cjs'),t=sc.pfsList(file);for(const e of t?.files||[]){if(out.length>=limit)break;if(!nameOk(e.name))continue;out.push({name:e.name,read:()=>guard(transform(sc.pfsRead(file,e,t.key),pack.transforms))});}}}
  return out;}

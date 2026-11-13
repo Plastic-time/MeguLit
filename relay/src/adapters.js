@@ -4,7 +4,9 @@
    Public (the app):
      GET  /api/adapters/feed?app=<version>&format=<n>   the packs on offer + withdrawn versions + open probe requests
      GET  /api/adapters/pack/<id>/<version>             one signed pack, as published
-     POST /api/adapters/report                          {version:1,reports:[{pack,packVersion,key,state,before,after,app}]}
+     POST /api/adapters/report                          {version:1,reports:[{pack,packVersion,key,state,before,after,app,
+                                                        verdict?,origin?}]} (verdict solved|read|partial|failed and origin
+                                                        runtime|probe are optional, E596; kept with the after numbers)
      POST /api/probe                                    one chunk {version:1,upload,part,parts,size,sha256,data(base64)}
                                                         the last chunk assembles the bundle, checks its sha256 and opens
                                                         a GitHub issue (label adapter-probe) with a summary and a link
@@ -64,18 +66,22 @@ async function probeRequest(request,env,now,{json,fail,readJSON}){const body=awa
 async function reportPost(request,env,now,{json,fail,readJSON}){const body=await readJSON(request);const list=body.value?.reports;if(body.value?.version!==1||!Array.isArray(list)||!list.length||list.length>ADAPTER_LIMITS.reports)return fail('INVALID_REPORT');
  let accepted=0;for(const r of list){if(!r||!ID.test(String(r.pack||''))||!Number.isSafeInteger(r.packVersion)||!HEX64.test(String(r.key||''))||!['kept','rolled-back','not-used'].includes(r.state))continue;
   await env.DB.prepare('INSERT INTO adapter_reports(pack,pack_version,game_key,state,before_json,after_json,app,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(pack,pack_version,game_key) DO UPDATE SET state=excluded.state,before_json=excluded.before_json,after_json=excluded.after_json,app=excluded.app,reporters=reporters+1,updated_at=excluded.updated_at')
-   .bind(r.pack,r.packVersion,r.key,r.state,JSON.stringify(nums(r.before)),JSON.stringify(nums(r.after)),String(r.app||'').replace(/[^0-9A-Za-z.-]/g,'').slice(0,40),Math.floor(now.getTime()/1000)).run();accepted++;}
+   .bind(r.pack,r.packVersion,r.key,r.state,JSON.stringify(nums(r.before)),JSON.stringify({...nums(r.after),...(['solved','read','partial','failed'].includes(r.verdict)?{verdict:r.verdict}:{}),...(['runtime','probe'].includes(r.origin)?{origin:r.origin}:{})}),String(r.app||'').replace(/[^0-9A-Za-z.-]/g,'').slice(0,40),Math.floor(now.getTime()/1000)).run();accepted++;}
  return json({ok:true,accepted});}
 async function reportsGet(env,url,{json}){const pack=url.searchParams.get('pack');const rows=pack&&ID.test(pack)?(await env.DB.prepare('SELECT * FROM adapter_reports WHERE pack=? ORDER BY updated_at DESC LIMIT 500').bind(pack).all()).results:(await env.DB.prepare('SELECT * FROM adapter_reports ORDER BY updated_at DESC LIMIT 500').all()).results;
  return json({ok:true,reports:(rows||[]).map(r=>({pack:r.pack,packVersion:r.pack_version,key:r.game_key,state:r.state,before:JSON.parse(r.before_json),after:JSON.parse(r.after_json),app:r.app,reporters:r.reporters,updatedAt:r.updated_at}))});}
 
 /* ---- probe uploads --------------------------------------------------------------------------------------------- */
 /* summary of a bundle for the issue: steps, engines, archive formats, sample and key counts; never the samples */
+/* E596 one line for the runtime findings of a game (counts and algorithms only; the bundle has the rest) */
+function runtimeLine(rt){const n=k=>Array.isArray(rt[k])?rt[k].length:0;
+ return `- runtime (v${rt.version|0}): keys ${(rt.keys||[]).slice(0,6).map(k=>md(k.algo)+' '+md(k.verified||'')).join(', ')||'-'} · indexes ${(rt.indexes||[]).slice(0,4).map(x=>md(x.archive?.name)+' ×'+(x.count|0)).join(', ')||'-'} · dispatch ${n('dispatch')} · scripts ${n('scripts')}`;}
 export function probeIssueBody(bundle,link,days){
  const lines=['MeguLit desensitized probe uploaded through the relay (no game text: every natural-language character was replaced locally and checked before upload).','',`- App: ${md(bundle.app||'?')}`,`- Created: ${md(bundle.createdAt||'?')}`,`- Games: ${bundle.games.length}`,''];
  for(const g of bundle.games.slice(0,30)){lines.push(`### ${md(g.title||'(title not shared)')}`,`- key: \`${String(g.key||'').slice(0,64)}\``,`- step: **${md(g.step)}** ${md(g.detail||'')}`,`- reader: ${md(g.detected||'none')} · lines ${g.lines|0} · Japanese ${g.japaneseLines|0}${g.pairing?` · pairing ${g.pairing.paired}/${g.pairing.total}`:''}`,
   `- archives: ${(g.inventory?.archives||[]).slice(0,6).map(a=>md(a.name)+' '+md(a.format||a.magic)).join(', ')||'-'}`,`- engines tried: ${(g.engines||[]).map(e=>md(e.id)+(e.error?' ('+md(e.error)+')':'')).slice(0,10).join(', ')||'-'}`,
-  `- samples: ${(g.samples||[]).filter(s=>s.sample).length}, dropped: ${(g.samples||[]).filter(s=>s.dropped).length}, key candidates: ${(g.keys||[]).map(k=>md(k.algo)+(k.key?':'+md(k.key):'')).slice(0,5).join(', ')||'-'}`,'');}
+  `- samples: ${(g.samples||[]).filter(s=>s.sample).length}, dropped: ${(g.samples||[]).filter(s=>s.dropped).length}, key candidates: ${(g.keys||[]).map(k=>md(k.algo)+(k.key?':'+md(k.key):'')).slice(0,5).join(', ')||'-'}`,
+  ...(g.runtime&&typeof g.runtime==='object'?[runtimeLine(g.runtime)]:[]),'');}
  lines.push(`Download (expires in ${days} days): ${link}`,'','Answer with a pack: `node tools/adapter-pack.cjs sign …` then `publish`; ask for a fresh probe with `probe-request`.');
  return lines.join('\n');}
 async function probeChunk(request,env,ip,now,url,{json,fail,readJSON}){

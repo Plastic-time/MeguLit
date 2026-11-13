@@ -10,44 +10,63 @@
                                           manifest the user sees: every item, its size, the total and the hash
      upload(root,{hash,followUp})         sends exactly that stored bundle, in chunks under the relay's size limit,
                                           only after the user confirmed it in the dialog (the hash must match)
-   Bundle (schema megulit.probe-bundle v1): {app, createdAt, games:[{key,title,step,detail,detected,reader,lines,
-   japaneseLines,sizes,pairing,inventory,engines,unsupported,preparing,samples:[{name,role,size,head,sample}],keys}]}.
+   Bundle (schema megulit.probe-bundle v1): {app, createdAt, features, games:[{key,title,step,detail,detected,reader,lines,
+   japaneseLines,sizes,pairing,inventory,engines,unsupported,preparing,samples:[{name,role,size,head,sample}],keys,runtime?}]}.
+   runtime (E596, optional, versioned on its own: {schema:'megulit.runtime-findings',version}) is what the opt-in runtime
+   harvest (runtime-harvest.cjs) kept of a running game: keys, index layouts, dispatch tables, desensitized script layouts.
+   Additive: a reader that does not know it skips it; "features" lists what a bundle carries.
    key is the anonymous shared-adaptation fingerprint (exe name + size + first-MiB hash); no path, user name or line. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const d=require('./desensitize.cjs');
-const MAX_BUNDLE=8<<20,CHUNK=512*1024,SAMPLE_HEAD=64*1024,SAMPLE_TAIL=16*1024,SCRIPT_MAX=128*1024,PER_GAME_SAMPLES=4;
+/* E596 (user 2026-11-14): after desensitizing, a script is long runs of the same placeholder bytes and gzip takes it to
+   about 1/150 (index tables of numbers about 1/6, archives whose encrypted blocks were zero-filled about 1/90; measured on
+   synthetic Shift-JIS / UTF-16 / bytecode / index data), so whole scripts and whole archive heads and tails go up,
+   compressed. Caps count what is sent (compressed), not the raw size: SAMPLE_PACKED_MAX per sample (a sample over it is
+   taken again with a quarter of the window), MAX_BUNDLE for the bundle (the relay limit). GAME_RAW_MAX / GAME_MS bound
+   the work on this PC per game. */
+const MAX_BUNDLE=8<<20,CHUNK=512*1024,SAMPLE_HEAD=8<<20,SAMPLE_TAIL=8<<20,SCRIPT_MAX=16<<20,PER_GAME_SAMPLES=8,SAMPLE_PACKED_MAX=2<<20,GAME_RAW_MAX=64<<20,GAME_MS=80000,MIN_WINDOW=64*1024;
 const outbox=root=>path.join(root,'data','adapter-probe','outbox');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
-function readHead(file,n){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(n);const k=fs.readSync(fd,b,0,n,0);return b.subarray(0,k);}finally{fs.closeSync(fd);}}
-function readRange(file,at,n){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(n);const k=fs.readSync(fd,b,0,n,at);return b.subarray(0,k);}finally{fs.closeSync(fd);}}
+const readHead=(file,n)=>require('./original-engines/kit.cjs').readAt(file,0,n);/* E580 */
+const readRange=(file,at,n)=>require('./original-engines/kit.cjs').readAt(file,at,n);/* E580 */
 
 /* ---- worker side ------------------------------------------------------------------------------------------------ */
 const SCRIPTY=/script|scenario|scene|scn|story|text|txt|msg|data|sys|main|game/i;
-function archiveSample(file,dir){
- const st=fs.statSync(file),whole=st.size<=SAMPLE_HEAD+SAMPLE_TAIL;
- const buf=whole?fs.readFileSync(file):Buffer.concat([readRange(file,0,SAMPLE_HEAD),Buffer.alloc(0)]);
- const s=d.sample(whole?buf:readRange(file,0,SAMPLE_HEAD),{max:SAMPLE_HEAD});let tail=null;
- if(!whole){tail=d.sample(readRange(file,st.size-SAMPLE_TAIL,SAMPLE_TAIL),{max:SAMPLE_TAIL});if(tail)for(const p of tail.parts)p.at+=st.size-SAMPLE_TAIL;if(tail)for(const o of tail.opaque)o.at+=st.size-SAMPLE_TAIL;}
- if(!s)return {name:d.maskString(path.relative(dir,file).replace(/\\/g,'/')).slice(0,120),role:'archive',size:st.size,dropped:'VERIFY'};
- const parts=[...s.parts,...(tail?.parts||[])],opaque=[...s.opaque,...(tail?.opaque||[])];
- return {name:d.maskString(path.relative(dir,file).replace(/\\/g,'/')).slice(0,120),role:'archive',size:st.size,head:sha(readHead(file,1<<20)),sample:{parts,opaque,entropy:s.entropy}};}
+/* a compressed sample that fits SAMPLE_PACKED_MAX: the window is quartered until it does (null when even MIN_WINDOW does
+   not, or verify() refused it) */
+const packedSize=s=>s?d.sampleSizes(s).packed:0;
+function fitted(make,window){for(let w=window;w>=MIN_WINDOW;w=Math.floor(w/4)){const s=make(w);if(!s)return null;if(packedSize(s)<=SAMPLE_PACKED_MAX)return s;}return null;}
+const sized=(entry,s)=>{if(s){const z=d.sampleSizes(s);entry.raw=z.raw;entry.packed=z.packed;}return entry;};
+/* an archive: whole when head + tail cover it, else its head and its tail (indexes live at either end) */
+function archiveSample(file,dir,budget){
+ const st=fs.statSync(file),name=d.maskString(path.relative(dir,file).replace(/\\/g,'/')).slice(0,120);
+ const s=fitted(w=>{const head=Math.min(w,SAMPLE_HEAD),tail=Math.min(w,SAMPLE_TAIL);
+  if(st.size<=head+tail){budget.raw+=st.size;return d.sample(fs.readFileSync(file),{max:st.size,compress:true});}
+  budget.raw+=head+tail;const h=d.sample(readRange(file,0,head),{max:head,compress:true});if(!h)return null;
+  const t=d.sample(readRange(file,st.size-tail,tail),{max:tail,compress:true});if(t){for(const p of t.parts)p.at+=st.size-tail;for(const o of t.opaque)o.at+=st.size-tail;}
+  return {size:st.size,parts:[...h.parts,...(t?.parts||[])],opaque:[...h.opaque,...(t?.opaque||[])],entropy:h.entropy};},Math.max(SAMPLE_HEAD,SAMPLE_TAIL));
+ if(!s)return {name,role:'archive',size:st.size,dropped:'VERIFY'};
+ return sized({name,role:'archive',size:st.size,head:sha(readHead(file,1<<20)),sample:{parts:s.parts,opaque:s.opaque,entropy:s.entropy}},s);}
+/* a script: the whole file up to SCRIPT_MAX */
+function scriptSample(bytes,max=SCRIPT_MAX){return fitted(w=>d.sample(bytes.subarray(0,Math.min(w,bytes.length)),{max:Math.min(w,bytes.length),compress:true}),Math.min(max,bytes.length));}
 /* encrypted entries of an XP3 archive, for known-plaintext key candidates: [{data,ext}] */
 function xp3Entries(file){try{const xp3=require('./original-engines/xp3.cjs'),t=xp3.list(file);if(!t)return [];return t.files.filter(e=>e.encrypted&&e.size>=16).slice(0,24).map(e=>{try{return {data:xp3.read(file,e).subarray(0,256),ext:path.extname(e.name).slice(1)};}catch{return null;}}).filter(Boolean);}catch{return [];}}
 function opaqueBlocks(file){try{const st=fs.statSync(file),out=[];for(const at of [0,4096,65536,1<<20,st.size>>1].filter(x=>x+4096<=st.size)){const b=readRange(file,at,4096);if(d.entropy(b)>7.2)out.push({data:b,ext:''});}return out;}catch{return [];}}
 function sampleGame({dir,executable,result}){
  const samples=[],entries=[];const archives=(result?._archives||[]).filter(f=>{try{return fs.statSync(f).isFile();}catch{return false;}});
+ const budget={raw:0,start:Date.now()},room=()=>budget.raw<GAME_RAW_MAX&&Date.now()-budget.start<GAME_MS;
  const step=result?.step||'';
  if(['unknown-pack','decrypt-failed','timeout','parse-failed'].includes(step)){
   const pick=archives.filter(f=>!/\.(ogg|png|wav|mp4|webm|avi|wmv)$/i.test(f)).sort((a,b)=>SCRIPTY.test(path.basename(b))-SCRIPTY.test(path.basename(a))).slice(0,3);
-  for(const f of pick){try{samples.push(archiveSample(f,dir));}catch{}entries.push(...xp3Entries(f),...opaqueBlocks(f));}}
+  for(const f of pick){if(room())try{samples.push(archiveSample(f,dir,budget));}catch{}entries.push(...xp3Entries(f),...opaqueBlocks(f));}}
  if(step==='parse-failed'){
   /* the scenes a reader opened but could not cut into lines */
   try{const scenes=require('./original-engines/scenes.cjs'),opened=(result.engines||[]).filter(e=>e.scenes>0&&!e.lines).map(e=>e.id);
-   for(const id of opened){const list=scenes.ENGINES[id]?.scenes(dir)||[];for(const s of list.slice(0,PER_GAME_SAMPLES-samples.length>0?PER_GAME_SAMPLES-samples.length:0)){let b;try{b=s.read();}catch{continue;}const sm=d.sample(b.subarray(0,SCRIPT_MAX),{max:SCRIPT_MAX});
-     samples.push(sm?{name:d.maskString(String(s.name)).slice(0,120),role:'script:'+id,size:b.length,head:sha(b.subarray(0,1<<20)),sample:sm}:{name:d.maskString(String(s.name)).slice(0,120),role:'script:'+id,size:b.length,dropped:'VERIFY'});}}}catch{}
+   for(const id of opened){const list=scenes.ENGINES[id]?.scenes(dir)||[];for(const s of list.slice(0,PER_GAME_SAMPLES-samples.length>0?PER_GAME_SAMPLES-samples.length:0)){if(!room())break;let b;try{b=s.read();}catch{continue;}budget.raw+=Math.min(b.length,SCRIPT_MAX);const sm=scriptSample(b);
+     samples.push(sm?sized({name:d.maskString(String(s.name)).slice(0,120),role:'script:'+id,size:b.length,head:sha(b.subarray(0,1<<20)),sample:sm},sm):{name:d.maskString(String(s.name)).slice(0,120),role:'script:'+id,size:b.length,dropped:'VERIFY'});}}}catch{}
   /* loose script-looking files no reader took */
   if(samples.length<PER_GAME_SAMPLES)try{const list=fs.readdirSync(dir).filter(n=>/\.(ks|scr|ss|s|sc|txt|ws2|bsc|asb|mjo|hcb)$/i.test(n)).slice(0,PER_GAME_SAMPLES-samples.length);
-   for(const n of list){const f=path.join(dir,n),b=readHead(f,SCRIPT_MAX),sm=d.sample(b,{max:SCRIPT_MAX});samples.push(sm?{name:d.maskString(n),role:'script',size:fs.statSync(f).size,head:sha(readHead(f,1<<20)),sample:sm}:{name:d.maskString(n),role:'script',size:fs.statSync(f).size,dropped:'VERIFY'});}}catch{}}
+   for(const n of list){if(!room())break;const f=path.join(dir,n),b=readHead(f,SCRIPT_MAX);budget.raw+=b.length;const sm=scriptSample(b);samples.push(sm?sized({name:d.maskString(n),role:'script',size:fs.statSync(f).size,head:sha(readHead(f,1<<20)),sample:sm},sm):{name:d.maskString(n),role:'script',size:fs.statSync(f).size,dropped:'VERIFY'});}}catch{}}
  const keys=entries.length?d.keyCandidates(entries):[];
  return {samples:samples.slice(0,PER_GAME_SAMPLES+3),keys};}
 
@@ -71,20 +90,32 @@ async function prepare(root,db,{ids=null,sampler,titles=true}={}){
  for(const g of games){const r=results[g.id];if(!r||!ALLOWED_STEPS.includes(r.step))continue;if(want&&!want.has(g.id))continue;
   let fp=null;try{fp=require('./shared-adaptation.cjs').fingerprint(g.executable);}catch{}
   let extra={samples:[],keys:[]};if(sampler&&r.step!=='low-pairing'&&r.step!=='not-japanese')try{extra=await sampler(g,r)||extra;}catch{}
-  list.push({key:fp?.key||sha('title:'+g.title).slice(0,64),title:titles?String(g.title).slice(0,120):'',...publicResult(r),samples:extra.samples||[],keys:extra.keys||[]});}
+  /* runtime findings of this game, through the privacy gate once more */
+  let runtime=null;try{const rh=require('./runtime-harvest.cjs');runtime=rh.gate(rh.load(root,g.id));}catch{}
+  list.push({key:fp?.key||sha('title:'+g.title).slice(0,64),title:titles?String(g.title).slice(0,120):'',...publicResult(r),samples:extra.samples||[],keys:extra.keys||[],...(runtime?{runtime}:{})});}
  if(!list.length)return {empty:true};
- let bundle={schema:'megulit.probe-bundle',version:1,app:appVersion(root),createdAt:new Date().toISOString(),games:list};
+ let bundle={schema:'megulit.probe-bundle',version:1,features:list.some(g=>g.runtime)?['runtime-1']:[],app:appVersion(root),createdAt:new Date().toISOString(),games:list};
  /* over the relay limit: drop tails, then samples from the biggest games, until it fits */
  let body=Buffer.from(JSON.stringify(bundle));
+ /* runtime script samples and name lists go first (the keys and index numbers are what solves a game) */
+ for(const g of bundle.games){if(body.length<=MAX_BUNDLE)break;if(g.runtime){g.runtime.scripts=g.runtime.scripts.map(({sample,...s})=>s);for(const ix of g.runtime.indexes)delete ix.names;g.trimmed=true;body=Buffer.from(JSON.stringify(bundle));}}
  for(let guard=0;body.length>MAX_BUNDLE&&guard<200;guard++){const g=bundle.games.filter(x=>x.samples.length).sort((a,b)=>JSON.stringify(b.samples).length-JSON.stringify(a.samples).length)[0];if(!g)break;g.samples.pop();g.trimmed=true;body=Buffer.from(JSON.stringify(bundle));}
  if(body.length>MAX_BUNDLE)return {error:'TOO_LARGE'};
  if(!clean(bundle))return {error:'TEXT_FOUND'};
  const hash=sha(body);fs.mkdirSync(outbox(root),{recursive:true});fs.writeFileSync(path.join(outbox(root),hash+'.json'),body);
- return {hash,bytes:body.length,chunks:Math.ceil(body.length/CHUNK),games:list.length,manifest:manifestOf(bundle)};}
+ return {hash,bytes:body.length,limit:MAX_BUNDLE,chunks:Math.ceil(body.length/CHUNK),games:list.length,manifest:manifestOf(bundle)};}
 function manifestOf(bundle){return bundle.games.map(g=>({key:g.key.slice(0,12),title:g.title,step:g.step,detail:g.detail,
- items:[{kind:'result',bytes:Buffer.byteLength(JSON.stringify({...g,samples:undefined,keys:undefined}))},...g.samples.map(s=>({kind:s.dropped?'dropped':'sample',name:s.name,role:s.role,size:s.size,bytes:s.sample?Buffer.byteLength(JSON.stringify(s.sample)):0,opaque:s.sample?.opaque?.length||0})),...(g.keys.length?[{kind:'keys',count:g.keys.length,algos:[...new Set(g.keys.map(k=>k.algo))]}]:[])]}));}
+ items:[{kind:'result',bytes:Buffer.byteLength(JSON.stringify({...g,samples:undefined,keys:undefined,runtime:undefined}))},...g.samples.map(s=>({kind:s.dropped?'dropped':'sample',name:s.name,role:s.role,size:s.size,bytes:s.sample?Buffer.byteLength(JSON.stringify(s.sample)):0,...(s.sample?d.sampleSizes(s.sample):{raw:0,packed:0}),opaque:s.sample?.opaque?.length||0})),...(g.keys.length?[{kind:'keys',count:g.keys.length,algos:[...new Set(g.keys.map(k=>k.algo))]}]:[]),...runtimeItems(g.runtime)]}));}
+/* every runtime finding as its own manifest row: what it is, how it was checked, its size (name is shown as is) */
+function runtimeItems(rt){if(!rt)return [];const size=x=>Buffer.byteLength(JSON.stringify(x)),out=[];
+ for(const k of rt.keys||[])out.push({kind:'runtime-key',name:'runtime · '+k.algo+' '+(k.form==='state'?'key schedule':k.form==='params'?'parameters':'key')+' · '+k.verified,role:'runtime',algo:k.algo,bytes:size(k)});
+ for(const ix of rt.indexes||[])out.push({kind:'runtime-index',name:'runtime · index of '+ix.archive.name+' · '+ix.count+' entries'+(ix.names?' + masked names':''),role:'runtime',count:ix.count,bytes:size(ix)});
+ for(const t of rt.dispatch||[])out.push({kind:'runtime-dispatch',name:'runtime · opcode table · '+t.count+' entries',role:'runtime',bytes:size(t)});
+ for(const s of rt.scripts||[])out.push({kind:'runtime-script',name:'runtime · script layout'+(s.sample?' + text-free sample':'')+' · '+(s.encoding||'?'),role:'runtime',bytes:size(s),...(s.sample?d.sampleSizes(s.sample):{})});
+ if((rt.constants||[]).length)out.push({kind:'runtime-constants',name:'runtime · cipher tables in modules · '+[...new Set(rt.constants.map(c=>c.algo))].join(', '),role:'runtime',bytes:size(rt.constants)});
+ return out;}
 /* what a stored bundle would upload (the dialog can show it again) */
-function manifest(root,hash){if(!/^[a-f0-9]{64}$/.test(String(hash)))return null;let body;try{body=fs.readFileSync(path.join(outbox(root),hash+'.json'));}catch{return null;}if(sha(body)!==hash)return null;const b=JSON.parse(body);return {hash,bytes:body.length,chunks:Math.ceil(body.length/CHUNK),games:b.games.length,manifest:manifestOf(b)};}
+function manifest(root,hash){if(!/^[a-f0-9]{64}$/.test(String(hash)))return null;let body;try{body=fs.readFileSync(path.join(outbox(root),hash+'.json'));}catch{return null;}if(sha(body)!==hash)return null;const b=JSON.parse(body);return {hash,bytes:body.length,limit:MAX_BUNDLE,chunks:Math.ceil(body.length/CHUNK),games:b.games.length,manifest:manifestOf(b)};}
 const consentFile=root=>path.join(root,'data','adapter-probe','consent.json');
 function consent(root){try{const v=JSON.parse(fs.readFileSync(consentFile(root),'utf8'));const now=Date.now();return Object.fromEntries(Object.entries(v.keys||{}).filter(([k,x])=>/^[a-f0-9]{64}$/.test(k)&&x.until>now));}catch{return {};}}
 function grant(root,keys,days=180){const all=consent(root),until=Date.now()+days*86400000;for(const k of keys)if(/^[a-f0-9]{64}$/.test(k))all[k]={at:Date.now(),until};fs.mkdirSync(path.dirname(consentFile(root)),{recursive:true});fs.writeFileSync(consentFile(root),JSON.stringify({version:1,keys:all}));}
@@ -103,4 +134,4 @@ async function upload(root,{hash,followUp=false,fetcher=globalThis.fetch,endpoin
  if(followUp){try{grant(root,JSON.parse(body).games.map(g=>g.key));}catch{}}
  try{fs.writeFileSync(path.join(outbox(root),hash+'.sent'),JSON.stringify({at:Date.now(),id:last.id||''}));}catch{}
  return {state:'uploaded',id:String(last.id||''),issueUrl:/^https:\/\//.test(String(last.issueUrl||''))?String(last.issueUrl):''};}
-module.exports={sampleGame,prepare,manifest,upload,consent,grant,revoke,publicResult,clean,MAX_BUNDLE,CHUNK};
+module.exports={sampleGame,prepare,manifest,upload,consent,grant,revoke,publicResult,clean,runtimeItems,archiveSample,scriptSample,MAX_BUNDLE,CHUNK,SAMPLE_HEAD,SAMPLE_TAIL,SCRIPT_MAX,SAMPLE_PACKED_MAX};

@@ -12,7 +12,16 @@
      adapter_consent_revoke                        stop automatic follow-up probes
      adapter_packs_status                          installed packs, per-game results, waiting probe requests
      adapter_packs_sync                            fetch the feed now (worker thread)
-     adapter_pack_rollback {id}                    block the active version of a pack and read its games again */
+     adapter_pack_rollback {id}                    block the active version of a pack and read its games again
+   E596 runtime harvest (services/runtime-harvest.cjs; opt-in, off by default):
+     adapter_runtime_status                        switch, per-game off list, running job, per-game finding counts
+     adapter_runtime_explain {locale}              what is read, why, what may leave the PC, what never does
+     adapter_runtime_enable {enabled}              the global switch (Settings: library.runtimeHarvest)
+     adapter_runtime_game {gameId,enabled}         on / off for one game
+     adapter_runtime_harvest {gameId,pid}          harvest a running game now (still only if allowed)
+     adapter_runtime_cancel                        stop the running harvest
+     adapter_runtime_findings {gameId}             the stored public findings (what an upload would carry)
+     adapter_runtime_forget {gameId}               delete them */
 const probe=require('./adapter-probe.cjs');
 async function handle(db,root,request,runtime=null){
  const emit=(event,data)=>{try{runtime?.emit?.(event,data);}catch{}};
@@ -28,6 +37,8 @@ async function handle(db,root,request,runtime=null){
   case 'adapter_consent_revoke':return require('./adapter-sample.cjs').revoke(root);
   case 'adapter_packs_status':return require('./adapter-feed.cjs').status(root);
   case 'adapter_packs_sync':return require('./adapter-feed.cjs').syncNow(root);
+  case 'adapter_runtime_status':case 'adapter_runtime_explain':case 'adapter_runtime_enable':case 'adapter_runtime_game':case 'adapter_runtime_harvest':case 'adapter_runtime_cancel':case 'adapter_runtime_findings':case 'adapter_runtime_forget':
+   return require('./runtime-harvest.cjs').handle(db,root,request,emit);
   case 'adapter_pack_rollback':{const id=String(request.id||'');if(!/^[a-z0-9][a-z0-9-]{2,63}$/.test(id))throw Error('INVALID_PACK_ID');return require('./adapter-feed.cjs').rollbackNow(root,id);}
   default:throw Error('UNKNOWN_ACTION');}
 }

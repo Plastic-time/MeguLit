@@ -40,8 +40,8 @@ export function resetHomeCache(){memo.daily=null;memo.at=0;memo.activity=null;ve
 /* spring-driven multi-layer parallax. layers: [{el,z,base?}] (z>0 near, z<0 far); planes inside the 3D canvas get their translateZ kept */
 export function createDepth(root,{layers=[],canvas=null,planes=[],raf=globalThis.requestAnimationFrame?.bind(globalThis),caf=globalThis.cancelAnimationFrame?.bind(globalThis),
  now=()=>performance.now()}={}){
- const reduced=globalThis.matchMedia?.('(prefers-reduced-motion:reduce)').matches;if(reduced||!raf)return {stop(){},frame(){},state:null};
- const s={x:0,y:0,vx:0,vy:0,tx:0,ty:0,inside:false,lastMove:-1e9,t0:now(),last:now(),id:0,alive:true};
+ const reduced=globalThis.matchMedia?.('(prefers-reduced-motion:reduce)').matches;if(reduced||!raf)return {stop(){},frame(){},state:null,hold(){},neutral:fn=>fn()};
+ const s={x:0,y:0,vx:0,vy:0,tx:0,ty:0,inside:false,hold:false,lastMove:-1e9,t0:now(),last:now(),id:0,alive:true};
  const onMove=e=>{const r=root.getBoundingClientRect();if(!r.width||!r.height)return;s.tx=Math.max(-.5,Math.min(.5,(e.clientX-r.left)/r.width-.5));
   s.ty=Math.max(-.5,Math.min(.5,(e.clientY-r.top)/r.height-.5));s.inside=true;s.lastMove=now();wake();};
  const onLeave=()=>{s.inside=false;s.tx=0;s.ty=0;wake();};
@@ -53,12 +53,16 @@ export function createDepth(root,{layers=[],canvas=null,planes=[],raf=globalThis
  function frame(t=now()){s.id=0;if(!s.alive)return;if(!root.isConnected){stop();return;}const dt=Math.min(.05,Math.max(.001,(t-s.last)/1000));s.last=t;
   /* idle breathing: a slow Lissajous drift that fades in after the pointer rests or leaves */
   const idle=Math.min(1,Math.max(0,(t-s.lastMove-1400)/2600)),ph=(t-s.t0)/1000,bx=Math.sin(ph*.21)*.07+Math.sin(ph*.13+1.3)*.035,by=Math.cos(ph*.17)*.05;
-  const gx=(s.inside?s.tx:0)*(1-idle*.35)+bx*idle,gy=(s.inside?s.ty:0)*(1-idle*.35)+by*idle;
-  /* under-damped a touch while following, slower when returning home */
-  const k=s.inside?38:14,c=s.inside?10.5:7.2;s.vx+=((gx-s.x)*k-s.vx*c)*dt;s.vy+=((gy-s.y)*k-s.vy*c)*dt;s.x+=s.vx*dt;s.y+=s.vy*dt;paint(s.x,s.y);
+  /* while a card flies onto the field the scene settles flat (hold), so the flying card and the real one meet with the same shape */
+  const gx=s.hold?0:(s.inside?s.tx:0)*(1-idle*.35)+bx*idle,gy=s.hold?0:(s.inside?s.ty:0)*(1-idle*.35)+by*idle;
+  /* under-damped a touch while following, slower when returning home, quick and nearly critical while holding */
+  const k=s.hold?110:s.inside?38:14,c=s.hold?19:s.inside?10.5:7.2;s.vx+=((gx-s.x)*k-s.vx*c)*dt;s.vy+=((gy-s.y)*k-s.vy*c)*dt;s.x+=s.vx*dt;s.y+=s.vy*dt;paint(s.x,s.y);
   if(document.hidden)return;s.id=raf(frame);}
  function wake(){if(!s.id&&s.alive)s.id=raf(frame);}
  const onVis=()=>{if(!document.hidden)wake();};document.addEventListener('visibilitychange',onVis);
  function stop(){s.alive=false;if(s.id)caf?.(s.id);s.id=0;root.removeEventListener('pointermove',onMove);root.removeEventListener('pointerleave',onLeave);
   document.removeEventListener('visibilitychange',onVis);}
- wake();return {stop,frame,state:s};}
+ /* hold(true) flattens the scene for a card landing; neutral(fn) measures the scene as it is with no tilt (layout read with neutral transforms, put back before any paint) */
+ function hold(on){s.hold=!!on;wake();}
+ function neutral(fn){paint(0,0);try{return fn();}finally{paint(s.x,s.y);}}
+ wake();return {stop,frame,state:s,hold,neutral};}

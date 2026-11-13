@@ -1,23 +1,22 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* About page (2026-11-13): one landscape screen, two columns — left: reel, 关于, 致谢, uninstall; right: 链接, 支持开发, 一起走过.
-   The columns run independently and end on the same line.
+/* About page (2026-11-13; layout 2026-11-14, owner's pick B): one landscape screen, three columns —
+   reel, 关于 | 链接, 致谢 | 支持开发, 一起走过, uninstall. Every section puts its heading over its content; the 关于 facts
+   and the 链接 rows share one row height so the first two columns read on one rhythm. The block sits in the middle of the
+   window and the columns end on one line (the last section of each sinks to the bottom).
    Everything is scoped under .ab so app-wide classes never leak in or out. */
 .ab{--ab-k:#050304;--ab-text:#f1e0d2;--ab-t2:#c9b2a3;--ab-t3:#a48e81;--ab-gold:#d9a54a;--ab-red:#c8323c;--ab-paper:#f0e6d6;
- --ab-rule:rgba(217,165,74,.16);--ab-rule2:rgba(241,224,210,.09);
+ --ab-rule:rgba(217,165,74,.16);--ab-rule2:rgba(241,224,210,.09);--ab-row:14px;
  --ab-serif:"Sitka Display","Sitka Text","Noto Serif SC","Noto Serif JP","Yu Mincho",SimSun,serif;--ab-mono:"Cascadia Mono","Consolas",monospace;
- box-sizing:border-box;min-height:100%;max-width:1500px;margin:0 auto;padding:22px 36px 14px;color:var(--ab-text);font:14px/1.6 var(--ab-serif);
- display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 56px}
-.ab-col{min-height:0;display:flex;flex-direction:column;gap:22px}
-.ab-bl{flex:1}
-.ab-journey{margin-top:auto}
-.ab-br{margin-top:auto}
+ box-sizing:border-box;min-height:100%;max-width:1500px;margin:0 auto;padding:26px 36px;color:var(--ab-text);font:14px/1.6 var(--ab-serif);
+ display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr);gap:0 44px;align-content:safe center}
+.ab-col{min-width:0;display:flex;flex-direction:column;gap:26px}
+.ab-col>:last-child:not(:first-child){margin-top:auto}
 .ab *{box-sizing:border-box}
 .ab :is(p,dd,span){word-break:keep-all;overflow-wrap:anywhere}
 .ab button{font:inherit;color:inherit;cursor:pointer}
 .ab button:focus-visible{outline:1px solid var(--ab-gold);outline-offset:3px}
-.ab-q{min-height:0;display:flex;flex-direction:column}
 
-/* ── top-left: the reel ── */
+/* ── the reel ── */
 .ab-player{position:relative;aspect-ratio:1040/600;border:1px solid var(--ab-rule2);overflow:hidden;background:var(--ab-k)}
 .ab-reel{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.92) saturate(1.05)}
 .ab-player::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 95% at 50% 36%,transparent 58%,rgba(5,3,4,.66)),linear-gradient(transparent 64%,rgba(5,3,4,.9) 82%,rgba(5,3,4,.96));box-shadow:inset 0 0 0 1px rgba(200,50,60,.18)}
@@ -34,36 +33,42 @@
 .ab-typed::after{content:"▮";margin-left:.25em;color:var(--ab-red);animation:ab-rec 1s steps(2) infinite}
 @keyframes ab-rec{50%{opacity:.25}}
 
-/* ── shared section grammar: a heading column, a hairline that turns red under the pointer ── */
-.ab-sec{position:relative;display:grid;grid-template-columns:120px minmax(0,1fr);gap:0 24px;padding-top:16px;border-top:1px solid var(--ab-rule)}
+/* ── shared section grammar: heading over content, a hairline that turns red under the pointer ── */
+.ab-sec{position:relative;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding-top:16px;border-top:1px solid var(--ab-rule)}
 .ab-sec::after{content:"";position:absolute;left:0;top:-1px;width:0;height:1px;background:var(--ab-red);transition:width .25s cubic-bezier(.2,.8,.2,1)}
 .ab-sec:is(:hover,:focus-within)::after{width:28px}
 .ab-sec>h2{margin:0;font:600 17px/1.3 var(--ab-serif);letter-spacing:.06em;color:var(--ab-text)}
-.ab-sec>h2 small{display:block;margin-top:5px;font:400 12.5px/1.6 var(--ab-serif);letter-spacing:0;color:var(--ab-t3)}
+.ab-sec>h2 small{display:inline;margin:0 0 0 10px;font:400 12.5px/1.6 var(--ab-serif);letter-spacing:0;color:var(--ab-t3)}
 
-/* ── top-right: 关于 + 链接 ── */
-.ab-facts{margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;font:15px/1.6 var(--ab-serif);color:var(--ab-t3)}
+/* ── 关于: label | value rows, the same height as the 链接 rows ── */
+.ab-facts{margin:0}
+.ab-facts>div{display:grid;grid-template-columns:104px minmax(0,1fr);gap:16px;align-items:baseline;padding:var(--ab-row) 0;border-bottom:1px solid var(--ab-rule2)}
+.ab-facts>div:first-child{padding-top:0}
+.ab-facts>div:last-child{border-bottom:0}
+.ab-facts dt{font:14.5px/1.6 var(--ab-serif);color:var(--ab-t3)}
+.ab-facts dd{margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;min-width:0;font:15px/1.6 var(--ab-serif);color:var(--ab-text)}
 .ab-facts b{font-weight:500;color:var(--ab-text);font-variant-numeric:tabular-nums}
-.ab-ver{font-size:17px}
-.ab-dot{margin:0 4px}
-.ab-tlink{background:none;border:0;padding:0 0 1px;margin-right:4px;color:var(--ab-t2);font:13px var(--ab-serif);border-bottom:1px solid var(--ab-rule);transition:color .15s,border-color .15s}
+.ab-facts dd small{font:13px var(--ab-serif);color:var(--ab-t3)}
+.ab-ver{font-size:16px}
+.ab-tlink{background:none;border:0;padding:0 0 1px;color:var(--ab-t2);font:13px var(--ab-serif);border-bottom:1px solid var(--ab-rule);transition:color .15s,border-color .15s}
 .ab-tlink:hover{color:var(--ab-text);border-color:var(--ab-t2)}
 .ab-tlink:disabled{opacity:.6;cursor:default}
 .ab-state{font-size:13px;color:var(--ab-t2)}.ab-state:empty{display:none}
 .ab-links{margin:0;padding:0;list-style:none}
-.ab-links button{position:relative;display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:14px;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--ab-rule2);background:none;text-align:left;color:var(--ab-text);font:16px var(--ab-serif);transition:padding .22s cubic-bezier(.2,.8,.2,1)}
+.ab-links button{position:relative;display:grid;grid-template-columns:104px minmax(0,1fr);align-items:baseline;gap:16px;width:100%;padding:var(--ab-row) 0;border:0;border-bottom:1px solid var(--ab-rule2);background:none;text-align:left;color:var(--ab-text);font:16px/1.6 var(--ab-serif);transition:padding .22s cubic-bezier(.2,.8,.2,1)}
 .ab-links li:first-child button{padding-top:0}
 .ab-links li:last-child button{border-bottom:0}
-.ab-links button small{font:13px var(--ab-serif);color:var(--ab-t3);transition:color .15s}
-.ab-links button small i{font-style:normal;margin-left:7px}
+/* the value sits right after its label at a readable size; the arrow keeps the far end */
+.ab-links button small{display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-width:0;font:14.5px/1.6 var(--ab-serif);color:var(--ab-t2);transition:color .15s}
+.ab-links button small i{font-style:normal;color:var(--ab-t3)}
 .ab-links button::before{content:"";position:absolute;left:0;top:50%;width:6px;height:6px;margin-top:-2px;background:var(--ab-red);transform:rotate(45deg) scale(0);transition:transform .2s}
 .ab-links li:first-child button::before{margin-top:-8px}
 .ab-links button:is(:hover,:focus-visible){padding-left:18px;outline:0}
 .ab-links button:is(:hover,:focus-visible)::before{transform:rotate(45deg) scale(1)}
 .ab-links button:is(:hover,:focus-visible) small{color:var(--ab-text)}
 
-/* ── right: 一起走过 — three plain figures from this PC ── */
-.ab-stats{margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 24px}
+/* ── 一起走过 — three plain figures from this PC ── */
+.ab-stats{margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 16px}
 .ab-stats[hidden]{display:none}
 .ab-stats div{display:grid;gap:2px;min-width:0}
 .ab-stats dt{display:flex;align-items:baseline;gap:5px;white-space:nowrap}
@@ -72,21 +77,20 @@
 .ab-stats dd{margin:0;font:13px/1.45 var(--ab-serif);color:var(--ab-t3)}
 .ab-jempty{margin:0;font:14px/1.7 var(--ab-serif);color:var(--ab-t3)}
 
-/* ── bottom-left: 致谢 + the quiet uninstall line ── */
-.ab-cred{margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 40px}
+/* ── 致谢 + the quiet uninstall line ── */
+.ab-cred{margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 28px}
 .ab-cred div{display:grid;gap:2px}
 .ab-cred dt{font:15.5px/1.35 var(--ab-serif);color:var(--ab-text)}.ab-cred dd{margin:0;font:13px/1.45 var(--ab-serif);color:var(--ab-t3)}
-.ab-end{margin-top:auto;display:flex;justify-content:space-between;align-items:baseline;gap:20px;padding-top:12px;border-top:1px solid var(--ab-rule2);font:13.5px var(--ab-serif);color:var(--ab-t3)}
+.ab-end{display:flex;justify-content:space-between;align-items:baseline;gap:20px;padding-top:12px;border-top:1px solid var(--ab-rule2);font:13.5px var(--ab-serif);color:var(--ab-t3)}
 .ab-danger{flex:none;border:0;background:none;padding:0 0 1px;border-bottom:1px solid var(--ab-rule2);color:var(--ab-t2);font:13.5px var(--ab-serif);transition:color .15s,border-color .15s}
 .ab-danger:is(:hover,:focus-visible){color:#e06a74;border-color:var(--ab-red);outline:0}
 .ab-danger:disabled{opacity:.6;cursor:default}
 
-/* ── bottom-right: 支持开发 — the Eris line leads; one plate, tabs pick which code shows ── */
+/* ── 支持开发 — the Eris line leads; one plate, tabs pick which code shows ── */
 .ab-eris{margin:0;font:15px/1.8 var(--ab-serif);color:var(--ab-text)}
 .ab:is(:lang(ja),:lang(en)) .ab-eris{font-size:14px;line-height:1.7}
 .ab-nw{white-space:nowrap}
 .ab:lang(ja) .ab-eris{word-break:normal;line-break:strict}
-.ab:lang(en) .ab-facts{font-size:14px;gap:4px 8px}
 .ab-plate{margin-top:16px;border:1px solid var(--ab-rule2);background:#0a0607}
 .ab-tabs{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 18px;padding:10px 16px 9px;border-bottom:1px solid var(--ab-rule2)}
 .ab-tab{position:relative;padding:2px 0;border:0;background:none;color:var(--ab-t2);font:14px var(--ab-serif);transition:color .15s}
@@ -109,16 +113,16 @@
 :root[data-theme=light] .ab-plate{background:rgba(255,255,255,.62)}
 .ab-player{--ab-text:#f1e0d2;--ab-t2:#c9b2a3;--ab-t3:#a48e81}
 
-/* medium windows: headings sit above their content instead of in a side column */
-@media (max-width:1280px){
- .ab{gap:24px 36px;padding:18px 24px 14px}
- .ab-sec{grid-template-columns:minmax(0,1fr);gap:10px}
- .ab-sec>h2 small{display:inline;margin:0 0 0 10px}
- .ab-cred{gap:10px 24px}
+/* medium windows: the support column takes a little more room so the plate's tabs stay on one line */
+@media (max-width:1440px){
+ .ab{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.15fr);gap:0 36px;padding:22px 24px}
+ .ab-tabs{gap:4px 12px}
 }
 /* narrow windows: one column, reel first */
-@media (max-width:980px){
+@media (max-width:1100px){
  .ab{grid-template-columns:minmax(0,1fr);gap:28px;padding:18px 20px}
- .ab-end{margin-top:22px}
+ .ab-col>:last-child:not(:first-child){margin-top:0}
+ .ab-player{max-width:720px}
 }
 @media (prefers-reduced-motion:reduce){.ab-typed::after{animation:none}}
+

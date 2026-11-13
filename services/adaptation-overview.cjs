@@ -21,7 +21,7 @@ function overview(db,root,{entries=null}={}){
   const seen=Math.max(evidence.lastPlayedAt||0,evidence.hookVerifiedAt||0,evidence.hookReadonlyAt||0,last?.at||0,Date.parse(streams?.at||'')||0)||null;
   /* E563 hook for the probe pipeline: the last local probe (step, reader, lines, pairing) and the adapter pack in use */
   const probe=safe(()=>probeBrief(g.id),null),adapter=packResults?.[g.id]?{tag:packResults[g.id].tag,state:packResults[g.id].state}:null;
-  return {probe,adapter,id:g.id,title:g.title,engine:g.engine||'',hidden:!!g.hidden,available:!!g.available,hookSupport:hook,reading:readingState({characters:g.characters||0,hook,hookVerifiedStream:library.hookVerifiedStream,launched}),zeroLatency:safe(()=>brief(g.id),'unknown'),lastSeenAt:seen,evidence};
+  return {probe,adapter,id:g.id,title:g.title,engine:g.engine||'',hidden:!!g.hidden,available:!!g.available,hookSupport:hook,reading:readingState({characters:g.characters||0,hook,hookVerifiedStream:library.hookVerifiedStream,launched}),zeroLatency:safe(()=>brief(g.id),'unknown'),scriptHarvest:safe(()=>g.executable?require('./script-harvest.cjs').brief(require('node:path').dirname(g.executable)):null,null),lastSeenAt:seen,evidence};
  });
  return {generatedAt:Date.now(),games};
 }
