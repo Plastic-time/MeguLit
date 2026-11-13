@@ -25,7 +25,7 @@ html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.gm-hero,.gm-group,.
  -webkit-backdrop-filter:var(--t-blur);backdrop-filter:var(--t-blur)}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.gm-hero,.gm-group,.stg-glass,.review-card) :is(.gm-group,.stg-glass,.review-card,.gm-stg,.gm-overview){box-shadow:none!important;background:none!important;border-radius:0!important;-webkit-backdrop-filter:none;backdrop-filter:none}
 /* rows and small boxes inside pages: square, ring only */
-html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.sentence-record,.ri-word,.about-qr,.stg-book,.field-search,.guide-block summary,.gm-stg,.gm-overview,.ri-level,.about-qcard,.tool-key-note,.steps){border-radius:var(--t-radius)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.sentence-record,.ri-word,.about-qr,.stg-book,.guide-block summary,.gm-stg,.gm-overview,.ri-level,.about-qcard,.tool-key-note,.steps){border-radius:var(--t-radius)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.sentence-record,.ri-word){-webkit-backdrop-filter:none;backdrop-filter:none}
 
 /* small labels: one mono kicker */
@@ -61,7 +61,7 @@ html:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(dialog.game-dialog,.lv-dia
 
 /* round 2: one N-level tag, square filters and chips, gold progress, red focus, mono kickers */
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.word-jlpt,.ri-badge,.dh-w em){border-radius:0!important;background:transparent!important;border:0!important;font:600 10px/1.7 var(--t-mono)!important;letter-spacing:.1em!important;padding:0 6px!important;font-style:normal!important}
-html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.sentence-filter .tab,.sentence-word,.revisit-chip,.review-card .eyebrow,.library-wall-toggle,.field-search input){border-radius:var(--t-radius)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.sentence-filter .tab,.sentence-word,.revisit-chip,.review-card .eyebrow){border-radius:var(--t-radius)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.review-card .eyebrow,.sentence-source,.sentence-when,.sentence-words .muted,.ri-head em,.ri-status){font-family:var(--t-mono)!important;letter-spacing:var(--t-label-track)!important;font-size:var(--t-label-size)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .sentence-source{color:var(--t-label-color)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .ri-count i{background:var(--t-bar-fill)!important;height:var(--t-bar-h)!important}
@@ -91,7 +91,6 @@ html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .tools-grid{gap:14px!imp
 
 /* round 4: readings and controls are neutral, emphasis lines are red, list rows are cards like the sentence cards */
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.record .word-reading,.word-row .word-reading,.ri-word .word-reading,.dict-home i){color:var(--t-label-color)!important}
-html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main>.field-search{border-color:var(--t-line-2)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.settings-callout,.settings-note,.tool-key-note,.dict-note,.translation-note){border-left-color:var(--t-red)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.guide-panel,.dev-notice) kbd{border-color:var(--t-line-2)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .game-dialog-kicker,html:not(#u):not(#v):not(#w):not(#x):not(#y) body .dev-notice-top>span{color:var(--t-label-color)!important}
@@ -104,7 +103,6 @@ html:not(#u):not(#v):not(#w):not(#x):not(#y) body .game-detail-hero .detail-engi
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .settings-content :is(.tr-conn-head,.tr-shared-head,.settings-section-title,.settings-group-title){color:var(--t-label-color)!important;font-family:var(--t-mono)!important;letter-spacing:var(--t-label-track)!important;font-size:var(--t-label-size)!important;font-weight:500!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .settings-nav .settings-category>summary *{font-family:var(--t-mono)!important;color:inherit!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .tool-card em{font-family:var(--t-mono)!important}
-html:not(#u):not(#v):not(#w):not(#x):not(#y) body .library-wall-toggle[aria-checked=true]{color:var(--t-red)!important;border-color:color-mix(in srgb,var(--t-red) 55%,transparent)!important;background:color-mix(in srgb,var(--t-red) 14%,transparent)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .sentence-record{border-color:var(--t-line)!important;box-shadow:var(--t-ring)!important;background:var(--t-panel)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .record.word-row{padding:18px 22px!important;box-sizing:border-box}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .ri-panel .ri-head em{font:500 11px/1 var(--t-mono)!important;letter-spacing:var(--t-label-track)!important;color:var(--t-red)!important}

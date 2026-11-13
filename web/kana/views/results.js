@@ -54,7 +54,7 @@ el.querySelector("#app").innerHTML=`
   <div class="ribbon"></div>
   <div class="h-main">
    <div class="h-meta"><b>${S.GAME[run.G]}</b> · ${S.DIFF[run.D]}${isRetry?" · 错题再挑战":""} · ${run.ended}</div>
-   <div class="h-score"><span class="n num">${P(A.pct)}</span><span class="rank">${A.rank}</span></div>${A.ap?apSeal():""}
+   <div class="h-score"><span class="n num">${P(A.pct)}</span></div>${A.ap?apSeal():""}
    <div class="record ${newRecord?"new":""}">${isRetry?"错题练习不计入个人最佳":newRecord?(prevBest?`新纪录 · 比之前的 ${P(prevBest.score)} 高 ${diff}%`:"这个难度的第一份成绩"):`个人最佳 ${P(prevBest.score)} · 还差 ${diff}%`}</div>
    <div class="h-stats">
     <div><b class="num">${st.ok}/${st.total}</b>答对</div>
@@ -69,7 +69,7 @@ el.querySelector("#app").innerHTML=`
     ${KD.JUDGES.map(j=>`<div><span class="judge j-${j.split(" ").join("-").toLowerCase()}">${j}</span><b class="num">${A.counts[j]}</b></div>`).join("")}
     <div><span>基础<small>按判定计分，BREAK（易混假名）占 5 倍</small></span><b class="num">${P(A.basePct)}</b></div>
     <div><span>BREAK 奖励<small>${A.breaks?`${A.breaks} 个 BREAK 的平均判定 × 1%`:"本局没有 BREAK，按全部题目计算"}</small></span><b class="num">+${P(A.bonusPct)}</b></div>
-    <div class="sum"><span>达成率 · ${A.rank}</span><b class="num">${P(A.pct)}</b></div>
+    <div class="sum"><span>达成率</span><b class="num">${P(A.pct)}</b></div>
    </div>
   </div>
  </section>
