@@ -82,9 +82,9 @@ class Reader{
   const r=await scanner.inWorker(root,path.join(this.root,'cache','engine-font-scan'));if(!r||this.gamePid!==pid)return;
   for(const file of r.files||[])try{this.fonts.addFile(file,'file');}catch{}
   this.gal?.hooks?.trace?.('engine font scan '+r.engine+': '+JSON.stringify(r.face||r.family||'')+' ('+r.reason+')');try{fs.appendFileSync(path.join(this.root,'logs','engine-font-scan.log'),JSON.stringify({at:new Date().toISOString(),root,engine:r.engine,face:r.face,family:r.family,reason:r.reason,files:r.files})+'\n');}catch{}
-  if(r.face||r.family)this.engineFont({type:'hookFont',engine:r.engine,face:r.face||'',family:r.family,scanned:true});}catch{}}
+  if(r.face||r.family)this.engineFont({type:'hookFont',engine:r.engine,face:r.face||'',family:r.family,scanned:true,bold:typeof r.bold==='boolean'?r.bold:undefined,size:r.size});}catch{}}
  applyEngineFont(message){const g=this.gal;const choice=require('../core/engine-font.cjs').pick({face:message.face,prerendered:message.prerendered,family:message.family,fonts:this.fonts?.current?.fonts});if(!choice)return null;
-  const values={japaneseFont:choice.key,japaneseFontSource:'game'};if(message.probe&&typeof message.bold==='boolean')values.japaneseBold=message.bold;
+  const values={japaneseFont:choice.key,japaneseFontSource:'game'};if((message.probe||message.scanned)&&typeof message.bold==='boolean')values.japaneseBold=message.bold;
   if(Object.keys(values).some(k=>g.preferences?.[k]!==values[k]))g.save({...g.preferences,...values});this.runtime.emit('reader-event',{type:'enginePreferences',values});
   this.gal.hooks?.trace?.('engine font '+JSON.stringify(choice.face)+(message.size?' '+message.size+'px':'')+(message.engine?' via '+message.engine:'')+(message.prerendered?' pfont='+message.prerendered:'')+' -> '+choice.key+' ('+choice.reason+')');return values;}
  engineFontFile(message){try{if(!this.fonts||!message?.path)return;const go=()=>{const added=this.fonts.addFile(String(message.path),message.kind==='mem'?'mem':'file');if(added?.length){this.gal?.hooks?.trace?.('game font loaded from '+(message.kind==='mem'?'memory':'file')+': '+added.map(f=>f.family).join(', '));const seen=this.engineFontSeen;if(seen&&seen.pid===this.gamePid&&this.gal?.preferences?.japaneseFontSource!=='user')this.applyEngineFont(seen.message);}};

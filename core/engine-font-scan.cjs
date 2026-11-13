@@ -139,7 +139,10 @@ function scan(root,cacheDir){const engine=engineOf(root);if(!engine)return null;
   if(ranked.length){const best=ranked[0];return {engine,face:best.family,files:[save(dir,best,'unity')],reason:'embedded '+best.source,candidates};}
   const tmp=sdf.filter(n=>!/^(liberation ?sans|arial|tinos)$/i.test(n));const jp=tmp.find(n=>JP_NAME.test(n)&&!OTHER_LANG.test(n))||tmp.find(n=>!OTHER_LANG.test(n)&&!DECOR.test(n));
   return jp?{engine,face:jp.replace(/[-_ ](regular|medium|bold|r|m|b)$/i,'').replace(/([a-z])([A-Z])/g,'$1 $2'),files:[],reason:'tmp sdf name',candidates,sdf:tmp}:{engine,face:'',files:[],reason:'no japanese font',candidates,sdf:tmp};}
- if(engine==='mages'){const m=mages(root);if(!m)return {engine,face:'',files:[],reason:'no atlas'};return {engine,face:'',family:m.family,files:[],reason:'atlas '+m.atlas+' stroke ratio '+m.ratio.toFixed(2),atlas:m};}
+ if(engine==='mages'){const m=mages(root);if(!m)return {engine,face:'',files:[],reason:'no atlas'};/* E532: the closest installed face, drawn glyph by glyph against the atlas (core/mages-font.cjs + services/font-match.ps1);
+   the stroke-ratio family stays the fallback when nothing installed scores >= 0.8. */
+  let near={face:''};try{const mf=require('./mages-font.cjs'),job=mf.sample(root);if(job)near={...mf.closest(mf.matchSync(job,dir)),size:job.cell};}catch{}
+  return {engine,face:near.face||'',family:m.family,bold:near.face?near.bold:undefined,size:near.size,files:[],reason:'atlas '+m.atlas+' stroke ratio '+m.ratio.toFixed(2)+(near.face?' ~ '+near.face+' '+near.score:''),atlas:m,candidates:near.candidates};}
  if(engine==='renpy'){const r=renpy(root);if(!r)return null;for(const n of r.named){const f=r.resolve(n.file);if(!f)continue;let buf;try{buf=f.read();}catch{continue;}const c=candidate(buf,f.rel);if(c.kana<80)continue;return {engine,face:c.family,files:[save(dir,c,'renpy')],reason:'gui.'+n.key+' = '+n.file,named:r.named};}
   /* no script names a Japanese font: the Japanese font file the game ships (game-fonts' own scan imports loose ones) */
   for(const f of r.files){let buf;try{buf=f.read();}catch{continue;}const c=candidate(buf,f.rel);if(c.score===null)continue;return {engine,face:c.family,files:[save(dir,c,'renpy')],reason:'bundled '+f.rel,named:r.named};}
@@ -147,7 +150,7 @@ function scan(root,cacheDir){const engine=engineOf(root);if(!engine)return null;
  return null;}
 /* cached per game folder (a Unity scan reads hundreds of MB once) */
 function cached(root,cacheDir){const file=path.join(cacheDir,'engine-font-scan.json');let all={};try{all=JSON.parse(fs.readFileSync(file,'utf8'))||{};}catch{}const key=root.toLowerCase();const hit=all[key];
- if(hit&&hit.version===1&&(hit.files||[]).every(f=>fs.existsSync(f)))return hit;const result=scan(root,cacheDir);if(!result)return null;const keep={version:1,...result};
+ if(hit&&hit.version===2&&(hit.files||[]).every(f=>fs.existsSync(f)))return hit;const result=scan(root,cacheDir);if(!result)return null;const keep={version:2,...result};
  try{fs.mkdirSync(cacheDir,{recursive:true});all[key]=keep;fs.writeFileSync(file,JSON.stringify(all,null,1));}catch{}return keep;}
 /* run in a worker thread so the reader service keeps answering while hundreds of MB are read */
 function inWorker(root,cacheDir){return new Promise(resolve=>{try{const {Worker}=require('node:worker_threads');const w=new Worker(__filename,{workerData:{engineFontScan:{root,cacheDir}}});let done=false;const end=v=>{if(!done){done=true;resolve(v);}};w.once('message',end);w.once('error',()=>end(null));w.once('exit',()=>end(null));}catch{resolve(null);}});}
