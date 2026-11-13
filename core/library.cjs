@@ -133,7 +133,8 @@ const ENGINE_EXE=/^(BGI|SiglusEngine|RealLive|AdvHD|cs2|malie|Game|nscr|LiveMake
 /* A Steam folder ships the steam_api DLL of the bitness its game is built for; an exe of the other bitness there (Summer
    Pockets: a stray x64 SummerPocketsRB.exe beside SiglusEngine_Steam.exe and a 32-bit steam_api.dll) cannot start, so the
    hook would attach to nothing and embedding fell back to read only. */
-function peBits(file){try{const fd=fs.openSync(file,'r'),b=Buffer.alloc(0x400);try{fs.readSync(fd,b,0,b.length,0);}finally{fs.closeSync(fd);}const o=b.readUInt32LE(0x3c);if(o+6>b.length||b.toString('latin1',o,o+4)!=='PE\0\0')return 0;const m=b.readUInt16LE(o+4);return m===0x14c?32:m===0x8664||m===0xaa64?64:0;}catch{return 0;}}
+/* E580 kit.peInfo */
+function peBits(file){const i=require('../services/original-engines/kit.cjs').peInfo(file);return i&&i.pe?i.bits:0;}
 function steamBits(names){const has=re=>names.some(n=>re.test(n)),a32=has(/^steam_api\.dll$/i),a64=has(/^steam_api64\.dll$/i);return a32&&!a64?32:a64&&!a32?64:0;}
 const SKIP_EXE=/^(unins|uninstall|setup|install|config|settings?|launcher_?config|crashpad|crash|unitycrashhandler|dxsetup|vcredist|dotnet|redist|notification_helper|steamerrorreporter|easyanticheat|ue4prereq|update|patch|register|cefsharp|7z|reg|eosbootstrapper|vc_redist)/i;
 

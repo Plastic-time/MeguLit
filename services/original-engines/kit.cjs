@@ -163,6 +163,12 @@ function table(file,spec,{maxIndex=64<<20}={}){const fsz=size(file);if(fsz<8)ret
 const entryRead=(file,e)=>readAt(file,e.offset,e.size);
 /* E578 a resource of a Windows executable: type and name are strings ("EXEC") or numbers; the first language. Engines
    that compile their scenario into the .exe (Malie EXEC, …) keep it here. -> Buffer or null */
+/* E580 a program's PE header: null when the file cannot be read; machine 0 when it is not a PE image. bits 32 / 64 / 0,
+   program: an executable image that is not a DLL (library, kirikiri-cold, voice-cold, patch-swap read this alike) */
+function peInfo(file){let b;try{b=readAt(file,0,0x1000);}catch{return null;}if(b.length<0x40)return {machine:0,bits:0,program:false,raw:b};
+ const o=b.readUInt32LE(0x3c);let h=o+24<=b.length?b.subarray(o,o+24):null;if(!h){try{h=readAt(file,o,24);}catch{h=Buffer.alloc(0);}}
+ if(b.readUInt16LE(0)!==0x5a4d||h.length<24||h.readUInt32LE(0)!==0x4550)return {machine:h.length>=6?h.readUInt16LE(4):0,bits:0,program:false,pe:false};
+ const machine=h.readUInt16LE(4),attr=h.readUInt16LE(22);return {machine,bits:machine===0x14c?32:machine===0x8664||machine===0xaa64?64:0,program:!!(attr&2)&&!(attr&0x2000),pe:true};}
 function peResource(file,type,name=null){try{const mz=readAt(file,0,0x40);if(mz.toString('latin1',0,2)!=='MZ')return null;const pe=mz.readUInt32LE(0x3c),h=readAt(file,pe,0x200);if(h.toString('latin1',0,4)!=='PE  ')return null;
  const nsec=h.readUInt16LE(6),opt=h.readUInt16LE(20),o=24,magic=h.readUInt16LE(o),dd=o+(magic===0x20b?112:96),rva=h.readUInt32LE(dd+2*8);if(!rva)return null;
  const secs=readAt(file,pe+24+opt,nsec*40);let sec=null;for(let i=0;i<nsec;i++){const va=secs.readUInt32LE(i*40+12),vs=Math.max(secs.readUInt32LE(i*40+8),secs.readUInt32LE(i*40+16));if(rva>=va&&rva<va+vs)sec={va,raw:secs.readUInt32LE(i*40+20),size:vs};}
@@ -248,6 +254,6 @@ function engine(def){const A=def.archives;
   const list=[...out.values()];return A?.sort===false?list:list.sort((a,b)=>a.name.localeCompare(b.name));};
  return {id:def.id,hint:def.hint,scenes,archives:def.overlay===false?()=>[]:scenes,sources:dir=>[...arcFiles(dir),...looseFiles(dir)],parse:buf=>{try{return def.parse(Buffer.isBuffer(buf)?buf:Buffer.from(buf));}catch{return {lines:[],anchors:[]};}},test:def.test||(n=>!!def.loose&&def.loose.name.test(n)),...(def.extra||{})};}
 
-module.exports={readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,encodeSjis,
+module.exports={peInfo,readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,encodeSjis,
  xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,lzDistance,SIGLUS_TOKEN,inflate,inflateRaw,zstd,unpackAny,huffman,table,entryRead,peResource,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine,
  sjisWeights,gbkWeights,textScore,xorKeyByColumns};

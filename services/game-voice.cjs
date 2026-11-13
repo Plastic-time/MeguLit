@@ -31,18 +31,15 @@ function kind(b){if(!b||b.length<12)return null;const h=b.toString('latin1',0,4)
  if(h.startsWith('ID3')||(b[0]===0xff&&(b[1]&0xe0)===0xe0))return {ext:'.mp3',mime:'audio/mpeg'};if(b.toString('latin1',4,8)==='ftyp')return {ext:'.m4a',mime:'audio/mp4'};return null;}
 
 /* ---- where a voice name is stored in a game folder ---- */
-function walk(dir,depth=4,out=[]){let list;try{list=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
- for(const e of list){const p=path.join(dir,e.name);if(e.isDirectory()){if(depth>0&&!/^(?:\.git|node_modules|savedata|save)$/i.test(e.name))walk(p,depth-1,out);}else out.push(p);}return out;}
+/* E580 kit.walk: every file, these folders skipped */
+const walk=(dir,depth=4,out=[])=>require('./original-engines/kit.cjs').walk(dir,depth,()=>true,out,/^(?:\.git|node_modules|savedata|save)$/i);
 const base=name=>path.basename(String(name).replace(/\\/g,'/')).replace(/\.[^.]+$/,'').toLowerCase();
-// AdvHD .arc: extension table, then 9- or 13-byte names with size and offset (offsets count from the end of the index).
-function arcList(file){let fd;try{fd=fs.openSync(file,'r');const size=fs.fstatSync(fd).size,head=Buffer.alloc(Math.min(size,8<<20));fs.readSync(fd,head,0,head.length,0);
- const n=head.readInt32LE(0);if(n<=0||n>0xff)return null;const exts=[];for(let i=0;i<n;i++){const p=4+i*12;const ext=head.toString('latin1',p,p+4).replace(/\0.*$/s,'');if(!/^[A-Za-z0-9]{1,4}$/.test(ext))return null;exts.push({ext,count:head.readUInt32LE(p+4),dir:head.readUInt32LE(p+8)});}
- const tryWidth=w=>{const out=[];for(const e of exts){let d=e.dir;for(let i=0;i<e.count;i++){if(d+w+8>head.length)return null;const name=head.toString('latin1',d,d+w).replace(/\0.*$/s,''),s=head.readUInt32LE(d+w),o=head.readUInt32LE(d+w+4);if(!name||o+s>size)return null;out.push({name:name+'.'+e.ext.toLowerCase(),size:s,offset:o});d+=w+8;}}return out;};
- return tryWidth(9)||tryWidth(13);}catch{return null;}finally{if(fd!==undefined)try{fs.closeSync(fd);}catch{}}}
+// AdvHD .arc: the AdvHD reader's index parser (E580)
+const arcList=file=>{try{return require('./original-engines/advhd.cjs').listFile(file);}catch{return null;}};
 // RealLive / Siglus .ovk: count, then {size, offset, id, samples} per clip; every clip is an Ogg stream.
 function ovkList(file){let fd;try{fd=fs.openSync(file,'r');const size=fs.fstatSync(fd).size,h=Buffer.alloc(4);fs.readSync(fd,h,0,4,0);const n=h.readUInt32LE(0);if(!n||n>100000||4+n*16>size)return null;
  const t=Buffer.alloc(n*16);fs.readSync(fd,t,0,t.length,4);const out=[];for(let i=0;i<n;i++){const s=t.readUInt32LE(i*16),o=t.readUInt32LE(i*16+4),id=t.readUInt32LE(i*16+8);if(o+s>size)return null;out.push({id,size:s,offset:o});}return out;}catch{return null;}finally{if(fd!==undefined)try{fs.closeSync(fd);}catch{}}}
-function slice(file,offset,size){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(size);fs.readSync(fd,b,0,size,offset);return b;}finally{fs.closeSync(fd);}}
+const slice=(file,offset,size)=>require('./original-engines/kit.cjs').readAt(file,offset,size);/* E580 */
 // Every voice clip a folder holds: name (no extension, lower case) -> a reader. Archives are listed once.
 /* E461 a clip is listed under its name and under "folder/name" (its last folder): scripts that name a folder find that
    folder's clip even when another folder holds a file of the same name; a bare name still finds the first one. */

@@ -16,18 +16,15 @@ const KEYS={
 function decrypt(key,iv,data){const d=crypto.createDecipheriv('aes-256-cbc',key,iv);d.setAutoPadding(false);return Buffer.concat([d.update(data),d.final()]);}
 const head=file=>kit.head(file,0x20);
 // The key that turns the first index block into a plausible entry (flag, short name length, printable name).
-function findKey(file){const h=head(file);if(h.toString('latin1',0,4)!=='NPK2')return null;const fd=fs.openSync(file,'r');let blk;try{blk=Buffer.alloc(32);fs.readSync(fd,blk,0,32,0x20);}finally{fs.closeSync(fd);}
+function findKey(file){const h=head(file);if(h.toString('latin1',0,4)!=='NPK2')return null;const blk=kit.readAt(file,0x20,32);
  for(const [title,v] of Object.entries(KEYS)){const key=Buffer.from(v.key,'hex'),p=decrypt(key,h.subarray(8,24),blk),n=p.readUInt16LE(1);
   if(p[0]<=1&&n>0&&n<=0x104&&/^[\x20-\x7e]{4}/.test(p.toString('latin1',3,7)))return {title,key};}
  return null;}
 function list(file,key){const h=head(file),iv=h.subarray(8,24),count=h.readUInt32LE(0x18),size=h.readUInt32LE(0x1c);
  if(!key){const k=findKey(file);if(!k)return null;key=k.key;}
- const fd=fs.openSync(file,'r');let enc;try{enc=Buffer.alloc(size);fs.readSync(fd,enc,0,size,0x20);}finally{fs.closeSync(fd);}
- const idx=decrypt(key,iv,enc),out=[];let p=0;
- for(let i=0;i<count;i++){p++;const n=idx.readUInt16LE(p);p+=2;const name=idx.toString('utf8',p,p+n);p+=n;const unpacked=idx.readUInt32LE(p);p+=4+32;const segs=idx.readInt32LE(p);p+=4;const s=[];
-  for(let j=0;j<segs;j++){s.push({offset:Number(idx.readBigInt64LE(p)),aligned:idx.readUInt32LE(p+8),size:idx.readUInt32LE(p+12),unpacked:idx.readUInt32LE(p+16)});p+=20;}
-  out.push({name,unpacked,read:()=>read(file,key,iv,s)});}
- return out;}
+ /* E580 the index parser is the Saya port's (core/nitroplus-npk.cjs npkIndex) */
+ let entries;try{entries=require('../../core/nitroplus-npk.cjs').npkIndex(decrypt(key,iv,kit.readAt(file,0x20,size)),count,kit.size(file));}catch{return null;}
+ return entries.map(e=>{const s=e.segments.map(x=>({offset:x.offset,aligned:x.stored,size:x.size,unpacked:x.unpacked}));return {name:e.name,unpacked:e.length,read:()=>read(file,key,iv,s)};});}
 function read(file,key,iv,segs){const fd=fs.openSync(file,'r');try{return Buffer.concat(segs.map(s=>{const b=Buffer.alloc(s.aligned);fs.readSync(fd,b,0,s.aligned,s.offset);const plain=decrypt(key,iv,b).subarray(0,s.size);return s.size<s.unpacked?zlib.inflateRawSync(plain):plain;}));}finally{fs.closeSync(fd);}}
 /* Scenes: media/script/nut/*.nut in script.npk, compiled Squirrel ("SCRP" ... "RIQS"). String literals are
    0x08000010, length, UTF-8. Message text starts with CRLF; a spoken line is "//【名前】" CRLF "<voice ...>" CRLF 「…」.

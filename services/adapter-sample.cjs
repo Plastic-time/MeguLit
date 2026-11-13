@@ -27,8 +27,8 @@ const d=require('./desensitize.cjs');
 const MAX_BUNDLE=8<<20,CHUNK=512*1024,SAMPLE_HEAD=8<<20,SAMPLE_TAIL=8<<20,SCRIPT_MAX=16<<20,PER_GAME_SAMPLES=8,SAMPLE_PACKED_MAX=2<<20,GAME_RAW_MAX=64<<20,GAME_MS=80000,MIN_WINDOW=64*1024;
 const outbox=root=>path.join(root,'data','adapter-probe','outbox');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
-function readHead(file,n){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(n);const k=fs.readSync(fd,b,0,n,0);return b.subarray(0,k);}finally{fs.closeSync(fd);}}
-function readRange(file,at,n){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(n);const k=fs.readSync(fd,b,0,n,at);return b.subarray(0,k);}finally{fs.closeSync(fd);}}
+const readHead=(file,n)=>require('./original-engines/kit.cjs').readAt(file,0,n);/* E580 */
+const readRange=(file,at,n)=>require('./original-engines/kit.cjs').readAt(file,at,n);/* E580 */
 
 /* ---- worker side ------------------------------------------------------------------------------------------------ */
 const SCRIPTY=/script|scenario|scene|scn|story|text|txt|msg|data|sys|main|game/i;

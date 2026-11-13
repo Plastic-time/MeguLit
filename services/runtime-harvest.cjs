@@ -94,7 +94,7 @@ function englishProse(buf){const ascii=Buffer.from(buf).toString('latin1');for(c
 const hex=b=>Buffer.from(b).toString('hex');
 const b64u32=list=>{const b=Buffer.alloc(list.length*4);list.forEach((v,i)=>b.writeUInt32LE(v>>>0,i*4));return b.toString('base64');};
 const magicHex=h=>Buffer.from(h.subarray(0,8).map(b=>b>=0x80?0x3f:b)).toString('hex');
-function readHead(file,n){try{const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(n);const k=fs.readSync(fd,b,0,n,0);return b.subarray(0,k);}finally{fs.closeSync(fd);}}catch{return Buffer.alloc(0);}}
+const readHead=(file,n)=>require('./original-engines/kit.cjs').head(file,n);/* E580 */
 const KIND_CODES={opaque:'o',text:'t',data:'d',png:'p',ogg:'g',riff:'w',jpeg:'j',bmp:'b',zip:'z',psb:'s',tjs2:'c',zlib:'l',utf16:'u',utf8:'8'};
 /* local findings (runtime-harvest-scan finish()) → the uploadable form + what was dropped */
 function publicize(local,{dumps=[]}={}){

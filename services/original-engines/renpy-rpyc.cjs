@@ -83,9 +83,14 @@ const rpaRead=(file,e)=>Buffer.concat([e.prefix,kit.readAt(file,e.offset,Math.ma
 
 /* ---- rpyc ------------------------------------------------------------------------------------------------------ */
 const isRpyc=buf=>buf.length>10&&(buf.toString('latin1',0,10)==='RENPY RPC2'||buf[0]===0x78);
-function statements(buf){let data=null;
- if(buf.toString('latin1',0,10)==='RENPY RPC2'){let p=10;while(p+12<=buf.length){const slot=buf.readUInt32LE(p),start=buf.readUInt32LE(p+4),len=buf.readUInt32LE(p+8);p+=12;if(!slot)break;if(slot===1){data=zlib.inflateSync(buf.subarray(start,start+len));break;}}}
- else data=zlib.inflateSync(buf);
+/* the pickled bytes of a .rpyc: slot 1 (or, with all, every slot joined: the font scan reads them all) */
+function data(buf,{all=false}={}){
+ if(buf.toString('latin1',0,10)!=='RENPY RPC2')return zlib.inflateSync(buf);
+ const parts=[];let p=10;while(p+12<=buf.length){const slot=buf.readUInt32LE(p),start=buf.readUInt32LE(p+4),len=buf.readUInt32LE(p+8);p+=12;if(!slot)break;
+  if(all){try{parts.push(zlib.inflateSync(buf.subarray(start,start+len)));}catch{}}else if(slot===1)return zlib.inflateSync(buf.subarray(start,start+len));}
+ return parts.length?Buffer.concat(parts):null;}
+function statements(buf){return statementsOf(data(buf));}
+function statementsOf(data){
  if(!data)return [];const v=unpickle(data);const stmts=Array.isArray(v)&&v.tuple?v[1]:v;return Array.isArray(stmts)?stmts:[];}
 const short=c=>String(c||'').replace(/^renpy\.(?:ast|sl2\.slast|atl)\./,'');
 const str=v=>typeof v==='string'?v:Buffer.isBuffer(v)?v.toString('utf8'):null;
@@ -124,4 +129,4 @@ function scripts(gameDir,{tl=false}={}){const out=new Map();const inTl=rel=>/(^|
   for(const [name,e] of idx){if(!/\.rpyc$/i.test(name)||inTl(name)!==tl)continue;out.set(name.replace(/c$/i,'').toLowerCase(),{rel:name,read:()=>rpaRead(a,e),source:a});}}
  for(const f of walkFiles(gameDir,4,n=>/\.rpyc$/i.test(n))){const rel=path.relative(gameDir,f).replace(/\\/g,'/');if(inTl(rel)!==tl)continue;out.set(rel.replace(/c$/i,'').toLowerCase(),{rel,read:()=>fs.readFileSync(f),source:f});}
  return out;}
-module.exports={unpickle,rpaHeader,rpaIndex,rpaRead,isRpyc,statements,walk,parse,translations,scripts,PyObj};
+module.exports={data,unpickle,rpaHeader,rpaIndex,rpaRead,isRpyc,statements,walk,parse,translations,scripts,PyObj};

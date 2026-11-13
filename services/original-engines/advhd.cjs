@@ -10,10 +10,10 @@
 const fs=require('node:fs'),path=require('node:path');
 const sj=new TextDecoder('shift_jis');
 const PROSE=/[ぁ-ゖァ-ヺ一-龯]/;
-function list(b){if(b.length<16)return null;const n=b.readInt32LE(0);if(n<=0||n>0xff||4+n*12>b.length)return null;const exts=[];
+function list(b,fileSize=b.length){if(b.length<16)return null;const n=b.readInt32LE(0);if(n<=0||n>0xff||4+n*12>b.length)return null;const exts=[];
  for(let i=0;i<n;i++){const p=4+i*12,ext=b.toString('latin1',p,p+4).replace(/\0.*$/s,'');if(!/^[A-Za-z0-9]{1,4}$/.test(ext))return null;exts.push({ext,count:b.readUInt32LE(p+4),dir:b.readUInt32LE(p+8)});}
  const read=size=>{const out=[];for(const e of exts){let d=e.dir;for(let i=0;i<e.count;i++){if(d+size+8>b.length)return null;const name=b.toString('latin1',d,d+size).replace(/\0.*$/s,'');
-   const s=b.readUInt32LE(d+size),o=b.readUInt32LE(d+size+4);if(!name||o+s>b.length)return null;out.push({name:name+'.'+e.ext.toLowerCase(),size:s,offset:o});d+=size+8;}}return out;};
+   const s=b.readUInt32LE(d+size),o=b.readUInt32LE(d+size+4);if(!name||o+s>fileSize)return null;out.push({name:name+'.'+e.ext.toLowerCase(),size:s,offset:o});d+=size+8;}}return out;};
  return read(9)||read(13);}
 function decode(raw){const d=Buffer.from(raw);for(let i=0;i<d.length;i++)d[i]=((d[i]>>>2)|(d[i]<<6))&255;return d;}
 function cstr(d,p){const e=d.indexOf(0,p);return e<0?null:{s:d.subarray(p,e),next:e+1};}
@@ -45,4 +45,6 @@ const engine={
  parse,test:n=>/\.wsc$/i.test(n),
  _internal:{list,decode},
 };
-module.exports={parse,decode,list,engine};
+/* E580 an archive's index without reading the whole file (the voice catalogue: voice archives are large) */
+const listFile=file=>{const kit=require('./kit.cjs');return list(kit.head(file,8<<20),kit.size(file));};
+module.exports={parse,decode,list,listFile,engine};
