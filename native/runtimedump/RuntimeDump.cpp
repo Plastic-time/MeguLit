@@ -784,7 +784,7 @@ bool DumpSkipped(const wchar_t *path) { try { return !path || Skipped(path); } c
 // MinHook freezes every other thread while it patches, then calls CloseHandle, VirtualProtect, heap functions on this
 // thread. A frozen thread may hold Gate (inside one of our hooks), so while MinHook runs this thread is marked as
 // inside MeguLit: all our hooks just call through and never wait for Gate (2026-11-14, mem-voice-api deadlock).
-bool DumpHook(void *target, void *detour, void **original) { DumpScope scope; return target && MH_CreateHook(target, detour, original) == MH_OK && MH_EnableHook(target) == MH_OK; }
+bool DumpHook(void *target, void *detour, void **original) { DumpScope scope; if (!target || MH_CreateHook(target, detour, original) != MH_OK) return false; if (MH_EnableHook(target) == MH_OK) return true; MH_RemoveHook(target); return false; }
 void DumpUnhook(void *target) { DumpScope scope; if (target) MH_DisableHook(target); }
 // Self-test only (MEGULIT_DUMP_SELFTEST=1 in the game's environment, set by selftest/fakegame.h), never used by MeguLit:
 //  1 = hold Gate for ms milliseconds on the calling thread, as a game thread inside one of our hooks would;

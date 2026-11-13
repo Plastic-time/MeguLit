@@ -20,7 +20,8 @@
 #include <map>
 #include <deque>
 #include <memory>
-#include "../minhook/include/MinHook.h"
+#include "dump_api.h"
+#include "../minhook/include/MinHook.h" // MH_Initialize only; hooks go through DumpHook
 
 namespace voicefile {
 wchar_t Dir[1024], OutDir[1024];
@@ -64,8 +65,7 @@ bool Put(const wchar_t *name, const void *a, DWORD an) {
 }
 void *Hooked[8]; volatile LONG HookedN;
 bool Hk(void *t, void *d, void **o) {
- if (!t || MH_CreateHook(t, d, o) != MH_OK) return false;
- if (MH_EnableHook(t) != MH_OK) { MH_RemoveHook(t); return false; }
+ if (!t || !DumpHook(t, d, o)) return false; // through the core (deadlock guard)
  LONG i = InterlockedIncrement(&HookedN) - 1; if (i < 8) Hooked[i] = t;
  return true;
 }
@@ -74,7 +74,7 @@ void Fault(const char *where) { // no heap, no lock
  InterlockedIncrement(&Faults);
  char line[160]; int n = sprintf_s(line, "fault in file %s at %llu\r\n", where, NowMs());
  if (n > 0) AppendRaw(L"disabled.txt", line, (DWORD)n);
- for (LONG i = 0; i < HookedN && i < 8; i++) MH_DisableHook(Hooked[i]);
+ for (LONG i = 0; i < HookedN && i < 8; i++) DumpUnhook(Hooked[i]);
 }
 bool Readable(const void *p, size_t n) {
  const char *a = (const char *)p, *end = a + n;

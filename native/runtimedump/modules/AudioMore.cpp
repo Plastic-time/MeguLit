@@ -35,7 +35,7 @@
 #include <vector>
 #include <map>
 #include "modules.h"
-#include "../minhook/include/MinHook.h"
+#include "dump_api.h"
 
 void AudioMoreStart(const wchar_t *out);
 void AudioMoreTick();
@@ -181,11 +181,12 @@ void HookMethod(void *obj, int index, void *detour) {
  try {
   Held h(&HookLock);
   for (LONG i = 0; i < Used; i++) if (Slots[i].target == t) return;
-  void *tramp = NULL;
-  if (Used < 128 && MH_CreateHook(t, detour, &tramp) == MH_OK) {
-   Slots[Used].target = t; Slots[Used].tramp = tramp;
+  if (Used < 128) {
+   // The slot is published before the hook goes live (the detour looks its trampoline up by target); DumpHook (core
+   // deadlock guard) writes the trampoline into it before enabling.
+   LONG k = Used; Slots[k].target = t; Slots[k].tramp = NULL;
    MemoryBarrier(); InterlockedIncrement(&Used);
-   bool on = MH_EnableHook(t) == MH_OK;
+   bool on = DumpHook(t, detour, &Slots[k].tramp);
    char line[96]; sprintf_s(line, "%s method %d at %p", on ? "hooked" : "could not enable", index, t); Note(line);
   }
  } catch (...) {}
@@ -424,7 +425,7 @@ void HookWwise(HMODULE m) {
   const char *n = (const char *)(base + names[i]);
   if (!strstr(n, "PostEvent") || strstr(n, "PostEventCallback") || strstr(n, "PostEventOn")) continue;
   void *fn = base + fns[ords[i]];
-  bool ok = MH_CreateHook(fn, PostHooks[PostUsed], (void **)&OPost[PostUsed]) == MH_OK && MH_EnableHook(fn) == MH_OK;
+  bool ok = DumpHook(fn, (void *)PostHooks[PostUsed], (void **)&OPost[PostUsed]);
   if (ok) PostUsed++;
   Note(std::string(ok ? "hooked " : "could not hook ") + n);
  }
@@ -452,7 +453,7 @@ bool HookOne(HMODULE m, const char *name, void *detour, void **original) {
  void *fn = (void *)GetProcAddress(m, name);
  if (!fn) return false;
  for (void *t : HookedTargets) if (t == fn) { Note(std::string("already hooked ") + name); return false; }
- bool ok = MH_CreateHook(fn, detour, original) == MH_OK && MH_EnableHook(fn) == MH_OK;
+ bool ok = DumpHook(fn, detour, original);
  if (ok) HookedTargets.push_back(fn);
  Note(std::string(ok ? "hooked " : "could not hook ") + name);
  return ok;
@@ -579,7 +580,7 @@ void AudioMoreStart(const wchar_t *out) {
  Crc32 = (Crc32Fn)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlComputeCrc32");
  HookExports(false);
  void *ldr = (void *)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "LdrLoadDll");
- if (ldr && MH_CreateHook(ldr, (void *)HLdrLoad, (void **)&OLdrLoad) == MH_OK) MH_EnableHook(ldr);
+ if (ldr) DumpHook(ldr, (void *)HLdrLoad, (void **)&OLdrLoad);
 }
 // Every ~120 ms on the dump thread: hooks modules loaded since, cuts static OpenAL plays, closes quiet clips, writes them.
 void AudioMoreTick() {

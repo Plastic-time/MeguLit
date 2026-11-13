@@ -31,7 +31,8 @@
 #include <map>
 #include <list>
 #include <memory>
-#include "../minhook/include/MinHook.h"
+#include "dump_api.h"
+#include "../minhook/include/MinHook.h" // MH_Initialize only; hooks go through DumpHook
 
 bool VoiceFileNameFor(ULONGLONG start, std::wstring &name); // modules/VoiceFile.cpp
 
@@ -80,8 +81,7 @@ bool Put(const wchar_t *name, const void *a, DWORD an, const void *b, DWORD bn) 
 }
 void *Hooked[48]; volatile LONG HookedN;
 bool Hk(void *t, void *d, void **o) {
- if (!t || MH_CreateHook(t, d, o) != MH_OK) return false;
- if (MH_EnableHook(t) != MH_OK) { MH_RemoveHook(t); return false; }
+ if (!t || !DumpHook(t, d, o)) return false; // through the core: threads are marked inside while MinHook freezes them
  LONG i = InterlockedIncrement(&HookedN) - 1; if (i < 48) Hooked[i] = t;
  return true;
 }
@@ -91,7 +91,7 @@ void Fault(const char *where) {
  InterlockedIncrement(&Faults);
  char line[160]; int n = sprintf_s(line, "fault in %s at %llu\r\n", where, NowMs());
  if (n > 0) AppendRaw(L"disabled.txt", line, (DWORD)n);
- for (LONG i = 0; i < HookedN && i < 48; i++) MH_DisableHook(Hooked[i]);
+ for (LONG i = 0; i < HookedN && i < 48; i++) DumpUnhook(Hooked[i]);
 }
 // Copies game memory without ever faulting in the game: committed, readable, no guard page, through ReadProcessMemory.
 bool Readable(const void *p, size_t n) {
