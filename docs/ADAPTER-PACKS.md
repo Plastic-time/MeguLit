@@ -86,7 +86,11 @@ placeholders. The upload is the exact stored bundle whose sha256 the user saw.
 * **grammar**: `lines` (decode, then per line `skip` / `anchor` / `strip` / `text` (group 1) / `name` / `join`) or
   `strings` (bytecode: `opcode` hex, then `u8|u16le|u32le` length or `zero` terminated).
 * **params**: extra entries for readers MeguLit already has (`cx-scheme` → `cx-filter.cjs`, `paz-scheme` → `paz.cjs`,
-  `malie-scheme` → `malie.cjs`: `{title, cipher: "camellia" | "cfi", key: hex, align, rotate: [4 words] for cfi}`).
+  `malie-scheme` → `malie.cjs`: `{title, cipher: "camellia" | "cfi", key: hex, align, rotate: [4 words] for cfi}`,
+  `qlie-key` → `qlie.cjs`: `{gameKey: hex of 256 bytes}` (QLIE 3.0 packs with key.fkey whose exe has no IconKeyImage),
+  `entis-key` → `entis.cjs`: `{password, archive?}` (NOA BSHF password when the exe has no IDR_COTOMI),
+  `marble-key` → `marble.cjs`: `{key}` (cp932 text) or `{hex}`). Readers try every candidate and keep the one whose
+  scripts decode to text, so one pack can carry keys for many titles.
 * Regular expressions: at most 300 characters, no backreferences or lookbehind, no quantified group that holds a
   quantifier or `|`; lines are cut at 4096 characters. Reads are capped (20 000 files, 64 MiB a file, 512 MiB a game,
   64 MiB inflated).

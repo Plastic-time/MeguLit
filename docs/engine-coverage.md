@@ -35,13 +35,13 @@ MeguLit 对一款游戏的支持分三层：
 | Majiro | 265 | 205 | 21 | ✅ 扩展（任何名字的 MajiroArc） | 🆕 majiro.cjs：MajiroArcV1–V3 + .mjo 字节码精确遍历 | ✅ |  |
 | Malie | 205 | 204 | 82 | ✅（已知密钥能开 data*.dat） | ✅ malie.cjs：LIB/LIBU/LIBP 原生，43 个作品密钥（Camellia/CFI）+ 适配包 malie-scheme，EXEC 消息表逐行 | ✅ | Karin（乙女）用（E578） |
 | NeXAS (Giga) | 199 | 197 | 147 | ✅ 扩展（script.pac 且非 Softpal） | ✅ nexas.cjs：PAC（Huffman 索引、LZSS/Huffman/zlib/zstd）+ .bin 串表逐行 | ✅ | 未经实物（E577） |
-| QLIE | 203 | 180 | 57 | ✅ | 🟡 GARbro（🆕 GameData/*.pack 进白名单） | ✅ | pack v3 密钥按作品 |
+| QLIE | 203 | 180 | 57 | ✅ | 🆕 qlie.cjs：pack 1.0–3.1 全部密码 + 1PC 解压 + .s 语法（E581） | ✅ | 3.0+key.fkey 的游戏密钥先取 exe 的 TFORM1，取不到用适配包 qlie-key |
 | NScripter / ONScripter | 2079 | 142 | 19 | ✅ | ✅ 0.txt / nscript.dat | ✅ |  |
 | AST | 155 | 141 | 0 | 🆕（无扩展名 ARC1/ARC2） | 🟡 ast.cjs：归档按规格做实（名字异或、LZSS+异或），剧本无公开资料 → 通用文本扫描 | ⚪ | 老作品（2016 后 0）；剧本语法需实物 |
-| Entis GLS | 139 | 133 | 30 | ✅ | 🟡 GARbro（🆕 .noa 进白名单） | ✅ |  |
-| AliceSoft System4 | 143 | 127 | 27 | ✅ | ✅ .ain（旧适配层）；🟡 .ald/.afa（🆕 白名单） | ✅ |  |
+| Entis GLS | 139 | 133 | 30 | 🆕 | 🆕 entis.cjs：NOA + ERISA-N + BSHF（口令取 exe 的 IDR_COTOMI）+ csx Talk/Mess/AddSelect（E582） | ✅ | csx 语法未经实物验证 |
+| AliceSoft System4 / System 3.x | 143 | 127 | 27 | 🆕 | ✅ .ain（旧适配层）；🆕 alicesoft.cjs：System 3.5–3.9 的 SA.ALD + SCO 精确遍历、System39.ain；.afa 只列表（E583） | ✅ / ⚪ 3.x | System4 的 .afa/.ald 不再交给 GARbro |
 | KaGuYa | 124 | 124 | 54 | 🆕 扩展（message.dat / params.dat 头、WFL1 / LINK 归档） | 🆕 kaguya.cjs：message.dat ver4（分组表）+ 早期分块格式；WFL1 / LINK3–6 里的 message.dat 也能找到 | ⚪ |  |
-| Marble | 140 | 124 | 0 | 🆕 | 🟡 GARbro（🆕 .mbl） | ⚪ |  |
+| Marble | 140 | 124 | 0 | 🆕 | 🆕 marble.cjs：mbl 两种索引 + 口令自动推断 + NUL 串语法（E584） | ⚪ |  |
 | Ikura GDL | 124 | 123 | 2 | 🆕 | 🆕 ikura.cjs：无扩展名 SM2MPX10 / DRS 归档 + ISF 指令流（PM 0xFF 文本，按版本变换）；带 SECRETFILTER 的作品报告“需要密钥” | ⚪ | 公开资料；SECRETFILTER 作品要每作品密钥 |
 | AdvHD / WillPlus | 124 | 123 | 103 | ✅ | ✅ Rio.arc .wsc | ✅ |  |
 | Ren'Py | 945 | 120 | 108 | ✅ | ✅ .rpy；🆕 无源码时读 .rpyc / .rpa，编译版 tl 按 translate id 配对 | ◎ MeguLitRenpy 桥 + ✅ | 商业/Steam 版多只带 rpyc+rpa，原来读不到 |

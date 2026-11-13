@@ -55,6 +55,12 @@ function decodeText(buf){
  return new TextDecoder(codepage(buf)).decode(buf);}
 const cstr=(b,at,limit=b.length)=>{if(at<0||at>=b.length)return null;const e=b.indexOf(0,at);return b.subarray(at,e<0||e>limit?limit:e);};
 const trimBoth=t=>t.replace(/^[\s　]+|[\s　]+$/g,'');
+/* E584 Shift-JIS (cp932) encoder for keys and passphrases given as text (Marble, adapter-pack params): the decode table
+   inverted once, first code wins; null when a character has no cp932 form */
+let sjisMap=null;
+function encodeSjis(s){if(!sjisMap){sjisMap=new Map();const dec=new TextDecoder('shift_jis');for(let b=0xa1;b<=0xdf;b++)sjisMap.set(dec.decode(Buffer.from([b])),[b]);
+  for(let a=0x81;a<=0xfc;a++){if(a>0x9f&&a<0xe0)continue;for(let b=0x40;b<=0xfc;b++){if(b===0x7f)continue;const c=dec.decode(Buffer.from([a,b]));if(c.length===1&&c!=='�'&&!sjisMap.has(c))sjisMap.set(c,[a,b]);}}}
+ const out=[];for(const ch of String(s)){const c=ch.codePointAt(0);if(c<0x80){out.push(c);continue;}const m=sjisMap.get(ch);if(!m)return null;out.push(...m);}return Buffer.from(out);}
 const ascii=t=>/^[\x20-\x7e]*$/.test(t);
 /* the generic scan (GARbro fallback, engines whose grammar is unknown): runs of Japanese text with kana, in order */
 const JP_RUN=/[ぁ-ゖァ-ヺー一-龯々〆〜～！？。、「」『』（）…―・　Ａ-Ｚａ-ｚ０-９]{2,}/g;
@@ -199,6 +205,31 @@ function lineGrammar(text,opts={}){const lines=[],anchors=[];let block=null;
   let s=t;for(const r of opts.strip||[/\[[^\]]*\]/g])s=s.replace(r,'');s=trimBoth(s);if(!s){anchors.push(t);continue;}lines.push(s);}
  return {lines,anchors};}
 
+/* ---- executables and keys (E581) -------------------------------------------------------------------------------- */
+/* (peResource: see E578 above; QLIE RESKEY / TFORM1 and Entis IDR_COTOMI use it too) */
+/* weights of plaintext bytes in Shift-JIS script text: kana / punctuation leads high, ASCII and line ends fair, control
+   bytes and bytes Shift-JIS never uses negative. sep: weight of 0x00 (strings separated by NUL) */
+function sjisWeights(sep=3){const w=new Float64Array(256);for(let b=0;b<256;b++){let v=0.4;
+ if(b===0)v=sep;else if(b===0x0a||b===0x0d)v=2;else if(b<0x20||b===0x7f)v=-2;else if(b<0x7f)v=1.5;else if(b===0x81||b===0x82)v=4;else if(b===0x83)v=2.5;else if(b>=0x88&&b<=0x9f)v=1.5;else if(b>=0xe0&&b<=0xea)v=1;else if(b===0x80||b===0xa0)v=-1;else if(b>=0xa1&&b<=0xdf)v=0.2;else if(b>=0xfd)v=-3;w[b]=v;}return w;}
+/* the same for GBK (Chinese patches): leads 0xB0-0xF7 and punctuation 0xA1-0xA9 high, trails 0xA1-0xFE fair */
+function gbkWeights(sep=3){const w=new Float64Array(256);for(let b=0;b<256;b++){let v=0.3;
+ if(b===0)v=sep;else if(b===0x0a||b===0x0d)v=2;else if(b<0x20||b===0x7f)v=-2;else if(b<0x7f)v=1.2;else if(b>=0xb0&&b<=0xf7)v=2.5;else if(b>=0xa1&&b<=0xa9)v=2;else if(b>=0xa1&&b<=0xfe)v=0.8;else if(b===0x80||b===0xff)v=-3;w[b]=v;}return w;}
+/* textScore(buf) -> share of characters that are CJK text, minus undecodable ones, in the codepage that fits (SJIS or GBK):
+   how plausible a decrypted script is, for any key search. Strong for Shift-JIS; weak alone for GBK, where almost every
+   byte pair decodes, so a reader adds its own structure check (separators, command lines) */
+function textScore(buf){const b=buf.subarray(0,32768);if(!b.length)return 0;const t=new TextDecoder(codepage(b)).decode(b);
+ const good=(t.match(/[ぁ-ヺー一-龯々　-〿！-～“”‘’…]/g)||[]).length,bad=(t.match(/[�\x01-\x08\x0b\x0c\x0e-\x1f\x7f]/g)||[]).length;return (good-2*bad)/t.length;}
+/* xorKeyByColumns(buf, {maxPeriod, weights, sample}) -> [{key, period, score}] best first: a repeating XOR key recovered
+   from ciphertext alone. Per period every column takes the key byte that makes its plaintext most like the weights; the
+   smallest period within 3 % of the best wins (a multiple of the true period always fits as well). Generic: Marble
+   scripts, and the adapter-pack key candidates */
+function xorKeyByColumns(buf,{maxPeriod=64,weights=sjisWeights(),sample=48<<10,minPeriod=1}={}){const s=buf.subarray(0,Math.min(buf.length,sample));if(s.length<64)return [];const out=[];
+ for(let L=minPeriod;L<=Math.min(maxPeriod,s.length>>3);L++){const key=Buffer.alloc(L);let total=0;
+  for(let c=0;c<L;c++){const h=new Uint32Array(256);for(let i=c;i<s.length;i+=L)h[s[i]]++;const used=[];for(let b=0;b<256;b++)if(h[b])used.push(b);let best=-Infinity,bk=0;
+   for(let k=0;k<256;k++){let v=0;for(const b of used)v+=h[b]*weights[b^k];if(v>best){best=v;bk=k;}}key[c]=bk;total+=best;}
+  out.push({key,period:L,score:total/s.length});}
+ if(!out.length)return [];const top=Math.max(...out.map(o=>o.score)),pick=out.find(o=>o.score>=top-Math.abs(top)*0.03);return [pick,...out.filter(o=>o!==pick).sort((a,b)=>b.score-a.score).slice(0,4)];}
+
 /* ---- engine factory --------------------------------------------------------------------------------------------- */
 /* engine({id, hint, archives:{name, magic, subs, list(file) -> entries|null, read(file, entry) -> Buffer, entry: RegExp},
    loose:{name, subs}, parse}) -> {id, hint, scenes, archives, sources, parse, test}. Loose files override archived
@@ -217,5 +248,6 @@ function engine(def){const A=def.archives;
   const list=[...out.values()];return A?.sort===false?list:list.sort((a,b)=>a.name.localeCompare(b.name));};
  return {id:def.id,hint:def.hint,scenes,archives:def.overlay===false?()=>[]:scenes,sources:dir=>[...arcFiles(dir),...looseFiles(dir)],parse:buf=>{try{return def.parse(Buffer.isBuffer(buf)?buf:Buffer.from(buf));}catch{return {lines:[],anchors:[]};}},test:def.test||(n=>!!def.loose&&def.loose.name.test(n)),...(def.extra||{})};}
 
-module.exports={readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,
- xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,lzDistance,SIGLUS_TOKEN,inflate,inflateRaw,zstd,unpackAny,huffman,table,entryRead,peResource,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine};
+module.exports={readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,encodeSjis,
+ xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,lzDistance,SIGLUS_TOKEN,inflate,inflateRaw,zstd,unpackAny,huffman,table,entryRead,peResource,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine,
+ sjisWeights,gbkWeights,textScore,xorKeyByColumns};

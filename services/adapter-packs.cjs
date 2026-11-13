@@ -7,7 +7,7 @@
    loose files, a declared index table, XP3 or PFS archives), how to turn the stored bytes into plain script (transforms:
    xor, xor-index, add/sub, not, rotate, zlib, raw deflate, LZSS, skip/take), how to cut that script into lines (grammar:
    text lines with safe regular expressions, or length-prefixed / NUL-terminated strings in bytecode), how to pair it
-   (pairing hints) and extra decrypt parameters for readers MeguLit already has (params: cx-scheme, paz-scheme, malie-scheme).
+   (pairing hints) and extra decrypt parameters for readers MeguLit already has (params: cx-scheme, paz-scheme, malie-scheme, and the per-title keys qlie-key / entis-key / marble-key).
 
    Safety. Every pack is signed (Ed25519 over its canonical JSON) with a key listed in services/adapter-pack-keys.json;
    a pack that is unsigned, signed by an unknown key, altered, invalid, or needs a capability this app lacks is skipped,
@@ -27,6 +27,8 @@ const CAPABILITIES=Object.freeze(['container:loose','container:table','container
  'grammar:lines','grammar:strings','params:cx-scheme','params:paz-scheme','match:exe','match:files',
  /* E578 per-title keys for the Malie reader (malie.cjs) */
  'params:malie-scheme',
+ /* E581–E584 per-title keys for QLIE 3.0 game keys, Entis NOA passwords, Marble passphrases */
+ 'params:qlie-key','params:entis-key','params:marble-key',
  /* E596 runtime findings: an index recovered from the running game, the block ciphers whose keys it held, xor keys
     that line up with the file offset */
  'container:index','transform:blowfish','transform:tea','transform:xtea','transform:camellia','transform:xor-file']);
@@ -125,7 +127,7 @@ function validGrammar(g){if(!isObj(g)||!['lines','strings'].includes(g.mode))ret
  else{if(!(typeof g.opcode==='string'&&HEX.test(g.opcode)&&g.opcode.length<=16))return false;if(!['u8','u16le','u32le','zero'].includes(g.length))return false;}
  if(g.minChars!==undefined&&!int(g.minChars,1,64))return false;return true;}
 function validPairing(p){return p===undefined||isObj(p)&&(p.by===undefined||['order','text'].includes(p.by))&&(p.dropNames===undefined||typeof p.dropNames==='boolean')&&(p.minChars===undefined||int(p.minChars,1,64));}
-const PARAM_TARGETS=['cx-scheme','paz-scheme','malie-scheme'];
+const PARAM_TARGETS=['cx-scheme','paz-scheme','malie-scheme','qlie-key','entis-key','marble-key'];
 function validParams(list){return list===undefined||Array.isArray(list)&&list.length<=16&&list.every(p=>isObj(p)&&PARAM_TARGETS.includes(p.target)&&isObj(p.value)&&JSON.stringify(p.value).length<=64*1024);}
 /* what a pack needs, computed from its content (its `requires` must list at least these) */
 function needs(p){const out=new Set();if(p.match?.exe)out.add('match:exe');if(p.match?.files?.length)out.add('match:files');

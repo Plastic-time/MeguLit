@@ -23,10 +23,13 @@ const ENGINES=[
  /* E568 Softpal keeps PAL.dll in dll\ (時計仕掛けのレイライン); its archives start "PAC " (NeXAS: "PAC" + a version byte) */
  {name:'SoftPal',hook:true,test:f=>f.has(/^pal\.dll$/i)||f.sub('dll',/^pal\.dll$/i)||f.magic(/^data\.pac$/i,'PAC ')||(f.has(/^data\.pac$/i)&&f.has(/^script\.src$/i))},
  {name:'NeXAS',hook:true,test:f=>f.has(/^thumbnail\.pac$/i)||f.has(/^update\.pac$/i)||f.has(/^script\.pac$/i)&&!f.magic(/^script\.pac$/i,'PAC ')},
- {name:'System4 (AliceSoft)',hook:true,test:f=>f.has(/\.ain$/i)||f.has(/\.ald$/i)},
+ /* E583 AliceSoft System 3.5–3.9: scenario in xxxSA.ALD (and System39.ain for 3.9), no System4 .ain beside it */
+ {name:'System 3.x (AliceSoft)',hook:null,test:f=>f.has(/^system39\.ain$/i)||f.has(/s[a-z]\.ald$/i)&&!f.has(/\.ain$/i)},
+ {name:'System4 (AliceSoft)',hook:true,test:f=>f.has(/\.ain$/i)||f.has(/\.ald$/i)||f.magicAny(/\.afa$/i,'AFAH')},
  /* E579 WARC 1.x archives (a .war of another engine is not counted) */
  {name:'ShiinaRio',hook:true,test:f=>f.magicAny(/\.war$/i,'WARC')},
- {name:'Entis / Cotopha',hook:true,test:f=>f.has(/\.noa$/i)},
+ /* E582 Entis GLS: .noa archives, or Cotopha images (.csx) left loose */
+ {name:'Entis / Cotopha',hook:true,test:f=>f.has(/\.noa$/i)||f.magicAny(/\.csx$/i,'Entis\x1a')},
  {name:'NScripter',hook:true,test:f=>f.has(/^(arc\.nsa|nscript\.dat|00\.txt|0\.txt)$/i)},
  /* LiveMaker 2/3: game.dat (or an .ext beside the exe) is a "vff" archive */
  {name:'LiveMaker',hook:true,test:f=>f.has(/\.lsb$/i)||f.has(/^live\.dll$/i)||f.magicAny(/\.(dat|ext)$/i,'vff\0')},

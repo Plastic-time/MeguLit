@@ -33,9 +33,11 @@ function readJson(file){try{return JSON.parse(fs.readFileSync(file,'utf8'));}cat
 
 // Archives in the game folder (and one level down) worth handing to GARbro, script-looking names first.
 function archives(dir){
+ /* E583 a System4 folder (its script is the .ain) keeps only CG / sound in .afa / .ald: never worth unpacking */
+ const sys4=(()=>{try{return require('./alicesoft.cjs').system4(dir);}catch{return false;}})();
  const out=[];const scan=(d,depth)=>{let list;try{list=fs.readdirSync(d,{withFileTypes:true});}catch{return;}
   for(const e of list){const p=path.join(d,e.name);if(e.isDirectory()){if(depth<1&&!/^(save|savedata|movie|movies|video|bgm|sound|voice|se|cg|image|images|logs?)$/i.test(e.name))scan(p,depth+1);continue;}
-   if(!ARCHIVE.test(e.name))continue;if(/^(unins\d*|setup|config|savedata|save\d*|global|sysdata)\./i.test(e.name))continue;
+   if(!ARCHIVE.test(e.name))continue;if(sys4&&/\.(afa|ald)$/i.test(e.name))continue;if(/^(unins\d*|setup|config|savedata|save\d*|global|sysdata)\./i.test(e.name))continue;
    let size=0;try{size=fs.statSync(p).size;}catch{}if(size>=MIN_SIZE)out.push({file:p,size,scripty:SCRIPTY.test(e.name)});}};
  scan(dir,0);
  return out.sort((a,b)=>b.scripty-a.scripty||a.size-b.size).slice(0,MAX_ARCHIVES).map(a=>a.file);
