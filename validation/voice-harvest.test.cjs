@@ -67,18 +67,20 @@ test('always on (no switch); three faults for a game switch it off',()=>{const{g
  const d=vh.voiceDir(game);fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,'disabled.txt'),'fault a\nfault b\n');assert.equal(vh.enabled(game),true);
  fs.appendFileSync(path.join(d,'disabled.txt'),'fault c\n');assert.equal(vh.enabled(game),false);});
 
-// Output of the native stand-in game (selftest/voice-run.ps1), when it has run on this machine.
-const NATIVE=process.env.MEGULIT_VOICE_SELFTEST||'H:\\MeguLit-Work\\voice-selftest';
-for(const bit of ['32','64'])test(`native stand-in game x${bit}: every voiced line gets its own clip`,{skip:!fs.existsSync(path.join(NATIVE,'out'+bit))},()=>{
+// Output of the shared stand-in game (native/runtimedump/selftest/run.ps1, case cases/Voice.cpp), when it has run here.
+const NATIVE=process.env.MEGULIT_VOICE_SELFTEST||'H:\MeguLit-Work\runtime-dump-selftest';
+for(const bit of ['32','64'])test(`native stand-in game x${bit}: every voiced line gets its own voice`,{skip:!fs.existsSync(path.join(NATIVE,'game'+bit,'voice-truth.json'))},()=>{
  process.env.MEGULIT_RUNTIME_DUMP=path.join(NATIVE,'out'+bit);for(const m of ['../services/runtime-dump.cjs','../services/voice-harvest.cjs'])delete require.cache[require.resolve(m)];
  const vh=require('../services/voice-harvest.cjs'),game=path.join(NATIVE,'game'+bit);
- const truth=JSON.parse(fs.readFileSync(path.join(NATIVE,'game'+bit,'truth.json'),'utf8'));
- vh.build(game);let right=0,wrong=0,missed=0,falsePos=0;
+ const truth=JSON.parse(fs.readFileSync(path.join(game,'voice-truth.json'),'utf8'));
+ try{fs.unlinkSync(path.join(vh.voiceDir(game),'voice-map.json'));}catch{}
+ vh.build(game);let right=0,wrong=0,missed=0,falsePos=0;const bad=[];
  for(const t of truth){const hit=vh.lookup(game,t.text);
-  if(t.id<0){if(hit)falsePos++;continue;}if(!hit){missed++;continue;}
-  const b=fs.readFileSync(hit.path),d=b.indexOf('data')+8,id=b.readInt16LE(d+2);/* the stand-in writes its clip id as the 2nd sample */
-  if(id===t.id)right++;else wrong++;
-  assert.equal(hit.partial,/これは9番目/.test(t.text),`partial flag for ${t.text}`);/* the stand-in skips line 9 mid-voice */}
+  if(t.id<0){if(hit){falsePos++;bad.push('false '+t.text);}continue;}if(!hit){missed++;bad.push('missed '+t.way+' '+t.id);continue;}
+  const b=fs.readFileSync(hit.path),id=b.toString('latin1',0,4)==='OggS'?b.readInt16LE(0x30):b.readInt16LE(b.indexOf('data')+8+2);
+  if(id===t.id)right++;else{wrong++;bad.push(`wrong ${t.way} ${t.id} got ${id}`);}
+  if(t.way==='file+dsound')assert.equal(hit.fmt,'ogg','the read voice file is kept over the decoded PCM');
+  assert.equal(hit.partial,!!t.skip,`partial flag for ${t.text}`);}
  const voiced=truth.filter(t=>t.id>=0).length;
- report.push(`  native x${bit} (${[...new Set(truth.map(t=>t.api).filter(Boolean))].join('/')})`.padEnd(36)+` right ${right}/${voiced}, wrong ${wrong}, false ${falsePos}, missed ${missed}`);
- assert.equal(wrong,0);assert.equal(falsePos,0);assert.ok(right>=voiced-1,`right ${right}/${voiced}`);});
+ report.push(`  native x${bit} (${[...new Set(truth.map(t=>t.way).filter(Boolean))].join('/')})`.padEnd(36)+` right ${right}/${voiced}, wrong ${wrong}, false ${falsePos}, missed ${missed}`);
+ assert.deepEqual(bad,[]);});

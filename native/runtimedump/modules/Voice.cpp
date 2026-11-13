@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Voice harvest inside MeguLitDump32/64.dll: records the game's own voice clips as the game plays them, so MeguLit can
+// Voice harvest, a module of MeguLitDump32/64.dll (modules/modules.h): records the game's own voice clips as the game plays them, so MeguLit can
 // replay a line's original CV later (backlog, Anki card audio, replay) whatever archive format or cipher the voice pack
 // uses. The game must hand plain PCM to an audio API before anything is heard; each sound the game submits is saved as one
 // WAV clip with the wall-clock time it started. Which clip belongs to which line is decided afterwards in node
 // (services/voice-harvest.cjs), from these start times and the times hooked lines were shown.
 //
 // Watched (MinHook, every access guarded):
+//  - file reads (kernel32 ReadFile): a buffer that is, or a moment later becomes (decrypted in place), a voice file by its
+//    magic (Ogg Vorbis/Opus, WAV, AT9, BGI bw, CRI HCA/ADX, FSB5, MP3) is saved as that file, with the time it was read
+//    (voice/files.jsonl): the most engines, original quality, no decoding;
 //  - DirectSound: IDirectSoundBuffer Unlock/Play/Stop (static buffers filled before Play, and streaming ring buffers);
 //  - XAudio2 2.8/2.9: IXAudio2::CreateSourceVoice (format) and IXAudio2SourceVoice SubmitSourceBuffer/Start/Stop;
 //  - waveOut: waveOutOpen (format), waveOutWrite, waveOutReset/Close (a device opened before the DLL arrived has no
@@ -28,10 +31,10 @@
 #include <string>
 #include <vector>
 #include <map>
-#include "minhook/include/MinHook.h"
+#include "../minhook/include/MinHook.h"
 
 namespace voice {
-wchar_t Dir[1024];
+wchar_t Dir[1024], OutDir[1024];
 CRITICAL_SECTION Gate;
 DWORD Tls = TLS_OUT_OF_INDEXES;
 volatile LONG On, Seq, Faults;
@@ -39,9 +42,10 @@ volatile LONGLONG Spent, Budget;
 const DWORD IdleMs = 1200, MaxClipMs = 90000, MinClipBytes = 2048;
 
 // Marks this thread as inside a hook, so the harvest's own calls are never watched (no destructor: __try needs none).
-bool Enter() { bool was = TlsGetValue(Tls) != NULL; TlsSetValue(Tls, (void *)1); return was; }
-void Leave(bool was) { if (!was) TlsSetValue(Tls, NULL); }
-bool Busy() { return Tls == TLS_OUT_OF_INDEXES || TlsGetValue(Tls) != NULL; }
+// All three keep the game's last error: TlsGetValue clears it, and engines read it right after the call we wrap.
+ULONGLONG Enter() { DWORD e = GetLastError(); bool was = TlsGetValue(Tls) != NULL; TlsSetValue(Tls, (void *)1); SetLastError(e); return ((ULONGLONG)was << 32) | e; }
+void Leave(ULONGLONG w) { if (!(w >> 32)) TlsSetValue(Tls, NULL); SetLastError((DWORD)w); }
+bool Busy() { DWORD e = GetLastError(); bool r = Tls == TLS_OUT_OF_INDEXES || TlsGetValue(Tls) != NULL; SetLastError(e); return r; }
 bool Live() { return On && !Busy(); }
 
 ULONGLONG NowMs() { FILETIME f; GetSystemTimeAsFileTime(&f); ULARGE_INTEGER u; u.LowPart = f.dwLowDateTime; u.HighPart = f.dwHighDateTime; return u.QuadPart / 10000 - 11644473600000ULL; }
@@ -69,17 +73,40 @@ bool Put(const std::wstring &name, const void *a, DWORD an, const void *b, DWORD
  if (!ok || !MoveFileExW(tmp.c_str(), p.c_str(), MOVEFILE_REPLACE_EXISTING)) { DeleteFileW(tmp.c_str()); return false; }
  return true;
 }
-// A fault inside a hook: stop everything for this run and leave a note MeguLit counts.
+void *Hooked[48]; volatile LONG HookedN;
+bool Hk(void *t, void *d, void **o) {
+ if (!t || MH_CreateHook(t, d, o) != MH_OK) return false;
+ if (MH_EnableHook(t) != MH_OK) { MH_RemoveHook(t); return false; }
+ LONG i = InterlockedIncrement(&HookedN) - 1; if (i < 48) Hooked[i] = t;
+ return true;
+}
+// A fault inside a hook: this module stops for the run (its own hooks only; the dump keeps going) and leaves a note.
 void Fault(const char *where) {
  if (InterlockedExchange(&On, 0) == 0) return;
  InterlockedIncrement(&Faults);
  char line[160]; sprintf_s(line, "fault in %s at %llu\r\n", where, NowMs());
  Append(L"disabled.txt", line);
- MH_DisableHook(MH_ALL_HOOKS); // also disables the dump hooks; one bad run is better than a crashed game
+ for (LONG i = 0; i < HookedN && i < 48; i++) MH_DisableHook(Hooked[i]);
+}
+// Copies game memory without ever faulting in the game: every page must be committed, readable and not a guard page,
+// and the copy goes through ReadProcessMemory (a buffer freed meanwhile fails the call instead of raising).
+bool Readable(const void *p, DWORD n) {
+ const char *a = (const char *)p, *end = a + n;
+ while (a < end) {
+  MEMORY_BASIC_INFORMATION m; if (!VirtualQuery(a, &m, sizeof m) || m.State != MEM_COMMIT) return false;
+  if (m.Protect & (PAGE_GUARD | PAGE_NOACCESS) || !(m.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))) return false;
+  a = (const char *)m.BaseAddress + m.RegionSize;
+ }
+ return true;
 }
 bool Copy(std::vector<unsigned char> &to, const void *p, DWORD n) {
- size_t at = to.size();
- __try { to.resize(at + n); memcpy(&to[at], p, n); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { to.resize(at); return false; }
+ if (!p || !n) return false;
+ DWORD e = GetLastError();
+ size_t at = to.size(); SIZE_T got = 0;
+ bool ok = Readable(p, n);
+ if (ok) { to.resize(at + n); ok = ReadProcessMemory(GetCurrentProcess(), p, &to[at], n, &got) && got == n; if (!ok) to.resize(at); }
+ SetLastError(e);
+ return ok;
 }
 
 // ---- streams -----------------------------------------------------------------------------------------------------
@@ -242,15 +269,15 @@ void DsFormat(void *b) {
  if (SUCCEEDED(GetFmt(b, w, sizeof w, &got))) SetFormat(b, w);
 }
 HRESULT STDMETHODCALLTYPE HUnlock(void *b, void *p1, DWORD n1, void *p2, DWORD n2) {
- if (Live()) { bool was = Enter(); __try { DsFormat(b); Feed("dsound", b, p1, n1, false); Feed("dsound", b, p2, n2, false); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("dsound unlock"); } Leave(was); }
+ if (Live()) { ULONGLONG was = Enter(); __try { DsFormat(b); Feed("dsound", b, p1, n1, false); Feed("dsound", b, p2, n2, false); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("dsound unlock"); } Leave(was); }
  return OUnlock(b, p1, n1, p2, n2);
 }
 HRESULT STDMETHODCALLTYPE HPlay(void *b, DWORD r, DWORD prio, DWORD flags) {
- if (Live()) { bool was = Enter(); __try { DsFormat(b); Start("dsound", b, (flags & 1) != 0); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("dsound play"); } Leave(was); }
+ if (Live()) { ULONGLONG was = Enter(); __try { DsFormat(b); Start("dsound", b, (flags & 1) != 0); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("dsound play"); } Leave(was); }
  return OPlay(b, r, prio, flags);
 }
 HRESULT STDMETHODCALLTYPE HStop(void *b) {
- if (Live()) { bool was = Enter(); __try { Stop(b); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("dsound stop"); } Leave(was); }
+ if (Live()) { ULONGLONG was = Enter(); __try { Stop(b); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("dsound stop"); } Leave(was); }
  return OStop(b);
 }
 // The buffer methods live in dsound.dll and are shared by every secondary buffer: a throwaway buffer shows where.
@@ -270,9 +297,9 @@ bool HookDsound() {
  if (SUCCEEDED(((CreateBufFn)dv[3])(ds, &desc, &buf, NULL)) && buf) {
   void **bv = *(void ***)buf;
   GetFmt = (GetFormatFn)bv[5];
-  ok = MH_CreateHook(bv[19], (void *)HUnlock, (void **)&OUnlock) == MH_OK && MH_EnableHook(bv[19]) == MH_OK;
-  ok = ok && MH_CreateHook(bv[12], (void *)HPlay, (void **)&OPlay) == MH_OK && MH_EnableHook(bv[12]) == MH_OK;
-  ok = ok && MH_CreateHook(bv[18], (void *)HStop, (void **)&OStop) == MH_OK && MH_EnableHook(bv[18]) == MH_OK;
+  ok = Hk(bv[19], (void *)HUnlock, (void **)&OUnlock);
+  ok = ok && Hk(bv[12], (void *)HPlay, (void **)&OPlay);
+  ok = ok && Hk(bv[18], (void *)HStop, (void **)&OStop);
   ((ReleaseFn)bv[2])(buf);
  }
  ((ReleaseFn)dv[2])(ds);
@@ -290,25 +317,25 @@ CreateSourceFn OCreateSource; SubmitFn OSubmit; XStartFn OXStart; XStopFn OXStop
 struct XBuffer { UINT32 flags, bytes; const BYTE *data; UINT32 playBegin, playLength, loopBegin, loopLength, loopCount; void *context; };
 HRESULT STDMETHODCALLTYPE HCreateSource(void *x, void **v, const WAVEFORMATEX *w, UINT32 f, float r, void *cb, const void *s, const void *e) {
  HRESULT hr = OCreateSource(x, v, w, f, r, cb, s, e);
- if (SUCCEEDED(hr) && Live()) { bool was = Enter(); __try { if (v && *v) SetFormat(*v, w); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("xaudio2 create"); } Leave(was); }
+ if (SUCCEEDED(hr) && Live()) { ULONGLONG was = Enter(); __try { if (v && *v) SetFormat(*v, w); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("xaudio2 create"); } Leave(was); }
  return hr;
 }
 HRESULT STDMETHODCALLTYPE HSubmit(void *v, const void *b, const void *wma) {
- if (Live() && b && !wma) { bool was = Enter(); __try { const XBuffer *x = (const XBuffer *)b; if (x->loopCount == 255) Stop(v); else Feed("xaudio2", v, x->data, x->bytes, false); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("xaudio2 submit"); } Leave(was); }
+ if (Live() && b && !wma) { ULONGLONG was = Enter(); __try { const XBuffer *x = (const XBuffer *)b; if (x->loopCount == 255) Stop(v); else Feed("xaudio2", v, x->data, x->bytes, false); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("xaudio2 submit"); } Leave(was); }
  return OSubmit(v, b, wma);
 }
 void XGone(void *v) { EnterCriticalSection(&Gate); auto it = Streams.find(v); if (it != Streams.end() && it->second.playing) Close(v, false); else if (it != Streams.end()) Streams.erase(it); Formats.erase(v); Kept.erase(v); LeaveCriticalSection(&Gate); }
 void STDMETHODCALLTYPE HDestroy(void *v) {
- if (Live()) { bool was = Enter(); __try { XGone(v); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("xaudio2 destroy"); } Leave(was); }
+ if (Live()) { ULONGLONG was = Enter(); __try { XGone(v); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("xaudio2 destroy"); } Leave(was); }
  ODestroy(v);
 }
 void XStarted(void *v) { EnterCriticalSection(&Gate); auto it = Streams.find(v); bool fresh = it == Streams.end() || !it->second.playing; LeaveCriticalSection(&Gate); if (fresh) Start("xaudio2", v, false); }
 HRESULT STDMETHODCALLTYPE HXStart(void *v, UINT32 f, UINT32 o) {
- if (Live()) { bool was = Enter(); __try { XStarted(v); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("xaudio2 start"); } Leave(was); }
+ if (Live()) { ULONGLONG was = Enter(); __try { XStarted(v); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("xaudio2 start"); } Leave(was); }
  return OXStart(v, f, o);
 }
 HRESULT STDMETHODCALLTYPE HXStop(void *v, UINT32 f, UINT32 o) {
- if (Live()) { bool was = Enter(); __try { Stop(v); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("xaudio2 stop"); } Leave(was); }
+ if (Live()) { ULONGLONG was = Enter(); __try { Stop(v); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("xaudio2 stop"); } Leave(was); }
  return OXStop(v, f, o);
 }
 bool HookXAudio2() {
@@ -317,7 +344,7 @@ bool HookXAudio2() {
  XCreateFn create = (XCreateFn)GetProcAddress(m, "XAudio2Create"); if (!create) return false;
  void *x = NULL; if (FAILED(create(&x, 0, 1)) || !x) return false;
  void **xv = *(void ***)x;
- bool ok = MH_CreateHook(xv[5], (void *)HCreateSource, (void **)&OCreateSource) == MH_OK && MH_EnableHook(xv[5]) == MH_OK;
+ bool ok = Hk(xv[5], (void *)HCreateSource, (void **)&OCreateSource);
  // A source voice needs no device as long as it is never started; CreateMasteringVoice (index 7) may still fail
  // without one, so the source voice is made against a mastering voice only when that works.
  typedef HRESULT(STDMETHODCALLTYPE *MasterFn)(void *, void **, UINT32, UINT32, UINT32, LPCWSTR, const void *, int);
@@ -327,12 +354,12 @@ bool HookXAudio2() {
   void *src = NULL;
   if (SUCCEEDED(OCreateSource ? OCreateSource(x, &src, &w, 0, 2.0f, NULL, NULL, NULL) : E_FAIL) && src) {
    void **sv = *(void ***)src;
-   ok = ok && MH_CreateHook(sv[21], (void *)HSubmit, (void **)&OSubmit) == MH_OK && MH_EnableHook(sv[21]) == MH_OK;
-   ok = ok && MH_CreateHook(sv[19], (void *)HXStart, (void **)&OXStart) == MH_OK && MH_EnableHook(sv[19]) == MH_OK;
-   ok = ok && MH_CreateHook(sv[20], (void *)HXStop, (void **)&OXStop) == MH_OK && MH_EnableHook(sv[20]) == MH_OK;
+   ok = ok && Hk(sv[21], (void *)HSubmit, (void **)&OSubmit);
+   ok = ok && Hk(sv[19], (void *)HXStart, (void **)&OXStart);
+   ok = ok && Hk(sv[20], (void *)HXStop, (void **)&OXStop);
    void *destroy = sv[18]; // the throwaway voice goes before the hook, so it never reaches the stream table
    ((DestroyFn)destroy)(src);
-   ok = ok && MH_CreateHook(destroy, (void *)HDestroy, (void **)&ODestroy) == MH_OK && MH_EnableHook(destroy) == MH_OK;
+   ok = ok && Hk(destroy, (void *)HDestroy, (void **)&ODestroy);
   } else ok = false;
   ((DestroyFn)(*(void ***)master)[18])(master);
  } else ok = false;
@@ -348,20 +375,20 @@ typedef MMRESULT(WINAPI *WResetFn)(HWAVEOUT);
 WOpenFn OWOpen; WWriteFn OWWrite; WResetFn OWReset, OWClose;
 MMRESULT WINAPI HWOpen(LPHWAVEOUT h, UINT_PTR d, LPCWAVEFORMATEX w, DWORD_PTR cb, DWORD_PTR inst, DWORD f) {
  MMRESULT r = OWOpen(h, d, w, cb, inst, f);
- if (r == MMSYSERR_NOERROR && h && Live() && !(f & WAVE_FORMAT_QUERY)) { bool was = Enter(); __try { SetFormat(*h, w); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("waveOutOpen"); } Leave(was); }
+ if (r == MMSYSERR_NOERROR && h && Live() && !(f & WAVE_FORMAT_QUERY)) { ULONGLONG was = Enter(); __try { SetFormat(*h, w); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("waveOutOpen"); } Leave(was); }
  return r;
 }
 MMRESULT WINAPI HWWrite(HWAVEOUT h, LPWAVEHDR hdr, UINT n) {
- if (Live() && hdr) { bool was = Enter(); __try { Feed("waveout", h, hdr->lpData, hdr->dwBufferLength, true); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("waveOutWrite"); } Leave(was); }
+ if (Live() && hdr) { ULONGLONG was = Enter(); __try { Feed("waveout", h, hdr->lpData, hdr->dwBufferLength, true); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("waveOutWrite"); } Leave(was); }
  return OWWrite(h, hdr, n);
 }
 void WGone(HWAVEOUT h) { Stop(h); EnterCriticalSection(&Gate); Formats.erase(h); LeaveCriticalSection(&Gate); }
 MMRESULT WINAPI HWClose(HWAVEOUT h) {
- if (Live()) { bool was = Enter(); __try { WGone(h); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("waveOutClose"); } Leave(was); }
+ if (Live()) { ULONGLONG was = Enter(); __try { WGone(h); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("waveOutClose"); } Leave(was); }
  return OWClose(h);
 }
 MMRESULT WINAPI HWReset(HWAVEOUT h) {
- if (Live()) { bool was = Enter(); __try { Stop(h); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("waveOutReset"); } Leave(was); }
+ if (Live()) { ULONGLONG was = Enter(); __try { Stop(h); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("waveOutReset"); } Leave(was); }
  return OWReset(h);
 }
 
@@ -397,12 +424,12 @@ void FPlayed(void *a, void *b) {
 template <int K> int __stdcall HFCreate(void *sys, const char *data, unsigned mode, void *ex, void **sound) {
  int r = FCreate[K](sys, data, mode, ex, sound);
  if (r == 0 && Live() && (mode & 0x800) && ex && sound) { // FMOD_OPENMEMORY: data is the (decrypted) file
-  bool was = Enter(); __try { FCreated(data, mode, ex, sound); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("fmod create"); } Leave(was);
+  ULONGLONG was = Enter(); __try { FCreated(data, mode, ex, sound); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("fmod create"); } Leave(was);
  }
  return r;
 }
 template <int K> int __stdcall HFPlay(void *sys, void *a, void *b, void *c, void *d) {
- if (Live()) { bool was = Enter(); __try { FPlayed(a, b); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("fmod play"); } Leave(was); }
+ if (Live()) { ULONGLONG was = Enter(); __try { FPlayed(a, b); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("fmod play"); } Leave(was); }
  return FPlay[K](sys, a, b, c, d);
 }
 FCreateFn FCreateHooks[FSlots] = { HFCreate<0>, HFCreate<1>, HFCreate<2>, HFCreate<3>, HFCreate<4>, HFCreate<5> };
@@ -424,68 +451,157 @@ void HookFmodModule(HMODULE m) {
    if (!create && !play) continue;
    void *fn = base + funcs[ords[i]];
    if (FDone.count(fn)) continue; FDone[fn] = 1;
-   if (create && FUsedCreate < FSlots) { int k = FUsedCreate++; if (MH_CreateHook(fn, (void *)FCreateHooks[k], (void **)&FCreate[k]) == MH_OK) MH_EnableHook(fn); }
-   if (play && FUsedPlay < FSlots) { int k = FUsedPlay++; if (MH_CreateHook(fn, (void *)FPlayHooks[k], (void **)&FPlay[k]) == MH_OK) MH_EnableHook(fn); }
+   if (create && FUsedCreate < FSlots) { int k = FUsedCreate++; Hk(fn, (void *)FCreateHooks[k], (void **)&FCreate[k]); }
+   if (play && FUsedPlay < FSlots) { int k = FUsedPlay++; Hk(fn, (void *)FPlayHooks[k], (void **)&FPlay[k]); }
   }
  } __except (EXCEPTION_EXECUTE_HANDLER) {}
 }
 
-// ---- file names --------------------------------------------------------------------------------------------------------
+// ---- file reads --------------------------------------------------------------------------------------------------------
+// Voice file magic (table: GARbro's format library, MIT, and vgmstream; facts, no code copied). "" = not a voice file.
+bool At(const unsigned char *p, DWORD n, DWORD at, const char *s, DWORD k) { return n >= at + k && memcmp(p + at, s, k) == 0; }
+const char *Sniff(const unsigned char *p, DWORD n) {
+ if (n < 16) return "";
+ if (At(p, n, 0, "OggS", 4) && p[4] == 0) return At(p, n, 0x1C, "OpusHead", 8) ? "opus" : "ogg";
+ if (At(p, n, 0, "RIFF", 4) && At(p, n, 8, "WAVE", 4)) {
+  if (n >= 0x3C && p[0x14] == 0xFE && p[0x15] == 0xFF && At(p, n, 0x2C, "\xD2\x42\xE1\x47\xBA\x36\x8D\x4D\x88\xFC\x61\x65\x4F\x8C\x83\x6C", 16)) return "at9";
+  return "wav";
+ }
+ if (At(p, n, 4, "bw  ", 4)) return "bw";                       // BGI voice: header, then Ogg
+ if (At(p, n, 0, "HCA\0", 4) || (p[0] == 0xC8 && p[1] == 0xC3 && p[2] == 0xC1 && p[3] == 0x80)) return "hca";
+ if (p[0] == 0x80 && p[1] == 0x00) { DWORD o = (p[2] << 8) | p[3]; if (o >= 2 && o < n && At(p, n, o - 2, "(c)CRI", 6)) return "adx"; }
+ if (At(p, n, 0, "FSB5", 4)) return "fsb5";
+ if (At(p, n, 0, "ID3", 3) && p[3] <= 4) return "mp3";
+ return "";
+}
+// File names: handle -> name for files opened for reading (outside Windows), and the last audio-looking name opened.
 typedef HANDLE(WINAPI *CFWFn)(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
 typedef HANDLE(WINAPI *CFAFn)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
-CFWFn OCFW; CFAFn OCFA;
+typedef BOOL(WINAPI *ReadFn)(HANDLE, LPVOID, DWORD, LPDWORD, LPOVERLAPPED);
+CFWFn OCFW; CFAFn OCFA; ReadFn ORead;
+std::map<HANDLE, std::wstring> Names;
 bool Audioish(const wchar_t *p) {
  const wchar_t *dot = wcsrchr(p, L'.'); if (!dot) return false;
  static const wchar_t *ext[] = { L".ogg", L".opus", L".wav", L".flac", L".mp3", L".m4a", L".at9", L".hca", L".adx", L".vag", L".wma", L".aac" };
  for (auto e : ext) if (!_wcsicmp(dot, e)) return true;
  return false;
 }
-void Name(const wchar_t *p) { if (!p || !Audioish(p)) return; EnterCriticalSection(&Gate); LastName = p; LastNameAt = NowMs(); LeaveCriticalSection(&Gate); }
+void Opened(HANDLE h, const wchar_t *p) {
+ if (!p || h == INVALID_HANDLE_VALUE || !h) return;
+ wchar_t win[MAX_PATH]; UINT w = GetWindowsDirectoryW(win, MAX_PATH); if (w && !_wcsnicmp(p, win, w)) return;
+ if (wcsstr(p, L"\\runtime-dump\\") || (OutDir[0] && !_wcsnicmp(p, OutDir, wcslen(OutDir)))) return; // never our own output
+ EnterCriticalSection(&Gate);
+ if (Names.size() > 4096) Names.clear();
+ Names[h] = p;
+ if (Audioish(p)) { LastName = p; LastNameAt = NowMs(); }
+ LeaveCriticalSection(&Gate);
+}
 HANDLE WINAPI HCFW(LPCWSTR n, DWORD a, DWORD s, LPSECURITY_ATTRIBUTES sa, DWORD c, DWORD f, HANDLE t) {
- if (Live() && n) { bool was = Enter(); __try { Name(n); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("CreateFileW"); } Leave(was); }
- return OCFW(n, a, s, sa, c, f, t);
+ HANDLE h = OCFW(n, a, s, sa, c, f, t);
+ if (Live() && n && !(a & GENERIC_WRITE)) { DWORD e = GetLastError(); ULONGLONG was = Enter(); __try { Opened(h, n); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("CreateFileW"); } Leave(was); SetLastError(e); }
+ return h;
 }
 HANDLE WINAPI HCFA(LPCSTR n, DWORD a, DWORD s, LPSECURITY_ATTRIBUTES sa, DWORD c, DWORD f, HANDLE t) {
- if (Live() && n) { bool was = Enter(); __try { wchar_t w[1024]; if (MultiByteToWideChar(CP_ACP, 0, n, -1, w, 1024)) Name(w); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("CreateFileA"); } Leave(was); }
- return OCFA(n, a, s, sa, c, f, t);
+ HANDLE h = OCFA(n, a, s, sa, c, f, t);
+ if (Live() && n && !(a & GENERIC_WRITE)) { DWORD e = GetLastError(); ULONGLONG was = Enter(); __try { wchar_t w[1024]; if (MultiByteToWideChar(CP_ACP, 0, n, -1, w, 1024)) Opened(h, w); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("CreateFileA"); } Leave(was); SetLastError(e); }
+ return h;
+}
+// A read buffer watched for a few seconds: it may be decrypted in place into a voice file.
+struct Read { const unsigned char *p; DWORD n; ULONG head; DWORD born; ULONGLONG at; ULONGLONG offset; std::wstring source; };
+std::vector<Read> Reads;
+const DWORD MaxVoiceFile = 8u << 20, ReadWatchMs = 3000;
+std::map<ULONG, std::string> FileSaved;
+// Saves a voice file seen in memory (under no lock; copies first).
+void Keep(const unsigned char *p, DWORD n, const char *fmt, ULONGLONG at, ULONGLONG offset, const std::wstring &source, const char *how) {
+ std::vector<unsigned char> data; if (!Copy(data, p, n)) return;
+ ULONG crc = Crc32 ? Crc32(0, data.data(), n) : n;
+ std::string file;
+ EnterCriticalSection(&Gate); auto f = FileSaved.find(crc); if (f != FileSaved.end()) file = f->second; LeaveCriticalSection(&Gate);
+ if (file.empty()) {
+  if (Spent + (LONGLONG)n > Budget) return;
+  LONG seq = InterlockedIncrement(&Seq);
+  char name[64]; wchar_t wname[64]; sprintf_s(name, "%05ld.%s", seq, fmt); swprintf_s(wname, L"%05ld.%hs", seq, fmt);
+  if (!Put(wname, data.data(), n, NULL, 0)) return;
+  file = name; Spent += n;
+  EnterCriticalSection(&Gate); if (FileSaved.size() > 100000) FileSaved.clear(); FileSaved[crc] = file; LeaveCriticalSection(&Gate);
+ }
+ std::string src = Utf8(source.c_str());
+ if (src.size() > 300) src = src.substr(src.size() - 300);
+ char line[1200];
+ sprintf_s(line, "{\"file\":%s,\"fmt\":\"%s\",\"how\":\"%s\",\"start\":%llu,\"bytes\":%lu,\"crc\":\"%08lx\",\"offset\":%llu,\"source\":%s}\n",
+  Json(file).c_str(), fmt, how, at, n, crc, offset, Json(src).c_str());
+ Append(L"files.jsonl", line);
+}
+ULONG Head(const unsigned char *p, DWORD n) { ULONG h = 0; DWORD k = n < 64 ? n : 64; for (DWORD i = 0; i < k; i++) h = h * 31 + p[i]; return h; }
+void ReadDone(HANDLE file, const unsigned char *p, DWORD n) {
+ if (n < MinClipBytes || n > MaxVoiceFile) return;
+ std::wstring source; EnterCriticalSection(&Gate); auto it = Names.find(file); if (it != Names.end()) source = it->second; LeaveCriticalSection(&Gate);
+ if (source.empty()) return; // pipes, consoles, files opened before the DLL arrived
+ LARGE_INTEGER zero, pos; zero.QuadPart = 0; pos.QuadPart = 0; SetFilePointerEx(file, zero, &pos, FILE_CURRENT);
+ ULONGLONG offset = (ULONGLONG)pos.QuadPart - n, at = NowMs();
+ const char *fmt = Sniff(p, n);
+ if (*fmt) { Keep(p, n, fmt, at, offset, source, "plain"); return; }
+ // Not (yet) a voice file: watched in case the game decrypts it in place.
+ EnterCriticalSection(&Gate);
+ if (Reads.size() < 64) Reads.push_back(Read{ p, n, Head(p, n), GetTickCount(), at, offset, source });
+ LeaveCriticalSection(&Gate);
+}
+BOOL WINAPI HRead(HANDLE h, LPVOID buf, DWORD want, LPDWORD got, LPOVERLAPPED ov) {
+ BOOL ok = ORead(h, buf, want, got, ov);
+ if (ok && !ov && got && *got && Live()) { DWORD e = GetLastError(); ULONGLONG was = Enter(); __try { ReadDone(h, (const unsigned char *)buf, *got); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("ReadFile"); } Leave(was); SetLastError(e); }
+ return ok;
+}
+// Each tick: a watched read whose first bytes changed into a voice file's magic is saved; older than 3 s, dropped.
+void FileTick() {
+ std::vector<Read> now; EnterCriticalSection(&Gate); now.swap(Reads); LeaveCriticalSection(&Gate);
+ std::vector<Read> keep;
+ DWORD tick = GetTickCount();
+ for (auto &r : now) {
+  std::vector<unsigned char> head; if (!Copy(head, r.p, r.n < 64 ? r.n : 64)) continue; // freed: gone
+  if (Head(head.data(), (DWORD)head.size()) != r.head) {
+   // Changed: decrypted in place (or the buffer was reused). Check the whole start only once it holds a voice magic.
+   std::vector<unsigned char> first; if (!Copy(first, r.p, r.n < 0x40 ? r.n : 0x40)) continue;
+   const char *fmt = Sniff(first.data(), (DWORD)first.size());
+   if (*fmt) Keep(r.p, r.n, fmt, r.at, r.offset, r.source, "inplace");
+   continue;
+  }
+  if (tick - r.born < ReadWatchMs) keep.push_back(r);
+ }
+ EnterCriticalSection(&Gate); for (auto &r : keep) if (Reads.size() < 64) Reads.push_back(r); LeaveCriticalSection(&Gate);
 }
 
 bool HookExport(const wchar_t *mod, const char *name, void *detour, void **orig) {
  HMODULE m = GetModuleHandleW(mod); void *fn = m ? (void *)GetProcAddress(m, name) : NULL;
- return fn && MH_CreateHook(fn, detour, orig) == MH_OK && MH_EnableHook(fn) == MH_OK;
+ return fn && Hk(fn, detour, orig);
 }
 void Log(const char *s) { char line[256]; sprintf_s(line, "%llu %s\r\n", NowMs(), s); Append(L"voice.log", line); }
 
-void SafeTick() { __try { Tick(); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("writer"); } }
-DWORD WINAPI Run(void *) {
- TlsSetValue(Tls, (void *)1);
- Crc32 = (Crc32Fn)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlComputeCrc32");
- bool ds = false, xa = false, wo = false, cf = false;
- std::map<HMODULE, int> fmodSeen;
- for (DWORD n = 0; On; n++) {
-  // Audio libraries are often loaded late (first sound, or after the title screen): look again for a minute.
-  if (n % 20 == 0 && n < 400) {
-   if (!cf) { cf = HookExport(L"kernel32.dll", "CreateFileW", (void *)HCFW, (void **)&OCFW); HookExport(L"kernel32.dll", "CreateFileA", (void *)HCFA, (void **)&OCFA); }
-   if (!ds && GetModuleHandleW(L"dsound.dll")) { ds = HookDsound(); Log(ds ? "dsound hooked" : "dsound not hooked"); }
-   if (!xa && (GetModuleHandleW(L"xaudio2_9.dll") || GetModuleHandleW(L"xaudio2_8.dll") || GetModuleHandleW(L"xaudio2_9redist.dll"))) { xa = HookXAudio2(); Log(xa ? "xaudio2 hooked" : "xaudio2 not hooked"); }
-   if (!wo && GetModuleHandleW(L"winmm.dll")) {
-    wo = HookExport(L"winmm.dll", "waveOutOpen", (void *)HWOpen, (void **)&OWOpen);
-    wo = HookExport(L"winmm.dll", "waveOutWrite", (void *)HWWrite, (void **)&OWWrite) && wo;
-    HookExport(L"winmm.dll", "waveOutReset", (void *)HWReset, (void **)&OWReset);
-    HookExport(L"winmm.dll", "waveOutClose", (void *)HWClose, (void **)&OWClose);
-    Log(wo ? "waveout hooked" : "waveout not hooked");
-   }
-   const wchar_t *fm[] = { L"fmod.dll", L"fmod64.dll", L"fmodex.dll", L"fmodex64.dll", L"fmodL.dll", L"fmodstudio.dll" };
-   for (auto f : fm) { HMODULE h = GetModuleHandleW(f); if (h && !fmodSeen.count(h)) { fmodSeen[h] = 1; HookFmodModule(h); Log("fmod hooked"); } }
-  }
-  Sleep(150);
-  SafeTick();
+void SafeTick() { __try { Tick(); FileTick(); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("writer"); } }
+DWORD Ticks; bool HaveDs, HaveXa, HaveWo, HaveFile; std::map<HMODULE, int> FmodSeen;
+// Audio libraries are often loaded late (first sound, or after the title screen): looked for again for two minutes.
+void Look() {
+ if (!HaveFile) {
+  HaveFile = HookExport(L"kernel32.dll", "CreateFileW", (void *)HCFW, (void **)&OCFW);
+  HookExport(L"kernel32.dll", "CreateFileA", (void *)HCFA, (void **)&OCFA);
+  HaveFile = HookExport(L"kernel32.dll", "ReadFile", (void *)HRead, (void **)&ORead) && HaveFile;
+  Log(HaveFile ? "file reads hooked" : "file reads not hooked");
  }
- return 0;
+ if (!HaveDs && GetModuleHandleW(L"dsound.dll")) { HaveDs = HookDsound(); Log(HaveDs ? "dsound hooked" : "dsound not hooked"); }
+ if (!HaveXa && (GetModuleHandleW(L"xaudio2_9.dll") || GetModuleHandleW(L"xaudio2_8.dll") || GetModuleHandleW(L"xaudio2_9redist.dll"))) { HaveXa = HookXAudio2(); Log(HaveXa ? "xaudio2 hooked" : "xaudio2 not hooked"); }
+ if (!HaveWo && GetModuleHandleW(L"winmm.dll")) {
+  HaveWo = HookExport(L"winmm.dll", "waveOutOpen", (void *)HWOpen, (void **)&OWOpen);
+  HaveWo = HookExport(L"winmm.dll", "waveOutWrite", (void *)HWWrite, (void **)&OWWrite) && HaveWo;
+  HookExport(L"winmm.dll", "waveOutReset", (void *)HWReset, (void **)&OWReset);
+  HookExport(L"winmm.dll", "waveOutClose", (void *)HWClose, (void **)&OWClose);
+  Log(HaveWo ? "waveout hooked" : "waveout not hooked");
+ }
+ const wchar_t *fm[] = { L"fmod.dll", L"fmod64.dll", L"fmodex.dll", L"fmodex64.dll", L"fmodL.dll", L"fmodstudio.dll" };
+ for (auto f : fm) { HMODULE h = GetModuleHandleW(f); if (h && !FmodSeen.count(h)) { FmodSeen[h] = 1; HookFmodModule(h); Log("fmod hooked"); } }
 }
 } // namespace voice
 
-// Called from RuntimeDump.cpp Run() with the per-game output folder (ending in '\'), before its own on/off check.
+// Module entry points (modules/modules.h): Start once with the game's dump folder (ends in '\\'), Tick about every 120 ms
+// on the DLL's watcher thread. MinHook is already initialised by RuntimeDump.cpp.
 void VoiceStart(const wchar_t *out) {
  using namespace voice;
  // A cold tool: no switch. It stays off only for a game where it has faulted three times (voice\disabled.txt).
@@ -498,6 +614,7 @@ void VoiceStart(const wchar_t *out) {
   std::wstring txt = std::wstring(out) + L"game.txt";
   if (g && GetFileAttributesW(txt.c_str()) == INVALID_FILE_ATTRIBUTES) { *g = 0; std::string u = Utf8(game); swprintf_s(Dir, L"%s", out); Put(L"game.txt", u.data(), (DWORD)u.size(), NULL, 0); }
  }
+ swprintf_s(OutDir, L"%s", out);
  swprintf_s(Dir, L"%svoice\\", out); CreateDirectoryW(Dir, NULL);
  Budget = 1536ll << 20;
  // Disk already used by earlier runs counts against the budget.
@@ -507,9 +624,17 @@ void VoiceStart(const wchar_t *out) {
  Seq = top;
  InitializeCriticalSection(&Gate);
  Tls = TlsAlloc();
+ Crc32 = (Crc32Fn)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlComputeCrc32");
  MH_STATUS s = MH_Initialize();
  if (s != MH_OK && s != MH_ERROR_ALREADY_INITIALIZED) return;
  On = 1;
- HANDLE t = CreateThread(NULL, 0, Run, NULL, 0, NULL);
- if (t) CloseHandle(t);
+ TlsSetValue(Tls, (void *)1); // the watcher thread's own file use is never watched
+ Look();
+}
+void VoiceTick() {
+ using namespace voice;
+ if (!On) return;
+ TlsSetValue(Tls, (void *)1);
+ if (++Ticks % 16 == 0 && Ticks < 1000) Look();
+ SafeTick();
 }
