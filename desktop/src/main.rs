@@ -527,7 +527,7 @@ fn main() {
             if window.label()=="reader"{let root=state.root.clone();tauri::async_runtime::spawn_blocking(move||{let _=run_service(root,json!({"action":"reader_detach"}));});return;}
             if window.label()!="main"{return;}
             if !state.exiting.load(Ordering::SeqCst) {
-                state.window_memory.queue_capture(window.clone());state.window_memory.flush();
+                state.window_memory.capture(window);state.window_memory.flush();
                 let close_to_tray=window_policy::close_to_tray(&state.root);
                 if close_to_tray { api.prevent_close(); let _=window.hide(); }
             }

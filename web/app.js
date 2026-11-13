@@ -246,8 +246,8 @@ function shell(){
   document.querySelector('#reader-notice button').onclick=event=>retryReader(event.currentTarget);
   /* E273 (user: the close button did nothing when maximized): the invisible top-right resize corner sat over the close
      button and swallowed the click, and resizing is a no-op while maximized. Hide the corners while maximized. */
-  {const mark=()=>document.documentElement.classList.toggle('is-maximized',outerWidth>=screen.availWidth-2&&outerHeight>=screen.availHeight-2);mark();addEventListener('resize',
-   mark);}
+  {const mark=()=>document.documentElement.classList.toggle('is-maximized',outerWidth>=screen.availWidth-2&&outerHeight>=screen.availHeight-2);mark();bindGlobalOnce('resize',()=>addEventListener('resize',
+   mark));}
   document.querySelectorAll('[data-resize]').forEach(handle=>handle.addEventListener('mousedown',event=>{if(event.button!==0)return;event.preventDefault();event.stopPropagation();
    invoke('window_action',{action:'resize_'+handle.dataset.resize}).catch(error=>toast(errorMessage(error)));}));
   {const logo=document.querySelector('.titlebar .brand-logo'),hist=document.querySelector('.titlebar .nav-history');if(logo&&hist)logo.after(hist);}
@@ -256,10 +256,12 @@ function shell(){
   moveTabInk();
   document.querySelectorAll('[data-nav-step]').forEach(button=>button.addEventListener('click',()=>stepNavigation(Number(button.dataset.navStep))));updateNavButtons();
   // Mouse side buttons and Alt+arrows step through the same history.
-  addEventListener('mouseup',event=>{if(event.button===3||event.button===4){event.preventDefault();stepNavigation(event.button===3?-1:1);}});
+  bindGlobalOnce('history-keys',()=>{addEventListener('mouseup',event=>{if(event.button===3||event.button===4){event.preventDefault();stepNavigation(event.button===3?-1:1);}});
   addEventListener('keydown',event=>{if(event.altKey&&!event.ctrlKey&&(event.key==='ArrowLeft'||event.key==='ArrowRight')&&!event.target.closest?.('input,textarea,select,[contenteditable]')){
-   event.preventDefault();stepNavigation(event.key==='ArrowLeft'?-1:1);}});
+   event.preventDefault();stepNavigation(event.key==='ArrowLeft'?-1:1);}});});
 }
+/* shell() runs again on every language change: window/document listeners must be added only once or back/forward steps twice */
+const boundGlobals=new Set();function bindGlobalOnce(key,bind){if(boundGlobals.has(key))return;boundGlobals.add(key);bind();}
 function bindDrag(){
  const drag=event=>{if(event.button!==0||event.detail>1||event.target.closest('button,input,select,textarea,a,summary'))return;event.preventDefault();window.__TAURI_INTERNALS__?.invoke('plugin:window|start_dragging',
   {label:'main'}).catch(error=>toast(errorMessage(error)));};
@@ -267,13 +269,13 @@ function bindDrag(){
   {action:'maximize'}).catch(error=>toast(errorMessage(error)));});
  document.querySelector('.app-frame').addEventListener('mousedown',event=>{if(event.target.matches('.app-frame,.workspace,.main'))drag(event);});
  /* 2026-11-12 (user: the start notice stopped the whole window from moving or resizing) a modal dialog makes the rest of the page inert and its backdrop takes every press: over a resize handle the window still resizes, over a title-bar button that button still works, anywhere else on the title bar the window still moves. Every dialog, not only the notice. */
- document.addEventListener('mousedown',event=>{const d=event.target;if(!(d instanceof HTMLDialogElement)||!d.open||event.button!==0)return;const x=event.clientX,
+ bindGlobalOnce('dialog-backdrop',()=>document.addEventListener('mousedown',event=>{const d=event.target;if(!(d instanceof HTMLDialogElement)||!d.open||event.button!==0)return;const x=event.clientX,
   y=event.clientY,r=d.getBoundingClientRect();if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom)return;const inside=q=>q.width>0&&x>=q.left&&x<=q.right&&y>=q.top&&y<=q.bottom;
   for(const h of document.querySelectorAll('[data-resize]'))if(inside(h.getBoundingClientRect())){event.preventDefault();event.stopPropagation();invoke('window_action',
    {action:'resize_'+h.dataset.resize}).catch(()=>{});return;}
   const bar=document.querySelector('.titlebar');if(!bar||!inside(bar.getBoundingClientRect()))return;event.preventDefault();event.stopPropagation();
   const button=[...bar.querySelectorAll('button')].find(b=>inside(b.getBoundingClientRect()));if(button){button.click();return;}
-  window.__TAURI_INTERNALS__?.invoke('plugin:window|start_dragging',{label:'main'}).catch(()=>{});},true);
+  window.__TAURI_INTERNALS__?.invoke('plugin:window|start_dragging',{label:'main'}).catch(()=>{});},true));
 }
 
 function empty(label,symbol='library',sub=''){const kind={[text.emptyWords]:'words',[text.emptySentences]:'sentences',[text.emptyTrash]:'trash',[text.emptyHistory]:'history',
