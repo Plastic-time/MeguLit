@@ -100,6 +100,14 @@ static void FinishEmbed(long id,string trans,bool hide=false){PendingEmbed p;loc
  static void ScnCapture(string bit,string loader,string[] args){try{string dll=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"MeguLitScn"+bit+".dll"),exe="";if(!File.Exists(dll))return;IntPtr h=OpenProcess(0x1000,false,Pid);if(h==IntPtr.Zero)return;try{var sb=new System.Text.StringBuilder(32768);int size=sb.Capacity;if(QueryFullProcessImageName(h,0,sb,ref size))exe=sb.ToString();}finally{CloseHandle(h);}
   if(exe==""||Directory.GetFiles(Path.GetDirectoryName(exe),"*.xp3").Length==0)return;var start=new ProcessStartInfo(loader,Pid+" "+args[1]+" \""+args[2]+"\" "+args[3]+" \""+dll+"\""){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true};
   using(var child=Process.Start(start)){if(!child.WaitForExit(12000)){Diagnostic("scene capture load timed out");return;}Diagnostic(child.ExitCode==0?"scene capture loaded":"scene capture failed: "+child.StandardError.ReadToEnd().Trim());}}catch(Exception e){Diagnostic("scene capture skipped: "+e.Message);}}
+ // Runtime dump (native\runtimedump\RuntimeDump.cpp): MeguLitDump<bit>.dll saves the scripts and translation packs a game
+ // decrypts in its own memory, whatever the cipher. Loaded only for games switched on with cache\runtime-dump\<key>\on
+ // (key: FNV-1a of the lower-case game folder, services/runtime-dump.cjs); any failure is only logged.
+ static string RuntimeDumpKey(string dir){uint h=2166136261;foreach(char ch in dir){uint c=ch;if(c>=65&&c<=90)c+=32;h=unchecked((h^c)*16777619);}return h.ToString("x8");}
+ static void RuntimeDump(string bit,string loader,string[] args){try{string dll=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"MeguLitDump"+bit+".dll"),exe="";if(!File.Exists(dll))return;IntPtr h=OpenProcess(0x1000,false,Pid);if(h==IntPtr.Zero)return;try{var sb=new System.Text.StringBuilder(32768);int size=sb.Capacity;if(QueryFullProcessImageName(h,0,sb,ref size))exe=sb.ToString();}finally{CloseHandle(h);}
+  if(exe=="")return;string root=Environment.GetEnvironmentVariable("MEGULIT_RUNTIME_DUMP");if(String.IsNullOrEmpty(root))root=Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\')),"cache","runtime-dump");
+  if(!File.Exists(Path.Combine(root,RuntimeDumpKey(Path.GetDirectoryName(exe)),"on")))return;var start=new ProcessStartInfo(loader,Pid+" "+args[1]+" \""+args[2]+"\" "+args[3]+" \""+dll+"\""){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true};
+  using(var child=Process.Start(start)){if(!child.WaitForExit(12000)){Diagnostic("runtime dump load timed out");return;}Diagnostic(child.ExitCode==0?"runtime dump loaded":"runtime dump failed: "+child.StandardError.ReadToEnd().Trim());}}catch(Exception e){Diagnostic("runtime dump skipped: "+e.Message);}}
  static void Diagnostic(string value){try{string file=Under("logs","hook-diagnostics.log");lock(OutputGate){if(!File.Exists(file)||new FileInfo(file).Length<1048576)File.AppendAllText(file,DateTime.UtcNow.ToString("o")+" "+value+Environment.NewLine);}}catch{}}
  // E244 per-game stream memory: the dialogue stream that last replaced text is remembered per game executable (name + size),
  // so the next launch pre-arms it and embeds from the first line. Written only after a real replacement; ignored on mismatch.
@@ -375,6 +383,7 @@ static volatile bool SkipHeld;static int BurstRun;const int BurstSkipLines=8;sta
    RenpyText(bit,loader,args);
    FontProbe(bit,loader,args);
    ScnCapture(bit,loader,args);
+   RuntimeDump(bit,loader,args);
    new Thread(Input){IsBackground=true}.Start();DateTime until=DateTime.UtcNow.AddSeconds(15);while(!Quit){if(!Connected&&DateTime.UtcNow>until)throw new Exception("LunaHook 未连接当前游戏");if(WaitHook!=null)WaitHook.Tick();Heartbeat();Thread.Sleep(40);}return 0;
   }catch(Exception e){Emit(new{type="hookError",hookActive=false,hookMessage=e.Message});return 1;}
   finally{if(WaitHook!=null)WaitHook.Dispose();if(Started){try{Deactivate("bridge-shutdown");Luna_DetachProcess(Pid);}catch{}}GC.KeepAlive(Keep);/* Keep loaded native code alive until process exit: native worker callbacks may still be returning. */}
