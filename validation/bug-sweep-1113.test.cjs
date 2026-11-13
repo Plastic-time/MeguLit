@@ -27,3 +27,18 @@ test('broker shutdown waits for the lock with a deadline and refuses new request
  assert.match(s,/if CLOSING\.load\(Ordering::SeqCst\)\{return Err\("SERVICE_CLOSING"/);
  assert.doesNotMatch(s,/if let Ok\(mut slot\)=broker\.process\.lock\(\)/);
 });
+
+test('font-follow migration: an unreadable (locked) preferences file throws so the one-time flag waits; missing or broken JSON is skipped',()=>{
+ const os=require('node:os'),M=require('../services/font-follow-migration.cjs');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-ffm-'));
+ assert.deepEqual(M.migrateFiles(dir),{global:false,profiles:0});
+ fs.writeFileSync(path.join(dir,'gal-preferences.json'),'{broken');assert.equal(M.migrateFiles(dir).global,false);
+ fs.rmSync(path.join(dir,'gal-preferences.json'));fs.mkdirSync(path.join(dir,'gal-preferences.json'));
+ assert.throws(()=>M.migrateFiles(dir));
+ fs.rmSync(dir,{recursive:true,force:true});
+});
+
+test('first-line speaker strip trims leading whitespace, not the letter s',()=>{
+ const s=read('services/original-text.cjs');
+ assert.match(s,/o\.replace\(\/\^\[\\s　\]\*\/,''\)/);assert.doesNotMatch(s,/o\.replace\(\/\^s\*\//);
+});
