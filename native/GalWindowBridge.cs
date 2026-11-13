@@ -394,6 +394,13 @@ public class GalWindowBridge {
         else if(type=="sceneShot"){string id=Str(d,"id");IntPtr target=Target;
             ThreadPool.QueueUserWorkItem(delegate{string jpeg="",hash="";double score=0;try{Rect rect;if(target!=IntPtr.Zero&&GetClientRect(target,out rect))jpeg=GameAudio.SceneShot(target,rect.Right,rect.Bottom,out score,out hash);}catch{}
                 try{Emit(new{type="sceneShot",id=id,jpeg=jpeg,score=score,hash=hash});}catch{}});}
+        /* 2026-11-13 collected sentence pictures: a full clean frame (asked only while the dialogue box is hidden) and a cheap probe of the top hash */
+        else if(type=="sceneFrame"){string id=Str(d,"id");IntPtr target=Target;
+            ThreadPool.QueueUserWorkItem(delegate{string jpeg="",hash="";double score=0;try{Rect rect;if(target!=IntPtr.Zero&&GetClientRect(target,out rect))jpeg=GameAudio.SceneFrame(target,rect.Right,rect.Bottom,out score,out hash);}catch{}
+                try{Emit(new{type="sceneFrame",id=id,jpeg=jpeg,score=score,topHash=hash});}catch{}});}
+        else if(type=="sceneProbe"){string id=Str(d,"id");IntPtr target=Target;
+            ThreadPool.QueueUserWorkItem(delegate{string hash="";try{Rect rect;if(target!=IntPtr.Zero&&GetClientRect(target,out rect))hash=GameAudio.SceneProbe(target,rect.Right,rect.Bottom);}catch{}
+                try{Emit(new{type="sceneProbe",id=id,topHash=hash});}catch{}});}
         else if(type=="mediaClip"){string id=Str(d,"id");long from=(long)Num(d,"from",0),to=(long)Num(d,"to",0);bool shot=Bool(d,"screenshot"),readerShot=Bool(d,"readerScreenshot");IntPtr target=Target,readerWindow=Overlay;
             var readerArea=new System.Drawing.Rectangle((int)Num(d,"readerX",0),(int)Num(d,"readerY",0),(int)Num(d,"readerWidth",0),(int)Num(d,"readerHeight",0));
             ThreadPool.QueueUserWorkItem(delegate{string wav="",jpeg="";bool voiced=false;try{var voice=GameAudio.Voice(Audio.Range(from,to));if(voice!=null){voiced=true;wav=Convert.ToBase64String(GameAudio.Wav(voice));}
@@ -628,6 +635,7 @@ if(args.Length==2&&args[0]=="--art-scan-file"){Console.OutputEncoding=Encoding.U
             if(!CoversMonitor(0,0,1920,1080,0,0,1920,1080)||CoversMonitor(0,0,1280,720,0,0,1920,1080)||!CoversMonitor(-8,-8,1928,1088,0,0,1920,1080)||OverlayMayActivate(true,true,true)||!OverlayMayActivate(false,true,true)||OverlayMayActivate(false,true,false))return 6;
             Emit(new{type="focus-selftest",passed=true,fullscreenGameKeepsForeground=true,foreignApplicationsYield=true,minimizedWindowPreserved=true});return 0;
         }
+        if(args.Length>0&&args[0]=="--scene-frame-self-test"){string r=GameAudio.SceneFrameSelfTest();Console.WriteLine(r=="0"?"PASS scene frame: top hash ignores the dialogue box, other scenes differ, fades give nothing, JPEG long side 1600":"FAIL scene frame: "+r);return r=="0"?0:15;}
         if(args.Length>0&&args[0]=="--audio-self-test"){if(!GameAudio.SelfTest())return 7;Console.WriteLine("PASS game audio: speech found over steady music, music alone rejected, WAV valid");return 0;}
         if(args.Length>0&&args[0]=="--self-test"){
             Rect b=Place(new Rect(100,200,1100,1000),4,66,92,26);

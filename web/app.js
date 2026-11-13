@@ -33,6 +33,8 @@ import {leaderboardLabel,mountLeaderboard,setView as setLeaderboardView} from '.
 import {setForumFilter} from './forum-view.js';
 import {maybeFirstRun} from './first-run.js';
 let selectedGameId='',gameOrigin='library',selectedSeriesId='';
+/* 2026-11-13 the detail tab a page asked the game page to open on (学习 › 句子 书架 → 收录句子); used once */
+let gameTab='';
 import {renderSettings} from './settings.js';
 import {openProfilePanel} from './profile-panel.js';
 import {avatarHTML} from './leaderboard-view.js';
@@ -913,7 +915,7 @@ async function learning(token){
   if(subtab==='review'){await review(token,target);if(token===pageToken){enhanceSelects(target);commit();}return;}
   if(subtab==='sentences'){try{const {mountSentences}=await import('./sentences-page.js');if(token!==pageToken)return;await mountSentences(target,{api,locale,esc,
    toast,errorMessage,empty,emptyLabel:text.emptySentences,readTime,datetime,icon,isCurrent:()=>token===pageToken,rerender:()=>renderRoute(),lookup:word=>{pendingDictionaryQuery=word;
-   navigate('learning','dictionary');},openGame:id=>{gameOrigin='library';selectedGameId=id;navigate('game');}});}catch(error){learningFailed(target,error,token);
+   navigate('learning','dictionary');},openGame:(id,opts)=>{gameOrigin='library';selectedGameId=id;gameTab=opts?.tab||'';navigate('game');},games:model.games,cover});}catch(error){learningFailed(target,error,token);
    }if(token===pageToken)commit();return;}
   let items,pending;try{[items,pending]=await Promise.all([api(subtab==='words'?'vocabulary':subtab==='trash'?'word_trash':'sentences'),subtab==='words'?api('unknown_words').catch(()=>[]):[]]);
    }catch(error){learningFailed(target,error,token);if(token===pageToken)commit();return;}if(token!==pageToken)return;
@@ -1193,9 +1195,9 @@ async function renderRoute(){watchStage();
    if(route!=='learning'&&route!=='statistics')main.classList.remove('review-page');if(route!=='learning'&&route!=='statistics')delete main.dataset.page;main.scrollTop=0;
   try{
     if(route==='home')home();else if(route==='library')library();else if(route==='series')seriesUI.renderDetail(main,selectedSeriesId);else if(route==='game'){main.innerHTML=loading();
-     await renderGamePage({main,id:selectedGameId,api,invoke,locale,text,esc,icon,cover,duration,datetime,relativeTime,number,definitions,isCurrent:()=>token===pageToken,
+     await renderGamePage({main,id:selectedGameId,tab:(t=>(gameTab='',t))(gameTab),api,invoke,locale,text,esc,icon,cover,duration,datetime,relativeTime,number,definitions,isCurrent:()=>token===pageToken,
      onBack:()=>navigate(gameOrigin),onLaunch:startGame,onEdit:editGame,onRemove:removeGame,onForum:game=>{setForumFilter({game:String(game?.title||''),engine:'',
-     tag:'',mine:false});setLeaderboardView({tab:'forum'});navigate('leaderboard');},onOriginalChanged:async()=>{model=await api('home');if(token===pageToken)renderRoute();
+     tag:'',mine:false});setLeaderboardView({tab:'forum'});navigate('leaderboard');},onLookup:word=>{pendingLookup=word;navigate('learning','dictionary');},onOriginalChanged:async()=>{model=await api('home');if(token===pageToken)renderRoute();
      },toast});}else if(route==='history')await history(token);else if(route==='learning')await learning(token);else if(route==='settings')await settings(token);
      else if(route==='leaderboard')await mountLeaderboard(main,{api,locale,esc,toast,isCurrent:()=>token===pageToken,lookup:word=>{pendingLookup=word;navigate('learning',
      'dictionary');},openSettings:section=>{settingsSection=section;settingsProfile='';try{localStorage.setItem('megulit-settings-section',section);}catch{}navigate('settings');
