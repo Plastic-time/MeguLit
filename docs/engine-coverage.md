@@ -42,12 +42,12 @@ MeguLit 对一款游戏的支持分三层：
 | AliceSoft System4 | 143 | 127 | 27 | ✅ | ✅ .ain（旧适配层）；🟡 .ald/.afa（🆕 白名单） | ✅ |  |
 | KaGuYa | 124 | 124 | 54 | 🆕 | 🟡 GARbro（.arc） | ⚪ |  |
 | Marble | 140 | 124 | 0 | 🆕 | 🟡 GARbro（🆕 .mbl） | ⚪ |  |
-| Ikura GDL | 124 | 123 | 2 | 🆕 | ❌（无扩展名 SM2MPX10 包，GARbro 能开但兜底不扫无扩展名文件） | ⚪ |  |
+| Ikura GDL | 124 | 123 | 2 | 🆕 | 🆕 ikura.cjs：无扩展名 SM2MPX10 / DRS 归档 + ISF 指令流（PM 0xFF 文本，按版本变换）；带 SECRETFILTER 的作品报告“需要密钥” | ⚪ | 公开资料；SECRETFILTER 作品要每作品密钥 |
 | AdvHD / WillPlus | 124 | 123 | 103 | ✅ | ✅ Rio.arc .wsc | ✅ |  |
 | Ren'Py | 945 | 120 | 108 | ✅ | ✅ .rpy；🆕 无源码时读 .rpyc / .rpa，编译版 tl 按 translate id 配对 | ◎ MeguLitRenpy 桥 + ✅ | 商业/Steam 版多只带 rpyc+rpa，原来读不到 |
 | Softpal ADV | 119 | 119 | 82 | 🆕 修正（PAL.dll 在 dll\ 下原来认不出） | 🆕 softpal.cjs：data.pac + SCRIPT.SRC/TEXT.DAT（实机文件验证 33102 行） | ✅ |  |
 | AVG32 | 111 | 110 | 0 | ✅（归为 RealLive） | ✅ TXT/SEEN.TXT | ✅ |  |
-| ExHIBIT | 104 | 98 | 56 | 🆕（.rld 脚本） | ❌ | ⚪ | 2016 后仍有 56 个公司发行 |
+| ExHIBIT | 104 | 98 | 56 | 🆕（.rld，含 rld\ 子目录） | 🆕 exhibit.cjs：rld 自描述指令（0x1C 台词 / 0x15 选项），明文或已知种子（rld-seeds.json） | ⚪ | 2016 后仍有 56 个公司发行；未知种子报告“需要种子” |
 | Bruns | 165 | 88 | 6 | 🆕 | ✅ scene/*.bso | ⚪ | 原来有读取器但库里是未知引擎 |
 | SaiSys | 80 | 80 | 0 | ❌ | ❌ | ⚪ |  |
 | TyranoScript | 4052 | 75 | 74 | 🆕 扩展（app.asar 读索引、package.nw） | 🆕 tyrano.cjs：散文件 / app.asar / package.nw / exe 尾部 zip | ✅（V8：nwjs/electron） | 原来被 kirikiri 读取器当 KAG 读，#名字 当正文 |
@@ -55,23 +55,23 @@ MeguLit 对一款游戏的支持分三层：
 | MAGES. | 60 | 60 | 51 | ✅ | ✅ script.mpk SC3（日版） | ◎ MAGES 内嵌 + ✅ |  |
 | DxLib | 62 | 58 | 21 | ✅ | 🟡 GARbro（.dxa） | ✅ |  |
 | Silky's | 57 | 55 | 52 | 🆕 | 🆕 silky.cjs：Silky .arc / IFL + .mes 操作码遍历（E576） | ⚪ |  |
-| EAGLS | 53 | 53 | 16 | 🆕 | 🟡 GARbro（.pak+.idx） | ✅ |  |
+| EAGLS | 53 | 53 | 16 | 🆕（含 Script\SCPACK） | 🆕 eagls.cjs：SCPACK.pak+.idx（默认密钥或由全 0 尾部自动求解）、.dat 隔字节 EAGLS_SYSTEM 流异或、#说话人 + 引号字面量 | ✅ | AdvSys 变体（136000 起 "ADVSYS"）未做 |
 | Musica (PAZ) | 54 | 53 | 25 | 🆕 | ✅ scr.dat / *.paz（paz.cjs） | ✅ | 原来有读取器但库里是未知引擎 |
-| Seraph | 63 | 53 | 0 | 🆕（ArchPac.dat） | ❌ | ⚪ |  |
+| Seraph | 63 | 53 | 0 | 🆕（ArchPac.dat） | 🟡 seraph.cjs：ScnPac.dat 偏移表 + 自有 LZ / zlib 按规格做实，剧本语法无公开资料 → 通用文本扫描（行近似，按位置配对） | ⚪ | 需实物确认剧本语法 |
 | SystemC | 53 | 52 | 33 | ❌ | ❌ | ⚪ | 2016 后 33 |
 | RPG Maker | 752 | 46 | 44 | ✅ | ✅ MV/MZ JSON；🆕 XP/VX/VX Ace：RGSSAD + Ruby Marshal，与 MV 共用消息遍历（E574） | ⚪ MV/MZ；✅ VX/XP |  |
 | CMVS (Purple) | 44 | 44 | 26 | 🆕 | 🟡 GARbro（.cpz，新版 cpz7 未必能开） | ✅ |  |
 | Lucifen | 48 | 44 | 4 | 🆕 | 🟡 GARbro（.lpk） | ⚪ |  |
-| Tmr-Hiro ADV | 40 | 39 | 29 | ❌ | ❌ | ⚪ | .pac 无魔数 |
+| Tmr-Hiro ADV | 40 | 39 | 29 | 🆕（.pac 索引自洽即认） | 🆕 tmrhiro.cjs：.pac（v1/v2）+ srp 指令流（半字节互换、“姓名,正文”、选项） | ⚪ | .pac 无魔数；TextScript（无扩展名）无可靠识别特征未做 |
 | FVP (FAVORITE) | 36 | 36 | 22 | 🆕 | ✅ <名>.hcb | ✅ | 原来有读取器但库里是未知引擎 |
 | Godot | 61 | 35 | 35 | 🆕 | ❌ | ⚪（LunaHook64 有 Godot2_x64） |  |
 | rUGP (âge) | 34 | 33 | 7 | 🆕 | ❌ | ⚪ |  |
-| Interheart FPK | 33 | 33 | 0 | ❌ | 🟡 GARbro（.fpk） | ⚪ |  |
+| Interheart FPK | 33 | 33 | 0 | 🆕（.fpk 索引自洽即认） | 🟡 interheart.cjs：.fpk 三种索引 + FPK 2.00 + ZLC2 按规格做实，剧本语法无公开资料 → 通用文本扫描 | ⚪ | 需实物确认剧本语法 |
 | SakanaGL | 32 | 32 | 32 | 🆕（sakanagl.dll） | ❌ | ✅（LunaHook 有 sakanagl hook） | 2016 后 32 |
 | Diesel Engine | 31 | 31 | 27 | ❌ | ❌ | ⚪ |  |
 | AI5WIN / AI6WIN (elf/Silky) | 31 | 31 | 11 | 🆕（AI5WIN/AI6WIN.exe） | 🆕 silky.cjs：AI6WIN 完整；AI5WIN 归档 + 通用扫描（E576） | ⚪ |  |
 | LC-ScriptEngine | 41 | 30 | 0 | ✅ | ❌ | ✅ |  |
-| NEKOPACK / NekoSDK | 30 | 30 | 10 | 🆕 | 🟡 GARbro（.dat/.pak） | ⚪ |  |
+| NEKOPACK / NekoSDK | 30 | 30 | 10 | 🆕（NekoSDK 单列） | 🆕 nekosdk.cjs：NEKOPACK4 .pak、0xCACACA .dat + ADVSCRIPT2 对白（选项无资料）；NekoPack 1–3 仍走 GARbro | ⚪ | NekoPack 1–3（名字只存哈希、流加密）是另一套引擎 |
 | PIX STUDIO | 28 | 28 | 27 | ❌ | ❌ | ⚪ |  |
 | GLib2 | 27 | 27 | 0 | 🆕 | ❌ | ⚪ |  |
 | ISM | 37 | 21 | 5 | 🆕 | 🟡 GARbro（.isa） | ⚪ |  |

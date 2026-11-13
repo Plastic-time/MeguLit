@@ -52,7 +52,7 @@ const ENGINES=[
  /* E569 engines MeguLit did not know at all: named so the library is not "unknown"; text goes through the general hook and
     is confirmed on first play (hook:null) */
  {name:'CMVS (Purple Software)',hook:true,test:f=>f.magicAny(/\.cpz$/i,'CPZ')},
- {name:'EAGLS',hook:true,test:f=>f.has(/^eagles\.dll$/i)||f.has(/^scpack\.(pak|idx)$/i)},
+ {name:'EAGLS',hook:true,test:f=>f.has(/^eagles\.dll$/i)||f.has(/^scpack\.(pak|idx)$/i)||f.sub('script',/^scpack\.(pak|idx)$/i)},
  {name:'Ikura GDL',hook:null,test:f=>f.magicAny(/^[A-Za-z0-9_]{2,12}$/,'SM2MPX10')},
  {name:"Silky's",hook:null,test:f=>f.magicAny(/\.ifl$/i,'IFLS')||f.has(/^ai[56]win\.exe$/i)},
  /* E570 System-NNN keeps its story scripts loose in spt\ (beside nya\, init\ and the dwq / vaw packs) */
@@ -61,6 +61,10 @@ const ENGINES=[
  {name:'codeX RScript (Liar-soft)',hook:null,test:f=>f.magicAny(/\.xfl$/i,'LB\x01\0')},
  /* E572 AST: archives without an extension starting "ARC1" / "ARC2" */
  {name:'AST',hook:null,test:f=>f.magicAny(/^[A-Za-z0-9_]{1,16}$/,'ARC2',8)||f.magicAny(/^[A-Za-z0-9_]{1,16}$/,'ARC1',8)},
+ /* E585 no-magic archives are recognised by their index: Tmr-Hiro srp.pac (.pac with a script entry), Interheart .fpk, NekoSDK NEKOPACK4 .pak / 0xCACACA .dat (ADVSCRIPT2) */
+ {name:'Tmr-Hiro ADV',hook:null,test:f=>f.probe(/\.pac$/i,p=>require('../services/original-engines/tmrhiro.cjs').isPac(p))},
+ {name:'Interheart (FPK)',hook:null,test:f=>f.magicAny(/\.fpk$/i,'FPK 2.00')||f.probe(/\.fpk$/i,p=>require('../services/original-engines/interheart.cjs').isArchive(p))},
+ {name:'NekoSDK',hook:null,test:f=>f.magicAny(/\.pak$/i,'NEKOPACK4')||f.probe(/\.dat$/i,p=>require('../services/original-engines/nekosdk.cjs').isArchive(p))},
  {name:'KaGuYa',hook:null,test:f=>f.has(/\.ari$/i)&&f.has(/\.arc$/i)},
  {name:'Lucifen',hook:null,test:f=>f.magicAny(/\.lpk$/i,'LPK1')},
  {name:'Yuka',hook:null,test:f=>f.magicAny(/\.ykc$/i,'YKC00')},
@@ -74,7 +78,7 @@ const ENGINES=[
  {name:'Seraph',hook:null,test:f=>f.has(/^(archpac|scnpac)\.dat$/i)},
  {name:'ISM',hook:null,test:f=>f.magicAny(/\.isa$/i,'ISM ARCHIVED')},
  {name:'GLib2',hook:null,test:f=>f.has(/\.g2$/i)&&f.has(/\.stx$/i)},
- {name:'ExHIBIT',hook:null,test:f=>f.has(/\.rld$/i)||f.sub('dat',/\.rld$/i)},
+ {name:'ExHIBIT',hook:null,test:f=>f.has(/\.rld$/i)||f.sub('dat',/\.rld$/i)||f.sub('rld',/\.rld$/i)},
  {name:'SakanaGL',hook:null,test:f=>f.has(/^sakanagl\.dll$/i)},
  {name:'Leaf / AQUAPLUS',hook:true,test:f=>f.has(/^grp\.pak$/i)&&f.has(/^char\.pak$/i)&&f.has(/^(voice|bgm|se)\.pak$/i)},
  // More engines (user, 2026-11-09). Signatures are files only these engines ship; text reading goes through the
@@ -136,7 +140,9 @@ function listing(dir){let names=[];try{names=fs.readdirSync(dir);}catch{}const c
  /* E569 magicAny: one of the first few files matching re starts with head; peek: a file's first n bytes match re */
  const magicAny=(re,head,max=4)=>names.filter(x=>re.test(x)).slice(0,max).some(n=>{try{const fd=fs.openSync(path.join(dir,n),'r'),b=Buffer.alloc(head.length);try{fs.readSync(fd,b,0,b.length,0);}finally{fs.closeSync(fd);}return b.toString('latin1')===head;}catch{return false;}});
  const peek=(rel,re,n=4096)=>{try{const fd=fs.openSync(path.join(dir,rel),'r'),b=Buffer.alloc(n);let got;try{got=fs.readSync(fd,b,0,n,0);}finally{fs.closeSync(fd);}return re.test(b.toString('latin1',0,got));}catch{return false;}};
- return {names,magic,magicAny,peek,managed,has:re=>names.some(n=>re.test(n)),sub:(name,re)=>{const real=names.find(n=>n.toLowerCase()===name.toLowerCase());if(!real)return false;if(!(real in cache))try{cache[real]=fs.readdirSync(path.join(dir,real));}catch{cache[real]=[];}return cache[real].some(n=>re.test(n));}};}
+ /* E585 probe: one of the first few files matching re passes a structure check (archives with no magic: Tmr-Hiro .pac, Interheart .fpk, NekoSDK .dat) */
+ const probe=(re,check,max=4)=>names.filter(x=>re.test(x)).slice(0,max).some(n=>{try{return !!check(path.join(dir,n));}catch{return false;}});
+ return {names,magic,magicAny,peek,probe,managed,has:re=>names.some(n=>re.test(n)),sub:(name,re)=>{const real=names.find(n=>n.toLowerCase()===name.toLowerCase());if(!real)return false;if(!(real in cache))try{cache[real]=fs.readdirSync(path.join(dir,real));}catch{cache[real]=[];}return cache[real].some(n=>re.test(n));}};}
 function engineOf(dir){const f=listing(dir);for(const e of ENGINES)if(e.test(f))return e;return null;}
 /* A Steam emulator's launcher names the program it starts (SmartSteamEmu: SmartSteamEmu\launcher.ini Target, UTF-16);
    the original exe beside it quits without Steam (サノバウィッチ: SabbatOfTheWitch.exe vs SabbatOfTheWitch_crack.exe). */
