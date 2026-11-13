@@ -115,7 +115,7 @@ class HookNative{
    if(m.type==='hookName'&&typeof m.text==='string'){const n=speakerName(m.text);if(n){this.speaker={text:n,at:this.now()};this.noteSpeaker(n);}return;}
    if(m.type==='hookThreads'&&Array.isArray(m.hookThreads)){// Unity games create a stream per String-method call site (often 100+); keep the selected and embeddable ones
    // ahead of the cut so a late dialogue stream such as Naninovel's printer is never dropped.
-   const rank=t=>(t&&t.selected===true?2:0)+(t&&t.embeddable===true?1:0);this.notify({hookAvailable:true,hookThreads:m.hookThreads.slice().sort((a,b)=>rank(b)-rank(a)).slice(0,100).filter(t=>typeof t.id==='string'&&t.id.length<100).map(t=>({id:t.id,name:String(t.name||'').slice(0,100),code:String(t.code||'').slice(0,1000),sample:String(t.sample||'').slice(0,110),selected:t.selected===true,embeddable:t.embeddable===true,...(t.hideOnly===true?{hideOnly:true}:{})}))});this.syncEmbedMode();if(this.preferredThread&&this.state.hookThreads.some(t=>t.id===this.preferredThread)){const id=this.preferredThread;this.preferredThread=null;this.select(id);}else if(!this.foreignPick())this.flowStreamCheck();return;}
+   const rank=t=>(t&&t.selected===true?2:0)+(t&&t.embeddable===true?1:0);this.notify({hookAvailable:true,hookThreads:m.hookThreads.slice().sort((a,b)=>rank(b)-rank(a)).slice(0,100).filter(t=>typeof t.id==='string'&&t.id.length<100).map(t=>({id:t.id,name:String(t.name||'').slice(0,100),code:String(t.code||'').slice(0,1000),sample:String(t.sample||'').slice(0,110),selected:t.selected===true,embeddable:t.embeddable===true,...(t.hideOnly===true?{hideOnly:true}:{})}))});this.syncEmbedMode();this.leaveCheck();if(this.preferredThread&&this.state.hookThreads.some(t=>t.id===this.preferredThread)){const id=this.preferredThread;this.preferredThread=null;this.select(id);}else if(!this.foreignPick())this.flowStreamCheck();return;}
    if(['hookStatus','hookError','hookHeartbeat'].includes(m.type)){const value={};for(const k of ['processAttached','streamSelected','receivedText'])if(typeof m[k]==='boolean')value[k]=m[k];if(typeof m.replacementState==='string')value.replacementState=this.verified&&this.enabled?'user-verified':m.replacementState;if(typeof m.hookActive==='boolean')value.hookActive=m.hookActive;if(m.hookMessage)value.hookMessage=String(m.hookMessage).slice(0,400);if(m.type!=='hookError'&&(value.receivedText??this.state.receivedText)&&(value.processAttached??this.state.processAttached)&&(value.streamSelected??this.state.streamSelected))value.hookMessage='已收到真实游戏台词；'+((value.replacementState||this.state.replacementState)==='user-verified'?'原文隐藏已由用户确认':'原文替换状态请见分阶段诊断');this.notify(value);if(m.type==='hookError')this.retryAt=this.now()+1000;this.syncMarker();}
   });this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookSource:this.lastSource||null,hookRecovering:!!this.lastSource,hookFramework:this.state.hookFramework||null,hookMessage:'正在连接 LunaHook；等待实际文本流'});
  }
@@ -424,6 +424,22 @@ class HookNative{
     white space) right after itself is ignored until another line comes; very short lines such as …… keep the old
     650 ms so a script that repeats them still advances. */
  sameAsLast(text){const k=s=>String(s||'').replace(/\s+/g,''),key=k(text);if(!key||key!==k(this.lastSource))return false;const age=this.now()-(this.lastSourceAt||0);/* E408: the same line from another stream (two hooks on one line) within 2.5 s is the same line; from the same stream a short line is a real repeat after 650 ms */return key.length>=6||age<650||!!this.sourceStream&&!!this.lastSourceStream&&this.sourceStream!==this.lastSourceStream&&age<2500;}
+ /* E530 (DDLC Plus: the boot prompt "Press HELP key..." stayed in the reader on the main menu): the game left the dialogue
+    screen when the stream that sent the shown line has been silent for 12 s while other streams changed to three or more
+    different short labels (menu buttons, titles). Clock/number-only samples and prose do not count, so a player reading
+    slowly or a ticking UI never clears a real line. The reader is cleared with an empty line; the next real line shows as usual. */
+ leaveCheck(){try{const now=this.now(),threads=this.state?.hookThreads||[],L=this.leave||(this.leave={samples:new Map(),labels:new Set(),since:0});
+  if(L.since!==this.lastSourceAt){L.since=this.lastSourceAt;L.labels.clear();}
+  const selected=threads.find(t=>t.selected)?.id||'';
+  for(const t of threads){const sample=String(t.sample||'').trim(),old=L.samples.get(t.id);L.samples.set(t.id,sample);if(t.id===selected||!sample||old===sample)continue;
+   for(const row of sample.split(/\n+/)){const x=row.trim();if(HookNative.leaveLabel(x)&&!(this.lastSource&&String(this.lastSource).includes(x)))L.labels.add(x);}}
+  if(L.samples.size>300)L.samples.clear();
+  if(!this.lastSource||!this.lastSourceAt||now-this.lastSourceAt<12000||L.labels.size<3)return false;
+  this.trace('left dialogue screen: stream silent '+Math.round((now-this.lastSourceAt)/1000)+'s, labels='+JSON.stringify([...L.labels].slice(0,5)));
+  this.lastSource='';this.lastSourceAt=0;L.labels.clear();this.clearChoices('left dialogue screen');
+  this.notify({hookSource:'',hookSpeaker:'',hookSourceOrigin:'leave',hookSequence:(this.state.hookSequence||0)+1,hookMessage:'游戏离开对话界面，已清空阅读器'});return true;}catch{return false;}}
+ /* a menu/title label: letters, at most 24 chars or 4 words, no sentence end */
+ static leaveLabel(x){return !!x&&x.length<=24&&x.split(/\s+/).length<=4&&/[\p{L}]{2,}/u.test(x)&&!/[。．.!?！？…」』"”]\s*$/.test(x);}
  emitSource(text,origin,engine='',nativeLine=0){
   /* E501 every source path (native line, merged batch, skip burst) meets the same frame-dump filter as the aux entries */
   if(require('./language-tracks.cjs').stuttered(text)){this.trace('drop typewriter/redraw frame '+JSON.stringify(String(text).slice(0,40)));return;}
