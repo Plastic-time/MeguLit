@@ -47,7 +47,7 @@ export async function openProbeUpload({api,locale,esc,toast,ids=null,reason='man
  const bar=dialog.querySelector('.probe-bar i'),now=dialog.querySelector('.probe-now'),out=dialog.querySelector('.probe-out'),status=dialog.querySelector('.diag-status'),stop=dialog.querySelector('[data-stop]'),send=dialog.querySelector('[data-upload]');
  dialog.querySelector('[data-close]').onclick=()=>dialog.close();
  stop.onclick=async()=>{clearInterval(timer);try{await p.cancel();}catch{}now.textContent=t.cancelled;stop.hidden=true;};
- try{await p.start({ids,reason});}catch{now.textContent=t.error;stop.hidden=true;return;}
+ try{await p.start({ids,reason,force:!!ids});}catch{now.textContent=t.error;stop.hidden=true;return;}
  const tick=async()=>{let s;try{s=await p.status();}catch{return;}if(!dialog.isConnected)return;
   const pct=s.total?Math.round(s.done/s.total*100):100;bar.style.width=pct+'%';
   if(s.state==='running'){now.textContent=`${t.scanning} ${s.done}${t.of}${s.total}${s.current?.title?' · '+s.current.title:''}`;return;}

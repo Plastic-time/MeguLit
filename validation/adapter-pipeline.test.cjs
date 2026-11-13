@@ -6,7 +6,7 @@
    withdrawn path. */
 process.env.MEGULIT_RELAY_BASE??='off';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
-const fx=require('./adapter-fixtures.cjs');
+const fx=require('./helpers/adapter-fixtures.cjs');
 const R=fx.root('megulit-pipeline-');process.env.MEGULIT_ROOT=R;process.env.MEGULIT_ADAPTER_PACKS_DIR=path.join(R,'data','adapter-packs');
 const packs=require('../services/adapter-packs.cjs'),probe=require('../services/adapter-probe.cjs'),sample=require('../services/adapter-sample.cjs'),feed=require('../services/adapter-feed.cjs');
 const K=fx.key();packs._trust([K.entry]);

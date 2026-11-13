@@ -97,7 +97,7 @@ placeholders. The upload is the exact stored bundle whose sha256 the user saw.
    format, a capability it lacks, or an app version outside `minApp`–`maxApp`. The feed carries the same fields, so an
    old app does not even download it.
 2. A new app reads every older format: add `MIGRATIONS[n]` in `adapter-packs.cjs` that lifts format n to n+1, keep the
-   frozen fixture `validation/fixtures/adapter-packs/format1-table-xor-zlib.json` passing, add one for the new format.
+   frozen fixture `validation/helpers/adapter-packs/format1-table-xor-zlib.json` passing, add one for the new format.
 3. Adding a capability (a new transform, container, grammar) keeps format 1; changing what an existing one means is a
    new format.
 4. A published version never changes (the relay refuses a different body for the same id+version). Fix → new version.

@@ -4,7 +4,7 @@
    declarative reader end to end (pack → scenes.cjs → original-text index rebuilt), fail-safety, rollback and params. */
 process.env.MEGULIT_RELAY_BASE??='off';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const fx=require('./adapter-fixtures.cjs');
+const fx=require('./helpers/adapter-fixtures.cjs');
 const R=fx.root();process.env.MEGULIT_ROOT=R;process.env.MEGULIT_ADAPTER_PACKS_DIR=path.join(R,'data','adapter-packs');
 const packs=require('../services/adapter-packs.cjs');
 const K=fx.key();packs._trust([K.entry]);

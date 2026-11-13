@@ -55,7 +55,8 @@ test('overview hands scanning to the probe pipeline and never uploads itself',()
  assert.match(ui,/import \{requestProbe\} from '\.\/probe-hook\.js'/);
  assert.doesNotMatch(ui,/diagnostics_upload|openDiagnostics|导出诊断包|发给我们/);
  const hook=fs.readFileSync(path.join(__dirname,'../web/probe-hook.js'),'utf8');
- assert.match(hook,/window\.megulitProbe\.open\(\{ ids: list, source \}\)/);
+ assert.match(hook,/window\.megulitProbe\.open\(\{ ids: list, source, onDone \}\)/);
+ assert.match(hook,/import\('\.\/adapter-probe-ui\.js'\)/,'E563 the pipeline module checks locally and shows the manifest before any upload');
  assert.doesNotMatch(hook,/diagnostics_upload|fetch\(/,'the hook itself sends nothing');
 });
 test('overview keeps one scroll area with a sticky head and a header close button',()=>{
