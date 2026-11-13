@@ -36,23 +36,8 @@ function parse(buf){const lines=[],anchors=[],ruby=[],voices=[],vt=voiceRef.trac
  const out={lines,anchors};if(ruby.some(Boolean))out.ruby=ruby;const v=voiceRef.keep(voices);if(v)out.voices=v;return out;}
 
 /* ---- containers ------------------------------------------------------------------------------------------------ */
-function asarList(file){const fd=fs.openSync(file,'r');try{const head=Buffer.alloc(16);if(fs.readSync(fd,head,0,16,0)<16||head.readUInt32LE(0)!==4)return null;
- const size=head.readUInt32LE(4);if(size<8||size>64<<20)return null;const h=Buffer.alloc(size);fs.readSync(fd,h,0,size,8);
- const len=h.readUInt32LE(4);let tree;try{tree=JSON.parse(h.toString('utf8',8,8+len));}catch{return null;}
- const base=8+size,out=[];const walk=(node,pre)=>{for(const [name,v] of Object.entries(node.files||{})){const rel=pre?pre+'/'+name:name;if(v.files)walk(v,rel);else if(!v.unpacked&&v.offset!==undefined)out.push({name:rel,offset:base+Number(v.offset),size:Number(v.size)});}};
- walk(tree,'');return out;}finally{fs.closeSync(fd);}}
-const readAt=kit.readAt;
-/* A zip anywhere in a file (package.nw, or appended to an exe): the end record, then the central directory; offsets
-   are taken relative to where the central directory really is, so a zip after an exe reads too. */
-function zipList(file){let size;try{size=fs.statSync(file).size;}catch{return null;}if(size<22)return null;
- const tailLen=Math.min(size,65557),tail=readAt(file,size-tailLen,tailLen);let e=-1;for(let i=tail.length-22;i>=0;i--)if(tail.readUInt32LE(i)===0x06054b50){e=i;break;}if(e<0)return null;
- const count=tail.readUInt16LE(e+10),cdSize=tail.readUInt32LE(e+12),cdOff=tail.readUInt32LE(e+16),cdAt=size-tailLen+e-cdSize,shift=cdAt-cdOff;if(cdAt<0)return null;
- const cd=readAt(file,cdAt,cdSize),out=[];let p=0;
- for(let i=0;i<count&&p+46<=cd.length;i++){if(cd.readUInt32LE(p)!==0x02014b50)break;const flags=cd.readUInt16LE(p+8),method=cd.readUInt16LE(p+10),comp=cd.readUInt32LE(p+20),raw=cd.readUInt32LE(p+24),nl=cd.readUInt16LE(p+28),xl=cd.readUInt16LE(p+30),cl=cd.readUInt16LE(p+32),local=cd.readUInt32LE(p+42);
-  const nameBuf=cd.subarray(p+46,p+46+nl),name=flags&0x800?nameBuf.toString('utf8'):decode(nameBuf);out.push({name:name.replace(/\\/g,'/'),method,comp,raw,local:local+shift,encrypted:!!(flags&1)});p+=46+nl+xl+cl;}
- return out;}
-function zipRead(file,e){const h=readAt(file,e.local,30);if(h.readUInt32LE(0)!==0x04034b50)throw Error('ZIP_LOCAL');const at=e.local+30+h.readUInt16LE(26)+h.readUInt16LE(28),data=readAt(file,at,e.comp);
- if(e.method===0)return data;if(e.method===8)return zlib.inflateRawSync(data);throw Error('ZIP_METHOD_'+e.method);}
+/* E604 the containers (asar, zip anywhere in a file) moved to kit.cjs: the web-bundle family shares them */
+const readAt=kit.readAt,{asarList,zipList,zipRead}=kit;
 
 function names(dir){try{return fs.readdirSync(dir);}catch{return [];}}
 const walk=(dir,depth)=>kit.walk(dir,depth,n=>/\.ks$/i.test(n),[],null);/* E577 kit.walk, every folder */

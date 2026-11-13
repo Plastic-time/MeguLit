@@ -236,6 +236,26 @@ function xorKeyByColumns(buf,{maxPeriod=64,weights=sjisWeights(),sample=48<<10,m
   out.push({key,period:L,score:total/s.length});}
  if(!out.length)return [];const top=Math.max(...out.map(o=>o.score)),pick=out.find(o=>o.score>=top-Math.abs(top)*0.03);return [pick,...out.filter(o=>o!==pick).sort((a,b)=>b.score-a.score).slice(0,4)];}
 
+/* ---- bundles (E604: TyranoScript's containers, shared by the web / NW.js / Electron / zip-asset family) --------------
+   asarList(file)  Electron app.asar: u32 4, u32 header size, pickle {u32, u32 json length, JSON tree}; data from 8 + size
+   zipList(file)   a zip anywhere in a file (package.nw, .love, .jar, a zip appended to an exe): end record, central
+                   directory, offsets taken from where the directory really is
+   zipRead(file,e) stored or deflated entry */
+function asarList(file){let head;try{head=readAt(file,0,16);}catch{return null;}if(head.length<16||head.readUInt32LE(0)!==4)return null;
+ const size=head.readUInt32LE(4);if(size<8||size>64<<20)return null;const h=readAt(file,8,size);if(h.length<8)return null;
+ const len=h.readUInt32LE(4);let tree;try{tree=JSON.parse(h.toString('utf8',8,8+len));}catch{return null;}
+ const base=8+size,out=[];const walkTree=(node,pre)=>{for(const [name,v] of Object.entries(node.files||{})){const rel=pre?pre+'/'+name:name;if(v.files)walkTree(v,rel);else if(!v.unpacked&&v.offset!==undefined)out.push({name:rel,offset:base+Number(v.offset),size:Number(v.size)});}};
+ walkTree(tree,'');return out;}
+function zipList(file){const sz=size(file);if(sz<22)return null;
+ const tailLen=Math.min(sz,65557),t=readAt(file,sz-tailLen,tailLen);let e=-1;for(let i=t.length-22;i>=0;i--)if(t.readUInt32LE(i)===0x06054b50){e=i;break;}if(e<0)return null;
+ const count=t.readUInt16LE(e+10),cdSize=t.readUInt32LE(e+12),cdOff=t.readUInt32LE(e+16),cdAt=sz-tailLen+e-cdSize,shift=cdAt-cdOff;if(cdAt<0)return null;
+ const cd=readAt(file,cdAt,cdSize),out=[];let p=0;
+ for(let i=0;i<count&&p+46<=cd.length;i++){if(cd.readUInt32LE(p)!==0x02014b50)break;const flags=cd.readUInt16LE(p+8),method=cd.readUInt16LE(p+10),comp=cd.readUInt32LE(p+20),raw=cd.readUInt32LE(p+24),nl=cd.readUInt16LE(p+28),xl=cd.readUInt16LE(p+30),cl=cd.readUInt16LE(p+32),local=cd.readUInt32LE(p+42);
+  const nameBuf=cd.subarray(p+46,p+46+nl),name=flags&0x800?nameBuf.toString('utf8'):decodeText(nameBuf);out.push({name:name.replace(/\\/g,'/'),method,comp,raw,local:local+shift,encrypted:!!(flags&1)});p+=46+nl+xl+cl;}
+ return out;}
+function zipRead(file,e){const h=readAt(file,e.local,30);if(h.readUInt32LE(0)!==0x04034b50)throw Error('ZIP_LOCAL');const at=e.local+30+h.readUInt16LE(26)+h.readUInt16LE(28),data=readAt(file,at,e.comp);
+ if(e.method===0)return data;if(e.method===8)return zlib.inflateRawSync(data,{maxOutputLength:256<<20});throw Error('ZIP_METHOD_'+e.method);}
+
 /* ---- engine factory --------------------------------------------------------------------------------------------- */
 /* engine({id, hint, archives:{name, magic, subs, list(file) -> entries|null, read(file, entry) -> Buffer, entry: RegExp},
    loose:{name, subs}, parse}) -> {id, hint, scenes, archives, sources, parse, test}. Loose files override archived
@@ -254,6 +274,6 @@ function engine(def){const A=def.archives;
   const list=[...out.values()];return A?.sort===false?list:list.sort((a,b)=>a.name.localeCompare(b.name));};
  return {id:def.id,hint:def.hint,scenes,archives:def.overlay===false?()=>[]:scenes,sources:dir=>[...arcFiles(dir),...looseFiles(dir)],parse:buf=>{try{return def.parse(Buffer.isBuffer(buf)?buf:Buffer.from(buf));}catch{return {lines:[],anchors:[]};}},test:def.test||(n=>!!def.loose&&def.loose.name.test(n)),...(def.extra||{})};}
 
-module.exports={peInfo,readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,encodeSjis,
+module.exports={asarList,zipList,zipRead,peInfo,readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,encodeSjis,
  xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,lzDistance,SIGLUS_TOKEN,inflate,inflateRaw,zstd,unpackAny,huffman,table,entryRead,peResource,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine,
  sjisWeights,gbkWeights,textScore,xorKeyByColumns};
