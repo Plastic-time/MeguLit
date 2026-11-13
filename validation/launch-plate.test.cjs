@@ -14,6 +14,9 @@ test('one plate covers launch, wizard, goal, Anki and dialog primaries; the big 
  assert.match(css,/clip-path:polygon\(0 0,calc\(100% - var\(--fold\)\) 0,100% var\(--fold\)/);
  assert.match(css,/detail-actions>button\.primary:not\(\.icon-button\):not\(\.titlebar \*\):not\(\.mgl-x\)\{height:52px/);
  assert.match(css,/\[aria-busy=true\]::before\{width:40%/);
+ assert.match(css,/@property --fold\{syntax:"<length>";inherits:true/,'the fold size must reach ::after');
+ assert.match(css,/:hover:not\(:disabled\)\{--fold:42px\}/,'hover folds the launch corner down');
+ assert.match(css,/prefers-reduced-motion:reduce/);
  assert.doesNotMatch(web('controls-b.css'),/diamond seal \*\/\r?\n& body \.main \.detail-actions/);
 });
 
