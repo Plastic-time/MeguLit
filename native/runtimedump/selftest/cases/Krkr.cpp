@@ -34,11 +34,18 @@ public:
  void __cdecl SetEndOfStorage() override {}
  u64 __cdecl GetSize() override { return d.size(); }
 };
+// A protection plugin's stream that refuses the first whole read with a Borland exception (0x0EEDFADE), as krkr2
+// builds raise them; the game's own later reads work.
+class GuardedStream : public MemStream {
+public:
+ bool refused = false;
+ unsigned __cdecl Read(void *b, unsigned n) override { if (!refused) { refused = true; pos = d.size() / 2; RaiseException(0x0EEDFADE, 0, 0, NULL); } return MemStream::Read(b, n); }
+};
 struct VariantString { int RefCount; wchar_t *LongString; wchar_t ShortString[22]; int Length; };
 std::map<std::wstring, std::string> Archive;
 Stream *__fastcall Open(void **name, unsigned flags) {
  VariantString *v = (VariantString *)*name; std::wstring n = v->LongString ? v->LongString : v->ShortString;
- MemStream *s = new MemStream(); s->d = Archive[n]; (void)flags; return s;
+ MemStream *s = n.find(L"guarded") != std::wstring::npos ? new GuardedStream() : new MemStream(); s->d = Archive[n]; (void)flags; return s;
 }
 EXCEPTION_DISPOSITION __cdecl Pass(EXCEPTION_RECORD *, void *, CONTEXT *, void *) { return ExceptionContinueSearch; }
 DWORD Cookie = 0xBB40E64E;
@@ -82,6 +89,10 @@ int CaseKrkr(FakeGame &g) {
  Archive[L"file://./data.xp3>scenario/packed.ks"] = packed;
  Archive[L"file://./data.xp3>image/bg01.png"] = bom + Utf16(Lines(L"画像に見える文字列", 30));
  Archive[L"file://./savedata/datasc.ksd"] = bom + Utf16(Lines(L"書き込み用のストリーム", 30));
+ // review 3: the archive itself, an oversized member and a stream that throws must not be read whole / must come back rewound
+ Archive[L"file://./data.xp3"] = bom + Utf16(Lines(L"アーカイブそのもの", 30));
+ Archive[L"file://./data.xp3>scenario/huge.ks"] = bom + Utf16(Lines(L"大きすぎるシナリオ", 30)) + std::string(9u << 20, ' ');
+ Archive[L"file://./data.xp3>scenario/guarded.ks"] = bom + Utf16(Lines(L"守られたシナリオ", 30));
 
  CreateFn create = (CreateFn)(void *)Stub;
  for (auto &e : Archive) {
@@ -100,6 +111,8 @@ int CaseKrkr(FakeGame &g) {
  if (!Saved(g.dir, bom + Utf16(m2), "krkr")) { printf("FAIL krkr: SimpleCrypt mode 2 (zlib) not saved decrypted\n"); fail++; }
  if (Contains(g.dir, Utf16(L"画像に見える文字列"), NULL)) { printf("FAIL krkr: image stream saved\n"); fail++; }
  if (Contains(g.dir, Utf16(L"書き込み用のストリーム"), NULL)) { printf("FAIL krkr: write stream saved\n"); fail++; }
+ if (Contains(g.dir, Utf16(L"アーカイブそのもの"), NULL)) { printf("FAIL krkr: the archive itself was read whole\n"); fail++; }
+ if (Contains(g.dir, Utf16(L"大きすぎるシナリオ"), NULL)) { printf("FAIL krkr: a member over 8 MB was read whole\n"); fail++; }
  return fail;
 }
 #else

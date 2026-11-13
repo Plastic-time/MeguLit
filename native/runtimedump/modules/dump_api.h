@@ -7,6 +7,9 @@
 // UTF-16LE), or always when force is set (a module that knows the bytes are a script). Same bytes are saved once.
 void DumpSave(const char *source, const char *how, const unsigned char *data, DWORD n, ULONGLONG offset, bool force = false);
 void DumpLog(const char *line);
+// False once the process is shutting down, the dump is off, or the module named here was switched off after a fault:
+// a hook that gets false must only call through.
+bool DumpActive(const char *module);
 // True while this thread is already inside MeguLit's own code (then a hook must only call through).
 bool DumpInside();
 // Marks this thread as inside MeguLit's code for its lifetime (nested use is fine) and keeps the last error.
