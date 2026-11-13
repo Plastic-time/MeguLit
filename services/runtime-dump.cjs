@@ -19,9 +19,12 @@ function dirFor(gameDir){const r=root(),own=path.join(r,key(gameDir));if(fs.exis
  let names=[];try{names=fs.readdirSync(r);}catch{return own;}const want=path.resolve(gameDir).toLowerCase();
  for(const n of names){try{if(path.resolve(fs.readFileSync(path.join(r,n,'game.txt'),'utf8').trim()).toLowerCase()===want)return path.join(r,n);}catch{}}
  return own;}
-function enable(gameDir){const d=path.join(root(),key(gameDir));fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,'on'),'');return d;}
-function disable(gameDir){try{fs.unlinkSync(path.join(dirFor(gameDir),'on'));}catch{}}
-const enabled=gameDir=>fs.existsSync(path.join(dirFor(gameDir),'on'));
+// On by default (2026-11-13): the DLL and HookBridge act unless <key>/off exists (or MEGULIT_RUNTIME_DUMP_OFF=1). The DLL
+// writes off itself after repeated faults, so a game it disturbs is left alone from then on.
+function enable(gameDir){const d=path.join(root(),key(gameDir));fs.mkdirSync(d,{recursive:true});try{fs.unlinkSync(path.join(d,'off'));}catch{}fs.writeFileSync(path.join(d,'on'),'');return d;}
+function disable(gameDir){const d=dirFor(gameDir);fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,'off'),'');try{fs.unlinkSync(path.join(d,'on'));}catch{}}
+const disabled=gameDir=>process.env.MEGULIT_RUNTIME_DUMP_OFF==='1'||fs.existsSync(path.join(dirFor(gameDir),'off'));
+const enabled=gameDir=>!disabled(gameDir);
 
 function entries(gameDir){const d=dirFor(gameDir);let raw='';try{raw=fs.readFileSync(path.join(d,'index.jsonl'),'utf8');}catch{return[];}
  const out=[];for(const line of raw.split('\n')){if(!line.trim())continue;let e;try{e=JSON.parse(line);}catch{continue;}
@@ -62,4 +65,4 @@ function exportTexts(gameDir,outDir){fs.mkdirSync(outDir,{recursive:true});const
   const file=path.join(outDir,name);fs.writeFileSync(file,d.text,'utf8');written.push(file);}
  return written;}
 
-module.exports={root,key,dirFor,enable,disable,enabled,entries,decode,lines,collect,corpus,exportTexts,_internal:{lang}};
+module.exports={root,key,dirFor,enable,disable,enabled,disabled,entries,decode,lines,collect,corpus,exportTexts,_internal:{lang}};

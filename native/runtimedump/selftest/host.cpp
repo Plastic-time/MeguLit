@@ -49,6 +49,39 @@ int Count(const std::string &dir) {
  do n++; while (FindNextFileA(h, &f)); FindClose(h); return n;
 }
 
+// Is there a saved .bin (of kind `how`) that contains `want`?
+bool Contains(const std::string &dir, const std::string &want, const char *how) {
+ WIN32_FIND_DATAA f; HANDLE h = FindFirstFileA((dir + "*.bin").c_str(), &f);
+ if (h == INVALID_HANDLE_VALUE) return false;
+ bool found = false;
+ do {
+  if (how && !strstr(f.cFileName, how)) continue;
+  DWORD n = 0; char *b = ReadAll(dir + f.cFileName, &n);
+  if (b && std::string(b, n).find(want) != std::string::npos) found = true;
+  free(b);
+ } while (!found && FindNextFileA(h, &f));
+ FindClose(h);
+ return found;
+}
+// A compiled script the way a VM engine keeps it after its own loader decrypted it: opcodes, then a string, per line.
+std::string Script(UINT cp, int lines) {
+ static const wchar_t *say[] = { L"今日は朝から雨が降っていた。", L"「傘、持ってくればよかったね」", L"窓の外を眺めながら、彼女は小さく笑った。",
+  L"「でも、こういう日も嫌いじゃないよ」", L"教室には僕たち二人しか残っていない。", L"時計の針の音だけが、静かに響いている。" };
+ std::string r;
+ for (int i = 0; i < lines; i++) {
+  wchar_t line[128]; swprintf_s(line, L"%s第%d話", say[i % 6], i);
+  std::string t = cp == 1200 ? std::string((const char *)line, wcslen(line) * 2) : Encode(line, cp);
+  unsigned char op[6] = { 0x10, (unsigned char)(i & 0xFF), 0x00, 0x00, (unsigned char)t.size(), 0x00 };
+  r.append((const char *)op, 6); r += t; r.append(cp == 1200 ? 2 : 1, '\0');
+ }
+ return r;
+}
+void Seed(const std::string &dir, const wchar_t *line) {
+ std::string u = Encode(line, 65001) + "\n";
+ HANDLE h = CreateFileA((dir + "seeds.txt").c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, 0, NULL);
+ DWORD w; WriteFile(h, u.data(), (DWORD)u.size(), &w, NULL); CloseHandle(h);
+}
+
 int main(int argc, char **argv) {
  if (argc < 3) return 2;
  char cwd[MAX_PATH]; GetCurrentDirectoryA(MAX_PATH, cwd);
@@ -91,9 +124,21 @@ int main(int argc, char **argv) {
  // 4. noise and media
  DWORD k = 0; char *nb = ReadAll("noise.bin", &k); free(nb);
  DWORD q = 0; char *mb = ReadAll("face.png", &q); free(mb);
- Sleep(1500);
+ // 5. seed expansion: a script decrypted by the game's own loader from a blob in the exe (no file read, no decompressor);
+ //    MeguLit's hook saw one line of it and wrote it to seeds.txt.
+ std::string sj = Script(932, 400), w16 = Script(1200, 400);
+ std::string sjEnc = sj, wEnc = w16; Xor(sjEnc); Xor(wEnc);
+ char *vm1 = (char *)VirtualAlloc(NULL, sj.size() + 4096, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+ char *vm2 = (char *)HeapAlloc(GetProcessHeap(), 0, w16.size());
+ memcpy(vm1 + 1000, sjEnc.data(), sjEnc.size()); { std::string t(vm1 + 1000, sj.size()); Xor(t); memcpy(vm1 + 1000, t.data(), t.size()); }
+ memcpy(vm2, wEnc.data(), wEnc.size()); { std::string t(vm2, w16.size()); Xor(t); memcpy(vm2, t.data(), t.size()); }
+ Seed(dir, L"【陽菜】「傘、持ってくればよかったね」第37話");
+ Seed(dir, L"時計の針の音だけが、静かに響いている。第203話");
+ Sleep(3500);
 
  int fail = 0;
+ if (!Contains(dir, sj.substr(6, 400), "seed") || !Contains(dir, sj.substr(sj.size() - 400), "seed")) { printf("FAIL Shift-JIS script around a seed not saved whole\n"); fail++; }
+ if (!Contains(dir, w16.substr(6, 400), "seed") || !Contains(dir, w16.substr(w16.size() - 400), "seed")) { printf("FAIL UTF-16 script around a seed not saved whole\n"); fail++; }
  if (!Saved(dir, ja, "inplace")) { printf("FAIL in-place decrypt not saved\n"); fail++; }
  if (!Saved(dir, ja2, "alloc")) { printf("FAIL fresh-buffer decrypt not saved\n"); fail++; }
  if (!Saved(dir, zh, "rtl")) { printf("FAIL RtlDecompressBuffer output not saved\n"); fail++; }
@@ -101,6 +146,6 @@ int main(int argc, char **argv) {
  if (Saved(dir, ja, "plain")) { printf("FAIL media file read as plain text\n"); fail++; }
  if (Saved(dir, a, NULL) || Saved(dir, b, NULL)) { printf("FAIL cipher text saved\n"); fail++; }
  printf("%s: %d saved, %d failures\n", sizeof(void *) == 8 ? "x64" : "x86", Count(dir), fail);
- free(buf); free(enc); free(plain);
+ free(buf); free(enc); free(plain); VirtualFree(vm1, 0, MEM_RELEASE); HeapFree(GetProcessHeap(), 0, vm2);
  return fail ? 1 : 0;
 }

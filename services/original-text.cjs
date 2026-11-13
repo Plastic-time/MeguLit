@@ -445,7 +445,8 @@ function adoptOriginal(root,id,state,dir){
 function providerKey(root,executable){const dir=path.dirname(String(executable||'')).toLowerCase();if(!dir||dir==='.')return '';const entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir:String(s?.gameDir||'').toLowerCase()===dir);if(!entry)return 'none|'+dir;const [id,s]=entry;return JSON.stringify([id,s.status||'',s.mode||'',s.runtime?.sha256||'',s.runtime?.index||'',s.patchStatus||'',s.patch?.index||'',s.patch?.version??'',s.patch?.runtimeSha||'',s.original?.index||'']);}
 function provider(root,executable){
  const dir=path.dirname(String(executable)).toLowerCase(),entry=Object.entries(readState(root)).find(([,s])=>s?.runtime?.file?runningDirOf(s.runtime).toLowerCase()===dir:String(s?.gameDir||'').toLowerCase()===dir);
- if(!entry)return null;
+ /* 2026-11-13 no imported script: the script harvested at run time (services/script-harvest.cjs), when there is one */
+ if(!entry){try{const h=require('./script-harvest.cjs');return h.report(path.dirname(String(executable)))?.total?h.provider(path.dirname(String(executable))):null;}catch{return null;}}
  const gameDir=path.dirname(String(executable));
  if(scenes.ENGINES[entry[1].runtime?.engine]?.live||!entry[1].runtime&&liveEngines().some(e=>e.eligible(gameDir)))return liveProvider(root,entry[0],executable);
  return staticProvider(root,executable);

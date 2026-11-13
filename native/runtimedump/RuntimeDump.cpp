@@ -12,11 +12,13 @@
 //     short time after a read, heap allocations of a matching size are watched the same way.
 //  3. Decompression: ntdll RtlDecompressBuffer(Ex) and any loaded module's exported zlib inflate/uncompress; their output
 //     is checked as soon as the call returns.
+//  4. Seed expansion: lines MeguLit's text hook captured are looked up in the game's memory and the run of text around
+//     each hit is saved (see Seeds()), for engines whose script never passes through a file read or a decompressor.
 // "Reads as text": Shift-JIS, GBK, UTF-8 or UTF-16LE CJK characters make up enough of the buffer (plain scripts, and
 // compiled scripts that embed their strings). Media, fonts and executables are never looked at.
 //
-// Off by default: it acts only when <MeguLit>\cache\runtime-dump\<key>\on exists (key: FNV-1a of the lower-case game
-// folder, as MeguLitScn uses) or MEGULIT_RUNTIME_DUMP_ON=1; MEGULIT_RUNTIME_DUMP=<folder> moves the output root (tests,
+// On by default: <MeguLit>\cache\runtime-dump\<key>\off switches a game off (key: FNV-1a of the lower-case game
+// folder, as MeguLitScn uses); MEGULIT_RUNTIME_DUMP_ON=1 forces it on; MEGULIT_RUNTIME_DUMP=<folder> moves the output root (tests,
 // H:\MeguLit-Work\runtime-dump). Output: <root>\<key>\ game.txt, ready.txt, dump.log, index.jsonl (one JSON line per saved
 // buffer) and the buffers as NNNNN_<source>_<how>.bin. services/runtime-dump.cjs reads it.
 #include <windows.h>
@@ -422,6 +424,142 @@ bool Hook(const wchar_t *module, const char *name, void *detour, void **original
  return ok;
 }
 
+// ---- seed expansion ------------------------------------------------------------------------------------------------
+// Engines that never pass their script through ReadFile or a decompressor (packed in the exe, decrypted by a custom
+// loader, kept in a VM heap) still hold it as plain text somewhere once a line is on screen. MeguLit appends every line
+// its text hook captured to <out>\seeds.txt (UTF-8, one per line); for each new one this finds the line in the game's
+// memory (Shift-JIS, GBK, UTF-8, UTF-16LE), grows the hit to the whole run of text around it (gaps of opcodes allowed)
+// and saves that block (how "seed"). Short hits (the text box's own copy of one line) are not scripts and are dropped by
+// the size bar. Read-only, every access guarded; repeated faults switch the scan off for the rest of the session.
+const SIZE_T SeedSide = 16u << 20, SeedChunk = 256, SeedRegionMax = 512u << 20;
+LONGLONG SeedRead;                         // bytes of seeds.txt already handled
+std::set<std::wstring> SeedSeen;
+std::vector<std::pair<ULONG_PTR, ULONG_PTR>> SeedBlocks; // ranges already saved by a seed
+volatile LONG SeedFaults; bool SeedOff;
+// Offset of needle in [base, base+n), -1 when absent, -2 when a page went away.
+SSIZE_T Find(const unsigned char *base, SIZE_T n, const char *nd, SIZE_T m) {
+ __try {
+  if (n < m) return -1;
+  const unsigned char f = (unsigned char)nd[0];
+  for (SIZE_T i = 0, last = n - m; i <= last; ) {
+   const void *hit = memchr(base + i, f, last - i + 1);
+   if (!hit) return -1;
+   SIZE_T at = (SIZE_T)((const unsigned char *)hit - base);
+   if (!memcmp(base + at, nd, m)) return (SSIZE_T)at;
+   i = at + 1;
+  }
+  return -1;
+ } __except (EXCEPTION_EXECUTE_HANDLER) { return -2; }
+}
+bool CjkW(wchar_t c) { return (c >= 0x3040 && c <= 0x30FF) || (c >= 0x4E00 && c <= 0x9FFF) || c == 0x3005; }
+// The longest run of kana/kanji in the line, up to 10 characters: punctuation, names and ruby markup vary between the
+// hooked text and the script, a plain run of prose does not.
+std::wstring Core(const std::wstring &w) {
+ size_t best = 0, bestLen = 0;
+ for (size_t i = 0; i < w.size(); ) {
+  if (!CjkW(w[i])) { i++; continue; }
+  size_t j = i; while (j < w.size() && CjkW(w[j])) j++;
+  if (j - i > bestLen) { best = i; bestLen = j - i; }
+  i = j;
+ }
+ if (bestLen < 4) return L"";
+ if (bestLen > 10) { best += (bestLen - 10) / 2; bestLen = 10; }
+ return w.substr(best, bestLen);
+}
+std::string Narrow(const std::wstring &w, UINT cp) {
+ BOOL lost = FALSE;
+ int n = WideCharToMultiByte(cp, 0, w.c_str(), (int)w.size(), NULL, 0, NULL, cp == CP_UTF8 ? NULL : &lost);
+ if (n <= 0 || lost) return "";
+ std::string r(n, '\0'); WideCharToMultiByte(cp, 0, w.c_str(), (int)w.size(), &r[0], n, NULL, cp == CP_UTF8 ? NULL : &lost);
+ return lost ? "" : r;
+}
+bool Textish(ULONG_PTR at, SIZE_T n) {
+ unsigned char *b = Copy((const void *)at, (DWORD)n); if (!b) return false;
+ Score s = Classify(b, (DWORD)n); free(b); return s.cjk >= 6;
+}
+// Grows [lo, hi) chunk by chunk while the chunks read as text; three non-text chunks in a row end it.
+void Grow(ULONG_PTR lo0, ULONG_PTR hi0, ULONG_PTR &lo, ULONG_PTR &hi) {
+ int miss = 0; ULONG_PTR keep = lo;
+ while (lo - lo0 >= SeedChunk && hi - (lo - SeedChunk) <= SeedSide * 2) {
+  lo -= SeedChunk; if (Textish(lo, SeedChunk)) { keep = lo; miss = 0; } else if (++miss > 2) break;
+ }
+ lo = keep; miss = 0; keep = hi;
+ while (hi0 - hi >= SeedChunk && hi + SeedChunk - lo <= SeedSide * 2) {
+  bool t = Textish(hi, SeedChunk); hi += SeedChunk;
+  if (t) { keep = hi; miss = 0; } else if (++miss > 2) break;
+ }
+ hi = keep;
+}
+bool Covered(ULONG_PTR p) { for (auto &r : SeedBlocks) if (p >= r.first && p < r.second) return true; return false; }
+void SeedOne(const std::wstring &line) {
+ std::wstring core = Core(line); if (core.empty()) return;
+ std::string forms[4] = { Narrow(core, 932), Narrow(core, 936), Narrow(core, CP_UTF8), std::string((const char *)core.data(), core.size() * 2) };
+ SYSTEM_INFO si; GetSystemInfo(&si);
+ DWORD start = GetTickCount();
+ for (ULONG_PTR p = (ULONG_PTR)si.lpMinimumApplicationAddress; p < (ULONG_PTR)si.lpMaximumApplicationAddress; ) {
+  MEMORY_BASIC_INFORMATION mi; if (!VirtualQuery((void *)p, &mi, sizeof mi)) break;
+  ULONG_PTR base = (ULONG_PTR)mi.BaseAddress, end = base + mi.RegionSize; p = end;
+  if (GetTickCount() - start > 3000) { Log("seed scan stopped at its time limit"); return; }
+  if (mi.State != MEM_COMMIT || mi.Type == MEM_IMAGE || mi.RegionSize > SeedRegionMax) continue;
+  if ((mi.Protect & (PAGE_GUARD | PAGE_NOACCESS)) || !(mi.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY))) continue;
+  for (auto &nd : forms) {
+   if (nd.size() < 8) continue;
+   for (SIZE_T from = 0; from < mi.RegionSize; ) {
+    SSIZE_T at = Find((const unsigned char *)base + from, mi.RegionSize - from, nd.data(), nd.size());
+    if (at == -2) { if (InterlockedIncrement(&SeedFaults) > 64) { SeedOff = true; WriteWhole(std::wstring(Out) + L"off", "faults", 6); Log("seed scan off: memory faults; game switched off"); return; } break; }
+    if (at < 0) break;
+    ULONG_PTR hit = base + from + (SIZE_T)at; from += (SIZE_T)at + nd.size();
+    // The needles themselves live in this DLL's heap; a hit inside one of our own strings is not the game's.
+    bool own = hit == (ULONG_PTR)core.data() || hit == (ULONG_PTR)line.data();
+    for (auto &g : forms) if (hit == (ULONG_PTR)g.data()) own = true;
+    if (own || Covered(hit)) continue;
+    ULONG_PTR lo = hit - (hit - base) % SeedChunk, hi = lo + SeedChunk; if (hi > end) hi = end;
+    Grow(base, end, lo, hi);
+    SIZE_T n = hi - lo;
+    if (n >= 2048 && n <= SeedSide * 2) { // one line or a text box copy is not a script
+     unsigned char *buf = Copy((const void *)lo, (DWORD)n);
+     if (buf) {
+      Score s = Classify(buf, (DWORD)n);
+      if (s.cjk >= 300) {
+       char src[48]; sprintf_s(src, "memory@%llx", (unsigned long long)lo);
+       Save(src, "seed", buf, (DWORD)n, (ULONGLONG)lo);
+       SeedBlocks.push_back({ lo, hi });
+       Log(std::string("seed block ") + src + " " + std::to_string((unsigned long long)n) + " bytes " + s.enc);
+      }
+      free(buf);
+     }
+    }
+    if (hi - base > from) from = hi - base;
+   }
+  }
+ }
+}
+void Seeds() {
+ if (SeedOff) return;
+ HANDLE h = (OCreateFileW ? OCreateFileW : CreateFileW)((std::wstring(Out) + L"seeds.txt").c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, 0, NULL);
+ if (h == INVALID_HANDLE_VALUE) return;
+ LARGE_INTEGER size; GetFileSizeEx(h, &size);
+ if (size.QuadPart < SeedRead) SeedRead = 0; // rewritten
+ std::string chunk;
+ if (size.QuadPart > SeedRead) {
+  LONGLONG left = size.QuadPart - SeedRead; DWORD want = (DWORD)(left < (1 << 20) ? left : (1 << 20)), got = 0;
+  chunk.resize(want); LARGE_INTEGER at; at.QuadPart = SeedRead; SetFilePointerEx(h, at, NULL, FILE_BEGIN);
+  if ((OReadFile ? OReadFile : ReadFile)(h, &chunk[0], want, &got, NULL)) chunk.resize(got); else chunk.clear();
+ }
+ (OCloseHandle ? OCloseHandle : CloseHandle)(h);
+ size_t nl = chunk.find_last_of('\n'); if (nl == std::string::npos) return;
+ chunk.resize(nl + 1); SeedRead += (LONGLONG)chunk.size();
+ int done = 0;
+ for (size_t i = 0; i < chunk.size(); ) {
+  size_t e = chunk.find('\n', i); std::string l = chunk.substr(i, e - i); i = e + 1;
+  int m = MultiByteToWideChar(CP_UTF8, 0, l.data(), (int)l.size(), NULL, 0); if (m <= 0) continue;
+  std::wstring w(m, L'\0'); MultiByteToWideChar(CP_UTF8, 0, l.data(), (int)l.size(), &w[0], m);
+  std::wstring core = Core(w);
+  if (core.empty() || SeedSeen.size() > 20000 || !SeedSeen.insert(core).second) continue;
+  if (done++ < 6) SeedOne(w); // a burst (skip mode) is sampled; later lines mostly land in blocks already saved
+ }
+}
+
 DWORD WINAPI Run(void *) {
  TlsSetValue(Tls, (void *)1); // this thread's own file and heap use is never watched
  wchar_t self[1024], game[1024], root[1024];
@@ -437,7 +575,8 @@ DWORD WINAPI Run(void *) {
  CreateDirectoryW(root, NULL);
  swprintf_s(Out, L"%s\\%08x\\", root, hash);
  wchar_t v[8]; bool forced = GetEnvironmentVariableW(L"MEGULIT_RUNTIME_DUMP_ON", v, 8) > 0 && v[0] == L'1';
- if (!forced && GetFileAttributesW((std::wstring(Out) + L"on").c_str()) == INVALID_FILE_ATTRIBUTES) return 0;
+ // On by default (2026-11-13): <key>\off switches one game off, MEGULIT_RUNTIME_DUMP_OFF=1 every game.
+ if (!forced && (GetFileAttributesW((std::wstring(Out) + L"off").c_str()) != INVALID_FILE_ATTRIBUTES || GetEnvironmentVariableW(L"MEGULIT_RUNTIME_DUMP_OFF", v, 8) > 0)) return 0;
  CreateDirectoryW(Out, NULL);
  std::string gameName = Utf8(game);
  WriteWhole(std::wstring(Out) + L"game.txt", gameName.data(), (DWORD)gameName.size());
@@ -462,6 +601,7 @@ DWORD WINAPI Run(void *) {
  for (DWORD n = 0;; n++) {
   Sleep(120);
   Poll();
+  if (n % 8 == 0) Seeds();
   if (n % 20 == 0 && ZUsed < ZSlots) HookZlib();
  }
 }

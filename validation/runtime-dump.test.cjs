@@ -14,9 +14,9 @@ function write(rd,game,items){const d=rd.enable(game);fs.writeFileSync(path.join
   return JSON.stringify({seq:i+1,file,source:it.source,how:it.how,offset:it.offset||0,size:it.data.length,enc:it.enc});});
  fs.writeFileSync(path.join(d,'index.jsonl'),lines.join('\n')+'\n');return d;}
 
-test('key matches the DLL (FNV-1a of the lower-case folder) and enable/disable toggles the on file',()=>{
+test('key matches the DLL (FNV-1a of the lower-case folder) and the dump is on by default and disable/enable toggle the off file',()=>{
  const{game,rd}=setup();assert.match(rd.key(game),/^[0-9a-f]{8}$/);assert.equal(rd.key(game),rd.key(game.toUpperCase()));
- assert.equal(rd.enabled(game),false);rd.enable(game);assert.equal(rd.enabled(game),true);rd.disable(game);assert.equal(rd.enabled(game),false);});
+ assert.equal(rd.enabled(game),true);rd.disable(game);assert.equal(rd.enabled(game),false);rd.enable(game);assert.equal(rd.enabled(game),true);});
 
 test('decrypted copies win over the cipher text read as plain; languages and lines come out',()=>{
  const{game,rd}=setup();
