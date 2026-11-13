@@ -159,8 +159,7 @@ function fakeWindow(layout){
  class El{constructor(tag){this.tag=tag;this.className='';this.children=[];this.parent=null;this.dataset={};this.style=new Style();this.classList=new ClassList(this);this.hidden=false;this._text='';}
   get isConnected(){let e=this;while(e.parent)e=e.parent;return e===doc.documentElement;}
   set textContent(v){this.children=[];this._text=String(v);}get textContent(){return this._text+this.children.map(c=>c.textContent).join('');}
-  append(...c){for(const x of c){x.remove();x.parent=this;this.children.push(x);}}prepend(...c){for(const x of c.reverse()){x.remove();x.parent=this;this.children.unshift(x);}}
-
+  append(...c){for(const x of c){x.remove();x.parent=this;this.children.push(x);}}prepend(...c){for(const x of c.reverse()){x.remove();x.parent=this;this.children.unshift(x);}}
   remove(){if(this.parent){this.parent.children.splice(this.parent.children.indexOf(this),1);this.parent=null;}}
   get firstChild(){return this.children[0]||null;}
   matches(sel){return sel.split(',').some(s=>{const m=/^\.([^\[]+)(?:\[data-index="(\d+)"\])?$/.exec(s.trim());return !!m&&this.classList.contains(m[1])&&(m[2]===undefined||this.dataset.index===m[2]);});}
