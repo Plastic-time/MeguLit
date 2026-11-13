@@ -44,6 +44,23 @@ const ENGINES=[
  // Older Nitroplus titles (装甲悪鬼村正, 沙耶の唄, スマガ…) pack scripts as nss.npa / system.npa (user report 2026-11-09).
  {name:'Nitroplus (NPA)',hook:true,test:f=>f.has(/^(nss|system|cg|sound)\.npa$/i)||f.names.filter(n=>/\.npa$/i.test(n)).length>=2},
  {name:"Ren'Py",hook:true,test:f=>f.has(/^renpy$/i)||f.sub('game',/\.rp[ay]c?$/i)},
+ /* E610 F1 bundled assets (web / NW.js / Electron / zip): webbundle.cjs profiles. Before TyranoScript, whose package.nw clause would otherwise claim any NW.js bundle */
+ {name:'Visual Novel Maker',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'vnmaker')},
+ {name:'Twine / SugarCube',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'twine')},
+ {name:'WebGAL',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'webgal')},
+ {name:'Monogatari',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'monogatari')},
+ {name:'RenJS',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'renjs')},
+ {name:'Narrat',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'narrat')},
+ {name:'ink (inkle)',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'ink')},
+ {name:'Bitsy',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'bitsy')},
+ {name:'GB Studio',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'gbstudio')},
+ {name:'GDevelop',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'gdevelop')},
+ {name:'Construct',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'construct')},
+ {name:'Decker',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'decker')},
+ {name:'Cocos2d',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'cocos')},
+ {name:'LÖVE',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'love')},
+ {name:'Defold',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'defold')},
+ {name:'Corona / Solar2D',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'solar2d')},
  /* E567 TyranoScript: loose (tyrano/ or index.html beside data/scenario), Electron app.asar whose index names the scenario,
     NW.js package.nw (an exe-appended NW.js build is found by the script reader, tyrano.cjs) */
  {name:'TyranoScript',hook:true,test:f=>f.sub('data',/^scenario$/i)&&(f.has(/^tyrano$/i)||f.has(/^index\.html$/i))||f.sub('resources',/^app\.asar$/i)&&f.peek('resources/app.asar',/data\/scenario|"scenario"/,65536)||f.has(/^package\.nw$/i)&&!f.sub('www',/./)},
@@ -115,6 +132,12 @@ const ENGINES=[
  // A Unity build keeps <Name>_Data beside <Name>.exe. A folder that only holds something named *_Data (a library
  // folder, or the folder a game was unpacked into) is not a Unity game by itself.
  {name:'Unity',hook:null,generic:true,test:f=>f.has(/^unityplayer\.dll$/i)||f.names.some(n=>/_Data$/i.test(n)&&f.names.some(e=>e.toLowerCase()===n.slice(0,-5).toLowerCase()+'.exe'))},
+ /* E610 generic web bundles last: named engines of the family with no signature of their own read through the generic HTML5 reader */
+ {name:'O2 Engine / Novelsphere',hook:null,generic:true,test:f=>f.names.some(n=>/novelsphere/i.test(n))},
+ {name:'NVLMaker',hook:null,generic:true,test:f=>f.names.some(n=>/nvlmaker/i.test(n))},
+ {name:'CloudNovel',hook:null,generic:true,test:f=>f.names.some(n=>/cloudnovel/i.test(n))},
+ {name:'HTMLVN',hook:null,generic:true,test:f=>f.names.some(n=>/htmlvn/i.test(n))},
+ {name:'HTML5 / Electron / NW.js',hook:null,generic:true,test:f=>require('./webbundle.cjs').probe(f.dir,'html5')},
 ];
 /* the readers of each engine */
 const READERS={"BGI / Ethornell":["bgi"],
@@ -173,6 +196,23 @@ const READERS={"BGI / Ethornell":["bgi"],
  "Unity (Naninovel)":["naninovel"],
  "Unity (Yarn Spinner)":["unity-text"],
  "Unity (Adventure Creator)":["unity-text"],
+ "Visual Novel Maker":["vnmaker"],
+ "Twine / SugarCube":["twine"],
+ "WebGAL":["webgal"],
+ "Monogatari":["monogatari"],
+ "RenJS":["renjs"],
+ "Narrat":["narrat"],
+ "ink (inkle)":["ink"],
+ "Bitsy":["bitsy"],
+ "GB Studio":["gbstudio"],
+ "GDevelop":["gdevelop"],
+ "Construct":["construct"],
+ "Decker":["decker"],
+ "Cocos2d":["cocos"],
+ "LÖVE":["love"],
+ "Defold":["defold"],
+ "Corona / Solar2D":["solar2d"],
+ "O2 Engine / Novelsphere":["html5"],"NVLMaker":["html5"],"CloudNovel":["html5"],"HTMLVN":["html5"],"HTML5 / Electron / NW.js":["html5"],
  "RE Engine (Capcom)":["re-pak"],"Unity":["unity-text","naninovel","higurashi","capcom-msg","vgprompter","pwaat"]};
 for(const e of ENGINES)e.readers=READERS[e.name]||[];
 

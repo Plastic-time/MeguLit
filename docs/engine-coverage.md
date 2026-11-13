@@ -190,3 +190,27 @@ MeguLit 对一款游戏的支持分三层：
 - **必须有实物**：AST（剧本语法）、Malie、ExHIBIT、Rejet Engine、DDSystem、Otomate / Idea Factory PC 版、Aksys/IFI Steam 移植、honeybee、Vitamin、Primula、Kaleido ADV Workshop、SakanaGL、Luca System。其中商业乙女几项**只要目录文件清单**（`dir /s /b` 的输出，不用游戏本体）就能先判断引擎
 - **有实物更稳**：NeXAS（确认 .bin 布局）、CMVS（新版 cpz7）、LiveMaker（验证 LSB 提取）
 - **按规格实现、还没碰过真游戏**：Majiro、TyranoScript（asar / NW.js 版）、Ren'Py 编译版、System-NNN、codeX RScript（Liar-soft）。任何一款都可以；Tyrano 和 Ren'Py 有大量免费作品
+
+## 第二轮 F1 打包资源（E610，webbundle.cjs）
+
+一个模块、每个引擎一份参数；容器：散文件 / resources\app.asar / package.nw / .love / 附在 exe 后的 zip；按内容类型取文本（JS 字符串、JSON、Lua、plist、HTML、各引擎专用文法）。合成夹具 + 日文原版 / 中文补丁 1:1 配对测试：`validation/e610-bundled-assets.test.cjs`。均未碰过真游戏。
+
+| 引擎 | 状态 | 说明 |
+|---|---|---|
+| Twine / SugarCube | 完整（按规格） | `<tw-passagedata>` 段落，去宏 / 链接取标签 |
+| WebGAL | 完整（按规格） | scene\*.txt，说话人、intro、choose；语音参数未接 |
+| Monogatari | 半成品 | js\script.js 字符串，首个 ASCII 词当说话人 |
+| RenJS | 半成品 | story\*.yaml 宽松取值 |
+| Narrat | 半成品 | .narrat 行内第一个引号串 |
+| ink | 完整（按规格） | 编译 JSON（`^` 文本 + `\n`）和 .ink 源码 |
+| Bitsy | 完整（按规格） | `DLG` 块 |
+| GB Studio | 半成品 | 只读 project.gbsproj；网页导出只有 ROM：需实物 |
+| GDevelop | 半成品 | data.js 的 JSON 串 + code*.js 字符串 |
+| Construct | 半成品 | data.js / data.json 的 JSON 串 |
+| Decker | 半成品 | .deck 字符串扫描（格式未核对） |
+| Cocos2d | 半成品 | res / src 内 json / lua / plist / js；加密 .jsc / .luac 不读 |
+| LÖVE | 完整（按规格） | .love（含附在 exe 后）内 lua / json / txt |
+| Corona / Solar2D | 半成品 | 散 lua；resource.car：需实物 |
+| Defold | 需实物 | 只做检测 + game.arcd 里未压缩的 UTF-8 串扫描（条目是 LZ4 压缩） |
+| Visual Novel Maker | 半成品 | NW.js 内 MZ 格式 data → rpgmaker.cjs；VNM 自有场景格式未核对，其余 data\*.json 走 JSON 串扫描 |
+| HTML5 / Electron / NW.js、O2 / Novelsphere、HTMLVN、Phaser / PixiJS、NVLMaker、CloudNovel | 半成品（通用扫描） | 脚本格式未知，只做检测 + js / json / html 通用串扫描（跳过 jquery / pixi 等库） |
