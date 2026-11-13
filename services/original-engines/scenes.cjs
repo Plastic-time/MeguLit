@@ -465,6 +465,7 @@ const systemnnn=require('./systemnnn.cjs').engine,liar=require('./liar.cjs').eng
 const qlie=require('./qlie.cjs').engine,entis=require('./entis.cjs').engine,alicesoft=require('./alicesoft.cjs').engine,marble=require('./marble.cjs').engine;
 /* E585 record-stream family (kit): Tmr-Hiro, NekoSDK, Ikura, ExHIBIT, EAGLS; archive layer + generic scan: Seraph, Interheart */
 const tmrhiro=require('./tmrhiro.cjs').engine,nekosdk=require('./nekosdk.cjs').engine,ikura=require('./ikura.cjs').engine,exhibit=require('./exhibit.cjs').engine,eagls=require('./eagls.cjs').engine,seraph=require('./seraph.cjs').engine,interheart=require('./interheart.cjs').engine;
+const circus=require('./circus.cjs').engine,whale=require('./whale.cjs').engine,ddsystem=require('./ddsystem.cjs').engine,aoi=require('./aoi.cjs').engine,kid=require('./kid.cjs').engine;/* E660–E664 F4b */
 /* E574 RPG Maker XP / VX / VX Ace (RGSSAD + Ruby Marshal, messages through rpgmaker.cjs): rgss.cjs */
 const rgss=require('./rgss.cjs').engine;
 /* E576 Silky's family (Silky Engine, AI6WIN, AI5WIN): silky.cjs */
@@ -474,7 +475,7 @@ const silky=require('./silky.cjs').engine;
 const nexas=require('./nexas.cjs').engine,malie=require('./malie.cjs').engine,shiinario=require('./shiinario.cjs').engine;
 /* E610 F1 bundled-asset family (web / NW.js / Electron / zip): webbundle.cjs */
 const webbundle=require('./webbundle.cjs').engines;
-const ENGINES={'adapter-pack':adapterPack,'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,tyrano,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,'spike-wad':spikeWad,pwaat,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak,fvp,advhd,reallive,vgprompter,majiro,softpal,systemnnn,liar,rgss,silky,tmrhiro,nekosdk,ikura,exhibit,eagls,ast,seraph,interheart,nexas,malie,shiinario,cmvs,lucifen,kaguya,lcse,yuka,qlie,entis,alicesoft,marble,...webbundle,plaintext:require('./plaintext.cjs').engine,garbro};
+const ENGINES={'adapter-pack':adapterPack,'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,tyrano,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,'spike-wad':spikeWad,pwaat,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak,fvp,advhd,reallive,vgprompter,majiro,softpal,systemnnn,liar,rgss,silky,tmrhiro,nekosdk,ikura,exhibit,eagls,ast,seraph,interheart,nexas,malie,shiinario,cmvs,lucifen,kaguya,lcse,yuka,qlie,entis,alicesoft,marble,...webbundle,plaintext:require('./plaintext.cjs').engine,circus,whale,ddsystem,aoi,kid,garbro};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,64)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */

@@ -15,7 +15,9 @@ const PACK='archives',DIR=()=>path.join(ROOT(),'runtime','garbro'),CACHE=()=>pro
    .assets/.bundle) are left out so a non-VN game in the library never pulls the pack in.
    E569 (engine survey): QLIE GameData/*.pack, ShiinaRio .war, Entis GLS .noa, AliceSoft .ald/.afa, Marble .mbl and rUGP
    .rio are containers GARbro opens that were missing here, so those engines never reached even this fallback. */
-const ARCHIVE=/\.(npk|iga|arc|pac|pak|dat|xp3|ypf|int|pfs|pf8|mpk|nsa|sar|ns2|gpk|ykc|lpk|mrg|fpk|afs|vfs|dxa|bin|cpz|hxp|lib|lac|pck|epk|vff|isa|nnk|ar2|psb|ttd|ifl|aos|tac|cmp|wag|fcb|cab|pack|war|noa|ald|afa|mbl|rio)$/i;
+const ARCHIVE=/\.(npk|iga|arc|pac|pak|dat|xp3|ypf|int|pfs|pf8|mpk|nsa|sar|ns2|gpk|ykc|lpk|mrg|fpk|afs|vfs|dxa|bin|cpz|hxp|lib|lac|pck|epk|vff|isa|nnk|ar2|psb|ttd|ifl|aos|tac|cmp|wag|fcb|cab|pack|war|noa|ald|afa|mbl|rio|box|snn|bdt|alf|gsp|med)$/i;
+/* E665 F4b engines whose archives GARbro opens but this list missed: SystemAoi .box, BlueGale .snn, Fairytale
+   .bdt, Eushully .alf, GSD .gsp, Triangle .med */
 const SCRIPTY=/script|scenario|scene|scn|story|text|txt|data|system|sys|main|game|msg/i;
 /* media entries never hold dialogue: skip them so a 4 GB CG archive is not written to disk */
 const MEDIA='png|bmp|jpe?g|gif|tga|dds|webp|psd|tlg\\d?|pna|bmx|g00|pic|ani|eri|mio|cps|hg[23]|ogg|wav|mp3|m4a|opus|flac|ahx|hca|at3|wma|mp4|wmv|avi|mpe?g|webm|ogv|mov|ttf|otf|ttc|fnt|pmx|x|fbx';

@@ -49,7 +49,7 @@ MeguLit 对一款游戏的支持分三层：
 | AVG32 | 111 | 110 | 0 | ✅（归为 RealLive） | ✅ TXT/SEEN.TXT | ✅ |  |
 | ExHIBIT | 104 | 98 | 56 | 🆕（.rld，含 rld\ 子目录） | 🆕 exhibit.cjs：rld 自描述指令（0x1C 台词 / 0x15 选项），明文或已知种子（rld-seeds.json） | ⚪ | 2016 后仍有 56 个公司发行；未知种子报告“需要种子” |
 | Bruns | 165 | 88 | 6 | 🆕 | ✅ scene/*.bso | ⚪ | 原来有读取器但库里是未知引擎 |
-| SaiSys | 80 | 80 | 0 | ❌ | ❌ | ⚪ |  |
+| SaiSys | 80 | 80 | 0 | ❌ | ❌ 需实物（E666） | ⚪ |  |
 | TyranoScript | 4052 | 75 | 74 | 🆕 扩展（app.asar 读索引、package.nw） | 🆕 tyrano.cjs：散文件 / app.asar / package.nw / exe 尾部 zip | ✅（V8：nwjs/electron） | 原来被 kirikiri 读取器当 KAG 读，#名字 当正文 |
 | Yuka | 66 | 66 | 2 | 🆕 | 🆕 yuka.cjs：.ykc + .yks 元素表遍历（StrOut / NameOut 的字符串常量）；选项无公开资料 | ⚪ |  |
 | MAGES. | 60 | 60 | 51 | ✅ | ✅ script.mpk SC3（日版） | ◎ MAGES 内嵌 + ✅ |  |
@@ -58,7 +58,7 @@ MeguLit 对一款游戏的支持分三层：
 | EAGLS | 53 | 53 | 16 | 🆕（含 Script\SCPACK） | 🆕 eagls.cjs：SCPACK.pak+.idx（默认密钥或由全 0 尾部自动求解）、.dat 隔字节 EAGLS_SYSTEM 流异或、#说话人 + 引号字面量 | ✅ | AdvSys 变体（136000 起 "ADVSYS"）未做 |
 | Musica (PAZ) | 54 | 53 | 25 | 🆕 | ✅ scr.dat / *.paz（paz.cjs） | ✅ | 原来有读取器但库里是未知引擎 |
 | Seraph | 63 | 53 | 0 | 🆕（ArchPac.dat） | 🟡 seraph.cjs：ScnPac.dat 偏移表 + 自有 LZ / zlib 按规格做实，剧本语法无公开资料 → 通用文本扫描（行近似，按位置配对） | ⚪ | 需实物确认剧本语法 |
-| SystemC | 53 | 52 | 33 | ❌ | ❌ | ⚪ | 2016 后 33 |
+| SystemC | 53 | 52 | 33 | ❌ | ❌ 需实物（E666） | ⚪ | 2016 后 33；无公开格式 |
 | RPG Maker | 752 | 46 | 44 | ✅ | ✅ MV/MZ JSON；🆕 XP/VX/VX Ace：RGSSAD + Ruby Marshal，与 MV 共用消息遍历（E574） | ⚪ MV/MZ；✅ VX/XP |  |
 | CMVS (Purple) | 44 | 44 | 26 | 🆕 | 🆕 cmvs.cjs：CPZ5 / CPZ6 索引四层解密（7 种 MD5 变体自动试，cmvs-schemes.json）+ PS2A 字节旋转 / 2KB LZSS + push 字符串；CPZ7 只检测并提示需实物 | ✅ |  |
 | Lucifen | 48 | 44 | 4 | 🆕 | 🆕 lucifen.cjs：SCRIPT.LPK（两套已知方案，lucifen-schemes.json；trie 索引、LZSS、条目加密）+ SOB0 / SOB2 重定位表取台词与选项 | ⚪ |  |
@@ -68,20 +68,20 @@ MeguLit 对一款游戏的支持分三层：
 | rUGP (âge) | 34 | 33 | 7 | 🆕 | ❌ | ⚪ |  |
 | Interheart FPK | 33 | 33 | 0 | 🆕（.fpk 索引自洽即认） | 🟡 interheart.cjs：.fpk 三种索引 + FPK 2.00 + ZLC2 按规格做实，剧本语法无公开资料 → 通用文本扫描 | ⚪ | 需实物确认剧本语法 |
 | SakanaGL | 32 | 32 | 32 | 🆕（sakanagl.dll） | ❌ | ✅（LunaHook 有 sakanagl hook） | 2016 后 32 |
-| Diesel Engine | 31 | 31 | 27 | ❌ | ❌ | ⚪ |  |
+| Diesel Engine | 31 | 31 | 27 | ❌（Nitro+ NPK 条目可能已认出） | ❌ 需实物（E666） | ⚪ |  |
 | AI5WIN / AI6WIN (elf/Silky) | 31 | 31 | 11 | 🆕（AI5WIN/AI6WIN.exe） | 🆕 silky.cjs：AI6WIN 完整；AI5WIN 归档 + 通用扫描（E576） | ⚪ |  |
 | LC-ScriptEngine | 41 | 30 | 0 | ✅ 扩展（lcsebody*.lst） | 🆕 lcse.cjs：.lst 索引 + 数据包（单字节密钥按长度反推）+ SNX 指令流 / 长度前缀串表 | ✅ |  |
 | NEKOPACK / NekoSDK | 30 | 30 | 10 | 🆕（NekoSDK 单列） | 🆕 nekosdk.cjs：NEKOPACK4 .pak、0xCACACA .dat + ADVSCRIPT2 对白（选项无资料）；NekoPack 1–3 仍走 GARbro | ⚪ | NekoPack 1–3（名字只存哈希、流加密）是另一套引擎 |
-| PIX STUDIO | 28 | 28 | 27 | ❌ | ❌ | ⚪ |  |
+| PIX STUDIO | 28 | 28 | 27 | ❌ | ❌ 需实物（E666） | ⚪ |  |
 | GLib2 | 27 | 27 | 0 | 🆕 | ❌ | ⚪ |  |
 | ISM | 37 | 21 | 5 | 🆕 | 🟡 GARbro（.isa） | ⚪ |  |
 | Cyberworks (C,system) | 39 | 19 | 10 | ✅ | 🟡 GARbro（Arc0N.dat） | ⚪ |  |
-| AGES Mk2 | 20 | 19 | 19 | ❌ | ❌ | ✅（LunaHook64 Ages7） |  |
+| AGES Mk2 | 20 | 19 | 19 | ❌ | ❌ 需实物（E666） | ✅（LunaHook64 Ages7） |  |
 | Luca System（Prototype 新移植） | 16 | 14 | 14 | 🆕 | ❌ | ⚪ | Kanon/AIR/Summer Pockets RB Steam |
 | Pajamas / PJADV | 16 | 14 | 6 | ✅ 扩展（任何名字的 GAMEDAT 包） | 🟡 GARbro（.dat） | ⚪ |  |
 | LiveMaker | 1747 | 12 | 3 | 🆕 扩展（vff 归档魔数） | 🟡 GARbro（vff） | ✅ | 乙女同人第二大引擎（532 款），LSB 二进制未做 |
 | Nitroplus（NPA/NPK/PAK/N4） | 12 | 12 | 0 | ✅ | ✅ npk / pak / N4；NPA 只检测 | ✅ |  |
-| CatSystem3 | 12 | 12 | 12 | ❌ | ❌ | ⚪ | 2016 后 12 |
+| CatSystem3 | 12 | 12 | 12 | ❌ | ❌ 需实物（E666） | ⚪ | 2016 后 12；不是 CatSystem2 格式 |
 | Unreal Engine 4/5 | 13 | 10 | 10 | 🆕 | ❌ | ⚪（LunaHook64 有 UE4/5） |  |
 | Light.vn | 161 | 9 | 9 | ✅ | ❌（.vndat 带密码 zip） | ✅ |  |
 | Innocent Grey (IGA) | 8 | 7 | 1 | 🆕 | ✅ script.iga | ✅ | 原来有读取器但库里是未知引擎 |
@@ -92,7 +92,13 @@ MeguLit 对一款游戏的支持分三层：
 | HuneX | 1 | 1 | 1 | 🆕 | ✅ .hfa 多语言 ctd 表 | ⚪ | 原来有读取器但库里是未知引擎；乙女移植常见 |
 | Adobe AIR / Flash | — | — | — | 🆕 | ❌ | ⚪ | 老乙女同人常见（43 款） |
 | Kaleido ADV Workshop | — | — | — | ✅ | ❌ | ⚪ | MAGES/Spike 新移植 |
-| DDSystem | — | — | — | ❌ | ❌ | ⚪ | Daisy2（乙女） |
+| DDSystem | — | — | — | 🆕 .dat DDP2/DDP3 | 🟡 ddsystem.cjs：DDP2/DDP3 + SHS + HXB 解密，剧本通用扫描（E661） | ⚪ | Daisy2 / PIL（乙女）；HXB 字节码需实物 |
+| Circus (adv32) | 43 | 43 | — | 🆕 AdvData + MES/PCK 实开 | 🆕 circus.cjs：MES 31 个版本操作码表 + PCK/DAT（E660） | ⚪ | D.C. 系列；msg-tool 规格 |
+| Whale | 38 | 38 | — | 🆕 .dat 哈希索引 | 🆕 whale.cjs：索引 + 剧本 zlib/异或（K 由 zlib 头反推）+ 【名】「台词」语法（E664） | ⚪ | HARUKAZE / みなとそふと |
+| SystemAoi | 22 | 22 | — | 🆕 .box AOIB/AOIMY | 🟡 aoi.cjs：BOX 解包 + 通用扫描（E662） | ⚪ | SofthouseChara |
+| KID Engine | 6 | 6 | — | 🆕 .dat LNK | 🟡 kid.cjs：LNK + lnd + 通用扫描（E663） | ⚪ | Ever17 / Remember11 |
+| AZ System / A98SYS / Eushully / Frontwing / F&C 系 / GSD / BlueGale / CRIware | — | — | — | 🆕 GARbro 签名（E665） | 🟡 GARbro 兜底 | ⚪ | 只检测 |
+| Dorian Engine / shin | 234 / 64 | 0 | 0 | — | — | — | 无 Windows 发行，不在范围 |
 | Escude | — | — | — | ✅ | 🟡 GARbro（script.bin ACPX） | ✅ |  |
 | minori (PAZ) | — | — | — | ✅ | ✅ scr.paz | ✅ |  |
 | Spike Chunsoft WAD | — | — | — | ✅ | ✅ .lin | ⚪ |  |

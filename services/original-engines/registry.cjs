@@ -98,6 +98,21 @@ const ENGINES=[
  {name:'rUGP (age)',hook:null,test:f=>f.has(/^rugp.*\.exe$/i)||f.has(/\.rio$/i)&&f.has(/\.rio\.ini$/i)},
  /* E620 the F2 plain-text script family (Suika 2, NVList, VNDS, PyMO …): fingerprints are data in plaintext-profiles.json */
  ...require('./plaintext.cjs').RAW.profiles.filter(p=>p.match).map(p=>({name:p.engine,hook:null,test:f=>require('./plaintext.cjs').matches(f,p.id)})),
+ /* E660–E669 F4b proprietary engines (research: H:\MeguLit-Work\f4b, notes E660–E669). Readers: Circus (adv32) and Whale
+    complete; DDSystem, SystemAoi, KID archive + generic scan. The rest are named from GARbro's archive fingerprints only */
+ {name:'Circus (adv32)',hook:null,test:f=>f.sub('advdata',/\.(mes|pck|dat|crx)$|^(mes|grp|dat)$/i)&&require('./circus.cjs').probe(f.dir)||f.has(/\.mes$/i)&&require('./circus.cjs').probe(f.dir)},
+ {name:'Whale',hook:null,test:f=>f.probe(/\.dat$/i,p=>(require('./whale.cjs').list(p)||[]).length>=3,6)},
+ {name:'DDSystem',hook:null,test:f=>f.magicAny(/\.dat$/i,'DDP2',8)||f.magicAny(/\.dat$/i,'DDP3',8)},
+ {name:'SystemAoi',hook:null,test:f=>f.magicAny(/\.box$/i,'AOIB')||f.magicAny(/\.box$/i,'AOIMY01\0')||f.magicAny(/\.box$/i,'A\0O\0I\0M\0')||f.has(/\.vfs$/i)&&f.magicAny(/\.vfs$/i,'VF')},
+ {name:'KID Engine',hook:null,test:f=>f.magicAny(/\.dat$/i,'LNK\0',8)},
+ {name:'AZ System',hook:null,test:f=>f.magicAny(/\.arc$/i,'ARC\x1a')||f.magicAny(/\.cpb$/i,'CPB\x1a')},
+ {name:'A98SYS (Active Soft)',hook:null,test:f=>f.magicAny(/\.pak$/i,'ADPACK32')},
+ {name:'ARCGameEngine (Eushully)',hook:null,test:f=>f.has(/^sys[34]ini\.bin$/i)&&(f.has(/\.alf$/i)||f.has(/\.agf$/i))},
+ {name:'FW-EDITOR (Frontwing)',hook:null,test:f=>f.probe(/\.(dat|bin|pak|lib|flt|arc)$/i,p=>require('./kit.cjs').head(p,16).toString('latin1')==='LIB_PACKDATA0000',8)},
+ {name:'F&C (ADVWin32 / ADVWIN / AGSI)',hook:null,test:f=>f.magicAny(/\.mrg$/i,'MRG\0')||f.magicAny(/\.mrg$/i,'mrg0')||f.names.some(n=>/^dt0.*\.bdt$/i.test(n))},
+ {name:'GSD',hook:null,test:f=>f.magicAny(/\.bin$/i,'LSDARC V.100')||f.magicAny(/\.bmz$/i,'ZLC3')},
+ {name:'BlueGale',hook:null,test:f=>f.names.some(n=>/\.snn$/i.test(n)&&f.has(new RegExp('^'+n.slice(0,-4).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\.inx$','i')))},
+ {name:'CRIware (CPK / AFS)',hook:null,generic:true,test:f=>f.magicAny(/\.cpk$/i,'CPK ')||f.magicAny(/\.afs$/i,'AFS\0')},
  {name:'Godot',hook:null,generic:true,test:f=>f.magicAny(/\.pck$/i,'GDPC')},
  {name:'Unreal Engine',hook:null,generic:true,test:f=>f.has(/^engine$/i)&&f.names.some(n=>/\.exe$/i.test(n))&&f.sub('engine',/^(binaries|content)$/i)},
  /* E601 Capcom RE Engine (逆転裁判456 王泥喜セレクション): read by re-pak.cjs but had no fingerprint, so it showed as unknown */
@@ -215,6 +230,11 @@ const READERS={"BGI / Ethornell":["bgi"],
  "Defold":["defold"],
  "Corona / Solar2D":["solar2d"],
  "O2 Engine / Novelsphere":["html5"],"NVLMaker":["html5"],"CloudNovel":["html5"],"HTMLVN":["html5"],"HTML5 / Electron / NW.js":["html5"],
+ "Circus (adv32)":["circus"],
+ "Whale":["whale"],
+ "DDSystem":["ddsystem"],
+ "SystemAoi":["aoi"],
+ "KID Engine":["kid"],
  "RE Engine (Capcom)":["re-pak"],"Unity":["unity-text","naninovel","higurashi","capcom-msg","vgprompter","pwaat"]};
 for(const p of require('./plaintext.cjs').RAW.profiles)READERS[p.engine]=p.detectOnly?[]:['plaintext'];
 for(const e of ENGINES)e.readers=READERS[e.name]||[];
