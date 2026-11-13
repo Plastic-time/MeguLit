@@ -347,7 +347,6 @@ function attachGameActions(main){
 }
 let launchInFlight=false,pendingHomeGame='';
 const playHomeMotion=createHomeMotion({frame:()=>document.querySelector('.app-frame'),reduced:()=>matchMedia('(prefers-reduced-motion:reduce)').matches});
-async function collapseHome(){await invoke('window_action',{action:'enter_overlay'});}
 async function startGame(id,button){
  if(launchInFlight)return;
  launchInFlight=true;if(button)button.disabled=true;
@@ -1031,7 +1030,7 @@ function dictionary(target){
     }catch(error){if(request===ticket&&results.isConnected)results.innerHTML=empty(online?L.fail:text.serviceFailed,'word');}
   });
   if(pendingLookup){const word=pendingLookup;pendingLookup='';const input=target.querySelector('#lookup-input');input.value=word;/* the form is attached by commit() after this returns */setTimeout(()=>{
-   const form=target.querySelector('#lookup-form');if(form.isConnected)form.requestSubmit(form.querySelector('button[value=moji]'));},0);}
+   const form=target.querySelector('#lookup-form');if(form?.isConnected)form.requestSubmit(form.querySelector('button[value=moji]'));},0);}
 }
 /* 2026-11-13 Anki review HUD: the latest played game's art for its background, and the window's own full screen */
  const ankiCover=()=>recentGames(model.games||[]).find(g=>g.cover)?.cover||'',ankiWindow=action=>invoke('window_action',{action});

@@ -282,10 +282,10 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
   else if(action==='primary')controls.querySelector('button.primary:not(:disabled)')?.click();else controls.querySelector('.rating-'+action.slice(5)+':not(:disabled)')?.click();
   return true;
  }
- const keydown=event=>{if(!isCurrent()||!stage()){return;}if(event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,select,textarea,[contenteditable],details[open],.anki-hud-lookup,.select-popup'))return;
+ const keydown=event=>{if(!isCurrent()){stop();return;}if(!stage())return;if(event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,select,textarea,[contenteditable],details[open],.anki-hud-lookup,.select-popup'))return;
   if(event.key!=='Escape'&&event.target.closest?.('button')&&(event.key===' '||event.key==='Enter'))return;if(key(event.key))event.preventDefault();};
  document.addEventListener('keydown',keydown);
- const messages=event=>{if(!isCurrent()){window.removeEventListener('message',messages);return;}
+ const messages=event=>{if(!isCurrent()){stop();return;}
   if(!currentFrame||event.source!==currentFrame.contentWindow||event.data?.nonce!==currentFrame.dataset.nonce)return;const d=event.data;
   if(d.type==='tome-anki-replay')replay(currentCard,target.querySelector('[data-replay]'));
   else if(d.type==='tome-anki-hud-move'&&Object.hasOwn(M.LAYOUT,d.id)){hud.layout[d.id]=H.normRect(d.rect,M.LAYOUT[d.id]);saveHud();}
@@ -294,7 +294,7 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
   else if(d.type==='tome-anki-key')key(String(d.key||''));
   else if(d.type==='tome-anki-lookup')lookup(String(d.word||'').slice(0,60));};
  window.addEventListener('message',messages);
- stopMessages=()=>{window.removeEventListener('message',messages);document.removeEventListener('keydown',keydown);document.removeEventListener('fullscreenchange',fullscreenSync);clearInterval(poll);leaveHud();};
+ const stop=()=>{window.removeEventListener('message',messages);document.removeEventListener('keydown',keydown);document.removeEventListener('fullscreenchange',fullscreenSync);clearInterval(poll);leaveHud();};stopMessages=stop;
  function progress(s,html){s.querySelector('.anki-hud-progress').innerHTML=html;requestAnimationFrame(placeBlocks);}
  function mountFrame(s,card){currentFrame=frame(card);s.querySelector('.anki-hud-frame-slot').replaceChildren(currentFrame);}
  function drawCard(card){

@@ -555,7 +555,11 @@ public class GalWindowBridge {
         Rect localReader=new Rect(reader.Left-box.Left,reader.Top-box.Top,reader.Right-box.Left,reader.Bottom-box.Top);
         if(!HasLastRect||localReader.Left!=LastReaderRect.Left||localReader.Top!=LastReaderRect.Top||localReader.Right!=LastReaderRect.Right||localReader.Bottom!=LastReaderRect.Bottom||box.Right-box.Left!=LastRect.Right-LastRect.Left||box.Bottom-box.Top!=LastRect.Bottom-LastRect.Top){var scan=TextMask!=null?TextMask.SurfaceRegion(client.Right,client.Bottom):System.Drawing.Rectangle.Empty;Emit(new{type="layout",clientWidth=layoutW,clientHeight=layoutH,clientX=layoutX-box.Left,clientY=layoutY-box.Top,magpie=magpie,readerX=localReader.Left,readerY=localReader.Top,readerWidth=localReader.Right-localReader.Left,readerHeight=localReader.Bottom-localReader.Top,surfaceWidth=box.Right-box.Left,surfaceHeight=box.Bottom-box.Top,maskX=scan.X-(box.Left-origin.X),maskY=scan.Y-(box.Top-origin.Y)});LastReaderRect=localReader;}
         ApplyRegion(box.Right-box.Left,box.Bottom-box.Top);
-        if(!HasLastRect||!IsShown||box.Left!=LastRect.Left||box.Top!=LastRect.Top||box.Right!=LastRect.Right||box.Bottom!=LastRect.Bottom){SetWindowPos(Overlay,homeOwned?fg:gameOwned?new IntPtr(-1):IntPtr.Zero,box.Left,box.Top,box.Right-box.Left,box.Bottom-box.Top,(uint)(0x0010|0x0040|(!HasLastRect?0x0020:0)));LastRect=box;HasLastRect=true;}IsShown=true;AckRegion();
+        /* 2026-11-13 (live test, game relaunched while bound: the reader stayed at the floating 160x28 spot at the screen bottom and
+           the opening and first lines never showed, while the game hid its own text): the cached LastRect said the window
+           was already placed. The real window rect is checked too, so a window moved by any other path is put back. */
+        Rect placed;bool strayed=HasLastRect&&GetWindowRect(Overlay,out placed)&&(placed.Left!=box.Left||placed.Top!=box.Top||placed.Right!=box.Right||placed.Bottom!=box.Bottom);
+        if(strayed||!HasLastRect||!IsShown||box.Left!=LastRect.Left||box.Top!=LastRect.Top||box.Right!=LastRect.Right||box.Bottom!=LastRect.Bottom){SetWindowPos(Overlay,homeOwned?fg:gameOwned?new IntPtr(-1):IntPtr.Zero,box.Left,box.Top,box.Right-box.Left,box.Bottom-box.Top,(uint)(0x0010|0x0040|(!HasLastRect?0x0020:0)));LastRect=box;HasLastRect=true;}IsShown=true;AckRegion();
         FocusMenuOnce();
         if(homeOwned&&LastHomeForeground!=fg)SetWindowPos(Overlay,fg,0,0,0,0,0x0001|0x0002|0x0010);
         LastHomeForeground=homeOwned?fg:IntPtr.Zero;
@@ -629,7 +633,10 @@ public class GalWindowBridge {
         PointerGate=new ReaderPointerGate(Emit);
         bool hotkey=RegisterHotKey(IntPtr.Zero,0x541,0x4001,0x54),coverHotkey=RegisterHotKey(IntPtr.Zero,0x542,0x4001,0x48),modeHotkey=RegisterHotKey(IntPtr.Zero,0x543,0x4001,0x4d);
         /* E476: a helper left running by another MeguLit folder (an older download) holds Alt+T: end it and take the keys */
-        if(!hotkey||!coverHotkey||!modeHotkey){if(EndForeignBridges()>0){Thread.Sleep(300);if(!hotkey)hotkey=RegisterHotKey(IntPtr.Zero,0x541,0x4001,0x54);if(!coverHotkey)coverHotkey=RegisterHotKey(IntPtr.Zero,0x542,0x4001,0x48);if(!modeHotkey)modeHotkey=RegisterHotKey(IntPtr.Zero,0x543,0x4001,0x4d);}}
+        /* E540: side-by-side test copies (MEGULIT_SIDE_BY_SIDE=1, E530) share the PC with other MeguLit folders on purpose;
+           ending their helpers unbound every other copy's game, so a side-by-side copy goes without Alt+T instead */
+        bool sideBySide=Environment.GetEnvironmentVariable("MEGULIT_SIDE_BY_SIDE")=="1";
+        if(!sideBySide&&(!hotkey||!coverHotkey||!modeHotkey)){if(EndForeignBridges()>0){Thread.Sleep(300);if(!hotkey)hotkey=RegisterHotKey(IntPtr.Zero,0x541,0x4001,0x54);if(!coverHotkey)coverHotkey=RegisterHotKey(IntPtr.Zero,0x542,0x4001,0x48);if(!modeHotkey)modeHotkey=RegisterHotKey(IntPtr.Zero,0x543,0x4001,0x4d);}}
         Emit(new{type="ready",hotkey=hotkey,coverHotkey=coverHotkey,modeHotkey=modeHotkey,coverEnabled=true,interfaceMode="normal"});
         DateTime nextHotkeyTry=DateTime.UtcNow.AddSeconds(2);
         var input=new Thread(delegate(){string line;while((line=Console.ReadLine())!=null){try{var command=Json.Deserialize<Dictionary<string,object>>(line);if(Str(command,"type")=="glass"){GlassCommand(command);continue;}Commands.Enqueue(command);}catch{}}Running=false;});input.IsBackground=true;input.Start();
