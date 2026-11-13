@@ -1180,11 +1180,14 @@ function loading(){return '<div class="loading-screen"><span class="spinner" ari
 /* the 个人主页 pill at the right of the top bar: same panel as the 排行榜 chip; shows your picture and name once known */
 async function paintTopProfile(){
  const me=document.querySelector('[data-top-me]');if(!me)return;
- let data;try{data=await api('leaderboard_view',{tab:'board'});}catch{return;}
- if(!data?.name)return;
- me.querySelector('.leaderboard-avatar')?.replaceWith(document.createRange().createContextualFragment(avatarHTML({name:data.name,avatar:data.self?.avatar||null},
-  data.avatars||{},esc)));
- me.querySelector('.top-me-name').textContent=data.name;me.title=data.name;
+ const paint=data=>{if(!data?.name)return;
+  me.querySelector('.leaderboard-avatar')?.replaceWith(document.createRange().createContextualFragment(avatarHTML({name:data.name,avatar:data.self?.avatar||null},
+   data.avatars||{},esc)));
+  me.querySelector('.top-me-name').textContent=data.name;me.title=data.name;};
+ /* 2026-11-14 (user: the pill sat on 「个人主页」 and a blank circle): name and cached picture from this PC first; the
+    board call, which waits on the relay, only refreshes them */
+ try{paint(await api('profile_chip',{}));}catch{}
+ try{paint(await api('leaderboard_view',{tab:'board'}));}catch{}
 }
 function bindTopProfile(){
  const me=document.querySelector('[data-top-me]');if(!me)return;
