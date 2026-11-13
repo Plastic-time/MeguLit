@@ -10,8 +10,11 @@
                                           manifest the user sees: every item, its size, the total and the hash
      upload(root,{hash,followUp})         sends exactly that stored bundle, in chunks under the relay's size limit,
                                           only after the user confirmed it in the dialog (the hash must match)
-   Bundle (schema megulit.probe-bundle v1): {app, createdAt, games:[{key,title,step,detail,detected,reader,lines,
-   japaneseLines,sizes,pairing,inventory,engines,unsupported,preparing,samples:[{name,role,size,head,sample}],keys}]}.
+   Bundle (schema megulit.probe-bundle v1): {app, createdAt, features, games:[{key,title,step,detail,detected,reader,lines,
+   japaneseLines,sizes,pairing,inventory,engines,unsupported,preparing,samples:[{name,role,size,head,sample}],keys,runtime?}]}.
+   runtime (E596, optional, versioned on its own: {schema:'megulit.runtime-findings',version}) is what the opt-in runtime
+   harvest (runtime-harvest.cjs) kept of a running game: keys, index layouts, dispatch tables, desensitized script layouts.
+   Additive: a reader that does not know it skips it; "features" lists what a bundle carries.
    key is the anonymous shared-adaptation fingerprint (exe name + size + first-MiB hash); no path, user name or line. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const d=require('./desensitize.cjs');
@@ -71,18 +74,30 @@ async function prepare(root,db,{ids=null,sampler,titles=true}={}){
  for(const g of games){const r=results[g.id];if(!r||!ALLOWED_STEPS.includes(r.step))continue;if(want&&!want.has(g.id))continue;
   let fp=null;try{fp=require('./shared-adaptation.cjs').fingerprint(g.executable);}catch{}
   let extra={samples:[],keys:[]};if(sampler&&r.step!=='low-pairing'&&r.step!=='not-japanese')try{extra=await sampler(g,r)||extra;}catch{}
-  list.push({key:fp?.key||sha('title:'+g.title).slice(0,64),title:titles?String(g.title).slice(0,120):'',...publicResult(r),samples:extra.samples||[],keys:extra.keys||[]});}
+  /* runtime findings of this game, through the privacy gate once more */
+  let runtime=null;try{const rh=require('./runtime-harvest.cjs');runtime=rh.gate(rh.load(root,g.id));}catch{}
+  list.push({key:fp?.key||sha('title:'+g.title).slice(0,64),title:titles?String(g.title).slice(0,120):'',...publicResult(r),samples:extra.samples||[],keys:extra.keys||[],...(runtime?{runtime}:{})});}
  if(!list.length)return {empty:true};
- let bundle={schema:'megulit.probe-bundle',version:1,app:appVersion(root),createdAt:new Date().toISOString(),games:list};
+ let bundle={schema:'megulit.probe-bundle',version:1,features:list.some(g=>g.runtime)?['runtime-1']:[],app:appVersion(root),createdAt:new Date().toISOString(),games:list};
  /* over the relay limit: drop tails, then samples from the biggest games, until it fits */
  let body=Buffer.from(JSON.stringify(bundle));
+ /* runtime script samples and name lists go first (the keys and index numbers are what solves a game) */
+ for(const g of bundle.games){if(body.length<=MAX_BUNDLE)break;if(g.runtime){g.runtime.scripts=g.runtime.scripts.map(({sample,...s})=>s);for(const ix of g.runtime.indexes)delete ix.names;g.trimmed=true;body=Buffer.from(JSON.stringify(bundle));}}
  for(let guard=0;body.length>MAX_BUNDLE&&guard<200;guard++){const g=bundle.games.filter(x=>x.samples.length).sort((a,b)=>JSON.stringify(b.samples).length-JSON.stringify(a.samples).length)[0];if(!g)break;g.samples.pop();g.trimmed=true;body=Buffer.from(JSON.stringify(bundle));}
  if(body.length>MAX_BUNDLE)return {error:'TOO_LARGE'};
  if(!clean(bundle))return {error:'TEXT_FOUND'};
  const hash=sha(body);fs.mkdirSync(outbox(root),{recursive:true});fs.writeFileSync(path.join(outbox(root),hash+'.json'),body);
  return {hash,bytes:body.length,chunks:Math.ceil(body.length/CHUNK),games:list.length,manifest:manifestOf(bundle)};}
 function manifestOf(bundle){return bundle.games.map(g=>({key:g.key.slice(0,12),title:g.title,step:g.step,detail:g.detail,
- items:[{kind:'result',bytes:Buffer.byteLength(JSON.stringify({...g,samples:undefined,keys:undefined}))},...g.samples.map(s=>({kind:s.dropped?'dropped':'sample',name:s.name,role:s.role,size:s.size,bytes:s.sample?Buffer.byteLength(JSON.stringify(s.sample)):0,opaque:s.sample?.opaque?.length||0})),...(g.keys.length?[{kind:'keys',count:g.keys.length,algos:[...new Set(g.keys.map(k=>k.algo))]}]:[])]}));}
+ items:[{kind:'result',bytes:Buffer.byteLength(JSON.stringify({...g,samples:undefined,keys:undefined,runtime:undefined}))},...g.samples.map(s=>({kind:s.dropped?'dropped':'sample',name:s.name,role:s.role,size:s.size,bytes:s.sample?Buffer.byteLength(JSON.stringify(s.sample)):0,opaque:s.sample?.opaque?.length||0})),...(g.keys.length?[{kind:'keys',count:g.keys.length,algos:[...new Set(g.keys.map(k=>k.algo))]}]:[]),...runtimeItems(g.runtime)]}));}
+/* every runtime finding as its own manifest row: what it is, how it was checked, its size (name is shown as is) */
+function runtimeItems(rt){if(!rt)return [];const size=x=>Buffer.byteLength(JSON.stringify(x)),out=[];
+ for(const k of rt.keys||[])out.push({kind:'runtime-key',name:'runtime · '+k.algo+' '+(k.form==='state'?'key schedule':k.form==='params'?'parameters':'key')+' · '+k.verified,role:'runtime',algo:k.algo,bytes:size(k)});
+ for(const ix of rt.indexes||[])out.push({kind:'runtime-index',name:'runtime · index of '+ix.archive.name+' · '+ix.count+' entries'+(ix.names?' + masked names':''),role:'runtime',count:ix.count,bytes:size(ix)});
+ for(const t of rt.dispatch||[])out.push({kind:'runtime-dispatch',name:'runtime · opcode table · '+t.count+' entries',role:'runtime',bytes:size(t)});
+ for(const s of rt.scripts||[])out.push({kind:'runtime-script',name:'runtime · script layout'+(s.sample?' + text-free sample':'')+' · '+(s.encoding||'?'),role:'runtime',bytes:size(s)});
+ if((rt.constants||[]).length)out.push({kind:'runtime-constants',name:'runtime · cipher tables in modules · '+[...new Set(rt.constants.map(c=>c.algo))].join(', '),role:'runtime',bytes:size(rt.constants)});
+ return out;}
 /* what a stored bundle would upload (the dialog can show it again) */
 function manifest(root,hash){if(!/^[a-f0-9]{64}$/.test(String(hash)))return null;let body;try{body=fs.readFileSync(path.join(outbox(root),hash+'.json'));}catch{return null;}if(sha(body)!==hash)return null;const b=JSON.parse(body);return {hash,bytes:body.length,chunks:Math.ceil(body.length/CHUNK),games:b.games.length,manifest:manifestOf(b)};}
 const consentFile=root=>path.join(root,'data','adapter-probe','consent.json');
@@ -103,4 +118,4 @@ async function upload(root,{hash,followUp=false,fetcher=globalThis.fetch,endpoin
  if(followUp){try{grant(root,JSON.parse(body).games.map(g=>g.key));}catch{}}
  try{fs.writeFileSync(path.join(outbox(root),hash+'.sent'),JSON.stringify({at:Date.now(),id:last.id||''}));}catch{}
  return {state:'uploaded',id:String(last.id||''),issueUrl:/^https:\/\//.test(String(last.issueUrl||''))?String(last.issueUrl):''};}
-module.exports={sampleGame,prepare,manifest,upload,consent,grant,revoke,publicResult,clean,MAX_BUNDLE,CHUNK};
+module.exports={sampleGame,prepare,manifest,upload,consent,grant,revoke,publicResult,clean,runtimeItems,MAX_BUNDLE,CHUNK};

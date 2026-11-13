@@ -129,3 +129,62 @@ node tools/adapter-pack.cjs probe-request req-2 <key>   # ask that game for a fr
 ```
 
 A probe upload opens a GitHub issue labelled `adapter-probe` with the summary and a 30-day download link of the bundle.
+
+## Runtime findings (E596–E599)
+
+Some archives can only be opened by the game itself: the key is derived at run time, or the index is encrypted with a
+cipher no static key opens. The offline probe stops there (its sample sees 64 KB of head; it cannot see a key that only
+exists in the running process). With the user's opt-in, MeguLit reads the running game's memory once and keeps the
+structure that solves it.
+
+```
+game bound by the hook (reader.cjs) ──4 min──► runtime-harvest.cjs (opt-in, needed?) ──fork, low priority──►
+  runtime-harvest-worker.cjs ── native/RuntimeHarvest.exe --pid (read-only stream) ──► runtime-harvest-scan.cjs
+  + runtime-dump buffers (known plaintext) + the game's archives          ──► publicize ─► gate ─► data/adapter-probe/runtime/<id>.json
+probe bundle (adapter-sample.cjs) ── games[].runtime, one manifest row per finding ── user confirms ──► relay ──► issue
+maintainer: tools/adapter-pack.cjs from-runtime → draft (index container + key transform + grammar guess) → sign → publish
+app: feed sync → rebuild offline → verdict solved / read / partial / failed → report (+ outcome on the findings)
+```
+
+| Piece | File |
+|---|---|
+| Read-only reader (no injection; query + read + wait rights only; budget, seconds, cancel by closing the pipe) | `native/RuntimeHarvest.cs` |
+| Detectors, locators, stream parser | `services/runtime-harvest-scan.cjs` |
+| Opt-in, triggers, privacy gate, store, `adapter_runtime_*` actions | `services/runtime-harvest.cjs`, `services/runtime-harvest-worker.cjs` |
+| Findings → pack draft | `services/runtime-pack-draft.cjs`, `tools/adapter-pack.cjs from-runtime` |
+| Tests (synthetic running game, live stand-in process, privacy detector) | `validation/runtime-harvest.test.cjs` |
+
+**What it recovers** (generic; no detector knows an engine):
+
+* cipher tables linked into a module (Blowfish pi, AES, Camellia, TEA delta, CRC32, MD5, zlib) with module + RVA and a
+  code pattern that references them;
+* Blowfish key schedules (self-consistency of the last S-box pairs, a 64-bit check random data never passes) and the
+  pass phrase when a string in the image reproduces it; Camellia-128 schedules (rotation relations of KL, KA kept as an
+  alternate); TEA / XTEA keys against known plaintext or an oracle (entry heads that decrypt to structure); XOR / add /
+  index-XOR parameters from known plaintext;
+* archive index tables: fixed-stride records whose offset/size fields tile one of the game's archives back to back (or
+  block-aligned); stride, field layout, unpacked size, count field, names (masked), what each entry is after the key;
+* opcode dispatch tables (≥ 48 pointers into one module's code);
+* decoded script layouts: opcode before the length byte, length prefix, terminator, a text-free sample;
+* for every find: module + RVA, or the module slot that points at a heap object, plus a byte pattern of the code that
+  references it with the address wildcarded (`8b0d????????…`), so an adapter can find it again by pattern.
+
+**What it cannot recover:** keys used once and wiped, stream ciphers whose state is not a table (RC4 state can be found
+only with known plaintext), AES key schedules (tables are detected, keys are not searched yet), unsorted index tables
+(hash-ordered), indexes the game never decodes as a whole (looked up per file), and anything in a region the budget
+did not reach.
+
+**Privacy.** Text samples pass `desensitize.sample()` (verify gate); names pass `maskString()`; every byte field (keys
+included) passes `naturalLanguage()` (three kana in a row, kanji runs, GB2312 runs, UTF-16 CJK runs with kana, English
+prose) and the finding is dropped if it reads as language; the bundle is checked once more as a whole. The test runs an
+independent detector (every 2-character piece of the stand-in game's lines, in every encoding, in every field and every
+decoded base64 / hex value) over the findings, the bundle and the issue; it fails on any hit. Desensitizing memory also
+fixed a gap in `desensitize.cjs`: a UTF-16 line inside Shift-JIS bytecode was left as is (its bytes were "taken" by
+misread Shift-JIS characters); such runs now win and remainders are replaced again.
+
+**Schema.** `games[].runtime` = `{schema:'megulit.runtime-findings', version:1, collector, stats, modules, constants,
+keys, indexes, dispatch, scripts, dropped}`; the bundle lists `features:['runtime-1']` and stays version 1 (additive:
+older readers skip it). Packs: new capabilities `container:index`, `transform:blowfish|tea|xtea|camellia`,
+`transform:xor-file`; an app without them skips such a pack (CAPABILITY) instead of misreading it. Reports may carry
+`verdict` (solved ≥ 98 % pairing / read / partial / failed) and `origin` (runtime / probe); the relay keeps them with
+the after numbers.

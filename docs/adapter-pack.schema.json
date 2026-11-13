@@ -18,7 +18,8 @@
    "container:loose", "container:table", "container:xp3", "container:pfs",
    "transform:xor", "transform:xor-index", "transform:add", "transform:sub", "transform:not", "transform:rol", "transform:ror",
    "transform:zlib", "transform:deflate-raw", "transform:lzss", "transform:skip", "transform:take",
-   "grammar:lines", "grammar:strings", "params:cx-scheme", "params:paz-scheme", "match:exe", "match:files", "params:malie-scheme"]}},
+   "grammar:lines", "grammar:strings", "params:cx-scheme", "params:paz-scheme", "match:exe", "match:files", "params:malie-scheme",
+   "container:index", "transform:blowfish", "transform:tea", "transform:xtea", "transform:camellia", "transform:xor-file"]}},
   "title": {"type": "string", "maxLength": 200},
   "engine": {"type": "string", "maxLength": 200},
   "note": {"type": "string", "maxLength": 200},
@@ -30,7 +31,10 @@
    "exe": {"type": "object", "additionalProperties": false, "properties": {
     "name": {"type": "string", "pattern": "^[^\\\\/:]{1,120}\\.exe$"}, "size": {"type": "integer", "minimum": 1}, "head": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}}}},
   "source": {"type": "object", "required": ["container"], "properties": {
-   "container": {"enum": ["loose", "table", "xp3", "pfs"]},
+   "container": {"enum": ["loose", "table", "xp3", "pfs", "index"]},
+   "index": {"type": "object", "required": ["size", "count", "words", "entries"], "description": "E596: an archive index recovered from the running game (runtime findings)", "properties": {
+    "size": {"type": "integer", "minimum": 1}, "count": {"type": "integer", "minimum": 1, "maximum": 65536}, "words": {"const": 3},
+    "entries": {"type": "string", "description": "base64 of u32le offset, size, unpacked per entry"}, "select": {"type": "string", "description": "base64 of u32le entry numbers to read"}, "trim": {"const": "unpacked"}}},
    "files": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/glob"}},
    "archives": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/glob"}},
    "entries": {"type": "string", "maxLength": 120},
@@ -60,8 +64,9 @@
   "encoding": {"enum": ["shift_jis", "utf-8", "utf-16le", "gbk", "euc-jp", "big5"]},
   "regex": {"type": "string", "minLength": 1, "maxLength": 300},
   "transform": {"type": "object", "required": ["op"], "properties": {
-   "op": {"enum": ["xor", "xor-index", "add", "sub", "not", "rol", "ror", "zlib", "deflate-raw", "lzss", "skip", "take"]},
-   "key": {"type": "string", "pattern": "^([0-9a-fA-F]{2}){1,256}$"}, "start": {"type": "integer"}, "base": {"type": "integer", "minimum": 0, "maximum": 255},
+   "op": {"enum": ["xor", "xor-index", "add", "sub", "not", "rol", "ror", "zlib", "deflate-raw", "lzss", "skip", "take", "blowfish", "tea", "xtea", "camellia"]},
+   "key": {"type": "string", "pattern": "^([0-9a-fA-F]{2}){1,256}$"}, "start": {"type": "integer"}, "phase": {"enum": ["entry", "file"]},
+   "state": {"type": "string", "description": "blowfish: base64 of the 4168-byte key schedule (P then S, little-endian words)"}, "words": {"enum": ["le", "be"]}, "rounds": {"enum": [16, 32, 64]}, "base": {"type": "integer", "minimum": 0, "maximum": 255},
    "step": {"type": "integer", "minimum": 0, "maximum": 255}, "mult": {"type": "integer", "minimum": 0, "maximum": 255}, "value": {"type": "integer", "minimum": 0, "maximum": 255},
    "bits": {"type": "integer", "minimum": 1, "maximum": 7}, "bytes": {"type": "integer", "minimum": 0}, "window": {"const": 4096}}}
  }

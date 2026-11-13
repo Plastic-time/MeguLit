@@ -12,7 +12,11 @@
      node tools/adapter-pack.cjs publish <signed.json>             POST to the relay (MEGULIT_ADAPTER_ADMIN_TOKEN)
      node tools/adapter-pack.cjs withdraw <id> <version>           take a published version off the feed
      node tools/adapter-pack.cjs probe-request <request id> <key,key,...>   ask those games for a fresh probe
-     node tools/adapter-pack.cjs reports [<pack id>]               before/after numbers the apps sent back
+     node tools/adapter-pack.cjs reports [<pack id>]               before/after numbers the apps sent back (verdict: solved /
+                                                                   read / partial / failed; origin: runtime / probe)
+     node tools/adapter-pack.cjs from-runtime <bundle.json> <game key prefix> --id <pack id> [--grammar <grammar.json>] [--out <draft.json>]
+         E596: an unsigned pack draft from a game's runtime findings (recovered index + verified key + grammar guess);
+         check the grammar against the script samples, then sign and publish
    Relay base: --relay <url> or MEGULIT_RELAY_BASE, default https://api.megulit.com. */
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const packs=require('../services/adapter-packs.cjs');
@@ -46,4 +50,9 @@ async function call(method,route,body){const r=await fetch(relay()+route,{method
  case 'withdraw':await call('POST','/api/adapters/withdraw',{id:args[0],version:Number(args[1])});break;
  case 'probe-request':await call('POST','/api/adapters/probe-request',{id:args[0],keys:String(args[1]||'').split(',').filter(Boolean)});break;
  case 'reports':await call('GET','/api/adapters/reports'+(args[0]?'?pack='+encodeURIComponent(args[0]):''));break;
+ case 'from-runtime':{const id=opt('id',''),grammarFile=opt('grammar',''),outFile=opt('out','');const bundle=readPack(args[0]),prefix=String(args[1]||'');
+  const g=(bundle.games||[]).find(x=>String(x.key||'').startsWith(prefix)&&x.runtime);if(!g)fail('no game with runtime findings for key '+prefix);
+  const r=require('../services/runtime-pack-draft.cjs').draft(g.runtime,{id,grammar:grammarFile?readPack(grammarFile):null,title:g.title?('Runtime: '+g.title).slice(0,200):''});
+  for(const n of r.notes||[])console.error('note:',n);if(r.error&&!r.pack)fail(r.error);if(r.error)console.error('draft is not valid yet:',r.error);
+  const file=outFile||id+'.draft.json';fs.writeFileSync(file,JSON.stringify(r.pack,null,1));console.log(file);break;}
  default:console.log(fs.readFileSync(__filename,'utf8').split('*/')[0].split('\n').slice(3).join('\n'));}})().catch(e=>fail(e.message));

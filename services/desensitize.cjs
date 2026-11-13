@@ -121,15 +121,22 @@ function primary(buf,found=detect(buf)){const b=bom(buf);if(b)return b;const n={
    (four or more characters, two or more kana) on bytes the primary did not already take, so the ASCII of a script is
    never mistaken for UTF-16 "kanji". The same rule decides what verify() checks. */
 function targets(buf,found=detect(buf)){
- const enc=primary(buf,found),taken=new Uint8Array(buf.length),out=[];
+ const enc=primary(buf,found),taken=new Uint32Array(buf.length),out=[];
  /* UTF-16 without a BOM: the alignment whose reading has more kana and kanji */
  let align=0;if(enc==='utf16le'&&!bom(buf)){const n=[0,0];for(const c of found)if(c.enc==='utf16le'&&(isKana(c.cp)||isHan(c.cp)))n[c.align]+=isKana(c.cp)?2:1;align=n[1]>n[0]?1:0;}
- for(const c of found)if(c.enc===enc&&(enc!=='utf16le'||c.align===align)){out.push(c);for(let k=0;k<c.len;k++)taken[c.at+k]=1;}
+ for(const c of found)if(c.enc===enc&&(enc!=='utf16le'||c.align===align)){out.push(c);for(let k=0;k<c.len;k++)taken[c.at+k]=out.length;}
  for(const e of ['sjis','utf8','gbk','utf16le']){if(e===enc)continue;
   const list=found.filter(c=>c.enc===e);let run=[];
-  const flush=()=>{if(run.length>=4&&run.filter(c=>isKana(c.cp)).length>=2&&run.every(c=>{for(let k=0;k<c.len;k++)if(taken[c.at+k])return false;return true;}))for(const c of run){out.push(c);for(let k=0;k<c.len;k++)taken[c.at+k]=1;}run=[];};
+  /* E596 (memory mixes encodings: a UTF-16 line next to Shift-JIS bytecode): a run that is plainly text in its own
+     encoding (4+ characters, 2+ kana) wins over the primary encoding's characters on the same bytes, which were a
+     misreading of it; those are dropped from the list, so every byte belongs to one target */
+  const flush=()=>{if(run.length>=4&&run.filter(c=>isKana(c.cp)).length>=2){const kana=run.filter(c=>isKana(c.cp)).length;let clash=0,theirs=0;
+    for(const c of run)for(let k=0;k<c.len;k++){const t=taken[c.at+k];if(t){clash++;if(out[t-1]&&isKana(out[t-1].cp))theirs++;}}
+    /* the bytes already read as kana by another encoding stay with it unless this run has more kana */
+    if(!clash||kana*2>theirs){for(const c of run)for(let k=0;k<c.len;k++){const t=taken[c.at+k];if(t&&out[t-1]){const o=out[t-1];out[t-1]=null;for(let j=0;j<o.len;j++)if(taken[o.at+j]===t)taken[o.at+j]=0;}}
+     for(const c of run){out.push(c);for(let k=0;k<c.len;k++)taken[c.at+k]=out.length;}}}run=[];};
   for(const c of list){const prev=run[run.length-1];if(prev&&c.at-(prev.at+prev.len)>6)flush();run.push(c);}flush();}
- return {enc,list:out};}
+ return {enc,list:out.filter(Boolean)};}
 
 function placeholder(c){const k=cls(c.cp);
  if(c.enc==='sjis')return c.len===1?[0xb1]:SJIS_PH[k]||SJIS_PH.other;
@@ -143,6 +150,9 @@ function desensitize(input){
  for(const c of list){const ph=placeholder(c);for(let k=0;k<c.len;k++){out[c.at+k]=ph[k];done[c.at+k]=1;}replaced++;}
  for(const [a,b] of asciiProse(buf))for(let i=a;i<b;i++){if(done[i])continue;const x=buf[i];if(x>=0x61&&x<=0x7a)out[i]=0x78;else if(x>=0x41&&x<=0x5a)out[i]=0x58;done[i]=1;}
  if(enc==='utf16le')for(const s of [0,1])for(const [a,b] of asciiProse16(buf,s))for(let i=a;i<b;i+=2){if(done[i])continue;const x=buf[i];if(x>=0x61&&x<=0x7a)out[i]=0x78;else if(x>=0x41&&x<=0x5a)out[i]=0x58;done[i]=1;}
+ /* E596 mixed encodings: where a run in one encoding replaced part of a character in another, the bytes left over can
+    read as text again; such remainders are replaced too (a few passes at most) */
+ for(let pass=0;pass<3;pass++){const rest=textRuns(out);if(!rest.length)break;for(const c of rest){const ph=placeholder(c);for(let k=0;k<c.len;k++)out[c.at+k]=ph[k];replaced++;}}
  return {bytes:out,encoding:enc,replaced};
 }
 
