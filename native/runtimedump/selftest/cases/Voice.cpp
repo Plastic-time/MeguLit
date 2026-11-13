@@ -83,7 +83,7 @@ IXAudio2SourceVoice *XPlay(const Clip &c) {
 }
 std::string Utf8(const wchar_t *s) { int n = WideCharToMultiByte(CP_UTF8, 0, s, -1, NULL, 0, NULL, NULL); std::string r(n, 0); WideCharToMultiByte(CP_UTF8, 0, s, -1, &r[0], n, NULL, NULL); r.resize(n - 1); return r; }
 int Found(const std::string &voiceDir, int id) { // 1 if a saved clip or file carries this id
- WIN32_FIND_DATAA f; HANDLE h = FindFirstFileA((voiceDir + "0*.*").c_str(), &f); if (h == INVALID_HANDLE_VALUE) return 0;
+ WIN32_FIND_DATAA f; HANDLE h = FindFirstFileA((voiceDir + "*.*").c_str(), &f); if (h == INVALID_HANDLE_VALUE) return 0;
  int hit = 0;
  do {
   DWORD n = 0; char *b = ReadAll(voiceDir + f.cFileName, &n); if (!b) continue;
