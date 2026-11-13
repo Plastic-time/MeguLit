@@ -824,7 +824,7 @@ function openViewer(cell){
   if(drag.mode==='free'){
    sh=gs.x.sh;const rel=cy-sh,dx=Math.abs(cx);
    /* the mouth: near the axis the flared lip guides the card in; on the axis past the lip it is on the rail */
-   if(rel>FREE_AT-18&&dx<14){const k=clamp((rel-(FREE_AT-18))/18,0,1)*.6;cx*=1-k;}
+   if(rel>FREE_AT-9&&dx<7){const k=clamp((rel-(FREE_AT-9))/9,0,1)*.15;cx*=1-k;}
    if(rel>FREE_AT&&Math.abs(cx)<CARD_W*.95){
     if(Math.abs(cx)<=RIM_PASS){drag.mode='push';state='in';ghost.out=false;setLoose(false);ghost.el.classList.remove('is-out');hideBin();gs.to({lz:0,cs:1,co:1},{k:300,c:32});}
     /* off the axis the card's edge rests on the rim */
@@ -835,7 +835,7 @@ function openViewer(cell){
    const kx=ccx<-mx?-mx+rubber(ccx+mx,30):ccx>base.width+mx?base.width+mx+rubber(ccx-base.width-mx,30):ccx,ky=ccy<-my?-my+rubber(ccy+my,30):ccy;
    cx+=(kx-ccx)/b.S;cy+=(ky-ccy)/b.S;
   }
-  ghost.el.classList.toggle('near-mouth',drag.mode==='free'&&cy-gs.x.sh>FREE_AT-35&&Math.abs(cx)<22);
+  ghost.el.classList.toggle('near-mouth',drag.mode==='free'&&cy-gs.x.sh>FREE_AT-18&&Math.abs(cx)<11);
   /* the card leans into the way it is moving */
   const lean=drag.mode==='free'?clamp(drag.vx*.006,-9,9):0;
   gs.to({cx,cy},{k:1400,c:75}).to({cr:lean},{k:260,c:24});
@@ -858,7 +858,7 @@ function openViewer(cell){
   if(armed){askDiscard();return;}
   hideBin();
   const rel=gs.x.cy-gs.x.sh;
-  if(Math.abs(gs.x.cx)<=RIM_PASS&&rel>FREE_AT-15&&vy>=0){seat();return;}
+  if(Math.abs(gs.x.cx)<=RIM_PASS*.6&&rel>FREE_AT-8&&vy>=0){seat();return;}
   /* thrown: it coasts on from the hand's speed and settles inside the window; over the sleeve its bottom edge hits the rim and bounces */
   const c=5.5,ex=coastEnd(gs.x.cx,vx,c),ey=coastEnd(gs.x.cy,vy,c);
   const b2=box(spring.goal);
