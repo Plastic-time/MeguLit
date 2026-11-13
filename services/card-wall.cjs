@@ -9,7 +9,7 @@
     'shot'  MeguLit's own scene shots (services/scene-shots): taken from the game window while it was read
     'save'  the game's own save marks the CG unlocked (services/game-cg: KiriKiri, HuneX, Siglus, YU-RIS readers)
     'seen'  an engine reported the picture on screen (noteSeen), resolved to a loose file of that exact name
-    'memory' the runtime dump DLL watched the game window show it (services/runtime-cg, native/runtimedump/RuntimeCg.cpp)
+    'memory' the runtime dump DLL watched the game window show it (services/runtime-cg, native/runtimedump/modules/Cg.cpp)
     'cover' the game's cover
    Anything else (gallery tables, archive listings, images merely loaded) is never offered, and cards_create only
    accepts a source id the unlocked list gives right now. With the R18 filter on, 'save' CGs follow the local rating
@@ -93,7 +93,7 @@ function sources(root,game,opts={}){
    for(const n of names){saved.add(n);out.push({id:'save:'+n,kind:'cg',source:'save',name:n});}}catch{}}
   if(!safe){const want=new Set(readSeen(root,exe).filter(n=>!saved.has(n)));const found=looseByName(path.dirname(exe),want);
    for(const [n,f] of found)out.push({id:'seen:'+n,kind:'cg',source:'seen',file:f});
-   try{out.push(...require('./runtime-cg.cjs').sources(exe));}catch{}}
+   try{out.push(...require('./runtime-cg.cjs').sources(exe,{settle:opts.settle}));}catch{}}
  }
  return out;}
 function fileOf(root,game,s){if(s.file)return s.file;try{return require('./game-cg.cjs').pictureFile(root,game.executable,s.name)||null;}catch{return null;}}
@@ -125,7 +125,7 @@ function image(db,root,gameId,srcId){
 
 function games(db,root){
  const store=require('./store.cjs'),out=[];
- for(const g of store.games(db,root)){if(g.hidden)continue;const row=db.prepare('SELECT id,title,executable,cover FROM games WHERE id=?').get(g.id);let n=0;try{n=sources(root,row).length;}catch{}
+ for(const g of store.games(db,root)){if(g.hidden)continue;const row=db.prepare('SELECT id,title,executable,cover FROM games WHERE id=?').get(g.id);let n=0;try{n=sources(root,row,{settle:false}).length;}catch{}
   if(n)out.push({gameId:g.id,title:g.title,cover:g.cover||'',unlockedCount:n});}
  return out;}
 

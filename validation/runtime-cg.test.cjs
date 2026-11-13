@@ -57,12 +57,14 @@ const hasCgRun=()=>{try{return fs.readdirSync(selfOut).some(k=>fs.existsSync(pat
 test('native self-test output: shown CGs readable, the preloaded one absent',{skip:!hasCgRun()},()=>{
  const work=path.join(process.env.MEGULIT_WORK||'H:\\MeguLit-Work','runtime-dump-selftest');
  process.env.MEGULIT_RUNTIME_DUMP=path.join(work,'out64');delete require.cache[require.resolve('../services/runtime-dump.cjs')];delete require.cache[require.resolve('../services/runtime-cg.cjs')];
- const cg=require('../services/runtime-cg.cjs');const l=cg.list(path.join(work,'game64','host.exe'));
+ const cg=require('../services/runtime-cg.cjs');cg.settle(require('../services/runtime-dump.cjs').dirFor(path.join(work,'game64')));
+ const l=cg.list(path.join(work,'game64','host.exe'),{settle:false});
  /* A (png) and C (jpg) confirmed by the DLL, F (TLG, shown) confirmed here and stored as png; G (TLG, preloaded) waits */
  assert.deepEqual(l.map(x=>x.fmt).sort(),['jpg','png','png']);for(const x of l){assert.equal(x.w,800);assert.equal(x.h,600);}
  assert.equal(l.filter(x=>x.how==='tlg').length,1);
  const dir=require('../services/runtime-dump.cjs').dirFor(path.join(work,'game64'));
  assert.equal(fs.readdirSync(path.join(dir,'cg-wait')).filter(n=>n.endsWith('.tlg')).length,1);});
+const tlgs=dir=>fs.readdirSync(path.join(dir,'cg-wait')).filter(n=>n.endsWith('.tlg'));
 
 /* TLG5 with raw channels (the inverse of cg-decoders tlg5): pixel(x,y) -> [r,g,b] */
 function tlg5(w,h,px){const head=Buffer.alloc(11+13+4);head.write('TLG5.0\0raw\x1a','latin1');head[11]=3;head.writeUInt32LE(w,12);head.writeUInt32LE(h,16);head.writeUInt32LE(h,20);
@@ -79,8 +81,21 @@ test('TLG: a waiting TLG that matches a logged screen becomes a png CG; one that
  /* the decoder agrees with the encoder */
  const img=require('../services/cg-decoders.cjs').tlg(tlg5(W,H,F));assert.deepEqual([...img.rgba.subarray(0,4)],[240,240,40,255]);
  fs.writeFileSync(path.join(dir,'cg-screens.bin'),screen(cg,W,H,F));
- const l=cg.list(exe);assert.deepEqual(l.map(x=>[x.crc,x.fmt,x.how]),[['0000000f','png','tlg']]);
- assert.deepEqual(cg.sources(exe).map(s=>s.id),['mem:0000000f']);
- assert.deepEqual(fs.readdirSync(path.join(dir,'cg-wait')),[`00000006_${W}x${H}_${now}.tlg`]);
- /* after the wait time a never-shown TLG is deleted, never offered */
- cg.settle(dir,Date.now()+31*60*1000);assert.deepEqual(fs.readdirSync(path.join(dir,'cg-wait')),[]);assert.equal(cg.list(exe).length,1);});
+ cg.settle(dir);
+ const l=cg.list(exe,{settle:false});assert.deepEqual(l.map(x=>[x.crc,x.fmt,x.how]),[['0000000f','png','tlg']]);
+ assert.deepEqual(cg.sources(exe,{settle:false}).map(s=>s.id),['mem:0000000f']);
+ assert.deepEqual(tlgs(dir),[`00000006_${W}x${H}_${now}.tlg`]);
+ /* a second settle reuses the cached signature (no decode) and changes nothing */
+ assert.ok(fs.existsSync(path.join(dir,'cg-wait',`00000006_${W}x${H}_${now}.tlg.sig`)));cg.settle(dir);assert.equal(cg.list(exe,{settle:false}).length,1);
+ /* after the wait time a never-shown TLG is deleted, never offered, and the screen log goes with it */
+ cg.settle(dir,Date.now()+31*60*1000);assert.deepEqual(fs.readdirSync(path.join(dir,'cg-wait')),[]);assert.equal(cg.list(exe,{settle:false}).length,1);
+ assert.equal(fs.existsSync(path.join(dir,'cg-screens.bin')),false);});
+
+test('spoiler guard: a preloaded variant of the shown CG (other face in a few cells) is not unlocked with it',()=>{
+ const {dir,exe,cg}=setup();const W=320,H=180,base=(x,y)=>x<W/3?[240,240,40]:[20,20,120],variant=(x,y)=>x>=200&&x<240&&y>=20&&y<60?[255,255,255]:base(x,y);
+ const now=Math.floor(Date.now()/1000);fs.mkdirSync(path.join(dir,'cg-wait'));
+ fs.writeFileSync(path.join(dir,'cg-wait',`000000a1_${W}x${H}_${now}.tlg`),tlg5(W,H,base));fs.writeFileSync(path.join(dir,'cg-wait',`000000b2_${W}x${H}_${now}.tlg`),tlg5(W,H,variant));
+ fs.writeFileSync(path.join(dir,'cg-screens.bin'),screen(cg,W,H,base));
+ cg.settle(dir);assert.deepEqual(cg.list(exe,{settle:false}).map(x=>x.crc),['000000a1']);assert.deepEqual(tlgs(dir),[`000000b2_${W}x${H}_${now}.tlg`]);
+ /* the same rule in numbers: mean distance is small, one cell is far */
+ const a=cg._internal.grid(Buffer.alloc(4),1,1);assert.equal(cg._internal.dist(a,a),0);});
