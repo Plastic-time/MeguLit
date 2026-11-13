@@ -1,6 +1,7 @@
 // E263: wall <-> simple list switch. Wall gathers to the centre and fades, the list then unrolls top-down like
 // dominoes (and the reverse), each cover with a small pan-crop. Uses individual translate/scale so the wall's own
 // positioning transforms are left alone.
+import {loadGsap,warmGsap} from './gsap-loader.js';
 const reduce=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 const frame=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
 const host=()=>document.querySelector('#library-results');
@@ -22,75 +23,102 @@ const capsule=()=>document.querySelector('.field-search');
 const remeasure=()=>dispatchEvent(new Event('megulit-field-measure'));
 const vignette=(el,out)=>el?.animate(out?[{scale:'1 1',opacity:1},{scale:'1.7 1',opacity:0}]:[{scale:'1.7 1',opacity:0},{scale:'1 1',opacity:1}],{pseudoElement:'::after',duration:out?300:560,easing:out?'cubic-bezier(.55,0,.75,.2)':'cubic-bezier(.2,.8,.2,1)',fill:out?'forwards':'backwards'});
 export const isBusy=()=>busy;
-/* 2026-11-13 (user: the three views must switch like a top Apple motion designer made it): a shared-element morph.
-   Every cover visible before and after flies from its old frame to its new one on a critically damped spring, as a
-   ghost on its own pre-warmed compositor layer; the real layouts only cross-fade underneath. Reads happen in one batch
-   before the render and one batch after it, writes go out together, and every animation is transform/opacity only
-   (WAAPI, so the compositor runs it even while the main thread builds the new layout). */
-const SPRING='linear(0,.009,.035 2.1%,.141 4.4%,.723 12.9%,.938 16.7%,1.017 19.4%,1.067,1.099 24.3%,1.108 26%,1.1,1.077 30.5%,1.024 35.4%,.996 39.8%,.987 42.6%,.987 46.2%,.997 54%,1.003 61.8%,1)';
-const SOFT='linear(0,.012,.048 3%,.188 6.6%,.588 15%,.778 20.4%,.9 26.1%,.966 32.3%,.994 39.6%,1.005 49%,1.003 62%,1)';
-const MORPH=620,GHOSTS=56;
-const coverBox=el=>el.querySelector('.cover-frame')||el;
-function snapshot(root){
- const out=new Map();if(!root)return out;const b=root.getBoundingClientRect(),cx=b.left+b.width/2,cy=Math.max(0,b.top)+Math.min(innerHeight,b.bottom)/2;
- for(const el of root.querySelectorAll('.library-card[data-member-id]')){if(el.closest('[data-parked]'))continue;const box=coverBox(el),r=box.getBoundingClientRect();
-  if(!r.width||r.bottom<0||r.top>innerHeight||r.right<0||r.left>innerWidth)continue;const d=Math.hypot(r.left+r.width/2-cx,r.top+r.height/2-cy),id=el.dataset.memberId,prev=out.get(id);
-  if(!prev||d<prev.d)out.set(id,{el,r,d,src:box.querySelector('img')?.currentSrc||''});}
+/* 2026-11-13 option v2 "camera through planes" (CS mode): an AE 3D camera move through layered planes.
+   The old view flies past the lens as one plane (scale 1 -> 1.12 on an accelerating in, 160 ms, then drifting on). It is the live, already
+   rastered results layer, so the compositor moves it from the very first frame and keeps moving it while the main
+   thread builds the new view; it stays bright (an object passing the lens, not a dissolve), so a slow build can never leave an empty or muddy frame. On the commit
+   that carries the new view the camera cuts hard (no cross-dissolve): the new plane arrives from depth (scale .9 -> 1, expo-out, 420 ms or what is left of a 600 ms budget), the capsule's ring is there on the cut and the
+   outer covers wash in ring by ring from the capsule outwards (24 ms a ring), and for one beat a dashed blueprint frame with
+   the view's running number (01 tracks, 02 wall, 03 grid) locks onto the vanishing point around the capsule.
+   Reads are batched before writes; every move is transform/opacity only (WAAPI for the planes so they run on the
+   compositor, a GSAP timeline for the beat). */
+const FLY=200,ARRIVE=420,BUDGET=600,RING=24,RINGS=5,CARD=340,LIGHT=100,FLOOR=.7;
+const EXPO_OUT='cubic-bezier(.16,1,.3,1)',FLY_IN='cubic-bezier(.35,0,.75,.45)'; /* an accelerating in that already reads in the first 100 ms, before the cut */
+const VIEW_TAG={tracks:['01','tracks'],wall:['02','wall'],list:['03','grid']};
+/* the HUD goes last in #main, under the capsule (z 6). It carries no class or id: main-kids.js mirrors the classes of
+   #main's children onto body as an attribute, and a new class there restyled the whole page (5.5k elements, 170+ ms) */
+const layerHost=root=>root.closest('.main')||document.body;
+warmGsap();
+/* keep the results host on its own compositor layer, so the fly-past starts on the click's first frame instead of
+   waiting for the whole view to be re-rastered as a new layer */
+const promote=()=>{const h=host();if(h&&h.style.willChange!=='transform, opacity')h.style.willChange='transform, opacity';};
+globalThis.requestIdleCallback?.(promote);
+/* one batch of reads: every visible card, the element that carries its own placement (wall cell, orbit slot or the
+   card itself) and its offset from the vanishing point. Rects come from the outer slot: in the grid that slot is the
+   content-visibility box, and measuring a card inside an off-screen one unlocked and laid it out (140 ms for 60) */
+function cells(root,vx,vy){const out=[];if(!root)return out;
+ for(const el of root.querySelectorAll('.library-card')){if(el.closest('[data-parked]'))continue;const r=(el.closest('mg-cell,.field-plane > *,.library-grid > *')||el).getBoundingClientRect();
+  if(!r.width||r.bottom<0||r.top>innerHeight||r.right<0||r.left>innerWidth)continue;const dx=r.left+r.width/2-vx,dy=r.top+r.height/2-vy;
+  out.push({node:el.closest('mg-cell,.field-plane > *')||el,dx,dy,h:Math.hypot(dx,dy)});if(out.length>=160)break;}
  return out;}
-function ghostLayer(){const layer=document.createElement('div');layer.className='lib-morph';layer.setAttribute('aria-hidden','true');
- layer.style.cssText='position:fixed;inset:0;z-index:5;pointer-events:none;contain:strict';document.body.append(layer);return layer;}
-function ghost(layer,from){const g=document.createElement('img');g.decoding='sync';g.src=from.src;const r=from.r;
- g.style.cssText=`position:absolute;left:0;top:0;width:${r.width}px;height:${r.height}px;object-fit:cover;border-radius:6px;will-change:transform,opacity;transform:translate(${r.left}px,${r.top}px);box-shadow:0 18px 40px -18px #000`;
- layer.append(g);return g;}
+/* the beat: dashed blueprint frame around the capsule's landing spot, corner ticks, the running number and a barcode */
+function hud(rect,view,root){const [num,word]=VIEW_TAG[view]||['00',view];const padX=14,padY=6,w=Math.round(rect.width+padX*2),h=Math.round(rect.height+padY*2);
+ const el=document.createElement('div');el.dataset.libPlate='hud';el.setAttribute('aria-hidden','true');
+ el.style.cssText=`position:fixed;left:${Math.round(rect.left-padX)}px;top:${Math.round(rect.top-padY)}px;width:${w}px;height:${h}px;pointer-events:none;z-index:5;opacity:0;color:var(--accent,#c8323c);font:500 11px/1 var(--t-mono,"IBM Plex Mono",Consolas,monospace);letter-spacing:.42em;text-transform:lowercase`;
+ const t=10;el.innerHTML=`<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="position:absolute;inset:0;overflow:visible">`
+  +`<rect data-fill x=".5" y=".5" width="${w-1}" height="${h-1}" rx="4" fill="currentColor" opacity="0"/>`
+  +`<rect x=".5" y=".5" width="${w-1}" height="${h-1}" rx="4" fill="none" stroke="currentColor" stroke-opacity=".72" stroke-dasharray="5 4"/>`
+  +`<path d="M-4 ${t}V-4H${t} M${w-t} -4H${w+4}V${t} M${w+4} ${h-t}V${h+4}H${w-t} M${t} ${h+4}H-4V${h-t}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`
+  +`<span data-num style="position:absolute;right:calc(100% + 16px);top:50%;margin-top:-6px;white-space:nowrap"><b style="font-weight:600">${num}</b><span style="color:var(--g-gold,#edb56e);opacity:.8"> &mdash; ${word}</span></span>`
+  +`<span data-code style="position:absolute;left:calc(100% + 16px);top:50%;margin-top:-5px;display:flex;gap:2px;height:9px;align-items:stretch">${[2,1,1,3,1,2,1].map(b=>`<i style="width:${b}px;background:var(--g-gold,#edb56e);opacity:.75"></i>`).join('')}</span>`;
+ layerHost(root).append(el);return el;}
+async function beat(el){let gsap;try{gsap=await loadGsap();}catch{el.remove();return;}
+ const frame=el.querySelector('svg'),fill=el.querySelector('[data-fill]'),num=el.querySelector('[data-num]'),code=el.querySelector('[data-code]');
+ /* instant cut in, lock-on push, a two-frame accent flash inside the frame, a slow drift while it holds, then out */
+ gsap.timeline({defaults:{ease:'expo.out'},onComplete:()=>el.remove()})
+  .set(el,{opacity:1})
+  .fromTo(frame,{scale:1.1,transformOrigin:'50% 50%'},{scale:1,duration:.26},0)
+  .fromTo(fill,{opacity:.22},{opacity:0,duration:.07,ease:'none'},0)
+  .fromTo(num,{x:12},{x:0,duration:.26},0)
+  .fromTo(code,{x:-12,scaleX:.4,transformOrigin:'0% 50%'},{x:0,scaleX:1,duration:.26},0)
+  .addLabel('drift',.2)
+  .to(el,{opacity:0,duration:.12,ease:'power2.in'},'drift')
+  .to(frame,{scale:1.025,duration:.12,ease:'none'},'drift');}
 export async function switchLibrary(view,render,from=''){
- if(busy)return;busy=true;const toWall=view!=='list';
+ if(busy)return;busy=true;const toWall=view!=='list',t0=performance.now();
  try{
-  if(reduce()){render();if(toWall)remeasure();return;}
-  const root=host(),before=snapshot(root),cap=capsule(),capFrom=cap?.getBoundingClientRect();
-  /* one ghost per shared cover, nearest the centre first; painted on this frame, before the heavy render */
-  const picked=[...before.values()].filter(v=>v.src).sort((a,b)=>a.d-b.d).slice(0,GHOSTS);
-  const layer=ghostLayer(),ghosts=new Map(picked.map(v=>[v.el.dataset.memberId,{from:v,g:ghost(layer,v)}]));
-  await Promise.race([Promise.all([...ghosts.values()].map(x=>x.g.decode?.().catch(()=>{}))),new Promise(r=>setTimeout(r,90))]);
-  /* old layout recedes as one compositor layer (no per-card work): a touch smaller and gone */
-  const leave=root?.animate([{opacity:1,scale:1},{opacity:0,scale:.985}],{duration:300,easing:'cubic-bezier(.3,0,.8,.15)',fill:'forwards'});
-  /* pick-up: shared covers lift a hair toward the viewer while the old layout recedes. Both run on the compositor, so the
-     heavy render below (new DOM, style, layout) happens under motion that keeps playing at full rate */
-  for(const {g} of ghosts.values())g.animate([{scale:1,opacity:1},{scale:1.035,opacity:1}],{duration:460,easing:SOFT,fill:'forwards'});
-  await frame();
-  if(cap)cap.style.transition='none';
-  window.__megulitOrbitWarm=true; /* tracks: no fly-in of its own, the ghosts are the entrance */
-  render();if(toWall)remeasure();
-  const next=host();
-  if(next){next.animate([{opacity:0},{opacity:0}],{duration:1,fill:'forwards',id:'lib-hold'});}
-  await frame();
-  /* after: one batch of reads */
-  const after=snapshot(next),capTo=capsule()?.getBoundingClientRect();
-  const now=capsule();
-  if(now&&capFrom&&capTo){const dx=capFrom.left+capFrom.width/2-(capTo.left+capTo.width/2),dy=capFrom.top+capFrom.height/2-(capTo.top+capTo.height/2);
-   if(Math.abs(dx)+Math.abs(dy)>1)now.animate([{translate:`${dx}px ${dy}px`},{translate:'0 0'}],{duration:MORPH,easing:SPRING}).finished.catch(()=>{}).finally(()=>{now.style.transition='';if(toWall)remeasure();});else now.style.transition='';}
-  /* then all writes: ghosts spring to their new frames, staggered a hair by distance from the centre */
-  const runs=[];let i=0;
-  for(const [id,{from:f,g}] of ghosts){const t=after.get(id);
-   if(!t){runs.push(g.animate([{opacity:1,transform:g.style.transform},{opacity:0,transform:`${g.style.transform} scale(.92)`}],{duration:220,easing:'cubic-bezier(.4,0,1,1)',fill:'forwards'}).finished);continue;}
-   const sx=t.r.width/f.r.width,sy=t.r.height/f.r.height,delay=Math.min(70,i++*1.6);
-   g.getAnimations().forEach(a=>{if(a.effect?.getKeyframes?.()[1]?.scale)a.commitStyles?.();a.cancel();});g.style.scale='1';
-   runs.push(g.animate([{transform:`translate(${f.r.left}px,${f.r.top}px) scale(1.035)`,transformOrigin:'0 0'},{transform:`translate(${t.r.left}px,${t.r.top}px) scale(${sx},${sy})`,transformOrigin:'0 0'}],{duration:MORPH,delay,easing:SPRING,fill:'forwards'}).finished);
-   t.el.animate([{opacity:0},{opacity:0,offset:.8},{opacity:1}],{duration:MORPH+delay,easing:'linear',fill:'backwards'});}
-  /* the new layout fades up underneath; covers without a ghost rise in softly (opacity + translate only, no scale on cells
-     that already carry a positioning transform) */
-  next?.getAnimations().forEach(a=>{if(a.id==='lib-hold')a.cancel();});
-  next?.animate([{opacity:0},{opacity:1}],{duration:260,easing:SOFT});
-  if(next){const b=next.getBoundingClientRect(),cy=b.top+b.height/2;let k=0;
-   for(const [id,t] of after){if(ghosts.has(id))continue;const lift=(t.r.top+t.r.height/2-cy)*.06;
-    (t.el.closest('mg-cell')||t.el).animate([{opacity:0,translate:`0 ${lift}px`},{opacity:1,translate:'0 0'}],{duration:520,delay:Math.min(160,40+k++*3),easing:SOFT,fill:'backwards'});}}
-  leave?.cancel();
-  await Promise.race([Promise.all(runs).catch(()=>{}),new Promise(r=>setTimeout(r,MORPH+200))]);
-  /* hand over: ghosts dissolve onto the real covers */
-  await layer.animate([{opacity:1},{opacity:0}],{duration:140,easing:'linear',fill:'forwards'}).finished.catch(()=>{});
-  layer.remove();
-  if(toWall)setTimeout(remeasure,760);
- }finally{busy=false;window.__megulitOrbitWarm=false;document.querySelectorAll('body > .lib-morph').forEach(n=>n.remove());host()?.classList.remove('lib-entering');}
+  const root=host();
+  if(!root||reduce()){render();if(toWall)remeasure();return;}
+  /* reads (old plane) */
+  const cap0=capsule()?.getBoundingClientRect(),b0=root.getBoundingClientRect();
+  const [ox,oy]=cap0?[cap0.left+cap0.width/2,cap0.top+cap0.height/2]:centre(root);
+  /* writes: the old plane flies past the lens around the capsule */
+  root.style.transformOrigin=`${ox-b0.left}px ${oy-b0.top}px`;
+  /* 160 ms to 1.12, then a slow drift on toward the lens, so a long build never freezes the frame before the cut */
+  const fly=root.animate([{scale:1,easing:FLY_IN},{scale:1.12,offset:.4},{scale:1.17}],{duration:FLY*2,fill:'forwards'});
+  const dim=root.animate([{opacity:1,easing:'cubic-bezier(.5,0,.9,.5)'},{opacity:FLOOR,offset:.4},{opacity:FLOOR*.8}],{duration:FLY*2,fill:'forwards'});
+  /* wait until the fly-past runs on the compositor (rAF alone can run ahead of the commit), so it keeps playing
+     through the render below */
+  await Promise.race([fly.ready,new Promise(r=>setTimeout(r,48))]);await new Promise(r=>requestAnimationFrame(r));
+  const cap=capsule();if(cap)cap.style.transition='none';
+  /* the cut: the fly-past ends in the same task as the render, so the screen keeps the flying plane until the commit that
+     carries the new view, and the wall measures itself against an untransformed host */
+  fly.cancel();dim.cancel();root.style.transformOrigin='';
+  window.__megulitOrbitWarm=true;render();if(toWall)remeasure();
+  /* reads (new plane), still in the same task, so the cut and the arrival reach the screen in one commit */
+  const next=host(),cap1=capsule()?.getBoundingClientRect();
+  const [nx,ny]=cap1?[cap1.left+cap1.width/2,cap1.top+cap1.height/2]:[ox,oy];
+  const b1=next?.getBoundingClientRect(),fresh=next?cells(next,nx,ny):[],far=Math.max(1,...fresh.map(c=>c.h));
+  /* a slow build eats into the arrival, never into the 600 ms budget (the arrival keeps at least 300 ms) */
+  const arrive=Math.round(Math.max(300,Math.min(ARRIVE,BUDGET-(performance.now()-t0)))),card=arrive-(ARRIVE-CARD);
+  /* writes: cut. Capsule glides into the frame, the new plane arrives from depth, rings wash in, the beat lands */
+  const now=capsule(),runs=[];
+  if(now&&cap0&&cap1){const dx=ox-nx,dy=oy-ny;
+   if(Math.abs(dx)+Math.abs(dy)>1)runs.push(now.animate([{translate:`${dx}px ${dy}px`},{translate:'0 0'}],{duration:arrive,easing:EXPO_OUT}).finished.catch(()=>{}).finally(()=>{now.style.transition='';if(toWall)remeasure();}));
+   else now.style.transition='';}
+  if(next){next.style.transformOrigin=`${nx-b1.left}px ${ny-b1.top}px`;
+   runs.push(next.animate([{scale:.9},{scale:1}],{duration:arrive,easing:EXPO_OUT}).finished.catch(()=>{}));
+   for(const c of fresh){const ring=Math.min(RINGS,Math.floor(c.h/far*(RINGS+1))),pull=.08+ring*.012;
+    const o=c.node.style.opacity||1,delay=ring*RING;
+    /* opacity lands fast (no muddy half-lit covers), the push toward the lens runs the full expo-out */
+    c.node.animate([{opacity:Math.max(0,1-ring*.2)*o},{opacity:o}],{duration:LIGHT,delay,easing:'cubic-bezier(.2,0,.2,1)',fill:'backwards'});
+    c.node.animate([{translate:`${-c.dx*pull}px ${-c.dy*pull}px`},{translate:'0px 0px'}],{duration:card,delay,easing:EXPO_OUT,fill:'backwards'});}}
+  if(cap1)beat(hud(cap1,view,next||root));
+  await Promise.race([Promise.all(runs),new Promise(r=>setTimeout(r,arrive+80))]);
+  if(next)next.style.transformOrigin='';
+ }finally{busy=false;window.__megulitOrbitWarm=false;promote();const h=host();h?.classList.remove('lib-entering');h?.getAnimations().forEach(a=>{if(a.playState!=='running')a.cancel();});}
 }
+
 
 /* v1.1.6 (user: switching back to the wall, and opening the library, must gather from the outside in, not spread out
    from the centre): cards start further out from the centre, a little larger and transparent, and settle inward; the

@@ -54,9 +54,10 @@ function chunk(type,data){const len=Buffer.alloc(4);len.writeUInt32BE(data.lengt
 function png(w,h,a,b){const raw=Buffer.alloc((w*3+1)*h);for(let y=0;y<h;y++){raw[y*(w*3+1)]=0;const t=y/h;for(let x=0;x<w;x++){const o=y*(w*3+1)+1+x*3;for(let k=0;k<3;k++)raw[o+k]=Math.round(a[k]*(1-t)+b[k]*t+((x*7+y*3)%17));}}
  const ih=Buffer.alloc(13);ih.writeUInt32BE(w);ih.writeUInt32BE(h,4);ih[8]=8;ih[9]=2;return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',ih),chunk('IDAT',zlib.deflateSync(raw)),chunk('IEND',Buffer.alloc(0))]);}
 
-const PROBE=`(()=>{if(window.__probe)return 1;window.__probe=1;window.__frames=[];window.__loaf=[];let last=0,on=true;const tick=t=>{if(last)window.__frames.push(t-last);last=t;if(on)requestAnimationFrame(tick);};requestAnimationFrame(tick);
+const PROBE=`(()=>{if(window.__probe)return 1;window.__probe=1;window.__frames=[];window.__loaf=[];let last=0,on=true;const tick=t=>{if(last)window.__frames.push(t-last),(window.__stamps||(window.__stamps=[])).push(t);last=t;if(on)requestAnimationFrame(tick);};requestAnimationFrame(tick);
  try{new PerformanceObserver(l=>{for(const e of l.getEntries())window.__loaf.push({d:Math.round(e.duration),block:Math.round(e.blockingDuration||0)});}).observe({type:'long-animation-frame'});}catch{}
  window.__stop=()=>{};return 1;})()`;
+const WINDOW=Number(arg('window',700));const p95=a=>{if(!a||!a.length)return 0;const s=[...a].sort((x,y)=>x-y);return Math.round(s[Math.min(s.length-1,Math.floor(s.length*.95))]*10)/10;};
 const VIEW=`(()=>{const t=document.querySelector('.library-wall-toggle');return t?t.dataset.view:'';})()`;
 
 async function main(){fs.mkdirSync(OUT,{recursive:true});const temp=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-views-'));const root=path.join(temp,'root');fs.mkdirSync(root);
@@ -69,18 +70,18 @@ async function main(){fs.mkdirSync(OUT,{recursive:true});const temp=fs.mkdtempSy
  const web=await startWeb(service),port=web.address().port,cdp=await startEdge(path.join(temp,'edge'));const report={rounds:[]};
  try{await cdp.send('Page.navigate',{url:`http://127.0.0.1:${port}/#%7B%7D`});
   for(let i=0;i<80;i++){await sleep(250);if(await cdp.evaluate('!!(window.__megulitTest&&document.querySelector("#main"))').catch(()=>false))break;}await sleep(2000);
-  await cdp.evaluate(`(()=>{document.querySelectorAll('dialog').forEach(d=>{try{d.close();}catch{}d.remove();});localStorage.setItem('megulit-library-view','tracks');const st=document.createElement('style');st.textContent='.toast,.toast-stack,[class*=toast]{display:none!important}';document.head.append(st);return 1;})()`);
+  await cdp.evaluate(`(()=>{document.querySelectorAll('dialog').forEach(d=>{try{d.close();}catch{}d.remove();});localStorage.setItem('megulit-library-view','tracks');const st=document.createElement('style');st.textContent='.toast,.toast-stack,[class*=toast],#reader-notice{display:none!important}';document.head.append(st);return 1;})()`);
   await cdp.evaluate(`(async()=>{await window.__megulitTest.navigate('library');return 1;})()`);await sleep(3000);
   const shoot=async name=>{const r=await cdp.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(OUT,name+'.png'),Buffer.from(r.data,'base64'));};
-  await shoot('view-'+await cdp.evaluate(VIEW));
+  await shoot('settled-'+await cdp.evaluate(VIEW));
   const rounds=Number(arg('rounds',3));
   for(let k=0;k<rounds*3;k++){const from=await cdp.evaluate(VIEW);await cdp.evaluate(PROBE);await sleep(300);
    if(arg('profile')===String(k)){await cdp.send('Profiler.enable');await cdp.send('Profiler.setSamplingInterval',{interval:200});await cdp.send('Profiler.start');}
    const tracing=arg('trace')===String(k);let events=[];if(tracing){cdp.onEvent=m=>{if(m.method==='Tracing.dataCollected')events.push(...m.params.value);};await cdp.send('Tracing.start',{categories:'devtools.timeline,disabled-by-default-devtools.timeline,blink,v8.execute',transferMode:'ReportEvents'});}
    const shots=[];if(!tracing){cdp.onEvent=m=>{if(m.method==='Page.screencastFrame'){shots.push(m.params.metadata.timestamp*1000);cdp.send('Page.screencastFrameAck',{sessionId:m.params.sessionId}).catch(()=>{});}};
     await cdp.send('Page.startScreencast',{format:'jpeg',quality:5,maxWidth:480,maxHeight:270,everyNthFrame:1});await sleep(200);shots.length=0;}
-   const t0=Date.now();await cdp.evaluate(`(()=>{window.__frames=[];window.__loaf=[];document.querySelector('.library-wall-toggle').click();return 1;})()`);await sleep(1600);
-   let comp=null;if(!tracing){await cdp.send('Page.stopScreencast');cdp.onEvent=null;const w=shots.filter(t=>t>=t0-5&&t<=t0+1100);const gaps=w.slice(1).map((t,i)=>t-w[i]);comp={frames:w.length,max:Math.round(Math.max(0,...gaps)*10)/10,over17:gaps.filter(g=>g>17.5).length};}
+   const t0=Date.now();await cdp.evaluate(`(()=>{window.__frames=[];window.__loaf=[];window.__stamps=[];window.__t0=performance.now();document.querySelector('.library-wall-toggle').click();return 1;})()`);await sleep(1600);
+   let comp=null;if(!tracing){await cdp.send('Page.stopScreencast');cdp.onEvent=null;const w=shots.filter(t=>t>=t0-5&&t<=t0+1100);const win=[t0,...shots.filter(t=>t>t0&&t<=t0+WINDOW)],gaps=win.slice(1).map((t,i)=>t-win[i]);comp={frames:w.length,max:Math.round(Math.max(0,...gaps)*10)/10,over17:gaps.filter(g=>g>17.5).length,p95:p95(gaps),gaps};}
    if(tracing){const done=new Promise(r=>{const prev=cdp.onEvent;cdp.onEvent=m=>{prev(m);if(m.method==='Tracing.tracingComplete')r();};});await cdp.send('Tracing.end');await done;
     const main=events.filter(e=>e.ph==='X'&&e.dur>=1000&&/^(ParseHTML|Layout|UpdateLayoutTree|RecalculateStyles|Paint|PrePaint|Layerize|Commit|FunctionCall|EvaluateScript|TimerFire|FireAnimationFrame|HitTest|UpdateLayerTree|ScheduleStyleRecalculation|v8.callFunction)$/.test(e.name));
     const agg=new Map();for(const e of main){const key=e.name+(e.args?.data?.functionName?' '+e.args.data.functionName:'');const v=agg.get(key)||{n:0,t:0,max:0};v.n++;v.t+=e.dur/1000;v.max=Math.max(v.max,e.dur/1000);agg.set(key,v);}
@@ -89,11 +90,25 @@ async function main(){fs.mkdirSync(OUT,{recursive:true});const temp=fs.mkdtempSy
    if(arg('profile')===String(k)){const {profile}=await cdp.send('Profiler.stop');fs.writeFileSync(path.join(OUT,'switch-'+k+'.cpuprofile'),JSON.stringify(profile));
     const self=new Map(),dt=profile.timeDeltas,byId=new Map(profile.nodes.map(n=>[n.id,n]));profile.samples.forEach((id,i)=>{const n=byId.get(id),f=n.callFrame,key=f.functionName+' '+f.url.split('/').pop()+':'+f.lineNumber;self.set(key,(self.get(key)||0)+(dt[i+1]||0)/1000);});
     console.log([...self].sort((a,b)=>b[1]-a[1]).slice(0,18).map(([k,v])=>'   '+v.toFixed(1).padStart(7)+' ms  '+k).join(String.fromCharCode(10)));}
-   const r=await cdp.evaluate(`(()=>{window.__stop();return {frames:window.__frames,loaf:window.__loaf};})()`);const to=await cdp.evaluate(VIEW);
-   const f=r.frames,max=Math.max(...f),over=f.filter(x=>x>16.7*1.5).length;const row={from,to,presented:comp,frames:f.length,max:Math.round(max*10)/10,over25:over,loaf:r.loaf};report.rounds.push(row);
+   const r=await cdp.evaluate(`(()=>{window.__stop();const s=window.__stamps||[],t0=window.__t0;const anim=s.slice(1).map((t,i)=>[t,t-s[i]]).filter(([t])=>t>t0&&t<=t0+${WINDOW}).map(([,d])=>d);return {frames:window.__frames,loaf:window.__loaf,anim};})()`);const to=await cdp.evaluate(VIEW);
+   const f=r.frames,max=Math.max(...f),over=f.filter(x=>x>16.7*1.5).length;const row={from,to,presented:comp,main:{p95:p95(r.anim),max:Math.round(Math.max(0,...r.anim)*10)/10,frames:r.anim.length,intervals:r.anim.map(x=>Math.round(x*10)/10)},frames:f.length,max:Math.round(max*10)/10,over25:over,loaf:r.loaf};report.rounds.push(row);
    console.log(`${from.padEnd(6)} -> ${to.padEnd(6)} presented ${comp?comp.frames+' max '+comp.max+'ms >17.5ms '+comp.over17:'-'} | main frames ${String(f.length).padStart(3)}  max ${row.max.toFixed(1).padStart(6)} ms  >25ms ${over}  LoAF ${r.loaf.map(l=>l.d).join(',')||'-'}`);
-   if(k<3){await sleep(800);await shoot('view-'+to);}}
+   if(k<3){await sleep(800);await shoot('settled-'+to);}}
+  /* frame strips: a full-size PNG screencast of one switch each way; frames nearest fixed target times, stable names every round */
+  if(arg('strip')!=='off'){const TARGETS=[0,40,80,120,160,200,260,320,400,500,650];report.strips=[];
+   for(let s=0;s<3;s++){const from=await cdp.evaluate(VIEW),frames=[];cdp.onEvent=m=>{if(m.method==='Page.screencastFrame'){frames.push({t:m.params.metadata.timestamp*1000,d:m.params.data});cdp.send('Page.screencastFrameAck',{sessionId:m.params.sessionId}).catch(()=>{});}};
+    await cdp.send('Page.startScreencast',{format:'jpeg',quality:92,maxWidth:1920,maxHeight:1080,everyNthFrame:1});await sleep(400);frames.length=0;const t0=Date.now();
+    await cdp.evaluate(`(()=>{document.querySelector('.library-wall-toggle').click();return 1;})()`);await sleep(1200);await cdp.send('Page.stopScreencast');cdp.onEvent=null;const to=await cdp.evaluate(VIEW);
+    const picks=[];TARGETS.forEach((T,n)=>{let best=null;for(const fr of frames){const d=fr.t-t0;if(d<=T+8&&(!best||d>best.t-t0))best=fr;}if(!best)best=frames[0];if(!best)return;
+     const name=`strip-${from}-${to}-${String(n+1).padStart(2,'0')}-${String(T).padStart(3,'0')}ms.png`;picks.push({name,d:best.d});report.strips.push({name,target:T,actual:Math.round(best.t-t0)});});
+    /* JPEG keeps the screencast fast enough to sample every frame; the picked frames are re-encoded as PNG in the page */
+    for(const p of picks){const b64=await cdp.evaluate(`(async()=>{const i=new Image();i.src='data:image/jpeg;base64,${p.d}';await i.decode();const c=new OffscreenCanvas(i.naturalWidth,i.naturalHeight);c.getContext('2d').drawImage(i,0,0);const b=await c.convertToBlob({type:'image/png'});const a=new Uint8Array(await b.arrayBuffer());let s='';for(let k=0;k<a.length;k+=32768)s+=String.fromCharCode.apply(null,a.subarray(k,k+32768));return btoa(s);})()`);fs.writeFileSync(path.join(OUT,p.name),Buffer.from(b64,'base64'));}
+    await sleep(900);}}
   /* search box focus/blur on the wall */
- }finally{fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify(report,null,1));cdp.stop();web.close();await service.stop();await sleep(500);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{const all=(k,from=0)=>report.rounds.slice(from).flatMap(r=>k(r)||[]);report.summary={window_ms:WINDOW,presented:{p95:p95(all(r=>r.presented?.gaps)),max:Math.round(Math.max(0,...all(r=>r.presented?.gaps))*10)/10},main:{p95:p95(all(r=>r.main?.intervals)),max:Math.round(Math.max(0,...all(r=>r.main?.intervals))*10)/10}};
+  /* the same numbers without the first cycle (cold caches, first GSAP/raster warm-up) */
+  report.summaryWarm={presented:{p95:p95(all(r=>r.presented?.gaps,3)),max:Math.round(Math.max(0,...all(r=>r.presented?.gaps,3))*10)/10},main:{p95:p95(all(r=>r.main?.intervals,3)),max:Math.round(Math.max(0,...all(r=>r.main?.intervals,3))*10)/10}};
+  report.perSwitch=report.rounds.map(r=>({from:r.from,to:r.to,presented_p95:r.presented?.p95,presented_max:r.presented?.max,main_p95:r.main?.p95,main_max:r.main?.max,loaf:r.loaf.map(l=>l.d)}));
+  fs.writeFileSync(path.join(OUT,'perf.json'),JSON.stringify({summary:report.summary,summaryWarm:report.summaryWarm,perSwitch:report.perSwitch,strips:report.strips,rounds:report.rounds},null,1));cdp.stop();web.close();await service.stop();await sleep(500);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
  console.log('screenshots and report.json in '+OUT);}
 if(require.main===module)main().catch(e=>{console.error(e);process.exitCode=2;});
