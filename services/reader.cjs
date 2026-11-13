@@ -48,7 +48,7 @@ class Reader{
   }
   /* E322: every whole-layer hide or show is logged with its cause (user: the layer faded out by itself in several games). */if(message.type==='dialogScene'||message.type==='dialogSceneKept')this.logVisibility({type:message.type,visible:message.visible,reason:message.reason});if(message.type==='dialogScene')this.immersion.scene(message.visible,'scene '+(message.reason||''));
   if(message.type==='dialogAuto')this.immersion.autoBox(message.visible);
-  if(message.type==='readerInput'){if(message.complete===true)this.immersion.input?.();this.immersion.skip(message.skipHeld);if(typeof message.skipHeld==='boolean')this.gal?.hooks?.skipHeld?.(message.skipHeld);}
+  if(message.type==='readerInput'){if(message.complete===true){this.immersion.input?.();this.gal?.hooks?.advance?.();}this.immersion.skip(message.skipHeld);if(typeof message.skipHeld==='boolean')this.gal?.hooks?.skipHeld?.(message.skipHeld);}
   if(message.type==='hookDialog')this.immersion.engine(message.visible,message.engine);
   /* 2026-11-12 (user: "自动校准的同时直接替换成游戏原生字体"): the engine names the face it draws the text with (KiriKiri
      MessageLayer.font.face). Our Japanese text takes it: the game's own font file when the folder scan found that family,
