@@ -209,7 +209,8 @@
 .tv-scene,.tv-index{display:none!important}
 /* 2026-11-13 (user) hand of cards along the bottom-right arc */
 .tv-hand{position:absolute;left:40vw;right:0;bottom:0;height:31vh;z-index:7;pointer-events:none}
-.tv-hc{position:absolute;left:0;top:0;width:var(--cw,88px);aspect-ratio:3/4;margin:0;padding:0!important;border:0!important;border-radius:8px!important;background:transparent!important;pointer-events:auto;cursor:pointer;transform-origin:50% 62%;transition:transform .42s cubic-bezier(.22,1.22,.36,1),opacity .2s linear;outline:none}
+.tv-hc{position:absolute;left:0;top:0;width:var(--cw,88px);aspect-ratio:3/4;margin:0;padding:0!important;border:0!important;border-radius:8px!important;background:transparent!important;pointer-events:auto;cursor:pointer;transform-origin:50% 62%;transition:transform .42s cubic-bezier(.22,1.22,.36,1);outline:none}
+/* (user: the returning cover flickered) a hand card is shown or hidden in the same frame the flying copy leaves or arrives, never faded */
 .tv-hc-face{position:absolute;inset:0;border-radius:inherit;background-size:cover!important;background-position:center!important;box-shadow:0 16px 28px -14px rgba(0,0,0,.75),0 0 0 1px color-mix(in srgb,var(--g-t1) 16%,transparent)}
 .tv-hc::after{content:"";position:absolute;inset:-1px;border-radius:9px;border:1px solid var(--g-gold);box-shadow:0 0 18px -2px color-mix(in srgb,var(--g-gold) 60%,transparent);opacity:0;transition:opacity .25s}
 .tv-hc:hover::after,.tv-hc:focus-visible::after{opacity:1}

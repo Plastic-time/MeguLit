@@ -333,10 +333,11 @@ export function renderHomeTV(main,ctx){
  function rail(){hand.render(list.map(g=>({id:g.id,title:g.title,cover:g.cover,pinned:setting.pinned.includes(g.id),g})),shown?.id||null);placeCover();}
  /* 2026-11-13 (user: "你要保证展示的卡要一直在手牌上方居中") the field card is centred over the fan of cards at every window size, measured on the
     untilted scene; if it would reach into the fan it moves up. Never while a card is in flight (its landing pose is already fixed). */
- function placeCover(){const c=$('.tv-cover'),face=c?.querySelector('.tv-face');if(!c||!face||!live||live.root!==root||hand.flying())return;const fan=hand.extent();if(!fan)return;
-  const run=fn=>live.depth?live.depth.neutral(fn):fn();run(()=>{c.style.left='';c.style.top='';const rr=root.getBoundingClientRect();
-   for(let i=0;i<4;i++){const r=face.getBoundingClientRect(),k=r.width/(c.offsetWidth||1)||1,dx=(fan.cx-(r.left+r.width/2-rr.left))/k;if(Math.abs(dx)<.5)break;c.style.left=(c.offsetLeft+dx)+'px';}
-   const r=face.getBoundingClientRect(),over=r.bottom-rr.top-(fan.top-14);if(over>0)c.style.top=(c.offsetTop-over/(r.height/(c.offsetHeight||1)||1))+'px';});}
+ /* measured on the card's resting box (hand.restRect), never on the card mid-animation; a touch left of the fan's centre (user: "往左边移动一点点") */
+ function placeCover(){const c=$('.tv-cover');if(!c||!live||live.root!==root||hand.flying())return;const fan=hand.extent();if(!fan)return;
+  const run=fn=>live.depth?live.depth.neutral(fn):fn();run(()=>{c.style.left='';c.style.top='';const rr=root.getBoundingClientRect(),aim=fan.cx-Math.min(48,rr.width*.025);
+   for(let i=0;i<4;i++){const r=hand.restRect(),k=r.width/(c.offsetWidth||1)||1,dx=(aim-(r.left+r.width/2-rr.left))/k;if(Math.abs(dx)<.5)break;c.style.left=(c.offsetLeft+dx)+'px';}
+   const r=hand.restRect(),over=r.bottom-rr.top-(fan.top-14);if(over>0)c.style.top=(c.offsetTop-over/(r.height/(c.offsetHeight||1)||1))+'px';});}
  function commit(){model.preferences.homeShowcase=setting;savePreferences({homeShowcase:setting});const id=shown?.id;list=showcaseGames(model.games,setting);
   paint(Math.max(0,list.findIndex(g=>g.id===id)),false);}
  /* 2026-11-13 (user: "不要全部作品 … 把＋卡移到最右边 不要是卡牌了 鼠标放上去再出来") the hand editor is a tab docked on the right edge that slides out
@@ -368,9 +369,10 @@ export function renderHomeTV(main,ctx){
  {let actSig=JSON.stringify(cachedActivity()||null);if(cachedActivity())showActivity(cachedActivity());api('learning_activity',{range:'year'}).then(r=>{rememberActivity(r);const n=JSON.stringify(r||null);if(n!==actSig){actSig=n;showActivity(r);}}).catch(()=>{});}
  const hand=createHand({root,box:$('.tv-hand'),layer:$('.tv-ghosts'),cover:$('.tv-cover'),reduced:matchMedia('(prefers-reduced-motion:reduce)').matches,
   back:`<img src="${LOGO}" alt="">`,art:h=>art(h.g||h,['#3b2a26','#5a3a30','#1a1110']),neutral:fn=>live?.depth?live.depth.neutral(fn):fn(),
-  onPlay:(h,kind,ms)=>{if(kind!=='plain'){root.classList.add('tv-fly');live?.depth?.hold(true);/* the field card's table shadow grows in as the flying card comes down onto it */
+  onBusy:on=>live?.depth?.hold(on),
+  onPlay:(h,kind,ms)=>{if(kind!=='plain'){root.classList.add('tv-fly');/* the field card's table shadow grows in as the flying card comes down onto it */
    $('.tv-cshadow')?.animate([{opacity:0},{opacity:0,offset:.55},{opacity:1}],{duration:ms||800,easing:'cubic-bezier(.3,0,.2,1)'});}paint(h.g,kind==='plain','fade');},
-  onLand:()=>{root.classList.remove('tv-fly');live?.depth?.hold(false);placeCover();}});live.hand=hand;
+  onLand:()=>{root.classList.remove('tv-fly');placeCover();}});live.hand=hand;
  hand.state&&requestAnimationFrame(()=>placeCover());
  const canvas=$('.tv-canvas'),planes=[...root.querySelectorAll('.tv-plane')],reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
  /* 2026-11-13 (user) every layer has its own depth: the far headline picture drifts against the pointer, near ones (cards, figures, rail, bottom bar) lead it */
