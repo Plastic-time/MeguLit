@@ -284,9 +284,10 @@
 .cw-tl[data-finish=shine] .cw-glint{position:absolute;inset:0;pointer-events:none;display:none;mix-blend-mode:screen;-webkit-mask-image:radial-gradient(farthest-corner circle at calc(50% + var(--px,0) * 45%) calc(40% + var(--py,0) * 45%),#000 0%,#000 22%,rgba(0,0,0,.45) 50%,rgba(0,0,0,.18) 85%);mask-image:radial-gradient(farthest-corner circle at calc(50% + var(--px,0) * 45%) calc(40% + var(--py,0) * 45%),#000 0%,#000 22%,rgba(0,0,0,.45) 50%,rgba(0,0,0,.18) 85%)}
 .cw-tl[data-finish=shine] .cw-glint.is-b{background:var(--cw-glint-b) 23px 41px/68px 68px;opacity:clamp(.08,calc(1 - max(var(--px,0),calc(var(--px,0) * -1)) * 1.6),1)}
 .cw-tl[data-finish=shine] .cw-glint.is-c{background:var(--cw-glint-c) 47px 13px/56px 56px;opacity:clamp(.08,calc(.3 + var(--px,0) * .9 - var(--py,0) * .3),1)}
-.cw-tl[data-finish=holo] .cw-foil{mix-blend-mode:color-dodge;opacity:clamp(.06,calc(.3 + var(--px,0) * .35),.7);filter:brightness(.66) contrast(1.3) saturate(1.3);
- background:repeating-linear-gradient(90deg,rgba(255,255,255,.22) 0 1px,transparent 1px 3px),
-  linear-gradient(105deg,transparent 18%,hsl(330 100% 65%) 30%,hsl(50 100% 60%) 40%,hsl(150 100% 55%) 50%,hsl(210 100% 62%) 60%,hsl(280 100% 65%) 70%,transparent 82%) calc(50% + var(--px,0) * 120%) 50%/240% 100% no-repeat}
+.cw-tl[data-finish=holo] .cw-foil{mix-blend-mode:color-dodge;transition:none;opacity:clamp(.1,calc(.24 + max(var(--px,0),calc(var(--px,0) * -1)) * .22),.5);filter:brightness(.62) contrast(1.12);
+ background:repeating-linear-gradient(90deg,rgba(255,255,255,.1) 0 1px,transparent 1px 3px),
+  repeating-linear-gradient(105deg,hsl(330 88% 62%) 0%,hsl(38 92% 62%) 8%,hsl(140 75% 58%) 16%,hsl(198 88% 62%) 24%,hsl(268 82% 66%) 32%,hsl(330 88% 62%) 40%) calc(50% + var(--px,0) * 60%) calc(50% + var(--py,0) * 30%)/300% 300%;
+ -webkit-mask-image:radial-gradient(farthest-corner circle at calc(50% + var(--px,0) * 45%) calc(40% + var(--py,0) * 45%),#000 0%,#000 14%,rgba(0,0,0,.4) 42%,rgba(0,0,0,.1) 78%);mask-image:radial-gradient(farthest-corner circle at calc(50% + var(--px,0) * 45%) calc(40% + var(--py,0) * 45%),#000 0%,#000 14%,rgba(0,0,0,.4) 42%,rgba(0,0,0,.1) 78%)}
 
 
 /* ---------- the velvet pad under a card taken out ----------
