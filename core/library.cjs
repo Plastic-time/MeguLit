@@ -67,7 +67,7 @@ const ENGINES=[
  {name:'Tmr-Hiro ADV',hook:null,test:f=>f.probe(/\.pac$/i,p=>require('../services/original-engines/tmrhiro.cjs').isPac(p))},
  {name:'Interheart (FPK)',hook:null,test:f=>f.magicAny(/\.fpk$/i,'FPK 2.00')||f.probe(/\.fpk$/i,p=>require('../services/original-engines/interheart.cjs').isArchive(p))},
  {name:'NekoSDK',hook:null,test:f=>f.magicAny(/\.pak$/i,'NEKOPACK4')||f.probe(/\.dat$/i,p=>require('../services/original-engines/nekosdk.cjs').isArchive(p))},
- {name:'KaGuYa',hook:null,test:f=>f.has(/\.ari$/i)&&f.has(/\.arc$/i)},
+ {name:'KaGuYa',hook:null,test:f=>f.has(/\.ari$/i)&&f.has(/\.arc$/i)||f.peek('message.dat',/^\[SCR-MESSAGE\]/,16)||f.peek('params.dat',/^\[SCR-PARAMS\]/,16)||f.magicAny(/\.arc$/i,'WFL1')||f.magicAny(/\.arc$/i,'LINK')},
  {name:'Lucifen',hook:null,test:f=>f.magicAny(/\.lpk$/i,'LPK1')},
  {name:'Yuka',hook:null,test:f=>f.magicAny(/\.ykc$/i,'YKC00')},
  {name:'Luca System',hook:null,test:f=>f.sub('files',/^script\.pak$/i)},
@@ -90,7 +90,7 @@ const ENGINES=[
  {name:'PJADV',hook:null,test:f=>f.magicAny(/\.(dat|pak)$/i,'GAMEDAT PAC')||f.has(/^textdata\.bin$/i)&&f.has(/^scenario\.dat$/i)},
  {name:'Valkyria',hook:true,test:f=>f.has(/\.odn$/i)},
  {name:'Cyberworks (C,system)',hook:null,test:f=>f.names.filter(n=>/^Arc0\d\.dat$/i.test(n)).length>=3},
- {name:'LC-ScriptEngine',hook:true,test:f=>f.has(/^lcsebody.*\.exe$/i)||f.has(/^lcscr.*\.lst$/i)},
+ {name:'LC-ScriptEngine',hook:true,test:f=>f.has(/^lcsebody.*\.exe$/i)||f.has(/^lcscr.*\.lst$/i)||f.has(/^lcsebody\d*\.lst$/i)},
  /* E375 WOLF RPG Editor: Game.exe or GamePro.exe (Pro, encrypted data) with Data.wolf, Data/*.wolf or a loose Data/BasicData. */
  {name:'Wolf RPG',hook:true,generic:true,test:f=>f.has(/\.wolf$/i)||f.sub('Data',/\.wolf$/i)||f.sub('Data',/^BasicData$/i)||f.has(/^gamepro\.exe$/i)&&f.has(/^data$/i)},
  /* E375 RPG Maker MV (www/js, www/data) and MZ (js/rmmz_core.js, data/System.json) run in NW.js. hook:null: LunaHook has no
