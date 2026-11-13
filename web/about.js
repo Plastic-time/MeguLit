@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // About page: what MeguLit is, version, links, credits, and the support (sponsor) codes.
-/* 2026-11-13 redesign (owner's picks): one landscape screen in four quarters — the cover reel top-left (the owner's own
-   edit "endless everything", Megumin-graded, always looping), 关于 + 链接 top-right, 致谢 + uninstall bottom-left,
-   支持开发 bottom-right with one plate whose tabs swap the code in place (WeChat first) and a small random toy beside it.
+/* 2026-11-13 redesign (owner's picks): the cover reel (the owner's own edit "endless everything", Megumin-graded, always
+   looping). 2026-11-14 layout (owner's pick B): three columns — reel, 关于 facts | 链接, 致谢 | 支持开发, 一起走过 and the
+   uninstall line; the 关于 facts and the 链接 rows share one row rhythm. 支持开发 has one plate whose tabs swap the code in place (WeChat first) and a small random toy beside it.
    Motion is plain Web Animations: no library. */
 import {checkForUpdates} from './update-notice.js';
 import {openFeedback} from './feedback-ui.js';
@@ -13,21 +13,21 @@ const REPO='https://github.com/ilynthn/MeguLit';
 const SPONSOR='https://github.com/sponsors/ilynthn';
 export const aboutLabel={zh:'关于',en:'About',ja:'について'};
 const w={
- zh:{reel:'MeguLit 封面短片',tag:'在 Galgame 里读日语的小魔导书',about:'关于',author:'作者',links:'链接',linksSub:'都会在浏览器里打开',
+ zh:{reel:'MeguLit 封面短片',tag:'在 Galgame 里读日语的小魔导书',about:'关于',author:'作者',fVer:'版本',fAuthor:'作者',fLicense:'许可',fLicenseSub:'开源',fSystem:'系统',fData:'数据',fDataVal:'游戏库和学习记录存在这台电脑',links:'链接',linksSub:'都会在浏览器里打开',
   site:'官网',faq:'常见问题',releases:'更新日志',source:'源码',report:'反馈问题',reportSub:'在本机打包日志后上传',
   journey:'一起走过',journeySub:'只算这台电脑',jHours:['小时','在游戏里读日语'],jChars:['字','读过的日文'],jLook:['次','查词'],jEmpty:'还没一起冒险过，去游戏库打开一部游戏吧',
   thanks:'致谢',credits:[['LunaHook','从游戏里取出文本'],['JMdict / EDRDG','日语词典'],['SudachiDict · UniDic','分词与注音'],['Tauri','桌面外壳'],['Anki · AnkiConnect','制卡'],['AivisSpeech','语音合成'],['Tomoyo','最早让我想做这个']],
   support:'支持开发',eris:'和 Bug 魔王军的战斗还在继续，冒险经费倒是快见底了…… (´･ω･`)\n如果 MeguLit 帮你在日语上往前走了一点，欢迎赞助几枚厄里斯',
   ways:'赞助方式',alipay:'支付宝',wechat:'微信赞赏',sponsorAria:'GitHub Sponsors（在浏览器打开）',scanAli:'打开支付宝扫一扫',scanWx:'打开微信扫一扫',aliAlt:'支付宝收款码',wxAlt:'微信赞赏码',
   coinIdle:'点一下，投一枚厄里斯',coinCount:n=>`厄里斯 ×${n}`},
- ja:{reel:'MeguLit カバー映像',tag:'ギャルゲーで日本語を読む、小さな魔導書',about:'アプリ情報',check:'更新を確認',author:'作者',links:'リンク',linksSub:'ブラウザで開きます',
+ ja:{reel:'MeguLit カバー映像',tag:'ギャルゲーで日本語を読む、小さな魔導書',about:'アプリ情報',check:'更新を確認',author:'作者',fVer:'バージョン',fAuthor:'作者',fLicense:'ライセンス',fLicenseSub:'オープンソース',fSystem:'動作環境',fData:'データ',fDataVal:'ライブラリと学習記録はこのPCに保存',links:'リンク',linksSub:'ブラウザで開きます',
   site:'公式サイト',faq:'よくある質問',releases:'更新履歴',source:'ソースコード',report:'不具合を報告',reportSub:'ログをまとめて送信',
   journey:'冒険の記録',journeySub:'このPCの分だけ',jHours:['時間','ゲームで日本語を読んだ'],jChars:['字','読んだ日本語'],jLook:['回','辞書を引いた'],jEmpty:'まだ一緒に冒険していません。ライブラリからゲームを開いてみてください',
   thanks:'謝辞',credits:[['LunaHook','ゲームからテキストを取り出す'],['JMdict / EDRDG','日本語辞書'],['SudachiDict · UniDic','形態素解析と読み'],['Tauri','デスクトップの外枠'],['Anki · AnkiConnect','カード作成'],['AivisSpeech','音声合成'],['Tomoyo','作るきっかけ']],
   support:'応援する',eris:'Bug 魔王軍との戦いは続くのに、資金はもう底が見えてきた…… (´･ω･`)\nMeguLit が役に立ったら、エリスを何枚か投げてもらえると嬉しいです',
   ways:'支援の方法',alipay:'Alipay',wechat:'WeChat',sponsorAria:'GitHub Sponsors（ブラウザで開く）',scanAli:'Alipay でスキャン',scanWx:'WeChat でスキャン',aliAlt:'Alipay の受取コード',wxAlt:'WeChat の投げ銭コード',
   coinIdle:'押してエリスを一枚',coinCount:n=>`エリス ×${n}`},
- en:{reel:'MeguLit cover reel',tag:'a tiny grimoire for reading Japanese in visual novels',about:'About',author:'by',links:'Links',linksSub:'Open in your browser',
+ en:{reel:'MeguLit cover reel',tag:'a tiny grimoire for reading Japanese in visual novels',about:'About',author:'by',fVer:'Version',fAuthor:'Author',fLicense:'Licence',fLicenseSub:'open source',fSystem:'System',fData:'Data',fDataVal:'Library and study records stay on this PC',links:'Links',linksSub:'Open in your browser',
   site:'Website',faq:'FAQ',releases:'Release notes',source:'Source code',report:'Report a problem',reportSub:'Sends the logs from this PC',
   journey:'The journey',journeySub:'on this PC only',jHours:['h','reading Japanese in games'],jChars:['chars','of Japanese read'],jLook:['×','dictionary lookups'],jEmpty:'No adventures yet: open a game from your library',
   thanks:'Thanks',credits:[['LunaHook','pulls the text out of games'],['JMdict / EDRDG','Japanese dictionary'],['SudachiDict · UniDic','word splitting & readings'],['Tauri','desktop shell'],['Anki · AnkiConnect','card making'],['AivisSpeech','speech synthesis'],['Tomoyo','where the idea started']],
@@ -39,29 +39,28 @@ const pickLocale=locale=>w[locale]?locale:String(locale||'').startsWith('ja')?'j
 export function aboutHTML(locale,esc){
  const L=pickLocale(locale),t=w[L],u=U[L],un=UN[L];
  const link=(url,label,sub)=>`<li><button type="button" data-open="${esc(url)}">${esc(label)}<small>${esc(sub)}<i aria-hidden="true">↗</i></small></button></li>`;
+ const fact=(label,value)=>`<div><dt>${esc(label)}</dt><dd>${value}</dd></div>`;
  return `<section class="ab" lang="${L==='zh'?'zh-CN':L}">
-  <div class="ab-col ab-left">
+  <div class="ab-col">
   <section class="ab-player" aria-label="${esc(t.reel)}">
    <video class="ab-reel" muted loop playsinline preload="auto" disablepictureinpicture disableremoteplayback poster="assets/about/cover-poster.webp" aria-hidden="true"><source src="assets/about/cover-reel.webm" type="video/webm"><source src="assets/about/cover-reel.mp4" type="video/mp4"></video>
    <div class="ab-hud" aria-hidden="true"><span class="ab-hud-tl"><b>●</b> megulit.exe · 2026</span></div>
    <div class="ab-mark"><div class="ab-logo"><img src="assets/sponsor/logo.png" alt="MeguLit"><img class="ab-g ab-gr" src="assets/sponsor/logo.png" alt=""><img class="ab-g ab-gc" src="assets/sponsor/logo.png" alt=""></div><p class="ab-typed${/^[\x00-\x7f]+$/.test(t.tag)?' ab-latin':''}">&gt; ${esc(t.tag)}</p></div>
   </section>
   <section class="ab-sec ab-about"><h2>${esc(t.about)}</h2>
-    <p class="ab-facts"><b class="ab-ver">v${esc(VERSION)}</b><button type="button" class="ab-tlink" data-update>${esc(t.check||u.check)}</button><span class="ab-state" data-update-state aria-live="polite"></span><span class="ab-dot">·</span><span>${esc(t.author)}</span> <b>魚魚棟</b><span class="ab-dot">·</span><b>GPL-3.0-or-later</b></p>
+   <dl class="ab-facts">${fact(t.fVer,`<b class="ab-ver">v${esc(VERSION)}</b><button type="button" class="ab-tlink" data-update>${esc(t.check||u.check)}</button><span class="ab-state" data-update-state aria-live="polite"></span>`)}${fact(t.fAuthor,'<b>魚魚棟</b>')}${fact(t.fLicense,`<b>GPL-3.0-or-later</b><small>${esc(t.fLicenseSub)}</small>`)}${fact(t.fSystem,'Windows 10 / 11 x64 · WebView2')}${fact(t.fData,esc(t.fDataVal))}</dl>
   </section>
-  <div class="ab-q ab-bl">
-   <section class="ab-sec"><h2>${esc(t.thanks)}</h2>
-    <dl class="ab-cred">${t.credits.map(([n,d])=>`<div><dt>${esc(n)}</dt><dd>${esc(d)}</dd></div>`).join('')}</dl>
-   </section>
-   <div class="ab-end"><span>${esc(un.hint)}</span><button type="button" class="ab-danger" data-uninstall>${esc(un.button)}…</button></div>
   </div>
-  </div>
-  <div class="ab-col ab-right">
+  <div class="ab-col">
   <section class="ab-sec ab-linksec"><h2>${esc(t.links)}<small>${esc(t.linksSub)}</small></h2>
     <ul class="ab-links">${link('https://megulit.com',t.site,'megulit.com')}${link(REPO+'#faq',t.faq,'GitHub · FAQ')}${link(REPO+'/releases',t.releases,'GitHub · Releases')}${link(REPO,t.source,'github.com/ilynthn/MeguLit')}<li><button type="button" data-feedback>${esc(t.report)}<small>${esc(t.reportSub)}<i aria-hidden="true">…</i></small></button></li></ul>
   </section>
-  <div class="ab-q ab-br">
-   <section class="ab-sec"><h2>${esc(t.support)}</h2>
+  <section class="ab-sec ab-thanks"><h2>${esc(t.thanks)}</h2>
+   <dl class="ab-cred">${t.credits.map(([n,d])=>`<div><dt>${esc(n)}</dt><dd>${esc(d)}</dd></div>`).join('')}</dl>
+  </section>
+  </div>
+  <div class="ab-col">
+  <section class="ab-sec ab-support"><h2>${esc(t.support)}</h2>
     <div>
      <p class="ab-eris">${esc(t.eris).replace(/\n/g,'<br>').replace(/\(´･ω･`\)/g,'<span class="ab-nw">$&</span>')}</p>
      <div class="ab-plate">
@@ -76,12 +75,12 @@ export function aboutHTML(locale,esc){
       </div>
      </div>
     </div>
-   </section>
-  </div>
+  </section>
   <section class="ab-sec ab-journey"><h2>${esc(t.journey)}<small>${esc(t.journeySub)}</small></h2>
    <dl class="ab-stats" data-journey>${[t.jHours,t.jChars,t.jLook].map(([unit,label],i)=>`<div><dt><b data-n="${i}">0</b><small>${esc(unit)}</small></dt><dd>${esc(label)}</dd></div>`).join('')}</dl>
    <p class="ab-jempty" hidden>${esc(t.jEmpty)}</p>
   </section>
+  <div class="ab-end"><span>${esc(un.hint)}</span><button type="button" class="ab-danger" data-uninstall>${esc(un.button)}…</button></div>
   </div>
  </section>`;
 }

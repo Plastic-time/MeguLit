@@ -286,6 +286,14 @@ async function hotWords(root,{week='',category='word'}={},options={}){
  return {state:'ok',week:/^\d{4}-W\d{2}$/.test(String(d.week||''))?d.week:null,weeks,settled:d.settled===true,participants:int(d.participants),category,awards};
 }
 
+/* 2026-11-14 the 个人主页 pill: your name and picture from this PC only (no relay round trip), so the top bar shows them
+   at once instead of waiting for view()'s submit + board + avatar requests. */
+function chip(root){
+ const s=relay.readJSON(stateFile(root)),avatar=AVATAR_ID.test(String(s.avatar?.id||''))?s.avatar.id:null,avatars={};
+ if(avatar)try{avatars[avatar]='data:image/webp;base64,'+fs.readFileSync(path.join(root,'data','cache','avatars',avatar+'.webp')).toString('base64');}catch{}
+ return {name:online(root).name,self:{avatar},avatars};
+}
+
 /* Everything the 排行榜 page needs in one call; refreshes the user's own entry at most every 10 minutes. */
 async function view(root,db,request={},options={}){
  const now=options.now||new Date(),period=PERIODS.includes(request.period)?request.period:'week',metric=[...METRICS,'games'].includes(request.metric)?request.metric:'seconds';
@@ -377,4 +385,4 @@ function libraryTitles(db){
  const seen=new Set();return rows.map(r=>String(r.title||'').trim().slice(0,120)).filter(t=>t&&!seen.has(t)&&seen.add(t)).slice(0,500);
 }
 /* forum pictures (forum.cjs) send raw WebP bytes */
-module.exports={relayCall:(...a)=>call(...a),socialCall,appealProfile,cleanBio,profileGet,profileSave,profileCard,followSet,reportProfile,social,libraryTitles,REPORT_KINDS,PERIODS,METRICS,CATEGORIES,BLOCKED,cleanName,cleanTerm,collectStats,collectLookups,hotWeekKey,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile,identity,setAvatar,removeAvatar,avatarStatus,appealAvatar,avatarImages,report,hotWords};
+module.exports={chip,relayCall:(...a)=>call(...a),socialCall,appealProfile,cleanBio,profileGet,profileSave,profileCard,followSet,reportProfile,social,libraryTitles,REPORT_KINDS,PERIODS,METRICS,CATEGORIES,BLOCKED,cleanName,cleanTerm,collectStats,collectLookups,hotWeekKey,periodKeys,windows,longestRun,currentRun,config,join,leave,submit,fetch:fetchBoard,view,publicHash,stateFile,identity,setAvatar,removeAvatar,avatarStatus,appealAvatar,avatarImages,report,hotWords};

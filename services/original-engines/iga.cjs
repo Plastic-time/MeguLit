@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const kit=require('./kit.cjs');/* E577 shared engine kit */
 /* Innocent Grey / Noesis "IGA0" archives (虚ノ少女 script.iga), as in GARbro (MIT, ArcFormats/Noesis/ArcIGA.cs):
    from 0x10 a packed-uint index length, then (name offset, data offset, size) packed uints, the name table length and
    one packed uint per name byte (cp932). Packed uint: bytes shifted in 7 bits at a time until the low bit is 1, >> 1.
@@ -7,7 +8,7 @@
    In a .s scene a string operand is 04 00 <length> then that many bytes (padded): Shift-JIS up to a NUL. A speaker is a string
    "＃名前"; ruby is written <漢字<よみ>. */
 const fs=require('node:fs'),path=require('node:path');
-const sj=new TextDecoder('shift_jis');
+const sj=kit.SJIS;
 /* #149 (殻ノ少女 / カルタグラ / クロウカシス / PP-ピアニッシモ, older Innocent Grey): "PACKDAT." archives (script.dat), as in
    IG_tools igtool (GPL) and Crass: u32 count twice, then 48-byte entries (cp932 name[32], absolute offset, mode,
    unpacked size, packed size). Mode & 0x10000 (pictures) is an XOR stream keyed by the size; .s scripts are stored plain
@@ -43,10 +44,7 @@ function parse(d){const lines=[],ruby=[],voices=[];let prevEnd=0;
 function audio(file){if(!/\.(?:iga|dat)$/i.test(file))return null;const l=list(file);return l?l.filter(e=>/\.(?:ogg|wav)$/i.test(e.name)):null;}
 function scriptIga(dir){const f=path.join(dir,'script.iga');try{if(fs.statSync(f).isFile())return f;}catch{}
  /* #149 older Innocent Grey games keep the scenes in script.dat (PACKDAT.) */const d=path.join(dir,'script.dat');try{const fd=fs.openSync(d,'r'),h=Buffer.alloc(8);try{fs.readSync(fd,h,0,8,0);}finally{fs.closeSync(fd);}if(h.toString('latin1')==='PACKDAT.')return d;}catch{}return null;}
-const engine={
- id:'iga',hint:'script.iga / script.dat（PACKDAT.）',
- scenes(dir){const f=scriptIga(dir);if(!f)return [];return (list(f)||[]).filter(e=>/\.s$/i.test(e.name));},
- archives:()=>[],sources:dir=>{const f=scriptIga(dir);return f?[f]:[];},
- parse,test:n=>/\.s$/i.test(n),
-};
+/* E577 kit.engine: one script archive, entries keep their names and order */
+const engine=kit.engine({id:'iga',hint:'script.iga / script.dat（PACKDAT.）',overlay:false,
+ archives:{find:dir=>scriptIga(dir),list,entry:/\.s$/i,keepPath:true,sort:false},parse,test:n=>/\.s$/i.test(n)});
 module.exports={list,parse,engine,audio};
