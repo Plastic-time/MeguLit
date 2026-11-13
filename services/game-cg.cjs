@@ -239,4 +239,4 @@ function image(root,executable,name,opts={}){
  if(opts.safe&&!require('./cg-rating.cjs').isSafe(require('./cg-rating.cjs').ratings(cacheDirOf(root,executable))[String(name||'').toLowerCase()]))throw Error('CG_HIDDEN');
  const b=fs.readFileSync(pictureFile(root,executable,name));return {mime:mimeOf(b),data:b.toString('base64')};
 }
-module.exports={list,image,scan,ksdText,tokens,kbad,esSlots,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};
+module.exports={list,image,scan,pictureFile,ksdText,tokens,kbad,esSlots,sdcUnpack,mzpNameSets,yssdArrays,siglusTable,siglusGlobalTables,SIGLUS_KEY};

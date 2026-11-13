@@ -53,6 +53,8 @@ class Reader{
   /* 2026-11-12 (user: "自动校准的同时直接替换成游戏原生字体"): the engine names the face it draws the text with (KiriKiri
      MessageLayer.font.face). Our Japanese text takes it: the game's own font file when the folder scan found that family,
      else the installed face by name. A font the user picked by hand is kept. */
+  /* 2026-11-13 card wall: an engine hook reports a picture on the game's screen (card-wall.cjs 'seen') */
+  if(message.type==='imageShown'&&typeof message.name==='string'&&this.gameExe)try{require('./card-wall.cjs').noteSeen(this.root,this.gameExe,message.name);}catch{}
   if(message.type==='hookFont')this.engineFont(message);
   if(message.type==='hookFontFile')this.engineFontFile(message);
   if(message.type==='markerPresence')this.immersion.marker(message.present===true);
