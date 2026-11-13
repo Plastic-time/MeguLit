@@ -37,8 +37,10 @@ function noteLine(gameDir,text,t=Date.now()){const s=String(text||'').trim();if(
 // original Ogg/Opus/... bytes, plain or decrypted in place; start = when it was read). Files over FILE_MAX are music.
 const FILE_MAX=3<<20;
 const events=gameDir=>{const d=voiceDir(gameDir),at=e=>({...e,path:path.join(d,e.file)});
- const played=readJsonl(path.join(d,'events.jsonl')).filter(e=>e&&e.file&&Number.isFinite(e.start)).map(e=>e.api==='file'?{...at(e),read:true,source:e.name}:at(e));/* api "file": modules/VoiceFile.cpp */
- const read=readJsonl(path.join(d,'files.jsonl')).filter(e=>e&&e.file&&Number.isFinite(e.start)&&e.bytes<=FILE_MAX&&!/[\\/]runtime-dump[^\\/]*[\\/]/i.test(e.source||'')/* never our own output */).map(e=>({...at(e),raw:true,read:true,ms:e.ms||0}));
+ const ours=s=>/[\\/]runtime-dump[^\\/]*[\\/]/i.test(s||'');/* never our own output */
+ // api "file" (modules/VoiceFile.cpp): a voice file the game read; over FILE_MAX it is music, not a voice (review item 6).
+ const played=readJsonl(path.join(d,'events.jsonl')).filter(e=>e&&e.file&&Number.isFinite(e.start)&&!(e.api==='file'&&(e.bytes>FILE_MAX||ours(e.name)))).map(e=>e.api==='file'?{...at(e),raw:true,read:true,source:e.name}:at(e));
+ const read=readJsonl(path.join(d,'files.jsonl')).filter(e=>e&&e.file&&Number.isFinite(e.start)&&e.bytes<=FILE_MAX&&!ours(e.source)).map(e=>({...at(e),raw:true,read:true,ms:e.ms||0}));
  return [...played,...read];};
 const lines=gameDir=>readJsonl(path.join(voiceDir(gameDir),'lines.jsonl')).filter(l=>l&&l.text&&Number.isFinite(l.t));
 
@@ -47,13 +49,14 @@ function match(lineList,clipList){
  const ls=[...lineList].sort((a,b)=>a.t-b.t);let cs=[...clipList].filter(c=>c.raw||(c.ms>=MIN_MS&&c.ms<=MAX_MS)).sort((a,b)=>a.start-b.start);
  // A voice file read just before a sound starts is that sound's file (read, decode, play): the pair counts once, and
  // the original file is kept rather than the decoded PCM.
- // Each read goes to the nearest sound starting from just before it to PAIR_BEFORE after; sounds heard more than once
- // (a click, music) never take a read.
+ // Each sound takes the latest unpaired read from PAIR_BEFORE before it to 150 ms after, if their lengths agree (the
+ // read's from its own header; a cut-off sound may be shorter). Sounds heard more than once (a click, music) never take a
+ // read. One pass over both lists in time order (review items 5, 6).
  const seen=new Map();for(const c of cs)if(!c.read){const k=c.crc||c.file;seen.set(k,(seen.get(k)||0)+1);}
- const enc=new Map(),paired=new Set();
- for(const r of cs.filter(c=>c.read)){let best=null;
-  for(const c of cs){if(c.read||enc.has(c)||seen.get(c.crc||c.file)>1||c.start<r.start-150||c.start>r.start+PAIR_BEFORE)continue;if(!best||Math.abs(c.start-r.start)<Math.abs(best.start-r.start))best=c;}
-  if(best){enc.set(best,r);paired.add(r);}}
+ const reads=cs.filter(c=>c.read),enc=new Map(),paired=new Set();let j=0;
+ for(const c of cs){if(c.read||seen.get(c.crc||c.file)>1)continue;
+  while(j<reads.length&&reads[j].start<=c.start+150)j++;
+  for(let k=j-1;k>=0&&reads[k].start>=c.start-PAIR_BEFORE;k--){const r=reads[k];if(paired.has(r)||!fits(r,c))continue;enc.set(c,r);paired.add(r);break;}}
  cs=cs.filter(c=>!paired.has(c)).map(c=>enc.has(c)?{...c,enc:enc.get(c)}:c);
  // Sound effects: the same clip near 3+ different lines.
  const near=new Map();
@@ -71,6 +74,9 @@ function match(lineList,clipList){
  for(const [i,c] of [...per].sort((a,b)=>a[0]-b[0])){const next=i+1<ls.length?ls[i+1].t:Infinity,end=c.start+(c.ms||0);
   out.push({text:ls[i].text,clip:c,partial:!!c.stopped&&next!==Infinity&&Math.abs(next-end)<CUT_GAP,gap:c.start-ls[i].t});}
  return out;}
+// Lengths of a read file and a played sound agree: unknown on either side, or within 25% (400 ms at least); a sound cut off
+// by the user may be shorter than its file, never much longer.
+function fits(r,c){if(!r.ms||!c.ms)return true;const slack=Math.max(400,r.ms*0.25);return c.stopped?c.ms<=r.ms+slack:Math.abs(r.ms-c.ms)<=slack;}
 // Index of the last line hooked by t+LEAD (-1: none, or more than LAG before t).
 function lineAt(ls,t){let lo=0,hi=ls.length-1,r=-1;while(lo<=hi){const m=(lo+hi)>>1;if(ls[m].t<=t+LEAD){r=m;lo=m+1;}else hi=m-1;}return r>=0&&t-ls[r].t<=LAG?r:-1;}
 function lineFloor(ls,t){let lo=0,hi=ls.length-1,r=0;while(lo<=hi){const m=(lo+hi)>>1;if(ls[m].t<=t){r=m;lo=m+1;}else hi=m-1;}return r;}
@@ -83,8 +89,9 @@ function better(a,b){if(!b)return true;const r=x=>(x.src==='script'?4:0)+(x.part
 function put(map,text,entry){const k=norm(text);if(!k)return false;if(!better(entry,map.lines[k]))return false;map.lines[k]={...entry,text};return true;}
 
 // Reads everything recorded so far for this game and updates voice-map.json. Returns {lines, voiced, added}.
-function build(gameDir,{script}={}){const map=loadMap(gameDir),ls=lines(gameDir),cs=events(gameDir).filter(c=>fs.existsSync(c.path));let added=0;
+function build(gameDir,{script}={}){const map=loadMap(gameDir),ls=lines(gameDir),cs=events(gameDir);let added=0;
  for(const m of match(ls,cs)){const c=m.clip,f=c.enc||c;/* the read file is whole even when its playback was cut */
+  if(!fs.existsSync(f.path))continue;
   if(put(map,m.text,{file:f.file,fmt:f.fmt||'wav',ms:c.ms,partial:c.enc?false:m.partial,src:c.enc?'time+file':c.read?'file':'time',gap:m.gap}))added++;}
  if(script)added+=fromScript(gameDir,script,map,cs);
  writeJSON(mapFile(gameDir),map);
@@ -102,9 +109,12 @@ function lookup(gameDir,text){const k=norm(text);if(!k)return null;const e=loadM
 
 // Hands full (not partial) clips to game-voice, so every place that already asks game-voice.find() for a line's voice
 // (learning page, saved sentences, Anki cards) plays them without knowing about this module.
+// Only entries not handed over yet (or whose file changed); game-voice's index is saved once at the end (review item 5).
 function publish(root,gameDir){const map=loadMap(gameDir);let n=0;
- for(const e of Object.values(map.lines)){if(e.partial)continue;let b;try{b=fs.readFileSync(path.join(voiceDir(gameDir),e.file));}catch{continue;}
-  if(gameVoice.remember(root,e.text,b,{game:'runtime'}))n++;}
+ for(const e of Object.values(map.lines)){if(e.partial||e.published===e.file)continue;let b;try{b=fs.readFileSync(path.join(voiceDir(gameDir),e.file));}catch{continue;}
+  if(gameVoice.remember(root,e.text,b,{game:'runtime',save:false}))n++;e.published=e.file;}
+ if(n)gameVoice.flush(root);
+ writeJSON(mapFile(gameDir),map);
  return n;}
 
 // For the reader: a line handler that records each hooked line for the running game and, a few seconds after lines stop

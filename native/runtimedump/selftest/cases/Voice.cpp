@@ -82,9 +82,10 @@ struct WaveOut {
   waveOutPrepareHeader(h, &hdr, sizeof hdr); waveOutWrite(h, &hdr, sizeof hdr);
  }
 };
-IXAudio2SourceVoice *XPlay(const Clip &c) {
+IXAudio2SourceVoice *XPlay(const Clip &clip) {
  IXAudio2SourceVoice *v = NULL; if (FAILED(Xa->CreateSourceVoice(&v, &Wf))) return NULL;
  v->SetVolume(0);
+ const Clip &c = *new Clip(clip); // XAudio2 reads the samples while it plays: kept to the end of the run
  XAUDIO2_BUFFER b = {}; b.Flags = XAUDIO2_END_OF_STREAM; b.AudioBytes = (UINT32)c.size() * 2; b.pAudioData = (const BYTE *)c.data();
  v->SubmitSourceBuffer(&b); v->Start(0); return v;
 }
@@ -102,7 +103,19 @@ int Found(const std::string &voiceDir, int id) { // 1 if a saved clip or file ca
 }
 }
 
+// A crash in the game is reported with the faulting module and offset before the process dies (first chance, so access
+// violations the DLL itself catches show up too; only the last line before a crash matters).
+LONG CALLBACK Report(EXCEPTION_POINTERS *e) {
+ if (e->ExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION) return EXCEPTION_CONTINUE_SEARCH;
+ HMODULE m = NULL; char name[MAX_PATH] = "?"; void *at = e->ExceptionRecord->ExceptionAddress;
+ if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)at, &m)) GetModuleFileNameA(m, name, MAX_PATH);
+ fprintf(stderr, "access violation at %s+0x%Ix (reading %p)\n", strrchr(name, '\\') ? strrchr(name, '\\') + 1 : name, (ULONG_PTR)at - (ULONG_PTR)m, (void *)e->ExceptionRecord->ExceptionInformation[1]);
+ fflush(stderr);
+ return EXCEPTION_CONTINUE_SEARCH;
+}
 int CaseVoice(FakeGame &g) {
+ setvbuf(stdout, NULL, _IONBF, 0);
+ AddVectoredExceptionHandler(1, Report);
  CoInitializeEx(NULL, COINIT_MULTITHREADED);
  std::string vdir = g.dir + "voice\\";
  bool haveDs = SUCCEEDED(DirectSoundCreate8(NULL, &Ds, NULL)) && SUCCEEDED(Ds->SetCooperativeLevel(GetDesktopWindow(), DSSCL_PRIORITY));
