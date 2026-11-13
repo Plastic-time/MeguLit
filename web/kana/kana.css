@@ -1290,3 +1290,13 @@ button.m0,button.m1,button.m2,button.m3{border:0;padding:0;font:inherit;cursor:p
 .v-index.mg .mastery button.sel.sel.sel,:host-context(:root[data-theme=light]) .v-index.mg .mastery button.sel.sel.sel{box-shadow:inset 0 0 0 2px var(--fm-red),0 0 0 3px color-mix(in srgb,var(--fm-red) 16%,transparent)!important}
 :host-context(:root[data-theme=light]) .v-index.mg .mastery button.m3{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fm-gold) 38%,transparent)!important}
 :host-context(:root[data-theme=light]) .v-index.mg .mastery button.m0{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--t1) 10%,transparent)!important}
+/* 2026-11-13 AP seal: 惠惠's hanko slammed onto the score (same red as the grammar 通关盖章) */
+.v-results .ap-stamp{position:absolute;right:26px;top:14px;width:150px;height:150px;color:var(--mg-red,#c8323c);pointer-events:none;z-index:2;transform:rotate(-13deg);mix-blend-mode:normal;animation:ap-slam .48s cubic-bezier(.3,1.4,.5,1) .55s both}
+.v-results .ap-seal{width:100%;height:100%;display:block;overflow:visible;opacity:.92;filter:drop-shadow(0 0 .5px currentColor)}
+.v-results .ap-ink{position:absolute;inset:8px;border-radius:50%;border:3px solid currentColor;opacity:0;animation:ap-ink .7s ease-out .86s both}
+.v-results .hero.ap-hit{animation:ap-shake .26s linear .86s both}
+@keyframes ap-slam{0%{opacity:0;transform:rotate(-2deg) scale(2.8)}55%{opacity:1;transform:rotate(-14deg) scale(.9)}75%{transform:rotate(-12deg) scale(1.03)}100%{opacity:1;transform:rotate(-13deg) scale(1)}}
+@keyframes ap-ink{0%{opacity:.55;transform:scale(.85)}100%{opacity:0;transform:scale(1.7)}}
+@keyframes ap-shake{0%,100%{transform:none}20%{transform:translate(3px,2px)}40%{transform:translate(-3px,-1px)}60%{transform:translate(2px,-2px)}80%{transform:translate(-1px,1px)}}
+@container kana (max-width:600px){.v-results .ap-stamp{width:104px;height:104px;right:12px;top:10px}}
+@media (prefers-reduced-motion:reduce){.v-results .ap-stamp,.v-results .hero.ap-hit{animation:none}.v-results .ap-ink{display:none}}
