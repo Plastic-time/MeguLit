@@ -12,7 +12,8 @@ import {renderHomeTV,homeTVSignature} from './home-tv.js';
 import {historyHTML} from './history-view.js';
 import {historyEmpty,sentencesEmpty,trashEmpty,reviewRest} from './empty-states.js';
 import {readTime} from './read-time.js';
-import {createSeriesLibrary} from './series-library.js';
+import {createSeriesLibrary,libraryEntries} from './series-library.js';
+import {driftFilter} from './library-drift.js';
 import {createLibraryRefresh} from './library-refresh.js';
 import {mountSettingsAutosave,leaveSettings,flushSettings} from './settings-autosave.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -458,6 +459,10 @@ let gameTransition=null;
 function renderGames(){
   const host=document.querySelector('#library-results');if(!host)return;
   if(gameTransition){gameTransition.cancel();gameTransition=null;}
+  /* multi-track view: library-drift.js carries every cover from where it is, so the render is a plain one */
+  if(libraryView()==='tracks'&&host.classList.contains('field-drift')){
+    const q=search.trim();let ids=null;if(q){const e=libraryEntries(model,search,false);ids=[...e.series.map(s=>'s:'+s.id),...e.games.map(g=>g.id)];}
+    if(driftFilter(host,ids))return;return renderGamesNow('drift');}
   const animate=!matchMedia('(prefers-reduced-motion: reduce)').matches,plane=host.querySelector('.field-plane');
   const orbit=host.classList.contains('field-orbit'),wall=!!plane&&!orbit&&!host.querySelector('.field-feature'),filtered=!!search.trim();
   const cells=plane?[...plane.children].filter(c=>!c.hasAttribute('data-parked')):[];
@@ -478,6 +483,7 @@ function renderGamesNow(mode=''){
   if(!host)return;
   /* view switch: library-switch-motion.js owns the whole transition, so just lay out the new view */
   if(mode==='plain'){window.__megulitOrbitWarm=true;seriesUI.renderLibrary(host);return;}
+  if(mode==='drift'){window.__megulitOrbitWarm=true;seriesUI.renderLibrary(host);window.__megulitOrbitWarm=false;return;}
   const animate=!matchMedia('(prefers-reduced-motion: reduce)').matches;
   const oldSingle=host.querySelector('.field-feature > [data-member-id]');
   const oldRect=oldSingle?.getBoundingClientRect();
@@ -582,7 +588,7 @@ function showLibraryResults(grid,selecting){
   host.classList.toggle('lib-selecting',selecting);
   main.classList.toggle('field-list',!wall);
   /* 2026-11-13 Blueprint multi-select: the bar floats over the grid, so picking no longer moves the capsule (no field-selecting) */
-  const single=wall&&!!search.trim()&&grid.childElementCount===1&&grid.firstElementChild.hasAttribute('data-member-id');
+  const single=wall&&view!=='tracks'&&!!search.trim()&&grid.childElementCount===1&&grid.firstElementChild.hasAttribute('data-member-id');
   main.classList.toggle('field-single',single);
   if(single){
     stopField();grid.classList.add('field-feature');

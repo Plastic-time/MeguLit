@@ -1,3 +1,4 @@
+import {driftMount} from './library-drift.js';
 import {fxPref} from './fx-prefs.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 // 魔导书 (grimoire) home: words, explosion glow, title marquee, shelf fit, greeting placement, close dialog, tools page.
@@ -241,7 +242,7 @@ function orbit(host,main,plane,items,pod){
   const node=source.cloneNode(true);node.draggable=false;node.querySelectorAll('img').forEach(img=>{img.draggable=false;});
   sources.set(node,source);plane.append(node);return node;});
  host.classList.add('field-orbit');
- let raf=0,angle=-Math.PI/2,last=0,paused=false,born=window.__megulitOrbitWarm?-1e9:0,width=0,height=0,podW=360,podH=44;
+ let raf=0,angle=-Math.PI/2,last=0,held=null,born=window.__megulitOrbitWarm?-1e9:0,width=0,height=0,podW=360,podH=44;
  const measure=()=>{width=host.clientWidth;height=host.clientHeight;podW=pod?.offsetWidth||360;podH=pod?.offsetHeight||44;};
  const place=()=>{
   const cw=168,chh=250,rx=Math.max(podW/2+cw*.75,Math.min(width*.36,podW/2+cw*2.2)),ry=Math.max(podH/2+chh*.62,Math.min(height*.36,chh*1.15));
@@ -254,13 +255,17 @@ function orbit(host,main,plane,items,pod){
    const spread=1+ring*.62*shrink,dir=ring%2?-1:1,a=dir*angle+k*2*Math.PI/n+ring*.37;
    /* E272/E274 (user): covers fly in from outside the window and settle onto the orbit, one after another */const start=nodes.length>1?index/(nodes.length-1)*.45:0,p=still?1:Math.max(0,Math.min(1,(t0-start)/.55)),grow=p<=0?0:1+2.2*Math.pow(p-1,3)+1.2*Math.pow(p-1,2),fade=Math.min(1,p*1.6);const x=Math.cos(a)*rx*spread*(1+1.4*(1-grow)),y=Math.sin(a)*ry*spread*(1+1.4*(1-grow)),depth=(Math.sin(a)+1)/2;
    const scale=(.78+.22*depth)*shrink*(1-ring*.05)*(.9+.1*fade);
-   node.style.transform='translate('+(width/2+x-cw/2).toFixed(1)+'px,'+(height/2+y-chh/2).toFixed(1)+'px) scale('+scale.toFixed(3)+')';
+   /* (user 2026-11-13: only the cover under the pointer stops) the hovered cover holds still; the ring turns on and it
+      glides back into its slot when the pointer leaves */
+   const tx=width/2+x-cw/2,ty=height/2+y-chh/2,cur=node._p||(node._p={x:tx,y:ty,s:scale});
+   if(node!==held){const f=node._back?Math.min(1,.12+(node._back++)*.012):1;cur.x+=(tx-cur.x)*f;cur.y+=(ty-cur.y)*f;cur.s+=(scale-cur.s)*f;if(f>=1)node._back=0;}
+   node.style.transform='translate('+cur.x.toFixed(1)+'px,'+cur.y.toFixed(1)+'px) scale('+cur.s.toFixed(3)+')';
    node.style.opacity=((.62+.38*depth)*fade).toFixed(2);node.style.zIndex=String(Math.round(depth*100)-ring*10+100);}});
  };
  const still=reduceMotion.matches;
- const tick=now=>{raf=0;const dt=last?Math.min(64,now-last):0;last=now;if(!paused&&!still)angle+=dt*2*Math.PI/60000;place();if(!still)raf=requestAnimationFrame(tick);};
- plane.addEventListener('pointerover',e=>{if(e.target.closest('.field-plane > *'))paused=true;},{signal});
- plane.addEventListener('pointerout',e=>{if(!e.relatedTarget||!plane.contains(e.relatedTarget)||!e.relatedTarget.closest('.field-plane > *'))paused=false;},{signal});
+ const tick=now=>{raf=0;const dt=last?Math.min(64,now-last):0;last=now;if(!still)angle+=dt*2*Math.PI/60000;place();if(!still)raf=requestAnimationFrame(tick);};
+ plane.addEventListener('pointerover',e=>{const n=e.target.closest('.field-plane > *');if(n&&n!==held){if(held)held._back=1;held=n;}},{signal});
+ plane.addEventListener('pointerout',e=>{const to=e.relatedTarget&&plane.contains(e.relatedTarget)?e.relatedTarget.closest('.field-plane > *'):null;if(held&&to!==held){held._back=1;held=to||null;}},{signal});
  host.addEventListener('click',e=>{const hit=e.target.closest(fieldActions),source=hit&&sources.get(hit.closest('.field-plane > *'));if(!source)return;
   const action=[...hit.attributes].find(attr=>['data-game','data-edit','data-launch','data-series'].includes(attr.name));if(action){e.preventDefault();e.stopPropagation();source.querySelector('['+action.name+']')?.click();}},{capture:true,signal});
  const ro=new ResizeObserver(()=>{measure();place();});ro.observe(host);if(pod)ro.observe(pod);
@@ -288,6 +293,9 @@ export function fieldify(grid,filtered=false,tracks=false){
  if(!host||!main)return;
  const pod=main.querySelector(':scope > .field-search');
  const items=spreadTwins([...grid.children]);
+ /* 2026-11-13 multi-track view: the drifting field (library-drift.js) owns the covers, search or not */
+ if(tracks){grid.classList.add('field-grid');const plane=document.createElement('div');plane.className='field-plane';grid.replaceChildren(plane);host.querySelector(':scope > .field-shield')?.remove();
+  fieldStop=driftMount(host,grid,plane,items.filter(el=>el.matches?.('[data-member-id],[data-series-drop]')),filtered,main.querySelector(':scope > .field-search'));return;}
  if(!items.length)return;
  grid.classList.add('field-grid');
  const plane=document.createElement('div');
