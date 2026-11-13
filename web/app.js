@@ -140,7 +140,7 @@ function relativeTime(timestamp){
   return date.toLocaleDateString(locales[locale],{year:'numeric',month:'short',day:'numeric'});
 }
 const datetime=timestamp=>timestamp?new Date(timestamp*1000).toLocaleString(locales[locale],{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):text.unknownTime;
-function duration(seconds){const min=Math.floor((seconds||0)/60);return min>=60?`${Math.floor(min/60)} ${text.hours} ${min%60} ${text.minutes}`:`${min} ${text.minutes}`;
+function duration(seconds){seconds=Math.max(0,Math.round(seconds||0));/* short sessions (79 s) used to floor to 1 min / 0 min */if(seconds<60)return `${seconds} ${({zh:"秒",ja:"秒",en:"s"})[locale]||"s"}`;const min=Math.round(seconds/60);return min>=60?`${Math.floor(min/60)} ${text.hours} ${min%60} ${text.minutes}`:`${min} ${text.minutes}`;
  }
 function toast(message){clearTimeout(toastTimer);const element=document.querySelector('#toast');element.textContent=message;element.classList.add('visible');toastTimer=setTimeout(()=>element.classList.remove('visible'),
  4600);}

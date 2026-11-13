@@ -1005,7 +1005,7 @@ html:not(#u):not(#v):not(#w) body .profile-hero-fav{margin-top:22px}
 html:not(#u):not(#v):not(#w) body .profile-hero-fav h4{margin:0 0 10px;font-family:var(--u-mono);font-size:10.5px;font-weight:400;letter-spacing:.2em;color:var(--g-gold)}
 html:not(#u):not(#v):not(#w) body .profile-hero-fav ol{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0;padding:0;list-style:none;counter-reset:fav}
 html:not(#u):not(#v):not(#w) body .profile-hero-fav li{counter-increment:fav;font:500 17px/1.4 var(--g-serif,serif);color:var(--g-t1,#f1e0d2)}
-html:not(#u):not(#v):not(#w) body .profile-hero-fav li::before{content:counter(fav,decimal-leading-zero) " ";font-family:var(--u-mono);font-size:11px;color:var(--g-t3,#a08a80)}
+html:not(#u):not(#v):not(#w) body .profile-hero-fav li::before{content:none}
 html:not(#u):not(#v):not(#w) body dialog.profile-panel .profile-panel-editor{margin-top:18px;border-top:1px solid var(--u-line-2)}
 html:not(#u):not(#v):not(#w):not(#x) body .profile-hero-id h3{margin:0!important;font:600 clamp(28px,2.6vw,36px)/1.1 var(--g-serif,serif)!important;letter-spacing:.01em!important;text-transform:none!important;color:var(--g-t1,#f1e0d2)!important;padding:0!important}
 /* JLPT level on each word */
@@ -1827,8 +1827,8 @@ html:not(#u):not(#v):not(#w):not(#x) body :is(dialog,.lv-dialog):is(:focus,:focu
 html:not(#u):not(#v):not(#w):not(#x) body .guide-level-note{margin:8px 0 0;font-size:12.5px;color:var(--g-t3,#a08a80)}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-dialog.lv-tips{width:min(560px,94vw)!important}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-tips-list{counter-reset:tip;list-style:none;margin:6px 0 0;padding:0;border-top:1px solid var(--u-line-2,rgba(255,255,255,.12))}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-tips-list li{counter-increment:tip;position:relative;padding:12px 0 12px 40px;border-bottom:1px solid var(--u-line,rgba(255,255,255,.07));font-size:14px;line-height:1.75;color:var(--g-t1,#f1e0d2)}
-html:not(#u):not(#v):not(#w):not(#x) body .lv-tips-list li::before{content:counter(tip,decimal-leading-zero);position:absolute;left:0;top:12px;font:400 20px/1.2 var(--g-serif,serif);color:var(--g-gold,#edb56e)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-tips-list li{counter-increment:tip;position:relative;padding:12px 0 12px 0;border-bottom:1px solid var(--u-line,rgba(255,255,255,.07));font-size:14px;line-height:1.75;color:var(--g-t1,#f1e0d2)}
+html:not(#u):not(#v):not(#w):not(#x) body .lv-tips-list li::before{content:none}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-tips .lv-note{margin:12px 0 0;font-size:12.5px}
 html:not(#u):not(#v):not(#w):not(#x) body .lv-tips footer{display:flex;justify-content:flex-end;margin-top:16px}
 /* 2026-11-12 (user: every settings page left a band empty on the right when maximised) the column, the search bar and the
