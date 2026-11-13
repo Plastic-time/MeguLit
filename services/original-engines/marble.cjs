@@ -26,11 +26,11 @@ function list(file){const fsz=kit.size(file);if(fsz<16)return null;const h=kit.h
  return null;}
 
 const negate=b=>{const o=Buffer.allocUnsafe(b.length);for(let i=0;i<b.length;i++)o[i]=(-b[i])&255;return o;};
-/* keys published with the open-source unpackers (passphrases are game data facts, not code) */
-const KNOWN=['amai_seikatu','ALSRA','喪服妻-','HIGONOKAMI','白兎隊は超サイコー','人妻搾乳飯店-0630-2006','MAYURI','くのいち・咲夜-0331-2006','女教師ゆうこ1968','MELCEDES','osyaburiana',
- '-輪奸病棟-　ルネTeamBitters PRESENTS','しおふきマーメイド-0330-2007','BLOODSUCKER','t2_nurse'];
+/* per-title passphrases (marble-schemes.json, like cx-schemes.json / paz-schemes.json) */
+const SCHEMES=require('./marble-schemes.json'),KNOWN=Object.entries(SCHEMES).filter(([k])=>k[0]!=='_').map(([,v])=>v);
 const sjisBytes=s=>kit.encodeSjis(s);
-function packKeys(){try{return require('../adapter-packs.cjs').params('marble-key').map(p=>p.value).map(v=>v?.hex&&/^([0-9a-f]{2})+$/i.test(v.hex)?Buffer.from(v.hex,'hex'):typeof v?.key==='string'?sjisBytes(v.key):null).filter(Boolean);}catch{return [];}}
+const keyOf=v=>v?.hex&&/^([0-9a-f]{2})+$/i.test(v.hex)?Buffer.from(v.hex,'hex'):typeof v?.key==='string'?sjisBytes(v.key):null;
+function packKeys(){let extra=[];try{extra=require('../adapter-packs.cjs').params('marble-key').map(p=>p.value);}catch{}return [...extra,...KNOWN].map(keyOf).filter(Boolean);}
 /* how much a decrypted script looks like Marble's: NUL-separated strings (one every ~100 bytes at least) that decode
    cleanly, with CJK text among them. GBK patches decode almost any byte pair, so the separators carry the check */
 function plausible(b){const t=b.subarray(0,32768),dec=new TextDecoder(kit.codepage(t)),parts=t.toString('latin1').split('\0').filter(Boolean);if(parts.length<t.length/120)return 0;
@@ -38,7 +38,7 @@ function plausible(b){const t=b.subarray(0,32768),dec=new TextDecoder(kit.codepa
 /* the transform that opens this archive's scripts: {key: Buffer} | {negate: true} | null */
 function cipherFor(file,entries){const sample=entries.filter(e=>/\.s$/i.test(e.name)).sort((a,b)=>b.size-a.size).slice(0,2).map(e=>kit.readAt(file,e.offset,Math.min(e.size,65536)));
  if(!sample.length)return null;const score=fn=>sample.reduce((s,b)=>s+plausible(fn(b)),0)/sample.length,good=0.75;
- for(const k of [...packKeys(),...KNOWN.map(sjisBytes).filter(Boolean)])if(score(b=>kit.xor(b,k))>=good)return {key:k};
+ for(const k of packKeys())if(score(b=>kit.xor(b,k))>=good)return {key:k};
  if(score(negate)>=good)return {negate:true};
  if(score(b=>b)>=good)return {plain:true};
  const big=sample[0];for(const weights of [kit.sjisWeights(),kit.gbkWeights()])for(const c of kit.xorKeyByColumns(big,{maxPeriod:64,weights}).slice(0,3)){if(score(b=>kit.xor(b,c.key))>=good)return {key:c.key};}

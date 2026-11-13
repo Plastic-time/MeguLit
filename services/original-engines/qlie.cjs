@@ -90,7 +90,9 @@ function keyFileFor(file){const d=path.dirname(file);for(const rel of ['.','..',
 function gameKeyFromExe(file){const d=path.dirname(file);for(const ed of [path.join(d,'..'),d])for(const n of kit.names(ed))if(/\.exe$/i.test(n)){
  const f=kit.peResource(path.join(ed,n),10,'TFORM1');if(!f||f.toString('latin1',0,4)!=='TPF0')continue;const at=f.indexOf('IconKeyImage','latin1');if(at<0)continue;
  const ic=f.indexOf(Buffer.from('\x05TIcon','latin1'),at);if(ic>=0&&ic+0x106<=f.length)return Buffer.from(f.subarray(ic+6,ic+0x106));}return null;}
-function packKeys(){try{return require('../adapter-packs.cjs').params('qlie-key').map(p=>p.value).filter(v=>v&&/^[0-9a-f]{512}$/i.test(String(v.gameKey||'')));}catch{return [];}}
+/* per-title game keys: qlie-schemes.json, then an adapter pack's "qlie-key" params */
+const SCHEMES=require('./qlie-schemes.json');
+function packKeys(){let extra=[];try{extra=require('../adapter-packs.cjs').params('qlie-key').map(p=>p.value);}catch{}return [...extra,...Object.entries(SCHEMES).filter(([k])=>k[0]!=='_').map(([,v])=>v)].filter(v=>v&&/^[0-9a-f]{512}$/i.test(String(v.gameKey||'')));}
 
 const memo=new Map();
 /* list(file) -> entries (each knows how to read itself) or null */

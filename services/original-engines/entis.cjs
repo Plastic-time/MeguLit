@@ -95,7 +95,9 @@ function exePasswords(dir){if(passMemo.has(dir))return passMemo.get(dir);const o
   try{const raw=nemesis(r,4<<20);xml=raw.includes(0)&&raw[1]===0?raw.toString('utf16le'):new TextDecoder(kit.codepage(raw)).decode(raw);}catch{continue;}
   for(const m of xml.matchAll(/<archive\b[^>]*>/gi)){const p=/\bpath\s*=\s*"([^"]*)"/i.exec(m[0]),k=/\bkey\s*=\s*"([^"]*)"/i.exec(m[0]);if(p&&k)out.set(path.basename(p[1].replace(/\\/g,'/')).toLowerCase(),k[1]);}}
  passMemo.set(dir,out);return out;}
-function packPasswords(){try{return require('../adapter-packs.cjs').params('entis-key').map(p=>p.value).filter(v=>v&&typeof v.password==='string');}catch{return [];}}
+/* per-title passwords: entis-schemes.json, then an adapter pack's "entis-key" params */
+const SCHEMES=require('./entis-schemes.json');
+function packPasswords(){let extra=[];try{extra=require('../adapter-packs.cjs').params('entis-key').map(p=>p.value);}catch{}return [...extra,...Object.entries(SCHEMES).filter(([k])=>k[0]!=='_').map(([,v])=>v)].filter(v=>v&&typeof v.password==='string');}
 /* the password an archive's BSHF entries open with: tried on its first encrypted entry until "Entis\x1a" or text appears */
 function passwordFor(file,entries){const enc=entries.find(e=>e.code===BSHF);if(!enc)return null;const name=path.basename(file).toLowerCase(),cands=[];
  const own=exePasswords(path.dirname(file)).get(name);if(own!==undefined)cands.push(own);for(const v of packPasswords())if(!v.archive||String(v.archive).toLowerCase()===name)cands.push(v.password);
