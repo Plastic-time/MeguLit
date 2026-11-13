@@ -733,9 +733,8 @@ html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms .lb-cro
 html:not(#u):not(#v) body .leaderboard-page .leaderboard-podium.is-terms .leaderboard-reason{text-align:left!important}
 
 /* ---- follow, editorial: no boxes; the two lists as ruled columns with serif headings ---- */
-html:not(#u):not(#v) body .leaderboard-page .lb-card:has(.lb-people,.lb-empty-action){background:none!important;box-shadow:none!important;padding:28px 0 8px!important;border-top:1px solid var(--u-line-2);-webkit-backdrop-filter:none;backdrop-filter:none}
-html:not(#u):not(#v) body .leaderboard-page .lb-card:has(.lb-people,.lb-empty-action)::before{display:none!important}
-html:not(#u):not(#v) body .leaderboard-page .lb-card:has(.lb-people,.lb-empty-action) .lb-h2{font-size:clamp(26px,2.2vw,34px)!important;font-family:var(--g-serif,serif)!important}
+/* 2026-11-13 关注: the frameless :has() variant (padding 0 at the sides, a bigger title) hit only the card that had a list or
+   an empty-state button, so 我关注的人 and 同好 drew differently and the rows touched the frame. Both are plain lb-cards now. */
 html:not(#u):not(#v) body .leaderboard-page .lb-people li{padding:16px 0!important}
 html:not(#u):not(#v) body .leaderboard-page .lb-people .leaderboard-avatar{width:40px!important;height:40px!important}
 html:not(#u):not(#v) body .leaderboard-page .lb-people .leaderboard-name{font-family:var(--g-serif,serif);font-size:17px}
