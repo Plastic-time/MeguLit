@@ -697,10 +697,13 @@ function openViewer(cell){
  const pocket=()=>{const r=P.root.querySelector('.cw-count').getBoundingClientRect(),s=.11;return {x:r.left-base.left+r.width/2-TL_W*s/2,y:r.top-base.top+r.height/2-TL_H*s/2,s};};
  const fit=()=>Math.min((base.height-170)/(TL_H+40),(base.width*.34)/TL_W,3.1);
  const h0=home();
+ /* the twin is laid out at the size it is shown at (CSS zoom) and only ever scaled down by its transform: a 168 px layout
+    scaled up 3x is drawn from a small bitmap while it moves (blurry when dragged or turned), a 3x layout scaled down is not */
+ const GZ=clamp(Math.ceil(fit()),1,3);ghost.el.style.zoom=String(GZ);
  /* position (x,y,s) of the twin; z = inspect zoom; b veil; u controls */
  const spring=new Spring({x:h0.x,y:h0.y,s:h0.s,z:1,b:0,u:0},v=>{
   const s=v.s*v.z,cx=v.x+TL_W*v.s/2,cy=v.y+TL_H*v.s/2;
-  ghost.el.style.transform='translate('+(cx-TL_W*s/2).toFixed(2)+'px,'+(cy-TL_H*s/2).toFixed(2)+'px) scale('+s.toFixed(4)+')';
+  ghost.el.style.transform='translate('+((cx-TL_W*s/2)/GZ).toFixed(3)+'px,'+((cy-TL_H*s/2)/GZ).toFixed(3)+'px) scale('+(s/GZ).toFixed(4)+')';
   veil.style.opacity=clamp(v.b,0,1).toFixed(3);
   const u=clamp(v.u,0,1);bar.style.opacity=u.toFixed(3);bar.style.transform='translate(-50%,'+((1-u)*14).toFixed(2)+'px)';hint.style.opacity=(hintGone?0:u*.8).toFixed(3);
   plate.style.opacity=(u*(1-clamp(bench*4,0,1))).toFixed(3);
