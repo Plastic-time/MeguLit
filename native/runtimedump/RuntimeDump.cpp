@@ -29,6 +29,14 @@
 #include <map>
 #include <set>
 #include "minhook/include/MinHook.h"
+#include "modules/modules.h"
+
+// ---- feature modules (modules/modules.h, docs/runtime-dump-pack.md) -------------------------------------------------
+#define MODULE(Name) void Name##Start(const wchar_t *out); void Name##Tick();
+MEGULIT_DUMP_MODULES
+#undef MODULE
+// Pack contract version, read by tests and by MeguLit to tell pack builds apart.
+extern "C" __declspec(dllexport) int MeguLitDumpVersion() { return 2; }
 
 namespace {
 HMODULE Self;
@@ -560,6 +568,19 @@ void Seeds() {
  }
 }
 
+struct ModuleSlot { const char *name; void (*start)(const wchar_t *); void (*tick)(); bool off; };
+#define MODULE(Name) { #Name, Name##Start, Name##Tick, false },
+ModuleSlot Modules[] = { MEGULIT_DUMP_MODULES { NULL, NULL, NULL, true } };
+#undef MODULE
+bool Guarded(void (*start)(const wchar_t *), void (*tick)()) {
+ __try { if (start) start(Out); else if (tick) tick(); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+void ModulesRun(bool starting) {
+ for (auto &m : Modules) {
+  if (m.off || !m.name) continue;
+  if (!Guarded(starting ? m.start : NULL, starting ? NULL : m.tick)) { m.off = true; Log(std::string("module off after a fault: ") + m.name); }
+ }
+}
 DWORD WINAPI Run(void *) {
  TlsSetValue(Tls, (void *)1); // this thread's own file and heap use is never watched
  wchar_t self[1024], game[1024], root[1024];
@@ -597,11 +618,13 @@ DWORD WINAPI Run(void *) {
  if (!any) { Log("no file hooks; nothing to watch"); return 0; }
  InterlockedExchange(&Ready, 1);
  WriteWhole(std::wstring(Out) + L"ready.txt", "1", 1);
+ ModulesRun(true);
  Log("watching " + gameName);
  for (DWORD n = 0;; n++) {
   Sleep(120);
   Poll();
   if (n % 8 == 0) Seeds();
+  ModulesRun(false);
   if (n % 20 == 0 && ZUsed < ZSlots) HookZlib();
  }
 }
