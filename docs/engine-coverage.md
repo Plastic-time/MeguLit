@@ -27,7 +27,7 @@ MeguLit 对一款游戏的支持分三层：
 | System-NNN | 390 | 371 | 111 | 🆕（spt\ + nya\/init\） | 🆕 systemnnn.cjs：spt dword 异或、PRINT/SELECT 按命令顺序（引擎源码公开） | ⚪ | 乙女社 Mio 用 |
 | Artemis | 495 | 347 | 330 | ✅ | ✅ pfs pf6/pf8、.ast、多语言 | ✅ |  |
 | BGI / Ethornell | 337 | 329 | 195 | ✅ | ✅（旧适配层 bgi.cjs） | ✅ |  |
-| ShiinaRio | 333 | 301 | 42 | ✅（WARC 魔数） | ✅ shiinario.cjs：WARC 1.1 原生，1.2+ 经 GARbro 方案库（127 作）解出 *_T.WAR，TXT 逐行 | ✅ | 加密 WARC 的原生解密未做（E579） |
+| ShiinaRio | 333 | 301 | 42 | ✅（WARC 魔数） | ✅ shiinario.cjs：WARC 1.1 原生，1.2–1.7 原生解密（shiinario-crypt.cjs，GARbro 127 作密钥，对拍逐字节一致，E602），TXT 逐行；打不开的仍经 GARbro | ✅ | 新作密钥走适配包 params:warc-scheme |
 | CatSystem2 | 264 | 236 | 108 | ✅ | ✅ scene.int（含 cnscene.int） | ✅ |  |
 | SiglusEngine | 223 | 222 | 154 | ✅ | ✅ Steam .dbs 多语言表、Scene.pck 内附源码 | ✅ |  |
 | codeX RScript（Liar-soft） | 211 | 211 | 91 | 🆕（"LB" .xfl 归档） | 🆕 liar.cjs：scr.xfl（可嵌套）+ .gsc 字符串表 | ⚪ | 就是 Liar-soft 引擎（Liar、raiL、Studio Ubai、SUKARADOG） |
@@ -169,7 +169,7 @@ MeguLit 对一款游戏的支持分三层：
 | 5 | ~~codeX RScript~~ | 211 / 91 | 已做（E571）：就是 Liar-soft，.xfl + .gsc 有公开工具 | 有实物可验证 |
 | 6 | LiveMaker | 1747 发行、乙女 532（公司只有 12） | 高：vff 归档 + LSB 二进制（pylivemaker 有完整规格，GPL-3.0） | 按 pylivemaker 移植 LSB 文本提取；同人免费作品多，验证容易 |
 | 7 | ExHIBIT | 98 / 56 | 中：.rld 脚本 XOR | 需实物 |
-| 8 | ShiinaRio | 301 / 42 | 高：WARC 按作品加密 | GARbro 兜底已可用，暂不自写 |
+| 8 | ShiinaRio | 301 / 42 | 高：WARC 按作品加密 | E602 已原生解密（127 作），GARbro 兜底保留 |
 | 9 | Silky's / KaGuYa / Entis / CMVS / SakanaGL / Diesel / PIX / Tmr-Hiro | 各 30–130 | 中到高 | 逐个需实物 |
 | 10 | 商业乙女自研引擎（Otomate PC、Aksys/IFI 移植、Rejet、DDSystem、honeybee） | 用户点名的乙女 | 未知 | 需要实物；先给目录文件清单即可判断引擎 |
 

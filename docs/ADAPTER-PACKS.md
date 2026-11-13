@@ -89,7 +89,14 @@ placeholders. The upload is the exact stored bundle whose sha256 the user saw.
   `malie-scheme` → `malie.cjs`: `{title, cipher: "camellia" | "cfi", key: hex, align, rotate: [4 words] for cfi}`,
   `qlie-key` → `qlie.cjs`: `{gameKey: hex of 256 bytes}` (QLIE 3.0 packs with key.fkey whose exe has no IconKeyImage),
   `entis-key` → `entis.cjs`: `{password, archive?}` (NOA BSHF password when the exe has no IDR_COTOMI),
-  `marble-key` → `marble.cjs`: `{key}` (cp932 text) or `{hex}`). Readers try every candidate and keep the one whose
+  `marble-key` → `marble.cjs`: `{key}` (cp932 text) or `{hex}`,
+  `warc-scheme` → `shiinario.cjs`: a ShiinaRio WARC 1.2–1.7 title, one entry of `shiinario-schemes.json`'s `schemes`:
+  `{Name, OriginalTitle, Version, EntryNameSize, CryptKey, HelperKey: ["0x…" ×5], Region, DecodeBin, ShiinaImage:
+  {Common, CommonLength, Tail (base64), Length, Sha256}, ExtraCrypt: {$type, Seed, Key, DecodeTable, …}, GameMap:
+  ["GAME.exe", …]}`; byte arrays are hex or `"@name"` of the shipped `SharedData` (`@CryptKey1`, `@Region1`,
+  `@DecodeBin1`…), `Common` names a shipped `CommonImages` part (`Image1`, `Image2`), so a title usually needs only its
+  tail, seed and keys. `tools/garbro-schemes.ps1 -Engine warc` prints entries in this shape. A pack scheme is tried
+  before the shipped ones, and replaces a shipped one of the same `Name`). Readers try every candidate and keep the one whose
   scripts decode to text, so one pack can carry keys for many titles.
 * Regular expressions: at most 300 characters, no backreferences or lookbehind, no quantified group that holds a
   quantifier or `|`; lines are cut at 4096 characters. Reads are capped (20 000 files, 64 MiB a file, 512 MiB a game,

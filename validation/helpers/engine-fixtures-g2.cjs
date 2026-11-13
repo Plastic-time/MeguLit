@@ -78,4 +78,20 @@ function warc11(files){const names=Object.keys(files),datas=[],idx=[];let off=12
  const h=Buffer.concat([Buffer.from('WARC 1.1','latin1'),u32((off^0xf182ad82)>>>0)]);return Buffer.concat([h,...datas,...idx]);}
 /* a keyed WARC header only (1.7): its index cannot be read without the title's keys */
 const warcKeyed=(version=7)=>Buffer.concat([Buffer.from('WARC 1.'+version,'latin1'),u32((16^0xf182ad82)>>>0),crypto.randomBytes(64)]);
-module.exports={huffman,nexasBin,nexasPac,malieExec,malieLibp,malieLib,camelliaEncrypt,ylzLiterals,warcEntry,warc11,warcKeyed};
+/* E602 a keyed WARC (1.2–1.7) under a scheme of shiinario-crypt.cjs: files {name: {data, tag ('YPK' | 'YLZ' | 'YH1' |
+   null = stored), flags, km}}; every step of GARbro's OpenEntry undone in reverse order, the index range coded (1.2–1.6)
+   or deflated after 8 bytes (1.7), encrypted and put at the end */
+function warcEncrypted(files,{version=7,scheme}){const C=require('../../services/original-engines/shiinario-crypt.cjs'),ver=100+version*10,dec=C.decoder(ver,scheme);
+ const inv=(data,index,length,flags)=>{if(!dec.extra)return;try{dec.extra.encrypt(data,index,length,flags);}catch(e){if(!(e instanceof C.Fault))throw e;dec.extra.decrypt(data,index,length,flags|0x200);}};
+ const datas=[],idx=[];let off=12;
+ for(const [name,f] of Object.entries(files)){const flags=(f.flags??0x80000000)>>>0;let body;
+  if(f.tag){const x=Buffer.from(f.data);inv(x,0,x.length,0x104);if(flags&0x40000000)dec.decrypt2(x,0,x.length);
+   body=warcEntry(x,f.tag,{km:!!f.km});const unpacked=x.length,sig=(body.readUInt32LE(0)^((unpacked^0x82ad82)&0xffffff))>>>0;body.writeUInt32LE(sig,0);}
+  else body=Buffer.from(f.data);
+  if(body.length>8){if(flags&0x20000000)dec.decrypt2(body,8,body.length-8);inv(body,8,body.length-8,0x102);if(flags&0x80000000)dec.encrypt(body,8,body.length-8);}
+  const rec=Buffer.alloc(scheme.nameSize+24);Buffer.from(name,'latin1').copy(rec,0,0,scheme.nameSize);rec.writeUInt32LE(off,scheme.nameSize);rec.writeUInt32LE(body.length,scheme.nameSize+4);
+  rec.writeUInt32LE(f.tag?f.data.length:body.length,scheme.nameSize+8);rec.writeUInt32LE(flags,scheme.nameSize+20);idx.push(rec);datas.push(body);off+=body.length;}
+ const table=Buffer.concat(idx),plain=ver>=170?Buffer.concat([u32(table.length),u32(idx.length),zlib.deflateSync(table)]):C.rangeEncode(table);
+ const buf=Buffer.alloc(dec.maxIndexLength);plain.copy(buf);dec.encryptIndex(off,buf);
+ return Buffer.concat([Buffer.from('WARC 1.'+version,'latin1'),u32((off^0xf182ad82)>>>0),...datas,buf.subarray(0,plain.length)]);}
+module.exports={huffman,nexasBin,nexasPac,malieExec,malieLibp,malieLib,camelliaEncrypt,ylzLiterals,warcEntry,warc11,warcKeyed,warcEncrypted};
