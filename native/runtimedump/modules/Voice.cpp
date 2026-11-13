@@ -6,17 +6,15 @@
 // (services/voice-harvest.cjs), from these start times and the times hooked lines were shown.
 //
 // Watched (MinHook, every access guarded):
-//  - file reads (kernel32 ReadFile): a buffer that is, or a moment later becomes (decrypted in place), a voice file by its
-//    magic (Ogg Vorbis/Opus, WAV, AT9, BGI bw, CRI HCA/ADX, FSB5, MP3) is saved as that file, with the time it was read
-//    (voice/files.jsonl): the most engines, original quality, no decoding;
+//  (voice files the game reads are saved by modules/VoiceFile.cpp into the same events.jsonl)
 //  - DirectSound: IDirectSoundBuffer Unlock/Play/Stop (static buffers filled before Play, and streaming ring buffers);
 //  - XAudio2 2.8/2.9: IXAudio2::CreateSourceVoice (format) and IXAudio2SourceVoice SubmitSourceBuffer/Start/Stop;
 //  - waveOut: waveOutOpen (format), waveOutWrite, waveOutReset/Close (a device opened before the DLL arrived has no
 //    known format and is skipped until the game opens it again);
 //  - FMOD (C and C++ API exports): sounds created from memory (FMOD_OPENMEMORY) are saved as the decrypted file itself,
 //    and playSound marks when one starts;
-//  - CreateFile of audio-looking names (kernel32 thunk): the file name opened just before a clip starts is kept with it,
-//    so voice commands in a script ("mgm0001") can name the clip.
+//  - the audio file name opened just before a clip starts (from modules/VoiceFile.cpp) is kept with it, so voice
+//    commands in a script ("mgm0001") can name the clip.
 // A clip ("stream") is what one buffer/voice/device receives from Play/Start (or its first write) until it stops, or
 // until nothing more arrives for a while. Loops over 90 s (music) are dropped while they record.
 //
@@ -116,7 +114,11 @@ struct Stream {
 };
 std::map<const void *, Stream> Streams;
 std::map<const void *, Fmt> Formats;
-std::wstring LastName; ULONGLONG LastNameAt;
+} // namespace voice
+bool VoiceFileLastName(std::wstring &name, ULONGLONG &at); // modules/VoiceFile.cpp
+namespace voice {
+// The audio file the game opened last (modules/VoiceFile.cpp watches CreateFile), if within 1.5 s before `start`.
+std::string NameNear(ULONGLONG start) { std::wstring n; ULONGLONG at = 0; if (!VoiceFileLastName(n, at) || at > start + 300 || start - at > 1500) return ""; return Utf8(n.c_str()); }
 
 struct Done { std::string api, name; Fmt fmt; std::vector<unsigned char> data; ULONGLONG start; DWORD ms; bool stopped, raw; std::string ext; const void *obj; };
 std::vector<Done> Queue;
@@ -138,7 +140,7 @@ void Close(const void *obj, bool stopped) {
   // "stopped" means cut off (the user clicked on). A streamed sound (written in pieces while it plays) was cut when it
   // stopped with no silence at its tail; a sound written whole, when it stopped before it could have played out.
   d.stopped = stopped && (s.writesAfterPlay >= 2 ? s.quietBytes == 0 : s.playTick && GetTickCount() - s.playTick + 150 < d.ms);
-  if (s.start - LastNameAt < 1500 || LastNameAt - s.start < 300) d.name = Utf8(LastName.c_str());
+  d.name = NameNear(s.start);
   if (Queue.size() < 256) Queue.push_back(std::move(d));
  }
  Streams.erase(it);
@@ -417,7 +419,7 @@ void FPlayed(void *a, void *b) {
  EnterCriticalSection(&Gate);
  void *args[2] = { a, b }; // Studio low level: (sound, group, ...); FMOD Ex: (channelindex, sound, ...)
  for (void *s : args) { auto it = FSounds.find(s); if (it == FSounds.end()) continue;
-  Done copy = it->second; copy.start = NowMs(); if (LastNameAt + 1500 > copy.start) copy.name = Utf8(LastName.c_str());
+  Done copy = it->second; copy.start = NowMs(); copy.name = NameNear(copy.start);
   if (Queue.size() < 256) Queue.push_back(std::move(copy)); break; }
  LeaveCriticalSection(&Gate);
 }
@@ -457,135 +459,16 @@ void HookFmodModule(HMODULE m) {
  } __except (EXCEPTION_EXECUTE_HANDLER) {}
 }
 
-// ---- file reads --------------------------------------------------------------------------------------------------------
-// Voice file magic (table: GARbro's format library, MIT, and vgmstream; facts, no code copied). "" = not a voice file.
-bool At(const unsigned char *p, DWORD n, DWORD at, const char *s, DWORD k) { return n >= at + k && memcmp(p + at, s, k) == 0; }
-const char *Sniff(const unsigned char *p, DWORD n) {
- if (n < 16) return "";
- if (At(p, n, 0, "OggS", 4) && p[4] == 0) return At(p, n, 0x1C, "OpusHead", 8) ? "opus" : "ogg";
- if (At(p, n, 0, "RIFF", 4) && At(p, n, 8, "WAVE", 4)) {
-  if (n >= 0x3C && p[0x14] == 0xFE && p[0x15] == 0xFF && At(p, n, 0x2C, "\xD2\x42\xE1\x47\xBA\x36\x8D\x4D\x88\xFC\x61\x65\x4F\x8C\x83\x6C", 16)) return "at9";
-  return "wav";
- }
- if (At(p, n, 4, "bw  ", 4)) return "bw";                       // BGI voice: header, then Ogg
- if (At(p, n, 0, "HCA\0", 4) || (p[0] == 0xC8 && p[1] == 0xC3 && p[2] == 0xC1 && p[3] == 0x80)) return "hca";
- if (p[0] == 0x80 && p[1] == 0x00) { DWORD o = (p[2] << 8) | p[3]; if (o >= 2 && o < n && At(p, n, o - 2, "(c)CRI", 6)) return "adx"; }
- if (At(p, n, 0, "FSB5", 4)) return "fsb5";
- if (At(p, n, 0, "ID3", 3) && p[3] <= 4) return "mp3";
- return "";
-}
-// File names: handle -> name for files opened for reading (outside Windows), and the last audio-looking name opened.
-typedef HANDLE(WINAPI *CFWFn)(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
-typedef HANDLE(WINAPI *CFAFn)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
-typedef BOOL(WINAPI *ReadFn)(HANDLE, LPVOID, DWORD, LPDWORD, LPOVERLAPPED);
-CFWFn OCFW; CFAFn OCFA; ReadFn ORead;
-std::map<HANDLE, std::wstring> Names;
-bool Audioish(const wchar_t *p) {
- const wchar_t *dot = wcsrchr(p, L'.'); if (!dot) return false;
- static const wchar_t *ext[] = { L".ogg", L".opus", L".wav", L".flac", L".mp3", L".m4a", L".at9", L".hca", L".adx", L".vag", L".wma", L".aac" };
- for (auto e : ext) if (!_wcsicmp(dot, e)) return true;
- return false;
-}
-void Opened(HANDLE h, const wchar_t *p) {
- if (!p || h == INVALID_HANDLE_VALUE || !h) return;
- wchar_t win[MAX_PATH]; UINT w = GetWindowsDirectoryW(win, MAX_PATH); if (w && !_wcsnicmp(p, win, w)) return;
- if (wcsstr(p, L"\\runtime-dump\\") || (OutDir[0] && !_wcsnicmp(p, OutDir, wcslen(OutDir)))) return; // never our own output
- EnterCriticalSection(&Gate);
- if (Names.size() > 4096) Names.clear();
- Names[h] = p;
- if (Audioish(p)) { LastName = p; LastNameAt = NowMs(); }
- LeaveCriticalSection(&Gate);
-}
-HANDLE WINAPI HCFW(LPCWSTR n, DWORD a, DWORD s, LPSECURITY_ATTRIBUTES sa, DWORD c, DWORD f, HANDLE t) {
- HANDLE h = OCFW(n, a, s, sa, c, f, t);
- if (Live() && n && !(a & GENERIC_WRITE)) { DWORD e = GetLastError(); ULONGLONG was = Enter(); __try { Opened(h, n); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("CreateFileW"); } Leave(was); SetLastError(e); }
- return h;
-}
-HANDLE WINAPI HCFA(LPCSTR n, DWORD a, DWORD s, LPSECURITY_ATTRIBUTES sa, DWORD c, DWORD f, HANDLE t) {
- HANDLE h = OCFA(n, a, s, sa, c, f, t);
- if (Live() && n && !(a & GENERIC_WRITE)) { DWORD e = GetLastError(); ULONGLONG was = Enter(); __try { wchar_t w[1024]; if (MultiByteToWideChar(CP_ACP, 0, n, -1, w, 1024)) Opened(h, w); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("CreateFileA"); } Leave(was); SetLastError(e); }
- return h;
-}
-// A read buffer watched for a few seconds: it may be decrypted in place into a voice file.
-struct Read { const unsigned char *p; DWORD n; ULONG head; DWORD born; ULONGLONG at; ULONGLONG offset; std::wstring source; };
-std::vector<Read> Reads;
-const DWORD MaxVoiceFile = 8u << 20, ReadWatchMs = 3000;
-std::map<ULONG, std::string> FileSaved;
-// Saves a voice file seen in memory (under no lock; copies first).
-void Keep(const unsigned char *p, DWORD n, const char *fmt, ULONGLONG at, ULONGLONG offset, const std::wstring &source, const char *how) {
- std::vector<unsigned char> data; if (!Copy(data, p, n)) return;
- ULONG crc = Crc32 ? Crc32(0, data.data(), n) : n;
- std::string file;
- EnterCriticalSection(&Gate); auto f = FileSaved.find(crc); if (f != FileSaved.end()) file = f->second; LeaveCriticalSection(&Gate);
- if (file.empty()) {
-  if (Spent + (LONGLONG)n > Budget) return;
-  LONG seq = InterlockedIncrement(&Seq);
-  char name[64]; wchar_t wname[64]; sprintf_s(name, "%05ld.%s", seq, fmt); swprintf_s(wname, L"%05ld.%hs", seq, fmt);
-  if (!Put(wname, data.data(), n, NULL, 0)) return;
-  file = name; Spent += n;
-  EnterCriticalSection(&Gate); if (FileSaved.size() > 100000) FileSaved.clear(); FileSaved[crc] = file; LeaveCriticalSection(&Gate);
- }
- std::string src = Utf8(source.c_str());
- if (src.size() > 300) src = src.substr(src.size() - 300);
- char line[1200];
- sprintf_s(line, "{\"file\":%s,\"fmt\":\"%s\",\"how\":\"%s\",\"start\":%llu,\"bytes\":%lu,\"crc\":\"%08lx\",\"offset\":%llu,\"source\":%s}\n",
-  Json(file).c_str(), fmt, how, at, n, crc, offset, Json(src).c_str());
- Append(L"files.jsonl", line);
-}
-ULONG Head(const unsigned char *p, DWORD n) { ULONG h = 0; DWORD k = n < 64 ? n : 64; for (DWORD i = 0; i < k; i++) h = h * 31 + p[i]; return h; }
-void ReadDone(HANDLE file, const unsigned char *p, DWORD n) {
- if (n < MinClipBytes || n > MaxVoiceFile) return;
- std::wstring source; EnterCriticalSection(&Gate); auto it = Names.find(file); if (it != Names.end()) source = it->second; LeaveCriticalSection(&Gate);
- if (source.empty()) return; // pipes, consoles, files opened before the DLL arrived
- LARGE_INTEGER zero, pos; zero.QuadPart = 0; pos.QuadPart = 0; SetFilePointerEx(file, zero, &pos, FILE_CURRENT);
- ULONGLONG offset = (ULONGLONG)pos.QuadPart - n, at = NowMs();
- const char *fmt = Sniff(p, n);
- if (*fmt) { Keep(p, n, fmt, at, offset, source, "plain"); return; }
- // Not (yet) a voice file: watched in case the game decrypts it in place.
- EnterCriticalSection(&Gate);
- if (Reads.size() < 64) Reads.push_back(Read{ p, n, Head(p, n), GetTickCount(), at, offset, source });
- LeaveCriticalSection(&Gate);
-}
-BOOL WINAPI HRead(HANDLE h, LPVOID buf, DWORD want, LPDWORD got, LPOVERLAPPED ov) {
- BOOL ok = ORead(h, buf, want, got, ov);
- if (ok && !ov && got && *got && Live()) { DWORD e = GetLastError(); ULONGLONG was = Enter(); __try { ReadDone(h, (const unsigned char *)buf, *got); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("ReadFile"); } Leave(was); SetLastError(e); }
- return ok;
-}
-// Each tick: a watched read whose first bytes changed into a voice file's magic is saved; older than 3 s, dropped.
-void FileTick() {
- std::vector<Read> now; EnterCriticalSection(&Gate); now.swap(Reads); LeaveCriticalSection(&Gate);
- std::vector<Read> keep;
- DWORD tick = GetTickCount();
- for (auto &r : now) {
-  std::vector<unsigned char> head; if (!Copy(head, r.p, r.n < 64 ? r.n : 64)) continue; // freed: gone
-  if (Head(head.data(), (DWORD)head.size()) != r.head) {
-   // Changed: decrypted in place (or the buffer was reused). Check the whole start only once it holds a voice magic.
-   std::vector<unsigned char> first; if (!Copy(first, r.p, r.n < 0x40 ? r.n : 0x40)) continue;
-   const char *fmt = Sniff(first.data(), (DWORD)first.size());
-   if (*fmt) Keep(r.p, r.n, fmt, r.at, r.offset, r.source, "inplace");
-   continue;
-  }
-  if (tick - r.born < ReadWatchMs) keep.push_back(r);
- }
- EnterCriticalSection(&Gate); for (auto &r : keep) if (Reads.size() < 64) Reads.push_back(r); LeaveCriticalSection(&Gate);
-}
-
 bool HookExport(const wchar_t *mod, const char *name, void *detour, void **orig) {
  HMODULE m = GetModuleHandleW(mod); void *fn = m ? (void *)GetProcAddress(m, name) : NULL;
  return fn && Hk(fn, detour, orig);
 }
 void Log(const char *s) { char line[256]; sprintf_s(line, "%llu %s\r\n", NowMs(), s); Append(L"voice.log", line); }
 
-void SafeTick() { __try { Tick(); FileTick(); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("writer"); } }
-DWORD Ticks; bool HaveDs, HaveXa, HaveWo, HaveFile; std::map<HMODULE, int> FmodSeen;
+void SafeTick() { __try { Tick(); } __except (EXCEPTION_EXECUTE_HANDLER) { Fault("writer"); } }
+DWORD Ticks; bool HaveDs, HaveXa, HaveWo; std::map<HMODULE, int> FmodSeen;
 // Audio libraries are often loaded late (first sound, or after the title screen): looked for again for two minutes.
 void Look() {
- if (!HaveFile) {
-  HaveFile = HookExport(L"kernel32.dll", "CreateFileW", (void *)HCFW, (void **)&OCFW);
-  HookExport(L"kernel32.dll", "CreateFileA", (void *)HCFA, (void **)&OCFA);
-  HaveFile = HookExport(L"kernel32.dll", "ReadFile", (void *)HRead, (void **)&ORead) && HaveFile;
-  Log(HaveFile ? "file reads hooked" : "file reads not hooked");
- }
  if (!HaveDs && GetModuleHandleW(L"dsound.dll")) { HaveDs = HookDsound(); Log(HaveDs ? "dsound hooked" : "dsound not hooked"); }
  if (!HaveXa && (GetModuleHandleW(L"xaudio2_9.dll") || GetModuleHandleW(L"xaudio2_8.dll") || GetModuleHandleW(L"xaudio2_9redist.dll"))) { HaveXa = HookXAudio2(); Log(HaveXa ? "xaudio2 hooked" : "xaudio2 not hooked"); }
  if (!HaveWo && GetModuleHandleW(L"winmm.dll")) {

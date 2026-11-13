@@ -37,7 +37,7 @@ function noteLine(gameDir,text,t=Date.now()){const s=String(text||'').trim();if(
 // original Ogg/Opus/... bytes, plain or decrypted in place; start = when it was read). Files over FILE_MAX are music.
 const FILE_MAX=3<<20;
 const events=gameDir=>{const d=voiceDir(gameDir),at=e=>({...e,path:path.join(d,e.file)});
- const played=readJsonl(path.join(d,'events.jsonl')).filter(e=>e&&e.file&&Number.isFinite(e.start)).map(at);
+ const played=readJsonl(path.join(d,'events.jsonl')).filter(e=>e&&e.file&&Number.isFinite(e.start)).map(e=>e.api==='file'?{...at(e),read:true,source:e.name}:at(e));/* api "file": modules/VoiceFile.cpp */
  const read=readJsonl(path.join(d,'files.jsonl')).filter(e=>e&&e.file&&Number.isFinite(e.start)&&e.bytes<=FILE_MAX&&!/[\\/]runtime-dump[^\\/]*[\\/]/i.test(e.source||'')/* never our own output */).map(e=>({...at(e),raw:true,read:true,ms:e.ms||0}));
  return [...played,...read];};
 const lines=gameDir=>readJsonl(path.join(voiceDir(gameDir),'lines.jsonl')).filter(l=>l&&l.text&&Number.isFinite(l.t));

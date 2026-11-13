@@ -14,4 +14,5 @@ void DumpSink(DumpSinkFn fn);
  MODULE(Cg) \
  MODULE(AudioMore) \
  MODULE(Voice) \
- MODULE(Krkr)
+ MODULE(Krkr) \
+ MODULE(VoiceFile)
