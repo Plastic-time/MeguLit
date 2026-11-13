@@ -22,7 +22,7 @@ test('uses the spec actions and listens for the card maker', () => {
     assert.ok(js.includes(`'${action}'`), action);
   assert.match(js, /addEventListener\('megulit:cards-changed'/);
   assert.match(js, /import\('\.\/card-maker\.js'\)/);
-  assert.match(js, /openCardMaker\(\{toploaderId:id\}\)/);
+  assert.match(js, /openCardMaker\(\{toploaderId:id,from:el\}\)/);
   assert.match(js, /words\(\)\.loading/);
 });
 

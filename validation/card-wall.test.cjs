@@ -81,3 +81,31 @@ test('undecoded CGs: the list answers at once and the background worker fills th
   wall.warm(root,exe,['ev101a']);assert.deepEqual(wall.handle(db,root,{action:'cards_pending',gameId:'g1'}),{pending:0});
   assert.deepEqual(wall.unlocked(db,root,'g1').map(x=>x.id),['cover','save:ev101a']);}
  finally{wall._setSpawnWarm((r,e,n)=>wall.warm(r,e,n));}});
+
+test('scene shots: only captures marked clean (taken with no dialogue box on screen) can become cards',()=>{
+ const {root,db,exe}=setup();const shots=require('../services/scene-shots.cjs');
+ /* two shots: one from before the no-dialogue-box rule (no clean mark), one taken after it */
+ const dir=path.join(root,'data','scene-shots',require('node:crypto').createHash('sha1').update(path.resolve(exe).toLowerCase()).digest('hex').slice(0,16));
+ fs.mkdirSync(dir,{recursive:true});for(const f of ['a1-aaaaaa.jpg','b2-bbbbbb.jpg'])fs.writeFileSync(path.join(dir,f),PNG);
+ fs.writeFileSync(path.join(dir,'index.json'),JSON.stringify([{file:'a1-aaaaaa.jpg',score:90,hash:'aaaaaaaaaaaaaaaa',at:1},{file:'b2-bbbbbb.jpg',score:80,hash:'bbbbbbbbbbbbbbbb',at:2,clean:true}]));
+ assert.deepEqual(shots.list(root,exe).map(s=>s.file),['b2-bbbbbb.jpg']);
+ wall.unlocked(db,root,'g1');const ids=wall.unlocked(db,root,'g1').map(x=>x.id);
+ assert.ok(ids.includes('shot:b2-bbbbbb.jpg'));assert.ok(!ids.includes('shot:a1-aaaaaa.jpg'),'a capture that may show a dialogue box is never offered');
+ assert.throws(()=>wall.create(db,root,{gameId:'g1',srcId:'shot:a1-aaaaaa.jpg'}),/CARD_SOURCE_LOCKED/);
+ /* keep() through the reader path always marks clean only when the box was hidden */
+ const reader={root,gameExe:exe,sceneDialogHidden:false};return shots.maybe(reader,{hidden:false}).then(()=>assert.equal(reader.sceneDialogHidden,false));});
+
+test('spoilers: a CG unlocked later appears, one never unlocked stays out of every action',()=>{
+ const {root,db,exe}=setup();
+ const before=new Set((wall.unlocked(db,root,'g1'),wall.unlocked(db,root,'g1')).map(x=>x.id));assert.ok(!before.has('save:ev102a'));
+ for(const action of ['cards_image','cards_create'])assert.throws(()=>wall.handle(db,root,{action,gameId:'g1',srcId:'save:ev102a',kind:'cg'}),/CARD_SOURCE_LOCKED/);
+ /* the player reaches ev102a: the save now marks it */
+ fs.writeFileSync(path.join(path.dirname(exe),'savedata','datasu.ksd'),Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from('%[ "cg_EV101A" => 1, "cg_EV102A" => 1 ]','utf16le')]));
+ wall.unlocked(db,root,'g1');const after=wall.unlocked(db,root,'g1').map(x=>x.id);
+ assert.ok(after.includes('save:ev102a'));assert.ok(!after.includes('save:ev103a'));});
+
+test('an ejected card stays in cards (我的卡) and can be sleeved into another toploader',()=>{
+ const {root,db}=setup();const card=wall.handle(db,root,{action:'cards_create',gameId:'g1',kind:'cover',srcId:'cover'});
+ wall.handle(db,root,{action:'cards_insert',toploaderId:'t1',cardId:card.id});let s=wall.handle(db,root,{action:'cards_eject',toploaderId:'t1'});
+ assert.ok(s.cards.some(c=>c.id===card.id));assert.ok(s.toploaders.every(t=>t.cardId!==card.id));
+ s=wall.handle(db,root,{action:'cards_insert',toploaderId:'t9',cardId:card.id});assert.equal(s.toploaders[9].cardId,card.id);});

@@ -69,13 +69,13 @@ const list=r=>Array.isArray(r)?r:Array.isArray(r?.items)?r.items:Array.isArray(r
 const WORDS={
  zh:{title:'制作收藏卡',games:'选择作品',search:'搜索作品名（中文 / 日文 / 英文）',noGames:'还没有可以做卡的作品。玩一会儿游戏，或在游戏库添加带封面的作品后再来',noMatch:'没有匹配的作品',
   count:'{n} 张可用',cgEmpty:'还没有解锁的 CG，玩到后会出现在这里；也可以用封面或截图做卡',groups:{cg:'游戏 CG',shot:'我的截图',cover:'封面'},src:{save:'存档已解锁',seen:'游戏中见过',shot:'MeguLit 截图',cover:'作品封面'},
-  hover:'悬停预览：卡在卡套里静止显示这个取景，鼠标悬停时从这里开始缓慢移动',hoverShort:'悬停试试',frame:'取景',hint:'拖动平移 · 滚轮或双指缩放 · 双击复原',front:'正面',back:'卡背',make:'生成并放入卡套',only:'只做卡，放进「我的卡」',makeOnly:'生成卡',printing:'正在印卡…',fail:'没能生成这张卡：{e}',back_:'返回',close:'关闭',loading:'正在读取…',pendingNote:'还有 {n} 张存档 CG 正在解码，好了会自动出现',reset:'复原'},
+  hover:'悬停预览：卡在卡套里静止显示这个取景，鼠标悬停时从这里开始缓慢移动',hoverShort:'悬停试试',frame:'取景',hint:'拖动平移 · 滚轮或双指缩放 · 双击复原',front:'正面',back:'卡背',make:'生成并放入卡套',only:'只做卡，放进「我的卡」',makeOnly:'生成卡',printing:'正在印卡…',fail:'没能生成这张卡：{e}',back_:'返回',close:'关闭',loading:'正在读取…',pendingNote:'还有 {n} 张存档 CG 正在解码，好了会自动出现',reset:'复原',mine:'我的卡',mineHint:'取出来的卡在这里，点一下放进这个卡套'},
  ja:{title:'コレクションカードを作る',games:'作品を選ぶ',search:'作品名で検索（日本語 / 中国語 / 英語）',noGames:'カードにできる作品がまだありません。少し遊ぶか、カバー付きの作品をライブラリに追加してください',noMatch:'一致する作品がありません',
   count:'{n} 枚使えます',cgEmpty:'解放済みの CG はまだありません。プレイすると出てきます。カバーやスクリーンショットでも作れます',groups:{cg:'ゲーム CG',shot:'スクリーンショット',cover:'カバー'},src:{save:'セーブで解放済み',seen:'ゲーム中に表示',shot:'MeguLit の撮影',cover:'作品カバー'},
-  hover:'ホバーで動きを確認：スリーブ内ではこの構図で止まり、ホバーするとここからゆっくり動きます',hoverShort:'ホバー',frame:'構図',hint:'ドラッグで移動 · ホイール／ピンチで拡大 · ダブルクリックで戻す',front:'表',back:'裏',make:'作ってスリーブに入れる',only:'作るだけ（マイカードへ）',makeOnly:'カードを作る',printing:'印刷中…',fail:'カードを作れませんでした：{e}',back_:'戻る',close:'閉じる',loading:'読み込み中…',pendingNote:'セーブの CG を {n} 枚デコード中です。終わると自動で表示されます',reset:'戻す'},
+  hover:'ホバーで動きを確認：スリーブ内ではこの構図で止まり、ホバーするとここからゆっくり動きます',hoverShort:'ホバー',frame:'構図',hint:'ドラッグで移動 · ホイール／ピンチで拡大 · ダブルクリックで戻す',front:'表',back:'裏',make:'作ってスリーブに入れる',only:'作るだけ（マイカードへ）',makeOnly:'カードを作る',printing:'印刷中…',fail:'カードを作れませんでした：{e}',back_:'戻る',close:'閉じる',loading:'読み込み中…',pendingNote:'セーブの CG を {n} 枚デコード中です。終わると自動で表示されます',reset:'戻す',mine:'マイカード',mineHint:'取り出したカードはここ。クリックでこのトップローダーに入れます'},
  en:{title:'Make a collector card',games:'Choose a work',search:'Search titles (Chinese / Japanese / English)',noGames:'No work has pictures for a card yet. Play for a while, or add a work with a cover to the library',noMatch:'No matching work',
   count:'{n} available',cgEmpty:'No unlocked CGs yet; they appear here once you reach them. You can also use the cover or a screenshot',groups:{cg:'Game CGs',shot:'My screenshots',cover:'Cover'},src:{save:'Unlocked in saves',seen:'Seen in game',shot:'MeguLit shot',cover:'Cover'},
-  hover:'Hover to preview: in the Toploader the card rests on this framing and drifts from here on hover',hoverShort:'hover',frame:'Framing',hint:'Drag to pan · wheel or pinch to zoom · double-click to reset',front:'Front',back:'Back',make:'Make and sleeve it',only:'Just make it (My cards)',makeOnly:'Make card',printing:'Printing…',fail:'Could not make this card: {e}',back_:'Back',close:'Close',loading:'Loading…',pendingNote:'{n} CGs from your saves are still being decoded; they appear here when ready',reset:'Reset'}};
+  hover:'Hover to preview: in the Toploader the card rests on this framing and drifts from here on hover',hoverShort:'hover',frame:'Framing',hint:'Drag to pan · wheel or pinch to zoom · double-click to reset',front:'Front',back:'Back',make:'Make and sleeve it',only:'Just make it (My cards)',makeOnly:'Make card',printing:'Printing…',fail:'Could not make this card: {e}',back_:'Back',close:'Close',loading:'Loading…',pendingNote:'{n} CGs from your saves are still being decoded; they appear here when ready',reset:'Reset',mine:'My cards',mineHint:'Cards you took out wait here; click one to sleeve it here'}};
 const lang=()=>{const l=(document.documentElement.lang||'zh').toLowerCase();return l.startsWith('ja')?'ja':l.startsWith('en')?'en':'zh';};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 const reduced=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -216,6 +216,20 @@ export function openCardMaker({toploaderId=null,from=null,api=null}={}){
  const gamesLayer=document.createElement('div');gamesLayer.className='cm-layer cm-games';gamesLayer.dataset.title=w.games;
  gamesLayer.innerHTML=`<label class="cm-search">${ICON.search}<input type="search" placeholder="${esc(w.search)}" aria-label="${esc(w.search)}" autocomplete="off" spellcheck="false"></label><div class="cm-scroll"><div class="cm-grid cm-game-grid" role="list"></div><p class="cm-empty" hidden></p><div class="cm-skel" aria-hidden="true">${'<i></i>'.repeat(10)}</div></div>`;
  push(gamesLayer);
+ /* 我的卡: cards that are in no Toploader (taken out on the wall, or made without sleeving) go back in with one click */
+ if(toploaderId!=null)Promise.resolve(call('cards_state')).then(st=>{
+  const used=new Set((st?.toploaders||[]).map(t=>t.cardId).filter(Boolean)),spare=(st?.cards||[]).filter(c=>c&&!used.has(c.id)&&c.src);
+  if(!spare.length||closing)return;
+  const box=document.createElement('section');box.className='cm-mine';
+  box.innerHTML=`<h4>${esc(w.mine)}<span>${spare.length}</span></h4><p class="cm-muted">${esc(w.mineHint)}</p><div class="cm-mine-row">${spare.map((c,i)=>`<button type="button" class="cm-mine-card" data-id="${esc(c.id)}" style="--i:${Math.min(i,12)}" aria-label="${esc(c.title||'')}" title="${esc(c.title||'')}"><img src="${esc(c.src)}" alt="" decoding="async"></button>`).join('')}</div>`;
+  gamesLayer.querySelector('.cm-scroll').prepend(box);
+  if(!reduced())box.querySelectorAll('.cm-mine-card').forEach((el,i)=>el.animate([{opacity:0,transform:'translateY(10px) scale(.96)'},{opacity:1,transform:'none'}],{...springEasing(SPRING.smooth),delay:Math.min(i,12)*24,fill:'backwards'}));
+  box.addEventListener('click',async e=>{const b=e.target.closest('.cm-mine-card');if(!b||printing||closing)return;printing=true;b.classList.add('is-picked');
+   const card=spare.find(c=>String(c.id)===b.dataset.id);
+   try{await call('cards_insert',{toploaderId,cardId:card.id});}catch(err){printing=false;b.classList.remove('is-picked');live.textContent=w.fail.replace('{e}',String(err?.message||err));return;}
+   window.dispatchEvent(new CustomEvent('megulit:cards-changed',{detail:{toploaderId,cardId:card.id,card}}));
+   printing=false;close(false,card,true);});
+ }).catch(()=>{});
  const input=gamesLayer.querySelector('input'),grid=gamesLayer.querySelector('.cm-game-grid'),empty=gamesLayer.querySelector('.cm-empty');
  const unfit=fitLibraryGrid(grid);
  let allGames=[];

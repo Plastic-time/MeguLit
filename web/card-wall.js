@@ -12,9 +12,9 @@ import {fxPref} from './fx-prefs.js';
 const reduceQuery=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)'):{matches:false};
 const reduce=()=>reduceQuery.matches;
 const WORDS={
- zh:{inspect:'拖动自由旋转 · 滚轮缩放 · 双击摆正',title:'卡面墙',back:'游戏库',list:'简洁列表',add:'加 Toploader',empty:'空 Toploader：点一下制作收藏卡',filled:'查看收藏卡',eject:'从 Toploader 取出',insert:'放回 Toploader',close:'关闭',flip:'点卡片翻面',loading:'制卡功能加载中',failed:'操作没有成功，请再试一次',count:(a,b)=>a+' / '+b},
- en:{inspect:'Drag to turn · wheel to zoom · double-click to face on',title:'Card wall',back:'Library',list:'Simple list',add:'Add toploader',empty:'Empty toploader: click to make a card',filled:'View card',eject:'Take out of toploader',insert:'Put back in toploader',close:'Close',flip:'Click the card to turn it over',loading:'The card maker is loading',failed:'That did not work, please try again',count:(a,b)=>a+' / '+b},
- ja:{inspect:'ドラッグで回転 · ホイールで拡大 · ダブルクリックで正面',title:'カードウォール',back:'ライブラリ',list:'シンプル表示',add:'トップローダーを追加',empty:'空のトップローダー：クリックでカードを作る',filled:'カードを見る',eject:'トップローダーから出す',insert:'トップローダーに戻す',close:'閉じる',flip:'カードをクリックで裏返す',loading:'カード作成を読み込み中',failed:'うまくいきませんでした。もう一度お試しください',count:(a,b)=>a+' / '+b}
+ zh:{inspect:'拖卡片抽出或放回 · 拖空白处旋转 · 拖到窗口边缘丢弃',title:'卡面墙',back:'游戏库',list:'简洁列表',add:'加 Toploader',empty:'空 Toploader：点一下制作收藏卡',filled:'查看收藏卡',eject:'从 Toploader 取出',insert:'放回 Toploader',close:'关闭',flip:'点卡片翻面',loading:'制卡功能加载中',failed:'操作没有成功，请再试一次',count:(a,b)=>a+' / '+b,emptyShort:'空卡套',binQ:'丢掉这张卡？',binBody:'只是这张卡没了，原来的 CG、封面和截图都还在',keep:'留着',discard:'丢掉',first:'点任意一个空卡套，用已解锁的 CG、封面或截图做第一张卡',source:{save:'存档已解锁 CG',seen:'游戏中见过',shot:'MeguLit 截图',cover:'作品封面',cg:'游戏 CG'}},
+ en:{inspect:'Drag the card out or back in · drag around it to turn · drag to a window edge to discard',title:'Card wall',back:'Library',list:'Simple list',add:'Add toploader',empty:'Empty toploader: click to make a card',filled:'View card',eject:'Take out of toploader',insert:'Put back in toploader',close:'Close',flip:'Click the card to turn it over',loading:'The card maker is loading',failed:'That did not work, please try again',count:(a,b)=>a+' / '+b,emptyShort:'Empty toploader',binQ:'Discard this card?',binBody:'Only the card goes; the CG, cover or screenshot it came from stays',keep:'Keep it',discard:'Discard',first:'Click any empty toploader to make your first card from an unlocked CG, the cover or a shot',source:{save:'Unlocked in saves',seen:'Seen in game',shot:'MeguLit shot',cover:'Cover',cg:'Game CG'}},
+ ja:{inspect:'カードをドラッグで出し入れ · 周りをドラッグで回転 · 画面の端へドラッグで手放す',title:'カードウォール',back:'ライブラリ',list:'シンプル表示',add:'トップローダーを追加',empty:'空のトップローダー：クリックでカードを作る',filled:'カードを見る',eject:'トップローダーから出す',insert:'トップローダーに戻す',close:'閉じる',flip:'カードをクリックで裏返す',loading:'カード作成を読み込み中',failed:'うまくいきませんでした。もう一度お試しください',count:(a,b)=>a+' / '+b,emptyShort:'空のトップローダー',binQ:'このカードを手放しますか？',binBody:'なくなるのはカードだけで、元の CG・カバー・スクリーンショットは残ります',keep:'残す',discard:'手放す',first:'空のトップローダーをクリックして、解放済みの CG・カバー・撮影から最初のカードを作りましょう',source:{save:'セーブで解放済み',seen:'ゲーム中に表示',shot:'MeguLit の撮影',cover:'作品カバー',cg:'ゲーム CG'}}
 };
 const words=()=>{const l=String(document.documentElement.lang||'zh').toLowerCase();return WORDS[l.startsWith('ja')?'ja':l.startsWith('en')?'en':'zh'];};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
@@ -88,6 +88,10 @@ class Spring{
  settled(){return this.until(()=>false);}
 }
 
+/* the named springs of the big moves (one system, gsap-performance: no magic numbers scattered over the tweens) */
+const MOTION={lift:{k:210,c:23},veil:{k:120,c:22},chrome:{k:90,c:19},home:{k:240,c:28}};
+const EASE_OUT='cubic-bezier(.22,1,.36,1)';
+
 /* ---------- a card's still framing, and the slow Ken Burns move around it ----------
    still = {x,y,scale}: x/y the centre of the framing as a fraction of the picture (0..1), scale the zoom over a
    cover fit (>= 1). Offsets are clamped so the picture always covers the card. */
@@ -97,13 +101,16 @@ function stillTransform(still,dx=0,dy=0,ds=1){
  const tx=clamp((.5-(Number(still?.x??.5)))*100+dx,-m,m),ty=clamp((.5-(Number(still?.y??.5)))*100+dy,-m,m);
  return 'scale('+s.toFixed(4)+') translate('+tx.toFixed(3)+'%,'+ty.toFixed(3)+'%)';
 }
+/* the face picture is already cut to the player's still by cards_create, so the card shows it whole and drifts from its centre
+   (applying the still again zoomed the CG twice: blurry and off its framing) */
+const FACED={x:.5,y:.5,scale:1};
 function hash(s){let h=2166136261;for(const ch of String(s))h=Math.imul(h^ch.codePointAt(0),16777619);return h>>>0;}
 function kenBurns(img,card,phase){
  for(const a of img.getAnimations())a.cancel();
- const base=stillTransform(card.still);img.style.transform=base;
+ const base=stillTransform(FACED);img.style.transform=base;
  if(reduce())return;
  const h=hash(card.id),ang=(h%360)*Math.PI/180,r=2.2;
- const to=stillTransform(card.still,Math.cos(ang)*r,Math.sin(ang)*r,1.075);
+ const to=stillTransform(FACED,Math.cos(ang)*r,Math.sin(ang)*r,1.075);
  const a=img.animate([{transform:base},{transform:to}],{duration:22000,iterations:Infinity,direction:'alternate',easing:'cubic-bezier(.42,0,.58,1)'});
  a.currentTime=phase||0;
 }
@@ -111,7 +118,7 @@ function kenBurns(img,card,phase){
 function freeze(img,card){
  const from=getComputedStyle(img).transform;
  for(const a of img.getAnimations())a.cancel();
- const to=stillTransform(card.still);img.style.transform=to;
+ const to=stillTransform(FACED);img.style.transform=to;
  if(!reduce()&&from&&from!=='none')img.animate([{transform:from},{transform:to}],{duration:720,easing:'cubic-bezier(.2,.8,.2,1)'});
 }
 const kbPhase=img=>{const a=img?.getAnimations?.()[0];return a?Number(a.currentTime)||0:undefined;};
@@ -119,6 +126,55 @@ const kbPhase=img=>{const a=img?.getAnimations?.()[0];return a?Number(a.currentT
 /* ---------- the card back: the collectible card's crest (detail-flip.js), the title's first character ---------- */
 const glyphOf=title=>[...String(title||'')].find(c=>/[一-鿿぀-ヿ]/.test(c))||String(title||' ').trim().charAt(0).toUpperCase()||'M';
 const crestHTML=card=>`<div class="dtv-back-art is-crest"><i class="dtv-ring"></i><i class="dtv-ring is-inner"></i><b>${esc(card?.initial||glyphOf(card?.title))}</b><span>MeguLit</span><small>${esc(card?.title||'')}</small></div>`;
+
+/* ---------- scuffs (user 2026-11-13: random per toploader, many with none, never more than a couple) ----------
+   Each toploader picks 0, 1 or 2 fine marks from a small pool by its id, so the same sleeve keeps its marks. */
+const SCUFFS=['M28 168c18-9 36-14 52-15','M118 52c9 6 15 13 19 22','M40 74l23-7','M96 196c10 2 21 1 30-3','M132 130l9 15','M24 120c6-8 14-13 24-15','M60 40l14 9','M110 160c8-3 17-3 25 1','M140 90l-6 18','M30 200l18-4','M84 112c4 7 10 12 18 14','M50 142l-10 16'];
+const scuffCache=new Map();
+function scuffPicks(id){
+ const h=hash(id+'/scuff'),roll=h%100,n=roll<42?0:roll<84?1:2,picks=[];
+ for(let i=0;picks.length<n&&i<8;i++){const k=(h>>>(7+i*3))%SCUFFS.length;if(!picks.includes(k))picks.push(k);}
+ return {picks,op:(.16+((h>>>27)%5)*.025).toFixed(3)};
+}
+function scuffOf(id){
+ const {picks,op}=scuffPicks(id);if(!picks.length)return '';
+ const key=picks.join(',')+'/'+op;if(scuffCache.has(key))return scuffCache.get(key);
+ const paths=picks.map(k=>"<path d='"+SCUFFS[k]+"'/>").join('');
+ const svg="<svg xmlns='http://www.w3.org/2000/svg' width='168' height='226'><g fill='none' stroke='white' stroke-linecap='round' stroke-opacity='"+op+"' stroke-width='.45'>"+paths+'</g></svg>';
+ const url='url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';scuffCache.set(key,url);return url;
+}
+
+/* ---------- the plate's title, split into characters for a staggered rise (gsap-text style, native WAAPI) ---------- */
+function splitTitle(el,title){
+ const text=String(title||'');el.textContent='';el.setAttribute('aria-label',text);
+ for(const ch of Array.from(text)){const s=document.createElement('span');s.className='cw-ch';s.setAttribute('aria-hidden','true');s.textContent=ch===' '?' ':ch;el.append(s);}
+}
+function revealTitle(plate,delay=0){
+ if(reduce())return;
+ const chars=plate.querySelectorAll('.cw-ch'),meta=plate.querySelector('.cw-plate-meta'),n=Math.min(chars.length,22);
+ chars.forEach((c,i)=>c.animate([{transform:'translateY(.62em)',opacity:0},{transform:'none',opacity:1}],{duration:560,delay:delay+Math.min(i,22)*16,easing:EASE_OUT,fill:'backwards'}));
+ meta?.animate([{transform:'translateY(6px)',opacity:0},{transform:'none',opacity:1}],{duration:480,delay:delay+n*16+80,easing:EASE_OUT,fill:'backwards'});
+}
+/* a card went into 我的卡: the counter takes it with a small beat */
+function pulseCount(){
+ const el=page?.root.querySelector('.cw-count');if(!el||reduce())return;
+ el.animate([{transform:'scale(1)'},{transform:'scale(1.28)',offset:.32},{transform:'scale(1)'}],{duration:520,easing:'cubic-bezier(.3,.7,.2,1)'});
+}
+
+/* ---------- the wall's back plane: a faint crimson-demon casting circle behind the toploaders ----------
+   One static picture on its own layer; while the wall pans it moves at a fifth of the speed, so the toploaders read as
+   hanging in front of a wall that is further away (the AE camera through layered planes, megu-edit). Drawn once. */
+let sigilUrl='';
+function sigil(){
+ if(sigilUrl)return sigilUrl;
+ const C=600,ring=r=>"<circle cx='"+C+"' cy='"+C+"' r='"+r+"'/>",pt=(r,a)=>[(C+r*Math.cos(a)).toFixed(1),(C+r*Math.sin(a)).toFixed(1)];
+ let ticks='';for(let i=0;i<120;i++){const a=i/120*Math.PI*2,l=i%10?8:20,[x1,y1]=pt(512,a),[x2,y2]=pt(512-l,a);ticks+='M'+x1+' '+y1+'L'+x2+' '+y2;}
+ let star='';for(let i=0;i<=7;i++){const [x,y]=pt(318,-Math.PI/2+i*3*Math.PI*2/7);star+=(i?'L':'M')+x+' '+y;}
+ let nodes='';for(let i=0;i<7;i++){const [x,y]=pt(318,-Math.PI/2+i*Math.PI*2/7);nodes+="<circle cx='"+x+"' cy='"+y+"' r='14'/>";}
+ const svg="<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='1200' viewBox='0 0 1200 1200'><g fill='none' stroke='%23edb56e' stroke-width='1.2'>"+ring(560)+ring(524)+ring(500)+ring(332)+ring(150)+ring(138)+"<path d='"+ticks+"'/><path d='"+star+"' stroke-width='1'/>"+nodes+'</g></svg>';
+ sigilUrl='url("data:image/svg+xml,'+svg.replace(/</g,'%3C').replace(/>/g,'%3E').replace(/"/g,"'")+'")';
+ return sigilUrl;
+}
 
 /* ---------- toploader markup ---------- */
 const TL_W=168,TL_H=226,CARD_W=146,CARD_H=204,CARD_TOP=12;
@@ -130,9 +186,9 @@ function buildToploader(t,card,{withBack=false}={}){
  /* the pin stays on the wall; the hang tab, the sleeve and its card swing on it together */
  el.innerHTML=`<div class="cw-hang"><i class="cw-tab" aria-hidden="true"></i><i class="cw-pin" aria-hidden="true"></i><div class="cw-tilt"><i class="cw-drop" aria-hidden="true"></i>`+
   `<div class="cw-card"><i class="cw-lift" aria-hidden="true"></i><div class="cw-flip"><div class="cw-face"><img class="cw-art" alt="" draggable="false" decoding="async"><i class="cw-foil"></i></div>${withBack?`<div class="cw-back">${crestHTML(card)}</div>`:''}</div></div>`+
-  `<div class="cw-shell" aria-hidden="true"><i class="cw-glare"></i><i class="cw-sweep"></i><i class="cw-lip"></i></div>${withBack?'<div class="cw-thick" aria-hidden="true"><i class="cw-pane"></i><i class="cw-side is-l"></i><i class="cw-side is-r"></i><i class="cw-side is-b"></i><i class="cw-side is-t"></i></div>':''}</div></div>`;
- const parts={el,hang:el.querySelector('.cw-hang'),tilt:el.querySelector('.cw-tilt'),card:el.querySelector('.cw-card'),flip:el.querySelector('.cw-flip'),img:el.querySelector('.cw-art'),shell:el.querySelector('.cw-shell'),sweep:el.querySelector('.cw-sweep'),back:el.querySelector('.cw-back'),lift:el.querySelector('.cw-lift'),drop:withBack?el.querySelector('.cw-drop'):null,thick:el.querySelector('.cw-thick')};
- {const h=hash(t.id);parts.el.querySelector('.cw-glare').style.translate=((h%41)-20)+'% '+(((h>>6)%17)-8)+'%';}
+  `<div class="cw-shell" aria-hidden="true"><i class="cw-glare"></i><i class="cw-sweep"></i><i class="cw-lip"></i></div>${withBack?'<div class="cw-thick" aria-hidden="true"><i class="cw-pane"></i><i class="cw-side is-l"></i><i class="cw-side is-r"></i><i class="cw-side is-b"></i><i class="cw-side is-t"></i></div>':''}</div></div>${withBack?'':'<p class="cw-label" aria-hidden="true"><b></b><small></small></p>'}`;
+ const parts={el,hang:el.querySelector('.cw-hang'),tilt:el.querySelector('.cw-tilt'),card:el.querySelector('.cw-card'),flip:el.querySelector('.cw-flip'),img:el.querySelector('.cw-art'),shell:el.querySelector('.cw-shell'),sweep:el.querySelector('.cw-sweep'),back:el.querySelector('.cw-back'),label:el.querySelector('.cw-label'),lift:el.querySelector('.cw-lift'),drop:withBack?el.querySelector('.cw-drop'):null,thick:el.querySelector('.cw-thick')};
+ {const h=hash(t.id);parts.el.querySelector('.cw-glare').style.translate=((h%41)-20)+'% '+(((h>>6)%17)-8)+'%';const sc=scuffOf(t.id);if(sc)parts.shell.style.setProperty('--cw-scuff',sc);if(!withBack){parts.el.style.setProperty('--cw-rest',(((h>>11)%17)-8)/10+'deg');parts.el.style.setProperty('--cw-dy',(((h>>15)%7)-3)+'px');}}
  fill(parts,card);
  return parts;
 }
@@ -140,26 +196,30 @@ function fill(parts,card,phase){
  parts.cardData=card||null;parts.el.__parts=parts;
  parts.el.classList.toggle('is-filled',!!card);
  parts.el.setAttribute('aria-label',card?words().filled+(card.title?' · '+card.title:''):words().empty);
- if(card){if(parts.img.getAttribute('src')!==card.src)parts.img.src=card.src;parts.img.decode?.().catch(()=>{});if(parts.live)kenBurns(parts.img,card,0);else{for(const a of parts.img.getAnimations())a.cancel();parts.img.style.transform=stillTransform(card.still);}}
+ if(card){if(parts.img.getAttribute('src')!==card.src)parts.img.src=card.src;parts.img.decode?.().catch(()=>{});if(parts.live)kenBurns(parts.img,card,0);else{for(const a of parts.img.getAnimations())a.cancel();parts.img.style.transform=stillTransform(FACED);}}
  else{for(const a of parts.img.getAnimations())a.cancel();parts.img.removeAttribute('src');}
  if(parts.back)parts.back.innerHTML=crestHTML(card);
+ if(parts.label){const w=words();parts.label.firstChild.textContent=card?.title||w.emptyShort;const d=card?.createdAt?new Date(card.createdAt):null;parts.label.lastChild.textContent=card?[w.source[card.source]||w.source[card.kind]||'',d&&!isNaN(d)?d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0'):''].filter(Boolean).join(' · '):'';}
  motion(parts).jump({cy:0,cx:0,cr:0,co:card?1:0});
 }
 /* the toploader's own spring: card (cx,cy,cr,co,f flip), shell (sx,sy press), glare sweep g, hang (hr swing, hy, ho) */
 function motion(parts){
  if(parts.spring)return parts.spring;
  const {card,shell,sweep,hang}=parts;
- parts.spring=new Spring({cx:0,cy:0,cr:0,co:0,so:1,sx:1,sy:1,g:0,hr:0,hy:0,ho:1},x=>{
+ parts.spring=new Spring({cx:0,cy:0,cr:0,cs:1,co:0,so:1,sh:0,sx:1,sy:1,g:0,hr:0,hy:0,ho:1},x=>{
   /* 2D only: the depth behind the shell comes from the CSS translate while the toploader tilts (no layer per card at rest) */
-  card.style.transform=x.cx||x.cy||x.cr?'translate('+x.cx.toFixed(2)+'px,'+x.cy.toFixed(2)+'px) rotate('+x.cr.toFixed(3)+'deg)':'';
+  card.style.transform=x.cx||x.cy||x.cr||x.cs!==1?'translate('+x.cx.toFixed(2)+'px,'+x.cy.toFixed(2)+'px) rotate('+x.cr.toFixed(3)+'deg)'+(x.cs!==1?' scale('+x.cs.toFixed(4)+')':''):'';
   card.style.opacity=clamp(x.co,0,1).toFixed(3);
   parts.lift.style.opacity=clamp(-x.cy/55,0,1).toFixed(3);
   if(parts.drop){const so=clamp(x.so,0,1).toFixed(3);shell.style.opacity=so;parts.drop.style.opacity=so;if(parts.thick)parts.thick.style.opacity=so;}
-  shell.style.transform=x.sx===1&&x.sy===1?'':'scale('+x.sx.toFixed(4)+','+x.sy.toFixed(4)+')';
+  /* sh: the sleeve drawn down off the card (inspect eject), the card itself stays put */
+  const slide=x.sh?'translateY('+x.sh.toFixed(2)+'px)':'';
+  if(parts.thick)parts.thick.style.transform=slide;if(parts.drop)parts.drop.style.transform=slide;
+  shell.style.transform=(slide+(x.sx===1&&x.sy===1?'':' scale('+x.sx.toFixed(4)+','+x.sy.toFixed(4)+')')).trim();
   const g=clamp(x.g,0,1);sweep.style.opacity=(Math.sin(Math.PI*g)*.9).toFixed(3);sweep.style.transform='translateX('+(-120+g*240).toFixed(1)+'%)';
   hang.style.transform=x.hr||x.hy?'translateY('+x.hy.toFixed(2)+'px) rotate('+x.hr.toFixed(3)+'deg)':'';
   hang.style.opacity=clamp(x.ho,0,1).toFixed(3);
- },{cx:.3,cy:.3,cr:.02,co:.004,so:.004,sx:.0006,sy:.0006,g:.004,hr:.02,hy:.2,ho:.004});
+ },{cx:.3,cy:.3,cr:.02,cs:.0008,co:.004,so:.004,sh:.3,sx:.0006,sy:.0006,g:.004,hr:.02,hy:.2,ho:.004});
  /* while it moves, the toploader's moving parts get their own layers (one cell restyles, nothing else), then drop them */
  parts.spring.onrun=()=>parts.el.classList.add('cw-anim');
  parts.spring.onidle=()=>parts.el.classList.remove('cw-anim');
@@ -188,21 +248,6 @@ async function insertMotion(parts,{from='above'}={}){
  await s.settled();if(!alive())return false;
  s.wall('cy',null).jump({g:0});
  return true;
-}
-async function ejectMotion(parts,{loose=false}={}){
- const t=ticket(parts),s=motion(parts),alive=()=>parts.seq===t;
- s.wall('cy',null);
- /* 1. pinched at the top and drawn up against the plastic's grip: slow, heavily damped */
- s.to({cy:-44},{k:70,c:24}).to({sx:.996,sy:1.004},{k:300,c:30});
- await s.until(x=>x.cy<-30);if(!alive())return false;
- if(loose)s.to({so:0},{k:120,c:22});
- /* 2. free of the grip it lifts clear with a small spring, the sleeve relaxes and sways */
- s.to({sx:1,sy:1},{k:420,c:16}).to({cy:loose?ABOVE+70:ABOVE-36},{k:200,c:loose?22:17,v:{cy:-520}}).kick({hr:5}).to({hr:0},{k:60,c:5.5});
- await s.until(x=>x.cy<ABOVE+(loose?110:30));if(!alive())return false;
- /* 3. (inspect) the empty sleeve fades away and the bare card settles where the sleeve was */
- if(loose){s.to({so:0},{k:220,c:30}).to({cy:0},{k:210,c:27});await s.until(x=>x.cy>-60);return alive();}
- await s.settled();
- return alive();
 }
 /* hung on the wall: dropped from a little above, it swings on the pin and settles */
 function hangMotion(parts,delay=0){
@@ -255,14 +300,14 @@ export async function openCardWall(main=document.querySelector('#main')){
  const w=words();
  const root=document.createElement('section');
  root.className='cw-page';root.setAttribute('aria-label',w.title);root.tabIndex=-1;
- root.innerHTML=`<div class="cw-field"><div class="cw-plane"></div></div>`+
+ root.innerHTML=`<div class="cw-field"><div class="cw-sigil" aria-hidden="true"></div><div class="cw-plane"></div></div>`+
   `<div class="field-search cw-pod"><span class="side"><button type="button" class="icon-button cw-back-btn" aria-label="${esc(w.back)}" title="${esc(w.back)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button></span>`+
   `<span class="cw-title"><b>${esc(w.title)}</b><small class="cw-count"></small></span>`+
   `<span class="side"><button type="button" class="library-wall-toggle cw-mode" role="switch" aria-label="${esc(w.list)}" title="${esc(w.list)}"></button><button type="button" class="icon-button cw-add" aria-label="${esc(w.add)}" title="${esc(w.add)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="6" y="3.5" width="12" height="17" rx="2"/><path d="M12 9v6M9 12h6"/></svg></button></span></div>`+
-  `<div class="cw-toast" role="status" aria-live="polite"></div>`;
+  `<p class="cw-first" hidden>${esc(w.first)}</p><div class="cw-toast" role="status" aria-live="polite"></div>`;
  document.body.append(root);
- const field=root.querySelector('.cw-field'),plane=root.querySelector('.cw-plane');
- const P=page={root,field,plane,main,cells:new Map(),state:null,mode:'a',view:{x:0,y:0,z:1},cols:1,rows:1,events:new AbortController()};
+ const field=root.querySelector('.cw-field'),plane=root.querySelector('.cw-plane');root.querySelector('.cw-sigil').style.backgroundImage=sigil();
+ const P=page={root,field,plane,sigil:root.querySelector('.cw-sigil'),main,cells:new Map(),state:null,mode:'a',view:{x:0,y:0,z:1},cols:1,rows:1,events:new AbortController()};
  const signal=P.events.signal;
  /* the page covers the main area only (the top bar stays as it is) */
  const place=()=>{const r=(P.main&&P.main.isConnected?P.main:document.documentElement).getBoundingClientRect();root.style.left=r.left+'px';root.style.top=r.top+'px';root.style.width=r.width+'px';root.style.height=r.height+'px';};
@@ -309,6 +354,7 @@ function toast(text){
 function updateCount(){
  const P=page;if(!P?.state)return;const filled=P.state.toploaders.filter(t=>t.cardId).length;
  P.root.querySelector('.cw-count').textContent=words().count(filled,P.state.toploaders.length);
+ P.root.querySelector('.cw-first').hidden=filled>0;
  const m=P.root.querySelector('.cw-mode');m.setAttribute('aria-checked',String(P.mode==='b'));
  P.root.dataset.mode=P.mode;
 }
@@ -328,7 +374,7 @@ function build(first=false){
  const nodes=list.map(t=>P.cells.get(t.id).node);if(nodes.some((n,i)=>P.plane.children[i]!==n))P.plane.append(...nodes);
  updateCount();
  measure();layoutGrid();
- if(first&&P.mode==='a'){const across=Math.max(1,Math.floor(P.width/P.cw));P.view.x=(Math.min(across,P.cols)-1)*P.cw/2;P.view.y=Math.max(0,(Math.min(P.rows,Math.floor(P.height/P.ch))-1))*P.ch/2;P.view.z=1;P.zoomTarget=1;}
+ if(first&&P.mode==='a'){const across=Math.max(1,Math.floor(P.width/P.cw));P.view.x=(Math.min(across,P.cols)-1)*P.cw/2;P.view.y=Math.max(0,(Math.min(P.rows,Math.floor(P.height/P.ch))-1))*P.ch/2;/* the whole width of the wall fits at first (no column cut by the window), never above 1 */const z=1;P.view.z=z;P.zoomTarget=z;P.view.x=(P.cols-1)*P.cw/2;P.view.y=Math.max(0,(P.height/z-P.ch)/2-60/z);}
  relayout();
  if(first&&!reduce()){let n=0;for(const cell of P.cells.values()){if(n<36&&onScreen(cell))hangMotion(cell.parts,n++*28+60);}}
 }
@@ -404,13 +450,14 @@ function layoutGrid(){
  const P=page;if(!P)return;
  P.cw=212;P.ch=318;
  const n=Math.max(1,P.cells.size);
- P.cols=Math.min(n,Math.max(2,Math.round(Math.sqrt(n*1.5*(P.width||1600)/Math.max(1,P.height||900)))));
+ /* as many columns as fit the window at full size (none cut by its edge); the wall then runs down */
+ P.cols=Math.min(n,Math.max(2,Math.floor(((P.width||1600)-96)/P.cw)));
  P.rows=Math.ceil(n/P.cols);
 }
 function constrain(){
  const P=page,v=P.view;
  const cx0=(P.cols-1)*P.cw/2,cy0=(P.rows-1)*P.ch/2;
- const rangeX=Math.max(0,(P.cols*P.cw-P.width/v.z)/2+P.cw*.15),rangeY=Math.max(0,(P.rows*P.ch-P.height/v.z)/2+P.ch*.15);
+ const rangeX=Math.max(0,(P.cols*P.cw-P.width/v.z)/2+P.cw*.15),rangeY=Math.max(0,(P.rows*P.ch-P.height/v.z)/2+P.ch*.15+60/v.z);
  v.x=clamp(v.x,cx0-rangeX,cx0+rangeX);v.y=clamp(v.y,cy0-rangeY,cy0+rangeY);
 }
 function relayout(){const P=page;if(!P)return;P.painted='';if(P.mode==='a')paint();else for(const c of P.cells.values()){if(c.t){c.node.style.transform='';c.node.style.opacity='';c.t=c.o='';}}}
@@ -421,9 +468,11 @@ function paint(){
  const stamp=x.toFixed(2)+' '+y.toFixed(2)+' '+z.toFixed(4)+' '+P.width+' '+P.height+' '+P.smear.toFixed(4)+' '+P.cells.size;
  if(stamp===P.painted)return;P.painted=stamp;
  const radius=Math.hypot(cx,cy)||1,ex=1+P.smear*Math.abs(P.smearX),ey=1+P.smear*Math.abs(P.smearY);
+ {const ox=(P.cols-1)*cw/2,oy=(P.rows-1)*ch/2,k=.2*z;P.sigil.style.transform='translate('+((ox-x)*k).toFixed(1)+'px,'+((oy-y)*k).toFixed(1)+'px) scale('+(.92+.08*z).toFixed(4)+')';}
  for(const c of P.cells.values()){
   const col=c.index%P.cols,row=Math.floor(c.index/P.cols);
-  const dx=(col*cw-x)*z,dy=(row*ch-y)*z;
+  if(c.jx==null){const h=hash(c.id+'/hang'),hc=hash('col'+col);c.jx=((h%9)-4);c.jy=((hc%25)-12)+((h>>5)%7-3);}
+  const dx=(col*cw+c.jx-x)*z,dy=(row*ch+c.jy-y)*z;
   const sx=cx+dx*ex,sy=cy+dy*ey;
   let t,o;
   if(sx<-cw*z*1.4||sx>P.width+cw*z*1.4||sy<-ch*z*1.4||sy>P.height+ch*z*1.4){t='translate(-300vw,-300vh)';o='0';}
@@ -529,8 +578,27 @@ async function activate(id){
  let maker=null;
  try{maker=await import('./card-maker.js');}catch(e){console.warn('card maker',e);}
  if(typeof maker?.openCardMaker!=='function'){toast(words().loading);return;}
- try{await maker.openCardMaker({toploaderId:id});}catch(e){console.warn('openCardMaker',e);toast(words().failed);}
+ try{await maker.openCardMaker({toploaderId:id,from:el});}catch(e){console.warn('openCardMaker',e);toast(words().failed);}
 }
+
+/* inspect, by hand (user 2026-11-13: "放卡和拿出卡都要做无极的自然带惯性的鼠标拖动交互 … 不要用按钮"): the card is pulled out of
+   the sleeve and pushed back in by dragging it, with no steps and with the hand's own speed carried on after release.
+   Inside the sleeve the card can only slide along it, held a little by the plastic at first; once its bottom edge
+   clears the mouth it is free and follows the pointer anywhere. Dropped near the mouth it is carried in and seated.
+   Taken towards a window edge a bin appears there and its ring closes as the card nears the edge; a closed ring means
+   discard, asked once more on release. These are the pure rules; openViewer drives them. */
+const FREE_AT=-(CARD_H+CARD_TOP);
+const rubber=(v,lim)=>lim*(1-1/(Math.abs(v)/lim+1))*Math.sign(v);
+/* raw pull (local px, negative = up) -> where the card is while still in the sleeve: pushing in gives only a hair,
+   the first 14 px of a pull are held by the plastic (the card lags 40 %), after that it slides 1:1 */
+function sleeveY(raw){if(raw>=0)return rubber(raw,3);return raw+Math.min(-raw,14)*.6;}
+/* the mouth: a free card whose bottom edge is over the opening, near the sleeve's axis, goes back in */
+const inMouth=(cx,cy)=>Math.abs(cx)<44&&cy>FREE_AT-70&&cy<FREE_AT+40;
+/* the bin's ring: 0 far from every edge, 1 (closed, discard) at the edge */
+const BIN_FROM=150,BIN_AT=34;
+const binProgress=d=>clamp((BIN_FROM-d)/(BIN_FROM-BIN_AT),0,1);
+/* a released card coasts on friction from the hand's speed: where it would stop (k=0 spring, damping c) */
+const coastEnd=(x,v,c)=>x+v/c;
 
 /* ---------- inspect (user correction 2026-11-13: like inspecting a weapon in CS2) ----------
    A twin of the toploader is laid exactly over the one on the wall (same size, same transform origin), the wall's copy
@@ -545,14 +613,26 @@ function openViewer(cell){
  if(hoverEl){liveCG(hoverEl,false);tiltReset(hoverEl);hoverEl=null;}
  const w=words(),src=cell.parts.el;
  const layer=document.createElement('div');layer.className='cw-viewer';
- layer.innerHTML=`<div class="cw-veil"></div><div class="cw-stage"></div><div class="cw-bar"><button type="button" class="cw-btn cw-eject">${esc(w.eject)}</button><button type="button" class="cw-btn cw-close">${esc(w.close)}</button></div><p class="cw-hint">${esc(w.inspect)}</p>`;
- const veil=layer.querySelector('.cw-veil'),bar=layer.querySelector('.cw-bar'),stage=layer.querySelector('.cw-stage'),hint=layer.querySelector('.cw-hint');
+ const day=card.createdAt?new Date(card.createdAt):null,stamp=day&&!isNaN(day)?day.getFullYear()+'.'+String(day.getMonth()+1).padStart(2,'0')+'.'+String(day.getDate()).padStart(2,'0'):'';
+ const RING=2*Math.PI*27;
+ layer.innerHTML=`<div class="cw-veil"></div><div class="cw-mat" aria-hidden="true"></div><div class="cw-stage"></div>`+
+  `<div class="cw-plate" aria-hidden="true"><h2 class="cw-plate-title" lang="ja"></h2><p class="cw-plate-meta"><span>${esc(w.source[card.source]||w.source[card.kind]||'')}</span>${stamp?`<span>${esc(stamp)}</span>`:''}</p></div>`+
+  `<div class="cw-bin" aria-hidden="true"><svg viewBox="0 0 64 64"><circle class="cw-bin-track" cx="32" cy="32" r="27"/><circle class="cw-bin-ring" cx="32" cy="32" r="27" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="${RING.toFixed(2)}"/><circle class="cw-bin-inner" cx="32" cy="32" r="18"/><path class="cw-bin-star" d="M32.00 18.00L38.07 44.61L21.05 23.27L45.65 35.12L18.35 35.12L42.95 23.27L25.93 44.61L32.00 18.00"/></svg></div>`+
+  `<div class="cw-bar"><button type="button" class="cw-btn cw-close">${esc(w.close)}</button></div><p class="cw-hint">${esc(w.inspect)}</p>`+
+  `<div class="cw-confirm" role="alertdialog" aria-modal="true" aria-label="${esc(w.binQ)}" hidden><div class="cw-confirm-box"><h3>${esc(w.binQ)}</h3><p>${esc(w.binBody)}</p><div class="cw-confirm-row"><button type="button" class="cw-btn cw-keep">${esc(w.keep)}</button><button type="button" class="cw-btn cw-discard">${esc(w.discard)}</button></div></div></div>`;
+ const veil=layer.querySelector('.cw-veil'),bar=layer.querySelector('.cw-bar'),stage=layer.querySelector('.cw-stage'),hint=layer.querySelector('.cw-hint'),plate=layer.querySelector('.cw-plate');
+ const bin=layer.querySelector('.cw-bin'),ring=layer.querySelector('.cw-bin-ring'),confirmEl=layer.querySelector('.cw-confirm');
  const ghost=buildToploader(cell.data,null,{withBack:true});ghost.el.classList.add('cw-ghost');ghost.el.removeAttribute('tabindex');
  ghost.el.style.position='absolute';ghost.el.style.left='0';ghost.el.style.top='0';ghost.el.style.transformOrigin='0 0';
- stage.append(ghost.el);P.root.append(layer);
+ stage.append(ghost.el);P.root.append(layer);P.root.classList.add('is-inspecting');
  fill(ghost,card);
+ /* the how-to line goes once the player has handled the card */
+ let hintGone=false;
+ splitTitle(plate.querySelector('.cw-plate-title'),card.title);
  const base=P.root.getBoundingClientRect();
  const home=()=>{const r=src.getBoundingClientRect();return {x:r.left-base.left,y:r.top-base.top,s:r.width/TL_W};};
+ /* a loose card leaves with the viewer for 我的卡: it shrinks into the wall's counter in the capsule */
+ const pocket=()=>{const r=P.root.querySelector('.cw-count').getBoundingClientRect(),s=.11;return {x:r.left-base.left+r.width/2-TL_W*s/2,y:r.top-base.top+r.height/2-TL_H*s/2,s};};
  const fit=()=>Math.min((base.height-170)/(TL_H+40),(base.width*.34)/TL_W,3.1);
  const h0=home();
  /* position (x,y,s) of the twin; z = inspect zoom; b veil; u controls */
@@ -560,60 +640,234 @@ function openViewer(cell){
   const s=v.s*v.z,cx=v.x+TL_W*v.s/2,cy=v.y+TL_H*v.s/2;
   ghost.el.style.transform='translate('+(cx-TL_W*s/2).toFixed(2)+'px,'+(cy-TL_H*s/2).toFixed(2)+'px) scale('+s.toFixed(4)+')';
   veil.style.opacity=clamp(v.b,0,1).toFixed(3);
-  const u=clamp(v.u,0,1);bar.style.opacity=u.toFixed(3);bar.style.transform='translate(-50%,'+((1-u)*14).toFixed(2)+'px)';hint.style.opacity=(u*.7).toFixed(3);
+  const u=clamp(v.u,0,1);bar.style.opacity=u.toFixed(3);bar.style.transform='translate(-50%,'+((1-u)*14).toFixed(2)+'px)';hint.style.opacity=(hintGone?0:u*.8).toFixed(3);
+  plate.style.opacity=(u*(1-bench)).toFixed(3);
  },{x:.3,y:.3,s:.0006,z:.0008,b:.003,u:.003});
+ /* the twin's screen box from the springs' goal or current values */
+ const box=(v=spring.x)=>{const s=v.s*v.z,cx=v.x+TL_W*v.s/2,cy=v.y+TL_H*v.s/2;return {x:cx-TL_W*s/2,y:cy-TL_H*s/2,S:s};};
+ const target=()=>{const s=fit();return {x:(base.width-TL_W*s)/2,y:(base.height-TL_H*s)/2-24,s,z:1};};
+ /* the workbench: the camera pulls back so the sleeve sits low and there is room above it for the card */
+ const ZB=.5;
+ const workbench=()=>{const s=fit(),S=s*ZB,room=(-FREE_AT+56)*S,total=room+TL_H*S,top=(base.height-total)/2-10,cy=top+room+TL_H*S/2;return {x:(base.width-TL_W*s)/2,y:cy-TL_H*s/2,s,z:ZB};};
+ let bench=0;
  spring.render(spring.x);
- const target=()=>{const s=fit();return {x:(base.width-TL_W*s)/2,y:(base.height-TL_H*s)/2-24,s};};
+ /* the museum plate sits right of the card at rest, centred on it (hidden when there is no room) */
+ {const t=target(),left=t.x+TL_W*t.s+40,room=base.width-left-40;plate.hidden=room<220;plate.style.left=left+'px';plate.style.top=(t.y+TL_H*t.s-6)+'px';plate.style.maxWidth=Math.min(420,room)+'px';}
  /* free rotation: rx/ry in degrees, unbounded; on the sleeve's tilt layer, or on the bare card */
- let loose=false,closing=false,busy=false;
+ let loose=false,closing=false;
+ const near=a=>a-360*Math.round(a/360);
  const turnTarget=()=>loose?ghost.flip:ghost.tilt;
  const turn=new Spring({rx:0,ry:0},v=>{
   const t='rotateX('+v.rx.toFixed(2)+'deg) rotateY('+v.ry.toFixed(2)+'deg)';
   turnTarget().style.transform=t;(loose?ghost.tilt:ghost.flip).style.transform='';
+  const gx=50+clamp(near(v.ry),-90,90)*.55,gy=50-clamp(near(v.rx),-90,90)*.45;ghost.tilt.style.setProperty('--mx',gx.toFixed(1)+'%');ghost.tilt.style.setProperty('--my',gy.toFixed(1)+'%');
  },{rx:.05,ry:.05});
+ const faceOn=(k=150,c=20)=>turn.jump({rx:near(turn.x.rx),ry:near(turn.x.ry)}).to({rx:0,ry:0},{k,c});
+ const gs=motion(ghost);gs.wall('cy',null);
  ghost.el.classList.add('is-inspect');
  src.style.opacity='0';
- const V=P.viewer={id:cell.id,layer,dispose:()=>{spring.stop();turn.stop();ghost.spring?.stop();layer.remove();src.style.opacity='';P.viewer=null;}};
+ const V=P.viewer={id:cell.id,layer,dispose:()=>{spring.stop();turn.stop();gs.stop();layer.remove();P.root.classList.remove('is-inspecting');src.style.opacity='';if(P.viewer===V)P.viewer=null;}};
  /* out of the wall: it lifts toward you with a quarter turn of play that settles face on (ζ≈0.8) */
- spring.to({...target()},{k:210,c:23}).to({b:1},{k:120,c:22}).to({u:1},{k:90,c:19});
- if(!reduce())turn.jump({rx:8,ry:-14}).to({rx:0,ry:0},{k:90,c:15});
- const ejectBtn=layer.querySelector('.cw-eject');
- /* z .58 and the sleeve lowered by half the card's travel: opening, card and sleeve all fit while it moves */
- const pullBack=()=>{const t=target(),z=.74;spring.to({x:t.x,y:t.y+(-ABOVE)*t.s*z/2,z},{k:130,c:22});};
+ spring.to({...target()},MOTION.lift).to({b:1},MOTION.veil).to({u:1},MOTION.chrome);
+ if(!reduce()){turn.jump({rx:8,ry:-14}).to({rx:0,ry:0},{k:90,c:15});revealTitle(plate,300);}
+ const mat=layer.querySelector('.cw-mat');
+ /* the felt mat the card is handled on: laid under the bench, faded with it */
+ const matTo=on=>{if(on){const wb=workbench(),S=wb.s*ZB,cx=wb.x+TL_W*wb.s/2,cy=wb.y+TL_H*wb.s/2,w=Math.min(base.width-80,TL_W*S*4.2),top=cy-TL_H*S/2-(-FREE_AT+56)*S-46,h=cy+TL_H*S/2+34-top;Object.assign(mat.style,{left:(cx-w/2)+'px',top:top+'px',width:w+'px',height:h+'px'});}
+  const from=getComputedStyle(mat).opacity;mat.style.opacity=on?'1':'0';if(!reduce())mat.animate([{opacity:from,transform:on?'scale(.985)':'none'},{opacity:on?1:0,transform:on?'none':'scale(.985)'}],{duration:on?420:300,easing:EASE_OUT});};
+ const goHome=()=>{if(bench)matTo(false);bench=0;spring.to({...target()},{k:150,c:24});};
+ const goBench=()=>{if(!bench)matTo(true);bench=1;spring.to({...workbench()},{k:150,c:24});};
+
+ /* the service follows what the hand did, in order (chain); a refusal puts the card back where the service has it */
+ let applied=false,chain=Promise.resolve();
+ const sync=goal=>{chain=chain.then(async()=>{
+  if(goal===applied)return;
+  try{const next=await call(goal?'cards_eject':'cards_insert',goal?{toploaderId:cell.id}:{toploaderId:cell.id,cardId:card.id});if(!next)throw Error('NO_STATE');
+   applied=goal;if(page===P){P.state=next;const t=next.toploaders.find(x=>x.id===cell.id);fill(cell.parts,t?cardOf(next,t):null);updateCount();}}
+  catch(e){console.warn(goal?'cards_eject':'cards_insert',e);toast(w.failed);if(!closing&&state!=='gone'){if(applied)free();else seat();}}
+ });return chain;};
+
+ /* ---- the card's states: 'in' (in the sleeve), 'free' (out, anywhere), 'gone' (discarded) ---- */
+ let state='in';
+ const setLoose=on=>{if(loose===on)return;loose=on;turn.render(turn.x);ghost.el.classList.toggle('is-loose',on);};
+ /* free: the bare card takes the turns over once face on */
+ const free=()=>{state='free';ghost.el.classList.add('is-out');faceOn(320,36);turn.until(v=>Math.abs(v.rx)<1.5&&Math.abs(v.ry)<1.5).then(()=>{if(state==='free')setLoose(true);});sync(true);};
+ /* seat: carried over the mouth, squared up, then the same insert as from the card maker */
+ const seat=async()=>{
+  state='in';setLoose(false);ghost.el.classList.remove('is-out');faceOn(240,30);sync(false);
+  gs.to({cs:1,co:1},{k:260,c:30});
+  const ok=await insertMotion(ghost,{from:'here'});
+  if(ok&&state==='in'&&!drag)goHome();
+ };
+
+ /* ---- the bin (only for a free card) ---- */
+ let binP=0,binSide='',armed=false,binAt=null;
+ const showBin=(px,py)=>{
+  /* pulling a card out goes up: the top edge does not count during the drag that freed it */
+  const W=base.width,H=base.height,d={l:px,r:W-px,b:H-py,...(drag?.pulled?{}:{t:py})},side=Object.keys(d).reduce((a,b)=>d[b]<d[a]?b:a),p=binProgress(d[side]);
+  binP=p;binSide=side;
+  /* on the edge the card heads for, beside the card (past its end along that edge), never under it */
+  const r=cardEl.getBoundingClientRect(),cx0=r.left-base.left+r.width/2,cy0=r.top-base.top+r.height/2,inset=46;
+  let bx,by;
+  if(side==='l'||side==='r'){bx=side==='l'?inset:W-inset;const below=cy0+r.height/2+56;by=below<H-50?below:cy0-r.height/2-56;by=clamp(by,50,H-50);}
+  else{by=side==='t'?inset:H-inset;const right=cx0+r.width/2+56;bx=right<W-50?right:cx0-r.width/2-56;bx=clamp(bx,50,W-50);}
+  binAt={x:bx,y:by,side};
+  const show=clamp(p*3,0,1);
+  bin.style.transform='translate('+(bx-32).toFixed(1)+'px,'+(by-32).toFixed(1)+'px) scale('+(.78+.22*show).toFixed(3)+')';
+  bin.style.opacity=show.toFixed(3);
+  ring.setAttribute('stroke-dashoffset',(RING*(1-p)).toFixed(2));
+  const now=p>=1;if(now!==armed){armed=now;bin.classList.toggle('is-armed',now);if(now&&!reduce())bin.animate([{scale:'1'},{scale:'1.16'},{scale:'1'}],{duration:360,easing:'cubic-bezier(.3,1.6,.4,1)'});}
+  /* the card gives itself up a little as it nears the bin */
+  gs.to({cs:1-.14*p,co:1-.28*p},{k:420,c:40});
+ };
+ const hideBin=()=>{binP=0;if(armed){armed=false;bin.classList.remove('is-armed');}bin.style.opacity='0';ring.setAttribute('stroke-dashoffset',RING.toFixed(2));};
+ const binCentre=()=>binAt?{x:binAt.x,y:binAt.y}:{x:base.width/2,y:base.height-60};
+
+ /* ---- dragging the card ---- */
+ const cardEl=ghost.card;
+ /* the card's local offset (cx,cy) that puts a pointer at (px,py) with the grab point g (local, from the card's corner) */
+ const localAt=(px,py,g)=>{const b=box();return {cx:(px-b.x)/b.S-11-g.x,cy:(py-b.y)/b.S-12-g.y};};
+ let drag=null,grab=null;
+ const startDrag=e=>{
+  const b=box(),g={x:(e.clientX-base.left-b.x)/b.S-11-gs.x.cx,y:(e.clientY-base.top-b.y)/b.S-12-gs.x.cy};
+  ghost.seq=(ghost.seq||0)+1;gs.wall('cy',null);
+  drag={id:e.pointerId,g,raw:{cx:gs.x.cx,cy:gs.x.cy},vx:0,vy:0,t:performance.now(),px:e.clientX,py:e.clientY,moved:false};
+  if(state==='free')gs.to({cs:1.04},{k:380,c:30});
+  stage.setPointerCapture?.(e.pointerId);
+  faceOn(320,36);
+  if(state==='in')goBench();
+ };
+ const moveDrag=e=>{
+  const now=performance.now(),dt=Math.max(4,now-drag.t);
+  const px=e.clientX-base.left,py=e.clientY-base.top;
+  if(!drag.moved){if(Math.hypot(e.clientX-drag.px,e.clientY-drag.py)<3)return;drag.moved=true;layer.classList.add('dragging');goneHint();}
+  /* hand speed in screen px/s, smoothed */
+  drag.vx=drag.vx*.35+(e.clientX-drag.px)/dt*1000*.65;drag.vy=drag.vy*.35+(e.clientY-drag.py)/dt*1000*.65;drag.px=e.clientX;drag.py=e.clientY;drag.t=now;
+  let {cx,cy}=localAt(px,py,drag.g);
+  if(state==='in'){
+   cy=sleeveY(cy);cx=rubber(cx,4);
+   if(cy<FREE_AT){free();drag.pulled=true;}
+  }else if(state==='free'&&inMouth(cx,cy)&&drag.vy>0&&Math.abs(cx)<20&&cy>FREE_AT){
+   /* pushed down into the mouth: back on the rail */
+   state='in';drag.pushing=true;setLoose(false);ghost.el.classList.remove('is-out');hideBin();gs.to({cs:1,co:1},{k:300,c:32});
+  }
+  if(state==='free'){const b=box(),hw=CARD_W/2,hh=CARD_H/2,ccx=b.x+(11+cx+hw)*b.S,ccy=b.y+(12+cy+hh)*b.S,mx=hw*b.S*.2,my=hh*b.S*.2;
+   const kx=ccx<-mx?-mx+rubber(ccx+mx,30):ccx>base.width+mx?base.width+mx+rubber(ccx-base.width-mx,30):ccx,ky=ccy<-my?-my+rubber(ccy+my,30):ccy>base.height+my?base.height+my+rubber(ccy-base.height-my,30):ccy;
+   cx+=(kx-ccx)/b.S;cy+=(ky-ccy)/b.S;}
+  ghost.el.classList.toggle('near-mouth',state==='free'&&inMouth(cx,cy));
+  /* the card leans into the way it is moving */
+  const lean=state==='free'?clamp(drag.vx*.006,-9,9):0;
+  gs.to({cx,cy},{k:1400,c:75}).to({cr:lean},{k:260,c:24});
+  if(state==='free')showBin(px,py);else hideBin();
+ };
+ const endDrag=async e=>{
+  const d=drag;drag=null;layer.classList.remove('dragging');ghost.el.classList.remove('near-mouth');
+  if(!d.moved){if(state==='in'){goHome();gs.to({cy:0},{k:300,c:26});}return;}
+  if(performance.now()-d.t>90){d.vx=0;d.vy=0;}
+  const b=box(),vx=clamp(d.vx,-4000,4000)/b.S,vy=clamp(d.vy,-4000,4000)/b.S;
+  gs.to({cr:0},{k:42,c:7.5});if(state==='free')gs.to({cs:1},{k:260,c:18});
+  if(state==='in'){
+   /* let go part way: a fast pull or more than half out finishes the pull, otherwise it slips back in */
+   const out=-gs.x.cy/-FREE_AT;
+   /* pushed in from outside: it goes home unless it is flicked back out */
+   if(d.pushing&&vy>-700){seat();return;}
+   if(out>.5&&vy<240||vy<-700){free();gs.to({cy:FREE_AT-30},{k:120,c:17,v:{cy:Math.min(vy,0)}});}
+   else{gs.to({cx:0},{k:300,c:30}).to({cy:0},{k:240,c:15,v:{cy:Math.max(vy,0)}});gs.wall('cy',0,.35);gs.until(x=>Math.abs(x.cy)<.5).then(()=>{if(state==='in'&&!drag){gs.kick({hr:-6}).to({hr:0},{k:60,c:4.6});goHome();}});}
+   return;
+  }
+  if(state!=='free')return;
+  if(armed){askDiscard();return;}
+  hideBin();
+  if(inMouth(gs.x.cx,gs.x.cy)){seat();return;}
+  /* thrown: it coasts on from the hand's speed and settles inside the window */
+  const c=5.5,ex=coastEnd(gs.x.cx,vx,c),ey=coastEnd(gs.x.cy,vy,c);
+  const b2=box(spring.goal),lim=(p,lo,hi)=>clamp(p,lo,hi);
+  const minX=(24-b2.x)/b2.S-11,maxX=(base.width-24-b2.x)/b2.S-11-CARD_W,minY=(24-b2.y)/b2.S-12,maxY=(base.height-110-b2.y)/b2.S-12-CARD_H;
+  gs.to({cx:lim(ex,minX,maxX),cy:lim(ey,minY,maxY)},{k:46,c:12.5,v:{cx:vx,cy:vy}});
+ };
+
+ /* ---- discard: asked once more ---- */
+ const askDiscard=()=>{
+  state='asking';confirmEl.hidden=false;const boxEl=confirmEl.querySelector('.cw-confirm-box');
+  {const bw=Math.min(360,base.width-48),bh=boxEl.offsetHeight||170,b=binAt||{x:base.width/2,y:base.height/2,side:'b'};
+   let left=b.side==='l'?b.x+52:b.side==='r'?b.x-52-bw:b.x-bw/2,top=b.side==='t'?b.y+52:b.side==='b'?b.y-52-bh:b.y-bh/2;
+   const L=clamp(left,24,base.width-bw-24),T=clamp(top,24,base.height-bh-24);boxEl.style.left=L+'px';boxEl.style.top=T+'px';boxEl.dataset.side=b.side;
+   boxEl.style.setProperty('--ax',clamp(b.x-L,22,bw-22)+'px');boxEl.style.setProperty('--ay',clamp(b.y-T,22,bh-22)+'px');}
+  if(!reduce()){confirmEl.animate([{opacity:0},{opacity:1}],{duration:200,easing:'linear'});boxEl.animate([{transform:'scale(.94)',opacity:0},{transform:'none',opacity:1}],{duration:420,easing:EASE_OUT});}
+  confirmEl.querySelector('.cw-keep').focus({preventScroll:true});
+ };
+ const closeAsk=()=>{if(confirmEl.hidden)return;if(reduce())confirmEl.hidden=true;else confirmEl.animate([{opacity:1},{opacity:0}],{duration:160,easing:'linear'}).finished.then(()=>{confirmEl.hidden=true;},()=>{confirmEl.hidden=true;});};
+ const keep=()=>{
+  closeAsk();state='free';hideBin();
+  /* it comes back from the edge to the middle of the bench */
+  gs.to({cx:0,cy:FREE_AT-30,cr:0,cs:1,co:1},{k:120,c:18});setTimeout(()=>layer.focus({preventScroll:true}),0);
+ };
+ const discard=async()=>{
+  closeAsk();state='gone';closing=true;
+  await chain;
+  /* into the bin: it shrinks onto the ring and goes out */
+  const bc=binCentre(),b=box();
+  gs.to({cx:(bc.x-b.x)/b.S-11-CARD_W/2,cy:(bc.y-b.y)/b.S-12-CARD_H/2,cs:.12,cr:-10},{k:170,c:24}).to({co:0},{k:90,c:20});
+  bin.classList.add('is-eating');if(!reduce())setTimeout(()=>{const f=document.createElement('i');f.className='cw-bin-flare';bin.append(f);f.animate([{transform:'scale(.6)',opacity:.9},{transform:'scale(2.4)',opacity:0}],{duration:620,easing:EASE_OUT}).finished.then(()=>f.remove(),()=>f.remove());},260);
+  let next=null;try{next=applied?await call('cards_delete',{cardId:card.id}):null;}catch(e){console.warn('cards_delete',e);}
+  if(!next){toast(w.failed);closing=false;state='free';bin.classList.remove('is-eating');keep();return;}
+  if(page===P){P.state=next;updateCount();}
+  await gs.until(x=>x.co<.05);hideBin();
+  /* the empty sleeve goes back to its place on the wall */
+  spring.to({...home(),z:1},MOTION.home).to({b:0},{k:170,c:28}).to({u:0},{k:300,c:34});
+  await spring.until(v=>Math.abs(v.s*v.z-home().s)<.02&&Math.hypot(v.x-home().x,v.y-home().y)<3);
+  src.style.opacity='';V.dispose();
+ };
+ confirmEl.querySelector('.cw-keep').addEventListener('click',keep);
+ confirmEl.addEventListener('pointerdown',e=>{if(!e.target.closest('.cw-confirm-box'))keep();});
+ confirmEl.querySelector('.cw-discard').addEventListener('click',discard);
+
  const close=async()=>{
-  if(closing)return;closing=true;layer.classList.add('closing');
+  if(closing)return;closing=true;layer.classList.add('closing');hideBin();
   ghost.seq=(ghost.seq||0)+1;
-  const gs=motion(ghost);
-  if(loose)gs.to({co:0,cy:gs.x.cy+40},{k:200,c:28});
-  /* the shortest way back to face on, wherever the free turn left it */
-  const near=a=>a-360*Math.round(a/360);turn.jump({rx:near(turn.x.rx),ry:near(turn.x.ry)}).to({rx:0,ry:0},{k:200,c:28});
-  spring.to({...home(),z:1},{k:240,c:28}).to({b:0},{k:170,c:28}).to({u:0},{k:300,c:34});
-  await spring.until(v=>Math.hypot(v.x-home().x,v.y-home().y)<home().s*TL_W*.12&&Math.abs(v.s*v.z-home().s)<home().s*.08);
+  const out=state==='free',into=out?pocket:home;
+  if(out)gs.to({co:0},{k:60,c:16});else gs.to({cx:0,cy:0,cr:0,cs:1},{k:300,c:30});
+  faceOn(200,28);
+  spring.to({...into(),z:1},MOTION.home).to({b:0},{k:170,c:28}).to({u:0},{k:300,c:34});
+  const at=(v,d)=>{const h=into();return Math.hypot(v.x-h.x,v.y-h.y)<d*h.s*TL_W&&Math.abs(v.s*v.z-h.s)<h.s*d*.7;};
+  await spring.until(v=>at(v,.12));
   src.style.opacity='';
-  await spring.until(v=>Math.abs(v.s*v.z-home().s)<.012&&Math.hypot(v.x-home().x,v.y-home().y)<2.5);
+  if(out){pulseCount();await spring.until(v=>at(v,.04)||gs.x.co<.02);}
+  else await spring.until(v=>Math.abs(v.s*v.z-home().s)<.012&&Math.hypot(v.x-home().x,v.y-home().y)<2.5);
   V.dispose();
  };
  layer.querySelector('.cw-close').addEventListener('click',close);
- layer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();}});
- /* drag to turn (with the velocity carried into a friction coast), wheel to zoom, double-click to face on.
-    A press that does not move closes only when it lands on the veil. */
- let grab=null;
+ const goneHint=()=>{if(hintGone)return;hintGone=true;if(!reduce())hint.animate([{opacity:getComputedStyle(hint).opacity},{opacity:0}],{duration:300,easing:'linear'});hint.style.opacity='0';};
+ /* keyboard: Enter / Space take the card out or put it back, Delete asks to discard, Escape closes */
+ const keyPull=()=>{if(closing)return;if(state==='in'){goBench();free();gs.to({cy:FREE_AT-30},{k:120,c:17});}else if(state==='free')seat();};
+ layer.addEventListener('keydown',e=>{
+  if(!confirmEl.hidden){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();keep();}return;}
+  if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();}
+  else if((e.key==='Enter'||e.key===' ')&&e.target===layer){e.preventDefault();keyPull();}
+  else if(e.key==='Delete'&&state==='free'){e.preventDefault();askDiscard();}
+ });
+ /* a press on the card drags it; anywhere else it turns the card (with the velocity carried into a friction coast);
+    wheel zooms, double-click faces on, a press that does not move on the veil closes */
+ cardEl.addEventListener('pointerenter',()=>{if(state==='in'&&!drag&&!grab&&!closing)gs.to({cy:-5},{k:300,c:26});});
+ cardEl.addEventListener('pointerleave',()=>{if(state==='in'&&!drag&&!closing)gs.to({cy:0},{k:300,c:26});});
  stage.style.pointerEvents='auto';
  stage.addEventListener('pointerdown',e=>{
-  if(closing||!e.isPrimary||e.button!==0)return;
+  if(closing||state==='asking'||state==='gone'||!e.isPrimary||e.button!==0)return;
+  if(e.target.closest('.cw-ghost .cw-card')){turn.stop();startDrag(e);return;}
   turn.stop();grab={id:e.pointerId,x:e.clientX,y:e.clientY,t:performance.now(),rx:turn.x.rx,ry:turn.x.ry,vx:0,vy:0,moved:false,onCard:!!e.target.closest('.cw-ghost')};
   stage.setPointerCapture?.(e.pointerId);
  });
  stage.addEventListener('pointermove',e=>{
+  if(drag?.id===e.pointerId){moveDrag(e);return;}
   if(grab?.id!==e.pointerId)return;
   const dx=e.clientX-grab.x,dy=e.clientY-grab.y;if(!grab.moved&&Math.hypot(dx,dy)<4)return;
-  if(!grab.moved){grab.moved=true;layer.classList.add('turning');}
+  if(!grab.moved){grab.moved=true;layer.classList.add('turning');goneHint();}
   const now=performance.now(),dt=Math.max(4,now-grab.t),k=.42/Math.sqrt(spring.x.z);
   const ry=grab.ry+dx*k,rx=grab.rx-dy*k,prevX=turn.x.rx,prevY=turn.x.ry;
   turn.jump({rx,ry});
   grab.vx=grab.vx*.3+(rx-prevX)/dt*1000*.7;grab.vy=grab.vy*.3+(ry-prevY)/dt*1000*.7;grab.t=now;
  });
  const release=e=>{
+  if(drag?.id===e.pointerId){endDrag(e);return;}
   if(grab?.id!==e.pointerId)return;const g=grab;grab=null;layer.classList.remove('turning');
   if(!g.moved){if(!g.onCard&&e.type==='pointerup')close();return;}
   if(performance.now()-g.t>80||reduce())return;
@@ -622,50 +876,17 @@ function openViewer(cell){
   turn.to({rx:turn.x.rx+vx/c,ry:turn.x.ry+vy/c},{k:0,c,v:{rx:vx,ry:vy}});
  };
  stage.addEventListener('pointerup',release);stage.addEventListener('pointercancel',release);
- stage.addEventListener('dblclick',()=>{if(closing)return;const near=a=>a-360*Math.round(a/360);turn.jump({rx:near(turn.x.rx),ry:near(turn.x.ry)}).to({rx:0,ry:0},{k:150,c:20});spring.to({z:1},{k:200,c:26});});
+ stage.addEventListener('dblclick',e=>{if(closing||e.target.closest('.cw-ghost .cw-card'))return;faceOn();spring.to({z:spring.goal.z>.9?1:spring.goal.z},{k:200,c:26});});
  stage.addEventListener('wheel',e=>{
-  e.preventDefault();if(closing)return;
+  e.preventDefault();if(closing||state!=='in'||bench)return;
   const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?base.height:1);
   const goal=clamp((spring.goal.z||1)*Math.exp(-delta*.0016),.55,3.2);
   spring.to({z:goal},{k:260,c:32});
  },{passive:false});
- ejectBtn.addEventListener('click',async()=>{
-  if(busy||closing)return;busy=true;ejectBtn.disabled=true;
-  const gs=motion(ghost),toLoose=!loose;
-  /* square up first, then the card leaves (or goes back into) the sleeve */
-  const near=a=>a-360*Math.round(a/360);turn.jump({rx:near(turn.x.rx),ry:near(turn.x.ry)}).to({rx:0,ry:0},{k:170,c:24});
-  await turn.until(v=>Math.abs(v.rx)<3&&Math.abs(v.ry)<3);
-  try{
-   if(toLoose){
-    const job=call('cards_eject',{toploaderId:cell.id});
-    pullBack();
-    const done=ejectMotion(ghost,{loose:true}).then(ok=>{if(ok&&!closing)spring.to({...target(),z:1},{k:240,c:29});return ok;});
-    let next=null;try{next=await job;}catch(e){console.warn('cards_eject',e);}
-    if(!next){toast(w.failed);await gs.to({so:1},{k:160,c:24}).until(x=>x.so>.9);await insertMotion(ghost,{from:'here'});}
-    else{
-     P.state=next;const t=next.toploaders.find(x=>x.id===cell.id);fill(cell.parts,t?cardOf(next,t):null);updateCount();
-     await done;
-     /* the bare card now takes the turns; the sleeve's angle passes to it */
-     turn.stop();loose=true;turn.render(turn.x);ghost.el.classList.add('is-loose');ejectBtn.textContent=w.insert;
-    }
-   }else{
-    const job=call('cards_insert',{toploaderId:cell.id,cardId:card.id});
-    turn.stop();loose=false;turn.render(turn.x);ghost.el.classList.remove('is-loose');ejectBtn.textContent=w.eject;
-    /* the sleeve comes back, the card is carried over its opening, then the same insert as from the card maker */
-    pullBack();
-    gs.to({so:1},{k:150,c:24}).to({cy:ABOVE-10,cx:0,cr:0},{k:150,c:20});
-    await gs.until(x=>x.so>.85&&x.cy<ABOVE);
-    const done=insertMotion(ghost,{from:'here'});
-    let next=null;try{next=await job;}catch(e){console.warn('cards_insert',e);}
-    if(!next)toast(w.failed);else{P.state=next;const t=next.toploaders.find(x=>x.id===cell.id);fill(cell.parts,t?cardOf(next,t):null);updateCount();}
-    await done;if(!closing)spring.to({...target(),z:1},{k:120,c:21});
-   }
-  }finally{busy=false;ejectBtn.disabled=false;}
- });
  layer.tabIndex=-1;layer.focus({preventScroll:true});
- V.turn=turn;V.spring=spring;V.ghost=ghost;V.close=close;V.eject=()=>ejectBtn.click();
+ V.turn=turn;V.spring=spring;V.ghost=ghost;V.close=close;V.pull=keyPull;V.state=()=>({state,applied,loose,closing,binP,armed});
  return V;
 }
 
 /* test hooks for the headless checks (validation/card-wall-*.cjs) */
-if(window.__TOME_TEST_TRANSPORT__)window.__megulitCardWall={open:openCardWall,close:closeCardWall,page:()=>page,insertMotion,ejectMotion,hangMotion,setMode,activate,refresh,stillTransform};
+if(window.__TOME_TEST_TRANSPORT__)window.__megulitCardWall={open:openCardWall,close:closeCardWall,page:()=>page,insertMotion,hangMotion,scuffPicks,sleeveY,inMouth,binProgress,setMode,activate,refresh,stillTransform};
