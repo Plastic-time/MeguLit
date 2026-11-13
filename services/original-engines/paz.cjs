@@ -16,9 +16,12 @@ const SCHEMES={
    A Steam build names itself in the header ("eden_en") but GARbro keys schemes by title, so an archive whose header has
    no built-in scheme takes the first scheme whose index key decrypts a sane index of that archive. */
 let catalog=null;
-function schemes(){if(catalog)return catalog;catalog=Object.values(SCHEMES);let raw={};try{raw=JSON.parse(fs.readFileSync(path.join(__dirname,'paz-schemes.json'),'utf8'));}catch{}
+/* E561 an adapter pack's paz schemes (params target "paz-scheme", same shape as a paz-schemes.json entry plus "title") come first */
+function packPaz(){try{return require('../adapter-packs.cjs').params('paz-scheme');}catch{return [];}}
+function schemes(){const extra=packPaz();if(catalog&&catalog.extra===extra)return catalog;catalog=Object.values(SCHEMES);
+ for(const {value:s} of extra){try{if(typeof s.title!=='string')continue;const o={title:s.title,version:s.version|0,sc:s.type?.sc||'',ogg:s.type?.ogg||''};for(const [a,k] of Object.entries(s.arc||{}))if(Array.isArray(k)&&typeof k[0]==='string'&&typeof k[1]==='string')o[a]={index:k[0],data:k[1]};catalog.push(o);}catch{}}let raw={};try{raw=JSON.parse(fs.readFileSync(path.join(__dirname,'paz-schemes.json'),'utf8'));}catch{}
  for(const [title,s] of Object.entries(raw)){const o={title,version:s.version|0,sc:s.type?.sc||'',ogg:s.type?.ogg||''};for(const [a,k] of Object.entries(s.arc||{}))if(k&&k[0]&&k[1])o[a]={index:k[0],data:k[1]};catalog.push(o);}
- return catalog;}
+ catalog.extra=extra;return catalog;}
 function rc4(key,skip=0){const S=new Uint8Array(256);for(let i=0;i<256;i++)S[i]=i;let j=0;for(let i=0;i<256;i++){j=(j+S[i]+key[i%key.length])&255;const t=S[i];S[i]=S[j];S[j]=t;}let a=0,b=0;
  for(let k=0;k<skip;k++){a=(a+1)&255;b=(b+S[a])&255;const t=S[a];S[a]=S[b];S[b]=t;} /* version 2: GARbro skips (crc32(key)>>12)&255 bytes */
  return buf=>{for(let i=0;i<buf.length;i++){a=(a+1)&255;b=(b+S[a])&255;const t=S[a];S[a]=S[b];S[b]=t;buf[i]^=S[(S[a]+S[b])&255];}return buf;};}

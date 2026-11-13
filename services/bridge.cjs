@@ -211,6 +211,8 @@ async function dispatch(request,runtime=null) {
     if(String(request.action).startsWith('series_'))return require('./series.cjs').handle(db,root,request);
     /* 2026-11-13 card wall (services/card-wall.cjs) */
     if(String(request.action).startsWith('cards_'))return require('./card-wall.cjs').handle(db,root,request);
+    /* E563 probe → desensitized upload → adapter packs (services/adapter-actions.cjs) */
+    if(String(request.action).startsWith('adapter_'))return await require('./adapter-actions.cjs').handle(db,root,request,runtime);
     switch(request.action) {
       case 'anki_sync':{
         const {AnkiSync}=require('./anki-sync.cjs'),{Anki}=require('../core/anki.cjs');const config=store.readJSON(path.join(root,'data','config','v4-preferences.json'));

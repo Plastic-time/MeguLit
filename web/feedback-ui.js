@@ -73,6 +73,9 @@ async function report({ api, reason, contact, locale, version }) {
   return text?.ok ? 'text' : '';
 }
 
+/* E563 after a problem report: check the library on this PC; anything found is uploaded only after the user confirms it */
+const probeAfterReport = ({ api, locale, esc, toast }) => import('./adapter-probe-ui.js').then(m => m.openProbeUpload({ api, locale, esc, toast, reason: 'feedback' })).catch(() => {});
+
 export function openFeedback({ api, locale = 'zh', esc, toast, version = '' }) {
   const t = words(locale), dialog = document.createElement('dialog');
   dialog.className = 'game-dialog feedback-dialog';
@@ -94,7 +97,7 @@ export function openFeedback({ api, locale = 'zh', esc, toast, version = '' }) {
     const outcome = await report({ api, reason, contact: contact.value.trim(), locale, version });
     if (!dialog.isConnected) return;
     send.textContent = t.send;
-    if (outcome) { toast && toast(outcome === 'full' ? t.sent : t.sentTextOnly); dialog.close(); return; }
+    if (outcome) { toast && toast(outcome === 'full' ? t.sent : t.sentTextOnly); dialog.close(); probeAfterReport({ api, locale, esc, toast }); return; }
     send.disabled = false; status.textContent = t.failed; status.dataset.state = 'bad';
   };
   text.focus();
@@ -224,7 +227,7 @@ export function openGuide({ api, locale = 'zh', esc, toast, version = '', tab = 
     const outcome = await report({ api, reason: value, contact: reach.value.trim(), locale, version });
     if (!dialog.isConnected) return;
     send.disabled = false; send.textContent = t.send;
-    if (outcome) { said.dataset.state = 'ok'; said.textContent = outcome === 'full' ? t.sent : t.sentTextOnly; reason.value = ''; toast && toast(said.textContent); return; }
+    if (outcome) { said.dataset.state = 'ok'; said.textContent = outcome === 'full' ? t.sent : t.sentTextOnly; reason.value = ''; toast && toast(said.textContent); probeAfterReport({ api, locale, esc, toast }); return; }
     said.textContent = t.failed; said.dataset.state = 'bad';
   };
   dialog.showModal();

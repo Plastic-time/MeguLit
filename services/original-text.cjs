@@ -265,6 +265,8 @@ const PATCH_VERSION=3;
    index now also carries a stamp of the reader code; another stamp reads the script again and rebuilds the patch. */
 const READER=(()=>{try{const h=require('node:crypto').createHash('sha256');const dir=path.join(__dirname,'original-engines');
  for(const f of fs.readdirSync(dir).filter(n=>n.endsWith('.cjs')).sort())h.update(f+'|').update(fs.readFileSync(path.join(dir,f)));
+ /* E561 the adapter-pack runtime reads scripts too: a fix to it reads the games it serves again */
+ try{h.update('adapter-packs|').update(fs.readFileSync(path.join(__dirname,'adapter-packs.cjs')));}catch{}
  return h.digest('hex').slice(0,12);}catch{return '';}})();
 const autoRuns=new Map();
 // Fire and forget, with its own database handle (callers' handles close when their request ends).
