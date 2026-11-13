@@ -1014,14 +1014,16 @@ function dictionary(target){
   if(pendingLookup){const word=pendingLookup;pendingLookup='';const input=target.querySelector('#lookup-input');input.value=word;/* the form is attached by commit() after this returns */setTimeout(()=>{
    const form=target.querySelector('#lookup-form');if(form.isConnected)form.requestSubmit(form.querySelector('button[value=moji]'));},0);}
 }
-async function review(token,target){
+/* 2026-11-13 Anki review HUD: the latest played game's art for its background, and the window's own full screen */
+ const ankiCover=()=>recentGames(model.games||[]).find(g=>g.cover)?.cover||'',ankiWindow=action=>invoke('window_action',{action});
+ async function review(token,target){
   target.innerHTML=`<div class="tabs review-sources"><button class="tab active" data-review-source="anki">${text.ankiReview}</button><button class="tab" data-review-source="local">${text.localReview}</button></div><div id="review-content"></div>`;
   const content=target.querySelector('#review-content');
   target.querySelectorAll('[data-review-source]').forEach(button=>button.onclick=()=>{target.querySelectorAll('[data-review-source]').forEach(b=>b.classList.toggle('active',
    b===button));if(button.dataset.reviewSource==='anki')renderAnkiReview({target:content,api,text,esc,isCurrent:()=>token===pageToken&&button.classList.contains('active'),
-   toast}).catch(error=>toast(errorMessage(error)));else localReview(token,content);});
+   toast,cover:ankiCover,windowAction:ankiWindow}).catch(error=>toast(errorMessage(error)));else localReview(token,content);});
   await renderAnkiReview({target:content,api,text,esc,isCurrent:()=>token===pageToken&&target.querySelector('[data-review-source="anki"]').classList.contains('active'),
-   toast,quiet:true});
+   toast,quiet:true,cover:ankiCover,windowAction:ankiWindow});
 }
 async function localReview(token,target){
   const words=await api('vocabulary');if(token!==pageToken)return;
