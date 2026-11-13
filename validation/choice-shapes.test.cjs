@@ -47,3 +47,15 @@ test('choices: native side splits a glued option at rows standing apart and pass
  assert.match(read('native/HookBridge.cs'),/ChoiceBatch\(name,EmbedBatch\.Recent\(DateTime\.UtcNow\)\)/);
  assert.match(read('core/hook-native.cjs'),/if\(this\.choice\?\.active\)return false;/);
 });
+test('choices: the reader stays up for the options but drops the old line when the game hid its text box',()=>{
+ const {Immersion}=require('../core/immersion.cjs');const out=[];const im=new Immersion(m=>out.push(m));im.configure({immersion:true,dialogDetection:'hook'});
+ im.choices(true);out.length=0;im.set(false,'scene');assert.deepStrictEqual(out,[{dialogVisible:true,choiceOnly:true}]);
+ im.choices(false);assert.deepStrictEqual(out.pop(),{dialogVisible:true,choiceOnly:false});
+ const src=fs.readFileSync(path.join(__dirname,'..','web/reader/bootstrap.js'),'utf8');assert.match(src,/megulit-choice-only/);
+});
+test('multi-language row: a Chinese tail glued after the Japanese sentence goes (ATRI)',()=>{
+ const {japaneseTrack}=require('../core/language-tracks.cjs');
+ assert.strictEqual(japaneseTrack('アトリが助けを求めるように俺を見た。足になります！成为你的右腿！成為你的右腿！'),'アトリが助けを求めるように俺を見た。足になります！');
+ assert.strictEqual(japaneseTrack('東京へ行こう。東京駅前広場'),'東京へ行こう。東京駅前広場');
+ assert.strictEqual(japaneseTrack('「はい」'),'「はい」');
+});

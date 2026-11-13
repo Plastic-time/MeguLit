@@ -74,6 +74,9 @@ function foreignRows(text){const rows=String(text).split(/\r?\n/);if(rows.length
    then two equal halves (a stray end marker letter allowed) keeps one. %l groups are left to inlineAlternatives. */
 function inlineCommands(text){return text.replace(/%(?!l)[a-z][a-z0-9]*;/gi,'').replace(/#(?:[0-9a-f]{6,8})?;/gi,'');}
 function halveLoose(s){const once=halve(s);if(once!==s)return once;const m=/^([\s\S]*?)[A-Za-z]{1,2}\s*$/.exec(s);if(m&&KANA.test(m[1])){const body=m[1].trimEnd(),h=halve(body);if(h!==body)return h;}return s;}
+/* 2026-11-13 (live ATRI: 「…足になります！成为你的右腿！成為你的右腿！」): a multi-language stream glues the Simplified and Traditional
+   lines onto the Japanese one in a single row. After the last kana's sentence end, a kana-free tail that reads as Chinese goes. */
+function foreignTail(row){const s=String(row);let last=-1;for(let i=s.length-1;i>=0;i--){if(/[ぁ-ゟァ-ヺ]/u.test(s[i])){last=i;break;}}if(last<0)return s;const end=s.slice(last).search(/[。！？!?」』…]/u);if(end<0)return s;const cut=last+end+1;let at=cut;while(at<s.length&&/[。！？!?」』…\s]/u.test(s[at]))at++;const tail=s.slice(at);if(!tail||/[ぁ-ゟァ-ヺ]/u.test(tail))return s;const han=(tail.match(/[㐀-鿿]/gu)||[]).length;return han>=3&&(zhScore(tail)>=1||tail.includes('，'))?s.slice(0,at).trimEnd():s;}
 function japaneseTrack(text){
  if(typeof text!=='string'||!text)return text;
  let out=inlineAlternatives(text);
@@ -81,6 +84,7 @@ function japaneseTrack(text){
  out=tracks(out)??out;
  out=semicolonTracks(out)??out;
  out=foreignRows(out);
+ out=out.split(/\r?\n/).map(foreignTail).join('\n');
  return out;
 }
 /* E312 (live test 2026-11-13, Summer Pockets: 10_プロローグ0725___for_summerpockets_language___for_summerpockets and a half-scrolled

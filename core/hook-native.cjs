@@ -211,7 +211,7 @@ class HookNative{
   if(!this.choiceOptions)return;
   {const fixed=placeChoices(items,this.choiceOptions,Array.isArray(m.missed)?m.missed.map(String):[],this.choice?.order);if(fixed.length!==items.length)this.trace('choice placed '+JSON.stringify(fixed.map(i=>[i.text,i.x0,i.y0,i.x1,i.y1])));items.splice(0,items.length,...fixed);}
   /* 2026-11-13 one box is enough when every other option is only ellipses (nothing to read or translate there) */
-  if(items.length>=2||items.length===1&&this.choiceOptions.length>=2&&(m.missed||[]).length>0&&(m.missed||[]).every(s=>SYMBOL_OPTION.test(String(s)))){this.choice.active=true;this.notify({hookChoices:{items,sw:n(m.sw),sh:n(m.sh),at:this.now()}});
+  if(items.length>=2||items.length===1&&this.choiceOptions.length>=2&&(m.missed||[]).length>0&&(m.missed||[]).every(s=>SYMBOL_OPTION.test(String(s)))){this.choice.active=true;this.notify({hookChoices:{items,sw:n(m.sw),sh:n(m.sh),at:this.now(),/* options on screen OCR could not box (ellipsis rows): the reader keeps clear of them */unboxed:Math.max(0,this.choiceOptions.length-items.length)}});
    /* the buttons can move (hover, animation): read them again a few times while the choice screen is up */const r=(this.choiceRound||0)+1;if(r<=8){clearTimeout(this.choiceTimer);this.choiceTimer=setTimeout(()=>{if(this.choice?.active)this.requestChoices(r);},1500);this.choiceTimer.unref?.();}}
   else if(this.choice?.active)this.clearChoices('choices no longer on screen');}
  /* 2026-11-13 the choice detector also knows the names learned from bare name lines (CLANNAD 「朋也」) */newChoiceCapture(){const C=new ChoiceCapture(()=>this.now());C.extraNames=()=>this.knownSpeakers||[];return C;}
