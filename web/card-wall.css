@@ -325,3 +325,7 @@
 @property --gl{syntax:'<number>';inherits:true;initial-value:0}
 /* the two extra glint sets show wherever the shine foil shows: the hovered card and the inspected one */
 .cw-tl[data-finish=shine] .cw-tilt.is-tilting .cw-glint,.cw-tl[data-finish=shine] .cw-tilt.tilt-out .cw-glint,.cw-ghost[data-finish=shine] .cw-glint{display:block}
+/* in inspect the card turns in 3D around its centre: its shadow lies well behind every angle it can reach, so the turning
+   card never cuts through it (that crossing drew a hard diagonal seam with half the card darkened); scaled back up for
+   the perspective it loses */
+.cw-ghost .cw-lift{translate:0 0 -170px;scale:1.115}
