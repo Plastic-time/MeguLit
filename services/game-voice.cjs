@@ -104,8 +104,10 @@ function gameDir(dir,depth=2){const sc=require('./original-engines/scenes.cjs');
  let list=[];try{list=fs.readdirSync(dir,{withFileTypes:true}).filter(e=>e.isDirectory()&&!/^(?:savedata|save|\.megulit)/i.test(e.name));}catch{}
  for(const e of list){const hit=gameDir(path.join(dir,e.name),depth-1);if(hit)return hit;}return null;}
 // Keep a clip recorded while the game ran for this line (runtime source). Never replaces a scanned voice.
-function remember(root,text,audio,{game='runtime'}={}){if(typeof audio==='string')audio=Buffer.from(audio,'base64');const k=keyOf(text),t=kind(audio);if(!k||!t)return false;const data=lines(root);if(data.lines[k]&&data.lines[k][1]!=='runtime')return false;
- const file=path.join(cacheDir(root),'runtime',k+t.ext);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,audio);data.lines[k]=[game,'runtime',t.ext];save(root);return true;}
+function remember(root,text,audio,{game='runtime',save:keep=true}={}){if(typeof audio==='string')audio=Buffer.from(audio,'base64');const k=keyOf(text),t=kind(audio);if(!k||!t)return false;const data=lines(root);if(data.lines[k]&&data.lines[k][1]!=='runtime')return false;
+ const file=path.join(cacheDir(root),'runtime',k+t.ext);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,audio);data.lines[k]=[game,'runtime',t.ext];if(keep)save(root);return true;}
+// After remember(..., {save:false}) calls: writes the index once.
+function flush(root){save(root);}
 // The voice for a line: {data, mime, source:'scan'|'runtime'} or null. A scanned clip is copied to the cache the first time.
 /* E461 a voice from a scan older than SCAN_VERSION may belong to another line: not played; that game is scanned again
    in the background (once) and the line has its voice when that is done */
@@ -132,4 +134,4 @@ function scanLater(root,executable,delay=8000,{cold=false}={}){if(!executable)re
  const t=setTimeout(()=>scanInWorker(root,start,({g,r})=>{running.delete(k);if(!g||!r)return;const e=lines(root).games[gameKey(g.dir)];if(e){e.from=k;save(root);}
    if(cold&&r.missing?.length){const vc=require('./voice-cold.cjs');const off=vc.onDone(job=>{if(job.game.dir===g.dir){off();scanInWorker(root,g.dir,()=>{});}});vc.consider(root,{executable:String(executable),dir:g.dir,engine:g.engine},r.missing);}}),delay);t.unref?.();}
 const has=(root,text)=>{const k=keyOf(text);return !!(k&&lines(root).lines[k]);};
-module.exports={hashedPaths,scanLater,norm,keyOf,kind,catalog,arcList,ovkList,scan,gameDir,remember,find,has,gameKey,_reset(){memo=null;catalogs.clear();}};
+module.exports={flush,hashedPaths,scanLater,norm,keyOf,kind,catalog,arcList,ovkList,scan,gameDir,remember,find,has,gameKey,_reset(){memo=null;catalogs.clear();}};

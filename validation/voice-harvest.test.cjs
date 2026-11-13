@@ -62,6 +62,24 @@ test('build keeps the full clip over a partial one and lookup/publish/script nam
  process.env.MEGULIT_TEST_ROOT=base;const gv=require('../services/game-voice.cjs');gv._reset();
  assert.equal(vh.publish(base,game),2);assert.ok(gv.find(base,'めぐみん「爆裂魔法！」'));});
 
+// Review 3 items 5 and 6 (port-notes/review3-voice.md).
+test('a read file pairs only with a sound of about its length, music reads never pair, and publish hands each entry over once',()=>{const{base,game,vh}=fresh();
+ const play=(file,start,ms,extra={})=>({file,start,ms,crc:file,api:'dsound',...extra}),read=(file,start,ms,bytes=6000)=>({file,start,ms,crc:'r'+file,read:true,raw:true,bytes,source:'voice\\'+file});
+ const ls=[{text:'一行目',t:1000},{text:'二行目',t:5000},{text:'三行目',t:9000}];
+ const m=vh.match(ls,[read('a.ogg',900,1200),play('a.wav',1050,1180),read('b.ogg',4900,4000),play('b.wav',5050,900),read('c.ogg',8900,3000),play('c.wav',9050,700,{stopped:true})]);
+ const by=Object.fromEntries(m.map(x=>[x.text,x.clip]));
+ assert.equal(by['一行目'].enc?.file,'a.ogg','lengths agree: the file is kept');
+ assert.equal(by['二行目'].file,'b.wav');assert.equal(by['二行目'].enc,undefined,'4 s file vs 0.9 s sound: not its file');
+ assert.equal(by['三行目'].enc?.file,'c.ogg','a cut-off sound may be shorter than its file');
+ // api "file" lines over FILE_MAX (music) are not read at all.
+ const dir=vh.voiceDir(game);fs.mkdirSync(dir,{recursive:true});
+ const ogg=n=>{const b=Buffer.alloc(n);b.write('OggS');return b;};fs.writeFileSync(path.join(dir,'f00001.ogg'),ogg(5000));fs.writeFileSync(path.join(dir,'f00002.ogg'),ogg(4096));
+ fs.writeFileSync(path.join(dir,'events.jsonl'),[{file:'f00001.ogg',api:'file',start:1000,ms:0,bytes:5000,crc:'x1',name:'voice\\v1.ogg'},{file:'f00002.ogg',api:'file',start:2000,ms:0,bytes:6<<20,crc:'x2',name:'bgm\\title.ogg'}].map(e=>JSON.stringify(e)).join('\n')+'\n');
+ assert.deepEqual(vh.events(game).map(e=>e.file),['f00001.ogg']);
+ vh.noteLine(game,'一行目',950);vh.build(game);
+ process.env.MEGULIT_TEST_ROOT=base;const gv=require('../services/game-voice.cjs');gv._reset();
+ assert.equal(vh.publish(base,game),1);assert.equal(vh.publish(base,game),0,'nothing new: nothing handed over again');});
+
 test('always on (no switch); three faults for a game switch it off',()=>{const{game,vh}=fresh();assert.equal(vh.enabled(game),true);
  assert.equal(vh.setEnabled,undefined);
  const d=vh.voiceDir(game);fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,'disabled.txt'),'fault a\nfault b\n');assert.equal(vh.enabled(game),true);
