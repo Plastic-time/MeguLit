@@ -312,12 +312,6 @@
 /* the whole CG over the face while it tours */
 .cw-full{position:absolute;left:0;top:0;max-width:none;opacity:0;transform-origin:0 0;pointer-events:none;user-select:none}
 /* the finish of a made card, next to Close */
-.cw-bar .cw-finish{display:flex;align-items:center;gap:2px;margin-right:6px;padding:0 6px;height:38px;border-radius:19px;border:1px solid var(--g-rule-strong,rgba(255,255,255,.16));background:color-mix(in srgb,var(--g-raise,#1d1513) 88%,transparent)}
-.cw-bar .cw-finish button{position:relative;padding:8px 10px;border:0;background:none;color:var(--g-t2,#c3ab9c);font:400 13px/1 var(--g-serif,serif);letter-spacing:.04em;cursor:pointer}
-.cw-bar .cw-finish button::after{content:"";position:absolute;left:10px;right:10px;bottom:4px;height:1px;background:var(--g-gold,#edb56e);scale:0 1;transition:scale .35s cubic-bezier(.22,1,.36,1)}
-.cw-bar .cw-finish button[aria-checked=true]{color:var(--g-t1,#f1e0d2)}
-.cw-bar .cw-finish button[aria-checked=true]::after{scale:1 1}
-.cw-bar .cw-finish button:focus-visible{outline:2px solid var(--g-gold,#edb56e);outline-offset:1px;border-radius:12px}
 .cw-viewer.desk .cw-bar{left:calc(100% - 250px)}
 @media (prefers-reduced-motion:reduce){.cw-bar .cw-finish button::after{transition:none}}
 
@@ -329,3 +323,17 @@
    card never cuts through it (that crossing drew a hard diagonal seam with half the card darkened); scaled back up for
    the perspective it loses */
 .cw-ghost .cw-lift{translate:0 0 -170px;scale:1.115}
+
+/* control system B segmented control (controls-b.css): 2px plate, hairline dividers, the chosen one solid red */
+.cw-bar .cw-finish{display:inline-flex;align-items:stretch;gap:0;padding:0;border:1px solid var(--mgc-line,rgba(240,229,218,.2));border-radius:var(--mgc-r,2px);background:color-mix(in srgb,var(--mgc-plate,#191315) 82%,transparent)}
+.cw-bar .cw-finish button{min-height:30px;padding:0 14px;margin:0;border:0;border-left:1px solid var(--mgc-line,rgba(240,229,218,.2));border-radius:0;background:transparent;color:var(--mgc-ink-2,#b8a69a);font:500 13px/1 var(--mgc-ui,sans-serif);letter-spacing:.02em;cursor:pointer;transition:background-color var(--mgc-t,.24s),color var(--mgc-t,.24s)}
+.cw-bar .cw-finish button:first-of-type{border-left:0}
+.cw-bar .cw-finish button:hover{background:color-mix(in srgb,var(--mgc-ink,#f0e5da) 9%,transparent);color:var(--mgc-ink,#f0e5da)}
+.cw-bar .cw-finish button[aria-checked=true]{background:var(--mgc-red,#c8323c);color:#fff;font-weight:600}
+.cw-bar .cw-finish button::after{content:none}
+.cw-bar .cw-finish{height:auto;margin-right:8px}
+.cw-confirm-box h3{font-family:var(--mgc-serif,serif)}
+
+/* control system B: one radius for panels too */
+.cw-confirm-box,.cw-toast{border-radius:var(--mgc-r,2px)}
+.cw-confirm-box::before{border-radius:0}

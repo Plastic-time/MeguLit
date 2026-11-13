@@ -159,13 +159,6 @@
 @media (prefers-reduced-motion:reduce){.cm-mine-card{transition:none}}
 
 /* finish picker: three words in a row, the chosen one underlined in gold */
-.cm-finish{display:flex;align-items:center;gap:4px;margin:2px 0 14px;font:400 13px/1 var(--g-serif,serif)}
-.cm-finish span{margin-right:10px;color:var(--g-t3,#8a746b);letter-spacing:.06em}
-.cm-finish button{position:relative;padding:8px 10px;border:0;background:none;color:var(--g-t2,#c3ab9c);font:inherit;letter-spacing:.04em;cursor:pointer;transition:color .2s ease}
-.cm-finish button::after{content:"";position:absolute;left:10px;right:10px;bottom:2px;height:1px;background:var(--g-gold,#edb56e);scale:0 1;transition:scale .35s cubic-bezier(.22,1,.36,1)}
-.cm-finish button[aria-checked=true]{color:var(--g-t1,#f1e0d2)}
-.cm-finish button[aria-checked=true]::after{scale:1 1}
-.cm-finish button:focus-visible{outline:2px solid var(--g-gold,#edb56e);outline-offset:2px;border-radius:4px}
 /* the finish on the preview, lit where the pointer is */
 @property --gl{syntax:'<number>';inherits:true;initial-value:0}
 .cm-frame[data-finish] .cm-foil{opacity:1;transition:none}
@@ -184,3 +177,13 @@
 .cm-error{position:absolute;left:50%;bottom:22px;z-index:5;max-width:min(560px,calc(100% - 48px));margin:0;padding:11px 16px;border-radius:12px;transform:translateX(-50%);
  font:400 13.5px/1.55 var(--g-serif,serif);color:#ffe3e7;background:color-mix(in srgb,var(--accent,#ad1539) 30%,#1d1213);border:1px solid color-mix(in srgb,var(--accent,#ad1539) 65%,transparent);box-shadow:0 18px 36px -16px rgba(0,0,0,.8)}
 .cm-error[hidden]{display:none}
+
+.cm-finish-row{display:flex;align-items:center;gap:12px;margin:2px 0 14px}
+.cm-finish-row>span{font:400 13px/1 var(--g-serif,serif);color:var(--g-t3,#8a746b);letter-spacing:.06em}
+/* control system B segmented control (controls-b.css): 2px plate, hairline dividers, the chosen one solid red */
+.cm-finish{display:inline-flex;align-items:stretch;gap:0;padding:0;border:1px solid var(--mgc-line,rgba(240,229,218,.2));border-radius:var(--mgc-r,2px);background:color-mix(in srgb,var(--mgc-plate,#191315) 82%,transparent)}
+.cm-finish button{min-height:30px;padding:0 14px;margin:0;border:0;border-left:1px solid var(--mgc-line,rgba(240,229,218,.2));border-radius:0;background:transparent;color:var(--mgc-ink-2,#b8a69a);font:500 13px/1 var(--mgc-ui,sans-serif);letter-spacing:.02em;cursor:pointer;transition:background-color var(--mgc-t,.24s),color var(--mgc-t,.24s)}
+.cm-finish button:first-of-type{border-left:0}
+.cm-finish button:hover{background:color-mix(in srgb,var(--mgc-ink,#f0e5da) 9%,transparent);color:var(--mgc-ink,#f0e5da)}
+.cm-finish button[aria-checked=true]{background:var(--mgc-red,#c8323c);color:#fff;font-weight:600}
+.cm-finish button::after{content:none}

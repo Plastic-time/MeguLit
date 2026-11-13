@@ -292,8 +292,8 @@ export function openCardMaker({toploaderId=null,from=null,api=null}={}){
    <p class="cm-hint">${w.hint}</p></div>
    <aside class="cm-side"><div class="cm-previews"><figure><div class="cm-mini cm-mini-front" title="${esc(w.hover)}"><span class="cm-drift"><img alt="" src="${esc(it.src)}"></span></div><figcaption>${w.front} / ${w.back} · ${w.hoverShort}</figcaption></figure><figure><div class="cm-mini cm-mini-back">${backHTML(glyph,game.title)}</div><figcaption>${w.back}</figcaption></figure></div>
    <div class="cm-info"><b lang="ja">${esc(game.title)}</b><span>${esc(w.groups[it.kind]||'')}${it.w&&it.h?` · ${it.w}×${it.h}`:''}</span></div><div class="cm-meta"><span class="cm-tag is-static">${esc(w.src[it.source]||w.groups[it.kind]||'')}</span><span class="cm-zoom" aria-live="off">100%</span></div>
-   <div class="cm-finish" role="radiogroup" aria-label="${esc(w.finish)}"><span>${esc(w.finish)}</span>${['plain','shine','holo'].map(f=>`<button type="button" role="radio" data-finish="${f}" aria-checked="${f==='plain'}">${esc(w.finishes[f])}</button>`).join('')}</div>
-   <div class="cm-actions"><button type="button" class="primary cm-make">${insert?w.make:w.makeOnly}</button>${insert?`<button type="button" class="cm-quiet cm-only">${w.only}</button>`:''}</div></aside>`;
+   <div class="cm-finish-row"><span>${esc(w.finish)}</span><div class="cm-finish" role="radiogroup" aria-label="${esc(w.finish)}">${['plain','shine','holo'].map(f=>`<button type="button" role="radio" data-finish="${f}" aria-checked="${f==='plain'}">${esc(w.finishes[f])}</button>`).join('')}</div></div>
+   <div class="cm-actions"><button type="button" class="primary cm-make">${insert?w.make:w.makeOnly}</button>${insert?`<button type="button" class="cm-quiet secondary cm-only">${w.only}</button>`:''}</div></aside>`;
   const frame=layer.querySelector('.cm-frame');
   push(layer,{fly:()=>{const img=btn.querySelector('img');const from=rectOf(img);frame.style.opacity='0';
    requestAnimationFrame(()=>{flight(from,rectOf(frame),{src:it.src,spring:SPRING.smooth,radius:8}).then(()=>{frame.style.opacity='';});});}});
