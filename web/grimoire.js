@@ -409,6 +409,7 @@ export function fieldify(grid,filtered=false){
     if(!pool.get(game)?.length){const sx=cx+(col*cw-x)*z,sy=cy+(row*ch-y)*z,mx=cardWidth*z,my=cardHeight*z;if((sx<-mx||sx>width+mx||sy<-my||sy>height+my)&&made>=6){deferred=true;continue;}made++;}
     const node=take(game);
     if(node.dataset.zoom!==tier)node.dataset.zoom=tier;
+
     if(!node.isConnected)(added||=document.createDocumentFragment()).append(node);
     cell={node,col,row,index:game,t:'',o:'',z:tier};cells.set(key,cell);
    }else if(cell.z!==tier){if(switched<24){cell.node.dataset.zoom=cell.z=tier;switched++;}else deferred=true;}
@@ -423,8 +424,8 @@ export function fieldify(grid,filtered=false){
   if(added)plane.append(added);
   if(deferred){painted='';queue();}
  }
- /* 2026-11-13 (user: dragging is smooth now but wants a little motion blur): a directional blur along the movement, only when the wall moves fast, in half-pixel steps so the filter is not rebuilt every frame; none with reduced motion */let zoomBusy=false,blurKey='0 0';const blurNode=(()=>{let svg=document.getElementById('mg-wall-blur-svg');if(!svg){svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id='mg-wall-blur-svg';svg.setAttribute('width','0');svg.setAttribute('height','0');svg.setAttribute('aria-hidden','true');svg.style.cssText='position:absolute;width:0;height:0;pointer-events:none';svg.innerHTML='<filter id="mg-wall-blur" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="0 0"/></filter>';document.body.append(svg);}return svg.querySelector('feGaussianBlur');})();const motionBlur=(sx,sy)=>{const step=v=>reduceMotion.matches?0:Math.min(6,Math.max(0,Math.round((Math.abs(v)-.35)*4)))/2;const key=step(sx)+' '+step(sy);if(key===blurKey)return;blurKey=key;blurNode?.setAttribute('stdDeviation',key);/* 2026-11-13 (user: dragging and zooming the wall still lag): an SVG url() filter on the whole plane is rasterised on the CPU and flattens every cover layer into one surface each frame, which was the drag/zoom stall. The blur is now a GPU CSS blur, only while the wall coasts or is flung fast, and it switches itself off for the session once frames run long while it is on. */const amt=Math.max(step(sx),step(sy));plane.style.filter=amt&&!wallBlurOff?`blur(${(amt*.5).toFixed(1)}px)`:'';};let wallBlurOff=false,slowFrames=0,lastFrameAt=0;const frameCost=now=>{const dt=lastFrameAt?now-lastFrameAt:16;lastFrameAt=now;if(plane.style.filter&&dt>22&&dt<200){if(++slowFrames>5){wallBlurOff=true;plane.style.filter='';}}else if(dt<=22)slowFrames=Math.max(0,slowFrames-1);};
-  function frame(now){
+ /* 2026-11-13 (CDP trace, user: drag and zoom still hitch): the motion blur is gone. Every change of its step repainted the covers (80-110 ms frames with the blur on the plane, 20-40 ms frames with it on each cover's layer); the wall moves without it */let zoomBusy=false;
+ function frame(now){
   raf=0;
   if(coastEnd){
    const dt=Math.min(32,Math.max(0,now-coastAt)),decay=Math.exp(-dt/105);
@@ -445,9 +446,9 @@ export function fieldify(grid,filtered=false){
   }
   zoomAt=zooming?now:0;zoomBusy=zooming;
   /* 2026-11-13 (user: no forced capsule position, free drag): the wall rests exactly where the drag or its coast leaves it; no easing to a row gap afterwards */
-  frameCost(now);paint();{const fast=drag?.active||coastEnd;motionBlur(fast?vx:0,fast?vy:0);}
+  paint();
   if(!coastEnd&&!drag?.active&&!zooming)moving(false);
-  if(coastEnd||zooming||(drag?.active&&Math.hypot(vx,vy)>.75)||blurKey!=='0 0')queue();
+  if(coastEnd||zooming||(drag?.active&&Math.hypot(vx,vy)>.75))queue();
  }
  const queue=()=>{if(!raf)raf=requestAnimationFrame(frame);};
  const measure=()=>{

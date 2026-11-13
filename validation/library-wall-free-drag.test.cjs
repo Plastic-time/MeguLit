@@ -56,6 +56,11 @@ test('covers move inside classless wrappers', () => {
   assert.match(web('library-switch-motion.js'), /closest\('mg-cell'\)/);
 });
 
+test('no filter is put on the moving wall (each blur step repainted every cover)', () => {
+  assert.doesNotMatch(grimoire, /plane\.style\.filter\s*=/);
+  assert.doesNotMatch(grimoire, /cell\.node\.style\.filter\s*=/);
+});
+
 test('starting or stopping the wall restyles no cover', () => {
   for (const name of ['grimoire.css', 'e255-polish.css', 'unify.css', 'judge-r2.css']) {
     const css = web(name).replace(/\/\*[\s\S]*?\*\//g, '');
