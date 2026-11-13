@@ -19,13 +19,15 @@ const ENGINES=[
  {name:'AdvHD / WillPlus',hook:true,test:f=>f.has(/^rio\.arc$/i)||f.has(/^advhd\.exe$/i)},
  {name:'Majiro',hook:true,test:f=>f.has(/^scenario\.arc$/i)&&f.has(/\.arc$/i)},
  {name:'QLIE',hook:true,test:f=>f.sub('GameData',/\.pack$/i)},
- {name:'SoftPal',hook:true,test:f=>f.has(/^pal\.dll$/i)||(f.has(/^data\.pac$/i)&&f.has(/^script\.src$/i))},
- {name:'NeXAS',hook:true,test:f=>f.has(/^thumbnail\.pac$/i)||f.has(/^update\.pac$/i)},
+ /* E568 Softpal keeps PAL.dll in dll\ (時計仕掛けのレイライン); its archives start "PAC " (NeXAS: "PAC" + a version byte) */
+ {name:'SoftPal',hook:true,test:f=>f.has(/^pal\.dll$/i)||f.sub('dll',/^pal\.dll$/i)||f.magic(/^data\.pac$/i,'PAC ')||(f.has(/^data\.pac$/i)&&f.has(/^script\.src$/i))},
+ {name:'NeXAS',hook:true,test:f=>f.has(/^thumbnail\.pac$/i)||f.has(/^update\.pac$/i)||f.has(/^script\.pac$/i)&&!f.magic(/^script\.pac$/i,'PAC ')},
  {name:'System4 (AliceSoft)',hook:true,test:f=>f.has(/\.ain$/i)||f.has(/\.ald$/i)},
  {name:'ShiinaRio',hook:true,test:f=>f.has(/\.war$/i)},
  {name:'Entis / Cotopha',hook:true,test:f=>f.has(/\.noa$/i)},
  {name:'NScripter',hook:true,test:f=>f.has(/^(arc\.nsa|nscript\.dat|00\.txt|0\.txt)$/i)},
- {name:'LiveMaker',hook:true,test:f=>f.has(/\.lsb$/i)||f.has(/^live\.dll$/i)},
+ /* LiveMaker 2/3: game.dat (or an .ext beside the exe) is a "vff" archive */
+ {name:'LiveMaker',hook:true,test:f=>f.has(/\.lsb$/i)||f.has(/^live\.dll$/i)||f.magicAny(/\.(dat|ext)$/i,'vff\0')},
  {name:'MAGES',hook:true,test:f=>f.has(/.mpk$/i)||f.sub('languagebarrier',/./)},
  /* Spike Chunsoft SDL2 ports (Steam ダンガンロンパ 1・2): AGAR .wad archives */
  {name:'Spike Chunsoft (WAD)',hook:null,test:f=>f.magic(/\.wad$/i,'AGAR')},
@@ -35,12 +37,41 @@ const ENGINES=[
  // Older Nitroplus titles (装甲悪鬼村正, 沙耶の唄, スマガ…) pack scripts as nss.npa / system.npa (user report 2026-11-09).
  {name:'Nitroplus (NPA)',hook:true,test:f=>f.has(/^(nss|system|cg|sound)\.npa$/i)||f.names.filter(n=>/\.npa$/i.test(n)).length>=2},
  {name:"Ren'Py",hook:true,test:f=>f.has(/^renpy$/i)||f.sub('game',/\.rp[ay]c?$/i)},
- {name:'TyranoScript',hook:true,test:f=>f.sub('data',/^scenario$/i)||f.sub('resources',/^app\.asar$/i)&&f.has(/^tyrano/i)},
+ /* E567 TyranoScript: loose (tyrano/ or index.html beside data/scenario), Electron app.asar whose index names the scenario,
+    NW.js package.nw (an exe-appended NW.js build is found by the script reader, tyrano.cjs) */
+ {name:'TyranoScript',hook:true,test:f=>f.sub('data',/^scenario$/i)&&(f.has(/^tyrano$/i)||f.has(/^index\.html$/i))||f.sub('resources',/^app\.asar$/i)&&f.peek('resources/app.asar',/data\/scenario|"scenario"/,65536)||f.has(/^package\.nw$/i)&&!f.sub('www',/./)},
+ /* E569 engines MeguLit reads but did not recognise (the library showed them as unknown): FAVORITE FVP (<name>.hcb),
+    Innocent Grey IGA, Musica PAZ (ぱれっと: scr.dat + sys.dat + st/bg.dat), Bruns (scene/*.bso), HuneX (.hfa),
+    Majiro archives under any name */
+ {name:'FVP (FAVORITE)',hook:true,test:f=>f.has(/\.hcb$/i)||f.has(/^fvpkernel\.dll$/i)},
+ {name:'Innocent Grey (IGA)',hook:true,test:f=>f.magicAny(/\.iga$/i,'IGA0')},
+ {name:'Musica (PAZ)',hook:true,test:f=>f.has(/\.paz$/i)&&!f.has(/^(scr|sys)\.paz$/i)||f.has(/^scr\.dat$/i)&&f.has(/^sys\.dat$/i)&&f.has(/^(st|bg)\.dat$/i)},
+ {name:'Bruns',hook:null,test:f=>f.sub('scene',/\.bso$/i)||f.has(/^belisama\.cfg$/i)},
+ {name:'HuneX',hook:null,test:f=>f.has(/\.hfa$/i)||f.sub('data',/\.hfa$/i)},
+ {name:'Majiro',hook:true,test:f=>f.magicAny(/\.arc$/i,'MajiroArcV')},
+ /* E569 engines MeguLit did not know at all: named so the library is not "unknown"; text goes through the general hook and
+    is confirmed on first play (hook:null) */
+ {name:'CMVS (Purple Software)',hook:true,test:f=>f.magicAny(/\.cpz$/i,'CPZ')},
+ {name:'EAGLS',hook:true,test:f=>f.has(/^eagles\.dll$/i)||f.has(/^scpack\.(pak|idx)$/i)},
+ {name:'Ikura GDL',hook:null,test:f=>f.magicAny(/^[A-Za-z0-9_]{2,12}$/,'SM2MPX10')},
+ {name:"Silky's",hook:null,test:f=>f.magicAny(/\.ifl$/i,'IFLS')||f.has(/^ai[56]win\.exe$/i)},
+ {name:'System-NNN',hook:null,test:f=>f.has(/\.gtb$/i)&&f.has(/\.gpk$/i)||f.has(/\.vtb$/i)&&f.has(/\.vpk$/i)},
+ {name:'KaGuYa',hook:null,test:f=>f.has(/\.ari$/i)&&f.has(/\.arc$/i)},
+ {name:'Lucifen',hook:null,test:f=>f.magicAny(/\.lpk$/i,'LPK1')},
+ {name:'Yuka',hook:null,test:f=>f.magicAny(/\.ykc$/i,'YKC00')},
+ {name:'Luca System',hook:null,test:f=>f.sub('files',/^script\.pak$/i)},
+ {name:'NEKOPACK',hook:null,test:f=>f.magicAny(/\.(dat|pak)$/i,'NEKOPACK')},
+ {name:'Marble',hook:null,test:f=>f.has(/\.mbl$/i)},
+ {name:'rUGP (age)',hook:null,test:f=>f.has(/^rugp.*\.exe$/i)||f.has(/\.rio$/i)&&f.has(/\.rio\.ini$/i)},
+ {name:'Godot',hook:null,generic:true,test:f=>f.magicAny(/\.pck$/i,'GDPC')},
+ {name:'Unreal Engine',hook:null,generic:true,test:f=>f.has(/^engine$/i)&&f.names.some(n=>/\.exe$/i.test(n))&&f.sub('engine',/^(binaries|content)$/i)},
+ {name:'Adobe AIR / Flash',hook:null,generic:true,test:f=>f.sub('META-INF',/^AIR$/i)||f.has(/\.swf$/i)&&f.names.some(n=>/\.exe$/i.test(n))},
  {name:'Leaf / AQUAPLUS',hook:true,test:f=>f.has(/^grp\.pak$/i)&&f.has(/^char\.pak$/i)&&f.has(/^(voice|bgm|se)\.pak$/i)},
  // More engines (user, 2026-11-09). Signatures are files only these engines ship; text reading goes through the
  // general hook and is confirmed on first play (hook:null) until a game of that engine is verified.
  {name:'Escude',hook:true,test:f=>f.magic(/^script\.bin$/i,'ESC-ARC')||f.has(/^script\.bin$/i)&&f.has(/^(gpr|evt|st)\.bin$/i)},
- {name:'PJADV',hook:null,test:f=>f.magic(/^archive\.dat$/i,'GAMEDAT PAC')||f.has(/^textdata\.bin$/i)&&f.has(/^scenario\.dat$/i)},
+ /* E569 PJADV is Pajamas Adventure System: its GAMEDAT PAC / PAC2 archives go by other names too (data1.dat …) */
+ {name:'PJADV',hook:null,test:f=>f.magicAny(/\.(dat|pak)$/i,'GAMEDAT PAC')||f.has(/^textdata\.bin$/i)&&f.has(/^scenario\.dat$/i)},
  {name:'Valkyria',hook:true,test:f=>f.has(/\.odn$/i)},
  {name:'Cyberworks (C,system)',hook:null,test:f=>f.names.filter(n=>/^Arc0\d\.dat$/i.test(n)).length>=3},
  {name:'LC-ScriptEngine',hook:true,test:f=>f.has(/^lcsebody.*\.exe$/i)||f.has(/^lcscr.*\.lst$/i)},
@@ -91,7 +122,10 @@ function listing(dir){let names=[];try{names=fs.readdirSync(dir);}catch{}const c
  const magic=(re,head)=>{const n=names.find(x=>re.test(x));if(!n)return false;try{const fd=fs.openSync(path.join(dir,n),'r'),b=Buffer.alloc(head.length);try{fs.readSync(fd,b,0,b.length,0);}finally{fs.closeSync(fd);}return b.toString('latin1')===head;}catch{return false;}};
  // managed: a Unity build's <Name>_Data/Managed holds an assembly matching re (the VN framework inside Unity).
  const managed=re=>{const data=names.find(n=>/_Data$/i.test(n));if(!data)return false;if(!('\0managed' in cache))try{cache['\0managed']=fs.readdirSync(path.join(dir,data,'Managed'));}catch{cache['\0managed']=[];}return cache['\0managed'].some(n=>re.test(n));};
- return {names,magic,managed,has:re=>names.some(n=>re.test(n)),sub:(name,re)=>{const real=names.find(n=>n.toLowerCase()===name.toLowerCase());if(!real)return false;if(!(real in cache))try{cache[real]=fs.readdirSync(path.join(dir,real));}catch{cache[real]=[];}return cache[real].some(n=>re.test(n));}};}
+ /* E569 magicAny: one of the first few files matching re starts with head; peek: a file's first n bytes match re */
+ const magicAny=(re,head,max=4)=>names.filter(x=>re.test(x)).slice(0,max).some(n=>{try{const fd=fs.openSync(path.join(dir,n),'r'),b=Buffer.alloc(head.length);try{fs.readSync(fd,b,0,b.length,0);}finally{fs.closeSync(fd);}return b.toString('latin1')===head;}catch{return false;}});
+ const peek=(rel,re,n=4096)=>{try{const fd=fs.openSync(path.join(dir,rel),'r'),b=Buffer.alloc(n);let got;try{got=fs.readSync(fd,b,0,n,0);}finally{fs.closeSync(fd);}return re.test(b.toString('latin1',0,got));}catch{return false;}};
+ return {names,magic,magicAny,peek,managed,has:re=>names.some(n=>re.test(n)),sub:(name,re)=>{const real=names.find(n=>n.toLowerCase()===name.toLowerCase());if(!real)return false;if(!(real in cache))try{cache[real]=fs.readdirSync(path.join(dir,real));}catch{cache[real]=[];}return cache[real].some(n=>re.test(n));}};}
 function engineOf(dir){const f=listing(dir);for(const e of ENGINES)if(e.test(f))return e;return null;}
 /* A Steam emulator's launcher names the program it starts (SmartSteamEmu: SmartSteamEmu\launcher.ini Target, UTF-16);
    the original exe beside it quits without Steam (サノバウィッチ: SabbatOfTheWitch.exe vs SabbatOfTheWitch_crack.exe). */

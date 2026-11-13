@@ -154,18 +154,37 @@ function tlPairs(files){const langs=new Map();
    m2=t.match(/^old\s+"((?:[^"\\]|\\.)*)"/);if(m2){old=unq(m2[1]);continue;}
    m2=t.match(/^(?:new\s+|(?:[A-Za-z_][\w.]*\s+)*)"((?:[^"\\]|\\.)*)"/);if(m2&&old!==null){pairs.set(old,unq(m2[1]));old=null;}}}
  return langs;}
+/* E566 compiled scripts: a game without .rpy sources is read from its .rpyc files (loose or in .rpa archives), and a
+   compiled tl/<language> translation pairs by the translate identifier of each line (renpy-rpyc.cjs). */
+const rpyc=require('./renpy-rpyc.cjs');
+function renpyScenes(dir){const g=gameDir(dir),out=new Map();
+ for(const [key,s] of rpyc.scripts(g))out.set(key,{name:key,read:s.read});
+ for(const file of walk(g,4,RPY).filter(outsideTl)){const name=path.relative(g,file).replace(/\\/g,'/').toLowerCase();out.set(name,{name,read:()=>fs.readFileSync(file)});}
+ return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));}
+/* compiled tl files of a patch (or of the game's own tl folders): per language, id -> text and old -> new */
+function rpycTl(dirs){const langs=new Map(),add=buf=>{const t=rpyc.translations(buf);if(!t.lang||/^none$/i.test(t.lang))return;const l=langs.get(t.lang)||{ids:new Map(),strings:new Map()};langs.set(t.lang,l);for(const [k,v] of t.ids)if(!l.ids.has(k))l.ids.set(k,v);for(const [k,v] of t.strings)if(!l.strings.has(k))l.strings.set(k,v);};
+ const seen=new Set();for(const d of dirs){let names;try{names=fs.readdirSync(d);}catch{continue;}
+  for(const n of names){const f=path.join(d,n),k=f.toLowerCase();if(seen.has(k))continue;seen.add(k);
+   if(/\.rpyc$/i.test(n)&&/[\\/]tl[\\/]/i.test(f)){try{add(fs.readFileSync(f));}catch{}}
+   else if(/\.rpa$/i.test(n)){let idx;try{idx=rpyc.rpaIndex(f);}catch{continue;}if(!idx)continue;for(const [name,e] of idx)if(/(^|\/)tl\/[^/]+\/.*\.rpyc$/i.test(name))try{add(rpyc.rpaRead(f,e));}catch{}}}}
+ return langs;}
+const chineseScore=values=>{let score=0;for(const v of values)if(/[一-鿿]/.test(v)&&!(v.match(KANA)||[]).length)score++;return score;};
 const renpy={
  id:'renpy',hint:'game\\tl\\<语言> 文件夹',
- scenes(dir){const g=gameDir(dir);return walk(g,4,RPY).filter(outsideTl).sort().map(file=>({name:path.relative(g,file).toLowerCase(),read:()=>fs.readFileSync(file)}));},
- archives:()=>[],sources:dir=>walk(gameDir(dir),4,RPY).filter(outsideTl),
- parse:parseRpy,test:RPY,
- // The patch: the tl language whose translations are most Chinese; every running line is looked up by its text.
+ scenes:renpyScenes,
+ archives:()=>[],sources:dir=>{const g=gameDir(dir);return [...walk(g,4,RPY).filter(outsideTl),...walk(g,4,n=>/\.rpyc$/i.test(n)).filter(outsideTl),...walk(g,3,n=>/\.rpa$/i.test(n))];},
+ parse:buf=>rpyc.isRpyc(buf)?rpyc.parse(buf):parseRpy(buf),test:n=>RPY(n)||/\.rpyc$/i.test(n),
+ // The patch: the tl language whose translations are most Chinese. A source line is looked up by its text (.rpy tl,
+ // old/new string tables) and, for compiled scripts, by its translate identifier (E566).
  patchLines(base,found){
-  const files=found.dirs.flatMap(d=>fs.readdirSync(d).filter(RPY).map(f=>path.join(d,f)));
+  const files=found.dirs.flatMap(d=>{try{return fs.readdirSync(d).filter(RPY).map(f=>path.join(d,f));}catch{return [];}});
   let best=null,bestScore=0;
-  for(const [,pairs] of tlPairs(files)){let score=0;for(const v of pairs.values())if(/[一-鿿]/.test(v)&&!(v.match(KANA)||[]).length)score++;if(score>bestScore){best=pairs;bestScore=score;}}
-  if(!best)return null;
-  return base.map(scene=>({...scene,patched:scene.lines.some(t=>best.has(t)),lines:scene.lines.map(t=>best.has(t)?best.get(t):t)}));
+  for(const [,pairs] of tlPairs(files)){const score=chineseScore(pairs.values());if(score>bestScore){best=pairs;bestScore=score;}}
+  let comp=null,compScore=0;
+  for(const [,l] of rpycTl(found.dirs)){const score=chineseScore([...l.ids.values(),...l.strings.values()]);if(score>compScore){comp=l;compScore=score;}}
+  if(!best&&!comp)return null;
+  const lookup=(t,id)=>{if(comp&&id&&comp.ids.has(id))return comp.ids.get(id);if(best&&best.has(t))return best.get(t);if(comp&&comp.strings.has(t))return comp.strings.get(t);return null;};
+  return base.map(scene=>{let hit=false;const lines=scene.lines.map((t,k)=>{const v=lookup(t,scene.ids?.[k]);if(v==null)return t;hit=true;return v;});return {...scene,patched:hit,lines};});
  },
 };
 
@@ -439,7 +458,11 @@ const garbro=require('./garbro.cjs').engine;
 /* E561 signed adapter packs (services/adapter-packs.cjs) go first: a pack exists for a folder only because the readers below
    did not read it well; a pack that makes a game worse is turned off for that game by adapter-feed.cjs */
 const adapterPack=(()=>{try{return require('../adapter-packs.cjs').engine;}catch{return {id:'adapter-pack',scenes:()=>[],parse:()=>({lines:[],anchors:[]}),sources:()=>[]};}})();
-const ENGINES={'adapter-pack':adapterPack,'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,'spike-wad':spikeWad,pwaat,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak,fvp,advhd,reallive,vgprompter,garbro};
+/* E565 Majiro scenario.arc (.mjo bytecode), E567 TyranoScript (loose / app.asar / NW.js zip; before kirikiri, which would
+   otherwise read its data/scenario/*.ks as plain KAG and keep the #name lines as text): majiro.cjs, tyrano.cjs. */
+/* E568 Softpal ADV (data.pac: SCRIPT.SRC + TEXT.DAT): softpal.cjs. */
+const majiro=require('./majiro.cjs').engine,tyrano=require('./tyrano.cjs').engine,softpal=require('./softpal.cjs').engine;
+const ENGINES={'adapter-pack':adapterPack,'nitroplus-n4':nitroplusN4,'kirikiri-lang':kirikiriLang,tyrano,kirikiri,artemis,renpy,siglus,'kirikiri-cx':kirikiriCx,'kirikiri-dump':kirikiriDump,'kirikiri-ks':kirikiriKs,hunex,yuris,aquaplus,nscripter,'unity-text':unityText,higurashi,mages,'capcom-msg':capcomMsg,'spike-wad':spikeWad,pwaat,naninovel,catsystem2,rpgmaker,wolf,avg32,'nitro-npk':nitroNpk,'nitro-pak':nitroPak,iga,paz,bruns,'re-pak':rePak,fvp,advhd,reallive,vgprompter,majiro,softpal,garbro};
 // The engine whose running scripts this folder holds, if any can be read.
 function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{return false;}
  for(const s of scenes.slice(0,64)){try{if(ENGINES[id].parse(s.read()).lines.length)return true;}catch{}}return false;} /* 64: a game may open with many code-only scenes (女王蜂の王房 endings, first.ks) */
