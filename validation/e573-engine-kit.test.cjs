@@ -58,3 +58,13 @@ test('E575 shared pieces: MSVC rand, key streams, nibble swap, record streams, C
  assert.equal(kit.lzss(Buffer.from([0x07,0x61,0x62,0x63,0xdf,0xe1]),6,{window:0x800,start:0x7df,lenBits:5,minMatch:2}).toString('latin1'),'abcabc');
  assert.ok(kit.decodeRuns(Buffer.concat([Buffer.from('cmd\0'),F.gbk('那封信寄到的时候，是一个晴朗的午后。')])).includes('那封信寄到的时候，是一个晴朗的午后。'));
 });
+
+/* E630 game-maker pieces: PE overlay, windowed signature scan, string-pool lines, generic text runs */
+test('kit: peOverlay, scan, poolLines, textRuns (E630)',t=>{const F3=require('./helpers/engine-fixtures-f3.cjs'),kit2=require('../services/original-engines/kit.cjs');
+ const d=fs.mkdtempSync(path.join(process.env.MEGULIT_TEST_TMP||os.tmpdir(),'e630k-'));t.after(()=>fs.rmSync(d,{recursive:true,force:true}));
+ const exe=path.join(d,'a.exe');fs.writeFileSync(exe,F3.pe(Buffer.from('xxDPMXyyDPMX')));assert.deepEqual(kit2.peOverlay(exe),{at:0x400,size:12});
+ const plain=path.join(d,'b.exe');fs.writeFileSync(plain,F3.pe());assert.equal(kit2.peOverlay(plain),null);fs.writeFileSync(path.join(d,'c.bin'),'MZ');assert.equal(kit2.peOverlay(path.join(d,'c.bin')),null);
+ assert.deepEqual(kit2.scan(exe,'DPMX'),[0x402,0x408]);assert.deepEqual(kit2.scan(exe,'DPMX',{from:0x403}),[0x408]);assert.deepEqual(kit2.scan(exe,'DPMX',{window:5}),[0x402,0x408]);
+ assert.deepEqual(kit2.poolLines(['obj_player','  「やあ」\r\n元気？ ','bad\u0001x','中文',' ','あ�']),['「やあ」\n元気？','中文']);
+ assert.deepEqual(kit2.textRuns('\0abc「こんにちは」def\0静かだ。\0漢字'),['「こんにちは」','静かだ。']);assert.deepEqual(kit2.textRuns('xx你好世界\0yy谢谢'),['你好世界','谢谢']);
+});

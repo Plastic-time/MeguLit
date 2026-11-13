@@ -237,3 +237,23 @@ MeguLit 对一款游戏的支持分三层：
 | Kaleido ADV Workshop | 需实物 | 只检测（`*_info.psb.m` + `*_body.bin`，M2 PSB 加密，密钥在 exe） |
 | Yuuki! Novel、Comic Maker 1/2/3、Scenario-kun、novelty、Kamishibai、Super Videotome / Videotome / Videotome:ADV、DNML、Adventure Creator (Tlaero)、Nejii、Famous Writer、恋愛シミュレーションツクール 1/2、Love Simulation Maker、NekoNovel、iFVN、Ark Script、ransel、LemoNovel | 需实物 | 查不到剧本格式也查不到可靠指纹：不检测，走 GARbro + 通用扫描；给一份目录清单（`dir /s /b`）即可先做检测 |
 | Kocho、Tadasu Novel Maker、Sandbox Adventure Engine | 不在范围 | 只有手机版 / 浏览器版，没有 Windows 版 |
+
+## 第二轮 F3 制作工具二进制（E630–E639，makers.cjs）
+
+一个模块、每个制作工具一个读取器，全建在 kit 上；新加的 kit 共用件：`peOverlay`（exe 尾部数据）、`scan`（大文件分块找签名）、`poolLines`（字符串池取显示文本）、`textRuns`（UTF-16 / UTF-8 数据的通用扫描）。exe 尾部挂数据的引擎（HSP / Clickteam / AGS / Director 放映机）由 `makers.probes.overlayKind` 看一次 exe 尾部 1 MB 判定并缓存
+
+| 引擎 | 状态 | 说明 |
+|---|---|---|
+| GameMaker | 完整（按规格） | data.win / game.unx 的 STRG 表（UTF-8），加上同目录的 json / csv / txt 等附带文件 |
+| Adventure Game Studio | 完整（3.x） | exe 尾部 CLIB、ac2game.dat / game28.dta、房间 .crm 里每个编译脚本 SCOM 的字符串段；中文 .tra 补丁按原文配对（patchLines）。2.x 老游戏加密的对话选项不读 |
+| Java / libGDX | 完整 | jar 里 .class 常量池的字符串字面量、.properties（\u 转义）、json / csv / xml / txt；gdx / lwjgl 等库跳过 |
+| RPG Paper Maker | 完整 | Content\Datas 下所有 json 的字符串值 |
+| Macromedia Director | 半成品 | .dxr/.dir/.cxt（RIFX/XFIR）与 Afterburner .dcr/.cct 的 STXT 文本演员，放映机 exe 里的影片也读；Lingo 脚本里的字符串字面量不读 |
+| Hot Soup Processor | 半成品 | exe 尾部 DPMX / data.dpm 里的 start.ax：代码段按顺序取字符串操作数，包里的 txt 也读；带密钥（加密）的条目和 HSP 3.6+ DPM2 索引需实物 |
+| Clickteam Fusion | 半成品 | exe 尾部 PAME / PAMU 区块（zlib、嵌套的场景区块）通用扫描；新版构建加密的区块跳过，需实物 |
+| SRPG Studio | 半成品 | data.dts 工程数据：默认密钥（keyset / _dynamic）RC4 解开，UTF-16 字符串池按顺序取；自定义密钥的作品需实物 |
+| MonoGame / XNA / FNA | 半成品 | Content\*.xnb（不压缩 / LZ4）的字符串、游戏程序集 #US 字面量；XNA 的 LZX 压缩不解 |
+| OHRRPGCE | 半成品 | .rpg 的 .say 文本框（400 字节记录、8 行 × 38 字节，按公开格式文档）；新版记录长度未验证 |
+| Unity Game Creator | 检测 | 认作 Unity (Game Creator)，走现有 unity-text |
+| RPG Developer Bakin、Visionaire Studio、Smile Game Builder | 需实物 | 只检测（Bakin data.rbpack 自有加密，Visionaire .vis，SGB 以 SharpKmy*.dll 认） |
+| iFAction、GameCreator（非 Unity 的同名工具） | 需实物 | 查不到文件特征，未加检测 |

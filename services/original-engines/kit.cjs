@@ -277,3 +277,27 @@ function engine(def){const A=def.archives;
 module.exports={asarList,zipList,zipRead,peInfo,readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,encodeSjis,
  xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,lzDistance,SIGLUS_TOKEN,inflate,inflateRaw,zstd,unpackAny,huffman,table,entryRead,peResource,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine,
  sjisWeights,gbkWeights,textScore,xorKeyByColumns};
+
+/* ---- game-maker binaries (E630: GameMaker, Director, HSP, Clickteam, AGS, SRPG Studio, XNA … keep their data appended to
+   the runtime exe or in one string pool) ---------------------------------------------------------------------------------
+   peOverlay(file)            {at, size} of the bytes after the last PE section (where HSP DPM, AGS CLIB, Clickteam PAME,
+                              Director projector movies sit), or null
+   scan(file, magic, opts)    offsets of magic (string latin1 or Buffer) in a file read in windows ({from, to, max, window})
+   poolLines(strings)         a string pool's shown text: trimmed, non-ASCII (Japanese or a Chinese patch), no undecodable
+                              bytes, CR LF -> LF, in pool order (a patch that rewrites the pool pairs 1:1)
+   textRuns(text)             runs of Japanese (with kana) or, when there is no kana anywhere, Chinese text in a decoded
+                              blob, in order (the generic scan for UTF-16 / UTF-8 data decodeRuns does not pick) */
+function peOverlay(file){try{const mz=readAt(file,0,0x40);if(mz.length<0x40||mz.toString('latin1',0,2)!=='MZ')return null;const pe=mz.readUInt32LE(0x3c),h=readAt(file,pe,24);
+ if(h.length<24||h.toString('latin1',0,4)!=='PE\0\0')return null;const nsec=h.readUInt16LE(6),opt=h.readUInt16LE(20),secs=readAt(file,pe+24+opt,nsec*40);let end=0;
+ for(let i=0;i<nsec&&(i+1)*40<=secs.length;i++){const raw=secs.readUInt32LE(i*40+20),rs=secs.readUInt32LE(i*40+16);if(raw&&raw+rs>end)end=raw+rs;}
+ const sz=size(file);return end&&end<sz?{at:end,size:sz-end}:null;}catch{return null;}}
+function scan(file,magic,{from=0,to=Infinity,max=64,window=16<<20}={}){const m=Buffer.isBuffer(magic)?magic:Buffer.from(magic,'latin1'),end=Math.min(size(file),to),out=[];
+ for(let p=from;p<end&&out.length<max;p+=window){const b=readAt(file,p,Math.min(window+m.length-1,end-p));let i=b.indexOf(m);while(i>=0&&i<window&&out.length<max){out.push(p+i);i=b.indexOf(m,i+1);}}
+ return out;}
+function poolLines(strings){const out=[];for(const s of strings){if(typeof s!=='string')continue;const t=trimBoth(s.replace(/\r\n|\r/g,'\n'));
+ if(!t||ascii(t.replace(/\n/g,' '))||/[�\x00-\x08\x0b\x0c\x0e-\x1f]/.test(t))continue;out.push(t);}return out;}
+const TEXT_RUN=/[ぁ-ゖァ-ヺー一-鿿々〆〜～！？。、，；：“”‘’「」『』（）…―—・　Ａ-Ｚａ-ｚ０-９]{2,}/g;
+function textRuns(text){const kana=hasKana(text),out=[];let last='';
+ for(const raw of String(text).split(/[\r\n\0]+/))for(const m of raw.matchAll(TEXT_RUN)){const s=trimBoth(m[0]);if(s.length<2||(kana?!hasKana(s):!/[一-鿿]/.test(s)))continue;if(s!==last)out.push(s);last=s;}
+ return out;}
+module.exports.peOverlay=peOverlay;module.exports.scan=scan;module.exports.poolLines=poolLines;module.exports.textRuns=textRuns;

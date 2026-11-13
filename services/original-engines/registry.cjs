@@ -139,10 +139,29 @@ const ENGINES=[
  {name:'RPG Maker MV/MZ',hook:null,generic:true,test:f=>f.sub('js',/^(rpg_core|rmmz_core)\.js$/i)||f.sub('www',/^js$/i)&&f.has(/^package\.json$/i)||f.sub('data',/^MapInfos\.json$/i)&&f.sub('data',/^System\.json$/i)&&f.has(/^(game|nw)\.exe$/i)},
  /* E574 also an unpacked XP / VX / VX Ace game: Data\*.rxdata / .rvdata / .rvdata2 beside Game.exe */
  {name:'RPG Maker VX/XP',hook:true,generic:true,test:f=>f.has(/\.rgss(3a|2a|ad)$/i)||f.sub('Data',/^(?:map\d+|system)\.r(?:x|v)data2?$/i)&&f.has(/^game\.exe$/i)},
+ /* E630–E639 F3 game-maker binaries (services/original-engines/makers.cjs). Exe-appended data is told by the PE overlay
+    (makers.probes.overlayKind, one cached 1 MB look per exe): HSP DPMX, Clickteam PAME / PAMU, AGS CLIB, Director XFIR / RIFX */
+ {name:'GameMaker',hook:null,generic:true,test:f=>f.magic(/^data.win$/i,'FORM')||f.magic(/^game.unx$/i,'FORM')},
+ {name:'SRPG Studio',hook:null,generic:true,test:f=>f.magic(/^data.dts$/i,'SDTS')||f.has(/^runtime.rts$/i)&&f.has(/^data.dts$/i)},
+ {name:'Adventure Game Studio',hook:null,generic:true,test:f=>f.has(/^(ac2game.dat|game28.dta)$/i)||f.has(/^acsetup.cfg$/i)&&f.has(/.(vox|exe)$/i)||f.probe(/.exe$/i,p=>require('./makers.cjs').probes.overlayKind(p)==='ags')},
+ {name:'Macromedia Director',hook:null,generic:true,test:f=>f.has(/.(dxr|dcr|cxt|cct)$/i)||f.sub('Xtras',/.x32$/i)||f.probe(/.exe$/i,p=>require('./makers.cjs').probes.overlayKind(p)==='director')},
+ {name:'Hot Soup Processor',hook:null,generic:true,test:f=>f.has(/^data.dpm$/i)||f.has(/^start.ax$/i)||f.has(/^hsp3.*.(dll|hpi)$/i)&&f.has(/.exe$/i)||f.probe(/.exe$/i,p=>require('./makers.cjs').probes.overlayKind(p)==='hsp')},
+ {name:'Clickteam Fusion',hook:null,generic:true,test:f=>f.has(/.(ccn|ccj)$/i)||f.sub('Modules',/.mfx$/i)||f.probe(/.exe$/i,p=>require('./makers.cjs').probes.overlayKind(p)==='clickteam')},
+ {name:'MonoGame / XNA',hook:null,generic:true,test:f=>f.has(/^(MonoGame.Framework|Microsoft.Xna.Framework.*|FNA).dll$/i)||f.sub('Content',/.xnb$/i)},
+ {name:'RPG Paper Maker',hook:null,generic:true,test:f=>f.sub('Content',/^Datas$/i)},
+ {name:'libGDX',hook:null,generic:true,test:f=>f.probe(/.jar$/i,p=>require('./makers.cjs').probes.gdx(p))||f.sub('lib',/^gdx.*.jar$/i)},
+ {name:'Java',hook:null,generic:true,test:f=>f.has(/.jar$/i)&&(f.has(/^jre$/i)||f.names.some(n=>/.(exe|bat|cmd)$/i.test(n)))||f.sub('lib',/.jar$/i)&&f.names.some(n=>/.(exe|bat|cmd)$/i.test(n))},
+ {name:'OHRRPGCE',hook:null,generic:true,test:f=>f.probe(/.rpg$/i,p=>require('./makers.cjs').probes.isRpg(p))||f.names.some(n=>/.rpgdir$/i.test(n))},
+ /* E639 recognised only: data packed with the maker's own cipher (Bakin BKNPAK, Visionaire .vis) or not yet known (Smile
+    Game Builder runtime SharpKmy*.dll); text goes through the hook and GARbro's generic scan until a real game is checked */
+ {name:'RPG Developer Bakin',hook:null,generic:true,test:f=>f.magicAny(/.rbpack$/i,'BKNPAK')},
+ {name:'Visionaire Studio',hook:null,generic:true,test:f=>f.has(/.vis$/i)&&f.names.some(n=>/.exe$/i.test(n))},
+ {name:'Smile Game Builder',hook:null,generic:true,test:f=>f.has(/^sharpkmy.*.dll$/i)},
  // Visual-novel frameworks inside Unity, named so the library and the hook choice can tell them apart.
  {name:'Unity (Utage)',hook:null,test:f=>f.managed(/^Utage/i)},
  {name:'Unity (Naninovel)',hook:null,test:f=>f.managed(/^Naninovel/i)},
  {name:'Unity (Yarn Spinner)',hook:null,test:f=>f.managed(/^YarnSpinner/i)},
+ {name:'Unity (Game Creator)',hook:null,test:f=>f.managed(/^GameCreator/i)},
  {name:'Unity (Adventure Creator)',hook:null,test:f=>f.managed(/^AC(\.|Runtime)|AdventureCreator/i)},
  {name:'DxLib',hook:true,generic:true,test:f=>f.has(/\.dxa$/i)},
  // Unity games read through LunaHook's Mono/IL2CPP hooks for many, not all, titles: verified on first play.
@@ -235,6 +254,9 @@ const READERS={"BGI / Ethornell":["bgi"],
  "DDSystem":["ddsystem"],
  "SystemAoi":["aoi"],
  "KID Engine":["kid"],
+ "Unity (Game Creator)":["unity-text"],
+ "GameMaker":["gamemaker"],"SRPG Studio":["srpg"],"Adventure Game Studio":["ags"],"Macromedia Director":["director"],"Hot Soup Processor":["hsp"],
+ "Clickteam Fusion":["clickteam"],"MonoGame / XNA":["xna"],"RPG Paper Maker":["rpgpaper"],"libGDX":["java"],"Java":["java"],"OHRRPGCE":["ohrrpgce"],
  "RE Engine (Capcom)":["re-pak"],"Unity":["unity-text","naninovel","higurashi","capcom-msg","vgprompter","pwaat"]};
 for(const p of require('./plaintext.cjs').RAW.profiles)READERS[p.engine]=p.detectOnly?[]:['plaintext'];
 for(const e of ENGINES)e.readers=READERS[e.name]||[];
