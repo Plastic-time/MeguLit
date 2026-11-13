@@ -2,6 +2,8 @@ import {activityCells} from './learning-activity.js';
 import {openLinesPicker} from './home-lines.js';
 import {createDepth,markFlat,cachedDaily,rememberDaily,dailyIsFresh,dailySignature,cachedActivity,rememberActivity} from './home-depth.js';
 import {createHand} from './home-hand.js';
+import {createDock,openHandPicker,HAND_MAX} from './home-picker.js';
+import {pickHeadline,cachedHeadline,translateHeadline,headlineLabel,activitySummary,emptyActivityHTML} from './home-today.js';
 
 const copy={
  zh:{tipClick:'单击',tipDetail:'作品详情',tipDbl:'双击',tipDraw:'抽一张',daily:'每日热点',streak:'最长连续',figRead:'累计阅读',figChars:'读过的字',figWords:'关联单词',last:'上次',coverHint:'单击查看详情 · 双击抽卡',
@@ -35,8 +37,8 @@ export function cleanShowcase(value){const v=value&&typeof value==='object'?valu
 
 export function showcaseGames(games,setting){const sc=cleanShowcase(setting),available=games.filter(g=>g.available!==false&&!sc.hidden.includes(g.id)),by=id=>available.find(g=>g.id===id),
  when=g=>g.lastLaunchedAt||g.lastPlayedAt||0,recent=[...available].sort((a,b)=>when(b)-when(a)),pinned=sc.pinned.map(by).filter(Boolean);
- if(sc.mode==='pick'){const picked=sc.order.map(by).filter(Boolean);if(picked.length)return [...pinned,...picked.filter(g=>!pinned.includes(g))];}
- return [...pinned,...recent.filter(g=>!pinned.includes(g))].slice(0,8);}
+ if(sc.mode==='pick'){const picked=sc.order.map(by).filter(Boolean);if(picked.length)return [...pinned,...picked.filter(g=>!pinned.includes(g))].slice(0,HAND_MAX);}
+ return [...pinned,...recent.filter(g=>!pinned.includes(g))].slice(0,HAND_MAX);}
 
 function palette(game){if(palettes.has(game.id))return Promise.resolve(palettes.get(game.id));const fallback=['#d05b34','#edb56e','#3b4a8c'];if(!game.cover)return Promise.resolve(fallback);
  return new Promise(done=>{const img=new Image();img.onload=()=>{try{const c=document.createElement('canvas');c.width=c.height=24;const x=c.getContext('2d',{willReadFrequently:true});
@@ -227,8 +229,9 @@ function glowTo(fn,g){if(!fn)return;const layer=document.querySelector('.grimoir
 
 const SENSITIVE_WORD=()=>{const l=document.documentElement.lang||'';return l.startsWith('ja')?'センシティブな内容':l.startsWith('en')?'Sensitive content':'敏感内容';},HOT_WORD=()=>{
  const l=document.documentElement.lang||'';return l.startsWith('ja')?'今日のトップ':l.startsWith('en')?'Top story today':'今日热点';};
-function fitLeft(root){const left=root.querySelector('.tv-left'),title=root.querySelector(root.classList.contains('has-hl')?'.tv-hl':'.tv-title');if(!left||!title)return;/* 2026-11-13 (user: after a draw the heat map was gone): a title not laid out yet (mid card change) measures 0 high, which hid every block; measure only a laid-out title */if(!title.getBoundingClientRect().height)return;
- /* 2026-11-12 (user: "还有我说的封面呢") the day's top news cover is kept longest: the small blocks go first, then the cover gets compact, and only then goes *//* 2026-11-13 (user: "大封面呢"): the title box reaches far above its letters (tall glyph cells), so blocks were hidden over empty space; compare with where the title's text is actually drawn */const inkTop=(()=>{
+function fitLeft(root){const left=root.querySelector('.tv-left'),title=root.querySelector('.tv-title');if(!left)return;/* 2026-11-13 (user: "左下角不要字") the game name is hidden while the library has games; the column then reaches down to the bottom bar */
+ const titleShown=!!title&&getComputedStyle(title).display!=='none',bar=root.querySelector('.tv-dialog');if(titleShown||!bar){if(!title)return;/* 2026-11-13 (user: after a draw the heat map was gone): a title not laid out yet (mid card change) measures 0 high, which hid every block; measure only a laid-out title */if(!title.getBoundingClientRect().height)return;}
+ /* 2026-11-12 (user: "还有我说的封面呢") the day's top news cover is kept longest: the small blocks go first, then the cover gets compact, and only then goes *//* 2026-11-13 (user: "大封面呢"): the title box reaches far above its letters (tall glyph cells), so blocks were hidden over empty space; compare with where the title's text is actually drawn */const inkTop=!titleShown?bar.getBoundingClientRect().top:(()=>{
  let top=Infinity;const walk=document.createTreeWalker(title,NodeFilter.SHOW_TEXT),range=document.createRange();for(let n=walk.nextNode();n;n=walk.nextNode()){if(!n.nodeValue.trim())continue;
  range.selectNodeContents(n);for(const r of range.getClientRects())if(r.width>0&&r.height>0)top=Math.min(top,r.top);}return Number.isFinite(top)?top:title.getBoundingClientRect().top;
  })(),fits=()=>left.getBoundingClientRect().bottom<=inkTop-14,hot=left.querySelector('.tv-hot-news'),parts=['.tv-heatsum','.tv-daily','.tv-hot-news','.tv-heat-card'].map(s=>left.querySelector(s)).filter(Boolean);
@@ -259,20 +262,18 @@ export function renderHomeTV(main,ctx){
   randomGame=()=>{const rest=pool.filter(g=>g!==shown);return rest[Math.floor(Math.random()*rest.length)]||pool[0];};
  const date=new Date().toLocaleDateString({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale],{month:'long',day:'numeric',weekday:'long'});
  const mins=s=>{const m=Math.floor((s||0)/60);return m>=60?`${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`:`${m}m`;};
- main.innerHTML=`<div class="tv-home" tabindex="-1"><div class="tv-hero" aria-hidden="true"></div><div class="tv-pile" aria-hidden="true"></div><div class="tv-canvas">
+ main.innerHTML=`<div class="tv-home" tabindex="-1"><div class="tv-pile" aria-hidden="true"></div><div class="tv-canvas">
   <div class="tv-plane" data-z="-200"><div class="tv-tl"></div></div>
   <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-ring"></div></div>
   <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div><button type="button" class="tv-lines-edit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span></span></button></div>
   <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><i class="tv-cshadow" aria-hidden="true"></i><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""><i></i><i></i><i></i><i></i></div></div><button type="button" class="tv-cover-play tv-play" data-act="play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg><span>${w.play}</span></button></div></div></div>
   <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div>
-  <div class="tv-left"><div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div><div class="tv-heat-card tv-card"><div class="tv-face"><button class="tv-heatlink" data-go="activity"></button><div class="tv-heat"></div><div class="tv-heatsum"></div><button class="tv-daily" data-go="daily"><i aria-hidden="true"></i><span class="tv-daily-k">${w.daily}</span><span class="tv-daily-t"></span><small>→</small></button><div class="tv-daily-pics"></div><i class="tv-glare"></i></div></div></div>
+  <div class="tv-left"><div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div><div class="tv-heat-card tv-card"><div class="tv-face"><button class="tv-heatlink" data-go="activity"></button><div class="tv-heat"></div><div class="tv-heat-none" hidden></div><div class="tv-heatsum"></div><button class="tv-daily" data-go="daily"><i aria-hidden="true"></i><span class="tv-daily-k">${w.daily}</span><span class="tv-daily-t"></span><small>→</small></button><div class="tv-daily-pics"></div><i class="tv-glare"></i></div></div></div>
   
   <div class="tv-figs"><button class="tv-fig" data-go="statistics"><b data-fig="time">0m</b><small>${w.figRead}</small></button><button class="tv-fig" data-go="detail"><b data-fig="chars">0</b><small>${w.figChars}</small></button><button class="tv-fig" data-go="words"><b data-fig="words">0</b><small>${w.figWords}</small></button><button class="tv-more" data-go="statistics">${w.full} →</button></div>
   <div class="tv-title"><div class="tv-h1" role="heading" aria-level="1"></div><div class="tv-meta"></div></div>
-  <button type="button" class="tv-hl" hidden><small class="tv-hl-k"></small><b class="tv-hl-t" lang="ja"></b></button>
   <div class="tv-hand"></div><div class="tv-ghosts" aria-hidden="true"></div>
-  <div class="tv-dialog"><span class="tv-who"></span><div class="tv-act"></div></div>
-  <section class="tv-drawer" aria-label="${w.title}"><h2>${w.title} <small>${w.sub}</small></h2><button class="tv-close">${w.close} ✕</button><div class="tv-mode"><button data-m="auto">${w.auto}</button><button data-m="pick">${w.pick}</button><input class="tv-search" type="search" placeholder="${w.search}" aria-label="${w.search}"></div><div class="tv-list"></div><div class="tv-hint"></div></section></div>`;
+  <div class="tv-dialog"><span class="tv-who"></span><span class="tv-line"></span><div class="tv-act"></div></div></div>`;
  const root=main.querySelector('.tv-home'),$=s=>root.querySelector(s);
  live={root,timer:0,beat:0,typer:0,depth:null};
  const art=(g,p)=>g.cover?`url("${String(g.cover).replace(/"/g,'%22')}") center/cover`:`linear-gradient(160deg,${p[0]},${p[2]} 70%)`;
@@ -287,7 +288,13 @@ export function renderHomeTV(main,ctx){
  $('[data-act="play"]')?.addEventListener('click',e=>{e.stopPropagation();if(shown)onLaunch(shown.id,e.currentTarget);});
  ['pointerdown','dblclick'].forEach(t=>$('[data-act="play"]')?.addEventListener(t,e=>e.stopPropagation()));
  $('[data-act="detail"]')?.addEventListener('click',()=>shown&&onDetail(shown.id));
- /* 2026-11-13 (user) the typed line along the bottom is gone; the daily headline takes the bottom-left corner instead */const type=()=>{};
+ /* 2026-11-13 (user: "左下角显示小字作品名 … 把之前删掉的那个动效…拿回来 放左下角最下面 点缀一下") the bottom bar is back as a quiet accent: the game name in
+    small type rises in letter by letter, then one of its lines types itself out */
+ const type=s=>{clearInterval(live.typer);let n=0;const line=$('.tv-line');if(!line)return;line.textContent='';line.classList.toggle('typing',!!s);if(!s)return;
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches){line.textContent='「'+s+'」';line.classList.remove('typing');return;}
+  live.typer=setInterval(()=>{line.textContent='「'+s.slice(0,++n)+(n<s.length?'':'」');if(n>=s.length){clearInterval(live.typer);line.classList.remove('typing');}},55);};
+ const nameIn=g=>{const who=$('.tv-who');if(!who)return;who.classList.remove('in');who.innerHTML=[...String(g.title||'')].map((c,i)=>`<i style="transition-delay:${Math.min(i,40)*22}ms">${esc(c)}</i>`).join('');
+  who.title=g.title+(g.lastPlayedAt?` · ${w.last} · ${relativeTime(g.lastPlayedAt)}`:'');void who.offsetWidth;requestAnimationFrame(()=>who.classList.add('in'));};
  const max=Math.max(1,...model.games.map(g=>g.characters||0));
  async function paint(i,flash=true,mode='draw'){
   const g=typeof i==='object'?i:list[i];if(!root.isConnected){if(live?.root===root)stopHomeTV();return;}if(!g||!live||live.root!==root)return;shown=g;cur=list.indexOf(g);
@@ -318,68 +325,49 @@ export function renderHomeTV(main,ctx){
    if(live&&live.root===root)fitLeft(root);},900);},flash?Math.max(0,reveal-(performance.now()-started)):0);
   tweenFig($('[data-fig="time"]'),g.readingSeconds||0,v=>mins(v));tweenFig($('[data-fig="chars"]'),g.characters||0,v=>number(Math.round(v)));tweenFig($('[data-fig="words"]'),
    g.learnedWords||0,v=>number(Math.round(v)));
-  $('.tv-who').textContent=g.title+(g.lastPlayedAt?` · ${w.last} · ${relativeTime(g.lastPlayedAt)}`:'');$('.tv-who').title=$('.tv-who').textContent;
+  nameIn(g);type(sentences[0]||'');
   
   rail();
  }
  /* 2026-11-13 (user) the cover strip became a hand of cards; picking one plays it onto the field (see home-hand.js) */
  function rail(){hand.render(list.map(g=>({id:g.id,title:g.title,cover:g.cover,pinned:setting.pinned.includes(g.id),g})),shown?.id||null);}
- function drawer(){const all=model.games.filter(g=>g.available!==false),when=g=>g.lastLaunchedAt||g.lastPlayedAt||0,ids=[...setting.order.filter(id=>all.some(g=>g.id===id)),
-  ...[...all].sort((a,b)=>when(b)-when(a)).map(g=>g.id).filter(id=>!setting.order.includes(id))];setting.order=ids;
-  root.querySelectorAll('.tv-mode button').forEach(b=>b.classList.toggle('on',b.dataset.m===setting.mode));
-  $('.tv-list').innerHTML=ids.map((id,i)=>{const g=all.find(x=>x.id===id),p=setting.pinned.includes(id),h=setting.hidden.includes(id);return `<div class="tv-item${p?' pinned':''}${h?' hidden':''}" draggable="true" data-id="${esc(id)}" data-q="${esc((g.title+' '+(g.names||[]).join(' ')+' '+(g.engine||'')).toLowerCase())}"><div class="cv">${g.cover?`<img src="${esc(g.cover)}" alt="">`:''}<span class="n">${String(i+1).padStart(2,'0')}</span></div><p title="${esc(g.title)}">${esc(g.title)}</p><div class="ops"><button data-op="pin" class="${p?'on':''}">${w.pin}</button><button data-op="hide" class="${h?'on':''}">${w.hide}</button></div></div>`;
-   }).join('');
-  $('.tv-hint').textContent=setting.mode==='auto'?w.hintAuto:w.hintPick;filter();
-  let drag=null;root.querySelectorAll('.tv-item').forEach(el=>{el.addEventListener('dragstart',()=>{drag=el.dataset.id;el.classList.add('dragging');});el.addEventListener('dragend',
-   ()=>el.classList.remove('dragging'));el.addEventListener('dragover',e=>e.preventDefault());el.addEventListener('drop',()=>{const a=setting.order.indexOf(drag),
-   b=setting.order.indexOf(el.dataset.id);if(a<0||b<0||a===b)return;setting.order.splice(b,0,setting.order.splice(a,1)[0]);setting.mode='pick';commit();});
-   el.querySelectorAll('[data-op]').forEach(b=>b.addEventListener('click',()=>{const id=el.dataset.id,key=b.dataset.op==='pin'?'pinned':'hidden';setting[key]=setting[key].includes(id)?setting[key].filter(x=>x!==id):[...setting[key],
-    id];commit();}));});}
- function filter(){const q=$('.tv-search').value.trim().toLowerCase();root.querySelectorAll('.tv-item').forEach(el=>{el.hidden=!!q&&!el.dataset.q.includes(q);});
-  }
- function commit(){model.preferences.homeShowcase=setting;savePreferences({homeShowcase:setting});drawer();const id=shown?.id;list=showcaseGames(model.games,setting);
+ function commit(){model.preferences.homeShowcase=setting;savePreferences({homeShowcase:setting});const id=shown?.id;list=showcaseGames(model.games,setting);
   paint(Math.max(0,list.findIndex(g=>g.id===id)),false);}
- root.querySelectorAll('.tv-mode button').forEach(b=>b.addEventListener('click',()=>{setting.mode=b.dataset.m;commit();}));
- $('.tv-search').addEventListener('input',filter);
- $('.tv-close').addEventListener('click',()=>$('.tv-drawer').classList.remove('open'));
+ /* 2026-11-13 (user: "不要全部作品 … 把＋卡移到最右边 不要是卡牌了 鼠标放上去再出来") the hand editor is a tab docked on the right edge that slides out
+    on hover and tucks back; it opens a window where the library's games are ticked into or out of the hand (home-picker.js) */
+ if(model.games.some(g=>g.available!==false))createDock(root,{locale,onOpen:()=>openHandPicker(root,{games:model.games,hand:list.map(g=>g.id),setting,locale,esc,
+  onSave:next=>{setting=next;commit();}})});
  /* 2026-11-13 (user: "每次回到首页都重新加载、卡一下") the daily block paints at once from the cached copy without replaying its entrance, then refreshes
     quietly and repaints only when the news really changed; flat one-colour pictures are never shown (user: "缩略图不要展示纯色图") */
- let dailySig='';const showDaily=(v,instant)=>{if(!live||live.root!==root)return;const sig=dailySignature(v);if(sig===dailySig)return;dailySig=sig;if(instant)root.classList.add('tv-instant');const n=(v?.news?.items||[]).find(x=>!x.flat)||v?.news?.items?.[0],h=v?.words?.words?.[0],t=$('.tv-daily-t'),pics=(v?.news?.items||[]).filter(x=>/^data:image\//.test(x.image||'')&&x.link&&!x.flat).slice(0,
-  3),box=$('.tv-daily-pics');if(box){box.innerHTML=pics.map(x=>`<button type="button" class="tv-daily-pic${x.sensitive?' is-sensitive':''}" data-link="${esc(x.link)}" title="${esc(x.title)}" style="background-image:url(&quot;${x.image}&quot;)">${x.sensitive?`<span class="tv-sensitive">${esc(SENSITIVE_WORD())}</span>`:''}</button>`).join('');
+  let dailySig='';const showDaily=(v,instant)=>{if(!live||live.root!==root)return;const sig=dailySignature(v);if(sig===dailySig)return;dailySig=sig;if(instant)root.classList.add('tv-instant');const n=(v?.news?.items||[]).find(x=>!x.flat)||v?.news?.items?.[0],h=v?.words?.words?.[0],t=$('.tv-daily-t'),dailyCat=(()=>{try{return localStorage.getItem('megulit-daily-cat')==='acg'?'acg':'gal';}catch{return 'gal';}})(),{top,small:pics}=pickHeadline(v?.news?.items,dailyCat),box=$('.tv-daily-pics');if(box){box.innerHTML=pics.map(x=>`<button type="button" class="tv-daily-pic${x.sensitive?' is-sensitive':''}" data-link="${esc(x.link)}" title="${esc(x.title)}" style="background-image:url(&quot;${x.image}&quot;)">${x.sensitive?`<span class="tv-sensitive">${esc(SENSITIVE_WORD())}</span>`:''}</button>`).join('');
   box.querySelectorAll('[data-link]').forEach(b=>b.addEventListener('click',()=>{try{sessionStorage.setItem('megulit-daily-focus',b.dataset.link);}catch{}navigate('daily');
-  }));}if(n){t.textContent=n.title;t.title=n.title+(n.source?' · '+n.source:'');}else if(h){t.textContent=h.term+(h.gloss?' · '+h.gloss:'');}/* 2026-11-12 (user) the empty space under the activity card shows the day's top news with its picture; an adult one is
-     blurred with a "sensitive content" note */
-  /* 2026-11-13 (user: "左侧大封面用这个网站的头条，然后标题直接放在左下角") the headline of the daily page's current tab becomes the large picture
-     behind the left half, and its title sits bottom-left; without daily data the game card and its name stay as before */
-  {const cat=(()=>{try{return localStorage.getItem('megulit-daily-cat')==='acg'?'acg':'gal';}catch{return 'gal';}})(),items=(v?.news?.items||[]).filter(x=>/^data:image\//.test(x.image||'')&&x.link&&!x.flat),
-    top=items.find(x=>(x.cat||'gal')===cat)||items[0],hero=$('.tv-hero'),hl=$('.tv-hl');left0:{if(!top||!hero||!hl)break left0;
-    const pic=document.createElement('i');pic.className=top.sensitive?'is-sensitive':'';pic.style.backgroundImage=`url("${String(top.image).replace(/"/g,'%22')}")`;
-    const old=[...hero.children];hero.appendChild(pic);old.forEach(o=>{o.classList.remove('on');setTimeout(()=>o.remove(),instant?0:1000);});
-    const ready=instant?()=>pic.classList.add('on'):()=>requestAnimationFrame(()=>requestAnimationFrame(()=>pic.classList.add('on')));const probe=new Image();probe.onload=ready;probe.onerror=ready;if(instant)ready();else probe.src=top.image;
-    hl.querySelector('.tv-hl-k').textContent=[HOT_WORD(),top.source,Date.parse(top.date||'')?relativeTime(Date.parse(top.date)/1000):''].filter(Boolean).join(' · ');
-    hl.querySelector('.tv-hl-t').textContent=top.title;hl.title=top.title;hl.hidden=false;root.classList.add('has-hl');
-    hl.onclick=()=>{try{sessionStorage.setItem('megulit-daily-focus',top.link);}catch{}navigate('daily');};
-    if(instant){hl.classList.add('in');fitLeft(root);}else requestAnimationFrame(()=>requestAnimationFrame(()=>{hl.classList.add('in');fitLeft(root);}));}}
+  }));}if(n){t.textContent=n.title;t.title=n.title+(n.source?' · '+n.source:'');}else if(h){t.textContent=h.term+(h.gloss?' · '+h.gloss:'');}/* 2026-11-13 (user: "左侧热力图卡片下面有第四张尺寸更大的第一头条", "左下角不要字") under the activity card the day's top story is a fourth,
+     larger picture, picture only; its title (in the UI language) labels it for the tooltip and screen readers. An adult one is blurred with a note */
+  {const left=$('.tv-left'),card=left?.querySelector('.tv-heat-card');let big=left?.querySelector('.tv-hot-news');if(!top||!card){big?.remove();}else{
+   if(!big){big=document.createElement('button');big.type='button';card.after(big);}big.className='tv-hot-news'+(top.sensitive?' is-sensitive':'');
+   big.innerHTML=`<span class="tv-hot-img" style="background-image:url(&quot;${top.image}&quot;)"></span>${top.sensitive?`<span class="tv-sensitive">${esc(SENSITIVE_WORD())}</span>`:''}`;
+   big.onclick=()=>{try{sessionStorage.setItem('megulit-daily-focus',top.link);}catch{}navigate('daily');};
+   const label=r=>{const text=headlineLabel(r,top.title);big.title=text+(top.source?'\n'+top.source:'');big.setAttribute('aria-label',HOT_WORD()+' · '+text.split('\n')[0]);};
+   const hit=cachedHeadline(top.title,locale);label(hit||{text:top.title,state:'original'});if(!hit)translateHeadline(api,top.title,locale).then(r=>{if(big.isConnected&&live?.root===root)label(r);});}
+   fitLeft(root);}
   if(instant)requestAnimationFrame(()=>requestAnimationFrame(()=>root.classList.remove('tv-instant')));};
  {const c=cachedDaily();if(c)showDaily(c,true);if(!c||!dailyIsFresh())api('daily_view',{}).then(v=>markFlat(v)).then(v=>{if(v)showDaily(rememberDaily(v),false);}).catch(()=>{});}
 
  const showActivity=records=>{if(!live||live.root!==root)return;const all=activityCells(Array.isArray(records)?records:[]);let from=Math.max(0,
-  all.length-20*7);while(from>0&&all[from].weekday!==0)from--;const cells=all.slice(from),active=cells.filter(c=>c.level).length;$('.tv-heat').innerHTML=cells.map((c,
+  all.length-20*7);while(from>0&&all[from].weekday!==0)from--;const cells=all.slice(from),sum=activitySummary(cells,all),active=sum.active,card=$('.tv-heat-card'),none=$('.tv-heat-none');
+  card?.classList.toggle('is-empty',sum.empty);if(none){none.hidden=!sum.empty;none.innerHTML=sum.empty?emptyActivityHTML(locale,esc):'';}$('.tv-heat').innerHTML=cells.map((c,
   i)=>`<i style="grid-row:${c.weekday+1};grid-column:${Math.floor(i/7)+1}" class="${i===cells.length-1?'today':c.level?'l'+Math.min(3,c.level):''}" data-day="${esc(c.day)}" data-min="${Math.round((c.seconds||0)/60)}"></i>`).join('');
-  $('.tv-heatlink').textContent=`${w.activity} · ${active} ${w.days} →`;let run=0,best=0;for(const c of cells){run=c.level?run+1:0;best=Math.max(best,run);}const secs=cells.reduce((a,
-  c)=>a+(c.seconds||0),0);$('.tv-heatsum').innerHTML=`<span><b>${active}</b>${w.days}</span><span><b>${esc(duration(secs))}</b>${w.total}</span><span><b>${best}</b>${w.streak}</span>`;
-  };
+  $('.tv-heatlink').textContent=sum.empty?`${w.activity} →`:`${w.activity} · ${active} ${w.days} →`;const best=sum.best,secs=sum.secs;$('.tv-heatsum').innerHTML=`<span><b>${active}</b>${w.days}</span><span><b>${esc(duration(secs))}</b>${w.total}</span><span><b>${best}</b>${w.streak}</span>`;
+  fitLeft(root);};
  {let actSig=JSON.stringify(cachedActivity()||null);if(cachedActivity())showActivity(cachedActivity());api('learning_activity',{range:'year'}).then(r=>{rememberActivity(r);const n=JSON.stringify(r||null);if(n!==actSig){actSig=n;showActivity(r);}}).catch(()=>{});}
  const hand=createHand({root,box:$('.tv-hand'),layer:$('.tv-ghosts'),cover:$('.tv-cover'),reduced:matchMedia('(prefers-reduced-motion:reduce)').matches,
   back:`<img src="${LOGO}" alt="">`,art:h=>art(h.g||h,['#3b2a26','#5a3a30','#1a1110']),onPlay:(h,kind)=>{if(kind!=='plain')root.classList.add('tv-fly');paint(h.g,kind==='plain','fade');},
   onLand:()=>root.classList.remove('tv-fly')});live.hand=hand;
- hand.setExtras([{cls:'tv-hc-add',title:w.edit,html:'<b>＋</b>',onClick:()=>{drawer();$('.tv-drawer').classList.add('open');}},
-  {cls:'tv-hc-all',title:w.all,html:`<b>${esc(w.all)}</b>`,onClick:()=>navigate('library')}]);
  const canvas=$('.tv-canvas'),planes=[...root.querySelectorAll('.tv-plane')],reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
  /* 2026-11-13 (user) every layer has its own depth: the far headline picture drifts against the pointer, near ones (cards, figures, rail, bottom bar) lead it */
- {const L=(sel,z)=>{const el=$(sel);return el?{el,z}:null;};live.depth=createDepth(root,{canvas,planes,layers:[L('.tv-hero',-40),L('.tv-left',7),L('.tv-hl',9),L('.tv-figs',8),
+ {const L=(sel,z)=>{const el=$(sel);return el?{el,z}:null;};live.depth=createDepth(root,{canvas,planes,layers:[L('.tv-left',7),L('.tv-figs',8),
   L('.tv-hand',24),L('.tv-dialog',5),L('.tv-title',9),L('.tv-marks',3),L('.tv-cshadow',-22)].filter(Boolean)});}
- const onResize=()=>{if(live&&live.root===root)fitLeft(root);else removeEventListener('resize',onResize);};addEventListener('resize',onResize);
+ const onResize=()=>{if(live&&live.root===root){fitLeft(root);}else removeEventListener('resize',onResize);};addEventListener('resize',onResize);
  root.querySelectorAll('.tv-cover,.tv-heat-card').forEach(cardify);
  const coverEl=$('.tv-cover');let clickTimer=0,pressAt=0,pressXY=[0,0];coverEl.setAttribute('aria-label',w.coverHint);const pop=document.createElement('div');pop.className='tv-pop';
   pop.innerHTML=`<p><i class="m1"></i><b>${w.tipClick}</b><span>${w.tipDetail}</span></p><p><i class="m2"></i><b>${w.tipDbl}</b><span>${w.tipDraw}</span></p>`;root.appendChild(pop);
