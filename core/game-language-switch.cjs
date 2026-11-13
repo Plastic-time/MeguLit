@@ -24,7 +24,9 @@ const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 const isFile=f=>{try{return fs.statSync(f).isFile();}catch{return false;}};
 const isDir=f=>{try{return fs.statSync(f).isDirectory();}catch{return false;}};
 const list=d=>{try{return fs.readdirSync(d);}catch{return [];}};
-const LANG_KEY=/lang|locale/i, SKIP_KEY=/store|font|dir|path|file|url|hook|count|history|voice/i;
+/* 2026-11-13 the key names the text language itself (languageType, textLanguageType, language, locale), not a sub/UI language,
+   a first-run flag (langinit_cn, initialSubLang) or a font (langUserFontFace0) */
+const LANG_KEY=/^(?:text|main|selected|current|game)?(?:lang(?:uage)?(?:type|id|code)?|locale)$/i, SKIP_KEY=/store|font|dir|path|file|url|hook|count|history|voice/i;
 
 /* ---- language codes ------------------------------------------------------------------------------------- */
 const JA_VALUE=/^(?:ja|jp|jpn|ja[-_]jp|japanese|日本語|nihongo)$/i;
@@ -49,7 +51,20 @@ function krkrDataDirs(gameDir,env){
   let p=decodeCf(m[1]).replace(/\$\((appdatapath|vistapath)\)/gi,env.appData).replace(/\$\(personalpath\)/gi,env.documents).replace(/\$\(localappdatapath\)/gi,env.localAppData).replace(/\$\(exepath\)/gi,gameDir).replace(/\$\(savedgamespath\)/gi,path.join(env.home,'Saved Games'));
   if(!path.isAbsolute(p))p=path.join(gameDir,p);out.push(path.normalize(p));}
  out.push(path.join(gameDir,'savedata'));
+ /* 2026-11-13 (live test: 9-nine Ep4 stayed English after textLanguageType in data_anchor.ksd was set to 0, and the game
+    wrote 1 back): KiriKiri builds with krkrsteam keep their system variables (languageType, uiLanguageType) in Steam's
+    remote storage, userdata/<user>/<appid>/remote/datasc.ksd, or a Steam emulator's SteamEmu/Saves. data_anchor.ksd there
+    only holds a stale copy. Both places are read. */
+ out.push(path.join(gameDir,'SteamEmu','Saves'));
+ const app=steamApp(gameDir);
+ if(app)for(const root of steamRoots(gameDir,env))for(const user of list(path.join(root,'userdata')).filter(n=>/^\d+$/.test(n)))out.push(path.join(root,'userdata',user,app.appid,'remote'));
  return [...new Set(out)].filter(isDir);
+}
+function steamRoots(gameDir,env){
+ const out=[];if(env.steamRoot)out.push(env.steamRoot);
+ const m=/^(.*)[\\/]steamapps[\\/]common[\\/]/i.exec(path.resolve(gameDir)+path.sep);if(m)out.push(m[1]);
+ if(!env.steamRoot)try{const v=(env.registry?.query?.('HKCU\\Software\\Valve\\Steam')||[]).find(x=>/^SteamPath$/i.test(x.name));if(v?.data)out.push(path.normalize(v.data));}catch{}
+ return [...new Set(out.map(p=>path.resolve(p)))].filter(isDir);
 }
 /* TJS text of a save file, with what is needed to write it back */
 function readKrkr(buf){
@@ -66,8 +81,9 @@ function writeKrkr(info,text){
  return Buffer.concat([info.prefix,head,z]);}
 const KRKR_KEY=/"([A-Za-z_]\w*)"\s*=>\s*(?:(-?\d+)|"([^"\\]{1,24})")/g;
 function krkrChanges(text){
- const out=[];let m;KRKR_KEY.lastIndex=0;
- while((m=KRKR_KEY.exec(text))){const key=m[1];if(!LANG_KEY.test(key)||SKIP_KEY.test(key))continue;
+ const out=[];let m;KRKR_KEY.lastIndex=0;const seen=new Map();for(const x of text.matchAll(KRKR_KEY))seen.set(x[1],(seen.get(x[1])||0)+1);KRKR_KEY.lastIndex=0;
+ /* a key written many times is per-record data (ATRI keeps textlang in every backlog entry), not the setting */
+ while((m=KRKR_KEY.exec(text))){const key=m[1];if(!LANG_KEY.test(key)||SKIP_KEY.test(key)||seen.get(key)>1)continue;
   if(m[2]!=null){const v=Number(m[2]);out.push({key,from:v,to:0,index:m.index,match:m[0],next:m[0].replace(/-?\d+$/,'0')});}
   else{const to=japaneseLike(m[3]);out.push({key,from:m[3],to:to??m[3],index:m.index,match:m[0],next:to?m[0].replace(/"[^"]*"$/,'"'+to+'"'):m[0],already:JA_VALUE.test(m[3])});}}
  return out;}
@@ -158,7 +174,7 @@ function setAcfLanguage(text,lang){
 
 /* ---- public ----------------------------------------------------------------------------------------------- */
 function environment(o={}){const home=o.home||os.homedir();return {home,appData:o.appData||process.env.APPDATA||path.join(home,'AppData','Roaming'),localAppData:o.localAppData||process.env.LOCALAPPDATA||path.join(home,'AppData','Local'),
- localLow:o.localLow||path.join(home,'AppData','LocalLow'),documents:o.documents||path.join(home,'Documents'),registry:o.registry||{query:regQuery,set:regSet},steamRunning:o.steamRunning||steamRunning,steamJapanese:o.steamJapanese,prefKeyFor:o.prefKeyFor};}
+ localLow:o.localLow||path.join(home,'AppData','LocalLow'),steamRoot:o.steamRoot||'',documents:o.documents||path.join(home,'Documents'),registry:o.registry||{query:regQuery,set:regSet},steamRunning:o.steamRunning||steamRunning,steamJapanese:o.steamJapanese,prefKeyFor:o.prefKeyFor};}
 function manifestPath(gameDir){return path.join(gameDir,BACKUP_DIR,'manifest.json');}
 function readManifest(gameDir){try{const m=JSON.parse(fs.readFileSync(manifestPath(gameDir),'utf8'));return m?.adapter===ADAPTER?m:null;}catch{return null;}}
 
@@ -204,7 +220,7 @@ function apply(gameDir,options={}){
 }
 function revert(buf,e){
  try{
-  if(e.format==='krkr'){const info=readKrkr(buf);if(!info)return null;const ch=krkrChanges(info.text).filter(c=>c.key===e.key&&String(c.from)===String(e.to));if(!ch.length)return null;
+  if(e.format==='krkr'){const info=readKrkr(buf);if(!info)return null;const all=krkrChanges(info.text),ch=all.filter(c=>c.key===e.key&&String(c.from)===String(e.to));/* the game (or the user) already put the old language back: nothing to write, the entry is done */if(!ch.length)return all.some(c=>c.key===e.key&&String(c.from)===String(e.from))?buf:null;
    let t=info.text;for(const c of ch)t=t.replace(c.match,typeof e.from==='number'?c.match.replace(/-?\d+$/,String(e.from)):c.match.replace(/"[^"]*"$/,'"'+e.from+'"'));return writeKrkr(info,t);}
   if(e.format==='json'){const t=buf.toString('utf8'),ch=jsonChanges(t).filter(c=>c.key===e.key&&c.from===e.to);if(!ch.length)return null;let n=t;for(const c of ch)n=n.replace(c.match,c.match.replace(/[^"\\]*(\\?")$/,e.from+'$1'));return Buffer.from(n,'utf8');}
   if(e.format==='pref'){const pairs=prefPairs(buf,e.prefKey).filter(p=>p.value===e.to);if(!pairs.length)return null;const n=Buffer.from(buf);for(const p of pairs){if(p.kind==='Single')n.writeFloatLE(e.from,p.offset);else n.writeInt32LE(e.from,p.offset);}return n;}
