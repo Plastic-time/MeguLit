@@ -6,6 +6,7 @@
    view 每周热词: 词汇 / 短语 / 短句, podium for 1–3, cards with the AI guess for 4–10, a plain list for 11–50. */
 import {mountEmailLogin} from './account-ui.js';
 import {changeAvatar} from './avatar-crop.js';
+import {busyText,isRateLimited,retrySeconds,autoRetry} from './rate-limit.js';
 import {personButton,socialHTML,bindSocial} from './leaderboard-social.js';
 import {openProfilePanel} from './profile-panel.js';
 import {rankTitle,SCHOOLS,elementName} from './reader-class.js';
@@ -125,7 +126,7 @@ function circleHTML(entries,metric,w,locale,esc,images,board){
 export function boardHTML(data,w,locale,esc){
  w={...words(locale),...w};
  const board=data.board||{},images=data.avatars||{};
- if(board.state==='error')return `<div class="leaderboard-offline"><p>${w.offline}</p><button type="button" class="primary" data-lb-retry>${w.retry}</button></div>`;
+ if(board.state==='error')return `<div class="leaderboard-offline"${isRateLimited(board)?` data-rate-wait="${retrySeconds(board)}"`:''}><p>${busyText(board,locale)||w.offline}</p><button type="button" class="primary" data-lb-retry>${w.retry}</button></div>`;
  if(view.metric==='games'&&!view.game){const games=board.games||[];if(!games.length)return `<p class="lb-empty">${w.empty}</p>`;
   return `<ol class="leaderboard-list leaderboard-games lb-rows">${games.map(g=>`<li><button type="button" data-lb-game="${esc(g.title)}"><span class="leaderboard-name">${esc(g.title)}</span><small>${esc(fill(w.readers,{n:g.readers}))}${g.top?` · ${w.top} ${esc(g.top.name)}`:''}</small></button></li>`).join('')}</ol>`;}
  const metric=view.metric==='games'?'characters':view.metric,entries=board.entries||[];
@@ -138,7 +139,7 @@ export function boardHTML(data,w,locale,esc){
 export function splitAwards(awards){const sorted=[...(awards||[])].sort((a,b)=>a.rank-b.rank);return {podium:sorted.filter(a=>a.rank<=3),cards:sorted.filter(a=>a.rank>=4&&a.rank<=10),list:sorted.filter(a=>a.rank>=11&&a.rank<=50)};}
 export function hotHTML(hot,w,locale,esc){
  w={...words(locale),...w};
- if(!hot||hot.state==='error')return `<div class="leaderboard-offline"><p>${w.offline}</p><button type="button" class="primary" data-lb-retry>${w.retry}</button></div>`;
+ if(!hot||hot.state==='error')return `<div class="leaderboard-offline"${isRateLimited(hot)?` data-rate-wait="${retrySeconds(hot)}"`:''}><p>${busyText(hot,locale)||w.offline}</p><button type="button" class="primary" data-lb-retry>${w.retry}</button></div>`;
  const n=v=>nf(locale).format(v||0);
  if(!hot.settled||!hot.awards?.length)return emptyState(hot.settled?'empty':'pending',hot.settled?w.hotEmpty:w.hotPending,w.hotRule);
  const {podium,cards,list}=splitAwards(hot.awards);
@@ -286,6 +287,7 @@ export async function mountLeaderboard(main,{api,locale,esc,toast,isCurrent=()=>
    const r=await changeAvatar({api,locale,toast,onBusy:busy=>{buttons.forEach(x=>{x.disabled=busy;x.classList.toggle('is-busy',busy);});if(busy)toast(words(locale).uploading);}});if(r&&isCurrent())render();});
   main.querySelector('[data-lb-back]')?.addEventListener('click',()=>{view.game='';render();});
   main.querySelector('[data-lb-retry]')?.addEventListener('click',()=>render());
+  {const wait=main.querySelector('[data-rate-wait]');if(wait)autoRetry(wait,Number(wait.dataset.rateWait),()=>render());}
   const login=main.querySelector('[data-lb-login]');if(login)mountEmailLogin(login,{api,locale,esc,toast,onDone:()=>render()});
   main.querySelector('[data-lb-join]')?.addEventListener('click',()=>{const box=main.querySelector('[data-lb-error]');box.hidden=true;
    if(!main.querySelector('[data-lb-consent]').checked){box.textContent=w.CONSENT_REQUIRED;box.hidden=false;return;}

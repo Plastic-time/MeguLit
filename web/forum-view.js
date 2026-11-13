@@ -4,6 +4,7 @@
    login). Three views in the page body: the thread list (tag switch, game / engine filter chips, 加载更多), one thread
    with its replies, and the new-post form. A post can name a work; the game detail page opens this tab filtered to that
    work (这部作品的讨论). Data: bridge forum_* (services/forum.cjs → relay/src/forum.js). */
+import {busyText,isRateLimited,retrySeconds,autoRetry} from './rate-limit.js';
 import {mountEmailLogin} from './account-ui.js';
 import {trayHTML,mountTray,galleryHTML,bindGallery,pictureWords} from './forum-pictures.js';
 
@@ -99,7 +100,7 @@ export async function mountForum(page,{api,locale,esc,toast,isCurrent=()=>true,a
  let listPage=0,seq=0;
  const busy=on=>body.classList.toggle('is-loading',on);
  const showError=(error)=>{const box=body.querySelector('[data-forum-error]');if(box){box.textContent=errorText(error,locale);box.hidden=false;}else toast(errorText(error,locale));};
- const failed=res=>{body.innerHTML=res?.state==='not-configured'?ctx.emptyState('pending',w.notReady):`${ctx.emptyState('empty',w.offline)}<p class="forum-center"><button type="button" class="leaderboard-leave" data-forum-retry>${w.retry}</button></p>`;body.querySelector('[data-forum-retry]')?.addEventListener('click',()=>show());};
+ const failed=res=>{body.innerHTML=res?.state==='not-configured'?ctx.emptyState('pending',w.notReady):`${ctx.emptyState('empty',isRateLimited(res)?'':w.offline)}${isRateLimited(res)?`<p class="forum-center" data-rate-wait>${busyText(res,locale)}</p>`:''}<p class="forum-center"><button type="button" class="leaderboard-leave" data-forum-retry>${w.retry}</button></p>`;body.querySelector('[data-forum-retry]')?.addEventListener('click',()=>show());{const wait=body.querySelector('[data-rate-wait]');if(wait)autoRetry(wait,retrySeconds(res),()=>show());}};
  const paintSub=()=>{sub.innerHTML=forumSubRow(locale,esc);
   sub.querySelectorAll('[data-forum-tag]').forEach(b=>b.onclick=()=>{filter.tag=b.dataset.forumTag;filter.mine=false;go('list');});
   sub.querySelectorAll('[data-forum-clear]').forEach(b=>b.onclick=()=>{filter[b.dataset.forumClear]='';go('list');});

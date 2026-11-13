@@ -148,7 +148,7 @@ async function call(url,init,fetcher,who=null,raw=false){
  const rotated=r.headers?.get?.('x-megulit-token');if(who&&rotated&&/^mgl_[A-Za-z0-9_-]{43}$/.test(rotated))try{who.save(rotated);}catch{}
  if(raw&&r.ok){try{return {state:'ok',bytes:Buffer.from(await r.arrayBuffer())};}catch{return {state:'error',error:'BAD_RESPONSE'};}}
  let data=null;try{data=await r.json();}catch{}
- if(!r.ok)return {state:'error',error:typeof data?.error==='string'&&/^[A-Z_]{2,40}$/.test(data.error)?data.error:'HTTP_'+r.status};
+ if(!r.ok){const out={state:'error',error:typeof data?.error==='string'&&/^[A-Z_]{2,40}$/.test(data.error)?data.error:'HTTP_'+r.status};if(r.status===429)out.retryAfter=require('./relay-gate.cjs').retryAfterSeconds(r);return out;}
  return {state:'ok',data:data||{}};
 }
 /* submit(stats) — stats as collectStats() returns it; this week's lookup counts ride along (term + count only). */
