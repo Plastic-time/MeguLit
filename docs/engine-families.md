@@ -82,3 +82,17 @@ kit 已按笔记补上共用件（E575）：MSVC rand、密钥流异或、半字
 | ShiinaRio、Malie、NeXAS | 组 2 | Opus 5.5 / high（按作品密钥，加密最重） |
 | QLIE、Entis、AliceSoft、Marble | 组 3 | Opus 5.5 / medium |
 | 按作品密钥（CMVS cpz 密钥、ExHIBIT 种子、ShiinaRio、Malie） | 各自做，但密钥表统一放成 `*-schemes.json`（仿 cx-schemes.json / paz-schemes.json），新作品密钥用适配包 `params` 下发 | — |
+
+## 第二轮：剩余引擎 + 同人长尾（2026-11-14）
+
+VNDB 引擎表共 617 个引擎、74083 个发行；已覆盖的 75 个占 90.9%。剩下 542 个按底层技术分：
+
+| 家族 | 引擎数 | 发行 | 思路 | 代表 |
+|---|---:|---:|---|---|
+| F1 打包资源（网页 / NW.js / Electron / zip 资源） | 约 60 | 约 1500 | kit.asarList / zipList（E604）+ 按内容取文本：JSON、JS 字符串、HTML、lua；Visual Novel Maker 数据即 RPG Maker MZ → rpgmaker.cjs | Visual Novel Maker、Twine、HTML5、Construct、NVLMaker、WebGAL、Monogatari、ink、Cocos2d、LÖVE、Defold、GB Studio |
+| F2 纯文本脚本 | 44 | 1091 | 一个按配置解析的读取器（kit.lineGrammar）+ 每家一份语法配置（可走适配包下发） | Yuuki! Novel、Comic Maker 1–3、Suika 2、Scenario-kun、novelty、Videotome、Kamishibai、PyWright、NVList |
+| F3 制作工具二进制 | 约 30 | 约 1300 | 多为集中字符串表或 zip/自有包 + 表 | GameMaker（data.win STRG）、Macromedia Director、HSP、Clickteam、AGS、SRPG Studio、Java（jar）、GameCreator、RPM |
+| F4a 私有引擎·有公开工具 | 约 25 | 约 1000 | 按工具规格逐个写，共用 kit | Luca System、Escude ACPX、PJADV、SLG System、Stuff Script、ISM、GLib2、Willadv、AI5WIN 完整、Cyberworks、DxLib、Tanuki、Yaneurao、Yeti/Regista、QuinRose、STCM2、BladeEngine、BKEngine、OROCHI |
+| F4b 私有引擎·无资料 | 约 20 | 约 900 | 先调研；查不到就只做检测 + 通用扫描，列为需要实物 | SaiSys、SystemC、Diesel、SakanaGL、rUGP、PIX STUDIO、AGES Mk2、CatSystem3、N2System、SystemAoi、KID、shin、CRIware、DDSystem、Dorian |
+| 不在范围 | — | — | PC-98 / 手机专用平台：hook 接不上 | ADV98V、AliceSoft System 1/2、A98SYS、Episode Interactive 等 |
+| 343 个 <20 发行的小引擎 | 343 | 1404 | 只靠 GARbro + 通用扫描 | — |
