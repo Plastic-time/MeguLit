@@ -127,8 +127,6 @@ html:not(#u):not(#v):not(#w):not(#x) body .lib-field .cover-frame{background-col
 /* captions read: larger, brighter, no heavy serif at 12px */
 html:not(#u):not(#v):not(#w):not(#x) body .lib-field .game-caption .mq{font-size:14px!important;letter-spacing:.01em!important;color:#f4e6da!important;text-shadow:0 1px 6px #000c}
 /* the tool capsule is a solid warm surface that lifts off the wall (it was a grey-blue glass that blended into the covers) */
-html:not(#u):not(#v):not(#w):not(#x) body .main>.field-search{background:color-mix(in srgb,#150f12 94%,transparent)!important;border:1px solid color-mix(in srgb,var(--g-gold,#edb56e) 30%,transparent)!important;box-shadow:0 14px 34px -12px #000!important}
-html:not(#u):not(#v):not(#w):not(#x) body .main>.field-search input::placeholder{color:color-mix(in srgb,var(--g-t1,#f1e0d2) 70%,transparent)!important}
 
 /* Detail: the title block (engine, name, last played, actions) is centred against the cover instead of leaving a
    gap above the buttons; the numbers column shares its left edge and width with the technical card below; the
