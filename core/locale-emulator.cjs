@@ -13,7 +13,7 @@ const GH_PATH=URL.replace('https://github.com/','');
 const DL=['https://dl.megulit.com/gh/'+GH_PATH,'https://cn-dl.megulit.com/gh/'+GH_PATH];
 const RELAYS=['https://gh-proxy.com/'+URL,'https://ghproxy.net/'+URL];
 const inChina=()=>{try{const o=Intl.DateTimeFormat().resolvedOptions();return o.timeZone==='Asia/Shanghai'||o.timeZone==='Asia/Urumqi'||/^zh-CN/i.test(o.locale||'');}catch{return false;}};
-const SOURCES=inChina()?[...DL,...RELAYS,URL]:[URL,...DL,...RELAYS];
+const SOURCES=inChina()?[...[...DL].reverse(),...RELAYS,URL]:[URL,...DL,...RELAYS];
 const REQUIRED=['LEProc.exe','LECommonLibrary.dll','LoaderDll.dll','LocaleEmulator.dll'];
 const GUID='b56f4ea1-f9ac-418a-add7-653dc2302e91';
 const XML=`<?xml version="1.0" encoding="utf-8"?><LEConfig><Profiles><Profile Name="Run in Japanese" Guid="${GUID}" MainMenu="false"><Parameter></Parameter><Location>ja-JP</Location><Timezone>Tokyo Standard Time</Timezone><RunAsAdmin>false</RunAsAdmin><RedirectRegistry>true</RedirectRegistry><IsAdvancedRedirection>false</IsAdvancedRedirection><RunWithSuspend>false</RunWithSuspend></Profile></Profiles></LEConfig>`;
