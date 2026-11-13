@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import {enhanceSelects} from './select-control.js';
+import {reviewRest} from './empty-states.js';
 import './hud-drag.js';
 import './anki-hud-model.js';
 let stopMessages=()=>{};
@@ -347,8 +348,10 @@ export async function renderAnkiReview({target,api,text,esc,isCurrent,toast,quie
   }catch(error){failed(error);}finally{if(button)button.disabled=false;}}
  function drawDone(card){
   currentCard=card;currentFrame=null;leaveHud();
-  const heading=card.practiceDone?copy.practiceDone:card.finished?text.ankiFinished:text.ankiEmpty;
-  target.innerHTML='<section class="panel review-card">'+(card.deck?'<div class="eyebrow">'+esc(card.deck)+(card.total?' · '+esc(copy.total.replace('{n}',card.total)):'')+'</div>':'')+'<h2>'+heading+'</h2>'+(card.finished?'<p class="muted">'+text.ankiFinishedHint+'</p>':'')+'<div class="review-controls">'+(card.deck&&card.total!==0?'<button class="primary" data-practice>'+copy.practice+'</button>':'')+(card.deck?'<button class="secondary" data-custom>'+copy.custom+'</button><button class="secondary" data-limits>'+copy.limits+'</button>':'')+'<button class="secondary" data-decks>'+text.chooseDeck+'</button></div></section>';
+  /* 2026-11-13 (AI-feel review): the finished state says what was done today, when cards come back, and offers new words */
+  const lang=document.documentElement.lang||'zh',loc=lang.startsWith('ja')?'ja':lang.startsWith('en')?'en':'zh';
+  target.innerHTML=reviewRest({locale:loc,esc,kind:card.practiceDone?'practice':card.finished?'rest':'empty',deck:card.deck||'',reviewed:card.reviewedToday??null,nextDue:card.finished?card.nextDue:undefined,total:card.total??null,
+   extra:(card.deck&&card.total!==0?'<button class="secondary" data-practice>'+copy.practice+'</button>':'')+'<span class="es-quiet">'+(card.deck?'<button class="text-button" data-custom>'+copy.custom+'</button><button class="text-button" data-limits>'+copy.limits+'</button>':'')+'<button class="text-button" data-decks>'+text.chooseDeck+'</button></span>'});
   target.querySelector('[data-decks]').onclick=drawDecks;
   target.querySelector('[data-practice]')?.addEventListener('click',()=>practice(card.deck,false));
   target.querySelector('[data-custom]')?.addEventListener('click',event=>openAnki('custom',card.deck,event.currentTarget));

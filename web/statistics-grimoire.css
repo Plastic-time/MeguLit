@@ -189,3 +189,9 @@
 .stg-cal .cell,.stg-cal [class*=cell]{border-radius:0}
 .stg-book img,.stg-books img{border-radius:0}
 .stg-more{font-family:var(--stg-mono);letter-spacing:.15em}
+
+/* 2026-11-13 (AI-feel review: four equal number tiles). Characters read leads in gold; time and lookups follow smaller, last read quieter. */
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .stg-keys>div>span{font-family:inherit!important;letter-spacing:.02em!important;font-size:12.5px!important;text-transform:none!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .stg-keys>div>b{font-size:26px!important;font-weight:500!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .stg-keys>div:first-child>b{font-weight:400!important;font-size:44px!important;color:var(--g-gold,var(--t-gold))!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .stg-keys>div:last-child>b{font-weight:400!important;font-size:18px!important;color:var(--t-text-2)!important}
