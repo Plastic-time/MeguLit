@@ -7,7 +7,8 @@ const {execFileSync}=require('node:child_process');
 const {realShortcuts}=require('../services/uninstall.cjs')._internal;
 
 test('shortcuts whose paths have spaces are read',{skip:process.platform!=='win32'},()=>{
- const base=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-lnk-')),target=path.join(base,'MeguLit 安装','MeguLit.exe');
+ // ASCII target: a shortcut made through WScript.Shell keeps only what the system code page can hold (CI is en-US).
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-lnk-')),target=path.join(base,'MeguLit app','MeguLit.exe');
  const files=[path.join(base,'Desktop','MeguLit.lnk'),path.join(base,'Desktop','Uninstall MeguLit.lnk'),path.join(base,'Start Menu','Programs','MeguLit.lnk'),path.join(base,'Start Menu','Programs','Uninstall MeguLit.lnk')];
  try{
   fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,'');
