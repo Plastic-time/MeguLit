@@ -161,17 +161,17 @@ html:not(#mgc1):not(#mgc2):not(#mgc3):not(#mgc4):not(#mgc5):not(#mgc6):not(#mgc7
 /* ---------- text fields, settings search, select trigger ---------- */
 & body :is(.settings-content,.lookup-form,.page-tools,.input-group,dialog,.dev-notice-form,.key-panel) :is(input:not([type=range]):not([type=color]):not([type=checkbox]):not([type=radio]):not(#game-search),textarea):not(.field-search *):not(.tv-search *),
 & body :is(.settings-search,.select-trigger){
- border:1px solid var(--mgc-line)!important;border-radius:var(--mgc-r)!important;background:var(--mgc-well)!important;color:var(--mgc-ink)!important;box-shadow:none!important;
+ border:1px solid var(--mgc-line)!important;border-radius:var(--mgc-r)!important;background-color:var(--mgc-well)!important;color:var(--mgc-ink)!important;box-shadow:none!important;
  font-family:var(--mgc-ui)!important;transition:border-color var(--mgc-t),background-color var(--mgc-t)!important;
  &::placeholder{color:var(--mgc-ink-3)!important}
  &:hover:not(:disabled){border-color:color-mix(in srgb,var(--mgc-ink) 40%,transparent)!important}
  &:focus{border-color:var(--mgc-ink)!important}
- &:disabled{border-style:dashed!important;color:var(--mgc-ink-3)!important;background:transparent!important}
+ &:disabled{border-style:dashed!important;color:var(--mgc-ink-3)!important;background-color:transparent!important}
  &[aria-invalid=true],&.invalid,&.is-error{border-color:var(--mgc-red)!important}
 }
 & body .select-trigger{
  &::after{border-color:var(--mgc-ink-2)!important;transition:transform var(--mgc-t) var(--mgc-ease)!important}
- &[aria-expanded=true]{border-color:var(--mgc-ink)!important;background:color-mix(in srgb,var(--mgc-ink) 10%,var(--mgc-well))!important}
+ &[aria-expanded=true]{border-color:var(--mgc-ink)!important;background-color:color-mix(in srgb,var(--mgc-ink) 10%,var(--mgc-well))!important}
  &[aria-expanded=true]::after{border-color:var(--mgc-ink)!important}
 }
 & body .settings-content .settings-row .setting-slider input[type=number],& body .settings-content .settings-row>input[type=number]{border-radius:var(--mgc-r)!important;font-family:var(--mgc-mono)!important}
