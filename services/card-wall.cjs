@@ -9,10 +9,11 @@
     'shot'  MeguLit's own scene shots (services/scene-shots): taken from the game window while it was read
     'save'  the game's own save marks the CG unlocked (services/game-cg: KiriKiri, HuneX, Siglus, YU-RIS readers)
     'seen'  an engine reported the picture on screen (noteSeen), resolved to a loose file of that exact name
+    'memory' the runtime dump DLL watched the game window show it (services/runtime-cg, native/runtimedump/RuntimeCg.cpp)
     'cover' the game's cover
    Anything else (gallery tables, archive listings, images merely loaded) is never offered, and cards_create only
    accepts a source id the unlocked list gives right now. With the R18 filter on, 'save' CGs follow the local rating
-   model like the detail card and 'seen' pictures (never rated) are left out. */
+   model like the detail card and 'seen'/'memory' pictures (never rated) are left out. */
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{spawnSync}=require('node:child_process');
 const DEFAULT_TOPLOADERS=50,MAX_TOPLOADERS=500,FACE_W=600,FACE_H=800,THUMB=480,FULL=1280,VIEW=1600;
 const sha=v=>crypto.createHash('sha1').update(String(v)).digest('hex');
@@ -91,7 +92,8 @@ function sources(root,game,opts={}){
    if(safe&&names.length){const rating=require('./cg-rating.cjs'),known=rating.ratings(path.join(root,'data','cg-cache',sha(path.dirname(String(exe)).toLowerCase()).slice(0,16)));names=names.filter(n=>rating.isSafe(known[n]));}
    for(const n of names){saved.add(n);out.push({id:'save:'+n,kind:'cg',source:'save',name:n});}}catch{}}
   if(!safe){const want=new Set(readSeen(root,exe).filter(n=>!saved.has(n)));const found=looseByName(path.dirname(exe),want);
-   for(const [n,f] of found)out.push({id:'seen:'+n,kind:'cg',source:'seen',file:f});}
+   for(const [n,f] of found)out.push({id:'seen:'+n,kind:'cg',source:'seen',file:f});
+   try{out.push(...require('./runtime-cg.cjs').sources(exe));}catch{}}
  }
  return out;}
 function fileOf(root,game,s){if(s.file)return s.file;try{return require('./game-cg.cjs').pictureFile(root,game.executable,s.name)||null;}catch{return null;}}
