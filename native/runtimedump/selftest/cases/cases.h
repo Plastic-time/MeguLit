@@ -4,4 +4,5 @@
 #define MEGULIT_SELFTEST_CASES \
  CASE(Example) \
  CASE(Safety) \
- CASE(Cg)
+ CASE(Cg) \
+ CASE(AudioMore)
