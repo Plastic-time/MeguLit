@@ -15,7 +15,7 @@
    fragments up to `proc` (0x841) or a page/wait control (`ctrl` 0x842 "p"/"w"/"r"); `ctrl "n"` is a line break inside
    it. Non-ASCII `ldstr` (0x801) strings are speaker names and choice labels; ASCII ones (file names, labels) are
    anchors. The opcode walk is exact, so a byte that merely looks like 0x840 inside an operand is never read as text. */
-const fs=require('node:fs'),path=require('node:path');
+const fs=require('node:fs'),path=require('node:path'),kit=require('./kit.cjs');
 
 /* ---- CRC-32 key ------------------------------------------------------------------------------------------------ */
 const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let v=n;for(let k=0;k<8;k++)v=v&1?(v>>>1)^0xEDB88320:v>>>1;t[n]=v>>>0;}return t;})();
@@ -65,21 +65,12 @@ function objHeader(b){
 
 /* Instructions that carry strings, in order: {op, bytes}. Stops quietly at the first unknown opcode (a damaged or
    unfamiliar script keeps what was read up to there). */
-function strings(code){const out=[];let p=0;
- while(p+2<=code.length){const op=code.readUInt16LE(p);p+=2;const enc=ENC.get(op);if(enc===undefined)break;
-  for(const c of enc){
-   if(c==='s'){if(p+2>code.length)return out;const n=code.readUInt16LE(p);p+=2;if(p+n>code.length)return out;out.push({op,bytes:code.subarray(p,p+Math.max(0,n-1))});p+=n;}
-   else if(c==='t'){if(p+2>code.length)return out;p+=2+code.readUInt16LE(p);}
-   else if(c==='c'){if(p+2>code.length)return out;p+=2+4*code.readUInt16LE(p);}
-   else p+={f:2,h:4,o:2,'0':4,i:4,r:4,a:2,j:4,l:2}[c];}
-  if(op===OP.PROC)out.push({op,bytes:null});}
- return out;}
+/* E573 through kit.opcodeWalk: Majiro's operand letters map to kit widths (f h o 0 i r a j l: fixed bytes) */
+const WIDTH={f:2,h:4,o:2,'0':4,i:4,r:4,a:2,j:4,l:2},KIT=new Map([...ENC].map(([op,e])=>[op,[...e].map(c=>WIDTH[c]??c)]));
+function strings(code){const out=[];kit.opcodeWalk(code,op=>KIT.get(op),(op,strs)=>{for(const b of strs)out.push({op,bytes:b});if(op===OP.PROC)out.push({op,bytes:null});});return out;}
 
-/* One encoding per script. Shift-JIS for the originals, GBK for Chinese patches: replacement characters and half-width katakana (what GBK bytes
-   turn into when read as Shift-JIS) count against an encoding; a tie goes to the one with more kana */
-function codepage(all){const score=enc=>{const t=new TextDecoder(enc).decode(all);return {bad:(t.match(/�/g)||[]).length*4+(t.match(/[｡-ﾟ]/g)||[]).length,kana:(t.match(/[ぁ-ゖァ-ヺ]/g)||[]).length};};
- const s=score('shift_jis'),g=score('gbk');return s.bad<g.bad||s.bad===g.bad&&s.kana>=g.kana?'shift_jis':'gbk';}
-function pickDecoder(list){const all=Buffer.concat(list.filter(x=>x.bytes&&x.bytes.some(c=>c>=0x80)).map(x=>x.bytes));if(!all.length)return sj;return codepage(all)==='gbk'?new TextDecoder('gbk'):sj;}
+/* one encoding per script (kit.codepage: SJIS originals, GBK patches) */
+function pickDecoder(list){const all=Buffer.concat(list.filter(x=>x.bytes&&x.bytes.some(c=>c>=0x80)).map(x=>x.bytes));return all.length&&kit.codepage(all)==='gbk'?new TextDecoder('gbk'):sj;}
 const PATHY=/[\\/.:]|^[$#@]/;
 function parse(buf){
  const h=objHeader(Buffer.isBuffer(buf)?buf:Buffer.from(buf));if(!h)return {lines:[],anchors:[]};

@@ -21,7 +21,6 @@ const SCRIPTY=/script|scenario|scene|scn|story|text|txt|data|system|sys|main|gam
 const MEDIA='png|bmp|jpe?g|gif|tga|dds|webp|psd|tlg\\d?|pna|bmx|g00|pic|ani|eri|mio|cps|hg[23]|ogg|wav|mp3|m4a|opus|flac|ahx|hca|at3|wma|mp4|wmv|avi|mpe?g|webm|ogv|mov|ttf|otf|ttc|fnt|pmx|x|fbx';
 const MATCH='^(?!.*\\.('+MEDIA+')$).+';
 const LIMIT_BYTES=512*1048576,LIMIT_FILES=20000,MAX_ARCHIVES=12,MIN_SIZE=16384;
-const KANA=/[ぁ-ゖァ-ヺ]/g,JP_RUN=/[ぁ-ゖァ-ヺー一-龯々〆〜～！？。、「」『』（）…―・　Ａ-Ｚａ-ｚ０-９]{2,}/g;
 
 const jobs=new Map();/* archive path → {state,startedAt,error} for archives being unpacked in this process */
 let packsRef=null;
@@ -74,15 +73,8 @@ function schedule(file){if(jobs.has(file))return;jobs.set(file,{state:'queued',s
 async function pump(){if(busy)return;busy=true;try{while(queue.length){const file=queue.shift(),job=jobs.get(file);job.state='running';
   try{await unpack(file);job.state='done';}catch(error){job.state='error';job.error=error.message;}}}finally{busy=false;}}
 
-function decodeRuns(buf){
- const pick=[];for(const enc of ['shift_jis','utf-8','utf-16le']){let t;try{t=new TextDecoder(enc).decode(buf);}catch{continue;}pick.push({enc,t,kana:(t.match(KANA)||[]).length});}
- const best=pick.sort((a,b)=>b.kana-a.kana)[0];if(!best||best.kana<4)return [];
- const lines=[];let last='';
- for(const raw of best.t.split(/[\r\n\0]+/)){
-  for(const m of raw.matchAll(JP_RUN)){const s=m[0].replace(/^[　\s]+|[　\s]+$/g,'');if(s.length<2||!(s.match(KANA)||[]).length)continue;if(/^[ァ-ヺー]+$/.test(s)&&s.length<3)continue;if(s!==last)lines.push(s);last=s;}
- }
- return lines;
-}
+/* E573 the generic kana scan is shared with every reader whose grammar is unknown (kit.cjs) */
+const decodeRuns=require('./kit.cjs').decodeRuns;
 // Engine interface used by scenes.cjs.
 const engine={id:'garbro',
  sources:dir=>archives(dir),

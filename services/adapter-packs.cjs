@@ -207,7 +207,8 @@ function expand(dir,g,limit=LIMITS.files){const parts=g.replace(/\\/g,'/').split
  if(parts.length>3)return out;walk(dir,0);return out.sort();}
 const headMemo=new Map();
 function exeHead(file){const st=fs.statSync(file);const k=file+'|'+st.size+'|'+st.mtimeMs;if(headMemo.has(k))return headMemo.get(k);const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(Math.min(1<<20,st.size));fs.readSync(fd,b,0,b.length,0);const h=crypto.createHash('sha256').update(b).digest('hex');headMemo.set(k,h);return h;}finally{fs.closeSync(fd);}}
-function readAt(file,offset,length){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(length);const n=fs.readSync(fd,b,0,length,offset);return b.subarray(0,n);}finally{fs.closeSync(fd);}}
+/* E573 packs and built-in readers share one runtime for file reads and LZSS (original-engines/kit.cjs) */
+const kit=require('./original-engines/kit.cjs'),readAt=kit.readAt;
 /* match(pack,dir) → specificity score (0 = no match): exe head 100, exe size 40, exe name 10, each file 5, magic 10 */
 function match(pack,dir){try{const m=pack.match;let score=0;
  if(m.exe){const exes=m.exe.name?[path.join(dir,m.exe.name)].filter(f=>fs.existsSync(f)):fs.readdirSync(dir).filter(f=>/\.exe$/i.test(f)).map(f=>path.join(dir,f));
@@ -224,11 +225,7 @@ function params(target,root=ROOT()){try{const list=active(root);if(!list.length)
 /* the same array while nothing changed: callers memoise on its identity */
 
 /* ---- runtime: transforms ---------------------------------------------------------------------------------------- */
-function lzss(src,cap=LIMITS.inflated){const win=new Uint8Array(4096);let r=0xfee,flags=0,i=0;const out=[];
- while(i<src.length&&out.length<cap){flags>>=1;if(!(flags&0x100)){flags=src[i++]|0xff00;if(i>src.length)break;}
-  if(flags&1){if(i>=src.length)break;const c=src[i++];out.push(c);win[r]=c;r=(r+1)&0xfff;}
-  else{if(i+1>=src.length)break;const a=src[i++],b=src[i++];const off=a|((b&0xf0)<<4),len=(b&0x0f)+3;for(let k=0;k<len;k++){const c=win[(off+k)&0xfff];out.push(c);win[r]=c;r=(r+1)&0xfff;}}}
- return Buffer.from(out.slice(0,cap));}
+const lzss=(src,cap=LIMITS.inflated)=>kit.lzss(src,undefined,{cap});
 function transform(buf,list){let b=Buffer.from(buf);
  for(const t of list||[]){switch(t.op){
   case 'xor':{const k=Buffer.from(t.key,'hex'),s=t.start||0;for(let i=0;i<b.length;i++)b[i]^=k[(i+s)%k.length];break;}

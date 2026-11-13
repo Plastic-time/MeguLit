@@ -8,7 +8,7 @@
    No description of the scenario files themselves is public. Until a real game shows their grammar, script-looking
    entries (by name: no media extension) are read with the generic text scan the GARbro fallback uses (Shift-JIS runs
    with kana): lines are approximate and pairing with a patch is by position only. */
-const fs=require('node:fs'),path=require('node:path');
+const fs=require('node:fs'),path=require('node:path'),kit=require('./kit.cjs');
 const sj=new TextDecoder('shift_jis');
 function list(file){let fd;try{fd=fs.openSync(file,'r');}catch{return null;}
  try{const size=fs.fstatSync(fd).size,h=Buffer.alloc(8);if(fs.readSync(fd,h,0,8,0)<8)return null;const sig=h.toString('latin1',0,4);if(sig!=='ARC1'&&sig!=='ARC2')return null;
@@ -19,21 +19,16 @@ function list(file){let fd;try{fd=fs.openSync(file,'r');}catch{return null;}
   const out=[];for(let i=0;i<raw.length;i++){const e=raw[i];if(!e.offset||e.offset>=size)continue;const next=i+1<raw.length?raw[i+1].offset:size;
    const packed=next===0?e.unpacked:next>=e.offset?next-e.offset:-1;if(packed<0||e.offset+packed>size)return null;out.push({name:e.name,offset:e.offset,size:packed,unpacked:e.unpacked,v2});}
   return out;}finally{fs.closeSync(fd);}}
-/* LZSS as GARbro's LzssStream: flag byte LSB first, 1 = literal; a reference is lo, hi: position lo | (hi & 0xF0) << 4,
-   length (hi & 0x0F) + 3; window 4096, writes start at 0xFEE, the window starts filled with 0xFF */
-function lzss(src,size){const out=Buffer.alloc(size),win=Buffer.alloc(4096,0xff);let wp=0xfee,o=0,s=0;
- while(o<size&&s<src.length){let flags=src[s++];for(let bit=0;bit<8&&o<size&&s<src.length;bit++,flags>>=1){
-  if(flags&1){const c=src[s++];out[o++]=c;win[wp]=c;wp=(wp+1)&0xfff;}
-  else{if(s+1>=src.length)return out.subarray(0,o);const lo=src[s++],hi=src[s++];let pos=lo|((hi&0xf0)<<4);const len=(hi&0x0f)+3;for(let k=0;k<len&&o<size;k++){const c=win[(pos+k)&0xfff];out[o++]=c;win[wp]=c;wp=(wp+1)&0xfff;}}}}
- return out.subarray(0,o);}
-function read(file,e){const fd=fs.openSync(file,'r');let b;try{b=Buffer.alloc(e.size);fs.readSync(fd,b,0,e.size,e.offset);}finally{fs.closeSync(fd);}
+/* E573 LZSS and the text scan come from kit.cjs (GARbro LzssStream variant: window filled with 0xFF) */
+const lzss=(src,size)=>kit.lzss(src,size,{fill:0xff});
+function read(file,e){const b=kit.readAt(file,e.offset,e.size);
  if(!e.v2)return b;const d=e.size!==e.unpacked?lzss(b,e.unpacked):Buffer.from(b);for(let i=0;i<d.length;i++)d[i]^=0xff;return d;}
 const MEDIA=/\.(png|bmp|jpe?g|ogg|wav|mp3|avi|mpe?g|wmv|ttf|otf|ani|cur|ico)$/i;
-const isArc=file=>{try{const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(4);fs.readSync(fd,b,0,4,0);return /^ARC[12]$/.test(b.toString('latin1'));}finally{fs.closeSync(fd);}}catch{return false;}};
+const isArc=file=>/^ARC[12]$/.test(kit.head(file,4).toString('latin1'));
 function archives(dir){let names;try{names=fs.readdirSync(dir);}catch{return [];}
  /* extension-less files only, as GARbro opens them: CsWare's .arc archives start "ARC2" too */
  return names.filter(n=>!/\./.test(n)).map(n=>path.join(dir,n)).filter(f=>{try{return fs.statSync(f).isFile()&&isArc(f);}catch{return false;}});}
 function scenes(dir){const out=[];for(const a of archives(dir)){const l=list(a);if(!l)continue;for(const e of l)if(!MEDIA.test(e.name))out.push({name:path.basename(a)+'/'+e.name,read:()=>read(a,e)});}return out.sort((a,b)=>a.name.localeCompare(b.name));}
-const parse=buf=>({lines:require('./garbro.cjs').decodeRuns(Buffer.isBuffer(buf)?buf:Buffer.from(buf)),anchors:[]});
+const parse=buf=>({lines:kit.decodeRuns(Buffer.isBuffer(buf)?buf:Buffer.from(buf)),anchors:[]});
 const engine={id:'ast',hint:'无扩展名 ARC1/ARC2 归档',scenes,archives:scenes,sources:archives,parse,test:()=>false,heuristic:true};
 module.exports={engine,list,read,lzss,parse};

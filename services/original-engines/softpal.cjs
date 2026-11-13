@@ -11,19 +11,14 @@
                 {02|0f|10|11|12|13|14} 00 02 00: +4 text offset, +12 name offset (0x0FFFFFFF: no name); a choice is
                 the 16-byte block with 17 00 01 00 02 00 06 00 at +8: +4 text offset. Offsets point into TEXT.DAT.
    Lines come in script order (name before its message), so a Chinese patch's SCRIPT.SRC + TEXT.DAT pair 1:1. */
-const fs=require('node:fs'),path=require('node:path');
+const fs=require('node:fs'),path=require('node:path'),kit=require('./kit.cjs');
+/* E573 the PAC index is a kit table */
+const PAC={magic:'PAC ',count:{at:8,type:'u32le'},entries:0x804,fields:[{name:'name',type:'cstr',size:32},{name:'size',type:'u32le'},{name:'offset',type:'u32le'}]};
+const pacList=file=>{const l=kit.table(file,PAC);return l&&l.length?l:null;};
+const pacRead=kit.entryRead;
 
-function pacList(file){let fd;try{fd=fs.openSync(file,'r');}catch{return null;}
- try{const h=Buffer.alloc(0x804+40);if(fs.readSync(fd,h,0,h.length,0)<h.length||h.toString('latin1',0,4)!=='PAC ')return null;
-  const count=h.readUInt32LE(8),first=h.readUInt32LE(0x804+36),size=fs.fstatSync(fd).size;if(!count||count>100000||first<0x804+40*count||first>size)return null;
-  const t=Buffer.alloc(40*count);fs.readSync(fd,t,0,t.length,0x804);const out=[];
-  for(let p=0;p<t.length;p+=40){const name=t.toString('latin1',p,p+32).replace(/\0.*$/s,''),s=t.readUInt32LE(p+32),o=t.readUInt32LE(p+36);if(!name||o+s>size)return null;out.push({name,size:s,offset:o});}
-  return out;}finally{fs.closeSync(fd);}}
-function pacRead(file,e){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(e.size);fs.readSync(fd,b,0,e.size,e.offset);return b;}finally{fs.closeSync(fd);}}
-
-const rol=(b,n)=>((b<<n)|(b>>>(8-n)))&255;
 function decryptText(buf){const d=Buffer.from(buf);if(d[0]!==0x24)return d;let shift=4;
- for(let i=16;i<d.length-4;i+=4){d[i]=rol(d[i],shift%8);d.writeUInt32LE((d.readUInt32LE(i)^0x084DF873^0xFF987DEE)>>>0,i);shift++;}
+ for(let i=16;i<d.length-4;i+=4){d[i]=kit.rol(d[i],shift);d.writeUInt32LE((d.readUInt32LE(i)^0x084DF873^0xFF987DEE)>>>0,i);shift++;}
  return d;}
 /* offset -> raw text bytes */
 function textTable(buf){const d=decryptText(buf);if(d.toString('latin1',1,12)!=='TEXT_LIST__')return null;/* a re-packed (plain) TEXT.DAT has 0 for the "$" */const out=new Map();let p=16;
@@ -34,11 +29,7 @@ function scriptRefs(src){const out=[];if(src.toString('latin1',0,2)!=='Sv')retur
   if(hi===2&&[0x02,0x0f,0x10,0x11,0x12,0x13,0x14].includes(lo)&&i>=24){const at=i-24,name=src.readUInt32LE(at+12);out.push({kind:'say',text:src.readUInt32LE(at+4),name:name===0x0fffffff?null:name});}
   else if(hi===6&&lo===2&&i>=8)out.push({kind:'choice',text:src.readUInt32LE(i-4),name:null});}
  return out;}
-/* Shift-JIS for the originals, GBK for Chinese patches: replacement characters and half-width katakana (what GBK bytes
-   turn into when read as Shift-JIS) count against an encoding; a tie goes to the one with more kana */
-function codepage(all){const score=enc=>{const t=new TextDecoder(enc).decode(all);return {bad:(t.match(/�/g)||[]).length*4+(t.match(/[｡-ﾟ]/g)||[]).length,kana:(t.match(/[ぁ-ゖァ-ヺ]/g)||[]).length};};
- const s=score('shift_jis'),g=score('gbk');return s.bad<g.bad||s.bad===g.bad&&s.kana>=g.kana?'shift_jis':'gbk';}
-function pickDecoder(bufs){const all=Buffer.concat(bufs.slice(0,3000));return new TextDecoder(codepage(all));}
+const pickDecoder=kit.decoder;
 /* inline codes: <R漢字|よみ> style ruby is kept as its base, \n / %N are breaks, other %X / <...> codes drop */
 const clean=t=>t.replace(/<R([^|>]*)\|[^>]*>/g,'$1').replace(/\\n|%N/g,'\n').replace(/%[A-Za-z0-9]+/g,'').replace(/<[^>]*>/g,'').replace(/^[\s　]+|[\s　]+$/g,'');
 /* The pair (SCRIPT.SRC, TEXT.DAT) is one scene: scenes() hands parse() both, joined with a marker. */
