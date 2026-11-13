@@ -103,7 +103,7 @@ async function prepare(root,db,{ids=null,sampler,titles=true}={}){
  if(body.length>MAX_BUNDLE)return {error:'TOO_LARGE'};
  if(!clean(bundle))return {error:'TEXT_FOUND'};
  const hash=sha(body);fs.mkdirSync(outbox(root),{recursive:true});fs.writeFileSync(path.join(outbox(root),hash+'.json'),body);
- return {hash,bytes:body.length,chunks:Math.ceil(body.length/CHUNK),games:list.length,manifest:manifestOf(bundle)};}
+ return {hash,bytes:body.length,limit:MAX_BUNDLE,chunks:Math.ceil(body.length/CHUNK),games:list.length,manifest:manifestOf(bundle)};}
 function manifestOf(bundle){return bundle.games.map(g=>({key:g.key.slice(0,12),title:g.title,step:g.step,detail:g.detail,
  items:[{kind:'result',bytes:Buffer.byteLength(JSON.stringify({...g,samples:undefined,keys:undefined,runtime:undefined}))},...g.samples.map(s=>({kind:s.dropped?'dropped':'sample',name:s.name,role:s.role,size:s.size,bytes:s.sample?Buffer.byteLength(JSON.stringify(s.sample)):0,...(s.sample?d.sampleSizes(s.sample):{raw:0,packed:0}),opaque:s.sample?.opaque?.length||0})),...(g.keys.length?[{kind:'keys',count:g.keys.length,algos:[...new Set(g.keys.map(k=>k.algo))]}]:[]),...runtimeItems(g.runtime)]}));}
 /* every runtime finding as its own manifest row: what it is, how it was checked, its size (name is shown as is) */
@@ -115,7 +115,7 @@ function runtimeItems(rt){if(!rt)return [];const size=x=>Buffer.byteLength(JSON.
  if((rt.constants||[]).length)out.push({kind:'runtime-constants',name:'runtime · cipher tables in modules · '+[...new Set(rt.constants.map(c=>c.algo))].join(', '),role:'runtime',bytes:size(rt.constants)});
  return out;}
 /* what a stored bundle would upload (the dialog can show it again) */
-function manifest(root,hash){if(!/^[a-f0-9]{64}$/.test(String(hash)))return null;let body;try{body=fs.readFileSync(path.join(outbox(root),hash+'.json'));}catch{return null;}if(sha(body)!==hash)return null;const b=JSON.parse(body);return {hash,bytes:body.length,chunks:Math.ceil(body.length/CHUNK),games:b.games.length,manifest:manifestOf(b)};}
+function manifest(root,hash){if(!/^[a-f0-9]{64}$/.test(String(hash)))return null;let body;try{body=fs.readFileSync(path.join(outbox(root),hash+'.json'));}catch{return null;}if(sha(body)!==hash)return null;const b=JSON.parse(body);return {hash,bytes:body.length,limit:MAX_BUNDLE,chunks:Math.ceil(body.length/CHUNK),games:b.games.length,manifest:manifestOf(b)};}
 const consentFile=root=>path.join(root,'data','adapter-probe','consent.json');
 function consent(root){try{const v=JSON.parse(fs.readFileSync(consentFile(root),'utf8'));const now=Date.now();return Object.fromEntries(Object.entries(v.keys||{}).filter(([k,x])=>/^[a-f0-9]{64}$/.test(k)&&x.until>now));}catch{return {};}}
 function grant(root,keys,days=180){const all=consent(root),until=Date.now()+days*86400000;for(const k of keys)if(/^[a-f0-9]{64}$/.test(k))all[k]={at:Date.now(),until};fs.mkdirSync(path.dirname(consentFile(root)),{recursive:true});fs.writeFileSync(consentFile(root),JSON.stringify({version:1,keys:all}));}

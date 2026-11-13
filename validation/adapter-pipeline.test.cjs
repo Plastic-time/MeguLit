@@ -52,6 +52,14 @@ test('upload bundle: desensitized samples + key candidates, manifest, no game te
  assert.equal(sample.clean({games:[{title:'x',detail:'猫が好き'}]}),false,'clean() refuses text outside titles');
  const m=sample.manifest(R,prep.hash);assert.equal(m.hash,prep.hash);assert.equal(m.manifest[0].title,'未知封包のゲーム');assert.ok(m.manifest[0].items.some(i=>i.kind==='sample'));
  test.prep=prep;
+ /* E599: the confirmation dialog shows, per sample, what it adds to the upload and its raw size; in total the bundle size
+    against the relay cap (the cap the bundle is trimmed to), then the raw size it stands for */
+ assert.equal(prep.limit,sample.MAX_BUNDLE);assert.equal(m.limit,sample.MAX_BUNDLE);
+ const smp=m.manifest.flatMap(x=>x.items).filter(i=>i.kind==='sample');assert.ok(smp.length&&smp.every(i=>i.raw>0&&i.packed>0&&i.bytes>0));
+ const ui=await import(pathToFileURL(path.join(__dirname,'..','web','adapter-probe-ui.js')).href),z=ui.bundleSizes(m);
+ assert.equal(z.sent,prep.bytes);assert.equal(z.limit,8<<20);assert.ok(z.sent<=z.limit&&z.raw>=z.sent);
+ assert.equal(z.raw,Math.max(prep.bytes,prep.bytes+smp.reduce((n,i)=>n+i.raw-i.bytes,0)));
+ assert.equal(ui.bundleSizes({bytes:10,manifest:[]}).limit,8<<20,'an older service without limit: the relay cap');
 });
 test('upload: chunks to /api/probe, assembled and checked by the relay, one issue with a summary only',async()=>{
  const {hash}=test.prep;const before=sample.CHUNK;
