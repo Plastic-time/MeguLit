@@ -31,7 +31,7 @@ function readerStamp(){try{const h=crypto.createHash('sha256'),dir=path.join(__d
  for(const f of ['adapter-packs.cjs','adapter-probe-core.cjs'])try{h.update(f).update(fs.readFileSync(path.join(__dirname,f)));}catch{}return h.digest('hex').slice(0,12);}catch{return '';}}
 let stampMemo=null;const reader=()=>stampMemo??=readerStamp();
 
-function head(file,n=16){try{const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(n);const k=fs.readSync(fd,b,0,n,0);return b.subarray(0,k);}finally{fs.closeSync(fd);}}catch{return Buffer.alloc(0);}}
+const head=(file,n=16)=>require('./original-engines/kit.cjs').head(file,n);/* E580 */
 function format(h){const hex=h.toString('hex');for(const [name,m] of MAGICS)if(m.length>=6&&hex.startsWith(m))return name;return '';}
 /* the magic of an archive as safe hex: printable ASCII and control bytes stay, every byte >= 0x80 is masked (it could be
    the first character of a Japanese file name or text) */

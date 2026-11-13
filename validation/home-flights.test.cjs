@@ -22,9 +22,9 @@ test('landing: no fade, the real card replaces the flying one in the same task, 
  assert.ok(js.includes('s=r.width/(W*Math.cos(t)+H*Math.sin(t))'),'landing scale from the rotated face box');
  assert.ok(!js.includes('{opacity:1},{opacity:0}'),'(user: 过渡到展示的怎么是渐变过渡的) the flying card never fades out');
  assert.ok(js.includes("done?.();f.anims.forEach(a=>a.cancel());f.el.remove();"),'swap and removal happen in one task');
- assert.ok(js.includes('(opts.neutral||(fn=>fn()))(coverPose)'),'landing pose measured on the untilted scene');
+ assert.ok(js.includes('flat(coverPose)')&&js.includes('flat(()=>slotPose(old.id,W))'),'landing and return slots measured on the untilted scene');
  assert.ok(depth.includes('function hold(on)')&&depth.includes('function neutral(fn)'),'depth can settle flat and measure flat');
- assert.ok(tv.includes('live?.depth?.hold(true)')&&tv.includes('live?.depth?.hold(false)'),'the scene settles flat for the flight and follows the pointer again after');
+ assert.ok(tv.includes('onBusy:on=>live?.depth?.hold(on)')&&js.includes('opts.onBusy?.(true)')&&js.includes('opts.onBusy?.(false)'),'the scene stays flat while any card flies, including a draw that sends the field card home');
  assert.ok(!/\.tv-canvas\{[^}]*transition/.test(css),'no CSS transition on the tilted canvas (it made the real card lag behind the measured pose)');
 });
 
@@ -35,6 +35,29 @@ test('random draw is tied to the hand; the field card stays centred over the fan
  assert.ok(tv.includes("hand.stow(prev.id,g.id))$('.tv-cover').dataset.stow='1'"),'otherwise the field card flies back into its slot');
  assert.ok(tv.includes("if(!stowed)outLayer(cover).appendChild(old);"),'a stowed field card is not also thrown off the table');
  assert.ok(hand.includes('function stow(oldId,newId)')&&hand.includes('function extent()'),'hand exposes stow and its fan extent');
- assert.ok(tv.includes('function placeCover()')&&tv.includes('fan.cx-(r.left+r.width/2-rr.left)'),'(user: 展示的卡要一直在手牌上方居中) field card centred on the fan');
+ assert.ok(tv.includes('function placeCover()')&&tv.includes('aim=fan.cx-Math.min(48,rr.width*.025)'),'(user: 展示的卡要一直在手牌上方居中, 往左边移动一点点) field card over the fan, a touch left');
+ assert.ok(tv.includes('for(let i=0;i<4;i++){const r=hand.restRect()')&&hand.includes('function restRect()'),'(user: 位置有大问题) measured on the resting box, never on the card mid draw animation');
+ const css=fs.readFileSync(path.join(W,'home-tv.css'),'utf8');assert.ok(!/^\.tv-hc\{[^}]*opacity \.2s/m.test(css),'(user: 收回的封面会闪烁) hand cards appear without an opacity fade');
+ assert.ok(hand.includes('if(st.flights.size&&el)return;'),'the fan holds still while a card flies to its slot');
  assert.ok(/onResize=\(\)=>\{if\(live&&live\.root===root\)\{fitLeft\(root\);hand\.relayout\(\);placeCover\(\);/.test(tv),'re-centred on resize');
+});
+
+test('a field card from outside the hand is thrown off, the card never leaves the top, the deck follows it',()=>{
+ const W=path.join(__dirname,'..','web'),tv=fs.readFileSync(path.join(W,'home-tv.js'),'utf8'),hand=fs.readFileSync(path.join(W,'home-hand.js'),'utf8');
+ assert.ok(hand.includes("const gone=!old?opts.field?.():null")&&hand.includes("fly('__gone',gone,fromGone,"),'(user: 还是有问题) a drawn field card is flown off when a hand card is played, not removed');
+ assert.ok(tv.includes('field:()=>shown,'),'the hand knows the field card');
+ assert.ok(tv.includes('if(r0.height>room&&room>80)c.style.width=')&&tv.includes('under=minTop-(r2.top-rr.top)'),'a short window gets a smaller card instead of one pushed off the top');
+ assert.ok(tv.includes("pile.style.left=c.style.left?(c.offsetLeft-rr.width*.06)+'px':''"),'the deck a draw is dealt from moves with the card');
+});
+
+test('a hovered (lifted) hand card takes off from where it is drawn, not from its resting slot',()=>{
+ const hand=fs.readFileSync(path.join(__dirname,'..','web','home-hand.js'),'utf8');
+ assert.ok(hand.includes('function cardPose(el,W)')&&hand.includes('new DOMMatrixReadOnly(getComputedStyle(el).transform)'),'pose read from the card as drawn');
+ assert.ok(hand.includes("?cardPose(pickEl,W):slotPose(id,W))"),'(user: 手牌就会有个强制被改变位置的bug) picked card starts at its drawn pose');
+});
+
+test('the fan moves with Web Animations, so a busy moment never skips a re-spacing',()=>{
+ const W=path.join(__dirname,'..','web'),hand=fs.readFileSync(path.join(W,'home-hand.js'),'utf8'),css=fs.readFileSync(path.join(W,'home-tv.css'),'utf8');
+ assert.ok(hand.includes("el._mv=el.animate([{transform:a},{transform:to}],{duration:420,easing:EASE})"),'(user: 手牌就会有个强制被改变位置的bug) moves are animations that start when drawn');
+ assert.ok(!/^\.tv-hc\{[^}]*transition:transform/m.test(css),'no CSS transform transition on hand cards (it was timed from the style change and skipped ahead after a busy frame)');
 });

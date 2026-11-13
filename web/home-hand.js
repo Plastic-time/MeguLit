@@ -69,15 +69,31 @@ export function createHand(opts){const {root,box,layer,cover,art,back='',onPlay,
  const metrics=()=>{const W=box.clientWidth,H=box.clientHeight,cw=Math.max(66,Math.min(118,innerWidth*.058));return {W,H,cw,ch:cw*4/3};};
  const inHand=()=>st.games.filter(g=>g.id!==st.out);
  function layout(){const m=metrics(),hand=inHand(),n=hand.length+st.extras.length,pos=handLayout(n,{...m,hover:st.hover});box.style.setProperty('--cw',m.cw+'px');
-  hand.forEach((g,j)=>place(st.cards.get(g.id),pos[j],m));st.extras.forEach((el,k)=>place(el,pos[hand.length+k],m));
+  const moves=[];hand.forEach((g,j)=>moves.push([st.cards.get(g.id),pos[j]]));st.extras.forEach((el,k)=>moves.push([el,pos[hand.length+k]]));
   const o=st.out&&st.cards.get(st.out);if(o){const j=Math.max(0,st.games.findIndex(g=>g.id===st.out)-1),p=pos[Math.min(j,pos.length-1)]||{x:m.W/2,y:m.H,a:0,s:1,z:0};
-   place(o,{...p,s:.9},m);}return {pos,m};}
- function place(el,p,m){if(!el||!p)return;el.style.zIndex=String(p.z);el.dataset.a=p.a;el.style.transform=`translate3d(${(p.x-m.cw/2).toFixed(1)}px,${(p.y-m.ch/2).toFixed(1)}px,0) rotate(${p.a.toFixed(2)}deg) scale(${p.s})`;}
+   moves.push([o,{...p,s:.9}]);}place(moves,m);return {pos,m};}
+ /* 2026-11-13 (user: "手牌就会有个强制被改变位置的bug") the fan moves with Web Animations, not a CSS transition: a CSS transition is timed from the style change, so
+    when a draw keeps the page busy for a moment the cards appeared already at their new places; an animation starts when it is first drawn and is
+    always seen whole. Current poses are all read before any is written (one style pass), and a move picks up from wherever the card is now. */
+ const EASE='cubic-bezier(.22,1.22,.36,1)';
+ function place(list,m){const items=list.filter(([el,p])=>el&&p).map(([el,p])=>[el,p,`translate3d(${(p.x-m.cw/2).toFixed(1)}px,${(p.y-m.ch/2).toFixed(1)}px,0) rotate(${p.a.toFixed(2)}deg) scale(${p.s})`]);
+  const from=items.map(([el,,to])=>el.style.transform&&el.style.transform!==to&&!reduced&&el.isConnected?getComputedStyle(el).transform:null);
+  items.forEach(([el,p,to],i)=>{el.style.zIndex=String(p.z);el.dataset.a=p.a;if(el.style.transform===to)return;el._mv?.cancel();el.style.transform=to;const a=from[i];
+   if(a&&a!=='none')el._mv=el.animate([{transform:a},{transform:to}],{duration:420,easing:EASE});});}
  /* pose of a game's slot in root pixels, from the layout numbers (not from a card that may be mid-transition) */
  function slotPose(id,W){const {pos,m}=st.lastLayout||layout(),j=inHand().findIndex(g=>g.id===id);const p=pos[j];if(!p)return null;const br=box.getBoundingClientRect(),
   rr=root.getBoundingClientRect();
   return {x:br.left-rr.left+p.x,y:br.top-rr.top+p.y,r:p.a,s:m.cw/W,rx:0,ry:0,o:1};}
- function coverPose(){const face=cover.querySelector('.tv-face')||cover,r=face.getBoundingClientRect(),rr=root.getBoundingClientRect(),W=cover.offsetWidth||1,H=cover.offsetHeight||1,
+ /* 2026-11-13 (user: "位置有大问题") the field card's resting box: a bare copy of it (same classes and inline place, no animations, hidden) is measured,
+    so a draw or deal animation still running on the real card never moves the measured spot */
+ /* slots and the field card are measured on the untilted scene, where the flights end */
+ const flat=fn=>(opts.neutral||(f=>f()))(fn);
+ function restRect(){const p=cover.cloneNode(false);p.style.visibility='hidden';p.style.pointerEvents='none';p.setAttribute('aria-hidden','true');cover.parentNode.appendChild(p);
+  try{return p.getBoundingClientRect();}finally{p.remove();}}
+ /* a hand card's pose as drawn: centre of its box (the image of its centre), angle and scale from its current transform */
+ function cardPose(el,W){const r=el.getBoundingClientRect(),rr=root.getBoundingClientRect(),m=new DOMMatrixReadOnly(getComputedStyle(el).transform);
+  return {x:r.left-rr.left+r.width/2,y:r.top-rr.top+r.height/2,r:Math.atan2(m.b,m.a)*180/Math.PI,s:Math.hypot(m.a,m.b)*el.offsetWidth/W,rx:0,ry:0,o:1};}
+ function coverPose(){const r=restRect(),rr=root.getBoundingClientRect(),W=cover.offsetWidth||1,H=cover.offsetHeight||1,
   t=4*Math.PI/180,s=r.width/(W*Math.cos(t)+H*Math.sin(t));return {x:r.left-rr.left+r.width/2,y:r.top-rr.top+r.height/2,r:-4,s:Number.isFinite(s)&&s>0?s:1,rx:0,ry:0,o:1};}
  function relayout(){st.lastLayout=layout();}
  function render(games,outId){st.games=games.slice();st.out=outId;const keep=new Set(games.map(g=>g.id));
@@ -89,33 +105,37 @@ export function createHand(opts){const {root,box,layer,cover,art,back='',onPlay,
   relayout();}
  function setExtras(list){st.extras.forEach(e=>e.remove());st.extras=list.map(x=>{const el=document.createElement('button');el.type='button';el.className='tv-hc tv-hc-extra '+(x.cls||'');
   el.innerHTML=x.html;el.title=x.title||'';el.setAttribute('aria-label',x.title||'');el.addEventListener('click',x.onClick);el.addEventListener('pointerenter',()=>hoverTo(el));box.appendChild(el);return el;});relayout();}
- function hoverTo(el){const all=[...inHand().map(g=>st.cards.get(g.id)),...st.extras],i=el?all.indexOf(el):-1;if(i===st.hover)return;st.hover=i;relayout();}
+ function hoverTo(el){/* (user: the returning cover flickered) the fan holds still while a card flies, so the slot a card is flying to does not move under it */if(st.flights.size&&el)return;const all=[...inHand().map(g=>st.cards.get(g.id)),...st.extras],i=el?all.indexOf(el):-1;if(i===st.hover)return;st.hover=i;relayout();}
  box.addEventListener('pointerleave',()=>hoverTo(null));
  function ghostFor(id,g){let f=st.flights.get(id);if(f){f.anims.forEach(a=>a.cancel());return f;}const W=cover.offsetWidth,H=cover.offsetHeight,el=document.createElement('div');
   el.className='tv-ghost';el.style.width=W+'px';el.style.height=H+'px';el.innerHTML=`<i class="tv-ghost-face"></i><i class="tv-ghost-back">${back}</i>`;el.firstChild.style.background=art(g);
   layer.appendChild(el);f={el,W,H,anims:[],frames:null,t0:0,dur:1,trails:[]};st.flights.set(id,f);return f;}
  function currentPose(f){return f.frames?samplePose(f.frames,(performance.now()-f.t0)/f.dur):null;}
- function fly(id,g,A,B,kind,dur,delay,done){const f=ghostFor(id,g),W=f.W,H=f.H;f.trails.forEach(t=>t.remove());f.trails=[];
+ function fly(id,g,A,B,kind,dur,delay,done){/* the scene settles flat while any card flies (opts.onBusy), and follows the pointer again after the last one */if(!st.flights.size)opts.onBusy?.(true);const f=ghostFor(id,g),W=f.W,H=f.H;f.trails.forEach(t=>t.remove());f.trails=[];
   const frames=flightFrames(kind,A,B);f.frames=frames;f.t0=performance.now()+delay;f.dur=dur;const keys=frames.map(p=>({transform:poseTransform(p,W,H)}));
   f.el.style.transform=keys[0].transform;const timing={duration:dur,delay,easing:'linear',fill:'both'};f.anims=[f.el.animate(keys,timing)];
   if(kind==='trail')[.34,.2,.1,.05].forEach((o,k)=>{const t=f.el.cloneNode(true);t.classList.add('is-trail');layer.insertBefore(t,f.el);f.trails.push(t);
    f.anims.push(t.animate(keys.map((x,i)=>({...x,opacity:o*Math.max(0,1-i/(keys.length*.55))})),{...timing,delay:delay+(k+1)*40}));});
   /* 2026-11-13 (user: "过渡到展示的怎么是渐变过渡的") no cross-fade: the last frame of the flight is the real card's exact pose, and in the same task the real
     card is shown and the flying one removed, so the next painted frame simply has the real card where the flying one was */
-  f.anims[0].finished.then(()=>{if(st.flights.get(id)!==f)return;st.flights.delete(id);f.trails.forEach(t=>t.remove());done?.();f.anims.forEach(a=>a.cancel());f.el.remove();},()=>{});return f;}
+  f.anims[0].finished.then(()=>{if(st.flights.get(id)!==f)return;st.flights.delete(id);if(!st.flights.size)queueMicrotask(()=>{if(!st.flights.size)opts.onBusy?.(false);});f.trails.forEach(t=>t.remove());done?.();f.anims.forEach(a=>a.cancel());f.el.remove();},()=>{});return f;}
  function play(id){const g=st.games.find(x=>x.id===id);if(!g||id===st.out&&!st.flights.has(id))return;const old=st.out?st.games.find(x=>x.id===st.out):null;
   if(reduced){st.out=id;render(st.games,id);onPlay(g,'plain');onLand?.(g);return;}
   const kind=globalThis.__forceKind||pickVariant(st.last);st.last=kind;const W=cover.offsetWidth;
   /* where the picked card is now: mid-flight pose if it was flying, else its hand slot */
-  const fromPick=(st.flights.has(id)&&currentPose(st.flights.get(id)))||slotPose(id,W);
+  /* (user: "手牌就会有个强制被改变位置的bug") a hovered card is lifted and enlarged; it takes off from exactly where it is drawn now (mid-transition included), not from its resting slot */
+  const pickEl=st.cards.get(id),fromPick=(st.flights.has(id)&&currentPose(st.flights.get(id)))||(pickEl&&!pickEl.classList.contains('is-out')&&!pickEl.classList.contains('is-wait')?cardPose(pickEl,W):slotPose(id,W));
   const fromOld=old?((st.flights.has(old.id)&&currentPose(st.flights.get(old.id)))||coverPose()):null;
+  /* (user: the field card vanished when it had come from a random draw) a field card that is not in the hand is thrown off the table, never just removed */
+  const gone=!old?opts.field?.():null,fromGone=gone&&gone.id!==id?coverPose():null;
   st.out=id;st.hover=-1;render(st.games,id);onPlay(g,kind,(FLIGHT_MS[kind]||760)+(old?120:0));
-  if(old){const el=st.cards.get(old.id);el?.classList.add('is-wait');const to=slotPose(old.id,W);/* the card going home slides in under its neighbours, the one coming out stays on top */if(to)fly(old.id,old,fromOld,to,kind,Math.round((FLIGHT_MS[kind]||760)*.88),0,()=>{el?.classList.remove('is-wait');}).el.style.zIndex='6';else el?.classList.remove('is-wait');}
+  if(fromGone){const rr=root.getBoundingClientRect(),w=cover.offsetWidth;fly('__gone',gone,fromGone,{x:rr.width+w*.9,y:fromGone.y-w*.35,r:24,s:fromGone.s*.94,rx:0,ry:0,o:1},'toss',620,0,null).el.style.zIndex='6';}
+  if(old){const el=st.cards.get(old.id);el?.classList.add('is-wait');const to=flat(()=>slotPose(old.id,W));/* the card going home slides in under its neighbours, the one coming out stays on top */if(to)fly(old.id,old,fromOld,to,kind,Math.round((FLIGHT_MS[kind]||760)*.88),0,()=>{el?.classList.remove('is-wait');}).el.style.zIndex='6';else el?.classList.remove('is-wait');}
   /* the landing pose is the field card as it sits with the scene flat (the scene settles flat during the flight, see home-depth hold) */
-  if(fromPick)fly(id,g,fromPick,(opts.neutral||(fn=>fn()))(coverPose),kind,FLIGHT_MS[kind]||760,old?120:0,()=>onLand?.(g)).el.style.zIndex='8';else onLand?.(g);}
+  if(fromPick)fly(id,g,fromPick,flat(coverPose),kind,FLIGHT_MS[kind]||760,old?120:0,()=>onLand?.(g)).el.style.zIndex='8';else onLand?.(g);}
  /* the field card goes back into its hand slot because a card from outside the hand is coming onto the field (random draw off the deck) */
  function stow(oldId,newId){const old=st.games.find(x=>x.id===oldId);if(reduced||!old||!cover.offsetWidth)return false;const W=cover.offsetWidth,
-  from=(st.flights.has(oldId)&&currentPose(st.flights.get(oldId)))||coverPose();st.out=newId;st.hover=-1;render(st.games,newId);const el=st.cards.get(oldId),to=slotPose(oldId,W);
+  from=(st.flights.has(oldId)&&currentPose(st.flights.get(oldId)))||coverPose();st.out=newId;st.hover=-1;render(st.games,newId);const el=st.cards.get(oldId),to=flat(()=>slotPose(oldId,W));
   if(!to)return false;el?.classList.add('is-wait');const kind=globalThis.__forceKind||pickVariant(st.last);st.last=kind;
   fly(oldId,old,from,to,kind,Math.round((FLIGHT_MS[kind]||760)*.88),0,()=>el?.classList.remove('is-wait')).el.style.zIndex='6';return true;}
  /* the field card changed some other way: take it out of the hand without a flight */
@@ -125,4 +145,4 @@ export function createHand(opts){const {root,box,layer,cover,art,back='',onPlay,
  /* the fan's horizontal centre and top edge in root pixels, from the resting layout (no hover lift) */
  function extent(){const m=metrics(),n=inHand().length+st.extras.length;if(!n||!m.W)return null;const pos=handLayout(n,{...m,hover:-1}),xs=pos.map(p=>p.x),
   br=box.getBoundingClientRect(),rr=root.getBoundingClientRect();return {cx:br.left-rr.left+(Math.min(...xs)+Math.max(...xs))/2,top:br.top-rr.top+Math.min(...pos.map(p=>p.y))-m.ch/2};}
- return {render,setExtras,play,stow,sync,stop,relayout,extent,state:st,flying:()=>st.flights.size>0};}
+ return {render,setExtras,play,stow,sync,stop,relayout,extent,restRect,state:st,flying:()=>st.flights.size>0};}

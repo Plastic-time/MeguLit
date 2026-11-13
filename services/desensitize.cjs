@@ -70,7 +70,14 @@ function runs(chars,buf,wide){
  const alone=(c,after)=>{if(before===ASCII||after===ASCII)return true;if(!wide&&(before===ZERO||after===ZERO))return true;if(!buf)return false;
   if(wide)return c.at>=4&&buf.readUInt32LE(c.at-4)===1||c.at>=2&&buf.readUInt16LE(c.at-2)===1&&before!==null;
   return c.at>=1&&buf[c.at-1]===c.len||c.at>=2&&buf[c.at-2]===c.len&&buf[c.at-1]===0;};
- const flush=after=>{const one=cur.find(c=>isText(c.cp));if(texts>=2||texts===1&&one.len>=2&&(cur.length>=2||alone(one,after)))for(const c of cur)if(isText(c.cp))out.push(c);cur=[];texts=0;};
+ /* E596 a run made only of single-byte half-width kana (0xA1-0xDF) is text only when it is 3+ long and stands between
+    ASCII / NUL / text on both sides: two such bytes between binary bytes are a number (0x03A6B010 = 10 B0 A6 03), and
+    whole index tables go up now, so their numbers must stay as they are */
+ const halfOnly=()=>cur.every(c=>!isText(c.cp)||c.len===1);
+ const plain=m=>m===ASCII||m===WORD||m===ZERO||!!(m&&m.cp!==undefined);
+ const flush=after=>{const one=cur.find(c=>isText(c.cp));const ok=texts>=2||texts===1&&one.len>=2&&(cur.length>=2||alone(one,after));
+  const keep=ok&&(wide||!halfOnly()||texts>=3&&plain(before)&&plain(after));
+  if(keep)for(const c of cur)if(isText(c.cp))out.push(c);cur=[];texts=0;};
  for(const c of chars){if(c&&c.cp!==undefined&&(isText(c.cp)||KEPT.has(String.fromCodePoint(c.cp)))){cur.push(c);if(isText(c.cp))texts++;}else{if(cur.length)flush(c);before=c;}}
  if(cur.length)flush(null);return out;}
 const SJIS_PH={hira:[0x82,0xa0],kata:[0x83,0x41],han:[0x88,0x9f],alpha:[0x82,0x60],digit:[0x82,0x4f],other:[0x81,0xa0],hangul:[0x81,0xa0]};
@@ -121,15 +128,22 @@ function primary(buf,found=detect(buf)){const b=bom(buf);if(b)return b;const n={
    (four or more characters, two or more kana) on bytes the primary did not already take, so the ASCII of a script is
    never mistaken for UTF-16 "kanji". The same rule decides what verify() checks. */
 function targets(buf,found=detect(buf)){
- const enc=primary(buf,found),taken=new Uint8Array(buf.length),out=[];
+ const enc=primary(buf,found),taken=new Uint32Array(buf.length),out=[];
  /* UTF-16 without a BOM: the alignment whose reading has more kana and kanji */
  let align=0;if(enc==='utf16le'&&!bom(buf)){const n=[0,0];for(const c of found)if(c.enc==='utf16le'&&(isKana(c.cp)||isHan(c.cp)))n[c.align]+=isKana(c.cp)?2:1;align=n[1]>n[0]?1:0;}
- for(const c of found)if(c.enc===enc&&(enc!=='utf16le'||c.align===align)){out.push(c);for(let k=0;k<c.len;k++)taken[c.at+k]=1;}
+ for(const c of found)if(c.enc===enc&&(enc!=='utf16le'||c.align===align)){out.push(c);for(let k=0;k<c.len;k++)taken[c.at+k]=out.length;}
  for(const e of ['sjis','utf8','gbk','utf16le']){if(e===enc)continue;
   const list=found.filter(c=>c.enc===e);let run=[];
-  const flush=()=>{if(run.length>=4&&run.filter(c=>isKana(c.cp)).length>=2&&run.every(c=>{for(let k=0;k<c.len;k++)if(taken[c.at+k])return false;return true;}))for(const c of run){out.push(c);for(let k=0;k<c.len;k++)taken[c.at+k]=1;}run=[];};
+  /* E596 (memory mixes encodings: a UTF-16 line next to Shift-JIS bytecode): a run that is plainly text in its own
+     encoding (4+ characters, 2+ kana) wins over the primary encoding's characters on the same bytes, which were a
+     misreading of it; those are dropped from the list, so every byte belongs to one target */
+  const flush=()=>{if(run.length>=4&&run.filter(c=>isKana(c.cp)).length>=2){const kana=run.filter(c=>isKana(c.cp)).length;let clash=0,theirs=0;
+    for(const c of run)for(let k=0;k<c.len;k++){const t=taken[c.at+k];if(t){clash++;if(out[t-1]&&isKana(out[t-1].cp))theirs++;}}
+    /* the bytes already read as kana by another encoding stay with it unless this run has more kana */
+    if(!clash||kana*2>theirs){for(const c of run)for(let k=0;k<c.len;k++){const t=taken[c.at+k];if(t&&out[t-1]){const o=out[t-1];out[t-1]=null;for(let j=0;j<o.len;j++)if(taken[o.at+j]===t)taken[o.at+j]=0;}}
+     for(const c of run){out.push(c);for(let k=0;k<c.len;k++)taken[c.at+k]=out.length;}}}run=[];};
   for(const c of list){const prev=run[run.length-1];if(prev&&c.at-(prev.at+prev.len)>6)flush();run.push(c);}flush();}
- return {enc,list:out};}
+ return {enc,list:out.filter(Boolean)};}
 
 function placeholder(c){const k=cls(c.cp);
  if(c.enc==='sjis')return c.len===1?[0xb1]:SJIS_PH[k]||SJIS_PH.other;
@@ -143,6 +157,9 @@ function desensitize(input){
  for(const c of list){const ph=placeholder(c);for(let k=0;k<c.len;k++){out[c.at+k]=ph[k];done[c.at+k]=1;}replaced++;}
  for(const [a,b] of asciiProse(buf))for(let i=a;i<b;i++){if(done[i])continue;const x=buf[i];if(x>=0x61&&x<=0x7a)out[i]=0x78;else if(x>=0x41&&x<=0x5a)out[i]=0x58;done[i]=1;}
  if(enc==='utf16le')for(const s of [0,1])for(const [a,b] of asciiProse16(buf,s))for(let i=a;i<b;i+=2){if(done[i])continue;const x=buf[i];if(x>=0x61&&x<=0x7a)out[i]=0x78;else if(x>=0x41&&x<=0x5a)out[i]=0x58;done[i]=1;}
+ /* E596 mixed encodings: where a run in one encoding replaced part of a character in another, the bytes left over can
+    read as text again; such remainders are replaced too (a few passes at most) */
+ for(let pass=0;pass<3;pass++){const rest=textRuns(out);if(!rest.length)break;for(const c of rest){const ph=placeholder(c);for(let k=0;k<c.len;k++)out[c.at+k]=ph[k];replaced++;}}
  return {bytes:out,encoding:enc,replaced};
 }
 
@@ -167,18 +184,31 @@ function verify(original,output){
 /* ---- structure / entropy --------------------------------------------------------------------------------------- */
 function entropy(buf){if(!buf.length)return 0;const n=new Uint32Array(256);for(const x of buf)n[x]++;let h=0;for(const c of n)if(c){const p=c/buf.length;h-=p*Math.log2(p);}return h;}
 const BLOCK=4096,OPAQUE=7.2;
-/* sample(buffer,{max}) → {bytes,head,opaque:[{at,len,entropy}],encoding,verified}
-   The plaintext part of the file up to `max` bytes, desensitized; opaque blocks inside that window are zero-filled
-   (their place and entropy are listed). Returns null when the result does not pass verify(). */
-function sample(input,{max=64*1024,tail=0}={}){
+/* sample(buffer,{max,tail,compress}) → {size,parts:[{at,len,encoding,base64|gzip,packed?}],opaque:[{at,len,entropy}],entropy}
+   The plaintext part of the file up to `max` bytes (and the last `tail` bytes), desensitized; opaque blocks inside that
+   window are zero-filled (their place and entropy are listed). Returns null when the result does not pass verify().
+   Opaque runs split the window: each plaintext stretch is desensitized and verified on its own (text never spans a
+   high-entropy block), so a large window that is mostly encrypted costs little.
+   compress (E596, 2026-11-14 user: send whole scripts and indexes, placeholders compress to almost nothing): the part
+   bytes are gzip-compressed (gzip: base64 of the gzip stream, packed: its size, len: the size it inflates to; read with
+   partBytes()). Width is kept: every offset in the sample is the offset in the file. */
+function sample(input,{max=64*1024,tail=0,compress=false}={}){
  const buf=Buffer.from(input),take=r=>buf.subarray(r[0],r[1]);
  const ranges=[[0,Math.min(buf.length,max)]];if(tail&&buf.length>max)ranges.push([Math.max(max,buf.length-tail),buf.length]);
  const parts=[],opaque=[];
- for(const r of ranges){const src=Buffer.from(take(r));const mask=Buffer.from(src);
-  for(let at=0;at<src.length;at+=BLOCK){const blk=src.subarray(at,Math.min(src.length,at+BLOCK)),h=entropy(blk);if(blk.length>=256&&h>OPAQUE){opaque.push({at:r[0]+at,len:blk.length,entropy:Math.round(h*100)/100});mask.fill(0,at,at+blk.length);}}
-  const d=desensitize(mask),v=verify(mask,d.bytes);if(!v.ok)return null;parts.push({at:r[0],bytes:d.bytes,encoding:d.encoding});}
- return {size:buf.length,parts:parts.map(p=>({at:p.at,len:p.bytes.length,encoding:p.encoding,base64:p.bytes.toString('base64')})),opaque,entropy:Math.round(entropy(buf.subarray(0,Math.min(buf.length,1<<20)))*100)/100};
+ for(const r of ranges){const src=Buffer.from(take(r));const out=Buffer.alloc(src.length),dark=new Uint8Array(Math.ceil(src.length/BLOCK));
+  for(let at=0,i=0;at<src.length;at+=BLOCK,i++){const blk=src.subarray(at,Math.min(src.length,at+BLOCK)),h=entropy(blk);if(blk.length>=256&&h>OPAQUE){opaque.push({at:r[0]+at,len:blk.length,entropy:Math.round(h*100)/100});dark[i]=1;}}
+  let encoding='',best=0;
+  for(let i=0;i<dark.length;){if(dark[i]){i++;continue;}let j=i;while(j<dark.length&&!dark[j])j++;const a=i*BLOCK,b=Math.min(src.length,j*BLOCK),seg=src.subarray(a,b);
+   const d=desensitize(seg),v=verify(seg,d.bytes);if(!v.ok)return null;d.bytes.copy(out,a);if(b-a>best){best=b-a;encoding=d.encoding;}i=j;}
+  parts.push({at:r[0],bytes:out,encoding:encoding||'sjis'});}
+ const pack=p=>{if(!compress)return {at:p.at,len:p.bytes.length,encoding:p.encoding,base64:p.bytes.toString('base64')};const z=zlib.gzipSync(p.bytes,{level:9});return {at:p.at,len:p.bytes.length,encoding:p.encoding,packed:z.length,gzip:z.toString('base64')};};
+ return {size:buf.length,parts:parts.map(pack),opaque,entropy:Math.round(entropy(buf.subarray(0,Math.min(buf.length,1<<20)))*100)/100};
 }
+/* the bytes of a sample part, plain or compressed (never inflates past the part's declared length) */
+function partBytes(p){if(!p)return Buffer.alloc(0);if(typeof p.gzip==='string'){try{return zlib.gunzipSync(Buffer.from(p.gzip,'base64'),{maxOutputLength:Math.max(1,Number(p.len)||1)});}catch{return Buffer.alloc(0);}}return Buffer.from(String(p.base64||''),'base64');}
+/* raw (inflated) and sent (compressed or base64) sizes of a sample */
+function sampleSizes(s){let raw=0,packed=0;for(const p of s?.parts||[]){raw+=p.len|0;packed+=typeof p.gzip==='string'?p.packed|0:p.len|0;}return {raw,packed};}
 
 /* ---- key / parameter candidates -------------------------------------------------------------------------------- */
 /* Known plaintext: what the start of a file of that kind holds. */
@@ -221,4 +251,4 @@ function keyCandidates(entries,{limit=8}={}){
  return out.sort((a,b)=>b.confidence-a.confidence).slice(0,limit);
 }
 
-module.exports={desensitize,verify,sample,keyCandidates,maskString,textRuns,detect,targets,entropy,primary,PLACEHOLDER_CPS,KEPT};
+module.exports={desensitize,verify,sample,partBytes,sampleSizes,keyCandidates,maskString,textRuns,detect,targets,entropy,primary,PLACEHOLDER_CPS,KEPT};
