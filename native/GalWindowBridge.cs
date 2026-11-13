@@ -140,7 +140,7 @@ public class GalWindowBridge {
     // the input thread calls it directly, so a dragged panel's glass does not wait for the next bridge loop (E139).
     static void GlassCommand(Dictionary<string,object> d){var boxes=new List<GlassLayer.Box>();object rects;if(d.TryGetValue("rects",out rects)&&rects is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)rects){var rect=item as Dictionary<string,object>;if(rect==null||boxes.Count>=16)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)boxes.Add(new GlassLayer.Box((int)x,(int)y,(int)w,(int)h,(int)Num(rect,"radius",Num(d,"radius",0)),(int)Math.Max(0,Math.Min(60,Num(rect,"blur",18))),(int)Math.Max(0,Math.Min(95,Num(rect,"dim",0))),(int)Math.Max(0,Math.Min(300,Num(rect,"saturate",100))),(int)Math.Max(0,Math.Min(100,Num(rect,"alpha",100))),(int)Num(rect,"fx",x),(int)Num(rect,"fy",y),(int)Math.Max(0,Math.Min(16384,Num(rect,"fw",w))),(int)Math.Max(0,Math.Min(16384,Num(rect,"fh",h)))));}}
         Glass.Set(boxes,(int)Num(d,"radius",0));}
-    sealed class HitRegion{public Rect Bounds;}
+    /* E533: Pass = painted (inside the window region) but never takes the pointer: art-text translations over game buttons */sealed class HitRegion{public Rect Bounds;public bool Pass;}
     static readonly List<HitRegion> HitRegions=new List<HitRegion>();static string RegionKey="";
     [DllImport("user32.dll")]static extern int SetWindowRgn(IntPtr window,IntPtr region,bool redraw);
     [DllImport("gdi32.dll")]static extern IntPtr CreateRectRgn(int left,int top,int right,int bottom);
@@ -415,7 +415,7 @@ public class GalWindowBridge {
             // Only when needed: re-showing and re-activating the already visible, already active main window made it
             // hide and reappear once (with the Windows open animation) on the first menu after start.
             if(!IsWindowVisible(Overlay))ShowWindow(Overlay,5);if(GetAncestor(GetForegroundWindow(),3)!=GetAncestor(Overlay,3))SetForegroundWindow(Overlay);IsShown=true;MenuFocusPending=false;}}}
-        else if(type=="hitRegions"){MenuRegionReady=Bool(d,"menuOpen");RegionAckPending=MenuRegionReady;HitRegions.Clear();object regions;if(d.TryGetValue("regions",out regions)&&regions is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)regions){var rect=item as Dictionary<string,object>;if(rect==null||HitRegions.Count>=256)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)HitRegions.Add(new HitRegion{Bounds=new Rect((int)x,(int)y,(int)(x+w),(int)(y+h))});}}
+        else if(type=="hitRegions"){MenuRegionReady=Bool(d,"menuOpen");RegionAckPending=MenuRegionReady;HitRegions.Clear();object regions;if(d.TryGetValue("regions",out regions)&&regions is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)regions){var rect=item as Dictionary<string,object>;if(rect==null||HitRegions.Count>=256)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)HitRegions.Add(new HitRegion{Bounds=new Rect((int)x,(int)y,(int)(x+w),(int)(y+h)),Pass=Bool(rect,"pass")});}}
             // Over a bound game apply the new region right away instead of in the next tick (which also captures the game
             // for text and marker detection and made the menu wait ~170 ms before it could open).
             if(TranslationMode&&Target!=IntPtr.Zero&&Overlay!=IntPtr.Zero&&Captured&&HasLastRect&&IsShown){ApplyRegion(LastRect.Right-LastRect.Left,LastRect.Bottom-LastRect.Top);AckRegion();}RefreshReaderPointer();}
@@ -425,7 +425,7 @@ public class GalWindowBridge {
     }
     static bool ReaderMouseDown,ReaderSpaceDown,ReaderEnterDown,ReaderSkipHeld;
     static bool ReaderOwnsPointer(){Point screen,origin=new Point();if(Overlay==IntPtr.Zero||!IsShown||!GetCursorPos(out screen)||!ClientToScreen(Overlay,ref origin))return false;
-        int x=screen.X-origin.X,y=screen.Y-origin.Y;return HitRegions.Exists(h=>x>=h.Bounds.Left&&x<h.Bounds.Right&&y>=h.Bounds.Top&&y<h.Bounds.Bottom);}
+        int x=screen.X-origin.X,y=screen.Y-origin.Y;return HitRegions.Exists(h=>!h.Pass&&x>=h.Bounds.Left&&x<h.Bounds.Right&&y>=h.Bounds.Top&&y<h.Bounds.Bottom);}
     static ReaderPointerGate PointerGate;
     static IntPtr NoActivateWindow;
     static void ReaderActivationPolicy(){
@@ -450,8 +450,8 @@ public class GalWindowBridge {
         /* Issue #133 (WHITE ALBUM2: clicking a word went to the next line). The overlay floated unbound (Target zero), the
            gate was off, and the game, which polls the mouse button, took the click as well. Unbound, the gate still owns
            clicks on MeguLit's own text regions (never the whole overlay), so a polling game under it never sees them. */
-        if(Target==IntPtr.Zero){PointerGate.Current=new ReaderPointerGate.Context(Overlay,IntPtr.Zero,client,false,HitRegions.ConvertAll(h=>h.Bounds).ToArray());return;}
-        PointerGate.Current=new ReaderPointerGate.Context(Overlay,GetAncestor(Target,2),client,LookupOpen,HitRegions.ConvertAll(h=>h.Bounds).ToArray());
+        if(Target==IntPtr.Zero){PointerGate.Current=new ReaderPointerGate.Context(Overlay,IntPtr.Zero,client,false,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray());return;}
+        PointerGate.Current=new ReaderPointerGate.Context(Overlay,GetAncestor(Target,2),client,LookupOpen,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray());
     }
     static void ReaderInputTick(bool foregroundGame){ReaderActivationPolicy();RefreshReaderPointer();
         bool mouse=(GetAsyncKeyState(0x01)&0x8000)!=0,space=(GetAsyncKeyState(0x20)&0x8000)!=0,enter=(GetAsyncKeyState(0x0d)&0x8000)!=0;
