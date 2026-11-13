@@ -23,6 +23,27 @@ unsigned PB(int x, int y) { return (((x + y) / 50) & 1) ? 0xFF10F010 : 0xFF60000
 unsigned PC(int x, int y) { int dx = x - W / 2, dy = y - H / 3; return dx * dx + dy * dy < 150 * 150 ? 0xFFF0F040 : (x < W / 2 ? 0xFF303030 : 0xFFA0A0F0); }
 unsigned PD(int, int) { return 0xFF000000; }
 unsigned PE(int x, int y) { return ((x / 10 + y / 10) & 1) ? 0xFFFFFFFF : 0xFF000000; }
+unsigned PF(int x, int y) { return x < W / 3 ? 0xFFC03030 : (y < H / 3 ? 0xFF30C0C0 : 0xFF404080); }
+unsigned PG(int x, int y) { return ((x / 80) & 1) ? 0xFFF0F0F0 : 0xFF202020; }
+// A TLG5 file image (KiriKiri) with raw (uncompressed) channels, one block: the decoder adds G back to B and R, sums
+// along the row, then adds the row above; this writes the differences that undo exactly that.
+std::string Tlg5(Pattern f, int w, int h) {
+ std::string r("TLG5.0\0raw\x1a", 11); r += (char)3; r.append((const char *)&w, 4); r.append((const char *)&h, 4); r.append((const char *)&h, 4);
+ DWORD zero = 0; r.append((const char *)&zero, 4);
+ std::vector<unsigned char> ch[3]; for (auto &c : ch) c.resize((size_t)w * h);
+ for (int y = 0; y < h; y++) {
+  int prev[3] = { 0, 0, 0 };
+  for (int x = 0; x < w; x++) {
+   unsigned p = f(x, y), u = y ? f(x, y - 1) : 0; int d[3];
+   for (int k = 0; k < 3; k++) d[k] = (int)((p >> (8 * k)) & 0xFF) - (y ? (int)((u >> (8 * k)) & 0xFF) : 0); // B G R
+   int db = d[0] - prev[0], dg = d[1] - prev[1], dr = d[2] - prev[2];
+   ch[0][(size_t)y * w + x] = (unsigned char)(db - dg); ch[1][(size_t)y * w + x] = (unsigned char)dg; ch[2][(size_t)y * w + x] = (unsigned char)(dr - dg);
+   for (int k = 0; k < 3; k++) prev[k] = d[k];
+  }
+ }
+ for (auto &c : ch) { r += (char)1; DWORD n = (DWORD)c.size(); r.append((const char *)&n, 4); r.append((const char *)c.data(), c.size()); }
+ return r;
+}
 
 std::string Encode(Pattern f, int w, int h, const GUID &fmt) {
  std::vector<unsigned> px((size_t)w * h); for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) px[(size_t)y * w + x] = f(x, y);
@@ -48,6 +69,12 @@ void Show(const char *data, size_t n) {
  dec->GetFrame(0, &fr); Wic->CreateFormatConverter(&cv); cv->Initialize(fr, GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, NULL, 0, WICBitmapPaletteTypeCustom);
  UINT w, h; cv->GetSize(&w, &h); Shown.resize((size_t)w * h * 4); cv->CopyPixels(NULL, w * 4, (UINT)Shown.size(), Shown.data()); ShownW = w; ShownH = h;
  cv->Release(); fr->Release(); dec->Release(); st->Release();
+ InvalidateRect(Win, NULL, FALSE); Pump(2500);
+}
+// The game's own TLG decoder already produced these pixels (no WIC for TLG): draw them.
+void ShowPattern(Pattern f) {
+ Shown.resize((size_t)W * H * 4); ShownW = W; ShownH = H;
+ for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) { unsigned p = f(x, y); memcpy(&Shown[((size_t)y * W + x) * 4], &p, 4); }
  InvalidateRect(Win, NULL, FALSE); Pump(2500);
 }
 void Paint(HDC dc) {
@@ -92,6 +119,11 @@ int CaseCg(FakeGame &g) {
  char *pd = p.ReadInPlace("ev/d.png", &n); g.Hold(pd); Pump(400); Show(pd, n);
  char *pe = p.ReadInPlace("fg/e.png", &n); g.Hold(pe); Pump(400); Show(pe, n);
  DWORD cn = 0; char *pc = ReadAll("gallery_c.jpg", &cn); g.Hold(pc); Show(pc, cn);
+ // TLG: F is shown, G only preloaded; both wait in cg-wait for MeguLit (validation/runtime-cg.test.cjs settles them)
+ std::string f = Tlg5(PF, W, H), gg = Tlg5(PG, W, H);
+ Pack t; t.Write("image.fpk", { { "ev/f.tlg", f }, { "ev/g.tlg", gg } });
+ char *pg = t.ReadInPlace("ev/g.tlg", &n); g.Hold(pg); Pump(400);
+ char *pf = t.ReadInPlace("ev/f.tlg", &n); g.Hold(pf); Pump(400); ShowPattern(PF);
  Pump(800);
  std::string cgDir = g.dir + "cg\\", index = ReadFileAll(g.dir + "cg.jsonl"), log = ReadFileAll(g.dir + "cg.log");
  int lines = 0, cands = 0; for (char ch : index) if (ch == '\n') lines++;
@@ -104,7 +136,10 @@ int CaseCg(FakeGame &g) {
  if (Recorded(cgDir, d)) { printf("FAIL cg: D (flat fade) recorded\n"); fail++; }
  if (Recorded(cgDir, e)) { printf("FAIL cg: E (sprite) recorded\n"); fail++; }
  if (lines != 2) { printf("FAIL cg: cg.jsonl has %d lines, want 2\n%s", lines, index.c_str()); fail++; }
- printf("cg: %d recorded, %d failures\n", lines, fail);
+ int waiting = 0; { WIN32_FIND_DATAA fd; HANDLE h = FindFirstFileA((g.dir + "cg-wait\\*.tlg").c_str(), &fd); if (h != INVALID_HANDLE_VALUE) { do waiting++; while (FindNextFileA(h, &fd)); FindClose(h); } }
+ if (waiting != 2) { printf("FAIL cg: %d TLG files waiting, want 2 (F G)\n", waiting); fail++; }
+ if (ReadFileAll(g.dir + "cg-screens.bin").size() < 8 + 32 * 18) { printf("FAIL cg: no screen logged while TLG waited\n"); fail++; }
+ printf("cg: %d recorded, %d TLG waiting, %d failures\n", lines, waiting, fail);
  DestroyWindow(Win);
  return fail;
 }

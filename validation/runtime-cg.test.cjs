@@ -51,9 +51,36 @@ test('R18 filter: memory CGs (never rated) are left out',()=>{
  fs.mkdirSync(path.join(root,'data','config'),{recursive:true});fs.writeFileSync(path.join(root,'data','config','native-preferences.json'),JSON.stringify({safe_cg:true}));
  assert.deepEqual(wall.unlocked(db,root,'g1').map(x=>x.id),[]);});
 
-// End to end with the native self-test output, when it has been run on this machine (run.ps1 writes it).
-test('native self-test output: shown CGs readable, the preloaded one absent',{skip:!fs.existsSync(path.join(process.env.MEGULIT_WORK||'H:\\MeguLit-Work','runtime-dump-selftest','out64'))},()=>{
+// End to end with the native self-test output, when run.ps1 has run on this machine with the Cg case (it leaves cg.log).
+const selfOut=path.join(process.env.MEGULIT_WORK||'H:\\MeguLit-Work','runtime-dump-selftest','out64');
+const hasCgRun=()=>{try{return fs.readdirSync(selfOut).some(k=>fs.existsSync(path.join(selfOut,k,'cg.log')));}catch{return false;}};
+test('native self-test output: shown CGs readable, the preloaded one absent',{skip:!hasCgRun()},()=>{
  const work=path.join(process.env.MEGULIT_WORK||'H:\\MeguLit-Work','runtime-dump-selftest');
  process.env.MEGULIT_RUNTIME_DUMP=path.join(work,'out64');delete require.cache[require.resolve('../services/runtime-dump.cjs')];delete require.cache[require.resolve('../services/runtime-cg.cjs')];
  const cg=require('../services/runtime-cg.cjs');const l=cg.list(path.join(work,'game64','host.exe'));
- assert.deepEqual(l.map(x=>x.fmt).sort(),['jpg','png']);for(const x of l){assert.equal(x.w,800);assert.equal(x.h,600);}});
+ /* A (png) and C (jpg) confirmed by the DLL, F (TLG, shown) confirmed here and stored as png; G (TLG, preloaded) waits */
+ assert.deepEqual(l.map(x=>x.fmt).sort(),['jpg','png','png']);for(const x of l){assert.equal(x.w,800);assert.equal(x.h,600);}
+ assert.equal(l.filter(x=>x.how==='tlg').length,1);
+ const dir=require('../services/runtime-dump.cjs').dirFor(path.join(work,'game64'));
+ assert.equal(fs.readdirSync(path.join(dir,'cg-wait')).filter(n=>n.endsWith('.tlg')).length,1);});
+
+/* TLG5 with raw channels (the inverse of cg-decoders tlg5): pixel(x,y) -> [r,g,b] */
+function tlg5(w,h,px){const head=Buffer.alloc(11+13+4);head.write('TLG5.0\0raw\x1a','latin1');head[11]=3;head.writeUInt32LE(w,12);head.writeUInt32LE(h,16);head.writeUInt32LE(h,20);
+ const ch=[0,1,2].map(()=>Buffer.alloc(w*h));
+ for(let y=0;y<h;y++){let prev=[0,0,0];for(let x=0;x<w;x++){const p=px(x,y),u=y?px(x,y-1):[0,0,0];const d=[p[2]-u[2],p[1]-u[1],p[0]-u[0]];/* B G R */
+  const db=d[0]-prev[0],dg=d[1]-prev[1],dr=d[2]-prev[2];ch[0][y*w+x]=(db-dg)&255;ch[1][y*w+x]=dg&255;ch[2][y*w+x]=(dr-dg)&255;prev=d;}}
+ return Buffer.concat([head,...ch.flatMap(c=>{const m=Buffer.alloc(5);m[0]=1;m.writeUInt32LE(c.length,1);return [m,c];})]);}
+function screen(cg,w,h,px){const rgba=Buffer.alloc(w*h*4);for(let y=0;y<h;y++)for(let x=0;x<w;x++){const p=px(x,y);rgba.set([p[0],p[1],p[2],255],(y*w+x)*4);}
+ const sig=cg._internal.grid(rgba,w,h),rec=Buffer.alloc(8+32*18);rec.writeUInt32LE(Math.floor(Date.now()/1000)+1,0);for(let i=0;i<sig.length;i++)rec[8+i]=sig[i];return rec;}
+test('TLG: a waiting TLG that matches a logged screen becomes a png CG; one that never showed stays out',()=>{
+ const {dir,exe,cg}=setup();const W=320,H=180,F=(x,y)=>x<W/3?[240,240,40]:[20,20,120],G=(x,y)=>((x>>4)&1)?[240,240,240]:[20,20,20];
+ const now=Math.floor(Date.now()/1000);fs.mkdirSync(path.join(dir,'cg-wait'));
+ fs.writeFileSync(path.join(dir,'cg-wait',`0000000f_${W}x${H}_${now}.tlg`),tlg5(W,H,F));fs.writeFileSync(path.join(dir,'cg-wait',`00000006_${W}x${H}_${now}.tlg`),tlg5(W,H,G));
+ /* the decoder agrees with the encoder */
+ const img=require('../services/cg-decoders.cjs').tlg(tlg5(W,H,F));assert.deepEqual([...img.rgba.subarray(0,4)],[240,240,40,255]);
+ fs.writeFileSync(path.join(dir,'cg-screens.bin'),screen(cg,W,H,F));
+ const l=cg.list(exe);assert.deepEqual(l.map(x=>[x.crc,x.fmt,x.how]),[['0000000f','png','tlg']]);
+ assert.deepEqual(cg.sources(exe).map(s=>s.id),['mem:0000000f']);
+ assert.deepEqual(fs.readdirSync(path.join(dir,'cg-wait')),[`00000006_${W}x${H}_${now}.tlg`]);
+ /* after the wait time a never-shown TLG is deleted, never offered */
+ cg.settle(dir,Date.now()+31*60*1000);assert.deepEqual(fs.readdirSync(path.join(dir,'cg-wait')),[]);assert.equal(cg.list(exe).length,1);});

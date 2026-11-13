@@ -11,7 +11,11 @@
 // in the game's gallery/recollection mode matches the same way. Only then is the plain file image written:
 //   <dump>\cg\<crc>_<w>x<h>.<ext> and one JSON line in <dump>\cg.jsonl (services/runtime-cg.cjs reads it). cg.log lists
 // candidates (CRC, size, how, source; no pixels) and which were shown, for diagnosis.
-// Limits: TLG (KiriKiri) and other formats WIC cannot decode are never confirmed; a CG drawn scaled, scrolled or under
+// TLG (KiriKiri) is not a WIC format: it is confirmed later by services/runtime-cg.cjs (decoder from cg-decoders.cjs).
+// While a TLG candidate is alive the DLL keeps its file image in cg-wait\<crc>_<w>x<h>_<unix time>.tlg and appends each
+// new steady window signature to cg-screens.bin (u32 unix time, u32 0, 576 grey bytes); MeguLit matches them and turns
+// a TLG that was shown into cg\<crc>_<w>x<h>.png, and deletes waiting files that never matched.
+// Limits: other formats WIC cannot decode (HG-3, CBG, ...) are never confirmed; a CG drawn scaled, scrolled or under
 // heavy effects may not match; images read in pieces (header first, body later) are not seen as one file image.
 #include <windows.h>
 #include <wincodec.h>
@@ -44,10 +48,13 @@ bool Probe(const unsigned char *p, DWORD n, std::string &ext, DWORD &w, DWORD &h
   if (!memcmp(p + 12, "VP8L", 4)) { DWORD b = p[21] | (p[22] << 8) | (p[23] << 16) | (p[24] << 24); w = (b & 0x3fff) + 1; h = ((b >> 14) & 0x3fff) + 1; return true; }
   return false;
  }
- if (!memcmp(p, "TLG", 3) && (!memcmp(p + 3, "5.0", 3) || !memcmp(p + 3, "6.0", 3) || !memcmp(p + 3, "0.0", 3))) {
-  DWORD o = !memcmp(p + 3, "0.0", 3) ? 15 : 0; // TLG0.0 sds wraps a TLG5/6 header
-  if (o + 19 > n || memcmp(p + o, "TLG", 3)) return false;
-  ext = "tlg"; w = *(DWORD *)(p + o + 12); h = *(DWORD *)(p + o + 16); return true;
+ if ((p[0] == 'T' || p[0] == 0xAB) && p[1] == 'L' && p[2] == 'G') { // TLG0 (sds wrapper) / TLG5 / TLG6, plain or AB-LG
+  DWORD o = !memcmp(p + 3, "0.0\0sds", 7) ? 15 : 0;
+  if (o + 23 > n || (p[o] != 'T' && p[o] != 0xAB) || memcmp(p + o + 1, "LG", 2) || memcmp(p + o + 6, "\0raw\x1a", 5)) return false;
+  ext = "tlg";
+  if (p[o + 3] == '5') { w = *(DWORD *)(p + o + 12); h = *(DWORD *)(p + o + 16); return true; }
+  if (p[o + 3] == '6') { w = *(DWORD *)(p + o + 15); h = *(DWORD *)(p + o + 19); return true; }
+  return false;
  }
  if (p[0] == 0xFF && p[1] == 0xD8 && p[2] == 0xFF) { // JPEG: walk segments to the first SOFn
   for (DWORD i = 2; i + 9 < n && i < (1u << 20); ) {
@@ -159,6 +166,17 @@ static void CgSee(const char *source, const char *how, const unsigned char *p, D
   while (Cands.size() > Keep) { delete Cands.front(); Cands.erase(Cands.begin()); }
  }
  LeaveCriticalSection(&Lock);
+ if (!known && ext == "tlg") { // see the header: TLG waits on disk for MeguLit to confirm it
+  std::wstring folder = Dir + L"cg-wait\\"; CreateDirectoryW(folder.c_str(), NULL);
+  wchar_t name[128]; swprintf_s(name, L"%08lx_%lux%lu_%llu.tlg", crc, w, h, (unsigned long long)time(NULL));
+  std::wstring tmp = folder + name + L".tmp";
+  HANDLE f = CreateFileW(tmp.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+  if (f != INVALID_HANDLE_VALUE) {
+   std::vector<unsigned char> copy; EnterCriticalSection(&Lock); for (auto c : Cands) if (c->crc == crc) copy = c->data; LeaveCriticalSection(&Lock);
+   DWORD wr = 0; BOOL ok = !copy.empty() && WriteFile(f, copy.data(), (DWORD)copy.size(), &wr, NULL); CloseHandle(f);
+   if (!ok || !MoveFileExW(tmp.c_str(), (folder + name).c_str(), MOVEFILE_REPLACE_EXISTING)) DeleteFileW(tmp.c_str());
+  }
+ }
 }
 void CgStart(const wchar_t *out) {
  using namespace cg;
@@ -179,6 +197,18 @@ void CgTick() {
  if (now.empty()) return;
  for (auto c : now) if (!c->sigTried) Decode(c); // only this thread touches signatures
  int screen[SW * SH]; bool shown = Screen(screen);
+ // TLG candidates: log steady screens that differ from the last logged one, for MeguLit to match after decoding.
+ static int prev[SW * SH], logged[SW * SH]; static bool hasPrev, hasLogged;
+ bool waiting = false; for (auto c : now) if (c->ext == "tlg") waiting = true;
+ if (waiting && shown && hasPrev && Same(screen, prev) && (!hasLogged || !Same(screen, logged))) {
+  unsigned char rec[8 + SW * SH] = { 0 }; DWORD at = (DWORD)time(NULL); memcpy(rec, &at, 4);
+  for (int i = 0; i < SW * SH; i++) rec[8 + i] = (unsigned char)(screen[i] < 0 ? 0 : screen[i] > 255 ? 255 : screen[i]);
+  std::wstring file = Dir + L"cg-screens.bin";
+  HANDLE f = CreateFileW(file.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_ALWAYS, 0, NULL);
+  if (f != INVALID_HANDLE_VALUE) { if (GetFileSize(f, NULL) < (8u << 20)) { DWORD wr; WriteFile(f, rec, sizeof rec, &wr, NULL); } CloseHandle(f); }
+  memcpy(logged, screen, sizeof logged); hasLogged = true;
+ }
+ if (shown) { memcpy(prev, screen, sizeof prev); hasPrev = true; } else hasPrev = false;
  std::vector<Cand *> seen;
  for (auto c : now) {
   if (!c->sigOk) continue;
