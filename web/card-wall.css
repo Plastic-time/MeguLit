@@ -252,7 +252,7 @@
 .cw-label{color:#d3c7b6}
 /* the hand: lifted off the mat the card's shadow grows and softens */
 /* the card's own shadow, moved by the lift spring (lz): a tight contact core plus a soft cast */
-.cw-ghost.is-out .cw-lift{inset:8px 8px 6px;border-radius:12px;background:rgba(0,0,0,.4);box-shadow:0 0 18px 10px rgba(0,0,0,.34)}
+.cw-ghost.is-out .cw-lift{inset:24% 22%;border-radius:45%;background:rgba(0,0,0,.34);box-shadow:0 0 34px 26px rgba(0,0,0,.34)}
 /* inspect: a soft ground shadow under the sleeve */
 .cw-ghost .cw-drop{display:block;inset:auto 10% -18px;height:24px;border-radius:50%;box-shadow:none;background:radial-gradient(closest-side,rgba(0,0,0,.55),transparent);opacity:1}
 .cw-ghost.is-out .cw-drop{opacity:.6}
@@ -309,3 +309,18 @@
 .cw-viewer.desk .cw-hint{opacity:0!important}
 
 
+
+/* the whole CG over the face while it tours */
+.cw-full{position:absolute;left:0;top:0;max-width:none;opacity:0;transform-origin:0 0;pointer-events:none;user-select:none;will-change:transform}
+/* the finish of a made card, next to Close */
+.cw-bar .cw-finish{display:flex;align-items:center;gap:2px;margin-right:6px;padding:0 6px;height:38px;border-radius:19px;border:1px solid var(--g-rule-strong,rgba(255,255,255,.16));background:color-mix(in srgb,var(--g-raise,#1d1513) 88%,transparent)}
+.cw-bar .cw-finish button{position:relative;padding:8px 10px;border:0;background:none;color:var(--g-t2,#c3ab9c);font:400 13px/1 var(--g-serif,serif);letter-spacing:.04em;cursor:pointer}
+.cw-bar .cw-finish button::after{content:"";position:absolute;left:10px;right:10px;bottom:4px;height:1px;background:var(--g-gold,#edb56e);scale:0 1;transition:scale .35s cubic-bezier(.22,1,.36,1)}
+.cw-bar .cw-finish button[aria-checked=true]{color:var(--g-t1,#f1e0d2)}
+.cw-bar .cw-finish button[aria-checked=true]::after{scale:1 1}
+.cw-bar .cw-finish button:focus-visible{outline:2px solid var(--g-gold,#edb56e);outline-offset:1px;border-radius:12px}
+.cw-viewer.desk .cw-bar{left:calc(100% - 250px)}
+@media (prefers-reduced-motion:reduce){.cw-bar .cw-finish button::after{transition:none}}
+
+/* --gl, how much light the finish catches, animates smoothly */
+@property --gl{syntax:'<number>';inherits:true;initial-value:0}

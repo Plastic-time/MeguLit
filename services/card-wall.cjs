@@ -155,6 +155,8 @@ function remove(root,cardId){
 function insert(root,toploaderId,cardId){mutate(root,s=>{const t=s.toploaders.find(x=>x.id===toploaderId);if(!t)throw Error('TOPLOADER_NOT_FOUND');if(!s.cards.some(c=>c.id===cardId))throw Error('CARD_NOT_FOUND');if(t.cardId&&t.cardId!==cardId)throw Error('TOPLOADER_FULL');
  for(const o of s.toploaders)if(o.cardId===cardId)o.cardId=null;t.cardId=cardId;});return state(root);}
 function eject(root,toploaderId){mutate(root,s=>{const t=s.toploaders.find(x=>x.id===toploaderId);if(!t)throw Error('TOPLOADER_NOT_FOUND');t.cardId=null;});return state(root);}
+/* a made card's finish can be changed later: plain, shine (闪卡) or holo (镭射) */
+function setFinish(root,cardId,finish){const f=finish==='shine'||finish==='holo'?finish:'plain';mutate(root,s=>{const c=s.cards.find(x=>x.id===cardId);if(!c)throw Error('CARD_NOT_FOUND');c.finish=f;});return state(root);}
 function addToploaders(root,count){const n=Math.floor(num(count,1,1,100));mutate(root,s=>{if(s.toploaders.length+n>MAX_TOPLOADERS)throw Error('TOPLOADER_LIMIT');for(let i=0;i<n;i++)s.toploaders.push({id:newId('t'),cardId:null,order:s.toploaders.length});});return state(root);}
 function setMode(root,mode){if(mode!=='a'&&mode!=='b')throw Error('INVALID_MODE');mutate(root,s=>{s.mode=mode;});return state(root);}
 
@@ -170,6 +172,7 @@ function handle(db,root,r){
   case 'cards_insert':return insert(root,String(r.toploaderId||''),String(r.cardId||''));
   case 'cards_eject':return eject(root,String(r.toploaderId||''));
   case 'cards_add_toploaders':return addToploaders(root,r.count);
+  case 'cards_set_finish':return setFinish(root,String(r.cardId||''),r.finish);
   case 'cards_set_mode':return setMode(root,r.mode);
  }
  throw Error('UNKNOWN_ACTION');}

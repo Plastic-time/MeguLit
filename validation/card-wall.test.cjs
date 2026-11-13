@@ -116,3 +116,10 @@ test('finish: plain, shine (闪卡) or holo (镭射) is kept on the card; anythi
  const b=wall.handle(db,root,{action:'cards_create',gameId:'g1',kind:'cover',srcId:'cover',finish:'shine'});assert.equal(b.finish,'shine');
  const c=wall.handle(db,root,{action:'cards_create',gameId:'g1',kind:'cover',srcId:'cover',finish:'<img>'});assert.equal(c.finish,'plain');
  assert.deepEqual(wall.state(root).cards.map(x=>x.finish),['holo','shine','plain']);});
+
+test('a made card can change its finish later; unknown finishes fall back to plain',()=>{
+ const {root,db}=setup();const c=wall.handle(db,root,{action:'cards_create',gameId:'g1',kind:'cover',srcId:'cover'});assert.equal(c.finish,'plain');
+ let s=wall.handle(db,root,{action:'cards_set_finish',cardId:c.id,finish:'shine'});assert.equal(s.cards[0].finish,'shine');
+ s=wall.handle(db,root,{action:'cards_set_finish',cardId:c.id,finish:'holo'});assert.equal(s.cards[0].finish,'holo');
+ s=wall.handle(db,root,{action:'cards_set_finish',cardId:c.id,finish:'x'});assert.equal(s.cards[0].finish,'plain');
+ assert.throws(()=>wall.handle(db,root,{action:'cards_set_finish',cardId:'nope',finish:'holo'}),/CARD_NOT_FOUND/);});

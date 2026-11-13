@@ -167,7 +167,7 @@
 .cm-finish button[aria-checked=true]::after{scale:1 1}
 .cm-finish button:focus-visible{outline:2px solid var(--g-gold,#edb56e);outline-offset:2px;border-radius:4px}
 /* the finish on the preview, lit where the pointer is */
-@property --gl{syntax:'<number>';inherits:true;initial-value:.25}
+@property --gl{syntax:'<number>';inherits:true;initial-value:0}
 .cm-frame[data-finish] .cm-foil{opacity:1;transition:none}
 .cm-frame[data-finish=shine] .cm-foil{mix-blend-mode:overlay;
  opacity:clamp(0,calc(.08 + var(--px,.2) * .3 - var(--py,0) * .14),.42);

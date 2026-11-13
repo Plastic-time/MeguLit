@@ -12,9 +12,9 @@ import {fxPref} from './fx-prefs.js';
 const reduceQuery=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)'):{matches:false};
 const reduce=()=>reduceQuery.matches;
 const WORDS={
- zh:{inspect:'拖卡片抽出或放回 · 拖空白处旋转 · 拖到窗口边缘丢弃',title:'卡面墙',back:'游戏库',list:'简洁列表',add:'加 Toploader',empty:'空 Toploader：点一下制作收藏卡',filled:'查看收藏卡',eject:'从 Toploader 取出',insert:'放回 Toploader',close:'关闭',flip:'点卡片翻面',loading:'制卡功能加载中',failed:'操作没有成功，请再试一次',count:(a,b)=>a+' / '+b,emptyShort:'空卡套',binQ:'丢掉这张卡？',binBody:'只是这张卡没了，原来的 CG、封面和截图都还在',keep:'留着',discard:'丢掉',first:'点任意一个空卡套，用已解锁的 CG、封面或截图做第一张卡',source:{save:'存档已解锁 CG',seen:'游戏中见过',shot:'MeguLit 截图',cover:'作品封面',cg:'游戏 CG'}},
- en:{inspect:'Drag the card out or back in · drag around it to turn · drag to a window edge to discard',title:'Card wall',back:'Library',list:'Simple list',add:'Add toploader',empty:'Empty toploader: click to make a card',filled:'View card',eject:'Take out of toploader',insert:'Put back in toploader',close:'Close',flip:'Click the card to turn it over',loading:'The card maker is loading',failed:'That did not work, please try again',count:(a,b)=>a+' / '+b,emptyShort:'Empty toploader',binQ:'Discard this card?',binBody:'Only the card goes; the CG, cover or screenshot it came from stays',keep:'Keep it',discard:'Discard',first:'Click any empty toploader to make your first card from an unlocked CG, the cover or a shot',source:{save:'Unlocked in saves',seen:'Seen in game',shot:'MeguLit shot',cover:'Cover',cg:'Game CG'}},
- ja:{inspect:'カードをドラッグで出し入れ · 周りをドラッグで回転 · 画面の端へドラッグで手放す',title:'カードウォール',back:'ライブラリ',list:'シンプル表示',add:'トップローダーを追加',empty:'空のトップローダー：クリックでカードを作る',filled:'カードを見る',eject:'トップローダーから出す',insert:'トップローダーに戻す',close:'閉じる',flip:'カードをクリックで裏返す',loading:'カード作成を読み込み中',failed:'うまくいきませんでした。もう一度お試しください',count:(a,b)=>a+' / '+b,emptyShort:'空のトップローダー',binQ:'このカードを手放しますか？',binBody:'なくなるのはカードだけで、元の CG・カバー・スクリーンショットは残ります',keep:'残す',discard:'手放す',first:'空のトップローダーをクリックして、解放済みの CG・カバー・撮影から最初のカードを作りましょう',source:{save:'セーブで解放済み',seen:'ゲーム中に表示',shot:'MeguLit の撮影',cover:'作品カバー',cg:'ゲーム CG'}}
+ zh:{inspect:'拖卡片抽出或放回 · 拖空白处旋转 · 拖到窗口边缘丢弃',title:'卡面墙',back:'游戏库',list:'简洁列表',add:'加 Toploader',empty:'空 Toploader：点一下制作收藏卡',filled:'查看收藏卡',eject:'从 Toploader 取出',insert:'放回 Toploader',close:'关闭',flip:'点卡片翻面',loading:'制卡功能加载中',failed:'操作没有成功，请再试一次',count:(a,b)=>a+' / '+b,emptyShort:'空卡套',finish:'卡面',finishes:{plain:'普通',shine:'闪卡',holo:'镭射'},binQ:'丢掉这张卡？',binBody:'只是这张卡没了，原来的 CG、封面和截图都还在',keep:'留着',discard:'丢掉',first:'点任意一个空卡套，用已解锁的 CG、封面或截图做第一张卡',source:{save:'存档已解锁 CG',seen:'游戏中见过',shot:'MeguLit 截图',cover:'作品封面',cg:'游戏 CG'}},
+ en:{inspect:'Drag the card out or back in · drag around it to turn · drag to a window edge to discard',title:'Card wall',back:'Library',list:'Simple list',add:'Add toploader',empty:'Empty toploader: click to make a card',filled:'View card',eject:'Take out of toploader',insert:'Put back in toploader',close:'Close',flip:'Click the card to turn it over',loading:'The card maker is loading',failed:'That did not work, please try again',count:(a,b)=>a+' / '+b,emptyShort:'Empty toploader',finish:'Finish',finishes:{plain:'Plain',shine:'Sparkle',holo:'Holo'},binQ:'Discard this card?',binBody:'Only the card goes; the CG, cover or screenshot it came from stays',keep:'Keep it',discard:'Discard',first:'Click any empty toploader to make your first card from an unlocked CG, the cover or a shot',source:{save:'Unlocked in saves',seen:'Seen in game',shot:'MeguLit shot',cover:'Cover',cg:'Game CG'}},
+ ja:{inspect:'カードをドラッグで出し入れ · 周りをドラッグで回転 · 画面の端へドラッグで手放す',title:'カードウォール',back:'ライブラリ',list:'シンプル表示',add:'トップローダーを追加',empty:'空のトップローダー：クリックでカードを作る',filled:'カードを見る',eject:'トップローダーから出す',insert:'トップローダーに戻す',close:'閉じる',flip:'カードをクリックで裏返す',loading:'カード作成を読み込み中',failed:'うまくいきませんでした。もう一度お試しください',count:(a,b)=>a+' / '+b,emptyShort:'空のトップローダー',finish:'カード面',finishes:{plain:'ノーマル',shine:'キラ',holo:'ホロ'},binQ:'このカードを手放しますか？',binBody:'なくなるのはカードだけで、元の CG・カバー・スクリーンショットは残ります',keep:'残す',discard:'手放す',first:'空のトップローダーをクリックして、解放済みの CG・カバー・撮影から最初のカードを作りましょう',source:{save:'セーブで解放済み',seen:'ゲーム中に表示',shot:'MeguLit の撮影',cover:'作品カバー',cg:'ゲーム CG'}}
 };
 const words=()=>{const l=String(document.documentElement.lang||'zh').toLowerCase();return WORDS[l.startsWith('ja')?'ja':l.startsWith('en')?'en':'zh'];};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
@@ -105,23 +105,6 @@ function stillTransform(still,dx=0,dy=0,ds=1){
    (applying the still again zoomed the CG twice: blurry and off its framing) */
 const FACED={x:.5,y:.5,scale:1};
 function hash(s){let h=2166136261;for(const ch of String(s))h=Math.imul(h^ch.codePointAt(0),16777619);return h>>>0;}
-function kenBurns(img,card,phase){
- for(const a of img.getAnimations())a.cancel();
- const base=stillTransform(FACED);img.style.transform=base;
- if(reduce())return;
- const h=hash(card.id),ang=(h%360)*Math.PI/180,r=2.2;
- const to=stillTransform(FACED,Math.cos(ang)*r,Math.sin(ang)*r,1.075);
- const a=img.animate([{transform:base},{transform:to}],{duration:22000,iterations:Infinity,direction:'alternate',easing:'cubic-bezier(.42,0,.58,1)'});
- a.currentTime=phase||0;
-}
-/* out of the sleeve the card stops on its still framing: glide from wherever the move is to the still, then rest */
-function freeze(img,card){
- const from=getComputedStyle(img).transform;
- for(const a of img.getAnimations())a.cancel();
- const to=stillTransform(FACED);img.style.transform=to;
- if(!reduce()&&from&&from!=='none')img.animate([{transform:from},{transform:to}],{duration:720,easing:'cubic-bezier(.2,.8,.2,1)'});
-}
-const kbPhase=img=>{const a=img?.getAnimations?.()[0];return a?Number(a.currentTime)||0:undefined;};
 
 /* ---------- the card back: the collectible card's crest (detail-flip.js), the title's first character ---------- */
 const glyphOf=title=>[...String(title||'')].find(c=>/[一-鿿぀-ヿ]/.test(c))||String(title||' ').trim().charAt(0).toUpperCase()||'M';
@@ -192,6 +175,47 @@ function facetsUrl(){
 }
 try{document.documentElement.style.setProperty('--cw-facets',facetsUrl());}catch{}
 
+/* ---------- the CG tour (user, from the start: under the pointer, or while handled, the card leaves its still and slowly
+   travels the whole CG, then comes back, round and round) ----------
+   At rest the card shows its face (the still, cut by cards_create). On hover a second picture, the whole CG, is laid
+   exactly over it at the same framing, then one looping WAAPI animation pans it: from the still to the nearer end of
+   the picture at full height (or width), across to the far end, and back to the still. Transform only, one card at a
+   time; when the pointer leaves it glides back to the still and the big picture is let go. */
+const TOUR_SPEED=24; /* local px per second across the picture */
+function tourGeometry(card){
+ const fw=Number(card.fullW)||0,fh=Number(card.fullH)||0;if(!fw||!fh)return null;
+ const Wc=CARD_W,Hc=CARD_H,base=Math.max(Wc/fw,Hc/fh),bw=fw*base,bh=fh*base;
+ const at=(x,y,k)=>{const dw=bw*k,dh=bh*k;return {tx:clamp(Wc/2-x*dw,Wc-dw,0),ty:clamp(Hc/2-y*dh,Hc-dh,0),k};};
+ const st=card.still||{},still=at(Number(st.x??.5),Number(st.y??.5),Math.max(1,Number(st.scale)||1));
+ const wide=bw>Wc+1,a=wide?at(0,.5,1):at(.5,0,1),b=wide?at(1,.5,1):at(.5,1,1);
+ return {bw,bh,still,a,b,wide};
+}
+const tf=p=>'translate('+p.tx.toFixed(2)+'px,'+p.ty.toFixed(2)+'px) scale('+p.k.toFixed(4)+')';
+function tour(parts,on){
+ const card=parts.cardData,img=parts.full;if(!img)return;
+ if(!on||!card||reduce()){
+  if(!parts.touring)return;parts.touring=false;
+  const cur=getComputedStyle(img).transform,g=card&&tourGeometry(card);
+  for(const a of img.getAnimations())a.cancel();
+  if(!g||reduce()){img.style.opacity='0';img.removeAttribute('src');return;}
+  img.style.transform=tf(g.still);
+  img.animate([{transform:cur},{transform:tf(g.still)}],{duration:700,easing:EASE_OUT}).finished.then(()=>{if(!parts.touring){img.style.opacity='0';img.removeAttribute('src');}},()=>{});
+  return;
+ }
+ if(parts.touring)return;parts.touring=true;
+ const g=tourGeometry(card);if(!g||!card.full){parts.touring=false;return;}
+ const go=()=>{
+  if(!parts.touring)return;
+  Object.assign(img.style,{width:g.bw+'px',height:g.bh+'px',transform:tf(g.still),opacity:'1'});
+  /* nearer end first, then across, then home; time follows distance */
+  const d=(p,q)=>Math.hypot(p.tx-q.tx,p.ty-q.ty)+Math.abs(p.k-q.k)*120;
+  const [n,f]=d(g.still,g.a)<=d(g.still,g.b)?[g.a,g.b]:[g.b,g.a];
+  const s1=d(g.still,n),s2=d(n,f),s3=d(f,g.still),T=Math.max(1,s1+s2+s3),dur=Math.max(9000,T/TOUR_SPEED*1000);
+  img.animate([{transform:tf(g.still),easing:'cubic-bezier(.45,0,.55,1)'},{transform:tf(n),offset:s1/T,easing:'cubic-bezier(.45,0,.55,1)'},{transform:tf(f),offset:(s1+s2)/T,easing:'cubic-bezier(.45,0,.55,1)'},{transform:tf(g.still)}],{duration:dur,iterations:Infinity});
+ };
+ if(img.getAttribute('src')!==card.full){img.src=card.full;img.decode?.().then(go,go)??go();}else go();
+}
+
 /* ---------- toploader markup ---------- */
 const TL_W=168,TL_H=226,CARD_W=146,CARD_H=204,CARD_TOP=12;
 const ABOVE=-(CARD_H+CARD_TOP)+4; /* the card's bottom edge just inside the opening */
@@ -201,9 +225,9 @@ function buildToploader(t,card,{withBack=false}={}){
  el.setAttribute('aria-label',card?words().filled+(card.title?' · '+card.title:''):words().empty);
  /* the pin stays on the wall; the hang tab, the sleeve and its card swing on it together */
  el.innerHTML=`<div class="cw-hang"><i class="cw-tab" aria-hidden="true"></i><i class="cw-pin" aria-hidden="true"></i><div class="cw-tilt"><i class="cw-drop" aria-hidden="true"></i>`+
-  `<div class="cw-card"><i class="cw-lift" aria-hidden="true"></i><div class="cw-flip"><div class="cw-face"><img class="cw-art" alt="" draggable="false" decoding="async"><i class="cw-foil"></i></div>${withBack?`<div class="cw-back">${crestHTML(card)}</div>`:''}</div></div>`+
+  `<div class="cw-card"><i class="cw-lift" aria-hidden="true"></i><div class="cw-flip"><div class="cw-face"><img class="cw-art" alt="" draggable="false" decoding="async"><img class="cw-full" alt="" draggable="false" decoding="async"><i class="cw-foil"></i></div>${withBack?`<div class="cw-back">${crestHTML(card)}</div>`:''}</div></div>`+
   `<div class="cw-shell" aria-hidden="true"><i class="cw-glare"></i><i class="cw-sweep"></i><i class="cw-lip"></i></div>${withBack?'<div class="cw-thick" aria-hidden="true"><i class="cw-pane"></i><i class="cw-side is-l"></i><i class="cw-side is-r"></i><i class="cw-side is-b"></i><i class="cw-side is-t"></i></div>':''}</div></div>${withBack?'':'<p class="cw-label" aria-hidden="true"><b></b><small></small></p>'}`;
- const parts={el,hang:el.querySelector('.cw-hang'),tilt:el.querySelector('.cw-tilt'),card:el.querySelector('.cw-card'),flip:el.querySelector('.cw-flip'),img:el.querySelector('.cw-art'),shell:el.querySelector('.cw-shell'),sweep:el.querySelector('.cw-sweep'),back:el.querySelector('.cw-back'),label:el.querySelector('.cw-label'),lift:el.querySelector('.cw-lift'),drop:withBack?el.querySelector('.cw-drop'):null,thick:el.querySelector('.cw-thick')};
+ const parts={el,hang:el.querySelector('.cw-hang'),tilt:el.querySelector('.cw-tilt'),card:el.querySelector('.cw-card'),flip:el.querySelector('.cw-flip'),img:el.querySelector('.cw-art'),full:el.querySelector('.cw-full'),shell:el.querySelector('.cw-shell'),sweep:el.querySelector('.cw-sweep'),back:el.querySelector('.cw-back'),label:el.querySelector('.cw-label'),lift:el.querySelector('.cw-lift'),drop:withBack?el.querySelector('.cw-drop'):null,thick:el.querySelector('.cw-thick')};
  {const h=hash(t.id);parts.el.querySelector('.cw-glare').style.translate=((h%41)-20)+'% '+(((h>>6)%17)-8)+'%';const sc=scuffOf(t.id);if(sc)parts.shell.style.setProperty('--cw-scuff',sc);if(!withBack){parts.el.style.setProperty('--cw-rest',(((h>>11)%27)-13)/10+'deg');parts.el.style.setProperty('--cw-dy',(((h>>15)%7)-3)+'px');}}
  fill(parts,card);
  return parts;
@@ -213,7 +237,7 @@ function fill(parts,card,phase){
  parts.el.classList.toggle('is-filled',!!card);
  if(card&&(card.finish==='shine'||card.finish==='holo'))parts.el.dataset.finish=card.finish;else delete parts.el.dataset.finish;
  parts.el.setAttribute('aria-label',card?words().filled+(card.title?' · '+card.title:''):words().empty);
- if(card){if(parts.img.getAttribute('src')!==card.src)parts.img.src=card.src;parts.img.decode?.().catch(()=>{});if(parts.live)kenBurns(parts.img,card,0);else{for(const a of parts.img.getAnimations())a.cancel();parts.img.style.transform=stillTransform(FACED);}}
+ if(card){if(parts.img.getAttribute('src')!==card.src)parts.img.src=card.src;parts.img.decode?.().catch(()=>{});if(parts.touring){parts.touring=false;tour(parts,true);}{for(const a of parts.img.getAnimations())a.cancel();parts.img.style.transform=stillTransform(FACED);}}
  else{for(const a of parts.img.getAnimations())a.cancel();parts.img.removeAttribute('src');}
  if(parts.back)parts.back.innerHTML=crestHTML(card);
  if(parts.label){const w=words();parts.label.firstChild.textContent=card?.title||w.emptyShort;const d=card?.createdAt?new Date(card.createdAt):null;parts.label.lastChild.textContent=card&&card.source!=='cover'?[w.source[card.source]||w.source[card.kind]||'',d&&!isNaN(d)?d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0'):''].filter(Boolean).join(' · '):'';}
@@ -291,7 +315,7 @@ function tiltReset(el){
    still, and when the pointer leaves it glides back to the still */
 function liveCG(tilt,on){
  const parts=tilt?.closest('.cw-tl')?.__parts;if(!parts?.cardData)return;
- parts.live=on;if(on)kenBurns(parts.img,parts.cardData,0);else freeze(parts.img,parts.cardData);
+ tour(parts,on);
 }
 function tiltPaint(){
  hoverRaf=0;if(!hoverEl||!hoverEv)return;const r=hoverEl.getBoundingClientRect();if(!r.width)return;
@@ -414,7 +438,7 @@ async function refresh(detail){
   if(before.get(t.id)!==t.cardId){
    if(P.viewer?.id===t.id)continue;
    fill(cell.parts,card);if(card&&!before.get(t.id))fresh.push(cell);
-  }else if(card&&cell.parts.cardData?.src!==card.src)fill(cell.parts,card,kbPhase(cell.parts.img));
+  }else if(card&&cell.parts.cardData?.src!==card.src)fill(cell.parts,card);
  }
  build();
  for(const id of added){const c=P.cells.get(id);if(c&&onScreen(c))hangMotion(c.parts,added.indexOf(id)*40);}
@@ -639,14 +663,14 @@ function openViewer(cell){
  layer.innerHTML=`<div class="cw-veil"></div><div class="cw-desk" aria-hidden="true"></div><div class="cw-stage"></div>`+
   `<div class="cw-plate" aria-hidden="true"><h2 class="cw-plate-title" lang="ja"></h2><p class="cw-plate-meta"><span>${esc(w.source[card.source]||w.source[card.kind]||'')}</span>${stamp?`<span>${esc(stamp)}</span>`:''}</p></div>`+
   `<div class="cw-bin" aria-hidden="true"><svg viewBox="0 0 64 64"><circle class="cw-bin-track" cx="32" cy="32" r="27"/><circle class="cw-bin-ring" cx="32" cy="32" r="27" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="${RING.toFixed(2)}"/><path class="cw-bin-icon" d="M24.5 25.5h15M29.5 25.5v-2.2h5v2.2M26.5 25.5l1 13.4c.1.9.8 1.6 1.7 1.6h5.6c.9 0 1.6-.7 1.7-1.6l1-13.4M30.4 29.5v7M33.6 29.5v7"/></svg></div>`+
-  `<div class="cw-bar"><button type="button" class="cw-btn cw-close">${esc(w.close)}</button></div><p class="cw-hint">${esc(w.inspect)}</p>`+
+  `<div class="cw-bar"><div class="cw-finish" role="radiogroup" aria-label="${esc(w.finish)}">${['plain','shine','holo'].map(f=>`<button type="button" role="radio" data-finish="${f}" aria-checked="${(card.finish||'plain')===f}">${esc(w.finishes[f])}</button>`).join('')}</div><button type="button" class="cw-btn cw-close">${esc(w.close)}</button></div><p class="cw-hint">${esc(w.inspect)}</p>`+
   `<div class="cw-confirm" role="alertdialog" aria-modal="true" aria-label="${esc(w.binQ)}" hidden><div class="cw-confirm-box"><h3>${esc(w.binQ)}</h3><p>${esc(w.binBody)}</p><div class="cw-confirm-row"><button type="button" class="cw-btn cw-keep">${esc(w.keep)}</button><button type="button" class="cw-btn cw-discard">${esc(w.discard)}</button></div></div></div>`;
  const veil=layer.querySelector('.cw-veil'),bar=layer.querySelector('.cw-bar'),stage=layer.querySelector('.cw-stage'),hint=layer.querySelector('.cw-hint'),plate=layer.querySelector('.cw-plate');
   const bin=layer.querySelector('.cw-bin'),ring=layer.querySelector('.cw-bin-ring'),confirmEl=layer.querySelector('.cw-confirm');
  const ghost=buildToploader(cell.data,null,{withBack:true});ghost.el.classList.add('cw-ghost');ghost.el.removeAttribute('tabindex');
  ghost.el.style.position='absolute';ghost.el.style.left='0';ghost.el.style.top='0';ghost.el.style.transformOrigin='0 0';
  stage.append(ghost.el);P.root.append(layer);P.root.classList.add('is-inspecting');
- fill(ghost,card);
+ fill(ghost,card);if(card.finish==='shine'||card.finish==='holo')ghost.el.dataset.finish=card.finish;
  /* the how-to line goes once the player has handled the card */
  let hintGone=false;
  splitTitle(plate.querySelector('.cw-plate-title'),card.title);
@@ -687,7 +711,7 @@ function openViewer(cell){
  const gs=motion(ghost);gs.wall('cy',null);
  ghost.el.classList.add('is-inspect');
  src.style.opacity='0';
- const V=P.viewer={id:cell.id,layer,dispose:()=>{spring.stop();turn.stop();gs.stop();layer.remove();P.root.classList.remove('is-inspecting');src.style.opacity='';if(P.viewer===V)P.viewer=null;}};
+ const V=P.viewer={id:cell.id,layer,dispose:()=>{tour(ghost,false);spring.stop();turn.stop();gs.stop();layer.remove();P.root.classList.remove('is-inspecting');src.style.opacity='';if(P.viewer===V)P.viewer=null;}};
  /* out of the wall: it lifts toward you with a quarter turn of play that settles face on (ζ≈0.8) */
  spring.to({...target()},MOTION.lift).to({b:1},MOTION.veil).to({u:1},MOTION.chrome);
  if(!reduce()){turn.jump({rx:8,ry:-14}).to({rx:0,ry:0},{k:90,c:15});revealTitle(plate,300);}
@@ -707,7 +731,7 @@ function openViewer(cell){
  let state='in';
  const setLoose=on=>{if(loose===on)return;loose=on;turn.render(turn.x);ghost.el.classList.toggle('is-loose',on);};
  /* free: the bare card takes the turns over once face on */
- const free=()=>{state='free';ghost.out=true;parked=true;desk(true);ghost.el.classList.add('is-out');faceOn(320,36);turn.until(v=>Math.abs(v.rx)<1.5&&Math.abs(v.ry)<1.5).then(()=>{if(state==='free')setLoose(true);});
+ const free=()=>{state='free';ghost.out=true;parked=true;desk(true);ghost.el.classList.add('is-out');setLoose(true);faceOn(320,36);
   /* the sleeve goes down out of the way until only its mouth shows at the bottom; it lets go of the card with a small kick */
   gs.to({sh:park()},{k:120,c:19}).kick({sy:-.03,hr:4}).to({sx:1,sy:1},{k:520,c:16}).to({hr:0},{k:70,c:6});sync(true);};
  /* seat: the card on the rail, pushed home while the sleeve rises back to its place (both converge, so the card only
@@ -878,6 +902,10 @@ function openViewer(cell){
   V.dispose();
  };
  layer.querySelector('.cw-close').addEventListener('click',close);
+ layer.querySelector('.cw-finish').addEventListener('click',async e=>{const btn=e.target.closest('[data-finish]');if(!btn||closing)return;const f=btn.dataset.finish,prev=card.finish||'plain';if(f===prev)return;
+  const setF=v=>{card.finish=v;for(const el of [ghost.el,cell.parts.el]){if(v==='plain')delete el.dataset.finish;else el.dataset.finish=v;}for(const x of layer.querySelectorAll('.cw-finish [data-finish]'))x.setAttribute('aria-checked',String(x.dataset.finish===v));};
+  setF(f);if(!reduce())ghost.tilt.animate([{'--gl':0},{'--gl':.8,offset:.4},{'--gl':0}],{duration:900,easing:EASE_OUT});
+  try{const next=await call('cards_set_finish',{cardId:card.id,finish:f});if(!next)throw Error('NO_STATE');if(page===P)P.state=next;}catch(err){console.warn('cards_set_finish',err);toast(w.failed);setF(prev);}});
  const goneHint=()=>{if(hintGone)return;hintGone=true;if(!reduce())hint.animate([{opacity:getComputedStyle(hint).opacity},{opacity:0}],{duration:300,easing:'linear'});hint.style.opacity='0';};
  /* keyboard: Enter / Space take the card out or put it back, Delete asks to discard, Escape closes */
  const keyPull=()=>{if(closing)return;if(state==='in'){bench=1;desk(true);spring.to({z:.72},{k:150,c:24});const rel=FREE_AT-30,cy=rel/2.2;free();gs.to({cy},{k:120,c:17});}else if(state==='free')seat();};
@@ -889,6 +917,7 @@ function openViewer(cell){
  });
  /* a press on the card drags it; anywhere else it turns the card (with the velocity carried into a friction coast);
     wheel zooms, double-click faces on, a press that does not move on the veil closes */
+ cardEl.addEventListener('pointerenter',()=>tour(ghost,true));cardEl.addEventListener('pointerleave',()=>{if(!drag)tour(ghost,false);});
  cardEl.addEventListener('pointerenter',()=>{if(state==='in'&&!drag&&!grab&&!closing)gs.to({cy:-5},{k:300,c:26});});
  cardEl.addEventListener('pointerleave',()=>{if(state==='in'&&!drag&&!closing)gs.to({cy:0},{k:300,c:26});});
  stage.style.pointerEvents='auto';

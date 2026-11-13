@@ -88,6 +88,10 @@ test('inspect: free turn on drag with inertia, wheel zoom, both the sleeve and t
 });
 
 test('on the wall the card rests on its still; the CG moves only under the pointer', () => {
-  assert.match(js, /if\(parts\.live\)kenBurns\(parts\.img,card,0\);else\{/);
   assert.match(js, /function liveCG\(tilt,on\)/);
+  assert.match(js, / tour\(parts,on\);/);
+  assert.match(js, /function tour\(parts,on\)\{/);
+  /* the tour travels the whole picture: still -> nearer end -> far end -> still, looping */
+  assert.match(js, /iterations:Infinity\}\);/);
+  assert.doesNotMatch(js, /function kenBurns/);
 });
