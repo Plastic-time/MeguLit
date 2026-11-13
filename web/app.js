@@ -349,9 +349,16 @@ function attachGameActions(main){
 }
 let launchInFlight=false,pendingHomeGame='';
 const playHomeMotion=createHomeMotion({frame:()=>document.querySelector('.app-frame'),reduced:()=>matchMedia('(prefers-reduced-motion:reduce)').matches});
+/* 2026-11-13 launch plate (user pick F1): while a launch runs the button says so and its foot line sweeps */
+const LAUNCHING={zh:'启动中…',ja:'起動中…',en:'Starting…'};
+function markLaunching(button,on){
+ if(!button)return;const node=[...button.childNodes].filter(n=>(n.nodeType===3||(n.nodeType===1&&n.tagName!=='svg'))&&n.textContent.trim()).pop();
+ if(on){button.setAttribute('aria-busy','true');if(node){button.dataset.idleLabel=node.textContent;node.textContent=LAUNCHING[locale]||LAUNCHING.zh;}return;}
+ button.removeAttribute('aria-busy');if(node&&button.dataset.idleLabel!==undefined){node.textContent=button.dataset.idleLabel;delete button.dataset.idleLabel;}
+}
 async function startGame(id,button){
  if(launchInFlight)return;
- launchInFlight=true;if(button)button.disabled=true;
+ launchInFlight=true;if(button)button.disabled=true;markLaunching(button,true);
  let started=false;
  try{
   await invoke('reader_open',{background:true});
@@ -379,7 +386,7 @@ async function startGame(id,button){
     openGameLanguage({id,api,invoke,locale,esc,toast,onChanged:async()=>{model=await api('home');renderRoute();}}).catch(()=>toast(text.serviceFailed));};dialog.querySelector('.dialog-actions').append(choose);
     }
   }
- }finally{launchInFlight=false;if(button)button.disabled=false;}
+ }finally{launchInFlight=false;if(button)button.disabled=false;markLaunching(button,false);}
 }
 
 const seriesUI=createSeriesLibrary({model:()=>model,locale:()=>locale,text:()=>text,esc,icon,api,invoke,card,modal,duration,number,relativeTime,search:()=>search,

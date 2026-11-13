@@ -31,7 +31,7 @@ html:not(#mgc1):not(#mgc2):not(#mgc3):not(#mgc4):not(#mgc5):not(#mgc6):not(#mgc7
  &::before,&::after{content:none!important}
 }
 /* primary: crimson plate; hover lifts 1px with a deep-red spine, press settles */
-& body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):not(.titlebar *):not(.detail-actions>button){
+& body :is(button.primary,.g-btn.primary,.hero-play):not(.icon-button):not(.titlebar *){
  position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:var(--mgc-h);padding:0 18px;
  border:1px solid var(--mgc-red)!important;border-radius:var(--mgc-r)!important;background:var(--mgc-red)!important;color:#fff!important;
  font:600 14px/1 var(--mgc-ui)!important;letter-spacing:.04em!important;text-transform:none!important;box-shadow:none!important;
@@ -41,23 +41,7 @@ html:not(#mgc1):not(#mgc2):not(#mgc3):not(#mgc4):not(#mgc5):not(#mgc6):not(#mgc7
  &:disabled,&[aria-disabled=true]{background:transparent!important;border:1px dashed color-mix(in srgb,var(--mgc-ink) 25%,transparent)!important;color:var(--mgc-ink-3)!important;transform:none;opacity:1!important}
  &::before,&::after{content:none!important}
 }
-/* launch (game detail): the large plate with the diamond seal */
-& body .main .detail-actions>button.primary:not(.icon-button){
- position:relative;display:inline-flex;align-items:center;gap:22px;min-height:52px;padding:0 64px 0 26px!important;
- border:1px solid var(--mgc-red)!important;border-radius:var(--mgc-r)!important;background:var(--mgc-red)!important;color:#fff!important;
- font:600 19px/1 var(--mgc-serif)!important;letter-spacing:.14em!important;box-shadow:none!important;
- transition:background-color var(--mgc-t) var(--mgc-ease),transform var(--mgc-t) var(--mgc-ease),box-shadow var(--mgc-t) var(--mgc-ease)!important;
- &::after{content:""!important;clip-path:none!important;-webkit-mask:none!important;mask:none!important;position:absolute!important;inset:50% 20px auto auto!important;width:22px!important;height:22px!important;margin:-11px 0 0 0!important;border-width:1px!important;border-style:solid!important;border-color:rgba(255,255,255,.7)!important;border-radius:0!important;transform:rotate(45deg)!important;background:none!important;transition:transform var(--mgc-t) var(--mgc-ease),background-color var(--mgc-t)!important;opacity:1!important;display:block!important;box-shadow:none!important}
- &::before{content:""!important;position:absolute!important;inset:50% 28px auto auto!important;width:6px!important;height:8px!important;margin:-4px 0 0 0!important;border:0!important;border-radius:0!important;background:#fff!important;clip-path:polygon(0 0,100% 50%,0 100%)!important;transform:none!important;display:block!important;opacity:1!important;box-shadow:none!important}
- & svg,& i:not(:only-child){display:none!important}
- & .primary-label::before,& .primary-label::after{content:none!important;display:none!important}
- &:hover:not(:disabled){background:var(--mgc-red-hi)!important;border-color:var(--mgc-red-hi)!important;transform:translateY(-1px);box-shadow:inset 0 -2px 0 var(--mgc-red-lo)!important}
- &:hover:not(:disabled)::after{transform:rotate(135deg)!important;background:rgba(255,255,255,.14)!important}
- &:active:not(:disabled){background:var(--mgc-red-lo)!important;transform:scale(.98);box-shadow:none!important}
- &:disabled{background:transparent!important;border:1px dashed color-mix(in srgb,var(--mgc-ink) 25%,transparent)!important;color:var(--mgc-ink-3)!important}
- &:disabled::after{border-color:color-mix(in srgb,var(--mgc-ink) 25%,transparent)!important}
- &:disabled::before{background:var(--mgc-ink-3)!important}
-}
+/* launch (game detail) and every other big primary plate: see launch-plate.css */
 /* danger: crimson text on a hairline; press is the deep blood plate with a left rule */
 & body :is(.danger-outline,button.danger,.btn-danger):not(.titlebar *){
  min-height:var(--mgc-h);padding:0 16px!important;border:1px solid color-mix(in srgb,var(--mgc-red) 45%,transparent)!important;border-radius:var(--mgc-r)!important;
