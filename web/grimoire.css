@@ -628,3 +628,6 @@ img{-webkit-user-drag:none}
 @media (max-width:980px){.top-me{padding:0 4px;gap:0}.top-me-name{display:none}.titlebar-end .top-tabs-util::after{margin:0 10px 0 6px}}
 @media (max-width:760px){.top-sep{margin:0 4px}.top-tabs-util .top-tab{min-width:0}}
 @media (max-width:600px){.titlebar>.nav-history{display:none}}
+
+/* 2026-11-13 perf: list cards below the fold skip style/layout/paint until scrolled near (view switch built ~1000 objects at once) */
+.lib-list .library-grid>*{content-visibility:auto;contain-intrinsic-size:auto 180px auto 400px}

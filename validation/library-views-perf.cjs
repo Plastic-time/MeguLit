@@ -76,7 +76,7 @@ async function main(){fs.mkdirSync(OUT,{recursive:true});const temp=fs.mkdtempSy
   const rounds=Number(arg('rounds',3));
   for(let k=0;k<rounds*3;k++){const from=await cdp.evaluate(VIEW);await cdp.evaluate(PROBE);await sleep(300);
    if(arg('profile')===String(k)){await cdp.send('Profiler.enable');await cdp.send('Profiler.setSamplingInterval',{interval:200});await cdp.send('Profiler.start');}
-   const tracing=arg('trace')===String(k);let events=[];if(tracing){cdp.onEvent=m=>{if(m.method==='Tracing.dataCollected')events.push(...m.params.value);};await cdp.send('Tracing.start',{categories:'devtools.timeline,blink,v8.execute',transferMode:'ReportEvents'});}
+   const tracing=arg('trace')===String(k);let events=[];if(tracing){cdp.onEvent=m=>{if(m.method==='Tracing.dataCollected')events.push(...m.params.value);};await cdp.send('Tracing.start',{categories:'devtools.timeline,disabled-by-default-devtools.timeline,blink,v8.execute',transferMode:'ReportEvents'});}
    const shots=[];if(!tracing){cdp.onEvent=m=>{if(m.method==='Page.screencastFrame'){shots.push(m.params.metadata.timestamp*1000);cdp.send('Page.screencastFrameAck',{sessionId:m.params.sessionId}).catch(()=>{});}};
     await cdp.send('Page.startScreencast',{format:'jpeg',quality:5,maxWidth:480,maxHeight:270,everyNthFrame:1});await sleep(200);shots.length=0;}
    const t0=Date.now();await cdp.evaluate(`(()=>{window.__frames=[];window.__loaf=[];document.querySelector('.library-wall-toggle').click();return 1;})()`);await sleep(1600);
@@ -84,6 +84,7 @@ async function main(){fs.mkdirSync(OUT,{recursive:true});const temp=fs.mkdtempSy
    if(tracing){const done=new Promise(r=>{const prev=cdp.onEvent;cdp.onEvent=m=>{prev(m);if(m.method==='Tracing.tracingComplete')r();};});await cdp.send('Tracing.end');await done;
     const main=events.filter(e=>e.ph==='X'&&e.dur>=1000&&/^(ParseHTML|Layout|UpdateLayoutTree|RecalculateStyles|Paint|PrePaint|Layerize|Commit|FunctionCall|EvaluateScript|TimerFire|FireAnimationFrame|HitTest|UpdateLayerTree|ScheduleStyleRecalculation|v8.callFunction)$/.test(e.name));
     const agg=new Map();for(const e of main){const key=e.name+(e.args?.data?.functionName?' '+e.args.data.functionName:'');const v=agg.get(key)||{n:0,t:0,max:0};v.n++;v.t+=e.dur/1000;v.max=Math.max(v.max,e.dur/1000);agg.set(key,v);}
+    for(const e of main.filter(e=>e.name==='UpdateLayoutTree'||e.name==='Layout'||e.name==='ParseHTML').sort((a,b)=>b.dur-a.dur).slice(0,6))console.log('   '+e.name+' '+(e.dur/1000).toFixed(1)+'ms '+JSON.stringify(e.args?.elementCount??e.args?.beginData??e.args?.data??{}).slice(0,160));
     console.log([...agg].sort((a,b)=>b[1].max-a[1].max).slice(0,20).map(([k,v])=>'   max '+v.max.toFixed(1).padStart(6)+'  total '+v.t.toFixed(1).padStart(6)+'  n '+v.n+'  '+k).join(String.fromCharCode(10)));}
    if(arg('profile')===String(k)){const {profile}=await cdp.send('Profiler.stop');fs.writeFileSync(path.join(OUT,'switch-'+k+'.cpuprofile'),JSON.stringify(profile));
     const self=new Map(),dt=profile.timeDeltas,byId=new Map(profile.nodes.map(n=>[n.id,n]));profile.samples.forEach((id,i)=>{const n=byId.get(id),f=n.callFrame,key=f.functionName+' '+f.url.split('/').pop()+':'+f.lineNumber;self.set(key,(self.get(key)||0)+(dt[i+1]||0)/1000);});
