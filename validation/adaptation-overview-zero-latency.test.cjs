@@ -28,15 +28,39 @@ test('a user-picked patch is kept by autoPatch and restored after a failed searc
  assert.match(src,/\(stale\|\|state\.patchStatus==='ready'\)&&state\.patch\.auto\)/);
  assert.match(src,/patch:before\.patch\|\|null/);
 });
-test('overview tones are distinct per meaning',()=>{
- const tone=Function('return '+ui.match(/const tone=(\{[^;]+\});/)[1])();
- assert.equal(tone.patch,'ok');assert.equal(tone.machine,'part');assert.equal(tone['patch-unreliable'],'bad');assert.equal(tone['patch-removed'],'part');
- assert.equal(tone.supported,'part');assert.equal(tone.verified,'ok');
- for(const t of ['ok','part','wait','bad'])assert.match(css,new RegExp(`adapt-pill\\[data-tone=${t}\\]`));
- for(const k of ['patch-unreliable','patch-removed'])assert.equal((ui.match(new RegExp(`\\['${k}'\\]:`,'g'))||[]).length,3,'zh/ja/en labels for '+k);
+/* option C (user pick 2026-11-13): state colours by meaning, problems first with a reason, scan only through the probe hook */
+const ov=()=>import(require('node:url').pathToFileURL(path.join(__dirname,'../web/adaptation-overview.js')).href);
+test('overview tones: grey works, gold fallback/unverified, red needs work, hollow grey untested',async()=>{
+ const {TONE,FALLBACK}=await ov();
+ assert.equal(TONE.patch,'ok');assert.equal(TONE.verified,'ok');assert.equal(TONE.reads,'ok');
+ assert.equal(TONE.machine,'part');assert.equal(TONE['patch-removed'],'part');assert.equal(TONE.supported,'part');
+ assert.ok(FALLBACK.has('machine')&&FALLBACK.has('patch-removed')&&!FALLBACK.has('supported'),'only fallbacks are hollow gold');
+ for(const v of ['no-text','missing','readonly','unsupported','patch-unreliable','needs-japanese','none'])assert.equal(TONE[v],'bad',v);
+ for(const v of ['untested','pending','unknown','preparing'])assert.equal(TONE[v],'wait',v);
+ for(const t of ['ok','part','wait','bad'])assert.match(css,new RegExp(`adapt-s\[data-t=${t}\]|adapt-seg\[data-t=${t}\]`),t);
 });
-test('overview has a header close button and one scroll area with a sticky head',()=>{
+test('overview sorts games that need work first and says why, read → embed → zero-latency',async()=>{
+ const {needsWork,sortByNeed,reasonFor}=await ov();
+ const ok={id:'a',reading:'reads',embedKind:'verified',zeroLatency:'patch',lastSeenAt:9},bad={id:'b',reading:'missing',embedKind:'readonly',zeroLatency:'needs-japanese',lastSeenAt:1};
+ assert.equal(needsWork(ok),false);assert.equal(needsWork(bad),true);
+ assert.deepEqual([ok,bad].sort(sortByNeed).map(g=>g.id),['b','a']);
+ assert.equal(reasonFor(bad,{missing:'A',readonly:'B','needs-japanese':'C'}),'A；B','first two blocking reasons in column order');
+});
+test('overview labels exist in zh/ja/en and a missing program reads as its own state',()=>{
+ for(const k of ['patch-unreliable','patch-removed','needs-japanese','no-text'])assert.ok(ui.split("['"+k+"']:").length-1>=3,k);
+ assert.ok(ui.split('missing:').length-1>=6,'missing: label + reason per locale');
+ assert.match(ui,/reading:g\.available===false\?'missing':g\.reading/);
+});
+test('overview hands scanning to the probe pipeline and never uploads itself',()=>{
+ assert.match(ui,/import \{requestProbe\} from '\.\/probe-hook\.js'/);
+ assert.doesNotMatch(ui,/diagnostics_upload|openDiagnostics|导出诊断包|发给我们/);
+ const hook=fs.readFileSync(path.join(__dirname,'../web/probe-hook.js'),'utf8');
+ assert.match(hook,/window\.megulitProbe\.open\(\{ ids: list, source \}\)/);
+ assert.doesNotMatch(hook,/diagnostics_upload|fetch\(/,'the hook itself sends nothing');
+});
+test('overview keeps one scroll area with a sticky head and a header close button',()=>{
  assert.match(ui,/class="adapt-close" data-close/);assert.doesNotMatch(ui,/dialog-actions/);
- assert.match(ui,/<div class="adapt-scroll"><div class="adapt-head"/);
+ assert.match(ui,/<div class="adapt-scroll"><div class="adapt-grid adapt-head"/);
  assert.match(css,/\.adapt-head\{position:sticky/);
+ assert.match(css,/@font-face\{font-family:"Adapt Digits"/,'lining digits for Sitka titles');
 });
