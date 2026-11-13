@@ -7,7 +7,7 @@ $work=Join-Path $base 'runtime-dump-selftest';if(Test-Path $work){Remove-Item $w
 foreach($bit in '32','64'){
  $game=Join-Path $work "game$bit";$out=Join-Path $work "out$bit";New-Item -ItemType Directory $game,$out | Out-Null
  $arch=if($bit -eq '32'){'x86'}else{'x64'}
- cmd /c "call `"$vs`" -arch=$arch -host_arch=x64 -no_logo >nul && cd /d `"$PSScriptRoot`" && cl /nologo /O2 /MT /EHsc /utf-8 /Fo`"$game/`" host.cpp /Fe:`"$game\host.exe`" >nul"
+ cmd /c "call `"$vs`" -arch=$arch -host_arch=x64 -no_logo >nul && cd /d `"$PSScriptRoot`" && cl /nologo /O2 /MT /EHsc /utf-8 /Fo`"$game/`" host.cpp cases\\*.cpp /Fe:`"$game\host.exe`" >nul"
  if($LASTEXITCODE){throw "build $bit failed"}
  Push-Location $game;try{& .\host.exe (Join-Path $PSScriptRoot "..\..\MeguLitDump$bit.dll") $out;$code=$LASTEXITCODE}finally{Pop-Location}
  Get-ChildItem $out -Recurse -Filter dump.log | Get-Content | ForEach-Object {"  [$bit] $_"}
