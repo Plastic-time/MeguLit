@@ -509,7 +509,8 @@ img{-webkit-user-drag:none}
 .lib-list .library-grid{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;align-content:start;margin:0;padding:18px var(--selection-inset) 28px!important}
 .lib-list .library-grid,.lib-list .library-grid *{user-select:none;-webkit-user-select:none}
 .lib-list .library-grid img{-webkit-user-drag:none}
-.lib-selecting .library-card :is(.game-hover,.edit-button){display:none!important}
+/* hidden without leaving layout: display:none here re-laid out every card on entering multi-select */
+.lib-selecting .library-card :is(.game-hover,.edit-button){opacity:0!important;pointer-events:none!important}
 .main.field-list>.field-search{top:calc(var(--selection-header)/2);left:auto;right:var(--selection-inset);transform:translateY(-50%)}
 .main.field-list.searching>.field-search{transform:translateY(-50%) scale(1.025)}
 .main.field-list:not(.field-selecting)>.field-search{left:50%;right:auto;transform:translate(-50%,-50%)}

@@ -392,7 +392,7 @@ async function startGame(id,button){
 }
 
 const seriesUI=createSeriesLibrary({model:()=>model,locale:()=>locale,text:()=>text,esc,icon,api,invoke,card,modal,duration,number,relativeTime,search:()=>search,
- toast,bindGames:attachGameActions,onLibraryRendered:showLibraryResults,openSeries:id=>{selectedSeriesId=id;navigate('series');},back:()=>navigate('library'),reload:async()=>{
+ toast,bindGames:attachGameActions,onLibraryRendered:showLibraryResults,refresh:async()=>{model=await api('home');},libraryView:()=>libraryView(),openSeries:id=>{selectedSeriesId=id;navigate('series');},back:()=>navigate('library'),reload:async()=>{
  model=await api('home');const main=document.querySelector('#main'),scroll=main.scrollTop;if(route==='library')renderGames();else if(route==='series')seriesUI.renderDetail(main,
  selectedSeriesId);main.scrollTop=scroll;}});
 function library(){
@@ -581,7 +581,7 @@ function showLibraryResults(grid,selecting){
   if(!wall)stopSimpleGrid=fitLibraryGrid(grid);
   host.classList.toggle('lib-selecting',selecting);
   main.classList.toggle('field-list',!wall);
-  main.classList.toggle('field-selecting',selecting);
+  /* 2026-11-13 Blueprint multi-select: the bar floats over the grid, so picking no longer moves the capsule (no field-selecting) */
   const single=wall&&!!search.trim()&&grid.childElementCount===1&&grid.firstElementChild.hasAttribute('data-member-id');
   main.classList.toggle('field-single',single);
   if(single){
@@ -592,7 +592,8 @@ function showLibraryResults(grid,selecting){
   }
   if(wall){fieldify(grid,!!search.trim(),view==='tracks');return;}
   stopField();
-  if(selecting)grid.querySelectorAll('[draggable],img').forEach(node=>{node.draggable=false;});
+  /* cards stay draggable: series-library cancels dragstart while picking, so leaving the mode in place needs no attribute writes */
+  if(selecting)grid.querySelectorAll('img').forEach(node=>{node.draggable=false;});
 }
 
 // E237 Tools → restore Japanese: list library games that ship Japanese data, check one, then apply or undo.
