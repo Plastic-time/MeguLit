@@ -185,7 +185,6 @@ html:not(#u):not(#v):not(#w):not(#x) body .settings-content :is(.settings-row,.k
 html:not(#u):not(#v):not(#w):not(#x) body .settings-content .tr-conn{border-radius:var(--t-radius)!important;border:0!important;background:var(--t-panel)!important;box-shadow:var(--t-ring)!important}
 html:not(#u):not(#v):not(#w):not(#x) body .settings-content :is(.tr-conn-head,.tr-shared-head){font-size:13px!important;letter-spacing:.06em!important;color:color-mix(in srgb,var(--g-gold,#edb56e) 92%,#fff)!important}
 /* the current page in the side list has a soft block behind it, not only a thin bar */
-html:not(#u):not(#v):not(#w):not(#x) body .settings-nav .settings-category-items>button.active{background:color-mix(in srgb,var(--g-gold,#edb56e) 10%,transparent)!important;color:var(--g-t1,#f1e0d2)!important}
 html:not(#u):not(#v):not(#w):not(#x) body .settings-nav .settings-category-items>button:not(.active){color:color-mix(in srgb,var(--g-t1,#f1e0d2) 74%,transparent)!important}
 html:not(#u):not(#v):not(#w):not(#x) body .settings-row .setting-description>small.settings-help{display:-webkit-box!important;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;max-width:60ch;text-wrap:pretty}
 html:not(#u):not(#v):not(#w):not(#x) body .settings-row:is(:hover,:focus-within) .setting-description>small.settings-help{-webkit-line-clamp:unset}

@@ -71,3 +71,60 @@ html:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.feedback-text,.feedback-c
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .dev-notice-form>input:focus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--t-red) 70%,transparent)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.dev-notice-form>button.secondary,.dev-notice-actions>button.text-button):hover:not(:disabled){box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--t-red) 60%,transparent)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .g-blank{padding:28px 32px!important}
+
+/* round 3: neutral kickers and tags (gold is for progress and numbers), list pages sit in one panel, no page-corner marks */
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.review-card .eyebrow,.g-blank .eyebrow,.about-eyebrow,.history-day span,.lb-circle-text>small,.main .settings-nav .settings-category>summary){color:var(--t-label-color)!important;font-family:var(--t-mono)!important;letter-spacing:var(--t-label-track)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .settings-nav .settings-category>summary{font-size:12px!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.word-jlpt,.ri-badge,.dh-w em){box-shadow:inset 0 0 0 1px var(--t-line-2)!important;color:var(--t-label-color)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .settings-nav .settings-category-items>button.active{background:color-mix(in srgb,var(--t-red) 10%,transparent)!important;box-shadow:inset 2px 0 0 var(--t-red)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.history-journal,.record-list,.lb-grimoire){background:var(--t-panel)!important;box-shadow:var(--t-ring)!important;border-radius:var(--t-radius)!important;clip-path:none!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.history-journal,.record-list){padding:8px 24px!important;box-sizing:border-box}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .lb-grimoire::before,html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .lb-grimoire::after{display:none!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .dtv-marks{display:none!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .sentence-word{background:transparent!important;box-shadow:inset 0 0 0 1px var(--t-line-2)!important;border:0!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .sentence-filter .tab{background:transparent!important;box-shadow:none!important;border:0!important;border-bottom:2px solid transparent!important;border-radius:0!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .sentence-filter .tab.active{border-bottom-color:var(--t-red)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.dev-notice-scroll,.guide-panel){scrollbar-width:thin!important;scrollbar-color:var(--t-line-2) transparent!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body dialog.feedback-dialog .feedback-text:not(:focus){border-color:var(--t-line-2)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .tool-top em{border:0!important;border-radius:0!important;background:transparent!important;box-shadow:inset 0 0 0 1px var(--t-line-2)!important;color:var(--t-label-color)!important;font:500 10px/1.8 var(--t-mono)!important;letter-spacing:.12em!important;font-style:normal!important;padding:0 6px!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .tools-grid{gap:14px!important}
+
+/* round 4: readings and controls are neutral, emphasis lines are red, list rows are cards like the sentence cards */
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.record .word-reading,.word-row .word-reading,.ri-word .word-reading,.dict-home i){color:var(--t-label-color)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main>.field-search{border-color:var(--t-line-2)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.settings-callout,.settings-note,.tool-key-note,.dict-note,.translation-note){border-left-color:var(--t-red)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.guide-panel,.dev-notice) kbd{border-color:var(--t-line-2)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .game-dialog-kicker,html:not(#u):not(#v):not(#w):not(#x):not(#y) body .dev-notice-top>span{color:var(--t-label-color)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .record-list{background:none!important;box-shadow:none!important;padding:0!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .record.word-row{background:var(--t-panel)!important;box-shadow:var(--t-ring)!important;border:0!important;border-radius:var(--t-radius)!important;margin-bottom:10px}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .dict-home .dh-col{border-color:var(--t-line)!important;background:var(--t-panel)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .game-detail-hero .detail-engine .embed-status{border-color:var(--t-line-2)!important;color:var(--t-label-color)!important;background:transparent!important}
+
+/* round 5: labels never gold; switches, cards and section numbers follow the red / neutral roles */
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .settings-content :is(.tr-conn-head,.tr-shared-head,.settings-section-title,.settings-group-title){color:var(--t-label-color)!important;font-family:var(--t-mono)!important;letter-spacing:var(--t-label-track)!important;font-size:var(--t-label-size)!important;font-weight:500!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .settings-nav .settings-category>summary *{font-family:var(--t-mono)!important;color:inherit!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .tool-card em{font-family:var(--t-mono)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .library-wall-toggle[aria-checked=true]{color:var(--t-red)!important;border-color:color-mix(in srgb,var(--t-red) 55%,transparent)!important;background:color-mix(in srgb,var(--t-red) 14%,transparent)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .sentence-record{border-color:var(--t-line)!important;box-shadow:var(--t-ring)!important;background:var(--t-panel)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .record.word-row{padding:18px 22px!important;box-sizing:border-box}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .ri-panel .ri-head em{font:500 11px/1 var(--t-mono)!important;letter-spacing:var(--t-label-track)!important;color:var(--t-red)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .guide-panel .guide-tabs button:focus-visible{box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--t-red) 60%,transparent)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .lb-grimoire small{color:var(--t-label-color)!important}
+
+/* round 6: detail kickers and tab numbers neutral with a red rule, red quote lines, the heat map in the red scale, room inside tool cards */
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .detail-engine{color:var(--t-label-color)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .detail-tabs>button::before{color:var(--t-label-color)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .detail-tabs>button::after{background:var(--t-red)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .record.word-row .word-source{border-left-color:color-mix(in srgb,var(--t-red) 60%,transparent)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .record .word-source .link-button:hover{box-shadow:inset 2px 0 0 var(--t-red)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .tv-heat{--accent:var(--t-red);--accent-light:var(--t-red-2)}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .tv-heat i.today{box-shadow:inset 0 0 0 1px var(--t-red-2)!important;background:var(--t-red)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .ri-panel .ri-head em{display:none!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .ri-panel{padding:24px 26px!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .tool-card{padding:24px 28px!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.guide-panel,.dev-notice) kbd{color:var(--text)!important}
+
+/* round 7: panel titles carry the same small red square as the statistics panels; links are red, list numbers neutral */
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .dict-home .dh-col>header h3::before{content:'';display:inline-block;width:6px;height:6px;background:var(--t-red);vertical-align:3px;margin-right:10px}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .moji-account .text-button{color:var(--t-red)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .tv-sno{color:var(--t-label-color)!important}
