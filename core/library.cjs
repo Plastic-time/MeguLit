@@ -66,6 +66,11 @@ const ENGINES=[
  {name:'Godot',hook:null,generic:true,test:f=>f.magicAny(/\.pck$/i,'GDPC')},
  {name:'Unreal Engine',hook:null,generic:true,test:f=>f.has(/^engine$/i)&&f.names.some(n=>/\.exe$/i.test(n))&&f.sub('engine',/^(binaries|content)$/i)},
  {name:'Adobe AIR / Flash',hook:null,generic:true,test:f=>f.sub('META-INF',/^AIR$/i)||f.has(/\.swf$/i)&&f.names.some(n=>/\.exe$/i.test(n))},
+ {name:'Seraph',hook:null,test:f=>f.has(/^(archpac|scnpac)\.dat$/i)},
+ {name:'ISM',hook:null,test:f=>f.magicAny(/\.isa$/i,'ISM ARCHIVED')},
+ {name:'GLib2',hook:null,test:f=>f.has(/\.g2$/i)&&f.has(/\.stx$/i)},
+ {name:'ExHIBIT',hook:null,test:f=>f.has(/\.rld$/i)||f.sub('dat',/\.rld$/i)},
+ {name:'SakanaGL',hook:null,test:f=>f.has(/^sakanagl\.dll$/i)},
  {name:'Leaf / AQUAPLUS',hook:true,test:f=>f.has(/^grp\.pak$/i)&&f.has(/^char\.pak$/i)&&f.has(/^(voice|bgm|se)\.pak$/i)},
  // More engines (user, 2026-11-09). Signatures are files only these engines ship; text reading goes through the
  // general hook and is confirmed on first play (hook:null) until a game of that engine is verified.

@@ -136,7 +136,7 @@ test('library: engines MeguLit reads, and engines it did not know, are recognise
   'Bruns':{'scene/a.bso':'EENC'},'HuneX':{'data00200.hfa':'HUNEXGGEFA10'},'SoftPal':{'data.pac':'PAC \0\0\0\0','dll/PAL.dll':'x'},
   'CMVS (Purple Software)':{'pack/x':'','script.cpz':'CPZ7xxxx'},'EAGLS':{'Scpack.pak':'x','Scpack.idx':'x'},'Ikura GDL':{'ISF':'SM2MPX10xxxx'},"Silky's":{'mes.ifl':'IFLSxxxx'},
   'PJADV':{'data1.dat':'GAMEDAT PAC2'},'System-NNN':{'ta.gtb':'x','ta.gpk':'x'},'Godot':{'game.pck':'GDPCxxxx'},'Majiro':{'data.arc':'MajiroArcV3.000\0'},
-  'TyranoScript':{'data/scenario/first.ks':'x','tyrano/tyrano.base.js':'x','index.html':'x'},'Luca System':{'files/SCRIPT.PAK':'x'},'Lucifen':{'a.lpk':'LPK1xxxx'}};
+  'TyranoScript':{'data/scenario/first.ks':'x','tyrano/tyrano.base.js':'x','index.html':'x'},'Luca System':{'files/SCRIPT.PAK':'x'},'Lucifen':{'a.lpk':'LPK1xxxx'},'Seraph':{'ArchPac.dat':'x'},'ISM':{'data.isa':'ISM ARCHIVED'},'ExHIBIT':{'dat/scr.rld':'x'}};
  for(const [name,files] of Object.entries(cases)){const d=tmp(t);F.writeTree(d,files);assert.equal(library.engineOf(d)?.name,name,JSON.stringify(files));}
  /* a NeXAS script.pac is not taken for Softpal and the other way round */
  const nx=tmp(t);F.writeTree(nx,{'Script.pac':'PAC\0\x04'});assert.equal(library.engineOf(nx)?.name,'NeXAS');
