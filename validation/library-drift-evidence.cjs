@@ -104,6 +104,14 @@ async function main(){fs.mkdirSync(OUT,{recursive:true});const tmpRoot=path.reso
   await shoot('drift-idle');
   const ROUNDS=Number(arg('rounds',2));
   for(let r=0;r<ROUNDS;r++){await measure('idle',async()=>{},3000);await measure('search',()=>type(Q),1500);await shoot('rails');await measure('clear',()=>type(EMPTY),1500);await sleep(400);}
+  /* wheel dolly and drag parallax (user 2026-11-13) */
+  const wheel=async(dy,n)=>{for(let i=0;i<n;i++){await cdp.send('Input.dispatchMouseEvent',{type:'mouseWheel',x:960,y:760,deltaX:0,deltaY:dy});await sleep(40);}};
+  const dragBy=async(dx,dy,steps,s=1)=>{await cdp.send('Input.dispatchMouseEvent',{type:'mousePressed',x:400,y:800,button:'left',clickCount:1});for(let i=1;i<=steps;i++){await cdp.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:400+dx*i/steps,y:800+dy*i/steps,button:'left',buttons:1});await sleep(16*s);}
+   await cdp.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:400+dx,y:800+dy,button:'left',clickCount:1});};
+  await measure('zoomIn',()=>wheel(-120,6),1200);await shoot('zoom-in');await measure('zoomOut',()=>wheel(120,12),1200);await shoot('zoom-out');await wheel(-120,6);await sleep(900);
+  await measure('drag',()=>dragBy(520,-160,30),1600);
+  await capture('drag',s=>dragBy(520,-160,30,s),1500,12);await sleep(1200);
+  const held=await cdp.evaluate('(()=>{const n=document.querySelector(".field-drift .field-plane>mg-cell");return !!n;})()');
   await measure('interrupt',()=>interrupt(1),1800);await type(EMPTY);await sleep(1500);
   await capture('search',()=>type(Q),1200,12);await sleep(800);await shoot('rails-settled');
   await capture('clear',()=>type(EMPTY),1200,12);await sleep(800);

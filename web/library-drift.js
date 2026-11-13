@@ -17,7 +17,13 @@ const calm=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-moti
 const fieldActions='[data-game],[data-edit],[data-launch],[data-series]';
 const S={covers:new Map(),sources:new Map(),host:null,plane:null,pod:null,rails:null,hits:null,
  W:0,H:0,cx:0,cy:0,podW:360,podH:44,angle:-Math.PI/2,running:false,events:null,ro:null,gsap:null,raf:0,last:0,
- mx:-1e4,my:-1e4,pvx:0,pvy:0,hover:null,ringCount:0,busyUntil:0};
+ mx:-1e4,my:-1e4,pvx:0,pvy:0,hover:null,ringCount:0,busyUntil:0,
+ cam:{z:0,px:0,py:0},camGoal:0,drag:null,railG:null,railT:''};
+/* (user 2026-11-13: 滚轮可以缩放 / 按住拖动是景深效果, not the wall's pan) a camera in the field's depth. Each cover sits at
+   distance D=1.6-z (near 0.6, far 1.6); the wheel dollies the camera along the depth, so near covers grow and pass by
+   faster than far ones. Dragging swings the view around the focal plane: near covers follow the hand, far ones move
+   the other way, the focal band stays put; letting go, the view springs back. Covers are never panned like the wall. */
+const CAM_NEAR=.42,CAM_FAR=-.5,PARALLAX=1.35;
 const R=(a,b)=>a+Math.random()*(b-a);
 const idOf=(el,i)=>el.dataset.memberId||(el.dataset.seriesDrop?'s:'+el.dataset.seriesDrop:'i'+i);
 
@@ -73,8 +79,9 @@ function drawRails(geo){
  if(!S.rails)return;
  const svg=S.rails,ns='http://www.w3.org/2000/svg',rings=S.hits&&S.hits.size>1?geo.slots.length:0;
  svg.setAttribute('viewBox','0 0 '+S.W+' '+S.H);
- while(svg.childElementCount<rings){const e=document.createElementNS(ns,'ellipse');svg.append(e);}
- [...svg.children].forEach((e,ring)=>{if(ring>=rings){e.remove();return;}const spread=1+ring*.62*geo.shrink;
+ if(!S.railG||S.railG.parentNode!==svg){S.railG=document.createElementNS(ns,'g');svg.append(S.railG);S.railT='';}const g=S.railG;
+ while(g.childElementCount<rings){const e=document.createElementNS(ns,'ellipse');g.append(e);}
+ [...g.children].forEach((e,ring)=>{if(ring>=rings){e.remove();return;}const spread=1+ring*.62*geo.shrink;
   e.setAttribute('cx',S.cx);e.setAttribute('cy',S.cy);e.setAttribute('rx',(geo.rx*spread).toFixed(1));e.setAttribute('ry',(geo.ry*spread).toFixed(1));});
  S.ringCount=rings;
 }
@@ -93,14 +100,15 @@ function frame(dt){
  if(!still&&S.hits)S.angle+=dt*1000*2*Math.PI/TURN;
  S.pvx*=Math.exp(-8*dt);S.pvy*=Math.exp(-8*dt);
  const geo=S.geo,follow=1-Math.exp(-dt*9);
+ if(S.railG){const D=1.6-FOCUS,P=D/Math.max(.06,D-S.cam.z),t='translate('+S.cx.toFixed(1)+' '+S.cy.toFixed(1)+') scale('+P.toFixed(4)+') translate('+(-S.cx).toFixed(1)+' '+(-S.cy).toFixed(1)+')';if(t!==S.railT){S.railG.setAttribute('transform',t);S.railT=t;}}
  for(const c of S.covers.values()){
   /* the drift keeps running under a cover on the rails, so clearing the search sends it back into a living field */
-  if(!still&&c!==S.hover){
+  if(!still&&(c!==S.hover||S.drag)){
    c.sway+=dt*.6;const slow=1-.55*c.r;
    c.x+=((c.vx+Math.sin(c.sway)*5)*slow+c.wx)*dt;c.y+=(c.vy*slow+c.wy)*dt;
    const drag=Math.exp(-1.6*dt);c.wx*=drag;c.wy*=drag;
-   const dx=c.x-S.mx,dy=c.y-S.my,dm=Math.hypot(dx,dy),reach=120+c.z*150;
-   if(c.w<.5&&dm<reach&&(S.pvx||S.pvy)){const k=(1-dm/reach)*(.4+c.z*.8)*dt*6;c.wx+=(S.pvx*1.4+dx/(dm||1)*50)*k;c.wy+=(S.pvy*1.4+dy/(dm||1)*50)*k;}
+   const dx=(c.sx??c.x)-S.mx,dy=(c.sy??c.y)-S.my,dm=Math.hypot(dx,dy),reach=120+c.z*150;
+   if(!S.drag&&c.w<.5&&dm<reach&&(S.pvx||S.pvy)){const k=(1-dm/reach)*(.4+c.z*.8)*dt*6;c.wx+=(S.pvx*1.4+dx/(dm||1)*50)*k;c.wy+=(S.pvy*1.4+dy/(dm||1)*50)*k;}
    const m=CH*driftScale(c.z)*.7;
    if(c.y<-m||c.x<-CW||c.x>S.W+CW){spawn(c,false);if(c.w<.02){c.t='';}}
    if(c.y>S.H+m*1.5)c.y=-m;
@@ -117,12 +125,17 @@ function frame(dt){
    x=x+(c.rx-x)*w+ox/ol*bow;y=y+(c.ry-y)*w+oy/ol*bow;s=(s+(c.rs-s)*w)*lift;a=a+(c.ra-a)*w;
   }
   s*=1-.45*c.r;a*=1-.86*c.r;
+  /* camera: a cover on the rails counts as sitting on the focal plane */
+  {const zf=c.z+(FOCUS-c.z)*Math.min(1,c.w),D=1.6-zf,dist=D-S.cam.z,P=dist>.06?D/dist:D/.06,par=(zf-FOCUS)*PARALLAX;
+   x=S.cx+(x-S.cx)*P+S.cam.px*par*P;y=S.cy+(y-S.cy)*P+S.cam.py*par*P;s*=P;
+   /* a cover the camera is about to pass fades out instead of filling the window */
+   a*=Math.max(0,Math.min(1,(dist-.14)/.2));c.sx=x;c.sy=y;}
   const t='translate('+(x-CW/2).toFixed(1)+'px,'+(y-CH/2).toFixed(1)+'px) scale('+s.toFixed(3)+')',o=a.toFixed(2);
   if(t!==c.t){c.node.style.transform=t;c.t=t;}
   if(o!==c.o){c.node.style.opacity=o;c.o=o;}
   const zi=c.w>.5?400+Math.round(c.rd*100)-(c.slot?.ring||0)*10:Math.round(c.z*100)+(c.r>.5?0:100);
   if(zi!==c.zi){c.node.style.zIndex=String(zi);c.zi=zi;}
-  const pe=c.r>.5?'none':'';if(pe!==c.pe){c.node.style.pointerEvents=pe;c.pe=pe;}
+  const pe=c.r>.5||a<.12?'none':'';if(pe!==c.pe){c.node.style.pointerEvents=pe;c.pe=pe;}
  }
 }
 function tick(){const now=performance.now(),dt=S.last?(now-S.last)/1000:0;S.last=now;frame(dt);}
@@ -176,9 +189,21 @@ export function driftMount(host,grid,plane,items,filtered,pod){
  host.addEventListener('pointermove',e=>{const b=host.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;
   if(S.mx>-1e3){S.pvx=S.pvx*.6+(x-S.mx)*.4*30;S.pvy=S.pvy*.6+(y-S.my)*.4*30;}S.mx=x;S.my=y;},{signal});
  host.addEventListener('pointerleave',()=>{S.mx=S.my=-1e4;S.hover=null;},{signal});
- plane.addEventListener('pointerover',e=>{const n=e.target.closest('mg-cell');S.hover=n?S.covers.get(n.dataset.id)||null:null;},{signal});
+ host.addEventListener('wheel',e=>{if(e.target.closest('.field-search,.series-select-bar,.series-suggestions,.bp-bar'))return;e.preventDefault();
+  const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?host.clientHeight:1);S.camGoal=Math.max(CAM_FAR,Math.min(CAM_NEAR,S.camGoal-delta*.0011));
+  if(S.gsap&&!calm())S.gsap.to(S.cam,{z:S.camGoal,duration:.7,ease:'power3.out',overwrite:'auto'});else{S.cam.z=S.camGoal;frame(0);}},{passive:false,signal});
+ host.addEventListener('pointerdown',e=>{if(!e.isPrimary||e.button!==0||e.target.closest('input,select,button:not(.game-card),.field-search,.bp-bar,.series-select-bar,.series-suggestions'))return;
+  S.gsap?.killTweensOf(S.cam,'px,py');S.drag={id:e.pointerId,x:e.clientX,y:e.clientY,px:S.cam.px,py:S.cam.py,moved:false};},{signal});
+ addEventListener('pointermove',e=>{const d=S.drag;if(!d||d.id!==e.pointerId)return;const dx=e.clientX-d.x,dy=e.clientY-d.y;
+  if(!d.moved){if(Math.hypot(dx,dy)<6)return;d.moved=true;S.hover=null;host.classList.add('drift-dragging');try{host.setPointerCapture(e.pointerId);}catch{}}
+  /* past a point the hand meets resistance, like pulling on a lens */
+  const soft=v=>Math.sign(v)*420*(1-Math.exp(-Math.abs(v)/420));S.cam.px=d.px+soft(dx);S.cam.py=d.py+soft(dy);if(calm())frame(0);},{signal});
+ const release=e=>{const d=S.drag;if(!d||d.id!==e.pointerId)return;S.drag=null;host.classList.remove('drift-dragging');if(d.moved)S.suppress=performance.now();
+  if(S.gsap&&!calm())S.gsap.to(S.cam,{px:0,py:0,duration:1.1,ease:'back.out(1.5)',overwrite:'auto'});else{S.cam.px=S.cam.py=0;frame(0);}};
+ addEventListener('pointerup',release,{signal});addEventListener('pointercancel',release,{signal});
+ plane.addEventListener('pointerover',e=>{if(S.drag?.moved)return;const n=e.target.closest('mg-cell');S.hover=n?S.covers.get(n.dataset.id)||null:null;},{signal});
  plane.addEventListener('pointerout',e=>{if(!e.relatedTarget||!e.relatedTarget.closest?.('mg-cell'))S.hover=null;},{signal});
- host.addEventListener('click',e=>{const hit=e.target.closest(fieldActions),n=hit&&hit.closest('mg-cell'),source=n&&S.sources.get(n.dataset.id);if(!source)return;
+ host.addEventListener('click',e=>{if(performance.now()-(S.suppress||0)<250&&e.detail){e.preventDefault();e.stopPropagation();return;}const hit=e.target.closest(fieldActions),n=hit&&hit.closest('mg-cell'),source=n&&S.sources.get(n.dataset.id);if(!source)return;
   const action=[...hit.attributes].find(attr=>['data-game','data-edit','data-launch','data-series'].includes(attr.name));
   if(action){e.preventDefault();e.stopPropagation();source.querySelector('['+action.name+']')?.click();}},{capture:true,signal});
  S.ro?.disconnect();S.ro=new ResizeObserver(()=>measure());S.ro.observe(host);if(pod)S.ro.observe(pod);

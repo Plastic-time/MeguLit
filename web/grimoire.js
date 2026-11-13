@@ -415,7 +415,7 @@ export function fieldify(grid,filtered=false,tracks=false){
    let cell=cells.get(key);
    if(!cell){
     const game=index%items.length;
-    if(!pool.get(game)?.length){const sx=cx+(col*cw-x)*z,sy=cy+(row*ch-y)*z,mx=cardWidth*z,my=cardHeight*z;if((sx<-mx||sx>width+mx||sy<-my||sy>height+my)&&made>=6){deferred=true;continue;}made++;}
+    if(!pool.get(game)?.length){const sx=cx+(col*cw-x)*z,sy=cy+(row*ch-y)*z,mx=cardWidth*z,my=cardHeight*z;if((sx<-mx||sx>width+mx||sy<-my||sy>height+my)&&made>=6&&!window.__megulitOrbitWarm){deferred=true;continue;} /* 2026-11-13 (user recording: drift -> wall, edge columns popped in at +140 ms): while a view switch plays the wall arrives from scale .9, so its margin ring is on screen; build all of it in the cut */made++;}
     const node=take(game);
     if(node.dataset.zoom!==tier)node.dataset.zoom=tier;
 

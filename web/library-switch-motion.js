@@ -32,7 +32,7 @@ export const isBusy=()=>busy;
    the view's running number (01 tracks, 02 wall, 03 grid) locks onto the vanishing point around the capsule.
    Reads are batched before writes; every move is transform/opacity only (WAAPI for the planes so they run on the
    compositor, a GSAP timeline for the beat). */
-const FLY=200,ARRIVE=420,BUDGET=600,RING=24,RINGS=5,CARD=340,LIGHT=100,FLOOR=.7;
+const FLY=200,ARRIVE=420,BUDGET=600,RING=16,RINGS=5,CARD=340,LIGHT=240,FLOOR=.7; /* 2026-11-13 (user recording, drift -> wall: 铺满的时候有几个地方卡): outer rings started near 0 and came up in 100 ms, which read as covers popping in at the edges; they now start at least 35% lit and rise over 240 ms */
 const EXPO_OUT='cubic-bezier(.16,1,.3,1)',FLY_IN='cubic-bezier(.35,0,.75,.45)'; /* an accelerating in that already reads in the first 100 ms, before the cut */
 const VIEW_TAG={tracks:['01','tracks'],wall:['02','wall'],list:['03','grid']};
 /* the HUD goes last in #main, under the capsule (z 6). It carries no class or id: main-kids.js mirrors the classes of
@@ -111,7 +111,7 @@ export async function switchLibrary(view,render,from=''){
    for(const c of fresh){const ring=Math.min(RINGS,Math.floor(c.h/far*(RINGS+1))),pull=.08+ring*.012;
     const o=c.node.style.opacity||1,delay=ring*RING;
     /* opacity lands fast (no muddy half-lit covers), the push toward the lens runs the full expo-out */
-    c.node.animate([{opacity:Math.max(0,1-ring*.2)*o},{opacity:o}],{duration:LIGHT,delay,easing:'cubic-bezier(.2,0,.2,1)',fill:'backwards'});
+    c.node.animate([{opacity:Math.max(.35,1-ring*.13)*o},{opacity:o}],{duration:LIGHT,delay,easing:'cubic-bezier(.25,.1,.25,1)',fill:'backwards'});
     c.node.animate([{translate:`${-c.dx*pull}px ${-c.dy*pull}px`},{translate:'0px 0px'}],{duration:card,delay,easing:EXPO_OUT,fill:'backwards'});}}
   if(cap1)beat(hud(cap1,view,next||root));
   await Promise.race([Promise.all(runs),new Promise(r=>setTimeout(r,arrive+80))]);

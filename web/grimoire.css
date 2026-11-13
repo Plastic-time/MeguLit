@@ -636,5 +636,8 @@ img{-webkit-user-drag:none}
 .lib-field .field-plane>.drift-rails{position:absolute!important;inset:0;width:100%!important;height:100%;pointer-events:none;overflow:visible;z-index:0}
 .drift-rails ellipse{fill:none;stroke:color-mix(in srgb,var(--accent,#ad1539) 55%,transparent);stroke-width:1;stroke-dasharray:2 7;vector-effect:non-scaling-stroke}
 .drift-rails ellipse:first-child{stroke-dasharray:none;stroke:color-mix(in srgb,var(--accent,#ad1539) 40%,transparent)}
-.lib-field.field-drift{cursor:default}
+
 .lib-field.field-drift .field-plane>mg-cell{will-change:transform,opacity}
+.lib-field.field-drift{cursor:grab}
+.lib-field.field-drift.drift-dragging{cursor:grabbing}
+.lib-field.field-drift.drift-dragging .field-plane>mg-cell{pointer-events:none!important}
