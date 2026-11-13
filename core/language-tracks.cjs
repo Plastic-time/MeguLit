@@ -47,13 +47,13 @@ function semicolonTracks(text){
 /* A whole line of Chinese (no kana, mostly Han, at least two characters only Chinese uses). Japanese lines written only in
    kanji are short and do not use these function characters. */
 /* E501 (live 9-nine beta.24: 「…よかったわ」「大概是因為…」 stayed in the Japanese line): 了 的 很 夠/够 繫 also mark Chinese in a kana-free row */
-const ZH_ONLY=/[這这麼么嗎吗您們们個个裡請请說说沒没還还讓让給给對对呢吧啊妳哪喔了的很夠够繫]/gu;
+const ZH_ONLY=/[這这麼么嗎吗您們们個个裡請请說说沒没還还讓让給给對对呢吧啊妳哪喔了的很夠够繫你]/gu;/* 2026-11-13 (ATRI 「成為你的右腿！」): 你 too */
 /* E270 (user, ATRI: a Traditional Chinese line still reached the reader as Japanese): also count Han forms that modern
    Japanese writes differently (traditional 從圖讓與學會實點經國關應歡聽讀賣錢樣黑處體發變邊氣當覺 and simplified 时为无开关长
    见头应问题电话书车门东亲爱欢谢语听读买卖钱样谁黑处发变边气觉), and the full-width comma ， that Japanese text does not use. */
 const ZH_FORM=/[從圖讓與學會實點經國關應歡聽讀賣錢樣黑處體發變邊氣當覺爲无为时开关长见头应问题电话书车门东亲爱欢谢语听读买卖钱样谁处发变边气觉试图从实经]/gu;
 function zhScore(t){return (t.match(ZH_ONLY)||[]).length+(t.match(ZH_FORM)||[]).length;}
-function foreignLine(text){const t=String(text||'');if(KANA.test(t))return false;const han=(t.match(/[㐀-鿿]/gu)||[]).length;if(han<6)return false;const score=zhScore(t);return score>=2||(score>=1&&t.includes('，'));}
+function foreignLine(text){const t=String(text||'');if(KANA.test(t))return false;const han=(t.match(/[㐀-鿿]/gu)||[]).length;if(han<4)return false;const score=zhScore(t);if(han<6)return score>=2;return score>=2||(score>=1&&t.includes('，'));}
 /* A line that arrives as Japanese rows plus a Chinese row of the same text keeps only the Japanese rows. */
 // Chinese translation patches that "borrow" Shift-JIS code points (借码) store Chinese sentences as unrelated JIS kanji;
 // only the patch's own font shows them as Chinese. Read back (an old save from the patched game, a patch launcher

@@ -58,4 +58,5 @@ test('multi-language row: a Chinese tail glued after the Japanese sentence goes 
  assert.strictEqual(japaneseTrack('アトリが助けを求めるように俺を見た。足になります！成为你的右腿！成為你的右腿！'),'アトリが助けを求めるように俺を見た。足になります！');
  assert.strictEqual(japaneseTrack('東京へ行こう。東京駅前広場'),'東京へ行こう。東京駅前広場');
  assert.strictEqual(japaneseTrack('「はい」'),'「はい」');
+ const {foreignLine}=require('../core/language-tracks.cjs');assert.ok(foreignLine('成為你的右腿！')&&foreignLine('成为你的右腿！'),'a short Chinese line is dropped, the Japanese one stays');assert.ok(!foreignLine('東京駅前広場')&&!foreignLine('右足義足'));
 });
