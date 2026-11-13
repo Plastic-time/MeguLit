@@ -75,7 +75,7 @@ class Reader{
  /* E475 + font probe (user 2026-11-13: 自动读内存来导入游戏字体): the font the game draws with is the reader's Japanese font
     unless the user picked another one after the font-follow migration (japaneseFontSource 'user'); 恢复为游戏原字体 sets it
     back to 'game'. An engine's own report (KiriKiri) outranks the probe's draw counts for the same game. */
- engineFont(message){try{const g=this.gal;if(!g||!message)return;const ef=require('../core/engine-font.cjs');if(message.probe&&ef.uiFace(message.face))return;const rank=ef.rank(message);
+ engineFont(message){try{const g=this.gal;if(!g||!message)return;const ef=require('../core/engine-font.cjs');if(message.probe&&ef.uiFace(message.face))return;if(ef.engineDefault?.(message)){this.gal?.hooks?.trace?.('engine font ignored: '+message.face+' '+message.size+'px is the engine default (no font set on that layer)');return;}const rank=ef.rank(message);
   if(this.engineFontSeen&&this.engineFontSeen.pid===this.gamePid&&this.engineFontSeen.rank>rank)return;
   this.engineFontSeen={pid:this.gamePid,rank,message};
   if(g.preferences?.japaneseFontSource==='user')return;this.applyEngineFont(message);}catch{}}
