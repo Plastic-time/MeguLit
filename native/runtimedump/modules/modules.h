@@ -6,4 +6,5 @@
 // Add your line in a commit of its own so parallel branches merge cleanly.
 #define MEGULIT_DUMP_MODULES \
  MODULE(Voice) \
+ MODULE(VoiceFile) \
  /* MODULE(Cg) */
