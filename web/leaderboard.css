@@ -575,3 +575,13 @@ dialog.forum-lightbox img{max-width:92vw;max-height:88vh;object-fit:contain;bord
 .forum-lightbox-nav:hover{background:rgba(255,255,255,.18)}
 .forum-lightbox-nav.is-prev{left:24px}.forum-lightbox-nav.is-next{right:24px}
 .forum-lightbox-count{position:fixed;left:50%;bottom:22px;translate:-50% 0;font:500 12px/1 var(--u-mono,monospace);letter-spacing:.18em;color:rgba(255,255,255,.75)}
+
+/* 2026-11-13 (AI-feel review: the three tab rows looked alike). Page tabs read as headings, metrics as a plain row, the period as a small switch. */
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body [data-lb-group=tab] button{font-family:var(--t-serif,serif)!important;font-size:19px!important;font-weight:600!important;letter-spacing:.02em!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body [data-lb-group=tab] button[aria-pressed=false]{color:var(--t-text-2)!important;font-weight:500!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body [data-lb-group=metric] button{font-size:13.5px!important;font-weight:400!important;letter-spacing:.02em!important;color:var(--t-text-2)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body [data-lb-group=metric] button[aria-pressed=true]{color:var(--t-text)!important;font-weight:600!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body [data-lb-group=period]{gap:0!important;box-shadow:inset 0 0 0 1px var(--t-line-2)!important;border:0!important;border-radius:2px!important;padding:2px!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body [data-lb-group=period] button{height:28px!important;padding:0 12px!important;font-size:12.5px!important;border:0!important;border-radius:1px!important;box-shadow:none!important;color:var(--t-text-2)!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body [data-lb-group=period] button::after{display:none!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body [data-lb-group=period] button[aria-pressed=true]{background:color-mix(in srgb,var(--t-text) 10%,transparent)!important;color:var(--t-text)!important}
