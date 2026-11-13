@@ -14,7 +14,7 @@ html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main :is(.es-acts .te
 /* History: the empty page is the filled page with no rows yet: today's ledger mark on the left, the games to start from on the right */
 html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-history{display:grid;grid-template-columns:180px minmax(0,1fr);gap:0 56px;max-width:1280px;margin:40px auto 0;padding:28px 0 0;border-top:1px solid var(--es-line)}
 html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-day{display:flex;flex-direction:column;gap:6px}
-html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-day b{font:500 64px/1 var(--t-serif,serif);color:var(--es-ink);font-variant-numeric:tabular-nums}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-day b{color:var(--es-ink);}
 html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-day span{font-size:13px;color:var(--es-ink-2)}
 html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-day small{font-size:12px;color:var(--es-ink-3)}
 html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-hbody h2{font-size:22px}
@@ -48,7 +48,7 @@ html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-demo-bar .on
 html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-demo figcaption{font-size:13px;color:var(--es-ink-2)}
 
 /* Recycle bin: one quiet line */
-html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-trash{margin:32px 0 0;padding:16px 0;border-top:1px solid var(--es-line);border-bottom:1px solid var(--es-line);font-size:14px;color:var(--es-ink-2)}
+html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-trash{margin:32px 0 0;padding:16px 0;border-bottom:1px solid var(--es-line);font-size:14px;color:var(--es-ink-2)}
 html:not(#u):not(#v):not(#w):not(#x):not(#y):not(#z) body .main .es-trash .text-button{margin-left:12px;padding:0;background:none;border:0;box-shadow:none;color:var(--es-ink);font-size:14px;cursor:pointer;text-decoration:underline;text-decoration-color:var(--es-line);text-underline-offset:5px}
 
 /* Review finished: one number leads (today's count, or when cards come back), the rest is one plain line; no card, anchored left like the other pages */

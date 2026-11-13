@@ -34,7 +34,7 @@ html:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.about-eyebrow,.upd-eyebro
 
 /* progress is gold everywhere (red stays for the active / current mark) */
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.stg-book .share,.ri-bar-saved){background:var(--t-bar-fill)!important}
-html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .stg-book .share{height:var(--t-bar-h)!important;border-radius:0!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .stg-book .share{border-radius:0!important}
 
 /* settings: the content uses the whole column; its scroller stays at the window's right edge */
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .settings-layout>.settings-content>*,
@@ -60,7 +60,7 @@ html:not(#u):not(#v):not(#w):not(#x):not(#y) body .dev-notice-actions>button:las
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(dialog.game-dialog,.lv-dialog,dialog.profile-panel,.lv-opt){border-radius:var(--t-radius)!important}
 
 /* round 2: one N-level tag, square filters and chips, gold progress, red focus, mono kickers */
-html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.word-jlpt,.ri-badge,.dh-w em){border-radius:0!important;background:transparent!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--t-gold) 70%,transparent)!important;border:0!important;color:var(--t-gold)!important;font:600 10px/1.7 var(--t-mono)!important;letter-spacing:.1em!important;padding:0 6px!important;font-style:normal!important}
+html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.word-jlpt,.ri-badge,.dh-w em){border-radius:0!important;background:transparent!important;border:0!important;font:600 10px/1.7 var(--t-mono)!important;letter-spacing:.1em!important;padding:0 6px!important;font-style:normal!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.sentence-filter .tab,.sentence-word,.revisit-chip,.review-card .eyebrow,.library-wall-toggle,.field-search input){border-radius:var(--t-radius)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.review-card .eyebrow,.sentence-source,.sentence-when,.sentence-words .muted,.ri-head em,.ri-status){font-family:var(--t-mono)!important;letter-spacing:var(--t-label-track)!important;font-size:var(--t-label-size)!important}
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .sentence-source{color:var(--t-label-color)!important}
@@ -139,8 +139,7 @@ html:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .profile-perks li{color:
  --t-red:#a8232f;--t-red-2:#c0303d;--t-gold:#8a6400;
  --t-panel:linear-gradient(160deg,rgba(255,252,249,.94),rgba(248,242,238,.92));
  --t-panel-solid:linear-gradient(160deg,#fffcf9,#f6efea);
- --t-line:rgba(60,30,30,.12);--t-line-2:rgba(60,30,30,.22);
- --t-text:#2a1a1a;--t-text-2:#5a4640;--t-label-color:#5a4640;
+ --t-line:rgba(60,30,30,.12);--t-line-2:rgba(60,30,30,.22);--t-label-color:#5a4640;
  --t-bar-track:rgba(60,30,30,.1)}
 :root{--t-text:var(--text,#f3f3f5);--t-text-2:color-mix(in srgb,var(--text,#f3f3f5) 72%,transparent)}
 :root[data-theme=light]{--t-text:#2a1a1a;--t-text-2:#5a4640}
