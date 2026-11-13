@@ -5,7 +5,7 @@ test('kana choices: always 4 distinct options with the target, even from a short
  for(let r=0;r<300;r++)for(const [t,pool] of [['う',['い']],['あ',[]],['ん',['を','わ','ん']],['か',['き','く','け','こ','さ']]]){
   const o=D.pickChoices(t,pool,near);assert.equal(o.length,4);assert.equal(new Set(o).size,4);assert.ok(o.includes(t));}
 });
-test('kana achievement: capped at 100 and shown with one decimal',async()=>{const D=await load();
- assert.equal(D.fmtPct(101),'100.0%');assert.equal(D.fmtPct(95.86),'95.9%');assert.equal(D.fmtPct(0),'0.0%');
- const log=Array.from({length:10},()=>({show:'シ',ok:true,t:0.5,brk:true}));assert.ok(D.achievement(log).pct<=100);
+test('kana achievement: capped at 101 and shown with one decimal',async()=>{const D=await load();
+ assert.equal(D.fmtPct(102),'101.0%');assert.equal(D.rankOf(101),'SSS+ AP');assert.equal(D.rankOf(100.5),'SSS+');assert.equal(D.rankOf(100),'SSS');assert.equal(D.fmtPct(95.86),'95.9%');assert.equal(D.fmtPct(0),'0.0%');
+ const log=Array.from({length:10},()=>({show:'シ',ok:true,t:0.5,brk:true}));assert.ok(D.achievement(log).pct<=101);
 });
