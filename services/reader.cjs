@@ -24,7 +24,7 @@ class Reader{
   }
   const config=this.runtime.config();
   if(message.gameProcessId&&message.gameProcessId!==this.gamePid){this.gamePid=message.gameProcessId;this.gameId=null;this.pendingLines=[];this.translation?.clearContext();this.setWorkPrompt('');this.stats.reset();const pid=this.gamePid;
-   require('../core/game-fonts.cjs').exePath(pid).then(exe=>{exe=require('./launch-path.cjs').canonical(exe);if(this.gamePid!==pid)return;this.gameExe=exe;this.refreshTextSource();this.translation?.clearContext();const db=openStore(this.root);try{const game=require('./library.cjs').activeGameForProgram(db,exe);this.gameId=game?.id||null;this.findTextSource(this.gameId);this.sharedImport(game);this.setWorkPrompt(game?.id|| (exe?'exe-'+require('node:crypto').createHash('sha256').update(exe.toLowerCase()).digest('hex'):''));for(const line of this.pendingLines||[])this.stats.line({...line,gameId:this.gameId});this.pendingLines=null;this.runtime.emit('reader-event',{type:'activeGame',legacyId:game?.legacy_id??null});}finally{db.close();}}).catch(()=>{});this.fonts.detect(pid).catch(()=>{});
+   require('../core/game-fonts.cjs').exePath(pid).then(exe=>{exe=require('./launch-path.cjs').canonical(exe);if(this.gamePid!==pid)return;this.gameExe=exe;this.refreshTextSource();this.translation?.clearContext();const db=openStore(this.root);try{const game=require('./library.cjs').activeGameForProgram(db,exe);this.gameId=game?.id||null;this.findTextSource(this.gameId);this.sharedImport(game);this.setWorkPrompt(game?.id|| (exe?'exe-'+require('node:crypto').createHash('sha256').update(exe.toLowerCase()).digest('hex'):''));for(const line of this.pendingLines||[])this.stats.line({...line,gameId:this.gameId});this.pendingLines=null;this.runtime.emit('reader-event',{type:'activeGame',legacyId:game?.legacy_id??null});}finally{db.close();}}).catch(()=>{});this.fonts.detect(pid).then(()=>this.engineFontScan(pid)).catch(()=>{});
   }
   if(message.bound===false&&this.gal?.process&&this.gal.process.exitCode!==null&&!this.gal.stopped){this.runtime.readerReady=false;this.runtime.readerError='READER_NATIVE_EXITED';this.runtime.emit('reader-health',{ready:false,error:'READER_NATIVE_EXITED'});}
   if(message.type==='gameClosed'){this.gameId=null;this.gamePid=null;this.pendingLines=null;this.setWorkPrompt('');this.stats.reset();}
@@ -75,7 +75,15 @@ class Reader{
   if(this.engineFontSeen&&this.engineFontSeen.pid===this.gamePid&&this.engineFontSeen.rank>rank)return;
   this.engineFontSeen={pid:this.gamePid,rank,message};
   if(g.preferences?.japaneseFontSource==='user')return;this.applyEngineFont(message);}catch{}}
- applyEngineFont(message){const g=this.gal;const choice=require('../core/engine-font.cjs').pick({face:message.face,prerendered:message.prerendered,fonts:this.fonts?.current?.fonts});if(!choice)return null;
+ /* E503 Unity / MAGES / Ren'Py draw without Windows, so the probe never names their dialogue font: the game's files are read
+    once (core/engine-font-scan.cjs, worker thread, cached per folder), the font it ships is imported like a probe font file
+    and reported as a scanned hookFont (outranks the probe, not a live engine report). */
+ async engineFontScan(pid){try{const root=this.fonts?.current?.root;if(!root||this.gamePid!==pid)return;const scanner=require('../core/engine-font-scan.cjs');if(!scanner.engineOf(root))return;
+  const r=await scanner.inWorker(root,path.join(this.root,'cache','engine-font-scan'));if(!r||this.gamePid!==pid)return;
+  for(const file of r.files||[])try{this.fonts.addFile(file,'file');}catch{}
+  this.gal?.hooks?.trace?.('engine font scan '+r.engine+': '+JSON.stringify(r.face||r.family||'')+' ('+r.reason+')');try{fs.appendFileSync(path.join(this.root,'logs','engine-font-scan.log'),JSON.stringify({at:new Date().toISOString(),root,engine:r.engine,face:r.face,family:r.family,reason:r.reason,files:r.files})+'\n');}catch{}
+  if(r.face||r.family)this.engineFont({type:'hookFont',engine:r.engine,face:r.face||'',family:r.family,scanned:true});}catch{}}
+ applyEngineFont(message){const g=this.gal;const choice=require('../core/engine-font.cjs').pick({face:message.face,prerendered:message.prerendered,family:message.family,fonts:this.fonts?.current?.fonts});if(!choice)return null;
   const values={japaneseFont:choice.key,japaneseFontSource:'game'};if(message.probe&&typeof message.bold==='boolean')values.japaneseBold=message.bold;
   if(Object.keys(values).some(k=>g.preferences?.[k]!==values[k]))g.save({...g.preferences,...values});this.runtime.emit('reader-event',{type:'enginePreferences',values});
   this.gal.hooks?.trace?.('engine font '+JSON.stringify(choice.face)+(message.size?' '+message.size+'px':'')+(message.engine?' via '+message.engine:'')+(message.prerendered?' pfont='+message.prerendered:'')+' -> '+choice.key+' ('+choice.reason+')');return values;}
