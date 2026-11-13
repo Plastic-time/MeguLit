@@ -8,4 +8,5 @@
  CASE(AudioMore) \
  CASE(Voice) \
  CASE(Krkr) \
- CASE(VoiceSafety)
+ CASE(VoiceSafety) \
+ CASE(Deadlock)

@@ -365,7 +365,13 @@ BOOL WINAPI HReadFile(HANDLE h, LPVOID buf, DWORD want, LPDWORD got, LPOVERLAPPE
  return ok;
 }
 BOOL WINAPI HCloseHandle(HANDLE h) {
- if (Ready && !Inside()) { DWORD e = GetLastError(); try { Guard g; Lock l; Files.erase(h); Sections.erase(h); } catch (...) {} SetLastError(e); }
+ // MinHook closes thread handles while every other thread is frozen; one of them may hold Gate. CloseHandle therefore
+ // never waits for Gate: when it is taken the entry just stays (a later open of the same handle value replaces it).
+ if (Ready && !Inside()) {
+  DWORD e = GetLastError();
+  if (TryEnterCriticalSection(&Gate)) { try { Guard g; Files.erase(h); Sections.erase(h); } catch (...) {} LeaveCriticalSection(&Gate); }
+  SetLastError(e);
+ }
  return OCloseHandle(h);
 }
 HANDLE WINAPI HCreateMappingW(HANDLE f, LPSECURITY_ATTRIBUTES sa, DWORD prot, DWORD hi, DWORD lo, LPCWSTR n) {
@@ -470,7 +476,7 @@ template <int K> int __cdecl HInflate(void *strm, int flush) {
   } catch (...) {}
   if (part) free(part);
   try { if (!whole.empty()) Output("inflate", whole.data(), (DWORD)whole.size()); } catch (...) {}
- } else if (Ready && before && r != 0 && r != 1) { // error or end of a stream we were collecting: forget it
+ } else if (Ready && before && r != 0 && r != 1 && !Inside()) { // error or end of a stream we were collecting: forget it
   Guard g;
   try { Lock l; auto it = Streams.find(strm); if (it != Streams.end()) { StreamBytes -= it->second.size(); Streams.erase(it); } } catch (...) {}
  }
@@ -775,8 +781,28 @@ bool DumpActive(const char *module) {
 DumpScope::DumpScope() { e = GetLastError(); was = TlsGetValue(Tls) != NULL; TlsSetValue(Tls, (void *)1); SetLastError(e); }
 DumpScope::~DumpScope() { if (!was) TlsSetValue(Tls, NULL); SetLastError(e); }
 bool DumpSkipped(const wchar_t *path) { try { return !path || Skipped(path); } catch (...) { return true; } }
-bool DumpHook(void *target, void *detour, void **original) { return target && MH_CreateHook(target, detour, original) == MH_OK && MH_EnableHook(target) == MH_OK; }
-void DumpUnhook(void *target) { if (target) MH_DisableHook(target); }
+// MinHook freezes every other thread while it patches, then calls CloseHandle, VirtualProtect, heap functions on this
+// thread. A frozen thread may hold Gate (inside one of our hooks), so while MinHook runs this thread is marked as
+// inside MeguLit: all our hooks just call through and never wait for Gate (2026-11-14, mem-voice-api deadlock).
+bool DumpHook(void *target, void *detour, void **original) { DumpScope scope; return target && MH_CreateHook(target, detour, original) == MH_OK && MH_EnableHook(target) == MH_OK; }
+void DumpUnhook(void *target) { DumpScope scope; if (target) MH_DisableHook(target); }
+// Self-test only (MEGULIT_DUMP_SELFTEST=1 in the game's environment, set by selftest/fakegame.h), never used by MeguLit:
+//  1 = hold Gate for ms milliseconds on the calling thread, as a game thread inside one of our hooks would;
+//  2 = hook and unhook a function from the calling thread through DumpHook, as a module on a game thread does.
+static int __stdcall SelfTestTarget(int x) { return x + 1; }
+static int(__stdcall *SelfTestOriginal)(int);
+static int __stdcall SelfTestDetour(int x) { return SelfTestOriginal(x) + 100; }
+extern "C" __declspec(dllexport) int MeguLitDumpSelfTest(int what, DWORD ms) {
+ wchar_t v[4]; if (GetEnvironmentVariableW(L"MEGULIT_DUMP_SELFTEST", v, 4) != 1 || v[0] != L'1') return -1;
+ if (what == 1) { EnterCriticalSection(&Gate); Sleep(ms); LeaveCriticalSection(&Gate); return 0; }
+ if (what == 2) {
+  int(__stdcall * volatile call)(int) = SelfTestTarget;
+  if (!DumpHook((void *)SelfTestTarget, (void *)SelfTestDetour, (void **)&SelfTestOriginal)) return -2;
+  int r = call(1); DumpUnhook((void *)SelfTestTarget); MH_RemoveHook((void *)SelfTestTarget);
+  return r == 102 ? 0 : -3;
+ }
+ return -1;
+}
 bool DumpReadable(const void *p, SIZE_T n) { return Readable(p, n); }
 
 // modules.h DumpQuiet: the same thread mark Guard sets, for module code that runs on game threads.
