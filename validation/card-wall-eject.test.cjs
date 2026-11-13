@@ -89,8 +89,12 @@ test('viewer: no buttons for the card; drag pulls, pushes, throws; edge drag ask
   const v = cut('function openViewer(cell){', '/* test hooks');
   assert.doesNotMatch(v, /cw-eject|cw-delete|pullBack/);
   assert.ok(v.includes("if(e.target.closest('.cw-ghost .cw-card')){turn.stop();startDrag(e);return;}"));
-  assert.ok(v.includes("cy=sleeveY(cy);cx=rubber(cx,4);"));
-  assert.ok(v.includes("if(cy<FREE_AT){free();drag.pulled=true;}"));
+  assert.ok(v.includes("const rel=sleeveY(Math.min(cy,40)*(1+PULL_K));cy=rel/(1+PULL_K);sh=cy-rel;"));
+  assert.ok(v.includes("if(Math.abs(cx)<=RIM_PASS){drag.mode='push'"), "on the axis the card goes onto the rail");
+  assert.ok(v.includes("else{cy=sh+FREE_AT+rubber(rel-FREE_AT,4);"), "off the axis it rests on the rim");
+  assert.ok(v.includes("gs.wall('cy',over?gs.x.sh+FREE_AT:null,.38);"), "a thrown card bounces off the rim");
+  assert.ok(v.includes("const park=()=>"), "the sleeve parks with its mouth at the bottom");
+  assert.ok(v.includes("if(rel<FREE_AT){drag.mode='free';drag.pulled=true;free();"));
   assert.ok(v.includes("if(armed){askDiscard();return;}"));
   assert.ok(v.includes("const discard=async()=>"));
   assert.ok(v.includes("call('cards_delete',{cardId:card.id})"));

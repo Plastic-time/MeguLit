@@ -176,6 +176,51 @@ function sigil(){
  return sigilUrl;
 }
 
+/* ---------- the magician's desk: a few things on the table, drawn once as pictures ----------
+   An open grimoire, a candle in a brass dish, a quill and its inkwell, a few crystals, gold scrollwork at the inlay's
+   corners. Still images on the table's own layer (no motion, nothing per frame). */
+let deskArt=null;
+function deskPictures(){
+ if(deskArt)return deskArt;
+ const u=svg=>'url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';
+ const book=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 170'><defs><linearGradient id='p' x1='0' x2='1'><stop offset='0' stop-color='#d9c8a2'/><stop offset='.45' stop-color='#efe3c6'/><stop offset='.5' stop-color='#bfa978'/><stop offset='.55' stop-color='#efe3c6'/><stop offset='1' stop-color='#d4c196'/></linearGradient></defs>
+  <path d='M8 26q60-20 122 4q62-24 122-4v128q-60-18-122 6q-62-24-122-6z' fill='#3b1216'/><path d='M14 22q58-18 116 6v128q-58-22-116-4z' fill='url(#p)'/><path d='M130 28q58-24 116-6v128q-58-18-116 6z' fill='url(#p)'/>
+  <g fill='none' stroke='#6d5638' stroke-opacity='.4' stroke-width='1.1'>${[0,1,2,3,4,5,6,7].map(i=>`<path d='M26 ${48+i*12}q40-10 90 3'/>`).join('')}</g>
+  <g fill='none' stroke='#8a1d2c' stroke-opacity='.75' stroke-width='1.3'><circle cx='188' cy='88' r='40'/><circle cx='188' cy='88' r='31'/><path d='${(()=>{let d='';for(let i=0;i<=7;i++){const a=-Math.PI/2+i*3*Math.PI*2/7;d+=(i?'L':'M')+(188+30*Math.cos(a)).toFixed(1)+' '+(88+30*Math.sin(a)).toFixed(1);}return d;})()}'/></g>
+  <path d='M130 30v126' stroke='#5a4527' stroke-opacity='.5'/><path d='M150 150q30 10 58 0' stroke='#8a1d2c' stroke-width='3' fill='none'/></svg>`;
+ const candle=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 200'><defs><linearGradient id='w' x1='0' x2='1'><stop offset='0' stop-color='#cdbd9c'/><stop offset='.4' stop-color='#f4ead4'/><stop offset='1' stop-color='#b9a77f'/></linearGradient><linearGradient id='b' x1='0' x2='0' y1='0' y2='1'><stop offset='0' stop-color='#f3d28c'/><stop offset='1' stop-color='#8a5f22'/></linearGradient><radialGradient id='f' cx='.5' cy='.62' r='.5'><stop offset='0' stop-color='#fffbe6'/><stop offset='.45' stop-color='#ffd27a'/><stop offset='1' stop-color='#ff8a3c' stop-opacity='0'/></radialGradient></defs>
+  <ellipse cx='60' cy='178' rx='54' ry='15' fill='url(#b)'/><ellipse cx='60' cy='174' rx='44' ry='10' fill='#5e3f16' fill-opacity='.5'/><path d='M88 176q22-4 26 6' stroke='#c99b4e' stroke-width='5' fill='none'/>
+  <rect x='42' y='70' width='36' height='104' rx='4' fill='url(#w)'/><path d='M42 76q6 10 2 22M74 74q4 14-2 26' stroke='#e9dcc0' stroke-width='5' stroke-linecap='round'/>
+  <path d='M60 70v-10' stroke='#2a1a10' stroke-width='2'/><path d='M60 18q-12 22-8 34q4 10 8 10q4 0 8-10q4-12-8-34z' fill='url(#f)'/></svg>`;
+ const quill=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 230 170'><defs><linearGradient id='g' x1='0' x2='1'><stop offset='0' stop-color='#141016'/><stop offset='.35' stop-color='#3a2a3c'/><stop offset='1' stop-color='#0d0a0e'/></linearGradient></defs>
+  <ellipse cx='62' cy='150' rx='46' ry='10' fill='#000' fill-opacity='.35'/><path d='M28 96q0-18 34-18t34 18v40q0 14-34 14t-34-14z' fill='url(#g)'/><rect x='46' y='62' width='32' height='20' rx='4' fill='#b8893d'/><path d='M38 104q4 20 10 30' stroke='#fff' stroke-opacity='.22' stroke-width='4' stroke-linecap='round'/>
+  <path d='M64 66L210 10' stroke='#e8dcc4' stroke-width='2'/><path d='M100 52q50-34 112-44q-30 34-94 54z' fill='#efe5d0' fill-opacity='.92'/><g stroke='#b9a98a' stroke-width='.9'>${[0,1,2,3,4,5,6,7,8].map(i=>`<path d='M${110+i*11} ${48-i*4}l${8} ${-10+i*.6}'/>`).join('')}</g></svg>`;
+ const gems=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 170 120'><ellipse cx='85' cy='104' rx='70' ry='10' fill='#000' fill-opacity='.3'/>
+  <path d='M40 100l-14-40l22-34l20 30l-6 44z' fill='#8e1230'/><path d='M48 26l20 30l-6 44l-8-40z' fill='#c4213f'/><path d='M40 100l-14-40l22-34l6 34z' fill='#5a0c1f'/>
+  <path d='M98 102l-10-30l16-22l14 24l-4 28z' fill='#4b2a6e'/><path d='M104 50l14 24l-4 28l-6-30z' fill='#7d50b0'/>
+  <path d='M128 104l-6-16l10-12l10 12l-4 16z' fill='#b8893d'/><path d='M132 76l10 12l-4 16l-4-14z' fill='#f3d28c'/>
+  <g fill='#edb56e'>${[[20,108],[70,112],[150,96],[118,112],[60,90]].map(([x,y])=>`<circle cx='${x}' cy='${y}' r='1.6'/>`).join('')}</g></svg>`;
+ const corner=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 90'><g fill='none' stroke='#edb56e' stroke-opacity='.55' stroke-width='1.2' stroke-linecap='round'><path d='M4 4h40q-14 6-14 20'/><path d='M4 4v40q6-14 20-14'/><path d='M14 14q22 2 26 22q-14-6-26 0q6-12 0-22z'/><circle cx='4' cy='4' r='2.6' fill='#edb56e' fill-opacity='.6'/><path d='M44 4q10 0 14 8M4 44q0 10 8 14'/></g></svg>`;
+ deskArt={book:u(book),candle:u(candle),quill:u(quill),gems:u(gems),corner:u(corner)};
+ return deskArt;
+}
+
+/* ---------- 闪卡 facets: crushed-ice prism (like a maimai DX PASS) ----------
+   A field of small jittered triangles, each its own grey. On the card the grey is set against a rainbow with
+   'difference', so every facet sits at its own place in the spectrum and the whole field changes colour as the rainbow
+   slides with the card's angle. Drawn once, shared by every card through --cw-facets. */
+function facetsUrl(){
+ const W=146,H=204,cols=17,rows=24,rnd=(i=>()=>((i=Math.imul(i^i>>>15,2246822507)^Math.imul(i^i>>>13,3266489909)+0x6D2B79F5)>>>0)/4294967296)(0x5eed);
+ const P=[];for(let r=0;r<=rows;r++){const row=[];for(let c=0;c<=cols;c++){const edge=r===0||c===0||r===rows||c===cols,jx=edge?0:(rnd()-.5)*.8,jy=edge?0:(rnd()-.5)*.8;row.push([((c+jx)*W/cols).toFixed(1),((r+jy)*H/rows).toFixed(1)]);}P.push(row);}
+ let tri='';const g=()=>{const v=Math.floor(rnd()*256);return 'rgb('+v+','+v+','+v+')';};
+ for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const a=P[r][c],b=P[r][c+1],d=P[r+1][c],e=P[r+1][c+1],flip=rnd()<.5;
+  const t1=flip?[a,b,e]:[a,b,d],t2=flip?[a,e,d]:[b,e,d];
+  for(const t of [t1,t2])tri+="<path d='M"+t[0].join(' ')+'L'+t[1].join(' ')+'L'+t[2].join(' ')+"Z' fill='"+g()+"'/>";}
+ const svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 "+W+' '+H+"' preserveAspectRatio='none'><g stroke='white' stroke-opacity='.18' stroke-width='.35'>"+tri+'</g></svg>';
+ return 'url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';
+}
+try{document.documentElement.style.setProperty('--cw-facets',facetsUrl());}catch{}
+
 /* ---------- toploader markup ---------- */
 const TL_W=168,TL_H=226,CARD_W=146,CARD_H=204,CARD_TOP=12;
 const ABOVE=-(CARD_H+CARD_TOP)+4; /* the card's bottom edge just inside the opening */
@@ -188,38 +233,41 @@ function buildToploader(t,card,{withBack=false}={}){
   `<div class="cw-card"><i class="cw-lift" aria-hidden="true"></i><div class="cw-flip"><div class="cw-face"><img class="cw-art" alt="" draggable="false" decoding="async"><i class="cw-foil"></i></div>${withBack?`<div class="cw-back">${crestHTML(card)}</div>`:''}</div></div>`+
   `<div class="cw-shell" aria-hidden="true"><i class="cw-glare"></i><i class="cw-sweep"></i><i class="cw-lip"></i></div>${withBack?'<div class="cw-thick" aria-hidden="true"><i class="cw-pane"></i><i class="cw-side is-l"></i><i class="cw-side is-r"></i><i class="cw-side is-b"></i><i class="cw-side is-t"></i></div>':''}</div></div>${withBack?'':'<p class="cw-label" aria-hidden="true"><b></b><small></small></p>'}`;
  const parts={el,hang:el.querySelector('.cw-hang'),tilt:el.querySelector('.cw-tilt'),card:el.querySelector('.cw-card'),flip:el.querySelector('.cw-flip'),img:el.querySelector('.cw-art'),shell:el.querySelector('.cw-shell'),sweep:el.querySelector('.cw-sweep'),back:el.querySelector('.cw-back'),label:el.querySelector('.cw-label'),lift:el.querySelector('.cw-lift'),drop:withBack?el.querySelector('.cw-drop'):null,thick:el.querySelector('.cw-thick')};
- {const h=hash(t.id);parts.el.querySelector('.cw-glare').style.translate=((h%41)-20)+'% '+(((h>>6)%17)-8)+'%';const sc=scuffOf(t.id);if(sc)parts.shell.style.setProperty('--cw-scuff',sc);if(!withBack){parts.el.style.setProperty('--cw-rest',(((h>>11)%17)-8)/10+'deg');parts.el.style.setProperty('--cw-dy',(((h>>15)%7)-3)+'px');}}
+ {const h=hash(t.id);parts.el.querySelector('.cw-glare').style.translate=((h%41)-20)+'% '+(((h>>6)%17)-8)+'%';const sc=scuffOf(t.id);if(sc)parts.shell.style.setProperty('--cw-scuff',sc);if(!withBack){parts.el.style.setProperty('--cw-rest',(((h>>11)%27)-13)/10+'deg');parts.el.style.setProperty('--cw-dy',(((h>>15)%7)-3)+'px');}}
  fill(parts,card);
  return parts;
 }
 function fill(parts,card,phase){
  parts.cardData=card||null;parts.el.__parts=parts;
  parts.el.classList.toggle('is-filled',!!card);
+ if(card&&(card.finish==='shine'||card.finish==='holo'))parts.el.dataset.finish=card.finish;else delete parts.el.dataset.finish;
  parts.el.setAttribute('aria-label',card?words().filled+(card.title?' · '+card.title:''):words().empty);
  if(card){if(parts.img.getAttribute('src')!==card.src)parts.img.src=card.src;parts.img.decode?.().catch(()=>{});if(parts.live)kenBurns(parts.img,card,0);else{for(const a of parts.img.getAnimations())a.cancel();parts.img.style.transform=stillTransform(FACED);}}
  else{for(const a of parts.img.getAnimations())a.cancel();parts.img.removeAttribute('src');}
  if(parts.back)parts.back.innerHTML=crestHTML(card);
- if(parts.label){const w=words();parts.label.firstChild.textContent=card?.title||w.emptyShort;const d=card?.createdAt?new Date(card.createdAt):null;parts.label.lastChild.textContent=card?[w.source[card.source]||w.source[card.kind]||'',d&&!isNaN(d)?d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0'):''].filter(Boolean).join(' · '):'';}
+ if(parts.label){const w=words();parts.label.firstChild.textContent=card?.title||w.emptyShort;const d=card?.createdAt?new Date(card.createdAt):null;parts.label.lastChild.textContent=card&&card.source!=='cover'?[w.source[card.source]||w.source[card.kind]||'',d&&!isNaN(d)?d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0'):''].filter(Boolean).join(' · '):'';}
  motion(parts).jump({cy:0,cx:0,cr:0,co:card?1:0});
 }
 /* the toploader's own spring: card (cx,cy,cr,co,f flip), shell (sx,sy press), glare sweep g, hang (hr swing, hy, ho) */
 function motion(parts){
  if(parts.spring)return parts.spring;
  const {card,shell,sweep,hang}=parts;
- parts.spring=new Spring({cx:0,cy:0,cr:0,cs:1,co:0,so:1,sh:0,sx:1,sy:1,g:0,hr:0,hy:0,ho:1},x=>{
+ parts.spring=new Spring({cx:0,cy:0,cr:0,cs:1,lz:0,co:0,so:1,sh:0,sx:1,sy:1,g:0,hr:0,hy:0,ho:1},x=>{
   /* 2D only: the depth behind the shell comes from the CSS translate while the toploader tilts (no layer per card at rest) */
-  card.style.transform=x.cx||x.cy||x.cr||x.cs!==1?'translate('+x.cx.toFixed(2)+'px,'+x.cy.toFixed(2)+'px) rotate('+x.cr.toFixed(3)+'deg)'+(x.cs!==1?' scale('+x.cs.toFixed(4)+')':''):'';
+  const k=x.cs*(1+.035*x.lz);
+  card.style.transform=x.cx||x.cy||x.cr||k!==1?'translate('+x.cx.toFixed(2)+'px,'+x.cy.toFixed(2)+'px) rotate('+x.cr.toFixed(3)+'deg)'+(k!==1?' scale('+k.toFixed(4)+')':''):'';
   card.style.opacity=clamp(x.co,0,1).toFixed(3);
-  parts.lift.style.opacity=clamp(-x.cy/55,0,1).toFixed(3);
+  {const lz=clamp(x.lz,-.2,1.2);parts.lift.style.opacity=Math.max(clamp(-x.cy/55,0,1)*(parts.out?.55:1),parts.out?clamp(.55+.45*lz,0,1):0).toFixed(3);
+   parts.lift.style.transform=lz?'translate('+(lz*12).toFixed(2)+'px,'+(lz*20).toFixed(2)+'px) scale('+(1+lz*.05).toFixed(4)+')':'';}
   if(parts.drop){const so=clamp(x.so,0,1).toFixed(3);shell.style.opacity=so;parts.drop.style.opacity=so;if(parts.thick)parts.thick.style.opacity=so;}
   /* sh: the sleeve drawn down off the card (inspect eject), the card itself stays put */
   const slide=x.sh?'translateY('+x.sh.toFixed(2)+'px)':'';
   if(parts.thick)parts.thick.style.transform=slide;if(parts.drop)parts.drop.style.transform=slide;
   shell.style.transform=(slide+(x.sx===1&&x.sy===1?'':' scale('+x.sx.toFixed(4)+','+x.sy.toFixed(4)+')')).trim();
-  const g=clamp(x.g,0,1);sweep.style.opacity=(Math.sin(Math.PI*g)*.9).toFixed(3);sweep.style.transform='translateX('+(-120+g*240).toFixed(1)+'%)';
+  const g=clamp(x.g,0,1);sweep.style.opacity=(Math.sin(Math.PI*g)*.38).toFixed(3);sweep.style.transform='translateX('+(-120+g*240).toFixed(1)+'%)';
   hang.style.transform=x.hr||x.hy?'translateY('+x.hy.toFixed(2)+'px) rotate('+x.hr.toFixed(3)+'deg)':'';
   hang.style.opacity=clamp(x.ho,0,1).toFixed(3);
- },{cx:.3,cy:.3,cr:.02,cs:.0008,co:.004,so:.004,sh:.3,sx:.0006,sy:.0006,g:.004,hr:.02,hy:.2,ho:.004});
+ },{cx:.3,cy:.3,cr:.02,cs:.0008,lz:.004,co:.004,so:.004,sh:.3,sx:.0006,sy:.0006,g:.004,hr:.02,hy:.2,ho:.004});
  /* while it moves, the toploader's moving parts get their own layers (one cell restyles, nothing else), then drop them */
  parts.spring.onrun=()=>parts.el.classList.add('cw-anim');
  parts.spring.onidle=()=>parts.el.classList.remove('cw-anim');
@@ -471,7 +519,7 @@ function paint(){
  {const ox=(P.cols-1)*cw/2,oy=(P.rows-1)*ch/2,k=.2*z;P.sigil.style.transform='translate('+((ox-x)*k).toFixed(1)+'px,'+((oy-y)*k).toFixed(1)+'px) scale('+(.92+.08*z).toFixed(4)+')';}
  for(const c of P.cells.values()){
   const col=c.index%P.cols,row=Math.floor(c.index/P.cols);
-  if(c.jx==null){const h=hash(c.id+'/hang'),hc=hash('col'+col);c.jx=((h%9)-4);c.jy=((hc%25)-12)+((h>>5)%7-3);}
+  if(c.jx==null){const h=hash(c.id+'/hang'),hc=hash('col'+col);c.jx=((h%7)-3);c.jy=((hc%11)-5);}
   const dx=(col*cw+c.jx-x)*z,dy=(row*ch+c.jy-y)*z;
   const sx=cx+dx*ex,sy=cy+dy*ey;
   let t,o;
@@ -615,12 +663,13 @@ function openViewer(cell){
  const layer=document.createElement('div');layer.className='cw-viewer';
  const day=card.createdAt?new Date(card.createdAt):null,stamp=day&&!isNaN(day)?day.getFullYear()+'.'+String(day.getMonth()+1).padStart(2,'0')+'.'+String(day.getDate()).padStart(2,'0'):'';
  const RING=2*Math.PI*27;
- layer.innerHTML=`<div class="cw-veil"></div><div class="cw-mat" aria-hidden="true"></div><div class="cw-stage"></div>`+
+ layer.innerHTML=`<div class="cw-veil"></div><div class="cw-desk" aria-hidden="true"><i class="cw-desk-sigil"></i><i class="cw-prop is-book"></i><i class="cw-prop is-candle"></i><i class="cw-prop is-quill"></i><i class="cw-prop is-gems"></i><i class="cw-corner is-tl"></i><i class="cw-corner is-tr"></i><i class="cw-corner is-bl"></i><i class="cw-corner is-br"></i></div><div class="cw-stage"></div>`+
   `<div class="cw-plate" aria-hidden="true"><h2 class="cw-plate-title" lang="ja"></h2><p class="cw-plate-meta"><span>${esc(w.source[card.source]||w.source[card.kind]||'')}</span>${stamp?`<span>${esc(stamp)}</span>`:''}</p></div>`+
-  `<div class="cw-bin" aria-hidden="true"><svg viewBox="0 0 64 64"><circle class="cw-bin-track" cx="32" cy="32" r="27"/><circle class="cw-bin-ring" cx="32" cy="32" r="27" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="${RING.toFixed(2)}"/><circle class="cw-bin-inner" cx="32" cy="32" r="18"/><path class="cw-bin-star" d="M32.00 18.00L38.07 44.61L21.05 23.27L45.65 35.12L18.35 35.12L42.95 23.27L25.93 44.61L32.00 18.00"/></svg></div>`+
+  `<div class="cw-bin" aria-hidden="true"><svg viewBox="0 0 64 64"><circle class="cw-bin-track" cx="32" cy="32" r="27"/><circle class="cw-bin-ring" cx="32" cy="32" r="27" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="${RING.toFixed(2)}"/><path class="cw-bin-icon" d="M24.5 25.5h15M29.5 25.5v-2.2h5v2.2M26.5 25.5l1 13.4c.1.9.8 1.6 1.7 1.6h5.6c.9 0 1.6-.7 1.7-1.6l1-13.4M30.4 29.5v7M33.6 29.5v7"/></svg></div>`+
   `<div class="cw-bar"><button type="button" class="cw-btn cw-close">${esc(w.close)}</button></div><p class="cw-hint">${esc(w.inspect)}</p>`+
   `<div class="cw-confirm" role="alertdialog" aria-modal="true" aria-label="${esc(w.binQ)}" hidden><div class="cw-confirm-box"><h3>${esc(w.binQ)}</h3><p>${esc(w.binBody)}</p><div class="cw-confirm-row"><button type="button" class="cw-btn cw-keep">${esc(w.keep)}</button><button type="button" class="cw-btn cw-discard">${esc(w.discard)}</button></div></div></div>`;
  const veil=layer.querySelector('.cw-veil'),bar=layer.querySelector('.cw-bar'),stage=layer.querySelector('.cw-stage'),hint=layer.querySelector('.cw-hint'),plate=layer.querySelector('.cw-plate');
+ {const d=layer.querySelector('.cw-desk'),a=deskPictures();d.querySelector('.cw-desk-sigil').style.backgroundImage=sigil();for(const k of ['book','candle','quill','gems'])d.querySelector('.is-'+k).style.backgroundImage=a[k];for(const el of d.querySelectorAll('.cw-corner'))el.style.backgroundImage=a.corner;}
  const bin=layer.querySelector('.cw-bin'),ring=layer.querySelector('.cw-bin-ring'),confirmEl=layer.querySelector('.cw-confirm');
  const ghost=buildToploader(cell.data,null,{withBack:true});ghost.el.classList.add('cw-ghost');ghost.el.removeAttribute('tabindex');
  ghost.el.style.position='absolute';ghost.el.style.left='0';ghost.el.style.top='0';ghost.el.style.transformOrigin='0 0';
@@ -641,18 +690,18 @@ function openViewer(cell){
   ghost.el.style.transform='translate('+(cx-TL_W*s/2).toFixed(2)+'px,'+(cy-TL_H*s/2).toFixed(2)+'px) scale('+s.toFixed(4)+')';
   veil.style.opacity=clamp(v.b,0,1).toFixed(3);
   const u=clamp(v.u,0,1);bar.style.opacity=u.toFixed(3);bar.style.transform='translate(-50%,'+((1-u)*14).toFixed(2)+'px)';hint.style.opacity=(hintGone?0:u*.8).toFixed(3);
-  plate.style.opacity=(u*(1-bench)).toFixed(3);
+  plate.style.opacity=(u*(1-clamp(bench*4,0,1))).toFixed(3);
+  if(parked&&state!=='gone'){const p=park();if(Math.abs(gs.goal.sh-p)>.5)gs.to({sh:p},{k:420,c:40});}
  },{x:.3,y:.3,s:.0006,z:.0008,b:.003,u:.003});
  /* the twin's screen box from the springs' goal or current values */
  const box=(v=spring.x)=>{const s=v.s*v.z,cx=v.x+TL_W*v.s/2,cy=v.y+TL_H*v.s/2;return {x:cx-TL_W*s/2,y:cy-TL_H*s/2,S:s};};
  const target=()=>{const s=fit();return {x:(base.width-TL_W*s)/2,y:(base.height-TL_H*s)/2-24,s,z:1};};
- /* the workbench: the camera pulls back so the sleeve sits low and there is room above it for the card */
- const ZB=.5;
- const workbench=()=>{const s=fit(),S=s*ZB,room=(-FREE_AT+56)*S,total=room+TL_H*S,top=(base.height-total)/2-10,cy=top+room+TL_H*S/2;return {x:(base.width-TL_W*s)/2,y:cy-TL_H*s/2,s,z:ZB};};
- let bench=0;
+ let bench=0,parked=false;
+ /* the parked sleeve: its top edge (the mouth) sits just above the window's bottom edge, whatever the zoom */
+ const park=()=>{const b=box();return (base.height-78-b.y)/b.S;};
  spring.render(spring.x);
  /* the museum plate sits right of the card at rest, centred on it (hidden when there is no room) */
- {const t=target(),left=t.x+TL_W*t.s+40,room=base.width-left-40;plate.hidden=room<220;plate.style.left=left+'px';plate.style.top=(t.y+TL_H*t.s-6)+'px';plate.style.maxWidth=Math.min(420,room)+'px';}
+ {const t=target(),left=t.x+TL_W*t.s+28,room=base.width-left-40;plate.hidden=room<220;plate.style.left=left+'px';plate.style.top=(t.y+TL_H*t.s-6)+'px';plate.style.maxWidth=Math.min(420,room)+'px';}
  /* free rotation: rx/ry in degrees, unbounded; on the sleeve's tilt layer, or on the bare card */
  let loose=false,closing=false;
  const near=a=>a-360*Math.round(a/360);
@@ -660,7 +709,7 @@ function openViewer(cell){
  const turn=new Spring({rx:0,ry:0},v=>{
   const t='rotateX('+v.rx.toFixed(2)+'deg) rotateY('+v.ry.toFixed(2)+'deg)';
   turnTarget().style.transform=t;(loose?ghost.tilt:ghost.flip).style.transform='';
-  const gx=50+clamp(near(v.ry),-90,90)*.55,gy=50-clamp(near(v.rx),-90,90)*.45;ghost.tilt.style.setProperty('--mx',gx.toFixed(1)+'%');ghost.tilt.style.setProperty('--my',gy.toFixed(1)+'%');
+  const ax=near(v.rx),ay=near(v.ry),gx=50+clamp(ay,-90,90)*.55,gy=50-clamp(ax,-90,90)*.45;ghost.tilt.style.setProperty('--mx',gx.toFixed(1)+'%');ghost.tilt.style.setProperty('--my',gy.toFixed(1)+'%');ghost.tilt.style.setProperty('--gl',Math.min(1,(Math.abs(ax)+Math.abs(ay))/50).toFixed(3));ghost.tilt.style.setProperty('--px',clamp(ay/40,-1.5,1.5).toFixed(3));ghost.tilt.style.setProperty('--py',clamp(-ax/40,-1.5,1.5).toFixed(3));
  },{rx:.05,ry:.05});
  const faceOn=(k=150,c=20)=>turn.jump({rx:near(turn.x.rx),ry:near(turn.x.ry)}).to({rx:0,ry:0},{k,c});
  const gs=motion(ghost);gs.wall('cy',null);
@@ -670,12 +719,8 @@ function openViewer(cell){
  /* out of the wall: it lifts toward you with a quarter turn of play that settles face on (ζ≈0.8) */
  spring.to({...target()},MOTION.lift).to({b:1},MOTION.veil).to({u:1},MOTION.chrome);
  if(!reduce()){turn.jump({rx:8,ry:-14}).to({rx:0,ry:0},{k:90,c:15});revealTitle(plate,300);}
- const mat=layer.querySelector('.cw-mat');
- /* the felt mat the card is handled on: laid under the bench, faded with it */
- const matTo=on=>{if(on){const wb=workbench(),S=wb.s*ZB,cx=wb.x+TL_W*wb.s/2,cy=wb.y+TL_H*wb.s/2,w=Math.min(base.width-80,TL_W*S*4.2),top=cy-TL_H*S/2-(-FREE_AT+56)*S-46,h=cy+TL_H*S/2+34-top;Object.assign(mat.style,{left:(cx-w/2)+'px',top:top+'px',width:w+'px',height:h+'px'});}
-  const from=getComputedStyle(mat).opacity;mat.style.opacity=on?'1':'0';if(!reduce())mat.animate([{opacity:from,transform:on?'scale(.985)':'none'},{opacity:on?1:0,transform:on?'none':'scale(.985)'}],{duration:on?420:300,easing:EASE_OUT});};
- const goHome=()=>{if(bench)matTo(false);bench=0;spring.to({...target()},{k:150,c:24});};
- const goBench=()=>{if(!bench)matTo(true);bench=1;spring.to({...workbench()},{k:150,c:24});};
+ const desk=on=>layer.classList.toggle('desk',on);
+ const goHome=()=>{bench=0;desk(false);spring.to({...target()},{k:150,c:24});};
 
  /* the service follows what the hand did, in order (chain); a refusal puts the card back where the service has it */
  let applied=false,chain=Promise.resolve();
@@ -690,20 +735,26 @@ function openViewer(cell){
  let state='in';
  const setLoose=on=>{if(loose===on)return;loose=on;turn.render(turn.x);ghost.el.classList.toggle('is-loose',on);};
  /* free: the bare card takes the turns over once face on */
- const free=()=>{state='free';ghost.el.classList.add('is-out');faceOn(320,36);turn.until(v=>Math.abs(v.rx)<1.5&&Math.abs(v.ry)<1.5).then(()=>{if(state==='free')setLoose(true);});sync(true);};
- /* seat: carried over the mouth, squared up, then the same insert as from the card maker */
+ const free=()=>{state='free';ghost.out=true;parked=true;desk(true);ghost.el.classList.add('is-out');faceOn(320,36);turn.until(v=>Math.abs(v.rx)<1.5&&Math.abs(v.ry)<1.5).then(()=>{if(state==='free')setLoose(true);});
+  /* the sleeve goes down out of the way until only its mouth shows at the bottom; it lets go of the card with a small kick */
+  gs.to({sh:park()},{k:120,c:19}).kick({sy:-.03,hr:4}).to({sx:1,sy:1},{k:520,c:16}).to({hr:0},{k:70,c:6});sync(true);};
+ /* seat: the card on the rail, pushed home while the sleeve rises back to its place (both converge, so the card only
+    ever goes deeper), a press and a small sway when it bottoms out */
  const seat=async()=>{
-  state='in';setLoose(false);ghost.el.classList.remove('is-out');faceOn(240,30);sync(false);
-  gs.to({cs:1,co:1},{k:260,c:30});
-  const ok=await insertMotion(ghost,{from:'here'});
-  if(ok&&state==='in'&&!drag)goHome();
+  state='in';ghost.out=false;parked=false;setLoose(false);ghost.el.classList.remove('is-out');faceOn(240,30);sync(false);
+  const t=ticket(ghost),alive=()=>ghost.seq===t;
+  gs.wall('cy',null);gs.to({cx:0,cr:0,cs:1,co:1},{k:300,c:30}).to({lz:0},{k:260,c:26}).to({cy:0},{k:110,c:17}).to({sh:0},{k:110,c:19.5});
+  goHome();
+  await gs.until(x=>Math.abs(x.sh)<2.5&&Math.abs(x.cy)<2.5);if(!alive())return;
+  gs.jump({g:0}).to({g:1},{k:46,c:13}).kick({hr:-7,sy:-.025}).to({hr:0},{k:60,c:4.6}).to({sx:1,sy:1},{k:520,c:16});
+  await gs.settled();if(alive())gs.jump({g:0});
  };
 
  /* ---- the bin (only for a free card) ---- */
  let binP=0,binSide='',armed=false,binAt=null;
  const showBin=(px,py)=>{
   /* pulling a card out goes up: the top edge does not count during the drag that freed it */
-  const W=base.width,H=base.height,d={l:px,r:W-px,b:H-py,...(drag?.pulled?{}:{t:py})},side=Object.keys(d).reduce((a,b)=>d[b]<d[a]?b:a),p=binProgress(d[side]);
+  const W=base.width,H=base.height,d={l:px,r:W-px,...(drag?.pulled?{}:{t:py})},side=Object.keys(d).reduce((a,b)=>d[b]<d[a]?b:a),p=binProgress(d[side]);
   binP=p;binSide=side;
   /* on the edge the card heads for, beside the card (past its end along that edge), never under it */
   const r=cardEl.getBoundingClientRect(),cx0=r.left-base.left+r.width/2,cy0=r.top-base.top+r.height/2,inset=46;
@@ -722,19 +773,21 @@ function openViewer(cell){
  const hideBin=()=>{binP=0;if(armed){armed=false;bin.classList.remove('is-armed');}bin.style.opacity='0';ring.setAttribute('stroke-dashoffset',RING.toFixed(2));};
  const binCentre=()=>binAt?{x:binAt.x,y:binAt.y}:{x:base.width/2,y:base.height-60};
 
- /* ---- dragging the card ---- */
- const cardEl=ghost.card;
+ /* ---- dragging the card ----
+    in, pulling: the card follows the hand and the sleeve is drawn the other way (PULL_K times as far), the camera pulls
+    back as it comes out; free: the card follows the hand anywhere, the parked sleeve's mouth is a solid object: a card
+    coming down onto it off-axis rests on the rim, near the axis it is funnelled in, on the axis it goes onto the rail */
+ const cardEl=ghost.card,PULL_K=1.2,RIM_PASS=9;
  /* the card's local offset (cx,cy) that puts a pointer at (px,py) with the grab point g (local, from the card's corner) */
  const localAt=(px,py,g)=>{const b=box();return {cx:(px-b.x)/b.S-11-g.x,cy:(py-b.y)/b.S-12-g.y};};
  let drag=null,grab=null;
  const startDrag=e=>{
   const b=box(),g={x:(e.clientX-base.left-b.x)/b.S-11-gs.x.cx,y:(e.clientY-base.top-b.y)/b.S-12-gs.x.cy};
   ghost.seq=(ghost.seq||0)+1;gs.wall('cy',null);
-  drag={id:e.pointerId,g,raw:{cx:gs.x.cx,cy:gs.x.cy},vx:0,vy:0,t:performance.now(),px:e.clientX,py:e.clientY,moved:false};
-  if(state==='free')gs.to({cs:1.04},{k:380,c:30});
+  drag={id:e.pointerId,g,vx:0,vy:0,t:performance.now(),px:e.clientX,py:e.clientY,moved:false,mode:state==='in'?'pull':'free',z0:spring.goal.z};
+  if(state==='free')gs.to({lz:1},{k:320,c:26});
   stage.setPointerCapture?.(e.pointerId);
   faceOn(320,36);
-  if(state==='in')goBench();
  };
  const moveDrag=e=>{
   const now=performance.now(),dt=Math.max(4,now-drag.t);
@@ -742,47 +795,64 @@ function openViewer(cell){
   if(!drag.moved){if(Math.hypot(e.clientX-drag.px,e.clientY-drag.py)<3)return;drag.moved=true;layer.classList.add('dragging');goneHint();}
   /* hand speed in screen px/s, smoothed */
   drag.vx=drag.vx*.35+(e.clientX-drag.px)/dt*1000*.65;drag.vy=drag.vy*.35+(e.clientY-drag.py)/dt*1000*.65;drag.px=e.clientX;drag.py=e.clientY;drag.t=now;
-  let {cx,cy}=localAt(px,py,drag.g);
-  if(state==='in'){
-   cy=sleeveY(cy);cx=rubber(cx,4);
-   if(cy<FREE_AT){free();drag.pulled=true;}
-  }else if(state==='free'&&inMouth(cx,cy)&&drag.vy>0&&Math.abs(cx)<20&&cy>FREE_AT){
-   /* pushed down into the mouth: back on the rail */
-   state='in';drag.pushing=true;setLoose(false);ghost.el.classList.remove('is-out');hideBin();gs.to({cs:1,co:1},{k:300,c:32});
+  let {cx,cy}=localAt(px,py,drag.g),sh=gs.goal.sh;
+  if(drag.mode==='pull'){
+   /* card and sleeve part along the rail; the plastic holds the first few px */
+   const rel=sleeveY(Math.min(cy,40)*(1+PULL_K));cy=rel/(1+PULL_K);sh=cy-rel;cx=rubber(cx,4);
+   const out=clamp(rel/FREE_AT,0,1);bench=out;desk(out>.12);spring.to({z:drag.z0-(drag.z0-.72)*out},{k:420,c:42});
+   gs.to({sh},{k:1400,c:75});
+   if(rel<FREE_AT){drag.mode='free';drag.pulled=true;free();gs.to({lz:1},{k:320,c:26});}
+  }else if(drag.mode==='push'){
+   /* on the rail into the parked sleeve: sideways it is held, deeper than home it will not go, back up past the mouth it is free */
+   sh=gs.x.sh;cx=rubber(cx,3);let rel=cy-sh;
+   if(rel<FREE_AT-6){drag.mode='free';state='free';ghost.out=true;ghost.el.classList.add('is-out');gs.to({lz:1},{k:300,c:28});}
+   else{if(rel>0)rel=rubber(rel,3);cy=sh+rel;}
   }
-  if(state==='free'){const b=box(),hw=CARD_W/2,hh=CARD_H/2,ccx=b.x+(11+cx+hw)*b.S,ccy=b.y+(12+cy+hh)*b.S,mx=hw*b.S*.2,my=hh*b.S*.2;
-   const kx=ccx<-mx?-mx+rubber(ccx+mx,30):ccx>base.width+mx?base.width+mx+rubber(ccx-base.width-mx,30):ccx,ky=ccy<-my?-my+rubber(ccy+my,30):ccy>base.height+my?base.height+my+rubber(ccy-base.height-my,30):ccy;
-   cx+=(kx-ccx)/b.S;cy+=(ky-ccy)/b.S;}
-  ghost.el.classList.toggle('near-mouth',state==='free'&&inMouth(cx,cy));
+  if(drag.mode==='free'){
+   sh=gs.x.sh;const rel=cy-sh,dx=Math.abs(cx);
+   /* the mouth: near the axis the flared lip guides the card in; on the axis past the lip it is on the rail */
+   if(rel>FREE_AT-36&&dx<28){const k=clamp((rel-(FREE_AT-36))/36,0,1)*.6;cx*=1-k;}
+   if(rel>FREE_AT&&Math.abs(cx)<CARD_W*.95){
+    if(Math.abs(cx)<=RIM_PASS){drag.mode='push';state='in';ghost.out=false;setLoose(false);ghost.el.classList.remove('is-out');hideBin();gs.to({lz:0,cs:1,co:1},{k:300,c:32});}
+    /* off the axis the card's edge rests on the rim */
+    else{cy=sh+FREE_AT+rubber(rel-FREE_AT,4);if(!drag.rim){drag.rim=true;gs.kick({sy:-.02});}}
+   }else drag.rim=false;
+   /* at least 40 % of it stays in the window */
+   const b=box(),hw=CARD_W/2,hh=CARD_H/2,ccx=b.x+(11+cx+hw)*b.S,ccy=b.y+(12+cy+hh)*b.S,mx=hw*b.S*.2,my=hh*b.S*.2;
+   const kx=ccx<-mx?-mx+rubber(ccx+mx,30):ccx>base.width+mx?base.width+mx+rubber(ccx-base.width-mx,30):ccx,ky=ccy<-my?-my+rubber(ccy+my,30):ccy;
+   cx+=(kx-ccx)/b.S;cy+=(ky-ccy)/b.S;
+  }
+  ghost.el.classList.toggle('near-mouth',drag.mode==='free'&&cy-gs.x.sh>FREE_AT-70&&Math.abs(cx)<44);
   /* the card leans into the way it is moving */
-  const lean=state==='free'?clamp(drag.vx*.006,-9,9):0;
+  const lean=drag.mode==='free'?clamp(drag.vx*.006,-9,9):0;
   gs.to({cx,cy},{k:1400,c:75}).to({cr:lean},{k:260,c:24});
-  if(state==='free')showBin(px,py);else hideBin();
+  if(drag.mode==='free')showBin(px,py);else hideBin();
  };
  const endDrag=async e=>{
   const d=drag;drag=null;layer.classList.remove('dragging');ghost.el.classList.remove('near-mouth');
-  if(!d.moved){if(state==='in'){goHome();gs.to({cy:0},{k:300,c:26});}return;}
+  if(!d.moved){if(state==='in'&&!parked){goHome();gs.to({cy:0,sh:0},{k:300,c:26});}return;}
   if(performance.now()-d.t>90){d.vx=0;d.vy=0;}
   const b=box(),vx=clamp(d.vx,-4000,4000)/b.S,vy=clamp(d.vy,-4000,4000)/b.S;
-  gs.to({cr:0},{k:42,c:7.5});if(state==='free')gs.to({cs:1},{k:260,c:18});
-  if(state==='in'){
-   /* let go part way: a fast pull or more than half out finishes the pull, otherwise it slips back in */
-   const out=-gs.x.cy/-FREE_AT;
-   /* pushed in from outside: it goes home unless it is flicked back out */
-   if(d.pushing&&vy>-700){seat();return;}
-   if(out>.5&&vy<240||vy<-700){free();gs.to({cy:FREE_AT-30},{k:120,c:17,v:{cy:Math.min(vy,0)}});}
-   else{gs.to({cx:0},{k:300,c:30}).to({cy:0},{k:240,c:15,v:{cy:Math.max(vy,0)}});gs.wall('cy',0,.35);gs.until(x=>Math.abs(x.cy)<.5).then(()=>{if(state==='in'&&!drag){gs.kick({hr:-6}).to({hr:0},{k:60,c:4.6});goHome();}});}
+  if(d.mode==='free'){const spin=clamp(d.vx*.022+d.vy*.006,-110,110);gs.to({cr:0},{k:26,c:6.4,v:{cr:spin}}).to({lz:0},{k:36,c:8.2});}else gs.to({cr:0},{k:160,c:16});
+  if(d.mode==='pull'){
+   /* let go part way: a fast pull or more than half out finishes it, otherwise card and sleeve close up again */
+   const rel=gs.x.cy-gs.x.sh,out=rel/FREE_AT;
+   if(out>.5&&vy<240||vy<-700){free();gs.to({cy:Math.min(gs.x.cy,gs.x.sh+FREE_AT-24)},{k:120,c:17,v:{cy:Math.min(vy,0)}});}
+   else{gs.to({cx:0},{k:300,c:30}).to({cy:0},{k:240,c:16,v:{cy:Math.max(vy,0)}}).to({sh:0},{k:240,c:20});goHome();gs.until(x=>Math.abs(x.cy-x.sh)<1).then(()=>{if(state==='in'&&!drag)gs.kick({hr:-6}).to({hr:0},{k:60,c:4.6});});}
    return;
   }
-  if(state!=='free')return;
+  if(d.mode==='push'){const rel=gs.x.cy-gs.x.sh;if(rel>FREE_AT+26||vy>0){seat();return;}free();return;}
   if(armed){askDiscard();return;}
   hideBin();
-  if(inMouth(gs.x.cx,gs.x.cy)){seat();return;}
-  /* thrown: it coasts on from the hand's speed and settles inside the window */
+  const rel=gs.x.cy-gs.x.sh;
+  if(Math.abs(gs.x.cx)<=RIM_PASS*2&&rel>FREE_AT-30&&vy>=0){seat();return;}
+  /* thrown: it coasts on from the hand's speed and settles inside the window; over the sleeve its bottom edge hits the rim and bounces */
   const c=5.5,ex=coastEnd(gs.x.cx,vx,c),ey=coastEnd(gs.x.cy,vy,c);
-  const b2=box(spring.goal),lim=(p,lo,hi)=>clamp(p,lo,hi);
-  const minX=(24-b2.x)/b2.S-11,maxX=(base.width-24-b2.x)/b2.S-11-CARD_W,minY=(24-b2.y)/b2.S-12,maxY=(base.height-110-b2.y)/b2.S-12-CARD_H;
-  gs.to({cx:lim(ex,minX,maxX),cy:lim(ey,minY,maxY)},{k:46,c:12.5,v:{cx:vx,cy:vy}});
+  const b2=box(spring.goal);
+  const minX=(24-b2.x)/b2.S-11,maxX=(base.width-24-b2.x)/b2.S-11-CARD_W,minY=(24-b2.y)/b2.S-12,maxY=(base.height-24-b2.y)/b2.S-12-CARD_H;
+  const over=Math.abs(clamp(ex,minX,maxX))<CARD_W*.95&&rel<FREE_AT;
+  gs.wall('cy',over?gs.x.sh+FREE_AT:null,.38);
+  gs.to({cx:clamp(ex,minX,maxX),cy:clamp(ey,minY,over?gs.x.sh+FREE_AT:maxY)},{k:46,c:12.5,v:{cx:vx,cy:vy}});
  };
 
  /* ---- discard: asked once more ---- */
@@ -811,7 +881,7 @@ function openViewer(cell){
   let next=null;try{next=applied?await call('cards_delete',{cardId:card.id}):null;}catch(e){console.warn('cards_delete',e);}
   if(!next){toast(w.failed);closing=false;state='free';bin.classList.remove('is-eating');keep();return;}
   if(page===P){P.state=next;updateCount();}
-  await gs.until(x=>x.co<.05);hideBin();
+  await gs.until(x=>x.co<.05);hideBin();desk(false);parked=false;gs.to({sh:0},{k:160,c:24});
   /* the empty sleeve goes back to its place on the wall */
   spring.to({...home(),z:1},MOTION.home).to({b:0},{k:170,c:28}).to({u:0},{k:300,c:34});
   await spring.until(v=>Math.abs(v.s*v.z-home().s)<.02&&Math.hypot(v.x-home().x,v.y-home().y)<3);
@@ -822,10 +892,10 @@ function openViewer(cell){
  confirmEl.querySelector('.cw-discard').addEventListener('click',discard);
 
  const close=async()=>{
-  if(closing)return;closing=true;layer.classList.add('closing');hideBin();
+  if(closing)return;closing=true;layer.classList.add('closing');hideBin();desk(false);
   ghost.seq=(ghost.seq||0)+1;
   const out=state==='free',into=out?pocket:home;
-  if(out)gs.to({co:0},{k:60,c:16});else gs.to({cx:0,cy:0,cr:0,cs:1},{k:300,c:30});
+  parked=false;if(out)gs.to({co:0},{k:60,c:16}).to({sh:0,so:0},{k:120,c:22});else gs.to({cx:0,cy:0,cr:0,cs:1,sh:0},{k:300,c:30});
   faceOn(200,28);
   spring.to({...into(),z:1},MOTION.home).to({b:0},{k:170,c:28}).to({u:0},{k:300,c:34});
   const at=(v,d)=>{const h=into();return Math.hypot(v.x-h.x,v.y-h.y)<d*h.s*TL_W&&Math.abs(v.s*v.z-h.s)<h.s*d*.7;};
@@ -838,7 +908,7 @@ function openViewer(cell){
  layer.querySelector('.cw-close').addEventListener('click',close);
  const goneHint=()=>{if(hintGone)return;hintGone=true;if(!reduce())hint.animate([{opacity:getComputedStyle(hint).opacity},{opacity:0}],{duration:300,easing:'linear'});hint.style.opacity='0';};
  /* keyboard: Enter / Space take the card out or put it back, Delete asks to discard, Escape closes */
- const keyPull=()=>{if(closing)return;if(state==='in'){goBench();free();gs.to({cy:FREE_AT-30},{k:120,c:17});}else if(state==='free')seat();};
+ const keyPull=()=>{if(closing)return;if(state==='in'){bench=1;desk(true);spring.to({z:.72},{k:150,c:24});const rel=FREE_AT-30,cy=rel/2.2;free();gs.to({cy},{k:120,c:17});}else if(state==='free')seat();};
  layer.addEventListener('keydown',e=>{
   if(!confirmEl.hidden){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();keep();}return;}
   if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();}
@@ -878,9 +948,9 @@ function openViewer(cell){
  stage.addEventListener('pointerup',release);stage.addEventListener('pointercancel',release);
  stage.addEventListener('dblclick',e=>{if(closing||e.target.closest('.cw-ghost .cw-card'))return;faceOn();spring.to({z:spring.goal.z>.9?1:spring.goal.z},{k:200,c:26});});
  stage.addEventListener('wheel',e=>{
-  e.preventDefault();if(closing||state!=='in'||bench)return;
+  e.preventDefault();if(closing||drag||(state==='in'&&bench))return;
   const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?base.height:1);
-  const goal=clamp((spring.goal.z||1)*Math.exp(-delta*.0016),.55,3.2);
+  const goal=clamp((spring.goal.z||1)*Math.exp(-delta*.0016),state==='free'?.5:.55,state==='free'?1.9:3.2);
   spring.to({z:goal},{k:260,c:32});
  },{passive:false});
  layer.tabIndex=-1;layer.focus({preventScroll:true});

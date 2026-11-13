@@ -109,3 +109,10 @@ test('an ejected card stays in cards (我的卡) and can be sleeved into another
  wall.handle(db,root,{action:'cards_insert',toploaderId:'t1',cardId:card.id});let s=wall.handle(db,root,{action:'cards_eject',toploaderId:'t1'});
  assert.ok(s.cards.some(c=>c.id===card.id));assert.ok(s.toploaders.every(t=>t.cardId!==card.id));
  s=wall.handle(db,root,{action:'cards_insert',toploaderId:'t9',cardId:card.id});assert.equal(s.toploaders[9].cardId,card.id);});
+
+test('finish: plain, shine (闪卡) or holo (镭射) is kept on the card; anything else is plain',()=>{
+ const {root,db}=setup();
+ const a=wall.handle(db,root,{action:'cards_create',gameId:'g1',kind:'cover',srcId:'cover',finish:'holo'});assert.equal(a.finish,'holo');
+ const b=wall.handle(db,root,{action:'cards_create',gameId:'g1',kind:'cover',srcId:'cover',finish:'shine'});assert.equal(b.finish,'shine');
+ const c=wall.handle(db,root,{action:'cards_create',gameId:'g1',kind:'cover',srcId:'cover',finish:'<img>'});assert.equal(c.finish,'plain');
+ assert.deepEqual(wall.state(root).cards.map(x=>x.finish),['holo','shine','plain']);});

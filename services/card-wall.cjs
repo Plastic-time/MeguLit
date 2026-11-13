@@ -132,7 +132,7 @@ function games(db,root){
 /* ---- cards ---- */
 const initialOf=t=>{const c=[...String(t||'').trim()][0]||'?';return c.toUpperCase();};
 const num=(v,d,lo,hi)=>{const n=Number(v);return Number.isFinite(n)?Math.min(hi,Math.max(lo,n)):d;};
-function publicCard(root,c){const img=path.join(dirOf(root),'img');return {id:c.id,gameId:c.gameId,title:c.title,initial:c.initial,kind:c.kind,source:c.source,srcId:c.srcId,src:dataUrl(path.join(img,c.face)),full:dataUrl(path.join(img,c.full)),w:c.w,h:c.h,fullW:c.fullW,fullH:c.fullH,still:c.still,createdAt:c.createdAt};}
+function publicCard(root,c){const img=path.join(dirOf(root),'img');return {id:c.id,gameId:c.gameId,title:c.title,initial:c.initial,kind:c.kind,source:c.source,srcId:c.srcId,src:dataUrl(path.join(img,c.face)),full:dataUrl(path.join(img,c.full)),w:c.w,h:c.h,fullW:c.fullW,fullH:c.fullH,still:c.still,finish:c.finish||'plain',createdAt:c.createdAt};}
 function state(root){const s=readState(root);return {toploaders:s.toploaders,cards:s.cards.map(c=>publicCard(root,c)),mode:s.mode};}
 function create(db,root,req){
  const g=gameRow(db,req.gameId),srcId=String(req.srcId||'');
@@ -140,12 +140,14 @@ function create(db,root,req){
  if(req.kind&&req.kind!==s.kind)throw Error('CARD_KIND_MISMATCH');
  const file=fileOf(root,g,s);if(!file)throw Error('CARD_SOURCE_UNREADABLE');
  const st=req.still||{},still={x:num(st.x,0.5,0,1),y:num(st.y,0.5,0,1),scale:num(st.scale,1,1,8)};
+ /* the card's finish: plain, 'shine' (闪卡) or 'holo' (镭射); drawn by the page, nothing is baked into the picture */
+ const finish=req.finish==='shine'||req.finish==='holo'?req.finish:'plain';
  const id=newId('c'),img=path.join(dirOf(root),'img');fs.mkdirSync(img,{recursive:true});
  const face=id+'-face.jpg',full=id+'-full.jpg';
  const res=runner([{mode:'crop',in:file,out:path.join(img,face),x:still.x,y:still.y,scale:still.scale,w:FACE_W,h:FACE_H},{mode:'thumb',in:file,out:path.join(img,full),max:FULL}]);
  if(!res[0]?.ok||!res[1]?.ok){for(const f of [face,full])try{fs.rmSync(path.join(img,f),{force:true});}catch{}throw Error('CARD_IMAGE_FAILED');}
  const k=Math.min(1,FULL/Math.max(res[1].w,res[1].h));
- const card={id,gameId:g.id,title:g.title,initial:initialOf(g.title),kind:s.kind,source:s.source,srcId,face,full,w:FACE_W,h:FACE_H,fullW:Math.round(res[1].w*k),fullH:Math.round(res[1].h*k),still,createdAt:Date.now()};
+ const card={id,gameId:g.id,title:g.title,initial:initialOf(g.title),kind:s.kind,source:s.source,srcId,face,full,w:FACE_W,h:FACE_H,fullW:Math.round(res[1].w*k),fullH:Math.round(res[1].h*k),still,finish,createdAt:Date.now()};
  mutate(root,x=>{x.cards.push(card);});return publicCard(root,card);}
 function remove(root,cardId){
  const c=mutate(root,s=>{const c=s.cards.find(x=>x.id===cardId);if(!c)throw Error('CARD_NOT_FOUND');s.cards=s.cards.filter(x=>x!==c);for(const t of s.toploaders)if(t.cardId===cardId)t.cardId=null;return c;});
