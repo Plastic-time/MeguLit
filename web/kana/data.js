@@ -109,7 +109,10 @@ export function achievement(log){
  const counts=Object.fromEntries(JUDGES.map(j=>[j,0]));let got=0,max=0,bonus=0,breaks=0;
  const rows=log.map(l=>{const j=judge(l),br=l.brk??isBreak(l.show),w=br?5:1;counts[j]++;max+=w;got+=w*(br?BASE_BREAK:BASE)[j];if(br){breaks++;bonus+=BONUS[j];}return {...l,judge:j,brk:br};});
  if(!breaks)bonus=rows.reduce((s,r)=>s+BONUS[r.judge],0);
- const basePct=max?got/max*100:0,bonusPct=log.length?bonus/(breaks||log.length):0,pct=Math.round((basePct+bonusPct)*10000)/10000;
- return {pct,basePct,bonusPct,counts,rank:rankOf(pct),rows,breaks};
+ const basePct=max?got/max*100:0,bonusPct=log.length?bonus/(breaks||log.length):0,raw=basePct+bonusPct,pct=Math.min(100,Math.round(raw*10)/10);
+ return {pct,basePct,bonusPct,counts,rank:rankOf(raw),rows,breaks};
 }
-export const fmtPct=p=>(Number(p)||0).toFixed(4)+'%';
+/* 2026-11-13 (user: 101.0000% is a bug): capped at 100, one decimal */
+export const fmtPct=p=>Math.max(0,Math.min(100,Number(p)||0)).toFixed(1)+'%';
+/* n distinct choices with the target: from pri first, then each fallback list in order; never short while the lists hold enough kana */
+export function pickChoices(t,pri,...fb){const o=[];for(const list of [pri,...fb])for(const x of list){if(o.length>=3)break;if(x&&x!==t&&!o.includes(x))o.push(x);}const a=[t,...o];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}return a;}

@@ -11,7 +11,7 @@ let demo=false;
 if(!run){el.innerHTML=`<div class="wrap"><a class="back" href="games.html">← 练习</a><p class="empty" style="margin-top:24px">还没有练习成绩，先去玩一局吧</p><a class="btn" href="games.html" style="margin-top:12px">去练习 →</a></div>`;return;}
 const st=S.stats(run),prevBest=S.bestOf(run.G,run.D,run.id),changes=S.applyRun(run,demo);
 const isRetry=run.only&&run.only.length;
-const newRecord=!isRetry&&(!prevBest||A.pct>prevBest.score);const diff=prevBest?Math.abs(A.pct-prevBest.score).toFixed(4):"";
+const newRecord=!isRetry&&(!prevBest||A.pct>prevBest.score);const diff=prevBest?Math.abs(A.pct-prevBest.score).toFixed(1):"";
 const KD=ctx.data,A=KD.achievement(run.log),P=KD.fmtPct;
 const fmt=n=>(Math.round(n*10)/10).toString();
 
