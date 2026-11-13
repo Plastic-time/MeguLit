@@ -178,7 +178,6 @@ html:not(#u):not(#v):not(#w):not(#x) body .review-page .review-controls button.p
    and long help text folds to two lines, opening in full when the row is hovered or focused. */
 html:not(#u):not(#v):not(#w):not(#x):not(#y) body .settings-row[hidden]{display:none!important}
 /* a readable measure: the settings column stops at ~1100px instead of pushing controls to the far edge */
-html:not(#u):not(#v):not(#w):not(#x) body .settings-content>*,html:not(#u):not(#v):not(#w):not(#x) body #advanced-settings-form>*{max-width:1120px!important}
 html:not(#u):not(#v):not(#w):not(#x) body .settings-content .settings-section-title{font-size:38px!important;margin-bottom:8px!important}
 html:not(#u):not(#v):not(#w):not(#x) body .settings-content .settings-search{margin-top:14px}
 /* the API key row looks like every other row: bold label and note on the left, the field with its button on the right */
