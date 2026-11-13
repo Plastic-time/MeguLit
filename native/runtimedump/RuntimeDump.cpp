@@ -41,6 +41,12 @@ static DumpSinkFn SinkList[8]; static volatile LONG SinkCount;
 void DumpSink(DumpSinkFn fn) { LONG i = InterlockedIncrement(&SinkCount) - 1; if (i < 8) SinkList[i] = fn; }
 static void SinkOne(DumpSinkFn fn, const char *source, const char *how, const unsigned char *p, DWORD n) { __try { fn(source, how, p, n); } __except (EXCEPTION_EXECUTE_HANDLER) {} }
 static void Sinks(const std::string &source, const char *how, const unsigned char *p, DWORD n) { DWORD e = GetLastError(); LONG k = SinkCount < 8 ? SinkCount : 8; for (LONG i = 0; i < k; i++) if (SinkList[i]) SinkOne(SinkList[i], source.c_str(), how, p, n); SetLastError(e); }
+// Stop callbacks (modules.h DumpOnStop): a module switched off, or the process exiting, tells the module to stand down.
+struct StopSlot { const char *name; DumpStopFn fn; };
+static StopSlot StopList[8]; static volatile LONG StopCount;
+void DumpOnStop(const char *module, DumpStopFn fn) { LONG i = InterlockedIncrement(&StopCount) - 1; if (i < 8) { StopList[i].name = module; MemoryBarrier(); StopList[i].fn = fn; } }
+static void StopOne(DumpStopFn fn) { __try { fn(); } __except (EXCEPTION_EXECUTE_HANDLER) {} }
+static void StopModules(const char *name) { LONG k = StopCount < 8 ? StopCount : 8; for (LONG i = 0; i < k; i++) if (StopList[i].fn && (!name || !strcmp(StopList[i].name, name))) StopOne(StopList[i].fn); }
 // Pack contract version, read by tests and by MeguLit to tell pack builds apart.
 extern "C" __declspec(dllexport) int MeguLitDumpVersion() { return 2; }
 
@@ -673,7 +679,7 @@ bool Guarded(void (*start)(const wchar_t *), void (*tick)()) {
 void ModulesRun(bool starting) {
  for (auto &m : Modules) {
   if (m.off || !m.name) continue;
-  if (!Guarded(starting ? m.start : NULL, starting ? NULL : m.tick)) { m.off = true; Log(std::string("module off after a fault: ") + m.name); }
+  if (!Guarded(starting ? m.start : NULL, starting ? NULL : m.tick)) { m.off = true; StopModules(m.name); Log(std::string("module off after a fault: ") + m.name); }
  }
 }
 DWORD WINAPI Run(void *) {
@@ -746,6 +752,10 @@ DWORD WINAPI Run(void *) {
 }
 }
 
+// modules.h DumpQuiet: the same thread mark Guard sets, for module code that runs on game threads.
+bool DumpQuietEnter() { DWORD e = GetLastError(); bool was = Tls == TLS_OUT_OF_INDEXES || TlsGetValue(Tls) != NULL; if (Tls != TLS_OUT_OF_INDEXES) TlsSetValue(Tls, (void *)1); SetLastError(e); return was; }
+void DumpQuietLeave(bool was) { DWORD e = GetLastError(); if (!was && Tls != TLS_OUT_OF_INDEXES) TlsSetValue(Tls, NULL); SetLastError(e); }
+
 BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, void *) {
  if (reason == DLL_PROCESS_ATTACH) {
   Self = h; DisableThreadLibraryCalls(h);
@@ -755,6 +765,6 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, void *) {
   HANDLE t = CreateThread(NULL, 0, Run, NULL, 0, NULL);
   if (t) CloseHandle(t);
  }
- if (reason == DLL_PROCESS_DETACH) InterlockedExchange(&Ready, 0); // review item 7: no hook work during ExitProcess
+ if (reason == DLL_PROCESS_DETACH) { InterlockedExchange(&Ready, 0); StopModules(NULL); } // review item 7: no hook work during ExitProcess
  return TRUE;
 }
