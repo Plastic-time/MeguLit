@@ -15,9 +15,15 @@ test('the ten flights each have a signature that tells them apart',async()=>{
  assert.ok(new Set(Object.values(h.FLIGHT_MS)).size>=6,'lengths differ');
 });
 
-test('landing: exact final pose, scale taken from the rotated real card, ghost fades over the real card',()=>{
- const js=fs.readFileSync(path.join(__dirname,'..','web','home-hand.js'),'utf8');
+test('landing: no fade, the real card replaces the flying one in the same task, on an untilted scene',()=>{
+ const W=path.join(__dirname,'..','web'),js=fs.readFileSync(path.join(W,'home-hand.js'),'utf8'),depth=fs.readFileSync(path.join(W,'home-depth.js'),'utf8'),
+  tv=fs.readFileSync(path.join(W,'home-tv.js'),'utf8'),css=fs.readFileSync(path.join(W,'home-tv.css'),'utf8');
  assert.ok(js.includes("if(q>=1)return {x:B.x,y:B.y"),'q=1 is exactly the target');
- assert.ok(/s=r\.width\/\(W\*Math\.cos\(t\)\+H\*Math\.sin\(t\)\)/.test(js),'landing scale from the rotated face box');
- assert.ok(js.includes("animate([{opacity:1},{opacity:0}],{duration:170"),'ghost cross-fades out after the real card shows');
+ assert.ok(js.includes('s=r.width/(W*Math.cos(t)+H*Math.sin(t))'),'landing scale from the rotated face box');
+ assert.ok(!js.includes('{opacity:1},{opacity:0}'),'(user: 过渡到展示的怎么是渐变过渡的) the flying card never fades out');
+ assert.ok(js.includes("done?.();f.anims.forEach(a=>a.cancel());f.el.remove();"),'swap and removal happen in one task');
+ assert.ok(js.includes('(opts.neutral||(fn=>fn()))(coverPose)'),'landing pose measured on the untilted scene');
+ assert.ok(depth.includes('function hold(on)')&&depth.includes('function neutral(fn)'),'depth can settle flat and measure flat');
+ assert.ok(tv.includes('live?.depth?.hold(true)')&&tv.includes('live?.depth?.hold(false)'),'the scene settles flat for the flight and follows the pointer again after');
+ assert.ok(!/\.tv-canvas\{[^}]*transition/.test(css),'no CSS transition on the tilted canvas (it made the real card lag behind the measured pose)');
 });

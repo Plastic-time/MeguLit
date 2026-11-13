@@ -360,8 +360,10 @@ export function renderHomeTV(main,ctx){
   fitLeft(root);};
  {let actSig=JSON.stringify(cachedActivity()||null);if(cachedActivity())showActivity(cachedActivity());api('learning_activity',{range:'year'}).then(r=>{rememberActivity(r);const n=JSON.stringify(r||null);if(n!==actSig){actSig=n;showActivity(r);}}).catch(()=>{});}
  const hand=createHand({root,box:$('.tv-hand'),layer:$('.tv-ghosts'),cover:$('.tv-cover'),reduced:matchMedia('(prefers-reduced-motion:reduce)').matches,
-  back:`<img src="${LOGO}" alt="">`,art:h=>art(h.g||h,['#3b2a26','#5a3a30','#1a1110']),onPlay:(h,kind)=>{if(kind!=='plain')root.classList.add('tv-fly');paint(h.g,kind==='plain','fade');},
-  onLand:()=>root.classList.remove('tv-fly')});live.hand=hand;
+  back:`<img src="${LOGO}" alt="">`,art:h=>art(h.g||h,['#3b2a26','#5a3a30','#1a1110']),neutral:fn=>live?.depth?live.depth.neutral(fn):fn(),
+  onPlay:(h,kind,ms)=>{if(kind!=='plain'){root.classList.add('tv-fly');live?.depth?.hold(true);/* the field card's table shadow grows in as the flying card comes down onto it */
+   $('.tv-cshadow')?.animate([{opacity:0},{opacity:0,offset:.55},{opacity:1}],{duration:ms||800,easing:'cubic-bezier(.3,0,.2,1)'});}paint(h.g,kind==='plain','fade');},
+  onLand:()=>{root.classList.remove('tv-fly');live?.depth?.hold(false);}});live.hand=hand;
  const canvas=$('.tv-canvas'),planes=[...root.querySelectorAll('.tv-plane')],reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
  /* 2026-11-13 (user) every layer has its own depth: the far headline picture drifts against the pointer, near ones (cards, figures, rail, bottom bar) lead it */
  {const L=(sel,z)=>{const el=$(sel);return el?{el,z}:null;};live.depth=createDepth(root,{canvas,planes,layers:[L('.tv-left',7),L('.tv-figs',8),

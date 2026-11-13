@@ -95,26 +95,24 @@ export function createHand(opts){const {root,box,layer,cover,art,back='',onPlay,
   el.className='tv-ghost';el.style.width=W+'px';el.style.height=H+'px';el.innerHTML=`<i class="tv-ghost-face"></i><i class="tv-ghost-back">${back}</i>`;el.firstChild.style.background=art(g);
   layer.appendChild(el);f={el,W,H,anims:[],frames:null,t0:0,dur:1,trails:[]};st.flights.set(id,f);return f;}
  function currentPose(f){return f.frames?samplePose(f.frames,(performance.now()-f.t0)/f.dur):null;}
- function fly(id,g,A,B,kind,dur,delay,done,handoff=false){const f=ghostFor(id,g),W=f.W,H=f.H;f.trails.forEach(t=>t.remove());f.trails=[];
+ function fly(id,g,A,B,kind,dur,delay,done){const f=ghostFor(id,g),W=f.W,H=f.H;f.trails.forEach(t=>t.remove());f.trails=[];
   const frames=flightFrames(kind,A,B);f.frames=frames;f.t0=performance.now()+delay;f.dur=dur;const keys=frames.map(p=>({transform:poseTransform(p,W,H)}));
   f.el.style.transform=keys[0].transform;const timing={duration:dur,delay,easing:'linear',fill:'both'};f.anims=[f.el.animate(keys,timing)];
   if(kind==='trail')[.34,.2,.1,.05].forEach((o,k)=>{const t=f.el.cloneNode(true);t.classList.add('is-trail');layer.insertBefore(t,f.el);f.trails.push(t);
    f.anims.push(t.animate(keys.map((x,i)=>({...x,opacity:o*Math.max(0,1-i/(keys.length*.55))})),{...timing,delay:delay+(k+1)*40}));});
-  /* 2026-11-13 (user: "手牌和在场牌最后衔接会卡") the ghost holds its last pose (fill) while the real card appears under it, then fades out over a few
-    frames instead of vanishing in the same frame the real card is first painted */
-  f.anims[0].finished.then(()=>{if(st.flights.get(id)!==f)return;st.flights.delete(id);f.trails.forEach(t=>t.remove());done?.();
-   if(!handoff){f.anims.forEach(a=>a.cancel());requestAnimationFrame(()=>f.el.remove());return;}
-   requestAnimationFrame(()=>requestAnimationFrame(()=>{const out=f.el.animate([{opacity:1},{opacity:0}],{duration:170,easing:'ease-out',fill:'forwards'});
-    out.finished.then(()=>{f.anims.forEach(a=>a.cancel());f.el.remove();},()=>f.el.remove());}));},()=>{});return f;}
+  /* 2026-11-13 (user: "过渡到展示的怎么是渐变过渡的") no cross-fade: the last frame of the flight is the real card's exact pose, and in the same task the real
+    card is shown and the flying one removed, so the next painted frame simply has the real card where the flying one was */
+  f.anims[0].finished.then(()=>{if(st.flights.get(id)!==f)return;st.flights.delete(id);f.trails.forEach(t=>t.remove());done?.();f.anims.forEach(a=>a.cancel());f.el.remove();},()=>{});return f;}
  function play(id){const g=st.games.find(x=>x.id===id);if(!g||id===st.out&&!st.flights.has(id))return;const old=st.out?st.games.find(x=>x.id===st.out):null;
   if(reduced){st.out=id;render(st.games,id);onPlay(g,'plain');onLand?.(g);return;}
   const kind=globalThis.__forceKind||pickVariant(st.last);st.last=kind;const W=cover.offsetWidth;
   /* where the picked card is now: mid-flight pose if it was flying, else its hand slot */
   const fromPick=(st.flights.has(id)&&currentPose(st.flights.get(id)))||slotPose(id,W);
   const fromOld=old?((st.flights.has(old.id)&&currentPose(st.flights.get(old.id)))||coverPose()):null;
-  st.out=id;st.hover=-1;render(st.games,id);onPlay(g,kind);
+  st.out=id;st.hover=-1;render(st.games,id);onPlay(g,kind,(FLIGHT_MS[kind]||760)+(old?120:0));
   if(old){const el=st.cards.get(old.id);el?.classList.add('is-wait');const to=slotPose(old.id,W);/* the card going home slides in under its neighbours, the one coming out stays on top */if(to)fly(old.id,old,fromOld,to,kind,Math.round((FLIGHT_MS[kind]||760)*.88),0,()=>{el?.classList.remove('is-wait');}).el.style.zIndex='6';else el?.classList.remove('is-wait');}
-  if(fromPick)fly(id,g,fromPick,coverPose(),kind,FLIGHT_MS[kind]||760,old?120:0,()=>onLand?.(g),true).el.style.zIndex='8';else onLand?.(g);}
+  /* the landing pose is the field card as it sits with the scene flat (the scene settles flat during the flight, see home-depth hold) */
+  if(fromPick)fly(id,g,fromPick,(opts.neutral||(fn=>fn()))(coverPose),kind,FLIGHT_MS[kind]||760,old?120:0,()=>onLand?.(g)).el.style.zIndex='8';else onLand?.(g);}
  /* the field card changed some other way (double-click draw): take it out of the hand without a flight */
  function sync(id){if(id===st.out||st.flights.has(id))return;st.out=id;render(st.games,id);}
  const onResize=()=>relayout();addEventListener('resize',onResize);
