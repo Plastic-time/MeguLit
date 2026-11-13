@@ -104,7 +104,8 @@ let spawnWarm=function(root,exe,names){
  if(warmBusy(root,exe))return;const job=path.join(dirOf(root),'warm-'+exeKey(exe)+'-job.json');atomicWrite(job,JSON.stringify({root,exe,names}));
  const child=require('node:child_process').spawn(process.execPath,[__filename,'--warm',job],{detached:true,stdio:'ignore',windowsHide:true});
  atomicWrite(warmFile(root,exe),JSON.stringify({pid:child.pid,at:Date.now()}));child.unref();};
-function warm(root,exe,names){const cg=require('./game-cg.cjs');for(const n of names){try{const f=cg.pictureFile(root,exe,n);if(f)scaled(root,[f],THUMB);}catch{}}}
+function warm(root,exe,names){const cg=require('./game-cg.cjs');/* decoded in batches of 24, each batch thumbnailed by one PowerShell run (one run per picture took minutes) */
+ for(let i=0;i<names.length;i+=24){const files=[];for(const n of names.slice(i,i+24)){try{const f=cg.pictureFile(root,exe,n);if(f)files.push(f);}catch{}}if(files.length)scaled(root,files,THUMB);}}
 function split(root,g){
  const list=sources(root,g),files=new Map(),later=[];
  for(const s of list){if(s.file){files.set(s.id,s.file);continue;}const f=require('./game-cg.cjs').cachedPicture(root,g.executable,s.name);if(f)files.set(s.id,f);else later.push(s.name);}
