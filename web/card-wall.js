@@ -159,21 +159,28 @@ function sigil(){
  return sigilUrl;
 }
 
-/* ---------- 闪卡 facets: crushed-ice prism (like a maimai DX PASS) ----------
-   A field of small jittered triangles, each its own grey. On the card the grey is set against a rainbow with
-   'difference', so every facet sits at its own place in the spectrum and the whole field changes colour as the rainbow
-   slides with the card's angle. Drawn once, shared by every card through --cw-facets. */
-function facetsUrl(){
- const W=146,H=204,cols=26,rows=36,rnd=(i=>()=>((i=Math.imul(i^i>>>15,2246822507)^Math.imul(i^i>>>13,3266489909)+0x6D2B79F5)>>>0)/4294967296)(0x5eed);
- const P=[];for(let r=0;r<=rows;r++){const row=[];for(let c=0;c<=cols;c++){const edge=r===0||c===0||r===rows||c===cols,jx=edge?0:(rnd()-.5)*.8,jy=edge?0:(rnd()-.5)*.8;row.push([((c+jx)*W/cols).toFixed(1),((r+jy)*H/rows).toFixed(1)]);}P.push(row);}
- let tri='';const g=()=>{const v=Math.floor(rnd()*256);return 'rgb('+v+','+v+','+v+')';};
- for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const a=P[r][c],b=P[r][c+1],d=P[r+1][c],e=P[r+1][c+1],flip=rnd()<.5;
-  const t1=flip?[a,b,e]:[a,b,d],t2=flip?[a,e,d]:[b,e,d];
-  for(const t of [t1,t2])tri+="<path d='M"+t[0].join(' ')+'L'+t[1].join(' ')+'L'+t[2].join(' ')+"Z' fill='"+g()+"'/>";}
- const svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 "+W+' '+H+"' preserveAspectRatio='none'><g stroke='white' stroke-opacity='.07' stroke-width='.25'>"+tri+'</g></svg>';
- return 'url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';
+/* ---------- 闪卡 glitter, like a maimai DX PASS (PRiSM / PRiSM PLUS) ----------
+   Reference photos (H:/MeguLit-Work/cardwall-e2e/ref/maimai): the foil is glitter printed under the ink: small flakes,
+   each one solid colour and its neighbours different (cyan, sky, violet, mint, lime, lemon, pink, white), laid along
+   a diamond halftone grid with a little jitter; dark ink keeps them dark; away from the light only a few twinkle,
+   near it the whole field flares. One tile is drawn once (canvas) and shared through --cw-flakes. */
+function flakesUrl(seed){
+ let i=seed>>>0;const rnd=()=>((i=Math.imul(i^i>>>15,2246822507)^Math.imul(i^i>>>13,3266489909)+0x6D2B79F5)>>>0)/4294967296;
+ const N=256,step=13,cv=document.createElement('canvas');cv.width=cv.height=N;const g=cv.getContext('2d');if(!g)return 'none';
+ const pal=['#3fd0e8','#6be6ff','#4f8dff','#9c8bff','#c99bff','#ff9ad5','#9dff9a','#b8e85a','#f2e04a','#fff6c8','#ffffff','#e6f7ff'];
+ for(let r=0,y=0;y<N+step;r++,y+=step*.87)for(let x=(r%2)*step/2;x<N+step;x+=step){
+  if(rnd()<.14)continue;
+  const cx=x+(rnd()-.5)*4,cy=y+(rnd()-.5)*4,rad=2.6+rnd()*2.6,sides=5+Math.floor(rnd()*3),rot=rnd()*Math.PI;
+  g.fillStyle=pal[Math.floor(rnd()*pal.length)];g.beginPath();
+  for(let k=0;k<sides;k++){const a=rot+k*Math.PI*2/sides,rr=rad*(.8+rnd()*.3);g[k?'lineTo':'moveTo'](cx+Math.cos(a)*rr,cy+Math.sin(a)*rr);}
+  g.closePath();g.fill();
+  /* wrap across the tile edges so it repeats without seams */
+  if(cx<rad||cx>N-rad||cy<rad||cy>N-rad){g.save();g.translate(cx<rad?N:cx>N-rad?-N:0,cy<rad?N:cy>N-rad?-N:0);g.fill();g.restore();}
+ }
+ return 'url("'+cv.toDataURL('image/png')+'")';
 }
-try{document.documentElement.style.setProperty('--cw-facets',facetsUrl());}catch{}
+try{document.documentElement.style.setProperty('--cw-flakes',flakesUrl(0x5eed));}catch{}
+
 
 /* ---------- the CG tour (user, from the start: under the pointer, or while handled, the card leaves its still and slowly
    travels the whole CG, then comes back, round and round) ----------
