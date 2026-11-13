@@ -25,7 +25,7 @@ class Reader{
   }
   const config=this.runtime.config();
   if(message.gameProcessId&&message.gameProcessId!==this.gamePid){this.gamePid=message.gameProcessId;this.gameId=null;this.pendingLines=[];this.translation?.clearContext();this.setWorkPrompt('');this.stats.reset();const pid=this.gamePid;
-   require('../core/game-fonts.cjs').exePath(pid).then(exe=>{exe=require('./launch-path.cjs').canonical(exe);if(this.gamePid!==pid)return;this.gameExe=exe;this.refreshTextSource();this.translation?.clearContext();const db=openStore(this.root);try{const game=require('./library.cjs').activeGameForProgram(db,exe);this.gameId=game?.id||null;this.findTextSource(this.gameId);this.sharedImport(game);this.setWorkPrompt(game?.id|| (exe?'exe-'+require('node:crypto').createHash('sha256').update(exe.toLowerCase()).digest('hex'):''));for(const line of this.pendingLines||[])this.stats.line({...line,gameId:this.gameId});this.pendingLines=null;this.runtime.emit('reader-event',{type:'activeGame',legacyId:game?.legacy_id??null});}finally{db.close();}}).catch(()=>{});this.fonts.detect(pid).then(()=>this.engineFontScan(pid)).catch(()=>{});
+   require('../core/game-fonts.cjs').exePath(pid).then(exe=>{exe=require('./launch-path.cjs').canonical(exe);if(this.gamePid!==pid)return;this.gameExe=exe;this.adoptTextSource(exe,pid);this.translation?.clearContext();const db=openStore(this.root);try{const game=require('./library.cjs').activeGameForProgram(db,exe);this.gameId=game?.id||null;this.findTextSource(this.gameId);this.sharedImport(game);this.setWorkPrompt(game?.id|| (exe?'exe-'+require('node:crypto').createHash('sha256').update(exe.toLowerCase()).digest('hex'):''));for(const line of this.pendingLines||[])this.stats.line({...line,gameId:this.gameId});this.pendingLines=null;this.runtime.emit('reader-event',{type:'activeGame',legacyId:game?.legacy_id??null});}finally{db.close();}}).catch(()=>{});this.fonts.detect(pid).then(()=>this.engineFontScan(pid)).catch(()=>{});
   }
   if(message.bound===false&&this.gal?.process&&this.gal.process.exitCode!==null&&!this.gal.stopped){this.runtime.readerReady=false;this.runtime.readerError='READER_NATIVE_EXITED';this.runtime.emit('reader-health',{ready:false,error:'READER_NATIVE_EXITED'});}
   if(message.type==='gameClosed'){this.gameId=null;this.gamePid=null;this.pendingLines=null;this.setWorkPrompt('');this.stats.reset();}
@@ -101,6 +101,8 @@ class Reader{
   if(!this.gal)return;
   if(this.gal.preferences.gameProcess!==processName||this.expectedExecutable&&this.expectedExecutable!==executable)this.gal.send({type:'unbind'});
   this.expectedExecutable=executable;
+  /* E545 zero-latency from the first line: the script provider is ready before the game process binds */
+  try{const exe=executable?require('./launch-path.cjs').canonical(executable):'';if(exe){this.textExe=exe;this.refreshTextSource({exe,pid:0});}}catch{}
   this.gal.send({type:'expectExecutable',path:executable});
   this.gal.save({...this.gal.preferences,gameProcess:processName,bindEnabled:true});
   if(enter)this.gal.send({type:'enterGame'});
@@ -116,6 +118,7 @@ class Reader{
   if(!this.gal.process){this.stop();throw Error('READER_NATIVE_MISSING');}
   this.gal.process.once('error',()=>{this.runtime.call({action:'reader_health',phase:'native-launch',error:'READER_NATIVE_START_FAILED'}).catch(()=>{});});
   if(this.runtime.pendingGame)this.selectGame(this.runtime.pendingGame,this.runtime.pendingGameEnter,this.runtime.pendingExecutable);
+  else if(this.textExe||this.gameExe)this.refreshTextSource();/* E545 a reader started again while the game runs: the new hooks get the provider */
   return {attached:true};
  }
  setWorkPrompt(key){
@@ -158,9 +161,19 @@ class Reader{
    try{const hooks=this.gal?.hooks,provider=hooks?.originalText;if(provider&&hooks.scriptAllowed?.()!==false){const found=require('./learning-insights.cjs').humanFromResolve(provider.kind,hooks.resolveSource(text));if(found)return found;}}catch{}return null;}
   this.humanLines.set(key,value);if(this.humanLines.size>800)this.humanLines.delete(this.humanLines.keys().next().value);return value;}
  sentenceTranslation(text,machine){const insights=require('./learning-insights.cjs'),human=this.humanLine(text);return insights.pickTranslation({human,machine:human&&insights.usable(machine)&&machine.trim()===human.text?'':machine});}
- refreshTextSource(){try{const hooks=this.gal?.hooks;if(!hooks)return;/* E330 the 零延迟翻译 switch in the translation settings */hooks.scriptAllowed=()=>this.prefs().scriptTranslation!==false;hooks.originalText=this.gameExe?require('./original-text.cjs').provider(this.root,this.gameExe):null;}catch{}}
+ /* E545 (user: 零延迟翻译 only worked after switching it off and on again): the provider is built for the program being
+    launched (selectGame) before its first line, adopted by the game process when it binds, checked again while the game
+    runs (a stale patch rebuilt in the background, the start-up script prewarm, a cold run) and on every settings save;
+    an unchanged key keeps the provider and its reading position, a changed one rebuilds it. force rebuilds anyway. */
+ refreshTextSource({force=true,exe=this.textExe||this.gameExe||'',pid=this.gamePid||0}={}){try{const hooks=this.gal?.hooks;if(!hooks)return;/* E330 the 零延迟翻译 switch in the translation settings */hooks.scriptAllowed=()=>this.prefs().scriptTranslation!==false;
+  if(!exe){hooks.originalText=null;hooks.textSourceKey='';return;}const ot=require('./original-text.cjs'),key=String(exe).toLowerCase()+'|'+ot.providerKey(this.root,exe);
+  if(!force&&hooks.originalText&&hooks.textSourceKey===key)return;hooks.originalText=ot.provider(this.root,exe);hooks.textSourceKey=key;hooks.textSourcePid=pid;}catch{}}
+ /* E545 the game process binds: a provider built at launch for this same program is kept (no reading-position reset) */
+ adoptTextSource(exe,pid){const hooks=this.gal?.hooks,same=!!(hooks?.originalText&&hooks.textSourcePid===0&&String(this.textExe||'').toLowerCase()===String(exe||'').toLowerCase());this.textExe=exe;
+  if(same){hooks.textSourcePid=pid;this.refreshTextSource({force:false,exe,pid});}else this.refreshTextSource({exe,pid});this.watchTextSource(exe);}
+ watchTextSource(exe){for(const t of this.textSourceTimers||[])clearTimeout(t);this.textSourceTimers=[3000,15000,60000,180000].map(ms=>{const t=setTimeout(()=>{if(this.textExe===exe&&this.gal)this.refreshTextSource({force:false});},ms);t.unref?.();return t;});}
  // E280: a Japanese game started without a patch set up: look for one on this computer in the background.
- findTextSource(gameId){/* E450 the game's own voices for its lines */try{const db=require('./store.cjs').openStore(this.root);try{const row=db.prepare('SELECT executable FROM games WHERE id=?').get(String(gameId));require('./game-voice.cjs').scanLater(this.root,row?.executable,8000,{cold:this.prefs?.()?.scriptColdRun!==false});}finally{db.close();}}catch{}const hooks=this.gal?.hooks;if(!gameId||hooks?.originalText)return;require('./original-text.cjs').autoPatchLater(this.root,gameId,()=>this.refreshTextSource());}
+ findTextSource(gameId){/* E450 the game's own voices for its lines */try{const db=require('./store.cjs').openStore(this.root);try{const row=db.prepare('SELECT executable FROM games WHERE id=?').get(String(gameId));require('./game-voice.cjs').scanLater(this.root,row?.executable,8000,{cold:this.prefs?.()?.scriptColdRun!==false});}finally{db.close();}}catch{}const hooks=this.gal?.hooks,ready=hooks?.originalText;/* E545 a provider without its patch (none yet, or one left stale by a reader update) still looks for one */if(!gameId||ready&&(ready.kind!=='patch'||ready.patch))return;require('./original-text.cjs').autoPatchLater(this.root,gameId,()=>this.refreshTextSource({force:false}));}
  /* E370 shared adaptation: a game with nothing saved on this PC starts from a matching shared record (local store, then
     the relay when one is configured); the reader says 已套用共享适配设置 once. Settings the user saved are never replaced. */
  sharedImport(game){const exe=this.gameExe;if(!exe)return;setTimeout(()=>{try{if(this.gameExe!==exe)return;const shared=require('./shared-adaptation.cjs');if(!shared.enabled(this.root))return;let original={};try{original=JSON.parse(game?.original||'{}')||{};}catch{}const lib=original.library||{};
@@ -282,7 +295,7 @@ class Reader{
    case 'gameFontsLoad':reply('gameFonts',this.fonts?.payload(true));break;
    case 'gameFontsRescan':if(this.gamePid)await this.fonts.detect(this.gamePid,true);break;
    case 'gameFontsApply':if(this.fonts?.current?.status==='ready'){const fonts=this.fonts.current.fonts,prefs={...g.preferences};for(const[lang,key]of [['ja','japaneseFont'],['zh','chineseFont']]){const f=fonts.find(f=>f.lang===lang);if(f)prefs[key]='game:'+f.id;}g.save(prefs);this.fonts.markApplied();reply('restoreGalSettings',prefs);}break;
-   case 'configure':{let success=true,error='';try{const {resolveOptions}=require('../core/providers.cjs'),options=resolveOptions(r);if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();require('../core/translation-settings.cjs').saveTranslationSettings(r,{resolveOptions,service:this.translator(),secrets:{set:(baseUrl,apiKey)=>new Settings(this.root).saveKey({provider:options.provider,baseUrl,apiKey})},persist:settings=>atomic(path.join(this.folder,'preferences.json'),{...readJSON(path.join(this.folder,'preferences.json')),...cleanPreferences(settings)})});}catch(e){success=false;error=e.message;}reply('configured',success,error,r.configureId??null);break;}
+   case 'configure':{let success=true,error='';try{const {resolveOptions}=require('../core/providers.cjs'),options=resolveOptions(r);if(options.provider!=='google'&&!require('../core/engines.cjs').ENGINES[options.provider]?.keyless)this.loadKeys();require('../core/translation-settings.cjs').saveTranslationSettings(r,{resolveOptions,service:this.translator(),secrets:{set:(baseUrl,apiKey)=>new Settings(this.root).saveKey({provider:options.provider,baseUrl,apiKey})},persist:settings=>atomic(path.join(this.folder,'preferences.json'),{...readJSON(path.join(this.folder,'preferences.json')),...cleanPreferences(settings)})});}catch(e){success=false;error=e.message;}reply('configured',success,error,r.configureId??null);/* E545 */if(success)this.refreshTextSource({force:false});break;}
    case 'learningSettings':atomic(path.join(this.folder,'preferences.json'),{...readJSON(path.join(this.folder,'preferences.json')),...cleanPreferences(r.settings)});break;
    case 'nativeSettings':await this.invoke('save_settings',{settings:r.settings});break;
    case 'v4':try{reply('v4Deliver',r.id,await this.v4(r.action,r.args||{}),'');}catch(e){reply('v4Deliver',r.id,null,e.message);}break;
