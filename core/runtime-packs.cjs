@@ -7,19 +7,16 @@ const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node
 
 /* E383 a mirror template may use {url} (whole GitHub URL), or {tag} and {file} (release tag and file name) for our own mirror dl.megulit.com */
 function mirrorUrl(template,url){const parts=String(url).split('/'),file=parts.pop()||'',tag=parts.pop()||'';return template.replace('{url}',url).replace('{tag}',tag).replace('{file}',file);}
-const MARKERS={base:'runtime/node.exe',reading:'runtime/reading/sudachidict_full/resources/system.dic',voice:'runtime/aivis/run.exe',archives:'runtime/garbro/ArcFormats.dll',dump:'runtime/runtimedump/MeguLitDump64.dll'};
+const MARKERS={base:'runtime/node.exe',reading:'runtime/reading/sudachidict_full/resources/system.dic',voice:'runtime/aivis/run.exe',archives:'runtime/garbro/ArcFormats.dll','runtime-dump':'runtime/runtime-dump/MeguLitDump64.dll'};
 /* E470 "archives": GARbro (morkt, MIT) downloaded only when a game's scripts sit in an archive MeguLit's own readers cannot open.
    onDemand packs are left out of "download full", unpack into their own dest folder (the upstream release is not laid out as runtime/...)
    and can be removed again in Settings. */
 const ON_DEMAND_FILES=['GameRes.dll','ArcFormats.dll','GameData/Formats.dat'];
-/* 2026-11-13 "dump": the runtime-dump cold pack (services/runtime-dump-pack.cjs). Pack convention:
-   - runtime.json: packs.dump = {onDemand:true, silent:true, dest:"runtime/runtimedump", files:[...], size, unpacked, sha256, urls}
-   - zip layout: MeguLitDump32.dll + MeguLitDump64.dll at the top (or in one top folder); unpacked into runtime/runtimedump
-   - DLL names: MeguLitDump32.dll / MeguLitDump64.dll (native/runtimedump/build.cmd); HookBridge loads <bit> from native\ first,
-     then from runtimeuntimedump\ (HookBridge.RuntimeDump), and loads it late on {"type":"runtimeDump"} after a download
-   - silent packs never show in Settings (status() leaves them out) and have no switch; an empty sha256 means "not published
-     yet" and the pack is skipped. `files` overrides ON_DEMAND_FILES for a dest pack (the files that must exist after unpack). */
-const filesOf=p=>Array.isArray(p?.files)&&p.files.length?p.files:ON_DEMAND_FILES;
+/* 2026-11-13 "runtime-dump" (docs/runtime-dump-pack.md): MeguLitDump32/64.dll, a cold pack the user never sees. It is
+   "hidden": left out of status() (no row in Settings, nothing to switch), never removable, fetched by core/hook-native.cjs
+   in the background the first time a game is hooked and injected by HookBridge once it is on disk. A pack may name the
+   files that make it complete with "files"; without it the GARbro list above applies. */
+const packFiles=pack=>Array.isArray(pack?.files)&&pack.files.length?pack.files:ON_DEMAND_FILES;
 
 const SHARED=new Map();
 class RuntimePacks{
@@ -29,9 +26,9 @@ class RuntimePacks{
  /* parsed once per change of runtime.json: installed() and status() ask for it on every reader and Settings poll */
  manifest(){const f=path.join(this.root,'setup','runtime.json');let k='';try{const s=fs.statSync(f);k=s.size+'|'+s.mtimeMs;}catch{}if(k&&this.manifestKey===k)return this.manifestCache;
   let m;try{m=JSON.parse(fs.readFileSync(f,'utf8').replace(/^﻿/,''));}catch{m={packs:{}};}this.manifestKey=k;this.manifestCache=m;return m;}
- installed(id){const marker=MARKERS[id];if(!marker||!fs.existsSync(path.join(this.root,marker)))return false;const dest=this.manifest().packs?.[id]?.dest;const p=this.manifest().packs?.[id];return !dest||filesOf(p).every(f=>fs.existsSync(path.join(this.root,dest,f)));}
+ installed(id){const marker=MARKERS[id];if(!marker||!fs.existsSync(path.join(this.root,marker)))return false;const p=this.manifest().packs?.[id],dest=p?.dest;return !dest||packFiles(p).every(f=>fs.existsSync(path.join(this.root,dest,f)));}
  onDemand(id){return !!this.manifest().packs?.[id]?.onDemand;}
- status(){const m=this.manifest();return {version:m.version||'',packs:Object.entries(m.packs||{}).filter(([,p])=>!p.silent).map(([id,p])=>{const j=this.jobs[id];return {id,size:p.size||0,unpacked:p.unpacked||0,onDemand:!!p.onDemand,license:p.license||'',installed:this.installed(id),job:j?{state:j.state,stage:j.stage,received:j.received,total:j.total,error:j.error}:null};})};}
+ status(){const m=this.manifest();return {version:m.version||'',packs:Object.entries(m.packs||{}).filter(([,p])=>!p.hidden).map(([id,p])=>{const j=this.jobs[id];return {id,size:p.size||0,unpacked:p.unpacked||0,onDemand:!!p.onDemand,license:p.license||'',installed:this.installed(id),job:j?{state:j.state,stage:j.stage,received:j.received,total:j.total,error:j.error}:null};})};}
  download(ids){
   const m=this.manifest(),list=(Array.isArray(ids)&&ids.length?ids:Object.keys(m.packs||{}).filter(id=>!m.packs[id].onDemand)).filter(id=>m.packs?.[id]&&!this.installed(id));
   if(this.running)return this.status();
@@ -46,7 +43,7 @@ class RuntimePacks{
    if(!this.running&&(!job||!['queued','downloading'].includes(job.state))){if(asked&&job&&['error','cancelled'].includes(job.state))throw Error(job.error||'PACK_'+job.state.toUpperCase());this.download([id]);asked=true;}
    await new Promise(r=>setTimeout(r,300));if(this.installed(id))return true;if(Date.now()-start>timeout)throw Error('PACK_TIMEOUT');}}
  /* Only on-demand packs can be removed; a running download of it is cancelled first. */
- uninstall(id){const p=this.manifest().packs?.[id];if(!p?.onDemand||!p.dest)throw Error('PACK_NOT_REMOVABLE');const job=this.jobs[id];if(job&&['queued','downloading'].includes(job.state)){job.state='cancelled';job.controller?.abort();}
+ uninstall(id){const p=this.manifest().packs?.[id];if(!p?.onDemand||!p.dest||p.hidden)throw Error('PACK_NOT_REMOVABLE');const job=this.jobs[id];if(job&&['queued','downloading'].includes(job.state)){job.state='cancelled';job.controller?.abort();}
   const dest=path.resolve(this.root,p.dest);if(!dest.startsWith(path.resolve(this.root,'runtime')+path.sep))throw Error('PACK_DEST_OUTSIDE');fs.rmSync(dest,{recursive:true,force:true});delete this.jobs[id];return this.status();}
  cancel(){for(const job of Object.values(this.jobs)){if(['queued','downloading'].includes(job.state)){job.state='cancelled';job.controller?.abort();}}return this.status();}
  async install(id,pack,job){
@@ -71,8 +68,8 @@ class RuntimePacks{
   await new Promise((resolve,reject)=>{const p=spawn(path.join(process.env.SystemRoot||'C:\\Windows','System32','tar.exe'),['-xf',part,'-C',stage],{windowsHide:true});p.on('error',reject);p.on('exit',code=>code===0?resolve():reject(Error('解压失败')));});
   if(pack.dest){/* whole release into its own folder; swap in atomically so a failed unpack leaves the old copy */
    const to=path.resolve(this.root,pack.dest);if(!to.startsWith(path.resolve(this.root,'runtime')+path.sep))throw Error('PACK_DEST_OUTSIDE');
-   const need=filesOf(pack),top=fs.readdirSync(stage),from=top.length===1&&fs.statSync(path.join(stage,top[0])).isDirectory()&&!need.some(f=>fs.existsSync(path.join(stage,f)))?path.join(stage,top[0]):stage;
-   if(!need.every(f=>fs.existsSync(path.join(from,f))))throw Error('安装不完整');
+   const files=packFiles(pack),top=fs.readdirSync(stage),from=top.length===1&&fs.statSync(path.join(stage,top[0])).isDirectory()&&!files.some(f=>fs.existsSync(path.join(stage,f)))?path.join(stage,top[0]):stage;
+   if(!files.every(f=>fs.existsSync(path.join(from,f))))throw Error('安装不完整');
    fs.mkdirSync(path.dirname(to),{recursive:true});fs.rmSync(to+'.old',{recursive:true,force:true});if(fs.existsSync(to))fs.renameSync(to,to+'.old');fs.renameSync(from,to);fs.rmSync(to+'.old',{recursive:true,force:true});
   }else{
   const from=path.join(stage,'runtime'),to=path.join(this.root,'runtime');fs.mkdirSync(to,{recursive:true});
@@ -100,4 +97,4 @@ function fetchTo(url,file,job,hops=0){
   req.on('error',reject);
  });
 }
-module.exports={RuntimePacks,MARKERS,ON_DEMAND_FILES,filesOf,mirrorUrl};
+module.exports={RuntimePacks,MARKERS,ON_DEMAND_FILES,mirrorUrl};
