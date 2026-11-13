@@ -5,6 +5,8 @@ const path=require('node:path');
 const {spawn}=require('node:child_process');
 const crypto=require('node:crypto');
 const store=require('./store.cjs');
+/* 2026-11-13 every relay call goes through one gate: short GET cache, Retry-After on 429, backoff (services/relay-gate.cjs) */
+require('./relay-gate.cjs').install();
 const root=(process.env.MEGULIT_ROOT||process.env.TOME_FINAL_ROOT)?path.resolve(process.env.MEGULIT_ROOT||process.env.TOME_FINAL_ROOT):path.resolve(__dirname,'..');
 const MAX_INPUT=512*1024;
 function cleanUiState(values){
