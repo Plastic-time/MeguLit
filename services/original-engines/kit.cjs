@@ -25,8 +25,10 @@ const tail=(file,n)=>{const s=size(file);if(s<0)return Buffer.alloc(0);try{retur
 const names=dir=>{try{return fs.readdirSync(dir);}catch{return [];}};
 const isFile=f=>{try{return fs.statSync(f).isFile();}catch{return false;}};
 /* files under dir (depth levels of sub folders) whose name passes test; save folders are never entered */
-function walk(dir,depth,test,out=[]){let es;try{es=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
- for(const e of es){const f=path.join(dir,e.name);if(e.isDirectory()){if(depth>0&&!/^(saves?|savedata|\.megulit)$/i.test(e.name))walk(f,depth-1,test,out);}else if(e.isFile()&&test(e.name,f))out.push(f);}return out;}
+/* skip: sub folders not entered (default: save folders and MeguLit's own); null enters every folder */
+const SKIP=/^(save|savedata|\.megulit)/i;
+function walk(dir,depth,test,out=[],skip=SKIP){let es;try{es=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
+ for(const e of es){const f=path.join(dir,e.name);if(e.isDirectory()){if(depth>0&&!(skip&&skip.test(e.name)))walk(f,depth-1,test,out,skip);}else if(e.isFile()&&test(e.name,f))out.push(f);}return out;}
 /* files in dir and the given sub folders matching name (RegExp) and, if given, starting with magic (string, latin1) */
 function files(dir,{name=/./,magic=null,subs=[''],max=64}={}){const out=[];
  for(const s of subs){const d=s?path.join(dir,s):dir;for(const n of names(d)){if(out.length>=max)return out;if(!name.test(n))continue;const f=path.join(d,n);if(!isFile(f))continue;
@@ -42,6 +44,15 @@ function codepage(all){if(!all||!all.length)return 'shift_jis';
  const score=enc=>{const t=new TextDecoder(enc).decode(all);return {bad:(t.match(/�/g)||[]).length*4+(t.match(/[｡-ﾟ]/g)||[]).length,kana:(t.match(KANA_G)||[]).length};};
  const s=score('shift_jis'),g=score('gbk');return s.bad<g.bad||s.bad===g.bad&&s.kana>=g.kana?'shift_jis':'gbk';}
 const decoder=bufs=>new TextDecoder(codepage(Buffer.concat(bufs.filter(b=>b&&b.some(c=>c>=0x80)).slice(0,4000))));
+/* E577 the same choice over many strings (BGI, WOLF, YU-RIS, System4 AIN …: one code page per script) */
+const codepageOf=(bufs,{min=0,max=4000}={})=>codepage(Buffer.concat(bufs.filter(b=>b&&b.length>min).slice(0,max)));
+/* a text script: BOM, then strict UTF-8, then Shift-JIS or GBK (KiriKiri, Tyrano, NScripter, Artemis, Ren'Py sources) */
+function decodeText(buf){
+ if(buf[0]===0xff&&buf[1]===0xfe)return buf.toString('utf16le',2);
+ if(buf[0]===0xfe&&buf[1]===0xff){const b=Buffer.from(buf.subarray(2));b.swap16();return b.toString('utf16le');}
+ if(buf[0]===0xef&&buf[1]===0xbb&&buf[2]===0xbf)return buf.toString('utf8',3);
+ try{return new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch{}
+ return new TextDecoder(codepage(buf)).decode(buf);}
 const cstr=(b,at,limit=b.length)=>{if(at<0||at>=b.length)return null;const e=b.indexOf(0,at);return b.subarray(at,e<0||e>limit?limit:e);};
 const trimBoth=t=>t.replace(/^[\s　]+|[\s　]+$/g,'');
 const ascii=t=>/^[\x20-\x7e]*$/.test(t);
@@ -88,6 +99,15 @@ function lzss(src,unpacked,opts={}){const W=opts.window||4096,mask=W-1,min=opts.
   if(lit){const c=src[s++];out[o++]=c;win[wp]=c;wp=(wp+1)&mask;}
   else{if(s+1>=src.length)return out.subarray(0,o);const lo=src[s++],hi=src[s++];const pos=lo|((hi>>lb)<<8),len=(hi&lm)+min;for(let k=0;k<len&&o<out.length;k++){const c=win[(pos+k)&mask];out[o++]=c;win[wp]=c;wp=(wp+1)&mask;}}}}
  return out.subarray(0,o);}
+/* E577 LZ with references measured back from the output (no window buffer): SiglusEngine (flags LSB first, 1 = literal,
+   u16 token: distance tok >> 4, length (tok & 15) + 2) and Interheart ZLC2 (flags MSB first, 1 = reference, distance
+   b0 | (b1 & 0xF0) << 4 with 0 meaning 4096, length (b1 & 15) + 3). opts: msb, refIsOne, token(b0, b1) -> {dist, len} */
+const SIGLUS_TOKEN=(b0,b1)=>{const t=b0|(b1<<8);return {dist:t>>4,len:(t&15)+2};};
+function lzDistance(src,unpacked,{at=0,msb=false,refIsOne=false,token=SIGLUS_TOKEN,strict=false}={}){const out=Buffer.alloc(unpacked);let s=at,o=0;
+ while(o<unpacked&&s<src.length){const fl=src[s++];for(let k=0;k<8&&o<unpacked;k++){const bit=msb?(fl>>(7-k))&1:(fl>>k)&1;
+  if(bit!==(refIsOne?1:0)){if(s>=src.length)break;out[o++]=src[s++];continue;}
+  if(s+1>=src.length)break;const {dist,len}=token(src[s],src[s+1]);s+=2;if(!dist||dist>o){if(strict)throw Error('LZ_DISTANCE');break;}for(let j=0;j<len&&o<unpacked;j++){out[o]=out[o-dist];o++;}}}
+ if(strict&&o<unpacked)throw Error('LZ_SHORT');return out.subarray(0,o);}
 const inflate=(b,max=64<<20)=>zlib.inflateSync(b,{maxOutputLength:max}),inflateRaw=(b,max=64<<20)=>zlib.inflateRawSync(b,{maxOutputLength:max});
 
 /* ---- containers ------------------------------------------------------------------------------------------------- */
@@ -166,5 +186,5 @@ function engine(def){
   return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));};
  return {id:def.id,hint:def.hint,scenes,archives:scenes,sources:dir=>[...arcFiles(dir),...looseFiles(dir)],parse:buf=>{try{return def.parse(Buffer.isBuffer(buf)?buf:Buffer.from(buf));}catch{return {lines:[],anchors:[]};}},test:def.test||(n=>!!def.loose&&def.loose.name.test(n)),...(def.extra||{})};}
 
-module.exports={readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,decoder,cstr,trimBoth,ascii,decodeRuns,
- xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,inflate,inflateRaw,table,entryRead,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine};
+module.exports={readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,
+ xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,lzDistance,SIGLUS_TOKEN,inflate,inflateRaw,table,entryRead,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine};

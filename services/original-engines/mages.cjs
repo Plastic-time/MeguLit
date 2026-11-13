@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const kit=require('./kit.cjs');/* E577 shared engine kit */
 /* E342 MAGES. engine (Steam STEINS;GATE): USRDIR/script.mpk holds one SC3 file per scene (.SCX). An SC3 file is
    "SC3\0", the offset of its string table, the offset of the table after it; each string runs to 0xFF. A byte 0x80-0xAF
    starts a two-byte glyph: (big-endian word & 0x7FFF) is an index into the game's font sheet, so the text is only
@@ -24,7 +25,7 @@ function mpkList(file){const key=file+'|'+stat(file);if(listMemo.has(key))return
     if(e.offset+e.packed>size){out=null;break;}out.push(e);}}}
  }catch{out=null;}finally{if(fd!==undefined)fs.closeSync(fd);}
  listMemo.set(key,out);if(listMemo.size>16)listMemo.delete(listMemo.keys().next().value);return out;}
-function mpkRead(file,e){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(e.packed);fs.readSync(fd,b,0,e.packed,e.offset);return e.compressed?zlib.inflateSync(b):b;}finally{fs.closeSync(fd);}}
+function mpkRead(file,e){const b=kit.readAt(file,e.offset,e.packed);return e.compressed?zlib.inflateSync(b):b;}
 // One SC3 string as display lines: the speaker's name (if any) and the text, with ruby pairs and unknown glyphs counted.
 function decodeString(b,q,cs){let text='',name='',miss=0;const ruby=[];
  const glyph=()=>{const i=b.readUInt16BE(q)&0x7fff;q+=2;const c=cs[i];if(c===undefined){miss++;return '';}return c;};

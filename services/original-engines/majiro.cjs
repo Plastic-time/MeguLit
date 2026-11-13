@@ -87,7 +87,7 @@ function parse(buf){
 
 /* ---- engine ---------------------------------------------------------------------------------------------------- */
 const MJO=n=>/\.mjo$/i.test(n);
-function head(file,n){try{const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(n);fs.readSync(fd,b,0,n,0);return b;}finally{fs.closeSync(fd);}}catch{return Buffer.alloc(0);}}
+const head=kit.head;
 function archives(dir){let names;try{names=fs.readdirSync(dir);}catch{return [];}
  return names.filter(n=>/\.arc$/i.test(n)).map(n=>path.join(dir,n)).filter(f=>head(f,10).toString('latin1')==='MajiroArcV')
   /* scenario.arc first, then update / patch archives, which the engine lets override it */

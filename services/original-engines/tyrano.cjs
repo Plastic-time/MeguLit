@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const kit=require('./kit.cjs');/* E577 shared engine kit */
 /* E567 TyranoScript / TyranoBuilder (ShinoGame; MIT engine). VNDB counts ~4000 Japanese Windows releases, the largest
    share of them doujin and otome titles. The scenario is plain KAG-style text, data/scenario/**\/*.ks, shipped as:
      loose          <game>/data/scenario, or <game>/resources/app/data/scenario (unpacked Electron)
@@ -40,7 +41,7 @@ function asarList(file){const fd=fs.openSync(file,'r');try{const head=Buffer.all
  const len=h.readUInt32LE(4);let tree;try{tree=JSON.parse(h.toString('utf8',8,8+len));}catch{return null;}
  const base=8+size,out=[];const walk=(node,pre)=>{for(const [name,v] of Object.entries(node.files||{})){const rel=pre?pre+'/'+name:name;if(v.files)walk(v,rel);else if(!v.unpacked&&v.offset!==undefined)out.push({name:rel,offset:base+Number(v.offset),size:Number(v.size)});}};
  walk(tree,'');return out;}finally{fs.closeSync(fd);}}
-function readAt(file,offset,size){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(size);fs.readSync(fd,b,0,size,offset);return b;}finally{fs.closeSync(fd);}}
+const readAt=kit.readAt;
 /* A zip anywhere in a file (package.nw, or appended to an exe): the end record, then the central directory; offsets
    are taken relative to where the central directory really is, so a zip after an exe reads too. */
 function zipList(file){let size;try{size=fs.statSync(file).size;}catch{return null;}if(size<22)return null;
@@ -54,7 +55,7 @@ function zipRead(file,e){const h=readAt(file,e.local,30);if(h.readUInt32LE(0)!==
  if(e.method===0)return data;if(e.method===8)return zlib.inflateRawSync(data);throw Error('ZIP_METHOD_'+e.method);}
 
 function names(dir){try{return fs.readdirSync(dir);}catch{return [];}}
-function walk(dir,depth,out=[]){for(const n of names(dir)){const f=path.join(dir,n);let st;try{st=fs.statSync(f);}catch{continue;}if(st.isDirectory()){if(depth>0)walk(f,depth-1,out);}else if(/\.ks$/i.test(n))out.push(f);}return out;}
+const walk=(dir,depth)=>kit.walk(dir,depth,n=>/\.ks$/i.test(n),[],null);/* E577 kit.walk, every folder */
 /* every place a Tyrano game keeps its scenario, as {kind, file, root} */
 function containers(dir){const out=[];
  for(const base of [dir,path.join(dir,'resources','app'),path.join(dir,'www')]){const sc=path.join(base,'data','scenario');if(fs.existsSync(sc))out.push({kind:'loose',root:base});}

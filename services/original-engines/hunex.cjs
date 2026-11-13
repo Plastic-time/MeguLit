@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const kit=require('./kit.cjs');/* E577 shared engine kit */
 // E304 (user, 2026-11-10: 魔法使いの夜 / WITCH ON THE HOLY NIGHT, Steam): HuneX engine releases keep every line of the
 // game in per-language text tables (script_text_ja.ctd, _zc Simplified, _zt Traditional, _en) inside HFA archives
 // ("HUNEXGGEFA10": a count, then 0x80-byte entries with name, offset, size). Line i of one table is line i of every
@@ -16,7 +17,7 @@ function hfaList(file){
   for(let i=0;i<n;i++){const e=i*0x80;out.push({name:index.toString('utf8',e,e+0x60).replace(/\0[\s\S]*$/,''),offset:base+index.readUInt32LE(e+0x60),size:index.readUInt32LE(e+0x64)});}
   return out;}finally{fs.closeSync(fd);}
 }
-function hfaRead(file,entry){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(entry.size);fs.readSync(fd,b,0,entry.size,entry.offset);return b;}finally{fs.closeSync(fd);}}
+const hfaRead=(file,entry)=>kit.readAt(file,entry.offset,entry.size);
 function lenzu(src){
  if(src.length<0x40||!src.subarray(0,16).equals(LENZU))throw Error('LENZU_MAGIC');
  const size=src.readUInt32LE(0x20);let p=0x30;

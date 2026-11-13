@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const kit=require('./kit.cjs');/* E577 shared engine kit */
 /* E566 Ren'Py games that ship no .rpy sources: compiled .rpyc scripts, loose or inside .rpa archives (most commercial
    and Steam Ren'Py releases). Formats as Ren'Py itself writes them (renpy/loader.py, renpy/script.py, MIT):
      RPA-3.0 <offset hex16> <key hex8>\n   index at offset: zlib(pickle({name: [(offset^key, length^key, prefix)]}))
@@ -78,7 +79,7 @@ function rpaIndex(file){const h=rpaHeader(file);if(!h)return null;const fd=fs.op
   for(const [name,parts] of idx){const t=Array.isArray(parts)&&parts[0];if(!t)continue;const prefix=t[2];
    out.set(String(name).replace(/\\/g,'/'),{offset:(t[0]^h.key)>>>0,length:(t[1]^h.key)>>>0,prefix:Buffer.isBuffer(prefix)?prefix:Buffer.from(String(prefix||''),'latin1')});}
   return out;}finally{fs.closeSync(fd);}}
-function rpaRead(file,e){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(Math.max(0,e.length-e.prefix.length));fs.readSync(fd,b,0,b.length,e.offset);return Buffer.concat([e.prefix,b]);}finally{fs.closeSync(fd);}}
+const rpaRead=(file,e)=>Buffer.concat([e.prefix,kit.readAt(file,e.offset,Math.max(0,e.length-e.prefix.length))]);
 
 /* ---- rpyc ------------------------------------------------------------------------------------------------------ */
 const isRpyc=buf=>buf.length>10&&(buf.toString('latin1',0,10)==='RENPY RPC2'||buf[0]===0x78);
@@ -114,8 +115,8 @@ function translations(buf){const out={ids:new Map(),strings:new Map(),lang:null}
  return out;}
 
 /* ---- game folder ----------------------------------------------------------------------------------------------- */
-function walkFiles(dir,depth,test,out=[]){let es;try{es=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
- for(const e of es){const f=path.join(dir,e.name);if(e.isDirectory()){if(depth>0&&!/^(saves?|cache|\.megulit)/i.test(e.name))walkFiles(f,depth-1,test,out);}else if(e.isFile()&&test(e.name))out.push(f);}return out;}
+/* E577 kit.walk; Ren'Py's cache folder is skipped too */
+const walkFiles=(dir,depth,test)=>kit.walk(dir,depth,n=>test(n),[],/^(saves?|cache|\.megulit)/i);
 /* Every script of a game folder ("game" or the folder itself): {rel, read, source}, keyed by the path without its
    extension so script.rpy and script.rpyc are one script; loose files override archives, as Ren'Py loads them. */
 function scripts(gameDir,{tl=false}={}){const out=new Map();const inTl=rel=>/(^|\/)tl\//i.test(rel);

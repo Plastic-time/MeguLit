@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const kit=require('./kit.cjs');/* E577 shared engine kit */
 /* Nitro+ NPK2 archives (みにくいモジカの子 and other Mware games). Layout and keys as in GARbro (MIT, morkt/GARbro
    ArcFormats/NitroPlus/ArcNPK.cs and its GameData/Formats.dat): "NPK2", version, IV (16) at 8, count at 0x18, index size at
    0x1C, AES-256-CBC index from 0x20. Entry: flag byte, u16 name length, UTF-8 name, unpacked size, 32-byte hash, segment
@@ -13,7 +14,7 @@ const KEYS={
  'Tokyo Necro':{exe:[],key:'962c5f3a789c8437b71212a115d6ca9f9ae3fd210ff6af70a8a8f8bbfe5e8af5'},
 };
 function decrypt(key,iv,data){const d=crypto.createDecipheriv('aes-256-cbc',key,iv);d.setAutoPadding(false);return Buffer.concat([d.update(data),d.final()]);}
-function head(file){const fd=fs.openSync(file,'r');try{const h=Buffer.alloc(0x20);fs.readSync(fd,h,0,0x20,0);return h;}finally{fs.closeSync(fd);}}
+const head=file=>kit.head(file,0x20);
 // The key that turns the first index block into a plausible entry (flag, short name length, printable name).
 function findKey(file){const h=head(file);if(h.toString('latin1',0,4)!=='NPK2')return null;const fd=fs.openSync(file,'r');let blk;try{blk=Buffer.alloc(32);fs.readSync(fd,blk,0,32,0x20);}finally{fs.closeSync(fd);}
  for(const [title,v] of Object.entries(KEYS)){const key=Buffer.from(v.key,'hex'),p=decrypt(key,h.subarray(8,24),blk),n=p.readUInt16LE(1);

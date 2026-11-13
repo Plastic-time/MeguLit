@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const kit=require('./kit.cjs');/* E577 shared engine kit */
 // E280 script engines read as a set of scene files (user, 2026-11-10: zero-latency bilingual for more engines).
 // Each engine lists the running game's scene files and turns one file into text lines plus anchors (the parts a
 // translation keeps unchanged: commands, file names, labels). A patch file with the same name lines up with the running
@@ -23,18 +24,12 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const xp3=require('./xp3.cjs');
 const KANA=/[ぁ-ゖァ-ヺ]/g;
-function decode(buf){
- if(buf[0]===0xff&&buf[1]===0xfe)return buf.toString('utf16le',2);
- if(buf[0]===0xfe&&buf[1]===0xff){const b=Buffer.from(buf.subarray(2));b.swap16();return b.toString('utf16le');}
- if(buf[0]===0xef&&buf[1]===0xbb&&buf[2]===0xbf)return buf.toString('utf8',3);
- try{return new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch{}
- const score=enc=>{const t=new TextDecoder(enc).decode(buf);return {t,bad:(t.match(/�/g)||[]).length,kana:(t.match(KANA)||[]).length};};
- const sj=score('shift_jis'),gbk=score('gbk');return sj.bad<gbk.bad||sj.bad===gbk.bad&&sj.kana>=gbk.kana?sj.t:gbk.t;
-}
+/* E577 kit.decodeText: BOM, strict UTF-8, then Shift-JIS / GBK */
+const decode=kit.decodeText;
 const ascii=t=>/^[\x20-\x7e]*$/.test(t);
 const {stat}=require('./file-key.cjs');
-function walk(dir,depth,test,out=[]){let entries;try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
- for(const e of entries){const full=path.join(dir,e.name);if(e.isDirectory()){if(depth>0&&!/^(save|savedata|\.megulit)/i.test(e.name))walk(full,depth-1,test,out);}else if(e.isFile()&&test(e.name,full))out.push(full);}return out;}
+/* E577 kit.walk (same folders skipped) */
+const walk=(dir,depth,test,out=[])=>kit.walk(dir,depth,test,out);
 
 // ---- KiriKiri -------------------------------------------------------------------------------------------------
 // Text lines are what is left of a line after its tags; command lines (@...), labels (*...) and tag-only lines are
@@ -91,7 +86,7 @@ function pfsList(file){
   return {files,key};
  }finally{fs.closeSync(fd);}
 }
-function pfsRead(file,entry,key){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(entry.size);fs.readSync(fd,b,0,entry.size,entry.offset);if(key)for(let i=0;i<b.length;i++)b[i]^=key[i%20];return b;}finally{fs.closeSync(fd);}}
+function pfsRead(file,entry,key){const b=kit.readAt(file,entry.offset,entry.size);return key?kit.xor(b,key):b;}
 const AST=n=>/\.ast$/i.test(n);
 function pfsScenes(file){let t;try{t=pfsList(file);}catch{return [];}if(!t)return [];return t.files.filter(e=>AST(e.name)).map(e=>({name:path.basename(e.name.replace(/\\/g,'/')),read:()=>pfsRead(file,e,t.key)}));}
 // Quoted strings in file order: the ones with any non-ASCII character are text, the rest are anchors.
