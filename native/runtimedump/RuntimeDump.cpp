@@ -30,6 +30,7 @@
 #include <set>
 #include "minhook/include/MinHook.h"
 #include "modules/modules.h"
+#include "modules/dump_api.h"
 
 // ---- feature modules (modules/modules.h, docs/runtime-dump-pack.md) -------------------------------------------------
 #define MODULE(Name) void Name##Start(const wchar_t *out); void Name##Tick();
@@ -208,10 +209,11 @@ bool Picture(const std::string &source) {
  std::string e = source.substr(d + 1); for (auto &c : e) if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
  return e == "png" || e == "jpg" || e == "jpeg" || e == "bmp" || e == "webp" || e == "tlg";
 }
-void Save(const std::string &source, const char *how, const unsigned char *data, DWORD n, ULONGLONG offset) {
- if (Picture(source)) return;
+void SaveAs(const std::string &source, const char *how, const unsigned char *data, DWORD n, ULONGLONG offset, bool force) {
+ if (!force && Picture(source)) return;
  Score s = Classify(data, n);
- if (!Texty(s)) return;
+ if (!force && !Texty(s)) return;
+ if (!*s.enc) s.enc = "binary";
  ULONG crc = Crc32 ? Crc32(0, data, n) : n;
  bool fresh; { Lock l; fresh = Saved.insert(crc).second; }
  if (!fresh) return;
@@ -226,6 +228,8 @@ void Save(const std::string &source, const char *how, const unsigned char *data,
  std::string line = "{\"seq\":" + std::to_string((long long)seq) + ",\"file\":" + Json(name) + ",\"source\":" + Json(source) + tail;
  Append(L"index.jsonl", line, 64u << 20);
 }
+
+void Save(const std::string &source, const char *how, const unsigned char *data, DWORD n, ULONGLONG offset) { SaveAs(source, how, data, n, offset, false); }
 
 // ---- watched regions -----------------------------------------------------------------------------------------------
 struct Region { const void *p; DWORD n; ULONG raw, last; DWORD born, seen; std::string source; ULONGLONG offset; const char *how; int stable; };
@@ -338,7 +342,8 @@ BOOL WINAPI HReadFile(HANDLE h, LPVOID buf, DWORD want, LPDWORD got, LPOVERLAPPE
  Guard g;
  std::string name; bool tracked = false;
  { Lock l; auto it = Files.find(h); if (it != Files.end()) { name = it->second; tracked = true; } }
- if (tracked && *got <= MaxRegion) { // a read of hundreds of MB is media or an archive, not a script: never copied on the game's thread
+ if (tracked && *got <= MaxRegion && Picture(name)) Sinks(name, "plain", (const unsigned char *)buf, *got); // loose pictures: Cg only, never Watch/Arm (keeps LastSource and Regions for scripts)
+ else if (tracked && *got <= MaxRegion) { // a read of hundreds of MB is media or an archive, not a script: never copied on the game's thread
   DWORD n = *got;
   LARGE_INTEGER zero, pos; zero.QuadPart = 0; pos.QuadPart = 0;
   SetFilePointerEx(h, zero, &pos, FILE_CURRENT);
@@ -377,10 +382,13 @@ LPVOID WINAPI HMapView(HANDLE s, DWORD a, DWORD hi, DWORD lo, SIZE_T n) {
    if (!size && VirtualQuery(p, &mi, sizeof mi)) size = mi.RegionSize;
    DWORD m = (DWORD)(size > MaxWatch ? MaxWatch : size); // review item 6: at most 16 MB read on the game's thread
    unsigned char *copy = Copy(p, m);
+   ULONGLONG offset = ((ULONGLONG)hi << 32) | lo;
    if (copy) {
-    ULONGLONG offset = ((ULONGLONG)hi << 32) | lo;
-    Save(name, "plain", copy, m, offset);
     Sinks(name, "plain", copy, m);
+    if (Picture(name)) { free(copy); copy = NULL; } // pictures: Cg only (see HReadFile)
+   }
+   if (copy) {
+    Save(name, "plain", copy, m, offset);
     // A mapped view the game can write to (copy-on-write or read-write) may be decrypted in place.
     if (a & (FILE_MAP_WRITE | FILE_MAP_COPY)) Watch(p, m, Crc32 ? Crc32(0, copy, m) : 0, name, offset, "inplace");
     if (m >= ArmFrom) Arm(m, name);
@@ -745,6 +753,21 @@ DWORD WINAPI Run(void *) {
  }
 }
 }
+
+// ---- module API (modules/dump_api.h) ---------------------------------------------------------------------------------
+void DumpSave(const char *source, const char *how, const unsigned char *data, DWORD n, ULONGLONG offset, bool force) {
+ if (!data || !n) return;
+ try { SaveAs(source ? source : "memory", how ? how : "module", data, n, offset, force); } catch (...) {}
+}
+void DumpLog(const char *line) { try { Log(line ? line : ""); } catch (...) {} }
+bool DumpInside() { return Inside(); }
+DumpScope::DumpScope() { e = GetLastError(); was = TlsGetValue(Tls) != NULL; TlsSetValue(Tls, (void *)1); SetLastError(e); }
+DumpScope::~DumpScope() { if (!was) TlsSetValue(Tls, NULL); SetLastError(e); }
+bool DumpSkipped(const wchar_t *path) { try { return !path || Skipped(path); } catch (...) { return true; } }
+bool DumpHook(void *target, void *detour, void **original) { return target && MH_CreateHook(target, detour, original) == MH_OK && MH_EnableHook(target) == MH_OK; }
+void DumpUnhook(void *target) { if (target) MH_DisableHook(target); }
+bool DumpReadable(const void *p, SIZE_T n) { return Readable(p, n); }
+
 
 BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, void *) {
  if (reason == DLL_PROCESS_ATTACH) {

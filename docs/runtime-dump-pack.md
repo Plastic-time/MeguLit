@@ -37,8 +37,13 @@ MeguLit-runtime-dump-v<ver>.zip
 
 两个函数都在 SEH 里跑：一个模块出错只关掉它自己（日志里写 `module off after a fault: <Name>`），其他模块和游戏都不受影响。模块要自己装 hook 的话用 MinHook（`MH_Initialize` 已经调过了），hook 函数里先看 `Inside()`，用 `Guard` 防止重入。读回的那一侧放在 `services/` 下，按 `<out>` 目录约定去读
 
+模块能用的核心接口在 `modules/dump_api.h`：`DumpSave`（写进 index.jsonl；`force` 跳过「像不像文本」的判断）、`DumpLog`、`DumpInside` / `DumpScope`（防重入，保留 GetLastError）、`DumpSkipped`、`DumpHook` / `DumpUnhook`（MinHook）、`DumpReadable`
+
+自测用例：`native/runtimedump/selftest/cases/<Name>.cpp` + `cases/cases.h` 一行，说明见 `selftest/fakegame.h`
+
 ## 现在 DLL 里有的东西
 
 - 抓解密/解压的输出：ReadFile/MapView 原地解密、读文件后同尺寸的新缓冲、RtlDecompressBuffer、zlib → `index.jsonl` + `NNNNN_<source>_<how>.bin`
 - 种子扩张：读 `seeds.txt`（MeguLit 写的 hook 行，UTF-8，一行一句），在进程内存里找到包含这句的整块文本，存为 `how:"seed"`
 - 读回：`services/runtime-dump.cjs`（原始缓冲）、`services/script-harvest.cjs`（整理好的剧本、日中配对、报告 → `harvest.json`）
+- KiriKiri 模块 `modules/Krkr.cpp`（仅 32 位）：挂 TVPCreateStream（KRKRZ/KRKR2 特征码，加壳的 exe 等到 GetProcAddress("V2Link") 时再找），把引擎刚打开、已经解密的流整份读出来再 Seek 回 0，KAG SimpleCrypt（FE FE 0/1/2）解成带 BOM 的 UTF-16，存为 `how:"krkr"`

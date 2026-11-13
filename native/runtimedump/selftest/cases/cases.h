@@ -6,4 +6,5 @@
  CASE(Safety) \
  CASE(Cg) \
  CASE(AudioMore) \
- CASE(Voice)
+ CASE(Voice) \
+ CASE(Krkr)
