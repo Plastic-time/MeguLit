@@ -34,12 +34,10 @@ const SCRIPT=/\.(scr|spt|txt)$/i;
 function list(file){const a=all(file);const s=(a||[]).filter(e=>SCRIPT.test(e.name));return s.length?s:null;}
 const isArchive=file=>{try{return !!all(file);}catch{return false;}};
 
-function zlc2(src){if(src.length<8||src.toString('latin1',0,4)!=='ZLC2')return src;const n=src.readUInt32LE(4);if(n>256<<20)return src;const out=Buffer.alloc(n);let o=0,p=8;
- while(p<src.length&&o<n){const ctl=src[p++];for(let m=0x80;m&&p<src.length&&o<n;m>>=1){
-  if(ctl&m){if(p+1>=src.length)return out.subarray(0,o);let off=src[p++];const b1=src[p++];off|=(b1&0xf0)<<4;const cnt=(b1&0x0f)+3;if(!off)off=4096;if(off>o)return out.subarray(0,o);
-   for(let k=0;k<cnt&&o<n;k++,o++)out[o]=out[o-off];}
-  else out[o++]=src[p++];}}
- return out.subarray(0,o);}
+/* E577 ZLC2 is the distance-back LZ shared with SiglusEngine (kit.lzDistance): flags MSB first, 1 = reference */
+const ZLC2_TOKEN=(b0,b1)=>({dist:(b0|(b1&0xf0)<<4)||4096,len:(b1&0x0f)+3});
+function zlc2(src){if(src.length<8||src.toString('latin1',0,4)!=='ZLC2')return src;const n=src.readUInt32LE(4);if(n>256<<20)return src;
+ return kit.lzDistance(src,n,{at:8,msb:true,refIsOne:true,token:ZLC2_TOKEN});}
 function read(file,e){let b=kit.readAt(file,e.offset,e.size);for(let i=0;i<4&&b.length>8&&b.toString('latin1',0,4)==='ZLC2';i++)b=zlc2(b);return b;}
 const engine=kit.engine({id:'interheart',hint:'*.fpk（*.scr / *.spt）',archives:{name:/\.fpk$/i,list,read},parse:buf=>({lines:kit.decodeRuns(buf),anchors:[]}),test:()=>false});
 engine.heuristic=true;

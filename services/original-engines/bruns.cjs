@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const kit=require('./kit.cjs');/* E577 shared engine kit */
 /* Bruns system (Belisama ダストマニア・グロテスク～解体挿入新書～): scene/*.bso are "EENC"/"EENZ" files, as in GARbro (MIT,
    ArcFormats/Bruns/ImageEENC.cs): key = (u32 at 4) ^ 0xDEADBEEF, bytes from 8 XOR-ed with the key's bytes in turn, then
    zlib for "EENZ". The scene is Lisp-like Shift-JIS: (a3:send-string "[$B千春$K]台詞$N" n) puts text up, wait-w waits
@@ -16,11 +17,6 @@ function parse(data){const t=sj.decode(decode(data)),lines=[];let name='',text='
   text+=s.replace(/\$[A-Za-z]/g,'');}
  flush();return {lines,anchors:[]};}
 const sceneDir=dir=>{const d=path.join(dir,'scene');try{return fs.readdirSync(d).some(f=>/\.bso$/i.test(f))?d:null;}catch{return null;}};
-const engine={
- id:'bruns',hint:'scene\\*.bso',
- scenes(dir){const d=sceneDir(dir);if(!d)return [];return fs.readdirSync(d).filter(f=>/\.bso$/i.test(f)).sort().map(f=>({name:f,read:()=>fs.readFileSync(path.join(d,f))}));},
- archives:()=>[],sources:dir=>{const d=sceneDir(dir);return d?fs.readdirSync(d).filter(f=>/\.bso$/i.test(f)).map(f=>path.join(d,f)):[];},
- parse,test:n=>/\.bso$/i.test(n),
- _internal:{decode},
-};
+/* E577 kit.engine: loose scene\*.bso */
+const engine=kit.engine({id:'bruns',hint:'scene\\*.bso',overlay:false,loose:{name:/\.bso$/i,subs:['scene']},parse,test:n=>/\.bso$/i.test(n),extra:{_internal:{decode}}});
 module.exports={decode,parse,engine};

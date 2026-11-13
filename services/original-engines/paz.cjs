@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const kit=require('./kit.cjs');/* E577 shared engine kit */
 /* Musica engine PAZ archives (ぱれっと ましろ色シンフォニー scr.dat), as in GARbro (MIT, ArcFormats/Musica/ArcPAZ.cs,
    keys from its GameData/Formats.dat PazScheme). Version 1+: a 32-byte header naming the game, then the index size
    (XOR-ed with its top byte when that is not 0), a Blowfish (index key) index: count, then per entry a C-string name,
@@ -67,16 +68,14 @@ function parse(data){const lines=[],voices=[];const text=japanese(data);if(text=
  const v=voiceRef.keep(voices);return v?{lines,anchors:[],voices:v}:{lines,anchors:[]};}
 /* scr.dat (Musica) or scr.paz / pmscr.paz (minori) */
 function scrDat(dir){for(const n of ['scr.dat','scr.paz']){const f=path.join(dir,n);if(fs.existsSync(f)&&schemeOf(f))return f;}return null;}
-const engine={
- id:'paz',hint:'scr.dat 或 scr.paz',
- scenes(dir){const f=scrDat(dir);if(!f)return [];return (list(f)||[]).filter(e=>/\.sc$/i.test(e.name));},
- archives:()=>[],sources:dir=>{const f=scrDat(dir);return f?[f]:[];},
- parse,test:n=>/\.sc$/i.test(n),
+/* E577 kit.engine: one script archive, entries keep their names and order */
+const engine=kit.engine({id:'paz',hint:'scr.dat 或 scr.paz',overlay:false,
+ archives:{find:dir=>scrDat(dir),list,entry:/\.sc$/i,keepPath:true,sort:false},parse,test:n=>/\.sc$/i.test(n),extra:{
  /* E452 the scenario opens but holds no Japanese (English Steam build, Chinese patch over scr.paz) */
  unsupported(dir){const f=scrDat(dir);if(!f)return '';const sc=(list(f)||[]).filter(e=>/\.sc$/i.test(e.name));if(!sc.length)return '';
   for(const e of sc){try{if(new TextDecoder('shift_jis').decode(e.read()).split(/\r?\n/).some(r=>r.startsWith('.message')&&KANA.test(r)))return '';}catch{}}return 'PAZ_NO_JAPANESE';},
  REASONS:{PAZ_NO_JAPANESE:'这个版本的剧本里没有日文原文（英文版或装了汉化补丁），需要日文版的 scr 文件'},
-};
+}});
 // E450 the clips of voice.dat, for game-voice.cjs.
 function audio(file){if(!/[\\/](?:pm)?voice\.(?:dat|paz)$/i.test(file))return null;const l=list(file);return l?l.map(e=>({name:/\.\w{2,4}$/.test(e.name)?e.name:e.name+'.ogg',read:e.read})):null;}
 module.exports={SCHEMES,list,parse,engine,audio};

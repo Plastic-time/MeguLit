@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const kit=require('./kit.cjs');/* E577 shared engine kit */
 /* Nitro+ PAK v2/v3 (沙耶の唄 2003 and other early Nitro+ games), as in GARbro (MIT, ArcFormats/NitroPlus/ArcPAK.cs):
    version, count, unpacked index size, packed index size at 0xC; a zlib index from 0x118 (0x114 in version 2). Entry:
    name length, Shift-JIS name, offset (from the index end), unpacked size, unused, packed flag, packed size; packed
@@ -23,10 +24,6 @@ function parse(data){const t=sj.decode(data),lines=[],ruby=[];
   if(!text||!/[ぁ-ゖァ-ヺ一-龯]/.test(text))continue;if(name){lines.push(name);ruby.push(null);}lines.push(text);ruby.push(pairs.length?pairs:null);}
  return {lines,anchors:[],ruby};}
 function scriptPak(dir){const f=path.join(dir,'script.pak');try{const l=list(f);if(l&&l.some(e=>/\.txt$/i.test(e.name)))return f;}catch{}return null;}
-const engine={
- id:'nitro-pak',hint:'script.pak',
- scenes(dir){const f=scriptPak(dir);if(!f)return [];return list(f).filter(e=>/\.txt$/i.test(e.name)).map(e=>({name:path.basename(e.name.replace(/\\/g,'/')),read:e.read}));},
- archives:()=>[],sources:dir=>{const f=scriptPak(dir);return f?[f]:[];},
- parse,test:n=>/\.txt$/i.test(n),
-};
+/* E577 kit.engine: one script archive, base names, archive order */
+const engine=kit.engine({id:'nitro-pak',hint:'script.pak',overlay:false,archives:{find:dir=>scriptPak(dir),list,entry:/\.txt$/i,sort:false},parse,test:n=>/\.txt$/i.test(n)});
 module.exports={list,parse,engine};

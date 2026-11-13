@@ -39,12 +39,7 @@ function parse(d){const lines=[],voices=[];for(const s of strings(d)){if(!s.star
 // E450 the voice clips of an NPK2 archive (voice.npk), for game-voice.cjs.
 function audio(file){try{if(!findKey(file))return null;return (list(file)||[]).filter(e=>/[.](?:ogg|wav|opus)$/i.test(e.name));}catch{return null;}}
 function scriptNpk(dir){for(const sub of ['.','..']){const f=path.join(dir,sub,'script.npk');try{if(fs.statSync(f).isFile()&&findKey(f))return f;}catch{}}return null;}
-const engine={
- id:'nitro-npk',hint:'script.npk',
- scenes(dir){const f=scriptNpk(dir);if(!f)return [];return (list(f)||[]).filter(e=>/^media\/script\/nut\/[^/]+\.nut$/i.test(e.name)).map(e=>({name:path.basename(e.name),read:e.read}));},
- archives:()=>[],
- sources:dir=>{const f=scriptNpk(dir);return f?[f]:[];},
- parse,test:n=>/\.nut$/i.test(n),
- _internal:{strings,clean},
-};
+/* E577 kit.engine: one script archive, base names, archive order */
+const engine=kit.engine({id:'nitro-npk',hint:'script.npk',overlay:false,
+ archives:{find:dir=>scriptNpk(dir),list,entry:/^media\/script\/nut\/[^/]+\.nut$/i,sort:false},parse,test:n=>/\.nut$/i.test(n),extra:{_internal:{strings,clean}}});
 module.exports={KEYS,findKey,list,engine,audio};

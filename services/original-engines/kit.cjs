@@ -203,14 +203,19 @@ function lineGrammar(text,opts={}){const lines=[],anchors=[];let block=null;
 /* engine({id, hint, archives:{name, magic, subs, list(file) -> entries|null, read(file, entry) -> Buffer, entry: RegExp},
    loose:{name, subs}, parse}) -> {id, hint, scenes, archives, sources, parse, test}. Loose files override archived
    ones of the same base name; scenes are sorted by name. */
-function engine(def){
- const arcFiles=dir=>def.archives?files(dir,{name:def.archives.name,magic:def.archives.magic,subs:def.archives.subs||['']}).filter(f=>{try{return !!def.archives.list(f);}catch{return false;}}):[];
+/* archives options (E577, so the single-script-archive readers share it too): find(dir) -> files instead of the name /
+   magic search; entries that carry their own read() keep it; keepPath keeps "folder/name" (default: the base name);
+   sort:false keeps the archive's order. overlay:false makes archives(dir) return [] (the reader pairs a patch its own
+   way, or a patch never replaces single entries). */
+function engine(def){const A=def.archives;
+ const arcFiles=dir=>!A?[]:(A.find?[].concat(A.find(dir)||[]):files(dir,{name:A.name,magic:A.magic,subs:A.subs||['']})).filter(f=>{try{return !!A.list(f);}catch{return false;}});
  const looseFiles=dir=>def.loose?files(dir,{name:def.loose.name,subs:def.loose.subs||[''],max:20000}):[];
  const scenes=dir=>{const out=new Map();
-  for(const a of arcFiles(dir)){let l;try{l=def.archives.list(a);}catch{l=null;}for(const e of l||[]){if(def.archives.entry&&!def.archives.entry.test(e.name))continue;const n=path.posix.basename(e.name);out.set(n.toLowerCase(),{name:n,read:()=>def.archives.read?def.archives.read(a,e):entryRead(a,e)});}}
+  for(const a of arcFiles(dir)){let l;try{l=A.list(a);}catch{l=null;}for(const e of l||[]){if(A.entry&&!A.entry.test(e.name))continue;const n=A.keepPath?e.name:path.posix.basename(String(e.name).replace(/\\/g,'/'));
+   out.set(n.toLowerCase(),{name:n,read:typeof e.read==='function'?e.read:()=>A.read?A.read(a,e):entryRead(a,e)});}}
   for(const f of looseFiles(dir))out.set(path.basename(f).toLowerCase(),{name:path.basename(f),read:()=>fs.readFileSync(f)});
-  return [...out.values()].sort((a,b)=>a.name.localeCompare(b.name));};
- return {id:def.id,hint:def.hint,scenes,archives:scenes,sources:dir=>[...arcFiles(dir),...looseFiles(dir)],parse:buf=>{try{return def.parse(Buffer.isBuffer(buf)?buf:Buffer.from(buf));}catch{return {lines:[],anchors:[]};}},test:def.test||(n=>!!def.loose&&def.loose.name.test(n)),...(def.extra||{})};}
+  const list=[...out.values()];return A?.sort===false?list:list.sort((a,b)=>a.name.localeCompare(b.name));};
+ return {id:def.id,hint:def.hint,scenes,archives:def.overlay===false?()=>[]:scenes,sources:dir=>[...arcFiles(dir),...looseFiles(dir)],parse:buf=>{try{return def.parse(Buffer.isBuffer(buf)?buf:Buffer.from(buf));}catch{return {lines:[],anchors:[]};}},test:def.test||(n=>!!def.loose&&def.loose.name.test(n)),...(def.extra||{})};}
 
 module.exports={readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,
  xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,lzDistance,SIGLUS_TOKEN,inflate,inflateRaw,zstd,unpackAny,huffman,table,entryRead,peResource,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine};
