@@ -29,7 +29,8 @@ public:
 };
 // ttstr = pointer to tTJSVariantString_S { RefCount, LongString, ShortString[22], Length, ... }
 struct VariantString { int RefCount; wchar_t *LongString; wchar_t ShortString[22]; int Length; };
-const unsigned Max = 48u << 20;
+// Scripts are small; anything bigger is an archive or media the game is about to stream (review 3, item 1).
+const unsigned Max = 8u << 20;
 
 // ---- inflate (RFC 1951), enough for SimpleCrypt mode 2 -------------------------------------------------------------
 struct Bits { const unsigned char *p, *end; unsigned bit, cnt; bool bad; };
@@ -56,6 +57,13 @@ int Decode(Bits &b, const Huff &h) {
   index += count; first += count; first <<= 1; code <<= 1;
  }
  return -1;
+}
+// Fixed Huffman tables, built once in KrkrStart before any hook can run (review 3, item 5: no first-use race).
+Huff FixedL, FixedD; bool FixedReady;
+void BuildFixed() {
+ short l[288]; int i = 0; for (; i < 144; i++) l[i] = 8; for (; i < 256; i++) l[i] = 9; for (; i < 280; i++) l[i] = 7; for (; i < 288; i++) l[i] = 8;
+ short d[30]; for (i = 0; i < 30; i++) d[i] = 5;
+ FixedReady = Build(FixedL, l, 288) && Build(FixedD, d, 30);
 }
 const short LBase[] = { 3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258 };
 const short LExt[] = { 0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0 };
@@ -86,10 +94,7 @@ bool Inflate(const unsigned char *in, size_t n, std::vector<unsigned char> &out,
    if ((len ^ 0xFFFF) != nlen || (size_t)(b.end - b.p) < len || out.size() + len > cap) return false;
    out.insert(out.end(), b.p, b.p + len); b.p += len;
   } else if (type == 1) {
-   static Huff lc, dc; static bool ready;
-   if (!ready) { short l[288]; int i = 0; for (; i < 144; i++) l[i] = 8; for (; i < 256; i++) l[i] = 9; for (; i < 280; i++) l[i] = 7; for (; i < 288; i++) l[i] = 8; Build(lc, l, 288);
-    short d[30]; for (i = 0; i < 30; i++) d[i] = 5; Build(dc, d, 30); ready = true; }
-   if (!Codes(b, out, lc, dc, cap)) return false;
+   if (!FixedReady || !Codes(b, out, FixedL, FixedD, cap)) return false;
   } else if (type == 2) {
    int nlen = (int)Need(b, 5) + 257, ndist = (int)Need(b, 5) + 1, ncode = (int)Need(b, 4) + 4;
    static const short order[19] = { 16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15 };
@@ -122,7 +127,8 @@ bool SimpleCrypt(const unsigned char *d, size_t n, std::vector<unsigned char> &o
   if (n < 21) return false;
   i64 packed, size; memcpy(&packed, d + 5, 8); memcpy(&size, d + 13, 8);
   if (packed <= 0 || size <= 0 || size > Max || (size_t)packed > n - 21) return false;
-  std::vector<unsigned char> plain; plain.reserve((size_t)size);
+  // the header's size is only a claim: never reserve more than the packed bytes can expand to (deflate max ~1032:1)
+  std::vector<unsigned char> plain; plain.reserve((size_t)min((u64)size, (u64)packed * 1032));
   if (!Inflate(d + 21, (size_t)packed, plain, (size_t)size) || plain.size() != (size_t)size) return false;
   out.insert(out.end(), plain.begin(), plain.end());
   return true;
@@ -141,29 +147,47 @@ std::string Narrow(const wchar_t *w) {
  int n = WideCharToMultiByte(CP_UTF8, 0, w, -1, NULL, 0, NULL, NULL); if (n <= 1) return "";
  std::string r(n - 1, '\0'); WideCharToMultiByte(CP_UTF8, 0, w, -1, &r[0], n, NULL, NULL); return r;
 }
-const wchar_t *NameOf(void *ttstr) {
- if (!ttstr || !DumpReadable(ttstr, sizeof(void *))) return NULL;
+// The name, bounded by its stored length (never an unbounded wcslen on game memory).
+bool NameOf(void *ttstr, std::wstring &out) {
+ if (!ttstr || !DumpReadable(ttstr, sizeof(void *))) return false;
  VariantString *v = *(VariantString **)ttstr;
- if (!v || !DumpReadable(v, sizeof *v)) return NULL;
- const wchar_t *p = v->LongString ? v->LongString : v->ShortString;
- return DumpReadable(p, 2) ? p : NULL;
+ if (!v || !DumpReadable(v, sizeof *v)) return false;
+ if (v->LongString) {
+  if (v->Length <= 0 || v->Length > 4096 || !DumpReadable(v->LongString, (SIZE_T)v->Length * 2)) return false;
+  out.assign(v->LongString, (size_t)v->Length);
+ } else out.assign(v->ShortString, wcsnlen(v->ShortString, 22));
+ return !out.empty();
 }
+// Only members of an archive (".xp3>..." or archive://) with a script-like extension are read: never the archive itself,
+// never media (review 3, item 1).
+bool Wanted(const std::wstring &path) {
+ if (path.find(L'>') == std::wstring::npos && path.compare(0, 10, L"archive://") != 0) return false;
+ size_t dot = path.find_last_of(L'.'), slash = path.find_last_of(L"/\\>");
+ if (dot == std::wstring::npos || (slash != std::wstring::npos && dot < slash)) return false;
+ std::wstring ext = path.substr(dot + 1); for (auto &c : ext) if (c >= L'A' && c <= L'Z') c = (wchar_t)(c + 32);
+ static const wchar_t *ok[] = { L"ks", L"tjs", L"txt", L"csv", L"tsv", L"ini", L"func", L"json", L"xml", L"scn", L"asd" };
+ for (auto e : ok) if (ext == e) return true;
+ return false;
+}
+// The game's stream methods may throw (eTJSError, BCB 0x0EEDFADE) or fault: they are called only through these SEH-only
+// helpers, so nothing ever leaves the hook (review 3, item 2).
+bool SafeSeek(Stream *s, i64 o, int whence, u64 *r) { __try { u64 v = s->Seek(o, whence); if (r) *r = v; return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
+bool SafeRead(Stream *s, void *b, unsigned n, unsigned *got) { __try { *got = s->Read(b, n); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { *got = 0; return false; } }
+// Whatever happens after the stream was touched, the game gets it back at position 0.
+struct Rewind { Stream *s; bool touched; ~Rewind() { if (touched) SafeSeek(s, 0, 0, NULL); } };
 volatile LONG Streams;
 // Reads the whole stream the engine just opened (already decrypted), saves it, and rewinds it for the game.
 void Process(Stream *s, void *name, unsigned flags) {
- if (!s || flags != 0 /* TJS_BS_READ */ || DumpInside()) return;
+ if (!s || flags != 0 /* TJS_BS_READ */ || !DumpActive("Krkr") || DumpInside()) return;
  DumpScope scope;
+ Rewind rewind = { s, false };
  try {
-  const wchar_t *wn = NameOf(name); if (!wn) return;
-  std::wstring path(wn);
-  // "file://./data.xp3>scenario/a.ks", "archive://./scenario/a.ks": the part after the last '>' or '/' marker names it
-  if (DumpSkipped(path.c_str())) return;
-  u64 size = s->Seek(0, 2 /* END */); s->Seek(0, 0 /* SET */);
-  if (!size || size > Max) { s->Seek(0, 0); return; }
+  std::wstring path; if (!NameOf(name, path) || !Wanted(path) || DumpSkipped(path.c_str())) return;
+  u64 size = 0; rewind.touched = true;
+  if (!SafeSeek(s, 0, 2 /* END */, &size) || !SafeSeek(s, 0, 0 /* SET */, NULL) || !size || size > Max) return;
   std::vector<unsigned char> buf((size_t)size);
-  unsigned got = s->Read(buf.data(), (unsigned)size);
-  s->Seek(0, 0);
-  if (got != size) return;
+  unsigned got = 0;
+  if (!SafeRead(s, buf.data(), (unsigned)size, &got) || got != size) return;
   std::string source = Narrow(path.c_str());
   std::vector<unsigned char> text;
   if (SimpleCrypt(buf.data(), buf.size(), text)) DumpSave(source.c_str(), "krkr", text.data(), (DWORD)text.size(), 0, true);
@@ -204,11 +228,18 @@ void __declspec(naked) Detour2() {
          ret }
 }
 
-// Signature search over the exe's image ('*' = 0x2A is a wildcard, as in KrkrDump's PE::SearchPattern).
-void *Search(const char *sig, size_t len) {
+// Signature search over the exe's image ('*' = 0x2A is a wildcard, as in KrkrDump's PE::SearchPattern). Packed exes
+// often wipe or fake their PE header, and this also runs on a game thread (GetProcAddress hook): headers are checked
+// and the whole walk is under SEH (review 3, item 3).
+void *SearchRaw(const char *sig, size_t len) {
  unsigned char *base = (unsigned char *)GetModuleHandleW(NULL);
- IMAGE_DOS_HEADER *dos = (IMAGE_DOS_HEADER *)base; IMAGE_NT_HEADERS *nt = (IMAGE_NT_HEADERS *)(base + dos->e_lfanew);
+ if (!base || !DumpReadable(base, sizeof(IMAGE_DOS_HEADER))) return NULL;
+ IMAGE_DOS_HEADER *dos = (IMAGE_DOS_HEADER *)base;
+ if (dos->e_magic != IMAGE_DOS_SIGNATURE || dos->e_lfanew <= 0 || dos->e_lfanew > 0x10000) return NULL;
+ IMAGE_NT_HEADERS *nt = (IMAGE_NT_HEADERS *)(base + dos->e_lfanew);
+ if (!DumpReadable(nt, sizeof *nt) || nt->Signature != IMAGE_NT_SIGNATURE || nt->FileHeader.NumberOfSections > 96) return NULL;
  IMAGE_SECTION_HEADER *sec = IMAGE_FIRST_SECTION(nt);
+ if (!DumpReadable(sec, sizeof *sec * nt->FileHeader.NumberOfSections)) return NULL;
  for (int k = 0; k < nt->FileHeader.NumberOfSections; k++) {
   if (!(sec[k].Characteristics & IMAGE_SCN_MEM_EXECUTE)) continue;
   unsigned char *p = base + sec[k].VirtualAddress; size_t n = sec[k].Misc.VirtualSize;
@@ -220,6 +251,7 @@ void *Search(const char *sig, size_t len) {
  }
  return NULL;
 }
+void *Search(const char *sig, size_t len) { __try { return SearchRaw(sig, len); } __except (EXCEPTION_EXECUTE_HANDLER) { return NULL; } }
 volatile LONG Hooked;
 bool HookCreateStream(const char *when) {
  if (Hooked) return true;
@@ -235,7 +267,7 @@ bool HookCreateStream(const char *when) {
 typedef HRESULT(__stdcall *V2LinkFn)(void *);
 V2LinkFn OV2Link; void *V2Target;
 HRESULT __stdcall HV2Link(void *exporter) {
- if (!Hooked) { DumpScope scope; char b[64]; sprintf_s(b, "krkr: V2Link exporter %p", exporter); DumpLog(b); HookCreateStream("at V2Link"); }
+ if (!Hooked && DumpActive("Krkr") && !DumpInside()) { DumpScope scope; char b[64]; sprintf_s(b, "krkr: V2Link exporter %p", exporter); DumpLog(b); HookCreateStream("at V2Link"); }
  return OV2Link(exporter);
 }
 typedef FARPROC(WINAPI *GetProcFn)(HMODULE, LPCSTR);
@@ -246,20 +278,23 @@ void Linked(FARPROC r, LPCSTR name);
 FARPROC WINAPI HGetProc0(HMODULE m, LPCSTR name) { FARPROC r = OGetProc[0](m, name); DWORD e = GetLastError(); Linked(r, name); SetLastError(e); return r; }
 FARPROC WINAPI HGetProc1(HMODULE m, LPCSTR name) { FARPROC r = OGetProc[1](m, name); DWORD e = GetLastError(); Linked(r, name); SetLastError(e); return r; }
 void Linked(FARPROC r, LPCSTR name) {
- if (r && HIWORD(name) && !DumpInside() && !strcmp(name, "V2Link")) {
+ if (r && HIWORD(name) && DumpActive("Krkr") && !DumpInside() && !strcmp(name, "V2Link")) {
   DumpScope scope;
-  if (!V2Target && DumpHook((void *)r, (void *)HV2Link, (void **)&OV2Link)) V2Target = (void *)r;
-  if (HookCreateStream("at GetProcAddress(V2Link)")) { DumpUnhook(GetProcTarget[0]); DumpUnhook(GetProcTarget[1]); }
+  if (HookCreateStream("at GetProcAddress(V2Link)")) {
+   // found: neither GetProcAddress nor V2Link (it lives in a plugin that can be unlinked) stays hooked (review 3, item 7)
+   DumpUnhook(GetProcTarget[0]); DumpUnhook(GetProcTarget[1]); if (V2Target) DumpUnhook(V2Target);
+  } else if (!V2Target && DumpHook((void *)r, (void *)HV2Link, (void **)&OV2Link)) V2Target = (void *)r;
  }
 }
 }
 
 void KrkrStart(const wchar_t *) {
+ BuildFixed();
  if (HookCreateStream("at start")) return;
  // Not (yet) a KiriKiri image: if the game folder has .xp3 archives, wait for the engine's plugins to link. Other games
  // get no GetProcAddress hook at all.
  wchar_t exe[1024]; DWORD n = GetModuleFileNameW(NULL, exe, 1024); if (!n || n >= 1024) return;
- wchar_t *cut = wcsrchr(exe, L'\\'); if (!cut) return; wcscpy_s(cut + 1, 1024 - (cut + 1 - exe), L"*.xp3");
+ wchar_t *cut = wcsrchr(exe, L'\\'); if (!cut) return; if (_snwprintf_s(cut + 1, 1024 - (cut + 1 - exe), _TRUNCATE, L"*.xp3") < 0) return; // review 3, item 6
  WIN32_FIND_DATAW f; HANDLE h = FindFirstFileW(exe, &f); if (h == INVALID_HANDLE_VALUE) return; FindClose(h);
  HMODULE k32 = GetModuleHandleW(L"kernel32.dll"), kb = GetModuleHandleW(L"kernelbase.dll");
  GetProcTarget[0] = k32 ? (void *)GetProcAddress(k32, "GetProcAddress") : NULL;

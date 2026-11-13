@@ -742,6 +742,11 @@ void DumpSave(const char *source, const char *how, const unsigned char *data, DW
 }
 void DumpLog(const char *line) { try { Log(line ? line : ""); } catch (...) {} }
 bool DumpInside() { return Inside(); }
+bool DumpActive(const char *module) {
+ if (!Ready) return false;
+ for (auto &m : Modules) if (m.name && module && !strcmp(m.name, module)) return !m.off;
+ return true;
+}
 DumpScope::DumpScope() { e = GetLastError(); was = TlsGetValue(Tls) != NULL; TlsSetValue(Tls, (void *)1); SetLastError(e); }
 DumpScope::~DumpScope() { if (!was) TlsSetValue(Tls, NULL); SetLastError(e); }
 bool DumpSkipped(const wchar_t *path) { try { return !path || Skipped(path); } catch (...) { return true; } }
