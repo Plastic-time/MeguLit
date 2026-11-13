@@ -154,3 +154,28 @@ html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .about-page{
 html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .about-page :is(dd,.about-link,h1,h2,h3,strong,b,.about-support>p,figcaption,.about-tagline,p){color:var(--t-text)!important}
 html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .about-page :is(dt,.about-update-state,.about-eyebrow,small,.about-sub,em){color:var(--t-text-2)!important}
 html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .about-page :is(button.about-update,.about-link){color:var(--t-text)!important;background:rgba(255,255,255,.7)!important;box-shadow:inset 0 0 0 1px var(--t-line-2)!important;border-color:var(--t-line-2)!important}
+
+/* light theme, every page: the grey / gold ink tokens are dark enough for small text on the light paper, and the surfaces that were drawn dark
+   (dialogs, the news card, stat tiles, page tabs) take the light panel; light ink that was written for dark glass reads the text token */
+:root[data-theme=light]{--g-t3:#76604f;--g-gold:#8a5a24;--gold-accent:#8a5a24;--lb-ink-3:#76604f;--lb-gold:#8a5a24}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(dialog.game-dialog,.lv-dialog){background:var(--t-panel-solid)!important;color:var(--t-text)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(dialog.game-dialog,.lv-dialog) :is(h2,h3,li,p,kbd,nav button){color:var(--t-text)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(dialog.game-dialog,.lv-dialog) kbd{background:rgba(60,30,30,.06)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.lb-tile,.tv-hot-news){background:var(--t-panel)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main :is(.lb-seg,.lb-tabs,.stg-tabs,.tabs)>button:is([aria-pressed=true],[aria-selected=true],.active,.on){color:var(--t-text)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main>.tabs{background:var(--t-panel)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main>.tabs>button{color:var(--t-text-2)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .game-caption .mq{color:var(--t-text)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.main .text-button,#reader-notice button){color:var(--t-red)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .tv-hot-news .tv-hot-meta{background:rgba(255,252,249,.92)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .tv-hot-news .tv-hot-meta small{color:var(--t-text-2)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .hero-placeholder .ph-title{color:#fff4ea!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .game-caption{opacity:1!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(dialog.game-dialog,.lv-dialog) :is(b,small,label,button.secondary,button.text-button){color:var(--t-text)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(dialog.game-dialog,.lv-dialog) small{color:var(--t-text-2)!important;opacity:1!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(dialog.game-dialog,.lv-dialog) button.secondary{background:#fff!important;box-shadow:inset 0 0 0 1px var(--t-line-2)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .gm-page :is(b,span,small,h2,.gm-kicker,.rw-title,.rw-album-btn,.gm-hero-prog,.gm-hero-level,.gm-stg-glyph,.gm-level){color:var(--t-text)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .gm-page :is(small,.gm-kicker,.lg-bar>span){color:var(--t-text-2)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .gm-page .gm-level.active{color:#fff!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .gm-page .gm-stg.on :is(span,b){color:#fff4ea!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .gm-page .gm-link{color:var(--t-red)!important}
