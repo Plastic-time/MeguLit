@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const kit=require('./kit.cjs');/* E577 shared engine kit */
 /* Musica engine PAZ archives (ぱれっと ましろ色シンフォニー scr.dat), as in GARbro (MIT, ArcFormats/Musica/ArcPAZ.cs,
    keys from its GameData/Formats.dat PazScheme). Version 1+: a 32-byte header naming the game, then the index size
    (XOR-ed with its top byte when that is not 0), a Blowfish (index key) index: count, then per entry a C-string name,
@@ -45,7 +46,7 @@ function list(file){const scheme=schemeOf(file),arc=path.parse(file).name.toLowe
  if(size&7||start+4+size>b.length)return null;const raw=Buffer.from(b.subarray(start+4,start+4+size));if(xor)for(let i=0;i<raw.length;i++)raw[i]^=xor;
  const idx=new Blowfish(Buffer.from(scheme[arc].index,'hex')).decryptBuffer(raw),count=idx.readUInt32LE(0),out=[];let p=4;
  if(count<=0||count>100000)return null;const dataKey=Buffer.from(scheme[arc].data,'hex');
- for(let i=0;i<count;i++){const z=idx.indexOf(0,p);if(z<0)return null;const name=new TextDecoder('shift_jis').decode(idx.subarray(p,z));p=z+1;
+ for(let i=0;i<count;i++){const z=idx.indexOf(0,p);if(z<0)return null;const name=kit.SJIS.decode(idx.subarray(p,z));p=z+1;
   const e={name,offset:Number(idx.readBigInt64LE(p)),unpacked:idx.readUInt32LE(p+8),size:idx.readUInt32LE(p+12),aligned:idx.readUInt32LE(p+16),packed:idx.readInt32LE(p+20)!==0};p+=24;
   if(e.offset+e.aligned>b.length)return null;
   out.push({name,read:()=>{let d=Buffer.from(b.subarray(e.offset,e.offset+e.aligned));if(xor)for(let k=0;k<d.length;k++)d[k]^=xor;d=new Blowfish(dataKey).decryptBuffer(d);
@@ -59,7 +60,7 @@ const voiceRef=require('./voice-ref.cjs');
 /* E452 a script is Japanese unless its messages have no kana and are either not plain ASCII (a Chinese patch in GBK
    over scr.paz, eden* on Steam) or many and all ASCII (an English release): those are not offered as originals. */
 const KANA=/[぀-ヿ]/;
-function japanese(data){const text=new TextDecoder('shift_jis').decode(data),rows=text.split(/\r?\n/).filter(r=>r.startsWith('.message'));
+function japanese(data){const text=kit.SJIS.decode(data),rows=text.split(/\r?\n/).filter(r=>r.startsWith('.message'));
  if(rows.some(r=>KANA.test(r)))return text;const ascii=rows.every(r=>/^[\x00-\x7f]*$/.test(r));return ascii&&rows.length<20?text:null;}
 function parse(data){const lines=[],voices=[];const text=japanese(data);if(text==null)return {lines,anchors:[]};
  for(const row of text.split(/\r?\n/)){if(!row.startsWith('.message'))continue;const f=row.split('\t');const name=f[3]||'',text=(f.slice(4).join('\t')||'').replace(/\\#[0-9A-Fa-f]{6}/g,'').replace(/\\n/g,'').replace(/\\[-+*A-Za-z]/g,'').trim();/* \#RRGGBB colour, \n break, \+ etc. */
@@ -67,16 +68,14 @@ function parse(data){const lines=[],voices=[];const text=japanese(data);if(text=
  const v=voiceRef.keep(voices);return v?{lines,anchors:[],voices:v}:{lines,anchors:[]};}
 /* scr.dat (Musica) or scr.paz / pmscr.paz (minori) */
 function scrDat(dir){for(const n of ['scr.dat','scr.paz']){const f=path.join(dir,n);if(fs.existsSync(f)&&schemeOf(f))return f;}return null;}
-const engine={
- id:'paz',hint:'scr.dat 或 scr.paz',
- scenes(dir){const f=scrDat(dir);if(!f)return [];return (list(f)||[]).filter(e=>/\.sc$/i.test(e.name));},
- archives:()=>[],sources:dir=>{const f=scrDat(dir);return f?[f]:[];},
- parse,test:n=>/\.sc$/i.test(n),
+/* E577 kit.engine: one script archive, entries keep their names and order */
+const engine=kit.engine({id:'paz',hint:'scr.dat 或 scr.paz',overlay:false,
+ archives:{find:dir=>scrDat(dir),list,entry:/\.sc$/i,keepPath:true,sort:false},parse,test:n=>/\.sc$/i.test(n),extra:{
  /* E452 the scenario opens but holds no Japanese (English Steam build, Chinese patch over scr.paz) */
  unsupported(dir){const f=scrDat(dir);if(!f)return '';const sc=(list(f)||[]).filter(e=>/\.sc$/i.test(e.name));if(!sc.length)return '';
-  for(const e of sc){try{if(new TextDecoder('shift_jis').decode(e.read()).split(/\r?\n/).some(r=>r.startsWith('.message')&&KANA.test(r)))return '';}catch{}}return 'PAZ_NO_JAPANESE';},
+  for(const e of sc){try{if(kit.SJIS.decode(e.read()).split(/\r?\n/).some(r=>r.startsWith('.message')&&KANA.test(r)))return '';}catch{}}return 'PAZ_NO_JAPANESE';},
  REASONS:{PAZ_NO_JAPANESE:'这个版本的剧本里没有日文原文（英文版或装了汉化补丁），需要日文版的 scr 文件'},
-};
+}});
 // E450 the clips of voice.dat, for game-voice.cjs.
 function audio(file){if(!/[\\/](?:pm)?voice\.(?:dat|paz)$/i.test(file))return null;const l=list(file);return l?l.map(e=>({name:/\.\w{2,4}$/.test(e.name)?e.name:e.name+'.ogg',read:e.read})):null;}
 module.exports={SCHEMES,list,parse,engine,audio};

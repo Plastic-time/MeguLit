@@ -311,6 +311,7 @@ async function dispatch(request,runtime=null) {
       case 'daily_anki':return await require('./daily.cjs').anki(root,runtime,request);
       case 'daily_open':{const url=String(request.url||'');if(!require('./daily.cjs').canOpen(url))throw Error('URL_NOT_ALLOWED');const child=spawn('explorer.exe',[new URL(url).href],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {opened:true};}
       /* E377 opt-in leaderboard (services/leaderboard.cjs) */
+      case 'profile_chip':return require('./leaderboard.cjs').chip(root);
       case 'leaderboard_view':return await require('./leaderboard.cjs').view(root,db,{period:String(request.period||''),metric:String(request.metric||''),game:typeof request.game==='string'?request.game:'',submit:request.submit===true,tab:String(request.tab||''),week:String(request.week||''),category:String(request.category||'')});
       /* E379 avatars (moderated on the relay) and reports */
       case 'leaderboard_avatar_set':return await require('./leaderboard.cjs').setAvatar(root,String(request.data||''));
@@ -423,6 +424,7 @@ async function dispatch(request,runtime=null) {
               (collection IN ('sessions','sentence_read_events','lookup_events','sentences','word_sentences') AND json_extract(payload,'$.media_id')=?)`).run(game.legacy_id,game.legacy_id);
             db.prepare('DELETE FROM games WHERE id=?').run(game.id);
             db.exec('COMMIT');
+            require('./sentence-scenes.cjs').removeGame(root,game.id);
           }catch(error){db.exec('ROLLBACK');throw error;}
         }else db.prepare('UPDATE games SET removed_at=? WHERE id=?').run(Math.floor(Date.now()/1000),game.id);
         return {removed:game.id};
@@ -467,9 +469,11 @@ async function dispatch(request,runtime=null) {
       case 'kana_game_words':return require('./kana.cjs').gameWords(db,request.words);
       case 'vocabulary':{/* 2026-11-12 each saved word carries its JLPT level (N5–N1) when the open JLPT list has it */const rows=db.prepare('SELECT v.id,v.spelling,v.reading,v.definitions,v.status,v.created_at,e.text AS example_text,e.game_id AS example_game_id,g.title AS example_title FROM vocabulary v LEFT JOIN examples e ON e.id=(SELECT id FROM examples WHERE word_id=v.id ORDER BY id DESC LIMIT 1) LEFT JOIN games g ON g.id=e.game_id ORDER BY v.created_at DESC,v.id DESC LIMIT 1000').all();let jlpt=null;try{jlpt=require('./learning-insights.cjs').loadJlpt();}catch{}return jlpt?rows.map(r=>({...r,jlpt:(jlpt.byForm.get(r.spelling)||jlpt.byForm.get(r.reading)||null)?.level||null})):rows;}
       case 'sentences':return require('./saved-sentences.cjs').list(db,{source:request.source});
-      case 'sentence_save':{const r=require('./saved-sentences.cjs').save(db,{gameId:request.gameId,text:request.text,translation:request.translation,source:request.source});runtime?.emit?.('reader-event',{type:'sentence-saved'});return r;}
-      case 'sentence_delete':{const r=require('./saved-sentences.cjs').remove(db,{id:request.id,gameId:request.gameId,text:request.text});runtime?.emit?.('reader-event',{type:'sentence-saved'});return r;}
+      case 'sentence_save':{const r=require('./saved-sentences.cjs').save(db,{gameId:request.gameId,text:request.text,translation:request.translation,source:request.source});/* a new sentence of the game being read: its clean picture when one matches (async) */if(r.created&&r.game_id&&runtime?.reader?.gameId===r.game_id)require('./sentence-scenes.cjs').attach(runtime.reader,r.id);runtime?.emit?.('reader-event',{type:'sentence-saved'});return r;}
+      case 'sentence_delete':{const r=require('./saved-sentences.cjs').remove(db,{id:request.id,gameId:request.gameId,text:request.text},{root});runtime?.emit?.('reader-event',{type:'sentence-saved'});return r;}
       case 'sentence_state':return require('./saved-sentences.cjs').state(db,{gameId:request.gameId,text:request.text});
+      /* 2026-11-13 the clean game picture kept with a collected sentence (sentence-scenes.cjs); file names are checked strictly */
+      case 'sentence_scene':return require('./sentence-scenes.cjs').read(root,String(request.id||''),request.file);
       case 'word_trash':return db.prepare('SELECT id,word_id,deleted_at,snapshot FROM word_trash ORDER BY deleted_at DESC,id DESC LIMIT 30').all().map(row=>{const s=JSON.parse(row.snapshot);return {id:row.id,deleted_at:row.deleted_at,spelling:s.word?.spelling || s.spelling || '',reading:s.word?.reading || s.reading || ''};});
       case 'delete_word':return deleteWord(db,Number(request.id));
       case 'restore_word':return restoreWord(db,Number(request.id));

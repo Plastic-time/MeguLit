@@ -32,6 +32,7 @@ class GalNative {
       if(message.type==='hookVisual'){this.controller.visual(message);return;}
       if(message.type==='readerPointer'||message.type==='hostFrame'){this.onEvent(message);return;}
       if(message.type==='sceneShot'){const pending=this.mediaPending?.get('s'+message.id);if(pending){this.mediaPending.delete('s'+message.id);pending(message);}return;}
+      if(message.type==='sceneFrame'||message.type==='sceneProbe'){const key=(message.type==='sceneFrame'?'f':'p')+message.id,pending=this.mediaPending?.get(key);if(pending){this.mediaPending.delete(key);pending(message);}return;}
       if(message.type==='mediaClip'){const pending=this.mediaPending?.get(String(message.id));if(pending){this.mediaPending.delete(String(message.id));pending(message);}return;}
       if (message.type === 'ready') { this.artScanKey='';this.onEvent(message);this.send({ type: 'configure', ...this.preferences });this.send({type:'gameAudio',enabled:!!this.gameAudioWanted}); this.notify({ hotkey:message.hotkey, coverHotkey:message.coverHotkey, modeHotkey:message.modeHotkey, coverEnabled:message.coverEnabled, message:message.hotkey?'全局 Alt+T 已就绪，可选择并绑定游戏窗口':'全局 Alt+T 被占用，可在 ToMe 窗口内按 Alt+T' }); return; }
       if(['normal','translation'].includes(message.interfaceMode)){if(this.pending)this.pending.interfaceMode=message.interfaceMode;this.save({...this.preferences,interfaceMode:message.interfaceMode},false);}
@@ -88,7 +89,7 @@ class GalNative {
   // Anki: the game's own sound and picture. Lines are remembered with the time they arrived; a card's sentence is cut
   // from its line's start to the next line's start (or now) out of the bridge's in-memory recording of the game.
   setGameAudio(enabled){this.gameAudioWanted=!!enabled;this.send({type:'gameAudio',enabled:this.gameAudioWanted});}
-  rememberLine(text){if(typeof text!=='string'||!text.trim())return;const lines=this.lines||(this.lines=[]);if(String(lines.at(-1)?.text||'').replace(/\s+/g,'')===text.replace(/\s+/g,''))return; /* E270: a re-sent line with other breaks is the same line */lines.push({text,at:Date.now()});this.keepVoice(lines.at(-2));if(lines.length>300)lines.splice(0,lines.length-300);}
+  rememberLine(text){if(typeof text!=='string'||!text.trim())return;const lines=this.lines||(this.lines=[]);if(String(lines.at(-1)?.text||'').replace(/\s+/g,'')===text.replace(/\s+/g,''))return; /* E270: a re-sent line with other breaks is the same line */lines.push({text,at:Date.now()});this.keepVoice(lines.at(-2));try{this.onLine?.(text);}catch{}/* voice-harvest.cjs: line times for the game's own voice clips */if(lines.length>300)lines.splice(0,lines.length-300);}
   /* E450 runtime source of the game's own voice: when the next line arrives, the clip recorded for the line before it is
      handed to onLineVoice (game-voice.cjs keeps it for that line). Only with the game sound capture on. */
   keepVoice(line){if(!line||!this.gameAudioWanted||typeof this.onLineVoice!=='function'||line.voiceKept)return;line.voiceKept=true;const text=line.text;setTimeout(()=>{this.gameMedia(text,Date.now(),false).then(m=>{if(m?.matched&&m.audio?.data)this.onLineVoice(text,m.audio.data);}).catch(()=>{});},300).unref?.();}
@@ -108,6 +109,11 @@ class GalNative {
   // Frosted-glass panels: a single frame of the game window only (ToMe's overlay is a separate window, not captured).
   /* 2026-11-12 one clean capture of the game window with its looks score and difference hash (scene-shots.cjs) */
   sceneShot(){const id=String(++this.mediaSerial||(this.mediaSerial=1));return new Promise(resolve=>{const map=this.mediaPending||(this.mediaPending=new Map());const timer=setTimeout(()=>{map.delete('s'+id);resolve(null);},5000);timer.unref?.();map.set('s'+id,m=>{clearTimeout(timer);resolve(m.jpeg?{jpeg:m.jpeg,score:Number(m.score)||0,hash:String(m.hash||'')}:null);});this.send({type:'sceneShot',id});});}
+  /* 2026-11-13 collected sentence pictures (services/sentence-scenes.cjs): sceneFrame = the whole clean frame as JPEG with the hash of
+     its top 62% (asked only while the dialogue box is hidden); sceneProbe = that top hash of the frame on screen now, no picture */
+  sceneFrame(){return this.sceneAsk('sceneFrame','f',m=>m.jpeg&&/^[0-9a-f]{16}$/.test(String(m.topHash||''))?{jpeg:m.jpeg,topHash:String(m.topHash),score:Number(m.score)||0}:null);}
+  sceneProbe(){return this.sceneAsk('sceneProbe','p',m=>/^[0-9a-f]{16}$/.test(String(m.topHash||''))?{topHash:String(m.topHash)}:null);}
+  sceneAsk(type,prefix,shape){const id=String(++this.mediaSerial||(this.mediaSerial=1));return new Promise(resolve=>{const map=this.mediaPending||(this.mediaPending=new Map());const timer=setTimeout(()=>{map.delete(prefix+id);resolve(null);},5000);timer.unref?.();map.set(prefix+id,m=>{clearTimeout(timer);resolve(shape(m));});this.send({type,id});});}
   gameFrame(readerBounds){const now=Date.now(),id=String(++this.mediaSerial||(this.mediaSerial=1));return new Promise(resolve=>{const map=this.mediaPending||(this.mediaPending=new Map());const timer=setTimeout(()=>{map.delete(id);resolve('');},4000);timer.unref?.();map.set(id,m=>{clearTimeout(timer);resolve(m.jpeg||'');});this.send({type:'mediaClip',id,from:now,to:now,screenshot:true,...(readerBounds&&{readerScreenshot:true,...readerBounds})});});}
   /* 2026-11-12 art scan (OCR read path, PageLocator.Scan): on while the game is bound and no hook line is current; sent only when it changes */
   artScan(){if(this.stopped)return;const s=this.state.bound===true&&this.preferences?.artText!==false?this.hooks.artScanState():{on:false,dialog:'',speaker:'',band:false};const key=JSON.stringify(s);if(key===this.artScanKey)return;this.artScanKey=key;this.send({type:'artScan',...s});}

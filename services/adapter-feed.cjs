@@ -32,6 +32,9 @@ function sharing(root){try{return require('./shared-adaptation.cjs').enabled(roo
 function numbers(root,id){let s=null;try{s=readJSON(path.join(root,'data','config','original-text.json'),{})[id];}catch{}const p=s?.patchAlignment?.pairing;
  return {engine:String(s?.runtime?.engine||s?.engine||''),status:String(s?.status||''),lines:s?.runtime?.lines|0,japanese:s?.runtime?.japaneseLines|0,total:p?.total|0,paired:p?.paired|0};}
 const rate=n=>n.total?n.paired/n.total:null;
+/* E596 whether a game is genuinely solved after the rebuild: with a translation to pair, the pairing rate decides
+   (≥ 98 % solved); without one, a full Japanese read is "read"; anything else is partial, nothing read is failed */
+function verdict(n){if(!n||!n.lines)return 'failed';const r=rate(n);if(r!==null)return r>=.98?'solved':'partial';return n.japanese>0?'read':'partial';}
 /* worse: fewer lines read (by more than 2 %), or a lower pairing rate (by more than half a point), or nothing read now */
 function worse(before,after){if(!after.lines&&before.lines)return true;if(before.lines&&after.lines<before.lines*.98)return true;const a=rate(before),b=rate(after);if(a!==null&&b!==null&&b<a-.005)return true;if(a!==null&&b===null&&before.total>0&&after.lines<before.lines)return true;return false;}
 /* the library games a pack matches: [{id,title,executable,dir}] */
@@ -50,11 +53,14 @@ async function apply(root,db,pack,{app}={}){
   /* the pack must be the reader now; if another engine still wins, it did not take */
   if(!/^adapter-pack$/.test(after.engine)&&(pack.source&&pack.grammar))state='not-used';
   if(state==='kept'&&worse(before,after)){packs.disableFor(root,g.dir,tag);after=await rebuild(root,db,g);state='rolled-back';}
-  store.games[g.id]={tag,state,before,after,at:Date.now()};out.push({pack:pack.id,packVersion:pack.version,key,state,before,after,app:app||''});}
+  const origin=pack['x-origin']==='runtime'?'runtime':'probe',v=state==='kept'?verdict(after):state==='not-used'?'failed':verdict(before),r=rate(after);
+  store.games[g.id]={tag,state,before,after,verdict:v,origin,rate:r,at:Date.now()};out.push({pack:pack.id,packVersion:pack.version,key,state,before,after,verdict:v,origin,rate:r,app:app||''});
+  /* the runtime findings this pack came from learn how it ended */
+  if(origin==='runtime')try{require('./runtime-harvest.cjs').noteOutcome(root,g.id,{tag,state,verdict:v,rate:r,lines:after.lines|0});}catch{}}
  writeJSON(resultsFile(root),store);return out;}
 
 async function report(root,reports,fetcher){if(!reports.length||!sharing(root))return {state:'skipped'};const b=base(root);if(!b)return {state:'not-configured'};
- const clean=reports.filter(r=>/^[a-f0-9]{64}$/.test(r.key)).slice(0,50).map(r=>({pack:r.pack,packVersion:r.packVersion,key:r.key,state:r.state,before:{lines:r.before.lines|0,japanese:r.before.japanese|0,total:r.before.total|0,paired:r.before.paired|0},after:{lines:r.after.lines|0,japanese:r.after.japanese|0,total:r.after.total|0,paired:r.after.paired|0},app:String(r.app||'').slice(0,40)}));
+ const clean=reports.filter(r=>/^[a-f0-9]{64}$/.test(r.key)).slice(0,50).map(r=>({pack:r.pack,packVersion:r.packVersion,key:r.key,state:r.state,before:{lines:r.before.lines|0,japanese:r.before.japanese|0,total:r.before.total|0,paired:r.before.paired|0},after:{lines:r.after.lines|0,japanese:r.after.japanese|0,total:r.after.total|0,paired:r.after.paired|0},...(['solved','read','partial','failed'].includes(r.verdict)?{verdict:r.verdict}:{}),...(['runtime','probe'].includes(r.origin)?{origin:r.origin}:{}),app:String(r.app||'').slice(0,40)}));
  if(!clean.length)return {state:'skipped'};
  try{const r=await fetcher(b+'/api/adapters/report',{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body:JSON.stringify({version:1,reports:clean}),signal:AbortSignal.timeout(TIMEOUT)});return r.ok?{state:'ok',sent:clean.length}:{state:'error',error:'HTTP_'+r.status};}catch{return {state:'error',error:'NETWORK'};}}
 
@@ -116,4 +122,4 @@ function start(root,{delay=180000,interval=INTERVAL}={}){
  const t=setTimeout(()=>{run();const i=setInterval(run,interval);i.unref?.();},delay);t.unref?.();return t;}
 if(!isMainThread&&workerData?.mode==='sync'){const store=require('./store.cjs');sync(workerData.root,{openDb:()=>store.openStore(workerData.root)}).then(r=>parentPort.postMessage(r),()=>parentPort.postMessage({state:'error'}));}
 if(!isMainThread&&workerData?.mode==='rollback'){const store=require('./store.cjs');let db;(async()=>{db=store.openStore(workerData.root);return rollback(workerData.root,db,String(workerData.id));})().then(r=>parentPort.postMessage(r),()=>parentPort.postMessage({ok:false,reason:'ERROR'})).finally(()=>{try{db?.close();}catch{}});}
-module.exports={syncNow,rollbackNow,inThread,sync,apply,report,worse,numbers,status,rollback,start,pendingProbes,probeRequests,matching};
+module.exports={syncNow,rollbackNow,inThread,sync,apply,report,worse,verdict,numbers,status,rollback,start,pendingProbes,probeRequests,matching};

@@ -95,6 +95,7 @@ class HookNative{
   // A HookBridge built while ToMe ran is staged as HookBridge.updated.exe and installed here, before the bridge starts.
   const staged=path.join(this.folder,'HookBridge.updated.exe');if(fs.existsSync(staged))try{fs.copyFileSync(staged,path.join(this.folder,'HookBridge.exe'));fs.unlinkSync(staged);}catch{}
   HookNative.syncShippedHook(this.folder);
+  HookNative.fetchRuntimeDump(this.folder);
   const root=this.layout.hook,required=['LunaHost64.dll','LunaHook32.dll','LunaHook64.dll'],missing=required.filter(n=>!fs.existsSync(path.join(root,n)));if(missing.length||!fs.existsSync(path.join(this.folder,'HookBridge.exe'))){this.retryAt=this.now()+30000;this.notify({hookMessage:'Hook 组件缺失：'+missing.join('、'),hookAvailable:false});return;}
   this.flowPage=FLOW_PAGE_EXES.test(name);this.flowGridName=(FLOW_GRIDS.find(([re])=>re.test(name))||[])[1]||'';  const identity=pid+"|"+started;if(identity!==this.identity){this.lastSource="";this.lastSourceAt=0;this.preferredThread=null;this.remembered=null;this.identity=identity;this.state.hookFramework=null;this.state.hookEmbedPending=false;}this.pid=pid;this.started=started;this.enabled=this.preferences?.hookProfile!=='read'&&!this.preflight&&this.windowState?.bound===true&&(this.windowState?.coverEnabled!==false||this.preferences?.embedTranslation===true);this.route=this.enabled?(this.preferences?.hookProfile==='embed'?'embed':'custom'):'read';this.markerKey='';this.lastHeartbeat=this.now();const serial=++this.serial,child=this.process=this.spawn(path.join(this.folder,'HookBridge.exe'),[String(pid),hwnd,name,started,...(this.route==='read'?['--read-only']:this.route==='embed'?['--official-embed']:[])],{cwd:this.folder,windowsHide:true,stdio:['pipe','pipe','ignore']});child.stdin.on('error',()=>{});if(this.enabled)this.send({type:'enable'});
   const failed=()=>{if(serial!==this.serial)return;this.process=null;++this.serial;this.retry('Hook 连接停止');};child.on('error',failed);child.on('exit',failed);
@@ -106,6 +107,8 @@ class HookNative{
    /* E531: an embed-capable hook is inserted; its stream appears with the first dialogue line, so a title menu is not "unsupported" */
    if(m.type==='hookEmbedPending'){this.trace('embed hook pending '+String(m.code||'').slice(0,200));this.notify({hookEmbedPending:true});return;}
    /* E520: the bridge found this game's remembered dialogue stream (it embedded before): no warm-up, replace from the first line */
+   /* signature memory: the remembered hook was relocated by its byte signature (game updated/other build) and inserted before the first line, always on, no switch; a miss is silent and falls back to the existing search */
+   if(m.type==='hookSignature'){this.state.hookSignature={found:!!m.found,moved:!!m.moved,module:String(m.module||'').slice(0,100)};this.trace('stream signature '+(m.found?(m.moved?'relocated ':'same place ')+String(m.code||'').slice(0,200):'not found in '+String(m.module||'')));return;}
    if(m.type==='hookMemory'){this.remembered={name:String(m.name||'').slice(0,100),code:String(m.code||'').slice(0,1000)};this.trace('stream memory '+this.remembered.name+' '+this.remembered.code);this.notify({hookRemembered:true});try{this.onRemembered?.(this.remembered);}catch(e){this.trace('remembered error '+(e?.message||e));}return;}
    if(m.type==='hookEngineLine'&&PAGE_ENGINES.has(m.engine)){this.pageLine(m);return;}
    if(m.type==='hookTextPos'&&m.engine==='pal_sprite_v1'){this.palPosition(m);return;}
@@ -436,6 +439,11 @@ class HookNative{
  /* E345 the hook engine (MeguLitHook32/64.dll) comes with the runtime pack, which is downloaded once. A newer build shipped
     with MeguLit in native\megulithook\ (YU-RIS embed) replaces the installed one before a game is attached; the old file
     is kept as .previous. A file still loaded by a running game cannot be replaced and is tried again next time. */
+ /* 2026-11-13 cold "runtime-dump" pack (docs/runtime-dump-pack.md): fetched in the background the first time a game is
+    hooked, no switch and no message; HookBridge injects it as soon as the files are there (also later in the same run).
+    Offline or any failure: nothing happens, the next game start tries once more. */
+ static fetchRuntimeDump(folder){try{if(HookNative.dumpFetch)return;const packs=require('./runtime-packs.cjs').RuntimePacks.shared(path.dirname(folder));
+  if(packs.installed('runtime-dump')||!packs.manifest().packs?.['runtime-dump'])return;HookNative.dumpFetch=packs.ensure('runtime-dump').catch(()=>{}).finally(()=>{HookNative.dumpFetch=null;});}catch{}}
  static syncShippedHook(folder){for(const name of ['MeguLitHook32.dll','MeguLitHook64.dll']){try{
   const src=path.join(folder,'megulithook',name),dst=path.join(folder,'..','runtime','megulithook',name);
   if(!fs.existsSync(src)||!fs.existsSync(path.dirname(dst)))continue;
