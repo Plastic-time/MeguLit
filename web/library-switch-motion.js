@@ -88,7 +88,7 @@ export async function switchLibrary(view,render,from=''){
   /* hand over: ghosts dissolve onto the real covers */
   await layer.animate([{opacity:1},{opacity:0}],{duration:140,easing:'linear',fill:'forwards'}).finished.catch(()=>{});
   layer.remove();
-  if(toWall)setTimeout(remeasure,200);
+  if(toWall)setTimeout(remeasure,760);
  }finally{busy=false;window.__megulitOrbitWarm=false;document.querySelectorAll('body > .lib-morph').forEach(n=>n.remove());host()?.classList.remove('lib-entering');}
 }
 
