@@ -90,6 +90,8 @@ export async function switchLibrary(view,render,from=''){
     /* opacity lands fast (no muddy half-lit covers), the push toward the lens runs the full expo-out */
     c.node.animate([{opacity:Math.max(.35,1-ring*.13)*o},{opacity:o}],{duration:LIGHT,delay,easing:'cubic-bezier(.25,.1,.25,1)',fill:'backwards'});
     c.node.animate([{translate:`${-c.dx*pull}px ${-c.dy*pull}px`},{translate:'0px 0px'}],{duration:card,delay,easing:EXPO_OUT,fill:'backwards'});}}
+  /* safety net: measure once more after everything has settled (layout-based, so it never re-seats the wall) */
+  if(toWall)setTimeout(remeasure,760);
   await Promise.race([Promise.all(runs),new Promise(r=>setTimeout(r,arrive+80))]);
   if(next)next.style.transformOrigin='';
  }finally{busy=false;window.__megulitOrbitWarm=false;promote();const h=host();h?.classList.remove('lib-entering');h?.getAnimations().forEach(a=>{if(a.playState!=='running')a.cancel();});}

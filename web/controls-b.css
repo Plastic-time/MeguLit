@@ -119,7 +119,8 @@ html:not(#mgc1):not(#mgc2):not(#mgc3):not(#mgc4):not(#mgc5):not(#mgc6):not(#mgc7
  &:checked::before{transform:translateX(19px) rotate(45deg)!important;background:#fff!important}
  &:disabled{border-style:dashed!important;opacity:.5}
 }
-& body .library-wall-toggle{border-radius:11px!important;
+/* the library's three-LED view switch is not an on/off toggle: keep it out of the red checked fill (user 2026-11-14) */
+& body .library-wall-toggle:not(.library-view-leds){border-radius:11px!important;
  &[aria-checked=true],&.on,&.active{background:var(--mgc-red)!important;border-color:var(--mgc-red)!important}}
 
 /* ---------- checkbox & radio (native inputs outside the title bar) ---------- */
