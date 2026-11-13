@@ -90,6 +90,8 @@ ${R} body{
  & .tomoyo-selection-card .tomoyo-anki-button:active:not(:disabled){background:var(--mgc-red-lo)!important;border-color:var(--mgc-red-lo)!important;box-shadow:none!important}
  & .tomoyo-selection-card .tomoyo-anki-button:disabled{background:transparent!important;border:1px dashed color-mix(in srgb,var(--mgc-ink) 25%,transparent)!important;color:var(--mgc-ink-3)!important}
  & .tomoyo-selection-card .tomoyo-speak-button{border-radius:var(--mgc-r)!important;border:1px solid var(--mgc-line)!important;background:transparent!important;box-shadow:none!important;transform:none!important}
+ & .tomoyo-selection-card .tomoyo-word-facts>span{border-radius:var(--mgc-r)!important;border-color:var(--mgc-line)!important;color:var(--mgc-ink-2)!important;font-weight:600}
+ & .tomoyo-selection-card .tomoyo-word-facts>.tomoyo-word-jlpt{border-color:color-mix(in srgb,var(--mgc-red) 55%,transparent)!important;color:var(--mgc-ink)!important;font-weight:800}
  & .tomoyo-selection-card .tomoyo-speak-button:hover{background:var(--mgc-tint)!important;border-color:color-mix(in srgb,var(--mgc-ink) 50%,transparent)!important}
  & .tomoyo-selection-card footer button:is(.active,.on,.is-on,[aria-pressed=true]){background:var(--mgc-red)!important;border-color:var(--mgc-red)!important;color:#fff!important}
 }

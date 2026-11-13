@@ -341,6 +341,7 @@ class Reader{
    this.cardScreenshots.set(id,{id,image,expires:Date.now()+180000});
    return {id};
   }
+  if(action==='mojiFacts')return await require('./moji-dictionary.cjs').cachedFacts(String(args.word||''),String(args.reading||''),{root:this.root}).catch(()=>null);
   if(action==='modelDelete')return this.runtime.models().remove(String(args.id));
   if(action==='runtimeDelete')return this.runtime.local().remove();
   if(action.startsWith('voicePack')){
