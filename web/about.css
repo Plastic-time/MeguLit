@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* About page (2026-11-13): one landscape screen, two columns — left: reel, 关于, 致谢, uninstall; right: 链接, 支持开发.
+/* About page (2026-11-13): one landscape screen, two columns — left: reel, 关于, 致谢, uninstall; right: 链接, 支持开发, 一起走过.
    The columns run independently and end on the same line.
    Everything is scoped under .ab so app-wide classes never leak in or out. */
 .ab{--ab-k:#050304;--ab-text:#f1e0d2;--ab-t2:#c9b2a3;--ab-t3:#a48e81;--ab-gold:#d9a54a;--ab-red:#c8323c;--ab-paper:#f0e6d6;

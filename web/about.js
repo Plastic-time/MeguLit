@@ -60,10 +60,6 @@ export function aboutHTML(locale,esc){
   <section class="ab-sec ab-linksec"><h2>${esc(t.links)}<small>${esc(t.linksSub)}</small></h2>
     <ul class="ab-links">${link('https://megulit.com',t.site,'megulit.com')}${link(REPO+'#faq',t.faq,'GitHub · FAQ')}${link(REPO+'/releases',t.releases,'GitHub · Releases')}${link(REPO,t.source,'github.com/ilynthn/MeguLit')}<li><button type="button" data-feedback>${esc(t.report)}<small>${esc(t.reportSub)}<i aria-hidden="true">…</i></small></button></li></ul>
   </section>
-  <section class="ab-sec ab-journey"><h2>${esc(t.journey)}<small>${esc(t.journeySub)}</small></h2>
-   <dl class="ab-stats" data-journey>${[t.jHours,t.jChars,t.jLook].map(([unit,label],i)=>`<div><dt><b data-n="${i}">0</b><small>${esc(unit)}</small></dt><dd>${esc(label)}</dd></div>`).join('')}</dl>
-   <p class="ab-jempty" hidden>${esc(t.jEmpty)}</p>
-  </section>
   <div class="ab-q ab-br">
    <section class="ab-sec"><h2>${esc(t.support)}</h2>
     <div>
@@ -82,6 +78,10 @@ export function aboutHTML(locale,esc){
     </div>
    </section>
   </div>
+  <section class="ab-sec ab-journey"><h2>${esc(t.journey)}<small>${esc(t.journeySub)}</small></h2>
+   <dl class="ab-stats" data-journey>${[t.jHours,t.jChars,t.jLook].map(([unit,label],i)=>`<div><dt><b data-n="${i}">0</b><small>${esc(unit)}</small></dt><dd>${esc(label)}</dd></div>`).join('')}</dl>
+   <p class="ab-jempty" hidden>${esc(t.jEmpty)}</p>
+  </section>
   </div>
  </section>`;
 }
@@ -96,6 +96,7 @@ const U={zh:{check:'检查更新',checking:'正在检查…',latest:'已经是�
    one is the start of the loop transition */
 const CUTS=[0,.333,1.417,2.375,5.167,5.833,6.333,7.042,7.792,8.542,9.167,9.833,10.958];
 const KANA='あいうえおかきくけこさしすせそアイウエオカキクケコ';
+const TOYS=['circle','coins','kana'];
 function mountReel(page,reduce){
  const v=page.querySelector('.ab-reel'),typed=page.querySelector('.ab-typed');
  const alive=()=>v.isConnected;
@@ -138,11 +139,17 @@ export function mountAbout(main,api,toast,model){
  /* support plate: tabs swap the code in place; WeChat shows first, already there (no fade on open) */
  const hint=page.querySelector('[data-hint]'),codes=page.querySelectorAll('.ab-code'),tabs=page.querySelectorAll('.ab-tab[data-k]');
  const pick=k=>{tabs.forEach(x=>x.setAttribute('aria-selected',String(x.dataset.k===k)));codes.forEach(c=>c.classList.toggle('on',c.dataset.c===k));hint.textContent=hint.dataset[k];};
- tabs.forEach(x=>x.addEventListener('click',()=>pick(x.dataset.k)));
  codes.forEach(c=>c.style.transition='none');pick('wx');void page.querySelector('.ab-qr').offsetWidth;codes.forEach(c=>c.style.transition='');
  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches||!fxPref('aboutReel').on;
  const words=w[locale],light=document.documentElement.dataset.theme==='light';
- mountSupportToy(page.querySelector('.ab-toy'),{reduce,coinIdle:words.coinIdle,coinCount:words.coinCount,...(light?{palette:{gold:'176,120,34',red:'178,32,48',cream:'70,40,36'}}:{})});
+ /* the toy beside the code: a random one each time the page opens, and a different one each time the tab changes
+    (a fresh canvas, so the old toy's listeners go with it) */
+ let toy='';
+ const mountToy=()=>{const old=page.querySelector('.ab-toy'),c=old.cloneNode(false);old.replaceWith(c);
+  const others=TOYS.filter(n=>n!==toy);
+  toy=mountSupportToy(c,{pick:others[Math.floor(Math.random()*others.length)],reduce,coinIdle:words.coinIdle,coinCount:words.coinCount,...(light?{palette:{gold:'176,120,34',red:'178,32,48',cream:'70,40,36'}}:{})});};
+ tabs.forEach(x=>x.addEventListener('click',()=>{if(x.getAttribute('aria-selected')==='true')return;pick(x.dataset.k);mountToy();}));
+ mountToy();
  mountJourney(page,model,reduce);
  mountReel(page,reduce);
 }
