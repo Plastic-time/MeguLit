@@ -23,7 +23,9 @@ const MIRROR_HOSTS=new Set([...MIRRORS.map(m=>new URL(m.replace('{url}','')).hos
 const inChina=()=>{try{const o=Intl.DateTimeFormat().resolvedOptions();return o.timeZone==='Asia/Shanghai'||o.timeZone==='Asia/Urumqi'||/^zh-CN/i.test(o.locale||'');}catch{return false;}};
 function sources(rel,china=inChina()){const direct=[rel.url];if(!rel.digest)return direct;const fresh=rel.url+(rel.url.includes('?')?'&':'?')+'v='+String(rel.digest).slice(0,12);const relayed=MIRRORS.map(m=>m.replace('{url}',fresh));
  /* the R2 mirror only holds the full packages (MeguLit-v*-win-x64.zip), never the small hot-update ones */
- const dl=ASSET.test(String(rel.name||''))?DL_MIRRORS.map(m=>m+rel.name):[];
+ /* content-addressed (files/<sha256>/<name>): exactly this package, never the mirror's "latest" (a by-name request is
+    redirected to whatever the mirror synced last), and cn-dl serves it itself instead of redirecting to dl */
+ const dl=ASSET.test(String(rel.name||''))&&/^[a-f0-9]{64}$/.test(String(rel.digest))?DL_MIRRORS.map(m=>m+'files/'+rel.digest+'/'+rel.name):[];
  return china?[...dl,...relayed,...direct]:[...direct,...dl,...relayed];}
 const updateLog=(root,line)=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','update.log'),new Date().toISOString()+' '+line+'\n');}catch{}};
 const HEADERS={'User-Agent':'MeguLit-Updater','Accept':'application/vnd.github+json'};
