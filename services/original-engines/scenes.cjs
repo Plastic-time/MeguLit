@@ -479,7 +479,12 @@ function readable(id,dir){let scenes;try{scenes=ENGINES[id].scenes(dir);}catch{r
 /* GARbro is the last resort: a folder MeguLit's own cx reader owns (encrypted KiriKiri Z xp3, cache still decrypting)
    stays unread until that cache is ready instead of going to GARbro (9-nine- Ep4 / ATRI read as garbro). */
 function ownCx(dir){return cxArchives(dir).some(f=>{try{return xp3.list(f)?.files.some(e=>e.encrypted);}catch{return false;}});}
-function detect(dir){for(const id of Object.keys(ENGINES)){if(id==='garbro'&&ownCx(dir))continue;if(readable(id,dir))return id;}return null;}
+/* E601 the readers of the engine the registry's fingerprints name are tried first (after an adapter pack), then every
+   reader in order as before, so a folder the fingerprints miss reads exactly as it did */
+function detect(dir){if(readable('adapter-pack',dir))return 'adapter-pack';
+ let hint=[];try{hint=require('./registry.cjs').readersFor(dir).filter(id=>ENGINES[id]&&id!=='garbro');}catch{}
+ for(const id of hint)if(readable(id,dir))return id;
+ for(const id of Object.keys(ENGINES)){if(id==='adapter-pack'||hint.includes(id))continue;if(id==='garbro'&&ownCx(dir))continue;if(readable(id,dir))return id;}return null;}
 function read(id,dir,overlay){const engine=ENGINES[id];
  // E449 a release's Chinese column gets the filled translations of the lines it leaves empty (fill.cjs).
  return engine.scenes(dir).map(s=>{const replaced=overlay?.get(s.name.toLowerCase());let parsed={lines:[],anchors:[]};try{parsed=engine.parse(replaced||s.read());}catch{}return fill.scene({name:s.name,...parsed,patched:!!replaced});});}
