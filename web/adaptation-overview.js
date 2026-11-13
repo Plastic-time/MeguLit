@@ -86,7 +86,8 @@ export async function openAdaptationOverview({api,locale,esc,toast,relativeTime,
   const visible=pool.filter(matches).sort(compare[sort]);
   list.innerHTML=visible.length?visible.map((g,i)=>{const need=needsWork(g),why=need?reasonFor(g,t.why):'';return `<div class="adapt-grid adapt-row${need?' need':''}" role="listitem"><span class="adapt-n">${pad(i+1)}</span><button type="button" class="adapt-open" data-open="${esc(g.id)}" title="${esc(evidence(g))}"><span><strong>${esc(g.title)}</strong><small>${esc(g.engine||'—')}${g.hidden?` · ${esc(t.hiddenTag)}`:''}</small></span>${why?`<em>${esc(why)}</em>`:''}</button>${cell('reading',g.reading)}${cell('embed',g.embedKind)}${cell('zero',g.zeroLatency)}<span class="adapt-seen">${g.lastSeenAt?esc(relativeTime(Math.floor(g.lastSeenAt/1000))):esc(t.never)}</span><button type="button" class="adapt-probe" data-probe="${esc(g.id)}" title="${esc(t.scanTitle)}">${esc(t.scan)}</button></div>`;}).join(''):`<p class="adapt-empty">${esc(t.empty)}</p>`;
  }
- const probe=ids=>requestProbe({ids,source:'overview',api,locale,esc,toast});
+ /* the probe pipeline calls onDone(result) when a scan finishes; the overview then reloads its rows */
+ const probe=ids=>requestProbe({ids,source:'overview',api,locale,esc,toast,onDone:()=>reload()});
  dialog.addEventListener('click',e=>{
   const p=e.target.closest('[data-pick]');if(p){const next=JSON.parse(p.dataset.pick);pick=same(pick,next)?null:next;render();return;}
   const o=e.target.closest('[data-open]');if(o){dialog.close();onOpenGame(o.dataset.open);return;}
@@ -98,7 +99,9 @@ export async function openAdaptationOverview({api,locale,esc,toast,relativeTime,
  $('[data-sort]').onchange=e=>{sort=e.target.value;render();};
  $('[data-hidden]').onchange=e=>{hidden=e.target.checked;render();};
  let timer=0;$('.adapt-search').oninput=e=>{clearTimeout(timer);timer=setTimeout(()=>{query=e.target.value.trim().toLowerCase();render();},120);};
- try{const data=await api('adaptation_overview',{});rows=data.games.map(derive);updated=new Date(data.generatedAt||Date.now()).toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'});}catch{if(dialog.isConnected){dialog.close();toast(t.failed);}return;}
+ const load=async()=>{const data=await api('adaptation_overview',{});rows=data.games.map(derive);updated=new Date(data.generatedAt||Date.now()).toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'});};
+ const reload=async()=>{if(!dialog.isConnected)return;try{await load();}catch{return;}if(dialog.isConnected)render();};
+ try{await load();}catch{if(dialog.isConnected){dialog.close();toast(t.failed);}return;}
  if(!dialog.isConnected)return;list.removeAttribute('aria-busy');render();playIntro(dialog);
 }
 /* Opening, one authored moment (timeline built like a GSAP one, run on the Web Animations API so web/ needs no
