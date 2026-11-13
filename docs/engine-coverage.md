@@ -24,20 +24,20 @@ MeguLit 对一款游戏的支持分三层：
 | KiriKiri / KAG | 7285 | 3158 | 1606 | ✅ | ✅ xp3（明文 / 按作品 cx 过滤 / 运行中读出）、散 .ks、多语言 xp3 | ◎ MeguLitKrkr 桥 + ✅ | Yuzusoft 等强加密 xp3 走运行中读出 |
 | Unity（Utage / Naninovel / 各厂自研） | 1412 | 810 | 785 | ✅ | ✅ naninovel / unity-text / higurashi / capcom-msg / vgprompter（按框架） | ⚪ Mono/IL2CPP | 通用 Unity 剧本无统一格式，按框架逐个做 |
 | YU-RIS | 852 | 480 | 318 | ✅ | ✅ ypf / YSTB | ✅ |  |
-| System-NNN | 390 | 371 | 111 | 🆕 | ❌（GARbro 只开图像/语音包） | ⚪ | 乙女社 Mio 用 |
+| System-NNN | 390 | 371 | 111 | 🆕（spt\ + nya\/init\） | 🆕 systemnnn.cjs：spt dword 异或、PRINT/SELECT 按命令顺序（引擎源码公开） | ⚪ | 乙女社 Mio 用 |
 | Artemis | 495 | 347 | 330 | ✅ | ✅ pfs pf6/pf8、.ast、多语言 | ✅ |  |
 | BGI / Ethornell | 337 | 329 | 195 | ✅ | ✅（旧适配层 bgi.cjs） | ✅ |  |
 | ShiinaRio | 333 | 301 | 42 | ✅ | 🟡 GARbro（🆕 .war 进白名单） | ✅ | WARC 按作品加密 |
 | CatSystem2 | 264 | 236 | 108 | ✅ | ✅ scene.int（含 cnscene.int） | ✅ |  |
 | SiglusEngine | 223 | 222 | 154 | ✅ | ✅ Steam .dbs 多语言表、Scene.pck 内附源码 | ✅ |  |
-| codeX RScript | 211 | 211 | 91 | ❌ | ❌ | ⚪ | 211 个公司发行；无公开格式资料，特征文件未知 |
+| codeX RScript（Liar-soft） | 211 | 211 | 91 | 🆕（"LB" .xfl 归档） | 🆕 liar.cjs：scr.xfl（可嵌套）+ .gsc 字符串表 | ⚪ | 就是 Liar-soft 引擎（Liar、raiL、Studio Ubai、SUKARADOG） |
 | RealLive | 220 | 207 | 21 | ✅ | ✅ Seen.txt | ✅ |  |
 | Majiro | 265 | 205 | 21 | ✅ 扩展（任何名字的 MajiroArc） | 🆕 majiro.cjs：MajiroArcV1–V3 + .mjo 字节码精确遍历 | ✅ |  |
 | Malie | 205 | 204 | 82 | ✅ | 🟡 GARbro（.lib/.dat，Camellia 按作品） | ✅ | Karin（乙女）用 |
 | NeXAS (Giga) | 199 | 197 | 147 | ✅ 扩展（script.pac 且非 Softpal） | 🟡 GARbro（.pac） | ✅ |  |
 | QLIE | 203 | 180 | 57 | ✅ | 🟡 GARbro（🆕 GameData/*.pack 进白名单） | ✅ | pack v3 密钥按作品 |
 | NScripter / ONScripter | 2079 | 142 | 19 | ✅ | ✅ 0.txt / nscript.dat | ✅ |  |
-| AST | 155 | 141 | 0 | ❌ | ❌ | ⚪ | 老作品（2016 后 0） |
+| AST | 155 | 141 | 0 | 🆕（无扩展名 ARC1/ARC2） | 🟡 ast.cjs：归档按规格做实（名字异或、LZSS+异或），剧本无公开资料 → 通用文本扫描 | ⚪ | 老作品（2016 后 0）；剧本语法需实物 |
 | Entis GLS | 139 | 133 | 30 | ✅ | 🟡 GARbro（🆕 .noa 进白名单） | ✅ |  |
 | AliceSoft System4 | 143 | 127 | 27 | ✅ | ✅ .ain（旧适配层）；🟡 .ald/.afa（🆕 白名单） | ✅ |  |
 | KaGuYa | 124 | 124 | 54 | 🆕 | 🟡 GARbro（.arc） | ⚪ |  |
@@ -105,7 +105,7 @@ MeguLit 对一款游戏的支持分三层：
 
 1. **MeguLit 能读却认不出**（最冤）：FVP（FAVORITE）、Innocent Grey IGA、Musica PAZ（ぱれっと）、Bruns、HuneX、Softpal（PAL.dll 在 `dll\` 下时）。本机 `E:\GAL` 的 いろとりどりのヒカリHD、虚ノ少女、ましろ色シンフォニー、ダストマニア、時計仕掛けのレイライン 实测都是这种情况，本轮已补
 2. **本轮补上检测**（仍走通用 hook 或 GARbro）：System-NNN、CMVS、EAGLS、Ikura GDL、Silky's / AI5WIN / AI6WIN、KaGuYa、Lucifen、Yuka、Luca System、NEKOPACK、Marble、rUGP、Seraph、ISM、GLib2、ExHIBIT、SakanaGL、Godot、Unreal、Adobe AIR / Flash；PJADV / Pajamas 扩到任何文件名的 GAMEDAT 包，LiveMaker 加 vff 归档魔数
-3. **仍然认不出**（没有公开格式资料或没有可靠特征文件）：codeX RScript（211 个公司发行，2016 后 91）、AST、SaiSys、SystemC、Tmr-Hiro ADV、Diesel、PIX STUDIO、AGES Mk2、CatSystem3、Kaleido ADV Workshop、Rejet Engine、DDSystem、Otomate / Idea Factory 的 PC 移植、honeybee、Interheart FPK
+3. **仍然认不出**（没有公开格式资料或没有可靠特征文件）：SaiSys、SystemC、Tmr-Hiro ADV、Diesel、PIX STUDIO、AGES Mk2、CatSystem3、Kaleido ADV Workshop、Rejet Engine、DDSystem、Otomate / Idea Factory 的 PC 移植、honeybee、Interheart FPK
 
 ## 乙女（otome）专节
 
@@ -124,7 +124,7 @@ MeguLit 对一款游戏的支持分三层：
 | Unity | 60 | 按框架 |
 | Comic Maker 1/2/3 | 114 | ❌ 老同人工具 |
 | Adobe AIR / Flash | 47 | 🆕 只检测 |
-| System-NNN | 24 | ❌ 读取 |
+| System-NNN | 24 | 🆕 读取（E570） |
 | BGI | 11 | ✅ |
 | Malie | 6 | 🟡 |
 | Artemis | 5 | ✅ |
@@ -147,7 +147,7 @@ MeguLit 对一款游戏的支持分三层：
 | Takuyo（怪盗アプリコット 等，2000 年代） | GSS / 未标注 | ❌ |
 | Tiaramode（Butlers、Brothers、Royals） | BGI | ✅ |
 | SPRAY（鬼畜眼鏡、学園ヘヴン BL） | RealLive / Siglus / AVG32 | ✅ |
-| Mio（浅き夢見し） | System-NNN | 🆕 检测，❌ 读取 |
+| Mio（浅き夢見し） | System-NNN | 🆕 检测 + 读取（E570，未经实物验证） |
 | Kirue | YU-RIS / LiveMaker | ✅ / 🟡 |
 | Primula（大正×対称アリス） | 未标注 | ❌ 需要实物 |
 | 道玄坂ラボ（手机移植） | 未标注，部分 Kaleido / KiriKiri | ❌ 大多未知 |
@@ -163,10 +163,10 @@ MeguLit 对一款游戏的支持分三层：
 | 排名 | 引擎 | 价值依据 | 难度 | 下一步 |
 |---|---|---|---|---|
 | 1 | NeXAS | 197 公司 / 147 近年（最多的未读引擎） | 中：GARbro 已能解 .pac，剧本 .bin 是 SJIS 串表 | 写 .bin 解析，接在 GARbro 解包之后；需一个实物确认 .bin 布局 |
-| 2 | System-NNN | 371 公司 / 111 近年，乙女 Mio | 中高：剧本 spt 无公开工具 | 需要实物 |
+| 2 | ~~System-NNN~~ | 371 公司 / 111 近年，乙女 Mio | 已做（E570）：引擎源码公开 | 有实物可验证 |
 | 3 | QLIE | 180 / 57 | 低：GARbro 解 pack 后 .s 是明文脚本 | 给 GARbro 兜底加 QLIE .s 语法（不需实物也能做，配对质量提升明显） |
 | 4 | Malie | 204 / 82，乙女 Karin | 高：lib 按作品 Camellia 密钥（GARbro 有），exec.dat 字符串表 | GARbro 解包 + exec.dat 串表解析；需实物 |
-| 5 | codeX RScript | 211 / 91 | 未知：无公开资料，连检测特征都不知道 | 需要实物（先要目录文件清单） |
+| 5 | ~~codeX RScript~~ | 211 / 91 | 已做（E571）：就是 Liar-soft，.xfl + .gsc 有公开工具 | 有实物可验证 |
 | 6 | LiveMaker | 1747 发行、乙女 532（公司只有 12） | 高：vff 归档 + LSB 二进制（pylivemaker 有完整规格，GPL-3.0） | 按 pylivemaker 移植 LSB 文本提取；同人免费作品多，验证容易 |
 | 7 | ExHIBIT | 98 / 56 | 中：.rld 脚本 XOR | 需实物 |
 | 8 | ShiinaRio | 301 / 42 | 高：WARC 按作品加密 | GARbro 兜底已可用，暂不自写 |
@@ -187,6 +187,6 @@ MeguLit 对一款游戏的支持分三层：
 
 ## 需要实物才能完成的
 
-- **必须有实物**：codeX RScript、System-NNN、Malie、ExHIBIT、Rejet Engine、DDSystem、Otomate / Idea Factory PC 版、Aksys/IFI Steam 移植、honeybee、Vitamin、Primula、Kaleido ADV Workshop、SakanaGL、Luca System。其中商业乙女几项**只要目录文件清单**（`dir /s /b` 的输出，不用游戏本体）就能先判断引擎
+- **必须有实物**：AST（剧本语法）、Malie、ExHIBIT、Rejet Engine、DDSystem、Otomate / Idea Factory PC 版、Aksys/IFI Steam 移植、honeybee、Vitamin、Primula、Kaleido ADV Workshop、SakanaGL、Luca System。其中商业乙女几项**只要目录文件清单**（`dir /s /b` 的输出，不用游戏本体）就能先判断引擎
 - **有实物更稳**：NeXAS（确认 .bin 布局）、CMVS（新版 cpz7）、LiveMaker（验证 LSB 提取）
-- **本轮按规格实现、还没碰过真游戏**：Majiro、TyranoScript（asar / NW.js 版）、Ren'Py 编译版。任何一款都可以；Tyrano 和 Ren'Py 有大量免费作品
+- **按规格实现、还没碰过真游戏**：Majiro、TyranoScript（asar / NW.js 版）、Ren'Py 编译版、System-NNN、codeX RScript（Liar-soft）。任何一款都可以；Tyrano 和 Ren'Py 有大量免费作品

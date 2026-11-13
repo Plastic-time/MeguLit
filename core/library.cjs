@@ -55,7 +55,12 @@ const ENGINES=[
  {name:'EAGLS',hook:true,test:f=>f.has(/^eagles\.dll$/i)||f.has(/^scpack\.(pak|idx)$/i)},
  {name:'Ikura GDL',hook:null,test:f=>f.magicAny(/^[A-Za-z0-9_]{2,12}$/,'SM2MPX10')},
  {name:"Silky's",hook:null,test:f=>f.magicAny(/\.ifl$/i,'IFLS')||f.has(/^ai[56]win\.exe$/i)},
- {name:'System-NNN',hook:null,test:f=>f.has(/\.gtb$/i)&&f.has(/\.gpk$/i)||f.has(/\.vtb$/i)&&f.has(/\.vpk$/i)},
+ /* E570 System-NNN keeps its story scripts loose in spt\ (beside nya\, init\ and the dwq / vaw packs) */
+ {name:'System-NNN',hook:null,test:f=>f.has(/\.gtb$/i)&&f.has(/\.gpk$/i)||f.has(/\.vtb$/i)&&f.has(/\.vpk$/i)||f.sub('spt',/\.spt$/i)&&(f.has(/^nya$/i)||f.has(/^init2?$/i)||f.has(/^dwq$/i))},
+ /* E571 codeX RScript (Liar-soft and its sister brands): scr.xfl / grp.xfl ... "LB\x01\0" archives */
+ {name:'codeX RScript (Liar-soft)',hook:null,test:f=>f.magicAny(/\.xfl$/i,'LB\x01\0')},
+ /* E572 AST: archives without an extension starting "ARC1" / "ARC2" */
+ {name:'AST',hook:null,test:f=>f.magicAny(/^[A-Za-z0-9_]{1,16}$/,'ARC2',8)||f.magicAny(/^[A-Za-z0-9_]{1,16}$/,'ARC1',8)},
  {name:'KaGuYa',hook:null,test:f=>f.has(/\.ari$/i)&&f.has(/\.arc$/i)},
  {name:'Lucifen',hook:null,test:f=>f.magicAny(/\.lpk$/i,'LPK1')},
  {name:'Yuka',hook:null,test:f=>f.magicAny(/\.ykc$/i,'YKC00')},
