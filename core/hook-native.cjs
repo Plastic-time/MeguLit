@@ -233,7 +233,12 @@ class HookNative{
      and was read as a story line, and one line once arrived twice in one piece. Text without any Japanese is menu/help text here, and a line made of
      the same sentence twice is that sentence. */
   if(this.flowPage)this.syncEmbedMode();
-  if(this.flowPage){if(!this.flowStory(text)){this.trace('flow page: not a story line, dropped (menu/help) '+JSON.stringify(text.slice(0,40)));this.flowStreamCheck(true);return;}
+  if(this.flowPage){if(!this.flowStory(text)){
+    /* E532 (user: ファタモルガーナの館 opening 「館がある」「聖なるかな」 stayed Japanese only): a short Japanese card with no sentence stop is
+       opening/title-card text, not menu help. It goes to the art path (located on the picture, translated in the original's style)
+       and the selected stream stays: switching on every card made the streams flip every 2 s and resend the story line. */
+    if(HookNative.artCard(text)){this.trace('flow page: title card to art '+JSON.stringify(text.slice(0,40)));this.artCandidate(text);return;}
+    this.trace('flow page: not a story line, dropped (menu/help) '+JSON.stringify(text.slice(0,40)));this.flowStreamCheck(true);return;}
    const once=HookNative.undouble(text);if(once!==text){this.trace('flow page: doubled line collapsed chars='+text.length);this.source({...m,text:once},name);return;}}
   /* E282 (user: game ruby first): readings the game's own script gives this line (KiriKiri Z scene files) join the ruby
      the hook delivered; only for a line the script matched, and never twice for one base. */
@@ -338,6 +343,10 @@ class HookNative{
     selected and the story was neither read, hidden nor replaced. A story line is one the game's own script table has
     (original-text provider); without the table, one with the game's paragraph indent, a quote or sentence-final
     punctuation. A selected stream whose text is not story is switched to the stream that carries story. */
+ /* E532 a title card: 2-40 characters of Japanese with kana or kanji, no long katakana run (BGM/effect/resource names such as
+    「女中のテーマピアノソロ」), no ASCII words and no control help. A false hit costs nothing: the art path shows it only when OCR
+    finds that text on the picture. */
+ static artCard(text){const t=String(text||'').replace(/<r[^<>]*>|<\/r>/g,'').replace(/\s+/g,'');const n=[...t].length;return n>=2&&n<=40&&/[぀-ゟ㐀-鿿]/.test(t)&&!/[゠-ヿ]{4,}/.test(t)&&!/[A-Za-z]{2,}/.test(t)&&!HookNative.uiHelp(String(text||''));}
  flowStory(text){const t=String(text||'').replace(/<r[^<>]*>|<\/r>/g,'').trim();if(!t||!/[\u3040-\u30ff\u3400-\u9fff]/.test(t)&&!/^[「『“]/.test(t)||HookNative.uiHelp(String(text||'')))return false;
   /* E353 (offline replay of the whole WoH table): the table only ever says YES. A line it holds is story even when the
      official Chinese left it as it is (names such as 「青子。」); a line it cannot match (spells written <rソウ>[swel]</r>,
