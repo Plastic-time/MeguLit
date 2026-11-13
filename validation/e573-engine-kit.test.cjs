@@ -47,3 +47,14 @@ test('text models: string table, pointer table, opcode walk, line grammar, gener
  const g=kit.lineGrammar('*label\n;comment\n#あかね\nおはよう[r]\n[iscript]\nx=1\n[endscript]\n',{name:/^#(.*)$/});assert.deepEqual(g.lines,['あかね','おはよう']);
  assert.deepEqual(kit.decodeRuns(Buffer.concat([Buffer.from('cmd\0'),F.sjis('「こんにちは」と言った。')])),['「こんにちは」と言った。']);
 });
+
+test('E575 shared pieces: MSVC rand, key streams, nibble swap, record streams, CMVS-style LZSS, GBK generic scan',()=>{
+ const r=kit.msvcRand(1);assert.deepEqual([r(),r(),r()],[41,18467,6334]);/* the MSVC CRT sequence for srand(1) */
+ assert.deepEqual([...kit.xorStream(Buffer.from([1,2,3,4]),()=>0xff,{start:1,stride:2})],[1,0xfd,3,0xfb]);
+ assert.deepEqual([...kit.nibbleSwap(Buffer.from([0x12,0xab]))],[0x21,0xba]);
+ const recs=kit.records(Buffer.from([2,0,0x61,0x62,1,0,0x63,0]),0,(b,p)=>{const n=b.readUInt16LE(p);return n?{text:b.toString('latin1',p+2,p+2+n),next:p+2+n}:null;});
+ assert.deepEqual(recs.map(x=>x.text),['ab','c']);
+ /* CMVS PS2A LZSS: 2 KB window from 0x7DF, offset lo | (hi & 0xE0) << 3, length (hi & 0x1F) + 2 */
+ assert.equal(kit.lzss(Buffer.from([0x07,0x61,0x62,0x63,0xdf,0xe1]),6,{window:0x800,start:0x7df,lenBits:5,minMatch:2}).toString('latin1'),'abcabc');
+ assert.ok(kit.decodeRuns(Buffer.concat([Buffer.from('cmd\0'),F.gbk('那封信寄到的时候，是一个晴朗的午后。')])).includes('那封信寄到的时候，是一个晴朗的午后。'));
+});

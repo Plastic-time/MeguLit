@@ -47,8 +47,14 @@ const trimBoth=t=>t.replace(/^[\s　]+|[\s　]+$/g,'');
 const ascii=t=>/^[\x20-\x7e]*$/.test(t);
 /* the generic scan (GARbro fallback, engines whose grammar is unknown): runs of Japanese text with kana, in order */
 const JP_RUN=/[ぁ-ゖァ-ヺー一-龯々〆〜～！？。、「」『』（）…―・　Ａ-Ｚａ-ｚ０-９]{2,}/g;
+/* E575 a Chinese patch has no kana: when no decoding gives kana, GBK text with enough Han characters is read the same way
+   (runs with a Han character), so a patch read by the generic scan still yields lines to pair */
+const ZH_RUN=/[一-鿿々〆〜～！？。，、；：“”‘’「」『』（）…—·　Ａ-Ｚａ-ｚ０-９]{2,}/g,HAN_G=/[一-鿿]/g;
 function decodeRuns(buf){const pick=[];for(const enc of ['shift_jis','utf-8','utf-16le']){let t;try{t=new TextDecoder(enc).decode(buf);}catch{continue;}pick.push({t,kana:(t.match(KANA_G)||[]).length});}
- const best=pick.sort((a,b)=>b.kana-a.kana)[0];if(!best||best.kana<4)return [];const lines=[];let last='';
+ const best=pick.sort((a,b)=>b.kana-a.kana)[0],lines=[];let last='';
+ if(!best||best.kana<4){let t='';try{t=new TextDecoder('gbk').decode(buf);}catch{return [];}if((t.match(HAN_G)||[]).length<8||(t.match(/�/g)||[]).length*20>t.length)return [];
+  for(const raw of t.split(/[\r\n\0]+/))for(const m of raw.matchAll(ZH_RUN)){const s=trimBoth(m[0]);if(s.length<2||!/[一-鿿]/.test(s))continue;if(s!==last)lines.push(s);last=s;}
+  return lines;}
  for(const raw of best.t.split(/[\r\n\0]+/))for(const m of raw.matchAll(JP_RUN)){const s=trimBoth(m[0]);if(s.length<2||!hasKana(s))continue;if(/^[ァ-ヺー]+$/.test(s)&&s.length<3)continue;if(s!==last)lines.push(s);last=s;}
  return lines;}
 
@@ -58,6 +64,18 @@ function xor(buf,key,start=0){const b=Buffer.from(buf),k=typeof key==='number'?[
 function xorDword(buf,key,add=0,inc=0){const n=buf.length>>>2,out=Buffer.from(buf);let x=key>>>0,v=0;for(let i=0;i<n;i++){out.writeUInt32LE(((buf.readUInt32LE(i*4)^x)+v)>>>0,i*4);x=(x+add)>>>0;v=(v+inc)>>>0;}return out;}
 const rol=(b,n)=>((b<<(n&7))|(b>>>(8-(n&7))))&255,ror=(b,n)=>((b>>>(n&7))|(b<<(8-(n&7))))&255;
 const not=buf=>Buffer.from(buf.map(c=>~c&255));
+/* E575 shared by EAGLS / CMVS / Lucifen / Ikura / Tmr-Hiro (engine-readers-d / -e research):
+   msvcRand(seed) -> next() as the MSVC CRT rand (seed * 214013 + 2531011, (seed >> 16) & 0x7FFF)
+   xorStream(buf, next, {start, stride}) XOR byte i with next() for i = start, start + stride, … (a key stream)
+   nibbleSwap(buf) every byte's halves swapped (rol 4)
+   rolBytes / rorBytes(buf, n) every byte rotated */
+function msvcRand(seed){let s=seed>>>0;return ()=>{s=(Math.imul(s,214013)+2531011)>>>0;return (s>>>16)&0x7fff;};}
+function xorStream(buf,next,{start=0,stride=1,end=buf.length}={}){const b=Buffer.from(buf);for(let i=start;i<end;i+=stride)b[i]^=next(i)&255;return b;}
+const nibbleSwap=buf=>Buffer.from(buf.map(c=>((c<<4)|(c>>>4))&255));
+const rolBytes=(buf,n)=>Buffer.from(buf.map(c=>rol(c,n))),rorBytes=(buf,n)=>Buffer.from(buf.map(c=>ror(c,n)));
+/* length-prefixed record streams (LCSE / Tmr-Hiro / NekoSDK / ExHIBIT): records(buf, at, read) calls read(view, p) ->
+   {next, ...record} until it returns null or runs past the end; returns the records */
+function records(buf,at,read,max=1e6){const out=[];let p=at;for(let n=0;n<max&&p<buf.length;n++){let r;try{r=read(buf,p);}catch{break;}if(!r||!(r.next>p))break;out.push(r);p=r.next;}return out;}
 /* LZSS, Okumura family. Defaults are the common one (GARbro LzssStream): 4 KB window, writes from 0xFEE, window filled
    with 0, flag bits LSB first and 1 = literal, a reference is lo | (hi & 0xF0) << 4 with length (hi & 0x0F) + 3.
    opts: window, start, fill, msb (flags read MSB first), zeroLiteral (0 = literal), minMatch, lenBits (low bits of
@@ -149,4 +167,4 @@ function engine(def){
  return {id:def.id,hint:def.hint,scenes,archives:scenes,sources:dir=>[...arcFiles(dir),...looseFiles(dir)],parse:buf=>{try{return def.parse(Buffer.isBuffer(buf)?buf:Buffer.from(buf));}catch{return {lines:[],anchors:[]};}},test:def.test||(n=>!!def.loose&&def.loose.name.test(n)),...(def.extra||{})};}
 
 module.exports={readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,decoder,cstr,trimBoth,ascii,decodeRuns,
- xor,xorDword,rol,ror,not,lzss,inflate,inflateRaw,table,entryRead,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine};
+ xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,inflate,inflateRaw,table,entryRead,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine};

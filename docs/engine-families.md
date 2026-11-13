@@ -51,11 +51,34 @@ Unity、Godot、Unreal、DxLib、Adobe AIR：剧本格式由各作品自己定�
 ### G. 没有公开资料，需要实物
 AST 剧本、SaiSys、SystemC、Diesel、PIX STUDIO、SakanaGL、rUGP（âge 自研，体量大）、Rejet、DDSystem、Otomate / Aksys 移植。先只做检测。
 
+## 定稿：每个引擎落到哪一族（依据 engine-readers-d / -e 的调研笔记）
+
+| 引擎 | 归档 | 文本模型 → 家族 | 能否纯按规格完成 |
+|---|---|---|---|
+| CMVS | CPZ5/6/7（索引多层加密）+ PS2A（字节旋转 + 2KB LZSS） | 代码里 push 文本段偏移 → **A 字符串池** | CPZ5/6 能；CPZ7 要实物（密钥藏在 start.ps3、MD5 变体） |
+| Lucifen | LPK1（两套已知方案，trie 索引，LZSS） | 重定位子表 → 资源区字符串 → **A** | 能（剧本归档不需要文件密钥） |
+| KaGuYa | WFL1 / LINK3–6 | message.dat 独立字符串表 → **A** | 能 |
+| LC-ScriptEngine | .lst 索引 + 无扩展名包，单字节 XOR | .snx 指令 + 长度前缀串表 → **A** | 能 |
+| Yuka | .ykc | .yks 数据段串表 → **A** | 待查 |
+| Ikura GDL | SM2MPX10 / DRS | [op][len] 自描述指令流，0xFF 后跟文本 → **B 记录流** | 无 SECRETFILTER 的作品能 |
+| ExHIBIT | 散 rld\*.rld | 自描述 word（int/串数量在指令字里）→ **B** | 明文或已知种子能，其它要实物 |
+| Tmr-Hiro ADV | .pac（无魔数） | u16 长度 + u32 操作码记录流 → **B** | 能 |
+| NekoSDK | NEKOPACK4 .pak / 0xCACACA 的 .dat | ADVSCRIPT2 长度前缀命令 + 串 → **B** | 对白能，选项无资料 |
+| Silky's / AI5WIN / AI6WIN | Silky arc / AI5WIN arc / AI6WIN arc | 1 字节操作码 + 内联串 → **B** | Silky、AI6WIN 能；AI5WIN 操作数有嵌套表达式，工作量大 |
+| EAGLS | SCPACK.pak + .idx（MSVC rand 异或，密钥可自动求解） | 解密后明文：引号字面量 + #说话人 → **C 明文** | 能 |
+| Seraph | ScnPac.dat 偏移表 + 自有 LZ | 无公开资料 → **G** | 只到归档层 + 通用扫描 |
+| Interheart FPK | 三种索引 + ZLC2 | 无公开资料 → **G** | 只到归档层 + 通用扫描 |
+| NekoPack 1–3 | 流加密、名字只存哈希 | 无资料 → 留给 GARbro 兜底 | — |
+
+kit 已按笔记补上共用件（E575）：MSVC rand、密钥流异或、半字节互换、字节旋转、长度前缀记录流、GBK 补丁也能走通用扫描；CMVS 那种 2KB 窗口 / 0x7DF 起点 / 高 3 位偏移的 LZSS 就是 kit.lzss 的参数，不用另写。
+
 ## 分工（按家族，不按引擎）
 
-| 家族 | 谁 |
-|---|---|
-| D（RPG Maker XP/VX/VX Ace）、B 里的 Silky 家族 | 本会话 |
-| A 待做 + B 其余（调研结果决定） | engine-readers-d / engine-readers-e，按调研笔记重新分 |
-| E 按作品密钥 | 与组 2（ShiinaRio、Malie）合用一套 GARbro 方案导出 |
-| C 明文型 | 优先做成适配包 |
+| 家族 | 谁 | 模型 / 强度 |
+|---|---|---|
+| A 字符串池（CMVS、Lucifen、KaGuYa、LC-ScriptEngine、Yuka） | engine-readers-d | Opus 5.5 / high（CPZ 索引解密繁琐） |
+| B 记录流（Ikura、ExHIBIT、Tmr-Hiro、NekoSDK）+ C 明文（EAGLS）+ G 归档层（Seraph、Interheart） | engine-readers-e | Sonnet 5.5 / medium（规格已写清） |
+| B 里的 Silky 家族、D（RPG Maker，已完成）、kit 维护、汇总回归 | 本会话 | — |
+| ShiinaRio、Malie、NeXAS | 组 2 | Opus 5.5 / high（按作品密钥，加密最重） |
+| QLIE、Entis、AliceSoft、Marble | 组 3 | Opus 5.5 / medium |
+| 按作品密钥（CMVS cpz 密钥、ExHIBIT 种子、ShiinaRio、Malie） | 各自做，但密钥表统一放成 `*-schemes.json`（仿 cx-schemes.json / paz-schemes.json），新作品密钥用适配包 `params` 下发 | — |
