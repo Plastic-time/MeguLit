@@ -83,6 +83,9 @@ export function createHand(opts){const {root,box,layer,cover,art,back='',onPlay,
  const flat=fn=>(opts.neutral||(f=>f()))(fn);
  function restRect(){const p=cover.cloneNode(false);p.style.visibility='hidden';p.style.pointerEvents='none';p.setAttribute('aria-hidden','true');cover.parentNode.appendChild(p);
   try{return p.getBoundingClientRect();}finally{p.remove();}}
+ /* a hand card's pose as drawn: centre of its box (the image of its centre), angle and scale from its current transform */
+ function cardPose(el,W){const r=el.getBoundingClientRect(),rr=root.getBoundingClientRect(),m=new DOMMatrixReadOnly(getComputedStyle(el).transform);
+  return {x:r.left-rr.left+r.width/2,y:r.top-rr.top+r.height/2,r:Math.atan2(m.b,m.a)*180/Math.PI,s:Math.hypot(m.a,m.b)*el.offsetWidth/W,rx:0,ry:0,o:1};}
  function coverPose(){const r=restRect(),rr=root.getBoundingClientRect(),W=cover.offsetWidth||1,H=cover.offsetHeight||1,
   t=4*Math.PI/180,s=r.width/(W*Math.cos(t)+H*Math.sin(t));return {x:r.left-rr.left+r.width/2,y:r.top-rr.top+r.height/2,r:-4,s:Number.isFinite(s)&&s>0?s:1,rx:0,ry:0,o:1};}
  function relayout(){st.lastLayout=layout();}
@@ -113,7 +116,8 @@ export function createHand(opts){const {root,box,layer,cover,art,back='',onPlay,
   if(reduced){st.out=id;render(st.games,id);onPlay(g,'plain');onLand?.(g);return;}
   const kind=globalThis.__forceKind||pickVariant(st.last);st.last=kind;const W=cover.offsetWidth;
   /* where the picked card is now: mid-flight pose if it was flying, else its hand slot */
-  const fromPick=(st.flights.has(id)&&currentPose(st.flights.get(id)))||slotPose(id,W);
+  /* (user: "手牌就会有个强制被改变位置的bug") a hovered card is lifted and enlarged; it takes off from exactly where it is drawn now (mid-transition included), not from its resting slot */
+  const pickEl=st.cards.get(id),fromPick=(st.flights.has(id)&&currentPose(st.flights.get(id)))||(pickEl&&!pickEl.classList.contains('is-out')&&!pickEl.classList.contains('is-wait')?cardPose(pickEl,W):slotPose(id,W));
   const fromOld=old?((st.flights.has(old.id)&&currentPose(st.flights.get(old.id)))||coverPose()):null;
   /* (user: the field card vanished when it had come from a random draw) a field card that is not in the hand is thrown off the table, never just removed */
   const gone=!old?opts.field?.():null,fromGone=gone&&gone.id!==id?coverPose():null;

@@ -49,3 +49,9 @@ test('a field card from outside the hand is thrown off, the card never leaves th
  assert.ok(tv.includes('if(r0.height>room&&room>80)c.style.width=')&&tv.includes('under=minTop-(r2.top-rr.top)'),'a short window gets a smaller card instead of one pushed off the top');
  assert.ok(tv.includes("pile.style.left=c.style.left?(c.offsetLeft-rr.width*.06)+'px':''"),'the deck a draw is dealt from moves with the card');
 });
+
+test('a hovered (lifted) hand card takes off from where it is drawn, not from its resting slot',()=>{
+ const hand=fs.readFileSync(path.join(__dirname,'..','web','home-hand.js'),'utf8');
+ assert.ok(hand.includes('function cardPose(el,W)')&&hand.includes('new DOMMatrixReadOnly(getComputedStyle(el).transform)'),'pose read from the card as drawn');
+ assert.ok(hand.includes("?cardPose(pickEl,W):slotPose(id,W))"),'(user: 手牌就会有个强制被改变位置的bug) picked card starts at its drawn pose');
+});
