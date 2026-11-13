@@ -11,6 +11,8 @@ MEGULIT_SELFTEST_CASES
 
 int main(int argc, char **argv) {
  if (argc < 3) return 2;
+ // A KiriKiri-looking folder (an .xp3 next to the exe), so the krkr module waits for V2Link (cases/Krkr.cpp).
+ Put("data.xp3", "XP3 archive stand-in");
  FakeGame g; if (int e = g.Start(argv[1], argv[2])) return e;
  std::string dir = g.dir;
  std::string ja = Repeat(Encode(L"【めぐみん】「我が名はめぐみん！紅魔族随一の魔法の使い手にして、爆裂魔法を操りし者！」\r\n", 932), 6);

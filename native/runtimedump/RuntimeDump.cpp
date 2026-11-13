@@ -30,6 +30,7 @@
 #include <set>
 #include "minhook/include/MinHook.h"
 #include "modules/modules.h"
+#include "modules/dump_api.h"
 
 // ---- feature modules (modules/modules.h, docs/runtime-dump-pack.md) -------------------------------------------------
 #define MODULE(Name) void Name##Start(const wchar_t *out); void Name##Tick();
@@ -196,9 +197,10 @@ unsigned char *Copy(const void *p, DWORD n) {
  if (!ReadProcessMemory(GetCurrentProcess(), p, buf, n, &got) || got != n) { free(buf); return NULL; }
  return buf;
 }
-void Save(const std::string &source, const char *how, const unsigned char *data, DWORD n, ULONGLONG offset) {
+void SaveAs(const std::string &source, const char *how, const unsigned char *data, DWORD n, ULONGLONG offset, bool force) {
  Score s = Classify(data, n);
- if (!Texty(s)) return;
+ if (!force && !Texty(s)) return;
+ if (!*s.enc) s.enc = "binary";
  ULONG crc = Crc32 ? Crc32(0, data, n) : n;
  bool fresh; { Lock l; fresh = Saved.insert(crc).second; }
  if (!fresh) return;
@@ -213,6 +215,8 @@ void Save(const std::string &source, const char *how, const unsigned char *data,
  std::string line = "{\"seq\":" + std::to_string((long long)seq) + ",\"file\":" + Json(name) + ",\"source\":" + Json(source) + tail;
  Append(L"index.jsonl", line, 64u << 20);
 }
+
+void Save(const std::string &source, const char *how, const unsigned char *data, DWORD n, ULONGLONG offset) { SaveAs(source, how, data, n, offset, false); }
 
 // ---- watched regions -----------------------------------------------------------------------------------------------
 struct Region { const void *p; DWORD n; ULONG raw, last; DWORD born, seen; std::string source; ULONGLONG offset; const char *how; int stable; };
@@ -730,6 +734,21 @@ DWORD WINAPI Run(void *) {
  }
 }
 }
+
+// ---- module API (modules/dump_api.h) ---------------------------------------------------------------------------------
+void DumpSave(const char *source, const char *how, const unsigned char *data, DWORD n, ULONGLONG offset, bool force) {
+ if (!data || !n) return;
+ try { SaveAs(source ? source : "memory", how ? how : "module", data, n, offset, force); } catch (...) {}
+}
+void DumpLog(const char *line) { try { Log(line ? line : ""); } catch (...) {} }
+bool DumpInside() { return Inside(); }
+DumpScope::DumpScope() { e = GetLastError(); was = TlsGetValue(Tls) != NULL; TlsSetValue(Tls, (void *)1); SetLastError(e); }
+DumpScope::~DumpScope() { if (!was) TlsSetValue(Tls, NULL); SetLastError(e); }
+bool DumpSkipped(const wchar_t *path) { try { return !path || Skipped(path); } catch (...) { return true; } }
+bool DumpHook(void *target, void *detour, void **original) { return target && MH_CreateHook(target, detour, original) == MH_OK && MH_EnableHook(target) == MH_OK; }
+void DumpUnhook(void *target) { if (target) MH_DisableHook(target); }
+bool DumpReadable(const void *p, SIZE_T n) { return Readable(p, n); }
+
 
 BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, void *) {
  if (reason == DLL_PROCESS_ATTACH) {
