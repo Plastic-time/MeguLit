@@ -31,7 +31,7 @@ test('bridge: review fixes (hooked capture, no early insert, off the Gate lock, 
  assert.match(remember,/ThreadPool\.QueueUserWorkItem\(_=>\{try\{string file=MemoryPath\(\);if\(file==""\)return;var sig=HookSignature\.Capture/,'capture + write off the Gate lock');
  const pre=s.slice(s.indexOf(' static void PreArmSignature(){'),s.indexOf(' static void RememberStream(){'));
  assert.match(pre,/lock\(Gate\)\{mem=CrossMemory;CrossMemory=null;\}/,'cross-build memory taken once, under the lock');
- assert.match(pre,/if\(offset==sig\.Offset\)\{lock\(Gate\)\{if\(Resume!=null\|\|Selected!=""\)return;/,'same place: no insert, E520 path, under lock');
+ assert.match(pre,/if\(offset==sig\.Offset\)\{Diagnostic\([^;]*\);return;\}/,'other build at the same place: no insert, not restored (exe names are shared by many games)');assert.doesNotMatch(pre,/Resume=mem|FromMemory=true|hookMemory/,'other-build memory never becomes the remembered stream');assert.match(s,/static void PreArmSignature\(\)\{ThreadPool\.QueueUserWorkItem\(_=>PreArmSignatureNow\(\)\);\}/,'off the injection path');
  assert.match(pre,/Thread\.Sleep\(2500\)/,'moved: after engine detection');
  assert.match(pre,/if\(k\.tp\.addr==addr\)/);assert.match(pre,/first==0xE9\|\|first==0xEB/);assert.match(pre,/SignatureInserted=true/);
  assert.doesNotMatch(pre.slice(pre.indexOf('Thread.Sleep(2500)')),/Resume=|FromMemory=true|hookMemory/,'moved hook is not the remembered fast path');
