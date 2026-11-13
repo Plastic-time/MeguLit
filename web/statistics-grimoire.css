@@ -177,7 +177,7 @@
 /* 2026-11-11 medium alignment with the megu-edit learning pages (user: 中幅度调整，不要和整体设计冲突): layout kept;
    panels become square black glass with a red top rule, headings lose the gold diamond for a red block, labels and
    numbers go tracked mono, switches and nav buttons go square, the accent is the one red. */
-.stg{--stg-red:#c8323c;--stg-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;--accent:var(--stg-red)}
+.stg{--stg-red:#c8323c;--stg-mono:"IBM Plex Mono",ui-monospace,Consolas,"Microsoft YaHei UI","Microsoft YaHei",monospace;--accent:var(--stg-red)}
 .stg-glass{border-radius:0;border:0;border-top:1px solid var(--stg-red);background:rgba(0,0,0,.78)}
 .stg-glass::before{display:none}
 :root[data-theme=light] .stg-glass{background:rgba(0,0,0,.78)}
