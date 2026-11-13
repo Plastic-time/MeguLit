@@ -14,10 +14,17 @@ const HOSTS=new Set(['github.com','objects.githubusercontent.com','release-asset
    relay is used. China-looking systems (time zone / language) try the relays first. */
 /* E289 (user report 2026-11-10, Henan: the download failed right at the end): ghfast.top added as a third relay; relays
    get the package digest as a query so a cached copy from before a same-version hotfix is never served. */
+/* E??? (user report 2026-11-13: "更新显示下载失败"): the site's own R2 mirror (dl.megulit.com, what the
+   download buttons on megulit.com use) is tried as well. It serves GitHub's own package by file name, supports Range
+   requests and is reachable in mainland China when GitHub and the gh proxies are not; the sha256 digest still decides. */
 const MIRRORS=['https://gh-proxy.com/{url}','https://ghproxy.net/{url}','https://ghfast.top/{url}'];
-const MIRROR_HOSTS=new Set(MIRRORS.map(m=>new URL(m.replace('{url}','')).hostname));
+const DL_MIRROR='https://dl.megulit.com/';
+const MIRROR_HOSTS=new Set([...MIRRORS.map(m=>new URL(m.replace('{url}','')).hostname),new URL(DL_MIRROR).hostname]);
 const inChina=()=>{try{const o=Intl.DateTimeFormat().resolvedOptions();return o.timeZone==='Asia/Shanghai'||o.timeZone==='Asia/Urumqi'||/^zh-CN/i.test(o.locale||'');}catch{return false;}};
-function sources(rel,china=inChina()){const direct=[rel.url];if(!rel.digest)return direct;const fresh=rel.url+(rel.url.includes('?')?'&':'?')+'v='+String(rel.digest).slice(0,12);const relayed=MIRRORS.map(m=>m.replace('{url}',fresh));return china?[...relayed,...direct]:[...direct,...relayed];}
+function sources(rel,china=inChina()){const direct=[rel.url];if(!rel.digest)return direct;const fresh=rel.url+(rel.url.includes('?')?'&':'?')+'v='+String(rel.digest).slice(0,12);const relayed=MIRRORS.map(m=>m.replace('{url}',fresh));
+ /* the R2 mirror only holds the full packages (MeguLit-v*-win-x64.zip), never the small hot-update ones */
+ const dl=ASSET.test(String(rel.name||''))?[DL_MIRROR+rel.name]:[];
+ return china?[...dl,...relayed,...direct]:[...direct,...dl,...relayed];}
 const updateLog=(root,line)=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','update.log'),new Date().toISOString()+' '+line+'\n');}catch{}};
 const HEADERS={'User-Agent':'MeguLit-Updater','Accept':'application/vnd.github+json'};
 /* E461 (user: players in mainland China, update_check "fetch failed"): api.github.com is often unreachable there, so the
