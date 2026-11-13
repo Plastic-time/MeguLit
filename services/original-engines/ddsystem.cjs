@@ -33,7 +33,7 @@ function list(file){const sz=kit.size(file);if(sz<0x30)return null;const h=kit.r
  const bk=kit.readAt(file,0x20,count*8);if(bk.length<count*8)return null;
  for(let i=0;i<count;i++){const size=bk.readInt32LE(i*8),at=bk.readInt32LE(i*8+4);if(!size)continue;if(at<0||at+size>sz)return null;const sec=kit.readAt(file,at,size);let p=0;
   while(p<sec.length){const n=sec[p];if(n<17||p+n>sec.length)break;const offset=sec.readUInt32LE(p+1),unpacked=sec.readUInt32LE(p+5),packed=sec.readUInt32LE(p+9),sz2=packed||unpacked;
-   const nb=sec.subarray(p+17,p+n),z=nb.indexOf(0),name=new TextDecoder('shift_jis').decode(z<0?nb:nb.subarray(0,z));if(offset+sz2>sz)return null;out.push({name,offset,size:sz2,unpacked,packed:!!packed});p+=n;}}
+   const nb=sec.subarray(p+17,p+n),z=nb.indexOf(0),name=kit.cname(nb);if(offset+sz2>sz)return null;out.push({name,offset,size:sz2,unpacked,packed:!!packed});p+=n;}}
  return out.length?out:null;}
 function read(file,e){const raw=kit.readAt(file,e.offset,e.size);return decryptHxb(e.packed?shs(raw,e.unpacked):raw);}
 function isScript(file,e){try{const raw=kit.readAt(file,e.offset,Math.min(e.size,0x20));const h=e.packed?shs(raw,4):raw;return h.toString('latin1',0,4)==='DDSx';}catch{return false;}}

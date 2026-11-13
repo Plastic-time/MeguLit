@@ -20,7 +20,7 @@ const PUSH=0x11,SHOW=0x0d,TEXT=0x2c,CHOICE=0x4f;
 function lst(file){const b=kit.readAt(file,0,Math.min(kit.size(file),8<<20));if(b.length<80)return null;
  for(const k of [1,2,...Array.from({length:256},(_,i)=>i).filter(i=>i>2),0]){const kk=(k*0x01010101)>>>0,n=(b.readUInt32LE(0)^kk)>>>0;if(4+76*n!==b.length||!n)continue;const out=[];
   for(let i=0;i<n;i++){const p=4+76*i,raw=b.subarray(p+8,p+72),nb=[];for(const c of raw){const x=c^k;if(!c||!x)break;nb.push(x);}
-   out.push({name:new TextDecoder('shift_jis').decode(Buffer.from(nb)),offset:(b.readUInt32LE(p)^kk)>>>0,size:(b.readUInt32LE(p+4)^kk)>>>0,type:(b.readUInt32LE(p+72)^kk)>>>0});}
+   out.push({name:kit.SJIS.decode(Buffer.from(nb)),offset:(b.readUInt32LE(p)^kk)>>>0,size:(b.readUInt32LE(p+4)^kk)>>>0,type:(b.readUInt32LE(p+72)^kk)>>>0});}
   if(out.every(e=>e.name))return out;}
  return null;}
 const pack=lstFile=>lstFile.replace(/\.lst$/i,'');

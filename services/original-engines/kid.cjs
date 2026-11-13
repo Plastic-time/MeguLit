@@ -15,7 +15,7 @@ function lnd(src,unpacked,at=0){const out=Buffer.alloc(unpacked);let s=at,d=0;
  return out.subarray(0,d);}
 function list(file){const sz=kit.size(file);if(sz<0x10)return null;const h=kit.readAt(file,0,0x10);if(h.toString('latin1',0,4)!=='LNK\0')return null;
  const count=h.readInt32LE(4);if(count<=0||count>100000)return null;const idx=kit.readAt(file,0x10,count*32);if(idx.length<count*32)return null;const base=0x10+count*32,out=[];
- for(let i=0;i<count;i++){const offset=base+idx.readUInt32LE(i*32),raw=idx.readUInt32LE(i*32+4),nb=idx.subarray(i*32+8,i*32+32),z=nb.indexOf(0);const name=new TextDecoder('shift_jis').decode(z<0?nb:nb.subarray(0,z)).trim();
+ for(let i=0;i<count;i++){const offset=base+idx.readUInt32LE(i*32),raw=idx.readUInt32LE(i*32+4),nb=idx.subarray(i*32+8,i*32+32),z=nb.indexOf(0);const name=kit.cname(nb).trim();
   if(!name)return null;const e={name,offset,size:raw>>>1,packed:!!(raw&1)};if(e.offset+e.size>sz)return null;out.push(e);}
  return out;}
 function read(file,e){const b=kit.readAt(file,e.offset,e.size);if(e.packed&&b.length>=0x10&&b.toString('latin1',0,4)==='lnd\0')return lnd(b,b.readUInt32LE(8),0x10);return b;}

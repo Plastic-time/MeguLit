@@ -20,7 +20,7 @@ function list(file){const fsz=kit.size(file);if(fsz<16)return null;const h=kit.h
  const n=h.readUInt32LE(4);const tries=[];if(n>0&&n<=0xff)tries.push([n,8]);tries.push([0x10,4],[0x38,4]);
  for(const [nl,at] of tries){const isz=(8+nl)*count;if(at+isz>fsz)continue;const idx=kit.readAt(file,at,isz),out=[];let ok=true;
   for(let i=0;i<count;i++){const p=i*(nl+8),nb=idx.subarray(p,p+nl),z=nb.indexOf(0),base=z>=0?nb.subarray(0,z):nb;if(!base.length)break;
-   let name=new TextDecoder('shift_jis').decode(base);if(z>=0&&nl-z>1){const r=nb.subarray(z+1),z2=r.indexOf(0),ext=(z2>=0?r.subarray(0,z2):r).toString('latin1');if(/^[A-Za-z0-9]{1,8}$/.test(ext))name=name.replace(/\.[^.]*$/,'')+'.'+ext;}
+   let name=kit.SJIS.decode(base);if(z>=0&&nl-z>1){const r=nb.subarray(z+1),z2=r.indexOf(0),ext=(z2>=0?r.subarray(0,z2):r).toString('latin1');if(/^[A-Za-z0-9]{1,8}$/.test(ext))name=name.replace(/\.[^.]*$/,'')+'.'+ext;}
    const offset=idx.readUInt32LE(p+nl),size=idx.readUInt32LE(p+nl+4);if(offset<isz||offset+size>fsz||/[\0-\x1f]/.test(name)){ok=false;break;}out.push({name:name.toLowerCase(),offset,size});}
   if(ok&&out.length&&!(out.length===1&&count>1))return out;}
  return null;}

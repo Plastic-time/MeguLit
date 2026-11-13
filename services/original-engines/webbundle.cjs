@@ -41,7 +41,7 @@ function entries(dir,any){if(!any&&!signals(dir))return [];
   else if(/\.exe$/i.test(n)&&!/^(nwjc|notification_helper|unins\d*|chromedriver|payload)\.exe$/i.test(n)&&(ns.some(x=>/^(nw|love)\.dll$/i.test(x))||ns.some(x=>/^(nw|love)\.dll$/i.test(x))))lists.push({f,zip:true});}
  for(const c of lists){let l=null;try{l=c.asar?kit.asarList(c.f):kit.zipList(c.f);}catch{}if(!l)continue;
   for(const e of l){if(e.encrypted||!(TEXT.test(e.name)||RAW.test(e.name)||/\.(gb|gbc)$/i.test(e.name)))continue;const sz=c.asar?e.size:e.raw;if(sz>MAXSIZE)continue;
-   const rd=c.asar?()=>kit.readAt(c.f,e.offset,e.size):()=>kit.zipRead(c.f,e);add(mk(e.name,sz,rd,c.f,c.asar?n=>kit.readAt(c.f,e.offset,Math.min(n,e.size)):null));}}
+   const rd=c.asar?()=>kit.readAt(c.f,e.offset,e.size):()=>kit.zipRead(c.f,e);add({...mk(e.name,sz,rd,c.f,c.asar?n=>kit.readAt(c.f,e.offset,Math.min(n,e.size)):null),packed:true});}}
  memo.set(dir,{key,list:out});if(memo.size>200)memo.delete(memo.keys().next().value);return out;}
 
 /* ---- text helpers ------------------------------------------------------------------------------------------------ */
@@ -166,7 +166,9 @@ const GENERIC_MAP=[[/\.js$/i,'js'],[/\.json$/i,'json'],[/\.html?$/i,'html']];
 const nonVendor=e=>!VENDOR.test(e.name)&&!/(^|\/)(package|package-lock|manifest|locales?)[^/]*\.json$/i.test(e.name);
 const PROFILES={
  vnmaker:{name:'Visual Novel Maker',hint:'NW.js 内 data\\*.json（RPG Maker MZ 格式）',
-  detect:es=>has(es,/(^|\/)data\/System\.json$/i)&&has(es,/(^|\/)data\/MapInfos\.json$/i),
+  /* E605: loose www\data or data\ with System.json + MapInfos.json is RPG Maker MV/MZ itself; VNM only when that data
+     sits inside its NW.js package and no RPG Maker core js ships with it */
+  detect:es=>es.some(e=>e.packed&&/(^|\/)data\/System\.json$/i.test(e.name))&&es.some(e=>e.packed&&/(^|\/)data\/MapInfos\.json$/i.test(e.name))&&!has(es,/(^|\/)(rpg_core|rmmz_core|rpg_managers|rmmz_managers)\.js$/i),
   pick:e=>/(^|\/)data\/(map\d+|commonevents|troops)\.json$/i.test(e.name)?'rpg':/(^|\/)data\/(?!system|mapinfos|actors|classes|skills|items|weapons|armors|enemies|states|animations|tilesets)[^/]+\.json$/i.test(e.name)?'json':null},
  twine:{name:'Twine / SugarCube',hint:'*.html 内 <tw-storydata>',
   detect:es=>es.some(e=>/\.html?$/i.test(e.name)&&sniff(e,16384,/<tw-storydata\b|<div[^>]*id="storeArea"/i)),

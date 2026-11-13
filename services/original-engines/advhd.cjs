@@ -7,8 +7,8 @@
      0x41 <3 bytes> text\0              narration
      0x42 <4 bytes> name\0 text\0       a spoken line and its speaker
    Text is Shift-JIS. Other commands (voice and image names, jumps) are ASCII and dropped. */
-const fs=require('node:fs'),path=require('node:path');
-const sj=new TextDecoder('shift_jis');
+const fs=require('node:fs'),path=require('node:path'),kit=require('./kit.cjs');/* E605 */
+const sj=kit.SJIS;
 const PROSE=/[ぁ-ゖァ-ヺ一-龯]/;
 function list(b,fileSize=b.length){if(b.length<16)return null;const n=b.readInt32LE(0);if(n<=0||n>0xff||4+n*12>b.length)return null;const exts=[];
  for(let i=0;i<n;i++){const p=4+i*12,ext=b.toString('latin1',p,p+4).replace(/\0.*$/s,'');if(!/^[A-Za-z0-9]{1,4}$/.test(ext))return null;exts.push({ext,count:b.readUInt32LE(p+4),dir:b.readUInt32LE(p+8)});}
@@ -48,5 +48,5 @@ const engine={
  _internal:{list,decode},
 };
 /* E580 an archive's index without reading the whole file (the voice catalogue: voice archives are large) */
-const listFile=file=>{const kit=require('./kit.cjs');return list(kit.head(file,8<<20),kit.size(file));};
+const listFile=file=>{return list(kit.head(file,8<<20),kit.size(file));};
 module.exports={parse,decode,list,listFile,engine};

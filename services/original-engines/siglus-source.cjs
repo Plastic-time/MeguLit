@@ -57,7 +57,7 @@ function sources(file){const b=fs.readFileSync(file);if(b.length<96)return [];co
  for(let i=0;i+4<=sizes.length;i+=4){const sz=sizes.readUInt32LE(i);if(!sz||pos+sz>b.length)break;try{out.push(chunk(b.subarray(pos,pos+sz)));}catch{}pos+=sz;}
  return out;}
 const decode=raw=>{if(raw[0]===0xff&&raw[1]===0xfe)return raw.toString('utf16le',2);if(raw[0]===0xef&&raw[1]===0xbb)return raw.toString('utf8',3);
- try{return new TextDecoder('utf-8',{fatal:true}).decode(raw);}catch{return new TextDecoder('shift_jis').decode(raw);}};
+ try{return new TextDecoder('utf-8',{fatal:true}).decode(raw);}catch{return kit.SJIS.decode(raw);}};
 /* Lines with their voice from source text: a KOE / koe / exkoe call sets the voice of the next message
    (@mes(id,name,text), or a plain 「…」 line). Comment lines (;) are skipped. */
 // The text argument of @mes(id,name,text) anywhere on a line (other tags may wrap it: @SIZE(20)@mes(...)@SIZE@RET).

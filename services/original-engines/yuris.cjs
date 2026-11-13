@@ -18,7 +18,7 @@ const memo=(map,key,make)=>{if(map.has(key))return map.get(key);const v=make();m
 // Index names are stored bitwise-NOT; their length byte is NOT-ed and then swapped through this table.
 const SWAP=[0x03,0x48,0x06,0x35,0x0C,0x10,0x11,0x19,0x1C,0x1E,0x09,0x0B,0x0D,0x13,0x15,0x1B,0x20,0x23,0x26,0x29,0x2C,0x2F,0x2E,0x32];
 const swapLen=new Map();for(let i=0;i<SWAP.length;i+=2){swapLen.set(SWAP[i],SWAP[i+1]);swapLen.set(SWAP[i+1],SWAP[i]);}
-const sjis=new TextDecoder('shift_jis');
+const sjis=kit.SJIS;
 function ypfIndex(buf,size,wide,swap){const count=buf.readUInt32LE(8),files=[];let p=32;
  for(let i=0;i<count;i++){if(p+5>buf.length)return null;let len=buf[p+4]^0xff;if(swap)len=swapLen.get(len)??len;p+=5;
   if(p+len+(wide?22:18)>buf.length)return null;const raw=Buffer.from(buf.subarray(p,p+len));for(let k=0;k<raw.length;k++)raw[k]^=0xff;p+=len;

@@ -24,7 +24,7 @@ function crypt(buf,offset=0){const out=Buffer.from(buf);for(let i=0;i<out.length
 function hash32(bytes){let r=0xffffffff;for(const b of bytes)r=(r>>>8)^CRC[(r^b)&255];return (~r)>>>0;}
 
 /* ---- archive --------------------------------------------------------------------------------------------------- */
-const sj=new TextDecoder('shift_jis');
+const sj=kit.SJIS;
 function arcList(b){
  if(!b||b.length<0x1c||b.toString('latin1',0,10)!=='MajiroArcV'||b.toString('latin1',11,16)!=='.000\0')return null;
  const version=b[10]-0x30;if(version<1||version>3)return null;

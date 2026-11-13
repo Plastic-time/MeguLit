@@ -22,7 +22,7 @@ function keyAt(offset){const o=offset>>>0,C=0x5cc8e9d7;
  const v9=((o-C)+shl(t9,31-((o>>>24)&15))+shr(t9,((o>>>24)&15)+1))>>>0;
  return shr((((o-C)+shl(v9,31-(o>>>28))+shr(v9,(o>>>28)+1))>>>0),o&15)&255;}
 function list(file){const sz=kit.size(file);if(sz<0x20)return null;const h=kit.readAt(file,0,0x20),tag=h.toString('latin1',0,4);
- const fixed=(b,at,len)=>{const nb=b.subarray(at,at+len),z=nb.indexOf(0);return new TextDecoder('shift_jis').decode(z<0?nb:nb.subarray(0,z));};
+ const fixed=(b,at,len)=>{const nb=b.subarray(at,at+len),z=nb.indexOf(0);return kit.cname(nb);};
  const ok=e=>e.offset+e.size<=sz&&e.size>=0;
  if(tag==='AOIB'){const v=h.toString('latin1',4,8);const version=v.startsWith('X10')?10:v.startsWith('X12')?12:v==='OX7\0'?7:v==='OX6\0'?6:v==='OX5 '?5:v==='OX4 '?4:0;if(!version)return null;
   const count=h.readInt32LE(8);if(count<=0||count>100000)return null;const key=VERSION_KEY[version],out=[];

@@ -9,7 +9,7 @@
    entries (by name: no media extension) are read with the generic text scan the GARbro fallback uses (Shift-JIS runs
    with kana): lines are approximate and pairing with a patch is by position only. */
 const fs=require('node:fs'),path=require('node:path'),kit=require('./kit.cjs');
-const sj=new TextDecoder('shift_jis');
+const sj=kit.SJIS;
 function list(file){let fd;try{fd=fs.openSync(file,'r');}catch{return null;}
  try{const size=fs.fstatSync(fd).size,h=Buffer.alloc(8);if(fs.readSync(fd,h,0,8,0)<8)return null;const sig=h.toString('latin1',0,4);if(sig!=='ARC1'&&sig!=='ARC2')return null;
   const v2=sig==='ARC2',count=h.readInt32LE(4);if(count<=0||count>100000)return null;

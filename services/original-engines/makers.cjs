@@ -149,7 +149,7 @@ function axStrings(b,h){const out=[],seg=b.subarray(h.at,h.at+h.size),ds=seg.sub
  return out;}
 /* DPMX index at b[d]: [{name, key, offset (absolute in b), size}] */
 function dpmx(b,d=0){if(b.toString('latin1',d,d+4)!=='DPMX'||d+16>b.length)return null;const data=b.readUInt32LE(d+4),n=b.readUInt32LE(d+8);if(n>100000||d+16+n*32>b.length)return null;const out=[];
- for(let i=0;i<n;i++){const e=d+16+i*32,nb=b.subarray(e,e+16),z=nb.indexOf(0);const name=new TextDecoder('shift_jis').decode(z<0?nb:nb.subarray(0,z));
+ for(let i=0;i<n;i++){const e=d+16+i*32,nb=b.subarray(e,e+16),z=nb.indexOf(0);const name=kit.cname(nb);
   const key=b.readUInt32LE(e+20),offset=d+data+b.readUInt32LE(e+24),size=b.readUInt32LE(e+28);if(!name||offset+size>b.length)return null;out.push({name,key,offset,size});}
  return out;}
 function hspPieces(b){const out=[],idx=(()=>{const d=b.indexOf('DPMX',0,'latin1');return d>=0?dpmx(b,d):null;})();

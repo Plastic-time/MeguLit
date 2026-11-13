@@ -6,7 +6,7 @@ const kit=require('./kit.cjs');/* E577 shared engine kit */
    zlib for "EENZ". The scene is Lisp-like Shift-JIS: (a3:send-string "[$B千春$K]台詞$N" n) puts text up, wait-w waits
    for a click. [$X名前$K] names the speaker; $N ends a line, other $X codes are colours/styles. */
 const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
-const sj=new TextDecoder('shift_jis');
+const sj=kit.SJIS;
 function decode(b){const tag=b.toString('latin1',0,4);if(tag!=='EENC'&&tag!=='EENZ')return b;const key=(b.readUInt32LE(4)^0xDEADBEEF)>>>0,d=Buffer.from(b.subarray(8));
  for(let i=0;i<d.length;i++)d[i]^=(key>>>((i&3)*8))&255;return tag==='EENZ'?zlib.inflateSync(d):d;}
 function parse(data){const t=sj.decode(decode(data)),lines=[];let name='',text='';

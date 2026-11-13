@@ -31,7 +31,7 @@ function listAld(file){const fsz=kit.size(file);if(fsz<512)return null;const h=k
  const ptrs=kit.readAt(file,0,link0),linkEnd=sector(ptrs,1);if(linkEnd<=link0||linkEnd>fsz)return null;const links=kit.readAt(file,link0,linkEnd-link0),vol=aldVolume(file),out=[];
  for(let i=0;i+3<=links.length;i+=3){const v=links[i],n=links[i+1]|links[i+2]<<8;if(!v)continue;if(v!==vol)continue;const at=sector(ptrs,n);if(at<0||at+16>fsz)return null;
   const eh=kit.readAt(file,at,48),hl=eh.readUInt32LE(0),sz=eh.readUInt32LE(4);if(hl<16||hl>0x200||at+hl+sz>fsz)return null;const nb=kit.readAt(file,at+16,hl-16),z=nb.indexOf(0);
-  out.push({name:new TextDecoder('shift_jis').decode(z>=0?nb.subarray(0,z):nb),link:i/3,offset:at+hl,size:sz});}
+  out.push({name:kit.SJIS.decode(z>=0?nb.subarray(0,z):nb),link:i/3,offset:at+hl,size:sz});}
  return out.length?out:null;}
 
 /* ---- System39.ain --------------------------------------------------------------------------------------------------- */
@@ -118,7 +118,7 @@ function walk(sco,{ain=null,utf8=false}={}){const c=sco,hdr=c.readUInt32LE(4),en
   }catch{/* data in the code area or a command this table lacks: resync one byte on */p=top+1;if(++bad>4096)break;}}
  return ev;}
 /* events -> lines: a shown page (text up to A or a menu boundary) is one line; R is a line break inside it */
-function scoLines(sco,opts){const ev=walk(sco,opts),lines=[];let cur=[],kind='text';const dec=new TextDecoder('shift_jis');
+function scoLines(sco,opts){const ev=walk(sco,opts),lines=[];let cur=[],kind='text';const dec=kit.SJIS;
  const flush=()=>{const t=kit.trimBoth(cur.join('').replace(/\n+$/,''));if(t&&!kit.ascii(t))lines.push(t);cur=[];};
  for(const e of ev){if(e.page){flush();continue;}if(e.br){if(cur.length)cur.push('\n');continue;}
   const t=typeof e.text==='string'?e.text:dec.decode(e.text);if(e.kind==='choice'){flush();const s=kit.trimBoth(t);if(s)lines.push(s);continue;}cur.push(t);}
@@ -149,8 +149,8 @@ function scenes(dir){const out=new Map(),ain=ain39(dir);const opts={ain,utf8:nul
  return [...out.values()].sort((a,b)=>(a.link??1e9)-(b.link??1e9)||a.name.localeCompare(b.name));}
 function parse(buf){try{const b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),opts=buf.ain||lastOpts;
  if(isSco(b))return {lines:scoLines(b,opts),anchors:[]};
- if(b.toString('latin1',0,4)==='MSGI'&&opts.ain){const lines=[];for(const m of opts.ain.messages||[]){const t=kit.trimBoth(new TextDecoder('shift_jis').decode(m));if(t&&!kit.ascii(t))lines.push(t);}return {lines,anchors:[]};}
- const a=readAin39(b);if(a?.messages){const lines=[];for(const m of a.messages){const t=kit.trimBoth(new TextDecoder('shift_jis').decode(m));if(t&&!kit.ascii(t))lines.push(t);}return {lines,anchors:[]};}}catch{}
+ if(b.toString('latin1',0,4)==='MSGI'&&opts.ain){const lines=[];for(const m of opts.ain.messages||[]){const t=kit.trimBoth(kit.SJIS.decode(m));if(t&&!kit.ascii(t))lines.push(t);}return {lines,anchors:[]};}
+ const a=readAin39(b);if(a?.messages){const lines=[];for(const m of a.messages){const t=kit.trimBoth(kit.SJIS.decode(m));if(t&&!kit.ascii(t))lines.push(t);}return {lines,anchors:[]};}}catch{}
  return {lines:[],anchors:[]};}
 function sources(dir){return [...kit.files(dir,{name:/\.ald$/i}).filter(f=>SCEN.test(f)),...kit.files(dir,{name:/\.(sco|ain)$/i,subs:['','sco','SCO'],max:4000})];}
 const engine={id:'alicesoft',hint:'*SA.ALD / System39.ain',scenes,archives:scenes,sources,parse,test:n=>/\.sco$/i.test(n)};

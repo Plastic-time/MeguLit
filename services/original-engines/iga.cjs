@@ -8,7 +8,7 @@ const kit=require('./kit.cjs');/* E577 shared engine kit */
    In a .s scene a string operand is 04 00 <length> then that many bytes (padded): Shift-JIS up to a NUL. A speaker is a string
    "＃名前"; ruby is written <漢字<よみ>. */
 const fs=require('node:fs'),path=require('node:path');
-const sj=new TextDecoder('shift_jis');
+const sj=kit.SJIS;
 /* #149 (殻ノ少女 / カルタグラ / クロウカシス / PP-ピアニッシモ, older Innocent Grey): "PACKDAT." archives (script.dat), as in
    IG_tools igtool (GPL) and Crass: u32 count twice, then 48-byte entries (cp932 name[32], absolute offset, mode,
    unpacked size, packed size). Mode & 0x10000 (pictures) is an XOR stream keyed by the size; .s scripts are stored plain

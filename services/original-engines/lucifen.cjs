@@ -38,7 +38,7 @@ function readIndex(idx,info){const count=idx.readInt32LE(0);if(count<=0||count>5
   for(let i=0;i<n;i++){const letter=idx[at++],off=wide?idx.readInt32LE(at):idx.readUInt16LE(at);at+=wide?4:2;name[depth]=letter;
    if(letter)walk(at+off,depth+1);
    else{let ep=entriesAt+size*off;if(depth<1||ep+size>idx.length)throw Error('lpk entry');if(size&1)ep++;const o=idx.readUInt32LE(ep);
-    const e={name:new TextDecoder('shift_jis').decode(Buffer.from(name.slice(0,depth))),offset:info.aligned?o*2048:o,size:idx.readUInt32LE(ep+4)};
+    const e={name:kit.SJIS.decode(Buffer.from(name.slice(0,depth))),offset:info.aligned?o*2048:o,size:idx.readUInt32LE(ep+4)};
     e.unpacked=info.packed?idx.readUInt32LE(ep+8):0;out.push(e);}}};
  walk(p,0);return out.length===count?out:null;}
 const memo=new Map();

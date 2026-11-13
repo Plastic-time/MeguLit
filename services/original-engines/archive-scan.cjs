@@ -58,14 +58,14 @@ function scanEngine({id,hint,name,magic,subs,list,read,loose,find}){
 function ismList(file){const h=kit.head(file,0x10);if(h.length<0x10||h.toString('latin1',0,12)!=='ISM ARCHIVED')return null;const count=h.readInt16LE(0x0c),version=h.readUInt16LE(0x0e)&0x7fff;if(count<=0)return null;
  const size=kit.size(file),idx=kit.readAt(file,0x10,count*0x40);
  const read=(nl,rl)=>{const out=[];let p=0;for(let i=0;i<count;i++){if(p+nl+12>idx.length)return null;const nb=kit.cstr(idx,p,p+nl);if(!nb||!nb.length||nb.some(c=>c<0x20))return null;
-  const offset=idx.readUInt32LE(p+nl+4),sz=idx.readUInt32LE(p+nl+8);if(offset+sz>size)return null;out.push({name:new TextDecoder('shift_jis').decode(nb),offset,size:sz});p+=nl+rl;}return out;};
+  const offset=idx.readUInt32LE(p+nl+4),sz=idx.readUInt32LE(p+nl+8);if(offset+sz>size)return null;out.push({name:kit.SJIS.decode(nb),offset,size:sz});p+=nl+rl;}return out;};
  return (version!==1?read(0x0c,0x14):null)||read(0x30,0x10);}
 
 /* ---- GLib2 -------------------------------------------------------------------------------------------------------- */
 const G2_HASHES='0df0b0b745b8c9b4cfb3f0b0a85f2c0b648dd4e111eadaa7fb5fe83a82a40f5dae646f6fec17040e25f2d2a13f4e9eb3a3c3126ccbe385976e19a4e5644ebd1243ff635db5fb8b1e7840ffb863858c222d2f479b185c19700c73e029e04df855a1f2dce5464b997a50f3c59d4fcf443403e64440b794ad98c4d3851c76430824624bf3088bc98fcd080528c67fda7171c93c3f85e0b964a8bf465652ebaa95074df4692c773d65cf22987d43c1f22de86758ea018b65e7fe54668f5944b21ccb92dab384c5c45179dc2ebc2aa07d74d534920bf6c3f5b68caabb114eb7b86636a419f92fe2b4273bcc0b4f642efebf77d00a4fa91aff5930c18b80bd22d2d8d28b8c1f8c6b4127a1e38af328910b6d9181a2c5aee7b998f7044d7851cf135ee38c5a5d13e3a9559960be077581ac63c880a11eabc3eb284729c65d02b5dbda13c3db8b4c034789b1874334079870a97dbc0f2452e7b510161759e21941fe6bee2eb6ae159010d4867c58bd7fbdc95385c1df55fd15439dd2df04561cb1840e81b14523d7bba84c08c6dc68feb6fca2e149c24c6e84743fbc4059e75cf74825423e891932aec31a7132295f8fdf6434eab7afbea45129ba1b00a007313f101b52d0d6cb010cd2c522aaf53b347eea1fe8ae3b144dca143cd49afb673a3b415ea08a5f02897ddc9fbb75dc59d3490783d5747cfc0d650bba84f6cf21afff7eacbac8e14dbbcbd934152bbb6da3349ed30bcedb739ee0f3cb447e1f274b3fceeec843067ec34cbf766b582c47d1688e15bceeead2b88674088be90e3a3ff70a239368b3871ef6fc4631fead89b51242d68c1214028ae3f3bc86679eb3012827c90fa4dd0e14422546ef0c6912bba14b431950541bbe114429b874e794c8a2172001e86f01b34713737a45b268bb86fd696db6040d2ec6436f656ec4cbc0e505067764276481b195e8774216d938d165bb7099801f0aa96c1db97b0ab400c63617ea129a46f840dcedc07bc5452115e5b0f54e1dd7aff85cf100490e74e69d7e112d50636704e9b9a519a6260cbc58808224f7062a08317b2e8646cffe7e9d15bc5e35fc9bcda1b09191fbfc54d9e1b3d381e3da41bdd27d9b0cbab2c6fab910d4c1ab62756dd4ffe1c4c05232e260636cdf8bd6bce0802663e8220198005572674cdd3b1e95e9ef698ef509a410ca5fd175b525ad0f4e443e58554e97b350f58bac5a3277aad14f3ed878925a020e668269120aadea82a1e1f08b35e7e1fd1ffd657e3ab4b75ffcf75ab2db5eeae63e13c7b5f902b99f2e620a210810bbb1246617774d49a593cdedeca50b79968e82178287a51d088c2372085fd53ffce23c182c0338a32b9c08907cdf0eaf615613acb78aa9f1ba6ac2cad5ed602c74a1724dc430ce02ab3c3c260eaeddcd278d188e4e94cd8a82573a84a85b108e931db28d7eb892cd2e4d24c8fd571d978e94e27471288c87227b9248ed2583be7f0d86347b90ee955f627764e3dafebc9b96ceebe4efba6c1942a8c2dea5fd68bdd46955116c69671e2e77cf3b205288ec6577ed28a811b7f5213f1f24eeb59511c44d6532d969aa6bf7e7c645c868b65b0029ead258a401539e906e05dc612f9b8cd4cc135621056cc7a3d66640cc4ed960710e4223e5e18f112648892af2acbb2ad3dc2b54e814789ff39dd063bb0430e5d491c9b055e9256292622814de4d80962a801e15762d36e3c36f7f07eaaa9fcae98f76d1cbe490695698ca4db0922e3e051538ffa34a24046779407b14d4e8a9e8f9d2ddd3cef23a55f118d0f25688e2bec0edfed333b1ac96a6f20f0be5960a88b346220818a1ae407ecca2e4b661bdeec14cd21882807f618fa34aa3a61bdd56b4ade4365af9e59586036ff3bf3f2fcdd446475a508fc27e60969a4219c46109ec7a5937218f6fff2033922c5c66c20de424f193159dcf987ae079baf8ac09270bace3f426a71c7c8d055a6a6a856947eb0703f4166f8de4fb48f82839775a674d08838dcbb8d7370efeed83f808b4ac721e1f51d55cd2e0e243301f463026d73d02c71e14f0e56aabc726b716091a11ada1cb416c4f84f2b45d1ce370a3966143746c5ae76c7333e26defa8f66a6e77f1ccb7e8043396f687798181f982d352633889e99c7530f74b4a2b4ee9421a26b237d4f45300c4d058efa81dd7331a6c8096a37c9b5b390de007ed2f8287a549b63ba3e4f115cd68f39ad1253f1647cd582e508ded45907360ef2591f9627c2eadb12fb5376f4f41a24a2aaafa2b5fa6adcf1644575e8583055d2ae7a51527005fc36001cb0e13517c19bfd3f360706c122764113649f8437cfe5dc3640d7e05251c8edf1f3139f8075b3bba75b84cbcaa60e1d435c93516b0d07b3bf8616b87336217047f1c587b966bd7dfbe5d82efe193d841bc829af9852670188e135e23f49d403591182c41826c561a5e7b38d4c2635979b15a4d89c11c85160343f590ff3883854b5beef299b4b11b94d68961e9f93138b3a009cc7a4f47dee478d9ffe62c94536d0c2fc27444';
 const G2H=new Map();for(let i=0;i<G2_HASHES.length/4;i++)G2H.set(parseInt(G2_HASHES.substr(i*4,4),16),i);
 const ORDERS=[[3,2,1,0],[0,2,1,3],[1,0,3,2],[3,0,2,1],[2,1,3,0],[3,2,1,0]];
-const rotr=(x,n)=>{x&=255;n&=7;return ((x>>>n)|(x<<(8-n)))&255;},rotl=(x,n)=>{x&=255;n&=7;return ((x<<n)|(x>>>(8-n)))&255;};
+const rotr=(x,n)=>kit.ror(x&255,n),rotl=(x,n)=>kit.rol(x&255,n);/* E605 kit rol/ror */
 const PERMS=[(i,x)=>rotr(x,i),(i,x)=>x^i,(i,x)=>~x,(i,x)=>~(x-100),(i,x)=>x+i,(i,x)=>rotl(x,4)];
 /* the inverse of each permutation, for building test archives: inv[k](i, y) gives x with PERMS[k](i, x) & 255 === y */
 const PERMS_INV=[(i,y)=>rotl(y,i),(i,y)=>(y^i)&255,(i,y)=>~y&255,(i,y)=>((~y)+100)&255,(i,y)=>(y-i)&255,(i,y)=>rotr(y,4)];
@@ -83,7 +83,7 @@ function g2List(file){const h0=kit.head(file,0x5c);if(h0.length<0x5c)return null
  const at=h.readUInt32LE(0x54),len=h.readUInt32LE(0x58),size=kit.size(file);if(at+len>size)return null;let idx=kit.readAt(file,at,len);
  for(const k of [0x44,0x34,0x24,0x14]){const sc=g2Scheme(h.readUInt32LE(k));if(!sc)return null;idx=g2Decrypt(sc,idx);}
  if(idx.toString('latin1',0,4)!=='CDBD')return null;const count=idx.readInt32LE(4),info=0x10+idx.readInt32LE(8),names=0x10+count*0x18;if(count<=0||names>idx.length)return null;
- const all=[],out=[];for(let i=0;i<count;i++){const p=0x10+i*0x18,nb=kit.cstr(idx,names+idx.readInt32LE(p),info),parent=idx.readInt32LE(p+8),attr=idx.readInt32LE(p+12);let name=nb?new TextDecoder('shift_jis').decode(nb):'';
+ const all=[],out=[];for(let i=0;i<count;i++){const p=0x10+i*0x18,nb=kit.cstr(idx,names+idx.readInt32LE(p),info),parent=idx.readInt32LE(p+8),attr=idx.readInt32LE(p+12);let name=nb?kit.SJIS.decode(nb):'';
   if(parent>=0&&parent<all.length)name=all[parent]+'/'+name;all.push(name);if(attr!==0x100)continue;const q=info+idx.readInt32LE(p+0x10);if(q+0x44>idx.length)return null;
   const sz=idx.readUInt32LE(q+8),offset=idx.readUInt32LE(q+12);if(offset+sz>size)return null;out.push({name,offset,size:sz,keys:[0,1,2,3].map(j=>idx.readUInt32LE(q+0x10+j*0x10))});}
  return out;}
@@ -125,7 +125,7 @@ function tacRead(file,e){const b=kit.readAt(file,e.offset,e.size);if(e.packed){t
  const o=Buffer.from(b);new Blowfish(Buffer.from(e.hash.toString()+'_tlib_secure_','latin1')).decryptBuffer(o.subarray(0,o.length&~7));return o;}
 
 /* ---- Yaneurao ----------------------------------------------------------------------------------------------------- */
-function yaneList(file){const h=kit.head(file,0x120);if(h.length<0x18)return null;const tag=h.toString('latin1',0,8),size=kit.size(file),sj=new TextDecoder('shift_jis'),out=[];
+function yaneList(file){const h=kit.head(file,0x120);if(h.length<0x18)return null;const tag=h.toString('latin1',0,8),size=kit.size(file),sj=kit.SJIS,out=[];
  const rec=(idx,count,nl,start)=>{for(let i=0;i<count;i++){const p=start+i*(nl+12);if(p+nl+12>idx.length)return null;const nb=kit.cstr(idx,p,p+nl);if(!nb||!nb.length)return null;const offset=idx.readUInt32LE(p+nl),unpacked=idx.readUInt32LE(p+nl+4),sz=idx.readUInt32LE(p+nl+8);if(offset+sz>size)return null;out.push({name:sj.decode(nb).replace(/\\/g,'/'),offset,size:sz,unpacked});}return out;};
  if(tag==='yanepkDx'&&h.length>=0x110){const first=h.readUInt32LE(0x10c);if(first<0x118||first>=size)return null;const count=Math.floor((first-0xc)/0x10c);return rec(kit.readAt(file,0,first),count,0x100,0xc);}
  if(tag==='yanepkEx'){const count=h.readInt32LE(8);if(count<=0||count>100000)return null;return rec(kit.readAt(file,0,0xc+count*0x2c),count,0x20,0xc);}
@@ -140,12 +140,12 @@ const yaneRead=(file,e)=>{const b=kit.readAt(file,e.offset,e.size);return e.unpa
 function safList(file){const h=kit.head(file,8);if(h.length<8)return null;const id=h.readUInt16LE(0),count=h.readInt16LE(2),size=kit.size(file),out=[];if(count<=0)return null;
  if((id&0xff00)===0x500){const idx=kit.readAt(file,4,count*32);if(idx.length<count*32)return null;if(id===0x501)for(let i=0;i<count;i++){let k=0xdf;for(let j=0;j<32;j++)idx[i*32+j]^=(k++)&255;}
   for(let i=0;i<count;i++){const p=i*32;if(idx[p]>0x7f)continue;const nb=kit.cstr(idx,p,p+0x14);if(!nb||!nb.length)return null;const offset=idx.readUInt32LE(p+0x14)*2048,sz=idx.readUInt32LE(p+0x18),unpacked=idx.readUInt32LE(p+0x1c);if(offset+sz>size)return null;
-   out.push({name:new TextDecoder('shift_jis').decode(nb).trimEnd(),offset,size:sz,unpacked,lzss:false});}
+   out.push({name:kit.SJIS.decode(nb).trimEnd(),offset,size:sz,unpacked,lzss:false});}
   return out;}
  if((id&0xff00)===0x600){const nlen=h.readInt32LE(4);if(nlen<=0||nlen>=size)return null;const idx=kit.readAt(file,8,count*16),names=kit.readAt(file,8+count*16,nlen);
   if(id&1){for(let i=0;i<count;i++){let k=0xef;for(let j=0;j<16;j++)idx[i*16+j]^=(k++)&255;}let k=0xff;for(let i=0;i<names.length;i++){names[i]^=k;k=(k-1)&255;}}
   for(let i=0;i<count;i++){const p=i*16;if(idx[p+3]>0x7f)continue;const nb=kit.cstr(names,idx.readUInt32LE(p)&0x7fffffff);if(!nb||!nb.length)return null;const offset=idx.readUInt32LE(p+4)*2048,sz=idx.readUInt32LE(p+8),unpacked=idx.readUInt32LE(p+12);if(offset+sz>size)return null;
-   out.push({name:new TextDecoder('shift_jis').decode(nb),offset,size:sz,unpacked,lzss:!!(id&2)});}
+   out.push({name:kit.SJIS.decode(nb),offset,size:sz,unpacked,lzss:!!(id&2)});}
   return out;}
  return null;}
 function safRead(file,e){const b=kit.readAt(file,e.offset,e.size);if(!e.unpacked)return b;if(e.lzss)return kit.lzss(b,e.unpacked);try{return zlib.inflateSync(b);}catch{return b;}}
@@ -153,7 +153,7 @@ function safRead(file,e){const b=kit.readAt(file,e.offset,e.size);if(!e.unpacked
 /* ---- BlueGale (SNN + INX) ----------------------------------------------------------------------------------------- */
 function snnList(file){const inx=file.replace(/\.snn$/i,'.inx'),alt=file.replace(/\.snn$/i,'.Inx');const ix=kit.isFile(inx)?inx:kit.isFile(alt)?alt:null;if(!ix)return null;
  const b=kit.head(ix,64<<20);if(b.length<4)return null;const count=b.readInt32LE(0);if(count<=0||4+count*0x48>b.length)return null;const size=kit.size(file),out=[];
- for(let i=0;i<count;i++){const p=4+i*0x48,nb=kit.cstr(b,p,p+0x40);if(!nb||!nb.length)return null;const offset=b.readUInt32LE(p+0x40),sz=b.readUInt32LE(p+0x44);if(offset+sz>size)return null;out.push({name:new TextDecoder('shift_jis').decode(nb),offset,size:sz});}
+ for(let i=0;i<count;i++){const p=4+i*0x48,nb=kit.cstr(b,p,p+0x40);if(!nb||!nb.length)return null;const offset=b.readUInt32LE(p+0x40),sz=b.readUInt32LE(p+0x44);if(offset+sz>size)return null;out.push({name:kit.SJIS.decode(nb),offset,size:sz});}
  return out;}
 
 /* ---- DxLib (unencrypted DXArchive through wolf.cjs) --------------------------------------------------------------- */
@@ -163,11 +163,11 @@ function dxaList(file){const t=wolfDxa().dxaList(file);return t&&t.state==='plai
 /* ---- SLG System --------------------------------------------------------------------------------------------------- */
 function szsList(file){const h=kit.head(file,0x10);if(h.length<0x10||h.toString('latin1',0,3)!=='SZS'||h.toString('latin1',5,8)!=='0__')return null;const count=h.readInt32LE(0xc);if(count<=0||count>100000)return null;
  const idx=kit.readAt(file,0x10,count*0x110),size=kit.size(file),out=[];if(idx.length<count*0x110)return null;
- for(let i=0;i<count;i++){const p=i*0x110,nb=kit.cstr(idx,p,p+0x100);if(!nb||!nb.length)return null;const offset=Number(idx.readBigInt64LE(p+0x100)),sz=idx.readUInt32LE(p+0x108);if(offset+sz>size)return null;out.push({name:new TextDecoder('shift_jis').decode(nb).replace(/;/g,'/'),offset,size:sz,xor:0x90});}
+ for(let i=0;i<count;i++){const p=i*0x110,nb=kit.cstr(idx,p,p+0x100);if(!nb||!nb.length)return null;const offset=Number(idx.readBigInt64LE(p+0x100)),sz=idx.readUInt32LE(p+0x108);if(offset+sz>size)return null;out.push({name:kit.SJIS.decode(nb).replace(/;/g,'/'),offset,size:sz,xor:0x90});}
  return out;}
 function spdList(file){const spl=file.replace(/\.spd$/i,'.spl'),ix=kit.isFile(spl)?spl:kit.isFile(file.replace(/\.spd$/i,'.SPL'))?file.replace(/\.spd$/i,'.SPL'):null;if(!ix)return null;
  const b=kit.head(ix,64<<20);if(b.length<0x30||b.toString('latin1',0,4)!=='SFP\0')return null;const align=b.readUInt32LE(0xc)||1,names=b.readUInt32LE(0x20);if(names<=0x20||names>b.length)return null;
- const count=Math.floor((names-0x20)/16),size=kit.size(file),out=[];for(let i=0;i<count;i++){const p=0x20+i*16,nb=kit.cstr(b,b.readUInt32LE(p));if(!nb||!nb.length)return null;const sz=b.readUInt32LE(p+4),offset=b.readUInt32LE(p+8)*align;if(offset+sz>size)return null;out.push({name:new TextDecoder('shift_jis').decode(nb),offset,size:sz});}
+ const count=Math.floor((names-0x20)/16),size=kit.size(file),out=[];for(let i=0;i<count;i++){const p=0x20+i*16,nb=kit.cstr(b,b.readUInt32LE(p));if(!nb||!nb.length)return null;const sz=b.readUInt32LE(p+4),offset=b.readUInt32LE(p+8)*align;if(offset+sz>size)return null;out.push({name:kit.SJIS.decode(nb),offset,size:sz});}
  return out;}
 const slgRead=(file,e)=>{const b=kit.readAt(file,e.offset,e.size);return e.xor?kit.xor(b,e.xor):b;};
 /* SLG_Crypto.py basic_keys and common_script_attacks */

@@ -81,12 +81,12 @@ function parse(b){const h=header(b);if(!h)return {lines:[],anchors:[]};const {in
 function pckList(file){const sz=kit.size(file);if(sz<16)return null;const b=kit.readAt(file,0,Math.min(sz,8<<20));const n=b.readUInt32LE(0);if(!n||n>0x40000||4+n*8+n*0x40>b.length)return null;
  const out=[];let prev=0;for(let i=0;i<n;i++){const off=b.readUInt32LE(4+i*8),size=b.readUInt32LE(8+i*8),e=4+n*8+i*0x40;
   if(off<prev||off+size>sz||b.readUInt32LE(e+0x38)!==off||b.readUInt32LE(e+0x3c)!==size)return null;prev=off+size;
-  const nb=b.subarray(e,e+0x38),z=nb.indexOf(0);const name=new TextDecoder('shift_jis').decode(z<0?nb:nb.subarray(0,z));if(!name)return null;out.push({name,offset:off,size});}
+  const nb=b.subarray(e,e+0x38),z=nb.indexOf(0);const name=kit.cname(nb);if(!name)return null;out.push({name,offset:off,size});}
  return out;}
 function datList(file){const sz=kit.size(file);if(sz<16)return null;const b=kit.readAt(file,0,Math.min(sz,8<<20));const count=b.readUInt32LE(0);if(count<2||count>100000)return null;
  for(const nl of [0x24,0x30,0x3c]){const isz=(nl+4)*count;if(4+isz>b.length)continue;const off=i=>b.readUInt32LE(4+i*(nl+4)+nl);
   if(off(0)<isz+4)continue;const out=[];let ok=true;
-  for(let i=0;i<count-1;i++){const o=off(i),next=i+1===count-1?sz:off(i+1);const nb=b.subarray(4+i*(nl+4),4+i*(nl+4)+nl),z=nb.indexOf(0),name=new TextDecoder('shift_jis').decode(z<0?nb:nb.subarray(0,z));
+  for(let i=0;i<count-1;i++){const o=off(i),next=i+1===count-1?sz:off(i+1);const nb=b.subarray(4+i*(nl+4),4+i*(nl+4)+nl),z=nb.indexOf(0),name=kit.cname(nb);
    if(!name||next<o||o<isz||next>sz||/[\x00-\x1f]/.test(name)){ok=false;break;}out.push({name,offset:o,size:next-o});}
   if(ok&&out.length)return out;}
  return null;}

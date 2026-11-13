@@ -6,7 +6,7 @@ const kit=require('./kit.cjs');/* E577 shared engine kit */
    name length, Shift-JIS name, offset (from the index end), unpacked size, unused, packed flag, packed size; packed
    entries are zlib. */
 const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
-const sj=new TextDecoder('shift_jis');
+const sj=kit.SJIS;
 function list(file){let b;try{b=fs.readFileSync(file);}catch{return null;}if(b.length<0x118)return null;const version=b.readInt32LE(0),count=b.readInt32LE(4),isz=b.readUInt32LE(12);
  const at=version===2?0x114:0x118;if(version<1||version>3||count<=0||count>100000||isz<2||at+isz>b.length)return null;let idx;try{idx=zlib.inflateSync(b.subarray(at,at+isz));}catch{return null;}
  const base=at+isz,out=[];let p=0;

@@ -35,20 +35,20 @@ function ai6List(file){const size=kit.size(file),h=kit.head(file,4);if(h.length<
  for(let i=0;i<count;i++){const p=i*0x110,raw=Buffer.from(idx.subarray(p,p+0x104));let n=raw.indexOf(0);if(n===0)return null;if(n<0)n=0x104;let key=(n+1)&255;
   for(let j=0;j<n;j++){raw[j]=(raw[j]-key)&255;key=(key-1)&255;if(raw[j]<0x20&&raw[j]!==0)return null;}
   const sz=idx.readUInt32BE(p+0x104),unpacked=idx.readUInt32BE(p+0x108),offset=idx.readUInt32BE(p+0x10c);if(offset<4+count*0x110||offset+sz>size)return null;
-  out.push({name:new TextDecoder('shift_jis').decode(raw.subarray(0,n)),offset,size:sz,unpacked,packed:sz!==unpacked});}
+  out.push({name:kit.SJIS.decode(raw.subarray(0,n)),offset,size:sz,unpacked,packed:sz!==unpacked});}
  return out;}
 function ai5List(file){const size=kit.size(file),h=kit.head(file,4);if(h.length<4)return null;const count=h.readInt32LE(0);if(count<2||count>100000)return null;
  for(const nl of [0x14,0x1e,0x20,0x100]){const dataAt=(nl+8)*count+4;if(dataAt>size)continue;const idx=kit.readAt(file,4,dataAt-4);
   const nameKey=idx[nl-1],firstSize=idx.readUInt32LE(nl),firstOff=idx.readUInt32LE(nl+4),offKey=(dataAt^firstOff)>>>0;if(nl+8+nl+8>idx.length)continue;
   const second=(idx.readUInt32LE((nl+8)+nl+4)^offKey)>>>0;if(second<dataAt||second>=size)continue;const sizeKey=((second-dataAt)^firstSize)>>>0;if(!offKey||!sizeKey)continue;
   const out=[];let ok=true;for(let i=0;i<count&&ok;i++){const p=i*(nl+8),nb=Buffer.from(idx.subarray(p,p+nl));let n=0;for(;n<nl;n++){nb[n]^=nameKey;if(!nb[n])break;if(nb[n]<0x20){ok=false;break;}}
-   const sz=(idx.readUInt32LE(p+nl)^sizeKey)>>>0,off=(idx.readUInt32LE(p+nl+4)^offKey)>>>0;if(!ok||!n||off<dataAt||off+sz>size){ok=false;break;}out.push({name:new TextDecoder('shift_jis').decode(nb.subarray(0,n)),offset:off,size:sz,packed:/\.(mes|lib|a6?|msk|x)$/i.test(new TextDecoder('shift_jis').decode(nb.subarray(0,n)))});}
+   const sz=(idx.readUInt32LE(p+nl)^sizeKey)>>>0,off=(idx.readUInt32LE(p+nl+4)^offKey)>>>0;if(!ok||!n||off<dataAt||off+sz>size){ok=false;break;}out.push({name:kit.SJIS.decode(nb.subarray(0,n)),offset:off,size:sz,packed:/\.(mes|lib|a6?|msk|x)$/i.test(kit.SJIS.decode(nb.subarray(0,n)))});}
   if(ok)return out.map(e=>({...e,ai5:true}));}
  return null;}
 function ai5DatList(file){const size=kit.size(file),h=kit.head(file,0x24);if(h.length<0x24)return null;const key=h.readUInt32LE(4),count=(h.readUInt32LE(0)^key)>>>0;if(!count||count>100000)return null;
  const nk=h[0x23],idx=kit.readAt(file,8,count*0x1c);if(idx.length<count*0x1c)return null;const out=[];
  for(let i=0;i<count;i++){const p=i*0x1c,sz=(idx.readUInt32LE(p)^key)>>>0,off=(idx.readUInt32LE(p+4)^key)>>>0;if(off<count*0x1c+8||off+sz>size)return null;const nb=Buffer.from(idx.subarray(p+8,p+0x1c));let n=0;for(;n<nb.length;n++){nb[n]^=nk;if(!nb[n])break;if(nb[n]<0x20)return null;}if(!n)return null;
-  const name=new TextDecoder('shift_jis').decode(nb.subarray(0,n));out.push({name,offset:off,size:sz,packed:/\.(mes|lib|a6?|msk|x)$/i.test(name),ai5:true});}
+  const name=kit.SJIS.decode(nb.subarray(0,n));out.push({name,offset:off,size:sz,packed:/\.(mes|lib|a6?|msk|x)$/i.test(name),ai5:true});}
  return out;}
 /* every archive kind of the family, tried in order: [{kind, list}] */
 function listAny(file){const head=kit.head(file,4).toString('latin1');

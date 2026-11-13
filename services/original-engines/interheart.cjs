@@ -12,7 +12,7 @@
    The script grammar has no public description: *.scr / *.spt / *.txt entries are read with the generic Japanese-text scan
    (kit.decodeRuns, also GBK patches), so lines are approximate and pairing with a patch is by position. */
 const kit=require('./kit.cjs');
-const nameOf=b=>{const z=b.indexOf(0);return new TextDecoder('shift_jis').decode(z<0?b:b.subarray(0,z));};
+const nameOf=b=>{const z=b.indexOf(0);return kit.cname(b);};
 const okName=n=>n.trim().length>0&&!/[\x00-\x1f]/.test(n);
 
 function plain(file,count,nameSize,fsz){const rec=8+nameSize,idx=kit.readAt(file,4,rec*count);if(idx.length<rec*count)return null;const data=4+rec*count,out=[];

@@ -26,7 +26,7 @@ const lzss=(src,start,outLen)=>kit.lzss(src.subarray(start),outLen);
 function kcapRead(file,e){const b=kit.readAt(file,e.offset,e.packed);
  if(!e.compressed)return b;const len=b.length>=8?b.readUInt32LE(4):0;return lzss(b,8,len>0&&len<64<<20?len:e.size);}
 const TXT=n=>/^\d[\w]*\.txt$/i.test(n);
-const sjis=new TextDecoder('shift_jis');
+const sjis=kit.SJIS;
 const RUBY=/<R([^|>]*)\|([^>]*)>/g;
 // E461 <F16…> and <W10…> wrap text (font size, wait): the tag and its closing > are dropped, the text kept
 function clean(t){return t.replace(RUBY,'$1').replace(/<[A-Za-z]+\d*>?/g,'').replace(/>/g,'').replace(/\\n/g,'\n');}

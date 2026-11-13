@@ -44,11 +44,11 @@ function walkRecords(file,first,read){const size=kit.size(file);let fd;try{fd=re
   for(let n=0;n<200000&&p+8<size;n++){const got=require('node:fs').readSync(fd,buf,0,buf.length,p),r=read(buf.subarray(0,got),p,size);if(!r)break;out.push(r);if(!(r.next>p))break;p=r.next;}
   return out.length?out:null;}finally{require('node:fs').closeSync(fd);}}
 function wfl(file){if(kit.head(file,4).toString('latin1')!=='WFL1')return null;
- return walkRecords(file,4,(v,p,size)=>{if(v.length<4)return null;const n=v.readInt32LE(0);if(n<=0||n>0x100||4+n+6>v.length)return null;const name=new TextDecoder('shift_jis').decode(kit.xor(v.subarray(4,4+n),0xff)).replace(/^\\+/,'');
+ return walkRecords(file,4,(v,p,size)=>{if(v.length<4)return null;const n=v.readInt32LE(0);if(n<=0||n>0x100||4+n+6>v.length)return null;const name=kit.SJIS.decode(kit.xor(v.subarray(4,4+n),0xff)).replace(/^\\+/,'');
   let q=4+n;const mode=v.readUInt16LE(q),sz=v.readUInt32LE(q+2);q+=6;if(mode===1)q+=4;if(p+q+sz>size)return null;return {next:p+q+sz,name,offset:p+q,size:sz,mode};});}
 function link(file){const h=kit.head(file,16);if(h.toString('latin1',0,4)!=='LINK')return null;const v=h[4]-48;if(v<3||v>6)return null;
  return walkRecords(file,v===3?8:v<6?0xA:8+h[7],(d,p,size)=>{if(d.length<0x10)return null;const len=d.readUInt32LE(0);if(!len||len<0x10||p+len>size)return null;const flags=d.readUInt16LE(4);let q=13,name;
-  if(v<6){const n=d[q],nb=d.subarray(q+3,q+3+n),z=nb.indexOf(0);name=new TextDecoder('shift_jis').decode(z<0?nb:nb.subarray(0,z));q+=3+n;}
+  if(v<6){const n=d[q],nb=d.subarray(q+3,q+3+n),z=nb.indexOf(0);name=kit.cname(nb);q+=3+n;}
   else{const n=d.readUInt16LE(q);name=d.subarray(q+2,q+2+n).toString('utf16le').replace(/\0+$/,'');q+=2+n;}
   return {next:p+len,name,offset:p+q,size:len-q,packed:!!(flags&3),encrypted:!!(flags&4)};});}
 const archiveList=f=>{const l=wfl(f)||link(f);return l&&l.filter(e=>!e.packed&&!e.encrypted&&e.mode!==1);};

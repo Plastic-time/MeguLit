@@ -256,6 +256,12 @@ function zipList(file){const sz=size(file);if(sz<22)return null;
 function zipRead(file,e){const h=readAt(file,e.local,30);if(h.readUInt32LE(0)!==0x04034b50)throw Error('ZIP_LOCAL');const at=e.local+30+h.readUInt16LE(26)+h.readUInt16LE(28),data=readAt(file,at,e.comp);
  if(e.method===0)return data;if(e.method===8)return zlib.inflateRawSync(data,{maxOutputLength:256<<20});throw Error('ZIP_METHOD_'+e.method);}
 
+/* ---- names (E605: every reader built its own TextDecoder('shift_jis') and cut fixed-size archive names at NUL by hand)
+   SJIS            one shared Shift-JIS decoder (decode() without stream is stateless, so sharing is safe)
+   cname(b,s,e)    b[s..e) cut at the first NUL, decoded as Shift-JIS: the fixed-width name field of most archive indexes */
+const SJIS=new TextDecoder('shift_jis');
+function cname(b,start=0,end=b.length){const s=b.subarray(start,end),z=s.indexOf(0);return SJIS.decode(z<0?s:s.subarray(0,z));}
+
 /* ---- engine factory --------------------------------------------------------------------------------------------- */
 /* engine({id, hint, archives:{name, magic, subs, list(file) -> entries|null, read(file, entry) -> Buffer, entry: RegExp},
    loose:{name, subs}, parse}) -> {id, hint, scenes, archives, sources, parse, test}. Loose files override archived
@@ -274,7 +280,7 @@ function engine(def){const A=def.archives;
   const list=[...out.values()];return A?.sort===false?list:list.sort((a,b)=>a.name.localeCompare(b.name));};
  return {id:def.id,hint:def.hint,scenes,archives:def.overlay===false?()=>[]:scenes,sources:dir=>[...arcFiles(dir),...looseFiles(dir)],parse:buf=>{try{return def.parse(Buffer.isBuffer(buf)?buf:Buffer.from(buf));}catch{return {lines:[],anchors:[]};}},test:def.test||(n=>!!def.loose&&def.loose.name.test(n)),...(def.extra||{})};}
 
-module.exports={asarList,zipList,zipRead,peInfo,readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,encodeSjis,
+module.exports={SJIS,cname,asarList,zipList,zipRead,peInfo,readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,encodeSjis,
  xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,lzDistance,SIGLUS_TOKEN,inflate,inflateRaw,zstd,unpackAny,huffman,table,entryRead,peResource,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine,
  sjisWeights,gbkWeights,textScore,xorKeyByColumns};
 

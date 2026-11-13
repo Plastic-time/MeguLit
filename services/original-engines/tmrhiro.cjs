@@ -20,7 +20,7 @@ function list(file){const fsz=kit.size(file);if(fsz<16)return null;const h=kit.h
  const count=h.readInt16LE(0),nameLen=h[2],data=h.readUInt32LE(3);if(count<=0||count>100000||!nameLen||data>=fsz)return null;
  const idx7=7+(nameLen+8)*count,v=data===idx7?1:data===idx7+4*count?2:0;if(!v)return null;
  const idx=kit.readAt(file,7,data-7),rec=nameLen+(v===1?8:12),out=[];
- for(let i=0;i<count;i++){const p=i*rec,nb=idx.subarray(p,p+nameLen),z=nb.indexOf(0),name=new TextDecoder('shift_jis').decode(z<0?nb:nb.subarray(0,z));
+ for(let i=0;i<count;i++){const p=i*rec,nb=idx.subarray(p,p+nameLen),z=nb.indexOf(0),name=kit.cname(nb);
   const offset=data+(v===1?idx.readUInt32LE(p+nameLen):Number(idx.readBigInt64LE(p+nameLen))),size=idx.readUInt32LE(p+nameLen+(v===1?4:8));
   if(!name||offset+size>fsz)return null;out.push({name,offset,size});}
  const scripts=out.filter(e=>{if(e.size<10)return false;const b=kit.readAt(file,e.offset,10);return b.readInt16LE(4)===6&&b.readUInt32LE(6)===OP_HEADER;});

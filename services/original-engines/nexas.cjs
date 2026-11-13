@@ -23,7 +23,7 @@ function index(file){const size=kit.size(file);if(size<16)return null;const h=ki
  if(h.toString('latin1',0,3)!=='PAC'||h[3]===0x20||h[3]===0x4b)return null;const count=h.readUInt32LE(4),type=h.readUInt32LE(8);if(!count||count>200000)return null;
  const entries=(buf,at,nameLen)=>{const out=[],step=nameLen+12;if(at+count*step>buf.length)return null;
   for(let i=0;i<count;i++){const p=at+i*step,z=buf.indexOf(0,p),nb=buf.subarray(p,z<0||z>p+nameLen?p+nameLen:z);if(!nb.length||nb[0]<0x20)return null;
-   const e={name:new TextDecoder('shift_jis').decode(nb).replace(/\\/g,'/'),offset:buf.readUInt32LE(p+nameLen),unpacked:buf.readUInt32LE(p+nameLen+4),size:buf.readUInt32LE(p+nameLen+8),type};
+   const e={name:kit.SJIS.decode(nb).replace(/\\/g,'/'),offset:buf.readUInt32LE(p+nameLen),unpacked:buf.readUInt32LE(p+nameLen+4),size:buf.readUInt32LE(p+nameLen+8),type};
    if(!e.name.trim()||e.offset<12||e.offset+e.size>size)return null;out.push(e);}
   return out;};
  /* old builds: the index right after the header */

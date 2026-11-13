@@ -24,7 +24,7 @@ function parse(buf){const b=Buffer.isBuffer(buf)?buf:Buffer.from(buf),w=best(b);
  for(const x of w.strs){const t=kit.trimBoth(dec.decode(x.bytes).replace(/\\n/g,'\n'));if(t)lines.push(t);}return {lines,anchors:[]};}
 function list(file){const h=kit.head(file,8);if(h.length<8)return null;const at=h.readUInt32LE(0),count=h.readInt32LE(4),size=kit.size(file);if(at<8||at>=size||count<=0||count>100000||at+count*0x28>size)return null;
  const idx=kit.readAt(file,at,count*0x28),key=idx[0x1f],out=[];for(let i=0;i<idx.length;i++)idx[i]^=key;
- for(let i=0;i<count;i++){const p=i*0x28,s=idx[p]===0x5c?1:0,nb=kit.cstr(idx,p+s,p+0x20);if(!nb||!nb.length||nb.some(c=>c<0x20))return null;const offset=idx.readUInt32LE(p+0x20),sz=idx.readUInt32LE(p+0x24);if(offset+sz>size)return null;out.push({name:new TextDecoder('shift_jis').decode(nb).replace(/\\/g,'/'),offset,size:sz});}
+ for(let i=0;i<count;i++){const p=i*0x28,s=idx[p]===0x5c?1:0,nb=kit.cstr(idx,p+s,p+0x20);if(!nb||!nb.length||nb.some(c=>c<0x20))return null;const offset=idx.readUInt32LE(p+0x20),sz=idx.readUInt32LE(p+0x24);if(offset+sz>size)return null;out.push({name:kit.SJIS.decode(nb).replace(/\\/g,'/'),offset,size:sz});}
  return out;}
 const unxor=b=>b.length>1&&b[0]===0x88&&b[1]===0x88?kit.xor(b,0x88):b;
 const MSC=/\.msc$/i;

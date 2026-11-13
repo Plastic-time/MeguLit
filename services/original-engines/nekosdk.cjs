@@ -25,7 +25,7 @@ function pakList(file){const h=kit.head(file,14);if(h.length<14||h.toString('lat
  const start=mode==='A'?14:10,end=start+h.readUInt32LE(10)+(mode==='A'?0:12);if(end>fsz||end<=start)return null;
  const idx=kit.readAt(file,start,end-start),out=[];let p=0;
  while(p+4<=idx.length){const nl=idx.readUInt32LE(p);p+=4;if(!nl)break;if(nl>256||p+nl+8>idx.length)return null;
-  let key=0;for(let i=0;i<nl;i++)key+=idx[p+i]<<24>>24;const z=idx.indexOf(0,p),name=new TextDecoder('shift_jis').decode(idx.subarray(p,z<0||z>=p+nl?p+nl:z));p+=nl;
+  let key=0;for(let i=0;i<nl;i++)key+=idx[p+i]<<24>>24;const z=idx.indexOf(0,p),name=kit.SJIS.decode(idx.subarray(p,z<0||z>=p+nl?p+nl:z));p+=nl;
   const offset=(idx.readUInt32LE(p)^key)>>>0,size=(idx.readUInt32LE(p+4)^key)>>>0;p+=8;if(!name||offset+size>fsz)return null;out.push({name,offset,size});}
  return out.length?out:null;}
 function pakRead(file,e){const raw=kit.readAt(file,e.offset,e.size);if(e.size<8)return raw;

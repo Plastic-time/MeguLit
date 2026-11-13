@@ -47,7 +47,7 @@ function schemes(){const extra=packSchemes();if(catalog&&catalog.extra===extra)r
 function readDec(file,dec,offset,length){if(!dec)return kit.readAt(file,offset,length);const a=offset&~15,end=(offset+length+15)&~15,b=kit.readAt(file,a,end-a);dec(b,a);return b.subarray(offset-a,offset-a+length);}
 
 /* ---- containers --------------------------------------------------------------------------------------------------- */
-const sj=new TextDecoder('shift_jis');
+const sj=kit.SJIS;
 function libList(file,base,size,root,out,depth=0){const h=kit.readAt(file,base,16);if(h.length<16||h.toString('latin1',0,4)!=='LIB\0')return false;const count=h.readInt16LE(8);if(count<=0||0x30*count>size)return false;
  const idx=kit.readAt(file,base+16,0x30*count),data=base+16+0x30*count;
  for(let i=0;i<count;i++){const p=i*0x30,z=idx.indexOf(0,p),name=root+sj.decode(idx.subarray(p,z<0||z>p+0x24?p+0x24:z)),esz=idx.readUInt32LE(p+0x24),off=base+idx.readUInt32LE(p+0x28);

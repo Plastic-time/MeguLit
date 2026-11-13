@@ -272,3 +272,17 @@ MeguLit 对一款游戏的支持分三层：
 | SLG System | 🆕 .szs / .spd+.spl | archive-scan.cjs slg：解包 + 已知 key 解密 + 通用扫描 | 半成品 |
 | ISM / GLib2 / Cyberworks / Tanuki / Yaneurao / Rits / BlueGale / DxLib | ✅ / 🆕 | archive-scan.cjs：解包 + 通用扫描 | 半成品（语法需实物） |
 | QuinRose 自研、Yeti/Regista、BladeEngine、BKEngine、OROCHI、MAPL、AGSI、FlixEngine、Interchannel/Prototype 旧引擎（GSD、BlueGale 的 GARbro 签名见 E665） | ❌ | ❌ | 需实物（E655） |
+
+## 第二轮汇总（2026-11-14）
+
+五个家族各自在合成夹具上测过，还没有拿真游戏验证
+
+| 家族 | 完整 | 半成品（解包 / 通用扫描） | 只检测 / 需实物 | 不在范围 |
+|---|---|---|---|---|
+| F1 打包资源 | 5 | 11 + 一组通用 HTML5 / Electron / NW.js | 1 | — |
+| F2 纯文本脚本 | 4 | 3 | 1 + 19 | 3（只有手机 / 网页版） |
+| F3 制作工具二进制 | 4 | 6 | 1 + 5 | — |
+| F4a 有工具的私有引擎 | 7 | 9 | 8 | — |
+| F4b 无资料的私有引擎 | 2 | 3 | 8 + 9 | — |
+
+二轮后查重（E605）：41 个读取器各自 `new TextDecoder('shift_jis')`，档案索引名「截到 NUL 再解码」也各写一遍。现在统一走 `kit.SJIS` 和 `kit.cname(b, start, end)`，archive-scan 的 rotr / rotl 改用 kit.ror / rol。各家族新加的 kit 共用件有 peOverlay、scan、poolLines、textRuns（F3），归 kit 后其余读取器都可以用

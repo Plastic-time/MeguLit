@@ -61,7 +61,7 @@ function lzDecode(src){const size=src.readUInt32LE(0),end=Math.min(src.length,sr
  return out;}
 
 // ---- Text ---------------------------------------------------------------------------------------------------------
-function dec(b){try{return new TextDecoder('utf-8',{fatal:true}).decode(b);}catch{return new TextDecoder('shift_jis').decode(b);}}
+function dec(b){try{return new TextDecoder('utf-8',{fatal:true}).decode(b);}catch{return kit.SJIS.decode(b);}}
 // One code page for a whole file: UTF-8 (WOLF 3), else Shift-JIS or (a Chinese patch) GBK, whichever reads cleaner.
 function codepage(bufs){const all=Buffer.concat(bufs.slice(0,4000));try{new TextDecoder('utf-8',{fatal:true}).decode(all);return 'utf-8';}catch{}
  /* E577 Shift-JIS vs GBK: kit.codepage */return kit.codepage(all);}

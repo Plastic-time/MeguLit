@@ -68,3 +68,7 @@ test('kit: peOverlay, scan, poolLines, textRuns (E630)',t=>{const F3=require('./
  assert.deepEqual(kit2.poolLines(['obj_player','  「やあ」\r\n元気？ ','bad\u0001x','中文',' ','あ�']),['「やあ」\n元気？','中文']);
  assert.deepEqual(kit2.textRuns('\0abc「こんにちは」def\0静かだ。\0漢字'),['「こんにちは」','静かだ。']);assert.deepEqual(kit2.textRuns('xx你好世界\0yy谢谢'),['你好世界','谢谢']);
 });
+test('names: one shared Shift-JIS decoder, fixed-width archive names cut at NUL (E605)',()=>{
+ const b=Buffer.concat([Buffer.from([0x82,0xa0,0x82,0xa2]),Buffer.from('.txt\0junk','latin1'),Buffer.from('ab','latin1')]);
+ assert.equal(kit.cname(b,0,13),'あい.txt');assert.equal(kit.cname(b,13),'ab');assert.equal(kit.cname(Buffer.from('noz','latin1')),'noz');
+ assert.equal(kit.SJIS.decode(Buffer.from([0x82,0xa0])),'あ');});

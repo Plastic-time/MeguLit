@@ -17,7 +17,7 @@ const fs=require('node:fs'),path=require('node:path'),kit=require('./kit.cjs');
 function list(file){const h=kit.head(file,0x10);if(h.length<0x10||h.toString('latin1',0,11)!=='GAMEDAT PAC')return null;const v=h[11]===0x4b?1:h[11]===0x32?2:0;if(!v)return null;
  const count=h.readInt32LE(12);if(count<=0||count>0xfffff)return null;const nl=v===1?16:32,size=kit.size(file),idx=kit.readAt(file,0x10,count*(nl+8));if(idx.length<count*(nl+8))return null;
  const base=0x10+count*(nl+8),out=[];for(let i=0;i<count;i++){const nb=kit.cstr(idx,i*nl,i*nl+nl),p=count*nl+i*8,offset=base+idx.readUInt32LE(p),sz=idx.readUInt32LE(p+4);if(!nb||offset+sz>size)return null;
-  out.push({name:new TextDecoder('shift_jis').decode(nb),offset,size:sz});}
+  out.push({name:kit.SJIS.decode(nb),offset,size:sz});}
  return out;}
 function decrypt(b){if(b.length>=5&&b[0]===0x95&&b[1]===0x6b&&b[2]===0x3c&&b[3]===0x9d&&b[4]===0x63){const o=Buffer.from(b);let k=0xc5;for(let i=0;i<o.length;i++){o[i]^=k;k=(k+0x5c)&255;}return o;}return b;}
 const str=(t,off)=>{if(!off||off>=t.length)return null;let e=off;while(e+1<t.length&&!(t[e]===0&&t[e+1]===0))e++;if(e+1>=t.length&&t[e]!==0)e=t.length;return t.subarray(off,e);};

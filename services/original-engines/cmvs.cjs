@@ -73,7 +73,7 @@ function readIndex(raw,h,variant,sc,fileSize){const idx=Buffer.from(raw),md5=md5
   entryCipher(idx,cur,len,md5.map((m,j)=>(m^((dirKey+sc.dirAddend[j])>>>0))>>>0),sc.indexSeed);
   for(let e=0;e<count;e++){if(cur+h.nameAt>end)return null;const es=idx.readInt32LE(cur);if(es<=h.nameAt||cur+es>end)return null;
    const nb=kit.cstr(idx,cur+h.nameAt,end);if(!nb||!nb.length||nb.some(c=>c<0x20))return null;const ko=cur+(h.version>6?0x14:0x10);
-   const entry={name:(name==='root'?'':name+'/')+new TextDecoder('shift_jis').decode(nb),offset:Number(idx.readBigInt64LE(cur+4))+base,size:idx.readUInt32LE(cur+12),key:(idx.readUInt32LE(ko+4)+dirKey)>>>0};
+   const entry={name:(name==='root'?'':name+'/')+kit.SJIS.decode(nb),offset:Number(idx.readBigInt64LE(cur+4))+base,size:idx.readUInt32LE(cur+12),key:(idx.readUInt32LE(ko+4)+dirKey)>>>0};
    if(entry.offset<base||entry.offset+entry.size>fileSize)return null;out.push(entry);cur+=es;}
   dp+=size;}
  return {entries:out,md5,variant:variant.name};}

@@ -79,7 +79,7 @@ const arcKeyOf=(file,f)=>f.major<3?0:((f.minor===1?hash31:hash30)(kit.readAt(fil
 function parseIndex(idx,f,{unicode,withHash,nameKeyV2,nameKey,arcKey}){const out=[];let p=0;
  for(let i=0;i<f.count;i++){if(p+2>idx.length)return null;let n=idx.readUInt16LE(p);p+=2;if(n>0x100)return null;if(unicode)n*=2;if(p+n+24>idx.length)return null;
   const raw=Buffer.from(idx.subarray(p,p+n));p+=n;let name;
-  if(unicode)name=nameXor31(raw,nameKey).toString('utf16le');else{nameXor(raw,nameKeyV2?n+(nameKey^0x3E):(nameKey^0x3E));name=new TextDecoder('shift_jis').decode(raw);}
+  if(unicode)name=nameXor31(raw,nameKey).toString('utf16le');else{nameXor(raw,nameKeyV2?n+(nameKey^0x3E):(nameKey^0x3E));name=kit.SJIS.decode(raw);}
   const offset=Number(idx.readBigInt64LE(p)),size=idx.readUInt32LE(p+8),unpacked=idx.readUInt32LE(p+12),packed=idx.readInt32LE(p+16)!==0,method=idx.readInt32LE(p+20);p+=24;if(withHash)p+=4;
   if(offset<0||offset+size>f.size)return null;out.push({name:name.replace(/\\/g,'/'),rawName:raw,offset,size,unpacked,packed,method,arcKey});}
  return out;}

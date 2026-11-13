@@ -23,11 +23,11 @@ function list(file){const h=kit.head(file,0x14);if(h.length<0x14||h.toString('la
  const count=(h.readUInt32LE(12)^next())>>>0;if(!count||count>200000)return null;const out=[];
  const dec=b=>{const o=Buffer.from(b);for(let i=0;i+4<=o.length;i+=4)o.writeUInt32LE((o.readUInt32LE(i)^next())>>>0,i);return o;};
  if(v===1){const idx=dec(kit.readAt(file,0x10,count*0x88));if(idx.length<count*0x88)return null;
-  for(let i=0;i<count;i++){const p=i*0x88,name=kit.cstr(idx,p,p+0x80),offset=idx.readUInt32LE(p+0x80),sz=idx.readUInt32LE(p+0x84);if(!name||!name.length||offset+sz>size)return null;out.push({name:new TextDecoder('shift_jis').decode(name).replace(/\\/g,'/'),offset,size:sz});}
+  for(let i=0;i<count;i++){const p=i*0x88,name=kit.cstr(idx,p,p+0x80),offset=idx.readUInt32LE(p+0x80),sz=idx.readUInt32LE(p+0x84);if(!name||!name.length||offset+sz>size)return null;out.push({name:kit.SJIS.decode(name).replace(/\\/g,'/'),offset,size:sz});}
   return out;}
  if(v!==2)return null;const namesSize=(kit.readAt(file,0x10,4).readUInt32LE(0)^next())>>>0;if(namesSize>size)return null;
  const idx=dec(kit.readAt(file,0x14,count*12)),names=kit.readAt(file,0x14+count*12,namesSize);if(idx.length<count*12)return null;
- for(let i=0;i<count;i++){const p=i*12,no=idx.readUInt32LE(p),offset=idx.readUInt32LE(p+4),sz=idx.readUInt32LE(p+8);const name=kit.cstr(names,no);if(!name||!name.length||offset+sz>size)return null;out.push({name:new TextDecoder('shift_jis').decode(name).replace(/\\/g,'/'),offset,size:sz});}
+ for(let i=0;i<count;i++){const p=i*12,no=idx.readUInt32LE(p),offset=idx.readUInt32LE(p+4),sz=idx.readUInt32LE(p+8);const name=kit.cstr(names,no);if(!name||!name.length||offset+sz>size)return null;out.push({name:kit.SJIS.decode(name).replace(/\\/g,'/'),offset,size:sz});}
  return out;}
 /* the "acp" LZW (also FAVORITE's): bits MSB first */
 function lzw(src,unpacked){const out=Buffer.alloc(unpacked),dict=new Int32Array(0x8900);let width=9,dp=0,o=0,bitPos=0;
@@ -53,7 +53,7 @@ function strings(b){const tag=b.toString('latin1',0,8);
 function parse(buf){const b=Buffer.isBuffer(buf)?buf:Buffer.from(buf);if(b.length<16)return {lines:[],anchors:[]};const s=strings(b);if(!s)return {lines:[],anchors:[]};
  /* the half-width forms count against Shift-JIS in kit.codepage, so ESCR1_00 text is judged after mapping them back */
  const all=Buffer.concat(s.list.filter(x=>x.some(c=>c>=0x80)).slice(0,4000)),score=t=>({bad:(t.match(/�/g)||[]).length,kana:(t.match(kit.KANA_G)||[]).length});
- const sj=score(restring(new TextDecoder('shift_jis').decode(all))),gb=score(new TextDecoder('gbk').decode(all));
+ const sj=score(restring(kit.SJIS.decode(all))),gb=score(new TextDecoder('gbk').decode(all));
  const enc=s.kind==='v1'?(sj.bad<gb.bad||sj.bad===gb.bad&&sj.kana>=gb.kana?'shift_jis':'gbk'):kit.codepage(all),dec=new TextDecoder(enc),lines=[],anchors=[];
  for(const x of s.list){if(!x.length)continue;if(!x.some(c=>c>=0x80)){anchors.push(x.toString('latin1'));continue;}let t=dec.decode(x);if(s.kind==='v1'&&enc==='shift_jis')t=restring(t);t=kit.trimBoth(t.replace(/\\n/g,'\n'));if(t)lines.push(t);}
  return {lines,anchors};}

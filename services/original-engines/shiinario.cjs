@@ -27,7 +27,7 @@ function header(file){const h=kit.head(file,12);if(h.length<12||h.toString('lati
 /* the entries of a WARC 1.1 archive (no keys), or null */
 function list(file){const h=header(file);if(!h||h.version!==110)return null;const size=kit.size(file),nameSize=16,step=nameSize+24;
  const idx=kit.readAt(file,h.indexOffset,Math.min(step*8192,size-h.indexOffset)),out=[],seen=new Set();
- for(let p=0;p+step<=idx.length;p+=step){const z=idx.indexOf(0,p),name=new TextDecoder('shift_jis').decode(idx.subarray(p,z<0||z>p+nameSize?p+nameSize:z));
+ for(let p=0;p+step<=idx.length;p+=step){const z=idx.indexOf(0,p),name=kit.SJIS.decode(idx.subarray(p,z<0||z>p+nameSize?p+nameSize:z));
   const e={name,offset:idx.readUInt32LE(p+nameSize),size:idx.readUInt32LE(p+nameSize+4),unpacked:idx.readUInt32LE(p+nameSize+8),flags:idx.readUInt32LE(p+nameSize+20)};
   if(!name||idx[p]>=0x80)continue;if(e.offset+e.size>size)return null;if(!seen.has(name)){seen.add(name);out.push(e);}}
  return out.length?out:null;}
@@ -93,7 +93,7 @@ function indexOf(file,h,dec){const size=kit.size(file),max=dec.maxIndexLength,le
  const buf=Buffer.alloc(max);kit.readAt(file,h.indexOffset,length).copy(buf);dec.decryptIndex(h.indexOffset,buf);
  let idx;if(h.version>=170){if(buf[8]!==0x78)return null;try{idx=zlib.inflateSync(buf.subarray(8,length),{finishFlush:zlib.constants.Z_SYNC_FLUSH,maxOutputLength:max});}catch{return null;}}
  else{idx=crypt.rangeDecode(buf,length,max);if(!idx||!idx.length)return null;}
- const step=dec.nameSize+24,out=[],seen=new Set(),sj=new TextDecoder('shift_jis');
+ const step=dec.nameSize+24,out=[],seen=new Set(),sj=kit.SJIS;
  for(let p=0;p+step<=idx.length;p+=step){const z=idx.indexOf(0,p),name=sj.decode(idx.subarray(p,z<0||z>=p+dec.nameSize?p+dec.nameSize:z)),q=p+dec.nameSize;
   const e={name,offset:idx.readUInt32LE(q),size:idx.readUInt32LE(q+4),unpacked:idx.readUInt32LE(q+8),flags:idx.readUInt32LE(q+20)};
   if(e.offset+e.size>size)return null;if(name&&idx[p]<0x80&&!seen.has(name)){seen.add(name);out.push(e);}}

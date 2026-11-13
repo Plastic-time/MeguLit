@@ -19,7 +19,7 @@ const SIG='LB\x01\0';
 function xflList(file){
  const dir=(base,prefix,depth)=>{const h=kit.readAt(file,base,12);if(h.length<12||h.toString('latin1',0,4)!==SIG)return null;
   const idx=h.readUInt32LE(4),count=h.readUInt32LE(8),t=kit.readAt(file,base+12,Math.min(idx,count*40));const data=base+12+idx,out=[];
-  for(let i=0;i<count&&(i+1)*40<=t.length;i++){const z=t.indexOf(0,i*40),name=new TextDecoder('shift_jis').decode(t.subarray(i*40,z<0||z>i*40+32?i*40+32:z)),offset=data+t.readUInt32LE(i*40+32),len=t.readUInt32LE(i*40+36),full=prefix?prefix+'/'+name:name;
+  for(let i=0;i<count&&(i+1)*40<=t.length;i++){const z=t.indexOf(0,i*40),name=kit.SJIS.decode(t.subarray(i*40,z<0||z>i*40+32?i*40+32:z)),offset=data+t.readUInt32LE(i*40+32),len=t.readUInt32LE(i*40+36),full=prefix?prefix+'/'+name:name;
    if(/\.xfl$/i.test(name)&&depth<4&&kit.readAt(file,offset,4).toString('latin1')===SIG){const sub=dir(offset,full,depth+1);if(sub){out.push(...sub);continue;}}
    out.push({name:full,offset,size:len});}
   return out;};
