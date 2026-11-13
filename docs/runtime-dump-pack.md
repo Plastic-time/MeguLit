@@ -6,7 +6,7 @@ MeguLitDump32/64.dll 是冷工具：用户看不到、也不用开。它在 Megu
 
 1. **注册**：`setup/runtime.json` 里 `packs["runtime-dump"]` 占一行（`native/runtimedump/pack.ps1` 生成）：`onDemand:true`、`hidden:true`、`dest:"runtime/runtime-dump"`、`files:[MeguLitDump32.dll, MeguLitDump64.dll, pack.json]`、sha256、`urls` 指向 GitHub release `runtime-dump-v<ver>`（镜像规则和其他包一样）
 2. **下载**：`core/hook-native.cjs` 的 `HookNative.fetchRuntimeDump()`。每次开始 hook 游戏时调用；如果没装，就在后台跑 `RuntimePacks.ensure('runtime-dump')`，同一时间只跑一个。失败（离线、校验不对）就静默放弃，不报错不提示，下次启动游戏再试一次
-3. **注入**：`native/HookBridge.cs` 的 `RuntimeDump()`。DLL 先找 `<安装目录>\runtime\runtime-dump\`，找不到再找 HookBridge 旁边（开发构建用）。第一次启动时如果包还在下载，后台线程会等最多 15 分钟，文件一到就注入，只要游戏还开着。注入失败只写进 `logs\hook-diagnostics.log`
+3. **注入**：`native/HookBridge.cs` 的 `RuntimeDump()`。DLL 先找 `<安装目录>\runtime\runtime-dump\`，找不到再找 HookBridge 旁边（开发构建用）。第一次启动时如果包还在下载，后台线程会等最多 15 分钟，文件一到就注入，只要游戏还开着。注入失败只写进 `logs\hook-diagnostics.log`。注入前 HookBridge 把 dump 根目录写进 DLL 旁边的 `root.txt`：游戏进程里拿不到 MeguLit 的环境变量，DLL 只能从这个文件知道根目录
 4. **默认开启**：DLL 只看 `cache\runtime-dump\<key>\off`（key = 小写游戏目录的 FNV-1a）。这个文件只在 DLL 自己出错时写（比如反复读内存出错），之后这个游戏就不再碰。`MEGULIT_RUNTIME_DUMP_OFF=1` 是测试用的总开关
 5. **runtime-packs 的规则**：`hidden` 包不出现在 `status()` 里，不能 `uninstall`，也不参加「全部下载」。包是否完整按它自己的 `files` 判断
 

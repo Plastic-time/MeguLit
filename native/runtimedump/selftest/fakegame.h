@@ -87,9 +87,12 @@ inline std::string Script(UINT cp, int lines) {
  return r;
 }
 inline void Seed(const std::string &dir, const wchar_t *line) {
- std::string u = Encode(line, 65001) + "\n";
+ // MeguLit writes these from its own process; the stand-in does it inside the game's process, so its copy is wiped
+ // right away, or the seed scan would find this copy instead of the game's.
+ std::string u = Encode(line, 65001);
  HANDLE h = CreateFileA((dir + "seeds.txt").c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, 0, NULL);
- DWORD w; WriteFile(h, u.data(), (DWORD)u.size(), &w, NULL); CloseHandle(h);
+ DWORD w; WriteFile(h, u.data(), (DWORD)u.size(), &w, NULL); WriteFile(h, "\n", 1, &w, NULL); CloseHandle(h);
+ SecureZeroMemory(&u[0], u.size());
 }
 
 

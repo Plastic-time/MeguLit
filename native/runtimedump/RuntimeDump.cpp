@@ -49,14 +49,22 @@ volatile LONG ArmMin, ArmMax;       // size window for allocations after the las
 std::string LastSource;             // source name for the armed window
 
 const DWORD MaxRegion = 48u << 20, MinRegion = 96;
+const DWORD MaxWatch = 16u << 20, PollBudget = 64u << 20, ArmFrom = 256; // review item 6: bounded work per read and per poll
 const DWORD WatchMs = 8000;
 
 typedef ULONG(NTAPI *Crc32Fn)(ULONG, const void *, ULONG);
 Crc32Fn Crc32;
 
-struct Guard { bool was; Guard() { was = TlsGetValue(Tls) != NULL; TlsSetValue(Tls, (void *)1); } ~Guard() { if (!was) TlsSetValue(Tls, NULL); } };
-bool Inside() { return Tls == TLS_OUT_OF_INDEXES || TlsGetValue(Tls) != NULL; }
+// TlsGetValue/TlsSetValue reset the thread's last error; the hooks run right after the game's own API call, whose last
+// error the game is about to read (ERROR_FILE_NOT_FOUND, ERROR_ALREADY_EXISTS ...). Guard and Inside() keep it, and every
+// hook also saves it right after the original call and puts it back on every path (review 2026-11-13, item 1).
+struct Guard { bool was; DWORD e; Guard() { e = GetLastError(); was = TlsGetValue(Tls) != NULL; TlsSetValue(Tls, (void *)1); SetLastError(e); } ~Guard() { if (!was) TlsSetValue(Tls, NULL); SetLastError(e); } };
+bool Inside() { DWORD e = GetLastError(); bool r = Tls == TLS_OUT_OF_INDEXES || TlsGetValue(Tls) != NULL; SetLastError(e); return r; }
+// Gate held by scope, so a C++ exception (bad_alloc) inside a hook cannot leave it locked (review item 4).
+struct Lock { Lock(); ~Lock(); };
 
+Lock::Lock() { EnterCriticalSection(&Gate); }
+Lock::~Lock() { LeaveCriticalSection(&Gate); }
 std::string Utf8(const std::wstring &s) {
  int n = WideCharToMultiByte(CP_UTF8, 0, s.c_str(), (int)s.size(), NULL, 0, NULL, NULL);
  std::string r(n, '\0');
@@ -160,31 +168,49 @@ std::string Safe(const std::string &name) {
  size_t s = base.find_last_of("\\/"); if (s != std::string::npos) base = base.substr(s + 1);
  std::string r;
  for (char c : base) r += (c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') ? '_' : c;
- if (r.size() > 60) r = r.substr(0, 60);
+ if (r.size() > 60) { size_t k = 60; while (k > 0 && ((unsigned char)r[k] & 0xC0) == 0x80) k--; r = r.substr(0, k); } // never split a UTF-8 character
  return r.empty() ? "mem" : r;
 }
-// Copies [p, p+n) under a guard; NULL if any page is gone.
+// Is all of [p, p+n) committed, readable and free of guard pages right now?
+bool ReadableProtect(DWORD p) {
+ if (p & (PAGE_GUARD | PAGE_NOACCESS)) return false;
+ p &= 0xFF;
+ return p == PAGE_READONLY || p == PAGE_READWRITE || p == PAGE_WRITECOPY || p == PAGE_EXECUTE_READ || p == PAGE_EXECUTE_READWRITE || p == PAGE_EXECUTE_WRITECOPY;
+}
+bool Readable(const void *p, SIZE_T n) {
+ for (ULONG_PTR a = (ULONG_PTR)p, end = a + n; a < end; ) {
+  MEMORY_BASIC_INFORMATION mi;
+  if (!VirtualQuery((void *)a, &mi, sizeof mi) || mi.State != MEM_COMMIT || !ReadableProtect(mi.Protect)) return false;
+  a = (ULONG_PTR)mi.BaseAddress + mi.RegionSize;
+ }
+ return true;
+}
+// Copies [p, p+n); NULL if any page is gone. Game buffers may be freed or unmapped at any time: the range is checked with
+// VirtualQuery and read with ReadProcessMemory, which fails quietly instead of raising an access violation a game's
+// vectored handler would see, and never touches a guard page (a thread stack's) (review item 5).
 unsigned char *Copy(const void *p, DWORD n) {
+ if (!n || !Readable(p, n)) return NULL;
  unsigned char *buf = (unsigned char *)malloc(n);
  if (!buf) return NULL;
- __try { memcpy(buf, p, n); } __except (EXCEPTION_EXECUTE_HANDLER) { free(buf); return NULL; }
+ SIZE_T got = 0;
+ if (!ReadProcessMemory(GetCurrentProcess(), p, buf, n, &got) || got != n) { free(buf); return NULL; }
  return buf;
 }
 void Save(const std::string &source, const char *how, const unsigned char *data, DWORD n, ULONGLONG offset) {
  Score s = Classify(data, n);
  if (!Texty(s)) return;
  ULONG crc = Crc32 ? Crc32(0, data, n) : n;
- EnterCriticalSection(&Gate);
- bool fresh = Saved.insert(crc).second;
- LeaveCriticalSection(&Gate);
+ bool fresh; { Lock l; fresh = Saved.insert(crc).second; }
  if (!fresh) return;
  LONG seq = InterlockedIncrement(&Seq);
- char name[160]; sprintf_s(name, "%05ld_%s_%s.bin", seq, Safe(source).c_str(), how);
+ char name[160]; _snprintf_s(name, _TRUNCATE, "%05ld_%s_%s.bin", seq, Safe(source).c_str(), how);
  std::wstring wname; { int m = MultiByteToWideChar(CP_UTF8, 0, name, -1, NULL, 0); wname.resize(m); MultiByteToWideChar(CP_UTF8, 0, name, -1, &wname[0], m); wname.resize(m - 1); }
  if (!WriteWhole(std::wstring(Out) + wname, data, n)) return;
- char line[1024];
- sprintf_s(line, "{\"seq\":%ld,\"file\":%s,\"source\":%s,\"how\":\"%s\",\"offset\":%llu,\"size\":%lu,\"enc\":\"%s\",\"cjk\":%lu,\"kana\":%lu,\"ratio\":%.3f,\"crc\":\"%08lx\",\"tick\":%lu}\n",
-  seq, Json(name).c_str(), Json(source).c_str(), how, offset, n, s.enc, s.cjk, s.kana, s.ratio, crc, GetTickCount());
+ // Built as a string: a long (CJK or \\?\\) source path must never overflow a fixed buffer (review item 3).
+ char tail[320];
+ _snprintf_s(tail, _TRUNCATE, ",\"how\":\"%s\",\"offset\":%llu,\"size\":%lu,\"enc\":\"%s\",\"cjk\":%lu,\"kana\":%lu,\"ratio\":%.3f,\"crc\":\"%08lx\",\"tick\":%lu}\n",
+  how, offset, n, s.enc, s.cjk, s.kana, s.ratio, crc, GetTickCount());
+ std::string line = "{\"seq\":" + std::to_string((long long)seq) + ",\"file\":" + Json(name) + ",\"source\":" + Json(source) + tail;
  Append(L"index.jsonl", line, 64u << 20);
 }
 
@@ -192,49 +218,52 @@ void Save(const std::string &source, const char *how, const unsigned char *data,
 struct Region { const void *p; DWORD n; ULONG raw, last; DWORD born, seen; std::string source; ULONGLONG offset; const char *how; int stable; };
 std::vector<Region> Regions;
 void Watch(const void *p, DWORD n, ULONG raw, const std::string &source, ULONGLONG offset, const char *how) {
- if (n < MinRegion || n > MaxRegion) return;
- EnterCriticalSection(&Gate);
- for (auto &r : Regions) if (r.p == p) { r = Region{ p, n, raw, raw, GetTickCount(), 0, source, offset, how, 0 }; LeaveCriticalSection(&Gate); return; }
- if (Regions.size() < 512) Regions.push_back(Region{ p, n, raw, raw, GetTickCount(), 0, source, offset, how, 0 });
- LeaveCriticalSection(&Gate);
+ if (n < MinRegion || n > MaxWatch) return;
+ Lock l;
+ for (auto &r : Regions) if (r.p == p) { r = Region{ p, n, raw, raw, GetTickCount(), 0, source, offset, how, 0 }; return; }
+ if (Regions.size() < 128) Regions.push_back(Region{ p, n, raw, raw, GetTickCount(), 0, source, offset, how, 0 });
 }
 // One pass: each region that changed since it was read and then held still for a poll is checked as text.
 void Poll() {
  std::vector<Region> now;
- EnterCriticalSection(&Gate); now = Regions; LeaveCriticalSection(&Gate);
- DWORD tick = GetTickCount();
+ { Lock l; now = Regions; }
+ DWORD tick = GetTickCount(), spent = 0;
  std::vector<const void *> drop;
  for (auto &r : now) {
+  if (spent > PollBudget) break; // the rest waits for the next poll
+  spent += r.n;
   unsigned char *buf = Copy(r.p, r.n);
   if (!buf) { drop.push_back(r.p); continue; }
   ULONG crc = Crc32 ? Crc32(0, buf, r.n) : 0;
   bool changed = crc != r.raw, still = crc == r.last;
   if (changed && still) { Save(r.source, r.how, buf, r.n, r.offset); drop.push_back(r.p); }
   free(buf);
-  EnterCriticalSection(&Gate);
-  for (auto &q : Regions) if (q.p == r.p) q.last = crc;
-  LeaveCriticalSection(&Gate);
+  { Lock l; for (auto &q : Regions) if (q.p == r.p) q.last = crc; }
   if (tick - r.born > WatchMs) drop.push_back(r.p);
  }
  if (drop.empty()) return;
- EnterCriticalSection(&Gate);
+ Lock l;
  for (size_t i = 0; i < Regions.size(); ) {
   bool d = false; for (auto p : drop) if (Regions[i].p == p) d = true;
   if (d) { Regions[i] = Regions.back(); Regions.pop_back(); } else i++;
  }
- LeaveCriticalSection(&Gate);
 }
 
 // ---- file names -------------------------------------------------------------------------------------------------------
 std::map<HANDLE, std::string> Files;   // tracked file handles
 std::map<HANDLE, std::string> Sections; // file-mapping handles of tracked files
+wchar_t win[MAX_PATH]; int winLen = 0;
+void InitSkipped() { winLen = (int)GetWindowsDirectoryW(win, MAX_PATH); if (winLen < 0 || winLen >= MAX_PATH) winLen = 0; for (int i = 0; i < winLen; i++) if (win[i] >= L'A' && win[i] <= L'Z') win[i] = (wchar_t)(win[i] + 32); }
 bool Skipped(const std::wstring &path) {
  std::wstring l = Lower(path);
  if (l.size() < 3 || l.compare(0, 4, L"\\\\.\\") == 0) return true;
- static wchar_t win[MAX_PATH]; static int winLen = -1;
- if (winLen < 0) { winLen = (int)GetWindowsDirectoryW(win, MAX_PATH); for (int i = 0; i < winLen; i++) if (win[i] >= L'A' && win[i] <= L'Z') win[i] = (wchar_t)(win[i] + 32); }
+ // Filled by InitSkipped() in Run before any hook is in, so threads never race on it (review item 8).
  if (winLen > 0 && l.compare(0, winLen, win) == 0) return true;
  if (l.find(L"\\cache\\runtime-dump\\") != std::wstring::npos) return true;
+ { // our own output folder, wherever the root is (index.jsonl, seeds.txt, saved buffers)
+  std::wstring own = Lower(Out); size_t k = l.compare(0, 4, L"\\\\?\\") == 0 ? 4 : 0;
+  if (!own.empty() && l.compare(k, own.size(), own) == 0) return true;
+ }
  size_t dot = l.find_last_of(L'.'), slash = l.find_last_of(L"\\/");
  if (dot == std::wstring::npos || (slash != std::wstring::npos && dot < slash)) return false;
  std::wstring ext = l.substr(dot + 1);
@@ -261,35 +290,42 @@ CreateMappingWFn OCreateMappingW; MapViewFn OMapView; AllocFn OAlloc; Decompress
 void Track(HANDLE h, const std::wstring &path) {
  if (h == INVALID_HANDLE_VALUE || !h || Skipped(path)) return;
  std::string name = Utf8(path);
- EnterCriticalSection(&Gate); Files[h] = name; LeaveCriticalSection(&Gate);
+ Lock l; if (Files.size() < 4096) Files[h] = name;
 }
 HANDLE WINAPI HCreateFileW(LPCWSTR n, DWORD a, DWORD s, LPSECURITY_ATTRIBUTES sa, DWORD c, DWORD f, HANDLE t) {
  HANDLE h = OCreateFileW(n, a, s, sa, c, f, t);
- if (Ready && !Inside() && n && (a & GENERIC_READ) && !(a & GENERIC_WRITE)) { Guard g; DWORD e = GetLastError(); Track(h, n); SetLastError(e); }
+ DWORD e = GetLastError();
+ if (Ready && !Inside() && n && (a & GENERIC_READ) && !(a & GENERIC_WRITE)) { try { Guard g; Track(h, n); } catch (...) {} }
+ SetLastError(e);
  return h;
 }
 HANDLE WINAPI HCreateFileA(LPCSTR n, DWORD a, DWORD s, LPSECURITY_ATTRIBUTES sa, DWORD c, DWORD f, HANDLE t) {
  HANDLE h = OCreateFileA(n, a, s, sa, c, f, t);
+ DWORD e = GetLastError();
  if (Ready && !Inside() && n && (a & GENERIC_READ) && !(a & GENERIC_WRITE)) {
-  Guard g; DWORD e = GetLastError();
-  int m = MultiByteToWideChar(CP_ACP, 0, n, -1, NULL, 0);
-  if (m > 0) { std::wstring w(m, L'\0'); MultiByteToWideChar(CP_ACP, 0, n, -1, &w[0], m); w.resize(m - 1); Track(h, w); }
-  SetLastError(e);
+  try {
+   Guard g;
+   int m = MultiByteToWideChar(CP_ACP, 0, n, -1, NULL, 0);
+   if (m > 0) { std::wstring w(m, L'\0'); MultiByteToWideChar(CP_ACP, 0, n, -1, &w[0], m); w.resize(m - 1); Track(h, w); }
+  } catch (...) {}
  }
+ SetLastError(e);
  return h;
 }
 void Arm(DWORD n, const std::string &source) {
- EnterCriticalSection(&Gate); LastSource = source; LeaveCriticalSection(&Gate);
+ { Lock l; LastSource = source; }
  ArmMin = (LONG)(n - n / 8); ArmMax = (LONG)((n > MaxRegion / 4 ? MaxRegion : n * 4) + 64);
  ArmedUntil = GetTickCount() + 1500;
 }
 BOOL WINAPI HReadFile(HANDLE h, LPVOID buf, DWORD want, LPDWORD got, LPOVERLAPPED ov) {
  BOOL ok = OReadFile(h, buf, want, got, ov);
- if (!ok || !Ready || Inside() || ov || !got || *got < MinRegion) return ok;
- Guard g; DWORD e = GetLastError();
+ DWORD e = GetLastError();
+ if (!ok || !Ready || Inside() || ov || !got || *got < MinRegion) { SetLastError(e); return ok; }
+ try {
+ Guard g;
  std::string name; bool tracked = false;
- EnterCriticalSection(&Gate); auto it = Files.find(h); if (it != Files.end()) { name = it->second; tracked = true; } LeaveCriticalSection(&Gate);
- if (tracked) {
+ { Lock l; auto it = Files.find(h); if (it != Files.end()) { name = it->second; tracked = true; } }
+ if (tracked && *got <= MaxRegion) { // a read of hundreds of MB is media or an archive, not a script: never copied on the game's thread
   DWORD n = *got;
   LARGE_INTEGER zero, pos; zero.QuadPart = 0; pos.QuadPart = 0;
   SetFilePointerEx(h, zero, &pos, FILE_CURRENT);
@@ -297,87 +333,96 @@ BOOL WINAPI HReadFile(HANDLE h, LPVOID buf, DWORD want, LPDWORD got, LPOVERLAPPE
   ULONG raw = Crc32 ? Crc32(0, buf, n) : 0;
   Save(name, "plain", (const unsigned char *)buf, n, offset); // loose text files that were never encrypted
   Watch(buf, n, raw, name, offset, "inplace");
-  Arm(n, name);
+  if (n >= ArmFrom) Arm(n, name);
  }
+ } catch (...) {}
  SetLastError(e);
  return ok;
 }
 BOOL WINAPI HCloseHandle(HANDLE h) {
- if (Ready && !Inside()) { Guard g; EnterCriticalSection(&Gate); Files.erase(h); Sections.erase(h); LeaveCriticalSection(&Gate); }
+ if (Ready && !Inside()) { DWORD e = GetLastError(); try { Guard g; Lock l; Files.erase(h); Sections.erase(h); } catch (...) {} SetLastError(e); }
  return OCloseHandle(h);
 }
 HANDLE WINAPI HCreateMappingW(HANDLE f, LPSECURITY_ATTRIBUTES sa, DWORD prot, DWORD hi, DWORD lo, LPCWSTR n) {
  HANDLE h = OCreateMappingW(f, sa, prot, hi, lo, n);
- if (h && Ready && !Inside()) {
-  Guard g; DWORD e = GetLastError();
-  EnterCriticalSection(&Gate); auto it = Files.find(f); if (it != Files.end()) Sections[h] = it->second; LeaveCriticalSection(&Gate);
-  SetLastError(e);
- }
+ DWORD e = GetLastError(); // ERROR_ALREADY_EXISTS for a named section: single-instance checks read it
+ if (h && Ready && !Inside()) { try { Guard g; Lock l; auto it = Files.find(f); if (it != Files.end()) Sections[h] = it->second; } catch (...) {} }
+ SetLastError(e);
  return h;
 }
 LPVOID WINAPI HMapView(HANDLE s, DWORD a, DWORD hi, DWORD lo, SIZE_T n) {
  LPVOID p = OMapView(s, a, hi, lo, n);
+ DWORD e = GetLastError();
  if (p && Ready && !Inside()) {
-  Guard g; DWORD e = GetLastError();
+  try {
+  Guard g;
   std::string name; bool tracked = false;
-  EnterCriticalSection(&Gate); auto it = Sections.find(s); if (it != Sections.end()) { name = it->second; tracked = true; } LeaveCriticalSection(&Gate);
+  { Lock l; auto it = Sections.find(s); if (it != Sections.end()) { name = it->second; tracked = true; } }
   if (tracked) {
    MEMORY_BASIC_INFORMATION mi; SIZE_T size = n;
    if (!size && VirtualQuery(p, &mi, sizeof mi)) size = mi.RegionSize;
-   DWORD m = (DWORD)(size > MaxRegion ? MaxRegion : size);
+   DWORD m = (DWORD)(size > MaxWatch ? MaxWatch : size); // review item 6: at most 16 MB read on the game's thread
    unsigned char *copy = Copy(p, m);
    if (copy) {
     ULONGLONG offset = ((ULONGLONG)hi << 32) | lo;
     Save(name, "plain", copy, m, offset);
     // A mapped view the game can write to (copy-on-write or read-write) may be decrypted in place.
     if (a & (FILE_MAP_WRITE | FILE_MAP_COPY)) Watch(p, m, Crc32 ? Crc32(0, copy, m) : 0, name, offset, "inplace");
-    Arm(m, name);
+    if (m >= ArmFrom) Arm(m, name);
     free(copy);
    }
   }
-  SetLastError(e);
+  } catch (...) {}
  }
+ SetLastError(e);
  return p;
 }
 PVOID NTAPI HAlloc(PVOID heap, ULONG flags, SIZE_T n) {
  PVOID p = OAlloc(heap, flags, n);
- if (p && ArmedUntil && (LONG)n >= ArmMin && (LONG)n <= ArmMax && Ready && !Inside() && (LONG)(GetTickCount() - ArmedUntil) < 0) {
-  Guard g;
-  std::string source; EnterCriticalSection(&Gate); source = LastSource; LeaveCriticalSection(&Gate);
-  // The new buffer still holds whatever the heap left there; it is saved once it has changed and settled.
-  Watch(p, (DWORD)n, Crc32 ? Crc32(0, p, (ULONG)n) : 0, source, 0, "alloc");
+ if (p && ArmedUntil && (LONG)n >= ArmMin && (LONG)n <= ArmMax && Ready && (LONG)(GetTickCount() - ArmedUntil) < 0 && !Inside()) {
+  DWORD e = GetLastError();
+  try {
+   Guard g;
+   std::string source; { Lock l; source = LastSource; }
+   // The new buffer still holds whatever the heap left there; it is saved once it has changed and settled.
+   Watch(p, (DWORD)n, Crc32 ? Crc32(0, p, (ULONG)n) : 0, source, 0, "alloc");
+  } catch (...) {}
+  SetLastError(e);
  }
  return p;
 }
 void Output(const char *how, const unsigned char *p, DWORD n) {
  if (!p || n < MinRegion) return;
- std::string source; EnterCriticalSection(&Gate); source = LastSource; LeaveCriticalSection(&Gate);
+ std::string source; { Lock l; source = LastSource; }
  unsigned char *copy = Copy(p, n > MaxRegion ? MaxRegion : n);
  if (copy) { Save(source.empty() ? "memory" : source, how, copy, n > MaxRegion ? MaxRegion : n, 0); free(copy); }
 }
 LONG NTAPI HDecompress(USHORT f, PUCHAR out, ULONG outSize, PUCHAR in, ULONG inSize, PULONG done) {
  LONG r = ODecompress(f, out, outSize, in, inSize, done);
- if (r >= 0 && done && Ready && !Inside()) { Guard g; Output("rtl", out, *done); }
+ if (r >= 0 && done && Ready && !Inside()) { DWORD e = GetLastError(); try { Guard g; Output("rtl", out, *done); } catch (...) {} SetLastError(e); }
  return r;
 }
 LONG NTAPI HDecompressEx(USHORT f, PUCHAR out, ULONG outSize, PUCHAR in, ULONG inSize, PULONG done, PVOID ws) {
  LONG r = ODecompressEx(f, out, outSize, in, inSize, done, ws);
- if (r >= 0 && done && Ready && !Inside()) { Guard g; Output("rtl", out, *done); }
+ if (r >= 0 && done && Ready && !Inside()) { DWORD e = GetLastError(); try { Guard g; Output("rtl", out, *done); } catch (...) {} SetLastError(e); }
  return r;
 }
 
 // zlib: the z_stream starts next_in, avail_in, total_in, next_out, avail_out (pointer-sized fields in between).
 struct ZHead { unsigned char *next_in; unsigned avail_in; unsigned long total_in; unsigned char *next_out; unsigned avail_out; };
-std::map<void *, std::vector<unsigned char>> Streams;
+std::map<void *, std::vector<unsigned char>> Streams; size_t StreamBytes; // bounded: review item 4
+const size_t StreamCap = 64u << 20, StreamMax = 16;
 const int ZSlots = 8;
 InflateFn ZInflate[ZSlots]; UncompressFn ZUncompress[ZSlots];
 bool ZPeek(void *strm, unsigned char **out, unsigned *room) {
  __try { ZHead *z = (ZHead *)strm; *out = z->next_out; *room = z->avail_out; return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 template <int K> int __cdecl HInflate(void *strm, int flush) {
+ DWORD e0 = GetLastError(); struct Keep { DWORD e; ~Keep() { SetLastError(e); } };
  unsigned char *before = NULL, *after = NULL; unsigned room = 0;
  ZPeek(strm, &before, &room);
  int r = ZInflate[K](strm, flush);
+ Keep keep = { GetLastError() }; (void)e0;
  if (Ready && !Inside() && before && (r == 0 || r == 1)) {
   Guard g;
   unsigned left = room;
@@ -385,19 +430,26 @@ template <int K> int __cdecl HInflate(void *strm, int flush) {
   DWORD n = room >= left ? room - left : 0;
   unsigned char *part = n ? Copy(before, n) : NULL;
   std::vector<unsigned char> whole;
-  EnterCriticalSection(&Gate);
-  auto &acc = Streams[strm];
-  if (part && acc.size() + n <= MaxRegion) acc.insert(acc.end(), part, part + n);
-  if (r == 1) { whole.swap(acc); Streams.erase(strm); }
-  LeaveCriticalSection(&Gate);
+  try {
+   Lock l;
+   // Streams that never reach Z_STREAM_END (libpng stops early, inflateEnd) must not pile up: a new stream past the
+   // count limit drops the others, and no stream grows past the total byte budget.
+   if (!Streams.count(strm) && Streams.size() >= StreamMax) { Streams.clear(); StreamBytes = 0; }
+   auto &acc = Streams[strm];
+   if (part && acc.size() + n <= MaxRegion && StreamBytes + n <= StreamCap) { acc.insert(acc.end(), part, part + n); StreamBytes += n; }
+   if (r == 1) { StreamBytes -= acc.size(); whole.swap(acc); Streams.erase(strm); }
+  } catch (...) {}
   if (part) free(part);
-  if (!whole.empty()) Output("inflate", whole.data(), (DWORD)whole.size());
+  try { if (!whole.empty()) Output("inflate", whole.data(), (DWORD)whole.size()); } catch (...) {}
+ } else if (Ready && before && r != 0 && r != 1) { // error or end of a stream we were collecting: forget it
+  Guard g;
+  try { Lock l; auto it = Streams.find(strm); if (it != Streams.end()) { StreamBytes -= it->second.size(); Streams.erase(it); } } catch (...) {}
  }
  return r;
 }
 template <int K> int __cdecl HUncompress(unsigned char *d, unsigned long *dl, const unsigned char *s, unsigned long sl) {
  int r = ZUncompress[K](d, dl, s, sl);
- if (r == 0 && Ready && !Inside() && dl) { Guard g; Output("inflate", d, (DWORD)*dl); }
+ if (r == 0 && Ready && !Inside() && dl) { try { Guard g; Output("inflate", d, (DWORD)*dl); } catch (...) {} }
  return r;
 }
 typedef int(__cdecl *InflateHook)(void *, int);
@@ -407,6 +459,12 @@ UncompressHook UncompressHooks[ZSlots] = { HUncompress<0>, HUncompress<1>, HUnco
 std::set<HMODULE> ZSeen; int ZUsed;
 // Modules that export zlib (zlib1.dll, a game's own DLL, ...). Checked again as the game loads more modules.
 void HookZlib() {
+#ifndef _WIN64
+ // x86: zlibwapi.dll (ZLIB_WINAPI) exports the same undecorated names as __stdcall; a __cdecl detour would leave the
+ // stack 8-16 bytes off and crash the game (review item 2). Detecting the convention per export is not reliable, so
+ // 32-bit games get no zlib hooks; their decompressed scripts still come in through seed expansion.
+ return;
+#endif
  HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, GetCurrentProcessId());
  if (snap == INVALID_HANDLE_VALUE) return;
  MODULEENTRY32W m; m.dwSize = sizeof m;
@@ -441,24 +499,36 @@ bool Hook(const wchar_t *module, const char *name, void *detour, void **original
 // the size bar. Read-only, every access guarded; repeated faults switch the scan off for the rest of the session.
 const SIZE_T SeedSide = 16u << 20, SeedChunk = 256, SeedRegionMax = 512u << 20;
 LONGLONG SeedRead;                         // bytes of seeds.txt already handled
-std::set<std::wstring> SeedSeen;
+std::set<unsigned long long> SeedSeen; // FNV-1a of each needle: a set of the strings would itself be a copy of the text in memory
 std::vector<std::pair<ULONG_PTR, ULONG_PTR>> SeedBlocks; // ranges already saved by a seed
 volatile LONG SeedFaults; bool SeedOff;
-// Offset of needle in [base, base+n), -1 when absent, -2 when a page went away.
+// Search in the style of Textractor's SearchForText / Util::SearchMemory (Artikash/Textractor, GPL-3.0; LunaHook's copy
+// in HIllya51/LunaTranslator): every committed, readable, non-image data region, needle per encoding. Unlike them this
+// never reads game memory in place: each 64 KB chunk (plus needle overlap) is checked with VirtualQuery and copied with
+// ReadProcessMemory first, so a block freed mid-scan or a thread stack's guard page costs nothing (port notes,
+// H:\MeguLit-Work\port-notes\text-search.md). Returns the hit's offset in [base, base+n), or -1.
 SSIZE_T Find(const unsigned char *base, SIZE_T n, const char *nd, SIZE_T m) {
- __try {
-  if (n < m) return -1;
-  const unsigned char f = (unsigned char)nd[0];
-  for (SIZE_T i = 0, last = n - m; i <= last; ) {
-   const void *hit = memchr(base + i, f, last - i + 1);
-   if (!hit) return -1;
-   SIZE_T at = (SIZE_T)((const unsigned char *)hit - base);
-   if (!memcmp(base + at, nd, m)) return (SSIZE_T)at;
+ const SIZE_T CH = 0x10000;
+ if (n < m || !m) return -1;
+ unsigned char *buf = (unsigned char *)malloc(CH + m);
+ if (!buf) return -1;
+ SSIZE_T found = -1;
+ for (SIZE_T off = 0; off + m <= n && found < 0; off += CH) {
+  SIZE_T len = CH + m - 1; if (off + len > n) len = n - off;
+  SIZE_T got = 0;
+  if (!Readable(base + off, len) || !ReadProcessMemory(GetCurrentProcess(), base + off, buf, len, &got) || got != len) continue;
+  for (SIZE_T i = 0; i + m <= len; ) {
+   const unsigned char *hit = (const unsigned char *)memchr(buf + i, (unsigned char)nd[0], len - m + 1 - i);
+   if (!hit) break;
+   SIZE_T at = (SIZE_T)(hit - buf);
+   if (!memcmp(hit, nd, m)) { found = (SSIZE_T)(off + at); break; }
    i = at + 1;
   }
-  return -1;
- } __except (EXCEPTION_EXECUTE_HANDLER) { return -2; }
+ }
+ free(buf);
+ return found;
 }
+unsigned long long Fnv(const std::wstring &w) { unsigned long long h = 1469598103934665603ull; for (wchar_t c : w) h = (h ^ (unsigned)c) * 1099511628211ull; return h; }
 bool CjkW(wchar_t c) { return (c >= 0x3040 && c <= 0x30FF) || (c >= 0x4E00 && c <= 0x9FFF) || c == 0x3005; }
 // The longest run of kana/kanji in the line, up to 10 characters: punctuation, names and ruby markup vary between the
 // hooked text and the script, a plain run of prose does not.
@@ -470,8 +540,9 @@ std::wstring Core(const std::wstring &w) {
   if (j - i > bestLen) { best = i; bestLen = j - i; }
   i = j;
  }
- if (bestLen < 4) return L"";
- if (bestLen > 10) { best += (bestLen - 10) / 2; bestLen = 10; }
+ // 6+ characters (12+ bytes in Shift-JIS): shorter needles hit hundreds of unrelated places (port notes, section 3).
+ if (bestLen < 6) return L"";
+ if (bestLen > 12) { best += (bestLen - 12) / 2; bestLen = 12; }
  return w.substr(best, bestLen);
 }
 std::string Narrow(const std::wstring &w, UINT cp) {
@@ -481,6 +552,13 @@ std::string Narrow(const std::wstring &w, UINT cp) {
  std::string r(n, '\0'); WideCharToMultiByte(cp, 0, w.c_str(), (int)w.size(), &r[0], n, NULL, cp == CP_UTF8 ? NULL : &lost);
  return lost ? "" : r;
 }
+// Our own copies of seed text (the line, its needles, the seeds.txt read) live in this process too: hits inside them
+// are skipped, and the buffers are wiped before they are freed so stale heap blocks cannot match either.
+std::vector<std::pair<ULONG_PTR, ULONG_PTR>> Own;
+void OwnAdd(const void *p, SIZE_T n) { Own.push_back({ (ULONG_PTR)p, (ULONG_PTR)p + n }); }
+bool IsOwn(ULONG_PTR p) { for (auto &r : Own) if (p >= r.first && p < r.second) return true; return false; }
+void Wipe(std::string &s) { if (!s.empty()) SecureZeroMemory(&s[0], s.size()); }
+void Wipe(std::wstring &s) { if (!s.empty()) SecureZeroMemory(&s[0], s.size() * 2); }
 bool Textish(ULONG_PTR at, SIZE_T n) {
  unsigned char *b = Copy((const void *)at, (DWORD)n); if (!b) return false;
  Score s = Classify(b, (DWORD)n); free(b); return s.cjk >= 6;
@@ -502,6 +580,9 @@ bool Covered(ULONG_PTR p) { for (auto &r : SeedBlocks) if (p >= r.first && p < r
 void SeedOne(const std::wstring &line) {
  std::wstring core = Core(line); if (core.empty()) return;
  std::string forms[4] = { Narrow(core, 932), Narrow(core, 936), Narrow(core, CP_UTF8), std::string((const char *)core.data(), core.size() * 2) };
+ Own.clear(); OwnAdd(line.data(), line.size() * 2); OwnAdd(core.data(), core.size() * 2);
+ for (auto &f : forms) OwnAdd(f.data(), f.size());
+ struct WipeAll { std::string *f; std::wstring *c; ~WipeAll() { for (int i = 0; i < 4; i++) Wipe(f[i]); Wipe(*c); Own.clear(); } } wipe = { forms, &core };
  SYSTEM_INFO si; GetSystemInfo(&si);
  DWORD start = GetTickCount();
  for (ULONG_PTR p = (ULONG_PTR)si.lpMinimumApplicationAddress; p < (ULONG_PTR)si.lpMaximumApplicationAddress; ) {
@@ -509,18 +590,14 @@ void SeedOne(const std::wstring &line) {
   ULONG_PTR base = (ULONG_PTR)mi.BaseAddress, end = base + mi.RegionSize; p = end;
   if (GetTickCount() - start > 3000) { Log("seed scan stopped at its time limit"); return; }
   if (mi.State != MEM_COMMIT || mi.Type == MEM_IMAGE || mi.RegionSize > SeedRegionMax) continue;
-  if ((mi.Protect & (PAGE_GUARD | PAGE_NOACCESS)) || !(mi.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY))) continue;
+  if (!ReadableProtect(mi.Protect) || (mi.Protect & 0xF0)) continue; // data only: no code pages
   for (auto &nd : forms) {
    if (nd.size() < 8) continue;
    for (SIZE_T from = 0; from < mi.RegionSize; ) {
     SSIZE_T at = Find((const unsigned char *)base + from, mi.RegionSize - from, nd.data(), nd.size());
-    if (at == -2) { if (InterlockedIncrement(&SeedFaults) > 64) { SeedOff = true; WriteWhole(std::wstring(Out) + L"off", "faults", 6); Log("seed scan off: memory faults; game switched off"); return; } break; }
     if (at < 0) break;
     ULONG_PTR hit = base + from + (SIZE_T)at; from += (SIZE_T)at + nd.size();
-    // The needles themselves live in this DLL's heap; a hit inside one of our own strings is not the game's.
-    bool own = hit == (ULONG_PTR)core.data() || hit == (ULONG_PTR)line.data();
-    for (auto &g : forms) if (hit == (ULONG_PTR)g.data()) own = true;
-    if (own || Covered(hit)) continue;
+    if (IsOwn(hit) || Covered(hit)) continue;
     ULONG_PTR lo = hit - (hit - base) % SeedChunk, hi = lo + SeedChunk; if (hi > end) hi = end;
     Grow(base, end, lo, hi);
     SIZE_T n = hi - lo;
@@ -557,15 +634,18 @@ void Seeds() {
  (OCloseHandle ? OCloseHandle : CloseHandle)(h);
  size_t nl = chunk.find_last_of('\n'); if (nl == std::string::npos) return;
  chunk.resize(nl + 1); SeedRead += (LONGLONG)chunk.size();
- int done = 0;
+ int done = 0; std::vector<std::wstring> lines;
  for (size_t i = 0; i < chunk.size(); ) {
   size_t e = chunk.find('\n', i); std::string l = chunk.substr(i, e - i); i = e + 1;
   int m = MultiByteToWideChar(CP_UTF8, 0, l.data(), (int)l.size(), NULL, 0); if (m <= 0) continue;
   std::wstring w(m, L'\0'); MultiByteToWideChar(CP_UTF8, 0, l.data(), (int)l.size(), &w[0], m);
   std::wstring core = Core(w);
-  if (core.empty() || SeedSeen.size() > 20000 || !SeedSeen.insert(core).second) continue;
-  if (done++ < 6) SeedOne(w); // a burst (skip mode) is sampled; later lines mostly land in blocks already saved
+  Wipe(l);
+  if (!core.empty() && SeedSeen.size() <= 20000 && SeedSeen.insert(Fnv(core)).second) lines.push_back(w);
+  Wipe(w); Wipe(core);
  }
+ Wipe(chunk);
+ for (auto &one : lines) { if (done++ < 6) SeedOne(one); Wipe(one); } // a burst (skip mode) is sampled; later lines mostly land in blocks already saved
 }
 
 struct ModuleSlot { const char *name; void (*start)(const wchar_t *); void (*tick)(); bool off; };
@@ -589,18 +669,39 @@ DWORD WINAPI Run(void *) {
  wchar_t *g = wcsrchr(game, L'\\'); if (!g) return 0; *g = 0;
  unsigned hash = 2166136261u;
  for (wchar_t *p = game; *p; p++) { wchar_t c = *p; if (c >= L'A' && c <= L'Z') c = (wchar_t)(c + 32); hash = (hash ^ (unsigned)c) * 16777619u; }
- if (!GetEnvironmentVariableW(L"MEGULIT_RUNTIME_DUMP", root, 1024)) {
-  swprintf_s(root, L"%s\\cache", self); CreateDirectoryW(root, NULL);
-  swprintf_s(root, L"%s\\cache\\runtime-dump", self);
+ // Dump root: MEGULIT_RUNTIME_DUMP in the game's own environment (tests), else root.txt next to this DLL (HookBridge writes
+ // MeguLit's root there before every injection: the game's environment never has MeguLit's variables, review item 9),
+ // else <two folders up>\cache\runtime-dump. Anything too long for the buffers ends the run instead of overflowing.
+ DWORD envLen = GetEnvironmentVariableW(L"MEGULIT_RUNTIME_DUMP", root, 1024);
+ if (envLen >= 1024) return 0;
+ if (!envLen) {
+  root[0] = 0;
+  wchar_t dllDir[1024]; if (!GetModuleFileNameW(Self, dllDir, 1024)) return 0;
+  wchar_t *cut = wcsrchr(dllDir, L'\\'); if (cut) *cut = 0;
+  std::wstring rootFile = std::wstring(dllDir) + L"\\root.txt";
+  HANDLE rf = CreateFileW(rootFile.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+  if (rf != INVALID_HANDLE_VALUE) {
+   char u[2048]; DWORD got = 0;
+   if (ReadFile(rf, u, sizeof u - 1, &got, NULL) && got) {
+    int start = (got >= 3 && (unsigned char)u[0] == 0xEF) ? 3 : 0; while (got > (DWORD)start && (u[got - 1] == '\r' || u[got - 1] == '\n' || u[got - 1] == ' ')) got--;
+    int m = MultiByteToWideChar(CP_UTF8, 0, u + start, (int)got - start, root, 1023); root[m > 0 ? m : 0] = 0;
+   }
+   CloseHandle(rf);
+  }
+  if (!root[0]) {
+   if (_snwprintf_s(root, _TRUNCATE, L"%s\\cache", self) < 0) return 0; CreateDirectoryW(root, NULL);
+   if (_snwprintf_s(root, _TRUNCATE, L"%s\\cache\\runtime-dump", self) < 0) return 0;
+  }
  }
  CreateDirectoryW(root, NULL);
- swprintf_s(Out, L"%s\\%08x\\", root, hash);
+ if (_snwprintf_s(Out, _TRUNCATE, L"%s\\%08x\\", root, hash) < 0) return 0;
  wchar_t v[8]; bool forced = GetEnvironmentVariableW(L"MEGULIT_RUNTIME_DUMP_ON", v, 8) > 0 && v[0] == L'1';
  // On by default (2026-11-13): <key>\off switches one game off, MEGULIT_RUNTIME_DUMP_OFF=1 every game.
  if (!forced && (GetFileAttributesW((std::wstring(Out) + L"off").c_str()) != INVALID_FILE_ATTRIBUTES || GetEnvironmentVariableW(L"MEGULIT_RUNTIME_DUMP_OFF", v, 8) > 0)) return 0;
  CreateDirectoryW(Out, NULL);
  std::string gameName = Utf8(game);
  WriteWhole(std::wstring(Out) + L"game.txt", gameName.data(), (DWORD)gameName.size());
+ InitSkipped();
  Crc32 = (Crc32Fn)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlComputeCrc32");
  if (MH_Initialize() != MH_OK) { Log("MinHook did not start"); return 0; }
  bool any = false;
@@ -639,5 +740,6 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, void *) {
   HANDLE t = CreateThread(NULL, 0, Run, NULL, 0, NULL);
   if (t) CloseHandle(t);
  }
+ if (reason == DLL_PROCESS_DETACH) InterlockedExchange(&Ready, 0); // review item 7: no hook work during ExitProcess
  return TRUE;
 }
