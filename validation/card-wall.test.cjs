@@ -46,7 +46,7 @@ test('cards_create refuses a locked or made-up source',()=>{
 test('create, insert, eject, delete, add Toploaders, mode',()=>{
  const {root,db}=setup();
  const card=wall.handle(db,root,{action:'cards_create',gameId:'g1',kind:'cg',srcId:'save:ev101a',still:{x:2,y:-1,scale:0.2}});
- assert.equal(card.initial,'S');assert.deepEqual(card.still,{x:1,y:0,scale:1});assert.match(card.src,/^data:image\//);assert.match(card.full,/^data:image\//);
+ assert.equal(card.initial,'S');assert.deepEqual(card.still,{x:1,y:0,scale:1});assert.match(card.src,/^data:image\//);assert.equal(card.full,undefined,'the big picture is not sent with every state');assert.match(wall.handle(db,root,{action:'cards_full',cardId:card.id}).full,/^data:image\//);
  let s=wall.handle(db,root,{action:'cards_insert',toploaderId:'t3',cardId:card.id});assert.equal(s.toploaders[3].cardId,card.id);
  s=wall.handle(db,root,{action:'cards_insert',toploaderId:'t5',cardId:card.id});assert.equal(s.toploaders[3].cardId,null);assert.equal(s.toploaders[5].cardId,card.id);
  s=wall.handle(db,root,{action:'cards_eject',toploaderId:'t5'});assert.equal(s.toploaders[5].cardId,null);assert.equal(s.cards.length,1);
