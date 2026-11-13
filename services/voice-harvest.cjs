@@ -24,12 +24,10 @@ function readJsonl(file){let raw='';try{raw=fs.readFileSync(file,'utf8');}catch{
  const out=[];for(const l of raw.split('\n')){if(!l.trim())continue;try{out.push(JSON.parse(l));}catch{}}return out;}
 function writeJSON(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file+'.tmp',JSON.stringify(value));fs.renameSync(file+'.tmp',file);}
 
-// On unless the user switched it off for this game (voice-off), or the DLL faulted 3 times there.
-function enabled(gameDir){const d=dump.dirFor(gameDir);if(fs.existsSync(path.join(d,'voice-off')))return false;
+// No switch (cold tool): it stops only for a game where the DLL faulted 3 times.
+function enabled(gameDir){const d=dump.dirFor(gameDir);
  let faults=0;try{faults=fs.readFileSync(path.join(d,'voice','disabled.txt'),'utf8').split('\n').filter(Boolean).length;}catch{}
  return faults<3;}
-function setEnabled(gameDir,on){const d=path.join(dump.root(),dump.key(gameDir));fs.mkdirSync(d,{recursive:true});const f=path.join(d,'voice-off');
- if(on){try{fs.unlinkSync(f);}catch{}try{fs.unlinkSync(path.join(d,'voice','disabled.txt'));}catch{}}else fs.writeFileSync(f,'');}
 
 // Called for every hooked line while the game runs (t: Date.now() when it arrived).
 function noteLine(gameDir,text,t=Date.now()){const s=String(text||'').trim();if(!s)return;
@@ -99,4 +97,4 @@ function recorder(root,exeOf,{every=60000,settle=4000}={}){let timer=null,last=0
  return text=>{try{const exe=exeOf&&exeOf();if(!exe)return;const dir=path.dirname(String(exe));if(!enabled(dir))return;noteLine(dir,text);
   if(timer)clearTimeout(timer);timer=setTimeout(()=>run(dir),Math.max(settle,every-(Date.now()-last)));timer.unref?.();}catch{}};}
 
-module.exports={recorder,enabled,setEnabled,noteLine,events,lines,match,build,fromScript,lookup,publish,voiceDir,_const:{LEAD,LAG,MIN_MS,MAX_MS,SE_REPEAT,CUT_GAP}};
+module.exports={recorder,enabled,noteLine,events,lines,match,build,fromScript,lookup,publish,voiceDir,_const:{LEAD,LAG,MIN_MS,MAX_MS,SE_REPEAT,CUT_GAP}};

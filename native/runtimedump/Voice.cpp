@@ -17,9 +17,10 @@
 // A clip ("stream") is what one buffer/voice/device receives from Play/Start (or its first write) until it stops, or
 // until nothing more arrives for a while. Loops over 90 s (music) are dropped while they record.
 //
-// On by default, unless <out>\voice-off exists or MEGULIT_VOICE_HARVEST=0. Light: copies only what the game writes,
-// one writer thread, a disk budget (MEGULIT_VOICE_BUDGET_MB, default 1536). Any fault inside a hook switches the whole
-// harvest off for this run and writes <out>\voice\disabled.txt (MeguLit stops loading it for this game after 3 of them).
+// A cold tool with no switch or setting: always on wherever the DLL is loaded (the runtime pack that carries the DLL
+// decides that). Light: copies only what the game writes, one writer thread, a 1.5 GB disk budget per game. Any fault
+// inside a hook silently switches the whole harvest off for this run and adds a line to <out>\voice\disabled.txt; after
+// three of them it no longer starts for that game.
 // Output: <out>\voice\ events.jsonl (one JSON line per clip) and NNNNN.wav / NNNNN.<ext>.
 #include <windows.h>
 #include <mmsystem.h>
@@ -487,9 +488,10 @@ DWORD WINAPI Run(void *) {
 // Called from RuntimeDump.cpp Run() with the per-game output folder (ending in '\'), before its own on/off check.
 void VoiceStart(const wchar_t *out) {
  using namespace voice;
- wchar_t v[16];
- if (GetEnvironmentVariableW(L"MEGULIT_VOICE_HARVEST", v, 16) && v[0] == L'0') return;
- if (GetFileAttributesW((std::wstring(out) + L"voice-off").c_str()) != INVALID_FILE_ATTRIBUTES) return;
+ // A cold tool: no switch. It stays off only for a game where it has faulted three times (voice\disabled.txt).
+ { wchar_t f[1100]; swprintf_s(f, L"%svoice\\disabled.txt", out);
+   HANDLE h = CreateFileW(f, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+   if (h != INVALID_HANDLE_VALUE) { char b[4096]; DWORD n = 0; ReadFile(h, b, sizeof b, &n, NULL); CloseHandle(h); int lines = 0; for (DWORD i = 0; i < n; i++) if (b[i] == '\n') lines++; if (lines >= 3) return; } }
  CreateDirectoryW(out, NULL);
  { // game.txt names the game folder (services/runtime-dump.cjs finds the folder by it)
   wchar_t game[1024]; DWORD n = GetModuleFileNameW(NULL, game, 1024); wchar_t *g = n ? wcsrchr(game, L'\\') : NULL;
@@ -498,7 +500,6 @@ void VoiceStart(const wchar_t *out) {
  }
  swprintf_s(Dir, L"%svoice\\", out); CreateDirectoryW(Dir, NULL);
  Budget = 1536ll << 20;
- if (GetEnvironmentVariableW(L"MEGULIT_VOICE_BUDGET_MB", v, 16)) Budget = (LONGLONG)_wtoi(v) << 20;
  // Disk already used by earlier runs counts against the budget.
  WIN32_FIND_DATAW f; HANDLE h = FindFirstFileW((std::wstring(Dir) + L"*").c_str(), &f);
  LONG top = 0;

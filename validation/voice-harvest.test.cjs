@@ -62,9 +62,10 @@ test('build keeps the full clip over a partial one and lookup/publish/script nam
  process.env.MEGULIT_TEST_ROOT=base;const gv=require('../services/game-voice.cjs');gv._reset();
  assert.equal(vh.publish(base,game),2);assert.ok(gv.find(base,'めぐみん「爆裂魔法！」'));});
 
-test('on by default; voice-off and three faults switch it off',()=>{const{game,vh}=fresh();assert.equal(vh.enabled(game),true);
- vh.setEnabled(game,false);assert.equal(vh.enabled(game),false);vh.setEnabled(game,true);assert.equal(vh.enabled(game),true);
- const d=vh.voiceDir(game);fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,'disabled.txt'),'fault a\nfault b\nfault c\n');assert.equal(vh.enabled(game),false);});
+test('always on (no switch); three faults for a game switch it off',()=>{const{game,vh}=fresh();assert.equal(vh.enabled(game),true);
+ assert.equal(vh.setEnabled,undefined);
+ const d=vh.voiceDir(game);fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,'disabled.txt'),'fault a\nfault b\n');assert.equal(vh.enabled(game),true);
+ fs.appendFileSync(path.join(d,'disabled.txt'),'fault c\n');assert.equal(vh.enabled(game),false);});
 
 // Output of the native stand-in game (selftest/voice-run.ps1), when it has run on this machine.
 const NATIVE=process.env.MEGULIT_VOICE_SELFTEST||'H:\\MeguLit-Work\\voice-selftest';
