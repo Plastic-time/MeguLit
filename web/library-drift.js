@@ -45,7 +45,7 @@ function seed(list){
 }
 function makeCover(id,source){
  const node=document.createElement('mg-cell'),card=source.cloneNode(true);
- card.draggable=false;card.classList.add('field-cell');
+ card.draggable=false;card.classList.add('field-cell');card.querySelector('.library-card-meta')?.remove();
  card.querySelectorAll('img').forEach(img=>{img.draggable=false;img.decoding='async';img.decode?.().catch(()=>{});});
  node.append(card);node.dataset.id=id;
  const z=Math.pow(Math.random(),1.25),c={id,node,z,x:0,y:0,vx:0,vy:0,sway:0,wx:0,wy:0,w:0,r:0,rx:null,ry:null,rs:1,ra:1,rd:0,slot:null,t:'',o:'',zi:-1,pe:''};

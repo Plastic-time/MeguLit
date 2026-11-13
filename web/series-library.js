@@ -43,13 +43,12 @@ export function createSeriesLibrary(env){
     a=ids.indexOf(id),b=ids.indexOf(node.dataset.memberId);if(a<0||b<0||a===b)return;ids.splice(a,1);ids.splice(b,0,id);await commit('series_order',{id:seriesId,
     gameIds:ids}).catch(()=>{});};}
  }
- /* Blueprint selection marks: ticks, frame, hover check and the running-number tag. Hidden until .lib-selecting. */
- const pad=n=>String(n).padStart(2,'0');
- function marks(order){return `<span class="bp-sel" aria-hidden="true"><i class="bp-ticks"></i><i class="bp-frame"></i><i class="bp-box">${icon('check')}</i><b class="bp-tag">${order?pad(order):''}</b></span>`;}
+ /* Blueprint selection marks: ticks, frame and hover check. Hidden until .lib-selecting. (2026-11-14: no running-number tag; no numbering in the UI) */
+ function marks(){return `<span class="bp-sel" aria-hidden="true"><i class="bp-ticks"></i><i class="bp-frame"></i><i class="bp-box">${icon('check')}</i></span>`;}
  function countParts(){const probe=987654321,text=String(w().selected(probe)),at=text.indexOf(String(probe));return at<0?[text,'']:[text.slice(0,at).trim(),text.slice(at+String(probe).length).trim()];}
  const backLabel=()=>({zh:'返回',en:'Back',ja:'戻る'})[env.locale()]||'Back';
  /* the bar: count, then either the two actions or the inline name field (no modal: naming needs neither interruption nor protected focus) */
- function barHTML(){const [pre,post]=countParts(),sw=w();return `<div class="bp-bar" role="toolbar" aria-label="${esc(sw.select)}"><i class="bp-rule" aria-hidden="true"></i><span class="bp-tagline" aria-hidden="true"><span class="bp-code"><i></i></span><span class="bp-label">select</span></span><span class="bp-count-wrap" aria-live="polite" aria-label="${esc(sw.selected(selected.size))}">${pre?`<span>${esc(pre)}</span>`:''}<span class="bp-count"><span>${pad(selected.size)}</span></span>${post?`<span>${esc(post)}</span>`:''}</span><span class="bp-actions"><button type="button" class="bp-create" data-create ${selected.size<2?'disabled':''}>${icon('layers')}<span>${esc(sw.create)}</span></button><button type="button" class="bp-cancel" data-select-cancel>${esc(sw.cancel)}</button></span><form class="bp-name" hidden><input class="bp-input" name="name" required maxlength="200" autocomplete="off" placeholder="${esc(sw.name)}" aria-label="${esc(sw.name)}"><button class="bp-create" type="submit" data-name-confirm>${icon('layers')}<span>${esc(sw.create)}</span></button><button type="button" class="bp-cancel" data-name-back>${esc(backLabel())}</button></form></div>`;}
+ function barHTML(){const [pre,post]=countParts(),sw=w();return `<div class="bp-bar" role="toolbar" aria-label="${esc(sw.select)}"><i class="bp-rule" aria-hidden="true"></i><span class="bp-tagline" aria-hidden="true"><span class="bp-code"><i></i></span><span class="bp-label">select</span></span><span class="bp-count-wrap" aria-live="polite" aria-label="${esc(sw.selected(selected.size))}">${pre?`<span>${esc(pre)}</span>`:''}<span class="bp-count"><span>${selected.size}</span></span>${post?`<span>${esc(post)}</span>`:''}</span><span class="bp-actions"><button type="button" class="bp-create" data-create ${selected.size<2?'disabled':''}>${icon('layers')}<span>${esc(sw.create)}</span></button><button type="button" class="bp-cancel" data-select-cancel>${esc(sw.cancel)}</button></span><form class="bp-name" hidden><input class="bp-input" name="name" required maxlength="200" autocomplete="off" placeholder="${esc(sw.name)}" aria-label="${esc(sw.name)}"><button class="bp-create" type="submit" data-name-confirm>${icon('layers')}<span>${esc(sw.create)}</span></button><button type="button" class="bp-cancel" data-name-back>${esc(backLabel())}</button></form></div>`;}
  function bindBar(root){const bar=root.querySelector('.bp-bar');if(!bar)return;const form=bar.querySelector('.bp-name'),input=form.querySelector('input');
   bar.querySelector('[data-create]').addEventListener('click',()=>{if(selected.size<2)return;bar.classList.add('is-naming');form.hidden=false;selectMotion.naming(bar,true);input.focus();});
   const back=()=>{bar.classList.remove('is-naming');form.hidden=true;selectMotion.naming(bar,false);bar.querySelector('[data-create]')?.focus();};
@@ -61,17 +60,15 @@ export function createSeriesLibrary(env){
   node.ondrop=async e=>{e.preventDefault();node.classList.remove('series-drop-target');const id=e.dataTransfer.getData('application/x-megulit-game');if(env.model().games.some(g=>g.id===id))await commit('series_assign',
    {id:node.dataset.seriesDrop,gameIds:[id]}).catch(()=>{});};}
  const nodeOf=(root,id)=>root.querySelector(`.series-game[data-member-id="${CSS.escape(id)}"]`);
- /* one card: class toggle, renumber the picks, update the bar. No re-render. */
+ /* one card: class toggle, update the bar. No re-render. */
  function toggleOne(node){const root=node.closest('#library-results')||node.parentElement,id=node.dataset.memberId,on=!selected.has(id),before=selected.size;
   if(on)selected.add(id);else selected.delete(id);
   node.classList.toggle('is-selected',on);node.querySelector('.game-card')?.setAttribute('aria-pressed',String(on));
-  let i=0;for(const pick of selected){i++;const tag=nodeOf(root,pick)?.querySelector('.bp-tag');if(tag&&tag.textContent!==pad(i))tag.textContent=pad(i);}
-  if(!on){const tag=node.querySelector('.bp-tag');if(tag)tag.textContent='';}
   root.classList.toggle('bp-has',selected.size>0);syncBar(root,before);selectMotion.toggle(node,on);}
  function syncBar(root,before){const bar=root.querySelector('.bp-bar');if(!bar)return;selectMotion.count(bar,selected.size,before);
   bar.querySelector('.bp-count-wrap')?.setAttribute('aria-label',w().selected(selected.size));const b=bar.querySelector('[data-create]');if(!b)return;const was=b.disabled;b.disabled=selected.size<2;if(was&&!b.disabled)selectMotion.arm(b);
   if(selected.size<2&&bar.classList.contains('is-naming'))bar.querySelector('[data-name-back]')?.click();}
- function clearPicks(root){for(const id of selected){const n=nodeOf(root,id);if(!n)continue;n.classList.remove('is-selected');n.querySelector('.game-card')?.removeAttribute('aria-pressed');const tag=n.querySelector('.bp-tag');if(tag)tag.textContent='';}selected.clear();}
+ function clearPicks(root){for(const id of selected){const n=nodeOf(root,id);if(!n)continue;n.classList.remove('is-selected');n.querySelector('.game-card')?.removeAttribute('aria-pressed');}selected.clear();}
  function setModeClasses(root,on){root.classList.toggle('lib-selecting',on);root.classList.toggle('bp-has',on&&selected.size>0);if(on){clearTimeout(layerTimer);root.classList.add('bp-layers');}else dropLayers(root);}
  let layerTimer=0;
  function dropLayers(root){clearTimeout(layerTimer);layerTimer=setTimeout(()=>{if(selecting)return;if(selectMotion.isBusy())return dropLayers(root);(window.requestIdleCallback||setTimeout)(()=>{if(!selecting)root.classList.remove('bp-layers');});},400);}

@@ -84,13 +84,13 @@ export async function leave(root,apply){
 /* one card toggled: CSS draws the frame and pops the tag; picking adds a two-frame accent invert on the tag */
 export function toggle(node,on){
  if(!on||calm())return;
- node.querySelector('.bp-tag')?.animate([{opacity:1},{opacity:1,offset:.3},{opacity:0}],{duration:170,easing:'linear',pseudoElement:'::after'});
+ node.querySelector('.bp-box')?.animate([{scale:1.18},{scale:1}],{duration:200,easing:'cubic-bezier(.16,1,.3,1)'});
 }
 
 /* the big numeral rolls: up when the count grows, down when it shrinks */
 export function count(bar,n,before){
  const box=bar?.querySelector('.bp-count');if(!box)return;
- const text=String(n).padStart(2,'0'),current=box.querySelector('span:not([data-out])');
+ const text=String(n),current=box.querySelector('span:not([data-out])');
  if(current?.textContent===text)return;
  box.querySelectorAll('[data-out]').forEach(s=>s.remove());
  const next=document.createElement('span');next.textContent=text;box.append(next);
@@ -144,7 +144,7 @@ export async function create({root,nodes,apply}){
  const flies=[],papers=[];
  for(let k=picked.length-1;k>=0;k--){
   const fly=document.createElement('div');fly.className='bp-fly';
-  const paper=document.createElement('div');paper.className='bp-paper';paper.innerHTML=`<b>no.${String(k+1).padStart(2,'0')}</b>`;
+  const paper=document.createElement('div');paper.className='bp-paper';
   const img=covers[k]?.querySelector('img');let face;
   if(img){face=document.createElement('img');face.src=img.currentSrc||img.src;face.alt='';}else{face=document.createElement('span');face.className='bp-blank';}
   fly.append(paper,face);stack.append(fly);flies[k]=fly;papers[k]=paper;

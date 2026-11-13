@@ -350,7 +350,7 @@ export function fieldify(grid,filtered=false,tracks=false){
     matches almost no rules; the cover itself is never touched while the wall moves. Its images decode off the main
     thread ahead of their first paint. */
  function make(index){
-  const source=items[index],card=source.cloneNode(true),node=document.createElement('mg-cell');
+  const source=items[index],card=source.cloneNode(true),node=document.createElement('mg-cell');card.querySelector('.library-card-meta')?.remove(); /* hidden on the field (display:none); clones skip it */
   card.draggable=false;card.classList.add('field-cell');
   card.querySelectorAll('img').forEach(img=>{img.draggable=false;img.decoding='async';img.decode?.().catch(()=>{});});
   node.append(card);sources.set(node,source);return node;
@@ -420,7 +420,7 @@ export function fieldify(grid,filtered=false,tracks=false){
    let cell=cells.get(key);
    if(!cell){
     const game=index%items.length;
-    if(!pool.get(game)?.length){const sx=cx+(col*cw-x)*z,sy=cy+(row*ch-y)*z,mx=cardWidth*z,my=cardHeight*z;if((sx<-mx||sx>width+mx||sy<-my||sy>height+my)&&made>=6&&!window.__megulitOrbitWarm){deferred=true;continue;} /* 2026-11-13 (user recording: drift -> wall, edge columns popped in at +140 ms): while a view switch plays the wall arrives from scale .9, so its margin ring is on screen; build all of it in the cut */made++;}
+    if(!pool.get(game)?.length){const sx=cx+(col*cw-x)*z,sy=cy+(row*ch-y)*z,mx=cardWidth*z,my=cardHeight*z;if((sx<-mx||sx>width+mx||sy<-my||sy>height+my)&&made>=6){deferred=true;continue;} /* 2026-11-14: the margin ring (cells a whole card outside the window) comes 6 a frame during a view switch too; building all of it in the cut doubled the cut frame (104 cells against 50, 75 -> 190+ ms) */made++;}
     const node=take(game);
     if(node.dataset.zoom!==tier)node.dataset.zoom=tier;
 
