@@ -823,13 +823,12 @@ td.none{color:var(--t3)}
 
 /* 判定文字 */
 .pts.judge{font-family:var(--serif);font-size:12px;letter-spacing:.08em;margin-left:8px}
-.j-critical-perfect{color:var(--gold)}.j-perfect{color:#e8b86d}.j-great{color:#e0647e}.j-good{color:#7fae8a}.j-miss{color:var(--paper-3)}
+.j-critical-perfect{color:#f5d36b!important;text-shadow:0 0 8px rgba(245,211,107,.45)}.j-perfect{color:#e8b86d}.j-great{color:#e0647e}.j-good{color:#7fae8a}.j-miss{color:var(--paper-3)}
 
 /* 结算：达成率 + 评级（不用印章） */
 .v-results .h-score .n{font-size:64px}
-.v-results .h-score .rank{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:.04em;color:var(--gold);padding-bottom:8px}
 .v-results .ledger .judge{font-family:var(--serif);font-size:12px;letter-spacing:.06em}
-.v-results .qc.q-critical-perfect i{background:var(--gold)}.v-results .qc.q-perfect i{background:#e8b86d;opacity:.75}.v-results .qc.q-great i{background:#e0647e;opacity:.7}.v-results .qc.q-good i{background:#7fae8a}.v-results .qc.q-miss i{background:var(--rule-strong)}
+.v-results .qc.q-critical-perfect i{background:#f5d36b}.v-results .qc.q-perfect i{background:#e8b86d;opacity:.75}.v-results .qc.q-great i{background:#e0647e;opacity:.7}.v-results .qc.q-good i{background:#7fae8a}.v-results .qc.q-miss i{background:var(--rule-strong)}
 .v-results .qc.q-miss span{color:var(--ink-accent)}
 @container kana (max-width:600px){.v-results .h-score .n{font-size:44px}}
 
