@@ -40,7 +40,8 @@ function japaneseLike(v){
 
 /* ---- KiriKiri ---------------------------------------------------------------------------------------------- */
 const KRKR_MAGIC=Buffer.from([0xFE,0xFE,0x02,0xFF,0xFE]);
-function decodeCf(v){return String(v).split('\\x').filter(Boolean).map(h=>String.fromCodePoint(parseInt(h,16))).join('');}
+/* \xNNNN escapes may sit next to plain text ("savedata"); plain text stays as is instead of throwing on parseInt NaN */
+function decodeCf(v){return String(v).replace(/\\x([0-9a-f]{1,6})/gi,(m,h)=>{const n=parseInt(h,16);return n<=0x10ffff?String.fromCodePoint(n):m;});}
 function krkrDataDirs(gameDir,env){
  const out=[];
  for(const n of list(gameDir).filter(n=>/\.cf$/i.test(n))){
@@ -133,7 +134,7 @@ function unityPlan(gameDir,env){
   const prefKey=files.some(f=>/\.(sav|dat|bin)$/i.test(f))?(env.prefKeyFor||preferenceLanguageKey)(path.join(data,'Managed')):null;
   for(const f of files.slice(0,200)){let buf;try{if(fs.statSync(f).size>256<<10)continue;buf=fs.readFileSync(f);}catch{continue;}
    if(/\.(json|txt|ini|cfg|xml|nson)$/i.test(f)&&!buf.includes(0)){const text=buf.toString('utf8'),ch=jsonChanges(text);if(ch.length)found=true;const todo=ch.filter(c=>c.next!==c.match);
-    if(todo.length){let next=text;for(const c of todo)next=next.replace(c.match,c.next);items.push({kind:'file',file:f,buf,next:Buffer.from(next,'utf8'),from:todo[0].from,to:todo[0].to,key:todo[0].key,format:'json'});}continue;}
+    if(todo.length){let next=text;for(const c of todo)next=next.replace(c.match,()=>c.next);items.push({kind:'file',file:f,buf,next:Buffer.from(next,'utf8'),from:todo[0].from,to:todo[0].to,key:todo[0].key,changes:todo.map(c=>({key:c.key,from:c.from,to:c.to})),format:'json'});}continue;}
    if(prefKey!=null){const pairs=prefPairs(buf,prefKey);if(!pairs.length)continue;found=true;const next=Buffer.from(buf);let changed=false;
     for(const p of pairs){if(p.value===UNITY_JAPANESE)continue;if(p.kind==='Single')next.writeFloatLE(UNITY_JAPANESE,p.offset);else next.writeInt32LE(UNITY_JAPANESE,p.offset);changed=true;}
     if(changed)items.push({kind:'file',file:f,buf,next,from:pairs[0].value,to:UNITY_JAPANESE,key:'Language',format:'pref',prefKey});}}
@@ -165,7 +166,7 @@ function readManifest(gameDir){try{const m=JSON.parse(fs.readFileSync(manifestPa
 function plan(gameDir,options={}){
  const env=environment(options),krkr=krkrPlan(gameDir,env),unity=krkr?null:unityPlan(gameDir,env),steam=steamApp(gameDir);
  const engine=krkr?.engine||unity?.engine||'';
- const items=[...(krkr?.files||[]).map(f=>({kind:'file',file:f.file,buf:f.buf,next:writeKrkr(f.info,f.changes.reduce((t,c)=>t.replace(c.match,c.next),f.info.text)),from:f.changes[0].from,to:f.changes[0].to,key:f.changes[0].key,format:'krkr'})),...(unity?.items||[])];
+ const items=[...(krkr?.files||[]).map(f=>({kind:'file',file:f.file,buf:f.buf,next:writeKrkr(f.info,f.changes.reduce((t,c)=>t.replace(c.match,()=>c.next),f.info.text)),from:f.changes[0].from,to:f.changes[0].to,key:f.changes[0].key,changes:f.changes.map(c=>({key:c.key,from:c.from,to:c.to})),format:'krkr'})),...(unity?.items||[])];
  const found=!!(krkr?.found||unity?.found);
  /* Japanese is known to exist: the game keeps a language setting (KiriKiri), Japanese resources (Unity), or the Steam store lists it */
  const japanese=!!(krkr?.found||unity?.japaneseAssets?.length||env.steamJapanese===true);
@@ -195,18 +196,22 @@ function apply(gameDir,options={}){
   const text=fs.readFileSync(p.steamSwitch.acf,'utf8');items.push({kind:'file',file:p.steamSwitch.acf,buf:Buffer.from(text,'utf8'),next:Buffer.from(setAcfLanguage(text,'japanese'),'utf8'),from:p.steamSwitch.current,to:'japanese',key:'steam'});}
  if(!items.length)throw Error('NOTHING_TO_RESTORE');
  fs.mkdirSync(backup,{recursive:true});
- items.forEach((it,i)=>{
+ const save=()=>writeAtomic(manifestPath(gameDir),Buffer.from(JSON.stringify({version:1,adapter:ADAPTER,engine:p.engine,at:new Date().toISOString(),entries},null,1)));
+ /* a failure part way still records what was already changed, so restore can undo it */
+ try{items.forEach((it,i)=>{
   if(it.kind==='registry'){p.env.registry.set(it.key,it.name,it.type,it.patched);entries.push({kind:'registry',key:it.key,name:it.name,type:it.type,original:it.original,patched:it.patched,from:it.from,to:it.to});return;}
   const keep=String(i).padStart(2,'0')+'-'+path.basename(it.file);fs.writeFileSync(path.join(backup,keep),it.buf);writeAtomic(it.file,it.next);
-  entries.push({kind:'file',file:it.file,backup:keep,originalSha256:sha(it.buf),patchedSha256:sha(it.next),key:it.key,from:it.from,to:it.to,format:it.format||'',prefKey:it.prefKey});});
- writeAtomic(manifestPath(gameDir),Buffer.from(JSON.stringify({version:1,adapter:ADAPTER,engine:p.engine,at:new Date().toISOString(),entries},null,1)));
+  entries.push({kind:'file',file:it.file,backup:keep,originalSha256:sha(it.buf),patchedSha256:sha(it.next),key:it.key,from:it.from,to:it.to,format:it.format||'',prefKey:it.prefKey,changes:it.changes});});}catch(error){if(entries.length)save();throw error;}
+ save();
  return {applied:entries.length,cells:0,mode:entries.some(e=>e.key==='steam')?'steam':'setting'};
 }
 function revert(buf,e){
+ /* undo every key the apply changed, not only the first (older manifests carry one) */
+ if(Array.isArray(e.changes)&&e.changes.length>1){let cur=buf,any=false;for(const c of e.changes){const n=revert(cur,{...e,changes:null,key:c.key,from:c.from,to:c.to});if(n){cur=n;any=true;}}return any?cur:null;}
  try{
   if(e.format==='krkr'){const info=readKrkr(buf);if(!info)return null;const ch=krkrChanges(info.text).filter(c=>c.key===e.key&&String(c.from)===String(e.to));if(!ch.length)return null;
-   let t=info.text;for(const c of ch)t=t.replace(c.match,typeof e.from==='number'?c.match.replace(/-?\d+$/,String(e.from)):c.match.replace(/"[^"]*"$/,'"'+e.from+'"'));return writeKrkr(info,t);}
-  if(e.format==='json'){const t=buf.toString('utf8'),ch=jsonChanges(t).filter(c=>c.key===e.key&&c.from===e.to);if(!ch.length)return null;let n=t;for(const c of ch)n=n.replace(c.match,c.match.replace(/[^"\\]*(\\?")$/,e.from+'$1'));return Buffer.from(n,'utf8');}
+   let t=info.text;for(const c of ch)t=t.replace(c.match,()=>typeof e.from==='number'?c.match.replace(/-?\d+$/,String(e.from)):c.match.replace(/"[^"]*"$/,()=>'"'+e.from+'"'));return writeKrkr(info,t);}
+  if(e.format==='json'){const t=buf.toString('utf8'),ch=jsonChanges(t).filter(c=>c.key===e.key&&c.from===e.to);if(!ch.length)return null;let n=t;for(const c of ch)n=n.replace(c.match,()=>c.match.replace(/[^"\\]*(\\?")$/,(_,q)=>e.from+q));return Buffer.from(n,'utf8');}
   if(e.format==='pref'){const pairs=prefPairs(buf,e.prefKey).filter(p=>p.value===e.to);if(!pairs.length)return null;const n=Buffer.from(buf);for(const p of pairs){if(p.kind==='Single')n.writeFloatLE(e.from,p.offset);else n.writeInt32LE(e.from,p.offset);}return n;}
  }catch{}
  return null;}
