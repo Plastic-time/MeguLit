@@ -93,4 +93,4 @@ const engine={id:'garbro',
   const startedAt=Math.min(...files.map(f=>jobs.get(f).startedAt)),pj=installed()?null:packs().status().packs.find(p=>p.id===PACK)?.job;
   return pj?{kind:'garbro',stage:'download',startedAt,received:pj.received,total:pj.total}:{kind:'garbro',stage:'unpack',startedAt};},
 };
-module.exports={engine,archives,unpack,run,decodeRuns,cacheDir,MATCH,PACK,jobs};
+module.exports={engine,archives,unpack,run,decodeRuns,cacheDir,schedule,installed,version,readJson,MATCH,PACK,jobs};

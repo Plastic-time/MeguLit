@@ -7,7 +7,7 @@
    loose files, a declared index table, XP3 or PFS archives), how to turn the stored bytes into plain script (transforms:
    xor, xor-index, add/sub, not, rotate, zlib, raw deflate, LZSS, skip/take), how to cut that script into lines (grammar:
    text lines with safe regular expressions, or length-prefixed / NUL-terminated strings in bytecode), how to pair it
-   (pairing hints) and extra decrypt parameters for readers MeguLit already has (params: cx-scheme, paz-scheme).
+   (pairing hints) and extra decrypt parameters for readers MeguLit already has (params: cx-scheme, paz-scheme, malie-scheme).
 
    Safety. Every pack is signed (Ed25519 over its canonical JSON) with a key listed in services/adapter-pack-keys.json;
    a pack that is unsigned, signed by an unknown key, altered, invalid, or needs a capability this app lacks is skipped,
@@ -24,7 +24,9 @@ const SCHEMA='megulit.adapter-pack',FORMAT=1,FORMATS=[1];
 /* Every capability a format-1 pack may require. Adding one is fine; removing or changing one is a new format. */
 const CAPABILITIES=Object.freeze(['container:loose','container:table','container:xp3','container:pfs',
  'transform:xor','transform:xor-index','transform:add','transform:sub','transform:not','transform:rol','transform:ror','transform:zlib','transform:deflate-raw','transform:lzss','transform:skip','transform:take',
- 'grammar:lines','grammar:strings','params:cx-scheme','params:paz-scheme','match:exe','match:files']);
+ 'grammar:lines','grammar:strings','params:cx-scheme','params:paz-scheme','match:exe','match:files',
+ /* E578 per-title keys for the Malie reader (malie.cjs) */
+ 'params:malie-scheme']);
 const LIMITS=Object.freeze({packBytes:256*1024,files:20000,fileBytes:64<<20,totalBytes:512<<20,inflated:64<<20,lineChars:4096,regex:300,strip:16,entries:200000,scenes:20000});
 const ID=/^[a-z0-9][a-z0-9-]{2,63}$/,HEX=/^(?:[0-9a-f]{2})+$/i,SEMVER=/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const ENCODINGS=['shift_jis','utf-8','utf-16le','gbk','euc-jp','big5'];
@@ -108,7 +110,8 @@ function validGrammar(g){if(!isObj(g)||!['lines','strings'].includes(g.mode))ret
  else{if(!(typeof g.opcode==='string'&&HEX.test(g.opcode)&&g.opcode.length<=16))return false;if(!['u8','u16le','u32le','zero'].includes(g.length))return false;}
  if(g.minChars!==undefined&&!int(g.minChars,1,64))return false;return true;}
 function validPairing(p){return p===undefined||isObj(p)&&(p.by===undefined||['order','text'].includes(p.by))&&(p.dropNames===undefined||typeof p.dropNames==='boolean')&&(p.minChars===undefined||int(p.minChars,1,64));}
-function validParams(list){return list===undefined||Array.isArray(list)&&list.length<=16&&list.every(p=>isObj(p)&&['cx-scheme','paz-scheme'].includes(p.target)&&isObj(p.value)&&JSON.stringify(p.value).length<=64*1024);}
+const PARAM_TARGETS=['cx-scheme','paz-scheme','malie-scheme'];
+function validParams(list){return list===undefined||Array.isArray(list)&&list.length<=16&&list.every(p=>isObj(p)&&PARAM_TARGETS.includes(p.target)&&isObj(p.value)&&JSON.stringify(p.value).length<=64*1024);}
 /* what a pack needs, computed from its content (its `requires` must list at least these) */
 function needs(p){const out=new Set();if(p.match?.exe)out.add('match:exe');if(p.match?.files?.length)out.add('match:files');
  if(p.source)out.add('container:'+p.source.container);for(const t of [...(p.transforms||[]),...(p.source?.table?.indexTransforms||[])])out.add('transform:'+t.op);

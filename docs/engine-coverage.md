@@ -27,14 +27,14 @@ MeguLit 对一款游戏的支持分三层：
 | System-NNN | 390 | 371 | 111 | 🆕（spt\ + nya\/init\） | 🆕 systemnnn.cjs：spt dword 异或、PRINT/SELECT 按命令顺序（引擎源码公开） | ⚪ | 乙女社 Mio 用 |
 | Artemis | 495 | 347 | 330 | ✅ | ✅ pfs pf6/pf8、.ast、多语言 | ✅ |  |
 | BGI / Ethornell | 337 | 329 | 195 | ✅ | ✅（旧适配层 bgi.cjs） | ✅ |  |
-| ShiinaRio | 333 | 301 | 42 | ✅ | 🟡 GARbro（🆕 .war 进白名单） | ✅ | WARC 按作品加密 |
+| ShiinaRio | 333 | 301 | 42 | ✅（WARC 魔数） | ✅ shiinario.cjs：WARC 1.1 原生，1.2+ 经 GARbro 方案库（127 作）解出 *_T.WAR，TXT 逐行 | ✅ | 加密 WARC 的原生解密未做（E579） |
 | CatSystem2 | 264 | 236 | 108 | ✅ | ✅ scene.int（含 cnscene.int） | ✅ |  |
 | SiglusEngine | 223 | 222 | 154 | ✅ | ✅ Steam .dbs 多语言表、Scene.pck 内附源码 | ✅ |  |
 | codeX RScript（Liar-soft） | 211 | 211 | 91 | 🆕（"LB" .xfl 归档） | 🆕 liar.cjs：scr.xfl（可嵌套）+ .gsc 字符串表 | ⚪ | 就是 Liar-soft 引擎（Liar、raiL、Studio Ubai、SUKARADOG） |
 | RealLive | 220 | 207 | 21 | ✅ | ✅ Seen.txt | ✅ |  |
 | Majiro | 265 | 205 | 21 | ✅ 扩展（任何名字的 MajiroArc） | 🆕 majiro.cjs：MajiroArcV1–V3 + .mjo 字节码精确遍历 | ✅ |  |
-| Malie | 205 | 204 | 82 | ✅ | 🟡 GARbro（.lib/.dat，Camellia 按作品） | ✅ | Karin（乙女）用 |
-| NeXAS (Giga) | 199 | 197 | 147 | ✅ 扩展（script.pac 且非 Softpal） | 🟡 GARbro（.pac） | ✅ |  |
+| Malie | 205 | 204 | 82 | ✅（已知密钥能开 data*.dat） | ✅ malie.cjs：LIB/LIBU/LIBP 原生，43 个作品密钥（Camellia/CFI）+ 适配包 malie-scheme，EXEC 消息表逐行 | ✅ | Karin（乙女）用（E578） |
+| NeXAS (Giga) | 199 | 197 | 147 | ✅ 扩展（script.pac 且非 Softpal） | ✅ nexas.cjs：PAC（Huffman 索引、LZSS/Huffman/zlib/zstd）+ .bin 串表逐行 | ✅ | 未经实物（E577） |
 | QLIE | 203 | 180 | 57 | ✅ | 🟡 GARbro（🆕 GameData/*.pack 进白名单） | ✅ | pack v3 密钥按作品 |
 | NScripter / ONScripter | 2079 | 142 | 19 | ✅ | ✅ 0.txt / nscript.dat | ✅ |  |
 | AST | 155 | 141 | 0 | 🆕（无扩展名 ARC1/ARC2） | 🟡 ast.cjs：归档按规格做实（名字异或、LZSS+异或），剧本无公开资料 → 通用文本扫描 | ⚪ | 老作品（2016 后 0）；剧本语法需实物 |
@@ -126,7 +126,7 @@ MeguLit 对一款游戏的支持分三层：
 | Adobe AIR / Flash | 47 | 🆕 只检测 |
 | System-NNN | 24 | 🆕 读取（E570） |
 | BGI | 11 | ✅ |
-| Malie | 6 | 🟡 |
+| Malie | 6 | ✅ |
 | Artemis | 5 | ✅ |
 
 按厂商（含 Switch / Vita / PSP 移植到 PC 的版本）：
@@ -142,7 +142,7 @@ MeguLit 对一款游戏的支持分三层：
 | QuinRose（アリス シリーズ） | KiriKiri（部分）+ 自研 QuinRose Engine | KiriKiri 版 ✅，自研 ❌ |
 | Operetta Due（越えざるは紅い花、幸ノ天秤） | YU-RIS、KiriKiri | ✅ |
 | Daisy2（絶対階級学園、三国恋戦記） | DDSystem | ❌ |
-| Karin Entertainment（絶対迷宮グリム、断罪のマリア） | Malie | 🟡 GARbro 兜底 |
+| Karin Entertainment（絶対迷宮グリム、断罪のマリア） | Malie | ✅ malie.cjs（EXEC 在 exe 资源里也读） |
 | Vitamin（イジって★プリンセス 等） | 未标注 | ❌ 需要实物 |
 | Takuyo（怪盗アプリコット 等，2000 年代） | GSS / 未标注 | ❌ |
 | Tiaramode（Butlers、Brothers、Royals） | BGI | ✅ |

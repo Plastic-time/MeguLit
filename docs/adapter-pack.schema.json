@@ -18,7 +18,7 @@
    "container:loose", "container:table", "container:xp3", "container:pfs",
    "transform:xor", "transform:xor-index", "transform:add", "transform:sub", "transform:not", "transform:rol", "transform:ror",
    "transform:zlib", "transform:deflate-raw", "transform:lzss", "transform:skip", "transform:take",
-   "grammar:lines", "grammar:strings", "params:cx-scheme", "params:paz-scheme", "match:exe", "match:files"]}},
+   "grammar:lines", "grammar:strings", "params:cx-scheme", "params:paz-scheme", "match:exe", "match:files", "params:malie-scheme"]}},
   "title": {"type": "string", "maxLength": 200},
   "engine": {"type": "string", "maxLength": 200},
   "note": {"type": "string", "maxLength": 200},
@@ -51,7 +51,7 @@
    "opcode": {"type": "string", "pattern": "^([0-9a-fA-F]{2}){1,8}$"}, "length": {"enum": ["u8", "u16le", "u32le", "zero"]},
    "minChars": {"type": "integer", "minimum": 1, "maximum": 64}}},
   "pairing": {"type": "object", "properties": {"by": {"enum": ["order", "text"]}, "dropNames": {"type": "boolean"}, "minChars": {"type": "integer", "minimum": 1, "maximum": 64}}},
-  "params": {"type": "array", "maxItems": 16, "items": {"type": "object", "required": ["target", "value"], "properties": {"target": {"enum": ["cx-scheme", "paz-scheme"]}, "value": {"type": "object"}}}},
+  "params": {"type": "array", "maxItems": 16, "items": {"type": "object", "required": ["target", "value"], "properties": {"target": {"enum": ["cx-scheme", "paz-scheme", "malie-scheme"]}, "value": {"type": "object"}}}},
   "signature": {"type": "object", "required": ["alg", "keyId", "value"], "properties": {"alg": {"const": "ed25519"}, "keyId": {"type": "string"}, "value": {"type": "string"}}}
  },
  "$defs": {

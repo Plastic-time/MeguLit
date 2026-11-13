@@ -15,7 +15,8 @@ const ENGINES=[
  {name:'RealLive',hook:true,test:f=>f.has(/^seen\.txt$/i)||f.has(/^reallive.*\.exe$/i)},
  {name:'CatSystem2',hook:true,test:f=>f.has(/^cs2conf\.dll$/i)||(f.has(/\.int$/i)&&f.has(/^cs2.*\.exe$/i))},
  {name:'Artemis',hook:true,test:f=>f.has(/\.pfs(\.\d+)?$/i)},
- {name:'Malie',hook:true,test:f=>f.has(/^malie\.ini$/i)||f.has(/\.lib$/i)&&f.has(/^malie.*\.exe$/i)},
+ /* E578 or a data*.dat / *.lib that opens as a Malie archive (plain LIB / LIBU, or LIBP with one of the known title keys) */
+ {name:'Malie',hook:true,test:f=>f.has(/^malie\.ini$/i)||f.has(/\.lib$/i)&&f.has(/^malie.*\.exe$/i)||(f.has(/^data\d*\.dat$|\.lib$/i)||f.sub('data',/^data\d*\.dat$|\.lib$/i))&&require('../services/original-engines/malie.cjs').probe(f.dir)},
  {name:'AdvHD / WillPlus',hook:true,test:f=>f.has(/^rio\.arc$/i)||f.has(/^advhd\.exe$/i)},
  {name:'Majiro',hook:true,test:f=>f.has(/^scenario\.arc$/i)&&f.has(/\.arc$/i)},
  {name:'QLIE',hook:true,test:f=>f.sub('GameData',/\.pack$/i)},
@@ -23,7 +24,8 @@ const ENGINES=[
  {name:'SoftPal',hook:true,test:f=>f.has(/^pal\.dll$/i)||f.sub('dll',/^pal\.dll$/i)||f.magic(/^data\.pac$/i,'PAC ')||(f.has(/^data\.pac$/i)&&f.has(/^script\.src$/i))},
  {name:'NeXAS',hook:true,test:f=>f.has(/^thumbnail\.pac$/i)||f.has(/^update\.pac$/i)||f.has(/^script\.pac$/i)&&!f.magic(/^script\.pac$/i,'PAC ')},
  {name:'System4 (AliceSoft)',hook:true,test:f=>f.has(/\.ain$/i)||f.has(/\.ald$/i)},
- {name:'ShiinaRio',hook:true,test:f=>f.has(/\.war$/i)},
+ /* E579 WARC 1.x archives (a .war of another engine is not counted) */
+ {name:'ShiinaRio',hook:true,test:f=>f.magicAny(/\.war$/i,'WARC')},
  {name:'Entis / Cotopha',hook:true,test:f=>f.has(/\.noa$/i)},
  {name:'NScripter',hook:true,test:f=>f.has(/^(arc\.nsa|nscript\.dat|00\.txt|0\.txt)$/i)},
  /* LiveMaker 2/3: game.dat (or an .ext beside the exe) is a "vff" archive */
@@ -142,7 +144,7 @@ function listing(dir){let names=[];try{names=fs.readdirSync(dir);}catch{}const c
  const peek=(rel,re,n=4096)=>{try{const fd=fs.openSync(path.join(dir,rel),'r'),b=Buffer.alloc(n);let got;try{got=fs.readSync(fd,b,0,n,0);}finally{fs.closeSync(fd);}return re.test(b.toString('latin1',0,got));}catch{return false;}};
  /* E585 probe: one of the first few files matching re passes a structure check (archives with no magic: Tmr-Hiro .pac, Interheart .fpk, NekoSDK .dat) */
  const probe=(re,check,max=4)=>names.filter(x=>re.test(x)).slice(0,max).some(n=>{try{return !!check(path.join(dir,n));}catch{return false;}});
- return {names,magic,magicAny,peek,probe,managed,has:re=>names.some(n=>re.test(n)),sub:(name,re)=>{const real=names.find(n=>n.toLowerCase()===name.toLowerCase());if(!real)return false;if(!(real in cache))try{cache[real]=fs.readdirSync(path.join(dir,real));}catch{cache[real]=[];}return cache[real].some(n=>re.test(n));}};}
+ return {dir,names,magic,magicAny,peek,probe,managed,has:re=>names.some(n=>re.test(n)),sub:(name,re)=>{const real=names.find(n=>n.toLowerCase()===name.toLowerCase());if(!real)return false;if(!(real in cache))try{cache[real]=fs.readdirSync(path.join(dir,real));}catch{cache[real]=[];}return cache[real].some(n=>re.test(n));}};}
 function engineOf(dir){const f=listing(dir);for(const e of ENGINES)if(e.test(f))return e;return null;}
 /* A Steam emulator's launcher names the program it starts (SmartSteamEmu: SmartSteamEmu\launcher.ini Target, UTF-16);
    the original exe beside it quits without Steam (サノバウィッチ: SabbatOfTheWitch.exe vs SabbatOfTheWitch_crack.exe). */

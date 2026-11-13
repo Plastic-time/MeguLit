@@ -109,6 +109,20 @@ function lzDistance(src,unpacked,{at=0,msb=false,refIsOne=false,token=SIGLUS_TOK
   if(s+1>=src.length)break;const {dist,len}=token(src[s],src[s+1]);s+=2;if(!dist||dist>o){if(strict)throw Error('LZ_DISTANCE');break;}for(let j=0;j<len&&o<unpacked;j++){out[o]=out[o-dist];o++;}}}
  if(strict&&o<unpacked)throw Error('LZ_SHORT');return out.subarray(0,o);}
 const inflate=(b,max=64<<20)=>zlib.inflateSync(b,{maxOutputLength:max}),inflateRaw=(b,max=64<<20)=>zlib.inflateRawSync(b,{maxOutputLength:max});
+/* zstd (NeXAS since ~2016); Node 22.15+ has it built in, an older runtime gets null */
+const zstd=(b,max=64<<20)=>typeof zlib.zstdDecompressSync==='function'?zlib.zstdDecompressSync(b,{maxOutputLength:max}):null;
+/* the container's own compression told by its first bytes: zstd frame, zlib header, else null */
+function unpackAny(b,max){if(b.length>=4&&b.readUInt32LE(0)===0xfd2fb528)return zstd(b,max);if(b.length>=2&&(b[0]&0x0f)===8&&((b[0]<<8)|b[1])%31===0){try{return inflate(b,max);}catch{}}return null;}
+/* E577 the static Huffman coding GARbro calls HuffmanDecoder (NeXAS, CMVS, Lucifen …): the tree first (bit 1 = node, then
+   left and right subtrees; bit 0 = leaf, then 8 bits), then the symbols. order 'msb': bits from each byte high first
+   (GARbro MsbBitStream, NeXAS); 'dword': bits from little-endian dwords low first (GARbro Purple/Cmvs); 'dword-msb':
+   little-endian dwords high bit first (ShiinaRio YH1); a short last dword reads as zero-padded */
+function huffman(src,unpacked,{order='msb',start=0}={}){const out=Buffer.alloc(unpacked),lhs=new Uint16Array(512),rhs=new Uint16Array(512);let p=start,cur=0,left=0,token=256;
+ const bit=()=>{if(!left){if(order!=='msb'){if(p>=src.length)throw new Error('huffman: input ends');cur=0;for(let k=0;k<4&&p<src.length;k++)cur|=src[p++]<<(8*k);cur>>>=0;left=32;}else{if(p>=src.length)throw new Error('huffman: input ends');cur=src[p++];left=8;}}
+  left--;return order==='dword'?(cur>>>(31-left))&1:(cur>>>left)&1;};
+ const bits=n=>{let v=0;while(n--)v=(v<<1)|bit();return v;};
+ const tree=depth=>{if(depth>512)throw new Error('huffman: tree');if(bit()){const v=token++;if(v>=511)throw new Error('huffman: tree');lhs[v]=tree(depth+1);rhs[v]=tree(depth+1);return v;}return bits(8);};
+ const root=tree(0);for(let o=0;o<unpacked;o++){let s=root;while(s>=256)s=bit()?rhs[s]:lhs[s];out[o]=s;}return out;}
 
 /* ---- containers ------------------------------------------------------------------------------------------------- */
 /* table(file, spec) -> [{name, offset, size, unpacked}] or null. spec:
@@ -141,6 +155,18 @@ function table(file,spec,{maxIndex=64<<20}={}){const fsz=size(file);if(fsz<8)ret
    const entry={name:e.name.replace(/\\/g,'/'),offset,size:sz,unpacked:e.unpacked??sz,flags:e.flags};if(spec.validate&&!spec.validate(entry,fsz))return null;out.push(entry);}
   return out;}catch{return null;}}
 const entryRead=(file,e)=>readAt(file,e.offset,e.size);
+/* E578 a resource of a Windows executable: type and name are strings ("EXEC") or numbers; the first language. Engines
+   that compile their scenario into the .exe (Malie EXEC, …) keep it here. -> Buffer or null */
+function peResource(file,type,name=null){try{const mz=readAt(file,0,0x40);if(mz.toString('latin1',0,2)!=='MZ')return null;const pe=mz.readUInt32LE(0x3c),h=readAt(file,pe,0x200);if(h.toString('latin1',0,4)!=='PE  ')return null;
+ const nsec=h.readUInt16LE(6),opt=h.readUInt16LE(20),o=24,magic=h.readUInt16LE(o),dd=o+(magic===0x20b?112:96),rva=h.readUInt32LE(dd+2*8);if(!rva)return null;
+ const secs=readAt(file,pe+24+opt,nsec*40);let sec=null;for(let i=0;i<nsec;i++){const va=secs.readUInt32LE(i*40+12),vs=Math.max(secs.readUInt32LE(i*40+8),secs.readUInt32LE(i*40+16));if(rva>=va&&rva<va+vs)sec={va,raw:secs.readUInt32LE(i*40+20),size:vs};}
+ if(!sec)return null;const rs=readAt(file,sec.raw,Math.min(sec.size,64<<20)),at=r=>r-sec.va+0;
+ const ustr=p=>rs.toString('utf16le',p+2,p+2+rs.readUInt16LE(p)*2);
+ const find=(dir,want)=>{const n=rs.readUInt16LE(dir+12)+rs.readUInt16LE(dir+14);for(let i=0;i<n;i++){const e=dir+16+i*8,id=rs.readUInt32LE(e),off=rs.readUInt32LE(e+4);
+  const key=id&0x80000000?ustr(id&0x7fffffff):id;if(want===null||(typeof want==='string'?typeof key==='string'&&key.toUpperCase()===want.toUpperCase():key===want))return off;}return null;};
+ let d=find(0,type);if(d===null||!(d&0x80000000))return null;d=find(d&0x7fffffff,name);if(d===null)return null;
+ if(d&0x80000000){d=find(d&0x7fffffff,null);if(d===null||d&0x80000000)return null;}
+ const drva=rs.readUInt32LE(d),dsz=rs.readUInt32LE(d+4);return Buffer.from(rs.subarray(at(drva),at(drva)+dsz));}catch{return null;}}
 
 /* ---- text models ------------------------------------------------------------------------------------------------ */
 /* offsets[i] (relative to base) -> the C strings, in table order */
@@ -187,4 +213,4 @@ function engine(def){
  return {id:def.id,hint:def.hint,scenes,archives:scenes,sources:dir=>[...arcFiles(dir),...looseFiles(dir)],parse:buf=>{try{return def.parse(Buffer.isBuffer(buf)?buf:Buffer.from(buf));}catch{return {lines:[],anchors:[]};}},test:def.test||(n=>!!def.loose&&def.loose.name.test(n)),...(def.extra||{})};}
 
 module.exports={readAt,size,head,tail,names,isFile,walk,files,KANA,KANA_G,hasKana,codepage,codepageOf,decodeText,decoder,cstr,trimBoth,ascii,decodeRuns,
- xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,lzDistance,SIGLUS_TOKEN,inflate,inflateRaw,table,entryRead,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine};
+ xor,xorDword,rol,ror,not,msvcRand,xorStream,nibbleSwap,rolBytes,rorBytes,records,lzss,lzDistance,SIGLUS_TOKEN,inflate,inflateRaw,zstd,unpackAny,huffman,table,entryRead,peResource,rdInt,stringTable,pointerTable,opcodeWalk,lineGrammar,engine};
