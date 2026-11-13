@@ -415,9 +415,11 @@ export function openCardMaker({toploaderId=null,from=null,api=null}={}){
    else showError(w.fail.replace('{e}',String(error?.message||error||'')));
    layer.querySelector('.cm-make')?.focus();return;}
   live.textContent='';
-  window.dispatchEvent(new CustomEvent('megulit:cards-changed',{detail:{toploaderId:insert?toploaderId:null,cardId:card?.id??null,card}}));
+  const flightMs=reduced()?0:springCurve(SPRING.smooth).duration,handoffAt=performance.now()+flightMs;
+  const tlEl=insert?document.querySelector('.cw-tl[data-tl="'+CSS.escape(String(toploaderId))+'"]'):null,tr=tlEl?.getBoundingClientRect(),overMouth=tr&&tr.width?{left:tr.left+tr.width*11/168,top:tr.top+tr.height*(-200/226),width:tr.width*146/168,height:tr.height*204/226}:null;
+  window.dispatchEvent(new CustomEvent('megulit:cards-changed',{detail:{toploaderId:insert?toploaderId:null,cardId:card?.id??null,card,handoffAt:overMouth?handoffAt:0}}));
   /* 3 the finished card heads for its Toploader (the wall takes over and plays the insert), the sheet folds away */
-  if(!reduced()){const from=rectOf(frame),to=insert&&origin?{left:origin.left+origin.width*.09,top:origin.top+origin.height*.07,width:origin.width*.82,height:origin.height*.82}:{left:from.left+from.width*.3,top:innerHeight-from.height*.4,width:from.width*.4,height:from.height*.4};
+  if(!reduced()){const from=rectOf(frame),to=overMouth||(insert&&origin?{left:origin.left+origin.width*.09,top:origin.top+origin.height*.07,width:origin.width*.82,height:origin.height*.82}:null)||{left:from.left+from.width*.3,top:innerHeight-from.height*.4,width:from.width*.4,height:from.height*.4};
    const fl=document.createElement('div');fl.className='cm-flight is-card';Object.assign(fl.style,{left:to.left+'px',top:to.top+'px',width:to.width+'px',height:to.height+'px'});
    const face=layer.querySelector('.cm-front').cloneNode(true);face.querySelector('.cm-sweep')?.remove();
    const fw=from.width,fh=from.height;face.style.cssText=`position:absolute;left:0;top:0;width:${fw}px;height:${fh}px;transform-origin:0 0;transform:scale(${to.width/fw},${to.height/fh})`;fl.append(face);document.body.append(fl);
@@ -428,7 +430,9 @@ export function openCardMaker({toploaderId=null,from=null,api=null}={}){
    fl.animate(f,{duration,fill:'forwards'});
    fl.animate([{opacity:1},{opacity:1,offset:.8},{opacity:insert&&origin?1:0}],{duration,fill:'forwards'});
    const sh=document.createElement('i');sh.className='cm-flight-shadow';fl.prepend(sh);sh.animate([{opacity:1},{opacity:0}],{duration,easing:'cubic-bezier(.3,0,.2,1)',fill:'forwards'});
-   setTimeout(()=>{fl.animate([{opacity:1},{opacity:0}],{duration:200,fill:'forwards'}).finished.then(()=>fl.remove(),()=>fl.remove());},duration+(insert?140:0));
+   /* handed over: the wall's own card is in this very place now, the flight just goes */
+   if(overMouth)setTimeout(()=>fl.remove(),duration+34);
+   else setTimeout(()=>{fl.animate([{opacity:1},{opacity:0}],{duration:200,fill:'forwards'}).finished.then(()=>fl.remove(),()=>fl.remove());},duration+(insert?140:0));
   }
   printing=false;close(false,card,true);
  }

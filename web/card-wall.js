@@ -290,13 +290,15 @@ function motion(parts){
    Each sequence takes a ticket; a newer motion on the same toploader invalidates it, and the new one starts from the
    springs' current state, so an interrupted insert turns into an eject (or back) without a jump. */
 const ticket=parts=>(parts.seq=(parts.seq||0)+1);
-async function insertMotion(parts,{from='above'}={}){
+async function insertMotion(parts,{from='above',at=0}={}){
  const t=ticket(parts),s=motion(parts),alive=()=>parts.seq===t;
  s.wall('cy',null);
+ /* handed over from the card maker's flight: the card appears exactly where the flight lands, then goes on in */
+ if(from==='handoff'){s.jump({cy:ABOVE,cx:0,cr:0,co:0});const wait=at-performance.now();if(wait>0)await new Promise(r=>setTimeout(r,wait));if(!alive())return false;s.jump({co:1});}
  if(from==='above'&&s.x.co<.05)s.jump({cy:ABOVE-120,cx:0,cr:-5,co:0});
- /* 1. carried in, squared up over the opening */
- s.to({cy:ABOVE,cx:0,cr:0},{k:150,c:21}).to({co:1},{k:260,c:34});
- await s.until(x=>Math.abs(x.cy-ABOVE)<4&&Math.abs(x.cr)<.6);if(!alive())return false;
+ /* 1. carried in, squared up over the opening (a handed-over card is there already) */
+ if(from!=='handoff'){s.to({cy:ABOVE,cx:0,cr:0},{k:150,c:21}).to({co:1},{k:260,c:34});
+  await s.until(x=>Math.abs(x.cy-ABOVE)<4&&Math.abs(x.cr)<.6);if(!alive())return false;}
  /* 2. a light press: the sleeve gives a little at the mouth and a light runs across the plastic */
  s.to({cy:ABOVE+46},{k:320,c:36}).to({sx:1.016,sy:.993},{k:520,c:40}).to({g:1},{k:46,c:13});
  await s.until(x=>x.cy>ABOVE+30);if(!alive())return false;
@@ -461,7 +463,7 @@ async function refresh(detail){
  for(const id of added){const c=P.cells.get(id);if(c&&onScreen(c))hangMotion(c.parts,added.indexOf(id)*40);}
  /* a card the card maker just made: bring its toploader into view and slide the card in */
  const focus=fresh.find(c=>c.id===detail?.toploaderId)||fresh[0];
- if(focus){await reveal(focus);if(page===P)insertMotion(focus.parts);}
+ if(focus){const at=Number(detail?.handoffAt)||0;if(!at)await reveal(focus);if(page===P)insertMotion(focus.parts,at?{from:'handoff',at}:{});}
  for(const c of fresh)if(c!==focus)insertMotion(c.parts);
 }
 async function addToploaders(count){
