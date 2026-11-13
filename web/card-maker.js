@@ -431,7 +431,11 @@ export function openCardMaker({toploaderId=null,from=null,api=null}={}){
    fl.animate([{opacity:1},{opacity:1,offset:.8},{opacity:insert&&origin?1:0}],{duration,fill:'forwards'});
    const sh=document.createElement('i');sh.className='cm-flight-shadow';fl.prepend(sh);sh.animate([{opacity:1},{opacity:0}],{duration,easing:'cubic-bezier(.3,0,.2,1)',fill:'forwards'});
    /* handed over: the wall's own card is in this very place now, the flight just goes */
-   if(overMouth)setTimeout(()=>fl.remove(),duration+34);
+   /* it waits on the mouth until the wall's own card is in its place (the wall has to read its state first, which can
+      take longer than the flight), then goes in the same frame; if the wall never says so it goes after 3 s */
+   if(overMouth){let gone=false;const go=()=>{if(gone)return;gone=true;removeEventListener('megulit:cards-handoff',onHand);fl.remove();};
+    const onHand=e=>{if(String(e.detail?.toploaderId)===String(toploaderId))requestAnimationFrame(go);};
+    addEventListener('megulit:cards-handoff',onHand);setTimeout(go,Math.max(3000,duration+1500));}
    else setTimeout(()=>{fl.animate([{opacity:1},{opacity:0}],{duration:200,fill:'forwards'}).finished.then(()=>fl.remove(),()=>fl.remove());},duration+(insert?140:0));
   }
   printing=false;close(false,card,true);

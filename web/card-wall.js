@@ -294,7 +294,8 @@ async function insertMotion(parts,{from='above',at=0}={}){
  const t=ticket(parts),s=motion(parts),alive=()=>parts.seq===t;
  s.wall('cy',null);
  /* handed over from the card maker's flight: the card appears exactly where the flight lands, then goes on in */
- if(from==='handoff'){s.jump({cy:ABOVE,cx:0,cr:0,co:0});const wait=at-performance.now();if(wait>0)await new Promise(r=>setTimeout(r,wait));if(!alive())return false;s.jump({co:1});}
+ if(from==='handoff'){s.jump({cy:ABOVE,cx:0,cr:0,co:0});const wait=at-performance.now();if(wait>0)await new Promise(r=>setTimeout(r,wait));if(!alive())return false;s.jump({co:1});
+  dispatchEvent(new CustomEvent('megulit:cards-handoff',{detail:{toploaderId:parts.el.dataset.tl}}));}
  if(from==='above'&&s.x.co<.05)s.jump({cy:ABOVE-120,cx:0,cr:-5,co:0});
  /* 1. carried in, squared up over the opening (a handed-over card is there already) */
  if(from!=='handoff'){s.to({cy:ABOVE,cx:0,cr:0},{k:150,c:21}).to({co:1},{k:260,c:34});
