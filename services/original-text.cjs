@@ -381,12 +381,14 @@ function foreignNear(map,text){const k=foreignKey(text),n=[...k].length;if(n<4||
 /* A sequence of art lines (an opening poem) follows its table: after a line is found, the next one is looked for in the few
    rows after it first, where a picture's own wording of the translation (different from the table's) still finds its row;
    with nothing alike there, the very next row stands for it while the last find is recent (15 s). */
-function foreignSeq(map,now=()=>Date.now()){const seq=Array.isArray(map.seq)&&map.seq.length?map.seq:[...map.entries()],pos=new Map();seq.forEach(([k],i)=>{if(!pos.has(k))pos.set(k,[]);pos.get(k).push(i);});let cands=[],lastAt=0;
- const take=(list,i)=>{cands=list;lastAt=now();return seq[i][1];};
+function foreignSeq(map,now=()=>Date.now()){const seq=Array.isArray(map.seq)&&map.seq.length?map.seq:[...map.entries()],pos=new Map();seq.forEach(([k],i)=>{if(!pos.has(k))pos.set(k,[]);pos.get(k).push(i);});let cands=[],lastAt=0;const jaKey=v=>foreignKey(v),byJa=new Map();seq.forEach(([,v],i)=>{const k=jaKey(v);if(!byJa.has(k))byJa.set(k,[]);byJa.get(k).push(i);});
+ /* the same Japanese line in several tables (a poem reused from a chapter): every copy is a place the sequence can be at */
+ const take=(list,i)=>{const all=new Set(list);for(const x of list)for(const y of byJa.get(jaKey(seq[x][1]))||[])all.add(y);cands=[...all];lastAt=now();return seq[i][1];};
  return text=>{const k=foreignKey(text),n=[...k].length;if(n<2)return '';const recent=cands.length&&now()-lastAt<15000,P=pos.get(k)||[];
   if(P.length){/* the same words in several tables: the row written exactly as drawn (punctuation too) first */const raw=String(text).replace(/\s+/g,''),same=i=>seq[i][2]!=null&&String(seq[i][2]).replace(/\s+/g,'')===raw,order=l=>{const s=l.filter(same);return s.length?s:l;};const near=order(recent?P.filter(i=>cands.some(c=>i>c&&i<=c+5)):[]);if(near.length)return take(near,near[0]);const all=order(P);return take(all,all[0]);}
   if(recent){const A=bigrams(k);let bi=-1,bs=0;for(const c of cands)for(let i=c+1;i<=c+4&&i<seq.length;i++){const s=dice(A,n,seq[i][0]);if(s>bs){bs=s;bi=i;}}
-   if(bi>=0&&bs>=.2)return take([bi],bi);let ni=-1,nd=Infinity;for(const c of cands){if(c+1>=seq.length)continue;const L=[...seq[c+1][0]].length,d=Math.abs(Math.log(Math.max(1,n)/Math.max(1,L)));if(L&&d<Math.log(2)&&d<nd){nd=d;ni=c+1;}}if(ni>=0)return take([ni],ni);}
+   if(bi>=0&&bs>=.1)return take([bi],bi);
+   /* the picture's own wording: the next row, when it shares a word with the read and is about as long */let ni=-1,nd=0;for(const c of cands){const i=c+1;if(i>=seq.length)continue;const s=dice(A,n,seq[i][0]),L=[...seq[i][0]].length;if(s>nd&&n>=L*.6&&n<=L*1.6){nd=s;ni=i;}}if(ni>=0)return take([ni],ni);}
   const ja=foreignNear(map,text);if(ja){const list=[];seq.forEach(([x,v],i)=>{if(v===ja&&Math.abs([...x].length-n)<=Math.max(2,n*.25))list.push(i);});if(list.length)return take(list,list[0]);}return ja;};}
 function liveProvider(root,id,executable){
  const engine=liveEngines()[0],dir=path.dirname(String(executable));let inner=null,stamp=null,checked=0,timer=null;
