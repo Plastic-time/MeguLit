@@ -188,7 +188,6 @@ html:not(#u):not(#v) body .stg .stg-rs button[aria-pressed=true]{background:colo
 html:not(#u):not(#v) body .stg .stg-cal{--accent:#9b2a3a}
 html:not(#u):not(#v) body .stg .stg-cal .cell{border-radius:2px}
 html:not(#u):not(#v) body .stg .stg-cal .cell.blank{border-style:solid;border-color:rgba(255,255,255,.04)}
-html:not(#u):not(#v) body .stg .stg-head h2::before{width:5px;height:5px;background:var(--g-gold);transform:rotate(45deg);margin-right:12px}
 html:not(#u):not(#v) body .stg .stg-tabs button[aria-pressed=true]::after{background:#c82f3b}
 html:not(#u):not(#v) body .stg :is(.stg-foot,.stg-legend,.stg-note,.stg-more,.stg-cal .wd){font-size:12px!important;color:var(--g-t2,#c3ab9c)!important}
 /* read words: the hud on the glass, the status as a note, readable small print */
