@@ -86,6 +86,8 @@ function sources(root,game,opts={}){
   try{const shots=require('./scene-shots.cjs'),d=path.join(root,'data','scene-shots',exeKey(exe));for(const s of shots.list(root,exe)){const f=path.join(d,s.file);if(fs.existsSync(f))out.push({id:'shot:'+s.file,kind:'shot',source:'shot',file:f});}}catch{}
   const saved=new Set();
   if(fs.existsSync(exe)){try{const cg=require('./game-cg.cjs'),r=cg.scan(exe);let names=r.supported?[...r.items.keys()]:[];
+   /* KiriKiri: only explicit cg_ unlock marks count on the wall (the detail card keeps its wider rule) */
+   if(r.engine==='KiriKiri'){const marked=cg.kirikiriMarked(exe)||new Set();names=names.filter(n=>marked.has(n));}
    if(safe&&names.length){const rating=require('./cg-rating.cjs'),known=rating.ratings(path.join(root,'data','cg-cache',sha(path.dirname(String(exe)).toLowerCase()).slice(0,16)));names=names.filter(n=>rating.isSafe(known[n]));}
    for(const n of names){saved.add(n);out.push({id:'save:'+n,kind:'cg',source:'save',name:n});}}catch{}}
   if(!safe){const want=new Set(readSeen(root,exe).filter(n=>!saved.has(n)));const found=looseByName(path.dirname(exe),want);
@@ -94,10 +96,25 @@ function sources(root,game,opts={}){
  return out;}
 function fileOf(root,game,s){if(s.file)return s.file;try{return require('./game-cg.cjs').pictureFile(root,game.executable,s.name)||null;}catch{return null;}}
 
+/* save CGs not decoded yet go to a background worker: the list answers at once with what is ready (cover, shots,
+   decoded CGs) and the page asks cards_pending, then cards_unlocked again, until pending is 0 */
+const warmFile=(root,exe)=>path.join(dirOf(root),'warm-'+exeKey(exe)+'.json');
+function warmBusy(root,exe){try{const v=JSON.parse(fs.readFileSync(warmFile(root,exe),'utf8'));if(Date.now()-v.at<10*60000){try{process.kill(v.pid,0);return true;}catch{}}}catch{}return false;}
+let spawnWarm=function(root,exe,names){
+ if(warmBusy(root,exe))return;const job=path.join(dirOf(root),'warm-'+exeKey(exe)+'-job.json');atomicWrite(job,JSON.stringify({root,exe,names}));
+ const child=require('node:child_process').spawn(process.execPath,[__filename,'--warm',job],{detached:true,stdio:'ignore',windowsHide:true});
+ atomicWrite(warmFile(root,exe),JSON.stringify({pid:child.pid,at:Date.now()}));child.unref();};
+function warm(root,exe,names){const cg=require('./game-cg.cjs');for(const n of names){try{const f=cg.pictureFile(root,exe,n);if(f)scaled(root,[f],THUMB);}catch{}}}
+function split(root,g){
+ const list=sources(root,g),files=new Map(),later=[];
+ for(const s of list){if(s.file){files.set(s.id,s.file);continue;}const f=require('./game-cg.cjs').cachedPicture(root,g.executable,s.name);if(f)files.set(s.id,f);else later.push(s.name);}
+ return {list,files,later};}
 function unlocked(db,root,gameId){
- const g=gameRow(db,gameId),list=sources(root,g),files=new Map();for(const s of list){const f=fileOf(root,g,s);if(f)files.set(s.id,f);}
- const th=scaled(root,[...files.values()],THUMB);
- return list.flatMap(s=>{const t=th.get(files.get(s.id));if(!t)return [];return [{id:s.id,kind:s.kind,source:s.source,src:dataUrl(t.out),w:t.w,h:t.h}];});}
+ const g=gameRow(db,gameId),{list,files,later}=split(root,g);
+ const th=scaled(root,[...files.values()],THUMB),ready=list.flatMap(s=>{const t=th.get(files.get(s.id));if(!t)return [];return [{id:s.id,kind:s.kind,source:s.source,src:dataUrl(t.out),w:t.w,h:t.h}];});
+ if(later.length)spawnWarm(root,g.executable,later);
+ return ready;}
+function pending(db,root,gameId){const g=gameRow(db,gameId),{later}=split(root,g);if(later.length)spawnWarm(root,g.executable,later);return {pending:later.length};}
 /* one unlocked picture at viewing size, for the framing step */
 function image(db,root,gameId,srcId){
  const g=gameRow(db,gameId),s=sources(root,g).find(x=>x.id===String(srcId||''));if(!s)throw Error('CARD_SOURCE_LOCKED');
@@ -141,6 +158,7 @@ function handle(db,root,r){
   case 'cards_state':return state(root);
   case 'cards_games':return games(db,root);
   case 'cards_unlocked':return unlocked(db,root,r.gameId);
+  case 'cards_pending':return pending(db,root,r.gameId);
   case 'cards_image':return image(db,root,r.gameId,r.srcId);
   case 'cards_create':return create(db,root,r);
   case 'cards_delete':return remove(root,String(r.cardId||''));
@@ -150,4 +168,5 @@ function handle(db,root,r){
   case 'cards_set_mode':return setMode(root,r.mode);
  }
  throw Error('UNKNOWN_ACTION');}
-module.exports={handle,state,games,unlocked,image,create,sources,noteSeen,readState,_setRunner:f=>{runner=f;},DEFAULT_TOPLOADERS};
+module.exports={handle,state,games,unlocked,image,create,sources,noteSeen,readState,_setRunner:f=>{runner=f;},_setSpawnWarm:f=>{spawnWarm=f;},warm,DEFAULT_TOPLOADERS};
+if(require.main===module&&process.argv[2]==='--warm'){try{const j=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));try{warm(j.root,j.exe,j.names);}finally{try{fs.rmSync(warmFile(j.root,j.exe),{force:true});fs.rmSync(process.argv[3],{force:true});}catch{}}}catch{}}
