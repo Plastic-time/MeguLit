@@ -54,12 +54,12 @@ MeguLit 对一款游戏的支持分三层：
 | Yuka | 66 | 66 | 2 | 🆕 | 🟡 GARbro（.ykc） | ⚪ |  |
 | MAGES. | 60 | 60 | 51 | ✅ | ✅ script.mpk SC3（日版） | ◎ MAGES 内嵌 + ✅ |  |
 | DxLib | 62 | 58 | 21 | ✅ | 🟡 GARbro（.dxa） | ✅ |  |
-| Silky's | 57 | 55 | 52 | 🆕 | 🟡 GARbro（.ifl/.arc） | ⚪ |  |
+| Silky's | 57 | 55 | 52 | 🆕 | 🆕 silky.cjs：Silky .arc / IFL + .mes 操作码遍历（E576） | ⚪ |  |
 | EAGLS | 53 | 53 | 16 | 🆕 | 🟡 GARbro（.pak+.idx） | ✅ |  |
 | Musica (PAZ) | 54 | 53 | 25 | 🆕 | ✅ scr.dat / *.paz（paz.cjs） | ✅ | 原来有读取器但库里是未知引擎 |
 | Seraph | 63 | 53 | 0 | 🆕（ArchPac.dat） | ❌ | ⚪ |  |
 | SystemC | 53 | 52 | 33 | ❌ | ❌ | ⚪ | 2016 后 33 |
-| RPG Maker | 752 | 46 | 44 | ✅ | ✅ MV/MZ JSON；VX/XP（rgss）只检测 | ⚪ MV/MZ；✅ VX/XP |  |
+| RPG Maker | 752 | 46 | 44 | ✅ | ✅ MV/MZ JSON；🆕 XP/VX/VX Ace：RGSSAD + Ruby Marshal，与 MV 共用消息遍历（E574） | ⚪ MV/MZ；✅ VX/XP |  |
 | CMVS (Purple) | 44 | 44 | 26 | 🆕 | 🟡 GARbro（.cpz，新版 cpz7 未必能开） | ✅ |  |
 | Lucifen | 48 | 44 | 4 | 🆕 | 🟡 GARbro（.lpk） | ⚪ |  |
 | Tmr-Hiro ADV | 40 | 39 | 29 | ❌ | ❌ | ⚪ | .pac 无魔数 |
@@ -69,7 +69,7 @@ MeguLit 对一款游戏的支持分三层：
 | Interheart FPK | 33 | 33 | 0 | ❌ | 🟡 GARbro（.fpk） | ⚪ |  |
 | SakanaGL | 32 | 32 | 32 | 🆕（sakanagl.dll） | ❌ | ✅（LunaHook 有 sakanagl hook） | 2016 后 32 |
 | Diesel Engine | 31 | 31 | 27 | ❌ | ❌ | ⚪ |  |
-| AI5WIN / AI6WIN (elf/Silky) | 31 | 31 | 11 | 🆕（AI5WIN/AI6WIN.exe） | 🟡 GARbro（.arc） | ⚪ |  |
+| AI5WIN / AI6WIN (elf/Silky) | 31 | 31 | 11 | 🆕（AI5WIN/AI6WIN.exe） | 🆕 silky.cjs：AI6WIN 完整；AI5WIN 归档 + 通用扫描（E576） | ⚪ |  |
 | LC-ScriptEngine | 41 | 30 | 0 | ✅ | ❌ | ✅ |  |
 | NEKOPACK / NekoSDK | 30 | 30 | 10 | 🆕 | 🟡 GARbro（.dat/.pak） | ⚪ |  |
 | PIX STUDIO | 28 | 28 | 27 | ❌ | ❌ | ⚪ |  |
