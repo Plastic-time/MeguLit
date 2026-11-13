@@ -20,7 +20,7 @@
  let autoSpoken={key:'',at:0};const minedKeys=new Set();
  b.decorateWordActions=(card,args,result,opts={})=>{if(!card||!args)return;card.querySelector('.tomoyo-v4-actions')?.remove();const box=el('div'),status=el('small'),
   pitch=el('div'),audio=button('🔊',()=>act('speak')),anki=button('＋ Anki',()=>{if(!ankiBusy&&!minedKeys.has(minedKey()))act('anki');});box.className='tomoyo-v4-actions';
-  let ankiBusy=false;const minedKey=()=>[args.text,args.start,args.end,args.entryId||''].join('|'),markMined=()=>{anki.textContent='✓ 已加入';anki.title='这个词已从这句加入 Anki';
+  let ankiBusy=false;const minedKey=()=>[args.text,args.start,args.end,args.entryId||''].join('|'),markMined=()=>{anki.dataset.state='done';anki.dataset.mgIcon='1';anki.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>已加入</span>';anki.title='这个词已从这句加入 Anki';
   };if(minedKeys.has(minedKey())){anki.disabled=true;markMined();}audio.setAttribute('aria-label','朗读当前词');audio.title='使用 AivisSpeech 朗读当前词';pitch.hidden=true;
   pitch.className='tomoyo-pitch-choices';pitch.setAttribute('role','radiogroup');pitch.setAttribute('aria-label','选择音调');let pitchValue;anki.className='tomoyo-anki-button';
   audio.className='tomoyo-speak-button';box.append(audio,pitch,anki);const keep=b.savedSentences;let keepButton=null;if(keep){/* 收藏句子 on every lookup card (user 2026-11-13: a click-lookup card had no button): the whole line the word sits in */keepButton=button('',
@@ -92,7 +92,7 @@
     return (await request('ankiScreenshot',bounds,5000)).id;
    }catch{}finally{card.classList.remove('megulit-mining-capture');document.body.classList.remove('megulit-capturing');}
   }
-  async function act(action){if(action==='anki'){if(ankiBusy)return;ankiBusy=true;}audio.disabled=anki.disabled=true;status.textContent=action==='speak'?'合成读音中…':'同步 Anki 中…';
+  async function act(action){if(action==='anki'){if(ankiBusy)return;ankiBusy=true;anki.dataset.state='busy';}audio.disabled=anki.disabled=true;status.textContent=action==='speak'?'合成读音中…':'同步 Anki 中…';
    const started=Date.now(),ticker=action==='speak'?setInterval(()=>{if(!alive())return;const s=Math.round((Date.now()-started)/1000);status.textContent='合成读音中… '+s+' 秒'+(s>=5?'（语音引擎首次启动或加载模型会慢一些）':'');
    },1000):0;try{const value=await request(action,{...scope,pitchChoice:pitch.hidden?undefined:pitchValue,...(action==='anki'?{aiNote:card.__megulitAi||undefined,
    translation:currentTranslation(scope.text),screenshotId:(await(card.__megulitShot||Promise.resolve(null)).then(v=>v&&Date.now()-v.at<170000?v.id:null).catch(()=>null).finally(()=>{
@@ -104,7 +104,7 @@
    if(value.sentenceAudioSource){const labels={game:['例句：游戏原声','Example: game voice','例文：ゲーム音声'],synthesized:['例句：合成语音','Example: synthesized voice','例文：合成音声']};
    const lang=document.documentElement.lang;status.textContent+=' · '+labels[value.sentenceAudioSource][lang.startsWith('ja')?2:lang.startsWith('en')?1:0];}try{
    window.__tomeAnkiMined?.({entry:result?.entries?.find(e=>e.id===entryId)||result?.entries?.[0],args,noteId:value.id,word});}catch{}}}catch(e){if(alive())status.textContent=e.message;
-   }finally{clearInterval(ticker);if(action==='anki')ankiBusy=false;if(alive()){audio.disabled=false;anki.disabled=minedKeys.has(minedKey());if(anki.disabled)markMined();
+   }finally{clearInterval(ticker);if(action==='anki'){ankiBusy=false;if(anki.dataset.state==='busy')delete anki.dataset.state;}if(alive()){audio.disabled=false;anki.disabled=minedKeys.has(minedKey());if(anki.disabled)markMined();
    }}}
   request('word',scope).then(value=>{if(!alive())return;word=value;status.textContent=(value.pronunciationForm==='lemma'?'原形朗读：':'')+(value.reading||value.surface)+(value.pitch?.length?' · 音调 '+value.pitch.join(' / '):'')+' · '+value.pitchSource;
    if(value.pitch?.length>1){pitch.hidden=false;const morae=(value.reading.match(/[ぁ-ゖァ-ヺー][ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ]?/g)||[]);const pick=p=>{pitchValue=p;for(const c of pitch.children)c.setAttribute('aria-checked',

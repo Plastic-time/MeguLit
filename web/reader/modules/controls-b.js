@@ -85,17 +85,31 @@ ${R} body{
  & .tomoyo-selection-card :is(.mg-ai-btn,.tomoyo-save-sentence-button){display:inline-flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;gap:6px!important;height:32px!important;min-height:32px!important;max-height:32px!important;width:auto!important;min-width:0!important;padding:0 12px!important;font:500 12.5px/1 var(--mgc-ui)!important;letter-spacing:.02em!important;white-space:nowrap!important}
  & .tomoyo-selection-card .mg-ai-btn svg{width:15px!important;height:15px!important;flex:none!important;margin:0!important;color:inherit!important;fill:currentColor!important;stroke:currentColor!important;stroke-width:1.6!important;stroke-linecap:round!important;stroke-linejoin:round!important}
  & .tomoyo-selection-card .mg-ai-btn[aria-pressed=true]{background:var(--mgc-red)!important;border-color:var(--mgc-red)!important;color:#fff!important}
- & .tomoyo-selection-card .tomoyo-anki-button{display:inline-flex!important;align-items:center!important;gap:6px!important;height:30px!important;min-height:30px!important;padding:0 14px!important;border:1px solid var(--mgc-red)!important;border-radius:var(--mgc-r)!important;background:var(--mgc-red)!important;color:#fff!important;font:600 13px/1 var(--mgc-ui)!important;box-shadow:none!important;transform:none!important;transition:background-color var(--mgc-t)!important}
- & .tomoyo-selection-card .tomoyo-anki-button:hover:not(:disabled){background:var(--mgc-red-hi)!important;border-color:var(--mgc-red-hi)!important;box-shadow:inset 0 -2px 0 var(--mgc-red-lo)!important}
- & .tomoyo-selection-card .tomoyo-anki-button:active:not(:disabled){background:var(--mgc-red-lo)!important;border-color:var(--mgc-red-lo)!important;box-shadow:none!important}
- & .tomoyo-selection-card .tomoyo-anki-button:disabled{background:transparent!important;border:1px dashed color-mix(in srgb,var(--mgc-ink) 25%,transparent)!important;color:var(--mgc-ink-3)!important}
+ & .tomoyo-selection-card .tomoyo-anki-button{position:relative!important;display:inline-flex!important;align-items:center!important;gap:7px!important;height:32px!important;min-height:32px!important;padding:0 18px 0 12px!important;border:0!important;border-radius:var(--mgc-r) 0 var(--mgc-r) var(--mgc-r)!important;background:var(--mgc-red)!important;color:#fff!important;font:600 13px/1 var(--mgc-ui)!important;letter-spacing:.03em!important;box-shadow:none!important;outline:none!important;overflow:hidden!important;transform:none!important;filter:none!important;opacity:1!important;cursor:pointer!important;clip-path:polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,0 100%)!important;transition:background-color var(--mgc-t),color var(--mgc-t),box-shadow var(--mgc-t)!important}
+  /* 切角 (user pick 2026-11-13): a flash-card corner folded back in deeper red */
+ & .tomoyo-selection-card .tomoyo-anki-button::after{content:''!important;position:absolute!important;top:0!important;right:0!important;width:9px!important;height:9px!important;background:linear-gradient(225deg,transparent 50%,var(--mgc-red-lo) 50%)!important;pointer-events:none!important}
+ & .tomoyo-selection-card .tomoyo-anki-button svg{width:14px!important;height:14px!important;flex:none!important;fill:none!important;stroke:currentColor!important;stroke-width:2.6!important;stroke-linecap:round!important;stroke-linejoin:round!important;animation:none!important}
+ & .tomoyo-selection-card .tomoyo-anki-button:focus-visible{box-shadow:inset 0 0 0 2px var(--mgc-focus)!important}
+ & .tomoyo-selection-card .tomoyo-anki-button:hover:not(:disabled){background:var(--mgc-red-hi)!important}
+ & .tomoyo-selection-card .tomoyo-anki-button:active:not(:disabled){background:var(--mgc-red-lo)!important}
+ & .tomoyo-selection-card .tomoyo-anki-button:active:not(:disabled)::after{background:linear-gradient(225deg,transparent 50%,var(--mgc-red-deep) 50%)!important}
+ & .tomoyo-selection-card .tomoyo-anki-button:disabled:not([data-state]){opacity:.55!important;cursor:default!important}
+  /* syncing: deeper red, a short white line sweeps along the bottom edge */
+ & .tomoyo-selection-card .tomoyo-anki-button[data-state=busy]{background:var(--mgc-red-lo)!important;color:rgba(255,255,255,.8)!important;cursor:progress!important}
+ & .tomoyo-selection-card .tomoyo-anki-button[data-state=busy]::after{background:linear-gradient(225deg,transparent 50%,var(--mgc-red-deep) 50%)!important}
+ & .tomoyo-selection-card .tomoyo-anki-button[data-state=busy]::before{content:''!important;position:absolute!important;left:0!important;bottom:0!important;width:40%!important;height:2px!important;background:rgba(255,255,255,.75)!important;animation:megulit-anki-sweep 1.1s cubic-bezier(.45,0,.55,1) infinite!important;pointer-events:none!important}
+  /* added: neutral frame, red check; the cut corner is closed by a 1px diagonal so it reads as cut, not broken */
+ & .tomoyo-selection-card .tomoyo-anki-button[data-state=done]{background:transparent!important;color:var(--mgc-ink-2)!important;box-shadow:inset 0 0 0 1px var(--mgc-line)!important;cursor:default!important}
+ & .tomoyo-selection-card .tomoyo-anki-button[data-state=done] svg{color:var(--mgc-red-ink)!important}
+ & .tomoyo-selection-card .tomoyo-anki-button[data-state=done]::after{background:linear-gradient(225deg,transparent calc(50% - .7px),var(--mgc-line) calc(50% - .7px) calc(50% + .7px),transparent calc(50% + .7px))!important}
  & .tomoyo-selection-card .tomoyo-speak-button{border-radius:var(--mgc-r)!important;border:1px solid var(--mgc-line)!important;background:transparent!important;box-shadow:none!important;transform:none!important}
  & .tomoyo-selection-card .tomoyo-word-facts>span{border-radius:var(--mgc-r)!important;border-color:var(--mgc-line)!important;color:var(--mgc-ink-2)!important;font-weight:600}
  & .tomoyo-selection-card .tomoyo-word-facts>.tomoyo-word-jlpt{border-color:color-mix(in srgb,var(--mgc-red) 55%,transparent)!important;color:var(--mgc-ink)!important;font-weight:800}
  & .tomoyo-selection-card .tomoyo-speak-button:hover{background:var(--mgc-tint)!important;border-color:color-mix(in srgb,var(--mgc-ink) 50%,transparent)!important}
  & .tomoyo-selection-card footer button:is(.active,.on,.is-on,[aria-pressed=true]){background:var(--mgc-red)!important;border-color:var(--mgc-red)!important;color:#fff!important}
 }
-@media (prefers-reduced-motion:reduce){${R} body :is(.tomoyo-cn-dialog,.tomoyo-selection-card,.tome-backlog) *{transition:none!important}}
+@keyframes megulit-anki-sweep{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+@media (prefers-reduced-motion:reduce){${R} body :is(.tomoyo-cn-dialog,.tomoyo-selection-card,.tome-backlog) *{transition:none!important}${R} body .tomoyo-selection-card .tomoyo-anki-button[data-state=busy]::before{animation:none!important;width:100%!important;opacity:.5}}
 `;
  const style=document.createElement('style');style.id='megulit-controls-b';style.textContent=css;document.head.appendChild(style);
  /* The reader's appearance is applied as --theme-* on <html> (bootstrap.js). Mirror its light / dark choice onto the
