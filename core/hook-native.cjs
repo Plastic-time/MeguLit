@@ -2,7 +2,11 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process'),{createInterface}=require('node:readline');
 const {identifierNoise}=require('./text-noise.cjs');const {ChoiceCapture,placeChoices,SYMBOL_OPTION}=require('./choice-capture.cjs');const {DoubleLine}=require('./double-line.cjs');
-function cleanSource(text,name='',code=''){if(code.endsWith(':JIT:UNITY'))text=text.replace(/<br\s*\/?>/gi,'\n').replace(/<ruby[^>]*>(.*?)<\/ruby>/gis,'$1').replace(/<\/?(?:color|size|font|b|i|u|s|mark|align|line-height|cspace|mspace|indent|margin|voffset|alpha|link|style|noparse|sprite)(?:[=\s][^>]*)?>/gi,'');return text.replace(/\r\n?/g,'\n').replace(/\x05/g,/^BGI(?:\.exe)?$/i.test(name)?'\n':'').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,'');}
+/* #148 (WHITE ALBUM2, AQUAPLUS: phone lines came as 「<F16「やぁ…」>」): inline engine tags of one ASCII letter (+ up to 3
+   digits) wrapped straight around Japanese text are unwrapped for every engine; <R漢字|かな> keeps its base. HTML-like tags
+   (<br>, <b>) are never touched: the letter must be followed by non-ASCII text. */
+function unwrapTags(text){let s=String(text),prev;do{prev=s;s=s.replace(/<R([^<>|\x00-\x7f][^<>|]*)\|[^<>]*>/g,'$1').replace(/<[A-Za-z]\d{0,3}(?=[^\x00-\x7f])([^<>]*)>/g,'$1');}while(s!==prev);return s;}
+function cleanSource(text,name='',code=''){if(code.endsWith(':JIT:UNITY'))text=text.replace(/<br\s*\/?>/gi,'\n').replace(/<ruby[^>]*>(.*?)<\/ruby>/gis,'$1').replace(/<\/?(?:color|size|font|b|i|u|s|mark|align|line-height|cspace|mspace|indent|margin|voffset|alpha|link|style|noparse|sprite)(?:[=\s][^>]*)?>/gi,'');text=unwrapTags(text);return text.replace(/\r\n?/g,'\n').replace(/\x05/g,/^BGI(?:\.exe)?$/i.test(name)?'\n':'').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,'');}
 /* A speaker name from a name stream: brackets and control marks stripped; anything that reads like a sentence is not a name. */
 function speakerName(raw){const n=String(raw||'').replace(/[\x00-\x1f]/g,'').replace(/^[\s【\[「『(（]+|[\s】\]」』)）:：]+$/gu,'').trim();if(n.length%2===0&&n.length>=4&&n.slice(0,n.length/2)===n.slice(n.length/2))return speakerName(n.slice(0,n.length/2)); /* a name stream that sends the name twice (時雨時雨) */
  return n&&n.length<=16&&(/^[?？]+$/.test(n)||!/[。、！？!?…]/.test(n))?n:'';}
