@@ -14,6 +14,10 @@
 //  - a clip the DLL saw cut off (stopped before it could play out) near the next line (the user clicked on) is partial: a full hearing of the
 //    same line (later, or replayed from the backlog in another session) replaces it.
 // Script voice commands ("voice mgm0001" next to a line) complete the map when the DLL saw the clip's file name.
+// Middleware that mixes on its own (CRI ADX2, Wwise; modules/AudioMore.cpp) gives no PCM, only which cue started:
+// events.jsonl lines with no file and name "<acb>|<cue>" or a Wwise event. A cue names one sound for good, so its first
+// line binding is kept (voice-map.json cues: name -> line) and a script voice name/number matching the cue wins over time.
+// Cue-only lines have no clip to play yet (lookup() stays null, cueFor() gives the cue for later extraction).
 const fs=require('node:fs'),path=require('node:path');
 const dump=require('./runtime-dump.cjs');
 const gameVoice=require('./game-voice.cjs');
@@ -40,6 +44,10 @@ const events=gameDir=>{const d=voiceDir(gameDir),at=e=>({...e,path:path.join(d,e
  const played=readJsonl(path.join(d,'events.jsonl')).filter(e=>e&&e.file&&Number.isFinite(e.start)).map(at);
  const read=readJsonl(path.join(d,'files.jsonl')).filter(e=>e&&e.file&&Number.isFinite(e.start)&&e.bytes<=FILE_MAX&&!/[\\/]runtime-dump[^\\/]*[\\/]/i.test(e.source||'')/* never our own output */).map(e=>({...at(e),raw:true,read:true,ms:e.ms||0}));
  return [...played,...read];};
+// Cue-only events (CRI / Wwise): {start, name, api}, shaped as raw clips so match() treats them like sounds.
+const CUE_APIS=new Set(['cri','wwise']);
+const cues=gameDir=>readJsonl(path.join(voiceDir(gameDir),'events.jsonl')).filter(e=>e&&!e.file&&CUE_APIS.has(e.api)&&e.name&&Number.isFinite(e.start))
+ .map(e=>({start:e.start,ms:0,raw:true,cue:String(e.name),api:e.api,crc:'cue:'+e.api+':'+e.name,file:''}));
 const lines=gameDir=>readJsonl(path.join(voiceDir(gameDir),'lines.jsonl')).filter(l=>l&&l.text&&Number.isFinite(l.t));
 
 // Pure matcher: lines [{text,t}] and clips [{start,ms,crc,stopped,...}] -> [{text, clip, partial, gap}].
@@ -79,31 +87,49 @@ const norm=t=>gameVoice.norm(t);
 function mapFile(gameDir){return path.join(voiceDir(gameDir),'voice-map.json');}
 function loadMap(gameDir){try{const m=JSON.parse(fs.readFileSync(mapFile(gameDir),'utf8'));if(m&&m.lines)return m;}catch{}return {schema:1,lines:{}};}
 // A better entry wins: script-confirmed > full > partial; between equals the longer clip.
-function better(a,b){if(!b)return true;const r=x=>(x.src==='script'?4:0)+(x.partial?0:2);if(r(a)!==r(b))return r(a)>r(b);return (a.ms||0)>(b.ms||0);}
-function put(map,text,entry){const k=norm(text);if(!k)return false;if(!better(entry,map.lines[k]))return false;map.lines[k]={...entry,text};return true;}
+function better(a,b){if(!b||!b.file)return !!a.file||!b;const r=x=>(x.src==='script'?4:0)+(x.partial?0:2);if(r(a)!==r(b))return r(a)>r(b);return (a.ms||0)>(b.ms||0);}
+const CUE_KEYS=['cue','cueApi','cueSrc'];
+function put(map,text,entry){const k=norm(text);if(!k)return false;const old=map.lines[k];if(!better(entry,old))return false;
+ const keep={};if(old)for(const f of CUE_KEYS)if(old[f]!==undefined)keep[f]=old[f];/* a clip arriving later keeps the line's cue */
+ map.lines[k]={...keep,...entry,text};return true;}
+// Binds a cue to a line. A cue already bound stays where it is unless a script names it (src 'script').
+function putCue(map,text,cue,api,src){const k=norm(text);if(!k)return false;const cs=map.cues||(map.cues={});
+ if(src!=='script'&&map.lines[k]&&map.lines[k].cueSrc==='script')return false;
+ const was=cs[cue];if(was&&(was.src==='script'||src!=='script'))return false;
+ if(was&&was.key!==k&&map.lines[was.key]&&map.lines[was.key].cue===cue){const o=map.lines[was.key];if(o.file){delete o.cue;delete o.cueApi;delete o.cueSrc;}else delete map.lines[was.key];}
+ cs[cue]={key:k,src};const e=map.lines[k]||{text,src:'cue'};map.lines[k]={...e,cue,cueApi:api,cueSrc:src};return true;}
 
 // Reads everything recorded so far for this game and updates voice-map.json. Returns {lines, voiced, added}.
 function build(gameDir,{script}={}){const map=loadMap(gameDir),ls=lines(gameDir),cs=events(gameDir).filter(c=>fs.existsSync(c.path));let added=0;
  for(const m of match(ls,cs)){const c=m.clip,f=c.enc||c;/* the read file is whole even when its playback was cut */
   if(put(map,m.text,{file:f.file,fmt:f.fmt||'wav',ms:c.ms,partial:c.enc?false:m.partial,src:c.enc?'time+file':c.read?'file':'time',gap:m.gap}))added++;}
- if(script)added+=fromScript(gameDir,script,map,cs);
+ const cl=cues(gameDir);
+ if(script)added+=fromScript(gameDir,script,map,cs,cl);/* names first: a cue a script names never goes to a line by time */
+ for(const m of match(ls,cl))if(putCue(map,m.text,m.clip.cue,m.clip.api,'time'))added++;
  writeJSON(mapFile(gameDir),map);
  return {lines:new Set(ls.map(l=>norm(l.text))).size,voiced:Object.keys(map.lines).length,added};}
 // Script pairs [{text, voice}] (voice: the file name or number the script plays): a clip whose opened file name matches.
-function fromScript(gameDir,pairs,map=null,cs=null){const own=!map;map=map||loadMap(gameDir);cs=cs||events(gameDir);
+function fromScript(gameDir,pairs,map=null,cs=null,cl=null){const own=!map;map=map||loadMap(gameDir);cs=cs||events(gameDir);cl=cl||cues(gameDir);
  const stem=s=>String(s||'').replace(/\\/g,'/').split('/').pop().replace(/\.[a-z0-9]{2,5}$/i,'').toLowerCase();
  const byName=new Map();for(const c of cs){const k=stem(c.name||c.source);if(k&&(!byName.has(k)||c.ms>byName.get(k).ms))byName.set(k,c);}
- let added=0;for(const p of pairs||[]){const c=byName.get(stem(p.voice));if(c&&put(map,p.text,{file:c.file,ms:c.ms,partial:false,src:'script'}))added++;}
+ // Cue names: the part after '|' (CRI) or the whole event (Wwise); numbers compare as numbers ("id:42" = "0042").
+ const cueKey=s=>{let t=String(s||'');t=t.slice(t.lastIndexOf('|')+1).replace(/^(id|index|wave):/,'');t=stem(t);return /^\d+$/.test(t)?String(+t):t;};
+ const byCue=new Map();for(const c of cl){const k=cueKey(c.cue);if(k&&!byCue.has(k))byCue.set(k,c);}
+ let added=0;for(const p of pairs||[]){const c=byName.get(stem(p.voice));if(c&&put(map,p.text,{file:c.file,ms:c.ms,partial:false,src:'script'}))added++;
+  const q=byCue.get(cueKey(p.voice));if(q&&putCue(map,p.text,q.cue,q.api,'script'))added++;}
  if(own)writeJSON(mapFile(gameDir),map);return added;}
 
 // The game's own clip for a line, or null (then the caller speaks it with AI).
-function lookup(gameDir,text){const k=norm(text);if(!k)return null;const e=loadMap(gameDir).lines[k];if(!e)return null;
+function lookup(gameDir,text){const k=norm(text);if(!k)return null;const e=loadMap(gameDir).lines[k];if(!e||!e.file)return null;
  const file=path.join(voiceDir(gameDir),e.file);return fs.existsSync(file)?{...e,path:file}:null;}
+
+// The middleware cue bound to a line ({cue, api, src}), or null.
+function cueFor(gameDir,text){const k=norm(text);const e=k&&loadMap(gameDir).lines[k];return e&&e.cue?{cue:e.cue,api:e.cueApi,src:e.cueSrc}:null;}
 
 // Hands full (not partial) clips to game-voice, so every place that already asks game-voice.find() for a line's voice
 // (learning page, saved sentences, Anki cards) plays them without knowing about this module.
 function publish(root,gameDir){const map=loadMap(gameDir);let n=0;
- for(const e of Object.values(map.lines)){if(e.partial)continue;let b;try{b=fs.readFileSync(path.join(voiceDir(gameDir),e.file));}catch{continue;}
+ for(const e of Object.values(map.lines)){if(e.partial||!e.file)continue;let b;try{b=fs.readFileSync(path.join(voiceDir(gameDir),e.file));}catch{continue;}
   if(gameVoice.remember(root,e.text,b,{game:'runtime'}))n++;}
  return n;}
 
@@ -114,4 +140,4 @@ function recorder(root,exeOf,{every=60000,settle=4000}={}){let timer=null,last=0
  return text=>{try{const exe=exeOf&&exeOf();if(!exe)return;const dir=path.dirname(String(exe));if(!enabled(dir))return;noteLine(dir,text);
   if(timer)clearTimeout(timer);timer=setTimeout(()=>run(dir),Math.max(settle,every-(Date.now()-last)));timer.unref?.();}catch{}};}
 
-module.exports={recorder,enabled,noteLine,events,lines,match,build,fromScript,lookup,publish,voiceDir,_const:{LEAD,LAG,MIN_MS,MAX_MS,SE_REPEAT,CUT_GAP}};
+module.exports={recorder,enabled,noteLine,events,cues,lines,match,build,fromScript,lookup,cueFor,publish,voiceDir,_const:{LEAD,LAG,MIN_MS,MAX_MS,SE_REPEAT,CUT_GAP}};
