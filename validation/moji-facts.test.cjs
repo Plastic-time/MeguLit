@@ -33,5 +33,5 @@ test('reader serves mojiFacts and the card paints it next to the class',()=>{
  assert.match(reader,/action==='mojiFacts'\)return await require\('\.\/moji-dictionary\.cjs'\)\.cachedFacts/);
  const card=fs.readFileSync(path.join(__dirname,'../web/reader/modules/selection.js'),'utf8');
  assert.match(card,/request\('mojiFacts',\{word,reading\}/);
- assert.match(card,/tomoyo-word-jlpt/);assert.match(card,/'热度 '\+views/);
+ assert.match(card,/tomoyo-word-jlpt/);assert.match(card,/'被查 '\+views/);
 });

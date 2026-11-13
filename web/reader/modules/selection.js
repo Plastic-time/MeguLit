@@ -66,7 +66,7 @@
  const views=n=>n>=10000?(n/10000).toFixed(n>=100000?0:1).replace(/\.0$/,'')+'万':String(n);
  function paintFacts(cell,f){const pos=[(f.partOfSpeech||[]).join('·'),f.verbType].filter(Boolean).join('·');if(pos){cell.textContent=pos;cell.title='MOJi 辞書词性'+(f.verbGroup?'（'+f.verbGroup+'动词）':'');}
   const tags=el('span','tomoyo-word-facts');if(f.jlpt){const n=el('span','tomoyo-word-jlpt',f.jlpt);n.title='JLPT '+f.jlpt+'（MOJi 标签：'+(f.jlptAll||[f.jlpt]).join(' · ')+'）';tags.append(n);}
-  if(Number.isFinite(f.views)){const n=el('span','tomoyo-word-freq','热度 '+views(f.views));n.title='MOJi 辞書查词次数 '+f.views.toLocaleString('zh-CN');tags.append(n);}
+  if(Number.isFinite(f.views)){const n=el('span','tomoyo-word-freq','被查 '+views(f.views)+' 次');n.title='在 MOJi 辞書被查过 '+f.views.toLocaleString('zh-CN')+' 次，越多说明越常碰到';tags.append(n);}
   if(tags.childElementCount){cell.querySelector('.tomoyo-word-facts')?.remove();cell.classList.add('has-facts');cell.append(tags);}}
  function wordHeader(result,entry,parent){const m=result.morphology||{},line=el('div','tomoyo-word-heading'),word=el('strong','',m.base||entry?.spellings?.[0]||result.surface);
   line.append(word);if(m.forms?.length){const shape=el('span','tomoyo-word-form');shape.append(el('b','',m.surface+' · '+m.forms.join(' · ')),el('small','',m.rules.join('；')));
