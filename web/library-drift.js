@@ -11,6 +11,7 @@
    the current value. Each frame writes transform and opacity on classless <mg-cell> wrappers, nothing else.
    Reduced motion: a still scatter, and the matches step onto the rails without flight. */
 import {loadGsap} from './gsap-loader.js';
+import {capsuleY} from './grimoire.js';
 
 const CW=168,CH=250,FOCUS=.42,TURN=60000;
 const calm=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -87,7 +88,7 @@ function drawRails(geo){
 }
 
 /* the rails turn around the search capsule, which sits above the field's middle */
-function podCentre(){const h=S.host,p=S.pod;if(!h||!p)return S.H/2;const a=p.getBoundingClientRect(),b=h.getBoundingClientRect(),y=a.top+a.height/2-b.top;return y>0&&y<S.H?y:S.H/2;}
+function podCentre(){const h=S.host,p=S.pod;if(!h||!p)return S.H/2;const y=capsuleY(p,h);return y>0&&y<S.H?y:S.H/2;}
 function measure(){
  const h=S.host;if(!h)return;S.W=h.clientWidth;S.H=h.clientHeight;S.podW=S.pod?.offsetWidth||360;S.podH=S.pod?.offsetHeight||44;S.cx=S.W/2;S.cy=podCentre();
  if(S.hits)assignSlots([...S.covers.values()].filter(c=>S.hits.has(c.id)));

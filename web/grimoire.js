@@ -286,6 +286,11 @@ export function spreadTwins(items){
  for(const el of wait){const at=out.findIndex((e,i)=>key(e)!==key(el)&&(i===0||key(out[i-1])!==key(el)));out.splice(at<0?out.length:at,0,el);}
  return out;
 }
+/* the capsule's centre in the host's layout space: offsets plus the capsule's own static transform, so host scales and
+   capsule glides (translate) never move it */
+export function capsuleY(pod,host){const top=el=>{let y=0,n=el;while(n){y+=n.offsetTop;n=n.offsetParent;}return y;};
+ let shift=0;try{const m=new DOMMatrixReadOnly(getComputedStyle(pod).transform);shift=m.m42;}catch{}
+ return top(pod)+pod.offsetHeight/2+shift-top(host);}
 export function fieldify(grid,filtered=false,tracks=false){
  fieldStop();
  if(!grid)return;
@@ -465,7 +470,10 @@ export function fieldify(grid,filtered=false,tracks=false){
   width=host.clientWidth;height=host.clientHeight;
   podWidth=pod?.offsetWidth||360;podHeight=pod?.offsetHeight||44;
   // E225: the capsule sits above centre; the wall is centred on the capsule, not on the window
-  if(pod){const a=pod.getBoundingClientRect(),b=host.getBoundingClientRect();podY=a.top+a.height/2-b.top;}else podY=height/2;
+  /* 2026-11-13 (user: drift -> wall, at the end every cover stepped down three times): measured from layout, not from
+     getBoundingClientRect, because a view switch scales the host .9 -> 1 and an animation may translate the capsule;
+     each measure taken mid-arrival used to re-seat the wall a few px lower */
+  if(pod)podY=capsuleY(pod,host);else podY=height/2;
   if(!(podY>0&&podY<height))podY=height/2;
  };
  const down=e=>{

@@ -104,6 +104,16 @@ async function main(){fs.mkdirSync(OUT,{recursive:true});const tmpRoot=path.reso
   await shoot('drift-idle');
   const ROUNDS=Number(arg('rounds',2));
   for(let r=0;r<ROUNDS;r++){await measure('idle',async()=>{},3000);await measure('search',()=>type(Q),1500);await shoot('rails');await measure('clear',()=>type(EMPTY),1500);await sleep(400);}
+  if(arg('probe')){for(let i=0;i<3;i++){await cdp.evaluate('(()=>{document.querySelector(".library-wall-toggle").click();return 1;})()');await sleep(2000);console.log('PROBE',JSON.stringify(await cdp.evaluate(fs.readFileSync(arg('probe'),'utf8'))));}return;}
+  if(arg('towall')){
+   /* drift -> wall: every frame, the screen y of the wall's first visible covers; steps after the arrival are the bug */
+   const samp='(()=>{window.__ys=[];const t0=performance.now();const f=()=>{const n=[...document.querySelectorAll(".field-plane>mg-cell")].filter(x=>!x.hasAttribute("data-parked")).slice(0,3);window.__ys.push([Math.round(performance.now()-t0),...n.map(x=>Math.round(x.getBoundingClientRect().top))]);if(performance.now()-t0<2000)requestAnimationFrame(f);};requestAnimationFrame(f);return 1;})()';
+   for(let r=0;r<2;r++){const shots=[];let n=0;cdp.onEvent=m=>{if(m.method==='Page.screencastFrame'){const f=path.join(OUT,'tw'+r+'-'+String(n++).padStart(3,'0')+'-'+Math.round(m.params.metadata.timestamp*1000)+'.jpg');fs.writeFileSync(f,Buffer.from(m.params.data,'base64'));cdp.send('Page.screencastFrameAck',{sessionId:m.params.sessionId}).catch(()=>{});}};
+    await cdp.send('Page.startScreencast',{format:'jpeg',quality:70,maxWidth:960,maxHeight:540,everyNthFrame:1});await sleep(300);fs.writeFileSync(path.join(OUT,'click'+r+'.txt'),String(Date.now()));
+    await cdp.evaluate('(()=>{document.querySelector(".library-wall-toggle").click();return 1;})()');await sleep(30);await cdp.evaluate(samp);await sleep(2200);await cdp.send('Page.stopScreencast');cdp.onEvent=null;
+    const ys=await cdp.evaluate('window.__ys');const steps=[];for(let i=1;i<ys.length;i++){const d=ys[i][1]-ys[i-1][1];if(Math.abs(d)>=1&&ys[i][0]>300)steps.push([ys[i][0],d]);}console.log('toWall steps after 300ms',JSON.stringify(steps));
+    await cdp.evaluate('(()=>{document.querySelector(".library-wall-toggle").click();return 1;})()');await sleep(1500);await cdp.evaluate('(()=>{document.querySelector(".library-wall-toggle").click();return 1;})()');await sleep(1800);}
+   return;}
   /* wheel dolly and drag parallax (user 2026-11-13) */
   const wheel=async(dy,n)=>{for(let i=0;i<n;i++){await cdp.send('Input.dispatchMouseEvent',{type:'mouseWheel',x:960,y:760,deltaX:0,deltaY:dy});await sleep(40);}};
   const dragBy=async(dx,dy,steps,s=1)=>{await cdp.send('Input.dispatchMouseEvent',{type:'mousePressed',x:400,y:800,button:'left',clickCount:1});for(let i=1;i<=steps;i++){await cdp.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:400+dx*i/steps,y:800+dy*i/steps,button:'left',buttons:1});await sleep(16*s);}
