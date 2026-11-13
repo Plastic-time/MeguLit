@@ -10,6 +10,6 @@
 typedef void (*DumpSinkFn)(const char *source, const char *how, const unsigned char *p, DWORD n);
 void DumpSink(DumpSinkFn fn);
 #define MEGULIT_DUMP_MODULES \
- /* MODULE(Voice) */ \
  MODULE(Cg) \
- MODULE(AudioMore)
+ MODULE(AudioMore) \
+ MODULE(Voice)

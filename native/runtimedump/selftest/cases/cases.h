@@ -5,4 +5,5 @@
  CASE(Example) \
  CASE(Safety) \
  CASE(Cg) \
- CASE(AudioMore)
+ CASE(AudioMore) \
+ CASE(Voice)
