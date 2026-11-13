@@ -179,3 +179,17 @@ html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .gm-pa
 html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .gm-page .gm-level.active{color:#fff!important}
 html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .gm-page .gm-stg.on :is(span,b){color:#fff4ea!important}
 html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .gm-page .gm-link{color:var(--t-red)!important}
+
+/* light theme, game library: the no-cover placeholder, the caption under each cover and the centre tool capsule were drawn for dark glass;
+   on the light paper they take the light panel and the text tokens (dark mode untouched, the wall's edge fade stays) */
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .cover-frame .hero-placeholder{background:var(--t-panel-solid)!important;border:1px solid var(--t-line-2)!important;color:var(--t-text-2)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .cover-frame .hero-placeholder svg{opacity:1!important;color:var(--t-text-2)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .main .cover-frame .hero-placeholder .ph-title{color:var(--t-text)!important;opacity:1!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .lib-field .cover-frame{background-color:transparent}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .lib-field .game-caption .mq{color:var(--t-text)!important;text-shadow:none!important;-webkit-text-stroke:0!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body .lib-field .game-caption.mq-box{background:rgba(255,252,249,.72);border-radius:var(--t-radius)}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.lib-toolbar,.main>.field-search){background:var(--t-panel-solid)!important;box-shadow:0 10px 28px rgba(60,30,30,.16),var(--t-ring)!important;border-color:var(--t-line-2)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.lib-toolbar,.field-search) #game-search{background:#fff!important;color:var(--t-text)!important;box-shadow:inset 0 0 0 1px var(--t-line-2)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.lib-toolbar,.main>.field-search) input::placeholder{color:var(--t-text-2)!important;opacity:1}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.lib-toolbar,.field-search) .icon-button{color:var(--t-text-2)!important}
+html[data-theme=light]:not(#u):not(#v):not(#w):not(#x):not(#y) body :is(.lib-toolbar,.field-search) .icon-button:hover{color:var(--t-text)!important}
