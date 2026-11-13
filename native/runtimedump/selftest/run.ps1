@@ -9,6 +9,11 @@ foreach($bit in '32','64'){
  $arch=if($bit -eq '32'){'x86'}else{'x64'}
  cmd /c "call `"$vs`" -arch=$arch -host_arch=x64 -no_logo >nul && cd /d `"$PSScriptRoot`" && cl /nologo /O2 /MT /EHsc /utf-8 /Fo`"$game/`" host.cpp cases\\*.cpp /Fe:`"$game\host.exe`" >nul"
  if($LASTEXITCODE){throw "build $bit failed"}
+ # Stand-in middleware DLLs (fakedll\<Name>.cpp -> <game>\<Name>.dll) for module cases that hook a DLL's exports.
+ foreach($f in Get-ChildItem (Join-Path $PSScriptRoot 'fakedll') -Filter *.cpp -ErrorAction SilentlyContinue){
+  cmd /c "call `"$vs`" -arch=$arch -host_arch=x64 -no_logo >nul && cd /d `"$PSScriptRoot`" && cl /nologo /Od /MT /LD /utf-8 /Fo`"$game/`" fakedll\$($f.Name) /Fe:`"$game\$($f.BaseName).dll`" /link /OPT:NOICF >nul"
+  if($LASTEXITCODE){throw "build $bit $($f.Name) failed"}
+ }
  Push-Location $game;try{& .\host.exe (Join-Path $PSScriptRoot "..\..\MeguLitDump$bit.dll") $out;$code=$LASTEXITCODE}finally{Pop-Location}
  Get-ChildItem $out -Recurse -Filter dump.log | Get-Content | ForEach-Object {"  [$bit] $_"}
  if($code){throw "x$bit self-test failed ($code)"}
