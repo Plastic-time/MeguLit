@@ -35,6 +35,12 @@
 #define MODULE(Name) void Name##Start(const wchar_t *out); void Name##Tick();
 MEGULIT_DUMP_MODULES
 #undef MODULE
+// Plain-buffer sinks (modules.h DumpSink): every buffer the DLL sees turn plain (file read as is, decrypted in place or
+// into a fresh buffer, decompressor output) is also handed to the modules that asked, e.g. Cg for picture files.
+static DumpSinkFn SinkList[8]; static volatile LONG SinkCount;
+void DumpSink(DumpSinkFn fn) { LONG i = InterlockedIncrement(&SinkCount) - 1; if (i < 8) SinkList[i] = fn; }
+static void SinkOne(DumpSinkFn fn, const char *source, const char *how, const unsigned char *p, DWORD n) { __try { fn(source, how, p, n); } __except (EXCEPTION_EXECUTE_HANDLER) {} }
+static void Sinks(const std::string &source, const char *how, const unsigned char *p, DWORD n) { DWORD e = GetLastError(); LONG k = SinkCount < 8 ? SinkCount : 8; for (LONG i = 0; i < k; i++) if (SinkList[i]) SinkOne(SinkList[i], source.c_str(), how, p, n); SetLastError(e); }
 // Pack contract version, read by tests and by MeguLit to tell pack builds apart.
 extern "C" __declspec(dllexport) int MeguLitDumpVersion() { return 2; }
 
@@ -196,7 +202,14 @@ unsigned char *Copy(const void *p, DWORD n) {
  if (!ReadProcessMemory(GetCurrentProcess(), p, buf, n, &got) || got != n) { free(buf); return NULL; }
  return buf;
 }
+// Picture files are tracked for the sinks (Cg) only; their bytes are never saved as text.
+bool Picture(const std::string &source) {
+ size_t d = source.find_last_of('.'); if (d == std::string::npos) return false;
+ std::string e = source.substr(d + 1); for (auto &c : e) if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
+ return e == "png" || e == "jpg" || e == "jpeg" || e == "bmp" || e == "webp" || e == "tlg";
+}
 void Save(const std::string &source, const char *how, const unsigned char *data, DWORD n, ULONGLONG offset) {
+ if (Picture(source)) return;
  Score s = Classify(data, n);
  if (!Texty(s)) return;
  ULONG crc = Crc32 ? Crc32(0, data, n) : n;
@@ -236,7 +249,7 @@ void Poll() {
   if (!buf) { drop.push_back(r.p); continue; }
   ULONG crc = Crc32 ? Crc32(0, buf, r.n) : 0;
   bool changed = crc != r.raw, still = crc == r.last;
-  if (changed && still) { Save(r.source, r.how, buf, r.n, r.offset); drop.push_back(r.p); }
+  if (changed && still) { Save(r.source, r.how, buf, r.n, r.offset); Sinks(r.source, r.how, buf, r.n); drop.push_back(r.p); }
   free(buf);
   { Lock l; for (auto &q : Regions) if (q.p == r.p) q.last = crc; }
   if (tick - r.born > WatchMs) drop.push_back(r.p);
@@ -267,7 +280,7 @@ bool Skipped(const std::wstring &path) {
  size_t dot = l.find_last_of(L'.'), slash = l.find_last_of(L"\\/");
  if (dot == std::wstring::npos || (slash != std::wstring::npos && dot < slash)) return false;
  std::wstring ext = l.substr(dot + 1);
- static const wchar_t *media[] = { L"png", L"jpg", L"jpeg", L"bmp", L"gif", L"webp", L"tlg", L"ogg", L"wav", L"mp3", L"opus", L"m4a", L"flac", L"wma",
+ static const wchar_t *media[] = { L"gif", L"ogg", L"wav", L"mp3", L"opus", L"m4a", L"flac", L"wma",
   L"mp4", L"wmv", L"avi", L"mpg", L"webm", L"mkv", L"ttf", L"otf", L"ttc", L"fon", L"dll", L"exe", L"sys", L"ico", L"cur", L"ani", L"log", L"mui", L"nls", L"manifest" };
  for (auto m : media) if (ext == m) return true;
  return false;
@@ -332,6 +345,7 @@ BOOL WINAPI HReadFile(HANDLE h, LPVOID buf, DWORD want, LPDWORD got, LPOVERLAPPE
   ULONGLONG offset = (ULONGLONG)pos.QuadPart - n;
   ULONG raw = Crc32 ? Crc32(0, buf, n) : 0;
   Save(name, "plain", (const unsigned char *)buf, n, offset); // loose text files that were never encrypted
+  Sinks(name, "plain", (const unsigned char *)buf, n);
   Watch(buf, n, raw, name, offset, "inplace");
   if (n >= ArmFrom) Arm(n, name);
  }
@@ -366,6 +380,7 @@ LPVOID WINAPI HMapView(HANDLE s, DWORD a, DWORD hi, DWORD lo, SIZE_T n) {
    if (copy) {
     ULONGLONG offset = ((ULONGLONG)hi << 32) | lo;
     Save(name, "plain", copy, m, offset);
+    Sinks(name, "plain", copy, m);
     // A mapped view the game can write to (copy-on-write or read-write) may be decrypted in place.
     if (a & (FILE_MAP_WRITE | FILE_MAP_COPY)) Watch(p, m, Crc32 ? Crc32(0, copy, m) : 0, name, offset, "inplace");
     if (m >= ArmFrom) Arm(m, name);
@@ -395,7 +410,7 @@ void Output(const char *how, const unsigned char *p, DWORD n) {
  if (!p || n < MinRegion) return;
  std::string source; { Lock l; source = LastSource; }
  unsigned char *copy = Copy(p, n > MaxRegion ? MaxRegion : n);
- if (copy) { Save(source.empty() ? "memory" : source, how, copy, n > MaxRegion ? MaxRegion : n, 0); free(copy); }
+ if (copy) { Save(source.empty() ? "memory" : source, how, copy, n > MaxRegion ? MaxRegion : n, 0); Sinks(source.empty() ? "memory" : source, how, copy, n > MaxRegion ? MaxRegion : n); free(copy); }
 }
 LONG NTAPI HDecompress(USHORT f, PUCHAR out, ULONG outSize, PUCHAR in, ULONG inSize, PULONG done) {
  LONG r = ODecompress(f, out, outSize, in, inSize, done);

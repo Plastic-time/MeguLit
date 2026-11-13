@@ -3,4 +3,5 @@
 #pragma once
 #define MEGULIT_SELFTEST_CASES \
  CASE(Example) \
- CASE(Safety)
+ CASE(Safety) \
+ CASE(Cg)
