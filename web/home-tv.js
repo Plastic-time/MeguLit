@@ -266,7 +266,7 @@ export function renderHomeTV(main,ctx){
   <div class="tv-plane" data-z="-200"><div class="tv-tl"></div></div>
   <div class="tv-plane" data-z="-80"><div class="tv-kana"></div><div class="tv-ring"></div></div>
   <div class="tv-plane" data-z="0"><div class="tv-slices"></div><div class="tv-script"></div><button type="button" class="tv-lines-edit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span></span></button></div>
-  <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><i class="tv-cshadow" aria-hidden="true"></i><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""><i></i><i></i><i></i><i></i></div></div><button type="button" class="tv-cover-play tv-play" data-act="play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg><span>${w.play}</span></button></div></div></div>
+  <div class="tv-plane" data-z="60"><div class="tv-cover tv-card"><i class="tv-cshadow" aria-hidden="true"></i><div class="tv-flip"><div class="tv-face"><div class="tv-art"></div><i class="tv-foil"></i><i class="tv-glare"></i></div><div class="tv-back"><img src="${LOGO}" alt=""><i></i><i></i><i></i><i></i></div></div></div></div></div>
   <div class="tv-scan"></div><div class="tv-grain"></div><div class="tv-marks"><i></i><i></i><i></i><i></i></div>
   <div class="tv-left"><div class="tv-clock"><span>${esc(date)}</span><b>${esc(greeting)}</b></div><div class="tv-heat-card tv-card"><div class="tv-face"><button class="tv-heatlink" data-go="activity"></button><div class="tv-heat"></div><div class="tv-heat-none" hidden></div><div class="tv-heatsum"></div><button class="tv-daily" data-go="daily"><i aria-hidden="true"></i><span class="tv-daily-k">${w.daily}</span><span class="tv-daily-t"></span><small>→</small></button><div class="tv-daily-pics"></div><i class="tv-glare"></i></div></div></div>
   
@@ -285,8 +285,7 @@ export function renderHomeTV(main,ctx){
   b.addEventListener('click',()=>{const g=shown;if(!g)return;openLinesPicker({api,locale,esc,game:g,shown:shownLines,relativeTime,onSave:async chosen=>{const d=await detail(api,
    g.id,locale);d.homeLines=chosen;if(shown!==g||!live||live.root!==root)return;const pick=homeLinesFor(d);shownLines=pick.lines.slice(-5);b.classList.toggle('custom',
    pick.custom);swapScript($('.tv-script'),shownLines,type);type(pick.lines[0]||'');}});});}
- $('[data-act="play"]')?.addEventListener('click',e=>{e.stopPropagation();if(shown)onLaunch(shown.id,e.currentTarget);});
- ['pointerdown','dblclick'].forEach(t=>$('[data-act="play"]')?.addEventListener(t,e=>e.stopPropagation()));
+ /* 2026-11-13 (user: no 「继续游玩」 button on home cards, 禁止) covers stay artwork and title only; launching lives on the detail page */
  $('[data-act="detail"]')?.addEventListener('click',()=>shown&&onDetail(shown.id));
  /* 2026-11-13 (user: "左下角显示小字作品名 … 把之前删掉的那个动效…拿回来 放左下角最下面 点缀一下") the bottom bar is back as a quiet accent: the game name in
     small type rises in letter by letter, then one of its lines types itself out */
@@ -307,7 +306,7 @@ export function renderHomeTV(main,ctx){
   const k=(g.title.length*37+pool.indexOf(g)*13)%60,picked=homeLinesFor(d),sentences=picked.lines,words=(d.words||[]).filter(x=>x.spelling).slice(0,10),sessions=d.sessions||[];
   $('.tv-kana').textContent=[...g.title].find(c=>/[一-鿿぀-ヿ]/.test(c))||([...g.title].find(c=>/[A-Za-z0-9]/.test(c))||g.title.slice(0,1)).toUpperCase();
   if(!g.cover)$('.tv-art').style.background=art(g,p);/* 2026-11-13 user: a coverless draw showed a bare gradient — write the cleaned title on it */{const nm=String(g.title||'').replace(/\[[^\]]*\]|\([^)]*\)|【[^】]*】/g,
-   ' ').replace(/\s+/g,' ').trim()||g.title||'';$('.tv-art').innerHTML=g.cover?'':`<span class="tv-art-name" lang="ja">${esc(nm)}</span>`;}$('.tv-play').title=g.lastPlayedAt?`${w.last} · ${relativeTime(g.lastPlayedAt)}`:'';
+   ' ').replace(/\s+/g,' ').trim()||g.title||'';$('.tv-art').innerHTML=g.cover?'':`<span class="tv-art-name" lang="ja">${esc(nm)}</span>`;}$('.tv-cover').title=g.lastPlayedAt?`${g.title} · ${w.last} · ${relativeTime(g.lastPlayedAt)}`:g.title;
   const pct=Math.max(.02,Math.min(1,(g.characters||0)/max)),ring=$('.tv-ring');ring.style.left=(44+k%14)+'%';const C=2*Math.PI*44,N=60;
   ring.innerHTML=`<svg viewBox="0 0 100 100"><defs><linearGradient id="tvgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff6e4"/><stop offset=".45" stop-color="var(--g-gold)"/><stop offset="1" stop-color="var(--tv-a)"/></linearGradient><filter id="tvglow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.4"/></filter></defs>${Array.from({length:N},(_,t)=>{const a=t/N*2*Math.PI-Math.PI/2,big=t%5===0,r1=big?38.6:39.4,r2=40.4;return `<line class="etch${big?' big':''}${t<Math.round(pct*N)?' on':''}" style="--d:${t*18}ms" x1="${(50+r1*Math.cos(a)).toFixed(2)}" y1="${(50+r1*Math.sin(a)).toFixed(2)}" x2="${(50+r2*Math.cos(a)).toFixed(2)}" y2="${(50+r2*Math.sin(a)).toFixed(2)}"/>`;}).join('')}<circle class="track" cx="50" cy="50" r="44"/><g transform="rotate(-90 50 50)"><circle class="glow" cx="50" cy="50" r="44" stroke-dasharray="${C}" stroke-dashoffset="${C}" filter="url(#tvglow)"/><circle class="prog" cx="50" cy="50" r="44" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></g><circle class="head" cx="50" cy="8.4" r=".9" style="transform-origin:50px 50px;transform:rotate(0deg)"/></svg>`;
    requestAnimationFrame(()=>requestAnimationFrame(()=>{const off=C*(1-pct);ring.querySelectorAll('.prog,.glow').forEach(c=>c.style.strokeDashoffset=off);const h=ring.querySelector('.head');
@@ -361,8 +360,10 @@ export function renderHomeTV(main,ctx){
   fitLeft(root);};
  {let actSig=JSON.stringify(cachedActivity()||null);if(cachedActivity())showActivity(cachedActivity());api('learning_activity',{range:'year'}).then(r=>{rememberActivity(r);const n=JSON.stringify(r||null);if(n!==actSig){actSig=n;showActivity(r);}}).catch(()=>{});}
  const hand=createHand({root,box:$('.tv-hand'),layer:$('.tv-ghosts'),cover:$('.tv-cover'),reduced:matchMedia('(prefers-reduced-motion:reduce)').matches,
-  back:`<img src="${LOGO}" alt="">`,art:h=>art(h.g||h,['#3b2a26','#5a3a30','#1a1110']),onPlay:(h,kind)=>{if(kind!=='plain')root.classList.add('tv-fly');paint(h.g,kind==='plain','fade');},
-  onLand:()=>root.classList.remove('tv-fly')});live.hand=hand;
+  back:`<img src="${LOGO}" alt="">`,art:h=>art(h.g||h,['#3b2a26','#5a3a30','#1a1110']),neutral:fn=>live?.depth?live.depth.neutral(fn):fn(),
+  onPlay:(h,kind,ms)=>{if(kind!=='plain'){root.classList.add('tv-fly');live?.depth?.hold(true);/* the field card's table shadow grows in as the flying card comes down onto it */
+   $('.tv-cshadow')?.animate([{opacity:0},{opacity:0,offset:.55},{opacity:1}],{duration:ms||800,easing:'cubic-bezier(.3,0,.2,1)'});}paint(h.g,kind==='plain','fade');},
+  onLand:()=>{root.classList.remove('tv-fly');live?.depth?.hold(false);}});live.hand=hand;
  const canvas=$('.tv-canvas'),planes=[...root.querySelectorAll('.tv-plane')],reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
  /* 2026-11-13 (user) every layer has its own depth: the far headline picture drifts against the pointer, near ones (cards, figures, rail, bottom bar) lead it */
  {const L=(sel,z)=>{const el=$(sel);return el?{el,z}:null;};live.depth=createDepth(root,{canvas,planes,layers:[L('.tv-left',7),L('.tv-figs',8),

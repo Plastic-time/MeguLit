@@ -3,7 +3,12 @@
    field (出牌). Ten flight styles share one spring (same mass and damping), are picked at random without repeating, can be interrupted from their
    current pose, and move only transform/opacity. */
 
-export const HAND_VARIANTS=['toss','flip','swing','slap','fan','dive','sidetilt','trail','pull','diag'];
+/* 2026-11-13 (user: "我要的十种不同手牌和在场牌切换的不同…动画呢") each flight has one clear signature, readable at a glance:
+   toss (high arc), flip (turns over, back shows mid-air), swing (pendulum), slap (fast, slams down with a squash), spin (one full turn),
+   dive (dips into the table, rises up), edge (turns edge-on and slices across), trail (afterimages), pull (winds back, then shoots),
+   float (lifts straight up, hangs, then glides). Each has its own length. */
+export const HAND_VARIANTS=['toss','flip','swing','slap','spin','dive','edge','trail','pull','float'];
+export const FLIGHT_MS={toss:780,flip:900,swing:880,slap:560,spin:900,dive:880,edge:820,trail:780,pull:860,float:1000};
 
 /* quadratic arc rising from bottom-middle-left, peaking above the old cover strip and falling into the bottom-right corner (container units) */
 export function arcPoint(t,W,H){const P0=[.0*W,1.04*H],P1=[.58*W,-.36*H],P2=[.97*W,.74*H],u=1-t,
@@ -20,21 +25,35 @@ export function handLayout(n,{W,H,cw,hover=-1}){if(n<=0)return [];const ch=cw*4/
 export function springAt(q,{zeta=.74,omega=11,T=.74}={}){const t=q*T;if(t<=0)return 0;const wd=omega*Math.sqrt(1-zeta*zeta),e=Math.exp(-zeta*omega*t);
  return 1-e*(Math.cos(wd*t)+zeta*omega/wd*Math.sin(wd*t));}
 
-const lerp=(a,b,k)=>a+(b-a)*k,ease=q=>1-Math.pow(1-q,3),bell=q=>Math.sin(Math.PI*Math.max(0,Math.min(1,q)));
-/* pose of a flight of `kind` from A to B at normalised time q; poses are {x,y,r,s,rx,ry,o} in root pixels */
-export function flightPose(kind,A,B,q){const dx=B.x-A.x,dy=B.y-A.y,dist=Math.hypot(dx,dy)||1;let nx=-dy/dist,ny=dx/dist;if(ny>0){nx=-nx;ny=-ny;}
- const take=B.s<A.s,spring=kind==='pull'?{zeta:.62,omega:10}:kind==='slap'?{zeta:.68,omega:13}:{};let p=springAt(q,spring),from=A,lift=0,side=0,s0=0,r0=0,rx=0,ry=0;
- if(kind==='dive'){const h=take?.3:.2,dy0=take?60:-34,ds=take?.9:1.05;if(q<h){const k=ease(q/h);return {x:A.x,y:A.y+dy0*k,r:A.r*(1-k*.6),s:A.s*(1+(ds-1)*k),rx:-8*k,ry:0,o:1};}from={...A,y:A.y+dy0,r:A.r*.4,s:A.s*ds};
-  p=springAt((q-h)/(1-h),{zeta:.7,omega:12});rx=-8*(1-Math.min(1,p));}
+const lerp=(a,b,k)=>a+(b-a)*k,clamp01=q=>Math.max(0,Math.min(1,q)),ease=q=>1-Math.pow(1-clamp01(q),3),bell=q=>Math.sin(Math.PI*clamp01(q)),
+ inOut=q=>{q=clamp01(q);return q<.5?4*q*q*q:1-Math.pow(-2*q+2,3)/2;};
+/* pose of a flight of `kind` from A to B at normalised time q; poses are {x,y,r,s,rx,ry,o} in root pixels; q=1 is exactly B (so the hand-off to the
+   real card has nothing left to settle) */
+export function flightPose(kind,A,B,q){const dx=B.x-A.x,dy=B.y-A.y,dist=Math.hypot(dx,dy)||1,dir=Math.sign(dx||1),take=B.s<A.s;let nx=-dy/dist,ny=dx/dist;if(ny>0){nx=-nx;ny=-ny;}
+ const turn=kind==='spin'?360*(take?-1:1):0,flipY=kind==='flip'?360:0;if(q>=1)return {x:B.x,y:B.y,r:B.r+turn,s:B.s,rx:0,ry:flipY,o:1};
+ let p=springAt(q),from=A,lift=0,side=0,s0=0,r0=0,rx=0,ry=0,lead=null;
+ /* two-stage flights: a first move away from the slot, then the spring from there */
+ if(kind==='dive'){const h=take?.3:.24,dy0=take?80:-56,ds=take?.86:1.12;if(q<h){const k=ease(q/h);return {x:A.x,y:A.y+dy0*k,r:A.r*(1-k*.7),s:A.s*(1+(ds-1)*k),rx:-14*k,ry:0,o:1};}
+  from={...A,y:A.y+dy0,r:A.r*.3,s:A.s*ds};p=springAt((q-h)/(1-h),{zeta:.66,omega:12});rx=-14*(1-Math.min(1,p));}
+ if(kind==='float'){const h=.36,up=Math.min(160,dist*.3);if(q<h){const k=ease(q/h);return {x:A.x,y:A.y-up*k,r:A.r*(1-k),s:A.s*(1+.1*k),rx:0,ry:0,o:1};}
+  from={...A,y:A.y-up,r:0,s:A.s*1.1};p=springAt((q-h)/(1-h),{zeta:.86,omega:9});}
+ if(kind==='pull'){const h=.3;if(q<h){const k=bell(q/h*.5),back=.14*k;return {x:A.x-dx*back,y:A.y-dy*back,r:A.r-8*dir*k,s:A.s*(1-.08*k),rx:0,ry:0,o:1};}
+  from={...A,x:A.x-dx*.14,y:A.y-dy*.14,r:A.r-8*dir,s:A.s*.92};p=springAt((q-h)/(1-h),{zeta:.55,omega:14});}
+ if(kind==='slap')p=springAt(q,{zeta:.42,omega:17});
  const b=bell(Math.min(1,p));
- switch(kind){case 'toss':lift=.34;r0=-10*bell(q);break;case 'flip':{lift=.18;const k=Math.min(1,q/.38);ry=360*(k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2);s0=.03*b;break;}
-  case 'swing':lift=.14;r0=14*Math.sin(2*Math.PI*q)*(1-q)*Math.sign(dx||1);break;case 'slap':lift=.06;side=take?.1:0;s0=.035*bell(Math.min(1,q*1.25));rx=8*bell(q);break;
-  case 'fan':lift=-.13;r0=-16*bell(q);break;case 'sidetilt':side=.16;ry=-22*bell(q)*Math.sign(dx||1);rx=6*bell(q);break;case 'trail':lift=.24;r0=-6*bell(q);break;
-  case 'pull':{const back=q<.34?Math.sin(Math.PI*q/.34)*.07:0;from={...A,x:A.x-dx*back,y:A.y-dy*back};break;}
-  case 'diag':rx=16*bell(q);r0=11*bell(q)*Math.sign(dx||1);break;default:break;}
- const x=lerp(from.x,B.x,p)+nx*dist*lift*b+ny*dist*side*b*(dx>0?1:-1),y=lerp(from.y,B.y,p)+ny*dist*lift*b-nx*dist*side*b*(dx>0?1:-1);
- /* growing onto the field the size leads the travel a little (ease-out), shrinking into the hand it follows it */
- const sp=B.s>from.s&&kind!=='dive'?springAt(q,{zeta:.8,omega:12.5}):p;
+ switch(kind){
+  case 'toss':lift=.46;r0=-22*bell(q)*dir;break;
+  case 'flip':lift=.22;ry=360*inOut(q/.78);s0=.07*bell(q);break;
+  case 'swing':lift=.08;r0=32*Math.sin(3*Math.PI*q)*Math.pow(1-q,1.4)*dir;break;
+  case 'slap':lift=.03;rx=22*clamp01(1-p);s0=p>1?-.5*(p-1):0;break;
+  case 'spin':lift=.16;r0=turn*inOut(q);break;
+  case 'edge':side=.22;lift=.05;ry=-84*bell(q)*dir;break;
+  case 'trail':lift=.3;r0=-8*bell(q);break;
+  case 'pull':lift=.04;break;
+  default:break;}
+ const x=lerp(from.x,B.x,p)+nx*dist*lift*b+ny*dist*side*b*dir,y=lerp(from.y,B.y,p)+ny*dist*lift*b-nx*dist*side*b*dir;
+ /* growing onto the field the size leads the travel a little, shrinking into the hand it follows it */
+ const sp=B.s>from.s&&kind!=='dive'&&kind!=='slap'?springAt(q,{zeta:.8,omega:12.5}):p;
  return {x,y,r:lerp(from.r,B.r,p)+r0,s:Math.max(.05,lerp(from.s,B.s,sp)*(1+s0)),rx,ry,o:1};}
 
 export function flightFrames(kind,A,B,steps=30){return Array.from({length:steps+1},(_,i)=>flightPose(kind,A,B,i/steps));}
@@ -58,7 +77,8 @@ export function createHand(opts){const {root,box,layer,cover,art,back='',onPlay,
  function slotPose(id,W){const {pos,m}=st.lastLayout||layout(),j=inHand().findIndex(g=>g.id===id);const p=pos[j];if(!p)return null;const br=box.getBoundingClientRect(),
   rr=root.getBoundingClientRect();
   return {x:br.left-rr.left+p.x,y:br.top-rr.top+p.y,r:p.a,s:m.cw/W,rx:0,ry:0,o:1};}
- function coverPose(){const r=cover.getBoundingClientRect(),rr=root.getBoundingClientRect();return {x:r.left-rr.left+r.width/2,y:r.top-rr.top+r.height/2,r:-4,s:1,rx:0,ry:0,o:1};}
+ function coverPose(){const face=cover.querySelector('.tv-face')||cover,r=face.getBoundingClientRect(),rr=root.getBoundingClientRect(),W=cover.offsetWidth||1,H=cover.offsetHeight||1,
+  t=4*Math.PI/180,s=r.width/(W*Math.cos(t)+H*Math.sin(t));return {x:r.left-rr.left+r.width/2,y:r.top-rr.top+r.height/2,r:-4,s:Number.isFinite(s)&&s>0?s:1,rx:0,ry:0,o:1};}
  function relayout(){st.lastLayout=layout();}
  function render(games,outId){st.games=games.slice();st.out=outId;const keep=new Set(games.map(g=>g.id));
   for(const [id,el] of st.cards)if(!keep.has(id)){el.remove();st.cards.delete(id);}
@@ -78,19 +98,21 @@ export function createHand(opts){const {root,box,layer,cover,art,back='',onPlay,
  function fly(id,g,A,B,kind,dur,delay,done){const f=ghostFor(id,g),W=f.W,H=f.H;f.trails.forEach(t=>t.remove());f.trails=[];
   const frames=flightFrames(kind,A,B);f.frames=frames;f.t0=performance.now()+delay;f.dur=dur;const keys=frames.map(p=>({transform:poseTransform(p,W,H)}));
   f.el.style.transform=keys[0].transform;const timing={duration:dur,delay,easing:'linear',fill:'both'};f.anims=[f.el.animate(keys,timing)];
-  if(kind==='trail')[.2,.11,.05].forEach((o,k)=>{const t=f.el.cloneNode(true);t.classList.add('is-trail');layer.insertBefore(t,f.el);f.trails.push(t);
-   f.anims.push(t.animate(keys.map((x,i)=>({...x,opacity:o*Math.max(0,1-i/(keys.length*.55))})),{...timing,delay:delay+(k+1)*34}));});
-  f.anims[0].finished.then(()=>{if(st.flights.get(id)!==f)return;st.flights.delete(id);f.anims.forEach(a=>a.cancel());f.trails.forEach(t=>t.remove());done?.();
-   requestAnimationFrame(()=>f.el.remove());},()=>{});return f;}
+  if(kind==='trail')[.34,.2,.1,.05].forEach((o,k)=>{const t=f.el.cloneNode(true);t.classList.add('is-trail');layer.insertBefore(t,f.el);f.trails.push(t);
+   f.anims.push(t.animate(keys.map((x,i)=>({...x,opacity:o*Math.max(0,1-i/(keys.length*.55))})),{...timing,delay:delay+(k+1)*40}));});
+  /* 2026-11-13 (user: "过渡到展示的怎么是渐变过渡的") no cross-fade: the last frame of the flight is the real card's exact pose, and in the same task the real
+    card is shown and the flying one removed, so the next painted frame simply has the real card where the flying one was */
+  f.anims[0].finished.then(()=>{if(st.flights.get(id)!==f)return;st.flights.delete(id);f.trails.forEach(t=>t.remove());done?.();f.anims.forEach(a=>a.cancel());f.el.remove();},()=>{});return f;}
  function play(id){const g=st.games.find(x=>x.id===id);if(!g||id===st.out&&!st.flights.has(id))return;const old=st.out?st.games.find(x=>x.id===st.out):null;
   if(reduced){st.out=id;render(st.games,id);onPlay(g,'plain');onLand?.(g);return;}
   const kind=globalThis.__forceKind||pickVariant(st.last);st.last=kind;const W=cover.offsetWidth;
   /* where the picked card is now: mid-flight pose if it was flying, else its hand slot */
   const fromPick=(st.flights.has(id)&&currentPose(st.flights.get(id)))||slotPose(id,W);
   const fromOld=old?((st.flights.has(old.id)&&currentPose(st.flights.get(old.id)))||coverPose()):null;
-  st.out=id;st.hover=-1;render(st.games,id);onPlay(g,kind);
-  if(old){const el=st.cards.get(old.id);el?.classList.add('is-wait');const to=slotPose(old.id,W);/* the card going home slides in under its neighbours, the one coming out stays on top */if(to)fly(old.id,old,fromOld,to,kind,680,0,()=>{el?.classList.remove('is-wait');}).el.style.zIndex='6';else el?.classList.remove('is-wait');}
-  if(fromPick)fly(id,g,fromPick,coverPose(),kind,kind==='dive'?820:760,old?(kind==='dive'?120:140):0,()=>onLand?.(g)).el.style.zIndex='8';else onLand?.(g);}
+  st.out=id;st.hover=-1;render(st.games,id);onPlay(g,kind,(FLIGHT_MS[kind]||760)+(old?120:0));
+  if(old){const el=st.cards.get(old.id);el?.classList.add('is-wait');const to=slotPose(old.id,W);/* the card going home slides in under its neighbours, the one coming out stays on top */if(to)fly(old.id,old,fromOld,to,kind,Math.round((FLIGHT_MS[kind]||760)*.88),0,()=>{el?.classList.remove('is-wait');}).el.style.zIndex='6';else el?.classList.remove('is-wait');}
+  /* the landing pose is the field card as it sits with the scene flat (the scene settles flat during the flight, see home-depth hold) */
+  if(fromPick)fly(id,g,fromPick,(opts.neutral||(fn=>fn()))(coverPose),kind,FLIGHT_MS[kind]||760,old?120:0,()=>onLand?.(g)).el.style.zIndex='8';else onLand?.(g);}
  /* the field card changed some other way (double-click draw): take it out of the hand without a flight */
  function sync(id){if(id===st.out||st.flights.has(id))return;st.out=id;render(st.games,id);}
  const onResize=()=>relayout();addEventListener('resize',onResize);

@@ -1201,7 +1201,7 @@ async function renderRoute(){watchStage();
      'dictionary');},openSettings:section=>{settingsSection=section;settingsProfile='';try{localStorage.setItem('megulit-settings-section',section);}catch{}navigate('settings');
      }});else if(route==='daily')await mountDaily(main,{api,locale,esc,toast,isCurrent:()=>token===pageToken,lookup:word=>{pendingLookup=word;navigate('learning',
      'dictionary');},openSettings:section=>{settingsSection=section;settingsProfile='';try{localStorage.setItem('megulit-settings-section',section);}catch{}navigate('settings');
-     }});else if(route==='about'){main.innerHTML=aboutHTML(locale,esc);mountAbout(main,api,toast);}else if(route==='tools'){main.innerHTML=toolsHTML(locale,esc);
+     }});else if(route==='about'){main.innerHTML=aboutHTML(locale,esc);mountAbout(main,api,toast,model);}else if(route==='tools'){main.innerHTML=toolsHTML(locale,esc);
      main.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>b.dataset.tool==='0'?japaneseRestore():toast((grimoireWords[locale]||grimoireWords.zh).toolPending)));
      }else if(route==='statistics')await statistics(token);
     if(token===pageToken){enhanceSelects(main);dockPageTools(main);moveTabInk();alignSubtabs();{const group=route==='statistics'?'learning':route,view=group+':'+subtab;

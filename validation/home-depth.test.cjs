@@ -35,7 +35,7 @@ test('hand of cards: arc layout, hover lift and spread, flights end where they s
  assert.ok(hov[3].y<base[3].y&&hov[3].s>1.2&&hov[3].z>hov[2].z,'hovered card lifts on top');assert.ok(hov[2].x<base[2].x&&hov[4].x>base[4].x,'neighbours give way');
  const A={x:900,y:700,r:12,s:.3,rx:0,ry:0,o:1},B={x:1000,y:300,r:-4,s:1,rx:0,ry:0,o:1};
  for(const k of h.HAND_VARIANTS){const f=h.flightFrames(k,A,B),end=f.at(-1);assert.ok(Math.abs(f[0].x-A.x)<1&&Math.abs(f[0].y-A.y)<1,k+' starts at the slot');
-  assert.ok(Math.hypot(end.x-B.x,end.y-B.y)<12&&Math.abs(end.s-1)<.06,k+' lands on the field');assert.ok(f.every(p=>p.s<1.12),k+' never balloons');}
+  assert.ok(end.x===B.x&&end.y===B.y&&end.s===B.s&&end.rx===0&&(end.r-B.r)%360===0&&end.ry%360===0,k+' ends exactly on the field pose (clean hand-off)');assert.ok(f.every(p=>p.s<1.12),k+' never balloons');}
  let last=null;for(let i=0;i<200;i++){const v=h.pickVariant(last);assert.notEqual(v,last);last=v;}
  assert.equal(h.HAND_VARIANTS.length,10);
 });
