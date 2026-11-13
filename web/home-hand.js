@@ -69,10 +69,17 @@ export function createHand(opts){const {root,box,layer,cover,art,back='',onPlay,
  const metrics=()=>{const W=box.clientWidth,H=box.clientHeight,cw=Math.max(66,Math.min(118,innerWidth*.058));return {W,H,cw,ch:cw*4/3};};
  const inHand=()=>st.games.filter(g=>g.id!==st.out);
  function layout(){const m=metrics(),hand=inHand(),n=hand.length+st.extras.length,pos=handLayout(n,{...m,hover:st.hover});box.style.setProperty('--cw',m.cw+'px');
-  hand.forEach((g,j)=>place(st.cards.get(g.id),pos[j],m));st.extras.forEach((el,k)=>place(el,pos[hand.length+k],m));
+  const moves=[];hand.forEach((g,j)=>moves.push([st.cards.get(g.id),pos[j]]));st.extras.forEach((el,k)=>moves.push([el,pos[hand.length+k]]));
   const o=st.out&&st.cards.get(st.out);if(o){const j=Math.max(0,st.games.findIndex(g=>g.id===st.out)-1),p=pos[Math.min(j,pos.length-1)]||{x:m.W/2,y:m.H,a:0,s:1,z:0};
-   place(o,{...p,s:.9},m);}return {pos,m};}
- function place(el,p,m){if(!el||!p)return;el.style.zIndex=String(p.z);el.dataset.a=p.a;el.style.transform=`translate3d(${(p.x-m.cw/2).toFixed(1)}px,${(p.y-m.ch/2).toFixed(1)}px,0) rotate(${p.a.toFixed(2)}deg) scale(${p.s})`;}
+   moves.push([o,{...p,s:.9}]);}place(moves,m);return {pos,m};}
+ /* 2026-11-13 (user: "手牌就会有个强制被改变位置的bug") the fan moves with Web Animations, not a CSS transition: a CSS transition is timed from the style change, so
+    when a draw keeps the page busy for a moment the cards appeared already at their new places; an animation starts when it is first drawn and is
+    always seen whole. Current poses are all read before any is written (one style pass), and a move picks up from wherever the card is now. */
+ const EASE='cubic-bezier(.22,1.22,.36,1)';
+ function place(list,m){const items=list.filter(([el,p])=>el&&p).map(([el,p])=>[el,p,`translate3d(${(p.x-m.cw/2).toFixed(1)}px,${(p.y-m.ch/2).toFixed(1)}px,0) rotate(${p.a.toFixed(2)}deg) scale(${p.s})`]);
+  const from=items.map(([el,,to])=>el.style.transform&&el.style.transform!==to&&!reduced&&el.isConnected?getComputedStyle(el).transform:null);
+  items.forEach(([el,p,to],i)=>{el.style.zIndex=String(p.z);el.dataset.a=p.a;if(el.style.transform===to)return;el._mv?.cancel();el.style.transform=to;const a=from[i];
+   if(a&&a!=='none')el._mv=el.animate([{transform:a},{transform:to}],{duration:420,easing:EASE});});}
  /* pose of a game's slot in root pixels, from the layout numbers (not from a card that may be mid-transition) */
  function slotPose(id,W){const {pos,m}=st.lastLayout||layout(),j=inHand().findIndex(g=>g.id===id);const p=pos[j];if(!p)return null;const br=box.getBoundingClientRect(),
   rr=root.getBoundingClientRect();

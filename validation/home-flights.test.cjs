@@ -55,3 +55,9 @@ test('a hovered (lifted) hand card takes off from where it is drawn, not from it
  assert.ok(hand.includes('function cardPose(el,W)')&&hand.includes('new DOMMatrixReadOnly(getComputedStyle(el).transform)'),'pose read from the card as drawn');
  assert.ok(hand.includes("?cardPose(pickEl,W):slotPose(id,W))"),'(user: 手牌就会有个强制被改变位置的bug) picked card starts at its drawn pose');
 });
+
+test('the fan moves with Web Animations, so a busy moment never skips a re-spacing',()=>{
+ const W=path.join(__dirname,'..','web'),hand=fs.readFileSync(path.join(W,'home-hand.js'),'utf8'),css=fs.readFileSync(path.join(W,'home-tv.css'),'utf8');
+ assert.ok(hand.includes("el._mv=el.animate([{transform:a},{transform:to}],{duration:420,easing:EASE})"),'(user: 手牌就会有个强制被改变位置的bug) moves are animations that start when drawn');
+ assert.ok(!/^\.tv-hc\{[^}]*transition:transform/m.test(css),'no CSS transform transition on hand cards (it was timed from the style change and skipped ahead after a busy frame)');
+});
