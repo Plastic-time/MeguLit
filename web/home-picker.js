@@ -2,7 +2,8 @@
    the hand editor: a tab docked on the right edge (QQ-style: hidden but for a sliver, slides out on hover, tucks back when the pointer
    leaves) opens a window listing the library; ticked games go into the home hand, the rest stay out. */
 
-export const HAND_MAX=12;
+/* (user: "手卡上限10张牌") */
+export const HAND_MAX=10;
 const COPY={
  zh:{dock:'选择手牌',title:'选择手牌',sub:'勾选的作品放进首页手牌，没勾的不出现',search:'搜索作品',auto:'恢复按最近游玩',count:n=>`已选 ${n} / ${HAND_MAX}`,full:`最多 ${HAND_MAX} 张`,
   save:'保存',cancel:'取消',none:'没有找到作品',in:'在手牌中',out:'不在手牌'},

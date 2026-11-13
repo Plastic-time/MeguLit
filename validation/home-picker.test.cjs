@@ -31,3 +31,17 @@ test('home page: no 全部作品 / + cards in the hand; a docked tab slides out 
  assert.ok(pick.includes("addEventListener('pointerenter'")&&pick.includes("addEventListener('pointerleave'"),'opens on hover, tucks back when the pointer leaves');
  assert.ok(pick.includes('aria-modal="true"')&&pick.includes("e.key==='Escape'"),'the window is a modal that Escape closes');
 });
+
+test('the hand holds at most 10 cards in every mode',async()=>{
+ const {HAND_MAX}=await import('../web/home-picker.js'),{showcaseGames}=await import('../web/home-tv.js');assert.equal(HAND_MAX,10);
+ const games=Array.from({length:30},(_,i)=>({id:'g'+i,title:'g'+i,lastPlayedAt:i}));
+ assert.equal(showcaseGames(games,{mode:'auto'}).length,10);
+ assert.equal(showcaseGames(games,{mode:'pick',order:games.map(g=>g.id),pinned:['g1','g2']}).length,10);
+});
+
+test('bottom bar: the small game name rises in letter by letter and a line types itself out',()=>{
+ const js=fs.readFileSync(path.join(WEB,'home-tv.js'),'utf8'),css=fs.readFileSync(path.join(WEB,'home-tv.css'),'utf8'),judge=fs.readFileSync(path.join(WEB,'judge-r2.css'),'utf8');
+ assert.ok(js.includes('<span class="tv-who"></span><span class="tv-line"></span>'));assert.ok(js.includes('nameIn(g);type('));assert.ok(!js.includes('const type=()=>{}'));
+ assert.match(css,/\.tv-dialog \.tv-who\{[^}]*font-size:12px/);assert.match(css,/\.tv-who\.in i\{opacity:1;transform:none\}/);
+ assert.ok(!/\.tv-dialog \.tv-who\{display:none/.test(judge),'the name is no longer hidden');
+});

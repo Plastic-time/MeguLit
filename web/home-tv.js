@@ -2,7 +2,7 @@ import {activityCells} from './learning-activity.js';
 import {openLinesPicker} from './home-lines.js';
 import {createDepth,markFlat,cachedDaily,rememberDaily,dailyIsFresh,dailySignature,cachedActivity,rememberActivity} from './home-depth.js';
 import {createHand} from './home-hand.js';
-import {createDock,openHandPicker} from './home-picker.js';
+import {createDock,openHandPicker,HAND_MAX} from './home-picker.js';
 import {pickHeadline,cachedHeadline,translateHeadline,headlineLabel,activitySummary,emptyActivityHTML} from './home-today.js';
 
 const copy={
@@ -37,8 +37,8 @@ export function cleanShowcase(value){const v=value&&typeof value==='object'?valu
 
 export function showcaseGames(games,setting){const sc=cleanShowcase(setting),available=games.filter(g=>g.available!==false&&!sc.hidden.includes(g.id)),by=id=>available.find(g=>g.id===id),
  when=g=>g.lastLaunchedAt||g.lastPlayedAt||0,recent=[...available].sort((a,b)=>when(b)-when(a)),pinned=sc.pinned.map(by).filter(Boolean);
- if(sc.mode==='pick'){const picked=sc.order.map(by).filter(Boolean);if(picked.length)return [...pinned,...picked.filter(g=>!pinned.includes(g))];}
- return [...pinned,...recent.filter(g=>!pinned.includes(g))].slice(0,8);}
+ if(sc.mode==='pick'){const picked=sc.order.map(by).filter(Boolean);if(picked.length)return [...pinned,...picked.filter(g=>!pinned.includes(g))].slice(0,HAND_MAX);}
+ return [...pinned,...recent.filter(g=>!pinned.includes(g))].slice(0,HAND_MAX);}
 
 function palette(game){if(palettes.has(game.id))return Promise.resolve(palettes.get(game.id));const fallback=['#d05b34','#edb56e','#3b4a8c'];if(!game.cover)return Promise.resolve(fallback);
  return new Promise(done=>{const img=new Image();img.onload=()=>{try{const c=document.createElement('canvas');c.width=c.height=24;const x=c.getContext('2d',{willReadFrequently:true});
@@ -273,7 +273,7 @@ export function renderHomeTV(main,ctx){
   <div class="tv-figs"><button class="tv-fig" data-go="statistics"><b data-fig="time">0m</b><small>${w.figRead}</small></button><button class="tv-fig" data-go="detail"><b data-fig="chars">0</b><small>${w.figChars}</small></button><button class="tv-fig" data-go="words"><b data-fig="words">0</b><small>${w.figWords}</small></button><button class="tv-more" data-go="statistics">${w.full} →</button></div>
   <div class="tv-title"><div class="tv-h1" role="heading" aria-level="1"></div><div class="tv-meta"></div></div>
   <div class="tv-hand"></div><div class="tv-ghosts" aria-hidden="true"></div>
-  <div class="tv-dialog"><span class="tv-who"></span><div class="tv-act"></div></div></div>`;
+  <div class="tv-dialog"><span class="tv-who"></span><span class="tv-line"></span><div class="tv-act"></div></div></div>`;
  const root=main.querySelector('.tv-home'),$=s=>root.querySelector(s);
  live={root,timer:0,beat:0,typer:0,depth:null};
  const art=(g,p)=>g.cover?`url("${String(g.cover).replace(/"/g,'%22')}") center/cover`:`linear-gradient(160deg,${p[0]},${p[2]} 70%)`;
@@ -288,7 +288,13 @@ export function renderHomeTV(main,ctx){
  $('[data-act="play"]')?.addEventListener('click',e=>{e.stopPropagation();if(shown)onLaunch(shown.id,e.currentTarget);});
  ['pointerdown','dblclick'].forEach(t=>$('[data-act="play"]')?.addEventListener(t,e=>e.stopPropagation()));
  $('[data-act="detail"]')?.addEventListener('click',()=>shown&&onDetail(shown.id));
- /* 2026-11-13 (user) the typed line along the bottom is gone; the daily headline takes the bottom-left corner instead */const type=()=>{};
+ /* 2026-11-13 (user: "左下角显示小字作品名 … 把之前删掉的那个动效…拿回来 放左下角最下面 点缀一下") the bottom bar is back as a quiet accent: the game name in
+    small type rises in letter by letter, then one of its lines types itself out */
+ const type=s=>{clearInterval(live.typer);let n=0;const line=$('.tv-line');if(!line)return;line.textContent='';line.classList.toggle('typing',!!s);if(!s)return;
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches){line.textContent='「'+s+'」';line.classList.remove('typing');return;}
+  live.typer=setInterval(()=>{line.textContent='「'+s.slice(0,++n)+(n<s.length?'':'」');if(n>=s.length){clearInterval(live.typer);line.classList.remove('typing');}},55);};
+ const nameIn=g=>{const who=$('.tv-who');if(!who)return;who.classList.remove('in');who.innerHTML=[...String(g.title||'')].map((c,i)=>`<i style="transition-delay:${Math.min(i,40)*22}ms">${esc(c)}</i>`).join('');
+  who.title=g.title+(g.lastPlayedAt?` · ${w.last} · ${relativeTime(g.lastPlayedAt)}`:'');void who.offsetWidth;requestAnimationFrame(()=>who.classList.add('in'));};
  const max=Math.max(1,...model.games.map(g=>g.characters||0));
  async function paint(i,flash=true,mode='draw'){
   const g=typeof i==='object'?i:list[i];if(!root.isConnected){if(live?.root===root)stopHomeTV();return;}if(!g||!live||live.root!==root)return;shown=g;cur=list.indexOf(g);
@@ -319,7 +325,7 @@ export function renderHomeTV(main,ctx){
    if(live&&live.root===root)fitLeft(root);},900);},flash?Math.max(0,reveal-(performance.now()-started)):0);
   tweenFig($('[data-fig="time"]'),g.readingSeconds||0,v=>mins(v));tweenFig($('[data-fig="chars"]'),g.characters||0,v=>number(Math.round(v)));tweenFig($('[data-fig="words"]'),
    g.learnedWords||0,v=>number(Math.round(v)));
-  $('.tv-who').textContent=g.title+(g.lastPlayedAt?` · ${w.last} · ${relativeTime(g.lastPlayedAt)}`:'');$('.tv-who').title=$('.tv-who').textContent;
+  nameIn(g);type(sentences[0]||'');
   
   rail();
  }
