@@ -26,8 +26,9 @@ test('home page: no 全部作品 / + cards in the hand; a docked tab slides out 
  const js=fs.readFileSync(path.join(WEB,'home-tv.js'),'utf8'),css=fs.readFileSync(path.join(WEB,'home-tv.css'),'utf8'),pick=fs.readFileSync(path.join(WEB,'home-picker.js'),'utf8');
  for(const gone of ['tv-hc-add','tv-hc-all','tv-drawer','hand.setExtras('])assert.ok(!js.includes(gone),gone+' is gone');
  assert.ok(js.includes('createDock(')&&js.includes('openHandPicker('));
- assert.match(css,/\.tv-dock\{[^}]*right:0;[^}]*border-radius:16px 0 0 16px!important;[^}]*transform:translateX\(calc\(100% - \d+px\)\)/,'rounded tab tucked into the right edge');
- assert.match(css,/\.tv-dock\.out\{transform:none\}/);
+ assert.match(css,/\.tv-dock\{[^}]*right:0;[^}]*width:\d+px;aspect-ratio:3\/4\.6;[^}]*border-radius:14px 0 0 14px!important;[^}]*transform:translateX\(calc\(100% - \d+px\)\)/,'portrait card tab tucked into the right edge');
+ assert.match(css,/\.tv-dock span\{writing-mode:vertical-rl/,'label runs down the card');
+ assert.match(css,/\.tv-dock\.out\{transform:translateX\(0\)/);
  assert.ok(pick.includes("addEventListener('pointerenter'")&&pick.includes("addEventListener('pointerleave'"),'opens on hover, tucks back when the pointer leaves');
  assert.ok(pick.includes('aria-modal="true"')&&pick.includes("e.key==='Escape'"),'the window is a modal that Escape closes');
 });

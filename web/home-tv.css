@@ -257,14 +257,15 @@
 
 /* 2026-11-13 (user: "把＋卡移到最右边 不要是卡牌了 鼠标放上去再出来 … 圆角的") the hand editor is a rounded tab docked on the right edge:
    only a sliver with a gold grip shows, it slides out under the pointer and tucks back after it leaves (home-picker.js) */
-.tv-dock{position:absolute;right:0;bottom:24vh;z-index:12;display:flex;align-items:center;gap:10px;height:50px;margin:0;padding:0 20px 0 22px!important;border:1px solid color-mix(in srgb,var(--g-t1) 18%,transparent)!important;border-right:0!important;border-radius:16px 0 0 16px!important;background:color-mix(in srgb,var(--bg) 84%,transparent)!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);color:var(--g-t1)!important;box-shadow:-12px 14px 30px -20px #000;transform:translateX(calc(100% - 14px));transition:transform .45s cubic-bezier(.22,1.18,.36,1),background-color .2s;cursor:pointer}
-.tv-dock::before{content:"";position:absolute;left:5px;top:13px;bottom:13px;width:3px;border-radius:3px;background:var(--g-gold);opacity:.75;transition:opacity .2s}
-.tv-dock.out{transform:none}.tv-dock.out::before{opacity:0}
-.tv-dock b{font:400 22px/1 var(--g-serif);color:var(--g-gold)}
-.tv-dock span{font-size:13px;letter-spacing:.12em;white-space:nowrap}
-.tv-dock:hover{background:color-mix(in srgb,var(--bg) 94%,transparent)!important}
+.tv-dock{position:absolute;right:0;bottom:22vh;z-index:12;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;width:68px;aspect-ratio:3/4.6;margin:0;padding:0!important;border:1px solid color-mix(in srgb,var(--g-gold) 38%,transparent)!important;border-right:0!important;border-radius:14px 0 0 14px!important;background:linear-gradient(160deg,color-mix(in srgb,var(--g-gold) 14%,var(--bg)),color-mix(in srgb,var(--bg) 92%,#000))!important;color:var(--g-t1)!important;box-shadow:-14px 16px 32px -20px #000,inset 0 0 0 4px color-mix(in srgb,var(--bg) 70%,transparent);transform:translateX(calc(100% - 12px)) rotate(0deg);transform-origin:100% 50%;transition:transform .5s cubic-bezier(.22,1.25,.36,1),box-shadow .25s;cursor:pointer}
+/* (user: "做成竖着的卡牌形状侧拉栏 不要长方形") a portrait card peeking from the right edge; only its gold edge shows until the pointer finds it */
+.tv-dock::before{content:"";position:absolute;left:4px;top:18%;bottom:18%;width:3px;border-radius:3px;background:var(--g-gold);opacity:.8;transition:opacity .2s}
+.tv-dock::after{content:"";position:absolute;inset:7px 0 7px 7px;border:1px solid color-mix(in srgb,var(--g-gold) 22%,transparent);border-right:0;border-radius:9px 0 0 9px;pointer-events:none}
+.tv-dock.out{transform:translateX(0) rotate(-3deg);box-shadow:-20px 22px 40px -22px #000,0 0 22px -6px color-mix(in srgb,var(--g-gold) 40%,transparent),inset 0 0 0 4px color-mix(in srgb,var(--bg) 70%,transparent)}.tv-dock.out::before{opacity:0}
+.tv-dock b{font:400 26px/1 var(--g-serif);color:var(--g-gold)}
+.tv-dock span{writing-mode:vertical-rl;font-size:12px;letter-spacing:.3em;white-space:nowrap;color:color-mix(in srgb,var(--g-t1) 85%,transparent)}
 .tv-dock:active{scale:.97}
-.tv-dock:focus-visible{outline:1px solid var(--g-gold);outline-offset:-4px}
+.tv-dock:focus-visible{outline:1px solid var(--g-gold);outline-offset:-5px}
 /* the window: the library as covers, ticked ones go into the hand */
 .tv-pick{position:absolute;inset:0;z-index:30;display:grid;place-items:center;opacity:0;transition:opacity .2s}
 .tv-pick.in{opacity:1}
