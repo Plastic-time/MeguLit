@@ -6,7 +6,7 @@
    withdrawn path. */
 process.env.MEGULIT_RELAY_BASE??='off';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
-const fx=require('./helpers/adapter-fixtures.cjs');
+const fx=require('./helpers/adapter-fixtures.cjs'),d=require('../services/desensitize.cjs');
 const R=fx.root('megulit-pipeline-');process.env.MEGULIT_ROOT=R;process.env.MEGULIT_ADAPTER_PACKS_DIR=path.join(R,'data','adapter-packs');
 const packs=require('../services/adapter-packs.cjs'),probe=require('../services/adapter-probe.cjs'),sample=require('../services/adapter-sample.cjs'),feed=require('../services/adapter-feed.cjs');
 const K=fx.key();packs._trust([K.entry]);
@@ -48,7 +48,7 @@ test('upload bundle: desensitized samples + key candidates, manifest, no game te
  /* privacy: no path, no user name, no line, no two characters of any line */
  assert.ok(!body.includes(R)&&!body.includes('Unknown Format Game')&&!body.includes(require('node:os').userInfo().username+'\\'));
  for(const line of fx.LINES){assert.ok(!body.includes(line));for(let i=0;i+1<line.length;i++)assert.ok(!body.includes(line.slice(i,i+2))||/[あア亜]{2}/.test(line.slice(i,i+2)),'pair '+line.slice(i,i+2));}
- const raw=Buffer.from(g.samples[0].sample.parts[0].base64,'base64');for(const enc of ['shift_jis','utf-8','utf-16le'])for(const line of fx.LINES)assert.ok(!new TextDecoder(enc).decode(raw).includes(line));
+ const raw=d.partBytes(g.samples[0].sample.parts[0]);for(const enc of ['shift_jis','utf-8','utf-16le'])for(const line of fx.LINES)assert.ok(!new TextDecoder(enc).decode(raw).includes(line));
  assert.equal(sample.clean({games:[{title:'x',detail:'猫が好き'}]}),false,'clean() refuses text outside titles');
  const m=sample.manifest(R,prep.hash);assert.equal(m.hash,prep.hash);assert.equal(m.manifest[0].title,'未知封包のゲーム');assert.ok(m.manifest[0].items.some(i=>i.kind==='sample'));
  test.prep=prep;

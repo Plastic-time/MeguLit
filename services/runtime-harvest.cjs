@@ -113,13 +113,15 @@ function publicize(local,{dumps=[]}={}){
   const entries=[];for(const e of ix.entries.slice(0,65536))entries.push(e[0],e[1],e[2]||0);
   const ext={};for(const n of names||[]){const m=/\.([A-Za-z0-9]{1,8})$/.exec(n);const k=m?m[1].toLowerCase():'(none)';ext[k]=(ext[k]||0)+1;}
   const kinds=ix.kinds?ix.kinds.map(([k])=>KIND_CODES[k]||'o').join(''):null;const via=ix.kinds?[...new Set(ix.kinds.map(([,v])=>v).filter(Boolean))]:[];
-  const item={archive:{name:d.maskString(ix.archive.name).slice(0,120),size:ix.archive.size,magic:ix.archive.file?magicHex(readHead(ix.archive.file,8)):''},where:where(ix.where),locator:loc(ix.locator),slotSig:sig(ix.slotSig),stride:ix.stride,fields:ix.fields,countAt:ix.countAt,count:ix.count,coverage:ix.coverage,
+  /* the table region itself, desensitized like a file sample (record layout, name fields as placeholders) */
+  const region=ix.region?d.sample(ix.region.bytes,{max:ix.region.bytes.length,compress:true}):null;if(ix.region&&!region)dropped.verify++;
+  const item={...(region?{region:{at:ix.region.at,sample:region}}:{}),archive:{name:d.maskString(ix.archive.name).slice(0,120),size:ix.archive.size,magic:ix.archive.file?magicHex(readHead(ix.archive.file,8)):''},where:where(ix.where),locator:loc(ix.locator),slotSig:sig(ix.slotSig),stride:ix.stride,fields:ix.fields,countAt:ix.countAt,count:ix.count,coverage:ix.coverage,
    entries:b64u32(entries),entryWords:3,...(names?{names:{at:ix.names.at,form:ix.names.form,list:names},ext}:{}),...(kinds?{kinds,via}:{})};
   if(names&&names.some(n=>naturalLanguage(Buffer.from(n,'utf8'))||naturalLanguage(Buffer.from(n,'utf16le')))){dropped.language++;delete item.names;}
   indexes.push(item);}
  const dispatch=(local.dispatch||[]).map(t=>({where:where(t.where),count:t.count,ptr:t.ptr,targets:b64u32(t.targets),sig:sig(t.sig)}));
- const scripts=[];for(const s of local.scripts||[]){const sm=d.sample(s.window,{max:65536});if(!sm){dropped.verify++;continue;}scripts.push({where:where(s.where),locator:loc(s.locator),encoding:s.encoding,runs:s.runs,textShare:s.textShare,before:s.before,opcodes:s.opcodes,lengthPrefix:s.lengthPrefix,terminator:s.terminator,sample:sm});}
- for(const x of dumps.slice(0,4)){const sm=d.sample(x.bytes.subarray(0,65536),{max:65536});if(!sm){dropped.verify++;continue;}const shape=require('./runtime-harvest-scan.cjs').bytecodeShape(x.bytes.subarray(0,65536));
+ const scripts=[];for(const s of local.scripts||[]){const sm=d.sample(s.window,{max:s.window.length,compress:true});if(!sm){dropped.verify++;continue;}scripts.push({where:where(s.where),locator:loc(s.locator),encoding:s.encoding,runs:s.runs,textShare:s.textShare,before:s.before,opcodes:s.opcodes,lengthPrefix:s.lengthPrefix,terminator:s.terminator,sample:sm});}
+ for(const x of dumps.slice(0,4)){const whole=x.bytes.subarray(0,8<<20),sm=d.sample(whole,{max:whole.length,compress:true});if(!sm){dropped.verify++;continue;}const shape=require('./runtime-harvest-scan.cjs').bytecodeShape(x.bytes.subarray(0,65536));
   scripts.push({where:{dump:true},source:d.maskString(path.basename(String(x.source||'memory').replace(/\\/g,'/'))).slice(0,80),how:x.how,size:x.bytes.length,...(shape||{}),sample:sm});}
  const modules=(local.modules||[]).map((m,i)=>used.has(i)||m.main?{id:i,name:d.maskString(m.name).slice(0,80),size:m.size,main:!!m.main}:null).filter(Boolean);
  return {schema:SCHEMA,version:VERSION,collector:{scan:scanStamp(),native:'RuntimeHarvest',bits:local.bits||0},stats:local.stats||{},modules,constants,keys,indexes,dispatch,scripts,dropped};}
@@ -138,7 +140,7 @@ function gate(pub){if(!pub||pub.schema!==SCHEMA)return null;const out=JSON.parse
   if(Array.isArray(v))return v.every(x=>fieldOk(x,k));if(v&&typeof v==='object')return Object.entries(v).every(([kk,x])=>kk==='sample'?sampleOk(x):fieldOk(x,kk));return true;};
  /* a text sample: the same rule verify() applied (no text run in the file's own encoding, no long kana run in another),
     and no English prose left */
- const sampleOk=s=>!!s&&Array.isArray(s.parts)&&s.parts.every(p=>{const b=Buffer.from(String(p.base64||''),'base64');return d.textRuns(b).length===0&&!englishProse(b);});
+ const sampleOk=s=>!!s&&Array.isArray(s.parts)&&s.parts.every(p=>{const b=d.partBytes(p);return b.length===(p.len|0)&&d.textRuns(b).length===0&&!englishProse(b);});
  for(const k of ['constants','keys','indexes','dispatch','scripts'])out[k]=(out[k]||[]).filter(f=>{const ok=fieldOk(f);if(!ok)out.dropped.gate++;return ok;});
  out.modules=(out.modules||[]).map(m=>({...m,name:textIn(m.name)?d.maskString(m.name):m.name}));
  return out;}

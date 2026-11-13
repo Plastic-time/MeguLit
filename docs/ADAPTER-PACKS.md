@@ -192,3 +192,22 @@ older readers skip it). Packs: new capabilities `container:index`, `transform:bl
 `transform:xor-file`; an app without them skips such a pack (CAPABILITY) instead of misreading it. Reports may carry
 `verdict` (solved ≥ 98 % pairing / read / partial / failed) and `origin` (runtime / probe); the relay keeps them with
 the after numbers.
+
+### Compressed samples and the re-scope (2026-11-14)
+
+Desensitized data is mostly repeated placeholders, so samples now go up gzip-compressed (`sample(…,{compress:true})`,
+part `{at,len,encoding,gzip,packed}`, read with `partBytes()`; width is kept, every offset is a file offset). Measured on
+synthetic data: a Shift-JIS / UTF-16 script or bytecode ≈ 1/150, an index table of numbers + masked names ≈ 1/6, an
+archive whose encrypted blocks were zero-filled ≈ 1/90. Limits are now: whole archive up to 16 MB, else 8 MB head + 8 MB
+tail; whole scripts up to 16 MB; 8 samples per game; ≤ 2 MB **compressed** per sample (quartered until it fits), ≤ 8 MB
+bundle (the relay limit), ≤ 64 MB read / 80 s per game on the user's PC. The manifest shows `raw` and `packed` per
+sample. Plaintext index tables that did not fit the old 64 KB head now go up whole — no memory reading needed for them.
+
+Memory reading stays for what a file sample cannot carry: keys that only exist at run time (high-entropy data is never
+sampled), and the layout of an index the game decrypts in memory (on disk it is high-entropy, so a file sample has only
+zeros there). Memory finds use the same path: script buffers and the index region are taken as large windows and go
+through `desensitize.sample()` + `verify()` + compression like a file.
+
+Desensitizing whole tables surfaced one more rule: two half-width-kana bytes between binary bytes are a number
+(`0x03A6B010` = `10 B0 A6 03`), not text; such runs now count as text only when 3+ long with ASCII / NUL / text on both
+sides, so index numbers stay intact.

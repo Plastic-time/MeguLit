@@ -26,7 +26,7 @@ function decodings(buf){const out=[];for(const enc of ['shift_jis','utf-8','utf-
 const NEEDLES=[...new Set(rf.JP_LINES.flatMap(l=>{const c=[...l].filter(ch=>!PLACE.has(ch)&&!'、。！？「」…ー'.includes(ch));const out=[];for(let i=0;i+1<c.length;i++)out.push(c[i]+c[i+1]);return out;}))];
 const EN_NEEDLES=rf.ENGLISH.flatMap(e=>{const w=e.split(/\s+/);const out=[];for(let i=0;i+2<w.length;i++)out.push(w.slice(i,i+3).join(' '));return out;});
 /* every string in a JSON value, and every base64 / hex field decoded, in every encoding */
-function surfaces(value){const out=[];const walk=(v,k)=>{if(typeof v==='string'){out.push(v);if(v.length>=8&&/^[A-Za-z0-9+/]+=*$/.test(v)&&v.length%4===0)for(const t of decodings(Buffer.from(v,'base64')))out.push(t);if(/^(?:[0-9a-f]{2}){4,}$/.test(v))for(const t of decodings(Buffer.from(v,'hex')))out.push(t);}
+function surfaces(value){const out=[];const walk=(v,k)=>{if(v&&typeof v==='object'&&typeof v.gzip==='string'){for(const t of decodings(d.partBytes(v)))out.push(t);}if(typeof v==='string'){out.push(v);if(v.length>=8&&/^[A-Za-z0-9+/]+=*$/.test(v)&&v.length%4===0)for(const t of decodings(Buffer.from(v,'base64')))out.push(t);if(/^(?:[0-9a-f]{2}){4,}$/.test(v))for(const t of decodings(Buffer.from(v,'hex')))out.push(t);}
  else if(Array.isArray(v))v.forEach(x=>walk(x,k));else if(v&&typeof v==='object')for(const [kk,x] of Object.entries(v))walk(x,kk);};walk(value,'');return out;}
 function leaks(value){const found=[];for(const s of surfaces(value)){for(const n of NEEDLES)if(s.includes(n))found.push(n);for(const n of EN_NEEDLES)if(s.includes(n))found.push(n);
  /* any kana run of 3+ that is not placeholders */const m=s.match(/[ぁ-ゖァ-ヺ]{3,}/g);if(m)for(const r of m)if([...r].some(ch=>!PLACE.has(ch)))found.push(r);}
@@ -75,7 +75,7 @@ test('privacy: the uploadable findings hold no natural language — independent 
  const pub=rh.gate(rh.publicize(LOCAL));
  assert.deepEqual(leaks(pub),[],'nothing of any line survives');
  assert.ok(pub.keys.length>=4&&pub.indexes.length===1&&pub.scripts.length===1,'and the structure is still there');
- const sample=Buffer.from(pub.scripts[0].sample.parts[0].base64,'base64');assert.equal(d.textRuns(sample).length,0);
+ const sample=d.partBytes(pub.scripts[0].sample.parts[0]);assert.equal(d.textRuns(sample).length,0);assert.ok(pub.scripts[0].sample.parts[0].packed<sample.length/4,'placeholders compress: '+pub.scripts[0].sample.parts[0].packed+' of '+sample.length);
  /* the script sample still carries the layout: same length, opcodes and lengths in place */
  const at=sample.indexOf(Buffer.from('SCB1'));assert.ok(at>=0);assert.equal(sample[at+16],0x11);assert.equal(sample[at+17],sjis('めぐみん').length);
  /* names are masked, module names too */

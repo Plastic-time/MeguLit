@@ -29,7 +29,7 @@
 const fs=require('node:fs'),crypto=require('node:crypto'),zlib=require('node:zlib');
 const d=require('./desensitize.cjs');
 
-const MEM_IMAGE=0x1000000,MEM_PRIVATE=0x20000;
+const MEM_IMAGE=0x1000000,MEM_PRIVATE=0x20000,SCRIPT_WINDOW=1<<20;
 const EXEC=0x10|0x20|0x40|0x80,WRITE=0x04|0x08|0x40|0x80;
 
 /* ---- crypto constants ------------------------------------------------------------------------------------------- */
@@ -209,7 +209,9 @@ function createScanner({archives=[],pairs=[],budgetMs=90000,now=Date.now}={}){
     let countAt=null;for(let back=1;back<=8;back++){if(at-back>=0&&w[at-back]===count){countAt=-back;break;}}
     const table=[];for(let k=0;k<count;k++){const i=at+k*stride;table.push([w[i],w[i+g],fields.unpacked?w[i+fields.unpacked.word]:0]);}
     const sig=crypto.createHash('sha1').update(Buffer.from(Uint32Array.from(table.flat()).buffer)).digest('hex');const twin=out.indexes.find(x=>x.sig===sig);if(twin){twin.copies=(twin.copies||1)+1;return;}
-    const a=base+at*4;out.indexes.push({sig,archive:arc,address:a,where:where(a),stride:stride*4,count,fields,names,countAt,entries:table,coverage:Math.round(covered/S*1000)/1000});return;}}}
+    /* the table as it sits in memory, 256 bytes either side (names and all; desensitized before it can leave) */
+    const from=Math.max(0,at*4-256),to=Math.min(b.length,(at+count*stride)*4+256);
+    const a=base+at*4;out.indexes.push({sig,region:{at:from-at*4,bytes:Buffer.from(b.subarray(from,to))},archive:arc,address:a,where:where(a),stride:stride*4,count,fields,names,countAt,entries:table,coverage:Math.round(covered/S*1000)/1000});return;}}}
  /* the name of each record: a NUL-terminated string at the same place in every record, or a pointer */
  function recordNames(b,at,count,stride){const recBytes=stride*4,first=at*4;
   /* inside the record first (the offset field need not be its first word), then a name before the offset field */
@@ -228,7 +230,8 @@ function createScanner({archives=[],pairs=[],budgetMs=90000,now=Date.now}={}){
    if(score<24)continue;if(++scriptWindows>400||over())return;
    const win=b.subarray(s,Math.min(b.length,s+65536));const shape=bytecodeShape(win);if(!shape)continue;
    const h=crypto.createHash('sha1').update(win.subarray(0,4096)).digest('hex');if(scriptSeen.has(h))continue;scriptSeen.add(h);
-   const a=base+s;out.scripts.push({address:a,where:where(a),...shape,window:Buffer.from(win)});s+=win.length-BLOCK;}}
+   /* the sample is a larger window (desensitized and compressed later: placeholders compress to almost nothing) */
+   const a=base+s;out.scripts.push({address:a,where:where(a),...shape,window:Buffer.from(b.subarray(s,Math.min(b.length,s+SCRIPT_WINDOW)))});s+=win.length-BLOCK;}}
  function finish(){
   /* code signatures for image finds and the heap slots that locate heap finds */
   /* the object may start a little before the find (a record's first field, a context struct around a key schedule) */
