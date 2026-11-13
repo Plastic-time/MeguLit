@@ -7,10 +7,38 @@ const fit=require('../web/reader/modules/game-fit.js');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 const PAGE='そう、雪だ。今なお、それは降り続け、僕の体を白く覆っていく。ああ…僕はこんなところで何をしているのだろう…。いつからこんなところに、ひとりぼっちで居るのだろう…。………。雪に埋もれた…僕の手。それが、何かを掴んでいた。引き上げる。';
 
-test('E542 replay: the prologue page is one game line; each page replaces the last (no accumulation across pages)',()=>{
+const PARTS=['そう、雪だ。','今なお、それは降り続け、僕の体を白く覆っていく。','ああ…','僕はこんなところで何をしているのだろう…。','いつからこんなところに、ひとりぼっちで居るのだろう…。','………。','雪に埋もれた…僕の手。','それが、何かを掴んでいた。','引き上げる。'];
+const shownLines=r=>r.events.filter(e=>e&&typeof e.hookSource==='string'&&e.hookSource).map(e=>e.hookSource);
+test('E542 replay (recorded, old HookBridge without parts): the flushed batch is one line, each new game line replaces it',()=>{
  const r=replay(path.join(__dirname,'helpers','prologue-replay','clannad-prologue.jsonl'),{name:'SiglusEngine_Steam.exe'});
- const lines=r.events.filter(e=>e&&typeof e.hookSource==='string'&&e.hookSource).map(e=>e.hookSource);
- assert.deepStrictEqual(lines,['一面、白い世界…','…','雪…',PAGE,'真っ白な手。','女の子の手だった。']);
+ assert.deepStrictEqual(shownLines(r),['一面、白い世界…','…','雪…',PAGE,'真っ白な手。','女の子の手だった。']);
+});
+test('E542 replay ADV: the batch of nine callbacks shows one sentence per player click, in order, never the whole page',()=>{
+ assert.strictEqual(PARTS.join(''),PAGE);
+ const r=replay(path.join(__dirname,'helpers','prologue-replay','clannad-prologue-adv.jsonl'),{name:'SiglusEngine_Steam.exe'});
+ const lines=shownLines(r);
+ assert.ok(!lines.includes(PAGE),'the whole page is never drawn');
+ assert.deepStrictEqual(lines,['一面、白い世界…','…','雪…',...PARTS,'真っ白な手。','女の子の手だった。']);
+});
+test('E542 page parts: clicks made before the flush are caught up; a held skip jumps to the last part; a new line drops the queue',()=>{
+ const {HookNative}=require('../core/hook-native.cjs');let now=100000;const ev=[];
+ const h=new HookNative({native:__dirname,hook:__dirname,logs:'Z:/none'},m=>ev.push(m),()=>{},()=>now);h.trace=()=>{};h.send=()=>{};
+ const src=()=>ev.filter(e=>e&&typeof e.hookSource==='string'&&e.hookSource).map(e=>e.hookSource);
+ h.advance();now+=1000;h.advance();now+=1000;
+ h.sourcePage({type:'hookSource',text:PAGE,parts:PARTS,partsAgeMs:2500,sourceName:'EmbedSiglus',sourceCode:'X'},'g.exe');
+ assert.strictEqual(src().pop(),PARTS[2],'two clicks since the first callback');
+ now+=100;assert.strictEqual(h.advance(),false,'a double click is one advance');
+ now+=1000;h.advance();assert.strictEqual(src().pop(),PARTS[3]);
+ now+=1000;h.skipHeld(true);assert.strictEqual(src().pop(),PARTS[8]);h.skipHeld(false);
+ now+=1000;assert.strictEqual(h.advance(),false);
+ h.sourcePage({type:'hookSource',text:PAGE,parts:PARTS,partsAgeMs:0,sourceName:'EmbedSiglus',sourceCode:'X'},'g.exe');now+=1000;
+ h.sourcePage({type:'hookSource',text:'真っ白な手。',sourceName:'EmbedSiglus',sourceCode:'X'},'g.exe');now+=1000;
+ assert.strictEqual(h.advance(),false);assert.strictEqual(src().pop(),'真っ白な手。');
+});
+test('E542 HookBridge sends the separate callbacks of a flushed batch; the reader forwards player advances',()=>{
+ assert.match(read('native/HookSourceFrames.cs'),/public List<string> Parts\(string output,DateTime now,out double ageMs\)/);
+ assert.match(read('native/HookBridge.cs'),/parts=pageParts\.ToArray\(\),partsAgeMs=/);
+ assert.match(read('services/reader.cjs'),/this\.gal\?\.hooks\?\.advance\?\.\(\)/);
 });
 
 test('E542 fit: the logged layout (top 818, 4 lines of 46.5 px + translation, client bottom 1004) shrinks into the client',()=>{

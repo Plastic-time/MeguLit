@@ -198,7 +198,7 @@ html:not(#u):not(#v):not(#w):not(#x) body .tv-home .tv-fig>b{font-size:clamp(34p
 html:not(#u):not(#v):not(#w):not(#x) body .tv-home .tv-figs{gap:10px!important}
 html:not(#u):not(#v):not(#w):not(#x) body .tv-home .tv-kana{opacity:.45}
 html:not(#u):not(#v):not(#w):not(#x) body .tv-home .tv-index{display:none!important}
-html:not(#u):not(#v):not(#w):not(#x) body .tv-home .tv-dialog .tv-who{display:none!important}
+html:not(#u):not(#v):not(#w):not(#x) body .tv-home:not(.has-hl) .tv-dialog .tv-who{display:none!important}
 /* library: deeper vignette so the wall reads as depth, fading at the edges instead of hard cuts; captions in the sans */
 html:not(#u):not(#v):not(#w):not(#x) body #library-results.lib-field::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:3;background:radial-gradient(120% 95% at 50% 50%,transparent 52%,rgba(8,6,8,.55) 82%,rgba(8,6,8,.9) 100%)}
 html:not(#u):not(#v):not(#w):not(#x) body .lib-field .game-caption .mq{font-family:"Segoe UI Variable Text","Microsoft YaHei UI","Yu Gothic UI",system-ui,sans-serif!important;font-weight:600!important}
