@@ -55,7 +55,7 @@ function collect(gameDir){const best=new Map();
  return docs.filter(d=>d.how!=='plain'||!decrypted.has(String(d.source).toLowerCase())).sort((a,b)=>a.seq-b.seq);}
 
 // Lines per language, in the order the game decrypted them: the input for pairing a Japanese script with its translation.
-function corpus(gameDir){const out={ja:[],zh:[]};for(const d of collect(gameDir))out[d.lang].push(...d.lines);return out;}
+function corpus(gameDir){const out={ja:[],zh:[]};for(const d of collect(gameDir))for(const l of d.lines)out[d.lang].push(l);return out;}
 
 // Writes each document as UTF-8 text to outDir (named after its source), so readers that take plain script files can open
 // them like files from the game folder. Returns the written paths.
