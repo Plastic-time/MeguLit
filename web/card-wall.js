@@ -176,47 +176,18 @@ function sigil(){
  return sigilUrl;
 }
 
-/* ---------- the magician's desk: a few things on the table, drawn once as pictures ----------
-   An open grimoire, a candle in a brass dish, a quill and its inkwell, a few crystals, gold scrollwork at the inlay's
-   corners. Still images on the table's own layer (no motion, nothing per frame). */
-let deskArt=null;
-function deskPictures(){
- if(deskArt)return deskArt;
- const u=svg=>'url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';
- const book=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 170'><defs><linearGradient id='p' x1='0' x2='1'><stop offset='0' stop-color='#d9c8a2'/><stop offset='.45' stop-color='#efe3c6'/><stop offset='.5' stop-color='#bfa978'/><stop offset='.55' stop-color='#efe3c6'/><stop offset='1' stop-color='#d4c196'/></linearGradient></defs>
-  <path d='M8 26q60-20 122 4q62-24 122-4v128q-60-18-122 6q-62-24-122-6z' fill='#3b1216'/><path d='M14 22q58-18 116 6v128q-58-22-116-4z' fill='url(#p)'/><path d='M130 28q58-24 116-6v128q-58-18-116 6z' fill='url(#p)'/>
-  <g fill='none' stroke='#6d5638' stroke-opacity='.4' stroke-width='1.1'>${[0,1,2,3,4,5,6,7].map(i=>`<path d='M26 ${48+i*12}q40-10 90 3'/>`).join('')}</g>
-  <g fill='none' stroke='#8a1d2c' stroke-opacity='.75' stroke-width='1.3'><circle cx='188' cy='88' r='40'/><circle cx='188' cy='88' r='31'/><path d='${(()=>{let d='';for(let i=0;i<=7;i++){const a=-Math.PI/2+i*3*Math.PI*2/7;d+=(i?'L':'M')+(188+30*Math.cos(a)).toFixed(1)+' '+(88+30*Math.sin(a)).toFixed(1);}return d;})()}'/></g>
-  <path d='M130 30v126' stroke='#5a4527' stroke-opacity='.5'/><path d='M150 150q30 10 58 0' stroke='#8a1d2c' stroke-width='3' fill='none'/></svg>`;
- const candle=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 200'><defs><linearGradient id='w' x1='0' x2='1'><stop offset='0' stop-color='#cdbd9c'/><stop offset='.4' stop-color='#f4ead4'/><stop offset='1' stop-color='#b9a77f'/></linearGradient><linearGradient id='b' x1='0' x2='0' y1='0' y2='1'><stop offset='0' stop-color='#f3d28c'/><stop offset='1' stop-color='#8a5f22'/></linearGradient><radialGradient id='f' cx='.5' cy='.62' r='.5'><stop offset='0' stop-color='#fffbe6'/><stop offset='.45' stop-color='#ffd27a'/><stop offset='1' stop-color='#ff8a3c' stop-opacity='0'/></radialGradient></defs>
-  <ellipse cx='60' cy='178' rx='54' ry='15' fill='url(#b)'/><ellipse cx='60' cy='174' rx='44' ry='10' fill='#5e3f16' fill-opacity='.5'/><path d='M88 176q22-4 26 6' stroke='#c99b4e' stroke-width='5' fill='none'/>
-  <rect x='42' y='70' width='36' height='104' rx='4' fill='url(#w)'/><path d='M42 76q6 10 2 22M74 74q4 14-2 26' stroke='#e9dcc0' stroke-width='5' stroke-linecap='round'/>
-  <path d='M60 70v-10' stroke='#2a1a10' stroke-width='2'/><path d='M60 18q-12 22-8 34q4 10 8 10q4 0 8-10q4-12-8-34z' fill='url(#f)'/></svg>`;
- const quill=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 230 170'><defs><linearGradient id='g' x1='0' x2='1'><stop offset='0' stop-color='#141016'/><stop offset='.35' stop-color='#3a2a3c'/><stop offset='1' stop-color='#0d0a0e'/></linearGradient></defs>
-  <ellipse cx='62' cy='150' rx='46' ry='10' fill='#000' fill-opacity='.35'/><path d='M28 96q0-18 34-18t34 18v40q0 14-34 14t-34-14z' fill='url(#g)'/><rect x='46' y='62' width='32' height='20' rx='4' fill='#b8893d'/><path d='M38 104q4 20 10 30' stroke='#fff' stroke-opacity='.22' stroke-width='4' stroke-linecap='round'/>
-  <path d='M64 66L210 10' stroke='#e8dcc4' stroke-width='2'/><path d='M100 52q50-34 112-44q-30 34-94 54z' fill='#efe5d0' fill-opacity='.92'/><g stroke='#b9a98a' stroke-width='.9'>${[0,1,2,3,4,5,6,7,8].map(i=>`<path d='M${110+i*11} ${48-i*4}l${8} ${-10+i*.6}'/>`).join('')}</g></svg>`;
- const gems=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 170 120'><ellipse cx='85' cy='104' rx='70' ry='10' fill='#000' fill-opacity='.3'/>
-  <path d='M40 100l-14-40l22-34l20 30l-6 44z' fill='#8e1230'/><path d='M48 26l20 30l-6 44l-8-40z' fill='#c4213f'/><path d='M40 100l-14-40l22-34l6 34z' fill='#5a0c1f'/>
-  <path d='M98 102l-10-30l16-22l14 24l-4 28z' fill='#4b2a6e'/><path d='M104 50l14 24l-4 28l-6-30z' fill='#7d50b0'/>
-  <path d='M128 104l-6-16l10-12l10 12l-4 16z' fill='#b8893d'/><path d='M132 76l10 12l-4 16l-4-14z' fill='#f3d28c'/>
-  <g fill='#edb56e'>${[[20,108],[70,112],[150,96],[118,112],[60,90]].map(([x,y])=>`<circle cx='${x}' cy='${y}' r='1.6'/>`).join('')}</g></svg>`;
- const corner=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 90'><g fill='none' stroke='#edb56e' stroke-opacity='.55' stroke-width='1.2' stroke-linecap='round'><path d='M4 4h40q-14 6-14 20'/><path d='M4 4v40q6-14 20-14'/><path d='M14 14q22 2 26 22q-14-6-26 0q6-12 0-22z'/><circle cx='4' cy='4' r='2.6' fill='#edb56e' fill-opacity='.6'/><path d='M44 4q10 0 14 8M4 44q0 10 8 14'/></g></svg>`;
- deskArt={book:u(book),candle:u(candle),quill:u(quill),gems:u(gems),corner:u(corner)};
- return deskArt;
-}
-
 /* ---------- 闪卡 facets: crushed-ice prism (like a maimai DX PASS) ----------
    A field of small jittered triangles, each its own grey. On the card the grey is set against a rainbow with
    'difference', so every facet sits at its own place in the spectrum and the whole field changes colour as the rainbow
    slides with the card's angle. Drawn once, shared by every card through --cw-facets. */
 function facetsUrl(){
- const W=146,H=204,cols=17,rows=24,rnd=(i=>()=>((i=Math.imul(i^i>>>15,2246822507)^Math.imul(i^i>>>13,3266489909)+0x6D2B79F5)>>>0)/4294967296)(0x5eed);
+ const W=146,H=204,cols=26,rows=36,rnd=(i=>()=>((i=Math.imul(i^i>>>15,2246822507)^Math.imul(i^i>>>13,3266489909)+0x6D2B79F5)>>>0)/4294967296)(0x5eed);
  const P=[];for(let r=0;r<=rows;r++){const row=[];for(let c=0;c<=cols;c++){const edge=r===0||c===0||r===rows||c===cols,jx=edge?0:(rnd()-.5)*.8,jy=edge?0:(rnd()-.5)*.8;row.push([((c+jx)*W/cols).toFixed(1),((r+jy)*H/rows).toFixed(1)]);}P.push(row);}
  let tri='';const g=()=>{const v=Math.floor(rnd()*256);return 'rgb('+v+','+v+','+v+')';};
  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const a=P[r][c],b=P[r][c+1],d=P[r+1][c],e=P[r+1][c+1],flip=rnd()<.5;
   const t1=flip?[a,b,e]:[a,b,d],t2=flip?[a,e,d]:[b,e,d];
   for(const t of [t1,t2])tri+="<path d='M"+t[0].join(' ')+'L'+t[1].join(' ')+'L'+t[2].join(' ')+"Z' fill='"+g()+"'/>";}
- const svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 "+W+' '+H+"' preserveAspectRatio='none'><g stroke='white' stroke-opacity='.18' stroke-width='.35'>"+tri+'</g></svg>';
+ const svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 "+W+' '+H+"' preserveAspectRatio='none'><g stroke='white' stroke-opacity='.07' stroke-width='.25'>"+tri+'</g></svg>';
  return 'url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';
 }
 try{document.documentElement.style.setProperty('--cw-facets',facetsUrl());}catch{}
@@ -355,7 +326,7 @@ export async function openCardWall(main=document.querySelector('#main')){
   `<p class="cw-first" hidden>${esc(w.first)}</p><div class="cw-toast" role="status" aria-live="polite"></div>`;
  document.body.append(root);
  const field=root.querySelector('.cw-field'),plane=root.querySelector('.cw-plane');root.querySelector('.cw-sigil').style.backgroundImage=sigil();
- const P=page={root,field,plane,sigil:root.querySelector('.cw-sigil'),main,cells:new Map(),state:null,mode:'a',view:{x:0,y:0,z:1},cols:1,rows:1,events:new AbortController()};
+ const P=page={root,field,plane,sigil:root.querySelector('.cw-sigil'),main,cells:new Map(),state:null,mode:'a',view:{x:0,y:0,z:1},cols:1,rows:1,cw:212,ch:318,events:new AbortController()};
  const signal=P.events.signal;
  /* the page covers the main area only (the top bar stays as it is) */
  const place=()=>{const r=(P.main&&P.main.isConnected?P.main:document.documentElement).getBoundingClientRect();root.style.left=r.left+'px';root.style.top=r.top+'px';root.style.width=r.width+'px';root.style.height=r.height+'px';};
@@ -422,7 +393,9 @@ function build(first=false){
  const nodes=list.map(t=>P.cells.get(t.id).node);if(nodes.some((n,i)=>P.plane.children[i]!==n))P.plane.append(...nodes);
  updateCount();
  measure();layoutGrid();
- if(first&&P.mode==='a'){const across=Math.max(1,Math.floor(P.width/P.cw));P.view.x=(Math.min(across,P.cols)-1)*P.cw/2;P.view.y=Math.max(0,(Math.min(P.rows,Math.floor(P.height/P.ch))-1))*P.ch/2;/* the whole width of the wall fits at first (no column cut by the window), never above 1 */const z=1;P.view.z=z;P.zoomTarget=z;P.view.x=(P.cols-1)*P.cw/2;P.view.y=Math.max(0,(P.height/z-P.ch)/2-60/z);}
+ /* the first build sets the wall's view whichever mode it opens in, so switching to the wall later starts from it
+    (opening in the list left the view unset: every toploader stacked in the top left corner) */
+ if(first){const z=1;P.view.z=z;P.zoomTarget=z;P.view.x=(P.cols-1)*P.cw/2;P.view.y=Math.max(0,(P.height/z-P.ch)/2-60/z);}
  relayout();
  if(first&&!reduce()){let n=0;for(const cell of P.cells.values()){if(n<36&&onScreen(cell))hangMotion(cell.parts,n++*28+60);}}
 }
@@ -510,7 +483,7 @@ function constrain(){
 }
 function relayout(){const P=page;if(!P)return;P.painted='';if(P.mode==='a')paint();else for(const c of P.cells.values()){if(c.t){c.node.style.transform='';c.node.style.opacity='';c.t=c.o='';}}}
 function paint(){
- const P=page;if(!P||P.mode!=='a')return;
+ const P=page;if(!P||P.mode!=='a'||!P.cells.size)return;
  constrain();
  const {x,y,z}=P.view,cx=P.width/2,cy=P.height/2,cw=P.cw,ch=P.ch;
  const stamp=x.toFixed(2)+' '+y.toFixed(2)+' '+z.toFixed(4)+' '+P.width+' '+P.height+' '+P.smear.toFixed(4)+' '+P.cells.size;
@@ -663,14 +636,13 @@ function openViewer(cell){
  const layer=document.createElement('div');layer.className='cw-viewer';
  const day=card.createdAt?new Date(card.createdAt):null,stamp=day&&!isNaN(day)?day.getFullYear()+'.'+String(day.getMonth()+1).padStart(2,'0')+'.'+String(day.getDate()).padStart(2,'0'):'';
  const RING=2*Math.PI*27;
- layer.innerHTML=`<div class="cw-veil"></div><div class="cw-desk" aria-hidden="true"><i class="cw-desk-sigil"></i><i class="cw-prop is-book"></i><i class="cw-prop is-candle"></i><i class="cw-prop is-quill"></i><i class="cw-prop is-gems"></i><i class="cw-corner is-tl"></i><i class="cw-corner is-tr"></i><i class="cw-corner is-bl"></i><i class="cw-corner is-br"></i></div><div class="cw-stage"></div>`+
+ layer.innerHTML=`<div class="cw-veil"></div><div class="cw-desk" aria-hidden="true"></div><div class="cw-stage"></div>`+
   `<div class="cw-plate" aria-hidden="true"><h2 class="cw-plate-title" lang="ja"></h2><p class="cw-plate-meta"><span>${esc(w.source[card.source]||w.source[card.kind]||'')}</span>${stamp?`<span>${esc(stamp)}</span>`:''}</p></div>`+
   `<div class="cw-bin" aria-hidden="true"><svg viewBox="0 0 64 64"><circle class="cw-bin-track" cx="32" cy="32" r="27"/><circle class="cw-bin-ring" cx="32" cy="32" r="27" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="${RING.toFixed(2)}"/><path class="cw-bin-icon" d="M24.5 25.5h15M29.5 25.5v-2.2h5v2.2M26.5 25.5l1 13.4c.1.9.8 1.6 1.7 1.6h5.6c.9 0 1.6-.7 1.7-1.6l1-13.4M30.4 29.5v7M33.6 29.5v7"/></svg></div>`+
   `<div class="cw-bar"><button type="button" class="cw-btn cw-close">${esc(w.close)}</button></div><p class="cw-hint">${esc(w.inspect)}</p>`+
   `<div class="cw-confirm" role="alertdialog" aria-modal="true" aria-label="${esc(w.binQ)}" hidden><div class="cw-confirm-box"><h3>${esc(w.binQ)}</h3><p>${esc(w.binBody)}</p><div class="cw-confirm-row"><button type="button" class="cw-btn cw-keep">${esc(w.keep)}</button><button type="button" class="cw-btn cw-discard">${esc(w.discard)}</button></div></div></div>`;
  const veil=layer.querySelector('.cw-veil'),bar=layer.querySelector('.cw-bar'),stage=layer.querySelector('.cw-stage'),hint=layer.querySelector('.cw-hint'),plate=layer.querySelector('.cw-plate');
- {const d=layer.querySelector('.cw-desk'),a=deskPictures();d.querySelector('.cw-desk-sigil').style.backgroundImage=sigil();for(const k of ['book','candle','quill','gems'])d.querySelector('.is-'+k).style.backgroundImage=a[k];for(const el of d.querySelectorAll('.cw-corner'))el.style.backgroundImage=a.corner;}
- const bin=layer.querySelector('.cw-bin'),ring=layer.querySelector('.cw-bin-ring'),confirmEl=layer.querySelector('.cw-confirm');
+  const bin=layer.querySelector('.cw-bin'),ring=layer.querySelector('.cw-bin-ring'),confirmEl=layer.querySelector('.cw-confirm');
  const ghost=buildToploader(cell.data,null,{withBack:true});ghost.el.classList.add('cw-ghost');ghost.el.removeAttribute('tabindex');
  ghost.el.style.position='absolute';ghost.el.style.left='0';ghost.el.style.top='0';ghost.el.style.transformOrigin='0 0';
  stage.append(ghost.el);P.root.append(layer);P.root.classList.add('is-inspecting');

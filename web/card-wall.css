@@ -279,46 +279,33 @@
    镭射 (holo): a laser-film grating, fine parallel lines with one smooth rainbow band sweeping across them.
    Both are drawn only on the card under the pointer and the card being inspected; --px/--py are its angle. */
 .cw-tl[data-finish] .cw-tilt.is-tilting .cw-foil,.cw-tl[data-finish] .cw-tilt.tilt-out .cw-foil,.cw-ghost[data-finish] .cw-foil{display:block;transition:none}
-.cw-tl[data-finish=shine] .cw-foil{mix-blend-mode:color-dodge;
- opacity:clamp(.03,calc(.2 + var(--px,0) * .7 - var(--py,0) * .35),.95);
- background-image:var(--cw-facets),repeating-linear-gradient(118deg,hsl(0 100% 58%) 0%,hsl(45 100% 58%) 3.5%,hsl(110 100% 55%) 7%,hsl(180 100% 55%) 10.5%,hsl(230 100% 62%) 14%,hsl(290 100% 62%) 17.5%,hsl(360 100% 58%) 21%);
- background-size:100% 100%,260% 260%;
- background-position:0 0,calc(50% + var(--px,0) * 85%) calc(50% + var(--py,0) * 65%);
- background-blend-mode:difference;filter:brightness(.78) contrast(1.7) saturate(1.9)}
-.cw-tl[data-finish=shine] .cw-foil::after{content:"";position:absolute;inset:0;mix-blend-mode:color-dodge;opacity:clamp(.08,calc(.5 + var(--px,0) * .5),1);
+.cw-tl[data-finish=shine] .cw-foil{mix-blend-mode:overlay;
+ opacity:clamp(0,calc(.08 + var(--px,0) * .3 - var(--py,0) * .14),.42);
+ background-image:var(--cw-facets),repeating-linear-gradient(118deg,hsl(0 80% 62%) 0%,hsl(45 85% 62%) 3.5%,hsl(110 70% 58%) 7%,hsl(180 75% 58%) 10.5%,hsl(230 80% 66%) 14%,hsl(290 75% 66%) 17.5%,hsl(360 80% 62%) 21%);
+ background-size:100% 100%,260% 260%;background-position:0 0,calc(50% + var(--px,0) * 85%) calc(50% + var(--py,0) * 65%);
+ background-blend-mode:difference;filter:brightness(.95) contrast(1.15) saturate(1.2)}
+.cw-tl[data-finish=shine] .cw-foil::after{content:"";position:absolute;inset:0;mix-blend-mode:color-dodge;opacity:clamp(.05,calc(.3 + var(--px,0) * .45),.75);
  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='70' height='70'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.6' numOctaves='1' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 11 -9.9'/%3E%3C/filter%3E%3Crect width='70' height='70' filter='url(%23g)'/%3E%3C/svg%3E") 0 0/70px 70px}
 .cw-tl[data-finish=holo] .cw-foil{mix-blend-mode:color-dodge;opacity:clamp(.06,calc(.3 + var(--px,0) * .35),.7);filter:brightness(.66) contrast(1.3) saturate(1.3);
  background:repeating-linear-gradient(90deg,rgba(255,255,255,.22) 0 1px,transparent 1px 3px),
   linear-gradient(105deg,transparent 18%,hsl(330 100% 65%) 30%,hsl(50 100% 60%) 40%,hsl(150 100% 55%) 50%,hsl(210 100% 62%) 60%,hsl(280 100% 65%) 70%,transparent 82%) calc(50% + var(--px,0) * 120%) 50%/240% 100% no-repeat}
 
 
-/* ---------- the magician's table under a card taken out ----------
-   Deep crimson velvet in a double gold inlay, a casting circle worked faintly into the cloth, one warm light from above;
-   the table lies away from the camera. One static layer, faded in and out on opacity. */
-.cw-desk{position:absolute;inset:-24% -8% -14%;opacity:0;pointer-events:none;transition:opacity .5s cubic-bezier(.22,1,.36,1);
- transform:perspective(1900px) rotateX(13deg);transform-origin:50% 100%;
- background:radial-gradient(42% 36% at 50% 30%,rgba(255,214,168,.16),transparent 72%),radial-gradient(75% 70% at 50% 45%,#40161c,#2a0d12 52%,#16080b 100%)}
-.cw-desk::before{content:"";position:absolute;inset:9% 11% 15%;border:1px solid rgba(237,181,110,.36);border-radius:4px;outline:1px solid rgba(237,181,110,.16);outline-offset:8px;
- box-shadow:inset 0 0 120px 30px rgba(10,3,5,.45)}
-.cw-desk::after{content:"";position:absolute;inset:0;opacity:.55;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .28 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E")}
-.cw-desk .cw-desk-sigil{position:absolute;left:50%;top:44%;width:min(64vh,64vw);aspect-ratio:1;translate:-50% -50%;opacity:.1;background:no-repeat center/100% 100%}
-.cw-viewer.desk .cw-desk{opacity:1}
-:root[data-theme=light] .cw-desk{background:radial-gradient(42% 36% at 50% 30%,rgba(255,236,210,.22),transparent 72%),radial-gradient(75% 70% at 50% 45%,#6a2630,#4a1820 55%,#2c0e13 100%)}
+/* ---------- the velvet pad under a card taken out ----------
+   Not a room, just one piece of cloth: a deep crimson velvet pad the size of a display tray, with a thin gold piping,
+   the nap catching a little light at the top left, and its shadow on what is behind. One static layer, faded in. */
+.cw-desk{position:absolute;left:50%;top:-4%;width:min(60vw,840px);height:92%;translate:-50% 0;scale:.975;opacity:0;pointer-events:none;border-radius:22px;
+ transform:perspective(1700px) rotateX(15deg);transform-origin:50% 100%;
+ transition:opacity .45s cubic-bezier(.22,1,.36,1),scale .55s cubic-bezier(.22,1,.36,1);
+ background:radial-gradient(70% 55% at 34% 18%,rgba(255,206,196,.1),transparent 62%),radial-gradient(120% 100% at 50% 40%,#4c1921,#34101a 58%,#240a10 100%);
+ box-shadow:inset 0 0 0 1px rgba(237,181,110,.34),inset 0 0 0 7px rgba(0,0,0,.14),inset 0 0 0 8px rgba(237,181,110,.12),inset 0 0 50px rgba(0,0,0,.45),
+  0 2px 0 #3a1219,0 9px 0 #1d080c,0 10px 0 rgba(237,181,110,.18),0 60px 80px -30px rgba(0,0,0,.9)}
+.cw-desk::after{content:"";position:absolute;inset:0;border-radius:inherit;opacity:.4;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .3 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+.cw-viewer.desk .cw-desk{opacity:1;scale:1}
+:root[data-theme=light] .cw-desk{background:radial-gradient(90% 60% at 30% 12%,rgba(255,230,222,.14),transparent 60%),radial-gradient(130% 100% at 50% 45%,#6a2630,#4c1a22 60%,#35111a 100%)}
 @media (prefers-reduced-motion:reduce){.cw-desk{transition:none}}
 /* on the table the close button steps up to the top corner, clear of the sleeve's mouth at the bottom */
 .cw-viewer.desk .cw-bar{bottom:calc(100% - 64px);left:calc(100% - 76px);white-space:nowrap}
 .cw-viewer.desk .cw-hint{opacity:0!important}
 
-/* the things on the desk: at the edges of the cloth, never under the card's path in the middle */
-.cw-prop,.cw-corner{position:absolute;pointer-events:none;background:no-repeat center/contain}
-.cw-prop.is-book{left:6%;top:12%;width:clamp(180px,19vw,300px);aspect-ratio:260/170;rotate:-9deg;filter:drop-shadow(10px 16px 14px rgba(0,0,0,.55))}
-.cw-prop.is-candle{right:9%;top:6%;width:clamp(70px,6.4vw,104px);aspect-ratio:120/200;filter:drop-shadow(8px 12px 10px rgba(0,0,0,.5))}
-.cw-prop.is-candle::before{content:"";position:absolute;left:50%;top:6%;width:520%;aspect-ratio:1;translate:-50% -50%;border-radius:50%;background:radial-gradient(closest-side,rgba(255,196,120,.22),rgba(255,160,90,.07) 55%,transparent)}
-.cw-prop.is-quill{left:7%;bottom:15%;width:clamp(170px,16vw,250px);aspect-ratio:230/170;rotate:6deg;filter:drop-shadow(8px 12px 10px rgba(0,0,0,.5))}
-.cw-prop.is-gems{right:8%;bottom:17%;width:clamp(120px,11vw,180px);aspect-ratio:170/120;filter:drop-shadow(6px 10px 8px rgba(0,0,0,.5))}
-.cw-corner{width:clamp(56px,5vw,86px);aspect-ratio:1}
-.cw-corner.is-tl{left:calc(11% - 10px);top:calc(9% - 10px)}
-.cw-corner.is-tr{right:calc(11% - 10px);top:calc(9% - 10px);scale:-1 1}
-.cw-corner.is-bl{left:calc(11% - 10px);bottom:calc(15% - 10px);scale:1 -1}
-.cw-corner.is-br{right:calc(11% - 10px);bottom:calc(15% - 10px);scale:-1 -1}
 

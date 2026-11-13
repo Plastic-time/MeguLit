@@ -63,19 +63,24 @@ export function groupUnlocked(items){
  for(const it of Array.isArray(items)?items:[]){if(!it||!it.src)continue;const kind=it.kind==='shot'||it.source==='shot'?'shot':it.kind==='cover'||it.source==='cover'?'cover':it.kind==='cg'?'cg':null;if(kind)groups[kind].push(it);}
  return ['cg','shot','cover'].map(kind=>({kind,items:groups[kind]})).filter(g=>g.items.length);
 }
+/* an insert the service refused, said plainly; a stale wall (full toploader, card gone) also asks the wall to refresh */
+export function insertProblem(err,w){const code=String(err?.message||err||'');
+ if(/TOPLOADER_FULL/.test(code))return {text:w.full,refresh:true};
+ if(/CARD_NOT_FOUND|TOPLOADER_NOT_FOUND/.test(code))return {text:w.gone,refresh:true};
+ return {text:w.insertFail.replace('{e}',code||'?'),refresh:false};}
 const list=r=>Array.isArray(r)?r:Array.isArray(r?.items)?r.items:Array.isArray(r?.games)?r.games:[];
 
 /* ---------- words ---------- */
 const WORDS={
  zh:{title:'制作收藏卡',games:'选择作品',search:'搜索作品名（中文 / 日文 / 英文）',noGames:'还没有可以做卡的作品。玩一会儿游戏，或在游戏库添加带封面的作品后再来',noMatch:'没有匹配的作品',
   count:'{n} 张可用',cgEmpty:'还没有解锁的 CG，玩到后会出现在这里；也可以用封面或截图做卡',groups:{cg:'游戏 CG',shot:'我的截图',cover:'封面'},src:{save:'存档已解锁',seen:'游戏中见过',shot:'MeguLit 截图',cover:'作品封面'},
-  hover:'悬停预览：卡在卡套里静止显示这个取景，鼠标悬停时从这里开始缓慢移动',hoverShort:'悬停试试',frame:'取景',hint:'拖动平移 · 滚轮或双指缩放 · 双击复原',front:'正面',back:'卡背',make:'生成并放入卡套',only:'只做卡，放进「我的卡」',makeOnly:'生成卡',printing:'正在印卡…',fail:'没能生成这张卡：{e}',back_:'返回',close:'关闭',loading:'正在读取…',pendingNote:'还有 {n} 张存档 CG 正在解码，好了会自动出现',reset:'复原',finish:'卡面',finishes:{plain:'普通',shine:'闪卡',holo:'镭射'},mine:'我的卡',mineHint:'取出来的卡在这里，点一下放进这个卡套'},
+  hover:'悬停预览：卡在卡套里静止显示这个取景，鼠标悬停时从这里开始缓慢移动',hoverShort:'悬停试试',frame:'取景',hint:'拖动平移 · 滚轮或双指缩放 · 双击复原',front:'正面',back:'卡背',make:'生成并放入卡套',only:'只做卡，放进「我的卡」',makeOnly:'生成卡',printing:'正在印卡…',fail:'没能生成这张卡：{e}',back_:'返回',close:'关闭',loading:'正在读取…',pendingNote:'还有 {n} 张存档 CG 正在解码，好了会自动出现',reset:'复原',finish:'卡面',finishes:{plain:'普通',shine:'闪卡',holo:'镭射'},mine:'我的卡',full:'这个卡套里已经有卡了（卡面墙刚刚变过），已经刷新，请换一个空卡套',gone:'这张卡已经不在了，「我的卡」已刷新',madeLoose:'卡做好了，但没能放进卡套（{e}），它在「我的卡」里',insertFail:'没能放进卡套：{e}',mineHint:'取出来的卡在这里，点一下放进这个卡套'},
  ja:{title:'コレクションカードを作る',games:'作品を選ぶ',search:'作品名で検索（日本語 / 中国語 / 英語）',noGames:'カードにできる作品がまだありません。少し遊ぶか、カバー付きの作品をライブラリに追加してください',noMatch:'一致する作品がありません',
   count:'{n} 枚使えます',cgEmpty:'解放済みの CG はまだありません。プレイすると出てきます。カバーやスクリーンショットでも作れます',groups:{cg:'ゲーム CG',shot:'スクリーンショット',cover:'カバー'},src:{save:'セーブで解放済み',seen:'ゲーム中に表示',shot:'MeguLit の撮影',cover:'作品カバー'},
-  hover:'ホバーで動きを確認：スリーブ内ではこの構図で止まり、ホバーするとここからゆっくり動きます',hoverShort:'ホバー',frame:'構図',hint:'ドラッグで移動 · ホイール／ピンチで拡大 · ダブルクリックで戻す',front:'表',back:'裏',make:'作ってスリーブに入れる',only:'作るだけ（マイカードへ）',makeOnly:'カードを作る',printing:'印刷中…',fail:'カードを作れませんでした：{e}',back_:'戻る',close:'閉じる',loading:'読み込み中…',pendingNote:'セーブの CG を {n} 枚デコード中です。終わると自動で表示されます',reset:'戻す',finish:'カード面',finishes:{plain:'ノーマル',shine:'キラ',holo:'ホロ'},mine:'マイカード',mineHint:'取り出したカードはここ。クリックでこのトップローダーに入れます'},
+  hover:'ホバーで動きを確認：スリーブ内ではこの構図で止まり、ホバーするとここからゆっくり動きます',hoverShort:'ホバー',frame:'構図',hint:'ドラッグで移動 · ホイール／ピンチで拡大 · ダブルクリックで戻す',front:'表',back:'裏',make:'作ってスリーブに入れる',only:'作るだけ（マイカードへ）',makeOnly:'カードを作る',printing:'印刷中…',fail:'カードを作れませんでした：{e}',back_:'戻る',close:'閉じる',loading:'読み込み中…',pendingNote:'セーブの CG を {n} 枚デコード中です。終わると自動で表示されます',reset:'戻す',finish:'カード面',finishes:{plain:'ノーマル',shine:'キラ',holo:'ホロ'},mine:'マイカード',full:'このトップローダーにはもうカードがあります（ウォールが更新されました）。空のトップローダーを選んでください',gone:'このカードはもうありません。マイカードを更新しました',madeLoose:'カードはできましたが、トップローダーに入れられませんでした（{e}）。マイカードにあります',insertFail:'トップローダーに入れられませんでした：{e}',mineHint:'取り出したカードはここ。クリックでこのトップローダーに入れます'},
  en:{title:'Make a collector card',games:'Choose a work',search:'Search titles (Chinese / Japanese / English)',noGames:'No work has pictures for a card yet. Play for a while, or add a work with a cover to the library',noMatch:'No matching work',
   count:'{n} available',cgEmpty:'No unlocked CGs yet; they appear here once you reach them. You can also use the cover or a screenshot',groups:{cg:'Game CGs',shot:'My screenshots',cover:'Cover'},src:{save:'Unlocked in saves',seen:'Seen in game',shot:'MeguLit shot',cover:'Cover'},
-  hover:'Hover to preview: in the Toploader the card rests on this framing and drifts from here on hover',hoverShort:'hover',frame:'Framing',hint:'Drag to pan · wheel or pinch to zoom · double-click to reset',front:'Front',back:'Back',make:'Make and sleeve it',only:'Just make it (My cards)',makeOnly:'Make card',printing:'Printing…',fail:'Could not make this card: {e}',back_:'Back',close:'Close',loading:'Loading…',pendingNote:'{n} CGs from your saves are still being decoded; they appear here when ready',reset:'Reset',finish:'Finish',finishes:{plain:'Plain',shine:'Sparkle',holo:'Holo'},mine:'My cards',mineHint:'Cards you took out wait here; click one to sleeve it here'}};
+  hover:'Hover to preview: in the Toploader the card rests on this framing and drifts from here on hover',hoverShort:'hover',frame:'Framing',hint:'Drag to pan · wheel or pinch to zoom · double-click to reset',front:'Front',back:'Back',make:'Make and sleeve it',only:'Just make it (My cards)',makeOnly:'Make card',printing:'Printing…',fail:'Could not make this card: {e}',back_:'Back',close:'Close',loading:'Loading…',pendingNote:'{n} CGs from your saves are still being decoded; they appear here when ready',reset:'Reset',finish:'Finish',finishes:{plain:'Plain',shine:'Sparkle',holo:'Holo'},mine:'My cards',full:'That toploader already holds a card (the wall changed); it has been refreshed, pick an empty one',gone:'That card is gone; My cards has been refreshed',madeLoose:'The card is made but could not go into the toploader ({e}); it is in My cards',insertFail:'Could not put it in the toploader: {e}',mineHint:'Cards you took out wait here; click one to sleeve it here'}};
 const lang=()=>{const l=(document.documentElement.lang||'zh').toLowerCase();return l.startsWith('ja')?'ja':l.startsWith('en')?'en':'zh';};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 const reduced=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -153,9 +158,12 @@ export function openCardMaker({toploaderId=null,from=null,api=null}={}){
  const root=document.createElement('div');root.className='cm-root';root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');root.setAttribute('aria-label',w.title);
  root.innerHTML=`<div class="cm-scrim" data-cm-close></div><section class="cm-sheet"><div class="cm-sheet-bg" aria-hidden="true"></div><div class="cm-content">
   <header class="cm-head"><button type="button" class="cm-icon cm-back" aria-label="${w.back_}" title="${w.back_}" hidden>${ICON.back}</button><div class="cm-heading"><span class="cm-eyebrow">${w.title}</span><h2 class="cm-title">${w.games}</h2></div><button type="button" class="cm-icon cm-x" aria-label="${w.close}" title="${w.close}" data-cm-close>${ICON.close}</button></header>
-  <div class="cm-stage"></div><p class="cm-live" role="status" aria-live="polite"></p></div></section>`;
+  <div class="cm-stage"></div><p class="cm-live" role="status" aria-live="polite"></p><p class="cm-error" role="alert" hidden></p></div></section>`;
  document.body.append(root);
  const sheet=root.querySelector('.cm-sheet'),bg=root.querySelector('.cm-sheet-bg'),content=root.querySelector('.cm-content'),stage=root.querySelector('.cm-stage'),title=root.querySelector('.cm-title'),backBtn=root.querySelector('.cm-back'),scrim=root.querySelector('.cm-scrim'),live=root.querySelector('.cm-live');
+ const errorEl=root.querySelector('.cm-error');let errorT=0;
+ const showError=text=>{errorEl.textContent=text;errorEl.hidden=false;live.textContent=text;if(!reduced())errorEl.animate([{opacity:0,transform:'translate(-50%,8px)'},{opacity:1,transform:'translate(-50%,0)'}],{duration:320,easing:'cubic-bezier(.22,1,.36,1)'});clearTimeout(errorT);errorT=setTimeout(()=>{errorEl.hidden=true;},7000);};
+ const wallChanged=detail=>window.dispatchEvent(new CustomEvent('megulit:cards-changed',{detail:detail||{}}));
  let level=0,layers=[],closing=false,printing=false,game=null,item=null,viewer=null,resolveDone,finish='plain';
  const finished=new Promise(r=>{resolveDone=r;});
 
@@ -226,7 +234,9 @@ export function openCardMaker({toploaderId=null,from=null,api=null}={}){
   if(!reduced())box.querySelectorAll('.cm-mine-card').forEach((el,i)=>el.animate([{opacity:0,transform:'translateY(10px) scale(.96)'},{opacity:1,transform:'none'}],{...springEasing(SPRING.smooth),delay:Math.min(i,12)*24,fill:'backwards'}));
   box.addEventListener('click',async e=>{const b=e.target.closest('.cm-mine-card');if(!b||printing||closing)return;printing=true;b.classList.add('is-picked');
    const card=spare.find(c=>String(c.id)===b.dataset.id);
-   try{await call('cards_insert',{toploaderId,cardId:card.id});}catch(err){printing=false;b.classList.remove('is-picked');live.textContent=w.fail.replace('{e}',String(err?.message||err));return;}
+   try{const r=await call('cards_insert',{toploaderId,cardId:card.id});if(!r)throw Error('NO_STATE');}
+   catch(err){printing=false;b.classList.remove('is-picked');const p=insertProblem(err,w);showError(p.text);
+    if(p.refresh){wallChanged();if(/CARD_NOT_FOUND/.test(String(err?.message||err))){b.remove();const n=box.querySelectorAll('.cm-mine-card').length;if(!n)box.remove();else box.querySelector('h4 span').textContent=n;}}return;}
    window.dispatchEvent(new CustomEvent('megulit:cards-changed',{detail:{toploaderId,cardId:card.id,card}}));
    printing=false;close(false,card,true);});
  }).catch(()=>{});
@@ -378,7 +388,7 @@ export function openCardMaker({toploaderId=null,from=null,api=null}={}){
   const still=viewer.still(),{w:iw,h:ih}=viewer.size();
   live.textContent=w.printing;
   const work=(async()=>{const card=await call('cards_create',{gameId:game.gameId,kind:item.kind,srcId:item.id,still,finish,...(call===mockApi?{__src:item.src,__w:iw,__h:ih}:{})});
-   if(insert&&card?.id!=null)await call('cards_insert',{toploaderId,cardId:card.id});return card;})();
+   if(insert&&card?.id!=null){try{const r=await call('cards_insert',{toploaderId,cardId:card.id});if(!r)throw Error('NO_STATE');}catch(err){err.card=card;err.made=true;throw err;}}return card;})();
   const print=layer.querySelector('.cm-print'),frame=layer.querySelector('.cm-frame'),ghost=layer.querySelector('.cm-ghost'),sweep=layer.querySelector('.cm-sweep');
   const quiet=[layer.querySelector('.cm-side'),layer.querySelector('.cm-hint'),ghost];
   let ok=true,card=null,error=null;
@@ -400,7 +410,9 @@ export function openCardMaker({toploaderId=null,from=null,api=null}={}){
    lift.cancel();
   }
   if(!ok){printing=false;layer.classList.remove('is-printing');frame.classList.remove('is-card');stopAnims(print);print.style.transform='';
-   for(const el of quiet){stopAnims(el);el.style.opacity='';}live.textContent=w.fail.replace('{e}',String(error?.message||error||''));
+   for(const el of quiet){stopAnims(el);el.style.opacity='';}
+   if(error?.made){const p=insertProblem(error,w);showError(p.refresh?p.text:w.madeLoose.replace('{e}',String(error?.message||error)));wallChanged({cardId:error.card?.id});}
+   else showError(w.fail.replace('{e}',String(error?.message||error||'')));
    layer.querySelector('.cm-make')?.focus();return;}
   live.textContent='';
   window.dispatchEvent(new CustomEvent('megulit:cards-changed',{detail:{toploaderId:insert?toploaderId:null,cardId:card?.id??null,card}}));
