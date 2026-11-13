@@ -46,7 +46,7 @@ class HookNative{
     script provider knows where pages start and most pages hold more than one line (HuneX tables, multilingual KiriKiri
     [cm]/[l]). Every page rule (page clears, no duplicates, row continuation, no marker/box auto-hide, no preflight) follows. */
  /* E422: the reader's skip key (Ctrl / the game's skip held), for the bridge's skip-burst rule. */
- skipHeld(v){const held=v===true;if(held===this.skipKey)return;this.skipKey=held;if(this.process)this.send({type:'skipHeld',held});}
+ skipHeld(v){const held=v===true;if(held===this.skipKey)return;if(held&&this.pageQueue?.rest.length){const q=this.pageQueue;this.pageQueue=null;this.source({...q.base,text:q.rest[q.rest.length-1]},q.name);}this.skipKey=held;if(this.process)this.send({type:'skipHeld',held});}
  /* 2026-11-12 (user, ファタモルガーナの館: "这死馆也没有上一句渐暗"): the script guess (flowGame: many multi-sentence pages) is
     overruled by the engine itself: once its page DLL reports lines (with their real places, box or full page), the game is not laid out as a flow page */
  get flowPage(){if(this._flowPage===true)return true;if(this.pageMode&&this.pageMode.engine!=='ocr')return false;return this.originalText?.flowGame?.()===true;}
@@ -113,7 +113,7 @@ class HookNative{
    if(m.type==='hookRender'){this.notify({hookDrawCount:Number(m.count)||0,hookDrawAt:Number(m.at)||0});return;}
    if(m.type==='waitMarkerDrawn'){this.emit({type:'waitMarkerDrawn'});return;}
    if(m.type==='waitMarkerStatus'){this.notify({waitMarkerMessage:String(m.message||'').slice(0,300),waitMarkerHookActive:m.active===true});return;}
-   if(m.type==='hookSource'&&typeof m.text==='string'&&m.text.length<=4000){this.source(m,name);return;}
+   if(m.type==='hookSource'&&typeof m.text==='string'&&m.text.length<=4000){this.sourcePage(m,name);return;}
    // v1.1.4: speaker names from a name-role stream, for every engine that reports one (user: the log showed every line as narration).
    if(m.type==='hookAuxText'&&typeof m.text==='string'&&m.text.length<=400){this.auxText(m);return;}
    if(m.type==='hookName'&&typeof m.text==='string'){const n=speakerName(m.text);if(n){this.speaker={text:n,at:this.now()};this.noteSpeaker(n);}return;}
@@ -216,6 +216,29 @@ class HookNative{
   else if(this.choice?.active)this.clearChoices('choices no longer on screen');}
  /* 2026-11-13 the choice detector also knows the names learned from bare name lines (CLANNAD 「朋也」) */newChoiceCapture(){const C=new ChoiceCapture(()=>this.now());C.extraNames=()=>this.knownSpeakers||[];return C;}
  clearChoices(why,keep=0,line=''){clearTimeout(this.choiceTimer);const shown=!!this.choice?.active||!!this.state.hookChoices;this.choice?.reset(keep,line);this.choiceOptions=null;/* 2026-11-13 candidates that came with the line itself are asked for again */if(keep&&this.choice?.items.length){this.choiceTimer=setTimeout(()=>this.requestChoices(0),450);this.choiceTimer.unref?.();}if(!shown)return;this.trace('choice cleared: '+why);this.notify({hookChoices:null});}
+ /* E542 (user, CLANNAD HD prologue: one sentence per click, but eight sentences arrived as one line): HookBridge marks an
+    output that is exactly several separate engine callbacks with parts (oldest first) and partsAgeMs. Only the first part
+    is shown; each advance input of the player (click / Space / Enter in the game, readerInput) shows the next. Inputs made
+    after the first callback but before LunaHost flushed the batch already advanced the game, so they are replayed. A
+    held skip shows the last part at once. Any new line from the game drops what is left. */
+ sourcePage(m,name){
+  const parts=Array.isArray(m.parts)?m.parts.map(p=>String(p||'').trim()).filter(Boolean):[];
+  this.pageQueue=null;
+  if(parts.length<2||parts.join('')!==String(m.text).trim()||this.skipKey){this.source(m,name);return;}
+  const now=this.now(),age=Math.max(0,Number(m.partsAgeMs)||0),since=now-age;
+  const done=(this.advanceTimes||[]).filter(t=>t>=since&&t<=now).length,first=Math.min(done,parts.length-1);
+  this.trace('page parts '+parts.length+' shown from '+(first+1));
+  const base={...m};delete base.parts;delete base.partsAgeMs;
+  this.pageQueue={base,name,rest:parts.slice(first+1)};this.partAt=now;
+  this.source({...base,text:parts[first]},name);
+ }
+ advance(){
+  const now=this.now();this.advanceTimes=(this.advanceTimes||[]).filter(t=>now-t<20000);this.advanceTimes.push(now);
+  const q=this.pageQueue;if(!q||!q.rest.length){this.pageQueue=null;return false;}
+  /* a double click or key repeat is one advance */if(now-(this.partAt||0)<250)return false;this.partAt=now;
+  const next=q.rest.shift();if(!q.rest.length)this.pageQueue=null;
+  this.trace('page part advance '+JSON.stringify(next.slice(0,20)));this.source({...q.base,text:next},q.name);return true;
+ }
  source(m,name){
   /* 2026-11-12 (ファタモルガーナの館: "……けれど……", drawn large in the middle of the opening, was hidden and shown as a subtitle
      at the bottom): while the engine says its text window is hidden, a line is art text. HookBridge leaves it to the game;
