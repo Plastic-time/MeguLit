@@ -5,5 +5,5 @@
 // Both run under SEH in RuntimeDump.cpp: a module that faults is switched off for the session, the others keep going.
 // Add your line in a commit of its own so parallel branches merge cleanly.
 #define MEGULIT_DUMP_MODULES \
- /* MODULE(Voice) */ \
+ MODULE(Voice) \
  /* MODULE(Cg) */
