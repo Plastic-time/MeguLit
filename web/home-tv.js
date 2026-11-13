@@ -335,9 +335,13 @@ export function renderHomeTV(main,ctx){
     untilted scene; if it would reach into the fan it moves up. Never while a card is in flight (its landing pose is already fixed). */
  /* measured on the card's resting box (hand.restRect), never on the card mid-animation; a touch left of the fan's centre (user: "往左边移动一点点") */
  function placeCover(){const c=$('.tv-cover');if(!c||!live||live.root!==root||hand.flying())return;const fan=hand.extent();if(!fan)return;
-  const run=fn=>live.depth?live.depth.neutral(fn):fn();run(()=>{c.style.left='';c.style.top='';const rr=root.getBoundingClientRect(),aim=fan.cx-Math.min(48,rr.width*.025);
+  const run=fn=>live.depth?live.depth.neutral(fn):fn();run(()=>{c.style.left='';c.style.top='';c.style.width='';const rr=root.getBoundingClientRect(),aim=fan.cx-Math.min(48,rr.width*.025);
+   /* (user: the card's top was cut off) a window too short for the card between the top and the fan gets a smaller card, it is never pushed off the top */
+   const minTop=Math.max(16,rr.height*.04),room=fan.top-14-minTop,r0=hand.restRect();if(r0.height>room&&room>80)c.style.width=(c.offsetWidth*room/r0.height)+'px';
    for(let i=0;i<4;i++){const r=hand.restRect(),k=r.width/(c.offsetWidth||1)||1,dx=(aim-(r.left+r.width/2-rr.left))/k;if(Math.abs(dx)<.5)break;c.style.left=(c.offsetLeft+dx)+'px';}
-   const r=hand.restRect(),over=r.bottom-rr.top-(fan.top-14);if(over>0)c.style.top=(c.offsetTop-over/(r.height/(c.offsetHeight||1)||1))+'px';});}
+   const r=hand.restRect(),ky=r.height/(c.offsetHeight||1)||1,over=r.bottom-rr.top-(fan.top-14);if(over>0)c.style.top=(c.offsetTop-over/ky)+'px';
+   const r2=hand.restRect(),under=minTop-(r2.top-rr.top);if(under>0)c.style.top=(c.offsetTop+under/ky)+'px';
+   /* the deck a random draw is dealt from sits with the card */const pile=root.querySelector(':scope>.tv-pile');if(pile){/* the card's plane is 6% larger than the page on every side (.tv-canvas inset -6%) */pile.style.left=c.style.left?(c.offsetLeft-rr.width*.06)+'px':'';pile.style.top=c.style.top?(c.offsetTop-rr.height*.06)+'px':'';pile.style.width=c.style.width;}});}
  function commit(){model.preferences.homeShowcase=setting;savePreferences({homeShowcase:setting});const id=shown?.id;list=showcaseGames(model.games,setting);
   paint(Math.max(0,list.findIndex(g=>g.id===id)),false);}
  /* 2026-11-13 (user: "不要全部作品 … 把＋卡移到最右边 不要是卡牌了 鼠标放上去再出来") the hand editor is a tab docked on the right edge that slides out
@@ -368,7 +372,7 @@ export function renderHomeTV(main,ctx){
   fitLeft(root);};
  {let actSig=JSON.stringify(cachedActivity()||null);if(cachedActivity())showActivity(cachedActivity());api('learning_activity',{range:'year'}).then(r=>{rememberActivity(r);const n=JSON.stringify(r||null);if(n!==actSig){actSig=n;showActivity(r);}}).catch(()=>{});}
  const hand=createHand({root,box:$('.tv-hand'),layer:$('.tv-ghosts'),cover:$('.tv-cover'),reduced:matchMedia('(prefers-reduced-motion:reduce)').matches,
-  back:`<img src="${LOGO}" alt="">`,art:h=>art(h.g||h,['#3b2a26','#5a3a30','#1a1110']),neutral:fn=>live?.depth?live.depth.neutral(fn):fn(),
+  back:`<img src="${LOGO}" alt="">`,art:h=>art(h.g||h,['#3b2a26','#5a3a30','#1a1110']),neutral:fn=>live?.depth?live.depth.neutral(fn):fn(),field:()=>shown,
   onBusy:on=>live?.depth?.hold(on),
   onPlay:(h,kind,ms)=>{if(kind!=='plain'){root.classList.add('tv-fly');/* the field card's table shadow grows in as the flying card comes down onto it */
    $('.tv-cshadow')?.animate([{opacity:0},{opacity:0,offset:.55},{opacity:1}],{duration:ms||800,easing:'cubic-bezier(.3,0,.2,1)'});}paint(h.g,kind==='plain','fade');},

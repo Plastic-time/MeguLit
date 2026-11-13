@@ -41,3 +41,11 @@ test('random draw is tied to the hand; the field card stays centred over the fan
  assert.ok(hand.includes('if(st.flights.size&&el)return;'),'the fan holds still while a card flies to its slot');
  assert.ok(/onResize=\(\)=>\{if\(live&&live\.root===root\)\{fitLeft\(root\);hand\.relayout\(\);placeCover\(\);/.test(tv),'re-centred on resize');
 });
+
+test('a field card from outside the hand is thrown off, the card never leaves the top, the deck follows it',()=>{
+ const W=path.join(__dirname,'..','web'),tv=fs.readFileSync(path.join(W,'home-tv.js'),'utf8'),hand=fs.readFileSync(path.join(W,'home-hand.js'),'utf8');
+ assert.ok(hand.includes("const gone=!old?opts.field?.():null")&&hand.includes("fly('__gone',gone,fromGone,"),'(user: 还是有问题) a drawn field card is flown off when a hand card is played, not removed');
+ assert.ok(tv.includes('field:()=>shown,'),'the hand knows the field card');
+ assert.ok(tv.includes('if(r0.height>room&&room>80)c.style.width=')&&tv.includes('under=minTop-(r2.top-rr.top)'),'a short window gets a smaller card instead of one pushed off the top');
+ assert.ok(tv.includes("pile.style.left=c.style.left?(c.offsetLeft-rr.width*.06)+'px':''"),'the deck a draw is dealt from moves with the card');
+});

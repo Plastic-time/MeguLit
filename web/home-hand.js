@@ -115,7 +115,10 @@ export function createHand(opts){const {root,box,layer,cover,art,back='',onPlay,
   /* where the picked card is now: mid-flight pose if it was flying, else its hand slot */
   const fromPick=(st.flights.has(id)&&currentPose(st.flights.get(id)))||slotPose(id,W);
   const fromOld=old?((st.flights.has(old.id)&&currentPose(st.flights.get(old.id)))||coverPose()):null;
+  /* (user: the field card vanished when it had come from a random draw) a field card that is not in the hand is thrown off the table, never just removed */
+  const gone=!old?opts.field?.():null,fromGone=gone&&gone.id!==id?coverPose():null;
   st.out=id;st.hover=-1;render(st.games,id);onPlay(g,kind,(FLIGHT_MS[kind]||760)+(old?120:0));
+  if(fromGone){const rr=root.getBoundingClientRect(),w=cover.offsetWidth;fly('__gone',gone,fromGone,{x:rr.width+w*.9,y:fromGone.y-w*.35,r:24,s:fromGone.s*.94,rx:0,ry:0,o:1},'toss',620,0,null).el.style.zIndex='6';}
   if(old){const el=st.cards.get(old.id);el?.classList.add('is-wait');const to=flat(()=>slotPose(old.id,W));/* the card going home slides in under its neighbours, the one coming out stays on top */if(to)fly(old.id,old,fromOld,to,kind,Math.round((FLIGHT_MS[kind]||760)*.88),0,()=>{el?.classList.remove('is-wait');}).el.style.zIndex='6';else el?.classList.remove('is-wait');}
   /* the landing pose is the field card as it sits with the scene flat (the scene settles flat during the flight, see home-depth hold) */
   if(fromPick)fly(id,g,fromPick,flat(coverPose),kind,FLIGHT_MS[kind]||760,old?120:0,()=>onLand?.(g)).el.style.zIndex='8';else onLand?.(g);}
