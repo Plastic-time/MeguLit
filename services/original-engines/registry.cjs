@@ -35,6 +35,8 @@ const ENGINES=[
  {name:'NScripter',hook:true,test:f=>f.has(/^(arc\.nsa|nscript\.dat|00\.txt|0\.txt)$/i)},
  /* LiveMaker 2/3: game.dat (or an .ext beside the exe) is a "vff" archive */
  {name:'LiveMaker',hook:true,test:f=>f.has(/\.lsb$/i)||f.has(/^live\.dll$/i)||f.magicAny(/\.(dat|ext)$/i,'vff\0')},
+ /* E643 Propeller's .mpk (index offset first, XORed names) before MAGES, whose test takes any .mpk (MAGES archives start "MPK\0") */
+ {name:'Stuff Script (Propeller)',hook:null,test:f=>f.probe(/\.mpk$/i,p=>{const l=require('./stuff.cjs').list(p);return !!l&&l.some(e=>/\.msc$/i.test(e.name));})||f.sub('msc',/\.msc$/i)},
  {name:'MAGES',hook:true,test:f=>f.has(/.mpk$/i)||f.sub('languagebarrier',/./)},
  /* Spike Chunsoft SDL2 ports (Steam ダンガンロンパ 1・2): AGAR .wad archives */
  {name:'Spike Chunsoft (WAD)',hook:null,test:f=>f.magic(/\.wad$/i,'AGAR')},
@@ -129,6 +131,13 @@ const ENGINES=[
  {name:'Escude',hook:true,test:f=>f.magic(/^script\.bin$/i,'ESC-ARC')||f.has(/^script\.bin$/i)&&f.has(/^(gpr|evt|st)\.bin$/i)},
  /* E569 PJADV is Pajamas Adventure System: its GAMEDAT PAC / PAC2 archives go by other names too (data1.dat …) */
  {name:'PJADV',hook:null,test:f=>f.magicAny(/\.(dat|pak)$/i,'GAMEDAT PAC')||f.has(/^textdata\.bin$/i)&&f.has(/^scenario\.dat$/i)},
+ /* E640–E654 family F4a (round two): engines with public tools or GARbro formats */
+ {name:'SLG System',hook:null,test:f=>f.magicAny(/\.szs$/i,'SZS')||f.has(/\.spd$/i)&&f.magicAny(/\.spl$/i,'SFP\0')},
+ {name:'STCM2',hook:null,test:f=>f.probe(/\.(dat|bin)$|^[^.]+$/i,p=>require('./stcm2.cjs').isStcm(p),8)},
+ {name:'Willadv',hook:null,test:f=>f.has(/\.arc$/i)&&require('./advhd.cjs').engine.sources(f.dir).length>0},
+ {name:'Tanuki Engine',hook:null,test:f=>f.magicAny(/\.tac$/i,'TArc')},
+ {name:'Yaneurao',hook:null,test:f=>f.magicAny(/\.dat$/i,'yanepk')||f.magicAny(/\.sda$/i,'SQDARC')},
+ {name:'Rits',hook:null,test:f=>f.probe(/\.saf$/i,p=>!!require('./archive-scan.cjs').safList(p))},
  {name:'Valkyria',hook:true,test:f=>f.has(/\.odn$/i)},
  {name:'Cyberworks (C,system)',hook:null,test:f=>f.names.filter(n=>/^Arc0\d\.dat$/i.test(n)).length>=3},
  {name:'LC-ScriptEngine',hook:true,test:f=>f.has(/^lcsebody.*\.exe$/i)||f.has(/^lcscr.*\.lst$/i)||f.has(/^lcsebody\d*\.lst$/i)},
@@ -223,6 +232,8 @@ const READERS={"BGI / Ethornell":["bgi"],
  "Marble":["marble"],
  "Seraph":["seraph"],
  "ExHIBIT":["exhibit"],
+ "Escude":["escude"],"PJADV":["pjadv"],"Luca System":["luca"],"ISM":["ism"],"GLib2":["glib2"],"Cyberworks (C,system)":["cyberworks"],"DxLib":["dxlib"],
+ "SLG System":["slg"],"Stuff Script (Propeller)":["stuff"],"STCM2":["stcm2"],"Willadv":["advhd"],"Tanuki Engine":["tanuki"],"Yaneurao":["yaneurao"],"Rits":["rits"],"BlueGale":["bluegale"],
  "Leaf / AQUAPLUS":["aquaplus"],
  "LC-ScriptEngine":["lcse"],
  "Wolf RPG":["wolf"],

@@ -53,7 +53,7 @@ MeguLit 对一款游戏的支持分三层：
 | TyranoScript | 4052 | 75 | 74 | 🆕 扩展（app.asar 读索引、package.nw） | 🆕 tyrano.cjs：散文件 / app.asar / package.nw / exe 尾部 zip | ✅（V8：nwjs/electron） | 原来被 kirikiri 读取器当 KAG 读，#名字 当正文 |
 | Yuka | 66 | 66 | 2 | 🆕 | 🆕 yuka.cjs：.ykc + .yks 元素表遍历（StrOut / NameOut 的字符串常量）；选项无公开资料 | ⚪ |  |
 | MAGES. | 60 | 60 | 51 | ✅ | ✅ script.mpk SC3（日版） | ◎ MAGES 内嵌 + ✅ |  |
-| DxLib | 62 | 58 | 21 | ✅ | 🟡 GARbro（.dxa） | ✅ |  |
+| DxLib | 62 | 58 | 21 | ✅ | 🆕 dxlib（archive-scan.cjs）：未加密 .dxa + 通用扫描（E651）；剧本各作品自写 | ✅ |  |
 | Silky's | 57 | 55 | 52 | 🆕 | 🆕 silky.cjs：Silky .arc / IFL + .mes 操作码遍历（E576） | ⚪ |  |
 | EAGLS | 53 | 53 | 16 | 🆕（含 Script\SCPACK） | 🆕 eagls.cjs：SCPACK.pak+.idx（默认密钥或由全 0 尾部自动求解）、.dat 隔字节 EAGLS_SYSTEM 流异或、#说话人 + 引号字面量 | ✅ | AdvSys 变体（136000 起 "ADVSYS"）未做 |
 | Musica (PAZ) | 54 | 53 | 25 | 🆕 | ✅ scr.dat / *.paz（paz.cjs） | ✅ | 原来有读取器但库里是未知引擎 |
@@ -69,16 +69,16 @@ MeguLit 对一款游戏的支持分三层：
 | Interheart FPK | 33 | 33 | 0 | 🆕（.fpk 索引自洽即认） | 🟡 interheart.cjs：.fpk 三种索引 + FPK 2.00 + ZLC2 按规格做实，剧本语法无公开资料 → 通用文本扫描 | ⚪ | 需实物确认剧本语法 |
 | SakanaGL | 32 | 32 | 32 | 🆕（sakanagl.dll） | ❌ | ✅（LunaHook 有 sakanagl hook） | 2016 后 32 |
 | Diesel Engine | 31 | 31 | 27 | ❌（Nitro+ NPK 条目可能已认出） | ❌ 需实物（E666） | ⚪ |  |
-| AI5WIN / AI6WIN (elf/Silky) | 31 | 31 | 11 | 🆕（AI5WIN/AI6WIN.exe） | 🆕 silky.cjs：AI6WIN 完整；AI5WIN 归档 + 通用扫描（E576） | ⚪ |  |
+| AI5WIN / AI6WIN (elf/Silky) | 31 | 31 | 11 | 🆕（AI5WIN/AI6WIN.exe） | 🆕 silky.cjs：AI6WIN 完整；AI5WIN v0/v1/v2 完整语法 + .dat 包（E644） | ⚪ |  |
 | LC-ScriptEngine | 41 | 30 | 0 | ✅ 扩展（lcsebody*.lst） | 🆕 lcse.cjs：.lst 索引 + 数据包（单字节密钥按长度反推）+ SNX 指令流 / 长度前缀串表 | ✅ |  |
 | NEKOPACK / NekoSDK | 30 | 30 | 10 | 🆕（NekoSDK 单列） | 🆕 nekosdk.cjs：NEKOPACK4 .pak、0xCACACA .dat + ADVSCRIPT2 对白（选项无资料）；NekoPack 1–3 仍走 GARbro | ⚪ | NekoPack 1–3（名字只存哈希、流加密）是另一套引擎 |
 | PIX STUDIO | 28 | 28 | 27 | ❌ | ❌ 需实物（E666） | ⚪ |  |
-| GLib2 | 27 | 27 | 0 | 🆕 | ❌ | ⚪ |  |
-| ISM | 37 | 21 | 5 | 🆕 | 🟡 GARbro（.isa） | ⚪ |  |
-| Cyberworks (C,system) | 39 | 19 | 10 | ✅ | 🟡 GARbro（Arc0N.dat） | ⚪ |  |
+| GLib2 | 27 | 27 | 0 | 🆕 | 🆕 glib2：.g2/.stx 解密 + 通用扫描（E646），语法需实物 | ⚪ |  |
+| ISM | 37 | 21 | 5 | 🆕 | 🆕 ism：.isa + 通用扫描（E645），语法需实物 | ⚪ |  |
+| Cyberworks (C,system) | 39 | 19 | 10 | ✅ | 🆕 cyberworks：Arc0N.dat + 索引 + 通用扫描（E647），语法需实物 | ⚪ |  |
 | AGES Mk2 | 20 | 19 | 19 | ❌ | ❌ 需实物（E666） | ✅（LunaHook64 Ages7） |  |
-| Luca System（Prototype 新移植） | 16 | 14 | 14 | 🆕 | ❌ | ⚪ | Kanon/AIR/Summer Pockets RB Steam |
-| Pajamas / PJADV | 16 | 14 | 6 | ✅ 扩展（任何名字的 GAMEDAT 包） | 🟡 GARbro（.dat） | ⚪ |  |
+| Luca System（Prototype 新移植） | 16 | 14 | 14 | 🆕 | 🆕 luca.cjs：SCRIPT.PAK + 指令遍历（操作码无关，E642） | ⚪ | Kanon/AIR/Summer Pockets RB Steam |
+| Pajamas / PJADV | 16 | 14 | 6 | ✅ 扩展（任何名字的 GAMEDAT 包） | 🆕 pjadv.cjs：GAMEDAT 包 + scenario/textdata 配对（E641） | ⚪ |  |
 | LiveMaker | 1747 | 12 | 3 | 🆕 扩展（vff 归档魔数） | 🟡 GARbro（vff） | ✅ | 乙女同人第二大引擎（532 款），LSB 二进制未做 |
 | Nitroplus（NPA/NPK/PAK/N4） | 12 | 12 | 0 | ✅ | ✅ npk / pak / N4；NPA 只检测 | ✅ |  |
 | CatSystem3 | 12 | 12 | 12 | ❌ | ❌ 需实物（E666） | ⚪ | 2016 后 12；不是 CatSystem2 格式 |
@@ -99,7 +99,7 @@ MeguLit 对一款游戏的支持分三层：
 | KID Engine | 6 | 6 | — | 🆕 .dat LNK | 🟡 kid.cjs：LNK + lnd + 通用扫描（E663） | ⚪ | Ever17 / Remember11 |
 | AZ System / A98SYS / Eushully / Frontwing / F&C 系 / GSD / BlueGale / CRIware | — | — | — | 🆕 GARbro 签名（E665） | 🟡 GARbro 兜底 | ⚪ | 只检测 |
 | Dorian Engine / shin | 234 / 64 | 0 | 0 | — | — | — | 无 Windows 发行，不在范围 |
-| Escude | — | — | — | ✅ | 🟡 GARbro（script.bin ACPX） | ✅ |  |
+| Escude | — | — | — | ✅ | 🆕 escude.cjs：ESC-ARC + acp LZW + ESCR1_00 / ESCR_NEW（E640） | ✅ |  |
 | minori (PAZ) | — | — | — | ✅ | ✅ scr.paz | ✅ |  |
 | Spike Chunsoft WAD | — | — | — | ✅ | ✅ .lin | ⚪ |  |
 
@@ -257,3 +257,18 @@ MeguLit 对一款游戏的支持分三层：
 | Unity Game Creator | 检测 | 认作 Unity (Game Creator)，走现有 unity-text |
 | RPG Developer Bakin、Visionaire Studio、Smile Game Builder | 需实物 | 只检测（Bakin data.rbpack 自有加密，Visionaire .vis，SGB 以 SharpKmy*.dll 认） |
 | iFAction、GameCreator（非 Unity 的同名工具） | 需实物 | 查不到文件特征，未加检测 |
+
+### 第二轮 F4a（E640–E655，2026-11-14）
+
+| 引擎 | 检测 | 剧本读取 | 状态 |
+|---|---|---|---|
+| Escude ACPX | ✅ | escude.cjs | 完整 |
+| PJADV / Pajamas | ✅ | pjadv.cjs | 完整 |
+| Luca System | ✅ | luca.cjs | 完整（实物待验固定参数） |
+| Stuff Script（Propeller .msc） | 🆕 .mpk / msc\ | stuff.cjs | 完整 |
+| AI5WIN | ✅ | silky.cjs | 完整 |
+| STCM2L | 🆕 STCM2 开头的文件 | stcm2.cjs | 完整（PC 版打包方式待验） |
+| Willadv | 🆕 含 WSC 的 Will ARC | advhd.cjs | 完整 |
+| SLG System | 🆕 .szs / .spd+.spl | archive-scan.cjs slg：解包 + 已知 key 解密 + 通用扫描 | 半成品 |
+| ISM / GLib2 / Cyberworks / Tanuki / Yaneurao / Rits / BlueGale / DxLib | ✅ / 🆕 | archive-scan.cjs：解包 + 通用扫描 | 半成品（语法需实物） |
+| QuinRose 自研、Yeti/Regista、BladeEngine、BKEngine、OROCHI、MAPL、AGSI、FlixEngine、Interchannel/Prototype 旧引擎（GSD、BlueGale 的 GARbro 签名见 E665） | ❌ | ❌ | 需实物（E655） |
