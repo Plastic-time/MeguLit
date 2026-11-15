@@ -13,7 +13,7 @@ const inverse=t=>{const inv=new Uint8Array(256);for(let i=0;i<256;i++)inv[t[i]]=
 
 /* ---- CMVS (E592) ------------------------------------------------------------------------------------------------- */
 /* items: ['text' | {push:'bgm01.ogg'}] -> PS2A (encrypted, literal-only LZSS); plain:true leaves it unpacked, as the
-   official Chinese クナド国記 keeps its scripts in FileHook\ */
+   official Chinese release of a CMVS title keeps its scripts in FileHook\ */
 function ps2a(items,{enc=sjis,key=0x12345678,plain=false}={}){const strs=[],code=[];let at=0;
  code.push(Buffer.from([0x05,0x00,0x00,0x00]));
  for(const it of items){const s=z(typeof it==='string'?it:it.push,enc);code.push(Buffer.from([1,2,0x20,1]),u32(at),Buffer.from([0x0f,2,0x30,4]),Buffer.from([0x11,0x00,0x00,0x00]));strs.push(s);at+=s.length;}

@@ -10,7 +10,7 @@
              (stage 1 with the CPZ5 secret, a byte substitution table, the directory cipher, the per-directory entry
              cipher), keyed by a modified MD5 of four header words (the variant differs per title). Entries are
              decrypted with the same secret and table.
-             CPZ7 (クナド国記, 青い鳥 …): a 0x48-byte header; after the index comes a key block {MD5 of the rest, unpacked
+             CPZ7 (青い鳥 …): a 0x48-byte header; after the index comes a key block {MD5 of the rest, unpacked
              length, 4 XOR bytes, a Huffman tree and stream} whose ≥ 1023 bytes are XORed over the index first. The passes
              then run with the CPZ6/7 constants (cmvs-schemes.json "cpz7") and four per-archive values that start.ps3
              registers with the archive (0x2268–0x226E after packing mode 0x201F = 13; mode 12 means zeros): the
@@ -146,7 +146,7 @@ function read(file,e){const a=open(file),data=kit.readAt(file,e.offset,e.size);i
 
 /* ---- PS2A script -------------------------------------------------------------------------------------------------- */
 /* a script whose header lengths (code, the 4-byte table, data, text) add up to the file is already plain: the official
-   Chinese release of クナド国記 keeps its scripts unpacked in FileHook\ */
+   Chinese release of a CPZ7 title keeps its scripts unpacked in FileHook\ */
 const plainPs2=buf=>0x30+buf.readUInt32LE(0x14)+4*buf.readUInt32LE(0x10)+buf.readUInt32LE(0x18)+buf.readUInt32LE(0x1C)===buf.length;
 function unpackPs2(buf){if(buf.length<0x30||buf.toString('latin1',0,4)!=='PS2A')return null;if(plainPs2(buf))return buf;const key=buf.readUInt32LE(12),shift=((key>>>20)%5)+1,k=((key>>>24)+(key>>>3))&255;
  const body=Buffer.from(buf.subarray(0x30).map(b=>kit.ror(k^((b-0x7C)&255),shift)));
@@ -166,7 +166,7 @@ function texts(buf){const d=unpackPs2(buf);if(!d)return [];const list=pushed(d),
 function parse(buf){const lines=[],anchors=[];for(const x of texts(buf)){if(x.kind==='line')lines.push(x.t);else if(x.kind==='anchor')anchors.push(x.t);}return {lines,anchors};}
 
 const PS=/\.ps[23]$/i;
-/* CMVS games keep their archives in data/pack (クナド国記, 青い鳥, アマツツミ) */
+/* CMVS games keep their archives in data/pack (青い鳥, アマツツミ) */
 const SUBS=['','data/pack','pack'];
 const cpz7=dir=>kit.files(dir,{name:/\.cpz$/i,magic:'CPZ7',subs:SUBS}).length>0&&!kit.files(dir,{name:/\.cpz$/i,subs:SUBS}).some(f=>list(f)?.some(e=>PS.test(e.name)));
 const engine=kit.engine({id:'cmvs',hint:'*.cpz（*.ps3）',
@@ -174,7 +174,7 @@ const engine=kit.engine({id:'cmvs',hint:'*.cpz（*.ps3）',
  loose:{name:PS,subs:['','script','patch','FileHook']},parse,
  extra:{unsupported:dir=>cpz7(dir)?'CMVS_CPZ7':'',REASONS:{CMVS_CPZ7:'这部 CMVS 作品的 CPZ7 归档解不开（start.ps3 里没找到它的注册参数，或者常数和已知作品不同），暂时读不了剧本'},
   originalLines:dir=>originalLines(dir)}});
-/* The official Chinese release of クナド国記 keeps the Japanese scripts in data/pack and lays plain Chinese ones over them in
+/* An official Chinese release keeps the Japanese scripts in data/pack and lays plain Chinese ones over them in
    FileHook\ (its loader reads those first), so the running script is Chinese and the archives hold its original. Both
    builds push the same strings in the same order: the running line at push n has the Japanese line at push n. One line
    per running line, '' where a scene has no archived copy or its pushes differ. */
