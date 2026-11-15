@@ -5,11 +5,17 @@
    Format references (read, not copied): GARbro ArcFormats/Cmvs ArcCPZ.cs, CpzHeader.cs, CmvsMD5.cs (morkt, MIT) for the
    archive; ZQF-ReVN/RxCMVS PS3_Cryptor.cpp / PS3_TextEditor.cpp (no licence: format facts only) for the script; the
    per-title constants live in cmvs-schemes.json.
-     *.cpz   "CPZ5" / "CPZ6" (read) / "CPZ7" (detected, needs a real game: its keys hide in start.ps3). A 0x40-byte header
+     *.cpz   "CPZ5" / "CPZ6" / "CPZ7" (read). A 0x40-byte header
              of XOR-masked fields with an additive checksum and the index's MD5; the index is decrypted in four passes
              (stage 1 with the CPZ5 secret, a byte substitution table, the directory cipher, the per-directory entry
              cipher), keyed by a modified MD5 of four header words (the variant differs per title). Entries are
              decrypted with the same secret and table.
+             CPZ7 (クナド国記, 青い鳥 …): a 0x48-byte header; after the index comes a key block {MD5 of the rest, unpacked
+             length, 4 XOR bytes, a Huffman tree and stream} whose ≥ 1023 bytes are XORed over the index first. The passes
+             then run with the CPZ6/7 constants (cmvs-schemes.json "cpz7") and four per-archive values that start.ps3
+             registers with the archive (0x2268–0x226E after packing mode 0x201F = 13; mode 12 means zeros): the
+             directory and file step XORs, a seed addend and an entry-seed XOR. Format reference (read, not copied):
+             Shizuku-in/cmvs-rs crates/cmvs-core/src/cpz/{cpz7,crypto}.rs and script_control.rs (Apache-2.0).
      *.ps2 / *.ps3  "PS2A": 0x30-byte header {+0xC key, +0x10 text count, +0x14 code size, +0x18 extra size,
              +0x1C text size, +0x24 packed size, +0x28 unpacked size}; the body is byte-rotated
              (b = ror(k ^ (b - 0x7C), (key >> 20) % 5 + 1), k = (key >> 24) + (key >> 3)) then LZSS (2 KB window from
@@ -18,14 +24,16 @@
    the offset points into the text section (C strings). Lines come in push order, so a Chinese patch that appends its
    strings and repoints the pushes (how RxCMVS rebuilds a .ps3) pairs 1:1. Resource names (.ogg, .ps3 …) and ASCII
    strings are anchors. */
-const kit=require('./kit.cjs'),fs=require('node:fs');
+const kit=require('./kit.cjs'),fs=require('node:fs'),path=require('node:path');
 const SCHEMES=require('./cmvs-schemes.json');
 const hex=s=>parseInt(s,16)>>>0;
-function scheme(params){const s=params||SCHEMES,c=s.cpz5;
- return {md5:Object.entries(s.md5).map(([name,v])=>({name,init:v.init.map(hex),out:v.out.map(([i,op,k])=>[i,op,hex(k)])})),
+/* set 'cpz5' (CPZ5/CPZ6) or 'cpz7'; an adapter pack's params may bring its own md5 variants and either set */
+function scheme(params,set='cpz5'){const s=params||SCHEMES,c=set==='cpz7'?{...SCHEMES.cpz7,...s.cpz7}:s.cpz5;
+ return {md5:Object.entries(s.md5||SCHEMES.md5).map(([name,v])=>({name,init:v.init.map(hex),out:v.out.map(([i,op,k])=>[i,op,hex(k)])})),
   secret:c.secret.map(hex),factor:hex(c.decoderFactor),entryInit:hex(c.entryInitKey),entrySub:hex(c.entrySubKey),entryTail:hex(c.entryTailKey),entryPos:hex(c.entryKeyPos),
-  indexSeed:hex(c.indexSeed),indexAddend:hex(c.indexAddend),indexSub:hex(c.indexSubtrahend),dirAddend:c.dirKeyAddend.map(hex)};}
-const DEFAULT=scheme();
+  indexSeed:hex(c.indexSeed),indexAddend:hex(c.indexAddend),indexSub:hex(c.indexSubtrahend),dirAddend:c.dirKeyAddend.map(hex),
+  entryIndexTail:hex(c.entryIndexTail||'5')};}
+const DEFAULT=scheme(),DEFAULT7=scheme(null,'cpz7');
 const rotl=(v,n)=>{n&=31;return n?((v<<n)|(v>>>(32-n)))>>>0:v>>>0;},rotr=(v,n)=>{n&=31;return n?((v>>>n)|(v<<(32-n)))>>>0:v>>>0;};
 
 /* ---- modified MD5: one compression of {w0..w3, 0x80, 0 …, 0x80 (bit length), 0} from the variant's state ---------- */
@@ -42,7 +50,7 @@ function header(h){if(h.length<0x40||h.toString('latin1',0,3)!=='CPZ')return nul
  const u=o=>h.readUInt32LE(o),i=o=>h.readInt32LE(o),sum=(n,init)=>{let s=init;for(let o=0;o<n;o+=4)s=(s+u(o))>>>0;return s;};
  const c=v===5?{k:[-0x1C5AC27,0x37F298E7,0x7A6F3A2C,0xAE7D39BF,0xFB73A955],m:[0x43DE7C19,0xCC65F415,0xD016A93C,0x97A3BA9A]}
   :{k:[-0x1C5AC26,0x37F298E8,0x7A6F3A2D,0xAE7D39B7,0xFB73A956],m:[0x43DE7C1A,0xCC65F416,0xD016A93D,0x97A3BA9B]};
- const r={version:v,dirCount:i(4)^c.k[0],dirSize:i(8)^c.k[1],fileSize:i(12)^c.k[2],master:(u(0x30)^c.k[3])>>>0,encrypted:((u(0x34)^c.k[4])>>>0)!==0,
+ const r={version:v,dirCount:i(4)^c.k[0],dirSize:i(8)^c.k[1],fileSize:i(12)^c.k[2],master:(u(0x30)^c.k[3])>>>0,mode:(u(0x34)^c.k[4])>>>0,encrypted:((u(0x34)^c.k[4])>>>0)!==0,
   md5:c.m.map((k,n)=>(u(0x20+n*4)^k)>>>0),entryKey:v===5?0:(Math.imul(0x7DA8F173,rotr((u(0x38)^0x37ACF832)>>>0,5))+0x13712765)>>>0,nameAt:0x18,indexAt:0x40,checksum:true};
  if(v===7){if(h.length<0x48)return null;const raw=u(0x40);r.keySize=(raw^0x65EF99F3)|0;r.nameAt=0x1C;r.indexAt=0x48;r.checksum=sum(0x40,(raw-0x6DC5A9B4)>>>0)===u(0x44);}
  else r.checksum=sum(0x3C,0x923A564C)===u(0x3C);
@@ -58,35 +66,77 @@ function stage1(d,key,sc){const sk=sc.secret.map(s=>(s-key)>>>0),shift=(((key>>>
 function dirCipher(d,len,key4,arcKey=0){let seed=0x76548AEF,i=0;
  for(;i<len>>>2;i++){d.writeUInt32LE((rotl(((d.readUInt32LE(i*4)^key4[i&3])-0x4A91C262)>>>0,3)-seed)>>>0,i*4);seed=(seed+((0x10FB562A^arcKey)>>>0))>>>0;}
  for(let q=i*4;q<len;q++,i++)d[q]=((d[q]^(key4[i&3]>>>6))+0x37)&255;}
-function entryCipher(d,at,len,key4,seed,arcKey=0){let i=0;
+function entryCipher(d,at,len,key4,seed,arcKey=0,tail=5){let i=0;
  for(;i<len>>>2;i++){const o=at+i*4;d.writeUInt32LE((rotl(((d.readUInt32LE(o)^key4[i&3])-seed)>>>0,2)+0x37A19E8B)>>>0,o);seed=(seed-((0x139FA9B^arcKey)>>>0))>>>0;}
- for(let q=at+i*4;q<at+len;q++,i++)d[q]=((d[q]^(key4[i&3]>>>4))+5)&255;}
-/* the entries of one directory index decrypted with one md5 variant, or null when it does not parse */
-function readIndex(raw,h,variant,sc,fileSize){const idx=Buffer.from(raw),md5=md5Words(h.md5,variant),mk=h.master;
+ for(let q=at+i*4;q<at+len;q++,i++)d[q]=((d[q]^(key4[i&3]>>>4))+tail)&255;}
+/* the entries of one directory index decrypted with one md5 variant, or null when it does not parse;
+   arc: a CPZ7 archive's start.ps3 values ({dirStep, fileStep}) and where its data begins (base) */
+function readIndex(raw,h,variant,sc,fileSize,arc={}){const idx=Buffer.from(raw),md5=md5Words(h.md5,variant),mk=h.master;
  stage1(idx,(mk^0x3795B39A)>>>0,sc);let t=table(mk,md5[1],sc.factor);for(let i=0;i<h.dirSize;i++)idx[i]=t[0x3A^idx[i]];
- dirCipher(idx,h.dirSize,[(md5[0]^((mk+0x76A3BF29)>>>0))>>>0,(md5[1]^mk)>>>0,(md5[2]^((mk+0x10000000)>>>0))>>>0,(md5[3]^mk)>>>0]);
- t=table(mk,md5[2],sc.factor);const base=h.indexAt+raw.length,out=[];let dp=0;
+ dirCipher(idx,h.dirSize,[(md5[0]^((mk+0x76A3BF29)>>>0))>>>0,(md5[1]^mk)>>>0,(md5[2]^((mk+0x10000000)>>>0))>>>0,(md5[3]^mk)>>>0],arc.dirStep||0);
+ t=table(mk,md5[2],sc.factor);const base=arc.base??h.indexAt+raw.length,out=[];let dp=0;
  for(let d=0;d<h.dirCount;d++){if(dp+16>h.dirSize)return null;const size=idx.readInt32LE(dp),count=idx.readInt32LE(dp+4),eo=idx.readInt32LE(dp+8),dirKey=idx.readUInt32LE(dp+12);
   if(size<=16||dp+size>h.dirSize||count<0||count>=0x10000)return null;const name=kit.cstr(idx,dp+16,dp+size).toString('latin1');
   const next=d+1===h.dirCount?h.fileSize:(dp+size+12<=h.dirSize?idx.readInt32LE(dp+size+8):-1),len=next-eo;if(len<=0||eo<0||h.dirSize+eo+len>idx.length)return null;
   let cur=h.dirSize+eo;const end=cur+len;for(let i=cur;i<end;i++)idx[i]=t[0x7E^idx[i]];
-  entryCipher(idx,cur,len,md5.map((m,j)=>(m^((dirKey+sc.dirAddend[j])>>>0))>>>0),sc.indexSeed);
+  entryCipher(idx,cur,len,md5.map((m,j)=>(m^((dirKey+sc.dirAddend[j])>>>0))>>>0),sc.indexSeed,arc.fileStep||0,sc.entryIndexTail);
   for(let e=0;e<count;e++){if(cur+h.nameAt>end)return null;const es=idx.readInt32LE(cur);if(es<=h.nameAt||cur+es>end)return null;
    const nb=kit.cstr(idx,cur+h.nameAt,end);if(!nb||!nb.length||nb.some(c=>c<0x20))return null;const ko=cur+(h.version>6?0x14:0x10);
    const entry={name:(name==='root'?'':name+'/')+kit.SJIS.decode(nb),offset:Number(idx.readBigInt64LE(cur+4))+base,size:idx.readUInt32LE(cur+12),key:(idx.readUInt32LE(ko+4)+dirKey)>>>0};
    if(entry.offset<base||entry.offset+entry.size>fileSize)return null;out.push(entry);cur+=es;}
   dp+=size;}
  return {entries:out,md5,variant:variant.name};}
+const md5sum=b=>require('node:crypto').createHash('md5').update(b).digest();
+
+/* ---- CPZ7 index key and start.ps3 values ---------------------------------------------------------------------------- */
+/* the key block after a CPZ7 index: {MD5 of the rest, unpacked length, 4 XOR bytes, Huffman tree + stream} -> the key, or
+   null. Bits are read low bit first from each byte XORed with xor[byte & 3]; a 0 bit is a leaf with an 8-bit symbol, a 1
+   bit an inner node (left, then right); at most 255 inner nodes. */
+function indexKey(block){if(block.length<24||!md5sum(block.subarray(16)).equals(block.subarray(0,16)))return null;const n=block.readUInt32LE(16);if(n<0x3FF||n>0x10000)return null;
+ const xor=block.subarray(20,24),bits=block.subarray(24);let bit=0;
+ const get=c=>{let v=0;for(;c>0;c--){const at=bit>>>3;if(at>=bits.length)throw Error('CPZ7_KEY_SHORT');v=(v<<1)|(((bits[at]^xor[at&3])>>>(bit&7))&1);bit++;}return v;};
+ const nodes=[],tree=()=>{if(!get(1))return get(8);if(nodes.length>=255)throw Error('CPZ7_KEY_TREE');const at=nodes.push([0,0])-1,l=tree(),r=tree();nodes[at]=[l,r];return at+256;};
+ try{const root=tree(),out=Buffer.alloc(n);for(let i=0;i<n;i++){let s=root;while(s>=256)s=nodes[s-256][get(1)];out[i]=s;}return out;}catch{return null;}}
+/* start.ps3's straight-line pushes: 00 02 00 01 <u32> 0F 02 30 04 (number) or 01 02 20 01 <text offset> 0F 02 30 04 (string),
+   then a 2-byte command. Packing mode 0x201F = 13 registers each CPZ7 archive with 0x2268–0x226E after six pushes: entry-seed
+   XOR, seed addend, file step XOR, directory step XOR, path, slot. Mode 12 uses zeros. -> {name: values} (lower-case base
+   names), {'*': zeros} for mode 12, null when the script says nothing. */
+const NUM=[0,2,0,1],STR=[1,2,0x20,1],END=[0x0F,2,0x30,4];
+function startValues(buf){const d=unpackPs2(buf);if(!d)return null;const count=d.readUInt32LE(0x10),code=0x30,codeLen=d.readUInt32LE(0x14),text=code+codeLen+4*count+d.readUInt32LE(0x18),textLen=d.readUInt32LE(0x1C);
+ if(text+textLen>d.length)return null;const end=Math.min(code+codeLen,text);
+ const push=(p,kind)=>{if(p<code||p+12>end)return null;for(let i=0;i<4;i++)if(d[p+i]!==kind[i]||d[p+8+i]!==END[i])return null;return d.readUInt32LE(p+4);};
+ let mode=null;const out={};
+ for(let p=code+12;p+2<=end;p++){const op=d.readUInt16LE(p);
+  if(op===0x201F&&push(p-12,NUM)!==null){mode=push(p-12,NUM);continue;}
+  if(mode!==13||op<0x2268||op>0x226E)continue;
+  const v=[0,12,24,36].map(o=>push(p-72+o,NUM)),at=push(p-24,STR),slot=push(p-12,NUM);if(v.includes(null)||at===null||slot===null)continue;
+  const s=kit.cstr(d,text+at,text+textLen);if(!s)continue;const name=s.toString('latin1').split(/[\\/]/).pop().toLowerCase();
+  out[name]={resXor:v[0],seedAdd:v[1],fileStep:v[2],dirStep:v[3]};}
+ return mode===12?{'*':{resXor:0,seedAdd:0,fileStep:0,dirStep:0}}:Object.keys(out).length?out:null;}
+const ZERO7={resXor:0,seedAdd:0,fileStep:0,dirStep:0};
+/* the values for one CPZ7 archive: start.ps3 beside it (data/pack) or one or two folders up, else zeros (青い鳥) */
+function cpz7Values(file){const name=path.basename(file).toLowerCase();let dir=path.dirname(file);
+ for(let up=0;up<3;up++,dir=path.dirname(dir)){const s=path.join(dir,'start.ps3');if(!kit.isFile(s))continue;
+  let v=null;try{v=startValues(fs.readFileSync(s));}catch{}if(v)return v[name]||v['*']||null;}
+ return null;}
+function open7(file,h,fsz,params){if(h.mode>1||h.keySize<24)return null;const n=h.dirSize+h.fileSize,raw=kit.readAt(file,h.indexAt,n+h.keySize);
+ if(raw.length!==n+h.keySize||!md5sum(raw).equals(h.indexMd5))return null;const key=indexKey(raw.subarray(n));if(!key)return null;
+ const idx=Buffer.from(raw.subarray(0,n));for(let i=0;i<n;i++)idx[i]^=key[(i+3)%0x3FF];
+ const sc=params?scheme(params,'cpz7'):DEFAULT7,found=cpz7Values(file),tries=found?[found,ZERO7]:[ZERO7];
+ for(const values of tries)for(const v of sc.md5){const x=readIndex(idx,h,v,sc,fsz,{...values,base:h.indexAt+n+h.keySize});if(x&&x.entries.length)return {...x,h,sc,values};}
+ return null;}
+
 const memo=new Map();
-/* {version, entries, md5, h, sc} for a CPZ5/CPZ6 archive; null for anything else (CPZ7 included) */
+/* {version, entries, md5, h, sc[, values]} for a CPZ5/CPZ6/CPZ7 archive; null for anything else */
 function open(file,params){const fsz=kit.size(file),stamp=file+'|'+fsz+'|'+(kit.isFile(file)?fs.statSync(file).mtimeMs:0);if(memo.has(stamp))return memo.get(stamp);
- let r=null;try{const h=header(kit.head(file,0x48));if(h&&h.version<7){const sc=params?scheme(params):DEFAULT,raw=kit.readAt(file,h.indexAt,h.dirSize+h.fileSize);
-  if(raw.length===h.dirSize+h.fileSize&&require('node:crypto').createHash('md5').update(raw).digest().equals(h.indexMd5))
+ let r=null;try{const h=header(kit.head(file,0x48));if(h&&h.version===7)r=open7(file,h,fsz,params);
+  else if(h){const sc=params?scheme(params):DEFAULT,raw=kit.readAt(file,h.indexAt,h.dirSize+h.fileSize);
+  if(raw.length===h.dirSize+h.fileSize&&md5sum(raw).equals(h.indexMd5))
    for(const v of sc.md5){const x=readIndex(raw,h,v,sc,fsz);if(x&&x.entries.length){r={...x,h,sc};break;}}}}catch{r=null;}
  if(memo.size>64)memo.clear();memo.set(stamp,r);return r;}
 const list=file=>open(file)?.entries||null;
 function read(file,e){const a=open(file),data=kit.readAt(file,e.offset,e.size);if(!a||!a.h.encrypted)return data;
- const {h,sc,md5}=a;let seed=((((h.master^e.key)>>>0)+h.dirCount)>>>0);seed=(seed-sc.entrySub)>>>0;seed=(seed^h.entryKey)>>>0;
+ const {h,sc,md5}=a,v=a.values||ZERO7;let seed=(((((h.master^e.key)>>>0)+h.dirCount)>>>0)^v.resXor)>>>0;seed=(seed-sc.entrySub)>>>0;seed=(seed^((h.entryKey+v.seedAdd)>>>0))>>>0;
  const t=table(md5[3],h.master,sc.factor),kb=Buffer.alloc(64);for(let i=0;i<16;i++)kb.writeUInt32LE(sc.secret[i],i*4);
  const low=(md5[1]>>>2)&255,sk=Array.from({length:16},(_,i)=>{for(let q=0;q<4;q++)kb[i*4+q]=low^t[kb[i*4+q]];return (kb.readUInt32LE(i*4)^seed)>>>0;});
  let key=sc.entryInit,k=sc.entryPos;const n=data.length>>>2;
@@ -111,9 +161,11 @@ function parse(buf){const d=unpackPs2(buf);if(!d)return {lines:[],anchors:[]};co
  return {lines,anchors};}
 
 const PS=/\.ps[23]$/i;
-const cpz7=dir=>kit.files(dir,{name:/\.cpz$/i,magic:'CPZ7'}).length>0&&!kit.files(dir,{name:/\.cpz$/i}).some(f=>list(f)?.some(e=>PS.test(e.name)));
+/* CMVS games keep their archives in data/pack (クナド国記, 青い鳥, アマツツミ) */
+const SUBS=['','data/pack','pack'];
+const cpz7=dir=>kit.files(dir,{name:/\.cpz$/i,magic:'CPZ7',subs:SUBS}).length>0&&!kit.files(dir,{name:/\.cpz$/i,subs:SUBS}).some(f=>list(f)?.some(e=>PS.test(e.name)));
 const engine=kit.engine({id:'cmvs',hint:'*.cpz（*.ps3）',
- archives:{name:/\.cpz$/i,magic:'CPZ',list:f=>{const l=list(f);return l&&l.some(e=>PS.test(e.name))?l:null;},read,entry:PS},
+ archives:{name:/\.cpz$/i,magic:'CPZ',subs:SUBS,list:f=>{const l=list(f);return l&&l.some(e=>PS.test(e.name))?l:null;},read,entry:PS},
  loose:{name:PS,subs:['','script','patch']},parse,
- extra:{unsupported:dir=>cpz7(dir)?'CMVS_CPZ7':'',REASONS:{CMVS_CPZ7:'这部 CMVS 作品用的是 CPZ7 归档（密钥藏在 start.ps3 里，各作品不同），还没有实物验证过，暂时读不了剧本'}}});
-module.exports={engine,parse,header,open,list,read,unpackPs2,pushed,md5Words,table,stage1,dirCipher,entryCipher,scheme,DEFAULT,rotl,rotr};
+ extra:{unsupported:dir=>cpz7(dir)?'CMVS_CPZ7':'',REASONS:{CMVS_CPZ7:'这部 CMVS 作品的 CPZ7 归档解不开（start.ps3 里没找到它的注册参数，或者常数和已知作品不同），暂时读不了剧本'}}});
+module.exports={engine,parse,header,open,list,read,unpackPs2,pushed,md5Words,table,stage1,dirCipher,entryCipher,scheme,DEFAULT,DEFAULT7,indexKey,startValues,rotl,rotr};

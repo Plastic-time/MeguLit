@@ -28,7 +28,27 @@ test('CMVS: CPZ5 / CPZ6 index and entries decrypted for any md5 variant; a GBK .
   assert.equal(library.engineOf(game)?.name,'CMVS (Purple Software)');assert.equal(scenes.detect(game),'cmvs');
   const own=scenes.read('cmvs',game).filter(s=>s.lines.length),zh=patchLines('cmvs',patch);pairs(own,zh);assert.equal(zh[0].lines[1],'“早上好，要迟到了”');}
 });
-test('CMVS: a CPZ7 archive is detected and reported as needing a real game',t=>{
+test('CMVS: CPZ7 in data/pack is read with the values start.ps3 registers for it',t=>{
+ const values={resXor:0x5F66BA7D,seedAdd:0xA6E98C19,fileStep:0x6AF47E21,dirStep:0x3E65BAB5},game=tmp(t);
+ F.writeTree(game,{'data/pack/script.cpz':F.cpz7({'scene/a01.ps3':F.ps2a(CM_JA),'scene/a02.ps3':F.ps2a(['二本目の話。'])},{values}),
+  'data/pack/start.ps3':F.startPs3([{path:'data\\pack\\update.cpz',values:{resXor:1,seedAdd:2,fileStep:3,dirStep:4}},{path:'data\\pack\\script.cpz',values}]),'cmvs64.exe':'MZ','cmvs.cfg':''});
+ const sv=cmvs.startValues(fs.readFileSync(path.join(game,'data/pack/start.ps3')));assert.deepEqual(sv['script.cpz'],values);assert.deepEqual(sv['update.cpz'],{resXor:1,seedAdd:2,fileStep:3,dirStep:4});
+ const a=cmvs.open(path.join(game,'data/pack/script.cpz'));assert.equal(a?.variant,'Aoi');assert.deepEqual(a.entries.map(e=>e.name),['scene/a01.ps3','scene/a02.ps3']);
+ assert.equal(scenes.detect(game),'cmvs');assert.equal(scenes.unsupportedReason(game),null);
+ assert.deepEqual(scenes.read('cmvs',game).filter(s=>s.lines.length).map(s=>s.lines),[['さくら','「おはよう、遅刻するよ」','朝の光が差し込む。'],['二本目の話。']]);
+});
+test('CMVS: CPZ7 with packing mode 12 or no start.ps3 uses zero values (青い鳥)',t=>{
+ for(const start of [F.startPs3([],{mode:12}),null]){const game=tmp(t);
+  F.writeTree(game,{'data/pack/script.cpz':F.cpz7({'a01.ps3':F.ps2a(CM_JA)}),...(start?{'data/pack/start.ps3':start}:{})});
+  assert.deepEqual(cmvs.list(path.join(game,'data/pack/script.cpz')).map(e=>e.name),['a01.ps3']);
+  assert.deepEqual(scenes.read('cmvs',game).filter(s=>s.lines.length)[0].lines,['さくら','「おはよう、遅刻するよ」','朝の光が差し込む。']);}
+});
+test('CMVS: CPZ7 key block: Huffman tree low bit first, MD5 checked, short keys refused',()=>{
+ const key=Buffer.from(Array.from({length:0x3FF},(_,i)=>(i*7)&255)),block=F.cpz7KeyBlock(key);assert.deepEqual(cmvs.indexKey(block),key);
+ const bad=Buffer.from(block);bad[30]^=1;assert.equal(cmvs.indexKey(bad),null);
+ assert.equal(cmvs.indexKey(F.cpz7KeyBlock(key.subarray(0,0x3FE))),null);
+});
+test('CMVS: a CPZ7 archive that does not open is reported',t=>{
  const game=tmp(t),c=F.cpz({'a.ps3':F.ps2a(['x'])});c.write('CPZ7',0,'latin1');F.writeTree(game,{'script.cpz':c});
  assert.equal(cmvs.list(path.join(game,'script.cpz')),null);assert.equal(scenes.unsupportedReason(game)?.code,'CMVS_CPZ7');
 });

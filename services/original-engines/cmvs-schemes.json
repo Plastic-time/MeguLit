@@ -22,5 +22,21 @@
     "indexAddend": "784C5962",
     "indexSubtrahend": "79",
     "dirKeyAddend": ["0", "00112233", "0", "34258765"]
+  },
+  "cpz7": {
+    "_comment": "CPZ7 constants (same secret as cpz5), from Shizuku-in/cmvs-rs crates/cmvs-core/src/cpz/crypto.rs (Apache-2.0). entryIndexTail: added to each tail byte of a file index.",
+    "secret": ["CD90F089", "E982B782", "A282AB88", "CD82718E", "52838A83", "A882AA82", "7592648E", "B582AB82",
+               "E182BF82", "DC82A282", "4281B782", "ED82F48E", "BF82EA82", "A282E182", "B782DC82", "6081E682",
+               "C6824181", "A482A282", "E082A982", "F48EA482", "BF82C182", "A282E182", "B582DC82", "F481BD82"],
+    "decoderFactor": "1A74F195",
+    "entryInitKey": "2748C39E",
+    "entrySubKey": "5C39E87B",
+    "entryTailKey": "AE",
+    "entryKeyPos": "A",
+    "indexSeed": "2A65CB4F",
+    "indexAddend": "784C5062",
+    "indexSubtrahend": "7D",
+    "dirKeyAddend": ["0", "11003322", "0", "34216785"],
+    "entryIndexTail": "3"
   }
 }

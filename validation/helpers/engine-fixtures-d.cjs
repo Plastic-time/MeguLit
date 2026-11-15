@@ -52,6 +52,52 @@ function cpz(files,{version=6,variant='Mirai',encrypted=true,master=0x1234ABCD,r
   for(let i=0;i<n;i++){const p=d.readUInt32LE(i*4);d.writeUInt32LE((((((md5[key&3]^p)>>>0)+seed)>>>0)^(sk[kk]>>>1)^sk[(key>>>6)&15])>>>0,i*4);kk=(kk+1)&15;key=(key+seed+p)>>>0;}
   for(let q=n*4;q<d.length;q++)d[q]=inv3[d[q]]^sc.entryTail;return d;});
  return Buffer.concat([h,idx,...enc]);}
+/* code + text -> PS2A (encrypted, literal-only LZSS), as ps2a() packs it */
+function ps2aRaw(codeBuf,text,key=0x12345678){const body=Buffer.concat([codeBuf,text]),shift=((key>>>20)%5)+1,k=((key>>>24)+(key>>>3))&255,packed=Buffer.from(literals(body).map(b=>((rol8(b,shift)^k)+0x7c)&255));
+ const h=Buffer.alloc(0x30);h.write('PS2A','latin1');h.writeUInt32LE(0x30,4);h.writeUInt32LE(key>>>0,12);h.writeUInt32LE(0,16);h.writeUInt32LE(codeBuf.length,20);h.writeUInt32LE(0,24);h.writeUInt32LE(text.length,28);h.writeUInt32LE(packed.length,36);h.writeUInt32LE(body.length,40);
+ return Buffer.concat([h,packed]);}
+/* start.ps3 that sets packing mode 0x201F and registers CPZ7 archives with 0x2268:
+   regs [{path:'data\\pack\\script.cpz', values:{resXor,seedAdd,fileStep,dirStep}}] */
+function startPs3(regs,{mode=13}={}){const num=v=>Buffer.concat([Buffer.from([0,2,0,1]),u32(v),Buffer.from([0x0f,2,0x30,4])]),str=o=>Buffer.concat([Buffer.from([1,2,0x20,1]),u32(o),Buffer.from([0x0f,2,0x30,4])]);
+ const code=[num(0),u16(0x201e),num(mode),u16(0x201f)],strs=[];let at=0;
+ regs.forEach((r,slot)=>{const s=z(r.path,b=>Buffer.from(b,'latin1')),v=r.values;code.push(num(v.resXor),num(v.seedAdd),num(v.fileStep),num(v.dirStep),str(at),num(slot),u16(0x2268));strs.push(s);at+=s.length;});
+ return ps2aRaw(Buffer.concat(code),Buffer.concat(strs));}
+/* a Huffman key block as CPZ7 stores it: a full depth-8 tree, low bit first, XORed with xor[byte & 3] */
+function cpz7KeyBlock(key,xor=[0x5a,0xa5,0x3c,0xc3]){const bits=[];const put=(v,n)=>{for(let i=n-1;i>=0;i--)bits.push((v>>>i)&1);};
+ const tree=(depth,prefix)=>{if(depth===8){put(0,1);put(prefix,8);return;}put(1,1);tree(depth+1,prefix<<1);tree(depth+1,(prefix<<1)|1);};tree(0,0);for(const b of key)put(b,8);
+ const out=Buffer.alloc(Math.ceil(bits.length/8));bits.forEach((b,i)=>{out[i>>>3]|=b<<(i&7);});for(let i=0;i<out.length;i++)out[i]^=xor[i&3];
+ const rest=Buffer.concat([u32(key.length),Buffer.from(xor),out]);return Buffer.concat([require('node:crypto').createHash('md5').update(rest).digest(),rest]);}
+/* files -> CPZ7 with the Aoi md5 variant, the cpz7 constants and four start.ps3 values (zeros for 青い鳥) */
+function cpz7(files,{values={resXor:0,seedAdd:0,fileStep:0,dirStep:0},master=0x1234ABCD,raw=[0x11111111,0x22222222,0x33333333,0x44444444],entryRaw=0x5555AAAA}={}){
+ const sc=cmvs.DEFAULT7,v=sc.md5.find(x=>x.name==='Aoi'),md5=cmvs.md5Words(raw,v),dirs=new Map();
+ for(const [n,b] of Object.entries(files)){const at=n.lastIndexOf('/'),d=at<0?'root':n.slice(0,at);if(!dirs.has(d))dirs.set(d,[]);dirs.get(d).push({name:n.slice(at+1),data:b});}
+ const dirKeys=[...dirs.keys()].map((_,i)=>(0x01020304*(i+1))>>>0);let dataAt=0;const dirBufs=[],entBufs=[],datas=[];let entOff=0;
+ [...dirs.entries()].forEach(([dn,list],di)=>{const ents=list.map((f,i)=>{const nb=z(f.name,s=>Buffer.from(s,'latin1')),e=Buffer.alloc(0x1C);e.writeInt32LE(0x1C+nb.length,0);e.writeBigInt64LE(BigInt(dataAt),4);e.writeUInt32LE(f.data.length,12);e.writeUInt32LE(0,16);e.writeUInt32LE(0,20);e.writeUInt32LE((0x100+i)>>>0,24);
+   f.key=((0x100+i)+dirKeys[di])>>>0;dataAt+=f.data.length;datas.push(f);return Buffer.concat([e,nb]);});
+  const eb=Buffer.concat(ents),nb=z(dn,s=>Buffer.from(s,'latin1')),dh=Buffer.alloc(16);dh.writeInt32LE(16+nb.length,0);dh.writeInt32LE(list.length,4);dh.writeInt32LE(entOff,8);dh.writeUInt32LE(dirKeys[di],12);
+  dirBufs.push(Buffer.concat([dh,nb]));entBufs.push({eb,dirKey:dirKeys[di],at:entOff});entOff+=eb.length;});
+ const dirArea=Buffer.concat(dirBufs),entArea=Buffer.concat(entBufs.map(x=>x.eb)),idx=Buffer.concat([dirArea,entArea]),mk=master>>>0;
+ const t1=inverse(cmvs.table(mk,md5[1],sc.factor)),t2=inverse(cmvs.table(mk,md5[2],sc.factor));
+ for(const x of entBufs){const at=dirArea.length+x.at,key4=md5.map((m,j)=>(m^((x.dirKey+sc.dirAddend[j])>>>0))>>>0);let seed=sc.indexSeed,i=0;
+  for(;i<x.eb.length>>>2;i++){const o=at+i*4;idx.writeUInt32LE(((rotr((idx.readUInt32LE(o)-0x37A19E8B)>>>0,2)+seed)>>>0^key4[i&3])>>>0,o);seed=(seed-((0x139FA9B^values.fileStep)>>>0))>>>0;}
+  for(let q=at+i*4;q<at+x.eb.length;q++,i++)idx[q]=(((idx[q]-sc.entryIndexTail)&255)^(key4[i&3]>>>4))&255;
+  for(let q=at;q<at+x.eb.length;q++)idx[q]=t2[idx[q]]^0x7E;}
+ {const key4=[(md5[0]^((mk+0x76A3BF29)>>>0))>>>0,(md5[1]^mk)>>>0,(md5[2]^((mk+0x10000000)>>>0))>>>0,(md5[3]^mk)>>>0];let seed=0x76548AEF,i=0;
+  for(;i<dirArea.length>>>2;i++){idx.writeUInt32LE(((rotr((idx.readUInt32LE(i*4)+seed)>>>0,3)+0x4A91C262)>>>0^key4[i&3])>>>0,i*4);seed=(seed+((0x10FB562A^values.dirStep)>>>0))>>>0;}
+  for(let q=i*4;q<dirArea.length;q++,i++)idx[q]=(((idx[q]-0x37)&255)^(key4[i&3]>>>6))&255;
+  for(let q=0;q<dirArea.length;q++)idx[q]=t1[idx[q]]^0x3A;}
+ encStage1(idx,(mk^0x3795B39A)>>>0,sc);
+ const key=Buffer.from(Array.from({length:0x3FF},(_,i)=>(i*37+11)&255)),block=cpz7KeyBlock(key);for(let i=0;i<idx.length;i++)idx[i]^=key[(i+3)%0x3FF];
+ const k=[-0x1C5AC26,0x37F298E8,0x7A6F3A2D,0xAE7D39B7,0xFB73A956,0x43DE7C1A,0xCC65F416,0xD016A93D,0x97A3BA9B],index=Buffer.concat([idx,block]);
+ const h=Buffer.alloc(0x48);h.write('CPZ7','latin1');h.writeInt32LE(dirs.size^k[0],4);h.writeInt32LE(dirArea.length^k[1],8);h.writeInt32LE(entArea.length^k[2],12);
+ require('node:crypto').createHash('md5').update(index).digest().copy(h,0x10);raw.forEach((m,i)=>h.writeUInt32LE((m^k[5+i])>>>0,0x20+i*4));h.writeUInt32LE((mk^k[3])>>>0,0x30);h.writeUInt32LE((1^k[4])>>>0,0x34);h.writeUInt32LE(entryRaw>>>0,0x38);
+ const ks=(block.length^0x65EF99F3)>>>0;h.writeUInt32LE(ks,0x40);let sum=(ks-0x6DC5A9B4)>>>0;for(let o=0;o<0x40;o+=4)sum=(sum+h.readUInt32LE(o))>>>0;h.writeUInt32LE(sum,0x44);
+ const hd=cmvs.header(h),t3=cmvs.table(md5[3],mk,sc.factor),inv3=inverse(t3),low=(md5[1]>>>2)&255,kb=Buffer.alloc(64);for(let i=0;i<16;i++)kb.writeUInt32LE(sc.secret[i],i*4);for(let i=0;i<64;i++)kb[i]=low^t3[kb[i]];
+ const enc=datas.map(f=>{const d=Buffer.from(f.data);let seed=(((((mk^f.key)>>>0)+dirs.size)>>>0)^values.resXor)>>>0;seed=(seed-sc.entrySub)>>>0;seed=(seed^((hd.entryKey+values.seedAdd)>>>0))>>>0;
+  const sk=Array.from({length:16},(_,i)=>(kb.readUInt32LE(i*4)^seed)>>>0);let key=sc.entryInit,kk=sc.entryPos;const n=d.length>>>2;
+  for(let i=0;i<n;i++){const p=d.readUInt32LE(i*4);d.writeUInt32LE((((((md5[key&3]^p)>>>0)+seed)>>>0)^(sk[kk]>>>1)^sk[(key>>>6)&15])>>>0,i*4);kk=(kk+1)&15;key=(key+seed+p)>>>0;}
+  for(let q=n*4;q<d.length;q++)d[q]=inv3[d[q]]^sc.entryTail;return d;});
+ return Buffer.concat([h,index,...enc]);}
 
 /* ---- Lucifen (E593) ---------------------------------------------------------------------------------------------- */
 /* items: [{say:'text', name?, voice?} | {choices:['a','b']}] -> SOB0 */
@@ -129,4 +175,4 @@ function ykc(files){const names=Object.keys(files);let at=0x18;const datas=[],of
  const idx=Buffer.concat(names.map((n,i)=>Buffer.concat([u32(nameOffs[i]),u32(nameBufs[i].length),u32(offs[i]),u32(datas[i].length),u32(0)])));
  const h=Buffer.alloc(0x18);h.write('YKC001\0\0','latin1');h.writeUInt32LE(0x18,8);h.writeUInt32LE(at,0x10);h.writeUInt32LE(idx.length,0x14);
  return Buffer.concat([h,...datas,...nameBufs,idx]);}
-module.exports={link4,ps2a,cpz,sob,lpk,trie,kaguya4,kaguyaEarly,wfl1,snx,lcsePack,yks,ykc,literals};
+module.exports={link4,ps2a,ps2aRaw,startPs3,cpz7KeyBlock,cpz7,cpz,sob,lpk,trie,kaguya4,kaguyaEarly,wfl1,snx,lcsePack,yks,ykc,literals};
