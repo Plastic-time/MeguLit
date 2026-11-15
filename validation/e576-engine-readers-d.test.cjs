@@ -48,6 +48,28 @@ test('CMVS: CPZ7 key block: Huffman tree low bit first, MD5 checked, short keys 
  const bad=Buffer.from(block);bad[30]^=1;assert.equal(cmvs.indexKey(bad),null);
  assert.equal(cmvs.indexKey(F.cpz7KeyBlock(key.subarray(0,0x3FE))),null);
 });
+/* クナド国記 official Chinese: Japanese scripts in data/pack, plain Chinese ones over them in FileHook\ (the Chinese leaves
+   one push empty, so a reader that skipped empty pushes would pair the lines after it with the wrong Japanese) */
+const fileHookGame=(t,{hook=true}={})=>{const game=tmp(t);
+ F.writeTree(game,{'data/pack/script.cpz':F.cpz7({'a01.ps3':F.ps2a(['さくら','「おはよう、遅刻するよ」',{push:'bgm01.ogg'},'今日も晴れだね。','朝の光が差し込む。']),'a02.ps3':F.ps2a(['二本目の話。'])}),'cmvs32.exe':'MZ',
+  ...(hook?{'FileHook/a01.ps3':F.ps2a(['樱','“早上好，要迟到了”',{push:'bgm01.ogg'},'','晨光照了进来。'],{enc:F.gbk,plain:true})}:{})});
+ return game;};
+test('CMVS: plain FileHook scripts over the archive are the running script, the archived line at the same push its original',t=>{
+ const game=fileHookGame(t);
+ assert.deepEqual(cmvs.parse(fs.readFileSync(path.join(game,'FileHook/a01.ps3'))).lines,['樱','“早上好，要迟到了”','晨光照了进来。']);
+ assert.equal(scenes.detect(game),'cmvs');
+ assert.deepEqual(scenes.read('cmvs',game).map(s=>s.lines),[['樱','“早上好，要迟到了”','晨光照了进来。'],['二本目の話。']]);
+ assert.deepEqual(cmvs.originalLines(game),['さくら','「おはよう、遅刻するよ」','朝の光が差し込む。','二本目の話。']);
+});
+test('CMVS: the official Chinese build is paired with its own archives; without FileHook it is the Japanese game',t=>{
+ const ot=require('../services/original-text.cjs');
+ const game=fileHookGame(t),root=tmp(t),exe=path.join(game,'cmvs32.exe');
+ const s=ot.scanRunning(root,'kunado',exe);assert.equal(s.status,'ready');assert.equal(s.mode,'original');assert.equal(s.original?.auto,true);
+ const r=ot.provider(root,exe).resolve('“早上好，要迟到了”');assert.equal(r.japanese,'「おはよう、遅刻するよ」');
+ assert.equal(ot.provider(root,exe).resolve('晨光照了进来。').japanese,'朝の光が差し込む。');
+ const ja=fileHookGame(t,{hook:false}),jaRoot=tmp(t),st=ot.scanRunning(jaRoot,'kunado-ja',path.join(ja,'cmvs32.exe'));
+ assert.equal(st.status,'native-japanese');assert.equal(st.original,undefined);
+});
 test('CMVS: a CPZ7 archive that does not open is reported',t=>{
  const game=tmp(t),c=F.cpz({'a.ps3':F.ps2a(['x'])});c.write('CPZ7',0,'latin1');F.writeTree(game,{'script.cpz':c});
  assert.equal(cmvs.list(path.join(game,'script.cpz')),null);assert.equal(scenes.unsupportedReason(game)?.code,'CMVS_CPZ7');

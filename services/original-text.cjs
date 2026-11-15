@@ -83,7 +83,13 @@ function scanRunning(root,id,executable){
  const index=writeIndex(root,id,'runtime-'+hash.slice(0,16)+'.json',{schema:SCHEMA,role:'runtime',engine:ain.engine,version:ain.version,codepage:ain.codepage,source:{file,sha256:hash},structure:ain.structure,lines:ain.lines,...(ain.ruby?{ruby:ain.ruby}:{}),...(ain.sizes?{sizes:ain.sizes}:{})});
  const original=current?.original;const runtime={file,engine:loc.engine,sha256:hash,reader:READER,index,codepage:ain.codepage,version:ain.version,structure:ain.structure,lines:nonEmpty,japaneseLines:japanese};
  // A changed game build invalidates the earlier alignment; the original index itself stays.
- return writeState(root,id,{engine:loc.engine,runtime,status:zhOnly&&!original?.index?'chinese-only':!zhOnly&&japanese>=nonEmpty*.5?'native-japanese':original?.index&&current?.runtime?.sha256===hash?current.status:original?.index?'needs-recheck':'awaiting-original'});
+ const state=writeState(root,id,{engine:loc.engine,runtime,status:zhOnly&&!original?.index?'chinese-only':!zhOnly&&japanese>=nonEmpty*.5?'native-japanese':original?.index&&current?.runtime?.sha256===hash?current.status:original?.index?'needs-recheck':'awaiting-original'});
+ /* A scene engine that reads the Japanese lines behind the running ones from this same folder (CMVS official Chinese:
+    FileHook\ over the archives) adopts them as the original, as the live engines do while the game runs. A copy the
+    user imported stays theirs. */
+ const eng=scenes.ENGINES[loc.engine];
+ if(ADAPTERS[loc.engine].scene&&eng?.originalLines&&!eng.live&&state.status!=='native-japanese'&&(!original||original.auto))try{return adoptOriginal(root,id,state,dir);}catch{}
+ return state;
 }
 // ---- Original import and alignment -------------------------------------------------------------
 function align(runtime,original){

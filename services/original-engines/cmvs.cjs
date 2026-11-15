@@ -145,20 +145,25 @@ function read(file,e){const a=open(file),data=kit.readAt(file,e.offset,e.size);i
  return data;}
 
 /* ---- PS2A script -------------------------------------------------------------------------------------------------- */
-function unpackPs2(buf){if(buf.length<0x30||buf.toString('latin1',0,4)!=='PS2A')return null;const key=buf.readUInt32LE(12),shift=((key>>>20)%5)+1,k=((key>>>24)+(key>>>3))&255;
+/* a script whose header lengths (code, the 4-byte table, data, text) add up to the file is already plain: the official
+   Chinese release of クナド国記 keeps its scripts unpacked in FileHook\ */
+const plainPs2=buf=>0x30+buf.readUInt32LE(0x14)+4*buf.readUInt32LE(0x10)+buf.readUInt32LE(0x18)+buf.readUInt32LE(0x1C)===buf.length;
+function unpackPs2(buf){if(buf.length<0x30||buf.toString('latin1',0,4)!=='PS2A')return null;if(plainPs2(buf))return buf;const key=buf.readUInt32LE(12),shift=((key>>>20)%5)+1,k=((key>>>24)+(key>>>3))&255;
  const body=Buffer.from(buf.subarray(0x30).map(b=>kit.ror(k^((b-0x7C)&255),shift)));
  return Buffer.concat([buf.subarray(0,0x30),kit.lzss(body,buf.readUInt32LE(0x28),{window:0x800,start:0x7df,lenBits:5,minMatch:2})]);}
 const PUSH=Buffer.from([1,2,0x20,1]),PUSH_END=Buffer.from([0x0f,2,0x30,4]);
 const RESOURCE=/\.(ogg|wav|mv2|pb3|pb2|ps3|ps2|cur|cmv|mgv|png|bmp)\b/i;
-/* the pushed strings in code order */
+/* the pushed strings in code order; an empty one stays as an empty buffer, so the n-th push of two builds of one script
+   is the same line */
 function pushed(d){const count=d.readUInt32LE(0x10),code=0x30,codeLen=d.readUInt32LE(0x14)+4*count+d.readUInt32LE(0x18),text=code+codeLen,textLen=d.readUInt32LE(0x1C),out=[];
  if(text+textLen>d.length||codeLen<0)return out;
- for(let p=code;p+12<=text;p++){if(d[p]!==1||!d.subarray(p,p+4).equals(PUSH)||!d.subarray(p+8,p+12).equals(PUSH_END))continue;const s=kit.cstr(d,text+d.readUInt32LE(p+4),text+textLen);if(s&&s.length)out.push(s);p+=11;}
+ for(let p=code;p+12<=text;p++){if(d[p]!==1||!d.subarray(p,p+4).equals(PUSH)||!d.subarray(p+8,p+12).equals(PUSH_END))continue;out.push(kit.cstr(d,text+d.readUInt32LE(p+4),text+textLen)||Buffer.alloc(0));p+=11;}
  return out;}
 const clean=t=>kit.trimBoth(t.replace(/\\n/g,'\n'));
-function parse(buf){const d=unpackPs2(buf);if(!d)return {lines:[],anchors:[]};const list=pushed(d),dec=kit.decoder(list),lines=[],anchors=[];
- for(const s of list){const t=s.some(c=>c>=0x80)?clean(dec.decode(s)):s.toString('latin1');if(!t)continue;if(kit.ascii(t)||RESOURCE.test(t))anchors.push(t);else lines.push(t);}
- return {lines,anchors};}
+/* every push as {kind, t}: 'line' (text the game shows), 'anchor' (a file name or command) or '' (empty) */
+function texts(buf){const d=unpackPs2(buf);if(!d)return [];const list=pushed(d),dec=kit.decoder(list.filter(s=>s.length));
+ return list.map(s=>{const t=!s.length?'':s.some(c=>c>=0x80)?clean(dec.decode(s)):s.toString('latin1');return {kind:!t?'':kit.ascii(t)||RESOURCE.test(t)?'anchor':'line',t};});}
+function parse(buf){const lines=[],anchors=[];for(const x of texts(buf)){if(x.kind==='line')lines.push(x.t);else if(x.kind==='anchor')anchors.push(x.t);}return {lines,anchors};}
 
 const PS=/\.ps[23]$/i;
 /* CMVS games keep their archives in data/pack (クナド国記, 青い鳥, アマツツミ) */
@@ -166,6 +171,15 @@ const SUBS=['','data/pack','pack'];
 const cpz7=dir=>kit.files(dir,{name:/\.cpz$/i,magic:'CPZ7',subs:SUBS}).length>0&&!kit.files(dir,{name:/\.cpz$/i,subs:SUBS}).some(f=>list(f)?.some(e=>PS.test(e.name)));
 const engine=kit.engine({id:'cmvs',hint:'*.cpz（*.ps3）',
  archives:{name:/\.cpz$/i,magic:'CPZ',subs:SUBS,list:f=>{const l=list(f);return l&&l.some(e=>PS.test(e.name))?l:null;},read,entry:PS},
- loose:{name:PS,subs:['','script','patch']},parse,
- extra:{unsupported:dir=>cpz7(dir)?'CMVS_CPZ7':'',REASONS:{CMVS_CPZ7:'这部 CMVS 作品的 CPZ7 归档解不开（start.ps3 里没找到它的注册参数，或者常数和已知作品不同），暂时读不了剧本'}}});
-module.exports={engine,parse,header,open,list,read,unpackPs2,pushed,md5Words,table,stage1,dirCipher,entryCipher,scheme,DEFAULT,DEFAULT7,indexKey,startValues,rotl,rotr};
+ loose:{name:PS,subs:['','script','patch','FileHook']},parse,
+ extra:{unsupported:dir=>cpz7(dir)?'CMVS_CPZ7':'',REASONS:{CMVS_CPZ7:'这部 CMVS 作品的 CPZ7 归档解不开（start.ps3 里没找到它的注册参数，或者常数和已知作品不同），暂时读不了剧本'},
+  originalLines:dir=>originalLines(dir)}});
+/* The official Chinese release of クナド国記 keeps the Japanese scripts in data/pack and lays plain Chinese ones over them in
+   FileHook\ (its loader reads those first), so the running script is Chinese and the archives hold its original. Both
+   builds push the same strings in the same order: the running line at push n has the Japanese line at push n. One line
+   per running line, '' where a scene has no archived copy or its pushes differ. */
+function originalLines(dir){const arch=new Map();
+ for(const f of kit.files(dir,{name:/\.cpz$/i,magic:'CPZ',subs:SUBS}))for(const e of engine.archiveEntries(f)||[])arch.set(e.name.toLowerCase(),e);
+ return engine.scenes(dir).flatMap(s=>{let own=[];try{own=texts(s.read());}catch{}const a=arch.get(s.name.toLowerCase());let ja=null;try{ja=a&&texts(a.read());}catch{}
+  return own.flatMap((x,i)=>x.kind!=='line'?[]:[ja&&ja.length===own.length&&ja[i].kind==='line'?ja[i].t:'']);});}
+module.exports={engine,parse,texts,originalLines,header,open,list,read,unpackPs2,pushed,md5Words,table,stage1,dirCipher,entryCipher,scheme,DEFAULT,DEFAULT7,indexKey,startValues,rotl,rotr};

@@ -12,12 +12,13 @@ const rol8=(b,n)=>((b<<n)|(b>>>(8-n)))&255;
 const inverse=t=>{const inv=new Uint8Array(256);for(let i=0;i<256;i++)inv[t[i]]=i;return inv;};
 
 /* ---- CMVS (E592) ------------------------------------------------------------------------------------------------- */
-/* items: ['text' | {push:'bgm01.ogg'}] -> PS2A (encrypted, literal-only LZSS) */
-function ps2a(items,{enc=sjis,key=0x12345678}={}){const strs=[],code=[];let at=0;
+/* items: ['text' | {push:'bgm01.ogg'}] -> PS2A (encrypted, literal-only LZSS); plain:true leaves it unpacked, as the
+   official Chinese クナド国記 keeps its scripts in FileHook\ */
+function ps2a(items,{enc=sjis,key=0x12345678,plain=false}={}){const strs=[],code=[];let at=0;
  code.push(Buffer.from([0x05,0x00,0x00,0x00]));
  for(const it of items){const s=z(typeof it==='string'?it:it.push,enc);code.push(Buffer.from([1,2,0x20,1]),u32(at),Buffer.from([0x0f,2,0x30,4]),Buffer.from([0x11,0x00,0x00,0x00]));strs.push(s);at+=s.length;}
  const codeBuf=Buffer.concat(code),text=Buffer.concat(strs),body=Buffer.concat([codeBuf,text]);
- const shift=((key>>>20)%5)+1,k=((key>>>24)+(key>>>3))&255,packed=Buffer.from(literals(body).map(b=>((rol8(b,shift)^k)+0x7c)&255));
+ const shift=((key>>>20)%5)+1,k=((key>>>24)+(key>>>3))&255,packed=plain?body:Buffer.from(literals(body).map(b=>((rol8(b,shift)^k)+0x7c)&255));
  const h=Buffer.alloc(0x30);h.write('PS2A','latin1');h.writeUInt32LE(0x30,4);h.writeUInt32LE(key>>>0,12);h.writeUInt32LE(0,16);h.writeUInt32LE(codeBuf.length,20);h.writeUInt32LE(0,24);h.writeUInt32LE(text.length,28);h.writeUInt32LE(packed.length,36);h.writeUInt32LE(body.length,40);
  return Buffer.concat([h,packed]);}
 const rotl=cmvs.rotl,rotr=cmvs.rotr;
