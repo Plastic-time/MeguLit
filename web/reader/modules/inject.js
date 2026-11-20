@@ -50,6 +50,19 @@
   /* 2026-11-19 (BGI: one quotation the game adds to piece by piece, each stage a new line): the translation of a line that
      grew stays on screen until the grown line's own arrives, which keeps what it shares with it and types only the rest */
   const flat = v => String(v || '').replace(/[\s\u3000]+/g, ''), grown = (before, next) => { const a = flat(before), c = flat(next); return !!a && c.length > a.length && c.startsWith(a); };
+  /* 2026-11-21 (owner, 千恋＊万花: 「译文后出来的话就会把上面的挤上去」): the translation row keeps room for the translation from the moment the
+     Japanese is shown: the height the recent translations took, or an estimate from the Japanese length, whichever is more. A late
+     translation shows inside that room and never moves the Japanese (a block standing on its bottom edge grows upwards otherwise). */
+  const recentHeights = [];
+  function reserve(text) {
+    if (!output) return;
+    const cs = getComputedStyle(output), size = parseFloat(cs.fontSize) || 20, lh = parseFloat(cs.lineHeight) || size * 1.4, width = output.clientWidth || row?.clientWidth || 600;
+    const estimate = Math.max(1, Math.ceil([...String(text || '').replace(/[\s\u3000]/g, '')].length * 1.2 * size / Math.max(size, width))) * lh;
+    const h = Math.ceil(Math.max(estimate, ...recentHeights, lh));
+    output.style.minHeight = h + 'px'; bridge.translationReserve = h;
+  }
+  function settled() { if (!output || output.dataset.state !== 'ready' || !output.textContent.trim() || output.textContent === '翻译中…') return; const prev = output.style.minHeight; output.style.minHeight = ''; const h = output.getBoundingClientRect().height; output.style.minHeight = prev;
+    if (h > 0) { recentHeights.push(h); if (recentHeights.length > 3) recentHeights.shift(); if (h > (parseFloat(prev) || 0)) output.style.minHeight = Math.ceil(h) + 'px'; } }
   function setText(text, error = false, animate = false) {
     if (!output) return;
     const was = output.dataset.state === 'ready' ? [...output.textContent] : [];
@@ -65,6 +78,7 @@
       }));
     }
     output.style.opacity = error ? '.7' : '1';
+    settled();
   }
   function ensureRow(sentence) {
     const nextParent = sentence.closest('.sentence-window');
@@ -87,10 +101,16 @@
     }
     return true;
   }
+  /* 2026-11-21 (r26: two lines paired with the patch were never asked for): every way read() leaves without asking is noted once per line and
+     reason (reader-host.log, layoutDiagnostic kind translateSkip) */
+  let skipKey = '';
+  function skip(reason, text = '') { const k = reason + '|' + text; if (k === skipKey) return; skipKey = k; bridge.lastSkip = { reason, text: String(text).slice(0, 40) };
+    try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'layoutDiagnostic', kind: 'translateSkip', reason, text: String(text).slice(0, 40) })); } catch {} }
   function read() {
-    if(bridge.pageTranslationActive?.())return;
+    if(bridge.pageTranslationActive?.()){skip('page translation active');return;}
     const sentence = document.querySelector('.sentence-text');
     if (!sentence) {
+      skip('no sentence on screen');
       if (bridge.sourceText) { bridge.sourceText = ''; bridge.onSourceText?.(''); }
       if (output) window.TomeTypewriter?.stop(output);
       row?.remove();
@@ -101,11 +121,11 @@
       bridge.serial++;
       return;
     }
-    if (!ensureRow(sentence)) return;
+    if (!ensureRow(sentence)) { skip('no sentence window'); return; }
     const chars = sentence.querySelectorAll('.char-token');
     const text = (chars.length ? Array.from(chars, c => c.textContent).join('') : sentence.textContent).trim();
     if (text !== bridge.sourceText) { bridge.sourceText = text; bridge.onSourceText?.(text); }
-    if (!enabled || !translationVisible || !text || text === bridge.current) return;
+    if (!enabled || !translationVisible || !text || text === bridge.current) { skip(!enabled ? 'translation off' : !translationVisible ? 'translation hidden' : !text ? 'empty line' : 'already asked', text); return; }
     const growing = grown(bridge.current, text) && output.dataset.state === 'ready' && !!output.textContent;
     bridge.current = text;
     const id = ++bridge.serial;
@@ -113,7 +133,7 @@
     /* 2026-11-19 (素晴らしき日々: the grown line's request failed and 「翻译暂不可用」 replaced the translation already shown) a grown
        line that gets no translation keeps the one on screen and asks again, twice at most (deliver) */
     bridge.growingId = growing ? id : 0; if (!growing) bridge.growRetries = 0;
-    if (!growing) { setText(bridge.quietTranslation ? '' : '翻译中…'); output.dataset.state = 'pending'; }
+    if (!growing) { reserve(text); setText(bridge.quietTranslation ? '' : '翻译中…'); output.dataset.state = 'pending'; }
     try {
       window.__tomoyoTranslateRequest(JSON.stringify({ id, text, options: bridge.options?.() || {} }));
     } catch {
@@ -127,9 +147,11 @@
     const chars = sentence?.querySelectorAll('.char-token');
     const text = sentence ? (chars?.length ? Array.from(chars,c=>c.textContent).join('') : sentence.textContent).trim() : '';
     if(text !== bridge.sourceText){bridge.sourceText=text;bridge.onSourceText?.(text);}
+    /* the translation row and its room exist from the first frame of the line, not 220 ms later */
+    if(sentence&&text&&enabled&&translationVisible&&!output?.isConnected&&ensureRow(sentence))reserve(text);
     /* 2026-11-13 (STEINS;GATE: each new line showed the previous line's translation for ~250 ms): the translation is
        requested after a 220 ms debounce, so the old one goes the moment the source line changes */
-    if(output&&text&&text!==bridge.current&&enabled&&translationVisible&&output.dataset.state!=='pending'&&!(output.dataset.state==='ready'&&grown(bridge.current,text))){window.TomeTypewriter?.stop(output);output.replaceChildren();output.dataset.state='pending';}
+    if(output&&text&&text!==bridge.current&&enabled&&translationVisible&&output.dataset.state!=='pending'&&!(output.dataset.state==='ready'&&grown(bridge.current,text))){reserve(text);window.TomeTypewriter?.stop(output);output.replaceChildren();output.dataset.state='pending';}
     clearTimeout(bridge.timer);
     bridge.timer = setTimeout(read, 220);
   }
