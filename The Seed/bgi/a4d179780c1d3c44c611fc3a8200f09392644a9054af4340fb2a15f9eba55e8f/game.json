@@ -1,0 +1,28 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "a4d179780c1d3c44c611fc3a8200f09392644a9054af4340fb2a15f9eba55e8f",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": "hide"
+  },
+  "hide": {
+   "textEffectsRead": false
+  }
+ },
+ "exe": "",
+ "engine": "bgi",
+ "app": "diff-maker/3",
+ "issuedAt": "",
+ "prints": {
+  "pack": "e791529082cb4a04f7177b13ccb4d27729eb10af118a0fb06e4c70411d343f7d",
+  "script": "69ffe0d1f0dfc9d2c2b7ffffabd4feb451fce8b4b2a6822211d078ed1211dc3a",
+  "title": "5ca1bb8c989b1df8b03e4a25c3970c6a4f9c90af4dd8fe0ef23d9b988e2b218b",
+  "vndb": "v3144"
+ }
+}
