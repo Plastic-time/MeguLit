@@ -141,7 +141,9 @@
     const workLimit = () => { const i = b.galLayoutInfo?.(), d = devicePixelRatio || 1; return Math.min(Number.isFinite(i?.workBottom) && i.workBottom > 0 ? i.workBottom / d : innerHeight, innerHeight) - 8; };
     /* 2026-11-21 (owner, 千恋＊万花: 「日文被挤上去」 when the translation came in late): every fit decision takes the row at the room
        its translation will need (inject.js translationReserve), so the Japanese is placed on the first frame and stays when the text lands */
-    const rowRect = () => { const q = row.getBoundingClientRect(), h = Math.max(q.height, Number(b.translationReserve) || 0); return { top: q.top, height: h, bottom: q.top + h }; };
+    /* 2026-11-21 incr9: 18468201 (decide with the reserved translation room) put the Japanese a row up on almost every named line of
+       千恋＊万花 (owner: 「现在成必发了」); reverted for every game: the row as it is */
+    const rowRect = () => row.getBoundingClientRect();
     const roomBelow = (() => { const wb = workLimit(); return row ? wb - (cy0 + chc) >= rowRect().height : false; })();
     /* 2026-11-20 release check (CHAOS;CHILD rig: with room below the window the strip rule was skipped whole and the Japanese third row
        sat on AUTO/SKIP). Both rules hold: MeguLit's Japanese never enters the game's button strip (rows close up, the block moves up),
@@ -180,8 +182,9 @@
       const fsx = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rx = rowRect();
       if (rx.bottom > uiLimit) { const fs = Math.max(Math.ceil(cnBase * .85), Math.floor(fsx * Math.max(.85, (uiLimit - rx.top) / Math.max(1, rx.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rx = rowRect(); }
       /* 2026-11-21 incr9 (owner, 千恋＊万花: two Japanese rows + two translation rows, the Japanese first row pushed to y 750 over the
-         name box 【運転手】 at 787): the Japanese stays on the game's own text place; the translation grows down and only this line's
-         translation is made smaller (at most 15 %, the owner: 「别这么小」), the block is never moved up for it */ }
+         name box 【運転手】 at 787): with the game profile's placement.translationGrowsDown the Japanese stays on the game's own text
+         place, the translation grows down and only shrinks (at most 15 %); every other game keeps moving the block up */
+      if (rx.bottom > uiLimit && !placeProfile.translationGrowsDown) { const up = Math.min(rx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); } }
     if (row) { const limit = workLimit();
       const fs0 = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rb = row.getBoundingClientRect();
       if (rb.bottom > limit) { /* 2026-11-20 (user: 「译文为啥都这么小啊 别这么小」): at most 15 % smaller; what still does not fit moves the block up instead */ const fs = Math.max(Math.ceil(cnBase * .85), Math.floor(fs0 * Math.max(.85, (limit - rb.top) / Math.max(1, rb.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rb = row.getBoundingClientRect(); }
@@ -748,7 +751,9 @@
   b.textPlacePage = m => { const had = !!page; if (m?.elsewhere === true || !m || !Array.isArray(m.lines)) { if (pageOwn) { pageOwn = false; briefSync(false); } } if (m?.elsewhere === true) { page = null; drawnByGame = ''; if (had) { pageGone(); dropOld(null); document.getElementById('megulit-page-ahead')?.replaceChildren(); document.body.classList.remove('megulit-place-game-drawn'); } schedule(); return; } page = m && Array.isArray(m.lines) ? { awake: m.awake === true, armed: m.armed === true, lines: m.lines.filter(l => l && typeof l.text === 'string' && Array.isArray(l.rects)), client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] } : null; if (page) { line = null; drawnByGame = ''; } else if (had) pageGone(); schedule(); };
   b.textPlaceExtra = m => { extras = { items: Array.isArray(m?.items) ? m.items.filter(i => i && typeof i.text === 'string' && Array.isArray(i.rects)) : [], client: Array.isArray(m?.client) ? m.client : null }; schedule(); };
   let modeGame = null;
-  b.textPlaceMode = m => { on = m?.on === true; if (!on) waits.clear(); if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; boxBottom = 0; boxKey = ''; if (page) { page = null; pageGone(); } } schedule(); };
+  /* the game's placement differences (core/overlay-placement.cjs GAME_PLACEMENT, later core/profiles/games): {} = the common behaviour */
+  let placeProfile = {};
+  b.textPlaceMode = m => { placeProfile = m?.profile && typeof m.profile === 'object' ? m.profile : {}; on = m?.on === true; if (!on) waits.clear(); if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; boxBottom = 0; boxKey = ''; if (page) { page = null; pageGone(); } } schedule(); };
   b.textPlaceStatus = () => ({ on, line: line ? { text: line.text, n: line.rects?.length || 0, fallback: !!line.fallback } : null, placed: document.body.classList.contains('megulit-placed'), geom: lastGeom.split(';').length });
   let busy = false;
   new MutationObserver(records => { if (on && (line || drawnByGame || page) && records.some(r => !(r.target.closest?.('.tomoyo-cn-dialog,#megulit-place-extras,#megulit-page-ahead,.megulit-old-line')) && !r.target.classList?.contains('megulit-old-line'))) { /* page mode: at once, before the next paint, so a line that just stopped being the reader's own never misses a frame */ if (page && !busy) { busy = true; try { apply(); } finally { busy = false; } } else schedule(); } }).observe(document.documentElement, { subtree: true, childList: true, characterData: true });

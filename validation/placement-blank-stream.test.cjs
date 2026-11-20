@@ -7,9 +7,9 @@
    hidden glyph only places it. Without blanking the old rule stays (the game draws it: `visible`). The GPU layer is per frame. */
 const assert = require('node:assert');
 const { OverlayPlacement } = require('../core/overlay-placement.cjs');
-function make(blank) {
+function make(blank, exe = 'SenrenBanka.exe') {
   const out = [], p = new OverlayPlacement({ send: m => out.push(m), blanking: () => blank }); p.wanted = () => true;
-  p.configure({}, { bound: true, layout: { clientWidth: 1535, clientHeight: 863 } }); out.length = 0; return { p, out };
+  p.configure({ gameProcess: exe }, { bound: true, layout: { clientWidth: 1535, clientHeight: 863 } }); out.length = 0; return { p, out };
 }
 const shortLines = ['お客さん', '……ぁ？', 'お客さんってば'];
 { const { p, out } = make(true);
@@ -26,5 +26,9 @@ const shortLines = ['お客さん', '……ぁ？', 'お客さんってば'];
 { const { p, out } = make(false);
   p.glyph({ seq: 1, text: 'お客さん', dots: [] });
   assert.strictEqual(out.find(m => m.type === 'textPlace')?.visible, true, 'no blanking: the game draws it itself (unchanged)');
+}
+{ const { p, out } = make(true, 'Other.exe');
+  p.glyph({ seq: 1, text: 'お客さん', dots: [] });
+  assert.strictEqual(out.find(m => m.type === 'textPlace')?.visible, true, 'another game: unchanged (the game profile carries drawWhileBlanking)');
 }
 console.log('PASS blanked stream: unhidden lines are drawn by the reader');

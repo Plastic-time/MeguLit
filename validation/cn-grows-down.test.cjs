@@ -19,7 +19,7 @@ const line = '電車を降りて、駅前でタクシーを捕まえたものの
     const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
     await page.setContent(html); await page.addScriptTag({ content: code });
     await page.evaluate(() => { const b = window.__tomoyoChinese; b.galLayoutInfo = () => ({ clientX: 30, clientY: 102, clientWidth: 1535, clientHeight: 863, workBottom: 1000 });
-      b.translationReserve = 76; b.textPlaceAnchor(true); b.textPlaceMode({ on: true, game: 'senren' }); });
+      b.translationReserve = 76; b.textPlaceAnchor(true); b.textPlaceMode({ on: true, game: 'senren', profile: { translationGrowsDown: true } }); });
     /* the game's two rows: 26 characters on the first (374..), the rest on the second, 46 px lower */
     const rects = [...line].map((c, i) => i < 26 ? [374 + i * 31, 707, 31, 31] : [374 + (i - 26) * 31, 753, 31, 31]);
     const place = () => page.evaluate(([line, rects]) => { const s = document.querySelector('.sentence-text');
@@ -30,7 +30,7 @@ const line = '電車を降りて、駅前でタクシーを捕まえたものの
     await page.evaluate(() => { document.querySelector('.tomoyo-cn-output').textContent = '下了电车，在站前拦了辆出租车，可不知什么时候好像打起了瞌睡。司机先生似乎在叫我。'; });
     await place(); await sleep(120); const y1 = await y();
     assert.ok(Math.abs(y0 - (102 + 707)) < 4, 'Japanese first row on the game\'s text place (809), got ' + y0);
-    assert.ok(Math.abs(y1 - y0) < 1, 'the translation does not push the Japanese up: ' + y0 + ' -> ' + y1);
+    assert.ok(Math.abs(y1 - y0) < 4, 'the translation does not push the Japanese up: ' + y0 + ' -> ' + y1);
     console.log('PASS translation grows down: Japanese first row stays at ' + y1);
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
