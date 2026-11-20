@@ -27,8 +27,10 @@ const counts = new Map(); for (const l of lines) { const t = String(l || '').tri
 const label = t => counts.get(t) >= 10 && [...t].length <= 8 && !/[。、！？!?…「『（]/.test(t);
 const forms = t => {
   const out = [['as written', t]];
-  const m = /^([「『])([？?]{2,}|[一-龯々ァ-ヶー・]{2,8})[\s　]+(.*)$/s.exec(t); if (m) out.push(['speaker taken off', m[1] + m[3]]);
-  if (/^[「『].*[」』]$/s.test(t)) out.push(['no brackets', t.slice(1, -1)]);
+  /* only what a name plate takes in play: an unknown speaker ？？？ (a first word with a space is often no speaker: 『浜田　和紀』) */
+  const m = /^([「『])([？?]{2,})[\s　]+(.*)$/s.exec(t); if (m) out.push(['speaker taken off', m[1] + m[3]]);
+  /* the outer pair only when it is one pair (「…」 or 『…』 around the whole line, not 『楽園』…」) */
+  if (/^「[^]*」$/.test(t) && !/^「[^「」]*」[^」]/.test(t) || /^『[^]*』$/.test(t) && !/^『[^『』]*』[^』]/.test(t)) out.push(['no brackets', t.slice(1, -1)]);
   const half = t.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)); if (half !== t) out.push(['half-width', half]);
   const k = /[一-龯々]{1,3}/.exec(t); if (k) out.push(['ruby markup', t.slice(0, k.index) + '｜' + k[0] + '《よみ》' + t.slice(k.index + k[0].length)]);
   out.push(['blanks', t.replace(/、/g, '、　')]);
