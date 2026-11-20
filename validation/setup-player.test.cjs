@@ -146,22 +146,34 @@ test('window edge hot zones take the mouse (native mode): every edge and corner 
   const px = await ev('(()=>{document.documentElement.style.setProperty("--rz","9px");return getComputedStyle(document.querySelector(".rz[data-e=l]")).width})()'); assert.equal(px, '9px');
 });
 
-test('native splash hand-off: ?st= (the exe splash clock) makes the video start at the same moment, intro first, the welcome loop later', { skip, timeout: 60000 }, async () => {
-  const withSt = async (ageMs) => { await ev('try{localStorage.clear()}catch(e){}'); await cdp('Page.navigate', { url: page(fixture, '&st=' + (Date.now() - ageMs)) }); for (let i = 0; i < 100; i++) { if (await ev('!!(window.Player&&window.Scene)').catch(() => false)) break; await sleep(50); } await until('Player.state.firstFrame', 20000, 'first frame'); return ev('JSON.stringify({log:Player.log.filter(e=>/splash/.test(e.k)),cur:Player.state.cur})'); };
-  const early = JSON.parse(await withSt(300)); assert.ok(early.log.some((e) => e.k === 'splash-handoff' && e.startId === 'intro'), 'a young splash continues in the intro: ' + JSON.stringify(early));
-  const late = JSON.parse(await withSt(5200)); assert.ok(late.log.some((e) => e.k === 'splash-handoff' && e.startId === 'welcome'), 'an old splash (5 s) continues in the welcome loop: ' + JSON.stringify(late));
-  const seek = late.log.find((e) => e.k === 'splash-seek'); assert.ok(seek && seek.id === 'welcome' && seek.t > 1 && seek.t < 4, 'the loop starts part-way: ' + JSON.stringify(seek));
-  await open(fixture); await on('intro'); assert.ok(!(await ev('Player.log.some(e=>/splash/.test(e.k))')), 'no ?st=, no hand-off');
+test('calm native loading screen: real stages from the script, no frame bundle, flag released at the first video frame', () => {
+  const rs = fs.readFileSync(path.join(repo, 'desktop', 'src', 'runtime_setup.rs'), 'utf8'), web = fs.readFileSync(path.join(repo, 'setup', 'setup-web.ps1'), 'utf8'), rt = fs.readFileSync(path.join(repo, 'setup', 'setup-runtime.ps1'), 'utf8');
+  assert.ok(!fs.existsSync(path.join(repo, 'setup', 'ui-web', 'video', 'splash-frames.bin')), 'the frame bundle is gone from the package');
+  assert.match(rs, /\.stage/); assert.match(rs, /MEGULIT_SPLASH_FLAG/); assert.match(rs, /AllowSetForegroundWindow/); assert.match(rs, /exe-splash-closed reason=skin-first-frame/); assert.match(rs, /exe-splash-faded/);
+  assert.ok(!/GdipCreateBitmapFromStream|SHCreateMemStream/.test(rs), 'no video/frame decoding in the exe splash');
+  assert.match(rt, /Set-SplashStage/); assert.match(rt, /'page-frame1'/); assert.match(rt, /-not \$env:MEGULIT_NATIVE_SPLASH/);
+  assert.match(web, /Release-NativeSplash 'skin-frame1'/); assert.match(rt, /\$script:win\.BringFront\(\)/, 'the skin window is brought to the front before the splash fades'); assert.match(web, /public void BringFront\(\)/);
+  assert.match(rs, /794\.0/); assert.match(web, /794 \* \$scale/); assert.match(rt, /Size\(794, 508\)/);
 });
 
-test('the exe splash bundle and the scripts that hand over to it', () => {
-  const bin = path.join(repo, 'setup', 'ui-web', 'video', 'splash-frames.bin');
-  assert.ok(fs.existsSync(bin), 'tools/setup-splash-frames.cjs output is in the package');
-  const d = fs.readFileSync(bin), count = d.readUInt32LE(4), fps = d.readUInt32LE(8), intro = d.readUInt32LE(12), loop = d.readUInt32LE(16);
-  assert.equal(d.toString('ascii', 0, 4), 'MLSF'); assert.equal(intro + loop, count); assert.ok(fps >= 10 && fps <= 30); assert.ok(d.length < 4 * 1048576, 'bundle stays small: ' + d.length);
-  const base = 20 + 4 * (count + 1); for (const i of [0, intro, count - 1]) { const a = base + d.readUInt32LE(20 + 4 * i); assert.equal(d[a], 0xFF); assert.equal(d[a + 1], 0xD8, 'frame ' + i + ' is a JPEG'); }
-  const rs = fs.readFileSync(path.join(repo, 'desktop', 'src', 'runtime_setup.rs'), 'utf8'), web = fs.readFileSync(path.join(repo, 'setup', 'setup-web.ps1'), 'utf8'), rt = fs.readFileSync(path.join(repo, 'setup', 'setup-runtime.ps1'), 'utf8');
-  assert.match(rs, /MEGULIT_SPLASH_T0/); assert.match(rs, /MEGULIT_SPLASH_FLAG/); assert.match(rs, /0x80\|0x8\|0x0800_0000/, 'topmost, no-activate while animating'); assert.match(rs, /exe-splash-closed reason=skin-first-frame/);
-  assert.match(web, /Release-NativeSplash 'skin-frame1'/); assert.match(web, /&st=/); assert.match(rt, /-not \$env:MEGULIT_NATIVE_SPLASH/, 'no PowerShell startup form while the native one animates');
-  assert.match(rs, /794\.0/); assert.match(web, /794 \* \$scale/); assert.match(rt, /Size\(794, 508\)/);
+test('nothing is downloaded, probed or prefetched before the user presses Install', () => {
+  const rt = fs.readFileSync(path.join(repo, 'setup', 'setup-runtime.ps1'), 'utf8');
+  const shown = rt.split('\n').find((l) => /add_Shown\(\{ Update-Free; Note 'shown'/.test(l)); assert.ok(shown, 'the Shown handler is there');
+  assert.match(shown, /MEGULIT_SETUP_PREFETCH -eq '1'/, 'Next-Download on Shown only in the opt-in test mode');
+  const conf = rt.slice(rt.indexOf('function Confirm-Install'), rt.indexOf('$confirm.add_Click'));
+  assert.match(conf, /download-after-confirm/); assert.match(conf, /Next-Download/, 'Confirm-Install starts the download');
+  const page = fs.readFileSync(path.join(repo, 'setup', 'ui-web', 'scene.js'), 'utf8'); assert.match(page, /__noPrefetch/, 'the page note says nothing downloads before the button');
+});
+
+test('the folder picker is in the page; no old FolderBrowserDialog tree is shown by the skin', () => {
+  const web = fs.readFileSync(path.join(repo, 'setup', 'setup-web.ps1'), 'utf8'), host = fs.readFileSync(path.join(repo, 'setup', 'ui-web', 'host.js'), 'utf8'), html = fs.readFileSync(path.join(repo, 'setup', 'ui-web', 'index.html'), 'utf8');
+  assert.match(web, /'listdir'/); assert.match(web, /'mkdir'/); assert.match(web, /'pickfolder'/); assert.match(web, /FileOpenDialogRCW/); assert.match(web, /0x20 \| 0x40 \| 0x800/, 'FOS_PICKFOLDERS | FORCEFILESYSTEM | PATHMUSTEXIST');
+  assert.match(host, /if \(native\) openPicker\(\)/, 'Browse opens the in-page panel in the native window'); assert.match(html, /id="picker"/);
+});
+
+test('the folder picker panel markup is in the page, hidden until Browse', { skip, timeout: 60000 }, async () => {
+  await open(fixture, '&native=1'); await on('welcome');
+  /* the panel markup is present and styled as a dialog; opening it needs host.js's native wiring, which the fixture page does not run, so only structure is checked here */
+  const s = await ev('(()=>{const p=document.getElementById("picker");const cs=getComputedStyle(p);return {has:!!p,display:cs.display,ids:["pkSide","pkMain","pkOk","pkMk","pkMore","pkCancel","pkNew"].every(i=>!!document.getElementById(i))}})()');
+  assert.ok(s.has && s.ids && s.display === 'none', JSON.stringify(s));
 });

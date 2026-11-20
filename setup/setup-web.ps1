@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # MeguLit setup, web skin. Dot-sourced by setup-runtime.ps1 right before the window is shown.
 # The download / install logic in setup-runtime.ps1 is not touched: this file only (1) tries to show the new one-take
 # 3D interface in a frameless WebView2 window, (2) feeds it the real state (segments, bytes, speed, source, phase) read
@@ -32,6 +32,23 @@ function Web-Check([string]$p) {
   if (-not $ok) { return @{ state = 'readonly'; free = 0; need = (Need-Bytes $pathBox.Text) } }
   try { $need = Need-Bytes $p } catch { return @{ state = 'readonly'; free = 0; need = (Need-Bytes $pathBox.Text) } }   # e.g. a drive letter that does not exist
   @{ state = $(if (Web-Writable $p) { 'ok' } else { 'readonly' }); free = (Drive-Free $p); need = $need }
+}
+# ---- in-page folder picker (index.html #picker): drives, usual places, recent choices, folders of one level, new folder ----
+function Web-RecentFile { Join-Path $env:LOCALAPPDATA 'MeguLit\setup-recent.json' }
+function Web-Recent { try { $f = Web-RecentFile; if (Test-Path $f) { return @((Get-Content -Raw -Encoding UTF8 $f | ConvertFrom-Json) | Where-Object { $_ } | Select-Object -First 6 | ForEach-Object { [string]$_ }) } } catch {}; @() }
+function Web-AddRecent([string]$p) { try { $l = @($p) + @(Web-Recent | Where-Object { $_ -ine $p }); [IO.Directory]::CreateDirectory((Split-Path (Web-RecentFile))) | Out-Null; [IO.File]::WriteAllText((Web-RecentFile), (ConvertTo-Json -Compress @($l | Select-Object -First 6)), [Text.Encoding]::UTF8) } catch {} }
+function Web-List([string]$p) {
+  $t0 = [DateTime]::Now
+  $drives = @(); foreach ($d in [IO.DriveInfo]::GetDrives()) { try { if (($d.DriveType -eq 'Fixed' -or $d.DriveType -eq 'Removable') -and $d.IsReady) { $drives += @{ path = $d.RootDirectory.FullName; label = [string]$d.VolumeLabel; free = [long]$d.AvailableFreeSpace; total = [long]$d.TotalSize } } } catch {} }
+  $places = @(); foreach ($pl in @(@('桌面|Desktop', [Environment]::GetFolderPath('Desktop')), @('文档|Documents', [Environment]::GetFolderPath('MyDocuments')), @('下载|Downloads', (Join-Path $env:USERPROFILE 'Downloads')), @('用户文件夹|Home', $env:USERPROFILE))) { if ($pl[1] -and (Test-Path $pl[1])) { $places += @{ name = $pl[0]; path = [string]$pl[1] } } }
+  $dirs = @(); $parent = ''; $cur = ''
+  if ($p) { try { $cur = [IO.Path]::GetFullPath($p).TrimEnd('\'); if ($cur.Length -eq 2) { $cur += '\' }; if (-not (Test-Path -LiteralPath $cur)) { $cur = '' } } catch { $cur = '' } }
+  if ($cur) {
+    try { $dirs = @([IO.Directory]::EnumerateDirectories($cur) | ForEach-Object { Split-Path $_ -Leaf } | Where-Object { $_ -and -not $_.StartsWith('$') -and $_ -ne 'System Volume Information' } | Sort-Object | Select-Object -First 400) } catch {}
+    try { $parent = Split-Path $cur -Parent } catch {}
+  }
+  Web-Log ('picker: list ' + $cur + ' dirs=' + $dirs.Count + ' took ' + [int]([DateTime]::Now - $t0).TotalMilliseconds + ' ms')
+  @{ path = $cur; parent = [string]$parent; dirs = $dirs; drives = $drives; places = $places; recent = @(Web-Recent) }
 }
 function Web-Info {
   $dr = @(); foreach ($d in [IO.DriveInfo]::GetDrives()) { if ($d.DriveType -eq 'Fixed' -and $d.IsReady -and $d.AvailableFreeSpace -gt (Need-Bytes $pathBox.Text)) { $dr += @{ path = (Join-Path $d.RootDirectory.FullName 'MeguLit'); free = $d.AvailableFreeSpace } } }
@@ -74,7 +91,8 @@ function Web-Act($m) {
   try {
     switch ($t) {
       'hello' { Web-Post @{ t = 'info'; i = (Web-Info) } }
-      'mark' { if ($m.what -eq 'frame1') { $script:frame1Seen = $true; Release-NativeSplash 'skin-frame1' }
+      'mark' { if ($m.what -eq 'poster') { Set-SplashStage 'page-poster' }
+        if ($m.what -eq 'frame1') { $script:frame1Seen = $true; Set-SplashStage 'page-frame1'; Release-NativeSplash 'skin-frame1' }
         if ($m.what -eq 'poster' -and $script:posterBox) { try { $script:win.Controls.Remove($script:posterBox); $script:posterBox.Dispose() } catch {}; $script:posterBox = $null }
         Web-Log ('cold-start mark=' + $m.what + ' ms=' + $(if ($script:shownAt) { [int]([DateTime]::Now - $script:shownAt).TotalMilliseconds } else { -1 }) + ' page=' + $m.at) }   # player.js: poster / frame1 on screen, ms since the window was shown
       'ready' { $script:webReady = $true; $script:readyMs = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds }
@@ -87,6 +105,11 @@ function Web-Act($m) {
       'rz-info' { Web-Log ('resize: page hot zones=' + $m.zones + ' native=' + $m.native + ' size=' + $m.w + 'x' + $m.h + ' dpr=' + $m.dpr + ' rzPx=' + $m.px + ' topAt=' + $m.top) }
       'minimize' { $script:win.WindowState = 'Minimized'; Web-Log ('minimized: state=' + $script:win.WindowState) }
       'close' { Web-Close }
+      'listdir' { if ($shim) { Web-Post @{ t = 'reply'; id = $m.id; r = (Web-List ([string]$m.path)) } } }
+      'mkdir' { if ($shim) { $ok = $false; $err = ''; try { $n = ([string]$m.name).Trim(); if ($n -and $n -notmatch '[\\/:*?"<>|]' -and $n -ne '.' -and $n -ne '..') { [IO.Directory]::CreateDirectory((Join-Path ([string]$m.path) $n)) | Out-Null; $ok = $true } else { $err = 'bad name' } } catch { $err = [string]$_.Exception.Message }
+          Web-Log ('picker: mkdir ' + $m.path + ' \ ' + $m.name + ' ok=' + $ok + ' ' + $err); Web-Post @{ t = 'reply'; id = $m.id; r = @{ ok = $ok; err = $err } } } }
+      'pickfolder' { if ($shim) { $r = ''; try { $r = [FolderPick]::Pick($script:win.Handle, [string]$m.path, '选择 MeguLit 的安装位置') } catch { Web-Log ('picker: IFileOpenDialog failed ' + $_) }
+          Web-Log ('picker: modern dialog -> ' + $r); Web-Post @{ t = 'reply'; id = $m.id; r = @{ path = [string]$r } } } }
       'checkpath' { if ($shim) { Web-Post @{ t = 'reply'; id = $m.id; r = (Web-Check ([string]$m.path)) } } }
       'browse' {
         if ($shim) {
@@ -100,7 +123,7 @@ function Web-Act($m) {
           $chk = Web-Check ([string]$m.path)
           # Answer at once and run the heavy part (copy, shortcuts, starting the unpack) from a timer tick: not inside this web-message callback, so the
           # page's other messages (window drag, resize, close) keep being delivered while it works.
-          if ($chk.state -eq 'ok') { $pathBox.Text = [string]$m.path; $deskCheck.Checked = [bool]$m.desktop; $menuCheck.Checked = [bool]$m.menu
+          if ($chk.state -eq 'ok') { Web-AddRecent ([string]$m.path); $pathBox.Text = [string]$m.path; $deskCheck.Checked = [bool]$m.desktop; $menuCheck.Checked = [bool]$m.menu
             if (-not $script:installTimer) { $script:installTimer = New-Object Windows.Forms.Timer; $script:installTimer.Interval = 30
               $script:installTimer.add_Tick({ $script:installTimer.Stop(); $t1 = [DateTime]::Now; try { $confirm.PerformClick() } catch { Web-Log ('install failed: ' + $_) }
                 Web-Log ('install: confirm took ' + [int]([DateTime]::Now - $t1).TotalMilliseconds + ' ms, confirmed=' + $script:confirmed); if (-not $script:confirmed) { Web-Post @{ t = 'installfail' } } }) }
@@ -128,6 +151,26 @@ function Start-WebSkin {
     $env:PATH = (Join-Path $dir $(if ([Environment]::Is64BitProcess) { 'x64' } else { 'x86' })) + ';' + $env:PATH
     if (-not ('SetupWin' -as [type])) { Add-Type -ReferencedAssemblies System.Windows.Forms, System.Drawing -TypeDefinition @'
 using System; using System.Runtime.InteropServices; using System.Windows.Forms;
+public static class FolderPick {
+  [ComImport, Guid("DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7")] class FileOpenDialogRCW { }
+  [ComImport, Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IShellItem { void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv); void GetParent(out IShellItem ppsi); void GetDisplayName(uint sigdnName, [MarshalAs(UnmanagedType.LPWStr)] out string ppszName); void GetAttributes(uint mask, out uint attr); void Compare(IShellItem psi, uint hint, out int order); }
+  [ComImport, Guid("42f85136-db7e-439c-85f1-e4075d135fc8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IFileDialog { [PreserveSig] int Show(IntPtr parent); void SetFileTypes(uint n, IntPtr spec); void SetFileTypeIndex(uint i); void GetFileTypeIndex(out uint i); void Advise(IntPtr events, out uint cookie); void Unadvise(uint cookie);
+    void SetOptions(uint fos); void GetOptions(out uint fos); void SetDefaultFolder(IShellItem psi); void SetFolder(IShellItem psi); void GetFolder(out IShellItem psi); void GetCurrentSelection(out IShellItem psi);
+    void SetFileName([MarshalAs(UnmanagedType.LPWStr)] string name); void GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string name); void SetTitle([MarshalAs(UnmanagedType.LPWStr)] string title); void SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)] string text);
+    void SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)] string label); void GetResult(out IShellItem psi); void AddPlace(IShellItem psi, int placement); void SetDefaultExtension([MarshalAs(UnmanagedType.LPWStr)] string ext); void Close(int hr); void SetClientGuid(ref Guid g); void ClearClientData(); void SetFilter(IntPtr filter); }
+  [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = false)] static extern void SHCreateItemFromParsingName([MarshalAs(UnmanagedType.LPWStr)] string path, IntPtr pbc, ref Guid riid, out IShellItem item);
+  // The modern Explorer-style folder dialog (FOS_PICKFOLDERS); returns "" when cancelled.
+  public static string Pick(IntPtr owner, string start, string title) {
+    IFileDialog dlg = (IFileDialog)new FileOpenDialogRCW();
+    uint fos; dlg.GetOptions(out fos); dlg.SetOptions(fos | 0x20 | 0x40 | 0x800);   // PICKFOLDERS | FORCEFILESYSTEM | PATHMUSTEXIST
+    if (!string.IsNullOrEmpty(title)) dlg.SetTitle(title);
+    try { if (!string.IsNullOrEmpty(start) && System.IO.Directory.Exists(start)) { Guid iid = new Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe"); IShellItem it; SHCreateItemFromParsingName(start, IntPtr.Zero, ref iid, out it); dlg.SetFolder(it); } } catch { }
+    int hr = dlg.Show(owner); if (hr != 0) return "";
+    IShellItem res; dlg.GetResult(out res); string p; res.GetDisplayName(0x80058000, out p); return p ?? "";
+  }
+}
 public class SetupWin : Form {
   [DllImport("user32.dll")] static extern bool ReleaseCapture();
   [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, int m, IntPtr w, IntPtr l);
@@ -144,6 +187,8 @@ public class SetupWin : Form {
   public void Drag() { ReleaseCapture(); SendMessage(Handle, 0xA1, (IntPtr)2, IntPtr.Zero); }
   protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); try { Dress(); if (Log != null) Log("window: handle created, frame dressed (no system caption) pos=" + Left + "," + Top + " size=" + Width + "x" + Height); } catch (Exception ex) { if (Log != null) Log("window: dress failed " + ex.Message); } }
   protected override void OnVisibleChanged(EventArgs e) { base.OnVisibleChanged(e); if (Log != null) Log("window: skin visible=" + Visible + " pos=" + Left + "," + Top + " size=" + Width + "x" + Height + " border=" + FormBorderStyle); }
+  public void BringFront() { bool was = TopMost; TopMost = true; Activate(); bool ok = SetForegroundWindow(Handle); TopMost = was; if (Log != null) Log("window: bring-to-front foreground-ok=" + ok + " active=" + (Form.ActiveForm == this) + " pos=" + Left + "," + Top); }
+  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
   public void Dress() { int round = 2; DwmSetWindowAttribute(Handle, 33, ref round, 4); MARGINS m = new MARGINS(); m.l = 1; m.r = 1; m.t = 1; m.b = 1; DwmExtendFrameIntoClientArea(Handle, ref m); }
   // ---- drag-resize of the frameless window, locked to the design box 1000:640 (the page is scaled as a whole by the WebView2 zoom) ----
   public const double Ratio = 0.64;   // 640 / 1000
@@ -215,7 +260,6 @@ public class SetupWin : Form {
       $uiLang = $(if ($env:MEGULIT_SETUP_LANG -eq 'en') { 'en' } else { 'zh' })   # Chinese by default like the old window; English only on request (MEGULIT_SETUP_LANG=en). Windows' language says too little: many Chinese users run an English Windows.
       $q = 'host=2&desk=1&lang=' + $uiLang;
       if ($testLog -and $env:MEGULIT_SETUP_WEB_QUERY) { $q += '&' + $env:MEGULIT_SETUP_WEB_QUERY }   # tests: feature switches such as shadow=0&env=0&trans=0&aa=1
-      if ($env:MEGULIT_SPLASH_T0 -match '^\d+$') { $q += '&st=' + $env:MEGULIT_SPLASH_T0 }   # the native splash's clock: the page's video continues from where the animation is
       if ($env:MEGULIT_SETUP_WEB_TEST) { $q += '&t=' + $env:MEGULIT_SETUP_WEB_TEST }   # was inside the comment above, so the page never saw the test switch
       $cw.add_NavigationCompleted({ try { $w = $script:win.Web; $w.ZoomFactor = [math]::Min([SetupWin]::ZoomFor($w.Width, $script:dpiS), [SetupWin]::ZoomFor([int]($w.Height / [SetupWin]::Ratio), $script:dpiS)) } catch {}; if (-not $script:tNav) { $script:tNav = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds } })
       $cw.Navigate('https://megulit-setup.local/index.html?' + $q)

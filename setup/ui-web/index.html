@@ -173,6 +173,27 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 /* ?prerender=1: only the scene, for the offline render of the installer videos */
 .prerender .layer,.prerender #chrome,.prerender #drag,.prerender #hud,.prerender #scrimb,.prerender #fx,.prerender #desk,.prerender #shadow,.prerender #boot{display:none!important}
 .prerender{--M:0px}.prerender #app{border-radius:0;box-shadow:none}
+/* the main view settles in (a gentle zoom-out) as the loading screen fades */
+.reveal #view{animation:rvin .5s cubic-bezier(.2,.7,.2,1) both}@keyframes rvin{from{transform:scale(1.03)}to{transform:none}}@media (prefers-reduced-motion:reduce){.reveal #view{animation:none}}
+/* in-page folder picker (native window only) */
+#picker{position:absolute;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(20,28,44,.34);backdrop-filter:blur(3px)}
+#picker.on{display:flex}
+#picker .pk{width:min(760px,94%);height:min(470px,92%);background:var(--card,#fff);color:var(--ink,#1c2434);border-radius:14px;box-shadow:0 24px 70px rgba(10,20,40,.36);display:grid;grid-template-columns:210px 1fr;grid-template-rows:auto 1fr auto;overflow:hidden;font:13px/1.4 var(--sans,system-ui,"Microsoft YaHei UI",sans-serif)}
+#picker .pkh{grid-column:1/3;display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid rgba(0,0,0,.08)}
+#picker .pkh b{font-size:15px;letter-spacing:.02em}#picker .pkh .crumb{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:rtl;text-align:left;color:#5a667c;font-size:12px}
+#picker .pkx{border:0;background:transparent;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.6;padding:2px 6px}#picker .pkx:hover{opacity:1}
+#picker .pkl{overflow:auto;padding:10px 8px;border-right:1px solid rgba(0,0,0,.08);background:rgba(120,140,170,.07)}
+#picker .pkl h4{margin:10px 10px 4px;font-size:11px;font-weight:600;letter-spacing:.08em;color:#7a869c;text-transform:uppercase}
+#picker .pkl button,#picker .pkm button.row{display:block;width:100%;text-align:left;border:0;background:transparent;color:inherit;padding:7px 10px;border-radius:8px;cursor:pointer;font:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#picker .pkl button:hover,#picker .pkm button.row:hover{background:rgba(200,32,60,.08)}#picker .pkl button small{display:block;color:#7a869c;font-size:11px}
+#picker .pkm{overflow:auto;padding:8px 10px}#picker .pkm .empty{padding:22px;color:#8791a5;text-align:center}
+#picker .pkm button.row::before{content:"";display:inline-block;width:14px;height:11px;margin-right:9px;vertical-align:-1px;border-radius:2px;background:#e2b94d;box-shadow:inset 0 3px 0 #efce7a}
+#picker .pkm button.up::before{background:#9aa6bd;box-shadow:none}
+#picker .pkf{grid-column:1/3;display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid rgba(0,0,0,.08)}
+#picker .pkf .sp{flex:1}#picker .pkf input{flex:0 1 190px;border:1px solid rgba(0,0,0,.18);border-radius:8px;padding:6px 9px;font:inherit;background:transparent;color:inherit}
+#picker .pkf button{border:1px solid rgba(0,0,0,.16);background:transparent;color:inherit;border-radius:9px;padding:7px 14px;cursor:pointer;font:inherit}#picker .pkf button:hover{background:rgba(0,0,0,.05)}
+#picker .pkf button.ok{background:var(--red,#c8203c);border-color:var(--red,#c8203c);color:#fff}#picker .pkf button.ok:hover{filter:brightness(1.08)}
+#picker .pkmsg{font-size:11px;color:#c8203c;margin-left:4px}
 </style>
 <script>try{var b=new URLSearchParams(location.search).get("btn");if(b)document.documentElement.setAttribute("data-btn",b)}catch(e){}</script>
 </head>
@@ -202,13 +223,14 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 <div class="layer" id="ui-done"><div class="big"><span id="doneT"></span><small id="doneEn">All set</small></div><div class="launch"><button class="go" id="launch">开读</button></div></div>
 <div class="layer" id="ui-mini" style="opacity:1;visibility:visible"><div id="mini"></div></div>
 </div>
+<div id="picker" role="dialog" aria-modal="true" aria-label="choose install location"><div class="pk"><div class="pkh"><b id="pkT"></b><span class="crumb" id="pkCrumb"></span><button class="pkx" id="pkClose" aria-label="close">×</button></div><div class="pkl" id="pkSide"></div><div class="pkm" id="pkMain"></div><div class="pkf"><input id="pkNew" maxlength="80" spellcheck="false"><button id="pkMk"></button><span class="pkmsg" id="pkMsg"></span><span class="sp"></span><button id="pkMore"></button><button id="pkCancel"></button><button class="ok" id="pkOk"></button></div></div></div>
 <div id="chrome"><div id="drag"></div><i class="rz" data-e="l"></i><i class="rz" data-e="r"></i><i class="rz" data-e="t"></i><i class="rz" data-e="b"></i><i class="rz" data-e="tl"></i><i class="rz" data-e="tr"></i><i class="rz" data-e="bl"></i><i class="rz" data-e="br"></i><svg class="rzg" viewBox="0 0 14 14" aria-hidden="true"><path d="M13 3 3 13M13 7 7 13M13 11 11 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg><div class="tab"><button id="btnTheme" aria-pressed="false"></button><button id="btnMin" aria-label="最小化 Minimize"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.6"/></svg></button><button id="btnClose" aria-label="关闭 Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.6"/></svg></button></div><div class="notch"></div></div>
 <div class="layer" id="ui-quit"><div class="scrim"></div><div class="card quit"><h2>货还在路上</h2><div class="en">Download in progress</div><p>现在关掉也没关系：已经下好的碎片会保留，下次打开接着下。</p><div class="acts"><button class="go" id="stay">等它到</button><button class="btn" id="leave">回头再来</button></div></div></div>
 </div>
 <script>/* Scripts load after the first paint, in their order (async=false), so the window shows the poster at once instead of waiting
    for the scene code (cold renderer: ~2 s). three.js + the live 3D scene only for the offline renderer (?prerender=1, tools/setup-scene/). */
 (function(){var q=new URLSearchParams(location.search),pre=q.get("prerender")==="1",h=q.get("host"),de=document.documentElement;
-if(pre)de.classList.add("prerender");if(h==="1"||h==="2"){if(h==="1")window.__waitConfirm=true;de.classList.add((q.get("native")==="1"||h==="2")?"native":"deskmode")}
+if(pre)de.classList.add("prerender");if(h==="1"||h==="2"){if(h==="1")window.__waitConfirm=true;window.__noPrefetch=true;de.classList.add((q.get("native")==="1"||h==="2")?"native":"deskmode")}
 var list=["logos/logos.js"];if(pre)list.push("../../tools/setup-scene/three.js");if(!pre)list.push("player.js");list.push("vendor/gsap.min.js","scene.js");if(pre)list.push("../../tools/setup-scene/glass.js");
 var f=(h==="1"||h==="2")?"host.js":q.get("demo")==="1"?"demo.js":null;if(f)list.push(f);
 function go(){list.forEach(function(src){var s=document.createElement("script");s.src=src;s.async=false;document.body.appendChild(s)})}
