@@ -17,6 +17,8 @@ test('the validation service releases deadlines for both successful and rejected
   const [success,failure]=await Promise.allSettled([service.call({action:'settings_get'},31001),service.call({action:'unknown_test_request'},31001)]);
   assert.equal(success.status,'fulfilled');assert.equal(failure.status,'rejected');
   assert.equal(deadlines.size,0);
+  await assert.rejects(service.call({action:'settings_get',value:1n},31001),TypeError);
+  assert.equal(deadlines.size,0);
   const slow=service.call({action:'settings_get'},31002);expire();
   await assert.rejects(slow,/SERVICE_TIMEOUT/);
   await service.call({action:'settings_get'},31001);assert.equal(deadlines.size,0);
