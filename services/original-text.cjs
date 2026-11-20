@@ -451,7 +451,8 @@ class Matcher{
   if(found.length===1){pick=found[0];method='unique';status='exact';}
   else{/* a line that grew (core/sentence-pieces.cjs) starts before the reading position and ends on or past it: the piece's own
      lookup (the embed request comes before the source line) has already moved the position to the piece. It comes first;
-     a one-line re-read of the line just read comes after the lines ahead. */const fwd=c=>c[0]>this.last&&c[0]-this.last<=400,back=c=>c[0]<=this.last&&c.at(-1)>=this.last&&this.last-c[0]<=12;const ahead=[...found.filter(c=>back(c)&&c.length>1),...found.filter(fwd).sort((a,b)=>a[0]-b[0]),...found.filter(c=>back(c)&&c.length===1)];
+     a one-line re-read of the line just read comes after the lines ahead. */const fwd=c=>c[0]>this.last&&c[0]-this.last<=400,back=c=>c[0]<=this.last&&c.at(-1)>=this.last&&this.last-c[0]<=12;/* 2026-11-21 (みにくいモジカの子 「狙って、」「狙って、狙って、」「狙って、狙って、狙って、」: the two lines just read joined are the next line
+     word for word) the very next line, whole, goes before a grown line */const next=found.filter(c=>c.length===1&&c[0]===this.last+1);const ahead=[...next,...found.filter(c=>back(c)&&c.length>1),...found.filter(fwd).sort((a,b)=>a[0]-b[0]).filter(c=>!next.includes(c)),...found.filter(c=>back(c)&&c.length===1)];
    /* 2026-11-21 (pairing self-test read in script order: PureStation's and みにくいモジカの子's first lines, 「くらい。」「どこ？」, stood in two
       places translated differently and stayed unpaired): while the place is not known (no line read yet, or a guess), every place the
       lines so far can be at is kept (maybe); a line that goes on from exactly one of them fixes the place (anchored) */

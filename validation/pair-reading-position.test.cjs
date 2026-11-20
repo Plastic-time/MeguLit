@@ -17,10 +17,11 @@ const provider = (rt, og) => {
   } };
 };
 const reader = p => ({ originalText: p, trace() {}, resolveSource: HookNative.prototype.resolveSource });
-const filler = n => Array.from({ length: n }, (_, i) => 'f' + i);
+const filler = n => Array.from({ length: n }, (_, i) => '台詞その' + i + 'です。');
+const [A, B, C, D] = ['朝が来た。', '昼になった。', '夜が更けた。', '夜中だった。'];
 
 test('the start: a repeated line is guessed by most places, the next line settles the place', () => {
-  const rt = ['………', 'あ', 'b', '………', 'い', 'c', '………', 'う', 'd'], og = ['……', '啊', 'b', '……', '咦', 'c', '………', '呜', 'd'];
+  const rt = ['………', 'あ', B, '………', 'い', C, '………', 'う', D], og = ['……', '啊', B, '……', '咦', C, '………', '呜', D];
   const m = new Matcher(rt, og), r = m.match('………');
   assert.equal(r.status, 'high'); assert.equal(r.method, 'guess'); assert.equal(r.japanese, '……', 'the translation most places have');
   assert.deepEqual(m.maybe, [0, 3, 6]);
@@ -38,33 +39,39 @@ test('the start: a repeated block is followed from its open places and settled w
 });
 
 test('a repeated line read again later is looked up at the new reading position, not answered from the cache', () => {
-  const rt = ['「ああ――」', 'a', 'b', 'c', '「ああ――」', 'd'], og = ['「知道了」', 'a', 'b', 'c', '「是啊——」', 'd'];
+  const rt = ['「ああ――」', A, B, C, '「ああ――」', D], og = ['「知道了」', A, B, C, '「是啊——」', D];
   const h = reader(provider(rt, og));
   assert.equal(h.resolveSource('「ああ――」').translation, '「知道了」');
-  for (const t of ['a', 'b', 'c']) h.resolveSource(t);
+  for (const t of [A, B, C]) h.resolveSource(t);
   assert.equal(h.resolveSource('「ああ――」').translation, '「是啊——」');
   assert.equal(h.resolveSource('「ああ――」').translation, '「是啊——」', 'the same line drawn again keeps its answer');
-  assert.equal(h.resolveSource('d').indices[0], 5);
+  assert.equal(h.resolveSource(D).indices[0], 5);
 });
 
 test('a bare line pairs with the bracketed line at the reading position, not with a bare line far away', () => {
-  const rt = ['a', '「へ？」', 'b', ...filler(500), 'へ？'], og = ['a', '「诶？」', 'b', ...filler(500), '嗯？'];
-  const h = reader(provider(rt, og)); h.resolveSource('a');
+  const rt = [A, '「へ？」', B, ...filler(500), 'へ？'], og = [A, '「诶？」', B, ...filler(500), '嗯？'];
+  const h = reader(provider(rt, og)); h.resolveSource(A);
   const r = h.resolveSource('へ？'); assert.equal(r.translation, '「诶？」'); assert.equal(r.indices[0], 1);
-  assert.equal(h.resolveSource('b').indices[0], 2, 'the reading goes on from there');
+  assert.equal(h.resolveSource(B).indices[0], 2, 'the reading goes on from there');
 });
 
 test('a bare line pairs with the nearest form: the bracketed line next, not a bare line further on', () => {
-  const rt = ['a', '「あれ？」', 'b', 'c', ...filler(50), 'あれ？'], og = ['a', '「咦？」', 'b', 'c', ...filler(50), '奇怪？'];
-  const h = reader(provider(rt, og)); h.resolveSource('a');
+  const rt = [A, '「あれ？」', B, C, ...filler(50), 'あれ？'], og = [A, '「咦？」', B, C, ...filler(50), '奇怪？'];
+  const h = reader(provider(rt, og)); h.resolveSource(A);
   assert.equal(h.resolveSource('あれ？').indices[0], 1);
 });
 
 test('a line the table leaves in Japanese at the reading position stays that line', () => {
-  const rt = ['a', '「何それ？」', 'b', ...filler(30), '何それ？'], og = ['a', '「何それ？」', 'b', ...filler(30), '这算啥？'];
-  const h = reader(provider(rt, og)); h.resolveSource('a');
+  const rt = [A, '「何それ？」', B, ...filler(30), '何それ？'], og = [A, '「何それ？」', B, ...filler(30), '这算啥？'];
+  const h = reader(provider(rt, og)); h.resolveSource(A);
   const r = h.resolveSource('何それ？'); assert.equal(r.method, 'untranslated'); assert.equal(r.indices[0], 1);
-  assert.equal(h.resolveSource('b').indices[0], 2);
+  assert.equal(h.resolveSource(B).indices[0], 2);
+});
+
+test('the next line word for word goes before the two lines just read joined (a grown line)', () => {
+  const rt = ['よーし、取るぞ。', '狙って、', '狙って、狙って、', '狙って、狙って、狙って、', 'えいっ！'], og = ['好，要上了。', '瞄准目标，', '瞄准，瞄准，', '瞄准，瞄准，瞄准，', '嘿！'];
+  const m = new Matcher(rt, og); for (const t of rt.slice(0, 3)) m.match(t);
+  assert.deepEqual(m.match('狙って、狙って、狙って、').indices, [3]);
 });
 
 test('a provider without a reading position (mocks, harvested scripts) is looked up as before', () => {

@@ -64,7 +64,9 @@ const untranslatedRow = i => { const z = String(zh[i] || '').trim(), j = String(
 const sceneOf = (() => { const sizes = Array.isArray(rt.sizes) ? rt.sizes : [lines.length], at = new Int32Array(lines.length); let i = 0; sizes.forEach((n, s) => { for (let k = 0; k < n && i < lines.length; k++) at[i++] = s; }); return at; })();
 const outScenes = (() => { const kept = new Map(), seen = new Map(); lines.forEach((t, i) => { if (!/[ぁ-ゖァ-ヺ]{2}/.test(String(t || ''))) return; const s = sceneOf[i]; seen.set(s, (seen.get(s) || 0) + 1); if (untranslatedRow(i)) kept.set(s, (kept.get(s) || 0) + 1); }); const out = new Set(); for (const [s, n] of seen) if ((kept.get(s) || 0) >= n * 0.95) out.add(s); return out; })();
 const key = t => String(t ?? '').replace(/\s+/g, '');
-const samePlace = (a, b) => a === b || key(lines[a]) === key(lines[b]) && key(zh[a]) === key(zh[b]);
+/* a translation that differs only by the outer brackets is the same: the hook gave the line without them */
+const bare = t => key(t).replace(/^[「『“"]+|[」』”"]+$/g, '');
+const samePlace = (a, b) => a === b || bare(lines[a]) === bare(lines[b]) && bare(zh[a]) === bare(zh[b]);
 let total = 0, paired = 0, nonDialogue = 0, untranslated = 0, outOfTable = 0; const misses = {}, skipped = [], kinds = ['as written', 'speaker taken off', 'no brackets', 'half-width', 'ruby markup', 'blanks', 'line break'];
 for (const kind of kinds) {
   const hh = { originalText: make(), trace() {}, resolveSource: HookNative.prototype.resolveSource }; let prev = -1;
