@@ -131,7 +131,10 @@
        then the translation is at most 15 % smaller, then the block moves up, for that sentence only. A centred page is not a box. */
     /* 2026-11-20 release check (user 2026-11-19, windowed 千恋＊万花: 「只要显示器上还有位置就不要这样」): the button-strip rule is for a game that
        fills the screen; when the work area has room for the translation below the game window it goes there at full size (the rule further down) */
-    const roomBelow = (() => { const i = b.galLayoutInfo?.(), d = devicePixelRatio || 1, wb = (Number.isFinite(i?.workBottom) && i.workBottom > 0 ? i.workBottom / d : innerHeight) - 8; return row ? wb - (cy0 + chc) >= row.getBoundingClientRect().height : false; })();
+    /* 2026-11-21 (owner's second recording, 千恋＊万花: the translation went out of sight below the window): MeguLit's own surface may end before
+       the work area does (the overlay spans the reader and the game, not always the desktop); what is drawn past its bottom is not seen */
+    const workLimit = () => { const i = b.galLayoutInfo?.(), d = devicePixelRatio || 1; return Math.min(Number.isFinite(i?.workBottom) && i.workBottom > 0 ? i.workBottom / d : innerHeight, innerHeight) - 8; };
+    const roomBelow = (() => { const wb = workLimit(); return row ? wb - (cy0 + chc) >= row.getBoundingClientRect().height : false; })();
     /* 2026-11-20 release check (CHAOS;CHILD rig: with room below the window the strip rule was skipped whole and the Japanese third row
        sat on AUTO/SKIP). Both rules hold: MeguLit's Japanese never enters the game's button strip (rows close up, the block moves up),
        and with room on the monitor the translation keeps its size; when it would land on the strip it goes below the window instead. */
@@ -143,18 +146,25 @@
       const rr = row.getBoundingClientRect(), over = rr.bottom - uiLimit, key = String(anchorLine || '');
       let below = cnBelow.key === key && cnBelow.below;
       if (rr.top >= cy0 + chc) below = false; /* already under the window: nothing to move */
+      /* (the fit check follows the hysteresis) 2026-11-21 (owner's recording, 千恋＊万花 window almost the whole screen: the translation went under the window onto the taskbar and off the
+         screen): below the window only when the whole row fits there above the work area's bottom; otherwise it stays under its Japanese
+         inside the game and the in-window rule (smaller by at most 15 %, then up) keeps it off the button strip */
       else below = below ? over > -glyph * .5 : over > glyph * .25;
+      const refused = below && cy0 + chc + 4 + rr.height > workLimit(); if (refused) below = false;
       cnBelow = { key, below };
       /* below the window: right against its bottom edge (4 px), never further */
-      if (below) set(row, 'margin-top', Math.ceil(cy0 + chc - rr.top + 4) + 'px'); }
-    else if (row && !roomBelow && !anchor.center && tr && tr.height) { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
-      sentence.style.removeProperty('line-height');
-      if (row.getBoundingClientRect().bottom > uiLimit && sentence.querySelector('br.megulit-row-br')) set(sentence, 'line-height', closeRows(sentence));
+      /* the row's margin is the user's 原文与译文间距 (it may be negative); the new margin replaces it, so it is counted in (it was not: the row
+         landed off by the gap, under the taskbar or past MeguLit's surface at -19..-28) */
+      if (below) set(row, 'margin-top', Math.ceil(cy0 + chc - rr.top + 4 + (parseFloat(getComputedStyle(row).marginTop) || 0)) + 'px');
+      else if (refused) inWindow(); }
+    else if (row && !roomBelow && !anchor.center && tr && tr.height) { sentence.style.removeProperty('line-height'); inWindow(); }
+    else sentence.style.removeProperty('line-height');
+    function inWindow() { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
+      if (row.getBoundingClientRect().bottom > uiLimit && sentence.querySelector('br.megulit-row-br') && !sentence.style.lineHeight) set(sentence, 'line-height', closeRows(sentence));
       const fsx = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rx = row.getBoundingClientRect();
       if (rx.bottom > uiLimit) { const fs = Math.max(Math.ceil(fsx * .85), Math.floor(fsx * Math.max(.85, (uiLimit - rx.top) / Math.max(1, rx.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rx = row.getBoundingClientRect(); }
       if (rx.bottom > uiLimit) { const up = Math.min(rx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); } }
-    else sentence.style.removeProperty('line-height');
-    if (row) { const info = b.galLayoutInfo?.(), dpr = devicePixelRatio || 1, limit = (Number.isFinite(info?.workBottom) && info.workBottom > 0 ? info.workBottom / dpr : innerHeight) - 8;
+    if (row) { const limit = workLimit();
       const fs0 = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rb = row.getBoundingClientRect();
       if (rb.bottom > limit) { /* 2026-11-20 (user: 「译文为啥都这么小啊 别这么小」): at most 15 % smaller; what still does not fit moves the block up instead */ const fs = Math.max(Math.ceil(fs0 * .85), Math.floor(fs0 * Math.max(.85, (limit - rb.top) / Math.max(1, rb.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rb = row.getBoundingClientRect(); }
       if (rb.bottom > limit) { const up = Math.min(rb.bottom - limit, Math.max(0, win.getBoundingClientRect().top)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); rb = row.getBoundingClientRect(); }
