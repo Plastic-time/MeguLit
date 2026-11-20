@@ -56,6 +56,10 @@ module.exports={
  },
  /* self-check thresholds of the auto-profile layer (feat/auto-profile): a window of lines whose hide/drop/repeat/pairing
     rates decide a fallback */
+ /* 2026-11-21 library scan (core/library.cjs steamParts): one work installed in parts (a program of the same name in the install root
+    and in part folders, BALDR SKY Dive1): { '.': root label, '<folder>': part label }; null = the kernel names a part after its
+    folder and the root after the game's title */
+ library:{partLabels:null},
  selfCheck:{window:20,minLines:8,hideVisible:0.25,dropRate:0.15,repeatRate:0.1,choiceMismatch:1,positionPx:96,pairRate:0.8},
  /* what this PC's calibration measured (auto layer): null = not calibrated, the kernel decides */
  calibrate:{

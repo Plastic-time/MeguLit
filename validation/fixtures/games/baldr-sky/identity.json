@@ -1,0 +1,14 @@
+{
+ "same":[
+  {"exe":"C:/Program Files (x86)/Steam/steamapps/common/Baldr Sky/BaldrSky.exe","steamAppId":"741140","engine":"NeXAS","title":"Baldr Sky"},
+  {"exe":"D:/SteamLibrary/steamapps/common/Baldr Sky/Dive1/BaldrSky.exe","steamAppId":"741140"},
+  {"exe":"E:/gal/BALDR SKY/BaldrSky.exe","engine":"NeXAS"},
+  {"exe":"E:/gal/バルドスカイ/Dive2/BaldrSky.exe","title":"バルドスカイ"}
+ ],
+ "other":[
+  {"exe":"E:/gal/BALDR SKY Zero/BaldrSkyZero.exe","title":"BALDR SKY Zero","engine":"NeXAS"},
+  {"exe":"E:/gal/BALDR HEART/BaldrHeart.exe","title":"BALDR HEART","engine":"NeXAS"},
+  {"exe":"C:/Program Files (x86)/Steam/steamapps/common/Other/Game.exe","steamAppId":"741141"},
+  {"exe":"D:/Games/SenrenBanka/SenrenBanka.exe"}
+ ]
+}

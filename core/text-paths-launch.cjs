@@ -67,11 +67,15 @@ function fontDot(root,exe,early,trace=()=>{}){
    shadow folder on the same volume (<volume>\MeguLit-Shadow\<exe>-<size>): folders as junctions, files as hard links
    only (no copies: a failed link drops the shadow and the launch stays as before). A game folder that already holds
    steam_appid.txt is started in place. Returns {exe,cwd,env,shadow} or null. */
-function steamDirect({exe,appid,shadowRoot=null,trace=()=>{}}){
+/* base: the folder the game runs from and the shadow mirrors (default the program's own folder). 2026-11-21 BALDR SKY Steam:
+   Dive1\BaldrSky.exe runs from the install root (steam_api.dll and the shared *.pac are there, Dive1\ holds only its own
+   Visual.pac/Voice.pac), so base = install root and the program starts as <shadow>\Dive1\BaldrSky.exe from the shadow. */
+function steamDirect({exe,appid,base=null,shadowRoot=null,trace=()=>{}}){
  const fs=require('node:fs');appid=String(appid||'');if(!/^\d+$/.test(appid)||!exe||!fs.existsSync(exe))return null;
- const env={SteamAppId:appid,SteamGameId:appid,SteamOverlayGameId:appid},dir=path.dirname(exe);
- if(fs.existsSync(path.join(dir,'steam_appid.txt'))){trace('steam-direct',{shadow:false});return {exe,cwd:dir,env,shadow:null};}
- const key=path.basename(exe).replace(/[^A-Za-z0-9._-]/g,'_')+'-'+fs.statSync(exe).size;
+ const env={SteamAppId:appid,SteamGameId:appid,SteamOverlayGameId:appid},dir=base?path.resolve(base):path.dirname(exe),rel=path.relative(dir,path.resolve(exe));
+ if(!rel||rel.startsWith('..')||path.isAbsolute(rel))return null;
+ if(fs.existsSync(path.join(dir,'steam_appid.txt'))){trace('steam-direct',{shadow:false,base:base?true:undefined});return {exe,cwd:dir,env,shadow:null};}
+ const key=(base?path.basename(dir).replace(/[^A-Za-z0-9._-]/g,'_')+'-':'')+path.basename(exe).replace(/[^A-Za-z0-9._-]/g,'_')+'-'+fs.statSync(exe).size;
  const shadow=path.join(shadowRoot||path.join(path.parse(path.resolve(exe)).root,'MeguLit-Shadow'),key);
  let stats;try{stats=U.mirror(dir,shadow,{linkOnly:true,ours:new Set(['steam_appid.txt','megulit-shadow.json'])});}
  catch(e){trace('steam-direct-skipped',{error:String(e?.code||e?.message||e).slice(0,80)});
@@ -79,9 +83,9 @@ function steamDirect({exe,appid,shadowRoot=null,trace=()=>{}}){
   try{for(const n of fs.readdirSync(shadow)){const p=path.join(shadow,n),t=fs.lstatSync(p);if(t.isSymbolicLink())fs.rmdirSync(p);else if(t.isFile())fs.unlinkSync(p);}fs.rmdirSync(shadow);}catch{}
   return null;}
  fs.writeFileSync(path.join(shadow,'steam_appid.txt'),appid);
- fs.writeFileSync(path.join(shadow,'megulit-shadow.json'),JSON.stringify({game:dir,exe:path.basename(exe),steam:appid,at:Date.now(),...stats}));
- trace('steam-direct',{shadow,links:stats.links,junctions:stats.junctions});
- return {exe:path.join(shadow,path.basename(exe)),cwd:shadow,env,shadow};
+ fs.writeFileSync(path.join(shadow,'megulit-shadow.json'),JSON.stringify({game:dir,exe:rel,steam:appid,at:Date.now(),...stats}));
+ trace('steam-direct',{shadow,links:stats.links,junctions:stats.junctions,part:base?rel:undefined});
+ return {exe:path.join(shadow,rel),cwd:shadow,env,shadow};
 }
 
 module.exports={prepare,attach,unityPack,fontDot,steamDirect};
