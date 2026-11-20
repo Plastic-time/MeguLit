@@ -25,7 +25,7 @@ Boot-Mark 'winforms-loaded'
 $script:splash = $null; $script:wv2EnvTask = $null
 if ($env:MEGULIT_SETUP_WEB -ne '0' -and (-not $env:MEGULIT_SETUP_TEST -or $env:MEGULIT_SETUP_WEB -eq '1') -and -not $env:MEGULIT_SETUP_PREVIEW -and -not $env:MEGULIT_SETUP_THEME -and -not $env:MEGULIT_SETUP_WEB_TEST) {
   try { $bsPath = Join-Path $Root 'setup\ui-web\video\light\intro.jpg'
-    if (Test-Path $bsPath) { $bsForm = New-Object Windows.Forms.Form; $bsForm.FormBorderStyle = 'None'; $bsForm.StartPosition = 'CenterScreen'; $bsForm.ShowInTaskbar = $false; $bsForm.Text = 'MeguLit'; $bsForm.ClientSize = New-Object Drawing.Size(600, 384); $bsForm.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
+    if (Test-Path $bsPath) { $bsForm = New-Object Windows.Forms.Form; $bsForm.FormBorderStyle = 'None'; $bsForm.StartPosition = 'CenterScreen'; $bsForm.ShowInTaskbar = $false; $bsForm.Text = 'MeguLit'; $bsForm.ClientSize = New-Object Drawing.Size(690, 442); $bsForm.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
       $bsPic = New-Object Windows.Forms.PictureBox; $bsPic.Dock = 'Fill'; $bsPic.SizeMode = 'StretchImage'; $bsPic.Image = [Drawing.Image]::FromStream((New-Object IO.MemoryStream (,[IO.File]::ReadAllBytes($bsPath)))); $bsForm.Controls.Add($bsPic)
       $bsForm.Show(); $bsForm.Refresh(); $script:splash = $bsForm; Boot-Mark 'splash-shown' } } catch { Boot-Mark ('splash-failed ' + ($_ -replace '\s+', ' ')) }
   # WebView2 warms up while the rest of the setup is built: its browser process starts now, not when the skin window is created.

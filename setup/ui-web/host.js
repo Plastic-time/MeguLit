@@ -16,7 +16,14 @@
     window.__askClose = () => document.getElementById('btnClose').click();
     window.addEventListener('install-failed', () => { const b = document.getElementById('install'); if (b) b.classList.remove('busy'); if (Scene.showInstallError) Scene.showInstallError(); });
     /* edge and corner hot zones (index.html .rz): the host starts the system size loop for the edge pressed */
-    document.querySelectorAll('.rz').forEach((z) => z.addEventListener('mousedown', (e) => { if (e.button === 0) { try { chrome.webview.postMessage({ type: 'resize', edge: z.dataset.e }); } catch (x) { /* no host */ } e.preventDefault(); } }));
+    /* zone widths in PHYSICAL pixels: the page is zoomed (devicePixelRatio = DPI scale x zoom), so 8 CSS px can be 4 device px or less */
+    const fitZones = () => { const d = window.devicePixelRatio || 1, st = document.documentElement.style; st.setProperty('--rz', Math.max(6, 9 / d).toFixed(1) + 'px'); st.setProperty('--rzc', Math.max(12, 18 / d).toFixed(1) + 'px'); st.setProperty('--rzg', Math.max(16, 24 / d).toFixed(1) + 'px'); };
+    fitZones(); window.addEventListener('resize', fitZones);
+    const zones = document.querySelectorAll('.rz'); let zinfoDone = false;
+    zones.forEach((z) => z.addEventListener('mousedown', (e) => { if (e.button === 0) { try { chrome.webview.postMessage({ type: 'resize', edge: z.dataset.e, zoom: +(window.devicePixelRatio || 1).toFixed(3), dpr: window.devicePixelRatio }); } catch (x) { /* no host */ } e.preventDefault(); } }));
+    /* one diagnostic line for setup-ui.log: are the zones there, and what sits on top at the window edge */
+    const zinfo = () => { if (zinfoDone) return; zinfoDone = true; const el = document.elementFromPoint(2, innerHeight / 2); try { chrome.webview.postMessage({ type: 'rz-info', zones: zones.length, native: true, w: innerWidth, h: innerHeight, dpr: window.devicePixelRatio, px: getComputedStyle(document.documentElement).getPropertyValue('--rz'), top: el ? (el.className || el.id || el.tagName) : 'none' }); } catch (x) { /* no host */ } };
+    setTimeout(zinfo, 2500);
   }
   const clock = () => performance.now() / 1000;
   async function check(p) { const c = await api('checkpath', { path: p }); Scene.setFree(c.free || 0, c.need || (info && info.need) || 0, c.state === 'protected' ? 'protected' : c.state === 'readonly' ? 'readonly' : 'ok'); return c; }
