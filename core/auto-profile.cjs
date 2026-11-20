@@ -28,10 +28,10 @@ const cleanSettings=s=>require('./profiles/domains.cjs').clean(s).value;
 
 function dir(root){return path.join(root,'data','config','auto-profiles');}
 /* 2026-11-21 (owner: 「key 用 exe 文件哈希（同名不同版本各自一份）」) the key of a game diff is the SHA-256 of the game's program file:
-   'x-' + its full SHA-256 (64 hex; logs show the first 8). Two versions of one game (a patch, a Steam update, a Chinese exe) are two diffs; a renamed copy
+   its 64 hex digits. Two versions of one game (a patch, a Steam update, a Chinese exe) are two diffs; a renamed copy
    of the same file is the same one. Never a path or a title, so it can be uploaded. */
-const KEY=/^x-[0-9a-f]{64}$/;
-const keyFor=({hash}={})=>/^[0-9a-f]{64}$/.test(String(hash||''))?'x-'+hash:'';
+const KEY=/^[0-9a-f]{64}$/;
+const keyFor=({hash}={})=>KEY.test(String(hash||'').toLowerCase())?String(hash).toLowerCase():'';
 /* the hash of a program file, remembered by path + size + mtime (data/config/exe-hashes.json), so a game start needs no read */
 const hashFile=root=>path.join(root,'data','config','exe-hashes.json');
 function statKey(executable){try{const s=fs.statSync(executable);return s.isFile()?path.resolve(executable).toLowerCase()+'|'+s.size+'|'+Math.floor(s.mtimeMs):'';}catch{return '';}}

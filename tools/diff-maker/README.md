@@ -7,8 +7,8 @@ node tools/diff-maker/index.cjs <探针目录>... [--key <gameKey>] [--out <目�
 node tools/diff-maker/index.cjs trim <探针目录> <输出目录>
 ```
 
-- 默认输出到 `H:\MeguLit-Work\diff-maker\out\<gameKey>-<hash12>\`：`diff-<hash12>.json`（差分草稿：未签名的 `megulit.game-diff`，key = `x-` + exe 完整 SHA-256）、`probe-<hash12>.replay.json`（回放）、`report.md` / `report.json`
-- `--write-repo` 另外写进仓库：`validation/fixtures/games/<gameKey>/diff-<hash12>.json` 和 `probe-<hash12>.{replay.json,case.cjs,report.md}`。官方差分只有一个位置：relay 上的签名文档（`tools/game-diff.cjs sign` 后 `POST /api/auto-profile/official`），客户端缓存在 `data/profiles/remote/`
+- 默认输出到 `H:\MeguLit-Work\diff-maker\out\<gameKey>-<hash12>\`：`diff-<hash12>.json`（差分草稿：未签名的 `megulit.game-diff`，key = exe 完整 SHA-256）、`probe-<hash12>.replay.json`（回放）、`report.md` / `report.json`
+- `--write-repo` 另外写进仓库：`validation/fixtures/games/<gameKey>/diff-<hash12>.json` 和 `probe-<hash12>.{replay.json,case.cjs,report.md}`。官方差分只有一个位置：relay 上的签名文档（`tools/sign-profile.cjs` 签名后 `POST /api/game-profile/signed`），客户端缓存在 `data/profiles/remote/`
 - `--key` 指定 gameKey；不给就用 `core/profiles` 认出的游戏（`games/<key>.cjs`），认不出是 `auto-<hash>`
 - `trim` 把一个完整探针裁成只含工具读到的日志行、只含回放碰到的剧本行的小探针（仓库里的样本探针就是这样来的，不放整部剧本）
 

@@ -26,7 +26,7 @@ test('layers stack in one order, the local step-down last; a layer with a bad ke
 });
 
 test('self-check-live hands the four outside layers to profileFor from the stored record and the relay answer',()=>{
- const {inputOf}=require('../services/self-check-live.cjs');const K='x-'+HASH;
+ const {inputOf}=require('../services/self-check-live.cjs');const K=HASH;
  const a=inputOf({key:K,input:{exe:'a.exe'},stored:{source:'calibration',settings:{page:{holdMs:2}}},shared:{source:'official',settings:{page:{holdMs:3}}}});
  assert.deepEqual([a.exeSha256,a.auto,a.official,a.shared,a.stepDown],[HASH,{page:{holdMs:2}},{page:{holdMs:3}},undefined,undefined]);
  const b=inputOf({key:K,input:{exe:'a.exe',official:{x:1}},stored:{source:'gate',settings:{hide:{textEffectsRead:true}}},shared:{source:'auto',settings:{page:{holdMs:1}}}});
@@ -34,11 +34,11 @@ test('self-check-live hands the four outside layers to profileFor from the store
  assert.equal(Profiles.profileFor(b).layers,'core+shared+stepdown');
 });
 
-test('one exe key: x- + the full SHA-256, remembered by path, size and mtime',async()=>{
+test('one exe key: the full SHA-256, remembered by path, size and mtime',async()=>{
  const ap=require('../core/auto-profile.cjs'),gd=require('../core/game-diff.cjs');const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-key-')),exe=path.join(dir,'Game.exe');fs.writeFileSync(exe,'MZ-1');
- const k=await ap.exeKey(dir,exe);assert.equal(k,'x-'+crypto.createHash('sha256').update('MZ-1').digest('hex'));assert.ok(ap.KEY.test(k)&&gd.KEY.test(k));assert.equal(ap.exeKeySync(dir,exe),k);
+ const k=await ap.exeKey(dir,exe);assert.equal(k,crypto.createHash('sha256').update('MZ-1').digest('hex'));assert.ok(ap.KEY.test(k)&&gd.KEY.test(k));assert.equal(ap.exeKeySync(dir,exe),k);
  assert.equal(require('../services/auto-profile-feed.cjs').dir(dir),path.join(dir,'data','profiles','remote'));
- assert.match(fs.readFileSync(path.join(root,'relay/src/auto-profile.js'),'utf8'),/\(x-\[0-9a-f\]\{64\}\)/);
+ assert.ok(fs.readFileSync(path.join(root,'relay/src/auto-profile.js'),'utf8').includes(String.raw`game-profile\/([0-9a-f]{64})`),'the relay route takes the full SHA-256');
 });
 
 test('HookBridge gets hide.engineTrial: env at spawn, a message when it changes, the kernel rule when unset',()=>{

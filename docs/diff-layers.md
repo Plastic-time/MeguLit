@@ -34,7 +34,7 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 
 ## 认游戏
 
-- **唯一的 exe 键：exe 文件完整 SHA-256**，写作 `x-<64 位小写 hex>`，日志里显示前 8 位。一个哈希 = 一个版本：改名、换路径还是同一份，补丁、Steam 更新、汉化 exe 各是一份。按路径+大小+修改时间记在 `data/config/exe-hashes.json`，已知的 exe 开游戏不用再读文件（`core/auto-profile.cjs exeKey / exeKeySync`）
+- **唯一的 exe 键：exe 文件完整 SHA-256**（64 位小写 hex），日志里显示前 8 位。一个哈希 = 一个版本：改名、换路径还是同一份，补丁、Steam 更新、汉化 exe 各是一份。按路径+大小+修改时间记在 `data/config/exe-hashes.json`，已知的 exe 开游戏不用再读文件（`core/auto-profile.cjs exeKey / exeKeySync`）
 - 仓库游戏差分的 `match`：`exeSha256`（列出的哈希，+10）、`steamAppId` / `files`（+3）、程序名（独特名 +3，BGI.exe 这类通用名 +1）、标题（完全相同 +3，包含 +2）、同引擎 +1；引擎冲突直接排除，`notTitles` 排除 FD/续作，≥3 才算命中。标题和 Steam id 只用来找候选
 - gameKey：仓库游戏文件名，没有就是 `auto-<hash>`（程序名 + 标题）
 - 日志：`profile <gameKey> exe=<哈希前8位> layers=core+engine+game+…+official+stepdown engine=<engine> match=<依据>`；还没算出哈希时 `exe=-`
@@ -44,7 +44,7 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 ```json
 {
  "schema": "megulit.game-diff", "version": 1,
- "key": "x-<exe SHA-256，64 位小写 hex>",
+ "key": "<exe SHA-256，64 位小写 hex>",
  "source": "official",
  "mode": "hide",
  "settings": { "page": { "holdMs": 900 }, "hide": { "engineTrial": { "enabled": false } } },
@@ -54,18 +54,20 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 ```
 
 - 只允许 `core/game-diff.cjs` 列出的字段；`mode:"read"` 必须同时有 `hide.textEffectsRead:true`
-- 签名：Ed25519，签去掉 `signature` 后的规范 JSON（键排序）。`official` 只认维护者密钥 `services/adapter-pack-keys.json`；`auto`（共享）认 relay 密钥 `services/auto-profile-keys.json`，维护者密钥也认。私钥不进仓库，`tools/game-diff.cjs keygen/make/sign/check`
+- 签名：Ed25519，签去掉 `signature` 后的规范 JSON（键排序）。官方差分和共享自动差分都由我们在本机签（`tools/sign-profile.cjs`，私钥路径走环境变量 `MEGULIT_PROFILE_KEY`，放在仓库里会被拒绝），relay 不持私钥；公钥只有一个文件 `services/profile-keys.json`（为空时不接受任何下发）。适配包继续用自己的 `services/adapter-pack-keys.json`
 - 验签和值域在 `services/auto-profile-feed.cjs layer()`，每次从缓存读都重新检查
 
 ## 热更新
 
-一个接口：`GET <relay>/api/auto-profile/<key>` → `{"schema":"megulit.game-diff-feed","version":1,"key":…,"diff":<签名文档>}`，404 表示这个 exe 没有差分。relay 每个 exe 只给一份：有官方给官方，否则给多人一致的共享自动差分（`relay/src/auto-profile.js`）
+一个接口：`GET <relay>/api/game-profile/<exe SHA-256>` → `{"schema":"megulit.game-diff-feed","version":1,"key":…,"diff":<签名文档>}`，404 表示这个 exe 没有差分（`/api/profile/<id>` 是社区个人主页，所以前缀是 game-profile）。relay 每个 exe 只给一份：有官方给官方，否则给多人一致、我们签过的共享自动差分（`relay/src/auto-profile.js`）
 
-客户端（`services/auto-profile-feed.cjs refresh`）：开游戏、知道 exe 键后读本地缓存 `data/profiles/remote/<key>.json` 立即叠层，后台再拉（缓存 1 天，"没有" 6 小时），拉到通过验签的新文档就当场 `setGameProfile`，不用重启。只发 exe 键。`MEGULIT_RELAY_BASE=off` 时不请求。本机校准结果和退档按「共享适配」开关上报 `/api/auto-profile/report`
+客户端（`services/auto-profile-feed.cjs refresh`）：开游戏、知道 exe 键后读本地缓存 `data/profiles/remote/<key>.json` 立即叠层，后台再拉（缓存 1 天，"没有" 6 小时），拉到通过验签的新文档就当场 `setGameProfile`，不用重启。只发 exe 键。`MEGULIT_RELAY_BASE=off` 时不请求
+
+上传（都默认关）：校准结果和退档要 `library.json autoProfileShare` 加「共享适配」；运行时样本要 `runtimeSampleShare`
 
 ## 流程
 
-用户一键探针上传 → 离线做出差分 + 回放夹具（`validation/fixtures/games/<gameKey>/`）→ 维护者签名 → `POST /api/auto-profile/official` 发布 → 客户端热更新 → 用户间按 exe 键共享去重。服务端和签名工具在 auto-profile 会话，离线做差分在 diff-maker 会话
+用户一键探针上传 → 离线做出差分 + 回放夹具（`validation/fixtures/games/<gameKey>/`）→ 本机签名（`tools/sign-profile.cjs`）→ `POST /api/game-profile/signed` 发布 → 客户端热更新 → 用户间按 exe 键共享去重。服务端和签名工具在 auto-profile 会话，离线做差分在 diff-maker 会话
 
 ## 测试
 

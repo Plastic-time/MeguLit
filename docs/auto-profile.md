@@ -2,34 +2,39 @@
 
 店主定的最终模型（2026-11-21）：
 
-1. **每个 exe 一份差分**：key = `x-` + 程序文件 SHA-256 的前 40 位十六进制。同名不同版本（补丁、Steam 更新、汉化 exe）各自一份；改名的同一个文件还是同一份。不用标题，不含路径
-2. **两种来源**：
-   - 官方差分：维护者根据一键上传的探针（脚本 + exe + 运行时样本）离线做出，用维护者密钥签名
-   - 自动差分：玩家本机首次游玩自动校准的结果，服务端汇总后用 relay 自己的密钥签名
-   - 官方优先，自动校准只给还没有官方差分的 exe 兜底
-3. **只能是数据**：只允许 `core/profiles/defaults.cjs` 登记过的键，值必须在 `core/profiles/domains.cjs` 的值域内（枚举、布尔、数值区间、矩形、安全正则列表）。服务端入库前过滤，客户端收到后再验一遍；签名覆盖整份文档，改一个值就验不过
-4. **热更新**：开游戏按 exe 哈希读本地缓存，后台拉新的，拉到就立刻叠成 profile 的 auto 层，不需要重装或重编
-5. **玩家之间共享**：同一 exe 收到多份校准，按一致性和分数去重，只保留一份下发
-6. **冻结和夹具**：仓库里已经做好的游戏差分（`core/profiles/games/<key>.cjs`）有回放夹具，`games-regression` 全过才能改内核；`domains.cjs` 缺键时 `auto-profile-relay` 测试会失败。客户端闸门退档时自动上报原因进修复队列，并触发自动探针（带运行时样本）
+1. **每个 exe 一份差分**：key = 游戏程序文件的 SHA-256（64 位小写十六进制）。同名不同版本（补丁、Steam 更新、汉化 exe）各自一份；改名的同一个文件还是同一份。不用标题，不含路径
+2. **两种来源**：官方差分（我们根据一键上传的探针：脚本 + exe + 运行时样本，离线做出）优先；玩家本机自动校准的结果只给还没有官方差分的 exe 兜底
+3. **只能是数据**：只允许 `core/profiles/defaults.cjs` 登记过的键，值必须在 `core/profiles/domains.cjs` 的值域内（枚举、布尔、数值区间、矩形、安全正则列表）。服务端入库前过滤，客户端收到后再验
+4. **签名只在我们本机**：Ed25519，私钥只在本机签发工具 `tools/sign-profile.cjs` 里，路径走环境变量 `MEGULIT_PROFILE_KEY`，绝不进仓库，relay 上也没有。relay 被攻破也造不出客户端认的差分
+5. **热更新**：开游戏按 exe 哈希拉差分，有就叠成 profile 的 auto 层，不重装不重编
+6. **玩家之间共享**：同一 exe 收到多份校准，按一致性和分数去重，只保留一份
+7. **冻结和夹具**：仓库里做好的游戏差分有回放夹具，`games-regression` 全过才能改内核；`domains.cjs` 缺键时 `auto-profile-relay` 测试会失败。客户端闸门退档时自动上报原因进修复队列，并触发自动探针
 
-分层（`core/profiles`，完整说明见 docs/diff-layers.md），后面的层盖前面的，全部叠加：
+分工：服务端、探针运行时样本、签名工具在本分支；客户端加载 / 验签 / 热更新由 diff-layers 会话基于 `core/game-diff.cjs`、`core/profiles/domains.cjs`、`core/auto-profile.cjs exeKey` 做。本分支里 `services/auto-profile-feed.cjs` + `services/self-check-live.cjs` 是一份能用的参考实现（层顺序如下），合并时以 diff-layers 为准。
+
+分层（`core/profiles`）：
 
 ```
-内核 ← 引擎差分 ← 仓库游戏差分 ← shared 共享自动 ← auto 本机校准 ← official 下发官方 ← stepdown 本机退档
+内核默认 defaults.cjs ← 引擎差分 engines/<id>.cjs ← 仓库游戏差分 games/<gameKey>.cjs ← auto 层（下面四选一）
 ```
 
-| 层 | 来源 |
+auto 层按顺序取第一个有的：
+
+| 顺序 | 来源 | 说明 |
+|---|---|---|
+| 1 | 本机退档 | 闸门在这台电脑上看到这个 exe 坏了：读模式，谁说的都不听 |
+| 2 | 官方差分 | relay 下发，我们签名 |
+| 3 | 本机校准 | `data/config/auto-profiles/<key>.json` |
+| 4 | 共享自动差分 | relay 下发，≥2 人一致，我们签名 |
+
+有官方差分或共享结论是读模式时，本机不再录制校准。「重新校准」删掉本机差分，这一局不看 relay，只按本机重测。key 按路径+大小+修改时间记在 `data/config/exe-hashes.json`，首次算哈希是异步流式读。
+
+两个开关（`data/config/library.json`，都默认关，等店主定）：
+
+| 键 | 管什么 |
 |---|---|
-| shared | relay 下发，relay 签名，≥2 人一致 |
-| auto | 本机校准 `data/config/auto-profiles/<key>.json` |
-| official | relay 下发，维护者签名 |
-| stepdown | 闸门在这台电脑上看到这个 exe 坏了：读模式，永远最高，保证坏了能退 |
-
-`services/self-check-live.cjs inputOf` 把这四层交给 `profileFor`；`choose` 只用来决定原因文字、是否读模式、是否录制校准。
-
-有官方差分或共享结论是读模式时，本机不再录制校准。「重新校准」删掉本机差分，这一局不看 relay，只按本机重测。
-
-接入：`services/reader.cjs applyGameProfile` → `services/self-check-live.cjs start`。key 已知（`data/config/exe-hashes.json` 按路径+大小+修改时间记住）时同步叠层；首次算哈希是异步流式读，算完再 `setGameProfile`。
+| `autoProfileShare` | 上传本机校准/退档结果（同时还要「共享适配」`sharedAdaptation` 开着；拉取下发的差分不算上传，一直开） |
+| `runtimeSampleShare` | 收集运行时样本（含游戏窗口截图），以及探针带上 / 单独补传样本 |
 
 ## 自检闸门 `core/self-check.cjs`
 
@@ -40,7 +45,7 @@
 | 指标 | 怎么算 | 默认阈值 |
 |---|---|---|
 | hideVisible | hookVisual stage=hidden、valid 的句子里，扫描区仍识别到日文的比例 | > 25%（至少检查 4 句） |
-| dropRate | `hook line drawn nowhere on the page, dropped` / (台词 + 丢句) | > 15% |
+| dropRate | core 放弃的钩子行 / (台词 + 丢句)。b64cb137 起 core 把找不到页面位置的行「drawn off the page layer, delivered from the hook text」补送给阅读层，记为 redrawn（补画，不算丢句）；「already read, skipped」不算；旧日志的「drawn nowhere ... dropped」仍算丢句 | > 15% |
 | repeatRate | 阅读层同一句（≥6 字）在窗口内画了第二次 | > 10% |
 | choiceMismatch | `choice options filtered A -> B` 里 A≥2 且 B<2 的次数 | > 1 次 |
 | positionPx | 引擎上报第一个字框的 top 与阅读层第一个字 top（换算到游戏客户区）之差的中位数 | > max(96, 3×字高)，至少 5 个样本 |
@@ -80,12 +85,12 @@ selfCheck window=1 lines=20 hide=0.25 drop=0.231 repeat=0 choice=1 pos=- pair=0.
 
 ## 存储格式 `data/config/auto-profiles/<key>.json`
 
-`key` = `x-` + exe SHA-256 前 40 位。不含路径。
+`key` = exe 的 SHA-256（64 位十六进制）。不含路径。
 
 ```json
 {
   "schema": 1,
-  "key": "x-3f9a…（40 位）",
+  "key": "3f9a…（64 位）",
   "engine": "krkr",
   "exe": "fata_jp.exe",
   "version": "1.4.21",
@@ -125,74 +130,96 @@ selfCheck window=1 lines=20 hide=0.25 drop=0.231 repeat=0 choice=1 pos=- pair=0.
 
 ## 签名差分文档 `core/game-diff.cjs`
 
-relay、客户端、维护者工具共用这一个纯函数文件，签名的字节处处一致：
+relay、客户端、签名工具共用这一个纯函数文件，签名的字节处处一致：
 
 ```json
 {
   "schema": "megulit.game-diff", "version": 1,
-  "key": "x-<64 hex: exe SHA-256>", "source": "official|auto", "mode": "hide|read",
+  "key": "<64 hex exe SHA-256>", "source": "official|auto", "mode": "hide|read",
   "settings": { "只含 domains.cjs 允许的键和值": true },
   "exe": "fata_jp.exe", "engine": "krkr", "app": "", "issuedAt": "ISO",
   "agree": 3, "reporters": 4, "cost": 0.2,
-  "signature": { "alg": "ed25519", "keyId": "k1|r1", "value": "<base64，签 canonical(去掉 signature 的文档)>" }
+  "signature": { "alg": "ed25519", "keyId": "p1", "value": "<base64，签 canonical(去掉 signature 的文档)>" }
 }
 ```
 
-- 官方：必须由 `services/adapter-pack-keys.json` 里的维护者密钥签
-- 自动：由 `services/auto-profile-keys.json` 里的 relay 密钥签（维护者密钥也认）
+- 客户端信任 `services/profile-keys.json` 里的公钥（现在为空：空着时客户端不接受任何下发差分）
 - settings 需要过滤才能通过的文档整份拒收；mode=read 必须带 `hide.textEffectsRead=true`；多余字段拒收
-- 客户端验不过就当没有，坏掉或被投毒的 relay 最多让玩家拿不到差分
+- 验不过就当没有：坏掉或被投毒的 relay 最多让玩家拿不到差分
 
-维护者工具 `tools/game-diff.cjs`：`keygen`（生成 relay 密钥：私钥给 `wrangler secret put AUTO_PROFILE_SIGNING_KEY`，公钥写进 `services/auto-profile-keys.json`）、`key <exe>`、`make <key> <settings.json>`、`sign <diff.json> <key.pem> <keyId>`、`check <signed.json>`。
+## 签名工具 `tools/sign-profile.cjs`（只在我们本机跑）
 
-## 服务端（relay/src/auto-profile.js）
+环境变量：`MEGULIT_PROFILE_KEY`（私钥 PEM 路径，必须在仓库外，否则拒绝）、`MEGULIT_PROFILE_KEY_ID`（默认 `p1`）、`MEGULIT_ADMIN_TOKEN`（relay 维护者令牌）。
 
-迁移 `relay/migrations/0021_auto_profiles.sql`：
-
-- `auto_profile_reports`：每个 exe、每个上报者（IP 哈希）一行，新覆盖旧，每个 exe 最多留 50 行
-- `game_diffs`：每个 exe 每种来源一份签好的文档（`official` / `auto`）
-- `auto_profile_queue`：修复队列，每个 exe 一行
-
-| 接口 | 说明 |
+| 命令 | 作用 |
 |---|---|
-| `POST /api/auto-profile/report` | `{version:1, profile:<autoProfile.profile>}`，每 IP 每小时 30 次；settings 按值域过滤；`source:'gate'` 的同时进修复队列 |
-| `GET /api/auto-profile/<x-key>` | `{schema:'megulit.game-diff-feed', version:1, key, diff}`；有官方给官方，否则给自动；都没有 404 |
-| `POST /api/auto-profile/official` | 维护者（`ADAPTER_ADMIN_TOKEN`）上传签好的官方差分；同时关掉该 exe 的队列项 |
-| `POST /api/auto-profile/official/withdraw` | 撤回官方，回到自动 |
-| `GET /api/auto-profile/queue[?all=1]` | 修复队列：exe、引擎、超线指标、上报人数、时间 |
-| `POST /api/auto-profile/queue/close` | 关掉一项 |
+| `keygen <仓库外目录>` | 生成密钥对：私钥写成 PEM，打印要加进 `services/profile-keys.json` 的公钥条目 |
+| `key <game.exe>` | 算 exe 的差分 key |
+| `make <exeHash> <settings.json> [--mode] [--exe] [--engine]` | 做一份官方差分（只留值域内的键，丢掉的打在 stderr） |
+| `sign <diff.json>` | 签一份 |
+| `picks <relay> <输出目录> [--upload]` | 拉 relay 上等签名的自动挑选结果，逐个校验、签名、写文件，`--upload` 传回 relay |
+| `check <signed.json>` | 按客户端规则验形状、值和签名 |
 
-自动差分挑选（最近 180 天）：相同 mode+settings 算一组；超过半数是读模式且至少 2 人 → 读模式；否则在 ≥2 人一致的隐藏组里取平均代价最低的；只有 1 人报过的永远不下发。结果变了才重新签名写入（多一次 upsert）。没设 `AUTO_PROFILE_SIGNING_KEY` 时不下发任何自动差分。读取不写 D1。
+## 服务端 `relay/src/auto-profile.js`
+
+路由前缀 `/api/game-profile/`（`/api/profile/<id>` 已经是社区个人主页）。迁移 `relay/migrations/0021_auto_profiles.sql`：
+
+- `auto_profile_reports`：每个 exe、每个上报者（IP 哈希）一行，新覆盖旧，每个 exe 最多 50 行
+- `auto_profile_picks`：每个 exe 的一致最佳结果（未签名），等我们签
+- `game_diffs`：每个 exe 每种来源一份我们签好的文档（`official` / `auto`），官方优先
+- `auto_profile_queue`：修复队列，每个 exe 一行
+- `profile_runtime`：单独补传的运行时样本（R2 `profile-runtime/<key>.json.gz`）
+
+| 接口 | 谁 | 说明 |
+|---|---|---|
+| `POST /api/game-profile/report` | 客户端 | `{version:1, profile:<autoProfile.profile>}`，每 IP 每小时 30 次；settings 按值域过滤；`source:'gate'` 的同时进修复队列 |
+| `GET /api/game-profile/<exeHash>` | 客户端 | `{schema:'megulit.game-diff-feed', version:1, key, diff}`；有官方给官方，否则给签过的自动差分；都没有 404 |
+| `POST /api/game-profile/runtime` | 客户端 | `{version:1, key, identity?, sha256, data:<base64 gzip 运行时包>}`，≤3 MB，每 IP 每小时 6 次；同一份不重复存 |
+| `GET /api/game-profile/picks` | 我们 | 等签名的挑选结果（未签名文档） |
+| `POST /api/game-profile/signed` | 我们 | `{diff}` 签好的文档；auto 必须正好是当前挑选，否则 409；official 同时关掉队列项 |
+| `POST /api/game-profile/withdraw` | 我们 | `{key, source}` 下架 |
+| `GET /api/game-profile/queue[?all=1]` / `POST …/queue/close` | 我们 | 修复队列 |
+| `GET /api/game-profile/runtime/list` / `…/runtime/get?key=` | 我们 | 补传的运行时样本 |
+
+「我们」= `Authorization: Bearer ADAPTER_ADMIN_TOKEN`。relay 没有任何私钥。
+
+自动挑选（最近 180 天）：相同 mode+settings 算一组；超过半数是读模式且至少 2 人 → 读模式；否则在 ≥2 人一致的隐藏组里取平均代价最低的；只有 1 人报过的永远不挑。挑选变了才写一次。读取不写 D1。
 
 部署（等店主说再做）：
-1. `node tools/game-diff.cjs keygen`，私钥 `wrangler secret put AUTO_PROFILE_SIGNING_KEY`，公钥加进 `services/auto-profile-keys.json`（随下个版本发）
-2. `wrangler d1 migrations apply megulit-relay --remote`
-3. `wrangler deploy`
+1. 本机 `node tools/sign-profile.cjs keygen <仓库外目录>`，公钥条目加进 `services/profile-keys.json`（随下个版本发）
+2. `wrangler d1 migrations apply megulit-relay --remote`，然后 `wrangler deploy`
+3. 定期本机跑 `sign-profile.cjs picks https://cn-api.megulit.com <目录> --upload`
 
-客户端 `services/auto-profile-feed.cjs`：校准完成、退档后上报（受「共享适配」开关）；缓存 `data/profiles/remote/<key>.json`（有结果 24 小时，404 六小时）。
+## 运行时样本 `services/runtime-sample.cjs`
 
-## 运行时样本（探针用，`services/runtime-sample.cjs`）
+只在 `runtimeSampleShare` 打开时收集。首个自检窗口（前 20 句）里收集，存 `data/runtime-samples/<key>/`：
 
-首个自检窗口（前 20 句）里收集，存 `data/runtime-samples/<key>/`，下一次自动探针（`probe-full.cjs`）打进包里：item kind `runtime`（`runtime/sample.json`）和 `shot`（`runtime/shot-N.jpg`）。
+| 文件 | 内容 |
+|---|---|
+| `sample.json` | 下面的结构化样本 |
+| `hook-events.log` | 这个窗口的 hook-events 原始行（自检和校准的输入，diff-maker 直接拿来跑 `predict/calibrate`） |
+| `reader-host.log` | 这个窗口的 reader-host 原始行（不含 hostFrame） |
+| `shot-1..3.jpg` | 第 3、10、18 句时各一张，`GalNative.sceneShot` 只截游戏自己的客户区（不含 MeguLit 图层和桌面），JPEG，每张 ≤600 KB |
+
+两份日志写盘前过 `diagnostics.scrub`（用户名、用户目录、邮箱）。
 
 ```json
 {
-  "schema": "megulit.runtime-sample", "version": 1, "key": "x-…", "exe": "fata_jp.exe", "engine": "krkr", "app": "1.4.21",
+  "schema": "megulit.runtime-sample", "version": 1, "key": "<64 hex>", "exe": "fata_jp.exe", "engine": "krkr", "app": "1.4.21",
   "createdAt": "ISO", "client": [804, 604], "shots": 3,
   "lines":   [{ "at": 0, "seq": 5, "chars": 18, "name": "綾" }],
   "boxes":   [{ "at": 0, "line": 1, "x": 220, "y": 488, "w": 20, "h": 22 }],
   "choices": [{ "at": 0, "raw": 3, "shown": 0 }],
   "aux":     [{ "at": 0, "texts": ["を私呼ぶを私声…"] }],
   "drops":   [{ "at": 0, "chars": 16 }],
+  "redrawn": [{ "at": 0, "chars": 9 }],
   "hide":    [{ "at": 0, "seq": 1, "visible": true }]
 }
 ```
 
-- `lines`：前 40 句的序号、字数、当时名字框里的名字（`hooks.state.hookSpeaker`）
-- `boxes`：引擎上报的首字框（游戏客户区像素），`client` 是客户区尺寸
-- `choices`：选项事件（引擎/钩子给的数 → 阅读层画出的数）
-- `aux`：旁路流文本（特效帧在这里），`drops`：画不出被丢的句子，`hide`：隐藏检查结果
-- 截图：第 3、10、18 句时各一张，`GalNative.sceneShot` 只截游戏自己的客户区（不含 MeguLit 图层和桌面），JPEG，每张 ≤600 KB，最多 3 张
+怎么上传：
+- 还没有完整探针的游戏：下一次自动探针（`probe-full.cjs`）把这些文件打进 `.mlfp`，item kind `runtime`（`runtime/sample.json`、`runtime/hook-events.log`、`runtime/reader-host.log`）和 `shot`（`runtime/shot-N.jpg`）
+- relay 已有这个 identity 的完整探针：`probe-auto.runtimeOnly` 只补传样本（gzip 包 `{schema:'megulit.runtime-bundle', version:1, key, files:[{name, kind, sha256, data(base64)}]}`），不重传脚本和 exe；同一份样本只传一次
 
 ## 测试
 
@@ -202,4 +229,6 @@ relay、客户端、维护者工具共用这一个纯函数文件，签名的字
 - 千恋＊万花（22:53:42Z 之后）：窗口全部过线，校准保持隐藏重画
 - 在线服务：首次校准写盘、读模式带原因、重新校准、已存的隐藏差分运行中退档
 
-`validation/auto-profile-relay.test.cjs`：Worker 进程内跑（D1 用 node:sqlite，WebCrypto Ed25519），覆盖值域表完整、单人不下发、两人一致下发且客户端验签通过、篡改/错误密钥/错 key 被拒、最低代价胜出、读模式要过半、危险正则和未知键被滤、官方优先/撤回/只认维护者密钥、退档进修复队列且官方差分关单、无签名密钥不下发、客户端四级优先级、共享开关关闭不上报、运行时样本
+`validation/auto-profile-relay.test.cjs`：Worker 进程内跑（D1 用 node:sqlite，R2 用 Map），覆盖值域表完整、私钥只能在仓库外、单人不挑、relay 不签名且未签不下发、本机工具签名后客户端验签通过、篡改/别的密钥/错 key 被拒、非当前挑选 409、最低代价胜出、读模式要过半、危险正则和未知键被滤、官方优先/撤回/只能我们传、退档进修复队列且官方差分关单、客户端四级优先级、两个开关默认关、运行时样本（日志脱敏、只补传一次）
+
+`validation/fata-effects-replay.test.cjs`（海馆新 core 夹具）：自检在同一批 trace 上丢句率 0，补送行记为补画

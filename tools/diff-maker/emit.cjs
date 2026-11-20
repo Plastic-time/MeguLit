@@ -2,7 +2,7 @@
 'use strict';
 /* diff-maker: the three products of one probe
      diff-<hash12>.json                               the game diff draft: an unsigned megulit.game-diff (core/game-diff.cjs),
-                                                      key x-<full exe SHA-256>; signed and published with tools/game-diff.cjs
+                                                      key = the full exe SHA-256; signed with tools/sign-profile.cjs
      validation/fixtures/games/<gameKey>/probe-<hash12>.replay.json + .case.cjs   the replay fixture and its case
      report.md / report.json                          scores per metric and key, draw roles, what a person still has to look at */
 const fs=require('node:fs'),path=require('node:path');
@@ -14,13 +14,13 @@ const TOOL='diff-maker/1';
 const plain=v=>v&&typeof v==='object'&&!Array.isArray(v);
 function deepMerge(a,b){const out={...a};for(const [k,v] of Object.entries(b||{}))out[k]=plain(v)&&plain(out[k])?deepMerge(out[k],v):v;return out;}
 
-/* the draft is the document the relay hands out (core/game-diff.cjs), unsigned: key 'x-' + the exe's full SHA-256 (manifest
+/* the draft is the document the relay hands out (core/game-diff.cjs), unsigned: key = the exe's full SHA-256 (manifest
    exe.sha256; '' when the probe does not carry it, then the report says it cannot be published). What only a person reviewing
    it needs (match, title, scores) stays in report.json. */
 function diffOf(probe,key,result,gameFile){const measured=Search.settingsOf(result);
  const settings=deepMerge(JSON.parse(JSON.stringify(gameFile?.settings||{})),measured);
  const mode=result.best.params.hideMethod==='read'?'read':'hide';const sha=/^[0-9a-f]{64}$/.test(probe.exe.sha256||'')?probe.exe.sha256:'';
- const d=require('../../core/game-diff.cjs').build({key:sha?'x-'+sha:'',source:'official',mode,settings,exe:probe.exe.name,engine:probe.engine,app:TOOL,issuedAt:''});
+ const d=require('../../core/game-diff.cjs').build({key:sha,source:'official',mode,settings,exe:probe.exe.name,engine:probe.engine,app:TOOL,issuedAt:''});
  const dropped=require('../../core/profiles/domains.cjs').clean(settings).rejected;if(dropped.length)throw new Error('diff uses keys or values outside core/profiles/domains.cjs: '+dropped.join(', '));
  return d;}
 function replayOf(probe,key,rep,result,diffRel){return {schema:1,tool:TOOL,gameKey:key,exeHash:probe.exe.hash,engine:probe.engine,title:probe.title,diff:diffRel,

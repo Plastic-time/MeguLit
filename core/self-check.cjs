@@ -7,7 +7,7 @@
 
    metric        what it counts (per window)                                                         default threshold
    hideVisible   hook lines whose hide check (hookVisual stage=hidden, valid) still read Japanese       > 25 % of checked lines (>= 4 checked)
-   dropRate      hook lines the page dropped ("hook line drawn nowhere on the page, dropped")          > 15 % of hook lines
+   dropRate      hook lines core gave up on (never reached the reader; redrawn lines are not drops)   > 15 % of hook lines
    repeatRate    lines the reader drew a second time (same text, >= 6 chars, within the window)        > 10 % of drawn lines
    choiceMismatch choice events where the engine/hooks had >= 2 options and the reader kept < 2         > 1 event
    positionPx    median |engine first box top - reader first glyph top| (game client px)             > max(96, 3 x glyph height), >= 5 samples
@@ -31,7 +31,14 @@ function parseTrace(line){let s=String(line||'');const ts=TS.exec(s);const at=ts
  let m;
  if(s.startsWith('selfCheck'))return null;
  if((m=/^source chars=(\d+) sequence=(\d+)/.exec(s)))return {kind:'line',at,chars:+m[1],seq:+m[2]};
- if((m=/page: hook line drawn nowhere on the page, dropped chars=(\d+)/.exec(s)))return {kind:'drop',at,chars:+m[1]};
+ /* 2026-11-21 (fata-effects, main b64cb137): core no longer drops a hook line it cannot find on the page, it delivers it from the hook
+    text ("drawn off the page layer, delivered from the hook text": the reader redraws it, counted apart as redrawn, never a drop);
+    "already read, skipped" is a line the reader showed before (no drop either). A drop is any other hook line core gave up on
+    ("... hook line ... dropped", the old "drawn nowhere on the page, dropped" of logs before b64cb137 included); a menu/help page
+    dropped on purpose is not one. */
+ if((m=/delivered from the hook text chars=(\d+)/.exec(s)))return {kind:'redrawn',at,chars:+m[1]};
+ if(/already read, skipped/.test(s))return null;
+ if((m=/hook line\b.*\bdropped\b(?:.*?chars=(\d+))?/.exec(s))&&!/menu|help|not a story line/.test(s))return {kind:'drop',at,chars:+(m[1]||0)};
  if((m=/^visual (\{.*\})\s*$/.exec(s))){try{const v=JSON.parse(m[1]);if(v.type==='hookVisual'&&v.stage==='hidden'&&v.valid===true)return {kind:'hide',at,seq:+v.sequence||0,visible:v.matched===true};}catch{}return null;}
  if((m=/^choice options filtered (\d+) -> (\d+)/.exec(s)))return {kind:'choice',at,raw:+m[1],shown:+m[2]};
  if((m=/^choice aux .*? added=(\[.*?\]) text=/.exec(s))){let added=[];try{added=JSON.parse(m[1]);}catch{}return added.length?{kind:'aux',at,texts:added.map(String)}:null;}
@@ -45,7 +52,7 @@ function parseReader(msg){let v=msg;if(typeof v==='string'){try{v=JSON.parse(v);
  return null;}
 
 const median=a=>{if(!a.length)return 0;const s=a.slice().sort((x,y)=>x-y),i=s.length>>1;return s.length%2?s[i]:(s[i-1]+s[i])/2;};
-function emptyWindow(n){return {n,lines:0,drops:0,checked:new Map(),drawn:[],repeats:0,choices:[],positions:[],glyphs:[],pair:null,patch:0,effects:0,firstAt:NaN,lastAt:NaN};}
+function emptyWindow(n){return {n,lines:0,drops:0,redrawn:0,checked:new Map(),drawn:[],repeats:0,choices:[],positions:[],glyphs:[],pair:null,patch:0,effects:0,firstAt:NaN,lastAt:NaN};}
 
 class SelfCheck{
  /* thresholds: DEFAULTS overridden by profile.selfCheck; onWindow(result) after each closed window; record: keep the per-line
@@ -59,6 +66,7 @@ class SelfCheck{
   switch(e.kind){
    case 'line':w.lines++;break;
    case 'drop':w.drops++;break;
+   case 'redrawn':w.redrawn++;break;
    case 'hide':{const was=w.checked.get(e.seq);w.checked.set(e.seq,was===true||e.visible);break;}
    case 'choice':w.choices.push({raw:e.raw,shown:e.shown});break;
    case 'aux':for(const t of e.texts)if(effectFrame(t))w.effects++;break;
@@ -89,7 +97,7 @@ class SelfCheck{
   if(v.positionPx!=null&&v.positionPx>posLimit)over.push('positionPx');
   if(v.pairRate!=null&&v.pairRate<t.pairRate)over.push('pairRate');
   for(const k of ['hideVisible','dropRate','repeatRate','pairRate'])if(v[k]!=null)v[k]=Math.round(v[k]*1000)/1000;
-  return {window:w.n,lines:w.lines,drops:w.drops,checked:checked.length,drawn:w.drawn.length,choices:w.choices.length,effects:w.effects,positionLimit:posLimit,metrics:v,over,pass:over.length===0};}
+  return {window:w.n,lines:w.lines,drops:w.drops,redrawn:w.redrawn,checked:checked.length,drawn:w.drawn.length,choices:w.choices.length,effects:w.effects,positionLimit:posLimit,metrics:v,over,pass:over.length===0};}
  /* closes the current window (also at game end with >= minLines lines): the result goes to onWindow */
  close(final=false){const w=this.w;if(final&&w.lines<this.t.minLines)return null;const r=this.score(w);r.final=!!final;this.windows.push(r);this.w=emptyWindow(w.n+1);
   if(!r.pass&&!this.tripped)this.tripped={window:r.window,over:r.over,metrics:r.metrics,reason:reasonText(r.over)};
@@ -99,7 +107,7 @@ class SelfCheck{
 }
 function reasonText(over){return (over||[]).map(k=>REASONS[k]||k).join('；');}
 /* the one trace line per window (hook-events.log) */
-function traceLine(r){const m=r.metrics,f=v=>v==null?'-':v;return 'selfCheck window='+r.window+' lines='+r.lines+' hide='+f(m.hideVisible)+' drop='+f(m.dropRate)+' repeat='+f(m.repeatRate)+' choice='+m.choiceMismatch+' pos='+f(m.positionPx)+' pair='+f(m.pairRate)+(r.pass?' pass':' over='+r.over.join(','));}
+function traceLine(r){const m=r.metrics,f=v=>v==null?'-':v;return 'selfCheck window='+r.window+' lines='+r.lines+' hide='+f(m.hideVisible)+' drop='+f(m.dropRate)+' repeat='+f(m.repeatRate)+' choice='+m.choiceMismatch+' pos='+f(m.positionPx)+' pair='+f(m.pairRate)+(r.redrawn?' redrawn='+r.redrawn:'')+(r.pass?' pass':' over='+r.over.join(','));}
 /* replay of log text (hook-events.log + reader-host.log, any order): events merged by time, between from and to (ISO, optional) */
 function replay(hookEvents,readerHost,{from='',to='',thresholds}={}){const ev=[];
  for(const l of String(hookEvents||'').split(/\r?\n/)){const at=l.slice(0,24);if(!TS.test(l)||(from&&at<from)||(to&&at>=to))continue;const e=parseTrace(l);if(e)ev.push(e);}

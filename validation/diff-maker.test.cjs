@@ -58,7 +58,7 @@ for(const [name,key,mode] of SAMPLES){
   const draft='diff-'+m.probe.exe.hash.slice(0,12)+'.json',diff=JSON.parse(fs.readFileSync(path.join(FIX,m.key,draft),'utf8'));
   assert.deepEqual(JSON.parse(JSON.stringify(m.diff)),diff,draft+' is stale: node tools/diff-maker/index.cjs '+path.relative(root,path.join(PROBES,name))+' --write-repo');
   const rep=JSON.parse(fs.readFileSync(path.join(FIX,m.key,m.name+'.replay.json'),'utf8'));assert.deepEqual(JSON.parse(JSON.stringify(m.replay)),rep,m.name+'.replay.json is stale');
-  assert.equal(require('../core/game-diff.cjs').validate({...diff,key:diff.key||'x-'+'0'.repeat(64)}).ok,true,'the draft is a valid megulit.game-diff');assert.equal(diff.key,m.probe.exe.sha256?'x-'+m.probe.exe.sha256:'');
+  assert.equal(require('../core/game-diff.cjs').validate({...diff,key:diff.key||'0'.repeat(64)}).ok,true,'the draft is a valid megulit.game-diff');assert.equal(diff.key,m.probe.exe.sha256||'');
   for(const r of m.result.roles)if(r.id.src!=='kernel')assert.ok(m.replay.expect.roles[r.label]!==undefined);
  });
 }

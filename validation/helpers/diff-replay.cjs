@@ -13,7 +13,7 @@ const Search=require('../../tools/diff-maker/search.cjs');
 module.exports=async(ctx,file)=>{const {assert}=ctx;const root=ctx.root||path.join(__dirname,'..','..');
  const rep=JSON.parse(fs.readFileSync(path.join(ctx.fixture,file),'utf8'));
  const diff=JSON.parse(fs.readFileSync(path.join(root,rep.diff),'utf8'));
- assert.equal(diff.schema,'megulit.game-diff',file+': the draft is a megulit.game-diff (core/game-diff.cjs)');assert.match(String(diff.key),/^(x-[0-9a-f]{64})?$/,file+': key is x- + the full exe SHA-256');
+ assert.equal(diff.schema,'megulit.game-diff',file+': the draft is a megulit.game-diff (core/game-diff.cjs)');assert.match(String(diff.key),/^([0-9a-f]{64})?$/,file+': key is the full exe SHA-256');
  assert.deepEqual(require('../../core/profiles/domains.cjs').clean(diff.settings).rejected,[],file+': diff keys and values must be in core/profiles/domains.cjs');
  const profile=Profiles.apply(Profiles.profileFor({engine:rep.engine}),diff.settings,'diff');
  const t=Search.thresholdsOf(profile);
