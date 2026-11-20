@@ -112,7 +112,7 @@ export function bindReception(target,{api,id,locale,esc,value}){
   root.querySelectorAll('[data-review-platform]').forEach(button=>button.onclick=()=>{const key=button.dataset.reviewPlatform,p=(state.summary||fromEnrichment(value)||[]).find(x=>x.key===key);
    if(!p?.available&&!p?.pending)return;if(state.open===key){state.open='';state.data=null;render();return;}state.open=key;state.data=null;state.page=1;load(1);
    });
-  root.querySelectorAll('[data-rv-page]').forEach(button=>button.onclick=()=>load(Number(button.dataset.reviewPage)));
+  root.querySelectorAll('[data-rv-page]').forEach(button=>button.onclick=()=>load(Number(button.dataset.rvPage)));
   const jump=root.querySelector('[data-review-jump]'),go=()=>{const n=Math.round(Number(jump.value));if(n>=1&&n<=(state.data?.pages||1))load(n);else jump.value=state.page;
    };
   root.querySelector('[data-review-go]')?.addEventListener('click',go);jump?.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();go();
