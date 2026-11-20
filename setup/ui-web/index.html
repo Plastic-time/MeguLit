@@ -203,10 +203,10 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 <script>/* Scripts load after the first paint, in their order (async=false), so the window shows the poster at once instead of waiting
    for the scene code (cold renderer: ~2 s). three.js + the live 3D scene only for the offline renderer (?prerender=1, tools/setup-scene/). */
 (function(){var q=new URLSearchParams(location.search),pre=q.get("prerender")==="1",h=q.get("host"),de=document.documentElement;
-if(pre)de.classList.add("prerender","native");if(h==="1"||h==="2"){if(h==="1")window.__waitConfirm=true;de.classList.add((q.get("native")==="1"||h==="2")?"native":"deskmode")}
-var list=["logos/logos.js"];if(pre)list.push("../../tools/setup-scene/three.js");list.push("vendor/gsap.min.js","scene.js");if(pre)list.push("../../tools/setup-scene/glass.js");list.push("player.js");
+if(pre)de.classList.add("prerender");if(h==="1"||h==="2"){if(h==="1")window.__waitConfirm=true;de.classList.add((q.get("native")==="1"||h==="2")?"native":"deskmode")}
+var list=["logos/logos.js"];if(pre)list.push("../../tools/setup-scene/three.js");list.push("vendor/gsap.min.js","scene.js");if(pre)list.push("../../tools/setup-scene/glass.js");if(!pre)list.push("player.js");
 var f=(h==="1"||h==="2")?"host.js":q.get("demo")==="1"?"demo.js":null;if(f)list.push(f);
 function go(){list.forEach(function(src){var s=document.createElement("script");s.src=src;s.async=false;document.body.appendChild(s)})}
-if(pre)go();else requestAnimationFrame(function(){setTimeout(go,0)})})()</script>
+if(pre){list.forEach(function(src){document.write("<script src=\""+src+"\"><\/script>")})}else requestAnimationFrame(function(){setTimeout(go,0)})})()</script>
 </body>
 </html>

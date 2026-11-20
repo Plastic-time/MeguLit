@@ -27,11 +27,11 @@ function segments(D) {
   const T0 = D.t0, P = 0.5, blank = { blank: true, poseP: P }, field = { blank: true, poseP: P };
   const lit = (phase, extra) => Object.assign({ state: 'done', phase }, extra || {});
   return [
-    { id: 'intro', kind: 'transition', train: true, n: 72, next: 'welcome', glass: true, t0: 0, t1: T0 - 0.001, opt: blank },
+    { id: 'intro', kind: 'transition', n: 72, next: 'welcome', glass: true, t0: 0, t1: T0 - 0.001, opt: blank },
     { id: 'welcome', kind: 'loop', n: 120, glass: true, tHold: T0 - 0.001, opt: blank },
-    { id: 'to-loc', kind: 'transition', train: true, n: 72, next: 'loc', glass: true, t0: T0, t1: T0 + MV.skim, opt: blank },
+    { id: 'to-loc', kind: 'transition', n: 72, next: 'loc', glass: true, t0: T0, t1: T0 + MV.skim, opt: blank },
     { id: 'loc', kind: 'loop', n: 120, glass: true, tHold: T0 + MV.skim + 0.1, opt: blank },
-    { id: 'to-field', kind: 'transition', train: true, n: 102, next: 'field', glass: true, t0: LAYOUT.under, t1: LAYOUT.under + MV.under, opt: field },
+    { id: 'to-field', kind: 'transition', n: 102, next: 'field', glass: true, t0: LAYOUT.under, t1: LAYOUT.under + MV.under, opt: field },
     { id: 'field', kind: 'loop', n: 180, glass: true, tHold: LAYOUT.under + MV.under + 0.1, opt: field },
     { id: 'to-unpack', kind: 'transition', n: 66, next: 'unpack', glass: false, t0: LAYOUT.dive, t1: LAYOUT.dive + MV.dive, opt: lit('unpack', { poseP: P }) },
     { id: 'unpack', kind: 'loop', n: 90, glass: false, tHold: LAYOUT.dive + MV.dive + 0.1, opt: lit('unpack') },
@@ -55,31 +55,39 @@ async function renderTheme(theme) {
   const cdp = (method, params = {}) => new Promise((res) => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
   const ev = async (expr) => { const r = await cdp('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }); return r.result && r.result.result && r.result.result.value; };
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1000, height: 640, deviceScaleFactor: DPR, mobile: false }); await cdp('Page.enable'); await cdp('Runtime.enable');
-  await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `window.__layout=${JSON.stringify(LAYOUT)};window.__still=false;window.__glassSlow=0.4;` });
+  await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `window.__layout=${JSON.stringify(LAYOUT)};window.__still=false;window.__glassSlow=0.2;` });
   await cdp('Page.navigate', { url: `${PAGE}?theme=${theme === 'dark' ? 'night' : 'edge'}&demo=1&paused=1&prerender=1${DRAFT ? '' : '&aa=1'}` }); await sleep(6000); await ev('document.fonts.ready.then(()=>1)');
   const D = await ev('({t0:Demo.T0,u0:Demo.U0,done:Demo.DONE,dur:Demo.DURATION,gl:!!(window.GL&&GL.ok),dpr:devicePixelRatio})'); if (!D.gl) throw new Error('no WebGL in the render browser');
   const info = await ev('(function(){Demo.seek(4.85,{blank:true});return GL.plateInfo()})()'); log('plates', info.plates.length, 'cores', info.cores);
-  const manifest = { version: 1, theme, width: 1280, height: 820, fps: FPS, draft: DRAFT, loopCrossfadeFrames: M, segments: [], plates: { cores: info.cores, info: info.plates }, boundaries: [], bytes: 0 };
-  const t00 = Date.now(); let G = 1000, prev = null; const ends = {};   /* G = motion clock of the next transition's first frame */
-  const shot = async (sg, tState, motionT, still, loop, trainOff, optOver) => {
+  const manifest = { version: 1, theme, width: 1280, height: 820, fps: FPS, draft: DRAFT, loopCrossfadeFrames: M, segments: [], plates: { cores: info.cores, info: info.plates }, boundaries: [], motion: {}, bytes: 0 };
+  const t00 = Date.now(); let G = 1000, prev = null; const ends = {}, motion = manifest.motion;   /* G = motion clock of the next transition's first frame */
+  const seek = async (sg, tState, motionT, still, loop, trainOff, optOver) => {
     await ev(`window.__still=${still};window.__motionT=${motionT};window.__trainOff=${trainOff === undefined ? 20000 : trainOff};${loop ? `window.__loopPhi=${loop.phi};window.__loopBase=${loop.base}` : 'delete window.__loopPhi'};Demo.seek(${tState},${JSON.stringify(optOver || sg.opt)});new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
-    const r = await cdp('Page.captureScreenshot', { format: 'jpeg', quality: 92 }); return Buffer.from(r.result.data, 'base64');
   };
+  const shot = async (...args) => { await seek(...args); const r = await cdp('Page.captureScreenshot', { format: 'jpeg', quality: 92 }); return Buffer.from(r.result.data, 'base64'); };
+  /* mean on-screen speed of the glass plates (video px per frame) of a loop with excursion scale A, measured on ~30 sampled frames without encoding anything */
+  const glassSpeed = async (sg, Te, A) => { await ev(`window.__loopA=${A}`); const n = sg.n, step = Math.max(1, Math.floor(n / 30)), pts = []; for (let i = 0; i < n; i += step) { await seek(sg, sg.tHold, Te, true, { phi: 2 * Math.PI * i / n, base: Te }); const o = await ev('GL.outlines(1000,640)'); pts.push((o || []).map((p) => { if (!p) return null; let x = 0, y = 0; for (let q = 0; q < p.length; q += 2) { x += p[q]; y += p[q + 1]; } return [x / (p.length / 2) * 1.28, y / (p.length / 2) * 1.28]; })); } const sp = []; for (let k = 1; k < pts.length; k++) for (let j = 0; j < pts[k].length; j++) if (pts[k][j] && pts[k - 1][j]) sp.push(Math.hypot(pts[k][j][0] - pts[k - 1][j][0], pts[k][j][1] - pts[k - 1][j][1]) / step); return sp.length ? sp.reduce((x, y) => x + y, 0) / sp.length : 0; };
   for (const sg of segments(D)) {
     while (freeGB(TMP) < 3 || freeGB(OUT) < 3) { log('PAUSED: a drive has less than 3 GB free'); await sleep(30000); }
-    if (SEGSEL !== 'all' && !SEGSEL.split(',').includes(sg.id)) { /* keep the clock consistent even when a segment is skipped */ }
-    const n = sg.n, file = path.join(dir, sg.id + '.mp4'), polys = [], ts = Date.now(); let first, last, second;
-    const glassOf = async () => { if (!sg.glass) return; const o = await ev('GL.outlines(1000,640)'); polys.push((o || []).map((p) => p ? p.map((v) => Math.round(v * (1280 / 1000) * 4)) : null)); };
+    if (SEGSEL !== 'all' && !SEGSEL.split(',').includes(sg.id)) { if (sg.kind === 'transition') G += sg.n / FPS; continue; }   /* a skipped segment still advances the motion clock like a rendered one */
+    const n = sg.n, file = path.join(dir, sg.id + '.mp4'), polys = [], ts = Date.now(); let first, last, second; const cams = [];
+    const cent = []; const glassOf = async () => { if (!sg.glass) return; const o = await ev('GL.outlines(1000,640)'); polys.push((o || []).map((p) => p ? p.map((v) => Math.round(v * (1280 / 1000) * 4)) : null)); };
     if (sg.kind === 'transition') {
       const ff = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', '-vf', scaleF].concat(encArgs(file)), { stdio: ['pipe', 'ignore', 'inherit'] }); const done = new Promise((r) => ff.on('close', r));
-      for (let i = 0; i < n; i++) { const buf = await shot(sg, sg.t0 + (sg.t1 - sg.t0) * i / (n - 1), G + i / FPS, false, null, sg.train ? -6500 + 9000 * i / (n - 1) : undefined); if (i === 0) first = buf; if (i === 1) second = buf; if (i === n - 1) last = buf; if (i === 0) fs.writeFileSync(path.join(dir, sg.id + '.jpg'), buf); if (!ff.stdin.write(buf)) await new Promise((res) => ff.stdin.once('drain', res)); await glassOf(); }
-      ff.stdin.end(); await done; var tEnd = G + (n - 1) / FPS; ends[sg.id] = { first, last, second }; G = tEnd + 1 / FPS;   // the next frame in time
+      for (let i = 0; i < n; i++) { const buf = await shot(sg, sg.t0 + (sg.t1 - sg.t0) * i / (n - 1), G + i / FPS, true, null, sg.train ? -6500 + 9000 * i / (n - 1) : undefined); { const q = await ev('(function(){var c=GL.camera;return [c.position.x,c.position.y,c.position.z,c.quaternion.x,c.quaternion.y,c.quaternion.z,c.quaternion.w]})()'); cams.push(q); }
+      if (i === 0) first = buf; if (i === 1) second = buf; if (i === n - 1) last = buf; if (i === 0) fs.writeFileSync(path.join(dir, sg.id + '.jpg'), buf); if (!ff.stdin.write(buf)) await new Promise((res) => ff.stdin.once('drain', res)); await glassOf(); }
+      ff.stdin.end(); await done; var tEnd = G + (n - 1) / FPS; const lin = [], ang = []; for (let k = 1; k < cams.length; k++) { const a = cams[k - 1], b = cams[k]; lin.push(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])); const dot = Math.abs(a[3] * b[3] + a[4] * b[4] + a[5] * b[5] + a[6] * b[6]); ang.push(2 * Math.acos(Math.min(1, dot))); }
+      const stat = (v) => { const avg = v.reduce((x, y) => x + y, 0) / v.length, pk = Math.max(...v); return { avg: +avg.toFixed(4), peak: +pk.toFixed(4), ratio: avg > 1e-9 ? +(pk / avg).toFixed(2) : null }; }; motion[sg.id] = { linear: stat(lin), angular: stat(ang) }; log(`motion ${sg.id}: peak/avg linear ${motion[sg.id].linear.ratio}, angular ${motion[sg.id].angular.ratio}`);
+      ends[sg.id] = { first, last, second }; G = tEnd + 1 / FPS;   // the next frame in time
     } else {
       /* loop: n frames of the still camera; the floating glass runs one full periodic cycle that starts from the motion clock value the previous transition ended on, so the loop point is seamless
          without any dissolve and the first frame continues the previous transition */
-      const Te = G - 1 / FPS, ff = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', '-vf', scaleF].concat(encArgs(file)), { stdio: ['pipe', 'ignore', 'inherit'] }); const done = new Promise((r) => ff.on('close', r));
-      for (let i = 0; i < n; i++) { const buf = await shot(sg, sg.tHold, Te, true, { phi: 2 * Math.PI * i / n, base: Te }); if (i === 0) { first = buf; fs.writeFileSync(path.join(dir, sg.id + '.jpg'), buf); } last = buf; if (!ff.stdin.write(buf)) await new Promise((res) => ff.stdin.once('drain', res)); await glassOf(); }
+      const Te = G - 1 / FPS; let A = 0.016 * n / FPS; for (let pass = 0; pass < 2; pass++) { const m = await glassSpeed(sg, Te, A); if (m > 1e-6) A = Math.max(0.005, Math.min(1, A * 0.038 / m)); }   /* every loop gets the same slow on-screen glass speed (0.038 px/frame, what the welcome view has) */
+      log(`loop ${sg.id}: glass excursion scale ${A.toFixed(4)}`); await ev(`window.__loopA=${A}`);
+      const ff = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', '-vf', scaleF].concat(encArgs(file)), { stdio: ['pipe', 'ignore', 'inherit'] }); const done = new Promise((r) => ff.on('close', r));
+      for (let i = 0; i < n; i++) { const buf = await shot(sg, sg.tHold, Te, true, { phi: 2 * Math.PI * i / n, base: Te }); { const o = await ev('GL.outlines(1000,640)'); cent.push((o || []).map((p) => { if (!p) return null; let x = 0, y = 0; for (let q = 0; q < p.length; q += 2) { x += p[q]; y += p[q + 1]; } return [x / (p.length / 2) * 1.28, y / (p.length / 2) * 1.28]; })); } if (i === 0) { first = buf; fs.writeFileSync(path.join(dir, sg.id + '.jpg'), buf); } last = buf; if (!ff.stdin.write(buf)) await new Promise((res) => ff.stdin.once('drain', res)); await glassOf(); }
       ff.stdin.end(); await done; ends[sg.id] = { first, last };
+      { const sp = []; for (let k = 1; k < cent.length; k++) for (let j = 0; j < cent[k].length; j++) if (cent[k][j] && cent[k - 1][j]) sp.push(Math.hypot(cent[k][j][0] - cent[k - 1][j][0], cent[k][j][1] - cent[k - 1][j][1])); const mean = sp.length ? sp.reduce((x, y) => x + y, 0) / sp.length : 0; manifest.glassSpeed = manifest.glassSpeed || {}; manifest.glassSpeed[sg.id] = { meanPxPerFrame: +mean.toFixed(4), peakPxPerFrame: +(sp.length ? Math.max(...sp) : 0).toFixed(3) }; log(`glass speed ${sg.id}: mean ${mean.toFixed(4)} px/frame, peak ${(sp.length ? Math.max(...sp) : 0).toFixed(3)}`); }
       if (sg.id === 'field') {
         /* what the player's overlay has to look like at 100%: the same frame with the glass lit by the scene's own style (reference stills for the overlay) + a preview-only field clip with fake progress */
         const lit = await shot(sg, sg.tHold, Te, true, { phi: 2 * Math.PI * (n - 1) / n, base: Te }, undefined, { state: 'done', phase: 'unpack', poseP: 0.5 }); ends[sg.id].lastLit = lit;
