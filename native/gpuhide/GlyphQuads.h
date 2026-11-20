@@ -62,6 +62,13 @@ struct GlyphLearner {
  // a glyph sheet made for one line is sized to that line (e.g. 76 x 88), unlike UI / font atlases (powers of two)
  static bool LineSized(unsigned w, unsigned h) { auto p2 = [](unsigned v) { return v && !(v & (v - 1)); }; return !(p2(w) && p2(h)) && w * h <= 1024u * 256u; }
  bool Armed(unsigned now) const { return n > 0 && (int)(armedUntil - now) > 0; }
+ /* 2026-11-21 (owner, CHAOS;CHILD centred narration: near the end of a page the previous line showed again under MeguLit's):
+    the game draws the whole page once more (earlier lines + the current one) from a texture the learner has not seen, so
+    neither the learned atlas nor the fresh-sheet rule hid it. A line that is the page so far (it ends with the line before
+    and is longer) is a redraw: for RedrawMs glyph-height quads in the learned area of a target of the learned size are
+    hidden whatever their texture. */
+ static const unsigned RedrawMs = 3000; unsigned redrawUntil = 0;
+ static bool PageRedraw(const std::wstring &now, const std::wstring &before) { return before.size() >= 2 && now.size() > before.size() && now.compare(now.size() - before.size(), before.size(), before) == 0; }
 
  /* Some hooks hand a sentence over twice in one go (the engine lays it out for the page and again for its log): "X    X".
     The line is X: counted twice, a line had room for twice its characters and took the next sentences' places, so the
@@ -82,6 +89,7 @@ struct GlyphLearner {
   const std::wstring t = Undouble(body);
   std::wstring s; for (wchar_t c : t) if (!Blank(c)) s += c; if (s.empty()) return;
   if (s == text && Armed(now)) { armedUntil = now + 60000; return; } // the same line again (re-read): keep its state
+  redrawUntil = learned && PageRedraw(s, text) ? now + RedrawMs : 0;
   { size_t a = 0, b = t.size(); while (a < b && Blank(t[a])) a++; while (b > a && Blank(t[b - 1])) b--; blankAt.clear(); nb = 0;
     for (size_t i = a; i < b; i++) { if (t[i] == L'\n' || t[i] == L'\r' || t[i] == 0x1F) continue; bool bl = Blank(t[i]); blankAt.push_back(bl); if (bl) nb++; } }
   prevLineAt = lineAt; text = s; n = (unsigned)s.size(); seq++; lineAt = now; armedUntil = now + 60000; reported = hitSent = hiddenSent = false; hiddenQuads = 0;
@@ -281,9 +289,10 @@ struct GlyphLearner {
    bool sameAtlas = rtW == areaW && rtH == areaH && atlases.count(AtlasKey(NULL, tex)), sheet = freshTex && LineSized(tw, th) && rtW == areaW && rtH == areaH && std::fabs((x.y1 - x.y0) - glyphH) <= glyphH * 0.25f;
    // glyph height only: a wait cursor or icon drawn from the same sheet inside the area stays
    bool glyphSize = std::fabs((x.y1 - x.y0) - glyphH) <= glyphH * 0.2f;
-   if (learned && armed && !readOnly && glyphSize && (sameAtlas || sheet)) {
+   bool redraw = (int)(redrawUntil - now) > 0 && rtW == areaW && rtH == areaH;
+   if (learned && armed && !readOnly && glyphSize && (sameAtlas || sheet || redraw)) {
     float cx = (x.x0 + x.x1) / 2, cy = (x.y0 + x.y1) / 2;
-    if (cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1) { drop.push_back((int)i); hiddenQuads++; if (log && hiddenQuads < 60) log("drop %s tex=%p %ux%u [%.0f,%.0f %.0fx%.0f uv %.3f,%.3f %.3fx%.3f]", sameAtlas ? "atlas" : "sheet", tex, tw, th, x.x0, x.y0, x.x1 - x.x0, x.y1 - x.y0, x.u0, x.v0, x.u1 - x.u0, x.v1 - x.v0); }
+    if (cx >= area.x0 && cx <= area.x1 && cy >= area.y0 && cy <= area.y1) { drop.push_back((int)i); hiddenQuads++; if (log && hiddenQuads < 60) log("drop %s tex=%p %ux%u [%.0f,%.0f %.0fx%.0f uv %.3f,%.3f %.3fx%.3f]", sameAtlas ? "atlas" : sheet ? "sheet" : "redraw", tex, tw, th, x.x0, x.y0, x.x1 - x.x0, x.y1 - x.y0, x.u0, x.v0, x.u1 - x.u0, x.v1 - x.v0); }
    }
   }
   if (!drop.empty() && !hitSent) { hitSent = true; char b[128]; snprintf(b, sizeof b, "ToMe_GPUHIDE hit seq=%u quads=%u chars=%u", seq, (unsigned)drop.size(), n); if (emit) emit(b); }

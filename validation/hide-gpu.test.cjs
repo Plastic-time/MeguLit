@@ -13,7 +13,8 @@ test('learner is API-independent, generic and hides only after learning, inside 
  assert.match(g,/armedUntil = now \+ 60000/,'a line stays armed 60 s after the last push');
  assert.match(g,/sameAtlas = rtW == areaW && rtH == areaH && atlases\.count\(AtlasKey\(NULL, tex\)\)/,'learned atlas (by texture) on every target of the learned size (pages drawn twice into a shadow buffer)');
  assert.match(g,/sheet = freshTex && LineSized\(tw, th\)/,'line-sized glyph sheets: only textures first drawn with this line');
- assert.match(g,/if \(learned && armed && !readOnly && glyphSize && \(sameAtlas \|\| sheet\)\)/,'hides only after learning, while armed; learned atlas at glyph height, or the current line\'s own fresh sheet');
+ assert.match(g,/if \(learned && armed && !readOnly && glyphSize && \(sameAtlas \|\| sheet \|\| redraw\)\)/,'hides only after learning, while armed; learned atlas at glyph height, the current line\'s own fresh sheet, or a page the game draws again');
+ assert.match(g,/bool redraw = \(int\)\(redrawUntil - now\) > 0 && rtW == areaW && rtH == areaH;/,'a page redraw only on a target of the learned size, for RedrawMs');
  assert.match(g,/if \(cx >= area\.x0 && cx <= area\.x1 && cy >= area\.y0 && cy <= area\.y1\) \{ drop\.push_back/,'hidden only inside the text area (page sheets go through PageQuad)');
  assert.match(g,/on >= 1 && on \* 10 >= in \* 6/,'an atlas is learned only when its quads line up with the glyphs (never a UI sheet under the text)');
  assert.match(g,/if \(a\.size\(\) == n\) return &a; if \(b\.size\(\) == n\) return &b;/,'learns only when the glyph count equals the characters');
