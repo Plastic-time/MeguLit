@@ -171,9 +171,9 @@ export async function renderSettings({main,api,invoke,text,locale,esc,toast,head
   'panels'].includes(section)){const ui=await api('ui_state');for(const[key,value]of Object.entries(ui))localStorage.setItem(key,value);}delete main.__settingsData;
   await onSaved({...result,scope:section});}});
  content.querySelector('#save-translation-key')?.addEventListener('click',async event=>{
-  const element=content.querySelector('#translation-key');if(!element.value)return toast(labels.keyRequired);event.currentTarget.disabled=true;
+  const element=content.querySelector('#translation-key');if(!element.value)return toast(labels.keyRequired);const button=event.currentTarget;button.disabled=true;
   try{await api('save_key',{provider:form.elements.namedItem('provider').value,baseUrl:form.elements.namedItem('baseUrl').value,apiKey:element.value});element.value='';
-   element.placeholder='••••••••';toast(labels.keySaved);}catch(error){toast(text.serviceFailed);}finally{event.currentTarget.disabled=false;}
+   element.placeholder='••••••••';toast(labels.keySaved);}catch(error){toast(text.serviceFailed);}finally{button.disabled=false;}
  });
 }
 

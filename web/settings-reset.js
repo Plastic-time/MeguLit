@@ -24,9 +24,9 @@ export function mountSettingsReset({target,api,locale,esc,toast,onSaved}){
   document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
   const cancel=dialog.querySelector('[data-cancel]');cancel.focus();cancel.onclick=()=>dialog.close();
   dialog.querySelector('[data-confirm]').onclick=async event=>{
-   event.currentTarget.disabled=true;
+   const button=event.currentTarget;button.disabled=true;
    try{const result=await api('settings_reset');dialog.close();await refresh();showUndo({id:result.id});}
-   catch{event.currentTarget.disabled=false;toast(t.failed);}
+   catch{button.disabled=false;toast(t.failed);}
   };
  };
  function showUndo({id}){
