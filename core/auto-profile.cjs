@@ -23,11 +23,24 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {SelfCheck,DEFAULTS,reasonText,effectFrame}=require('./self-check.cjs');
 const SCHEMA=1;
+/* only keys and values core/profiles/domains.cjs allows: a stored or uploaded diff is data the kernel already understands */
+const cleanSettings=s=>require('./profiles/domains.cjs').clean(s).value;
 
 function dir(root){return path.join(root,'data','config','auto-profiles');}
-/* the profile key: the game diff's key when core/profiles knows the game, else a hash of the program name (same for every copy
-   path of one exe, never a path, so it can be uploaded) */
-/* gameKey may be a games/<key>.cjs key or the profile's 'auto-<hash>' */function keyFor({gameKey,exe}={}){if(gameKey&&/^[a-z0-9][a-z0-9-]{1,62}$/.test(gameKey))return gameKey;const name=path.win32.basename(String(exe||'')).toLowerCase();return name?'exe-'+crypto.createHash('sha1').update(name).digest('hex').slice(0,12):'';}
+/* 2026-11-21 (owner: 「key 用 exe 文件哈希（同名不同版本各自一份）」) the key of a game diff is the SHA-256 of the game's program file:
+   'x-' + its first 40 hex digits. Two versions of one game (a patch, a Steam update, a Chinese exe) are two diffs; a renamed copy
+   of the same file is the same one. Never a path or a title, so it can be uploaded. */
+const KEY=/^x-[0-9a-f]{40}$/;
+const keyFor=({hash}={})=>/^[0-9a-f]{64}$/.test(String(hash||''))?'x-'+hash.slice(0,40):'';
+/* the hash of a program file, remembered by path + size + mtime (data/config/exe-hashes.json), so a game start needs no read */
+const hashFile=root=>path.join(root,'data','config','exe-hashes.json');
+function statKey(executable){try{const s=fs.statSync(executable);return s.isFile()?path.resolve(executable).toLowerCase()+'|'+s.size+'|'+Math.floor(s.mtimeMs):'';}catch{return '';}}
+function readHashes(root){try{const v=JSON.parse(fs.readFileSync(hashFile(root),'utf8'));return v&&typeof v==='object'?v:{};}catch{return {};}}
+function exeKeySync(root,executable){const k=statKey(executable);const h=k&&readHashes(root)[k];return h?keyFor({hash:h}):'';}
+async function exeKey(root,executable){const known=exeKeySync(root,executable);if(known)return known;const k=statKey(executable);if(!k)return '';
+ const hash=await new Promise((resolve)=>{const h=crypto.createHash('sha256');fs.createReadStream(executable).on('data',d=>h.update(d)).on('error',()=>resolve('')).on('end',()=>resolve(h.digest('hex')));});if(!hash)return '';
+ try{const all=readHashes(root);all[k]=hash;const keys=Object.keys(all);for(const old of keys.slice(0,Math.max(0,keys.length-500)))delete all[old];fs.mkdirSync(path.dirname(hashFile(root)),{recursive:true});const tmp=hashFile(root)+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(all));fs.renameSync(tmp,hashFile(root));}catch{}
+ return keyFor({hash});}
 function load(root,key){if(!key)return null;try{const v=JSON.parse(fs.readFileSync(path.join(dir(root),key+'.json'),'utf8').replace(/^﻿/,''));return v&&v.schema===SCHEMA?v:null;}catch{return null;}}
 function store(root,key,value){if(!key)return;const d=dir(root);fs.mkdirSync(d,{recursive:true});const f=path.join(d,key+'.json');fs.writeFileSync(f+'.tmp',JSON.stringify(value,null,2));fs.renameSync(f+'.tmp',f);}
 function clear(root,key){if(!key)return false;try{fs.unlinkSync(path.join(dir(root),key+'.json'));return true;}catch{return false;}}
@@ -71,13 +84,13 @@ const changes=p=>(p.effectFrames!==null)+(p.filters!=='kernel');
 
 /* the stored record (also the upload payload, see docs/auto-profile.md) */
 function record({key,engine='',exe='',version='',source='calibration',result,gate=null}){return {schema:SCHEMA,key,engine:String(engine||''),exe:path.win32.basename(String(exe||'')).toLowerCase(),
- version:String(version||''),at:new Date().toISOString(),source,mode:result.mode,reason:result.reason||'',settings:result.settings,score:result.score,candidates:result.candidates||[],gate};}
+ version:String(version||''),at:new Date().toISOString(),source,mode:result.mode,reason:result.reason||'',settings:cleanSettings(result.settings),score:result.score,candidates:result.candidates||[],gate};}
 /* a gate trip on a stored hide profile: the same record, stepped down to read mode, with the window that tripped */
 function stepDown(prev,{key,engine,exe,version,trip,window}){const base=prev||{settings:{}};return {schema:SCHEMA,key,engine:String(engine||base.engine||''),exe:path.win32.basename(String(exe||base.exe||'')).toLowerCase(),version:String(version||''),
- at:new Date().toISOString(),source:'gate',mode:'read',reason:trip.reason,settings:{...base.settings,calibrate:{...(base.settings?.calibrate||{}),hideMethod:'read'},hide:{textEffectsRead:true}},
+ at:new Date().toISOString(),source:'gate',mode:'read',reason:trip.reason,settings:cleanSettings({...base.settings,calibrate:{...(base.settings?.calibrate||{}),hideMethod:'read'},hide:{...(base.settings?.hide||{}),textEffectsRead:true}}),
  score:{metrics:window?.metrics||trip.metrics,over:trip.over,lines:window?.lines||0},candidates:base.candidates||[],gate:{window:trip.window,over:trip.over,metrics:trip.metrics},previous:prev?{mode:prev.mode,source:prev.source,at:prev.at}:null};}
 /* the block the one-click diagnostic adds (info.json autoProfile): only what the server aggregates, no paths */
 function diagnostic(rec,windows=[]){if(!rec&&!windows.length)return null;return {schema:SCHEMA,profile:rec?{key:rec.key,engine:rec.engine,exe:rec.exe,version:rec.version,at:rec.at,source:rec.source,mode:rec.mode,reason:rec.reason,settings:rec.settings,score:rec.score,gate:rec.gate||null,candidates:(rec.candidates||[]).slice(0,4)}:null,
  windows:windows.slice(-10).map(w=>({window:w.window,lines:w.lines,metrics:w.metrics,over:w.over,pass:w.pass}))};}
 function list(root){try{return fs.readdirSync(dir(root)).filter(f=>f.endsWith('.json')).map(f=>load(root,f.slice(0,-5))).filter(Boolean);}catch{return [];}}
-module.exports={SCHEMA,dir,keyFor,load,store,clear,list,candidates,predict,calibrate,record,stepDown,diagnostic};
+module.exports={SCHEMA,KEY,dir,keyFor,exeKey,exeKeySync,load,store,clear,list,candidates,predict,calibrate,record,stepDown,diagnostic};

@@ -71,7 +71,7 @@ async function fullOne(root,db,game,result,s,{fetcher,fullBase,fuller,now=Date.n
  if(['sent','duplicate','nothing'].includes(f.state)||f.nextAt&&f.nextAt>now)return 'skipped';
  const retry=(state,extra={})=>{const attempts=(f.attempts|0)+1;rec.full={...f,identity:ident.id,state,at:now,attempts,nextAt:now+Math.min(RETRY_MAX,RETRY_MIN*2**Math.min(6,attempts-1)),...extra};return state;};
  let file=pf.pending(root,f.hash),bytes=f.bytes|0,hash=f.hash||'';
- if(!file){const c=await fuller(game,result,{out:pf.fullDir(root),identity:ident.id,title:String(game.title||''),vndb:ident.vndb||'',app:appVersion(root)});
+ if(!file){const c=await fuller(game,result,{out:pf.fullDir(root),runtime:(()=>{try{return require('./runtime-sample.cjs').dirFor(root,game.executable);}catch{return '';}})(),identity:ident.id,title:String(game.title||''),vndb:ident.vndb||'',app:appVersion(root)});
   if(c?.empty){rec.full={identity:ident.id,state:'nothing',at:now};return 'nothing';}
   if(!c?.file)return retry('failed',{error:String(c?.error||'COLLECT').slice(0,40)});
   file=c.file;bytes=c.bytes;hash=c.sha256;}

@@ -1,0 +1,4 @@
+{
+ "note": "2026-11-21 public keys of the relay's own signing key for automatic game diffs (relay/src/auto-profile.js, docs/auto-profile.md). The private key is the wrangler secret AUTO_PROFILE_SIGNING_KEY and never goes in this repository. Until a key is listed here the app accepts only official diffs (signed with services/adapter-pack-keys.json). Make one with: node tools/game-diff.cjs keygen. To rotate: add the new key, ship an app with both, switch the secret, later mark the old one \"revoked\": true.",
+ "keys": []
+}

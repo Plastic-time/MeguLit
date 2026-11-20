@@ -40,22 +40,32 @@ assert.strictEqual(cs.settings.page.effectFrames,null,'the least change wins amo
 const strict=replay(he,rh,{from:SENREN[0],to:SENREN[1],thresholds:{window:5,dropRate:-1}});assert.ok(strict.tripped,'a game diff may tighten the thresholds');
 
 /* the record + upload block */
-const rec=ap.record({key:'fata-morgana',engine:'krkr',exe:'D:\\Games\\Fata\\fata_jp.exe',version:'1.4.21',result:cf});
+(async()=>{
+const crypto=require('node:crypto');
+const K='x-'+'ab'.repeat(20);
+const rec=ap.record({key:K,engine:'krkr',exe:'D:\\Games\\Fata\\fata_jp.exe',version:'1.4.21',result:cf});
 assert.strictEqual(rec.exe,'fata_jp.exe','no paths');assert.strictEqual(rec.schema,1);
-const diag=ap.diagnostic(rec,fata.windows);assert.strictEqual(diag.profile.mode,'read');assert.strictEqual(diag.windows.length,fata.windows.length);assert.ok(!JSON.stringify(diag).includes('D:\\\\Games'));
-assert.match(ap.keyFor({exe:'C:\\x\\Fata_JP.exe'}),/^exe-[0-9a-f]{12}$/);assert.strictEqual(ap.keyFor({exe:'C:\\x\\Fata_JP.exe'}),ap.keyFor({exe:'D:\\y\\fata_jp.exe'}));
+const diag=ap.diagnostic(rec,fata.windows);assert.strictEqual(diag.profile.mode,'read');assert.strictEqual(diag.windows.length,fata.windows.length);assert.ok(!JSON.stringify(diag).includes('Games'));
 
 /* the live service: first play calibrates and stores read mode, the reason reaches GalNative, 重新校准 records again */
 const root=fs.mkdtempSync(path.join(process.env.MEGULIT_TMP||os.tmpdir(),'selfcheck-'));
 try{
+ /* the diff key is the exe file's hash: two copies of one file share it, another version does not */
+ const exe=path.join(root,'Fata','fata_jp.exe'),copy=path.join(root,'Copy','renamed.exe'),other=path.join(root,'Fata','fata_jp_v2.exe');
+ for(const [f,b] of [[exe,'MZ-fata-1'],[copy,'MZ-fata-1'],[other,'MZ-fata-2']]){fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,b);}
+ const key=await ap.exeKey(root,exe);assert.strictEqual(key,'x-'+crypto.createHash('sha256').update('MZ-fata-1').digest('hex').slice(0,40));
+ assert.strictEqual(await ap.exeKey(root,copy),key,'a renamed copy is the same diff');assert.notStrictEqual(await ap.exeKey(root,other),key,'another version is its own diff');
+ assert.strictEqual(ap.exeKeySync(root,exe),key,'remembered: no read at the next start');
  const live=require('../services/self-check-live.cjs');const calls=[],logged=[],traced=[];
  const profiles=[];const gal={setGameProfile(p){profiles.push(p);},textEffectsHold:null,textEffects(on,why){calls.push([on,why]);this.textEffectsHold=on?{why}:null;},hooks:{pageMode:{engine:'krkr'},trace:l=>traced.push(l)}};
- const reader={root,gal,gameExe:'D:\\Games\\Fata\\fata_jp.exe',logVisibility:e=>logged.push(e)};
- live.start(reader,reader.gameExe);
+ const reader={root,gal,gameExe:exe,logVisibility:e=>logged.push(e)};
+ live.start(reader,reader.gameExe);assert.strictEqual(live.current().key,key);
  for(const l of he.split('\n'))if(l>=FATA[0]&&l<FATA[1])live.feedTrace(l);
- const key=require('../core/profiles/index.cjs').profileFor({exe:reader.gameExe}).gameKey,stored=ap.load(root,key);assert.strictEqual(key,'fata-morgana','keyed by the game diff');
+ const stored=ap.load(root,key);
  assert.ok(stored,'calibration stored');assert.strictEqual(stored.mode,'read');assert.strictEqual(calls.length,1);assert.strictEqual(calls[0][0],true);assert.ok(calls[0][1].length>0,'Alt+T shows why');
  assert.ok(traced.some(l=>l.startsWith('selfCheck window=1')),'window traced');const top=profiles[profiles.length-1];assert.ok(top.layers.endsWith('+auto'),'the calibration is the profile top layer: '+top.layers);assert.strictEqual(top.hide.textEffectsRead,true);assert.strictEqual(top.calibrate.hideMethod,'read');assert.ok(logged.some(e=>e.kind==='selfCheck'&&e.what==='calibrated'));
+ /* the runtime sample of the first window */
+ const sample=JSON.parse(fs.readFileSync(path.join(root,'data','runtime-samples',key,'sample.json'),'utf8'));assert.strictEqual(sample.schema,'megulit.runtime-sample');assert.ok(sample.lines.length>=20);assert.ok(sample.boxes.length>0);assert.ok(sample.drops.length>0);assert.strictEqual(sample.exe,'fata_jp.exe');
  live.stop();gal.textEffectsHold=null;calls.length=0;
  live.start(reader,reader.gameExe);assert.strictEqual(calls.length,1,'stored read mode applies at the next start');
  gal.textEffectsHold=null;live.recalibrate(reader);assert.strictEqual(ap.load(root,key),null,'重新校准 forgets the stored diff');assert.ok(live.current().check.recording,'and records again');
@@ -67,3 +77,4 @@ try{
  live.stop();
 }finally{fs.rmSync(root,{recursive:true,force:true});}
 console.log('self-check gate: Fata steps down (window 1: '+fata.tripped.over.join(',')+'), calibration -> read; Senren '+senren.windows.length+' window(s) pass, calibration -> hide');
+})().catch(e=>{console.error(e);process.exit(1);});
