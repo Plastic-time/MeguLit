@@ -19,6 +19,7 @@
   const pend = new Map(); let lastState = null, info = null, infoWait = [], nid = 0;
   chrome.webview.addEventListener('message', (e) => { const m = e.data || {};
     if (m.t === 'state') lastState = m.s; else if (m.t === 'info') { info = m.i; infoWait.forEach((f) => f(info)); infoWait = []; }
+    else if (m.t === 'installfail') { try { window.dispatchEvent(new CustomEvent('install-failed')); } catch (e) { /* old engine */ } }
     else if (m.t === 'reply') { const f = pend.get(m.id); if (f) { pend.delete(m.id); f(m.r); } } });
   const nativeFetch = window.fetch.bind(window), resp = (o) => new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } });
   window.fetch = (url, opt) => {

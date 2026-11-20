@@ -14,13 +14,16 @@
   if (native) {
     const dr = document.getElementById('drag'); if (dr) dr.addEventListener('mousedown', (e) => { if (e.button === 0) post('drag'); });
     window.__askClose = () => document.getElementById('btnClose').click();
+    window.addEventListener('install-failed', () => { const b = document.getElementById('install'); if (b) b.classList.remove('busy'); if (Scene.showInstallError) Scene.showInstallError(); });
+    /* edge and corner hot zones (index.html .rz): the host starts the system size loop for the edge pressed */
+    document.querySelectorAll('.rz').forEach((z) => z.addEventListener('mousedown', (e) => { if (e.button === 0) { try { chrome.webview.postMessage({ type: 'resize', edge: z.dataset.e }); } catch (x) { /* no host */ } e.preventDefault(); } }));
   }
   const clock = () => performance.now() / 1000;
   async function check(p) { const c = await api('checkpath', { path: p }); Scene.setFree(c.free || 0, c.need || (info && info.need) || 0, c.state === 'protected' ? 'protected' : c.state === 'readonly' ? 'readonly' : 'ok'); return c; }
   Scene.onAction = async (m) => {
     if (m.type === 'checkpath') { clearTimeout(checkTimer); checkTimer = setTimeout(() => check(m.path), 250); }
     else if (m.type === 'browse') { const r = await api('browse'); if (r.path) { pathEl.value = r.path; check(r.path); } }
-    else if (m.type === 'install') { const c = await api('install', { path: pathEl.value, desktop: m.desktop, menu: m.menu }); if (c.state && c.state !== 'ok') { Scene.setFree(c.free || 0, c.need || 0, c.state === 'protected' ? 'protected' : 'readonly'); return; } installed = true; goTo('field', 'under'); }
+    else if (m.type === 'install') { const c = await api('install', { path: pathEl.value, desktop: m.desktop, menu: m.menu }); const b = document.getElementById('install'); if (c.state && c.state !== 'ok') { if (b) b.classList.remove('busy'); Scene.setFree(c.free || 0, c.need || 0, c.state === 'protected' ? 'protected' : 'readonly'); return; } installed = true; goTo('field', 'under'); }   /* the host answers at once (the heavy copy runs after the reply); a later failure comes as install-failed */
     else if (m.type === 'retry') { api('retry'); }
     else if (m.type === 'copylog') api('copylog'); else if (m.type === 'manual') api('manual'); else if (m.type === 'launch') api('launch'); else if (m.type === 'minimize') { if (!native) api('minimize'); } else if (m.type === 'close') { api('close'); if (!native) setTimeout(() => window.close(), 400); }
   };
