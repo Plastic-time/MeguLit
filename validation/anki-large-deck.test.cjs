@@ -6,7 +6,7 @@ const {Anki}=require('../core/anki.cjs'),{AnkiSync,link}=require('../services/an
 const {openStore}=require('../services/store.cjs');
 
 function deck(count){
- const ids=Array.from({length:count},(_,i)=>i+1),batches=[];
+ const ids=Array.from({length:count},(_,i)=>count-i),batches=[];
  const anki=new Anki(async(_url,options)=>{
   const {action,params}=JSON.parse(options.body);let result;
   if(action==='findNotes')result=ids;
@@ -36,13 +36,14 @@ test('the last note in a 5001-note deck syncs and a failed later batch can be re
   link(db,id,id);
  }
  const {anki,batches}=deck(5001),sync=new AnkiSync({db,config:{},anki});
+ assert.deepEqual((await anki.stats({})).map(note=>note.noteId),Array.from({length:5001},(_,i)=>5001-i));
  const fetcher=anki.fetch;
- anki.fetch=async(url,options)=>JSON.parse(options.body).params.notes?.[0]===5001?Response.json({error:'second batch unavailable'}):fetcher(url,options);
+ anki.fetch=async(url,options)=>JSON.parse(options.body).params.notes?.[0]===1?Response.json({error:'second batch unavailable'}):fetcher(url,options);
  await assert.rejects(sync.run(),/second batch unavailable/);
  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM review_events').get().n,0);
  anki.fetch=fetcher;batches.length=0;
  const first=await sync.run();
  assert.deepEqual(batches,[5000,1]);assert.equal(first.reviews,2);assert.equal(first.status,2);
- assert.equal(db.prepare('SELECT status FROM vocabulary WHERE id=5001').get().status,4);
+ assert.equal(db.prepare('SELECT status FROM vocabulary WHERE id=1').get().status,4);
  assert.equal((await sync.run()).reviews,0);
 });
