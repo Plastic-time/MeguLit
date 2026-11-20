@@ -31,7 +31,8 @@
     '.megulit-anchor-window .tome-page-lines{opacity:.6;position:absolute;left:0;right:0;bottom:100%}',
     '.megulit-anchor-window.megulit-page-fresh .tome-page-lines{display:none!important}',
     '.megulit-anchor-window:not(.megulit-anchor-center) .tome-page-lines{display:none!important}',
-    '.megulit-anchor-window.megulit-game-rows .sentence-text{white-space:nowrap!important}', /* a line on the game's rows breaks where the game broke it, nowhere else */ /* dialogue lines never carry the dimmed page above them (2026-11-20 user: the old lines covered the screen) */
+    '.megulit-anchor-window.megulit-game-rows .sentence-text{white-space:nowrap!important}' +
+    '.megulit-anchor-window.megulit-rows-predicted .sentence-text{white-space:normal!important;max-width:var(--megulit-centre-width)!important;margin-left:auto!important;margin-right:auto!important}', /* a line on the game's rows breaks where the game broke it, nowhere else */ /* dialogue lines never carry the dimmed page above them (2026-11-20 user: the old lines covered the screen) */
     'body.megulit-placed .megulit-place-window .megulit-ruby-base{position:absolute!important;display:block!important;margin:0!important;padding:0!important}',
     'body.megulit-placed .megulit-place-window .char-token{position:absolute!important;display:block!important;margin:0!important;padding:0!important;text-align:center!important;white-space:pre!important;letter-spacing:0!important;text-indent:0!important;pointer-events:auto}',
     'body.megulit-placed .megulit-place-window .char-token.megulit-unplaced{display:none!important}',
@@ -433,6 +434,9 @@
      centres them (two or more rows sharing a centre with different left edges, or one row centred in the client away from
      its left side) */
   let rowsLine = '', rowsPrev = null, rowsFresh = false, rowsSeq = 0, rowsCentred = false;
+  /* 2026-11-21 (owner, CHAOS;CHILD centred narration: a new line typed out on one row and only wrapped and centred when it was
+     complete): the widest row of the last fully drawn centred line; a centred line the game is still typing wraps at it */
+  let centreWidth = 0;
   function gameRows(boxes, size, map) {
     const rows = [], rowOf = new Array(boxes.length).fill(-1); let cur = null;
     boxes.forEach((r, j) => { if (!r || r[3] < size * .7 || r[2] > size * 1.6) return; /* a small glyph (the game's own ruby) or a wide one (a UI button the layer took for a glyph) is no row */ if (!cur || r[1] > cur.t + size * .6 || r[0] < cur.l - size * .5 && r[1] > cur.t + size * .3) { cur = { l: r[0], r: r[0] + r[2], t: r[1], first: j }; rows.push(cur); } else { cur.l = Math.min(cur.l, r[0]); cur.r = Math.max(cur.r, r[0] + r[2]); } rowOf[j] = rows.length - 1; });
@@ -560,6 +564,13 @@
       release(true, false); /* pinned once below, after the row breaks: a pin from the unbroken layout here decided the translation's place from a different block every other frame */
       win.classList.toggle('megulit-page-fresh', rowsFresh); if (rowsFresh) b.hookPageReset?.();
       rowBreaks(win, shown, rows);
+      { const known = boxes.filter(Boolean).length, centred = Number.isFinite(rows.center);
+        if (centred && known >= shown.length && rows.rows.length) centreWidth = Math.max(...rows.rows.map(r => r.r - r.l)) + size;
+        else if (!centred && !(anchor && anchor.center)) centreWidth = 0;
+        /* while the game has not drawn every row of a centred line, the whole line already wraps at the page's row width and is
+           centred, so typing only reveals characters in their final place; the game's own breaks replace it row by row */
+        const predict = centred && centreWidth > size * 4 && shown.some((t, j) => !(rows.rowOf[j] >= 0));
+        win.classList.toggle('megulit-rows-predicted', predict); if (predict) win.style.setProperty('--megulit-centre-width', Math.round(centreWidth) + 'px'); else win.style.removeProperty('--megulit-centre-width'); }
       cnRows(win, shown, rows);
       pin(win, sentence);
       return;
