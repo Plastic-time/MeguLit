@@ -83,7 +83,8 @@ function Web-Act($m) {
       'fatal' { Web-Log ('page fatal: ' + $m.reason); $script:webFatalSeen = $true; Web-Abort ('page reported: ' + $m.reason) }
       'asked' { $script:askAt = $null }
       'drag' { Web-Log 'drag: system move loop starts'; $script:win.Drag(); Web-Log ('drag: loop ended at ' + $script:win.Location) }
-      'resize' { $script:win.SizeFrom([string]$m.edge) }
+      'resize' { Web-Log ('resize: message from page edge=' + $m.edge + ' zoom=' + $m.zoom + ' dpr=' + $m.dpr + ' w=' + $script:win.Width); $script:win.SizeFrom([string]$m.edge) }
+      'rz-info' { Web-Log ('resize: page hot zones=' + $m.zones + ' native=' + $m.native + ' size=' + $m.w + 'x' + $m.h + ' dpr=' + $m.dpr + ' rzPx=' + $m.px + ' topAt=' + $m.top) }
       'minimize' { $script:win.WindowState = 'Minimized'; Web-Log ('minimized: state=' + $script:win.WindowState) }
       'close' { Web-Close }
       'checkpath' { if ($shim) { Web-Post @{ t = 'reply'; id = $m.id; r = (Web-Check ([string]$m.path)) } } }
@@ -144,7 +145,7 @@ public class SetupWin : Form {
   public void Dress() { int round = 2; DwmSetWindowAttribute(Handle, 33, ref round, 4); MARGINS m = new MARGINS(); m.l = 1; m.r = 1; m.t = 1; m.b = 1; DwmExtendFrameIntoClientArea(Handle, ref m); }
   // ---- drag-resize of the frameless window, locked to the design box 1000:640 (the page is scaled as a whole by the WebView2 zoom) ----
   public const double Ratio = 0.64;   // 640 / 1000
-  public int Grip = 8; public bool Sizable = true;
+  public int Grip = 8; public bool Sizable = true; public Action<string> Log; bool hitLogged = false;
   [StructLayout(LayoutKind.Sequential)] struct RECT { public int l, t, r, b; }
   // limits in physical px for the DPI scale `scale` (logical min 480 x 307) and the work area waW x waH: max is the biggest 1000:640 box inside the work area
   public static void SizeLimits(double scale, int waW, int waH, out int minW, out int minH, out int maxW, out int maxH) {
@@ -164,14 +165,14 @@ public class SetupWin : Form {
   }
   public int MinW, MaxW;
   // the page's edge/corner hot zones ask for the system size loop: edge letters l r t b + corners (HTLEFT 10 ... HTBOTTOMRIGHT 17)
-  public void SizeFrom(string edge) { if (!Sizable || WindowState != FormWindowState.Normal) return; int ht; switch (edge) { case "l": ht = 10; break; case "r": ht = 11; break; case "t": ht = 12; break; case "tl": ht = 13; break; case "tr": ht = 14; break; case "b": ht = 15; break; case "bl": ht = 16; break; case "br": ht = 17; break; default: return; } ReleaseCapture(); SendMessage(Handle, 0xA1, (IntPtr)ht, IntPtr.Zero); }
+  public void SizeFrom(string edge) { if (Log != null) Log("resize: hit=" + edge + " start sizable=" + Sizable + " state=" + WindowState + " size=" + Width + "x" + Height); if (!Sizable || WindowState != FormWindowState.Normal) return; int ht; switch (edge) { case "l": ht = 10; break; case "r": ht = 11; break; case "t": ht = 12; break; case "tl": ht = 13; break; case "tr": ht = 14; break; case "b": ht = 15; break; case "bl": ht = 16; break; case "br": ht = 17; break; default: return; } ReleaseCapture(); SendMessage(Handle, 0xA1, (IntPtr)ht, IntPtr.Zero); if (Log != null) Log("resize: loop ended size=" + Width + "x" + Height); }
   protected override void WndProc(ref Message m) {
     if (m.Msg == 0x83 && m.WParam != IntPtr.Zero) { m.Result = IntPtr.Zero; return; }   // WM_NCCALCSIZE: no frame, the whole window is client
     if (m.Msg == 0x84 && Sizable && WindowState == FormWindowState.Normal) {   // WM_NCHITTEST
       long lp = m.LParam.ToInt64(); System.Drawing.Point p = PointToClient(new System.Drawing.Point((short)(lp & 0xFFFF), (short)((lp >> 16) & 0xFFFF)));
       bool L = p.X < Grip, R = p.X >= ClientSize.Width - Grip, T = p.Y < Grip, B = p.Y >= ClientSize.Height - Grip;
       int hit = (T && L) ? 13 : (T && R) ? 14 : (B && L) ? 16 : (B && R) ? 17 : L ? 10 : R ? 11 : T ? 12 : B ? 15 : 0;
-      if (hit != 0) { m.Result = (IntPtr)hit; return; }
+      if (hit != 0) { if (!hitLogged && Log != null) { hitLogged = true; Log("resize: ring hit-test code=" + hit + " at " + p.X + "," + p.Y); } m.Result = (IntPtr)hit; return; }
     } else if (m.Msg == 0x214 && Sizable) {   // WM_SIZING
       RECT rc = (RECT)Marshal.PtrToStructure(m.LParam, typeof(RECT)); LockAspect(ref rc.l, ref rc.t, ref rc.r, ref rc.b, (int)m.WParam, MinW, MaxW); Marshal.StructureToPtr(rc, m.LParam, false); m.Result = (IntPtr)1; return;
     }
@@ -184,12 +185,13 @@ public class SetupWin : Form {
     $oldCtx = [IntPtr]::Zero; try { $oldCtx = [SetupWin]::SetThreadDpiAwarenessContext([IntPtr](-4)) } catch {}
     $scale = 1.0; try { $scale = [SetupWin]::GetDpiForSystem() / 96.0 } catch {}
     $dpiS = $scale   # the real DPI scale (the window may be smaller than that on a small screen; the page zoom follows the real one)
-    $wa0 = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea; $scale = [math]::Max(0.5, [math]::Min($scale, [math]::Min($wa0.Width / 600.0, $wa0.Height / 384.0)))   # never larger than the work area (small screens)
+    $wa0 = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea; $scale = [math]::Max(0.5, [math]::Min($scale, [math]::Min($wa0.Width / 690.0, $wa0.Height / 442.0)))   # never larger than the work area (small screens)
     if ($testLog -and $env:MEGULIT_SETUP_WEB_DPI) { $scale = [double]$env:MEGULIT_SETUP_WEB_DPI / 96.0; $dpiS = $scale }   # tests: emulate 125/150/200 % (with --force-device-scale-factor)
     $win = New-Object SetupWin
     $win.Text = 'MeguLit 安装'; $win.FormBorderStyle = 'None'; $win.StartPosition = 'CenterScreen'; $win.ShowInTaskbar = -not $testLog; $win.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
-    # starts at 60 % of the design box (600 x 384 logical); the user can drag the edges/corners: ratio locked, 480 x 307 logical minimum, at most the work area
-    $win.ClientSize = New-Object Drawing.Size([int](600 * $scale), [int](384 * $scale)); $win.Grip = [int][math]::Max(4, [math]::Round(4 * $scale))   # (the WebView2 child swallows hit-tests, so the edges are hot zones in the page that ask the host for the system size loop)
+    # starts at 69 % of the design box (690 x 442 logical); the user can drag the edges/corners: ratio locked, 480 x 307 logical minimum, at most the work area
+    $win.ClientSize = New-Object Drawing.Size([int](690 * $scale), [int](442 * $scale)); $win.Grip = [int][math]::Max(5, [math]::Round(5 * $scale)); $win.Padding = New-Object Windows.Forms.Padding($win.Grip)   # route 1: a thin ring of the form's own around the WebView2 child (which swallows hit-tests): WM_NCHITTEST there gives the sizing codes. Route 2: the page's edge hot zones (index.html .rz) ask the host via a 'resize' message
+    $win.Log = [Action[string]]{ param($s) Web-Log $s }
     $lim = @(0, 0, 0, 0); $miW = 0; $miH = 0; $maW = 0; $maH = 0; [SetupWin]::SizeLimits($scale, $wa0.Width, $wa0.Height, [ref]$miW, [ref]$miH, [ref]$maW, [ref]$maH)
     $win.MinimumSize = New-Object Drawing.Size($miW, $miH); $win.MaximumSize = New-Object Drawing.Size($maW, $maH); $win.MinW = $miW; $win.MaxW = $maW
     $script:dpiS = $dpiS; $script:zoomWin = $win

@@ -25,9 +25,9 @@ html,body{background:transparent!important}
 :root[data-theme=night] #app{box-shadow:0 0 0 1px rgba(255,255,255,.1)}
 #chrome{position:absolute;inset:0;pointer-events:none}
 /* window resize hot zones + a visible corner grip, only in the real (native) window */
-.rz,.rzg{display:none}.native .rz{display:block;position:absolute;z-index:60}.native .rzg{display:block;position:absolute;right:3px;bottom:3px;width:14px;height:14px;z-index:59;pointer-events:none;opacity:.55}
-.rz[data-e=l]{left:0;top:14px;bottom:14px;width:8px;cursor:w-resize}.rz[data-e=r]{right:0;top:14px;bottom:14px;width:8px;cursor:e-resize}.rz[data-e=t]{left:14px;right:210px;top:0;height:6px;cursor:n-resize}.rz[data-e=b]{left:14px;right:14px;bottom:0;height:8px;cursor:s-resize}
-.rz[data-e=tl]{left:0;top:0;width:14px;height:14px;cursor:nw-resize}.rz[data-e=tr]{right:0;top:0;width:8px;height:14px;cursor:ne-resize}.rz[data-e=bl]{left:0;bottom:0;width:14px;height:14px;cursor:sw-resize}.rz[data-e=br]{right:0;bottom:0;width:16px;height:16px;cursor:se-resize}
+.rz,.rzg{display:none}.native .rz{display:block;position:absolute;z-index:60;pointer-events:auto}.native .rzg{display:block;position:absolute;right:3px;bottom:3px;width:14px;height:14px;z-index:59;pointer-events:none;opacity:.55}
+.rz[data-e=l]{left:0;top:var(--rzc,14px);bottom:var(--rzc,14px);width:var(--rz,8px);cursor:w-resize}.rz[data-e=r]{right:0;top:var(--rzc,14px);bottom:var(--rzc,14px);width:var(--rz,8px);cursor:e-resize}.rz[data-e=t]{left:var(--rzc,14px);right:210px;top:0;height:var(--rz,8px);cursor:n-resize}.rz[data-e=b]{left:var(--rzc,14px);right:var(--rzc,14px);bottom:0;height:var(--rz,8px);cursor:s-resize}
+.rz[data-e=tl]{left:0;top:0;width:var(--rzc,14px);height:var(--rzc,14px);cursor:nw-resize}.rz[data-e=tr]{right:0;top:0;width:var(--rz,8px);height:var(--rzc,14px);cursor:ne-resize}.rz[data-e=bl]{left:0;bottom:0;width:var(--rzc,14px);height:var(--rzc,14px);cursor:sw-resize}.rz[data-e=br]{right:0;bottom:0;width:var(--rzg,18px);height:var(--rzg,18px);cursor:se-resize}
 .go.busy{transform:scale(.97);opacity:.78;pointer-events:none;transition:transform .08s,opacity .08s}
 #drag{position:absolute;left:0;right:196px;top:0;height:46px;pointer-events:auto;cursor:default}
 #chrome .tab{position:absolute;right:26px;top:-14px;height:48px;padding:14px 8px 0 14px;display:flex;gap:2px;background:var(--red);pointer-events:auto;clip-path:polygon(0 100%,10px 0,100% 0,100% 100%);box-shadow:0 8px 24px rgba(200,32,60,.35)}

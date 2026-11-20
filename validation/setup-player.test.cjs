@@ -134,5 +134,14 @@ test('the host answers the install request at once and runs the heavy work from 
   const tick = block.slice(block.indexOf('add_Tick'), block.indexOf('$script:installTimer.Start()'));
   assert.equal((block.match(/PerformClick\(\)/g) || []).length, 1, 'confirm is clicked exactly once, inside the tick: ' + direct.length);
   assert.ok(tick.includes('PerformClick()'), 'and that click is inside the tick handler');
-  assert.match(src, /'resize' \{ \$script:win\.SizeFrom/, 'the page can start the system size loop');
+  assert.match(src, /'resize' \{.*\$script:win\.SizeFrom/, 'the page can start the system size loop');
+});
+
+test('window edge hot zones take the mouse (native mode): every edge and corner point hits a .rz, widths follow the zoom', { skip, timeout: 60000 }, async () => {
+  await open(fixture); await on('welcome');
+  await ev('document.documentElement.classList.add("native");document.documentElement.style.setProperty("--M","0px")'); await sleep(200);
+  const hits = await ev('(()=>{const W=innerWidth,H=innerHeight,pts={l:[2,H/2],r:[W-2,H/2],t:[W/2-120,2],b:[W/2,H-2],tl:[2,2],tr:[W-2,2],bl:[2,H-2],br:[W-2,H-2]},o={};for(const k in pts){const e=document.elementFromPoint(pts[k][0],pts[k][1]);o[k]=e&&e.dataset&&e.dataset.e||(e&&(e.id||e.tagName))}return o})()');
+  for (const k of ['l', 'r', 't', 'b', 'tl', 'tr', 'bl', 'br']) assert.equal(hits[k], k, 'edge point ' + k + ' hits its zone: ' + JSON.stringify(hits));
+  /* zones are sized in physical px: at a zoom below 1 the CSS width grows */
+  const px = await ev('(()=>{document.documentElement.style.setProperty("--rz","9px");return getComputedStyle(document.querySelector(".rz[data-e=l]")).width})()'); assert.equal(px, '9px');
 });
