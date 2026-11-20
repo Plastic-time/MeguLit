@@ -18,16 +18,16 @@ if (!id) { const dir = path.dirname(exe).toLowerCase(); id = Object.keys(all).fi
 const state = all[id]; if (!state?.runtime?.index || !state?.patch?.index) { console.error('no imported script and patch for ' + (exe || id)); process.exit(2); }
 const lines = JSON.parse(fs.readFileSync(state.runtime.index, 'utf8')).lines, zh = JSON.parse(fs.readFileSync(state.patch.index, 'utf8')).lines;
 const live = () => { try { return exe ? ot.provider(root, exe) : null; } catch { return null; } };
-/* the table itself: normal key -> translation; a key with two different translations is uncertain */
-const tableProvider = () => { const map = new Map(), norm = t => String(t || '').replace(/[\s　]+/g, '');
-  lines.forEach((l, i) => { const k = norm(l), z = String(zh[i] || '').trim(); if (!k || !z) return; const had = map.get(k); map.set(k, had !== undefined && had !== z ? null : z); });
-  return { kind: 'patch', resolve: t => { const k = norm(t); if (!map.has(k)) return { status: 'none' }; const z = map.get(k); return z ? { status: 'exact', translation: z, indices: [0] } : { status: 'uncertain' }; } }; };
+/* the table itself, following the reading position like the game's lookup: normal key -> its rows; the first row after the last one read */
+const tableProvider = () => { const map = new Map(), norm = t => String(t || '').replace(/[\s　]+/g, ''); let last = -1;
+  lines.forEach((l, i) => { const k = norm(l), z = String(zh[i] || '').trim(); if (!k || !z) return; (map.get(k) || map.set(k, []).get(k)).push(i); });
+  return { kind: 'patch', resolve: t => { const rows = map.get(norm(t)); if (!rows) return { status: 'none' }; const i = rows.find(r => r > last) ?? rows[0]; last = i; return { status: 'exact', translation: String(zh[i]).trim(), indices: [i] }; } }; };
 const mode = live() ? 'game' : 'table';
 const counts = new Map(); for (const l of lines) { const t = String(l || '').trim(); counts.set(t, (counts.get(t) || 0) + 1); }
 const label = t => counts.get(t) >= 10 && [...t].length <= 8 && !/[。、！？!?…「『（]/.test(t);
 const forms = t => {
   const out = [['as written', t]];
-  const m = /^([「『])([？?]{2,}|[一-龯々ァ-ヶー・]{1,8})[\s　]+(.*)$/s.exec(t); if (m) out.push(['speaker taken off', m[1] + m[3]]);
+  const m = /^([「『])([？?]{2,}|[一-龯々ァ-ヶー・]{2,8})[\s　]+(.*)$/s.exec(t); if (m) out.push(['speaker taken off', m[1] + m[3]]);
   if (/^[「『].*[」』]$/s.test(t)) out.push(['no brackets', t.slice(1, -1)]);
   const half = t.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)); if (half !== t) out.push(['half-width', half]);
   const k = /[一-龯々]{1,3}/.exec(t); if (k) out.push(['ruby markup', t.slice(0, k.index) + '｜' + k[0] + '《よみ》' + t.slice(k.index + k[0].length)]);
