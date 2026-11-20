@@ -153,6 +153,7 @@
     const chars = sentence?.querySelectorAll('.char-token');
     const text = sentence ? (chars?.length ? Array.from(chars,c=>c.textContent).join('') : sentence.textContent).trim() : '';
     if(text !== bridge.sourceText){bridge.sourceText=text;bridge.onSourceText?.(text);}
+    guard(text);
     /* the translation row and its room exist from the first frame of the line, not 220 ms later */
     if(sentence&&text&&enabled&&translationVisible&&!output?.isConnected&&ensureRow(sentence))reserve(text);
     /* 2026-11-13 (STEINS;GATE: each new line showed the previous line's translation for ~250 ms): the translation is
@@ -180,6 +181,23 @@
      line written another way (ruby / brackets / blanks: the same normal form as services/reader.cjs, or one inside the other, 60 %) */
   const normal = v => { let t = String(v || '').replace(/[｜|]([^《\[｜|]+)[《\[][^》\]]*[》\]]/g, '$1').replace(/《[^》]*》/g, '').replace(/\[[^\]]*\]/g, '').replace(/<[^>]*>/g, '').replace(/[\s\u3000\u200b\u001f]+/g, ''); for (let k = 0; k < 3; k++) t = t.replace(/^[「『“"（(【]+/, '').replace(/[」』”"）)】]+$/, ''); return t; };
   const sameLine = (a, b) => { const x = normal(a), y = normal(b); if (!x || !y) return false; if (x === y) return true; const lx = [...x].length, ly = [...y].length; return (x.includes(y) || y.includes(x)) && Math.min(lx, ly) / Math.max(lx, ly) >= .6; };
+  /* 2026-11-21 translation guard: 600 ms, 1.5 s and 3 s after a line is shown, a line still without a translation is asked again by its
+     text (services/reader.cjs translateGuard: cache, script, fallback chain), past the "already asked" check and the request serial; after 3 s
+     a faint 「翻译中…」 stands where the translation will go, never an empty row */
+  let guardTimers = [], guardText = '';
+  const guardNote = (what, text) => { try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'layoutDiagnostic', kind: 'translationGuard', what, text: String(text).slice(0, 40) })); } catch {} };
+  const hasTranslation = () => output?.isConnected && output.dataset.state === 'ready' && !!output.textContent.trim() && output.textContent !== '翻译中…' && !bridge.lastTranslationError;
+  function guard(text) {
+    if (text === guardText) return; guardText = text; for (const t of guardTimers) clearTimeout(t); guardTimers = [];
+    if (!text || !enabled || !translationVisible) return;
+    for (const [ms, last] of [[600, false], [1500, false], [3000, true]]) guardTimers.push(setTimeout(() => {
+      if (guardText !== text || !sameLine(bridge.sourceText, text) || hasTranslation()) return;
+      guardNote(last ? 'still-missing' : 'retry', text);
+      try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'translateGuard', text })); } catch {}
+      if (last && output?.isConnected && (!output.textContent.trim() || output.textContent === '翻译中…')) { output.textContent = '翻译中…'; output.style.opacity = '.45'; output.dataset.state = 'pending'; }
+    }, ms));
+  }
+  bridge.translationGuard = guard;
   bridge.deliverBackfill = (source, text, kind = '') => {
     if (!enabled || !translationVisible || !String(text || '').trim()) return;
     const shown = bridge.sourceText || bridge.current;
