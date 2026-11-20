@@ -3361,7 +3361,7 @@ dependencies = [
 
 [[package]]
 name = "megulit"
-version = "1.4.19"
+version = "1.4.20"
 dependencies = [
  "serde",
  "serde_json",

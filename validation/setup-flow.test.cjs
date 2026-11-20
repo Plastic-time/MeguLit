@@ -8,7 +8,8 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const repo=path.join(__dirname,'..'),script=path.join(repo,'setup','setup-runtime.ps1');
 const hiddesk=process.env.MEGULIT_HIDDESK||'E:\\Apps\\megu-testbed\\HidDesk.exe';
 const skip=process.platform!=='win32'||!fs.existsSync(hiddesk)?'needs Windows and HidDesk.exe (hidden desktop)':false;
-const tmpBase=process.env.MEGULIT_TEST_TMP||os.tmpdir();
+/* NOT under %TEMP%: setup-runtime.ps1 treats a folder inside %TEMP% as "opened from an archive" and then suggests the roomiest other drive (the real E:\MeguLit on a dev machine), so "nothing to download" and the wrong install target would make every case here depend on the machine. */
+const tmpBase=process.env.MEGULIT_TEST_TMP||path.join(os.homedir(),'.megulit-setup-test');fs.mkdirSync(tmpBase,{recursive:true});
 const ps=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
 const MB=1<<20;
 const MARKERS={base:['node.exe','python/python.exe','python/Lib/zipfile/__init__.py','python/Lib/encodings/__init__.py'],reading:['reading/sudachidict_full/resources/system.dic'],voice:['aivis/run.exe']};
