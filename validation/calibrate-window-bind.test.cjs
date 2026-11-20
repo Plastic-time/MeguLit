@@ -42,7 +42,7 @@ test('校准: 绑定游戏窗口 sits after 拖动文本框 and its hint, before
   assert.ok(s.barOk,'binding status bar sits above the sub-tabs; manual block between bar and tabs; 拖动文本框 and imports below the tabs: '+JSON.stringify(s));
   assert.ok(s.drag>=0&&s.sync>s.drag&&s.imports>s.sync,'order 拖动文本框 → hint → imports: '+JSON.stringify(s));
   assert.ok(!s.manualOpen,'manual bind controls start collapsed, bound or not');
-  assert.deepEqual(s.tabLabels,['校准与位置','导入与历史'],'calibration sub-tabs');
+  assert.deepEqual(s.tabLabels,['校准','导入'],'calibration sub-tabs (short names, full name in the tooltip)');
   assert.deepEqual(s.inBlock,[true,true,true,true,true,true,true],'manual binding controls (pick, hint, list, refresh, bind, unbind, state) live in the block');
   assert.ok(s.presetVisible&&s.gridVisible,'preset and margins stay on the page, not folded');
   assert.equal(s.hint,'先开游戏后开 MeguLit，或 MeguLit 重开后，用这里或 Alt+M 重新连接');assert.equal(s.bound,'未绑定');assert.equal(s.pick,'绑定游戏窗口');

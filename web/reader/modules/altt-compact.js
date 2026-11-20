@@ -60,13 +60,19 @@
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-import-row>:is(select,button){margin:0!important}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-import-row>button{padding:5px 12px!important;height:32px}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-calibration-imports{margin-top:6px}
- /* reusable in-panel second-level tabs (.mg-subtabs): plain text tabs; a narrow panel wraps them onto more rows, so every tab is always visible (sideways scrolling hid the last ones) */
- .mg-subtabs{display:flex;flex-wrap:wrap;gap:2px 4px;margin:6px 0 6px;border-bottom:1px solid var(--menu-border,#34343a);overflow:visible}
- .mg-subtabs>button{flex:none;padding:7px 12px!important;border:0!important;border-bottom:2px solid transparent!important;border-radius:0!important;background:transparent!important;color:var(--theme-textSecondary,#aaa)!important;cursor:pointer;font-size:13px;margin-bottom:-1px;white-space:nowrap}
- .mg-subtabs>button:hover{color:var(--theme-text,#e8e9ec)!important}
- .mg-subtabs>button[aria-selected=true]{color:var(--menu-accent,#e0495a)!important;border-bottom-color:var(--menu-accent,#e0495a)!important;font-weight:700}
- .mg-subtabs>button:focus-visible{outline:2px solid var(--menu-accent,#e0495a);outline-offset:-2px;border-radius:6px!important}
- @media (pointer:coarse){.mg-subtabs>button{padding:11px 14px!important}}
+ /* reusable in-panel second-level tabs (.mg-subtabs): one segmented control. A single trough holds every tab in equal cells (4 a row in a narrow panel, one row when wide); the selected cell is filled. It must not look like the action buttons below it. */
+ .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid;grid-template-columns:repeat(var(--mg-seg-cols,4),minmax(0,1fr));gap:2px;margin:8px 0 10px;padding:3px;border:0;border-radius:10px;background:color-mix(in srgb,var(--theme-text,#e8e9ec) 7%,transparent);overflow:visible}
+ .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button{min-width:0;margin:0!important;padding:7px 4px!important;border:1px solid transparent!important;border-radius:7px!important;background:transparent!important;box-shadow:none!important;color:var(--theme-textSecondary,#aaa)!important;cursor:pointer;font-size:13px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+ .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button:hover{color:var(--theme-text,#e8e9ec)!important;background:color-mix(in srgb,var(--theme-text,#e8e9ec) 6%,transparent)!important}
+ .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button[aria-selected=true]{color:var(--theme-text,#f2f3f5)!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 22%,transparent)!important;border-color:color-mix(in srgb,var(--menu-accent,#e0495a) 55%,transparent)!important;font-weight:700}
+ .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button:focus-visible{outline:2px solid var(--menu-accent,#e0495a);outline-offset:1px}
+ @media (pointer:coarse){.mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button{padding:11px 4px!important}}
+ /* action buttons on the calibration page: an even two-column grid instead of ragged rows; toggles, hints and selects keep the full width */
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:center}
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>:not(button){grid-column:1/-1}
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button,.tome-window-bind-row:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button{width:100%;min-width:0;margin:0!important;justify-content:center;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .tome-window-bind-row:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}
+ .tome-window-bind-row:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>:not(button){grid-column:1/-1}
  .tome-ac:not(#q1):not(#q2):not(#q3) output.tomoyo-slider-value{color:var(--theme-text,#f1f1f4)!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 30%,transparent)!important;border-radius:6px;padding:1px 6px;font-weight:600}
  .tome-ac:not(#q1):not(#q2):not(#q3) [data-menu-category=text] details.tome-ac-pane .tomoyo-cn-grid{display:block!important}
  @container (min-width:600px){.tome-ac:not(#q1):not(#q2):not(#q3) [data-menu-category=text] details[data-text-colours] .tomoyo-cn-grid{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:0 24px!important}.tome-ac:not(#q1):not(#q2):not(#q3) [data-menu-category=text] details[data-text-colours] .tomoyo-cn-grid>label:has(>output){grid-column:1/-1}}
@@ -85,21 +91,23 @@
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-ac-cols .tomoyo-cn-grid{grid-template-columns:minmax(0,1fr)!important}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-ac-cols{display:grid;grid-template-columns:minmax(0,1fr);gap:0 28px}
  @container (min-width:640px){.tome-ac:not(#q1):not(#q2):not(#q3) .tome-ac-cols{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
- @media (pointer:coarse){.tome-ac:not(#q1):not(#q2):not(#q3) .mg-subtabs>button{padding:10px 12px!important}}
+ @media (pointer:coarse){.tome-ac:not(#q1):not(#q2):not(#q3) .mg-subtabs>button{padding:11px 4px!important}}
  `;(document.head||document.documentElement).appendChild(style);
  const strip=s=>(s||'').replace(/\s*(设置|設定|settings?)$/i,'').trim();
  const mk=(tag,cls,attrs)=>{const e=document.createElement(tag);if(cls)e.className=cls;for(const k in attrs||{})e.setAttribute(k,attrs[k]);return e;};
  const wrapPair=(a,b,cls)=>{if(!a||!b||a.parentElement!==b.parentElement||a.parentElement.classList.contains('tome-ac-pair'))return;const w=mk('div','tome-ac-pair '+(cls||''));a.before(w);w.append(a,b);};
  const byName=(root,n)=>root.querySelector('[name='+n+']')?.closest('label');
  /* sub-tab bar: items = [{label, nodes:[...], get label()}]; idempotent, re-run on every mutation */
+ /* short names for the segmented control (the full name stays as the tooltip) */
+ const SHORT={'沉浸与等待图标':'沉浸','显示方式':'显示','行距与间距':'间距','游戏字体':'字体','校准与位置':'校准','导入与历史':'导入'};
  function chips(host,before,id,items,state){
   let bar=host.querySelector(':scope>.mg-subtabs[data-ac-id='+id+']');
-  if(!bar){bar=mk('div','mg-subtabs',{role:'tablist','data-ac-id':id,'data-ac-added':''});before.before(bar);
+  if(!bar){bar=mk('div','mg-subtabs',{role:'tablist','data-ac-id':id,'data-ac-added':''});before.before(bar);bar.style.setProperty('--mg-seg-cols',String(items.length<=4?items.length:Math.ceil(items.length/2)));
    items.forEach((it,i)=>{const b=mk('button','',{type:'button',role:'tab','data-ac-added':''});b.onclick=()=>{state.i=i;paint();save();};bar.append(b);});
    const sk='megulit-altt-subtab-'+id,save=()=>{try{localStorage.setItem(sk,String(state.i));}catch{}};
    try{const v=Number(localStorage.getItem(sk));if(Number.isInteger(v)&&v>=0&&v<items.length)state.i=v;}catch{}
    bar.addEventListener('keydown',e=>{const k=e.key;if(!['ArrowRight','ArrowLeft','Home','End'].includes(k))return;const n=k==='Home'?0:k==='End'?items.length-1:(state.i+(k==='ArrowRight'?1:items.length-1))%items.length;state.i=n;paint();save();bar.children[n].focus();bar.children[n].scrollIntoView({block:'nearest',inline:'nearest'});e.preventDefault();});}
-  function paint(){[...bar.children].forEach((b,i)=>{const t=items[i].label();if(b.textContent!==t)b.textContent=t;b.setAttribute('aria-selected',String(i===state.i));b.tabIndex=i===state.i?0:-1;});
+  function paint(){[...bar.children].forEach((b,i)=>{const full=items[i].label(),t=SHORT[full]||full;if(b.textContent!==t)b.textContent=t;if(t!==full)b.title=full;else b.removeAttribute('title');b.setAttribute('aria-selected',String(i===state.i));b.tabIndex=i===state.i?0:-1;});
    items.forEach((it,i)=>{for(const n of it.nodes()){n.classList.toggle('tome-ac-off',i!==state.i);if(n.tagName==='DETAILS'&&it.pane){n.classList.add('tome-ac-pane');if(i===state.i){n.open=true;for(const d of n.querySelectorAll('details'))if(!d.dataset.acOpened){d.dataset.acOpened='1';d.open=true;}}}}});}
   paint();return bar;}
  window.__megulitSubTabs={mount:chips};
