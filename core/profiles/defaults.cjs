@@ -23,6 +23,11 @@ module.exports={
   /* the game draws one line over several frames (fade, wipe, per-character effects): null = kernel heuristics; true = every
      repaint of the same line is one line (never a new line, never a skip); false = frames are not effects */
   effectFrames:null,
+  /* the game is laid out as a flow page (several sentences per page, the reader lays them out from the text box): null = kernel
+     (script guess, overruled by an engine page DLL); true / false = always / never */
+  flowPage:null,
+  /* ms a hook line waits for its place on the page before it is dropped: null = kernel (OCR 5000, engines 1500) */
+  holdMs:null,
  },
  choice:{
   /* RegExp sources (flags 'u'); a choice candidate whose text matches one of them is never offered as an option */
@@ -32,6 +37,19 @@ module.exports={
   /* the game's text effect cannot be hidden line by line: start this game in read mode (the original stays, MeguLit shows
      the translation), like the per-exe memory of services/text-effects.cjs */
   textEffectsRead:false,
+  /* show the original first and check it before hiding: null = kernel (skipped while a KiriKiri page DLL hides the text itself) */
+  preflight:null,
+  /* the game itself draws the current line invisible, calibration waits for the next line: null = kernel (KiriKiri page DLL) */
+  drawsHidden:null,
+ },
+ /* self-check thresholds of the auto-profile layer (feat/auto-profile): a window of lines whose hide/drop/repeat/pairing
+    rates decide a fallback */
+ selfCheck:{window:20,minLines:8,hideVisible:0.25,dropRate:0.15,repeatRate:0.1,choiceMismatch:1,positionPx:96,pairRate:0.8},
+ /* what this PC's calibration measured (auto layer): null = not calibrated, the kernel decides */
+ calibrate:{
+  positionSource:null,/* 'engine' | 'glyph' | 'ocr' */
+  textBox:null,/* {x,y,w,h} client px */
+  hideMethod:null,/* 'engine' | 'glyph' | 'gpu' | 'read' */
  },
  safeMode:{
   /* reader redraws per second while the game is in a page effect; null = kernel default */

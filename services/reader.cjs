@@ -210,7 +210,7 @@ class Reader{
  applyGameProfile(exe,game){try{const P=require('../core/profiles/index.cjs');let o={};try{o=JSON.parse(game?.original||'{}')||{};}catch{}const folder=exe?path.dirname(exe):'';
   let engine=String(o.library?.engine||o.engine||'');if(!engine&&folder)try{engine=require('../core/library.cjs').engineOf(folder)?.name||'';}catch{}
   let steamAppId='';if(folder)try{steamAppId=fs.readFileSync(path.join(folder,'steam_appid.txt'),'utf8').trim().slice(0,12);}catch{}
-  const title=String(game?.title||this.gal?.state?.gameTitle||'');this.gal?.setGameProfile?.(P.profileFor({engine,exe,title,folder,steamAppId}));}catch(error){this.gal?.hooks?.trace?.('profile error '+(error?.message||error));}}
+  const title=String(game?.title||this.gal?.state?.gameTitle||'');const input={engine,exe,title,folder,steamAppId};this.gal?.setGameProfile?.(P.profileFor(input),input);}catch(error){this.gal?.hooks?.trace?.('profile error '+(error?.message||error));}}
  adoptTextSource(exe,pid){const hooks=this.gal?.hooks,same=!!(hooks?.originalText&&hooks.textSourcePid===0&&String(this.textExe||'').toLowerCase()===String(exe||'').toLowerCase());this.textExe=exe;
   if(same){hooks.textSourcePid=pid;this.refreshTextSource({force:false,exe,pid});}else this.refreshTextSource({exe,pid});this.watchTextSource(exe);}
  watchTextSource(exe){for(const t of this.textSourceTimers||[])clearTimeout(t);this.textSourceTimers=[3000,15000,60000,180000].map(ms=>{const t=setTimeout(()=>{if(this.textExe===exe&&this.gal)this.refreshTextSource({force:false});},ms);t.unref?.();return t;});}
