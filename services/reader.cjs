@@ -289,7 +289,7 @@ class Reader{
      cover goes down services/translation-chain.cjs (local model, bound API, machine translation); when every source fails the line
      is retried in the background and filled in on screen and in the dialogue log (fillTranslation) */
   if(this.displayLanguage()!=='en'){const script=this.gal?.hooks?.scriptTranslation?.(text)||'';if(script){this.embedCached(text,script);return script;}}
-  try{const r=await this.chainTranslate(text,options,{id:request.id,current});if(gameId)this.stats.translation(gameId,text,r.text);this.embedCached(text,r.text);return r.text;}
+  try{const r=await this.chainTranslate(text,options,{id:request.id,current});if(gameId)this.stats.translation(gameId,text,r.text);this.embedCached(text,r.text);/* 2026-11-21 (owner, 千恋＊万花 r34: lines the patch did not pair got their fallback translation 1 to 8 s later, after the reader had moved on, and it was dropped): a late answer still fills the line wherever it is shown (on screen, the page's earlier lines, the log) */if(!current()&&r?.text)try{this.runtime.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,r.text,'late']});}catch{}return r.text;}
   catch(error){this.translationRetries().add(text,{gameId,options});throw error;}}
  /* One line through the fallback chain (services/translation-chain.cjs). options: the reader's resolved options. */
  async chainTranslate(text,options,{id=null,current=()=>true}={}){const chain=require('./translation-chain.cjs'),engines=require('../core/engines.cjs').ENGINES;this.loadKeys();
