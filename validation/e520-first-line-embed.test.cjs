@@ -43,7 +43,8 @@ test('read plan or hiding switched off: memory does not force hiding',()=>{
 test('matcher: a repeated line with identical text everywhere resolves without a reading position',()=>{
  const m=new Matcher(['はい','いいえ','はい','終わり'],['はい','いいえ','はい','終わり']);
  const r=m.match('はい');assert.equal(r.status,'high');assert.equal(r.method,'same-text');assert.equal(r.japanese,'はい');assert.equal(m.last,-1);
- const p=new Matcher(['はい','x','はい'],['好','x','是']);assert.equal(p.match('はい').status,'uncertain','different translations stay uncertain');
+ /* 2026-11-21 (pair-uncertain): different translations no longer stay uncertain; the first line is a guess the lines after it settle (validation/pair-reading-position.test.cjs) */
+ const p=new Matcher(['はい','x','はい'],['好','x','是']);const g=p.match('はい');assert.equal(g.status,'high');assert.equal(g.method,'guess');
 });
 
 test('bridge: memory loaded in read-only starts and announced; relocated code accepted',()=>{
