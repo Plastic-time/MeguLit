@@ -852,7 +852,7 @@
        the game's style profile (not an undo of unsaved edits); it needs the engine's glyph places, so without them it is greyed with the reason as its tooltip (the position state line below already says 本作品尚无引擎坐标) */
     const anchorReset = group.querySelector('[data-gal-anchor-reset]'),
      anchorResetWords = {zh:['回到游戏原字位置','本作品尚无引擎坐标'],en:['Back to the game text position','No engine positions for this game yet'],ja:['ゲームの文字位置に戻す','この作品はまだエンジン座標がありません']};
-    const paintAnchorReset = () => { const w = anchorResetWords[(window.__tomeI18n?.get?.()||'zh').slice(0,2)] || anchorResetWords.zh, on = anchoredNow(); anchorReset.dataset.noI18n = '';
+    const paintAnchorReset = () => { const w = anchorResetWords[(window.__tomeI18n?.get?.()||'zh').slice(0,2)] || anchorResetWords.zh, on = document.body.classList.contains('megulit-anchored'); /* the button: this line sits on the game's places now (the fields use the stable mode, anchoredNow) */ anchorReset.dataset.noI18n = '';
      anchorReset.textContent = w[0]; anchorReset.disabled = !on; anchorReset.title = on ? '' : w[1]; anchorReset.setAttribute('aria-disabled', String(!on)); };
     const fillPosition = () => { fieldsAreOffset = anchoredNow(); if (fieldsAreOffset) { f('galX').value = Number(preferences.anchorDX) || 0; f('galY').value = Number(preferences.anchorDY) || 0; f('galX').min = f('galY').min = '-95'; } else { f('galX').value = preferences.x; f('galY').value = preferences.y; f('galX').min = f('galY').min = '0'; } };
     fillPosition();
