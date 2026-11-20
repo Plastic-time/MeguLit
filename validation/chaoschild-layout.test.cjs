@@ -3,7 +3,9 @@ const test = require('node:test'), assert = require('node:assert'), fs = require
 const src = fs.readFileSync(path.join(__dirname, '../web/reader/modules/text-place.js'), 'utf8');
 test('box line: Japanese rows close up, translation <=15% smaller, then the block moves up, under client bottom minus two glyph rows', () => {
   assert.match(src, /uiLimit = cy0 \+ chc - glyph \* 2/);
-  assert.match(src, /set\(sentence, 'line-height', '1\.45'\)/);
+  assert.match(src, /set\(sentence, 'line-height', closeRows\(sentence\)\)/); /* rows close up, never under 1.45 and never so far the furigana sits on the row above */
+  assert.match(src, /Math\.max\(1\.45, Math\.round\(\(1 \+ rs \+ \.12\)/);
+  assert.match(src, /\.megulit-anchor-window\.megulit-game-rows \.sentence-text\{white-space:nowrap!important\}/, 'a line on the game rows breaks only where the game did');
   assert.match(src, /fsx \* \.85/);
   assert.match(src, /!anchor\.center && tr && tr\.height/);
 });

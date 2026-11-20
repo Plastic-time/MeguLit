@@ -43,7 +43,9 @@
   layers.dark.el.style.opacity = '0';
 
   /* ---------- state ---------- */
-  let mix = window.__themeDark ? 1 : 0, cur = null, target = 'welcome', switching = false, firstFrame = false, dead = false, started = false;
+  /* player.js loads before scene.js now: read the remembered theme the same way scene.js does */
+  let themeDark0 = window.__themeDark; if (themeDark0 === undefined) { try { themeDark0 = Q.get('theme') ? Q.get('theme') === 'night' : localStorage.getItem('megulit.setup.theme') === 'dark'; } catch (e) { themeDark0 = false; } }
+  let mix = themeDark0 ? 1 : 0, cur = null, target = 'welcome', switching = false, firstFrame = false, dead = false, started = false;
   const fpsOf = () => (base().man && base().man.fps) || 30;
   const base = () => (mix >= 1 ? layers.dark : layers.light);   /* the layer whose clock leads (fully covered layers may be paused) */
   const segOf = (L, id) => L.man && L.man.segments.find((s) => s.id === id);
@@ -61,6 +63,7 @@
     const s = segOf(L, id); if (!s) return Promise.reject(new Error('no segment ' + id + ' in ' + L.theme + ' manifest'));
     v.loop = false;
     if (v.dataset.id === id && v.readyState >= 2) { try { v.pause(); } catch (e) { /* ignore */ } if (v.currentTime !== 0) v.currentTime = 0; return seeked(v); }
+    if (v.dataset.id === id) return new Promise((ok, bad) => { v.addEventListener('loadeddata', () => ok(), { once: true }); v.addEventListener('error', () => bad(new Error('cannot load ' + s.file)), { once: true }); });   /* the element the HTML already started */
     v.dataset.id = id; v.src = url(L, s.file); v.load();
     return new Promise((ok, bad) => { const done = () => { v.removeEventListener('loadeddata', done); ok(); }; v.addEventListener('loadeddata', done); v.addEventListener('error', () => bad(new Error('cannot load ' + s.file)), { once: true }); });
   }
@@ -165,6 +168,13 @@
     const probe = document.createElement('video');
     if (!probe.canPlayType || !probe.canPlayType('video/mp4; codecs="avc1.640028"')) { fatal('no H.264 decoder'); return; }
     const first = mix >= 1 ? layers.dark : layers.light;
+    /* adopt the <video id=v0> the HTML started loading: it becomes this layer's back video, so the first switch (intro) finds it loaded */
+    const v0 = document.getElementById('v0');
+    if (v0 && v0.dataset.theme === first.theme) {
+      const old = first.vids[0]; v0.removeAttribute('style'); v0.removeAttribute('id'); v0.dataset.id = 'intro';
+      v0.addEventListener('error', () => fatal('video decode/load error ' + first.theme + ' intro code=' + (v0.error && v0.error.code)));
+      first.el.replaceChild(v0, old); first.vids[0] = v0; first.front = 1; note('adopted-v0', { rs: v0.readyState });
+    } else if (v0) v0.remove();
     /* poster first: a real frame on screen before any video is decoded */
     first.poster.src = VBASE + first.theme + '/intro.jpg'; first.poster.classList.add('on');
     /* the poster is a real frame: it replaces the boot screen at once, and the host logs when (cold-start timing) */
@@ -205,5 +215,8 @@
     return true;
   };
   if (!hook()) { const iv = setInterval(() => { if (hook()) clearInterval(iv); }, 20); }
+  /* test switch (MEGULIT_SETUP_WEB_TEST=stall): the page comes up and says ready, but no video frame ever arrives and nothing
+     is reported: only the host's watchdog can get the user out of this */
+  if (Q.get('t') === 'stall') { GL.ok = true; const p = document.getElementById('vposter'); if (p && p.complete) mark('poster'); return; }
   start();
 })();

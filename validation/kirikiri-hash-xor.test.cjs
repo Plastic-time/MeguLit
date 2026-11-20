@@ -74,3 +74,23 @@ test('codepage keeps Shift-JIS when full-width kana far outnumber half-width mid
  assert.equal(kit.codepage(sj),'shift_jis');
  assert.equal(kit.codepage(F.gbk('这是中文汉化脚本，里面没有日文假名，只有汉字和标点符号。')),'gbk');
 });
+
+/* 2026-11-20 #472 #417 #415 #404 #411: 45 KiB plug-in (kinglove / hutamata / koirowa / koikari.tpm), key = adlr hash as a
+   31-bit ring, byte at offset o XOR key[o % 31]. The adlr hash is the Adler-32 of the plain file. */
+const adler=b=>{let a=1,c=0;for(const x of b){a=(a+x)%65521;c=(c+a)%65521;}return ((c<<16)|a)>>>0;};
+test('rot31 hash-keyed XP3 archives are found by content and decrypt to scenes',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-rot31-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const ks1=F.sjis('; ==============================\r\n*s01|テスト\r\n[cm]\r\n「おはようございます、ご主人様」[l][r]\r\n　空が青い。[p]\r\n');
+ const ks2=F.sjis('; ==============================\r\n*s02|次\r\n@wait time=100\r\n「こんにちは」[l][r]\r\n　風が吹く。[p]\r\n');
+ const tjs=Buffer.from('// k2compat\r\nclass A { function f() { return 1; } }\r\n','latin1');
+ const enc=b=>{const h=adler(b);return [cx.rot31(h,0,Buffer.from(b)),h];};
+ const key=cx.rot31Key(0x2a97766c);assert.equal(key.length,31);assert.equal(key.subarray(0,3).toString('hex'),'6c7697');
+ writeEncryptedXp3(path.join(dir,'data.xp3'),[['scenario/s01.ks',...enc(ks1)],['scenario/s02.ks',...enc(ks2)],['k2compat/a.tjs',...enc(tjs)]]);
+ const f=cx.forArchive(path.join(dir,'data.xp3'));
+ assert.ok(f,'filter found');assert.deepEqual(f.titles,['rot31']);
+ /* offset-aware: decrypting a tail slice matches the whole-file result */
+ const [c1,h1]=enc(ks1),tail=Buffer.from(c1.subarray(40));f(h1,40,tail);assert.deepEqual(tail,ks1.subarray(40));
+ const read=scenes.read('kirikiri',dir);
+ assert.deepEqual(read.map(s=>s.lines),[['「おはようございます、ご主人様」','空が青い。'],['「こんにちは」','風が吹く。']]);
+ assert.equal(probeGame({dir,title:'テスト'}).step,'ok');
+});

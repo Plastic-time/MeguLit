@@ -7,6 +7,7 @@
 // which queues the line for a writer thread. The writer sends the lines to HookBridge over the pipe
 // \\.\pipe\MeguLitKrkr-<pid>; with no reader the lines are dropped. Every step is guarded: if anything is missing the
 // game runs untouched. KiriKiri SDK: native\krkrtext\sdk (tp_stub, W.Dee and contributors, GPL dual license).
+#include "../shared/MeguLitSafeRead.h"
 #include <windows.h>
 #include <objidl.h>
 #include <tlhelp32.h>
@@ -109,7 +110,8 @@ bool Executable(uintptr_t p) {
  return p && VirtualQuery((void *)p, &m, sizeof m) && m.State == MEM_COMMIT &&
   (m.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) && !(m.Protect & PAGE_GUARD);
 }
-bool ReadPtr(const void *at, uintptr_t *v) { __try { *v = *(const uintptr_t *)at; return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
+/* P0 2026-11-20: never __try-read a guessed pointer blind (stack guard pages), see ../shared/MeguLitSafeRead.h */
+bool ReadPtr(const void *at, uintptr_t *v) { return MeguLitSafe::ReadPtr(at, v); }
 #ifdef _M_IX86
 // Calls exporter->QueryFunctionsByNarrowString and measures who cleaned the stack: 16 bytes left for the caller is
 // the cdecl interface this DLL is built for (TJS2 2.4.14 and later, every KiriKiri Z); 0 is an old stdcall engine.

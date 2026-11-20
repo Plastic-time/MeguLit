@@ -25,7 +25,8 @@
     'body.megulit-place-gone .sentence-window.tomoyo-hook-reader,body.megulit-place-gone .sentence-window.tomoyo-hook-reader *{opacity:0!important;visibility:hidden!important}', /* 2026-11-20 (CHAOS;CHILD: the game cleared its text at a scene change, the old line stayed): gone with the game's line until the next one */
     '.megulit-anchor-window .tome-page-lines{opacity:.6;position:absolute;left:0;right:0;bottom:100%}',
     '.megulit-anchor-window.megulit-page-fresh .tome-page-lines{display:none!important}',
-    '.megulit-anchor-window:not(.megulit-anchor-center) .tome-page-lines{display:none!important}', /* dialogue lines never carry the dimmed page above them (2026-11-20 user: the old lines covered the screen) */
+    '.megulit-anchor-window:not(.megulit-anchor-center) .tome-page-lines{display:none!important}',
+    '.megulit-anchor-window.megulit-game-rows .sentence-text{white-space:nowrap!important}', /* a line on the game's rows breaks where the game broke it, nowhere else */ /* dialogue lines never carry the dimmed page above them (2026-11-20 user: the old lines covered the screen) */
     'body.megulit-placed .megulit-place-window .megulit-ruby-base{position:absolute!important;display:block!important;margin:0!important;padding:0!important}',
     'body.megulit-placed .megulit-place-window .char-token{position:absolute!important;display:block!important;margin:0!important;padding:0!important;text-align:center!important;white-space:pre!important;letter-spacing:0!important;text-indent:0!important;pointer-events:auto}',
     'body.megulit-placed .megulit-place-window .char-token.megulit-unplaced{display:none!important}',
@@ -129,12 +130,12 @@
     if (row) row.style.removeProperty('margin-top');
     if (row && roomBelow && !anchor.center && tr && tr.height) { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
       sentence.style.removeProperty('line-height'); let sx = sentence.getBoundingClientRect();
-      if (sx.bottom > uiLimit && sentence.querySelector('br.megulit-row-br')) { set(sentence, 'line-height', '1.45'); sx = sentence.getBoundingClientRect(); }
+      if (sx.bottom > uiLimit && sentence.querySelector('br.megulit-row-br')) { set(sentence, 'line-height', closeRows(sentence)); sx = sentence.getBoundingClientRect(); }
       if (sx.bottom > uiLimit) { const up = Math.min(sx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); }
       const rr = row.getBoundingClientRect(); if (rr.bottom > uiLimit && rr.top < cy0 + chc) set(row, 'margin-top', Math.ceil(cy0 + chc - rr.top + 4) + 'px'); }
     else if (row && !roomBelow && !anchor.center && tr && tr.height) { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
       sentence.style.removeProperty('line-height');
-      if (row.getBoundingClientRect().bottom > uiLimit && sentence.querySelector('br.megulit-row-br')) set(sentence, 'line-height', '1.45');
+      if (row.getBoundingClientRect().bottom > uiLimit && sentence.querySelector('br.megulit-row-br')) set(sentence, 'line-height', closeRows(sentence));
       const fsx = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rx = row.getBoundingClientRect();
       if (rx.bottom > uiLimit) { const fs = Math.max(Math.ceil(fsx * .85), Math.floor(fsx * Math.max(.85, (uiLimit - rx.top) / Math.max(1, rx.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rx = row.getBoundingClientRect(); }
       if (rx.bottom > uiLimit) { const up = Math.min(rx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); } }
@@ -204,6 +205,9 @@
     }
     window.__tomoyoHitRegionsRefresh?.(true);
   }
+  /* 2026-11-20 (CHAOS;CHILD two-row line: closed up to 1.45 the furigana of the second row sat on the first row's glyphs): the
+     tightest row pitch that still leaves the ruby its own height above the next row (ruby scale of the text, plus a small gap) */
+  function closeRows(n) { const rs = parseFloat(getComputedStyle(n).getPropertyValue('--tomoyo-ruby-scale')) || .55; return String(Math.max(1.45, Math.round((1 + rs + .12) * 100) / 100)); }
   function set(n, p, v) { if (n.style.getPropertyValue(p) !== v) n.style.setProperty(p, v, 'important'); }
   /* the reader's current line, as the placement compares it (blanks out) */
   function readerLine() {
@@ -445,6 +449,7 @@
     shown.forEach((t, j) => { const r = rows.rowOf[j]; if (r < 0) return; if (prev >= 0 && r > prev) { const base = t.closest('.megulit-ruby-base'); const at = base && base.querySelector('.char-token') === t ? base : t; if (!base || at === base) want.add(at); } prev = r; });
     for (const br of win.querySelectorAll('br.megulit-row-br')) if (!want.has(br.nextSibling)) br.remove();
     for (const at of want) if (!(at.previousSibling && at.previousSibling.nodeName === 'BR' && at.previousSibling.classList.contains('megulit-row-br'))) { const br = document.createElement('br'); br.className = 'megulit-row-br'; at.parentNode.insertBefore(br, at); }
+    win.classList.toggle('megulit-game-rows', want.size > 0); /* 2026-11-20 (CHAOS;CHILD: a two-row line drawn as three) the game's row breaks only */
     win.classList.toggle('megulit-anchor-center', Number.isFinite(rows.center));
   }
   function anchorFrom(got, size, map, lineKey, center = null) {

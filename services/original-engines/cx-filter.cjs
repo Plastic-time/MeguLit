@@ -204,7 +204,15 @@ function scoreScript(b){
  for(const dec of [sjisDec,gbkDec]){const t=dec.decode(view);if(!/\ufffd/.test(t)&&(t.match(/[｡-ﾟ]/g)||[]).length<=t.length*.05)return crlf>=lf*.5?8:6;}
  return 0;
 }
-// KiriKiri 2 simple xp3dec.tpm extraction filter: each byte is XOR-ed with (adlr_hash ^ key) & 0xff.
+/* KiriKiri keyless hash filters: the whole key comes from the entry's adlr hash, so they are found by trying them on
+   sample entries and keeping the one whose output reads as a known file head or a script, never by title.
+   hash^k: KiriKiri 2 simple xp3dec.tpm, each byte XOR (adlr_hash ^ k) & 0xff, k one of 256.
+   rot31: 2026-11-20 (#472 #417 #415 #404 #411: kinglove/hutamata/koirowa/koikari.tpm, one 45 KiB plug-in): h = hash &
+   0x7fffffff seen as a 31-bit ring, key[i] = low byte of h rotated right by 8*i bits, byte at file offset o XOR key[o % 31]. */
+function rot31Key(hash){let h=(hash&0x7fffffff)>>>0;h=(h|(h<<31))>>>0;const k=Buffer.alloc(31);for(let i=0;i<31;i++){k[i]=h&0xff;h=((h>>>8)|(((h&0xfffffffe)<<23)>>>0))>>>0;}return k;}
+function rot31(hash,offset,buf,pos=0,count=buf.length-pos){const k=rot31Key(hash>>>0);let o=offset%31;for(let i=0;i<count;i++){buf[pos+i]^=k[o];if(++o===31)o=0;}return buf;}
+const hashXor=k=>function decrypt(hash,offset,buf,pos=0,count=buf.length-pos){const x=((hash>>>0)^k)&0xff;for(let i=0;i<count;i++)buf[pos+i]^=x;return buf;};
+function keylessCandidates(){const out=[{name:'rot31',dec:rot31}];for(let k=0;k<256;k++)out.push({name:'hash^'+k,dec:hashXor(k)});return out;}
 function hashXorFilter(file,xp3,list,plainHits){
  const enc=(list?list.files:[]).filter(e=>e.encrypted&&e.size>=16&&e.size<=(4<<20));
  if(!enc.length)return null;
@@ -212,20 +220,18 @@ function hashXorFilter(file,xp3,list,plainHits){
  const sample=picked.map(e=>{try{return {e,r:xp3.read(file,e).subarray(0,512)};}catch{return null;}}).filter(Boolean);
  if(!sample.length||plainHits>=Math.max(2,Math.ceil(sample.length/2)))return null;
  const minHits=Math.min(2,sample.length);
- let bestK=-1,bestScore=0;
- for(let k=0;k<256;k++){
+ let best=null,bestScore=0;
+ for(const c of keylessCandidates()){
   let hits=0,score=0;
   for(const {e,r} of sample){
-   const x=((e.hash>>>0)^k)&0xff,b=Buffer.from(r);for(let i=0;i<b.length;i++)b[i]^=x;
+   const b=c.dec(e.hash>>>0,0,Buffer.from(r));
    if(looksHashXor(b)){hits++;score+=10;}
    else if(TEXT_NAME.test(e.name)){const sc=scoreScript(b);if(sc>0){hits++;score+=sc;}}
   }
-  if(hits>=minHits&&hits>plainHits&&score>bestScore){bestScore=score;bestK=k;}
+  if(hits>=minHits&&hits>plainHits&&score>bestScore){bestScore=score;best=c;}
  }
- if(bestK<0)return null;
- return function decrypt(hash,offset,buf,pos=0,count=buf.length-pos){
-  const x=((hash>>>0)^bestK)&0xff;for(let i=0;i<count;i++)buf[pos+i]^=x;return buf;
- };
+ if(!best)return null;
+ const dec=best.dec;const fn=(hash,offset,buf,pos=0,count=buf.length-pos)=>dec(hash,offset,buf,pos,count);fn.titles=[best.name];return fn;
 }
 const memo=new Map();
 // The filter of one archive: the known scheme that turns most of its encrypted entries into known heads (at least
@@ -251,4 +257,4 @@ function forArchive(file){let key;try{const st=fs.statSync(file);key=path.resolv
     if(cb)tryScheme(()=>filter({...s,cb}),s.titles);}
     if(!best)best=hashXorFilter(file,xp3,list,plainHits);}}catch{best=null;}
  memo.set(key,best);return best;}
-module.exports={filter,generate,run,schemes,controlBlockIn,forArchive,looks,hxChacha,hxEntryDecryptor};
+module.exports={rot31,rot31Key,filter,generate,run,schemes,controlBlockIn,forArchive,looks,hxChacha,hxEntryDecryptor};

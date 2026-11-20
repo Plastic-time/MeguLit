@@ -75,7 +75,10 @@ function voiced(text){const out=[];let pending=[];
   if(m){if(pending.length)for(const koe of pending)out.push({text:m,koe});else out.push({text:m,koe:null});pending=[];}}
  return out;}
 // The release's scene package: Scene.pck first (the original), else another Scene*.pck.
-function scenePck(dir){let names=[];try{names=fs.readdirSync(dir).filter(n=>/^scene.*\.pck$/i.test(n));}catch{}names.sort((a,b)=>(/^scene\.pck$/i.test(b)?1:0)-(/^scene\.pck$/i.test(a)?1:0));return names.length?path.join(dir,names[0]):null;}
+function scenePckHere(dir){let names=[];try{names=fs.readdirSync(dir).filter(n=>/^scene.*\.pck$/i.test(n));}catch{}names.sort((a,b)=>(/^scene\.pck$/i.test(b)?1:0)-(/^scene\.pck$/i.test(a)?1:0));return names.length?path.join(dir,names[0]):null;}
+/* Scene.pck at the top, else in one sub-folder (patched / repacked installs keep the game in e.g. 1st_beat/ beside readme folders) */
+function scenePck(dir){const top=scenePckHere(dir);if(top)return top;let subs=[];try{subs=fs.readdirSync(dir,{withFileTypes:true}).filter(d=>d.isDirectory()).map(d=>d.name).sort();}catch{}
+ const hits=subs.map(n=>scenePckHere(path.join(dir,n))).filter(Boolean);return hits.length===1?hits[0]:null;}
 // Lines with a voice number in a game folder: [{text, ref:'koe:<n>'}].
 function voiceLines(dir){const f=scenePck(dir);if(!f)return [];let list=[];try{list=sources(f);}catch{return [];}
  return list.filter(s=>/\.ss$/i.test(s.name)).flatMap(s=>voiced(decode(s.raw))).filter(x=>x.koe!==null).map(x=>({text:x.text,ref:'koe:'+x.koe}));}

@@ -60,8 +60,8 @@
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-import-row>:is(select,button){margin:0!important}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-import-row>button{padding:5px 12px!important;height:32px}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-calibration-imports{margin-top:6px}
- /* reusable in-panel second-level tabs (.mg-subtabs): plain text tabs, one row, scrolls sideways when too many */
- .mg-subtabs{display:flex;flex-wrap:nowrap;gap:2px 4px;margin:6px 0 6px;border-bottom:1px solid var(--menu-border,#34343a);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+ /* reusable in-panel second-level tabs (.mg-subtabs): plain text tabs; a narrow panel wraps them onto more rows, so every tab is always visible (sideways scrolling hid the last ones) */
+ .mg-subtabs{display:flex;flex-wrap:wrap;gap:2px 4px;margin:6px 0 6px;border-bottom:1px solid var(--menu-border,#34343a);overflow:visible}
  .mg-subtabs>button{flex:none;padding:7px 12px!important;border:0!important;border-bottom:2px solid transparent!important;border-radius:0!important;background:transparent!important;color:var(--theme-textSecondary,#aaa)!important;cursor:pointer;font-size:13px;margin-bottom:-1px;white-space:nowrap}
  .mg-subtabs>button:hover{color:var(--theme-text,#e8e9ec)!important}
  .mg-subtabs>button[aria-selected=true]{color:var(--menu-accent,#e0495a)!important;border-bottom-color:var(--menu-accent,#e0495a)!important;font-weight:700}
@@ -136,7 +136,7 @@
     btn.onclick=()=>{bst.open=!bst.expanded;run();};cal.prepend(bar);}
    if(bar.nextElementSibling!==calNodes.bind)bar.after(calNodes.bind);
    const bound=!!window.__tomoyoChinese?.galBoundTitle;if(bst.last!==bound){bst.open=null;bst.last=bound;}
-   bst.expanded=bst.open===null?!bound:bst.open;bar.dataset.bound=String(bound);calNodes.bind.classList.toggle('tome-ac-off',!bst.expanded);
+   bst.expanded=bst.open===null?false:bst.open;bar.dataset.bound=String(bound);calNodes.bind.classList.toggle('tome-ac-off',!bst.expanded);
    const btn=bar.querySelector('button'),t=I(bst.expanded?'收起':'换一个窗口');if(btn.textContent!==t)btn.textContent=t;btn.setAttribute('aria-expanded',String(bst.expanded));}
   for(const s of dialog.querySelectorAll('[data-menu-category=text] small,[data-menu-category=calibrate] small'))if(!s.dataset.acT){s.dataset.acT='1';s.addEventListener('mouseover',()=>{if(!s.title&&s.scrollHeight>s.clientHeight+1)s.title=s.textContent.trim();});s.addEventListener('click',()=>s.classList.toggle('tome-ac-open'));}
  }
