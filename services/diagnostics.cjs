@@ -104,6 +104,10 @@ function originalTextState(root,id){
  if(saved&&typeof saved==='object'){const pick={};for(const k of ['status','patchStatus','engine','mode','error','updatedAt','checkedAt','lines','matched','coverage','provider'])if(saved[k]!=null)pick[k]=typeof saved[k]==='object'?saved[k]:String(saved[k]).slice(0,400);if(saved.runtime)pick.runtime={engine:saved.runtime.engine,file:saved.runtime.file,codepage:saved.runtime.codepage,version:saved.runtime.version,lines:saved.runtime.lines,japaneseLines:saved.runtime.japaneseLines};saved=pick;}
  return {brief,saved};
 }
+/* 2026-11-21 the game diff calibrated on this PC and the self-check windows of the running game (docs/auto-profile.md): the
+   upload format the server aggregates; no paths, the program name only */
+function autoProfile(root,executable,engine){try{const ap=require('../core/auto-profile.cjs');let gameKey='';try{const p=require('../core/profiles/index.cjs').profileFor({exe:executable,engine});if(p&&p.gameKey&&p.gameKey!=='none')gameKey=p.gameKey;}catch{}
+ const key=ap.keyFor({gameKey,exe:executable});if(!key)return null;let windows=[];try{const cur=require('./self-check-live.cjs').current();if(cur&&cur.key===key)windows=cur.check.windows;}catch{}return ap.diagnostic(ap.load(root,key),windows);}catch{return null;}}
 function osInfo(){let version='';try{version=os.version();}catch{}return {platform:process.platform,release:os.release(),version,arch:process.arch,node:process.version,locale:Intl.DateTimeFormat().resolvedOptions().locale};}
 function findScreenshot(root,executable,maxAgeMs=6*3600*1000){
  const dirs=[path.join(root,'data','screenshots'),path.join(root,'logs','screenshots'),path.join(root,'logs')];const base=executable?path.basename(executable,path.extname(executable)).toLowerCase():'';let best=null;
@@ -121,7 +125,7 @@ function collect(root,db,id,{version='',now=new Date(),who=identity(),screenshot
  const info={schema:1,createdAt:now.toISOString(),megulit:{version:String(version||'')},os:osInfo(),
   game:{id:String(row.id),title:row.title,engine:String(library.engine||''),executable:row.executable||'',executableName:exe,available:!!row.executable&&fs.existsSync(row.executable),localeMode:library.localeMode||(library.localeJapanese===true?'japanese':'auto'),source:row.source,lastLaunchedAt:ms(row.last_launched_at)?new Date(ms(row.last_launched_at)).toISOString():null,removed:row.removed_at!=null},
   embed:{hookSupport:String(library.hook||'unknown'),hookVerifiedAt:ms(library.hookVerifiedAt)?new Date(ms(library.hookVerifiedAt)).toISOString():null,hookVerifiedStream:library.hookVerifiedStream||null,hookReadonlyAt:ms(library.hookReadonlyAt)?new Date(ms(library.hookReadonlyAt)).toISOString():null,hookReadonlyBuild:library.hookReadonlyBuild||null,hookVerdictStale:require('./hook-verdict.cjs').stale(library,require('./hook-verdict.cjs').appVersion(root)),hookStreams:hookStreams(root,row.executable)},
-  originalText:originalTextState(root,id),adaptation:overviewRow?{reading:overviewRow.reading,zeroLatency:overviewRow.zeroLatency,evidence:overviewRow.evidence}:null,
+  originalText:originalTextState(root,id),autoProfile:autoProfile(root,row.executable,library.engine),adaptation:overviewRow?{reading:overviewRow.reading,zeroLatency:overviewRow.zeroLatency,evidence:overviewRow.evidence}:null,
   runs:windows.slice(-20).map(w=>({from:new Date(w.from).toISOString(),to:new Date(w.to).toISOString()})),logs:logInfo};
  files.unshift({name:'info.json',data:scrub(JSON.stringify(info,null,2),who),kind:'info'});
  const shot=screenshot?findScreenshot(root,row.executable):null;if(shot){try{files.push({name:'screenshot'+(shot.ext==='.png'?'.png':'.jpg'),data:fs.readFileSync(shot.file),kind:'screenshot'});}catch{}}
