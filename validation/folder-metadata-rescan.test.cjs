@@ -79,6 +79,7 @@ test('a folder game keeps its enriched identity through startup and manual resca
  online=false;save('v3');await enrichment.run(game.id,'en',false);
  assert.deepEqual(info(),{id:game.id,vndbId:'v3',detailVndbId:'v3',appid:'333'});
  save('v4');
+ assert.deepEqual(info(),{id:game.id,vndbId:'v4',detailVndbId:'v4',appid:''});
  online=false;await scan(true);await enrichment.run(game.id,'en',true);
  work='v4';storeId='444';online=true;await enrichment.run(game.id,'en',true);
  assert.deepEqual(info(),{id:game.id,vndbId:'v4',detailVndbId:'v4',appid:'444'});
