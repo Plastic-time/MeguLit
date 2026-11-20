@@ -41,7 +41,7 @@ class RuntimeSample{
   return null;}
  shot(jpegBase64){if(this.shots.length>=SHOTS_AT.length||typeof jpegBase64!=='string')return false;const b=Buffer.from(jpegBase64,'base64');if(b.length<100||b.length>SHOT_MAX||b[0]!==0xff||b[1]!==0xd8)return false;this.shots.push(b);return true;}
  /* written once, after the first window; an older sample of the same exe is replaced */
- save(root,key){if(this.done||!key)return '';this.done=true;const d=keyDir(root,key);try{fs.rmSync(d,{recursive:true,force:true});fs.mkdirSync(d,{recursive:true});
+ save(root,key,prints=null){if(this.done||!key)return '';this.done=true;if(prints)this.sample.prints=require('../core/game-print.cjs').check(prints);const d=keyDir(root,key);try{fs.rmSync(d,{recursive:true,force:true});fs.mkdirSync(d,{recursive:true});
   fs.writeFileSync(path.join(d,'sample.json'),JSON.stringify({...this.sample,key,shots:this.shots.length},null,1));this.shots.forEach((b,i)=>fs.writeFileSync(path.join(d,'shot-'+(i+1)+'.jpg'),b));
   let scrub=t=>t;try{const dg=require('./diagnostics.cjs');if(dg.scrub)scrub=t=>dg.scrub(t);}catch{}
   const NL=String.fromCharCode(10);fs.writeFileSync(path.join(d,'hook-events.log'),scrub(this.logs.hook.join(NL)+NL));fs.writeFileSync(path.join(d,'reader-host.log'),scrub(this.logs.reader.join(NL)+NL));}catch{return '';}return d;}

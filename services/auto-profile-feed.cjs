@@ -29,7 +29,7 @@ function keys(){return trusted||keyList('profile-keys.json');}
 function _trust(v){trusted=v||null;}
 function verify(doc,list){const s=doc?.signature;if(!s||s.alg!=='ed25519'||typeof s.keyId!=='string'||typeof s.value!=='string')return false;const k=list.find(x=>x.id===s.keyId);if(!k)return false;
  try{return crypto.verify(null,Buffer.from(gameDiff.canonical(gameDiff.unsigned(doc))),crypto.createPublicKey({key:Buffer.from(k.publicKey,'base64'),format:'der',type:'spki'}),Buffer.from(s.value,'base64'));}catch{return false;}}
-function layer(answer,key){const d=answer?.diff;if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key||!d||d.key!==key)return null;
+function layer(answer,key){const d=answer?.diff;if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key||!d||(d.layer!=='game'&&d.key!==key))return null;
  if(!gameDiff.validate(d).ok)return null;if(!verify(d,keys()))return null;
  return {source:d.source,mode:d.mode,settings:d.settings,agree:d.agree|0,reporters:d.reporters|0,issuedAt:d.issuedAt||''};}
 function cached(root,key){if(!gameDiff.KEY.test(String(key||'')))return null;try{const v=JSON.parse(fs.readFileSync(path.join(dir(root),key+'.json'),'utf8'));return v&&typeof v==='object'?v:null;}catch{return null;}}

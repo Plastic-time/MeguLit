@@ -7,8 +7,13 @@
    node tools/sign-profile.cjs keygen <folder outside the repo>   a new key pair: <folder>/megulit-profile-<id>.pem (private) and the
                                                                    public key (SPKI DER, base64) to add to services/profile-keys.json
    node tools/sign-profile.cjs key <game.exe>                      the diff key of a program file (64 hex SHA-256)
-   node tools/sign-profile.cjs make <exeHash> <settings.json> [--mode hide|read] [--exe name] [--engine id] > diff.json
-                                                                   an official diff (only domain keys survive; dropped ones on stderr)
+   node tools/sign-profile.cjs make <key> <settings.json> [--layer version|game] [--prints prints.json] [--rev N] [--mode hide|read]
+                                    [--exe name] [--engine id] > diff.json
+                                                                   an official diff (only domain keys survive; dropped ones on stderr).
+                                                                   version layer: key = the exe SHA-256, prints may add head / pe;
+                                                                   game layer: key = the game identity (the relay's 'game' of a report,
+                                                                   or any 64 hex), prints = pack / script / steam / vndb / title
+                                                                   (core/game-print.cjs) - every build with one of them gets it
    node tools/sign-profile.cjs sign <diff.json> > signed.json      sign one document (official or auto)
    node tools/sign-profile.cjs picks <relay base> <out folder> [--upload]
                                                                    the relay's agreed picks waiting for a signature (MEGULIT_ADMIN_TOKEN):
@@ -38,7 +43,8 @@ if(require.main===module){const [cmd,a,b]=process.argv.slice(2);const arg=(n,f)=
    console.log(JSON.stringify({privateKeyFile:f,set:'MEGULIT_PROFILE_KEY='+f,profileKeysEntry:{id,alg:'ed25519',publicKey:publicKey.export({format:'der',type:'spki'}).toString('base64'),added:new Date().toISOString().slice(0,10)}},null,1));}
   else if(cmd==='key')console.log(crypto.createHash('sha256').update(fs.readFileSync(a)).digest('hex'));
   else if(cmd==='make'){const r=clean(JSON.parse(fs.readFileSync(b,'utf8')));if(r.rejected.length)console.error('dropped: '+r.rejected.join(', '));
-   const d=gameDiff.build({key:a,source:'official',mode:arg('mode','hide'),settings:r.value,exe:arg('exe',''),engine:arg('engine','')});const v=gameDiff.validate(d);if(!v.ok)throw Error('invalid: '+v.error);console.log(JSON.stringify(d,null,1));}
+   const prints=arg('prints','')?JSON.parse(fs.readFileSync(arg('prints'),'utf8')):undefined;
+   const d=gameDiff.build({key:a,layer:arg('layer','version'),prints,rev:Number(arg('rev','1'))||1,source:'official',mode:arg('mode','hide'),settings:r.value,exe:arg('exe',''),engine:arg('engine','')});const v=gameDiff.validate(d);if(!v.ok)throw Error('invalid: '+v.error);console.log(JSON.stringify(d,null,1));}
   else if(cmd==='sign')console.log(JSON.stringify(signDoc(JSON.parse(fs.readFileSync(a,'utf8')),privateKey(),keyId()),null,1));
   else if(cmd==='picks')console.log(JSON.stringify(await signPicks(a,b,{upload:process.argv.includes('--upload')}),null,1));
   else if(cmd==='check'){const d=JSON.parse(fs.readFileSync(a,'utf8'));const v=gameDiff.validate(d);const feed=require('../services/auto-profile-feed.cjs');const ok=v.ok&&feed.verify(d,feed.keys());console.log(v.ok?(ok?'ok':'bad signature'):'invalid: '+v.error);process.exitCode=ok?0:1;}

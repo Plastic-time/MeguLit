@@ -66,7 +66,9 @@ function windowDone(s,r){if(live!==s)return;const {reader}=s;
  if(!s.key){s.pending=r;return;}
  hookTrace(reader,traceLine(r));
  reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'window',key:s.key,window:r.window,lines:r.lines,pass:r.pass,over:r.over.join(','),layer:s.from||'none',...Object.fromEntries(Object.entries(r.metrics).map(([k,v])=>[k,v==null?-1:v]))});
- if(r.window===1&&s.sample){try{s.sample.save(reader.root,s.key);}catch{}}
+ if(r.window===1&&s.sample){/* the fingerprints the relay matches diffs by (core/game-print.cjs); the exe hash is known, the rest is small reads */
+  let prints=null;try{prints=require('../core/game-print.cjs').prints(s.exe,{exe:s.key,title:s.input?.title||'',steamAppId:s.input?.steamAppId||'',engine:engineOf(s)});}catch{}
+  try{s.sample.save(reader.root,s.key,prints);}catch{}}
  const engine=engineOf(s);
  if(!s.calibrated){s.calibrated=true;let res;try{res=auto.calibrate(s.check.recording||[],{thresholds:s.check.t});}catch(e){hookTrace(reader,'selfCheck calibration failed '+String(e?.message||e).slice(0,120));return;}
   const rec=auto.record({key:s.key,engine,exe:s.exe,version:s.ver,source:'calibration',result:res});try{auto.store(reader.root,s.key,rec);}catch{}s.stored=rec;s.check.recording=null;
