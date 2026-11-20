@@ -5,7 +5,11 @@
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
 const { HookNative } = require('../core/hook-native.cjs');
 test('choice finder: r30 candidates (dialogue pieces and an effect frame) are not options; real options are', () => {
-  const h = { lastSource: 'でも……お声が聞けて、良かったです。', recentSources: [], trace() {} };
+  /* since the layered profiles these checks are ファタ's game diff (choice.dropEffectFrames); the kernel keeps every candidate (ATRI's glued options) */
+  const P = require('../core/profiles/index.cjs'), fata = P.profileFor({ exe: 'C:/g/fata_jp.exe' });
+  const h = { lastSource: 'でも……お声が聞けて、良かったです。', recentSources: [], trace() {}, profile: fata };
+  assert.equal(P.get(fata, 'choice.dropEffectFrames', false), true);
+  assert.deepEqual(HookNative.prototype.choiceFilter.call({ ...h, profile: P.profileFor({}) }, ['お声が聞けて', 'かったです']), ['お声が聞けて', 'かったです'], 'kernel: unchanged');
   assert.equal(HookNative.prototype.choiceFilter.call(h, ['お声が聞けて', 'かったです', 'か良ったか良でっすたか良。良でっすたかでっ。すたかでっ。すたで。す。']), null);
   assert.deepEqual(HookNative.prototype.choiceFilter.call(h, ['扉を開ける', '引き返す']), ['扉を開ける', '引き返す']);
   assert.equal(HookNative.interleaved('り困ますり困わま、すり困わますり、困わますり、わます、わ'), true);

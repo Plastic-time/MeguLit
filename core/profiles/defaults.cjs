@@ -41,6 +41,9 @@ module.exports={
   /* an interleaved effect frame is told by content characters only (ellipses and punctuation repeat in any option); false = the
      kernel: every character counts */
   contentInterleave:false,
+  /* candidates that are a text effect's interleaved frame, or a piece of a line already read, are no options (9b3ff9b1, ファタ r30);
+     false = the kernel: only choice.filters apply */
+  dropEffectFrames:false,
  },
  hide:{
   /* the game's text effect cannot be hidden line by line: start this game in read mode (the original stays, MeguLit shows
