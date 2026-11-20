@@ -9,3 +9,9 @@ test('page lines carry their translation in a reserved row',()=>{
  assert.match(s,/\.tome-page-lines \.tome-page-tr\{display:block;min-height:calc\(var\(--tomoyo-gal-cn-size,20px\) \* 1\.35\)/,'the row is reserved before its text arrives');
  assert.match(s,/for\(const n of document\.querySelectorAll\('\.tome-page-tr'\)\)\{const t=pageTr\.get\(n\.__tomeKey\)\|\|'';if\(n\.textContent!==t\)n\.textContent=t;\}/,'a late translation only fills its row');
 });
+test('page lines take their room from the same estimate as the current translation row (inject.js)',()=>{
+ const inj=fs.readFileSync(path.join(__dirname,'..','web','reader','modules','inject.js'),'utf8');
+ assert.match(inj,/function reserveHeight\(text, el\) \{/);assert.match(inj,/bridge\.translationReserveFor = \(text, el\) => el \? reserveHeight\(text, el\) : 0;/);
+ assert.match(inj,/const h = reserveHeight\(text, output\);/,'the current row uses the same function');
+ assert.match(s,/translationReserveFor\?\.\(\[\.\.\.\(tr\.parentElement\?\.querySelectorAll\('\.tome-page-char'\)/);
+});

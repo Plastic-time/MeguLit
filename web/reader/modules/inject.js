@@ -54,11 +54,17 @@
      Japanese is shown: the height the recent translations took, or an estimate from the Japanese length, whichever is more. A late
      translation shows inside that room and never moves the Japanese (a block standing on its bottom edge grows upwards otherwise). */
   const recentHeights = [];
+  /* the room a translation row of `text` needs, measured on the row element `el`: max(the last three settled translations,
+     the Japanese length at the row's width, one row). Shared with the page's earlier lines (hook-reader.js) */
+  function reserveHeight(text, el) {
+    const cs = getComputedStyle(el), size = parseFloat(cs.fontSize) || 20, lh = parseFloat(cs.lineHeight) || size * 1.4, width = el.clientWidth || row?.clientWidth || 600;
+    const estimate = Math.max(1, Math.ceil([...String(text || '').replace(/[\s\u3000]/g, '')].length * 1.2 * size / Math.max(size, width))) * lh;
+    return Math.ceil(Math.max(estimate, ...recentHeights, lh));
+  }
+  bridge.translationReserveFor = (text, el) => el ? reserveHeight(text, el) : 0;
   function reserve(text) {
     if (!output) return;
-    const cs = getComputedStyle(output), size = parseFloat(cs.fontSize) || 20, lh = parseFloat(cs.lineHeight) || size * 1.4, width = output.clientWidth || row?.clientWidth || 600;
-    const estimate = Math.max(1, Math.ceil([...String(text || '').replace(/[\s\u3000]/g, '')].length * 1.2 * size / Math.max(size, width))) * lh;
-    const h = Math.ceil(Math.max(estimate, ...recentHeights, lh));
+    const h = reserveHeight(text, output);
     output.style.minHeight = h + 'px'; bridge.translationReserve = h;
   }
   function settled() { if (!output || output.dataset.state !== 'ready' || !output.textContent.trim() || output.textContent === '翻译中…') return; const prev = output.style.minHeight; output.style.minHeight = ''; const h = output.getBoundingClientRect().height; output.style.minHeight = prev;
