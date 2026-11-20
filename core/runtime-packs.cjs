@@ -16,6 +16,8 @@ const ON_DEMAND_FILES=['GameRes.dll','ArcFormats.dll','GameData/Formats.dat'];
    "hidden": left out of status() (no row in Settings, nothing to switch), never removable, fetched by core/hook-native.cjs
    in the background the first time a game is hooked and injected by HookBridge once it is on disk. A pack may name the
    files that make it complete with "files"; without it the GARbro list above applies. */
+/* contract of an installed pack (its pack.json), 0 when there is none */
+const packContract=dir=>{try{return +JSON.parse(fs.readFileSync(path.join(dir,'pack.json'),'utf8').replace(/^﻿/,'')).contract||0;}catch{return 0;}};
 const packFiles=pack=>Array.isArray(pack?.files)&&pack.files.length?pack.files:ON_DEMAND_FILES;
 
 const SHARED=new Map();
@@ -26,7 +28,9 @@ class RuntimePacks{
  /* parsed once per change of runtime.json: installed() and status() ask for it on every reader and Settings poll */
  manifest(){const f=path.join(this.root,'setup','runtime.json');let k='';try{const s=fs.statSync(f);k=s.size+'|'+s.mtimeMs;}catch{}if(k&&this.manifestKey===k)return this.manifestCache;
   let m;try{m=JSON.parse(fs.readFileSync(f,'utf8').replace(/^﻿/,''));}catch{m={packs:{}};}this.manifestKey=k;this.manifestCache=m;return m;}
- installed(id){const marker=MARKERS[id];if(!marker||!fs.existsSync(path.join(this.root,marker)))return false;const p=this.manifest().packs?.[id],dest=p?.dest;return !dest||packFiles(p).every(f=>fs.existsSync(path.join(this.root,dest,f)));}
+ installed(id){const marker=MARKERS[id];if(!marker||!fs.existsSync(path.join(this.root,marker)))return false;const p=this.manifest().packs?.[id],dest=p?.dest;if(!dest)return true;if(!packFiles(p).every(f=>fs.existsSync(path.join(this.root,dest,f))))return false;
+   /* 2026-11-21 (P0, runtime-dump: the 2026-11-13 pack kept a stack overflow its source had fixed; files present = installed, so it was never fetched again): a manifest entry may name the pack contract it needs; an installed pack.json below it is not installed, and the pack is fetched again */
+   return packContract(path.join(this.root,dest))>=(+p.contract||0);}
  onDemand(id){return !!this.manifest().packs?.[id]?.onDemand;}
  status(){const m=this.manifest();return {version:m.version||'',packs:Object.entries(m.packs||{}).filter(([,p])=>!p.hidden).map(([id,p])=>{const j=this.jobs[id];return {id,size:p.size||0,unpacked:p.unpacked||0,onDemand:!!p.onDemand,license:p.license||'',installed:this.installed(id),job:j?{state:j.state,stage:j.stage,received:j.received,total:j.total,error:j.error}:null};})};}
  download(ids){
@@ -79,4 +83,4 @@ class RuntimePacks{
   if(!this.installed(id))throw Error('安装不完整');
  }
 }
-module.exports={RuntimePacks,MARKERS,ON_DEMAND_FILES,mirrorUrl};
+module.exports={RuntimePacks,packContract,MARKERS,ON_DEMAND_FILES,mirrorUrl};
