@@ -387,7 +387,11 @@ class HookNative{
   {const t=m.text;const at=setTimeout(()=>this.artCandidate(t),AUX_ART_DELAY_MS);at.unref?.();}/* 2026-11-19 (千恋＊万花 settings page: 「オオ」「テテ」 went to OCR as options) no choice candidates while the dialogue box is gone for a known reason */if(this.dialogGoneAt&&Date.now()-this.dialogGoneAt>=800){this.trace('choice aux skipped: dialogue box gone');return;}const C=this.choice||(this.choice=this.newChoiceCapture());const added=C.add(m.text,this.lastSource,this.speaker?.text);
   this.trace('choice aux '+String(m.sourceName||'').slice(0,40)+' role='+(m.role??'')+' added='+JSON.stringify(added)+' text='+JSON.stringify(String(m.text).slice(0,80)));
   if(!added.length)return;clearTimeout(this.choiceTimer);this.choiceTimer=setTimeout(()=>this.requestChoices(0),450);this.choiceTimer.unref?.();}
- requestChoices(round){const options=round>0&&this.choiceOptions?this.choiceOptions:this.choice?.options();
+ /* 2026-11-21 (ファタモルガーナの館 r30: 「choice locate options=["お声が聞けて","かったです","か良ったか良でっす…"]」): a text effect's interleaved frame and a piece
+    of the dialogue line are not options. Interleaved: one pair of characters three times or more, or few distinct characters for its length */
+ static interleaved(t){const a=[...HookNative.flat(t)];if(a.length<8)return false;if(new Set(a).size/a.length<.55)return true;const m=new Map();for(let i=0;i+1<a.length;i++){const g=a[i]+a[i+1];m.set(g,(m.get(g)||0)+1);if(m.get(g)>=3)return true;}return false;}
+ choiceFilter(options){if(!Array.isArray(options))return options;const said=[this.lastSource,...(this.recentSources||[])].map(x=>HookNative.flat(x)).filter(Boolean);const kept=options.filter(o=>{const f=HookNative.flat(o);if(!f||HookNative.interleaved(f))return false;return !said.some(x=>x!==f&&x.includes(f));});if(kept.length!==options.length)this.trace('choice options filtered '+options.length+' -> '+kept.length);return kept.length>=2?kept:null;}
+ requestChoices(round){const options=this.choiceFilter(round>0&&this.choiceOptions?this.choiceOptions:this.choice?.options());
   if(!options){this.trace('choice candidates too few n='+(this.choice?.items.length||0));return;}
   if(typeof this.locateChoices!=='function'){this.trace('choice locate unavailable');return;}
   this.choiceOptions=options;this.choiceRound=round;this.trace('choice locate round='+round+' options='+JSON.stringify(options));this.locateChoices(options);}
