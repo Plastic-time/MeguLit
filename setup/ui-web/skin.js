@@ -9,6 +9,7 @@
   window.addEventListener('unhandledrejection', (e) => die('promise rejected: ' + (e.reason && e.reason.message || e.reason)));
   let gl = null; try { const c = document.createElement('canvas'); gl = c.getContext('webgl2') || c.getContext('webgl'); } catch (e) { /* none */ }
   if (!gl || T === 'nogl') { die('WebGL is not available'); return; }
+  try { const lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext(); } catch (e) { /* ignore */ }   /* the probe context is not needed any more: do not hold a GPU context while the scene creates its own */
   if (T === 'boom') { throw new Error('test: script error before the first frame'); }
   /* bridge */
   const pend = new Map(); let lastState = null, info = null, infoWait = [], nid = 0;
@@ -28,7 +29,7 @@
   };
   window.__askClose = () => { post({ type: 'asked' }); const b = document.getElementById('btnClose'); if (b) b.click(); };
   /* first frame: the scene exists and two frames were drawn; then say ready (the host waits up to 10 s) */
-  let frames = 0; const t0 = performance.now(), count = () => { frames++; if (!isReady && frames >= 2 && window.Scene && Scene.section && T !== 'silent') { isReady = true; post({ type: 'ready' }); setTimeout(() => { const b = document.getElementById('boot'); if (b) { b.classList.add('gone'); setTimeout(() => b.remove(), 800); } }, 1800); if (T === 'lateboom') setTimeout(() => { throw new Error('test: script error after the first frame'); }, 3000); } requestAnimationFrame(count); };
+  let frames = 0; const t0 = performance.now(), count = () => { frames++; if (!isReady && frames >= 2 && window.Scene && Scene.section && window.GL && GL.ok && T !== 'silent') { isReady = true; post({ type: 'ready' }); setTimeout(() => { const b = document.getElementById('boot'); if (b) { b.classList.add('gone'); setTimeout(() => b.remove(), 800); } }, 1800); if (T === 'lateboom') setTimeout(() => { throw new Error('test: script error after the first frame'); }, 3000); } requestAnimationFrame(count); };
   requestAnimationFrame(count);
   /* frame-rate guard: halve the render scale first, then give up on the skin */
   let slowChecks = 0, last = 0, lastT = performance.now(); setInterval(() => {

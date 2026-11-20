@@ -10,7 +10,9 @@
   const Q = new URLSearchParams(location.search), NIGHT = window.__themeDark !== undefined ? !!window.__themeDark : Q.get('theme') === 'night', REDUCE = Q.get('reduce') === '1' || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const MODE = Q.get('mode') === 'B' ? 'B' : Q.get('mode') === 'A' ? 'A' : 'M';   /* M = merged: radial-cracked plates in B's clear relief glass */
   const view = document.getElementById('view'); if (!view) return;
-  let renderer; try { renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' }); } catch (e) { return; }
+  /* the GPU process of a fresh WebView2 profile is not always ready for the first context ("OES_packed_depth_stencil support is required"): try again for up to ~2 s before giving up */
+  let renderer; for (let tries = 0; tries < 14 && !renderer; tries++) { try { renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' }); } catch (e) { renderer = null; const until = performance.now() + 150; while (performance.now() < until) { /* brief wait */ } } }
+  if (!renderer) return;
   if (!renderer.getContext()) return;
   const P = 820, FY = 1200, D2R = Math.PI / 180;
   const el = renderer.domElement; el.id = 'gl'; el.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block'; view.insertBefore(el, view.firstChild);
