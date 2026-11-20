@@ -153,7 +153,7 @@ test('calm native loading screen: real stages from the script, no frame bundle, 
   assert.ok(!/GdipCreateBitmapFromStream|SHCreateMemStream/.test(rs), 'no video/frame decoding in the exe splash');
   assert.match(rt, /Set-SplashStage/); assert.match(rt, /'page-frame1'/); assert.match(rt, /-not \$env:MEGULIT_NATIVE_SPLASH/);
   assert.match(web, /Release-NativeSplash 'skin-frame1'/); assert.match(rt, /\$script:win\.BringFront\(\)/, 'the skin window is brought to the front before the splash fades'); assert.match(web, /public void BringFront\(\)/);
-  assert.match(rs, /794\.0/); assert.match(web, /794 \* \$scale/); assert.match(rt, /Size\(794, 508\)/);
+  assert.match(rs, /913\.0/); assert.match(web, /913 \* \$scale/); assert.match(rt, /Size\(913, 584\)/);
 });
 
 test('nothing is downloaded, probed or prefetched before the user presses Install', () => {
@@ -178,10 +178,11 @@ test('the folder picker panel markup is in the page, hidden until Browse', { ski
   assert.ok(s.has && s.ids && s.display === 'none', JSON.stringify(s));
 });
 
-test('transparent glass loading screen: per-pixel alpha window, glass logo PNG with real alpha, click-through, skin fades in as it fades out', () => {
+test('transparent loading screen: only a thin bar and a small status line, per-pixel alpha, click-through, skin fades in as it fades out', () => {
   const rs = fs.readFileSync(path.join(repo, 'desktop', 'src', 'runtime_setup.rs'), 'utf8'), web = fs.readFileSync(path.join(repo, 'setup', 'setup-web.ps1'), 'utf8'), rt = fs.readFileSync(path.join(repo, 'setup', 'setup-runtime.ps1'), 'utf8');
-  const png = fs.readFileSync(path.join(repo, 'setup', 'glass-logo.png')); assert.equal(png.toString('ascii', 1, 4), 'PNG'); assert.equal(png[25], 6, 'RGBA'); assert.ok(png.readUInt32BE(16) >= 900, 'about 2x resolution: ' + png.readUInt32BE(16));
-  assert.match(rs, /UpdateLayeredWindow/); assert.match(rs, /0x80\|0x8\|0x0800_0000\|0x0008_0000\|0x20/, 'toolwindow, topmost, no-activate, layered, transparent (click-through)'); assert.match(rs, /0x000E200B/, '32bpp premultiplied ARGB'); assert.match(rs, /glass-logo\.png/);
-  assert.ok(!rs.includes('CreateSolidBrush') && !/[^p]FillRect\(/.test(rs), 'no background plate any more');
+  assert.ok(!fs.existsSync(path.join(repo, 'setup', 'glass-logo.png')) && !fs.existsSync(path.join(repo, 'tools', 'setup-glass-logo.cjs')), 'no glass logo asset or tool any more');
+  assert.ok(!rs.includes('GdipDrawImageRectI(s.g'), 'nothing but bar and text is drawn'); assert.match(rs, /320\.0\*s\.sc/, 'bar about 320 logical px'); assert.match(rs, /12\.0\*scale/, 'status text 12 px');
+  assert.match(rs, /UpdateLayeredWindow/); assert.match(rs, /0x80\|0x8\|0x0800_0000\|0x0008_0000\|0x20/, 'toolwindow, topmost, no-activate, layered, transparent (click-through)'); assert.match(rs, /0x000E200B/, '32bpp premultiplied ARGB');
+  assert.ok(!rs.includes('CreateSolidBrush') && !/[^p]FillRect\(/.test(rs), 'no background plate');
   assert.match(web, /MEGULIT_NATIVE_SPLASH\) \{ \$win\.Opacity = 0 \}/); assert.match(web, /public void FadeIn\(/); assert.match(rt, /FadeIn\(14, 280\)/);
 });
