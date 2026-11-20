@@ -75,18 +75,39 @@ test('ファタ: a hook line no page line draws (its own layer) is delivered fro
  assert.ok(f.traces.some(s=>/hook line already read, skipped/.test(s)));
 });
 
-test('ファタ 22:52:51-22:52:54: the choice 「……おはよう………………」 is an option and its hook line is read as the choice rows',t=>{
+test('ファタ 22:52:51-22:52:54: the option 「……おはよう………………」 survives the choice filter, the screen label does not; its hook line is left to the choice layer',t=>{
  const f=fixture(t);prologue(f);f.at(S('2:51.000'));
  assert.equal(HookNative.interleaved('……おはよう………………'),false,'ellipses are no effect frame');
  assert.equal(HookNative.interleaved('……おはよう……………おはよう……………'),true,'the effect frame of it is');
+ assert.deepEqual(f.hook.choiceFilter(['選択肢','……おはよう………………','…………']),['……おはよう………………','…………']);
  f.aux(S('2:51.584'),'選択肢','Krkr2wcs');f.aux(S('2:52.629'),'……おはよう……………おはよう……………');
  f.hookLine(S('2:52.634'),'選択肢選択肢……おはよう………………','Krkr2wcs');f.aux(S('2:52.636'),'……おはよう………………','KiriKiri4');
- f.at(S('2:53.200'));
- assert.ok(f.located.some(o=>o.includes('……おはよう………………')),'the option is located: '+JSON.stringify(f.located)+' '+JSON.stringify(f.traces.filter(s=>/choice/.test(s))));
  f.at(S('2:55.000'));
  const got=f.sources();
- assert.ok(got.some(g=>g.split('\n').includes('……おはよう………………')),'the option text is read with translation and ruby: '+JSON.stringify(got)+JSON.stringify(f.traces.slice(-14)));
+ assert.ok(!got.some(g=>/おはよう/.test(g)),'the choice screen is not read as a dialogue line (that cleared the choice layer): '+JSON.stringify(got));
+ assert.ok(f.traces.some(s=>/left to the choice layer/.test(s)),JSON.stringify(f.traces.slice(-8)));
  assert.equal(f.traces.filter(s=>/dropped/.test(s)).length,0);
+});
+
+/* incr11 (owner, 2026-11-20 23:33:41Z, hook-diagnostics-20261120-232903-812.log): the option came on the selected dialogue stream (KiriKiri4)
+   while the side streams carried the music title and the screen's labels. The game now draws the link text itself (script.inc keeps link
+   text visible); OCR finds the option, the other candidate is only an ellipsis row: the choice layer shows the one option */
+test('ファタ incr11 23:33:41: labels and the music title are no options; the option OCR finds is shown, never read as a line',t=>{
+ const f=fixture(t);prologue(f);f.at(S('3:40.000'));
+ f.aux(S('3:41.210'),'女中のテーマピアノソロ','Krkr2wcs');f.begin(S('3:41.400'),44);f.hookLine(S('3:41.451'),'おはようございます、旦那さま……。','KiriKiri4');f.end(S('3:41.900'),44,'おはようございます、旦那さま……。');
+ f.aux(S('3:41.465'),'…………。　　　おはようございます、旦那さま……。');f.aux(S('3:41.466'),'おはようございます、旦那さま……。','KiriKiri2');
+ f.aux(S('3:41.511'),'選択肢選択肢選択肢……おはよう………………','Krkr2wcs');f.aux(S('3:41.512'),'……おはよう………………');
+ f.hookLine(S('3:41.513'),'……おはよう………………','KiriKiri4');f.aux(S('3:41.709'),'選択ライン選択ライン','Krkr2wcs');
+ f.at(S('3:42.400'));
+ const asked=f.located[f.located.length-1]||[];
+ assert.ok(asked.includes('……おはよう………………'),'the option is located: '+JSON.stringify(f.located)+JSON.stringify(f.traces.filter(s=>/choice/.test(s)).slice(-8)));
+ assert.ok(!asked.some(o=>/テーマ|選択/.test(o)),'no label or music title: '+JSON.stringify(asked));
+ f.hook.choiceBoxes({type:'hookChoiceBoxes',status:'found',sw:804,sh:604,items:[{text:'……おはよう………………',x0:300,y0:262,x1:520,y1:290}],missed:asked.filter(o=>o!=='……おはよう………………'),rows:['……おはよう……']});
+ const shown=f.events.filter(m=>m&&m.hookChoices).pop();
+ assert.ok(shown&&shown.hookChoices.items.length===1&&shown.hookChoices.items[0].text==='……おはよう………………','the choice layer shows the option: '+JSON.stringify(asked)+JSON.stringify(f.traces.filter(s=>/choice/.test(s)).slice(-6)));
+ f.at(S('3:46.000'));
+ assert.ok(!f.sources().some(g=>/おはよう………/.test(g)),'the option is not read as a dialogue line: '+JSON.stringify(f.sources().slice(-3)));
+ assert.ok(!f.events.slice(f.events.indexOf(shown)+1).some(m=>m&&m.hookChoices===null),'the choice stays up');
 });
 
 test('core read-mode judge: ファタ\'s lines broken by the effect switch once; clean lines (千恋＊万花) never',t=>{
