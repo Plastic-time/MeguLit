@@ -68,6 +68,17 @@ struct GlyphLearner {
     and is longer) is a redraw: for RedrawMs glyph-height quads in the learned area of a target of the learned size are
     hidden whatever their texture. */
  static const unsigned RedrawMs = 3000; unsigned redrawUntil = 0;
+ /* 2026-11-21 (owner, STEINS;GATE r25: the game's own furigana 「な」「き」 showed over MeguLit's text): a ruby glyph is about half
+    the body height, so the glyph-height rule (+-20 %) never hid it. A quad 0.35-0.65 of the learned height whose box overlaps a
+    body glyph of the current or an earlier line horizontally and sits right on top of it (bottom within 0.15..0.7 body heights
+    above the body's top edge, or overlapping it a little) is that glyph's ruby. */
+ bool RubySized(float h) const { return glyphH > 0 && h >= glyphH * 0.35f && h <= glyphH * 0.65f; }
+ bool RubyOver(const Rect &q) const {
+  for (const std::vector<Rect> *v : { &lastRects, &earlierRects }) for (auto &b : *v) {
+   float bh = b.y1 - b.y0; if (bh <= 0) continue;
+   bool across = q.x1 > b.x0 - bh * 0.25f && q.x0 < b.x1 + bh * 0.25f; float gap = b.y0 - q.y1;
+   if (across && gap >= -bh * 0.15f && gap <= bh * 0.7f) return true; }
+  return false; }
  static bool PageRedraw(const std::wstring &now, const std::wstring &before) { return before.size() >= 2 && now.size() > before.size() && now.compare(now.size() - before.size(), before.size(), before) == 0; }
 
  /* Some hooks hand a sentence over twice in one go (the engine lays it out for the page and again for its log): "X    X".
@@ -289,6 +300,7 @@ struct GlyphLearner {
    bool sameAtlas = rtW == areaW && rtH == areaH && atlases.count(AtlasKey(NULL, tex)), sheet = freshTex && LineSized(tw, th) && rtW == areaW && rtH == areaH && std::fabs((x.y1 - x.y0) - glyphH) <= glyphH * 0.25f;
    // glyph height only: a wait cursor or icon drawn from the same sheet inside the area stays
    bool glyphSize = std::fabs((x.y1 - x.y0) - glyphH) <= glyphH * 0.2f;
+   if (!glyphSize && RubySized(x.y1 - x.y0) && RubyOver(Rect{ x.x0, x.y0, x.x1, x.y1 })) glyphSize = true; /* the line's ruby goes with it */
    bool redraw = (int)(redrawUntil - now) > 0 && rtW == areaW && rtH == areaH;
    if (learned && armed && !readOnly && glyphSize && (sameAtlas || sheet || redraw)) {
     float cx = (x.x0 + x.x1) / 2, cy = (x.y0 + x.y1) / 2;
