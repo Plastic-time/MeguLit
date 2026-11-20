@@ -39,19 +39,22 @@ async function coldRuns() {
   for (let i = 1; i <= RUNS; i++) {
     killLeft(); await sleep(500);
     const r = start(i); let t = '', out = null;
-    while (Date.now() - r.t0 < 45000) { await sleep(150); t = read(r.log); if (/cold-start mark=frame1/.test(t) || /classic window|result=fallback/.test(t)) break; }
+    while (Date.now() - r.t0 < 90000) { await sleep(150); t = read(r.log); if (/cold-start mark=frame1/.test(t) || /classic window|result=fallback/.test(t)) break; }
     await sleep(400); t = read(r.log);
     const fb = /classic window|result=fallback/.test(t);
     out = { run: i, poster: ms(t, 'native-poster') !== null ? ms(t, 'native-poster') : ms(t, 'poster'), pagePoster: ms(t, 'poster'), frame1: ms(t, 'frame1'), fallback: fb, why: fb ? ((/reason="([^"]*)"/.exec(t) || [])[1] || (/classic window[^\n]*/.exec(t) || [''])[0]) : '' };
     out.blank = !fb && (out.poster === null && out.frame1 === null);
+    /* boot steps, ms since the process was launched (spawn time here, `at=` epoch ms in the log) */
+    out.boot = {}; for (const m of t.matchAll(/boot step=(\S+) since_proc=(-?\d+) at=(\d+)/g)) if (!(m[1] in out.boot)) out.boot[m[1]] = +m[3] - r.t0;
+    out.splash = out.boot['splash-shown'] !== undefined ? out.boot['splash-shown'] : null; out.frame1Spawn = out.frame1 !== null && out.boot['skin-window-shown'] !== undefined ? out.boot['skin-window-shown'] + out.frame1 : null;
     { const pg = await cdpPage(r.port); if (pg) { if (i === 1) await pg.shot(path.join(WORK, 'cold-run1.png')); out.nav = await pg.ev('(()=>{const n=performance.getEntriesByType("navigation")[0]||{},p={};performance.getEntriesByType("paint").forEach(e=>p[e.name]=Math.round(e.startTime));return {fetchStart:Math.round(n.fetchStart||0),responseEnd:Math.round(n.responseEnd||0),domInteractive:Math.round(n.domInteractive||0),dcl:Math.round(n.domContentLoadedEventEnd||0),fp:p["first-paint"],fcp:p["first-contentful-paint"],poster:window.__posterAt,m:performance.getEntriesByType("mark").map(e=>e.name+":"+Math.round(e.startTime)).join(" "),res:performance.getEntriesByType("resource").filter(e=>/skin/.test(e.name)).map(e=>Math.round(e.startTime)+"-"+Math.round(e.responseEnd)).join(" ")}})()').catch(() => null); pg.close(); } }
     killTree(r.p.pid); killLeft();
-    console.log(`run ${i}: poster ${out.poster} ms, first video frame ${out.frame1} ms page ${JSON.stringify(out.nav)}${fb ? ' FALLBACK ' + out.why : ''}${out.blank ? ' BLANK' : ''}`);
+    console.log(`run ${i}: splash ${out.splash} ms after launch; window->poster ${out.poster} ms, window->first video frame ${out.frame1} ms, launch->first video frame ${out.frame1Spawn} ms; boot ${JSON.stringify(out.boot)}${fb ? ' FALLBACK ' + out.why : ''}${out.blank ? ' BLANK' : ''}`);
     res.push(out);
   }
   const med = (k) => { const v = res.map((r) => r[k]).filter((x) => x !== null).sort((a, b) => a - b); return v.length ? v[Math.floor((v.length - 1) / 2)] : null; };
   const mx = (k) => Math.max(...res.map((r) => r[k] === null ? Infinity : r[k]));
-  const sum = { runs: RUNS, blank: res.filter((r) => r.blank).length, fallback: res.filter((r) => r.fallback).length, posterMedian: med('poster'), posterMax: mx('poster'), frame1Median: med('frame1'), frame1Max: mx('frame1'), runsDetail: res };
+  const sum = { splashMedian: med('splash'), splashMax: mx('splash'), launchToFrame1Median: med('frame1Spawn'), runs: RUNS, blank: res.filter((r) => r.blank).length, fallback: res.filter((r) => r.fallback).length, posterMedian: med('poster'), posterMax: mx('poster'), frame1Median: med('frame1'), frame1Max: mx('frame1'), runsDetail: res };
   fs.writeFileSync(path.join(WORK, 'cold.json'), JSON.stringify(sum, null, 1)); console.log(JSON.stringify({ ...sum, runsDetail: undefined }));
 }
 async function flow() {

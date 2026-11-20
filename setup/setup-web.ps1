@@ -107,6 +107,7 @@ function Web-Act($m) {
 }
 
 function Start-WebSkin {
+  Boot-Mark 'web-layer-start'
   $why = Web-Wanted; if ($why) { Web-Log ('classic window: ' + $why); return }
   $t0 = [DateTime]::Now; $script:skinT0 = $t0
   try {
@@ -164,7 +165,7 @@ public class SetupWin : Form {
       $cw.add_NavigationCompleted({ if (-not $script:tNav) { $script:tNav = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds } })
       $cw.Navigate('https://megulit-setup.local/index.html?' + $q)
     })
-    $win.Show(); $script:shownAt = [DateTime]::Now; if ($script:posterBox) { $win.Refresh(); Web-Log ('cold-start mark=native-poster ms=' + [int]([DateTime]::Now - $script:shownAt).TotalMilliseconds) }; [void]$web.EnsureCoreWebView2Async($null)
+    $win.Show(); $script:shownAt = [DateTime]::Now; Boot-Mark 'skin-window-shown'; Close-Splash; if ($script:posterBox) { $win.Refresh(); Web-Log ('cold-start mark=native-poster ms=' + [int]([DateTime]::Now - $script:shownAt).TotalMilliseconds) }; $wvEnv = $null; if ($script:wv2EnvTask) { $tw = [DateTime]::Now; while (-not $script:wv2EnvTask.IsCompleted -and ([DateTime]::Now - $tw).TotalSeconds -lt 20) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 10 }; if ($script:wv2EnvTask.Status -eq 'RanToCompletion') { $wvEnv = $script:wv2EnvTask.Result; Web-Log ('webview2 environment prewarmed, ready ' + [int]([DateTime]::Now - $tw).TotalMilliseconds + ' ms after the window') } else { Web-Log ('prewarmed environment not usable: ' + $script:wv2EnvTask.Status) } }; if ($wvEnv) { [void]$web.EnsureCoreWebView2Async($wvEnv) } else { $web.CreationProperties = $props; [void]$web.EnsureCoreWebView2Async($null) }
     if ($oldCtx -ne [IntPtr]::Zero) { try { [void][SetupWin]::SetThreadDpiAwarenessContext($oldCtx) } catch {} }
     # wait for the first rendered frame (the page says "ready" only after WebGL and the scene came up); 10 s at most
     $deadline = $t0.AddSeconds(32)
