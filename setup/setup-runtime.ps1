@@ -23,9 +23,9 @@ Boot-Mark 'winforms-loaded'
 # Splash: the first frame of the installer's opening clip, on screen before any C# is compiled (each Add-Type -TypeDefinition starts csc.exe,
 # seconds on a busy machine). The real window replaces it (setup-web.ps1 / the classic window's Shown). Only where the web skin is wanted.
 $script:splash = $null; $script:wv2EnvTask = $null
-if ($env:MEGULIT_SETUP_WEB -ne '0' -and (-not $env:MEGULIT_SETUP_TEST -or $env:MEGULIT_SETUP_WEB -eq '1') -and -not $env:MEGULIT_SETUP_PREVIEW -and -not $env:MEGULIT_SETUP_THEME -and -not $env:MEGULIT_SETUP_WEB_TEST) {
+if ($env:MEGULIT_SETUP_WEB -ne '0' -and (-not $env:MEGULIT_SETUP_TEST -or $env:MEGULIT_SETUP_WEB -eq '1') -and -not $env:MEGULIT_SETUP_PREVIEW -and -not $env:MEGULIT_SETUP_THEME -and -not $env:MEGULIT_SETUP_WEB_TEST -and -not $env:MEGULIT_NATIVE_SPLASH) {   # with the exe's animated native splash there is no PowerShell startup form at all (it cost ~1.4 s of Forms/GDI+ start-up and showed a still picture)
   try { $bsPath = Join-Path $Root 'setup\ui-web\video\light\intro.jpg'
-    if (Test-Path $bsPath) { $bsForm = New-Object Windows.Forms.Form; $bsForm.FormBorderStyle = 'None'; $bsForm.StartPosition = 'CenterScreen'; $bsForm.ShowInTaskbar = $false; $bsForm.Text = 'MeguLit'; $bsForm.ClientSize = New-Object Drawing.Size(690, 442); $bsForm.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
+    if (Test-Path $bsPath) { $bsForm = New-Object Windows.Forms.Form; $bsForm.FormBorderStyle = 'None'; $bsForm.StartPosition = 'CenterScreen'; $bsForm.ShowInTaskbar = $false; $bsForm.Text = 'MeguLit'; $bsForm.ClientSize = New-Object Drawing.Size(794, 508); $bsForm.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
       $bsPic = New-Object Windows.Forms.PictureBox; $bsPic.Dock = 'Fill'; $bsPic.SizeMode = 'StretchImage'; $bsPic.Image = [Drawing.Image]::FromStream((New-Object IO.MemoryStream (,[IO.File]::ReadAllBytes($bsPath)))); $bsForm.Controls.Add($bsPic)
       $bsForm.Show(); $bsForm.Refresh(); $script:splash = $bsForm; Boot-Mark 'splash-shown' } } catch { Boot-Mark ('splash-failed ' + ($_ -replace '\s+', ' ')) }
   # WebView2 warms up while the rest of the setup is built: its browser process starts now, not when the skin window is created.
@@ -33,6 +33,8 @@ if ($env:MEGULIT_SETUP_WEB -ne '0' -and (-not $env:MEGULIT_SETUP_TEST -or $env:M
       $script:webData = $(if ($env:MEGULIT_SETUP_WEBVIEW2_DATA) { $env:MEGULIT_SETUP_WEBVIEW2_DATA } elseif ($env:WEBVIEW2_USER_DATA_FOLDER) { $env:WEBVIEW2_USER_DATA_FOLDER } else { Join-Path $env:LOCALAPPDATA ('MeguLit\setup-webview2' + $PID) })
       $script:wv2EnvTask = [Microsoft.Web.WebView2.Core.CoreWebView2Environment]::CreateAsync($null, $script:webData, $null); Boot-Mark 'webview2-env-started' } } catch { $script:wv2EnvTask = $null; Boot-Mark ('webview2-prewarm-failed ' + ($_ -replace '\s+', ' ')) }
 }
+# The exe's animated native splash is dropped by a flag file once the skin shows its first video frame (or the classic window appears instead).
+function Release-NativeSplash([string]$why) { if ($env:MEGULIT_SPLASH_FLAG -and -not $script:splashReleased) { $script:splashReleased = $true; try { [IO.File]::WriteAllText($env:MEGULIT_SPLASH_FLAG, $why) } catch {}; Boot-Mark ('native-splash-released why=' + $why) } }
 function Close-Splash { if ($script:splash) { try { $script:splash.Close(); $script:splash.Dispose() } catch {}; $script:splash = $null; Boot-Mark 'splash-closed' } }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [Windows.Forms.Application]::EnableVisualStyles()
@@ -1188,7 +1190,7 @@ $button.add_Click({
   }
   else { if ($script:fetch) { $poll.Stop(); $script:fetch.Cancel() }; $form.Close() }
 })
-$form.add_Shown({ Close-Splash; Boot-Mark ('classic-shown web=' + [bool]$script:webActive + ' opacity=' + $form.Opacity + ' pos=' + $form.Location.X + ',' + $form.Location.Y + $(if ($script:webActive) { ' (invisible control surface, not a visible window)' } else { ' (the classic window is the real UI)' })) })
+$form.add_Shown({ Close-Splash; Release-NativeSplash 'classic-shown'; Boot-Mark ('classic-shown web=' + [bool]$script:webActive + ' opacity=' + $form.Opacity + ' pos=' + $form.Location.X + ',' + $form.Location.Y + $(if ($script:webActive) { ' (invisible control surface, not a visible window)' } else { ' (the classic window is the real UI)' })) })
 $form.add_FormClosing({ if (-not $script:done -and $script:fetch) { $poll.Stop(); $script:fetch.Cancel() } })
 $form.add_Shown({ Update-Free; Note 'shown' @{ stage = $stageDir; want = ($want -join ',') }; if (-not $env:MEGULIT_SETUP_PREVIEW) { Next-Download } })
 if ($testLog) { $deskCheck.Checked = $false; $menuCheck.Checked = $false }

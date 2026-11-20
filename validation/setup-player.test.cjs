@@ -145,3 +145,23 @@ test('window edge hot zones take the mouse (native mode): every edge and corner 
   /* zones are sized in physical px: at a zoom below 1 the CSS width grows */
   const px = await ev('(()=>{document.documentElement.style.setProperty("--rz","9px");return getComputedStyle(document.querySelector(".rz[data-e=l]")).width})()'); assert.equal(px, '9px');
 });
+
+test('native splash hand-off: ?st= (the exe splash clock) makes the video start at the same moment, intro first, the welcome loop later', { skip, timeout: 60000 }, async () => {
+  const withSt = async (ageMs) => { await ev('try{localStorage.clear()}catch(e){}'); await cdp('Page.navigate', { url: page(fixture, '&st=' + (Date.now() - ageMs)) }); for (let i = 0; i < 100; i++) { if (await ev('!!(window.Player&&window.Scene)').catch(() => false)) break; await sleep(50); } await until('Player.state.firstFrame', 20000, 'first frame'); return ev('JSON.stringify({log:Player.log.filter(e=>/splash/.test(e.k)),cur:Player.state.cur})'); };
+  const early = JSON.parse(await withSt(300)); assert.ok(early.log.some((e) => e.k === 'splash-handoff' && e.startId === 'intro'), 'a young splash continues in the intro: ' + JSON.stringify(early));
+  const late = JSON.parse(await withSt(5200)); assert.ok(late.log.some((e) => e.k === 'splash-handoff' && e.startId === 'welcome'), 'an old splash (5 s) continues in the welcome loop: ' + JSON.stringify(late));
+  const seek = late.log.find((e) => e.k === 'splash-seek'); assert.ok(seek && seek.id === 'welcome' && seek.t > 1 && seek.t < 4, 'the loop starts part-way: ' + JSON.stringify(seek));
+  await open(fixture); await on('intro'); assert.ok(!(await ev('Player.log.some(e=>/splash/.test(e.k))')), 'no ?st=, no hand-off');
+});
+
+test('the exe splash bundle and the scripts that hand over to it', () => {
+  const bin = path.join(repo, 'setup', 'ui-web', 'video', 'splash-frames.bin');
+  assert.ok(fs.existsSync(bin), 'tools/setup-splash-frames.cjs output is in the package');
+  const d = fs.readFileSync(bin), count = d.readUInt32LE(4), fps = d.readUInt32LE(8), intro = d.readUInt32LE(12), loop = d.readUInt32LE(16);
+  assert.equal(d.toString('ascii', 0, 4), 'MLSF'); assert.equal(intro + loop, count); assert.ok(fps >= 10 && fps <= 30); assert.ok(d.length < 4 * 1048576, 'bundle stays small: ' + d.length);
+  const base = 20 + 4 * (count + 1); for (const i of [0, intro, count - 1]) { const a = base + d.readUInt32LE(20 + 4 * i); assert.equal(d[a], 0xFF); assert.equal(d[a + 1], 0xD8, 'frame ' + i + ' is a JPEG'); }
+  const rs = fs.readFileSync(path.join(repo, 'desktop', 'src', 'runtime_setup.rs'), 'utf8'), web = fs.readFileSync(path.join(repo, 'setup', 'setup-web.ps1'), 'utf8'), rt = fs.readFileSync(path.join(repo, 'setup', 'setup-runtime.ps1'), 'utf8');
+  assert.match(rs, /MEGULIT_SPLASH_T0/); assert.match(rs, /MEGULIT_SPLASH_FLAG/); assert.match(rs, /0x80\|0x8\|0x0800_0000/, 'topmost, no-activate while animating'); assert.match(rs, /exe-splash-closed reason=skin-first-frame/);
+  assert.match(web, /Release-NativeSplash 'skin-frame1'/); assert.match(web, /&st=/); assert.match(rt, /-not \$env:MEGULIT_NATIVE_SPLASH/, 'no PowerShell startup form while the native one animates');
+  assert.match(rs, /794\.0/); assert.match(web, /794 \* \$scale/); assert.match(rt, /Size\(794, 508\)/);
+});
