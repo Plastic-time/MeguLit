@@ -29,7 +29,12 @@ class Immersion{
     later) or changed the scene (11:20:32.916 "scene changed 80%, box 59%"). There is no text to give back to the game then, and giving it
     back made the game draw the next line itself before the hide was on again. Not this: a skip (the game shows its own fast-forward),
     a marker or a focus change, where the layer is away while the game's text is still there to read. */
- awayByDialog(){return this.visible===false&&this.skipAt==null&&(this.windowHidden===true||this.sceneHidden===true);}
+    /* 2026-11-21 (owner's recording 08:28, 千恋＊万花 incr11, hook-diagnostics 23:28:17.47-21.31): a skip counts too, until the next line shows the
+    layer. The hide layers stand down while the key is held anyway (the game shows its own fast-forward); the layer was hidden for the skip at
+    17.88, the key let go at 19.06, the next line delivered after the skip burst settled (20.07) and shown 0.7 s later (20.80): 1.6 s of
+    "lost" samples had passed, the bridge gave the text back at 20.49 and the game drew 「観光に来たわけじゃないんだから…」 itself under the
+    returning layer until 21.31. A layer away for a skip has nothing to give back either. */
+ awayByDialog(){return this.visible===false&&(this.reason==='skip'||this.skipAt==null&&(this.windowHidden===true||this.sceneHidden===true));}
  /* an inference that arrived while frozen: a hide is dropped, a "shown again" of the text window or the scene is kept for the thaw */
  refuse(source,visible,why=''){if(visible&&(source==='window'||source==='scene'))this.deferred[source]=why;else delete this.deferred[source];this.onDecision?.({refused:true,source,visible,why,frozen:this.contextActive===false?'context':this.menuOpen?'menu':'settling'});return false;}
  /* the menu was opened or closed (reader service): frozen while it is open and for a while after, with or without a native context report */

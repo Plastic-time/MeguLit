@@ -752,6 +752,9 @@
   b.textPlaceExtra = m => { extras = { items: Array.isArray(m?.items) ? m.items.filter(i => i && typeof i.text === 'string' && Array.isArray(i.rects)) : [], client: Array.isArray(m?.client) ? m.client : null }; schedule(); };
   let modeGame = null;
   b.textPlaceMode = m => { on = m?.on === true; if (!on) waits.clear(); if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; boxBottom = 0; boxKey = ''; if (page) { page = null; pageGone(); } } schedule(); };
+  /* 2026-11-21 (owner's recording 08:28, 千恋＊万花): game-fit.js measured the reader on its own place in the gap between two lines and cut the
+     next line's translation; while this module anchors lines on the game's place it owns their layout, gaps included */
+  b.textPlaceOwns = () => on && anchorMode && !!anchor;
   b.textPlaceStatus = () => ({ on, line: line ? { text: line.text, n: line.rects?.length || 0, fallback: !!line.fallback } : null, placed: document.body.classList.contains('megulit-placed'), geom: lastGeom.split(';').length });
   let busy = false;
   new MutationObserver(records => { if (on && (line || drawnByGame || page) && records.some(r => !(r.target.closest?.('.tomoyo-cn-dialog,#megulit-place-extras,#megulit-page-ahead,.megulit-old-line')) && !r.target.classList?.contains('megulit-old-line'))) { /* page mode: at once, before the next paint, so a line that just stopped being the reader's own never misses a frame */ if (page && !busy) { busy = true; try { apply(); } finally { busy = false; } } else schedule(); } }).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
