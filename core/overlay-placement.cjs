@@ -14,8 +14,8 @@ const fs = require('node:fs'), path = require('node:path');
 const { rectsToClient } = require('./compositor-host.cjs');
 
 class OverlayPlacement {
-  constructor({ root, send = () => {}, trace = () => {}, replaced = () => false } = {}) {
-    this.replaced = replaced; this.root = root; this.send = send; this.trace = trace; this.client = [0, 0]; this.current = null; this.on = false;
+  constructor({ root, send = () => {}, trace = () => {}, replaced = () => false, hidden = () => {} } = {}) {
+    this.hidden = hidden; this.replaced = replaced; this.root = root; this.send = send; this.trace = trace; this.client = [0, 0]; this.current = null; this.on = false;
   }
   wanted(preferences) {
     if (process.env.MEGULIT_CAPTURE_COMPOSITOR === '1') return false;
@@ -185,6 +185,16 @@ class OverlayPlacement {
       this.send({ type: 'placeChoiceBoxes', sw: this.client[0], sh: this.client[1], items: options.map(i => { const r = i.rects; return { text: i.text, x0: Math.round(Math.min(...r.map(v => v[0]))), y0: Math.round(Math.min(...r.map(v => v[1]))), x1: Math.round(Math.max(...r.map(v => v[0] + v[2]))), y1: Math.round(Math.max(...r.map(v => v[1] + v[3]))) }; }) });
     }
   }
+  /* options found from hidden lines no source carried (hook-native placedHidden): drawn as choices on their boxes, and given to the reader's
+     choice overlay (ruby + translation under each) */
+  hiddenChoices(items) {
+    if (!this.on || !Array.isArray(items) || items.length < 2) return;
+    const ok = items.map(i => ({ id: 'hidden:' + i.text, kind: 'o', text: i.text, rects: i.rects })).filter(i => Array.isArray(i.rects) && i.rects.length);
+    if (ok.length < 2) return;
+    this.extraKey = JSON.stringify(ok); this.send({ type: 'textPlaceExtra', items: ok, client: this.client.slice() }); this.choicesPlaced = true; this.choiceSent = true;
+    this.send({ type: 'placeChoiceBoxes', sw: this.client[0], sh: this.client[1], items: ok.map(i => { const r = i.rects; return { text: i.text, x0: Math.round(Math.min(...r.map(v => v[0]))), y0: Math.round(Math.min(...r.map(v => v[1]))), x1: Math.round(Math.max(...r.map(v => v[0] + v[2]))), y1: Math.round(Math.max(...r.map(v => v[1] + v[3]))) }; }) });
+    this.why('hchoice:' + ok.length, 'choices from hidden lines no source carried: ' + ok.map(i => i.text).join(' / ').slice(0, 80));
+  }
   /* the dialogue area learned from an exactly placed line: left edge, first row top, row pitch, width, size */
   learn(rects) {
     const r = rects.filter(Boolean); if (r.length < 2) return;
@@ -265,6 +275,9 @@ class OverlayPlacement {
   emitLine(line) {
     if (!line.fallback) {
       const rects = OverlayPlacement.sane(line.rects, line.client);
+      /* 2026-11-21 (owner: 「原地补画不就能二次认领了吗」): a line the game drew hidden goes to the source side with its boxes; a line no source
+         carried becomes a source line (furigana, translation, lookups) or, with others at once, the options of a choice */
+      if (rects) try { this.hidden({ text: line.text, rects, client: line.client }); } catch {}
       if (!rects) this.why('insane:' + line.id + ':' + line.text, 'not placed: ' + line.id + ' has no box on the game client (off the client, or all on its top edge: a buffer drawn at its own origin); the reader keeps its own box and the anchor is not taught');
       line = rects ? { ...line, rects } : { id: line.id, engine: line.engine, text: line.text, fallback: true, client: line.client, ...(line.color ? { color: line.color } : {}), ...(typeof line.read === 'boolean' ? { read: line.read } : {}) };
       if (rects && !line.approx) this.learn(rects);

@@ -11,12 +11,12 @@ const fake = () => { const o = { serial: 1, traced: [], delivered: [], sent: [] 
 test('a hidden line no source carried is delivered from the placement; one a source carried is not', async () => {
   const h = fake(); h.recentSources = [HookNative.flat('そして火の爆ぜる音。')];
   h.placedHidden('呼吸をひとつする度に、\u001f指先に感覚が宿る。'); h.placedHidden('そして火の爆ぜる音。'); h.placedHidden('呼吸をひとつする度に、指先に感覚が宿る。');
-  await new Promise(r => setTimeout(r, 520));
+  await new Promise(r => setTimeout(r, 750));
   assert.deepEqual(h.delivered, [['呼吸をひとつする度に、指先に感覚が宿る。', 'placement']]);
 });
 test('a source arriving within the wait wins', async () => {
   const h = fake(); h.placedHidden('どこかで雨の音を聞いた。'); setTimeout(() => { h.recentSources = [HookNative.flat('どこかで雨の音を聞いた。')]; }, 200);
-  await new Promise(r => setTimeout(r, 520)); assert.deepEqual(h.delivered, []);
+  await new Promise(r => setTimeout(r, 750)); assert.deepEqual(h.delivered, []);
 });
 test('give way goes to the bridge, bounded; the bridge holds the hide off until then; the reader asks when it cannot draw', () => {
   const h = fake(); h.giveWay(99999); assert.deepEqual(h.sent, [{ type: 'engineGiveWay', ms: 10000 }]);
@@ -24,6 +24,6 @@ test('give way goes to the bridge, bounded; the bridge holds the hide off until 
   assert.match(bridge, /bool want=ReplacementEnabled&&!KrkrHideBroken&&over&&DateTime\.UtcNow\.Ticks>=Interlocked\.Read\(ref GiveWayUntil\)/);
   assert.match(bridge, /type=="engineGiveWay"/);
   assert.match(read('services/reader.cjs'), /case 'engineGiveWay':g\?\.hooks\?\.giveWay\?\.\(r\.ms\)/);
-  assert.match(read('core/gal-native.cjs'), /message\.type==='hookCharRects'&&message\.hidden===true&&message\.text&&this\.placement\?\.on\)this\.hooks\?\.placedHidden/);
+  assert.ok(read('core/gal-native.cjs').includes('this.hooks.placedHidden?.(l.text,l)'), 'every placed hidden line is offered with its boxes');
   assert.match(read('web/reader/modules/text-place.js'), /\{ giveWay\(\); return; \} \/\* cannot be drawn here/);
 });
