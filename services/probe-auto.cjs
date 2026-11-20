@@ -64,19 +64,29 @@ async function one(root,db,game,result,s,{fetcher,endpoint,hasEndpoint,sampler,n
    to code, versions), once per identity, after the desensitized one. Kept under games[id].full {identity,state,hash,
    bytes,at,attempts,nextAt}; the collected file stays in data/adapter-probe/full only until the relay has it. */
 const appVersion=root=>{try{return require('./shared-adaptation.cjs').appVersion(root);}catch{return '';}};
+/* the runtime sample of an exe (services/runtime-sample.cjs), only with its consent switch */
+const runtimeStamp=(root,exe)=>{try{const rs=require('./runtime-sample.cjs');return rs.enabled(root)?rs.stamp(rs.dirFor(root,exe)):'';}catch{return '';}};
+async function runtimeOnly(root,game,ident,f,{fetcher=globalThis.fetch}={}){const rs=require('./runtime-sample.cjs');if(!rs.enabled(root))return {state:'off'};
+ const key=require('../core/auto-profile.cjs').exeKeySync(root,game.executable),dir=key?rs.keyDir(root,key):'',stamp=dir?rs.stamp(dir):'';if(!stamp||stamp===f.runtime)return {state:'nothing'};
+ const b=rs.bundle(dir,key);if(!b)return {state:'nothing'};const body=JSON.stringify({version:1,key,identity:ident.id,sha256:b.sha256,data:b.data.toString('base64')});
+ let urls=[];try{urls=require('./relay-config.cjs').endpoints(root,'/api/game-profile/runtime');}catch{}
+ for(const url of urls){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(60000)});if(r.ok)return {state:'sent',stamp};if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused'};}catch{}}
+ return {state:'failed'};}
 async function fullOne(root,db,game,result,s,{fetcher,fullBase,fuller,now=Date.now()}){
  const pf=require('./probe-full.cjs'),pi=require('./probe-identity.cjs');
  const ident=pi.identity({executable:game.executable,result,vndb:pi.vndbOf(db,game.id)});if(!ident.id)return 'skipped';
  const rec=s.games[game.id]||(s.games[game.id]={}),f=rec.full&&rec.full.identity===ident.id?rec.full:{};
+ /* 2026-11-21 the relay has this game's scripts and exe: a runtime sample made since goes on its own (scripts and exe not again) */
+ if(['sent','duplicate'].includes(f.state)&&!(f.nextAt&&f.nextAt>now)){const r=await runtimeOnly(root,game,ident,f,{fetcher});if(r.state==='sent'){rec.full={...f,runtime:r.stamp,at:now};return 'runtime';}return 'skipped';}
  if(['sent','duplicate','nothing'].includes(f.state)||f.nextAt&&f.nextAt>now)return 'skipped';
  const retry=(state,extra={})=>{const attempts=(f.attempts|0)+1;rec.full={...f,identity:ident.id,state,at:now,attempts,nextAt:now+Math.min(RETRY_MAX,RETRY_MIN*2**Math.min(6,attempts-1)),...extra};return state;};
  let file=pf.pending(root,f.hash),bytes=f.bytes|0,hash=f.hash||'';
- if(!file){const c=await fuller(game,result,{out:pf.fullDir(root),runtime:(()=>{try{return require('./runtime-sample.cjs').dirFor(root,game.executable);}catch{return '';}})(),identity:ident.id,title:String(game.title||''),vndb:ident.vndb||'',app:appVersion(root)});
+ if(!file){const c=await fuller(game,result,{out:pf.fullDir(root),runtime:(()=>{try{const rs=require('./runtime-sample.cjs');return rs.enabled(root)?rs.dirFor(root,game.executable):'';}catch{return '';}})(),identity:ident.id,title:String(game.title||''),vndb:ident.vndb||'',app:appVersion(root)});
   if(c?.empty){rec.full={identity:ident.id,state:'nothing',at:now};return 'nothing';}
   if(!c?.file)return retry('failed',{error:String(c?.error||'COLLECT').slice(0,40)});
   file=c.file;bytes=c.bytes;hash=c.sha256;}
  const u=await pf.upload(root,{file,identity:ident.id,title:String(game.title||''),vndb:ident.vndb||'',step:result.step||'',app:appVersion(root),fetcher,base:fullBase});
- if(u.state==='uploaded'||u.state==='duplicate'){const state=u.state==='uploaded'?'sent':'duplicate';rec.full={identity:ident.id,state,hash,bytes,at:now};
+ if(u.state==='uploaded'||u.state==='duplicate'){const state=u.state==='uploaded'?'sent':'duplicate';rec.full={identity:ident.id,state,hash,bytes,at:now,...(u.state==='uploaded'?{runtime:runtimeStamp(root,game.executable)}:{})};
   logEntry(s,{gameId:game.id,title:game.title,identity:ident.id,hash,bytes,state,kind:'full'});return state;}
  if(u.state==='not-configured')return 'offline';
  return retry('failed',{hash,bytes,error:String(u.error||'').slice(0,40)});}
@@ -118,4 +128,4 @@ function schedule(root,delay){if(!opener)return;clearTimeout(timer);timer=setTim
 function start(root,openDb,{delay=FIRST_DELAY}={}){if(process.env.NODE_TEST_CONTEXT||started===root)return null;started=root;opener=openDb;schedule(root,delay);return true;}
 function kick(root,{delay=KICK_DELAY}={}){if(!opener||started!==root||!enabled(root))return false;schedule(root,delay);return true;}
 
-module.exports={enabled,setEnabled,has,covered,run,fullOne,status,start,kick,load,fileOf,RETRY_MIN,RETRY_MAX};
+module.exports={enabled,setEnabled,has,covered,run,fullOne,runtimeOnly,status,start,kick,load,fileOf,RETRY_MIN,RETRY_MAX};

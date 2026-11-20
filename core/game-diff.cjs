@@ -2,18 +2,19 @@
 'use strict';
 /* 2026-11-21 (owner: 「差分只能是数据…签名下发，客户端验签，防止共享数据被投毒」) the signed game diff document the relay hands out.
    Pure (no Node or Worker API): the relay (relay/src/auto-profile.js), the app (services/auto-profile-feed.cjs) and the maintainer
-   tool (tools/game-diff.cjs) all use this file, so the bytes that are signed are the same everywhere.
+   tool (tools/sign-profile.cjs) all use this file, so the bytes that are signed are the same everywhere.
 
-   {schema:'megulit.game-diff', version:1, key:'x-<40 hex of the exe SHA-256>', source:'official'|'auto', mode:'hide'|'read',
+   {schema:'megulit.game-diff', version:1, key:'<64 hex: the SHA-256 of the game exe>', source:'official'|'auto', mode:'hide'|'read',
     settings:{<only keys and values of core/profiles/domains.cjs>}, exe, engine, app, issuedAt, agree, reporters, cost,
     signature:{alg:'ed25519', keyId, value:<base64 over canonical(document without signature)>}}
 
-   official: made by the maintainer from a probe (scripts + exe + runtime samples), signed offline with an adapter-pack key
-             (services/adapter-pack-keys.json). It wins over everything automatic.
-   auto:     the agreed best calibration of the players of that exe, signed by the relay's own key (services/auto-profile-keys.json).
+   official: made by us from a probe (scripts + exe + runtime samples). It wins over everything automatic.
+   auto:     the agreed best calibration of the players of that exe (picked by the relay, signed by us).
+   Both are signed offline with our profile key (tools/sign-profile.cjs; the private key never leaves our PC, the relay holds none);
+   the app trusts the public keys of services/profile-keys.json.
    A document whose settings needed any cleaning is refused whole: a signer never signs anything the kernel does not know. */
 const {clean}=require('./profiles/domains.cjs');
-const KEY=/^x-[0-9a-f]{40}$/;
+const KEY=/^[0-9a-f]{64}$/;
 function canonical(v){if(Array.isArray(v))return '['+v.map(canonical).join(',')+']';if(v&&typeof v==='object')return '{'+Object.keys(v).filter(k=>v[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+canonical(v[k])).join(',')+'}';return JSON.stringify(v);}
 const unsigned=d=>{const {signature,...rest}=d||{};return rest;};
 const str=(v,n)=>String(v??'').slice(0,n);

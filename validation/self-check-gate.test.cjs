@@ -42,7 +42,7 @@ const strict=replay(he,rh,{from:SENREN[0],to:SENREN[1],thresholds:{window:5,drop
 /* the record + upload block */
 (async()=>{
 const crypto=require('node:crypto');
-const K='x-'+'ab'.repeat(20);
+const K='ab'.repeat(32);
 const rec=ap.record({key:K,engine:'krkr',exe:'D:\\Games\\Fata\\fata_jp.exe',version:'1.4.21',result:cf});
 assert.strictEqual(rec.exe,'fata_jp.exe','no paths');assert.strictEqual(rec.schema,1);
 const diag=ap.diagnostic(rec,fata.windows);assert.strictEqual(diag.profile.mode,'read');assert.strictEqual(diag.windows.length,fata.windows.length);assert.ok(!JSON.stringify(diag).includes('Games'));
@@ -53,7 +53,7 @@ try{
  /* the diff key is the exe file's hash: two copies of one file share it, another version does not */
  const exe=path.join(root,'Fata','fata_jp.exe'),copy=path.join(root,'Copy','renamed.exe'),other=path.join(root,'Fata','fata_jp_v2.exe');
  for(const [f,b] of [[exe,'MZ-fata-1'],[copy,'MZ-fata-1'],[other,'MZ-fata-2']]){fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,b);}
- const key=await ap.exeKey(root,exe);assert.strictEqual(key,'x-'+crypto.createHash('sha256').update('MZ-fata-1').digest('hex').slice(0,40));
+ const key=await ap.exeKey(root,exe);assert.strictEqual(key,crypto.createHash('sha256').update('MZ-fata-1').digest('hex'));require('../services/runtime-sample.cjs').setEnabled(root,true);
  assert.strictEqual(await ap.exeKey(root,copy),key,'a renamed copy is the same diff');assert.notStrictEqual(await ap.exeKey(root,other),key,'another version is its own diff');
  assert.strictEqual(ap.exeKeySync(root,exe),key,'remembered: no read at the next start');
  const live=require('../services/self-check-live.cjs');const calls=[],logged=[],traced=[];

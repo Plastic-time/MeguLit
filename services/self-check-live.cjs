@@ -44,7 +44,8 @@ function settle(s){const c=choose(s);const was=s.from;s.layer=c?.settings||null;
 function start(reader,exe,profile=null,input=null,options={}){stop();profile=profile||Profiles.profileFor({exe});input=input||{exe};
  const s={reader,exe,key:'',input,profile,stored:null,shared:null,layer:null,from:'',calibrated:false,skipFeed:!!options.skipFeed,ver:version(reader.root)};
  s.check=new SelfCheck({thresholds:profile.selfCheck||{},record:true,onWindow:r=>windowDone(s,r)});
- s.sample=new RuntimeSample({exe,engine:profile.engine,app:s.ver});
+ /* the runtime sample only with the player's consent (runtime-sample.cjs enabled, default off) */
+ s.sample=require('./runtime-sample.cjs').enabled(reader.root)?new RuntimeSample({exe,engine:profile.engine,app:s.ver}):null;
  live=s;
  const known=options.key||auto.exeKeySync(reader.root,exe);
  if(known)bindKey(s,known);
@@ -65,7 +66,7 @@ function windowDone(s,r){if(live!==s)return;const {reader}=s;
  if(!s.key){s.pending=r;return;}
  hookTrace(reader,traceLine(r));
  reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'window',key:s.key,window:r.window,lines:r.lines,pass:r.pass,over:r.over.join(','),layer:s.from||'none',...Object.fromEntries(Object.entries(r.metrics).map(([k,v])=>[k,v==null?-1:v]))});
- if(r.window===1){try{s.sample.save(reader.root,s.key);}catch{}}
+ if(r.window===1&&s.sample){try{s.sample.save(reader.root,s.key);}catch{}}
  const engine=engineOf(s);
  if(!s.calibrated){s.calibrated=true;let res;try{res=auto.calibrate(s.check.recording||[],{thresholds:s.check.t});}catch(e){hookTrace(reader,'selfCheck calibration failed '+String(e?.message||e).slice(0,120));return;}
   const rec=auto.record({key:s.key,engine,exe:s.exe,version:s.ver,source:'calibration',result:res});try{auto.store(reader.root,s.key,rec);}catch{}s.stored=rec;s.check.recording=null;
@@ -88,8 +89,8 @@ function recalibrate(reader){const s=live;const exe=s?.exe||reader.gameExe;if(!e
 const speakerOf=()=>{try{return String(live?.reader?.gal?.hooks?.state?.hookSpeaker||'');}catch{return '';}};
 function sampleEvent(s,e){if(!e||!s.sample||s.sample.done)return;const want=s.sample.event(e,speakerOf());if(want==='shot'){try{s.reader.gal?.sceneShot?.().then(m=>{if(m?.jpeg)s.sample.shot(m.jpeg);}).catch(()=>{});}catch{}}}
 /* the sample sees each event before the check, so the line that closes the first window is in it */
-const feedTrace=line=>{const s=live;if(!s)return;try{const e=parseTrace(line);if(!e)return;sampleEvent(s,e);s.check.event(e);}catch{}};
-const feedReader=msg=>{const s=live;if(!s)return;try{const e=parseReader(msg);if(!e)return;sampleEvent(s,e);s.check.event(e);}catch{}};
+const feedTrace=line=>{const s=live;if(!s)return;try{const e=parseTrace(line);if(s.sample&&!s.sample.done&&!String(line).startsWith('selfCheck'))s.sample.rawTrace(line);if(!e)return;sampleEvent(s,e);s.check.event(e);}catch{}};
+const feedReader=msg=>{const s=live;if(!s)return;try{const e=parseReader(msg);if(s.sample&&!s.sample.done&&msg?.type!=='hostFrame'&&msg?.kind!=='selfCheck')s.sample.rawReader(msg);if(!e)return;sampleEvent(s,e);s.check.event(e);}catch{}};
 /* diagnostics: the running game's record + its windows, for info.json */
 function diagnostic(){const s=live;if(!s)return null;return auto.diagnostic(s.stored,s.check.windows);}
 module.exports={start,stop,recalibrate,feedTrace,feedReader,diagnostic,current:()=>live,choose};

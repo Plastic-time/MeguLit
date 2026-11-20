@@ -48,6 +48,8 @@ test('ファタ 22:51:40-22:52:06: every line reaches the reader once, effect fr
  assert.ok(!got.some(g=>['が……','たのだ。','…','…だから……'].includes(g)),'no piece of a line is a line: '+JSON.stringify(got));
  assert.ok(!got.some(g=>HookNative.interleaved(g)),'no effect frame is a line');
  assert.equal(f.traces.filter(s=>/dropped/.test(s)).length,0,'nothing dropped');
+ /* 2026-11-21 the self-check gate on the same traces: drop rate 0 */
+ {const {SelfCheck}=require('../core/self-check.cjs');const sc=new SelfCheck();for(const s of f.traces)sc.trace(s);assert.equal(sc.score().metrics.dropRate??0,0);}
 });
 
 test('ファタ 22:51:55: a page line takes the held hook line its drawn text shows, not the oldest one',t=>{
@@ -69,6 +71,8 @@ test('ファタ: a hook line no page line draws (its own layer) is delivered fro
  assert.ok(!got.some(g=>g.length>60),'the page dump is not read again');
  assert.ok(f.traces.some(s=>/drawn off the page layer, delivered from the hook text/.test(s)));
  assert.ok(f.traces.some(s=>/hook line already read, skipped/.test(s)));
+ /* 2026-11-21 the self-check gate (core/self-check.cjs) counts the delivered line as redrawn and the read dump as nothing: no drop */
+ {const {SelfCheck}=require('../core/self-check.cjs');const sc=new SelfCheck();for(const s of f.traces)sc.trace(s);const r=sc.score();assert.equal(r.drops,0,'no drop: '+JSON.stringify(r));assert.ok(r.redrawn>=1,'the delivered line is a redraw');}
 });
 
 test('ファタ 22:52:51-22:52:54: the choice 「……おはよう………………」 is an option and its hook line is read as the choice rows',t=>{
