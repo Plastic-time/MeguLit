@@ -139,7 +139,7 @@
    '原位置遮盖方式':['Cover for the original spot','元の位置の覆い方'],'游戏真实画面（等待符闪灭时截取）':["Game's real picture (taken while the marker blinks off)",'ゲームの実画面（マークが消えた瞬間を取得）'],'周围色推算融合':['Estimated from surrounding colours',
    '周囲の色から推定してなじませる'],'迁移时自动隐藏原位置；提取不可靠时保留原等待符（单独隐藏仍按下方开关）':['Moving hides the original position; uncertain extraction keeps it there (separate hiding follows the switch below)',
    '移動中は元の位置を隠します。抽出できない場合は元の位置に残します（個別の非表示は下の設定に従います）'],'恢复上一个颜色':['Restore previous color','前の文字色に戻す'],
-  '假名注音':['Furigana','ふりがな'],'汉字上方自动注音（本地）':['Auto furigana above kanji (local)','漢字の上に自動ふりがな（ローカル）'],'假名大小（相对正文）':['Furigana size (relative)','ふりがなの大きさ（本文比）'],
+  '假名大小':['Furigana size','ふりがなの大きさ'],'假名水平偏移':['Furigana X offset','ふりがな横オフセット'],'假名垂直偏移':['Furigana Y offset','ふりがな縦オフセット'],'单行垂直':['Per-row Y','行ごと縦'],'单行水平':['Per-row X','行ごと横'],'假名注音':['Furigana','ふりがな'],'汉字上方自动注音（本地）':['Auto furigana above kanji (local)','漢字の上に自動ふりがな（ローカル）'],'假名大小（相对正文）':['Furigana size (relative)','ふりがなの大きさ（本文比）'],
    '假名水平位置 X（右＋，px）':['Furigana X offset (px)','ふりがな横位置 X（px）'],'假名垂直位置 Y（下＋，px）':['Furigana Y offset (px)','ふりがな縦位置 Y（px）'],'假名描边':['Furigana outline','ふりがなの縁取り'],
    '假名描边颜色':['Furigana outline color','ふりがなの縁取り色'],'假名描边粗细':['Furigana outline width','ふりがなの縁取りの太さ'],
   '日文字体与描边':['Japanese font & outline','日本語フォントと縁取り'],'中文字体与描边':['Chinese font & outline','中国語フォントと縁取り'],'日文字体':['Japanese font','日本語フォント'],'中文字体':['Chinese font',
