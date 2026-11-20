@@ -129,6 +129,7 @@
       if (toks.length) { const l = Math.min(...toks.map(r => r.left)), r = Math.max(...toks.map(r => r.right)), rr = row.getBoundingClientRect(), w = Math.max(r - l, wr.width * .5);
         set(row, 'max-width', Math.ceil(w) + 'px'); if (anchor.center) { set(row, 'margin-left', 'auto'); set(row, 'margin-right', 'auto'); } else set(row, 'margin-left', Math.max(0, Math.round(l - rr.left)) + 'px'); } }
     for (const o of row ? [row, ...parts] : []) o.style.removeProperty('font-size');
+    const cnBase = row ? parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16 : 16; /* the user's translation size: 85 % of it is the floor of every rule below */
     /* 2026-11-20 (CHAOS;CHILD acceptance: a two-row dialogue line put its translation over the game's AUTO/SKIP buttons and under
        the box's bottom edge): a text box's line stays inside the game client above the strip a game keeps under its last text row
        for its own buttons (two glyph rows). What does not fit there: first the Japanese rows close up (ruby on top, no game pitch),
@@ -177,11 +178,14 @@
     function inWindow() { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
       if (rowRect().bottom > uiLimit && sentence.querySelector('br.megulit-row-br') && !sentence.style.lineHeight) set(sentence, 'line-height', closeRows(sentence));
       const fsx = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rx = rowRect();
-      if (rx.bottom > uiLimit) { const fs = Math.max(Math.ceil(fsx * .85), Math.floor(fsx * Math.max(.85, (uiLimit - rx.top) / Math.max(1, rx.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rx = rowRect(); }
-      if (rx.bottom > uiLimit) { const up = Math.min(rx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); } }
+      if (rx.bottom > uiLimit) { const fs = Math.max(Math.ceil(cnBase * .85), Math.floor(fsx * Math.max(.85, (uiLimit - rx.top) / Math.max(1, rx.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rx = rowRect(); }
+      /* 2026-11-21 incr9 (owner, 千恋＊万花: two Japanese rows + two translation rows, the Japanese first row pushed to y 750 over the
+         name box 【運転手】 at 787): the Japanese stays on the game's own text place; the translation grows down and only this line's
+         translation is made smaller (at most 15 %, the owner: 「别这么小」), the block is never moved up for it */ }
     if (row) { const limit = workLimit();
       const fs0 = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rb = row.getBoundingClientRect();
-      if (rb.bottom > limit) { /* 2026-11-20 (user: 「译文为啥都这么小啊 别这么小」): at most 15 % smaller; what still does not fit moves the block up instead */ const fs = Math.max(Math.ceil(fs0 * .85), Math.floor(fs0 * Math.max(.85, (limit - rb.top) / Math.max(1, rb.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rb = row.getBoundingClientRect(); }
+      if (rb.bottom > limit) { /* 2026-11-20 (user: 「译文为啥都这么小啊 别这么小」): at most 15 % smaller; what still does not fit moves the block up instead */ const fs = Math.max(Math.ceil(cnBase * .85), Math.floor(fs0 * Math.max(.85, (limit - rb.top) / Math.max(1, rb.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rb = row.getBoundingClientRect(); }
+      /* off the monitor even at 85 %: the block moves up just enough (a translation nobody can see is worse than a moved line) */
       if (rb.bottom > limit) { const up = Math.min(rb.bottom - limit, Math.max(0, win.getBoundingClientRect().top)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); rb = row.getBoundingClientRect(); }
     }
   }
