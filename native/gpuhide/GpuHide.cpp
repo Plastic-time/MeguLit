@@ -424,10 +424,13 @@ static HRESULT WINAPI HBufLock(void *buf, UINT off, UINT size, void **pp, DWORD 
 }
 static bool SafeCopy(void *to, const void *from, size_t n) { __try { memcpy(to, from, n); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
 static void Unlocked(void *buf, bool index) {
+ /* the buffer's description is asked before Lock is taken (no D3D call under Lock, see ProbeTexture) */
+ bool pending = false; { Guard g; for (auto &x : Pending) if (x.buf == buf) { pending = true; break; } } if (!pending) return;
+ UINT total = 0; bool i32 = false;
+ if (index) { D3DINDEXBUFFER_DESC dd; if (FAILED(((IDirect3DIndexBuffer9 *)buf)->GetDesc(&dd))) return; total = dd.Size; i32 = dd.Format == D3DFMT_INDEX32; }
+ else { D3DVERTEXBUFFER_DESC dd; if (FAILED(((IDirect3DVertexBuffer9 *)buf)->GetDesc(&dd))) return; total = dd.Size; }
  Guard g; for (size_t i = 0; i < Pending.size(); i++) if (Pending[i].buf == buf) {
-  PendingLock p = Pending[i]; Pending.erase(Pending.begin() + i); UINT total = 0; bool i32 = false;
-  if (index) { D3DINDEXBUFFER_DESC dd; if (FAILED(((IDirect3DIndexBuffer9 *)buf)->GetDesc(&dd))) return; total = dd.Size; i32 = dd.Format == D3DFMT_INDEX32; }
-  else { D3DVERTEXBUFFER_DESC dd; if (FAILED(((IDirect3DVertexBuffer9 *)buf)->GetDesc(&dd))) return; total = dd.Size; }
+  PendingLock p = Pending[i]; Pending.erase(Pending.begin() + i);
   if (total == 0 || total > 8 * 1024 * 1024) return; UINT size = p.size ? p.size : total - p.off; if (p.off >= total) return; if (p.off + size > total) size = total - p.off;
   Shadow &s = Buffers[buf]; if (s.data.size() != total) s.data.assign(total, 0); s.i32 = i32;
   if (!SafeCopy(&s.data[p.off], p.ptr, size)) Buffers.erase(buf);
