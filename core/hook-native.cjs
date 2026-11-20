@@ -405,7 +405,12 @@ class HookNative{
   if(Array.isArray(dialog)&&dialog.length){const d=dialog.filter(v=>Array.isArray(v)&&v[2]>0);if(d.length){const D={x0:Math.min(...d.map(v=>v[0])),y0:Math.min(...d.map(v=>v[1]))-g,x1:Math.max(...d.map(v=>v[0]+v[2])),y1:Math.max(...d.map(v=>v[1]+v[3]))+g*2.5};if(bb.some(b=>b.x0<D.x1&&D.x0<b.x1&&b.y0<D.y1&&D.y0<b.y1))return false;}}
   return true;}
  static speakerless(text){const t=String(text||'').trim(),out=[];const add=v=>{v=v.trim();if(v&&v!==t&&!out.includes(v))out.push(v);};
-  add(t.replace(/^【[^】]{1,16}】s*/,''));const name='(?:[？?]{2,}|[一-龯々ァ-ヶー・]{1,8})';add(t.replace(new RegExp('^([「『（]?)'+name+'[\s　]+'),'$1'));add(t.replace(new RegExp('^'+name+'[\s　]*(?=[「『])'),''));
+  add(t.replace(/^【[^】]{1,16}】\s*/,''));const name='(?:[？?]{2,}|[一-龯々ァ-ヶー・]{1,8})';add(t.replace(new RegExp('^([「『（])'+name+'[\\s　]+'),'$1'));add(t.replace(new RegExp('^'+name+'[\\s　]*(?=[「『])'),''));
+  /* the other way round: the script keeps an unknown speaker inside the line (千恋＊万花: 「？？？　例のイベントって？」, 7 of 54584 lines) while the
+     hook gives the line without it (the name plate took ？？？; r34 seq 37 came as 11 characters) */
+  if(/^[「『]/.test(t)&&!/^[「『][？?]{2,}/.test(t))add(t[0]+'？？？　'+t.slice(1));
+  /* a line handed over without its brackets (the bracket drawn apart, or cut by the source) is the script's 「…」 / 『…』 line */
+  if(t&&!/^[「【]/.test(t))add('「'+t+'」');if(t&&!/^[「『【]/.test(t))add('『'+t+'』');
   for(const v of out.slice())add(v.replace(/^[「『]/,'').replace(/[」』]$/,''));return out;}
  static interleaved(t){const a=[...HookNative.flat(t)];if(a.length<8)return false;if(new Set(a).size/a.length<.55)return true;const m=new Map();for(let i=0;i+1<a.length;i++){const g=a[i]+a[i+1];m.set(g,(m.get(g)||0)+1);if(m.get(g)>=3)return true;}return false;}
  choiceFilter(options){if(!Array.isArray(options))return options;const said=[this.lastSource,...(this.recentSources||[])].map(x=>HookNative.flat(x)).filter(Boolean);const kept=options.filter(o=>{const f=HookNative.flat(o);if(!f||HookNative.interleaved(f))return false;return !said.some(x=>x!==f&&x.includes(f));});if(kept.length!==options.length)this.trace('choice options filtered '+options.length+' -> '+kept.length);return kept.length>=2?kept:null;}
