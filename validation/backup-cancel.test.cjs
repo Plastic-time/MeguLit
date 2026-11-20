@@ -3,9 +3,32 @@
 const test=require('node:test'), assert=require('node:assert/strict');
 const fs=require('node:fs'), os=require('node:os'), path=require('node:path');
 const {startEdge,startWeb}=require('./library-views-perf.cjs');
-const {exportBackup,previewBackup}=require('../services/backup.cjs');
+const {exportBackup,previewBackup,applyBackup,discardBackup}=require('../services/backup.cjs');
 const hasEdge=[process.env.MEGULIT_EDGE,'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
  'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].some(p=>p&&fs.existsSync(p));
+
+test('a committed restore keeps its checkpoint if preview cleanup fails',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-restored-preview-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const file=path.join(root,'copy.megulitbak');
+ await exportBackup(root,file);
+ const {id}=previewBackup(root,file),folder=path.join(root,'cache',id);
+ const rm=fs.rmSync;
+ const locked=t.mock.method(fs,'rmSync',(target,options)=>{
+  if(target===folder)throw Object.assign(Error('busy'),{code:'EBUSY'});
+  return rm(target,options);
+ });
+ const result=applyBackup(root,id);
+ assert.equal(result.restored,true);
+ assert.ok(fs.existsSync(path.join(result.rollback,'megulit.sqlite')));
+ assert.throws(()=>applyBackup(root,id),/INVALID_BACKUP_ID/);
+ assert.equal(fs.readdirSync(path.dirname(path.dirname(result.rollback))).length,1);
+ locked.mock.restore();
+ discardBackup(root,id);
+ assert.ok(!fs.existsSync(folder));
+ assert.doesNotThrow(()=>discardBackup(root,id));
+ assert.throws(()=>discardBackup(root,'not-a-preview'),/INVALID_BACKUP_ID/);
+});
 
 test('backup previews can be cancelled, retried, and restored',{skip:!hasEdge},async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-backup-cancel-'));
