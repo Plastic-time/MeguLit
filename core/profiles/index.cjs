@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 /* 2026-11-21 layered game profile: kernel defaults <- engine diff <- game diff, one frozen settings object per running game.
-   profileFor({engine,exe,title,folder,files,steamAppId}) -> frozen {gameKey,engine,layers,placement,page,choice,hide,safeMode}
+   profileFor({engine,exe,title,folder,files,steamAppId,auto}) -> frozen {gameKey,engine,layers,placement,page,choice,hide,safeMode}
 
    gameKey: the file name of games/<gameKey>.cjs, a hand-picked slug ('senren-banka'), never derived from a path, so it stays the
    same for the retail, Steam, patched and renamed copies of one work. Which copy is which game is told by the game file's
@@ -54,10 +54,17 @@ function unknownKeys(settings,base=DEFAULTS,at=''){const out=[];for(const [k,v] 
 function merge(a,b){if(!plain(b))return a;const out={...a};for(const [k,v] of Object.entries(b)){if(!(k in a))continue;out[k]=plain(a[k])&&plain(v)?merge(a[k],v):Array.isArray(v)?v.slice():v;}return out;}
 function freeze(v){if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.freeze(v);for(const x of Object.values(v))freeze(x);}return v;}
 const clone=v=>JSON.parse(JSON.stringify(v));
+/* only the kernel keys of a layer (an auto layer read from disk may carry stale or unknown keys: they are dropped, not errors) */
+function known(settings,base=DEFAULTS){const out={};if(!plain(settings))return out;for(const [k,v] of Object.entries(settings)){if(!(k in base))continue;if(plain(base[k])){if(plain(v))out[k]=known(v,base[k]);}else out[k]=v;}return out;}
+/* one more layer over a profile (same rule as profileFor): a new frozen profile, layers +name */
+function apply(profile,layer,name){const meta={gameKey:profile.gameKey,engine:profile.engine,layers:profile.layers,matched:profile.matched};const base={};for(const k of Object.keys(DEFAULTS))base[k]=clone(profile[k]);
+ const s=merge(base,clone(known(layer)));return freeze({...meta,layers:name?meta.layers+'+'+name:meta.layers,...s});}
 
 function profileFor(input={}){input=input||{};const hit=findGame(input);const game=hit?.game||null;
  const engine=engineId(input.engine)||engineId(game?.engine)||'';const eng=loadEngine(engine);
  let s=clone(DEFAULTS);const layers=['core'];if(eng){s=merge(s,clone(eng.settings||{}));layers.push('engine');}if(game){s=merge(s,clone(game.settings||{}));layers.push('game');}
+ /* 4th layer: this PC's measured auto profile (data/config/auto-profiles/<gameKey>.json, feat/auto-profile), known keys only */
+ if(plain(input.auto)){s=merge(s,clone(known(input.auto)));layers.push('auto');}
  return freeze({gameKey:game?game.key:autoKey(input),engine:engine||'unknown',layers:layers.join('+'),matched:hit?hit.why.join(','):'',...s});}
 /* the trace line every run writes once (hook-events.log), so the owner's log tells which layers this game ran with */
 const traceLine=p=>'profile '+p.gameKey+' engine='+p.engine+' layers='+p.layers+(p.matched?' match='+p.matched:'');
@@ -65,4 +72,4 @@ const traceLine=p=>'profile '+p.gameKey+' engine='+p.engine+' layers='+p.layers+
 function get(p,key,fallback){let v=p;for(const k of String(key).split('.')){if(v==null||typeof v!=='object')return fallback;v=v[k];}return v===undefined||v===null?fallback:v;}
 /* the RegExps of choice.filters (bad sources are skipped) */
 function choiceFilters(p){const out=[];for(const src of get(p,'choice.filters',[]))try{out.push(new RegExp(String(src),'u'));}catch{}return out;}
-module.exports={DEFAULTS,profileFor,engineId,matchScore,findGame,games,loadEngine,unknownKeys,traceLine,get,choiceFilters,reload,GENERIC_EXE,ENGINE_DIR,GAME_DIR};
+module.exports={DEFAULTS,profileFor,merge,apply,known,engineId,matchScore,findGame,games,loadEngine,unknownKeys,traceLine,get,choiceFilters,reload,GENERIC_EXE,ENGINE_DIR,GAME_DIR};
