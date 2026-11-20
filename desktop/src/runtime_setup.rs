@@ -101,10 +101,10 @@ mod splash{
    let mut img:isize=0;if GdipCreateBitmapFromFile(path.as_ptr(),&mut img)!=0||img==0{let _=tx.send(false);return;}
    IMAGE.store(img,Ordering::SeqCst);
    let cls=wide("MeguLitSetupSplash");let wc=WndClassW{style:0,proc_:proc_,cls:0,wnd:0,inst:0,icon:0,cursor:0,bg:0,menu:std::ptr::null(),name:cls.as_ptr()};RegisterClassW(&wc);
-   /* same box as the setup window: 1000x640 at the system scale, never larger than the work area, centred on it */
+   /* same box as the setup window: 600x384 (60 % of the 1000x640 design box) at the system scale, never larger than the work area, centred on it */
    let mut wa:Rect=std::mem::zeroed();SystemParametersInfoW(0x0030,0,&mut wa as *mut Rect as *mut c_void,0);
-   let (ww,wh)=((wa.r-wa.l) as f64,(wa.b-wa.t) as f64);let scale=(GetDpiForSystem() as f64/96.0).min(ww/1000.0).min(wh/640.0).max(0.5);
-   let (w,h)=((1000.0*scale) as i32,(640.0*scale) as i32);let (x,y)=(wa.l+((ww as i32-w)/2).max(0),wa.t+((wh as i32-h)/2).max(0));
+   let (ww,wh)=((wa.r-wa.l) as f64,(wa.b-wa.t) as f64);let scale=(GetDpiForSystem() as f64/96.0).min(ww/600.0).min(wh/384.0).max(0.5);
+   let (w,h)=((600.0*scale) as i32,(384.0*scale) as i32);let (x,y)=(wa.l+((ww as i32-w)/2).max(0),wa.t+((wh as i32-h)/2).max(0));
    let title=wide("MeguLit");
    let hwnd=CreateWindowExW(0x80,cls.as_ptr(),title.as_ptr(),0x8000_0000|0x1000_0000,x,y,w,h,0,0,0,std::ptr::null());   /* WS_EX_TOOLWINDOW, WS_POPUP|WS_VISIBLE */
    if hwnd==0{let _=tx.send(false);return;}
