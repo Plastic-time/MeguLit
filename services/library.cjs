@@ -66,6 +66,15 @@ function reconcile(root,items,{restoreRemoved=false}={}){const db=openStore(root
  if(existing?.removed_at!=null){if(item.missing||!item.exe||String(existing.executable||'').toLowerCase()===String(item.exe).toLowerCase()||!fs.existsSync(item.exe))continue;db.prepare('UPDATE games SET removed_at=NULL WHERE id=?').run(existing.id);existing.removed_at=null;}
  if(item.missing&&existing?.executable&&existing.executable.toLowerCase()!==String(item.exe||'').toLowerCase()&&fs.existsSync(existing.executable))continue;
  const cover=path.win32.basename(item.cover||''),original=existing?JSON.parse(existing.original):{},saved=original.library||{};original.library=require('./library-dedupe.cjs').keepMergedEditions(saved,{...saved,...item,executableSignature:signature(item.exe,saved.executableSignature)});if(saved.localeMode)original.library.localeMode=saved.localeMode;
+ // The folder scanner's cache predates metadata fetched from the details page.
+ // Keep that match for the same installation unless the scan identifies a different work.
+ const next=original.library;
+ if((item.source==='folder'||item.source==='manual')&&saved.source===item.source&&item.dir&&canonical(saved.dir)===canonical(item.dir)
+    &&saved.vndbId&&!item.appid&&(!item.vndbId||item.vndbId===saved.vndbId)
+    &&(!saved.executableSignature||saved.executableSignature.hash===next.executableSignature?.hash)){
+  next.vndbId=saved.vndbId;
+  if(saved.appid)next.appid=saved.appid;
+ }
  const selected=existing&&saved.contentLanguage&&saved.languageExecutables?.[saved.contentLanguage];
  const preserve=existing&&((saved.originalExecutableVerified&&fs.existsSync(existing.executable))||selected&&canonical(saved.dir)===canonical(item.dir));
  const executable=preserve?existing.executable:item.exe||existing?.executable||'';
