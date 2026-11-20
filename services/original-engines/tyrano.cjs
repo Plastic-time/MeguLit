@@ -15,6 +15,7 @@ const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
 const voiceRef=require('./voice-ref.cjs');
 const decode=buf=>require('./scenes.cjs').decode(buf);
 const KS=n=>/(?:^|\/)data\/scenario\/.*\.ks$/i.test(n.replace(/\\/g,'/'));
+const NW_RUNTIME=/^nw\.(?:dll|pak)$/i;
 
 /* ---- parse ----------------------------------------------------------------------------------------------------- */
 function parse(buf){const lines=[],anchors=[],ruby=[],voices=[],vt=voiceRef.tracker();let code=false,block=false;
@@ -45,10 +46,11 @@ const walk=(dir,depth)=>kit.walk(dir,depth,n=>/\.ks$/i.test(n),[],null);/* E577 
 function containers(dir){const out=[];
  for(const base of [dir,path.join(dir,'resources','app'),path.join(dir,'www')]){const sc=path.join(base,'data','scenario');if(fs.existsSync(sc))out.push({kind:'loose',root:base});}
  const asar=path.join(dir,'resources','app.asar');if(fs.existsSync(asar))out.push({kind:'asar',file:asar});
- for(const n of names(dir)){const f=path.join(dir,n);
+ const files=names(dir),nw=files.some(n=>NW_RUNTIME.test(n));
+ for(const n of files){const f=path.join(dir,n);
   if(/^package\.nw$/i.test(n))out.push({kind:'zip',file:f});
-  /* NW.js: the zip appended to the game's own exe (nw.dll beside it) */
-  else if(/\.exe$/i.test(n)&&!/^(nwjc|notification_helper|unins\d*|chromedriver|payload)\.exe$/i.test(n)&&names(dir).some(x=>/^nw\.dll$/i.test(x)))out.push({kind:'zip',file:f,exe:true});}
+  /* Older NW.js builds ship nw.pak without a separate nw.dll. */
+  else if(nw&&/\.exe$/i.test(n)&&!/^(nwjc|notification_helper|unins\d*|chromedriver|payload)\.exe$/i.test(n))out.push({kind:'zip',file:f,exe:true});}
  return out;}
 function scenes(dir){const out=new Map();
  for(const c of containers(dir)){
@@ -69,4 +71,4 @@ const engine={
  sources:dir=>containers(dir).map(c=>c.file||path.join(c.root,'data','scenario')),
  parse,test:n=>/\.ks$/i.test(n),
 };
-module.exports={engine,parse,asarList,zipList,zipRead,containers,isTyrano,scenes};
+module.exports={engine,parse,asarList,zipList,zipRead,containers,isTyrano,scenes,NW_RUNTIME};
