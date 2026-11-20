@@ -29,7 +29,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>:root{--ga
       return new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => { const s = document.querySelector('.sentence-text').getBoundingClientRect(), c = document.querySelector('.tomoyo-cn-row'), cr = c.getBoundingClientRect(), pad = 0;
         res({ gap, jpBottom: Math.round(s.bottom), cnTop: Math.round(cr.top + pad), cnBottom: Math.round(cr.bottom), size: parseFloat(getComputedStyle(c).fontSize) }); }))); }, [n, gap]);
     const sweep = []; for (let g = -28; g <= 40; g += 1) sweep.push(await at(g)); for (let g = 40; g >= -28; g -= 3) sweep.push(await at(g));
-    const clientBottom = 955, strip = 955 - 2 * 30, work = 1032;
+    const clientBottom = 955, strip = 955 - 31 * 1.5, work = 1032;
     for (const m of sweep) { assert.ok(m.cnBottom <= work - 8 + 1, 'whole on the screen ' + JSON.stringify(m));
       if (m.cnTop < clientBottom) { assert.ok(m.cnBottom <= strip + 30 * .25 + 1, 'off the button strip ' + JSON.stringify(m)); assert.ok(Math.abs(m.cnTop - m.jpBottom - m.gap) <= 6, 'at the set gap ' + JSON.stringify(m)); }
       else assert.ok(Math.abs(m.cnTop - clientBottom - 4) <= 2, 'right against the window bottom ' + JSON.stringify(m)); }

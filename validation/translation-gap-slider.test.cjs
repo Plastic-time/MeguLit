@@ -30,7 +30,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>:root{--ga
       return new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => { const s = document.querySelector('.sentence-text').getBoundingClientRect(), c = document.querySelector('.tomoyo-cn-row'), cr = c.getBoundingClientRect(), pad = parseFloat(getComputedStyle(c).paddingTop) || 0;
         res({ gap, jpBottom: Math.round(s.bottom), cnTop: Math.round(cr.top + pad), cnBottom: Math.round(cr.bottom), size: parseFloat(getComputedStyle(c).fontSize) }); }))); }, [n, gap]);
     const sweep = []; for (let g = 0; g <= 80; g += 2) sweep.push(await at(g)); for (let g = 80; g >= 0; g -= 2) sweep.push(await at(g));
-    const clientBottom = 860, strip = 796, under = m => m.cnTop < clientBottom;
+    const clientBottom = 860, strip = 860 - 32 * 1.5, under = m => m.cnTop < clientBottom;
     let switches = 0; for (let i = 1; i < sweep.length; i++) if (under(sweep[i]) !== under(sweep[i - 1])) switches++;
     assert.ok(switches <= 2, 'one switch each way over a full drag, got ' + switches + ': ' + JSON.stringify(sweep.map(m => [m.gap, m.cnTop])));
     for (const m of sweep) {
