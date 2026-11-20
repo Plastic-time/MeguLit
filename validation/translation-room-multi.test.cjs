@@ -33,7 +33,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>:root{--ga
     let sw = 0; for (let i = 1; i < sweep.length; i++) if (inBox(sweep[i]) !== inBox(sweep[i - 1])) sw++;
     assert.ok(sw <= 2, 'one switch each way, got ' + sw + ' ' + JSON.stringify(sweep.map(m => [m.gap, m.cnTop])));
     for (const m of sweep) { assert.ok(m.cnBottom <= work - 8 + 1, 'whole on the screen ' + JSON.stringify(m)); assert.strictEqual(m.size, 26, 'size kept'); if (inBox(m)) assert.ok(Math.abs(m.cnTop - m.jpBottom - m.gap) <= 6, 'under its Japanese at the set gap ' + JSON.stringify(m)); else assert.ok(Math.abs(m.cnTop - clientBottom - 4) <= 2, 'against the window bottom ' + JSON.stringify(m)); }
-    for (const m of sweep.slice(0, 71)) if (m.gap <= 0) assert.ok(inBox(m), 'the owner range (gap <= 0): in the box ' + JSON.stringify(m));
+    for (const m of sweep) if (m.gap < 0) assert.ok(inBox(m), 'the owner range (gap <= 0): in the box ' + JSON.stringify(m));
     for (let i = 1; i < 71; i++) assert.ok(sweep[i].cnTop >= sweep[i - 1].cnTop, 'moves down with the slider ' + JSON.stringify([sweep[i - 1], sweep[i]]));
     console.log('ok translation room multi: switches ' + sw);
   } finally { await browser.close(); }

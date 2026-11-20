@@ -155,7 +155,10 @@
          screen): below the window only when the whole row fits there above the work area's bottom; otherwise it stays under its Japanese
          inside the game and the in-window rule (smaller by at most 15 %, then up) keeps it off the button strip */
       else below = below ? over > -glyph * .5 : over > glyph * .25;
-      const refused = below && cy0 + chc + 4 + rr.height > workLimit(); if (refused) below = false;
+      /* 2026-11-21 (owner: works with a negative 原文与译文间距 and drags it there): at a negative gap the translation always stays under its
+         Japanese inside the box, whatever the earlier state; the hysteresis only covers positive gaps */
+      const userGap = parseFloat(getComputedStyle(row).marginTop) || 0;
+      const refused = below && (userGap < 0 || cy0 + chc + 4 + rr.height > workLimit()); if (refused) below = false;
       cnBelow = { key, below };
       /* below the window: right against its bottom edge (4 px), never further */
       /* the row's margin is the user's 原文与译文间距 (it may be negative); the new margin replaces it, so it is counted in (it was not: the row
