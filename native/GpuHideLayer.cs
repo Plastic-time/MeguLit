@@ -88,7 +88,7 @@ public static partial class HookBridge {
   return d.ContainsKey("reason")?Convert.ToString(d["reason"]):"off";}
  static string GpuCanaryOffFile(string f){return GpuCanaryOffReason(GpuCanaryRead(f),BridgeBuild());}
  // Arms the file for a run (false = the layer is off for this game). Pure file logic, self-tested.
- static bool GpuCanaryArmFile(string f,long pid){if(f=="")return true;var d=GpuCanaryRead(f);object v;if(GpuCanaryOffReason(d,BridgeBuild())!="")return false;
+ static bool GpuCanaryArmFile(string f,long pid){if(f=="")return true;var d=GpuCanaryRead(f);object v;if(GpuCanaryOffReason(d,BridgeBuild())!="")return false;if(pid>4&&d.TryGetValue("vanish",out v)&&Convert.ToInt32(v)>=QuickVanishLimit){Diagnostic("gpu hide canary: safe mode (the game vanished right after start "+v+" times); layer 4 stays out");return false;}
   if(d.TryGetValue("off",out v)&&Convert.ToBoolean(v)){string old=d.ContainsKey("reason")?Convert.ToString(d["reason"]):"off";d.Remove("off");d.Remove("reason");d["retried"]=old;
    Diagnostic("gpu hide canary: the record that turned layer 4 off is not this build's ("+old+"); trying the layer once more");}
   if(d.TryGetValue("armed",out v)&&Convert.ToBoolean(v)){/* #483 (2026-11-20, a Steam game started through Steam or picked up by its window: the bridge never sees its exit code, so a crash in play never reached the canary and the game kept crashing ~30 s in). The previous run's crash witness report decides: an unhandled exception in play turns the layer off as an exit code would; no report or the close flow keeps it on. */
