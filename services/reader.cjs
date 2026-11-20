@@ -319,6 +319,7 @@ class Reader{
    case 'hookPrefs':g?.setHookPrefs(r.settings);break;case 'compositorRuby':g?.compositor?.ruby?.(String(r.text||''),Array.isArray(r.ruby)?r.ruby:[]);break;
    case 'hookStart':g?.userStart(r.profile,r.force===true,r.id);break;
    case 'hookReselect':g?.reselectStream?.(r.onlyIfBad===true);break;
+   case 'engineGiveWay':g?.hooks?.giveWay?.(r.ms);break; /* 2026-11-21: a hidden line the reader cannot draw goes back to the game */
    case 'hookSelect':g?.hooks.select(r.id,true);break;
    case 'hookCheck':g?.controller.check();break;
    case 'readerReading':this.immersion?.reading?.();break;
