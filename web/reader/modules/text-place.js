@@ -11,7 +11,12 @@
   const b = window.__tomoyoChinese;
   if (!b || !document.body) { document.addEventListener('DOMContentLoaded', install, { once: true }); return; }
   if (b.textPlace) return;
-  let unmatched = null; const UNMATCHED_MS = 400;
+  let unmatched = null;
+  /* 2026-11-21 (owner's recording, windowed 千恋＊万花: dragging the 原文与译文间距 slider made the translation jump between right under
+     its Japanese and below the game window, back and forth): one decision per line, with hysteresis. The translation leaves for
+     below the window only once it reaches a quarter glyph into the game's button strip, and comes back under its Japanese only
+     once it fits with half a glyph to spare; between the two it stays where it is, so a slider moves it continuously. */
+  let cnBelow = { key: null, below: false }; const UNMATCHED_MS = 400;
   let on = false, line = null, frame = 0, lastGeom = '', boxBottom = 0, boxKey = '', anchor = null, anchorLine = '', anchorLimit = NaN, anchorMode = true, drawnByGame = '', drawnHiding = false, pageOwn = false, page = null; const clones = new Map();
   const style = document.createElement('style');
   style.textContent = [
@@ -93,6 +98,9 @@
     if (!anchor || !win || !sentence) return;
     document.body.classList.add('megulit-anchored'); win.classList.add('megulit-anchor-window');
     for (const p of ['left', 'top']) win.style.removeProperty(p);
+    /* 2026-11-21 (owner's recording: the translation jumped back and forth while a slider moved): the rows a previous frame closed
+       up are opened before anything is measured, so every frame places the line from the same layout and decides once */
+    sentence.style.removeProperty('line-height'); win.querySelector('.tomoyo-cn-row')?.style.removeProperty('margin-top');
     const tok = sentence.querySelector('.char-token'), wr = win.getBoundingClientRect(), tr = tok?.getBoundingClientRect();
     /* 2026-11-19 (user: 「左右留白和边距现在都调整不了文本框位置了」): in anchored mode the box position fields are the line's offset
        from the game's own place, saved with the game's profile (anchorDX/anchorDY, client %, 0 = on the game's first character);
@@ -132,7 +140,13 @@
       sentence.style.removeProperty('line-height'); let sx = sentence.getBoundingClientRect();
       if (sx.bottom > uiLimit && sentence.querySelector('br.megulit-row-br')) { set(sentence, 'line-height', closeRows(sentence)); sx = sentence.getBoundingClientRect(); }
       if (sx.bottom > uiLimit) { const up = Math.min(sx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); }
-      const rr = row.getBoundingClientRect(); if (rr.bottom > uiLimit && rr.top < cy0 + chc) set(row, 'margin-top', Math.ceil(cy0 + chc - rr.top + 4) + 'px'); }
+      const rr = row.getBoundingClientRect(), over = rr.bottom - uiLimit, key = String(anchorLine || '');
+      let below = cnBelow.key === key && cnBelow.below;
+      if (rr.top >= cy0 + chc) below = false; /* already under the window: nothing to move */
+      else below = below ? over > -glyph * .5 : over > glyph * .25;
+      cnBelow = { key, below };
+      /* below the window: right against its bottom edge (4 px), never further */
+      if (below) set(row, 'margin-top', Math.ceil(cy0 + chc - rr.top + 4) + 'px'); }
     else if (row && !roomBelow && !anchor.center && tr && tr.height) { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
       sentence.style.removeProperty('line-height');
       if (row.getBoundingClientRect().bottom > uiLimit && sentence.querySelector('br.megulit-row-br')) set(sentence, 'line-height', closeRows(sentence));
@@ -146,7 +160,7 @@
       if (rb.bottom > limit) { const up = Math.min(rb.bottom - limit, Math.max(0, win.getBoundingClientRect().top)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); rb = row.getBoundingClientRect(); }
     }
   }
-  function release(fallback = false) {
+  function release(fallback = false, repin = true) {
     if (!page) document.body.classList.remove('megulit-placed');
     document.body.classList.remove('megulit-anchored');
     for (const br of document.querySelectorAll('br.megulit-row-br,br.megulit-cn-br')) br.remove();
@@ -160,7 +174,7 @@
     }
     if (lastGeom) { lastGeom = ''; dispatchEvent(new CustomEvent('megulit-reveal-progress', { detail: { typing: false } })); }
     /* between lines (the next one not matched yet) the text stays where the last line was, not at the reader's own place */
-    if (fallback === true && anchorMode && anchor) { const w = target(); pin(w, w?.querySelector('.sentence-text:not(.megulit-old-line)')); }
+    if (fallback === true && repin && anchorMode && anchor) { const w = target(); pin(w, w?.querySelector('.sentence-text:not(.megulit-old-line)')); }
   }
   /* record px are game-client px; the reader surface may be larger than the game (galLayoutInfo: client origin and size
      in physical px), CSS px = physical / devicePixelRatio */
@@ -523,7 +537,7 @@
       /* the page's earlier lines stay above only when the game drew this line under them; a line that starts at or above
          where the last one ended is a new page (a title card, a cleared box), whatever the text stream said */
       { const k = String(line.text || ''), first = rows.rows[0], seq = Number(sentence.dataset.sequence) || 0; if (k !== rowsLine) { /* only the line placed just before counts (lines skipped through were never placed) */ rowsFresh = !(rowsPrev && rowsSeq && seq - rowsSeq <= 1 && first && first.t >= rowsPrev - size * .3 && Number.isFinite(rows.center) === rowsCentred); /* a centred page and a text box are never one page */ rowsCentred = Number.isFinite(rows.center); rowsPrev = rows.rows.length ? rows.rows[rows.rows.length - 1].t + size : null; rowsLine = k; rowsSeq = seq; } }
-      release(true);
+      release(true, false); /* pinned once below, after the row breaks: a pin from the unbroken layout here decided the translation's place from a different block every other frame */
       win.classList.toggle('megulit-page-fresh', rowsFresh); if (rowsFresh) b.hookPageReset?.();
       rowBreaks(win, shown, rows);
       cnRows(win, shown, rows);
