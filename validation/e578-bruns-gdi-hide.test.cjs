@@ -33,7 +33,7 @@ test('hook DLL: GDI functions skip only matched dialogue and otherwise pass thro
 test('host: probe on selection, hide-only only after the DLL reports a hidden string',()=>{
  const b=read('native/HookBridge.cs');
  assert.ok(b.includes('static bool Armed(Candidate c){return c!=null&&(c.embed||c.gdiProbe);}'));
- assert.ok(b.includes('static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&c.role!=2&&c.role!=3&&!LoadUnsafe().ContainsKey(UnsafeKey(c.name,c.role));}'),'never the name stream, never a stream marked unsafe');
+ assert.ok(b.includes('static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&!ConversionHook(c.code)&&c.role!=2&&c.role!=3&&!LoadUnsafe().ContainsKey(UnsafeKey(c.name,c.role));}'),'never the name stream, never a stream marked unsafe');
  assert.ok(b.includes('if(GdiProbeable(c)){c.gdiProbe=true;'));
  assert.ok(b.includes('if(Armed(c)&&(ReplacementEnabled||ProbeWanted&&c.gdiProbe)&&!DotsOwn(c)){var t3=c.tp;bool v3=true;later.Add(()=>Luna_UseEmbed(t3,v3));}'),'switched on with replacement on or as a hide probe, outside Gate (E560); not in glyph dot mode (docs/text-architecture.md)');
  assert.ok(b.includes('Armed(Candidates[Selected])&&!(ProbeWanted&&Candidates[Selected].gdiProbe))Luna_UseEmbed(Candidates[Selected].tp,false);ReplacementEnabled=false;'),'switched off with replacement unless the reader still probes');
