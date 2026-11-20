@@ -57,7 +57,7 @@
   function reserve(text) {
     if (!output) return;
     const cs = getComputedStyle(output), size = parseFloat(cs.fontSize) || 20, lh = parseFloat(cs.lineHeight) || size * 1.4, width = output.clientWidth || row?.clientWidth || 600;
-    const estimate = Math.max(1, Math.ceil([...String(text || '').replace(/[\s\u3000]/g, '')].length * .8 * size / Math.max(size, width))) * lh;
+    const estimate = Math.max(1, Math.ceil([...String(text || '').replace(/[\s\u3000]/g, '')].length * 1.2 * size / Math.max(size, width))) * lh;
     const h = Math.ceil(Math.max(estimate, ...recentHeights, lh));
     output.style.minHeight = h + 'px'; bridge.translationReserve = h;
   }
@@ -147,9 +147,11 @@
     const chars = sentence?.querySelectorAll('.char-token');
     const text = sentence ? (chars?.length ? Array.from(chars,c=>c.textContent).join('') : sentence.textContent).trim() : '';
     if(text !== bridge.sourceText){bridge.sourceText=text;bridge.onSourceText?.(text);}
+    /* the translation row and its room exist from the first frame of the line, not 220 ms later */
+    if(sentence&&text&&enabled&&translationVisible&&!output?.isConnected&&ensureRow(sentence))reserve(text);
     /* 2026-11-13 (STEINS;GATE: each new line showed the previous line's translation for ~250 ms): the translation is
        requested after a 220 ms debounce, so the old one goes the moment the source line changes */
-    if(output&&text&&text!==bridge.current&&enabled&&translationVisible&&output.dataset.state!=='pending'&&!(output.dataset.state==='ready'&&grown(bridge.current,text))){window.TomeTypewriter?.stop(output);output.replaceChildren();output.dataset.state='pending';}
+    if(output&&text&&text!==bridge.current&&enabled&&translationVisible&&output.dataset.state!=='pending'&&!(output.dataset.state==='ready'&&grown(bridge.current,text))){reserve(text);window.TomeTypewriter?.stop(output);output.replaceChildren();output.dataset.state='pending';}
     clearTimeout(bridge.timer);
     bridge.timer = setTimeout(read, 220);
   }
