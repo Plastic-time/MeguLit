@@ -82,6 +82,7 @@
       const seg = segOf(Ls[0], id), loop = seg.kind === 'loop';
       await Promise.all(Ls.map(async (L) => {
         const nv = L.vids[1 - L.front], ov = L.vids[L.front];
+        const ss = window.__splashStart; if (ss && !firstFrame && !REDUCE) { const off = (Date.now() - ss.st0) / 1000 + 0.15, d = nv.duration || 0; let t = id === 'intro' ? Math.min(off, Math.max(0, d - 0.05)) : (off - ss.introDur) % (d || 4); if (t > 0.02) { try { nv.currentTime = t; } catch (e) { /* not seekable yet */ } await seeked(nv); } note('splash-seek', { id, off: +off.toFixed(2), t: +t.toFixed(2) }); }
         nv.loop = loop && !REDUCE; if (!REDUCE || !loop) { const p = nv.play(); if (p && p.catch) p.catch((e) => { if (!dead) fatal('play() refused: ' + e.message); }); }
         await shown(nv);
         if (how === 'fade' && ov.classList.contains('on') && !REDUCE) { nv.style.transition = 'opacity ' + FADE + 'ms linear'; nv.style.zIndex = 2; ov.style.zIndex = 1; nv.classList.add('on'); await new Promise((r) => setTimeout(r, FADE + 20)); nv.style.transition = ''; }
@@ -186,7 +187,10 @@
     catch (e) { clearTimeout(timer); fatal(e.message); return; }
     if (first.man.segments[0] && first.man.segments[0].poster) first.poster.src = url(first, segOf(first, 'intro') ? segOf(first, 'intro').poster : first.man.segments[0].poster);
     GL.ok = true; started = true; note('manifest', { theme: first.theme, draft: !!first.man.draft, segs: first.man.segments.length });
-    if (REDUCE) await switchTo('welcome', 'cut'); else await switchTo('intro', 'cut');
+    /* the exe's native splash (?st=<epoch ms of its first frame>) has been playing intro + welcome cycles: continue from the same moment */
+    const st0 = +Q.get('st') || 0, introS = segOf(first, 'intro'); let startId = 'intro';
+    if (st0 && introS && !REDUCE) { const off = (Date.now() - st0) / 1000 + 0.6; if (off >= introS.frames / fpsOf()) startId = 'welcome'; window.__splashStart = { st0, introDur: introS.frames / fpsOf() }; note('splash-handoff', { off: +off.toFixed(2), startId }); }
+    if (REDUCE) await switchTo('welcome', 'cut'); else await switchTo(startId, 'cut');
     clearTimeout(timer);
     if (target !== 'welcome') step();
   }
