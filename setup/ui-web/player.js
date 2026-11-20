@@ -21,6 +21,7 @@
   const FROM = { 'to-loc': 'welcome', 'to-field': 'loc', 'to-unpack': 'field', 'to-done': 'unpack' };   /* a transition's first frame = this loop's frame 0 */
   const THEMES = ['light', 'dark'];
   const post = (o) => { try { if (window.chrome && chrome.webview) chrome.webview.postMessage(o); } catch (e) { /* no host */ } };
+  const marks = {}; const mark = (what) => { if (marks[what]) return; marks[what] = Math.round(performance.now()); post({ type: 'mark', what, at: marks[what] }); };
   const log = []; const note = (k, d) => { const e = Object.assign({ t: Math.round(performance.now()), k }, d || {}); log.push(e); if (log.length > 400) log.shift(); };
 
   /* ---------- DOM ---------- */
@@ -94,7 +95,7 @@
         if (dropGlass) { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.transition = ''; canvas.style.opacity = '1'; }
       }));
       cur = id; note('on', { id });
-      if (!firstFrame) { firstFrame = true; note('first-frame', {}); }
+      if (!firstFrame) { firstFrame = true; note('first-frame', {}); mark('frame1'); const p0 = document.getElementById('vposter'); if (p0) { p0.style.transition = 'opacity .2s'; p0.style.opacity = '0'; setTimeout(() => p0.remove(), 300); } }
       watch(); prefetch();
     } catch (e) { fatal(e.message || String(e)); }
     finally { switching = false; }
@@ -234,6 +235,10 @@
     const first = mix >= 1 ? layers.dark : layers.light;
     /* poster first: a real frame on screen before any video is decoded */
     first.poster.src = VBASE + first.theme + '/intro.jpg'; first.poster.classList.add('on');
+    /* the poster is a real frame: it replaces the boot screen at once, and the host logs when (cold-start timing) */
+    const posterUp = () => { const b = document.getElementById('boot'); if (b && !b.classList.contains('gone')) { b.classList.add('gone'); setTimeout(() => b.remove(), 800); } mark('poster'); };
+    if (window.__posterAt) marks.poster = window.__posterAt;   /* the static poster in index.html was first */
+    if (first.poster.complete && first.poster.naturalWidth) posterUp(); else first.poster.addEventListener('load', posterUp, { once: true });
     const timer = setTimeout(() => { if (!firstFrame) fatal('no video frame within ' + TIMEOUT + ' ms'); }, TIMEOUT);
     try { await Promise.all(THEMES.map((t) => load(layers[t]).catch((e) => { if (layers[t] === first) throw e; note('manifest-missing', { t, e: e.message }); }))); }
     catch (e) { clearTimeout(timer); fatal(e.message); return; }
@@ -259,7 +264,7 @@
   window.Player = {
     go(section) { if (!LOOP[section]) return; target = section; note('want', { section }); if (cur && !switching) { if (!loopOf(cur)) prefetch(); else step(); } },
     get state() { return { cur, target, firstFrame, dead, mix, pending: pending && pending.id, switching }; },
-    log, layers,
+    log, layers, marks,
     verdict() { const L = base(), v = L.vids[L.front]; const onScreen = firstFrame ? v.readyState >= 2 : (L.poster.complete && L.poster.naturalWidth > 0); return { result: onScreen ? 'ok' : 'blank', renderer: 'video' + (L.man && L.man.draft ? ' (draft)' : ''), std: onScreen ? 10 : 0, errs: 0, hw: true }; }
   };
   /* scene.js drives the stage changes: follow its goTo (host.js / skin.js call it on the installer's real events) */

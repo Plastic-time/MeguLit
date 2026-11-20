@@ -176,7 +176,7 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 <div id="desk"></div>
 <div id="shadow"></div>
 <div id="win"><div id="app">
-<div id="view"><div id="world"></div></div>
+<div id="view"><img id="vposter" alt="" decoding="sync" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:4" onload="try{var b=document.getElementById('boot');if(b)b.classList.add('gone');window.__posterAt=Math.round(performance.now());if(window.chrome&&chrome.webview)chrome.webview.postMessage({type:'mark',what:'poster',at:window.__posterAt})}catch(e){}"><script>/* the first frame of the opening clip, in the first paint: no script has to run before the window shows the scene */try{var q=new URLSearchParams(location.search),vb=(q.get("vbase")||"video/").replace(/\/?$/,"/"),dk=q.get("theme")?q.get("theme")==="night":localStorage.getItem("megulit.setup.theme")==="dark";if(q.get("prerender")!=="1")document.getElementById("vposter").src=vb+(dk?"dark":"light")+"/intro.jpg";else document.getElementById("vposter").remove()}catch(e){}</script><div id="world"></div></div>
 <div id="fx"><div id="vig"></div><div id="streaks"></div><div id="flash"></div></div>
 <div class="layer" id="ui-top" style="opacity:1;visibility:visible"><div class="top"><img id="topLogo" src="logos/logo-orig.svg" alt="MeguLit"><div class="steps" id="steps"><i></i><i></i><i></i><i></i><span id="stepname"></span></div></div></div>
 <div class="scrimb layer" id="scrimb" style="opacity:1;visibility:visible;pointer-events:none"></div>
@@ -200,12 +200,13 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 <div id="chrome"><div id="drag"></div><div class="tab"><button id="btnTheme" aria-pressed="false"></button><button id="btnMin" aria-label="最小化 Minimize"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.6"/></svg></button><button id="btnClose" aria-label="关闭 Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.6"/></svg></button></div><div class="notch"></div></div>
 <div class="layer" id="ui-quit"><div class="scrim"></div><div class="card quit"><h2>货还在路上</h2><div class="en">Download in progress</div><p>现在关掉也没关系：已经下好的碎片会保留，下次打开接着下。</p><div class="acts"><button class="go" id="stay">等它到</button><button class="btn" id="leave">回头再来</button></div></div></div>
 </div>
-<script src="logos/logos.js"></script>
-<script>/* three.js and the live 3D scene are only for the offline renderer (tools/setup-prerender.cjs, ?prerender=1); the installer plays videos (player.js) */if(new URLSearchParams(location.search).get("prerender")==="1")document.write('<script src="../../tools/setup-scene/three.js"><\/script>')</script>
-<script src="vendor/gsap.min.js"></script>
-<script src="scene.js"></script>
-<script>if(new URLSearchParams(location.search).get("prerender")==="1")document.write('<script src="../../tools/setup-scene/glass.js"><\/script>')</script>
-<script src="player.js"></script>
-<script>(function(){var q=new URLSearchParams(location.search);var h=q.get("host");var f=(h==="1"||h==="2")?"host.js":q.get("demo")==="1"?"demo.js":null;if(f){var s=document.createElement("script");s.src=f;document.body.appendChild(s)}if(q.get("prerender")==="1"){document.documentElement.classList.add("prerender","native")}if(h==="1"||h==="2"){if(h==="1")window.__waitConfirm=true;document.documentElement.classList.add((q.get("native")==="1"||h==="2")?"native":"deskmode")}})()</script>
+<script>/* Scripts load after the first paint, in their order (async=false), so the window shows the poster at once instead of waiting
+   for the scene code (cold renderer: ~2 s). three.js + the live 3D scene only for the offline renderer (?prerender=1, tools/setup-scene/). */
+(function(){var q=new URLSearchParams(location.search),pre=q.get("prerender")==="1",h=q.get("host"),de=document.documentElement;
+if(pre)de.classList.add("prerender","native");if(h==="1"||h==="2"){if(h==="1")window.__waitConfirm=true;de.classList.add((q.get("native")==="1"||h==="2")?"native":"deskmode")}
+var list=["logos/logos.js"];if(pre)list.push("../../tools/setup-scene/three.js");list.push("vendor/gsap.min.js","scene.js");if(pre)list.push("../../tools/setup-scene/glass.js");list.push("player.js");
+var f=(h==="1"||h==="2")?"host.js":q.get("demo")==="1"?"demo.js":null;if(f)list.push(f);
+function go(){list.forEach(function(src){var s=document.createElement("script");s.src=src;s.async=false;document.body.appendChild(s)})}
+if(pre)go();else requestAnimationFrame(function(){setTimeout(go,0)})})()</script>
 </body>
 </html>

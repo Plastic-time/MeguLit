@@ -74,6 +74,8 @@ function Web-Act($m) {
   try {
     switch ($t) {
       'hello' { Web-Post @{ t = 'info'; i = (Web-Info) } }
+      'mark' { if ($m.what -eq 'poster' -and $script:posterBox) { try { $script:win.Controls.Remove($script:posterBox); $script:posterBox.Dispose() } catch {}; $script:posterBox = $null }
+        Web-Log ('cold-start mark=' + $m.what + ' ms=' + $(if ($script:shownAt) { [int]([DateTime]::Now - $script:shownAt).TotalMilliseconds } else { -1 }) + ' page=' + $m.at) }   # player.js: poster / frame1 on screen, ms since the window was shown
       'ready' { $script:webReady = $true; $script:readyMs = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds }
       'gl-attempt' { Web-Log ('cold-start attempt=' + $m.attempt + ' result=retry why="' + $m.reason + '" ms=' + $m.ms) }
       'gl-report' { Web-Log ('cold-start attempt=' + $m.attempt + ' result=' + $m.result + ' ms=' + $script:readyMs + ' renderer="' + $m.renderer + '" std=' + $m.std + ' errs=' + $m.errs + ' t_init=' + $script:tInit + ' t_nav=' + $script:tNav + ' t_create=' + $m.created + ' t_frame1=' + $m.frame1 + ' t_settle=' + $m.settleMs + ' t_page=' + $m.pageMs) }
@@ -140,10 +142,14 @@ public class SetupWin : Form {
     $wa0 = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea; $scale = [math]::Max(0.5, [math]::Min($scale, [math]::Min($wa0.Width / 1000.0, $wa0.Height / 640.0)))   # never larger than the work area (small screens)
     if ($testLog -and $env:MEGULIT_SETUP_WEB_DPI) { $scale = [double]$env:MEGULIT_SETUP_WEB_DPI / 96.0 }   # tests: emulate 125/150/200 % (with --force-device-scale-factor)
     $win = New-Object SetupWin
-    $win.Text = 'MeguLit 安装'; $win.FormBorderStyle = 'None'; $win.StartPosition = 'CenterScreen'; $win.ShowInTaskbar = $true; $win.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
+    $win.Text = 'MeguLit 安装'; $win.FormBorderStyle = 'None'; $win.StartPosition = 'CenterScreen'; $win.ShowInTaskbar = -not $testLog; $win.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
     $win.ClientSize = New-Object Drawing.Size([int](1000 * $scale), [int](640 * $scale)); $win.MinimumSize = $win.Size
     $ico = Join-Path $sourceRoot 'MeguLit.exe'; if (Test-Path $ico) { try { $win.Icon = [Drawing.Icon]::ExtractAssociatedIcon($ico) } catch {} }
     $web = New-Object Microsoft.Web.WebView2.WinForms.WebView2; $web.Dock = 'Fill'; $win.Controls.Add($web); $win.Web = $web
+    # Native poster: the first frame of the opening clip, drawn by the window itself the moment it appears. A cold WebView2 needs ~2 s
+    # (more on a loaded machine) before the page can paint anything; the poster covers that and is removed when the page shows its own.
+    $script:posterBox = $null
+    try { $pp = Join-Path $ui 'video\light\intro.jpg'; if (Test-Path $pp) { $ms = New-Object IO.MemoryStream (,[IO.File]::ReadAllBytes($pp)); $pb = New-Object Windows.Forms.PictureBox; $pb.Dock = 'Fill'; $pb.SizeMode = 'StretchImage'; $pb.Image = [Drawing.Image]::FromStream($ms); $win.Controls.Add($pb); $pb.BringToFront(); $script:posterBox = $pb } } catch { Web-Log ('native poster: ' + $_) }
     $props = New-Object Microsoft.Web.WebView2.WinForms.CoreWebView2CreationProperties; $script:webData = $(if ($env:MEGULIT_SETUP_WEBVIEW2_DATA) { $env:MEGULIT_SETUP_WEBVIEW2_DATA } elseif ($env:WEBVIEW2_USER_DATA_FOLDER) { $env:WEBVIEW2_USER_DATA_FOLDER } else { Join-Path $env:LOCALAPPDATA ('MeguLit\setup-webview2' + $PID) }); $props.UserDataFolder = $script:webData   # one folder per setup process: two setups at once do not fight over it; $web.CreationProperties = $props
     $script:win = $win; $script:webReady = $false
     $win.AskClose = { $script:askAt = [DateTime]::Now; try { $script:win.Web.CoreWebView2.ExecuteScriptAsync('window.__askClose&&window.__askClose()') | Out-Null } catch { Web-Close } }
@@ -158,7 +164,7 @@ public class SetupWin : Form {
       $cw.add_NavigationCompleted({ if (-not $script:tNav) { $script:tNav = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds } })
       $cw.Navigate('https://megulit-setup.local/index.html?' + $q)
     })
-    $win.Show(); [void]$web.EnsureCoreWebView2Async($null)
+    $win.Show(); $script:shownAt = [DateTime]::Now; if ($script:posterBox) { $win.Refresh(); Web-Log ('cold-start mark=native-poster ms=' + [int]([DateTime]::Now - $script:shownAt).TotalMilliseconds) }; [void]$web.EnsureCoreWebView2Async($null)
     if ($oldCtx -ne [IntPtr]::Zero) { try { [void][SetupWin]::SetThreadDpiAwarenessContext($oldCtx) } catch {} }
     # wait for the first rendered frame (the page says "ready" only after WebGL and the scene came up); 10 s at most
     $deadline = $t0.AddSeconds(32)
