@@ -44,3 +44,16 @@ test('a Steam launch accepts a game process from another program in the install 
  assert.match(src,/const anyProcess=async\(\)=>\{const own=await gameProcesses\(root,game\.executable\)/);
  assert.match(src,/waitForVisibleGame\(anyProcess,\{helper:steam/);
 });
+
+test('the running check answers from GameProcess.exe without waiting on PowerShell',async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-running-')),dir=path.join(root,'games','native');
+ fs.mkdirSync(dir,{recursive:true});
+ const exe=path.join(dir,'game.exe');fs.copyFileSync(path.join(process.env.SystemRoot,'System32','PING.EXE'),exe);
+ const game=spawn(exe,['-n','60','127.0.0.1'],{windowsHide:true,stdio:'ignore'});
+ try{
+  await new Promise((resolve,reject)=>{game.once('spawn',resolve);game.once('error',reject);});
+  const t=Date.now();assert.equal(jr._internal.nativeRunning(dir),true);assert.ok(Date.now()-t<15000);
+ }finally{game.kill();await new Promise(resolve=>game.once('exit',resolve));}
+ assert.equal(jr._internal.nativeRunning(dir),false);
+ fs.rmSync(root,{recursive:true,force:true});
+});
