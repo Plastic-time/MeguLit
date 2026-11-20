@@ -61,6 +61,8 @@
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-import-row>button{padding:5px 12px!important;height:32px}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-calibration-imports{margin-top:6px}
  /* reusable in-panel second-level tabs (.mg-subtabs): one segmented control. A single trough holds every tab in equal cells (4 a row in a narrow panel, one row when wide); the selected cell is filled. It must not look like the action buttons below it. */
+ /* a pane under the segmented control already says which tab it is: its own fold header is not shown */
+ details.tome-ac-pane:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7)>summary{display:none!important}
  .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid;grid-template-columns:repeat(var(--mg-seg-cols,4),minmax(0,1fr));gap:2px;margin:8px 0 10px;padding:3px;border:0;border-radius:10px;background:color-mix(in srgb,var(--theme-text,#e8e9ec) 7%,transparent);overflow:visible}
  .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button{min-width:0;margin:0!important;padding:7px 4px!important;border:1px solid transparent!important;border-radius:7px!important;background:transparent!important;box-shadow:none!important;color:var(--theme-textSecondary,#aaa)!important;cursor:pointer;font-size:13px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
  .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button:hover{color:var(--theme-text,#e8e9ec)!important;background:color-mix(in srgb,var(--theme-text,#e8e9ec) 6%,transparent)!important}
@@ -113,7 +115,7 @@
    try{const v=Number(localStorage.getItem(sk));if(Number.isInteger(v)&&v>=0&&v<items.length)state.i=v;}catch{}
    bar.addEventListener('keydown',e=>{const k=e.key;if(!['ArrowRight','ArrowLeft','Home','End'].includes(k))return;const n=k==='Home'?0:k==='End'?items.length-1:(state.i+(k==='ArrowRight'?1:items.length-1))%items.length;state.i=n;paint();save();bar.children[n].focus();bar.children[n].scrollIntoView({block:'nearest',inline:'nearest'});e.preventDefault();});}
   function paint(){[...bar.children].forEach((b,i)=>{const full=items[i].label(),t=SHORT[full]||full;if(b.textContent!==t)b.textContent=t;if(t!==full)b.title=full;else b.removeAttribute('title');b.setAttribute('aria-selected',String(i===state.i));b.tabIndex=i===state.i?0:-1;});
-   items.forEach((it,i)=>{for(const n of it.nodes()){n.classList.toggle('tome-ac-off',i!==state.i);if(n.tagName==='DETAILS'&&it.pane){n.classList.add('tome-ac-pane');if(i===state.i){n.open=true;for(const d of n.querySelectorAll('details'))if(!d.dataset.acOpened){d.dataset.acOpened='1';d.open=true;}}}}});}
+   items.forEach((it,i)=>{for(const n of it.nodes()){n.classList.toggle('tome-ac-off',i!==state.i);if(n.tagName==='DETAILS'&&it.pane){n.classList.add('tome-ac-pane');const sm=n.querySelector(':scope>summary');if(sm)sm.style.setProperty('display','none','important');if(i===state.i){n.open=true;for(const d of n.querySelectorAll('details'))if(!d.dataset.acOpened){d.dataset.acOpened='1';d.open=true;}}}}});}
   paint();return bar;}
  window.__megulitSubTabs={mount:chips};
  const st={text:{i:0},cal:{i:0}},bst={open:null,last:null,expanded:false};
@@ -134,7 +136,7 @@
    if(embL){const m=mk('div','tome-ac-mode');m.append(embL,...hots);general.after(m);}
    grp(bold,[bold]);grp(pair,[pair,hintA]);grp(disp,[disp,au&&au.closest('label')||au]);}
   const det=n=>text.querySelector(':scope>details[data-text-'+n+']'),jp=det('japanese'),cn=det('chinese'),en=det('megulit-english')||text.querySelector(':scope>details[data-megulit-english]'),ruby=det('ruby'),pal=det('colours'),spc=det('spacing'),gf=det('game-font');
-  const modeBox=text.querySelector('.tome-ac-mode');{const anchor=ruby||pal||gf;if(modeBox&&anchor&&modeBox.nextElementSibling!==anchor)anchor.before(modeBox);}const modeBox2=modeBox,blurLb=byName(text,'galTranslationBlur')?.closest('label');if(cn&&blurLb&&!cn.contains(blurLb))cn.append(blurLb);
+  const modeBox=text.querySelector('.tome-ac-mode');{const anchor=ruby||pal||gf;if(modeBox&&anchor&&modeBox.nextElementSibling!==anchor)anchor.before(modeBox);}const modeBox2=modeBox,blurLb=byName(text,'galTranslationBlur')?.closest('label');if(cn&&blurLb&&!cn.contains(blurLb))cn.append(blurLb);/* bold switches live in their own language tab, not on top of the page */{const into=(name,box)=>{const l=byName(text,name)?.closest('label');if(!l||!box||box.contains(l))return;const sum=box.querySelector(':scope>summary');const holder=sum?.nextElementSibling&&sum.nextElementSibling.tagName!=='LABEL'?sum.nextElementSibling:box;holder===box&&sum?sum.after(l):holder.prepend(l);};into('galJapaneseBold',jp);into('galChineseBold',cn);const bg=text.querySelector('.tome-text-general .tomoyo-cn-grid');if(bg&&!bg.querySelector('input')){const g=bg.closest('.tome-ac-group');(g||bg).remove();}}
   const groups=[jp,cn,en,modeBox2,ruby,pal,spc,gf].filter(Boolean);
   const calNodes={sync:cal.querySelector(':scope>.tome-game-style-sync'),pos:cal.querySelector(':scope>[data-calibration-position]'),bind:cal.querySelector('[data-calibration-window-bind]'),imp:cal.querySelector('.tome-calibration-imports'),hist:cal.querySelector('.tome-calibration-history')};
   if(V==='b'){

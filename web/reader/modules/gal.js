@@ -695,8 +695,8 @@
       <label>字体搭配<select name="galStyle"><option value="classic">MS Mincho（日文明朝）／素晴汉化字体</option><option value="clean">MS Gothic（日文黑体）／素晴汉化字体</option><option value="custom">自定义 · 沿用下方译文设置</option></select></label>
       <div class="tomoyo-cn-grid"><label><input name="galJapaneseBold" type="checkbox">日文加粗</label><label><input name="galChineseBold" type="checkbox">中文加粗</label><label title="译文默认模糊，鼠标移上去才显示"><input name="galTranslationBlur" type="checkbox">译文模糊（悬停显示）</label></div>
       <label><input name="galTypewriter" type="checkbox">文字逐字显示</label>
-      <label>显示速度（字/秒）<input name="galTypewriterSpeed" type="number" min="5" max="120" step="1"></label>
-      <small>点击游戏或按空格可补全当前文字；按住 Ctrl 快速显示，不拦截游戏操作</small>
+      <label>速度（字/秒）<input name="galTypewriterSpeed" type="number" min="5" max="120" step="1"></label>
+      <small>点游戏或按空格补全当前句；按住 Ctrl 快速显示</small>
       <label>显示内容<select name="galDisplay"><option value="bilingual">日文＋假名／中文</option><option value="japanese">仅日文＋假名</option><option value="chinese">仅中文 · 接近汉化版</option><option value="bilingual-en">日文＋假名／英文</option><option value="english">仅英文</option><option value="none">不显示（只看游戏文本框）</option></select></label>
       <div class="tomoyo-cn-grid tomoyo-type-sizes"><label>中文字号<input name="galChineseSize" type="number" min="12" max="60"></label></div>
       <div class="tomoyo-cn-grid"><label>未读渐变<input name="galTextGradient" type="checkbox"></label><label>已读渐变<input name="galReadTextGradient" type="checkbox"></label><label>未读渐变上色<input name="galTextGradientTop" type="color"></label><label>未读渐变下色<input name="galTextGradientBottom" type="color"></label><label>已读渐变上色<input name="galReadTextGradientTop" type="color"></label><label>已读渐变下色<input name="galReadTextGradientBottom" type="color"></label><label>未读渐变起点（%）<input name="galTextGradientStart" type="number" min="0" max="95" step="1"></label><label>已读渐变起点（%）<input name="galReadTextGradientStart" type="number" min="0" max="95" step="1"></label></div>
