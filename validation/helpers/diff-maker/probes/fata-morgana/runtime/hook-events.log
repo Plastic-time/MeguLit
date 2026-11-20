@@ -1,56 +1,34 @@
-2026-11-20T22:51:04.644Z stream memory Krkr2wcs EXHQXN8@175310:fata_jp.exe
-2026-11-20T22:51:07.821Z ocr line "当作品には流血・暴力や精神的不安を煽る表現が含まれておりますまた、差別的な用語を"
 2026-11-20T22:51:07.881Z source chars=204 sequence=1
 2026-11-20T22:51:09.013Z visual {"type":"hookVisual","sequence":1,"stage":"hidden","sample":1,"valid":true,"matched":true,"japaneseCharacters":58,"recognizedCharacters":60,"sourceCharacters":194,"checkedAt":1795215069011,"region":{"x":56,"y":459,"width":747,"height":144}}
 2026-11-20T22:51:09.715Z visual {"type":"hookVisual","sequence":1,"stage":"hidden","sample":2,"valid":true,"matched":true,"japaneseCharacters":58,"recognizedCharacters":60,"sourceCharacters":194,"checkedAt":1795215069714,"region":{"x":56,"y":459,"width":747,"height":144}}
-2026-11-20T22:51:14.633Z ocr line "当作品のプレイには、ヘッドホンやイヤホン等のご利用を心からお勧めさせていただきま"
 2026-11-20T22:51:14.644Z source chars=83 sequence=2
 2026-11-20T22:51:16.317Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":79,"checkedAt":1795215075889,"region":{"x":56,"y":459,"width":747,"height":144}}
 2026-11-20T22:51:16.593Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":79,"checkedAt":1795215076593,"region":{"x":56,"y":459,"width":747,"height":144}}
-2026-11-20T22:51:32.253Z ocr line "館がある"
 2026-11-20T22:51:32.255Z source chars=4 sequence=3
 2026-11-20T22:51:33.248Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":4,"checkedAt":1795215093248,"region":{"x":56,"y":459,"width":747,"height":144}}
 2026-11-20T22:51:33.941Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":4,"checkedAt":1795215093941,"region":{"x":56,"y":459,"width":747,"height":144}}
-2026-11-20T22:51:37.141Z ocr line "鬱蒼と茂る闇の森をかき分けると"
 2026-11-20T22:51:37.142Z source chars=15 sequence=4
 2026-11-20T22:51:38.100Z visual {"type":"hookVisual","sequence":4,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":15,"checkedAt":1795215098100,"region":{"x":56,"y":459,"width":747,"height":144}}
 2026-11-20T22:51:38.794Z visual {"type":"hookVisual","sequence":4,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":15,"checkedAt":1795215098794,"region":{"x":56,"y":459,"width":747,"height":144}}
 2026-11-20T22:51:40.966Z source chars=18 sequence=5
 2026-11-20T22:51:40.989Z placement placed: line 1, 18 characters, first box 220,488,20,22 in client 804x604
-2026-11-20T22:51:41.168Z choice aux KiriKiri2 role=0 added=[] text="その瞬間、私は死体を見下ろしていた。"
-2026-11-20T22:51:41.170Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="その瞬間、私は死体を見下ろしていた。"
 2026-11-20T22:51:44.880Z source chars=9 sequence=6
 2026-11-20T22:51:44.900Z placement placed: line 2, 9 characters, first box 307,488,22,22 in client 804x604
-2026-11-20T22:51:45.098Z choice aux KiriKiri2 role=0 added=[] text="……自分の死体だ。"
-2026-11-20T22:51:45.226Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="………自分……の自死……体…自だ…。自体だ分の死。体だ分の死。分体の死だ。体だ分の死。"
 2026-11-20T22:51:46.753Z source chars=17 sequence=7
 2026-11-20T22:51:46.771Z placement placed: line 3, 17 characters, first box 226,488,22,22 in client 804x604
-2026-11-20T22:51:46.994Z choice aux KiriKiri2 role=0 added=[] text="磔の場へと引きずられるその姿に……"
-2026-11-20T22:51:47.111Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="磔の場へと引きずられるその姿に……"
 2026-11-20T22:51:48.361Z source chars=9 sequence=8
 2026-11-20T22:51:48.389Z placement placed: line 4, 9 characters, first box 307,488,22,22 in client 804x604
-2026-11-20T22:51:48.588Z choice aux KiriKiri2 role=0 added=[] text="深い絶望を抱き……"
-2026-11-20T22:51:48.716Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="深い深絶望い深を絶抱望い深き深絶…いを望抱…絶きを望…抱…きを望…抱…きを…抱…き……"
 2026-11-20T22:51:49.370Z source chars=9 sequence=9
 2026-11-20T22:51:49.387Z placement placed: line 5, 9 characters, first box 309,488,20,22 in client 804x604
-2026-11-20T22:51:49.614Z choice aux KiriKiri2 role=0 added=[] text="そして魂は砕け……"
-2026-11-20T22:51:49.728Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="そしそて魂しそはて砕魂しそけそはて…し魂砕…てはけ魂…砕は…け魂…砕は…け…砕…け……"
 2026-11-20T22:51:50.380Z source chars=12 sequence=10
 2026-11-20T22:51:50.394Z placement placed: line 6, 12 characters, first box 281,488,22,22 in client 804x604
-2026-11-20T22:51:50.587Z choice aux KiriKiri2 role=0 added=[] text="私のすべては、消滅した。"
-2026-11-20T22:51:50.710Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="私のすべては、消滅した。"
 2026-11-20T22:51:51.474Z source chars=14 sequence=11
 2026-11-20T22:51:51.490Z placement placed: line 7, 14 characters, first box 265,488,20,22 in client 804x604
-2026-11-20T22:51:51.679Z choice aux KiriKiri2 role=0 added=[] text="そう、一度はすべてを失った。"
-2026-11-20T22:51:51.844Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="そう、一度はすべてを失った。"
 2026-11-20T22:51:52.418Z source chars=7 sequence=12
 2026-11-20T22:51:52.445Z placement placed: line 8, 7 characters, first box 327,488,22,22 in client 804x604
-2026-11-20T22:51:52.652Z choice aux KiriKiri2 role=0 added=[] text="……けれど……"
 2026-11-20T22:51:52.777Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["………けれ……どけ…れ…………どけ…れ…どけ……れ…どけ……れど………"] text="………けれ……どけ…れ…………どけ…れ…どけ……れ…どけ……れど………"
 2026-11-20T22:51:53.473Z source chars=16 sequence=13
 2026-11-20T22:51:53.489Z placement placed: line 9, 16 characters, first box 240,488,22,22 in client 804x604
-2026-11-20T22:51:53.735Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="……とこしえの闇に溶けゆく中……"
-2026-11-20T22:51:55.129Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="私"
 2026-11-20T22:51:55.204Z krkr page: hook line drawn nowhere on the page, dropped chars=16
 2026-11-20T22:51:55.272Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["を私呼ぶを私声呼ぶがを私…私声呼…をぶ"] text="を私呼ぶを私声呼ぶがを私…私声呼…をぶ"
 2026-11-20T22:51:55.377Z source chars=7 sequence=14
@@ -67,14 +45,11 @@
 2026-11-20T22:51:59.581Z krkr page: hook line drawn nowhere on the page, dropped chars=6
 2026-11-20T22:52:02.010Z source chars=9 sequence=17
 2026-11-20T22:52:02.036Z placement placed: line 12, 9 characters, first box 320,488,16,22 in client 804x604
-2026-11-20T22:52:02.241Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="もうも一度うも、一誓度うもっも、一たう誓度。一、っ誓度た、。っ誓度た、。っ誓た。った。"
 2026-11-20T22:52:03.742Z krkr page: hook line drawn nowhere on the page, dropped chars=9
 2026-11-20T22:52:04.367Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……自分の死体だ。"] text="……自分の死体だ。"
 2026-11-20T22:52:04.371Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["その瞬間、私は死体を見下ろしていた。"] text="その瞬間、私は死体を見下ろしていた。"
 2026-11-20T22:52:04.372Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["磔の場へと引きずられるその姿に……"] text="磔の場へと引きずられるその姿に……"
-2026-11-20T22:52:04.380Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="もう一度、誓った。"
 2026-11-20T22:52:04.381Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["私を呼ぶ声が……届いたのだ。"] text="私を呼ぶ声が……届いたのだ。"
-2026-11-20T22:52:04.382Z choice aux KiriKiri1 role=0 added=[] text="その瞬間、私は死体を見下ろしていた。……自分の死体だ。磔の場へと引きずられるその姿に……深い絶望を抱き……そして魂は砕け……私のすべては、消滅した。そう、一度は"
 2026-11-20T22:52:04.383Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["そう、一度はすべてを失った。"] text="そう、一度はすべてを失った。"
 2026-11-20T22:52:04.384Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……けれど……"] text="……けれど……"
 2026-11-20T22:52:04.385Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……とこしえの闇に溶けゆく中……"] text="……とこしえの闇に溶けゆく中……"
@@ -84,11 +59,8 @@
 2026-11-20T22:52:04.389Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……だから……"] text="……だから……"
 2026-11-20T22:52:09.366Z source chars=4 sequence=18
 2026-11-20T22:52:09.380Z placement placed: line 13, 10 characters, first box 300,488,19,22 in client 804x604
-2026-11-20T22:52:09.577Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="どれどほどれど時ほをどれど重どほ時ねれどをてほ重時もどねをて重時ねをもて重時ねをもて重ねもて"
-2026-11-20T22:52:09.578Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="も"
 2026-11-20T22:52:11.079Z krkr page: hook line drawn nowhere on the page, dropped chars=1
 2026-11-20T22:52:11.375Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……とこしえの闇に溶けゆく中……"] text="……とこしえの闇に溶けゆく中……"
-2026-11-20T22:52:11.375Z choice aux KiriKiri1 role=0 added=[] text="その瞬間、私は死体を見下ろしていた。……自分の死体だ。磔の場へと引きずられるその姿に……深い絶望を抱き……そして魂は砕け……私のすべては、消滅した。そう、一度は"
 2026-11-20T22:52:11.375Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["深い絶望を抱き……"] text="深い絶望を抱き……"
 2026-11-20T22:52:11.376Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["どれほど時を重ねても"] text="どれほど時を重ねても"
 2026-11-20T22:52:11.377Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["私を呼ぶ声が……届いたのだ。"] text="私を呼ぶ声が……届いたのだ。"
@@ -103,12 +75,8 @@
 2026-11-20T22:52:11.379Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["そう、一度はすべてを失った。"] text="そう、一度はすべてを失った。"
 2026-11-20T22:52:13.619Z source chars=11 sequence=19
 2026-11-20T22:52:13.661Z placement placed: line 14, 11 characters, first box 298,488,22,22 in client 804x604
-2026-11-20T22:52:13.854Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="多くの障害があろうとも"
-2026-11-20T22:52:15.677Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="君"
 2026-11-20T22:52:15.943Z source chars=1 sequence=20
 2026-11-20T22:52:15.970Z placement placed: line 15, 15 characters, first box 257,488,22,22 in client 804x604
-2026-11-20T22:52:16.162Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="が君どん君がなど姿んが君に君などなが姿んっどなにてん姿ないなっに姿よ姿てなうにいっとなよてもっういよてとういもよてとういもよとうもと"
-2026-11-20T22:52:16.163Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="も"
 2026-11-20T22:52:16.648Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["迎え迎に行え迎くにと行え迎…迎にく…え行"] text="迎え迎に行え迎くにと行え迎…迎にく…え行"
 2026-11-20T22:52:16.673Z source chars=6 sequence=21
 2026-11-20T22:52:16.687Z placement placed: line 16, 9 characters, first box 315,488,22,22 in client 804x604
@@ -123,10 +91,8 @@
 2026-11-20T22:52:19.675Z source chars=6 sequence=23
 2026-11-20T22:52:19.691Z placement placed: line 18, 12 characters, first box 283,488,22,22 in client 804x604
 2026-11-20T22:52:19.912Z krkr page: hook line drawn nowhere on the page, dropped chars=2
-2026-11-20T22:52:19.912Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="ら…ね…な…戻ら…ばらな戻ねなばいららとねなな。ばいらとなな。いらとなな。いらとな。いと。"
 2026-11-20T22:52:20.843Z source chars=1 sequence=24
 2026-11-20T22:52:20.845Z placement placed: line 19, 10 characters, first box 300,488,22,22 in client 804x604
-2026-11-20T22:52:21.041Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="……だか……らだどか…ら…う…だか…かど…だらう…かかどら…う…かどら…う…かど…う…か……"
 2026-11-20T22:52:21.056Z krkr page: hook line drawn nowhere on the page, dropped chars=5
 2026-11-20T22:52:21.210Z krkr page: hook line drawn nowhere on the page, dropped chars=6
 2026-11-20T22:52:22.194Z krkr page: hook line drawn nowhere on the page, dropped chars=1
@@ -155,21 +121,15 @@
 2026-11-20T22:52:26.107Z choice aux KiriKiri2 role=0 added=["…待っていて欲しい…"] text="…待っていて欲しい…"
 2026-11-20T22:52:26.115Z source chars=12 sequence=25
 2026-11-20T22:52:26.132Z placement placed: line 20, 12 characters, first box 276,488,22,22 in client 804x604
-2026-11-20T22:52:26.331Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="…待っていて欲しい…"
 2026-11-20T22:52:27.184Z choice aux KiriKiri2 role=0 added=["……このば"] text="……このば"
 2026-11-20T22:52:27.341Z source chars=14 sequence=26
 2026-11-20T22:52:27.357Z placement placed: line 21, 14 characters, first box 256,488,22,22 in client 804x604
-2026-11-20T22:52:27.555Z choice aux KiriKiri2 role=0 added=[] text="らばらの肉体が……"
-2026-11-20T22:52:27.556Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="………この……ばこら…の…ば…ばこら…のらのこばば肉のらら体ばのばがら肉ら…ばの体…ら肉がの…体肉…がの…体肉…が…体…が……"
 2026-11-20T22:52:28.859Z choice aux KiriKiri2 role=0 added=["…そこに"] text="…そこに"
 2026-11-20T22:52:29.002Z source chars=13 sequence=27
 2026-11-20T22:52:29.019Z placement placed: line 22, 13 characters, first box 273,488,22,22 in client 804x604
-2026-11-20T22:52:29.199Z choice aux KiriKiri2 role=0 added=[] text="向かうまで……。"
-2026-11-20T22:52:29.211Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="……そこ……にそ向こ……か…にそう…こ向まそにかでこ向う…にかま…向でう。か…までう……ま。でう……ま。で……。…。"
 2026-11-20T22:52:29.679Z choice aux Krkr2wcs role=0 added=["暖炉"] text="暖炉"
 2026-11-20T22:52:29.898Z source chars=26 sequence=28
 2026-11-20T22:52:29.913Z placement placed: line 23, 26 characters, first box 70,488,22,22 in client 804x604
-2026-11-20T22:52:29.924Z choice aux KiriKiri4 role=0 added=[] text="波間をたゆたう意識が、ぎい、ぎいと引き戻されていく。"
 2026-11-20T22:52:29.925Z source chars=6 sequence=29
 2026-11-20T22:52:29.935Z placement placed: line 24, 4 characters, first box 363,488,22,22 in client 804x604
 2026-11-20T22:52:30.134Z source chars=20 sequence=30
@@ -186,8 +146,6 @@
 2026-11-20T22:52:30.192Z placement placed: line 29, 10 characters, first box 70,488,20,22 in client 804x604
 2026-11-20T22:52:30.193Z source chars=10 sequence=35
 2026-11-20T22:52:30.204Z placement placed: line 30, 8 characters, first box 325,488,22,22 in client 804x604
-2026-11-20T22:52:30.205Z choice aux KiriKiri2 role=0 added=[] text="波間をたゆたう意識が、ぎい、ぎいと引き戻されていく。……さま呼吸をひとつする度に、指先に感覚が宿る。だんなさまどこかで雨の音を聞いた。ねえ？そして火の爆ぜる音。"
-2026-11-20T22:52:30.206Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="波間をたゆたう意識が、ぎい、ぎいと引き戻されていく。 ……さま呼吸をひとつする度に、指先に感覚が宿る。 だんなさまどこかで雨の音を聞いた。 ねえ？そして火の爆ぜ"
 2026-11-20T22:52:30.207Z choice aux KiriKiri4 role=0 added=["そして火の爆ぜる音。"] text="そして火の爆ぜる音。"
 2026-11-20T22:52:30.208Z source chars=9 sequence=36
 2026-11-20T22:52:30.218Z placement placed: line 31, 9 characters, first box 70,488,18,22 in client 804x604
@@ -200,18 +158,13 @@
 2026-11-20T22:52:30.245Z choice aux KiriKiri4 role=0 added=["…………。…………………。………ここは………？"] text="…………。…………………。………ここは………？"
 2026-11-20T22:52:31.676Z source chars=32 sequence=39
 2026-11-20T22:52:31.688Z placement placed: line 34, 32 characters, first box 70,488,22,22 in client 804x604
-2026-11-20T22:52:31.689Z choice aux KiriKiri4 role=0 added=[] text="室内は薄暗く、暖炉の中で火花を散らす灯り以外、頼れるものはない。"
 2026-11-20T22:52:31.696Z source chars=33 sequence=40
 2026-11-20T22:52:31.709Z placement placed: line 35, 33 characters, first box 70,488,22,22 in client 804x604
-2026-11-20T22:52:31.711Z choice aux KiriKiri4 role=0 added=[] text="閉じられた窓からは何の明かりも見えず、ひたひたと滴がガラスを打つ。まるで屋敷全体を暗闇が包み込んでいるようだ。"
-2026-11-20T22:52:31.713Z choice aux KiriKiri2 role=0 added=[] text="起きてくださいなきい、きい、きい。起きて……「あなた」は気付くとロッキングチェアーに揺られていた。室内は薄暗く、暖炉の中で火花を散らす灯り以外、頼れるものはない"
-2026-11-20T22:52:31.714Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text=" 起きてくださいなきい、きい、きい。 起きて……「あなた」は気付くとロッキングチェアーに揺られていた。室内は薄暗く、暖炉の中で火花を散らす灯り以外、頼れるものは"
 2026-11-20T22:52:31.715Z choice aux KiriKiri2 role=0 added=["まるで"] text="まるで"
 2026-11-20T22:52:31.716Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["まるまで"] text="まるまで"
 2026-11-20T22:52:31.717Z choice aux KiriKiri2 role=0 added=["屋敷全体を暗"] text="屋敷全体を暗"
 2026-11-20T22:52:31.877Z source chars=22 sequence=41
 2026-11-20T22:52:31.917Z placement placed: line 36, 22 characters, first box 70,517,17,22 in client 804x604
-2026-11-20T22:52:32.014Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="屋るま敷で全るま屋体まで敷をる全屋暗で体敷闇屋を全が敷暗体包全を闇み体暗が込を包闇ん暗みがで闇込包いがんみる包で込よみんいう込でるだんよい。でるうだよい。るうだ"
 2026-11-20T22:52:32.334Z choice options filtered 3 -> 1
 2026-11-20T22:52:33.423Z krkr page: hook line drawn nowhere on the page, dropped chars=6
 2026-11-20T22:52:33.423Z krkr page: hook line drawn nowhere on the page, dropped chars=13
@@ -227,27 +180,18 @@
 2026-11-20T22:52:35.001Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["まあ……、やっと、お目覚めになられましたのね。"] text="まあ……、やっと、お目覚めになられましたのね。"
 2026-11-20T22:52:35.002Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["たまねの。したねの。ね。"] text="たまねの。したねの。ね。"
 2026-11-20T22:52:35.463Z choice options filtered 6 -> 5
-2026-11-20T22:52:35.463Z choice locate round=0 options=["やっと、お","目覚めになら","れましたの","ね。","まあ……、やっと、お目覚めになられましたのね。"]
 2026-11-20T22:52:35.601Z krkr page: hook line drawn nowhere on the page, dropped chars=11
 2026-11-20T22:52:38.901Z choice aux KiriKiri4 role=0 added=["「あなた死者」に声をかける人物がいる。"] text="「あなた死者」に声をかける人物がいる。"
-2026-11-20T22:52:39.099Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="あ「なたあ「」なにたあ「」声「なをあたにかな」声けた"
-2026-11-20T22:52:39.101Z choice aux KiriKiri2 role=0 added=[] text="あなた」に声をかけ"
 2026-11-20T22:52:39.130Z choice aux KiriKiri2 role=0 added=["る人"] text="る人"
 2026-11-20T22:52:39.233Z source chars=17 sequence=43
 2026-11-20T22:52:39.249Z placement placed: line 38, 17 characters, first box 70,488,12,22 in client 804x604
 2026-11-20T22:52:39.259Z choice aux KiriKiri2 role=0 added=["物がいる。"] text="物がいる。"
-2026-11-20T22:52:39.301Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="をにる」か声人にけを物声かるがを人けいかる物人るけが。るい物人るが。い物人る"
 2026-11-20T22:52:39.379Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["が。い物るが。いる"] text="が。い物るが。いる"
 2026-11-20T22:52:39.836Z choice options filtered 4 -> 2
-2026-11-20T22:52:39.836Z choice locate round=0 options=["「あなた死者」に声をかける人","が。い物るが。いる"]
 2026-11-20T22:52:40.557Z choice aux KiriKiri4 role=0 added=["「あなた死者」は周囲を見渡そうとするが、その必要はなかった。"] text="「あなた死者」は周囲を見渡そうとするが、その必要はなかった。"
-2026-11-20T22:52:40.680Z choice aux KiriKiri2 role=0 added=[] text="た」は周囲"
 2026-11-20T22:52:40.725Z choice aux KiriKiri2 role=0 added=["を見"] text="を見"
-2026-11-20T22:52:40.727Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="「あな「たあ」な「はあたな周「」囲あはたをな周」囲見たは"
 2026-11-20T22:52:40.787Z choice aux KiriKiri2 role=0 added=["渡そう"] text="渡そう"
 2026-11-20T22:52:40.880Z choice aux KiriKiri2 role=0 added=["とするが、"] text="とするが、"
-2026-11-20T22:52:41.068Z choice aux KiriKiri2 role=0 added=[] text="そ"
-2026-11-20T22:52:41.070Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="渡」周をそは囲見う周渡をと囲そ見すをう渡る見そとが渡うす、そるとうがす、るとうがす、るとがす、るが、そ"
 2026-11-20T22:52:41.176Z choice aux KiriKiri2 role=0 added=["の必要はな"] text="の必要はな"
 2026-11-20T22:52:41.239Z source chars=28 sequence=44
 2026-11-20T22:52:41.297Z placement placed: line 39, 28 characters, first box 70,517,12,22 in client 804x604
@@ -257,13 +201,8 @@
 2026-11-20T22:52:41.453Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["た。"] text="た。"
 2026-11-20T22:52:41.910Z choice options filtered 6 -> 0
 2026-11-20T22:52:43.415Z choice aux KiriKiri4 role=0 added=["声の主は「あなた死者」の傍らにそっとしゃがみ、翠色の瞳で見上げていたのだから。"] text="声の主は「あなた死者」の傍らにそっとしゃがみ、翠色の瞳で見上げていたのだから。"
-2026-11-20T22:52:43.430Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="声"
-2026-11-20T22:52:43.432Z choice aux KiriKiri2 role=0 added=[] text="声"
-2026-11-20T22:52:43.538Z choice aux KiriKiri2 role=0 added=[] text="の主は「あ"
-2026-11-20T22:52:43.660Z choice aux KiriKiri2 role=0 added=[] text="なた」の傍ら"
 2026-11-20T22:52:43.858Z choice aux KiriKiri2 role=0 added=["にそっとしゃがみ、"] text="にそっとしゃがみ、"
 2026-11-20T22:52:44.284Z choice aux KiriKiri2 role=0 added=["翠色の瞳で見上げていたのだ"] text="翠色の瞳で見上げていたのだ"
-2026-11-20T22:52:44.286Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="声の主は「あなた死者」の傍らにそっとしゃがみ、翠色の瞳で見上げていたのだから。"
 2026-11-20T22:52:44.316Z choice aux KiriKiri2 role=0 added=["から"] text="から"
 2026-11-20T22:52:44.324Z source chars=38 sequence=45
 2026-11-20T22:52:44.390Z placement placed: line 40, 37 characters, first box 70,488,22,22 in client 804x604
@@ -271,21 +210,15 @@
 2026-11-20T22:52:44.445Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["の。からだ。のらかだ"] text="の。からだ。のらかだ"
 2026-11-20T22:52:44.518Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["。らか。"] text="。らか。"
 2026-11-20T22:52:44.980Z choice options filtered 5 -> 3
-2026-11-20T22:52:44.981Z choice locate round=0 options=["声の主は「あなた死者」の傍らにそっとしゃがみ、翠色の瞳で見上げていたのだから。","かのらだ。のからだ","。らか。"]
 2026-11-20T22:52:47.437Z placement placed: line 42, 5 characters, first box 70,491,22,22 in client 804x604
-2026-11-20T22:52:49.461Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="お"
-2026-11-20T22:52:49.463Z choice aux KiriKiri2 role=0 added=[] text="お"
 2026-11-20T22:52:49.552Z choice aux KiriKiri2 role=0 added=["はようござ"] text="はようござ"
 2026-11-20T22:52:49.643Z choice aux KiriKiri2 role=0 added=["います、"] text="います、"
 2026-11-20T22:52:49.945Z source chars=5 sequence=46
 2026-11-20T22:52:49.948Z placement placed: line 44, 17 characters, first box 70,491,22,22 in client 804x604
 2026-11-20T22:52:49.952Z source chars=17 sequence=47
-2026-11-20T22:52:49.984Z choice aux KiriKiri2 role=0 added=[] text="旦那さま……。"
-2026-11-20T22:52:50.089Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="おはようございます、旦那さま……。"
 2026-11-20T22:52:51.584Z choice aux Krkr2wcs role=0 added=["選択肢"] text="選択肢"
 2026-11-20T22:52:52.629Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……おはよう……………おはよう……………"] text="……おはよう……………おはよう……………"
 2026-11-20T22:52:52.636Z choice aux KiriKiri4 role=0 added=["……おはよう………………"] text="……おはよう………………"
 2026-11-20T22:52:53.090Z choice options filtered 3 -> 1
 2026-11-20T22:52:54.149Z krkr page: hook line drawn nowhere on the page, dropped chars=18
-2026-11-20T22:52:57.334Z ocr line "ノ気ゞ亠。"
 2026-11-20T22:52:58.845Z krkr page: hook line drawn nowhere on the page, dropped chars=5

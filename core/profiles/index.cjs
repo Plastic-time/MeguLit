@@ -15,7 +15,7 @@ const DEFAULTS=require('./defaults.cjs');
 const ENGINE_DIR=path.join(__dirname,'engines'),GAME_DIR=path.join(__dirname,'games');
 const KEY=/^[a-z0-9][a-z0-9-]{1,62}$/;
 /* names the engine detectors use (services/original-engines/registry.cjs names, hook page engines, probe ids) -> engine file id */
-const ALIASES={'bgi':'bgi','ethornell':'bgi','bgi/ethornell':'bgi','yuris':'yuris','yu-ris':'yuris','kirikiri':'kirikiri','kirikiriz':'kirikiri','krkr':'kirikiri','krkrz':'kirikiri','krkr2':'kirikiri','tvpx':'kirikiri','siglus':'siglus','siglusengine':'siglus','reallive':'reallive','catsystem2':'catsystem2','cs2':'catsystem2','artemis':'artemis','malie':'malie','advhd':'advhd','willplus':'advhd','kogado':'kogado','majiro':'majiro','qlie':'qlie','softpal':'softpal','nexas':'nexas','system3x':'system3','system3':'system3','system4':'system4','shiinario':'shiinario','entis':'entis','cotopha':'entis','nscripter':'nscripter','livemaker':'livemaker','stuffscript':'stuffscript','unity':'unity','renpy':'renpy','tyrano':'tyrano','rpgmaker':'rpgmaker','rpgmakermv':'rpgmaker','rpgmakermz':'rpgmaker','rpgmv':'rpgmaker','rpgmz':'rpgmaker','rmmv':'rpgmaker','rmmz':'rpgmaker','mages':'mages','wolf':'wolf','avg32':'avg32','unknown':''};
+const ALIASES={'bgi':'bgi','ethornell':'bgi','bgi/ethornell':'bgi','yuris':'yuris','yu-ris':'yuris','kirikiri':'kirikiri','kirikiriz':'kirikiri','krkr':'kirikiri','krkrz':'kirikiri','krkr2':'kirikiri','tvpx':'kirikiri','siglus':'siglus','siglusengine':'siglus','reallive':'reallive','catsystem2':'catsystem2','cs2':'catsystem2','artemis':'artemis','malie':'malie','advhd':'advhd','willplus':'advhd','kogado':'kogado','majiro':'majiro','qlie':'qlie','softpal':'softpal','nexas':'nexas','system3x':'system3','system3':'system3','system4':'system4','shiinario':'shiinario','entis':'entis','cotopha':'entis','nscripter':'nscripter','livemaker':'livemaker','stuffscript':'stuffscript','unity':'unity','renpy':'renpy','tyrano':'tyrano','rpgmaker':'rpgmaker','rpgmakermv':'rpgmaker','rpgmakermz':'rpgmaker','rpgmv':'rpgmaker','rpgmz':'rpgmaker','rpgm':'rpgmaker','mages':'mages','wolf':'wolf','avg32':'avg32','unknown':''};
 /* program names many unrelated games share: they count as a weak sign only */
 const GENERIC_EXE=new Set(['game.exe','bgi.exe','siglusengine.exe','advhd.exe','malie.exe','cs2.exe','start.exe','launcher.exe','system.exe','reallive.exe','krkr.exe','krkrz.exe','tvpwin32.exe','nscripter.exe','nscr.exe','gamepro.exe','main.exe','play.exe','run.exe','setup.exe','config.exe','avg32.exe','sys4.exe','system4.exe','livemaker.exe','windows.exe','nw.exe','ruby.exe','soft.exe','pal.exe','renpy.exe','python.exe']);
 
@@ -49,16 +49,13 @@ function findGame(input){let best=null;for(const g of games()){const r=matchScor
 function autoKey(input){const exe=exeName(input.exe),t=fold(input.title);if(!exe&&!t)return 'none';return 'auto-'+crypto.createHash('sha1').update(exe+'|'+t).digest('hex').slice(0,10);}
 
 const plain=v=>v&&typeof v==='object'&&!Array.isArray(v)&&!(v instanceof RegExp);
-/* open maps: dictionaries whose entries are data, not kernel keys (role.map: identity -> role). A layer adds or overrides entries,
-   the entries of the layers under it stay */
-const OPEN=new Set(['role.map']);
 /* keys a layer may set: the kernel tree only (a typo or an unknown key is an error, found by validation/games-regression) */
-function unknownKeys(settings,base=DEFAULTS,at=''){const out=[];for(const [k,v] of Object.entries(settings||{})){if(!(k in base)){out.push(at+k);continue;}if(plain(base[k])){if(!plain(v))out.push(at+k);else if(!OPEN.has(at+k))out.push(...unknownKeys(v,base[k],at+k+'.'));}}return out;}
-function merge(a,b,at=''){if(!plain(b))return a;const out={...a};for(const [k,v] of Object.entries(b)){if(!(k in a))continue;out[k]=OPEN.has(at+k)&&plain(v)?{...(plain(a[k])?a[k]:{}),...v}:plain(a[k])&&plain(v)?merge(a[k],v,at+k+'.'):Array.isArray(v)?v.slice():v;}return out;}
+function unknownKeys(settings,base=DEFAULTS,at=''){const out=[];for(const [k,v] of Object.entries(settings||{})){if(!(k in base)){out.push(at+k);continue;}if(plain(base[k])){if(!plain(v))out.push(at+k);else out.push(...unknownKeys(v,base[k],at+k+'.'));}}return out;}
+function merge(a,b){if(!plain(b))return a;const out={...a};for(const [k,v] of Object.entries(b)){if(!(k in a))continue;out[k]=plain(a[k])&&plain(v)?merge(a[k],v):Array.isArray(v)?v.slice():v;}return out;}
 function freeze(v){if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.freeze(v);for(const x of Object.values(v))freeze(x);}return v;}
 const clone=v=>JSON.parse(JSON.stringify(v));
 /* only the kernel keys of a layer (an auto layer read from disk may carry stale or unknown keys: they are dropped, not errors) */
-function known(settings,base=DEFAULTS,at=''){const out={};if(!plain(settings))return out;for(const [k,v] of Object.entries(settings)){if(!(k in base))continue;if(plain(base[k])){if(plain(v))out[k]=OPEN.has(at+k)?{...v}:known(v,base[k],at+k+'.');}else out[k]=v;}return out;}
+function known(settings,base=DEFAULTS){const out={};if(!plain(settings))return out;for(const [k,v] of Object.entries(settings)){if(!(k in base))continue;if(plain(base[k])){if(plain(v))out[k]=known(v,base[k]);}else out[k]=v;}return out;}
 /* one more layer over a profile (same rule as profileFor): a new frozen profile, layers +name */
 function apply(profile,layer,name){const meta={gameKey:profile.gameKey,engine:profile.engine,layers:profile.layers,matched:profile.matched};const base={};for(const k of Object.keys(DEFAULTS))base[k]=clone(profile[k]);
  const s=merge(base,clone(known(layer)));return freeze({...meta,layers:name?meta.layers+'+'+name:meta.layers,...s});}
@@ -75,4 +72,4 @@ const traceLine=p=>'profile '+p.gameKey+' engine='+p.engine+' layers='+p.layers+
 function get(p,key,fallback){let v=p;for(const k of String(key).split('.')){if(v==null||typeof v!=='object')return fallback;v=v[k];}return v===undefined||v===null?fallback:v;}
 /* the RegExps of choice.filters (bad sources are skipped) */
 function choiceFilters(p){const out=[];for(const src of get(p,'choice.filters',[]))try{out.push(new RegExp(String(src),'u'));}catch{}return out;}
-module.exports={DEFAULTS,OPEN,profileFor,merge,apply,known,engineId,matchScore,findGame,games,loadEngine,unknownKeys,traceLine,get,choiceFilters,reload,GENERIC_EXE,ENGINE_DIR,GAME_DIR};
+module.exports={DEFAULTS,profileFor,merge,apply,known,engineId,matchScore,findGame,games,loadEngine,unknownKeys,traceLine,get,choiceFilters,reload,GENERIC_EXE,ENGINE_DIR,GAME_DIR};

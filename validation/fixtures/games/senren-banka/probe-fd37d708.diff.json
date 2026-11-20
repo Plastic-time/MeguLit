@@ -1,0 +1,31 @@
+{
+ "schema": "megulit.profile",
+ "format": 1,
+ "exeSha256": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3",
+ "gameKey": "senren-banka",
+ "engine": "kirikiri",
+ "settings": {
+  "placement": {
+   "drawWhileBlanking": true,
+   "translationGrowsDown": true
+  },
+  "calibrate": {
+   "positionSource": "engine",
+   "textBox": {
+    "x": 220,
+    "y": 488,
+    "w": 185,
+    "h": 250,
+    "client": [
+     1535,
+     863
+    ]
+   },
+   "hideMethod": "hide"
+  },
+  "hide": {
+   "textEffectsRead": false
+  }
+ },
+ "note": "unsigned draft, diff-maker/2 from probe 27dd03c156e8 (SenrenBanka.exe, 千恋＊万花): hide, every self-check window passes; carries core/profiles/games/senren-banka.cjs"
+}

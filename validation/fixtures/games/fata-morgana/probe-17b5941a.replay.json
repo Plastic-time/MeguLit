@@ -1,11 +1,12 @@
 {
  "schema": 1,
- "tool": "diff-maker/1",
+ "tool": "diff-maker/2",
  "gameKey": "fata-morgana",
- "exeHash": "8174315aaeb3de028326cf907d95e73c2e935e2b5babf1aade38bdb86c5f51a1",
+ "exeSha256": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42",
  "engine": "kirikiri",
  "title": "ファタモルガーナの館",
- "diff": "core/profiles/diffs/8174315aaeb3de028326cf907d95e73c2e935e2b5babf1aade38bdb86c5f51a1.json",
+ "diff": "probe-17b5941a.diff.json",
+ "lines": "probe-17b5941a.lines.json",
  "events": [
   {
    "kind": "line",
@@ -1891,52 +1892,7 @@
    "chars": 5
   }
  ],
- "identities": [
-  {
-   "label": "hook:tTVPNativeBaseBitmap::DrawText",
-   "id": {
-    "hook": "tTVPNativeBaseBitmap::DrawText"
-   }
-  },
-  {
-   "label": "hook:Krkr2wcs",
-   "id": {
-    "hook": "Krkr2wcs"
-   }
-  },
-  {
-   "label": "hook:KiriKiri2",
-   "id": {
-    "hook": "KiriKiri2"
-   }
-  },
-  {
-   "label": "hook:KiriKiri4",
-   "id": {
-    "hook": "KiriKiri4"
-   }
-  },
-  {
-   "label": "hook:ocr",
-   "id": {
-    "hook": "ocr",
-    "src": "kernel"
-   }
-  },
-  {
-   "label": "hook:choice-capture",
-   "id": {
-    "hook": "choice-capture",
-    "src": "kernel"
-   }
-  },
-  {
-   "label": "hook:KiriKiri1",
-   "id": {
-    "hook": "KiriKiri1"
-   }
-  }
- ],
+ "records": [],
  "expect": {
   "params": {
    "hideMethod": "read",
@@ -1966,19 +1922,12 @@
     "dropRate"
    ]
   },
-  "roles": {
-   "hook:tTVPNativeBaseBitmap::DrawText": "system",
-   "hook:Krkr2wcs": "dialogue",
-   "hook:KiriKiri2": "dialogue",
-   "hook:KiriKiri4": "dialogue",
-   "hook:ocr": null,
-   "hook:choice-capture": null,
-   "hook:KiriKiri1": "dialogue"
-  },
+  "draw": [],
+  "items": 0,
   "scriptPair": {
-   "lines": 15,
+   "lines": 13,
    "found": 4,
-   "rate": 0.267
+   "rate": 0.308
   }
  }
 }

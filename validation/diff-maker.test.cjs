@@ -1,78 +1,75 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// 2026-11-21 tools/diff-maker: probe -> game diff draft + replay fixture + report, and the draw roles (core/draw-role.cjs).
+// 2026-11-21 tools/diff-maker: probe -> unsigned game diff draft + engine-draw line replacement data + replay fixture + report.
 // The sample probes under validation/helpers/diff-maker/probes/ (KiriKiri: the owner's incr9 run of 千恋＊万花 and
-// ファタモルガーナの館, trimmed; RPG Maker MZ: a made-up sample game) must regenerate exactly the committed diffs and fixtures,
-// and every generated probe fixture must replay green.
+// ファタモルガーナの館, trimmed; RPG Maker MZ: a made-up sample game reported as engine-draw records) must regenerate exactly
+// the committed fixtures, and every generated probe fixture must replay green.
 'use strict';
 process.env.MEGULIT_RELAY_BASE??='off';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const root=path.join(__dirname,'..');
-const Profiles=require('../core/profiles/index.cjs'),Role=require('../core/draw-role.cjs');
-const Maker=require('../tools/diff-maker/index.cjs'),Probe=require('../tools/diff-maker/probe.cjs'),Samples=require('../tools/diff-maker/samples.cjs');
+const Profiles=require('../core/profiles/index.cjs');
+const Maker=require('../tools/diff-maker/index.cjs'),Probe=require('../tools/diff-maker/probe.cjs'),Roles=require('../tools/diff-maker/roles.cjs'),Scripts=require('../tools/diff-maker/scripts.cjs');
 const PROBES=path.join(__dirname,'helpers','diff-maker','probes'),FIX=path.join(__dirname,'fixtures','games');
 const SAMPLES=[['senren-banka','','hide'],['fata-morgana','','read'],['rpgm-sample','rpgm-sample','hide']];
+const REC='ToMe_CHARS engine=rpgm line=1 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=';
 
-test('draw roles: kernel default is unchanged, engine diffs classify by the engine identity',()=>{
- const k=Profiles.profileFor({});assert.deepEqual({...k.role.map},{});assert.equal(k.role.fallback,null);assert.equal(Role.classify(k,{hook:'TextRender'}).role,null,'no engine: the kernel decides as before');
- const r=Profiles.profileFor({engine:'RPG Maker MV'});assert.equal(r.engine,'rpgmaker');
- assert.equal(Role.classify(r,{cls:['Window_Message','Window_Base']}).role,'dialogue');
- assert.equal(Role.classify(r,{cls:['Window_ChoiceList','Window_Command','Window_Selectable','Window_Base']}).role,'ui');
- assert.deepEqual(Role.classify(r,{cls:['Window_MyChoice','Window_ChoiceList','Window_Command']}),{role:'ui',by:'class:Window_ChoiceList'},'a plugin subclass inherits its base role');
- assert.equal(Role.classify(r,{cls:['Window_ShopBuy','Window_Selectable']}).role,'ui');assert.equal(Role.classify(r,{cls:['Window_Gold','Window_Base']}).role,'system');
- assert.equal(Role.classify(r,{cls:['Window_QuestLog']}).role,null,'an unknown class with no chain has no role');
- assert.equal(Role.treat(r,'ui'),'annotate');assert.equal(Role.treat(r,'dialogue'),'embed');
- const s=Profiles.profileFor({exe:'D:/g/SenrenBanka.exe'});assert.equal(s.gameKey,'senren-banka');
- assert.equal(Role.classify(s,{hook:'TextRender'}).role,'dialogue');assert.equal(Role.classify(s,{call:'selectLink',hook:'TextRender'}).role,'ui','the call wins over the hook');
- assert.equal(Role.classify(s,{cls:['MyButton','LinkButtonLayer','ButtonLayer']}).role,'ui');assert.equal(Role.classify(s,{hook:'tTVPNativeBaseBitmap::DrawText'}).role,'system');
- /* a game diff adds to the engine's open map, it does not replace it */
- const g=Profiles.apply(r,{role:{map:{'class:Window_QuestLog':'ui','class:Window_Gold':'ui'}}},'diff');
- assert.equal(Role.classify(g,{cls:['Window_QuestLog']}).role,'ui');assert.equal(Role.classify(g,{cls:['Window_Gold']}).role,'ui');assert.equal(Role.classify(g,{cls:['Window_Message']}).role,'dialogue');
- assert.equal(Role.classify(r,{cls:['Window_Gold']}).role,'system','the engine profile itself is untouched');
- assert.deepEqual(Profiles.unknownKeys({role:{map:{'class:X':'ui'},patterns:[['^hook:Foo','system']],treat:{ui:'annotate'}}}),[]);assert.deepEqual(Profiles.unknownKeys({role:{nope:1}}),['role.nope']);
- const p=Profiles.apply(k,{role:{patterns:[['^hook:Krkr','dialogue']],fallback:'system'}},'diff');
- assert.deepEqual(Role.classify(p,{hook:'KrkrFoo'}),{role:'dialogue',by:'pattern:^hook:Krkr'});assert.deepEqual(Role.classify(p,{hook:'x'}),{role:'system',by:'fallback'});
+test('engine-draw records: role / id / box / sel / emb, UI items deduplicated by (role, id, text), protocol breaks counted',()=>{
+ const line=Roles.record('2026-11-21T10:00:00Z '+REC+'2 rects=1,2,3,4;5,6,7,8 emb=1 text=はい');
+ assert.equal(Roles.roleOf(line),'line');assert.equal(Roles.kindOf(line),'dialogue');assert.equal(line.emb,1);
+ const ui=Roles.record(REC+'0 rects= role=choice id=c:0 box=10,20,200,36 sel=1 text=はい');
+ assert.equal(ui.role,'choice');assert.deepEqual(ui.box,[10,20,200,36]);assert.equal(ui.sel,true);assert.equal(Roles.kindOf(ui),'ui');
+ assert.equal(Roles.record(REC+'0 rects= role=line text=はい'),null,'a line needs its rects');
+ assert.equal(Roles.record(REC+'0 rects= role=weird box=1,1,1,1 text=x'),null);
+ assert.equal(Roles.kindOf({role:'name'}),'system');assert.equal(Roles.kindOf({role:'menu'}),'ui');assert.equal(Roles.kindOf({role:'button'}),'ui');
+ const bad=Roles.record(REC.replace('hidden=0','hidden=1')+'0 rects= role=menu id=m box=1,1,1,1 emb=2 text=x');assert.deepEqual(Roles.violations(bad),['hidden','emb=2']);
+ const sum=Roles.summary([line,ui,ui,{...ui,id:'c:1'},bad]);
+ assert.deepEqual(sum.roles.map(r=>[r.role,r.records,r.unique,r.violations]),[['choice',3,2,0],['line',1,1,0],['menu',1,1,1]]);assert.equal(sum.items.length,3);
 });
 
-test('engine detection: manifest, then runtime samples, then files',()=>{
- const none={hookEvents:'',draws:''};
+test('line replacement data: k without white space, game ruby as [start, len, reading] over k, aligned patch zh',()=>{
+ assert.deepEqual(Scripts.rubyRanges('「志那都荘まで」',[['志那都','しなつ']]),[[1,3,'しなつ']]);
+ assert.deepEqual(Scripts.rubyRanges('𠮟る犬と犬',[['犬','いぬ'],['犬','いぬ'],['猫','ねこ']]),[[2,1,'いぬ'],[4,1,'いぬ']],'code points, left to right, unknown base skipped');
+ assert.deepEqual(Scripts.replacements([{line:'あ い',ruby:null,zh:'啊'},{line:'あい',ruby:null,zh:'重复'},{line:'う',ruby:null,zh:''}]),[{k:'あい',ruby:[],zh:'啊'}]);
+});
+
+test('engine detection: manifest, then engine-draw records / hooks, then files; the exe key is the full SHA-256',()=>{
+ const none={hookEvents:'',extra:''};
  assert.equal(Probe.detectEngine({detected:'KiriKiri Z'},none,[]).engine,'kirikiri');
- assert.equal(Probe.detectEngine({},{hookEvents:'',draws:'{"t":"draw","cls":["Window_Message"]}'},[]).engine,'rpgmaker');
- assert.equal(Probe.detectEngine({},{hookEvents:'2026-11-20T22:51:55.204Z krkr page: hook line drawn nowhere',draws:''},[]).engine,'kirikiri');
+ assert.equal(Probe.detectEngine({},{hookEvents:'2026-11-21T10:00:00Z '+REC+'0 rects= text=',extra:''},[]).engine,'rpgmaker');
+ assert.equal(Probe.detectEngine({},{hookEvents:'2026-11-20T22:51:55.204Z krkr page: hook line drawn nowhere',extra:''},[]).engine,'kirikiri');
  assert.equal(Probe.detectEngine({},none,[{path:'www/js/rpg_core.js'}]).engine,'rpgmaker');assert.equal(Probe.detectEngine({},none,['data.xp3']).engine,'kirikiri');
- assert.equal(Probe.detectEngine({},none,['a.dat']).engine,'');
-});
-
-test('RPG Maker draws: per-character message draws fold into one line; a line MeguLit never showed is a drop',()=>{
- const prof=Profiles.profileFor({engine:'rpgmaker'}),roleOf=id=>Role.classify(prof,id).role,M=['Window_Message','Window_Base'];
- const rows=[...'こんにちは'].map((c,i)=>({t:'draw',at:100+i*20,cls:M,text:c})).concat([{t:'shown',at:300,cls:M,text:'こんにちは'},{t:'page',at:400,cls:M}],
-  [...'さようなら'].map((c,i)=>({t:'draw',at:1000+i*20,cls:M,text:c})),[{t:'choice',at:2000,cls:['Window_ChoiceList','Window_Command'],items:['はい','いいえ'],shown:1}]);
- const r=Samples.fromDraws(rows.map(x=>JSON.stringify(x)).join('\n'),{roleOf});
- assert.deepEqual(r.events.filter(e=>e.kind==='line').map(e=>e.chars),[5,5]);assert.equal(r.events.filter(e=>e.kind==='drop').length,1);
- assert.deepEqual(r.events.find(e=>e.kind==='choice'),{kind:'choice',at:2000,raw:2,shown:1});
- assert.deepEqual(r.draws.filter(d=>d.kind==='line').map(d=>d.text),['こんにちは','さようなら']);
+ assert.equal(Profiles.engineId('RPG Maker MZ'),'rpgmaker');assert.equal(Profiles.engineId('rpgm'),'rpgmaker');
+ const tmp=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'dm-'));fs.writeFileSync(path.join(tmp,'manifest.json'),JSON.stringify({exe:{name:'a.exe',hash:'0'.repeat(64)}}));
+ assert.throws(()=>Probe.load(tmp),/full exe SHA-256/,'the head/tail probe-identity hash is not the exe key');fs.rmSync(tmp,{recursive:true,force:true});
 });
 
 for(const [name,key,mode] of SAMPLES){
- test('sample probe '+name+' regenerates the committed diff and fixture ('+mode+')',()=>{
+ test('sample probe '+name+' regenerates the committed fixture ('+mode+')',()=>{
   const m=Maker.make(path.join(PROBES,name),{key});assert.equal(m.result.best.params.hideMethod,mode);
-  const diff=JSON.parse(fs.readFileSync(path.join(root,'core','profiles','diffs',m.probe.exe.hash+'.json'),'utf8'));
-  assert.deepEqual(JSON.parse(JSON.stringify(m.diff)),diff,'core/profiles/diffs/'+m.probe.exe.hash+'.json is stale: node tools/diff-maker/index.cjs '+path.relative(root,path.join(PROBES,name))+' --write-repo');
-  const rep=JSON.parse(fs.readFileSync(path.join(FIX,m.key,m.name+'.replay.json'),'utf8'));assert.deepEqual(JSON.parse(JSON.stringify(m.replay)),rep,m.name+'.replay.json is stale');
-  assert.deepEqual(Profiles.unknownKeys(diff.settings),[]);assert.equal(diff.exeHash,m.probe.exe.hash);assert.match(diff.exeHash,/^[0-9a-f]{64}$/);
-  for(const r of m.result.roles)if(r.id.src!=='kernel')assert.ok(m.replay.expect.roles[r.label]!==undefined);
+  const read=f=>JSON.parse(fs.readFileSync(path.join(FIX,m.key,m.name+f),'utf8'));const stale=' is stale: node tools/diff-maker/index.cjs '+path.relative(root,path.join(PROBES,name)).replace(/\\/g,'/')+(key?' --key '+key:'')+' --write-repo';
+  assert.deepEqual(JSON.parse(JSON.stringify(m.diff)),read('.diff.json'),m.name+'.diff.json'+stale);
+  assert.deepEqual(JSON.parse(JSON.stringify(m.replay)),read('.replay.json'),m.name+'.replay.json'+stale);
+  assert.deepEqual(JSON.parse(JSON.stringify(m.fixtureLines)),read('.lines.json').lines,m.name+'.lines.json'+stale);
+  assert.equal(m.diff.schema,'megulit.profile');assert.equal(m.diff.exeSha256,m.probe.exe.sha256);assert.ok(!('signature' in m.diff));
+  assert.deepEqual(Object.keys(m.diff),['schema','format','exeSha256','gameKey','engine','settings','note']);
  });
 }
 
-test('KiriKiri samples: the verdicts of the live gate (Fata read, Senren hide) and the roles of their hooks',()=>{
- const f=Maker.make(path.join(PROBES,'fata-morgana')),s=Maker.make(path.join(PROBES,'senren-banka'));
+test('samples: the live gate verdicts (Fata read, Senren hide), the engine-draw roles of the RPG Maker sample',()=>{
+ const f=Maker.make(path.join(PROBES,'fata-morgana')),s=Maker.make(path.join(PROBES,'senren-banka')),r=Maker.make(path.join(PROBES,'rpgm-sample'),{key:'rpgm-sample'});
  assert.ok(f.result.hideBest.over.includes('dropRate'),'Fata: lines drawn nowhere');assert.equal(f.diff.settings.hide.textEffectsRead,true);
  assert.equal(s.result.best.pass,true);assert.equal(s.diff.settings.placement.drawWhileBlanking,true,'the hand-written game diff is carried into the draft');
- const roles=Object.fromEntries(s.result.roles.map(r=>[r.label,r.role]));assert.equal(roles['hook:TextRender'],'dialogue');assert.equal(roles['hook:tTVPNativeBaseBitmap::DrawText'],'system');
- assert.ok(!('hook:ocr' in (s.diff.settings.role?.map||{})),'OCR lines are MeguLit\'s own source, never an engine identity in a diff');
+ assert.ok(s.lines.length>0&&s.lines.every(l=>l.zh),'Senren: the aligned Chinese patch gives zh');assert.equal(f.lines.length,0,'Fata: the patch is not aligned (other line count), no zh');
+ assert.ok(s.report.look.some(x=>/没有 engine-draw 记录/.test(x)),'old KiriKiri probes carry no roles: said in the report');
+ const roles=Object.fromEntries(r.result.draw.roles.map(x=>[x.role,x]));
+ assert.deepEqual(Object.keys(roles).sort(),['button','choice','line','menu','name','system']);
+ assert.equal(roles.line.script.dialogue,roles.line.unique,'every line is script dialogue');assert.equal(roles.choice.script.choice,2,'the choices are the script\'s 102 choices');
+ assert.equal(roles.menu.boxOnly,6,'shop list items reported as box only');assert.ok(r.result.draw.roles.every(x=>x.violations===0));
+ assert.ok(!r.report.look.some(x=>/引擎差分可能把/.test(x)),'no role contradicts the script');
 });
 
 test('every generated probe fixture replays green',async()=>{let n=0;
- for(const key of fs.readdirSync(FIX)){const dir=path.join(FIX,key);for(const f of fs.readdirSync(dir).filter(f=>/^probe-[0-9a-f]{12}\.case\.cjs$/.test(f))){n++;
+ for(const key of fs.readdirSync(FIX)){const dir=path.join(FIX,key);for(const f of fs.readdirSync(dir).filter(f=>/^probe-[0-9a-f]{8}\.case\.cjs$/.test(f))){n++;
   await require(path.join(dir,f))({assert,root,fixture:dir,name:f,Profiles,profile:null});}}
  assert.ok(n>=3,'the three sample fixtures exist');
 });

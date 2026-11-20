@@ -1,0 +1,27 @@
+{
+ "schema": "megulit.profile",
+ "format": 1,
+ "exeSha256": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42",
+ "gameKey": "fata-morgana",
+ "engine": "kirikiri",
+ "settings": {
+  "calibrate": {
+   "positionSource": null,
+   "textBox": {
+    "x": 70,
+    "y": 488,
+    "w": 322,
+    "h": 51,
+    "client": [
+     804,
+     604
+    ]
+   },
+   "hideMethod": "read"
+  },
+  "hide": {
+   "textEffectsRead": true
+  }
+ },
+ "note": "unsigned draft, diff-maker/2 from probe f3a5ffde1fa9 (fata_jp.exe, ファタモルガーナの館): read mode, no hide candidate passed (dropRate); carries core/profiles/games/fata-morgana.cjs"
+}

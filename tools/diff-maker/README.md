@@ -1,71 +1,55 @@
-# diff-maker：探针包 → 游戏差分草稿 + 回放夹具
+# diff-maker：探针包 → 未签名差分草稿 + 回放夹具 + 报告
 
-拿到玩家一键上传的探针包，不下游戏、不开游戏，离线做出这部游戏（按 exe 哈希区分版本）的差分草稿、回放夹具和一份报告。
+拿到玩家一键上传的探针包，不下游戏、不开游戏，离线做出这部游戏（按 exe 完整文件 SHA-256 区分版本）的差分草稿、台词替换数据、回放夹具和报告。签名用 `tools/game-diff.cjs sign`；下发格式、下发目录、客户端加载归 diff-layers（`docs/diff-layers.md`）；画字角色协议归 engine-draw（`docs/engine-draw-protocol.md`）
 
 ```
 node tools/diff-maker/index.cjs <探针目录>... [--key <gameKey>] [--out <目录>] [--write-repo]
 node tools/diff-maker/index.cjs trim <探针目录> <输出目录>
 ```
 
-- 默认输出到 `H:\MeguLit-Work\diff-maker\out\<gameKey>-<hash12>\`：`<exeHash>.json`（差分草稿）、`probe-<hash12>.replay.json`（回放）、`report.md` / `report.json`
-- `--write-repo` 另外写进仓库：`core/profiles/diffs/<exeHash>.json`，`validation/fixtures/games/<gameKey>/probe-<hash12>.{replay.json,case.cjs,report.md}`
-- `--key` 指定 gameKey；不给就用 `core/profiles` 认出的游戏（`games/<key>.cjs`），认不出是 `auto-<hash>`
-- `trim` 把一个完整探针裁成只含工具读到的日志行、只含回放碰到的剧本行的小探针（仓库里的样本探针就是这样来的，不放整部剧本）
+- 默认输出到 `H:\MeguLit-Work\diff-maker\out\<gameKey>-<sha8>\`：
+  - `<exeSha256>.json` 差分草稿 `{schema:"megulit.profile",format:1,exeSha256,gameKey,engine,settings,note}`，没有 signature
+  - `<exeSha256>.lines.json` 台词替换数据 `{schema:"megulit.lines",format:1,exeSha256,lines:[{k,ruby:[[start,len,"よみ"]],zh}]}`（k = 原句去空白，start/len 按 k 的码位）
+  - `probe-<sha8>.replay.json`、`report.md`、`report.json`（探针来源、exe 名、标题、候选、角色统计都在这里，不进草稿）
+- `--write-repo` 另外写夹具 `validation/fixtures/games/<gameKey>/probe-<sha8>.{replay.json,diff.json,lines.json,case.cjs,report.md}`（lines.json 只放回放碰到的句子）
+- `--key` 指定 gameKey；不给就用 `core/profiles` 认出的游戏，认不出是 `auto-<hash>`
+- `trim` 把完整探针裁成只含工具读到的日志行、只含回放碰到的剧本行的小探针（仓库样本就是这样来的，不放整部剧本）
 
 ## 探针目录
 
 ```
 manifest.json          probe-full 解包后的 manifest，至少要有：
-                         title, detected（引擎）, exe:{name, hash, sha256?}, files:[{path}]
-                         hash = services/probe-identity.cjs exeHash（大小 + 首尾 1 MiB 的 sha256）；没有就从 bin/<exe> 算
+                         title, detected（引擎）, exe:{name, sha256}, files:[{path}]
+                         sha256 = exe 整个文件的 SHA-256；没有就从 bin/<exe> 算；都没有报错
                          runtime:{from,to}（ISO，可选）：日志里属于这一局的时间段
-scripts/lines.json     剧本台词（services/original-engines 的 original-text 索引 {lines:[...]}，或纯数组）
+scripts/lines.json     剧本台词 + 游戏 ruby（original-text 索引 {lines:[...], ruby:[[[原文,读音],...]|null,...]}）
+scripts/patch.json     和 lines.json 逐行对齐的译文（original-text patch 索引 {lines:[...]}）；行数不同视为没对齐，不用
 scripts/**/*.ks|txt    KAG 剧本：去掉标签的是台词，[link]/[glink text=]/[seladd text=] 是选项
 scripts/data/*.json    RPG Maker MV/MZ：401/405 台词、102 选项，System.json 用语和数据库名字算 UI 词
-runtime/hook-events.log + runtime/reader-host.log   钩子引擎（KiriKiri 等）的运行时样本，就是 MeguLit 自己写的日志
-runtime/draws.jsonl    RPG Maker 插件的画字样本，一行一个：
-                         {"t":"draw","at":ms,"cls":["Window_ChoiceList","Window_Command",...],"text":"..","rect":[x,y,w,h],"scene":".."}
-                         {"t":"page","at":ms,"cls":[...]}        消息窗换页（之前的逐字画字合成一句）
-                         {"t":"shown","at":ms,"cls":[...],"text":".."}   MeguLit 画出了这段（内嵌或旁注）
-                         {"t":"choice","at":ms,"cls":[...],"items":[..],"shown":n}   选项 / 命令窗打开，n 项有 MeguLit 文字
-runtime/info.json      一键诊断 info.json（可选，autoProfile 块）
+runtime/hook-events.log + runtime/reader-host.log   MeguLit 自己的日志（自检事件）
+runtime/*.log          其余日志里的 ToMe_CHARS 行（engine-draw 记录，可带时间戳前缀）
+runtime/info.json      一键诊断 info.json（可选）
 ```
-
-运行时样本格式和上传归 auto-profile 会话（`docs/auto-profile.md`）；这里只读。
 
 ## 做了什么
 
-1. **识别**：引擎按 manifest → 运行时样本（KiriKiri 钩子名 / RPG Maker 窗口类）→ 文件（.xp3、rpg_core.js / rmmz_core.js）；exe 哈希；`core/profiles` 认游戏
-2. **回放序列**（`samples.cjs`）：自检事件用 `core/self-check.cjs` 同一套解析（回放 = 玩家电脑上跑过的）；每次画字带引擎身份 `{hook, cls, call, layer}`。OCR 行和内核选项捕捉标成内核来源，没有角色
-3. **离线搜索**（`search.cjs`）：候选和预测规则就是 `core/auto-profile.cjs` 的（位置来源、page.effectFrames、choice.filters、隐藏 / 读模式），文本框由引擎首字框并集推出；整局按 20 句切自检窗口，所有窗口都过线才算过，选 cost 最低、改动最少的隐藏组合，一个都不过就是读模式
-4. **绘制角色**：`core/draw-role.cjs` 按引擎差分 / 游戏差分里的 `role.*` 分台词 / UI / 系统装饰；没有规则或只靠基类定的身份，按它的文字在剧本里的归属提议角色写进差分 `role.map`，报告里列出请人确认
-5. **产出**：差分草稿（已有手写游戏差分的，先并入它的设置，再盖上量到的值；只用 `defaults.cjs` 的键，否则报错）；回放夹具（`validation/helpers/diff-replay.cjs` 重放：判定、每个指标、每个画字身份的角色都必须和记录一致）；报告（每个指标的分数、每个键各取值的结果、角色表、剧本配对、需要人看的地方）
-
-## 绘制角色
-
-| 角色 | 是什么 | 怎么处理（`role.treat`） |
-|---|---|---|
-| dialogue | 对话框、旁白、NVL 整页 | embed：内嵌替换，用游戏自己的渲染画日文、注音和中文 |
-| ui | 系统按钮、菜单、选项、命令窗、商店、物品列表 | annotate：不替换，原文和点击区域原样保留，旁边补注音和翻译 |
-| system | 名字框、帮助行、金钱、地名、状态页、美术层上的字 | annotate（引擎差分里写的，默认 null = 内核原行为） |
-
-身份顺序：调用方 `call:` → 类链 `class:`（自己的类在前，插件子类继承基类角色）→ 钩子 `hook:` → 层 `layer:` → patterns → fallback。`role.map` 是开放字典：游戏差分只加 / 改条目，引擎的条目保留。
-
-- RPG Maker（`core/profiles/engines/rpgmaker.cjs`）：Window_Message / Window_ScrollText 台词；Window_ChoiceList、Window_Command 及各命令 / 列表窗 UI；Window_NameBox、Window_Help、Window_Gold、Window_MapName、状态页、战斗日志 系统
-- KiriKiri（`core/profiles/engines/kirikiri.cjs`）：TextRender 和消息层钩子（KiriKiriZ、KiriKiri1/2/4、Krkr2wcs、EmbedKrkrZ）、layer:msg 台词；[link]/[glink]/selectLink 和 LinkButtonLayer / ButtonLayer 等 UI；Bitmap DrawText、layer:art 系统
-
-内核目前还没有读 `role.*` 的分支（默认值 = 原行为）；接到内核（选项捕捉只收 ui 画字、按 treat 分流）是下一步。
+1. **识别**：引擎按 manifest → engine-draw 记录的 engine= / KiriKiri 钩子 → 文件（.xp3、rpg_core.js / rmmz_core.js）；exe 完整 SHA-256；`core/profiles` 认游戏
+2. **回放序列**（`samples.cjs`）：自检事件用 `core/self-check.cjs` 同一套解析；engine-draw 记录原样保留（夹具里存原始 ToMe_CHARS 行）
+3. **离线搜索**（`search.cjs`）：候选和预测规则是 `core/auto-profile.cjs` 的（位置来源、page.effectFrames、choice.filters、隐藏 / 读模式），文本框由引擎首字框并集推出；整局按 20 句切自检窗口，全部过线才算过，选 cost 最低、改动最少的；一个都不过就是读模式
+4. **画字角色**（`roles.cjs`，engine-draw 协议的消费方）：`line` 台词（唯一可替换/隐藏）；`choice` `button` `menu` UI（旁注，点击区不动）；`name` `system` 系统（旁注）。UI 项按 (role, id, text) 去重；非 line 记录被隐藏或带 emb 算违规；每个角色的文字在剧本里的归属，对不上的列进「需要人看」。解析用 `core/text-paths.cjs parseChars`（engine-draw 合进来之前用同格式的本地解析，合并后删）
+5. **台词替换数据**（`scripts.cjs`）：剧本每句 → `{k, ruby, zh}`，ruby 来自游戏自己的 ruby，zh 来自对齐的汉化补丁；没有的句子不出
+6. **产出**：草稿只用 `defaults.cjs` 的键（否则报错），已有手写游戏差分的先并入它的设置；夹具 case（`validation/helpers/diff-replay.cjs`）重放：判定、每个指标、每个角色的记录数 / 去重数 / emb / 违规都必须和记录一致，替换数据格式合法
 
 ## 样例和测试
 
-`validation/helpers/diff-maker/probes/`：千恋＊万花、ファタモルガーナの館（店主 incr9 测试版日志裁剪 + original-text 剧本里碰到的行）、`rpgm-sample`（自编的 RPG Maker MZ 小游戏，没有任何真实游戏文字）。
+`validation/helpers/diff-maker/probes/`：千恋＊万花、ファタモルガーナの館（店主 incr9 测试版日志裁剪 + original-text 剧本里碰到的行；旧日志没有 engine-draw 记录）、`rpgm-sample`（自编的 RPG Maker MZ 小游戏，按 engine-draw 协议的 rpgm 记录，没有任何真实游戏文字）
 
 ```
 node --test validation/diff-maker.test.cjs
 MEGULIT_GAMES=senren-banka,fata-morgana node --test validation/games-regression.test.cjs
 ```
 
-改了工具、引擎差分的角色规则或样本后，重新生成：
+改了工具或样本后重新生成：
 
 ```
 node tools/diff-maker/index.cjs validation/helpers/diff-maker/probes/senren-banka validation/helpers/diff-maker/probes/fata-morgana --write-repo
