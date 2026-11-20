@@ -68,9 +68,13 @@
  .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button:focus-visible{outline:2px solid var(--menu-accent,#e0495a);outline-offset:1px}
  @media (pointer:coarse){.mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button{padding:11px 4px!important}}
  /* action buttons on the calibration page: an even two-column grid instead of ragged rows; toggles, hints and selects keep the full width */
- .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:center}
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 8px;align-items:center}
  .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>:not(button){grid-column:1/-1}
  .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button,.tome-window-bind-row:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button{width:100%;min-width:0;margin:0!important;justify-content:center;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ /* one obvious action: 校准当前句 is the main button (full width, filled); the partial ones sit under it as quiet small buttons */
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-game-style-sync]{grid-column:1/-1;height:38px!important;font-weight:700;color:#fff!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 80%,transparent)!important;border-color:transparent!important}
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-game-style-sync]:hover:not(:disabled){background:var(--menu-accent,#e0495a)!important}
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-calibrate-text],.tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-gal-position-sync],.tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-calibrate-stream]{height:28px!important;font-size:12px!important;font-weight:400!important;color:var(--theme-textSecondary,#aaa)!important;background:transparent!important;border-color:var(--menu-border,#34343a)!important}
  .tome-window-bind-row:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}
  .tome-window-bind-row:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>:not(button){grid-column:1/-1}
  .tome-ac:not(#q1):not(#q2):not(#q3) output.tomoyo-slider-value{color:var(--theme-text,#f1f1f4)!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 30%,transparent)!important;border-radius:6px;padding:1px 6px;font-weight:600}
@@ -83,6 +87,7 @@
  .tome-ac-bindbar[data-bound=true]>small::before{background:#45c47f}
  .tome-ac-bindbar>button{flex:none;padding:4px 10px!important;border:0!important;background:transparent!important;color:color-mix(in srgb,var(--menu-accent,#e0495a) 55%,#fff)!important;cursor:pointer;font-size:12.5px;border-radius:6px!important}
  .tome-ac-bindbar>button:hover{background:color-mix(in srgb,var(--menu-accent,#e0495a) 14%,transparent)!important}
+ .tome-ac-bindbar>button.tome-ac-bind-cta{color:#fff!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 80%,transparent)!important;border-radius:6px!important;font-weight:700}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-ac-off{display:none!important}
  .tome-ac:not(#q1):not(#q2):not(#q3) details.tome-ac-pane{border:0!important;background:transparent!important;margin-top:0!important}
  .tome-ac:not(#q1):not(#q2):not(#q3) details.tome-ac-pane>summary{display:none!important}
@@ -145,10 +150,10 @@
    if(bar.nextElementSibling!==calNodes.bind)bar.after(calNodes.bind);
    const bound=!!window.__tomoyoChinese?.galBoundTitle;if(bst.last!==bound){bst.open=null;bst.last=bound;}
    bst.expanded=bst.open===null?false:bst.open;bar.dataset.bound=String(bound);calNodes.bind.classList.toggle('tome-ac-off',!bst.expanded);
-   const btn=bar.querySelector('button'),t=I(bst.expanded?'收起':'换一个窗口');if(btn.textContent!==t)btn.textContent=t;btn.setAttribute('aria-expanded',String(bst.expanded));}
+   const btn=bar.querySelector('button'),t=I(bst.expanded?'收起':bound?'换一个窗口':'绑定游戏窗口');btn.classList.toggle('tome-ac-bind-cta',!bound&&!bst.expanded);if(btn.textContent!==t)btn.textContent=t;btn.setAttribute('aria-expanded',String(bst.expanded));}
   for(const s of dialog.querySelectorAll('[data-menu-category=text] small,[data-menu-category=calibrate] small'))if(!s.dataset.acT){s.dataset.acT='1';s.addEventListener('mouseover',()=>{if(!s.title&&s.scrollHeight>s.clientHeight+1)s.title=s.textContent.trim();});s.addEventListener('click',()=>s.classList.toggle('tome-ac-open'));}
  }
- const L={en:{'校准与位置':'Calibrate & position','导入与历史':'Import & history','换一个窗口':'Change window','收起':'Hide','显示方式':'Display mode','更多文字设置':'More text settings','绑定与导入':'Binding & import'},ja:{'校准与位置':'調整と位置','导入与历史':'取り込みと履歴','换一个窗口':'ウィンドウを変更','收起':'閉じる','显示方式':'表示方法','更多文字设置':'その他の文字設定','绑定与导入':'バインドと取り込み'}};
+ const L={en:{'校准与位置':'Calibrate & position','导入与历史':'Import & history','换一个窗口':'Change window','绑定游戏窗口':'Bind game window','收起':'Hide','显示方式':'Display mode','更多文字设置':'More text settings','绑定与导入':'Binding & import'},ja:{'校准与位置':'調整と位置','导入与历史':'取り込みと履歴','换一个窗口':'ウィンドウを変更','绑定游戏窗口':'ゲーム画面をバインド','收起':'閉じる','显示方式':'表示方法','更多文字设置':'その他の文字設定','绑定与导入':'バインドと取り込み'}};
  const I=k=>(L[document.documentElement.lang.slice(0,2)]||{})[k]||k;
  let queued=0;
  const run=()=>{queued=0;const d=document.querySelector('.tomoyo-cn-dialog[data-menu-organized]:not([data-leaving])');if(!d)return;d.classList.add('tome-ac');d.dataset.alttUi=V;try{organize(d);}catch(e){console.error('altt-compact',e);}};
