@@ -27,11 +27,11 @@ function segments(D) {
   const T0 = D.t0, P = 0.5, blank = { blank: true, poseP: P }, field = { blank: true, poseP: P };
   const lit = (phase, extra) => Object.assign({ state: 'done', phase }, extra || {});
   return [
-    { id: 'intro', kind: 'transition', n: 72, next: 'welcome', glass: true, t0: 0, t1: T0 - 0.001, opt: blank },
+    { id: 'intro', kind: 'transition', train: true, n: 72, next: 'welcome', glass: true, t0: 0, t1: T0 - 0.001, opt: blank },
     { id: 'welcome', kind: 'loop', n: 120, glass: true, tHold: T0 - 0.001, opt: blank },
-    { id: 'to-loc', kind: 'transition', n: 72, next: 'loc', glass: true, t0: T0, t1: T0 + MV.skim, opt: blank },
+    { id: 'to-loc', kind: 'transition', train: true, n: 72, next: 'loc', glass: true, t0: T0, t1: T0 + MV.skim, opt: blank },
     { id: 'loc', kind: 'loop', n: 120, glass: true, tHold: T0 + MV.skim + 0.1, opt: blank },
-    { id: 'to-field', kind: 'transition', n: 102, next: 'field', glass: true, t0: LAYOUT.under, t1: LAYOUT.under + MV.under, opt: field },
+    { id: 'to-field', kind: 'transition', train: true, n: 102, next: 'field', glass: true, t0: LAYOUT.under, t1: LAYOUT.under + MV.under, opt: field },
     { id: 'field', kind: 'loop', n: 180, glass: true, tHold: LAYOUT.under + MV.under + 0.1, opt: field },
     { id: 'to-unpack', kind: 'transition', n: 66, next: 'unpack', glass: false, t0: LAYOUT.dive, t1: LAYOUT.dive + MV.dive, opt: lit('unpack', { poseP: P }) },
     { id: 'unpack', kind: 'loop', n: 90, glass: false, tHold: LAYOUT.dive + MV.dive + 0.1, opt: lit('unpack') },
@@ -55,14 +55,14 @@ async function renderTheme(theme) {
   const cdp = (method, params = {}) => new Promise((res) => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
   const ev = async (expr) => { const r = await cdp('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }); return r.result && r.result.result && r.result.result.value; };
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1000, height: 640, deviceScaleFactor: DPR, mobile: false }); await cdp('Page.enable'); await cdp('Runtime.enable');
-  await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `window.__layout=${JSON.stringify(LAYOUT)};window.__still=false;` });
+  await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `window.__layout=${JSON.stringify(LAYOUT)};window.__still=false;window.__glassSlow=0.4;` });
   await cdp('Page.navigate', { url: `${PAGE}?theme=${theme === 'dark' ? 'night' : 'edge'}&demo=1&paused=1&prerender=1${DRAFT ? '' : '&aa=1'}` }); await sleep(6000); await ev('document.fonts.ready.then(()=>1)');
   const D = await ev('({t0:Demo.T0,u0:Demo.U0,done:Demo.DONE,dur:Demo.DURATION,gl:!!(window.GL&&GL.ok),dpr:devicePixelRatio})'); if (!D.gl) throw new Error('no WebGL in the render browser');
   const info = await ev('(function(){Demo.seek(4.85,{blank:true});return GL.plateInfo()})()'); log('plates', info.plates.length, 'cores', info.cores);
   const manifest = { version: 1, theme, width: 1280, height: 820, fps: FPS, draft: DRAFT, loopCrossfadeFrames: M, segments: [], plates: { cores: info.cores, info: info.plates }, boundaries: [], bytes: 0 };
   const t00 = Date.now(); let G = 1000, prev = null; const ends = {};   /* G = motion clock of the next transition's first frame */
-  const shot = async (sg, tState, motionT, still) => {
-    await ev(`window.__still=${still};window.__motionT=${motionT};Demo.seek(${tState},${JSON.stringify(sg.opt)});new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
+  const shot = async (sg, tState, motionT, still, loop, trainOff, optOver) => {
+    await ev(`window.__still=${still};window.__motionT=${motionT};window.__trainOff=${trainOff === undefined ? 20000 : trainOff};${loop ? `window.__loopPhi=${loop.phi};window.__loopBase=${loop.base}` : 'delete window.__loopPhi'};Demo.seek(${tState},${JSON.stringify(optOver || sg.opt)});new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
     const r = await cdp('Page.captureScreenshot', { format: 'jpeg', quality: 92 }); return Buffer.from(r.result.data, 'base64');
   };
   for (const sg of segments(D)) {
@@ -72,18 +72,22 @@ async function renderTheme(theme) {
     const glassOf = async () => { if (!sg.glass) return; const o = await ev('GL.outlines(1000,640)'); polys.push((o || []).map((p) => p ? p.map((v) => Math.round(v * (1280 / 1000) * 4)) : null)); };
     if (sg.kind === 'transition') {
       const ff = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', '-vf', scaleF].concat(encArgs(file)), { stdio: ['pipe', 'ignore', 'inherit'] }); const done = new Promise((r) => ff.on('close', r));
-      for (let i = 0; i < n; i++) { const buf = await shot(sg, sg.t0 + (sg.t1 - sg.t0) * i / (n - 1), G + i / FPS, false); if (i === 0) first = buf; if (i === 1) second = buf; if (i === n - 1) last = buf; if (i === 0) fs.writeFileSync(path.join(dir, sg.id + '.jpg'), buf); if (!ff.stdin.write(buf)) await new Promise((res) => ff.stdin.once('drain', res)); await glassOf(); }
+      for (let i = 0; i < n; i++) { const buf = await shot(sg, sg.t0 + (sg.t1 - sg.t0) * i / (n - 1), G + i / FPS, false, null, sg.train ? -6500 + 9000 * i / (n - 1) : undefined); if (i === 0) first = buf; if (i === 1) second = buf; if (i === n - 1) last = buf; if (i === 0) fs.writeFileSync(path.join(dir, sg.id + '.jpg'), buf); if (!ff.stdin.write(buf)) await new Promise((res) => ff.stdin.once('drain', res)); await glassOf(); }
       ff.stdin.end(); await done; var tEnd = G + (n - 1) / FPS; ends[sg.id] = { first, last, second }; G = tEnd + 1 / FPS;   // the next frame in time
     } else {
-      /* loop: frames f[0..N+M-1] of the still scene at motion times T..T+(N+M-1)/30 with T = (time of the frame after the previous transition) - N/30 */
-      const frames = path.join(work, 'loop-' + sg.id); fs.mkdirSync(frames, { recursive: true }); const T = G - n / FPS;
-      for (let k = 0; k < n + M; k++) { const buf = await shot(sg, sg.tHold, T + k / FPS, true); fs.writeFileSync(path.join(frames, String(k).padStart(4, '0') + '.jpg'), buf); if (k === n) first = buf; if (k === n - 1) last = buf; if (k < n) await glassOf(); }
-      fs.copyFileSync(path.join(frames, String(n).padStart(4, '0') + '.jpg'), path.join(dir, sg.id + '.jpg'));   /* poster = loop frame 0 = f[N] */
-      const fc = `[0:v]split=2[a][b];[a]trim=start_frame=0:end_frame=${n},setpts=PTS-STARTPTS[A];[b]trim=start_frame=${n}:end_frame=${n + M},setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop=${n - M}[B];[A][B]blend=all_expr='A*min(N/${M},1)+B*(1-min(N/${M},1))'[v];[v]${scaleF}[o]`;
-      ffmpegSync(['-framerate', String(FPS), '-i', path.join(frames, '%04d.jpg'), '-filter_complex', fc, '-map', '[o]'].concat(encArgs(file)));
-      ends[sg.id] = { first, last };
-      if (sg.id === 'field') ends[sg.id].lastLit = await shot(Object.assign({}, sg, { opt: { state: 'done', phase: 'unpack', poseP: 0.5 } }), sg.tHold, T + (n - 1) / FPS, true);   /* the same frame with the glass lit: what the player's overlay shows at 100% */
-      fs.rmSync(frames, { recursive: true, force: true });   // clock: a loop does not advance it
+      /* loop: n frames of the still camera; the floating glass runs one full periodic cycle that starts from the motion clock value the previous transition ended on, so the loop point is seamless
+         without any dissolve and the first frame continues the previous transition */
+      const Te = G - 1 / FPS, ff = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', '-vf', scaleF].concat(encArgs(file)), { stdio: ['pipe', 'ignore', 'inherit'] }); const done = new Promise((r) => ff.on('close', r));
+      for (let i = 0; i < n; i++) { const buf = await shot(sg, sg.tHold, Te, true, { phi: 2 * Math.PI * i / n, base: Te }); if (i === 0) { first = buf; fs.writeFileSync(path.join(dir, sg.id + '.jpg'), buf); } last = buf; if (!ff.stdin.write(buf)) await new Promise((res) => ff.stdin.once('drain', res)); await glassOf(); }
+      ff.stdin.end(); await done; ends[sg.id] = { first, last };
+      if (sg.id === 'field') {
+        /* what the player's overlay has to look like at 100%: the same frame with the glass lit by the scene's own style (reference stills for the overlay) + a preview-only field clip with fake progress */
+        const lit = await shot(sg, sg.tHold, Te, true, { phi: 2 * Math.PI * (n - 1) / n, base: Te }, undefined, { state: 'done', phase: 'unpack', poseP: 0.5 }); ends[sg.id].lastLit = lit;
+        fs.mkdirSync(path.join(OUT, 'ref'), { recursive: true }); fs.writeFileSync(path.join(OUT, 'ref', `${theme}-field-unlit.jpg`), last); fs.writeFileSync(path.join(OUT, 'ref', `${theme}-field-lit.jpg`), lit);
+        const pf = path.join(work, 'field-preview.mp4'), ffp = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', '-vf', scaleF].concat(encArgs(pf)), { stdio: ['pipe', 'ignore', 'inherit'] }); const donep = new Promise((r) => ffp.on('close', r));
+        for (let i = 0; i < n; i++) { const u = Math.min(1, i / (n - 8)); const buf = await shot(sg, sg.tHold, Te, true, { phi: 2 * Math.PI * i / n, base: Te }, undefined, { progress: u, poseP: 0.5 }); if (!ffp.stdin.write(buf)) await new Promise((res) => ffp.stdin.once('drain', res)); }
+        ffp.stdin.end(); await donep; fs.mkdirSync(PREVIEW, { recursive: true }); fs.copyFileSync(pf, path.join(PREVIEW, `field-preview-${theme}.mp4`));
+      }
     }
     if (sg.glass && theme === 'light') { fs.mkdirSync(path.join(OUT, 'glass'), { recursive: true }); fs.writeFileSync(path.join(OUT, 'glass', sg.id + '.glass.json.gz'), zlib.gzipSync(JSON.stringify({ fps: FPS, frames: n, plates: info.plates.length, scale: 4, polys }), { level: 9 })); }
     const bytes = fs.statSync(file).size; manifest.bytes += bytes;
