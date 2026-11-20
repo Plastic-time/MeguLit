@@ -138,7 +138,10 @@
     /* 2026-11-21 (owner's second recording, 千恋＊万花: the translation went out of sight below the window): MeguLit's own surface may end before
        the work area does (the overlay spans the reader and the game, not always the desktop); what is drawn past its bottom is not seen */
     const workLimit = () => { const i = b.galLayoutInfo?.(), d = devicePixelRatio || 1; return Math.min(Number.isFinite(i?.workBottom) && i.workBottom > 0 ? i.workBottom / d : innerHeight, innerHeight) - 8; };
-    const roomBelow = (() => { const wb = workLimit(); return row ? wb - (cy0 + chc) >= row.getBoundingClientRect().height : false; })();
+    /* 2026-11-21 (owner, 千恋＊万花: 「日文被挤上去」 when the translation came in late): every fit decision takes the row at the room
+       its translation will need (inject.js translationReserve), so the Japanese is placed on the first frame and stays when the text lands */
+    const rowRect = () => { const q = row.getBoundingClientRect(), h = Math.max(q.height, Number(b.translationReserve) || 0); return { top: q.top, height: h, bottom: q.top + h }; };
+    const roomBelow = (() => { const wb = workLimit(); return row ? wb - (cy0 + chc) >= rowRect().height : false; })();
     /* 2026-11-20 release check (CHAOS;CHILD rig: with room below the window the strip rule was skipped whole and the Japanese third row
        sat on AUTO/SKIP). Both rules hold: MeguLit's Japanese never enters the game's button strip (rows close up, the block moves up),
        and with room on the monitor the translation keeps its size; when it would land on the strip it goes below the window instead. */
@@ -152,7 +155,7 @@
          buttons take about one and a half of the game's own glyph rows (千恋＊万花 31 px glyphs: its box keeps a free third row; CHAOS;CHILD 40 px:
          AUTO/SKIP start 80 px above the bottom, its box has no third row), so the translation stays under its Japanese while it ends there */
       const cnLimit = cy0 + chc - (anchor.size > 0 ? anchor.size : glyph) * 1.5;
-      const rr = row.getBoundingClientRect(), over = rr.bottom - cnLimit, key = String(anchorLine || '');
+      const rr = rowRect(), over = rr.bottom - cnLimit, key = String(anchorLine || '');
       let below = cnBelow.key === key && cnBelow.below;
       if (rr.top >= cy0 + chc) below = false; /* already under the window: nothing to move */
       /* (the fit check follows the hysteresis) 2026-11-21 (owner's recording, 千恋＊万花 window almost the whole screen: the translation went under the window onto the taskbar and off the
@@ -172,9 +175,9 @@
     else if (row && !roomBelow && !anchor.center && tr && tr.height) { sentence.style.removeProperty('line-height'); inWindow(); }
     else sentence.style.removeProperty('line-height');
     function inWindow() { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
-      if (row.getBoundingClientRect().bottom > uiLimit && sentence.querySelector('br.megulit-row-br') && !sentence.style.lineHeight) set(sentence, 'line-height', closeRows(sentence));
-      const fsx = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rx = row.getBoundingClientRect();
-      if (rx.bottom > uiLimit) { const fs = Math.max(Math.ceil(fsx * .85), Math.floor(fsx * Math.max(.85, (uiLimit - rx.top) / Math.max(1, rx.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rx = row.getBoundingClientRect(); }
+      if (rowRect().bottom > uiLimit && sentence.querySelector('br.megulit-row-br') && !sentence.style.lineHeight) set(sentence, 'line-height', closeRows(sentence));
+      const fsx = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rx = rowRect();
+      if (rx.bottom > uiLimit) { const fs = Math.max(Math.ceil(fsx * .85), Math.floor(fsx * Math.max(.85, (uiLimit - rx.top) / Math.max(1, rx.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rx = rowRect(); }
       if (rx.bottom > uiLimit) { const up = Math.min(rx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); } }
     if (row) { const limit = workLimit();
       const fs0 = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rb = row.getBoundingClientRect();
@@ -247,6 +250,22 @@
     if (keep.length !== orphans.length) { orphans = keep; extraKey = ''; schedule(); }
   }
   /* the placed line is not drawn by the reader (no matching sentence, nothing aligned, no box): after ORPHAN_MS it is drawn from the placement */
+  /* 2026-11-21 (owner, ファタモルガーナの館 vs 千恋＊万花): a game whose text effect keeps the hidden line from pairing with the reader's
+     (the reader can only redraw it at the game's place, an orphan) is not served by hiding: of the first 20 lines of a game, at least 6
+     seen and over 30 % orphans sends galTextEffects once and core shows the game's own text with the translation only (read mode).
+     Every counted line is logged (layoutDiagnostic kind=textEffects) so the real rates show in the owner's logs */
+  let fx = { game: null, paired: new Set(), orphan: new Set(), sent: false };
+  function fxCount(kind, key) {
+    key = [...String(key || '')].filter(c => !blank(c)).join(''); if (!key) return;
+    if (fx.game !== modeGame) fx = { game: modeGame, paired: new Set(), orphan: new Set(), sent: false };
+    if (fx.sent || fx.paired.has(key) || fx.orphan.has(key) && kind === 'orphan') return;
+    if (fx.paired.size + fx.orphan.size >= 20 && !fx.orphan.has(key)) return;
+    if (kind === 'paired') fx.orphan.delete(key); fx[kind].add(key);
+    const n = fx.paired.size + fx.orphan.size, rate = fx.orphan.size / n;
+    try { window.__tomoyoTranslateRequest?.(JSON.stringify({ type: 'layoutDiagnostic', kind: 'textEffects', line: kind, paired: fx.paired.size, orphan: fx.orphan.size, rate: Math.round(rate * 100) })); } catch {}
+    if (n >= 6 && rate > .3) { fx.sent = true; try { window.__tomoyoTranslateRequest?.(JSON.stringify({ type: 'galTextEffects', paired: fx.paired.size, orphan: fx.orphan.size })); } catch {} }
+  }
+  b.textEffectsCount = () => ({ paired: fx.paired.size, orphan: fx.orphan.size, sent: fx.sent });
   function orphan(l) {
     if (!l || l.fallback || !Array.isArray(l.rects) || !l.text) return;
     const chars = [...l.text], rects = []; chars.forEach((c, i) => { if (!blank(c)) rects.push(l.rects[i]); });
@@ -261,6 +280,7 @@
     if (orphanWait?.text !== text) { if (!waits.has(text)) waits.set(text, { at: now, l }); if (waits.size > 16) waits.delete(waits.keys().next().value); orphanWait = { text, at: waits.get(text).at }; setTimeout(schedule, ORPHAN_MS + 20); if (now - orphanWait.at < ORPHAN_MS) return; }
     if (now - orphanWait.at < ORPHAN_MS) return;
     /* one place, one line: an orphan whose boxes the new one covers is an earlier frame of it (the last one wins) */
+    fxCount('orphan', text);
     orphans = orphans.filter(o => !o.rects.some(a => rects.some(c => overlaps(a, c)))).concat({ text, rects, client: l.client }).slice(-12); extraKey = ''; orphanWait = null; schedule(); waits.delete(text);
     const log = b.textPlaceOrphans || (b.textPlaceOrphans = []); log.push(text.slice(0, 40)); if (log.length > 30) log.shift();
   }
@@ -590,7 +610,7 @@
       if (got0.length && readerText && /[぀-ヿ]/.test(placeText)) { orphan(line); release(); document.body.classList.add('megulit-place-garbled'); return; }
       document.body.classList.remove('megulit-place-garbled');
       if (got0.length && !readerText) orphan(line); /* nothing of the reader's for this hidden line (its hook line was dropped) */
-      if (got0.length) { anchorFrom(got0, median(got0.map(r => r[3])) || 0, map0, String(line.text || '')); release(true); pin(win, sentence); return; } }
+      if (got0.length) { if (readerText) fxCount('paired', line.text); anchorFrom(got0, median(got0.map(r => r[3])) || 0, map0, String(line.text || '')); release(true); pin(win, sentence); return; } }
     if (!idx) { if (!gameDrawn()) orphan(line); if (gameDrawn()) release(); else release(true); return; }
     if (document.body.classList.contains('megulit-place-game-drawn')) { document.body.classList.remove('megulit-place-game-drawn'); window.__tomoyoHitRegionsRefresh?.(true); }
     /* record px are game-client px; the reader surface may be larger than the game (galLayoutInfo: client origin and size
@@ -615,6 +635,7 @@
       /* 2026-11-20 (user: a centred line started at the left as 「流」 while the game typed it): with under half of the line's boxes known
          the centring cannot be measured yet; a page that was centred stays centred on the same middle until it can */
       /* a line whose first characters start at the left edge of the page's left-aligned lines is not centred, whatever came before */ if (!Number.isFinite(rows.center) && anchor && anchor.center && !atLeft && boxes.filter(Boolean).length < shown.length * .5) rows.center = anchor[0]; b.textPlaceRows = { text: readerText, rows: rows.rows.map(r => [Math.round(r.l), Math.round(r.r), Math.round(r.t), r.first]), center: rows.center, boxes: boxes.map(r => r && r.map(Math.round)), idx };
+      fxCount('paired', line.text);
       if (!(anchor && lead >= 3 && Number(b.hookSourceContinues) > 0)) anchorFrom(boxes.filter(Boolean), size, map, String(line.text || ''), rows.center);
       /* the page's earlier lines stay above only when the game drew this line under them; a line that starts at or above
          where the last one ended is a new page (a title card, a cleared box), whatever the text stream said */
