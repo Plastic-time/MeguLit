@@ -10,8 +10,17 @@ async function exportBackup(root,destination){
  if(typeof destination!=='string'||!path.isAbsolute(destination)||!/\.(?:megulitbak|tomebak)$/i.test(destination))throw Error('INVALID_BACKUP_PATH');const temporary=stage(root,'backup-export-');
  try{const data=path.join(temporary,'data');fs.mkdirSync(data);const db=openStore(root);try{await backup(db,path.join(data,'megulit.sqlite'));}finally{db.close();}
   for(const name of ['config','assets','sentence-scenes','saved-voice','preferences.json','ui-state.json']){const source=path.join(root,'data',name);if(fs.existsSync(source))fs.cpSync(source,path.join(data,name),{recursive:true,dereference:false});}
-  const files=inventory(data,'data/'),payload=Buffer.from(JSON.stringify({schema:1,createdAt:new Date().toISOString(),files})),output=Buffer.concat([MAGIC,zlib.gzipSync(payload,{level:1})]);const file=destination+'.'+crypto.randomUUID()+'.tmp';fs.writeFileSync(file,output);fs.renameSync(file,destination);return {path:destination,bytes:output.length,files:Object.keys(files).length};
- }finally{safeRemove(path.join(root,'cache'),temporary);}
+  const files=inventory(data,'data/'),payload=Buffer.from(JSON.stringify({schema:1,createdAt:new Date().toISOString(),files})),output=Buffer.concat([MAGIC,zlib.gzipSync(payload,{level:1})]);
+  const file=destination+'.'+crypto.randomUUID()+'.tmp';
+  try{fs.writeFileSync(file,output);fs.renameSync(file,destination);}
+  catch(error){
+   try{fs.rmSync(file,{force:true});}catch(cleanup){console.warn('Backup output cleanup failed',cleanup.code);}
+   throw error;
+  }
+  return {path:destination,bytes:output.length,files:Object.keys(files).length};
+ }finally{
+  try{safeRemove(path.join(root,'cache'),temporary);}catch(error){console.warn('Backup staging cleanup failed',error.code);}
+ }
 }
 function previewBackup(root,source){
  if(typeof source!=='string'||!path.isAbsolute(source)||!fs.statSync(source).isFile()||fs.statSync(source).size>512*1024*1024)throw Error('INVALID_BACKUP_FILE');const bytes=fs.readFileSync(source);if(!bytes.subarray(0,8).equals(MAGIC)&&!bytes.subarray(0,8).equals(LEGACY_MAGIC))throw Error('INVALID_BACKUP_FILE');
