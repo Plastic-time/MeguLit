@@ -179,14 +179,11 @@ void CommunicationInitialize(HANDLE hostPipe, HANDLE hookPipe, bool &running)
    array) or in a trampoline that was kept; checked with every other thread suspended at once (MeguLitSafeUnhook.h) */
 static bool SafeToUnload()
 {
-	MeguLitUnhook::Span spans[64];
-	int n = 0;
-	spans[n++] = MeguLitUnhook::ModuleSpan((HMODULE)&__ImageBase);
-	spans[n++] = MeguLitUnhook::Span{(uintptr_t)hooks, (uintptr_t)hooks + sizeof(*hooks)};
-	if (MeguLitUnhook::KeptCount() * 4 > 64 - n) /* more kept hooks than one check can cover: stay loaded */
-		return false;
-	n += MeguLitUnhook::KeptSpans(spans + n, 64 - n);
-	return MeguLitUnhook::WaitQuiet(spans, n, nullptr, 0, 2000, 64 << 10, true); /* all at once: callbacks can still enter the DLL */
+	/* #468 (寒蝉 rig dump 2026-11-20): the all-at-once check suspended every game thread and then waited in GetThreadContext for one that
+	   could not reach suspension (a thread in the kernel, waiting on a lock a suspended thread held); the game stayed frozen and no
+	   later host could connect. The DLL no longer unloads after its host goes: it stays with every hook off and waits for the next
+	   host (which runs engine detection again, MeguLitRehijack). No thread is ever suspended on this path. */
+	return false;
 }
 DWORD WINAPI Pipe(LPVOID)
 {
