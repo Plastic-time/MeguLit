@@ -26,16 +26,16 @@ const run=selected();
 test('profile layers: kernel defaults <- engine diff <- game diff, frozen',()=>{
  const p=Profiles.profileFor({});assert.equal(p.layers,'core');assert.ok(Object.isFrozen(p)&&Object.isFrozen(p.placement)&&Object.isFrozen(p.choice.filters));
  assert.deepEqual({...p.placement},Profiles.DEFAULTS.placement);
- assert.match(Profiles.traceLine(Profiles.profileFor({exe:'C:/g/Unknown.exe',title:'x'})),/^profile auto-[0-9a-f]{10} engine=unknown layers=core$/);
+ assert.match(Profiles.traceLine(Profiles.profileFor({exe:'C:/g/Unknown.exe',title:'x'})),/^profile auto-[0-9a-f]{10} exe=- layers=core engine=unknown$/);
  assert.equal(Profiles.engineId('BGI / Ethornell'),'bgi');assert.equal(Profiles.engineId('KiriKiri'),'kirikiri');assert.equal(Profiles.engineId('System4 (AliceSoft)'),'system4');
  assert.equal(Profiles.get(p,'placement.firstLineAnchor','auto'),'auto');assert.equal(Profiles.get(p,'no.such.key',5),5);
 });
 
 test('every engine and game file uses kernel keys only, every game has fixtures',()=>{
  for(const f of fs.readdirSync(Profiles.ENGINE_DIR).filter(f=>f.endsWith('.cjs'))){const e=require(path.join(Profiles.ENGINE_DIR,f));
-  assert.equal(e.engine,f.slice(0,-4),f+': engine id = file name');assert.deepEqual(Profiles.unknownKeys(e.settings),[],f+': keys not in core/profiles/defaults.cjs');}
+  assert.equal(e.engine,f.slice(0,-4),f+': engine id = file name');assert.deepEqual(require('../core/profiles/schema.cjs').validate(e.settings).errors,[],f+': keys/values not allowed by core/profiles/schema.cjs');}
  for(const g of Profiles.games()){assert.match(g.key,/^[a-z0-9][a-z0-9-]{1,62}$/);assert.ok(!g.key.startsWith('auto-'),g.key+': auto- is reserved');
-  assert.deepEqual(Profiles.unknownKeys(g.settings),[],g.key+': keys not in core/profiles/defaults.cjs');
+  assert.deepEqual(require('../core/profiles/schema.cjs').validate(g.settings).errors,[],g.key+': keys/values not allowed by core/profiles/schema.cjs');
   const eng=Profiles.engineId(g.engine);if(eng)assert.ok(fs.existsSync(path.join(Profiles.ENGINE_DIR,eng+'.cjs')),g.key+': engine file '+eng+'.cjs missing');
   assert.ok(fs.existsSync(path.join(FIX,g.key,'identity.json')),g.key+': validation/fixtures/games/'+g.key+'/identity.json missing');}
 });

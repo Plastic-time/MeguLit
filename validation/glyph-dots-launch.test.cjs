@@ -43,7 +43,7 @@ test('launch flow: direct starts use the launcher (helper, not indirect); Steam 
   /* ③ text paths (web/Unity) start the game themselves: no early glyph launcher then; the launcher starts the shadow program */assert.ok(b.includes("const early=steam||textPath?null:require('../core/glyph-dots.cjs').earlyStart(root,launchExe,companion?companionArgs:[],require('../core/locale-emulator.cjs').x86(game.executable),directEnv||process.env);"));
   assert.ok(b.includes("startProcess(early?early.file:steam?'explorer.exe':launchExe,early?early.args:"));
   assert.ok(b.includes('{helper:steam||!!early,indirect:steam,'), 'the launcher exiting is not the game exiting; a game that quits at once is still seen');
-  assert.match(read('core/hook-native.cjs'),/env:\{\.\.\.process\.env,(?:\.\.\.\(this\.sourceLanguage\?\{MEGULIT_SOURCE_LANGUAGE:this\.sourceLanguage\}:\{\}\),)?\.\.\.require\('\.\/glyph-dots\.cjs'\)\.bridgeEnv\(path\.join\(this\.folder,'\.\.'\)\)/);
+  assert.match(read('core/hook-native.cjs'),/env:\{\.\.\.process\.env,(?:MEGULIT_PROFILE:JSON\.stringify\(this\.bridgeProfile\(\)\),)?(?:\.\.\.\(this\.sourceLanguage\?\{MEGULIT_SOURCE_LANGUAGE:this\.sourceLanguage\}:\{\}\),)?\.\.\.require\('\.\/glyph-dots\.cjs'\)\.bridgeEnv\(path\.join\(this\.folder,'\.\.'\)\)/);
   const lc = read('core/locale-emulator.cjs');
   assert.ok(lc.includes("const early=require('./glyph-dots.cjs').earlyLocale(this.root,s.dir,launchExe);")&&lc.includes("trace('locale-early-failed'"),'日文环境 tries the early launcher, falls back to LEProc');
   assert.ok(read('native/fontprobe/Launch.cpp').includes('GetProcAddress(m, "LeCreateProcess")'),'launcher creates through LE loader');

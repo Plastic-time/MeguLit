@@ -41,6 +41,11 @@ module.exports={
   preflight:null,
   /* the game itself draws the current line invisible, calibration waits for the next line: null = kernel (KiriKiri page DLL) */
   drawsHidden:null,
+  /* the engine side hides the text itself (KiriKiri / Ren'Py page DLL) and HookBridge passes lines unchanged once one line was
+     confirmed hidden (native/HookBridge.cs EngineAllOk, sent as MEGULIT_PROFILE / {type:'profile'}). null = kernel rule:
+     enabled (trial on), unconfirmedLines 2 (lines in a row without a hidden confirmation end the proof), clickMs 400 (texts of
+     one click), skipAside true (scene labels and name plates pass without starting a trial) */
+  engineTrial:{enabled:null,unconfirmedLines:null,clickMs:null,skipAside:null},
  },
  /* self-check thresholds of the auto-profile layer (feat/auto-profile): a window of lines whose hide/drop/repeat/pairing
     rates decide a fallback */

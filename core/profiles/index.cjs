@@ -36,6 +36,8 @@ function reload(){for(const dir of [ENGINE_DIR,GAME_DIR])for(const f of readDir(
    rules the game out; a title listed in notTitles (fan disc, sequel) never counts. Accepted at 3 or more. */
 function matchScore(g,input){const m=g.match||{};let score=0;const why=[];
  const eng=engineId(input.engine),own=engineId(g.engine);if(eng&&own&&eng!==own)return {score:0,why:['engine '+eng+'!='+own]};
+ /* the program's SHA-256 is the version itself: a listed hash names the game whatever the file is called */
+ if(Array.isArray(m.exeSha256)&&input.exeSha256&&m.exeSha256.map(x=>String(x).toLowerCase()).includes(String(input.exeSha256).toLowerCase())){score+=10;why.push('sha256');}
  if(m.steamAppId&&String(input.steamAppId||'')===String(m.steamAppId)){score+=3;why.push('steam');}
  if(Array.isArray(m.files)&&m.files.length&&input.folder){const ok=m.files.every(f=>{try{return fs.existsSync(path.join(input.folder,f));}catch{return false;}});if(ok){score+=3;why.push('files');}}
  else if(Array.isArray(m.files)&&m.files.length&&Array.isArray(input.files)){const have=new Set(input.files.map(f=>String(f).toLowerCase().replace(/\\/g,'/')));if(m.files.every(f=>have.has(String(f).toLowerCase())))
@@ -57,17 +59,25 @@ const clone=v=>JSON.parse(JSON.stringify(v));
 /* only the kernel keys of a layer (an auto layer read from disk may carry stale or unknown keys: they are dropped, not errors) */
 function known(settings,base=DEFAULTS){const out={};if(!plain(settings))return out;for(const [k,v] of Object.entries(settings)){if(!(k in base))continue;if(plain(base[k])){if(plain(v))out[k]=known(v,base[k]);}else out[k]=v;}return out;}
 /* one more layer over a profile (same rule as profileFor): a new frozen profile, layers +name */
-function apply(profile,layer,name){const meta={gameKey:profile.gameKey,engine:profile.engine,layers:profile.layers,matched:profile.matched};const base={};for(const k of Object.keys(DEFAULTS))base[k]=clone(profile[k]);
+function apply(profile,layer,name){const meta={gameKey:profile.gameKey,engine:profile.engine,exeSha256:profile.exeSha256||'',remoteVersion:profile.remoteVersion||0,layers:profile.layers,matched:profile.matched,rejected:profile.rejected||''};const base={};for(const k of Object.keys(DEFAULTS))base[k]=clone(profile[k]);
  const s=merge(base,clone(known(layer)));return freeze({...meta,layers:name?meta.layers+'+'+name:meta.layers,...s});}
 
+/* layers: kernel <- engine <- repo game diff <- official remote diff (signed, this exe version) <- this PC's calibration (auto,
+   only while no official diff exists). input.remote is a document already admitted by core/profiles/remote.cjs check()/load();
+   it is validated again here, and a bad one is left out whole (profile.rejected says why). */
 function profileFor(input={}){input=input||{};const hit=findGame(input);const game=hit?.game||null;
- const engine=engineId(input.engine)||engineId(game?.engine)||'';const eng=loadEngine(engine);
+ let remote=null,rejected='';if(plain(input.remote)){const v=require('./schema.cjs').validate(input.remote.settings);if(v.ok)remote=input.remote;else rejected='remote: '+v.errors.slice(0,2).join('; ');}
+ const engine=engineId(input.engine)||engineId(remote?.engine)||engineId(game?.engine)||'';const eng=loadEngine(engine);
  let s=clone(DEFAULTS);const layers=['core'];if(eng){s=merge(s,clone(eng.settings||{}));layers.push('engine');}if(game){s=merge(s,clone(game.settings||{}));layers.push('game');}
- /* 4th layer: this PC's measured auto profile (data/config/auto-profiles/<gameKey>.json, feat/auto-profile), known keys only */
- if(plain(input.auto)){s=merge(s,clone(known(input.auto)));layers.push('auto');}
- return freeze({gameKey:game?game.key:autoKey(input),engine:engine||'unknown',layers:layers.join('+'),matched:hit?hit.why.join(','):'',...s});}
+ if(remote){s=merge(s,clone(remote.settings||{}));layers.push('remote');}
+ /* this PC's measured auto profile (data/config/auto-profiles/<gameKey>.json, feat/auto-profile): known keys only, and only
+    while the official diff of this version is absent */
+ else if(plain(input.auto)){s=merge(s,clone(known(input.auto)));layers.push('auto');}
+ const exe=/^[0-9a-f]{64}$/.test(String(input.exeSha256||''))?String(input.exeSha256):'';
+ const gameKey=game?game.key:(remote&&typeof remote.gameKey==='string'&&remote.gameKey)?remote.gameKey:autoKey(input);
+ return freeze({gameKey,engine:engine||'unknown',exeSha256:exe,remoteVersion:remote?remote.version|0:0,layers:layers.join('+'),matched:hit?hit.why.join(','):'',rejected,...s});}
 /* the trace line every run writes once (hook-events.log), so the owner's log tells which layers this game ran with */
-const traceLine=p=>'profile '+p.gameKey+' engine='+p.engine+' layers='+p.layers+(p.matched?' match='+p.matched:'');
+const traceLine=p=>'profile '+p.gameKey+' exe='+(p.exeSha256?p.exeSha256.slice(0,8):'-')+' layers='+p.layers+' engine='+p.engine+(p.remoteVersion?' remote=v'+p.remoteVersion:'')+(p.matched?' match='+p.matched:'')+(p.rejected?' rejected='+p.rejected:'');
 /* a dotted key of a profile, with the fallback when the profile or the key is missing */
 function get(p,key,fallback){let v=p;for(const k of String(key).split('.')){if(v==null||typeof v!=='object')return fallback;v=v[k];}return v===undefined||v===null?fallback:v;}
 /* the RegExps of choice.filters (bad sources are skipped) */

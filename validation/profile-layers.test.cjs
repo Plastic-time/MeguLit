@@ -12,7 +12,7 @@ function hook(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-profile-
 test('hook-native starts on the kernel layer and takes the game profile',()=>{
  const {h,events,log}=hook();assert.equal(h.profile.layers,'core');
  const p=Profiles.profileFor({exe:'D:/g/SenrenBanka.exe'});h.setProfile(p);
- assert.equal(h.profile,p);assert.match(log(),/profile senren-banka engine=kirikiri layers=core\+engine\+game/);
+ assert.equal(h.profile,p);assert.match(log(),/profile senren-banka exe=- layers=core\+engine\+game engine=kirikiri/);
  assert.ok(events.some(e=>e.type==='hook'&&e.gameProfile?.gameKey==='senren-banka'));
 });
 
@@ -32,7 +32,7 @@ test('reader bootstrap keeps a frozen window.MeguLitProfile with get()',()=>{
 
 test('a game without a library engine takes the engine diff from its first engine page record',()=>{
  const {h,log}=hook();const input={exe:'D:/g/Unknown.exe',title:'x'};h.setProfile(Profiles.profileFor(input),input);assert.equal(h.profile.layers,'core');
- h.learnEngine('krkr');assert.equal(h.profile.engine,'kirikiri');assert.equal(h.profile.layers,'core+engine');assert.match(log(),/engine=kirikiri layers=core\+engine/);
+ h.learnEngine('krkr');assert.equal(h.profile.engine,'kirikiri');assert.equal(h.profile.layers,'core+engine');assert.match(log(),/layers=core\+engine engine=kirikiri/);
  h.learnEngine('cs2');assert.equal(h.profile.engine,'kirikiri','a known engine is never replaced');
 });
 

@@ -152,7 +152,7 @@ test('an engine-side hidden confirmation keeps the line in the game: the glyph c
  const ok=hb.slice(hb.indexOf('public static bool GlyphAllOk(string text){'));assert.ok(ok.indexOf('if(EngineAllOk(text))return true;')>0&&ok.indexOf('if(EngineAllOk(text))return true;')<ok.indexOf('if(GlyphCached)'),'checked before the GDI-only reasons to write back');
  assert.ok(hb.includes('if(want)Interlocked.Increment(ref EngineHideOn);else Interlocked.Decrement(ref EngineHideOn);')&&hb.includes('if(!EngineAllSelfTest())'));});
 test('pass-through by engine confirmation can be taken back: unconfirmed lines return to write-back hidden, menus are not on this path',()=>{const hb=read('native/HookBridge.cs'),s=read('native/krkrtext/script.inc');
- assert.ok(hb.includes('if(++EngineUnconfirmed>=2){EngineHideProven=false;EngineTrialFailed=true;'),'two unconfirmed lines in a row end it for the run');
+ assert.ok(hb.includes('if(++EngineUnconfirmed>=ProfileUnconfirmed){EngineHideProven=false;EngineTrialFailed=true;')&&/ProfileUnconfirmed=2/.test(hb),'two unconfirmed lines in a row end it for the run (hide.engineTrial.unconfirmedLines, kernel 2)');
  assert.ok(hb.includes('if(Volatile.Read(ref EngineHideOn)>0&&!SkipHeld&&!EngineSameClick(text,now)){'),'counted only while the engine hide is on and the skip key is up; the texts of one click, their repeats and typewriter steps are one line');
  /* the dialogue-only ownership gate of the engine hide is untouched (4e2bd3f8 / E980): a renderer bound to no layer is the dialogue's only while KAG writes to that message layer */
  assert.ok(s.includes("return typeof inst.textLayer=='undefined' && L===this.kag.current;"));});
@@ -181,4 +181,4 @@ test('every layer that hides the game text gives way in one place, and the pass-
  assert.ok(hb.includes('if(!GiveWaySelfTest()){')&&hb.includes('if(LayersGiveWay("self-test")!="write-back=off engine=off glyph=off gpu=off"||ReplacementEnabled||ev.WaitOne(0))return false;'));
  /* live log: proven 05:55:15.50, taken back 05:55:16.35 by the scene label and the name of the same click */
  assert.ok(hb.includes('if(!EngineAllOk("■自動車（車内／走行）")||!EngineAllOk("【運転手】")||!EngineAllOk("【運転手】")||!EngineAllOk("台詞"+i+"。"))return false;EngineHideProof("self-test");'));
- assert.ok(hb.includes('if((now-EngineBatchAt).TotalMilliseconds<EngineBatchMs){'));});
+ assert.ok(hb.includes('if((now-EngineBatchAt).TotalMilliseconds<ProfileClickMs){')&&hb.includes('ProfileClickMs=EngineBatchMs;'));});
