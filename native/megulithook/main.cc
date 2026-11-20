@@ -5,6 +5,7 @@
 #include "lunarpc.h"
 #include "../../fileversion.hpp"
 void HIJACK();
+extern bool MeguLitRehijack;
 bool detachall();
 void veh_release_late();
 /* MeguLit: set once every hook was removed safely and MinHook uninitialized, right before the DLL unloads itself */
@@ -240,6 +241,8 @@ DWORD WINAPI Pipe(LPVOID)
 		}
 		isDetachClear = false;
 		host_connected = false;
+		/* every hook was removed above: the next host gets the engine hooks again (enginecontrol.cpp HIJACK) */
+		MeguLitRehijack = true;
 		return Pipe(0);
 	}
 }
