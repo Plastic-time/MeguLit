@@ -299,7 +299,9 @@ static void Deactivate(string reason){if(WaitHook!=null)WaitHook.Disable();lock(
     Engine-agnostic. The stream becomes hide-only only after the DLL reports a hidden string ("MeguLit_GDIHIDE hit"),
     so engines that do not draw through GDI keep today's behaviour. */
  static bool Armed(Candidate c){return c!=null&&(c.embed||c.gdiProbe);}
- static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&c.role!=2&&c.role!=3&&!LoadUnsafe().ContainsKey(UnsafeKey(c.name,c.role));}
+ /* 2026-11-20 (#470, a game read only through kernel32 MultiByteToWideChar/WideCharToMultiByte: "游戏界面没有文字了只有标点符号"): a string conversion or C runtime copy is not a draw call; the game uses its output for everything (script, paths, every string it draws), so blanking it there left only punctuation on screen. Only text the game draws or measures (gdi32/user32/dwrite/d2d1 and engine hooks) may be probed for hiding. */
+static bool ConversionHook(string code){return System.Text.RegularExpressions.Regex.IsMatch(code??"",@"(?i):(kernel32|kernelbase|msvcr\w*|msvcp\w*|ucrtbase|vcruntime\w*)\.dll:");}
+static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&!ConversionHook(c.code)&&c.role!=2&&c.role!=3&&!LoadUnsafe().ContainsKey(UnsafeKey(c.name,c.role));}
  static void GdiHideHit(string info){Candidate c;lock(Gate){if(Selected==""||!Candidates.TryGetValue(Selected,out c)||!c.gdiProbe||c.embed)return;c.embed=true;c.hideOnly=true;List();}Diagnostic("gdi hide confirmed for "+c.name+" "+c.code+": hide-only ("+info+")");}
  static bool OldBgiCharHook(Candidate c){return c!=null&&c.name=="BGI"&&c.code!=null&&c.code.StartsWith("H")&&c.code.EndsWith(":BGI.exe",StringComparison.OrdinalIgnoreCase)&&String.Equals(BoundProcess,"BGI",StringComparison.OrdinalIgnoreCase);}
  /* E560 (月に寄りそう乙女の作法 froze when the selection followed a new context): LunaHost's UseEmbed waits for the game's hook,
