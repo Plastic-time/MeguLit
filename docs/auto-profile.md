@@ -8,7 +8,13 @@
 内核默认 defaults.cjs ← 引擎差分 engines/<id>.cjs ← 游戏差分 games/<gameKey>.cjs ← 本机自动差分 data/config/auto-profiles/<key>.json
 ```
 
-本机自动差分是数据，不是代码，只能写 defaults.cjs 里已有的键；按「新量到的值盖过旧存的」排在最后。
+本机自动差分是数据，不是代码，只能写 defaults.cjs 里已有的键（`profileFor({...input, auto})`，未知键丢弃，layers 末尾 `+auto`）。
+
+**顺序定为本机校准层 > 仓库游戏差分**：本机是在这台电脑、这份游戏拷贝上实测出来的，按「新量到的值盖过旧存的」排最上。手写游戏差分修了某个问题之后，本机旧校准如果仍是读模式，玩家点 Alt+T「重新校准」即可重测；服务端下发的差分也是这一层，本机再校准的结果覆盖它。
+
+接入：`services/reader.cjs applyGameProfile` 先算不带 auto 的 profile，取 `gameKey`，读 `data/config/auto-profiles/<gameKey>.json`，有就 `profileFor({...input, auto: settings})` 交给 `GalNative.setGameProfile`；校准完成、闸门退档、重新校准时 `services/self-check-live.cjs` 再调一次 setGameProfile，内核照常经 `Profiles.get(this.profile, ...)` 读。
+
+内核读取的键：`hide.textEffectsRead`（读模式）、`placement.firstLineAnchor`（positionSource=glyph → `glyph`，ocr → `box`；engine 是内核默认首选，不写）。`calibrate.*`、`page.effectFrames` 目前只存盘和上传，内核还没有分支读它们。
 
 ## 自检闸门 `core/self-check.cjs`
 
@@ -21,11 +27,11 @@
 | hideVisible | hookVisual stage=hidden、valid 的句子里，扫描区仍识别到日文的比例 | > 25%（至少检查 4 句） |
 | dropRate | `hook line drawn nowhere on the page, dropped` / (台词 + 丢句) | > 15% |
 | repeatRate | 阅读层同一句（≥6 字）在窗口内画了第二次 | > 10% |
-| choiceMismatch | `choice options filtered A -> B` 里 A≥2 且 B<2 的次数 | ≥ 2 次 |
+| choiceMismatch | `choice options filtered A -> B` 里 A≥2 且 B<2 的次数 | > 1 次 |
 | positionPx | 引擎上报第一个字框的 top 与阅读层第一个字 top（换算到游戏客户区）之差的中位数 | > max(96, 3×字高)，至少 5 个样本 |
 | pairRate | 字形配对 paired/(paired+orphan)；有汉化补丁行时再取补丁行/台词 | < 80%（至少 6 句） |
 
-阈值在 `self-check.cjs` 的 `DEFAULTS`，对应 profile 的 `selfCheck.*`，引擎差分或游戏差分可以覆盖。
+阈值在 `core/profiles/defaults.cjs` 的 `selfCheck.*`（`self-check.cjs` 的 `DEFAULTS` 是同值兜底），引擎差分或游戏差分可以覆盖。位置偏差用引擎上报的首字框坐标（`placement placed: ... first box`）。
 
 每个窗口写一行 hook-events.log：
 
@@ -59,7 +65,7 @@ selfCheck window=1 lines=20 hide=0.25 drop=0.231 repeat=0 choice=1 pos=- pair=0.
 
 ## 存储格式 `data/config/auto-profiles/<key>.json`
 
-`key` = 手写游戏差分的 gameKey（如 `fata-morgana`），没有就是 `exe-` + sha1(小写程序名) 前 12 位。不含路径。
+`key` = profile 的 gameKey：手写游戏差分的 key（如 `fata-morgana`），没有游戏差分的是 profileFor 给的 `auto-<hash>`（程序名+标题）。不含路径。
 
 ```json
 {
