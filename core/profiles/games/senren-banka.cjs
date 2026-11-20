@@ -10,5 +10,7 @@ module.exports={
   titles:['千恋＊万花','千恋万花','Senren Banka','Senren＊Banka'],
   steamAppId:1144400,
  },
- settings:{},
+ /* incr9 2026-11-21 (owner): short lines showed the translation alone (the game hid them, no hidden glyph came back);
+    the Japanese sat over the name box 【運転手】 when two translation rows did not fit */
+ settings:{placement:{drawWhileBlanking:true,translationGrowsDown:true}},
 };

@@ -12,6 +12,12 @@ module.exports={
   firstLineAnchor:null,
   /* extra pixels (game client) added to the Japanese line's top, after the kernel placed it */
   lineOffsetY:0,
+  /* while the glyph layer blanks the selected writable stream, a line not yet seen hidden is drawn by the reader (false = the
+     kernel: the game draws it itself until a hidden glyph comes back) */
+  drawWhileBlanking:false,
+  /* the Japanese stays on the game's text place and its translation only grows down (smaller by at most 15 %); false = the
+     kernel: a translation that does not fit above the game's button strip moves the block up */
+  translationGrowsDown:false,
  },
  page:{
   /* the game draws one line over several frames (fade, wipe, per-character effects): null = kernel heuristics; true = every
