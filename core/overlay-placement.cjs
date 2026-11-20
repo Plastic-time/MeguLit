@@ -14,8 +14,8 @@ const fs = require('node:fs'), path = require('node:path');
 const { rectsToClient } = require('./compositor-host.cjs');
 
 class OverlayPlacement {
-  constructor({ root, send = () => {}, trace = () => {}, replaced = () => false, hidden = () => {} } = {}) {
-    this.hidden = hidden; this.replaced = replaced; this.root = root; this.send = send; this.trace = trace; this.client = [0, 0]; this.current = null; this.on = false;
+  constructor({ root, send = () => {}, trace = () => {}, replaced = () => false, hidden = () => {}, blanking = () => false } = {}) {
+    this.hidden = hidden; this.replaced = replaced; this.blanking = blanking; this.root = root; this.send = send; this.trace = trace; this.client = [0, 0]; this.current = null; this.on = false;
     /* the running game's layered profile (core/profiles), set by gal-native setGameProfile; branches read this.profile.placement.* */
     this.profile = require('./profiles/index.cjs').profileFor({});
   }
@@ -69,6 +69,9 @@ class OverlayPlacement {
          already showed hidden from its cached glyphs, and the repaint reports it as not hidden. That is the same line,
          still hidden on screen: it stays placed. */
       if (m.hidden !== true && m.engine !== 'gpu' && this.current && !this.current.fallback && this.current.id === id && this.current.text === flat.join('')) return; /* GPU hiding is decided per frame: there, not hidden is the game showing it */
+      /* incr9 2026-11-21 (owner, 千恋＊万花 lines 100001..: 「お客さん」 drawn by nobody): the bridge blanks this stream's glyphs, so a line the
+         engine reports unhidden is not on screen: the reader draws its Japanese where the last line was; a hidden glyph later only places it */
+      if (m.hidden !== true && m.engine !== 'gpu' && this.blanking()) { this.why('sblank:' + id, 'fallback: line ' + (Number(m.line) || 0) + ' reported unhidden while the glyph layer blanks the stream (the reader draws it)'); return this.emitLine({ id, engine: m.engine || 'engine', text: flat.join(''), fallback: true, client: this.client.slice() }); }
       if (m.hidden !== true) { this.why('shown:' + id, 'not placed: line ' + (Number(m.line) || 0) + ' is drawn by the game itself (hidden=0)'); if (this.current?.id === id) this.clear(); const vis = flat.join(''); if (vis && vis !== this.visibleKey) { this.visibleKey = vis; this.send({ type: 'textPlace', visible: true, text: vis, ...(this.hiding === true ? { hiding: true } : {}) }); } return; }
       if (m.engine === 'gpu') this.gpuHiding = Date.now();
       this.visibleKey = ''; this.why('placed:' + id + ':' + rects.length, 'placed: line ' + (Number(m.line) || 0) + ', ' + rects.length + ' characters, first box ' + (rects[0] ? [].concat(rects[0]).map(v => Math.round(Number(v) || 0)).join(',') : '-') + ' in client ' + this.client.join('x'));
@@ -104,6 +107,9 @@ class OverlayPlacement {
     /* 2026-11-21 r29 (owner, 千恋＊万花: lines tripled, the place moving, the original flashing): only for a game whose lines no engine reports
        with places (STEINS;GATE/MAGES); a game with an engine path (KiriKiri) keeps the note and its hide timing as before */
     if (!this.hideSeen && !this.engineSeen && this.replaced()) { this.why('greplaced:' + id, 'not placed: glyph line ' + (Number(table.seq) || 0) + ' unhidden, but the write-back replaced the original (the reader draws it)'); if (this.current?.id === id) this.clear(); return; }
+    /* incr9 2026-11-21 (owner, 千恋＊万花: 「お客さん」「……ぁ？」 every short line 'has no hidden glyph yet', the game drew nothing, the reader
+       neither): with the bridge blanking the writable stream the line is hidden; the reader draws it, a late hidden glyph only places it */
+    if (!this.hideSeen && this.blanking()) { this.why('gblank:' + id, 'fallback: glyph line ' + (Number(table.seq) || 0) + ' has no hidden glyph yet, but the glyph layer blanks the stream (the reader draws it)'); return this.emitLine({ id, engine: 'glyph', text: table.text, fallback: true, client: this.client.slice() }); }
     if (!this.hideSeen) this.why('gshown:' + id, 'not placed: glyph line ' + (Number(table.seq) || 0) + ' has no hidden glyph yet (the game draws it itself)');
     if (!this.hideSeen) { const vis = chars.filter(c => !/\s/.test(c)).join(''); if (this.current?.id === id) this.clear(); if (vis && vis !== this.visibleKey) { this.visibleKey = vis; this.send({ type: 'textPlace', visible: true, text: vis, ...(this.hiding === true ? { hiding: true } : {}) }); } return; }
     const typed = this.typed(table, chars.length, recorded), drawn = new Set(chars.map((c, i) => i).filter(i => i < typed));
