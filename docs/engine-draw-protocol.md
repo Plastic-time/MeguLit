@@ -20,6 +20,8 @@ ToMe_CHARS engine=<e> line=N hidden=0|1 sw=W sh=H vx= vy= vw= vh= n=K rects=x,y,
 
 `engine` 新增 `rpgm`（RPG Maker MV/MZ 的 JS 层）
 
+**UI 快照**：同一组 UI 项（组 = `role` + `id` 里 `:` 前的部分，没有 `:` 就只按 `role`）一次一起报，共用一个 `line` 号；更大的 `line` 号替换这一组旧的项；空快照（`text=` 为空、`box=0,0,0,0`、`id=<组>:`）清空这一组。KiriKiri：`L<层>:<link>` 是选项、`B<n>` 是按钮
+
 ## 角色怎么用（阅读层）
 
 | role | 替换 | 阅读层做什么 |
@@ -29,7 +31,7 @@ ToMe_CHARS engine=<e> line=N hidden=0|1 sw=W sh=H vx= vy= vw= vh= n=K rects=x,y,
 | `choice` `button` `menu` | **永远不替换、不隐藏** | 在 box 旁边补注音和中文，点击区域原样留给游戏（阅读层不接鼠标） |
 | `system` | 不替换 | 同上，只补注音和中文；对话框外的说明、帮助窗 |
 
-内核 `core/hook-native.cjs`：`role` 不是 `line` 的记录不进 HiddenGate、不当台词，发 `hookDrawUi` 事件；`line` 记录照旧发 `hookCharRects`（带 `emb`）
+内核 `core/hook-native.cjs`：`role` 不是 `line` 的记录不进 HiddenGate、不当台词，发 `hookDrawUi` 事件；`services/reader.cjs` 经 `core/engine-draw.cjs` UiTracker 转成 art-text 项（`web/reader/modules/art-text.js`：每行一个隐形可查词的副本 + 旁边的译文，不接鼠标）。`line` 记录照旧发 `hookCharRects`；`emb` 经 overlay-placement 的 `textPlace {visible, embedded}` 到阅读层，`emb=2` 时阅读层连中文行也不画（`megulit-game-embedded`）。`draw.embed` 开着时，没带 `emb` 的台词由内核发 `hookDrawEmbed` 向阅读层要注音（`example-ruby`：游戏 ruby → 词典）和译文（剧本 → 兜底链），回 `drawEmbedReply` 写进引擎的替换表
 
 ## 替换数据（MeguLit → 引擎）
 

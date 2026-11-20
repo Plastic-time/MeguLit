@@ -66,7 +66,7 @@ test('Ren\'Py: every located sentence (ADV too) sends its character boxes; the s
 
 test('KiriKiri: the TJS script reports each sentence\'s boxes at its end; hidden only after real opacity-0 draws; the DLL forwards ToMe_CHARS',()=>{
  const s=read('native/krkrtext/script.inc'),c=read('native/krkrtext/KrkrText.cpp'),h=read('native/krkrtext/selftest/host.cpp');
- assert.ok(s.includes("rec.rs+=(rec.cn>0?';':'')+int(cx)+','+int(cy)+','+int(cw)+','+int(size);rec.cn++;"));assert.ok(s.includes('if(this.hideOn()) rec.hc++;'),'hidden counted per character as drawn');
+ assert.ok(s.includes("rec.rs+=(rec.cn>0?';':'')+int(cx)+','+int(cy)+','+int(cw)+','+int(size);rec.cn++;"));assert.ok(s.includes('if(this.hideMsg()) rec.hc++;'),'hidden counted per character as drawn (engine-draw: never on the processCh path while the game draws the replacement)');
  assert.ok(s.includes('var h=(rec.hc>=rec.cn)?1:0;'),'live 2026-11-14 Fata Morgana: glyphs drawn invisible stay so after the switch');
  assert.ok(s.includes("'ToMe_CHARS engine=krkr line='+rec.line+' hidden='+h"));
  assert.match(s,/if\(rec\.n>0\) \{this\.send\('end',rec,rec\.x0,rec\.x1\);[\s\S]{0,700}?try \{this\.chars\(rec\);\} catch\(e\) \{this\.charsErr=e\.message;\}\}/,'a failing record never breaks the end line (sent first, the record in its own try)');
