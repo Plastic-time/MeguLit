@@ -32,14 +32,17 @@ const forms = t => {
   const half = t.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)); if (half !== t) out.push(['half-width', half]);
   const k = /[一-龯々]{1,3}/.exec(t); if (k) out.push(['ruby markup', t.slice(0, k.index) + '｜' + k[0] + '《よみ》' + t.slice(k.index + k[0].length)]);
   out.push(['blanks', t.replace(/、/g, '、　')]);
-  if (t.length > 12) out.push(['line break', t.slice(0, Math.ceil(t.length / 2)) + '\n' + t.slice(Math.ceil(t.length / 2))]);
+  if (t.length > 12) { let at = Math.ceil(t.length / 2); for (const m of t.matchAll(/%[^;%\n]{0,40};|#[0-9a-fA-F]{6,8};|\[[^\]\n]{0,12}\]/g)) if (at > m.index && at < m.index + m[0].length) at = m.index + m[0].length; if (at < t.length) out.push(['line break', t.slice(0, at) + '\n' + t.slice(at)]); } /* never inside an engine tag */
   return out;
 };
-let total = 0, paired = 0, nonDialogue = 0; const misses = {}, skipped = [], kinds = ['as written', 'speaker taken off', 'no brackets', 'half-width', 'ruby markup', 'blanks', 'line break'];
+/* a row the patch leaves in Japanese (empty, or the Japanese itself with kana) has no human translation to pair: counted apart (the running game fills it: fill / machine translation) */
+const untranslatedRow = i => { const z = String(zh[i] || '').trim(), j = String(lines[i] || '').trim(); return !z || z.replace(/\s/g, '') === j.replace(/\s/g, '') && /[ぁ-ゖァ-ヺ]{2}/.test(j); };
+let total = 0, paired = 0, nonDialogue = 0, untranslated = 0; const misses = {}, skipped = [], kinds = ['as written', 'speaker taken off', 'no brackets', 'half-width', 'ruby markup', 'blanks', 'line break'];
 for (const kind of kinds) { const p = live() || tableProvider(), hh = { originalText: p, trace() {}, resolveSource: HookNative.prototype.resolveSource };
   lines.forEach((raw, i) => { const t = String(raw || '').trim(); if (!t || !/[぀-ヿ一-鿿]/.test(t)) return;
     if (HookNative.nonDialogue(t) || label(t)) { if (kind === 'as written') { nonDialogue++; if (skipped.length < 8) skipped.push(t.slice(0, 30)); } return; }
+    if (untranslatedRow(i)) { if (kind === 'as written') untranslated++; return; }
     const f = forms(t).find(x => x[0] === kind); if (!f) return; total++; const r = hh.resolveSource(f[1]);
     if (r && (r.status === 'exact' || r.status === 'high')) paired++; else (misses[kind] = misses[kind] || []).push([i, t, r?.status || 'none']); }); }
-console.log(JSON.stringify({ mode, lookups: total, paired, unpaired: total - paired, nonDialogue, nonDialogueExamples: skipped, byForm: Object.fromEntries(Object.entries(misses).map(([k, v]) => [k, { count: v.length, examples: v.slice(0, 5) }])) }, null, 1));
+console.log(JSON.stringify({ mode, lookups: total, paired, unpaired: total - paired, nonDialogue, untranslatedInPatch: untranslated, nonDialogueExamples: skipped, byForm: Object.fromEntries(Object.entries(misses).map(([k, v]) => [k, { count: v.length, examples: v.slice(0, 5) }])) }, null, 1));
 process.exit(total === paired ? 0 : 1);
