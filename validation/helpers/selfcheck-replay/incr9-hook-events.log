@@ -1,0 +1,298 @@
+2026-11-20T22:51:07.881Z source chars=204 sequence=1
+2026-11-20T22:51:09.013Z visual {"type":"hookVisual","sequence":1,"stage":"hidden","sample":1,"valid":true,"matched":true,"japaneseCharacters":58,"recognizedCharacters":60,"sourceCharacters":194,"checkedAt":1795215069011,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T22:51:09.715Z visual {"type":"hookVisual","sequence":1,"stage":"hidden","sample":2,"valid":true,"matched":true,"japaneseCharacters":58,"recognizedCharacters":60,"sourceCharacters":194,"checkedAt":1795215069714,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T22:51:14.644Z source chars=83 sequence=2
+2026-11-20T22:51:16.317Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":79,"checkedAt":1795215075889,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T22:51:16.593Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":79,"checkedAt":1795215076593,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T22:51:32.255Z source chars=4 sequence=3
+2026-11-20T22:51:33.248Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":4,"checkedAt":1795215093248,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T22:51:33.941Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":4,"checkedAt":1795215093941,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T22:51:37.142Z source chars=15 sequence=4
+2026-11-20T22:51:38.100Z visual {"type":"hookVisual","sequence":4,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":15,"checkedAt":1795215098100,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T22:51:38.794Z visual {"type":"hookVisual","sequence":4,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":15,"checkedAt":1795215098794,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T22:51:40.966Z source chars=18 sequence=5
+2026-11-20T22:51:40.989Z placement placed: line 1, 18 characters, first box 220,488,20,22 in client 804x604
+2026-11-20T22:51:44.880Z source chars=9 sequence=6
+2026-11-20T22:51:44.900Z placement placed: line 2, 9 characters, first box 307,488,22,22 in client 804x604
+2026-11-20T22:51:46.753Z source chars=17 sequence=7
+2026-11-20T22:51:46.771Z placement placed: line 3, 17 characters, first box 226,488,22,22 in client 804x604
+2026-11-20T22:51:48.361Z source chars=9 sequence=8
+2026-11-20T22:51:48.389Z placement placed: line 4, 9 characters, first box 307,488,22,22 in client 804x604
+2026-11-20T22:51:49.370Z source chars=9 sequence=9
+2026-11-20T22:51:49.387Z placement placed: line 5, 9 characters, first box 309,488,20,22 in client 804x604
+2026-11-20T22:51:50.380Z source chars=12 sequence=10
+2026-11-20T22:51:50.394Z placement placed: line 6, 12 characters, first box 281,488,22,22 in client 804x604
+2026-11-20T22:51:51.474Z source chars=14 sequence=11
+2026-11-20T22:51:51.490Z placement placed: line 7, 14 characters, first box 265,488,20,22 in client 804x604
+2026-11-20T22:51:52.418Z source chars=7 sequence=12
+2026-11-20T22:51:52.445Z placement placed: line 8, 7 characters, first box 327,488,22,22 in client 804x604
+2026-11-20T22:51:52.777Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["………けれ……どけ…れ…………どけ…れ…どけ……れ…どけ……れど………"] text="………けれ……どけ…れ…………どけ…れ…どけ……れ…どけ……れど………"
+2026-11-20T22:51:53.473Z source chars=16 sequence=13
+2026-11-20T22:51:53.489Z placement placed: line 9, 16 characters, first box 240,488,22,22 in client 804x604
+2026-11-20T22:51:55.204Z krkr page: hook line drawn nowhere on the page, dropped chars=16
+2026-11-20T22:51:55.272Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["を私呼ぶを私声呼ぶがを私…私声呼…をぶ"] text="を私呼ぶを私声呼ぶがを私…私声呼…をぶ"
+2026-11-20T22:51:55.377Z source chars=7 sequence=14
+2026-11-20T22:51:55.380Z placement placed: line 10, 14 characters, first box 255,488,22,22 in client 804x604
+2026-11-20T22:51:55.409Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["が届呼声…いぶ…が声た声届…のがい…だ…届た。…いの"] text="が届呼声…いぶ…が声た声届…のがい…だ…届た。…いの"
+2026-11-20T22:51:55.580Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["届だたい。の届だたい。のだた。のだ。"] text="届だたい。の届だたい。のだた。のだ。"
+2026-11-20T22:51:56.031Z choice options filtered 3 -> 0
+2026-11-20T22:51:56.047Z source chars=14 sequence=15
+2026-11-20T22:51:56.788Z krkr page: hook line drawn nowhere on the page, dropped chars=3
+2026-11-20T22:51:56.905Z krkr page: hook line drawn nowhere on the page, dropped chars=4
+2026-11-20T22:51:58.041Z source chars=1 sequence=16
+2026-11-20T22:51:58.044Z placement placed: line 11, 7 characters, first box 328,488,22,22 in client 804x604
+2026-11-20T22:51:58.246Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……だか……らだ…か…………らだか……らだ…か……らだ…か…ら………"] text="……だか……らだ…か…………らだか……らだ…か……らだ…か…ら………"
+2026-11-20T22:51:59.581Z krkr page: hook line drawn nowhere on the page, dropped chars=6
+2026-11-20T22:52:02.010Z source chars=9 sequence=17
+2026-11-20T22:52:02.036Z placement placed: line 12, 9 characters, first box 320,488,16,22 in client 804x604
+2026-11-20T22:52:03.742Z krkr page: hook line drawn nowhere on the page, dropped chars=9
+2026-11-20T22:52:04.367Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……自分の死体だ。"] text="……自分の死体だ。"
+2026-11-20T22:52:04.371Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["その瞬間、私は死体を見下ろしていた。"] text="その瞬間、私は死体を見下ろしていた。"
+2026-11-20T22:52:04.372Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["磔の場へと引きずられるその姿に……"] text="磔の場へと引きずられるその姿に……"
+2026-11-20T22:52:04.381Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["私を呼ぶ声が……届いたのだ。"] text="私を呼ぶ声が……届いたのだ。"
+2026-11-20T22:52:04.383Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["そう、一度はすべてを失った。"] text="そう、一度はすべてを失った。"
+2026-11-20T22:52:04.384Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……けれど……"] text="……けれど……"
+2026-11-20T22:52:04.385Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……とこしえの闇に溶けゆく中……"] text="……とこしえの闇に溶けゆく中……"
+2026-11-20T22:52:04.386Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["深い絶望を抱き……"] text="深い絶望を抱き……"
+2026-11-20T22:52:04.387Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["私のすべては、消滅した。"] text="私のすべては、消滅した。"
+2026-11-20T22:52:04.388Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["そして魂は砕け……"] text="そして魂は砕け……"
+2026-11-20T22:52:04.389Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……だから……"] text="……だから……"
+2026-11-20T22:52:09.366Z source chars=4 sequence=18
+2026-11-20T22:52:09.380Z placement placed: line 13, 10 characters, first box 300,488,19,22 in client 804x604
+2026-11-20T22:52:11.079Z krkr page: hook line drawn nowhere on the page, dropped chars=1
+2026-11-20T22:52:11.375Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……とこしえの闇に溶けゆく中……"] text="……とこしえの闇に溶けゆく中……"
+2026-11-20T22:52:11.375Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["深い絶望を抱き……"] text="深い絶望を抱き……"
+2026-11-20T22:52:11.376Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["どれほど時を重ねても"] text="どれほど時を重ねても"
+2026-11-20T22:52:11.377Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["私を呼ぶ声が……届いたのだ。"] text="私を呼ぶ声が……届いたのだ。"
+2026-11-20T22:52:11.377Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["そして魂は砕け……"] text="そして魂は砕け……"
+2026-11-20T22:52:11.377Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……だから……"] text="……だから……"
+2026-11-20T22:52:11.377Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……自分の死体だ。"] text="……自分の死体だ。"
+2026-11-20T22:52:11.377Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["もう一度、誓った。"] text="もう一度、誓った。"
+2026-11-20T22:52:11.377Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["その瞬間、私は死体を見下ろしていた。"] text="その瞬間、私は死体を見下ろしていた。"
+2026-11-20T22:52:11.378Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["磔の場へと引きずられるその姿に……"] text="磔の場へと引きずられるその姿に……"
+2026-11-20T22:52:11.378Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["私のすべては、消滅した。"] text="私のすべては、消滅した。"
+2026-11-20T22:52:11.378Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……けれど……"] text="……けれど……"
+2026-11-20T22:52:11.379Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["そう、一度はすべてを失った。"] text="そう、一度はすべてを失った。"
+2026-11-20T22:52:13.619Z source chars=11 sequence=19
+2026-11-20T22:52:13.661Z placement placed: line 14, 11 characters, first box 298,488,22,22 in client 804x604
+2026-11-20T22:52:15.943Z source chars=1 sequence=20
+2026-11-20T22:52:15.970Z placement placed: line 15, 15 characters, first box 257,488,22,22 in client 804x604
+2026-11-20T22:52:16.648Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["迎え迎に行え迎くにと行え迎…迎にく…え行"] text="迎え迎に行え迎くにと行え迎…迎にく…え行"
+2026-11-20T22:52:16.673Z source chars=6 sequence=21
+2026-11-20T22:52:16.687Z placement placed: line 16, 9 characters, first box 315,488,22,22 in client 804x604
+2026-11-20T22:52:16.883Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["と。にく…行…とく…行…とく…。と……。…。"] text="と。にく…行…とく…行…とく…。と……。…。"
+2026-11-20T22:52:17.343Z choice options filtered 2 -> 0
+2026-11-20T22:52:17.483Z krkr page: hook line drawn nowhere on the page, dropped chars=2
+2026-11-20T22:52:18.193Z source chars=4 sequence=22
+2026-11-20T22:52:18.208Z placement placed: line 17, 8 characters, first box 316,488,22,22 in client 804x604
+2026-11-20T22:52:18.402Z krkr page: hook line drawn nowhere on the page, dropped chars=1
+2026-11-20T22:52:18.427Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["………その……館そにの…………館そに……の館そ…にの…館そ…にの…館…に………"] text="………その……館そにの…………館そに……の館そ…にの…館そ…にの…館…に………"
+2026-11-20T22:52:19.549Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……戻ら……ね戻ば"] text="……戻ら……ね戻ば"
+2026-11-20T22:52:19.675Z source chars=6 sequence=23
+2026-11-20T22:52:19.691Z placement placed: line 18, 12 characters, first box 283,488,22,22 in client 804x604
+2026-11-20T22:52:19.912Z krkr page: hook line drawn nowhere on the page, dropped chars=2
+2026-11-20T22:52:20.843Z source chars=1 sequence=24
+2026-11-20T22:52:20.845Z placement placed: line 19, 10 characters, first box 300,488,22,22 in client 804x604
+2026-11-20T22:52:21.056Z krkr page: hook line drawn nowhere on the page, dropped chars=5
+2026-11-20T22:52:21.210Z krkr page: hook line drawn nowhere on the page, dropped chars=6
+2026-11-20T22:52:22.194Z krkr page: hook line drawn nowhere on the page, dropped chars=1
+2026-11-20T22:52:22.380Z krkr page: hook line drawn nowhere on the page, dropped chars=9
+2026-11-20T22:52:22.935Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……戻らねばならないと。"] text="……戻らねばならないと。"
+2026-11-20T22:52:22.937Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……とこしえの闇に溶けゆく中……"] text="……とこしえの闇に溶けゆく中……"
+2026-11-20T22:52:22.938Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["私を呼ぶ声が……届いたのだ。"] text="私を呼ぶ声が……届いたのだ。"
+2026-11-20T22:52:22.939Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……だからどうか……"] text="……だからどうか……"
+2026-11-20T22:52:22.940Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["そして魂は砕け……"] text="そして魂は砕け……"
+2026-11-20T22:52:22.940Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["多くの障害があろうとも"] text="多くの障害があろうとも"
+2026-11-20T22:52:22.941Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……だから……"] text="……だから……"
+2026-11-20T22:52:22.942Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["私のすべては、消滅した。"] text="私のすべては、消滅した。"
+2026-11-20T22:52:22.943Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["君がどんな姿になっていようとも"] text="君がどんな姿になっていようとも"
+2026-11-20T22:52:22.944Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["もう一度、誓った。"] text="もう一度、誓った。"
+2026-11-20T22:52:22.944Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["磔の場へと引きずられるその姿に……"] text="磔の場へと引きずられるその姿に……"
+2026-11-20T22:52:22.945Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["どれほど時を重ねても"] text="どれほど時を重ねても"
+2026-11-20T22:52:22.946Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……自分の死体だ。"] text="……自分の死体だ。"
+2026-11-20T22:52:22.947Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["深い絶望を抱き……"] text="深い絶望を抱き……"
+2026-11-20T22:52:22.948Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["そう、一度はすべてを失った。"] text="そう、一度はすべてを失った。"
+2026-11-20T22:52:22.949Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["迎えに行くと……。"] text="迎えに行くと……。"
+2026-11-20T22:52:22.957Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……けれど……"] text="……けれど……"
+2026-11-20T22:52:22.960Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……その館に……"] text="……その館に……"
+2026-11-20T22:52:22.961Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["その瞬間、私は死体を見下ろしていた。"] text="その瞬間、私は死体を見下ろしていた。"
+2026-11-20T22:52:24.456Z krkr page: hook line drawn nowhere on the page, dropped chars=133
+2026-11-20T22:52:24.473Z krkr page: hook line drawn nowhere on the page, dropped chars=208
+2026-11-20T22:52:26.107Z choice aux KiriKiri2 role=0 added=["…待っていて欲しい…"] text="…待っていて欲しい…"
+2026-11-20T22:52:26.115Z source chars=12 sequence=25
+2026-11-20T22:52:26.132Z placement placed: line 20, 12 characters, first box 276,488,22,22 in client 804x604
+2026-11-20T22:52:27.184Z choice aux KiriKiri2 role=0 added=["……このば"] text="……このば"
+2026-11-20T22:52:27.341Z source chars=14 sequence=26
+2026-11-20T22:52:27.357Z placement placed: line 21, 14 characters, first box 256,488,22,22 in client 804x604
+2026-11-20T22:52:28.859Z choice aux KiriKiri2 role=0 added=["…そこに"] text="…そこに"
+2026-11-20T22:52:29.002Z source chars=13 sequence=27
+2026-11-20T22:52:29.019Z placement placed: line 22, 13 characters, first box 273,488,22,22 in client 804x604
+2026-11-20T22:52:29.679Z choice aux Krkr2wcs role=0 added=["暖炉"] text="暖炉"
+2026-11-20T22:52:29.898Z source chars=26 sequence=28
+2026-11-20T22:52:29.913Z placement placed: line 23, 26 characters, first box 70,488,22,22 in client 804x604
+2026-11-20T22:52:29.925Z source chars=6 sequence=29
+2026-11-20T22:52:29.935Z placement placed: line 24, 4 characters, first box 363,488,22,22 in client 804x604
+2026-11-20T22:52:30.134Z source chars=20 sequence=30
+2026-11-20T22:52:30.147Z placement placed: line 25, 20 characters, first box 70,488,22,22 in client 804x604
+2026-11-20T22:52:30.148Z source chars=7 sequence=31
+2026-11-20T22:52:30.158Z placement placed: line 26, 5 characters, first box 354,488,21,22 in client 804x604
+2026-11-20T22:52:30.158Z choice aux KiriKiri4 role=0 added=["呼吸をひとつする度に、指先に感覚が宿る。"] text="呼吸をひとつする度に、指先に感覚が宿る。"
+2026-11-20T22:52:30.160Z source chars=12 sequence=32
+2026-11-20T22:52:30.169Z placement placed: line 27, 12 characters, first box 70,488,19,22 in client 804x604
+2026-11-20T22:52:30.170Z source chars=5 sequence=33
+2026-11-20T22:52:30.180Z placement placed: line 28, 3 characters, first box 370,488,22,22 in client 804x604
+2026-11-20T22:52:30.181Z choice aux KiriKiri4 role=0 added=["どこかで雨の音を聞いた。"] text="どこかで雨の音を聞いた。"
+2026-11-20T22:52:30.182Z source chars=10 sequence=34
+2026-11-20T22:52:30.192Z placement placed: line 29, 10 characters, first box 70,488,20,22 in client 804x604
+2026-11-20T22:52:30.193Z source chars=10 sequence=35
+2026-11-20T22:52:30.204Z placement placed: line 30, 8 characters, first box 325,488,22,22 in client 804x604
+2026-11-20T22:52:30.207Z choice aux KiriKiri4 role=0 added=["そして火の爆ぜる音。"] text="そして火の爆ぜる音。"
+2026-11-20T22:52:30.208Z source chars=9 sequence=36
+2026-11-20T22:52:30.218Z placement placed: line 31, 9 characters, first box 70,488,18,22 in client 804x604
+2026-11-20T22:52:30.219Z source chars=7 sequence=37
+2026-11-20T22:52:30.228Z placement placed: line 32, 5 characters, first box 350,488,22,22 in client 804x604
+2026-11-20T22:52:30.229Z choice aux KiriKiri4 role=0 added=["きい、きい、きい。"] text="きい、きい、きい。"
+2026-11-20T22:52:30.235Z source chars=27 sequence=38
+2026-11-20T22:52:30.244Z placement placed: line 33, 27 characters, first box 70,488,12,22 in client 804x604
+2026-11-20T22:52:30.244Z choice aux Krkr2wcs role=0 added=["暖炉のぱちぱち"] text="暖炉のぱちぱち"
+2026-11-20T22:52:30.245Z choice aux KiriKiri4 role=0 added=["…………。…………………。………ここは………？"] text="…………。…………………。………ここは………？"
+2026-11-20T22:52:31.676Z source chars=32 sequence=39
+2026-11-20T22:52:31.688Z placement placed: line 34, 32 characters, first box 70,488,22,22 in client 804x604
+2026-11-20T22:52:31.696Z source chars=33 sequence=40
+2026-11-20T22:52:31.709Z placement placed: line 35, 33 characters, first box 70,488,22,22 in client 804x604
+2026-11-20T22:52:31.715Z choice aux KiriKiri2 role=0 added=["まるで"] text="まるで"
+2026-11-20T22:52:31.716Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["まるまで"] text="まるまで"
+2026-11-20T22:52:31.717Z choice aux KiriKiri2 role=0 added=["屋敷全体を暗"] text="屋敷全体を暗"
+2026-11-20T22:52:31.877Z source chars=22 sequence=41
+2026-11-20T22:52:31.917Z placement placed: line 36, 22 characters, first box 70,517,17,22 in client 804x604
+2026-11-20T22:52:32.334Z choice options filtered 3 -> 1
+2026-11-20T22:52:33.423Z krkr page: hook line drawn nowhere on the page, dropped chars=6
+2026-11-20T22:52:33.423Z krkr page: hook line drawn nowhere on the page, dropped chars=13
+2026-11-20T22:52:34.204Z choice aux KiriKiri4 role=0 added=["まあ……、やっと、お目覚めになられましたのね。"] text="まあ……、やっと、お目覚めになられましたのね。"
+2026-11-20T22:52:34.296Z choice aux KiriKiri2 role=0 added=["まあ……、"] text="まあ……、"
+2026-11-20T22:52:34.374Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["まあま……あま、……あま、……あま、…"] text="まあま……あま、……あま、……あま、…"
+2026-11-20T22:52:34.557Z choice aux KiriKiri2 role=0 added=["やっと、お"] text="やっと、お"
+2026-11-20T22:52:34.680Z choice aux KiriKiri2 role=0 added=["目覚めになら"] text="目覚めになら"
+2026-11-20T22:52:34.773Z choice aux KiriKiri2 role=0 added=["れましたの"] text="れましたの"
+2026-11-20T22:52:34.801Z source chars=7 sequence=42
+2026-11-20T22:52:34.821Z placement placed: line 37, 23 characters, first box 70,491,17,22 in client 804x604
+2026-11-20T22:52:35.000Z choice aux KiriKiri2 role=0 added=["ね。"] text="ね。"
+2026-11-20T22:52:35.001Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["まあ……、やっと、お目覚めになられましたのね。"] text="まあ……、やっと、お目覚めになられましたのね。"
+2026-11-20T22:52:35.002Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["たまねの。したねの。ね。"] text="たまねの。したねの。ね。"
+2026-11-20T22:52:35.463Z choice options filtered 6 -> 5
+2026-11-20T22:52:35.601Z krkr page: hook line drawn nowhere on the page, dropped chars=11
+2026-11-20T22:52:38.901Z choice aux KiriKiri4 role=0 added=["「あなた死者」に声をかける人物がいる。"] text="「あなた死者」に声をかける人物がいる。"
+2026-11-20T22:52:39.130Z choice aux KiriKiri2 role=0 added=["る人"] text="る人"
+2026-11-20T22:52:39.233Z source chars=17 sequence=43
+2026-11-20T22:52:39.249Z placement placed: line 38, 17 characters, first box 70,488,12,22 in client 804x604
+2026-11-20T22:52:39.259Z choice aux KiriKiri2 role=0 added=["物がいる。"] text="物がいる。"
+2026-11-20T22:52:39.379Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["が。い物るが。いる"] text="が。い物るが。いる"
+2026-11-20T22:52:39.836Z choice options filtered 4 -> 2
+2026-11-20T22:52:40.557Z choice aux KiriKiri4 role=0 added=["「あなた死者」は周囲を見渡そうとするが、その必要はなかった。"] text="「あなた死者」は周囲を見渡そうとするが、その必要はなかった。"
+2026-11-20T22:52:40.725Z choice aux KiriKiri2 role=0 added=["を見"] text="を見"
+2026-11-20T22:52:40.787Z choice aux KiriKiri2 role=0 added=["渡そう"] text="渡そう"
+2026-11-20T22:52:40.880Z choice aux KiriKiri2 role=0 added=["とするが、"] text="とするが、"
+2026-11-20T22:52:41.176Z choice aux KiriKiri2 role=0 added=["の必要はな"] text="の必要はな"
+2026-11-20T22:52:41.239Z source chars=28 sequence=44
+2026-11-20T22:52:41.297Z placement placed: line 39, 28 characters, first box 70,517,12,22 in client 804x604
+2026-11-20T22:52:41.298Z choice aux KiriKiri2 role=0 added=["かった。"] text="かった。"
+2026-11-20T22:52:41.299Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["そ必要のそは必な要のそかそは必っのな要た必はか。要なっはたか"] text="そ必要のそは必な要のそかそは必っのな要た必はか。要なっはたか"
+2026-11-20T22:52:41.408Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["な。っはたか。なったか。っ"] text="な。っはたか。なったか。っ"
+2026-11-20T22:52:41.453Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["た。"] text="た。"
+2026-11-20T22:52:41.910Z choice options filtered 6 -> 0
+2026-11-20T22:52:43.415Z choice aux KiriKiri4 role=0 added=["声の主は「あなた死者」の傍らにそっとしゃがみ、翠色の瞳で見上げていたのだから。"] text="声の主は「あなた死者」の傍らにそっとしゃがみ、翠色の瞳で見上げていたのだから。"
+2026-11-20T22:52:43.858Z choice aux KiriKiri2 role=0 added=["にそっとしゃがみ、"] text="にそっとしゃがみ、"
+2026-11-20T22:52:44.284Z choice aux KiriKiri2 role=0 added=["翠色の瞳で見上げていたのだ"] text="翠色の瞳で見上げていたのだ"
+2026-11-20T22:52:44.316Z choice aux KiriKiri2 role=0 added=["から"] text="から"
+2026-11-20T22:52:44.324Z source chars=38 sequence=45
+2026-11-20T22:52:44.390Z placement placed: line 40, 37 characters, first box 70,488,22,22 in client 804x604
+2026-11-20T22:52:44.391Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["かのらだ。のからだ"] text="かのらだ。のからだ"
+2026-11-20T22:52:44.445Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["の。からだ。のらかだ"] text="の。からだ。のらかだ"
+2026-11-20T22:52:44.518Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["。らか。"] text="。らか。"
+2026-11-20T22:52:44.980Z choice options filtered 5 -> 3
+2026-11-20T22:52:47.437Z placement placed: line 42, 5 characters, first box 70,491,22,22 in client 804x604
+2026-11-20T22:52:49.552Z choice aux KiriKiri2 role=0 added=["はようござ"] text="はようござ"
+2026-11-20T22:52:49.643Z choice aux KiriKiri2 role=0 added=["います、"] text="います、"
+2026-11-20T22:52:49.945Z source chars=5 sequence=46
+2026-11-20T22:52:49.948Z placement placed: line 44, 17 characters, first box 70,491,22,22 in client 804x604
+2026-11-20T22:52:49.952Z source chars=17 sequence=47
+2026-11-20T22:52:51.584Z choice aux Krkr2wcs role=0 added=["選択肢"] text="選択肢"
+2026-11-20T22:52:52.629Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["……おはよう……………おはよう……………"] text="……おはよう……………おはよう……………"
+2026-11-20T22:52:52.636Z choice aux KiriKiri4 role=0 added=["……おはよう………………"] text="……おはよう………………"
+2026-11-20T22:52:53.090Z choice options filtered 3 -> 1
+2026-11-20T22:52:54.149Z krkr page: hook line drawn nowhere on the page, dropped chars=18
+2026-11-20T22:52:58.845Z krkr page: hook line drawn nowhere on the page, dropped chars=5
+2026-11-20T22:54:03.064Z source chars=4 sequence=48
+2026-11-20T22:54:10.239Z source chars=6 sequence=49
+2026-11-20T22:54:11.262Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":20,"sourceCharacters":4,"checkedAt":1795215251262,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:12.015Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":20,"sourceCharacters":4,"checkedAt":1795215252014,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:12.820Z source chars=6 sequence=50
+2026-11-20T22:54:13.949Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":19,"sourceCharacters":1,"checkedAt":1795215253948,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:14.761Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":37,"sourceCharacters":1,"checkedAt":1795215254759,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:16.309Z source chars=9 sequence=51
+2026-11-20T22:54:17.310Z visual {"type":"hookVisual","sequence":4,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":7,"checkedAt":1795215257308,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:18.054Z visual {"type":"hookVisual","sequence":4,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":7,"checkedAt":1795215258054,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:26.271Z source chars=14 sequence=52
+2026-11-20T22:54:27.247Z visual {"type":"hookVisual","sequence":5,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":9,"checkedAt":1795215267247,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:28.055Z visual {"type":"hookVisual","sequence":5,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":9,"checkedAt":1795215268055,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:30.236Z choice aux TextRender role=0 added=["飛び起きた俺は、前に座っている運転手に返事をする。"] text="飛び起きた俺は、前に座っている運転手に返事をする。"
+2026-11-20T22:54:30.244Z source chars=25 sequence=53
+2026-11-20T22:54:32.228Z source chars=22 sequence=54
+2026-11-20T22:54:34.770Z source chars=13 sequence=55
+2026-11-20T22:54:35.499Z placement placed: line 100003, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:35.736Z placement placed: line 100004, 41 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:35.939Z source chars=41 sequence=56
+2026-11-20T22:54:36.008Z placement placed: line 100004, 41 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:37.122Z visual {"type":"hookVisual","sequence":9,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":38,"checkedAt":1795215277121,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:37.959Z visual {"type":"hookVisual","sequence":9,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":38,"checkedAt":1795215277959,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:57.297Z choice aux TextRender role=0 added=["まだ大雑把な目的地しか伝えていなかったのを思い出した。"] text="まだ大雑把な目的地しか伝えていなかったのを思い出した。"
+2026-11-20T22:54:57.305Z source chars=27 sequence=57
+2026-11-20T22:54:57.703Z placement placed: line 100005, 27 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:58.299Z visual {"type":"hookVisual","sequence":10,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":26,"checkedAt":1795215298299,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:58.643Z placement placed: line 100006, 19 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:58.833Z choice aux TextRender role=0 added=["「志那都荘まで行って欲しいんですけど」"] text="「志那都荘まで行って欲しいんですけど」"
+2026-11-20T22:54:58.843Z source chars=19 sequence=58
+2026-11-20T22:54:58.896Z placement placed: line 100006, 19 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:59.837Z visual {"type":"hookVisual","sequence":11,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":17,"checkedAt":1795215299836,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:00.016Z placement placed: line 100007, 30 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:00.187Z source chars=30 sequence=59
+2026-11-20T22:55:00.203Z placement placed: line 100007, 30 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:01.212Z visual {"type":"hookVisual","sequence":12,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":25,"checkedAt":1795215301211,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:01.962Z visual {"type":"hookVisual","sequence":12,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":25,"checkedAt":1795215301961,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:03.858Z placement placed: line 100008, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:04.062Z source chars=28 sequence=60
+2026-11-20T22:55:04.099Z placement placed: line 100008, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:05.092Z visual {"type":"hookVisual","sequence":13,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":23,"checkedAt":1795215305091,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:05.260Z placement placed: line 100009, 17 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:05.458Z choice aux TextRender role=0 added=["「（サービスの悪い運転手だ……）」"] text="「（サービスの悪い運転手だ……）」"
+2026-11-20T22:55:05.480Z source chars=17 sequence=61
+2026-11-20T22:55:05.506Z placement placed: line 100009, 17 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:06.533Z placement placed: line 100010, 34 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:06.671Z visual {"type":"hookVisual","sequence":14,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":11,"checkedAt":1795215306670,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:06.724Z source chars=34 sequence=62
+2026-11-20T22:55:06.819Z placement placed: line 100010, 34 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:07.862Z visual {"type":"hookVisual","sequence":15,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":32,"checkedAt":1795215307862,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:08.169Z placement placed: line 100011, 11 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:08.362Z choice aux TextRender role=0 added=["「本当にすみませんね」"] text="「本当にすみませんね」"
+2026-11-20T22:55:08.367Z source chars=11 sequence=63
+2026-11-20T22:55:08.417Z placement placed: line 100011, 11 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:09.421Z visual {"type":"hookVisual","sequence":16,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":9,"checkedAt":1795215309420,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:09.771Z placement placed: line 100012, 22 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:09.984Z choice aux TextRender role=0 added=["「……わかりました。じゃあ、ここでいいです」"] text="「……わかりました。じゃあ、ここでいいです」"
+2026-11-20T22:55:09.991Z source chars=22 sequence=64
+2026-11-20T22:55:10.010Z placement placed: line 100012, 22 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:11.027Z visual {"type":"hookVisual","sequence":17,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":16,"checkedAt":1795215311026,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:11.794Z visual {"type":"hookVisual","sequence":17,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":16,"checkedAt":1795215311788,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:56:59.098Z placement placed: line 100013, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:56:59.190Z source chars=12 sequence=65
+2026-11-20T22:56:59.208Z placement placed: line 100013, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:56:59.981Z placement placed: line 100014, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:00.177Z choice aux TextRender role=0 added=["タクシーが止まり、俺は精算を済ませて、タクシーを降りる。"] text="タクシーが止まり、俺は精算を済ませて、タクシーを降りる。"
+2026-11-20T22:57:00.185Z source chars=28 sequence=66
+2026-11-20T22:57:00.200Z placement placed: line 100014, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:01.179Z visual {"type":"hookVisual","sequence":19,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":25,"checkedAt":1795215421178,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:57:01.226Z placement placed: line 100015, 44 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:01.433Z source chars=44 sequence=67
+2026-11-20T22:57:01.499Z placement placed: line 100015, 44 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:02.538Z visual {"type":"hookVisual","sequence":20,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":38,"checkedAt":1795215422533,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:57:03.460Z visual {"type":"hookVisual","sequence":20,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":38,"checkedAt":1795215423458,"region":{"x":353,"y":560,"width":1181,"height":302}}
