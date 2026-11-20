@@ -14,8 +14,8 @@ const fs = require('node:fs'), path = require('node:path');
 const { rectsToClient } = require('./compositor-host.cjs');
 
 class OverlayPlacement {
-  constructor({ root, send = () => {}, trace = () => {} } = {}) {
-    this.root = root; this.send = send; this.trace = trace; this.client = [0, 0]; this.current = null; this.on = false;
+  constructor({ root, send = () => {}, trace = () => {}, replaced = () => false } = {}) {
+    this.replaced = replaced; this.root = root; this.send = send; this.trace = trace; this.client = [0, 0]; this.current = null; this.on = false;
   }
   wanted(preferences) {
     if (process.env.MEGULIT_CAPTURE_COMPOSITOR === '1') return false;
@@ -95,6 +95,10 @@ class OverlayPlacement {
     /* 2026-11-20 (user, CHAOS;CHILD: 「对话框的字咋没了」): the GPU layer hides this game's lines (it placed one as hidden), so a line the
        glyph path never saw hidden is still not the game's own drawing: the reader draws its Japanese where the last line was */
     if (!this.hideSeen && this.gpuHiding && Date.now() - this.gpuHiding < 30 * 60 * 1000) { this.why('gfall:' + id, 'fallback: glyph line ' + (Number(table.seq) || 0) + ' unplaced while the GPU layer hides the game lines'); return this.emitLine({ id, engine: 'glyph', text: table.text, fallback: true, client: this.client.slice() }); }
+    /* 2026-11-21 (owner, STEINS;GATE: 「每次校准才出来一下日文」): the write-back (embed) has replaced and verified the game's original, so a glyph line
+       the glyph layer never saw hidden is not the game drawing the original: the reader keeps its Japanese (it was hidden as the game's own line
+       on every line and came back only while a calibration switched the mode) */
+    if (!this.hideSeen && this.replaced()) { this.why('greplaced:' + id, 'not placed: glyph line ' + (Number(table.seq) || 0) + ' unhidden, but the write-back replaced the original (the reader draws it)'); if (this.current?.id === id) this.clear(); return; }
     if (!this.hideSeen) this.why('gshown:' + id, 'not placed: glyph line ' + (Number(table.seq) || 0) + ' has no hidden glyph yet (the game draws it itself)');
     if (!this.hideSeen) { const vis = chars.filter(c => !/\s/.test(c)).join(''); if (this.current?.id === id) this.clear(); if (vis && vis !== this.visibleKey) { this.visibleKey = vis; this.send({ type: 'textPlace', visible: true, text: vis, ...(this.hiding === true ? { hiding: true } : {}) }); } return; }
     const typed = this.typed(table, chars.length, recorded), drawn = new Set(chars.map((c, i) => i).filter(i => i < typed));
