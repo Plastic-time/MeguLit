@@ -184,7 +184,7 @@
   const POSE = {
     welcome: () => ({ cx: 3300, cy: 700, cz: 2300, rx: 4, ry: 0, rz: 0 }),
     loc: () => ({ cx: 3900, cy: 560, cz: 1500, rx: 3, ry: -14, rz: 0 }),
-    field: (s) => { const p = s && s.total ? clamp(s.got / s.total) : 0; return orbit(key(AZ, p), key(EL, p), key(RR, p)); },
+    field: (s) => { const p = s && s.total ? clamp(s.poseP !== undefined ? s.poseP : s.got / s.total) : 0; return orbit(key(AZ, p), key(EL, p), key(RR, p)); },
     unpack: () => orbit(30, 52, 3000),
     done: () => ({ ...FINAL })
   };
@@ -202,7 +202,7 @@
   function apply(extra) {
     const c = cam, e = extra || {};
     const LP = window.__loopPhase, t = last.t || 0, br = REDUCE || moving || (LP === undefined && last.phase === "done") ? 0 : 1;      /* a little handheld breath while resting; __loopPhase (0..1) = one seamless cycle for the pre-rendered loops */
-    const LA = window.__loopAmp || 1, cx = c.cx + (LP !== undefined ? Math.sin(LP * 2 * Math.PI) * 5 * LA : Math.sin(t * 0.7) * 5 * br), cy = c.cy + (LP !== undefined ? Math.cos(LP * 2 * Math.PI) * 4 * LA : Math.cos(t * 0.5) * 4 * br);
+    const LA = window.__loopAmp || 1, cx = c.cx + (LP !== undefined ? Math.sin(LP * 2 * Math.PI) * 5 * LA : Math.sin(t * 0.7) * 5 * br), cy = c.cy + (LP !== undefined ? Math.sin(LP * 4 * Math.PI) * 2.5 * LA : Math.cos(t * 0.5) * 4 * br);   /* loop drift is zero at phase 0: a figure of eight that starts and ends at the pose */
     world.style.transform = `rotateZ(${c.rz}deg) rotateX(${-c.rx}deg) rotateY(${c.ry}deg) translate3d(${-cx}px,${-cy}px,${-c.cz}px)`;
     if (window.GL) { GL.setCamera(c, cx - c.cx, cy - c.cy); if (!GLraf) { GLraf = true; requestAnimationFrame(() => { GLraf = false; GL.draw(); }); } }
     const sk = $('#streaks'); sk.style.opacity = e.streak || 0; $('#flash').style.opacity = e.flash || 0;
@@ -242,7 +242,7 @@
     last = s; if (!N && s.st) buildField(s.st.length);
     const t = s.t || 0;
     nudge.x = 0; nudge.y = 0;
-    if (override) { Object.assign(cam, override); apply(); } else if (!moving && POSE[section]) { Object.assign(cam, POSE[section](s)); if (s.phase === 'done' && section === 'done' && !REDUCE) { const LP2 = window.__loopPhase, w = Math.max(0, t - revealAt - 0.6), u = clamp(w / 1.2); if (LP2 !== undefined) { nudge.x = 440 * Math.sin(LP2 * 2 * Math.PI); nudge.y = 120 * Math.sin(LP2 * 2 * Math.PI + 1); } else { nudge.x = 440 * u * Math.sin(w * 1.3); nudge.y = 120 * u * Math.sin(w * 0.9 + 1); } cam.cx += nudge.x; cam.cy += nudge.y; } apply(); }
+    if (override) { Object.assign(cam, override); apply(); } else if (!moving && POSE[section]) { Object.assign(cam, POSE[section](s)); if (s.phase === 'done' && section === 'done' && !REDUCE) { const LP2 = window.__loopPhase, w = Math.max(0, t - revealAt - 0.6), u = clamp(w / 1.2); if (LP2 !== undefined) { nudge.x = 440 * Math.sin(LP2 * 2 * Math.PI); nudge.y = 120 * Math.sin(LP2 * 4 * Math.PI); } else { nudge.x = 440 * u * Math.sin(w * 1.3); nudge.y = 120 * u * Math.sin(w * 0.9 + 1); } cam.cx += nudge.x; cam.cy += nudge.y; } apply(); }
     if (N && s.st) {
       const br = REDUCE ? 0 : 1;
       const dd = Math.hypot(cam.cx - nudge.x - FINAL.cx, cam.cy - nudge.y - FINAL.cy, cam.cz - FINAL.cz), reveal = s.phase === 'done' ? smooth(clamp(1 - dd / (RF * 0.55))) : 0;
