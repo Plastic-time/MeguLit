@@ -290,6 +290,7 @@ async function lookupEntry(learning,base,key){for(const text of [...new Set([bas
 async function dispatch(request,runtime=null) {
   if(request.action==='backup_export')return require('./backup.cjs').exportBackup(root,request.path);
   if(request.action==='backup_preview')return require('./backup.cjs').previewBackup(root,request.path);
+  if(request.action==='backup_discard')return require('./backup.cjs').discardBackup(root,request.id);
   if(request.action==='backup_apply'){runtime?.reader?.stop();if(runtime){runtime.reader=null;runtime.libraryManager=null;}return require('./backup.cjs').applyBackup(root,request.id);}
   if(request.action==='history_translate'){if(!runtime)throw Error('RUNTIME_REQUIRED');return runtime.history().ensure(Number(request.id));}
   /* E378 account + cloud sync (services/account.cjs); opens the store itself */
