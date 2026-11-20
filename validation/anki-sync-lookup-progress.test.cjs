@@ -36,3 +36,17 @@ test('resuming lookups keeps the original update order for two notes matching th
  assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=10').get().note_id,301);
  assert.equal(db.prepare('SELECT status FROM vocabulary WHERE id=10').get().status,1);
 });
+
+test('an older sync cannot move later dictionary progress backwards',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-anki-overlap-')),db=openStore(root);
+ t.after(()=>{db.close();fs.rmSync(root,{recursive:true,force:true});});
+ const notes=Array.from({length:601},(_,i)=>({noteId:i+1,word:'entry'+i}));
+ const anki={stats:async()=>notes},run=resolveEntry=>new AnkiSync({db,anki,config:{},resolveEntry}).run();
+ let entered,resume;
+ const waiting=new Promise(resolve=>{entered=resolve;}),gate=new Promise(resolve=>{resume=resolve;});
+ const first=run(async word=>{if(word==='entry0'){entered();await gate;}return null;});
+ await waiting;
+ try{await run(async()=>null);await run(async()=>null);}finally{resume();await first;}
+ const calls=[];await run(async word=>{calls.push(word);return null;});
+ assert.equal(calls[0],'entry600');
+});

@@ -14,8 +14,8 @@ class AnkiSync{
   const notes=await this.anki.stats(this.config);if(!Array.isArray(notes))throw Error('ANKI_INVALID_RESPONSE');
   const {ankiUrl,ankiDeck,ankiModel}=require('../core/v4-config.cjs').cleanV4(this.config);
   const key='anki-lookup-after:'+JSON.stringify([ankiUrl,ankiDeck,ankiModel]);
-  const saved=this.db.prepare('SELECT value FROM meta WHERE key=?').get(key);
-  const start=saved?notes.findIndex(n=>n.noteId===Number(saved.value))+1:0,matches=[];
+  const progress=this.db.prepare('SELECT value FROM meta WHERE key=?'),saved=progress.get(key)?.value;
+  const start=saved?notes.findIndex(n=>n.noteId===Number(saved))+1:0,matches=[];
   let attempts=0,lastAttempt,more=false;
   for(let i=0;i<notes.length;i++){
    const index=(start+i)%notes.length,note=notes[index];if(!Number.isSafeInteger(note.noteId))continue;
@@ -39,8 +39,10 @@ class AnkiSync{
     const status=Number(note.status);if(Number.isInteger(status)&&status>=0&&status<=4)result.status+=Number(this.db.prepare('UPDATE vocabulary SET status=? WHERE id=? AND status!=?').run(status,wordId,status).changes);
     for(const id of note.reviews||[]){if(!Number.isSafeInteger(id)||id<0)continue;const inserted=this.db.prepare('INSERT OR IGNORE INTO anki_synced_reviews VALUES(?,?)').run(id,wordId);if(inserted.changes){this.db.prepare('INSERT INTO review_events(word_id,reviewed_at) VALUES(?,?)').run(wordId,Math.floor(id/1000));result.reviews++;}}
    }
-   if(more)this.db.prepare('INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)').run(key,String(lastAttempt));
-   else if(saved)this.db.prepare('DELETE FROM meta WHERE key=?').run(key);
+   if((more||saved)&&progress.get(key)?.value===saved){
+    if(more)this.db.prepare('INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)').run(key,String(lastAttempt));
+    else this.db.prepare('DELETE FROM meta WHERE key=?').run(key);
+   }
    this.db.exec('COMMIT');return result;
   }catch(error){this.db.exec('ROLLBACK');throw error;}
  }
