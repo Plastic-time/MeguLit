@@ -228,6 +228,6 @@ const engine={
   return loadPck(dir)?.scenes.length?'':'SIGLUS_EXE_KEY';
  },
  REASONS:{SIGLUS_EXE_KEY:'这个 SiglusEngine 游戏的 Scene.pck 用了按作品的 exe 密钥加密，从 exe 和剧本本身都没能取到密钥（或 Scene.pck 不完整），暂时读不了'},
- gameexe(dir){const f=siglusKey.gameexeFile(dir);if(!f)return '';try{const b=fs.readFileSync(f);if(b.readInt32LE(4)===0)return siglusKey.gameexeText(b,null);return siglusKey.gameexeText(b,loadPck(dir)?.key?.key||null);}catch{return '';}},
+ gameexe(dir){const pck=siglusSource.scenePck(dir),f=siglusKey.gameexeFile(pck?path.dirname(pck):dir);if(!f)return '';try{const b=fs.readFileSync(f);if(b.readInt32LE(4)===0)return siglusKey.gameexeText(b,null);return siglusKey.gameexeText(b,loadPck(dir)?.key?.key||null);}catch{return '';}},
 };
 module.exports={engine,parseHeader,isSiglusDat,compiledScenes,sceneKey,parseCompiledDat,parseSs,_internal:{EASY_ANGOU_CODE,stripLineComment}};

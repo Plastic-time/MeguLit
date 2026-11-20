@@ -169,6 +169,19 @@ test('siglus-pck reads unkeyed compiled scenes (exe_angou_mod=0) in order with s
  assert.deepEqual(p.speakers, ['吉野', '', '瑚太朗']);
 }));
 
+test('siglus-pck finds Scene.pck in a single game sub-folder (patched installs like 1st_beat/)', () => withDir(dir => {
+ const dat = buildCompiledDat([{ kind: 'name', text: '音無' }, { kind: 'text', text: '「ここはどこだ」' }]);
+ const sub = path.join(dir, '1st_beat'); fs.mkdirSync(sub); fs.mkdirSync(path.join(dir, 'readme'));
+ fs.writeFileSync(path.join(sub, 'Scene.pck'), buildScenePck({ scenes: [{ name: 'seen01', blob: kit.xor(siglusPack(dat), EASY_ANGOU) }], exeAngouMod: 0 }));
+ fs.writeFileSync(path.join(sub, 'Scene.chs'), Buffer.alloc(92));
+ fs.writeFileSync(path.join(sub, 'SiglusEngine.exe'), 'MZ');
+ const e = scenes.ENGINES['siglus-pck'];
+ assert.equal(ss.scenePck(dir), path.join(sub, 'Scene.pck'));
+ const sc = e.scenes(dir);
+ assert.equal(sc.length, 1);
+ assert.deepEqual(e.parse(sc[0].read()).lines, ['「ここはどこだ」']);
+}));
+
 test('siglus-pck falls back to OS .ss sources when exe_angou_mod!=0, supporting @mes, @lsv2_line, and quoted R lines', () => withDir(dir => {
  const ss1 = Buffer.from('\ufeff// comment\n/* 「コメント内の台詞」\n*/\n@KOE(1001,001)@mes(1, 【美佐枝】, 「おはよう」)\n', 'utf8');
  const ss2 = Buffer.from('\ufeff$lsv2_koe(1002,002)$lsv2_name("朱音") @lsv2_line(200, 「本当？」)R\n@lsv2_line(201, 世界は静かだった。)R\n', 'utf8');
