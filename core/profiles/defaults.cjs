@@ -28,10 +28,19 @@ module.exports={
   flowPage:null,
   /* ms a hook line waits for its place on the page before it is dropped: null = kernel (OCR 5000, engines 1500) */
   holdMs:null,
+  /* a page line takes the held hook line its drawn text shows (equal, inside, or an effect frame's shuffled characters), a clean
+     drawn line holding the hook piece and more is the line itself; false = the kernel: the first held hook line, by order */
+  pairByDrawn:false,
+  /* a hook line no page line took within holdMs is delivered from the hook text unless the reader already has it; false = the
+     kernel: dropped while the page is up ("drawn nowhere on the page, dropped") */
+  keepHeld:false,
  },
  choice:{
   /* RegExp sources (flags 'u'); a choice candidate whose text matches one of them is never offered as an option */
   filters:[],
+  /* an interleaved effect frame is told by content characters only (ellipses and punctuation repeat in any option); false = the
+     kernel: every character counts */
+  contentInterleave:false,
  },
  hide:{
   /* the game's text effect cannot be hidden line by line: start this game in read mode (the original stays, MeguLit shows
@@ -54,5 +63,8 @@ module.exports={
  safeMode:{
   /* reader redraws per second while the game is in a page effect; null = kernel default */
   redrawRate:null,
+  /* core counts the first 20 lines broken by the text effect (hook-text / placement fallback, shuffled page draw, effect frame of
+     the line) and switches read mode over 30 % (hookTextEffects); false = the kernel: only the reader's own pairing count */
+  effectJudge:false,
  },
 };
