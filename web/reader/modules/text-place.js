@@ -138,7 +138,10 @@
     /* 2026-11-21 (owner's second recording, 千恋＊万花: the translation went out of sight below the window): MeguLit's own surface may end before
        the work area does (the overlay spans the reader and the game, not always the desktop); what is drawn past its bottom is not seen */
     const workLimit = () => { const i = b.galLayoutInfo?.(), d = devicePixelRatio || 1; return Math.min(Number.isFinite(i?.workBottom) && i.workBottom > 0 ? i.workBottom / d : innerHeight, innerHeight) - 8; };
-    const roomBelow = (() => { const wb = workLimit(); return row ? wb - (cy0 + chc) >= row.getBoundingClientRect().height : false; })();
+    /* 2026-11-21 (owner, 千恋＊万花: 「日文被挤上去」 when the translation came in late): every fit decision takes the row at the room
+       its translation will need (inject.js translationReserve), so the Japanese is placed on the first frame and stays when the text lands */
+    const rowRect = () => { const q = row.getBoundingClientRect(), h = Math.max(q.height, Number(b.translationReserve) || 0); return { top: q.top, height: h, bottom: q.top + h }; };
+    const roomBelow = (() => { const wb = workLimit(); return row ? wb - (cy0 + chc) >= rowRect().height : false; })();
     /* 2026-11-20 release check (CHAOS;CHILD rig: with room below the window the strip rule was skipped whole and the Japanese third row
        sat on AUTO/SKIP). Both rules hold: MeguLit's Japanese never enters the game's button strip (rows close up, the block moves up),
        and with room on the monitor the translation keeps its size; when it would land on the strip it goes below the window instead. */
@@ -152,7 +155,7 @@
          buttons take about one and a half of the game's own glyph rows (千恋＊万花 31 px glyphs: its box keeps a free third row; CHAOS;CHILD 40 px:
          AUTO/SKIP start 80 px above the bottom, its box has no third row), so the translation stays under its Japanese while it ends there */
       const cnLimit = cy0 + chc - (anchor.size > 0 ? anchor.size : glyph) * 1.5;
-      const rr = row.getBoundingClientRect(), over = rr.bottom - cnLimit, key = String(anchorLine || '');
+      const rr = rowRect(), over = rr.bottom - cnLimit, key = String(anchorLine || '');
       let below = cnBelow.key === key && cnBelow.below;
       if (rr.top >= cy0 + chc) below = false; /* already under the window: nothing to move */
       /* (the fit check follows the hysteresis) 2026-11-21 (owner's recording, 千恋＊万花 window almost the whole screen: the translation went under the window onto the taskbar and off the
@@ -172,9 +175,9 @@
     else if (row && !roomBelow && !anchor.center && tr && tr.height) { sentence.style.removeProperty('line-height'); inWindow(); }
     else sentence.style.removeProperty('line-height');
     function inWindow() { const glyph = tr.height, uiLimit = cy0 + chc - glyph * 2;
-      if (row.getBoundingClientRect().bottom > uiLimit && sentence.querySelector('br.megulit-row-br') && !sentence.style.lineHeight) set(sentence, 'line-height', closeRows(sentence));
-      const fsx = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rx = row.getBoundingClientRect();
-      if (rx.bottom > uiLimit) { const fs = Math.max(Math.ceil(fsx * .85), Math.floor(fsx * Math.max(.85, (uiLimit - rx.top) / Math.max(1, rx.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rx = row.getBoundingClientRect(); }
+      if (rowRect().bottom > uiLimit && sentence.querySelector('br.megulit-row-br') && !sentence.style.lineHeight) set(sentence, 'line-height', closeRows(sentence));
+      const fsx = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rx = rowRect();
+      if (rx.bottom > uiLimit) { const fs = Math.max(Math.ceil(fsx * .85), Math.floor(fsx * Math.max(.85, (uiLimit - rx.top) / Math.max(1, rx.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rx = rowRect(); }
       if (rx.bottom > uiLimit) { const up = Math.min(rx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); } }
     if (row) { const limit = workLimit();
       const fs0 = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rb = row.getBoundingClientRect();
