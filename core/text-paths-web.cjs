@@ -17,6 +17,8 @@
    off for them. Nothing here starts the game; services/bridge.cjs adds launchArgs() when the path is allowed. */
 const fs=require('node:fs'),path=require('node:path'),net=require('node:net'),http=require('node:http');
 const {formatChars}=require('./text-paths.cjs');
+/* engine-draw: the RPG Maker MV/MZ reader (engine layer) rides along with the DOM page script */
+const {RPGM_SCRIPT}=require('./text-paths-rpgm.cjs');
 
 /* ---- which games: a Chromium shell next to the program (generic, any web engine) ---------------------------------- */
 function chromiumShell(exe){const dir=path.dirname(String(exe||''));let names;try{names=fs.readdirSync(dir).map(n=>n.toLowerCase());}catch{return null;}
@@ -98,7 +100,7 @@ class Cdp{
 
 /* One game: attaches to every page target, keeps hide / wanted in sync, turns reports into ToMe_CHARS lines. */
 class WebTextPath{
- constructor({port,onChars=()=>{},onStatus=()=>{},canary=null,now=()=>Date.now()}){Object.assign(this,{port,onChars,onStatus,canary,now});this.pages=new Map();this.on=false;this.wanted='';this.stopped=false;this.armed=false;}
+ constructor({port,onChars=()=>{},onStatus=()=>{},onAsk=()=>{},canary=null,now=()=>Date.now()}){Object.assign(this,{port,onChars,onStatus,onAsk,canary,now});this.drawCfg=null;this.pages=new Map();this.on=false;this.wanted='';this.stopped=false;this.armed=false;}
  async attach({timeout=60000}={}){const until=this.now()+timeout;
   while(!this.stopped&&this.now()<until){let list=[];try{list=await getJson(this.port,'/json/list');}catch{}
    for(const t of list)if(t.type==='page'&&t.webSocketDebuggerUrl&&!/^(devtools|chrome|chrome-extension):/i.test(t.url||'')&&!this.pages.has(t.id))await this.attachPage(t).catch(e=>this.onStatus('attach '+e.message));
@@ -107,19 +109,23 @@ class WebTextPath{
  async attachPage(t){const c=new Cdp(t.webSocketDebuggerUrl);await c.ready;this.pages.set(t.id,c);c.closed.then(()=>this.pages.delete(t.id));
   c.handlers.add(m=>{if(m.method==='Runtime.bindingCalled'&&m.params?.name==='__megulitReport')this.report(m.params.payload);});
   await c.send('Runtime.enable');await c.send('Runtime.addBinding',{name:'__megulitReport'});
-  await c.send('Page.enable').catch(()=>{});await c.send('Page.addScriptToEvaluateOnNewDocument',{source:PAGE_SCRIPT}).catch(()=>{});
-  await this.evaluate(c,PAGE_SCRIPT);await this.sync(c);
+  await c.send('Page.enable').catch(()=>{});await c.send('Page.addScriptToEvaluateOnNewDocument',{source:PAGE_SCRIPT}).catch(()=>{});await c.send('Page.addScriptToEvaluateOnNewDocument',{source:RPGM_SCRIPT}).catch(()=>{});
+  await this.evaluate(c,PAGE_SCRIPT);await this.evaluate(c,RPGM_SCRIPT);await this.sync(c);
   /* a reload or new document: the page script runs again; give it the current state */
   c.handlers.add(m=>{if(m.method==='Runtime.executionContextCreated')setTimeout(()=>this.sync(c).catch(()=>{}),300);});}
  evaluate(c,expression){return c.send('Runtime.evaluate',{expression,returnByValue:true}).catch(()=>null);}
- sync(c){return this.evaluate(c,'window.__megulitText&&(window.__megulitText.want('+JSON.stringify(this.wanted)+'),window.__megulitText.hide('+(this.on?'true':'false')+'))');}
+ sync(c){return this.evaluate(c,'window.__megulitText&&(window.__megulitText.want('+JSON.stringify(this.wanted)+'),window.__megulitText.hide('+(this.on?'true':'false')+'));'+(this.drawCfg?'window.__megulitRpgm&&window.__megulitRpgm.config('+JSON.stringify(this.drawCfg)+')':''));}
+ /* engine-draw (core/engine-draw.cjs): roles / embed switches and one sentence's replacement for the RPG Maker reader */
+ async drawConfig(cfg){const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;for(const p of this.pages.values())await this.sync(p);}
+ async drawEmbed(key,o={}){const e={ruby:Array.isArray(o.ruby)?o.ruby:[],zh:String(o.zh||'')},js='window.__megulitRpgm&&window.__megulitRpgm.embed('+JSON.stringify(String(key||''))+','+JSON.stringify(e)+')';for(const p of this.pages.values())await this.evaluate(p,js);}
  async hide(on){this.on=!!on;if(this.on&&this.canary&&!this.canary.allowed('web')){this.on=false;this.onStatus('web invisible drawing off for this game (crash canary)');}
   for(const c of this.pages.values())await this.sync(c);}
  async want(text){this.wanted=String(text||'');for(const c of this.pages.values())await this.sync(c);}
  report(payload){let o;try{o=JSON.parse(payload);}catch{return;}if(o.status){this.onStatus(o.status);return;}
+  if(typeof o.ask==='string'&&o.ask){this.onAsk({key:o.ask,text:String(o.text||o.ask),engine:'rpgm'});return;}
   if(!Array.isArray(o.rects))return;
   if(o.hidden&&this.canary){if(!this.armed){this.canary.arm('web');this.armed=true;}else this.canary.alive('web');}
-  this.onChars(formatChars({engine:'web',line:o.line,hidden:o.hidden,sw:o.sw,sh:o.sh,viewport:[0,0,o.sw,o.sh],rects:o.rects,text:o.text,color:o.color}));}
+  this.onChars(formatChars({engine:o.engine==='rpgm'?'rpgm':'web',line:o.line,hidden:o.hidden,sw:o.sw,sh:o.sh,viewport:[0,0,o.sw,o.sh],rects:o.rects,text:o.text,color:o.color,role:o.role,id:o.id,box:o.box,sel:o.sel,emb:o.emb}));}
  exited(code){if(this.canary&&this.armed)this.canary.exited('web',code);}
  stop(){this.stopped=true;for(const c of this.pages.values()){this.evaluate(c,'window.__megulitText&&window.__megulitText.hide(false)').finally(()=>c.close());}this.pages.clear();}
 }
