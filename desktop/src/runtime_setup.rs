@@ -24,12 +24,12 @@ pub fn ensure(root:&Path)->bool{
  #[cfg(windows)] let stage=std::path::PathBuf::from(format!("{}.stage",flag.display()));
  #[cfg(windows)] let _=std::fs::remove_file(&flag);
  #[cfg(windows)] let _=std::fs::remove_file(&stage);
- #[cfg(windows)] let shown=splash::show(&root.join("setup/glass-logo.png"),&stage);
+ #[cfg(windows)] let shown=splash::show(&root.join("setup/logo.png"),&stage);
  #[cfg(windows)] if shown.is_some(){splash::log(&format!("exe-splash-up after {} ms in ensure()",t_enter.elapsed().as_millis()));}
  let mut command=std::process::Command::new("powershell.exe");
  command.args(["-NoProfile","-ExecutionPolicy","Bypass","-STA","-File"]).arg(&script).arg("-Root").arg(root).current_dir(root);
  #[cfg(windows)] command.creation_flags(0x08000000);
- /* the calm native loading screen (logo, a thin bar, one status line) stays up until the skin has its first video frame: the setup script writes real stages into <flag>.stage and drops <flag> when it is ready */
+ /* the calm native loading screen (one thin bar, one small status line, nothing else) stays up until the skin has its first video frame: the setup script writes real stages into <flag>.stage and drops <flag> when it is ready */
  #[cfg(windows)] if shown.is_some(){command.env("MEGULIT_NATIVE_SPLASH","1").env("MEGULIT_SPLASH_FLAG",&flag);}
  let mut child=match command.spawn(){
   Ok(c)=>c,
@@ -111,36 +111,26 @@ mod splash{
  /* stage file written by setup-runtime.ps1: "<0..1>|<status text>" */
  fn read_stage(p:&Path)->Option<(f64,String)>{let s=std::fs::read_to_string(p).ok()?;let (a,b)=s.trim_start_matches('\u{feff}').split_once('|')?;Some((a.trim().parse::<f64>().ok()?.clamp(0.0,1.0),b.trim().to_string()))}
  unsafe extern "system" fn proc_(h:Hwnd,m:u32,w:usize,l:isize)->isize{DefWindowProcW(h,m,w,l)}
- /* everything the loading screen draws, on a transparent 32-bit premultiplied surface: the glass logo (with a light sweep), a soft-shadowed status line, a thin bar */
+ /* everything the loading screen draws, on a transparent 32-bit premultiplied surface: a thin bar and a small soft-shadowed status line */
  struct Surface{g:isize,bits:*mut u8,w:i32,h:i32,logo:isize,lw:i32,lh:i32,font:isize,fmt:isize,sc:f64}
  unsafe fn draw(s:&Surface,status:&str,bar:f64,t:f64){
   GdipGraphicsClear(s.g,0);
-  let cx=s.w/2;let top=s.h/2-(86.0*s.sc) as i32;
-  /* glass logo */
-  let (mut lx0,mut ly0)=(0,0);
-  if s.logo!=0&&s.lw>0{lx0=cx-s.lw/2;ly0=top;GdipDrawImageRectI(s.g,s.logo,lx0,ly0,s.lw,s.lh);
-   /* a light sweep across the glass (~2.2 s cycle, soft, clipped to the logo's own alpha): added on the premultiplied pixels */
-   let cyc=2.4;let ph=(t%cyc)/cyc;if ph<0.8{let sx=-(0.2*s.lw as f64)+ph/0.8*(1.4*s.lw as f64);let bw=(0.09*s.lw as f64).max(8.0);
-    for y in ly0.max(0)..(ly0+s.lh).min(s.h){let row=s.bits.offset((y*s.w*4) as isize) as *mut u32;
-     for x in lx0.max(0)..(lx0+s.lw).min(s.w){let px=row.offset(x as isize);let v=*px;let a=(v>>24) as f64;if a<4.0{continue;}
-      let d=((x-lx0) as f64+0.35*(y-ly0) as f64-sx)/bw;let f=(-d*d).exp();if f<0.02{continue;}
-      let add=f*0.6;let r=((v>>16)&255) as f64;let g=((v>>8)&255) as f64;let b=(v&255) as f64;
-      let nr=(r+(a-r)*add).min(a);let ng=(g+(a-g)*add).min(a);let nb=(b+(a-b)*add).min(a);
-      *px=((a as u32)<<24)|((nr as u32)<<16)|((ng as u32)<<8)|(nb as u32);}}}}
+  let cx=s.w/2;
+  let (lh,top)=(0i32,s.h/2-(14.0*s.sc) as i32);
   /* status line: a soft dark shadow, then near-white text */
-  let ty=(top+s.lh) as f32+(22.0*s.sc) as f32;let tw=s.w as f32;
-  for (dx,dy,col) in [(0.0f32,2.0f32,0x26000000u32),(1.0,1.0,0x30000000),(-1.0,1.0,0x30000000),(0.0,1.0,0x40000000)]{
+  let ty=(top+lh) as f32+(14.0*s.sc) as f32+((3.0*s.sc).max(2.0)) as f32;let tw=s.w as f32;
+  for (dx,dy,col) in [(0.0f32,1.0f32,0x22000000u32),(1.0,1.0,0x14000000),(-1.0,1.0,0x14000000)]{
    let mut b:isize=0;GdipCreateSolidFill(col,&mut b);let r=RectF{x:dx,y:ty+dy,w:tw,h:(30.0*s.sc) as f32};let ws=wide(status);GdipDrawString(s.g,ws.as_ptr(),-1,s.font,&r,s.fmt,b);GdipDeleteBrush(b);}
-  {let mut b:isize=0;GdipCreateSolidFill(0xF4FFFFFF,&mut b);let r=RectF{x:0.0,y:ty,w:tw,h:(30.0*s.sc) as f32};let ws=wide(status);GdipDrawString(s.g,ws.as_ptr(),-1,s.font,&r,s.fmt,b);GdipDeleteBrush(b);}
+  {let mut b:isize=0;GdipCreateSolidFill(0xB8FFFFFF,&mut b);let r=RectF{x:0.0,y:ty,w:tw,h:(30.0*s.sc) as f32};let ws=wide(status);GdipDrawString(s.g,ws.as_ptr(),-1,s.font,&r,s.fmt,b);GdipDeleteBrush(b);}
   /* thin bar: shadow, glass track, bright fill */
-  let bw=(260.0*s.sc) as i32;let bh=((3.0*s.sc) as i32).max(2);let bx=cx-bw/2;let by=(ty+(40.0*s.sc) as f32) as i32;
-  let mut b:isize=0;GdipCreateSolidFill(0x30000000,&mut b);GdipFillRectangleI(s.g,b,bx-1,by+1,bw+2,bh+2);GdipDeleteBrush(b);
+  let bw=(320.0*s.sc) as i32;let bh=((3.0*s.sc) as i32).max(2);let bx=cx-bw/2;let by=top;
+  let mut b:isize=0;GdipCreateSolidFill(0x1C000000,&mut b);GdipFillRectangleI(s.g,b,bx-1,by+1,bw+2,bh+2);GdipDeleteBrush(b);
   GdipCreateSolidFill(0x55FFFFFF,&mut b);GdipFillRectangleI(s.g,b,bx,by,bw,bh);GdipDeleteBrush(b);
   GdipCreateSolidFill(0xF2FFFFFF,&mut b);GdipFillRectangleI(s.g,b,bx,by,((bw as f64)*bar.clamp(0.0,1.0)) as i32,bh);GdipDeleteBrush(b);
  }
  pub fn show(logo:&Path,stage:&Path)->Option<Shown>{
   if std::env::var("MEGULIT_EXE_SPLASH").map(|v|v=="0").unwrap_or(false){return None;}
-  let logo_path:Vec<u16>=logo.as_os_str().encode_wide().chain(std::iter::once(0)).collect();let have_logo=logo.is_file();
+  let _=logo;
   let stage=stage.to_path_buf();
   let close=Arc::new(AtomicBool::new(false));let c2=close.clone();let (tx,rx)=std::sync::mpsc::channel();
   let t0=Arc::new(AtomicU64::new(0));let t02=t0.clone();let bar=Arc::new(AtomicU64::new(0));let bar2=bar.clone();
@@ -148,10 +138,10 @@ mod splash{
    let mut tok=0usize;let input=GdipInput{ver:1,cb:std::ptr::null(),no_bg:0,no_ext:0};
    if GdiplusStartup(&mut tok,&input,std::ptr::null_mut())!=0{let _=tx.send(false);return;}
    let cls=wide("MeguLitSetupSplash");let wc=WndClassW{style:0,proc_:proc_,cls:0,wnd:0,inst:0,icon:0,cursor:0,bg:0,menu:std::ptr::null(),name:cls.as_ptr()};RegisterClassW(&wc);
-   /* same box as the setup window: 794x508 (79 % of the 1000x640 design box) at the system scale, never larger than the work area, centred on it */
+   /* same box as the setup window: 913x584 (91 % of the 1000x640 design box) at the system scale, never larger than the work area, centred on it */
    let mut wa:Rect=std::mem::zeroed();SystemParametersInfoW(0x0030,0,&mut wa as *mut Rect as *mut c_void,0);
-   let (ww,wh)=((wa.r-wa.l) as f64,(wa.b-wa.t) as f64);let scale=(GetDpiForSystem() as f64/96.0).min(ww/794.0).min(wh/508.0).max(0.5);
-   let (w,h)=((794.0*scale) as i32,(508.0*scale) as i32);let (x,y)=(wa.l+((ww as i32-w)/2).max(0),wa.t+((wh as i32-h)/2).max(0));
+   let (ww,wh)=((wa.r-wa.l) as f64,(wa.b-wa.t) as f64);let scale=(GetDpiForSystem() as f64/96.0).min(ww/913.0).min(wh/584.0).max(0.5);
+   let (w,h)=((913.0*scale) as i32,(584.0*scale) as i32);let (x,y)=(wa.l+((ww as i32-w)/2).max(0),wa.t+((wh as i32-h)/2).max(0));
    let title=wide("MeguLit");
    /* WS_EX_TOOLWINDOW|TOPMOST|NOACTIVATE|LAYERED|TRANSPARENT: no background at all (per-pixel alpha), click-through, above the skin window without taking the focus; WS_POPUP|WS_VISIBLE */
    let hwnd=CreateWindowExW(0x80|0x8|0x0800_0000|0x0008_0000|0x20,cls.as_ptr(),title.as_ptr(),0x9000_0000,x,y,w,h,0,0,0,std::ptr::null());
@@ -164,11 +154,9 @@ mod splash{
    let mut bmp:isize=0;let mut g:isize=0;
    if GdipCreateBitmapFromScan0(w,h,w*4,0x000E200B,bits,&mut bmp)!=0||GdipGetImageGraphicsContext(bmp,&mut g)!=0||g==0{let _=tx.send(false);return;}   /* PixelFormat32bppPARGB */
    GdipSetSmoothingMode(g,4);GdipSetTextRenderingHint(g,4);GdipSetInterpolationMode(g,7);
-   let (mut lw,mut lh,mut limg)=(0i32,0i32,0isize);
-   if have_logo{let mut img:isize=0;if GdipCreateBitmapFromFile(logo_path.as_ptr(),&mut img)==0&&img!=0{let (mut a,mut b)=(0u32,0u32);GdipGetImageWidth(img,&mut a);GdipGetImageHeight(img,&mut b);
-     let target=(440.0*scale) as i32;lw=target;lh=(target as f64*b as f64/a.max(1) as f64) as i32;limg=img;}}
+   let (lw,lh,limg)=(0i32,0i32,0isize);
    let mut fam:isize=0;if GdipCreateFontFamilyFromName(wide("Microsoft YaHei UI").as_ptr(),0,&mut fam)!=0{GdipCreateFontFamilyFromName(wide("Segoe UI").as_ptr(),0,&mut fam);}
-   let mut font:isize=0;GdipCreateFont(fam,(15.0*scale) as f32,0,2,&mut font);
+   let mut font:isize=0;GdipCreateFont(fam,(12.0*scale) as f32,0,2,&mut font);
    let mut fmt:isize=0;GdipCreateStringFormat(0,0,&mut fmt);GdipSetStringFormatAlign(fmt,1);GdipSetStringFormatLineAlign(fmt,0);
    let surf=Surface{g,bits,w,h,logo:limg,lw,lh,font,fmt,sc:scale};
    let present=|alpha:u8|{let pt=Point{x,y};let sz=Size{cx:w,cy:h};let ps=Point{x:0,y:0};let bl=Blend{op:0,flags:0,alpha,fmt:1};UpdateLayeredWindow(hwnd,screen,&pt,&sz,mem,&ps,0,&bl,2);};

@@ -235,13 +235,13 @@ public class SetupWin : Form {
     $oldCtx = [IntPtr]::Zero; try { $oldCtx = [SetupWin]::SetThreadDpiAwarenessContext([IntPtr](-4)) } catch {}
     $scale = 1.0; try { $scale = [SetupWin]::GetDpiForSystem() / 96.0 } catch {}
     $dpiS = $scale   # the real DPI scale (the window may be smaller than that on a small screen; the page zoom follows the real one)
-    $wa0 = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea; $scale = [math]::Max(0.5, [math]::Min($scale, [math]::Min($wa0.Width / 794.0, $wa0.Height / 508.0)))   # never larger than the work area (small screens)
+    $wa0 = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea; $scale = [math]::Max(0.5, [math]::Min($scale, [math]::Min($wa0.Width / 913.0, $wa0.Height / 584.0)))   # never larger than the work area (small screens)
     if ($testLog -and $env:MEGULIT_SETUP_WEB_DPI) { $scale = [double]$env:MEGULIT_SETUP_WEB_DPI / 96.0; $dpiS = $scale }   # tests: emulate 125/150/200 % (with --force-device-scale-factor)
     $win = New-Object SetupWin
     if ($env:MEGULIT_NATIVE_SPLASH) { $win.Opacity = 0 }   # under the transparent native loading screen the skin window is there (WebView2 loads and plays) but invisible until it is released
     $win.Text = 'MeguLit 安装'; $win.FormBorderStyle = 'None'; $win.StartPosition = 'CenterScreen'; $win.ShowInTaskbar = -not $testLog; $win.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
-    # starts at 79 % of the design box (794 x 508 logical); the user can drag the edges/corners: ratio locked, 480 x 307 logical minimum, at most the work area
-    $win.ClientSize = New-Object Drawing.Size([int](794 * $scale), [int](508 * $scale)); $win.Grip = [int][math]::Max(5, [math]::Round(5 * $scale)); $win.Padding = New-Object Windows.Forms.Padding($win.Grip)   # route 1: a thin ring of the form's own around the WebView2 child (which swallows hit-tests): WM_NCHITTEST there gives the sizing codes. Route 2: the page's edge hot zones (index.html .rz) ask the host via a 'resize' message
+    # starts at 91 % of the design box (913 x 584 logical); the user can drag the edges/corners: ratio locked, 480 x 307 logical minimum, at most the work area
+    $win.ClientSize = New-Object Drawing.Size([int](913 * $scale), [int](584 * $scale)); $win.Grip = [int][math]::Max(5, [math]::Round(5 * $scale)); $win.Padding = New-Object Windows.Forms.Padding($win.Grip)   # route 1: a thin ring of the form's own around the WebView2 child (which swallows hit-tests): WM_NCHITTEST there gives the sizing codes. Route 2: the page's edge hot zones (index.html .rz) ask the host via a 'resize' message
     $win.Log = [Action[string]]{ param($s) Web-Log $s }
     $lim = @(0, 0, 0, 0); $miW = 0; $miH = 0; $maW = 0; $maH = 0; [SetupWin]::SizeLimits($scale, $wa0.Width, $wa0.Height, [ref]$miW, [ref]$miH, [ref]$maW, [ref]$maH)
     $win.MinimumSize = New-Object Drawing.Size($miW, $miH); $win.MaximumSize = New-Object Drawing.Size($maW, $maH); $win.MinW = $miW; $win.MaxW = $maW
