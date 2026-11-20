@@ -135,17 +135,55 @@ public class SetupWin : Form {
   public static void ToolWindow(IntPtr h, bool on) { int ex = GetWindowLong(h, -20); SetWindowLong(h, -20, on ? (ex | 0x80) : (ex & ~0x80)); }   // keeps the hidden control surface out of Alt+Tab
   public void Drag() { ReleaseCapture(); SendMessage(Handle, 0xA1, (IntPtr)2, IntPtr.Zero); }
   public void Dress() { int round = 2; DwmSetWindowAttribute(Handle, 33, ref round, 4); MARGINS m = new MARGINS(); m.l = 1; m.r = 1; m.t = 1; m.b = 1; DwmExtendFrameIntoClientArea(Handle, ref m); }
+  // ---- drag-resize of the frameless window, locked to the design box 1000:640 (the page is scaled as a whole by the WebView2 zoom) ----
+  public const double Ratio = 0.64;   // 640 / 1000
+  public int Grip = 8; public bool Sizable = true;
+  [StructLayout(LayoutKind.Sequential)] struct RECT { public int l, t, r, b; }
+  // limits in physical px for the DPI scale `scale` (logical min 480 x 307) and the work area waW x waH: max is the biggest 1000:640 box inside the work area
+  public static void SizeLimits(double scale, int waW, int waH, out int minW, out int minH, out int maxW, out int maxH) {
+    minW = (int)Math.Round(480 * scale); minH = (int)Math.Round(307 * scale);
+    maxW = Math.Min(waW, (int)Math.Floor(waH / Ratio)); maxW = Math.Max(minW, maxW); maxH = (int)Math.Round(maxW * Ratio);
+  }
+  // WebView2 zoom that makes a client box of clientW physical px show the 1000-wide design at DPI scale dpiScale
+  public static double ZoomFor(int clientW, double dpiScale) { return Math.Max(0.25, Math.Min(5.0, clientW / (1000.0 * dpiScale))); }
+  // WM_SIZING: the dragged rectangle keeps the ratio; edge = WMSZ_* (1 L, 2 R, 3 T, 4 TL, 5 TR, 6 B, 7 BL, 8 BR); width is clamped to [minW, maxW]
+  public static void LockAspect(ref int l, ref int t, ref int r, ref int b, int edge, int minW, int maxW) {
+    int w = r - l, h = b - t;
+    if (edge == 3 || edge == 6) w = (int)Math.Round(h / Ratio);
+    w = Math.Max(minW, Math.Min(maxW, w)); h = (int)Math.Round(w * Ratio);
+    bool left = edge == 1 || edge == 4 || edge == 7, top = edge == 3 || edge == 4 || edge == 5;
+    if (left) l = r - w; else r = l + w;
+    if (top) t = b - h; else b = t + h;
+  }
+  public int MinW, MaxW;
+  protected override void WndProc(ref Message m) {
+    if (m.Msg == 0x84 && Sizable && WindowState == FormWindowState.Normal) {   // WM_NCHITTEST
+      long lp = m.LParam.ToInt64(); System.Drawing.Point p = PointToClient(new System.Drawing.Point((short)(lp & 0xFFFF), (short)((lp >> 16) & 0xFFFF)));
+      bool L = p.X < Grip, R = p.X >= ClientSize.Width - Grip, T = p.Y < Grip, B = p.Y >= ClientSize.Height - Grip;
+      int hit = (T && L) ? 13 : (T && R) ? 14 : (B && L) ? 16 : (B && R) ? 17 : L ? 10 : R ? 11 : T ? 12 : B ? 15 : 0;
+      if (hit != 0) { m.Result = (IntPtr)hit; return; }
+    } else if (m.Msg == 0x214 && Sizable) {   // WM_SIZING
+      RECT rc = (RECT)Marshal.PtrToStructure(m.LParam, typeof(RECT)); LockAspect(ref rc.l, ref rc.t, ref rc.r, ref rc.b, (int)m.WParam, MinW, MaxW); Marshal.StructureToPtr(rc, m.LParam, false); m.Result = (IntPtr)1; return;
+    }
+    base.WndProc(ref m);
+  }
   protected override void OnFormClosing(FormClosingEventArgs e) { if (!AllowClose && AskClose != null) { e.Cancel = true; AskClose(); } base.OnFormClosing(e); }
 }
 '@ }
     # per-monitor DPI awareness for the skin's window only: the old window keeps its own (system-scaled) behaviour
     $oldCtx = [IntPtr]::Zero; try { $oldCtx = [SetupWin]::SetThreadDpiAwarenessContext([IntPtr](-4)) } catch {}
     $scale = 1.0; try { $scale = [SetupWin]::GetDpiForSystem() / 96.0 } catch {}
-    $wa0 = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea; $scale = [math]::Max(0.5, [math]::Min($scale, [math]::Min($wa0.Width / 1000.0, $wa0.Height / 640.0)))   # never larger than the work area (small screens)
-    if ($testLog -and $env:MEGULIT_SETUP_WEB_DPI) { $scale = [double]$env:MEGULIT_SETUP_WEB_DPI / 96.0 }   # tests: emulate 125/150/200 % (with --force-device-scale-factor)
+    $dpiS = $scale   # the real DPI scale (the window may be smaller than that on a small screen; the page zoom follows the real one)
+    $wa0 = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea; $scale = [math]::Max(0.5, [math]::Min($scale, [math]::Min($wa0.Width / 600.0, $wa0.Height / 384.0)))   # never larger than the work area (small screens)
+    if ($testLog -and $env:MEGULIT_SETUP_WEB_DPI) { $scale = [double]$env:MEGULIT_SETUP_WEB_DPI / 96.0; $dpiS = $scale }   # tests: emulate 125/150/200 % (with --force-device-scale-factor)
     $win = New-Object SetupWin
     $win.Text = 'MeguLit 安装'; $win.FormBorderStyle = 'None'; $win.StartPosition = 'CenterScreen'; $win.ShowInTaskbar = -not $testLog; $win.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
-    $win.ClientSize = New-Object Drawing.Size([int](1000 * $scale), [int](640 * $scale)); $win.MinimumSize = $win.Size
+    # starts at 60 % of the design box (600 x 384 logical); the user can drag the edges/corners: ratio locked, 480 x 307 logical minimum, at most the work area
+    $win.ClientSize = New-Object Drawing.Size([int](600 * $scale), [int](384 * $scale)); $win.Grip = [int][math]::Max(4, [math]::Round(4 * $scale)); $win.Padding = New-Object Windows.Forms.Padding($win.Grip)   # the WebView2 child swallows hit-tests, so the grips are the form's own padding ring around it
+    $lim = @(0, 0, 0, 0); $miW = 0; $miH = 0; $maW = 0; $maH = 0; [SetupWin]::SizeLimits($scale, $wa0.Width, $wa0.Height, [ref]$miW, [ref]$miH, [ref]$maW, [ref]$maH)
+    $win.MinimumSize = New-Object Drawing.Size($miW, $miH); $win.MaximumSize = New-Object Drawing.Size($maW, $maH); $win.MinW = $miW; $win.MaxW = $maW
+    $script:dpiS = $dpiS; $script:zoomWin = $win
+    $win.add_Resize({ try { $w = $script:zoomWin.Web; $w.ZoomFactor = [math]::Min([SetupWin]::ZoomFor($w.Width, $script:dpiS), [SetupWin]::ZoomFor([int]($w.Height / [SetupWin]::Ratio), $script:dpiS)) } catch {} })
     $ico = Join-Path $sourceRoot 'MeguLit.exe'; if (Test-Path $ico) { try { $win.Icon = [Drawing.Icon]::ExtractAssociatedIcon($ico) } catch {} }
     $web = New-Object Microsoft.Web.WebView2.WinForms.WebView2; $web.Dock = 'Fill'; $win.Controls.Add($web); $win.Web = $web
     # Native poster: the first frame of the opening clip, drawn by the window itself the moment it appears. A cold WebView2 needs ~2 s
@@ -164,7 +202,7 @@ public class SetupWin : Form {
       $q = 'host=2&desk=1&lang=' + $uiLang;
       if ($testLog -and $env:MEGULIT_SETUP_WEB_QUERY) { $q += '&' + $env:MEGULIT_SETUP_WEB_QUERY }   # tests: feature switches such as shadow=0&env=0&trans=0&aa=1
       if ($env:MEGULIT_SETUP_WEB_TEST) { $q += '&t=' + $env:MEGULIT_SETUP_WEB_TEST }   # was inside the comment above, so the page never saw the test switch
-      $cw.add_NavigationCompleted({ if (-not $script:tNav) { $script:tNav = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds } })
+      $cw.add_NavigationCompleted({ try { $w = $script:win.Web; $w.ZoomFactor = [math]::Min([SetupWin]::ZoomFor($w.Width, $script:dpiS), [SetupWin]::ZoomFor([int]($w.Height / [SetupWin]::Ratio), $script:dpiS)) } catch {}; if (-not $script:tNav) { $script:tNav = [int]([DateTime]::Now - $script:skinT0).TotalMilliseconds } })
       $cw.Navigate('https://megulit-setup.local/index.html?' + $q)
     })
     $win.Show(); $script:shownAt = [DateTime]::Now; Boot-Mark 'skin-window-shown'; Close-Splash; if ($script:posterBox) { $win.Refresh(); Web-Log ('cold-start mark=native-poster ms=' + [int]([DateTime]::Now - $script:shownAt).TotalMilliseconds) }; $wvEnv = $null; if ($script:wv2EnvTask) { $tw = [DateTime]::Now; while (-not $script:wv2EnvTask.IsCompleted -and ([DateTime]::Now - $tw).TotalSeconds -lt 20) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 10 }; if ($script:wv2EnvTask.Status -eq 'RanToCompletion') { $wvEnv = $script:wv2EnvTask.Result; Web-Log ('webview2 environment prewarmed, ready ' + [int]([DateTime]::Now - $tw).TotalMilliseconds + ' ms after the window') } else { Web-Log ('prewarmed environment not usable: ' + $script:wv2EnvTask.Status) } }; if ($wvEnv) { [void]$web.EnsureCoreWebView2Async($wvEnv) } else { $web.CreationProperties = $props; [void]$web.EnsureCoreWebView2Async($null) }
