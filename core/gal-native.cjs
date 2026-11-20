@@ -62,6 +62,11 @@ class GalNative {
   /* 2026-11-21 text effects (ファタモルガーナの館): the game's text effect cannot be hidden line by line, so for this game the original stays
      and MeguLit shows the translation only. In memory only: the saved 隐藏游戏原文 is kept for every other game; the user's own
      switch of 隐藏游戏原文 ends it (切回隐藏) */
+  /* 2026-11-21 layered game profile (core/profiles/index.cjs profileFor): the running game's frozen settings reach the hook
+     kernel (hook-native this.profile, trace 'profile <gameKey> engine=.. layers=..'), the overlay placement and, through the
+     hook state (gameProfile), the reader (bootstrap.js window.MeguLitProfile). services/reader.cjs calls this once the program
+     and library row are known, and with profileFor({}) when the game closes. */
+  setGameProfile(profile){if(!profile||typeof profile!=='object')return;this.profile=profile;if(this.placement)this.placement.profile=profile;this.hooks?.setProfile?.(profile);if(profile.hide?.textEffectsRead===true&&!this.textEffectsHold)this.textEffects(true);}
   textEffects(on){if(on){if(this.textEffectsHold)return;this.textEffectsHold={hookHide:this.preferences.hookHide};this.preferences={...this.preferences,hookHide:false};}else{if(!this.textEffectsHold)return;const h=this.textEffectsHold.hookHide;this.textEffectsHold=null;this.preferences={...this.preferences,hookHide:h};}this.notify({...this.hookPrefs(),textEffectsRead:!!on});this.controller.apply(true);}
   setHookPrefs(v){if(this.textEffectsHold&&typeof v?.hookHide==='boolean'){this.textEffectsHold=null;this.notify({textEffectsRead:false});}const next={...this.preferences};for(const k of ['hookAutoStart','hookHide','hookFast','ocrReadLines'])if(typeof v?.[k]==='boolean')next[k]=v[k];if(next.hookAutoStart&&!this.preferences.hookAutoStart&&typeof v?.hookHide!=='boolean')next.hookHide=true;const hideChanged=next.hookHide!==this.preferences.hookHide,autoOn=next.hookAutoStart&&!this.preferences.hookAutoStart;this.save(next,true,true);this.notify(this.hookPrefs());if(hideChanged||autoOn)this.controller.apply(true);}
   /* E337 (user 2026-11-10, 女装山脈: a stream decoded as garbage was picked, "文本流捕捉错了要加个手动刷新重新选取"): pick the

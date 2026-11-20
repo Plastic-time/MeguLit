@@ -1,0 +1,14 @@
+{
+ "same":[
+  {"exe":"D:/Games/SenrenBanka/SenrenBanka.exe","engine":"KiriKiri","title":"千恋＊万花"},
+  {"exe":"C:/Program Files (x86)/Steam/steamapps/common/Senren Banka/SenrenBanka.exe","steamAppId":"1144400"},
+  {"exe":"E:/gal/千恋万花/SenrenBanka_chs.exe","title":"千恋＊万花 汉化版"},
+  {"exe":"E:/gal/renamed/千恋万花汉化硬盘版.exe","title":"【千恋＊万花】","engine":"KiriKiri"}
+ ],
+ "other":[
+  {"exe":"D:/Games/Fata/fata.exe","engine":"KiriKiri"},
+  {"exe":"D:/Games/x/BGI.exe","title":"サノバウィッチ"},
+  {"exe":"D:/Games/x/Game.exe"},
+  {"exe":"D:/Games/x/SenrenBanka.exe","engine":"BGI / Ethornell"}
+ ]
+}

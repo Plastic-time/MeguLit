@@ -54,6 +54,11 @@ function event(message){if(!loaded){queued.push(message);return;}if(message.type
  if(message.type==='dialogVisibility'){document.body.classList.toggle('megulit-dialog-hidden',message.visible===false);/* 2026-11-13 choices on screen while the game hid its text box: the reader shows them, not the old line */document.body.classList.toggle('megulit-choice-only',message.choiceOnly===true);return;}
  if(message.type==='fonts'){b.gameFonts?.(message.fonts);return;}
  /* which hotkeys the bridge holds (ready / hotkeyState): those keys have their single path there (settings.js) */if(typeof message.hotkey==='boolean')b.nativeHotkeys={menu:message.hotkey,cover:message.coverHotkey===true};
+ /* 2026-11-21 layered game profile (core/profiles, hook state gameProfile): the running game's frozen kernel+engine+game settings.
+    Reader modules read window.MeguLitProfile.get('placement.firstLineAnchor',fallback), never the program name; 'megulit-profile' fires on change */
+ if(message.gameProfile&&typeof message.gameProfile==='object'){const freeze=v=>{if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.freeze(v);for(const x of Object.values(v))freeze(x);}return v;};const data=freeze(JSON.parse(JSON.stringify(message.gameProfile)));
+  window.MeguLitProfile=Object.freeze({data,get:(key,fallback)=>{let v=data;for(const k of String(key).split('.')){if(v==null||typeof v!=='object')return fallback;v=v[k];}return v===undefined||v===null?fallback:v;}});b.gameProfile=data;
+  document.body.dataset.gameProfile=String(data.gameKey||'');document.body.dataset.gameEngine=String(data.engine||'');dispatchEvent(new CustomEvent('megulit-profile',{detail:data}));}
  if(message.type==='hotkey')b.toggleGalMenu?.();else b.galStatus?.(message);
  b.learningStatus?.(message);b.hookReaderStatus?.();
  // interface-mode-host owns mode navigation, avoiding a duplicate home reveal/focus.

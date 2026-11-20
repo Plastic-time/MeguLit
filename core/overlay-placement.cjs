@@ -16,6 +16,8 @@ const { rectsToClient } = require('./compositor-host.cjs');
 class OverlayPlacement {
   constructor({ root, send = () => {}, trace = () => {}, replaced = () => false, hidden = () => {} } = {}) {
     this.hidden = hidden; this.replaced = replaced; this.root = root; this.send = send; this.trace = trace; this.client = [0, 0]; this.current = null; this.on = false;
+    /* the running game's layered profile (core/profiles), set by gal-native setGameProfile; branches read this.profile.placement.* */
+    this.profile = require('./profiles/index.cjs').profileFor({});
   }
   wanted(preferences) {
     if (process.env.MEGULIT_CAPTURE_COMPOSITOR === '1') return false;

@@ -33,6 +33,11 @@ validation/*
 !validation/*.test.cjs
 !validation/helpers/
 !validation/helpers/*.cjs
+# per-game replay fixtures of the layered profiles (core/profiles, validation/games-regression.test.cjs)
+!validation/fixtures/
+validation/fixtures/*
+!validation/fixtures/games/
+!validation/fixtures/games/**
 validation/**/results*/
 validation/**/*-profile-*/
 

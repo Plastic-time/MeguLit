@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+/* 2026-11-21 layered game profile: kernel defaults <- engine diff <- game diff, one frozen settings object per running game.
+   profileFor({engine,exe,title,folder,files,steamAppId}) -> frozen {gameKey,engine,layers,placement,page,choice,hide,safeMode}
+
+   gameKey: the file name of games/<gameKey>.cjs, a hand-picked slug ('senren-banka'), never derived from a path, so it stays the
+   same for the retail, Steam, patched and renamed copies of one work. Which copy is which game is told by the game file's
+   `match` (see matchScore): Steam app id, fingerprint files of the game folder, program names and titles. A program name
+   alone is not enough when it is a generic engine name (BGI.exe, Game.exe, SiglusEngine.exe ...): it needs a second sign.
+   A pirated or renamed copy keeps its data files and its window/library title, so files or title still name it; a Chinese
+   patch that renames the exe is listed in exe or found by title. A game without a game file gets an 'auto-' key (hash of the
+   program name and title) and only the core+engine layers. */
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const DEFAULTS=require('./defaults.cjs');
+const ENGINE_DIR=path.join(__dirname,'engines'),GAME_DIR=path.join(__dirname,'games');
+const KEY=/^[a-z0-9][a-z0-9-]{1,62}$/;
+/* names the engine detectors use (services/original-engines/registry.cjs names, hook page engines, probe ids) -> engine file id */
+const ALIASES={'bgi':'bgi','ethornell':'bgi','bgi/ethornell':'bgi','yuris':'yuris','yu-ris':'yuris','kirikiri':'kirikiri','kirikiriz':'kirikiri','krkr':'kirikiri','krkrz':'kirikiri','krkr2':'kirikiri','tvpx':'kirikiri','siglus':'siglus','siglusengine':'siglus','reallive':'reallive','catsystem2':'catsystem2','cs2':'catsystem2','artemis':'artemis','malie':'malie','advhd':'advhd','willplus':'advhd','kogado':'kogado','majiro':'majiro','qlie':'qlie','softpal':'softpal','nexas':'nexas','system3x':'system3','system3':'system3','system4':'system4','shiinario':'shiinario','entis':'entis','cotopha':'entis','nscripter':'nscripter','livemaker':'livemaker','stuffscript':'stuffscript','unity':'unity','renpy':'renpy','tyrano':'tyrano','rpgmaker':'rpgmaker','mages':'mages','wolf':'wolf','avg32':'avg32','unknown':''};
+/* program names many unrelated games share: they count as a weak sign only */
+const GENERIC_EXE=new Set(['game.exe','bgi.exe','siglusengine.exe','advhd.exe','malie.exe','cs2.exe','start.exe','launcher.exe','system.exe','reallive.exe','krkr.exe','krkrz.exe','tvpwin32.exe','nscripter.exe','nscr.exe','gamepro.exe','main.exe','play.exe','run.exe','setup.exe','config.exe','avg32.exe','sys4.exe','system4.exe','livemaker.exe','windows.exe','nw.exe','ruby.exe','soft.exe','pal.exe','renpy.exe','python.exe']);
+
+function engineId(name){const raw=String(name||'').toLowerCase().trim();if(!raw)return '';const head=raw.split(/\s*[/(]\s*/)[0];
+ for(const s of [raw,head])for(const v of [s.replace(/[^a-z0-9]/g,''),s.replace(/[^a-z0-9-]/g,'')])if(v in ALIASES)return ALIASES[v];
+ const id=head.replace(/[^a-z0-9]/g,'');return /^[a-z0-9]{2,40}$/.test(id)?id:'';}
+const fold=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[\s　・*＊\-_:：!！?？~〜「」『』【】()（）\[\]'"`.,、。]/g,'');
+const exeName=p=>path.win32.basename(String(p||'')).toLowerCase();
+
+const cache={engines:new Map(),games:null};
+function readDir(dir){try{return fs.readdirSync(dir).filter(f=>f.endsWith('.cjs')).sort();}catch{return [];}}
+function loadEngine(id){if(!id)return null;if(cache.engines.has(id))return cache.engines.get(id);let e=null;const file=path.join(ENGINE_DIR,id+'.cjs');if(fs.existsSync(file))e=require(file);cache.engines.set(id,e);return e;}
+function games(){if(cache.games)return cache.games;cache.games=readDir(GAME_DIR).map(f=>{const g=require(path.join(GAME_DIR,f));return {...g,key:f.slice(0,-4)};});return cache.games;}
+function reload(){for(const dir of [ENGINE_DIR,GAME_DIR])for(const f of readDir(dir))delete require.cache[path.join(dir,f)];cache.engines.clear();cache.games=null;}
+
+/* how strongly a running copy looks like game g: steam 3, all fingerprint files 3, a distinctive exe 3, a generic exe 1,
+   a title 3 (2 when the title only contains it), the same known engine +1. An engine both sides know that differs
+   rules the game out; a title listed in notTitles (fan disc, sequel) never counts. Accepted at 3 or more. */
+function matchScore(g,input){const m=g.match||{};let score=0;const why=[];
+ const eng=engineId(input.engine),own=engineId(g.engine);if(eng&&own&&eng!==own)return {score:0,why:['engine '+eng+'!='+own]};
+ if(m.steamAppId&&String(input.steamAppId||'')===String(m.steamAppId)){score+=3;why.push('steam');}
+ if(Array.isArray(m.files)&&m.files.length&&input.folder){const ok=m.files.every(f=>{try{return fs.existsSync(path.join(input.folder,f));}catch{return false;}});if(ok){score+=3;why.push('files');}}
+ else if(Array.isArray(m.files)&&m.files.length&&Array.isArray(input.files)){const have=new Set(input.files.map(f=>String(f).toLowerCase().replace(/\\/g,'/')));if(m.files.every(f=>have.has(String(f).toLowerCase())))
+  {score+=3;why.push('files');}}
+ const exe=exeName(input.exe);if(exe&&(m.exe||[]).some(x=>String(x).toLowerCase()===exe)){const w=GENERIC_EXE.has(exe)?1:3;score+=w;why.push(w>1?'exe':'exe(generic)');}
+ const t=fold(input.title),exact=(m.titles||[]).some(x=>!(x instanceof RegExp)&&fold(x)&&fold(x)===t);
+ if(t&&!(m.notTitles||[]).some(x=>fold(x)&&t.includes(fold(x)))&&(exact||(m.titles||[]).some(x=>x instanceof RegExp?x.test(String(input.title).normalize('NFKC')):(fold(x)&&t.includes(fold(x)))))){score+=exact?3:2;why.push(exact?'title':'title~');}
+ if(score&&eng&&own&&eng===own){score+=1;why.push('engine');}
+ return {score,why};}
+function findGame(input){let best=null;for(const g of games()){const r=matchScore(g,input);if(r.score>=3&&(!best||r.score>best.score))best={game:g,...r};}return best;}
+function autoKey(input){const exe=exeName(input.exe),t=fold(input.title);if(!exe&&!t)return 'none';return 'auto-'+crypto.createHash('sha1').update(exe+'|'+t).digest('hex').slice(0,10);}
+
+const plain=v=>v&&typeof v==='object'&&!Array.isArray(v)&&!(v instanceof RegExp);
+/* keys a layer may set: the kernel tree only (a typo or an unknown key is an error, found by validation/games-regression) */
+function unknownKeys(settings,base=DEFAULTS,at=''){const out=[];for(const [k,v] of Object.entries(settings||{})){if(!(k in base)){out.push(at+k);continue;}if(plain(base[k])){if(!plain(v))out.push(at+k);else out.push(...unknownKeys(v,base[k],at+k+'.'));}}return out;}
+function merge(a,b){if(!plain(b))return a;const out={...a};for(const [k,v] of Object.entries(b)){if(!(k in a))continue;out[k]=plain(a[k])&&plain(v)?merge(a[k],v):Array.isArray(v)?v.slice():v;}return out;}
+function freeze(v){if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.freeze(v);for(const x of Object.values(v))freeze(x);}return v;}
+const clone=v=>JSON.parse(JSON.stringify(v));
+
+function profileFor(input={}){input=input||{};const hit=findGame(input);const game=hit?.game||null;
+ const engine=engineId(input.engine)||engineId(game?.engine)||'';const eng=loadEngine(engine);
+ let s=clone(DEFAULTS);const layers=['core'];if(eng){s=merge(s,clone(eng.settings||{}));layers.push('engine');}if(game){s=merge(s,clone(game.settings||{}));layers.push('game');}
+ return freeze({gameKey:game?game.key:autoKey(input),engine:engine||'unknown',layers:layers.join('+'),matched:hit?hit.why.join(','):'',...s});}
+/* the trace line every run writes once (hook-events.log), so the owner's log tells which layers this game ran with */
+const traceLine=p=>'profile '+p.gameKey+' engine='+p.engine+' layers='+p.layers+(p.matched?' match='+p.matched:'');
+/* a dotted key of a profile, with the fallback when the profile or the key is missing */
+function get(p,key,fallback){let v=p;for(const k of String(key).split('.')){if(v==null||typeof v!=='object')return fallback;v=v[k];}return v===undefined||v===null?fallback:v;}
+/* the RegExps of choice.filters (bad sources are skipped) */
+function choiceFilters(p){const out=[];for(const src of get(p,'choice.filters',[]))try{out.push(new RegExp(String(src),'u'));}catch{}return out;}
+module.exports={DEFAULTS,profileFor,engineId,matchScore,findGame,games,loadEngine,unknownKeys,traceLine,get,choiceFilters,reload,GENERIC_EXE,ENGINE_DIR,GAME_DIR};
