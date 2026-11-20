@@ -24,11 +24,35 @@ test('the text window back without a new line (the player hid it and showed it a
   const { im, step } = rig(); im.window(false, 'text window hidden: box 70%, picture 1%'); step(100); assert.equal(im.awayByDialog(), true);
   im.window(true, 'text window back'); step(100); assert.equal(im.visible, true); assert.equal(im.awayByDialog(), false);
 });
-test('a scene change that takes the dialogue box away (recorded 80% / 59%) counts; a skip does not', () => {
+test('a scene change that takes the dialogue box away (recorded 80% / 59%) counts; so does a skip, until the next line', () => {
   const { im, step } = rig(); im.scene(false, 'scene changed 80%, box 59%'); step(100);
   assert.equal(im.visible, false); assert.equal(im.awayByDialog(), true);
   const b = rig(); b.im.skip(true); b.step(500); assert.equal(b.im.visible, false, 'the layer stands down for the game\'s own fast-forward');
-  assert.equal(b.im.awayByDialog(), false, 'the game shows its text itself while skipping');
+  assert.equal(b.im.awayByDialog(), true, 'the hide layers stand down for the skip anyway; the gate keeps its state for after it');
+  b.im.skip(false); b.step(100); assert.equal(b.im.awayByDialog(), true, 'key let go, no line yet: still away');
+  b.im.source('「……行くか」観光に来たわけじゃないんだから、立ち尽くしてても仕方ない。', 'krkr', 'hook'); b.step(800);
+  assert.equal(b.im.visible, true); assert.equal(b.im.awayByDialog(), false, 'the next line ends it');
+});
+/* 2026-11-21 (owner's recording 08:28, 千恋＊万花 incr11) replayed against the bridge's gate (native/HookBridge.cs OverlayGate, 200 ms samples):
+   hook-diagnostics 23:28:17.475 skip key held / 19.061 released / 20.489 "krkr draws its text itself" / 21.306 "draws its text invisible";
+   reader-host 17.878 visibilityDecision skip, 20.799 the line shows the layer. Video frames 253-266: the game's 「観光に来た…」 alone for
+   0.6 s, then under MeguLit's copy for 0.5 s. */
+test('recorded skip 23:28:17-21: the gate never gives the text back to the game around a skip', () => {
+  const ShownSamples = 3, LostSamples = 8; /* HookBridge.cs OverlayGate */
+  const track = (over, st, seen) => { if (seen === 1) { st.bad = 0; if (++st.ok >= ShownSamples) over = true; } else if (seen === 0) { st.ok = 0; if (++st.bad >= LostSamples) over = false; } return over; };
+  const replay = away => {
+    let now = 17000; const im = new Immersion(() => {}, () => now); im.configure({ immersion: true, dialogDetection: 'hook' });
+    im.source('青々とした木々ばかりの面白味のない風景の峠道を抜け、ようやく辿り着いた穂織の町。', 'krkr', 'hook'); now += 100; im.tick();
+    let over = true; const st = { ok: 0, bad: 0 }, given = [];
+    const until = t => { while (now < t) { now += 100; im.tick(); if (now % 200 === 0) { const seen = im.visible ? 1 : 0, s = seen === 0 && away(im) ? -1 : seen; over = track(over, st, s); if (!over) given.push(now); } } };
+    now = 17400; im.skip(true); until(19000); assert.equal(im.visible, false, 'hidden for the skip (17.88 recorded)');
+    im.skip(false); until(20000);
+    im.source('「……行くか」観光に来たわけじゃないんだから、立ち尽くしてても仕方ない。', 'krkr', 'hook'); until(22000);
+    assert.equal(im.visible, true, 'the line shows the layer'); return given; };
+  const given = replay(im => im.awayByDialog());
+  assert.deepEqual(given, [], 'given back at ' + given[0] + ' (recorded 20489: the game drew the line itself)');
+  /* the rule before: a skip was a real absence, and the replay gives the text back as recorded */
+  assert.ok(replay(im => im.visible === false && im.skipAt == null && (im.windowHidden === true || im.sceneHidden === true)).length > 0);
 });
 test('a layer that is simply shown, or hidden for no reason of the text window, is not away with it', () => {
   const { im } = rig(); assert.equal(im.awayByDialog(), false);
