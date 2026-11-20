@@ -343,6 +343,12 @@ class Reader{
    case 'hookPrefs':g?.setHookPrefs(r.settings);break;case 'compositorRuby':g?.compositor?.ruby?.(String(r.text||''),Array.isArray(r.ruby)?r.ruby:[]);break;
    case 'hookStart':g?.userStart(r.profile,r.force===true,r.id);break;
    case 'hookReselect':g?.reselectStream?.(r.onlyIfBad===true);break;
+   /* 2026-11-21 (owner: 「再加个兜底的检测有没有译文，没有的话就再查赶紧补上」): the reader's translation guard asks for a line still without a
+      translation, by its text (no serial, no current-line check): the cache, the script, then the fallback chain; the answer fills the line wherever it is shown */
+   case 'translateGuard':{const text=String(r.text||'');if(!text.trim()||text.length>4000)break;const tr=x=>{try{g?.hooks?.trace?.('translation guard '+x+' '+JSON.stringify(text.slice(0,24)));}catch{}};
+    (async()=>{let t=this.embedCached(text)||'';if(!t&&this.displayLanguage()!=='en'){t=this.gal?.hooks?.scriptTranslation?.(text)||'';if(t)this.embedCached(text,t);}
+     if(t){tr('fill cache');}else{tr('retry chain');try{t=(await this.chainTranslate(text,this.baseOptions(),{})).text||'';if(t)this.embedCached(text,t);}catch(e){tr('still-missing '+String(e?.message||e).slice(0,40));}}
+     if(t)this.runtime.emit('reader-event',{type:'call',method:'deliverBackfill',args:[text,t,'guard']});})();break;}
    case 'engineGiveWay':g?.hooks?.giveWay?.(r.ms);break; /* 2026-11-21: a hidden line the reader cannot draw goes back to the game */
    case 'hookSelect':g?.hooks.select(r.id,true);break;
    case 'hookCheck':g?.controller.check();break;
