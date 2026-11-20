@@ -51,6 +51,16 @@ module.exports={
   textBox:null,/* {x,y,w,h} client px */
   hideMethod:null,/* 'engine' | 'glyph' | 'gpu' | 'read' */
  },
+ /* engine-draw (docs/engine-draw-protocol.md): the engine layer reads what it draws from inside the engine */
+ draw:{
+  /* report each drawn run with its role (name / choice / button / menu / system); false = the kernel: names are not
+     reported, link and choice text goes with the dialogue */
+  roles:false,
+  /* the game draws MeguLit's replacement of a dialogue line itself (Japanese + ruby [+ Chinese]); false = hide + overlay */
+  embed:false,
+  /* with embed on, the Chinese is drawn by the game too (false = ruby only, the reader draws the Chinese) */
+  embedTranslation:true,
+ },
  safeMode:{
   /* reader redraws per second while the game is in a page effect; null = kernel default */
   redrawRate:null,

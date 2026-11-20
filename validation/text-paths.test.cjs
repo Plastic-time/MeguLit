@@ -247,3 +247,17 @@ test('dot font under 日文环境: the LE early launcher carries it too, fallbac
  assert.ok(lc.includes("const fontDot=early?require('./text-paths-launch.cjs').fontDot(this.root,launchExe,early,trace):null;"));
  assert.ok(lc.includes('if(fontDot)fontDot.watch(result.pid);'));assert.ok(lc.includes("if(fontDot)fontDot.canary.exited('fontdot',0);"));
 });
+
+test('engine-draw fields: role / id / box / sel / emb round trip, UI items may come as a box alone, lines stay strict',()=>{
+ const ui=TP.formatChars({engine:'rpgm',line:4,hidden:false,sw:816,sh:624,rects:[],text:'はい',role:'choice',id:'w2:0',box:[10,20,200,36],sel:true});
+ assert.equal(ui,'ToMe_CHARS engine=rpgm line=4 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=0 rects= role=choice id=w2:0 box=10,20,200,36 sel=1 text=はい');
+ const r=TP.parseChars(ui);
+ assert.deepEqual([r.role,r.id,r.box,r.sel,r.rects.length,r.text],['choice','w2:0',[10,20,200,36],true,0,'はい']);
+ assert.equal(TP.parseChars(ui.replace(' role=choice','')),null,'a line needs one rect per character');
+ assert.equal(TP.parseChars(ui.replace('role=choice','role=other')),null,'known roles only');
+ const ln=TP.formatChars({engine:'krkr',line:5,hidden:false,sw:1280,sh:720,rects:[[1,2,3,4]],text:'あ',read:true,emb:2,role:'line'});
+ assert.equal(ln,'ToMe_CHARS engine=krkr line=5 hidden=0 sw=1280 sh=720 vx=0 vy=0 vw=0 vh=0 n=1 rects=1,2,3,4 read=1 emb=2 text=あ','role=line is the default and is left out');
+ const p=TP.parseChars(ln);assert.equal(p.emb,2);assert.equal(p.role,undefined);
+ const old='ToMe_CHARS engine=krkr line=7 hidden=1 sw=1280 sh=720 vx=0 vy=0 vw=0 vh=0 n=1 rects=1,2,3,4 color=ffffff read=0 text=あ';
+ assert.deepEqual(Object.keys(TP.parseChars(old)).sort(),['color','engine','hidden','line','read','rects','sh','sw','text','type','viewport'],'old records parse as before');
+});
