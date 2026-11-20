@@ -2,18 +2,29 @@
 'use strict';
 /* Offline pairing self-test (2026-11-21, owner: 「这是官方的中文，不可能会对不上，没对上那就是我们的问题」): every line of a game's imported
    script is looked up the way the running game hands it over, in each form the hook may give (as written; the speaker taken off by the name
-   plate; without the outer brackets; with blanks and line breaks; with ruby markup), through the same lookup the reader uses
-   (core/hook-native.cjs resolveSource). Prints total / paired / unpaired with the reasons; exit 1 when anything is unpaired.
-   Usage: node tools/patch-pair-selftest.cjs <MeguLit root> <game exe> */
-const path = require('node:path');
+   plate; without the outer brackets; half-width; ruby markup; blanks; a line break), through the same lookup the reader uses
+   (core/hook-native.cjs resolveSource), one pass per form in script order (the provider follows the reading position, as in play).
+   Lines that are no dialogue (HookNative.nonDialogue, or a short label repeated all over the script) are counted apart and never looked up.
+   When the game's own lookup cannot be built (the game is not installed) the pairing table itself is used (mode "table").
+   Prints lookups / paired / unpaired / nonDialogue with the reasons; exit 1 when anything is unpaired.
+   Usage: node tools/patch-pair-selftest.cjs <MeguLit root> (<game exe> | --id <game id>) */
+const path = require('node:path'), fs = require('node:fs');
 const ot = require('../services/original-text.cjs'), { HookNative } = require('../core/hook-native.cjs');
-const [root, exe] = process.argv.slice(2);
-if (!root || !exe) { console.error('usage: node tools/patch-pair-selftest.cjs <MeguLit root> <game exe>'); process.exit(2); }
-const provider = ot.provider(path.resolve(root), path.resolve(exe));
-if (!provider) { console.error('no imported script for ' + exe); process.exit(2); }
-const dir = path.dirname(path.resolve(exe)).toLowerCase(), state = Object.values(require(path.join(path.resolve(root), 'data', 'config', 'original-text.json'))).find(s => s?.runtime?.index && [s.runtime.file, s.patch?.dir].some(d => d && (path.resolve(d).toLowerCase() === dir || path.dirname(path.resolve(d)).toLowerCase() === dir)));
-const lines = require(state.runtime.index).lines;
-const h = { originalText: provider, trace() {}, resolveSource: HookNative.prototype.resolveSource };
+const args = process.argv.slice(2), root = path.resolve(args[0] || '');
+if (!args[0] || !args[1]) { console.error('usage: node tools/patch-pair-selftest.cjs <MeguLit root> (<game exe> | --id <game id>)'); process.exit(2); }
+const all = JSON.parse(fs.readFileSync(path.join(root, 'data', 'config', 'original-text.json'), 'utf8'));
+let id = args[1] === '--id' ? args[2] : null; const exe = id ? null : path.resolve(args[1]);
+if (!id) { const dir = path.dirname(exe).toLowerCase(); id = Object.keys(all).find(k => { const s = all[k]; return s?.runtime?.index && [s.runtime.file, s.patch?.dir].some(d => d && (path.resolve(d).toLowerCase() === dir || path.dirname(path.resolve(d)).toLowerCase() === dir)); }); }
+const state = all[id]; if (!state?.runtime?.index || !state?.patch?.index) { console.error('no imported script and patch for ' + (exe || id)); process.exit(2); }
+const lines = JSON.parse(fs.readFileSync(state.runtime.index, 'utf8')).lines, zh = JSON.parse(fs.readFileSync(state.patch.index, 'utf8')).lines;
+const live = () => { try { return exe ? ot.provider(root, exe) : null; } catch { return null; } };
+/* the table itself: normal key -> translation; a key with two different translations is uncertain */
+const tableProvider = () => { const map = new Map(), norm = t => String(t || '').replace(/[\s　]+/g, '');
+  lines.forEach((l, i) => { const k = norm(l), z = String(zh[i] || '').trim(); if (!k || !z) return; const had = map.get(k); map.set(k, had !== undefined && had !== z ? null : z); });
+  return { kind: 'patch', resolve: t => { const k = norm(t); if (!map.has(k)) return { status: 'none' }; const z = map.get(k); return z ? { status: 'exact', translation: z, indices: [0] } : { status: 'uncertain' }; } }; };
+const mode = live() ? 'game' : 'table';
+const counts = new Map(); for (const l of lines) { const t = String(l || '').trim(); counts.set(t, (counts.get(t) || 0) + 1); }
+const label = t => counts.get(t) >= 10 && [...t].length <= 8 && !/[。、！？!?…「『（]/.test(t);
 const forms = t => {
   const out = [['as written', t]];
   const m = /^([「『])([？?]{2,}|[一-龯々ァ-ヶー・]{1,8})[\s　]+(.*)$/s.exec(t); if (m) out.push(['speaker taken off', m[1] + m[3]]);
@@ -24,9 +35,11 @@ const forms = t => {
   if (t.length > 12) out.push(['line break', t.slice(0, Math.ceil(t.length / 2)) + '\n' + t.slice(Math.ceil(t.length / 2))]);
   return out;
 };
-/* one pass per form, in script order with a fresh lookup each (the provider follows the reading position, as in play) */
-let total = 0, paired = 0; const misses = {}, kinds = ['as written', 'speaker taken off', 'no brackets', 'half-width', 'ruby markup', 'blanks', 'line break'];
-for (const kind of kinds) { const p = ot.provider(path.resolve(root), path.resolve(exe)), hh = { originalText: p, trace() {}, resolveSource: HookNative.prototype.resolveSource };
-  lines.forEach((raw, i) => { const t = String(raw || '').trim(); if (!t || !/[぀-ヿ一-鿿]/.test(t)) return; const f = forms(t).find(x => x[0] === kind); if (!f) return; total++; const r = hh.resolveSource(f[1]); if (r && (r.status === 'exact' || r.status === 'high')) paired++; else (misses[kind] = misses[kind] || []).push([i, t, r?.status || 'none']); }); }
-console.log(JSON.stringify({ lookups: total, paired, unpaired: total - paired, byForm: Object.fromEntries(Object.entries(misses).map(([k, v]) => [k, { count: v.length, examples: v.slice(0, 5) }])) }, null, 1));
+let total = 0, paired = 0, nonDialogue = 0; const misses = {}, skipped = [], kinds = ['as written', 'speaker taken off', 'no brackets', 'half-width', 'ruby markup', 'blanks', 'line break'];
+for (const kind of kinds) { const p = live() || tableProvider(), hh = { originalText: p, trace() {}, resolveSource: HookNative.prototype.resolveSource };
+  lines.forEach((raw, i) => { const t = String(raw || '').trim(); if (!t || !/[぀-ヿ一-鿿]/.test(t)) return;
+    if (HookNative.nonDialogue(t) || label(t)) { if (kind === 'as written') { nonDialogue++; if (skipped.length < 8) skipped.push(t.slice(0, 30)); } return; }
+    const f = forms(t).find(x => x[0] === kind); if (!f) return; total++; const r = hh.resolveSource(f[1]);
+    if (r && (r.status === 'exact' || r.status === 'high')) paired++; else (misses[kind] = misses[kind] || []).push([i, t, r?.status || 'none']); }); }
+console.log(JSON.stringify({ mode, lookups: total, paired, unpaired: total - paired, nonDialogue, nonDialogueExamples: skipped, byForm: Object.fromEntries(Object.entries(misses).map(([k, v]) => [k, { count: v.length, examples: v.slice(0, 5) }])) }, null, 1));
 process.exit(total === paired ? 0 : 1);
