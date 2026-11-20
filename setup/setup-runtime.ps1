@@ -39,7 +39,7 @@ if ($env:MEGULIT_SETUP_WEB -ne '0' -and (-not $env:MEGULIT_SETUP_TEST -or $env:M
 # The exe's animated native splash is dropped by a flag file once the skin shows its first video frame (or the classic window appears instead).
 function Release-NativeSplash([string]$why) { if ($env:MEGULIT_SPLASH_FLAG -and -not $script:splashReleased) { $script:splashReleased = $true
     # the skin window must be in front and active BEFORE the loading screen fades (a window shown behind a topmost one is not activated): bring it up, then drop the flag
-    try { if ($script:win) { $script:win.BringFront() } } catch { Boot-Mark ('bring-front failed ' + $_) }
+    try { if ($script:win) { $script:win.BringFront(); $script:win.FadeIn(14, 280) } } catch { Boot-Mark ('bring-front failed ' + $_) }
     try { [IO.File]::WriteAllText($env:MEGULIT_SPLASH_FLAG, $why) } catch {}; Boot-Mark ('native-splash-released why=' + $why) } }
 function Close-Splash { if ($script:splash) { try { $script:splash.Close(); $script:splash.Dispose() } catch {}; $script:splash = $null; Boot-Mark 'splash-closed' } }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

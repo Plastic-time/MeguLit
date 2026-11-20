@@ -177,3 +177,11 @@ test('the folder picker panel markup is in the page, hidden until Browse', { ski
   const s = await ev('(()=>{const p=document.getElementById("picker");const cs=getComputedStyle(p);return {has:!!p,display:cs.display,ids:["pkSide","pkMain","pkOk","pkMk","pkMore","pkCancel","pkNew"].every(i=>!!document.getElementById(i))}})()');
   assert.ok(s.has && s.ids && s.display === 'none', JSON.stringify(s));
 });
+
+test('transparent glass loading screen: per-pixel alpha window, glass logo PNG with real alpha, click-through, skin fades in as it fades out', () => {
+  const rs = fs.readFileSync(path.join(repo, 'desktop', 'src', 'runtime_setup.rs'), 'utf8'), web = fs.readFileSync(path.join(repo, 'setup', 'setup-web.ps1'), 'utf8'), rt = fs.readFileSync(path.join(repo, 'setup', 'setup-runtime.ps1'), 'utf8');
+  const png = fs.readFileSync(path.join(repo, 'setup', 'glass-logo.png')); assert.equal(png.toString('ascii', 1, 4), 'PNG'); assert.equal(png[25], 6, 'RGBA'); assert.ok(png.readUInt32BE(16) >= 900, 'about 2x resolution: ' + png.readUInt32BE(16));
+  assert.match(rs, /UpdateLayeredWindow/); assert.match(rs, /0x80\|0x8\|0x0800_0000\|0x0008_0000\|0x20/, 'toolwindow, topmost, no-activate, layered, transparent (click-through)'); assert.match(rs, /0x000E200B/, '32bpp premultiplied ARGB'); assert.match(rs, /glass-logo\.png/);
+  assert.ok(!rs.includes('CreateSolidBrush') && !/[^p]FillRect\(/.test(rs), 'no background plate any more');
+  assert.match(web, /MEGULIT_NATIVE_SPLASH\) \{ \$win\.Opacity = 0 \}/); assert.match(web, /public void FadeIn\(/); assert.match(rt, /FadeIn\(14, 280\)/);
+});

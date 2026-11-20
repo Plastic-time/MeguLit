@@ -189,6 +189,9 @@ public class SetupWin : Form {
   protected override void OnVisibleChanged(EventArgs e) { base.OnVisibleChanged(e); if (Log != null) Log("window: skin visible=" + Visible + " pos=" + Left + "," + Top + " size=" + Width + "x" + Height + " border=" + FormBorderStyle); }
   public void BringFront() { bool was = TopMost; TopMost = true; Activate(); bool ok = SetForegroundWindow(Handle); TopMost = was; if (Log != null) Log("window: bring-to-front foreground-ok=" + ok + " active=" + (Form.ActiveForm == this) + " pos=" + Left + "," + Top); }
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+  // the skin window loads invisible (opacity 0) under the transparent native loading screen and fades in as that fades out
+  System.Windows.Forms.Timer fadeT; int fadeStep;
+  public void FadeIn(int steps, int ms) { if (fadeT != null) return; fadeStep = 0; fadeT = new System.Windows.Forms.Timer(); fadeT.Interval = Math.Max(10, ms / steps); fadeT.Tick += delegate { fadeStep++; Opacity = Math.Min(1.0, fadeStep / (double)steps); if (fadeStep >= steps) { fadeT.Stop(); if (Log != null) Log("window: skin faded in, opacity=" + Opacity); } }; fadeT.Start(); if (Log != null) Log("window: skin fade-in starts"); }
   public void Dress() { int round = 2; DwmSetWindowAttribute(Handle, 33, ref round, 4); MARGINS m = new MARGINS(); m.l = 1; m.r = 1; m.t = 1; m.b = 1; DwmExtendFrameIntoClientArea(Handle, ref m); }
   // ---- drag-resize of the frameless window, locked to the design box 1000:640 (the page is scaled as a whole by the WebView2 zoom) ----
   public const double Ratio = 0.64;   // 640 / 1000
@@ -235,6 +238,7 @@ public class SetupWin : Form {
     $wa0 = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea; $scale = [math]::Max(0.5, [math]::Min($scale, [math]::Min($wa0.Width / 794.0, $wa0.Height / 508.0)))   # never larger than the work area (small screens)
     if ($testLog -and $env:MEGULIT_SETUP_WEB_DPI) { $scale = [double]$env:MEGULIT_SETUP_WEB_DPI / 96.0; $dpiS = $scale }   # tests: emulate 125/150/200 % (with --force-device-scale-factor)
     $win = New-Object SetupWin
+    if ($env:MEGULIT_NATIVE_SPLASH) { $win.Opacity = 0 }   # under the transparent native loading screen the skin window is there (WebView2 loads and plays) but invisible until it is released
     $win.Text = 'MeguLit 安装'; $win.FormBorderStyle = 'None'; $win.StartPosition = 'CenterScreen'; $win.ShowInTaskbar = -not $testLog; $win.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
     # starts at 79 % of the design box (794 x 508 logical); the user can drag the edges/corners: ratio locked, 480 x 307 logical minimum, at most the work area
     $win.ClientSize = New-Object Drawing.Size([int](794 * $scale), [int](508 * $scale)); $win.Grip = [int][math]::Max(5, [math]::Round(5 * $scale)); $win.Padding = New-Object Windows.Forms.Padding($win.Grip)   # route 1: a thin ring of the form's own around the WebView2 child (which swallows hit-tests): WM_NCHITTEST there gives the sizing codes. Route 2: the page's edge hot zones (index.html .rz) ask the host via a 'resize' message
