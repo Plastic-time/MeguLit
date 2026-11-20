@@ -1,7 +1,7 @@
 {
  "schema": "megulit.game-diff",
  "version": 1,
- "key": "",
+ "key": "20a57cfa736d946ede4ccc91b5b158091c031e9a54869aecacdb52c6cfa35086",
  "source": "official",
  "mode": "hide",
  "settings": {
@@ -12,15 +12,10 @@
   },
   "hide": {
    "textEffectsRead": false
-  },
-  "draw": {
-   "roleMap": {
-    "class:Window_QuestLog": "system"
-   }
   }
  },
  "exe": "Game.exe",
  "engine": "rpgmaker",
- "app": "diff-maker/1",
+ "app": "diff-maker/2",
  "issuedAt": ""
 }

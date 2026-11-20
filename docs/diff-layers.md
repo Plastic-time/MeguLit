@@ -30,7 +30,7 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 
 ## 绘制角色
 
-一套角色，以画字协议为准（docs/engine-draw-protocol.md）：引擎能报角色时直接在 `ToMe_CHARS` 里带 `role=line|name|choice|button|menu|system`（`draw.roles` 打开）；只知道自己身份（钩子名、窗口类、调用）时，由 `draw.roleMap` / `draw.rolePatterns` / `draw.roleFallback` 归到同样的六种角色（`core/draw-role.cjs`，引擎差分写本引擎的类，游戏差分只加自己的插件窗口）。只有 `line` 可以隐藏或替换
+一套角色，只看画字协议（docs/engine-draw-protocol.md）：引擎差分在 `ToMe_CHARS` 记录里带 `role=line|name|choice|button|menu|system`（`draw.roles` 打开时上报），内核和 diff-maker 都只认这个字段，不再按钩子名 / 窗口类在 profile 里另配规则。只有 `line` 可以隐藏或替换；`draw.embed` / `draw.embedTranslation` 控制台词由游戏自己画
 
 ## 认游戏
 

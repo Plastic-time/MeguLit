@@ -1,11 +1,12 @@
 {
  "schema": 1,
- "tool": "diff-maker/1",
+ "tool": "diff-maker/2",
  "gameKey": "senren-banka",
- "exeHash": "28915c460e41f686ed988033cc31b810d76bc25e112fe59bb81f493f93f90081",
+ "exeSha256": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3",
  "engine": "kirikiri",
  "title": "千恋＊万花",
- "diff": "validation/fixtures/games/senren-banka/diff-28915c460e41.json",
+ "diff": "probe-fd37d708.diff.json",
+ "lines": "probe-fd37d708.lines.json",
  "events": [
   {
    "kind": "line",
@@ -2837,51 +2838,7 @@
    "glyph": -1
   }
  ],
- "identities": [
-  {
-   "label": "hook:KiriKiriZ",
-   "id": {
-    "hook": "KiriKiriZ"
-   }
-  },
-  {
-   "label": "hook:EmbedKrkrZ",
-   "id": {
-    "hook": "EmbedKrkrZ"
-   }
-  },
-  {
-   "label": "hook:TextRender",
-   "id": {
-    "hook": "TextRender"
-   }
-  },
-  {
-   "label": "hook:tTVPNativeBaseBitmap::DrawText",
-   "id": {
-    "hook": "tTVPNativeBaseBitmap::DrawText"
-   }
-  },
-  {
-   "label": "hook:Krkr2wcs",
-   "id": {
-    "hook": "Krkr2wcs"
-   }
-  },
-  {
-   "label": "hook:KiriKiri2",
-   "id": {
-    "hook": "KiriKiri2"
-   }
-  },
-  {
-   "label": "hook:ocr",
-   "id": {
-    "hook": "ocr",
-    "src": "kernel"
-   }
-  }
- ],
+ "records": [],
  "expect": {
   "params": {
    "hideMethod": "hide",
@@ -2909,19 +2866,12 @@
    "pass": true,
    "over": []
   },
-  "roles": {
-   "hook:KiriKiriZ": "line",
-   "hook:EmbedKrkrZ": "line",
-   "hook:TextRender": "line",
-   "hook:tTVPNativeBaseBitmap::DrawText": "system",
-   "hook:Krkr2wcs": "line",
-   "hook:KiriKiri2": "line",
-   "hook:ocr": null
-  },
+  "draw": [],
+  "items": 0,
   "scriptPair": {
-   "lines": 21,
+   "lines": 19,
    "found": 14,
-   "rate": 0.667
+   "rate": 0.737
   }
  }
 }
