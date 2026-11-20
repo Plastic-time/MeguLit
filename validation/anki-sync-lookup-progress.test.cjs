@@ -23,6 +23,7 @@ test('later syncs reach words after 300 dictionary misses and still retry earlie
  assert.equal(second.imported,2);assert.equal(second.reviews,2);
  const third=await sync();assert.equal(third.imported,0);assert.equal(third.reviews,0);
  assert.ok(calls.includes('word299'));
+ await sync();assert.equal(calls[0],'word1');
 });
 
 test('resuming lookups keeps the original update order for two notes matching the same word',async t=>{
