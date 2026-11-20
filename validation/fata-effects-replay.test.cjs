@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// 2026-11-21 ファタモルガーナの館 (KiriKiri2, owner's run 22:51:03Z-22:53:42Z in E:\MeguLit-Test-1421\logs, hook-events.log and
+// hook-diagnostics-20261120-225350-542.log). The game fades each line in with a shuffled per-character effect drawn by
+// tTVPNativeBaseBitmap::DrawText (「そしそて魂しそはて砕魂…」); its KAG message layer page lines and the KiriKiri2 hook (the line in pieces
+// cut at its waits: 「が……」「たのだ。」) did not line up, and core logged 20 「krkr page: hook line drawn nowhere on the page, dropped」.
+// The texts, their order and their times below are the log's; page lines are where the log placed them (「placement placed: line N, K
+// characters」). Every story line must reach the reader once, the choice 「……おはよう………………」 must survive the choice filter, and core
+// must count this game's lines as broken by the effect (read mode) while a game with clean lines is never switched.
+const test=require('node:test'),assert=require('node:assert/strict');
+const {HookNative}=require('../core/hook-native.cjs');
+const DRAW='tTVPNativeBaseBitmap::DrawText';
+function fixture(t){t.mock.timers.enable({apis:['setTimeout']});let now=100000;const events=[],traces=[],located=[];
+ const hook=new HookNative({native:__dirname,hook:__dirname,logs:'Z:/no-fixture-log'},m=>events.push(m),()=>{},()=>now);hook.trace=s=>traces.push(s);hook.locateChoices=o=>located.push(o);t.after(()=>hook.stop());
+ const box={x0:56,y0:459,x1:748,y1:459,size:22,sw:804,sh:604,count:0};
+ const at=ms=>{while(ms>now){const step=Math.min(50,ms-now);now+=step;t.mock.timers.tick(step);}};
+ return {hook,events,traces,located,at,
+  hookLine(ms,text,sourceName='KiriKiri2'){at(ms);hook.source({text,sourceName,origin:'live'},'');},
+  aux(ms,text,sourceName=DRAW){at(ms);hook.auxText({text,sourceName,role:0});},
+  begin(ms,line){at(ms);hook.pageLine({type:'hookEngineLine',engine:'krkr',phase:'begin',line,same:false,nvl:true,...box,text:''});},
+  end(ms,line,text){at(ms);hook.pageLine({type:'hookEngineLine',engine:'krkr',phase:'end',line,same:false,nvl:true,...box,count:[...text].length,text});},
+  sources:()=>events.filter(m=>typeof m.hookSource==='string'&&m.hookSource).map(m=>m.hookSource)};}
+const S=s=>{const [m,r]=s.split(':');return 100000+(Number(m)*60+Number(r))*1000;};/* 22:5m:ss.sss -> fixture ms */
+
+/* 22:51:40-22:51:53 the prologue: page lines 5-8 drew each sentence, the DrawText effect frames of it around them */
+function prologue(f){
+ const L=[['1:40.966','その瞬間、私は死体を見下ろしていた。',null],['1:44.880','……自分の死体だ。','1:45.226 ………自分……の自死……体…自だ…。自体だ分の死。体だ分の死。分体の死だ。体だ分の死。'],
+  ['1:46.753','磔の場へと引きずられるその姿に……',null],['1:48.361','深い絶望を抱き……','1:48.716 深い深絶望い深を絶抱望い深き深絶…いを望抱…絶きを望…抱…きを望…抱…きを…抱…き……'],
+  ['1:49.370','そして魂は砕け……','1:49.728 そしそて魂しそはて砕魂しそけそはて…し魂砕…てはけ魂…砕は…け魂…砕は…け…砕…け……'],['1:50.380','私のすべては、消滅した。',null],
+  ['1:51.474','そう、一度はすべてを失った。',null],['1:52.418','……けれど……','1:52.777 ………けれ……どけ…れ…………どけ…れ…どけ……れ…どけ……れど………']];
+ L.forEach(([ms,text,frame],i)=>{f.begin(S(ms)-200,i+1);f.end(S(ms),i+1,text);if(frame){const [fm,...ft]=frame.split(' ');f.aux(S(fm),ft.join(' '));}});
+}
+/* 22:51:53-22:52:04 the KiriKiri2 stream, selected: one line whole, then lines in pieces at their waits; page lines 9-12 */
+function kirikiri2(f){
+ f.begin(S('1:53.300'),9);f.hookLine(S('1:53.470'),'……とこしえの闇に溶けゆく中……');f.end(S('1:53.489'),9,'……とこしえの闇に溶けゆく中……');
+ f.begin(S('1:55.129'),10);f.aux(S('1:55.272'),'を私呼ぶを私声呼ぶがを私…私声呼…をぶ');f.hookLine(S('1:55.268'),'が……');f.end(S('1:55.380'),10,'私を呼ぶ声が……届いたのだ。');
+ f.hookLine(S('1:55.393'),'たのだ。');f.aux(S('1:55.409'),'が届呼声…いぶ…が声た声届…のがい…だ…届た。…いの');f.aux(S('1:55.580'),'届だたい。の届だたい。のだた。のだ。');
+ f.begin(S('1:57.900'),11);f.hookLine(S('1:57.936'),'…');f.hookLine(S('1:58.073'),'…だから……');f.end(S('1:58.044'),11,'……だから……');f.aux(S('1:58.246'),'……だか……らだ…か…………らだか……らだ…か……らだ…か…ら………');
+ /* page line 12 drew the effect frame (the reader's own pairing missed it): the hook line is its text */
+ f.begin(S('2:01.900'),12);f.hookLine(S('2:02.010'),'もう一度、誓った。');f.end(S('2:02.036'),12,'もうも一度うも、一誓度うもっも、一たう誓度。一、っ誓度た、。っ誓度た、。っ誓た。った。');
+ f.at(S('2:06.000'));
+}
+
+test('ファタ 22:51:40-22:52:06: every line reaches the reader once, effect frames and pieces never',t=>{
+ const f=fixture(t);prologue(f);kirikiri2(f);
+ const got=f.sources().map(HookNative.flat);
+ const want=['その瞬間、私は死体を見下ろしていた。','……自分の死体だ。','磔の場へと引きずられるその姿に……','深い絶望を抱き……','そして魂は砕け……','私のすべては、消滅した。','そう、一度はすべてを失った。','……けれど……','……とこしえの闇に溶けゆく中……','私を呼ぶ声が……届いたのだ。','……だから……','もう一度、誓った。'];
+ for(const w of want)assert.equal(got.filter(g=>g===w).length,1,w+' once in '+JSON.stringify(got));
+ assert.ok(!got.some(g=>['が……','たのだ。','…','…だから……'].includes(g)),'no piece of a line is a line: '+JSON.stringify(got));
+ assert.ok(!got.some(g=>HookNative.interleaved(g)),'no effect frame is a line');
+ assert.equal(f.traces.filter(s=>/dropped/.test(s)).length,0,'nothing dropped');
+});
+
+test('ファタ 22:51:55: a page line takes the held hook line its drawn text shows, not the oldest one',t=>{
+ const f=fixture(t);prologue(f);
+ /* the oldest held line is a late copy of the line before; page line 9 draws the next one */
+ f.hookLine(S('1:53.000'),'……けれど……');f.hookLine(S('1:53.100'),'……とこしえの闇に溶けゆく中……');f.begin(S('1:53.200'),9);f.end(S('1:53.400'),9,'……とこしえの闇に溶けゆく中……');f.at(S('1:56.000'));
+ const got=f.sources().map(HookNative.flat);
+ assert.equal(got.filter(g=>g==='……けれど……').length,1,'the line before is not read twice: '+JSON.stringify(got));
+ assert.equal(got[got.length-1],'……とこしえの闇に溶けゆく中……');
+});
+
+test('ファタ: a hook line no page line draws (its own layer) is delivered from the hook text; a page dump of read lines goes quietly',t=>{
+ const f=fixture(t);prologue(f);
+ f.hookLine(S('2:26.115'),'…待っていて欲しい…');f.at(S('2:28.000'));
+ /* 22:52:22 KiriKiri1 dumped the page so far (216 characters) */
+ f.hookLine(S('2:28.100'),'その瞬間、私は死体を見下ろしていた。……自分の死体だ。磔の場へと引きずられるその姿に……深い絶望を抱き……そして魂は砕け……私のすべては、消滅した。そう、一度はすべてを失った。','KiriKiri1');f.at(S('2:30.000'));
+ const got=f.sources().map(HookNative.flat);
+ assert.equal(got.filter(g=>g==='…待っていて欲しい…').length,1,JSON.stringify(got));
+ assert.ok(!got.some(g=>g.length>60),'the page dump is not read again');
+ assert.ok(f.traces.some(s=>/drawn off the page layer, delivered from the hook text/.test(s)));
+ assert.ok(f.traces.some(s=>/hook line already read, skipped/.test(s)));
+});
+
+test('ファタ 22:52:51-22:52:54: the choice 「……おはよう………………」 is an option and its hook line is read as the choice rows',t=>{
+ const f=fixture(t);prologue(f);f.at(S('2:51.000'));
+ assert.equal(HookNative.interleaved('……おはよう………………'),false,'ellipses are no effect frame');
+ assert.equal(HookNative.interleaved('……おはよう……………おはよう……………'),true,'the effect frame of it is');
+ f.aux(S('2:51.584'),'選択肢','Krkr2wcs');f.aux(S('2:52.629'),'……おはよう……………おはよう……………');
+ f.hookLine(S('2:52.634'),'選択肢選択肢……おはよう………………','Krkr2wcs');f.aux(S('2:52.636'),'……おはよう………………','KiriKiri4');
+ f.at(S('2:53.200'));
+ assert.ok(f.located.some(o=>o.includes('……おはよう………………')),'the option is located: '+JSON.stringify(f.located)+' '+JSON.stringify(f.traces.filter(s=>/choice/.test(s))));
+ f.at(S('2:55.000'));
+ const got=f.sources();
+ assert.ok(got.some(g=>g.split('\n').includes('……おはよう………………')),'the option text is read with translation and ruby: '+JSON.stringify(got)+JSON.stringify(f.traces.slice(-14)));
+ assert.equal(f.traces.filter(s=>/dropped/.test(s)).length,0);
+});
+
+test('core read-mode judge: ファタ\'s lines broken by the effect switch once; clean lines (千恋＊万花) never',t=>{
+ const f=fixture(t);prologue(f);kirikiri2(f);
+ const fx=f.events.filter(m=>m.type==='hookTextEffects');
+ assert.equal(fx.length,1,JSON.stringify(f.traces.filter(s=>/text effects/.test(s))));
+ assert.ok(fx[0].orphan/(fx[0].orphan+fx[0].paired)>.3);
+});
+
+test('core read-mode judge: clean lines (千恋＊万花 22:53:50Z on: ADV lines, side streams only carry the name plate) never switch',t=>{
+ const g=fixture(t);
+ const lines=['「おはようございます」','今日も朝から暑い。','穂織の町は山に囲まれている。','「将臣、起きてるか？」','祖父の声が聞こえた。','俺は布団から起き上がる。','窓の外では蝉が鳴いていた。','「今行くよ」'];
+ lines.forEach((l,i)=>{g.aux(200000+i*3000,'【 将臣 】','KiriKiriZ');g.hookLine(200100+i*3000,l,'KiriKiriZ');});
+ g.at(240000);
+ assert.equal(g.events.filter(m=>m.type==='hookTextEffects').length,0,JSON.stringify(g.traces.filter(s=>/text effects/.test(s))));
+});

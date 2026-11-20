@@ -391,7 +391,7 @@ class HookNative{
   /* 2026-11-15 (死に逝く君、館に芽吹く憎悪: the side stream's 「X　X　」 frame came 4-25 ms before the dialogue stream's line, was located
      as art text and drawn translated next to the subtitle): a side-stream text waits until the dialogue line of that moment
      has arrived, then the usual "part of the current line" check drops it */
-  {const t=m.text;const at=setTimeout(()=>this.artCandidate(t),AUX_ART_DELAY_MS);at.unref?.();}/* 2026-11-19 (千恋＊万花 settings page: 「オオ」「テテ」 went to OCR as options) no choice candidates while the dialogue box is gone for a known reason */if(this.dialogGoneAt&&Date.now()-this.dialogGoneAt>=800){this.trace('choice aux skipped: dialogue box gone');return;}const C=this.choice||(this.choice=this.newChoiceCapture());const added=C.add(m.text,this.lastSource,this.speaker?.text);
+  {const t=m.text;const at=setTimeout(()=>this.artCandidate(t),AUX_ART_DELAY_MS);at.unref?.();}try{this.textEffectsFrame(m.text);}catch{}/* 2026-11-19 (千恋＊万花 settings page: 「オオ」「テテ」 went to OCR as options) no choice candidates while the dialogue box is gone for a known reason */if(this.dialogGoneAt&&Date.now()-this.dialogGoneAt>=800){this.trace('choice aux skipped: dialogue box gone');return;}const C=this.choice||(this.choice=this.newChoiceCapture());const added=C.add(m.text,this.lastSource,this.speaker?.text);
   this.trace('choice aux '+String(m.sourceName||'').slice(0,40)+' role='+(m.role??'')+' added='+JSON.stringify(added)+' text='+JSON.stringify(String(m.text).slice(0,80)));
   if(!added.length)return;clearTimeout(this.choiceTimer);this.choiceTimer=setTimeout(()=>this.requestChoices(0),450);this.choiceTimer.unref?.();}
  /* 2026-11-21 (ファタモルガーナの館 r30: 「choice locate options=["お声が聞けて","かったです","か良ったか良でっす…"]」): a text effect's interleaved frame and a piece
@@ -431,7 +431,9 @@ class HookNative{
    const full=t.replace(/(%[0-9A-Za-z]*;)|[0-9A-Za-z]/g,(c,tag)=>tag||String.fromCharCode(c.charCodeAt(0)+0xFEE0));if(full!==t)add(full);} /* engine tags (KiriKiri %84; …%;) stay as written */
   if(t){add('「'+t+'」');add('『'+t+'』');} /* also around a line that has its own inner brackets: 『「…」\n「…」』, 「「のわっ」」 */
   for(const v of out.slice())add(v.replace(/^[「『]/,'').replace(/[」』]$/,''));return out;}
- static interleaved(t){const a=[...HookNative.flat(t)];if(a.length<8)return false;if(new Set(a).size/a.length<.55)return true;const m=new Map();for(let i=0;i+1<a.length;i++){const g=a[i]+a[i+1];m.set(g,(m.get(g)||0)+1);if(m.get(g)>=3)return true;}return false;}
+ /* 2026-11-21 (ファタモルガーナの館 22:52:53: the only option 「……おはよう………………」 was taken for an effect frame by its ellipses, choice filtered 3 -> 1):
+    only content characters count, punctuation and symbols repeat in any line */
+ static interleaved(t){const a=[...HookNative.content(t)];if(a.length<8)return false;if(new Set(a).size/a.length<.55)return true;const m=new Map();for(let i=0;i+1<a.length;i++){const g=a[i]+a[i+1];m.set(g,(m.get(g)||0)+1);if(m.get(g)>=3)return true;}return false;}
  choiceFilter(options){if(!Array.isArray(options))return options;const said=[this.lastSource,...(this.recentSources||[])].map(x=>HookNative.flat(x)).filter(Boolean);const drop=Profiles.choiceFilters(this.profile);const kept=options.filter(o=>{const f=HookNative.flat(o);if(!f||HookNative.interleaved(f))return false;if(drop.some(r=>r.test(String(o))))return false;return !said.some(x=>x!==f&&x.includes(f));});if(kept.length!==options.length)this.trace('choice options filtered '+options.length+' -> '+kept.length);return kept.length>=2?kept:null;}
  requestChoices(round){const options=this.choiceFilter(round>0&&this.choiceOptions?this.choiceOptions:this.choice?.options());
   if(!options){this.trace('choice candidates too few n='+(this.choice?.items.length||0));return;}
@@ -622,16 +624,21 @@ class HookNative{
   if(this.pageMode?.mode!=='nvl')this.trace(engine+' page mode on');this.pageMode={mode:'nvl',engine,at:now};
   let e=K.lines.get(m.line);if(!e){e={line:m.line,same:m.same===true,hookText:'',origin:'live',ended:false,at:now};K.lines.set(m.line,e);if(K.lines.size>64)K.lines.delete(K.lines.keys().next().value);
    if(!e.same)this.emit({type:'hookPage',engine,line:m.line*2-1,same:false,token:0,at:now});}
-  if(!e.hookText){const h=K.held.shift();if(h){e.hookText=h.text;e.origin=h.origin;}}
+  if(!e.hookText){const h=K.held.shift();if(h){e.hookText=h.text;e.origin=h.origin;e.heldAt=h.at;}}
   // OCR reports after the hook line: the first sentence of a page was already delivered as an ordinary line; it is re-read as the page's.
   if(!e.hookText&&engine==='ocr'&&this.lastSource&&HookNative.flat(this.lastSource)===HookNative.flat(String(m.text||'')))e.hookText=this.lastSource;
   if(m.phase!=='end'||e.ended)return;e.ended=true;
+  /* 2026-11-21 (ファタモルガーナの館, 22:51:55: page line 10 drew 「私を呼ぶ声が……届いたのだ。」 but took the hook line held before it, 「……けれど……」,
+     and the sentence was read twice while the right one was dropped): the hook text is paired by what the line drew, not by order alone.
+     A drawn line with kana takes the held hook line whose characters it shows (an effect frame shows them shuffled or repeated); when
+     none does, the drawn text is the line and the hook line waits for its own page line (expirePageHeld delivers it if none comes) */
+  const fx=engine!=='ocr'&&this.pagePick(K,e,String(m.text||''))===true;
   const drawn=HookNative.pageText(String(m.text||''),e.hookText),text=e.hookText||!drawn?drawn:this.originalTextFor(drawn);
   if(!text){this.trace(engine+' page line '+m.line+' had no readable text');return;}
   const token=IslandSource.token(text),line=m.line*2;
   this.emit({type:'hookPage',engine,line,same:e.same,token,at:now});
   this.emit({type:'hookTextPos',engine:engine+'_screen_v1',line,token,x0:m.x0,y0:m.y0,x1:m.x1,y1:m.y1,size:m.size,sw:m.sw,sh:m.sh,count:m.count,...(typeof m.color==='string'&&/^#[0-9a-f]{6}$/i.test(m.color)?{color:m.color}:{}),...HookNative.paintField(m.paint),at:now});
-  this.emitSource(text,e.origin==='history'?'live':e.origin,engine,line);
+  this.fxNext=fx;try{this.emitSource(text,e.origin==='history'?'live':e.origin,engine,line);}finally{this.fxNext=false;}
  }
  /* What the game really drew this line with (any engine path may report it): paint=f:rrggbbaa[,e:rrggbbaa:width][,s:rrggbbaa:dx:dy]
     f = glyph fill and its opacity, e = outline, s = drop shadow, a:1 = the opacity is not settled yet (a fade-in may be running). Missing parts were not drawn; a malformed field is dropped. */
@@ -653,7 +660,45 @@ class HookNative{
   K.held.push({text,origin:origin||'live',at:now});if(K.held.length>8)K.held.shift();this.schedulePageHeld();return true;
  }
  schedulePageHeld(){const K=this.pageState;if(!K)return;clearTimeout(K.timer);if(!K.held.length)return;const serial=this.serial,wait=Math.max(0,K.held[0].at+this.holdFor(K.engine)-this.now());K.timer=setTimeout(()=>{if(serial===this.serial)this.expirePageHeld();},wait);K.timer.unref?.();}
- expirePageHeld(){const K=this.pageState;if(!K)return;const now=this.now(),keep=[];for(const h of K.held){if(now-h.at<this.holdFor(K.engine)){keep.push(h);continue;}if(this.pageNvl()&&K.engine!=='ocr')this.trace(K.engine+' page: hook line drawn nowhere on the page, dropped chars='+h.text.length);else this.deliverSource(h.text,h.origin);}K.held=keep;this.schedulePageHeld();}
+ /* 2026-11-21 (ファタモルガーナの館: 20 hook lines 「drawn nowhere on the page, dropped」 in 2.5 minutes, about half the story): a hook line no
+    page line took is never dropped. One the reader already has (a piece of a delivered line, or a page dump made of delivered lines) goes
+    quietly; any other is the game's line drawn off the message layer (a text effect drawn on its own layer, a choice) and is delivered from
+    the hook text, counted as an effect line (textEffectsLine). Choice texts glued in one hook line come as one row each */
+ expirePageHeld(){const K=this.pageState;if(!K)return;const now=this.now(),keep=[];for(const h of K.held){if(now-h.at<this.holdFor(K.engine)){keep.push(h);continue;}if(this.pageNvl()&&K.engine!=='ocr'){if(this.heldCovered(h.text)){this.trace(K.engine+' page: hook line already read, skipped chars='+h.text.length);continue;}const parts=HookNative.glued(h.text,this.choiceKeys());const text=parts?parts.join('\n'):h.text;this.trace(K.engine+' page: hook line drawn off the page layer, delivered from the hook text chars='+h.text.length+(parts?' as '+parts.length+' choice row(s)':''));this.fxNext=true;try{this.deliverSource(text,h.origin);}finally{this.fxNext=false;}}else this.deliverSource(h.text,h.origin);}K.held=keep;this.schedulePageHeld();}
+ /* content characters: no spaces, punctuation or symbols (ellipses and brackets say nothing about which line it is) */
+ static content(v){return HookNative.flat(v).replace(/[\p{P}\p{S}]/gu,'');}
+ /* the drawn text shows the hook line: the same text, one inside the other, or (a text effect: characters shuffled, repeated, fading in) nearly every
+    distinct character of the drawn text is in the hook line and most of the hook line's are drawn */
+ static drawnMatch(hook,drawn){const a=HookNative.flat(hook),b=HookNative.flat(drawn);if(!a||!b)return false;if(a===b||a.length>=2&&b.includes(a)&&a.length>=b.length*.8||b.length>=2&&a.includes(b)&&b.length>=a.length*.8)return true;
+  const x=new Set(HookNative.content(hook)),y=new Set(HookNative.content(drawn));if(x.size<2||y.size<2)return false;let inX=0,inY=0;for(const c of y)if(x.has(c))inX++;for(const c of x)if(y.has(c))inY++;return inX/y.size>=.9&&inY/x.size>=.75;}
+ pagePick(K,e,own){if(!/[぀-ヿ]/.test(own))return;/* blank (hidden) or written back (a translation): the hook text stays the line's */
+  /* a clean drawn line that holds the hook text and more (the hook line came in pieces: 「…」「…だから……」 for 「……だから……」) is the line itself */
+  const whole=h=>{const a=HookNative.flat(h),b=HookNative.flat(own);return b.length>a.length&&b.includes(a)&&!HookNative.interleaved(own);};
+  if(e.hookText&&HookNative.drawnMatch(e.hookText,own)){if(whole(e.hookText)){e.hookText='';e.origin='live';return false;}return HookNative.flat(e.hookText)!==HookNative.flat(own);}
+  const i=K.held.findIndex(h=>HookNative.drawnMatch(h.text,own));
+  if(i>=0){const h=K.held.splice(i,1)[0];if(e.hookText)K.held.unshift({text:e.hookText,origin:e.origin,at:e.heldAt||this.now()});if(whole(h.text)){e.hookText='';e.origin='live';this.schedulePageHeld();return false;}e.hookText=h.text;e.origin=h.origin;this.trace(K.engine+' page line '+e.line+' paired by its drawn text');this.schedulePageHeld();return HookNative.flat(h.text)!==HookNative.flat(own);}
+  if(HookNative.interleaved(own))return;/* an effect frame no hook line explains is never the line */
+  if(e.hookText){K.held.unshift({text:e.hookText,origin:e.origin,at:e.heldAt||this.now()});this.trace(K.engine+' page line '+e.line+' drew another text than the hook line; the drawn text is the line');e.hookText='';e.origin='live';this.schedulePageHeld();}}
+ /* a held hook line the reader already has: inside one recent line, or (a page dump) at least 80 % made of recent lines */
+ heldCovered(text){const f=HookNative.flat(text),R=(this.recentSources||[]).filter(Boolean);if(!f)return true;if(R.some(r=>r.includes(f)))return true;
+  const mark=new Uint8Array(f.length);for(const r of R){if(r.length<4)continue;let at=f.indexOf(r);while(at>=0){mark.fill(1,at,at+r.length);at=f.indexOf(r,at+1);}}let n=0;for(const v of mark)n+=v;return n>=f.length*.8;}
+ choiceKeys(){const C=this.choice;if(!C||!Array.isArray(C.items))return [];const now=this.now();return C.items.filter(x=>now-x.at<5000).map(x=>x.key).filter(k=>k&&k.length>=2);}
+ /* 2026-11-21 (ファタモルガーナの館: the reader's own count saw 5-11 % orphans and never switched to read mode, because the lines the text
+    effect broke never reached it): core counts each of the game's first 20 lines. A line is an effect line when it came from the hook
+    text because no page line drew it, from a hidden placement with no hook line, from a page line that drew it shuffled, or when an
+    interleaved effect frame of its characters was drawn within 3 s. Six lines or more and over 30 % effect lines: hookTextEffects once
+    (services/reader.cjs: read mode for this exe, as galTextEffects). A game whose lines come clean (千恋＊万花) never gets there */
+ textEffectsState(){const pid=Number(this.state?.gameProcessId)||0;if(!this.fx||this.fx.pid!==pid)this.fx={pid,lines:[],frames:[],sent:false};return this.fx;}
+ static frameOf(set,key){if(set.size<3)return false;const k=new Set(key);let n=0;for(const c of set)if(k.has(c))n++;return n/set.size>=.9;}
+ textEffectsLine(text,effect){const F=this.textEffectsState();if(F.sent)return;const key=HookNative.content(text);if(key.length<2)return;const now=this.now();let l=F.lines.find(x=>x.key===key);
+  if(!l){if(F.lines.length>=20)return;l={key,at:now,effect:false};F.lines.push(l);}
+  if(!effect&&F.frames.some(fr=>now-fr.at<3000&&HookNative.frameOf(fr.set,key)))effect=true;
+  if(effect)l.effect=true;this.textEffectsJudge(F,l);}
+ textEffectsFrame(text){if(!HookNative.interleaved(text))return;const F=this.textEffectsState();if(F.sent)return;const now=this.now(),set=new Set(HookNative.content(text));F.frames=F.frames.filter(fr=>now-fr.at<3000);F.frames.push({set,at:now});if(F.frames.length>16)F.frames.shift();
+  for(const l of F.lines)if(!l.effect&&now-l.at<3000&&HookNative.frameOf(set,l.key)){l.effect=true;this.textEffectsJudge(F,l);}}
+ textEffectsJudge(F,l){const n=F.lines.length,e=F.lines.filter(x=>x.effect).length;this.trace('text effects: line '+(l.effect?'effect':'clean')+' '+e+'/'+n);if(F.sent||n<6||e/n<=.3)return;F.sent=true;this.trace('text effects: '+e+' of '+n+' lines broken by the text effect, read mode');this.emit({type:'hookTextEffects',paired:n-e,orphan:e,at:this.now()});}
+ /* a text made only of the given pieces glued (each may repeat): the distinct pieces in order, or null */
+ static glued(text,keys){const f=HookNative.flat(text),K=[...new Set(keys)].sort((a,b)=>b.length-a.length);if(!f||!K.length)return null;let rest=f;const out=[];for(let k=0;rest&&k<16;k++){const p=K.find(x=>rest.startsWith(x));if(!p)return null;if(!out.includes(p))out.push(p);rest=rest.slice(p.length);}return rest?null:out;}
  /* E306: engines without a page DLL are located on the picture (OCR, PageLocator.cs in GalWindowBridge). Each live hook
     line is sent there (gal-native sets this.locate) unless a native page engine (krkr / renpy) reported in the last
     10 minutes; ISLAND lines never get here. The OCR answer takes up to ~3.5 s, so on an OCR page a held hook line waits
@@ -837,7 +882,7 @@ class HookNative{
   /* 2026-11-20 core/page-text.cjs: the rest of a sentence that the last line left open with a comma is shown with it, as one sentence */
   const part=text;let continues=0;/* not when the engine named a new speaker after the last line */if(paged&&!(this.speaker&&this.speaker.at>(this.lastSourceAt||0))){const c=this.pageText.continuation(text,this.now());if(c){this.trace('sentence continues the shown line ('+c.continues+' chars before)');text=c.text;continues=c.continues;}}
   this.learnBareName(text);
-  const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;/* E416 the choice detector learns every dialogue line and speaker, whatever the engine */(this.choice||(this.choice=this.newChoiceCapture())).noteDialogue(text,speaker);/* E407 a new dialogue line ends the choice screen */if(text.replace(/\s+/g,'')!==String(this.lastSource||'').replace(/\s+/g,''))this.clearChoices('new dialogue line',400,text);this.lastSource=text;this.lastSourceAt=this.now();/* #468 the lines the game's own text gave (never an OCR line): an OCR reading of the same page is refused (ocrLineRefused) */if(origin!=='ocr'){const R=this.hookRecent||(this.hookRecent=[]);R.push({key:HookNative.flat(text),at:this.now()});if(R.length>24)R.shift();}this.palFlush?.();this.lastSourceStream=this.sourceStream||'';this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));if(paged){/* the reader keeps the page's earlier lines above this one while the page stays (web hook-reader.js) */if(!continues&&this.pageText.pages){const same=this.pageText.samePage(this.now());this.pageSaidSame=same;this.emit({type:'hookPage',engine:'text',line:(this.state.hookSequence||0)+1,same,at:this.now()});}this.pageText.shown(part,text,this.now());}this.notify({...(this.lineUnreadable?(this.lineUnreadable=false,{hookLineUnreadable:false}):{}),hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookFlowGrid:engine==='nvl'?(this.flowGridName||''):'',...(()=>{const f=engine==='nvl'?this.flowLayout(text):null;/* E410 */return {hookFlowPageStart:f?.pageStart===true,hookFlowRow:f?.row||'',hookSourceIndex:Number.isSafeInteger(f?.index)?f.index:-1};})(),hookSourceContinues:continues,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
+  const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;/* E416 the choice detector learns every dialogue line and speaker, whatever the engine */(this.choice||(this.choice=this.newChoiceCapture())).noteDialogue(text,speaker);/* E407 a new dialogue line ends the choice screen */if(text.replace(/\s+/g,'')!==String(this.lastSource||'').replace(/\s+/g,''))this.clearChoices('new dialogue line',400,text);this.lastSource=text;this.lastSourceAt=this.now();/* #468 the lines the game's own text gave (never an OCR line): an OCR reading of the same page is refused (ocrLineRefused) */if(origin!=='ocr'){const R=this.hookRecent||(this.hookRecent=[]);R.push({key:HookNative.flat(text),at:this.now()});if(R.length>24)R.shift();}this.palFlush?.();this.lastSourceStream=this.sourceStream||'';this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.textEffectsLine(text,this.fxNext===true||origin==='placement');if(paged){/* the reader keeps the page's earlier lines above this one while the page stays (web hook-reader.js) */if(!continues&&this.pageText.pages){const same=this.pageText.samePage(this.now());this.pageSaidSame=same;this.emit({type:'hookPage',engine:'text',line:(this.state.hookSequence||0)+1,same,at:this.now()});}this.pageText.shown(part,text,this.now());}this.notify({...(this.lineUnreadable?(this.lineUnreadable=false,{hookLineUnreadable:false}):{}),hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookFlowGrid:engine==='nvl'?(this.flowGridName||''):'',...(()=>{const f=engine==='nvl'?this.flowLayout(text):null;/* E410 */return {hookFlowPageStart:f?.pageStart===true,hookFlowRow:f?.row||'',hookSourceIndex:Number.isSafeInteger(f?.index)?f.index:-1};})(),hookSourceContinues:continues,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
  }
  /* #141 (CLANNAD: a bare name sent as its own string, with no brackets, before the 「…」 line). A short name-like line
     followed within 2 s by a quoted line is a name candidate; the second time it happens the name is learned, so from then
