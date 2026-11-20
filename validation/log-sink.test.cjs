@@ -8,12 +8,13 @@ function fakeIo(){const io={files:{},fail:false,hang:false,calls:0,pending:[],
  stat(f,cb){setImmediate(()=>io.files[f]!==undefined?cb(null,{size:io.files[f].length}):cb(new Error('ENOENT')));},
  rename(a,b,cb){io.files[b]=io.files[a];delete io.files[a];setImmediate(()=>cb(null));}};return io;}
 const tick=()=>new Promise(r=>setTimeout(r,20));
+const until=async(f,ms=5000)=>{const t=Date.now();while(!f()&&Date.now()-t<ms)await tick();};
 test('a full drive drops lines, counts them and says so once writing works again',async()=>{
  sink._reset();const io=fakeIo();io.fail=true;
  for(let i=0;i<5;i++)sink.append('L',`line ${i}\n`,{},io);
- await tick();await tick();
+ await until(()=>sink.pending('L').dropped===5);
  assert.equal(io.files.L,undefined);assert.equal(sink.pending('L').dropped,5);
- io.fail=false;sink.append('L','after\n',{},io);await tick();await tick();
+ io.fail=false;sink.append('L','after\n',{},io);await until(()=>/after\n$/.test(io.files.L||''));
  assert.match(io.files.L,/^\S+ log: dropped 5 lines \(log drive not writable\)\nafter\n$/);
  assert.equal(sink.pending('L').dropped,0);
 });
