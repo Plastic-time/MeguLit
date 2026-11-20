@@ -592,10 +592,15 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
             NoActivateWindow=window;
         }
     }
+    /* 2026-11-21 (owner, STEINS;GATE with the Alt+T panel pinned open: clicks on words advanced the game; the host logged no
+       click at all while the panel was open): since 1.0.0 an open menu switched the gate off, so with the panel pinned every
+       click on the reader's text went to the game. The gate stays on while the menu is open: the panel and the text regions
+       are both MeguLit's (HitRegions carries both), everything else still reaches the game. */
+    internal static bool PointerGateOn(bool translation,bool menuOpen,bool overlay,bool shown){return translation&&overlay&&shown;}
     static void RefreshReaderPointer(){
         if(PointerGate==null)return;
         Rect client;
-        if(!TranslationMode||MenuOpen||Overlay==IntPtr.Zero||!IsShown||!GetClientRect(Overlay,out client)){
+        if(!PointerGateOn(TranslationMode,MenuOpen,Overlay!=IntPtr.Zero,IsShown)||!GetClientRect(Overlay,out client)){
             PointerGate.Current=null;return;
         }
         /* Issue #133 (WHITE ALBUM2: clicking a word went to the next line). The overlay floated unbound (Target zero), the

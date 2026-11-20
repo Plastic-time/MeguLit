@@ -156,6 +156,8 @@ internal sealed class ReaderPointerGate {
     }
 
     internal static bool SelfTest(){
+        /* an open (or pinned) menu keeps the gate on; no translation layer, no overlay or a hidden layer switch it off */
+        if(!GalWindowBridge.PointerGateOn(true,true,true,true)||!GalWindowBridge.PointerGateOn(true,false,true,true)||GalWindowBridge.PointerGateOn(false,true,true,true)||GalWindowBridge.PointerGateOn(true,true,false,true)||GalWindowBridge.PointerGateOn(true,true,true,false))return false;
         /* hook guard: input after the hook went quiet for StaleMs means reinstall; input the hook saw, or old input, does not */
         if(!Stale(1000,3500,3600)||Stale(4000,3500,4100)||Stale(1000,1500,2900)||Stale(1000,3500,9000))return false;
         var client=new GalWindowBridge.Rect(0,0,1920,1080);

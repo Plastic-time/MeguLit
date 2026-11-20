@@ -14,3 +14,10 @@ test('relay survives a failed write; the hook is reinstalled when it goes quiet'
  assert.match(s,/IntPtr Filter\(int code,IntPtr message,ref Mouse mouse\)\{\r?\n\s*lastHook=GetTickCount\(\);/,'every hook callback counts as alive');
  assert.match(s,/if\(!Stale\(1000,3500,3600\)\|\|Stale\(4000,3500,4100\)\|\|Stale\(1000,1500,2900\)\|\|Stale\(1000,3500,9000\)\)return false;/,'decision covered by the bridge self-test');
 });
+test('an open or pinned Alt+T menu keeps the pointer gate on (STEINS;GATE 2026-11-21)',()=>{
+ const g=fs.readFileSync(path.join(__dirname,'..','native','GalWindowBridge.cs'),'utf8');
+ assert.match(g,/internal static bool PointerGateOn\(bool translation,bool menuOpen,bool overlay,bool shown\)\{return translation&&overlay&&shown;\}/);
+ assert.match(g,/if\(!PointerGateOn\(TranslationMode,MenuOpen,Overlay!=IntPtr\.Zero,IsShown\)\|\|!GetClientRect\(Overlay,out client\)\)\{/);
+ assert.doesNotMatch(g,/if\(!TranslationMode\|\|MenuOpen\|\|Overlay==IntPtr\.Zero\|\|!IsShown/,'the menu no longer switches the gate off');
+ assert.match(s,/GalWindowBridge\.PointerGateOn\(true,true,true,true\)/,'covered by the bridge self-test');
+});
