@@ -19,6 +19,8 @@ setlocal
 call "%MEGULIT_VS%" -arch=x64 -host_arch=x64 -no_logo >nul || exit /b 1
 cl %FLAGS% /Fo"%OUT%\host64.obj" host.cpp /Fe:"%OUT%\host64.exe" /link d3d9.lib d3d11.lib d3dcompiler.lib opengl32.lib user32.lib gdi32.lib >nul || exit /b 1
 cl %FLAGS% /Fo"%OUT%\fontdots64.obj" fontdotshost.cpp /Fe:"%OUT%\fontdots64.exe" >nul || exit /b 1
+rem page redraw rule of the glyph learner (CHAOS;CHILD 2026-11-21)
+cl %FLAGS% /std:c++17 /Fo"%OUT%\redraw.obj" redraw.cpp /Fe:"%OUT%\redraw.exe" >nul || exit /b 1
 endlocal
 set FAIL=0
 call "%~dp0run-scope.cmd" || set FAIL=1
@@ -27,6 +29,7 @@ for %%m in (d3d9-up d3d9-vb d3d9-ivb d3d9-quad4 d3d9-decl d3d11 gl gl-ff gdi) do
  "%OUT%\host64.exe" "%DLLS%\MeguLitGpu64.dll" %%m || set FAIL=1
 )
 call "%~dp0run-trace.cmd" "%DLLS%" || set FAIL=1
+"%OUT%\redraw.exe" || set FAIL=1
 "%OUT%\fontdots32.exe" "%DLLS%\MeguLitGpu32.dll" || set FAIL=1
 "%OUT%\fontdots64.exe" "%DLLS%\MeguLitGpu64.dll" || set FAIL=1
 findstr /c:"MeguLitGpu version=1" "%DLLS%\MeguLitGpu32.dll" >nul || (echo FAIL MeguLitGpu32.dll has no version marker & set FAIL=1)
