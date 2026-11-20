@@ -5,6 +5,7 @@
      and the first-play calibration finds no hide combination that passes -> read mode.
    - 千恋＊万花 (22:53:42Z on): no window over a threshold, calibration keeps hide + redraw.
    Then the live service on a fake reader: calibration stored, read mode with the reason, 重新校准 records again. */
+process.env.MEGULIT_RELAY_BASE='off';/* no relay: the shared result and the report stay local */
 const assert=require('node:assert'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {replay,parseTrace,SelfCheck,effectFrame}=require('../core/self-check.cjs');
 const ap=require('../core/auto-profile.cjs');

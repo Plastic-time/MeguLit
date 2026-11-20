@@ -27,7 +27,7 @@ test('reader bootstrap keeps a frozen window.MeguLitProfile with get()',()=>{
  const s=fs.readFileSync(path.join(root,'web/reader/bootstrap.js'),'utf8');
  assert.match(s,/message\.gameProfile/);assert.match(s,/window\.MeguLitProfile=Object\.freeze/);assert.match(s,/megulit-profile/);
  const g=fs.readFileSync(path.join(root,'core/gal-native.cjs'),'utf8');assert.match(g,/setGameProfile\(profile,input\)/);
- const r=fs.readFileSync(path.join(root,'services/reader.cjs'),'utf8');assert.match(r,/this\.applyGameProfile\(exe,game\)/);assert.match(r,/let profile=P\.profileFor\(input\);/);/* 2026-11-21 this PC's auto layer (services/self-check-live.cjs) goes on top before the profile is handed over */assert.match(r,/profile=P\.profileFor\(\{\.\.\.input,auto:s\.stored\.settings\}\)/);assert.match(r,/setGameProfile\?\.\(profile,input\)/);
+ const r=fs.readFileSync(path.join(root,'services/reader.cjs'),'utf8');assert.match(r,/this\.applyGameProfile\(exe,game\)/);assert.match(r,/let profile=P\.profileFor\(input\);/);/* 2026-11-21 this PC's auto layer (services/self-check-live.cjs) goes on top before the profile is handed over */assert.match(r,/profile=P\.profileFor\(\{\.\.\.input,auto:s\.layer\}\)/);assert.match(r,/setGameProfile\?\.\(profile,input\)/);
 });
 
 test('a game without a library engine takes the engine diff from its first engine page record',()=>{

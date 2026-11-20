@@ -108,14 +108,30 @@ selfCheck window=1 lines=20 hide=0.25 drop=0.231 repeat=0 choice=1 pos=- pair=0.
 
 `windows` 是当前在跑的这局最近 10 个窗口（诊断时游戏开着才有）。整份 info.json 照旧过 `scrub`。
 
-## 服务端聚合（之后另开会话）
+## 服务端汇总和下发（relay/src/auto-profile.js）
 
-建议规则，供服务端会话参考：
+现有 Worker（D1，免费额度），迁移 `relay/migrations/0021_auto_profiles.sql`，表 `auto_profile_reports`：每个游戏每个上报者（IP 哈希）一行，新的覆盖旧的。
 
-- 按 `key` 聚合；同一 `exe` 不同 `key` 的以 `key` 为准
-- 只聚合 `version` ≥ 当前最低支持版本的记录
-- `mode=read` 的票数超过一半，下发读模式；否则取 `pass` 的 `settings` 里出现最多的一组
-- 下发的差分仍是同一格式，客户端当作「本机自动差分」那一层；本机再校准出的结果覆盖下发的（新量到的盖过旧的）
+| 接口 | 说明 |
+|---|---|
+| `POST /api/auto-profile/report` | `{version:1, profile:<上面 autoProfile.profile 那块>}`，每 IP 每小时 30 次；`settings` 只留可调键（calibrate.* / page.effectFrames / hide.textEffectsRead / placement.firstLineAnchor / choice.filters，坏 RegExp 丢掉），mode=read 强制 `hide.textEffectsRead=true` |
+| `GET /api/auto-profile/<gameKey>` | `{schema:'megulit.auto-profile', version:1, key, mode, settings, agree, reporters, cost, at}`；没有一致结果时 404 |
+
+挑选规则（只看最近 180 天）：
+- 相同 mode+settings（规范化 JSON）的算一组
+- 超过半数上报者是读模式、且至少 2 人 → 下发读模式
+- 否则在 ≥2 人一致的隐藏组里取平均代价最低（分最高）的，人数多者优先
+- 只有 1 人报过的结果永远不下发
+
+写入成本：每次上报 1 行 upsert + 1 行限流；读取不写 D1（全局 IP 限流兜底）。
+
+客户端 `services/auto-profile-feed.cjs`：
+- 校准完成、闸门退档后自动上报；受「共享适配」开关控制（和适配记录同一个开关）
+- 开游戏时同步读本地缓存 `data/config/auto-profiles-feed/<gameKey>.json`，后台刷新（有结果缓存 24 小时，404 缓存 6 小时）
+- **本机校准优先**：本机有 `auto-profiles/<gameKey>.json` 就不用下发的；没有时下发的隐藏结果作为 auto 层，本机照常录制校准，校准完成后覆盖；下发的是读模式就直接读模式、不再录制
+- 「重新校准」跳过下发结果，只按本机重测
+
+部署（等店主说再做）：`wrangler d1 migrations apply megulit-relay --remote`，然后 `wrangler deploy`
 
 ## 测试
 
@@ -124,3 +140,5 @@ selfCheck window=1 lines=20 hide=0.25 drop=0.231 repeat=0 choice=1 pos=- pair=0.
 - ファタモルガーナの館（22:51–22:53Z）：第 1 个窗口丢句率 23% 超线 → 退档；校准里所有隐藏组合都不过线 → 读模式
 - 千恋＊万花（22:53:42Z 之后）：窗口全部过线，校准保持隐藏重画
 - 在线服务：首次校准写盘、读模式带原因、重新校准、已存的隐藏差分运行中退档
+
+`validation/auto-profile-relay.test.cjs`：Worker 进程内跑（D1 用 node:sqlite），覆盖单人不下发、两人一致下发、同 IP 一行、最低代价胜出、读模式要过半、键过滤、坏请求；客户端上报/缓存/本机优先/下发读模式/共享开关关闭不上报
