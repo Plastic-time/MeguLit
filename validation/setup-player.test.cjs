@@ -2,8 +2,8 @@
 // Pre-rendered installer player (setup/ui-web/player.js) in ONE headless Chrome over CDP, against fake segments built by
 // tools/setup-player-fixture.cjs (every frame carries its segment id + frame number, same files/manifest as video/INTERFACE.md).
 // Checks: poster before the first video frame, intro -> welcome loop, stage changes driven by Scene.goTo (the installer's real
-// events), transitions entered at the loop point (cut) or cross-faded, glass overlay lit from real segment states on the
-// video frame on screen, light/dark cross-fade on the same clip, and the fatal paths (missing files, broken video) that make
+// events), transitions entered at the loop point (cut) or cross-faded, only ever along the chain of ADJACENT clips (no progress overlay
+// on the video any more), light/dark cross-fade on the same clip, and the fatal paths (missing files, broken video) that make
 // the host fall back to the classic window.
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), http = require('node:http'), { spawn, execFileSync } = require('node:child_process');
 const repo = path.join(__dirname, '..');
@@ -53,17 +53,11 @@ test('poster first, then intro, then the welcome loop', { skip, timeout: 60000 }
   assert.equal(await ev('Player.state.dead'), false);
 });
 
-test('stage changes follow Scene.goTo: transition at the loop point, then the next loop; glass lit from real segments', { skip, timeout: 90000 }, async () => {
+test('stage changes follow Scene.goTo: transition at the loop point, then the next loop; no overlay canvas', { skip, timeout: 90000 }, async () => {
   await ev('void Scene.goTo("loc","skim")'); await on('to-loc'); await on('loc');
   await ev('void Scene.goTo("field","under")'); await on('to-field'); await on('field');
   const sw = await switches(); assert.ok(sw.includes('to-loc:cut') && sw.includes('to-field:cut'), 'loops end on the transition\'s first pose: ' + sw);
-  /* the overlay draws nothing while no segment has arrived, and lights plates once segments finish */
-  await feed(64, -1, 0); await sleep(300);
-  const dark0 = await ev('(()=>{const c=document.getElementById("vov"),d=c.getContext("2d").getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;return n})()');
-  assert.equal(dark0, 0, 'nothing lit before any download');
-  await feed(64, 33, 0.52); await sleep(400);
-  const lit = await ev('(()=>{const c=document.getElementById("vov"),d=c.getContext("2d").getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;return n})()');
-  assert.ok(lit > 2000, 'plates of finished groups lit: ' + lit + ' px');
+  assert.equal(await ev('!!document.getElementById("vov")'), false, 'progress is not drawn on the video');
   const f = await ev('__playerFrame'); assert.equal(f.id, 'field');
 });
 
@@ -79,11 +73,12 @@ test('light/dark cross-fade on the same clip; the covered theme sleeps', { skip,
   assert.equal(await ev('Player.state.dead'), false);
 });
 
-test('a jump over stages (location -> done) cross-fades into the last transition', { skip, timeout: 60000 }, async () => {
+test('a jump over stages (location -> done) chains the transitions in between, every step adjacent', { skip, timeout: 60000 }, async () => {
   await open(fixture); await on('welcome'); await ev('void Scene.goTo("loc","skim")'); await on('loc');
   await ev('void Scene.goTo("done","pull")'); await on('to-done');
   await on('done');
-  const sw = await switches(); assert.ok(sw.includes('to-done:fade'), sw.join(' '));
+  const sw = (await switches()).map((s) => s.split(':')[0]), a = sw.indexOf('to-field'), b = sw.indexOf('to-unpack'), c = sw.indexOf('to-done');
+  assert.ok(a >= 0 && b > a && c > b, 'to-field, to-unpack, to-done in order: ' + sw.join(' ')); assert.ok(!(await switches()).some((s) => /:fade$/.test(s) && !/^to-/.test(s)), 'no fade into a loop');
 });
 
 test('installer asks for the next stage during a transition: no extra loop is played', { skip, timeout: 60000 }, async () => {
@@ -103,17 +98,14 @@ test('reduced motion: no transitions are played, stages fade between loops', { s
   const sw = await switches(); assert.ok(!sw.some((s) => s.startsWith('intro') || s.startsWith('to-')), sw.join(' '));
 });
 
-test('the real renders in setup/ui-web/video: poster, intro, field with lit glass from the shared .gz outlines, dark theme', { skip: skip || (!fs.existsSync(path.join(repo, 'setup', 'ui-web', 'video', 'light', 'manifest.json')) && 'no renders yet'), timeout: 120000 }, async () => {
+test('the real renders in setup/ui-web/video: poster, intro, field, dark theme', { skip: skip || (!fs.existsSync(path.join(repo, 'setup', 'ui-web', 'video', 'light', 'manifest.json')) && 'no renders yet'), timeout: 120000 }, async () => {
   const shots = process.env.MEGULIT_PLAYER_SHOTS, shot = async (n) => { if (!shots) return; fs.mkdirSync(shots, { recursive: true }); const r = await cdp('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(shots, n + '.png'), Buffer.from(r.result.data, 'base64')); };
   await ev('try{localStorage.clear()}catch(e){}'); await cdp('Page.navigate', { url: fileUrl(path.join(repo, 'setup', 'ui-web', 'index.html')) + '?lang=zh' });
   await until('!!(window.Player&&window.Scene)', 10000); await shot('0-poster');
   await on('intro'); await on('welcome'); await shot('1-welcome');
   await ev('void Scene.goTo("loc","skim")'); await on('loc'); await shot('2-loc');
   await ev('void Scene.goTo("field","under")'); await on('field');
-  const N = 142; await feed(N, Math.floor(N * 0.55), 0.55); await sleep(600);
-  const lit = await ev('(()=>{const c=document.getElementById("vov"),d=c.getContext("2d").getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;return n})()');
-  assert.ok(lit > 1000, 'real glass outlines lit: ' + lit + ' px ' + JSON.stringify(await ev('Player.log.filter(e=>/overlay|glass/.test(e.k))'))); await shot('3-field-55pct');
-  await ev('Scene.setTheme(true)'); await until('(()=>{const L=Player.layers.dark;return L.id==="field"&&!L.vids[L.front].paused})()', 8000, 'dark field'); await sleep(1000); await feed(N, Math.floor(N * 0.55), 0.55); await sleep(300); await shot('4-field-dark');
-  await ev('void Scene.goTo("unpack","dive")'); await on('to-unpack'); assert.ok((await switches()).includes('to-unpack:fade'), 'finished glass: fully lit overlay, then a fade'); await on('unpack'); await ev('void Scene.goTo("done","pull")'); await on('done'); await sleep(800); await shot('5-done-dark');
+  await ev('Scene.setTheme(true)'); await until('(()=>{const L=Player.layers.dark;return L.id==="field"&&!L.vids[L.front].paused})()', 8000, 'dark field'); await sleep(1000); await shot('4-field-dark');
+  await ev('void Scene.goTo("unpack","dive")'); await on('to-unpack'); await on('unpack'); await ev('void Scene.goTo("done","pull")'); await on('done'); await sleep(800); await shot('5-done-dark');
   assert.equal(await ev('Player.state.dead'), false); assert.equal(await ev('Player.layers.light.man.draft'), false);
 });
