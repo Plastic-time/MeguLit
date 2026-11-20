@@ -106,7 +106,7 @@ export function bindReception(target,{api,id,locale,esc,value}){
   state.busy=false;if(section())refreshList();};
  const load=async(page)=>{const ticket=state.ticket=(state.ticket||0)+1;state.translate=state.auto;state.loading=true;state.error='';render();try{const data=await api('game_reviews',
   {id,platform:state.open,page,size:state.size,lang:state.open==='steam'?state.steamLang||'all':'all'});if(ticket!==state.ticket)return;state.data=data;state.page=data.page;
-  }catch(error){if(ticket!==state.ticket)return;state.error=String(error?.message||error);}state.loading=false;if(!section())return;render();section()?.querySelector('.review-toolbar')?.scrollIntoView({
+  }catch(error){if(ticket!==state.ticket)return;state.page=page;state.error=String(error?.message||error);}state.loading=false;if(!section())return;render();section()?.querySelector('.review-toolbar')?.scrollIntoView({
   block:'nearest',behavior:'smooth'});translatePage();};
  const wire=root=>{
   root.querySelectorAll('[data-review-platform]').forEach(button=>button.onclick=()=>{const key=button.dataset.reviewPlatform,p=(state.summary||fromEnrichment(value)||[]).find(x=>x.key===key);
