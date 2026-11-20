@@ -5,11 +5,12 @@
    `line 100001 is drawn by the game itself (hidden=0)`; on screen the game drew nothing and MeguLit only the translation).
    With the bridge blanking the selected writable stream the line is hidden: the reader draws its Japanese (fallback), a late
    hidden glyph only places it. Without blanking the old rule stays (the game draws it: `visible`). The GPU layer is per frame. */
-const assert = require('node:assert');
-const { OverlayPlacement } = require('../core/overlay-placement.cjs');
-function make(blank, exe = 'SenrenBanka.exe') {
+const { OverlayPlacement } = require('../../../../core/overlay-placement.cjs');
+module.exports = async ({ profile, Profiles, assert }) => {
+assert.equal(Profiles.get(profile, 'placement.drawWhileBlanking', false), true, 'senren-banka.cjs sets placement.drawWhileBlanking');
+function make(blank, prof = profile) {
   const out = [], p = new OverlayPlacement({ send: m => out.push(m), blanking: () => blank }); p.wanted = () => true;
-  p.configure({ gameProcess: exe }, { bound: true, layout: { clientWidth: 1535, clientHeight: 863 } }); out.length = 0; return { p, out };
+  p.profile = prof; p.configure({}, { bound: true, layout: { clientWidth: 1535, clientHeight: 863 } }); out.length = 0; return { p, out };
 }
 const shortLines = ['お客さん', '……ぁ？', 'お客さんってば'];
 { const { p, out } = make(true);
@@ -27,8 +28,8 @@ const shortLines = ['お客さん', '……ぁ？', 'お客さんってば'];
   p.glyph({ seq: 1, text: 'お客さん', dots: [] });
   assert.strictEqual(out.find(m => m.type === 'textPlace')?.visible, true, 'no blanking: the game draws it itself (unchanged)');
 }
-{ const { p, out } = make(true, 'Other.exe');
+{ const { p, out } = make(true, Profiles.profileFor({ exe: 'Other.exe', title: 'Other' }));
   p.glyph({ seq: 1, text: 'お客さん', dots: [] });
   assert.strictEqual(out.find(m => m.type === 'textPlace')?.visible, true, 'another game: unchanged (the game profile carries drawWhileBlanking)');
 }
-console.log('PASS blanked stream: unhidden lines are drawn by the reader');
+};
