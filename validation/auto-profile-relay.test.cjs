@@ -82,9 +82,9 @@ test('relay: official diff wins over auto, is ours only, can be withdrawn; gate 
  assert.equal((await maint('POST','/api/game-profile/signed',{diff:tool.signDoc(gameDiff.build({key:KC,source:'official',mode:'read',settings:{}}),OURS,'p1')})).status,201);
  assert.ok(!(await (await maint('GET','/api/game-profile/queue')).json()).queue.some(x=>x.key===KC),'an official diff closes the queue entry');});
 
-test('app: uploads off by default, hot-updated layer by precedence (step-down > official > own calibration > shared)',async()=>{
+test('app: uploads on by default (the switch turns them off), hot-updated layer by precedence (step-down > official > own calibration > shared)',async()=>{
  const root=tmp();try{
-  assert.equal((await feed.report(root,rec(H('f'),'hide',HIDE),{fetcher:user('40.0.0.8')})).state,'skipped','calibration uploads are off by default');feed.setSharing(root,true);
+  assert.equal(feed.sharing(root),true,'calibration uploads are on by default');feed.setSharing(root,false);assert.equal((await feed.report(root,rec(H('f'),'hide',HIDE),{fetcher:user('40.0.0.8')})).state,'skipped','the switch turns them off');feed.setSharing(root,true);require('../services/runtime-sample.cjs').setEnabled(root,false);
   const exe=path.join(root,'Game','game.exe');fs.mkdirSync(path.dirname(exe),{recursive:true});fs.writeFileSync(exe,'MZ-precedence');const key=await ap.exeKey(root,exe);
   assert.equal(key,crypto.createHash('sha256').update('MZ-precedence').digest('hex'));
   await feed.report(root,rec(key,'hide',HIDE,0.1),{fetcher:user('40.0.0.1')});await feed.report(root,rec(key,'hide',HIDE,0.1),{fetcher:user('40.0.0.2')});await signRun();
@@ -93,7 +93,7 @@ test('app: uploads off by default, hot-updated layer by precedence (step-down > 
   const live=require('../services/self-check-live.cjs'),P=require('../core/profiles/index.cjs');const modes=[];
   const gal={setGameProfile(){},textEffectsHold:null,textEffects(on,why){modes.push([on,why]);this.textEffectsHold=on?{why}:null;},hooks:{pageMode:{engine:'krkr'},trace(){}}};
   const reader={root,gal,gameExe:exe,logVisibility(){}};const begin=()=>{live.stop();gal.textEffectsHold=null;modes.length=0;return live.start(reader,exe,P.profileFor({exe}),{exe});};
-  let s=begin();assert.equal(s.from,'shared');assert.ok(s.check.recording,'still calibrating here');assert.equal(s.sample,null,'no runtime sample without consent');
+  let s=begin();assert.equal(s.from,'shared');assert.ok(s.check.recording,'still calibrating here');assert.equal(s.sample,null,'no runtime sample when the player turned it off');
   ap.store(root,key,ap.record({key,engine:'krkr',exe,version:'x',result:{mode:'hide',settings:{...HIDE,placement:{firstLineAnchor:'glyph'}},score:{cost:0}}}));
   s=begin();assert.equal(s.from,'local','own calibration over the shared one');assert.equal(s.layer.placement.firstLineAnchor,'glyph');
   await maint('POST','/api/game-profile/signed',{diff:tool.signDoc(gameDiff.build({key,source:'official',mode:'hide',settings:{placement:{firstLineAnchor:'box'}}}),OURS,'p1')});
@@ -104,8 +104,8 @@ test('app: uploads off by default, hot-updated layer by precedence (step-down > 
   fs.writeFileSync(path.join(root,'data','config','library.json'),JSON.stringify({autoProfileShare:true,sharedAdaptation:false}));assert.equal((await feed.report(root,rec(key,'hide',HIDE),{fetcher:user('40.0.0.9')})).state,'skipped','共享适配 off too');
  }finally{fs.rmSync(root,{recursive:true,force:true});}});
 
-test('runtime sample: consent off by default; first lines, boxes, names, logs, at most 3 JPEG shots; sent alone when the full probe is there',async()=>{const root=tmp();try{
- const rs=require('../services/runtime-sample.cjs');assert.equal(rs.enabled(root),false,'off by default');rs.setEnabled(root,true);
+test('runtime sample: on by default, the switch turns it off; first lines, boxes, names, logs, at most 3 JPEG shots; sent alone when the full probe is there',async()=>{const root=tmp();try{
+ const rs=require('../services/runtime-sample.cjs');assert.equal(rs.enabled(root),true,'on by default');rs.setEnabled(root,false);assert.equal(rs.enabled(root),false);rs.setEnabled(root,true);
  const sample=new rs.RuntimeSample({exe:'D:\\G\\game.exe',engine:'krkr'});const want=[];
  for(let i=1;i<=25;i++){sample.rawTrace('source chars=10 sequence='+i);const w=sample.event({kind:'line',at:i,seq:i,chars:10},i%2?'綾':'');if(w)want.push(i);sample.event({kind:'box',at:i,line:i,x:1,y:2,w:3,h:4,cw:800,ch:600});}
  sample.rawReader({type:'layoutDiagnostic',text:'C:\\Users\\'+(process.env.USERNAME||'someone')+'\\x'});
