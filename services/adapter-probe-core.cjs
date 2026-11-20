@@ -37,9 +37,9 @@ function format(h){const hex=h.toString('hex');for(const [name,m] of MAGICS)if(m
    erased the fingerprint of every binary header (âge rio, Unity .resS), and 8 header bytes carry no readable text */
 const magicHex=h=>Buffer.from(h.subarray(0,8)).toString('hex');
 const fp=require('./engine-fingerprint.cjs');
-function inventory(dir,{depth=2,limit=6000}={}){
+function inventory(dir,{depth=2,limit=6000,deadline=Infinity}={}){
  const inv={files:0,bytes:0,ext:{},archives:[],scripts:0,markers:[]};const mark=n=>{const m=fp.markerOf(n);if(m&&!inv.markers.includes(m)&&inv.markers.length<8)inv.markers.push(m);};const walk=(d,level)=>{let list;try{list=fs.readdirSync(d,{withFileTypes:true});}catch{return;}
-  for(const e of list){if(inv.files>=limit)return;const full=path.join(d,e.name);
+  for(const e of list){if(inv.files>=limit||Date.now()>deadline){inv.truncated=true;return;}const full=path.join(d,e.name);
    mark(e.name);if(e.isDirectory()){if(level<depth&&!SKIP_DIR.test(e.name))walk(full,level+1);continue;}if(!e.isFile())continue;
    let size=0;try{size=fs.statSync(full).size;}catch{}inv.files++;inv.bytes+=size;const ext=(path.extname(e.name).toLowerCase()||'(none)').slice(0,12);inv.ext[ext]=(inv.ext[ext]||0)+1;
    if(fp.DOCUMENT.test(e.name))continue;
@@ -148,13 +148,19 @@ function underlay(dir,id,executable){const scenes=require('./original-engines/sc
  const loc=ot.ADAPTERS[id].locate(b,base);return loc?{kind:'backup',lines:ot.readScript(loc).lines.filter(Boolean)}:null;}
 function probeGame({dir,executable,title},{budgetMs=60000,progress=null}={}){
  const t=Date.now();let fingerprint=null,deadline=t+budgetMs;
- try{if(executable)fingerprint=require('./shared-adaptation.cjs').fingerprint(executable);}catch{}
- const inv=inventory(dir);let unsupported=null,preparing=null;
- budgetMs=scaledBudget(budgetMs,inv);deadline=t+budgetMs;
- const route=routedReaders(dir,inv);
  /* S5 stages written as they finish: a worker killed on the budget still reports the inventory, the readers that
-    ran and the stage it was in (the service reads this back, adapter-probe.cjs probeOne) */
+    ran and the stage it was in (the service reads this back, adapter-probe.cjs probeOne). #479 (2026-11-20, a probe that
+    timed out with 0 files and no stage): the first report is written before anything touches the disk, and the folder
+    walk itself stops at half the budget, so a huge or slow game folder still hands back what was counted. */
+ let inv={files:0,bytes:0,ext:{},archives:[],scripts:0,markers:[]},route={readers:[]};
  const report=p=>{if(!progress)return;try{progress({at:Date.now(),budgetMs,inventory:{files:inv.files,bytes:inv.bytes,ext:inv.ext,scripts:inv.scripts,markers:inv.markers,archives:fp.tidy(inv.archives.map(({_path,...a})=>a))},routed:route.readers,...p,engines:(p.engines||[]).map(({sizes,...e})=>e)});}catch{}};
+ report({stage:'fingerprint'});
+ try{if(executable)fingerprint=require('./shared-adaptation.cjs').fingerprint(executable);}catch{}
+ report({stage:'inventory'});
+ inv=inventory(dir,{deadline:t+budgetMs/2});let unsupported=null,preparing=null;
+ budgetMs=scaledBudget(budgetMs,inv);deadline=t+budgetMs;
+ report({stage:'route'});
+ route=routedReaders(dir,inv);
  report({stage:'cx-prepare'});
  /* cx archives are decrypted here, not by a background worker the probe would not wait for */
  try{require('./original-engines/scenes.cjs').cxPrepareSync(dir,{deadline:t+budgetMs/2});}catch{}
