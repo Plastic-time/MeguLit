@@ -246,10 +246,15 @@
     const text = chars.filter(c => !blank(c)).join('');
     if (!text || !rects.length || !rects.every(r => Array.isArray(r) && r[2] > 0 && r[3] > 0)) { giveWay(); return; } /* cannot be drawn here: the game draws it */
     if (orphans.some(o => o.text === text)) return;
+    /* 2026-11-21 (owner, ファタモルガーナの館 r33: a clump of characters in the middle of the screen; two lines on top of each other):
+       the text effect redraws one place again and again, and a frame of two passes puts two characters on one box
+       (「………自分……の自死体…分…の自だ…」). Such a frame is not a line: it is never drawn */
+    { const near = (a, c) => Math.abs(a[0] - c[0]) < Math.min(a[2], c[2]) * .5 && Math.abs(a[1] - c[1]) < Math.min(a[3], c[3]) * .5; for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) if (near(rects[i], rects[j])) return; }
     const now = performance.now();
     if (orphanWait?.text !== text) { orphanWait = { text, at: now }; setTimeout(schedule, ORPHAN_MS + 20); return; }
     if (now - orphanWait.at < ORPHAN_MS) return;
-    orphans = orphans.concat({ text, rects, client: l.client }).slice(-12); extraKey = ''; orphanWait = null; schedule();
+    /* one place, one line: an orphan whose boxes the new one covers is an earlier frame of it (the last one wins) */
+    orphans = orphans.filter(o => !o.rects.some(a => rects.some(c => overlaps(a, c)))).concat({ text, rects, client: l.client }).slice(-12); extraKey = ''; orphanWait = null; schedule();
     const log = b.textPlaceOrphans || (b.textPlaceOrphans = []); log.push(text.slice(0, 40)); if (log.length > 30) log.shift();
   }
   function drawn(l) { document.body.classList.remove('megulit-place-garbled'); const t = l ? [...String(l.text || '')].filter(c => !blank(c)).join('') : ''; if (orphanWait?.text === t) orphanWait = null; if (orphans.some(o => o.text === t)) { orphans = orphans.filter(o => o.text !== t); extraKey = ''; } }
