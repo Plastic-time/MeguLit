@@ -26,7 +26,7 @@ const run=selected();
 test('profile layers: kernel defaults <- engine diff <- game diff, frozen',()=>{
  const p=Profiles.profileFor({});assert.equal(p.layers,'core');assert.ok(Object.isFrozen(p)&&Object.isFrozen(p.placement)&&Object.isFrozen(p.choice.filters));
  assert.deepEqual({...p.placement},Profiles.DEFAULTS.placement);
- assert.match(Profiles.traceLine(Profiles.profileFor({exe:'C:/g/Unknown.exe',title:'x'})),/^profile auto-[0-9a-f]{10} exe=- layers=core engine=unknown$/);
+ assert.match(Profiles.traceLine(Profiles.profileFor({exe:'C:/g/Unknown.exe',title:'x'})),/^profile auto-[0-9a-f]{10} match=none exe=- layers=core engine=unknown$/);
  assert.equal(Profiles.engineId('BGI / Ethornell'),'bgi');assert.equal(Profiles.engineId('KiriKiri'),'kirikiri');assert.equal(Profiles.engineId('System4 (AliceSoft)'),'system4');
  assert.equal(Profiles.get(p,'placement.firstLineAnchor','auto'),'auto');assert.equal(Profiles.get(p,'no.such.key',5),5);
 });

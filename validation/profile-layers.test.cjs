@@ -12,7 +12,7 @@ function hook(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-profile-
 test('hook-native starts on the kernel layer and takes the game profile',()=>{
  const {h,events,log}=hook();assert.equal(h.profile.layers,'core');
  const p=Profiles.profileFor({exe:'D:/g/SenrenBanka.exe'});h.setProfile(p);
- assert.equal(h.profile,p);assert.match(log(),/profile senren-banka exe=- layers=core\+engine\+game engine=kirikiri/);
+ assert.equal(h.profile,p);assert.match(log(),/profile senren-banka match=game:name exe=- layers=core\+engine\+game engine=kirikiri/);
  assert.ok(events.some(e=>e.type==='hook'&&e.gameProfile?.gameKey==='senren-banka'));
 });
 

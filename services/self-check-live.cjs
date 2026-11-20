@@ -30,9 +30,11 @@ function readMode(reader,reason){try{const g=reader.gal;if(g&&!g.textEffectsHold
    shared (the players' agreed diff) <- auto (this PC's calibration) <- official (the maintainer's diff) <- stepDown (this PC's
    gate step-down, always last so a game that broke here can always fall back). choose() still names the deciding one (reason,
    read mode, whether to calibrate). */
-function inputOf(s){const st=s.stored,sh=s.shared,out={...(s.input||{})};for(const k of ['shared','auto','official','stepDown'])delete out[k];
+function inputOf(s){const st=s.stored,sh=s.shared,out={...(s.input||{})};for(const k of ['shared','auto','officialGame','official','stepDown','match'])delete out[k];
  if(/^[0-9a-f]{64}$/.test(String(s.key||'')))out.exeSha256=s.key;
- if(sh&&sh.source==='auto'&&sh.settings)out.shared=sh.settings;if(sh&&sh.source==='official'&&sh.settings)out.official=sh.settings;
+ if(sh&&sh.source==='auto'&&sh.settings)out.shared=sh.settings;
+ if(sh&&sh.source==='official'){if(sh.gameSettings)out.officialGame=sh.gameSettings;else if(sh.settings&&!sh.versionSettings)out.official=sh.settings;if(sh.versionSettings)out.official=sh.versionSettings;}
+ if(sh&&sh.match)out.match=sh.match;
  if(st&&st.settings){if(st.source==='gate')out.stepDown=st.settings;else out.auto=st.settings;}return out;}
 function applyLayer(s){try{const p=Profiles.profileFor(inputOf(s));s.profile=p;s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
 /* which layer wins (see above) */
@@ -45,7 +47,9 @@ function choose(s){const st=s.stored,sh=s.shared;
 function settle(s){const c=choose(s);const was=s.from;s.layer=c?.settings||null;s.from=c?.from||'';
  if(c&&c.mode==='read')readMode(s.reader,c.reason);
  /* nothing to record when the result is already decided for this exe */
- if(!s.stored&&(s.shared?.source==='official'||s.shared?.mode==='read')&&s.check.recording){s.check.recording=null;s.calibrated=true;}
+ /* a candidate (the relay found it by the binary or the game, not this exe) does not stop the recording: if the gate refuses it
+    the first window is this PC's calibration */
+ if(!s.stored&&s.shared?.exact!==false&&(s.shared?.source==='official'||s.shared?.mode==='read')&&s.check.recording){s.check.recording=null;s.calibrated=true;}
  if(was!==s.from||c)return c;return null;}
 
 /* profile: the game's layered profile without the auto layer; input: its profileFor input */
@@ -60,13 +64,15 @@ function start(reader,exe,profile=null,input=null,options={}){stop();profile=pro
  else auto.exeKey(reader.root,exe).then(k=>{if(live!==s||!k)return;bindKey(s,k);applyLayer(s);}).catch(()=>{});
  return s;}
 function bindKey(s,key){const {reader}=s;s.key=key;s.stored=auto.load(reader.root,key);s.calibrated=!!s.stored;if(s.stored)s.check.recording=null;
- s.shared=s.skipFeed?null:feed.layer(feed.cached(reader.root,key),key);
+ s.shared=s.skipFeed?null:feed.layer(feed.cached(reader.root,key),key);if(s.shared&&feed.rejected(reader.root,key,s.shared))s.shared=null;
  const c=settle(s);
  reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'bound',key,layer:s.from||'none',mode:c?.mode||'',calibrating:!s.calibrated});
  hookTrace(reader,'selfCheck key='+key+' layer='+(s.from||'none')+(c?' mode='+c.mode:'')+(s.calibrated?'':' calibrating (first '+s.check.t.window+' lines)'));
  /* the relay's copy is refreshed in the background (hot update: a new diff applies at once) */
- if(!s.skipFeed)feed.refresh(reader.root,key).then(v=>{if(live!==s)return;const l=feed.layer(v,key);if(!l||JSON.stringify(l)===JSON.stringify(s.shared))return;s.shared=l;const before=s.from;settle(s);
-  if(s.from!==before||s.from==='official'||s.from==='shared'){hookTrace(reader,'selfCheck fetched key='+key+' '+l.source+' mode='+l.mode+' layer='+(s.from||'none'));applyLayer(s);}}).catch(()=>{});
+ /* the relay is asked with every fingerprint (core/profiles/identity.cjs): exe hash, binary, game identity, engine */
+ if(!s.skipFeed)require('../core/profiles/identity.cjs').identityOf({root:reader.root,exe:s.exe,folder:s.input?.folder,title:s.input?.title,steamAppId:s.input?.steamAppId,vndb:s.input?.vndb,engine:s.input?.engine||s.profile?.engine,exeSha256:key})
+  .then(identity=>feed.refresh(reader.root,key,{identity})).then(v=>{if(live!==s)return;const l=feed.layer(v,key);if(!l||feed.rejected(reader.root,key,l)||JSON.stringify(l)===JSON.stringify(s.shared))return;s.shared=l;const before=s.from;settle(s);
+  if(s.from!==before||s.from==='official'||s.from==='shared'){hookTrace(reader,'selfCheck fetched key='+key+' '+l.source+' match='+l.match+' mode='+l.mode+' layer='+(s.from||'none'));applyLayer(s);}}).catch(()=>{});
  /* a window that closed before the key was known */
  if(s.pending){const r=s.pending;s.pending=null;windowDone(s,r);}}
 
@@ -76,6 +82,15 @@ function windowDone(s,r){if(live!==s)return;const {reader}=s;
  reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'window',key:s.key,window:r.window,lines:r.lines,pass:r.pass,over:r.over.join(','),layer:s.from||'none',...Object.fromEntries(Object.entries(r.metrics).map(([k,v])=>[k,v==null?-1:v]))});
  if(r.window===1&&s.sample){try{s.sample.save(reader.root,s.key);}catch{}}
  const engine=engineOf(s);
+ /* 2026-11-21 (owner: 非精确命中的下发差分只是候选) a diff the relay found by the binary or the game identity, not this exe: its
+    first window decides. Over a threshold: this PC stops using it (remembered until the relay hands out another), falls back to its
+    own calibration of this window or read mode, and reports it, so the repair queue gets this exe's version layer */
+ if(r.window===1&&s.shared&&s.shared.exact===false&&!r.pass){const l=s.shared;const why='同游戏新版本：下发差分（match='+l.match+'）第一个窗口未过线：'+reasonText(r.over);
+  feed.reject(reader.root,s.key,l,why);s.shared=null;hookTrace(reader,'selfCheck candidate refused key='+s.key+' match='+l.match+' over='+r.over.join(','));
+  reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'candidateRefused',key:s.key,match:l.match,over:r.over.join(',')});
+  const rec={...auto.stepDown(null,{key:s.key,engine,exe:s.exe,version:s.ver,trip:{window:r.window,over:r.over,metrics:r.metrics,reason:why},window:r}),reason:why};
+  feed.report(reader.root,rec).catch(()=>{});try{require('./probe-auto.cjs').kick(reader.root);}catch{}
+  settle(s);applyLayer(s);}
  if(!s.calibrated){s.calibrated=true;let res;try{res=auto.calibrate(s.check.recording||[],{thresholds:s.check.t});}catch(e){hookTrace(reader,'selfCheck calibration failed '+String(e?.message||e).slice(0,120));return;}
   const rec=auto.record({key:s.key,engine,exe:s.exe,version:s.ver,source:'calibration',result:res});try{auto.store(reader.root,s.key,rec);}catch{}s.stored=rec;s.check.recording=null;
   hookTrace(reader,'selfCheck calibrated key='+s.key+' mode='+res.mode+' settings='+JSON.stringify(rec.settings)+(res.reason?' reason='+res.reason:''));
