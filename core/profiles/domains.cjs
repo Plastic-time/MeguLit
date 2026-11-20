@@ -34,6 +34,9 @@ const DOMAINS={
  'calibrate.positionSource':{enum:[null,'engine','glyph','ocr']},
  'calibrate.textBox':{rect:true,nullable:true},
  'calibrate.hideMethod':{enum:[null,'hide','engine','glyph','gpu','read']},
+ 'draw.roles':{bool:true},
+ 'draw.embed':{bool:true},
+ 'draw.embedTranslation':{bool:true},
  'safeMode.redrawRate':{number:[0,120],nullable:true},
 };
 const plain=v=>v&&typeof v==='object'&&!Array.isArray(v);
