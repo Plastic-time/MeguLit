@@ -348,5 +348,5 @@
   buildStatic();
   Object.assign(cam, REDUCE ? POSE.welcome() : { cx: 3300, cy: 800, cz: 4300, rx: 6, ry: 0, rz: 0 }); apply(); setSteps();
   /* welcome plate is visible at once; the opening push-in settles on it (demo/host starts it) */
-  Scene.intro = () => { const o = { p: 0 }, A = { ...cam }; return gsap.to(o, { p: 1, duration: 2.4, ease: 'power3.out', onUpdate() { const B = POSE.welcome(); for (const k in B) cam[k] = lerp(A[k], B[k], o.p); apply(); } }); };
+  Scene.intro = () => { const o = { p: 0 }, A = { ...cam }; if (window.__layout) { const B0 = POSE.welcome(); Object.assign(A, { cx: B0.cx, cy: B0.cy + 90, cz: B0.cz + 320, rx: B0.rx + 1.5, ry: 0, rz: 0 }); }   /* pre-render: start the push-in close enough that the model's far end never shows empty ground */ return gsap.to(o, { p: 1, duration: 2.4, ease: 'power3.out', onUpdate() { const B = POSE.welcome(); for (const k in B) cam[k] = lerp(A[k], B[k], o.p); apply(); } }); };
 })();

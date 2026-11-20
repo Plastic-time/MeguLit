@@ -142,6 +142,8 @@
     { const m = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 20), mhMat, mh.length), o = new THREE.Object3D(); mh.forEach((b, i) => { o.position.set(b[0], b[1], b[2]); o.scale.set(b[3], b[4], b[5]); o.updateMatrix(); m.setMatrixAt(i, o.matrix); }); m.frustumCulled = false; scene.add(m); }
     { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(jt, 3)); const l = new THREE.LineSegments(g, eMat); l.frustumCulled = false; scene.add(l); } }
   const road = new THREE.Mesh(new THREE.PlaneGeometry(4900, 12000), roadMat); road.rotation.x = -Math.PI / 2; road.position.set(X0, FLOORY - 1, -3500); road.receiveShadow = true; scene.add(road);
+  /* ground beyond the street (under the viaduct arches, to the horizon): the road's own colour, fogged into the sky, so no camera ever sees where the model ends */
+  { const gMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }); const flat = new THREE.Mesh(new THREE.PlaneGeometry(120000, 120000), gMat); flat.rotation.x = -Math.PI / 2; flat.position.set(X0, FLOORY - 4, -3500); flat.receiveShadow = true; if (Q.get('ground') !== '0') scene.add(flat); gMat.color.copy(roadMat.color); themed.push(() => gMat.color.copy(roadMat.color)); }
   { const mk = []; for (let z = 2000; z > -9500; z -= 260) pushBox(mk, X0 + 600, FLOORY + 2, z, 14, 2, 120), pushBox(mk, X0 - 600, FLOORY + 2, z, 14, 2, 120); for (const zc of [1300, -2600, -3100]) for (let x = -2100; x <= 2100; x += 200) pushBox(mk, X0 + x, FLOORY + 2, zc, 110, 2, 480);
     for (const zc of [700, -1900]) for (const lx of [-1500, -900, -300, 300, 900, 1500]) { pushBox(mk, X0 + lx, FLOORY + 2, zc, 26, 2, 260); pushBox(mk, X0 + lx - 34, FLOORY + 2, zc - 150, 24, 2, 100, 0.7); pushBox(mk, X0 + lx + 34, FLOORY + 2, zc - 150, 24, 2, 100, -0.7); }
     inst(mk, markMat, unit, false); }
@@ -152,16 +154,17 @@
     const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(L, 0); sh.lineTo(L, wallH); sh.lineTo(0, wallH); sh.closePath();
     for (let x = 70; x + bay - 140 < L; x += bay) { const hole = new THREE.Path(), x0 = x, x1 = x + bay - 140, rr0 = (x1 - x0) / 2; hole.moveTo(x0, 0); hole.lineTo(x1, 0); hole.lineTo(x1, 250); hole.absarc(x0 + rr0, 250, rr0, 0, Math.PI, false); hole.lineTo(x0, 0); sh.holes.push(hole); }
     const wg = new THREE.ExtrudeGeometry(sh, { depth: 460, bevelEnabled: false, curveSegments: 10 }); wg.translate(X0 - L / 2, FLOORY, zc - 230);
-    const wall = new THREE.Mesh(wg, bMat); wall.castShadow = true; wall.receiveShadow = true; scene.add(wall);
-    const shops = []; for (let x = 70; x + bay - 140 < L; x += bay) if (r2() < 0.6) { pushBox(shops, X0 - L / 2 + x + (bay - 140) / 2, FLOORY + 120, zc + 210, bay - 200, 240, 30); pushBox(shops, X0 - L / 2 + x + (bay - 140) / 2, FLOORY + 262, zc + 250, bay - 180, 14, 90); } inst(shops, sMat, unit, false);
-    const deck = new THREE.Mesh(unit, bMat); deck.scale.set(L, 70, 520); deck.position.set(X0, deckY - 35, zc); deck.castShadow = true; deck.receiveShadow = true; scene.add(deck);
+    const wall = new THREE.Mesh(wg, bMat); wall.castShadow = true; wall.receiveShadow = true; if (window.__wall === true) scene.add(wall);   /* the masonry under the deck is left out: the street runs through under the viaduct, you see the piers and the road behind */
+    const shops = []; for (let x = 70; x + bay - 140 < L; x += bay) if (r2() < 0.6 && window.__shops === true) { pushBox(shops, X0 - L / 2 + x + (bay - 140) / 2, FLOORY + 120, zc + 210, bay - 200, 240, 30); pushBox(shops, X0 - L / 2 + x + (bay - 140) / 2, FLOORY + 262, zc + 250, bay - 180, 14, 90); } inst(shops, sMat, unit, false);
+    const deckMat = new THREE.MeshStandardMaterial({ color: 0xb9c5df, roughness: 0.85, metalness: 0 }); themed.push((m) => deckMat.color.copy(col(0xb9c5df, 0x464e5c, m))); const deck = new THREE.Mesh(unit, deckMat); deck.scale.set(L, 70, 520); deck.position.set(X0, deckY - 35, zc); deck.castShadow = true; deck.receiveShadow = true; scene.add(deck);
     for (const zz of [zc - 262, zc + 262]) { const g = new THREE.Mesh(unit, bMat); g.scale.set(L, 190, 26); g.position.set(X0, deckY + 95, zz); g.castShadow = true; scene.add(g); }   /* the plate girders */
     const rp = []; for (const zz of [zc - 276, zc + 276]) { for (let x = -L / 2; x < L / 2; x += 130) rp.push(X0 + x, deckY + 5, zz, X0 + x, deckY + 190, zz); rp.push(X0 - L / 2, deckY + 40, zz, X0 + L / 2, deckY + 40, zz, X0 - L / 2, deckY + 160, zz, X0 + L / 2, deckY + 160, zz); for (let x = -L / 2; x < L / 2; x += 45) rp.push(X0 + x, deckY + 28, zz, X0 + x, deckY + 33, zz, X0 + x, deckY + 168, zz, X0 + x, deckY + 173, zz); }
     const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3)); const rl0 = new THREE.LineSegments(rg, eMat); rl0.frustumCulled = false; scene.add(rl0);
     const rl = new THREE.Mesh(unit, redMat); rl.scale.set(L, 16, 16); rl.position.set(X0, deckY + 210, zc - 262); scene.add(rl); const rl2 = rl.clone(); rl2.position.z = zc + 262; scene.add(rl2);
-    const pie = []; for (let x = -5400; x <= 5400; x += bay) { pushBox(pie, X0 + x, FLOORY + wallH / 2, zc - 200, 90, wallH, 80); pushBox(pie, X0 + x, FLOORY + wallH / 2, zc + 200, 90, wallH, 80); } inst(pie, bMat, unit, true);
-    trainG = new THREE.Group(); for (let k = 0; k < 4; k++) { const car = new THREE.Mesh(unit, sMat); car.scale.set(980, 200, 150); car.position.set(k * 1020, 0, 0); car.castShadow = true; trainG.add(car); const win = new THREE.Mesh(unit, wMat); win.scale.set(900, 34, 154); win.position.set(k * 1020, 30, 0); trainG.add(win); }
-    trainG.position.set(X0, deckY + 100, zc); scene.add(trainG); }
+    const pie = []; for (let x = -5400; x <= 5400; x += bay) { pushBox(pie, X0 + x, FLOORY + wallH / 2, zc - 200, 90, wallH, 80); pushBox(pie, X0 + x, FLOORY + wallH / 2, zc + 200, 90, wallH, 80); } const pierMat = new THREE.MeshStandardMaterial({ color: 0xa8b4d2, roughness: 0.8, metalness: 0 }); themed.push((m) => pierMat.color.copy(col(0xa8b4d2, 0x3c4452, m))); inst(pie, pierMat, unit, true);   /* mid-tone piers: passing between them never turns the whole frame white */
+    const trMat = new THREE.MeshStandardMaterial({ color: 0x7f8fb5, roughness: 0.7, metalness: 0.05 }); themed.push((m) => trMat.color.copy(col(0x7f8fb5, 0x8190b4, m)));   /* a mid-tone body so the train reads against the pale sky and the white viaduct */
+    trainG = new THREE.Group(); for (let k = 0; k < 4; k++) { const car = new THREE.Mesh(unit, trMat); car.scale.set(980, 300, 160); car.position.set(k * 1020, 0, 0); car.castShadow = true; trainG.add(car); const win = new THREE.Mesh(unit, wMat); win.scale.set(900, 34, 154); win.position.set(k * 1020, 30, 0); trainG.add(win); }
+    trainG.position.set(X0, deckY + 255, zc);   /* high enough to show above the plate girders from the street */ scene.add(trainG); }
   /* poles and wires along the street, a few across it */
   { const wp = [], poles = []; for (const side of [-1, 1]) for (let z = 1900; z > -9000; z -= 700) { pushBox(poles, X0 + side * (innerAt(z) - 90), FLOORY + 450, z, 24, 900, 24); }
     const cat = (a, b, sag) => { let prev = a; for (let i = 1; i <= 10; i++) { const t = i / 10, p = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t - sag * 4 * t * (1 - t), a[2] + (b[2] - a[2]) * t]; wp.push(...prev, ...p); prev = p; } };
@@ -332,19 +335,24 @@
   silImg.onload = () => { if (MODE === 'M') { buildMerged(); GL.draw(); } if (MODE === 'A') { buildFragments(); GL.draw(); } }; silImg.src = 'logos/logo-orig.svg';
 
   /* ---- API used by scene.js ---- */
+  /* motion phase of the floating glass: normally the clock; in a pre-rendered loop one full cycle (window.__loopPhi, 0..2pi) starting from the clock value the transition before it ended on (window.__loopBase) */
+  const GLASS_SLOW = window.__glassSlow === undefined ? 1 : window.__glassSlow;   /* pre-render: floating and spinning glass at ~0.4x for a slow, weightless feel */
+  /* floating glass: the clock normally; in a pre-rendered loop the pose of the previous transition's last frame plus a small periodic excursion (window.__loopA scales it so the glass moves about as slowly as it does in the free-running scene: a short loop cannot hold a full natural-speed cycle) */
+  const OSC = (fn, c, ph, ft) => { if (window.__loopPhi === undefined) return fn(ft * c * GLASS_SLOW + ph); const b = c * GLASS_SLOW * window.__loopBase + ph, k = c > 0.55 ? 2 : 1, a0 = fn(b), a1 = fn(b + window.__loopPhi * k); return a0 + (window.__loopA === undefined ? 1 : window.__loopA) * (a1 - a0); };
+  const FTc = (c, ft) => window.__loopPhi !== undefined ? c * GLASS_SLOW * window.__loopBase + window.__loopPhi * (c > 0.55 ? 2 : 1) : ft * c * GLASS_SLOW;
   const GL = {
     ok: true, THREE, scene, camera, renderer,
     setCamera(c, bx, by) {
       camera.position.set(c.cx + (bx || 0), -(c.cy + (by || 0)), c.cz); camera.rotation.set(-c.rx * D2R, -c.ry * D2R, c.rz * D2R, 'YXZ'); camera.translateZ(P); camera.updateMatrixWorld(true);
     },
     update(frames, m) {
-      if (trainG) trainG.position.x = X0 - 6400 + ((m.t || 0) * 520) % 12800;
+      if (trainG) trainG.position.x = window.__trainOff !== undefined ? X0 + window.__trainOff : X0 - 6400 + ((m.t || 0) * 520) % 12800;
       if (MODE === 'M') { if (!merged) buildMerged(); if (!merged) return; const s = m.s, N = s.st.length, cores = gplates.filter((p) => p.core), K = cores.length, br = REDUCE ? 0 : 1, ft = m.t * br, damp = 1 - m.reveal, kk = 1 - m.reveal, prog = m.prog || 0;
         gplates.forEach((p) => { let f = 0, lit = 0, fl = 0;
           if (p.core) { const a = Math.floor(p.order * N / K), b = Math.max(a + 1, Math.floor((p.order + 1) * N / K)); let sum = 0, dn = 0, mx = 0; for (let i = a; i < b; i++) { const st = s.st[i]; if (st === 2) { sum += 1; dn++; mx = Math.max(mx, s.doneAt[i] || 0); } else if (st === 1 || st === 3) sum += s.fr[i]; } f = sum / (b - a); lit = dn === b - a ? 1 : 0; fl = lit ? Math.max(0, 1 - (m.t - mx) / 0.9) : 0; }
           else { lit = prog > p.thr ? 1 : 0; f = lit; }
-          const ox = Math.sin(ft * 0.5 + p.ph) * p.amp * damp * br, oy = Math.cos(ft * 0.4 + p.ph) * p.amp * damp * br, oz = Math.sin(ft * 0.6 + p.ph * 2) * p.amp * 2 * damp * br;
-          p.g3.position.set(p.X + ox, -(p.Y + oy), p.Z + oz); p.g3.rotation.set(-(p.rx + Math.sin(ft * p.spin + p.ph) * 8 * br) * kk * D2R, (p.ry + Math.cos(ft * p.spin + p.ph) * 8 * br) * kk * D2R, -p.rz * kk * D2R, 'ZYX'); p.g3.scale.setScalar(p.k * FU);
+          const ox = OSC(Math.sin, 0.5, p.ph, ft) * p.amp * damp * br, oy = OSC(Math.cos, 0.4, p.ph, ft) * p.amp * damp * br, oz = OSC(Math.sin, 0.6, p.ph * 2, ft) * p.amp * 2 * damp * br;
+          p.g3.position.set(p.X + ox, -(p.Y + oy), p.Z + oz); p.g3.rotation.set(-(p.rx + OSC(Math.sin, p.spin, p.ph, ft) * 8 * br) * kk * D2R, (p.ry + OSC(Math.cos, p.spin, p.ph, ft) * 8 * br) * kk * D2R, -p.rz * kk * D2R, 'ZYX'); p.g3.scale.setScalar(p.k * FU);
           const inten = lit ? 1 : f > 0 ? 0.3 + 0.7 * f : 0.16; if (p.mat.normalScale) p.mat.normalScale.set(1.5 * inten, 1.5 * inten); p.ghost.visible = !lit && f <= 0;
           p.glowMat.uniforms.prog.value = f; p.glowMat.uniforms.lit.value = p.core ? lit : 0; p.glowMat.uniforms.time.value = m.t; p.glowMat.uniforms.uGain.value = p.core ? (m.reveal > 0.5 ? 0.55 : 1) : 0;
           p.edgeMat.opacity = lit ? (m.reveal > 0.5 ? 0.22 : 0.5) : f > 0 ? 0.18 + 0.4 * f : 0.05; });
