@@ -59,14 +59,14 @@ class HookNative{
  skipHeld(v){const held=v===true;if(held===this.skipKey)return;if(held&&this.pageQueue?.rest.length){const q=this.pageQueue;this.pageQueue=null;this.source({...q.base,text:q.rest[q.rest.length-1]},q.name);}this.skipKey=held;if(this.process)this.send({type:'skipHeld',held});}
  /* 2026-11-12 (user, ファタモルガーナの館: "这死馆也没有上一句渐暗"): the script guess (flowGame: many multi-sentence pages) is
     overruled by the engine itself: once its page DLL reports lines (with their real places, box or full page), the game is not laid out as a flow page */
- get flowPage(){if(this._flowPage===true)return true;if(this.pageMode&&this.pageMode.engine!=='ocr')return false;return this.originalText?.flowGame?.()===true;}
+ get flowPage(){{const o=this.profile?.page?.flowPage;if(typeof o==='boolean')return o;}if(this._flowPage===true)return true;if(this.pageMode&&this.pageMode.engine!=='ocr')return false;return this.originalText?.flowGame?.()===true;}
  set flowPage(v){this._flowPage=v===true;}
  /* 2026-11-12 a KiriKiri page DLL draws the game's own text invisible itself (MeguLitKrkr __megulitKrkrHide): nothing to look at
     before hiding, so the preflight that shows the original first (and stayed in read mode when its check was cancelled) is skipped.
     E472: except while the game style is being calibrated: the probe samples the game's own glyphs, so the game must draw them. */
- get preflight(){return this._preflight===true&&this.flowPage!==true&&(this.pageMode?.engine!=='krkr'||this.calibrating===true);}
+ get preflight(){const o=this.profile?.hide?.preflight;return this._preflight===true&&this.flowPage!==true&&((typeof o==='boolean'?o:this.pageMode?.engine!=='krkr')||this.calibrating===true);}
  /* E472: the game itself draws the current line invisible (KiriKiri page DLL): calibration has to wait for the next line. */
- get drawsHidden(){return this.enabled===true&&this.pageMode?.engine==='krkr';}
+ get drawsHidden(){const o=this.profile?.hide?.drawsHidden;return this.enabled===true&&(typeof o==='boolean'?o:this.pageMode?.engine==='krkr');}
  set preflight(v){this._preflight=v===true;}
  /* E410: where a flow line sits on the page, from the game's own scripts (null when unknown). */
  flowLayout(text){try{const provider=this.originalText;if(!provider?.flowLayout)return null;const r=this.resolveSource(text);if(!r||r.method==='same-text'/* E520: the place of a repeated line is unknown */||!(r.status==='exact'||r.status==='high'||r.method==='untranslated'))return null;return provider.flowLayout(r.indices)||null;}catch{return null;}}
@@ -74,7 +74,9 @@ class HookNative{
  trace(message){try{const file=path.join(this.layout.logs||path.join(this.folder,"..","logs"),"hook-events.log");require("./log-sink.cjs").append(file,new Date().toISOString()+" "+message+"\n",{rotate:1048576});}catch{}}
  /* 2026-11-21 layered game profile (core/profiles): kernel <- engine diff <- game diff. Every per-engine / per-game branch of the
     kernel reads this.profile (never the program name); the reader gets the same object as hookState gameProfile. */
- setProfile(profile){if(!profile||typeof profile!=='object')return;this.profile=profile;this.trace(Profiles.traceLine(profile));this.notify({gameProfile:profile});}
+ setProfile(profile,input){if(!profile||typeof profile!=='object')return;this.profile=profile;if(input!==undefined)this.profileInput=input&&typeof input==='object'?input:null;this.trace(Profiles.traceLine(profile));this.notify({gameProfile:profile});}
+ /* a game the library knows no engine for: the first page record of an engine text path (krkr -> kirikiri) adds that engine's diff */
+ learnEngine(name){try{if(this.profile?.engine!=='unknown')return;const id=Profiles.engineId(name);if(!id||!Profiles.loadEngine(id))return;this.setProfile(Profiles.profileFor({...(this.profileInput||{}),engine:id}));}catch{}}
  notify(v){if(Object.entries(v).every(([k,value])=>this.state[k]===value))return;this.state={...this.state,...v};this.emit({type:'hook',...v});}
  configure(preferences,state){this.preferences=preferences;this.windowState=state;const pid=Number(state.gameProcessId),hwnd=String(state.gameHwnd||'');this.wanted=(preferences.hookAutoStart||['hook','local'].includes(preferences.maskMode))&&preferences.bindEnabled===true&&preferences.hookProfile!=='off';this.target=Number.isSafeInteger(pid)&&pid>0&&/^\d{1,19}$/.test(hwnd)?{pid,hwnd,name:String(state.processName||''),started:String(state.gameStarted||'')}:null;
   if(!this.wanted||!this.target){this.stop(false);return;}if(this.process&&(this.pid!==pid||this.started!==this.target.started))this.stop(false);
@@ -603,6 +605,7 @@ class HookNative{
  pageLine(m){
   // E320: a flow page (WoH) is laid out by the reader from the text box; the screen OCR locator placed the same lines again (doubles, jumps).
   if(this.flowPage&&m.engine==='ocr')return;
+  this.learnEngine(m.engine);
   if(!Number.isSafeInteger(m.line)||m.line<1||!['begin','end'].includes(m.phase))return;
   const now=this.now(),engine=m.engine,K=this.pageState&&this.pageState.engine===engine?this.pageState:(this.pageReset(),this.pageState={engine,lines:new Map(),held:[],timer:null});
   if(!m.nvl){if(this.pageMode?.mode==='nvl')this.trace(engine+' page mode off');this.pageMode={mode:'adv',engine,at:now};this.releasePageHeld();
@@ -648,8 +651,8 @@ class HookNative{
   if(open){open.hookText=text;open.origin=origin||'live';return true;}
   K.held.push({text,origin:origin||'live',at:now});if(K.held.length>8)K.held.shift();this.schedulePageHeld();return true;
  }
- schedulePageHeld(){const K=this.pageState;if(!K)return;clearTimeout(K.timer);if(!K.held.length)return;const serial=this.serial,wait=Math.max(0,K.held[0].at+HookNative.holdFor(K.engine)-this.now());K.timer=setTimeout(()=>{if(serial===this.serial)this.expirePageHeld();},wait);K.timer.unref?.();}
- expirePageHeld(){const K=this.pageState;if(!K)return;const now=this.now(),keep=[];for(const h of K.held){if(now-h.at<HookNative.holdFor(K.engine)){keep.push(h);continue;}if(this.pageNvl()&&K.engine!=='ocr')this.trace(K.engine+' page: hook line drawn nowhere on the page, dropped chars='+h.text.length);else this.deliverSource(h.text,h.origin);}K.held=keep;this.schedulePageHeld();}
+ schedulePageHeld(){const K=this.pageState;if(!K)return;clearTimeout(K.timer);if(!K.held.length)return;const serial=this.serial,wait=Math.max(0,K.held[0].at+this.holdFor(K.engine)-this.now());K.timer=setTimeout(()=>{if(serial===this.serial)this.expirePageHeld();},wait);K.timer.unref?.();}
+ expirePageHeld(){const K=this.pageState;if(!K)return;const now=this.now(),keep=[];for(const h of K.held){if(now-h.at<this.holdFor(K.engine)){keep.push(h);continue;}if(this.pageNvl()&&K.engine!=='ocr')this.trace(K.engine+' page: hook line drawn nowhere on the page, dropped chars='+h.text.length);else this.deliverSource(h.text,h.origin);}K.held=keep;this.schedulePageHeld();}
  /* E306: engines without a page DLL are located on the picture (OCR, PageLocator.cs in GalWindowBridge). Each live hook
     line is sent there (gal-native sets this.locate) unless a native page engine (krkr / renpy) reported in the last
     10 minutes; ISLAND lines never get here. The OCR answer takes up to ~3.5 s, so on an OCR page a held hook line waits
@@ -697,6 +700,8 @@ class HookNative{
     buttons joins them into one string. Such text (each joined piece) is never a story line and never a stream to pick. */
  static uiHelp(text){const t=String(text||'').replace(/<r[^<>]*>|<\/r>/g,'').replace(/\s+$/,'');if(!t||/[「」『』“”。！？!?]/.test(t)||/^[\u3000\s]/.test(t))return false;
   const parts=t.split(/(?<=ます|ません)/).map(p=>p.trim()).filter(Boolean);return parts.length>0&&parts.every(p=>/(?:ます|ません)$/.test(p)&&[...p].length<=32);}
+ /* profile page.holdMs (engine/game diff) over the kernel's hold */
+ holdFor(engine){const o=this.profile?.page?.holdMs;return Number.isFinite(o)&&o>=0?o:HookNative.holdFor(engine);}
  static holdFor(engine){return engine==='ocr'?5000:1500;}
  releasePageHeld(){const K=this.pageState;if(!K)return;const held=K.held;K.held=[];clearTimeout(K.timer);for(const h of held)this.deliverSource(h.text,h.origin);}
  // A render burst can report several sentences before the host flushes their source frames.
