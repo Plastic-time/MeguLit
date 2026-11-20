@@ -1188,7 +1188,7 @@ $button.add_Click({
   }
   else { if ($script:fetch) { $poll.Stop(); $script:fetch.Cancel() }; $form.Close() }
 })
-$form.add_Shown({ Close-Splash; Boot-Mark 'classic-shown' })
+$form.add_Shown({ Close-Splash; Boot-Mark ('classic-shown web=' + [bool]$script:webActive + ' opacity=' + $form.Opacity + ' pos=' + $form.Location.X + ',' + $form.Location.Y + $(if ($script:webActive) { ' (invisible control surface, not a visible window)' } else { ' (the classic window is the real UI)' })) })
 $form.add_FormClosing({ if (-not $script:done -and $script:fetch) { $poll.Stop(); $script:fetch.Cancel() } })
 $form.add_Shown({ Update-Free; Note 'shown' @{ stage = $stageDir; want = ($want -join ',') }; if (-not $env:MEGULIT_SETUP_PREVIEW) { Next-Download } })
 if ($testLog) { $deskCheck.Checked = $false; $menuCheck.Checked = $false }

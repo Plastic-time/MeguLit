@@ -57,3 +57,12 @@ test('the scripts still parse', () => {
     assert.equal(r.trim(), '', f);
   }
 });
+
+test('no system title bar at any time: the frame is dressed when the window handle is created (before the first show), the control surface is logged as invisible', () => {
+  const s = fs.readFileSync(path.join(repo, 'setup', 'setup-web.ps1'), 'utf8');
+  assert.match(s, /OnHandleCreated\(EventArgs e\) \{ base\.OnHandleCreated\(e\); try \{ Dress\(\);/, 'Dress() runs in OnHandleCreated');
+  assert.match(s, /WS_THICKFRAME|0x00040000/, 'thick frame (system size loop) is still on');
+  assert.match(s, /window: control surface \(classic form\) shown, invisible/, 'the hidden classic form logs that it is invisible');
+  const r = fs.readFileSync(path.join(repo, 'setup', 'setup-runtime.ps1'), 'utf8');
+  assert.match(r, /classic-shown web=/, 'classic-shown says whether it is only the control surface');
+});

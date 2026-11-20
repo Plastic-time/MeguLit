@@ -142,6 +142,8 @@ public class SetupWin : Form {
   [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int i, int v);
   public static void ToolWindow(IntPtr h, bool on) { int ex = GetWindowLong(h, -20); SetWindowLong(h, -20, on ? (ex | 0x80) : (ex & ~0x80)); }   // keeps the hidden control surface out of Alt+Tab
   public void Drag() { ReleaseCapture(); SendMessage(Handle, 0xA1, (IntPtr)2, IntPtr.Zero); }
+  protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); try { Dress(); if (Log != null) Log("window: handle created, frame dressed (no system caption) pos=" + Left + "," + Top + " size=" + Width + "x" + Height); } catch (Exception ex) { if (Log != null) Log("window: dress failed " + ex.Message); } }
+  protected override void OnVisibleChanged(EventArgs e) { base.OnVisibleChanged(e); if (Log != null) Log("window: skin visible=" + Visible + " pos=" + Left + "," + Top + " size=" + Width + "x" + Height + " border=" + FormBorderStyle); }
   public void Dress() { int round = 2; DwmSetWindowAttribute(Handle, 33, ref round, 4); MARGINS m = new MARGINS(); m.l = 1; m.r = 1; m.t = 1; m.b = 1; DwmExtendFrameIntoClientArea(Handle, ref m); }
   // ---- drag-resize of the frameless window, locked to the design box 1000:640 (the page is scaled as a whole by the WebView2 zoom) ----
   public const double Ratio = 0.64;   // 640 / 1000
@@ -240,11 +242,11 @@ public class SetupWin : Form {
     $deadline = $t0.AddSeconds(32)
     while (-not $script:webReady -and [DateTime]::Now -lt $deadline -and $script:win -and -not $script:webFatalSeen) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 20 }
     if (-not $script:webReady) { throw ('no confirmed scene within 32 s' + $(if ($script:webFatalSeen) { ' (page reported a problem)' } else { '' })) }
-    $win.Dress()
+    $win.Dress(); Web-Log ('window: skin dressed after the first frame, pos=' + $win.Location + ' size=' + $win.Size)
     $script:webActive = $true
     # the old window becomes the invisible control surface: same controls, same handlers, no second taskbar button
     $form.ShowInTaskbar = $false; $form.StartPosition = 'Manual'; $form.Location = New-Object Drawing.Point(-32000, -32000); $form.Opacity = 0
-    $form.add_Shown({ try { [SetupWin]::ToolWindow($form.Handle, $true) } catch {} })
+    $form.add_Shown({ try { [SetupWin]::ToolWindow($form.Handle, $true) } catch {}; Web-Log ('window: control surface (classic form) shown, invisible: opacity=' + $form.Opacity + ' pos=' + $form.Location + ' taskbar=' + $form.ShowInTaskbar) })
     $form.add_FormClosing({ Web-Log ('classic window closing: ' + $_.CloseReason + ', hold=' + $script:webHold + ', done=' + $script:done + ' ' + ((Get-PSCallStack | ForEach-Object { $_.FunctionName + ':' + $_.ScriptLineNumber }) -join ' < ')); if ($script:webHold) { $_.Cancel = $true } })
     $form.add_FormClosed({ try { if ($script:webData -and $script:webData -like '*setup-webview2\*') { Start-Process -WindowStyle Hidden -FilePath "$env:SystemRoot\System32\cmd.exe" -ArgumentList ('/c ping -n 8 127.0.0.1 >nul & rmdir /s /q "' + $script:webData + '"') } } catch {}; try { if ($script:win) { $script:win.AllowClose = $true; $script:win.Close() } } catch {} })
     $script:webTimer = New-Object Windows.Forms.Timer; $script:webTimer.Interval = 150
