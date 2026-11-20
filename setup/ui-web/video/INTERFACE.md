@@ -5,9 +5,9 @@ Frozen on 2026-11-20. The renderer only adds files under this folder; the player
 ## Files (per theme: `light` and `dark`)
 
 ```
-setup/ui-web/video/<theme>/<id>.mp4          H.264, yuv420p, 1280x820, 30 fps, no audio, +faststart, every segment starts with a keyframe
+setup/ui-web/video/<theme>/<id>.mp4          H.264, yuv420p, 1920x1230, 30 fps, no audio, +faststart, every segment starts with a keyframe
 setup/ui-web/video/<theme>/<id>.glass.json   per-frame glass outlines (see below), only for segments that show glass
-setup/ui-web/video/<theme>/<id>.jpg          poster = frame 0 of the segment (JPEG, 1280x820)
+setup/ui-web/video/<theme>/<id>.jpg          poster = frame 0 of the segment (JPEG, 1920x1230)
 setup/ui-web/video/<theme>/manifest.json     the list below, machine readable
 ```
 
@@ -49,10 +49,10 @@ belongs to group `floor(s * 8 / N)` (same rule as scene.js `groupOf`); a plate i
 
 ```json
 { "fps": 30, "frames": 180, "plates": 41, "scale": 4,
-  "polys": [ [ [x0,y0,x1,y1,...], null, [ ... ], ... ],   // frame 0: one entry per plate, flat int pairs in 1/4 px of the 1280x820 video; null = not visible
+  "polys": [ [ [x0,y0,x1,y1,...], null, [ ... ], ... ],   // frame 0: one entry per plate, flat int pairs in 1/4 px of the 1920x1230 video; null = not visible
              [ ... ] ] }
 ```
-- Coordinates are in video pixels * `scale` (so divide by 4); origin top-left of the 1280x820 frame; the player scales the overlay with the `<video>` (object-fit: fill into the 1000x640 stage).
+- Coordinates are in video pixels * `scale` (so divide by 4); origin top-left of the 1920x1230 frame; the player scales the overlay with the `<video>` (object-fit: fill into the 1000x640 stage).
 - Each polygon is the convex outline (8-16 points) of the plate's glass body in that frame. The player lights a plate by clipping to its polygon and drawing a soft inner
   glow plus an edge line, intensity from the group's real progress; the video itself never contains the lit state.
 - Plate order is stable across segments and themes and equals `manifest.plates.group` order.
@@ -65,9 +65,14 @@ Posters are always real frames.
 
 ## Size budget
 
-Both themes together <= 14 MB (hard). Loops are 3-6 s, 30 fps, 1280 wide. The renderer reports the real numbers in `manifest.json` (`bytes`) and in its log.
+Both themes together <= 30 MB (hard). Loops are 3-6 s, 30 fps, 1280 wide. The renderer reports the real numbers in `manifest.json` (`bytes`) and in its log.
 
 ## Renderer behaviour you can rely on
 
 - Frames are piped to ffmpeg, nothing but the finished files is written under `setup/ui-web/video/`.
 - The renderer never blocks on the player; it can be re-run per segment (`--seg <id> --theme light|night`).
+
+
+## Update 2026-11-21 (HD, no progress overlay)
+
+Videos are 1920x1230 (crf 23). There are no `*.glass.json(.gz)` files and no `plates` / `glass` manifest fields any more: the field loop's glass is the same plain glass as the other segments, progress is not drawn on the video (the UI's own text/percent only). Playback only ever follows the chain intro > welcome > to-loc > loc > to-field > field > to-unpack > unpack > to-done > done (a loop may be skipped when the target is further ahead).

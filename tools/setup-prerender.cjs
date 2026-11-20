@@ -12,9 +12,9 @@
    Two themes run as two processes in parallel. A drive below 3 GB free pauses the render. */
 const { spawn, execFileSync } = require('child_process'), fs = require('fs'), path = require('path'), http = require('http'), zlib = require('zlib');
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i < 0 ? d : (process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : true); };
-const THEME = arg('theme', 'both'), SEGSEL = arg('seg', 'all'), DRAFT = !!arg('draft', false), FPS = +arg('fps', 30), CRF = +arg('crf', DRAFT ? 40 : 28), M = 20;
+const THEME = arg('theme', 'both'), SEGSEL = arg('seg', 'all'), DRAFT = !!arg('draft', false), FPS = +arg('fps', 30), CRF = +arg('crf', DRAFT ? 40 : 23), M = 20;
 const OUT = path.resolve(arg('out', path.join(__dirname, '..', 'setup', 'ui-web', 'video'))), TMP = path.resolve(arg('tmp', 'E:/try/prerender-tmp')), PREVIEW = path.resolve(arg('preview', 'H:/MeguLit-Work/setup-preview'));
-const W = DRAFT ? 640 : 1280, H = DRAFT ? 410 : 820, DPR = W / 1000;
+const W = DRAFT ? 640 : 1920, H = DRAFT ? 410 : 1230, DPR = W / 1000;
 const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', FFMPEG = process.env.FFMPEG || 'D:/ffmpeg/bin/ffmpeg';
 const PAGE = 'file:///' + path.resolve(__dirname, '../setup/ui-web/index.html').replace(/\\/g, '/');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -33,8 +33,8 @@ function segments(D) {
     { id: 'loc', kind: 'loop', n: 120, glass: true, tHold: T0 + MV.skim + 0.1, opt: blank },
     { id: 'to-field', kind: 'transition', n: 102, next: 'field', glass: true, t0: LAYOUT.under, t1: LAYOUT.under + MV.under, opt: field },
     { id: 'field', kind: 'loop', n: 180, glass: true, tHold: LAYOUT.under + MV.under + 0.1, opt: field },
-    { id: 'to-unpack', kind: 'transition', n: 66, next: 'unpack', glass: false, t0: LAYOUT.dive, t1: LAYOUT.dive + MV.dive, opt: lit('unpack', { poseP: P }) },
-    { id: 'unpack', kind: 'loop', n: 90, glass: false, tHold: LAYOUT.dive + MV.dive + 0.1, opt: lit('unpack') },
+    { id: 'to-unpack', kind: 'transition', n: 66, next: 'unpack', glass: false, t0: LAYOUT.dive, t1: LAYOUT.dive + MV.dive, opt: field },
+    { id: 'unpack', kind: 'loop', n: 90, glass: false, tHold: LAYOUT.dive + MV.dive + 0.1, opt: field },
     { id: 'to-done', kind: 'transition', n: 132, next: 'done', glass: false, t0: LAYOUT.pull, t1: LAYOUT.pull + MV.pull, opt: lit('done') },
     { id: 'done', kind: 'loop', n: 180, glass: false, tHold: LAYOUT.pull + MV.pull + 0.1, opt: lit('done') },
   ];
@@ -59,7 +59,7 @@ async function renderTheme(theme) {
   await cdp('Page.navigate', { url: `${PAGE}?theme=${theme === 'dark' ? 'night' : 'edge'}&demo=1&paused=1&prerender=1${DRAFT ? '' : '&aa=1'}` }); await sleep(6000); await ev('document.fonts.ready.then(()=>1)');
   const D = await ev('({t0:Demo.T0,u0:Demo.U0,done:Demo.DONE,dur:Demo.DURATION,gl:!!(window.GL&&GL.ok),dpr:devicePixelRatio})'); if (!D.gl) throw new Error('no WebGL in the render browser');
   const info = await ev('(function(){Demo.seek(4.85,{blank:true});return GL.plateInfo()})()'); log('plates', info.plates.length, 'cores', info.cores);
-  const manifest = { version: 1, theme, width: 1280, height: 820, fps: FPS, draft: DRAFT, loopCrossfadeFrames: M, segments: [], plates: { cores: info.cores, info: info.plates }, boundaries: [], motion: {}, bytes: 0 };
+  const manifest = { version: 1, theme, width: W, height: H, fps: FPS, draft: DRAFT, segments: [], boundaries: [], motion: {}, bytes: 0 };
   const t00 = Date.now(); let G = 1000, prev = null; const ends = {}, motion = manifest.motion;   /* G = motion clock of the next transition's first frame */
   const seek = async (sg, tState, motionT, still, loop, trainOff, optOver) => {
     await ev(`window.__still=${still};window.__motionT=${motionT};window.__trainOff=${trainOff === undefined ? 20000 : trainOff};${loop ? `window.__loopPhi=${loop.phi};window.__loopBase=${loop.base}` : 'delete window.__loopPhi'};Demo.seek(${tState},${JSON.stringify(optOver || sg.opt)});new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
@@ -88,18 +88,9 @@ async function renderTheme(theme) {
       for (let i = 0; i < n; i++) { const buf = await shot(sg, sg.tHold, Te, true, { phi: 2 * Math.PI * i / n, base: Te }); { const o = await ev('GL.outlines(1000,640)'); cent.push((o || []).map((p) => { if (!p) return null; let x = 0, y = 0; for (let q = 0; q < p.length; q += 2) { x += p[q]; y += p[q + 1]; } return [x / (p.length / 2) * 1.28, y / (p.length / 2) * 1.28]; })); } if (i === 0) { first = buf; fs.writeFileSync(path.join(dir, sg.id + '.jpg'), buf); } last = buf; if (!ff.stdin.write(buf)) await new Promise((res) => ff.stdin.once('drain', res)); await glassOf(); }
       ff.stdin.end(); await done; ends[sg.id] = { first, last };
       { const sp = []; for (let k = 1; k < cent.length; k++) for (let j = 0; j < cent[k].length; j++) if (cent[k][j] && cent[k - 1][j]) sp.push(Math.hypot(cent[k][j][0] - cent[k - 1][j][0], cent[k][j][1] - cent[k - 1][j][1])); const mean = sp.length ? sp.reduce((x, y) => x + y, 0) / sp.length : 0; manifest.glassSpeed = manifest.glassSpeed || {}; manifest.glassSpeed[sg.id] = { meanPxPerFrame: +mean.toFixed(4), peakPxPerFrame: +(sp.length ? Math.max(...sp) : 0).toFixed(3) }; log(`glass speed ${sg.id}: mean ${mean.toFixed(4)} px/frame, peak ${(sp.length ? Math.max(...sp) : 0).toFixed(3)}`); }
-      if (sg.id === 'field') {
-        /* what the player's overlay has to look like at 100%: the same frame with the glass lit by the scene's own style (reference stills for the overlay) + a preview-only field clip with fake progress */
-        const lit = await shot(sg, sg.tHold, Te, true, { phi: 2 * Math.PI * (n - 1) / n, base: Te }, undefined, { state: 'done', phase: 'unpack', poseP: 0.5 }); ends[sg.id].lastLit = lit;
-        fs.mkdirSync(path.join(OUT, 'ref'), { recursive: true }); fs.writeFileSync(path.join(OUT, 'ref', `${theme}-field-unlit.jpg`), last); fs.writeFileSync(path.join(OUT, 'ref', `${theme}-field-lit.jpg`), lit);
-        const pf = path.join(work, 'field-preview.mp4'), ffp = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', '-vf', scaleF].concat(encArgs(pf)), { stdio: ['pipe', 'ignore', 'inherit'] }); const donep = new Promise((r) => ffp.on('close', r));
-        for (let i = 0; i < n; i++) { const u = Math.min(1, i / (n - 8)); const buf = await shot(sg, sg.tHold, Te, true, { phi: 2 * Math.PI * i / n, base: Te }, undefined, { progress: u, poseP: 0.5 }); if (!ffp.stdin.write(buf)) await new Promise((res) => ffp.stdin.once('drain', res)); }
-        ffp.stdin.end(); await donep; fs.mkdirSync(PREVIEW, { recursive: true }); fs.copyFileSync(pf, path.join(PREVIEW, `field-preview-${theme}.mp4`));
-      }
-    }
-    if (sg.glass && theme === 'light') { fs.mkdirSync(path.join(OUT, 'glass'), { recursive: true }); fs.writeFileSync(path.join(OUT, 'glass', sg.id + '.glass.json.gz'), zlib.gzipSync(JSON.stringify({ fps: FPS, frames: n, plates: info.plates.length, scale: 4, polys }), { level: 9 })); }
+        }
     const bytes = fs.statSync(file).size; manifest.bytes += bytes;
-    manifest.segments.push({ id: sg.id, kind: sg.kind, frames: n, next: sg.next || null, file: sg.id + '.mp4', poster: sg.id + '.jpg', glass: sg.glass ? '../glass/' + sg.id + '.glass.json.gz' : null, bytes });
+    manifest.segments.push({ id: sg.id, kind: sg.kind, frames: n, next: sg.next || null, file: sg.id + '.mp4', poster: sg.id + '.jpg', bytes });
     log(`${sg.id}: ${n} frames, ${(bytes / 1048576).toFixed(2)} MB, ${((Date.now() - ts) / 1000).toFixed(0)} s (total ${((Date.now() - t00) / 1000).toFixed(0)} s, free E: ${freeGB(TMP).toFixed(0)} GB)`);
   }
   /* boundary check: last frame of a segment vs first frame of the next one in play order (a transition's first frame is the frame after a loop's last, and a loop's first frame follows the

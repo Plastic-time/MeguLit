@@ -18,7 +18,7 @@ const HOLD = { intro: [0.5, { blank: true, poseP: 0.5 }], welcome: [2.399, { bla
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1000, height: 640, deviceScaleFactor: 1.28, mobile: false }); await cdp('Page.enable'); await cdp('Runtime.enable'); await cdp('Log.enable');
   await cdp('Page.addScriptToEvaluateOnNewDocument', { source: 'window.__layout={under:5.3,dive:9.0,pull:11.5};window.__still=true;window.__glassSlow=' + arg('slow', '0.2') + ';window.__wall=' + (arg('wall', '0') === '1') + ';' });
   await cdp('Page.navigate', { url: `${PAGE}?theme=${THEME === 'dark' ? 'night' : 'edge'}&demo=1&paused=1&prerender=1&aa=1${QUERY ? '&' + QUERY : ''}` }); await sleep(6000);
-  const [t, opt] = HOLD[SEG];
+  let [t, opt] = HOLD[SEG]; if (arg('blank', '0') === '1') opt = { blank: true, poseP: 0.5 };
   await ev(`window.__motionT=${SEG === 'donenative' ? 'undefined' : 1000};window.__trainOff=20000;Demo.seek(${t},${JSON.stringify(opt)});new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
   const r = await cdp('Page.captureScreenshot', { format: 'jpeg', quality: 90 }); fs.writeFileSync(OUT, Buffer.from(r.result.data, 'base64')); console.log('wrote', OUT);
   ws.close(); ch.kill(); await sleep(500); try { fs.rmSync(work, { recursive: true, force: true }); } catch (e) { /* busy */ }
