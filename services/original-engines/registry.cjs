@@ -69,7 +69,7 @@ const ENGINES=[
  /* E567 TyranoScript: loose (tyrano/ or index.html beside data/scenario), Electron app.asar whose index names the scenario,
     NW.js package.nw or an executable containing both the Tyrano runtime and scenario */
  {name:'TyranoScript',hook:true,test:f=>f.sub('data',/^scenario$/i)&&(f.has(/^tyrano$/i)||f.has(/^index\.html$/i))||f.sub('resources',/^app\.asar$/i)&&f.peek('resources/app.asar',/data\/scenario|"scenario"/,65536)||f.has(/^package\.nw$/i)&&!f.sub('www',/./)
-    ||f.has(tyrano.NW_RUNTIME)&&tyrano.isTyrano(f.dir)},
+    ||tyrano.legacyExeBundles(f.dir,f.names).length>0},
  /* E569 engines MeguLit reads but did not recognise (the library showed them as unknown): FAVORITE FVP (<name>.hcb),
     Innocent Grey IGA, Musica PAZ (ぱれっと: scr.dat + sys.dat + st/bg.dat), Bruns (scene/*.bso), HuneX (.hfa),
     Majiro archives under any name */
