@@ -11,7 +11,7 @@ export function renderBackup({target,api,invoke,locale,esc,toast,onSaved}){
   cancel.onclick=async()=>{
    restore.disabled=cancel.disabled=true;
    try{await api('backup_discard',{id:preview.id});dialog.close();}
-   catch{restore.disabled=cancel.disabled=false;toast(t.failed);}
+   catch{cancel.disabled=false;toast(t.failed);}
   };
   dialog.oncancel=event=>{event.preventDefault();cancel.click();};
   restore.onclick=async()=>{

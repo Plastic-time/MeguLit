@@ -30,6 +30,26 @@ test('a committed restore keeps its checkpoint if preview cleanup fails',async t
  assert.throws(()=>discardBackup(root,'not-a-preview'),/INVALID_BACKUP_ID/);
 });
 
+test('a partially cleaned preview can only be discarded again',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-discard-retry-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const file=path.join(root,'copy.megulitbak');
+ fs.mkdirSync(path.join(root,'data','assets'),{recursive:true});
+ fs.writeFileSync(path.join(root,'data','assets','cover.png'),'fixture');
+ await exportBackup(root,file);
+ const {id}=previewBackup(root,file);
+ const stop=t.mock.method(fs,'rmSync',target=>{
+  fs.unlinkSync(path.join(target,'data','assets','cover.png'));
+  throw Object.assign(Error('busy'),{code:'EBUSY'});
+ });
+ assert.throws(()=>discardBackup(root,id),/busy/);
+ stop.mock.restore();
+ assert.throws(()=>applyBackup(root,id),/INVALID_BACKUP_ID/);
+ discardBackup(root,id);
+ assert.ok(!fs.readdirSync(path.join(root,'cache')).some(name=>name.includes(id)));
+ assert.ok(fs.existsSync(path.join(root,'data','megulit.sqlite')));
+});
+
 test('backup previews can be cancelled, retried, and restored',{skip:!hasEdge},async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-backup-cancel-'));
  const previous=process.env.MEGULIT_ROOT;
@@ -102,7 +122,7 @@ test('backup previews can be cancelled, retried, and restored',{skip:!hasEdge},a
   window.busyDiscard=true;
   const cancel=document.querySelector('[data-cancel]');
   cancel.click();await new Promise(resolve=>setTimeout(resolve,0));
-  return cancel.closest('dialog').open&&!cancel.disabled;
+  return cancel.closest('dialog').open&&!cancel.disabled&&document.querySelector('[data-restore]').disabled;
  })()`),true);
  assert.equal(previews().length,2);
  await browser.evaluate('dismiss(true)');

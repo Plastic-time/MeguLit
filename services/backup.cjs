@@ -28,7 +28,9 @@ function previewFolder(root,id){
 }
 function discardBackup(root,id){
  const folder=previewFolder(root,id);
- if(fs.existsSync(path.join(folder,'preview.json')))safeRemove(path.join(root,'cache'),folder);
+ const discarded=folder+'.discarding';
+ if(fs.existsSync(path.join(folder,'preview.json')))fs.renameSync(folder,discarded);
+ if(fs.existsSync(discarded))safeRemove(path.join(root,'cache'),discarded);
 }
 function applyBackup(root,id){
  const folder=previewFolder(root,id);if(!fs.existsSync(path.join(folder,'preview.json'))||!fs.existsSync(path.join(folder,'data','megulit.sqlite')))throw Error('INVALID_BACKUP_ID');
