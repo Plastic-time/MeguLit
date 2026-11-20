@@ -147,10 +147,20 @@
   };
   /* 2026-11-19 (user rule: no line stays 「未翻译」) a translation that came from the background retry (services/translation-chain.cjs)
      fills the line still on screen when it shows none or an error; a line already translated is left as it is */
+  /* 2026-11-21 (owner, 千恋＊万花 中文版: a line paired with the patch shown without Chinese; r26: the patch stored, no lookup ever came): the
+     line on screen is the sentence the reader shows (bridge.sourceText), whether or not a request went out for it; it matches a filled
+     line written another way (ruby / brackets / blanks: the same normal form as services/reader.cjs, or one inside the other, 60 %) */
+  const normal = v => { let t = String(v || '').replace(/[｜|]([^《\[｜|]+)[《\[][^》\]]*[》\]]/g, '$1').replace(/《[^》]*》/g, '').replace(/\[[^\]]*\]/g, '').replace(/<[^>]*>/g, '').replace(/[\s\u3000\u200b\u001f]+/g, ''); for (let k = 0; k < 3; k++) t = t.replace(/^[「『“"（(【]+/, '').replace(/[」』”"）)】]+$/, ''); return t; };
+  const sameLine = (a, b) => { const x = normal(a), y = normal(b); if (!x || !y) return false; if (x === y) return true; const lx = [...x].length, ly = [...y].length; return (x.includes(y) || y.includes(x)) && Math.min(lx, ly) / Math.max(lx, ly) >= .6; };
   bridge.deliverBackfill = (source, text) => {
-    if (!enabled || !translationVisible || !output?.isConnected || !String(text || '').trim()) return;
-    if (flat(bridge.current) !== flat(source)) return;
-    if (output.dataset.state === 'ready' && output.textContent.trim() && !bridge.lastTranslationError) return;
+    if (!enabled || !translationVisible || !String(text || '').trim()) return;
+    const shown = bridge.sourceText || bridge.current;
+    if (!sameLine(shown, source)) return;
+    if (!output?.isConnected) { const s = document.querySelector('.sentence-window .sentence-text:not(.megulit-old-line)'); if (!s || !ensureRow(s)) return; }
+    const mine = sameLine(bridge.current, shown);
+    if (mine && output.dataset.state === 'ready' && output.textContent.trim() && !bridge.lastTranslationError) return;
+    if (!mine) { bridge.current = shown; bridge.serial++; }
+    output.dataset.state = 'ready';
     bridge.lastTranslationError = ''; setText(text, false, true); bridge.alignText?.();
   };
   bridge.deliver = (id, text, error, message = '') => {
