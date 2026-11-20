@@ -143,14 +143,22 @@
       sentence.style.removeProperty('line-height'); let sx = sentence.getBoundingClientRect();
       if (sx.bottom > uiLimit && sentence.querySelector('br.megulit-row-br')) { set(sentence, 'line-height', closeRows(sentence)); sx = sentence.getBoundingClientRect(); }
       if (sx.bottom > uiLimit) { const up = Math.min(sx.bottom - uiLimit, Math.max(0, win.getBoundingClientRect().top - cy0)); set(win, 'top', (parseFloat(win.style.top) || win.getBoundingClientRect().top) - up + 'px'); }
-      const rr = row.getBoundingClientRect(), over = rr.bottom - uiLimit, key = String(anchorLine || '');
+      /* 2026-11-21 (owner's third recording, 千恋＊万花, speaker row + one line: the translation left a box that had a free third row for below
+         the window): the two glyph rows kept clear under the last text row are for MeguLit's Japanese (CHAOS;CHILD's AUTO/SKIP); the game's own
+         buttons take about one and a half of the game's own glyph rows (千恋＊万花 31 px glyphs: its box keeps a free third row; CHAOS;CHILD 40 px:
+         AUTO/SKIP start 80 px above the bottom, its box has no third row), so the translation stays under its Japanese while it ends there */
+      const cnLimit = cy0 + chc - (anchor.size > 0 ? anchor.size : glyph) * 1.5;
+      const rr = row.getBoundingClientRect(), over = rr.bottom - cnLimit, key = String(anchorLine || '');
       let below = cnBelow.key === key && cnBelow.below;
       if (rr.top >= cy0 + chc) below = false; /* already under the window: nothing to move */
       /* (the fit check follows the hysteresis) 2026-11-21 (owner's recording, 千恋＊万花 window almost the whole screen: the translation went under the window onto the taskbar and off the
          screen): below the window only when the whole row fits there above the work area's bottom; otherwise it stays under its Japanese
          inside the game and the in-window rule (smaller by at most 15 %, then up) keeps it off the button strip */
       else below = below ? over > -glyph * .5 : over > glyph * .25;
-      const refused = below && cy0 + chc + 4 + rr.height > workLimit(); if (refused) below = false;
+      /* 2026-11-21 (owner: works with a negative 原文与译文间距 and drags it there): at a negative gap the translation always stays under its
+         Japanese inside the box, whatever the earlier state; the hysteresis only covers positive gaps */
+      const userGap = parseFloat(getComputedStyle(row).marginTop) || 0;
+      const refused = below && (userGap < 0 || cy0 + chc + 4 + rr.height > workLimit()); if (refused) below = false;
       cnBelow = { key, below };
       /* below the window: right against its bottom edge (4 px), never further */
       /* the row's margin is the user's 原文与译文间距 (it may be negative); the new margin replaces it, so it is counted in (it was not: the row
@@ -490,7 +498,7 @@
        margin gave two anchors one character apart, and the line jumped sideways at every change between them. On the same row a
        start up to about one and a half characters off is the same text box: the anchor keeps the leftmost (one move at most) */
     else if (anchor && Math.abs(a[1] - anchor[1]) <= Math.max(6, size * .6) && Math.abs(a[0] - anchor[0]) <= size * 1.6) a = [Math.min(a[0], anchor[0]), anchor[1]];
-    anchor = a; anchor.center = Number.isFinite(center); anchorLine = lineKey;
+    anchor = a; anchor.center = Number.isFinite(center); anchor.size = size; anchorLine = lineKey;
     anchorLimit = map.bounds[3] - (median(got.map(b => b[3])) || size) * 1.3;
   }
   function apply() {
