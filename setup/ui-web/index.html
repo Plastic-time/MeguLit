@@ -201,10 +201,11 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 <div class="layer" id="ui-quit"><div class="scrim"></div><div class="card quit"><h2>货还在路上</h2><div class="en">Download in progress</div><p>现在关掉也没关系：已经下好的碎片会保留，下次打开接着下。</p><div class="acts"><button class="go" id="stay">等它到</button><button class="btn" id="leave">回头再来</button></div></div></div>
 </div>
 <script src="logos/logos.js"></script>
-<script src="vendor/three.js"></script>
+<script>/* three.js and the live 3D scene are only for the offline renderer (tools/setup-prerender.cjs, ?prerender=1); the installer plays videos (player.js) */if(new URLSearchParams(location.search).get("prerender")==="1")document.write('<script src="../../tools/setup-scene/three.js"><\/script>')</script>
 <script src="vendor/gsap.min.js"></script>
 <script src="scene.js"></script>
-<script src="glass.js"></script>
+<script>if(new URLSearchParams(location.search).get("prerender")==="1")document.write('<script src="../../tools/setup-scene/glass.js"><\/script>')</script>
+<script src="player.js"></script>
 <script>(function(){var q=new URLSearchParams(location.search);var h=q.get("host");var f=(h==="1"||h==="2")?"host.js":q.get("demo")==="1"?"demo.js":null;if(f){var s=document.createElement("script");s.src=f;document.body.appendChild(s)}if(q.get("prerender")==="1"){document.documentElement.classList.add("prerender","native")}if(h==="1"||h==="2"){if(h==="1")window.__waitConfirm=true;document.documentElement.classList.add((q.get("native")==="1"||h==="2")?"native":"deskmode")}})()</script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 /* Skin side of the real installer (host=2): runs inside the frameless WebView2 window of setup\setup-web.ps1.
-   - guards: WebGL probe, script errors, a crawling frame rate. Any of them tells the host, which drops this window and shows the classic one.
+   - guards: no video picture in time (player.js), script errors, a crawling frame rate. Any of them tells the host, which drops this window and shows the classic one.
    - bridge: /api/info, /api/state and /api/act are answered from messages the host posts (no server, no network). */
 (function () {
   const q = new URLSearchParams(location.search); if (q.get('host') !== '2' || !(window.chrome && chrome.webview)) return;
@@ -12,10 +12,8 @@
   window.addEventListener('error', (e) => die('script error: ' + (e.message || e.filename || '?')));
   window.addEventListener('unhandledrejection', (e) => die('promise rejected: ' + (e.reason && e.reason.message || e.reason)));
   window.__glErrs = 0; const ce = console.error.bind(console); console.error = function () { try { if (/WebGL|OES_|context/i.test(Array.prototype.join.call(arguments, ' '))) window.__glErrs++; } catch (e) { /* ignore */ } return ce.apply(console, arguments); };
-  let gl = null; try { const c = document.createElement('canvas'); gl = c.getContext('webgl2') || c.getContext('webgl'); } catch (e) { /* none */ }
-  if (T === 'nogl') { die('WebGL is not available (test)'); return; }
-  if (!gl) { window.__skin.fail('probe: no WebGL context yet'); return; }
-  try { const lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext(); } catch (e) { /* ignore */ }   /* the probe context is not needed any more: do not hold a GPU context while the scene creates its own */
+  /* No WebGL any more: the scene is pre-rendered video (player.js), decoded by the system's video engine. nogl stays as the test switch for "no picture". */
+  if (T === 'nogl') { die('no picture (test)'); return; }
   if (T === 'boom') { throw new Error('test: script error before the first frame'); }
   /* bridge */
   const pend = new Map(); let lastState = null, info = null, infoWait = [], nid = 0;
@@ -34,7 +32,7 @@
     m.id = ++nid; return new Promise((ok) => { pend.set(m.id, (r) => ok(resp(r || {}))); post(m); setTimeout(() => { if (pend.has(m.id)) { pend.delete(m.id); ok(resp({ state: 'ok' })); } }, 8000); });
   };
   /* verdict for the host (written to setup-ui.log as one line): pixels of the drawn canvas, renderer string, GL errors seen */
-  const verdict = () => { const o = { std: -1, renderer: '?', errs: window.__glErrs | 0 };
+  const verdict = () => { if (window.Player && Player.verdict) return Player.verdict(); const o = { std: -1, renderer: '?', errs: window.__glErrs | 0 };
     try { const g = document.getElementById('gl'); if (g) { const x = g.getContext('webgl2') || g.getContext('webgl'); const ex = x && x.getExtension('WEBGL_debug_renderer_info'); if (ex) o.renderer = String(x.getParameter(ex.UNMASKED_RENDERER_WEBGL)).slice(0, 80); const c = document.createElement('canvas'); c.width = 48; c.height = 30; const c2 = c.getContext('2d'); c2.drawImage(g, 0, 0, 48, 30); const d = c2.getImageData(0, 0, 48, 30).data; let m = 0, n = d.length / 4; for (let i = 0; i < d.length; i += 4) m += d[i] + d[i + 1] + d[i + 2]; m /= n * 3; let v = 0; for (let i = 0; i < d.length; i += 4) { const a = (d[i] + d[i + 1] + d[i + 2]) / 3 - m; v += a * a; } o.std = +Math.sqrt(v / n).toFixed(2); } } catch (e) { o.err = String(e).slice(0, 60); }
     o.hw = !/swiftshader|software|llvmpipe|basic render/i.test(o.renderer); o.result = o.std >= 0 && o.std < 4 ? 'blank' : (!o.hw ? 'degraded' : 'ok'); return o; };
   window.__askClose = () => { post({ type: 'asked' }); const b = document.getElementById('btnClose'); if (b) b.click(); };
