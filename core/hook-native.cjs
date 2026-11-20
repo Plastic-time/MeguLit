@@ -343,11 +343,14 @@ class HookNative{
    this.trace('ocr line '+JSON.stringify(text.slice(0,40)));O.lastText=text;
    this.source({type:'hookSource',text,origin:'ocr',hookActive:true,...(box&&sw&&sh?{ocrRect:{...box,sw,sh}}:{})},'ocr');}
   if(wait>0)this.ocrSchedule(wait+20);}
+ static ocrSentence(flat){const t=String(flat||''),n=[...t].length;return n>=12&&/[぀-ヿ]/.test(t)&&(/[。！？!?]/.test(t)||/(ます|ました|ましょう|ません|です|ください)/.test(t));}
  ocrLineRefused(it,now){const f=require('./art-filter.cjs'),t=String(it.text||'').trim(),flat=HookNative.flat(t),n=[...flat].length,O=this.ocr,kana=/[぀-ヿ]/.test(flat);
   if(it.dialogSeen)return 'the dialogue line is on the picture';
   const line=String(this.lastSource||'').trim();if(line&&line!==O.lastText&&this.engineDialog!==false&&now-(this.lastSourceAt||0)<OCR_LINE_QUIET_MS)return 'a hook line is current';
   /* a title or menu screen: three or more rows on the picture that are no Japanese group (START, LOAD, CONFIG, a copyright line) */
-  if(it.others>=3)return 'a title or menu screen';
+  /* 2026-11-21 (owner, STEINS;GATE: 「【フォーントリガー】ボタンで携帯電話を呼び出して、…」 a tutorial over the game's button legend was refused as a menu and never
+     translated): a whole Japanese sentence among the other rows is a notice the player reads; it is taken like a line */
+  if(it.others>=3&&!HookNative.ocrSentence(flat))return 'a title or menu screen';
   if(it.once&&(!kana||n<4))return 'read once, too short or without kana';
   if(n<2||n>120)return 'length';if(f.artJunk(t,it.rows,it.sh))return 'logo or OCR noise';if(f.artList(it.rows))return 'a list';
   if(require('./text-sanity.cjs').garbledSource(t,{controls:false}))return 'unreadable';
