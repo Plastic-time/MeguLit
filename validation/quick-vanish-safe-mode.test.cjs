@@ -8,6 +8,6 @@ test('quick vanish count, safe mode and the layer gate',()=>{
  assert.match(cs,/try\{QuickVanishNote\(\);\}catch\{\}try\{Deactivate\("bridge-shutdown"\);/);
  assert.match(cs,/QuickVanishCheck\(\);Started=true;SessionStart=DateTime\.UtcNow;/);
  assert.match(cs,/ReplacementEnabled=!SafeMode&&d\.ContainsKey\("replace"\)/);assert.match(cs,/type=="enable"\)\{ReplacementEnabled=!SafeMode;/);
- assert.match(cs,/Status\("这部游戏前两次刚启动就退出了/);
+ assert.match(cs,/Status\(SafeModeMessage\);/);assert.match(cs,/SafeModeMessage="这部游戏前两次刚启动就退出了[^"]*このゲームは[^"]*This game closed right after starting/,'zh ja en');
  assert.match(gl,/if\(pid>4&&d\.TryGetValue\("vanish",out v\)&&Convert\.ToInt32\(v\)>=QuickVanishLimit\)\{[^}]*return false;\}/,'safe mode keeps layer 4 out; self-test pids untouched');
 });
