@@ -27,8 +27,8 @@
   document.documentElement.classList.add('video');
   const css = document.createElement('style');
   css.textContent = '.video #world{display:none}#vstage{position:absolute;inset:0;overflow:hidden;background:var(--bg,#eef2f8)}'
-    + '#vstage .vl{position:absolute;inset:0;transition:none}#vstage video,#vstage img.vp{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;opacity:0}'
-    + '#vstage img.vp.on,#vstage video.on{opacity:1}#vov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}';
+    + '#vstage .vl{position:absolute;inset:0;transition:none;z-index:1}#vstage .vl[data-theme=dark]{z-index:2}#vstage video,#vstage img.vp{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;opacity:0}'
+    + '#vstage img.vp.on,#vstage video.on{opacity:1}#vov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}';
   document.head.appendChild(css);
   const stage = document.createElement('div'); stage.id = 'vstage'; view.insertBefore(stage, view.firstChild);
   const canvas = document.createElement('canvas'); canvas.id = 'vov'; stage.appendChild(canvas); const ctx = canvas.getContext('2d');
@@ -85,10 +85,13 @@
         const nv = L.vids[1 - L.front], ov = L.vids[L.front];
         nv.loop = loop && !REDUCE; if (!REDUCE || !loop) { const p = nv.play(); if (p && p.catch) p.catch((e) => { if (!dead) fatal('play() refused: ' + e.message); }); }
         await shown(nv);
+        const dropGlass = L === base() && !segOf(L, id).glass && L.id && (segOf(L, L.id) || {}).glass;   /* the overlay fades out with the clip that carried it */
+        if (dropGlass) { canvas.style.transition = 'opacity ' + FADE + 'ms linear'; canvas.style.opacity = '0'; }
         if (how === 'fade' && ov.classList.contains('on') && !REDUCE) { nv.style.transition = 'opacity ' + FADE + 'ms linear'; nv.style.zIndex = 2; ov.style.zIndex = 1; nv.classList.add('on'); await new Promise((r) => setTimeout(r, FADE + 20)); nv.style.transition = ''; }
         else { nv.style.zIndex = 2; ov.style.zIndex = 1; nv.classList.add('on'); }
         ov.classList.remove('on'); try { ov.pause(); } catch (e) { /* ignore */ }
         L.front = 1 - L.front; L.id = id; L.poster.classList.remove('on');
+        if (dropGlass) { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.transition = ''; canvas.style.opacity = '1'; }
       }));
       cur = id; note('on', { id });
       if (!firstFrame) { firstFrame = true; note('first-frame', {}); }
@@ -108,18 +111,21 @@
       if (REDUCE) { switchTo(LOOP[target], 'fade'); return; }
       /* wait for the loop point when it is close and the transition starts from this loop's pose; otherwise cross-fade now */
       const left = (frontV.duration || 0) - (frontV.currentTime || 0);
+      /* field -> to-unpack: the field shows unlit glass lit by the overlay, to-unpack has it finished in the picture: fully lit overlay, then a 0.25 s fade */
+      if (cur === 'field' && tr === 'to-unpack') { switchTo(tr, 'fade'); return; }
       if (FROM[tr] === cur && left <= HOLD_MAX) { liveLayers().forEach((L) => { L.vids[L.front].loop = false; }); pending = { id: tr, how: 'cut' }; prefetch(); }
       else switchTo(tr, 'fade');
     }
   }
-  let pending = null, watching = null;
+  let pending = null, watching = null, overlayErr = false;
   function watch() {
     /* frame clock of the clip on screen: overlay + the moment a transition (or a loop with a pending transition) reaches its last frame */
     const L = base(), v = L.vids[L.front]; watching = v; const fps = fpsOf();
     const tick = (now, md) => {
       if (watching !== v || dead) return;
       const t = md ? md.mediaTime : v.currentTime, frame = Math.min(((segOf(L, L.id) || {}).frames || 1) - 1, Math.max(0, Math.round(t * fps)));
-      drawOverlay(L, L.id, frame); window.__playerFrame = { id: L.id, frame, theme: L.theme };
+      try { drawOverlay(L, L.id, frame); } catch (e) { if (!overlayErr) { overlayErr = true; note('overlay-error', { e: String(e && e.message || e) }); } }   /* a bad outline must never stop the clip clock */
+      window.__playerFrame = { id: L.id, frame, theme: L.theme };
       const last = (v.duration || 0) - t <= 1.5 / fps;
       if (last || v.ended) { const loopNow = loopOf(L.id); if (!loopNow || pending) { const nx = loopNow ? pending : nextOf(L.id); pending = null; if (nx) { watching = null; switchTo(nx.id, nx.how); return; } } }
       if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(tick); else requestAnimationFrame(() => tick(0, null));
@@ -179,20 +185,24 @@
     for (let i = 0; i < row.length; i++) {
       const pts = row[i], info = plates[i]; if (!pts || !info || pts.length < 6) continue;
       let f, lit, flash = 0;
-      if (info.core) { const g = Math.min(K - 1, info.order | 0); f = G.f[g]; lit = G.lit[g]; flash = lit && G.at[g] ? Math.max(0, 1 - (lastT - G.at[g]) / 0.9) : 0; }
+      const all = target === 'unpack' || target === 'done' || lastProg >= 1;   /* download complete: every plate lit, matching the finished glass of to-unpack */
+      if (all) { f = 1; lit = 1; }
+      else if (info.core) { const g = Math.min(K - 1, info.order | 0); f = +G.f[g] || 0; lit = G.lit[g] | 0; flash = lit && G.at[g] ? Math.max(0, 1 - (lastT - G.at[g]) / 0.9) : 0; }
       else { lit = lastProg > (info.thr || 0) ? 1 : 0; f = lit; }
       if (!lit && f <= 0) continue;
       let cx = 0, cy = 0, rr = 0; const n = pts.length / 2;
       ctx.beginPath(); for (let k = 0; k < n; k++) { const x = pts[2 * k] * sx, y = pts[2 * k + 1] * sy; cx += x; cy += y; if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); } ctx.closePath(); cx /= n; cy /= n;
       for (let k = 0; k < n; k++) rr = Math.max(rr, Math.hypot(pts[2 * k] * sx - cx, pts[2 * k + 1] * sy - cy));
       const inten = lit ? 1 : 0.3 + 0.7 * f;
-      /* inner glow: cold white light filling the plate (red while its group is still coming in, like the old scene), plus an edge line */
+      /* light inside the plate: MeguLit red while its group is still arriving, clear white once the group is complete (a flash when it
+         just completed); an edge line and a soft outer glow so a lit plate reads on both the white and the night city */
+      const c = lit ? '255,255,255' : '214,32,63', a0 = lit ? 0.5 : 0.18 + 0.32 * f, glow = lit ? (dark ? 'rgba(200,225,255,.9)' : 'rgba(214,32,63,.55)') : 'rgba(214,32,63,' + (0.35 + 0.4 * f).toFixed(2) + ')';
       ctx.save(); ctx.clip();
       const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, rr * 1.05);
-      const c = lit ? (dark ? '233,242,255' : '255,255,255') : '214,32,63';
-      gr.addColorStop(0, `rgba(${c},${((lit ? 0.32 : 0.22 * f) + 0.45 * flash).toFixed(3)})`); gr.addColorStop(0.7, `rgba(${c},${((lit ? 0.16 : 0.12 * f) + 0.2 * flash).toFixed(3)})`); gr.addColorStop(1, `rgba(${c},${(lit ? 0.42 : 0.25 * f).toFixed(3)})`);
+      gr.addColorStop(0, `rgba(${c},${Math.min(1, a0 * 0.55 + 0.5 * flash).toFixed(3)})`); gr.addColorStop(0.65, `rgba(${c},${Math.min(1, a0 * 0.35 + 0.25 * flash).toFixed(3)})`); gr.addColorStop(1, `rgba(${c},${Math.min(1, a0).toFixed(3)})`);
       ctx.fillStyle = gr; ctx.fillRect(cx - rr - 2, cy - rr - 2, rr * 2 + 4, rr * 2 + 4); ctx.restore();
-      ctx.lineWidth = Math.max(1, 1.4 * dpr); ctx.strokeStyle = dark ? `rgba(233,242,255,${(0.18 + 0.6 * inten).toFixed(3)})` : `rgba(36,50,79,${(0.12 + 0.45 * inten).toFixed(3)})`; ctx.stroke();
+      ctx.save(); ctx.shadowColor = glow; ctx.shadowBlur = (lit ? 14 : 8 + 8 * f) * dpr;
+      ctx.lineWidth = Math.max(1, (lit ? 2 : 1.4) * dpr); ctx.strokeStyle = lit ? (dark ? 'rgba(235,244,255,.95)' : 'rgba(200,32,60,.9)') : `rgba(214,32,63,${(0.3 + 0.6 * f).toFixed(3)})`; ctx.stroke(); ctx.restore();
     }
     ctx.restore();
   }
@@ -227,7 +237,7 @@
     const timer = setTimeout(() => { if (!firstFrame) fatal('no video frame within ' + TIMEOUT + ' ms'); }, TIMEOUT);
     try { await Promise.all(THEMES.map((t) => load(layers[t]).catch((e) => { if (layers[t] === first) throw e; note('manifest-missing', { t, e: e.message }); }))); }
     catch (e) { clearTimeout(timer); fatal(e.message); return; }
-    const mp = first.man.plates || {}; K = mp.cores || 8;
+    const mp = first.man.plates || {}; K = mp.cores || 8; G = groups(lastSnap);
     plates = Array.isArray(mp.info) ? mp.info : Array.isArray(mp.group) ? mp.group.map((g) => ({ core: true, order: g })) : [];
     if (first.man.segments[0] && first.man.segments[0].poster) first.poster.src = url(first, segOf(first, 'intro') ? segOf(first, 'intro').poster : first.man.segments[0].poster);
     GL.ok = true; started = true; note('manifest', { theme: first.theme, draft: !!first.man.draft, segs: first.man.segments.length });

@@ -35,7 +35,7 @@ test.after(() => { try { ws && ws.close(); } catch { /* gone */ } try { chrome &
 
 const page = (vbase, extra = '') => fileUrl(path.join(repo, 'setup', 'ui-web', 'index.html')) + '?lang=zh&vbase=' + encodeURIComponent(fileUrl(vbase) + '/') + extra;
 async function open(vbase, extra) { await ev('try{localStorage.clear()}catch(e){}'); await cdp('Page.navigate', { url: page(vbase, extra) }); for (let i = 0; i < 100; i++) { if (await ev('!!(window.Player&&window.Scene)').catch(() => false)) return; await sleep(50); } throw new Error('page did not load'); }
-async function until(expr, ms = 15000, what = expr) { const t0 = Date.now(); for (;;) { const v = await ev(expr).catch(() => null); if (v) return v; if (Date.now() - t0 > ms) throw new Error('timed out waiting for ' + what + '\n' + JSON.stringify(await ev("({s:Player.state,log:Player.log.filter(e=>e.k!==\"want\").slice(-12)})"))); await sleep(40); } }
+async function until(expr, ms = 15000, what = expr) { const t0 = Date.now(); for (;;) { const v = await ev(expr).catch(() => null); if (v) return v; if (Date.now() - t0 > ms) throw new Error('timed out waiting for ' + what + '\n' + JSON.stringify(await ev("({s:Player.state,log:Player.log.filter(e=>e.k!==\"want\").slice(-12),v:Player.layers.light.vids.map(v=>({id:v.dataset.id,t:v.currentTime,d:v.duration,p:v.paused,e:v.ended,rs:v.readyState,on:v.classList.contains(\"on\"),err:v.error&&v.error.code}))})"))); await sleep(40); } }
 const on = (id) => until(`Player.state.cur===${JSON.stringify(id)}&&window.__playerFrame&&__playerFrame.id===${JSON.stringify(id)}`, 20000, 'clip ' + id);
 const switches = () => ev('Player.log.filter(e=>e.k==="switch").map(e=>e.id+":"+e.how)');
 /* (Scene.goTo returns a GSAP timeline: `void` it, returning it by value over CDP takes seconds) */
@@ -101,4 +101,19 @@ test('missing videos or a broken clip: fatal (the host shows the classic window)
 test('reduced motion: no transitions are played, stages fade between loops', { skip, timeout: 60000 }, async () => {
   await open(fixture, '&reduce=1'); await on('welcome'); await ev('void Scene.goTo("loc","skim")'); await on('loc');
   const sw = await switches(); assert.ok(!sw.some((s) => s.startsWith('intro') || s.startsWith('to-')), sw.join(' '));
+});
+
+test('the real renders in setup/ui-web/video: poster, intro, field with lit glass from the shared .gz outlines, dark theme', { skip: skip || (!fs.existsSync(path.join(repo, 'setup', 'ui-web', 'video', 'light', 'manifest.json')) && 'no renders yet'), timeout: 120000 }, async () => {
+  const shots = process.env.MEGULIT_PLAYER_SHOTS, shot = async (n) => { if (!shots) return; fs.mkdirSync(shots, { recursive: true }); const r = await cdp('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(shots, n + '.png'), Buffer.from(r.result.data, 'base64')); };
+  await ev('try{localStorage.clear()}catch(e){}'); await cdp('Page.navigate', { url: fileUrl(path.join(repo, 'setup', 'ui-web', 'index.html')) + '?lang=zh' });
+  await until('!!(window.Player&&window.Scene)', 10000); await shot('0-poster');
+  await on('intro'); await on('welcome'); await shot('1-welcome');
+  await ev('void Scene.goTo("loc","skim")'); await on('loc'); await shot('2-loc');
+  await ev('void Scene.goTo("field","under")'); await on('field');
+  const N = 142; await feed(N, Math.floor(N * 0.55), 0.55); await sleep(600);
+  const lit = await ev('(()=>{const c=document.getElementById("vov"),d=c.getContext("2d").getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;return n})()');
+  assert.ok(lit > 1000, 'real glass outlines lit: ' + lit + ' px ' + JSON.stringify(await ev('Player.log.filter(e=>/overlay|glass/.test(e.k))'))); await shot('3-field-55pct');
+  await ev('Scene.setTheme(true)'); await until('(()=>{const L=Player.layers.dark;return L.id==="field"&&!L.vids[L.front].paused})()', 8000, 'dark field'); await sleep(1000); await feed(N, Math.floor(N * 0.55), 0.55); await sleep(300); await shot('4-field-dark');
+  await ev('void Scene.goTo("unpack","dive")'); await on('unpack'); await ev('void Scene.goTo("done","pull")'); await on('done'); await sleep(800); await shot('5-done-dark');
+  assert.equal(await ev('Player.state.dead'), false); assert.equal(await ev('Player.layers.light.man.draft'), false);
 });
