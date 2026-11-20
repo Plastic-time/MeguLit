@@ -32,7 +32,8 @@ public static partial class HookBridge {
  /* 2026-11-15 (user: 保存了设置的游戏从开游戏开始就绑定，第一句就替换): the glyph height and target size a run learned are kept per game
     (cache/gpu-hide/<exe hash>.txt) and handed to the DLL at connect, so the next run hides from its first line. */
  static string GpuCalibrationFile(){string exe=HookTarget.ExePath??"";if(exe=="")return "";uint h=2166136261;foreach(char ch in exe.ToLowerInvariant()){h^=ch;h*=16777619;}return Under("cache","gpu-hide",h.ToString("x8")+".txt");}
- static void GpuCalibrationSave(string v){try{string f=GpuCalibrationFile();if(f!=""&&File.Exists(f)&&File.ReadAllText(f).Trim()==v+" b")return;if(f!=""&&!(File.Exists(f)&&File.ReadAllText(f).Trim()==v)){File.WriteAllText(f,v);Diagnostic("gpu hide calibration saved "+v);}}catch{}}
+ static void GpuCalibrationSave(string v){DiskLater(()=>GpuCalibrationSaveNow(v));}
+ static void GpuCalibrationSaveNow(string v){try{string f=GpuCalibrationFile();if(f!=""&&File.Exists(f)&&File.ReadAllText(f).Trim()==v+" b")return;if(f!=""&&!(File.Exists(f)&&File.ReadAllText(f).Trim()==v)){File.WriteAllText(f,v);Diagnostic("gpu hide calibration saved "+v);}}catch{}}
  static string GpuCalibrationLoad(){try{string f=GpuCalibrationFile();if(f==""||!File.Exists(f))return "";string v=File.ReadAllText(f).Trim();return System.Text.RegularExpressions.Regex.IsMatch(v,@"^[0-9.]{1,6} \d{2,5} \d{2,5}( b)?$")?v:"";}catch{return "";}}
  static void GpuReport(string s){
   /* page model (GlyphQuads.h): the whole page, every line with its places; core/overlay-placement.cjs page() */
