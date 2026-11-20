@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "x-17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42",
+ "source": "official",
+ "mode": "read",
+ "settings": {
+  "calibrate": {
+   "positionSource": null,
+   "textBox": {
+    "x": 70,
+    "y": 488,
+    "w": 322,
+    "h": 51,
+    "client": [
+     804,
+     604
+    ]
+   },
+   "hideMethod": "read"
+  },
+  "hide": {
+   "textEffectsRead": true
+  }
+ },
+ "exe": "fata_jp.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/1",
+ "issuedAt": ""
+}

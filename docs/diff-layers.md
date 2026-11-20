@@ -28,6 +28,10 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 - 阅读层：`window.MeguLitProfile.get('placement.firstLineAnchor',null)`，变化时触发 `megulit-profile`
 - HookBridge（原生）：`hide.engineTrial.{enabled,unconfirmedLines,clickMs,skipAside}`，启动时环境变量 `MEGULIT_PROFILE`，之后 `{"type":"profile","engineTrial":{...}}`（`native/HookBridge.cs ApplyProfile`，`--self-test` 含 `ProfileSelfTest`）。不设就是旧规则：试验开、连续 2 句未确认就关、一次点击 400 ms、名字牌和场景标签跳过
 
+## 绘制角色
+
+一套角色，以画字协议为准（docs/engine-draw-protocol.md）：引擎能报角色时直接在 `ToMe_CHARS` 里带 `role=line|name|choice|button|menu|system`（`draw.roles` 打开）；只知道自己身份（钩子名、窗口类、调用）时，由 `draw.roleMap` / `draw.rolePatterns` / `draw.roleFallback` 归到同样的六种角色（`core/draw-role.cjs`，引擎差分写本引擎的类，游戏差分只加自己的插件窗口）。只有 `line` 可以隐藏或替换
+
 ## 认游戏
 
 - **唯一的 exe 键：exe 文件完整 SHA-256**，写作 `x-<64 位小写 hex>`，日志里显示前 8 位。一个哈希 = 一个版本：改名、换路径还是同一份，补丁、Steam 更新、汉化 exe 各是一份。按路径+大小+修改时间记在 `data/config/exe-hashes.json`，已知的 exe 开游戏不用再读文件（`core/auto-profile.cjs exeKey / exeKeySync`）

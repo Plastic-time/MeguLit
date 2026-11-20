@@ -1,0 +1,24 @@
+{
+ "schema": 1,
+ "note": "synthetic RPG Maker MZ probe made for tools/diff-maker (made-up game, no real game text)",
+ "title": "MeguLit 見本",
+ "detected": "RPG Maker MZ",
+ "exe": {
+  "name": "Game.exe",
+  "hash": "20a57cfa736d946ede4ccc91b5b158091c031e9a54869aecacdb52c6cfa35086"
+ },
+ "files": [
+  {
+   "path": "Game.exe"
+  },
+  {
+   "path": "js/rmmz_core.js"
+  },
+  {
+   "path": "js/plugins.js"
+  },
+  {
+   "path": "data/System.json"
+  }
+ ]
+}

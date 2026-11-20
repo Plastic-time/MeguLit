@@ -1,0 +1,515 @@
+2026-11-20T22:53:50.542Z stream memory EmbedKrkrZ ENHVXN-8@2198:SenrenBanka.exe
+2026-11-20T22:54:03.063Z ocr line "画取存言"
+2026-11-20T22:54:03.064Z source chars=4 sequence=48
+2026-11-20T22:54:07.102Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:54:07.103Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:54:10.239Z source chars=6 sequence=49
+2026-11-20T22:54:11.262Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":20,"sourceCharacters":4,"checkedAt":1795215251262,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:12.015Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":20,"sourceCharacters":4,"checkedAt":1795215252014,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:12.814Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:54:12.814Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:54:12.820Z source chars=6 sequence=50
+2026-11-20T22:54:13.949Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":19,"sourceCharacters":1,"checkedAt":1795215253948,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:14.761Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":37,"sourceCharacters":1,"checkedAt":1795215254759,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:16.309Z source chars=9 sequence=51
+2026-11-20T22:54:17.150Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:54:17.151Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:54:17.310Z visual {"type":"hookVisual","sequence":4,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":7,"checkedAt":1795215257308,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:18.054Z visual {"type":"hookVisual","sequence":4,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":7,"checkedAt":1795215258054,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:26.271Z source chars=14 sequence=52
+2026-11-20T22:54:26.282Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:54:26.284Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:54:27.247Z visual {"type":"hookVisual","sequence":5,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":9,"checkedAt":1795215267247,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:28.055Z visual {"type":"hookVisual","sequence":5,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":9,"checkedAt":1795215268055,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:30.236Z choice aux TextRender role=0 added=["飛び起きた俺は、前に座っている運転手に返事をする。"] text="飛び起きた俺は、前に座っている運転手に返事をする。"
+2026-11-20T22:54:30.244Z source chars=25 sequence=53
+2026-11-20T22:54:30.883Z choice aux KiriKiriZ role=0 added=[] text="飛び起きた俺は、前に座っている運転手に返事をする。"
+2026-11-20T22:54:30.917Z choice aux KiriKiriZ role=0 added=[] text="飛び起きた俺は、前に座っている運転手に返事をする。"
+2026-11-20T22:54:32.228Z source chars=22 sequence=54
+2026-11-20T22:54:32.245Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:54:32.245Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:54:32.285Z choice aux TextRender role=0 added=[] text="「そろそろ着きますけど、どこで止めますか？」"
+2026-11-20T22:54:32.808Z choice aux KiriKiriZ role=0 added=[] text="「そろそろ着きますけど、どこで止めますか？」"
+2026-11-20T22:54:32.809Z choice aux KiriKiriZ role=0 added=[] text="「そろそろ着きますけど、どこで止めますか？」"
+2026-11-20T22:54:34.770Z source chars=13 sequence=55
+2026-11-20T22:54:34.785Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:54:34.790Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:54:34.791Z choice aux TextRender role=0 added=[] text="「え？　あ、そうでしたね」"
+2026-11-20T22:54:35.076Z choice aux KiriKiriZ role=0 added=[] text="「え？　あ、そうでしたね」"
+2026-11-20T22:54:35.076Z choice aux KiriKiriZ role=0 added=[] text="「え？　あ、そうでしたね」"
+2026-11-20T22:54:35.499Z placement placed: line 100003, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:35.736Z placement placed: line 100004, 41 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:35.929Z choice aux TextRender role=0 added=[] text="電車を降りて、駅前でタクシーを捕まえたものの、いつの間にかうたたねしていたらしい。"
+2026-11-20T22:54:35.939Z source chars=41 sequence=56
+2026-11-20T22:54:36.008Z placement placed: line 100004, 41 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:36.973Z choice aux KiriKiriZ role=0 added=[] text="電車を降りて、駅前でタクシーを捕まえたものの、いつの間にかうたたねしていたらしい。"
+2026-11-20T22:54:36.974Z choice aux KiriKiriZ role=0 added=[] text="電車を降りて、駅前でタクシーを捕まえたものの、いつの間にかうたたねしていたらしい。"
+2026-11-20T22:54:37.122Z visual {"type":"hookVisual","sequence":9,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":38,"checkedAt":1795215277121,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:37.959Z visual {"type":"hookVisual","sequence":9,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":38,"checkedAt":1795215277959,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:57.297Z choice aux TextRender role=0 added=["まだ大雑把な目的地しか伝えていなかったのを思い出した。"] text="まだ大雑把な目的地しか伝えていなかったのを思い出した。"
+2026-11-20T22:54:57.305Z source chars=27 sequence=57
+2026-11-20T22:54:57.703Z placement placed: line 100005, 27 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:57.966Z choice aux KiriKiriZ role=0 added=[] text="まだ大雑把な目的地しか伝えていなかったのを思い出した。"
+2026-11-20T22:54:57.967Z choice aux KiriKiriZ role=0 added=[] text="まだ大雑把な目的地しか伝えていなかったのを思い出した。"
+2026-11-20T22:54:58.299Z visual {"type":"hookVisual","sequence":10,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":26,"checkedAt":1795215298299,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:58.643Z placement placed: line 100006, 19 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:58.832Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:54:58.832Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:54:58.833Z choice aux TextRender role=0 added=["「志那都荘まで行って欲しいんですけど」"] text="「志那都荘まで行って欲しいんですけど」"
+2026-11-20T22:54:58.843Z source chars=19 sequence=58
+2026-11-20T22:54:58.896Z placement placed: line 100006, 19 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:59.313Z choice aux KiriKiriZ role=0 added=[] text="「志那都荘まで行って欲しいんですけど」"
+2026-11-20T22:54:59.314Z choice aux KiriKiriZ role=0 added=[] text="「志那都荘まで行って欲しいんですけど」"
+2026-11-20T22:54:59.837Z visual {"type":"hookVisual","sequence":11,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":17,"checkedAt":1795215299836,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:00.016Z placement placed: line 100007, 30 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:00.187Z source chars=30 sequence=59
+2026-11-20T22:55:00.202Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:55:00.203Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:55:00.203Z placement placed: line 100007, 30 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:00.210Z choice aux TextRender role=0 added=[] text="「あー……すみません。アタシはここいらに詳しくないんですよ」"
+2026-11-20T22:55:00.959Z choice aux KiriKiriZ role=0 added=[] text="「あー……すみません。アタシはここいらに詳しくないんですよ」"
+2026-11-20T22:55:00.960Z choice aux KiriKiriZ role=0 added=[] text="「あー……すみません。アタシはここいらに詳しくないんですよ」"
+2026-11-20T22:55:01.212Z visual {"type":"hookVisual","sequence":12,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":25,"checkedAt":1795215301211,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:01.962Z visual {"type":"hookVisual","sequence":12,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":25,"checkedAt":1795215301961,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:03.858Z placement placed: line 100008, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:04.055Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:55:04.055Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:55:04.062Z source chars=28 sequence=60
+2026-11-20T22:55:04.077Z choice aux TextRender role=0 added=[] text="「ですからね……奥まで行くのは勘弁してもらえませんか？」"
+2026-11-20T22:55:04.099Z placement placed: line 100008, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:04.737Z choice aux KiriKiriZ role=0 added=[] text="「ですからね……奥まで行くのは勘弁してもらえませんか？」"
+2026-11-20T22:55:04.738Z choice aux KiriKiriZ role=0 added=[] text="「ですからね……奥まで行くのは勘弁してもらえませんか？」"
+2026-11-20T22:55:05.092Z visual {"type":"hookVisual","sequence":13,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":23,"checkedAt":1795215305091,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:05.260Z placement placed: line 100009, 17 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:05.456Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:55:05.457Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:55:05.458Z choice aux TextRender role=0 added=["「（サービスの悪い運転手だ……）」"] text="「（サービスの悪い運転手だ……）」"
+2026-11-20T22:55:05.480Z source chars=17 sequence=61
+2026-11-20T22:55:05.506Z placement placed: line 100009, 17 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:05.920Z choice aux KiriKiriZ role=0 added=[] text="「（サービスの悪い運転手だ……）」"
+2026-11-20T22:55:05.948Z choice aux KiriKiriZ role=0 added=[] text="「（サービスの悪い運転手だ……）」"
+2026-11-20T22:55:06.533Z placement placed: line 100010, 34 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:06.671Z visual {"type":"hookVisual","sequence":14,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":11,"checkedAt":1795215306670,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:06.724Z source chars=34 sequence=62
+2026-11-20T22:55:06.740Z choice aux TextRender role=0 added=[] text="それが顔に出ていたのか、運転手が愛想笑いを浮かべながら言葉を続ける。"
+2026-11-20T22:55:06.819Z placement placed: line 100010, 34 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:07.586Z choice aux KiriKiriZ role=0 added=[] text="それが顔に出ていたのか、運転手が愛想笑いを浮かべながら言葉を続ける。"
+2026-11-20T22:55:07.587Z choice aux KiriKiriZ role=0 added=[] text="それが顔に出ていたのか、運転手が愛想笑いを浮かべながら言葉を続ける。"
+2026-11-20T22:55:07.862Z visual {"type":"hookVisual","sequence":15,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":32,"checkedAt":1795215307862,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:08.169Z placement placed: line 100011, 11 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:08.360Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:55:08.361Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:55:08.362Z choice aux TextRender role=0 added=["「本当にすみませんね」"] text="「本当にすみませんね」"
+2026-11-20T22:55:08.367Z source chars=11 sequence=63
+2026-11-20T22:55:08.417Z placement placed: line 100011, 11 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:08.709Z choice aux KiriKiriZ role=0 added=[] text="「本当にすみませんね」"
+2026-11-20T22:55:08.710Z choice aux KiriKiriZ role=0 added=[] text="「本当にすみませんね」"
+2026-11-20T22:55:09.421Z visual {"type":"hookVisual","sequence":16,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":9,"checkedAt":1795215309420,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:09.771Z placement placed: line 100012, 22 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:09.982Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:55:09.983Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T22:55:09.984Z choice aux TextRender role=0 added=["「……わかりました。じゃあ、ここでいいです」"] text="「……わかりました。じゃあ、ここでいいです」"
+2026-11-20T22:55:09.991Z source chars=22 sequence=64
+2026-11-20T22:55:10.010Z placement placed: line 100012, 22 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:10.509Z choice aux KiriKiriZ role=0 added=[] text="「……わかりました。じゃあ、ここでいいです」"
+2026-11-20T22:55:10.510Z choice aux KiriKiriZ role=0 added=[] text="「……わかりました。じゃあ、ここでいいです」"
+2026-11-20T22:55:11.027Z visual {"type":"hookVisual","sequence":17,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":16,"checkedAt":1795215311026,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:11.794Z visual {"type":"hookVisual","sequence":17,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":16,"checkedAt":1795215311788,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:56:59.098Z placement placed: line 100013, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:56:59.184Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:56:59.184Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:56:59.190Z source chars=12 sequence=65
+2026-11-20T22:56:59.207Z choice aux TextRender role=0 added=[] text="「ありがとうございます」"
+2026-11-20T22:56:59.208Z placement placed: line 100013, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:56:59.477Z choice aux KiriKiriZ role=0 added=[] text="「ありがとうございます」"
+2026-11-20T22:56:59.478Z choice aux KiriKiriZ role=0 added=[] text="「ありがとうございます」"
+2026-11-20T22:56:59.981Z placement placed: line 100014, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:00.177Z choice aux TextRender role=0 added=["タクシーが止まり、俺は精算を済ませて、タクシーを降りる。"] text="タクシーが止まり、俺は精算を済ませて、タクシーを降りる。"
+2026-11-20T22:57:00.185Z source chars=28 sequence=66
+2026-11-20T22:57:00.200Z placement placed: line 100014, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:00.880Z choice aux KiriKiriZ role=0 added=[] text="タクシーが止まり、俺は精算を済ませて、タクシーを降りる。"
+2026-11-20T22:57:00.881Z choice aux KiriKiriZ role=0 added=[] text="タクシーが止まり、俺は精算を済ませて、タクシーを降りる。"
+2026-11-20T22:57:01.179Z visual {"type":"hookVisual","sequence":19,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":25,"checkedAt":1795215421178,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:57:01.226Z placement placed: line 100015, 44 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:01.433Z source chars=44 sequence=67
+2026-11-20T22:57:01.448Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:57:01.448Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T22:57:01.448Z choice aux TextRender role=0 added=[] text="「わざわざイヌツキの土地に祭りを見に来るなんて、不心得者が増えたもんだよ、まったく……」"
+2026-11-20T22:57:01.499Z placement placed: line 100015, 44 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:02.536Z choice aux KiriKiriZ role=0 added=[] text="「わざわざイヌツキの土地に祭りを見に来るなんて、不心得者が増えたもんだよ、まったく……」"
+2026-11-20T22:57:02.537Z choice aux KiriKiriZ role=0 added=[] text="「わざわざイヌツキの土地に祭りを見に来るなんて、不心得者が増えたもんだよ、まったく……」"
+2026-11-20T22:57:02.538Z visual {"type":"hookVisual","sequence":20,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":38,"checkedAt":1795215422533,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:57:03.460Z visual {"type":"hookVisual","sequence":20,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":38,"checkedAt":1795215423458,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:26:57.570Z stream memory EmbedKrkrZ ENHVXN-8@2198:SenrenBanka.exe
+2026-11-20T23:27:03.132Z ocr line "首自法行傾件下翻加ド東(れ- ru禰imp -。、1 )"
+2026-11-20T23:27:03.226Z source chars=28 sequence=1
+2026-11-20T23:27:04.321Z visual {"type":"hookVisual","sequence":1,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":19,"checkedAt":1795217224320,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:05.071Z visual {"type":"hookVisual","sequence":1,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":19,"checkedAt":1795217225070,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:05.705Z choice aux KiriKiriZ role=0 added=[] text="　1-12026/11/21 07:57「わざわざイヌツキの土地…Continue"
+2026-11-20T23:27:10.383Z source chars=6 sequence=2
+2026-11-20T23:27:10.718Z choice aux TextRender role=0 added=[] text="『お客さん』"
+2026-11-20T23:27:11.364Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":1,"valid":true,"matched":true,"japaneseCharacters":7,"recognizedCharacters":26,"sourceCharacters":4,"checkedAt":1795217231363,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:11.828Z placement placed: line 100001, 6 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:12.118Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":20,"sourceCharacters":4,"checkedAt":1795217232118,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:12.791Z placement placed: line 100002, 5 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:13.162Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:13.164Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:13.166Z placement placed: line 100002, 5 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:13.497Z source chars=5 sequence=3
+2026-11-20T23:27:14.229Z placement placed: line 100003, 6 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:14.436Z choice aux TextRender role=0 added=[] text="『お客さん』"
+2026-11-20T23:27:14.497Z placement placed: line 100003, 6 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:14.646Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":20,"sourceCharacters":0,"checkedAt":1795217234646,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:15.482Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":20,"sourceCharacters":0,"checkedAt":1795217235481,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:16.466Z placement placed: line 100004, 6 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:16.647Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:16.648Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:16.651Z choice aux TextRender role=0 added=["「……ぁ？」"] text="「……ぁ？」"
+2026-11-20T23:27:16.697Z placement placed: line 100004, 6 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:16.780Z choice aux KiriKiriZ role=0 added=[] text="「「「「「「「「……「…「「…………「……「「…………ぁぁ「……ぁ「「…………ぁぁ？？「……ぁ？「「…………ぁぁ？？」」「……ぁ？」「「…………ぁぁ？？」」「…"
+2026-11-20T23:27:17.073Z source chars=6 sequence=4
+2026-11-20T23:27:18.001Z source chars=9 sequence=5
+2026-11-20T23:27:20.800Z visual {"type":"hookVisual","sequence":5,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":7,"checkedAt":1795217239356,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:20.800Z visual {"type":"hookVisual","sequence":5,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":7,"checkedAt":1795217240253,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:20.802Z placement placed: line 100005, 9 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:20.803Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:20.803Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:20.804Z choice aux TextRender role=0 added=[] text="「お客さんってば」"
+2026-11-20T23:27:21.896Z placement placed: line 100006, 14 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:22.095Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:22.095Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:22.101Z source chars=14 sequence=6
+2026-11-20T23:27:22.117Z choice aux TextRender role=0 added=[] text="「あっ、はい。なんですか？」"
+2026-11-20T23:27:22.597Z choice aux KiriKiriZ role=0 added=[] text="「あっ、はい。なんですか？」"
+2026-11-20T23:27:22.597Z choice aux KiriKiriZ role=0 added=[] text="「あっ、はい。なんですか？」"
+2026-11-20T23:27:23.258Z visual {"type":"hookVisual","sequence":6,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":9,"checkedAt":1795217243258,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:23.315Z placement placed: line 100007, 25 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:23.516Z source chars=25 sequence=7
+2026-11-20T23:27:23.532Z choice aux TextRender role=0 added=[] text="飛び起きた俺は、前に座っている運転手に返事をする。"
+2026-11-20T23:27:23.598Z placement placed: line 100007, 25 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:24.162Z choice aux KiriKiriZ role=0 added=[] text="飛び起きた俺は、前に座っている運転手に返事をする。"
+2026-11-20T23:27:24.164Z choice aux KiriKiriZ role=0 added=[] text="飛び起きた俺は、前に座っている運転手に返事をする。"
+2026-11-20T23:27:24.512Z visual {"type":"hookVisual","sequence":7,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":23,"checkedAt":1795217244511,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:24.595Z placement placed: line 100008, 22 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:24.782Z source chars=22 sequence=8
+2026-11-20T23:27:24.798Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:24.798Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:24.799Z choice aux TextRender role=0 added=[] text="「そろそろ着きますけど、どこで止めますか？」"
+2026-11-20T23:27:24.799Z placement placed: line 100008, 22 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:25.341Z choice aux KiriKiriZ role=0 added=[] text="「そろそろ着きますけど、どこで止めますか？」"
+2026-11-20T23:27:25.344Z choice aux KiriKiriZ role=0 added=[] text="「そろそろ着きますけど、どこで止めますか？」"
+2026-11-20T23:27:26.246Z visual {"type":"hookVisual","sequence":8,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":18,"checkedAt":1795217245920,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:26.248Z placement placed: line 100009, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:26.249Z choice aux TextRender role=0 added=["「え？　あ、そうでしたね」"] text="「え？　あ、そうでしたね」"
+2026-11-20T23:27:26.250Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:26.256Z source chars=13 sequence=9
+2026-11-20T23:27:26.273Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:26.274Z placement placed: line 100009, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:26.492Z choice aux KiriKiriZ role=0 added=[] text="「え？　あ、そうでしたね」"
+2026-11-20T23:27:26.494Z choice aux KiriKiriZ role=0 added=[] text="「え？　あ、そうでしたね」"
+2026-11-20T23:27:27.281Z placement placed: line 100010, 41 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:27.299Z visual {"type":"hookVisual","sequence":9,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":8,"checkedAt":1795217247298,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:27.493Z source chars=41 sequence=10
+2026-11-20T23:27:27.506Z choice aux TextRender role=0 added=[] text="電車を降りて、駅前でタクシーを捕まえたものの、いつの間にかうたたねしていたらしい。"
+2026-11-20T23:27:27.507Z placement placed: line 100010, 41 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:28.500Z choice aux KiriKiriZ role=0 added=[] text="電車を降りて、駅前でタクシーを捕まえたものの、いつの間にかうたたねしていたらしい。"
+2026-11-20T23:27:28.501Z choice aux KiriKiriZ role=0 added=[] text="電車を降りて、駅前でタクシーを捕まえたものの、いつの間にかうたたねしていたらしい。"
+2026-11-20T23:27:29.419Z visual {"type":"hookVisual","sequence":10,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":38,"checkedAt":1795217249418,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:30.207Z visual {"type":"hookVisual","sequence":10,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":38,"checkedAt":1795217250207,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:31.976Z placement placed: line 100011, 27 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:32.319Z source chars=27 sequence=11
+2026-11-20T23:27:32.537Z choice aux TextRender role=0 added=[] text="まだ大雑把な目的地しか伝えていなかったのを思い出した。"
+2026-11-20T23:27:32.860Z choice aux KiriKiriZ role=0 added=[] text="まだ大雑把な目的地しか伝えていなかったのを思い出した。"
+2026-11-20T23:27:32.946Z choice aux KiriKiriZ role=0 added=[] text="まだ大雑把な目的地しか伝えていなかったのを思い出した。"
+2026-11-20T23:27:34.064Z placement placed: line 100012, 19 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:34.076Z visual {"type":"hookVisual","sequence":11,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":26,"checkedAt":1795217254076,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:34.262Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:34.263Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:34.275Z source chars=19 sequence=12
+2026-11-20T23:27:34.290Z choice aux TextRender role=0 added=[] text="「志那都荘まで行って欲しいんですけど」"
+2026-11-20T23:27:34.298Z placement placed: line 100012, 19 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:34.730Z choice aux KiriKiriZ role=0 added=[] text="「志那都荘まで行って欲しいんですけど」"
+2026-11-20T23:27:34.732Z choice aux KiriKiriZ role=0 added=[] text="「志那都荘まで行って欲しいんですけど」"
+2026-11-20T23:27:35.204Z placement placed: line 100013, 30 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:35.325Z visual {"type":"hookVisual","sequence":12,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":17,"checkedAt":1795217255324,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:35.402Z choice aux TextRender role=0 added=["「あー……すみません。アタシはここいらに詳しくないんですよ」"] text="「あー……すみません。アタシはここいらに詳しくないんですよ」"
+2026-11-20T23:27:35.407Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:35.408Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:35.417Z source chars=30 sequence=13
+2026-11-20T23:27:36.164Z choice aux KiriKiriZ role=0 added=[] text="「あー……すみません。アタシはここいらに詳しくないんですよ」"
+2026-11-20T23:27:36.176Z choice aux KiriKiriZ role=0 added=[] text="「あー……すみません。アタシはここいらに詳しくないんですよ」"
+2026-11-20T23:27:36.520Z visual {"type":"hookVisual","sequence":13,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":25,"checkedAt":1795217256520,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:37.406Z visual {"type":"hookVisual","sequence":13,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":25,"checkedAt":1795217257394,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:37.472Z placement placed: line 100014, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:37.665Z source chars=28 sequence=14
+2026-11-20T23:27:37.679Z choice aux TextRender role=0 added=[] text="「ですからね……奥まで行くのは勘弁してもらえませんか？」"
+2026-11-20T23:27:37.679Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:37.679Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:37.698Z placement placed: line 100014, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:38.326Z choice aux KiriKiriZ role=0 added=[] text="「ですからね……奥まで行くのは勘弁してもらえませんか？」"
+2026-11-20T23:27:38.327Z choice aux KiriKiriZ role=0 added=[] text="「ですからね……奥まで行くのは勘弁してもらえませんか？」"
+2026-11-20T23:27:38.811Z visual {"type":"hookVisual","sequence":14,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":23,"checkedAt":1795217258810,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:38.937Z placement placed: line 100015, 17 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:39.129Z source chars=17 sequence=15
+2026-11-20T23:27:39.146Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:39.146Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:39.147Z choice aux TextRender role=0 added=[] text="「（サービスの悪い運転手だ……）」"
+2026-11-20T23:27:39.193Z placement placed: line 100015, 17 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:39.602Z choice aux KiriKiriZ role=0 added=[] text="「（サービスの悪い運転手だ……）」"
+2026-11-20T23:27:39.603Z choice aux KiriKiriZ role=0 added=[] text="「（サービスの悪い運転手だ……）」"
+2026-11-20T23:27:40.216Z placement placed: line 100016, 34 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:40.341Z visual {"type":"hookVisual","sequence":15,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":11,"checkedAt":1795217260340,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:40.427Z source chars=34 sequence=16
+2026-11-20T23:27:40.438Z choice aux TextRender role=0 added=[] text="それが顔に出ていたのか、運転手が愛想笑いを浮かべながら言葉を続ける。"
+2026-11-20T23:27:41.284Z choice aux KiriKiriZ role=0 added=[] text="それが顔に出ていたのか、運転手が愛想笑いを浮かべながら言葉を続ける。"
+2026-11-20T23:27:41.285Z choice aux KiriKiriZ role=0 added=[] text="それが顔に出ていたのか、運転手が愛想笑いを浮かべながら言葉を続ける。"
+2026-11-20T23:27:41.537Z visual {"type":"hookVisual","sequence":16,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":32,"checkedAt":1795217261537,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:42.288Z visual {"type":"hookVisual","sequence":16,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":32,"checkedAt":1795217262288,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:42.501Z placement placed: line 100017, 11 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:42.701Z choice aux TextRender role=0 added=["「本当にすみませんね」"] text="「本当にすみませんね」"
+2026-11-20T23:27:42.702Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:42.707Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:42.713Z source chars=11 sequence=17
+2026-11-20T23:27:43.004Z choice aux KiriKiriZ role=0 added=[] text="「本当にすみませんね」"
+2026-11-20T23:27:43.005Z choice aux KiriKiriZ role=0 added=[] text="「本当にすみませんね」"
+2026-11-20T23:27:43.756Z placement placed: line 100018, 22 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:43.778Z visual {"type":"hookVisual","sequence":17,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":9,"checkedAt":1795217263778,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:43.947Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:43.948Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:43.955Z source chars=22 sequence=18
+2026-11-20T23:27:43.970Z choice aux TextRender role=0 added=[] text="「……わかりました。じゃあ、ここでいいです」"
+2026-11-20T23:27:43.996Z placement placed: line 100018, 22 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:44.497Z choice aux KiriKiriZ role=0 added=[] text="「……わかりました。じゃあ、ここでいいです」"
+2026-11-20T23:27:44.498Z choice aux KiriKiriZ role=0 added=[] text="「……わかりました。じゃあ、ここでいいです」"
+2026-11-20T23:27:48.480Z placement placed: line 100019, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:48.666Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:48.667Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:48.674Z source chars=12 sequence=19
+2026-11-20T23:27:48.691Z choice aux TextRender role=0 added=[] text="「ありがとうございます」"
+2026-11-20T23:27:48.693Z placement placed: line 100019, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:48.965Z choice aux KiriKiriZ role=0 added=[] text="「ありがとうございます」"
+2026-11-20T23:27:48.966Z choice aux KiriKiriZ role=0 added=[] text="「ありがとうございます」"
+2026-11-20T23:27:49.695Z placement placed: line 100020, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:49.891Z source chars=28 sequence=20
+2026-11-20T23:27:49.917Z placement placed: line 100020, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:49.921Z choice aux TextRender role=0 added=[] text="タクシーが止まり、俺は精算を済ませて、タクシーを降りる。"
+2026-11-20T23:27:50.596Z choice aux KiriKiriZ role=0 added=[] text="タクシーが止まり、俺は精算を済ませて、タクシーを降りる。"
+2026-11-20T23:27:50.597Z choice aux KiriKiriZ role=0 added=[] text="タクシーが止まり、俺は精算を済ませて、タクシーを降りる。"
+2026-11-20T23:27:51.147Z placement placed: line 100021, 44 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:51.354Z source chars=44 sequence=21
+2026-11-20T23:27:51.373Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:51.373Z choice aux KiriKiriZ role=0 added=[] text="【運転手】"
+2026-11-20T23:27:51.373Z choice aux TextRender role=0 added=[] text="「わざわざイヌツキの土地に祭りを見に来るなんて、不心得者が増えたもんだよ、まったく……」"
+2026-11-20T23:27:51.393Z placement placed: line 100021, 44 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:52.426Z choice aux KiriKiriZ role=0 added=[] text="「わざわざイヌツキの土地に祭りを見に来るなんて、不心得者が増えたもんだよ、まったく……」"
+2026-11-20T23:27:52.427Z choice aux KiriKiriZ role=0 added=[] text="「わざわざイヌツキの土地に祭りを見に来るなんて、不心得者が増えたもんだよ、まったく……」"
+2026-11-20T23:27:52.438Z visual {"type":"hookVisual","sequence":21,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":38,"checkedAt":1795217272438,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:53.183Z placement placed: line 100022, 5 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:53.211Z visual {"type":"hookVisual","sequence":21,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":38,"checkedAt":1795217273210,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:53.388Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:53.389Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:27:53.396Z placement placed: line 100022, 5 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:55.422Z placement placed: line 100023, 15 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:55.627Z source chars=15 sequence=22
+2026-11-20T23:27:55.642Z choice aux TextRender role=0 added=[] text="降りる間際に聞こえてきた呟き。"
+2026-11-20T23:27:55.694Z placement placed: line 100023, 15 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:56.018Z choice aux KiriKiriZ role=0 added=[] text="降りる間際に聞こえてきた呟き。"
+2026-11-20T23:27:56.036Z choice aux KiriKiriZ role=0 added=[] text="降りる間際に聞こえてきた呟き。"
+2026-11-20T23:27:56.714Z placement placed: line 100024, 14 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:56.737Z visual {"type":"hookVisual","sequence":22,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":14,"checkedAt":1795217276727,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:56.886Z source chars=14 sequence=23
+2026-11-20T23:27:56.902Z choice aux TextRender role=0 added=[] text="無視して、そのまま外に出た。"
+2026-11-20T23:27:56.903Z placement placed: line 100024, 14 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:27:57.223Z choice aux KiriKiriZ role=0 added=[] text="無視して、そのまま外に出た。"
+2026-11-20T23:27:57.225Z choice aux KiriKiriZ role=0 added=[] text="無視して、そのまま外に出た。"
+2026-11-20T23:27:58.052Z visual {"type":"hookVisual","sequence":23,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":12,"checkedAt":1795217278052,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:27:59.013Z visual {"type":"hookVisual","sequence":23,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":12,"checkedAt":1795217279013,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:02.955Z choice aux KiriKiriZ role=0 added=["小镇今昔"] text="小镇今昔"
+2026-11-20T23:28:02.956Z choice aux KiriKiriZ role=0 added=[] text="小镇今昔"
+2026-11-20T23:28:02.981Z source chars=28 sequence=24
+2026-11-20T23:28:03.276Z placement placed: line 100025, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:03.475Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:28:03.475Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:28:03.475Z choice aux TextRender role=0 added=[] text="「まだ距離があるけど……ま、いっか。久しぶりだし歩こう」"
+2026-11-20T23:28:04.169Z choice aux KiriKiriZ role=0 added=[] text="「まだ距離があるけど……ま、いっか。久しぶりだし歩こう」"
+2026-11-20T23:28:04.180Z choice aux KiriKiriZ role=0 added=[] text="「まだ距離があるけど……ま、いっか。久しぶりだし歩こう」"
+2026-11-20T23:28:04.757Z placement placed: line 100026, 26 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:04.982Z source chars=26 sequence=25
+2026-11-20T23:28:05.015Z choice aux TextRender role=0 added=[] text="息を吐き、両手を腰に当てて、大きく背をのけ反らせる。"
+2026-11-20T23:28:05.016Z placement placed: line 100026, 26 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:05.597Z choice aux KiriKiriZ role=0 added=[] text="息を吐き、両手を腰に当てて、大きく背をのけ反らせる。"
+2026-11-20T23:28:05.598Z choice aux KiriKiriZ role=0 added=[] text="息を吐き、両手を腰に当てて、大きく背をのけ反らせる。"
+2026-11-20T23:28:06.068Z visual {"type":"hookVisual","sequence":25,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":1,"recognizedCharacters":26,"sourceCharacters":23,"checkedAt":1795217286038,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:06.303Z placement placed: line 100027, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:06.523Z source chars=28 sequence=26
+2026-11-20T23:28:06.538Z choice aux TextRender role=0 added=[] text="ずっと座っていたせいか、腰の辺りでポキポキと骨が鳴った。"
+2026-11-20T23:28:07.218Z choice aux KiriKiriZ role=0 added=[] text="ずっと座っていたせいか、腰の辺りでポキポキと骨が鳴った。"
+2026-11-20T23:28:07.222Z choice aux KiriKiriZ role=0 added=[] text="ずっと座っていたせいか、腰の辺りでポキポキと骨が鳴った。"
+2026-11-20T23:28:08.378Z placement placed: line 100028, 20 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:08.543Z visual {"type":"hookVisual","sequence":26,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":30,"sourceCharacters":26,"checkedAt":1795217288543,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:08.578Z source chars=21 sequence=27
+2026-11-20T23:28:08.593Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:28:08.593Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:28:08.593Z choice aux TextRender role=0 added=[] text="「んーーー！　つっかれたぁぁぁーーーー！」"
+2026-11-20T23:28:08.598Z placement placed: line 100028, 20 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:09.088Z choice aux KiriKiriZ role=0 added=[] text="「んーーー！　つっかれたぁぁぁーーーー！」"
+2026-11-20T23:28:09.103Z choice aux KiriKiriZ role=0 added=[] text="「んーーー！　つっかれたぁぁぁーーーー！」"
+2026-11-20T23:28:10.395Z visual {"type":"hookVisual","sequence":27,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":30,"sourceCharacters":16,"checkedAt":1795217290394,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:10.537Z placement placed: line 100029, 17 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:10.739Z source chars=17 sequence=28
+2026-11-20T23:28:10.755Z choice aux TextRender role=0 added=[] text="家を出て、電車を乗り継ぎ約２時間。"
+2026-11-20T23:28:10.794Z placement placed: line 100029, 17 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:11.217Z choice aux KiriKiriZ role=0 added=[] text="家を出て、電車を乗り継ぎ約２時間。"
+2026-11-20T23:28:11.218Z choice aux KiriKiriZ role=0 added=[] text="家を出て、電車を乗り継ぎ約２時間。"
+2026-11-20T23:28:11.889Z visual {"type":"hookVisual","sequence":28,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":1,"recognizedCharacters":26,"sourceCharacters":15,"checkedAt":1795217291848,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:12.121Z placement placed: line 100030, 16 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:12.326Z source chars=16 sequence=29
+2026-11-20T23:28:12.341Z choice aux TextRender role=0 added=[] text="そしてタクシーを使って約３０分。"
+2026-11-20T23:28:12.398Z placement placed: line 100030, 16 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:12.707Z choice aux KiriKiriZ role=0 added=[] text="そしてタクシーを使って約３０分。"
+2026-11-20T23:28:12.708Z choice aux KiriKiriZ role=0 added=[] text="そしてタクシーを使って約３０分。"
+2026-11-20T23:28:13.382Z visual {"type":"hookVisual","sequence":29,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":1,"recognizedCharacters":26,"sourceCharacters":15,"checkedAt":1795217293375,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:13.549Z placement placed: line 100031, 40 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:13.752Z choice aux TextRender role=0 added=["青々とした木々ばかりの面白味のない風景の峠道を抜け、ようやく辿り着いた穂織の町。"] text="青々とした木々ばかりの面白味のない風景の峠道を抜け、ようやく辿り着いた穂織の町。"
+2026-11-20T23:28:13.796Z source chars=40 sequence=30
+2026-11-20T23:28:14.795Z choice aux KiriKiriZ role=0 added=[] text="青々とした木々ばかりの面白味のない風景の峠道を抜け、ようやく辿り着いた穂織の町。"
+2026-11-20T23:28:14.815Z choice aux KiriKiriZ role=0 added=[] text="青々とした木々ばかりの面白味のない風景の峠道を抜け、ようやく辿り着いた穂織の町。"
+2026-11-20T23:28:14.970Z visual {"type":"hookVisual","sequence":30,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":1,"recognizedCharacters":26,"sourceCharacters":38,"checkedAt":1795217294969,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:17.129Z placement placed: line 100032, 15 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.172Z placement placed: line 100033, 30 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.212Z placement placed: line 100034, 38 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.254Z placement placed: line 100035, 32 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.301Z placement placed: line 100036, 29 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.343Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:28:17.343Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:28:17.343Z placement placed: line 100037, 29 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.380Z placement placed: line 100038, 13 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.420Z placement placed: line 100039, 42 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.469Z placement placed: line 100040, 35 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.526Z placement placed: line 100041, 34 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.575Z placement placed: line 100042, 56 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.632Z placement placed: line 100043, 25 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:17.646Z visual {"type":"hookVisual","sequence":30,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":30,"sourceCharacters":38,"checkedAt":1795217297646,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:17.670Z placement placed: line 100044, 52 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:18.333Z source chars=15 sequence=31
+2026-11-20T23:28:18.363Z source chars=30 sequence=32
+2026-11-20T23:28:18.380Z source chars=38 sequence=33
+2026-11-20T23:28:18.396Z source chars=32 sequence=34
+2026-11-20T23:28:18.411Z source chars=29 sequence=35
+2026-11-20T23:28:18.427Z source chars=29 sequence=36
+2026-11-20T23:28:18.443Z source chars=13 sequence=37
+2026-11-20T23:28:18.458Z source chars=42 sequence=38
+2026-11-20T23:28:18.474Z source chars=35 sequence=39
+2026-11-20T23:28:18.489Z source chars=34 sequence=40
+2026-11-20T23:28:18.505Z source chars=56 sequence=41
+2026-11-20T23:28:18.521Z source chars=25 sequence=42
+2026-11-20T23:28:18.537Z source chars=52 sequence=43
+2026-11-20T23:28:19.353Z placement placed: line 100045, 7 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:19.383Z placement placed: line 100046, 29 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:19.534Z visual {"type":"hookVisual","sequence":43,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":1,"recognizedCharacters":26,"sourceCharacters":49,"checkedAt":1795217299533,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:19.562Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:28:19.562Z choice aux KiriKiriZ role=0 added=[] text="【 将臣 】"
+2026-11-20T23:28:19.594Z choice aux TextRender role=0 added=["「……行くか」観光に来たわけじゃないんだから、立ち尽くしてても仕方ない。"] text="「……行くか」観光に来たわけじゃないんだから、立ち尽くしてても仕方ない。"
+2026-11-20T23:28:19.598Z placement placed: line 100046, 29 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:19.999Z source chars=50 sequence=44
+2026-11-20T23:28:20.073Z source chars=7 sequence=45
+2026-11-20T23:28:20.098Z source chars=29 sequence=46
+2026-11-20T23:28:20.290Z choice aux KiriKiriZ role=0 added=[] text="「……行くか」観光に来たわけじゃないんだから、立ち尽くしてても仕方ない。"
+2026-11-20T23:28:20.291Z choice aux KiriKiriZ role=0 added=[] text="「……行くか」観光に来たわけじゃないんだから、立ち尽くしてても仕方ない。"
+2026-11-20T23:28:21.144Z visual {"type":"hookVisual","sequence":46,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":23,"recognizedCharacters":54,"sourceCharacters":27,"checkedAt":1795217301143,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:21.950Z visual {"type":"hookVisual","sequence":46,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":1,"recognizedCharacters":26,"sourceCharacters":27,"checkedAt":1795217301950,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:23.763Z placement placed: line 100047, 5 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:23.947Z choice aux KiriKiriZ role=0 added=[] text="【 女性 】"
+2026-11-20T23:28:23.948Z choice aux KiriKiriZ role=0 added=[] text="【 女性 】"
+2026-11-20T23:28:23.994Z placement placed: line 100047, 5 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:24.456Z source chars=5 sequence=47
+2026-11-20T23:28:25.496Z visual {"type":"hookVisual","sequence":47,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":1,"recognizedCharacters":26,"sourceCharacters":0,"checkedAt":1795217305495,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:26.246Z placement placed: line 100048, 10 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:26.291Z visual {"type":"hookVisual","sequence":47,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":25,"sourceCharacters":0,"checkedAt":1795217306290,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:26.438Z source chars=10 sequence=48
+2026-11-20T23:28:26.471Z choice aux KiriKiriZ role=0 added=[] text="【 女性 】"
+2026-11-20T23:28:26.471Z choice aux KiriKiriZ role=0 added=[] text="【 女性 】"
+2026-11-20T23:28:26.471Z choice aux TextRender role=0 added=[] text="「……んー……あの」"
+2026-11-20T23:28:26.496Z placement placed: line 100048, 10 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T23:28:26.678Z choice aux KiriKiriZ role=0 added=[] text="「「「「「「「「……「…「「…………「……「「…………んん「……ん「「…………んんーー「……んー「「…………んんーー……「……んー…「「…………んんーー…………"
+2026-11-20T23:28:26.679Z choice aux KiriKiriZ role=0 added=[] text="「「「「「「……「「…………「「…………んん「「…………んんーー「「…………んんーー……「「…………んんーー…………「「…………んんーー…………ああ「「…………"
+2026-11-20T23:28:27.602Z visual {"type":"hookVisual","sequence":48,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":34,"sourceCharacters":4,"checkedAt":1795217307505,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:28:28.298Z visual {"type":"hookVisual","sequence":48,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":34,"sourceCharacters":4,"checkedAt":1795217308297,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T23:29:03.826Z stream memory Krkr2wcs EXHQXN8@175310:fata_jp.exe
+2026-11-20T23:29:07.602Z ocr line "当作品には流血・暴力や精神的不安を煽る表現が含まれておりますまた、差別的な用語を"
+2026-11-20T23:29:07.605Z source chars=204 sequence=49
+2026-11-20T23:29:08.544Z ocr line "当作品のプレイには、ヘッドホンやイヤホン等のご利用を心からお勧めさせていただきま"
+2026-11-20T23:29:08.545Z source chars=83 sequence=50
+2026-11-20T23:29:10.335Z visual {"type":"hookVisual","sequence":50,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":79,"checkedAt":1795217349697,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T23:29:12.451Z visual {"type":"hookVisual","sequence":50,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":79,"checkedAt":1795217350462,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T23:31:20.333Z ocr line "鬱蒼と茂る闇の森をかき分けると"
+2026-11-20T23:31:20.334Z source chars=15 sequence=51
+2026-11-20T23:31:21.290Z visual {"type":"hookVisual","sequence":51,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":15,"checkedAt":1795217481290,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T23:31:21.984Z visual {"type":"hookVisual","sequence":51,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":0,"recognizedCharacters":0,"sourceCharacters":15,"checkedAt":1795217481983,"region":{"x":56,"y":459,"width":747,"height":144}}
+2026-11-20T23:31:25.901Z source chars=18 sequence=52
+2026-11-20T23:31:25.988Z placement placed: line 1, 18 characters, first box 220,488,20,22 in client 804x604
+2026-11-20T23:31:26.105Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="その瞬間、私は死体を見下ろしていた。"
+2026-11-20T23:31:26.105Z choice aux KiriKiri2 role=0 added=[] text="その瞬間、私は死体を見下ろしていた。"
+2026-11-20T23:31:27.064Z source chars=9 sequence=53
+2026-11-20T23:31:27.154Z placement placed: line 2, 9 characters, first box 307,488,22,22 in client 804x604
+2026-11-20T23:31:27.357Z choice aux KiriKiri2 role=0 added=[] text="……自分の死体だ。"
+2026-11-20T23:31:27.420Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="………自分……の自死分……体…の自だ…分死。自の体分だ死の。体分だ死の。体だ死。体だ。"
+2026-11-20T23:31:29.167Z source chars=17 sequence=54
+2026-11-20T23:31:29.216Z placement placed: line 3, 17 characters, first box 226,488,22,22 in client 804x604
+2026-11-20T23:31:29.399Z choice aux KiriKiri2 role=0 added=[] text="磔の場へと引きずられるその姿に……"
+2026-11-20T23:31:29.513Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="磔の場へと引きずられるその姿に……"
+2026-11-20T23:31:31.513Z source chars=9 sequence=55
+2026-11-20T23:31:31.532Z placement placed: line 4, 9 characters, first box 307,488,22,22 in client 804x604
+2026-11-20T23:31:31.718Z choice aux KiriKiri2 role=0 added=[] text="深い絶望を抱き……"
+2026-11-20T23:31:31.867Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="深い深絶望い深を絶抱望い深き深を絶…い望抱…絶をき望…抱を…き望…抱を…き…抱…き……"
+2026-11-20T23:31:32.757Z source chars=9 sequence=56
+2026-11-20T23:31:32.772Z placement placed: line 5, 9 characters, first box 309,488,20,22 in client 804x604
+2026-11-20T23:31:32.968Z choice aux KiriKiri2 role=0 added=[] text="そして魂は砕け……"
+2026-11-20T23:31:33.089Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="そしそて魂しそはて砕魂しそけそはて…し魂砕…てはけ魂…砕は…け魂…砕は…け…砕…け……"
+2026-11-20T23:31:33.696Z source chars=12 sequence=57
+2026-11-20T23:31:33.713Z placement placed: line 6, 12 characters, first box 281,488,22,22 in client 804x604
+2026-11-20T23:31:33.897Z choice aux KiriKiri2 role=0 added=[] text="私のすべては、消滅した。"
+2026-11-20T23:31:34.049Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="私のすべては、消滅した。"
+2026-11-20T23:31:34.776Z source chars=14 sequence=58
+2026-11-20T23:31:34.792Z placement placed: line 7, 14 characters, first box 265,488,20,22 in client 804x604
+2026-11-20T23:31:34.983Z choice aux KiriKiri2 role=0 added=[] text="そう、一度はすべてを失った。"
+2026-11-20T23:31:35.132Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="そう、一度はすべてを失った。"
+2026-11-20T23:31:35.767Z source chars=7 sequence=59
+2026-11-20T23:31:35.810Z placement placed: line 8, 7 characters, first box 327,488,22,22 in client 804x604
+2026-11-20T23:31:36.002Z choice aux KiriKiri2 role=0 added=[] text="……けれど……"
+2026-11-20T23:31:36.126Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["………けれ……どけ…れ…………けどれ……け…どれ……け…どれ……ど……"] text="………けれ……どけ…れ…………けどれ……け…どれ……け…どれ……ど……"
+2026-11-20T23:31:37.648Z source chars=16 sequence=60
+2026-11-20T23:31:37.664Z placement placed: line 9, 16 characters, first box 240,488,22,22 in client 804x604
+2026-11-20T23:31:37.893Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="……とこしえの闇に溶けゆく中……"
+2026-11-20T23:31:39.133Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="私"
+2026-11-20T23:31:39.381Z source chars=14 sequence=61
+2026-11-20T23:31:39.407Z placement placed: line 10, 14 characters, first box 255,488,22,22 in client 804x604
+2026-11-20T23:31:39.588Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="を私呼ぶを私声呼がぶを私…私声呼…をぶが届呼声…いぶ…がた声届…のがい…だ…た届。…いのた届だい。のた届だい。のただ。のだ。"
+2026-11-20T23:31:41.026Z source chars=7 sequence=62
+2026-11-20T23:31:41.041Z placement placed: line 11, 7 characters, first box 328,488,22,22 in client 804x604
+2026-11-20T23:31:41.212Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["…だか……らだ……か………らだ……か…らだ……か…らだ…か…ら……"] text="…だか……らだ……か………らだ……か…らだ……か…らだ…か…ら……"
+2026-11-20T23:31:42.331Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="も"
+2026-11-20T23:31:42.485Z source chars=9 sequence=63
+2026-11-20T23:31:42.500Z placement placed: line 12, 9 characters, first box 320,488,16,22 in client 804x604
+2026-11-20T23:31:42.679Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["うも一度うも、一誓度うもっも一、たう度誓。一っ、度た誓。"] text="うも一度うも、一誓度うもっも一、たう度誓。一っ、度た誓。"
+2026-11-20T23:31:42.681Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["っ、た度誓。っ、た誓。った。"] text="っ、た度誓。っ、た誓。った。"
+2026-11-20T23:31:43.139Z choice options filtered 2 -> 0
+2026-11-20T23:31:43.499Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="ど"
+2026-11-20T23:31:43.661Z source chars=10 sequence=64
+2026-11-20T23:31:43.724Z placement placed: line 13, 10 characters, first box 300,488,19,22 in client 804x604
+2026-11-20T23:31:43.915Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["れどほどどれ時ほをどどれ重ど時ほねれをどてほ時重もどをね時て重をもね時て重をもね"] text="れどほどどれ時ほをどどれ重ど時ほねれをどてほ時重もどをね時て重をもね時て重をもね"
+2026-11-20T23:31:43.916Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["て重もねても"] text="て重もねても"
+2026-11-20T23:31:44.381Z choice options filtered 2 -> 1
+2026-11-20T23:31:45.226Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="多"
+2026-11-20T23:31:45.410Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["く多の障く多害のが障く多あ多害のろく障がうの害あと障ろ"] text="く多の障く多害のが障く多あ多害のろく障がうの害あと障ろ"
+2026-11-20T23:31:45.412Z source chars=11 sequence=65
+2026-11-20T23:31:45.429Z placement placed: line 14, 11 characters, first box 298,488,22,22 in client 804x604
+2026-11-20T23:31:45.612Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["がも害うあとろがうあもとろがうあもとろうもと"] text="がも害うあとろがうあもとろがうあもとろうもと"
+2026-11-20T23:31:45.613Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="も"
+2026-11-20T23:31:46.078Z choice options filtered 2 -> 0
+2026-11-20T23:31:46.693Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=[] text="君"
+2026-11-20T23:31:46.894Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["が君どんが君など姿がん君に君などながん姿っどなにてんな姿いな"] text="が君どんが君など姿がん君に君などながん姿っどなにてんな姿いな"
+2026-11-20T23:31:46.965Z source chars=15 sequence=66
+2026-11-20T23:31:46.981Z placement placed: line 15, 15 characters, first box 257,488,22,22 in client 804x604
+2026-11-20T23:31:47.165Z choice aux tTVPNativeBaseBitmap::DrawText role=0 added=["っによ姿てなうにいっとなてよもっいうてよといもうてよといもうよともうとも"] text="っによ姿てなうにいっとなてよもっいうてよといもうてよといもうよともうとも"
+2026-11-20T23:31:47.626Z choice options filtered 2 -> 0

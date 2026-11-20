@@ -65,6 +65,15 @@ module.exports={
   embed:false,
   /* with embed on, the Chinese is drawn by the game too (false = ruby only, the reader draws the Chinese) */
   embedTranslation:true,
+  /* which role a draw has when the engine layer reports only its own identity of the draw, not a role (core/draw-role.cjs,
+     from diff-maker): the hook / stream ('hook:TextRender'), the window or layer class chain, own class first
+     ('class:Window_ChoiceList'), the script call ('call:selectLink') or the kind of layer a native reader wrapped ('layer:msg').
+     Order: call, class chain, hook, layer, rolePatterns, roleFallback. Roles are the protocol's (docs/engine-draw-protocol.md):
+     line (the only one that may be hidden or replaced), name, choice, button, menu, system. roleMap is an open dictionary:
+     a game diff adds or overrides entries, the engine's stay. Empty map + null fallback = the kernel as before */
+  roleMap:{},
+  rolePatterns:[],/* [[RegExp source over the identity string, role]], flags 'u' */
+  roleFallback:null,
  },
  safeMode:{
   /* reader redraws per second while the game is in a page effect; null = kernel default */

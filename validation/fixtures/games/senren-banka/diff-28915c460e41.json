@@ -1,0 +1,34 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "x-fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "drawWhileBlanking": true,
+   "translationGrowsDown": true
+  },
+  "calibrate": {
+   "positionSource": "engine",
+   "textBox": {
+    "x": 220,
+    "y": 488,
+    "w": 185,
+    "h": 250,
+    "client": [
+     1535,
+     863
+    ]
+   },
+   "hideMethod": "hide"
+  },
+  "hide": {
+   "textEffectsRead": false
+  }
+ },
+ "exe": "SenrenBanka.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/1",
+ "issuedAt": ""
+}
