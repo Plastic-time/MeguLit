@@ -376,5 +376,13 @@
   GL.setMix = (m) => { applyTheme(m); GL.draw(); }; applyTheme(night);
   GL.dbg = { get plates() { return gplates; } };
   GL.setScale = (k) => { renderer.setPixelRatio(Math.max(0.5, Math.min(Math.max(window.devicePixelRatio || 1, Q.get('aa') === '1' ? 1 : 1.5), REDUCE ? 1 : 2) * k)); resize(); };   /* low frame rate: lower the render resolution */
+  /* pre-render export: which plate is lit by what, and each plate's screen outline (convex hull, <= 14 points, CSS px of the current camera) */
+  GL.plateInfo = () => ({ cores: gplates.filter((p) => p.core).length, plates: gplates.map((p) => p.core ? { core: true, order: p.order } : { core: false, thr: +(+p.thr).toFixed(3) }) });
+  GL.outlines = (W, H) => { const v = new THREE.Vector3(); return gplates.map((p) => { try {
+    if (!p.g3.visible || !p.glass.visible) return null; p.g3.updateWorldMatrix(true, true); const pos = p.glass.geometry.attributes.position, pts = []; const step = Math.max(1, Math.floor(pos.count / 400));
+    for (let i = 0; i < pos.count; i += step) { v.fromBufferAttribute(pos, i).applyMatrix4(p.glass.matrixWorld).project(camera); if (v.z > 1 || v.z < -1) continue; pts.push([(v.x * 0.5 + 0.5) * W, (1 - (v.y * 0.5 + 0.5)) * H]); }
+    if (pts.length < 3) return null; pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]); const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
+    for (const q of pts) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); } for (let i = pts.length - 1; i >= 0; i--) { const q = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+    let hull = lo.slice(0, -1).concat(up.slice(0, -1)); if (hull.length > 14) { const o = []; for (let i = 0; i < 14; i++) o.push(hull[Math.floor(i * hull.length / 14)]); hull = o; } const flat = []; hull.forEach((q) => flat.push(q[0], q[1])); return flat; } catch (e) { return null; } }); };
   window.GL = GL;
 })();

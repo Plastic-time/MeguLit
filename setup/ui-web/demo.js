@@ -32,6 +32,7 @@
     const s = { t, st, fr, doneAt: da, got: Math.min(TOTAL, got), total: TOTAL, speed, eta: speed > 0 ? (TOTAL - got) / speed : 0, pack, src: lead, srcN: nb, dir: 'D:/MeguLit/runtime',
       phase: t < T0 ? 'probe' : t < TEND + 0.4 ? 'download' : t < DONE ? 'unpack' : 'done', unpack: Math.max(0, Math.min(1, (t - U0) / UD)) };
     if (s.phase === 'unpack' || s.phase === 'done') s.got = TOTAL;
+    if (o.blank) { s.poseP = Math.max(0, Math.min(1, (t - T0) / (TEND - T0))); st.fill(0); fr.fill(0); s.got = 0; s.speed = 0; s.eta = 0; s.phase = 'download'; }   /* pre-render: every segment still pending, the glass is drawn unlit (the player lights it from the real progress) */
     if (o.fail === 'download') { for (let i = 0; i < N; i++) if (st[i] === 1 || st[i] === 3) st[i] = 4; s.speed = 0; s.eta = 0;
       s.err = { kind: 'download' }; }
     if (o.fail === 'install') s.err = { kind: 'install' };
