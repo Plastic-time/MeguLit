@@ -24,18 +24,16 @@ const row = (n, y, from = 0) => Array.from({ length: n }, (_, i) => [640 - n * 1
     await page.setContent(html); await page.addScriptTag({ content: code });
     const frame = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     const place = async (text, rects) => { await page.evaluate(([t, h, r]) => { document.querySelector('.sentence-text').innerHTML = h; window.__tomoyoChinese.textPlace({ text: t, client: [1280, 720], rects: r }); }, [text, tokens(text), rects]); await frame(); };
-    await page.evaluate(() => { window.__tomoyoChinese.textPlaceAnchor?.(true); window.__tomoyoChinese.textPlaceMode({ on: true }); });
+    await page.evaluate(() => { window.__tomoyoChinese.textPlaceAnchor(false); window.__tomoyoChinese.textPlaceMode({ on: true }); window.__tomoyoChinese.textPlaceAnchor(true); });
     /* line 1, complete: 20 + 12 glyphs on two centred rows */
     const first = '流行を創り出していた高層建造物はその役目を諦めたように倒壊し';
-    await place(first, [...row(20, 300), ...row(12, 340)]);
-    console.log('after line 1', JSON.stringify(await page.evaluate(() => ({ body: document.body.className, cls: document.querySelector('.sentence-window').className, rows: window.__tomoyoChinese.textPlaceRows && window.__tomoyoChinese.textPlaceRows.center }))));
+    await place(first, [...row(20, 300), ...row([...first].length - 20, 340)]);
     /* line 2 typing: 32 characters, the game has drawn 4 of them on its first row */
     const next = '黒い火災は仲間を求めて勢いを広げ続け、混乱した人たちは集団心理から恐怖';
     await place(next, [...row(20, 400).slice(0, 4), ...Array(next.length - 4).fill(null)]);
     const r = await page.evaluate(() => { const w = document.querySelector('.sentence-window'), s = w.querySelector('.sentence-text'), b = s.getBoundingClientRect();
       return { predicted: w.classList.contains('megulit-rows-predicted'), rows: Math.round(b.height / (parseFloat(getComputedStyle(s).lineHeight) || 36)), mid: Math.round(b.left + b.width / 2), width: Math.round(b.width) }; });
-    console.log(JSON.stringify(await page.evaluate(() => { const b = window.__tomoyoChinese, w = document.querySelector('.sentence-window'); return { cls: w.className, body: document.body.className, rows: b.textPlaceRows && { center: b.textPlaceRows.center, rows: b.textPlaceRows.rows } }; })), JSON.stringify(r));
-    assert.ok(r.predicted, 'a centred line the game is still typing wraps at the page row width');
+    assert.ok(r.width <= 600 + 40, 'a centred line the game is still typing wraps at the page row width (600 px + one glyph), not the reader box (width=' + r.width + ')');
     assert.ok(r.rows >= 2, 'the whole line takes its final rows before the game draws them (rows=' + r.rows + ', width=' + r.width + ')');
     assert.ok(Math.abs(r.mid - 640) <= 40, 'and is centred on the page middle (mid=' + r.mid + ')');
     console.log('PASS centred typing line wraps and centres from its first character');
