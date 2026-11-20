@@ -126,7 +126,15 @@ static void FinishEmbed(long id,string trans,bool hide=false){PendingEmbed p;loc
  static string RuntimeDumpKey(string dir){uint h=2166136261;foreach(char ch in dir){uint c=ch;if(c>=65&&c<=90)c+=32;h=unchecked((h^c)*16777619);}return h.ToString("x8");}
  // The DLL comes from the cold runtime pack runtime\\runtime-dump (docs/runtime-dump-pack.md), else next to HookBridge (dev builds).
  // On a first run the pack may still be downloading: a background thread waits for it (up to 15 min, while the game runs).
- static string RuntimeDumpDll(string bit){string install=Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\'));foreach(string d in new[]{Path.Combine(install,"runtime","runtime-dump"),AppDomain.CurrentDomain.BaseDirectory}){string f=Path.Combine(d,"MeguLitDump"+bit+".dll");if(File.Exists(f))return f;}return null;}
+ /* P0 2026-11-21 (1.4.20 users: SenrenBanka, Higurashi, Rance ended with 0xC00000FD; WER dump: MeguLitDump32 recursing through
+    RtlAllocateHeap until the stack ran out). The fix (cd35cbd4) was in the source but the cold pack users download was never
+    rebuilt (pack.json contract 2, 2026-11-13), and an installed pack is never fetched again. A pack below MinDumpContract is
+    treated as absent: the dump stays off until a fixed pack is in place. A DLL next to HookBridge (dev build) has no pack.json. */
+ internal const int MinDumpContract=3;static bool DumpStaleNoted;
+ internal static int PackContract(string dir){try{string j=File.ReadAllText(Path.Combine(dir,"pack.json"));var m=System.Text.RegularExpressions.Regex.Match(j,"\"contract\"\\s*:\\s*(\\d+)");return m.Success?Int32.Parse(m.Groups[1].Value):0;}catch{return 0;}}
+ static string RuntimeDumpDll(string bit){string install=Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\'));string pack=Path.Combine(install,"runtime","runtime-dump");
+  {string f=Path.Combine(pack,"MeguLitDump"+bit+".dll");if(File.Exists(f)){int c=PackContract(pack);if(c>=MinDumpContract)return f;if(!DumpStaleNoted){DumpStaleNoted=true;Diagnostic("runtime dump pack contract "+c+" is below "+MinDumpContract+" (known stack overflow): not loaded until the pack is updated");}}}
+  {string f=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"MeguLitDump"+bit+".dll");if(File.Exists(f)&&!File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"pack.json")))return f;}return null;}
  static void RuntimeDump(string bit,string loader,string[] args){if(RuntimeDumpDll(bit)!=null){RuntimeDumpNow(bit,loader,args);return;}new Thread(()=>{try{for(int i=0;i<900&&!Quit;i++){Thread.Sleep(1000);if(RuntimeDumpDll(bit)!=null){Thread.Sleep(1500);RuntimeDumpNow(bit,loader,args);return;}}}catch{}}){IsBackground=true}.Start();}
  static void RuntimeDumpNow(string bit,string loader,string[] args){try{string dll=RuntimeDumpDll(bit),exe="";if(dll==null)return;IntPtr h=OpenProcess(0x1000,false,Pid);if(h==IntPtr.Zero)return;try{var sb=new System.Text.StringBuilder(32768);int size=sb.Capacity;if(QueryFullProcessImageName(h,0,sb,ref size))exe=sb.ToString();}finally{CloseHandle(h);}
   if(exe=="")return;string root=Environment.GetEnvironmentVariable("MEGULIT_RUNTIME_DUMP");if(String.IsNullOrEmpty(root))root=Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\')),"cache","runtime-dump");
