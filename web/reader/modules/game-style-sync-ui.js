@@ -232,11 +232,12 @@
     if(submit.textContent!==label)submit.textContent=label;}
    const box=dialog.querySelector('.tome-game-style-sync');if(box){
     const sync=box.querySelector('[data-game-style-sync]');if(sync){sync.dataset.noI18n='';sync.textContent=t('sync');sync.disabled=!!saving||aligning;sync.onclick=()=>{
-     send({type:'hookReselect',onlyIfBad:true});resync('all');};}
+     /* 2026-11-21 (owner: after 文本框上边距 moved the text, 校准当前句 did not bring it back): calibrating puts the line back on the game's own place (offset 0) */
+     window.__tomoyoChinese?.galAnchorOffsetReset?.();send({type:'hookReselect',onlyIfBad:true});resync('all');};}
     let textButton=box.querySelector('[data-calibrate-text]');if(!textButton){textButton=document.createElement('button');textButton.type='button';textButton.dataset.calibrateText='';
      textButton.dataset.noI18n='';textButton.onclick=()=>resync('text');box.append(textButton);}textButton.textContent=t('textSync');textButton.disabled=!!saving||aligning;
     const positionButton=dialog.querySelector('[data-gal-position-sync]');if(positionButton){positionButton.dataset.noI18n='';positionButton.textContent=t('positionSync');
-     positionButton.disabled=!!saving||aligning;positionButton.onclick=()=>resync('position');if(positionButton.parentElement!==box)box.append(positionButton);}
+     positionButton.disabled=!!saving||aligning;positionButton.onclick=()=>{window.__tomoyoChinese?.galAnchorOffsetReset?.();resync('position');};if(positionButton.parentElement!==box)box.append(positionButton);}
     let streamButton=box.querySelector('[data-calibrate-stream]');if(!streamButton){streamButton=document.createElement('button');streamButton.type='button';streamButton.dataset.calibrateStream='';
      streamButton.dataset.noI18n='';streamButton.onclick=()=>send({type:'hookReselect'});box.append(streamButton);}streamButton.textContent=({en:'Re-pick text stream',
      ja:'テキストストリームを選び直す'})[document.documentElement.lang?.slice(0,2)]||'重新选取文本流';

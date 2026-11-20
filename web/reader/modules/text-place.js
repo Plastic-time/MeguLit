@@ -87,6 +87,8 @@
   }
   b.textPlaceAlign = align;
   /* per-character placement on the game's boxes (the layout before 2026-11-16) instead of the anchored reader layout */
+  /* the game's place is in use for this game (placement on, anchored mode): stable while lines come and go, unlike the body class */
+  b.textPlaceAnchorActive = () => on && anchorMode;
   b.textPlaceAnchor = v => { anchorMode = v !== false; anchor = null; anchorLine = ''; schedule?.(); };
   const median = list => { const v = list.filter(n => n > 0).sort((x, y) => x - y); return v.length ? v[v.length >> 1] : 0; };
   function target() {

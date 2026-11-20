@@ -839,7 +839,10 @@
     /* 2026-11-19 (user: 「左右留白和边距现在都调整不了文本框位置了」): while the line is anchored on the game's own place the box
        position fields are its offset from there (anchorDX/anchorDY, client %, default 0, may be negative); the box position
        x/y of the reader's own box is kept apart and untouched */
-    const anchoredNow = () => document.body.classList.contains('megulit-anchored');
+    /* 2026-11-21 (owner's recording, 千恋＊万花: dragging 文本框上边距 threw the text to mid-screen and 校准当前句 did not bring it back): the body class
+       comes and goes between lines and while the game draws a line itself, so a drag switched the fields between the offset and the reader's own
+       place halfway and wrote one into the other. The mode is the game's (placement on, anchored), stable for the whole drag. */
+    const anchoredNow = () => typeof bridge.textPlaceAnchorActive === 'function' ? !!bridge.textPlaceAnchorActive() : document.body.classList.contains('megulit-anchored');
     /* 2026-11-19 (user, 千恋＊万花: 「我校准了之后调了一下换行长度，直接再也恢复不了正确位置了」): the meaning of the two fields is
        fixed when they are filled. The menu had been opened on a line the game drew itself (box mode: the fields held x 24.63 /
        y 79.7); the next line was anchored and dragging the wrap width wrote those numbers as an offset. A change of mode while
@@ -941,6 +944,7 @@
      };
     dragButton.onclick = () => { const on = !document.body.classList.contains('tome-box-dragging'); dragMode(on); if (!on) save(); };
     dragLabel(false); dialog.addEventListener('close', () => dragMode(false), { once:true });
+    bridge.galAnchorOffsetReset = () => anchorReset.onclick?.(); /* 校准当前句 / 仅校准位置 put the line back on the game's own place */
     anchorReset.onclick = () => { if (!anchoredNow()) return; if (bridge.gameStyleCommitReady?.() === false) return; preferences = { ...current(), anchorDX: 0, anchorDY: 0 };
      if (fieldsAreOffset) { const was = syncingForm; syncingForm = true; try { f('galX').value = 0; f('galY').value = 0; for (const update of sliderOutputs) update(); } finally { syncingForm = was; } }
      committed = { ...preferences }; send({ type: 'galConfigure', settings: preferences }); bridge.saveGameProfileFromMenu?.(preferences); apply(); };
