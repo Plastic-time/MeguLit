@@ -68,6 +68,6 @@ fn kill_with_app(child:&Child){
  #[repr(C)] #[derive(Default)] struct Extended{basic:Basic,io:Io,p:usize,j:usize,pp:usize,pj:usize}
  #[link(name="kernel32")] extern "system"{fn CreateJobObjectW(a:*mut c_void,n:*const u16)->*mut c_void;fn SetInformationJobObject(j:*mut c_void,class:i32,info:*const c_void,len:u32)->i32;fn AssignProcessToJobObject(j:*mut c_void,p:*mut c_void)->i32;}
  static JOB:OnceLock<usize>=OnceLock::new();
- let job=*JOB.get_or_init(||unsafe{let j=CreateJobObjectW(std::ptr::null_mut(),std::ptr::null());if j.is_null(){return 0;}let mut info=Extended::default();info.basic.flags=0x2000;if SetInformationJobObject(j,9,&info as *const _ as *const c_void,std::mem::size_of::<Extended>() as u32)==0{return 0;}j as usize});
+ let job=*JOB.get_or_init(||unsafe{let j=CreateJobObjectW(std::ptr::null_mut(),std::ptr::null());if j.is_null(){return 0;}let mut info=Extended::default();info.basic.flags=0x2000|0x800;/* 1.4.21 (user: MeguLit 关了游戏也被关): KILL_ON_JOB_CLOSE for the service and its helpers, BREAKAWAY_OK so a game started through MeguLit.exe --spawn-outside-job (main.rs) leaves the job and outlives MeguLit */if SetInformationJobObject(j,9,&info as *const _ as *const c_void,std::mem::size_of::<Extended>() as u32)==0{return 0;}j as usize});
  if job!=0{unsafe{AssignProcessToJobObject(job as *mut c_void,child.as_raw_handle() as *mut c_void);}}
 }
