@@ -59,25 +59,26 @@ const clone=v=>JSON.parse(JSON.stringify(v));
 /* only the kernel keys of a layer (an auto layer read from disk may carry stale or unknown keys: they are dropped, not errors) */
 function known(settings,base=DEFAULTS){const out={};if(!plain(settings))return out;for(const [k,v] of Object.entries(settings)){if(!(k in base))continue;if(plain(base[k])){if(plain(v))out[k]=known(v,base[k]);}else out[k]=v;}return out;}
 /* one more layer over a profile (same rule as profileFor): a new frozen profile, layers +name */
-function apply(profile,layer,name){const meta={gameKey:profile.gameKey,engine:profile.engine,exeSha256:profile.exeSha256||'',remoteVersion:profile.remoteVersion||0,layers:profile.layers,matched:profile.matched,rejected:profile.rejected||''};const base={};for(const k of Object.keys(DEFAULTS))base[k]=clone(profile[k]);
+function apply(profile,layer,name){const meta={gameKey:profile.gameKey,engine:profile.engine,exeSha256:profile.exeSha256||'',layers:profile.layers,matched:profile.matched,rejected:profile.rejected||''};const base={};for(const k of Object.keys(DEFAULTS))base[k]=clone(profile[k]);
  const s=merge(base,clone(known(layer)));return freeze({...meta,layers:name?meta.layers+'+'+name:meta.layers,...s});}
 
-/* layers: kernel <- engine <- repo game diff <- official remote diff (signed, this exe version) <- this PC's calibration (auto,
-   only while no official diff exists). input.remote is a document already admitted by core/profiles/remote.cjs check()/load();
-   it is validated again here, and a bad one is left out whole (profile.rejected says why). */
-function profileFor(input={}){input=input||{};const hit=findGame(input);const game=hit?.game||null;
- let remote=null,rejected='';if(plain(input.remote)){const v=require('./schema.cjs').validate(input.remote.settings);if(v.ok)remote=input.remote;else rejected='remote: '+v.errors.slice(0,2).join('; ');}
- const engine=engineId(input.engine)||engineId(remote?.engine)||engineId(game?.engine)||'';const eng=loadEngine(engine);
- let s=clone(DEFAULTS);const layers=['core'];if(eng){s=merge(s,clone(eng.settings||{}));layers.push('engine');}if(game){s=merge(s,clone(game.settings||{}));layers.push('game');}
- if(remote){s=merge(s,clone(remote.settings||{}));layers.push('remote');}
- /* this PC's measured auto profile (data/config/auto-profiles/<gameKey>.json, feat/auto-profile): known keys only, and only
-    while the official diff of this version is absent */
- else if(plain(input.auto)){s=merge(s,clone(known(input.auto)));layers.push('auto');}
+/* layers, each over the one before (docs/diff-layers.md):
+     core <- engine <- game (repo) <- shared (relay, the players' agreed diff of this exe) <- auto (this PC's calibration)
+     <- official (relay, the maintainer's signed diff of this exe) <- stepdown (this PC's gate step-down: always last, so a
+     game that broke here can always fall back)
+   Layers from outside the repo are data: input.shared / input.auto / input.official / input.stepDown are settings objects
+   (services/self-check-live.cjs inputOf picks them; the signed documents are checked by services/auto-profile-feed.cjs).
+   Each is checked again against core/profiles/domains.cjs here; one key or value outside its domain leaves that layer out
+   whole (profile.rejected names it). input.exeSha256: the program's SHA-256, shown in the trace. */
+const OUTSIDE=[['shared','shared'],['auto','auto'],['official','official'],['stepDown','stepdown']];
+function profileFor(input={}){input=input||{};const hit=findGame(input);const game=hit?.game||null;const {clean}=require('./domains.cjs');
+ const engine=engineId(input.engine)||engineId(game?.engine)||'';const eng=loadEngine(engine);
+ let s=clone(DEFAULTS);const layers=['core'],rejected=[];if(eng){s=merge(s,clone(eng.settings||{}));layers.push('engine');}if(game){s=merge(s,clone(game.settings||{}));layers.push('game');}
+ for(const [field,name] of OUTSIDE){const v=input[field];if(!plain(v))continue;const c=clean(v);if(c.rejected.length){rejected.push(name+': '+c.rejected.slice(0,3).join(','));continue;}s=merge(s,c.value);layers.push(name);}
  const exe=/^[0-9a-f]{64}$/.test(String(input.exeSha256||''))?String(input.exeSha256):'';
- const gameKey=game?game.key:(remote&&typeof remote.gameKey==='string'&&remote.gameKey)?remote.gameKey:autoKey(input);
- return freeze({gameKey,engine:engine||'unknown',exeSha256:exe,remoteVersion:remote?remote.version|0:0,layers:layers.join('+'),matched:hit?hit.why.join(','):'',rejected,...s});}
+ return freeze({gameKey:game?game.key:autoKey(input),engine:engine||'unknown',exeSha256:exe,layers:layers.join('+'),matched:hit?hit.why.join(','):'',rejected:rejected.join('; '),...s});}
 /* the trace line every run writes once (hook-events.log), so the owner's log tells which layers this game ran with */
-const traceLine=p=>'profile '+p.gameKey+' exe='+(p.exeSha256?p.exeSha256.slice(0,8):'-')+' layers='+p.layers+' engine='+p.engine+(p.remoteVersion?' remote=v'+p.remoteVersion:'')+(p.matched?' match='+p.matched:'')+(p.rejected?' rejected='+p.rejected:'');
+const traceLine=p=>'profile '+p.gameKey+' exe='+(p.exeSha256?p.exeSha256.slice(0,8):'-')+' layers='+p.layers+' engine='+p.engine+(p.matched?' match='+p.matched:'')+(p.rejected?' rejected='+p.rejected:'');
 /* a dotted key of a profile, with the fallback when the profile or the key is missing */
 function get(p,key,fallback){let v=p;for(const k of String(key).split('.')){if(v==null||typeof v!=='object')return fallback;v=v[k];}return v===undefined||v===null?fallback:v;}
 /* the RegExps of choice.filters (bad sources are skipped) */
