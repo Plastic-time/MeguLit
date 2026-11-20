@@ -34,3 +34,11 @@ test('a line the patch does not have goes down the fallback chain; the miss is n
 test('a short unrelated line never borrows a longer one', () => {
   const { r } = make(); r.embedCached(JP, ZH); assert.equal(r.embedCached('いつの間にか'), undefined);
 });
+test('ファタモルガーナの館: paired on 「あなた死者」 (ruby base and reading together), asked as the hook line 「あなた」に…', async () => {
+  const { r, chained, traced } = make(); r.embedCached('「あなた死者」に声をかける人物がいる。', '有人在向「你死者」搭话。');
+  assert.equal(await r.translate({ id: 6, text: '「あなた」に声をかける人物がいる。' }), '有人在向「你死者」搭话。');
+  assert.deepEqual(chained, []); assert.ok(traced.some(t => /^translation near key=.* similar 0\.\d\d/.test(t)));
+});
+test('a different line of the same length never borrows by similarity', () => {
+  const { r } = make(); r.embedCached('私のすべては、消滅した。', '我的一切都消失了。'); assert.equal(r.embedCached('そう、一度はすべてを失った。'), undefined);
+});

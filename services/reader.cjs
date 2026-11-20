@@ -240,7 +240,13 @@ class Reader{
    const inside=c.includes(q),around=q.includes(c);if(!inside&&!around)continue;
    if(Math.min(cl,ql)/Math.max(cl,ql)<.6&&!(inside&&c.endsWith(q)))continue;
    if(!best||cl>best.len)best={value:v,len:cl,why:(inside?'asked line inside cached ':'cached line inside asked ')+Reader.keyPrint(k)};}
-  return best;}
+  if(best)return best;
+  /* 2026-11-21 (ファタモルガーナの館: the game draws 「あなた死者」 (ruby あなた on 死者), the hook gave 「あなた」に…, the patch was paired on one, the reader asked with the other):
+     the same line with a word more or less: character-pair (bigram) overlap of at least 0.8 and lengths within 30 %, the closest wins */
+  const grams=t=>{const a=[...t],m=new Map();for(let i=0;i+1<a.length;i++){const g=a[i]+a[i+1];m.set(g,(m.get(g)||0)+1);}return m;},qg=grams(q),qn=Math.max(1,ql-1);let close=null;
+  for(const [k,v] of this.embedCache){if(!v||!k.startsWith(p)||(p===''&&k.startsWith('en|')))continue;const c=k.slice(p.length),cl=[...c].length;if(cl<4||Math.min(cl,ql)/Math.max(cl,ql)<.7)continue;
+   const cg=grams(c);let both=0;for(const [g,n] of qg)both+=Math.min(n,cg.get(g)||0);const dice=2*both/(qn+Math.max(1,cl-1));if(dice>=.8&&(!close||dice>close.dice))close={value:v,dice,why:'similar '+dice.toFixed(2)+' '+Reader.keyPrint(k)};}
+  return close;}
  embedKey(text){return (this.displayLanguage()==='en'?'en|':'')+Reader.normKey(text);}
  embedCached(text,value){this.embedCache??=new Map();const key=this.embedKey(text);if(!key)return undefined;if(value===undefined){const hit=this.embedCache.get(key);if(hit){this.embedNote('hit',key);return hit;}const near=this.embedNear(key);if(near){this.embedNote('near',key,near.why);return near.value;}this.embedNote('miss',key,'no cached line equal to or around it ('+this.embedCache.size+' cached)');return undefined;}if(value)this.embedNote('store',key);this.embedCache.delete(key);this.embedCache.set(key,value);if(this.embedCache.size>800)this.embedCache.delete(this.embedCache.keys().next().value);return value;}
  /* 2026-11-12 art text (PageLocator art mode): the page gets the place and the translation; the game keeps drawing the line */
