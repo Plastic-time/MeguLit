@@ -13,8 +13,9 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* ---------- services on a temp root ---------- */
 function startService(root){const child=spawn(process.execPath,[path.join(ROOT,'services','server.cjs')],{env:{...process.env,MEGULIT_ROOT:root},stdio:['pipe','pipe','ignore']});
  let next=1,buf='';const waits=new Map();
- child.stdout.on('data',d=>{buf+=d;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+1);let m;try{m=JSON.parse(line);}catch{continue;}const w=waits.get(m.id);if(w){waits.delete(m.id);m.ok?w[0](m.data):w[1](Error(m.error));}}});
- const call=(request,ms=20000)=>new Promise((res,rej)=>{const id=next++;waits.set(id,[res,rej]);child.stdin.write(JSON.stringify({id,request})+'\n');setTimeout(()=>{if(waits.delete(id))rej(Error('SERVICE_TIMEOUT'));},ms);});
+ child.stdout.on('data',d=>{buf+=d;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+1);let m;try{m=JSON.parse(line);}catch{continue;}const w=waits.get(m.id);if(w){waits.delete(m.id);clearTimeout(w.timer);m.ok?w.resolve(m.data):w.reject(Error(m.error));}}});
+ const call=(request,ms=20000)=>new Promise((res,rej)=>{const id=next++,timer=setTimeout(()=>{if(waits.delete(id))rej(Error('SERVICE_TIMEOUT'));},ms);
+  waits.set(id,{resolve:res,reject:rej,timer});child.stdin.write(JSON.stringify({id,request})+'\n');});
  return {call,stop:async()=>{await call({action:'__shutdown'},5000).catch(()=>{});child.kill();}};}
 
 /* ---------- static server + test transport ---------- */
