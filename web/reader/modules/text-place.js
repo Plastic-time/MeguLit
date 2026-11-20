@@ -35,6 +35,7 @@
     'body.megulit-placed .megulit-place-window .megulit-ruby-base{position:absolute!important;display:block!important;margin:0!important;padding:0!important}',
     'body.megulit-placed .megulit-place-window .char-token{position:absolute!important;display:block!important;margin:0!important;padding:0!important;text-align:center!important;white-space:pre!important;letter-spacing:0!important;text-indent:0!important;pointer-events:auto}',
     'body.megulit-placed .megulit-place-window .char-token.megulit-unplaced{display:none!important}',
+    'body.megulit-place-garbled .sentence-window.tomoyo-hook-reader{visibility:hidden!important}', /* a broken copy of the game's Japanese line: the game's own text is drawn instead */
     /* fallback (the game drew its line blank but said nowhere where): the reader keeps its own place, without any plate */
     'body.megulit-place-fallback .sentence-window.tomoyo-hook-reader,body.megulit-place-fallback .sentence-window.tomoyo-hook-reader .tomoyo-cn-row,body.megulit-place-game-drawn .sentence-window.tomoyo-hook-reader,body.megulit-place-game-drawn .sentence-window.tomoyo-hook-reader .tomoyo-cn-row{background:none!important;border-color:transparent!important;box-shadow:none!important;backdrop-filter:none!important}',
     'body.megulit-place-fallback .sentence-window.tomoyo-hook-reader::before,body.megulit-place-fallback .sentence-window.tomoyo-hook-reader::after,body.megulit-place-fallback .tome-box-deco,body.megulit-place-game-drawn .sentence-window.tomoyo-hook-reader::before,body.megulit-place-game-drawn .sentence-window.tomoyo-hook-reader::after,body.megulit-place-game-drawn .tome-box-deco{display:none!important}',
@@ -250,7 +251,7 @@
     orphans = orphans.concat({ text, rects, client: l.client }).slice(-12); extraKey = ''; orphanWait = null; schedule();
     const log = b.textPlaceOrphans || (b.textPlaceOrphans = []); log.push(text.slice(0, 40)); if (log.length > 30) log.shift();
   }
-  function drawn(l) { const t = l ? [...String(l.text || '')].filter(c => !blank(c)).join('') : ''; if (orphanWait?.text === t) orphanWait = null; if (orphans.some(o => o.text === t)) { orphans = orphans.filter(o => o.text !== t); extraKey = ''; } }
+  function drawn(l) { document.body.classList.remove('megulit-place-garbled'); const t = l ? [...String(l.text || '')].filter(c => !blank(c)).join('') : ''; if (orphanWait?.text === t) orphanWait = null; if (orphans.some(o => o.text === t)) { orphans = orphans.filter(o => o.text !== t); extraKey = ''; } }
   function drawExtras() {
     let layer = document.getElementById('megulit-place-extras');
     const all = extras.items.concat(orphanItems());
@@ -541,7 +542,7 @@
     frame = 0;
     drawExtras();
     if (page) return applyPage();
-    if (!on || !line) { release(); gameDrawn(); return; }
+    if (!on || !line) { document.body.classList.remove('megulit-place-garbled'); release(); gameDrawn(); return; }
     if (line.fallback) { release(true); return; }
     const win = target(), sentence = win?.querySelector('.sentence-text:not(.megulit-old-line)');
     orphansMeet(line);
@@ -564,6 +565,11 @@
        another language than the reader's text (a translation patch, a Chinese display), so no character can be aligned. In anchored
        mode only the place is needed, never the characters: the top-left of the game's first row of boxes, taken like any anchor. */
     if (!idx && anchorMode && !gameDrawn()) { const map0 = mapper(line.client), got0 = placeRects.map(r => r && map0(r)).filter(r => r && r[2] > 0 && r[3] > 0);
+      /* 2026-11-21 (ファタモルガーナの館: its hook text garbled by the text effects, 「いき、い、き」 for 「呼吸をひとつする度に、指先に感覚が宿る。」): the
+         game's line is Japanese too, so the reader's line is not another language of it but a broken copy. The game's own text is drawn on its
+         place (and core delivers it as a source line for furigana and translation); the broken copy is not shown */
+      if (got0.length && readerText && /[぀-ヿ]/.test(placeText)) { orphan(line); release(); document.body.classList.add('megulit-place-garbled'); return; }
+      document.body.classList.remove('megulit-place-garbled');
       if (got0.length && !readerText) orphan(line); /* nothing of the reader's for this hidden line (its hook line was dropped) */
       if (got0.length) { anchorFrom(got0, median(got0.map(r => r[3])) || 0, map0, String(line.text || '')); release(true); pin(win, sentence); return; } }
     if (!idx) { if (!gameDrawn()) orphan(line); if (gameDrawn()) release(); else release(true); return; }
