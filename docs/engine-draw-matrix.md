@@ -57,8 +57,8 @@
 
 收益 = 发行量 × 现在缺的程度 ÷ 难度
 
-1. **KiriKiri processCh 路线**（7285 日文发行，已经在引擎内部，只差角色和内嵌）：本分支第二步
-2. **RPG Maker MV/MZ**（JS 层源码公开，现在坐标和角色全无，S）：本分支第二步
+1. **KiriKiri processCh 路线**（7285 日文发行，已经在引擎内部，只差角色和内嵌）：已做（ecc1e0b7），默认关，等实机
+2. **RPG Maker MV/MZ**（JS 层源码公开，现在坐标和角色全无，S）：已做（core/text-paths-rpgm.cjs），引擎差分默认开，等实机
 3. TyranoScript（S，DOM 已在，只差角色和 DOM 内嵌）、Ren'Py（S，有官方翻译钩子）：同一套协议，下一批
 4. Unity（M，组件已在内部，角色靠框架）
 5. 其余（Siglus / BGI / YU-RIS / AdvHD / Majiro / QLIE / Malie / Escude / CIRCUS / LiveMaker / NScripter / Artemis）是 L：每个要逆向二进制画字函数、按版本签名。共同的捷径是 GDI 引擎走 VNTextProxy 那条「代理 GDI + 写回字符串」的路，角色继续用 LunaHook 的 ctx2，坐标继续用字形点；真正的「内」要一个引擎一个会话
