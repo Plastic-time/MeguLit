@@ -22,7 +22,7 @@ test('page lines without a translation are asked by text and filled; the Japanes
     /* hook-reader's fill, as on main: by text into the row */
     await page.evaluate(() => { window.__tomoyoChinese.pageTranslationFill = (t, tr) => { let hit = false; for (const d of document.querySelectorAll('.tome-page-lines > div')) if (d.querySelector('.tome-page-char').textContent === t) { d.querySelector('.tome-page-tr').textContent = tr; hit = true; } return hit; }; });
     const tops = () => page.evaluate(() => [...document.querySelectorAll('.tome-page-char')].map(c => Math.round(c.getBoundingClientRect().top)));
-    const before = await tops(); await page.waitForTimeout(3300); /* within the guard's 3 s */
+    const before = await tops(); await page.waitForTimeout(800); /* the 600 ms check fills them */
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.tome-page-tr')].map(n => n.textContent)), ['「托你的福啦」', '「话说，你是一个人来的？」']);
     assert.deepEqual(await tops(), before, 'the Japanese does not move');
     assert.ok(await page.evaluate(() => window.__sent.some(m => m.kind === 'translationGuard' && /page/.test(m.what))), 'noted');

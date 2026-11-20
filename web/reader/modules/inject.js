@@ -153,7 +153,7 @@
     const chars = sentence?.querySelectorAll('.char-token');
     const text = sentence ? (chars?.length ? Array.from(chars,c=>c.textContent).join('') : sentence.textContent).trim() : '';
     if(text !== bridge.sourceText){bridge.sourceText=text;bridge.onSourceText?.(text);}
-    guard(text);
+    guard(text); try { pageGuard(); } catch {}
     /* the translation row and its room exist from the first frame of the line, not 220 ms later */
     if(sentence&&text&&enabled&&translationVisible&&!output?.isConnected&&ensureRow(sentence))reserve(text);
     /* 2026-11-13 (STEINS;GATE: each new line showed the previous line's translation for ~250 ms): the translation is
@@ -211,7 +211,8 @@
       try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'translateGuard', text: jp })); } catch {}
     }
   }
-  setInterval(pageGuard, 300);
+  /* 2026-11-21: a page line was first seen at the next 300 ms scan, so its 600 ms check came at 0.9 to 1.2 s; the scan is every 100 ms and also runs when a line is shown */
+  setInterval(pageGuard, 100);
   bridge.deliverBackfill = (source, text, kind = '') => {
     if (!enabled || !translationVisible || !String(text || '').trim()) return;
     const shown = bridge.sourceText || bridge.current;
