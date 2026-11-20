@@ -114,6 +114,6 @@ test('the real renders in setup/ui-web/video: poster, intro, field with lit glas
   const lit = await ev('(()=>{const c=document.getElementById("vov"),d=c.getContext("2d").getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;return n})()');
   assert.ok(lit > 1000, 'real glass outlines lit: ' + lit + ' px ' + JSON.stringify(await ev('Player.log.filter(e=>/overlay|glass/.test(e.k))'))); await shot('3-field-55pct');
   await ev('Scene.setTheme(true)'); await until('(()=>{const L=Player.layers.dark;return L.id==="field"&&!L.vids[L.front].paused})()', 8000, 'dark field'); await sleep(1000); await feed(N, Math.floor(N * 0.55), 0.55); await sleep(300); await shot('4-field-dark');
-  await ev('void Scene.goTo("unpack","dive")'); await on('unpack'); await ev('void Scene.goTo("done","pull")'); await on('done'); await sleep(800); await shot('5-done-dark');
+  await ev('void Scene.goTo("unpack","dive")'); await on('to-unpack'); assert.ok((await switches()).includes('to-unpack:fade'), 'finished glass: fully lit overlay, then a fade'); await on('unpack'); await ev('void Scene.goTo("done","pull")'); await on('done'); await sleep(800); await shot('5-done-dark');
   assert.equal(await ev('Player.state.dead'), false); assert.equal(await ev('Player.layers.light.man.draft'), false);
 });
