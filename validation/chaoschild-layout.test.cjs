@@ -6,7 +6,8 @@ test('box line: Japanese rows close up, translation <=15% smaller, then the bloc
   assert.match(src, /set\(sentence, 'line-height', closeRows\(sentence\)\)/); /* rows close up, never under 1.45 and never so far the furigana sits on the row above */
   assert.match(src, /Math\.max\(1\.45, Math\.round\(\(1 \+ rs \+ \.12\)/);
   assert.match(src, /\.megulit-anchor-window\.megulit-game-rows \.sentence-text\{white-space:nowrap!important\}/, 'a line on the game rows breaks only where the game did');
-  assert.match(src, /fsx \* \.85/);
+  /* 85 % of the current size: only 千恋＊万花's translationGrowsDown takes 85 % of the user's size (649b93ef) */
+  assert.match(src, /Math\.ceil\(\(grows\(\) \? cnBase : fsx\) \* \.85\)/); assert.match(src, /rx\.bottom > uiLimit && !grows\(\)\) \{ const up/);
   assert.match(src, /!anchor\.center && tr && tr\.height/);
 });
 test('centred line keeps only its top while typing', () => { assert.match(src, /anchor\.center && Number\.isFinite\(center\) && anchorLine === lineKey[^\n]*a = \[center, anchor\[1\]\]/); });
