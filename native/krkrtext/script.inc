@@ -24,7 +24,7 @@ LR"MGLT((function(){
      KiriKiri builds; typeof does not */
   var st=(typeof global.__megulitKrkrState=='Object')?global.__megulitKrkrState:void;
   if(st===void) {
-   st=%['skipped'=>0,'drawArgs'=>void,'drawOp'=>0,'drawLo'=>256,'drawQuiet'=>0,'lastEnd'=>void,'charsSent'=>0,'charsErr'=>'','trWrapped'=>0,'trLine'=>0,'trText'=>'','trKey'=>'','trOp'=>void,'trT'=>void,'trOwner'=>void,'trRec'=>void,'skippedCls'=>'','lastFont'=>'','pfontName'=>void,'art'=>0,'artText'=>'','artSeen'=>[],'calls'=>0,'hid'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
+   st=%['skipped'=>0,'drawArgs'=>void,'drawOp'=>0,'drawLo'=>256,'drawQuiet'=>0,'lastEnd'=>void,'charsSent'=>0,'charsErr'=>'','trWrapped'=>0,'trLine'=>0,'trText'=>'','trKey'=>'','trOp'=>void,'trT'=>void,'trOwner'=>void,'trRec'=>void,'skippedCls'=>'','lastFont'=>'','pfontName'=>void,'art'=>0,'artText'=>'','artSeen'=>[],'calls'=>0,'hid'=>0,'link'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
    st.screen=function(){
     var sw=+this.kag.scWidth,sh=+this.kag.scHeight;
     if(!(sw>0) || !(sh>0)) {sw=+this.kag.primaryLayer.width;sh=+this.kag.primaryLayer.height;}
@@ -179,7 +179,13 @@ LR"MGLT((function(){
       if(self.__mgKind=='msg') {
        st.calls++;
        {var d=[];d.assign(args);st.drawArgs=d;var o=d.count>4?+d[4]:255;if(o>st.drawOp) st.drawOp=o;if(o<st.drawLo) st.drawLo=o;st.drawQuiet=0;}
-       if(st.hideOn()) {
+       /* 2026-11-21 (ファタモルガーナの館 incr11 23:33:41Z: the option 「……おはよう………………」 was drawn at opacity 0 with the dialogue and
+          nothing drew it back: link text has no click wait, so no sentence end, no box). Text drawn while the message layer is
+          inside a link (KAG MessageLayer.inLink >= 0) is a choice button: the game draws it as it is (its text and its click area
+          stay), the choice overlay adds ruby and translation next to it */
+       var inLink=false;try {var m=self.parent;if(m!==void && m!==null && isvalid m && typeof m.inLink!='undefined' && +m.inLink>=0) inLink=true;} catch(e) {}
+       if(inLink) st.link++;
+       if(st.hideOn() && !inLink) {
         var a=[];a.assign(args);
         while(a.count<7) a.add(a.count==4?255:(a.count==5?true:0));
         a[4]=0;a[6]=0;st.hid++;
@@ -442,7 +448,7 @@ LR"MGLT((function(){
       if(typeof ms!='Object' || ms===void || ms===null) continue;
       for(var j=0;j<ms.count && j<32;j++) this.install(ms[j]);
      }
-     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' tr='+(this.trWrapped?1:0)+(typeof this.trWhy=='Object' && this.trWhy!==void?'/layer'+(+this.trWhy.layer)+'/own'+(+this.trWhy.own)+'/scr'+(+this.trWhy.scr)+'/small'+(+this.trWhy.small)+'/hid'+(+this.trWhy.hid)+'/empty'+(+this.trWhy.empty)+'/blank'+(+this.trWhy.blank):'')+'/sent'+(+this.charsSent)+(this.charsErr!==void?'/err:'+this.charsErr:'')+' draws='+this.calls+' hidden='+this.hid+' art='+this.art+' artLayers='+this.artSeen.count+' font='+this.fontNow()+' chars='+this.charsSent+(this.charsErr!=''?' charsErr='+this.charsErr:'')+' skipped='+this.skipped+(this.skippedCls!=''?'('+this.skippedCls+')':'');
+     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' tr='+(this.trWrapped?1:0)+(typeof this.trWhy=='Object' && this.trWhy!==void?'/layer'+(+this.trWhy.layer)+'/own'+(+this.trWhy.own)+'/scr'+(+this.trWhy.scr)+'/small'+(+this.trWhy.small)+'/hid'+(+this.trWhy.hid)+'/empty'+(+this.trWhy.empty)+'/blank'+(+this.trWhy.blank):'')+'/sent'+(+this.charsSent)+(this.charsErr!==void?'/err:'+this.charsErr:'')+' draws='+this.calls+' hidden='+this.hid+' link='+this.link+' art='+this.art+' artLayers='+this.artSeen.count+' font='+this.fontNow()+' chars='+this.charsSent+(this.charsErr!=''?' charsErr='+this.charsErr:'')+' skipped='+this.skipped+(this.skippedCls!=''?'('+this.skippedCls+')':'');
     } catch(e) {return 'error '+e.message;}
    } incontextof st;
    global.__megulitKrkrState=st;
