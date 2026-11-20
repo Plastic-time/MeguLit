@@ -250,6 +250,22 @@
     if (keep.length !== orphans.length) { orphans = keep; extraKey = ''; schedule(); }
   }
   /* the placed line is not drawn by the reader (no matching sentence, nothing aligned, no box): after ORPHAN_MS it is drawn from the placement */
+  /* 2026-11-21 (owner, ファタモルガーナの館 vs 千恋＊万花): a game whose text effect keeps the hidden line from pairing with the reader's
+     (the reader can only redraw it at the game's place, an orphan) is not served by hiding: of the first 20 lines of a game, at least 6
+     seen and over 30 % orphans sends galTextEffects once and core shows the game's own text with the translation only (read mode).
+     Every counted line is logged (layoutDiagnostic kind=textEffects) so the real rates show in the owner's logs */
+  let fx = { game: null, paired: new Set(), orphan: new Set(), sent: false };
+  function fxCount(kind, key) {
+    key = [...String(key || '')].filter(c => !blank(c)).join(''); if (!key) return;
+    if (fx.game !== modeGame) fx = { game: modeGame, paired: new Set(), orphan: new Set(), sent: false };
+    if (fx.sent || fx.paired.has(key) || fx.orphan.has(key) && kind === 'orphan') return;
+    if (fx.paired.size + fx.orphan.size >= 20 && !fx.orphan.has(key)) return;
+    if (kind === 'paired') fx.orphan.delete(key); fx[kind].add(key);
+    const n = fx.paired.size + fx.orphan.size, rate = fx.orphan.size / n;
+    try { window.__tomoyoTranslateRequest?.(JSON.stringify({ type: 'layoutDiagnostic', kind: 'textEffects', line: kind, paired: fx.paired.size, orphan: fx.orphan.size, rate: Math.round(rate * 100) })); } catch {}
+    if (n >= 6 && rate > .3) { fx.sent = true; try { window.__tomoyoTranslateRequest?.(JSON.stringify({ type: 'galTextEffects', paired: fx.paired.size, orphan: fx.orphan.size })); } catch {} }
+  }
+  b.textEffectsCount = () => ({ paired: fx.paired.size, orphan: fx.orphan.size, sent: fx.sent });
   function orphan(l) {
     if (!l || l.fallback || !Array.isArray(l.rects) || !l.text) return;
     const chars = [...l.text], rects = []; chars.forEach((c, i) => { if (!blank(c)) rects.push(l.rects[i]); });
@@ -264,6 +280,7 @@
     if (orphanWait?.text !== text) { if (!waits.has(text)) waits.set(text, { at: now, l }); if (waits.size > 16) waits.delete(waits.keys().next().value); orphanWait = { text, at: waits.get(text).at }; setTimeout(schedule, ORPHAN_MS + 20); if (now - orphanWait.at < ORPHAN_MS) return; }
     if (now - orphanWait.at < ORPHAN_MS) return;
     /* one place, one line: an orphan whose boxes the new one covers is an earlier frame of it (the last one wins) */
+    fxCount('orphan', text);
     orphans = orphans.filter(o => !o.rects.some(a => rects.some(c => overlaps(a, c)))).concat({ text, rects, client: l.client }).slice(-12); extraKey = ''; orphanWait = null; schedule(); waits.delete(text);
     const log = b.textPlaceOrphans || (b.textPlaceOrphans = []); log.push(text.slice(0, 40)); if (log.length > 30) log.shift();
   }
@@ -593,7 +610,7 @@
       if (got0.length && readerText && /[぀-ヿ]/.test(placeText)) { orphan(line); release(); document.body.classList.add('megulit-place-garbled'); return; }
       document.body.classList.remove('megulit-place-garbled');
       if (got0.length && !readerText) orphan(line); /* nothing of the reader's for this hidden line (its hook line was dropped) */
-      if (got0.length) { anchorFrom(got0, median(got0.map(r => r[3])) || 0, map0, String(line.text || '')); release(true); pin(win, sentence); return; } }
+      if (got0.length) { if (readerText) fxCount('paired', line.text); anchorFrom(got0, median(got0.map(r => r[3])) || 0, map0, String(line.text || '')); release(true); pin(win, sentence); return; } }
     if (!idx) { if (!gameDrawn()) orphan(line); if (gameDrawn()) release(); else release(true); return; }
     if (document.body.classList.contains('megulit-place-game-drawn')) { document.body.classList.remove('megulit-place-game-drawn'); window.__tomoyoHitRegionsRefresh?.(true); }
     /* record px are game-client px; the reader surface may be larger than the game (galLayoutInfo: client origin and size
@@ -618,6 +635,7 @@
       /* 2026-11-20 (user: a centred line started at the left as 「流」 while the game typed it): with under half of the line's boxes known
          the centring cannot be measured yet; a page that was centred stays centred on the same middle until it can */
       /* a line whose first characters start at the left edge of the page's left-aligned lines is not centred, whatever came before */ if (!Number.isFinite(rows.center) && anchor && anchor.center && !atLeft && boxes.filter(Boolean).length < shown.length * .5) rows.center = anchor[0]; b.textPlaceRows = { text: readerText, rows: rows.rows.map(r => [Math.round(r.l), Math.round(r.r), Math.round(r.t), r.first]), center: rows.center, boxes: boxes.map(r => r && r.map(Math.round)), idx };
+      fxCount('paired', line.text);
       if (!(anchor && lead >= 3 && Number(b.hookSourceContinues) > 0)) anchorFrom(boxes.filter(Boolean), size, map, String(line.text || ''), rows.center);
       /* the page's earlier lines stay above only when the game drew this line under them; a line that starts at or above
          where the last one ended is a new page (a title card, a cleared box), whatever the text stream said */

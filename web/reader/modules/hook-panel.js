@@ -52,7 +52,7 @@
  `;document.head.append(style);
  function text(node,value){if(node.textContent!==value)node.textContent=value;}
  function paint(p){
-for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookPref==='hookHide'?state.hookHide===true:state[cb.dataset.hookPref]!==false;if(cb.checked!==v&&document.activeElement!==cb)cb.checked=v;
+{const fx=p.querySelector('[data-hook-fx]');if(fx)fx.hidden=state.textEffectsRead!==true;}for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookPref==='hookHide'?state.hookHide===true:state[cb.dataset.hookPref]!==false;if(cb.checked!==v&&document.activeElement!==cb)cb.checked=v;
  }
   {const hiding=['embed','euphoria474'].includes(state.hookProfile),threads=state.hookThreads||[],sel=threads.find(t=>t.selected);let tone='idle',parts=[];
    if(state.hookProfile==='off'){parts.push('Hook 已停止');}
@@ -88,7 +88,7 @@ for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookP
   const p=document.createElement('section');p.className='tome-hooks';p.setAttribute('aria-label','Hook 引擎启动与效果检查');
   p.innerHTML=`<div class="tome-hook-main">
     <div class="tome-hook-summary" data-hook-summary><i data-hook-dot></i><span data-hook-summary-text></span></div>
-    <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookHide"><span>隐藏游戏原文</span></label>
+    <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookHide"><span>隐藏游戏原文</span></label><div class="tome-hook-fx" data-hook-fx hidden><span>这部游戏的文字特效和隐藏原文冲突，已自动改为只显示译文</span> <button type="button" data-hook-fx-back>切回隐藏</button></div>
     <small class="tome-hook-hint">开或关之后约 3 秒，从下一句开始生效；当前已显示的那句不会立刻变</small>
     <div class="tome-hook-actions"><button type="button" data-hook-reselect title="当前文本流读到的是乱码或不是台词时，换一条文本流">文本不对？重新选取文本流</button></div>
     <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookAutoStart">全自动：读取台词、同步原文样式并内嵌</label>
@@ -102,6 +102,7 @@ for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookP
     <h5>已发现的文本流</h5><div data-hook-streams><small>还没有发现文本流，在游戏里推进一句</small></div>
    </details>`;
   p.querySelector('[data-hook-restart]').onclick=()=>send({type:'hookStart',profile:'auto'});
+  {const back=p.querySelector('[data-hook-fx-back]');if(back)back.onclick=()=>{state={...state,hookHide:true,textEffectsRead:false};send({type:'hookPrefs',settings:{hookHide:true}});};}
   p.querySelector('[data-hook-reselect]').onclick=()=>send({type:'hookReselect'});
   p.querySelector('[data-hook-feedback]').onclick=openFeedback;
   for(const cb of p.querySelectorAll('[data-hook-pref]'))cb.onchange=()=>{state={...state,[cb.dataset.hookPref]:cb.checked};send({type:'hookPrefs',settings:{[cb.dataset.hookPref]:cb.checked}});
