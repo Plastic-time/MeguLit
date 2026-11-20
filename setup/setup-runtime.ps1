@@ -13,7 +13,27 @@
 # Packs, URLs, SHA-256 and sizes come from setup\runtime.json. Exit 0 = runtime ready.
 param([Parameter(Mandatory=$true)][string]$Root)
 $ErrorActionPreference = 'Stop'
+# Boot timing (setup-ui.log, one line per step): where the time between the double click and the first window goes.
+$script:bootLog = $(if ($env:MEGULIT_SETUP_UILOG) { $env:MEGULIT_SETUP_UILOG } else { Join-Path $env:LOCALAPPDATA 'MeguLit\setup-ui.log' })
+$script:procStart = try { [Diagnostics.Process]::GetCurrentProcess().StartTime } catch { [DateTime]::Now }
+function Boot-Mark([string]$step) { try { $n = [DateTime]::Now; [IO.Directory]::CreateDirectory((Split-Path $script:bootLog)) | Out-Null; [IO.File]::AppendAllText($script:bootLog, (Get-Date -Format 's') + ' boot step=' + $step + ' since_proc=' + [int]($n - $script:procStart).TotalMilliseconds + ' at=' + [DateTimeOffset]::Now.ToUnixTimeMilliseconds() + "`r`n") } catch {} }
+Boot-Mark 'script-start'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+Boot-Mark 'winforms-loaded'
+# Splash: the first frame of the installer's opening clip, on screen before any C# is compiled (each Add-Type -TypeDefinition starts csc.exe,
+# seconds on a busy machine). The real window replaces it (setup-web.ps1 / the classic window's Shown). Only where the web skin is wanted.
+$script:splash = $null; $script:wv2EnvTask = $null
+if ($env:MEGULIT_SETUP_WEB -ne '0' -and (-not $env:MEGULIT_SETUP_TEST -or $env:MEGULIT_SETUP_WEB -eq '1') -and -not $env:MEGULIT_SETUP_PREVIEW -and -not $env:MEGULIT_SETUP_THEME -and -not $env:MEGULIT_SETUP_WEB_TEST) {
+  try { $bsPath = Join-Path $Root 'setup\ui-web\video\light\intro.jpg'
+    if (Test-Path $bsPath) { $bsForm = New-Object Windows.Forms.Form; $bsForm.FormBorderStyle = 'None'; $bsForm.StartPosition = 'CenterScreen'; $bsForm.ShowInTaskbar = $false; $bsForm.Text = 'MeguLit'; $bsForm.ClientSize = New-Object Drawing.Size(1000, 640); $bsForm.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
+      $bsPic = New-Object Windows.Forms.PictureBox; $bsPic.Dock = 'Fill'; $bsPic.SizeMode = 'StretchImage'; $bsPic.Image = [Drawing.Image]::FromStream((New-Object IO.MemoryStream (,[IO.File]::ReadAllBytes($bsPath)))); $bsForm.Controls.Add($bsPic)
+      $bsForm.Show(); $bsForm.Refresh(); $script:splash = $bsForm; Boot-Mark 'splash-shown' } } catch { Boot-Mark ('splash-failed ' + ($_ -replace '\s+', ' ')) }
+  # WebView2 warms up while the rest of the setup is built: its browser process starts now, not when the skin window is created.
+  try { $bsWv = Join-Path $Root 'setup\webview2'; if (Test-Path (Join-Path $bsWv 'Microsoft.Web.WebView2.Core.dll')) { Add-Type -Path (Join-Path $bsWv 'Microsoft.Web.WebView2.Core.dll'); $env:PATH = (Join-Path $bsWv $(if ([Environment]::Is64BitProcess) { 'x64' } else { 'x86' })) + ';' + $env:PATH
+      $script:webData = $(if ($env:MEGULIT_SETUP_WEBVIEW2_DATA) { $env:MEGULIT_SETUP_WEBVIEW2_DATA } elseif ($env:WEBVIEW2_USER_DATA_FOLDER) { $env:WEBVIEW2_USER_DATA_FOLDER } else { Join-Path $env:LOCALAPPDATA ('MeguLit\setup-webview2' + $PID) })
+      $script:wv2EnvTask = [Microsoft.Web.WebView2.Core.CoreWebView2Environment]::CreateAsync($null, $script:webData, $null); Boot-Mark 'webview2-env-started' } } catch { $script:wv2EnvTask = $null; Boot-Mark ('webview2-prewarm-failed ' + ($_ -replace '\s+', ' ')) }
+}
+function Close-Splash { if ($script:splash) { try { $script:splash.Close(); $script:splash.Dispose() } catch {}; $script:splash = $null; Boot-Mark 'splash-closed' } }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [Windows.Forms.Application]::EnableVisualStyles()
 
@@ -74,6 +94,7 @@ function Img($name) { $p = Join-Path $Root "setup\$name"; if (Test-Path $p) { tr
 $logo = Img 'logo.png'
 
 # Double-buffered panel so the hand-drawn line art does not flicker.
+Boot-Mark 'compile-1-start'
 Add-Type -ReferencedAssemblies System.Windows.Forms,System.Drawing -TypeDefinition @'
 public class GrimoirePanel : System.Windows.Forms.Panel {
   public GrimoirePanel() { this.DoubleBuffered = true; this.SetStyle(System.Windows.Forms.ControlStyles.ResizeRedraw, true); }
@@ -94,6 +115,7 @@ function Draw-Circle($g, $cx, $cy, $r, $color, $alpha) {
 # The setup runs inside powershell.exe, so the taskbar grouped it with PowerShell and showed PowerShell's icon.
 # An own AppUserModelID gives the window its own taskbar entry with the MeguLit icon set below.
 try { Add-Type -Namespace MeguLit -Name Shell -MemberDefinition '[DllImport("shell32.dll")] public static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string id);'; [void][MeguLit.Shell]::SetCurrentProcessExplicitAppUserModelID('app.megulit.setup') } catch {}
+Boot-Mark 'compiled'
 $form = New-Object Windows.Forms.Form
 $form.Text = 'MeguLit'; $form.ClientSize = New-Object Drawing.Size(720,560); $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.BackColor = $C.bg; $form.ForeColor = $C.cream
@@ -1154,8 +1176,10 @@ function Install-Pack([string]$id, [string]$part) {
   } catch { Fail 'install' ('安装失败：' + $_.Exception.Message); return $false }
 }
 
+Boot-Mark 'logic-built'
 $uiLayer = Join-Path $sourceRoot 'setup/setup-ui.ps1'; $themeName = 'classic'; if (Test-Path $uiLayer) { . $uiLayer }
 # New interface as a skin on top of this window (falls back to this window when anything is wrong; see setup-web.ps1)
+Boot-Mark 'ui-layer-loaded'
 $webLayer = Join-Path $sourceRoot 'setup/setup-web.ps1'; if (Test-Path $webLayer) { try { . $webLayer } catch { try { Add-Content -Encoding UTF8 (Join-Path $env:LOCALAPPDATA 'MeguLit\setup-ui.log') ((Get-Date -Format 's') + ' web layer failed to load: ' + $_) } catch {} } }
 $button.add_Click({
   if ($script:mode -eq 'failed') {
@@ -1164,6 +1188,7 @@ $button.add_Click({
   }
   else { if ($script:fetch) { $poll.Stop(); $script:fetch.Cancel() }; $form.Close() }
 })
+$form.add_Shown({ Close-Splash; Boot-Mark 'classic-shown' })
 $form.add_FormClosing({ if (-not $script:done -and $script:fetch) { $poll.Stop(); $script:fetch.Cancel() } })
 $form.add_Shown({ Update-Free; Note 'shown' @{ stage = $stageDir; want = ($want -join ',') }; if (-not $env:MEGULIT_SETUP_PREVIEW) { Next-Download } })
 if ($testLog) { $deskCheck.Checked = $false; $menuCheck.Checked = $false }
