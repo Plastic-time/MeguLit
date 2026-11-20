@@ -18,28 +18,33 @@ if (!id) { const dir = path.dirname(exe).toLowerCase(); id = Object.keys(all).fi
 const state = all[id]; if (!state?.runtime?.index || !state?.patch?.index) { console.error('no imported script and patch for ' + (exe || id)); process.exit(2); }
 const lines = JSON.parse(fs.readFileSync(state.runtime.index, 'utf8')).lines, zh = JSON.parse(fs.readFileSync(state.patch.index, 'utf8')).lines;
 const live = () => { try { return exe ? ot.provider(root, exe) : null; } catch { return null; } };
-/* the table itself: normal key -> translation; a key with two different translations is uncertain */
-const tableProvider = () => { const map = new Map(), norm = t => String(t || '').replace(/[\s　]+/g, '');
-  lines.forEach((l, i) => { const k = norm(l), z = String(zh[i] || '').trim(); if (!k || !z) return; const had = map.get(k); map.set(k, had !== undefined && had !== z ? null : z); });
-  return { kind: 'patch', resolve: t => { const k = norm(t); if (!map.has(k)) return { status: 'none' }; const z = map.get(k); return z ? { status: 'exact', translation: z, indices: [0] } : { status: 'uncertain' }; } }; };
+/* the table itself, following the reading position like the game's lookup: normal key -> its rows; the first row after the last one read */
+const tableProvider = () => { const map = new Map(), norm = t => String(t || '').replace(/[\s　]+/g, ''); let last = -1;
+  lines.forEach((l, i) => { const k = norm(l), z = String(zh[i] || '').trim(); if (!k || !z) return; (map.get(k) || map.set(k, []).get(k)).push(i); });
+  return { kind: 'patch', resolve: t => { const rows = map.get(norm(t)); if (!rows) return { status: 'none' }; const i = rows.find(r => r > last) ?? rows[0]; last = i; return { status: 'exact', translation: String(zh[i]).trim(), indices: [i] }; } }; };
 const mode = live() ? 'game' : 'table';
 const counts = new Map(); for (const l of lines) { const t = String(l || '').trim(); counts.set(t, (counts.get(t) || 0) + 1); }
 const label = t => counts.get(t) >= 10 && [...t].length <= 8 && !/[。、！？!?…「『（]/.test(t);
 const forms = t => {
   const out = [['as written', t]];
-  const m = /^([「『])([？?]{2,}|[一-龯々ァ-ヶー・]{1,8})[\s　]+(.*)$/s.exec(t); if (m) out.push(['speaker taken off', m[1] + m[3]]);
-  if (/^[「『].*[」』]$/s.test(t)) out.push(['no brackets', t.slice(1, -1)]);
+  /* only what a name plate takes in play: an unknown speaker ？？？ (a first word with a space is often no speaker: 『浜田　和紀』) */
+  const m = /^([「『])([？?]{2,})[\s　]+(.*)$/s.exec(t); if (m) out.push(['speaker taken off', m[1] + m[3]]);
+  /* the outer pair only when it is one pair (「…」 or 『…』 around the whole line, not 『楽園』…」) */
+  if (/^「[^]*」$/.test(t) && !/^「[^「」]*」[^」]/.test(t) || /^『[^]*』$/.test(t) && !/^『[^『』]*』[^』]/.test(t)) out.push(['no brackets', t.slice(1, -1)]);
   const half = t.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)); if (half !== t) out.push(['half-width', half]);
   const k = /[一-龯々]{1,3}/.exec(t); if (k) out.push(['ruby markup', t.slice(0, k.index) + '｜' + k[0] + '《よみ》' + t.slice(k.index + k[0].length)]);
   out.push(['blanks', t.replace(/、/g, '、　')]);
-  if (t.length > 12) out.push(['line break', t.slice(0, Math.ceil(t.length / 2)) + '\n' + t.slice(Math.ceil(t.length / 2))]);
+  if (t.length > 12) { let at = Math.ceil(t.length / 2); for (const m of t.matchAll(/%[^;%\n]{0,40};|#[0-9a-fA-F]{6,8};|\[[^\]\n]{0,12}\]/g)) if (at > m.index && at < m.index + m[0].length) at = m.index + m[0].length; if (at < t.length) out.push(['line break', t.slice(0, at) + '\n' + t.slice(at)]); } /* never inside an engine tag */
   return out;
 };
-let total = 0, paired = 0, nonDialogue = 0; const misses = {}, skipped = [], kinds = ['as written', 'speaker taken off', 'no brackets', 'half-width', 'ruby markup', 'blanks', 'line break'];
+/* a row the patch leaves in Japanese (empty, or the Japanese itself with kana) has no human translation to pair: counted apart (the running game fills it: fill / machine translation) */
+const untranslatedRow = i => { const z = String(zh[i] || '').trim(), j = String(lines[i] || '').trim(); return !z || z.replace(/\s/g, '') === j.replace(/\s/g, '') && /[ぁ-ゖァ-ヺ]{2}/.test(j); };
+let total = 0, paired = 0, nonDialogue = 0, untranslated = 0; const misses = {}, skipped = [], kinds = ['as written', 'speaker taken off', 'no brackets', 'half-width', 'ruby markup', 'blanks', 'line break'];
 for (const kind of kinds) { const p = live() || tableProvider(), hh = { originalText: p, trace() {}, resolveSource: HookNative.prototype.resolveSource };
   lines.forEach((raw, i) => { const t = String(raw || '').trim(); if (!t || !/[぀-ヿ一-鿿]/.test(t)) return;
     if (HookNative.nonDialogue(t) || label(t)) { if (kind === 'as written') { nonDialogue++; if (skipped.length < 8) skipped.push(t.slice(0, 30)); } return; }
+    if (untranslatedRow(i)) { if (kind === 'as written') untranslated++; return; }
     const f = forms(t).find(x => x[0] === kind); if (!f) return; total++; const r = hh.resolveSource(f[1]);
     if (r && (r.status === 'exact' || r.status === 'high')) paired++; else (misses[kind] = misses[kind] || []).push([i, t, r?.status || 'none']); }); }
-console.log(JSON.stringify({ mode, lookups: total, paired, unpaired: total - paired, nonDialogue, nonDialogueExamples: skipped, byForm: Object.fromEntries(Object.entries(misses).map(([k, v]) => [k, { count: v.length, examples: v.slice(0, 5) }])) }, null, 1));
+console.log(JSON.stringify({ mode, lookups: total, paired, unpaired: total - paired, nonDialogue, untranslatedInPatch: untranslated, nonDialogueExamples: skipped, byForm: Object.fromEntries(Object.entries(misses).map(([k, v]) => [k, { count: v.length, examples: v.slice(0, 5) }])) }, null, 1));
 process.exit(total === paired ? 0 : 1);

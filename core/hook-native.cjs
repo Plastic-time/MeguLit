@@ -414,21 +414,22 @@ class HookNative{
     (■…■), engine variables and commands (@…, Bustshot, backlay, motion_stop, %D$vl1; on their own), and bare labels without kana or
     sentence marks (タイトル-like UI words are kept apart by the caller's repeat count) */
  static nonDialogue(text){const t=String(text||'').trim();if(!t)return true;
-  if(/^■.*■$/.test(t)||/^[@＠#＃;；\/]/.test(t))return true;
+  if(/^■.*■$/.test(t)||/^[@＠#＃;；]/.test(t)||/^\/\/[^぀-ヿ]*$/.test(t))return true; /* a // comment, never 「/////っ！！」 */
   const ascii=(t.match(/[A-Za-z_$]/g)||[]).length;if(/\b(?:Bustshot|Sprite|backlay|motion_\w+|playse|playbgm|wait|jump|call|layopt|trans|image|eval)\b/i.test(t)&&ascii>=t.length*.3)return true;
+  if((t.match(/[!-\/:-@\[-`{-~]/g)||[]).length>=12)return true; /* a font sample row (DDLC: !"#%&'()*+,-./0123456789:;<=>\u2026) */
   if(!/[\u3040-\u30ff\u4e00-\u9fff]/.test(t))return !/[「『（]/.test(t)&&!/[。！？!?…ー〜～]/.test(t)&&t.length<=24;
   if(/が表示されていません|翻訳不要|未使用|ダミー/.test(t))return true;
   return false;}
  static speakerless(text){const t=String(text||'').trim(),out=[];const add=v=>{v=v.trim();if(v&&v!==t&&!out.includes(v))out.push(v);};
-  add(t.replace(/^【[^】]{1,16}】\s*/,''));const name='(?:[？?]{2,}|[一-龯々ァ-ヶー・]{1,8})';add(t.replace(new RegExp('^([「『（])'+name+'[\\s　]+'),'$1'));add(t.replace(new RegExp('^'+name+'[\\s　]*(?=[「『])'),''));
+  add(t.replace(/^【[^】]{1,16}】\s*/,''));const name='(?:[？?]{2,}|[一-龯々ァ-ヶー・]{2,8})'; /* one character is no name (素晴らしき日々: 「マ　で？　マジ…」, a line with gaps) */add(t.replace(new RegExp('^([「『（])'+name+'[\\s　]+'),'$1'));add(t.replace(new RegExp('^'+name+'[\\s　]*(?=[「『])'),''));
   /* the other way round: the script keeps an unknown speaker inside the line (千恋＊万花: 「？？？　例のイベントって？」, 7 of 54584 lines) while the
      hook gives the line without it (the name plate took ？？？; r34 seq 37 came as 11 characters) */
-  if(/^[「『]/.test(t)&&!/^[「『][？?]{2,}/.test(t))add(t[0]+'？？？　'+t.slice(1));
+  if(/^[「『]/.test(t)&&!/^[「『][？?]{2,}/.test(t)){add(t[0]+'？？？　'+t.slice(1));add(t[0]+'？？　'+t.slice(1));}
   /* a line handed over without its brackets (the bracket drawn apart, or cut by the source) is the script's 「…」 / 『…』 line */
   /* ruby / effect markup the script does not keep, and digits or letters the source gives half-width where the script has them full-width */
   {const plain=t.replace(/[｜|]([^《\[｜|]+)[《\[][^》\]]*[》\]]/g,'$1').replace(/《[^》]*》/g,'').replace(/\[[^\]]*\]/g,'');if(plain!==t){add(plain);for(const v of HookNative.speakerless(plain))add(v);}
    const full=t.replace(/(%[0-9A-Za-z]*;)|[0-9A-Za-z]/g,(c,tag)=>tag||String.fromCharCode(c.charCodeAt(0)+0xFEE0));if(full!==t)add(full);} /* engine tags (KiriKiri %84; …%;) stay as written */
-  if(t&&!/^[「【]/.test(t))add('「'+t+'」');if(t&&!/^[「『【]/.test(t))add('『'+t+'』');
+  if(t){add('「'+t+'」');add('『'+t+'』');} /* also around a line that has its own inner brackets: 『「…」\n「…」』, 「「のわっ」」 */
   for(const v of out.slice())add(v.replace(/^[「『]/,'').replace(/[」』]$/,''));return out;}
  static interleaved(t){const a=[...HookNative.flat(t)];if(a.length<8)return false;if(new Set(a).size/a.length<.55)return true;const m=new Map();for(let i=0;i+1<a.length;i++){const g=a[i]+a[i+1];m.set(g,(m.get(g)||0)+1);if(m.get(g)>=3)return true;}return false;}
  choiceFilter(options){if(!Array.isArray(options))return options;const said=[this.lastSource,...(this.recentSources||[])].map(x=>HookNative.flat(x)).filter(Boolean);const drop=Profiles.choiceFilters(this.profile);const kept=options.filter(o=>{const f=HookNative.flat(o);if(!f||HookNative.interleaved(f))return false;if(drop.some(r=>r.test(String(o))))return false;return !said.some(x=>x!==f&&x.includes(f));});if(kept.length!==options.length)this.trace('choice options filtered '+options.length+' -> '+kept.length);return kept.length>=2?kept:null;}
