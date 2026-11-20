@@ -1,0 +1,50 @@
+{
+ "schema": 1,
+ "kind": "megulit.game-diff",
+ "exeHash": "20a57cfa736d946ede4ccc91b5b158091c031e9a54869aecacdb52c6cfa35086",
+ "exe": {
+  "name": "Game.exe"
+ },
+ "gameKey": "rpgm-sample",
+ "engine": "rpgmaker",
+ "title": "MeguLit 見本",
+ "match": {
+  "exe": [
+   "Game.exe"
+  ],
+  "titles": [
+   "MeguLit 見本"
+  ]
+ },
+ "settings": {
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": "hide"
+  },
+  "hide": {
+   "textEffectsRead": false
+  },
+  "role": {
+   "map": {
+    "class:Window_QuestLog": "system"
+   }
+  }
+ },
+ "maker": {
+  "tool": "diff-maker/1",
+  "probe": "",
+  "mode": "hide",
+  "cost": 0,
+  "metrics": {
+   "hideVisible": null,
+   "dropRate": 0,
+   "repeatRate": 0,
+   "choiceMismatch": 0,
+   "positionPx": null,
+   "pairRate": null
+  },
+  "over": [],
+  "from": "probe"
+ }
+}

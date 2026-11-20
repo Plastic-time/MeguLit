@@ -51,6 +51,24 @@ module.exports={
   textBox:null,/* {x,y,w,h} client px */
   hideMethod:null,/* 'engine' | 'glyph' | 'gpu' | 'read' */
  },
+ /* 2026-11-21 (owner: 每一次画字都要分清角色) what one text draw is, told by the engine's own identity of the draw, never by
+    the picture: the hook / stream that delivered it ('hook:TextRender'), the window or layer class and its base classes
+    ('class:Window_ChoiceList', 'class:LinkButtonLayer'), the script call that made it ('call:selectLink') or the kind of layer a
+    native layer reader wrapped ('layer:msg'). core/draw-role.cjs classifies: call, then the class chain (own class first),
+    then hook, then layer, then patterns, then fallback.
+      dialogue  the dialogue box, narration, an NVL page: embedded replacement, the game's own rendering draws Japanese, furigana
+                and Chinese
+      ui        system buttons, menus, choices, command / shop / item windows: never replaced, the original and its click area
+                stay, furigana and translation go beside it
+      system    system and decoration text (name plates, help lines, gold, map names, titles drawn on art layers)
+    Empty map + null fallback = the kernel as before (the dialogue stream is dialogue, everything else is choice / aux material). */
+ role:{
+  map:{},/* identity -> 'dialogue' | 'ui' | 'system' */
+  patterns:[],/* [[RegExp source over the identity string, role]], flags 'u' */
+  fallback:null,/* role of an identity nothing names; null = kernel */
+  /* what the kernel does with each role: 'embed' | 'annotate' | 'leave'; null = as before */
+  treat:{dialogue:null,ui:null,system:null},
+ },
  safeMode:{
   /* reader redraws per second while the game is in a page effect; null = kernel default */
   redrawRate:null,

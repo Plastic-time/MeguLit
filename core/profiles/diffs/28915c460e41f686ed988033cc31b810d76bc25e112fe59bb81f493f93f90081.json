@@ -1,0 +1,59 @@
+{
+ "schema": 1,
+ "kind": "megulit.game-diff",
+ "exeHash": "28915c460e41f686ed988033cc31b810d76bc25e112fe59bb81f493f93f90081",
+ "exe": {
+  "name": "SenrenBanka.exe",
+  "sha256": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3"
+ },
+ "gameKey": "senren-banka",
+ "engine": "kirikiri",
+ "title": "千恋＊万花",
+ "match": {
+  "exe": [
+   "SenrenBanka.exe"
+  ],
+  "titles": [
+   "千恋＊万花"
+  ]
+ },
+ "settings": {
+  "placement": {
+   "drawWhileBlanking": true,
+   "translationGrowsDown": true
+  },
+  "calibrate": {
+   "positionSource": "engine",
+   "textBox": {
+    "x": 220,
+    "y": 488,
+    "w": 185,
+    "h": 250,
+    "client": [
+     1535,
+     863
+    ]
+   },
+   "hideMethod": "hide"
+  },
+  "hide": {
+   "textEffectsRead": false
+  }
+ },
+ "maker": {
+  "tool": "diff-maker/1",
+  "probe": "27dd03c156e87597a0d5f5086789b8aeafa98a0ed2ad805bcfd637dcb5c7754f",
+  "mode": "hide",
+  "cost": 0.141,
+  "metrics": {
+   "hideVisible": 0.059,
+   "dropRate": 0,
+   "repeatRate": 0,
+   "choiceMismatch": 0,
+   "positionPx": 20,
+   "pairRate": 0.976
+  },
+  "over": [],
+  "from": "core/profiles/games/senren-banka.cjs + probe"
+ }
+}

@@ -1,0 +1,48 @@
+{
+ "schema": 1,
+ "note": "simulated probe from the owner test build logs (incr9) + original-text index",
+ "title": "ファタモルガーナの館",
+ "identity": "f3a5ffde1fa90b2dfb02a5b97c55c9e0e2a18dc62e34e241c4215c0a948ecf8e",
+ "detected": "kirikiri",
+ "exe": {
+  "name": "fata_jp.exe",
+  "hash": "8174315aaeb3de028326cf907d95e73c2e935e2b5babf1aade38bdb86c5f51a1",
+  "sha256": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42"
+ },
+ "runtime": {
+  "from": "2026-11-20T22:51:03",
+  "to": "2026-11-20T22:53:42"
+ },
+ "files": [
+  {
+   "path": "data.xp3"
+  },
+  {
+   "path": "data_en.xp3"
+  },
+  {
+   "path": "data_jp.xp3"
+  },
+  {
+   "path": "data_zh.xp3"
+  },
+  {
+   "path": "dtcn.xp3"
+  },
+  {
+   "path": "dten.xp3"
+  },
+  {
+   "path": "dtjp.xp3"
+  },
+  {
+   "path": "fata_cn.exe"
+  },
+  {
+   "path": "fata_en.exe"
+  },
+  {
+   "path": "fata_jp.exe"
+  }
+ ]
+}

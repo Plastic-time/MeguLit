@@ -1,0 +1,63 @@
+{
+ "schema": 1,
+ "note": "simulated probe from the owner test build logs (incr9) + original-text index",
+ "title": "千恋＊万花",
+ "identity": "27dd03c156e87597a0d5f5086789b8aeafa98a0ed2ad805bcfd637dcb5c7754f",
+ "detected": "kirikiri",
+ "exe": {
+  "name": "SenrenBanka.exe",
+  "hash": "28915c460e41f686ed988033cc31b810d76bc25e112fe59bb81f493f93f90081",
+  "sha256": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3"
+ },
+ "runtime": {
+  "from": "2026-11-20T22:53:42",
+  "to": ""
+ },
+ "files": [
+  {
+   "path": "adult.xp3"
+  },
+  {
+   "path": "adult2.xp3"
+  },
+  {
+   "path": "bgimage.xp3"
+  },
+  {
+   "path": "bgm.xp3"
+  },
+  {
+   "path": "data.xp3"
+  },
+  {
+   "path": "evimage.xp3"
+  },
+  {
+   "path": "fgimage.xp3"
+  },
+  {
+   "path": "patch.xp3"
+  },
+  {
+   "path": "patch_extra.xp3"
+  },
+  {
+   "path": "scn.xp3"
+  },
+  {
+   "path": "SenrenBanka.exe"
+  },
+  {
+   "path": "steam.xp3"
+  },
+  {
+   "path": "video.xp3"
+  },
+  {
+   "path": "video2.xp3"
+  },
+  {
+   "path": "voice.xp3"
+  }
+ ]
+}

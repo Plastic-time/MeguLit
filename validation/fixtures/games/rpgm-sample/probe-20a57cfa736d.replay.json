@@ -1,0 +1,330 @@
+{
+ "schema": 1,
+ "tool": "diff-maker/1",
+ "gameKey": "rpgm-sample",
+ "exeHash": "20a57cfa736d946ede4ccc91b5b158091c031e9a54869aecacdb52c6cfa35086",
+ "engine": "rpgmaker",
+ "title": "MeguLit 見本",
+ "diff": "core/profiles/diffs/20a57cfa736d946ede4ccc91b5b158091c031e9a54869aecacdb52c6cfa35086.json",
+ "events": [
+  {
+   "kind": "choice",
+   "at": 40,
+   "raw": 3,
+   "shown": 3
+  },
+  {
+   "kind": "line",
+   "at": 1565,
+   "chars": 14,
+   "seq": 1
+  },
+  {
+   "kind": "drawn",
+   "at": 1930,
+   "text": "むかしむかし、ある小さな村に",
+   "top": -1,
+   "clientY": -1,
+   "glyph": -1
+  },
+  {
+   "kind": "line",
+   "at": 3255,
+   "chars": 13,
+   "seq": 2
+  },
+  {
+   "kind": "drawn",
+   "at": 3595,
+   "text": "ひとりの旅人がやってきた。",
+   "top": -1,
+   "clientY": -1,
+   "glyph": -1
+  },
+  {
+   "kind": "line",
+   "at": 7010,
+   "chars": 11,
+   "seq": 3
+  },
+  {
+   "kind": "drawn",
+   "at": 7300,
+   "text": "よく来たな、旅の者よ。",
+   "top": -1,
+   "clientY": -1,
+   "glyph": -1
+  },
+  {
+   "kind": "line",
+   "at": 8670,
+   "chars": 16,
+   "seq": 4
+  },
+  {
+   "kind": "drawn",
+   "at": 9085,
+   "text": "この村は小さいが、良いところだ。",
+   "top": -1,
+   "clientY": -1,
+   "glyph": -1
+  },
+  {
+   "kind": "line",
+   "at": 10455,
+   "chars": 14,
+   "seq": 5
+  },
+  {
+   "kind": "drawn",
+   "at": 10820,
+   "text": "ひとつ頼みを聞いてくれんか？",
+   "top": -1,
+   "clientY": -1,
+   "glyph": -1
+  },
+  {
+   "kind": "choice",
+   "at": 12160,
+   "raw": 2,
+   "shown": 2
+  },
+  {
+   "kind": "line",
+   "at": 13430,
+   "chars": 17,
+   "seq": 6
+  },
+  {
+   "kind": "drawn",
+   "at": 13895,
+   "text": "ありがたい！　北の森へ向かってくれ。",
+   "top": -1,
+   "clientY": -1,
+   "glyph": -1
+  },
+  {
+   "kind": "choice",
+   "at": 15240,
+   "raw": 3,
+   "shown": 3
+  },
+  {
+   "kind": "choice",
+   "at": 15290,
+   "raw": 3,
+   "shown": 3
+  },
+  {
+   "kind": "line",
+   "at": 16905,
+   "chars": 13,
+   "seq": 7
+  },
+  {
+   "kind": "drawn",
+   "at": 17245,
+   "text": "お兄ちゃん、森は危ないよ。",
+   "top": -1,
+   "clientY": -1,
+   "glyph": -1
+  },
+  {
+   "kind": "line",
+   "at": 18615,
+   "chars": 11,
+   "seq": 8
+  },
+  {
+   "kind": "drawn",
+   "at": 18905,
+   "text": "薬草を持っていってね。",
+   "top": -1,
+   "clientY": -1,
+   "glyph": -1
+  },
+  {
+   "kind": "choice",
+   "at": 20270,
+   "raw": 5,
+   "shown": 5
+  }
+ ],
+ "identities": [
+  {
+   "label": "class:Window_NameBox|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_NameBox",
+     "Window_Base"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_MenuCommand|class:Window_Command|class:Window_Selectable|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_MenuCommand",
+     "Window_Command",
+     "Window_Selectable",
+     "Window_Base"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_TitleCommand|class:Window_Command|class:Window_Selectable|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_TitleCommand",
+     "Window_Command",
+     "Window_Selectable",
+     "Window_Base"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_Message|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_Message",
+     "Window_Base"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_ShopCommand|class:Window_HorzCommand|class:Window_Command|class:Window_Selectable|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_ShopCommand",
+     "Window_HorzCommand",
+     "Window_Command",
+     "Window_Selectable",
+     "Window_Base"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_ShopBuy|class:Window_Selectable|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_ShopBuy",
+     "Window_Selectable",
+     "Window_Base"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_ChoiceList|class:Window_Command|class:Window_Selectable|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_ChoiceList",
+     "Window_Command",
+     "Window_Selectable",
+     "Window_Base"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_ScrollText|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_ScrollText",
+     "Window_Base"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_MapName|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_MapName",
+     "Window_Base"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_Help|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_Help",
+     "Window_Base"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_MessageEx|class:Window_Message|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_MessageEx",
+     "Window_Message",
+     "Window_Base"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_QuestLog",
+   "id": {
+    "cls": [
+     "Window_QuestLog"
+    ]
+   }
+  },
+  {
+   "label": "class:Window_Gold|class:Window_Base",
+   "id": {
+    "cls": [
+     "Window_Gold",
+     "Window_Base"
+    ]
+   }
+  }
+ ],
+ "expect": {
+  "params": {
+   "hideMethod": "hide",
+   "positionSource": null,
+   "effectFrames": null,
+   "filters": "kernel"
+  },
+  "pass": true,
+  "over": [],
+  "metrics": {
+   "hideVisible": null,
+   "dropRate": 0,
+   "repeatRate": 0,
+   "choiceMismatch": 0,
+   "positionPx": null,
+   "pairRate": null
+  },
+  "hideBest": {
+   "params": {
+    "hideMethod": "hide",
+    "positionSource": null,
+    "effectFrames": null,
+    "filters": "kernel"
+   },
+   "pass": true,
+   "over": []
+  },
+  "roles": {
+   "class:Window_NameBox|class:Window_Base": "system",
+   "class:Window_MenuCommand|class:Window_Command|class:Window_Selectable|class:Window_Base": "ui",
+   "class:Window_TitleCommand|class:Window_Command|class:Window_Selectable|class:Window_Base": "ui",
+   "class:Window_Message|class:Window_Base": "dialogue",
+   "class:Window_ShopCommand|class:Window_HorzCommand|class:Window_Command|class:Window_Selectable|class:Window_Base": "ui",
+   "class:Window_ShopBuy|class:Window_Selectable|class:Window_Base": "ui",
+   "class:Window_ChoiceList|class:Window_Command|class:Window_Selectable|class:Window_Base": "ui",
+   "class:Window_ScrollText|class:Window_Base": "dialogue",
+   "class:Window_MapName|class:Window_Base": "system",
+   "class:Window_Help|class:Window_Base": "system",
+   "class:Window_MessageEx|class:Window_Message|class:Window_Base": "dialogue",
+   "class:Window_QuestLog": "system",
+   "class:Window_Gold|class:Window_Base": "system"
+  },
+  "scriptPair": {
+   "lines": 8,
+   "found": 8,
+   "rate": 1
+  }
+ }
+}

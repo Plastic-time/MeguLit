@@ -1,0 +1,55 @@
+{
+ "schema": 1,
+ "kind": "megulit.game-diff",
+ "exeHash": "8174315aaeb3de028326cf907d95e73c2e935e2b5babf1aade38bdb86c5f51a1",
+ "exe": {
+  "name": "fata_jp.exe",
+  "sha256": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42"
+ },
+ "gameKey": "fata-morgana",
+ "engine": "kirikiri",
+ "title": "ファタモルガーナの館",
+ "match": {
+  "exe": [
+   "fata_jp.exe"
+  ],
+  "titles": [
+   "ファタモルガーナの館"
+  ]
+ },
+ "settings": {
+  "calibrate": {
+   "positionSource": null,
+   "textBox": {
+    "x": 70,
+    "y": 488,
+    "w": 322,
+    "h": 51,
+    "client": [
+     804,
+     604
+    ]
+   },
+   "hideMethod": "read"
+  },
+  "hide": {
+   "textEffectsRead": true
+  }
+ },
+ "maker": {
+  "tool": "diff-maker/1",
+  "probe": "f3a5ffde1fa90b2dfb02a5b97c55c9e0e2a18dc62e34e241c4215c0a948ecf8e",
+  "mode": "read",
+  "cost": 0,
+  "metrics": {
+   "hideVisible": null,
+   "dropRate": null,
+   "repeatRate": null,
+   "choiceMismatch": 0,
+   "positionPx": null,
+   "pairRate": null
+  },
+  "over": [],
+  "from": "core/profiles/games/fata-morgana.cjs + probe"
+ }
+}
