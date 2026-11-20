@@ -10,17 +10,20 @@
   const Q = new URLSearchParams(location.search), NIGHT = window.__themeDark !== undefined ? !!window.__themeDark : Q.get('theme') === 'night', REDUCE = Q.get('reduce') === '1' || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const MODE = Q.get('mode') === 'B' ? 'B' : Q.get('mode') === 'A' ? 'A' : 'M';   /* M = merged: radial-cracked plates in B's clear relief glass */
   const view = document.getElementById('view'); if (!view) return;
-  /* the GPU process of a fresh WebView2 profile is not always ready for the first context ("OES_packed_depth_stencil support is required"): try again for up to ~2 s before giving up */
-  let renderer; for (let tries = 0; tries < 14 && !renderer; tries++) { try { renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' }); } catch (e) { renderer = null; const until = performance.now() + 150; while (performance.now() < until) { /* brief wait */ } } }
-  if (!renderer) return;
+  /* A fresh WebView2 profile can hand out a broken first context ("OES_packed_depth_stencil support is required"); a context made after such a failure can draw nothing.
+     So: one attempt per page load. On failure the skin (skin.js) reloads the page after a short pause, up to its time limit, and only then gives the skin up. */
+  let renderer; try { renderer = new THREE.WebGLRenderer({ antialias: Q.get('aa') === '1', preserveDrawingBuffer: true, powerPreference: 'high-performance' }); } catch (e) { if (window.__skin) window.__skin.fail('create: ' + (e && e.message || e)); return; }
+  if (!renderer || !renderer.getContext()) { if (window.__skin) window.__skin.fail('no context'); return; }
+  window.__glT = { created: Math.round(performance.now()) };
   if (!renderer.getContext()) return;
   const P = 820, FY = 1200, D2R = Math.PI / 180;
   const el = renderer.domElement; el.id = 'gl'; el.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block'; view.insertBefore(el, view.firstChild);
   const wd = document.getElementById('world'); if (wd) wd.style.display = 'none';
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, REDUCE ? 1 : 2)); renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio || 1, Q.get('aa') === '1' ? 1 : 1.5), REDUCE ? 1 : 2));   /* no MSAA (its depth/stencil buffers are what a cold GPU process refuses): smooth by rendering at least 1.5x instead */ renderer.outputColorSpace = THREE.SRGBColorSpace;
   const col = (a, b, m) => new THREE.Color(a).lerp(new THREE.Color(b), m), themed = [];
   let night = NIGHT ? 1 : 0; const isDark = () => night > 0.5;
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const SHADOW = Q.get('shadow') !== '0', TRANS = Q.get('trans') === '0' ? 0 : 1, ENVMAP = Q.get('env') !== '0';   /* feature switches for the cold-start experiments */
+  renderer.shadowMap.enabled = SHADOW; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0xc4cfe0); scene.fog = new THREE.Fog(0xc4cfe0, 2600, 11000);
   themed.push((m) => { const c0 = col(0xd5e0ef, 0x0a0c10, m); scene.background.copy(c0); scene.fog.color.copy(c0); });
   const camera = new THREE.PerspectiveCamera(40, 1.5, 30, 40000); camera.rotation.order = 'YXZ';
@@ -29,13 +32,13 @@
 
   /* ---- light + a small studio for reflections (softboxes make the glass edges and clearcoat read) ---- */
   const hemi = new THREE.HemisphereLight(0xffffff, 0x6f86ad, 1.2); scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-2500, 4000, 3000); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -9000; sc.right = 9000; sc.top = 9000; sc.bottom = -9000; sc.near = 500; sc.far = 18000; sun.shadow.bias = -0.0004; sun.shadow.radius = 5; scene.add(sun);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-2500, 4000, 3000); sun.castShadow = SHADOW; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -9000; sc.right = 9000; sc.top = 9000; sc.bottom = -9000; sc.near = 500; sc.far = 18000; sun.shadow.bias = -0.0004; sun.shadow.radius = 5; scene.add(sun);
   themed.push((m) => { hemi.color.copy(col(0xffffff, 0x8fa0c4, m)); hemi.groundColor.copy(col(0x4a6598, 0x14171f, m)); hemi.intensity = 0.8 + (0.55 - 0.8) * m; sun.color.copy(col(0xffffff, 0xcfe0ff, m)); sun.intensity = 2.1 + (1.1 - 2.1) * m; });
   const makeEnv = (N) => { const es = new THREE.Scene(); es.background = new THREE.Color(N ? 0x05060a : 0x7d92b4);
     const box = (w, h, x, y, z, k) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 1, 1).multiplyScalar(k), side: THREE.DoubleSide })); m.position.set(x, y, z); m.lookAt(0, 0, 0); es.add(m); };
     box(60, 14, -95, 40, 30, N ? 9 : 5); box(10, 60, 80, 10, -30, N ? 3.5 : 3); box(30, 30, 0, 60, -50, N ? 8 : 3); for (let i = 0; i < 7; i++) if (i !== 2 && i !== 3) box(5 + (i % 3) * 3, 90, -70 + i * 24, 20 - (i % 4) * 14, (i % 2 ? 40 : -40), N ? 8 : 4); for (let i = 0; i < 4; i++) box(100, 5, 0, -30 + i * 30, -45 + i * 20, N ? 7 : 3.5);
     const pm = new THREE.PMREMGenerator(renderer); const t = pm.fromScene(es, 0.02).texture; pm.dispose(); return t; };
-  const envDay = makeEnv(false), envNight = makeEnv(true); scene.environment = NIGHT ? envNight : envDay;
+  const envDay = ENVMAP ? makeEnv(false) : null, envNight = ENVMAP ? makeEnv(true) : null; scene.environment = NIGHT ? envNight : envDay;
 
   /* ---- canvas textures ---- */
   const tex = (cv) => { const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
@@ -200,7 +203,7 @@
     cells.forEach((q, i) => {
       const pts = q.p.map((v) => new THREE.Vector2(v[0] - q.cx, -(v[1] - q.cy))); const shape = new THREE.Shape(pts);
       const geo = new THREE.ExtrudeGeometry(shape, { depth: TH, bevelEnabled: true, bevelThickness: 2.6, bevelSize: 2.6, bevelOffset: -2.6, bevelSegments: 2, steps: 1, curveSegments: 1 }); geo.translate(0, 0, -TH / 2);
-      const glass = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.04, transmission: 1, thickness: 22, ior: 1.52, attenuationColor: new THREE.Color(0xb9ecdd), attenuationDistance: 420, depthWrite: false, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: NIGHT ? 1.6 : 1.1, specularIntensity: 1 }));
+      const glass = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.04, transmission: TRANS, thickness: 22, ior: 1.52, attenuationColor: new THREE.Color(0xb9ecdd), attenuationDistance: 420, depthWrite: false, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: NIGHT ? 1.6 : 1.1, specularIntensity: 1 }));
       const g = new THREE.Group(); g.add(glass);
       /* frost: three translucent layers at different depths inside the plate, bumped, so the etching has volume */
       const mk = () => { const sg = new THREE.ShapeGeometry(shape); const pos = sg.attributes.position, uv = sg.attributes.uv; for (let k = 0; k < pos.count; k++) { uv.setXY(k, (pos.getX(k) + q.cx) / LWg, 1 - (q.cy - pos.getY(k)) / LHg); } uv.needsUpdate = true; return sg; };
@@ -252,7 +255,7 @@
       outers.forEach((o) => { const shape = new THREE.Shape(o.map(T)); holes.forEach((h) => { if (inPoly(h[0], o)) shape.holes.push(new THREE.Path(h.map(T))); }); frags.push({ shape, cx, cy, area: Math.abs(area2(o)), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }); });
     }
     frags.sort((a, b) => a.cx - b.cx); const K = frags.length; FU = (window.SceneCells ? window.SceneCells.LW : 860) / MW; const LW = MW * FU, LH = MH * FU;
-    const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.02, transmission: 1, thickness: 20, ior: 1.52, dispersion: 0.6, attenuationColor: new THREE.Color(0xcdeee5), attenuationDistance: 1500, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: NIGHT ? 1.8 : 1.25, specularIntensity: 1, depthWrite: false });
+    const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.02, transmission: TRANS, thickness: 20, ior: 1.52, dispersion: 0.6, attenuationColor: new THREE.Color(0xcdeee5), attenuationDistance: 1500, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: NIGHT ? 1.8 : 1.25, specularIntensity: 1, depthWrite: false });
     const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: NIGHT ? 0.05 : 0.14, depthWrite: false });
     frags.forEach((f, i) => {
       const geo = new THREE.ExtrudeGeometry(f.shape, { depth: 18, bevelEnabled: true, bevelThickness: 2.6, bevelSize: 2.2, bevelOffset: -2.2, bevelSegments: 2, curveSegments: 1 }); geo.translate(0, 0, -9);
@@ -307,7 +310,7 @@
     const carries = (q) => { const xs = q.map((p) => p[0]), ys = q.map((p) => p[1]); let hit = 0; for (let y = Math.min(...ys); y <= Math.max(...ys); y += 7) for (let x = Math.min(...xs); x <= Math.max(...xs); x += 7) if (inPoly([x, y], q) && maskAt(x, y)) hit++; return hit; };
     const kept = out.filter((q) => carries(q) >= 3).map((q) => { const g = q.reduce((a, p) => [a[0] + p[0] / q.length, a[1] + p[1] / q.length], [0, 0]); return q.map((p) => [g[0] + (p[0] - g[0]) * 0.88, g[1] + (p[1] - g[1]) * 0.88]); }); out.length = 0; out.push(...kept);
     const nCore = out.length; for (let i = 0; i < 16; i++) { const g = [rr() * (MW + 80) - 40, rr() * (MH + 60) - 30], s = 14 + rr() * 34, a = rr() * 6.28; out.push([[g[0], g[1]], [g[0] + s * Math.cos(a), g[1] + s * Math.sin(a)], [g[0] + s * 0.4 * Math.cos(a + 2.2), g[1] + s * 0.4 * Math.sin(a + 2.2)]]); }
-    const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.012, transmission: 1, thickness: 26, ior: 1.52, dispersion: 0.7, attenuationColor: new THREE.Color(0xa9e6d8), attenuationDistance: 900, clearcoat: 1, clearcoatRoughness: 0.015, envMapIntensity: NIGHT ? 1.5 : 1.7, specularIntensity: 1, depthWrite: false, normalMap: reliefTex });
+    const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.012, transmission: TRANS, thickness: 26, ior: 1.52, dispersion: 0.7, attenuationColor: new THREE.Color(0xa9e6d8), attenuationDistance: 900, clearcoat: 1, clearcoatRoughness: 0.015, envMapIntensity: NIGHT ? 1.5 : 1.7, specularIntensity: 1, depthWrite: false, normalMap: reliefTex });
     FU = (window.SceneCells ? window.SceneCells.LW : 860) / MW;
     out.forEach((q, idx) => {
       const xs = q.map((p) => p[0]), ys = q.map((p) => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, T = (p) => new THREE.Vector2(p[0] - cx, -(p[1] - cy));
@@ -372,6 +375,6 @@
     if (plateDark !== d) { plateDark = d; logoImg.src = 'logos/logo-C-' + (d ? 'white' : 'black') + '.svg'; plates.forEach(redrawPlate); } }
   GL.setMix = (m) => { applyTheme(m); GL.draw(); }; applyTheme(night);
   GL.dbg = { get plates() { return gplates; } };
-  GL.setScale = (k) => { renderer.setPixelRatio(Math.max(0.5, Math.min(window.devicePixelRatio || 1, REDUCE ? 1 : 2) * k)); resize(); };   /* low frame rate: lower the render resolution */
+  GL.setScale = (k) => { renderer.setPixelRatio(Math.max(0.5, Math.min(Math.max(window.devicePixelRatio || 1, Q.get('aa') === '1' ? 1 : 1.5), REDUCE ? 1 : 2) * k)); resize(); };   /* low frame rate: lower the render resolution */
   window.GL = GL;
 })();
