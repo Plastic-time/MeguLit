@@ -36,13 +36,15 @@
  function captionFeedback(){const id=String(state.gameProcessId||'')+'|'+String(state.gameStarted||'');if(feedbackShown.has(id))return;feedbackShown.add(id);document.querySelector('.megulit-embed-feedback')?.remove();
   const n=document.createElement('div');n.className='megulit-embed-feedback';n.setAttribute('role','status');n.textContent=feedbackCopy()[0];
   n.style.cssText='font:13px/1.6 Meiryo,"Microsoft YaHei",sans-serif;color:#ffd9a8;background:rgba(40,20,10,.78);border:1px solid rgba(255,190,120,.35);border-radius:8px;padding:6px 10px;margin-top:8px;text-shadow:none;-webkit-text-stroke:0;cursor:pointer;transition:opacity .6s ease;';
-  const host=document.querySelector('.sentence-window');if(host)host.appendChild(n);else{n.style.cssText+='position:fixed;z-index:2147481500;left:50%;bottom:24px;transform:translateX(-50%);max-width:min(620px,calc(100vw - 32px));';
-   document.body.appendChild(n);}
+  /* 2026-11-21 (owner screenshot, ファタモルガーナの館: a narrow brown box over the line's last character and the translation): inside the sentence
+     window an anchored line (text-place.js max-width, game row breaks) squeezed it into a strip at the line's end. It is its own box, fixed */
+  n.style.cssText+='position:fixed;z-index:2147481500;left:50%;bottom:24px;transform:translateX(-50%);width:max-content;max-width:min(620px,calc(100vw - 32px));margin:0;';
+  document.body.appendChild(n);
   const close=()=>{n.style.opacity='0';setTimeout(()=>n.remove(),650);};n.addEventListener('click',e=>{e.stopPropagation();close();},{capture:true});setTimeout(close,
    8000);}
  const previous=b.galStatus;b.galStatus=m=>{previous(m);state={...state,...m};/* E416: the reader knows when the hook can only read (the game's text stays visible); fallbacks key off this class only */if('hookEmbedUnsupported' in m||'hookProfile' in m)document.body.classList.toggle('megulit-readonly-hook',
   state.hookEmbedUnsupported===true&&state.hookProfile!=='off');if(m.sourceChinese===true)chineseNotice();else if(m.sourceChinese===false)document.querySelector('.megulit-chinese-notice')?.remove();if(m.sourceForeign===true)chineseNotice('foreign');else if(m.sourceForeign===false)document.querySelector('.megulit-chinese-notice.is-foreign')?.remove();
-  if(Number.isFinite(m.sharedAdaptation)&&m.sharedAdaptation>0)sharedNotice(m.sharedAdaptation);if(m.hookEmbedUnsupported===true)captionFeedback();else if(m.hookEmbedUnsupported===false)document.querySelector('.megulit-embed-feedback')?.remove();
+  if(Number.isFinite(m.sharedAdaptation)&&m.sharedAdaptation>0)sharedNotice(m.sharedAdaptation);if(m.hookEmbedUnsupported===true&&state.textEffectsRead!==true)captionFeedback();else if(m.hookEmbedUnsupported===false)document.querySelector('.megulit-embed-feedback')?.remove();
   if(m.hookProfile)b.restoreGalSettings?.({hookProfile:m.hookProfile,maskMode:m.hookAutoOcr?'local':'hook',bindEnabled:true});for(const p of panels)if(p.isConnected)paint(p);
   else panels.delete(p);};
  const style=document.createElement('style');style.textContent=`
