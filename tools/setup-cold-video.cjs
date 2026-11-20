@@ -24,6 +24,8 @@ function start(i, extraEnv) {
   return { p, dir, port, log: path.join(dir, 'ui.log'), t0: Date.now() };
 }
 const read = (f) => { try { return fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''); } catch (e) { return ''; } };
+/* setup-ui.log can lose a line when this tool holds it open at the moment the host appends (Web-Log swallows the error): read the test event log too */
+const readRun = (r) => read(r.log) + '\n' + read(path.join(r.dir, 'events.log'));
 const ms = (t, what) => { const m = new RegExp('cold-start mark=' + what + ' ms=(-?\\d+)').exec(t); return m ? +m[1] : null; };
 async function cdpPage(port) {
   let list; for (let i = 0; i < 60; i++) { try { list = await getJ('http://127.0.0.1:' + port + '/json/list'); if (list.find((x) => x.type === 'page' && /megulit-setup/.test(x.url))) break; } catch (e) { /* wait */ } await sleep(250); }
@@ -39,8 +41,8 @@ async function coldRuns() {
   for (let i = 1; i <= RUNS; i++) {
     killLeft(); await sleep(500);
     const r = start(i); let t = '', out = null;
-    while (Date.now() - r.t0 < 90000) { await sleep(150); t = read(r.log); if (/cold-start mark=frame1/.test(t) || /classic window|result=fallback/.test(t)) break; }
-    await sleep(400); t = read(r.log);
+    while (Date.now() - r.t0 < 90000) { await sleep(150); t = readRun(r); if (/cold-start mark=frame1/.test(t) || /classic window|result=fallback/.test(t)) break; }
+    await sleep(400); t = readRun(r);
     const fb = /classic window|result=fallback/.test(t);
     out = { run: i, poster: ms(t, 'native-poster') !== null ? ms(t, 'native-poster') : ms(t, 'poster'), pagePoster: ms(t, 'poster'), frame1: ms(t, 'frame1'), fallback: fb, why: fb ? ((/reason="([^"]*)"/.exec(t) || [])[1] || (/classic window[^\n]*/.exec(t) || [''])[0]) : '' };
     out.blank = !fb && (out.poster === null && out.frame1 === null);
