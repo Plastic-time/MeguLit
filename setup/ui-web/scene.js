@@ -310,7 +310,7 @@
   $('#stay').addEventListener('click', () => Scene.showQuit(false)); $('#leave').addEventListener('click', () => act('close')); $('#btnMin').addEventListener('click', () => act('minimize'));
   $('#drag').addEventListener('mousedown', (e) => { if (e.button === 0) act('dragstart'); });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (quitOpen) Scene.showQuit(false); else $('#btnClose').click(); } });
-  { const t = document.getElementById('topLogo'); if (t) t.src = INK; }
+  { const t = document.getElementById('topLogo'); if (t) t.src = 'logos/logo-orig.svg'; }
   { const map = { '#ui-loc .card h2': 'locT', '#browse': 'change', '#install': 'install', '#ui-loc .note': 'locNote', '#retry': 'retry', '#copylog': 'copylog', '#manual': 'manual', '#doneT': 'doneT', '#launch': 'launch', '.card.quit h2': 'quitT', '.card.quit p': 'quitM', '#stay': 'stay', '#leave': 'leave' };
     for (const [sel, k] of Object.entries(map)) { const el = $(sel); if (el) el.textContent = tr(k === 'locNote' && window.__waitConfirm ? 'locNoteWait' : k); }
     $('#ui-loc .card .en').textContent = tr('locEn'); $('#lblPath').textContent = tr('lblPath'); $('#lblSugg').textContent = tr('lblSugg'); $('.card.quit .en').textContent = ''; $('#doneEn').textContent = tr('doneEn'); const ws = $('#welcomeSub'); if (ws) { ws.textContent = ''; tr('welcomeSub').split('|').forEach((t, i) => { const sp = document.createElement('span'); sp.className = 'wl' + (i + 1); sp.textContent = t; ws.appendChild(sp); }); }   /* two staggered lines */
@@ -334,7 +334,7 @@
   Scene.t = tr; Scene.setOverride = (p) => { override = p; };
   /* day / night: one number (0..1) drives the WebGL colours; the DOM flips at the half way point and eases its colours with a short CSS transition */
   let themeMix = startDark ? 1 : 0, themeTween = null; const htmlEl = document.documentElement;
-  function paintTheme(m) { themeMix = m; const dark = m > 0.5, th = dark ? 'night' : 'edge'; if (THEME !== th) { THEME = th; htmlEl.dataset.theme = th; const t = $('#topLogo'); if (t) t.src = 'logos/logo-' + LK + '-' + (dark ? 'white' : 'black') + '.svg'; const wl = $('#welcomeLogo'); if (wl) wl.src = 'logos/logo-' + LK + '-' + (dark ? 'white' : 'black') + '.svg'; syncThemeBtn(); }
+  function paintTheme(m) { themeMix = m; const dark = m > 0.5, th = dark ? 'night' : 'edge'; if (THEME !== th) { THEME = th; htmlEl.dataset.theme = th; const wl = $('#welcomeLogo'); if (wl) wl.src = 'logos/logo-' + LK + '-' + (dark ? 'white' : 'black') + '.svg'; syncThemeBtn(); }
     if (window.GL && GL.setMix) GL.setMix(m); }
   function syncThemeBtn() { const b = $('#btnTheme'); if (!b) return; const dark = THEME === 'night'; b.setAttribute('aria-pressed', dark); const lab = dark ? tr('toLight') : tr('toDark'); b.setAttribute('aria-label', lab); b.title = lab; b.innerHTML = dark ? '<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="2.8" fill="currentColor"/><g stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.8 2.8l1.1 1.1M10.1 10.1l1.1 1.1M2.8 11.2l1.1-1.1M10.1 3.9l1.1-1.1"/></g></svg>' : '<svg width="14" height="14" viewBox="0 0 14 14"><path d="M11.6 8.6A5.2 5.2 0 0 1 5.4 2.4a5.2 5.2 0 1 0 6.2 6.2z" fill="currentColor"/></svg>'; }
   Scene.setTheme = (dark, instant) => { try { localStorage.setItem(STORE, dark ? 'dark' : 'light'); } catch (e) { /* no memory */ } act('theme', { dark }); const to = dark ? 1 : 0;

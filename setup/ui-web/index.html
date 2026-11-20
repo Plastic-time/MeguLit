@@ -140,7 +140,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);color:v
 .tchange,.tchange *{transition:color .55s,background-color .55s,border-color .55s,box-shadow .55s,text-shadow .55s,fill .55s!important}
 #chrome .tab #btnTheme{opacity:.95}
 .pathfull.long{display:block}
-.welcome{position:absolute;left:56px;bottom:92px}.welcome i{display:block;width:64px;height:5px;background:var(--red);margin-bottom:16px}.welcome p span{display:block}.welcome p .wl2{padding-left:2.2em;font-size:.82em;font-weight:600;margin-top:2px}.welcome p{font-size:34px;font-weight:700;letter-spacing:-.5px;color:var(--ink);text-shadow:0 1px 0 rgba(255,255,255,.6)}
+.welcome{position:absolute;left:56px;bottom:92px}.welcome i{display:block;width:64px;height:5px;background:var(--red);margin-bottom:16px}.welcome p span{display:block}.welcome p .wl2{font-size:.82em;font-weight:600;margin-top:2px}.welcome p{font-size:34px;font-weight:700;letter-spacing:-.5px;color:var(--ink);text-shadow:0 1px 0 rgba(255,255,255,.6)}
 #trialTag{font-size:11px;letter-spacing:.5px;color:var(--mute);padding:3px 9px;box-shadow:inset 0 0 0 1px var(--line);margin-left:16px;white-space:nowrap}
 
 /* buttons: chamfer echoes the top-right tab; edge light sweeps on hover (transform/opacity only) */
@@ -159,7 +159,12 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 /* first-frame placeholder of the real installer: plain background and one line until the scene has drawn its first seconds */
 #boot{position:fixed;inset:0;z-index:999;display:none;align-items:center;justify-content:flex-start;padding-left:56px;padding-bottom:92px;align-items:flex-end;background:#eef2f9;color:#15181f;font-family:'Microsoft YaHei UI','Segoe UI',sans-serif;transition:opacity .6s ease}
 .native #boot{display:flex}#boot.gone{opacity:0;pointer-events:none}
-#boot i{display:block;width:64px;height:5px;background:#c8203c;margin:0 0 16px}#boot b{display:block;font-size:34px;font-weight:700;letter-spacing:-.5px;text-align:left}#boot b+b{padding-left:2.2em;font-size:28px;font-weight:600;margin-top:2px}#boot u{display:block;position:absolute;left:56px;right:56px;bottom:30px;height:3px;background:rgba(21,24,31,.08);overflow:hidden}#boot u::after{content:'';position:absolute;left:0;top:0;height:100%;width:28%;background:#c8203c;animation:bootbar 1.3s ease-in-out infinite}@keyframes bootbar{0%{transform:translateX(-110%)}100%{transform:translateX(380%)}}
+#boot i{display:block;width:64px;height:5px;background:#c8203c;margin:0 0 16px}#boot b{display:block;font-size:34px;font-weight:700;letter-spacing:-.5px;text-align:left}#boot b+b{font-size:28px;font-weight:600;margin-top:2px}#boot u{display:block;position:absolute;left:56px;right:56px;bottom:30px;height:3px;background:rgba(21,24,31,.08);overflow:hidden}#boot u::after{content:'';position:absolute;left:0;top:0;height:100%;width:28%;background:#c8203c;animation:bootbar 1.3s ease-in-out infinite}@keyframes bootbar{0%{transform:translateX(-110%)}100%{transform:translateX(380%)}}
+/* the original colour logo sits in the scene: a faint soft shadow, slightly calmer colour, a gentle fade-in; a thin light rim on dark so it stays readable */
+#topLogo{height:30px!important;opacity:0;animation:logoin .8s .35s ease forwards;filter:saturate(.9) brightness(1.04) drop-shadow(0 1px 2px rgba(30,40,70,.2))}
+:root[data-theme=night] #topLogo{filter:saturate(.95) brightness(1.18) drop-shadow(0 0 1px rgba(255,255,255,.6)) drop-shadow(0 0 5px rgba(255,255,255,.12)) drop-shadow(0 1px 2px rgba(0,0,0,.45))}
+@keyframes logoin{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#topLogo{animation:none;opacity:1}}
 </style>
 <script>try{var b=new URLSearchParams(location.search).get("btn");if(b)document.documentElement.setAttribute("data-btn",b)}catch(e){}</script>
 </head>
@@ -170,7 +175,7 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 <div id="win"><div id="app">
 <div id="view"><div id="world"></div></div>
 <div id="fx"><div id="vig"></div><div id="streaks"></div><div id="flash"></div></div>
-<div class="layer" id="ui-top" style="opacity:1;visibility:visible"><div class="top"><img id="topLogo" src="logos/logo-C-black.svg" alt="MeguLit"><div class="steps" id="steps"><i></i><i></i><i></i><i></i><span id="stepname"></span></div></div></div>
+<div class="layer" id="ui-top" style="opacity:1;visibility:visible"><div class="top"><img id="topLogo" src="logos/logo-orig.svg" alt="MeguLit"><div class="steps" id="steps"><i></i><i></i><i></i><i></i><span id="stepname"></span></div></div></div>
 <div class="scrimb layer" id="scrimb" style="opacity:1;visibility:visible;pointer-events:none"></div>
 <div class="layer" id="hud"><div class="pct"><span id="pct">0</span><small>%</small></div><div class="stat"><span><b id="got">0 MB</b> / <span id="total">0 MB</span></span><span id="speed">测速中</span><span id="eta"></span></div><div class="what"><h3 id="whatT"></h3><p id="whatP"></p></div></div>
 <div class="layer" id="ui-welcome" style="opacity:1;visibility:visible"><div class="welcome"><i></i><p id="welcomeSub"></p></div></div>
