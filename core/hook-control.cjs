@@ -2,10 +2,15 @@
 'use strict';
 const naninovelStream=t=>/Naninovel.*RevealableText|:Naninovel\.UI:RevealableText:SetTextValue:/i.test((t.name||'')+' '+(t.code||''));
 const streamRank=t=>naninovelStream(t)?300:/^Embed/.test(t.name||'')||t.embeddable===true?200:/TMP_Text|TextMeshPro|TextElement|TextField/.test(t.name||'')?10:100;
+const HIDDEN_REDRAWN='原文已隐藏：游戏的字由 MeguLit 在原位重画';
+const READ_ON_PURPOSE=why=>why?'自检未过线，已自动改为只显示译文：'+why:'这部游戏的文字特效和隐藏原文冲突，已自动改为只显示译文';
 const EMBED_FEEDBACK='这个游戏暂时不能隐藏原文：请在「关于」里提交反馈，附上游戏名和截图，一般一天内就能适配';
 class HookControl{
+ /* the original is kept off screen another way than write-back (or shown on purpose): the status line for it, else '' */
+ hiddenWithoutEmbed(){const h=this.host,k=h.hooks||{};if(h.textEffectsHold)return READ_ON_PURPOSE(h.textEffectsHold.why);
+  if(k.enabled===true&&k.route!=='read'&&(k.ownTextFn?.()===true||k.compositedFn?.()===true))return HIDDEN_REDRAWN;return '';}
  constructor(host,now=Date.now){this.host=host;this.now=now;this.seq=0;this.baseline=false;this.plan='read';this.running=false;this.lastIdentity='';}
- status(value){if(value.hookCheckState)this.host.hooks.trace?.('check '+value.hookCheckState+' '+(value.hookCheckMessage||''));this.host.notify({type:'hookCheck',hookProfile:this.plan,hookAutoOcr:!!this.autoOcr,...value});}
+ status(value){if('hookEmbedUnsupported' in value)this.unsupported=value.hookEmbedUnsupported===true;if(value.hookCheckState)this.host.hooks.trace?.('check '+value.hookCheckState+' '+(value.hookCheckMessage||''));this.host.notify({type:'hookCheck',hookProfile:this.plan,hookAutoOcr:!!this.autoOcr,...value});}
  // No stream of this game can be embedded: keep reading and let OCR cover the original text instead. Only a mask
  // mode ToMe chose itself is changed back, never one the user picked.
  // OCR may still measure positions, but covering the original text is only ever the user's choice (maskModeSource 'user').
@@ -112,7 +117,7 @@ class HookControl{
   }
   if(this.plan==='euphoria474'&&h.state.hookExact474===false)this.start('read');
   const hiding=['embed','euphoria474'].includes(this.plan);
-  if(!p.hookHide){h.hooks.probeHide?.(false);this.ocr(false);if(hiding)this.start('read');else if(explicit&&this.plan==='off')this.start('read');return;}
+  if(!p.hookHide){h.hooks.probeHide?.(false);this.ocr(false);if(h.textEffectsHold&&this.unsupported===true)this.status({hookEmbedUnsupported:false,hookCheckMessage:READ_ON_PURPOSE(h.textEffectsHold.why)});if(hiding)this.start('read');else if(explicit&&this.plan==='off')this.start('read');return;}
   // The verified YU-RIS 0.474 build uses a custom draw hook; read-only discovery does not expose that hook.
   if(h.state.hookExact474===true){if(!explicit&&!(h.state.bound&&h.state.coverEnabled!==false))return;if(this.plan!=='euphoria474')this.start('euphoria474',p.hookFast!==false);return;}
   const identity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');if(this.discoveryIdentity!==identity){this.discoveryIdentity=identity;this.readOnlySince=null;}
@@ -133,7 +138,12 @@ class HookControl{
     /* E578: the selected stream cannot write back; the hook may still hide the game's own drawing of it (GDI / glyph hide). It is switched on
        as a probe and the stream turns embeddable (hide-only) once a hidden draw is reported; only after several lines without one is the game unsupported. */
     if(h.hooks.probing===true&&h.hooks.state.hookEmbedPending!==true&&this.pendingSamples.size<4){this.status({hookCheckState:'waiting',hookEmbedUnsupported:false,hookCheckMessage:'正在尝试通用隐藏原文：推进几句后自动生效'});return;}
-    if(h.hooks.state.hookEmbedPending===true&&this.pendingSamples.size<4){this.status({hookCheckState:'waiting',hookEmbedUnsupported:false,hookCheckMessage:'已找到可内嵌的引擎钩子，进入剧情第一句后自动隐藏原文'});return;}/* E346 (user 2026-11-10): every engine that ends here tells the user how to get the game adapted. */this.status({hookCheckState:'reading',hookEmbedUnsupported:true,hookCheckMessage:EMBED_FEEDBACK});return;}
+    if(h.hooks.state.hookEmbedPending===true&&this.pendingSamples.size<4){this.status({hookCheckState:'waiting',hookEmbedUnsupported:false,hookCheckMessage:'已找到可内嵌的引擎钩子，进入剧情第一句后自动隐藏原文'});return;}/* 2026-11-21 (owner, ファタモルガーナの館 incr11: 「已经隐藏了却显示了这个提示」, hook-events 23:31:21.984 隐藏检查通过, 23:31:37.856 embed -> custom,
+       then 这个游戏暂时不能隐藏原文 every 2 s): no stream writes back, but the original is still hidden: the glyph layer blanks it and MeguLit draws
+       the line on its place (overlay placement / compositor). Nothing to report then. A read mode chosen by the self-check or the text-effect
+       judge shows the game's text on purpose: it says so (the Alt+T read-mode line), never "send feedback". */
+    const hidden=this.hiddenWithoutEmbed();if(hidden){this.status({hookEmbedUnsupported:false,hookCheckMessage:hidden});return;}
+    /* E346 (user 2026-11-10): every engine that ends here tells the user how to get the game adapted. */this.status({hookCheckState:'reading',hookEmbedUnsupported:true,hookCheckMessage:EMBED_FEEDBACK});return;}
    this.status({hookCheckState:'waiting',hookCheckMessage:'已开启隐藏：等 Hook 找到游戏文本流，推进一句后自动开始隐藏'});return;}
   if(!explicit&&!(h.state.bound&&h.state.coverEnabled!==false))return;
   h.hooks.preferredThread=t.id;this.start(/DrawHide/.test(t.name)?'euphoria474':'embed',p.hookFast!==false);
