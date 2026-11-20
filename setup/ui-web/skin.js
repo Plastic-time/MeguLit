@@ -28,7 +28,7 @@
     if (u === '/api/state') return Promise.resolve(resp(lastState || { phase: 'probe', n: 0, st: '', fr: [] }));
     let m = {}; try { m = JSON.parse(opt && opt.body || '{}'); } catch (e) { /* none */ }
     if (m.type === 'close' || m.type === 'minimize') return Promise.resolve(resp({ ok: true }));      /* the scene posts those itself */
-    m.via = 'shim'; const wait = m.type === 'checkpath' || m.type === 'install' || m.type === 'browse';
+    m.via = 'shim'; const wait = m.type === 'checkpath' || m.type === 'install' || m.type === 'browse' || m.type === 'listdir' || m.type === 'mkdir' || m.type === 'pickfolder';
     if (!wait) { post(m); return Promise.resolve(resp({ ok: true })); }
     m.id = ++nid; return new Promise((ok) => { pend.set(m.id, (r) => ok(resp(r || {}))); post(m); setTimeout(() => { if (pend.has(m.id)) { pend.delete(m.id); ok(resp({ state: 'ok' })); } }, 8000); });
   };

@@ -66,3 +66,7 @@ test('no system title bar at any time: the frame is dressed when the window hand
   const r = fs.readFileSync(path.join(repo, 'setup', 'setup-runtime.ps1'), 'utf8');
   assert.match(r, /classic-shown web=/, 'classic-shown says whether it is only the control surface');
 });
+
+test('setup-web.ps1 carries a UTF-8 BOM (it is dot-sourced; without it Windows PowerShell reads the Chinese text as ANSI and a quote can be swallowed)', () => {
+  const b = fs.readFileSync(path.join(repo, 'setup', 'setup-web.ps1')); assert.deepEqual([...b.subarray(0, 3)], [0xEF, 0xBB, 0xBF]);
+});
