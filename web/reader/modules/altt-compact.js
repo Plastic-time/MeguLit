@@ -104,7 +104,7 @@
  const byName=(root,n)=>root.querySelector('[name='+n+']')?.closest('label');
  /* sub-tab bar: items = [{label, nodes:[...], get label()}]; idempotent, re-run on every mutation */
  /* short names for the segmented control (the full name stays as the tooltip) */
- const SHORT={'沉浸与等待图标':'沉浸','显示方式':'显示','行距与间距':'间距','游戏字体':'字体','校准与位置':'校准','导入与历史':'导入'};
+ const SHORT={'沉浸与等待图标':'沉浸','显示方式':'显示','行距与间距':'间距','游戏字体':'字体','校准与位置':'校准','导入与历史':'沿用设置'};
  function chips(host,before,id,items,state){
   let bar=host.querySelector(':scope>.mg-subtabs[data-ac-id='+id+']');
   if(!bar){bar=mk('div','mg-subtabs',{role:'tablist','data-ac-id':id,'data-ac-added':''});before.before(bar);bar.style.setProperty('--mg-seg-cols',String(items.length<=4?items.length:Math.ceil(items.length/2)));
