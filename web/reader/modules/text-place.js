@@ -436,13 +436,15 @@
   let rowsLine = '', rowsPrev = null, rowsFresh = false, rowsSeq = 0, rowsCentred = false;
   /* 2026-11-21 (owner, CHAOS;CHILD centred narration: a new line typed out on one row and only wrapped and centred when it was
      complete): the widest row of the last fully drawn centred line; a centred line the game is still typing wraps at it */
-  let centreWidth = 0;
-  function gameRows(boxes, size, map) {
+  let centreWidth = 0, leftEdge = null; /* left edge of the last fully drawn left-aligned line */
+  function gameRows(boxes, size, map, leftEdge = null) {
     const rows = [], rowOf = new Array(boxes.length).fill(-1); let cur = null;
     boxes.forEach((r, j) => { if (!r || r[3] < size * .7 || r[2] > size * 1.6) return; /* a small glyph (the game's own ruby) or a wide one (a UI button the layer took for a glyph) is no row */ if (!cur || r[1] > cur.t + size * .6 || r[0] < cur.l - size * .5 && r[1] > cur.t + size * .3) { cur = { l: r[0], r: r[0] + r[2], t: r[1], first: j }; rows.push(cur); } else { cur.l = Math.min(cur.l, r[0]); cur.r = Math.max(cur.r, r[0] + r[2]); } rowOf[j] = rows.length - 1; });
     let center = null; const [L, , R] = map.bounds || [0, 0, innerWidth], mid = r => (r.l + r.r) / 2;
     if (rows.length >= 2) { const c = mid(rows[0]); if (rows.every(r => Math.abs(mid(r) - c) < size * .75) && Math.max(...rows.map(r => r.l)) - Math.min(...rows.map(r => r.l)) > size * 1.5) center = rows.reduce((t, r) => t + mid(r), 0) / rows.length; }
-    else if (rows.length === 1 && Math.abs(mid(rows[0]) - (L + R) / 2) < size * .75 && rows[0].l > L + (R - L) * .15) center = mid(rows[0]);
+    /* 2026-11-21 (owner, 千恋＊万花: 「普通说话以为要居中，点一下又左对齐」): a text box that sits in the middle of the screen makes a full
+       one-row line look centred; a row that starts at the left edge of the page's left-aligned lines is that box, not a centred line */
+    else if (rows.length === 1 && Math.abs(mid(rows[0]) - (L + R) / 2) < size * .75 && rows[0].l > L + (R - L) * .15 && !(Number.isFinite(leftEdge) && Math.abs(rows[0].l - leftEdge) <= size * .5)) center = mid(rows[0]);
     return { rows, rowOf, center };
   }
   /* a line break before each reader character the game put at the start of a new row */
@@ -553,10 +555,10 @@
       /* 2026-11-20 (user, CHAOS;CHILD: 「排版要贴近游戏」 — narration centred mid-screen, a dialogue box left-aligned): the game's rows
          decide where the reader breaks the line and whether the block is centred; size and wrap width stay the user's.
          A sentence whose first part the game drew earlier (core/page-text.cjs `continues`) keeps the place that part had. */
-      const rows = gameRows(boxes, size, map), lead = idx.findIndex(k => k != null);
+      const rows = gameRows(boxes, size, map, leftEdge), lead = idx.findIndex(k => k != null), firstBox = boxes.find(Boolean), atLeft = !!firstBox && Number.isFinite(leftEdge) && Math.abs(firstBox[0] - leftEdge) <= size * .5;
       /* 2026-11-20 (user: a centred line started at the left as 「流」 while the game typed it): with under half of the line's boxes known
          the centring cannot be measured yet; a page that was centred stays centred on the same middle until it can */
-      if (!Number.isFinite(rows.center) && anchor && anchor.center && boxes.filter(Boolean).length < shown.length * .5) rows.center = anchor[0]; b.textPlaceRows = { text: readerText, rows: rows.rows.map(r => [Math.round(r.l), Math.round(r.r), Math.round(r.t), r.first]), center: rows.center, boxes: boxes.map(r => r && r.map(Math.round)), idx };
+      /* a line whose first characters start at the left edge of the page's left-aligned lines is not centred, whatever came before */ if (!Number.isFinite(rows.center) && anchor && anchor.center && !atLeft && boxes.filter(Boolean).length < shown.length * .5) rows.center = anchor[0]; b.textPlaceRows = { text: readerText, rows: rows.rows.map(r => [Math.round(r.l), Math.round(r.r), Math.round(r.t), r.first]), center: rows.center, boxes: boxes.map(r => r && r.map(Math.round)), idx };
       if (!(anchor && lead >= 3 && Number(b.hookSourceContinues) > 0)) anchorFrom(boxes.filter(Boolean), size, map, String(line.text || ''), rows.center);
       /* the page's earlier lines stay above only when the game drew this line under them; a line that starts at or above
          where the last one ended is a new page (a title card, a cleared box), whatever the text stream said */
@@ -566,6 +568,7 @@
       rowBreaks(win, shown, rows);
       { const known = boxes.filter(Boolean).length, centred = Number.isFinite(rows.center);
         if (centred && known >= shown.length && rows.rows.length) centreWidth = Math.max(...rows.rows.map(r => r.r - r.l)) + size;
+        if (!centred && known >= shown.length && rows.rows.length) leftEdge = Math.min(...rows.rows.map(r => r.l));
         else if (!centred && !(anchor && anchor.center)) centreWidth = 0;
         /* while the game has not drawn every row of a centred line, the whole line already wraps at the page's row width and is
            centred, so typing only reveals characters in their final place; the game's own breaks replace it row by row */
