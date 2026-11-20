@@ -63,6 +63,12 @@
  /* reusable in-panel second-level tabs (.mg-subtabs): one segmented control. A single trough holds every tab in equal cells (4 a row in a narrow panel, one row when wide); the selected cell is filled. It must not look like the action buttons below it. */
  /* a pane under the segmented control already says which tab it is: its own fold header is not shown */
  details.tome-ac-pane:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7)>summary{display:none!important}
+ /* colour rows take one line: name on the left, a small swatch + hex on the right (no copy button; the hex box still copies and pastes) */
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) label:has(>.tome-color-field){display:flex!important;flex-direction:row!important;align-items:center;justify-content:space-between;gap:10px;min-height:32px}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-color-field{display:inline-flex!important;align-items:center;gap:6px;width:auto!important;flex:none;margin:0!important}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-color-field>.tome-color-swatch{width:24px!important;height:24px!important;min-width:0!important;min-height:0!important;padding:0!important;border-radius:6px!important}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-color-field>.tome-color-text{width:84px!important;height:28px!important;padding:0 8px!important;font-size:12px!important;font-family:ui-monospace,Consolas,monospace}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-color-field>.tome-color-copy{display:none!important}
  .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid;grid-template-columns:repeat(var(--mg-seg-cols,4),minmax(0,1fr));gap:2px;margin:8px 0 10px;padding:3px;border:0;border-radius:10px;background:color-mix(in srgb,var(--theme-text,#e8e9ec) 7%,transparent);overflow:visible}
  .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button{min-width:0;margin:0!important;padding:7px 4px!important;border:1px solid transparent!important;border-radius:7px!important;background:transparent!important;box-shadow:none!important;color:var(--theme-textSecondary,#aaa)!important;cursor:pointer;font-size:13px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
  .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button:hover{color:var(--theme-text,#e8e9ec)!important;background:color-mix(in srgb,var(--theme-text,#e8e9ec) 6%,transparent)!important}
@@ -106,7 +112,7 @@
  const byName=(root,n)=>root.querySelector('[name='+n+']')?.closest('label');
  /* sub-tab bar: items = [{label, nodes:[...], get label()}]; idempotent, re-run on every mutation */
  /* short names for the segmented control (the full name stays as the tooltip) */
- const SHORT={'沉浸与等待图标':'沉浸','显示方式':'显示','行距与间距':'间距','游戏字体':'字体','校准与位置':'校准','导入与历史':'沿用设置'};
+ const SHORT={'沉浸与等待图标':'沉浸模式','显示方式':'显示','行距与间距':'间距','游戏字体':'字体','校准与位置':'校准','导入与历史':'沿用设置'};
  function chips(host,before,id,items,state){
   let bar=host.querySelector(':scope>.mg-subtabs[data-ac-id='+id+']');
   if(!bar){bar=mk('div','mg-subtabs',{role:'tablist','data-ac-id':id,'data-ac-added':''});before.before(bar);bar.style.setProperty('--mg-seg-cols',String(items.length<=4?items.length:Math.ceil(items.length/2)));
