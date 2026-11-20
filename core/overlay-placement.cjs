@@ -39,7 +39,10 @@ class OverlayPlacement {
        hiding the game's text, a line the game draws itself is on screen only until the hide is back; the reader is told so and leaves
        the Japanese to the game for that time. Reading without hiding (the reader as a second text) is not touched. */
     this.hiding = (preferences?.hookProfile === 'embed' || preferences?.hookProfile === 'euphoria474') && preferences?.hookHide !== false;
-    if (on !== this.on) { this.on = on; if (!on) { this.clear(); if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] }); this.extraKey = ''; } this.send({ type: 'textPlaceMode', on }); }
+    /* 2026-11-21 (owner, STEINS;GATE right after 千恋＊万花 in one MeguLit run: its lines came with no place and were pinned at 千恋＊万花's place and rows):
+       the reader is told which game the mode is for; another game starts with no place of its own */
+    const game = String(state?.gameProcessId || state?.gameHwnd || '');
+    if (on !== this.on || game !== this.game) { const was = this.on; this.on = on; this.game = game; if (!on && was) { this.clear(); if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] }); this.extraKey = ''; } this.send(game ? { type: 'textPlaceMode', on, game } : { type: 'textPlaceMode', on }); }
   }
   clear() { if (this.current) { this.current = null; this.send({ type: 'textPlace', clear: true }); } }
   /* 2026-11-19 (千恋＊万花 maximised, krkr drawing its text invisible, the reader still in its style box): why a reported line
