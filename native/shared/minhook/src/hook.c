@@ -196,64 +196,6 @@ static DWORD_PTR FindNewIP(PHOOK_ENTRY pHook, DWORD_PTR ip)
 }
 
 //-------------------------------------------------------------------------
-/* MeguLit P0 (2026-11-21): reading a frozen thread's context could wait for ever (GetThreadContext waits until the thread has
-   really stopped; a thread that cannot reach suspension never does) while every other thread stays frozen. The context is read
-   on a helper thread made at MH_Initialize and waited for at most MEGULIT_CTX_TIMEOUT_MS; a read that does not come back fails
-   the freeze, every thread is resumed and the hook is left as it was (the caller gets an error and may try again). The helper is
-   never frozen. No heap use while threads are frozen. */
-#define MEGULIT_CTX_TIMEOUT_MS 200
-static HANDLE g_ctxGo = NULL, g_ctxDone = NULL, g_ctxWorker = NULL;
-static DWORD g_ctxWorkerId = 0;
-static HANDLE g_ctxTarget = NULL;
-static CONTEXT g_ctxBuf;
-static volatile LONG g_ctxBusy = 0, g_ctxOk = 0;
-static DWORD WINAPI CtxWorker(LPVOID unused)
-{
-    (void)unused;
-    for (;;)
-    {
-        WaitForSingleObject(g_ctxGo, INFINITE);
-        g_ctxOk = GetThreadContext(g_ctxTarget, &g_ctxBuf) ? 1 : 0;
-        CloseHandle(g_ctxTarget);
-        g_ctxTarget = NULL;
-        InterlockedExchange(&g_ctxBusy, 0);
-        SetEvent(g_ctxDone);
-    }
-}
-static VOID StartCtxWorker(VOID)
-{
-    if (g_ctxWorker != NULL)
-        return;
-    g_ctxGo = CreateEventW(NULL, FALSE, FALSE, NULL);
-    g_ctxDone = CreateEventW(NULL, FALSE, FALSE, NULL);
-    if (g_ctxGo && g_ctxDone)
-        g_ctxWorker = CreateThread(NULL, 0, CtxWorker, NULL, 0, &g_ctxWorkerId);
-}
-/* TRUE with the context, FALSE when it cannot be read in time (or a read that timed out earlier is still pending) */
-static BOOL GetContextTimed(HANDLE hThread, CONTEXT *pc)
-{
-    HANDLE dup = NULL;
-    if (g_ctxWorker == NULL)
-        return GetThreadContext(hThread, pc);
-    if (g_ctxBusy)
-        return FALSE;
-    if (!DuplicateHandle(GetCurrentProcess(), hThread, GetCurrentProcess(), &dup, 0, FALSE, DUPLICATE_SAME_ACCESS))
-        return FALSE;
-    InterlockedExchange(&g_ctxBusy, 1);
-    g_ctxTarget = dup;
-    g_ctxBuf.ContextFlags = pc->ContextFlags;
-    ResetEvent(g_ctxDone);
-    SetEvent(g_ctxGo);
-    if (WaitForSingleObject(g_ctxDone, MEGULIT_CTX_TIMEOUT_MS) != WAIT_OBJECT_0)
-        return FALSE; /* the helper finishes on its own once the thread is resumed */
-    if (!g_ctxOk)
-        return FALSE;
-    *pc = g_ctxBuf;
-    return TRUE;
-}
-static volatile BOOL g_freezeFailed = FALSE;
-
-//-------------------------------------------------------------------------
 static VOID ProcessThreadIPs(HANDLE hThread, UINT pos, UINT action)
 {
     // If the thread suspended in the overwritten area,
@@ -268,11 +210,8 @@ static VOID ProcessThreadIPs(HANDLE hThread, UINT pos, UINT action)
     UINT count;
 
     c.ContextFlags = CONTEXT_CONTROL;
-    if (!GetContextTimed(hThread, &c))
-    {
-        g_freezeFailed = TRUE; /* cannot tell where this thread is: the freeze is given up */
+    if (!GetThreadContext(hThread, &c))
         return;
-    }
 
     if (pos == ALL_HOOKS_POS)
     {
@@ -373,7 +312,7 @@ static int EnumerateOwnThreads(PFROZEN_THREADS pThreads)
             CloseHandle(hThread);
         hThread = hNext;
         tid = GetThreadId(hThread);
-        if (tid != 0 && tid != self && tid != g_ctxWorkerId && !AddThreadId(pThreads, tid))
+        if (tid != 0 && tid != self && !AddThreadId(pThreads, tid))
         {
             succeeded = FALSE;
             break;
@@ -415,8 +354,7 @@ static BOOL EnumerateThreadsSnapshot(PFROZEN_THREADS pThreads)
             {
                 if (te.dwSize >= (FIELD_OFFSET(THREADENTRY32, th32OwnerProcessID) + sizeof(DWORD))
                     && te.th32OwnerProcessID == GetCurrentProcessId()
-                    && te.th32ThreadID != GetCurrentThreadId()
-                    && te.th32ThreadID != g_ctxWorkerId)
+                    && te.th32ThreadID != GetCurrentThreadId())
                 {
                     if (pThreads->pItems == NULL)
                     {
@@ -465,11 +403,9 @@ static BOOL EnumerateThreadsSnapshot(PFROZEN_THREADS pThreads)
 }
 
 //-------------------------------------------------------------------------
-static VOID Unfreeze(PFROZEN_THREADS pThreads);
 static MH_STATUS Freeze(PFROZEN_THREADS pThreads, UINT pos, UINT action)
 {
     MH_STATUS status = MH_OK;
-    g_freezeFailed = FALSE;
 
     pThreads->pItems   = NULL;
     pThreads->capacity = 0;
@@ -500,14 +436,6 @@ static MH_STATUS Freeze(PFROZEN_THREADS pThreads, UINT pos, UINT action)
             {
                 // Mark thread as not suspended, so it's not resumed later on.
                 pThreads->pItems[i] = 0;
-            }
-            if (g_freezeFailed)
-            {
-                UINT j;
-                for (j = i + 1; j < pThreads->size; ++j)
-                    pThreads->pItems[j] = 0; /* never suspended */
-                Unfreeze(pThreads); /* resumes the ones suspended so far and frees the list */
-                return MH_ERROR_NOT_EXECUTABLE;
             }
         }
     }
@@ -670,7 +598,6 @@ MH_STATUS WINAPI MH_Initialize(VOID)
         {
             // Initialize the internal function buffer.
             InitializeBuffer();
-            StartCtxWorker();
         }
         else
         {
@@ -707,16 +634,6 @@ MH_STATUS WINAPI MH_Uninitialize(VOID)
             UninitializeBuffer();
 
             HeapFree(g_hHeap, 0, g_hooks.pItems);
-            /* the context helper waits idle: end it before this code can be unloaded (a read still pending keeps it) */
-            if (g_ctxWorker != NULL && !g_ctxBusy)
-            {
-                TerminateThread(g_ctxWorker, 0);
-                CloseHandle(g_ctxWorker);
-                CloseHandle(g_ctxGo);
-                CloseHandle(g_ctxDone);
-                g_ctxWorker = g_ctxGo = g_ctxDone = NULL;
-                g_ctxWorkerId = 0;
-            }
             HeapDestroy(g_hHeap);
 
             g_hHeap = NULL;
