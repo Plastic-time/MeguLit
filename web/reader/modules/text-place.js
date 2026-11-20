@@ -225,6 +225,8 @@
      Whatever the game hides is on screen. It stays until the game draws over its place or starts a new page. */
   const ORPHAN_MS = 450;
   let orphans = [], orphanWait = null;
+  let gaveWayAt = 0;
+  function giveWay() { const now = performance.now(); if (now - gaveWayAt < 1000) return; gaveWayAt = now; (b.textPlaceGaveWay = (b.textPlaceGaveWay || 0) + 1); try { window.__tomoyoTranslateRequest?.(JSON.stringify({ type: 'engineGiveWay', ms: 3000 })); } catch {} }
   function orphanItems() { return orphans.map(o => ({ id: 'orphan:' + o.text, kind: 'l', text: o.text, rects: o.rects, client: o.client })); }
   function overlaps(a, b) { return a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3]; }
   /* a new placed line: orphans under its boxes are gone (the game drew over them); a line starting above every orphan is a new page */
@@ -239,8 +241,8 @@
   function orphan(l) {
     if (!l || l.fallback || !Array.isArray(l.rects) || !l.text) return;
     const chars = [...l.text], rects = []; chars.forEach((c, i) => { if (!blank(c)) rects.push(l.rects[i]); });
-    if (!rects.length || !rects.every(r => Array.isArray(r) && r[2] > 0 && r[3] > 0)) return;
     const text = chars.filter(c => !blank(c)).join('');
+    if (!text || !rects.length || !rects.every(r => Array.isArray(r) && r[2] > 0 && r[3] > 0)) { giveWay(); return; } /* cannot be drawn here: the game draws it */
     if (orphans.some(o => o.text === text)) return;
     const now = performance.now();
     if (orphanWait?.text !== text) { orphanWait = { text, at: now }; setTimeout(schedule, ORPHAN_MS + 20); return; }

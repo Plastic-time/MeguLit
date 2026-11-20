@@ -755,7 +755,13 @@ class HookNative{
   if(P.said||(this.krkrChars?.pid===pid&&this.krkrChars.n>0))return;if(!/krkr|kirikiri|textrender/i.test(String(this.dialogueHook||'')))return;
   if(++P.lines<3)return;P.said=true;this.trace('positions: no character records from the TextRender game after '+P.lines+' lines (started before MeguLit)');
   this.notify({hookNotice:'这款游戏要从 MeguLit 游戏库启动（或重启游戏）后，文字位置和隐藏才完整',hookNoticeAt:this.now()});}
- emitSource(text,origin,engine='',nativeLine=0){this.positionsCheck?.();
+ /* 2026-11-21 (ファタモルガーナの館: its hook text garbled by the text effects or dropped while the game drew the line hidden): a line the game drew
+    hidden that no source line carried within 450 ms is delivered as a source line itself (origin 'placement'), so it is read, given furigana and
+    translated like any other; the recent sources are kept for the comparison */
+ placedHidden(raw){const text=String(raw||'').replace(/\u001f/g,'\n').replace(/\n/g,''),f=HookNative.flat(text);if(!f||f.length<2)return;const seen=()=>(this.recentSources||[]).some(s=>s.includes(f)||f.includes(s));if(seen())return;if((this.placedWait||(this.placedWait=new Map())).has(f))return;
+  const serial=this.serial,t=setTimeout(()=>{this.placedWait.delete(f);if(serial!==this.serial||seen())return;this.trace('placement line without a source line, delivered from the placement chars='+f.length);this.deliverSource(text,'placement');},450);t.unref?.();this.placedWait.set(f,t);if(this.placedWait.size>16){const k=this.placedWait.keys().next().value;clearTimeout(this.placedWait.get(k));this.placedWait.delete(k);}}
+ giveWay(ms){this.send({type:'engineGiveWay',ms:Math.max(0,Math.min(10000,Number(ms)||3000))});}
+ emitSource(text,origin,engine='',nativeLine=0){{const f=HookNative.flat(text);if(f){(this.recentSources||(this.recentSources=[])).push(f);if(this.recentSources.length>24)this.recentSources.shift();}}this.positionsCheck?.();
   try{this.textPath?.want(text);}catch{}
   /* E501 every source path (native line, merged batch, skip burst) meets the same frame-dump filter as the aux entries */
   if(require('./language-tracks.cjs').stuttered(text)){this.trace('drop typewriter/redraw frame '+JSON.stringify(String(text).slice(0,40)));return;}
