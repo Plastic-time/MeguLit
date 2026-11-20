@@ -285,5 +285,8 @@
     return true;
   };
   if (!hook()) { const iv = setInterval(() => { if (hook()) clearInterval(iv); }, 20); }
+  /* test switch (MEGULIT_SETUP_WEB_TEST=stall): the page comes up and says ready, but no video frame ever arrives and nothing
+     is reported: only the host's watchdog can get the user out of this */
+  if (Q.get('t') === 'stall') { GL.ok = true; const p = document.getElementById('vposter'); if (p && p.complete) mark('poster'); return; }
   start();
 })();
