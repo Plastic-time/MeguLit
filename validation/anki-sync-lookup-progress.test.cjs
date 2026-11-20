@@ -24,3 +24,15 @@ test('later syncs reach words after 300 dictionary misses and still retry earlie
  const third=await sync();assert.equal(third.imported,0);assert.equal(third.reviews,0);
  assert.ok(calls.includes('word299'));
 });
+
+test('resuming lookups keeps the original update order for two notes matching the same word',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-anki-note-order-')),db=openStore(root);
+ t.after(()=>{db.close();fs.rmSync(root,{recursive:true,force:true});});
+ const notes=Array.from({length:301},(_,i)=>({noteId:i+1,word:'entry'+i,status:i===300?1:4}));
+ let active=false;
+ const sync=new AnkiSync({db,config:{},anki:{stats:async()=>notes},resolveEntry:async word=>
+  active&&['entry2','entry300'].includes(word)?{id:10,spellings:['same entry']}:null});
+ await sync.run();active=true;await sync.run();
+ assert.equal(db.prepare('SELECT note_id FROM anki_links WHERE word_id=10').get().note_id,301);
+ assert.equal(db.prepare('SELECT status FROM vocabulary WHERE id=10').get().status,1);
+});
