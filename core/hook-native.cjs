@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process'),{createInterface}=require('node:readline');
+const Profiles=require('./profiles/index.cjs');
 const {parseGlyphPos,fillPlaces}=require('./gpu-glyph-pos.cjs');const {identifierNoise}=require('./text-noise.cjs');const {ChoiceCapture,placeChoices,SYMBOL_OPTION}=require('./choice-capture.cjs');const {DoubleLine}=require('./double-line.cjs');
 /* #148 (WHITE ALBUM2, AQUAPLUS: phone lines came as 「<F16「やぁ…」>」): inline engine tags of one ASCII letter (+ up to 3
    digits) wrapped straight around Japanese text are unwrapped for every engine; <R漢字|かな> keeps its base. HTML-like tags
@@ -69,8 +70,11 @@ class HookNative{
  set preflight(v){this._preflight=v===true;}
  /* E410: where a flow line sits on the page, from the game's own scripts (null when unknown). */
  flowLayout(text){try{const provider=this.originalText;if(!provider?.flowLayout)return null;const r=this.resolveSource(text);if(!r||r.method==='same-text'/* E520: the place of a repeated line is unknown */||!(r.status==='exact'||r.status==='high'||r.method==='untranslated'))return null;return provider.flowLayout(r.indices)||null;}catch{return null;}}
- constructor(layout,onEvent,spawnHelper=spawn,now=Date.now){this.layout=typeof layout==='string'?{native:layout,hook:path.join(layout,'hook-runtime')}:layout;this.folder=this.layout.native;this.emit=onEvent;require('./text-sanity.cjs').warmUp();this.spawn=spawnHelper;this.now=now;this.state={hookActive:false,hookAvailable:false,hookThreads:[],processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookMessage:'Hook 未启用'};this.islandSources=new Map();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;this.lastSource="";this.identity="";this.serial=0;this.enabled=false;this.attempt=0;this.retryAt=0;this.timer=setInterval(()=>this.tick(),1000);this.timer.unref?.();}
+ constructor(layout,onEvent,spawnHelper=spawn,now=Date.now){this.profile=Profiles.profileFor({});this.layout=typeof layout==='string'?{native:layout,hook:path.join(layout,'hook-runtime')}:layout;this.folder=this.layout.native;this.emit=onEvent;require('./text-sanity.cjs').warmUp();this.spawn=spawnHelper;this.now=now;this.state={hookActive:false,hookAvailable:false,hookThreads:[],processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookMessage:'Hook 未启用'};this.islandSources=new Map();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;this.lastSource="";this.identity="";this.serial=0;this.enabled=false;this.attempt=0;this.retryAt=0;this.timer=setInterval(()=>this.tick(),1000);this.timer.unref?.();}
  trace(message){try{const file=path.join(this.layout.logs||path.join(this.folder,"..","logs"),"hook-events.log");require("./log-sink.cjs").append(file,new Date().toISOString()+" "+message+"\n",{rotate:1048576});}catch{}}
+ /* 2026-11-21 layered game profile (core/profiles): kernel <- engine diff <- game diff. Every per-engine / per-game branch of the
+    kernel reads this.profile (never the program name); the reader gets the same object as hookState gameProfile. */
+ setProfile(profile){if(!profile||typeof profile!=='object')return;this.profile=profile;this.trace(Profiles.traceLine(profile));this.notify({gameProfile:profile});}
  notify(v){if(Object.entries(v).every(([k,value])=>this.state[k]===value))return;this.state={...this.state,...v};this.emit({type:'hook',...v});}
  configure(preferences,state){this.preferences=preferences;this.windowState=state;const pid=Number(state.gameProcessId),hwnd=String(state.gameHwnd||'');this.wanted=(preferences.hookAutoStart||['hook','local'].includes(preferences.maskMode))&&preferences.bindEnabled===true&&preferences.hookProfile!=='off';this.target=Number.isSafeInteger(pid)&&pid>0&&/^\d{1,19}$/.test(hwnd)?{pid,hwnd,name:String(state.processName||''),started:String(state.gameStarted||'')}:null;
   if(!this.wanted||!this.target){this.stop(false);return;}if(this.process&&(this.pid!==pid||this.started!==this.target.started))this.stop(false);
@@ -425,7 +429,7 @@ class HookNative{
   if(t&&!/^[「【]/.test(t))add('「'+t+'」');if(t&&!/^[「『【]/.test(t))add('『'+t+'』');
   for(const v of out.slice())add(v.replace(/^[「『]/,'').replace(/[」』]$/,''));return out;}
  static interleaved(t){const a=[...HookNative.flat(t)];if(a.length<8)return false;if(new Set(a).size/a.length<.55)return true;const m=new Map();for(let i=0;i+1<a.length;i++){const g=a[i]+a[i+1];m.set(g,(m.get(g)||0)+1);if(m.get(g)>=3)return true;}return false;}
- choiceFilter(options){if(!Array.isArray(options))return options;const said=[this.lastSource,...(this.recentSources||[])].map(x=>HookNative.flat(x)).filter(Boolean);const kept=options.filter(o=>{const f=HookNative.flat(o);if(!f||HookNative.interleaved(f))return false;return !said.some(x=>x!==f&&x.includes(f));});if(kept.length!==options.length)this.trace('choice options filtered '+options.length+' -> '+kept.length);return kept.length>=2?kept:null;}
+ choiceFilter(options){if(!Array.isArray(options))return options;const said=[this.lastSource,...(this.recentSources||[])].map(x=>HookNative.flat(x)).filter(Boolean);const drop=Profiles.choiceFilters(this.profile);const kept=options.filter(o=>{const f=HookNative.flat(o);if(!f||HookNative.interleaved(f))return false;if(drop.some(r=>r.test(String(o))))return false;return !said.some(x=>x!==f&&x.includes(f));});if(kept.length!==options.length)this.trace('choice options filtered '+options.length+' -> '+kept.length);return kept.length>=2?kept:null;}
  requestChoices(round){const options=this.choiceFilter(round>0&&this.choiceOptions?this.choiceOptions:this.choice?.options());
   if(!options){this.trace('choice candidates too few n='+(this.choice?.items.length||0));return;}
   if(typeof this.locateChoices!=='function'){this.trace('choice locate unavailable');return;}
