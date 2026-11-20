@@ -227,6 +227,13 @@
      Whatever the game hides is on screen. It stays until the game draws over its place or starts a new page. */
   const ORPHAN_MS = 450;
   let orphans = [], orphanWait = null;
+  /* 2026-11-21 (owner, ファタモルガーナの館 r30: the choice screen showed its frames and nothing in them): the game draws its options one right
+     after the other, each a hidden line of its own; only the last one stayed current for ORPHAN_MS, the others never became orphans. Every
+     unclaimed hidden line waits on its own (by text) and is drawn when its time is up, current or not, unless the reader drew it meanwhile */
+  const waits = new Map(), drawnRecent = new Set();
+  /* a placed line replaced before any frame drew it (options arrive within one frame) waits like the current one */
+  function noteReplaced(l) { if (!l || l.fallback || !Array.isArray(l.rects) || !l.text) return; const t = [...l.text].filter(c => !blank(c)).join(''); if (!t || drawnRecent.has(t) || waits.has(t) || orphans.some(o => o.text === t)) return; waits.set(t, { at: performance.now(), l }); setTimeout(schedule, ORPHAN_MS + 20); }
+  function flushWaits() { const now = performance.now(); for (const [t, w] of [...waits]) if (now - w.at >= ORPHAN_MS) { waits.delete(t); if (t) { drawnRecent.add(t); if (drawnRecent.size > 40) drawnRecent.delete(drawnRecent.values().next().value); } orphanWait = { text: t, at: w.at }; orphan(w.l); } }
   let gaveWayAt = 0;
   function giveWay() { const now = performance.now(); if (now - gaveWayAt < 1000) return; gaveWayAt = now; (b.textPlaceGaveWay = (b.textPlaceGaveWay || 0) + 1); try { window.__tomoyoTranslateRequest?.(JSON.stringify({ type: 'engineGiveWay', ms: 3000 })); } catch {} }
   function orphanItems() { return orphans.map(o => ({ id: 'orphan:' + o.text, kind: 'l', text: o.text, rects: o.rects, client: o.client })); }
@@ -251,13 +258,13 @@
        (「………自分……の自死体…分…の自だ…」). Such a frame is not a line: it is never drawn */
     { const near = (a, c) => Math.abs(a[0] - c[0]) < Math.min(a[2], c[2]) * .5 && Math.abs(a[1] - c[1]) < Math.min(a[3], c[3]) * .5; for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) if (near(rects[i], rects[j])) return; }
     const now = performance.now();
-    if (orphanWait?.text !== text) { orphanWait = { text, at: now }; setTimeout(schedule, ORPHAN_MS + 20); return; }
+    if (orphanWait?.text !== text) { if (!waits.has(text)) waits.set(text, { at: now, l }); if (waits.size > 16) waits.delete(waits.keys().next().value); orphanWait = { text, at: waits.get(text).at }; setTimeout(schedule, ORPHAN_MS + 20); if (now - orphanWait.at < ORPHAN_MS) return; }
     if (now - orphanWait.at < ORPHAN_MS) return;
     /* one place, one line: an orphan whose boxes the new one covers is an earlier frame of it (the last one wins) */
-    orphans = orphans.filter(o => !o.rects.some(a => rects.some(c => overlaps(a, c)))).concat({ text, rects, client: l.client }).slice(-12); extraKey = ''; orphanWait = null; schedule();
+    orphans = orphans.filter(o => !o.rects.some(a => rects.some(c => overlaps(a, c)))).concat({ text, rects, client: l.client }).slice(-12); extraKey = ''; orphanWait = null; schedule(); waits.delete(text);
     const log = b.textPlaceOrphans || (b.textPlaceOrphans = []); log.push(text.slice(0, 40)); if (log.length > 30) log.shift();
   }
-  function drawn(l) { document.body.classList.remove('megulit-place-garbled'); const t = l ? [...String(l.text || '')].filter(c => !blank(c)).join('') : ''; if (orphanWait?.text === t) orphanWait = null; if (orphans.some(o => o.text === t)) { orphans = orphans.filter(o => o.text !== t); extraKey = ''; } }
+  function drawn(l) { document.body.classList.remove('megulit-place-garbled'); const t = l ? [...String(l.text || '')].filter(c => !blank(c)).join('') : ''; waits.delete(t); if (orphanWait?.text === t) orphanWait = null; if (orphans.some(o => o.text === t)) { orphans = orphans.filter(o => o.text !== t); extraKey = ''; } }
   function drawExtras() {
     let layer = document.getElementById('megulit-place-extras');
     const all = extras.items.concat(orphanItems());
@@ -551,6 +558,7 @@
   }
   function apply() {
     frame = 0;
+    if (waits.size) flushWaits();
     drawExtras();
     if (page) return applyPage();
     if (!on || !line) { document.body.classList.remove('megulit-place-garbled'); release(); gameDrawn(); return; }
@@ -708,14 +716,14 @@
     drawnByGame = vis; drawnHiding = m.hiding === true; schedule(); return; } if (m && Array.isArray(m.rects) && m.text) drawnByGame = ''; { const nb = t => [...String(t || '')].filter(c => !blank(c)).join(''), cur = line && !line.fallback ? nb(line.text) : '', nt = m?.fallback && m.text ? nb(m.text) : '';
     /* the same page redraw seen first as an unplaced line of the whole page (earlier lines + the placed one) */
     if (cur && nt.length > cur.length && nt.endsWith(cur)) { document.body.classList.add('megulit-place-gone'); line = null; schedule(); return; } }
-    document.body.classList.remove('megulit-place-gone'); if (m?.clear) line = null; else if (m?.fallback && m.text) line = { fallback: true, text: String(m.text) }; else if (m && Array.isArray(m.rects) && m.text) line = { text: String(m.text), rects: m.rects, client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] }; schedule(); };
+    document.body.classList.remove('megulit-place-gone'); if (m?.clear) line = null; else if (m?.fallback && m.text) line = { fallback: true, text: String(m.text) }; else if (m && Array.isArray(m.rects) && m.text) { if (line && !line.fallback && line.text !== String(m.text)) noteReplaced(line); } if (m?.clear) {} else if (m?.fallback && m.text) {} else if (m && Array.isArray(m.rects) && m.text) line = { text: String(m.text), rects: m.rects, client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] }; schedule(); };
   const pageGone = () => { for (const n of document.querySelectorAll('.megulit-old-line')) n.remove(); clones.clear(); document.body.classList.remove('megulit-place-asleep'); };
   /* 2026-11-15 `elsewhere` (core/overlay-placement.cjs page()): the layer is not armed and another path hides the game's
      line (write-back, glyph layer); the page says nothing about the line, so the reader places it as without a page */
   b.textPlacePage = m => { const had = !!page; if (m?.elsewhere === true || !m || !Array.isArray(m.lines)) { if (pageOwn) { pageOwn = false; briefSync(false); } } if (m?.elsewhere === true) { page = null; drawnByGame = ''; if (had) { pageGone(); dropOld(null); document.getElementById('megulit-page-ahead')?.replaceChildren(); document.body.classList.remove('megulit-place-game-drawn'); } schedule(); return; } page = m && Array.isArray(m.lines) ? { awake: m.awake === true, armed: m.armed === true, lines: m.lines.filter(l => l && typeof l.text === 'string' && Array.isArray(l.rects)), client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] } : null; if (page) { line = null; drawnByGame = ''; } else if (had) pageGone(); schedule(); };
   b.textPlaceExtra = m => { extras = { items: Array.isArray(m?.items) ? m.items.filter(i => i && typeof i.text === 'string' && Array.isArray(i.rects)) : [], client: Array.isArray(m?.client) ? m.client : null }; schedule(); };
   let modeGame = null;
-  b.textPlaceMode = m => { on = m?.on === true; if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; boxBottom = 0; boxKey = ''; if (page) { page = null; pageGone(); } } schedule(); };
+  b.textPlaceMode = m => { on = m?.on === true; if (!on) waits.clear(); if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; boxBottom = 0; boxKey = ''; if (page) { page = null; pageGone(); } } schedule(); };
   b.textPlaceStatus = () => ({ on, line: line ? { text: line.text, n: line.rects?.length || 0, fallback: !!line.fallback } : null, placed: document.body.classList.contains('megulit-placed'), geom: lastGeom.split(';').length });
   let busy = false;
   new MutationObserver(records => { if (on && (line || drawnByGame || page) && records.some(r => !(r.target.closest?.('.tomoyo-cn-dialog,#megulit-place-extras,#megulit-page-ahead,.megulit-old-line')) && !r.target.classList?.contains('megulit-old-line'))) { /* page mode: at once, before the next paint, so a line that just stopped being the reader's own never misses a frame */ if (page && !busy) { busy = true; try { apply(); } finally { busy = false; } } else schedule(); } }).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
