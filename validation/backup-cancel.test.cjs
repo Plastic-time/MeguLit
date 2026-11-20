@@ -7,6 +7,25 @@ const {exportBackup,previewBackup,applyBackup,discardBackup}=require('../service
 const hasEdge=[process.env.MEGULIT_EDGE,'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
  'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].some(p=>p&&fs.existsSync(p));
 
+test('failed restore attempts only leave checkpoints that contain data',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-checkpoint-retry-')),data=path.join(root,'data');
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const file=path.join(root,'copy.megulitbak');await exportBackup(root,file);
+ const {id}=previewBackup(root,file),staged=path.join(root,'cache',id,'data'),checkpoints=path.join(root,'migration','checkpoints');
+ const rename=fs.renameSync;
+ for(const locked of [data,staged]){
+  const mock=t.mock.method(fs,'renameSync',(from,to)=>{if(from===locked)throw Error('busy');return rename(from,to);});
+  try{assert.throws(()=>applyBackup(root,id),/busy/);}finally{mock.mock.restore();}
+  assert.deepEqual(fs.readdirSync(checkpoints),[]);
+  assert.ok(fs.existsSync(path.join(data,'megulit.sqlite')));
+  assert.ok(fs.existsSync(path.join(staged,'megulit.sqlite')));
+ }
+ const mock=t.mock.method(fs,'renameSync',(from,to)=>{if(from===staged||to===data)throw Error('busy');return rename(from,to);});
+ try{assert.throws(()=>applyBackup(root,id),/busy/);}finally{mock.mock.restore();}
+ const [checkpoint]=fs.readdirSync(checkpoints);
+ assert.ok(fs.existsSync(path.join(checkpoints,checkpoint,'data','megulit.sqlite')));
+});
+
 test('a committed restore keeps its checkpoint if preview cleanup fails',async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-restored-preview-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
