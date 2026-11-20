@@ -16,10 +16,10 @@ test('late translations and failures leave the selected review language intact',
  const source=fs.readFileSync(path.join(__dirname,'../web/game-reception.js'),'base64');
  const result=await browser.evaluate(`(async()=>{
   const {bindReception,receptionHTML}=await import('data:text/javascript;base64,${source}');
-  const id='game',value={steam:{percent:90,total:1}},requests=[];
+  const id='game',value={steam:{percent:90,total:1}},requests=[];let items=[{id:'a',text:'Original'}];
   const api=async(action,request)=>{
    if(action==='game_reviews_summary')return {platforms:[{key:'steam',name:'Steam',available:true}]};
-   if(action==='game_reviews')return {available:true,items:[{id:'a',text:'Original'}],page:1,pages:1,total:1};
+   if(action==='game_reviews')return {available:true,items,page:1,pages:1,total:items.length};
    if(action==='reviews_translate')return new Promise((resolve,reject)=>requests.push({target:request.target,resolve,reject}));
    return {};
   };
@@ -35,8 +35,15 @@ test('late translations and failures leave the selected review language intact',
   const busy=button().disabled,error=q('.review-translate-error')?.textContent||'';
   select('ja');const cached={text:q('.review-list p').textContent,busy:button().disabled};
   requests[3].resolve({texts:['Chinese']});await tick();
-  return {japanese,busy,error,cached,final:q('.review-list p').textContent,requests:requests.map(x=>x.target)};
+  const final=q('.review-list p').textContent;
+  select('en');const englishRetry=requests.at(-1).target==='en';
+  requests.at(-1).resolve({error:'REVIEW_HTTP_429',texts:[]});await tick();
+  const currentError=q('.review-translate-error')?.textContent.includes('rate limited')||false;
+  q('[data-review-platform="steam"]').click();items=[];
+  q('[data-review-platform="steam"]').click();await tick();
+  const target=q('[data-review-target]');target.focus();select('ko');
+  return {japanese,busy,error,cached,final,englishRetry,currentError,focus:document.activeElement===target,requests:requests.map(x=>x.target)};
  })()`);
  assert.deepEqual(result,{japanese:'Japanese',busy:true,error:'',cached:{text:'Japanese',busy:false},
-  final:'Japanese',requests:['en','ja','ko','zh-TW']});
+  final:'Japanese',englishRetry:true,currentError:true,focus:true,requests:['en','ja','ko','zh-TW','en']});
 });

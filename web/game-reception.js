@@ -98,8 +98,9 @@ export function bindReception(target,{api,id,locale,esc,value}){
   old.replaceWith(next);wire(next);};
  const translatePage=async()=>{
   const run=state.translationRun=Symbol(),page=state.data;
+  const hadStatus=state.busy||!!state.translateError;
   state.translateError='';state.busy=false;
-  if(!state.translate||!page?.items?.length){refreshList();return;}
+  if(!state.translate||!page?.items?.length){if(hadStatus)refreshList();return;}
   const pending=page.items.filter(item=>(!item.spoiler||state.revealed.has(item.id))&&!state.translations.has(tkey(state,item)));
   if(!pending.length){refreshList();return;}state.busy=true;refreshList();
   const current=()=>state.translationRun===run&&state.data===page&&state.translate;
