@@ -182,3 +182,19 @@
  new MutationObserver(()=>{if(!queued)queued=requestAnimationFrame(run);}).observe(document.documentElement,{subtree:true,childList:true});
  run();
 })();
+
+/* 2026-11-21 (owner: Alt+T sliders did not move): a slider value that code writes back within 300 ms of the user's input is
+   logged (reader-host.log layoutDiagnostic kind=sliderOverwrite: field, the user's value, the written value, the writer's
+   first frames), so a slider held by a sync loop names that loop. */
+(function sliderOverwriteWatch(){
+ 'use strict';
+ if(window.__megulitSliderWatch)return;window.__megulitSliderWatch=true;
+ const recent=new WeakMap(),desc=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+ const report=m=>{try{window.__tomoyoTranslateRequest(JSON.stringify(Object.assign({type:'layoutDiagnostic',kind:'sliderOverwrite'},m)));}catch{}};
+ document.addEventListener('input',e=>{const t=e.target;if(!(t instanceof HTMLInputElement)||t.type!=='range'||!t.closest('.tomoyo-cn-dialog'))return;
+  recent.set(t,{v:desc.get.call(t),at:performance.now()});
+  if(t.__megulitWatched)return;t.__megulitWatched=true;
+  Object.defineProperty(t,'value',{configurable:true,get(){return desc.get.call(this);},set(v){const r=recent.get(this);
+   if(r&&performance.now()-r.at<300&&String(v)!==String(r.v)){const by=(new Error().stack||'').split('\n').slice(2,5).map(s=>s.trim().replace(/^at /,'')).join(' < ').slice(0,190);report({field:this.name||'',user:String(r.v),wrote:String(v),by});}
+   desc.set.call(this,v);}});},true);
+})();
