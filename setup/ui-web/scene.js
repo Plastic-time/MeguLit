@@ -19,7 +19,7 @@
   const I18N = {
     zh: {
       title: 'MeguLit 安装', step_welcome: '开始', step_loc: '位置', step_field: '下载', step_unpack: '安装', step_done: '完成',
-      welcomeSub: '开场前，先备料', locSub: '给它找个窝', locT: '给它找个窝', locEn: 'Install location', change: '换个地方',
+      welcomeSub: '欢迎使用MeguLit|现在开始安装', locSub: '给它找个窝', locT: '给它找个窝', locEn: 'Install location', change: '换个地方',
       swDesk: '放一个桌面快捷方式', swMenu: '加到开始菜单', install: '就这儿，开搬',
       protectedMsg: '这是你正在用的正式安装位置，试用版不会动它。换一个位置吧。', lblPath: '装到这个文件夹', defaultHint: '默认位置，不用改也能直接装。', lblSugg: '或者放到', chip: (p, f) => p + '  ·  剩 ' + f, readonly: (p) => '这个位置写不进去，像 Program Files 这样的文件夹要管理员权限。换个位置吧，比如 ' + p + '。', spaceHint: (p, f) => '这块盘装不下。' + p + ' 还有 ' + f + '，装那儿？',
       locNoteWait: '点「就这儿，开搬」才开始下载。都是各项目官方的原版文件，下完会逐个校验，被改过的不会装。',
@@ -30,7 +30,7 @@
       retryNote: '有一条线卡住了，已经自动换线重试。',
       verifyT: '验货', verifyP: (p) => '在核对「' + p + '」是不是原版，几秒钟的事。',
       unpackT: '拆箱上架', unpackP: (p, d) => '把「' + p + '」解压到 ' + d + '。',
-      doneT: '到货了', doneEn: 'NOW SHOWING', launch: '开读',
+      doneT: '安装完成', doneEn: 'INSTALLED', launch: '开读',
       probing: '测速中', eta: (s) => s < 60 ? '还要 ' + Math.ceil(s) + ' 秒左右' : '还要 ' + Math.floor(s / 60) + ' 分 ' + Math.round(s % 60) + ' 秒左右', srcMore: (h, n) => h + ' 等 ' + n + ' 条线',
       packs: { app: '程序本体', base: '基础组件', reading: '注音词典', voice: '语音引擎' },
       errDownT: '这趟没送到', errDownM: '试了好几条线，都连不上。多半是网络断了，或者被代理拦住了。', errDownTip: '先点「重试」，已经下好的部分不会重下。还不行就点「复制日志」发给我们，或者去官网手动下整包。',
@@ -41,7 +41,7 @@
     },
     en: {
       title: 'MeguLit setup', step_welcome: 'Start', step_loc: 'Location', step_field: 'Download', step_unpack: 'Install', step_done: 'Done',
-      welcomeSub: 'Getting things ready', locSub: 'Where should it live?', locT: 'Where to?', locEn: '', change: 'Change',
+      welcomeSub: 'Welcome to MeguLit|Let us get it installed', locSub: 'Where should it live?', locT: 'Where to?', locEn: '', change: 'Change',
       swDesk: 'Desktop shortcut', swMenu: 'Start menu entry', install: 'Install',
       protectedMsg: 'This is your real MeguLit install. The trial leaves it alone, pick another folder.', lblPath: 'Install into this folder', defaultHint: 'Default spot, fine to leave as is.', lblSugg: 'Or put it in', chip: (p, f) => p + '  ·  ' + f + ' free', readonly: (p) => "Can't write to this folder. Places like Program Files need admin rights. Try " + p + ' instead.', spaceHint: (p, f) => "This drive can't fit it. " + p + ' has ' + f + ' free, put it there?',
       locNoteWait: 'Nothing is downloaded until you press the install button. Every file is the original from its project and gets checked before anything is installed.',
@@ -52,7 +52,7 @@
       retryNote: 'One route stalled, so it switched and is trying again.',
       verifyT: 'Checking the files', verifyP: (p) => 'Making sure ' + p + ' is the original. Takes a few seconds.',
       unpackT: 'Installing', unpackP: (p, d) => 'Unpacking ' + p + ' into ' + d + '.',
-      doneT: 'All set', doneEn: 'Ready when you are', launch: 'Open MeguLit',
+      doneT: 'Installed', doneEn: 'Ready when you are', launch: 'Open MeguLit',
       probing: 'testing', eta: (s) => s < 60 ? 'about ' + Math.ceil(s) + ' s left' : 'about ' + Math.floor(s / 60) + ' min ' + Math.round(s % 60) + ' s left', srcMore: (h, n) => h + ' and ' + (n - 1) + ' more',
       packs: { app: 'the app', base: 'core files', reading: 'furigana dictionary', voice: 'voice engine' },
       errDownT: 'The download stopped', errDownM: 'Every route failed to answer. Usually that is the network or a proxy.', errDownTip: 'Hit Retry first, what is already downloaded is kept. If it still fails, copy the log and send it to us, or grab the full package from the site.',
@@ -116,7 +116,7 @@
     const T3 = [[-800, -6200, 520, 2600, 420], [700, -7000, 420, 3200, 380], [1900, -6000, 600, 2300, 500], [3300, -7400, 700, 3400, 520], [4700, -6100, 560, 2500, 460], [5900, -6900, 420, 3000, 400], [7100, -6000, 520, 2400, 440], [8300, -7200, 460, 3100, 420], [-1900, -7000, 500, 2800, 420],
       [900, -2300, 360, 1700, 320], [300, -1200, 300, 1500, 280], [5800, -1700, 360, 1800, 320], [7200, -900, 320, 1500, 300], [-1200, -2600, 400, 2000, 360], [8200, -2400, 420, 2100, 380]];
     T3.forEach(([x, z, w, hh, d], i) => box(x, FY - hh / 2, z, w, hh, d, i === 3 ? 'red' : ''));
-    plate(0, -20, -1000, 760, 360, '<img src="' + (typeof INK !== 'undefined' ? INK : 'logos/logo-A-black.svg') + '" alt=""><h2>' + tr('welcomeSub') + '</h2>');
+    plate(0, -20, -1000, 760, 360, '<img src="' + (typeof INK !== 'undefined' ? INK : 'logos/logo-A-black.svg') + '" alt=""><h2>' + tr('welcomeSub').split('|').join(' ') + '</h2>');
   }
 
   /* Eight big irregular glass plates (cells of 8 hand-placed seeds over the logo), each carrying only its own part of the logo,
@@ -313,7 +313,7 @@
   { const t = document.getElementById('topLogo'); if (t) t.src = INK; }
   { const map = { '#ui-loc .card h2': 'locT', '#browse': 'change', '#install': 'install', '#ui-loc .note': 'locNote', '#retry': 'retry', '#copylog': 'copylog', '#manual': 'manual', '#doneT': 'doneT', '#launch': 'launch', '.card.quit h2': 'quitT', '.card.quit p': 'quitM', '#stay': 'stay', '#leave': 'leave' };
     for (const [sel, k] of Object.entries(map)) { const el = $(sel); if (el) el.textContent = tr(k === 'locNote' && window.__waitConfirm ? 'locNoteWait' : k); }
-    $('#ui-loc .card .en').textContent = tr('locEn'); $('#lblPath').textContent = tr('lblPath'); $('#lblSugg').textContent = tr('lblSugg'); $('.card.quit .en').textContent = ''; $('#doneEn').textContent = tr('doneEn'); const ws = $('#welcomeSub'); if (ws) ws.textContent = tr('welcomeSub');
+    $('#ui-loc .card .en').textContent = tr('locEn'); $('#lblPath').textContent = tr('lblPath'); $('#lblSugg').textContent = tr('lblSugg'); $('.card.quit .en').textContent = ''; $('#doneEn').textContent = tr('doneEn'); const ws = $('#welcomeSub'); if (ws) { ws.textContent = ''; tr('welcomeSub').split('|').forEach((t, i) => { const sp = document.createElement('span'); sp.className = 'wl' + (i + 1); sp.textContent = t; ws.appendChild(sp); }); }   /* two staggered lines */
     $('#swDesk').lastChild.textContent = tr('swDesk'); $('#swMenu').lastChild.textContent = tr('swMenu');
     $('#btnMin').setAttribute('aria-label', tr('minimize')); $('#btnClose').setAttribute('aria-label', tr('close')); document.title = tr('title'); document.documentElement.lang = LANG === 'en' ? 'en' : 'zh-CN'; }
   let drives = [], need = 1.4 * 1073741824, freeNow = 182 * 1073741824, pathState = 'ok';
