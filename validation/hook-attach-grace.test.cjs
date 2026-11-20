@@ -29,3 +29,10 @@ test('once the process is attached the 12 s heartbeat holds', async () => {
     r.at(13000); assert.equal(r.kills.length, 1, 'attached and silent for 13 s: ended as before');
   } finally { r.h.stop?.(); fs.rmSync(r.dir, { recursive: true, force: true }); }
 });
+
+test('the bridge says it is alive every second while the hook loader works, gives up after 45 s, logs the time', () => {
+  const hb = fs.readFileSync(path.join(__dirname, '..', 'native', 'HookBridge.cs'), 'utf8');
+  assert.match(hb, /while\(!child\.WaitForExit\(1000\)\)\{Emit\(new\{type="hookHeartbeat",phase="injecting"\}\);if\(\(DateTime\.UtcNow-injectAt\)\.TotalSeconds>45\)throw/);
+  assert.match(hb, /Diagnostic\("inject took "/);
+  assert.ok(!hb.includes('WaitForExit(12000))throw new Exception("LunaHook 加载超时")'), 'no silent 12 s wait');
+});
