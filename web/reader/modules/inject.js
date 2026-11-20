@@ -198,10 +198,24 @@
     }, ms));
   }
   bridge.translationGuard = guard;
+  /* the page's earlier lines (.tome-page-tr, hook-reader): each one still empty at 0.6 / 1.5 / 3 s after it was first seen is asked by its text */
+  const pageSeen = new Map();
+  function pageGuard() {
+    if (!enabled || !translationVisible) return; const now = performance.now();
+    for (const tr of document.querySelectorAll('.tome-page-lines .tome-page-tr')) {
+      const jp = [...(tr.parentElement?.querySelectorAll('.tome-page-char') || [])].map(c => c.textContent).join('').trim(); if (!jp) continue;
+      if (tr.textContent.trim()) { pageSeen.delete(jp); continue; }
+      let s = pageSeen.get(jp); if (!s) { s = { at: now, step: 0 }; pageSeen.set(jp, s); if (pageSeen.size > 200) pageSeen.delete(pageSeen.keys().next().value); }
+      const due = [600, 1500, 3000][s.step]; if (due == null || now - s.at < due) continue; s.step++;
+      guardNote(s.step === 3 ? 'still-missing page' : 'retry page', jp);
+      try { window.__tomoyoTranslateRequest(JSON.stringify({ type: 'translateGuard', text: jp })); } catch {}
+    }
+  }
+  setInterval(pageGuard, 300);
   bridge.deliverBackfill = (source, text, kind = '') => {
     if (!enabled || !translationVisible || !String(text || '').trim()) return;
     const shown = bridge.sourceText || bridge.current;
-    if (!sameLine(shown, source)) return;
+    if (!sameLine(shown, source)) { window.__tomoyoChinese?.pageTranslationFill?.(source, text); return; }
     if (!output?.isConnected) { const s = document.querySelector('.sentence-window .sentence-text:not(.megulit-old-line)'); if (!s || !ensureRow(s)) return; }
     const mine = sameLine(bridge.current, shown);
     if (mine && output.dataset.state === 'ready' && output.textContent.trim() && !bridge.lastTranslationError && kind !== 'better') return;
