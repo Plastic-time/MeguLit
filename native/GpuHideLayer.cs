@@ -91,8 +91,15 @@ public static partial class HookBridge {
  static bool GpuCanaryArmFile(string f,long pid){if(f=="")return true;var d=GpuCanaryRead(f);object v;if(GpuCanaryOffReason(d,BridgeBuild())!="")return false;
   if(d.TryGetValue("off",out v)&&Convert.ToBoolean(v)){string old=d.ContainsKey("reason")?Convert.ToString(d["reason"]):"off";d.Remove("off");d.Remove("reason");d["retried"]=old;
    Diagnostic("gpu hide canary: the record that turned layer 4 off is not this build's ("+old+"); trying the layer once more");}
-  if(d.TryGetValue("armed",out v)&&Convert.ToBoolean(v))Diagnostic("gpu hide canary: the previous run was not seen to its end (bridge stopped first); keeping the layer on");
+  if(d.TryGetValue("armed",out v)&&Convert.ToBoolean(v)){/* #483 (2026-11-20, a Steam game started through Steam or picked up by its window: the bridge never sees its exit code, so a crash in play never reached the canary and the game kept crashing ~30 s in). The previous run's crash witness report decides: an unhandled exception in play turns the layer off as an exit code would; no report or the close flow keeps it on. */
+   string why=GpuCanaryUnseenCrash(d);if(why!=""){d["armed"]=false;d["off"]=true;d["bridge"]=BridgeBuild();d["reason"]=why;GpuCanaryWrite(f,d);Diagnostic("gpu hide canary: "+why+"; layer 4 is off for this game from now on");return false;}
+   Diagnostic("gpu hide canary: the previous run was not seen to its end (bridge stopped first); no crash report for it, keeping the layer on");}
   d["armed"]=true;d["pid"]=pid;d["at"]=DateTime.UtcNow.ToString("o");GpuCanaryWrite(f,d);return true;}
+ /* the crash witness report of the previous armed run (pid in the record), read without moving it */
+ static string GpuCanaryUnseenCrash(System.Collections.Generic.Dictionary<string,object> d){try{object pv;if(!d.TryGetValue("pid",out pv))return "";long pid=Convert.ToInt64(pv);if(pid<=4)return "";
+  string dir=Path.Combine(Path.GetTempPath(),"MeguLit-crash");if(!Directory.Exists(dir))return "";string[] found=Directory.GetFiles(dir,"*-"+pid+".txt");if(found.Length==0)return "";
+  var w=CrashWitnessRead(File.ReadAllLines(found[0]));if(w.Closing||w.At.IndexOf("UNHANDLED",StringComparison.Ordinal)<0)return "";
+  return "the previous run (pid "+pid+", exit not seen) ended in an unhandled exception in play while layer 4 was loaded; witness: "+w.At;}catch{return "";}}
  // The game ended with this exit code: an exception code in play turns the layer off for the game, anything else clears the arm.
  static void GpuCanaryExitFile(string f,uint code,CrashWitnessInfo w=null){if(f=="")return;var e=GpuCanaryRead(f);e["armed"]=false;e["exit"]=(long)code;
   string at=w!=null&&w.At!=""?"; witness: "+w.At:"";
