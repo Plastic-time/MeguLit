@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {openStore}=require('./store.cjs');
 const normalize=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu,'');
-function signature(file,saved){try{const stat=fs.statSync(file);if(!stat.isFile())return null;if(saved?.size===stat.size&&saved?.mtime===stat.mtimeMs)return saved;const hash=crypto.createHash('sha256'),chunk=Buffer.alloc(1024*1024),fd=fs.openSync(file,'r');try{let length;while((length=fs.readSync(fd,chunk,0,chunk.length,null)))hash.update(chunk.subarray(0,length));}finally{fs.closeSync(fd);}return {size:stat.size,mtime:stat.mtimeMs,hash:hash.digest('hex')};}catch{return saved||null;}}
+function signature(file,saved){try{const stat=fs.statSync(file);if(!stat.isFile())return null;if(saved?.size===stat.size&&saved?.mtime===stat.mtimeMs&&saved.ctime===stat.ctimeMs)return saved;const hash=crypto.createHash('sha256'),chunk=Buffer.alloc(1024*1024),fd=fs.openSync(file,'r');try{let length;while((length=fs.readSync(fd,chunk,0,chunk.length,null)))hash.update(chunk.subarray(0,length));}finally{fs.closeSync(fd);}return {size:stat.size,mtime:stat.mtimeMs,ctime:stat.ctimeMs,hash:hash.digest('hex')};}catch{return saved||null;}}
 const canonical=file=>file?require('./launch-path.cjs').canonical(file).toLowerCase():'';
 function knownPrograms(row,lib){
  return [row.executable,lib.languageLaunch?.exe,...Object.values(lib.languageExecutables||{}),...(lib.variants||[]).map(v=>v.exe)].filter(file=>typeof file==='string'&&file);

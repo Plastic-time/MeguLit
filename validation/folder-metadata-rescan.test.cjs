@@ -45,6 +45,9 @@ test('a folder game keeps its enriched identity through startup and manual resca
  const exe=path.join(dir,'game.exe'),replacement=path.join(dir,'replacement.exe'),stamp=new Date('2020-01-01T12:00:00Z');
  // A renamed, different program can share the previous executable's size and build time.
  fs.utimesSync(exe,stamp,stamp);await scan(true);
+ fs.writeFileSync(exe,Buffer.alloc(220000,2));fs.utimesSync(exe,stamp,stamp);await scan(true);
+ assert.deepEqual(info(),{id:game.id,vndbId:'',detailVndbId:'',appid:''});
+ online=true;await enrichment.run(game.id,'en',true);online=false;
  fs.unlinkSync(exe);fs.writeFileSync(replacement,Buffer.alloc(220000,1));fs.utimesSync(replacement,stamp,stamp);
  await scan(false);
  assert.deepEqual(info(),{id:game.id,vndbId:'',detailVndbId:'',appid:''});
@@ -71,9 +74,11 @@ test('a folder game keeps its enriched identity through startup and manual resca
  assert.equal(info().detailVndbId,'v3');
  online=true;await enrichment.run(game.id,'en',true);
  // A manual correction replaces the link inferred from the old work.
- const request={action:'save_game',id:game.id,title:'Some Game',executable:exe,vndb:'v4'};
- require('node:child_process').execFileSync(process.execPath,['-e',"require('./services/bridge.cjs').dispatch(JSON.parse(process.argv[1]))",JSON.stringify(request)],
-  {cwd:path.resolve(__dirname,'..'),env:{...process.env,MEGULIT_ROOT:root}});
+ const save=vndb=>require('node:child_process').execFileSync(process.execPath,['-e',"require('./services/bridge.cjs').dispatch(JSON.parse(process.argv[1]))",
+  JSON.stringify({action:'save_game',id:game.id,title:'Some Game',executable:exe,vndb})],{cwd:path.resolve(__dirname,'..'),env:{...process.env,MEGULIT_ROOT:root}});
+ online=false;save('v3');await enrichment.run(game.id,'en',false);
+ assert.deepEqual(info(),{id:game.id,vndbId:'v3',detailVndbId:'v3',appid:'333'});
+ save('v4');
  online=false;await scan(true);await enrichment.run(game.id,'en',true);
  work='v4';storeId='444';online=true;await enrichment.run(game.id,'en',true);
  assert.deepEqual(info(),{id:game.id,vndbId:'v4',detailVndbId:'v4',appid:'444'});

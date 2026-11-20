@@ -504,7 +504,7 @@ async function dispatch(request,runtime=null) {
           const vndb=request.vndb===undefined?undefined:require('./game-enrichment.cjs').vndbIdFrom(request.vndb),vndbChanged=vndb!==undefined&&vndb!==(original.vndbManual||'');
           if(vndbChanged){if(vndb)original.vndbManual=vndb;else delete original.vndbManual;
             const lib=original.library;
-            if(lib?.appid&&['folder','manual'].includes(lib.source)&&!require('../core/library.cjs').steamAppidFor(executable)){
+            if(lib?.appid&&vndb!==lib.vndbId&&['folder','manual'].includes(lib.source)&&!require('../core/library.cjs').steamAppidFor(executable)){
               lib.appid=null;lib.vndbSteamAppid=null;
             }}
           original.library={...original.library,exe:executable,executableSignature:require('./library.cjs').signature(executable)};
