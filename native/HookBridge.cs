@@ -686,7 +686,15 @@ static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&!ConversionHook(
    if((now-EngineBatchAt).TotalMilliseconds<EngineBatchMs){if(EngineBatch.Count<16&&!EngineBatch.Contains(text))EngineBatch.Add(text);return true;}
    foreach(string b in EngineBatch)if(text==b||TypewriterStep(b,text))return true;return false;}}
  static void EngineNewClick(string text,DateTime now){lock(EngineBatch){EngineBatch.Clear();EngineBatch.Add(text);EngineBatchAt=now;}EnginePassConfirmed=false;}
+ /* 2026-11-21 (owner incr9, 千恋＊万花 22:54:04Z: the trial line was the scene label ■自動車（車内／走行）, which the game never draws, so no
+    hidden record could confirm it; the sentence came 0.6 s later as a new click and the trial failed. The fallback wrote every line back
+    blank, TextRender laid out spaces, no ToMe_CHARS was sent and the reader had no place: the Japanese was gone for the whole opening).
+    A scene label or a name plate is never the line the game side confirms: it passes, starts no trial and is no click of its own. */
+ static readonly System.Text.RegularExpressions.Regex EngineNamePlate=new System.Text.RegularExpressions.Regex(@"^\s*【[^】
+]{1,16}】\s*$");
+ static bool EngineAside(string text){return text.Length>0&&(EngineNamePlate.IsMatch(text)||EmbedTextPolicy.Label(text)&&!SpokenPiece(text));}
  static bool EngineAllOk(string text){text=text??"";DateTime now=DateTime.UtcNow;
+  if(Volatile.Read(ref EngineHideOn)>0&&!EngineTrialFailed&&EngineAside(text))return true;
   if(EngineHideProven){
    if(Volatile.Read(ref EngineHideOn)>0&&!SkipHeld&&!EngineSameClick(text,now)){
     bool pending;lock(EngineBatch){pending=EngineBatch.Count>0;}
@@ -745,6 +753,9 @@ static bool GdiProbeable(Candidate c){return c!=null&&!c.embed&&!ConversionHook(
    EngineHideOn=1;if(!EngineAllOk("■自動車（車内／走行）")||!EngineAllOk("【 将臣 】")||!EngineAllOk("【 将臣 】")||!EngineAllOk("「あっ、")||EngineTrialFailed)return false;
    next();if(!EngineAllOk("【 将臣 】")||!EngineAllOk("「あっ、はい。なんですか？」")||EngineTrialFailed)return false; /* repeats and typewriter steps of that click */
    if(EngineAllOk("二行目。")||!EngineTrialFailed||EngineAllOk("三行目。"))return false; /* the next click came without a confirmation: off for this run */
+   /* incr9: the label arrives alone and the sentence 0.6 s later: the sentence is the trial, the label never was */
+   EngineTrialFailed=false;EngineTrialText=null;lock(EngineBatch){EngineBatch.Clear();}if(!EngineAllOk("■自動車（車内／走行）")||EngineTrialText!=null)return false;next();if(!EngineAllOk("【運転手】")||EngineTrialText!=null)return false;next();if(!EngineAllOk("「お客さんってば」")||EngineTrialFailed||EngineTrialText!="「お客さんってば」")return false;EngineHideProof("self-test");if(!EngineHideProven)return false;
+   EngineHideProven=false;EngineTrialFailed=true;EngineTrialText=null;lock(EngineBatch){EngineBatch.Clear();}
    EngineTrialFailed=false;EngineTrialText=null;if(!EngineAllOk("一行目。"))return false;EngineHideProof("self-test");next();if(!EngineAllOk("二行目。"))return false;next();if(!EngineAllOk("三行目。"))return false; /* confirmed: every line passes */
    EngineHideProof("self-test");EngineHideOn=0;next();if(!EngineAllOk("四行目。"))return false;next();if(!EngineAllOk("五行目。"))return false;next();if(!EngineAllOk("六行目。")||!EngineHideProven||EngineUnconfirmed!=0)return false; /* hide off: the game draws on purpose, nothing is counted */
    /* live 千恋＊万花: three clicks of label + name + sentence, each confirmed once: the proof stays */
