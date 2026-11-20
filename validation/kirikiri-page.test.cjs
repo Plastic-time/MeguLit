@@ -80,15 +80,11 @@ test('leaving the full-screen page releases a held hook line to the ADV box at o
  assert.deepEqual(f.sources(),['ページの文。','ウィンドウに戻った台詞。']);
 });
 
-/* 2026-11-21 (ファタモルガーナの館: half its lines were dropped here, drawn by a text effect off the message layer): a hook line no page
-   sentence takes is never lost; only one the reader already has goes */
-test('a hook line no page sentence takes is delivered from the hook text while the page is up; a repeat of a read line is not',t=>{
+test('a hook line no page sentence takes is dropped while the page is up',t=>{
  const f=fixture(t);
  f.begin(1,false);f.hookLine('ページの文。');f.tick(500);f.end(1,false,'ページの文。');
  f.tick(5000);f.hookLine('どこにも描かれない文字列');f.tick(1600);
- assert.deepEqual(f.sources(),['ページの文。','どこにも描かれない文字列']);
- f.tick(5000);f.hookLine('ページの文。');f.tick(1600);
- assert.deepEqual(f.sources(),['ページの文。','どこにも描かれない文字列']);
+ assert.deepEqual(f.sources(),['ページの文。']);
 });
 
 test('the reader\'s page model keeps a page\'s sentences at their own places and clears them at the next page',t=>{

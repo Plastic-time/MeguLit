@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// Case of validation/games-regression.test.cjs (ctx.profile = this game's layered profile).
 // 2026-11-21 ファタモルガーナの館 (KiriKiri2, owner's run 22:51:03Z-22:53:42Z in E:\MeguLit-Test-1421\logs, hook-events.log and
 // hook-diagnostics-20261120-225350-542.log). The game fades each line in with a shuffled per-character effect drawn by
 // tTVPNativeBaseBitmap::DrawText (「そしそて魂しそはて砕魂…」); its KAG message layer page lines and the KiriKiri2 hook (the line in pieces
@@ -6,13 +7,16 @@
 // The texts, their order and their times below are the log's; page lines are where the log placed them (「placement placed: line N, K
 // characters」). Every story line must reach the reader once, the choice 「……おはよう………………」 must survive the choice filter, and core
 // must count this game's lines as broken by the effect (read mode) while a game with clean lines is never switched.
-const test=require('node:test'),assert=require('node:assert/strict');
-const {HookNative}=require('../core/hook-native.cjs');
+const assert=require('node:assert/strict'),{mock}=require('node:test');
+const {HookNative}=require('../../../../core/hook-native.cjs');
+const Profiles=require('../../../../core/profiles/index.cjs');
+let PROFILE=null;
+const CASES=[];const test=(name,fn)=>CASES.push([name,fn]);
 const DRAW='tTVPNativeBaseBitmap::DrawText';
-function fixture(t){t.mock.timers.enable({apis:['setTimeout']});let now=100000;const events=[],traces=[],located=[];
- const hook=new HookNative({native:__dirname,hook:__dirname,logs:'Z:/no-fixture-log'},m=>events.push(m),()=>{},()=>now);hook.trace=s=>traces.push(s);hook.locateChoices=o=>located.push(o);t.after(()=>hook.stop());
+function fixture(t){let now=100000;const events=[],traces=[],located=[];
+ const hook=new HookNative({native:__dirname,hook:__dirname,logs:'Z:/no-fixture-log'},m=>events.push(m),()=>{},()=>now);hook.trace=s=>traces.push(s);hook.locateChoices=o=>located.push(o);if(PROFILE)hook.setProfile(PROFILE);t.after(()=>hook.stop());
  const box={x0:56,y0:459,x1:748,y1:459,size:22,sw:804,sh:604,count:0};
- const at=ms=>{while(ms>now){const step=Math.min(50,ms-now);now+=step;t.mock.timers.tick(step);}};
+ const at=ms=>{while(ms>now){const step=Math.min(50,ms-now);now+=step;mock.timers.tick(step);}};
  return {hook,events,traces,located,at,
   hookLine(ms,text,sourceName='KiriKiri2'){at(ms);hook.source({text,sourceName,origin:'live'},'');},
   aux(ms,text,sourceName=DRAW){at(ms);hook.auxText({text,sourceName,role:0});},
@@ -99,3 +103,12 @@ test('core read-mode judge: clean lines (千恋＊万花 22:53:50Z on: ADV lines
  g.at(240000);
  assert.equal(g.events.filter(m=>m.type==='hookTextEffects').length,0,JSON.stringify(g.traces.filter(s=>/text effects/.test(s))));
 });
+
+/* the kernel (every other game, 千恋＊万花 among them) keeps its behaviour: a held hook line no page line takes is dropped as before */
+test('kernel profile: unchanged, the held line is dropped and the judge is off',t=>{
+ const save=PROFILE;PROFILE=Profiles.profileFor({});try{const f=fixture(t);prologue(f);f.hookLine(S('2:26.115'),'…待っていて欲しい…');f.at(S('2:30.000'));
+  assert.ok(!f.sources().map(HookNative.flat).includes('…待っていて欲しい…'));assert.ok(f.traces.some(s=>/drawn nowhere on the page, dropped/.test(s)));
+  assert.equal(f.events.filter(m=>m.type==='hookTextEffects').length,0);assert.equal(HookNative.interleaved('……おはよう………………',false),true,'kernel counting unchanged');}finally{PROFILE=save;}
+});
+module.exports=async({profile})=>{PROFILE=profile;
+ for(const [name,fn] of CASES){mock.timers.enable({apis:['setTimeout']});const after=[];try{fn({after:f=>after.push(f)});}catch(e){e.message=name+': '+e.message;throw e;}finally{for(const f of after)try{f();}catch{}mock.timers.reset();}}};
