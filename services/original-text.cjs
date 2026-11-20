@@ -565,7 +565,9 @@ function staticProvider(root,executable){
   const rtIndex=readIndex(state.runtime.index),rt=rtIndex.lines,m=new Matcher(rt,patched?readIndex(state.patch.index).lines:rt),fill=fillStore(root,id,scenes.ENGINES[state.runtime.engine]?.live?'live':state.runtime.sha256);
   // The script's own ruby for the matched lines (KiriKiri Z scene files): game readings come before dictionary ones.
   const readings=Array.isArray(rtIndex.ruby)?rtIndex.ruby:null,withRuby=r=>{if(!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
-  const untranslated=i=>{const o=m.og[i];return !o||norm(o)===norm(rt[i]);};
+  /* 2026-11-21 (千恋＊万花 中文版 pairing self-test: 「将臣！」「神力……？」「……忍者……」, 68 lines whose official Chinese is written exactly like the Japanese): a line
+     without kana that the patch keeps as it is IS translated (names, kanji-only lines read the same in Chinese); one with kana left alone is not */
+  const untranslated=i=>{const o=m.og[i];return !o||norm(o)===norm(rt[i])&&/[぀-ヿ]/.test(String(rt[i]||''));};
   /* E358: an engine that draws from a fixed glyph set (HuneX bitmap fonts) says which characters it has. drawable(text) is
      null when unknown; tableDrawable() is false when the game cannot draw its own translation table (WoH in Japanese draws
      4.9 % of the official Chinese lines in full), so the game is not asked to draw translations it would leave with holes. */

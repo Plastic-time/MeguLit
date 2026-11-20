@@ -180,13 +180,13 @@
      line written another way (ruby / brackets / blanks: the same normal form as services/reader.cjs, or one inside the other, 60 %) */
   const normal = v => { let t = String(v || '').replace(/[｜|]([^《\[｜|]+)[《\[][^》\]]*[》\]]/g, '$1').replace(/《[^》]*》/g, '').replace(/\[[^\]]*\]/g, '').replace(/<[^>]*>/g, '').replace(/[\s\u3000\u200b\u001f]+/g, ''); for (let k = 0; k < 3; k++) t = t.replace(/^[「『“"（(【]+/, '').replace(/[」』”"）)】]+$/, ''); return t; };
   const sameLine = (a, b) => { const x = normal(a), y = normal(b); if (!x || !y) return false; if (x === y) return true; const lx = [...x].length, ly = [...y].length; return (x.includes(y) || y.includes(x)) && Math.min(lx, ly) / Math.max(lx, ly) >= .6; };
-  bridge.deliverBackfill = (source, text) => {
+  bridge.deliverBackfill = (source, text, kind = '') => {
     if (!enabled || !translationVisible || !String(text || '').trim()) return;
     const shown = bridge.sourceText || bridge.current;
     if (!sameLine(shown, source)) return;
     if (!output?.isConnected) { const s = document.querySelector('.sentence-window .sentence-text:not(.megulit-old-line)'); if (!s || !ensureRow(s)) return; }
     const mine = sameLine(bridge.current, shown);
-    if (mine && output.dataset.state === 'ready' && output.textContent.trim() && !bridge.lastTranslationError) return;
+    if (mine && output.dataset.state === 'ready' && output.textContent.trim() && !bridge.lastTranslationError && kind !== 'better') return;
     if (!mine) { bridge.current = shown; bridge.serial++; }
     output.dataset.state = 'ready';
     bridge.lastTranslationError = ''; setText(text, false, true); bridge.alignText?.();

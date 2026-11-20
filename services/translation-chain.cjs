@@ -31,10 +31,23 @@ function candidates(prefs,{hasKey=()=>false,localInstalled=false,resolve=require
 const sourceOf=o=>isLocal(o.provider)?'local':isMt(o.provider)?'mt':'api';
 
 /* Tries each option until one gives a translation. attempt(options) -> string (throws or '' on failure). */
-async function translate(text,list,attempt,{isCurrent=()=>true}={}){
+/* Tries each option until one gives a translation. attempt(options) -> string (throws or '' on failure).
+   2026-11-21 (owner, 千恋＊万花 r34: fallback answers came 1 to 8 s late, after the line was gone): every attempt is timed (trace); with a
+   budget, machine translation is started alongside once the budget is spent, its answer is shown first, and a better source that answers
+   later replaces it (onLate). */
+async function translate(text,list,attempt,{isCurrent=()=>true,budgetMs=0,trace=null,onLate=null}={}){
  const errors=[];
- for(const options of list){if(!isCurrent())break;try{const t=String(await attempt(options)||'').trim();if(t)return {text:t,provider:options.provider,source:sourceOf(options),errors};errors.push(options.provider+': empty');}catch(e){errors.push(options.provider+': '+String(e?.message||e).slice(0,120));}}
- const e=Error('TRANSLATION_UNAVAILABLE');e.errors=errors;throw e;
+ const timed=async options=>{const t0=Date.now();try{const t=String(await attempt(options)||'').trim();try{trace?.('chain '+options.provider+' '+(Date.now()-t0)+' ms '+(t?'ok':'empty'));}catch{}if(!t)errors.push(options.provider+': empty');return t;}catch(e){try{trace?.('chain '+options.provider+' '+(Date.now()-t0)+' ms failed '+String(e?.message||e).slice(0,60));}catch{}errors.push(options.provider+': '+(e?.message||e));return '';}};
+ const run=async items=>{for(const options of items){if(!isCurrent())break;const t=await timed(options);if(t)return {text:t,provider:options.provider,source:sourceOf(options),errors};}return null;};
+ const fail=()=>{const e=Error('TRANSLATION_UNAVAILABLE');e.errors=errors;throw e;};
+ const mt=list.filter(o=>isMt(o.provider));
+ if(!(budgetMs>0)||!mt.length||list.every(o=>isMt(o.provider))){const r=await run(list);return r||fail();}
+ const main=run(list);let timer=null;
+ const quick=new Promise(res=>{timer=setTimeout(()=>{try{trace?.('chain budget '+budgetMs+' ms spent: machine translation alongside');}catch{}run(mt).then(res,()=>res(null));},budgetMs);});
+ const first=await Promise.race([main.then(r=>({main:true,r})),quick.then(r=>({main:false,r}))]);
+ if(first.main){clearTimeout(timer);return first.r||fail();}
+ if(first.r){main.then(r=>{if(r&&r.source!=='mt'&&r.text!==first.r.text)try{onLate?.(r);}catch{}},()=>{});return {...first.r,early:true};}
+ const r=await main;return r||fail();
 }
 
 /* Background retries for lines that got no translation: 5 s, 20 s, 1 min, then every 2 min, 8 times at most; a line that
