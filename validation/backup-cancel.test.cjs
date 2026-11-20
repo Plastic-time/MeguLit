@@ -51,8 +51,12 @@ test('backup previews can be cancelled, retried, and restored',{skip:!hasEdge},a
  await browser.evaluate(`(async()=>{
   const {renderBackup}=await import('/backup-ui.js');
   let lastCall;
-  const messages=[];
+  const messages=[];window.discards=0;
   const api=(action,params)=>{
+   if(action==='backup_discard'){
+    window.discards++;
+    if(window.busyDiscard){window.busyDiscard=false;return Promise.reject(Error('BACKUP_BUSY'));}
+   }
    if(action==='backup_apply'&&window.failOnce){
     window.failOnce=false;
     return new Promise((_,reject)=>{window.rejectApply=()=>reject(Error('BACKUP_BUSY'));});
@@ -94,6 +98,16 @@ test('backup previews can be cancelled, retried, and restored',{skip:!hasEdge},a
  assert.ok(fs.existsSync(file));
  assert.ok(fs.existsSync(path.join(root,'data','megulit.sqlite')));
  await browser.evaluate('openPreview()');
+ assert.equal(await browser.evaluate(`(async()=>{
+  window.busyDiscard=true;
+  const cancel=document.querySelector('[data-cancel]');
+  cancel.click();await new Promise(resolve=>setTimeout(resolve,0));
+  return cancel.closest('dialog').open&&!cancel.disabled;
+ })()`),true);
+ assert.equal(previews().length,2);
+ await browser.evaluate('dismiss(true)');
+ assert.deepEqual(previews(),[other.id]);
+ await browser.evaluate('openPreview()');
  assert.deepEqual(await browser.evaluate('retryRestore()'),{
   pending:true,canRetry:true,failed:'Operation failed. Check the backup file or try again later'
  });
@@ -104,4 +118,5 @@ test('backup previews can be cancelled, retried, and restored',{skip:!hasEdge},a
   assert.ok(fs.existsSync(path.join(result.rollback,'megulit.sqlite')));
   assert.deepEqual(previews(),[other.id]);
  }
+ assert.equal(await browser.evaluate('window.discards'),4);
 });

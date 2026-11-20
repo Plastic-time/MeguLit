@@ -7,18 +7,19 @@ export function renderBackup({target,api,invoke,locale,esc,toast,onSaved}){
  target.querySelector('[data-import]').onclick=async()=>{busy(true);try{const path=await invoke('pick_backup',{save:false});if(!path)return;const preview=await api('backup_preview',{path}),dialog=document.createElement('dialog');dialog.innerHTML=`<h2>${t.confirm}</h2><p>${t.replace}</p><p>${esc(preview.counts.games)} ${t.games} · ${esc(preview.counts.words)} ${t.words} · ${esc(preview.counts.sessions)} ${t.sessions}</p><div class="dialog-actions"><button class="secondary" data-cancel>${t.cancel}</button><button class="primary" data-restore>${t.confirm}</button></div>`;
   document.body.append(dialog);
   const cancel=dialog.querySelector('[data-cancel]'),restore=dialog.querySelector('[data-restore]');
-  dialog.onclose=()=>{
-   dialog.remove();
-   if(dialog.returnValue!=='restored')api('backup_discard',{id:preview.id}).catch(()=>toast(t.failed));
+  dialog.onclose=()=>dialog.remove();
+  cancel.onclick=async()=>{
+   restore.disabled=cancel.disabled=true;
+   try{await api('backup_discard',{id:preview.id});dialog.close();}
+   catch{restore.disabled=cancel.disabled=false;toast(t.failed);}
   };
-  cancel.onclick=()=>dialog.close();
-  dialog.oncancel=event=>{if(restore.disabled)event.preventDefault();};
+  dialog.oncancel=event=>{event.preventDefault();cancel.click();};
   restore.onclick=async()=>{
    restore.disabled=cancel.disabled=true;
    let result;
    try{result=await api('backup_apply',{id:preview.id});}
    catch{restore.disabled=cancel.disabled=false;toast(t.failed);return;}
-   dialog.close('restored');
+   dialog.close();
    target.querySelector('[data-result]').textContent=result.rollback;
    try{await onSaved();toast(t.restored);}catch{toast(t.refreshFailed);}
   };
