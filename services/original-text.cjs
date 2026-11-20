@@ -16,7 +16,11 @@ const SPEAKER=/^[^「『（(\s。、…―]{1,16}(?=[「『（(])/u;
 const inlineTags=s=>String(s||'').replace(/%[A-Za-z][^;%\n「」]{0,24};/g,'');
 const plainKey=s=>norm(inlineTags(s)).replace(/≪([^≪≫／]*)／[^≪≫]*≫/g,'$1').replace(/[●○◯〇＊*■□]/g,'●');
 const RESOURCE_LINE=/^[!-~]{1,64}$/;
-const matchKey=s=>norm(inlineTags(s)).replace(/≪([^≪≫／]*)／[^≪≫]*≫/g,'$1').replace(SPEAKER,'').replace(/[●○◯〇＊*■□]/g,'●');
+/* 2026-11-21 (pairing self-test over every patched game): every ruby / markup form the engines write folds to its base text on both sides
+   (｜base《reading》, base《かな》, <r…>base</r> and other short tags, {base:reading}, short [tags] such as CatSystem2's [/・]), and full-width
+   digits and letters fold to half-width; a 《title》 that is no ruby (a kanji-less run) is kept */
+const rubyFold=s=>String(s||'').replace(/[｜|]([^《｜|\n]+)《[^》\n]*》/g,'$1').replace(/([一-龯々〆ヶ]+)《[ぁ-ゖァ-ヺー・]+》/g,'$1').replace(/<\/?[A-Za-z][^<>\n]{0,24}>/g,'').replace(/\{([^:{}\n]+):[^{}\n]*\}/g,'$1').replace(/\[[^\]\n]{0,12}\]/g,'').replace(/[０-９Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+const matchKey=s=>norm(rubyFold(inlineTags(s))).replace(/≪([^≪≫／]*)／[^≪≫]*≫/g,'$1').replace(SPEAKER,'').replace(/[●○◯〇＊*■□]/g,'●');
 const japaneseLine=t=>{const k=(t.match(KANA)||[]).length,h=(t.match(HAN)||[]).length;return k>=2&&k>=h*.2;};
 // Lines that carry language at all (not file names, labels or numbers): what the Japanese / translated share is measured on.
 const prose=t=>/[^\x00-\x7f]/.test(t)&&!!String(t).trim();
@@ -567,7 +571,7 @@ function staticProvider(root,executable){
   const readings=Array.isArray(rtIndex.ruby)?rtIndex.ruby:null,withRuby=r=>{if(!readings||!Array.isArray(r.indices))return r;const pairs=r.indices.flatMap(i=>Array.isArray(readings[i])?readings[i]:[]);return pairs.length?{...r,ruby:pairs}:r;};
   /* 2026-11-21 (千恋＊万花 中文版 pairing self-test: 「将臣！」「神力……？」「……忍者……」, 68 lines whose official Chinese is written exactly like the Japanese): a line
      without kana that the patch keeps as it is IS translated (names, kanji-only lines read the same in Chinese); one with kana left alone is not */
-  const untranslated=i=>{const o=m.og[i];return !o||norm(o)===norm(rt[i])&&/[぀-ヿ]/.test(String(rt[i]||''));};
+  const untranslated=i=>{const o=m.og[i];return !o||norm(o)===norm(rt[i])&&/[ぁ-ゖァ-ヺ]{2}/.test(String(rt[i]||''));};
   /* E358: an engine that draws from a fixed glyph set (HuneX bitmap fonts) says which characters it has. drawable(text) is
      null when unknown; tableDrawable() is false when the game cannot draw its own translation table (WoH in Japanese draws
      4.9 % of the official Chinese lines in full), so the game is not asked to draw translations it would leave with holes. */
