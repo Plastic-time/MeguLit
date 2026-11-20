@@ -30,7 +30,7 @@
     'body.megulit-place-gone .sentence-window.tomoyo-hook-reader,body.megulit-place-gone .sentence-window.tomoyo-hook-reader *{opacity:0!important;visibility:hidden!important}', /* 2026-11-20 (CHAOS;CHILD: the game cleared its text at a scene change, the old line stayed): gone with the game's line until the next one */
     '.megulit-anchor-window .tome-page-lines{opacity:.6;position:absolute;left:0;right:0;bottom:100%}',
     '.megulit-anchor-window.megulit-page-fresh .tome-page-lines{display:none!important}',
-    '.megulit-anchor-window:not(.megulit-anchor-center) .tome-page-lines{display:none!important}',
+    '.megulit-anchor-window.megulit-page-fresh:not(.megulit-anchor-center) .tome-page-lines{display:none!important}',
     '.megulit-anchor-window.megulit-game-rows .sentence-text{white-space:nowrap!important}' +
     '.megulit-anchor-window.megulit-rows-predicted .sentence-text{white-space:normal!important;max-width:var(--megulit-centre-width)!important;margin-left:auto!important;margin-right:auto!important}', /* a line on the game's rows breaks where the game broke it, nowhere else */ /* dialogue lines never carry the dimmed page above them (2026-11-20 user: the old lines covered the screen) */
     'body.megulit-placed .megulit-place-window .megulit-ruby-base{position:absolute!important;display:block!important;margin:0!important;padding:0!important}',

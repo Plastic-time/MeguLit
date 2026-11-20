@@ -71,7 +71,7 @@
    Math.min(innerHeight-h-4,ev.clientY-dy))+'px';},up=()=>{head.style.cursor='grab';head.removeEventListener('pointermove',move);head.removeEventListener('pointerup',
    up);head.removeEventListener('pointercancel',up);window.__tomoyoHitRegionsRefresh?.(true);};
   head.addEventListener('pointermove',move);head.addEventListener('pointerup',up);head.addEventListener('pointercancel',up);});}
- function paragraphText(at){const root=at?.closest?.('.sentence-text,.tome-log-src')||document.querySelector('.sentence-text'),chars=root?[...root.querySelectorAll('.char-token')]:[];
+ function paragraphText(at){const line=at?.closest?.('.tome-page-lines>div');if(line){const chars=[...line.querySelectorAll('.tome-page-char')];return {root:line,chars,text:chars.map(n=>n.textContent).join('')};}const root=at?.closest?.('.sentence-text,.tome-log-src')||document.querySelector('.sentence-text'),chars=root?[...root.querySelectorAll('.char-token')].filter(t=>!t.closest('.tome-page-lines')):[];
   return {root,chars,text:chars.map(n=>n.textContent).join('')};}
  function selected(){const selection=getSelection();if(!selection||selection.isCollapsed||!selection.rangeCount)return null;const range=selection.getRangeAt(0),
   {root,chars,text}=paragraphText(range.startContainer.nodeType===3?range.startContainer.parentElement:range.startContainer);if(!root||!root.contains(range.startContainer)||!root.contains(range.endContainer))return null;
@@ -182,7 +182,7 @@
  const inOwn=node=>node?.closest?.('.tomoyo-selection-card,.tomoyo-cn-dialog,.tomoyo-learning-panel,.mg-select-pop');
  // E213: resolve the clicked character from geometry, not the event target. Ruby, padding or a drawing layer above the
  // line made the target the first token ("(" at the line start). Line breaks are covered by per-line client rects.
- function tokenAt(e){const x=e.clientX,y=e.clientY;let root=e.target?.closest?.('.sentence-text');if(!root)for(const n of document.elementsFromPoint(x,y)){root=n.closest?.('.sentence-text');
+ function tokenAt(e){const x=e.clientX,y=e.clientY;/* an earlier line of the page is its own block of characters */{const line=e.target?.closest?.('.tome-page-lines>div');if(line){let best=null,dist=Infinity;for(const t of line.querySelectorAll('.tome-page-char'))for(const r of t.getClientRects()){if(!r.width||!r.height)continue;const dx=x<r.left?r.left-x:x>r.right?x-r.right:0,dy=y<r.top?r.top-y:y>r.bottom?y-r.bottom:0,d=dx*dx+dy*dy*4;if(d<dist){dist=d;best=t;}}if(best&&dist<=576)return best;}}let root=e.target?.closest?.('.sentence-text');if(!root)for(const n of document.elementsFromPoint(x,y)){root=n.closest?.('.sentence-text');
   if(root)break;}if(!root)for(const n of document.querySelectorAll('.sentence-text')){const r=n.getBoundingClientRect();if(r.width&&r.height&&x>=r.left-4&&x<=r.right+4&&y>=r.top-4&&y<=r.bottom+4){
   root=n;break;}}if(!root)return null;
   let best=null,dist=Infinity;for(const t of root.querySelectorAll('.char-token:not(.tome-typewriter-pending)')){for(const r of t.getClientRects()){if(!r.width||!r.height)continue;
