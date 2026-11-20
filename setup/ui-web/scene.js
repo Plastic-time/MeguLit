@@ -296,9 +296,9 @@
   function hideError() { showErr = false; gsap.to('#ui-err', { opacity: 0, duration: 0.25, overwrite: true, onComplete() { $('#ui-err').style.visibility = 'hidden'; } }); }
 
   /* ---------- actions out ---------- */
-  const Scene = { cam, onAction: null, goTo, render, THEME, REDUCE, get section() { return section; }, init(opts) { if (opts && opts.count) buildField(opts.count); apply(); setSteps(); } };
+  const Scene = { cam, onAction: null, goTo, render, THEME, REDUCE, get section() { return section; }, showInstallError() { showError({ kind: 'install' }); }, init(opts) { if (opts && opts.count) buildField(opts.count); apply(); setSteps(); } };
   function act(type, extra) { const m = Object.assign({ type }, extra || {}); if (window.chrome && chrome.webview) chrome.webview.postMessage(m); if (Scene.onAction) Scene.onAction(m); }
-  $('#install').addEventListener('click', () => act('install', { path: $('#path').value, desktop: $('#swDesk').getAttribute('aria-checked') === 'true', menu: $('#swMenu').getAttribute('aria-checked') === 'true' }));
+  $('#install').addEventListener('click', () => { $('#install').classList.add('busy'); act('install', { path: $('#path').value, desktop: $('#swDesk').getAttribute('aria-checked') === 'true', menu: $('#swMenu').getAttribute('aria-checked') === 'true' }); });   /* instant press feedback: the button reacts in the same frame, whatever the host does next */
   $('#browse').addEventListener('click', () => act('browse')); $('#retry').addEventListener('click', () => act('retry'));
   $('#copylog').addEventListener('click', () => { act('copylog'); $('#copylog').textContent = tr('copied'); }); $('#manual').addEventListener('click', () => act('manual')); $('#launch').addEventListener('click', () => act('launch'));
   document.querySelectorAll('.sw').forEach((b) => b.addEventListener('click', () => b.setAttribute('aria-checked', b.getAttribute('aria-checked') !== 'true')));

@@ -83,6 +83,7 @@ function Web-Act($m) {
       'fatal' { Web-Log ('page fatal: ' + $m.reason); $script:webFatalSeen = $true; Web-Abort ('page reported: ' + $m.reason) }
       'asked' { $script:askAt = $null }
       'drag' { Web-Log 'drag: system move loop starts'; $script:win.Drag(); Web-Log ('drag: loop ended at ' + $script:win.Location) }
+      'resize' { $script:win.SizeFrom([string]$m.edge) }
       'minimize' { $script:win.WindowState = 'Minimized'; Web-Log ('minimized: state=' + $script:win.WindowState) }
       'close' { Web-Close }
       'checkpath' { if ($shim) { Web-Post @{ t = 'reply'; id = $m.id; r = (Web-Check ([string]$m.path)) } } }
@@ -96,7 +97,13 @@ function Web-Act($m) {
         if ($shim) {
           # variable names here must not collide (case-insensitively) with the logic's own: $C is its colour table, read by the handlers called below
           $chk = Web-Check ([string]$m.path)
-          if ($chk.state -eq 'ok') { $pathBox.Text = [string]$m.path; $deskCheck.Checked = [bool]$m.desktop; $menuCheck.Checked = [bool]$m.menu; $confirm.PerformClick(); if (-not $script:confirmed) { $chk.state = 'readonly' } }
+          # Answer at once and run the heavy part (copy, shortcuts, starting the unpack) from a timer tick: not inside this web-message callback, so the
+          # page's other messages (window drag, resize, close) keep being delivered while it works.
+          if ($chk.state -eq 'ok') { $pathBox.Text = [string]$m.path; $deskCheck.Checked = [bool]$m.desktop; $menuCheck.Checked = [bool]$m.menu
+            if (-not $script:installTimer) { $script:installTimer = New-Object Windows.Forms.Timer; $script:installTimer.Interval = 30
+              $script:installTimer.add_Tick({ $script:installTimer.Stop(); $t1 = [DateTime]::Now; try { $confirm.PerformClick() } catch { Web-Log ('install failed: ' + $_) }
+                Web-Log ('install: confirm took ' + [int]([DateTime]::Now - $t1).TotalMilliseconds + ' ms, confirmed=' + $script:confirmed); if (-not $script:confirmed) { Web-Post @{ t = 'installfail' } } }) }
+            $script:installTimer.Start() }
           Web-Post @{ t = 'reply'; id = $m.id; r = $chk }
         } }
       'retry' { if ($shim -and $script:mode -eq 'failed') { $button.PerformClick() } }
@@ -129,7 +136,7 @@ public class SetupWin : Form {
   [DllImport("dwmapi.dll")] static extern int DwmExtendFrameIntoClientArea(IntPtr h, ref MARGINS m);
   [StructLayout(LayoutKind.Sequential)] struct MARGINS { public int l, r, t, b; }
   public bool AllowClose = false; public Action AskClose; public Control Web;
-  protected override CreateParams CreateParams { get { CreateParams cp = base.CreateParams; cp.Style |= 0x00020000 | 0x00080000; return cp; } }
+  protected override CreateParams CreateParams { get { CreateParams cp = base.CreateParams; cp.Style |= 0x00020000 | 0x00080000 | 0x00040000; return cp; } }
   [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
   [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int i, int v);
   public static void ToolWindow(IntPtr h, bool on) { int ex = GetWindowLong(h, -20); SetWindowLong(h, -20, on ? (ex | 0x80) : (ex & ~0x80)); }   // keeps the hidden control surface out of Alt+Tab
@@ -156,7 +163,10 @@ public class SetupWin : Form {
     if (top) t = b - h; else b = t + h;
   }
   public int MinW, MaxW;
+  // the page's edge/corner hot zones ask for the system size loop: edge letters l r t b + corners (HTLEFT 10 ... HTBOTTOMRIGHT 17)
+  public void SizeFrom(string edge) { if (!Sizable || WindowState != FormWindowState.Normal) return; int ht; switch (edge) { case "l": ht = 10; break; case "r": ht = 11; break; case "t": ht = 12; break; case "tl": ht = 13; break; case "tr": ht = 14; break; case "b": ht = 15; break; case "bl": ht = 16; break; case "br": ht = 17; break; default: return; } ReleaseCapture(); SendMessage(Handle, 0xA1, (IntPtr)ht, IntPtr.Zero); }
   protected override void WndProc(ref Message m) {
+    if (m.Msg == 0x83 && m.WParam != IntPtr.Zero) { m.Result = IntPtr.Zero; return; }   // WM_NCCALCSIZE: no frame, the whole window is client
     if (m.Msg == 0x84 && Sizable && WindowState == FormWindowState.Normal) {   // WM_NCHITTEST
       long lp = m.LParam.ToInt64(); System.Drawing.Point p = PointToClient(new System.Drawing.Point((short)(lp & 0xFFFF), (short)((lp >> 16) & 0xFFFF)));
       bool L = p.X < Grip, R = p.X >= ClientSize.Width - Grip, T = p.Y < Grip, B = p.Y >= ClientSize.Height - Grip;
@@ -179,7 +189,7 @@ public class SetupWin : Form {
     $win = New-Object SetupWin
     $win.Text = 'MeguLit 安装'; $win.FormBorderStyle = 'None'; $win.StartPosition = 'CenterScreen'; $win.ShowInTaskbar = -not $testLog; $win.BackColor = [Drawing.Color]::FromArgb(236, 241, 249)
     # starts at 60 % of the design box (600 x 384 logical); the user can drag the edges/corners: ratio locked, 480 x 307 logical minimum, at most the work area
-    $win.ClientSize = New-Object Drawing.Size([int](600 * $scale), [int](384 * $scale)); $win.Grip = [int][math]::Max(4, [math]::Round(4 * $scale)); $win.Padding = New-Object Windows.Forms.Padding($win.Grip)   # the WebView2 child swallows hit-tests, so the grips are the form's own padding ring around it
+    $win.ClientSize = New-Object Drawing.Size([int](600 * $scale), [int](384 * $scale)); $win.Grip = [int][math]::Max(4, [math]::Round(4 * $scale))   # (the WebView2 child swallows hit-tests, so the edges are hot zones in the page that ask the host for the system size loop)
     $lim = @(0, 0, 0, 0); $miW = 0; $miH = 0; $maW = 0; $maH = 0; [SetupWin]::SizeLimits($scale, $wa0.Width, $wa0.Height, [ref]$miW, [ref]$miH, [ref]$maW, [ref]$maH)
     $win.MinimumSize = New-Object Drawing.Size($miW, $miH); $win.MaximumSize = New-Object Drawing.Size($maW, $maH); $win.MinW = $miW; $win.MaxW = $maW
     $script:dpiS = $dpiS; $script:zoomWin = $win

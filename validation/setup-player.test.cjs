@@ -109,3 +109,30 @@ test('the real renders in setup/ui-web/video: poster, intro, field, dark theme',
   await ev('void Scene.goTo("unpack","dive")'); await on('to-unpack'); await on('unpack'); await ev('void Scene.goTo("done","pull")'); await on('done'); await sleep(800); await shot('5-done-dark');
   assert.equal(await ev('Player.state.dead'), false); assert.equal(await ev('Player.layers.light.man.draft'), false);
 });
+
+test('responsiveness: the install click shows press feedback in the same frame; the drag zone is reachable in every stage', { skip, timeout: 90000 }, async () => {
+  await open(fixture); await on('welcome');
+  /* press feedback does not wait for anything the host does */
+  const t = await ev('(()=>{const b=document.getElementById("install");const t0=performance.now();b.click();return {busy:b.classList.contains("busy"),ms:performance.now()-t0}})()');
+  assert.ok(t.busy && t.ms < 100, 'the button is busy at once: ' + JSON.stringify(t));
+  /* the title drag zone is on top at its probe point in every stage (a covered drag zone = a window that cannot be moved) */
+  const probe = '(()=>{const r=document.getElementById("drag").getBoundingClientRect(),e=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return e&&e.id})()';
+  for (const [stage, move] of [['welcome', ''], ['loc', 'skim'], ['field', 'under'], ['unpack', 'dive'], ['done', 'pull']]) {
+    if (stage !== 'welcome') { await ev(`void Scene.goTo(${JSON.stringify(stage)},${JSON.stringify(move)})`); await sleep(300); }
+    assert.equal(await ev(probe), 'drag', 'drag zone reachable in ' + stage);
+  }
+});
+
+test('the host answers the install request at once and runs the heavy work from a timer tick (never inside the web-message callback)', () => {
+  const src = fs.readFileSync(path.join(repo, 'setup', 'setup-web.ps1'), 'utf8');
+  const a = src.indexOf("'install' {"), b = src.indexOf("'retry' {");
+  const block = src.slice(a, b);
+  const lines = block.split('\n');
+  const direct = lines.filter((l) => /PerformClick\(\)/.test(l) && !/add_Tick/.test(l) && !lines[lines.indexOf(l) - 1].includes('add_Tick'));
+  assert.ok(/add_Tick/.test(block) && /\$script:installTimer\.Start\(\)/.test(block), 'a one-shot timer runs the confirm');
+  assert.ok(block.indexOf('Web-Post @{ t = \'reply\'') > block.indexOf('installTimer.Start()'), 'the reply is posted right after the timer was armed');
+  const tick = block.slice(block.indexOf('add_Tick'), block.indexOf('$script:installTimer.Start()'));
+  assert.equal((block.match(/PerformClick\(\)/g) || []).length, 1, 'confirm is clicked exactly once, inside the tick: ' + direct.length);
+  assert.ok(tick.includes('PerformClick()'), 'and that click is inside the tick handler');
+  assert.match(src, /'resize' \{ \$script:win\.SizeFrom/, 'the page can start the system size loop');
+});

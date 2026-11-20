@@ -24,6 +24,11 @@ html,body{background:transparent!important}
 #app{position:absolute;inset:0;border-radius:22px;overflow:hidden;background:var(--bg2);box-shadow:0 0 0 1px rgba(0,0,0,.18)}
 :root[data-theme=night] #app{box-shadow:0 0 0 1px rgba(255,255,255,.1)}
 #chrome{position:absolute;inset:0;pointer-events:none}
+/* window resize hot zones + a visible corner grip, only in the real (native) window */
+.rz,.rzg{display:none}.native .rz{display:block;position:absolute;z-index:60}.native .rzg{display:block;position:absolute;right:3px;bottom:3px;width:14px;height:14px;z-index:59;pointer-events:none;opacity:.55}
+.rz[data-e=l]{left:0;top:14px;bottom:14px;width:8px;cursor:w-resize}.rz[data-e=r]{right:0;top:14px;bottom:14px;width:8px;cursor:e-resize}.rz[data-e=t]{left:14px;right:210px;top:0;height:6px;cursor:n-resize}.rz[data-e=b]{left:14px;right:14px;bottom:0;height:8px;cursor:s-resize}
+.rz[data-e=tl]{left:0;top:0;width:14px;height:14px;cursor:nw-resize}.rz[data-e=tr]{right:0;top:0;width:8px;height:14px;cursor:ne-resize}.rz[data-e=bl]{left:0;bottom:0;width:14px;height:14px;cursor:sw-resize}.rz[data-e=br]{right:0;bottom:0;width:16px;height:16px;cursor:se-resize}
+.go.busy{transform:scale(.97);opacity:.78;pointer-events:none;transition:transform .08s,opacity .08s}
 #drag{position:absolute;left:0;right:196px;top:0;height:46px;pointer-events:auto;cursor:default}
 #chrome .tab{position:absolute;right:26px;top:-14px;height:48px;padding:14px 8px 0 14px;display:flex;gap:2px;background:var(--red);pointer-events:auto;clip-path:polygon(0 100%,10px 0,100% 0,100% 100%);box-shadow:0 8px 24px rgba(200,32,60,.35)}
 #chrome .tab button{width:40px;height:30px;border:0;background:transparent;color:#fff;cursor:pointer;display:grid;place-items:center;transition:background .15s}
@@ -197,7 +202,7 @@ html[data-btn=C] .go{padding:0 0 0 26px;justify-content:space-between;gap:0}html
 <div class="layer" id="ui-done"><div class="big"><span id="doneT"></span><small id="doneEn">All set</small></div><div class="launch"><button class="go" id="launch">开读</button></div></div>
 <div class="layer" id="ui-mini" style="opacity:1;visibility:visible"><div id="mini"></div></div>
 </div>
-<div id="chrome"><div id="drag"></div><div class="tab"><button id="btnTheme" aria-pressed="false"></button><button id="btnMin" aria-label="最小化 Minimize"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.6"/></svg></button><button id="btnClose" aria-label="关闭 Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.6"/></svg></button></div><div class="notch"></div></div>
+<div id="chrome"><div id="drag"></div><i class="rz" data-e="l"></i><i class="rz" data-e="r"></i><i class="rz" data-e="t"></i><i class="rz" data-e="b"></i><i class="rz" data-e="tl"></i><i class="rz" data-e="tr"></i><i class="rz" data-e="bl"></i><i class="rz" data-e="br"></i><svg class="rzg" viewBox="0 0 14 14" aria-hidden="true"><path d="M13 3 3 13M13 7 7 13M13 11 11 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg><div class="tab"><button id="btnTheme" aria-pressed="false"></button><button id="btnMin" aria-label="最小化 Minimize"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.6"/></svg></button><button id="btnClose" aria-label="关闭 Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.6"/></svg></button></div><div class="notch"></div></div>
 <div class="layer" id="ui-quit"><div class="scrim"></div><div class="card quit"><h2>货还在路上</h2><div class="en">Download in progress</div><p>现在关掉也没关系：已经下好的碎片会保留，下次打开接着下。</p><div class="acts"><button class="go" id="stay">等它到</button><button class="btn" id="leave">回头再来</button></div></div></div>
 </div>
 <script>/* Scripts load after the first paint, in their order (async=false), so the window shows the poster at once instead of waiting
