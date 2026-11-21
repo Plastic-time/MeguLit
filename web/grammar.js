@@ -597,10 +597,18 @@ export async function mountGrammar(target,{api,locale,esc,toast,isCurrent=()=>tr
     say(`已用 Anki 打开 ${r.file}，在 Anki 里确认导入后点「我已导入，刷新」`);}catch{setTimeout(tick,3000);}};tick();}
  async function loadAnki(tell){const job=memo.ankiJob||=api('grammar_bluebook');
   try{const r=await job;if(!isCurrent())return;
-   memo.anki=r?.available?r:{available:false,points:[]};memo.ankiAt=Date.now();useAnkiCards(memo.anki.points);
+   if(r?.incomplete&&memo.anki?.available){if(tell)toast?.(r.errors?.join('、'));return;}
+   const lessonSnapshot=()=>JSON.stringify([point,data?.examples?.[point?.id]]);
+   const before=view==='lesson'?lessonSnapshot():null;
+   memo.anki=r?.available?r:{...r,available:false,points:[],examples:{}};memo.ankiAt=r?.incomplete?0:Date.now();useAnkiCards(memo.anki.points);
    if(data){data={...data,examples:{...memo.anki.examples,...memo.reportExamples}};memo.data=data;}
    if(tell)toast?.(r?.available?`读到 ${r.points.length} 条语法卡，已并进课程`:'还没在你的 Anki 里找到蓝宝书语法牌组：导入后先关掉再打开一次 Anki 试试');
-   if(view!=='lesson')render();
+   if(view==='lesson'&&point){
+    point=pointById(point.id);
+    if(!point){go('list');return;}
+    if(before===lessonSnapshot())return;
+   }
+   render();
   }catch{if(isCurrent()&&!memo.anki){memo.anki={available:false,points:[]};if(view==='list')render();}}
   finally{if(memo.ankiJob===job)memo.ankiJob=null;}}
  if(!memo.anki||Date.now()-(memo.ankiAt||0)>FRESH_MS)loadAnki(false);

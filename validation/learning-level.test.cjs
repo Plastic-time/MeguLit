@@ -223,14 +223,14 @@ test('editing a recorded translation refreshes the examples in an open collectio
 
 test('revisiting grammar refreshes imported examples without replacing built-in ones',async t=>{
  const {pathToFileURL}=require('node:url'),g=await import(pathToFileURL(path.join(__dirname,'../web/grammar.js')).href+'?revisit');
- let now=Date.now(),blue=0,reports=0,available=true;t.mock.method(Date,'now',()=>now);
+ let now=Date.now(),blue=0,reports=0,available=true,locked=false;t.mock.method(Date,'now',()=>now);
  const doc={scrollingElement:{scrollTop:0},createElement:()=>({style:{},isConnected:true,addEventListener(){},querySelector:()=>null,querySelectorAll:()=>[],closest:()=>null})};
  for(const [name,value] of Object.entries({document:doc,matchMedia:()=>({matches:true})})){
   const old=Object.getOwnPropertyDescriptor(globalThis,name);Object.defineProperty(globalThis,name,{value,configurable:true});
   t.after(()=>{if(old)Object.defineProperty(globalThis,name,old);else delete globalThis[name];});
  }
  const api=async action=>{
-  if(action==='grammar_bluebook'){blue++;return {available,points:[],examples:{'bb-25':[{text:'entry-'+blue}],shared:[]}};}
+  if(action==='grammar_bluebook'){blue++;if(locked)return {available:false,incomplete:true,errors:['EBUSY'],points:[]};return {available,points:[],examples:{'bb-25':[{text:'entry-'+blue}],shared:[]}};}
   if(action==='grammar_report'){reports++;return {progress:{},examples:{shared:[{text:'built-in'}]}};}
   return action==='learning_level'?{level:'none'}:{};
  };
@@ -239,5 +239,7 @@ test('revisiting grammar refreshes imported examples without replacing built-in 
  assert.equal((await visit())['bb-25'][0].text,'entry-1');
  await visit();assert.equal(blue,1);
  now+=6*60000;const updated=await visit();assert.equal(updated['bb-25'][0].text,'entry-2');assert.equal(updated.shared[0].text,'built-in');assert.equal(reports,2);
+ locked=true;now+=6*60000;assert.equal((await visit())['bb-25'][0].text,'entry-2');
+ locked=false;assert.equal((await visit())['bb-25'][0].text,'entry-4');
  available=false;now+=6*60000;assert.equal((await visit())['bb-25'],undefined);
 });
