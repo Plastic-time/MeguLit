@@ -7,44 +7,27 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
   },
   "lang": {
    "ja": {
@@ -62,13 +45,22 @@
   "title": "6c3aeabc90e646347011dd94f50f916b914fb00e4591cc3954f46ab3ed2d3419",
   "vndb": "v4"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "clannad",
  "builds": [
   "116a1b6ab5902bb6dc49e25086b1ef6f07d941dbb090b497fb7a158e997dea2d"
  ],
- "seedFormat": 1,
+ "match": {
+  "exe": [
+   "SiglusEngine_Steam.exe"
+  ],
+  "titles": [
+   "CLANNAD"
+  ]
+ },
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

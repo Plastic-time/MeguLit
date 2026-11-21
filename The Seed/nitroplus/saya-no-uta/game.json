@@ -7,44 +7,27 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": "hide"
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
   },
   "lang": {
    "ja": {
@@ -62,13 +45,23 @@
   "steam": "702050",
   "vndb": "v97"
  },
+ "seedFormat": 1,
  "status": "verified",
  "slug": "saya-no-uta",
  "builds": [
   "7092242e66d534a691c005034756b324be78babf81cd4b352c318460a8de027d"
  ],
- "seedFormat": 1,
+ "match": {
+  "exe": [
+   "Saya_Steam.exe"
+  ],
+  "titles": [
+   "The Song of Saya",
+   "沙耶の唄"
+  ]
+ },
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

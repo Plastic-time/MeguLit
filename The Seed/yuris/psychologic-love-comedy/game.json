@@ -7,44 +7,27 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
   },
   "lang": {
    "ja": {
@@ -62,13 +45,24 @@
   "title": "6ce4689035af8172a1f0bf2b9cecc6163c03e5d1f294cfb8d90b2dcfbb00c1b9",
   "vndb": "v16584"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "psychologic-love-comedy",
  "builds": [
   "90d4614fa0c2f23ed263fe79ca6e03394e9c25c092ac4187bb3ed9e63d292d8c"
  ],
- "seedFormat": 1,
+ "match": {
+  "exe": [
+   "saikoro.exe"
+  ],
+  "titles": [
+   "サイコロジック・ラブコメディ",
+   "サイコロジック ラブコメディ",
+   "[150828][initial] サイコロジック・ラブコメディ"
+  ]
+ },
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

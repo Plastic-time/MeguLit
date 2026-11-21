@@ -7,15 +7,11 @@
  "mode": "read",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null,
    "pairByDrawn": true,
    "keepHeld": true
   },
@@ -28,39 +24,12 @@
    "dropEffectFrames": true
   },
   "hide": {
-   "textEffectsRead": true,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": {
-    "x": 70,
-    "y": 488,
-    "w": 322,
-    "h": 51,
-    "client": [
-     804,
-     604
-    ]
-   },
-   "hideMethod": "read"
+   "textEffectsRead": true
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null,
    "effectJudge": true
   },
   "lang": {
@@ -79,6 +48,7 @@
   "title": "b875bbc5bee84c5b84c550da5934f1115f680233162baf3120f30d9822940cb3",
   "vndb": "v12402"
  },
+ "seedFormat": 1,
  "status": "read",
  "slug": "fata-morgana",
  "builds": [
@@ -95,11 +65,12 @@
    "ファタモルガーナの館",
    "The House in Fata Morgana",
    "魔女之馆",
-   "法塔莫尔加纳之馆"
+   "法塔莫尔加纳之馆",
+   "海市蜃楼之馆"
   ]
  },
- "seedFormat": 1,
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

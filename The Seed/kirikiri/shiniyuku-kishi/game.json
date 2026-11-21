@@ -7,44 +7,27 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
   },
   "lang": {
    "ja": {
@@ -62,13 +45,24 @@
   "title": "7dc413e2147ff8d7349abd5df2368c210926d6414724357631a6c57b56575f34",
   "vndb": "v49274"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "shiniyuku-kishi",
  "builds": [
   "017ab8a718356000a6c8dfb83718c594498e7d7b12390566e0f2baa48f99a1d5"
  ],
- "seedFormat": 1,
+ "match": {
+  "exe": [
+   "bug05nknk.exe"
+  ],
+  "titles": [
+   "死に逝く騎士、異世界に響く断末魔",
+   "濒死的骑士、于异世界中响彻的绝唱",
+   "archive"
+  ]
+ },
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

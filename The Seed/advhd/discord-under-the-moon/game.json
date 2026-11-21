@@ -7,44 +7,27 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
   },
   "lang": {
    "ja": {
@@ -62,13 +45,25 @@
   "title": "952caa1ad5651bc6616e4dd9e6c484529eecc2f7e2802fb63d9b0b595815b6bc",
   "vndb": "v19434"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "discord-under-the-moon",
  "builds": [
   "cf7b3a19ef818d67682192dabb29528129c90c4ff7d861d89074c309cc2e3282"
  ],
- "seedFormat": 1,
+ "match": {
+  "exe": [
+   "utmoon.exe"
+  ],
+  "titles": [
+   "ディスコード！",
+   "disc",
+   "[061215][シュガービーンズ] Under The Moon～ (iso)",
+   "Discord!"
+  ]
+ },
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }

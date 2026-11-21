@@ -7,44 +7,27 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
   },
   "lang": {
    "ja": {
@@ -62,13 +45,23 @@
   "title": "1edfa8cba606567749430cdcf4cde0102caa048a5f0182a1a223c94f7fefcb7d",
   "vndb": "v97"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "saya-no-uta-jp",
  "builds": [
   "d3c47ed8b085fbfb51390d37a0a3f5a476364d13de7a852c20aee0ec4b81c8a1"
  ],
- "seedFormat": 1,
+ "match": {
+  "exe": [
+   "saya.exe"
+  ],
+  "titles": [
+   "沙耶の唄",
+   "[031226][Nitro+] 沙耶の唄"
+  ]
+ },
  "sourceLangs": [
   "ja"
- ]
+ ],
+ "rev": 1
 }
