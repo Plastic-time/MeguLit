@@ -36,11 +36,16 @@ test('identical saved lines only list words collected from the same game',t=>{
   }
   example.run(2,'a','別の文。');
   example.run(1,'a',line);
-  db.prepare('INSERT INTO examples(word_id,game_id,text,original) VALUES(2,NULL,?,?)').run(line,JSON.stringify({sync:true,game:'On another device'}));
+  db.prepare('INSERT INTO examples(word_id,game_id,text,original) VALUES(2,NULL,?,?)').run(line,JSON.stringify({sync:true,game:'Élan'}));
   const rows=saved.list(db);
   assert.deepEqual(rows.map(r=>[r.game_id,r.words.map(w=>w.id)]),[[null,[3]],['b',[2]],['a',[1]]]);
-  db.prepare('UPDATE saved_sentences SET original=? WHERE game_id IS NULL').run(JSON.stringify({sync:true,game:'ON ANOTHER DEVICE'}));
+  db.prepare('UPDATE saved_sentences SET original=? WHERE game_id IS NULL').run(JSON.stringify({sync:true,game:'élan'}));
   assert.deepEqual(saved.list(db)[0].words.map(w=>w.id),[2]);
+  assert.equal(saved.state(db,{gameId:null,text:line}).saved,false);
+  assert.equal(saved.save(db,{gameId:null,text:line}).created,true);
+  require('../services/learning-insights.cjs').saveWord(db,{id:2},{gameId:null,text:line});
+  const pending=saved.list(db).filter(r=>r.game_id==null);
+  assert.deepEqual(pending.map(r=>r.words.map(w=>w.id)),[[3,2],[2]]);
  }finally{db.close();}
 });
 
