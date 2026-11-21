@@ -70,7 +70,8 @@ function check(d0,{engine,slug,file}={}){const e=[];const bad=m=>e.push(m);
 let cache=null;
 function load(dir=SEED_DIR){const games=[],versions=new Map(),errors=[];
  const read=f=>{try{return JSON.parse(fs.readFileSync(f,'utf8').replace(/^﻿/,''));}catch(x){errors.push(path.relative(dir,f)+': '+x.message);return null;}};
- let engines=[];try{engines=fs.readdirSync(dir,{withFileTypes:true}).filter(d=>d.isDirectory()).map(d=>d.name);}catch{return {games,versions,errors,dir};}
+ // Publication history has its own signed-chain validator and never supplies profile settings.
+ let engines=[];try{engines=fs.readdirSync(dir,{withFileTypes:true}).filter(d=>d.isDirectory()&&d.name!=='history').map(d=>d.name);}catch{return {games,versions,errors,dir};}
  for(const engine of engines){let slugs=[];try{slugs=fs.readdirSync(path.join(dir,engine),{withFileTypes:true}).filter(d=>d.isDirectory()).map(d=>d.name);}catch{}
   for(const slug of slugs){const base=path.join(dir,engine,slug);
    let files=[];try{files=fs.readdirSync(path.join(base,'versions')).filter(f=>f.endsWith('.json'));}catch{}
