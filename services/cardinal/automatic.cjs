@@ -9,7 +9,7 @@ async function automatic(job,scenario,options,{games=Games,budget=Budget,interva
   const allowed=await budget.wait(job.root,{delay:delayMs});if(!allowed)return {deferred:true,errors:['idle wait cancelled']};
   const controller=new AbortController();let finished,operation=null,timer=null,checking=false;
   const completed=new Promise(resolve=>finished=resolve);
-  const cancel=async()=>{controller.abort();await completed;if(out?.cleanupFailure||out?.processClosed===false)throw Error('CARDINAL_TREE_EXIT_UNCONFIRMED '+JSON.stringify(out.cleanupFailure||{}));};
+  const cancel=async()=>{controller.abort();await completed;if(out?.cleanupFailure||out?.processClosed===false){const code='CARDINAL_TREE_EXIT_UNCONFIRMED',detail=out.cleanupFailure||{};try{job.trace?.('cardinal stop '+code+' '+JSON.stringify(detail));}catch{}throw Object.assign(Error(code),{code,detail});}};
   const release=games.track(job.game.exe,cancel);
   let out;
   try{
