@@ -83,7 +83,8 @@ function windowDone(s,r){if(live!==s)return;const {reader}=s;
  reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'window',key:s.key,window:r.window,lines:r.lines,pass:r.pass,over:r.over.join(','),layer:s.from||'none',...Object.fromEntries(Object.entries(r.metrics).map(([k,v])=>[k,v==null?-1:v]))});
  if(r.window===1&&s.sample){/* the fingerprints the relay matches diffs by (core/game-print.cjs); the exe hash is known, the rest is small reads */
   let prints=null;try{prints=require('../core/game-print.cjs').prints(s.exe,{exe:s.key,title:s.input?.title||'',steamAppId:s.input?.steamAppId||'',engine:engineOf(s)});}catch{}
-  try{s.sample.save(reader.root,s.key,prints);}catch{}}
+  /* the window's verdict decides whether its pictures may leave this PC (runtime-sample.cjs shotPolicy) */
+  try{s.sample.save(reader.root,s.key,prints,{pass:r.pass,metrics:r.metrics,thresholds:s.check.t});}catch{}}
  const engine=engineOf(s);
  /* 2026-11-21 (owner: 非精确命中的下发差分只是候选) a diff the relay found by the binary or the game identity, not this exe: its
     first window decides. Over a threshold: this PC stops using it (remembered until the relay hands out another), falls back to its

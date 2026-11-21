@@ -120,11 +120,18 @@ test('runtime sample: on by default, the switch turns it off; first lines, boxes
  /* engine-draw.log: only this run's lines go into the sample */
  fs.mkdirSync(path.join(root,'logs'),{recursive:true});const now=Date.now(),iso=ms=>new Date(ms).toISOString();
  fs.writeFileSync(path.join(root,'logs','engine-draw.log'),[iso(now-3600e3)+' ToMe_CHARS old',iso(now)+' ToMe_CHARS role=1 id=7 box=1,2,3,4 sel=0 emb=1',iso(now+3600e3)+' ToMe_CHARS later'].join('\n')+'\n');
- const d=sample.save(root,K);const s=JSON.parse(fs.readFileSync(path.join(d,'sample.json'),'utf8'));
+ /* screenshot policy: a window that did not pass attaches its pictures; the pictures always stay in the local temp folder too */
+ const d=sample.save(root,K,null,{pass:false,metrics:{dropRate:0.3},thresholds:{dropRate:0.15}});const s=JSON.parse(fs.readFileSync(path.join(d,'sample.json'),'utf8'));assert.equal(s.shotPolicy,'over');assert.ok(fs.existsSync(path.join(rs.localShots(K),'shot-1.jpg')));
  const draw=fs.readFileSync(path.join(d,'engine-draw.log'),'utf8');assert.match(draw,/role=1 id=7/);assert.ok(!/old|later/.test(draw),'only this window');
  assert.equal(s.exe,'game.exe');assert.equal(s.lines[0].name,'綾');assert.deepEqual(s.client,[800,600]);assert.equal(s.shots,1);
  assert.deepEqual(rs.files(d).map(f=>f.name),['engine-draw.log','hook-events.log','reader-host.log','sample.json','shot-1.jpg']);
  if(process.env.USERNAME&&process.env.USERNAME.length>=2)assert.ok(!fs.readFileSync(path.join(d,'reader-host.log'),'utf8').includes(process.env.USERNAME),'logs scrubbed');
+ /* a clean pass uploads no picture; a pass at the edge does */
+ assert.equal(rs.shotPolicy({pass:true,metrics:{dropRate:0.02,pairRate:0.95},thresholds:{dropRate:0.15,pairRate:0.8}}),'pass');assert.equal(rs.shotPolicy({pass:true,metrics:{dropRate:0.13},thresholds:{dropRate:0.15}}),'edge');
+ assert.equal(rs.shotPolicy({pass:true,metrics:{pairRate:0.82},thresholds:{pairRate:0.8}}),'edge');assert.equal(rs.shotPolicy(null),'none');
+ {const exe2=path.join(root,'G2','game.exe');fs.mkdirSync(path.dirname(exe2),{recursive:true});fs.writeFileSync(exe2,'MZ-runtime-2');const K2=await ap.exeKey(root,exe2);
+  const again=new rs.RuntimeSample({exe:exe2,engine:'kirikiri',app:'1.4.21'});again.shot(jpg);const d2=again.save(root,K2,null,{pass:true,metrics:{dropRate:0},thresholds:{dropRate:0.15}});
+  assert.ok(!rs.files(d2).some(f=>f.kind==='shot'),'a passing window sends no picture');assert.equal(JSON.parse(fs.readFileSync(path.join(d2,'sample.json'),'utf8')).shotsTaken,1);}
  const src=fs.readFileSync(path.join(__dirname,'..','services','probe-full.cjs'),'latin1');assert.match(src,/runtime-sample\.cjs'\)\.files\(runtime\)/);assert.match(src,/kind!=='shot'&&isMediaBytes/);
  /* the full probe of this game is on the relay already: only the runtime bundle goes, once per sample */
  const pa=require('../services/probe-auto.cjs'),ident={id:H('9')};

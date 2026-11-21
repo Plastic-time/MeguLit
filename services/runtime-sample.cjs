@@ -6,7 +6,11 @@
    data/runtime-samples/<exe key>/ (sample.json + shot-1..3.jpg), and packed into the next probe (probe-full.cjs items kind
    'runtime' and 'shot'). Format: docs/auto-profile.md.
    Privacy: only the game's own window is captured (GalNative.sceneShot: the game's client area, MeguLit's layers and the desktop
-   are not in it), at most 3 pictures, each at most 600 KB; the text is the game's own; logs are scrubbed (services/diagnostics.cjs
+   are not in it), at most 3 pictures, each at most 600 KB.
+   2026-11-21 screenshot policy (owner, docs/diff-layers.md 当前权威接口): every score is made on this PC; the pictures are kept in a
+   local temp folder for that (os.tmpdir()/megulit-runtime-shots/<exe key>/) and leave the PC only when the first window did not
+   pass or passed at the edge (shotPolicy): then 2-3 of them, each at most 300 KB, go into the sample; a passing window uploads
+   scores, prints and the diff only, no picture; with runtimeSampleShare off no sample is made at all; the text is the game's own; logs are scrubbed (services/diagnostics.cjs
    scrub: user name, profile paths, e-mails). The player's switch: library.json runtimeSampleShare, on unless turned off (=== false;
    owner 2026-11-21: 「这两个可以都开了 我已经和他们说了 全答应了」).
    Also kept: the first window's own log lines (runtime/hook-events.log, runtime/reader-host.log), the input of
@@ -14,7 +18,14 @@
 const fs=require('node:fs'),path=require('node:path');
 const auto=require('../core/auto-profile.cjs');
 const MAX_LINES=40,MAX_EVENTS=400,MAX_LOG=800,SHOTS_AT=[3,10,18],SHOT_MAX=600*1024,BUNDLE_MAX=3*1024*1024;
-const zlib=require('node:zlib'),crypto=require('node:crypto');
+const zlib=require('node:zlib'),crypto=require('node:crypto'),os=require('node:os');
+const UPLOAD_SHOT_MAX=300*1024;
+const localShots=key=>path.join(os.tmpdir(),'megulit-runtime-shots',key);
+/* the window's verdict decides whether pictures go along: 'over' (a threshold failed), 'edge' (passed, but a rate within a quarter
+   of its threshold, or pairing within 0.05 above its floor), 'pass' (no picture) or 'none' (no verdict: no picture) */
+function shotPolicy(verdict){if(!verdict||typeof verdict!=='object')return 'none';if(verdict.pass!==true)return 'over';const m=verdict.metrics||{},t=verdict.thresholds||{};
+ for(const k of ['hideVisible','dropRate','repeatRate','positionPx'])if(Number.isFinite(m[k])&&Number.isFinite(t[k])&&t[k]>0&&m[k]>=0.75*t[k])return 'edge';
+ if(Number.isFinite(m.pairRate)&&Number.isFinite(t.pairRate)&&m.pairRate<t.pairRate+0.05)return 'edge';return 'pass';}
 function readLib(root){try{return JSON.parse(fs.readFileSync(path.join(root,'data','config','library.json'),'utf8'))||{};}catch{return {};}}
 /* the player's switch (on by default, off when set to false) */
 const enabled=root=>readLib(root).runtimeSampleShare!==false;
@@ -41,8 +52,11 @@ class RuntimeSample{
   return null;}
  shot(jpegBase64){if(this.shots.length>=SHOTS_AT.length||typeof jpegBase64!=='string')return false;const b=Buffer.from(jpegBase64,'base64');if(b.length<100||b.length>SHOT_MAX||b[0]!==0xff||b[1]!==0xd8)return false;this.shots.push(b);return true;}
  /* written once, after the first window; an older sample of the same exe is replaced */
- save(root,key,prints=null){if(this.done||!key)return '';this.done=true;if(prints)this.sample.prints=require('../core/game-print.cjs').check(prints);const d=keyDir(root,key);try{fs.rmSync(d,{recursive:true,force:true});fs.mkdirSync(d,{recursive:true});
-  fs.writeFileSync(path.join(d,'sample.json'),JSON.stringify({...this.sample,key,shots:this.shots.length},null,1));this.shots.forEach((b,i)=>fs.writeFileSync(path.join(d,'shot-'+(i+1)+'.jpg'),b));
+ save(root,key,prints=null,verdict=null){if(this.done||!key)return '';this.done=true;if(prints)this.sample.prints=require('../core/game-print.cjs').check(prints);const d=keyDir(root,key);try{fs.rmSync(d,{recursive:true,force:true});fs.mkdirSync(d,{recursive:true});
+  /* every picture stays on this PC (scoring); only an 'over' or 'edge' window attaches 2-3 small ones to the sample */
+  const local=localShots(key);try{fs.rmSync(local,{recursive:true,force:true});fs.mkdirSync(local,{recursive:true});this.shots.forEach((b,i)=>fs.writeFileSync(path.join(local,'shot-'+(i+1)+'.jpg'),b));}catch{}
+  const why=shotPolicy(verdict),attach=why==='over'||why==='edge'?this.shots.filter(b=>b.length<=UPLOAD_SHOT_MAX).slice(0,3):[];
+  fs.writeFileSync(path.join(d,'sample.json'),JSON.stringify({...this.sample,key,shots:attach.length,shotsTaken:this.shots.length,shotPolicy:why},null,1));attach.forEach((b,i)=>fs.writeFileSync(path.join(d,'shot-'+(i+1)+'.jpg'),b));
   let scrub=t=>t;try{const dg=require('./diagnostics.cjs');if(dg.scrub)scrub=t=>dg.scrub(t);}catch{}
   const NL=String.fromCharCode(10);fs.writeFileSync(path.join(d,'hook-events.log'),scrub(this.logs.hook.join(NL)+NL));fs.writeFileSync(path.join(d,'reader-host.log'),scrub(this.logs.reader.join(NL)+NL));
   /* 2026-11-21 (diff-maker: engine-draw ToMe_CHARS records) the engine-draw log lines of this window too */
@@ -63,4 +77,4 @@ function bundle(dir,key){const list=files(dir);if(!list.length)return null;const
  const z=zlib.gzipSync(Buffer.from(JSON.stringify(doc)),{level:9});return z.length<=BUNDLE_MAX?{data:z,sha256:crypto.createHash('sha256').update(z).digest('hex'),bytes:z.length}:null;}
 /* what changes when the sample changes (the probe remembers it to send a new one only) */
 function stamp(dir){try{return crypto.createHash('sha256').update(fs.readFileSync(path.join(dir,'sample.json'))).digest('hex');}catch{return '';}}
-module.exports={RuntimeSample,dirFor,keyDir,files,bundle,stamp,enabled,setEnabled,engineDraw,SHOTS_AT,BUNDLE_MAX};
+module.exports={shotPolicy,localShots,RuntimeSample,dirFor,keyDir,files,bundle,stamp,enabled,setEnabled,engineDraw,SHOTS_AT,BUNDLE_MAX};
