@@ -224,22 +224,38 @@ test('editing a recorded translation refreshes the examples in an open collectio
 test('revisiting grammar refreshes imported examples without replacing built-in ones',async t=>{
  const {pathToFileURL}=require('node:url'),g=await import(pathToFileURL(path.join(__dirname,'../web/grammar.js')).href+'?revisit');
  let now=Date.now(),blue=0,reports=0,available=true,locked=false;t.mock.method(Date,'now',()=>now);
- const doc={scrollingElement:{scrollTop:0},createElement:()=>({style:{},isConnected:true,addEventListener(){},querySelector:()=>null,querySelectorAll:()=>[],closest:()=>null})};
+ const buttons=new Set(['[data-back]','[data-prev]','[data-nextstep]','[data-stepof]','[data-learned]','[data-quiz]']);
+ const element=()=>({style:{},dataset:{},isConnected:true,addEventListener(){},querySelector:q=>buttons.has(q)?element():null,querySelectorAll:()=>[],closest:()=>null});
+ const doc={scrollingElement:{scrollTop:0},createElement:element};
  for(const [name,value] of Object.entries({document:doc,matchMedia:()=>({matches:true})})){
   const old=Object.getOwnPropertyDescriptor(globalThis,name);Object.defineProperty(globalThis,name,{value,configurable:true});
   t.after(()=>{if(old)Object.defineProperty(globalThis,name,old);else delete globalThis[name];});
  }
+ const B=require('../services/bluebook.cjs'),fields={Word:'試験句',Level:'N5',Explain1:'说明'},card=B.cardOf(k=>fields[k]||'',25,'Fixture');
+ const {pageNav}=await import('../web/page-nav.js');
  const api=async action=>{
-  if(action==='grammar_bluebook'){blue++;if(locked)return {available:false,incomplete:true,errors:['EBUSY'],points:[]};return {available,points:[],examples:{'bb-25':[{text:'entry-'+blue}],shared:[]}};}
+  if(action==='grammar_bluebook'){blue++;if(locked)return {available:false,incomplete:true,errors:['EBUSY'],points:[]};return {available,points:[card],examples:{'bb-25':[{text:'今の試験句です。',translation:'entry-'+blue,origin:'history',start:2,end:5}],shared:[]}};}
   if(action==='grammar_report'){reports++;return {progress:{},examples:{shared:[{text:'built-in'}]}};}
   return action==='learning_level'?{level:'none'}:{};
  };
- const visit=async()=>{const close=await g.mountGrammar({replaceChildren(){}},{api,locale:'zh',esc:String});
-  try{await new Promise(resolve=>setImmediate(resolve));return g.grammarMemo().data.examples;}finally{close();}};
- assert.equal((await visit())['bb-25'][0].text,'entry-1');
+ let root;const visit=async(open=false)=>{const close=await g.mountGrammar({replaceChildren(el){root=el;}},{api,locale:'zh',esc:String});
+  try{await new Promise(resolve=>setImmediate(resolve));if(open){g.keepStep(card.id,4);assert.ok(pageNav.apply({view:'lesson',level:'N5',point:card.id}));}
+   return g.grammarMemo().data.examples;}finally{close();}};
+ assert.equal((await visit(true))['bb-25'][0].translation,'entry-1');assert.match(root.innerHTML,/entry-1/);
  await visit();assert.equal(blue,1);
- now+=6*60000;const updated=await visit();assert.equal(updated['bb-25'][0].text,'entry-2');assert.equal(updated.shared[0].text,'built-in');assert.equal(reports,2);
- locked=true;now+=6*60000;assert.equal((await visit())['bb-25'][0].text,'entry-2');
- locked=false;assert.equal((await visit())['bb-25'][0].text,'entry-4');
+ now+=6*60000;const updated=await visit();assert.equal(updated['bb-25'][0].translation,'entry-2');assert.equal(updated.shared[0].text,'built-in');assert.equal(reports,2);
+ assert.match(root.innerHTML,/entry-2/);assert.doesNotMatch(root.innerHTML,/entry-1/);
+ locked=true;now+=6*60000;assert.equal((await visit())['bb-25'][0].translation,'entry-2');
+ locked=false;assert.equal((await visit())['bb-25'][0].translation,'entry-4');
  available=false;now+=6*60000;assert.equal((await visit())['bb-25'],undefined);
+});
+
+test('an offline AnkiConnect distinguishes an empty local collection from an unreadable profile',async t=>{
+ const B=require('../services/bluebook.cjs'),{DatabaseSync}=require('node:sqlite'),root=temp(),profile=path.join(root,'Anki2','Fixture');
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));fs.mkdirSync(profile,{recursive:true});
+ const file=path.join(profile,'collection.anki2'),opts={env:{APPDATA:root},anki:{call:async()=>{throw Error('offline');}},config:{}};
+ const db=new DatabaseSync(file);try{db.exec('CREATE TABLE notetypes(id INTEGER,name TEXT);');}finally{db.close();}
+ const empty=await B.readAll(root,opts);assert.equal(empty.available,false);assert.ok(!empty.incomplete);
+ fs.writeFileSync(file,'unreadable collection');
+ const failed=await B.readAll(root,opts);assert.equal(failed.incomplete,true);assert.equal(failed.available,false);
 });

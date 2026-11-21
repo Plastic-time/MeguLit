@@ -60,7 +60,7 @@ async function fromAnkiConnect(anki,config){
 /* Files first; AnkiConnect when the files give nothing; every reason kept so the page can say what went wrong. */
 async function readAll(root,{env=process.env,anki=null,config=null}={}){
   const a=fromFiles(root,env);if(a.available)return a;
-  if(anki&&config){try{const b=await fromAnkiConnect(anki,config);if(b.available)return {...b,profiles:a.profiles};if(b.decks?.length)a.errors.push('AnkiConnect 找到了牌组 '+b.decks.join('、')+'，但卡片字段不是蓝宝书格式');a.decks=b.decks;}catch(e){a.incomplete=true;a.errors.push('AnkiConnect：'+(e.message||e));}}
+  if(anki&&config){try{const b=await fromAnkiConnect(anki,config);if(b.available)return {...b,profiles:a.profiles};if(b.decks?.length)a.errors.push('AnkiConnect 找到了牌组 '+b.decks.join('、')+'，但卡片字段不是蓝宝书格式');a.decks=b.decks;}catch(e){if(!a.profiles.length)a.incomplete=true;a.errors.push('AnkiConnect：'+(e.message||e));}}
   return a;
 }
 function read(root,opts){return fromFiles(root,opts?.env);}
