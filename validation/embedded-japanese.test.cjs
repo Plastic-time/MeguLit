@@ -24,6 +24,7 @@ test('source/role/Voice/header mismatch and duplicate source row IDs are refused
  for(const mutatePatch of edits){const f=fixture(t,{mutatePatch}),before=hash(f.baseFile);assert.equal(embedded.scan(f.dir).state,'unsupported');assert.equal(hash(f.baseFile),before);}
  const duplicate=fixture(t,{patch:false,duplicateId:true});assert.deepEqual(embedded.scan(duplicate.dir).warnings,['EMBEDDED_DUPLICATE_ROW_ID']);
  const shifted=fixture(t,{patchRowOffset:100});assert.deepEqual(embedded.scan(shifted.dir).warnings,['EMBEDDED_CONFLICT']);
+ const multiple=fixture(t);fs.mkdirSync(path.join(multiple.dir,'Other_Data'));assert.deepEqual(embedded.scan(multiple.dir).warnings,['EMBEDDED_UNSUPPORTED_DATA_LAYOUT']);
  const ordinary=fs.mkdtempSync(path.join(os.tmpdir(),'embedded-other-'));t.after(()=>fs.rmSync(ordinary,{recursive:true,force:true}));fs.writeFileSync(path.join(ordinary,'story.txt'),'声のラベルだけです。');
  assert.equal(embedded.scan(ordinary).canRestore,false);assert.equal(embedded.scan(ordinary).coverage.rows,0);
 });

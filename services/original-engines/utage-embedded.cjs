@@ -39,6 +39,7 @@ function sourceFiles(dir,check,directories){
  const files=[],dataDirs=[];let visited=0;
  function entries(folder){directories.push(folder);const out=[],handle=fs.opendirSync(folder);try{let e;while((e=handle.readSync())){if(++visited>MAX_ENTRIES)throw Error('EMBEDDED_ENTRY_BUDGET');check();if(e.isSymbolicLink())continue;out.push(e);}}finally{handle.closeSync();}return out;}
  for(const e of entries(dir))if(e.isDirectory()&&/_Data$/i.test(e.name))dataDirs.push(path.join(dir,e.name));
+ if(dataDirs.length!==1)throw Error('EMBEDDED_UNSUPPORTED_DATA_LAYOUT');
  for(const data of dataDirs){
   for(const e of entries(data))if(e.isFile()&&/^(?:resources|sharedassets\d+|globalgamemanagers)\.assets$|^level\d+$/i.test(e.name))files.push(path.join(data,e.name));
   const streaming=path.join(data,'StreamingAssets');
