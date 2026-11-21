@@ -14,6 +14,7 @@ const fs=require('node:fs'),path=require('node:path');
 const gv=()=>require('./game-voice.cjs');
 const DIR=root=>path.join(root,'data','saved-voice');
 const FILE=/^\d{1,12}\.(?:ogg|wav|mp3|m4a)$/;
+const savedId=id=>id===undefined||id===null||id===''?NaN:Number(id);
 const parse=o=>{try{const v=JSON.parse(o||'{}');return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}catch{return {};}};
 const voiceOf=original=>{const v=(typeof original==='string'?parse(original):original||{}).voice;return v&&typeof v==='object'?v:null;};
 // Re-read the row and merge voice into its original JSON (sentence-scenes.cjs writes scene into the same JSON).
@@ -53,7 +54,7 @@ function read(root,voice,text){if(!voice)return null;
 /* The game voice for a sentence: a saved line (id) by its kept record, then the line index by text; a saved line whose
    game index is stale is scanned first. A found voice is written back into the saved row (older saved lines). */
 async function play(root,{id,text,db:open}={}){
- const openDb=open||(()=>require('./store.cjs').openStore(root));const n=id===undefined||id===null||id===''?NaN:Number(id);
+ const openDb=open||(()=>require('./store.cjs').openStore(root));const n=savedId(id);
  let row=null,exe='';if(Number.isSafeInteger(n)){const db=openDb();try{row=db.prepare('SELECT id,game_id,text,original FROM saved_sentences WHERE id=?').get(n)||null;exe=row?exeOf(db,row.game_id):'';}finally{db.close();}}
  text=String(text||row?.text||'').trim();
  if(row){const rec=voiceOf(row.original),kept=read(root,rec,text);if(kept)return kept;
@@ -66,9 +67,18 @@ async function play(root,{id,text,db:open}={}){
  return v;}
 /* Which texts have a game voice (button labels, no audio read): saved rows by their record, any text by the index; a
    recorded clip of a quiet line does not count. */
-function has(root,items,{db:open}={}){const list=Array.isArray(items)?items.slice(0,500):[];const ids=list.map(x=>Number(x?.id)).filter(Number.isSafeInteger);let kept=new Map();
- if(ids.length){const db=(open||(()=>require('./store.cjs').openStore(root)))();try{for(const r of db.prepare('SELECT id,original FROM saved_sentences WHERE id IN ('+ids.map(()=>'?').join(',')+')').all(...ids)){const v=voiceOf(r.original),text=list.find(x=>Number(x?.id)===Number(r.id))?.text;kept.set(Number(r.id),!!v&&v.kind!=='none'&&!(v.kind==='file'&&text&&gv().verdict(root,String(text))==='quiet'));}}finally{db.close();}}
- return list.map(x=>kept.get(Number(x?.id))||(!!x?.text&&gv().has(root,String(x.text))));}
+function has(root,items,{db:open}={}){
+ const list=Array.isArray(items)?items.slice(0,500):[],rows=new Map();
+ const ids=[...new Set(list.map(x=>savedId(x?.id)).filter(Number.isSafeInteger))];
+ if(ids.length){const db=(open||(()=>require('./store.cjs').openStore(root)))();try{
+  for(const row of db.prepare('SELECT id,text,original FROM saved_sentences WHERE id IN ('+ids.map(()=>'?').join(',')+')').all(...ids))rows.set(row.id,row);
+ }finally{db.close();}}
+ return list.map(item=>{
+  const row=rows.get(savedId(item?.id)),voice=voiceOf(row?.original),text=String(item?.text||row?.text||'').trim();
+  if(voice?.kind==='scan'&&voice.g&&voice.ref)return true;
+  if(voice?.kind==='file'&&typeof voice.file==='string'&&FILE.test(voice.file)&&gv().recordingExists(path.join(DIR(root),voice.file))&&(!text||gv().verdict(root,text)==='unknown'))return true;
+  return !!text&&gv().has(root,text);
+ });}
 // A removed saved line takes its kept clip with it.
 function release(root,original){const v=voiceOf(original);if(v?.kind==='file'&&FILE.test(String(v.file||'')))try{fs.unlinkSync(path.join(DIR(root),v.file));}catch{}}
 module.exports={attach,play,has,read,release,voiceOf};
