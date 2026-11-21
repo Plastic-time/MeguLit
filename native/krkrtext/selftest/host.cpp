@@ -71,7 +71,7 @@ public:
                              L"not a protocol line"};
    for (auto l : lines) { tTJSVariant v(l), *a[1] = {&v}; Report->FuncCall(0, NULL, NULL, NULL, 1, a, NULL); }
   }
-  if (result) *result = tTJSVariant(source.c_str()[0] == L'(' && wcsstr(source.c_str(), L"__megulitKrkrState") ? L"ok layers=2 lines=1 wait=11" : L"unexpected script");
+  if (result) *result = tTJSVariant(source.c_str()[0] == L'(' && wcsstr(source.c_str(), L"__megulitKrkrState") && wcsstr(source.c_str(), L"st.embRestore=function") && wcsstr(source.c_str(), L"return st.refresh();") ? /* every piece of script.inc joined (engine-draw) */ L"ok layers=2 lines=1 wait=11" : L"unexpected script");
   return TJS_S_OK;
  }
 };

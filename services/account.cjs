@@ -174,11 +174,13 @@ const kinds={
    return out;
   },
   apply(db,key,record){
-   const rows=db.prepare('SELECT id,text FROM saved_sentences').all().filter(r=>'s:'+sha(r.text,32)===key),source=record.data?.source==='auto'?'auto':'manual';
-   if(record.deleted){for(const r of rows)db.prepare('DELETE FROM saved_sentences WHERE id=?').run(r.id);return;}
-   const d=record.data;
-   if(rows.length)db.prepare('UPDATE saved_sentences SET translation=?,source=? WHERE id=?').run(String(d.translation||''),source,rows[0].id);
-   else db.prepare('INSERT INTO saved_sentences(game_id,text,translation,created_at,original,source) VALUES(?,?,?,?,?,?)').run(gameByTitle(db).get(String(d.game||'').toLowerCase())||null,String(d.text),String(d.translation||''),Number(d.created_at)||0,syncOriginal(d.game),source);
+   const matches=db.prepare('SELECT id,text,game_id,original FROM saved_sentences ORDER BY id').all().filter(r=>'s:'+sha(r.text,32)===key);
+   if(record.deleted){for(const r of matches)db.prepare('DELETE FROM saved_sentences WHERE id=?').run(r.id);return;}
+   const d=record.data,source=d.source==='auto'?'auto':'manual',title=cleanTitle(d.game).toLowerCase();
+   const gameId=gameByTitle(db).get(title)||null;
+   const match=(gameId&&matches.find(row=>row.game_id===gameId))||matches.find(row=>row.game_id===null&&syncedTitle(row.original).toLowerCase()===title);
+   if(match)db.prepare('UPDATE saved_sentences SET game_id=?,translation=?,source=? WHERE id=?').run(gameId,String(d.translation||''),source,match.id);
+   else db.prepare('INSERT INTO saved_sentences(game_id,text,translation,created_at,original,source) VALUES(?,?,?,?,?,?)').run(gameId,String(d.text),String(d.translation||''),Number(d.created_at)||0,syncOriginal(d.game),source);
   }
  },
  reading:{

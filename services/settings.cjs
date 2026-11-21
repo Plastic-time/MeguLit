@@ -46,7 +46,7 @@ class Settings{
     for(const panel of ['menu','log','card'])value.panels[panel]={...panelDefaults,...Object.fromEntries(Object.keys(panelDefaults).map(k=>[k,value[k]??panelDefaults[k]])),...value.panels[panel]};return value;
   }
   if(scope==='online')return {relayUrl:'',leaderboardEnabled:false,leaderboardName:'',leaderboardShareGames:false,...readJSON(path.join(this.folder,'online.json'))};
-  if(scope==='library'){const library=libraryConfig??readJSON(this.file('library.json'));return {autoSeries:library.autoSeries!==false,sharedAdaptation:library.sharedAdaptation!==false,sceneShots:library.sceneShots!==false,runtimeHarvest:library.runtimeHarvest!==false,probeUpload:library.probeUpload!==false,adapterContrib:require('./adapter-contrib.cjs').enabled(this.root),steamPath:library.steamPath||'',folders:(library.folders||[]).join('\n')};}
+  if(scope==='library'){const library=libraryConfig??readJSON(this.file('library.json'));return {autoSeries:library.autoSeries!==false,sharedAdaptation:library.sharedAdaptation!==false,sceneShots:library.sceneShots!==false,runtimeHarvest:library.runtimeHarvest!==false,probeUpload:library.probeUpload!==false,coldTest:library.coldTest!==false,coldTestShots:library.coldTestShots!==false,adapterContrib:require('./adapter-contrib.cjs').enabled(this.root),steamPath:library.steamPath||'',folders:(library.folders||[]).join('\n')};}
   throw Error('SETTINGS_SCOPE_INVALID');
  }
  get(profile=''){
@@ -55,7 +55,7 @@ class Settings{
   const entries=readJSON(this.file('game-style-profiles.json')).entries||{};
   if(profile&&!entries[profile])throw Error('SETTINGS_PROFILE_INVALID');
   const {resolveOptions}=require('../core/providers.cjs'),{ENGINES}=require('../core/engines.cjs'),translationProfiles=readJSON(this.file('translation-profiles.json'));
-  const providers={};for(const option of fields.find(field=>field.scope==='translation'&&field.key==='provider').options){const provider=option.value,base=resolveOptions({provider});providers[provider]={defaultBaseUrl:base.baseUrl||'',defaultModel:base.model||'',baseUrl:base.baseUrl||'',model:base.model||(provider==='gpt'?'gpt-4.1-mini':''),editable:provider==='gpt'||ENGINES[provider]?.editable===true,keyless:provider==='google'||ENGINES[provider]?.keyless===true,...translationProfiles[provider]};}
+  const providers={};for(const option of fields.find(field=>field.scope==='translation'&&field.key==='provider').options){const provider=option.value,base=resolveOptions({provider});providers[provider]={models:require('../core/engines.cjs').modelsFor(provider),defaultBaseUrl:base.baseUrl||'',defaultModel:base.model||'',baseUrl:base.baseUrl||'',model:base.model||(provider==='gpt'?'gpt-4.1-mini':''),editable:provider==='gpt'||ENGINES[provider]?.editable===true,keyless:provider==='google'||ENGINES[provider]?.keyless===true,...translationProfiles[provider]};}
   return {groups,fields,values,providers,profile,profiles:Object.entries(entries).filter(([key])=>/^[a-f0-9]{64}$/.test(key)).map(([key,entry])=>({id:key,name:String(entry.name||key.slice(0,12)),savedAt:entry.savedAt||0})),hasSavedKeys:fs.existsSync(this.file('secrets.dpapi'))};
  }
  save({scope,values,profile='',appendFolders=false}){
@@ -107,7 +107,7 @@ class Settings{
      folders=[...new Set([...(library.folders||[]),...folders])];
      next.steamPath=current.steamPath||next.steamPath;
     }
-    atomic(this.file('library.json'),{...library,steamPath:next.steamPath,folders,autoSeries:next.autoSeries,sharedAdaptation:next.sharedAdaptation!==false,sceneShots:next.sceneShots!==false,runtimeHarvest:next.runtimeHarvest!==false,probeUpload:next.probeUpload!==false});
+    atomic(this.file('library.json'),{...library,steamPath:next.steamPath,folders,autoSeries:next.autoSeries,sharedAdaptation:next.sharedAdaptation!==false,sceneShots:next.sceneShots!==false,runtimeHarvest:next.runtimeHarvest!==false,probeUpload:next.probeUpload!==false,coldTest:next.coldTest!==false,coldTestShots:next.coldTestShots!==false});
   }
   /* the contribution switch is the player's decision: written only when it was changed here (an untouched switch must not decide for them) */
   if(scope==='library'&&Object.hasOwn(values,'adapterContrib')&&(c=>c.decided||(next.adapterContrib===true)!==c.enabled)(require('./adapter-contrib.cjs').consentState(this.root)))require('./adapter-contrib.cjs').setConsent(this.root,next.adapterContrib===true,{source:'settings'});

@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+/* 2026-11-21 (owner: 每部游戏按 exe 哈希一份差分；官方差分优先，自动校准兜底；签名下发，客户端验签) game diffs from the relay
+   (relay/src/auto-profile.js, docs/auto-profile.md). Hot update: nothing is rebuilt or reinstalled, a fetched diff is a profile
+   layer the next time (or the moment) the game starts.
+   - report(root, record): after a calibration or a gate step-down this PC's result goes to /api/game-profile/report (the
+     共享适配 switch, shared-adaptation.cjs). A step-down also puts the exe in the maintainer's repair queue.
+   - cached(root, key) / refresh(root, key): the relay's answer per exe key, kept in data/config/auto-profiles-feed/<key>.json
+     (a day; a "none" answer 6 hours).
+   - layer(answer, key): the answer as a layer, or null. Checked here, whatever the relay said: the document shape and every
+     value (core/game-diff.cjs, core/profiles/domains.cjs), and its Ed25519 signature by one of our profile keys
+     (services/profile-keys.json; we sign offline, tools/sign-profile.cjs, the relay holds no key). Anything else is ignored, so a
+     broken or poisoned relay can at worst hand out nothing. */
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const auto=require('../core/auto-profile.cjs'),gameDiff=require('../core/game-diff.cjs');
+const TIMEOUT=15000,FRESH_MS=24*3600000,NONE_MS=6*3600000;
+/* 2026-11-21 (owner: 存放下发差分的文件夹叫「The Seed」) the relay's answers for this PC's exes: data/The Seed/<exe SHA-256>.json */
+const dir=root=>path.join(root,'data','The Seed');
+/* 2026-11-21 (owner: 「这两个可以都开了 我已经和他们说了 全答应了」) uploading calibrations has its own switch, library.json
+   autoProfileShare, on unless the player turns it off (=== false), on top of 共享适配 (sharedAdaptation, used by other features, untouched).
+   Fetching diffs is not an upload and is always on. */
+function sharing(root){let lib={};try{lib=JSON.parse(fs.readFileSync(path.join(root,'data','config','library.json'),'utf8'))||{};}catch{}if(lib.autoProfileShare===false)return false;try{return require('./shared-adaptation.cjs').enabled(root);}catch{return false;}}
+function setSharing(root,on){const f=path.join(root,'data','config','library.json');let lib={};try{lib=JSON.parse(fs.readFileSync(f,'utf8'))||{};}catch{}fs.mkdirSync(path.dirname(f),{recursive:true});const tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify({...lib,autoProfileShare:on===true},null,2));fs.renameSync(tmp,f);return sharing(root);}
+function endpoints(root,route){try{return require('./relay-config.cjs').endpoints(root,route);}catch{return [];}}
+function keyList(file){try{const raw=JSON.parse(fs.readFileSync(path.join(__dirname,file),'utf8'));return (Array.isArray(raw.keys)?raw.keys:[]).filter(k=>k&&k.alg==='ed25519'&&typeof k.id==='string'&&typeof k.publicKey==='string'&&!k.revoked);}catch{return [];}}
+let trusted=null;
+/* {official:[maintainer keys], auto:[relay keys + maintainer keys]} */
+function keys(){return trusted||keyList('profile-keys.json');}
+/* tests trust their own keys */
+function _trust(v){trusted=v||null;}
+function verify(doc,list){const s=doc?.signature;if(!s||s.alg!=='ed25519'||typeof s.keyId!=='string'||typeof s.value!=='string')return false;const k=list.find(x=>x.id===s.keyId);if(!k)return false;
+ try{return crypto.verify(null,Buffer.from(gameDiff.canonical(gameDiff.unsigned(doc))),crypto.createPublicKey({key:Buffer.from(k.publicKey,'base64'),format:'der',type:'spki'}),Buffer.from(s.value,'base64'));}catch{return false;}}
+/* the relay's answer as layers, or null (docs/diff-layers.md). Version 2 (multi-level match, core/game-print.cjs):
+     {versionLayer:{match:'exe'|'head'|'pe',key,diff}|null, gameLayer:{match:'pack'|'script'|'steam'|'vndb'|'title',key,diff}|null}
+   (relay/src/auto-profile.js; 'version' is the feed's own format number)
+   version 1: {diff} for this exe. Each document is checked (shape, values, layer, signature); a bad one is left out.
+   A version document counts only on an exe-level match (exe / head / pe) and, matched by exe, only for this exe; a game document
+   on any match. -> {source, mode, match, exact, settings, version:{source,mode,settings,rev}|null, game:{...}|null, stamp}
+   exact: this exe's own hash matched the version layer; anything else is a candidate the self-check gate has to accept first. */
+const VERSION_MATCH=['exe','head','pe'],GAME_MATCH=['exe','head','pe','pack','script','steam','vndb','title'];
+const docOk=d=>gameDiff.validate(d).ok&&verify(d,keys());
+const part=d=>({source:d.source,mode:d.mode||'hide',settings:d.settings||{},rev:d.rev|0,issuedAt:d.issuedAt||'',agree:d.agree|0,reporters:d.reporters|0});
+function layer(answer,key){if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key)return null;
+ let v=null,g=null,vm='',gm='';
+ if(answer.version===2){const V=answer.versionLayer,G=answer.gameLayer;
+  if(V&&V.diff&&VERSION_MATCH.includes(V.match)&&V.diff.layer!=='game'&&(V.match!=='exe'||V.diff.key===key)&&docOk(V.diff)){v=V.diff;vm=V.match;}
+  if(G&&G.diff&&GAME_MATCH.includes(G.match)&&G.diff.layer==='game'&&docOk(G.diff)){const {split}=require('../core/profiles/domains.cjs');if(!Object.keys(split(G.diff.settings).version).length){g=G.diff;gm=G.match;}}}
+ if(!v&&!g&&answer.diff){const d=answer.diff;if(d.layer==='game'){if(docOk(d)){g=d;gm='title';}}else if(d.key===key&&docOk(d)){v=d;vm='exe';}}
+ if(!v&&!g)return null;
+ const P={version:v?part(v):null,game:g?part(g):null};const lead=P.version||P.game;
+ const merged=JSON.parse(JSON.stringify(P.game?.settings||{}));const deep=(a,b)=>{for(const [k,x] of Object.entries(b||{}))a[k]=x&&typeof x==='object'&&!Array.isArray(x)&&a[k]&&typeof a[k]==='object'?deep(a[k],x):x;return a;};deep(merged,P.version?.settings);
+ const mode=(P.version&&P.version.mode==='read')||(P.game&&P.game.mode==='read')?'read':'hide';
+ return {source:lead.source,mode,match:v?vm:VERSION_MATCH.includes(gm)?gm:'game:'+gm,exact:vm==='exe'||!v&&gm==='exe',settings:merged,version:P.version,game:P.game,agree:lead.agree,reporters:lead.reporters,issuedAt:lead.issuedAt,
+  stamp:(v?v.key+'@'+(v.rev|0)+'@'+(v.issuedAt||''):'-')+'|'+(g?g.key+'@'+(g.rev|0)+'@'+(g.issuedAt||''):'-')};}
+/* a candidate (not this exe's own hash) the self-check gate refused on this PC: not applied again until the relay hands out another */
+const rejectFile=(root,key)=>path.join(dir(root),key+'.rejected.json');
+function rejected(root,key,l){if(!l||l.exact)return false;try{return JSON.parse(fs.readFileSync(rejectFile(root,key),'utf8')).stamp===l.stamp;}catch{return false;}}
+function reject(root,key,l,why=''){if(!l||l.exact)return;try{fs.mkdirSync(dir(root),{recursive:true});fs.writeFileSync(rejectFile(root,key),JSON.stringify({stamp:l.stamp,match:l.match,why:String(why).slice(0,200),at:new Date().toISOString()}));}catch{}}
+/* the query of GET /api/game-profile: every print (core/game-print.cjs check) + the revisions this PC has */
+function query(key,prints,old){const p={...require('../core/game-print.cjs').check(prints||{}),exe:key};const q=new URLSearchParams();for(const k of ['exe','head','pe','pack','script','steam','vndb','title','engine'])if(p[k])q.set(k,p[k]);
+ const l=old&&!old.none?layer(old,key):null;if(l?.version)q.set('have',String(l.version.rev));if(l?.game)q.set('haveGame',String(l.game.rev));return '?'+q.toString();}
+function cached(root,key){if(!gameDiff.KEY.test(String(key||'')))return null;try{const v=JSON.parse(fs.readFileSync(path.join(dir(root),key+'.json'),'utf8'));return v&&typeof v==='object'?v:null;}catch{return null;}}
+function keep(root,key,v){fs.mkdirSync(dir(root),{recursive:true});const f=path.join(dir(root),key+'.json'),tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(v));fs.renameSync(tmp,f);}
+async function refresh(root,key,{fetcher=globalThis.fetch,now=Date.now(),force=false,prints=null}={}){if(!gameDiff.KEY.test(String(key||''))||!fetcher)return null;
+ const old=cached(root,key);if(!force&&old&&now-(old.fetchedAt||0)<(old.none?NONE_MS:FRESH_MS))return old;
+ for(const url of endpoints(root,'/api/game-profile'+query(key,prints,old))){try{const r=await fetcher(url,{headers:{'user-agent':'MeguLit',accept:'application/json'},signal:AbortSignal.timeout(TIMEOUT)});
+   if(r.status===304&&old&&!old.none){const v={...old,fetchedAt:now};keep(root,key,v);return v;}
+   if(r.status===404){const v={none:true,key,fetchedAt:now};keep(root,key,v);return v;}
+   if(!r.ok)continue;const text=await r.text();if(text.length>64*1024)continue;const v=JSON.parse(text);if(!layer(v,key))continue;v.fetchedAt=now;keep(root,key,v);return v;}catch{}}
+ return old;}
+async function report(root,record,{fetcher=globalThis.fetch,prints=null}={}){if(!record||!sharing(root))return {state:'skipped'};const block=auto.diagnostic(record)?.profile;if(!block||!gameDiff.KEY.test(String(block.key||'')))return {state:'skipped'};
+ const pr=prints?require('../core/game-print.cjs').check(prints):null;const body=JSON.stringify({version:1,profile:block,...(pr&&Object.keys(pr).length?{prints:pr}:{})});
+ for(const url of endpoints(root,'/api/game-profile/report')){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok)return {state:'sent'};if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
+ return {state:'failed'};}
+module.exports={cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};

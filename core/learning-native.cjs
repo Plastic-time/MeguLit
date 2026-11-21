@@ -21,19 +21,40 @@ class LocalLearning{
  runtimeFolder(){return require('./layout.cjs').reading;}
  installed(){return fs.existsSync(path.join(this.runtimeFolder(),'sudachidict_full/resources/system.dic'));}
  async install(retry=false,force=false,only=null){
+  if(this.closed)throw Error('本地辞书已关闭');
   const SPECS={sudachi:['sudachidict_full==20261015'],unidic:['unidic-lite==1.0.8']},ALL=['sudachipy==0.7.0','sudachidict_full==20261015','fugashi==1.5.2','unidic-lite==1.0.8'];
   const packages=Array.isArray(only)&&only.length?[...new Set(only.flatMap(id=>SPECS[id]||[]))]:ALL;
-  if(this.installing)return this.installing;
-  if(this.installError&&!retry)throw Error(this.installError);
-  if(retry)this.installError='';
-  if(!force&&await require('./python-installer.cjs').dictionariesReady(this.python(),this.runtimeFolder())){this.progress={stage:'ready',percent:100};this.onStatus({learningProgress:this.progress,learningInstalled:true,learningMessage:'SudachiDict Full 已安装，离线词典可用'});return;}
+  const previous=this.installing;
+  if(!previous&&this.installError&&!retry)throw Error(this.installError);
+  if(previous&&force===this.installRequest.force&&packages.every(pkg=>this.installRequest.packages.includes(pkg))){
+   this.installRequest.retry||=retry;return previous;
+  }
+  const request={force,packages,retry};
+  const start=async()=>{
+   if(this.closed)throw Error('本地辞书已关闭');
+   if(this.installError&&!request.retry)throw Error(this.installError);
+   if(request.retry)this.installError='';
+   const reporter=new InstallProgress(value=>{this.progress=value;this.onStatus({learningProgress:value,learningInstalled:value.stage==='ready'});});
+   try{await this.runInstall(force,packages,reporter);}catch(e){reporter.finish(false);this.installError=e.message;this.onStatus({learningMessage:e.message});throw e;}
+   finally{this.installer=null;}
+  };
+  this.installRequest=request;
+  const job=(previous?previous.catch(()=>{}).then(start):start()).finally(()=>{
+   if(this.installing===job){this.installing=null;this.installRequest=null;}
+  });
+  this.installing=job;return job;
+ }
+ async runInstall(force,packages,reporter){
+  const ready=!force&&await require('./python-installer.cjs').dictionariesReady(this.python(),this.runtimeFolder());
+  if(this.closed)throw Error('本地辞书已关闭');
+  if(ready){this.progress={stage:'ready',percent:100};this.onStatus({learningProgress:this.progress,learningInstalled:true,learningMessage:'SudachiDict Full 已安装，离线词典可用'});return;}
   await require('./python-installer.cjs').ensurePip(this.python(),require('./layout.cjs').root);
   // Repair overwrites the dictionary files; the worker keeps them open (locked on Windows), so stop it first.
   if(force&&this.worker){const old=this.worker;this.worker=null;await new Promise(r=>{old.once('exit',r);try{old.stdin.end();old.kill();}catch{r();}setTimeout(r,3000);});this.cache.clear();}
-  const reporter=new InstallProgress(value=>{this.progress=value;this.onStatus({learningProgress:value,learningInstalled:value.stage==='ready'});});
+  if(this.closed)throw Error('本地辞书已关闭');
   reporter.update({stage:'resolve',percent:null});
   this.onStatus({learningMessage:'正在安装 SudachiDict Full 本地组件，首次需要下载较大的词典；完成后分词、注音、查词均离线'});
-  this.installing=new Promise((resolve,reject)=>{
+  return new Promise((resolve,reject)=>{
    const child=spawn(this.python(),['-m','pip','install','--target',this.runtimeFolder(),'--upgrade','--no-compile','--disable-pip-version-check','--progress-bar','raw',...(force?['--force-reinstall','--no-deps','--no-cache-dir']:[]),...packages],{windowsHide:true,stdio:['ignore','pipe','pipe']});
    // Keep pip's own output so a failed install says why (logs/dictionary-install.log and the error message).
    const logFile=path.join(require('./layout.cjs').logs,'dictionary-install.log');let tail='';const keep=(d)=>{const t=d.toString();tail=(tail+t).slice(-20000);try{fs.appendFileSync(logFile,t.replace(/\r(?!\n)/g,'\n').split('\n').filter(l=>!/^Progress \d+ of \d+/.test(l)).join('\n'));}catch{}};
@@ -41,12 +62,14 @@ class LocalLearning{
    this.installer=child;child.stdout.on('data',data=>{reporter.feed(data,'out');keep(data);});child.stderr.on('data',data=>{reporter.feed(data,'err');keep(data);});
    child.on('error',()=>reject(Error('无法启动本地 Python，请安装 Python 3.13 并重启新版启动器')));
    child.on('exit',code=>{this.installer=null;if(code===0&&this.installed()){reporter.finish(true);this.onStatus({learningMessage:'SudachiDict Full 已安装，分词／注音／点读全部就绪'});resolve();}else{const lines=tail.split(/\r?\n/).map(l=>l.trim()).filter(l=>l&&!/^Progress \d+ of \d+/.test(l));const why=[...lines].reverse().find(l=>/error|could not|denied|permission|timed out|connection|ssl|winerror|拒绝|访问/i.test(l))||lines.at(-1)||'';reject(Error('词典下载或安装失败'+(why?'：'+why.slice(0,220):'')+'（完整输出见 logs\\dictionary-install.log）'));}});
-  }).catch(e=>{reporter.finish(false);this.installError=e.message;this.onStatus({learningMessage:e.message});throw e;}).finally(()=>{this.installing=null;});return this.installing;
+  });
  }
  async ready(){
   if(this.closed)throw Error('本地辞书已关闭');
-  if(this.installing)await this.installing.catch(()=>{});
-  if(!this.installed())await this.install();if(this.worker)return this.starting;
+  while(this.installing)await this.installing.catch(()=>{});
+  if(this.closed)throw Error('本地辞书已关闭');
+  if(!this.installed()){await this.install();return this.ready();}
+  if(this.worker)return this.starting;
   try{await this.spawnWorker();}
   catch(error){
    // User report (2026-11-09): the worker died on start (a half-finished install) and every lookup said
@@ -57,7 +80,8 @@ class LocalLearning{
    if(missing&&!['sudachipy','sudachidict_full','fugashi','unidic_lite'].includes(missing))throw Error('MeguLit 自带的 Python 不完整（缺少 '+missing+'），重装词典修不好：请完全退出 MeguLit（托盘图标也退出）再打开，会自动重新下载基础组件');
    if(this.selfRepaired)throw this.workerError(error);
    this.selfRepaired=true;this.onStatus({learningMessage:'分词组件无法启动，正在自动修复（重新下载 Sudachi 组件）…'});
-   try{await this.install(true,true);await this.spawnWorker();}catch(again){throw this.workerError(again);}
+   try{await this.install(true,true);}catch(again){throw this.workerError(again);}
+   return this.ready();
   }
  }
  workerError(error){const why=String(error?.message||'').slice(0,200);return Error('分词组件无法运行，自动修复后仍失败：请按 Alt+T → 设置 → 词典 → 「修复 / 重新下载」'+(why?'（'+why+'）':''));}

@@ -55,9 +55,10 @@ function fakeRoot(dir,src,{installed=[]}={}){
 /* HidDesk is started async: a blocking spawn would also stall the HTTP sources this process serves.
    Resolve on exit, not close: the window it starts can keep an inherited pipe open. */
 function hid(args,env){return new Promise(ok=>{const p=spawn(hiddesk,args,{env,windowsHide:true});let out='';p.stdout.on('data',d=>out+=d);p.stderr.on('data',d=>out+=d);p.on('exit',()=>setTimeout(()=>ok(out),300));});}
+/* Since 52751111 the window downloads only after Install is pressed; the cases about what happens before Install opt back into the prefetch path. */
 async function runWindow(root,env,{timeout=90000,shots={}}={}){
  const log=path.join(tmpBase,'msf-events-'+crypto.randomUUID()+'.jsonl');
- const e={...process.env,MEGULIT_SETUP_TEST:log,MEGULIT_SETUP_TARGET:root,...env};
+ const e={...process.env,MEGULIT_SETUP_TEST:log,MEGULIT_SETUP_TARGET:root,MEGULIT_SETUP_PREFETCH:"1",...env};   /* the new installer downloads only after Install is pressed; these scenarios model the old open-and-download flow, so they opt in */
  const out=await hid(['run',ps,'-NoProfile','-ExecutionPolicy','Bypass','-STA','-File',path.join(root,'setup','setup-runtime.ps1'),'-Root',root],e);
  const pid=+out.trim().split(/\s+/)[0];assert.ok(pid>0,'HidDesk run failed: '+out);
  const t0=Date.now(),taken=new Set();let seen;/* after its exit event the window still holds its files until the process is gone */
@@ -97,7 +98,7 @@ test('download ends first: waits for Install, nothing unpacked before it; repair
  const src=await server(2*MB),work=tmp('msf-wait-'),root=fakeRoot(path.join(work,'MeguLit'),src,{installed:['base']}),stage=path.join(root,'.megulit-download');
  try{
   const shots=process.env.MEGULIT_SETUP_SHOTS?{'all-downloaded':path.join(process.env.MEGULIT_SETUP_SHOTS,'2-downloaded-waiting.png')}:{};
-  const ev=await runWindow(root,{MEGULIT_SETUP_AUTOSTART:'downloaded',MEGULIT_SETUP_STAGING:stage},{shots});
+  const ev=await runWindow(root,{MEGULIT_SETUP_PREFETCH:'1',MEGULIT_SETUP_AUTOSTART:'downloaded',MEGULIT_SETUP_STAGING:stage},{shots});
   assert.equal(ev.at(-1).code,0,JSON.stringify(ev));
   assert.equal(ev.find(e=>e.kind==='shown').want,'reading,voice','base already there, not fetched again');
   assert.equal(src.served.base,0,'base never downloaded');
@@ -112,7 +113,7 @@ test('window closed mid-way: next launch reuses the finished pack and resumes th
  const src=await server(MB,{slow:{id:'reading',from:4*MB,rate:96*1024}}),work=tmp('msf-resume-'),root=fakeRoot(path.join(work,'MeguLit'),src),stage=path.join(work,'stage');
  const P=packs();
  try{
-  const ev1=await runWindow(root,{MEGULIT_SETUP_STAGING:stage,MEGULIT_SETUP_CLOSE_AT:String(P.base.length+5*MB)});
+  const ev1=await runWindow(root,{MEGULIT_SETUP_PREFETCH:'1',MEGULIT_SETUP_STAGING:stage,MEGULIT_SETUP_CLOSE_AT:String(P.base.length+5*MB)});
   assert.equal(ev1.at(-1).code,1);assert.ok(ev1.some(e=>e.kind==='close'));
   assert.ok(fs.existsSync(path.join(stage,'runtime-base.setup.part.ok')),'finished pack marked');
   assert.ok(fs.existsSync(path.join(stage,'runtime-reading.setup.part.json')),'half pack has resume state');
@@ -134,7 +135,7 @@ test('staging and install folder on different drives',{skip:skip||(!otherDrive&&
  const src=await server(2*MB),work=tmp('msf-cross-'),root=fakeRoot(path.join(work,'from'),src),stage=path.join(work,'stage');
  const far=fs.mkdtempSync(path.join(otherDrive,'megulit-setup-flow-test-')),target=path.join(far,'MeguLit');
  try{
-  const ev=await runWindow(root,{MEGULIT_SETUP_STAGING:stage,MEGULIT_SETUP_TARGET:target,MEGULIT_SETUP_AUTOSTART:'downloaded'});
+  const ev=await runWindow(root,{MEGULIT_SETUP_PREFETCH:'1',MEGULIT_SETUP_STAGING:stage,MEGULIT_SETUP_TARGET:target,MEGULIT_SETUP_AUTOSTART:'downloaded'});
   assert.equal(ev.at(-1).code,3,JSON.stringify(ev));
   assert.notEqual(path.parse(stage).root.toUpperCase(),path.parse(target).root.toUpperCase());
   for(const id of ['base','reading','voice'])assert.ok(has(target,id),id+' on the other drive');
@@ -146,7 +147,7 @@ test('staging and install folder on different drives',{skip:skip||(!otherDrive&&
 test('not enough space on the chosen drive: says so up front and does not start installing',{skip,timeout:60000},async()=>{
  const src=await server(256*1024),work=tmp('msf-space-'),root=fakeRoot(path.join(work,'MeguLit'),src),stage=path.join(work,'stage');
  try{
-  const ev=await runWindow(root,{MEGULIT_SETUP_STAGING:stage,MEGULIT_SETUP_AUTOSTART:'now',MEGULIT_SETUP_FREE:String(MB),MEGULIT_SETUP_CLOSE_AT:String(MB)});
+  const ev=await runWindow(root,{MEGULIT_SETUP_PREFETCH:'1',MEGULIT_SETUP_STAGING:stage,MEGULIT_SETUP_AUTOSTART:'now',MEGULIT_SETUP_FREE:String(MB),MEGULIT_SETUP_CLOSE_AT:String(MB)});
   const msg=ev.find(e=>e.kind==='message');
   assert.ok(msg&&/空间不够/.test(msg.text),JSON.stringify(ev));
   assert.ok(!ev.some(e=>e.kind==='confirmed'),'not confirmed');

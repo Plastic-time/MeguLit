@@ -19,7 +19,7 @@
   const I18N = {
     zh: {
       title: 'MeguLit 安装', step_welcome: '开始', step_loc: '位置', step_field: '下载', step_unpack: '安装', step_done: '完成',
-      welcomeSub: '开场前，先备料', locSub: '给它找个窝', locT: '给它找个窝', locEn: 'Install location', change: '换个地方',
+      welcomeSub: '欢迎使用MeguLit|现在开始安装', locSub: '给它找个窝', locT: '给它找个窝', locEn: 'Install location', change: '换个地方',
       swDesk: '放一个桌面快捷方式', swMenu: '加到开始菜单', install: '就这儿，开搬',
       protectedMsg: '这是你正在用的正式安装位置，试用版不会动它。换一个位置吧。', lblPath: '装到这个文件夹', defaultHint: '默认位置，不用改也能直接装。', lblSugg: '或者放到', chip: (p, f) => p + '  ·  剩 ' + f, readonly: (p) => '这个位置写不进去，像 Program Files 这样的文件夹要管理员权限。换个位置吧，比如 ' + p + '。', spaceHint: (p, f) => '这块盘装不下。' + p + ' 还有 ' + f + '，装那儿？',
       locNoteWait: '点「就这儿，开搬」才开始下载。都是各项目官方的原版文件，下完会逐个校验，被改过的不会装。',
@@ -30,7 +30,7 @@
       retryNote: '有一条线卡住了，已经自动换线重试。',
       verifyT: '验货', verifyP: (p) => '在核对「' + p + '」是不是原版，几秒钟的事。',
       unpackT: '拆箱上架', unpackP: (p, d) => '把「' + p + '」解压到 ' + d + '。',
-      doneT: '到货了', doneEn: 'NOW SHOWING', launch: '开读',
+      doneT: '安装完成', doneEn: 'INSTALLED', launch: '开读',
       probing: '测速中', eta: (s) => s < 60 ? '还要 ' + Math.ceil(s) + ' 秒左右' : '还要 ' + Math.floor(s / 60) + ' 分 ' + Math.round(s % 60) + ' 秒左右', srcMore: (h, n) => h + ' 等 ' + n + ' 条线',
       packs: { app: '程序本体', base: '基础组件', reading: '注音词典', voice: '语音引擎' },
       errDownT: '这趟没送到', errDownM: '试了好几条线，都连不上。多半是网络断了，或者被代理拦住了。', errDownTip: '先点「重试」，已经下好的部分不会重下。还不行就点「复制日志」发给我们，或者去官网手动下整包。',
@@ -41,7 +41,7 @@
     },
     en: {
       title: 'MeguLit setup', step_welcome: 'Start', step_loc: 'Location', step_field: 'Download', step_unpack: 'Install', step_done: 'Done',
-      welcomeSub: 'Getting things ready', locSub: 'Where should it live?', locT: 'Where to?', locEn: '', change: 'Change',
+      welcomeSub: 'Welcome to MeguLit|Let us get it installed', locSub: 'Where should it live?', locT: 'Where to?', locEn: '', change: 'Change',
       swDesk: 'Desktop shortcut', swMenu: 'Start menu entry', install: 'Install',
       protectedMsg: 'This is your real MeguLit install. The trial leaves it alone, pick another folder.', lblPath: 'Install into this folder', defaultHint: 'Default spot, fine to leave as is.', lblSugg: 'Or put it in', chip: (p, f) => p + '  ·  ' + f + ' free', readonly: (p) => "Can't write to this folder. Places like Program Files need admin rights. Try " + p + ' instead.', spaceHint: (p, f) => "This drive can't fit it. " + p + ' has ' + f + ' free, put it there?',
       locNoteWait: 'Nothing is downloaded until you press the install button. Every file is the original from its project and gets checked before anything is installed.',
@@ -52,7 +52,7 @@
       retryNote: 'One route stalled, so it switched and is trying again.',
       verifyT: 'Checking the files', verifyP: (p) => 'Making sure ' + p + ' is the original. Takes a few seconds.',
       unpackT: 'Installing', unpackP: (p, d) => 'Unpacking ' + p + ' into ' + d + '.',
-      doneT: 'All set', doneEn: 'Ready when you are', launch: 'Open MeguLit',
+      doneT: 'Installed', doneEn: 'Ready when you are', launch: 'Open MeguLit',
       probing: 'testing', eta: (s) => s < 60 ? 'about ' + Math.ceil(s) + ' s left' : 'about ' + Math.floor(s / 60) + ' min ' + Math.round(s % 60) + ' s left', srcMore: (h, n) => h + ' and ' + (n - 1) + ' more',
       packs: { app: 'the app', base: 'core files', reading: 'furigana dictionary', voice: 'voice engine' },
       errDownT: 'The download stopped', errDownM: 'Every route failed to answer. Usually that is the network or a proxy.', errDownTip: 'Hit Retry first, what is already downloaded is kept. If it still fails, copy the log and send it to us, or grab the full package from the site.',
@@ -116,7 +116,7 @@
     const T3 = [[-800, -6200, 520, 2600, 420], [700, -7000, 420, 3200, 380], [1900, -6000, 600, 2300, 500], [3300, -7400, 700, 3400, 520], [4700, -6100, 560, 2500, 460], [5900, -6900, 420, 3000, 400], [7100, -6000, 520, 2400, 440], [8300, -7200, 460, 3100, 420], [-1900, -7000, 500, 2800, 420],
       [900, -2300, 360, 1700, 320], [300, -1200, 300, 1500, 280], [5800, -1700, 360, 1800, 320], [7200, -900, 320, 1500, 300], [-1200, -2600, 400, 2000, 360], [8200, -2400, 420, 2100, 380]];
     T3.forEach(([x, z, w, hh, d], i) => box(x, FY - hh / 2, z, w, hh, d, i === 3 ? 'red' : ''));
-    plate(0, -20, -1000, 760, 360, '<img src="' + (typeof INK !== 'undefined' ? INK : 'logos/logo-A-black.svg') + '" alt=""><h2>' + tr('welcomeSub') + '</h2>');
+    plate(0, -20, -1000, 760, 360, '<img src="' + (typeof INK !== 'undefined' ? INK : 'logos/logo-A-black.svg') + '" alt=""><h2>' + tr('welcomeSub').split('|').join(' ') + '</h2>');
   }
 
   /* Eight big irregular glass plates (cells of 8 hand-placed seeds over the logo), each carrying only its own part of the logo,
@@ -184,7 +184,7 @@
   const POSE = {
     welcome: () => ({ cx: 3300, cy: 700, cz: 2300, rx: 4, ry: 0, rz: 0 }),
     loc: () => ({ cx: 3900, cy: 560, cz: 1500, rx: 3, ry: -14, rz: 0 }),
-    field: (s) => { const p = s && s.total ? clamp(s.got / s.total) : 0; return orbit(key(AZ, p), key(EL, p), key(RR, p)); },
+    field: (s) => { const p = s && s.total ? clamp(s.poseP !== undefined ? s.poseP : s.got / s.total) : 0; return orbit(key(AZ, p), key(EL, p), key(RR, p)); },
     unpack: () => orbit(30, 52, 3000),
     done: () => ({ ...FINAL })
   };
@@ -201,8 +201,8 @@
   let GLraf = false, override = null;
   function apply(extra) {
     const c = cam, e = extra || {};
-    const t = last.t || 0, br = REDUCE || moving || (last.phase === "done") ? 0 : 1;      /* a little handheld breath while resting */
-    const cx = c.cx + Math.sin(t * 0.7) * 5 * br, cy = c.cy + Math.cos(t * 0.5) * 4 * br;
+    const LP = window.__loopPhase, t = last.t || 0, br = REDUCE || moving || window.__still || (LP === undefined && last.phase === "done") ? 0 : 1;      /* a little handheld breath while resting; __loopPhase (0..1) = one seamless cycle for the pre-rendered loops */
+    const LA = window.__loopAmp || 1, cx = c.cx + (LP !== undefined ? Math.sin(LP * 2 * Math.PI) * 5 * LA : Math.sin(t * 0.7) * 5 * br), cy = c.cy + (LP !== undefined ? Math.sin(LP * 4 * Math.PI) * 2.5 * LA : Math.cos(t * 0.5) * 4 * br);   /* loop drift is zero at phase 0: a figure of eight that starts and ends at the pose */
     world.style.transform = `rotateZ(${c.rz}deg) rotateX(${-c.rx}deg) rotateY(${c.ry}deg) translate3d(${-cx}px,${-cy}px,${-c.cz}px)`;
     if (window.GL) { GL.setCamera(c, cx - c.cx, cy - c.cy); if (!GLraf) { GLraf = true; requestAnimationFrame(() => { GLraf = false; GL.draw(); }); } }
     const sk = $('#streaks'); sk.style.opacity = e.streak || 0; $('#flash').style.opacity = e.flash || 0;
@@ -239,10 +239,11 @@
 
   /* ---------- render from a snapshot (pure: same snapshot, same picture) ---------- */
   function render(s) {
+    if (window.__motionT !== undefined) s = Object.assign({}, s, { t: window.__motionT });   /* pre-render: one continuous motion clock for the scene's own activity (floating glass, train) */
     last = s; if (!N && s.st) buildField(s.st.length);
     const t = s.t || 0;
     nudge.x = 0; nudge.y = 0;
-    if (override) { Object.assign(cam, override); apply(); } else if (!moving && POSE[section]) { Object.assign(cam, POSE[section](s)); if (s.phase === 'done' && section === 'done' && !REDUCE) { const w = Math.max(0, t - revealAt - 0.6), u = clamp(w / 1.2); nudge.x = 440 * u * Math.sin(w * 1.3); nudge.y = 120 * u * Math.sin(w * 0.9 + 1); cam.cx += nudge.x; cam.cy += nudge.y; } apply(); }
+    if (override) { Object.assign(cam, override); apply(); } else if (!moving && POSE[section]) { Object.assign(cam, POSE[section](s)); if (s.phase === 'done' && section === 'done' && !REDUCE && !window.__still) { const LP2 = window.__loopPhase, w = Math.max(0, t - revealAt - 0.6), u = clamp(w / 1.2); if (LP2 !== undefined) { nudge.x = 440 * Math.sin(LP2 * 2 * Math.PI); nudge.y = 120 * Math.sin(LP2 * 4 * Math.PI); } else { nudge.x = 440 * u * Math.sin(w * 1.3); nudge.y = 120 * u * Math.sin(w * 0.9 + 1); } cam.cx += nudge.x; cam.cy += nudge.y; } apply(); }
     if (N && s.st) {
       const br = REDUCE ? 0 : 1;
       const dd = Math.hypot(cam.cx - nudge.x - FINAL.cx, cam.cy - nudge.y - FINAL.cy, cam.cz - FINAL.cz), reveal = s.phase === 'done' ? smooth(clamp(1 - dd / (RF * 0.55))) : 0;
@@ -295,9 +296,9 @@
   function hideError() { showErr = false; gsap.to('#ui-err', { opacity: 0, duration: 0.25, overwrite: true, onComplete() { $('#ui-err').style.visibility = 'hidden'; } }); }
 
   /* ---------- actions out ---------- */
-  const Scene = { cam, onAction: null, goTo, render, THEME, REDUCE, get section() { return section; }, init(opts) { if (opts && opts.count) buildField(opts.count); apply(); setSteps(); } };
+  const Scene = { cam, onAction: null, goTo, render, THEME, REDUCE, get section() { return section; }, showInstallError() { showError({ kind: 'install' }); }, init(opts) { if (opts && opts.count) buildField(opts.count); apply(); setSteps(); } };
   function act(type, extra) { const m = Object.assign({ type }, extra || {}); if (window.chrome && chrome.webview) chrome.webview.postMessage(m); if (Scene.onAction) Scene.onAction(m); }
-  $('#install').addEventListener('click', () => act('install', { path: $('#path').value, desktop: $('#swDesk').getAttribute('aria-checked') === 'true', menu: $('#swMenu').getAttribute('aria-checked') === 'true' }));
+  $('#install').addEventListener('click', () => { $('#install').classList.add('busy'); act('install', { path: $('#path').value, desktop: $('#swDesk').getAttribute('aria-checked') === 'true', menu: $('#swMenu').getAttribute('aria-checked') === 'true' }); });   /* instant press feedback: the button reacts in the same frame, whatever the host does next */
   $('#browse').addEventListener('click', () => act('browse')); $('#retry').addEventListener('click', () => act('retry'));
   $('#copylog').addEventListener('click', () => { act('copylog'); $('#copylog').textContent = tr('copied'); }); $('#manual').addEventListener('click', () => act('manual')); $('#launch').addEventListener('click', () => act('launch'));
   document.querySelectorAll('.sw').forEach((b) => b.addEventListener('click', () => b.setAttribute('aria-checked', b.getAttribute('aria-checked') !== 'true')));
@@ -310,10 +311,10 @@
   $('#stay').addEventListener('click', () => Scene.showQuit(false)); $('#leave').addEventListener('click', () => act('close')); $('#btnMin').addEventListener('click', () => act('minimize'));
   $('#drag').addEventListener('mousedown', (e) => { if (e.button === 0) act('dragstart'); });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (quitOpen) Scene.showQuit(false); else $('#btnClose').click(); } });
-  { const t = document.getElementById('topLogo'); if (t) t.src = INK; }
+  { const t = document.getElementById('topLogo'); if (t) t.src = 'logos/logo-orig.svg'; }
   { const map = { '#ui-loc .card h2': 'locT', '#browse': 'change', '#install': 'install', '#ui-loc .note': 'locNote', '#retry': 'retry', '#copylog': 'copylog', '#manual': 'manual', '#doneT': 'doneT', '#launch': 'launch', '.card.quit h2': 'quitT', '.card.quit p': 'quitM', '#stay': 'stay', '#leave': 'leave' };
-    for (const [sel, k] of Object.entries(map)) { const el = $(sel); if (el) el.textContent = tr(k === 'locNote' && window.__waitConfirm ? 'locNoteWait' : k); }
-    $('#ui-loc .card .en').textContent = tr('locEn'); $('#lblPath').textContent = tr('lblPath'); $('#lblSugg').textContent = tr('lblSugg'); $('.card.quit .en').textContent = ''; $('#doneEn').textContent = tr('doneEn'); const ws = $('#welcomeSub'); if (ws) ws.textContent = tr('welcomeSub');
+    for (const [sel, k] of Object.entries(map)) { const el = $(sel); if (el) el.textContent = tr(k === 'locNote' && (window.__waitConfirm || window.__noPrefetch) ? 'locNoteWait' : k); }
+    $('#ui-loc .card .en').textContent = tr('locEn'); $('#lblPath').textContent = tr('lblPath'); $('#lblSugg').textContent = tr('lblSugg'); $('.card.quit .en').textContent = ''; $('#doneEn').textContent = tr('doneEn'); const ws = $('#welcomeSub'); if (ws) { ws.textContent = ''; tr('welcomeSub').split('|').forEach((t, i) => { const sp = document.createElement('span'); sp.className = 'wl' + (i + 1); sp.textContent = t; ws.appendChild(sp); }); }   /* two staggered lines */
     $('#swDesk').lastChild.textContent = tr('swDesk'); $('#swMenu').lastChild.textContent = tr('swMenu');
     $('#btnMin').setAttribute('aria-label', tr('minimize')); $('#btnClose').setAttribute('aria-label', tr('close')); document.title = tr('title'); document.documentElement.lang = LANG === 'en' ? 'en' : 'zh-CN'; }
   let drives = [], need = 1.4 * 1073741824, freeNow = 182 * 1073741824, pathState = 'ok';
@@ -334,7 +335,7 @@
   Scene.t = tr; Scene.setOverride = (p) => { override = p; };
   /* day / night: one number (0..1) drives the WebGL colours; the DOM flips at the half way point and eases its colours with a short CSS transition */
   let themeMix = startDark ? 1 : 0, themeTween = null; const htmlEl = document.documentElement;
-  function paintTheme(m) { themeMix = m; const dark = m > 0.5, th = dark ? 'night' : 'edge'; if (THEME !== th) { THEME = th; htmlEl.dataset.theme = th; const t = $('#topLogo'); if (t) t.src = 'logos/logo-' + LK + '-' + (dark ? 'white' : 'black') + '.svg'; const wl = $('#welcomeLogo'); if (wl) wl.src = 'logos/logo-' + LK + '-' + (dark ? 'white' : 'black') + '.svg'; syncThemeBtn(); }
+  function paintTheme(m) { themeMix = m; const dark = m > 0.5, th = dark ? 'night' : 'edge'; if (THEME !== th) { THEME = th; htmlEl.dataset.theme = th; const wl = $('#welcomeLogo'); if (wl) wl.src = 'logos/logo-' + LK + '-' + (dark ? 'white' : 'black') + '.svg'; syncThemeBtn(); }
     if (window.GL && GL.setMix) GL.setMix(m); }
   function syncThemeBtn() { const b = $('#btnTheme'); if (!b) return; const dark = THEME === 'night'; b.setAttribute('aria-pressed', dark); const lab = dark ? tr('toLight') : tr('toDark'); b.setAttribute('aria-label', lab); b.title = lab; b.innerHTML = dark ? '<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="2.8" fill="currentColor"/><g stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.8 2.8l1.1 1.1M10.1 10.1l1.1 1.1M2.8 11.2l1.1-1.1M10.1 3.9l1.1-1.1"/></g></svg>' : '<svg width="14" height="14" viewBox="0 0 14 14"><path d="M11.6 8.6A5.2 5.2 0 0 1 5.4 2.4a5.2 5.2 0 1 0 6.2 6.2z" fill="currentColor"/></svg>'; }
   Scene.setTheme = (dark, instant) => { try { localStorage.setItem(STORE, dark ? 'dark' : 'light'); } catch (e) { /* no memory */ } act('theme', { dark }); const to = dark ? 1 : 0;
@@ -347,5 +348,5 @@
   buildStatic();
   Object.assign(cam, REDUCE ? POSE.welcome() : { cx: 3300, cy: 800, cz: 4300, rx: 6, ry: 0, rz: 0 }); apply(); setSteps();
   /* welcome plate is visible at once; the opening push-in settles on it (demo/host starts it) */
-  Scene.intro = () => { const o = { p: 0 }, A = { ...cam }; return gsap.to(o, { p: 1, duration: 2.4, ease: 'power3.out', onUpdate() { const B = POSE.welcome(); for (const k in B) cam[k] = lerp(A[k], B[k], o.p); apply(); } }); };
+  Scene.intro = () => { const o = { p: 0 }, A = { ...cam }; if (window.__layout) { const B0 = POSE.welcome(); Object.assign(A, { cx: B0.cx, cy: B0.cy + 90, cz: B0.cz + 320, rx: B0.rx + 1.5, ry: 0, rz: 0 }); }   /* pre-render: start the push-in close enough that the model's far end never shows empty ground */ return gsap.to(o, { p: 1, duration: 2.4, ease: 'power3.out', onUpdate() { const B = POSE.welcome(); for (const k in B) cam[k] = lerp(A[k], B[k], o.p); apply(); } }); };
 })();

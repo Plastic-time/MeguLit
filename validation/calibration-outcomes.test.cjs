@@ -36,13 +36,15 @@ for(const engine of ['krkr','']) for(const placement of [true,false]) for(const 
  test('a calibration that ends "'+name+'" leaves hiding as it was ('+(engine||'no engine page')+', '+(placement?'overlay placement':'reader box')+', '+(manual?'manual':'automatic')+')',()=>{
   const r=rig({engine,placement});const before=r.hide();
   r.control.beginStyleSync(manual,'all');
+  /* 2026-11-21 (owner, test pack v5 Fata): the KiriKiri page reports every character's box: calibration follows it, never gives way */
+  if(engine==='krkr'){assert.deepEqual(r.switches(),[],'no give way on a KiriKiri page');assert.equal(r.style.statuses.at(-1),'following');end(r);assert.deepEqual(r.hide(),before);assert.deepEqual(r.switches(),[]);return;}
   assert.deepEqual(r.switches(),[{type:'disable',reason:'reader-preflight'}],'every hide layer gives way while the probe measures');
   end(r);
   if(name==='the game was closed and started again'){assert.equal(r.hook.preflight,false);assert.equal(r.hook.calibrating===true,false);return;} /* another process: its own start decides */
   assert.deepEqual(r.hide(),before,'hide state after = hide state before');
   assert.deepEqual(r.switches().map(m=>m.type),['disable','enable'],'one give-way, one return; nothing in between, nothing after');
  });}
-test('a second calibration started while one runs does not leave the first one\'s give-way behind',()=>{const r=rig();const before=r.hide();
+test('a second calibration started while one runs does not leave the first one\'s give-way behind',()=>{const r=rig({engine:''});const before=r.hide();
  r.control.beginStyleSync(true,'all');r.control.beginStyleSync(true,'text');r.control.finishStyleSync(false);
  assert.deepEqual(r.hide(),before);assert.equal(r.switches().at(-1).type,'enable');assert.equal(r.switches().filter(m=>m.type==='disable').length,1);});
 
@@ -145,3 +147,17 @@ test('dark text never gets a dark outline, whatever set the two colours; the tra
  assert.equal(outline({textColor:'#000001'},'#000000'),'#ffffff');assert.equal(outline({textColor:'#f8f8f8'},'#000000'),'#000000');assert.equal(outline({textColor:'#000001'},'#f4f4ff'),'#f4f4ff');assert.equal(outline({textColor:'#000001',textGradient:true},'#000000'),'#000000');
  /* frames 2 and 6 of the recording: the Japanese line had its white outline, the translation under it the saved black one */
  assert.ok(gal.includes('--tomoyo-jp-stroke-color:var(--tomoyo-gal-line-edge); --tomoyo-ruby-stroke-color:var(--tomoyo-gal-line-edge); --tomoyo-cn-stroke-color:var(--tomoyo-gal-line-edge); }'));});
+
+/* 2026-11-21 (owner, test pack v5 ファタ 03:32:53Z: the measurement was cancelled and hiding never came back): a give way lasts
+   HookNative.GIVE_WAY_MS at most, whatever the measurement does: then the hide and the replacement are back, the calibration ends */
+test('a give way is capped: no answer from the probe, hiding is back within 2 s and the calibration ends as timed out',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const manual of [true,false]){const r=rig({engine:'',publish:false});const before=r.hide();r.control.beginStyleSync(manual,'all');
+  assert.deepEqual(r.switches(),[{type:'disable',reason:'reader-preflight'}]);
+  t.mock.timers.tick(1999);assert.equal(r.hook.enabled,false,'still measuring');
+  t.mock.timers.tick(1);assert.deepEqual(r.hide(),before,'hide state restored');assert.equal(r.switches().at(-1).type,'enable');
+  assert.equal(r.control.styleCalibration,false);assert.equal(r.style.statuses.at(-1),'timeout');}
+ /* the screen baseline preflight is capped the same way */
+ const r=rig({engine:''});r.hook.preflight=true;r.hook.calibrating=true;r.hook.configure(r.control.host.preferences,r.control.host.state);assert.equal(r.hook.enabled,false);
+ t.mock.timers.tick(2000);assert.equal(r.hook.preflight,false);assert.equal(r.hook.enabled,true);
+});

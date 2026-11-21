@@ -205,15 +205,16 @@ static std::vector<int> Decide(Dev &v, std::vector<Quad> &q) {
 }
 // The device's own getters at every draw: state the game set before the DLL arrived (a declaration set once at start,
 // DR1) counts too. A pure device refuses Get* calls; then the hooked setters' view stays.
-static void NoteTexture(void *t);
+static TexInfo ProbeTexture(void *t); static void StoreTexture(void *t, const TexInfo &i);
 static void Refresh9(IDirect3DDevice9 *d) {
  IDirect3DVertexDeclaration9 *x = NULL; DWORD fvf = 0; IDirect3DVertexShader9 *vs = NULL; IDirect3DBaseTexture9 *t = NULL; IDirect3DVertexBuffer9 *vb = NULL; UINT off = 0, st = 0; IDirect3DIndexBuffer9 *ib = NULL;
  bool hx = SUCCEEDED(d->GetVertexDeclaration(&x)), hf = SUCCEEDED(d->GetFVF(&fvf)), hv = SUCCEEDED(d->GetVertexShader(&vs)), ht = SUCCEEDED(d->GetTexture(0, &t)), hs = SUCCEEDED(d->GetStreamSource(0, &vb, &off, &st)), hi = SUCCEEDED(d->GetIndices(&ib));
- bool known = true; if (x) { Guard g; known = Decls.count(x) > 0; } DeclInfo info = {}; if (x && !known) info = ParseDecl(x);
+ bool known = true, texKnown = true; { Guard g; if (x) known = Decls.count(x) > 0; if (t) texKnown = Textures.count(t) > 0; } DeclInfo info = {}; if (x && !known) info = ParseDecl(x);
+ TexInfo tinfo = {}; if (t && !texKnown) tinfo = ProbeTexture(t);
  { Guard g; Dev &v = *DevOf(d);
   if (x && !known) { if (Decls.size() > 4096) Decls.clear(); Decls[x] = info; }
   if (hx) { v.decl = x != NULL; v.declPtr = x; } if (hf && !x) v.fvf = fvf; if (hv) v.vs = vs != NULL;
-  if (ht && t != v.tex0) { v.tex0 = t; if (t && !Textures.count(t)) NoteTexture(t); }
+  if (ht && t != v.tex0) { v.tex0 = t; if (t && !texKnown && !Textures.count(t)) StoreTexture(t, tinfo); }
   if (hs) { v.vb = vb; v.vbOff = off; v.vbStride = st; } if (hi) v.ib = ib; }
  if (x) x->Release(); if (vs) vs->Release(); if (t) t->Release(); if (vb) vb->Release(); if (ib) ib->Release();
 }
@@ -279,21 +280,27 @@ static HRESULT WINAPI HDrawIndexedPrimitiveUP(IDirect3DDevice9 *d, D3DPRIMITIVET
 }
 
 // ---------------------------------------------------------------------------------------------------------- state hooks
-static void NoteTexture(void *t) {
- if (!t) return; IDirect3DBaseTexture9 *b = (IDirect3DBaseTexture9 *)t; TexInfo i = { 0, 0, D3DFMT_UNKNOWN, false };
+// 2026-11-20 (CHAOS;CHILD froze while skipping; dump: the main thread held Lock inside our hook and waited for the d3d9 device
+// lock, a second game thread held the device lock inside d3d9 and waited for Lock). Rule: no D3D/COM call is ever made while
+// Lock is held. ProbeTexture asks the texture (no lock), StoreTexture files the answer (caller holds Lock).
+static TexInfo ProbeTexture(void *t) {
+ TexInfo i = { 0, 0, D3DFMT_UNKNOWN, false }; if (!t) return i; IDirect3DBaseTexture9 *b = (IDirect3DBaseTexture9 *)t;
  if (b->GetType() == D3DRTYPE_TEXTURE) { D3DSURFACE_DESC sd; if (SUCCEEDED(((IDirect3DTexture9 *)t)->GetLevelDesc(0, &sd))) { i.w = sd.Width; i.h = sd.Height; i.fmt = sd.Format; i.rt = (sd.Usage & D3DUSAGE_RENDERTARGET) != 0; } }
- Textures[t] = i; if (Textures.size() > 8192) Textures.clear();
+ return i;
 }
+static void StoreTexture(void *t, const TexInfo &i) { if (!t) return; Textures[t] = i; if (Textures.size() > 8192) Textures.clear(); }
 static HRESULT WINAPI HSetTexture(IDirect3DDevice9 *d, DWORD stage, IDirect3DBaseTexture9 *t) {
  HRESULT hr = ORIG(HRESULT(WINAPI *)(IDirect3DDevice9 *, DWORD, IDirect3DBaseTexture9 *), d, 65)(d, stage, t);
- if (stage == 0 && SUCCEEDED(hr)) { Guard g; DevOf(d)->tex0 = t; NoteTexture(t); } return hr;
+ if (stage == 0 && SUCCEEDED(hr)) { TexInfo ti = ProbeTexture(t); Guard g; DevOf(d)->tex0 = t; StoreTexture(t, ti); } return hr;
 }
 static HRESULT WINAPI HSetRenderTarget(IDirect3DDevice9 *d, DWORD index, IDirect3DSurface9 *s) {
  HRESULT hr = ORIG(HRESULT(WINAPI *)(IDirect3DDevice9 *, DWORD, IDirect3DSurface9 *), d, 37)(d, index, s);
- if (index == 0 && SUCCEEDED(hr) && s) { Guard g; Dev &v = *DevOf(d); D3DSURFACE_DESC sd; void *tex = NULL;
-  if (SUCCEEDED(s->GetDesc(&sd))) { v.rtW = sd.Width; v.rtH = sd.Height; v.vp.X = v.vp.Y = 0; v.vp.Width = sd.Width; v.vp.Height = sd.Height; v.vp.MinZ = 0; v.vp.MaxZ = 1; }
+ if (index == 0 && SUCCEEDED(hr) && s) { D3DSURFACE_DESC sd; bool desc = SUCCEEDED(s->GetDesc(&sd)); void *tex = NULL;
   IDirect3DTexture9 *t = NULL; if (SUCCEEDED(s->GetContainer(__uuidof(IDirect3DTexture9), (void **)&t)) && t) { tex = t; t->Release(); }
-  v.rtTex = tex; v.rtIsBack = tex == NULL; if (tex) NoteTexture(tex); }
+  TexInfo ti = {}; if (tex) ti = ProbeTexture(tex);
+  Guard g; Dev &v = *DevOf(d);
+  if (desc) { v.rtW = sd.Width; v.rtH = sd.Height; v.vp.X = v.vp.Y = 0; v.vp.Width = sd.Width; v.vp.Height = sd.Height; v.vp.MinZ = 0; v.vp.MaxZ = 1; }
+  v.rtTex = tex; v.rtIsBack = tex == NULL; if (tex) StoreTexture(tex, ti); }
  return hr;
 }
 static HRESULT WINAPI HSetStreamSource(IDirect3DDevice9 *d, UINT n, IDirect3DVertexBuffer9 *vb, UINT off, UINT stride) {
@@ -417,10 +424,13 @@ static HRESULT WINAPI HBufLock(void *buf, UINT off, UINT size, void **pp, DWORD 
 }
 static bool SafeCopy(void *to, const void *from, size_t n) { __try { memcpy(to, from, n); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
 static void Unlocked(void *buf, bool index) {
+ /* the buffer's description is asked before Lock is taken (no D3D call under Lock, see ProbeTexture) */
+ bool pending = false; { Guard g; for (auto &x : Pending) if (x.buf == buf) { pending = true; break; } } if (!pending) return;
+ UINT total = 0; bool i32 = false;
+ if (index) { D3DINDEXBUFFER_DESC dd; if (FAILED(((IDirect3DIndexBuffer9 *)buf)->GetDesc(&dd))) return; total = dd.Size; i32 = dd.Format == D3DFMT_INDEX32; }
+ else { D3DVERTEXBUFFER_DESC dd; if (FAILED(((IDirect3DVertexBuffer9 *)buf)->GetDesc(&dd))) return; total = dd.Size; }
  Guard g; for (size_t i = 0; i < Pending.size(); i++) if (Pending[i].buf == buf) {
-  PendingLock p = Pending[i]; Pending.erase(Pending.begin() + i); UINT total = 0; bool i32 = false;
-  if (index) { D3DINDEXBUFFER_DESC dd; if (FAILED(((IDirect3DIndexBuffer9 *)buf)->GetDesc(&dd))) return; total = dd.Size; i32 = dd.Format == D3DFMT_INDEX32; }
-  else { D3DVERTEXBUFFER_DESC dd; if (FAILED(((IDirect3DVertexBuffer9 *)buf)->GetDesc(&dd))) return; total = dd.Size; }
+  PendingLock p = Pending[i]; Pending.erase(Pending.begin() + i);
   if (total == 0 || total > 8 * 1024 * 1024) return; UINT size = p.size ? p.size : total - p.off; if (p.off >= total) return; if (p.off + size > total) size = total - p.off;
   Shadow &s = Buffers[buf]; if (s.data.size() != total) s.data.assign(total, 0); s.i32 = i32;
   if (!SafeCopy(&s.data[p.off], p.ptr, size)) Buffers.erase(buf);

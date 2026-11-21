@@ -94,6 +94,8 @@
       { label: () => T.tOcr, pane: true, nodes: () => [...panel.querySelectorAll(':scope>details:not(.tome-mask-diag)')] },
       { label: () => T.tDiag, pane: true, nodes: k('details.tome-mask-diag') }
     ], tabState);
+    /* 2026-11-21 (user: 文字来源也给我放到下面去): the source card and its OCR switch sit under the tab pages, not above the tabs */
+    const srcCard = panel.querySelector(':scope>.tome-mask-src'); if (srcCard && panel.lastElementChild !== srcCard) panel.append(srcCard);
   }
   function mount() {
     for (const p of document.querySelectorAll('.tome-hooks')) {

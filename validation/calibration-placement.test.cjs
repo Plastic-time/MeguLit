@@ -25,13 +25,16 @@ function rig({placement=true,compositor=false,engine='krkr'}={}){
  return {hook,control,style,sent,switches:()=>sent.filter(m=>m.type==='enable'||m.type==='disable')};
 }
 
+/* 2026-11-21 (owner, test pack v5 ファタ: calibration gave way and never came back): a KiriKiri page reports every character's box,
+   calibration follows those boxes and never shows the original; the give-way path is kept for engines without boxes */
+for(const purpose of ['all','text','position'])test('KiriKiri page: a '+purpose+' calibration follows the engine boxes, no give way',()=>{
+ const r=rig();r.control.beginStyleSync(true,purpose);assert.deepEqual(r.switches(),[]);assert.equal(r.hook.enabled,true);assert.equal(r.style.statuses.at(-1),'following');assert.equal(r.control.styleCalibration,false);});
 for(const purpose of ['all','text','position']){
- test('overlay placement on KiriKiri: a '+purpose+' calibration shows the original, then hiding resumes',()=>{
-  const r=rig();
+ test('overlay placement without engine boxes: a '+purpose+' calibration shows the original, then hiding resumes',()=>{
+  const r=rig({engine:''});r.hook.placement=null;
   r.control.beginStyleSync(true,purpose);
   assert.deepEqual(r.switches(),[{type:'disable',reason:'reader-preflight'}],'the game must draw its original while the probe measures it');
   assert.equal(r.hook.enabled,false);
-  assert.equal(r.control.host.styleSync.waitNext,true,'the current line was drawn invisible: measure the next one');
   r.sent.length=0;r.control.finishStyleSync(true);
   assert.deepEqual(r.switches(),[{type:'enable'}],'hiding comes back after the calibration');
   assert.equal(r.style.statuses.at(-1),'applied');
@@ -39,14 +42,14 @@ for(const purpose of ['all','text','position']){
 }
 
 test('a cancelled calibration hides again at once',()=>{
- const r=rig();r.control.beginStyleSync(true,'all');r.sent.length=0;
+ const r=rig({engine:''});r.control.beginStyleSync(true,'all');r.sent.length=0;
  r.control.finishStyleSync(false,true);
  assert.equal(r.style.cancelled,true);
  assert.deepEqual(r.switches(),[{type:'enable'}]);
 });
 
 test('capture compositor and plain embed pause the same way; placement between calibrations stays on',()=>{
- for(const opt of [{placement:false,compositor:true},{placement:false}]){const r=rig(opt);r.control.beginStyleSync(true,'all');assert.deepEqual(r.switches(),[{type:'disable',reason:'reader-preflight'}]);}
+ for(const opt of [{placement:false,compositor:true,engine:''},{placement:false,engine:''}]){const r=rig(opt);r.control.beginStyleSync(true,'all');assert.deepEqual(r.switches(),[{type:'disable',reason:'reader-preflight'}]);}
  const r=rig();r.hook.preflight=true;/* a KiriKiri baseline preflight outside a calibration does not apply (E472) */r.hook.configure(r.control.host.preferences,r.control.host.state);
  assert.deepEqual(r.switches(),[],'placement keeps the line hidden outside a calibration');
 });

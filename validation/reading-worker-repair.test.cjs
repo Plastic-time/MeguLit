@@ -22,7 +22,7 @@ test('a worker that fails to start is repaired once and started again',async()=>
 
 test('when repair does not help, the error says exactly where to repair and why',async()=>{
  const {l,log}=rig([false,false]);
- await assert.rejects(l.ready(),e=>/Alt\+T → 设置 → 词典 → 「修复 \/ 重新下载」/.test(e.message)&&/sudachipy/.test(e.message));
+ await assert.rejects(l.ready(),e=>e.message.split('分词组件无法运行').length===2&&/Alt\+T → 设置 → 词典 → 「修复 \/ 重新下载」/.test(e.message)&&/sudachipy/.test(e.message));
  assert.equal(log.installs.length,1);
  /* no endless repair loop on the next lookup */
  await assert.rejects(l.ready(),/Alt\+T/);assert.equal(log.installs.length,1);

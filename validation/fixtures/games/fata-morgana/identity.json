@@ -1,0 +1,12 @@
+{
+ "same":[
+  {"exe":"D:/Games/Fata/fata.exe","engine":"KiriKiri","title":"ファタモルガーナの館"},
+  {"exe":"C:/Program Files (x86)/Steam/steamapps/common/The House in Fata Morgana/fata_jp.exe","steamAppId":"303310"},
+  {"exe":"E:/gal/fata/fata_cn.exe"},
+  {"exe":"E:/gal/fata/start.exe","title":"ファタモルガーナの館 -Dreams of the Revenants Edition-","engine":"KiriKiri"}
+ ],
+ "other":[
+  {"exe":"D:/Games/SenrenBanka/SenrenBanka.exe"},
+  {"exe":"D:/Games/x/Game.exe","title":"foo"}
+ ]
+}

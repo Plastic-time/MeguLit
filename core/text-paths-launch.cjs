@@ -38,13 +38,16 @@ async function prepare({root,exe,profile={},enabled=false,shadowRoot=null,trace=
 
 /* Connect a prepared session to the hook reader (core/hook-native.cjs): records in, replacement switch and lines out. */
 function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepared.session;
- s.onChars=line=>hook.charRects(line);s.onStatus=st=>hook.trace?.('text path '+prepared.path+': '+st);hook.attachTextPath?.(s);}
+ s.onChars=line=>hook.charRects(line);s.onStatus=st=>hook.trace?.('text path '+prepared.path+': '+st);/* engine-draw: a sentence the engine wants to draw itself asks the reader for its ruby and translation */s.onAsk=a=>{try{hook.emit?.({type:'hookDrawEmbed',...a});}catch{}};hook.attachTextPath?.(s);}
 
 /* ③ dot font at the source (native/fontdot, docs/text-architecture.md): when ① starts the game through MeguLitLaunch
    (compositor mode), MeguLitFontDot<bit>.dll rides along in MEGULIT_LAUNCH_EXTRA and is loaded while the game is still
    suspended. Off with MEGULIT_FONTDOT_OFF=1, without the DLL, or once the crash canary saw the game die with it. The DLL
    itself serves dots only while the compositor's heartbeat says it is presenting (else the real fonts). */
 function fontDot(root,exe,early,trace=()=>{}){
+ /* 2026-11-21 (owner: 打点可以不要了，精度差、容易漏点) the dot font is retired: never loaded into a game. Kept as code only so an
+    old install's canary record still reads; MEGULIT_FONTDOT_FORCE=1 (tests, research) is the one way in */
+ if(process.env.MEGULIT_FONTDOT_FORCE!=='1')return null;
  if(!early||process.env.MEGULIT_FONTDOT_OFF==='1')return null;/* dot font = marks: only with the capture compositor (off by default since 2026-11-14) */if(process.env.MEGULIT_CAPTURE_COMPOSITOR!=='1')return null;
  const bit=/MeguLitLaunch32\.exe$/i.test(early.file)?'32':'64',dll=path.join(root,'native','MeguLitFontDot'+bit+'.dll');
  if(!require('node:fs').existsSync(dll))return null;
@@ -67,11 +70,15 @@ function fontDot(root,exe,early,trace=()=>{}){
    shadow folder on the same volume (<volume>\MeguLit-Shadow\<exe>-<size>): folders as junctions, files as hard links
    only (no copies: a failed link drops the shadow and the launch stays as before). A game folder that already holds
    steam_appid.txt is started in place. Returns {exe,cwd,env,shadow} or null. */
-function steamDirect({exe,appid,shadowRoot=null,trace=()=>{}}){
+/* base: the folder the game runs from and the shadow mirrors (default the program's own folder). 2026-11-21 BALDR SKY Steam:
+   Dive1\BaldrSky.exe runs from the install root (steam_api.dll and the shared *.pac are there, Dive1\ holds only its own
+   Visual.pac/Voice.pac), so base = install root and the program starts as <shadow>\Dive1\BaldrSky.exe from the shadow. */
+function steamDirect({exe,appid,base=null,shadowRoot=null,trace=()=>{}}){
  const fs=require('node:fs');appid=String(appid||'');if(!/^\d+$/.test(appid)||!exe||!fs.existsSync(exe))return null;
- const env={SteamAppId:appid,SteamGameId:appid,SteamOverlayGameId:appid},dir=path.dirname(exe);
- if(fs.existsSync(path.join(dir,'steam_appid.txt'))){trace('steam-direct',{shadow:false});return {exe,cwd:dir,env,shadow:null};}
- const key=path.basename(exe).replace(/[^A-Za-z0-9._-]/g,'_')+'-'+fs.statSync(exe).size;
+ const env={SteamAppId:appid,SteamGameId:appid,SteamOverlayGameId:appid},dir=base?path.resolve(base):path.dirname(exe),rel=path.relative(dir,path.resolve(exe));
+ if(!rel||rel.startsWith('..')||path.isAbsolute(rel))return null;
+ if(fs.existsSync(path.join(dir,'steam_appid.txt'))){trace('steam-direct',{shadow:false,base:base?true:undefined});return {exe,cwd:dir,env,shadow:null};}
+ const key=(base?path.basename(dir).replace(/[^A-Za-z0-9._-]/g,'_')+'-':'')+path.basename(exe).replace(/[^A-Za-z0-9._-]/g,'_')+'-'+fs.statSync(exe).size;
  const shadow=path.join(shadowRoot||path.join(path.parse(path.resolve(exe)).root,'MeguLit-Shadow'),key);
  let stats;try{stats=U.mirror(dir,shadow,{linkOnly:true,ours:new Set(['steam_appid.txt','megulit-shadow.json'])});}
  catch(e){trace('steam-direct-skipped',{error:String(e?.code||e?.message||e).slice(0,80)});
@@ -79,9 +86,9 @@ function steamDirect({exe,appid,shadowRoot=null,trace=()=>{}}){
   try{for(const n of fs.readdirSync(shadow)){const p=path.join(shadow,n),t=fs.lstatSync(p);if(t.isSymbolicLink())fs.rmdirSync(p);else if(t.isFile())fs.unlinkSync(p);}fs.rmdirSync(shadow);}catch{}
   return null;}
  fs.writeFileSync(path.join(shadow,'steam_appid.txt'),appid);
- fs.writeFileSync(path.join(shadow,'megulit-shadow.json'),JSON.stringify({game:dir,exe:path.basename(exe),steam:appid,at:Date.now(),...stats}));
- trace('steam-direct',{shadow,links:stats.links,junctions:stats.junctions});
- return {exe:path.join(shadow,path.basename(exe)),cwd:shadow,env,shadow};
+ fs.writeFileSync(path.join(shadow,'megulit-shadow.json'),JSON.stringify({game:dir,exe:rel,steam:appid,at:Date.now(),...stats}));
+ trace('steam-direct',{shadow,links:stats.links,junctions:stats.junctions,part:base?rel:undefined});
+ return {exe:path.join(shadow,rel),cwd:shadow,env,shadow};
 }
 
 module.exports={prepare,attach,unityPack,fontDot,steamDirect};

@@ -51,7 +51,7 @@ test('reader.translate: script translation first, else the chain; a total failur
  const fill=events.find(e=>e.method==='deliverBackfill');assert.deepEqual(fill.args.slice(0,2),['私(あるいはこれを読むあなた)は世界に属さない。',mt],'filled in on screen');
  assert.deepEqual(stats.at(-1),['game-1','私(あるいはこれを読むあなた)は世界に属さない。',mt],'and in the dialogue log (as a machine translation)');
  assert.equal(cache.get('私(あるいはこれを読むあなた)は世界に属さない。'),mt);
- assert.match(fs.readFileSync(path.join(__dirname,'../web/reader/modules/inject.js'),'utf8'),/bridge\.deliverBackfill = \(source, text\) => \{/);
+ assert.match(fs.readFileSync(path.join(__dirname,'../web/reader/modules/inject.js'),'utf8'),/bridge\.deliverBackfill = \(source, text(?:, kind = '')?\) => \{/);
 });
 
 test('a LOG line far back does not cost the story lines after it their translation (the scene is twice in the script)',()=>{

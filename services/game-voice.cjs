@@ -194,5 +194,8 @@ function scanLater(root,executable,delay=8000,{cold=false}={}){if(!executable)re
 const staleRuns=new Map();
 function refreshStale(root){if(staleRuns.has(root))return staleRuns.get(root);const games=Object.values(lines(root).games).filter(g=>stale(g)&&g.dir&&fs.existsSync(g.dir)).sort((a,b)=>(a.lines||0)-(b.lines||0));
  const run=Promise.all(games.map(g=>new Promise(resolve=>scanInWorker(root,g.dir,()=>resolve(),true)))).then(()=>games.length);staleRuns.set(root,run);return run;}
-const has=(root,text)=>{const k=keyOf(text);return !!(k&&lines(root).lines[k]);};
-module.exports={refreshStale,verdict,recordedFits,seconds,pieceKeys,QUIET_REV,flush,hashedPaths,scanLater,norm,keyOf,kind,catalog,arcList,ovkList,scan,gameDir,remember,find,has,gameKey,clip,entry,runtimeFile,gameFor,ensureScanned,stale,ENGINE_REV,_reset(){memo=null;quietMemo=null;catalogs.clear();}};
+function recordingExists(file){try{const s=fs.statSync(file);return s.isFile()&&s.size>=12;}catch{return false;}}
+function has(root,text){const hit=entry(root,text);if(!hit)return false;
+ if(hit.ref==='runtime')return !quiet(root).has(hit.key)&&recordingExists(runtimeFile(root,hit.key,hit.ext));
+ return true;}
+module.exports={refreshStale,verdict,recordedFits,recordingExists,seconds,pieceKeys,QUIET_REV,flush,hashedPaths,scanLater,norm,keyOf,kind,catalog,arcList,ovkList,scan,gameDir,remember,find,has,gameKey,clip,entry,runtimeFile,gameFor,ensureScanned,stale,ENGINE_REV,_reset(){memo=null;quietMemo=null;catalogs.clear();}};

@@ -1,0 +1,74 @@
+2026-11-20T22:54:03.064Z source chars=4 sequence=48
+2026-11-20T22:54:10.239Z source chars=6 sequence=49
+2026-11-20T22:54:11.262Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":20,"sourceCharacters":4,"checkedAt":1795215251262,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:12.015Z visual {"type":"hookVisual","sequence":2,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":20,"sourceCharacters":4,"checkedAt":1795215252014,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:12.820Z source chars=6 sequence=50
+2026-11-20T22:54:13.949Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":3,"recognizedCharacters":19,"sourceCharacters":1,"checkedAt":1795215253948,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:14.761Z visual {"type":"hookVisual","sequence":3,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":37,"sourceCharacters":1,"checkedAt":1795215254759,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:16.309Z source chars=9 sequence=51
+2026-11-20T22:54:17.310Z visual {"type":"hookVisual","sequence":4,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":7,"checkedAt":1795215257308,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:18.054Z visual {"type":"hookVisual","sequence":4,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":7,"checkedAt":1795215258054,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:26.271Z source chars=14 sequence=52
+2026-11-20T22:54:27.247Z visual {"type":"hookVisual","sequence":5,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":9,"checkedAt":1795215267247,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:28.055Z visual {"type":"hookVisual","sequence":5,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":9,"checkedAt":1795215268055,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:30.236Z choice aux TextRender role=0 added=["飛び起きた俺は、前に座っている運転手に返事をする。"] text="飛び起きた俺は、前に座っている運転手に返事をする。"
+2026-11-20T22:54:30.244Z source chars=25 sequence=53
+2026-11-20T22:54:32.228Z source chars=22 sequence=54
+2026-11-20T22:54:34.770Z source chars=13 sequence=55
+2026-11-20T22:54:35.499Z placement placed: line 100003, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:35.736Z placement placed: line 100004, 41 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:35.939Z source chars=41 sequence=56
+2026-11-20T22:54:36.008Z placement placed: line 100004, 41 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:37.122Z visual {"type":"hookVisual","sequence":9,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":38,"checkedAt":1795215277121,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:37.959Z visual {"type":"hookVisual","sequence":9,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":38,"checkedAt":1795215277959,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:57.297Z choice aux TextRender role=0 added=["まだ大雑把な目的地しか伝えていなかったのを思い出した。"] text="まだ大雑把な目的地しか伝えていなかったのを思い出した。"
+2026-11-20T22:54:57.305Z source chars=27 sequence=57
+2026-11-20T22:54:57.703Z placement placed: line 100005, 27 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:58.299Z visual {"type":"hookVisual","sequence":10,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":26,"checkedAt":1795215298299,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:54:58.643Z placement placed: line 100006, 19 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:58.833Z choice aux TextRender role=0 added=["「志那都荘まで行って欲しいんですけど」"] text="「志那都荘まで行って欲しいんですけど」"
+2026-11-20T22:54:58.843Z source chars=19 sequence=58
+2026-11-20T22:54:58.896Z placement placed: line 100006, 19 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:54:59.837Z visual {"type":"hookVisual","sequence":11,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":17,"checkedAt":1795215299836,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:00.016Z placement placed: line 100007, 30 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:00.187Z source chars=30 sequence=59
+2026-11-20T22:55:00.203Z placement placed: line 100007, 30 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:01.212Z visual {"type":"hookVisual","sequence":12,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":25,"checkedAt":1795215301211,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:01.962Z visual {"type":"hookVisual","sequence":12,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":25,"checkedAt":1795215301961,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:03.858Z placement placed: line 100008, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:04.062Z source chars=28 sequence=60
+2026-11-20T22:55:04.099Z placement placed: line 100008, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:05.092Z visual {"type":"hookVisual","sequence":13,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":23,"checkedAt":1795215305091,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:05.260Z placement placed: line 100009, 17 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:05.458Z choice aux TextRender role=0 added=["「（サービスの悪い運転手だ……）」"] text="「（サービスの悪い運転手だ……）」"
+2026-11-20T22:55:05.480Z source chars=17 sequence=61
+2026-11-20T22:55:05.506Z placement placed: line 100009, 17 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:06.533Z placement placed: line 100010, 34 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:06.671Z visual {"type":"hookVisual","sequence":14,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":11,"checkedAt":1795215306670,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:06.724Z source chars=34 sequence=62
+2026-11-20T22:55:06.819Z placement placed: line 100010, 34 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:07.862Z visual {"type":"hookVisual","sequence":15,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":32,"checkedAt":1795215307862,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:08.169Z placement placed: line 100011, 11 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:08.362Z choice aux TextRender role=0 added=["「本当にすみませんね」"] text="「本当にすみませんね」"
+2026-11-20T22:55:08.367Z source chars=11 sequence=63
+2026-11-20T22:55:08.417Z placement placed: line 100011, 11 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:09.421Z visual {"type":"hookVisual","sequence":16,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":9,"checkedAt":1795215309420,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:09.771Z placement placed: line 100012, 22 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:09.984Z choice aux TextRender role=0 added=["「……わかりました。じゃあ、ここでいいです」"] text="「……わかりました。じゃあ、ここでいいです」"
+2026-11-20T22:55:09.991Z source chars=22 sequence=64
+2026-11-20T22:55:10.010Z placement placed: line 100012, 22 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:55:11.027Z visual {"type":"hookVisual","sequence":17,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":16,"checkedAt":1795215311026,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:55:11.794Z visual {"type":"hookVisual","sequence":17,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":4,"recognizedCharacters":23,"sourceCharacters":16,"checkedAt":1795215311788,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:56:59.098Z placement placed: line 100013, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:56:59.190Z source chars=12 sequence=65
+2026-11-20T22:56:59.208Z placement placed: line 100013, 12 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:56:59.981Z placement placed: line 100014, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:00.177Z choice aux TextRender role=0 added=["タクシーが止まり、俺は精算を済ませて、タクシーを降りる。"] text="タクシーが止まり、俺は精算を済ませて、タクシーを降りる。"
+2026-11-20T22:57:00.185Z source chars=28 sequence=66
+2026-11-20T22:57:00.200Z placement placed: line 100014, 28 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:01.179Z visual {"type":"hookVisual","sequence":19,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":2,"recognizedCharacters":20,"sourceCharacters":25,"checkedAt":1795215421178,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:57:01.226Z placement placed: line 100015, 44 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:01.433Z source chars=44 sequence=67
+2026-11-20T22:57:01.499Z placement placed: line 100015, 44 characters, first box 374,707,31,31 in client 1535x863
+2026-11-20T22:57:02.538Z visual {"type":"hookVisual","sequence":20,"stage":"hidden","sample":1,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":38,"checkedAt":1795215422533,"region":{"x":353,"y":560,"width":1181,"height":302}}
+2026-11-20T22:57:03.460Z visual {"type":"hookVisual","sequence":20,"stage":"hidden","sample":2,"valid":true,"matched":false,"japaneseCharacters":5,"recognizedCharacters":25,"sourceCharacters":38,"checkedAt":1795215423458,"region":{"x":353,"y":560,"width":1181,"height":302}}

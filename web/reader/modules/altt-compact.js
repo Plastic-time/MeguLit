@@ -60,13 +60,45 @@
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-import-row>:is(select,button){margin:0!important}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-import-row>button{padding:5px 12px!important;height:32px}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-calibration-imports{margin-top:6px}
- /* reusable in-panel second-level tabs (.mg-subtabs): plain text tabs, one row, scrolls sideways when too many */
- .mg-subtabs{display:flex;flex-wrap:nowrap;gap:2px 4px;margin:6px 0 6px;border-bottom:1px solid var(--menu-border,#34343a);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
- .mg-subtabs>button{flex:none;padding:7px 12px!important;border:0!important;border-bottom:2px solid transparent!important;border-radius:0!important;background:transparent!important;color:var(--theme-textSecondary,#aaa)!important;cursor:pointer;font-size:13px;margin-bottom:-1px;white-space:nowrap}
- .mg-subtabs>button:hover{color:var(--theme-text,#e8e9ec)!important}
- .mg-subtabs>button[aria-selected=true]{color:var(--menu-accent,#e0495a)!important;border-bottom-color:var(--menu-accent,#e0495a)!important;font-weight:700}
- .mg-subtabs>button:focus-visible{outline:2px solid var(--menu-accent,#e0495a);outline-offset:-2px;border-radius:6px!important}
- @media (pointer:coarse){.mg-subtabs>button{padding:11px 14px!important}}
+ /* reusable in-panel second-level tabs (.mg-subtabs): one segmented control. A single trough holds every tab in equal cells (4 a row in a narrow panel, one row when wide); the selected cell is filled. It must not look like the action buttons below it. */
+ /* a pane under the segmented control already says which tab it is: its own fold header is not shown */
+ details.tome-ac-pane:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7)>summary{display:none!important}
+ /* colour rows take one line: name on the left, a small swatch + hex on the right (with a small copy button) */
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) label:has(>.tome-color-field){display:flex!important;flex-direction:row!important;align-items:center;justify-content:space-between;gap:10px;min-height:32px}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-color-field{display:inline-flex!important;align-items:center;gap:6px;width:auto!important;flex:none;margin:0!important}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-color-field>.tome-color-swatch{width:24px!important;height:24px!important;min-width:0!important;min-height:0!important;padding:0!important;border-radius:6px!important}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-color-field>.tome-color-text{width:84px!important;height:28px!important;padding:0 8px!important;font-size:12px!important;font-family:ui-monospace,Consolas,monospace}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-color-field>.tome-color-copy{height:28px!important;min-height:0!important;padding:0 10px!important;font-size:12px!important}
+ /* furigana per-row tweaks: one line each — name, row chips, slider, value — like every other slider row */
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows{display:grid!important;grid-template-columns:64px minmax(0,1fr) 44px!important;align-items:center;column-gap:10px;row-gap:6px}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows>.megulit-ruby-rows-title{grid-row:1!important;grid-column:1!important;white-space:nowrap}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows>.megulit-ruby-rows-chips{grid-row:1!important;grid-column:2/-1!important}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows>.megulit-ruby-axis{grid-column:1!important;padding-left:12px;color:var(--theme-textSecondary,#aaa);white-space:nowrap}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows>.megulit-ruby-axis[data-a=y],.tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows>.megulit-ruby-rows-slider:not([data-axis-x]),.tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows>.megulit-ruby-rows-value:not([data-axis-x]){grid-row:2!important}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows>.megulit-ruby-axis[data-a=x],.tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows>.megulit-ruby-rows-slider[data-axis-x],.tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows>.megulit-ruby-rows-value[data-axis-x]{grid-row:3!important}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows>.megulit-ruby-rows-slider{grid-column:2!important;width:100%!important;margin:0!important}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .megulit-ruby-rows>.megulit-ruby-rows-value{grid-column:3!important;text-align:right}
+ /* 2026-11-21 (user: 同类的不能左右双列吗): paired settings inside a tab page sit side by side; each cell stacks name+value over its slider */
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-ac-pane .tomoyo-cn-grid:not(.tomoyo-type-sizes):not(:has(.tome-color-field)){display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;column-gap:18px!important;row-gap:10px!important}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-ac-pane .tomoyo-cn-grid:not(.tomoyo-type-sizes):not(:has(.tome-color-field))>label:has(input[type=range]){display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center;row-gap:4px;column-gap:6px;min-width:0}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-ac-pane .tomoyo-cn-grid:not(.tomoyo-type-sizes):not(:has(.tome-color-field))>label:has(input[type=range])>input[type=range]{grid-row:2!important;grid-column:1/-1!important;width:100%!important;margin:0!important}
+ .tomoyo-cn-dialog:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5):not(#q6):not(#q7) .tome-ac-pane .tomoyo-cn-grid:not(.tomoyo-type-sizes):not(:has(.tome-color-field))>label:has(input[type=range])>:not(input[type=range]){grid-row:1!important;grid-column:2!important}
+ .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid;grid-template-columns:repeat(var(--mg-seg-cols,4),minmax(0,1fr));gap:2px;margin:8px 0 10px;padding:3px;border:0;border-radius:10px;background:color-mix(in srgb,var(--theme-text,#e8e9ec) 7%,transparent);overflow:visible}
+ .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button{min-width:0;margin:0!important;padding:7px 4px!important;border:1px solid transparent!important;border-radius:7px!important;background:transparent!important;box-shadow:none!important;color:var(--theme-textSecondary,#aaa)!important;cursor:pointer;font-size:13px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+ .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button:hover{color:var(--theme-text,#e8e9ec)!important;background:color-mix(in srgb,var(--theme-text,#e8e9ec) 6%,transparent)!important}
+ .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button[aria-selected=true]{color:var(--theme-text,#f2f3f5)!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 22%,transparent)!important;border-color:color-mix(in srgb,var(--menu-accent,#e0495a) 55%,transparent)!important;font-weight:700}
+ .mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button:focus-visible{outline:2px solid var(--menu-accent,#e0495a);outline-offset:1px}
+ @media (pointer:coarse){.mg-subtabs:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button{padding:11px 4px!important}}
+ /* action buttons on the calibration page: an even two-column grid instead of ragged rows; toggles, hints and selects keep the full width */
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 8px;align-items:center}
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>:not(button){grid-column:1/-1}
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button,.tome-window-bind-row:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>button{width:100%;min-width:0;margin:0!important;justify-content:center;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ /* one obvious action: 校准当前句 is the main button (full width, filled); the partial ones sit under it as quiet small buttons */
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-game-style-sync]{grid-column:1/-1;height:38px!important;font-weight:700;color:#fff!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 80%,transparent)!important;border-color:transparent!important}
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-game-style-sync]:hover:not(:disabled){background:var(--menu-accent,#e0495a)!important}
+ .tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-calibrate-text],.tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-gal-position-sync],.tome-game-style-sync:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>[data-calibrate-stream]{height:28px!important;font-size:12px!important;font-weight:400!important;color:var(--theme-textSecondary,#aaa)!important;background:transparent!important;border-color:var(--menu-border,#34343a)!important}
+ .tome-window-bind-row:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5){display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}
+ .tome-window-bind-row:not(#q1):not(#q2):not(#q3):not(#q4):not(#q5)>:not(button){grid-column:1/-1}
  .tome-ac:not(#q1):not(#q2):not(#q3) output.tomoyo-slider-value{color:var(--theme-text,#f1f1f4)!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 30%,transparent)!important;border-radius:6px;padding:1px 6px;font-weight:600}
  .tome-ac:not(#q1):not(#q2):not(#q3) [data-menu-category=text] details.tome-ac-pane .tomoyo-cn-grid{display:block!important}
  @container (min-width:600px){.tome-ac:not(#q1):not(#q2):not(#q3) [data-menu-category=text] details[data-text-colours] .tomoyo-cn-grid{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:0 24px!important}.tome-ac:not(#q1):not(#q2):not(#q3) [data-menu-category=text] details[data-text-colours] .tomoyo-cn-grid>label:has(>output){grid-column:1/-1}}
@@ -77,6 +109,7 @@
  .tome-ac-bindbar[data-bound=true]>small::before{background:#45c47f}
  .tome-ac-bindbar>button{flex:none;padding:4px 10px!important;border:0!important;background:transparent!important;color:color-mix(in srgb,var(--menu-accent,#e0495a) 55%,#fff)!important;cursor:pointer;font-size:12.5px;border-radius:6px!important}
  .tome-ac-bindbar>button:hover{background:color-mix(in srgb,var(--menu-accent,#e0495a) 14%,transparent)!important}
+ .tome-ac-bindbar>button.tome-ac-bind-cta{color:#fff!important;background:color-mix(in srgb,var(--menu-accent,#e0495a) 80%,transparent)!important;border-radius:6px!important;font-weight:700}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-ac-off{display:none!important}
  .tome-ac:not(#q1):not(#q2):not(#q3) details.tome-ac-pane{border:0!important;background:transparent!important;margin-top:0!important}
  .tome-ac:not(#q1):not(#q2):not(#q3) details.tome-ac-pane>summary{display:none!important}
@@ -85,22 +118,24 @@
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-ac-cols .tomoyo-cn-grid{grid-template-columns:minmax(0,1fr)!important}
  .tome-ac:not(#q1):not(#q2):not(#q3) .tome-ac-cols{display:grid;grid-template-columns:minmax(0,1fr);gap:0 28px}
  @container (min-width:640px){.tome-ac:not(#q1):not(#q2):not(#q3) .tome-ac-cols{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
- @media (pointer:coarse){.tome-ac:not(#q1):not(#q2):not(#q3) .mg-subtabs>button{padding:10px 12px!important}}
+ @media (pointer:coarse){.tome-ac:not(#q1):not(#q2):not(#q3) .mg-subtabs>button{padding:11px 4px!important}}
  `;(document.head||document.documentElement).appendChild(style);
  const strip=s=>(s||'').replace(/\s*(设置|設定|settings?)$/i,'').trim();
  const mk=(tag,cls,attrs)=>{const e=document.createElement(tag);if(cls)e.className=cls;for(const k in attrs||{})e.setAttribute(k,attrs[k]);return e;};
  const wrapPair=(a,b,cls)=>{if(!a||!b||a.parentElement!==b.parentElement||a.parentElement.classList.contains('tome-ac-pair'))return;const w=mk('div','tome-ac-pair '+(cls||''));a.before(w);w.append(a,b);};
  const byName=(root,n)=>root.querySelector('[name='+n+']')?.closest('label');
  /* sub-tab bar: items = [{label, nodes:[...], get label()}]; idempotent, re-run on every mutation */
+ /* short names for the segmented control (the full name stays as the tooltip) */
+ const SHORT={'沉浸与等待图标':'沉浸模式','显示方式':'显示','行距与间距':'间距','游戏字体':'字体','校准与位置':'校准','导入与历史':'沿用设置'};
  function chips(host,before,id,items,state){
   let bar=host.querySelector(':scope>.mg-subtabs[data-ac-id='+id+']');
-  if(!bar){bar=mk('div','mg-subtabs',{role:'tablist','data-ac-id':id,'data-ac-added':''});before.before(bar);
+  if(!bar){bar=mk('div','mg-subtabs',{role:'tablist','data-ac-id':id,'data-ac-added':''});before.before(bar);bar.style.setProperty('--mg-seg-cols',String(items.length<=4?items.length:Math.ceil(items.length/2)));
    items.forEach((it,i)=>{const b=mk('button','',{type:'button',role:'tab','data-ac-added':''});b.onclick=()=>{state.i=i;paint();save();};bar.append(b);});
    const sk='megulit-altt-subtab-'+id,save=()=>{try{localStorage.setItem(sk,String(state.i));}catch{}};
    try{const v=Number(localStorage.getItem(sk));if(Number.isInteger(v)&&v>=0&&v<items.length)state.i=v;}catch{}
    bar.addEventListener('keydown',e=>{const k=e.key;if(!['ArrowRight','ArrowLeft','Home','End'].includes(k))return;const n=k==='Home'?0:k==='End'?items.length-1:(state.i+(k==='ArrowRight'?1:items.length-1))%items.length;state.i=n;paint();save();bar.children[n].focus();bar.children[n].scrollIntoView({block:'nearest',inline:'nearest'});e.preventDefault();});}
-  function paint(){[...bar.children].forEach((b,i)=>{const t=items[i].label();if(b.textContent!==t)b.textContent=t;b.setAttribute('aria-selected',String(i===state.i));b.tabIndex=i===state.i?0:-1;});
-   items.forEach((it,i)=>{for(const n of it.nodes()){n.classList.toggle('tome-ac-off',i!==state.i);if(n.tagName==='DETAILS'&&it.pane){n.classList.add('tome-ac-pane');if(i===state.i){n.open=true;for(const d of n.querySelectorAll('details'))if(!d.dataset.acOpened){d.dataset.acOpened='1';d.open=true;}}}}});}
+  function paint(){[...bar.children].forEach((b,i)=>{const full=items[i].label(),t=SHORT[full]||full;if(b.textContent!==t)b.textContent=t;if(t!==full)b.title=full;else b.removeAttribute('title');b.setAttribute('aria-selected',String(i===state.i));b.tabIndex=i===state.i?0:-1;});
+   items.forEach((it,i)=>{for(const n of it.nodes()){n.classList.toggle('tome-ac-off',i!==state.i);if(n.tagName==='DETAILS'&&it.pane){n.classList.add('tome-ac-pane');const sm=n.querySelector(':scope>summary');if(sm)sm.style.setProperty('display','none','important');if(i===state.i){n.open=true;for(const d of n.querySelectorAll('details'))if(!d.dataset.acOpened){d.dataset.acOpened='1';d.open=true;}}}}});}
   paint();return bar;}
  window.__megulitSubTabs={mount:chips};
  const st={text:{i:0},cal:{i:0}},bst={open:null,last:null,expanded:false};
@@ -115,13 +150,13 @@
    const grp=(first,nodes)=>{const nn=nodes.filter(Boolean);if(!first||!nn.length)return;const g=mk('div','tome-ac-group');first.before(g);g.append(...nn);};
    const bold=general.querySelector(':scope>.tomoyo-cn-grid'),pair=tw?.parentElement?.classList.contains('tome-ac-pair')?tw.parentElement:tw,hintA=pair?.nextElementSibling?.tagName==='SMALL'?pair.nextElementSibling:null;
    const disp=byName(general,'galDisplay'),au=byName(general,'galAutoScale');
-   /* rarely used rows leave the top: blur goes to the Chinese tab, embed-by-game + Alt+H note to a display-mode tab */
+   /* rarely used rows leave the top: blur goes to the top of the translation page, embed-by-game + Alt+H note to a display-mode tab */
    const blurL=byName(general,'galTranslationBlur')?.closest('label'),embL=byName(general,'galEmbedTranslation')?.closest('label');
    const hots=[...general.querySelectorAll(':scope>small.tomoyo-hotkey-hint')];
    if(embL){const m=mk('div','tome-ac-mode');m.append(embL,...hots);general.after(m);}
    grp(bold,[bold]);grp(pair,[pair,hintA]);grp(disp,[disp,au&&au.closest('label')||au]);}
   const det=n=>text.querySelector(':scope>details[data-text-'+n+']'),jp=det('japanese'),cn=det('chinese'),en=det('megulit-english')||text.querySelector(':scope>details[data-megulit-english]'),ruby=det('ruby'),pal=det('colours'),spc=det('spacing'),gf=det('game-font');
-  const modeBox=text.querySelector('.tome-ac-mode');{const anchor=ruby||pal||gf;if(modeBox&&anchor&&modeBox.nextElementSibling!==anchor)anchor.before(modeBox);}const modeBox2=modeBox,blurLb=byName(text,'galTranslationBlur')?.closest('label');if(cn&&blurLb&&!cn.contains(blurLb))cn.append(blurLb);
+  const modeBox=text.querySelector('.tome-ac-mode');{const anchor=ruby||pal||gf;if(modeBox&&anchor&&modeBox.nextElementSibling!==anchor)anchor.before(modeBox);}const modeBox2=modeBox,blurLb=byName(text,'galTranslationBlur')?.closest('label');{const tr=dialog.querySelector('[data-menu-category=translate]');if(tr&&blurLb&&tr.firstElementChild!==blurLb)tr.prepend(blurLb);}/* bold switches live in their own language tab, not on top of the page */{const into=(name,box)=>{const l=byName(text,name)?.closest('label');if(!l||!box||box.contains(l))return;const sum=box.querySelector(':scope>summary');const holder=sum?.nextElementSibling&&sum.nextElementSibling.tagName!=='LABEL'?sum.nextElementSibling:box;holder===box&&sum?sum.after(l):holder.prepend(l);};into('galJapaneseBold',jp);into('galChineseBold',cn);const bg=text.querySelector('.tome-text-general .tomoyo-cn-grid');if(bg&&!bg.querySelector('input')){const g=bg.closest('.tome-ac-group');(g||bg).remove();}}
   const groups=[jp,cn,en,modeBox2,ruby,pal,spc,gf].filter(Boolean);
   const calNodes={sync:cal.querySelector(':scope>.tome-game-style-sync'),pos:cal.querySelector(':scope>[data-calibration-position]'),bind:cal.querySelector('[data-calibration-window-bind]'),imp:cal.querySelector('.tome-calibration-imports'),hist:cal.querySelector('.tome-calibration-history')};
   if(V==='b'){
@@ -136,14 +171,30 @@
     btn.onclick=()=>{bst.open=!bst.expanded;run();};cal.prepend(bar);}
    if(bar.nextElementSibling!==calNodes.bind)bar.after(calNodes.bind);
    const bound=!!window.__tomoyoChinese?.galBoundTitle;if(bst.last!==bound){bst.open=null;bst.last=bound;}
-   bst.expanded=bst.open===null?!bound:bst.open;bar.dataset.bound=String(bound);calNodes.bind.classList.toggle('tome-ac-off',!bst.expanded);
-   const btn=bar.querySelector('button'),t=I(bst.expanded?'收起':'换一个窗口');if(btn.textContent!==t)btn.textContent=t;btn.setAttribute('aria-expanded',String(bst.expanded));}
+   bst.expanded=bst.open===null?false:bst.open;bar.dataset.bound=String(bound);calNodes.bind.classList.toggle('tome-ac-off',!bst.expanded);
+   const btn=bar.querySelector('button'),t=I(bst.expanded?'收起':bound?'换一个窗口':'绑定游戏窗口');btn.classList.toggle('tome-ac-bind-cta',!bound&&!bst.expanded);if(btn.textContent!==t)btn.textContent=t;btn.setAttribute('aria-expanded',String(bst.expanded));}
   for(const s of dialog.querySelectorAll('[data-menu-category=text] small,[data-menu-category=calibrate] small'))if(!s.dataset.acT){s.dataset.acT='1';s.addEventListener('mouseover',()=>{if(!s.title&&s.scrollHeight>s.clientHeight+1)s.title=s.textContent.trim();});s.addEventListener('click',()=>s.classList.toggle('tome-ac-open'));}
  }
- const L={en:{'校准与位置':'Calibrate & position','导入与历史':'Import & history','换一个窗口':'Change window','收起':'Hide','显示方式':'Display mode','更多文字设置':'More text settings','绑定与导入':'Binding & import'},ja:{'校准与位置':'調整と位置','导入与历史':'取り込みと履歴','换一个窗口':'ウィンドウを変更','收起':'閉じる','显示方式':'表示方法','更多文字设置':'その他の文字設定','绑定与导入':'バインドと取り込み'}};
+ const L={en:{'校准与位置':'Calibrate & position','导入与历史':'Import & history','换一个窗口':'Change window','绑定游戏窗口':'Bind game window','收起':'Hide','显示方式':'Display mode','更多文字设置':'More text settings','绑定与导入':'Binding & import'},ja:{'校准与位置':'調整と位置','导入与历史':'取り込みと履歴','换一个窗口':'ウィンドウを変更','绑定游戏窗口':'ゲーム画面をバインド','收起':'閉じる','显示方式':'表示方法','更多文字设置':'その他の文字設定','绑定与导入':'バインドと取り込み'}};
  const I=k=>(L[document.documentElement.lang.slice(0,2)]||{})[k]||k;
  let queued=0;
  const run=()=>{queued=0;const d=document.querySelector('.tomoyo-cn-dialog[data-menu-organized]:not([data-leaving])');if(!d)return;d.classList.add('tome-ac');d.dataset.alttUi=V;try{organize(d);}catch(e){console.error('altt-compact',e);}};
  new MutationObserver(()=>{if(!queued)queued=requestAnimationFrame(run);}).observe(document.documentElement,{subtree:true,childList:true});
  run();
+})();
+
+/* 2026-11-21 (owner: Alt+T sliders did not move): a slider value that code writes back within 300 ms of the user's input is
+   logged (reader-host.log layoutDiagnostic kind=sliderOverwrite: field, the user's value, the written value, the writer's
+   first frames), so a slider held by a sync loop names that loop. */
+(function sliderOverwriteWatch(){
+ 'use strict';
+ if(window.__megulitSliderWatch)return;window.__megulitSliderWatch=true;
+ const recent=new WeakMap(),desc=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+ const report=m=>{try{window.__tomoyoTranslateRequest(JSON.stringify(Object.assign({type:'layoutDiagnostic',kind:'sliderOverwrite'},m)));}catch{}};
+ document.addEventListener('input',e=>{const t=e.target;if(!(t instanceof HTMLInputElement)||t.type!=='range'||!t.closest('.tomoyo-cn-dialog'))return;
+  recent.set(t,{v:desc.get.call(t),at:performance.now()});
+  if(t.__megulitWatched)return;t.__megulitWatched=true;
+  Object.defineProperty(t,'value',{configurable:true,get(){return desc.get.call(this);},set(v){const r=recent.get(this);
+   if(r&&performance.now()-r.at<300&&String(v)!==String(r.v)){const by=(new Error().stack||'').split('\n').slice(2,5).map(s=>s.trim().replace(/^at /,'')).join(' < ').slice(0,190);report({field:this.name||'',user:String(r.v),wrote:String(v),by});}
+   desc.set.call(this,v);}});},true);
 })();

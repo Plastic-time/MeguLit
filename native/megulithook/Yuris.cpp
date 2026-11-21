@@ -1,4 +1,5 @@
 #include "Yuris.h"
+#include "YurisDraw.h" /* engine-draw 2026-11-21: the dialogue glyph loop of any YU-RIS build (opt-in, docs/engine-draw-native.md) */
 #include "EuphoriaHD474Draw.h" /* MeguLit 2026-11-19 one hook runtime: the euphoria HD 0.474 draw adapter that runtime/hook carried */
 /********************************************************************************************
 YU-RIS hook:
@@ -785,5 +786,6 @@ bool Yuris::attach_function()
   ok = InsertYuris6Hook() || ok;
   ok = yuris7() || ok;
   ok = yuris8() || ok;
+  if (ok) YurisDraw::Arm(processStartAddress);
   return ok;
 }
