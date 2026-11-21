@@ -63,8 +63,8 @@ function setup(share=false){
  const original=Live.current;Live.current=()=>({reader,key:reader.cardinalKey||SHA,from:'',profile:Profiles.profileFor({})});
  return {root,reader,traces,close(){Live.current=original;Jobs._reset();Tape.clear();}};
 }
-// Job-control tests inject a controlled delivery clock; their old real DOM is not a fabricated healthy alignment.
-const observed=sc=>{let n=0;return {...structuredClone(fixture.run.o),sourceEpisodes:(sc?.steps||[]).flatMap((st,step)=>st.hb?.type==='hookSource'?[{step,line:st.line,text:st.hb.text,at:n++*1600}]:[])};};
+// Job-control tests use explicitly synthetic clocks and bad DOM shapes; the old real selected-frame fixture remains a timing-negative input.
+const observed=sc=>require('./helpers/cardinal-timing.cjs').faulty(sc,fixture.run.o);
 test('the queue drains a third job scheduled during its second replay, and idle waits for all three',async()=>{
  const h=setup();let releaseA,releaseB,startedB;const waitA=new Promise(r=>releaseA=r),waitB=new Promise(r=>releaseB=r),bStarted=new Promise(r=>startedB=r),calls=[];
  try{
@@ -127,9 +127,9 @@ test('a failed score upload stays unsent with its reason, then calibration retri
 
 test('pending upload requires current explicit observation evidence and preserves old documents',async()=>{
  const h=setup(true),feed=require('../services/auto-profile-feed.cjs'),auto=require('../core/auto-profile.cjs'),{eligible}=require('../core/cardinal/upload.cjs');
- const detail={pairObservation:{source:'live-display',reliable:true},leakObservation:{observed:true},timeline:{source:'measured-delivery',reliable:true},choiceObservation:{reliable:true}};
+ const detail={pairObservation:{source:'live-display',reliable:true},leakObservation:{observed:true},timeline:{source:'measured-delivery',reliable:true},choiceObservation:{reliable:true},timing:require('./helpers/cardinal-timing.cjs').proof()};
  const valid={record:S.record({key:SHA,result:S.score(fixture.run,D.cardinal),cardinalRev:D.cardinal.rev}),unreliable:false,errors:[],sent:false,detail};
- try{for(const mutate of [d=>delete d.unreliable,d=>delete d.detail,d=>d.record.cardinalRev='6',d=>d.detail.pairObservation.source='live',d=>d.detail.pairObservation.reliable=false,d=>d.detail.timeline.reliable=false,d=>d.detail.leakObservation.observed=false,d=>d.detail.choiceObservation.reliable=false,d=>d.errors.push('probe failed')]){
+ try{for(const mutate of [d=>delete d.unreliable,d=>delete d.detail,d=>d.record.cardinalRev='7',d=>delete d.detail.timing,d=>d.detail.timing.reliable=false,d=>d.detail.timing.sampleP95=5000,d=>d.detail.pairObservation.source='live',d=>d.detail.pairObservation.reliable=false,d=>d.detail.timeline.reliable=false,d=>d.detail.leakObservation.observed=false,d=>d.detail.choiceObservation.reliable=false,d=>d.errors.push('probe failed')]){
   const doc=structuredClone(valid);mutate(doc);assert.equal(eligible(doc),false);fs.mkdirSync(Jobs.dir(h.root),{recursive:true});const f=Jobs.fileOf(h.root,SHA),raw=JSON.stringify(doc);fs.writeFileSync(f,raw);const calls=[];
   await feed.report(h.root,auto.record({key:SHA,engine:'kirikiri',exe:'x.exe',version:'1.4.23',source:'calibration',result:{mode:'hide',settings:{},score:{cost:0},reason:''}}),{fetcher:async url=>{calls.push(url);return {ok:false,status:503};}});
   assert.equal(calls.some(u=>u.endsWith('/api/cardinal/score')),false);assert.equal(fs.readFileSync(f,'utf8'),raw,'old evidence is retained without rewriting its score');
@@ -179,5 +179,13 @@ test('absence of a display acknowledgement stays unobserved and cannot upload a 
  const h=setup(true),calls=[];try{
   Tape.liveSource('同じ原文がもう一度',{sequence:90});Tape.liveTranslation('同じ原文がもう一度','缓存成功不代表显示');
   Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>observed(sc),fetcher:async u=>{calls.push(u);return {ok:true,status:200};}});await Jobs.idle();const doc=Jobs.load(h.root,SHA);assert.equal(doc.unreliable,true);assert.equal(doc.detail.pairObservation.reliable,false);assert.equal(doc.detail.pair.unobserved,1);assert.deepEqual(calls,[]);
+ }finally{h.close();}
+});
+
+test('reliable low scores require measured sampling; slow, missing and invalid clocks cannot upload',async()=>{
+ const h=setup(true),Score=require('../core/cardinal/score.cjs');try{
+  for(const variant of ['timely-synthetic-bad-DOM','slow-sample-summary','missing-lag','invalid-step-summary','missing-timing','insufficient-probes','legacy-real-selected-frames']){const calls=[];let expected;
+   Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{const out=observed(sc);if(variant==='slow-sample-summary')out.lag={...out.lag,sampleP95:5000,sampleMax:5000};if(variant==='missing-lag')delete out.lag;if(variant==='invalid-step-summary')out.lag.stepP95='not-a-number';if(variant==='missing-timing')delete out.timing;if(variant==='insufficient-probes'){out.samples=out.samples.slice(0,3);out.timing.probes=out.timing.probes.slice(0,3);}if(variant==='legacy-real-selected-frames')out.samples=structuredClone(fixture.run.o.samples);expected=Score.score({steps:sc.steps,o:out,livePairing:Tape.pairing(60)},D.cardinal).total;return out;},fetcher:async url=>{calls.push(url);return {ok:true,status:200};}});await Jobs.idle();const doc=Jobs.load(h.root,SHA);assert.equal(doc.record.total,expected,'timing admission never changes the measured score');assert.equal(doc.unreliable,variant!=='timely-synthetic-bad-DOM',variant);assert.equal(doc.sent,variant==='timely-synthetic-bad-DOM',variant);assert.equal(calls.length,variant==='timely-synthetic-bad-DOM'?1:0,variant);
+  }
  }finally{h.close();}
 });

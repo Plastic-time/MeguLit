@@ -126,7 +126,7 @@ test('scores reach the relay only with sharing on, as the bare record',async()=>
   assert.equal(calls[0].url,'https://relay.test/api/cardinal/score');assert.equal(calls[0].init.method,'POST');assert.deepEqual(JSON.parse(calls[0].init.body),rec);
   assert.ok(!/cookie|authorization/i.test(JSON.stringify(calls[0].init.headers)));
   /* Explicit synthetic transport evidence: a compatible unsent score retries with calibration, not a live acceptance fixture. */
-  const C2=require('../services/cardinal.cjs');fs.mkdirSync(C2.dir(root),{recursive:true});fs.writeFileSync(C2.fileOf(root,SHA),JSON.stringify({record:{...rec,cardinalRev:String(D.cardinal.rev)},sent:false,unreliable:false,errors:[],detail:{pairObservation:{source:'live-display',reliable:true},leakObservation:{observed:true},timeline:{source:'measured-delivery',reliable:true},choiceObservation:{reliable:true}}}));
+  const C2=require('../services/cardinal.cjs');fs.mkdirSync(C2.dir(root),{recursive:true});fs.writeFileSync(C2.fileOf(root,SHA),JSON.stringify({record:{...rec,cardinalRev:String(D.cardinal.rev)},sent:false,unreliable:false,errors:[],detail:{pairObservation:{source:'live-display',reliable:true},leakObservation:{observed:true},timeline:{source:'measured-delivery',reliable:true},choiceObservation:{reliable:true},timing:require('./helpers/cardinal-timing.cjs').proof()}}));
   calls.length=0;const ap=require('../core/auto-profile.cjs');
   await feed.report(root,ap.record({key:SHA,engine:'kirikiri',exe:'x.exe',version:'1.4.23',source:'calibration',result:{mode:'hide',settings:{},score:{cost:0},reason:''}}),{fetcher});
   for(let i=0;i<20&&!calls.some(c=>/cardinal/.test(c.url));i++)await new Promise(r=>setTimeout(r,10));
@@ -139,7 +139,7 @@ test('a background run writes data/The Seed/cardinal/<sha>.json and never touche
  Tape.record('gwb',{type:'bound',gameProcessId:11,gameStarted:'3'},t);for(let i=0;i<12;i++){Tape.record('hb',{type:'hookSource',text:'台詞'+i},t+=1500);require('./helpers/cardinal-display.cjs').display(Tape,'台詞'+i,'受控transport译文'+i,{sequence:i+1});}
  const touched=[];const gal=new Proxy({state:{gameProcessId:11},hooks:{trace:l=>touched.push('trace:'+l.split(' ')[1])}},{get(o,k){if(k in o)return o[k];return (...a)=>{touched.push(String(k));};}});
  const reader={root,gameExe:'C:/Games/x.exe',gal};
- let scenario=null;const replay=async sc=>{scenario=sc;const lines=sc.steps.filter(s=>s.line);return run({sourceSteps:sc.steps,lines:lines.map((s,i)=>({text:s.text,at:i*1600}))}).o;};
+ let scenario=null;const replay=async sc=>{scenario=sc;const lines=sc.steps.filter(s=>s.line);return require('./helpers/cardinal-timing.cjs').instrument(sc.steps,run({sourceSteps:sc.steps,lines:lines.map((s,i)=>({text:s.text,at:i*1600}))}).o);};
  const prev=process.env.MEGULIT_CARDINAL_REPLAY;process.env.MEGULIT_CARDINAL_REPLAY='1';assert.equal(C2.kick(reader,'session-end',{manual:true,replay}).why,'inside a replay');if(prev===undefined)delete process.env.MEGULIT_CARDINAL_REPLAY;
  /* no exe key here: tell it through a stand-in self-check session */
  const live=require('../services/self-check-live.cjs');const orig=live.current;live.current=()=>({reader,key:SHA,from:'',profile:Profiles.profileFor({})});
@@ -159,7 +159,7 @@ test('a replay the PC could not keep up with is kept on this PC and never upload
  Tape.record('gwb',{type:'bound',gameProcessId:12,gameStarted:'4'},t);for(let i=0;i<12;i++){Tape.record('hb',{type:'hookSource',text:'台詞'+i},t+=1500);require('./helpers/cardinal-display.cjs').display(Tape,'台詞'+i,'受控transport译文'+i,{sequence:i+1});}
  const reader={root,gameExe:'C:/Games/x.exe',gal:{state:{},hooks:{trace(){}}}};const live=require('../services/self-check-live.cjs'),orig=live.current;live.current=()=>({reader,key:SHA,from:'',profile:Profiles.profileFor({})});
  const net=[];const fetcher=async u=>{net.push(u);return {ok:true,status:200};};const prev=process.env.MEGULIT_RELAY_BASE;process.env.MEGULIT_RELAY_BASE='https://relay.test';
- const replay=lag=>async sc=>{const o=run({sourceSteps:sc.steps,lines:sc.steps.filter(s=>s.line).map((s,i)=>({text:s.text,at:i*1600}))}).o;o.lag={stepP95:lag,stepMax:lag};return o;};
+ const replay=lag=>async sc=>{const o=require('./helpers/cardinal-timing.cjs').instrument(sc.steps,run({sourceSteps:sc.steps,lines:sc.steps.filter(s=>s.line).map((s,i)=>({text:s.text,at:i*1600}))}).o);for(const step of o.timing.steps)step.at=step.due+lag;o.lag=require('../core/cardinal/timing.cjs').statistics(o.timing.steps,o.timing.probes,90).lag;return o;};
  try{C2.kick(reader,'session-end',{manual:true,replay:replay(400),fetcher});await C2.idle();const doc=C2.load(root,SHA);assert.equal(doc.unreliable,true);assert.equal(doc.sent,false);assert.deepEqual(net,[]);
   C2._reset();C2.kick(reader,'session-end',{manual:true,replay:replay(10),fetcher});await C2.idle();assert.equal(C2.load(root,SHA).unreliable,false);assert.deepEqual(net,['https://relay.test/api/cardinal/score']);}
  finally{live.current=orig;if(prev===undefined)delete process.env.MEGULIT_RELAY_BASE;else process.env.MEGULIT_RELAY_BASE=prev;Tape.clear();C2._reset();}

@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+const finite=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0;
+const integer=n=>Number.isSafeInteger(n)&&n>=0;
+const q=(a,p)=>a.length?[...a].sort((a,b)=>a-b)[Math.min(a.length-1,Math.floor(a.length*p))]:0;
+const close=(a,b)=>finite(a)&&finite(b)&&Math.abs(a-b)<.01;
+function statistics(steps,probes,sampleMs){const late=steps.map(s=>Math.max(0,s.at-s.due)),gaps=probes.slice(1).map((s,i)=>s.at-probes[i].at),samples=gaps.map(n=>Math.max(0,n-sampleMs));return {lag:{stepP95:q(late,.95),stepMax:q(late,1),sampleP95:q(samples,.95),sampleMax:q(samples,1)},sampleGapMax:q(gaps,1)};}
+function recorder({sampleMs,now=()=>performance.now()}={}){const origin=now(),steps=[],probes=[];let truncated=false;const elapsed=()=>now()-origin;return {elapsed,step(step,due){if(steps.length>=65536){truncated=true;return;}steps.push({step,due,at:elapsed()});},sample(ok){const at=elapsed();if(probes.length>=65536)truncated=true;else probes.push({at,ok:ok===true});return at;},finish(){return {schema:1,source:'driver-monotonic',clock:'performance.now',sampleMs,steps,probes,durationMs:elapsed(),truncated};}};}
+function validProof(p){return !!(p?.schema===1&&p.source==='driver-monotonic'&&p.clock==='performance.now'&&p.reliable===true&&finite(p.sampleMs)&&p.sampleMs>=30&&p.sampleMs<=1000&&finite(p.maxLagMs)&&p.maxLagMs>=10&&p.maxLagMs<=5000&&finite(p.durationMs)&&p.durationMs>0&&integer(p.stepCount)&&p.stepCount>0&&p.stepCount===p.expectedStepCount&&integer(p.sampleCount)&&p.sampleCount>=4&&p.sampleCount===p.sampleAttempts&&p.sampleIntervals===p.sampleCount-1&&['firstSampleAt','lastSampleAt','sampleGapMax','stepP95','stepMax','sampleP95','sampleMax'].every(k=>finite(p[k]))&&p.lastSampleAt>p.firstSampleAt&&p.lastSampleAt<=p.durationMs&&p.firstSampleAt<=p.sampleMs+p.maxLagMs&&p.durationMs-p.lastSampleAt<=p.sampleMs+p.maxLagMs&&p.sampleGapMax>0&&p.sampleGapMax<=p.sampleMs+p.maxLagMs&&p.stepP95<=p.maxLagMs&&p.sampleP95<=p.maxLagMs&&p.stepMax>=p.stepP95&&p.sampleMax>=p.sampleP95&&p.sampleCount>=Math.ceil((p.lastSampleAt-p.firstSampleAt)/(p.sampleMs+p.maxLagMs))+1);}
+function check({steps=[],o={},rules={}}={}){
+ const t=o.timing,expected=steps.flatMap((s,i)=>s.t!=null?[i]:[]),proof={schema:1,source:'driver-monotonic',clock:'performance.now',reliable:false,why:'missing timing evidence',sampleMs:rules.sampleMs,maxLagMs:rules.maxLagMs,expectedStepCount:expected.length};
+ const fail=why=>({...proof,reliable:false,why});
+ if(!t||t.schema!==1||t.source!==proof.source||t.clock!==proof.clock||t.truncated!==false||!Array.isArray(t.steps)||!Array.isArray(t.probes)||!Array.isArray(o.samples)||!Array.isArray(o.sourceEpisodes)||!finite(t.durationMs)||t.durationMs<=0||t.sampleMs!==rules.sampleMs||!finite(t.sampleMs)||!finite(rules.maxLagMs))return fail('missing or invalid timing fields');
+ if(t.steps.length!==expected.length||!t.steps.length||t.steps.some((s,i)=>!s||s.step!==expected[i]||!finite(s.at)||!finite(s.due)||s.at>=t.durationMs||s.at+.01<s.due||i>0&&(s.at<t.steps[i-1].at||s.due<t.steps[i-1].due)))return fail('invalid or missing step clock');
+ if(t.probes.length<4||t.probes.some((s,i)=>!s||s.ok!==true||!finite(s.at)||s.at>t.durationMs||i>0&&s.at<=t.probes[i-1].at))return fail('invalid, failed or insufficient sample clock');
+ const ticks=(o.samples||[]).filter(s=>s.mark==='tick');if(ticks.length!==t.probes.length||ticks.some((s,i)=>s.error||!close(s.at,t.probes[i].at)))return fail('sample count or clock domain mismatch');
+ if(o.samples.some(s=>s.error||!finite(s.at)||s.at>t.durationMs)||o.sourceEpisodes.some(s=>!finite(s.at)||s.at>t.durationMs))return fail('observation outside measured clock');
+ const measured=statistics(t.steps,t.probes,t.sampleMs);if(!o.lag||Object.keys(measured.lag).some(k=>!close(o.lag[k],measured.lag[k])))return fail('invalid or inconsistent lag summary');
+ Object.assign(proof,measured.lag,{durationMs:t.durationMs,stepCount:t.steps.length,sampleAttempts:t.probes.length,sampleCount:ticks.length,sampleIntervals:t.probes.length-1,firstSampleAt:t.probes[0].at,lastSampleAt:t.probes.at(-1).at,sampleGapMax:measured.sampleGapMax,reliable:true,why:''});
+ return validProof(proof)?proof:fail('slow or insufficient sampling coverage');
+}
+module.exports={recorder,statistics,check,validProof};

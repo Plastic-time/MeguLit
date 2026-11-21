@@ -120,38 +120,38 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
   for(const m of early.splice(0))await page.evaluate(m=>window.__replayEvent(m),m).catch(()=>{});
   await page.addScriptTag({path:path.join(REPO,'web','reader','replay-probe.js')});
   /* ---- the timeline: bridge lines at their recorded times (gaps over maxGap shortened) ---- */
-  const t0=Date.now();out.t0=t0;let clock=0;const maxGap=scenario.maxGap||2500;
+  const t0=Date.now();out.t0=t0;const Timing=require('../../core/cardinal/timing.cjs'),timing=Timing.recorder({sampleMs:scenario.sampleEvery}),elapsed=timing.elapsed;let clock=0;const maxGap=scenario.maxGap||2500;
   let prevT=null,sampling=!!scenario.sampleEvery;
   const hits=()=>(gwb.sent.filter(x=>x.m.type==='hitRegions').at(-1)?.m.regions)||[];
   /* a sampler beside the timeline: what the page shows every sampleEvery ms (flashes between two marks) */
   /* how late the replay ran (a busy PC stretches it and the scores would blame the reader): each step's start past its time, each sample's gap past sampleEvery */
-  const late={steps:[],samples:[]};let lastSample=0;
-  const sampler=(async()=>{while(sampling){const s=await page.evaluate(()=>window.__replayProbe()).catch(()=>null);{const now=Date.now();if(lastSample)late.samples.push(Math.max(0,now-lastSample-scenario.sampleEvery));lastSample=now;}if(s){s.mark='tick';s.watch=true;s.at=Date.now()-t0;s.hitRegions=hits();s.src=s.hookSource;out.samples.push(s);}await sleep(scenario.sampleEvery);}})();
+
+  const sampler=(async()=>{while(sampling){const s=await page.evaluate(()=>window.__replayProbe()).catch(()=>null);const at=timing.sample(!!s&&typeof s==='object'&&!Array.isArray(s)&&!s.error);if(s){s.mark='tick';s.watch=true;s.at=at;s.hitRegions=hits();s.src=s.hookSource;out.samples.push(s);}await sleep(scenario.sampleEvery);}})();
   /* scenario.attachSettleMs: the reader settles (its profile, the hide route) after the attach before the first line, as on the player's
      PC where the reader is up long before the game says anything */
   let settled=!scenario.attachSettleMs;
   for(const [stepIndex,step] of scenario.steps.entries()){
    if(!settled&&step.hb?.type==='hookSource'){settled=true;clock+=scenario.attachSettleMs;}
-   if(step.t!=null){if(prevT!=null){const gap=Math.min(maxGap,Math.max(0,step.t-prevT));clock+=gap;}prevT=step.t;const wait=t0+clock-Date.now();if(wait>0)await sleep(wait);late.steps.push(Math.max(0,Date.now()-(t0+clock)));}
+   if(step.t!=null){if(prevT!=null){const gap=Math.min(maxGap,Math.max(0,step.t-prevT));clock+=gap;}prevT=step.t;let wait=clock-elapsed();while(wait>0){await sleep(wait);wait=clock-elapsed();}timing.step(stepIndex,clock);}
    if(step.gwb){if(models&&step.gwb.type==='bound'&&!krkr&&fs.existsSync(path.join(REPO,'native','krkrtext','script.inc')))try{const {KrkrModel}=require(path.join(REPO,'tools','reader-replay','krkr-model.cjs'));krkr=new KrkrModel({pid:step.gwb.gameProcessId,tmp:process.env.TEMP});}catch(e){out.krkr.error=String(e.message||e);krkr=false;}
     /* MODEL (labelled): the game clears its message layer at the click ([cm]); the script's own clearSent reports it when the control file says #clearline */
     if(step.gwb.type==='readerInput'&&krkr&&lastLine&&step.pageClear!==false){krkr.tick();const n=krkr.reports.length;krkr.st.clearSent(lastLine);for(const r of krkr.reports.slice(n))hb.line({type:'hookChars',line:r});out.krkr.clears+=krkr.reports.length-n;}
     gwb.line(step.gwb);}
-   if(step.hb){if(step.hb.type==='hookSource')out.sourceEpisodes.push({step:stepIndex,line:step.line,text:step.hb.text,at:Date.now()-t0});hb.line(step.hb);if(step.hb.type==='hookChars'){const m=/ line=(\d+) hidden=\d sw=(\d+) sh=(\d+) .* n=(\d+) /.exec(step.hb.line);if(m&&!/ role=(?!line)/.test(step.hb.line)&&+m[4]>0)lastLine={line:+m[1],sentLine:+m[1],sw:+m[2],sh:+m[3]};}}
+   if(step.hb){if(step.hb.type==='hookSource')out.sourceEpisodes.push({step:stepIndex,line:step.line,text:step.hb.text,at:elapsed()});hb.line(step.hb);if(step.hb.type==='hookChars'){const m=/ line=(\d+) hidden=\d sw=(\d+) sh=(\d+) .* n=(\d+) /.exec(step.hb.line);if(m&&!/ role=(?!line)/.test(step.hb.line)&&+m[4]>0)lastLine={line:+m[1],sentLine:+m[1],sw:+m[2],sh:+m[3]};}}
    if(step.choicePage&&krkr){krkr.tick();out.krkr.choice.push({mark:step.choicePage,frame:step.frame||'選択肢',ui:krkr.st.uiDraw({parent:{frameGraphic:step.frame||'選択肢',height:400}}),cfg:JSON.parse(JSON.stringify(krkr.st.cfg,(k,v)=>v instanceof RegExp?String(v):v))});}
    if(step.page)await page.evaluate(typeof step.page==="string"?"("+step.page+")()":step.page).catch(e=>out.errors.push('step page: '+e.message));
-   if(step.mark){await sleep(step.settle??150);const s=await page.evaluate(()=>window.__replayProbe()).catch(e=>({error:e.message}));s.mark=step.mark;s.at=Date.now()-t0;s.hitRegions=hits();out.samples.push(s);}
-   if(step.watch){const until=Date.now()+step.watch;while(Date.now()<until){const s=await page.evaluate(()=>window.__replayProbe()).catch(e=>({error:e.message}));s.mark=step.mark||('watch:'+step.watchName);s.at=Date.now()-t0;s.watch=true;s.hitRegions=hits();out.samples.push(s);await sleep(step.every||80);}}
+   if(step.mark){await sleep(step.settle??150);const s=await page.evaluate(()=>window.__replayProbe()).catch(e=>({error:e.message}));s.mark=step.mark;s.at=elapsed();s.hitRegions=hits();out.samples.push(s);}
+   if(step.watch){const until=elapsed()+step.watch;while(elapsed()<until){const s=await page.evaluate(()=>window.__replayProbe()).catch(e=>({error:e.message}));s.mark=step.mark||('watch:'+step.watchName);s.at=elapsed();s.watch=true;s.hitRegions=hits();out.samples.push(s);await sleep(step.every||80);}}
    if(step.control){const dir=path.join(process.env.TEMP,'MeguLit','draw');await sleep(120);const files=fs.existsSync(dir)?fs.readdirSync(dir):[];out.control.push({mark:step.control,files:files.map(f=>({name:f,text:fs.readFileSync(path.join(dir,f)).slice(2).toString('utf16le')}))});}
   }
   /* the last line stays on screen a moment, so it is measured like the others */
   if(scenario.tailMs)await sleep(scenario.tailMs);
-  sampling=false;await sampler;
+  sampling=false;await sampler;out.timing=timing.finish();out.lag=Timing.statistics(out.timing.steps,out.timing.probes,scenario.sampleEvery).lag;
   {const dir=path.join(process.env.TEMP,'MeguLit','draw');const files=fs.existsSync(dir)?fs.readdirSync(dir).filter(f=>/^\d+\.txt$/.test(f)):[];out.control.push({mark:'end',files:files.map(f=>({name:f,text:fs.readFileSync(path.join(dir,f)).slice(2).toString('utf16le')}))});}
   if(krkr){krkr.tick();out.krkr.cfg=JSON.parse(JSON.stringify(krkr.st.cfg,(k,v)=>v instanceof RegExp?String(v):v));out.krkr.ctl=krkr.ctl;}
   out.hookSpawned=hookSpawned;out.gwbSent=gwb.sent.filter(x=>x.m.type!=='hitRegions').slice(-200).map(x=>x.m);out.hbSent=hb.sent.map(x=>({at:x.at-t0,...x.m})).filter(m=>m.type!=='source');
   out.events=events.map(e=>({at:e.at-t0,type:e.m.type,keys:Object.keys(e.m).slice(0,12)})).slice(-400);
-  {const q=(a,p)=>{if(!a.length)return 0;const b=[...a].sort((x,y)=>x-y);return b[Math.min(b.length-1,Math.floor(b.length*p))];};out.lag={stepP95:q(late.steps,0.95),stepMax:q(late.steps,1),sampleP95:q(late.samples,0.95),sampleMax:q(late.samples,1)};}
+
   out.choiceOffers=offers.map(c=>({at:c.at-t0,n:c.n,texts:c.texts,until:c.until==null?null:c.until-t0}));out.hidden=hidden.snapshot();
   out.hookEvents=[];for(const f of ['hook-events.log.previous','hook-events.log.1','hook-events.log']){const x=path.join(root,'logs',f);if(fs.existsSync(x))out.hookEvents.push(...fs.readFileSync(x,'utf8').split(/\r?\n/).filter(l=>l&&!/Z (chain|translation|choice aux|art text located) /.test(l)));}
   out.readerHost=fs.existsSync(path.join(root,'logs','reader-host.log'))?fs.readFileSync(path.join(root,'logs','reader-host.log'),'utf8').split('\n').filter(l=>!/"hostFrame"/.test(l)).slice(-200):[];
