@@ -38,14 +38,16 @@ function auto(db,id){id=String(id||'');const ok=storyOnly(db,id);
 function chosen(root,id){const all=store.readJSON(file(root),{});return cleanList(all&&typeof all==='object'?all[String(id)]:[]);}
 function save(root,id,lines){id=String(id||'');if(!id)throw Error('GAME_NOT_FOUND');const f=file(root),all=store.readJSON(f,{}),next=all&&typeof all==='object'&&!Array.isArray(all)?all:{},list=cleanList(lines);
  if(list.length)next[id]=list;else delete next[id];fs.mkdirSync(path.dirname(f),{recursive:true});const tmp=f+'.tmp';fs.writeFileSync(tmp,JSON.stringify(next,null,1));fs.renameSync(tmp,f);return list;}
-function list(db,root,id,{query='',limit=400}={}){id=String(id||'');const q=clean(query),lim=Math.max(1,Math.min(5000,Number(limit)||400)),like='%'+q.replace(/[!%_]/g,c=>'!'+c)+'%';
+function list(db,root,id,{query='',limit=400}={}){id=String(id||'');const q=clean(query),lim=Math.max(1,Math.min(5000,Number(limit)||400));
+ const like='%'+q.replace(/[!%_]/g,c=>'!'+c).replace(/ /g,'%')+'%',phrase=q.includes(' ')?q.toLowerCase():'';
  const ok=storyOnly(db,id),rows=new Map();
  const read=db.prepare(`SELECT text,MAX(${millis('read_at')}) at FROM reading_events WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!' GROUP BY text ORDER BY at DESC`).iterate(id,like);
- for(const r of read){const t=clean(r.text);if(rows.has(t)||!ok(t))continue;rows.set(t,{text:t,at:r.at,saved:false});if(rows.size>=lim)break;}
+ for(const r of read){const t=clean(r.text);if(rows.has(t)||phrase&&!t.toLowerCase().includes(phrase)||!ok(t))continue;rows.set(t,{text:t,at:r.at,saved:false});if(rows.size>=lim)break;}
  const unmarked=new Set(rows.keys()),saved=new Set();
  const bookmarks=db.prepare(`SELECT text,${millis('created_at')} at FROM saved_sentences WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!' ORDER BY at DESC`).iterate(id,like);
  for(const r of bookmarks){
   const t=clean(r.text);
+  if(phrase&&!t.toLowerCase().includes(phrase))continue;
   if(unmarked.delete(t)){const row=rows.get(t);row.saved=true;row.at=Math.max(row.at,r.at);}
   if(saved.size<lim&&!saved.has(t)&&(rows.has(t)||ok(t))){saved.add(t);if(!rows.has(t))rows.set(t,{text:t,at:r.at,saved:true});}
   if(saved.size>=lim&&!unmarked.size)break;
