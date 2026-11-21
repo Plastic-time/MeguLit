@@ -6,8 +6,18 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
-static std::vector<std::string> Logs;static bool ThrowLog=false,FaultLog=false;static void (*LogTap)()=nullptr;
-namespace Msg{static void Log(const char *format,...){if(FaultLog)RaiseException(EXCEPTION_ACCESS_VIOLATION,0,0,nullptr);if(ThrowLog)throw std::runtime_error("fixture logger failure");char b[1200];va_list args;va_start(args,format);vsnprintf(b,sizeof b,format,args);va_end(args);Logs.push_back(b);if(LogTap)LogTap();
+static std::vector<std::string> Logs;static bool ThrowLog=false,FaultLog=false;static void (*LogTap)()=nullptr;static const char *TapContains=nullptr;
+static HANDLE Entered=nullptr,Release=nullptr;static int FxFault=0;static volatile LONG FxInjected=0;static const DWORD LoggerMxcsr=0x5f80;
+#ifndef _WIN64
+static __declspec(align(16)) unsigned char FaultFx[512];
+#endif
+namespace Msg{static void Log(const char *format,...){
+#ifndef _WIN64
+ if(FxFault){InterlockedIncrement(&FxInjected);__asm{pxor xmm0,xmm0}__asm{pxor xmm7,xmm7}__asm{fninit}__asm{ldmxcsr LoggerMxcsr}__asm{fxsave FaultFx}
+  if(FxFault==1)throw std::runtime_error("FX then C++ fault");RaiseException(EXCEPTION_ACCESS_VIOLATION,0,0,nullptr);}
+#endif
+ if(FaultLog)RaiseException(EXCEPTION_ACCESS_VIOLATION,0,0,nullptr);if(ThrowLog)throw std::runtime_error("fixture logger failure");char b[1200];va_list args;va_start(args,format);vsnprintf(b,sizeof b,format,args);va_end(args);
+ if(Entered){SetEvent(Entered);if(WaitForSingleObject(Release,3000)!=WAIT_OBJECT_0)throw std::runtime_error("held logger timeout");}Logs.push_back(b);if(LogTap&&(!TapContains||std::strstr(b,TapContains)))LogTap();
 #ifndef _WIN64
  __asm{
   push eax
@@ -17,6 +27,7 @@ namespace Msg{static void Log(const char *format,...){if(FaultLog)RaiseException
   pxor xmm0,xmm0
   pxor xmm7,xmm7
   fninit
+  ldmxcsr LoggerMxcsr
   stc
   pop eax
  }
@@ -24,12 +35,21 @@ namespace Msg{static void Log(const char *format,...){if(FaultLog)RaiseException
 }}
 #ifndef _WIN64
 #include "MinHook.h"
-static int EnableCalls=0,FailEnableAt=0;
-static MH_STATUS TestEnableHook(LPVOID target){EnableCalls++;return FailEnableAt&&EnableCalls==FailEnableAt?MH_ERROR_MEMORY_PROTECT:MH_EnableHook(target);}
+static int CreateCalls=0,EnableCalls=0,FailEnableAt=0;
+static MH_STATUS TestCreateHook(LPVOID target,LPVOID detour,LPVOID *original){CreateCalls++;return MH_CreateHook(target,detour,original);}
+static MH_STATUS TestEnableHook(LPVOID target){EnableCalls++;MH_STATUS result=MH_EnableHook(target);return FailEnableAt&&EnableCalls==FailEnableAt&&result==MH_OK?MH_ERROR_MEMORY_PROTECT:result;}
+#define MH_CreateHook TestCreateHook
 #define MH_EnableHook TestEnableHook
 #endif
-#include "../FvpDraw.h"
+#ifndef FVP_HEADER
+#define FVP_HEADER "../FvpDraw.h"
+#endif
+#if !defined(FVP_LEGACY_PERMISSION) && !defined(FVP_PERMISSION_FIXED)
+#define FVP_PERMISSION_FIXED
+#endif
+#include FVP_HEADER
 #ifndef _WIN64
+#undef MH_CreateHook
 #undef MH_EnableHook
 #endif
 #ifdef _WIN64
@@ -48,6 +68,13 @@ static bool NestedSkipped=true;static int NestedCalls=0;
 static void InvokeNested();
 static void Reenter(){auto saved=LogTap;LogTap=nullptr;size_t before=Logs.size();InvokeNested();NestedSkipped=NestedSkipped&&before==Logs.size();NestedCalls++;LogTap=saved;}
 static void Check(bool ok,const char *why){Checks++;printf("%s %s\n",ok?"PASS":"FAIL",why);if(!ok)Failures++;}
+static bool IsObserving(){
+#ifdef FVP_PERMISSION_FIXED
+ return (FvpDraw::Ticket()&1)!=0;
+#else
+ return FvpDraw::Observing!=0;
+#endif
+}
 static __declspec(naked) void Draw0(){__asm{
  pushfd
  pushad
@@ -138,9 +165,16 @@ static __declspec(naked) void CallFixture(){__asm{
  ret
 }}
 static std::wstring ControlPath(){wchar_t tmp[MAX_PATH],file[MAX_PATH+64];GetTempPathW(MAX_PATH,tmp);std::wstring dir=std::wstring(tmp)+L"MeguLit";CreateDirectoryW(dir.c_str(),nullptr);dir+=L"\\draw";CreateDirectoryW(dir.c_str(),nullptr);swprintf_s(file,L"%s\\%lu.txt",dir.c_str(),GetCurrentProcessId());return file;}
-static void Control(const wchar_t *value){auto f=ControlPath();HANDLE h=CreateFileW(f.c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);DWORD written;WriteFile(h,value,(DWORD)(wcslen(value)*2),&written,nullptr);CloseHandle(h);}
-static void ControlRaw(const char *value,DWORD bytes){auto f=ControlPath();HANDLE h=CreateFileW(f.c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);DWORD written;WriteFile(h,value,bytes,&written,nullptr);CloseHandle(h);}
-static void Revoke(){LogTap=nullptr;Control(L"#cfg roles=0 embed=0 fvpInput=0\r\n");FvpDraw::RefreshControl();RevokedInFlight=FvpDraw::Observing==0;}
+static void ControlRaw(const char *value,DWORD bytes){auto f=ControlPath();HANDLE h=INVALID_HANDLE_VALUE;DWORD error=0;for(int i=0;i<100;i++){h=CreateFileW(f.c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);if(h!=INVALID_HANDLE_VALUE)break;error=GetLastError();if(error!=ERROR_SHARING_VIOLATION)break;Sleep(1);}DWORD written=0;BOOL ok=h!=INVALID_HANDLE_VALUE&&WriteFile(h,value,bytes,&written,nullptr);if(h!=INVALID_HANDLE_VALUE)CloseHandle(h);if(!ok||written!=bytes){printf("fixture control write failed error=%lu bytes=%lu/%lu\n",error,written,bytes);exit(90);}}
+static void Control(const wchar_t *value){ControlRaw((const char *)value,(DWORD)(wcslen(value)*2));}
+
+static void Revoke(){LogTap=nullptr;Control(L"#cfg roles=0 embed=0 fvpInput=0\r\n");FvpDraw::RefreshControl();RevokedInFlight=!IsObserving();}
+static void RevokeResume(){Revoke();Control(L"#cfg roles=0 embed=0 fvpInput=1\r\n");FvpDraw::RefreshControl();}
+static bool WaitPermission(bool on){DWORD begin=GetTickCount();do{if(IsObserving()==on)return true;Sleep(10);}while(GetTickCount()-begin<3500);return false;}
+static DWORD WINAPI HeldCall(void *){CallFixture();return 0;}
+static DWORD WINAPI RefreshThread(void *){FvpDraw::RefreshControl();return 0;}
+static void RefreshFaultCpp(){try{FvpDraw::RefreshControl();}catch(...){}}
+static void RefreshFaultSafe(){__try{RefreshFaultCpp();}__except(EXCEPTION_EXECUTE_HANDLER){}}
 static void ControlChecks(){
  const wchar_t *bad[]={L"prefix #cfg fvpInput=1\r\n",L"#cfg fvpInput=0\r\nbody #cfg fvpInput=1\r\n",L"body\r\n#cfg fvpInput=1\r\n",L"#cfg fvpInput=1",L"#cfg fvpInput=1\r",L"#cfg fvpInput=10\r\n",L"#cfg fvpInput=1 fvpInput=0\r\n",L"#cfg fvpInput=1 fvpInput=1\r\n",L"#cfg fvpInput=10 fvpInput=1\r\n",L"#cfg xfvpInput=1\r\n",L"#cfg fvpInput=1x\r\n",L"#cfg fvpInput=1\t\r\n",L"\x6323\x6766\x6620\x7076\x6e49\x7570\x3d74\x0a31"};
  for(auto value:bad){Control(value);Check(!FvpDraw::DiagnosticAsked(),"real UTF16 file rejects non-first/incomplete/duplicate/lookalike/non-ASCII authorization");}
@@ -174,10 +208,22 @@ static void Exercise(unsigned entry){
  FaultLog=true;CallFixture();FaultLog=false;Logs.clear();CallFixture();Check(HexText()==Hex(text,4)&&AbiOkay(),"logger SEH fault clears recursion guard and preserves ABI");
 
  NestedSkipped=true;NestedCalls=0;Logs.clear();LogTap=&Reenter;CallFixture();LogTap=nullptr;Check(NestedCalls>0&&NestedSkipped&&HexText()==Hex(text,4)&&AbiOkay(),"recursive real detour suppresses diagnostics but executes its original");
- Logs.clear();RevokedInFlight=false;LogTap=&Revoke;CallFixture();LogTap=nullptr;Check(RevokedInFlight&&!FvpDraw::Observing&&HexText()==Hex(text,4)&&AbiOkay(),"off stops new observers but an already-entered snapshot may finish; not a close acknowledgement");
+ Logs.clear();RevokedInFlight=false;LogTap=&Revoke;CallFixture();LogTap=nullptr;Check(RevokedInFlight&&!IsObserving()&&Logs.size()==1&&HexText().empty()&&AbiOkay(),"off in begin stops old data/end continuation; entered logger is not a close acknowledgement");
  Logs.clear();CallFixture();Check(Logs.empty()&&AbiOkay(),"next call after off is pass-through only");
- Control(L"#cfg roles=0 embed=0 fvpInput=0\r\n");FvpDraw::RefreshControl();Logs.clear();CallFixture();Check(!FvpDraw::Observing&&Logs.empty()&&AbiOkay(),"removing diagnostic permission leaves original pass-through");
- Control(L"#cfg roles=0 embed=0 fvpInput=1\r\n");FvpDraw::RefreshControl();Logs.clear();CallFixture();Check(FvpDraw::Observing&&HexText()==Hex(text,4)&&AbiOkay(),"same detour resume diagnostics after permission returns");
+ for(const char *phase:{" begin "," data "}){
+  RevokeResume();std::string chunked(512,'q');Args[0]=(DWORD)chunked.c_str();Logs.clear();TapContains=phase;LogTap=&RevokeResume;CallFixture();LogTap=nullptr;TapContains=nullptr;
+  bool atBegin=std::strcmp(phase," begin ")==0;
+  Check(IsObserving()&&AbiOkay()&&Logs.size()==(atBegin?1:2)&&HexText().size()==(atBegin?0:FvpDraw::ChunkBytes*2)&&Logs.back().find(" end ")==std::string::npos,"off-on during begin/data invalidates old snapshot before remaining data/end");
+  Logs.clear();CallFixture();Check(AbiOkay()&&HexText()==Hex(chunked.data(),chunked.size())&&Logs.back().find(" end ")!=std::string::npos,"fresh complete append after off-on uses new permission generation");
+ }
+ Args[0]=(DWORD)text;
+ for(int fault:{1,2}){Logs.clear();LONG injected=FxInjected;FxFault=fault;CallFixture();FxFault=0;unsigned char zero[16]={};
+  Check(FxInjected==injected+1&&!std::memcmp(FaultFx+160,zero,16)&&!std::memcmp(FaultFx+272,zero,16)&&*(DWORD *)(FaultFx+24)==LoggerMxcsr&&*(WORD *)FaultFx==0x37f&&AbiOkay()&&!FvpDraw::InObserver,"logger FX clobber before actual C++/SEH fault restores ABI and recursion guard");
+  Logs.clear();CallFixture();Check(AbiOkay()&&HexText()==Hex(text,4),"fresh call remains observable after combined FX and exception");
+ }
+
+ Control(L"#cfg roles=0 embed=0 fvpInput=0\r\n");FvpDraw::RefreshControl();Logs.clear();CallFixture();Check(!IsObserving()&&Logs.empty()&&AbiOkay(),"removing diagnostic permission leaves original pass-through");
+ Control(L"#cfg roles=0 embed=0 fvpInput=1\r\n");FvpDraw::RefreshControl();Logs.clear();CallFixture();Check(IsObserving()&&HexText()==Hex(text,4)&&AbiOkay(),"same detour resume diagnostics after permission returns");
 }
 int wmain(int argc,wchar_t **argv){
  Args[0]=(DWORD)"baseline";Control(L"#cfg roles=0 embed=0 fvpInput=0\r\n");FvpDraw::Arm();Check(!FvpDraw::VersionPinned&&!FvpDraw::Installed,"unrecognized host remains unhooked");
@@ -189,18 +235,38 @@ int wmain(int argc,wchar_t **argv){
  CallFixture();Check(AbiOkay()&&Logs.empty(),"unhooked baseline consumes one word with ret4 and returns opaque EAX");
  ControlChecks();
  Check(MH_Initialize()==MH_OK,"real MinHook initialized");FvpDraw::Image=(uintptr_t)GetModuleHandleA(nullptr);auto nt=(IMAGE_NT_HEADERS *)(FvpDraw::Image+((IMAGE_DOS_HEADER *)FvpDraw::Image)->e_lfanew);FvpDraw::ImageEnd=FvpDraw::Image+nt->OptionalHeader.SizeOfImage;FvpDraw::DrawAt=(uintptr_t)&Draw0;
- FvpDraw::RefreshControl();Check(!FvpDraw::Installed&&!FvpDraw::Observing,"address cannot bypass identity pin");
+ FvpDraw::RefreshControl();Check(!FvpDraw::Installed&&!IsObserving(),"address cannot bypass identity pin");
  // Fixture-only substitution: runtime sets these only after exact file pin and one unique expected RVA.
  FvpDraw::VersionPinned=true;FvpDraw::RefreshControl();Check(!FvpDraw::Installed,"missing selected build fails closed");FvpDraw::BuildIndex=0;
- auto saved=FvpDraw::DrawAt;FvpDraw::DrawAt=1;FvpDraw::RefreshControl();Check(!FvpDraw::Installed&&!FvpDraw::Observing&&!FvpDraw::Original,"hook creation error remains pass-through");FvpDraw::DrawAt=saved;
- FailEnableAt=1;FvpDraw::RefreshControl();Check(FvpDraw::Blocked&&!FvpDraw::Installed&&!FvpDraw::Observing&&FvpDraw::Original,"enable error retains safe trampoline and blocks retry");
- Logs.clear();CallFixture();Check(Logs.empty()&&AbiOkay(),"enable failure never observes or damages original");FailEnableAt=0;FvpDraw::RefreshControl();Check(!FvpDraw::Observing&&!FvpDraw::Installed,"polling cannot retry an uncertain enable");
+ auto saved=FvpDraw::DrawAt;FvpDraw::DrawAt=1;FvpDraw::RefreshControl();Check(!FvpDraw::Installed&&!IsObserving()&&!FvpDraw::Original,"hook creation error remains pass-through");FvpDraw::DrawAt=saved;
+ Check(FvpDraw::Blocked,"hook creation error blocks uncertain retry");int creates=CreateCalls;FvpDraw::RefreshControl();Check(CreateCalls==creates&&!FvpDraw::Installed&&!IsObserving(),"polling does not retry after create failure even with a restored address");
+ // Explicit fixture reset only; production keeps failed installation blocked until process exit.
+ if(FvpDraw::Original){MH_DisableHook((void *)&Draw0);MH_RemoveHook((void *)&Draw0);FvpDraw::Original=nullptr;FvpDraw::Installed=0;}FvpDraw::Blocked=0;EnableCalls=0;
+
+ FailEnableAt=1;FvpDraw::RefreshControl();Check(FvpDraw::Blocked&&!FvpDraw::Installed&&!IsObserving()&&FvpDraw::Original,"enable error retains safe trampoline and blocks retry");
+ Fn=(void *)&FvpDraw::Gate;Logs.clear();CallFixture();Check(Logs.empty()&&AbiOkay(),"partly enabled failure retains a callable original trampoline behind the real gate");Fn=(void *)&Draw0;
+ Logs.clear();CallFixture();Check(Logs.empty()&&AbiOkay(),"enable failure never observes or damages original");FailEnableAt=0;FvpDraw::RefreshControl();Check(!IsObserving()&&!FvpDraw::Installed,"polling cannot retry an uncertain enable");
  // Explicit single-thread test teardown; production retains the trampoline until process exit.
  Check(MH_RemoveHook((void *)&Draw0)==MH_OK,"fixture removes disabled hook");FvpDraw::Original=nullptr;FvpDraw::Blocked=0;
- FvpDraw::RefreshControl();Check(FvpDraw::Installed&&FvpDraw::Observing&&FvpDraw::Original,"real detour activates diagnostic only");
+ Logs.clear();LogTap=&Revoke;FvpDraw::RefreshControl();LogTap=nullptr;Check(FvpDraw::Installed&&!IsObserving(),"install status logger revocation cannot be overwritten by an outer stale grant");
+ Control(L"#cfg fvpInput=1\r\n");FvpDraw::RefreshControl();Check(FvpDraw::Installed&&IsObserving()&&FvpDraw::Original,"real detour activates diagnostic only");
  Exercise(0);Exercise(1);
+ std::string heldText(512,'h');Args[0]=(DWORD)heldText.c_str();Logs.clear();Entered=CreateEventW(nullptr,TRUE,FALSE,nullptr);Release=CreateEventW(nullptr,TRUE,FALSE,nullptr);HANDLE call=CreateThread(nullptr,0,HeldCall,nullptr,0,nullptr);
+ bool entered=WaitForSingleObject(Entered,3000)==WAIT_OBJECT_0;RevokeResume();SetEvent(Release);bool joined=call&&WaitForSingleObject(call,3000)==WAIT_OBJECT_0;Check(entered&&joined&&Logs.size()==1&&HexText().empty()&&AbiOkay(),"cross-thread off-on stops old snapshot after already-entered begin logger");if(!joined)return Failures;CloseHandle(call);CloseHandle(Entered);CloseHandle(Release);Entered=Release=nullptr;
+ Logs.clear();CallFixture();Check(AbiOkay()&&HexText()==Hex(heldText.data(),heldText.size()),"fresh call after held logger uses current epoch");
+ HANDLE stop=CreateEventW(nullptr,TRUE,FALSE,nullptr),watcher=CreateThread(nullptr,0,FvpDraw::Watch,stop,0,nullptr);Control(L"#cfg fvpInput=0\r\n");Check(watcher&&WaitPermission(false),"continuous real watcher revokes installed diagnostic");Logs.clear();CallFixture();Check(Logs.empty()&&AbiOkay(),"watcher-revoked call only forwards original");Control(L"#cfg fvpInput=1\r\n");Check(WaitPermission(true),"same watcher resumes existing detour");Logs.clear();CallFixture();Check(AbiOkay()&&HexText()==Hex(heldText.data(),heldText.size()),"watcher accepts new-generation input");
+ SetEvent(stop);bool stopped=watcher&&WaitForSingleObject(watcher,3500)==WAIT_OBJECT_0;Check(stopped&&!IsObserving(),"owned watcher stop revokes observation before joining");if(!stopped)return Failures;CloseHandle(watcher);CloseHandle(stop);
+
  Control(L"#cfg roles=0 embed=0 fvpInput=0\r\n");FvpDraw::RefreshControl();Logs.clear();CallFixture();Check(Logs.empty()&&AbiOkay(),"closed permission remains pass-through");
- Check(MH_DisableHook((void *)&Draw0)==MH_OK,"real detour disables cleanly");MH_RemoveHook((void *)&Draw0);MH_Uninitialize();
+ Check(MH_DisableHook((void *)&Draw0)==MH_OK,"real detour disables cleanly");MH_RemoveHook((void *)&Draw0);FvpDraw::Installed=0;FvpDraw::Original=nullptr;
+ for(int fault:{1,2}){
+  Control(L"#cfg fvpInput=1\r\n");ThrowLog=fault==1;FaultLog=fault==2;RefreshFaultSafe();ThrowLog=FaultLog=false;
+  Check(FvpDraw::Installed&&!IsObserving()&&FvpDraw::Original,"install logger C++/SEH failure leaves observation closed with original retained");
+  Control(L"#cfg fvpInput=0\r\n");HANDLE thread=CreateThread(nullptr,0,RefreshThread,nullptr,0,nullptr);bool joined=thread&&WaitForSingleObject(thread,3000)==WAIT_OBJECT_0;Check(joined&&!IsObserving(),"install logger fault releases control lock for another real thread");if(!joined)return Failures;CloseHandle(thread);
+  Fn=(void *)&FvpDraw::Gate;Logs.clear();CallFixture();Check(Logs.empty()&&AbiOkay(),"install logger fault leaves original ret4 gate callable without observation");Fn=(void *)&Draw0;
+  MH_DisableHook((void *)&Draw0);MH_RemoveHook((void *)&Draw0);FvpDraw::Installed=0;FvpDraw::Original=nullptr;
+ }
+ MH_Uninitialize();
  printf("FVP actual ABI append gate: %d checks, %d failures\n",Checks,Failures);return Failures;
 }
 #endif
