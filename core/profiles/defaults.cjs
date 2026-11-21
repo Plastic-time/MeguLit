@@ -122,8 +122,8 @@ module.exports={
     sampleMs); minIntervalMin = at most one run per exe in that time (a session's end always runs); maxLagMs = a run whose steps started
     later than this (95th percentile: a busy PC, the game running) is kept on this PC only, never uploaded */
  cardinal:{
-  rev:1,lines:60,maxGapMs:1500,sampleMs:90,minIntervalMin:30,maxLagMs:80,
-  /* the total = weighted mean of the scores that apply (a score with nothing to look at leaves the total) */
+  rev:2,lines:60,maxGapMs:1500,sampleMs:90,minIntervalMin:30,maxLagMs:80,
+  /* the total = applicable-score weighted mean, capped by visible expected dialogue coverage */
   weights:{row:3,stable:1,clean:2,clear:1,choice:1,pair:1,leak:2},
   /* core/cardinal/checks.cjs T0: a line is settled settleMs after it became the reader's line, the row counts as shown in shownRate of
      its settled samples; stablePx: the Japanese row may move this much; cnOverlapPx: the Chinese may reach this far over the Japanese;

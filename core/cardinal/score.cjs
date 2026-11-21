@@ -24,21 +24,24 @@ function score(run,rules={}){const t={...C.T0,...(rules.thresholds||{})},w=rules
  const s={
   row:lineRate(ls.filter(l=>l.rowBad).length),
   stable:lineRate(ls.filter(l=>l.stableBad).length),
-  clean:(wh.n?1-wh.badN/wh.n:1)*(n?1-Math.min(1,(fl.comebacks+ownerLines)/n):fl.comebacks+ownerLines?0:1),
+  clean:(pl.visibility.expected?pl.visibility.shown/pl.visibility.expected:1)*(wh.n?1-wh.badN/wh.n:1)*(n?1-Math.min(1,(fl.comebacks+ownerLines)/n):fl.comebacks+ownerLines?0:1),
   clear:cl.n?1-cl.stale/cl.n:1,
   choice:ch.n?ch.ok/ch.n:1,
   pair:pairs.shown?pairs.paired/pairs.shown:n?0:1,
   leak:1-lk.rate};
  const scores={};for(const k of KEYS)scores[k]=r3(s[k]);
  let sum=0,wsum=0;for(const k of KEYS){const wk=Number(w[k]);if(!applies[k]||!(wk>0))continue;sum+=wk*scores[k];wsum+=wk;}
- const total=wsum?r3(sum/wsum):0;
+ /* An absent row cannot earn cleanliness or a stable/clear bonus from having nothing to inspect. */
+ const visibility={...pl.visibility,rate:r3(pl.visibility.expected?pl.visibility.shown/pl.visibility.expected:1)};
+ const total=wsum?r3(Math.min(sum/wsum,visibility.rate)):0;
  const below=KEYS.filter(k=>applies[k]&&Number.isFinite(rules.floor?.[k])&&scores[k]<rules.floor[k]);
- return {scores,total,lines:n,applies,below,detail:{pair:{...pairs},row:pl.row.slice(0,6),stable:pl.stable.slice(0,6),owner:pl.owner.slice(0,6),dup:pl.dup.slice(0,6),white:wh.bad.slice(0,6),flash:fl.bad.slice(0,6),clear:cl.bad,choice:ch.bad,leak:lk.bad}};}
+ return {scores,total,lines:n,applies,below,detail:{pair:{...pairs},visibility,row:pl.row.slice(0,6),stable:pl.stable.slice(0,6),owner:pl.owner.slice(0,6),dup:pl.dup.slice(0,6),white:wh.bad.slice(0,6),flash:fl.bad.slice(0,6),clear:cl.bad,choice:ch.bad,leak:lk.bad}};}
 /* several runs of one game: the scores weighted by each run's lines */
 function combine(results,rules={}){const w=rules.weights||{};const tot=results.reduce((a,r)=>a+Math.max(1,r.lines),0)||1;const scores={},applies={};
  for(const k of KEYS){const rs=results.filter(r=>r.applies[k]);applies[k]=rs.length>0;const d=rs.reduce((a,r)=>a+Math.max(1,r.lines),0);scores[k]=rs.length?r3(rs.reduce((a,r)=>a+r.scores[k]*Math.max(1,r.lines),0)/d):1;}
  let sum=0,wsum=0;for(const k of KEYS){const wk=Number(w[k]);if(!applies[k]||!(wk>0))continue;sum+=wk*scores[k];wsum+=wk;}
- return {scores,total:wsum?r3(sum/wsum):0,lines:results.reduce((a,r)=>a+r.lines,0),applies,runs:results.length};}
+ const visibilityRate=results.reduce((a,r)=>a+Math.max(1,r.lines)*(r.detail?.visibility?.rate??1),0)/tot;
+ return {scores,total:wsum?r3(Math.min(sum/wsum,visibilityRate)):0,lines:results.reduce((a,r)=>a+r.lines,0),applies,runs:results.length};}
 /* the record the relay takes (POST /api/cardinal/score; relay/src/cardinal.js checks every field, never rename one). No identity:
    the exe hash, the seed revision, the app version and the scores only */
 function record({key,seedRev=null,source='none',app,result,cardinalRev,at=new Date()}){

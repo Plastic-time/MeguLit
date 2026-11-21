@@ -33,10 +33,11 @@ function lines(run,t){t=opts(t);const o=run.o,out=[];const steps=fed(run).filter
 
 /* per line: 1 the Japanese row is there and clickable, 2 it keeps its place (the Chinese under it, the row's y does not move),
    9 one render owner, and the pairing (a Chinese row while the Japanese is shown) */
-function perLine(run,t){t=opts(t);const name=run.name||'run',row=[],stable=[],owner=[],dup=[],pairs={shown:0,paired:0};const ls=lines(run,t);
+function perLine(run,t){t=opts(t);const name=run.name||'run',row=[],stable=[],owner=[],dup=[],pairs={shown:0,paired:0},visibility={shown:0,expected:0};const ls=lines(run,t);
  for(const l of ls){const want=norm(l.text);if(!want)continue;let rowBad=false,stableBad=false;
   /* while options are on the reader the line gives way to them (not a missing row) */
   const settled=l.samples.filter(s=>s.at-l.samples[0].at>=t.settleMs&&!(s.choices||[]).some(c=>c.shown));const shown=settled.filter(s=>norm(lineGlyphs(s).map(g=>g.text).join('')).length>=Math.min(want.length,2));
+  visibility.expected+=settled.length;visibility.shown+=shown.length;
   if(settled.length&&shown.length<settled.length*t.shownRate){row.push(name+' line '+l.line+' 「'+l.text+'」 Japanese shown in '+shown.length+'/'+settled.length+' samples');rowBad=true;}
   for(const s of shown){const g=lineGlyphs(s);const out=g.filter(x=>!inside(x,s.hitRegions)||x.pointer==='none');if(out.length){row.push(name+' line '+l.line+' not clickable: '+out.map(x=>x.text).join(''));rowBad=true;break;}}
   const withCn=shown.filter(s=>(s.cn||[]).length);if(withCn.length){const s=withCn[0],jpBottom=Math.max(...lineGlyphs(s).map(g=>g.rect.y+g.rect.h));const c0=s.cn[0],cnTop=c0.ink&&c0.fontSize?c0.ink.y+Math.max(0,(c0.ink.h-c0.fontSize)/2):(c0.ink||c0.rect).y;/* the Chinese glyphs' em box (web/reader/replay-probe.js: the text's content area, centred em of fontSize; a CJK font's content area is taller than its em), the row's padded box when a probe has neither */if(cnTop<jpBottom-t.cnOverlapPx){stable.push(name+' line '+l.line+' Chinese at '+cnTop+' over the Japanese bottom '+jpBottom);stableBad=true;}}
@@ -46,7 +47,7 @@ function perLine(run,t){t=opts(t);const name=run.name||'run',row=[],stable=[],ow
   if(want.length>=2)for(const s of shown){const all=norm(lineGlyphs(s).map(g=>g.text).join(''));if(all.split(want).length-1>1){dup.push(name+' line '+l.line+' drawn twice: '+all.slice(0,30));l.dupBad=true;break;}}
   if(shown.length){pairs.shown++;if(withCn.length)pairs.paired++;}
   l.rowBad=rowBad;l.stableBad=stableBad;}
- return {lines:ls,row,stable,owner,dup,pairs};}
+ return {lines:ls,row,stable,owner,dup,pairs,visibility};}
 
 /* 10 (owner 2026-11-21): no Japanese that cannot be clicked and read (the placement fallback layer passes clicks to the game) or is not
    in the line's colour; -> bad sample messages (all of them counted, the first ones kept) */
