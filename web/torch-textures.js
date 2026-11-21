@@ -102,7 +102,7 @@ export function coffers(w,h,{cols=24,rows=6,v0=.1,v1=.92,field=[44,38,72],frame=
  return {map,normal:heightToNormal(H,w,h,6)};}
 
 /* ---- stained glass: a rose window (radial tracery) and a lancet; muted jewel colours, dark leading ---- */
-const GLASS=[[58,64,118],[96,58,112],[128,40,58],[176,128,70],[70,104,128],[88,70,128],[160,146,110]];
+const GLASS=[[24,48,132],[96,36,100],[150,20,38],[200,140,40],[26,92,66],[40,62,150],[206,204,190]];
 export function rose(size,seed,{petals=12}={}){const c=canvas2d(size,size),g=c.getContext('2d'),r=rng(seed),R=size/2;g.translate(R,R);
  g.fillStyle='#000';g.fillRect(-R,-R,size,size);
  const cell=(path,col)=>{const k=.82+r()*.3;g.fillStyle=`rgb(${col[0]*k|0},${col[1]*k|0},${col[2]*k|0})`;path();g.fill();};
@@ -127,14 +127,40 @@ export function quarries(w,h,seed){const c=canvas2d(w,h),g=c.getContext('2d'),r=
   g.fillStyle=`rgb(${226*k|0},${222*k|0},${232*k|0})`;g.beginPath();g.moveTo(x+ox,y-cell/2);g.lineTo(x+ox+cell/2,y);g.lineTo(x+ox,y+cell/2);g.lineTo(x+ox-cell/2,y);g.closePath();g.fill();}
  g.strokeStyle='#2a2630';g.lineWidth=w/90;for(let d=-h;d<w+h;d+=cell){g.beginPath();g.moveTo(d,0);g.lineTo(d+h*.5,h);g.stroke();g.beginPath();g.moveTo(d,0);g.lineTo(d-h*.5,h);g.stroke();}
  g.lineWidth=w/18;g.strokeRect(0,0,w,h);return c;}
-export function lancet(w,h,seed){const c=canvas2d(w,h),g=c.getContext('2d'),r=rng(seed);g.fillStyle='#000';g.fillRect(0,0,w,h);
- const cols=3,rowsN=9,cw=w/cols,rh=h/rowsN;
- for(let i=0;i<rowsN;i++)for(let j=0;j<cols;j++){const col=GLASS[(i*2+j*3+(r()*2|0))%GLASS.length],k=.75+r()*.35;g.fillStyle=`rgb(${col[0]*k|0},${col[1]*k|0},${col[2]*k|0})`;g.fillRect(j*cw,i*rh,cw,rh);}
- /* medallions */
- for(const cy of [h*.3,h*.62]){g.fillStyle='rgb(150,30,52)';g.beginPath();g.arc(w/2,cy,w*.34,0,Math.PI*2);g.fill();g.fillStyle='rgb(196,150,70)';g.beginPath();g.arc(w/2,cy,w*.2,0,Math.PI*2);g.fill();
-  g.strokeStyle='#08060a';g.lineWidth=w/30;g.beginPath();g.arc(w/2,cy,w*.34,0,Math.PI*2);g.stroke();g.beginPath();g.arc(w/2,cy,w*.2,0,Math.PI*2);g.stroke();}
- g.strokeStyle='#08060a';g.lineWidth=w/40;for(let i=1;i<rowsN;i++){g.beginPath();g.moveTo(0,i*rh);g.lineTo(w,i*rh);g.stroke();}for(let j=1;j<cols;j++){g.beginPath();g.moveTo(j*cw,0);g.lineTo(j*cw,h);g.stroke();}
- g.lineWidth=w/14;g.strokeRect(0,0,w,h);return c;}
+/* medieval lancet (the Chartres kind): the light is a mosaic of small irregular pieces of pot-metal glass (a jittered Voronoi), mostly
+   deep blue, held by lead cames of uneven width; three geometric medallions (circle, quatrefoil, lozenge) with a ruby ground and a pale
+   rim; a border of alternating ruby and blue blocks with white pearls; iron saddle bars across. Each piece has its own tint and streaks. */
+export function lancet(w,h,seed){const r=rng(seed),fbm=makeNoise(seed+5),c=canvas2d(w,h),g=c.getContext('2d'),img=g.createImageData(w,h),d=img.data;
+ const BLUE=[24,48,132],DEEP=[16,30,96],RUBY=[150,20,38],MURREY=[96,36,100],EMER=[26,92,66],AMBER=[200,140,40],PALE=[206,204,190];
+ const pick=(list)=>{let t=r()*list.reduce((a,b)=>a+b[1],0);for(const [c2,wt] of list){t-=wt;if(t<=0)return c2;}return list[0][0];};
+ const bw=w*.1,R=w*.34,meds=[[w/2,h*.2,0],[w/2,h*.5,1],[w/2,h*.8,2]];
+ /* signed distance to each medallion's outline (negative inside) */
+ const sd=(m,x,y)=>{const dx=x-m[0],dy=y-m[1];if(m[2]===0)return Math.hypot(dx,dy)-R;
+  if(m[2]===1){let v=1e9;for(const [ox,oy] of [[1,0],[-1,0],[0,1],[0,-1]])v=Math.min(v,Math.hypot(dx-ox*R*.46,dy-oy*R*.46)-R*.56);return v;}
+  return (Math.abs(dx)+Math.abs(dy))/Math.SQRT2-R*.86;};
+ const region=(x,y)=>{if(x<bw||x>w-bw)return 'border';for(const m of meds){const s=sd(m,x,y);if(s<-w*.035)return 'med';if(s<0)return 'rim';}return 'field';};
+ const colorFor=(x,y)=>{const rg=region(x,y);
+  if(rg==='border')return (Math.floor(y/(bw*1.25))%2)?RUBY:BLUE;
+  if(rg==='rim')return PALE;
+  if(rg==='med')return pick([[RUBY,6],[BLUE,2],[AMBER,1.2],[EMER,1],[PALE,.8],[MURREY,1]]);
+  return pick([[BLUE,7],[DEEP,3],[RUBY,1],[MURREY,1.2],[EMER,.5],[AMBER,.3]]);};
+ /* jittered grid of glass pieces, smaller inside the medallions */
+ const cs=Math.max(8,Math.round(w/20)),gx=Math.ceil(w/cs)+2,gy=Math.ceil(h/cs)+2,S=[];
+ for(let j=0;j<gy;j++)for(let i=0;i<gx;i++){const x=(i-1+.15+r()*.7)*cs,y=(j-1+.15+r()*.7)*cs;S.push({x,y,c:colorFor(Math.min(w-1,Math.max(0,x)),Math.min(h-1,Math.max(0,y))),k:.78+r()*.4,s:r()*10});}
+ const lead=Math.max(1.4,w/240);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){const ci=Math.floor(x/cs)+1,cj=Math.floor(y/cs)+1;let d1=1e9,d2=1e9,best=null;
+  for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const s=S[(cj+dj)*gx+(ci+di)];if(!s)continue;const dd=Math.hypot(x-s.x,y-s.y);if(dd<d1){d2=d1;d1=dd;best=s;}else if(dd<d2)d2=dd;}
+  const o=(y*w+x)*4;let col=best.c,k=best.k*(.82+.32*fbm(x/w*3+best.s,y/h*9,4,3))*(.92+.16*Math.sin(y*.09+best.s*3));
+  /* the same colour must not run across a lead: pieces bordering their region boundary are cut by a heavier came */
+  let L=(d2-d1)<lead;let edge=1e9;if(x<bw+3&&x>bw-3||x>w-bw-3&&x<w-bw+3)edge=0;for(const m of meds)edge=Math.min(edge,Math.abs(sd(m,x,y)),Math.abs(sd(m,x,y)+w*.035));
+  if(edge<lead*1.6)L=true;if(x<lead*2.5||x>w-lead*2.5)L=true;
+  const bar=[1,2,3,4,5,6].some(q=>Math.abs(y-h*q/7)<h*.006);
+  if(L||bar){const v=bar?14:10;d[o]=v;d[o+1]=v;d[o+2]=v+2;d[o+3]=255;continue;}
+  d[o]=col[0]*k;d[o+1]=col[1]*k;d[o+2]=col[2]*k;d[o+3]=255;}
+ g.putImageData(img,0,0);
+ /* white pearls down the middle of the border */
+ for(const bx of [bw/2,w-bw/2])for(let y=bw*.6;y<h;y+=bw*1.25){g.fillStyle='rgb(214,210,196)';g.beginPath();g.arc(bx,y,bw*.2,0,Math.PI*2);g.fill();g.strokeStyle='#0c0a0e';g.lineWidth=lead;g.stroke();}
+ return c;}
 
 /* ---- marble ---- */
 export function marble(size,seed,{base=[16,18,22],vein=[86,92,104],veinK=7,warp=2.6}={}){const fbm=makeNoise(seed);
