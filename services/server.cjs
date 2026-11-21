@@ -30,6 +30,7 @@ try{require('./adapter-probe.cjs').resumeLater(root,()=>require('./store.cjs').o
 try{require('./probe-auto.cjs').start(root,()=>require('./store.cjs').openStore(root));}catch{}
 /* 2026-11-21 (owner: 闲时冷测试，默认开) idle-time cold test of library games for The Seed (services/cold-test.cjs; Settings
    library.coldTest); never while MeguLit has a game bound */
+require('./background-games.cjs').configure(()=>!!runtime.reader?.gamePid);
 try{require('./cold-test.cjs').start(root,()=>require('./store.cjs').openStore(root),{isPlaying:()=>{try{const r=runtime.reader;return !!(r&&r.gamePid);}catch{return false;}}});}catch{}
 input.on('line',line=>{handle(line).catch(()=>{});});
 /* E426 the host is gone once stdin closes: a stop that never settles must not leave node.exe and its bridges behind */

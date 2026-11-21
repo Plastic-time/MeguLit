@@ -65,6 +65,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   let stage='launch-preflight',featureWatch=null,drmPlan=null;if(!retried)markLaunch(id,'prepare');
   let launcherRun=null;/* the DRM launcher this start runs (services/launcher-cleanup.cjs) */try{
   if(!game.executable||!fs.existsSync(game.executable))throw Error('EXECUTABLE_MISSING');
+  stage='background-stop';trace('background-stop');await require('./background-games.cjs').foreground();trace('background-stopped');
   let original={};try{original=JSON.parse(game.original||'{}')||{};}catch{}const profile=original.library || {};
   /* E-SteamOwned: a game Steam installed (appmanifest lists its folder) starts through Steam even when it was added by hand or by a folder scan (core/steam-owned.cjs) */
   const steamAppid=(()=>{try{return require('../core/steam-owned.cjs').launchAppid(game.executable,profile);}catch{return '';}})();if(steamAppid)trace('steam-owned',{appid:steamAppid,source:profile.source||''});
@@ -115,7 +116,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
     // サノバウィッチ 'would not start' while a hidden copy from a Japanese-locale launch kept running).
     let readyState=null;try{const state=await ready();readyState=state;trace('existing-window-ready',state);markLaunch(id,'ready');try{require('../core/japanese-auto.cjs').launchResult(root,id,true);}catch{}}catch(error){trace('existing-window-not-ready',{error:error.message});throw error.message==='GAME_WINDOW_NOT_READY'?Object.assign(Error('GAME_RUNNING_HIDDEN'),{detail:path.basename(game.executable)}):error;}
     db.prepare('UPDATE games SET last_launched_at=? WHERE id=?').run(Math.floor(Date.now()/1000),id);
-    runtime?.prepareGame(game.executable);runtime?.bindLaunched?.(readyState?.pid);return {action:focused,connected:false};
+    await require('./background-games.cjs').unmute(root,readyState?.pid);runtime?.prepareGame(game.executable);runtime?.bindLaunched?.(readyState?.pid);return {action:focused,connected:false};
   }
   trace('launch-request',{windowsLaunch});markLaunch(id,'request');
   /* a Windows feature install window the game still opens is closed at once (the game goes on as if it was cancelled);
@@ -228,7 +229,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
    if(textPath){try{const tp=require('../core/text-paths-launch.cjs');const join=(n=0)=>{const hook=runtime?.reader?.gal?.hooks;if(hook){tp.attach(textPath,hook);return;}if(n<20)setTimeout(()=>join(n+1),1500).unref?.();};join();textPath.connect().catch(()=>{});
     const exitWatch=setInterval(()=>{if(child.exit){clearInterval(exitWatch);try{textPath.session.exited(child.exit.code??-1);textPath.session.stop();}catch{}}},2000);exitWatch.unref?.();}catch(error){trace('text-paths-attach-failed',{error:String(error?.message||error).slice(0,160)});}}
   }
-  trace('new-window-ready',state);markLaunch(id,'ready');try{require('../core/japanese-auto.cjs').launchResult(root,id,true);}catch{}
+  await require('./background-games.cjs').unmute(root,state?.pid);trace('new-window-ready',state);markLaunch(id,'ready');try{require('../core/japanese-auto.cjs').launchResult(root,id,true);}catch{}
   {const watch=featureWatch;featureWatch=null;setTimeout(()=>watch.stop(),30000).unref?.();}
   db.prepare('UPDATE games SET last_launched_at=? WHERE id=?').run(Math.floor(Date.now()/1000),id);
   runtime?.prepareGame(game.executable);runtime?.bindLaunched?.(state?.pid);return {action:'launched',connected:false};
@@ -425,7 +426,7 @@ async function dispatch(request,runtime=null) {
         const reader=runtime.reader??=new(require('./reader.cjs').Reader)(runtime);
         return await reader.v4('anki',{dictionary:true,text:word,start:0,end:[...word].length,sentence:String(request.sentence||'').slice(0,1000),translation:String(request.translation||'').slice(0,1000)});}
       case 'study_words':return require('./game-detail.cjs').studyWords(db,root);
-      case 'game_detail':return require('./game-detail.cjs').detail(db,root,String(request.id),request.locale);
+      case 'game_detail':await require('./background-games.cjs').foreground();return require('./game-detail.cjs').detail(db,root,String(request.id),request.locale);
       case 'home_lines':return require('./home-lines.cjs').list(db,root,String(request.id),{query:request.query,limit:request.limit});
       case 'home_lines_save':return {chosen:require('./home-lines.cjs').save(root,String(request.id),request.lines)};
       case 'game_synopsis':return await require('./game-detail.cjs').refreshSynopsis(db,root,String(request.id),request.locale);
