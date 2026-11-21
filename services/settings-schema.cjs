@@ -111,6 +111,7 @@ for(const[panel,names]of Object.entries(panelNames)){
 }
 field('library','steamPath','Steam 安装目录','Steam folder','Steam フォルダ');field('library','folders','其他游戏目录（一行一个）','Other game folders (one per line)','ほかのゲームフォルダ（1行に1つ）',
  'multiline');
+bool('library','nsfw','显示成人向封面（NSFW，默认关）','Show adult covers (NSFW, off by default)','成人向けの表紙を表示（NSFW・既定はオフ）');
 bool('library','autoSeries','自动识别游戏系列','Automatically recognize game series','ゲームシリーズを自動認識');
 /* E370: anonymous adaptation records (hook stream, embed result, calibration) shared between users; off stops both directions */
 /* 2026-11-12 the game's good-looking scenes, captured quietly for the detail card's back (scene-shots.cjs) */

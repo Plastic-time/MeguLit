@@ -253,6 +253,7 @@ function shell(){
    }catch(error){toast(errorMessage(error));}}));
   document.querySelectorAll('[data-route]').forEach(button=>button.addEventListener('click',()=>{navigate(button.dataset.route);}));
   document.querySelector('[data-top-guide]')?.addEventListener('click',()=>openGuide({api,locale,esc,toast,version:VERSION}));
+  import('./nsfw.js').then(m=>m.initNsfw({api,locale})).catch(()=>{});
   document.querySelector('[data-top-feedback]')?.addEventListener('click',()=>openFeedback({api,locale,esc,toast,version:VERSION}));
   if(model.preferences.homeBackground)api('background').then(image=>{if(!backgroundPreview)applyBackground(image);}).catch(()=>{});
   document.querySelector('#reader-notice button').onclick=event=>retryReader(event.currentTarget);
