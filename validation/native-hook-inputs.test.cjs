@@ -27,4 +27,3 @@ test('directory tracking includes a signature-only commit in the source freshnes
  const signature=sourceTime(['native/megulithook/DrawSitesSig.h']);assert.ok(signature>0);
  assert.ok(sourceTime(entry.sources)>=signature,'signature changes cannot leave hook freshness behind');
 });
-
