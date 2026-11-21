@@ -257,45 +257,65 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
  const sets={east:{n:windows.east.normal,beams:bundle(windows.east.list.slice(1,6),.7,.7)},south:{n:windows.south.normal,beams:bundle([windows.south.pos],windows.south.r*.62,1)},
   north:{n:windows.north.normal,beams:bundle([windows.north.pos],windows.north.r*.62,1)},west:{n:windows.west.normal,beams:bundle([windows.west.pos],windows.west.r*.62,1)}};
 
- /* ---- time of day ---- */
+ /* ---- real sun ----
+    The sun's place is computed from today's date and the PC's clock (solar declination + hour angle), at a latitude guessed from the
+    time zone, so sunrise and sunset move with the seasons. The church is oriented the old way: the apse behind the stele faces east
+    (-z), south is +x, west (the nave, behind the camera) is +z. There is one sun: all its light comes from one direction and gets in
+    only through the windows that face it. Sky colour, glass, fog, exposure and the torches follow the sun's height, not the hour.
+    After dark the moon (opposite the sun) gives a faint cold light and no shafts. */
  const C=h=>new THREE.Color(h);
- /* hour: sky (hemisphere) colour & intensity, ground colour, light colour & strength, glass tint & strength, fog colour & density, exposure, torches, shafts */
- const KEYS=[
-  [0,   {sky:C(0x1c1f3e),skyI:.14,gnd:C(0x0c0a10),lc:C(0x7d8cc8),li:.32,glass:C(0x4a52a0),gi:.32,fog:C(0x07060c),fd:.019,exp:.92,torch:1,beam:.35}],
-  [4.5, {sky:C(0x272452),skyI:.16,gnd:C(0x0e0c14),lc:C(0x8a90cc),li:.24,glass:C(0x5a5aa8),gi:.36,fog:C(0x0c0a14),fd:.018,exp:.92,torch:1,beam:.25}],
-  [6,   {sky:C(0x6a5288),skyI:.32,gnd:C(0x1a1418),lc:C(0xffa08a),li:.9,glass:C(0xffb6a0),gi:.9,fog:C(0x2a1e2a),fd:.016,exp:.98,torch:.85,beam:1}],
-  [7.5, {sky:C(0xa896c8),skyI:.8,gnd:C(0x2a2228),lc:C(0xffd2b4),li:2.0,glass:C(0xf6dcd6),gi:1.6,fog:C(0x3a3040),fd:.013,exp:1,torch:.15,beam:1}],
-  [9.5, {sky:C(0xb8bcec),skyI:1.1,gnd:C(0x302a30),lc:C(0xfff0e2),li:2.8,glass:C(0xeceaff),gi:2.1,fog:C(0x3c3a4c),fd:.011,exp:1.1,torch:0,beam:1}],
-  [12,  {sky:C(0xc4c8f0),skyI:1.25,gnd:C(0x343036),lc:C(0xffffff),li:3.2,glass:C(0xf4f2ff),gi:2.4,fog:C(0x403e50),fd:.010,exp:1.1,torch:0,beam:.85}],
-  [15.5,{sky:C(0xbcb2e2),skyI:1.1,gnd:C(0x342c2c),lc:C(0xffe6c8),li:2.8,glass:C(0xfff0e0),gi:2.1,fog:C(0x3e3846),fd:.011,exp:1.1,torch:0,beam:1}],
-  [17.4,{sky:C(0x9a78a8),skyI:.75,gnd:C(0x2c2024),lc:C(0xffa868),li:2.0,glass:C(0xffc090),gi:1.6,fog:C(0x3a2834),fd:.013,exp:1,torch:.02,beam:1}],
-  [18,  {sky:C(0x7a5a8a),skyI:.42,gnd:C(0x22181e),lc:C(0xff8c58),li:1.4,glass:C(0xe89878),gi:1.2,fog:C(0x2e1e28),fd:.014,exp:.99,torch:.45,beam:.95}],
-  [18.6,{sky:C(0x5a4072),skyI:.3,gnd:C(0x1a1218),lc:C(0xff7a48),li:.9,glass:C(0xd08070),gi:.8,fog:C(0x22161e),fd:.016,exp:.97,torch:.85,beam:.9}],
-  [20,  {sky:C(0x262246),skyI:.16,gnd:C(0x0e0b12),lc:C(0x7884c4),li:.3,glass:C(0x50549c),gi:.36,fog:C(0x0a0810),fd:.019,exp:.92,torch:1,beam:.35}],
-  [24,  null]];
- KEYS[KEYS.length-1][1]=KEYS[0][1];
+ /* by solar elevation in degrees */
+ const EKEYS=[
+  [-90,{sky:C(0x1a1c3a),skyI:.13,gnd:C(0x0b0a10),lc:C(0x7d8cc8),li:.2,glass:C(0x464e9c),gi:.3,fog:C(0x07060c),fd:.019,exp:.92,beam:0}],
+  [-12,{sky:C(0x1c1e40),skyI:.14,gnd:C(0x0b0a10),lc:C(0x7d8cc8),li:.2,glass:C(0x4a52a0),gi:.32,fog:C(0x08070e),fd:.019,exp:.92,beam:0}],
+  [-6, {sky:C(0x312a5c),skyI:.2,gnd:C(0x100d16),lc:C(0x8a90cc),li:.08,glass:C(0x6a62b0),gi:.45,fog:C(0x100c18),fd:.018,exp:.93,beam:0}],
+  [-2.5,{sky:C(0x5e4a7e),skyI:.3,gnd:C(0x18131a),lc:C(0xff9a7a),li:0,glass:C(0xc89aa8),gi:.75,fog:C(0x221a26),fd:.016,exp:.96,beam:0}],
+  [2,  {sky:C(0x8a6a98),skyI:.46,gnd:C(0x221a1e),lc:C(0xff9460),li:1.3,glass:C(0xffb890),gi:1.2,fog:C(0x34242e),fd:.014,exp:.99,beam:.9}],
+  [8,  {sky:C(0xa896c8),skyI:.75,gnd:C(0x2a2228),lc:C(0xffc89c),li:2.0,glass:C(0xf6dcd0),gi:1.6,fog:C(0x3a3040),fd:.013,exp:1.03,beam:1}],
+  [20, {sky:C(0xb8bcec),skyI:1.05,gnd:C(0x302a30),lc:C(0xfff0e2),li:2.8,glass:C(0xeceaff),gi:2.1,fog:C(0x3c3a4c),fd:.011,exp:1.08,beam:1}],
+  [45, {sky:C(0xc4c8f0),skyI:1.25,gnd:C(0x343036),lc:C(0xffffff),li:3.2,glass:C(0xf4f2ff),gi:2.4,fog:C(0x403e50),fd:.010,exp:1.1,beam:.9}],
+  [90, null]];
+ EKEYS[EKEYS.length-1][1]=EKEYS[EKEYS.length-2][1];
  const cur={sky:new THREE.Color(),gnd:new THREE.Color(),lc:new THREE.Color(),glass:new THREE.Color(),fog:new THREE.Color()};let first=true;
- function sample(h){let i=0;while(i<KEYS.length-2&&KEYS[i+1][0]<=h)i++;const [h0,a]=KEYS[i],[h1,b]=KEYS[i+1];let t=(h-h0)/(h1-h0);t=t*t*(3-2*t);
+ function sample(e){let i=0;while(i<EKEYS.length-2&&EKEYS[i+1][0]<=e)i++;const [e0,a]=EKEYS[i],[e1,b]=EKEYS[i+1];let t=Math.min(1,Math.max(0,(e-e0)/(e1-e0)));t=t*t*(3-2*t);
   const o={};for(const k in a)o[k]=a[k].isColor?a[k].clone().lerp(b[k],t):a[k]+(b[k]-a[k])*t;return o;}
- /* sun path: rises in the east (-z), south (+x) at noon, sets in the west (+z); the moon takes the opposite sky */
- function sunAt(h){const th=(h-6)/12*Math.PI,el=Math.sin(th)*1.08,dir=new THREE.Vector3(Math.sin(th)*Math.cos(Math.max(0,el)),Math.sin(el),-Math.cos(th)*Math.cos(Math.max(0,el)));
-  if(el>.03)return {pos:dir.normalize(),moon:false,up:Math.min(1,el/.25)};
-  const mth=th+Math.PI,mel=Math.max(.5,Math.sin(mth)*.9);return {pos:new THREE.Vector3(Math.sin(mth)*Math.cos(mel),Math.sin(mel),-Math.cos(mth)*Math.cos(mel)).normalize(),moon:true,up:Math.min(1,Math.max(0,(-el-.02)/.2))};}
- const hoursNow=()=>{if(typeof window.__TORCH_HOUR==='number')return window.__TORCH_HOUR;const d=new Date();return d.getHours()+d.getMinutes()/60+d.getSeconds()/3600;};
- const hallState={torch:0,beam:0,sunPos:new THREE.Vector3(0,1,0),exposure:1};
- function applyTime(dt,renderer){const h=hoursNow(),k=sample(h),s=sunAt(h),a=first?1:1-Math.exp(-dt*1.5);first=false;
+ /* latitude from the time zone (the page cannot know where the PC is; this is close enough for the light) */
+ const LAT=(()=>{let tz='';try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch{}
+  const map=[[/Shanghai|Chongqing|Harbin|Urumqi/,31],[/Hong_Kong|Macau/,22.3],[/Taipei/,25],[/Tokyo/,35.7],[/Seoul/,37.5],[/Singapore|Kuala_Lumpur/,2],[/Sydney|Melbourne/,-34],[/Los_Angeles/,34],[/New_York/,40.7],[/London/,51.5],[/Paris|Berlin/,50]];
+  for(const [re,v] of map)if(re.test(tz))return v;return 35;})();
+ const D2R=Math.PI/180;
+ /* time used: the PC clock, or window.__TORCH_HOUR (a test hook) on today's date */
+ const nowDate=()=>{const d=new Date();if(typeof window.__TORCH_HOUR==='number'){const h=window.__TORCH_HOUR;d.setHours(Math.floor(h),Math.round((h%1)*60),0,0);}return d;};
+ /* -> {el: elevation in degrees, az: azimuth from north, clockwise, in degrees}; solar time taken as the zone's clock time */
+ function solar(d){const start=new Date(d.getFullYear(),0,0),n=Math.floor((d-start)/864e5),phi=LAT*D2R;
+  const decl=23.44*D2R*Math.sin(2*Math.PI*(284+n)/365),lst=d.getHours()+d.getMinutes()/60+d.getSeconds()/3600,H=15*(lst-12)*D2R;
+  const sinE=Math.sin(phi)*Math.sin(decl)+Math.cos(phi)*Math.cos(decl)*Math.cos(H),el=Math.asin(Math.max(-1,Math.min(1,sinE)));
+  const az=Math.atan2(-Math.sin(H),Math.tan(decl)*Math.cos(phi)-Math.sin(phi)*Math.cos(H));return {el:el/D2R,az:((az/D2R)+360)%360};}
+ /* sky direction (unit vector toward the body) in hall space: north -x, east -z, south +x, west +z */
+ const skyDir=(az,el)=>{const a=az*D2R,e=el*D2R;return new THREE.Vector3(-Math.cos(a)*Math.cos(e),Math.sin(e),-Math.sin(a)*Math.cos(e)).normalize();};
+ function sunAt(){const {el,az}=solar(nowDate());
+  if(el>-2.5)return {pos:skyDir(az,Math.max(el,1.5)),moon:false,up:1,el};
+  /* the moon, roughly opposite the sun, never lower than 25° so its faint light still reaches in */
+  return {pos:skyDir((az+180)%360,Math.max(25,Math.min(70,-el))),moon:true,up:1,el};}
+ const hoursNow=()=>{const d=nowDate();return d.getHours()+d.getMinutes()/60;};
+ const hallState={torch:0,beam:0,sunPos:new THREE.Vector3(0,1,0),exposure:1,el:0};
+ function applyTime(dt,renderer){const s=sunAt(),k=sample(s.el),a=first?1:1-Math.exp(-dt*1.5);first=false;
+  /* torches: lit as the sun goes down (from 10° above the horizon, fully by 1°), out again in the morning */
+  k.torch=1-THREE.MathUtils.smoothstep(s.el,1,10);hallState.el=s.el;
   cur.sky.lerp(k.sky,a);cur.gnd.lerp(k.gnd,a);cur.lc.lerp(k.lc,a);cur.glass.lerp(k.glass,a);cur.fog.lerp(k.fog,a);
   for(const key of ['skyI','li','gi','fd','exp','torch','beam'])hallState[key]=hallState[key]===undefined?k[key]:hallState[key]+(k[key]-hallState[key])*a;
+  /* sun ↔ moon swap happens while the direct light is ~0 (elevation -2.5°), so the jump is invisible */
+  if(s.moon!==hallState.moon){hallState.moon=s.moon;hallState.sunPos.copy(s.pos);}
   hallState.sunPos.lerp(s.pos,a).normalize();
   hemi.color.copy(cur.sky);hemi.groundColor.copy(cur.gnd);hemi.intensity=hallState.skyI*(low?1.5:1);
   /* the light tier has no shadows, so the sun would come through the roof: keep it to a soft key there */
-  sun.color.copy(cur.lc);sun.intensity=hallState.li*(low?.18:1)*s.up;sun.position.copy(sun.target.position).addScaledVector(hallState.sunPos,90);
+  sun.color.copy(cur.lc);sun.intensity=hallState.li*(low?.18:1);sun.position.copy(sun.target.position).addScaledVector(hallState.sunPos,90);
   for(const m of glass)m.color.copy(cur.glass).multiplyScalar(hallState.gi);
   scene.fog.color.copy(cur.fog);scene.fog.density=hallState.fd;scene.background.copy(cur.fog);
   renderer.toneMappingExposure=hallState.exp;
   /* shafts: travel along -sunPos; a window side gets them when it faces the sun */
   const dir=hallState.sunPos.clone().negate();
-  for(const set of Object.values(sets)){const steep=THREE.MathUtils.smoothstep(-dir.y,.28,.55),face=Math.max(0,set.n.dot(hallState.sunPos)),w=Math.pow(face,.8)*s.up*hallState.beam*steep*(s.moon?.45:1);
+  for(const set of Object.values(sets)){const steep=THREE.MathUtils.smoothstep(-dir.y,.28,.55),face=Math.max(0,set.n.dot(hallState.sunPos)),w=s.moon?0:Math.pow(face,.8)*hallState.beam*steep;
    for(const m of set.beams){const len=dir.y<-.05?Math.min(30,m.position.y/-dir.y):0;m.visible=w>.01&&len>0;m.userData.pool.visible=m.visible;if(!m.visible)continue;
     m.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),dir);m.scale.set(m.userData.r,len,m.userData.r);
     m.material.uniforms.uStrength.value=w*m.userData.str;m.material.uniforms.uColor.value.copy(cur.lc).lerp(new THREE.Color(0xd8d0ff),.35);
