@@ -12,8 +12,16 @@
 #include <string>
 #include <vector>
 static std::vector<std::string> Lines;
-namespace Msg { inline void Log(const char *f, ...) { char b[1024]; va_list a; va_start(a, f); vsnprintf(b, sizeof b, f, a); va_end(a); if (strlen(b) > 500) printf("LONG %zu %s\n", strlen(b), b); Lines.push_back(b); } }
-#include "../MagesDraw.h"
+static void (*LogAction)()=nullptr;
+static int (*CommitAction)(int,int,int)=nullptr;
+namespace Msg { inline void Log(const char *f, ...) { char b[1024]; va_list a; va_start(a, f); vsnprintf(b, sizeof b, f, a); va_end(a); if(LogAction)LogAction(); if (strlen(b) > 500) printf("LONG %zu %s\n", strlen(b), b); Lines.push_back(b); } }
+static BOOL WINAPI FixtureEnumWindows(WNDENUMPROC,LPARAM){return TRUE;}
+#define EnumWindows FixtureEnumWindows
+#ifndef MAGES_HEADER
+#define MAGES_HEADER "../MagesDraw.h"
+#endif
+#include MAGES_HEADER
+#undef EnumWindows
 static int Failures = 0;
 static void Check(bool ok, const std::string &what) { printf("%s %s\n", ok ? "PASS" : "FAIL", what.c_str()); if (!ok) Failures++; }
 static bool Has(const std::string &s) { for (auto &l : Lines) if (l.find(s) != std::string::npos) return true; return false; }
@@ -28,7 +36,7 @@ static float ScaleValue = 1.5f;
 static std::uint16_t BackbufferSize[4] = {1920, 0, 1200, 0}; /* u16 width, u16 at +4 height: a 16:10 back buffer */
 static std::uint8_t *Pg(int p) { return PageMem.data() + (size_t)p * STRIDE; }
 #pragma optimize("", off)
-extern "C" __declspec(noinline) int __cdecl FakeCommit(int page, int unused, int flag) {
+extern "C" __declspec(noinline) int __cdecl FakeCommitBody(int page, int unused, int flag) {
   std::uint8_t *pg = Pg(page); int &len = *(int *)(pg + 0xc); std::uint8_t *a = pg + 0x3c;
   for (int i = 0; i < Layout.count; i++) {
     std::uint16_t c = Layout.codes[i]; if (c & 0x8000) continue; if (!LayoutInfo[i].w) continue;
@@ -40,6 +48,7 @@ extern "C" __declspec(noinline) int __cdecl FakeCommit(int page, int unused, int
   }
   return len + unused * 1000;
 }
+extern "C" __declspec(noinline) int __cdecl FakeCommit(int page,int unused,int flag){if(CommitAction)return CommitAction(page,unused,flag);return FakeCommitBody(page,unused,flag);}
 extern "C" __declspec(noinline) int __cdecl FakeClear(int page) { std::uint8_t *pg = Pg(page); memset(pg + 0x3c + 12 * S, 0, S); *(int *)(pg + 0xc) = 0; return 77 + page; }
 extern "C" __declspec(noinline) int __cdecl FakeGlyph(int tex, float sx, float sy, float sw, float sh, float x0, float y0, float x1, float y1, int color, unsigned op) { return tex + (int)x0 + (int)op; }
 extern "C" __declspec(noinline) void __cdecl FakeDialogue(int font, int page, unsigned opacity) { for (int i = 0; i < 3; i++) FakeGlyph(0x4e, 33.f * i, 0, 30, 30, 100.f + 30 * i, 800, 130.f + 30 * i, 830, 0xffffff, opacity); }
@@ -59,7 +68,8 @@ int main(int argc, char **argv) {
   Commit = (uintptr_t)FakeCommit; Clear[0] = (uintptr_t)FakeClear; Clears = 1; Dlg[0] = (uintptr_t)FakeDialogue; Dlg[1] = (uintptr_t)FakeDialogue2; Glyph = (uintptr_t)FakeGlyph;
   { uintptr_t fns[] = {(uintptr_t)FakeCommit, (uintptr_t)FakeClear, (uintptr_t)FakeGlyph, (uintptr_t)FakeDialogue, (uintptr_t)FakeDialogue2, (uintptr_t)FakeMenu, (uintptr_t)FakeMenu2, (uintptr_t)main};
     for (int i = 0; i < 2; i++) { DlgEnd[i] = Dlg[i] + 0x1000; for (uintptr_t f : fns) if (f > Dlg[i] && f < DlgEnd[i]) DlgEnd[i] = f; } } /* the next function: the real end comes from the signature */
-  Install();
+  InitializeCriticalSection(&Lock);
+  Install();SetPermission(true);
   Check(Has("ToMe_DRAWRUN engine=mages on: "), "installed: the on line");
   // a name + the first piece of a sentence (one glyph the layout gave no width: not in the page)
   SetLayout({0x8001, 0x3b0, 0x3b1, 0x8002, 0x254, 0xf4, -1, 0xe5});

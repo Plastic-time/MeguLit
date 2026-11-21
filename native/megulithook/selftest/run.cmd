@@ -97,3 +97,6 @@ rem minori exact English-build byte-string input observer, default off; no game 
 call "%~dp0run-minori.cmd" || exit /b 1
 rem Siglus trusted control, reversible Push/Clear/Frame observation and idle flush.
 call "%~dp0run-siglus-permission.cmd" || exit /b 1
+
+rem MAGES strict control, persistent permission epochs, TLS return ownership and actual cdecl gates.
+call "%~dp0run-mages-permission.cmd" || exit /b 1
