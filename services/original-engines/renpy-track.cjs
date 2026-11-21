@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 // Explicit offline translation tracks; no directory discovery or language inference.
-const LIMITS=Object.freeze({sources:64,fileBytes:1024*1024,totalBytes:4*1024*1024,fileLines:40000,totalLines:100000,lineBytes:16384,blocks:10000,says:40000,groupSays:64,textBytes:4*1024*1024});
+const LIMITS=Object.freeze({sources:64,fileBytes:1024*1024,totalBytes:4*1024*1024,fileLines:40000,totalLines:100000,lineBytes:16384,speakerBytes:256,blocks:10000,says:40000,groupSays:64,textBytes:4*1024*1024});
 const IDENT=/^[A-Za-z_][A-Za-z0-9_]{0,159}$/,LANG=/^[A-Za-z_][A-Za-z0-9_]{0,63}$/,WHO=/^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
 const STATEMENTS=new Set('old new define default python init style screen translate label if elif else while for return jump call show hide scene play queue stop voice pause with image pass'.split(' '));
 function fail(code,source,line){const error=Error('RENPY_TRACK_'+code);error.code=error.message;if(source!==undefined)error.source=source;if(line!==undefined)error.line=line;throw error;}
@@ -10,6 +10,12 @@ function languageOf(value){if(typeof value!=='string'||!LANG.test(value)||/^none
 function nameOf(value){if(typeof value!=='string'||!value||value.length>512||/[\0\r\n]/.test(value))fail('SOURCE_NAME');return value;}
 function spend(counts,limits,key,amount,source,line){counts[key]=(counts[key]||0)+amount;if(counts[key]>limits[key])fail('BUDGET_'+key.toUpperCase(),source,line);}
 function textOf(value,limits,counts,source,line){if(typeof value!=='string'||!value.trim()||!value.isWellFormed()||value.includes('\0'))fail('SAY_TEXT',source,line);const bytes=Buffer.byteLength(value);if(bytes>limits.lineBytes)fail('BUDGET_LINEBYTES',source,line);spend(counts,limits,'textBytes',bytes,source,line);return value;}
+function whoOf(value,limits,counts,source,line){
+ if(value===null)return null;if(typeof value!=='string')fail('SPEAKER',source,line);
+ if(value.length>limits.speakerBytes)fail('BUDGET_SPEAKERBYTES',source,line);
+ if(!WHO.test(value)||STATEMENTS.has(value))fail('SPEAKER',source,line);
+ spend(counts,limits,'textBytes',value.length,source,line);return value;
+}
 function unquote(body,source,line){let out='';for(let at=0;at<body.length;at++){
  const c=body[at];if(c!=='\\'){out+=c;continue;}const e=body[++at];
  if(e==='n')out+='\n';else if(e==='r')out+='\r';else if(e==='t')out+='\t';else if(e==='"'||e==="'"||e==='\\')out+=e;
@@ -18,7 +24,7 @@ function unquote(body,source,line){let out='';for(let at=0;at<body.length;at++){
 function sayOf(raw,limits,counts,source,line){
  const m=raw.match(/^(?:([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s+)?"((?:[^"\\]|\\.)*)"\s*(?:#.*)?$/);
  if(!m||STATEMENTS.has(m[1]))fail('UNSUPPORTED_SAY',source,line);spend(counts,limits,'says',1,source,line);
- return {who:m[1]||null,text:textOf(unquote(m[2],source,line),limits,counts,source,line)};
+ return {who:whoOf(m[1]||null,limits,counts,source,line),text:textOf(unquote(m[2],source,line),limits,counts,source,line)};
 }
 function parseLoose({language,sources,limits:inputLimits}={}){
  language=languageOf(language);const limits=limitsOf(inputLimits),counts={},blocks=[],excluded=[],ids=new Set(),names=new Set();
@@ -57,9 +63,10 @@ function validateGroup(group,limits,counts,ids,source){
  if(!group||typeof group!=='object'||typeof group.id!=='string'||!IDENT.test(group.id))fail('BLOCK_ID',source);
  if(ids.has(group.id))fail('DUPLICATE_ID',source);ids.add(group.id);spend(counts,limits,'blocks',1,source);
  if(!Array.isArray(group.says)||!group.says.length||group.says.length>limits.groupSays)fail('GROUP_SIZE',source);
+ for(let at=0;at<group.says.length;at++)if(!Object.hasOwn(group.says,at))fail('SPARSE_SAYS',source);
  return {id:group.id,says:group.says.map(say=>{
-  if(!say||typeof say!=='object'||say.who!==null&&(typeof say.who!=='string'||!WHO.test(say.who)||STATEMENTS.has(say.who)))fail('SPEAKER',source);
-  spend(counts,limits,'says',1,source);return {who:say.who,text:textOf(say.text,limits,counts,source)};
+  if(!say||typeof say!=='object')fail('SPEAKER',source);
+  spend(counts,limits,'says',1,source);return {who:whoOf(say.who,limits,counts,source),text:textOf(say.text,limits,counts,source)};
  })};
 }
 function pairTrack({language,canonical,track,limits:inputLimits}={}){

@@ -94,3 +94,19 @@ test('aggregate limits stop the second individually valid source, including excl
  const bytes=Buffer.byteLength('最初の例次の例');rejects(()=>run({textBytes:bytes*2-1}),'BUDGET_TEXTBYTES');
  rejects(()=>parse(input+'translate Japanese python:\n    arbitrary_stuff()\n',{limits:{blocks:1}}),'BUDGET_BLOCKS');
 });
+test('direct pairing and loose parsing bound speaker metadata and count it in aggregate text',()=>{
+ const track=who=>({language:'Japanese',blocks:[group('speaker',says([who,'x']))]}),c=who=>[{name:'scene',groups:[group('speaker',says([who,'x']))]}];
+ const run=(who,limits)=>pairTrack({language:'Japanese',track:track(who),canonical:c(who),limits});
+ rejects(()=>run('a'.repeat(32768)),'BUDGET_SPEAKERBYTES');rejects(()=>run('a'.repeat(257)),'BUDGET_SPEAKERBYTES');
+ assert.equal(run('a'.repeat(256)).coverage.says,1);rejects(()=>run('aa',{speakerBytes:1}),'BUDGET_SPEAKERBYTES');
+ rejects(()=>parse('translate Japanese speaker:\n    '+ 'a'.repeat(257)+' "例"\n'),'BUDGET_SPEAKERBYTES');
+ const token='speaker';rejects(()=>run(token,{textBytes:token.length*2+1}),'BUDGET_TEXTBYTES');assert.equal(run(token,{textBytes:(token.length+1)*2}).coverage.rate,1);
+});
+test('sparse Say arrays reject on either side with the fixed error contract',()=>{
+ const normal=says(['a','x'],[null,'y']),hole=new Array(2);hole[1]=normal[1];
+ const run=(base,translation)=>pairTrack({language:'Japanese',canonical:[{name:'scene',groups:[group('id',base)]}],track:{language:'Japanese',blocks:[group('id',translation)]}});
+ rejects(()=>run(hole,normal),'SPARSE_SAYS');rejects(()=>run(normal,hole),'SPARSE_SAYS');rejects(()=>run(new Array(1),new Array(1)),'SPARSE_SAYS');
+ const trailing=[normal[0]];trailing.length=2;rejects(()=>run(trailing,normal),'SPARSE_SAYS');
+ const inherited=new Array(2),proto=Object.create(Array.prototype);proto[0]=normal[0];Object.setPrototypeOf(inherited,proto);inherited[1]=normal[1];
+ rejects(()=>run(normal,inherited),'SPARSE_SAYS');assert.equal(run(normal,normal).coverage.says,2);
+});

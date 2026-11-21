@@ -14,7 +14,9 @@ Every translated ID must match exactly one canonical group, all canonical groups
 
 This verifies structural correspondence, not translation meaning or language quality. Reordered meanings spoken by the same speaker cannot be detected from these structural fields. No native/compositor or in-game display observation is provided
 
-Hard budgets are 64 supplied sources, 1 MiB per buffer, 4 MiB aggregate input, 40,000 physical lines per buffer, 100,000 aggregate physical lines, 16 KiB per physical line/text, 10,000 blocks, 40,000 Say statements, 64 Says per group, and 4 MiB aggregate extracted text. Pairing independently budgets both canonical and translated groups/Says/text together. Caller overrides may lower these limits, never raise them. Excluded blocks still consume byte/line/block budgets
+Hard budgets are 64 supplied sources, 1 MiB per buffer, 4 MiB aggregate input, 40,000 physical lines per buffer, 100,000 aggregate physical lines, 16 KiB per physical line/text, 256 bytes per ASCII speaker token, 10,000 blocks, 40,000 Say statements, 64 Says per group, and 4 MiB aggregate body text plus speaker tokens. Pairing independently budgets both canonical and translated groups/Says/text together. Caller overrides may lower these limits, never raise them. Excluded blocks still consume byte/line/block budgets
+
+Both parsing and direct pairing enforce the speaker cap and aggregate accounting. Every Say array must have an own element at every index; holes or prototype-supplied elements reject with RENPY_TRACK_SPARSE_SAYS before mapping. No sparse array can be accepted as an empty group member or escape as an incidental TypeError
 
 Failures throw fixed `RENPY_TRACK_*` codes, with source/line provenance where available and no dialogue text in the error. Parsing and pairing return no partial result on failure
 
