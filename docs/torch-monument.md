@@ -1,0 +1,76 @@
+# 传火碑（三维）——怎么做的、用什么做的、以后怎么改
+
+顶栏「传火碑」按钮打开一个全屏 3D 页面：一座带穹顶的石砌教堂，碑立在中央，所有传过火的玩家的名字竖排刻在碑面上。场景随电脑本地时间变化：白天日光从窗户照进来，黄昏点起火把，夜里有月光。
+
+## 用了什么
+
+- **three.js r168**，打包在 `web/vendor/three/`（锁定版本、离线可用，不走 CDN）。用到的 addon：Reflector、EffectComposer / RenderPass / ShaderPass / UnrealBloomPass / OutputPass 和它们的着色器、BufferGeometryUtils。来源和改动见 `web/vendor/three/VERSION.txt`、`THIRD-PARTY.md`。
+- **GSAP**（项目已有，`web/gsap-loader.js`）：开场推镜、界面淡入。
+- 所有模型、贴图都是**代码生成的原创内容**，没有任何外部图片或模型文件。
+- 数据：relay 的 `/api/torch/monument | months | find | me`，经 `services/torch-monument.cjs` 和 bridge 访问（页面本身的 CSP 不允许联网）。
+
+## 文件
+
+| 文件 | 内容 |
+|---|---|
+| `web/torch-monument.js` | 页面本体：界面、数据分页 / 虚拟化、碑面刻字（canvas）、镜头、渲染管线、画质档、生命周期 |
+| `web/torch-hall.js` | 殿堂和碑的几何、材质、火把、太阳 / 月亮和时间光照（`buildHall`、`buildStele`） |
+| `web/torch-textures.js` | 全部程序贴图：砌块石、浮雕檐带、藻井、彩窗、玻璃、大理石（`marbleHQ`、`floorHQ`）、柱头浮雕、拼花走道 |
+| `web/torch-bake.js` | 烘焙结果的加载 / 校验、AO 和火把光体积的计算、给材质注入体积采样 |
+| `web/torch-volumetric.js` | 体积光（丁达尔效应）后处理 |
+| `web/torch-monument.css` | 页面界面样式 |
+| `web/assets/torch/` | 烘焙产物（贴图 webp、`ao.bin`、`torch.bin`、`manifest.json`） |
+| `tools/torch-bake.cjs` | 烘焙工具 |
+| `services/torch-monument.cjs` | relay 接口封装（两个 relay 地址都会试） |
+| `validation/torch-bake.test.cjs`、`validation/torch-monument.test.cjs` | 测试 |
+
+## 怎么做的
+
+**场景（torch-hall.js）**：仿大型穹顶教堂的形制。
+- 中央方厅四角是大方柱，方柱朝里的两面贴着带凹槽的扁平壁柱。
+- 四个大拱撑起帆拱，帆拱上一圈环形檐口，再往上是开 16 扇窗的鼓座（窗间是成对壁柱），顶上是 16 肋藻井穹顶，穹顶中央开采光眼，上面立采光亭。
+- 东端（碑后）是七边形后殿：下段做盲龛，上段开彩窗，半穹顶从大拱的起拱线起。
+- 两侧是帕沃纳佐大理石柱廊（象牙白底、紫灰纹），柱头是拜占庭篮形柱头。两侧大拱下各有一扇玫瑰窗，西端是中殿。
+- 碑：黑色抛光玄武岩，整条坐在通长台基上（五格金框面板），台基下是七级圆角石阶。
+
+**光照**：
+- 太阳位置按当天日期和本地时间计算（赤纬 + 时角，纬度按时区估算）。教堂坐西朝东，所以早上东南光、中午南光、下午西南光。
+- 光只从窗户进来，因为全场有日光阴影：透明玻璃透光，彩色玻璃挡光。
+- 天空颜色、玻璃亮度、雾、曝光、火把亮灭都按**太阳高度角**插值，所以变化是连续的。火把在太阳低于 10° 时开始点亮。
+- 夜里换成月亮：位置近似取太阳的对面，固定在高位，让月光能透过鼓座落到地面。
+- **体积光**（`torch-volumetric.js`）：沿每个像素的视线逐步采样太阳 / 月亮的阴影图，光柱的形状由窗户决定。
+- **火**：体积火（在一个盒子里对 3D 噪声做光线步进，按温度着色）加上火星。台阶旁两个火盆是实时点光源；墙上和柱上的火把光是烘焙好的体积。
+
+**预烘焙（关键）**：
+- 程序贴图和光照体积都在离线阶段算好，运行时直接加载，打开页面几乎不需要计算。
+- `manifest.json` 里记录了三个场景源码的哈希（`torch-hall.js`、`torch-textures.js`、`torch-bake.js`，换行统一后算 SHA-256）。哈希对不上时，页面会退回现场生成：贴图用四分之一分辨率，体积现场计算，打开要多等几秒。
+- AO 体积 30 cm 一格，火把光体积 60 cm 一格。
+
+**渲染管线**：
+- 高配：MSAA 场景 → 体积光 → bloom → 调色暗角 → 输出。还开了地面实时反射（Reflector 半分辨率）、日光阴影 2048、清漆材质。
+- 省电：体积光（四分之一分辨率）→ 输出。阴影 1024，贴图减半，不开反射、bloom、MSAA，暗角用 CSS 实现。
+- 阴影不是每帧都画：太阳移动约 0.1° 才重画一次。着色器先用 `compileAsync` 编译完再开场，编译期间显示「正在准备殿堂…」。
+- 页面打开才建场景，关闭时全部 dispose 并释放 WebGL 上下文。窗口隐藏或失焦时停止渲染；启动游戏前会收到 `megulit-game-launch` 事件并直接关闭页面。
+
+**碑面刻字（torch-monument.js）**：
+- 名字竖排画进碑面 canvas。刻痕效果分四层：上沿内阴影、下沿受光、槽底哑光、淡淡的冷白自发光。
+- 一次只取 300 条，内存最多保留 1200 条，翻页只重画碑面贴图。
+- 碑顶有月份刻度；「找名字」支持输入 `#N` 直达编号；「我的名字」会让对应那条发光。
+
+## 以后怎么改
+
+1. **改场景或贴图**：编辑 `web/torch-hall.js`、`web/torch-textures.js` 或 `web/torch-bake.js` 之后，**必须重新烘焙**：
+   ```
+   node tools/torch-bake.cjs
+   ```
+   - 工具会在无头 Chrome / Edge 里跑同一套代码（不渲染，约 1 分钟），重写 `web/assets/torch/`。
+   - 不重新烘焙的话，`validation/torch-bake.test.cjs` 会失败；页面本身仍能打开，只是退回现场生成，又慢又糊。
+   - 新增贴图：用 `maps('名字',()=>生成函数(...))` 包起来，烘焙时会自动收录。大贴图的尺寸乘上 `HQ()`，这样回退时会自动用小尺寸。
+2. **只改界面、刻字、镜头**（`web/torch-monument.js`、`.css`）：不影响烘焙，直接改。
+3. **调光照**：
+   - 天色 / 曝光 / 雾 / 玻璃亮度：`torch-hall.js` 里的 `EKEYS`（按太阳高度角的关键帧）。
+   - 太阳算法：`solar()`。月亮：`sunAt()`。纬度表：`LAT`。
+   - 体积光强度：`torch-volumetric.js` 里的 `density` 参数，以及 `torch-monument.js` 每帧设置的 `vol.strength`。
+4. **调材质颜色**：大理石配色在 `torch-hall.js` 的 `PAL`（violet = 帕沃纳佐柱子，cream = 台阶 / 碑座，floor = 地面）。改完要重新烘焙。
+5. **截图检查**（不在屏幕上弹窗）：用无头 Chrome 开真实应用外壳，并用 `window.__TORCH_HOUR = 小时数` 指定时间。我用的脚本在 `H:\MeguLit-Work\torch-shots\shot.cjs`，不在仓库里，有需要可以搬进 `tools/`。
+6. **性能**：在省电档基础上还可以继续降的地方：`torch-volumetric.js` 的 `steps`；`applyTier()` 里的阴影尺寸和像素比。

@@ -11,7 +11,7 @@
    and the torches are lit from dusk to morning. Everything is interpolated, so the room changes as slowly as the day. */
 import * as THREE from './vendor/three/three.module.min.js';
 import {mergeGeometries} from './vendor/three/addons/utils/BufferGeometryUtils.js';
-import {ashlar,relief,coffers,rose,lancet,quarries,marble,marbleHQ,floorHQ,inlay,glowSprite,basalt} from './torch-textures.js';
+import {ashlar,relief,coffers,rose,lancet,quarries,marble,marbleHQ,floorHQ,inlay,glowSprite,basalt,basketRelief} from './torch-textures.js';
 import {maps} from './torch-bake.js';
 
 export const HALL={HX:10,BACK:-6.5,FRONT:14.5,SPRING:9.3,NZ1:40,AX:13.2};
@@ -54,6 +54,20 @@ function corinthian(r){const parts=[];const bellH=r*2.1;
  const ab2=new THREE.BoxGeometry(r*2.7,r*.12,r*2.7);ab2.translate(0,bellH-r*.02,0);parts.push(ab2);
  const flat=parts.map(p=>p.index?p.toNonIndexed():p),m=mergeGeometries(flat,false);parts.forEach(p=>p.dispose());flat.forEach(p=>p.dispose());return m;}
 
+/* Byzantine basket capital (height 2.42 r, as the old one): a bowl that turns from round at the neck to square at the top, slightly
+   swelling, carved all over (relief texture), on an astragal; and an impost block that widens to carry the arches */
+function basketCapital(r){const M=24,N=64,hb=r*1.85,hi=r*.57,pos=[],uv=[],idx=[];
+ for(let j=0;j<=M;j++){const t=j/M,p=2+Math.pow(t,1.5)*12,sm=t*t*(3-2*t),s=r*1.04*(1-sm)+r*1.5*sm+Math.sin(Math.PI*t)*r*.1;
+  for(let i=0;i<=N;i++){const a=i/N*Math.PI*2,c=Math.cos(a),sn=Math.sin(a),k=Math.pow(Math.pow(Math.abs(c),p)+Math.pow(Math.abs(sn),p),-1/p);
+   pos.push(c*k*s,t*hb,sn*k*s);uv.push(i/N*4,t);}}
+ for(let j=0;j<M;j++)for(let i=0;i<N;i++){const a=j*(N+1)+i,b=a+N+1;idx.push(a,b,a+1,b,b+1,a+1);}
+ const bowl=new THREE.BufferGeometry();bowl.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));bowl.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));bowl.setIndex(idx);bowl.computeVertexNormals();
+ const neck=new THREE.TorusGeometry(r*1.04,r*.09,8,40).rotateX(Math.PI/2).translate(0,r*.04,0);
+ const imp=new THREE.CylinderGeometry(r*1.86*Math.SQRT2,r*1.5*Math.SQRT2,hi,4,1).rotateY(Math.PI/4).translate(0,hb+hi/2,0);
+ const slab=new THREE.BoxGeometry(r*3.9,r*.1,r*3.9).translate(0,hb+hi+r*.05-r*.1,0);
+ const flat=g=>g.index?g.toNonIndexed():g;
+ return {bowl:mergeGeometries([flat(bowl),flat(neck)]),impost:mergeGeometries([flat(imp),flat(slab)])};}
+
 /* moulding profiles (x = out from the wall, y = up), extruded along a straight run */
 function profileShape(pts){const s=new THREE.Shape();s.moveTo(pts[0][0],pts[0][1]);for(const q of pts.slice(1))if(q.length===4)s.quadraticCurveTo(q[0],q[1],q[2],q[3]);else s.lineTo(q[0],q[1]);s.closePath();return s;}
 const CORNICE=[[0,0],[.1,0],[.1,.05],[.14,.05,.2,.16],[.24,.16],[.24,.2],[.46,.2],[.46,.36],[.5,.36],[.5,.4,.66,.54],[.68,.54],[.68,.6],[0,.6]];
@@ -70,7 +84,8 @@ function textureMaker(keep,maxAniso=8){const seen=new Map();
   x.colorSpace=srgb?THREE.SRGBColorSpace:THREE.NoColorSpace;x.wrapS=x.wrapT=THREE.RepeatWrapping;x.anisotropy=maxAniso;x.repeat.set(rep,rep);return x;};}
 
 /* marble palettes; HQ: full size when baking (tools/torch-bake.cjs), a quarter when a stale bake has to draw them on the spot */
-const PAL={violet:{ground:[30,18,40],vein:[196,176,212],hair:[120,96,142],tint:[206,176,124],k:2,warp:3.6},
+/* violet: pavonazzo, an ivory marble veined in purple-grey (the theme's violet, in a stone real churches use) */
+const PAL={violet:{ground:[228,220,208],vein:[112,86,108],hair:[178,164,168],tint:[146,106,116],k:2,warp:4.2,veinPow:16,hairAmt:.42},
  cream:{ground:[222,212,194],vein:[150,140,128],hair:[186,176,162],tint:[200,178,140],k:2,warp:3,veinPow:30,hairAmt:.35},
  floor:{ground:[182,178,188],vein:[118,110,130],hair:[150,144,160],tint:[170,150,120],k:2,warp:3.4,veinPow:32,hairAmt:.4}};
 const HQ=()=>window.__TORCH_BAKE?1:.25;
@@ -134,10 +149,12 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
  const stoneDark=keep(new THREE.MeshStandardMaterial({map:T(ashDark.map),normalMap:T(ashDark.normal,false),roughnessMap:T(ashDark.rough,false),roughness:1,metalness:0,envMapIntensity:.25}));
  const carved=keep(new THREE.MeshStandardMaterial({map:T(rel.map),normalMap:T(rel.normal,false),roughness:.82,metalness:0,envMapIntensity:.3}));
  const smooth=keep(new THREE.MeshStandardMaterial({map:T(pale.map),color:0xf2ebe0,roughness:.74,metalness:0,envMapIntensity:.45}));
- const violet=keep(new THREE.MeshPhysicalMaterial({map:T(col.map),roughnessMap:T(col.rough,false),normalMap:T(col.normal,false),roughness:1,metalness:0,clearcoat:low?0:.85,clearcoatRoughness:.05,envMapIntensity:1}));
+ const violet=keep(new THREE.MeshPhysicalMaterial({map:T(col.map),roughnessMap:T(col.rough,false),normalMap:T(col.normal,false),roughness:1,metalness:0,clearcoat:low?0:.35,clearcoatRoughness:.12,envMapIntensity:.7}));
  /* shafts are 1.7 m round and 5 m tall: three repeats up the height keep the veins in proportion */
  for(const k of ['map','roughnessMap','normalMap'])violet[k].repeat.set(1,3);
  const capMat=keep(new THREE.MeshStandardMaterial({map:T(pale.map),color:0xefe6d6,roughness:.75,metalness:0,side:THREE.DoubleSide,envMapIntensity:.4}));
+ const bask=maps('basketCapital',()=>basketRelief(1024,512,19));
+ const basketMat=keep(new THREE.MeshStandardMaterial({map:T(bask.map),normalMap:T(bask.normal,false),roughness:.78,metalness:0,envMapIntensity:.4}));
  const gilt=keep(new THREE.MeshStandardMaterial({color:0xb48a4a,roughness:.32,metalness:.9,envMapIntensity:1.2}));
  const iron=keep(new THREE.MeshStandardMaterial({color:0x1c1a1e,roughness:.55,metalness:.85,envMapIntensity:.6}));
  const domeMat=keep(new THREE.MeshStandardMaterial({map:T(vault.map),normalMap:T(vault.normal,false),roughness:.85,metalness:0,side:THREE.BackSide,envMapIntensity:.3}));
@@ -166,11 +183,12 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
  const nicheMat=keep(new THREE.MeshStandardMaterial({color:0x120e16,roughness:.95}));
  /* ---- column kit ---- */
  const COL_R=.27,COL_H=5.0;
- const shaftG=flutedShaft(COL_R,COL_H),baseG=atticBase(COL_R),capG=corinthian(COL_R),plinthG=box(COL_R*2.9,.3,COL_R*2.9);
+ const shaftG=flutedShaft(COL_R,COL_H),baseG=atticBase(COL_R),capG=basketCapital(COL_R),plinthG=(()=>{const w=COL_R*2.9,r=.025,sh=new THREE.Shape(),x=w/2-r;sh.moveTo(-x,-x);sh.lineTo(x,-x);sh.lineTo(x,x);sh.lineTo(-x,x);sh.closePath();
+  const g=new THREE.ExtrudeGeometry(sh,{depth:.3-2*r,bevelEnabled:true,bevelThickness:r,bevelSize:r,bevelSegments:3});g.rotateX(-Math.PI/2);g.translate(0,-.15+r,0);return worldUV(g,4);})();
  const colZ=[];for(let z=BACK+2.6;z<NZ1-2;z+=1.7)if(Math.abs(z-(FRONT-.4))>1.6)colZ.push(z);
  const colP=[];for(const z of colZ)for(const sx of [-1,1])colP.push([sx*HX,0,z]);
- inst(plinthG,smooth,colP.map(p=>[p[0],.15,p[2]]));inst(baseG,smooth,colP.map(p=>[p[0],.3,p[2]]));
- inst(shaftG,violet,colP.map(p=>[p[0],.3+COL_R*.5+COL_H/2,p[2]]));inst(capG,capMat,colP.map(p=>[p[0],.3+COL_R*.5+COL_H,p[2]]));
+ inst(plinthG,smooth,colP.map(p=>[p[0],.15,p[2]]));inst(new THREE.TorusGeometry(COL_R*1.36,.022,6,32).rotateX(Math.PI/2),smooth,colP.map(p=>[p[0],.305,p[2]]),{cast:false});inst(baseG,smooth,colP.map(p=>[p[0],.3,p[2]]));
+ inst(shaftG,violet,colP.map(p=>[p[0],.3+COL_R*.5+COL_H/2,p[2]]));{const at=colP.map(p=>[p[0],.3+COL_R*.5+COL_H,p[2]]);inst(capG.bowl,basketMat,at);inst(capG.impost,smooth,at);}
  const CAP_TOP=.3+COL_R*.5+COL_H+COL_R*2.1+COL_R*.32;
 
  /* ---- the four piers, each with an engaged column on its two faces toward the bay ---- */

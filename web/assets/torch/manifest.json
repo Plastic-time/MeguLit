@@ -1,5 +1,5 @@
 {
- "hash": "dee1edaf66ae419188f9a6d4",
+ "hash": "43f21f5372363b597f297252",
  "textures": {
   "ashlar": {
    "map": "ashlar.map.webp",
@@ -50,6 +50,10 @@
   },
   "lancet": {
    "map": "lancet.map.webp"
+  },
+  "basketCapital": {
+   "map": "basketCapital.map.webp",
+   "normal": "basketCapital.normal.webp"
   },
   "inlay": {
    "map": "inlay.map.webp"

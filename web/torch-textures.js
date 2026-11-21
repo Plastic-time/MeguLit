@@ -216,3 +216,16 @@ export function floorHQ(size,seed,palette){const f=marbleField(size>>1,seed,pale
  const gr=rough.getContext('2d'),rr=rng(seed+77);gr.globalAlpha=.05;gr.strokeStyle='#fff';for(let i=0;i<half*.5;i++){const x=rr()*half,y=rr()*half,a=rr()*Math.PI,l=half*(.01+rr()*.04);gr.lineWidth=.6+rr();gr.beginPath();gr.moveTo(x,y);gr.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);gr.stroke();}
  const Hh=new Float32Array(half*half);for(let y=0;y<half;y++)for(let x=0;x<half;x++)Hh[y*half+x]=H[(y*2)*size+x*2];
  return {map,rough,normal:heightToNormal(Hh,half,half,3)};}
+/* Byzantine basket capital relief: an interlaced lattice of drilled bands with a rosette in every diamond, a fillet top and bottom
+   (four repeats go round the capital; tileable across) */
+export function basketRelief(w,h,seed,{base=[226,216,198]}={}){const c=canvas2d(w,h),g=c.getContext('2d');g.fillStyle='rgb(70,70,70)';g.fillRect(0,0,w,h);
+ const n=4,cell=w/n,lw=cell*.11;g.lineCap='round';
+ for(const pass of [0,1]){g.strokeStyle=pass?'rgb(240,240,240)':'rgb(140,140,140)';g.lineWidth=pass?lw*.55:lw;
+  for(let i=-n;i<=n*2;i++){g.beginPath();g.moveTo(i*cell,0);g.lineTo(i*cell+h,h);g.stroke();g.beginPath();g.moveTo(i*cell,0);g.lineTo(i*cell-h,h);g.stroke();}}
+ const dome=(x,y,r)=>{const gr=g.createRadialGradient(x,y-r*.2,0,x,y,r);gr.addColorStop(0,'rgb(250,250,250)');gr.addColorStop(.7,'rgb(150,150,150)');gr.addColorStop(1,'rgb(80,80,80)');g.fillStyle=gr;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill();};
+ for(let y=cell/2;y<h;y+=cell/2)for(let x=((Math.round(y/(cell/2))%2)?0:cell/2);x<=w;x+=cell){dome(x,y,cell*.14);for(let k=0;k<6;k++){const a=k/6*Math.PI*2;dome(x+Math.cos(a)*cell*.17,y+Math.sin(a)*cell*.17,cell*.05);}}
+ g.fillStyle='rgb(230,230,230)';g.fillRect(0,0,w,h*.06);g.fillRect(0,h*.94,w,h*.06);g.fillStyle='rgb(120,120,120)';g.fillRect(0,h*.06,w,h*.012);g.fillRect(0,h*.928,w,h*.012);
+ const soft=canvas2d(w,h),sg=soft.getContext('2d');sg.filter='blur('+Math.max(1,w/400)+'px)';sg.drawImage(c,0,0);
+ const H=heightOf(soft),fbm=makeNoise(seed);
+ const map=pixels(w,h,(u,v,x,y)=>{const hh=H[y*w+x],ao=.5+.5*Math.pow(hh,.8),k=.93+.1*fbm(u,v,6,3);return [base[0]*ao*k,base[1]*ao*k,base[2]*ao*k];});
+ return {map,normal:heightToNormal(H,w,h,6)};}
