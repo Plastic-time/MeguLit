@@ -85,11 +85,11 @@ class UnityTextPath{
  push(){if(this.stopped||!this.sock)return;this.sock.write('WANT '+this.wanted.replace(/\r?\n/g,'\x1f')+'\nHIDE '+(this.on?1:0)+'\n'+(this.drawCfg?this.drawLine():'')+[...this.embeds.values()].join(''));}
  drawLine(){const c=this.drawCfg;return 'DRAW roles='+(c.roles?1:0)+' embed='+(c.embed?1:0)+' zh='+(c.zh?1:0)+'\n';}
  /* engine-draw: the switches, and one sentence's replacement (kept for a reconnect, newest 64) */
- drawConfig(cfg){const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;if(this.sock)this.sock.write(this.drawLine());}
- drawEmbed(key,o={}){const {krkrControlText}=require('./engine-draw.cjs');const body=krkrControlText({roles:false,embed:true,zh:true},new Map([[String(key||''),{ruby:o.ruby||[],zh:o.zh||''}]])).split('\r\n')[1]||'';if(!body)return;
+ drawConfig(cfg){if(this.stopped)return;const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;if(this.sock)this.sock.write(this.drawLine());}
+ drawEmbed(key,o={}){if(this.stopped)return;const {krkrControlText}=require('./engine-draw.cjs');const body=krkrControlText({roles:false,embed:true,zh:true},new Map([[String(key||''),{ruby:o.ruby||[],zh:o.zh||''}]])).split('\r\n')[1]||'';if(!body)return;
   const l='EMB '+body+'\n';this.embeds.delete(key);this.embeds.set(key,l);while(this.embeds.size>64)this.embeds.delete(this.embeds.keys().next().value);if(this.sock)this.sock.write(l);}
- hide(on){this.on=!!on;if(this.on&&this.canary&&!this.canary.allowed('unity')){this.on=false;this.onStatus('unity invisible drawing off for this game (crash canary)');}this.push();}
- want(text){this.wanted=String(text||'');this.push();}
+ hide(on){if(this.stopped)return;this.on=!!on;if(this.on&&this.canary&&!this.canary.allowed('unity')){this.on=false;this.onStatus('unity invisible drawing off for this game (crash canary)');}this.push();}
+ want(text){if(this.stopped)return;this.wanted=String(text||'');this.push();}
  exited(code){if(this.canary&&this.armed)this.canary.exited('unity',code);}
  stop(){if(this.stopping)return this.stopping;this.stopped=true;this.on=false;this.drawCfg={roles:false,embed:false,zh:false};this.embeds.clear();const s=this.sock,server=this.server;this.stopping=new Promise((resolve,reject)=>{let timer;const finish=error=>{clearTimeout(timer);if(error)reject(error);else resolve();};timer=setTimeout(()=>{s?.destroy();finish(Error('READER_STOP_INCOMPLETE'));},2000);const close=()=>{if(!server?.listening){finish();return;}server.close(error=>finish(error));};if(s&&!s.destroyed){s.once('close',close);s.end('HIDE 0\nDRAW roles=0 embed=0 zh=0\n');}else close();});this.stopping.catch(()=>{});return this.stopping;}
 }

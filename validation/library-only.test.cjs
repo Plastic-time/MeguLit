@@ -5,6 +5,7 @@ const {spawn}=require('node:child_process'),{once,EventEmitter}=require('node:ev
 const {Settings}=require('../services/settings.cjs'),{Runtime}=require('../services/runtime.cjs'),{Reader}=require('../services/reader.cjs');
 const {stopOwned,trackStop}=require('../core/owned-exit.cjs'),{libraryOnly}=require('../core/library-mode.cjs');
 const {HookNative}=require('../core/hook-native.cjs'),{GalNative}=require('../core/gal-native.cjs');
+const {UnityTextPath}=require('../core/text-paths-unity.cjs');
 function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'library-only-'));fs.mkdirSync(path.join(root,'logs'));const settings=new Settings(root);t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return {root,settings};}
 const tick=()=>new Promise(r=>setImmediate(r));
 async function child(t,delay=60){const p=spawn(process.execPath,['-e',`process.stdin.resume();process.stdin.on('end',()=>setTimeout(()=>process.exit(0),${delay}));console.log('ready');`],{windowsHide:true,stdio:['pipe','pipe','pipe']});t.after(()=>{if(p.exitCode===null&&p.signalCode===null)p.kill();});await once(p.stdout,'data');return p;}
@@ -44,6 +45,35 @@ test('global shutdown keeps the reader failure while still stopping every other 
  r.stopReading=async()=>{calls.push('reader');throw Error('READER_STOP_INCOMPLETE');};r.ankiRunner={stop:async()=>calls.push('anki')};r.gameEnrichment={stop:()=>calls.push('metadata')};r.gameReviews={stop:()=>calls.push('reviews')};
  r.localLearning={stop(){calls.push('learning');throw Error('SECONDARY_FAILURE');}};r.modelStore={jobs:{a:{},b:{}},cancel:id=>calls.push('model-'+id)};r.localEngine={cancel:()=>calls.push('local-cancel'),stop:async()=>calls.push('local-stop')};r.serviceManager={stop:async()=>calls.push('services')};
  await assert.rejects(r.stop(),/READER_STOP_INCOMPLETE/);for(const task of ['reader','anki','metadata','reviews','learning','model-a','model-b','local-cancel','local-stop','services'])assert(calls.includes(task),task);assert.equal(r.stopped,true);
+});
+
+test('Unity stopped sessions reject late drawing and intent updates until delayed socket close',async t=>{
+ const socket=()=>Object.assign(new EventEmitter(),{destroyed:false,writes:[],write(text){this.writes.push(text);},end(text){this.writes.push(text);},destroy(){}});
+ const old=new UnityTextPath(),s=socket();old.sock=s;let closedServer=false;
+ old.server={listening:true,close(callback){closedServer=true;callback();}};
+ old.drawConfig({roles:true,embed:true});old.drawEmbed('合成台詞',{zh:'synthetic'});old.hide(true);old.want('before');
+ assert(s.writes.some(line=>line.startsWith('EMB ')));assert(s.writes.some(line=>line.startsWith('DRAW roles=1')));
+ let done=false;const stop=old.stop().then(()=>{done=true;});t.after(()=>s.emit('close'));
+ const writesAtStop=s.writes.length;assert.match(s.writes.at(-1),/HIDE 0\nDRAW roles=0 embed=0 zh=0/);
+ old.drawConfig({roles:true,embed:true});old.drawEmbed('遅い合成台詞',{zh:'late'});old.hide(true);old.want('late');old.push();
+ assert.deepEqual(s.writes.slice(writesAtStop),[]);assert.equal(old.on,false);assert.deepEqual(old.drawCfg,{roles:false,embed:false,zh:false});assert.equal(old.embeds.size,0);assert.equal(old.wanted,'before');
+ await tick();assert.equal(done,false);assert.equal(closedServer,false);s.emit('close');await stop;assert.equal(closedServer,true);
+ const fresh=new UnityTextPath(),next=socket();fresh.sock=next;fresh.drawConfig({roles:true,embed:true});fresh.drawEmbed('新しい合成台詞',{zh:'new'});fresh.hide(true);fresh.want('new');
+ assert(next.writes.some(line=>line.startsWith('DRAW roles=1 embed=1')));assert(next.writes.some(line=>line.startsWith('EMB ')));assert.equal(fresh.on,true);assert.equal(fresh.wanted,'new');
+ const freshStop=fresh.stop();next.emit('close');await freshStop;
+});
+
+test('stopReading waits for every owned cleanup before exposing the first rejection',async t=>{
+ for(const syncThrow of [false,true]){
+  const {root}=fixture(t),r=new Runtime(root),first=Error('READER_STOP_INCOMPLETE first');let release,pathStarted=false,settled=false;
+  const reader={stop:()=>{if(syncThrow)throw first;return Promise.reject(first);}};
+  const slow={stop:()=>{pathStarted=true;return new Promise(resolve=>{release=resolve;});}},second={stop:()=>Promise.reject(Error('secondary'))};
+  r.reader=reader;r.textPaths=new Set([slow,second]);
+  const stop=r.stopReading().then(()=>{settled=true;return null;},error=>{settled=true;return error;});
+  assert.equal(pathStarted,true);
+  await tick();const before={pathStarted,settled};release?.();const result=await stop;
+  assert.deepEqual(before,{pathStarted:true,settled:false});assert.equal(result,first);assert.equal(r.readerError,'READER_STOP_INCOMPLETE');assert.equal(r.reader,reader);assert.equal(r.textPaths.size,2);
+ }
 });
 test('owned teardown waits for the real child exit and deduplicates concurrent callers',async t=>{
  const p=await child(t,80);let requests=0,done=false;const a=stopOwned(p,()=>{requests++;p.stdin.end();});const b=stopOwned(p,()=>requests++);assert.equal(a,b);a.then(()=>{done=true;});await tick();assert.equal(done,false);await a;assert.equal(requests,1);assert.equal(p.exitCode,0);
