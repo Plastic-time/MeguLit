@@ -252,7 +252,7 @@ static std::string Find(const char *needle) { for (auto &l : Logs) if (l.find(ne
 static std::string U8(const wchar_t *w) { return SiglusDraw::Utf8(w, (int)wcslen(w)); }
 
 static std::wstring ControlFile(){wchar_t tmp[MAX_PATH],file[MAX_PATH+64];GetTempPathW(MAX_PATH,tmp);std::wstring dir=std::wstring(tmp)+L"MeguLit";CreateDirectoryW(dir.c_str(),nullptr);dir+=L"\\draw";CreateDirectoryW(dir.c_str(),nullptr);swprintf_s(file,L"%s\\%lu.txt",dir.c_str(),GetCurrentProcessId());return file;}
-static void Control(const wchar_t *s){HANDLE h=CreateFileW(ControlFile().c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);DWORD written;WriteFile(h,s,(DWORD)(wcslen(s)*2),&written,nullptr);CloseHandle(h);}
+static void Control(const wchar_t *s){HANDLE h=CreateFileW(ControlFile().c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);if(h==INVALID_HANDLE_VALUE){printf("FIXTURE control open failed: %lu\n",GetLastError());ExitProcess(98);}DWORD size=(DWORD)(wcslen(s)*2),written=0;bool ok=WriteFile(h,s,size,&written,nullptr)&&written==size;CloseHandle(h);if(!ok){puts("FIXTURE control write incomplete");ExitProcess(98);}}
 static void Refresh(){
 #ifdef SIGLUS_PERMISSION_FIXED
  SiglusDraw::RefreshControl();
