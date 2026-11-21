@@ -1,5 +1,45 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {LibraryScans}=require('../services/library-scan.cjs');
+for(const fails of [false,true]){
+ test('a scan requested after changing folders uses the saved roots when the old scan '+(fails?'fails':'succeeds'),async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-rescan-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const {Settings}=require('../services/settings.cjs'),{Runtime}=require('../services/runtime.cjs');
+  const settings=new Settings(root),runtime=new Runtime(root),seen=[];
+  function save(folders){
+   const request={scope:'library',values:{folders}};
+   settings.save(request);runtime.settingsSaved(request);
+  }
+  save('Old');
+  let release;
+  runtime.libraryScans=new LibraryScans(async({incremental})=>{
+   const folders=settings.read('library').folders;seen.push({folders,incremental});
+   if(seen.length===1){await new Promise(r=>release=r);if(fails)throw Error('old scan failed');}
+   return folders;
+  });
+  const start=runtime.call({action:'library_scan',startup:true});
+  const old=fails?assert.rejects(start,/old scan failed/):start;
+  await Promise.resolve();
+  save('New');
+  const first=runtime.call({action:'library_scan'}),second=runtime.call({action:'library_scan'});
+  await Promise.resolve();assert.equal(seen.length,1);
+  release();await old;
+  assert.deepEqual(await Promise.all([first,second]),['New','New']);
+  assert.deepEqual(seen,[{folders:'Old',incremental:true},{folders:'New',incremental:false}]);
+ });
+}
+test('changing only Steam clears the cached startup scan, other library preferences keep it',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-rescan-steam-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const runtime=new(require('../services/runtime.cjs').Runtime)(root);let runs=0;
+ runtime.libraryScans=new LibraryScans(async()=>++runs);
+ const startup=()=>runtime.call({action:'library_scan',startup:true});
+ assert.equal(await startup(),1);
+ runtime.settingsSaved({scope:'library',values:{autoSeries:false}});
+ assert.equal(await startup(),1);
+ runtime.settingsSaved({scope:'library',values:{steamPath:'NewSteam'}});
+ assert.equal(await startup(),2);assert.equal(await startup(),2);
+});
 test('startup scans once, overlapping requests share work, and later manual refresh runs again',async()=>{
  let runs=0,release;const scanner=new LibraryScans(async()=>{runs++;await new Promise(r=>release=r);return {added:runs};});const first=scanner.run({startup:true}),manual=scanner.run();await Promise.resolve();assert.equal(runs,1);release();assert.deepEqual(await first,{added:1});assert.deepEqual(await manual,{added:1});await scanner.run({startup:true});assert.equal(runs,1);const next=scanner.run();await Promise.resolve();release();await next;assert.equal(runs,2);
 });
