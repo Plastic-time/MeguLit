@@ -101,7 +101,7 @@ const steamRunning=()=>{try{return require('./game-process.cjs').imageRunning('s
 
 /* ---- one game -------------------------------------------------------------------------------------------------------- */
 let current=null;
-function stopNow(why){const c=current;if(!c?.worker)return false;try{c.worker.send?.({stop:why});}catch{}try{c.worker.kill();}catch{}return true;}
+function stopNow(why){const c=current;if(!c?.stop)return false;c.stop(why).catch(()=>{});return true;}
 
 /* -> {verdict, why, ...}; deps for tests: {runner(opts)->result, report, upload, now} */
 async function testOne(root,game,{budgetMs,deps={}}={}){const s=load(root),id=game.exeKey||'id:'+game.id,now=deps.now||Date.now;const t0=now();
@@ -112,6 +112,8 @@ async function testOne(root,game,{budgetMs,deps={}}={}){const s=load(root),id=ga
  const located=(deps.locate||Saves.locate)({exe:game.exe,engine:game.engine,title:game.title},deps.env||process.env);
  if(!located.ok)return block('no-save-place');
  const auto=require('../core/auto-profile.cjs');const key=game.exeKey||await auto.exeKey(root,game.exe);
+ if(deps.startAllowed&&!await deps.startAllowed())return {verdict:'skipped',why:'not-idle'};
+ if(require('./background-games.cjs').blocked())return {verdict:'skipped',why:'foreground'};
  const snap=Saves.snapshot(root,located,{id:'r'+t0.toString(36),key});if(!snap.ok)return block('snapshot: '+snap.why);
  const runDir=path.join(runsDir(root),(key||game.id).slice(0,16)+'-'+t0.toString(36));
  let wroteAppid=false,result=null,restored=null,unknown=[],profile=null;
@@ -119,12 +121,18 @@ async function testOne(root,game,{budgetMs,deps={}}={}){const s=load(root),id=ga
  try{profile=require('../core/profiles/index.cjs').profileFor({engine:game.engine,exe:game.exe,title:game.title,folder:path.dirname(game.exe),steamAppId:steam?.appid||game.steamAppId,vndb:game.vndb,exeSha256:key||undefined});}catch{}
  try{
   if(steam&&!steam.has){fs.writeFileSync(steam.file,steam.appid);wroteAppid=true;}
-  current={game,started:t0};
+  /* A crash must not restore over a still-running cold game. Only confirmed native cleanup unlocks this snapshot. */
+  snap.journal.state='failed';snap.journal.errors=['cold cleanup has not been confirmed'];snap.journal.coldCleanup={state:'starting',at:new Date().toISOString()};
+  fs.writeFileSync(path.join(Saves.snapDir(root),snap.journal.id,'journal.json'),JSON.stringify(snap.journal,null,1));
+  current={game,started:t0,snapshot:{root,journal:snap.journal},stop:()=>require('./background-games.cjs').foreground()};
   result=await (deps.runner||runInWorker)({root,exe:game.exe,runDir,budgetMs,profile:profile?JSON.parse(JSON.stringify(profile)):null});}
  finally{current=null;
-  if(wroteAppid)try{fs.unlinkSync(steam.file);}catch{}
-  restored=Saves.restore(root,snap.journal);
-  try{unknown=Saves.sweep(located,t0-1000,deps.env||process.env);}catch{}}
+  if(result?.cleanupConfirmed!==true){restored={ok:false,errors:['cold cleanup has not been confirmed']};}
+  else{snap.journal.coldCleanup={...snap.journal.coldCleanup,state:'confirmed'};
+   if(wroteAppid)try{fs.unlinkSync(steam.file);}catch{}
+   restored=Saves.restore(root,snap.journal);
+   try{unknown=Saves.sweep(located,t0-1000,deps.env||process.env);}catch{}}}
+ if(result?.cleanupConfirmed!==true)return block('cleanup-unconfirmed');
  const ms=Math.max(0,now()-t0);
  /* score the one recording */
  const read=f=>{try{return fs.readFileSync(path.join(runDir,f),'utf8');}catch{return '';}};
@@ -147,11 +155,7 @@ async function testOne(root,game,{budgetMs,deps={}}={}){const s=load(root),id=ga
  pruneRuns(root);
  return out;}
 
-function runInWorker(opts){return new Promise(resolve=>{let w;try{w=fork(path.join(__dirname,'cold-test-worker.cjs'),[],{stdio:['ignore','ignore','ignore','ipc'],windowsHide:true});}catch(e){return resolve({end:'fork '+String(e?.message||e).slice(0,80),lines:0,shots:[]});}
- if(current)current.worker=w;const untrack=require('./background-games.cjs').track(opts.exe,()=>new Promise(resolve=>{w.once('exit',resolve);try{w.send({stop:'foreground'});}catch{}const timer=setTimeout(()=>{try{w.kill();}catch{}},7000);w.once('exit',()=>clearTimeout(timer));}));w.once('exit',untrack);let done=false;const fin=r=>{if(done)return;done=true;clearTimeout(guard);resolve(r);};
- /* the worker never outlives its budget by much (ColdDesk ends the game with it in any case: KILL_ON_JOB_CLOSE) */
- const guard=setTimeout(()=>{try{w.kill();}catch{}fin({end:'watchdog',lines:0,shots:[]});},(opts.budgetMs||360000)+90000);guard.unref?.();
- w.on('message',r=>fin(r));w.on('exit',()=>fin({end:'worker-exit',lines:0,shots:[],stopped:'killed'}));w.send(opts);});}
+function runInWorker(opts,deps={}){const snap=current?.snapshot;return require('./cold-native-session.cjs').runInWorker(opts,{...deps,onState:state=>{if(snap){snap.journal.coldCleanup={...snap.journal.coldCleanup,...state};fs.writeFileSync(path.join(Saves.snapDir(snap.root),snap.journal.id,'journal.json'),JSON.stringify(snap.journal,null,1));}deps.onState?.(state);}});}
 
 /* the score, prints and diff (owner: 过线只上传分数、指纹、差分) */
 async function reportResult(root,{game,key,scored,verdict,profile},{fetcher}={}){const auto=require('../core/auto-profile.cjs'),feed=require('./auto-profile-feed.cjs');
@@ -185,16 +189,19 @@ function pruneRuns(root){let dirs=[];try{dirs=fs.readdirSync(runsDir(root),{with
 /* ---- the schedule --------------------------------------------------------------------------------------------------- */
 let timer=null,busy=false,started='',opener=null,playing=()=>false;
 /* one check: -> {state, reason?, result?} */
-async function tick(root,{db=null,deps={}}={}){if(require('./background-games.cjs').blocked())return {state:'waiting',reason:'foreground'};if(busy)return {state:'busy'};busy=true;try{
+async function tick(root,{db=null,deps={}}={}){if(require('./background-games.cjs').blocked())return {state:'waiting',reason:'foreground'};if(busy||require('./background-games.cjs').occupied())return {state:'busy'};busy=true;try{
   const s=load(root);const cfg=Cond.config(readLib(root).coldTestLimits);
   const r=await (deps.reading||reading)(root);
-  const c=Cond.check(r?{...r,gameRunning:(deps.playing||playing)(),freeMb:freeMb(root)}:null,{cfg,today:today(s),enabled:enabled(root),helper:!!(deps.helper??helperPath(root)),platform:deps.platform||process.platform});
+  const c=Cond.check(r?{...r,gameRunning:(deps.playing||playing)(),freeMb:(deps.freeMb||freeMb)(root)}:null,{cfg,today:today(s),enabled:enabled(root),helper:!!(deps.helper??helperPath(root)),platform:deps.platform||process.platform});
   if(!c.ok)return {state:'waiting',reason:c.reason};
   if(require('./background-games.cjs').blocked())return {state:'waiting',reason:'foreground'};
   const games=withSeeds(root,(deps.games||libraryGames)(db));
   const list=Pick.candidates(games,{retest:await (deps.retest||retest)(root),state:s,exists:deps.exists||(f=>fs.existsSync(f)),running:deps.running||(()=>false)});
+  if(require('./background-games.cjs').blocked())return {state:'waiting',reason:'foreground'};
   if(!list.length)return {state:'nothing'};
-  const result=await testOne(root,list[0],{budgetMs:Cond.budgetMs(cfg,today(s)),deps});
+  const startAllowed=async()=>{const bg=require('./background-games.cjs');if(bg.blocked()||bg.occupied())return false;const fresh=await (deps.reading||reading)(root);
+   return Cond.check(fresh?{...fresh,gameRunning:(deps.playing||playing)(),freeMb:(deps.freeMb||freeMb)(root)}:null,{cfg,today:today(load(root)),enabled:enabled(root),helper:!!(deps.helper??helperPath(root)),platform:deps.platform||process.platform}).ok&&!bg.blocked()&&!bg.occupied();};
+  const result=await testOne(root,list[0],{budgetMs:Cond.budgetMs(cfg,today(s)),deps:{...deps,startAllowed}});
   return {state:'tested',game:list[0].title,result};}
  finally{busy=false;}}
 
