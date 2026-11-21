@@ -45,24 +45,26 @@ function kick(reader,why,{now=Date.now(),replay=null,fetcher=undefined}={}){try{
  const job={root,key,why,rules,pairing:snap.pairing,rows:snap.rows,lines:snap.lines,game:gameOf(reader,key),...sourceOf(s,profile),reader,replay,fetcher};
  lastRun.set(key,now);
  if(running){pending=job;return {state:'queued'};}
- running=go(job).finally(()=>{running=null;const next=pending;pending=null;if(next)running=go(next).finally(()=>{running=null;});});
+ running=drain(job);
  return {state:'started'};}catch(e){return {state:'failed',why:String(e?.message||e)};}}
+async function drain(job){try{while(job){try{await go(job);}catch(e){const errors=[String(e?.message||e).slice(0,1200)];trace(job.reader,'cardinal failed key='+job.key.slice(0,8)+' '+errors[0]);try{save(job.root,job.key,{...(load(job.root,job.key)||{}),failed:{at:new Date().toISOString(),why:job.why,errors}});}catch{}}
+ job=pending;pending=null;}}finally{running=null;}}
 async function go(job){const {root,key,rules,reader}=job;const started=Date.now();
  trace(reader,'cardinal replay key='+key.slice(0,8)+' why='+job.why+' lines='+job.lines);
  const steps=fromTape(job.rows,job.game);
  const scenario={game:job.game,steps,maxGap:rules.maxGapMs,sampleEvery:rules.sampleMs,models:false,tailMs:1200,attachSettleMs:2000};
  const o=await (job.replay||require('./cardinal/run.cjs').replay)(scenario,{data:path.join(root,'data'),work:path.join(os.tmpdir(),'megulit-cardinal'),low:true,timeoutMs:15*60000,name:'cardinal'});
- const errors=(o.errors||[]).slice(0,4);
+ const errors=(o.errors||[]).slice(0,4);if(!(o.samples||[]).length&&!errors.length)errors.push('replay produced no DOM samples');
  if(errors.length&&!(o.samples||[]).length){trace(reader,'cardinal failed key='+key.slice(0,8)+' '+String(errors[0]).slice(0,200));save(root,key,{...(load(root,key)||{}),failed:{at:new Date().toISOString(),why:job.why,errors}});return null;}
  const result=Score.score({name:'session',steps,o,livePairing:job.pairing},rules);
  const rec=Score.record({key,seedRev:job.seedRev,source:job.source,app:appVersion(root),result,cardinalRev:rules.rev});
  /* a replay the PC could not keep up with (stepP95 over cardinal.maxLagMs) measured the PC, not the seed: kept here, never uploaded */
- const lag=o.lag||null,unreliable=!!(lag&&lag.stepP95>(rules.maxLagMs??80));
+ const lag=o.lag||null,unreliable=errors.length>0||!!(lag&&lag.stepP95>(rules.maxLagMs??80));
  const doc={record:rec,why:job.why,applies:result.applies,below:result.below,detail:result.detail,ms:Date.now()-started,lag,unreliable,errors,sent:false};
  try{save(root,key,doc);}catch{}
- trace(reader,'cardinal scored key='+key.slice(0,8)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' ')+(lag?' lagP95='+lag.stepP95:'')+(unreliable?' unreliable (busy PC): not uploaded':''));
+ trace(reader,'cardinal scored key='+key.slice(0,8)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' ')+(lag?' lagP95='+lag.stepP95:'')+(unreliable?(errors.length?' unreliable (replay errors): not uploaded':' unreliable (busy PC): not uploaded'):''));
  if(unreliable)return doc;
- try{const r=await require('./auto-profile-feed.cjs').reportScore(root,rec,job.fetcher?{fetcher:job.fetcher}:{});if(r.state==='sent'){doc.sent=true;save(root,key,doc);}}catch{}
+ try{const r=await require('./auto-profile-feed.cjs').reportScore(root,rec,job.fetcher?{fetcher:job.fetcher}:{});doc.upload={state:r.state,...(r.status?{status:r.status}:{})};if(r.state==='sent')doc.sent=true;save(root,key,doc);}catch{}
  return doc;}
 const idle=()=>running||Promise.resolve();
 module.exports={kick,load,fileOf,dir,sourceOf,idle,_reset(){running=null;pending=null;lastRun.clear();}};

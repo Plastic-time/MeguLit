@@ -24,8 +24,9 @@ const fed=run=>(run.steps||[]).filter(st=>st.hb?.type==='hookSource');
 
 /* the dialogue lines of a run: each hookSource with its first record, and the samples taken while it was the reader's line.
    A line counts once it is the reader's line for lineMs; lines of a skip burst (the next record within burstMs, Ctrl held) only pass by */
-function lines(run,t){t=opts(t);const o=run.o,out=[];const steps=fed(run).filter(st=>st.line!=null);
- steps.forEach((st,i)=>{if(steps[i+1]&&steps[i+1].t-st.t<t.burstMs)return;if(i>0&&st.t-steps[i-1].t<t.burstMs)return;out.push({line:st.line,text:st.text,t:st.t});});
+function expectedLines(run,t){t=opts(t);const steps=fed(run).filter(st=>st.line!=null);
+ return steps.filter((st,i)=>norm(st.text)&&!(steps[i+1]&&steps[i+1].t-st.t<t.burstMs)&&!(i>0&&st.t-steps[i-1].t<t.burstMs));}
+function lines(run,t){t=opts(t);const o=run.o,out=expectedLines(run,t).map(st=>({line:st.line,text:st.text,t:st.t}));
  const all=(o.samples||[]).filter(s=>!menuOpen(s));
  for(const l of out){let run2=[];for(let i=0;i<all.length;i++){if(norm(all[i].hookSource)&&norm(all[i].hookSource)===norm(l.text)){run2.push(all[i]);}else if(run2.length){if(run2.at(-1).at-run2[0].at>=t.lineMs)break;run2=[];}}
   l.samples=run2.length&&run2.at(-1).at-run2[0].at>=t.lineMs?run2:[];}
@@ -148,4 +149,4 @@ function offSpans(run,t){t=opts(t);const o=run.o,ev=[];const at=l=>Date.parse(St
  for(const k of Object.keys(open))if(open[k])spans.push({...open[k],to:end});
  return spans.filter(s=>!(s.to-s.from<=t.preflightMs&&checks.some(c=>Math.abs(c-s.from)<=300)));}
 
-module.exports={T0,JP,norm,jpGlyphs,lineGlyphs,inside,lines,perLine,white,flashes,hold,readMode,calibration,clears,choices,leaks,offSpans};
+module.exports={T0,JP,norm,jpGlyphs,lineGlyphs,inside,expectedLines,lines,perLine,white,flashes,hold,readMode,calibration,clears,choices,leaks,offSpans};
