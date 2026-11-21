@@ -95,3 +95,5 @@ call "%~dp0run-yuris-permission.cmd" || exit /b 1
 
 rem minori exact English-build byte-string input observer, default off; no game execution.
 call "%~dp0run-minori.cmd" || exit /b 1
+rem Siglus trusted control, reversible Push/Clear/Frame observation and idle flush.
+call "%~dp0run-siglus-permission.cmd" || exit /b 1

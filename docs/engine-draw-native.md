@@ -125,7 +125,17 @@ watcher 安装后继续每两秒刷新；撤权、控制文件缺失或读取失
 - 没做：按钮 / 系统菜单（Siglus 的系统菜单多是图片按钮，不走 moji，【推测】）；竖排注音（现在只按 x 配底字）
 
 #### 店主测试清单（SiglusEngine：CLANNAD、Summer Pockets）
-1. 在 The Seed 里给这部游戏的游戏差分（`The Seed/siglus/clannad/game.json` 或 `summer-pockets/game.json`）把 `"draw":{"roles":false}` 改成 `true`；或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE 或 UTF-8，内容 `#cfg roles=1`）
+
+权限回归：只接受首条完整 ASCII `#cfg` 行里的唯一精确 `roles=1`，支持实际 transport 的 UTF-16LE BOM，同时保留旧 UTF-16LE、ASCII、UTF-8 BOM 格式及空格 / tab 分隔
+安装和观察分开；安装后仍每两秒检查权限，关闭、文件缺失、读失败或畸形首行会在同一把锁内清空文字、ruby、角色 / 来源、颜色、坐标原点和去重状态
+OnPush 的快照读取与 Handle、Clear、Frame、FlushIdle 都受观察权限保护；转换或 logger 回调发生重入 off-on 时，epoch 阻止旧缓冲复活
+三个 gate 保存 GPR、flags、ESP 和 FXSAVE 状态，观察器异常不能跳过原 push / clear / frame；开启时保留原有 150ms idle flush，关闭时只做两秒权限轮询
+这是异步轮询，不是同步关闭 ACK；已经通过最终权限检查的观察回调可能完成 logger，已写日志不能撤回
+`selftest/run-siglus-permission.cmd` 直接读取真实 JS transport 文件，运行实际 MinHook 三门、台词 / 名字 / 选项 / ruby 和撤权反例；它接入手动自检，普通 CI 不编译此 Windows native gate
+纯签名匹配器按 x86 EIP32 计算相对 CALL，即使自检编译在 x64 host 也一样；双 host 的真实字节自检不代表支持 x64 Siglus 游戏
+本轮没有新增 seed 或允许名单，没有重编完整 DLL，也没有游戏实机验收
+
+1. 获得该游戏版本的实测授权后，才临时开启版本差分里的 `draw.roles`；或写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE 或 UTF-8，首行 `#cfg roles=1`，必须以换行结束）
 2. 开游戏，开新游戏推 5 句（带一句有注音的、一句有名字的），出一次选项，开一次回想（backlog）再关掉
 3. 看 `logs\hook-diagnostics.log`：
    - 有一行 `ToMe_DRAWRUN engine=siglus on: push … add_msg … clear …`
@@ -136,6 +146,7 @@ watcher 安装后继续每两秒刷新；撤权、控制文件缺失或读取失
    - 截一句已读（再读一次）和一句未读的对话框：字色一样 = 「Siglus 没有已读变色」的推测成立
 4. 游戏照常显示、推进不卡、不崩、日志不刷屏（同一句不会每帧重复出现，`origin` 只在窗口挪动后出现）= 过
 5. 不过时发：`hook-diagnostics.log`（含 `on:` 或 `off:` 那一行）、`hook-events.log`、exe 版本；`off: push count differs` 之类 = 这个版本签名没对上
+6. 在一行仍待 idle flush 时关闭 roles，等待轮询确认 run / clear / origin 不再新增；恢复后仅记录新文字，原点重新稳定后再报，旧半句和 ruby 不能回来
 
 ### MAGES.（已做：画字层，2026-11-21，feat/re-mages）
 - 现有：`native/megulithook/MagesEngine.cpp`、`MeguLitSg.cpp`、`native/mages/`（SC3 串解码含注音；STEINS;GATE 按 PE 时间戳精确匹配的串钩子 + 内嵌）。这些都是「读 SC3 字符串」，不是画字

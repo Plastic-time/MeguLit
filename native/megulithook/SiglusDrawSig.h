@@ -79,9 +79,10 @@ static const int Want[P_COUNT] = {1, 2, 1, 1, 1, 0};
 
 inline const Seg *At(const Seg *s, int ns, std::uint32_t va) { for (int i = 0; i < ns; i++) if (va >= s[i].va && va < s[i].va + s[i].n) return &s[i]; return nullptr; }
 inline bool Tail(const Seg &s, size_t off, const char *p) { size_t len = PatLen(p); return off >= len && Match(s.b + off - len, len, p); }
+// EIP-relative CALL targets wrap at 32 bits, including when this matcher runs on a 64-bit host.
 template <class F> inline void CallsTo(const Seg *s, int ns, std::uint32_t target, F f) {
   for (int k = 0; k < ns; k++) for (size_t i = 0; i + 5 <= s[k].n; i++)
-    if (s[k].b[i] == 0xe8 && s[k].va + i + 5 + (std::uint32_t)I32(s[k].b + i + 1) == target) f(s[k], i);
+    if (s[k].b[i] == 0xe8 && (std::uint32_t)(s[k].va + i + 5 + (std::uint32_t)I32(s[k].b + i + 1)) == target) f(s[k], i);
 }
 
 inline Result Find(const Seg *s, int ns) {

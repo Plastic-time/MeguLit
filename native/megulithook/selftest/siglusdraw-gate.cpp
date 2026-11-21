@@ -9,18 +9,125 @@
 #include <cstdarg>
 #include <string>
 #include <vector>
+#include <stdexcept>
 static std::vector<std::string> Logs;
-namespace Msg { void Log(const char *f, ...) { char b[700]; va_list a; va_start(a, f); vsnprintf(b, sizeof b, f, a); va_end(a); Logs.push_back(b); } }
-#include "../SiglusDraw.h"
+static bool ThrowLog=false,FaultLog=false;static void (*LogTap)()=nullptr;static void (*ConversionTap)()=nullptr;
+static int WINAPI ObserverWideCharToMultiByte(UINT cp,DWORD flags,LPCWCH text,int length,LPSTR out,int cap,LPCCH def,LPBOOL used){if(ConversionTap){auto tap=ConversionTap;ConversionTap=nullptr;tap();}return ::WideCharToMultiByte(cp,flags,text,length,out,cap,def,used);}
+namespace Msg { void Log(const char *f, ...) { if(ThrowLog)throw std::runtime_error("fixture logger");if(FaultLog)RaiseException(EXCEPTION_ACCESS_VIOLATION,0,0,nullptr);char b[700]; va_list a; va_start(a, f); vsnprintf(b, sizeof b, f, a); va_end(a); Logs.push_back(b);if(LogTap)LogTap();__asm {pxor xmm0,xmm0}
+__asm {pxor xmm7,xmm7}
+__asm {fninit}
+__asm {stc}
+} }
+#if !defined(SIGLUS_LEGACY_PERMISSION) && !defined(SIGLUS_PERMISSION_FIXED)
+#define SIGLUS_PERMISSION_FIXED
+#endif
+#ifndef SIGLUS_HEADER
+#define SIGLUS_HEADER "../SiglusDraw.h"
+#endif
+#define WideCharToMultiByte ObserverWideCharToMultiByte
+#include SIGLUS_HEADER
+#undef WideCharToMultiByte
 
-static int Failures = 0;
-static void Check(bool ok, const std::string &what) { printf("%s %s\n", ok ? "PASS" : "FAIL", what.c_str()); if (!ok) Failures++; }
+static int Failures = 0,Checks=0;
+static void Check(bool ok, const std::string &what) { Checks++;printf("%s %s\n", ok ? "PASS" : "FAIL", what.c_str()); if (!ok) Failures++; }
 
 static volatile DWORD LastRet, LastAddRet, LastEcx, LastMoji, LastClearEcx, Pushes, Clears, LastFrameEcx, LastFrameArg9, Frames;
+static DWORD EntryEax,EntryEcx,EntryEdx,EntryEbx,EntryEbp,EntryEsi,EntryEdi,EntryFlags,EntryEsp;
+static DWORD AbiAfterEax,AbiAfterEcx,AbiAfterEdx,AbiAfterEbx,AbiAfterEbp,AbiAfterEsi,AbiAfterEdi,AbiBeforeEsp,AbiAfterEsp;
+static DWORD AbiCaller[2]={0,0x12341234},AbiWords[9],AbiCount=0,AbiEcx=0;static void *AbiTarget=nullptr;
+static __declspec(align(16)) unsigned char EntryFx[512],AbiSavedFx[512];
+static __declspec(align(16)) DWORD Pattern[4]={0xabcdef12,0x12345678,0x11223344,0x55667788},AbiXmm0[4],AbiXmm7[4];
+static DWORD Mxcsr=0x3f80,AbiMxcsr;static WORD FpuControl=0x0b7f,AbiFpuControl;static double AbiX87;
+static __declspec(naked) void CaptureEntry(){__asm{
+ pushfd
+ pushad
+ mov edx,esp
+ mov eax,[edx+28]
+ mov EntryEax,eax
+ mov eax,[edx+24]
+ mov EntryEcx,eax
+ mov eax,[edx+20]
+ mov EntryEdx,eax
+ mov eax,[edx+16]
+ mov EntryEbx,eax
+ mov eax,[edx+8]
+ mov EntryEbp,eax
+ mov eax,[edx+4]
+ mov EntryEsi,eax
+ mov eax,[edx]
+ mov EntryEdi,eax
+ mov eax,[edx+32]
+ mov EntryFlags,eax
+ lea eax,[edx+40]
+ mov EntryEsp,eax
+ fxsave EntryFx
+ popad
+ popfd
+ ret
+}}
+static __declspec(naked) void AbiInvoke(){__asm{
+ push ebp
+ push ebx
+ push esi
+ push edi
+ fxsave AbiSavedFx
+ mov ecx,AbiCount
+ test ecx,ecx
+ jz seeded
+ lea edx,AbiWords
+argloop:
+ push dword ptr [edx+ecx*4-4]
+ dec ecx
+ jnz argloop
+seeded:
+ mov AbiBeforeEsp,esp
+ fninit
+ fld1
+ fldcw FpuControl
+ ldmxcsr Mxcsr
+ movdqu xmm0,Pattern
+ movdqu xmm7,Pattern
+ pushfd
+ pop eax
+ and eax,0xfffff32a
+ or eax,0xc45
+ push eax
+ popfd
+ mov eax,0x24682468
+ mov ecx,AbiEcx
+ mov edx,0x33334444
+ mov ebx,0x55556666
+ mov ebp,offset AbiCaller
+ mov esi,0x73737373
+ mov edi,0x93939393
+ call dword ptr [AbiTarget]
+ mov AbiAfterEax,eax
+ mov AbiAfterEcx,ecx
+ mov AbiAfterEdx,edx
+ mov AbiAfterEbx,ebx
+ mov AbiAfterEbp,ebp
+ mov AbiAfterEsi,esi
+ mov AbiAfterEdi,edi
+ mov AbiAfterEsp,esp
+ cld
+ movdqu AbiXmm0,xmm0
+ movdqu AbiXmm7,xmm7
+ stmxcsr AbiMxcsr
+ fnstcw AbiFpuControl
+ fstp AbiX87
+ fxrstor AbiSavedFx
+ pop edi
+ pop esi
+ pop ebx
+ pop ebp
+ ret
+}}
+static bool AbiState(DWORD result){return EntryEax==0x24682468&&EntryEcx==AbiEcx&&EntryEdx==0x33334444&&EntryEbx==0x55556666&&EntryEbp==(DWORD)AbiCaller&&EntryEsi==0x73737373&&EntryEdi==0x93939393&&(EntryFlags&0xcd5)==0xc45&&EntryEsp+4==AbiBeforeEsp&&AbiAfterEax==result&&AbiAfterEcx==AbiEcx&&AbiAfterEdx==EntryEdx&&AbiAfterEbx==EntryEbx&&AbiAfterEbp==EntryEbp&&AbiAfterEsi==EntryEsi&&AbiAfterEdi==EntryEdi&&AbiAfterEsp==AbiBeforeEsp+AbiCount*4&&!memcmp(EntryFx+160,Pattern,16)&&!memcmp(EntryFx+272,Pattern,16)&&*(DWORD *)(EntryFx+24)==Mxcsr&&*(WORD *)EntryFx==FpuControl&&!memcmp(AbiXmm0,Pattern,16)&&!memcmp(AbiXmm7,Pattern,16)&&AbiMxcsr==Mxcsr&&AbiFpuControl==FpuControl&&AbiX87==1.0;}
 /* (each stub below starts with its own mov eax,N so the linker cannot fold identical ones into one address) */
 /* the stand-in std::vector<moji>::push_back(const moji&): records what it was given, ret 4 */
 static __declspec(naked) void FakePush() {
   __asm {
+    call CaptureEntry
     mov eax, [esp]
     mov LastRet, eax
     mov eax, [ebp + 4]
@@ -34,6 +141,7 @@ static __declspec(naked) void FakePush() {
 }
 static __declspec(naked) void FakeClear() {
   __asm {
+    call CaptureEntry
     mov LastClearEcx, ecx
     inc Clears
     nop
@@ -43,6 +151,7 @@ static __declspec(naked) void FakeClear() {
 /* the stand-in msg::frame(param, 8 more): ret 0x24 like the engine's */
 static __declspec(naked) void FakeFrame() {
   __asm {
+    call CaptureEntry
     mov LastFrameEcx, ecx
     mov eax, [esp + 36]
     mov LastFrameArg9, eax
@@ -142,7 +251,27 @@ static bool Has(const char *needle) { for (auto &l : Logs) if (l.find(needle) !=
 static std::string Find(const char *needle) { for (auto &l : Logs) if (l.find(needle) != std::string::npos) return l; return std::string(); }
 static std::string U8(const wchar_t *w) { return SiglusDraw::Utf8(w, (int)wcslen(w)); }
 
+static std::wstring ControlFile(){wchar_t tmp[MAX_PATH],file[MAX_PATH+64];GetTempPathW(MAX_PATH,tmp);std::wstring dir=std::wstring(tmp)+L"MeguLit";CreateDirectoryW(dir.c_str(),nullptr);dir+=L"\\draw";CreateDirectoryW(dir.c_str(),nullptr);swprintf_s(file,L"%s\\%lu.txt",dir.c_str(),GetCurrentProcessId());return file;}
+static void Control(const wchar_t *s){HANDLE h=CreateFileW(ControlFile().c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);DWORD written;WriteFile(h,s,(DWORD)(wcslen(s)*2),&written,nullptr);CloseHandle(h);}
+static void Refresh(){
+#ifdef SIGLUS_PERMISSION_FIXED
+ SiglusDraw::RefreshControl();
+#else
+ if(SiglusDraw::RolesAsked())SiglusDraw::Install();
+#endif
+}
+static void Permit(){Control(L"\xfeff#cfg roles=1 embed=0 zh=1\r\n");Refresh();}
+#ifdef SIGLUS_PERMISSION_FIXED
+static bool EmptyState(){EnterCriticalSection(&SiglusDraw::Lock);bool empty=SiglusDraw::RunG.empty()&&SiglusDraw::RunRuby.empty()&&!SiglusDraw::RunVec&&SiglusDraw::RunRole==-1&&SiglusDraw::RunSrc==-1&&!SiglusDraw::InRuby&&!SiglusDraw::LastTick&&!SiglusDraw::NDrawn&&!SiglusDraw::NOrigins;LeaveCriticalSection(&SiglusDraw::Lock);return empty;}
+static bool WaitObserving(LONG n){for(int i=0;i<400;i++){EnterCriticalSection(&SiglusDraw::Lock);bool same=SiglusDraw::Observing==n;LeaveCriticalSection(&SiglusDraw::Lock);if(same)return true;Sleep(10);}return false;}
+static DWORD WINAPI ReadThread(void *){SiglusDraw::RolesAsked();return 0;}
+static bool LockReleased(){HANDLE t=CreateThread(nullptr,0,ReadThread,nullptr,0,nullptr);bool done=t&&WaitForSingleObject(t,1000)==WAIT_OBJECT_0;if(t)CloseHandle(t);return done;}
+static void Revoke(){LogTap=nullptr;Control(L"\xfeff#cfg roles=0\r\n");Refresh();}
+static void RevokeResume(){Revoke();Permit();}
+#endif
+
 int main() {
+  setvbuf(stdout,nullptr,_IONBF,0);
   SetConsoleOutputCP(CP_UTF8);
   /* learn each call site's return address with the push not hooked yet */
   using namespace SiglusDrawSig;
@@ -161,7 +290,7 @@ int main() {
   S.colors = (std::uint32_t)(uintptr_t)ColorVec;
   InitializeCriticalSection(&SiglusDraw::Lock);
   Check(MH_Initialize() == MH_OK, "MinHook");
-  SiglusDraw::Install();
+  Permit();
   Check(Has("ToMe_DRAWRUN engine=siglus on:") && Find("engine=siglus on:").find(" frame 0 ") == std::string::npos, "hook on, msg::frame too");
   /* the window slides in (two places), then stays: one origin, the settled one = (int)param x + arg 8 */
   Param[5] = 10.75f; Param[6] = 500.5f; FrameCall(MsgA, Param, 0, 0); Param[5] = 40.5f; FrameCall(MsgA, Param, 0, 0);
@@ -218,7 +347,56 @@ int main() {
   Text(LineCall, MsgA, L"再", 8, 0); Sleep(200); SiglusDraw::FlushIdle();
   size_t n = Logs.size(); Text(RubyPush, MsgA, L"さい", 8, -16, 16); Sleep(200); SiglusDraw::FlushIdle();
   Check(Logs.size() == n, "a late ruby writes nothing");
+  // The installed old observer continues collecting after permission is removed.
+  Logs.clear();Text(LineCall,MsgA,L"旧",8,0);Control(L"\xfeff#cfg roles=0\r\n");Refresh();
+  Check(SiglusDraw::RunG.empty()&&SiglusDraw::RunRuby.empty()&&!SiglusDraw::RunVec&&SiglusDraw::RunRole==-1&&SiglusDraw::NDrawn==0&&SiglusDraw::NOrigins==0,"revocation clears pending text/ruby/role/source/origin/clear dedup");
+  DWORD pushesBefore=Pushes,clearsBefore=Clears,framesBefore=Frames;
+  Text(LineCall,MsgA,L"拒",8,0);Text(RubyPush,MsgA,L"きょ",8,-16,16);ClearCall(MsgA);for(int i=0;i<3;i++)FrameCall(MsgA,Param,60,20);Sleep(170);SiglusDraw::FlushIdle();
+  Check(Logs.empty()&&Pushes==pushesBefore+3&&Clears==clearsBefore+1&&Frames==framesBefore+3,"off Push/Ruby/Clear/Frame/FlushIdle only forward original functions");
+  SiglusDraw::Moji direct{0,L'拒',32,0,8,0,-1};SiglusDraw::Handle(P_PRINT,A_LINE,(uintptr_t)Vec(MsgA),direct);
+  Check(SiglusDraw::RunG.empty(),"direct Handle entry also rejects observation after permission is revoked");
+#ifdef SIGLUS_PERMISSION_FIXED
+  Check(EmptyState(),"all revoked paths leave no hidden pending/dedup state");
+  Permit();Logs.clear();Text(LineCall,MsgA,L"新",8,0);Sleep(170);SiglusDraw::FlushIdle();Check(Logs.size()==1&&Has(("text="+U8(L"新")).c_str())&&!Has(U8(L"旧").c_str()),"resume publishes only fresh text");
+  Logs.clear();for(int i=0;i<3;i++)FrameCall(MsgA,Param,60,20);Check(Logs.size()==1&&Has("engine=siglus origin"),"origin settles again after epoch reset instead of using old told dedup");
+  // A failed logger must not strand the lock or swallow any original operation.
+  Logs.clear();Text(LineCall,MsgA,L"旧",8,0);ThrowLog=true;pushesBefore=Pushes;Text(NamePush,MsgName,L"新",0,0);ThrowLog=false;
+  Check(Pushes==pushesBefore+1&&LockReleased()&&EmptyState(),"Push logger C++ exception clears state, releases lock and forwards original");
+  Text(LineCall,MsgA,L"旧",8,0);FaultLog=true;pushesBefore=Pushes;Text(NamePush,MsgName,L"新",0,0);FaultLog=false;
+  Check(Pushes==pushesBefore+1&&LockReleased()&&EmptyState(),"Push logger SEH fault also leaves original and lock usable");
+  Text(LineCall,MsgA,L"旧",8,0);ThrowLog=true;clearsBefore=Clears;ClearCall(MsgA);ThrowLog=false;
+  Check(Clears==clearsBefore+1&&LockReleased()&&EmptyState(),"Clear logger exception cannot skip original clear or strand lock");
+  for(int i=0;i<2;i++)FrameCall(MsgA,Param,60,20);ThrowLog=true;framesBefore=Frames;FrameCall(MsgA,Param,60,20);ThrowLog=false;
+  Check(Frames==framesBefore+1&&LockReleased()&&EmptyState(),"Frame logger exception cannot skip original frame or strand lock");
+  Text(LineCall,MsgA,L"旧",8,0);Sleep(170);ThrowLog=true;SiglusDraw::FlushIdle();ThrowLog=false;
+  Check(LockReleased()&&EmptyState(),"idle-flush logger exception releases lock and discards partial state");
+  SiglusDraw::OnPush(S.site[0]+5,(const unsigned char *)1,(uintptr_t)Vec(MsgA),(const unsigned char *)1);Check(LockReleased()&&EmptyState(),"bad push snapshot pointer clears state safely");
+  SiglusDraw::OnFrame((uintptr_t)MsgA,(const unsigned char *)1);Check(LockReleased()&&EmptyState(),"bad frame pointer clears state safely");
+  // Every continuation checks its permission epoch after external conversion/logger calls.
+  Logs.clear();Text(LineCall,MsgA,L"旧",8,0);LogTap=&RevokeResume;Text(NamePush,MsgName,L"新",0,0);Check(SiglusDraw::Observing&&EmptyState(),"off-on during Push boundary flush cannot rebuild old/new pending text from the interrupted call");
+  Logs.clear();Text(LineCall,MsgA,L"旧",8,0);LogTap=&Revoke;ClearCall(MsgA);Check(!SiglusDraw::Observing&&EmptyState()&&Logs.size()==1&&!Has("engine=siglus clear"),"Clear stops continuation after a flush logger revokes permission");Permit();
+  Logs.clear();Text(LineCall,MsgA,L"旧",8,0);Sleep(170);ConversionTap=&RevokeResume;SiglusDraw::FlushIdle();Check(Logs.empty()&&EmptyState(),"off-on during Flush UTF16 conversion discards old snapshot before log");
+  Logs.clear();Text(LineCall,MsgA,L"漢字",8,0);*(long *)(MsgA+0x180)=0;*(long *)(MsgA+0xe0)=64;ConversionTap=&RevokeResume;Text(RubyPush,MsgA,L"か",8,-16,16);Check(Logs.empty()&&EmptyState(),"ruby conversion off-on cannot append an old reading into fresh epoch");
+  for(int i=0;i<2;i++)FrameCall(MsgA,Param,60,20);LogTap=&RevokeResume;FrameCall(MsgA,Param,60,20);Check(EmptyState(),"origin logger off-on cannot resurrect told/origin state");
+  Logs.clear();Text(LineCall,MsgA,L"旧",8,0);AbiTarget=(void *)&FakePush;AbiEcx=(DWORD)Vec(MsgA);AbiWords[0]=(DWORD)Moji(L'新',8,0);AbiCount=1;pushesBefore=Pushes;AbiInvoke();
+  Check(AbiState((DWORD)&M)&&Pushes==pushesBefore+1&&LastMoji==(DWORD)&M&&LastEcx==AbiEcx,"actual Push ret4 gate preserves entry GPR/flags/ESP/XMM/x87, original argument and opaque return");
+  Text(LineCall,MsgA,L"旧",8,0);AbiTarget=(void *)&FakeClear;AbiEcx=(DWORD)MsgA;AbiCount=0;clearsBefore=Clears;AbiInvoke();
+  Check(AbiState(0x24682468)&&Clears==clearsBefore+1&&LastClearEcx==AbiEcx,"actual Clear ret0 gate preserves entry GPR/flags/ESP/XMM/x87 and original return");
+  for(int i=0;i<2;i++)FrameCall(MsgA,Param,60,20);AbiTarget=(void *)&FakeFrame;AbiEcx=(DWORD)MsgA;memset(AbiWords,0,sizeof AbiWords);AbiWords[0]=(DWORD)Param;AbiWords[7]=60;AbiWords[8]=20;AbiCount=9;framesBefore=Frames;AbiInvoke();
+  Check(AbiState(20)&&Frames==framesBefore+1&&LastFrameArg9==20&&LastFrameEcx==AbiEcx,"actual Frame ret36 gate preserves nine words, GPR/flags/ESP/XMM/x87 and opaque return");
+  // Real background watcher continues permission refresh while preserving 150ms idle flush.
+  Logs.clear();HANDLE stop=CreateEventW(nullptr,TRUE,FALSE,nullptr);HANDLE watcher=CreateThread(nullptr,0,SiglusDraw::Watch,stop,0,nullptr);
+  Control(L"\xfeff#cfg roles=0\r\n");Check(watcher&&WaitObserving(0)&&EmptyState(),"continuous watcher revokes installed paths");
+  Text(LineCall,MsgA,L"拒",8,0);Sleep(170);SiglusDraw::FlushIdle();Check(Logs.empty(),"watcher-revoked glyphs do not leak through idle flush");
+  Control(L"\xfeff#cfg roles=1\r\n");Check(WaitObserving(1),"same watcher resumes existing hooks");
+  Logs.clear();Text(LineCall,MsgA,L"新",8,0);bool idleLogged=false;for(int i=0;i<100;i++){EnterCriticalSection(&SiglusDraw::Lock);idleLogged=!Logs.empty();LeaveCriticalSection(&SiglusDraw::Lock);if(idleLogged)break;Sleep(10);}Check(idleLogged,"product watcher retains the normal idle-run flush without another glyph");
+  HANDLE locked=CreateFileW(ControlFile().c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);Check(locked!=INVALID_HANDLE_VALUE&&WaitObserving(0)&&EmptyState(),"read failure revokes installed observer");if(locked!=INVALID_HANDLE_VALUE)CloseHandle(locked);Check(WaitObserving(1),"watcher recovers after read failure");
+  Control(L"\xfeff#cfg roles=10\r\n");Check(WaitObserving(0),"malformed permission revokes installed observer");Control(L"\xfeff#cfg roles=1\r\n");Check(WaitObserving(1),"valid permission resumes after malformed file");
+  wchar_t oldTmp[32768]={},missing[32768];DWORD count=GetEnvironmentVariableW(L"TMP",oldTmp,32768);swprintf_s(missing,L"H:\\MeguLit-Work\\tmp\\siglus-gate-missing-%lu\\",GetCurrentProcessId());SetEnvironmentVariableW(L"TMP",missing);Check(WaitObserving(0),"missing control revokes installed observer");SetEnvironmentVariableW(L"TMP",count?oldTmp:nullptr);Check(WaitObserving(1),"watcher recovers after control path returns");
+  SetEvent(stop);Check(WaitForSingleObject(watcher,4000)==WAIT_OBJECT_0,"watcher joins before MinHook cleanup");CloseHandle(watcher);CloseHandle(stop);Revoke();
+#endif
+  Check(MH_DisableHook((void *)(uintptr_t)S.push)==MH_OK&&MH_DisableHook((void *)(uintptr_t)S.clear)==MH_OK&&MH_DisableHook((void *)(uintptr_t)S.frame)==MH_OK,"actual three detours disable cleanly");MH_RemoveHook((void *)(uintptr_t)S.push);MH_RemoveHook((void *)(uintptr_t)S.clear);MH_RemoveHook((void *)(uintptr_t)S.frame);MH_Uninitialize();
   for (auto &l : Logs) printf("  %s\n", l.c_str());
-  printf("siglus draw gate: %d failure(s)\n", Failures);
+  printf("siglus draw gate: %d checks, %d failure(s)\n",Checks,Failures);
   return Failures;
 }
