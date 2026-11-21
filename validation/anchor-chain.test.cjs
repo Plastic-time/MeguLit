@@ -57,5 +57,5 @@ test('anchored chain: calibrate -> slider -> 回到游戏原字位置 -> another
   near(s.afterReset.pos,s.p0,2,'回到游戏原字位置: on the engine place');assert.deepEqual(s.afterReset.saved,[0,0]);assert.equal(s.afterReset.field,0);
   near(s.gameB.pos,s.p0,2,'another game starts on its engine place');assert.deepEqual(s.gameB.prefs.slice(0,2),[0,0]);
   near(s.backA.pos,[s.p0[0]+4*s.W/100,s.p0[1]-10*s.H/100],3,'back to the first game: its saved offset');
- }finally{cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });

@@ -45,7 +45,7 @@ test('lookup card: smaller type, width 360-440, at most half the game window, no
    if(name==='long'){assert.ok(c.scrolls,'long entry scrolls inside the card');assert.ok(c.more,'bottom fade while more is below');}
    else assert.equal(c.more,false,'no fade on a card that fits');
   }
- }finally{cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });
 
 /* 2026-11-16 (user: 我点读窗口呢？, The Song of Saya ver1.00S): in overlay placement the sentence block was a full-window box
@@ -74,5 +74,5 @@ test('lookup card: a page-sized sentence block (overlay placement) and a window 
   await cdp.evaluate(`(()=>{for(const [k,v] of Object.entries({availLeft:0,availTop:0,availWidth:600,availHeight:420}))Object.defineProperty(screen,k,{get:()=>v,configurable:true});return 1})()`);
   c=await cdp.evaluate(PLACE);
   assert.ok(c.top>=0&&c.bottom<=420&&c.left>=0&&c.right<=600,'card inside the work area: '+JSON.stringify(c));
- }finally{cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });

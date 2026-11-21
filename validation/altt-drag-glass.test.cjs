@@ -39,5 +39,5 @@ test('Alt+T header drag: no glass message or picture re-placement per frame, one
   assert.equal(mid.glass,first.glass,'no glass message while dragging');assert.equal(mid.pos,first.pos,'picture not re-placed while dragging (it moves with the panel)');
   await mouse('mouseReleased',x-500,y+190);await sleep(500);
   const after=await cdp.evaluate(STATE);assert.equal(after.dragging,false);assert.ok(after.glass>mid.glass,'release sends the new glass read');assert.ok(after.fx<first.fx-300,'the read moved with the panel: '+JSON.stringify([first.fx,after.fx]));
- }finally{cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });

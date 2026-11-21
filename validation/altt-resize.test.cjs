@@ -69,5 +69,5 @@ test('Alt+T edge resize: whole-layer region and glass during the drag, footer pi
   for(let i=1;i<=10;i++){await mouse('mouseMoved',x-i*20,y);await sleep(20);}await mouse('mouseReleased',x-200,y);await sleep(400);
   const grown=await cdp.evaluate(STATE);assert.equal(grown.panel[2]-grown.panel[0],640,'west edge grew the panel by 200 px');assert.equal(grown.panel[2],after.panel[2],'right edge kept');
   const reopened=await cdp.evaluate(OPEN);assert.deepEqual(reopened,grown.panel,'size and position kept after reopening');
- }finally{cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });

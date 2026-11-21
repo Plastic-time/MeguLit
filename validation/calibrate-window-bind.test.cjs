@@ -49,5 +49,5 @@ test('校准: 绑定游戏窗口 sits after 拖动文本框 and its hint, before
   assert.deepEqual(s.pickBox,[true,true,true],'the pick button looks like 拖动文本框');assert.match(s.blockBg,/rgba\(0, 0, 0, 0\)\|none/,'no glass box');
   assert.match(s.footer,/Alt\+M ?绑定窗口/);
   assert.equal(s.boundAfter,'当前：さくらの詩');assert.deepEqual(s.picking,['请点一下游戏窗口…（再点这里取消）',true]);assert.equal(s.pickAfter,false);assert.equal(s.tip,'已绑定：さくらの詩');assert.equal(s.unbound,'未绑定');
- }finally{cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });

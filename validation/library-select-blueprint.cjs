@@ -32,6 +32,7 @@ function startWeb(service){const server=http.createServer(async(req,res)=>{try{
 
 /* ---------- headless Edge over CDP ---------- */
 function edgePath(){for(const p of [process.env.MEGULIT_EDGE,'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe','C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'])if(p&&fs.existsSync(p))return p;throw Error('EDGE_NOT_FOUND');}
+const {stopLayoutBrowser}=require('./helpers/stop-layout-browser.cjs');
 async function startEdge(profile){const child=spawn(edgePath(),['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--window-size='+String(arg('size','1920x1080')).replace('x',','),'--hide-scrollbars','--force-device-scale-factor=1',
   '--no-first-run','--no-default-browser-check','--disable-extensions','--mute-audio','about:blank'],{stdio:'ignore'});
  const portFile=path.join(profile,'DevToolsActivePort');for(let i=0;i<100&&!fs.existsSync(portFile);i++)await sleep(100);const port=fs.readFileSync(portFile,'utf8').split(/\r?\n/)[0];
@@ -41,7 +42,7 @@ async function startEdge(profile){const child=spawn(edgePath(),['--headless=new'
  const send=(method,params={})=>new Promise((res,rej)=>{const id=next++;waits.set(id,[res,rej]);ws.send(JSON.stringify({id,method,params}));});
  const evaluate=async(expression)=>{const r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error('EVAL: '+(r.exceptionDetails.exception?.description||r.exceptionDetails.text));return r.result.value;};
  await send('Page.enable');await send('Runtime.enable');await send('Emulation.setDeviceMetricsOverride',{width:Number(String(arg('size','1920x1080')).split('x')[0]),height:Number(String(arg('size','1920x1080')).split('x')[1]),deviceScaleFactor:1,mobile:false});
- const api={send,evaluate,set onEvent(f){globalThis.__cdpEvent=f;},get onEvent(){return globalThis.__cdpEvent;},stop:()=>{try{ws.close();}catch{}child.kill();}};return api;}
+ const api={send,evaluate,set onEvent(f){globalThis.__cdpEvent=f;},get onEvent(){return globalThis.__cdpEvent;},stop:stopLayoutBrowser(ws,child)};return api;}
 
 
 /* tiny PNG writer: a vertical two-colour gradient cover */
@@ -150,6 +151,6 @@ async function main(){fs.mkdirSync(OUT,{recursive:true});const tmpRoot=path.reso
   await pick5();await create('テスト合集 C');await measure('create',submit,1400);await sleep(900);
   summarise();
   const check=await cdp.evaluate(`(()=>({selecting:!!document.querySelector('.lib-selecting'),collections:document.querySelectorAll('.series-collection').length,games:document.querySelectorAll('.series-game').length}))()`);perf.final=check;console.log('final',JSON.stringify(check));
- }finally{if(!probe)fs.writeFileSync(path.join(OUT,'perf.json'),JSON.stringify(perf,null,1));cdp.stop();web.close();await service.stop();await sleep(500);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{if(!probe)fs.writeFileSync(path.join(OUT,'perf.json'),JSON.stringify(perf,null,1));await cdp.stop();web.close();await service.stop();await sleep(500);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
  console.log('evidence in '+OUT);}
 if(require.main===module)main().catch(e=>{console.error(e);process.exitCode=2;});

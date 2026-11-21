@@ -64,6 +64,7 @@ function startWeb(service){const server=http.createServer(async(req,res)=>{try{
 
 /* ---------- headless Edge over CDP ---------- */
 function edgePath(){for(const p of [process.env.MEGULIT_EDGE,'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe','C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'])if(p&&fs.existsSync(p))return p;throw Error('EDGE_NOT_FOUND');}
+const {stopLayoutBrowser}=require('./helpers/stop-layout-browser.cjs');
 async function startEdge(profile){const child=spawn(edgePath(),['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--window-size='+String(arg('size','1920x1080')).replace('x',','),'--hide-scrollbars','--force-device-scale-factor=1',
   '--no-first-run','--no-default-browser-check','--disable-extensions','--mute-audio','about:blank'],{stdio:'ignore'});
  const portFile=path.join(profile,'DevToolsActivePort');for(let i=0;i<100&&!fs.existsSync(portFile);i++)await sleep(100);const port=fs.readFileSync(portFile,'utf8').split(/\r?\n/)[0];
@@ -74,7 +75,7 @@ async function startEdge(profile){const child=spawn(edgePath(),['--headless=new'
  const evaluate=async(expression)=>{const r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error('EVAL: '+(r.exceptionDetails.exception?.description||r.exceptionDetails.text));return r.result.value;};
  await send('Page.enable');await send('Runtime.enable');await send('Emulation.setDeviceMetricsOverride',{width:Number(String(arg('size','1920x1080')).split('x')[0]),height:Number(String(arg('size','1920x1080')).split('x')[1]),deviceScaleFactor:1,mobile:false});
  await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
- return {send,evaluate,stop:()=>{try{ws.close();}catch{}child.kill();}};}
+ return {send,evaluate,stop:stopLayoutBrowser(ws,child)};}
 
 /* ---------- in-page: list the visible text ---------- */
 const COLLECT=`(()=>{const out=[],dlg=[...document.querySelectorAll('dialog[open]')].pop(),W=innerWidth,H=innerHeight;
@@ -133,7 +134,7 @@ async function main(){fs.mkdirSync(OUT,{recursive:true});const temp=fs.mkdtempSy
      console.log(`${scene.padEnd(6)} ${page.padEnd(20)} ${String(res.length).padStart(4)} texts  min ${Number.isFinite(min)?min.toFixed(2):'-'}  fail ${bad.length}`);
      for(const b of bad.slice(0,arg('verbose')?999:12))console.log(`   ${b.ratio.toFixed(2)}<${b.need} ${b.path} "${b.text}" fg ${b.fg} bg ${b.bg}`);}
     catch(e){console.log(`${scene} ${page} ERROR ${e.message}`);report[scene][page]={error:e.message};failures++;}}}
- }finally{fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify(report,null,1));cdp.stop();web.close();await service.stop();await sleep(500);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify(report,null,1));await cdp.stop();web.close();await service.stop();await sleep(500);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
  console.log(`\n${failures} text(s) below the WCAG threshold. Screenshots and report.json in ${OUT}`);
  if(process.argv.includes('--strict')&&failures)process.exitCode=1;}
 if(require.main===module)main().catch(e=>{console.error(e);process.exitCode=2;});
