@@ -202,8 +202,22 @@ BGI、Siglus 等只要画字最终经过 TextOut / ExtTextOut / DrawText / GetGl
 | 引擎 / 游戏 | 静态看到的 | 缺什么 | 下一步 |
 |---|---|---|---|
 | Leaf / AQUAPLUS：WHITE ALBUM2（WA2.exe） | 导入表和代码里没有任何 GDI 文字 API，也没有经寄存器的调用；字是 fnt.pak / fon.pak 里的预渲染字库图集，D3D9 + d3dx9_41 画四边形。游戏目录里另有一个 d3d9.dll（中文补丁带的代理） | 送字函数（从剧本串取字 → 查图集 → 出四边形）在哪，只能运行中看 | 位置已经能走现有的层 4 GPU 字形四边形（native/gpuhide）；台词 / 名字 / 选项要在实机里对四边形的纹理坐标找图集查表函数，再出签名 |
-| Spike Chunsoft：ダンガンロンパ 1 / 2（DR1_us.exe / DR2_us.exe） | **SteamStub（`.bind` 节）**：代码在磁盘上是加密的；导入 SDL2 + OpenGL + FreeImage，没有 GDI 文字 API | 解开的代码 | 先用 Steamless 类工具从店主本机文件只读解出一个副本（不改游戏目录），在副本上找字库纹理的送字函数；不脱壳不做 |
-| Spike Chunsoft：ニューダンガンロンパV3（Dangan3Win.exe，x64） | SteamStub + `.text` 熵 8.0（整段加密），D3D11 | 同上，且 DrawSites 只做 x86，要另写 x64 门 | 同上，再加 x64 版本的门 |
+| Spike Chunsoft：ダンガンロンパ 1 / 2（DR1_us.exe / DR2_us.exe） | SteamStub 只包了一层：`.text` 熵 6.66，磁盘上就是明文（re-mages 的 tools/engine-sigs/steamstub.cjs 解不出头 = 没加密代码）。没有任何 GDI 文字 API（GDI32 只导入 BitBlt 等 5 个）；DR1 静态链接了 FreeType（sfnt / glyph-dict / FontBBox 等字符串），字用 FreeType 栅格化后经 SDL2 + OpenGL 贴图 | DrawSites 用不上（没有 GDI 调用点）。要找的是 FreeType 的 FT_Load_Glyph / FT_Render_Glyph 在 exe 里的位置和调用它的排版函数 | 照 MAGES 的路子单开一个逆向：用 FreeType 模块表（"truetype" / "sfnt" / "smooth" 等模块名串引用的类结构）定位 FT_Load_Glyph，再往上找排版函数出签名 |
+| Spike Chunsoft：ニューダンガンロンパV3（Dangan3Win.exe，x64） | SteamStub + `.text` 熵 8.0（整段加密），GDI32 只导入 GetStockObject，D3D11 | 64 位 SteamStub 解码（steamstub.cjs 只做 x86）；画字同样不走 GDI，64 位 DrawSites 对它没用 | 先给 steamstub.cjs 加 x64 头格式解出代码，再和 1 / 2 一样找字形栅格化函数 |
 | Nitroplus：みにくいモジカの子 | **Enigma Protector**（`.enigma1` 熵 7.91），导入表只剩壳自己的几个 | 运行中解开的内存镜像 | 只能实机里用 runtimedump 一类的方式取解开后的镜像；静态不做 |
 
 这四个在静态这一步交不出 6 件套。签名表里没有它们，DrawSites 在这些游戏里什么都不挂
+
+#### 实机采集方案（等店主说「你来测」再跑，不开游戏之前只写方案）
+**WHITE ALBUM2（WA2.exe，Leaf，fnt.pak 字库图集 + D3D9）**
+1. 照常经 MeguLit 启动，开 LunaHook Leaf 文本钩子（拿当前句的字符串和它在内存里的地址）+ 层 4 GPU 字形四边形记录（native/gpuhide，拿每个字的屏幕框和纹理坐标）
+2. 记下 fnt.pak / fon.pak 被读进来后建成的纹理：钩 IDirect3DDevice9::CreateTexture / D3DXCreateTextureFromFileInMemory（d3dx9_41），记录纹理指针和尺寸；游戏目录里的 d3d9.dll 代理先看一眼是谁的（中文补丁？），必要时临时改名让系统 d3d9 生效
+3. DrawPrimitiveUP / DrawIndexedPrimitiveUP 时绑定的是字库纹理的那几次：抓 4 层返回地址（栈回溯），按调用点分组 → 候选「画字形四边形」函数
+4. 对 LunaHook 给出的字符串地址下硬件读断点（第一字节），第一个读它的函数是排版 / 送字函数；记录它的参数（笔位、窗口号）
+5. 结果：送字函数和画字形函数的 RVA、参数布局、调用栈，写进夹具，再按 DrawSites 的写法出静态签名（WA2 不走 GDI，签名要另做一种「函数入口」形式，届时补进表格式）
+**みにくいモジカの子（丑小鸭与文字祸.exe，Enigma Protector）**
+1. 游戏启动到标题画面（Enigma 此时已解开代码），用 native/runtimedump 一类的方式只读取出主模块内存镜像（ReadProcessMemory，整段 SizeOfImage），存到 H:\MeguLit-Work
+2. 镜像里 IAT 已被填成真实地址或 Enigma 的转发桩：把每个槽的目标对照 gdi32 / user32 导出表解析回 API 名（转发桩要跟一跳）
+3. 同时用一个临时 GDI 钩子（GetGlyphOutline / TextOut / ExtTextOut）记录调用者返回地址，换算成镜像 RVA → 画字点
+4. 在镜像上用 slot-refs / draw-sites 找这些点的模式；Enigma 会把部分 API 调用改成跳到它自己的桩，签名要能认这种「call 桩」形式，届时补进表格式
+5. 镜像不进仓库，只进夹具字节（调用点前后几十字节）+ 主程序 SHA-256
