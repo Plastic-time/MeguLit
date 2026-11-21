@@ -86,11 +86,56 @@
 4. 游戏照常显示、推进不卡、不崩、日志不刷屏（同一句不会每帧重复出现，`origin` 只在窗口挪动后出现）= 过
 5. 不过时发：`hook-diagnostics.log`（含 `on:` 或 `off:` 那一行）、`hook-events.log`、exe 版本；`off: push count differs` 之类 = 这个版本签名没对上
 
-### MAGES.
-- 现有：`native/megulithook/MagesEngine.cpp`、`MeguLitSg.cpp`、`native/mages/`（SC3 串解码含注音，STEINS;GATE 精确匹配的画字钩子）
-- 画字：不走 GDI。字库是图集，每个字是一个 D3D9 四边形；层 4（假 GPU，`native/gpuhide`）已经能看到这些四边形的位置
-- 方案：把 STEINS;GATE 那个精确匹配的画字钩子泛化：MAGES 各作共用 SC3 VM，送字函数的参数里有字形索引和屏幕位置；按 exe 版本表（版本层差分）登记各作的函数地址，角色来自 SC3 的窗口命令（名字框是单独的 `NameBox` 区）。内嵌：SC3 串本来就支持注音标记（`native/mages/readString.cpp` 已能解），写回「日文带注音 + 中文」即可，前提是字库图集里有中文字形（没有就用 `core/mages-font.cjs` 补字库）
-- 参考：Committee of Zero 的 LanguageBarrier（开源，正是 MAGES 的画字 + 字库钩子）
+### MAGES.（已做：画字层，2026-11-21，feat/re-mages）
+- 现有：`native/megulithook/MagesEngine.cpp`、`MeguLitSg.cpp`、`native/mages/`（SC3 串解码含注音；STEINS;GATE 按 PE 时间戳精确匹配的串钩子 + 内嵌）。这些都是「读 SC3 字符串」，不是画字
+- 加壳：店主本机 5 个 Steam 版 Game.exe 都是 SteamStub 3.1（`.bind` 段，`.text` 加密）。静态分析用 `tools/engine-sigs/steamstub.cjs` 在内存里解开（自己实现的 XOR 头 + AES-256-CBC，和 Steamless 输出逐字节一致），不写游戏文件。运行时 SteamStub 先解密再跑游戏，钩子看到的是明文代码
+- 画字（静态逆向，5 个 exe 都核对过；名字和 LanguageBarrier 一致）：
+  - **对话页**：引擎把每个文字窗口的字放在一个静态「页」数组里（10 页，步长 0x3C + 30×S；S = 2000，比翼恋理 7000）。每页头 0x3C 字节（+0xC = 字数），后面是逐字数组：fontNumber、charColor、outlineColor（int）、glyphCol/Row（u8，字码 = Row×64 + Col = SC3 字符码，字库每行 64 格 32 px）、原宽高（u8）、charDisplayX/Y、显示宽高（i16，设计坐标 1280×720）、标志字节（选项号）、…、不透明度
+  - **drawDialogue / drawDialogue2(font, page, opacity)**：逐字三遍（描边 + 本体）调 **drawGlyph**(纹理, 源 x y w h, 目标 x0 y0 x1 y1, 颜色, 不透明度)，坐标乘引擎自己的缩放（`.rdata` 里的 1.5 → 1920×1080）
+  - **提交函数（commit）**：把排版缓冲（字数、u16 字码、每字 16 字节信息）追加进第 page 页。排版缓冲保留了 SC3 控制码当标记：0x8001 名字开始、0x8002 名字结束（排版函数里按这对标记把名字挪到名字框，已在代码里确认）
+  - **两个清页函数**：memset 页数组、字数归零
+  - **谁写哪页**（顺着 SC3 指令表 01 0C / 01 12 / 01 14 找到，对照 impacto 的 opcode 表）：Mes → 当前窗口页（台词 + 名字）；**Sel → 第 7 页**（选项，标志字节 = 选项号）；**SysSel → 第 5 + 窗口页**（系统选项）。5 个 exe 完全相同
+- 签名（按结构，不按整段字节；`tools/engine-sigs/mages-draw.cjs` 和 `native/megulithook/MagesDrawSig.h` 同一算法）：
+  - drawDialogue：`push ebp; mov ebp,esp; sub esp,0C|10; push ebx` 后 24 字节内 `imul r, <页号>, stride`（stride 能整除出 S），紧跟 `cmp dword [r + pages+0xC], 0; je` → 页表地址、步长、字数；必须正好两个，且各有三处 `call X … add esp,2Ch` 指向同一个 X = drawGlyph；第一个 `movss xmm1,[abs]` = 缩放
+  - commit：函数头 16 字节内 `cmp [count], eax; jbe`，0x60 内 `movzx edx, word [eax*2+codes]` 和 `mov ecx, info`，函数体里有 stride 和 `inc dword [r + pages+0xC]`；必须正好一个
+  - 清页：`imul r, <页号>, stride; push S; (push 0 | push reg); lea eax, [r + glyphCol]`
+  - 两种编译形态（SG / LBP：`8b 7d 0c … 69 db`；SG0 / CC / MDE：`69 5d 0c`）都命中，每个 exe 各部件只命中一次
+- 版本层：每个 exe 的地址表（模块偏移）写进 `The Seed/mages/<游戏>/versions/<exe sha256>.json` 的 `settings.draw.engineTable`（新键 `draw.engineTable`，默认 null = 只靠签名）：drawDialogue、drawGlyph、commit、clear、pages、stride、chars、scale、layoutCount/Codes/Info、selPage 7、sysSelPage 5、charset（SG = sghd、SG0 / CC = default、LBP = sglbp、MDE = sgmde）、canvas 1920×1080。内核把它写成控制文件一行 `#table mages …`，DLL 用签名找，和表不一致就不挂
+- 运行时（`native/megulithook/MagesDraw.h`，两个 MAGES 入口都调 `MagesDraw::Arm`：STEINS;GATE 精确适配和上游 MAGES 引擎；同一进程只武装一次）：
+  - 默认不挂：控制文件出现 `roles=1`（这部游戏 seed 里 `draw.roles: true`）才装钩子；看守线程每 2 s 查一次
+  - commit 前后：前面抄排版缓冲（字码、跳过标记），后面读新加进页的字（字码、框 ×缩放、颜色、标志）→ `ToMe_DRAWRUN engine=mages ev=add page= seq= role=line|choice|system from= n= codes=`（字码含标记）+ `ToMe_DRAWBOX … rects= color= flag=`
+  - 清页 → `ev=clear page= seq=`；drawDialogue 第一次画这页 → `ev=show`；drawDialogue 以外的 drawGlyph（菜单、回想、手机……）按调用点成段，内容变了才记一行 `ev=glyph site=<rva> box= size= color=`
+  - 返回值、寄存器、栈原样（pre 门 + 返回跳板），游戏看不到区别
+- 内核（`core/mages-draw.cjs`，第二批已接进实时流）：`parse` + `PageTracker`（一页在两次清页之间 = 一个单位 page:seq；名字来自 0x8001/0x8002 标记；注音见下）+ `MagesLive`（实时：DLL 记录 → ToMe_CHARS，每个 page:seq 一个固定行号，文字变长就是同一行再报一次；清页或页重新开始时同一行号报一次空记录（协议里的「离开」）；名字 role=name `N:<页>`；选项每页一个 UI 快照（`C:<号>` / `Y<页>:<号>`），清页时空快照）。链路：MagesDraw.h → hook-diagnostics 行 → HookBridge `EngineInfo`（`hookEngineDraw`，自检里有一条）→ `HookNative.magesDraw` → `charRects` → hookCharRects / hookDrawUi。`core/text-paths.cjs` 登记 `engine=mages`
+- **画布 → 窗口（静态，5 部一致）**：呈现函数在 Present(NULL,NULL,NULL,NULL) 前，把 16:9 的场景画进后备缓冲：宽铺满、高 = (宽 >> 4) × 9、垂直居中（(高 − 那个) × 0.5）；Present 再把后备缓冲整个拉伸到客户区。所以画布 1920×1080 在客户区的位置 = [0, (bh − h16)/2 × ch/bh, cw, h16 × ch/bh]（`viewport()`，写进 ToMe_CHARS 的 vx..vh）：16:10 全屏上下黑边、超宽屏上下被裁（vy < 0）、后备缓冲和窗口形状不同就被拉伸。后备缓冲尺寸是两个 u16 全局（签名：宽 → `shr 4` → `lea ×9` → 高 → `×0.5` → Present；JS `backbuffer()` / C++ `FindBackbuffer`），DLL 在每页第一帧和每 120 帧读一次，连同游戏窗口客户区报 `ev=view bb= client=`（变了才报）；读不到后备缓冲就按客户区，读不到客户区就交给内核按比例放
+- **菜单调用点角色表（推断）**：drawDialogue 以外调用 drawGlyph 的函数里，直接调用次数最多的那个（5 部都是 9 个参数：SG 0x45bc0、SG0 0x62f30、CC 0x73010、LBP 0x4b200、MDE 0x699e0）= LanguageBarrier 的 drawSingleTextLine（系统菜单用）→ role menu；其余（手机、邮件、回想、TIPS、链接高亮）→ role system。根据是参数个数 + 调用次数，不是游戏里的名字。版本层 `menuText: [起, 止]`，`MagesLive.glyphRole(site)`。`ev=glyph` 只有框没有字，所以暂不送进阅读层（只给探针 / diff-maker 用）
+- **注音标记（静态核实）**：5 部的 SC3 文本解析器（填排版缓冲的函数）对**每一个** < 0x20 的控制字节先写 `0x8000 + 字节` 进排版缓冲，再按 32 项跳转表分派；0x0A、0x0B 两个分支都推进排版下标（标记保留），并置 / 清同一个局部标志；字形路径看到这个标志为 1 时照样写字形，只是不计入这一行的字数。所以 0x8009 / 0x800A / 0x800B 会作为标记到达 commit，0x800A 和 0x800B 之间的字是排好的注音字（测试逐个 exe 核对）。仍是**推断**的只有一点：0x09 是「注音底字开始」（SC3 / impacto 的 STT_RubyBaseStart；0x09 分支只保留标记）
+- **CHAOS;CHILD「一句拆成两句、排版对不上」**：原因是**推断**（没开游戏验证）：串钩子挂在 SC3 解析器上，一句里有等待（SC3 0x03 / 0x0E 等）时会分几次送出，所以一句被拆。画字层上，这几次都是往同一页 commit，中间没有清页；`MagesLive` 给同一 page:seq 同一个行号，后面几段是同一行变长再报，清页时这一行报一次空。回放测试 `validation/engine-draw-mages-live.test.cjs`：三段 commit → 行号都是 1、文字依次变长、清页一次空记录、下一句是行 2；再喂给 OverlayPlacement，看到的是一行在变长，不是两句
+- 验证：
+  - `validation/engine-draw-sig-mages.test.cjs`：5 个夹具片段、近似字节不命中、店主 5 个 exe（有就跑，SHA-256 对上）整段只命中一次且等于版本层表、Sel/SysSel 的 commit 调用形态、运行时日志回读、控制文件行
+  - `native/megulithook/selftest/magesdraw.cpp`：同样的片段给 C++ 匹配器（41 项）
+  - `native/megulithook/selftest/magesgate.cpp`：真 MinHook 挂在仿引擎函数上，跑 commit / 两段 commit / 清页 / 选项 / 菜单，检查返回值、栈、记录；输出就是 `validation/fixtures/engine-sigs/mages-draw-log.txt`
+- 没做：内嵌（方案见下，未接）；`ev=glyph` 的文字解码（菜单字要从源坐标反推字码，描边和本体各画一遍，等探针日志再定）
+- **内嵌替换方案（只写方案，未接）**：
+  1. 位置：commit 之前（MagesDraw 已经在 commit 入口拿到排版缓冲）。台词那一页（Mes）在 commit 前把排版缓冲里这一句的字形换掉，不动 SC3 脚本、不动 VM
+  2. 做法 A（推荐）：在解析器入口（SG 的 0x4496a0，`sc3 串, 2, 8, 0, &out`）换输入串：日文本身不变，只在汉字后插 SC3 注音 `09 底字 0A 读音 0B`（引擎自己排注音），中文作为第二段追加在 `00`（换行）之后；串用 SC3 字码编码，**中文字形必须在字库图集里**：先用这一版的字码表查（没查过，不知道够不够），缺的字用 `core/mages-font.cjs` 补字库（替换 FONT 纹理里没用到的格子，并把这些格子写进字码表）
+  3. 做法 B（不补字库）：只插注音（日文字库够用），中文仍由阅读层画在对话框外（`emb=1`）
+  4. 行数上限：每页 S 个字、每个窗口的行数（排版参数表，SG 在 0x16f4bc4，按窗口号），放不下就降到只注音；写进版本层（`draw.embed*`）
+  5. 配对：commit 记录里报 `emb=1/2`（MagesLive 带上），阅读层按协议少画；回放测试照 KiriKiri 的做法加「替换后整句只画一次」
+  6. 风险：现有 SG 的 `EmbedMAGES_SteinsGate`（sgBlank）已经在同一解析器入口改串，两者必须二选一（按 seed 的 draw.embed 互斥），否则会重复改
+
+#### 店主测试清单（MAGES）
+1. 在 The Seed 里给 STEINS;GATE（或 CHAOS;CHILD / STEINS;GATE 0 / 两部外传）的游戏差分设 `"draw":{"roles":true}`（版本层的 engineTable 已经有了），或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`）
+2. 开游戏，新游戏推 5 句（有名字的句子至少 1 句），出一次选项，开一次系统菜单
+3. 看 `logs\hook-diagnostics.log`：
+   - 有 `ToMe_DRAWRUN engine=mages on: drawDialogue=…`（地址应和版本层表一致）
+   - 每句有 `ev=add page=0 …`（或别的窗口页）和 `ToMe_DRAWBOX`；有名字的句子 codes 里有 `8001…8002`
+   - 推到下一句前有 `ev=clear page=…`；选项出现时有 `ev=add page=7 … role=choice`，DRAWBOX 的 flag 是 0、1、2…
+   - CHAOS;CHILD：一句里有停顿的句子，同一 `seq` 下有多条 `ev=add`（from 递增），中间没有 clear
+   - 有 `ev=view bb=<后备缓冲> client=<客户区>`：窗口化 / 全屏各切一次，数值跟着变
+   - 阅读层：有停顿的句子在 MeguLit 里只出现一行（不再拆成两行），清字时跟着消失；名字和选项旁边有注音 / 中文，点选项照常
+4. 游戏照常显示、不卡、不崩 = 过
+5. 不过时发：`hook-diagnostics.log` 全文；没有 `on:` 只有 `off: …` 那行 = 这个版本签名或表没对上，连同 exe 路径发来
 
 ### Unity（7 部）——Mono 已做
 - 分布（静态看游戏目录）：Mono = Doki Doki Literature Club Plus、ひぐらし、月に寄りそう乙女の作法、夏色四叶草 Summer Clover；IL2CPP = 逆転検事 1&2（GK12，il2cpp_data）、魔法少女ノ魔女裁判（manosaba）；haisha-fengyun 本机未找到
@@ -145,7 +190,7 @@
 
 ## 建议的推进方式
 
-一个引擎一个逆向会话（Opus high），各自 worktree，交付：签名 + 静态签名测试（对店主本机 exe 命中一次）+ 原生自检 + 店主测试清单。顺序：YU-RIS（一个调用点，4 部游戏）→ BGI（素晴日）→ MAGES（泛化已有钩子）→ Siglus（VM 最复杂；签名 + 钩子已做）→ Unity（先解决引用包）
+一个引擎一个逆向会话（Opus high），各自 worktree，交付：签名 + 静态签名测试（对店主本机 exe 命中一次）+ 原生自检 + 店主测试清单。顺序：YU-RIS（一个调用点，4 部游戏）→ BGI（素晴日）→ MAGES（已做：对话页 + 提交函数，5 部 Steam 版）→ Siglus（VM 最复杂；签名 + 钩子已做）→ Unity（先解决引用包）
 
 ## GDI 画字点：其余原生引擎的通用部件（re-misc）
 
