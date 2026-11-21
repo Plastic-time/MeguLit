@@ -4,18 +4,18 @@
    thanks (the calibration went out). It asks once when the page opens (the service answers from its cache, a slow relay shows
    nothing) and then polls the cache, so the card turns into the thank-you by itself. */
 const W={
- zh:{eyebrow:'传火计划',glyph:'火',
-  first:{title:'恭喜，你是第一位玩这个版本的玩家',body:'这个版本还没有人校准过，第一簇火要由你来点。启动游戏后请耐心玩 3 到 8 分钟，让自动校准跑完，就算加入传火计划了。你的校准结果会共享给之后玩同一版本的人，他们打开就能直接用；你平时用到的适配，也是前面的玩家这样一份份传下来的。互相传火，大家才走得远',note:'约 3–8 分钟 · 自动校准 · 结果与之后的玩家共享'},
-  off:{title:'打开共享适配，就能参与传火',body:'这个版本还没有人校准过，你会是第一位。现在共享适配关着，校准结果只留在这台电脑上，之后的玩家用不上。打开它，玩 3 到 8 分钟让自动校准跑完，结果就会共享给之后玩同一版本的人；你用到的适配，也是别的玩家这样共享来的',button:'打开共享适配',busy:'正在打开…',failed:'没打开成功，稍后再试'},
-  thanks:{title:'火已经传出去了',body:'你的校准结果已经上传。之后玩这个版本的人，打开就能直接用上，这是你点的火。谢谢你，传火人',note:'已共享 · 之后的玩家会直接拿到'}},
- en:{eyebrow:'Pass the flame',glyph:'火',
-  first:{title:'Congratulations, you are the first to play this version',body:'Nobody has calibrated this version yet, so the first spark is yours. After you start the game, please keep playing for 3 to 8 minutes so the automatic calibration can finish; that is all it takes to join the Pass the flame project. Your result is shared with everyone who plays the same version later, and they can use it right away. The adaptations you rely on were passed to you by earlier players in just the same way: we get further by sharing',note:'About 3–8 minutes · automatic calibration · shared with later players'},
-  off:{title:'Turn on shared adaptation to pass the flame',body:'Nobody has calibrated this version yet, so you would be the first. Shared adaptation is off, which keeps the result on this PC and no later player can use it. Turn it on, play for 3 to 8 minutes to let the automatic calibration finish, and the result is shared with everyone who plays this version later, just as other players shared theirs with you',button:'Turn on shared adaptation',busy:'Turning on…',failed:'Could not turn it on, try again later'},
-  thanks:{title:'The flame has been passed on',body:'Your calibration has been uploaded. Whoever plays this version next can use it as soon as they open it: you lit that fire. Thank you, flame bearer',note:'Shared · later players get it right away'}},
- ja:{eyebrow:'火を継ぐ計画',glyph:'火',
-  first:{title:'おめでとう、このバージョンを最初に遊ぶプレイヤーです',body:'このバージョンはまだ誰も校正していません。最初の火はあなたの手で。起動したら 3〜8 分ほど遊び続けて、自動校正を最後まで走らせてください。それで「火を継ぐ計画」に参加したことになります。校正結果は同じバージョンを後から遊ぶ人に共有され、開くだけで使えます。あなたが使っている適応も、先に遊んだ人たちがこうして届けてくれたものです。分け合ってこそ遠くまで行けます',note:'約 3〜8 分 · 自動校正 · 後のプレイヤーと共有'},
-  off:{title:'共有適応をオンにすると火を継げます',body:'このバージョンはまだ誰も校正していないので、あなたが最初になります。いまは共有適応がオフで、結果はこの PC に残るだけ、後のプレイヤーには届きません。オンにして 3〜8 分遊び、自動校正を走らせれば、結果は同じバージョンを遊ぶ人に共有されます',button:'共有適応をオンにする',busy:'オンにしています…',failed:'オンにできませんでした。あとでもう一度'},
-  thanks:{title:'火は無事に継がれました',body:'校正結果をアップロードしました。このバージョンを次に遊ぶ人は、開くだけで使えます。あなたが灯した火です。ありがとう、火を継ぐ人',note:'共有済み · 後のプレイヤーはすぐ使えます'}}};
+ zh:{eyebrow:'传火计划',
+  first:{title:'恭喜，你是第一位玩这个版本的玩家',body:'这个版本还没有人校准过。启动游戏后请耐心玩 3 到 8 分钟，让自动校准跑完，就算参与传火计划了。校准结果会共享给之后玩同一版本的人，他们打开就能直接用；你现在用到的适配，也是之前的玩家这样共享出来的。大家互相分享，每个人都省事',note:'约 3–8 分钟 · 自动校准 · 结果与之后的玩家共享'},
+  off:{title:'打开共享适配，就能参与传火',body:'这个版本还没有人校准过，你是第一位。现在共享适配是关着的，校准结果只留在这台电脑上，之后的玩家用不上。打开后玩 3 到 8 分钟，让自动校准跑完，结果就会共享给之后玩同一版本的人',button:'打开共享适配',busy:'正在打开…',failed:'没打开成功，稍后再试'},
+  thanks:{title:'感谢你的分享',body:'你的校准结果已上传，之后玩这个版本的玩家打开就能直接用',note:'已共享'}},
+ en:{eyebrow:'Pass the flame',
+  first:{title:'Congratulations, you are the first to play this version',body:'Nobody has calibrated this version yet. After you start the game, please keep playing for 3 to 8 minutes so the automatic calibration can finish; that is all it takes to join. The result is shared with everyone who plays the same version later, and they can use it right away. The adaptations you use now were shared by earlier players in the same way: when everyone shares, everyone saves time',note:'About 3–8 minutes · automatic calibration · shared with later players'},
+  off:{title:'Turn on shared adaptation to take part',body:'Nobody has calibrated this version yet, so you are the first. Shared adaptation is off, so the result stays on this PC and later players cannot use it. Turn it on, play for 3 to 8 minutes and let the automatic calibration finish, and the result is shared with everyone who plays this version later',button:'Turn on shared adaptation',busy:'Turning on…',failed:'Could not turn it on, try again later'},
+  thanks:{title:'Thank you for sharing',body:'Your calibration has been uploaded. Players of this version can use it as soon as they open it',note:'Shared'}},
+ ja:{eyebrow:'火を継ぐ計画',
+  first:{title:'おめでとう、このバージョンを最初に遊ぶプレイヤーです',body:'このバージョンはまだ誰も校正していません。起動したら 3〜8 分ほど遊び続けて、自動校正を最後まで走らせてください。校正結果は同じバージョンを後から遊ぶ人に共有され、開くだけで使えます。いま使っている適応も、先に遊んだ人たちが共有してくれたものです。みんなで分け合えば、みんなが楽になります',note:'約 3〜8 分 · 自動校正 · 後のプレイヤーと共有'},
+  off:{title:'共有適応をオンにすると参加できます',body:'このバージョンはまだ誰も校正していないので、あなたが最初です。いまは共有適応がオフで、結果はこの PC に残るだけ、後のプレイヤーには届きません。オンにして 3〜8 分遊び、自動校正を走らせれば、結果は同じバージョンを遊ぶ人に共有されます',button:'共有適応をオンにする',busy:'オンにしています…',failed:'オンにできませんでした。あとでもう一度'},
+  thanks:{title:'共有ありがとうございます',body:'校正結果をアップロードしました。このバージョンを遊ぶ人は、開くだけで使えます',note:'共有済み'}}};
 const POLL_MS=20000,POLL_MAX=90;
 export function mountFirstPlayer({host,id,api,locale,esc,isCurrent=()=>true,placement='tabs'}){
  if(!host)return;const w=W[locale]||W.zh;let timer=0,shown='',polls=0;
