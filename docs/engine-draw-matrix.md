@@ -96,11 +96,11 @@
 
 | 引擎 | 本机样本 | 结果 |
 |---|---|---|
-| Silky's（AI5WIN / AI6WIN） | 没有 | 跳过；要一部 Silky's 作品（例：ヴァルキリーコンプレックス、イエスタデイをうたって 之类 AI6WIN 版本）的 exe |
-| LiveMaker | 没有 | 跳过；要一部 LiveMaker 作品（例：ミライ、ノラと皇女と野良猫ハート 之外的 LiveMaker 同人作）的 exe（游戏数据附在 exe 末尾） |
+| Silky's（AI5WIN / AI6WIN） | 没有 | 跳过；要一部 Silky's 作品的 exe |
+| LiveMaker | 没有 | 跳过；要一部 LiveMaker 作品的 exe（游戏数据附在 exe 末尾） |
 | Will（ADV 引擎，Rio.arc / Chip.arc） | Under The Moon（已签，advhd）；いじわるMyMaster（mymaster.exe 是 AlphaROM 加壳，导入表空，静态看不了） | 没有新签名；いじわるMyMaster 要运行中解开的镜像 |
-| AliceSoft System4 | 没有 | 跳过；要一部 System 4.x 作品（例：ランス10、ドーナドーナ）的 System40.exe |
-| Escu:de | 没有 | 跳过；要一部 Escu:de 作品（例：絶対階級学園、Re:BIRTHDAY SONG）的 exe |
+| AliceSoft System4 | 没有 | 跳过；要一部 System 4.x 作品的 System40.exe |
+| Escu:de | 没有 | 跳过；要一部 Escu:de 作品的 exe |
 | Kaguya（アトリエかぐや） | 没有 | 跳过；要一部かぐや作品的 exe |
 
 顺带核对的：時計仕掛けのレイライン 2 的 PAL.dll 两条 Softpal 签名各正好命中一次（已进夹具，413e0cc5）；レイライン 3 是 KiriKiri。Air 的 avg32_cn.dll 导入了 TextOutA 但代码里没有对它 IAT 槽的引用（经别的跳板调用），新版 AVG32 要另看。
