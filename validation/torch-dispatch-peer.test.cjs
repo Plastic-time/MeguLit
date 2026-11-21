@@ -49,16 +49,16 @@ test('actual originalExecutable mutation failure cannot queue; success uses forc
  h=bridge();await h.dispatch({action:'game_original_executable',id:'g1'});assert.equal(h.queued.length,1);assert(h.events.indexOf('mutation')<h.events.indexOf('enqueue'));assert.equal(h.queued[0][2].force,true);assert.equal(h.queued[0][2].priority,'user');
 });
 function runtime(fail=''){
- const events=[],queued=[];let release;
+ const events=[],queued=[];let release,releaseStory;
  const receiver={resume(root){events.push('resume');},enqueue(...args){events.push('enqueue');queued.push(args);},stop(){events.push('receiver-stop');return new Promise(resolve=>{release=()=>{events.push('receiver-ended');resolve();};});}};
  const store={readJSON:()=>({}),openStore(){
   events.push('open');
   return {close(){events.push('close');},prepare(){return {all(){events.push('query');if(fail==='query')throw Error('DB_READ_FAILED');return [{id:'g1',executable}];}};}};
  }};
- const deps={'./torch-receive.cjs':receiver,'./store.cjs':store,'./library-scan.cjs':require(path.join(sourceRoot,'services/library-scan.cjs')),'./library.cjs':{reconcile(){events.push('reconcile');if(fail==='reconcile')throw Error('DB_RECONCILE_FAILED');return {};}}};
+ const deps={'./story-analysis.cjs':{stop(){events.push('story-stop');return new Promise(resolve=>{releaseStory=()=>{events.push('story-ended');resolve();};});}},'./torch-receive.cjs':receiver,'./store.cjs':store,'./library-scan.cjs':require(path.join(sourceRoot,'services/library-scan.cjs')),'./library.cjs':{reconcile(){events.push('reconcile');if(fail==='reconcile')throw Error('DB_RECONCILE_FAILED');return {};}}};
  const {Runtime}=cjs('services/runtime.cjs',deps),r=new Runtime(fixtureRoot);
  r.config=()=>({});r.libraryOnly=()=>false;r.library=()=>({scan:async()=>events.push('scan'),load:()=>({games:[]}),read:()=>({folders:[]})});r.metadata=()=>({enqueue(){events.push('metadata');}});
- return {r,events,queued,release:()=>release()};
+ return {r,events,queued,release:()=>release(),releaseStory:()=>releaseStory()};
 }
 test('actual library_scan reconciles/reads DB before bulk-default receiver queue',async()=>{
  const h=runtime();await h.r.call({action:'library_scan'});assert.equal(h.queued.length,1);assert.equal(h.queued[0].length,2);assert(h.events.indexOf('reconcile')<h.events.indexOf('enqueue'));assert(h.events.indexOf('query')<h.events.indexOf('enqueue'));assert.equal(h.events.at(-1),'close');assert.equal(h.events[0],'resume');
@@ -68,12 +68,12 @@ test('actual library_scan reconcile/read failures cannot enqueue',async()=>{
 });
 test('actual Runtime.stop awaits receiver, keeps first failure and still completes every cleanup stage',async()=>{
  const h=runtime(),r=h.r,error=Error('READER_STOP_INCOMPLETE');r.stopReading=async()=>{h.events.push('reader');throw error;};r.ankiRunner={stop:async()=>{h.events.push('anki');throw Error('ANKI_FAILED');}};r.gameEnrichment={stop:async()=>h.events.push('enrichment')};r.gameReviews={stop:async()=>h.events.push('reviews')};r.localLearning={stop:async()=>h.events.push('learning')};r.modelStore={jobs:{owned:{}},cancel:async()=>h.events.push('model')};r.localEngine={cancel:async()=>h.events.push('engine-cancel'),stop:async()=>h.events.push('engine-stop')};r.serviceManager={stop:async()=>h.events.push('services')};
- let done=false;const p=r.stop().then(()=>{done=true;},e=>{done=true;assert.equal(e,error);});await new Promise(resolve=>setImmediate(resolve));assert.equal(done,false);assert.equal(r.stopped,true);assert(!h.events.includes('services'));await assert.rejects(r.call({action:'library_scan'}),/RUNTIME_STOPPED/);h.release();await p;for(const e of ['receiver-ended','reader','anki','enrichment','reviews','learning','model','engine-cancel','engine-stop','services'])assert(h.events.includes(e));assert(h.events.indexOf('receiver-ended')<h.events.indexOf('services'));
+ let done=false;const p=r.stop().then(()=>{done=true;},e=>{done=true;assert.equal(e,error);});await new Promise(resolve=>setImmediate(resolve));assert.equal(done,false);assert.equal(r.stopped,true);assert(!h.events.includes('services'));await assert.rejects(r.call({action:'library_scan'}),/RUNTIME_STOPPED/);h.release();await new Promise(resolve=>setImmediate(resolve));assert.equal(done,false);assert(!h.events.includes('services'));h.releaseStory();await p;for(const e of ['receiver-ended','story-stop','story-ended','reader','anki','enrichment','reviews','learning','model','engine-cancel','engine-stop','services'])assert(h.events.includes(e));assert(h.events.indexOf('receiver-ended')<h.events.indexOf('services'));assert(h.events.indexOf('story-ended')<h.events.indexOf('services'));
 });
 test('actual receiver-stop rejection still awaits delayed reader and runs later cleanup before returning its error',async()=>{
  const events=[],error=Error('TORCH_STOP_FAILED');let releaseReader;
  // Replace only the external receiver dependency by loading the same full Runtime source again
- const {Runtime}=cjs('services/runtime.cjs',{'./store.cjs':{readJSON:()=>({})},'./torch-receive.cjs':{resume(){},stop:async()=>{throw error;}}});
+ const {Runtime}=cjs('services/runtime.cjs',{'./story-analysis.cjs':{stop:async()=>events.push('story-after-failure')},'./store.cjs':{readJSON:()=>({})},'./torch-receive.cjs':{resume(){},stop:async()=>{throw error;}}});
  const subject=new Runtime(fixtureRoot);subject.stopReading=()=>new Promise(resolve=>{releaseReader=resolve;});subject.localLearning={stop:async()=>events.push('learning-after-failure')};subject.serviceManager={stop:async()=>{events.push('service-after-failure');throw Error('SERVICE_STOP_FAILED');}};
  let returned=false;const result=subject.stop().then(()=>{throw Error('UNEXPECTED_SUCCESS');},e=>{returned=true;assert.equal(e,error);});await new Promise(resolve=>setImmediate(resolve));assert.equal(returned,false);assert(!events.includes('learning-after-failure'));releaseReader();await result;assert(events.includes('learning-after-failure'));assert(events.includes('service-after-failure'));
 });
