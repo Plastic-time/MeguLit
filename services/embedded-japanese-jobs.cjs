@@ -1,16 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{fork}=require('node:child_process');
-const jobs=new Map(),requests=new Map(),legacyWrites=new Set(),ACTIVE=new Set(['queued','running','cancelling']);
+const jobs=new Map(),requests=new Map(),legacyWrites=new Set(),launches=new Map(),launchOwners=new Map(),ACTIVE=new Set(['queued','running','cancelling']);
 const MAX_JOBS=16,MAX_REQUESTS=4096,TIMEOUT_MS=60000;
-const directory=dir=>path.resolve(dir).toLowerCase(),requestKey=(id,nonce)=>JSON.stringify([String(id),nonce]);
+function directory(dir){let value=path.resolve(dir);try{value=fs.realpathSync.native(value);}catch{}return process.platform==='win32'?value.toLowerCase():value;}
+const requestKey=(id,nonce)=>JSON.stringify([String(id),nonce]);
 function nonce(value){if(!/^[a-zA-Z0-9_-]{8,80}$/.test(String(value||'')))throw Error('INVALID_REQUEST_ID');return String(value);}
 function dto(job){return {jobId:job.jobId,requestId:job.requestId,operation:job.operation,state:job.state,progress:job.progress,cancellable:job.operation==='scan'&&ACTIVE.has(job.state),...(job.result?{result:job.result}:{}),...(job.error?{error:job.error}:{}),...(job.legacy?{legacy:true}:{}),...(job.retired?{retired:true,notStarted:true}:{})};}
 function known(id,requestId){if(!requestId)return null;const job=requests.get(requestKey(id,nonce(requestId)));return job?dto(job):null;}
 function active(dir){return [...jobs.values()].filter(job=>job.directory===directory(dir)&&ACTIVE.has(job.state));}
 function locked(dir){return fs.existsSync(path.join(dir,'.megulit-embedded-lock'));}
-function assertLaunchSafe(dir){if(legacyWrites.has(directory(dir))||active(dir).some(job=>job.operation!=='scan')||locked(dir))throw Error('EMBEDDED_JOB_BUSY');}
-function reserveLegacyWrite(dir){if(legacyWrites.has(directory(dir))||active(dir).length||locked(dir))throw Error('EMBEDDED_JOB_BUSY');const key=directory(dir);legacyWrites.add(key);return ()=>legacyWrites.delete(key);}
+function recoveryPending(dir){
+ const backup=path.join(dir,'.megulit-japanese');
+ try{const file=path.join(backup,'manifest.json');if(fs.statSync(file).size>1<<20)return true;const m=JSON.parse(fs.readFileSync(file));return m.adapter==='utage-embedded'&&m.phase!=='applied';}catch{return fs.existsSync(path.join(backup,'embedded-pairs.json'));}
+}
+function assertLaunchSafe(dir){if(legacyWrites.has(directory(dir))||launches.has(directory(dir))||active(dir).some(job=>job.operation!=='scan')||locked(dir))throw Error('EMBEDDED_JOB_BUSY');if(recoveryPending(dir))throw Error('EMBEDDED_RECOVERY_REQUIRED');}
+function reserveLegacyWrite(dir){if(legacyWrites.has(directory(dir))||launches.has(directory(dir))||active(dir).length||locked(dir))throw Error('EMBEDDED_JOB_BUSY');if(recoveryPending(dir))throw Error('EMBEDDED_RECOVERY_REQUIRED');const key=directory(dir);legacyWrites.add(key);return ()=>legacyWrites.delete(key);}
+function reserveLaunch(dir,priorToken){
+ const token=priorToken||crypto.randomBytes(16).toString('hex'),prior=launchOwners.get(token);
+ if(priorToken&&!prior)throw Error('EMBEDDED_JOB_BUSY');
+ const keys=prior||new Set();
+ const acquire=folder=>{
+  const key=directory(folder),held=launches.get(key);if(held&&held!==token)throw Error('EMBEDDED_JOB_BUSY');
+  if(!held)assertLaunchSafe(folder);
+  launches.set(key,token);keys.add(key);launchOwners.set(token,keys);
+ };
+ acquire(dir);let released=false;
+ return {token,extend:acquire,release(){if(prior||released)return;released=true;for(const key of keys)if(launches.get(key)===token)launches.delete(key);launchOwners.delete(token);}};
+}
 function owned(id,query={}){
  if(typeof query==='string')query={jobId:query};let job;
  if(query.requestId)job=requests.get(requestKey(id,nonce(query.requestId)));
@@ -24,6 +41,7 @@ function status(id,query={}){
  if(query.requestId&&query.retireIfMissing===true){
   const requestId=nonce(query.requestId),operation=query.operation||'scan';
   if(!['scan','restore','undo'].includes(operation))throw Error('EMBEDDED_JOB_OPERATION');
+  if(requests.size>=MAX_REQUESTS)throw Error('EMBEDDED_REQUEST_LIMIT');
   job={id:String(id),requestId,operation,jobId:crypto.randomBytes(12).toString('hex'),state:'cancelled',retired:true,progress:{phase:'not-started'},closed:Promise.resolve()};
   requests.set(requestKey(id,requestId),job);return dto(job);
  }
@@ -77,7 +95,8 @@ function start(id,dir,{operation='scan',scanToken,requestId,onDone}={}){
  /* Register before cancellation waits or fork. A retired nonce cannot be revived
     by a late start on the same service connection. */
  requests.set(requestKey(id,requestId),job);jobs.set(job.jobId,job);
- if(legacyWrites.has(job.directory)||locked(dir)||previous.some(prior=>prior.operation!=='scan'||operation!=='scan')){job.error='EMBEDDED_JOB_BUSY';finish(job);throw Error(job.error);}
+ if(legacyWrites.has(job.directory)||launches.has(job.directory)||locked(dir)||previous.some(prior=>prior.operation!=='scan'||operation!=='scan')){job.error='EMBEDDED_JOB_BUSY';finish(job);throw Error(job.error);}
+ if(operation==='restore'&&recoveryPending(dir)){job.error='EMBEDDED_RECOVERY_REQUIRED';finish(job);throw Error(job.error);}
  void run(job,previous);return dto(job);
 }
 async function runLegacy(id,dir,{operation,requestId},perform){
@@ -99,4 +118,4 @@ async function runLegacy(id,dir,{operation,requestId},perform){
  catch(error){if(job){job.error=String(error.message||error);finish(job);}throw error;}
  finally{release();}
 }
-module.exports={start,status,cancel,known,runLegacy,assertLaunchSafe,reserveLegacyWrite,_internal:{jobs,requests,legacyWrites,active}};
+module.exports={start,status,cancel,known,runLegacy,assertLaunchSafe,reserveLegacyWrite,reserveLaunch,_internal:{jobs,requests,legacyWrites,launches,active,MAX_REQUESTS}};

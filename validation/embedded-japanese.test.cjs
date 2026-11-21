@@ -100,3 +100,27 @@ test('adding a new scenario source invalidates an attached index before any text
  fs.copyFileSync(f.patchFile,path.join(path.dirname(f.patchFile),'new.scenarios.asset'));
  assert.equal(provider.resolve('これから最初の旅に出ます。').method,'source-changed');assert.equal(embedded.provider(f.dir),null);
 });
+
+test('an incomplete rollback keeps its verified journal and blocks launch/import until undo completes',t=>{
+ const f=fixture(t),scan=embedded.scan(f.dir),before=[hash(f.baseFile),hash(f.patchFile)];let writes=0,caught;
+ const atomic=(file,bytes)=>{if([f.baseFile,f.patchFile].includes(file)&&++writes>=2)throw Error('synthetic transaction failure');embedded._internal.atomic(file,bytes);};
+ try{embedded.apply(f.dir,{scanToken:scan.scanToken,_io:{...quiet,atomic}});}catch(error){caught=error;}
+ assert.equal(caught.rollbackIncomplete,true);assert.equal(embedded.manifest(f.dir).phase,'prepared');assert.equal(embedded.provider(f.dir),null);
+ const jobs=require('../services/embedded-japanese-jobs.cjs');assert.throws(()=>jobs.assertLaunchSafe(f.dir),/EMBEDDED_RECOVERY_REQUIRED/);assert.throws(()=>jobs.reserveLegacyWrite(f.dir),/EMBEDDED_RECOVERY_REQUIRED/);
+ const undo=embedded.undo(f.dir,{_io:quiet});assert.deepEqual(undo.skipped,[]);assert.deepEqual([hash(f.baseFile),hash(f.patchFile)],before);jobs.assertLaunchSafe(f.dir);
+});
+
+test('the public running-game guard canonicalizes a junction alias before comparing process paths',t=>{
+ const f=fixture(t),alias=path.join(f.dir,'Alias');fs.symlinkSync(f.dir,alias,'junction');
+ const cp=require('node:child_process'),old=cp.execFileSync;cp.execFileSync=(exe,args,options)=>{if(/powershell/i.test(String(exe)))return f.exe+'\r\n';throw Error('native query unavailable in fixture');};
+ try{assert.throws(()=>require('../core/japanese-restore.cjs').apply(alias),/GAME_RUNNING/);assert.throws(()=>require('../core/japanese-restore.cjs').restore(alias),/GAME_RUNNING/);}finally{cp.execFileSync=old;}
+});
+
+test('retirement is bounded without forgetting sealed nonces or allowing a late start',t=>{
+ const f=fixture(t),jobs=require('../services/embedded-japanese-jobs.cjs'),{requests,MAX_REQUESTS}=jobs._internal;
+ const sealed=jobs.status('capacity',{requestId:'first-sealed-request',operation:'restore',retireIfMissing:true});
+ for(let i=0;requests.size<MAX_REQUESTS;i++)jobs.status('capacity',{requestId:'sealed-request-'+i,operation:'restore',retireIfMissing:true});
+ const size=requests.size;assert.throws(()=>jobs.status('capacity',{requestId:'one-more-retirement',operation:'restore',retireIfMissing:true}),/EMBEDDED_REQUEST_LIMIT/);assert.equal(requests.size,size);
+ assert.throws(()=>jobs.start('capacity',f.dir,{requestId:'new-late-write-request',operation:'restore',scanToken:'0'.repeat(64)}),/EMBEDDED_REQUEST_LIMIT/);
+ const late=jobs.start('capacity',f.dir,{requestId:'first-sealed-request',operation:'restore',scanToken:'0'.repeat(64)});assert.equal(late.state,'cancelled');assert.equal(late.jobId,sealed.jobId);assert.equal(embedded.manifest(f.dir),null);
+});

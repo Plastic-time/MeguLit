@@ -56,16 +56,16 @@ const LAUNCH_MILESTONES={prepare:.08,features:.16,'process-check':.26,request:.3
 const launchProgress=new Map();
 function markLaunch(id,key,extra={}){const p=LAUNCH_MILESTONES[key];if(p===undefined&&!extra.state)return;const prev=launchProgress.get(id);const keep=prev&&!extra.state&&prev.state==='run'&&prev.p>p?prev.p:p;
  launchProgress.set(id,{p:extra.state==='failed'?(prev?.p||0):keep,key,state:extra.state||(key==='ready'?'done':'run'),error:extra.error||'',at:Date.now(),next:Object.values(LAUNCH_MILESTONES).find(v=>v>keep)||1});}
-async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redirected=false}={}) {
+async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redirected=false,launchToken}={}) {
   const game=db.prepare('SELECT * FROM games WHERE id=? AND removed_at IS NULL').get(id);
   if(!game)throw Error('GAME_NOT_FOUND');
   /* 2026-11-12 a folder used as another game's Japanese original starts that game (services/import-source.cjs) */
   {let target='';try{const sources=require('./import-source.cjs');sources.backfill(db);target=sources.targetOf(db,db.prepare('SELECT original FROM games WHERE id=?').get(id));}catch{}if(target&&target!==id&&!redirected)return launch(db,target,runtime,windowsLaunch,{redirected:true});}
    const trace=(stage,extra={})=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','game-launch.log'),JSON.stringify({at:new Date().toISOString(),gameId:id,stage,...extra})+'\n');}catch{}};
   let stage='launch-preflight',featureWatch=null,drmPlan=null;if(!retried)markLaunch(id,'prepare');
-  let launcherRun=null;/* the DRM launcher this start runs (services/launcher-cleanup.cjs) */try{
+  let launcherRun=null,launchLease=null;/* the DRM launcher this start runs (services/launcher-cleanup.cjs) */try{
   if(!game.executable||!fs.existsSync(game.executable))throw Error('EXECUTABLE_MISSING');
-  require('./embedded-japanese-jobs.cjs').assertLaunchSafe(path.dirname(game.executable));
+  launchLease=require('./embedded-japanese-jobs.cjs').reserveLaunch(path.dirname(game.executable),launchToken);
   stage='background-stop';trace('background-stop');await require('./background-games.cjs').foreground();trace('background-stopped');
   let original={};try{original=JSON.parse(game.original||'{}')||{};}catch{}const profile=original.library || {};
   /* E-SteamOwned: a game Steam installed (appmanifest lists its folder) starts through Steam even when it was added by hand or by a folder scan (core/steam-owned.cjs) */
@@ -80,7 +80,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
     if(plan.changed&&plan.executable&&fs.existsSync(plan.executable)){
      const before=String(game.executable),same=before.toLowerCase()===plan.executable.toLowerCase(),record=profile.drm||{};
      if(!same||String(profile.launchVia||'')!==plan.launchVia||record.kind!==plan.kind){
-      game.executable=plan.executable;
+      launchLease.extend(path.dirname(plan.executable));game.executable=plan.executable;
       original.library={...profile,exe:plan.executable,launchVia:plan.launchVia,drm:{kind:plan.kind,wrapped:plan.wrapped,from:record.from||before,at:Date.now()}};
       db.prepare('UPDATE games SET executable=?,original=? WHERE id=?').run(plan.executable,JSON.stringify(original),id);
       Object.assign(profile,original.library);trace('drm-corrected',{from:path.basename(before),executable:path.basename(plan.executable),launcher:path.basename(plan.launchVia||'')});}
@@ -242,13 +242,13 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
    if(featureWatch){featureWatch.stop();const asked=featureWatch.found;featureWatch=null;
     if(asked.length&&['GAME_PROCESS_EXITED','GAME_WINDOW_NOT_READY','GAME_LAUNCH_FAILED'].includes(error.message)){
      const feature=asked[0];trace('windows-feature-needed',{feature,retried});
-     if(/^directplay$/i.test(feature)&&!retried){const dp=require('../core/directplay.cjs').prepare(path.dirname(game.executable),{root,exe:game.executable,all:true});if(!dp.missing.length)return launch(db,id,runtime,windowsLaunch,{retried:true});}
+     if(/^directplay$/i.test(feature)&&!retried){const dp=require('../core/directplay.cjs').prepare(path.dirname(game.executable),{root,exe:game.executable,all:true});if(!dp.missing.length)return await launch(db,id,runtime,windowsLaunch,{retried:true,launchToken:launchLease?.token});}
      neededFeature.set(id,feature);error=Object.assign(Error(/^directplay$/i.test(feature)?'DIRECTPLAY_REQUIRED':'WINDOWS_FEATURE_REQUIRED'),{detail:feature});}}
    /* E299: a boxed release whose protection plug-in wants the original DVD quits on start; say so (disc-check.cjs). */
    if(['GAME_PROCESS_EXITED','GAME_WINDOW_NOT_READY'].includes(error.message)&&game.executable&&require('./disc-check.cjs').discProtected(path.dirname(game.executable)))error=Object.assign(Error('GAME_DISC_REQUIRED'),{detail:error.message});
    /* E-DRM: say which program needs which licence check and what was or can be used instead (launch_hint has the words) */
    if(drmPlan&&['GAME_PROCESS_EXITED','GAME_WINDOW_NOT_READY','GAME_LAUNCH_FAILED'].includes(error.message))error=Object.assign(Error(drmPlan.kind==='steam'?'GAME_STEAM_REQUIRED':drmPlan.launchVia?'GAME_DRM_LAUNCHER_FAILED':'GAME_DRM_WRAPPED'),{detail:error.message});
-   trace('launch-failed',{phase:stage,error:error.message,detail:error.detail||error.code});markLaunch(id,'failed',{state:'failed',error:error.message});try{require('../core/japanese-auto.cjs').launchResult(root,id,false);}catch{}throw error;}
+   trace('launch-failed',{phase:stage,error:error.message,detail:error.detail||error.code});markLaunch(id,'failed',{state:'failed',error:error.message});try{require('../core/japanese-auto.cjs').launchResult(root,id,false);}catch{}throw error;}finally{launchLease?.release();}
 }
 function deleteWord(db,id) {
   const word=db.prepare('SELECT * FROM vocabulary WHERE id=?').get(id);

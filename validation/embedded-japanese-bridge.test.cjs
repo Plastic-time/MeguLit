@@ -87,3 +87,17 @@ test('two library ids for the same directory share the write guard at real bridg
  assert.equal(jobs.status('shared-a',started.jobId).error,'SCAN_STALE');
  jobs.assertLaunchSafe(f.dir);assert.equal(embedded.manifest(f.dir),null);
 });
+
+test('a real deferred bridge launch holds its reservation across await and across a junction alias',async()=>{
+ const f=game('deferred-launch'),alias=path.join(root,'launch-alias');fs.symlinkSync(f.dir,alias,'junction');fs.writeFileSync(path.join(f.dir,'Other.exe'),'fixture, never execute');
+ const db=store.openStore(root);try{db.prepare('INSERT INTO games(id,title,executable) VALUES(?,?,?)').run('deferred-alias','Alias',path.join(alias,'Other.exe'));}finally{db.close();}
+ const background=require('../services/background-games.cjs'),old=background.foreground;let entered,stop;
+ const waiting=new Promise(resolve=>{entered=resolve;});background.foreground=()=>{entered();return new Promise((resolve,reject)=>{stop=()=>reject(Error('DEFERRED_LAUNCH_END'));});};
+ const launching=dispatch({action:'launch',id:'deferred-launch'}).catch(error=>error);
+ try{
+  await waiting;assert.equal(jobs._internal.launches.size,1);
+  for(const request of [{action:'jp_restore_apply',embedded:true,scanToken:'0'.repeat(64)},{action:'jp_import_apply'},{action:'jp_restore_undo'},{action:'jp_restore_scan'},{action:'launch'}])await assert.rejects(dispatch({...request,id:'deferred-alias'}),/EMBEDDED_JOB_BUSY/);
+ }finally{stop();const error=await launching;assert.equal(error.message,'DEFERRED_LAUNCH_END');background.foreground=old;}
+ assert.equal(jobs._internal.launches.size,0);jobs.assertLaunchSafe(alias);
+ const lease=jobs.reserveLaunch(f.dir),nested=jobs.reserveLaunch(alias,lease.token);nested.release();assert.throws(()=>jobs.reserveLegacyWrite(alias),/EMBEDDED_JOB_BUSY/);lease.release();jobs.assertLaunchSafe(alias);
+});

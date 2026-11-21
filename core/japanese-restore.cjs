@@ -170,6 +170,7 @@ function nativeRunning(gameDir){
  return false;
 }
 function gameRunning(gameDir){
+ try{gameDir=fs.realpathSync.native(path.resolve(gameDir));}catch{}
  {const quick=nativeRunning(gameDir);if(quick!==null)return quick;}
  // PowerShell prints in the console code page unless told otherwise; Japanese and Chinese paths must come back as UTF-8.
  // A cold PowerShell start can take well over 15 s on a busy machine; a timeout used to read as "not running",
