@@ -152,3 +152,9 @@
 ### CMVS（青い鳥，Steam）
 - 点：cmvs32.exe 0x46145e，字形例程 0x4613b0（EBP 帧，2 个调用者）里每个字一次 `GetGlyphOutlineA(hdc, 字, GGO_GRAY4, &gm, 0, NULL, &mat)`（0x4614b7 是栅格化那次，不签）。字形进 D3D11 纹理，没有笔位，via / via2 是调用者
 - 店主测试清单：同 AVG32，行里是 `engine=cmvs`
+
+### FVP（いろとりどりのヒカリ 中文版 Hikari.exe / HD 版 irohika_HD.exe，两个是同一套布局）
+- 点：字形例程（Hikari 0x430d10 / HD 0x432790 附近）按第三个参数走两条路：只要 `GetGlyphOutlineA(.., GGO_METRICS, ..)`（Hikari 0x430d6f），或 GGO_BITMAP 先量再画（画那次 Hikari 0x430e2c）。各签一条：`fvp` 和 `fvp-bitmap`
+- 例程没有 EBP 帧（ebp 当普通寄存器存第一个参数）：返回地址在 API 第一个参数上方 0x28 / 0x2c。中文版的启动器 五彩斑斓的曙光.exe 只是外壳，钩子在 Hikari.exe
+- 字形进 D3D9 纹理，没有笔位；via 是调用者，fargs 是例程参数
+- 店主测试清单：同 AVG32，行里是 `engine=fvp` 或 `engine=fvp-bitmap`

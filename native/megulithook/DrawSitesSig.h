@@ -46,6 +46,12 @@ static const Sig Sigs[] = {
   // CMVS (青い鳥, cmvs32.exe 0x46145e): the glyph routine 0x4613b0 (EBP frame, 2 callers) asks GetGlyphOutlineA(hdc, ch,
   // GGO_GRAY4, &gm, 0, NULL, &mat) for each character (0x4614b7 renders it: not signed); no pen, via / via2 = its callers
   { "cmvs", "", "GetGlyphOutlineA", "8d 4d ?? 51 6a 00 6a 00 8d 4d ?? 0f b7 c6 51 6a 05 50 ff 75 08 0f 11 45 ??", 1, 1 },
+  // FVP (いろとりどりのヒカリ: Hikari.exe 0x430d6f / 0x430e2c, irohika_HD.exe 0x4327cf / 0x43288c, one layout): the glyph routine
+  // (push ebp as a register, then esi / edi: no frame) takes one of two paths by its third argument: GetGlyphOutlineA(..,
+  // GGO_METRICS, ..) alone, or GGO_BITMAP size then render; one signature each (the size query in between is not signed).
+  // Return address 0x28 / 0x2c above the API's first argument (depth 0xc / 0x10 + the 7 arguments)
+  { "fvp", "", "GetGlyphOutlineA", "68 ?? ?? ?? ?? 6a 00 6a 00 8d 86 ?? ?? 00 00 50 6a 00 51 52", 1, 0x28 },
+  { "fvp-bitmap", "", "GetGlyphOutlineA", "8b 45 0c 8b 4e 04 68 ?? ?? ?? ?? 50 0f b7 44 24 20 57 53 6a 01 50 51", 1, 0x2c },
 };
 static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
 

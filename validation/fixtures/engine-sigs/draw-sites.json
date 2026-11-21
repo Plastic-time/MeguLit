@@ -99,6 +99,50 @@
    "slot": "0x4c7054",
    "call": "0x46145e",
    "hex": "8be55dc210008b750c8b4df4538b5d14535756e80affffff85c00f85290200000f2805b01a4d008d4db0516a006a008d4dc80fb7c6516a0550ff75080f1145b0ff1554704c008bf78945f80faff78d0c"
+  },
+  "irohika-cn/fvp": {
+   "id": "fvp",
+   "file": "Hikari.exe",
+   "sha256": "1d0f37a6f22dc77780621982f5466d4e9e9d19e1b901f0ea4f8422b2e6a75b83",
+   "api": "GetGlyphOutlineA",
+   "va": "0x430d2f",
+   "callOffset": 64,
+   "slot": "0x45b01c",
+   "call": "0x430d6f",
+   "hex": "460450ff1524b045008b56048d8e346600005152894610ff1520b04500807c24180075270fb74c24148b560468e8b845006a006a008d866c660000506a005152ff151cb04500e9bd0000008b4e04538d"
+  },
+  "irohika-hd/fvp": {
+   "id": "fvp",
+   "file": "irohika_HD.exe",
+   "sha256": "adb556478ad608a3a0321f7d3b6e7e3c8394c648ca4758fea80e2ac0c683a492",
+   "api": "GetGlyphOutlineA",
+   "va": "0x43278f",
+   "callOffset": 64,
+   "slot": "0x45d01c",
+   "call": "0x4327cf",
+   "hex": "460450ff1524d045008b56048d8e346600005152894610ff1520d04500807c24180075270fb74c24148b560468f8d845006a006a008d866c660000506a005152ff151cd04500e9bd0000008b4e04538d"
+  },
+  "irohika-cn/fvp-bitmap": {
+   "id": "fvp-bitmap",
+   "file": "Hikari.exe",
+   "sha256": "1d0f37a6f22dc77780621982f5466d4e9e9d19e1b901f0ea4f8422b2e6a75b83",
+   "api": "GetGlyphOutlineA",
+   "va": "0x430dec",
+   "callOffset": 64,
+   "slot": "0x45b01c",
+   "call": "0x430e2c",
+   "hex": "725301008b4f0cc60100eb3e6a008dae54670000578bcde8c8f6ffff8b55102b550c7505e84d5301008b450c8b4e0468e8b84500500fb744242057536a015051ff151cb045008b6c24145b8b56108b46"
+  },
+  "irohika-hd/fvp-bitmap": {
+   "id": "fvp-bitmap",
+   "file": "irohika_HD.exe",
+   "sha256": "adb556478ad608a3a0321f7d3b6e7e3c8394c648ca4758fea80e2ac0c683a492",
+   "api": "GetGlyphOutlineA",
+   "va": "0x43284c",
+   "callOffset": 64,
+   "slot": "0x45d01c",
+   "call": "0x43288c",
+   "hex": "d65801008b4f0cc60100eb3e6a008dae54670000578bcde818f1ffff8b55102b550c7505e8b15801008b450c8b4e0468f8d84500500fb744242057536a015051ff151cd045008b6c24145b8b56108b46"
   }
  }
 }
