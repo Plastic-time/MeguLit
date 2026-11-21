@@ -219,21 +219,67 @@ MAGESDRAW_PRE_GATE(GlyphGate, OnGlyph, GlyphOrig)
 
 // ---- finding: the signature, checked against the version layer's table when there is one ----
 struct Table { bool has = false; uintptr_t dlg[2] = {}, glyph = 0, commit = 0, clear[4] = {}, pages = 0; int clears = 0; std::uint32_t stride = 0; };
-static bool ReadControl(bool &roles, Table &t) {
-  wchar_t tmp[MAX_PATH]; DWORD n = GetTempPathW(MAX_PATH, tmp); if (!n || n >= MAX_PATH) return false;
-  wchar_t path[MAX_PATH + 64]; swprintf_s(path, L"%sMeguLit\\draw\\%lu.txt", tmp, GetCurrentProcessId());
-  HANDLE h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
-  if (h == INVALID_HANDLE_VALUE) return false;
-  static char raw[16384]; DWORD got = 0; ReadFile(h, raw, sizeof(raw) - 2, &got, nullptr); CloseHandle(h);
-  std::string a; for (DWORD i = 0; i < got; i++) if (raw[i] && (unsigned char)raw[i] < 0x80) a += raw[i]; // UTF-16LE ASCII part
-  roles = a.find("roles=1") != std::string::npos;
-  size_t at = a.find("#table mages "); if (at == std::string::npos) return true;
-  std::string line = a.substr(at, a.find('\n', at) - at); t.has = true;
-  auto list = [&](const char *key, uintptr_t *out, int cap) { int k = 0; size_t p = line.find(std::string(" ") + key + "="); if (p == std::string::npos) return 0; p += strlen(key) + 2;
-    while (k < cap) { char *e; unsigned long v = strtoul(line.c_str() + p, &e, 16); if (e == line.c_str() + p) break; out[k++] = v; p = e - line.c_str(); if (line[p] != ',') break; p++; } return k; };
-  list("drawDialogue", t.dlg, 2); list("drawGlyph", &t.glyph, 1); list("commit", &t.commit, 1); t.clears = list("clear", t.clear, 4); list("pages", &t.pages, 1);
-  uintptr_t st = 0; list("stride", &st, 1); t.stride = (std::uint32_t)st;
-  return true;
+// Decode only complete control metadata. Later translation/body rows cannot supply cfg or address pins.
+static bool ControlLine(const unsigned char *raw,size_t bytes,size_t &at,bool wide,std::string &line,bool &ascii){
+ line.clear();ascii=true;
+ while(at<bytes){
+  if(wide&&at+1>=bytes)return false;
+  unsigned c=raw[at],high=wide?raw[at+1]:0;at+=wide?2:1;
+  if(!high&&c=='\n')return true;
+  if(!high&&c=='\r'){if(at>=bytes||raw[at]!='\n'||(wide&&(at+1>=bytes||raw[at+1])))return false;at+=wide?2:1;return true;}
+  if(high||(c!='\t'&&(c<0x20||c>0x7e)))ascii=false;else line+=(char)c;
+ }
+ return false;
+}
+static bool CfgRoles(const std::string &line,bool &roles){
+ if(line.size()<5||line.compare(0,4,"#cfg")||(line[4]!=' '&&line[4]!='\t'))return false;
+ int keys=0;bool on=false;
+ for(size_t a=4;a<line.size();){
+  while(a<line.size()&&(line[a]==' '||line[a]=='\t'))a++;size_t end=line.find_first_of(" \t",a);if(end==std::string::npos)end=line.size();std::string token=line.substr(a,end-a);
+  if(!token.compare(0,6,"roles=")){keys++;if(token!="roles=1"&&token!="roles=0")return false;on=token=="roles=1";}else if(token=="roles")return false;a=end;
+ }
+ roles=keys==1&&on;return keys==1;
+}
+static bool AddressList(const std::string &text,uintptr_t *out,int cap,int &count){
+ count=0;for(size_t begin=0;begin<text.size();){
+  if(count>=cap)return false;size_t end=text.find(',',begin);if(end==std::string::npos)end=text.size();size_t at=begin;
+  if(end-at>=2&&text[at]=='0'&&(text[at+1]=='x'||text[at+1]=='X'))at+=2;if(at==end||end-at>8)return false;
+  std::uint32_t value=0;for(;at<end;at++){unsigned c=(unsigned char)text[at];int digit=c>='0'&&c<='9'?c-'0':c>='a'&&c<='f'?c-'a'+10:c>='A'&&c<='F'?c-'A'+10:-1;if(digit<0)return false;value=(value<<4)|(unsigned)digit;}out[count++]=value;
+  if(end==text.size())return true;begin=end+1;if(begin==text.size())return false;
+ }return false;
+}
+static bool AddressTable(const std::string &line,Table &t){
+ if(line.compare(0,13,"#table mages "))return false;unsigned seen=0;Table parsed;parsed.has=true;
+ for(size_t a=13;a<line.size();){
+  while(a<line.size()&&(line[a]==' '||line[a]=='\t'))a++;size_t end=line.find_first_of(" \t",a);if(end==std::string::npos)end=line.size();std::string token=line.substr(a,end-a);a=end;if(token.empty())continue;
+  size_t eq=token.find('=');if(eq==std::string::npos)return false;std::string key=token.substr(0,eq),value=token.substr(eq+1);unsigned bit=0;uintptr_t values[4]={};int count=0,cap=1;
+  if(key=="drawDialogue"){bit=1;cap=2;}else if(key=="drawGlyph")bit=2;else if(key=="commit")bit=4;else if(key=="clear"){bit=8;cap=4;}else if(key=="pages")bit=16;else if(key=="stride")bit=32;
+  // Fields not consumed by the old native matcher (chars, scale, menuText, etc.) remain version-layer data.
+  if(!bit)continue;if(seen&bit)return false;seen|=bit;if(!AddressList(value,values,cap,count)||(bit==1&&count!=2))return false;
+  if(bit==1){parsed.dlg[0]=values[0];parsed.dlg[1]=values[1];}else if(bit==2)parsed.glyph=values[0];else if(bit==4)parsed.commit=values[0];else if(bit==8){parsed.clears=count;for(int k=0;k<count;k++)parsed.clear[k]=values[k];}else if(bit==16)parsed.pages=values[0];else parsed.stride=(std::uint32_t)values[0];
+ }
+ if(seen!=63)return false;t=parsed;return true;
+}
+static bool ParseControl(const unsigned char *raw,size_t bytes,bool &roles,Table &t){
+ roles=false;t=Table{};if(bytes<2)return false;size_t at=0;bool wide=false;
+ if(raw[0]==0xff&&raw[1]==0xfe){wide=true;at=2;}else if(raw[0]=='#'&&!raw[1])wide=true;else if(bytes>=3&&raw[0]==0xef&&raw[1]==0xbb&&raw[2]==0xbf)at=3;
+ std::string line;bool ascii;if(!ControlLine(raw,bytes,at,wide,line,ascii)||!ascii||!CfgRoles(line,roles))return false;
+ while(at<bytes){
+  bool complete=ControlLine(raw,bytes,at,wide,line,ascii);
+  if(!ascii)break;
+  if(!line.compare(0,12,"#table mages")){if(!complete||t.has||!AddressTable(line,t)){roles=false;t=Table{};return false;}}
+  else if(!complete)break;
+  else if(line=="#clearline"||!line.compare(0,6,"#role ")||!line.compare(0,13,"#choiceframe ")||!line.compare(0,7,"#table "))continue;
+  else break;
+ }
+ return true;
+}
+static bool ReadControl(bool &roles,Table &t){
+ roles=false;t=Table{};wchar_t tmp[MAX_PATH];DWORD n=GetTempPathW(MAX_PATH,tmp);if(!n||n>=MAX_PATH)return false;
+ wchar_t path[MAX_PATH+64];swprintf_s(path,L"%sMeguLit\\draw\\%lu.txt",tmp,GetCurrentProcessId());
+ HANDLE h=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,0,nullptr);if(h==INVALID_HANDLE_VALUE)return false;
+ unsigned char raw[16384];DWORD got=0;bool ok=ReadFile(h,raw,sizeof raw,&got,nullptr)!=FALSE;CloseHandle(h);if(!ok)return false;
+ try{return ParseControl(raw,got,roles,t);}catch(...){roles=false;t=Table{};return false;}
 }
 static bool FindInImage(const Table &t) {
   auto dos = (IMAGE_DOS_HEADER *)Base; auto nt = (IMAGE_NT_HEADERS *)(Base + dos->e_lfanew); auto sec = IMAGE_FIRST_SECTION(nt);
