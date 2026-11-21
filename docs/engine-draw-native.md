@@ -452,6 +452,9 @@ e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4
 后续实机采集须经游戏适配单队列排期，先 MuteProc 再 HidDesk run，并在 finally 关闭自己启动的进程和恢复静音。临时允许名单和 seed 开关只为这一部游戏建立。推进至少 20 句，重复出现相同字验证缓存命中仍完整，分别记录正文、名字、选项、菜单和 ruby，截图与 DRAWRUN 对齐以确定画布原点和角色调用者。观察层开启、关闭都回放原始句序，确认其他游戏不受影响。补第二个 Majiro 版本后才谈泛化；现在不把原生 stand-in 回放当成游戏实测
 
 ### 静态做不出签名的（写清缺什么，不硬交）
+
+RGSS XP/VX/VX Ace 的本轮状态另见 [engine-rgss.md](engine-rgss.md)。只为固定《魔女の家》VX 1.09a 建立默认关闭的 Ruby 副本观察，不新增原生 DrawSites，也不从任意后台线程调用 RGSSEval。完整归档核对与 Ruby API 回放通过；真实游戏、原版 Ruby 和 Reader 尚未验收，XP/Ace、名字、内嵌和游戏 ruby 未完成
+
 | 引擎 / 游戏 | 静态看到的 | 缺什么 | 下一步 |
 |---|---|---|---|
 | Leaf / AQUAPLUS：WHITE ALBUM2（WA2.exe） | 导入表和代码里没有任何 GDI 文字 API，也没有经寄存器的调用；字是 fnt.pak / fon.pak 里的预渲染字库图集，D3D9 + d3dx9_41 画四边形。游戏目录里另有一个 d3d9.dll（中文补丁带的代理） | 送字函数（从剧本串取字 → 查图集 → 出四边形）在哪，只能运行中看 | 位置已经能走现有的层 4 GPU 字形四边形（native/gpuhide）；台词 / 名字 / 选项要在实机里对四边形的纹理坐标找图集查表函数，再出签名 |

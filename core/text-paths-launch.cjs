@@ -15,11 +15,18 @@ const W=require('./text-paths-web.cjs'),U=require('./text-paths-unity.cjs');
 
 function unityPack(root){const dir=path.join(root,'runtime','unity-text');try{return require('node:fs').existsSync(path.join(dir,'MeguLitUnityText.dll'))?dir:null;}catch{return null;}}
 
-async function prepare({root,exe,profile={},enabled=false,shadowRoot=null,trace=()=>{}}){
+async function prepare({root,exe,profile={},title='',enabled=false,shadowRoot=null,trace=()=>{}}){
  if(!enabled||!exe||require('./library-mode.cjs').libraryOnly(root))return null;
  const canary=new Canary(root,exe);const off=canary.settle();if(Object.keys(off||{}).length)trace('text-paths-canary',{off:Object.keys(off)});
  const steam=require('./steam-owned.cjs').launchAppid(exe,profile)||null; /* E-SteamOwned */
  const steamEnv=steam?{SteamAppId:steam,SteamGameId:steam,SteamOverlayGameId:steam}:{};
+ if(require('./profiles/index.cjs').engineId(profile.engine)==='rgss'&&canary.allowed('rgss')){
+  const R=require('./text-paths-rgss.cjs');let session;
+  try{const resolved=R.launchProfile({root,exe,profile,title});if(resolved.draw?.roles!==true)return null;
+   const source=R.plan(exe);session=new R.RgssTextPath();session.drawConfig(resolved.draw);const port=await session.listen(),sh=R.makeShadow({source,shadowRoot:shadowRoot||path.join(root,'data','rgss-shadow'),port,token:session.token});
+   trace('text-paths-rgss',{shadow:sh.shadow,files:sh.files,bytes:sh.bytes});return {path:'rgss',exe:sh.exe,args:[],env:steamEnv,cwd:sh.shadow,session,connect:async()=>true};
+  }catch(error){session?.stop();trace('text-paths-rgss-skipped',{error:error.message});return null;}
+ }
  if(W.chromiumShell(exe)&&canary.allowed('web')){
   const port=await W.freePort();if(require('./library-mode.cjs').libraryOnly(root))return null;const session=new W.WebTextPath({port,canary});
   return {path:'web',exe,args:W.launchArgs(port),env:steamEnv,cwd:path.dirname(exe),session,
@@ -39,12 +46,20 @@ async function prepare({root,exe,profile={},enabled=false,shadowRoot=null,trace=
 
 /* Connect a prepared session to the hook reader (core/hook-native.cjs): records in, replacement switch and lines out. */
 function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepared.session;
+ if(prepared.path==='rgss')s.owner=()=>hook.wanted===false||hook.disposed||hook.stopPending||hook.stopError?0:hook.gamePid?.()||hook.target?.pid||0;
  s.onSource=m=>{const {sameOwner}=require('./unity-kemco-source.cjs');
+  if(prepared.path==='rgss'){
+   const current=()=>hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&hook.wanted!==false&&!s.stopped&&s.roles&&s.generation===m.generation&&hook.gamePid?.()===m.pid&&s.body.get(m.line)?.text===m.text;
+   if(!current()||typeof hook.emitSource!=='function')return false;
+   if(hook.state?.hookSourceOrigin!=='rgss'&&hook.sameAsLast?.(m.text))return true;
+   const before=hook.state?.hookSequence||0;hook.emitSource(m.text,'rgss','rgss',m.line);
+   return current()&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='rgss'&&hook.state.hookSourceLine===m.line;
+  }
   const current=()=>prepared.path==='unity'&&hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&sameOwner(hook.target,m?.unityOwner);
   if(!current())return false;const before=hook.state?.hookSequence||0;hook.source(m,'KEMCO Message');
   return current()&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='unity-kemco'&&hook.state.hookSource===m.text;
  };
- s.onChars=line=>hook.charRects(line);s.onStatus=st=>hook.trace?.('text path '+prepared.path+': '+st);/* engine-draw: a sentence the engine wants to draw itself asks the reader for its ruby and translation */s.onAsk=a=>{try{hook.emit?.({type:'hookDrawEmbed',...a});}catch{}};hook.attachTextPath?.(s);}
+ s.onChars=line=>{if(prepared.path!=='rgss'||hook.textPath===s)hook.charRects(line);};s.onStatus=st=>hook.trace?.('text path '+prepared.path+': '+st);/* engine-draw: a sentence the engine wants to draw itself asks the reader for its ruby and translation */s.onAsk=a=>{try{hook.emit?.({type:'hookDrawEmbed',...a});}catch{}};hook.attachTextPath?.(s);}
 
 /* ③ dot font at the source (native/fontdot, docs/text-architecture.md): when ① starts the game through MeguLitLaunch
    (compositor mode), MeguLitFontDot<bit>.dll rides along in MEGULIT_LAUNCH_EXTRA and is loaded while the game is still

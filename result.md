@@ -10,3 +10,5 @@ The integration checkpoint and its consumer regression are recorded in docs/kag-
 - [TextRender lifetime and role report](side-session-notes/TextRender-roles-result-ec6a304b.md)
 
 - [RPG Maker CDP and page-state report](side-session-notes/RPGMaker-cdp-result-ff1063a0.md)
+
+- [RGSS fixed VX observation and user checklist](side-session-notes/RGSS-vx-result.md)

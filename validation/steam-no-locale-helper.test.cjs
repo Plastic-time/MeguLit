@@ -15,7 +15,8 @@ test('a folder with steam_api is a Steam build: never recommended for, nor start
 test('launch, restore, undo and shared records check it',()=>{
  const src=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8'),bridge=src('services/bridge.cjs');
  assert.match(bridge,/x86\(game\.executable\)&&!\(require\('\.\.\/core\/locale-emulator\.cjs'\)\.steamApi\(game\.executable\)/,'locale start skipped');
- assert.match(bridge,/!LE\.x86\(game\.executable\)\|\|LE\.steamApi\(game\.executable\)\)throw error;/,'quick-exit retry skipped');
+ assert.match(bridge,/fallbackExe=textPath\?\.path==='rgss'\?textPath\.exe:game\.executable/,'only RGSS retries its patched shadow');
+ assert.match(bridge,/!LE\.x86\(fallbackExe\)\|\|LE\.steamApi\(fallbackExe\)\)throw error;/,'quick-exit retry checks the program actually launched');
  assert.match(bridge,/LE\.x86\(file\)&&!LE\.steamApi\(file\)\?'japanese'/,'restore keeps the mode');
  assert.match(bridge,/if\(lib\.localeBeforeJapanese!==undefined\)\{original\.library\.localeMode=lib\.localeBeforeJapanese;/,'undo puts it back');
  assert.match(src('services/game-language.cjs'),/x86\(file\)&&!require\('\.\.\/core\/locale-emulator\.cjs'\)\.steamApi\(file\)\?'japanese'/);

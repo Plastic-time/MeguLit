@@ -63,7 +63,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   if(!require('../core/library-mode.cjs').libraryOnly(root)){let target='';try{const sources=require('./import-source.cjs');sources.backfill(db);target=sources.targetOf(db,db.prepare('SELECT original FROM games WHERE id=?').get(id));}catch{}if(target&&target!==id&&!redirected)return launch(db,target,runtime,windowsLaunch,{redirected:true});}
    const trace=(stage,extra={})=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','game-launch.log'),JSON.stringify({at:new Date().toISOString(),gameId:id,stage,...extra})+'\n');}catch{}};
   let stage='launch-preflight',featureWatch=null,drmPlan=null;if(!retried)markLaunch(id,'prepare');
-  let launcherRun=null,launchLease=null;/* the DRM launcher this start runs (services/launcher-cleanup.cjs) */try{
+  let launcherRun=null,launchLease=null,textPath=null;/* the DRM launcher this start runs (services/launcher-cleanup.cjs) */try{
   if(!game.executable||!fs.existsSync(game.executable))throw Error('EXECUTABLE_MISSING');
   launchLease=require('./embedded-japanese-jobs.cjs').reserveLaunch(path.dirname(game.executable),launchToken);
   stage='background-stop';trace('background-stop');await require('./background-games.cjs').foreground();trace('background-stopped');if(require('../core/library-mode.cjs').libraryOnly(root))await runtime?.stopReading?.();
@@ -127,6 +127,9 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   /* a Windows feature install window the game still opens is closed at once (the game goes on as if it was cancelled);
      DirectPlay is prepared while the game runs, anything else is remembered for this folder */
   featureWatch=require('../core/windows-features.cjs').watch(gameDir,{trace,onFeature:feature=>{if(/^directplay$/i.test(feature)){const dp=require('../core/directplay.cjs').prepare(gameDir,{root,exe:game.executable,all:true});trace('directplay',dp);}}});
+  const prepareEnginePath=async()=>{if(require('../core/library-mode.cjs').libraryOnly(root))return;try{let prefs={};try{prefs=JSON.parse(fs.readFileSync(path.join(root,'data','preferences.json'),'utf8'))||{};}catch{}textPath=await require('../core/text-paths-launch.cjs').prepare({root,exe:game.executable,profile,title:game.title,enabled:prefs.ownTextOutput===true||(()=>{try{return JSON.parse(fs.readFileSync(path.join(root,'data','config','gal-preferences.json'),'utf8')).textRenderer==='compositor';}catch{return false;}})(),trace});}catch(error){textPath=null;trace('text-paths-failed',{error:String(error?.message||error).slice(0,160)});}};
+  const rgssPath=require('../core/profiles/index.cjs').engineId(profile.engine)==='rgss';
+  if(rgssPath&&!launchVia&&!elevation&&!windowsLaunch)await prepareEnginePath();
   let state;
   // "Japanese system environment": non-Unicode Japanese games (WA2) show their own dialogs garbled under a Chinese locale.
   if(launchVia&&!windowsLaunch){
@@ -143,8 +146,8 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
    stage='window-wait';state=await waitForVisibleGame(()=>gameProcesses(root,game.executable),{helper:true,helperError:'GAME_LAUNCH_FAILED',exit:()=>child.exit,trace,attempts:360,timeout:90000});
   }else if(!elevation&&!windowsLaunch&&profile.localeMode==='japanese'&&!steamAppid&&require('../core/locale-emulator.cjs').x86(game.executable)&&!(require('../core/locale-emulator.cjs').steamApi(game.executable)&&(trace('locale-skipped-steam',{}),true))){
    stage='locale-start';const lib=runtime?.library?.()||new(require('../core/library.cjs').Library)(require('../core/layout.cjs'));
-   let result=await lib.locale.launch(game.executable,{trace});
-   if(result.needLocaleEmulator){trace('locale-emulator-install',{});await lib.locale.ensure();result=await lib.locale.launch(game.executable,{trace});if(result.needLocaleEmulator)throw Error('LOCALE_EMULATOR_REQUIRED');}
+   const localeExe=textPath?.path==='rgss'?textPath.exe:game.executable;let result=await lib.locale.launch(localeExe,{trace});
+   if(result.needLocaleEmulator){trace('locale-emulator-install',{});await lib.locale.ensure();result=await lib.locale.launch(localeExe,{trace});if(result.needLocaleEmulator)throw Error('LOCALE_EMULATOR_REQUIRED');}
    state={pid:result.gamePid,locale:'japanese'};
   }else if(elevation||windowsLaunch){
    stage='windows-launch';
@@ -165,7 +168,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
    /* Text architecture ③ (core/text-paths-launch.cjs, owner switch preferences.ownTextOutput): a web or Unity engine path may start
       the game with Chromium debugging switches or from MeguLit's shadow folder (Steam app id in the environment, never a restart
       through Steam). Anything failing here leaves the launch exactly as before. */
-   let textPath=null;if(!require('../core/library-mode.cjs').libraryOnly(root))try{let prefs={};try{prefs=JSON.parse(fs.readFileSync(path.join(root,'data','preferences.json'),'utf8'))||{};}catch{}textPath=await require('../core/text-paths-launch.cjs').prepare({root,exe:game.executable,profile,enabled:prefs.ownTextOutput===true||(()=>{/* 文字显示 = 画进游戏画面 is the same owner switch (MeguLit draws all text) */try{return JSON.parse(fs.readFileSync(path.join(root,'data','config','gal-preferences.json'),'utf8')).textRenderer==='compositor';}catch{return false;}})(),trace});}catch(error){textPath=null;trace('text-paths-failed',{error:String(error?.message||error).slice(0,160)});}
+   if(!rgssPath)await prepareEnginePath();
    /* ①/③ with 文字显示 = compositor: a Steam game is started directly (SteamAppId; shadow + steam_appid.txt when the folder
       has none, core/text-paths-launch.cjs steamDirect) so MeguLitLaunch can load the glyph dots and the dot font before
       its first glyph. Anything failing keeps the steam:// launch. */
@@ -222,24 +225,25 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
      trace('steam-launcher-wait',{});stage='steam-launcher-wait';markLaunch(id,'window-wait');
      try{state=await waitForVisibleGame(anyProcess,{helper:false,indirect:true,exit:()=>gone?{code:0,signal:null}:null,trace,attempts:2400,timeout:600000});}
      catch(waitError){throw Object.assign(Error('STEAM_LAUNCHER_START'),{detail:waitError.message});}finally{clearInterval(poll);}    }else{
-    const LE=require('../core/locale-emulator.cjs');
-    if(error.message!=='GAME_PROCESS_EXITED'||steam||elevation||windowsLaunch||Date.now()-startedAt>3000||!LE.x86(game.executable)||LE.steamApi(game.executable))throw error;
+    const LE=require('../core/locale-emulator.cjs'),fallbackExe=textPath?.path==='rgss'?textPath.exe:game.executable;
+    if(error.message!=='GAME_PROCESS_EXITED'||steam||elevation||windowsLaunch||Date.now()-startedAt>3000||!LE.x86(fallbackExe)||LE.steamApi(fallbackExe))throw error;
     const lib=runtime?.library?.()||new(require('../core/library.cjs').Library)(require('../core/layout.cjs'));
-    trace('locale-fallback',{});stage='locale-start';const result=await lib.locale.launch(game.executable,{trace});if(result.needLocaleEmulator)throw error;
+    trace('locale-fallback',{});stage='locale-start';const result=await lib.locale.launch(fallbackExe,{trace});if(result.needLocaleEmulator)throw error;
     state={pid:result.gamePid,locale:'japanese'};
     }
    }
    /* ③ dot font: the game must live 20 s with it, or the crash canary turns it off for this game */
    if(fontDot)fontDot.watch(state?.pid);
    /* ③ the engine path joins the hook reader once the game is up; its exit code goes to the crash canary */
-   if(textPath){try{const tp=require('../core/text-paths-launch.cjs');const join=(n=0)=>{if(require('../core/library-mode.cjs').libraryOnly(root)){textPath.session.stop();return;}const hook=runtime?.reader?.gal?.hooks;if(hook){tp.attach(textPath,hook);return;}if(n<20)setTimeout(()=>join(n+1),1500).unref?.();};join();textPath.connect().catch(()=>{});
+   if(textPath&&textPath.path!=='rgss'){try{const tp=require('../core/text-paths-launch.cjs');const join=(n=0)=>{if(require('../core/library-mode.cjs').libraryOnly(root)){textPath.session.stop();return;}const hook=runtime?.reader?.gal?.hooks;if(hook){tp.attach(textPath,hook);return;}if(n<20)setTimeout(()=>join(n+1),1500).unref?.();};join();textPath.connect().catch(()=>{});
     const exitWatch=setInterval(()=>{if(child.exit){clearInterval(exitWatch);try{textPath.session.exited(child.exit.code??-1);Promise.resolve(textPath.session.stop()).then(()=>runtime?.forgetTextPath?.(textPath.session),()=>{});}catch{}}},2000);exitWatch.unref?.();}catch(error){trace('text-paths-attach-failed',{error:String(error?.message||error).slice(0,160)});}}
   }
+  if(textPath?.path==='rgss'){runtime?.trackTextPath?.(textPath);const tp=require('../core/text-paths-launch.cjs');const join=(n=0)=>{if(textPath.session.stopped)return;if(require('../core/library-mode.cjs').libraryOnly(root)){textPath.session.stop();return;}const hook=runtime?.reader?.gal?.hooks;if(hook){tp.attach(textPath,hook);return;}if(n<20)setTimeout(()=>join(n+1),1500).unref?.();};textPath.session.watch(state?.pid);join();}
   await require('./background-games.cjs').unmute(root,state?.pid);trace('new-window-ready',state);markLaunch(id,'ready');try{require('../core/japanese-auto.cjs').launchResult(root,id,true);}catch{}
   {const watch=featureWatch;featureWatch=null;setTimeout(()=>watch.stop(),30000).unref?.();}
   db.prepare('UPDATE games SET last_launched_at=? WHERE id=?').run(Math.floor(Date.now()/1000),id);
   runtime?.prepareGame(game.executable);runtime?.bindLaunched?.(state?.pid);return {action:'launched',connected:false};
-  }catch(error){if(launcherRun)try{await require('./launcher-cleanup.cjs').endHidden({...launcherRun,gameExe:game.executable,list:exe=>require('./game-process.cjs').gameProcesses(root,exe),trace});}catch{}try{runtime?.reader?.gal?.send({type:'enterGame',cancel:true});}catch{}
+  }catch(error){if(textPath?.path==='rgss')textPath.session.stop();if(launcherRun)try{await require('./launcher-cleanup.cjs').endHidden({...launcherRun,gameExe:game.executable,list:exe=>require('./game-process.cjs').gameProcesses(root,exe),trace});}catch{}try{runtime?.reader?.gal?.send({type:'enterGame',cancel:true});}catch{}
    /* a game that quit after asking Windows for a feature: DirectPlay is placed now, so try once more; anything else is
       offered as an install (no restart) */
    if(featureWatch){featureWatch.stop();const asked=featureWatch.found;featureWatch=null;
