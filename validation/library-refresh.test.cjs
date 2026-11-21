@@ -46,7 +46,7 @@ test('changing only Steam clears the cached startup scan, other library preferen
 test('startup scans once, overlapping requests share work, and later manual refresh runs again',async()=>{
  let runs=0,release;const scanner=new LibraryScans(async()=>{runs++;await new Promise(r=>release=r);return {added:runs};});const first=scanner.run({startup:true}),manual=scanner.run();await Promise.resolve();assert.equal(runs,1);release();assert.deepEqual(await first,{added:1});assert.deepEqual(await manual,{added:1});await scanner.run({startup:true});assert.equal(runs,1);const next=scanner.run();await Promise.resolve();release();await next;assert.equal(runs,2);
 });
-test('queued work uses the same saved roots for scheduling and scanning after another edit',async()=>{
+test('queued work uses the same saved roots for scheduling and scanning after another edit',{timeout:5000},async()=>{
  let folders=['A'];const scanned=[],starts=[],releases=[];
  const scanner=new LibraryScans(async(_options,state)=>{
   const root=state.folders[0];scanned.push(root);
