@@ -78,7 +78,7 @@ class HookNative{
   /* HookBridge reads hide.engineTrial.* (native/HookBridge.cs ApplyProfile): at spawn from MEGULIT_PROFILE, afterwards as a message */
   const now=this.bridgeProfile();if(this.process&&JSON.stringify(now)!==before)this.send({type:'profile',...now});}
  /* the part of the profile the bridge reads; keys left at null (kernel rule) are not sent */
- bridgeProfile(){const t=this.profile?.hide?.engineTrial||{},out={};for(const k of ['enabled','unconfirmedLines','clickMs','skipAside'])if(t[k]!==null&&t[k]!==undefined)out[k]=t[k];return {engineTrial:out};}
+ bridgeProfile(){const t=this.profile?.hide?.engineTrial||{},out={};for(const k of ['enabled','unconfirmedLines','clickMs','skipAside'])if(t[k]!==null&&t[k]!==undefined)out[k]=t[k];const profile={engineTrial:out};if(this.profile?.engine==='artemis'&&this.profile?.source?.artemisQuoteSpans===true)profile.artemisQuoteSpans=true;return profile;}
  /* a game the library knows no engine for: the first page record of an engine text path (krkr -> kirikiri) adds that engine's diff */
  learnEngine(name){try{if(this.profile?.engine!=='unknown')return;const id=Profiles.engineId(name);if(!id||!Profiles.loadEngine(id))return;this.setProfile(Profiles.profileFor({...(this.profileInput||{}),engine:id}));}catch{}}
  notify(v){if(Object.entries(v).every(([k,value])=>this.state[k]===value))return;this.state={...this.state,...v};this.emit({type:'hook',...v});}
@@ -258,7 +258,7 @@ class HookNative{
  /* 2026-11-19 a grown line (core/sentence-pieces.cjs) the script cannot cover as a whole (the engine lost a part between two
     pieces): each piece's own script translation, in order, when every piece has one */
  piecedTranslation(text){try{const pieces=this.sentencePieces?.piecesOf(text);if(!pieces||this.scriptAllowed?.()===false)return null;let machine=false;const parts=pieces.map(p=>{const r=this.resolveSource(String(p).replace(/\n+$/,''));if(!r||r.status!=='exact'&&r.status!=='high'||typeof r.translation!=='string'||!r.translation.trim()||require('../services/original-text.cjs').japaneseLine(r.translation))return null;if(r.machine===true)machine=true;return r.translation.replace(/\s+$/,'');});return parts.every(Boolean)?{text:parts.join(''),n:parts.length,machine}:null;}catch{return null;}}
- originalTextFor(text){const provider=this.originalText;if(!provider||!text)return text;try{const r=this.resolveSource(text);
+ originalTextFor(text){const provider=this.originalText;if(!provider||!text)return text;try{const r=this.resolveSource(text);if(!r)return text;
   if(provider.kind==='patch'){if((r.status==='exact'||r.status==='high')&&typeof r.translation==='string'&&r.translation.trim()&&!require('../services/original-text.cjs').japaneseLine(r.translation)&&typeof this.emit==='function'&&this.scriptAllowed?.()!==false){this.trace('patch-text '+r.status+' #'+r.indices[0]);if(r.machine!==true)this.markScriptSource();this.emit({type:'hookPatchTranslation',japanese:text,chinese:require('./language-tracks.cjs').engineMarkup(r.translation),machine:r.machine===true});}else{const pieced=this.piecedTranslation(text);if(pieced){this.trace('patch-text pieced from '+pieced.n+' pieces');this.emit({type:'hookPatchTranslation',japanese:text,chinese:require('./language-tracks.cjs').engineMarkup(pieced.text),machine:pieced.machine});}}return text;}if((r.status==='exact'||r.status==='high')&&r.japanese&&!r.alreadyJapanese){this.trace('original-text '+r.status+' '+r.method+' #'+r.indices[0]);
    /* The patched line is the translation group's own Chinese for this Japanese line (user, 2026-11-09: zero-latency
       bilingual from an existing 汉化). Hand the pair to the reader before the line itself, so its translation is ready. */
@@ -959,7 +959,7 @@ class HookNative{
  /* engine-draw: the profile's draw.* switches go to the engine paths that read them (web / RPG Maker now, KiriKiri with its next line) */
  drawSync(){const ED=require('./engine-draw.cjs'),cfg=ED.settings(this.profile);try{this.textPath?.drawConfig?.(cfg);}catch{}
   /* a game whose diff turns draw.* on gets its control file at once (YU-RIS arms its glyph loop hook from it before any line) */
-  try{const pid=this.gamePid();if(pid&&(cfg.roles||cfg.embed||cfg.clear||(cfg.choiceFrames||[]).length))this.ensureEngineDraw(pid);else this.engineDraw?.setProfile(this.profile);}catch{}}
+  try{const pid=this.gamePid();if(pid&&(cfg.roles||cfg.embed||cfg.clear||cfg.advhdInput===true||(cfg.choiceFrames||[]).length))this.ensureEngineDraw(pid);else this.engineDraw?.setProfile(this.profile);}catch{}}
  send(v){if(v&&(v.type==='enable'||v.type==='disable'))try{this.textPath?.hide(v.type==='enable');}catch{}if(this.process?.stdin.writable)this.process.stdin.write(JSON.stringify(v)+'\n');}
  /* engine-draw: one replacement table per game process, handed to the engine's transport (KiriKiri: control file) */
  /* the control file of this game process (every engine DLL that reads draw.* reads it: KiriKiri, Ren'Py, YU-RIS) */

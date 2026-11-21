@@ -1,0 +1,19 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "5132eed8c2e4a7d0ec4d853cd2b8247f3a0641c4a3825a8210fd435530e7d716",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "source": {
+   "artemisQuoteSpans": true
+  }
+ },
+ "exe": "Amakano3.exe",
+ "engine": "artemis",
+ "app": "",
+ "issuedAt": "",
+ "prints": {
+  "exe": "5132eed8c2e4a7d0ec4d853cd2b8247f3a0641c4a3825a8210fd435530e7d716"
+ }
+}

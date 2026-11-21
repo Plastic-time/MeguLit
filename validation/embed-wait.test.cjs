@@ -3,6 +3,17 @@
    native/megulithook/selftest/embedwait.cpp (run.cmd); this checks that the hook and the bridge keep using it. */
 const test=require('node:test');const assert=require('node:assert');const fs=require('fs');const path=require('path');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
+
+test('native cache uses exact complete binary input rather than a lossy 64-bit text identity',()=>{
+ const h=read('native/megulithook/MeguLitEmbedWait.h'),e=read('native/megulithook/embed_util.cc');
+ assert.match(h,/std::unordered_map<std::string, Entry> map;/);
+ assert.match(e,/static std::string textkey\(const void \*data, size_t len\)\s*\{\s*return std::string\(static_cast<const char \*>\(data\), len\);/);
+ assert.equal((e.match(/translatecache\.Find\(textkey\(buff\.data, buff\.size\)/g)||[]).length,2,'both preflight cache reads use all raw bytes');
+ assert.match(e,/auto key = textkey\(buff->data, buff->size\);/,'writeback uses the same binary identity');
+ assert.doesNotMatch(e,/\btexthash\s*\(/,'the lossy prefix-discarding hash is no longer used');
+ const replay=read('native/megulithook/selftest/embedwait.cpp');
+ assert.match(replay,/CheckCacheIdentity\(\);/,'the existing dual-architecture native replay executes the collision regression');
+});
 test('hook: the answer event exists before the line goes out, every answer is cached per generation, only waiting streams clear the answer buffer',()=>{
  const h=read('native/megulithook/MeguLitEmbedWait.h');
  assert.match(h,/const ULONGLONG UnchangedTtlMs = 500;/);
@@ -11,7 +22,7 @@ test('hook: the answer event exists before the line goes out, every answer is ca
  assert.match(e,/static_assert\(offsetof\(CommonSharedMem, hash\) == 16/);
  assert.match(e,/int MeguLitEmbedArm\(HookParam &hp, TextBuffer &buff, const ThreadParam &tp\)\s*\{\s*if \(!check_embed_able\(tp\)\)\s*return -1;/,'a stream that is not selected returns before anything else');
  assert.match(e,/ZeroMemory\(commonsharedmem->text[^;]*;[^\n]*\n[^\n]*\n\s*MeguLitEmbed::Arm\(/,'the buffer is cleared and the event made just before the line goes out');
- assert.match(e,/translatecache\.Put\(hash, generation, GetTickCount64\(\), translate\);\s*if \(\(translate\.size\(\) == 0\)\)\s*return false;/,'an empty answer is cached too');
+ assert.match(e,/translatecache\.Put\(key, generation, GetTickCount64\(\), translate\);\s*if \(\(translate\.size\(\) == 0\)\)\s*return false;/,'an empty answer is cached too');
  const t=read('native/megulithook/texthook.cc');
  assert.match(t,/int armed = MeguLitEmbedArm\(hp, buff, tp\);/);
  assert.match(t,/if \(armed > 0 \|\| armed == -2\)\s*buffer->type &= \(~EMBED_ABLE\);/,'never strips EMBED_ABLE from a stream that is not selected');

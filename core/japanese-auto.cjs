@@ -59,7 +59,7 @@ function run(root,id,gameDir,{options={},trigger='scan',apply}={}){
   update(root,id,g=>{g.checked=new Date().toISOString();g.found=plan.action==='none'?'no-japanese':plan.action==='already'?'japanese':plan.action;});
   return {done:false,reason:plan.action};}
  if(plan.action==='redirect'){update(root,id,g=>Object.assign(g,{state:'auto',mode:'redirect',provider:plan.provider,at:new Date().toISOString(),launch:''}));return notice(root,id,{done:true,mode:'redirect',trigger});}
- let result;try{result=(apply||jr().apply)(gameDir,options);}catch(error){update(root,id,g=>{g.lastError=String(error?.message||error).slice(0,160);g.checked=new Date().toISOString();});return {done:false,reason:'APPLY_FAILED',error:String(error?.message||error)};}
+ let result;try{result=(apply||jr().apply)(gameDir,options);}catch(error){if(error.message==='JAPANESE_REPAIR_BLOCKED')throw error;update(root,id,g=>{g.lastError=String(error?.message||error).slice(0,160);g.checked=new Date().toISOString();});return {done:false,reason:'APPLY_FAILED',error:String(error?.message||error)};}
  const mode=plan.action==='setting'?'setting':'files';
  update(root,id,g=>Object.assign(g,{state:'auto',mode,adapter:plan.detected.adapter,dir:path.resolve(gameDir),at:new Date().toISOString(),launch:''}));
  return notice(root,id,{done:true,mode,trigger,result});
@@ -80,14 +80,14 @@ function verifyFiles(gameDir){
  return {ok:true};
 }
 /* launch preflight: a file switch that never reached a game window last time, or a bad table, is put back */
-function selfCheck(root,id,gameDir,{restore}={}){
+function selfCheck(root,id,gameDir,{restore,options={}}={}){
  id=String(id);const g=read(root).games[id];if(!g||g.state!=='auto'||g.mode!=='files')return {checked:false};
  let why='';
  /* E598 a window alone is not a working game (black screen): only text read from it is */
  if(g.launch==='pending'||g.launch==='failed'||g.launch==='window')why=g.launch==='window'?'NO_TEXT':'LAUNCH_FAILED';
  else{const v=verifyFiles(gameDir);if(!v.ok)why=v.reason;}
  if(!why){update(root,id,x=>{x.launch='pending';});return {checked:true,ok:true};}
- try{(restore||jr().restore)(gameDir);}catch(error){update(root,id,x=>{x.launch='';x.lastError=String(error?.message||error).slice(0,160);});return {checked:true,ok:false,reverted:false,reason:why,error:String(error?.message||error)};}
+ try{(restore||jr().restore)(gameDir,options);}catch(error){if(error.message==='JAPANESE_REPAIR_BLOCKED')throw error;update(root,id,x=>{x.launch='';x.lastError=String(error?.message||error).slice(0,160);});return {checked:true,ok:false,reverted:false,reason:why,error:String(error?.message||error)};}
  update(root,id,x=>Object.assign(x,{state:'reverted',reason:why,launch:'',at:new Date().toISOString()}));
  return {checked:true,ok:false,reverted:true,reason:why};
 }
@@ -97,16 +97,16 @@ function launchResult(root,id,ok){id=String(id);const g=read(root).games[id];if(
 function textSeen(root,id){id=String(id);const g=read(root).games[id];if(!g||g.state!=='auto'||!['pending','window'].includes(g.launch))return false;update(root,id,x=>{x.launch='ok';});return true;}
 /* E598 the game was closed without one line of text after a file switch (black screen, hang): put the files back at once
    and say so, instead of leaving the user to rename files */
-function gameClosed(root,id,{restore,now=Date.now()}={}){id=String(id);const g=read(root).games[id];
+function gameClosed(root,id,{restore,now=Date.now(),options={}}={}){id=String(id);const g=read(root).games[id];
  if(!g||g.state!=='auto'||g.mode!=='files'||g.launch!=='window'||!g.dir||now-(g.windowAt||now)<NO_TEXT_GRACE)return {reverted:false};
- try{(restore||jr().restore)(g.dir);}catch(error){update(root,id,x=>{x.lastError=String(error?.message||error).slice(0,160);});return {reverted:false,error:String(error?.message||error)};}
+ try{(restore||jr().restore)(g.dir,options);}catch(error){update(root,id,x=>{x.lastError=String(error?.message||error).slice(0,160);});return {reverted:false,error:String(error?.message||error)};}
  update(root,id,x=>Object.assign(x,{state:'reverted',reason:'NO_TEXT',launch:'',at:new Date().toISOString()}));
  const s=read(root);s.notices=[{id,at:new Date().toISOString(),mode:'reverted'},...s.notices.filter(n=>n.id!==id)].slice(0,50);write(root,s);return {reverted:true};}
 
 /* user undo from the notice or the tool: final for this game */
-function undo(root,id,gameDir,{restore}={}){
+function undo(root,id,gameDir,{restore,options={}}={}){
  id=String(id);const g=read(root).games[id];
- if(g?.mode!=='redirect')(restore||jr().restore)(gameDir);
+ if(g?.mode!=='redirect')(restore||jr().restore)(gameDir,options);
  update(root,id,x=>Object.assign(x,{state:'undone',launch:'',at:new Date().toISOString()}));
  const s=read(root);s.notices=s.notices.filter(n=>n.id!==id);write(root,s);return {ok:true};
 }

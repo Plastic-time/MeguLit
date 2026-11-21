@@ -311,16 +311,9 @@ void TextHook::parsenewlineseperator(TextBuffer *buff)
     StringCharReplacer(buff, newlineseperatorA.c_str(), newlineseperatorA.size(), '\n');
   }
 }
-UINT64 texthash(void *data, size_t len)
+static std::string textkey(const void *data, size_t len)
 {
-  UINT64 sum = 0;
-  auto u8data = (UINT8 *)data;
-  for (int i = 0; i < len; i++)
-  {
-    sum += u8data[i];
-    sum = sum << 1;
-  }
-  return sum;
+  return std::string(static_cast<const char *>(data), len);
 }
 static_assert(offsetof(CommonSharedMem, hash) == 16, "HookBridge.cs SyncEmbedGeneration writes the generation at offset 16");
 /* MeguLit: the cache generation (MeguLitEmbedWait.h): what the bridge bumped plus what the hook sees itself */
@@ -348,7 +341,7 @@ bool checktranslatedok(TextBuffer buff)
 {
   if (buff.size > 1000)
     return true;
-  return translatecache.Find(texthash(buff.data, buff.size), embedgeneration(), GetTickCount64(), nullptr) != MeguLitEmbed::Miss;
+  return translatecache.Find(textkey(buff.data, buff.size), embedgeneration(), GetTickCount64(), nullptr) != MeguLitEmbed::Miss;
 }
 /* MeguLit 2026-11-19, before the line goes out (texthook.cc). 1: cached, no wait and no question to the bridge;
    0: the bridge is asked and the answer event already exists; -1: no write-back for this line (not selected, unreadable);
@@ -362,7 +355,7 @@ int MeguLitEmbedArm(HookParam &hp, TextBuffer &buff, const ThreadParam &tp)
     return -2; /* upstream: never asked, so it only waited the full time for nothing */
   if (commonsharedmem->clearText)
     return 0;
-  if (translatecache.Find(texthash(buff.data, buff.size), embedgeneration(), GetTickCount64(), nullptr) != MeguLitEmbed::Miss)
+  if (translatecache.Find(textkey(buff.data, buff.size), embedgeneration(), GetTickCount64(), nullptr) != MeguLitEmbed::Miss)
     return 1;
   auto hostcodepage = embedcodepage(hp, buff);
   if (hp.isAscii() && !hostcodepage)
@@ -399,9 +392,9 @@ bool TextHook::waitfornotify(TextBuffer *buff, ThreadParam tp)
   else
     return false;
   std::wstring translate;
-  auto hash = texthash(buff->data, buff->size);
+  auto key = textkey(buff->data, buff->size);
   auto generation = embedgeneration();
-  auto hit = translatecache.Find(hash, generation, GetTickCount64(), &translate);
+  auto hit = translatecache.Find(key, generation, GetTickCount64(), &translate);
   if (hit == MeguLitEmbed::Unchanged)
     return false;
   if (hit == MeguLitEmbed::Miss)
@@ -410,7 +403,7 @@ bool TextHook::waitfornotify(TextBuffer *buff, ThreadParam tp)
       return false;
     translate = commonsharedmem->text;
     /* an empty answer is cached too (short-lived): the next redraw of this line does not wait again */
-    translatecache.Put(hash, generation, GetTickCount64(), translate);
+    translatecache.Put(key, generation, GetTickCount64(), translate);
     if ((translate.size() == 0))
       return false;
   }

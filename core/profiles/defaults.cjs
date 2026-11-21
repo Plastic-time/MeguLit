@@ -7,6 +7,11 @@
    the kernel first adds its key here with the old behaviour as default, then the one engine or game that needs it sets it.
    Arrays replace, they never merge: a game that sets choice.filters owns the whole list. */
 module.exports={
+ source:{
+  /* Artemis64x: retain a quoted message split across one callback batch; only a measured version opts in. */
+  artemisQuoteSpans:false,
+  siglusDbsNameColumn:null,
+ },
  placement:{
   /* where the first line of a page is anchored: null = kernel (glyph records, then the text box); 'glyph' | 'box' | 'page' */
   firstLineAnchor:null,
@@ -91,6 +96,8 @@ module.exports={
   /* report each drawn run with its role (name / choice / button / menu / system); false = the kernel: names are not
      reported, link and choice text goes with the dialogue */
   roles:false,
+  /* Version-pinned diagnostic full input only; does not grant roles, hide or embedding. */
+  advhdInput:false,
   /* the game draws MeguLit's replacement of a dialogue line itself (Japanese + ruby [+ Chinese]); false = hide + overlay */
   embed:false,
   /* with embed on, the Chinese is drawn by the game too (false = ruby only, the reader draws the Chinese) */

@@ -1,7 +1,7 @@
 'use strict';
 const { createHash } = require('node:crypto');
 const { createTranslator } = require('./translate.cjs');
-const { ENGINES, SAKURA_SYSTEM, machineTranslate } = require('./engines.cjs');
+const { ENGINES, SAKURA_SYSTEM, machineTranslate, supportsTranslationTarget } = require('./engines.cjs');
 
 function normalizeBase(value = 'https://api.openai.com/v1') {
   const url = new URL(value.trim());
@@ -61,6 +61,11 @@ function createTranslationService(fetcher = fetch, environmentKey = '') {
   async function translate(text, options = {}, isCurrent = () => true) {
     if (typeof text !== 'string' || !text.trim() || text.length > 4000) throw new Error('台词为空或过长');
     options = resolveOptions(options);
+    if (!supportsTranslationTarget(options.provider, options.learnerLanguage)) {
+      const error = Error('TRANSLATION_TARGET_UNSUPPORTED');
+      error.provider = options.provider; error.target = options.learnerLanguage;
+      throw error;
+    }
     /* garbage (mojibake, control codes) is never sent: the translator would answer about it, not translate it (core/text-sanity.cjs) */
     const sanity = require('./text-sanity.cjs');
     if (sanity.garbledSource(text,{noise:false})) return '';

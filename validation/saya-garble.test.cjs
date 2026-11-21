@@ -58,14 +58,29 @@ test('a readable Japanese stream keeps its noise lines (the game\'s script text)
   assert.equal(ev[back].hookSource.trim(), READABLE[1].trim(), 'the reader comes back with the readable line itself');
 });
 
-test('a noise line never goes to the art path (no translation drawn over the game\'s own line)', t => {
+test('a noise line never goes to the art path (no translation drawn over the game\'s own line)', async t => {
   const hook = new HookNative({ native: __dirname, hook: __dirname, logs: 'Z:/no-fixture-log' }, () => {}, () => {}, () => 1000);
   const located = [], traces = []; hook.trace = m => traces.push(m); hook.artLocate = x => located.push(x); t.after(() => hook.stop());
   for (const n of NOISE) hook.artCandidate(n);
   assert.deepEqual(located, []);
   hook.artCandidate('館がある'); assert.deepEqual(located, ['館がある'], 'a readable card still goes');
   assert.ok(traces.some(m => /^art text unreadable/.test(m)));
-  assert.match(read('services/reader.cjs'), /async artText\(message\)\{\/\* 2026-11-15 unreadable art text[^]*?garbledSource\(String\(message\.text\|\|''\),\{controls:false\}\)\)\{[^}]*translation:'',visible:false\}\);return;\}/);
+  const { Reader } = require('../services/reader.cjs'), reader = Object.create(Reader.prototype);
+  const events = [], translated = [];
+  Object.assign(reader, {
+    gal: { hooks: { trace() {} } }, prefs: () => ({ provider: 'google', learnerLanguage: 'zh' }),
+    runtime: { emit: (event, message) => events.push({ event, message }) },
+    embedCached: (text, value) => value,
+    chainTranslate: async text => { translated.push(text); return { text: '这里有一座馆' }; }
+  });
+  for (const [id, text] of NOISE.entries()) await reader.artText({ id, text, visible: true });
+  assert.deepEqual(translated, [], 'the actual reader never asks a translator for noise');
+  assert.equal(reader.artTurns, undefined, 'noise does not enter the art render lifecycle');
+  assert.deepEqual(events.map(e => [e.event, e.message.translation, e.message.visible]), NOISE.map(() => ['reader-event', '', false]));
+  await reader.artText({ id: 'readable', text: '館がある', visible: true });
+  assert.deepEqual(translated, ['館がある'], 'a readable card still translates through the actual reader');
+  assert.equal(events.at(-1).message.translation, '这里有一座馆');
+  assert.equal(events.at(-1).message.visible, true);
 });
 
 test('a line the game still draws itself: the placement host says so, a placed line clears it', () => {

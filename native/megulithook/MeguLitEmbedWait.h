@@ -34,7 +34,8 @@ namespace MeguLitEmbed
   class Cache
   {
     SRWLOCK lock = SRWLOCK_INIT;
-    std::unordered_map<UINT64, Entry> map;
+    // Binary string equality also checks length and embedded NULs after a bucket hash collision
+    std::unordered_map<std::string, Entry> map;
     UINT64 gen = 0;
     /* caller holds lock exclusively */
     void Roll(UINT64 g)
@@ -47,7 +48,7 @@ namespace MeguLitEmbed
     }
 
   public:
-    Hit Find(UINT64 key, UINT64 g, ULONGLONG now, std::wstring *out)
+    Hit Find(const std::string &key, UINT64 g, ULONGLONG now, std::wstring *out)
     {
       AcquireSRWLockExclusive(&lock);
       Roll(g);
@@ -71,7 +72,7 @@ namespace MeguLitEmbed
     }
     /* an empty answer is "unchanged" (the bridge sends "" for passthrough); a non-empty one, also the line itself (glyph dots
        passthrough), is cached for good as before */
-    void Put(UINT64 key, UINT64 g, ULONGLONG now, const std::wstring &answer)
+    void Put(const std::string &key, UINT64 g, ULONGLONG now, const std::wstring &answer)
     {
       AcquireSRWLockExclusive(&lock);
       Roll(g);

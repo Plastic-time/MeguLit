@@ -48,19 +48,26 @@ static __declspec(noinline) void Draw(const char *s, int n, int x, int y) {
     pop esi
   }
 }
-// a glyph routine without an EBP frame, laid out like NScripter's 0x40eb20: 0xfe4 bytes below its return address, then the
-// API's 5 arguments (its own arguments: s, x, y, taken as the TextOutA pen here)
+// NScripter's actual stack shape: three SEH words, 0xfc4 locals, four saved registers, then five API arguments.
+// The four sentinel routine arguments exercise fargs; their fake API x/y are not claimed to be page coordinates.
 static volatile int Sink;
 static void *StubN; static DWORD NoFrameRet; static void **DrawSitesOriginal_1 = &DrawSites::DrawSitesOriginal[1];
-static __declspec(naked) void NoFrame(const char *, int, int) {
+static __declspec(naked) void NoFrame(const char *, int, int, int) {
   __asm {
     mov eax, [esp]
     mov NoFrameRet, eax
-    sub esp, 0xfe4
+    push -1
+    push 0x45067d
+    push eax                     // SEH-sized word only; this fake does not install an exception handler
+    sub esp, 0xfc4
+    push ebx
+    push ebp
+    push esi
+    push edi
     push 2                       // TextOutA(hdc, x, y, s, 2)
-    push dword ptr [esp + 0xfe4 + 4 + 4]       // s   (arg 1: past the 0xfe4, the return address and the 1 push)
-    push dword ptr [esp + 0xfe4 + 12 + 8]      // y   (arg 3)
-    push dword ptr [esp + 0xfe4 + 8 + 12]      // x   (arg 2)
+    push dword ptr [esp + 0xfe0 + 4 + 4]       // s (arg 1, after one API push)
+    push dword ptr [esp + 0xfe0 + 12 + 8]      // sentinel arg 3, after two pushes
+    push dword ptr [esp + 0xfe0 + 8 + 12]      // sentinel arg 2, after three pushes
     push 0x1234
     lea ecx, back2
     mov edx, DrawSitesOriginal_1
@@ -71,11 +78,16 @@ static __declspec(naked) void NoFrame(const char *, int, int) {
     push ecx
     jmp dword ptr [FakeSlot]
   back2:
-    add esp, 0xfe4
+    pop edi
+    pop esi
+    pop ebp
+    pop ebx
+    add esp, 0xfc4
+    add esp, 12
     ret
   }
 }
-static __declspec(noinline) void NoFrameCaller(const char *s, int x, int y) { NoFrame(s, x, y); Sink++; }
+static __declspec(noinline) void NoFrameCaller(const char *s, int x, int y) { NoFrame(s, x, y, 0x333); Sink++; }
 // two text routines of the game, each drawing a string a character at a time (a loop: one call site each)
 static __declspec(noinline) void CallerA(const char *s, int chars, int x, int y) { for (int i = 0; i < chars; i++) Draw(s + i * 2, 2, x + i * 22, y); Sink++; }
 static __declspec(noinline) void CallerB(const char *s, int chars, int x, int y) { for (int i = 0; i < chars; i++) Draw(s + i * 2, 2, x + i * 22, y); Sink += 2; }
@@ -98,10 +110,10 @@ int main() {
     auto via = [](const std::string &l) { size_t a = l.find("via=") + 4; return l.substr(a, l.find(' ', a) - a); };
     Check(via(Logged[0]) != via(Logged[1]) && via(Logged[0]).find("0/") != 0, "via= tells the callers apart");
   }
-  /* a routine without an EBP frame (NScripter's glyph routine: 0xfe4 bytes of prologue, frame = 0xff8 in the table): its
+  /* a routine without an EBP frame, with NScripter's captured stack shape: its
      return address and its own arguments are read at the fixed distance above the API's arguments */
   int ns = -1; for (int i = 0; i < DrawSitesSig::SigCount; i++) if (!strcmp(DrawSitesSig::Sigs[i].id, "nscripter")) ns = i;
-  Check(ns >= 0 && DrawSitesSig::Sigs[ns].frame == 0xff8, "nscripter signature: frame 0xff8");
+  Check(ns >= 0, "nscripter signature exists");
   if (ns >= 0) {
     DrawSites::Sites[1] = { 0, (uintptr_t)GetModuleHandleA(nullptr), ns, DrawSites::A_TextOutA }; DrawSites::NSites = 2;
     StubN = DrawSites::Stub(1); Logged.clear();
@@ -110,7 +122,7 @@ int main() {
     for (auto &l : Logged) printf("  log: %s\n", l.c_str());
     char want[64]; snprintf(want, sizeof want, "via=%lx/0", (unsigned long)(NoFrameRet - (DWORD)(uintptr_t)GetModuleHandleA(nullptr)));
     Check(Logged.size() == 1 && Logged[0].find(want) != std::string::npos, std::string("no frame: via = the routine's return address (") + want + ")");
-    char args[64]; snprintf(args, sizeof args, "fargs=%lx,111,222,", (unsigned long)(DWORD)(uintptr_t)ai);
+    char args[64]; snprintf(args, sizeof args, "fargs=%lx,111,222,333", (unsigned long)(DWORD)(uintptr_t)ai);
     Check(Logged.size() == 1 && Logged[0].find(args) != std::string::npos, std::string("no frame: fargs = the routine's arguments (") + args + ")");
     Check(GotX == 0x111 && GotY == 0x222 && GotStr == ai, "no frame: the API gets the game's arguments");
   }

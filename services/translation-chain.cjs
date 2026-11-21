@@ -8,7 +8,7 @@
    Only sources the user has set up are used; nothing new is switched on for them. Only when all fail does the line say so,
    and a background retry keeps going (Retries) and fills the translation in on screen and in the dialogue log.
    Per line, the same for every game; the result says which source gave it (never recorded as a group pairing). */
-const {ENGINES}=require('../core/engines.cjs');
+const {ENGINES,supportsTranslationTarget}=require('../core/engines.cjs');
 const API_BUILTIN=['gpt','deepseek','bing','deepl'];
 const isLocal=p=>ENGINES[p]?.group==='local';
 const isMt=p=>p==='google'||ENGINES[p]?.kind==='mt'&&ENGINES[p]?.keyless===true;
@@ -18,7 +18,7 @@ const isApi=p=>!isLocal(p)&&!isMt(p)&&(API_BUILTIN.includes(p)||!!ENGINES[p]);
    prefs: the reader preferences (provider, baseUrl, model, ...); hasKey(baseUrl): a key is stored for that API;
    localInstalled: a local model is installed (the runtime can start it). resolve: core/providers resolveOptions. */
 function candidates(prefs,{hasKey=()=>false,localInstalled=false,resolve=require('../core/providers.cjs').resolveOptions}={}){
- const out=[],seen=new Set(),add=o=>{try{const r=resolve(o);const k=r.provider+'|'+(r.baseUrl||'')+'|'+(r.model||'');if(seen.has(k))return;seen.add(k);out.push(r);}catch{}};
+ const out=[],seen=new Set(),add=o=>{try{const r=resolve(o);if(!supportsTranslationTarget(r.provider,r.learnerLanguage))return;const k=r.provider+'|'+(r.baseUrl||'')+'|'+(r.model||'');if(seen.has(k))return;seen.add(k);out.push(r);}catch{}};
  const chosen=String(prefs?.provider||'');
  if(isLocal(chosen))add({...prefs});else if(localInstalled)add({...prefs,provider:'sakura',baseUrl:'',model:''});
  const keyed=o=>{try{return ENGINES[o.provider]?.keyless===true||hasKey(resolve(o).baseUrl);}catch{return false;}};
@@ -61,7 +61,7 @@ async function translate(text,list,attempt,{isCurrent=()=>true,budgetMs=0,trace=
    gets its translation is filled in (fill(text, result)) and forgotten. */
 class Retries{
  constructor(run,fill,{delays=[5000,20000,60000,120000,120000,120000,120000,120000],timers={set:setTimeout,clear:clearTimeout}}={}){this.run=run;this.fill=fill;this.delays=delays;this.timers=timers;this.jobs=new Map();}
- add(text,context={}){const key=String(text||'').replace(/\s+/g,'');if(!key||this.jobs.has(key))return;const job={text,context,tries:0,timer:null};this.jobs.set(key,job);this.next(key,job);}
+ add(text,context={}){const body=String(text||'').replace(/\s+/g,'');if(!body)return;const key=(context.options?.learnerLanguage==='en'?'en':'zh')+'|'+body;if(this.jobs.has(key))return;const job={text,context,tries:0,timer:null};this.jobs.set(key,job);this.next(key,job);}
  next(key,job){if(job.tries>=this.delays.length){this.jobs.delete(key);return;}job.timer=this.timers.set(async()=>{job.tries++;try{const r=await this.run(job.text,job.context);if(r&&r.text){this.jobs.delete(key);this.fill(job.text,r,job.context);return;}}catch{}if(this.jobs.get(key)===job)this.next(key,job);},this.delays[job.tries]);job.timer?.unref?.();}
  clear(){for(const j of this.jobs.values())this.timers.clear(j.timer);this.jobs.clear();}
  get size(){return this.jobs.size;}

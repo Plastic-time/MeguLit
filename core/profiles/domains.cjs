@@ -8,6 +8,8 @@
    Kinds: enum (the listed values), bool, number [min,max] (nullable when listed), rect {x,y,w,h[,client]}, regexList (RegExp
    sources with flags 'u': no backreferences, no nested quantifiers, bounded size). */
 const DOMAINS={
+ 'source.artemisQuoteSpans':{bool:true,layer:'version'},
+ 'source.siglusDbsNameColumn':{number:[0,2147483647],nullable:true,int:true,layer:'version'},
  'placement.firstLineAnchor':{enum:[null,'glyph','box','page']},
  'placement.lineOffsetY':{number:[-400,400]},
  'placement.drawWhileBlanking':{bool:true},
@@ -42,6 +44,7 @@ const DOMAINS={
  'calibrate.textBox':{rect:true,nullable:true},
  'calibrate.hideMethod':{enum:[null,'hide','engine','glyph','gpu','read']},
  'draw.roles':{bool:true},
+ 'draw.advhdInput':{bool:true,layer:'version'},
  'draw.embed':{bool:true,layer:'version'},
  'draw.embedTranslation':{bool:true,layer:'version'},
  'draw.engineTable':{engineTable:true,nullable:true,layer:'version'},

@@ -76,3 +76,8 @@ rem one hook runtime (2026-11-19): the ISLAND, STEINS;GATE, euphoria HD adapters
 for %%M in (ToMeCS2_DRAW ToMeSG_EMBED EmbedEuphoria474_DrawHide_TEST2) do (
  findstr /m /c:"%%M" "%~dp0..\MeguLitHook32.dll" >nul && (echo PASS MeguLitHook32.dll carries %%M) || (echo FAIL MeguLitHook32.dll lacks %%M & exit /b 1)
 )
+
+rem Majiro complete-string observer: signatures and real MinHook gate, x86 and x64 stub
+call "%~dp0run-majiro.cmd" || exit /b 1
+rem AdvHD version-pinned diagnostic input, custom EAX + eleven-word ABI and x64 no-op.
+call "%~dp0run-advhd.cmd" || exit /b 1

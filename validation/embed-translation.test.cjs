@@ -37,7 +37,7 @@ test('the reader translates a held line once and shares it with the page',async(
  const src=fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8');
  assert.match(src,/if\(message\.type==='hookEmbedRequest'\)\{this\.embedTranslate\(message\.id,message\.text\);return;\}/);
  assert.match(src,/this\.gal\?\.hooks\?\.embedReply\(id,hide\?'':trans,/);
- assert.match(src,/\{const cached=this\.embedCached\(text\);if\(cached\)return cached;\}/);
+ assert.match(src,/\{const cached=this\.embedCached\(text,undefined,\{language:cacheLanguage\}\);if\(cached\)return cached;\}/);
 });
 
 test('the native bridge holds the line, answers with the translation, and lets the original through on timeout',()=>{
@@ -57,4 +57,13 @@ test('a matched patch line is cached as the translation of its Japanese original
  Object.assign(r,{root:'Z:/no-root',runtime:{},translator:()=>({translate:async()=>{calls++;return 'x';}})});
  r.embedCached('おはよう、春希','早上好，春希');
  assert.equal(r.embedCached('おはよう、 春希'),'早上好，春希','whitespace does not matter');assert.equal(calls,0);
+});
+
+test('CLANNAD diagnostic script labels with no pairing result do not throw, and the next paired line still resolves',()=>{
+ const {h,events}=hook(),traces=[];h.trace=t=>traces.push(t);h.originalText={kind:'patch',resolve:text=>text==='雪…'?{status:'exact',indices:[9094],translation:'雪…'}:null};
+ for(const text of ['tret','seen0414','《渚の名前》《秋生の名前》《'])assert.equal(h.originalTextFor(text),text);
+ assert.deepEqual(events.filter(e=>e.type==='hookPatchTranslation'),[]);
+ assert.equal(traces.some(t=>t.startsWith('original-text error ')),false);
+ assert.equal(h.originalTextFor('雪…'),'雪…');
+ assert.deepEqual(events.find(e=>e.type==='hookPatchTranslation'),{type:'hookPatchTranslation',japanese:'雪…',chinese:'雪…',machine:false});
 });

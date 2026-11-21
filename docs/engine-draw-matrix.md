@@ -6,13 +6,15 @@
 
 下面各引擎的画字钩子都已合进 main。默认全部不挂：只有这部游戏的 seed 打开 `draw.roles`（MeguLit 写出控制文件 `#cfg roles=1`）才装钩子；现在没有任何游戏 seed 打开它。这一点由 `validation/engine-draw-opt-in.test.cjs` 钉住：钩子只在 `Install()` 里装，`Install()` 只在 roles=1 检查之后调，启动时 `Arm()` 从不挂钩；内核默认不写控制文件；seed 要开得先加进测试里的允许名单
 
+AdvHD 新增的单版本输入诊断使用独立、默认 false 的 `draw.advhdInput`，不授予上段角色或渲染能力，也没有 seed 开启，详见下表及诊断文档
+
 | 引擎 | 部件（native/megulithook） | 状态 |
 |---|---|---|
 | ReaLive / AVG32（涙、Air） | DrawSites（GDI 画字点）签名 `avg32` | 已进 main，默认不挂 |
 | Softpal（レイライン 1 / 2） | DrawSites `softpal`、`softpal-2` | 已进 main，默认不挂 |
-| NScripter（月姬 v1.4 / v1.6） | DrawSites `nscripter` | 已进 main，默认不挂 |
+| NScripter（月姬 v1.4 / v1.6，同一 exe） | DrawSites `nscripter`（mode 1 字形点） | 默认不挂；页面坐标、角色、mode 0/2 和样本编码尚未验收 |
 | Innocent Grey（虚ノ少女，MFC） | DrawSites `mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw` | 已进 main，默认不挂 |
-| AdvHD / WillPlus（Under The Moon） | DrawSites `advhd` | 已进 main，默认不挂 |
+| AdvHD / WillPlus（Under The Moon） | DrawSites `advhd`；AdvhdDraw 输入诊断 | 默认不挂；诊断钉住单一 exe，仅完整原始输入，不授予正文角色、隐藏或嵌入能力 |
 | CMVS（青い鳥） | DrawSites `cmvs` | 已进 main，默认不挂 |
 | FVP（ヒカリ 中文版 / HD） | DrawSites `fvp`、`fvp-bitmap` | 已进 main，默认不挂 |
 | minori（eden 英文版） | DrawSites `minori` | 已进 main，默认不挂 |
@@ -28,7 +30,11 @@
 | WHITE ALBUM2、ダンガンロンパ 1 / 2 / V3、みにくいモジカの子 | 无 | 没做：静态做不出，实机采集方案见 engine-draw-native.md |
 | Silky's、LiveMaker、System4、Escu:de、Kaguya 等 | 无 | 没做：本机没有样本 |
 
-GetGlyphOutline 类的签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、沙耶两版）以及 NScripter 的字形小图，是不是字形缓存（只有第一次出现的字）还要实机确认，见 engine-draw-native.md「注意：字形缓存」
+AdvHD 的本机样本已静态确认缓存命中会绕过旧 GetGlyphOutline 点，新输入诊断在缓存判断之前，尚未游戏实测，见 [AdvHD 诊断交付](re-advhd-input.md)。其余 GetGlyphOutline 类签名和 NScripter 字形小图仍需确认缓存覆盖，见 engine-draw-native.md「注意：字形缓存」
+
+## Majiro 本轮交付
+
+旧版 Majiro 六件套已随 `aa22ae6e` 合入 main，双架构 DLL 编译及完整原生自检通过。`MajiroDraw.h` 在字体缓存判断之前观察完整字符串，签名只在本机姫子样本命中一次，22 个其他引擎程序均未命中。默认不挂，没有游戏 seed 开启。真实游戏坐标、角色、注音和译文效果尚未验收，不能据此写“适配完成”。详细证据及下一步见 [engine-draw-native.md](engine-draw-native.md) 的 Majiro 节
 
 ## 图例
 
@@ -72,7 +78,7 @@ GetGlyphOutline 类的签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、
 | CatSystem2 | ISLAND 精确匹配画字钩子（ToMeIslandDraw.h，含 ruby）；其他 CS2 走 LunaHook + cs2 屏幕协议 | 内（ISLAND）/ 外 | 内（ISLAND）/ 外 | 外 | 外 | 无 | 无 | 内（ISLAND） | 把 ISLAND 的画字钩子按特征码泛化到其他 cs2.exe 版本 | L | CatSystem2 工具（cstl / cst 解包）、LunaHook CS2 |
 | YU-RIS | megulithook Yuris.cpp（内嵌 + 选项） | 外（流） | 外（字形点） | 外 | 外（独立选项流） | 无 | 外（写回） | 外（Yuris ruby 串） | YU-RIS 画字（ESC 码解析后的字形函数）签名；按钮多是图片 | L | YurisTools、yu-ris 解包 |
 | AdvHD / WillPlus | LunaHook（只读流 + flush 延迟）；Euphoria HD 474 精确匹配画字 | 外 / 内（474） | 外（字形点）/ 内（474） | 外 | 外 | 无 | 无（只读） | 无 | 泛化 474 的画字钩子；AdvHD 的 .ws2 VM 文本函数 | L | AdvHDTools、ArcUnpacker、LunaHook WillPlus |
-| Majiro | LunaHook | 外 | 外（GDI 字形点，Majiro 走 GetGlyphOutline） | 外 | 外 | 无 | 外（LunaHook 写回） | 无 | mjo VM 的文本操作码处理函数 | L | majiro-tools / mjotool |
+| Majiro | LunaHook + MajiroDraw.h（旧版完整字符串画字观察层） | 内（传入画字函数的 CP932 整串，静态与回放） | 内（font 笔位，画布坐标，待实机） | 外 | 外 | 无 | 外（既有 LunaHook 写回） | 无 | 真机区分角色、坐标原点和 paint 含义；第二版本；接入实时角色协议 | L | LunaHook Majiro、majiro-tools / mjotool、VNTranslationTools |
 | QLIE | LunaHook | 外 | 外（字形点） | 外 | 外 | 无 | 外 | 无 | Delphi 引擎，画字在 TQLIE 文本对象里；要按版本找 | L | QLIE 解包（qlie-tools）、LunaHook |
 | Malie | LunaHook（内嵌） | 外 | 外（GPU 四边形） | 外 | 外 | 无 | 外 | 无 | Malie 自绘字体，画字函数在 exe 内；Camellia 密钥已有 | L | MalieTools、LunaHook Malie |
 | Softpal / Pal | megulithook Pal.cpp（内嵌 + ruby + pal_sprite_v1 坐标通道） | 外（流） | 内（pal_sprite_v1 文字精灵） | 外 | 外 | 无 | 外（写回） | 外 | 精灵通道加角色字段；选项精灵 | M | SoftpalTools、LunaHook Pal |
@@ -101,7 +107,7 @@ GetGlyphOutline 类的签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、
 | 引擎（seed 数） | 游戏 / 文件 | 画字所在模块 | 位数 | 文字 API 调用点 | 图形 | 壳 | LunaHook 现有 | 难度 |
 |---|---|---|---|---|---|---|---|---|
 | Spike Chunsoft（3） | ダンガンロンパ 1 / 2 / V3（Steam） | DR1_us.exe / DR2_us.exe / Dangan3Win.exe | x86 / x86 / x64 | 导入表里没有文字 API | D3D9（1/2）、D3D11（V3） | **SteamStub `.bind`**，V3 的 `.text` 熵 8.0 = 整段加密 | Chunsoft.cpp（x64，78 行） | 难：静态看不到代码，要先脱 SteamStub（Steamless 类工具，只读出一个解开的副本）再找自绘字库 |
-| NScripter（2） | 月姬 v1.4 / v1.6 | Tsukihime.exe（两版同一 exe，400 KB） | x86 | TextOutA ×8、CreateFontA ×13 | GDI DIB（BitBlt / StretchDIBits） | 无 | Onscripter 系（对 NScripter 本体只有通用 GDI） | 易：GDI 画进 DIB，8 个调用点按笔位分出台词 / 名字 / 选项 |
+| NScripter（2） | 月姬 v1.4 / v1.6 | Tsukihime.exe（两版同一 exe，400 KB） | x86 | TextOutA ×8、CreateFontA ×13 | GDI DIB（BitBlt / StretchDIBits） | 无 | Onscripter 系（对 NScripter 本体只有通用 GDI） | 只核实 mode 1 字形点和栈布局；页面笔位与台词 / 名字 / 选项角色未证明 |
 | FVP（2） | いろとりどりのヒカリ（中文版）/ HD | Hikari.exe（中文版启动器 五彩斑斓的曙光.exe 只是外壳）/ irohika_HD.exe | x86 | GetGlyphOutlineA ×3、CreateFontA ×1 | D3D9 | 无 | FVP.cpp | 中：3 个字形调用点，字形进 D3D9 纹理，坐标在上层排版 |
 | Nitroplus（2） | 沙耶の唄（Steam）/ みにくいモジカの子 | Mware.dll（Steam 版）/ 丑小鸭与文字祸.exe | x86 | Steam 版：Mware.dll 只有 D3D11，exe 只有 CreateFontW ×2；モジカ：没有可见导入 | D3D11 | モジカ：**Enigma Protector**（`.enigma1` 熵 7.91） | Nitroplus.cpp / Nitroplus2.cpp | 难：沙耶 Steam 是自绘字库（字形不走 GDI）；モジカ有壳，静态做不了 |
 | Softpal（1） | 時計仕掛けのレイライン | dll\PAL.dll | x86 | **GetGlyphOutlineA ×1**、CreateFontA ×1 | GDI DIB | 无 | Pal.cpp（本仓库已改：内嵌 + ruby + pal_sprite_v1） | 易：唯一一个字形调用点，和 YU-RIS 一样做锚 |
@@ -141,7 +147,7 @@ GetGlyphOutline 类的签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、
 | 引擎 | 本机样本 | 备注 |
 |---|---|---|
 | Silky's AI5WIN / AI6WIN、LiveMaker、AliceSoft System4、Escu:de、Kaguya | 无 | 见上表 |
-| Majiro | 无 | GetGlyphOutline 路线，适合 DrawSites |
+| Majiro | ナルキッソス 姫子エピローグ，Narci_himeko.exe，MajiroArcV3.000 | 完整字符串画字 0x41a660 的结构签名 + 默认关闭观察层 + 32/64 位独立回放已完成；只有一版样本，未实机，不开 seed |
 | QLIE | 无 | Delphi，画字在 TQLIE 文本对象 |
 | Malie | 无 | 自绘字库，类似 MAGES |
 | CIRCUS | 无 | MES VM，GDI 字形点 |
