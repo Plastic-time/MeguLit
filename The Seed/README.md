@@ -4,8 +4,11 @@
 
 ```
 The Seed/<engine>/<slug>/game.json                  游戏层：core/game-diff.cjs 文档，layer game，key = 游戏身份，prints = pack / script / steam / vndb / title
+The Seed/<engine>/<slug>/story.json                 可选作品结构：独立 megulit.story schema，不属于 profile domains，不含玩家进度或存档值
 The Seed/<engine>/<slug>/versions/<exeSha256>.json  版本层：layer version，key = exe 整文件 SHA-256，prints = exe / head / pe，只含版本层的键，不带 mode
 ```
+
+`story.json` 由 `services/story-data.cjs` 独立严格读取，完整内容身份在低优先级 worker 核对后才允许解释本机只读存档。通用规则分析与支持边界见 [剧情进度文档](../docs/story-progress.md)。作品数据可随普通 App hotbundle 更新；尚未实现独立作品规则投稿或分发接口
 
 - 游戏身份 key = relay 的 gidFor：SHA-256(`'game|'+种类+':'+指纹`)，种类取 pack → script → steam → vndb → title 里最强的一个（`core/game-print.cjs`）
 - 同一个 exe 被几部游戏共用时（同一程序的不同发行），版本层只出一份，放在 slug 排第一的那部下面，其他游戏在 `builds` 里引用它

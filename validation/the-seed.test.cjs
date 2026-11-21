@@ -14,7 +14,8 @@ test('every file of The Seed passes: format, keys and values, prints, folder nam
  const files=[];const walk=d=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else files.push(path.relative(DIR,p).replace(/\\/g,'/'));}};walk(DIR);
  assert.ok(files.includes('README.md'));
  for(const f of files){if(f==='README.md'||f.startsWith('history/'))continue;
-  const m=/^([a-z0-9]{2,40})\/([a-z0-9][a-z0-9-]{1,62})\/(game\.json|versions\/[0-9a-f]{64}\.json)$/.exec(f);assert.ok(m,'unexpected file '+f+' (The Seed/<engine>/<slug>/game.json or versions/<exe SHA-256>.json)');
+  const m=/^([a-z0-9]{2,40})\/([a-z0-9][a-z0-9-]{1,62})\/(game\.json|story\.json|versions\/[0-9a-f]{64}\.json)$/.exec(f);assert.ok(m,'unexpected file '+f+' (game.json, story.json or versions/<exe SHA-256>.json)');
+  if(m[3]==='story.json'){const text=fs.readFileSync(path.join(DIR,f),'utf8'),doc=JSON.parse(text),game=JSON.parse(fs.readFileSync(path.join(DIR,m[1],m[2],'game.json'),'utf8'));assert.ok(Buffer.byteLength(text)<=8*1024*1024);assert.deepEqual(require('../services/story-data.cjs').validate(doc),{ok:true,errors:[]},f);assert.equal(doc.gameKey,game.key,f+': story belongs to its game');assert.ok(doc.builds.length>0);assert.ok(doc.scripts.length>0);const versions=fs.readdirSync(path.join(DIR,m[1],m[2],'versions')).filter(n=>/^[a-f0-9]{64}\.json$/.test(n)).map(n=>n.slice(0,-5));assert.equal(require('../services/story-data.cjs').validateSeed(doc,game,versions).ok,true,f+': declared content version');continue;}
   const text=fs.readFileSync(path.join(DIR,f),'utf8');assert.ok(Buffer.byteLength(text)<=16*1024,f+': a seed stays small');
   const doc=JSON.parse(text);const r=Seed.check(doc,m[3]==='game.json'?{engine:m[1],slug:m[2]}:{engine:m[1],file:path.basename(f)});assert.deepEqual(r.errors,[],f);
   assert.deepEqual(r.warnings,[],f+': a seed pins non-null behaviour keys only (no null, no calibrate.*, no selfCheck.*)');}

@@ -212,6 +212,20 @@ function image(db,root,gameId,srcId){
  const g=gameRow(db,gameId),s=sources(root,g).find(x=>x.id===String(srcId||''));if(!s)throw Error('CARD_SOURCE_LOCKED');
  const f=fileOf(root,g,s),t=f&&scaled(root,[f],VIEW).get(f);if(!t)throw Error('CARD_SOURCE_UNREADABLE');return {id:s.id,src:dataUrl(t.out),w:t.w,h:t.h};}
 
+/* A bounded save-only view of the existing warmer. No image is decoded on a list request. */
+function memoriesThumb(root,exe,name){
+ const f=require('./game-cg.cjs').cachedPicture(root,exe,name);if(!f)return null;
+ const t=cachedThumbs(root,[f],THUMB).get(f);if(!t)return null;
+ const size=fs.statSync(t.out).size;if(size>512*1024)throw Error('MEMORIES_IMAGE_TOO_LARGE');
+ return {src:dataUrl(t.out),w:t.w,h:t.h};
+}
+function memoriesQueue(root,exe,names){
+ const list=[...new Set(names)].slice(0,24),failed=readFailed(root,exe),need=[];
+ for(const n of list)if(!failed.has(itemKey(n))&&!memoriesThumb(root,exe,n))need.push(n);
+ // A busy worker owns its current batch. Later page requests retry after it exits.
+ if(need.length&&!warmBusy(root,exe))spawnWarm(root,exe,need);
+ return {pending:need.length,failed:list.filter(n=>failed.has(itemKey(n))).length,paused:!!readWarm(root,exe)?.paused};
+}
 function games(db,root){
  const store=require('./store.cjs'),out=[];
  for(const g of store.games(db,root)){if(g.hidden)continue;const row=db.prepare('SELECT id,title,executable,cover FROM games WHERE id=?').get(g.id);let n=0;try{n=sources(root,row,{settle:false}).length;}catch{}
@@ -275,5 +289,5 @@ function handle(db,root,r){
   case 'cards_set_mode':return setMode(root,r.mode);
  }
  throw Error('UNKNOWN_ACTION');}
-module.exports={handle,state,games,unlocked,image,create,sources,noteSeen,readState,_setRunner:f=>{runner=f;},_setSpawnWarm:f=>{spawnWarm=f;},warm,warmRun,noteGame,DEFAULT_TOPLOADERS};
+module.exports={memoriesThumb,memoriesQueue,handle,state,games,unlocked,image,create,sources,noteSeen,readState,_setRunner:f=>{runner=f;},_setSpawnWarm:f=>{spawnWarm=f;},warm,warmRun,noteGame,DEFAULT_TOPLOADERS};
 if(require.main===module&&process.argv[2]==='--warm'){setTimeout(()=>process.exit(0),30*60000).unref();try{const j=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));warmRun(j.root,j.exe,j.items||j.names||[]).catch(()=>{}).finally(()=>{try{fs.rmSync(warmFile(j.root,j.exe),{force:true});fs.rmSync(process.argv[3],{force:true});}catch{}process.exit(0);});}catch{}}
