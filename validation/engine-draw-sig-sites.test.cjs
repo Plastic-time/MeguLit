@@ -21,7 +21,7 @@ const OTHERS=['E:/GAL/月姬 v1.4/Tsukihime.exe','E:/Steam/steamapps/common/Aoi 
 test('the table parses: ids unique, APIs known, patterns valid',()=>{
  const sigs=S.sigs();assert.ok(sigs.length>=1);assert.equal(new Set(sigs.map(g=>g.id+'|'+g.module+'|'+g.api+'|'+g.pre)).size,sigs.length);
  for(const g of sigs){assert.ok(['TextOutA','TextOutW','ExtTextOutA','ExtTextOutW','DrawTextA','DrawTextW','GetGlyphOutlineA','GetGlyphOutlineW'].includes(g.api),g.id);
-  assert.ok(S.pattern(g.pre).length>=6,g.id+': at least 6 bytes before the call');assert.ok(S.pattern(g.pre).every(b=>b===null||(b>=0&&b<=255)),g.id);assert.ok(g.count>=1);}
+  assert.ok(S.pattern(g.pre).length>=6,g.id+': at least 6 bytes before the call');assert.ok(S.pattern(g.pre).every(b=>b===null||b==='S'||(b>=0&&b<=255)),g.id);assert.ok(g.count>=1);}
 });
 
 test('fixture snippets: one site each, at the call; another slot or a changed byte: none',()=>{
@@ -31,7 +31,7 @@ test('fixture snippets: one site each, at the call; another slot or a changed by
   assert.ok(g,name);assert.deepEqual(S.find(b,[slot],g.pre),[s.callOffset],name);
   assert.equal(parseInt(s.va,16)+s.callOffset,parseInt(s.call,16),name);
   assert.deepEqual(S.find(b,[slot+4],g.pre),[],name+': another slot');
-  const p=S.pattern(g.pre),i=p.findIndex(x=>x!==null),c=Buffer.from(b);c[s.callOffset-p.length+i]^=0x5a;assert.deepEqual(S.find(c,[slot],g.pre),[],name+': changed byte');
+  const p=S.pattern(g.pre),i=p.findIndex(x=>typeof x==='number'),c=Buffer.from(b);c[s.callOffset-p.length+i]^=0x5a;assert.deepEqual(S.find(c,[slot],g.pre),[],name+': changed byte');
  }
 });
 

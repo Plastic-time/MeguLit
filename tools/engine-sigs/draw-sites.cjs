@@ -12,17 +12,23 @@ function sigs(file=HEADER){
  const s=fs.readFileSync(file,'utf8');while((m=re.exec(s)))out.push({id:m[1],module:m[2],api:m[3],pre:m[4],count:+m[5],frame:+m[6]});
  return out;
 }
-function pattern(pre){return pre.trim().split(/\s+/).filter(Boolean).map(t=>t==='??'?null:parseInt(t,16));}
-/* code: Buffer, slots: [uint32], pre: pattern string -> offsets of the FF 15 in code */
+/* pattern tokens: hex byte, ?? (any), SLOT (4 bytes: the API's IAT slot) -> [byte | null | 'S'] */
+function pattern(pre){const out=[];for(const t of pre.trim().split(/\s+/).filter(Boolean)){if(t==='SLOT')out.push('S','S','S','S');else out.push(t==='??'?null:parseInt(t,16));}return out;}
+/* code: Buffer, slots: [uint32], pre: pattern string -> offsets of the call in code: FF 15 <slot> after the pattern, or with SLOT
+   in the pattern a call reg (FF D0..D7) right after it */
 function find(code,slots,pre){
- const p=pattern(pre),set=new Set(slots),out=[];
+ const p=pattern(pre),set=new Set(slots),out=[],sa=p.indexOf('S');
  for(let i=p.length;i+6<=code.length;i++){
-  if(code[i]!==0xff||code[i+1]!==0x15)continue;if(!set.has(code.readUInt32LE(i+2)))continue;
-  let ok=true;for(let k=0;k<p.length&&ok;k++)if(p[k]!==null&&code[i-p.length+k]!==p[k])ok=false;
+  if(code[i]!==0xff)continue;
+  if(sa<0){if(code[i+1]!==0x15||!set.has(code.readUInt32LE(i+2)))continue;}
+  else{if((code[i+1]&0xf8)!==0xd0||!set.has(code.readUInt32LE(i-p.length+sa)))continue;}
+  let ok=true;for(let k=0;k<p.length&&ok;k++)if(typeof p[k]==='number'&&code[i-p.length+k]!==p[k])ok=false;
   if(ok)out.push(i);
  }
  return out;
 }
+/* the IAT slot a site found by find() calls through */
+function slotOf(code,at,pre){const p=pattern(pre),sa=p.indexOf('S');return sa<0?code.readUInt32LE(at+2):code.readUInt32LE(at-p.length+sa);}
 /* a PE file (x86): image base, executable sections, IAT slots of an API imported by name */
 function pe(buf){
  const at=buf.readUInt32LE(0x3c);if(buf.toString('latin1',at,at+4)!=='PE\0\0')throw Error('not a PE file');
@@ -47,5 +53,5 @@ function scanFile(file,moduleName=''){
   if(sites.length)out.push({id:g.id,api:g.api,sites,count:g.count,ok:sites.length===g.count,slots:sl});}
  return {base:p.base,hits:out};
 }
-module.exports={sigs,pattern,find,pe,scanFile,HEADER};
+module.exports={sigs,pattern,find,slotOf,pe,scanFile,HEADER};
 if(require.main===module)for(const f of process.argv.slice(2)){try{const r=scanFile(f,process.env.MODULE||'');console.log(JSON.stringify({file:f,base:'0x'+r.base.toString(16),hits:r.hits.map(h=>({...h,sites:h.sites.map(v=>'0x'+v.toString(16)),slots:h.slots.map(v=>'0x'+v.toString(16))}))}));}catch(e){console.log(JSON.stringify({file:f,error:e.message}));}}

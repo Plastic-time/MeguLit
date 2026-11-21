@@ -24,13 +24,14 @@ int main() {
     Check(k == 1 && at[0] == (size_t)s.callOffset, n + ": one site, at the call");
     Check(DrawSitesSig::Find(b.data(), b.size(), &other, 1, g->pre, at, 4) == 0, n + ": another API slot, no match");
     unsigned char pb[64], pm[64]; int len = DrawSitesSig::Pattern(g->pre, pb, pm, 64);
-    auto c = b; for (int i = 0; i < len; i++) if (pm[i]) { c[s.callOffset - len + i] ^= 0x5a; break; }
+    auto c = b; for (int i = 0; i < len; i++) if (pm[i] == 0xff) { c[s.callOffset - len + i] ^= 0x5a; break; }
     Check(DrawSitesSig::Find(c.data(), c.size(), &slot, 1, g->pre, at, 4) == 0, n + ": pattern byte changed, no match");
     for (const auto &o : DrawSitesSig::Sigs) if (strcmp(o.id, s.id) && !strcmp(o.api, g->api))
       Check(DrawSitesSig::Find(b.data(), b.size(), &slot, 1, o.pre, at, 4) == 0, n + ": not " + o.id);
   }
   unsigned char pb[8], pm[8];
   Check(DrawSitesSig::Pattern("52 ?? ff", pb, pm, 8) == 3 && pb[0] == 0x52 && pm[1] == 0 && pb[2] == 0xff, "pattern parse");
+  Check(DrawSitesSig::Pattern("8b 3d SLOT 50", pb, pm, 8) == 7 && pm[1] == 0xff && pm[2] == 2 && pm[5] == 2 && pb[6] == 0x50, "pattern parse: SLOT");
   Check(DrawSitesSig::SjisLead(0x82) && DrawSitesSig::SjisLead(0xe0) && !DrawSitesSig::SjisLead('a') && !DrawSitesSig::SjisLead(0xa0), "SJIS lead bytes");
   printf("draw sites signature: %d failure(s)\n", Failures);
   return Failures;

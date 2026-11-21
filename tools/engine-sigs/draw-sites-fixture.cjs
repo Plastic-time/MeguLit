@@ -14,7 +14,7 @@ for(const f of files){
  const buf=fs.readFileSync(f.path),p=S.pe(buf),sha=crypto.createHash('sha256').update(buf).digest('hex');
  for(const g of S.sigs()){if(g.id!==f.id)continue;const sl=p.slots(g.api);
   let k=0;for(const c of p.code)for(const o of S.find(c.bytes,sl,g.pre)){const from=Math.max(0,o-0x40),to=Math.min(c.bytes.length,o+0x10);
-   out.snippets[f.name+'/'+g.id+(k?'#'+k:'')]={id:g.id,file:path.basename(f.path),sha256:sha,api:g.api,va:'0x'+(c.va+from).toString(16),callOffset:o-from,slot:'0x'+c.bytes.readUInt32LE(o+2).toString(16),call:'0x'+(c.va+o).toString(16),hex:c.bytes.subarray(from,to).toString('hex')};k++;}}
+   out.snippets[f.name+'/'+g.id+(k?'#'+k:'')]={id:g.id,file:path.basename(f.path),sha256:sha,api:g.api,va:'0x'+(c.va+from).toString(16),callOffset:o-from,slot:'0x'+S.slotOf(c.bytes,o,g.pre).toString(16),call:'0x'+(c.va+o).toString(16),hex:c.bytes.subarray(from,to).toString('hex')};k++;}}
 }
 fs.writeFileSync(path.join(dir,'draw-sites.json'),JSON.stringify(out,null,1)+'\n');
 const rows=Object.entries(out.snippets).map(([n,s])=>`  { "${n}", "${s.id}", ${s.slot}u, ${s.callOffset}, "${s.hex}" },`);
