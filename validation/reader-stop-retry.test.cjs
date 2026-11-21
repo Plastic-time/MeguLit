@@ -98,6 +98,12 @@ test('owned aggregate waits for a second real child after another child already 
  await tick();assert.equal(done,false);assert.equal(slow.exitCode,null);assert.match((await result).message,/READER_STOP_INCOMPLETE/);assert.equal(slow.exitCode,0);
 });
 
+test('an observed ENOENT spawn failure never owned a process and can finish teardown',async t=>{
+ const r=runtime(t),missing=path.join(r.root,'missing-native-helper.exe');assert.equal(fs.existsSync(missing),false);
+ const p=spawn(missing,[],{windowsHide:true,stdio:'ignore'}),[error]=await once(p,'error');assert.equal(error.code,'ENOENT');assert.equal(p.pid,undefined);assert(p.exitCode<0);
+ let requests=0;const owner={};await trackStop(owner,p,()=>{requests++;});await trackStop(owner,p,()=>{requests++;});assert.equal(requests,0);assert.equal(owner.ownedStops.size,0);
+});
+
 test('full native reader stop retains a failed control revocation and retries after both owned helpers exit',async t=>{
  const r=runtime(t),reader=new Reader(r),hookChild=await child(t,80),galChild=await child(t,20),profile=structuredClone(Profiles.profileFor({}));profile.draw.advhdInput=true;
  const transport=new KrkrTransport(hookChild.pid,{tmp:r.root}),draw=new EngineDraw({profile,transport});transport.flush(draw.cfg,draw.entries);

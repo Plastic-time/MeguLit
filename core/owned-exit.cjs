@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
+const {ChildProcess}=require('node:child_process');
 const pending=new WeakMap();
 // Hold the actual spawned child, never look up or terminate a process by PID.
 function stopOwned(child,request,{graceMs=2000,killMs=2000}={}){
  if(!child)return Promise.resolve();
- if(child.exitCode!=null||child.signalCode!=null){const result=child.exitCode===0?Promise.resolve():Promise.reject(Error('READER_STOP_INCOMPLETE'));result.catch(()=>{});return result;}
+ if(child.exitCode!=null||child.signalCode!=null){const neverStarted=child instanceof ChildProcess&&child.pid===undefined&&child.exitCode<0&&child.signalCode==null;const result=child.exitCode===0||neverStarted?Promise.resolve():Promise.reject(Error('READER_STOP_INCOMPLETE'));result.catch(()=>{});return result;}
  if(pending.has(child))return pending.get(child);
  let result;
  result=new Promise((resolve,reject)=>{
