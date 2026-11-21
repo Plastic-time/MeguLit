@@ -1,0 +1,49 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* 传火碑: an original drawing in CSS only. A dim marble hall, cold light falling from above, one wide black stone slab with the
+   names engraved in vertical columns (inner shadow, a faint glowing groove). Sits under the title bar, never over it. */
+.monu{--stone:#0a0b0f;--groove:#8db4de;--glow:rgba(120,176,236,.5);position:fixed;left:0;right:0;bottom:0;top:var(--titlebar-height,70px);z-index:150;display:flex;flex-direction:column;align-items:center;padding:18px 32px 28px;color:#c9d6e6;background:radial-gradient(120% 80% at 50% 0%,#26344d 0%,#121926 46%,#07080c 100%);overflow:hidden;animation:monu-in .28s ease-out both}
+.monu.is-closing{animation:monu-out .18s ease-in both}
+@keyframes monu-in{from{opacity:0}to{opacity:1}}
+@keyframes monu-out{to{opacity:0}}
+.monu-hall{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+/* marble: veins from SVG noise, very faint */
+.monu-hall::before{content:"";position:absolute;inset:0;opacity:.22;mix-blend-mode:soft-light;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='520' height='520'><filter id='n' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' baseFrequency='0.006 0.016' numOctaves='5' seed='7'/><feColorMatrix values='0 0 0 0 .75  0 0 0 0 .82  0 0 0 0 .95  0 0 0 1.6 -.55'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");background-size:520px 520px}
+.monu-hall::after{content:"";position:absolute;inset:0;background:radial-gradient(90% 60% at 50% 100%,rgba(0,0,0,.65),transparent 70%),linear-gradient(90deg,rgba(0,0,0,.55),transparent 22%,transparent 78%,rgba(0,0,0,.55))}
+.monu-beam{position:absolute;top:-6%;height:92%;background:linear-gradient(to bottom,rgba(185,222,255,.5),rgba(130,185,240,.16) 55%,transparent 92%);filter:blur(14px);mix-blend-mode:screen;transform-origin:50% 0;animation:monu-beam 9s ease-in-out infinite alternate}
+.monu-beam.b1{left:14%;width:11%;clip-path:polygon(34% 0,66% 0,100% 100%,0 100%);transform:rotate(7deg);animation-delay:-2s}
+.monu-beam.b2{left:44%;width:13%;clip-path:polygon(30% 0,70% 0,100% 100%,0 100%);opacity:.9}
+.monu-beam.b3{right:13%;width:10%;clip-path:polygon(34% 0,66% 0,100% 100%,0 100%);transform:rotate(-8deg);animation-delay:-5s}
+@keyframes monu-beam{from{opacity:.55}to{opacity:1}}
+.monu-floor{position:absolute;left:50%;bottom:-8%;width:78%;height:22%;transform:translateX(-50%);background:radial-gradient(50% 50% at 50% 50%,rgba(110,168,230,.20),transparent 72%);filter:blur(10px)}
+.monu-head{position:relative;z-index:2;display:flex;align-items:flex-end;gap:18px;width:min(1180px,100%);margin-bottom:14px}
+.monu-head>div{flex:1;min-width:0}
+.monu-head h2{margin:0;font:600 24px/1.2 "Noto Serif JP","Noto Serif SC","Yu Mincho","Songti SC",serif;letter-spacing:.3em;color:#dbe8f7;text-shadow:0 0 18px rgba(130,185,245,.45)}
+.monu-head p{margin:6px 0 0;font-size:12.5px;letter-spacing:.06em;color:#7e8da3}
+.monu-total{flex:none;font:500 12px/1 "IBM Plex Mono",Consolas,monospace;letter-spacing:.14em;color:#8db4de}
+.monu-close{flex:none;width:34px;height:34px;padding:0;border:0;border-radius:0;background:rgba(255,255,255,.04);box-shadow:inset 0 0 0 1px rgba(160,190,230,.22);color:#b9c8da;font-size:22px;line-height:1;cursor:pointer}
+.monu-close:hover{box-shadow:inset 0 0 0 1px #8db4de;color:#fff}
+/* the stone */
+.monu-slab{position:relative;z-index:1;flex:1;min-height:0;width:min(1180px,100%);overflow:hidden;border-radius:3px;background:linear-gradient(180deg,#0e1016 0%,#08090c 30%,#040507 100%);box-shadow:inset 0 0 90px rgba(0,0,0,.92),inset 0 2px 0 rgba(190,215,245,.10),inset 0 0 0 1px rgba(150,180,220,.14),0 36px 90px rgba(0,0,0,.85),0 0 110px rgba(90,150,230,.13)}
+.monu-slab::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;background:linear-gradient(180deg,rgba(150,200,255,.12),transparent 26%),linear-gradient(90deg,rgba(0,0,0,.5),transparent 9%,transparent 91%,rgba(0,0,0,.5))}
+.monu-scroll{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#2c3646 transparent;outline:0}
+.monu-space{position:relative;width:100%}
+.monu-row{position:absolute;left:0;right:0;top:0;height:var(--row);display:grid;grid-template-columns:repeat(var(--cols),var(--cell));justify-content:center;align-content:start;will-change:transform;box-shadow:inset 0 -1px 0 rgba(0,0,0,.7),0 1px 0 rgba(150,185,225,.045)}
+.monu-cell{box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:7px;height:var(--row);padding:20px 6px 12px;position:relative}
+.monu-cell+.monu-cell::before{content:"";position:absolute;left:0;top:18px;bottom:16px;width:1px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.55) 20%,rgba(0,0,0,.55) 80%,transparent);box-shadow:1px 0 0 rgba(150,185,225,.05)}
+/* engraved name: dark cut edge above, a lit lip below, a faint cold glow in the groove */
+.monu-name{writing-mode:vertical-rl;text-orientation:upright;height:122px;max-width:76px;overflow:hidden;font:500 17px/1.28 "Noto Serif JP","Noto Serif SC","Yu Mincho","Songti SC",serif;letter-spacing:.12em;color:#86a2c4;opacity:.78;text-shadow:0 -1px 0 rgba(0,0,0,.95),0 1px 0 rgba(190,215,245,.14),0 0 9px rgba(120,176,236,.28);overflow-wrap:anywhere}
+.monu-name.is-long{font-size:14px;letter-spacing:.06em}
+.monu-cell.is-anon .monu-name{opacity:.55;letter-spacing:.08em}
+.monu-date{margin-top:auto;font:500 10px/1 "IBM Plex Mono",Consolas,monospace;letter-spacing:.08em;color:#566377;text-shadow:0 -1px 0 rgba(0,0,0,.9)}
+.monu-game{box-sizing:border-box;max-width:100%;padding:0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;line-height:1.2;color:#4b5667;text-shadow:0 -1px 0 rgba(0,0,0,.9)}
+.monu-cell:hover .monu-name{opacity:1;color:#a9c6e8}
+/* your own name: lit */
+.monu-cell.is-mine{background:radial-gradient(70% 60% at 50% 38%,rgba(140,200,255,.20),rgba(80,140,220,.07) 60%,transparent 80%);box-shadow:inset 0 0 0 1px rgba(150,205,255,.28),inset 0 0 26px rgba(110,176,255,.16)}
+.monu-cell.is-mine .monu-name{opacity:1;color:#f1f9ff;text-shadow:0 -1px 0 rgba(0,0,0,.9),0 0 6px rgba(190,228,255,.95),0 0 16px rgba(120,185,255,.75),0 0 34px rgba(90,160,255,.5);animation:monu-pulse 3.4s ease-in-out infinite}
+.monu-cell.is-mine .monu-date,.monu-cell.is-mine .monu-game{color:#9fc4ea}
+@keyframes monu-pulse{50%{text-shadow:0 -1px 0 rgba(0,0,0,.9),0 0 5px rgba(190,228,255,.8),0 0 12px rgba(120,185,255,.55),0 0 24px rgba(90,160,255,.35)}}
+.monu-empty{position:absolute;left:0;right:0;top:50%;z-index:1;margin:0;transform:translateY(-50%);text-align:center;font:500 18px/1.6 "Noto Serif JP","Noto Serif SC","Yu Mincho","Songti SC",serif;letter-spacing:.32em;color:#5f7391;text-shadow:0 -1px 0 rgba(0,0,0,.95),0 1px 0 rgba(190,215,245,.12),0 0 14px rgba(120,176,236,.22)}
+.monu-empty[hidden]{display:none}
+@media (max-width:760px){.monu{padding:12px 14px 18px}.monu-head h2{font-size:20px}}
+@media (prefers-reduced-motion:reduce){.monu,.monu-beam,.monu-cell.is-mine .monu-name{animation:none}}
+.monu-cell.is-anon .monu-name{text-orientation:mixed;white-space:nowrap;font-size:15px;letter-spacing:.08em}

@@ -77,7 +77,7 @@ function writeSent(root,key,v){try{fs.mkdirSync(dir(root),{recursive:true});cons
 function markSent(root,key,credit=null){const old=readSent(root,key)||{};writeSent(root,key,{...old,key,at:old.at||new Date().toISOString(),...(credit?{credit}:{})});}
 function sent(root,key){return gameDiff.KEY.test(String(key||''))&&fs.existsSync(sentFile(root,key));}
 /* a credit name: plain text, at most 20 characters, no control characters; empty = none (anonymous) */
-const CREDIT_MAX=20;
+const CREDIT_MAX=30;
 const BAD_CP=c=>c<32||c===127||c===0x2028||c===0x2029||(c>=0x202a&&c<=0x202e)||(c>=0x2066&&c<=0x2069);
 function cleanName(v){if(typeof v!=='string')return null;const t=[...v].map(ch=>BAD_CP(ch.codePointAt(0))?' ':ch).join('').replace(/\s+/g,' ').trim();const c=[...t].slice(0,CREDIT_MAX).join('').trim();return c||null;}
 /* what the relay says about a credit: {torchNo, name|null, at} or null */
