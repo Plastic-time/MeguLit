@@ -10,13 +10,23 @@ function titleOf(mana){let i=0;for(let k=0;k<TITLES.length;k++)if(mana>=TITLES[k
 function state(db){ensure(db);const mana=db.prepare('SELECT COALESCE(SUM(points),0) AS m FROM learning_mana').get().m,album=db.prepare('SELECT COUNT(*) AS n FROM learning_album').get().n;return {mana,album,...titleOf(mana)};}
 /* One reward: kind (answer / learned / find / clear / practice), a streak bonus for answers, and a line to collect. */
 function add(db,{kind,ref='',streak=0,line=null}={}){
-  if(!KINDS[kind])throw Error('INVALID_REWARD');ensure(db);const before=state(db),now=Math.floor(Date.now()/1000);
+  if(!KINDS[kind])throw Error('INVALID_REWARD');
   const bonus=kind==='answer'?Math.min(20,Math.max(0,(Number(streak)||0)-1)*2):0,points=KINDS[kind]+bonus;
-  db.prepare('INSERT INTO learning_mana(kind,points,ref,at) VALUES(?,?,?,?)').run(kind,points,String(ref).slice(0,80),now);
-  let collected=false;
-  if(kind==='answer'&&line&&['history','script'].includes(line.origin)&&typeof line.text==='string'&&line.text){
-    const r=db.prepare('INSERT OR IGNORE INTO learning_album(text,title,translation,point,read_at,at) VALUES(?,?,?,?,?,?)').run(line.text.slice(0,300),String(line.title||'').slice(0,200),String(line.translation||'').slice(0,500),String(ref).slice(0,80),Number(line.readAt)||null,now);collected=r.changes>0;}
-  const after=state(db);return {...after,gained:points,bonus,collected,levelUp:after.rank>before.rank};
+  db.exec('SAVEPOINT learning_reward');
+  try{
+    const before=state(db),now=Math.floor(Date.now()/1000);
+    db.prepare('INSERT INTO learning_mana(kind,points,ref,at) VALUES(?,?,?,?)').run(kind,points,String(ref).slice(0,80),now);
+    let collected=false;
+    if(kind==='answer'&&line&&['history','script'].includes(line.origin)&&typeof line.text==='string'&&line.text){
+      const r=db.prepare('INSERT OR IGNORE INTO learning_album(text,title,translation,point,read_at,at) VALUES(?,?,?,?,?,?)').run(line.text.slice(0,300),String(line.title||'').slice(0,200),String(line.translation||'').slice(0,500),String(ref).slice(0,80),Number(line.readAt)||null,now);collected=r.changes>0;}
+    const after=state(db);
+    db.exec('RELEASE learning_reward');
+    return {...after,gained:points,bonus,collected,levelUp:after.rank>before.rank};
+  }catch(error){
+    // SQLite may already have rolled back the transaction on a write error.
+    try{db.exec('ROLLBACK TO learning_reward; RELEASE learning_reward');}catch{}
+    throw error;
+  }
 }
 function album(db,{limit=300}={}){ensure(db);return db.prepare('SELECT text,title,translation,point,read_at AS readAt,at FROM learning_album ORDER BY at DESC LIMIT ?').all(limit);}
 module.exports={KINDS,TITLES,titleOf,state,add,album,ensure};

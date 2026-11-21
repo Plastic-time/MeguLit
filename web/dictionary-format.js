@@ -3,20 +3,31 @@
    part-of-speech codes inline). formatDefinition turns it into senses: { tags, glosses } so the page can show a numbered list. */
 
 const ARROW = /[→⇒]\s*(?:英和|和英|英|和|参照|cf\.?)?\s*/g;
-const NUMBERED = /(?:^|\s)(?:\(\d{1,2}\)|（\d{1,2}）|[①-⑳]|\d{1,2}[.)．])\s*/g;
+const NUMBERED = /(?:^|\s)(?:\(\d{1,2}\)|（\d{1,2}）|[①-⑳]|\d{1,2}(?:\)|[.．](?![0-9０-９])))\s*/g;
+// A slash between digits is part of a fraction in the definition.
+const GLOSS_SEPARATOR = /[;；]|(?<![0-9０-９])\/|\/(?![0-9０-９])/;
 const TAG = /^\s*(?:\(([^()]{1,24})\)|（([^（）]{1,24})）|【([^【】]{1,24})】|\[([^[\]]{1,24})\])\s*/;
 
 function cleanGloss(text) { return String(text).replace(ARROW, '').replace(/\s+/g, ' ').replace(/^[\s,，、;；/]+|[\s,，、;；/]+$/g, '').trim(); }
 
 export function formatDefinition(raw) {
   const text = String(raw || '').replace(/\r/g, '').trim(); if (!text) return [];
-  const lines = text.split(/\n+/).flatMap(line => line.replace(NUMBERED, '\n').split('\n')).map(s => s.trim()).filter(Boolean);
+  let nextNumber = null;
+  const lines = text.split(/\n+/).flatMap(line => {
+    // A numbered line may itself begin with a quantity, e.g. "1.成人\n2.18歳未満".
+    const marker = /^\s*(\d{1,2})[.．]/.exec(line);
+    if (marker && (Number(marker[1]) === nextNumber || !/^[0-9０-９]/.test(line.slice(marker[0].length)))) {
+      nextNumber = Number(marker[1]) + 1;
+      line = line.slice(marker[0].length);
+    } else nextNumber = null;
+    return line.replace(NUMBERED, '\n').split('\n');
+  }).map(s => s.trim()).filter(Boolean);
   const senses = [];
   for (let line of lines) {
     const tags = []; let match;
     while ((match = TAG.exec(line))) { tags.push(...match.slice(1).find(Boolean).split(/[,，、]/).map(s => s.trim()).filter(Boolean)); line = line.slice(match[0].length); }
     const seen = new Set(), glosses = [];
-    for (const part of line.split(/[;；]|\s*\/\s*/)) { const g = cleanGloss(part); if (g && !seen.has(g.toLowerCase())) { seen.add(g.toLowerCase()); glosses.push(g); } }
+    for (const part of line.split(GLOSS_SEPARATOR)) { const g = cleanGloss(part); if (g && !seen.has(g.toLowerCase())) { seen.add(g.toLowerCase()); glosses.push(g); } }
     if (glosses.length) senses.push({ tags, glosses });
     else if (tags.length && senses.length) senses[senses.length - 1].tags.push(...tags);
   }

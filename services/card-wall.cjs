@@ -30,7 +30,9 @@ function withLock(root,fn){
   try{if(Date.now()-fs.statSync(lock).mtimeMs>30000)fs.rmSync(lock,{force:true});}catch{}sleep(25);}}
  if(fd===null)throw Error('CARDS_BUSY');
  try{return fn();}finally{try{fs.closeSync(fd);}catch{}try{fs.rmSync(lock,{force:true});}catch{}}}
-function atomicWrite(file,data){fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.'+Date.now().toString(36)+'.tmp';fs.writeFileSync(tmp,data);fs.renameSync(tmp,file);}
+function atomicWrite(file,data){fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.'+Date.now().toString(36)+'.tmp';
+ try{fs.writeFileSync(tmp,data);fs.renameSync(tmp,file);}
+ catch(error){try{fs.rmSync(tmp,{force:true});}catch{}throw error;}}
 const newId=p=>p+Date.now().toString(36)+crypto.randomBytes(3).toString('hex');
 function clean(raw){
  const v=raw&&typeof raw==='object'?raw:{};
@@ -231,11 +233,19 @@ function create(db,root,req){
  const finish=req.finish==='shine'||req.finish==='holo'?req.finish:'plain';
  const id=newId('c'),img=path.join(dirOf(root),'img');fs.mkdirSync(img,{recursive:true});
  const face=id+'-face.jpg',full=id+'-full.jpg';
- const res=runner([{mode:'crop',in:file,out:path.join(img,face),x:still.x,y:still.y,scale:still.scale,w:FACE_W,h:FACE_H},{mode:'thumb',in:file,out:path.join(img,full),max:FULL}]);
- if(!res[0]?.ok||!res[1]?.ok){for(const f of [face,full])try{fs.rmSync(path.join(img,f),{force:true});}catch{}throw Error('CARD_IMAGE_FAILED');}
- const k=Math.min(1,FULL/Math.max(res[1].w,res[1].h));
- const card={id,gameId:g.id,title:g.title,initial:initialOf(g.title),kind:s.kind,source:s.source,srcId,face,full,w:FACE_W,h:FACE_H,fullW:Math.round(res[1].w*k),fullH:Math.round(res[1].h*k),still,finish,createdAt:Date.now()};
- mutate(root,x=>{x.cards.push(card);});return publicCard(root,card);}
+ let card;
+ try{
+  const res=runner([{mode:'crop',in:file,out:path.join(img,face),x:still.x,y:still.y,scale:still.scale,w:FACE_W,h:FACE_H},{mode:'thumb',in:file,out:path.join(img,full),max:FULL}]);
+  if(!res[0]?.ok||!res[1]?.ok)throw Error('CARD_IMAGE_FAILED');
+  const k=Math.min(1,FULL/Math.max(res[1].w,res[1].h));
+  card={id,gameId:g.id,title:g.title,initial:initialOf(g.title),kind:s.kind,source:s.source,srcId,face,full,w:FACE_W,h:FACE_H,fullW:Math.round(res[1].w*k),fullH:Math.round(res[1].h*k),still,finish,createdAt:Date.now()};
+  mutate(root,x=>{x.cards.push(card);});
+ }catch(error){
+  // card-image.ps1 writes each JPEG to its .tmp sibling before moving it into place.
+  for(const f of [face,full,face+'.tmp',full+'.tmp'])try{fs.rmSync(path.join(img,f),{force:true});}catch{}
+  throw error;
+ }
+ return publicCard(root,card);}
 function full(root,cardId){const s=readState(root),c=s.cards.find(x=>x.id===cardId);if(!c)throw Error('CARD_NOT_FOUND');return {id:c.id,full:dataUrl(path.join(dirOf(root),'img',path.basename(c.full))),w:c.fullW,h:c.fullH};}
 function remove(root,cardId){
  const c=mutate(root,s=>{const c=s.cards.find(x=>x.id===cardId);if(!c)throw Error('CARD_NOT_FOUND');s.cards=s.cards.filter(x=>x!==c);for(const t of s.toploaders)if(t.cardId===cardId)t.cardId=null;return c;});

@@ -31,11 +31,15 @@ function sources(dir){const players=[],bundles=[],loose=[];
 
 function noise(s){return !CJK.test(s)||/^(Assets|Packages)\/|^[\w.\-/\\ ]+\.\w{2,5}$/.test(s)||/^\d+_[A-Za-z]/.test(s);}
 /* one serialized buffer → entries { name, kind, bytes } */
-function entriesOf(buf,label){const r=ser.parse(buf);if(!r)return [];const out=[];const mono=[];
+function entriesOf(buf,label,ids){const r=ser.parse(buf);if(!r)return [];const out=[];const mono=[];
+ let linked=null;
+ if(ids?.size&&r.little&&r.version>=17){try{linked=ser.parse(buf,{externals:true});}catch{}}
  for(const o of r.objects){
   if(o.type===49){const t=ser.textAsset(buf,o);if(t&&t.text.length>=8&&CJK.test(t.text.toString('utf8',0,Math.min(t.text.length,200000))))out.push({name:t.name||label,bytes:Buffer.from(t.text)});}
-  else if(o.type===114&&o.size>=12){let s;try{s=ser.strings(buf,o);}catch{continue;}for(const x of s)if(!noise(x))mono.push(x);}}
- if(mono.length>=2)out.push({name:label+'#mono',bytes:Buffer.from('\u0001MONO\n'+mono.join('\n'),'utf8')});
+  else if(o.type===114&&o.size>=12){
+   if(linked){const table=require('./unity-i2.cjs').entry(buf,o,linked,ids);if(table){out.push(table);continue;}}
+   let s;try{s=ser.strings(buf,o);}catch{continue;}for(const x of s)if(!noise(x))mono.push(x);}}
+ if(mono.length>=2||(mono.length===1&&out.some(e=>e.kind==='i2')))out.push({name:label+'#mono',kind:'mono',bytes:Buffer.from('\u0001MONO\n'+mono.join('\n'),'utf8')});
  return out;}
 
 function wantNode(head){
@@ -49,9 +53,16 @@ const memo=new Map();
 function index(dir,opts={}){const key=dir;const src=sources(dir);const sig=[...src.players,...src.bundles,...src.loose].map(f=>f+'|'+stat(f)).join('\n');
  const hit=memo.get(key);if(hit&&hit.sig===sig)return hit.scenes;
  const deadline=opts?.deadline||Infinity;let timedOut=false;
- const scenes=new Map();const add=(e,from)=>{let k=e.name.toLowerCase(),n=1,base=k;while(scenes.has(k))k=base+'~'+(++n);scenes.set(k,{name:e.name,read:()=>e.bytes,from});};
+ const scenes=new Map();const add=(e,from)=>{let k=e.name.toLowerCase(),n=1,base=k;while(scenes.has(k))k=base+'~'+(++n);scenes.set(k,{name:e.name,read:()=>e.bytes,from,kind:e.kind});};
+ const metadata=new Map(src.players.filter(f=>path.basename(f).toLowerCase()==='globalgamemanagers.assets').map(f=>[path.dirname(f),f]));
+ const scripts=new Map();
  for(const f of src.players){if(Date.now()>deadline){timedOut=true;break;}let sz=0;try{sz=fs.statSync(f).size;}catch{}if(sz>MAX_NODE*4||!sz)continue;let buf;try{buf=fs.readFileSync(f);}catch{continue;}
-  try{for(const e of entriesOf(buf,path.basename(f)))add(e,f);}catch{}}
+  const folder=path.dirname(f),meta=metadata.get(folder);
+  if(meta&&!scripts.has(folder)){
+   scripts.set(folder,null);
+   try{if(meta===f||fs.statSync(meta).size<=MAX_NODE*4)scripts.set(folder,require('./unity-i2.cjs').scriptIds(meta===f?buf:fs.readFileSync(meta)));}catch{}
+  }
+  try{for(const e of entriesOf(buf,path.basename(f),scripts.get(folder)))add(e,f);}catch{}}
  if(!timedOut)for(const f of src.bundles){if(Date.now()>deadline){timedOut=true;break;}
   let nodes;try{nodes=ufs.readMatchingNodes(f,wantNode,MAX_NODE);}catch{nodes=null;}if(!nodes)continue;
   for(const node of nodes){try{for(const e of entriesOf(node.data,path.basename(f).replace(/_[0-9a-f]{32}\.bundle$/i,'')))add(e,f);}catch{}}}
@@ -82,15 +93,86 @@ function csvLines(text){const rows=text.split(/\r?\n/).filter(Boolean);if(rows.l
  return cells.slice(1).filter(r=>r[best]&&CJK.test(r[best])).map(r=>({text:r[best],speaker:sc>=0&&r[sc]&&speakerLike(r[sc])?r[sc]:''}));}
 function textLines(text){return text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>=2&&CJK.test(l)&&!/^(\/\/|#|;)/.test(l)&&!noise(l)).map(l=>({text:l,speaker:''}));}
 const clean=t=>t.replace(/<br\s*\/?>|\\n|\[n\]/gi,'\n').replace(/<\/?(?:color|size|b|i|ruby|rt|sprite)[^>]*>/gi,'').replace(/\[rb,([^,\]]*),[^\]]*\]/g,'$1').trim();
+// These TextAssets store one displayed message between MesSta and MesEnd, sometimes across several lines.
+function messageText(text, readings){
+ return clean(text.replace(/%rbs([^%{}\n]+?)\{([^%{}\n]+)\}%rbe|%rbs([^%()\n]+?)\(([^%()\n]+)\)%rbe/g,
+  (_,base,reading,altBase,altReading)=>{
+   if(readings)readings.push([base||altBase,reading||altReading]);
+   return base||altBase;
+  }).replace(/%dot\(([^()]*)\)/g,'$1').replace(/%co\d+|%coe|%hos|%hoe/g,''));
+}
+function messageBlocks(text){
+ const messages=[];
+ let speaker='',parts=null,complete=false,cjk=0,letters=0;
+ function flush(){
+  if(parts&&parts.length){
+   const readings=[],line=messageText(parts.join('\n'),readings);
+   if(CJK.test(line))cjk++;
+   if(/\p{L}/u.test(line))letters++;
+   messages.push({line,speaker,readings});
+   parts.length=0;
+  }
+ }
+ for(const raw of text.split(/\r?\n/)){
+  const line=raw.trim();
+  const name=/^#MesName\((.*)\)$/.exec(line);
+  if(name){flush();speaker=messageText(name[1]).replace(/@s/g,' ');}
+  else if(/^#MesSta\(.*\)$/.test(line)){flush();parts=[];}
+  else if(line==='#MesEnd()'&&parts){flush();complete=true;}
+  else if(parts&&line&&!/^(#|\/\/|;)/.test(line))parts.push(line);
+ }
+ flush();
+ if(!complete||!messages.length)return null;
+ const lines=[],speakers=[],ruby=[];
+ for(const msg of messages){
+  // Keep pauses such as 「……」 in CJK scripts. The same player can carry a separate English copy.
+  if(!CJK.test(msg.line)&&!(cjk>0&&cjk*2>=letters&&/^[\p{P}\p{S}\s]+$/u.test(msg.line)))continue;
+  lines.push(msg.line);speakers.push(msg.speaker);ruby.push(msg.readings.length?msg.readings:null);
+ }
+ const result={lines,anchors:[],speakers};
+ if(ruby.some(Boolean))result.ruby=ruby;
+ return result;
+}
 function parse(buf){
  let text=buf.toString('utf8');if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
+ if(text.startsWith('\u0001I2\n')){
+  try{
+   const doc=JSON.parse(text.slice(4));
+   if([doc.lines,doc.zh,doc.anchors].every(a=>Array.isArray(a)&&a.every(v=>typeof v==='string')))return doc;
+  }catch{}
+ }
  let rows=null;
  if(text.startsWith('\u0001MONO\n'))rows=text.slice(6).split('\n').map(t=>({text:t,speaker:''}));
  else{const t=text.trimStart();if(t[0]==='['||t[0]==='{'){try{rows=[];jsonLines(JSON.parse(t),rows);}catch{rows=null;}}
+  if(!rows&&text.includes('#MesSta(')){const messages=messageBlocks(text);if(messages)return messages;}
   if(!rows||!rows.length)rows=csvLines(text);if(!rows||!rows.length)rows=textLines(text);}
  const lines=[],speakers=[];const seen=new Set();
  for(const r of rows||[]){const t=clean(r.text);if(!t||!CJK.test(t))continue;const sp=(r.speaker||'').replace(/^\d+_(?:[A-Za-z ]+_)?/,'');lines.push(sp?sp+'：'+t:t);speakers.push(sp);}
  return {lines,anchors:[],speakers};}
+function originalLines(dir){
+ const list=index(dir);
+ if(!list.some(s=>s.kind==='i2'))return null;
+ const result=[],known=new Set(),localized=new Map(),japanese=new Set(),unknown=new Set();
+ for(const scene of list.filter(s=>s.kind==='i2')){
+  const doc=parse(scene.read());localized.set(scene,doc.lines);
+  for(const t of doc.lines){known.add(t);if(KANA.test(t))japanese.add(t);}
+  for(const t of doc.zh)if(t)known.add(t);
+ }
+ for(const scene of list){
+  if(localized.has(scene)){for(const line of localized.get(scene))result.push(line);continue;}
+  for(const line of parse(scene.read()).lines){
+   if(!known.has(line)&&!KANA.test(line)){
+    // A loose script or TextAsset carries authored text. An untyped MonoBehaviour may also carry resource labels.
+    if(scene.kind!=='mono')return null;
+    unknown.add(line);
+   }
+   result.push(KANA.test(line)?line:'');
+  }
+ }
+ // A small translated menu cannot establish the original for a larger, independent story.
+ // Serialized objects can repeat the same resource label in hundreds of places.
+ return japanese.size>unknown.size?result:null;
+}
 module.exports={id:'unity-assets',hint:'<游戏>_Data（TextAsset / MonoBehaviour / AssetBundle）',
  scenes:(dir,opts)=>index(dir,opts),archives:()=>[],sources:dir=>{const s=sources(dir);return [...s.players,...s.bundles,...s.loose].filter(f=>/_Data/i.test(f));},
- parse,test:()=>false,_internal:{entriesOf,jsonLines,csvLines,sources,wantNode,KANA}};
+ parse,originalLines,patchLines:require('./fill.cjs').patchLines,test:()=>false,_internal:{entriesOf,jsonLines,csvLines,sources,wantNode,KANA}};

@@ -9,7 +9,7 @@
 const COMMON=['AABB','AnimationClip','AnimationCurve','AnimationState','Array','Base','BitField','bitset','bool','char','ColorRGBA','Component','data','deque','double','dynamic_array','FastPropertyName','first','float','Font','GameObject','Generic Mono','GradientNEW','GUID','GUIStyle','int','list','long long','map','Matrix4x4f','MdFour','MonoBehaviour','MonoScript','m_ByteSize','m_Curve','m_EditorClassIdentifier','m_EditorHideFlags','m_Enabled','m_ExtensionPtr','m_GameObject','m_Index','m_IsArray','m_IsStatic','m_MetaFlag','m_Name','m_ObjectHideFlags','m_PrefabInternal','m_PrefabParentObject','m_Script','m_StaticEditorFlags','m_Type','m_Version','Object','pair','PPtr<Component>','PPtr<GameObject>','PPtr<Material>','PPtr<MonoBehaviour>','PPtr<MonoScript>','PPtr<Object>','PPtr<Prefab>','PPtr<Sprite>','PPtr<TextAsset>','PPtr<Texture>','PPtr<Texture2D>','PPtr<Transform>','Prefab','Quaternionf','Rectf','RectInt','RectOffset','second','set','short','size','SInt16','SInt32','SInt64','SInt8','staticvector','string','TextAsset','TextMesh','Texture','Texture2D','Transform','TypelessData','UInt16','UInt32','UInt64','UInt8','unsigned int','unsigned long long','unsigned short','vector','Vector2f','Vector3f','Vector4f','m_ScriptingClassIdentifier','Gradient','Type*','int2_storage','int3_storage','BoundsInt','m_CorrespondingSourceObject','m_PrefabInstance','m_PrefabAsset','FileSize','Hash128'];
 const COMMON_AT=(()=>{const m=new Map();let o=0;for(const s of COMMON){m.set(o,s);o+=s.length+1;}return m;})();
 
-function parse(buf){
+function parse(buf,{externals=false}={}){
  let p=0;const be=()=>{const v=buf.readUInt32BE(p);p+=4;return v;};
  let metaSize=be(),fileSize=be();const version=be();let dataOffset=be();let little=true;
  if(version<9||version>40)return null;
@@ -34,7 +34,22 @@ function parse(buf){
   o.offset=(version>=22?i64():u32())+dataOffset;o.size=u32();
   if(version>=16){const ti=i32();o.type=types[ti]?.classId??-1;o.tree=types[ti]?.tree||null;o.scriptIndex=types[ti]?.scriptIndex;}else{const tid=i32();const t=types.find(x=>x.classId===tid);o.type=t?t.classId:tid;o.tree=t?.tree||null;i16();if(version>=11)i16();if(version>=15)p++;}
   objects.push(o);}
- return {version,unity,typeTree,little,objects};}
+ const result={version,unity,typeTree,little,objects};
+ if(externals&&version>=17){
+  const limit=Math.min(dataOffset,buf.length),scripts=i32();
+  if(scripts<0||scripts>(limit-p)/12)return null;
+  for(let i=0;i<scripts;i++){p+=4;p=(p+3)&~3;p+=8;}
+  if(p+4>limit)return null;
+  const count=i32();if(count<0||count>(limit-p)/22)return null;
+  const names=[];
+  for(let i=0;i<count;i++){
+   const end=buf.indexOf(0,p);if(end<0||end+21>=limit)return null;
+   p=end+21;const last=buf.indexOf(0,p);if(last<0||last>=limit)return null;
+   names.push(buf.toString('utf8',p,last));p=last+1;
+  }
+  result.externals=names;
+ }
+ return result;}
 
 /* type tree, "blob" format (version 12+ and 10): count, string buffer size, 24-byte nodes (32 with the ref-type hash from 19) */
 function readTree(buf,p,version,little,setP){
