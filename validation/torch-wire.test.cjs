@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+process.env.MEGULIT_RELAY_BASE='https://relay.test';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+const {fixture,database}=require('./helpers/torch-release.cjs'),P=require('../core/torch-release.cjs'),feed=require('../services/auto-profile-feed.cjs'),R=require('../services/torch-receive.cjs'),first=require('../services/first-player.cjs'),{openStore}=require('../services/store.cjs');
+test('actual SQLite schema -> signed relay publication -> streamed import -> current source card, then higher winner and export',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'mgl-torch-wire-')),exe=path.join(root,'game.exe'),script=path.join(root,'data.xp3');fs.writeFileSync(exe,'MZ wire fixture');fs.writeFileSync(script,'neutral wire script');
+ const f=fixture(),relay=await import('../relay/src/torch-release.js'),db=database(),app=openStore(root);t.after(async()=>{await R.stop(root);feed._trust(null);app.close();db.raw.close();fs.rmSync(root,{recursive:true,force:true});});
+ f.identity.exe=await R.fileHash(exe);f.identity.script=await R.fileHash(script);feed._trust(f.keys.profileKeys);
+ app.prepare('INSERT INTO games(id,title,executable,source,original) VALUES(?,?,?,?,?)').run('g','Neutral wire fixture',exe,'manual',JSON.stringify({library:{engine:'KiriKiri'}}));assert.equal(app.prepare('PRAGMA table_info(games)').all().some(c=>c.name==='engine'),false);
+ feed.markSent(root,f.identity.exe,{torchNo:9,name:'Prior uploader',at:'old'});
+ const now=new Date('2026-11-21T02:00:00.000Z'),helpers={json:v=>Response.json(v),fail:(error,status=400)=>Response.json({error},{status}),readJSON:async r=>({value:await r.json()})},env={...f.env,DB:db},wire=async(url,init={})=>{const u=new URL(url);return relay.torchReleaseRoute(new Request(url,init),env,now,u,u.pathname,helpers);};
+ async function publish(old=null,mean=.94){const profile=f.profile((old?.profile.rev||0)+1),review=await f.review(profile,old,{mean}),proposal=await relay.propose(db,{profile,review},f.env,new Date('2026-11-21T01:00:00.000Z')),release=await require('../tools/torch-release.cjs').signProposal(proposal.proposal,{keys:f.keys,sign:f.publisher.sign});await relay.publish(db,release,f.env,now);return release;}
+ const a=await publish();const initial=await R.receive(root,'g',{keys:f.keys,fetcher:wire,resources:()=>true});assert.equal(initial.state,'received');assert.equal(initial.receipt.hash,await P.hash(a));assert.equal(initial.receipt.serverTime,now.toISOString());assert.notEqual(initial.receipt.serverTime,a.preparedAt);
+ const card=await first.state(app,root,'g',{wait:0,torchKeys:f.keys});assert.equal(card.state,'received');assert.equal(card.receipt.hash,await P.hash(a));assert.equal(card.receipt.credit.torchNo,0);
+ const b=await publish(a,.96);await R.receive(root,'g',{keys:f.keys,fetcher:wire,resources:()=>true});const next=await first.state(app,root,'g',{wait:0,torchKeys:f.keys});assert.equal(next.receipt.hash,await P.hash(b));assert.notEqual(next.receipt.hash,card.receipt.hash);
+ const out=await relay.exportHistory(db,f.identity.exe);assert.equal(out.releases.length,2);assert.equal(out.releases[0].publishedAt,now.toISOString());const seed=path.join(root,'The Seed');fs.mkdirSync(seed);await require('../tools/torch-release.cjs').exportHistory(out,seed,{keys:f.keys});assert.equal(fs.existsSync(path.join(seed,'history','v1',f.identity.exe,(await P.hash(a))+'.json')),true);
+ app.prepare('UPDATE games SET removed_at=1 WHERE id=?').run('g');assert.equal((await R.receive(root,'g',{keys:f.keys,fetcher:wire,resources:()=>true})).state,'hidden');assert.equal((await first.state(app,root,'g',{wait:0,torchKeys:f.keys})).state,'hidden');
+});
