@@ -85,6 +85,24 @@ function playableGame(g){
  const exe=g.exe&&!isTranslated(g.exe)?g.exe:variants[0]?.exe||mainExe(g.dir||'')||g.exe||'';
  return {...g,exe,localeJapanese:recommended(g,exe),variants:variants.map(v=>({...v,localeJapanese:recommended(g,v.exe)}))};
 }
+/* 2026-11-21 (群友: BALDR SKY Steam 版 Dive1+Dive2 扫不出/打不开) a Steam install that holds one work in parts: the install
+   root's program and a program of the same file name in a subfolder (BALDR SKY: BaldrSky.exe + Dive1\BaldrSky.exe, the part
+   folder carries only its own override archives and no steam_api.dll). Steam's single launch option starts only the root
+   one. Every part is recorded as a variant, so a part added by hand is the same library game and the launch knows the
+   install tree. Generic: same program name, any engine; a game diff may name the parts (library.partLabels). */
+const PART_SKIP=/^(save|savedata|_commonredist|redist|directx|manual|ost|soundtrack|bonus|extra|movie|backup|bak)$/i;
+function steamParts(root,exe,title=''){
+ if(!root||!exe||path.dirname(exe).toLowerCase()!==path.resolve(root).toLowerCase())return [];
+ const name=path.basename(exe).toLowerCase(),parts=[{dir:path.resolve(root),exe,name:''}];
+ for(const n of listing(root).names){const sub=path.join(root,n);try{if(PART_SKIP.test(n)||isTranslated(n)||!fs.statSync(sub).isDirectory())continue;}catch{continue;}
+  const hit=listing(sub).names.find(f=>f.toLowerCase()===name);if(!hit)continue;try{if(fs.statSync(path.join(sub,hit)).size<200000)continue;}catch{continue;}
+  parts.push({dir:sub,exe:path.join(sub,hit),name:n});}
+ if(parts.length<2)return [];
+ let labels=null;try{const P=require('./profiles/index.cjs');labels=P.get(P.profileFor({exe,title,folder:root,steamAppId:require('./steam-owned.cjs').steamOf(exe)?.appid||''}),'library.partLabels',null);}catch{}
+ return parts.map(p=>({label:String(labels?.[p.name||'.']||p.name||title||path.basename(root)),dir:p.dir,exe:p.exe,part:p.name||'.'}));}
+/* why each scanned folder was taken or left out (logs/library-scan.log, kept under 512 KB): a game "not found" by the scan
+   is told from this file instead of a guess */
+function scanLog(root,entry){if(!root)return;try{const dir=path.join(root,'logs'),file=path.join(dir,'library-scan.log');fs.mkdirSync(dir,{recursive:true});try{if(fs.statSync(file).size>512*1024)fs.renameSync(file,file+'.1');}catch{}fs.appendFileSync(file,JSON.stringify({at:new Date().toISOString(),...entry})+'\n');}catch{}}
 const hookState=e=>!e?'unknown':e.hook===true?'supported':e.hook===null?'unverified':'unsupported';
 
 // ── Steam ──────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -178,7 +196,7 @@ async function vndbSteam(appid){
 async function download(url,file){try{const r=await fetch(url,{signal:AbortSignal.timeout(15000)});if(!r.ok)return false;fs.writeFileSync(file,Buffer.from(await r.arrayBuffer()));return true;}catch{return false;}}
 
 class Library{
- constructor(layout){this.locale=new LocaleEmulator(layout.root||path.dirname(layout.config));this.file=path.join(layout.config,'library.json');this.coverDir=path.join(layout.root||path.dirname(layout.config),'data','assets','covers');this.state=this.read();this.verifiedPids=new Set();}
+ constructor(layout){this.locale=new LocaleEmulator(layout.root||path.dirname(layout.config));this.file=path.join(layout.config,'library.json');this.coverDir=path.join(layout.root||path.dirname(layout.config),'data','assets','covers');this.state=this.read();this.verifiedPids=new Set();this.logRoot=layout.root||path.dirname(layout.config);}
  read(){try{const v=JSON.parse(fs.readFileSync(this.file,'utf8'));return {autoSeries:v.autoSeries!==false,localeAutoJapanese:v.localeAutoJapanese!==false,localePath:String(v.localePath||''),setupDone:!!v.setupDone,steamPath:steamRoot(String(v.steamPath||'').trim()),folders:Array.isArray(v.folders)?v.folders.map(String):[],games:Array.isArray(v.games)?v.games:[],scanVersion:5,notGal:v.scanVersion===5&&v.notGal&&typeof v.notGal==='object'?v.notGal:{}};}catch{return {setupDone:false,steamPath:'',folders:[],games:[],notGal:{}};}}
  write(){try{fs.mkdirSync(path.dirname(this.file),{recursive:true});fs.writeFileSync(this.file+'.tmp',JSON.stringify(this.state,null,2));fs.renameSync(this.file+'.tmp',this.file);return true;}catch{return false;}}
  load(){return {...this.state,games:this.state.games.map(playableGame)};}
@@ -205,7 +223,7 @@ class Library{
    scanned.add(c.root.toLowerCase());
    // Folders already found not to be a visual novel are skipped until their contents change (start-up checks stay fast).
    const stamp=(()=>{try{return Math.round(fs.statSync(c.root).mtimeMs);}catch{return 0;}})(),rootKey=c.root.toLowerCase();
-   if(this.state.notGal[rootKey]===stamp&&!known.has(rootKey)){if(c.source==='folder')this.unconfirmed.push({title:c.title,dir:c.root});continue;}
+   if(this.state.notGal[rootKey]===stamp&&!known.has(rootKey)){scanLog(this.logRoot,{source:c.source,appid:c.appid||'',title:c.title,dir:c.root,result:'skipped',why:'not-gal-cached'});if(c.source==='folder')this.unconfirmed.push({title:c.title,dir:c.root});continue;}
    const g=findGame(c.root);
    // A visual-novel folder whose only program is a translated edition (CLANNAD's clannadFV_sc.exe, the original REALLIVE.EXE
    // moved aside by the patch) is kept as a library game in that language; the game language dialog offers the original.
@@ -214,13 +232,13 @@ class Library{
       named as a translated edition hides its own program from the scan. It is listed with its main program as that
       language's edition, so the game language dialog can point to a Japanese one. */
    if(g&&g.engine&&!g.exe&&isTranslated(g.dir)){const own=mainExe(g.dir,true);if(own){g.exe=own;g.translated=translationOf(path.basename(g.dir))||'en';}}
-    if(!g||!g.exe)continue;
+    if(!g||!g.exe){scanLog(this.logRoot,{source:c.source,appid:c.appid||'',title:c.title,dir:c.root,result:'skipped',why:!g?'no-program':'no-japanese-program',engine:g?.engine?.name||'',programs:listing(c.root).names.filter(n=>/\.exe$/i.test(n)).slice(0,12)});continue;}
     const appid=c.appid||steamAppidFor(g.exe);
     if(appid){c.source='steam';c.appid=appid;}
     const previous=known.get(g.dir.toLowerCase());
     const steamTrusted=c.source!=='steam'||String(previous?.appid||'')===c.appid&&previous?.vndbSteamAppid===c.appid&&(previous.vndbId||g.engine&&!g.engine.generic);
     if(incremental&&previous&&!previous.steamRejected&&steamTrusted&&String(previous.exe).toLowerCase()===g.exe.toLowerCase()){
-     games.push({...previous,missing:false,engine:g.engine?.name||previous.engine||'',hook:previous.hook==='verified'?'verified':hookState(g.engine),variants:c.source==='folder'?findVariants(c.root):previous.variants||[]});continue;
+     games.push({...previous,missing:false,engine:g.engine?.name||previous.engine||'',hook:previous.hook==='verified'?'verified':hookState(g.engine),variants:c.source==='folder'?findVariants(c.root):c.source==='steam'?steamParts(g.dir,g.exe,c.title):previous.variants||[]});scanLog(this.logRoot,{source:c.source,appid:c.appid||'',title:c.title,dir:g.dir,exe:g.exe,result:'kept',engine:g.engine?.name||previous.engine||''});continue;
     }
    // A folder game is named after its game folder when that is deeper (E:GAL素晴日素晴らしき日々HD版 -> 素晴らしき日々).
    const names=[...new Set([c.source==='folder'&&g.dir!==c.root?label(g.dir):'',c.title].filter(Boolean))];
@@ -236,6 +254,7 @@ class Library{
       games.push(previous.source==='manual'?{...previous,missing:false}:{...previous,steamRejected:true,vndbId:null,vndbSteamAppid:null,missing:false});
      }
     }
+    scanLog(this.logRoot,{source:c.source,appid:c.appid||'',title:c.title,dir:g.dir,exe:g.exe,result:'skipped',why:lookupFailed?'vndb-unreachable':'not-gal',engine:g.engine?.name||''});
     if(c.source==='folder')this.unconfirmed.push({title:c.title,dir:g.dir,exe:g.exe});
     continue;
    }delete this.state.notGal[rootKey];
@@ -248,7 +267,8 @@ class Library{
    games.push({key,source:old.source==='manual'?'manual':c.source,appid:c.appid||null,title:c.source==='steam'?c.title:(vn?.title||names[0]),names:[...new Set([...names,vn?.title].filter(Boolean))],dir:g.dir,exe:g.exe,engine:g.engine?.name||'',
     hook:old.hook==='verified'?'verified':hookState(g.engine),vndbId:vn?.id||(c.source==='steam'?null:old.vndbId)||null,cover,mediaId:old.mediaId||null,
     ...(c.source==='steam'?{vndbSteamAppid:!lookupFailed||vn?c.appid:null,steamRejected:false}:{}),
-    variants:c.source==='folder'?findVariants(c.root):[],...(g.translated?{contentLanguage:g.translated}:{})});}
+    variants:c.source==='folder'?findVariants(c.root):c.source==='steam'?steamParts(g.dir,g.exe,c.title):[],...(g.translated?{contentLanguage:g.translated}:{})});
+   scanLog(this.logRoot,{source:c.source,appid:c.appid||'',title:c.title,dir:g.dir,exe:g.exe,result:'added',engine:g.engine?.name||'',vndb:vn?.id||'',parts:games[games.length-1].variants.length||undefined});}
   progress({done:found.length,total:found.length,title:''});
   // Games found earlier that are now gone are kept (their media entries stay), only marked missing.
   for(const old of this.state.games)if(!games.some(g=>g.dir.toLowerCase()===String(old.dir||'').toLowerCase()))games.push({...old,missing:old.source==='manual'?!fs.existsSync(old.exe):true});
@@ -258,9 +278,11 @@ class Library{
  manualAdd(value){
   const exe=path.resolve(String(value?.exe||'').trim());if(!/\.exe$/i.test(exe)||!fs.existsSync(exe)||!fs.statSync(exe).isFile())throw Error('请选择现有游戏 exe 文件');
   if(isTranslated(exe)||SKIP_EXE.test(path.basename(exe))||SKIP_EXE_ANY.test(path.basename(exe)))throw Error('请选择原游戏程序，不要选择补丁或翻译启动器');
-  const dir=path.dirname(exe),engine=engineOf(dir),key=crypto.createHash('sha1').update(dir.toLowerCase()).digest('hex').slice(0,16),old=this.state.games.find(g=>g.key===key)||{};
+  /* a part program picked by hand (Dive1\BaldrSky.exe) belongs to the install root's game: same record, engine and parts */
+  let dir=path.dirname(exe),parts=[];{const up=path.dirname(dir),rootExe=path.join(up,path.basename(exe));if(up!==dir&&fs.existsSync(rootExe)&&require('./steam-owned.cjs').steamOf(exe)?.installed){const p=steamParts(up,rootExe,String(value?.title||''));if(p.some(v=>v.exe.toLowerCase()===exe.toLowerCase())){dir=up;parts=p;}}}
+  const engine=engineOf(dir),key=crypto.createHash('sha1').update(dir.toLowerCase()).digest('hex').slice(0,16),old=this.state.games.find(g=>g.key===key)||{};
   const title=String(value.title||old.title||label(dir)).trim().slice(0,180);if(!title)throw Error('请填写游戏名称');
-  const game={...old,key,source:'manual',title,names:[...new Set([title,...old.names||[]])],dir,exe,engine:engine?.name||'',hook:old.hook==='verified'?'verified':hookState(engine),variants:[],missing:false};
+  const game={...old,key,source:'manual',title,names:[...new Set([title,...old.names||[]])],dir,exe,engine:engine?.name||'',hook:old.hook==='verified'?'verified':hookState(engine),variants:parts,missing:false};
   const previous=this.state;this.state={...previous,games:previous.games.filter(g=>g.key!==key).concat(game),setupDone:true};if(!this.write()){this.state=previous;throw Error('游戏库保存失败');}return game;
  }
  // Runs the patch's own restore tool for a folder the last scan reported (only those), then checks that the Japanese
@@ -355,4 +377,4 @@ class Synopses{
    if(!out.zh&&!out.en&&!out.ja&&!a.appid)return Object.keys(old.src||{}).some(l=>require('./synopsis-policy.cjs').approved(old.src[l]))?old:null;if(!fs.existsSync(this.file+'.pre-vndb.json')&&fs.existsSync(this.file))fs.copyFileSync(this.file,this.file+'.pre-vndb.json');this.cache[String(a.mediaId)]=out;this.write();return out;
  }
 }
-module.exports={searchNames,machine,restoreTool,Library,Synopses,engineOf,findGame,steamGames,steamAppidFor,folderGames,findSteam,registryString,findVariants,isTranslated,playableGame};
+module.exports={searchNames,machine,restoreTool,Library,Synopses,engineOf,findGame,steamGames,steamAppidFor,folderGames,findSteam,registryString,findVariants,steamParts,isTranslated,playableGame};

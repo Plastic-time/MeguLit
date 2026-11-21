@@ -16,7 +16,7 @@
 > - 认 exe、封包、剧本指纹、Steam / VNDB 编号，补丁版、汉化版、不同发行版都能找到自己那颗
 > - 玩的时候一直在自检，丢句、没选项、原文没藏住就先退回读模式并上报，我们把那份差分修好，热更新送到大家手上
 >
-> 现在 [`The Seed/`](The%20Seed) 里先种下了 55 部游戏。读取、自动回传和热更新会在下一个大版本解封，之后大家玩得越多，长出来的就越多
+> 现在 [`The Seed/`](The%20Seed) 里先种下了 55 部游戏。读取、自动回传和热更新从 1.4.22 起已经上线，大家玩得越多，长出来的就越多
 >
 > <sub>名字致敬《刀剑神域》里的 The Seed；共享的思路致敬当年大家在论坛上互相贴的 Textractor 钩子码 · Named after <i>Sword Art Online</i>'s The Seed; the sharing idea is a nod to the Textractor hook codes people used to post for each other · 名前は『ソードアート・オンライン』の The Seed から。共有の発想は、かつて皆で貼り合った Textractor のフックコードへのオマージュ</sub>
 
@@ -39,7 +39,7 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-8b1e2d?style=flat-square)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/%E2%99%A1-Sponsor-c8323c?style=flat-square)](https://github.com/sponsors/ilynthn)
 
-**[下载 v1.4.20](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; **[官网 megulit.com](https://megulit.com)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [更新日志](https://github.com/ilynthn/MeguLit/releases) &nbsp;·&nbsp; [♡ 赞赏](#support)
+**[下载 v1.4.22](https://github.com/ilynthn/MeguLit/releases/latest)** &nbsp;·&nbsp; **[官网 megulit.com](https://megulit.com)** &nbsp;·&nbsp; [简体中文](#zh) &nbsp;·&nbsp; [English](#en) &nbsp;·&nbsp; [日本語](#ja) &nbsp;·&nbsp; [常见问题](#faq) &nbsp;·&nbsp; [更新日志](https://github.com/ilynthn/MeguLit/releases) &nbsp;·&nbsp; [♡ 赞赏](#support)
 
 <br>
 
@@ -263,7 +263,7 @@
 > [!IMPORTANT]
 > **游戏剧情必须是日文原文**。MeguLit 读的是游戏正在显示的台词，剧情被汉化后读到的就不是日文。只汉化了菜单、剧情仍是日文的游戏不受影响；汉化版可以先试试「工具 → 日文原版恢复」
 
-1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.4.20-win-x64.zip`（约 18 MB），解压后运行 `MeguLit.exe`
+1. 去 [Releases](https://github.com/ilynthn/MeguLit/releases/latest) 下载 `MeguLit-v1.4.22-win-x64.zip`（约 18 MB），解压后运行 `MeguLit.exe`
 2. 第一次启动会弹出安装窗口，马上开始下载运行组件（约 565 MB，含注音词典和 AivisSpeech 语音引擎，需要约 1.8 GB 空间）。下载的同时选好安装位置和快捷方式，点「安装」，下完自动装好；中途关掉，下次打开会接着下
 3. 选好放游戏的文件夹，等游戏库扫描完
 4. 点一部作品 →「启动游戏」，**用窗口模式玩**
@@ -415,7 +415,7 @@ Supported engines and what works for each: [engine coverage](docs/engine-coverag
 
 ### Install
 
-1. Download `MeguLit-v1.4.20-win-x64.zip` (about 18 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`
+1. Download `MeguLit-v1.4.22-win-x64.zip` (about 18 MB) from [Releases](https://github.com/ilynthn/MeguLit/releases/latest), unzip it and run `MeguLit.exe`
 2. The setup window starts downloading the runtime components at once (about 565 MB, with the furigana dictionaries and the AivisSpeech voice engine). Pick the install folder meanwhile and press *Install*
 3. Choose your game folder, pick a game and press *Launch*. Play in **windowed mode**. Press <kbd>Alt</kbd> + <kbd>T</kbd> for the menu
 
@@ -467,7 +467,7 @@ GPL-3.0-or-later · [LICENSE](LICENSE) · [THIRD-PARTY.md](THIRD-PARTY.md)
 
 ### インストール
 
-1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.4.20-win-x64.zip`（約 18 MB）をダウンロードして展開し、`MeguLit.exe` を起動
+1. [Releases](https://github.com/ilynthn/MeguLit/releases/latest) から `MeguLit-v1.4.22-win-x64.zip`（約 18 MB）をダウンロードして展開し、`MeguLit.exe` を起動
 2. 初回セットアップを開くとすぐコンポーネント（約 565 MB）のダウンロードが始まるので、その間にインストール先を選んで「インストール」を押す
 3. ゲームフォルダを選び、作品を選んで「ゲーム起動」。**ウィンドウモード**で遊んでください。<kbd>Alt</kbd> + <kbd>T</kbd> でメニュー
 

@@ -28,7 +28,8 @@ test('the quiet check suspends every other thread at once, without heap use, and
  assert.match(inside,/InSpans\(ip,/);assert.match(inside,/InSpans\(v,/);
  for(const b of [quiet,inside])assert.doesNotMatch(b,/std::vector|new |malloc|HeapAlloc|printf/,'no heap use while threads are suspended');
  assert.match(quiet,/if \(allAtOnce\)/,'one thread at a time unless a consistent picture is needed');
- assert.match(body(mainSrc,'static bool SafeToUnload('),/WaitQuiet\([^;]*, true\)/,'a DLL unload looks at every thread at once');
+ /* #468 / P0 (寒蝉 dump 2026-11-20): suspending every thread at once for the unload check could freeze the game for good; after its host goes the DLL stays loaded with its hooks off (next host: MeguLitRehijack) and never suspends threads on that path */
+ { const unload=body(mainSrc,'static bool SafeToUnload('); assert.match(unload,/^\s*\{[^]*?return false;\s*\}?\s*$/,'the DLL does not unload after its host goes'); assert.doesNotMatch(unload,/WaitQuiet|SuspendThread/,'no thread is suspended on the unload path'); }
  assert.match(body(shared,'inline bool OpenOtherThreads('),/NtGetNextThread/,'only this process\'s threads are walked');
 });
 test('the shared removal frees only after a quiet check and keeps the memory otherwise',()=>{

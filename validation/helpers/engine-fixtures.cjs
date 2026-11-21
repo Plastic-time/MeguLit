@@ -44,11 +44,12 @@ function majiroArc(files,version=3){const names=Object.keys(files),count=names.l
  return Buffer.concat([h,table,namesBuf,...datas]);}
 
 /* ---- zip (stored + deflate), enough for NW.js package.nw and exe-appended zips ---------------------------------- */
-function zip(files,{prefix=Buffer.alloc(0)}={}){const local=[],central=[];let off=prefix.length;
+function zip(files,{prefix=Buffer.alloc(0),flagged=[]}={}){const local=[],central=[];let off=prefix.length;
  const crc32=b=>{let r=0xffffffff;for(const x of b)r=(r>>>8)^CRCT[(r^x)&255];return (~r)>>>0;};
  for(const [name,data0] of Object.entries(files)){const data=Buffer.isBuffer(data0)?data0:Buffer.from(data0),comp=zlib.deflateRawSync(data),nm=Buffer.from(name,'utf8');
   const lh=Buffer.alloc(30);lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(0x800,6);lh.writeUInt16LE(8,8);lh.writeUInt32LE(crc32(data),14);lh.writeUInt32LE(comp.length,18);lh.writeUInt32LE(data.length,22);lh.writeUInt16LE(nm.length,26);
   const ch=Buffer.alloc(46);ch.writeUInt32LE(0x02014b50,0);ch.writeUInt16LE(20,4);ch.writeUInt16LE(20,6);ch.writeUInt16LE(0x800,8);ch.writeUInt16LE(8,10);ch.writeUInt32LE(crc32(data),16);ch.writeUInt32LE(comp.length,20);ch.writeUInt32LE(data.length,24);ch.writeUInt16LE(nm.length,28);ch.writeUInt32LE(off,42);
+  if(flagged.includes(name)){lh.writeUInt16LE(0x801,6);ch.writeUInt16LE(0x801,8);}
   local.push(lh,nm,comp);central.push(ch,nm);off+=30+nm.length+comp.length;}
  const cd=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(central.length/2,8);end.writeUInt16LE(central.length/2,10);end.writeUInt32LE(cd.length,12);end.writeUInt32LE(off,16);
  return Buffer.concat([prefix,...local,cd,end]);}

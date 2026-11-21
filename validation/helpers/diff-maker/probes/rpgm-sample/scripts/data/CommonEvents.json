@@ -1,0 +1,36 @@
+[
+ null,
+ {
+  "id": 1,
+  "name": "opening",
+  "list": [
+   {
+    "code": 105,
+    "indent": 0,
+    "parameters": [
+     2,
+     false
+    ]
+   },
+   {
+    "code": 405,
+    "indent": 0,
+    "parameters": [
+     "むかしむかし、ある小さな村に"
+    ]
+   },
+   {
+    "code": 405,
+    "indent": 0,
+    "parameters": [
+     "ひとりの旅人がやってきた。"
+    ]
+   },
+   {
+    "code": 0,
+    "indent": 0,
+    "parameters": []
+   }
+  ]
+ }
+]

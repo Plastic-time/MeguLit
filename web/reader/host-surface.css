@@ -11,6 +11,8 @@ html:root:root:root:root .tomoyo-menu-header{padding:16px 22px 12px!important;ga
 html:root:root:root:root .tomoyo-cn-dialog button:focus:not(:focus-visible){outline:none!important}
 html:root:root:root:root .tomoyo-cn-dialog input[type=number]{text-align:center!important;max-width:80px}
 html:root:root:root:root .tomoyo-cn-dialog input[type=range]{height:4px!important;border-radius:99px;accent-color:var(--theme-primary,#ad1539)}
+/* 2026-11-21 (owner: sliders hard to grab): the press area is 20 px tall with the diamond inside it; the drawn rail stays a thin line in the middle */
+html:root:root:root:root .tomoyo-cn-dialog input[type=range]{height:20px!important;background-size:100% 4px!important;background-position:0 50%!important;background-repeat:no-repeat!important;background-clip:content-box!important}
 
 body.tomoyo-gal-bound #reader-host{display:block;position:fixed;inset:0;pointer-events:none}
 body.tomoyo-gal-bound #reader-base{pointer-events:auto;transition:opacity .14s ease-out}

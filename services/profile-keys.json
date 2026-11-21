@@ -1,0 +1,4 @@
+{
+ "note": "2026-11-21 public keys of our game-diff signing key (tools/sign-profile.cjs, docs/auto-profile.md). The private key stays on our PC (MEGULIT_PROFILE_KEY, a PEM outside the repository) and never goes in this repository or on the relay. Until a key is listed here the app accepts no shared game diff. Make one with: node tools/sign-profile.cjs keygen <folder outside the repo>. To rotate: add the new key, ship an app with both, sign with the new one, later mark the old one \"revoked\": true.",
+ "keys": []
+}

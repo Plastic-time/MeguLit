@@ -66,7 +66,7 @@ test('Ren\'Py: every located sentence (ADV too) sends its character boxes; the s
 
 test('KiriKiri: the TJS script reports each sentence\'s boxes at its end; hidden only after real opacity-0 draws; the DLL forwards ToMe_CHARS',()=>{
  const s=read('native/krkrtext/script.inc'),c=read('native/krkrtext/KrkrText.cpp'),h=read('native/krkrtext/selftest/host.cpp');
- assert.ok(s.includes("rec.rs+=(rec.cn>0?';':'')+int(cx)+','+int(cy)+','+int(cw)+','+int(size);rec.cn++;"));assert.ok(s.includes('if(this.hideOn()) rec.hc++;'),'hidden counted per character as drawn');
+ assert.ok(s.includes("rec.rs+=(rec.cn>0?';':'')+int(cx)+','+int(cy)+','+int(cw)+','+int(size);rec.cn++;"));assert.ok(s.includes('if(this.hideMsg()) rec.hc++;'),'hidden counted per character as drawn (engine-draw: never on the processCh path while the game draws the replacement)');
  assert.ok(s.includes('var h=(rec.hc>=rec.cn)?1:0;'),'live 2026-11-14 Fata Morgana: glyphs drawn invisible stay so after the switch');
  assert.ok(s.includes("'ToMe_CHARS engine=krkr line='+rec.line+' hidden='+h"));
  assert.match(s,/if\(rec\.n>0\) \{this\.send\('end',rec,rec\.x0,rec\.x1\);[\s\S]{0,700}?try \{this\.chars\(rec\);\} catch\(e\) \{this\.charsErr=e\.message;\}\}/,'a failing record never breaks the end line (sent first, the record in its own try)');
@@ -88,7 +88,7 @@ test('web: Chromium shells only, switches only, page script hides by one style r
  const p=W.PAGE_SCRIPT;new Function(p);
  for(const k of ['.message_inner','[data-content="dialog"]','[class*="TextBox_main"]'])assert.ok(p.includes(k),k);
  assert.match(p,/color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important/);
- assert.match(p,/r\.getClientRects\(\)/);assert.match(p,/devicePixelRatio/);assert.match(p,/closest\('rt,rp,script,style'\)/,'ruby left out');
+ assert.match(p,/r\.getClientRects\(\)/);assert.match(p,/devicePixelRatio/);assert.match(p,/closest\('rt,rp,script,style,\.megulit-zh'\)/,'ruby (and MeguLit\'s own Chinese block) left out');
  assert.doesNotMatch(p,/localStorage|indexedDB|\.save\(|writeFile/,'never touches game storage');
 });
 
@@ -203,6 +203,8 @@ test('dot font in the normal launch: rides along MeguLitLaunch, crash canary, co
  const L=require('../core/text-paths-launch.cjs'),base=tmp();
  fs.mkdirSync(path.join(base,'native'));const exe=path.join(base,'Game.exe');fs.writeFileSync(exe,'MZ');
  const early={file:path.join(base,'native','MeguLitLaunch64.exe'),args:['x.dll',exe],env:{MEGULIT_GLYPH_MODE:'dot-blind'}};
+ fs.writeFileSync(path.join(base,'native','MeguLitFontDot64.dll'),'x');process.env.MEGULIT_CAPTURE_COMPOSITOR='1';assert.equal(L.fontDot(base,exe,{...early,env:{}}),null,'the dot font is retired: never loaded without MEGULIT_FONTDOT_FORCE');fs.unlinkSync(path.join(base,'native','MeguLitFontDot64.dll'));
+ process.env.MEGULIT_FONTDOT_FORCE='1';
  assert.equal(L.fontDot(base,exe,early),null,'no DLL: nothing');
  fs.writeFileSync(path.join(base,'native','MeguLitFontDot64.dll'),'x');
  const fd=L.fontDot(base,exe,early);assert.ok(fd);assert.equal(early.env.MEGULIT_LAUNCH_EXTRA,path.join(base,'native','MeguLitFontDot64.dll'));
@@ -246,4 +248,18 @@ test('dot font under 日文环境: the LE early launcher carries it too, fallbac
  const lc=read('core/locale-emulator.cjs');
  assert.ok(lc.includes("const fontDot=early?require('./text-paths-launch.cjs').fontDot(this.root,launchExe,early,trace):null;"));
  assert.ok(lc.includes('if(fontDot)fontDot.watch(result.pid);'));assert.ok(lc.includes("if(fontDot)fontDot.canary.exited('fontdot',0);"));
+});
+
+test('engine-draw fields: role / id / box / sel / emb round trip, UI items may come as a box alone, lines stay strict',()=>{
+ const ui=TP.formatChars({engine:'rpgm',line:4,hidden:false,sw:816,sh:624,rects:[],text:'はい',role:'choice',id:'w2:0',box:[10,20,200,36],sel:true});
+ assert.equal(ui,'ToMe_CHARS engine=rpgm line=4 hidden=0 sw=816 sh=624 vx=0 vy=0 vw=0 vh=0 n=0 rects= role=choice id=w2:0 box=10,20,200,36 sel=1 text=はい');
+ const r=TP.parseChars(ui);
+ assert.deepEqual([r.role,r.id,r.box,r.sel,r.rects.length,r.text],['choice','w2:0',[10,20,200,36],true,0,'はい']);
+ assert.equal(TP.parseChars(ui.replace(' role=choice','')),null,'a line needs one rect per character');
+ assert.equal(TP.parseChars(ui.replace('role=choice','role=other')),null,'known roles only');
+ const ln=TP.formatChars({engine:'krkr',line:5,hidden:false,sw:1280,sh:720,rects:[[1,2,3,4]],text:'あ',read:true,emb:2,role:'line'});
+ assert.equal(ln,'ToMe_CHARS engine=krkr line=5 hidden=0 sw=1280 sh=720 vx=0 vy=0 vw=0 vh=0 n=1 rects=1,2,3,4 read=1 emb=2 text=あ','role=line is the default and is left out');
+ const p=TP.parseChars(ln);assert.equal(p.emb,2);assert.equal(p.role,undefined);
+ const old='ToMe_CHARS engine=krkr line=7 hidden=1 sw=1280 sh=720 vx=0 vy=0 vw=0 vh=0 n=1 rects=1,2,3,4 color=ffffff read=0 text=あ';
+ assert.deepEqual(Object.keys(TP.parseChars(old)).sort(),['color','engine','hidden','line','read','rects','sh','sw','text','type','viewport'],'old records parse as before');
 });

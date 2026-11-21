@@ -14,8 +14,10 @@ const fs = require('node:fs'), path = require('node:path');
 const { rectsToClient } = require('./compositor-host.cjs');
 
 class OverlayPlacement {
-  constructor({ root, send = () => {}, trace = () => {} } = {}) {
-    this.root = root; this.send = send; this.trace = trace; this.client = [0, 0]; this.current = null; this.on = false;
+  constructor({ root, send = () => {}, trace = () => {}, replaced = () => false, hidden = () => {}, blanking = () => false } = {}) {
+    this.hidden = hidden; this.replaced = replaced; this.blanking = blanking; this.root = root; this.send = send; this.trace = trace; this.client = [0, 0]; this.current = null; this.on = false;
+    /* the running game's layered profile (core/profiles), set by gal-native setGameProfile; branches read this.profile.placement.* */
+    this.profile = require('./profiles/index.cjs').profileFor({});
   }
   wanted(preferences) {
     if (process.env.MEGULIT_CAPTURE_COMPOSITOR === '1') return false;
@@ -39,7 +41,10 @@ class OverlayPlacement {
        hiding the game's text, a line the game draws itself is on screen only until the hide is back; the reader is told so and leaves
        the Japanese to the game for that time. Reading without hiding (the reader as a second text) is not touched. */
     this.hiding = (preferences?.hookProfile === 'embed' || preferences?.hookProfile === 'euphoria474') && preferences?.hookHide !== false;
-    if (on !== this.on) { this.on = on; if (!on) { this.clear(); if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] }); this.extraKey = ''; } this.send({ type: 'textPlaceMode', on }); }
+    /* 2026-11-21 (owner, STEINS;GATE right after 千恋＊万花 in one MeguLit run: its lines came with no place and were pinned at 千恋＊万花's place and rows):
+       the reader is told which game the mode is for; another game starts with no place of its own */
+    const game = String(state?.gameProcessId || state?.gameHwnd || '');
+    if (on !== this.on || game !== this.game) { const was = this.on; this.on = on; if (game !== this.game) this.engineHidden = false; this.game = game; if (!on && was) { this.clear(); if (this.extraKey && this.extraKey !== '[]') this.send({ type: 'textPlaceExtra', items: [] }); this.extraKey = ''; } this.send(game ? { type: 'textPlaceMode', on, game } : { type: 'textPlaceMode', on }); }
   }
   clear() { if (this.current) { this.current = null; this.send({ type: 'textPlace', clear: true }); } }
   /* 2026-11-19 (千恋＊万花 maximised, krkr drawing its text invisible, the reader still in its style box): why a reported line
@@ -51,9 +56,15 @@ class OverlayPlacement {
     /* engine position hooks (hookTextPos: line box in game-screen px) anchor lines that come without device positions */
     if (m.type === 'hookTextPos') { const k = m.sw > 0 && this.client[0] ? this.client[0] / m.sw : 1, ky = m.sh > 0 && this.client[1] ? this.client[1] / m.sh : k; if ([m.x0, m.y0, m.x1, m.size].every(Number.isFinite) && m.size > 0) this.anchor({ x: m.x0 * k, y: m.y0 * ky, size: m.size * ky, width: Math.max((m.x1 - m.x0) * k, m.size * ky * 16) }); return; }
     if (m.type === 'hookCharRects') {
+      if (m.engine !== 'gpu') this.engineSeen = true; /* an engine reports this game's lines with their places (krkr, renpy, …) */
       const chars = [...String(m.text || '')].map(c => c === '\u001f' ? '\n' : c), flat = [];
       for (const c of chars) if (c !== '\n' && c !== '\r') flat.push(c);
       const rects = rectsToClient(m, this.client[0], this.client[1]);
+      /* 2026-11-21 (ファタモルガーナの館, owner's recording 02:57Z: the line just read came back in white for 0.7 s after each click): an
+         engine that reports its cleared line (KiriKiri MessageLayer.clear, page.reportClear in the game's diff) sends it once more,
+         empty and not hidden. The game's page is gone: the reader never draws it again from its boxes. The line stays the placement's
+         last line (the next one is typed where it was) */
+      if (m.hidden !== true && !flat.length && !rects.length && m.engine !== 'gpu') { const id0 = String(m.engine || 'path') + ':' + (Number(m.line) || 0); if (this.current && !this.current.fallback && this.current.id === id0 && this.goneId !== id0) { this.goneId = id0; this.why('gone:' + id0, 'gone: line ' + (Number(m.line) || 0) + ' cleared by the game'); this.send({ type: 'textPlace', gone: true, text: this.current.text }); } return; }
       if (rects.length !== flat.length) { this.why('count:' + m.line + ':' + rects.length, 'rejected: line ' + (Number(m.line) || 0) + ' has ' + rects.length + ' boxes for ' + flat.length + ' characters'); return; } // one rect per character is the protocol; anything else is not placeable
       const id = String(m.engine || 'path') + ':' + (Number(m.line) || 0);
       /* 2026-11-15 (沙耶の唄: MeguLit's Japanese drawn a few px off the game's own, unhidden line): the source says the game
@@ -63,8 +74,12 @@ class OverlayPlacement {
          already showed hidden from its cached glyphs, and the repaint reports it as not hidden. That is the same line,
          still hidden on screen: it stays placed. */
       if (m.hidden !== true && m.engine !== 'gpu' && this.current && !this.current.fallback && this.current.id === id && this.current.text === flat.join('')) return; /* GPU hiding is decided per frame: there, not hidden is the game showing it */
-      if (m.hidden !== true) { this.why('shown:' + id, 'not placed: line ' + (Number(m.line) || 0) + ' is drawn by the game itself (hidden=0)'); if (this.current?.id === id) this.clear(); const vis = flat.join(''); if (vis && vis !== this.visibleKey) { this.visibleKey = vis; this.send({ type: 'textPlace', visible: true, text: vis, ...(this.hiding === true ? { hiding: true } : {}) }); } return; }
+      /* incr9 2026-11-21 (owner, 千恋＊万花 lines 100001..: 「お客さん」 drawn by nobody): the bridge blanks this stream's glyphs, so a line the
+         engine reports unhidden is not on screen: the reader draws its Japanese where the last line was; a hidden glyph later only places it */
+      if (m.hidden !== true && m.engine !== 'gpu' && require('./profiles/index.cjs').get(this.profile, 'placement.drawWhileBlanking', false) && this.blanking()) { this.why('sblank:' + id, 'fallback: line ' + (Number(m.line) || 0) + ' reported unhidden while the glyph layer blanks the stream (the reader draws it)'); return this.emitLine({ id, engine: m.engine || 'engine', text: flat.join(''), fallback: true, client: this.client.slice() }); }
+      if (m.hidden !== true) { this.why('shown:' + id, 'not placed: line ' + (Number(m.line) || 0) + ' is drawn by the game itself (hidden=0)'); if (this.current?.id === id) this.clear(); const vis = flat.join(''), vkey = vis + (m.emb ? '|emb' + m.emb : ''); if (vis && vkey !== this.visibleKey) { this.visibleKey = vkey; this.send({ type: 'textPlace', visible: true, text: vis, ...(this.hiding === true ? { hiding: true } : {}), ...(m.emb === 1 || m.emb === 2 ? { embedded: m.emb } : {}) }); } return; }
       if (m.engine === 'gpu') this.gpuHiding = Date.now();
+      else this.engineHidden = true;
       this.visibleKey = ''; this.why('placed:' + id + ':' + rects.length, 'placed: line ' + (Number(m.line) || 0) + ', ' + rects.length + ' characters, first box ' + (rects[0] ? [].concat(rects[0]).map(v => Math.round(Number(v) || 0)).join(',') : '-') + ' in client ' + this.client.join('x'));
       this.emitLine({ id, engine: m.engine, text: flat.join(''), rects, client: this.client.slice(), ...(m.color ? { color: m.color } : {}), ...(typeof m.read === 'boolean' ? { read: m.read } : {}) });
     }
@@ -92,6 +107,19 @@ class OverlayPlacement {
     /* 2026-11-20 (user, CHAOS;CHILD: 「对话框的字咋没了」): the GPU layer hides this game's lines (it placed one as hidden), so a line the
        glyph path never saw hidden is still not the game's own drawing: the reader draws its Japanese where the last line was */
     if (!this.hideSeen && this.gpuHiding && Date.now() - this.gpuHiding < 30 * 60 * 1000) { this.why('gfall:' + id, 'fallback: glyph line ' + (Number(table.seq) || 0) + ' unplaced while the GPU layer hides the game lines'); return this.emitLine({ id, engine: 'glyph', text: table.text, fallback: true, client: this.client.slice() }); }
+    /* 2026-11-21 (owner, STEINS;GATE: 「每次校准才出来一下日文」): the write-back (embed) has replaced and verified the game's original, so a glyph line
+       the glyph layer never saw hidden is not the game drawing the original: the reader keeps its Japanese (it was hidden as the game's own line
+       on every line and came back only while a calibration switched the mode) */
+    /* 2026-11-21 r29 (owner, 千恋＊万花: lines tripled, the place moving, the original flashing): only for a game whose lines no engine reports
+       with places (STEINS;GATE/MAGES); a game with an engine path (KiriKiri) keeps the note and its hide timing as before */
+    if (!this.hideSeen && !this.engineSeen && this.replaced()) { this.why('greplaced:' + id, 'not placed: glyph line ' + (Number(table.seq) || 0) + ' unhidden, but the write-back replaced the original (the reader draws it)'); if (this.current?.id === id) this.clear(); return; }
+    /* 2026-11-21 (owner incr9, 千恋＊万花: glyph lines 7-25 arrived as "the game draws it itself" between the KiriKiri lines placed hidden at
+       374,707): once an engine has placed one of this game's lines hidden, the engine's places are the source and the glyph path is only
+       the fallback for games without one. An unhidden glyph line then sends no `visible` note that could keep the reader's Japanese away. */
+    if (!this.hideSeen && this.engineHidden) { this.why('gengine:' + id, 'skipped: glyph line ' + (Number(table.seq) || 0) + ' (the engine path places the lines of this game)'); return; }
+    /* incr9 2026-11-21 (owner, 千恋＊万花: 「お客さん」「……ぁ？」 every short line 'has no hidden glyph yet', the game drew nothing, the reader
+       neither): with the bridge blanking the writable stream the line is hidden; the reader draws it, a late hidden glyph only places it */
+    if (!this.hideSeen && require('./profiles/index.cjs').get(this.profile, 'placement.drawWhileBlanking', false) && this.blanking()) { this.why('gblank:' + id, 'fallback: glyph line ' + (Number(table.seq) || 0) + ' has no hidden glyph yet, but the glyph layer blanks the stream (the reader draws it)'); return this.emitLine({ id, engine: 'glyph', text: table.text, fallback: true, client: this.client.slice() }); }
     if (!this.hideSeen) this.why('gshown:' + id, 'not placed: glyph line ' + (Number(table.seq) || 0) + ' has no hidden glyph yet (the game draws it itself)');
     if (!this.hideSeen) { const vis = chars.filter(c => !/\s/.test(c)).join(''); if (this.current?.id === id) this.clear(); if (vis && vis !== this.visibleKey) { this.visibleKey = vis; this.send({ type: 'textPlace', visible: true, text: vis, ...(this.hiding === true ? { hiding: true } : {}) }); } return; }
     const typed = this.typed(table, chars.length, recorded), drawn = new Set(chars.map((c, i) => i).filter(i => i < typed));
@@ -175,6 +203,16 @@ class OverlayPlacement {
       this.send({ type: 'placeChoiceBoxes', sw: this.client[0], sh: this.client[1], items: options.map(i => { const r = i.rects; return { text: i.text, x0: Math.round(Math.min(...r.map(v => v[0]))), y0: Math.round(Math.min(...r.map(v => v[1]))), x1: Math.round(Math.max(...r.map(v => v[0] + v[2]))), y1: Math.round(Math.max(...r.map(v => v[1] + v[3]))) }; }) });
     }
   }
+  /* options found from hidden lines no source carried (hook-native placedHidden): drawn as choices on their boxes, and given to the reader's
+     choice overlay (ruby + translation under each) */
+  hiddenChoices(items) {
+    if (!this.on || !Array.isArray(items) || items.length < 2) return;
+    const ok = items.map(i => ({ id: 'hidden:' + i.text, kind: 'o', text: i.text, rects: i.rects })).filter(i => Array.isArray(i.rects) && i.rects.length);
+    if (ok.length < 2) return;
+    this.extraKey = JSON.stringify(ok); this.send({ type: 'textPlaceExtra', items: ok, client: this.client.slice() }); this.choicesPlaced = true; this.choiceSent = true;
+    this.send({ type: 'placeChoiceBoxes', sw: this.client[0], sh: this.client[1], items: ok.map(i => { const r = i.rects; return { text: i.text, x0: Math.round(Math.min(...r.map(v => v[0]))), y0: Math.round(Math.min(...r.map(v => v[1]))), x1: Math.round(Math.max(...r.map(v => v[0] + v[2]))), y1: Math.round(Math.max(...r.map(v => v[1] + v[3]))) }; }) });
+    this.why('hchoice:' + ok.length, 'choices from hidden lines no source carried: ' + ok.map(i => i.text).join(' / ').slice(0, 80));
+  }
   /* the dialogue area learned from an exactly placed line: left edge, first row top, row pitch, width, size */
   learn(rects) {
     const r = rects.filter(Boolean); if (r.length < 2) return;
@@ -255,6 +293,9 @@ class OverlayPlacement {
   emitLine(line) {
     if (!line.fallback) {
       const rects = OverlayPlacement.sane(line.rects, line.client);
+      /* 2026-11-21 (owner: 「原地补画不就能二次认领了吗」): a line the game drew hidden goes to the source side with its boxes; a line no source
+         carried becomes a source line (furigana, translation, lookups) or, with others at once, the options of a choice */
+      if (rects) try { this.hidden({ text: line.text, rects, client: line.client }); } catch {}
       if (!rects) this.why('insane:' + line.id + ':' + line.text, 'not placed: ' + line.id + ' has no box on the game client (off the client, or all on its top edge: a buffer drawn at its own origin); the reader keeps its own box and the anchor is not taught');
       line = rects ? { ...line, rects } : { id: line.id, engine: line.engine, text: line.text, fallback: true, client: line.client, ...(line.color ? { color: line.color } : {}), ...(typeof line.read === 'boolean' ? { read: line.read } : {}) };
       if (rects && !line.approx) this.learn(rects);

@@ -15,9 +15,10 @@ const fs = require('node:fs'), path = require('node:path');
 /* 'place', 'dot' or '' (off). */
 function mode(root) {
   const env = process.env.MEGULIT_GLYPH_MODE;
-  if (env === 'dot' || env === 'blank' || env === 'place') return env === 'dot' ? 'dot' : 'blank';
+  /* 2026-11-21 (owner: 打点可以不要了，精度差、容易漏点) dot glyphs are retired: every request for them is the blank mode */
+  if (env === 'dot' || env === 'blank' || env === 'place') return 'blank';
   try { const r = JSON.parse(fs.readFileSync(path.join(root, 'data', 'config', 'gal-preferences.json'), 'utf8').replace(/^\uFEFF/, '')).textRenderer; if (r !== 'placed' && r !== 'compositor') return ''; } catch { return ''; }
-  return process.env.MEGULIT_CAPTURE_COMPOSITOR === '1' ? 'dot' : 'blank';
+  return 'blank';
 }
 function wanted(root) { return !!mode(root); }
 /* Extra environment for HookBridge.exe. */

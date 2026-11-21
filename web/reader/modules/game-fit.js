@@ -36,10 +36,15 @@
   if(b.gameFit)return;
   const css=d.createElement('style');css.id='megulit-game-fit-style';
   /* 2026-11-16 (user: 不要自动调日文字体大小): the Japanese keeps its size; only the translation is made smaller */
+  /* 2026-11-21 (owner's recording 08:28, 千恋＊万花 incr11: 「ずっと座っていたせいか…」 had its translation cut to a 3 px strip for the whole line, and
+     one line's translation was 25 px while its neighbours were 22 px): a fit decided in the gap between two lines, while text-place.js had
+     released the anchor and the reader stood on its own place, stayed on the next lines, which text-place.js places itself. The rules never
+     apply to a line text-place.js places or anchors (it fits those against the work area itself) */
+  const own=':not(.megulit-anchored):not(.megulit-placed)';
   css.textContent=
-   'html body.tomoyo-gal-bound.megulit-fit-on .sentence-window:not(.tome-island-page) .tomoyo-cn-output{font-size:calc(var(--tomoyo-gal-cn-size,24px) * var(--megulit-fit,1))!important}'+
-   'html body.tomoyo-gal-bound.megulit-fit-up .sentence-window:not(.tome-island-page){top:calc(var(--tomoyo-reader-y,0px) + var(--megulit-fit-shift,0px))!important}'+
-   'html body.tomoyo-gal-bound.megulit-fit-room .sentence-window:not(.tome-island-page) .tomoyo-cn-output{max-height:var(--megulit-fit-room,4em)!important;overflow-y:auto!important;overscroll-behavior:contain}';
+   'html body.tomoyo-gal-bound.megulit-fit-on'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{font-size:calc(var(--tomoyo-gal-cn-size,24px) * var(--megulit-fit,1))!important}'+
+   'html body.tomoyo-gal-bound.megulit-fit-up'+own+' .sentence-window:not(.tome-island-page){top:calc(var(--tomoyo-reader-y,0px) + var(--megulit-fit-shift,0px))!important}'+
+   'html body.tomoyo-gal-bound.megulit-fit-room'+own+' .sentence-window:not(.tome-island-page) .tomoyo-cn-output{max-height:var(--megulit-fit-room,4em)!important;overflow-y:auto!important;overscroll-behavior:contain}';
   (d.head||d.documentElement).append(css);
   let fit=1,shift=0,room=0,line='',frame=0;
   const main=()=>[...d.querySelectorAll('.sentence-window')].find(n=>!n.classList.contains('tome-island-page'));
@@ -54,14 +59,14 @@
   function check(){frame=0;
    if(!d.body?.classList.contains('tomoyo-gal-bound')){reset();return;}
    /* 2026-11-15 in-place drawing (text-place.js): every character sits on the game's own place and the window fills the client, so there is nothing to fit; measuring it shrank the text and switched the translation's height limit on and off every frame (the translation's second line flashed) */
-   if(d.body.classList.contains('megulit-placed')||d.body.classList.contains('megulit-anchored')){reset();return;}/* 2026-11-20 (user, CHAOS;CHILD: 「译文为啥都这么小」): a line anchored on the game's own place is fitted by text-place.js against the monitor's work area (translation at most 15 % smaller); fitting it again to the game client shrank two-row sentences' translation to 60 % */
+   if(d.body.classList.contains('megulit-placed')||d.body.classList.contains('megulit-anchored')||b.textPlaceOwns?.()===true){reset();return;}/* 2026-11-20 (user, CHAOS;CHILD: 「译文为啥都这么小」): a line anchored on the game's own place is fitted by text-place.js against the monitor's work area (translation at most 15 % smaller); fitting it again to the game client shrank two-row sentences' translation to 60 % */
    const info=b.galLayoutInfo?.(),win=main();if(!win||!info||!(info.clientHeight>0))return;
    const dpr=Math.max(.5,Number(w.devicePixelRatio)||1),client={top:info.clientY/dpr,bottom:(info.clientY+info.clientHeight)/dpr};
    /* measured with the current shift taken out, so moving up is decided again from the real place */
    const m=measure(win);if(!m)return;const box={top:m.top-shift,bottom:m.bottom-shift};
    const roomNow=room;if(roomNow>0){/* the translation was cut to roomNow: its full height decides */const cn=win.querySelector('.tomoyo-cn-output');if(cn&&cn.scrollHeight>cn.clientHeight)box.bottom+=cn.scrollHeight-cn.clientHeight;}
    const p=plan(box,client,fit,m.jp?{top:m.jp.top-shift,bottom:m.jp.bottom-shift}:null);
-   let nextRoom=0;if(p.room>0){const cn=win.querySelector('.tomoyo-cn-output');if(cn){const full=cn.scrollHeight||cn.getBoundingClientRect().height;nextRoom=Math.max(0,Math.floor(full-p.room));}}
+   let nextRoom=0;if(p.room>0){const cn=win.querySelector('.tomoyo-cn-output');if(cn){const full=cn.scrollHeight||cn.getBoundingClientRect().height;nextRoom=Math.max(0,Math.floor(full-p.room));/* less than one row of the translation left: cutting it shows a strip nobody can read, it stays whole */const rowH=parseFloat(w.getComputedStyle(cn).fontSize)*1.1||0;if(nextRoom<rowH)nextRoom=0;}}
    /* within one sentence the result only tightens (a translation arriving in parts, a resize pass): it never flips back and forth */
    const nf=Math.min(fit,p.fit),ns=Math.min(shift,p.shift),nr=Math.max(room,nextRoom);
    if(nf!==fit||ns!==shift||nr!==room){fit=nf;shift=ns;room=nr;set();schedule();}

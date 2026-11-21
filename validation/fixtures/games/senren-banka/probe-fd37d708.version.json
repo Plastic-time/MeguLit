@@ -1,0 +1,15 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3",
+ "layer": "version",
+ "source": "official",
+ "settings": {},
+ "exe": "SenrenBanka.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3"
+ }
+}

@@ -10,13 +10,13 @@ call "E:\Apps\build-tools\vs2022\Common7\Tools\VsDevCmd.bat" -arch=x86 -no_logo 
 set "INCLUDE=%MEGULIT_HOOK_TREE%\atl\VC\Tools\MSVC\14.44.35207\atlmfc\include;%INCLUDE%"
 set "LIB=%MEGULIT_HOOK_TREE%\atl\VC\Tools\MSVC\14.44.35207\atlmfc\lib\x86;%LIB%"
 rem GDI hide (MeguLitGdiHide.h): the hook core files changed for it are copied over the upstream tree first
-for %%F in (MeguLitGdiHide.h MeguLitMarks.h MeguLitEmbedWait.h texthook.cc hijackfuns.cc embed_util.cc main.cc veh_hook.cpp hookfinder.cc) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
+for %%F in (MeguLitGdiHide.h MeguLitMarks.h MeguLitEmbedWait.h texthook.cc hijackfuns.cc embed_util.cc main.cc veh_hook.cpp hookfinder.cc enginecontrol.cpp) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1
 rem the shared safe unhook flow (native\shared\MeguLitSafeUnhook.h); main.cc and veh_hook.cpp carry its detach and breakpoint parts
 copy /y "%~dp0..\shared\MeguLitSafeUnhook.h" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\MeguLitSafeUnhook.h" >nul || exit /b 1
 rem the crash witness (native\shared\MeguLitCrashWitness.h), armed by main.cc
 copy /y "%~dp0..\shared\MeguLitCrashWitness.h" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\MeguLitCrashWitness.h" >nul || exit /b 1
 rem the changed engine files go to engine32 (copied by hand before; the YU-RIS in-place marks need Yuris.cpp built)
-for %%F in (BGI.cpp Siglus.cpp Yuris.cpp Pal.cpp ToMeIslandDraw.h ToMeIslandFlow.h ToMeTextPos.h MeguLitSg.cpp EuphoriaHD474Draw.h EuphoriaDrawFlow.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\%%F" >nul || exit /b 1
+for %%F in (BGI.cpp Siglus.cpp Yuris.cpp YurisDraw.h YurisDrawSig.h Pal.cpp ToMeIslandDraw.h ToMeIslandFlow.h ToMeTextPos.h MeguLitSg.cpp EuphoriaHD474Draw.h EuphoriaDrawFlow.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\%%F" >nul || exit /b 1
 rem one hook runtime (2026-11-19): the exact-program adapters (ISLAND, STEINS;GATE) are engines our enginecollection32.cpp lists first, euphoria HD sits in Yuris.cpp;
 rem the STEINS;GATE adapter is compiled from native\mages under its own namespaces (MeguLitSg.cpp), upstream engines\mages untouched
 for %%F in (enginecollection32.cpp MeguLitEngines.h MeguLitMatch.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\%%F" >nul || exit /b 1

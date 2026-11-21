@@ -9,7 +9,7 @@ $repo=Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $stage=Join-Path $Out 'stage';if(Test-Path $stage){Remove-Item $stage -Recurse -Force};New-Item -ItemType Directory $stage -Force | Out-Null
 foreach($bit in '32','64'){Copy-Item (Join-Path $repo "native\MeguLitDump$bit.dll") $stage}
 $commit=(git -C $repo rev-parse --short HEAD)
-[IO.File]::WriteAllText((Join-Path $stage 'pack.json'),(@{pack='runtime-dump';version=$Version;contract=2;commit=$commit}|ConvertTo-Json -Compress))
+[IO.File]::WriteAllText((Join-Path $stage 'pack.json'),(@{pack='runtime-dump';version=$Version;contract=3;commit=$commit}|ConvertTo-Json -Compress))
 $zip=Join-Path $Out "MeguLit-runtime-dump-v$Version.zip";if(Test-Path $zip){Remove-Item $zip -Force}
 Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip
 $sha=(Get-FileHash $zip -Algorithm SHA256).Hash;$size=(Get-Item $zip).Length

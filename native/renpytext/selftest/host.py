@@ -118,6 +118,16 @@ def install_fakes():
         def get_layout(self):
             return self._layout
 
+        def set_text(self, text):
+            # engine-draw: Ren'Py lays the new text out again; here a row per paragraph, ruby readings and tags left out
+            self.text_parameter, self.text = text, [text]
+            plain = re.sub(r'\{rt\}.*?\{/rt\}', '', text)
+            plain = re.sub(r'\{[^{}]*\}', '', plain.replace('{{', '\x00').replace('[[', '[')).replace('\x00', '{')
+            size = self.style.size
+            self._layout = Layout([Line(r * (size + 10) * 2, (size + 10) * 2, [Glyph(ch, i * size * 2, size * 2) for i, ch in enumerate(row)])
+                                   for r, row in enumerate(plain.split('\n'))])
+            self.set_calls = getattr(self, 'set_calls', []) + [text]
+
         def render(self, width, height, st, at):
             rv = Render()
             rv.alpha = 1.0
@@ -147,6 +157,18 @@ def install_fakes():
             renpy.display.render.render_screen(state['tree'], 1280, 720)
     character.display_say = display_say
     exports.display_say = display_say
+    state['restarts'] = 0
+
+    def restart_interaction():
+        state['restarts'] += 1
+    exports.restart_interaction = restart_interaction
+
+    def display_menu(items, interact=True):
+        for _ in range(2):
+            renpy.display.render.render_screen(state['tree'], 1280, 720)
+        return items[0][1]
+    exports.display_menu = display_menu
+    renpy.display_menu = display_menu
     renpy.display_say = display_say
     return renpy, store, Render, Text, Matrix, nvl_show_core, say_show, state
 
@@ -191,6 +213,43 @@ def scenario(fakes):
     store.nvl_list = [('c', 'z', {})]
     state['tree'] = screen((t4, (20, 30), None))
     renpy.display_say(None, '\u65b0\u3057\u3044\u9801\u3002', nvl_show_core)
+
+
+def scenario_draw(fakes, ctl):
+    renpy, store, Render, Text, Matrix, nvl_show_core, say_show, state = fakes
+    with open(ctl, 'wb') as f:
+        f.write(u'#cfg roles=1 embed=1 zh=1\r\n\u4eca\u65e5\u306f\u6674\u308c\t0:2:\u304d\u3087\u3046\t\u4eca\u5929\u6674\u6717\r\n'.encode('utf-16'))
+    sys._megulit_renpy_ctl = ctl
+
+    def screen(*texts):
+        root = Render()
+        window = root.blit(Render(), (100, 50))
+        for t, pos in texts:
+            window.blit(Render(t), pos)
+        return root
+    name = Text('Eileen', 20, ['Eileen'])
+    what = Text('\u4eca\u65e5\u306f\u6674\u308c', 24, ['\u4eca\u65e5\u306f\u6674\u308c'])
+    state['tree'] = screen((name, (60, 440)), (what, (60, 500)))
+    sys._megulit_renpy_hide = lambda: True
+    renpy.character.display_say('Eileen', '\u4eca\u65e5\u306f\u6674\u308c', say_show)
+    for _ in range(3):
+        renpy.display.render.render_screen(state['tree'], 1280, 720)
+    state['set_calls'] = getattr(what, 'set_calls', [])
+    a, b = Text('\u306f\u3044', 24, ['\u306f\u3044']), Text('\u3044\u3044\u3048', 24, ['\u3044\u3044\u3048'])
+    state['tree'] = screen((a, (400, 200)), (b, (400, 280)))
+    renpy.exports.display_menu([('\u306f\u3044', 1), ('\u3044\u3044\u3048', 2), ('\u898b\u51fa\u3057', None)])
+
+
+def run_sink_draw(script, ctl):
+    fakes = install_fakes()
+    out = []
+    sys._megulit_renpy_sink = out.append
+    src = open(script, 'rb').read().decode('utf-8')
+    exec(compile(src, script, 'exec'), {'__name__': '__main__'})
+    scenario_draw(fakes, ctl)
+    out.append('HOST set_calls=%s restarts=%d' % (json.dumps(fakes[7].get('set_calls')), fakes[7].get('restarts')))
+    sys.stdout.buffer.write(json.dumps(out).encode('utf-8'))
+    return 0
 
 
 def run_sink(script):
@@ -262,6 +321,8 @@ def run_dll(dll):
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == '--sink':
         sys.exit(run_sink(sys.argv[2]))
+    if len(sys.argv) == 4 and sys.argv[1] == '--sink-draw':
+        sys.exit(run_sink_draw(sys.argv[2], sys.argv[3]))
     if len(sys.argv) == 3 and sys.argv[1] == '--dll':
         sys.exit(run_dll(sys.argv[2]))
     print('usage: host.py --sink MeguLitRenpy.py | --dll MeguLitRenpy64.dll')

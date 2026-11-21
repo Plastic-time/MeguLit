@@ -130,7 +130,7 @@
       <label class="megulit-script-toggle"><input name="scriptTranslation" type="checkbox">零延迟翻译（汉化脚本）</label><p class="hint megulit-script-hint">当前作品已用汉化脚本：能对上的句子直接用汉化组译文（零延迟），翻译引擎只翻对不上的句子</p><label>翻译引擎<select name="provider"><option value="google">Google 免费</option><option value="bing">Bing / Microsoft Translator API</option><option value="deepseek">DeepSeek API</option><option value="deepl">DeepL API</option><option value="gpt">GPT / OpenAI 兼容接口</option></select></label>
       <div class="tomoyo-cn-gpt">
         <label>API 地址<input name="baseUrl" type="url" placeholder="https://api.openai.com/v1"></label>
-        <label>模型名<input name="model" type="text" placeholder="gpt-4.1-mini" maxlength="200"></label>
+        <label>模型名<input name="model" type="text" placeholder="gpt-4.1-mini" maxlength="200" list="megulit-reader-model-list"><datalist id="megulit-reader-model-list"></datalist></label>
         <label>Azure 区域<input name="region" type="text" placeholder="例如 eastasia；全局资源留空" maxlength="60"></label>
         <label>DeepL 接口<select name="deeplTier"><option value="free">API Free</option><option value="pro">API Pro / 付费接口</option></select></label>
         <label>API Key<input name="apiKey" type="password" autocomplete="off" placeholder="已配置可留空；密钥由 Windows 加密保存"></label>
@@ -211,7 +211,7 @@
     const updateForm = () => {
       field('transparent').checked = !!window.__tomoyoMode?.isTranslation();
       field('transparent').disabled = true;
-      const provider = field('provider').value, eng = ENG[provider], useGPT = provider === 'gpt' || !!eng?.editable, llm = ['gpt','deepseek'].includes(provider) || eng?.kind === 'llm';
+      const provider = field('provider').value, eng = ENG[provider], useGPT = provider === 'gpt' || !!eng?.editable, llm = ['gpt','deepseek'].includes(provider) || eng?.kind === 'llm'; { const list = dialog.querySelector('#megulit-reader-model-list'); if (list) list.replaceChildren(...(Array.isArray(eng?.models) ? eng.models : (window.__tomoyoModelLists || {})[provider] || []).map(name => Object.assign(document.createElement('option'), { value: name }))); }
       dialog.querySelector('.tomoyo-cn-gpt').hidden = provider === 'google';
       field('baseUrl').closest('label').hidden = !useGPT;
       field('model').closest('label').hidden = !llm;

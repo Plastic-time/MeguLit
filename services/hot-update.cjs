@@ -12,7 +12,8 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto'),{spawnSync}
 const NAME=/^MeguLit-v([0-9A-Za-z.-]+?)-hot-from-v([0-9A-Za-z.-]+?)-([a-f0-9]{12})\.zip$/i;
 const HOSTS=new Set(['github.com','objects.githubusercontent.com','release-assets.githubusercontent.com']);
 /* Only these folders may change in a hot update; native helpers, the runtime and user data never do. */
-const ALLOWED=/^(web|services|core|setup)\//;
+/* 2026-11-21 The Seed/: the built-in game diffs (docs/diff-layers.md) come with hot updates too */
+const ALLOWED=/^(web|services|core|setup|The Seed)\//;
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 
 function asset(rel){

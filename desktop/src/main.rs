@@ -452,7 +452,22 @@ fn prepare_profile(root:&std::path::Path,profile:&std::path::Path) {
     }
 }
 
+/* 1.4.21 (user: 「不要让megulit关了游戏也被关」): the service (node.exe) is in a job that ends with MeguLit, and every process it
+   starts joins that job, games included. The service starts games through this mode instead: this process (started by the
+   service, so in the job too) creates the program with CREATE_BREAKAWAY_FROM_JOB, prints its pid and exits. The job allows
+   breakaway only on request (broker.rs), so helpers keep ending with MeguLit. Environment and working folder are the caller's. */
+#[cfg(windows)]
+fn spawn_outside_job(args:&[String])->i32{
+    use std::os::windows::process::CommandExt;
+    if args.len()<2{eprintln!("usage: --spawn-outside-job <cwd> <file> [args...]");return 2;}
+    let (cwd,file,rest)=(&args[0],&args[1],&args[2..]);
+    let start=|flags:u32|{let mut c=std::process::Command::new(file);c.args(rest).creation_flags(flags).stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());if !cwd.is_empty(){c.current_dir(cwd);}c.spawn()};
+    /* CREATE_BREAKAWAY_FROM_JOB | CREATE_NEW_PROCESS_GROUP; a job that does not allow breakaway refuses it: start inside then */
+    match start(0x01000000|0x00000200).or_else(|_|start(0x00000200)){Ok(mut child)=>{println!("{}",child.id());/* then its exit code, for the caller's checks (Steam restart: 53) */match child.wait(){Ok(s)=>{println!("exit {}",s.code().map(|c|c.to_string()).unwrap_or_else(||"null".into()));}Err(_)=>{}}0}Err(e)=>{eprintln!("{}",e);1}}
+}
 fn main() {
+    #[cfg(windows)]
+    {let args:Vec<String>=std::env::args().collect();if args.get(1).map(|a|a=="--spawn-outside-job").unwrap_or(false){std::process::exit(spawn_outside_job(&args[2..]));}}
     STARTED.get_or_init(std::time::Instant::now);
     window_policy::no_ghost_windows();
     let root = root_directory();

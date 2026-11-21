@@ -60,7 +60,7 @@ test('E542 fit: a block that fits stays as it is; one too tall at 60 % moves up,
 test('E542 fit: loaded in the reader, only for the bound dialogue window, reset by a new line',()=>{
  assert.ok(JSON.parse(read('web/reader/modules.json')).includes('game-fit'));assert.match(read('web/reader/module-list.js'),/"game-fit"/);
  const src=read('web/reader/modules/game-fit.js');
- assert.match(src,/body\.tomoyo-gal-bound\.megulit-fit-on \.sentence-window:not\(\.tome-island-page\)/);
+ assert.match(src,/body\.tomoyo-gal-bound\.megulit-fit-on'\+own\+' \.sentence-window:not\(\.tome-island-page\)/);assert.match(src,/const own=':not\(\.megulit-anchored\):not\(\.megulit-placed\)';/,'never on a line text-place.js places');
  assert.match(src,/m\.hookSource!==line\)\{line=m\.hookSource;reset\(\);/);
  assert.doesNotMatch(src,/background:/,'nothing is drawn over the game');
 });

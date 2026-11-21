@@ -169,6 +169,19 @@ test('siglus-pck reads unkeyed compiled scenes (exe_angou_mod=0) in order with s
  assert.deepEqual(p.speakers, ['吉野', '', '瑚太朗']);
 }));
 
+test('siglus-pck finds Scene.pck in a single game sub-folder (patched installs like 1st_beat/)', () => withDir(dir => {
+ const dat = buildCompiledDat([{ kind: 'name', text: '音無' }, { kind: 'text', text: '「ここはどこだ」' }]);
+ const sub = path.join(dir, '1st_beat'); fs.mkdirSync(sub); fs.mkdirSync(path.join(dir, 'readme'));
+ fs.writeFileSync(path.join(sub, 'Scene.pck'), buildScenePck({ scenes: [{ name: 'seen01', blob: kit.xor(siglusPack(dat), EASY_ANGOU) }], exeAngouMod: 0 }));
+ fs.writeFileSync(path.join(sub, 'Scene.chs'), Buffer.alloc(92));
+ fs.writeFileSync(path.join(sub, 'SiglusEngine.exe'), 'MZ');
+ const e = scenes.ENGINES['siglus-pck'];
+ assert.equal(ss.scenePck(dir), path.join(sub, 'Scene.pck'));
+ const sc = e.scenes(dir);
+ assert.equal(sc.length, 1);
+ assert.deepEqual(e.parse(sc[0].read()).lines, ['「ここはどこだ」']);
+}));
+
 test('Siglus launcher reads the package beside Gameexe.dat in a nested installation', () => withDir(dir => {
  const install = path.join(dir, 'StartData', 'gamedata');
  fs.mkdirSync(install, { recursive: true });

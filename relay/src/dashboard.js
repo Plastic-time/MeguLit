@@ -14,7 +14,7 @@ export const DASHBOARD_HTML=String.raw`<!doctype html>
 <style>
 /* operator console in the btop / htop / tmux idiom: titled hairline panes, aligned columns, bar meters, sparklines,
    a request log with latency. Black and one red. Code mono for data, small pixel caps for labels, pixel CJK. */
-:root{--bg:#070707;--pane:#0b0b0b;--line:#262626;--line2:#1a1a1a;--fg:#cfcfcf;--hi:#f2f2f2;--dim:#626262;--dim2:#3a3a3a;--red:#e0303e;--ok:#5b9a6b;
+:root{--bg:#070707;--pane:#0b0b0b;--line:#262626;--line2:#1a1a1a;--fg:#cfcfcf;--hi:#f2f2f2;--dim:#626262;--dim2:#3a3a3a;--red:#e0303e;--ok:#5b9a6b;--gold:#e0a84b;--gold2:#7a5a26;
   --mono:"JetBrains Mono","DotGothic16",ui-monospace,Menlo,Consolas,monospace;--px:"Silkscreen",ui-monospace,monospace;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0}
@@ -95,6 +95,16 @@ body{background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:13px
 .cnt .k{color:var(--dim);font-size:11px}
 .kv{display:grid;grid-template-columns:8em 1fr;gap:2px 10px;font-size:12px}
 .kv .k{color:var(--dim)}
+/* THE SEED: the one gold pane */
+.pane.gold{border-color:var(--gold2);align-self:start}
+.pane.gold .ti{color:var(--gold)}.pane.gold .ti b{color:var(--gold)}
+.pane.gold .bar i{color:var(--gold)}
+.seed-top{display:flex;align-items:flex-end;gap:14px;margin-bottom:8px}
+.seed-n{font-size:40px;line-height:1;color:var(--gold);font-weight:600}
+.seed-u{color:var(--dim);font-size:12px;line-height:1.4}.seed-u b{color:var(--hi);font-weight:400}
+.m.seed-ok .v{color:var(--gold)}.m.seed-ok .k{color:var(--hi)}
+.chips.gold span{border-color:var(--gold2)}.chips.gold b{color:var(--gold)}
+.pane .ti.cjk{font-family:"DotGothic16",var(--mono);font-size:12px}
 
 /* tables */
 table{width:100%;border-collapse:collapse;font-size:12px}
@@ -189,20 +199,9 @@ tbody tr:hover td{background:#121212}
       <div id="quota"><div class="empty">-- loading</div></div>
     </section>
 
-    <section class="pane c3">
-      <span class="ti">┤ <b>full dumps</b> ├</span><span class="tr">r2://probe-full</span>
-      <div class="cnt">
-        <div><div class="v r" id="fReady">--</div><div class="k">ready</div></div>
-        <div><div class="v" id="fUp">--</div><div class="k">uploading</div></div>
-        <div><div class="v" id="fDone">--</div><div class="k">done</div></div>
-      </div>
-      <div class="m"><span class="k">r2</span><span class="bar" id="bR2"></span><span class="v" id="vR2">--</span></div>
-      <div class="kv" style="margin-top:6px">
-        <span class="k">stored</span><span id="fMB">--</span>
-        <span class="k">avg / dump</span><span id="fAvg">--</span>
-        <span class="k">last upload</span><span id="fLast">--</span>
-      </div>
-      <div id="fMore"></div>
+    <section class="pane c3 gold">
+      <span class="ti">┤ <b>the seed</b> ├</span><span class="tr">The Seed/ · game diffs</span>
+      <div id="seed"><div class="empty">-- loading</div></div>
     </section>
 
     <section class="pane c3">
@@ -243,6 +242,21 @@ tbody tr:hover td{background:#121212}
     <section class="pane c3">
       <span class="ti">┤ <b>storage</b> ├</span><span class="tr">r2 · uploads in flight</span>
       <div id="stor"><div class="empty">-- loading</div></div>
+    </section>
+
+    <section class="pane c3">
+      <span class="ti">┤ <b>full dumps</b> ├</span><span class="tr">r2://probe-full</span>
+      <div class="cnt">
+        <div><div class="v r" id="fReady">--</div><div class="k">ready</div></div>
+        <div><div class="v" id="fUp">--</div><div class="k">uploading</div></div>
+        <div><div class="v" id="fDone">--</div><div class="k">done</div></div>
+      </div>
+      <div class="m"><span class="k">r2</span><span class="bar" id="bR2"></span><span class="v" id="vR2">--</span></div>
+      <div class="kv" style="margin-top:6px">
+        <span class="k">stored</span><span id="fMB">--</span>
+        <span class="k">avg / dump</span><span id="fAvg">--</span>
+        <span class="k">last upload</span><span id="fLast">--</span>
+      </div>
     </section>
 
     <section class="pane c3">
@@ -292,7 +306,7 @@ function setBig(v){var t=fmt(v),el=$("big");el.setAttribute("aria-label",t+" onl
 
 /* htop meter */
 function cols(el,cw){return Math.max(8,Math.floor(el.clientWidth/cw));}
-function meter(el,v,max){var w=cols(el,7.9)-2,n=max>0?Math.round(Math.min(1,(v||0)/max)*w):0;
+function meter(el,v,max){if(!el)return;var w=cols(el,7.9)-2,n=max>0?Math.round(Math.min(1,Math.max(0,Number(v)||0)/max)*w):0;n=Math.max(0,Math.min(w,n|0));
  el.innerHTML="["+"<i>"+"|".repeat(n)+"</i>"+" ".repeat(Math.max(0,w-n))+"]";}
 
 /* sparklines from this viewer's own samples */
@@ -359,7 +373,7 @@ function renderExt(x){if(!x)return;barQ=[];
   sub("uploads")+kvs([["diagnostics",hv(K(dg.total))+p7(dg.n7d)+' <span class="d">'+mb(dg.mb||0)+'</span>'],["diag issues",hv(K(dg.issues))],["probe bundles",hv(K(bd.total))+p7(bd.n7d)+' <span class="d">'+mb(bd.mb||0)+'</span>']]);
  flushBars();
  $("extAt").textContent="ext "+ago(x.at);}
-function renderFullMore(j){var f=j.full||{},el=$("fMore");if(!el)return;
+function renderFullMore(j){var f=j.full||{},el=$("fMore");if(!el){renderStorage(j);return;}
  el.innerHTML=kvs([["size range",hv(mb(f.minMB||0))+'<span class="d"> → </span>'+hv(mb(f.maxMB||0))],["reporters",hv(K(f.reporters))],
   ["uploads 24h",hv(K(f.d1))+' <span class="d">'+K(f.d7)+' in 7d · '+K(f.games)+' total</span>'],
   ["expiring 7d",(f.expiring?'<span class="r">'+f.expiring+'</span>':hv(0))+' <span class="d">kept 30d</span>'],
@@ -431,7 +445,7 @@ function kick(){if(reduce)return;var n=$("name");n.classList.remove("kick");void
 /* both relay nodes are hit every poll; the first good answer is shown, each node's latency is kept */
 var lat={};
 function poll(){var t0=performance.now();
- var reqs=NODES.map(function(n){return fetch(n[1],{cache:"no-store"}).then(function(r){var ms=Math.round(performance.now()-t0);lat[n[0]]=r.ok?ms:-1;if(!r.ok)throw 0;
+ var reqs=NODES.map(function(n){var ac=window.AbortController?new AbortController():null;if(ac)setTimeout(function(){ac.abort();},12000);return fetch(n[1],{cache:"no-store",signal:ac?ac.signal:undefined}).then(function(r){var ms=Math.round(performance.now()-t0);lat[n[0]]=r.ok?ms:-1;if(!r.ok)throw 0;
   return r.json().then(function(j){j.__node=n[0];j.__ms=ms;j.__code=r.status;return j;});},function(e){lat[n[0]]=-1;throw e;});});
  return {first:Promise.any(reqs),all:Promise.allSettled(reqs)};}
 var prev=null,peak=0,since=Date.now(),last=null;
@@ -444,21 +458,42 @@ function apply(j){
  prev=on;setBig(on);$("peak").textContent=peak;last=j;render(j);
  $("host").textContent="relay ─ "+j.__node;$("code").textContent=j.__code+" · "+j.__ms+"ms";$("mode").textContent="LINK";$("mode").className="md";
  log("INF",'GET /api/probe/stats <span class="h">'+j.__code+'</span> <span class="ms">'+j.__ms+'ms '+j.__node+'</span> online=<span class="r">'+on+'</span> 1h='+j.active1h+' ready='+((j.full||{}).ready|0));}
-function render(j){spark();
+/* 2026-11-21 one panel throwing (e.g. a negative size) used to abort render() and was reported as "failed on every
+   node"; now each panel draws on its own and a broken one logs "ERR render <panel>" while the others keep updating */
+var badPanels={};
+function safe(name,fn){try{fn();if(badPanels[name]){delete badPanels[name];log("INF","render "+name+" ok again");}}catch(e){if(!badPanels[name])log("ERR","render "+esc(name)+": "+esc(String(e&&e.message||e).slice(0,80)));badPanels[name]=1;}}
+function render(j){safe("spark",spark);safe("stats",function(){renderStats(j);});safe("seed",function(){renderSeed(j.seed);});safe("probe packs",function(){renderPacks(j);});
+ safe("why",function(){renderSteps(j.steps,j);});safe("targets",function(){renderTop(j.top);});safe("now playing",function(){renderPlaying(j.playing);});
+ safe("ext",function(){renderExt(j.ext);});safe("storage",function(){renderFullMore(j);});safe("quota",function(){renderQuota(j);});safe("online",function(){renderRow1(j);});
+ var er=j.errors||{};Object.keys(er).forEach(function(k){log("ERR","server "+esc(k)+": "+esc(er[k]));});
+ if(!j.ext)["acc","com","most","adp"].forEach(function(id){$(id).innerHTML='<div class="empty"><span class="r">-- aggregates unavailable</span>, retry in '+PERIOD+'s</div>';});}
+function renderStats(j){
  var today=Math.max(j.today|0,1);
  meter($("b1"),j.active1h,today);$("v1").textContent=fmt(j.active1h);
  $("b2").innerHTML='<span class="d">1h/today '+(j.today?Math.round((j.active1h|0)/j.today*100):0)+'%</span>';$("v2").textContent=fmt(j.today);
  var f=j.full||{};
  $("b3").innerHTML='<span class="d">'+(f.games|0)+' with full dump</span>';$("v3").textContent=fmt(j.probedGames);
- $("v4").textContent=fmt(j.reporters);$("v5").textContent=j.probedGames?(j.reporters/j.probedGames).toFixed(2):"--";
+ $("v4").textContent=fmt(j.reporters);$("v5").textContent=j.probedGames?(j.reporters/j.probedGames).toFixed(2):"--";}
+function renderPacks(j){var f=j.full||{};
  $("fReady").textContent=fmt(f.ready);$("fUp").textContent=fmt(f.uploading);$("fDone").textContent=fmt(f.done);
  meter($("bR2"),f.storedMB||0,f.limitMB||8192);$("vR2").textContent=((f.storedMB||0)/(f.limitMB||8192)*100).toFixed(1)+"%";
  $("fMB").innerHTML=mb(f.storedMB||0)+' <span class="d">/ '+mb(f.limitMB||8192)+'</span>';
- $("fAvg").textContent=f.ready?mb((f.storedMB||0)/f.ready):"--";$("fLast").textContent=ago(f.lastAt);
- renderSteps(j.steps,j);renderTop(j.top);renderPlaying(j.playing);renderExt(j.ext);renderFullMore(j);renderQuota(j);renderRow1(j);}
+ $("fAvg").textContent=f.ready?mb((f.storedMB||0)/f.ready):"--";$("fLast").textContent=ago(f.lastAt);}
+/* THE SEED: games + versions, confirmed (verified / owner-ok) vs waiting for more players (skeleton / read) */
+function renderSeed(s){var el=$("seed"),se=(s&&s.errors)||{},errH=Object.keys(se).map(function(k){return '<div class="sub"><span class="r">'+esc(k)+'</span> '+esc(se[k])+'</div>';}).join("");
+ if(!s||!s.sources||!s.sources.length){el.innerHTML='<div class="empty">-- counting The Seed/ (first count runs in the background)</div>'+errH;return;}
+ var st=s.status||{},tot=Math.max(1,s.games|0),ok=s.confirmed|0,wait=s.waiting|0;
+ var html='<div class="seed-top"><span class="seed-n">'+(s.games|0)+'</span><span class="seed-u">games seeded<br><b>'+(s.versions|0)+'</b> exe versions</span></div>'+
+  '<div class="m m4 seed-ok"><span class="k">confirmed</span><span class="bar" id="sdOk"></span><span class="v">'+ok+'</span><span class="pc">'+Math.round(ok/tot*100)+'%</span></div>'+
+  '<div class="m m4"><span class="k">waiting</span><span class="bar" id="sdWait"></span><span class="v">'+wait+'</span><span class="pc">'+Math.round(wait/tot*100)+'%</span></div>'+
+  '<div class="chips gold">'+[["verified",st.verified],["owner-ok",st["owner-ok"]],["read",st.read],["skeleton",st.skeleton]].map(function(c){return '<span>'+c[0]+' <b>'+(c[1]|0)+'</b></span>';}).join("")+
+  (s.other?'<span>other <b>'+s.other+'</b></span>':'')+'</div>'+
+  '<div class="sub" style="margin-top:6px">confirmed = verified + owner-ok · waiting for more players = read + skeleton</div>'+
+  '<div class="sub">'+s.sources.map(function(x){return esc(x.source)+' '+x.games;}).join(" · ")+' · updated '+ago(s.at)+'</div>'+errH;
+ el.innerHTML=html;meter($("sdOk"),ok,tot);meter($("sdWait"),wait,tot);}
 function nodesLine(){$("node").innerHTML=NODES.map(function(n){var v=lat[n[0]];return n[0]+" "+(v==null?"--":v<0?'<span class="r">down</span>':v+"ms");}).join(" · ");
  var ok=NODES.filter(function(n){return lat[n[0]]>0;}).map(function(n){return lat[n[0]];});$("latT").textContent=ok.length?"latency "+Math.min.apply(null,ok)+"ms":"latency";}
-function tick(){var p=poll();p.first.then(apply).catch(function(){$("mode").textContent="DOWN";$("mode").className="md err";$("code").textContent="timeout";log("ERR","GET /api/probe/stats failed on every node · retry in "+PERIOD+"s");});p.all.then(nodesLine);}
+function tick(){var p=poll();p.first.then(function(j){try{apply(j);}catch(e){log("ERR","render: "+esc(String(e&&e.message||e).slice(0,80)));}},function(){$("mode").textContent="DOWN";$("mode").className="md err";$("code").textContent="timeout";log("ERR","GET /api/probe/stats failed on every node · retry in "+PERIOD+"s");});p.all.then(nodesLine);}
 addEventListener("resize",function(){drawLed(shown||"--");if(last)render(last);else spark();});
 
 var LINES=[['$ ssh op@relay.megulit.com',''],['  authenticated · ed25519','ok'],['$ tmux attach -t megulit',''],['  attached','ok']];

@@ -1,0 +1,173 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// 2026-11-21 (owner: 闲时冷测试) runs one library game on a separate, invisible Windows desktop for the idle-time cold test
+// (services/cold-test-run.cjs, docs/cold-test.md). Same idea as the owner's test tools HidDesk (separate desktop, PostMessage
+// input, PrintWindow pictures) and MuteProc (the game's audio sessions muted), in one helper that ships with MeguLit.
+//
+//   ColdDesk.exe status
+//     one JSON line: {idleMs, ac (true|false|null = no battery), fullscreen, cpu (0..1 over 1 s), quns}
+//   ColdDesk.exe run <game.exe> [--seconds N] [--steam-appid ID]
+//     starts the game suspended on desktop "MeguLitColdDesk" inside a job object (KILL_ON_JOB_CLOSE: the whole process tree
+//     dies with this helper), keeps every audio session of the job muted, and prints JSON events, one per line:
+//       {"type":"started","pid":n,"started":"<StartTime UTC ticks>"}   {"type":"window","hwnd":"…","w":n,"h":n,"title":"…"}
+//       {"type":"input"}  the user touched keyboard or mouse: the game is ended at once
+//       {"type":"power","ac":false}  {"type":"fullscreen","on":true}   (reported; the service decides)
+//       {"type":"relaunched","pid":n}  the game exited and the same program came back outside the job (Steam): it is ended
+//       {"type":"shot","ok":true,"path":"…","w":n,"h":n,"black":false}  {"type":"timeout"}  {"type":"exited","code":n}
+//       {"type":"ended","why":"…"}  last line
+//     stdin commands, one per line: key <vk> | keydown <vk> | keyup <vk> | click <x> <y> | activate | shot <maxWidth> <path> | kill
+// The user's screen, taskbar, focus, mouse and keyboard are never touched: input is PostMessage to the game's window only, so
+// GetLastInputInfo keeps measuring the user alone.
+using System;using System.Collections.Generic;using System.Diagnostics;using System.Drawing;using System.Drawing.Imaging;using System.IO;
+using System.Runtime.InteropServices;using System.Text;using System.Threading;
+
+[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceEnumerator{int EnumAudioEndpoints(int flow,int mask,out IMMDeviceCollection c);}
+[Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceCollection{int GetCount(out int n);int Item(int i,out IMMDevice d);}
+[Guid("D666063F-1587-4E43-81F1-B948E807363F"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDevice{int Activate(ref Guid id,int ctx,IntPtr p,[MarshalAs(UnmanagedType.IUnknown)] out object o);}
+[Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioSessionManager2{int f1();int f2();int GetSessionEnumerator(out IAudioSessionEnumerator e);}
+[Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioSessionEnumerator{int GetCount(out int n);int GetSession(int i,out IAudioSessionControl2 s);}
+[Guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioSessionControl2{int a1();int a2();int a3();int a4();int a5();int a6();int a7();int a8();int a9();int b1();int b2();int GetProcessId(out uint pid);}
+[Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface ISimpleAudioVolume{int SetMasterVolume(float v,ref Guid g);int GetMasterVolume(out float v);int SetMute(bool m,ref Guid g);int GetMute(out bool m);}
+[ComImport,Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class MMDeviceEnumeratorCls{}
+
+static class ColdDesk{
+ const string DESK="MeguLitColdDesk";
+ [StructLayout(LayoutKind.Sequential)] struct RECT{public int L,T,R,B;}
+ [StructLayout(LayoutKind.Sequential)] struct POINT{public int X,Y;}
+ [StructLayout(LayoutKind.Sequential)] struct LASTINPUTINFO{public uint cbSize,dwTime;}
+ [StructLayout(LayoutKind.Sequential)] struct SYSTEM_POWER_STATUS{public byte ACLineStatus,BatteryFlag,BatteryLifePercent,SystemStatusFlag;public int BatteryLifeTime,BatteryFullLifeTime;}
+ [StructLayout(LayoutKind.Sequential)] struct FILETIME{public uint Lo,Hi;}
+ [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)] struct STARTUPINFO{public int cb;public string lpReserved,lpDesktop,lpTitle;public int dwX,dwY,dwXSize,dwYSize,dwXCountChars,dwYCountChars,dwFillAttribute,dwFlags;public short wShowWindow,cbReserved2;public IntPtr lpReserved2,hStdInput,hStdOutput,hStdError;}
+ [StructLayout(LayoutKind.Sequential)] struct PROCESS_INFORMATION{public IntPtr hProcess,hThread;public int dwProcessId,dwThreadId;}
+ [StructLayout(LayoutKind.Sequential)] struct JOBOBJECT_BASIC_LIMIT_INFORMATION{public long PerProcessUserTimeLimit,PerJobUserTimeLimit;public uint LimitFlags;public UIntPtr MinimumWorkingSetSize,MaximumWorkingSetSize;public uint ActiveProcessLimit;public UIntPtr Affinity;public uint PriorityClass,SchedulingClass;}
+ [StructLayout(LayoutKind.Sequential)] struct IO_COUNTERS{public ulong a,b,c,d,e,f;}
+ [StructLayout(LayoutKind.Sequential)] struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION{public JOBOBJECT_BASIC_LIMIT_INFORMATION Basic;public IO_COUNTERS Io;public UIntPtr ProcessMemoryLimit,JobMemoryLimit,PeakProcessMemoryUsed,PeakJobMemoryUsed;}
+ delegate bool EnumProc(IntPtr h,IntPtr l);
+ [DllImport("user32.dll",SetLastError=true,CharSet=CharSet.Unicode)] static extern IntPtr CreateDesktop(string n,IntPtr d,IntPtr m,int f,uint a,IntPtr s);
+ [DllImport("user32.dll",SetLastError=true,CharSet=CharSet.Unicode)] static extern IntPtr OpenDesktop(string n,int f,bool i,uint a);
+ [DllImport("user32.dll")] static extern bool CloseDesktop(IntPtr d);
+ [DllImport("user32.dll")] static extern bool EnumDesktopWindows(IntPtr d,EnumProc cb,IntPtr l);
+ [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb,IntPtr l);
+ [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h,out uint pid);
+ [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h,out RECT r);
+ [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr h,out RECT r);
+ [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+ [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr h,StringBuilder s,int n);
+ [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h,IntPtr dc,uint f);
+ [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);
+ [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h,IntPtr a,int x,int y,int cx,int cy,uint f);
+ [DllImport("user32.dll")] static extern IntPtr ChildWindowFromPointEx(IntPtr h,POINT p,uint f);
+ [DllImport("user32.dll")] static extern int MapWindowPoints(IntPtr a,IntPtr b,ref POINT p,uint n);
+ [DllImport("user32.dll")] static extern uint MapVirtualKey(uint code,uint type);
+ [DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LASTINPUTINFO i);
+ [DllImport("shell32.dll")] static extern int SHQueryUserNotificationState(out int state);
+ [DllImport("kernel32.dll")] static extern bool GetSystemPowerStatus(out SYSTEM_POWER_STATUS s);
+ [DllImport("kernel32.dll")] static extern bool GetSystemTimes(out FILETIME idle,out FILETIME kernel,out FILETIME user);
+ [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool CreateProcess(string app,StringBuilder cmd,IntPtr pa,IntPtr ta,bool inherit,uint flags,IntPtr env,string dir,ref STARTUPINFO si,out PROCESS_INFORMATION pi);
+ [DllImport("kernel32.dll")] static extern uint ResumeThread(IntPtr h);
+ [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+ [DllImport("kernel32.dll")] static extern bool GetExitCodeProcess(IntPtr h,out uint code);
+ [DllImport("kernel32.dll",CharSet=CharSet.Unicode)] static extern IntPtr CreateJobObject(IntPtr a,string n);
+ [DllImport("kernel32.dll")] static extern bool SetInformationJobObject(IntPtr j,int c,ref JOBOBJECT_EXTENDED_LIMIT_INFORMATION i,uint n);
+ [DllImport("kernel32.dll")] static extern bool AssignProcessToJobObject(IntPtr j,IntPtr p);
+ [DllImport("kernel32.dll")] static extern bool TerminateJobObject(IntPtr j,uint code);
+ [DllImport("kernel32.dll")] static extern bool QueryInformationJobObject(IntPtr j,int c,IntPtr info,uint n,IntPtr ret);
+ [DllImport("kernel32.dll")] static extern uint GetTickCount();
+
+ static readonly object Out=new object();
+ static void Emit(string json){lock(Out){Console.Out.WriteLine(json);Console.Out.Flush();}}
+ static string Q(string s){var b=new StringBuilder("\"");foreach(var c in s??""){if(c=='"'||c=='\\'){b.Append('\\').Append(c);}else if(c<0x20){b.Append("\\u").Append(((int)c).ToString("x4"));}else b.Append(c);}return b.Append('"').ToString();}
+
+ static int Main(string[] a){
+  if(a.Length<1){Console.Error.WriteLine("ColdDesk status | run <game.exe> [--seconds N] [--steam-appid ID]");return 2;}
+  try{if(a[0]=="status"){Emit(Status());return 0;}if(a[0]=="run"&&a.Length>1)return Run(a);}
+  catch(Exception e){Emit("{\"type\":\"ended\",\"why\":"+Q("error "+e.Message)+"}");return 1;}
+  return 2;}
+
+ /* ---- status ---------------------------------------------------------------------------------------------------- */
+ static uint IdleMs(){var li=new LASTINPUTINFO();li.cbSize=(uint)Marshal.SizeOf(li);if(!GetLastInputInfo(ref li))return 0;return unchecked(GetTickCount()-li.dwTime);}
+ static string Ac(){SYSTEM_POWER_STATUS s;if(!GetSystemPowerStatus(out s))return "null";if((s.BatteryFlag&128)!=0||s.BatteryFlag==255)return "null";return s.ACLineStatus==1?"true":s.ACLineStatus==0?"false":"null";}
+ /* QUNS_BUSY 2, QUNS_RUNNING_D3D_FULL_SCREEN 3, QUNS_PRESENTATION_MODE 4 */
+ static int Quns(){int q=0;try{SHQueryUserNotificationState(out q);}catch{}return q;}
+ static ulong Ft(FILETIME f){return ((ulong)f.Hi<<32)|f.Lo;}
+ static double Cpu(){FILETIME i0,k0,u0,i1,k1,u1;if(!GetSystemTimes(out i0,out k0,out u0))return -1;Thread.Sleep(1000);GetSystemTimes(out i1,out k1,out u1);
+  double idle=Ft(i1)-Ft(i0),total=(Ft(k1)-Ft(k0))+(Ft(u1)-Ft(u0));return total<=0?0:Math.Max(0,Math.Min(1,1-idle/total));}
+ static string Status(){int q=Quns();return "{\"idleMs\":"+IdleMs()+",\"ac\":"+Ac()+",\"fullscreen\":"+(q==2||q==3||q==4?"true":"false")+",\"quns\":"+q+",\"cpu\":"+Cpu().ToString("0.000",System.Globalization.CultureInfo.InvariantCulture)+"}";}
+
+ /* ---- run ------------------------------------------------------------------------------------------------------- */
+ static IntPtr Job,Desk,GameWin;static HashSet<uint> Pids=new HashSet<uint>();static string ImageName="";static DateTime StartedAt;
+ static List<uint> JobPids(){var l=new List<uint>();int size=8+4*1024;IntPtr buf=Marshal.AllocHGlobal(size);try{if(QueryInformationJobObject(Job,3,buf,(uint)size,IntPtr.Zero)){int n=Marshal.ReadInt32(buf,4);for(int i=0;i<n;i++)l.Add((uint)Marshal.ReadIntPtr(buf,8+i*IntPtr.Size).ToInt64());}}finally{Marshal.FreeHGlobal(buf);}return l;}
+ static IntPtr Biggest(){IntPtr best=IntPtr.Zero;long area=-1;var pids=new HashSet<uint>(JobPids());EnumProc cb=(h,_)=>{uint p;GetWindowThreadProcessId(h,out p);if(!pids.Contains(p)||!IsWindowVisible(h))return true;RECT r;GetWindowRect(h,out r);long s=(long)(r.R-r.L)*(r.B-r.T);if(s>area){area=s;best=h;}return true;};
+  EnumDesktopWindows(Desk,cb,IntPtr.Zero);return best;}
+ static void Mute(){try{var pids=new HashSet<uint>(JobPids());if(pids.Count==0)return;var en=(IMMDeviceEnumerator)new MMDeviceEnumeratorCls();Guid iid=typeof(IAudioSessionManager2).GUID,g=Guid.Empty;IMMDeviceCollection c;en.EnumAudioEndpoints(0,1,out c);int n;c.GetCount(out n);
+  for(int i=0;i<n;i++){IMMDevice d;c.Item(i,out d);object o;d.Activate(ref iid,23,IntPtr.Zero,out o);var m=(IAudioSessionManager2)o;IAudioSessionEnumerator se;m.GetSessionEnumerator(out se);int k;se.GetCount(out k);
+   for(int j=0;j<k;j++){IAudioSessionControl2 s;se.GetSession(j,out s);uint pid;s.GetProcessId(out pid);if(pids.Contains(pid)){var v=(ISimpleAudioVolume)s;bool mu;v.GetMute(out mu);if(!mu)v.SetMute(true,ref g);}}}}catch{}}
+ static IntPtr Lp(uint vk,bool up){uint sc=MapVirtualKey(vk,0);long l=1|(sc<<16);if(up)l|=0xC0000000L;return (IntPtr)unchecked((int)l);}
+ static void Key(uint vk,bool down,bool up){if(GameWin==IntPtr.Zero)return;if(down)PostMessage(GameWin,0x100,(IntPtr)vk,Lp(vk,false));if(down&&up&&(vk==0x0d||vk==0x20||vk==0x1b))PostMessage(GameWin,0x102,(IntPtr)vk,Lp(vk,false));if(up)PostMessage(GameWin,0x101,(IntPtr)vk,Lp(vk,true));}
+ static void Click(int x,int y){if(GameWin==IntPtr.Zero)return;var w=GameWin;/* the deepest child under the point (KiriKiri draws in a child) */for(int i=0;i<8;i++){POINT pt;pt.X=x;pt.Y=y;var c=ChildWindowFromPointEx(w,pt,1);if(c==IntPtr.Zero||c==w)break;POINT o;o.X=0;o.Y=0;MapWindowPoints(c,w,ref o,1);x-=o.X;y-=o.Y;w=c;}
+  var lp=(IntPtr)((y<<16)|(x&0xffff));PostMessage(w,0x200,IntPtr.Zero,lp);PostMessage(w,0x201,(IntPtr)1,lp);Thread.Sleep(40);PostMessage(w,0x202,IntPtr.Zero,lp);}
+ /* games pause when they think they lost focus: tell the window it is the active one (on its own desktop) */
+ static void Activate(){if(GameWin==IntPtr.Zero)return;PostMessage(GameWin,0x1C,(IntPtr)1,IntPtr.Zero);PostMessage(GameWin,0x06,(IntPtr)1,IntPtr.Zero);PostMessage(GameWin,0x86,(IntPtr)1,IntPtr.Zero);PostMessage(GameWin,0x07,IntPtr.Zero,IntPtr.Zero);}
+ static ImageCodecInfo Jpeg(){foreach(var c in ImageCodecInfo.GetImageEncoders())if(c.MimeType=="image/jpeg")return c;return null;}
+ /* the client area only (PW_CLIENTONLY | PW_RENDERFULLCONTENT), scaled to maxWidth, JPEG q70; black = nothing drawn */
+ static void Shot(int maxW,string file){if(GameWin==IntPtr.Zero){Emit("{\"type\":\"shot\",\"ok\":false,\"why\":\"no window\"}");return;}RECT r;GetClientRect(GameWin,out r);int w=r.R-r.L,h=r.B-r.T;if(w<16||h<16){Emit("{\"type\":\"shot\",\"ok\":false,\"why\":\"tiny\"}");return;}
+  using(var b=new Bitmap(w,h,PixelFormat.Format32bppArgb)){using(var g=Graphics.FromImage(b)){var dc=g.GetHdc();try{PrintWindow(GameWin,dc,3);}finally{g.ReleaseHdc(dc);}}
+   double sum=0,sq=0;int n=0;for(int yy=0;yy<h;yy+=Math.Max(1,h/48))for(int xx=0;xx<w;xx+=Math.Max(1,w/64)){var c=b.GetPixel(xx,yy);double v=(c.R+c.G+c.B)/3.0;sum+=v;sq+=v*v;n++;}
+   double mean=n>0?sum/n:0,sd=n>0?Math.Sqrt(Math.Max(0,sq/n-mean*mean)):0;bool black=mean<10&&sd<6;
+   int tw=Math.Min(w,Math.Max(160,maxW)),th=(int)Math.Round(h*(double)tw/w);
+   using(var s=new Bitmap(tw,th)){using(var g=Graphics.FromImage(s)){g.InterpolationMode=System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;g.DrawImage(b,0,0,tw,th);}
+    var ep=new EncoderParameters(1);ep.Param[0]=new EncoderParameter(System.Drawing.Imaging.Encoder.Quality,70L);Directory.CreateDirectory(Path.GetDirectoryName(file));s.Save(file,Jpeg(),ep);}
+   Emit("{\"type\":\"shot\",\"ok\":true,\"path\":"+Q(file)+",\"w\":"+tw+",\"h\":"+th+",\"black\":"+(black?"true":"false")+"}");}}
+
+ static int Run(string[] a){string exe=Path.GetFullPath(a[1]);int seconds=600;for(int i=2;i<a.Length-1;i++){if(a[i]=="--seconds")seconds=Math.Max(10,int.Parse(a[i+1]));}
+  ImageName=Path.GetFileNameWithoutExtension(exe);
+  Desk=OpenDesktop(DESK,0,false,0x10000000);if(Desk==IntPtr.Zero)Desk=CreateDesktop(DESK,IntPtr.Zero,IntPtr.Zero,0,0x10000000,IntPtr.Zero);if(Desk==IntPtr.Zero){Emit("{\"type\":\"ended\",\"why\":\"desktop\"}");return 1;}
+  Job=CreateJobObject(IntPtr.Zero,null);var lim=new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();lim.Basic.LimitFlags=0x2000;/* KILL_ON_JOB_CLOSE */SetInformationJobObject(Job,9,ref lim,(uint)Marshal.SizeOf(lim));
+  var si=new STARTUPINFO();si.cb=Marshal.SizeOf(si);si.lpDesktop="WinSta0\\"+DESK;PROCESS_INFORMATION pi;
+  if(!CreateProcess(exe,new StringBuilder("\""+exe+"\""),IntPtr.Zero,IntPtr.Zero,false,0x4/* CREATE_SUSPENDED */,IntPtr.Zero,Path.GetDirectoryName(exe),ref si,out pi)){Emit("{\"type\":\"ended\",\"why\":\"create "+Marshal.GetLastWin32Error()+"\"}");return 1;}
+  if(!AssignProcessToJobObject(Job,pi.hProcess)){/* the game could escape the tree kill: never run it so */TerminateJobObject(Job,1);try{Process.GetProcessById(pi.dwProcessId).Kill();}catch{}Emit("{\"type\":\"ended\",\"why\":\"job\"}");return 1;}
+  ResumeThread(pi.hThread);CloseHandle(pi.hThread);StartedAt=DateTime.UtcNow;
+  string started="";try{started=Process.GetProcessById(pi.dwProcessId).StartTime.ToUniversalTime().Ticks.ToString();}catch{}
+  Emit("{\"type\":\"started\",\"pid\":"+pi.dwProcessId+",\"started\":"+Q(started)+"}");
+  var cmds=new Queue<string>();var reader=new Thread(()=>{string l;try{while((l=Console.In.ReadLine())!=null)lock(cmds)cmds.Enqueue(l);}catch{}lock(cmds)cmds.Enqueue("kill");});reader.IsBackground=true;reader.Start();
+  uint baseInput=0;{var li=new LASTINPUTINFO();li.cbSize=(uint)Marshal.SizeOf(li);GetLastInputInfo(ref li);baseInput=li.dwTime;}
+  int lastW=0,lastH=0;IntPtr lastHwnd=IntPtr.Zero;DateTime lastMute=DateTime.MinValue,lastPower=DateTime.MinValue;string why="";bool everAlive=false;DateTime goneAt=DateTime.MinValue;bool wasFull=Quns()>=2&&Quns()<=4;
+  var end=DateTime.UtcNow.AddSeconds(seconds);
+  while(why==""){
+   /* the user is back: end now, before anything else */
+   {var li=new LASTINPUTINFO();li.cbSize=(uint)Marshal.SizeOf(li);if(GetLastInputInfo(ref li)&&li.dwTime!=baseInput){Emit("{\"type\":\"input\"}");why="input";break;}}
+   string c=null;lock(cmds)if(cmds.Count>0)c=cmds.Dequeue();
+   if(c!=null){var p=c.Trim().Split(new[]{' '},3);try{switch(p[0]){
+     case "key":Key(Convert.ToUInt32(p[1]),true,true);break;
+     case "keydown":Key(Convert.ToUInt32(p[1]),true,false);break;
+     case "keyup":Key(Convert.ToUInt32(p[1]),false,true);break;
+     case "click":Click(int.Parse(p[1]),int.Parse(p[2]));break;
+     case "activate":Activate();break;
+     case "shot":Shot(int.Parse(p[1]),p[2]);break;
+     case "kill":why="killed";break;}}catch(Exception e){Emit("{\"type\":\"error\",\"what\":"+Q(c)+",\"why\":"+Q(e.Message)+"}");}
+    if(why!="")break;continue;}
+   var pids=JobPids();
+   if(pids.Count>0){everAlive=true;goneAt=DateTime.MinValue;}
+   else if(everAlive){if(goneAt==DateTime.MinValue){goneAt=DateTime.UtcNow;}
+    /* Steam: the game exits and the client starts it again on the user's desktop. Push its windows away and end it */
+    foreach(var pr in Process.GetProcessesByName(ImageName)){try{if(pr.StartTime.ToUniversalTime()>StartedAt&&!pids.Contains((uint)pr.Id)){EnumProc off=(h,_)=>{uint wp;GetWindowThreadProcessId(h,out wp);if(wp==pr.Id)SetWindowPos(h,(IntPtr)1,-30000,-30000,0,0,0x0001|0x0010);return true;};EnumWindows(off,IntPtr.Zero);pr.Kill();Emit("{\"type\":\"relaunched\",\"pid\":"+pr.Id+"}");why="relaunched";}}catch{}}
+    if(why!="")break;
+    if((DateTime.UtcNow-goneAt).TotalSeconds>12){uint code=0;GetExitCodeProcess(pi.hProcess,out code);Emit("{\"type\":\"exited\",\"code\":"+code+"}");why="exited";break;}}
+   var w=Biggest();if(w!=IntPtr.Zero){RECT r;GetClientRect(w,out r);int cw=r.R-r.L,ch=r.B-r.T;if(w!=lastHwnd||cw!=lastW||ch!=lastH){lastHwnd=w;lastW=cw;lastH=ch;GameWin=w;var t=new StringBuilder(256);GetWindowText(w,t,256);Activate();
+     Emit("{\"type\":\"window\",\"hwnd\":"+Q(w.ToInt64().ToString())+",\"w\":"+cw+",\"h\":"+ch+",\"title\":"+Q(t.ToString())+"}");}}
+   if((DateTime.UtcNow-lastMute).TotalMilliseconds>700){lastMute=DateTime.UtcNow;Mute();}
+   if((DateTime.UtcNow-lastPower).TotalSeconds>5){lastPower=DateTime.UtcNow;if(Ac()=="false")Emit("{\"type\":\"power\",\"ac\":false}");int q=Quns();bool full=q>=2&&q<=4;if(full&&!wasFull)Emit("{\"type\":\"fullscreen\",\"on\":true}");wasFull=full;}
+   if(DateTime.UtcNow>end){Emit("{\"type\":\"timeout\"}");why="timeout";break;}
+   Thread.Sleep(100);}
+  TerminateJobObject(Job,1);CloseHandle(Job);CloseHandle(pi.hProcess);
+  /* the desktop goes away with its last handle once the game's windows are gone */
+  Thread.Sleep(300);CloseDesktop(Desk);
+  Emit("{\"type\":\"ended\",\"why\":"+Q(why)+"}");return 0;}
+}

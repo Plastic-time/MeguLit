@@ -162,7 +162,7 @@ public class GalWindowBridge {
     // the input thread calls it directly, so a dragged panel's glass does not wait for the next bridge loop (E139).
     static void GlassCommand(Dictionary<string,object> d){var boxes=new List<GlassLayer.Box>();object rects;if(d.TryGetValue("rects",out rects)&&rects is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)rects){var rect=item as Dictionary<string,object>;if(rect==null||boxes.Count>=16)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)boxes.Add(new GlassLayer.Box((int)x,(int)y,(int)w,(int)h,(int)Num(rect,"radius",Num(d,"radius",0)),(int)Math.Max(0,Math.Min(60,Num(rect,"blur",18))),(int)Math.Max(0,Math.Min(95,Num(rect,"dim",0))),(int)Math.Max(0,Math.Min(300,Num(rect,"saturate",100))),(int)Math.Max(0,Math.Min(100,Num(rect,"alpha",100))),(int)Num(rect,"fx",x),(int)Num(rect,"fy",y),(int)Math.Max(0,Math.Min(16384,Num(rect,"fw",w))),(int)Math.Max(0,Math.Min(16384,Num(rect,"fh",h)))));}}
         Glass.Set(boxes,(int)Num(d,"radius",0));}
-    /* E533: Pass = painted (inside the window region) but never takes the pointer: art-text translations over game buttons */sealed class HitRegion{public Rect Bounds;public bool Pass;}
+    /* E533: Pass = painted (inside the window region) but never takes the pointer: art-text translations over game buttons */sealed class HitRegion{public Rect Bounds;public bool Pass;public bool Menu;}
     static readonly List<HitRegion> HitRegions=new List<HitRegion>();static string RegionKey="";
     [DllImport("user32.dll")]static extern int SetWindowRgn(IntPtr window,IntPtr region,bool redraw);
     [DllImport("gdi32.dll")]static extern IntPtr CreateRectRgn(int left,int top,int right,int bottom);
@@ -470,6 +470,10 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
         else if(type=="maskAssist"){if(TextMask!=null)TextMask.Assist(Str(d,"source"));}
         else if(type=="hookVerifyCancel"){if(HookVerifier!=null)HookVerifier.Cancel();}
         else if(type=="gameAudio"){AudioWanted=Bool(d,"enabled");uint pid=0;if(AudioWanted&&Target!=IntPtr.Zero)GetWindowThreadProcessId(Target,out pid);if(AudioWanted&&pid!=0)Audio.Start(pid);else if(!AudioWanted)Audio.Stop();}
+        /* 2026-11-21 runtime sample: {type:"clientShot",id,maxEdge,maxBytes} -> the whole client area, full size + a scaled copy (GameAudio.ClientShot) */
+        else if(type=="clientShot"){string id=Str(d,"id");IntPtr target=Target;object me,mb;int maxEdge=d.TryGetValue("maxEdge",out me)?Math.Max(64,Math.Min(4096,Convert.ToInt32(me))):960,maxBytes=d.TryGetValue("maxBytes",out mb)?Math.Max(16*1024,Math.Min(2*1024*1024,Convert.ToInt32(mb))):150*1024;
+            ThreadPool.QueueUserWorkItem(delegate{string full="",small="";try{Rect rect;if(target!=IntPtr.Zero&&GetClientRect(target,out rect))GameAudio.ClientShot(target,rect.Right,rect.Bottom,maxEdge,maxBytes,out full,out small);}catch{}
+                try{Emit(new{type="clientShot",id=id,full=full,small=small});}catch{}});}
         else if(type=="sceneShot"){string id=Str(d,"id");IntPtr target=Target;
             ThreadPool.QueueUserWorkItem(delegate{string jpeg="",hash="";double score=0;try{Rect rect;if(target!=IntPtr.Zero&&GetClientRect(target,out rect))jpeg=GameAudio.SceneShot(target,rect.Right,rect.Bottom,out score,out hash);}catch{}
                 try{Emit(new{type="sceneShot",id=id,jpeg=jpeg,score=score,hash=hash});}catch{}});}
@@ -518,7 +522,7 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
             // Only when needed: re-showing and re-activating the already visible, already active main window made it
             // hide and reappear once (with the Windows open animation) on the first menu after start.
             bool keepGame=FullscreenTarget()&&GetAncestor(GetForegroundWindow(),3)==GetAncestor(Target,3);if(!IsWindowVisible(Overlay))ShowWindow(Overlay,keepGame?4:5);if(!keepGame&&GetAncestor(GetForegroundWindow(),3)!=GetAncestor(Overlay,3))SetForegroundWindow(Overlay);IsShown=true;MenuFocusPending=false;}}}
-        else if(type=="hitRegions"){MenuRegionReady=Bool(d,"menuOpen");RegionAckPending=MenuRegionReady;HitRegions.Clear();object regions;if(d.TryGetValue("regions",out regions)&&regions is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)regions){var rect=item as Dictionary<string,object>;if(rect==null||HitRegions.Count>=256)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)HitRegions.Add(new HitRegion{Bounds=new Rect((int)x,(int)y,(int)(x+w),(int)(y+h)),Pass=Bool(rect,"pass")});}}
+        else if(type=="hitRegions"){MenuRegionReady=Bool(d,"menuOpen");RegionAckPending=MenuRegionReady;HitRegions.Clear();object regions;if(d.TryGetValue("regions",out regions)&&regions is System.Collections.ArrayList){foreach(object item in (System.Collections.ArrayList)regions){var rect=item as Dictionary<string,object>;if(rect==null||HitRegions.Count>=256)continue;double x=Num(rect,"x",0),y=Num(rect,"y",0),w=Num(rect,"width",0),h=Num(rect,"height",0);if(w>0&&h>0&&w<=16384&&h<=16384&&Math.Abs(x)<32768&&Math.Abs(y)<32768)HitRegions.Add(new HitRegion{Bounds=new Rect((int)x,(int)y,(int)(x+w),(int)(y+h)),Pass=Bool(rect,"pass"),Menu=Bool(rect,"menu")});}}
             // Over a bound game apply the new region right away instead of in the next tick (which also captures the game
             // for text and marker detection and made the menu wait ~170 ms before it could open).
             if(TranslationMode&&Target!=IntPtr.Zero&&Overlay!=IntPtr.Zero&&Captured&&HasLastRect&&IsShown){ApplyRegion(LastRect.Right-LastRect.Left,LastRect.Bottom-LastRect.Top);AckRegion();}
@@ -592,17 +596,22 @@ static Rect SurfaceBounds(Rect reader,Rect game,System.Drawing.Rectangle scan){r
             NoActivateWindow=window;
         }
     }
+    /* 2026-11-21 (owner, STEINS;GATE with the Alt+T panel pinned open: clicks on words advanced the game; the host logged no
+       click at all while the panel was open): since 1.0.0 an open menu switched the gate off, so with the panel pinned every
+       click on the reader's text went to the game. The gate stays on while the menu is open: the panel and the text regions
+       are both MeguLit's (HitRegions carries both), everything else still reaches the game. */
+    internal static bool PointerGateOn(bool translation,bool menuOpen,bool overlay,bool shown){return translation&&overlay&&shown;}
     static void RefreshReaderPointer(){
         if(PointerGate==null)return;
         Rect client;
-        if(!TranslationMode||MenuOpen||Overlay==IntPtr.Zero||!IsShown||!GetClientRect(Overlay,out client)){
+        if(!PointerGateOn(TranslationMode,MenuOpen,Overlay!=IntPtr.Zero,IsShown)||!GetClientRect(Overlay,out client)){
             PointerGate.Current=null;return;
         }
         /* Issue #133 (WHITE ALBUM2: clicking a word went to the next line). The overlay floated unbound (Target zero), the
            gate was off, and the game, which polls the mouse button, took the click as well. Unbound, the gate still owns
            clicks on MeguLit's own text regions (never the whole overlay), so a polling game under it never sees them. */
-        if(Target==IntPtr.Zero){PointerGate.Current=new ReaderPointerGate.Context(Overlay,IntPtr.Zero,client,false,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray());return;}
-        PointerGate.Current=new ReaderPointerGate.Context(Overlay,GetAncestor(Target,2),client,LookupOpen,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray());
+        if(Target==IntPtr.Zero){PointerGate.Current=new ReaderPointerGate.Context(Overlay,IntPtr.Zero,client,false,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray(),HitRegions.FindAll(h=>h.Menu).ConvertAll(h=>h.Bounds).ToArray());return;}
+        PointerGate.Current=new ReaderPointerGate.Context(Overlay,GetAncestor(Target,2),client,LookupOpen,HitRegions.FindAll(h=>!h.Pass).ConvertAll(h=>h.Bounds).ToArray(),HitRegions.FindAll(h=>h.Menu).ConvertAll(h=>h.Bounds).ToArray());
     }
     static bool? LastReaderContext;
     /* 2026-11-19 one reading of the foreground per tick and one decision for the layer (native/ReaderLayerPolicy.cs):
@@ -800,6 +809,7 @@ if(args.Length==2&&args[0]=="--art-scan-file"){Console.OutputEncoding=Encoding.U
         }
         if(args.Length>0&&args[0]=="--mode-self-test"){
             if(!GameSceneProbe.SelfTest())return 6;
+            if(!GameAudio.ClientShotSelfTest())return 9;
             Command(new Dictionary<string,object>{{"type","configure"},{"interfaceMode","translation"}});
             if(!TranslationMode)return 4;
             Command(new Dictionary<string,object>{{"type","configure"},{"interfaceMode","normal"}});

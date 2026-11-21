@@ -32,6 +32,10 @@
     const s = { t, st, fr, doneAt: da, got: Math.min(TOTAL, got), total: TOTAL, speed, eta: speed > 0 ? (TOTAL - got) / speed : 0, pack, src: lead, srcN: nb, dir: 'D:/MeguLit/runtime',
       phase: t < T0 ? 'probe' : t < TEND + 0.4 ? 'download' : t < DONE ? 'unpack' : 'done', unpack: Math.max(0, Math.min(1, (t - U0) / UD)) };
     if (s.phase === 'unpack' || s.phase === 'done') s.got = TOTAL;
+    if (o.progress !== undefined) { const x = o.progress * N, k = Math.floor(x); for (let i = 0; i < N; i++) { st[i] = i < k ? 2 : i === k && o.progress < 1 ? 1 : (o.progress >= 1 ? 2 : 0); fr[i] = i === k ? x - k : 0; da[i] = 0; } s.got = o.progress * TOTAL; s.phase = 'download'; s.poseP = o.poseP !== undefined ? o.poseP : 0.5; }   /* pre-render preview: fake download progress, glass lit by the scene's own style */
+    if (o.state === 'done') { st.fill(2); fr.fill(1); da.fill(0); s.got = TOTAL; s.speed = 0; s.eta = 0; s.phase = o.phase || 'unpack'; s.unpack = o.phase === 'done' ? 1 : 0.5; }   /* pre-render: every segment finished, glass in its final state */
+    if (o.poseP !== undefined) s.poseP = o.poseP;
+    if (o.blank) { s.poseP = o.poseP !== undefined ? o.poseP : Math.max(0, Math.min(1, (t - T0) / (TEND - T0))); st.fill(0); fr.fill(0); s.got = 0; s.speed = 0; s.eta = 0; s.phase = 'download'; }   /* pre-render: every segment still pending, the glass is drawn unlit (the player lights it from the real progress) */
     if (o.fail === 'download') { for (let i = 0; i < N; i++) if (st[i] === 1 || st[i] === 3) st[i] = 4; s.speed = 0; s.eta = 0;
       s.err = { kind: 'download' }; }
     if (o.fail === 'install') s.err = { kind: 'install' };
@@ -41,7 +45,9 @@
   function build() {
     tl = gsap.timeline({ paused: true });
     tl.add(Scene.intro(), 0);
-    tl.add(Scene.goTo('loc', ROUTE[0], 'welcome'), T0).add(Scene.goTo('field', ROUTE[1], 'loc'), 4.9).add(Scene.goTo('unpack', ROUTE[2], 'field'), U0 - 0.3).add(Scene.goTo('done', ROUTE[3], 'unpack'), DONE);
+    const L = window.__layout;   /* pre-render: the four moves are spaced out so that none overlaps the next one */
+    if (L) tl.add(Scene.goTo('loc', ROUTE[0], 'welcome'), T0).add(Scene.goTo('field', ROUTE[1], 'loc'), L.under).add(Scene.goTo('unpack', ROUTE[2], 'field'), L.dive).add(Scene.goTo('done', ROUTE[3], 'unpack'), L.pull);
+    else tl.add(Scene.goTo('loc', ROUTE[0], 'welcome'), T0).add(Scene.goTo('field', ROUTE[1], 'loc'), 4.9).add(Scene.goTo('unpack', ROUTE[2], 'field'), U0 - 0.3).add(Scene.goTo('done', ROUTE[3], 'unpack'), DONE);
     const BS = String.fromCharCode(92), typed = 'D:' + BS + 'Games' + BS + 'MeguLit'; const path = document.getElementById('path');
     tl.call(() => { path.value = 'D:' + BS + 'MeguLit'; }, null, 0);
     for (let i = 0; i < typed.length; i++) tl.call(() => { path.value = typed.slice(0, i + 1); }, null, 3.3 + i * 0.05);

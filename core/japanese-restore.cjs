@@ -149,7 +149,20 @@ function detect(gameDir,options={}){
  return {state:'none'};
 }
 
+/* Native first (the same GameProcess.exe launch and patch-swap use): a cold PowerShell start under build or render load
+   ran past 40 s twice and the check gave up with PROCESS_QUERY_FAILED. Each .exe in the folder (and one level down) is
+   asked by name and full path; any answer other than running/absent falls back to the PowerShell scan below. */
+function nativeRunning(gameDir){
+ const tool=path.join(__dirname,'..','native','GameProcess.exe');if(!fs.existsSync(tool))return null;
+ const exes=[];const add=d=>{let names=[];try{names=fs.readdirSync(d,{withFileTypes:true});}catch{return [];}for(const e of names)if(e.isFile()&&/\.exe$/i.test(e.name))exes.push(path.join(d,e.name));return names;};
+ for(const e of add(gameDir))if(e.isDirectory())add(path.join(gameDir,e.name));
+ if(!exes.length||exes.length>40)return null;
+ for(const exe of exes){let out;try{out=require('node:child_process').execFileSync(tool,['--patch-check',exe],{encoding:'utf8',windowsHide:true,timeout:15000}).trim();}catch{return null;}
+  if(out==='running')return true;if(out!=='absent')return null;}
+ return false;
+}
 function gameRunning(gameDir){
+ {const quick=nativeRunning(gameDir);if(quick!==null)return quick;}
  // PowerShell prints in the console code page unless told otherwise; Japanese and Chinese paths must come back as UTF-8.
  // A cold PowerShell start can take well over 15 s on a busy machine; a timeout used to read as "not running",
  // so the check now waits longer and asks a second time before giving up.
@@ -169,7 +182,7 @@ function writeAtomic(file,data){const tmp=file+'.megulit-tmp';fs.writeFileSync(t
 function apply(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));if(gameRunning(gameDir))throw Error('GAME_RUNNING');
  {const y=readManifest(gameDir)?null:yurisPlan(gameDir);if(y&&y.updates.length)return yurisApply(gameDir,y);}
- const plan=siglusPlan(gameDir);if(!plan||!plan.changes.length){if(!readManifest(gameDir)&&langSwitch().detect(gameDir,options).state==='restorable')return langSwitch().apply(gameDir,options);if(!readManifest(gameDir)&&artemis().detect(gameDir).state==='restorable')return artemis().apply(gameDir);throw Error('NOTHING_TO_RESTORE');}
+ const plan=siglusPlan(gameDir);if(!plan||!plan.changes.length){if(!readManifest(gameDir)&&langSwitch().detect(gameDir,options).state==='restorable')return langSwitch().apply(gameDir,options);if(!readManifest(gameDir)&&artemis().detect(gameDir).state==='restorable')return artemis().apply(gameDir,{bilingual:options.bilingual});throw Error('NOTHING_TO_RESTORE');}
  const backup=path.join(gameDir,BACKUP_DIR,'dat');fs.mkdirSync(backup,{recursive:true});
  const prior=readManifest(gameDir),entries=prior?prior.files:[],built=[];
  for(const c of plan.changes){ // build and verify every file before any write
@@ -215,4 +228,4 @@ function repairShared(gameDir){
  const undone=restore(gameDir);if(undone.skipped.length)return {repaired:false,skipped:undone.skipped};
  const done=apply(gameDir);return {repaired:true,applied:done.applied};
 }
-module.exports={repairShared,detect,apply,restore,_internal:{sharedPool,readManifest,siglusPlan,shownJapanese,isIdent,yurisPlan,gameRunning,decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};
+module.exports={repairShared,detect,apply,restore,_internal:{sharedPool,readManifest,siglusPlan,shownJapanese,isIdent,yurisPlan,gameRunning,nativeRunning,decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};

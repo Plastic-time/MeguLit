@@ -695,8 +695,8 @@
       <label>字体搭配<select name="galStyle"><option value="classic">MS Mincho（日文明朝）／素晴汉化字体</option><option value="clean">MS Gothic（日文黑体）／素晴汉化字体</option><option value="custom">自定义 · 沿用下方译文设置</option></select></label>
       <div class="tomoyo-cn-grid"><label><input name="galJapaneseBold" type="checkbox">日文加粗</label><label><input name="galChineseBold" type="checkbox">中文加粗</label><label title="译文默认模糊，鼠标移上去才显示"><input name="galTranslationBlur" type="checkbox">译文模糊（悬停显示）</label></div>
       <label><input name="galTypewriter" type="checkbox">文字逐字显示</label>
-      <label>显示速度（字/秒）<input name="galTypewriterSpeed" type="number" min="5" max="120" step="1"></label>
-      <small>点击游戏或按空格可补全当前文字；按住 Ctrl 快速显示，不拦截游戏操作</small>
+      <label>速度（字/秒）<input name="galTypewriterSpeed" type="number" min="5" max="120" step="1"></label>
+      <small>点游戏或按空格补全当前句；按住 Ctrl 快速显示</small>
       <label>显示内容<select name="galDisplay"><option value="bilingual">日文＋假名／中文</option><option value="japanese">仅日文＋假名</option><option value="chinese">仅中文 · 接近汉化版</option><option value="bilingual-en">日文＋假名／英文</option><option value="english">仅英文</option><option value="none">不显示（只看游戏文本框）</option></select></label>
       <div class="tomoyo-cn-grid tomoyo-type-sizes"><label>中文字号<input name="galChineseSize" type="number" min="12" max="60"></label></div>
       <div class="tomoyo-cn-grid"><label>未读渐变<input name="galTextGradient" type="checkbox"></label><label>已读渐变<input name="galReadTextGradient" type="checkbox"></label><label>未读渐变上色<input name="galTextGradientTop" type="color"></label><label>未读渐变下色<input name="galTextGradientBottom" type="color"></label><label>已读渐变上色<input name="galReadTextGradientTop" type="color"></label><label>已读渐变下色<input name="galReadTextGradientBottom" type="color"></label><label>未读渐变起点（%）<input name="galTextGradientStart" type="number" min="0" max="95" step="1"></label><label>已读渐变起点（%）<input name="galReadTextGradientStart" type="number" min="0" max="95" step="1"></label></div>
@@ -710,7 +710,7 @@
     group.querySelector('.tomoyo-type-sizes').prepend(group.querySelector('[name=galJapaneseSize]').closest('label'));
     // Furigana position sliders sit directly under the furigana switch instead of inside a collapsed section.
     const rubyBlock=document.createElement('div');rubyBlock.className='tomoyo-ruby-position';
-    rubyBlock.innerHTML='<div class="tomoyo-ruby-size"><label>假名大小（相对正文）<input name="galRubyScale" type="number" min="0.2" max="0.85" step="0.01"></label></div><div class="tomoyo-cn-grid"><label>假名水平位置 X（右＋，px）<input name="galRubyOffsetX" type="number" min="-40" max="40" step="0.5"></label><label>假名垂直位置 Y（下＋，px）<input name="galRubyOffsetY" type="number" min="-100" max="100" step="0.5"></label><div class="megulit-ruby-rows" data-ruby-rows><span class="megulit-ruby-rows-title">按行微调 Y</span><div class="megulit-ruby-rows-chips" role="tablist"></div><output class="megulit-ruby-rows-value">0</output><input type="range" class="megulit-ruby-rows-slider" min="-60" max="60" step="0.5" value="0" aria-label="所选行的假名垂直位置"><input type="hidden" name="galRubyRowOffsets"><span class="megulit-ruby-rows-title">按行微调 X</span><span></span><output class="megulit-ruby-rows-value" data-axis-x>0</output><input type="range" class="megulit-ruby-rows-slider" data-axis-x min="-60" max="60" step="0.5" value="0" aria-label="所选行的假名水平位置"><input type="hidden" name="galRubyRowOffsetsX"></div></div><label><input name="galRubyOutline" type="checkbox">假名描边</label><div class="tomoyo-cn-grid"><label>假名描边颜色<input name="galRubyOutlineColor" type="color"></label><label>假名描边粗细<input name="galRubyOutlineWidth" type="number" min="0" max="2" step="0.05"></label></div>';
+    rubyBlock.innerHTML='<div class="tomoyo-ruby-size"><label title="相对正文字号的比例">假名大小<input name="galRubyScale" type="number" min="0.2" max="0.85" step="0.01"></label></div><div class="tomoyo-cn-grid"><label title="向右为正，单位 px">假名水平偏移<input name="galRubyOffsetX" type="number" min="-40" max="40" step="0.5"></label><label title="向下为正，单位 px">假名垂直偏移<input name="galRubyOffsetY" type="number" min="-100" max="100" step="0.5"></label><div class="megulit-ruby-rows" data-ruby-rows><span class="megulit-ruby-rows-title">单行微调</span><div class="megulit-ruby-rows-chips" role="tablist"></div><span class="megulit-ruby-axis" data-a="y">垂直</span><output class="megulit-ruby-rows-value">0</output><input type="range" class="megulit-ruby-rows-slider" min="-60" max="60" step="0.5" value="0" aria-label="所选行的假名垂直位置"><input type="hidden" name="galRubyRowOffsets"><span class="megulit-ruby-axis" data-a="x">水平</span><output class="megulit-ruby-rows-value" data-axis-x>0</output><input type="range" class="megulit-ruby-rows-slider" data-axis-x min="-60" max="60" step="0.5" value="0" aria-label="所选行的假名水平位置"><input type="hidden" name="galRubyRowOffsetsX"></div></div><label><input name="galRubyOutline" type="checkbox">假名描边</label><div class="tomoyo-cn-grid"><label>假名描边颜色<input name="galRubyOutlineColor" type="color"></label><label>假名描边粗细<input name="galRubyOutlineWidth" type="number" min="0" max="2" step="0.05"></label></div>';
     const rubyMenu=document.createElement('details');rubyMenu.className='tomoyo-ruby-menu';rubyMenu.innerHTML='<summary>注音字体与描边</summary>';
     const furiganaLabel=group.querySelector('[name=galFurigana]').closest('label');furiganaLabel.before(rubyMenu);rubyMenu.append(furiganaLabel,rubyBlock);
     const layout = document.createElement('details');
@@ -839,7 +839,10 @@
     /* 2026-11-19 (user: 「左右留白和边距现在都调整不了文本框位置了」): while the line is anchored on the game's own place the box
        position fields are its offset from there (anchorDX/anchorDY, client %, default 0, may be negative); the box position
        x/y of the reader's own box is kept apart and untouched */
-    const anchoredNow = () => document.body.classList.contains('megulit-anchored');
+    /* 2026-11-21 (owner's recording, 千恋＊万花: dragging 文本框上边距 threw the text to mid-screen and 校准当前句 did not bring it back): the body class
+       comes and goes between lines and while the game draws a line itself, so a drag switched the fields between the offset and the reader's own
+       place halfway and wrote one into the other. The mode is the game's (placement on, anchored), stable for the whole drag. */
+    const anchoredNow = () => typeof bridge.textPlaceAnchorActive === 'function' ? !!bridge.textPlaceAnchorActive() : document.body.classList.contains('megulit-anchored');
     /* 2026-11-19 (user, 千恋＊万花: 「我校准了之后调了一下换行长度，直接再也恢复不了正确位置了」): the meaning of the two fields is
        fixed when they are filled. The menu had been opened on a line the game drew itself (box mode: the fields held x 24.63 /
        y 79.7); the next line was anchored and dragging the wrap width wrote those numbers as an offset. A change of mode while
@@ -849,7 +852,7 @@
        the game's style profile (not an undo of unsaved edits); it needs the engine's glyph places, so without them it is greyed with the reason as its tooltip (the position state line below already says 本作品尚无引擎坐标) */
     const anchorReset = group.querySelector('[data-gal-anchor-reset]'),
      anchorResetWords = {zh:['回到游戏原字位置','本作品尚无引擎坐标'],en:['Back to the game text position','No engine positions for this game yet'],ja:['ゲームの文字位置に戻す','この作品はまだエンジン座標がありません']};
-    const paintAnchorReset = () => { const w = anchorResetWords[(window.__tomeI18n?.get?.()||'zh').slice(0,2)] || anchorResetWords.zh, on = anchoredNow(); anchorReset.dataset.noI18n = '';
+    const paintAnchorReset = () => { const w = anchorResetWords[(window.__tomeI18n?.get?.()||'zh').slice(0,2)] || anchorResetWords.zh, on = document.body.classList.contains('megulit-anchored'); /* the button: this line sits on the game's places now (the fields use the stable mode, anchoredNow) */ anchorReset.dataset.noI18n = '';
      anchorReset.textContent = w[0]; anchorReset.disabled = !on; anchorReset.title = on ? '' : w[1]; anchorReset.setAttribute('aria-disabled', String(!on)); };
     const fillPosition = () => { fieldsAreOffset = anchoredNow(); if (fieldsAreOffset) { f('galX').value = Number(preferences.anchorDX) || 0; f('galY').value = Number(preferences.anchorDY) || 0; f('galX').min = f('galY').min = '-95'; } else { f('galX').value = preferences.x; f('galY').value = preferences.y; f('galX').min = f('galY').min = '0'; } };
     fillPosition();
@@ -941,6 +944,7 @@
      };
     dragButton.onclick = () => { const on = !document.body.classList.contains('tome-box-dragging'); dragMode(on); if (!on) save(); };
     dragLabel(false); dialog.addEventListener('close', () => dragMode(false), { once:true });
+    bridge.galAnchorOffsetReset = () => anchorReset.onclick?.(); /* 校准当前句 / 仅校准位置 put the line back on the game's own place */
     anchorReset.onclick = () => { if (!anchoredNow()) return; if (bridge.gameStyleCommitReady?.() === false) return; preferences = { ...current(), anchorDX: 0, anchorDY: 0 };
      if (fieldsAreOffset) { const was = syncingForm; syncingForm = true; try { f('galX').value = 0; f('galY').value = 0; for (const update of sliderOutputs) update(); } finally { syncingForm = was; } }
      committed = { ...preferences }; send({ type: 'galConfigure', settings: preferences }); bridge.saveGameProfileFromMenu?.(preferences); apply(); };

@@ -22,6 +22,7 @@
 #include <deque>
 #include <algorithm>
 #include "../shared/minhook/include/MinHook.h"
+#include "../shared/MeguLitSafeRead.h"
 
 namespace {
 // TJS string (tTJSVariantString): a ttstr is one pointer to this.
@@ -162,7 +163,8 @@ bool QueryGuarded(void *exporter, const char *name, void **fn) {
   return ((QueryNarrowFn)vt[1])(exporter, names, fn, 1) && *fn;
  } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-bool ReadPtr(const void *at, uintptr_t *v) { __try { *v = *(const uintptr_t *)at; return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
+/* P0 2026-11-20: never __try-read a guessed pointer blind (stack guard pages), see ../shared/MeguLitSafeRead.h */
+bool ReadPtr(const void *at, uintptr_t *v) { return MeguLitSafe::ReadPtr(at, v); }
 
 // ---- the hook ---------------------------------------------------------------------------------------------------
 bool IsScene(const wchar_t *name) { size_t n = wcslen(name); return n > 4 && !_wcsicmp(name + n - 4, L".scn"); }

@@ -7,44 +7,32 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -57,9 +45,24 @@
   "title": "ea6d9d756909167ece140bf9497fa9b8943eecca1a6165b93656c664db911f03",
   "vndb": "v10028"
  },
+ "seedFormat": 1,
  "status": "skeleton",
  "slug": "irotoridori-no-hikari-chs",
  "builds": [
   "ea2cb0cd2d01808cf80ec68da2713a96e6aa91c425c2b16e4e6667b226cb47f3"
- ]
+ ],
+ "match": {
+  "exe": [
+   "五彩斑斓的曙光.exe"
+  ],
+  "titles": [
+   "いろとりどりのヒカリ",
+   "五彩斑斓的曙光",
+   "[120831][FAVORITE] いろとりどりのヒカリ"
+  ]
+ },
+ "sourceLangs": [
+  "ja"
+ ],
+ "rev": 1
 }

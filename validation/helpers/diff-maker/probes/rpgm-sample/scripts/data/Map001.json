@@ -1,0 +1,196 @@
+{
+ "displayName": "はじまりの村",
+ "events": [
+  null,
+  {
+   "id": 1,
+   "name": "村長",
+   "pages": [
+    {
+     "list": [
+      {
+       "code": 101,
+       "indent": 0,
+       "parameters": [
+        "",
+        0,
+        0,
+        2,
+        "村長"
+       ]
+      },
+      {
+       "code": 401,
+       "indent": 0,
+       "parameters": [
+        "よく来たな、旅の者よ。"
+       ]
+      },
+      {
+       "code": 401,
+       "indent": 0,
+       "parameters": [
+        "この村は小さいが、良いところだ。"
+       ]
+      },
+      {
+       "code": 101,
+       "indent": 0,
+       "parameters": [
+        "",
+        0,
+        0,
+        2,
+        "村長"
+       ]
+      },
+      {
+       "code": 401,
+       "indent": 0,
+       "parameters": [
+        "ひとつ頼みを聞いてくれんか？"
+       ]
+      },
+      {
+       "code": 102,
+       "indent": 0,
+       "parameters": [
+        [
+         "引き受ける",
+         "断る"
+        ],
+        1,
+        0,
+        2,
+        0
+       ]
+      },
+      {
+       "code": 402,
+       "indent": 0,
+       "parameters": [
+        0,
+        "引き受ける"
+       ]
+      },
+      {
+       "code": 101,
+       "indent": 0,
+       "parameters": [
+        "",
+        0,
+        0,
+        2,
+        "村長"
+       ]
+      },
+      {
+       "code": 401,
+       "indent": 0,
+       "parameters": [
+        "ありがたい！　北の森へ向かってくれ。"
+       ]
+      },
+      {
+       "code": 0,
+       "indent": 1,
+       "parameters": []
+      },
+      {
+       "code": 402,
+       "indent": 0,
+       "parameters": [
+        1,
+        "断る"
+       ]
+      },
+      {
+       "code": 101,
+       "indent": 0,
+       "parameters": [
+        "",
+        0,
+        0,
+        2,
+        "村長"
+       ]
+      },
+      {
+       "code": 401,
+       "indent": 0,
+       "parameters": [
+        "そうか……気が変わったらまた来てくれ。"
+       ]
+      },
+      {
+       "code": 0,
+       "indent": 1,
+       "parameters": []
+      },
+      {
+       "code": 404,
+       "indent": 0,
+       "parameters": []
+      },
+      {
+       "code": 302,
+       "indent": 0,
+       "parameters": [
+        0,
+        1,
+        0,
+        0,
+        false
+       ]
+      },
+      {
+       "code": 0,
+       "indent": 0,
+       "parameters": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "name": "少女",
+   "pages": [
+    {
+     "list": [
+      {
+       "code": 101,
+       "indent": 0,
+       "parameters": [
+        "",
+        0,
+        0,
+        2,
+        "ミナ"
+       ]
+      },
+      {
+       "code": 401,
+       "indent": 0,
+       "parameters": [
+        "お兄ちゃん、森は危ないよ。"
+       ]
+      },
+      {
+       "code": 401,
+       "indent": 0,
+       "parameters": [
+        "薬草を持っていってね。"
+       ]
+      },
+      {
+       "code": 0,
+       "indent": 0,
+       "parameters": []
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

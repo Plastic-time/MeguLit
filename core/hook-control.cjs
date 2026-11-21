@@ -2,10 +2,15 @@
 'use strict';
 const naninovelStream=t=>/Naninovel.*RevealableText|:Naninovel\.UI:RevealableText:SetTextValue:/i.test((t.name||'')+' '+(t.code||''));
 const streamRank=t=>naninovelStream(t)?300:/^Embed/.test(t.name||'')||t.embeddable===true?200:/TMP_Text|TextMeshPro|TextElement|TextField/.test(t.name||'')?10:100;
+const HIDDEN_REDRAWN='原文已隐藏：游戏的字由 MeguLit 在原位重画';
+const READ_ON_PURPOSE=why=>why?'自检未过线，已自动改为只显示译文：'+why:'这部游戏的文字特效和隐藏原文冲突，已自动改为只显示译文';
 const EMBED_FEEDBACK='这个游戏暂时不能隐藏原文：请在「关于」里提交反馈，附上游戏名和截图，一般一天内就能适配';
 class HookControl{
+ /* the original is kept off screen another way than write-back (or shown on purpose): the status line for it, else '' */
+ hiddenWithoutEmbed(){const h=this.host,k=h.hooks||{};if(h.textEffectsHold)return READ_ON_PURPOSE(h.textEffectsHold.why);
+  if(k.enabled===true&&k.route!=='read'&&(k.ownTextFn?.()===true||k.compositedFn?.()===true))return HIDDEN_REDRAWN;return '';}
  constructor(host,now=Date.now){this.host=host;this.now=now;this.seq=0;this.baseline=false;this.plan='read';this.running=false;this.lastIdentity='';}
- status(value){if(value.hookCheckState)this.host.hooks.trace?.('check '+value.hookCheckState+' '+(value.hookCheckMessage||''));this.host.notify({type:'hookCheck',hookProfile:this.plan,hookAutoOcr:!!this.autoOcr,...value});}
+ status(value){if('hookEmbedUnsupported' in value)this.unsupported=value.hookEmbedUnsupported===true;if(value.hookCheckState)this.host.hooks.trace?.('check '+value.hookCheckState+' '+(value.hookCheckMessage||''));this.host.notify({type:'hookCheck',hookProfile:this.plan,hookAutoOcr:!!this.autoOcr,...value});}
  // No stream of this game can be embedded: keep reading and let OCR cover the original text instead. Only a mask
  // mode ToMe chose itself is changed back, never one the user picked.
  // OCR may still measure positions, but covering the original text is only ever the user's choice (maskModeSource 'user').
@@ -16,7 +21,7 @@ class HookControl{
   if(profile==='euphoria474'&&h.state.hookExact474!==true){this.status({hookCheckState:'unsupported',hookCheckMessage:'此游戏版本不匹配，YU-RIS 0.474 隐藏没有启动'});return;}
   if(profile==='embed'&&!h.hooks.state.hookThreads.some(t=>t.embeddable)){this.status({hookCheckState:'unsupported',hookCheckMessage:'还没有支持内嵌的文本流，先启动通用读取并推进一句'});return;}
   if(this.styleCalibration&&this.styleTimer)this.finishStyleSync(false,true);
-  this.running=profile!=='off';this.plan=profile;this.baseline=false;this.baselineMisses=0;this.missSequence=null;this.seq=0;const styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleCalibration=!!(force&&!h.hooks.remembered/* E520 */&&h.preferences.autoGameStyle!==false&&h.styleSync&&!h.styleSync.latest&&this.styleCalibrationIdentity!==styleIdentity);if(this.styleCalibration)force=false;h.hooks.preflight=this.running&&profile!=='read'&&!force&&!h.hooks.remembered;
+  this.running=profile!=='off';this.plan=profile;this.baseline=false;this.baselineMisses=0;this.missSequence=null;this.seq=0;const styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleCalibration=!!(force&&!h.hooks.remembered/* E520 */&&h.preferences.autoGameStyle!==false&&h.styleSync&&!h.styleSync.latest&&this.styleCalibrationIdentity!==styleIdentity);if(this.styleCalibration)force=false;h.hooks.onGiveWayCapped=()=>this.giveWayCapped();h.hooks.preflight=this.running&&profile!=='read'&&!force&&!h.hooks.remembered;
   h.send({type:'hookVerifyCancel'});
   this.autoOcr=false;const userOcr=false;/* 2026-11-12 (user) OCR never covers the original */
   h.save({...h.preferences,bindEnabled:true,maskMode:userOcr?'local':'hook',maskModeSource:userOcr?'user':'',hookProfile:profile});
@@ -27,6 +32,11 @@ class HookControl{
  }
  beginStyleSync(manual=false,purpose='all',owner=''){
   const h=this.host;if(!h.styleSync||!h.state.bound){this.styleCalibration=false;h.styleSync?.status('waiting');return;}
+  /* 2026-11-21 (owner, test pack v5 ファタモルガーナの館): a game whose engine reports every character's box (KiriKiri page DLL,
+     ファタ / 千恋＊万花) is placed from those boxes: calibration never gives way to measure the original, it follows the engine */
+  {const cur=h.placement?.current,engineBoxes=!!(cur&&!cur.fallback&&Array.isArray(cur.rects)&&cur.rects.length)||h.hooks?.drawsHidden===true;
+   if(engineBoxes){clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');h.styleSync.calibrating=false;h.hooks.calibrating=false;if(h.hooks.preflight){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);}try{h.hooks.trace?.('calibration: engine boxes, no give way (following the engine coordinates)');}catch{}h.styleSync.status('following');return;}}
+  h.hooks.onGiveWayCapped=()=>this.giveWayCapped();
   this.styleCalibrationIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');clearTimeout(this.styleTimer);this.styleManual=manual;this.styleRetryLine=null;this.styleAwaitLive=false;this.styleCalibration=true;this.styleIdentity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleRestore=['embed','euphoria474'].includes(this.plan)&&h.preferences.hookHide!==false;
   h.styleSync.calibrating=true;h.styleSync.waitNext=this.styleRestore||h.hooks.drawsHidden===true;h.hooks.calibrating=true; // E246.1: embedding cleared the current line, so measure the next original line
    h.hooks.preflight=true;h.hooks.configure?.(h.preferences,h.state);h.onEvent?.({gameStylePreview:false});h.styleSync.automatic=!manual;h.styleSync.owner=owner;if(!h.styleSync.source){const source=h.state.hookSource||h.hooks.lastSource;if(source?.trim()){h.styleSync.source=source;h.styleSync.sourceRead=h.state.hookSourceRead===true;}}h.styleSync.status('revealing');
@@ -50,11 +60,15 @@ class HookControl{
    this.finishStyleSync(false);this.styleRetryLine=identity;this.styleRetryAt=this.now()+30000;};
   arm(lineAt?deadline:1000); /* automatic calibration pauses embedding: keep that pause short once the line is there (user: ISLAND showed the original for 90 s after every launch) */
  }
+ /* HookNative capped a give way (GIVE_WAY_MS): a calibration ends with what it measured, or as timed out; the baseline goes on hidden */
+ giveWayCapped(){const h=this.host;if(this.styleCalibration){if(h.styleSync?.publish?.())return;this.finishStyleSync(false);h.styleSync?.status('timeout');return;}
+  if(this.running&&!this.baseline){this.stage='switching';this.status({hookCheckState:'switching',hookCheckMessage:'原文检查超过 2 秒，已恢复隐藏'});}}
  finishStyleSync(success,cancel=false){
   if(!this.styleCalibration)return;clearTimeout(this.styleTimer);this.styleTimer=null;this.styleCalibration=false;const h=this.host;if(this.styleRevealed){this.styleRevealed=false;h.onEvent?.({gameStyleReveal:false});}h.hooks.calibrating=false;h.hooks.preflight=false;h.styleSync.calibrating=false;clearTimeout(h.styleSync.timer);if(cancel){h.styleSync.cancel?.();/* the calibration showed the original (hide paused): a cancelled one hides again at once, not at the next settings save */h.hooks.configure?.(h.preferences,h.state);}h.onEvent?.({gameStylePreview:false});
   const same=this.styleIdentity===String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');this.styleRetryAt=this.now()+15000;
   if(same&&!cancel){h.hooks.preflight=false;h.hooks.configure?.(h.preferences,h.state);this.styleAwaitLive=false;h.styleSync.status(success?'applied':'retrying');}
   if(!same||cancel||!this.styleRestore){this.styleAwaitLive=false;h.onEvent?.({gameStylePreview:false});}
+
  }
  check(){const h=this.host;if(!this.running){this.start(h.preferences.hookProfile==='off'?'read':h.preferences.hookProfile);return;}if(h.hooks.lastSource)this.source(h.hooks.lastSource);else this.status({hookCheckMessage:'还没有台词，请在游戏里推进一句'});}
  source(text){
@@ -112,7 +126,7 @@ class HookControl{
   }
   if(this.plan==='euphoria474'&&h.state.hookExact474===false)this.start('read');
   const hiding=['embed','euphoria474'].includes(this.plan);
-  if(!p.hookHide){h.hooks.probeHide?.(false);this.ocr(false);if(hiding)this.start('read');else if(explicit&&this.plan==='off')this.start('read');return;}
+  if(!p.hookHide){h.hooks.probeHide?.(false);this.ocr(false);if(h.textEffectsHold&&this.unsupported===true)this.status({hookEmbedUnsupported:false,hookCheckMessage:READ_ON_PURPOSE(h.textEffectsHold.why)});if(hiding)this.start('read');else if(explicit&&this.plan==='off')this.start('read');return;}
   // The verified YU-RIS 0.474 build uses a custom draw hook; read-only discovery does not expose that hook.
   if(h.state.hookExact474===true){if(!explicit&&!(h.state.bound&&h.state.coverEnabled!==false))return;if(this.plan!=='euphoria474')this.start('euphoria474',p.hookFast!==false);return;}
   const identity=String(h.state.gameProcessId||'')+'|'+String(h.state.gameStarted||'');if(this.discoveryIdentity!==identity){this.discoveryIdentity=identity;this.readOnlySince=null;}
@@ -133,7 +147,12 @@ class HookControl{
     /* E578: the selected stream cannot write back; the hook may still hide the game's own drawing of it (GDI / glyph hide). It is switched on
        as a probe and the stream turns embeddable (hide-only) once a hidden draw is reported; only after several lines without one is the game unsupported. */
     if(h.hooks.probing===true&&h.hooks.state.hookEmbedPending!==true&&this.pendingSamples.size<4){this.status({hookCheckState:'waiting',hookEmbedUnsupported:false,hookCheckMessage:'正在尝试通用隐藏原文：推进几句后自动生效'});return;}
-    if(h.hooks.state.hookEmbedPending===true&&this.pendingSamples.size<4){this.status({hookCheckState:'waiting',hookEmbedUnsupported:false,hookCheckMessage:'已找到可内嵌的引擎钩子，进入剧情第一句后自动隐藏原文'});return;}/* E346 (user 2026-11-10): every engine that ends here tells the user how to get the game adapted. */this.status({hookCheckState:'reading',hookEmbedUnsupported:true,hookCheckMessage:EMBED_FEEDBACK});return;}
+    if(h.hooks.state.hookEmbedPending===true&&this.pendingSamples.size<4){this.status({hookCheckState:'waiting',hookEmbedUnsupported:false,hookCheckMessage:'已找到可内嵌的引擎钩子，进入剧情第一句后自动隐藏原文'});return;}/* 2026-11-21 (owner, ファタモルガーナの館 incr11: 「已经隐藏了却显示了这个提示」, hook-events 23:31:21.984 隐藏检查通过, 23:31:37.856 embed -> custom,
+       then 这个游戏暂时不能隐藏原文 every 2 s): no stream writes back, but the original is still hidden: the glyph layer blanks it and MeguLit draws
+       the line on its place (overlay placement / compositor). Nothing to report then. A read mode chosen by the self-check or the text-effect
+       judge shows the game's text on purpose: it says so (the Alt+T read-mode line), never "send feedback". */
+    const hidden=this.hiddenWithoutEmbed();if(hidden){this.status({hookEmbedUnsupported:false,hookCheckMessage:hidden});return;}
+    /* E346 (user 2026-11-10): every engine that ends here tells the user how to get the game adapted. */this.status({hookCheckState:'reading',hookEmbedUnsupported:true,hookCheckMessage:EMBED_FEEDBACK});return;}
    this.status({hookCheckState:'waiting',hookCheckMessage:'已开启隐藏：等 Hook 找到游戏文本流，推进一句后自动开始隐藏'});return;}
   if(!explicit&&!(h.state.bound&&h.state.coverEnabled!==false))return;
   h.hooks.preferredThread=t.id;this.start(/DrawHide/.test(t.name)?'euphoria474':'embed',p.hookFast!==false);

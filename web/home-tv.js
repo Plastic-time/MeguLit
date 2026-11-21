@@ -3,6 +3,7 @@ import {openLinesPicker} from './home-lines.js';
 import {createDepth,markFlat,cachedDaily,rememberDaily,dailyIsFresh,dailySignature,cachedActivity,rememberActivity} from './home-depth.js';
 import {exAttr,setExample} from './example-ruby.js';
 import {loadGsap} from './gsap-loader.js';
+import {seedBannerHTML,openSeedDialog} from './the-seed.js';
 import {createDock,openHandPicker,HAND_MAX} from './home-picker.js';
 import {pickHeadline,cachedHeadline,translateHeadline,headlineLabel,activitySummary,emptyActivityHTML} from './home-today.js';
 
@@ -326,6 +327,9 @@ export function renderHomeTV(main,ctx){
   <div class="tv-rail"></div>
   <div class="tv-dialog"><span class="tv-who"></span><span class="tv-line"></span><div class="tv-act"></div></div></div>`;
  const root=main.querySelector('.tv-home'),$=s=>root.querySelector(s);
+ /* The Seed banner: a plaque on the right, above the recent-games rail */
+ {root.insertAdjacentHTML('beforeend',seedBannerHTML(locale,esc));
+  const b=root.querySelector('.seed-banner');b.addEventListener('click',()=>openSeedDialog({api,locale,esc}));}
  live={root,timer:0,beat:0,typer:0,depth:null};loadGsap().catch(()=>{});
  const art=(g,p)=>g.cover?`url("${String(g.cover).replace(/"/g,'%22')}") center/cover`:`linear-gradient(160deg,${p[0]},${p[2]} 70%)`;
  root.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{const to=b.dataset.go;if(to==='detail'){if(shown)onDetail(shown.id);return;}if(to==='words')navigate('learning',
