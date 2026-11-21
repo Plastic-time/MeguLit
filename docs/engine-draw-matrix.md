@@ -89,3 +89,34 @@
 后 4 个（Leaf、Nitroplus、Spike Chunsoft、BRUNS 原版）静态普查已经说明拿不到 GDI 调用点：自绘字库或加壳，要在运行中找送字函数或先脱壳，单靠静态做不出签名，做到时会先写清缺什么，不硬交
 
 进度（feat/re-misc）：通用 GDI 画字点部件（native/megulithook/DrawSites.h + DrawSitesSig.h）已交付，签名已有 ReaLive / AVG32、Softpal（两条）、NScripter、Innocent Grey（MFC CDC 三条）、AdvHD、CMVS、FVP（两条）、minori、Musica、BRUNS、Nitroplus（沙耶 Steam）、NitroPlus 2003（沙耶原版），每条在店主本机文件上正好命中、在其他引擎文件里不命中。普查时漏看了「经寄存器调用」的情况：Musica、沙耶 Steam、Softpal 第二条都是这样找到的（签名的 SLOT 形式）。Leaf、Spike Chunsoft、モジカ 静态做不出，见 engine-draw-native.md 末尾
+
+## 下一批（总指挥 2026-11-21）：本机样本
+
+只读查了 E:\GAL、E:\Steam\steamapps\common、H:\、D:\（4 层深，按引擎特征文件 / exe 名：AI5WIN / AI6WIN、mes.arc、live.dll / .lsb、Rio.arc / Chip.arc、System40 / .ain、Escu:de 的 .bin 包、Kaguya 的 params.dat / LINKPACK / .alp）：
+
+| 引擎 | 本机样本 | 结果 |
+|---|---|---|
+| Silky's（AI5WIN / AI6WIN） | 没有 | 跳过；要一部 Silky's 作品（例：ヴァルキリーコンプレックス、イエスタデイをうたって 之类 AI6WIN 版本）的 exe |
+| LiveMaker | 没有 | 跳过；要一部 LiveMaker 作品（例：ミライ、ノラと皇女と野良猫ハート 之外的 LiveMaker 同人作）的 exe（游戏数据附在 exe 末尾） |
+| Will（ADV 引擎，Rio.arc / Chip.arc） | Under The Moon（已签，advhd）；いじわるMyMaster（mymaster.exe 是 AlphaROM 加壳，导入表空，静态看不了） | 没有新签名；いじわるMyMaster 要运行中解开的镜像 |
+| AliceSoft System4 | 没有 | 跳过；要一部 System 4.x 作品（例：ランス10、ドーナドーナ）的 System40.exe |
+| Escu:de | 没有 | 跳过；要一部 Escu:de 作品（例：絶対階級学園、Re:BIRTHDAY SONG）的 exe |
+| Kaguya（アトリエかぐや） | 没有 | 跳过；要一部かぐや作品的 exe |
+
+顺带核对的：時計仕掛けのレイライン 2 的 PAL.dll 两条 Softpal 签名各正好命中一次（已进夹具，413e0cc5）；レイライン 3 是 KiriKiri。Air 的 avg32_cn.dll 导入了 TextOutA 但代码里没有对它 IAT 槽的引用（经别的跳板调用），新版 AVG32 要另看。
+
+## 普查还没覆盖的引擎
+
+| 引擎 | 本机样本 | 备注 |
+|---|---|---|
+| Silky's AI5WIN / AI6WIN、LiveMaker、AliceSoft System4、Escu:de、Kaguya | 无 | 见上表 |
+| Majiro | 无 | GetGlyphOutline 路线，适合 DrawSites |
+| QLIE | 无 | Delphi，画字在 TQLIE 文本对象 |
+| Malie | 无 | 自绘字库，类似 MAGES |
+| CIRCUS | 无 | MES VM，GDI 字形点 |
+| EntisGLS（Entis） | 无 | |
+| SystemNNN、ExHIBIT、Ikura GDL、rUGP（âge）、AGE System | 无 | |
+| RealLive / AVG32 新版（Air 的 avg32_cn.dll） | 有（Air） | TextOutA 不经 IAT 直接调用，要先找跳板 |
+| Leaf（WHITE ALBUM2）、Spike Chunsoft（ダンガンロンパ 1 / 2 / V3）、みにくいモジカの子 | 有 | 静态做不出，实机采集方案见 engine-draw-native.md |
+| Unity Naninovel（夏色四叶草）、Unity（デスマッチラブコメ！） | 有 | 归 Unity 组件路线（unitytext），不是原生画字 |
+| BGI、Siglus、MAGES、CatSystem2 | 有 | re-bgi / re-siglus / re-mages / re-cs2 在做 |
