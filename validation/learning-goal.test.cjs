@@ -23,6 +23,19 @@ test('countdown counts days to each sitting and marks a past one',()=>{
   assert.equal(c[0].kind,'eju');assert.ok(c[0].past);
   assert.equal(c[1].kind,'jlpt');assert.equal(c[1].days,24);assert.ok(!c[1].past);
 });
+test('countdown changes at local midnight for both exams',()=>{
+  for(const [kind,month,day] of [['jlpt',12,6],['eju',6,21]]){
+    const goal={[kind]:{year:2026,month}};
+    for(const [offset,days] of [[-1,1],[0,0],[1,-1]]){
+      for(const hour of [0,8,9,23]){
+        const now=new Date(2026,month-1,day+offset,hour).getTime();
+        const [entry]=G.countdown(goal,now);
+        assert.equal(entry.days,days,`${kind} at ${new Date(now)}`);
+        assert.equal(entry.past,days<0);
+      }
+    }
+  }
+});
 test('plan: goals decide which grammar categories come first and where review weighs',()=>{
   const jl=G.plan(G.normalize({goals:['jlpt'],jlpt:{level:'N2',full:true}},NOW));
   assert.equal(jl.level,'N2');assert.equal(jl.groups[0],'particle');assert.equal(jl.review.particle,3);

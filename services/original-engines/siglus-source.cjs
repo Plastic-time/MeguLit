@@ -76,9 +76,27 @@ function voiced(text){const out=[];let pending=[];
  return out;}
 // The release's scene package: Scene.pck first (the original), else another Scene*.pck.
 function scenePckHere(dir){let names=[];try{names=fs.readdirSync(dir).filter(n=>/^scene.*\.pck$/i.test(n));}catch{}names.sort((a,b)=>(/^scene\.pck$/i.test(b)?1:0)-(/^scene\.pck$/i.test(a)?1:0));return names.length?path.join(dir,names[0]):null;}
-/* Scene.pck at the top, else in one sub-folder (patched / repacked installs keep the game in e.g. 1st_beat/ beside readme folders) */
-function scenePck(dir){const top=scenePckHere(dir);if(top)return top;let subs=[];try{subs=fs.readdirSync(dir,{withFileTypes:true}).filter(d=>d.isDirectory()).map(d=>d.name).sort();}catch{}
- const hits=subs.map(n=>scenePckHere(path.join(dir,n))).filter(Boolean);return hits.length===1?hits[0]:null;}
+function scenePckLaunched(dir){
+ const name=/^scene.*\.pck$/i;
+ const names=kit.names(dir);
+ let files=names.filter(n=>name.test(n)).map(n=>path.join(dir,n)).filter(kit.isFile);
+ if(!files.length){
+  // A launcher can sit above the installation. The scene package and the engine settings belong together.
+  const engineLauncher=names.some(n=>/^siglusengine.*\.exe$/i.test(n));
+  const startData=names.find(n=>/^startdata$/i.test(n));
+  if(!engineLauncher&&!(startData&&names.some(n=>/^start\.exe$/i.test(n))))return null;
+  const rootEngine=require('./registry.cjs').engineOf(dir);
+  if(rootEngine&&rootEngine.name!=='SiglusEngine')return null;
+  const candidates=engineLauncher?kit.walk(dir,2,n=>name.test(n)):kit.walk(path.join(dir,startData),1,n=>name.test(n));
+  const dirs=[...new Set(candidates.map(f=>path.dirname(f)))].filter(d=>kit.files(d,{name:/^gameexe.*\.dat$/i,max:1}).length);
+  if(dirs.length!==1)return null;
+  files=candidates.filter(f=>path.dirname(f)===dirs[0]);
+ }
+ return files.find(f=>/^scene\.pck$/i.test(path.basename(f)))||files[0];
+}
+/* Scene.pck at the top or below a launcher (#597), else in one sub-folder (#441: patched / repacked installs keep the game in e.g. 1st_beat/ beside readme folders) */
+function scenePck(dir){const found=scenePckLaunched(dir);if(found)return found;const top=kit.names(dir);if(top.some(n=>/^siglusengine.*\.exe$/i.test(n))||(top.some(n=>/^startdata$/i.test(n))&&top.some(n=>/^start\.exe$/i.test(n))))return null;/* a launcher at the top already decided */let subs=[];try{subs=fs.readdirSync(dir,{withFileTypes:true}).filter(d=>d.isDirectory()).map(d=>d.name).sort();}catch{}
+ const hits=subs.map(n=>scenePckHere(path.join(dir,n))).filter(f=>f&&kit.names(path.dirname(f)).some(n=>/^(siglusengine.*\.exe|gameexe.*\.dat)$/i.test(n)));return hits.length===1?hits[0]:null;}
 // Lines with a voice number in a game folder: [{text, ref:'koe:<n>'}].
 function voiceLines(dir){const f=scenePck(dir);if(!f)return [];let list=[];try{list=sources(f);}catch{return [];}
  return list.filter(s=>/\.ss$/i.test(s.name)).flatMap(s=>voiced(decode(s.raw))).filter(x=>x.koe!==null).map(x=>({text:x.text,ref:'koe:'+x.koe}));}

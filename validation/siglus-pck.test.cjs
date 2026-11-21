@@ -182,6 +182,49 @@ test('siglus-pck finds Scene.pck in a single game sub-folder (patched installs l
  assert.deepEqual(e.parse(sc[0].read()).lines, ['「ここはどこだ」']);
 }));
 
+test('Siglus launcher reads the package beside Gameexe.dat in a nested installation', () => withDir(dir => {
+ const install = path.join(dir, 'StartData', 'gamedata');
+ fs.mkdirSync(install, { recursive: true });
+ const dat = buildCompiledDat([{ kind: 'text', text: '「ここにいるよ。」' }]);
+ const pack = buildScenePck({ scenes: [{ name: 'intro', blob: kit.xor(siglusPack(dat), EASY_ANGOU) }], exeAngouMod: 0 });
+ fs.writeFileSync(path.join(install, 'Scene.pck'), pack);
+ const extra = path.join(dir, 'A');
+ fs.mkdirSync(extra);
+ fs.writeFileSync(path.join(extra, 'Scene.pck'), pack);
+ fs.writeFileSync(path.join(install, 'Scene-alt.pck'), pack);
+ fs.writeFileSync(path.join(dir, 'Start.exe'), 'MZ');
+ assert.equal(ss.scenePck(dir), null);
+ fs.writeFileSync(path.join(install, 'Gameexe.dat'), '');
+ assert.equal(ss.scenePck(dir), path.join(install, 'Scene.pck'));
+ const result = core.probeGame({ dir, executable: path.join(dir, 'Start.exe') });
+ assert.equal(result.step, 'ok');
+ assert.equal(result.detected, 'siglus-pck');
+ assert.deepEqual(scenes.read('siglus-pck', dir)[0].lines, ['「ここにいるよ。」']);
+
+ const mainGame = path.join(dir, 'game');
+ fs.mkdirSync(mainGame);
+ const script = path.join(mainGame, 'story.rpy');
+ fs.writeFileSync(script, 'label start:\n    "「こっちが本編です。」"\n');
+ assert.equal(core.probeGame({ dir }).detected, 'renpy');
+ assert.equal(ss.scenePck(dir), null);
+ fs.unlinkSync(script);
+
+ fs.renameSync(path.join(dir,'Start.exe'), path.join(dir,'Game.exe'));
+ const scenario = path.join(dir, 'data', 'scenario');
+ fs.mkdirSync(scenario, {recursive:true});
+ fs.writeFileSync(path.join(scenario, 'first.ks'), '「こっちが本編です。」[p]');
+ assert.equal(core.probeGame({ dir }).detected, 'kirikiri');
+ assert.equal(ss.scenePck(dir), null);
+ fs.renameSync(path.join(dir,'Game.exe'), path.join(dir,'SiglusEngine.exe'));
+ const second = path.join(dir, 'Second');
+ fs.mkdirSync(second);
+ fs.writeFileSync(path.join(second, 'Scene.pck'), pack);
+ fs.writeFileSync(path.join(second, 'Gameexe.dat'), '');
+ assert.equal(ss.scenePck(dir), null);
+ fs.writeFileSync(path.join(dir, 'SceneEN.pck'), pack);
+ assert.equal(ss.scenePck(dir), path.join(dir, 'SceneEN.pck'));
+}));
+
 test('siglus-pck falls back to OS .ss sources when exe_angou_mod!=0, supporting @mes, @lsv2_line, and quoted R lines', () => withDir(dir => {
  const ss1 = Buffer.from('\ufeff// comment\n/* 「コメント内の台詞」\n*/\n@KOE(1001,001)@mes(1, 【美佐枝】, 「おはよう」)\n', 'utf8');
  const ss2 = Buffer.from('\ufeff$lsv2_koe(1002,002)$lsv2_name("朱音") @lsv2_line(200, 「本当？」)R\n@lsv2_line(201, 世界は静かだった。)R\n', 'utf8');

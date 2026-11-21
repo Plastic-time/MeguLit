@@ -3,6 +3,65 @@ process.env.MEGULIT_RELAY_BASE??='off';/* tests never reach the real relay */
 /* E415 日报 page: relay RSS parsing + D1 cache + routes, the bridge's cleaning and link gate, and the page markup. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
 const relayDir=path.join(__dirname,'..','relay');
+test('daily reports the configured engine error when both translations are empty',async()=>{
+ const daily=require('../services/daily.cjs'),runtime={reviews:()=>({translate:async()=>({texts:[''],error:'MODEL_BUSY'})})};
+ await assert.rejects(daily.translate('',runtime,['空の応答'],'en',{translateFree:async()=>''}),/TRANSLATION_FAILED:MODEL_BUSY/);
+});
+test('the daily machine settings use the reader fallback and keep its source in cache',async t=>{
+ const daily=require('../services/daily.cjs'),{Runtime}=require('../services/runtime.cjs');
+ const root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'megulit-daily-machine-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const runtime=Object.assign(Object.create(Runtime.prototype),{root,folder:root,gameReviews:{translate:async()=>({texts:['wrong']})}});
+ for(const reviewEngine of ['machine','follow']){
+  fs.writeFileSync(path.join(root,'preferences.json'),JSON.stringify({provider:'google',reviewEngine}));
+  const calls=[],options={withEngine:true,translateFree:async(_,o)=>{calls.push(o.preferred);return '译文';}};
+  const run=()=>daily.translate(root,runtime,['機械翻訳の設定 '+reviewEngine],'zh',options);
+  const expected={texts:['译文'],engine:'microsoft'};
+  assert.deepEqual(await run(),expected);
+  assert.deepEqual(await run(),expected);
+  assert.deepEqual(calls,['microsoft']);
+ }
+});
+test('English daily articles fall back when the selected local model is Chinese-only',async t=>{
+ const daily=require('../services/daily.cjs'),{Runtime}=require('../services/runtime.cjs');
+ const root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'megulit-daily-lang-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const runtime=Object.assign(Object.create(Runtime.prototype),{root,folder:root,local:()=>({ensure:async()=>{}}),
+  reviewTranslator:{translate:async()=> '中文译文'}});
+ for(const [provider,reviewEngine] of [['google','local'],['sakura','follow']]){
+  fs.writeFileSync(path.join(root,'preferences.json'),JSON.stringify({provider,reviewEngine}));
+  const text='言語のテスト '+provider,used=[];
+  const options={withEngine:true,translateFree:async(t,o)=>{used.push([t,o.target]);return 'English';}};
+  const result=await daily.translate(root,runtime,[text],'en',options);
+  assert.deepEqual(result,{texts:['English'],engine:'microsoft'});
+  assert.deepEqual(used,[[text,'en']]);
+  assert.deepEqual(await daily.translate(root,runtime,[text],'en',options),result);
+  assert.equal(used.length,1);
+  assert.deepEqual(await daily.translate(root,runtime,[text],'zh',options),{texts:['中文译文'],engine:'app'});
+ }
+});
+test('daily uses the configured review translator through the last article paragraph',async()=>{
+ const daily=require('../services/daily.cjs'),{GameReviews}=require('../services/game-reviews.cjs');
+ const reviews=new GameReviews('',undefined,{engine:()=>'api',translate:async text=>'translated '+text});
+ const list=Array.from({length:120},(_,i)=>'記事の段落 '+i);
+ const article=require('../services/news-article.cjs').paragraphs(list.map(t=>'<p>'+t+'</p>').join(''));
+ assert.deepEqual(article,list);
+ const fallback=[];
+ const result=await daily.translate('',{reviews:()=>reviews},article,'en',{withEngine:true,translateFree:async t=>{fallback.push(t);return 'fallback';}});
+ assert.deepEqual({length:result.texts.length,first:result.texts[0],last:result.texts.at(-1),fallback:fallback.length},
+  {length:120,first:'translated '+list[0],last:'translated '+list.at(-1),fallback:0});
+ assert.deepEqual(result,{texts:list.map(t=>'translated '+t),engine:'app'});
+});
+test('daily falls back only for missing paragraphs in a structured engine result',async()=>{
+ const daily=require('../services/daily.cjs'),texts=['記事の冒頭','記事の末尾'],used=[];
+ const runtime={reviews:()=>({translate:async()=>({texts:['opening',''],engine:'api',error:'MODEL_BUSY'})})};
+ const options={withEngine:true,translateFree:async t=>{used.push(t);return 'ending';}};
+ const expected={texts:['opening','ending'],engine:'app+microsoft'};
+ assert.deepEqual(await daily.translate('',runtime,texts,'en',options),expected);
+ assert.deepEqual(used,[texts[1]]);
+ assert.deepEqual(await daily.translate('',runtime,texts,'en',options),expected);
+ assert.deepEqual(used,[texts[1]]);
+});
 const load=name=>import(pathToFileURL(path.join(relayDir,'src',name)).href);
 const MIGRATIONS=fs.readdirSync(path.join(relayDir,'migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>fs.readFileSync(path.join(relayDir,'migrations',f),'utf8')).join('');
 function d1(){const db=new DatabaseSync(':memory:');db.exec(MIGRATIONS);const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>{db.prepare(sql).run(...args);return {success:true};}});return {prepare:sql=>stmt(sql)};}
