@@ -1,6 +1,6 @@
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{Worker}=require('node:worker_threads');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{Worker}=require('node:worker_threads');
 const budget=require('../services/background-budget.cjs');
-const tmp=path.join('H:/MeguLit-Work/tmp','cpu-budget-'+process.pid);fs.mkdirSync(tmp,{recursive:true});test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
+const tmp=path.join(os.tmpdir(),'cpu-budget-'+process.pid);fs.mkdirSync(tmp,{recursive:true});test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
 test('real maintenance worker asks the service again after input activity and cannot trust its own playing closure',async()=>{
  const source=`const {parentPort}=require('node:worker_threads');require(${JSON.stringify(require.resolve('../services/background-budget.cjs'))}).wait('root',{delay:5}).then(ok=>parentPort.postMessage({done:ok}));`;
  const worker=new Worker(source,{eval:true,workerData:{backgroundBudget:true}});let checks=0;
