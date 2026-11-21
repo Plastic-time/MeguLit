@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
-static std::vector<std::string> Logs;static bool ThrowLog=false;static void (*LogTap)()=nullptr;
+static std::vector<std::string> Logs;static bool ThrowLog=false,FaultLog=false;static void (*LogTap)()=nullptr;
 namespace Msg{static void Log(const char *format,...){if(ThrowLog)throw std::runtime_error("fixture logger failure");char b[1200];va_list args;va_start(args,format);vsnprintf(b,sizeof b,format,args);va_end(args);Logs.push_back(b);if(LogTap)LogTap();
 #ifndef _WIN64
  __asm{
@@ -14,6 +14,7 @@ namespace Msg{static void Log(const char *format,...){if(ThrowLog)throw std::run
   fninit
  }
 #endif
+ if(FaultLog)RaiseException(EXCEPTION_ACCESS_VIOLATION,0,0,nullptr);
 }}
 #include "../AdvhdDraw.h"
 #ifdef _WIN64
@@ -121,7 +122,11 @@ static __declspec(naked) void CallFixture(){__asm{
  ret
 }}
 static std::wstring ControlPath(){wchar_t tmp[MAX_PATH],file[MAX_PATH+64];GetTempPathW(MAX_PATH,tmp);std::wstring dir=std::wstring(tmp)+L"MeguLit";CreateDirectoryW(dir.c_str(),nullptr);dir+=L"\\draw";CreateDirectoryW(dir.c_str(),nullptr);swprintf_s(file,L"%s\\%lu.txt",dir.c_str(),GetCurrentProcessId());return file;}
-static void Control(const wchar_t *value){auto f=ControlPath();HANDLE h=CreateFileW(f.c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);DWORD written;WriteFile(h,value,(DWORD)(wcslen(value)*2),&written,nullptr);CloseHandle(h);}
+static void RawControl(const void *value,DWORD bytes){auto f=ControlPath();HANDLE h=CreateFileW(f.c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);if(h==INVALID_HANDLE_VALUE){printf("FIXTURE control open failed: %lu\n",GetLastError());ExitProcess(98);}DWORD written=0;bool ok=WriteFile(h,value,bytes,&written,nullptr)&&written==bytes;CloseHandle(h);if(!ok){puts("FIXTURE control write incomplete");ExitProcess(98);}}
+static void Control(const wchar_t *value){RawControl(value,(DWORD)(wcslen(value)*2));}
+static void RevokeReopen(){LogTap=nullptr;Control(L"#cfg advhdInput=0\r\n");AdvhdDraw::RefreshControl();Control(L"#cfg advhdInput=1\r\n");AdvhdDraw::RefreshControl();}
+static void RevokeOnData(){if(Logs.back().find(" data ")==std::string::npos)return;RevokeReopen();}
+static bool WaitObservation(bool on){DWORD start=GetTickCount();while(GetTickCount()-start<3500){if((AdvhdDraw::Observing!=0)==on)return true;Sleep(5);}return false;}
 static std::string HexText(){std::string out;for(const auto &line:Logs){auto p=line.find(" hex=");if(p!=std::string::npos)out+=line.substr(p+5);}return out;}
 static std::string Hex(const char *s,size_t size){const char digits[]="0123456789abcdef";std::string out;for(size_t i=0;i<size;i++){unsigned b=(unsigned char)s[i];out+=digits[b>>4];out+=digits[b&15];}return out;}
 static bool AbiOkay(){return GotHeight==24&&AfterEax==OriginalResult&&!std::memcmp(Got,Args,sizeof Args)&&GotEcx==AfterEcx&&AfterEcx==0x11112222&&GotEdx==AfterEdx&&AfterEdx==0x33334444&&GotEbx==AfterEbx&&AfterEbx==0x51515151&&GotEbp==AfterEbp&&AfterEbp==0x45454545&&GotEsi==AfterEsi&&AfterEsi==0x73737373&&GotEdi==AfterEdi&&AfterEdi==0x93939393&&(GotFlags&StatusMask)==StatusBits&&(AfterFlags&StatusMask)==StatusBits&&BeforeEsp==BeforeCleanupEsp+44&&BeforeEsp==AfterEsp&&!std::memcmp(XmmPattern,AfterXmm,sizeof XmmPattern)&&AfterX87==1.0;}
@@ -132,6 +137,11 @@ int wmain(int argc,wchar_t **argv){
  if(argc>1){Check(AdvhdDraw::VerifyFileBuild(argv[1]),"actual owned executable SHA256 pins by reading only");
   wchar_t tmp[MAX_PATH];GetTempPathW(MAX_PATH,tmp);std::wstring bad=std::wstring(tmp)+L"advhd-wrong-hash.bin";HANDLE h=CreateFileW(bad.c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);char zeros[4096]={};DWORD written;unsigned remaining=AdvhdDrawSig::FileBytes;bool writtenAll=h!=INVALID_HANDLE_VALUE;while(writtenAll&&remaining){DWORD n=remaining>sizeof zeros?sizeof zeros:remaining;writtenAll=WriteFile(h,zeros,n,&written,nullptr)&&written==n;remaining-=n;}LARGE_INTEGER size;writtenAll=writtenAll&&GetFileSizeEx(h,&size)&&size.QuadPart==AdvhdDrawSig::FileBytes;if(h!=INVALID_HANDLE_VALUE)CloseHandle(h);Check(writtenAll&&!AdvhdDraw::VerifyFileBuild(bad.c_str()),"same-size wrong SHA rejected");}
  Check(!AdvhdDraw::DiagnosticAsked(),"explicit diagnostic zero is off");Control(L"#cfg roles=1 embed=0\r\n");Check(!AdvhdDraw::DiagnosticAsked(),"roles permission alone never installs diagnostic input");Control(L"#cfg roles=0 embed=0 advhdInput=10\r\n");Check(!AdvhdDraw::DiagnosticAsked(),"lookalike token rejected");Control(L"#cfg roles=0 embed=0 advhdInput=1\r\n");Check(AdvhdDraw::DiagnosticAsked(),"independent UTF16 diagnostic flag requires no role claim");
+ Control(L"\xfeff#cfg advhdInput=1\r\n");Check(AdvhdDraw::DiagnosticAsked(),"normal UTF16 BOM control remains accepted");
+ const wchar_t *badControls[]={L"old body\r\n#cfg advhdInput=1\r\n",L"#cfg advhdInput=1 advhdInput=0\r\n",L"#cfg advhdInput=0 advhdInput=1\r\n",L"#cfg advhdInput=1 advhdInput=1\r\n",L"#cfg advhdInput=1 advhdInput\r\n",L"#cfg advhdInput=1",L"#cfg advhdInput=1\r",L"#cfg advhdInput=1\rnot-LF\n",L"#cfg advhdInput=1 \u0100\r\n"};
+ for(auto value:badControls){Control(value);Check(!AdvhdDraw::DiagnosticAsked(),"malformed or duplicate/body/incomplete control fails closed");}
+ const char ascii[]="#cfg advhdInput=1\r\n";RawControl(ascii,sizeof ascii-1);Check(!AdvhdDraw::DiagnosticAsked(),"non-protocol narrow bytes cannot authorize diagnostic input");
+ Control(L"#cfg advhdInput=1\r\n");
  CallFixture();Check(AbiOkay()&&Logs.empty(),"unhooked EAX+11-word original ABI baseline");
  Check(MH_Initialize()==MH_OK,"real MinHook initialized");AdvhdDraw::Image=(uintptr_t)GetModuleHandleA(nullptr);auto nt=(IMAGE_NT_HEADERS *)(AdvhdDraw::Image+((IMAGE_DOS_HEADER *)AdvhdDraw::Image)->e_lfanew);AdvhdDraw::ImageEnd=AdvhdDraw::Image+nt->OptionalHeader.SizeOfImage;AdvhdDraw::DrawAt=(uintptr_t)&Draw;
  AdvhdDraw::RefreshControl();Check(!AdvhdDraw::Installed,"diagnostic opt-in cannot bypass a failed version pin");
@@ -148,8 +158,15 @@ int wmain(int argc,wchar_t **argv){
  std::string tooLong(AdvhdDraw::MaxText+1,'x');Args[6]=(DWORD)tooLong.c_str();Logs.clear();CallFixture();Check(Logs.empty()&&AbiOkay(),"over-limit input is refused rather than silently truncated");
  Args[6]=(DWORD)text;ThrowLog=true;CallFixture();ThrowLog=false;Logs.clear();CallFixture();Check(HexText()==Hex(text,4)&&AbiOkay(),"logger exception leaves the ABI and recursion guard intact");
  Logs.clear();LogTap=&Reenter;CallFixture();LogTap=nullptr;Check(NestedCalls>0&&NestedSkipped&&HexText()==Hex(text,4)&&AbiOkay(),"logger reentry cannot recursively capture another input or change the original ABI");
+ Logs.clear();LogTap=&RevokeReopen;CallFixture();LogTap=nullptr;Check(Logs.size()==1&&HexText().empty()&&AbiOkay(),"logger off-on revocation cannot revive old snapshot data or end");
+ Logs.clear();CallFixture();Check(HexText()==Hex(text,4)&&AbiOkay(),"fresh input after reopened permission remains complete");
+ Args[6]=(DWORD)longer.c_str();Logs.clear();LogTap=&RevokeOnData;CallFixture();LogTap=nullptr;Check(Logs.size()==2&&HexText()==Hex(longer.data(),128)&&AbiOkay(),"revoke-reopen during first data chunk drops remaining old chunks and end");Args[6]=(DWORD)text;
+ Logs.clear();FaultLog=true;CallFixture();FaultLog=false;Check(AbiOkay(),"logger SEH after FP destruction still calls original with preserved ABI");Logs.clear();CallFixture();Check(HexText()==Hex(text,4)&&AbiOkay(),"SEH releases TLS guard for next input");
+ std::wstring unreadable=ControlPath();HANDLE denied=CreateFileW(unreadable.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);Check(denied!=INVALID_HANDLE_VALUE,"fixture exclusive control read handle acquired");AdvhdDraw::RefreshControl();Logs.clear();CallFixture();Check(!AdvhdDraw::Observing&&Logs.empty()&&AbiOkay(),"unreadable control revokes installed observer");if(denied!=INVALID_HANDLE_VALUE)CloseHandle(denied);AdvhdDraw::RefreshControl();
  Control(L"#cfg roles=0 embed=0 advhdInput=0\r\n");AdvhdDraw::RefreshControl();Logs.clear();CallFixture();Check(!AdvhdDraw::Observing&&Logs.empty()&&AbiOkay(),"installed gate becomes pass-through after diagnostic permission is removed");
  Control(L"#cfg roles=0 embed=0 advhdInput=1\r\n");AdvhdDraw::RefreshControl();Logs.clear();CallFixture();Check(AdvhdDraw::Observing&&HexText()==Hex(text,4)&&AbiOkay(),"diagnostic permission can reopen the same detour without changing original behavior");Control(L"#cfg roles=0 embed=0 advhdInput=0\r\n");AdvhdDraw::RefreshControl();Logs.clear();
+ HANDLE stop=CreateEventW(nullptr,TRUE,FALSE,nullptr),watch=stop?CreateThread(nullptr,0,&AdvhdDraw::Watch,stop,0,nullptr):nullptr;
+ Check(watch!=nullptr,"real persistent permission watcher started");if(watch){Control(L"#cfg advhdInput=1\r\n");Check(WaitObservation(true),"watcher enables already installed diagnostic gate");Control(L"#cfg advhdInput=0\r\n");Check(WaitObservation(false),"watcher observes off after installation instead of stopping discovery");Logs.clear();CallFixture();Check(Logs.empty()&&AbiOkay(),"watcher revoked gate remains original pass-through");SetEvent(stop);bool joined=WaitForSingleObject(watch,3000)==WAIT_OBJECT_0;Check(joined,"owned watcher joins before MinHook teardown");if(!joined)ExitProcess(98);CloseHandle(watch);}if(stop)CloseHandle(stop);
  Check(MH_DisableHook((void *)&Draw)==MH_OK,"real detour disables cleanly");CallFixture();Check(Logs.empty()&&AbiOkay(),"original remains unchanged after unhook");MH_RemoveHook((void *)&Draw);MH_Uninitialize();
  printf("AdvHD actual ABI gate: %d checks, %d failures\n",Checks,Failures);return Failures;
 }

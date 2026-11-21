@@ -15,29 +15,36 @@ namespace AdvhdDraw {
 static void *Original=nullptr;
 static uintptr_t Image=0,ImageEnd=0,DrawAt=0;
 static bool VersionPinned=false;
-static volatile LONG Armed=0,Installed=0,Observing=0,Run=0;
+static volatile LONG Armed=0,Installed=0,Observing=0,Permission=0,Blocked=0,Run=0;
 static __declspec(thread) bool InObserver=false;
 static const DWORD ObserverMxcsr=0x1f80;
 static const int MaxText=32768,ChunkBytes=128;
 struct Snapshot{DWORD height,caller,args[AdvhdDrawSig::StackWords];int bytes;char text[MaxText+1];};
+static LONG Ticket(){return InterlockedCompareExchange(&Permission,0,0);}
+static bool Allowed(LONG ticket){return (ticket&1)&&Ticket()==ticket;}
+static void SetPermission(bool on){for(;;){LONG old=Ticket();if(((old&1)!=0)==on)break;if(InterlockedCompareExchange(&Permission,(LONG)((ULONG)old+1),old)==old)break;}InterlockedExchange(&Observing,(Ticket()&1)!=0);}
 static bool Capture(DWORD height,const DWORD *stack,Snapshot *out){
  __try{if(!stack||!out)return false;out->height=height;out->caller=stack[0];for(unsigned i=0;i<AdvhdDrawSig::StackWords;i++)out->args[i]=stack[i+1];
   const char *text=(const char *)out->args[AdvhdDrawSig::TextArg-1];if(!text)return false;
   int n=0;while(n<MaxText&&text[n]){out->text[n]=text[n];n++;}if(n==MaxText&&text[n])return false;out->text[n]=0;out->bytes=n;return true;
  }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
 }
-static void EmitSnapshot(const Snapshot &s){
+static void EmitSnapshot(const Snapshot &s,LONG ticket){
  try{
+  if(!Allowed(ticket))return;
   LONG run=InterlockedIncrement(&Run);DWORD via=s.caller>=Image&&s.caller<ImageEnd?s.caller-(DWORD)Image:0;
-  Msg::Log("ToMe_ADVHD_INPUT begin run=%lu via=%lx height=%lu words=11 bytes=%d args=%lx,%lx,%lx,%lx,%lx,%lx,%lx,%lx,%lx,%lx,%lx",(unsigned long)run,(unsigned long)via,(unsigned long)s.height,s.bytes,(unsigned long)s.args[0],(unsigned long)s.args[1],(unsigned long)s.args[2],(unsigned long)s.args[3],(unsigned long)s.args[4],(unsigned long)s.args[5],(unsigned long)s.args[6],(unsigned long)s.args[7],(unsigned long)s.args[8],(unsigned long)s.args[9],(unsigned long)s.args[10]);
-  for(int offset=0;offset<s.bytes;offset+=ChunkBytes){char hex[ChunkBytes*2+1];int n=s.bytes-offset;if(n>ChunkBytes)n=ChunkBytes;const char digits[]="0123456789abcdef";for(int j=0;j<n;j++){unsigned b=(unsigned char)s.text[offset+j];hex[j*2]=digits[b>>4];hex[j*2+1]=digits[b&15];}hex[n*2]=0;
-   Msg::Log("ToMe_ADVHD_INPUT data run=%lu offset=%d hex=%s",(unsigned long)run,offset,hex);}
-  Msg::Log("ToMe_ADVHD_INPUT end run=%lu bytes=%d",(unsigned long)run,s.bytes);
+  Msg::Log("ToMe_ADVHD_INPUT begin run=%lu epoch=%lu via=%lx height=%lu words=11 bytes=%d args=%lx,%lx,%lx,%lx,%lx,%lx,%lx,%lx,%lx,%lx,%lx",(unsigned long)run,(unsigned long)ticket,(unsigned long)via,(unsigned long)s.height,s.bytes,(unsigned long)s.args[0],(unsigned long)s.args[1],(unsigned long)s.args[2],(unsigned long)s.args[3],(unsigned long)s.args[4],(unsigned long)s.args[5],(unsigned long)s.args[6],(unsigned long)s.args[7],(unsigned long)s.args[8],(unsigned long)s.args[9],(unsigned long)s.args[10]);
+  for(int offset=0;offset<s.bytes;offset+=ChunkBytes){if(!Allowed(ticket))return;char hex[ChunkBytes*2+1];int n=s.bytes-offset;if(n>ChunkBytes)n=ChunkBytes;const char digits[]="0123456789abcdef";for(int j=0;j<n;j++){unsigned b=(unsigned char)s.text[offset+j];hex[j*2]=digits[b>>4];hex[j*2+1]=digits[b&15];}hex[n*2]=0;
+   Msg::Log("ToMe_ADVHD_INPUT data run=%lu epoch=%lu offset=%d hex=%s",(unsigned long)run,(unsigned long)ticket,offset,hex);}
+  if(Allowed(ticket))Msg::Log("ToMe_ADVHD_INPUT end run=%lu epoch=%lu bytes=%d",(unsigned long)run,(unsigned long)ticket,s.bytes);
  }catch(...){}
 }
+static void ObserveSafe(DWORD height,const DWORD *stack,LONG ticket){
+ __try{Snapshot s;if(Capture(height,stack,&s)&&Allowed(ticket))EmitSnapshot(s,ticket);}__except(EXCEPTION_EXECUTE_HANDLER){}
+}
 static void Observe(DWORD height,const DWORD *stack){
- if(!InterlockedCompareExchange(&Observing,0,0)||InObserver)return;InObserver=true;
- __try{Snapshot s;if(Capture(height,stack,&s))EmitSnapshot(s);}__except(EXCEPTION_EXECUTE_HANDLER){}InObserver=false;
+ LONG ticket=Ticket();if(!(ticket&1)||InObserver)return;InObserver=true;
+ __try{ObserveSafe(height,stack,ticket);}__finally{InObserver=false;}
 }
 static __declspec(naked) void Gate(){
  __asm{
@@ -85,21 +92,34 @@ static bool FindInImage(uintptr_t base){
  if(total!=1||found-base!=AdvhdDrawSig::EntryRva)return false;
  Image=base;ImageEnd=base+nt->OptionalHeader.SizeOfImage;DrawAt=found;VersionPinned=true;return true;
 }
-static bool Token(const std::string &cfg,const char *word){size_t p=cfg.find(word),n=std::strlen(word);return p!=std::string::npos&&(p==0||cfg[p-1]==' ')&&(p+n==cfg.size()||cfg[p+n]==' ');}
+static bool ConfigAsked(const unsigned char *bytes,size_t size){
+ if(!bytes||size<2)return false;size_t p=0;
+ if(bytes[0]==0xff&&bytes[1]==0xfe)p=2;else if(bytes[1]!=0)return false;
+ std::string line;bool complete=false;
+ for(;p+2<=size;p+=2){unsigned c=bytes[p];if(bytes[p+1])return false;
+  if(c=='\n'){complete=true;break;}if(c=='\r'){if(p+4>size||bytes[p+2]!='\n'||bytes[p+3])return false;complete=true;break;}
+  if(c<0x20||c>0x7e)return false;line+=(char)c;
+ }
+ if(!complete||line.compare(0,5,"#cfg "))return false;
+ int keys=0;bool enabled=false;for(size_t begin=5;begin<line.size();){while(begin<line.size()&&line[begin]==' ')begin++;size_t end=line.find(' ',begin);if(end==std::string::npos)end=line.size();
+  std::string token=line.substr(begin,end-begin);if(token.compare(0,11,"advhdInput=")==0){keys++;enabled=token=="advhdInput=1";}else if(token=="advhdInput")return false;begin=end;
+ }
+ return keys==1&&enabled;
+}
 static bool DiagnosticAsked(){
  wchar_t tmp[MAX_PATH],file[MAX_PATH+64];DWORD n=GetTempPathW(MAX_PATH,tmp);if(!n||n>=MAX_PATH)return false;swprintf_s(file,L"%sMeguLit\\draw\\%lu.txt",tmp,GetCurrentProcessId());
  HANDLE h=CreateFileW(file,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,0,nullptr);if(h==INVALID_HANDLE_VALUE)return false;
- char bytes[1024]={};DWORD got=0;bool ok=ReadFile(h,bytes,sizeof bytes-1,&got,nullptr)!=FALSE;CloseHandle(h);if(!ok)return false;std::string ascii;for(DWORD i=0;i<got;i++)if(bytes[i])ascii+=bytes[i];
- size_t p=ascii.find("#cfg ");if(p==std::string::npos)return false;size_t end=ascii.find_first_of("\r\n",p);return Token(ascii.substr(p,end==std::string::npos?end:end-p),"advhdInput=1");
+ unsigned char bytes[1024];DWORD got=0;bool ok=ReadFile(h,bytes,sizeof bytes,&got,nullptr)!=FALSE;CloseHandle(h);return ok&&ConfigAsked(bytes,got);
 }
 static bool Install(){
- if(Installed)return true;if(!VersionPinned||!DrawAt)return false;
- if(MH_CreateHook((void *)DrawAt,(void *)&Gate,&Original)!=MH_OK)return false;
- if(MH_EnableHook((void *)DrawAt)!=MH_OK){MH_RemoveHook((void *)DrawAt);Original=nullptr;return false;}
+ if(Installed)return true;if(Blocked||!VersionPinned||!DrawAt)return false;
+ if(MH_CreateHook((void *)DrawAt,(void *)&Gate,&Original)!=MH_OK){InterlockedExchange(&Blocked,1);return false;}
+ if(MH_EnableHook((void *)DrawAt)!=MH_OK){SetPermission(false);InterlockedExchange(&Blocked,1);MH_DisableHook((void *)DrawAt);return false;}
  InterlockedExchange(&Installed,1);Msg::Log("ToMe_ADVHD_INPUT on rva=%lx diagnostic=1",(unsigned long)(DrawAt-Image));return true;
 }
-static void RefreshControl(){if(DiagnosticAsked()){if(Install())InterlockedExchange(&Observing,1);}else InterlockedExchange(&Observing,0);}
-static DWORD WINAPI Watch(void *stop){for(;;){RefreshControl();if(stop){if(WaitForSingleObject((HANDLE)stop,2000)==WAIT_OBJECT_0)return 0;}else Sleep(2000);}}
+static void RefreshControlCpp(){try{SetPermission(DiagnosticAsked()&&Install());}catch(...){SetPermission(false);}}
+static void RefreshControl(){__try{RefreshControlCpp();}__except(EXCEPTION_EXECUTE_HANDLER){SetPermission(false);}}
+static DWORD WINAPI Watch(void *stop){for(;;){RefreshControl();if(stop){if(WaitForSingleObject((HANDLE)stop,2000)==WAIT_OBJECT_0){SetPermission(false);return 0;}}else Sleep(2000);}}
 static void Arm(){if(InterlockedExchange(&Armed,1))return;__try{if(!FindInImage((uintptr_t)GetModuleHandleA(nullptr)))return;}__except(EXCEPTION_EXECUTE_HANDLER){return;}HANDLE thread=CreateThread(nullptr,0,Watch,nullptr,0,nullptr);if(thread)CloseHandle(thread);}
 }
 #else
