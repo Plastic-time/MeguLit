@@ -2,7 +2,7 @@
 
 `original-engines/renpy-pickle-bounded.cjs` is unregistered and does not replace the existing RPYC reader. It accepts an already decompressed Buffer, never a path. It neither imports Python modules nor invokes constructors, reduction callables, state methods, persistent IDs or extension handlers
 
-`decode(buffer, {limits, classes, allowDefaultDict:false, allowPyCodeState:false, allowPyExpr:false})` returns `{value, protocol, counts, bytesRead}`. The default class allowlist contains only `renpy.ast.Say`, `Translate` and `TranslateSay`; a caller can explicitly supply up to 64 inert `renpy.ast` class identities. This is an identity allowlist, not proof that an AST class is supported by a narrative extractor
+`decode(buffer, {limits, classes, allowDefaultDict:false, allowPyCodeState:false, allowPyExpr:false, allowRevertableDict:false})` returns `{value, protocol, counts, bytesRead}`. The default class allowlist contains only `renpy.ast.Say`, `Translate` and `TranslateSay`; a caller can explicitly supply up to 64 inert `renpy.ast` class identities. This is an identity allowlist, not proof that an AST class is supported by a narrative extractor
 
 By default both GLOBAL and STACK_GLOBAL require the exact module token `renpy.ast` and a simple class-name token. Qualified names through a parent module are conservatively rejected; concatenated spelling alone is not an identity proof. Unicode data retains a leading U+FEFF literally, rather than treating each string as a file with a removable BOM
 
@@ -67,3 +67,23 @@ A completed instance BUILD also records `stateShape` outside writable state. Gen
 Opaque PyCode records `pycode:tuple4` through `pycode:tuple7`. These fixed tags retain the consumed BUILD container and part kinds without preserving another copy of the graph. They are bounded metadata, like className/stateKind, and do not change the logical input-node, stored-edge or input-string-byte counts
 
 Equal merged Maps can now be distinguished before applying a profile-specific rule such as requiring the verified cslots writer's `(None, slots_dict)` form. State entries named stateShape cannot overwrite this metadata. The tags do not authenticate the writer, restore descriptor defaults, identify which dictionary supplied each merged key, or prove semantic AST compatibility
+
+## Explicit inert RevertableDict
+
+The independent strict boolean `allowRevertableDict:true` admits only the exact GLOBAL or STACK_GLOBAL tokens `renpy.revertable` / `RevertableDict`. It is off by default, does not change `CLASSES`, and does not grant List, Set, DefaultDict, parent-module qualified names or aliases. Other feature flags do not grant this identity
+
+The fixed primary source is bundled `revertable.py`, 17,349 bytes, SHA256 `aaf21f22649db2d999fcba865a62f4950eb1a8a16e6b7d03b0cf3af49738e426`, Git blob `4991d6f6354d9b090ca952d96fbc61f36c784cea`, matching official commit `8881389241074a3095dfe7b91c8b6bb0df018f02`. Lines 250–308 define a dict subclass with rollback-aware initialization and mutations, but no own pickle/state methods. The chosen identity separately matches the already observed module length16/SHA256 `34e77e74c474247995dfee948fd8931d58ac0da65129cbd7a978edda8accabec` and name length14/SHA256 `8bc67c639db187b0dc44f95d12d62806416dea50c7af1033f0d32fc3545b1199`. Neither source nor token identity authenticates a compiler
+
+Only empty-tuple NEWOBJ creates `{kind:'revertable-dict', className:'renpy.revertable.RevertableDict', entries:Map, state:null}`. No dict subclass, Python constructor, mutation wrapper, weakref, rollback log, copyreg reconstructor or module import runs. This flag does not enable REDUCE, NEWOBJ_EX or another class's constructor path. The wrapper is a dictionary data record, not a narrative AST node or an allowed opaque PyCode source
+
+SETITEM and SETITEMS use the same finite key subset, duplicate-key rejection and two stored edges per entry as the existing inert dictionaries. Missing keys do not insert values. Memo aliases and cycles remain graph references, requiring a separate bounded traversal policy from consumers
+
+Optional BUILD accepts only one ordinary inert dictionary of string-key instance attributes. Attributes are copied into a separate Map, never applied to wrapper fields or prototypes; arbitrary names such as `_clean`, `kind`, `entries`, `state`, `stateShape` and `__proto__` have no behavior. No attribute-name guess restricts the data to an engine callback. Repeat BUILD, None, tuple/slot state, numeric attribute keys and other state shapes reject. This is a deliberate subset, not a claim those shapes are impossible under every Python producer
+
+Without BUILD, state remains null and stateShape is absent. With accepted attributes, state becomes the copied Map and the existing fixed provenance tag is `stateShape:'dict'`. Other classes retain their prior BUILD, PyCode and stateShape rules
+
+The wrapper's normal push charges one node, and its entries Map charges one additional node before allocation. Its entries and state data fields charge two stored edges in total; later BUILD replaces the already charged null state reference and charges one new attributes Map node. Each entry in the incoming attribute dictionary and copied state Map retains its own two-edge cost. Constant kind/className/field-name metadata adds no input-string bytes. All operand strings, tuples, memo recalls, operations and input bytes retain existing limits
+
+`validation/fixtures/renpy-revertable-dict-cpython.json` contains twelve controls: protocols 2/4/5 crossed with empty, entries, instance attributes and memo-cycle shapes. Their producer uses an ordinary neutral dict subclass in a synthetic module, only `pickle.dumps` and `pickletools`; it does not import or construct the engine class, call pickle.loads or read game bytes. These controls establish the NEWOBJ/SETITEM(S)/dict-BUILD subset for that serializer, not RenPy compiler compatibility or complete AST support. The adjacent optional producer accepts `--revertable-dict`
+
+Validation: `node --test validation/renpy-revertable-dict.test.cjs`
