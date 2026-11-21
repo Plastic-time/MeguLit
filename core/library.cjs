@@ -195,7 +195,7 @@ class Library{
  async scan(progress=()=>{},{incremental=false}={}){
   // Folders in the user's game folders that could not be confirmed as visual novels (unknown engine and no VNDB
   // match) are reported instead of vanishing, so the library can offer to add them by hand.
-  this.unconfirmed=[];
+  this.unconfirmed=[];this.confirmedFolderMatches=new Set();
   require('./steam-owned.cjs')._internal.cache.clear();
   const found=[],skipped=[];this.restorable=new Map();if(this.state.steamPath)found.push(...steamGames(this.state.steamPath));for(const f of this.state.folders)found.push(...folderGames(f));
   const known=new Map(this.state.games.map(g=>[String(g.dir||'').toLowerCase(),g]));if(!this.state.notGal)this.state.notGal={};const games=[],scanned=new Set();let i=0;
@@ -226,6 +226,7 @@ class Library{
    const names=[...new Set([c.source==='folder'&&g.dir!==c.root?label(g.dir):'',c.title].filter(Boolean))];
    let vn=null,lookupFailed=false;const queries=[...new Set(names.flatMap(n=>[n,n.replace(/\s*[（(][^）)]*[）)]/g,'').trim(),...searchNames(n),...[...n.matchAll(/[（(]([^）)]+)[）)]/g)].map(m=>m[1])]).filter(Boolean))].slice(0,8);if(c.source==='steam'){const hit=await vndbSteam(c.appid);if(hit===undefined)lookupFailed=true;else if(hit)vn=hit;}
    if(c.source!=='steam'&&!vn&&(!g.engine||g.engine.hook===null||c.source==='folder'))for(const n of queries){const result=await vndb(n,false);if(result===undefined)lookupFailed=true;else if(result){vn=result;break;}}
+   if(c.source==='folder'&&vn?.id)this.confirmedFolderMatches.add(g.dir);
    if(!vn&&lookupFailed&&c.source==='steam'&&previous?.appid===c.appid&&previous.vndbSteamAppid===c.appid&&previous.vndbId)vn={id:previous.vndbId,title:previous.names?.[1]||previous.title};
    // Steam also installs software. An AppID link or a specific visual-novel engine confirms an automatic entry.
    if((!g.engine||g.engine.generic)&&!vn){
