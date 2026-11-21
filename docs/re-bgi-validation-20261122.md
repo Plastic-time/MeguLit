@@ -60,8 +60,53 @@ Live prerequisites, coordinated by the root session:
 5. Collect at least one named utterance, a real choice, a menu and return to dialogue; derive `viaRoles` only from these observed examples, not from string length or guessed native callers
 6. Exercise repeated glyphs, two rows, a completed page, clear/hide, off/on and menu return; collect client/DLL/control/log hashes with screenshots and DOM records
 
-No slot was assigned during this candidate, so no game was started
-There is also a product gap before the full five-gate acceptance can pass: diagnostic rows alone cannot supply precise screen boxes, real sprite clear events, or the full hidden-Japanese/lookup/translation path
+No game was started during the first static candidate
+The later root-authorized hidden attempt is recorded below
+There is a product gap before full five-gate acceptance can pass: diagnostic rows alone cannot supply precise screen boxes, real sprite clear events, or the full hidden-Japanese/lookup/translation path
+
+## Root-authorized bounded hidden attempt, 04:07–04:16 JST
+
+Slot2 was acquired with CreateNew and released after the owned process exited
+No download or extraction was performed
+A private x86 Hook tree built successfully through 278 Ninja steps, using parallelism 2; its BGI header SHA-256 exactly matches this branch's header
+
+- Candidate `MeguLitHook32.dll`: 2,211,328 bytes, SHA-256 `6b68096d8a8c8485de07e543e9de6df47cc40645d9a598107da7d146486622a3`
+- Compiled BGI header SHA-256: `059f4673fd451757d68c6660a2a53f28bd017d5e46504e5422ee4c37c57d54a7`
+- Private physical allocation, including build tree, rig and game copies: 204,771,345 bytes, below the 512 MiB limit
+- Private BGI.exe/gdb/hvl were copied; 56 existing arc/font resources were linked, without copying the game or changing original archive attributes
+- The original small-file pre/post hash census is unchanged, including BGI.exe/gdb/hvl
+- `draw.roles=false`, `draw.embed=false`, no new allowlist or permanent seed changes
+
+The existing MuteProc executable was compared with a private optimize-disabled build of its source
+All reflected types, fields, method/constructor flags, attributes, IL bytes and local signatures match exactly
+This establishes a much narrower binary/source correspondence than a filename or neighboring source file; it does not establish real audio recovery
+
+HidDesk launched a private fail-closed borderless launcher on the hidden desktop
+The launcher loads the existing borderless DLL before resuming the game; its private change terminates the owned suspended child if that load fails
+The actual private BGI process was bound by PID, executable path and UTC creation ticks
+It displayed **“Direct3D initialization failed. Do you want to try again?”**, captured in `live/shots/launch-error.png`
+No intro, dialogue, name or choice was reached, and no foreground fallback or repeat Direct3D startup was attempted
+
+The independent audio guard also failed before ready, reporting `session pid`
+Its final event is `released`, `captureOnly=true`, `muterStopped=true`, `muteConfirmed=false`, `restored=false`, `safe=false`
+No muter was started and no audio mute write was performed; this is not an audio restoration pass
+The owned BGI process was then stopped and exit confirmed; no Guard or MuteProc remains, and slot2 no longer exists
+The HookBridge and newly built MeguLitHook32 DLL were not attached to this game, so the run supplies no actual I/G or H/D/U evidence
+
+The orchestration runner also exposed a closed-stdin/EPIPE error; its attempt and guard evidence remain intact rather than being replaced with a successful-looking log
+Any future runner needs a persistent command channel, stdin error handling and process/guard startup failure supervision before another authorized game run
+
+### Concrete production gaps for root integration
+
+1. `HookBridge.EngineInfo` forwards DRAWRUN only for MAGES; BGI currently remains a diagnostic log string, with no BGI draw event consumed by hook-native
+2. `core/text-paths.cjs` does not admit `bgi` in its engine set; registering it before real full-text, box and lifecycle support would only turn an unsupported diagnostic into a misleading rendering claim
+3. Add a BGI-owned conversion layer only after native records provide full untruncated text, glyph bounds, sprite identity, sprite screen origin and actual visibility/destruction/page clear; temporary chain free cannot supply those events
+4. Establish real via-role mappings for dialogue/name/choice/menu from the exact running build before version-level data is enabled
+5. Only after that evidence should root wire BGI records to the shared reader and demonstrate hidden Japanese, dictionary DOM lookup, translation ACK and old-page removal with the ten real candidates
+
+The audio helper's `HR` currently treats every nonzero GetProcessId return as an error
+Microsoft documents a nonzero multi-process-session status for that API, but the actual failing HRESULT was not logged here, so it remains only a possible cause
+Root's audio owner should add HRESULT diagnostics and validate the session contract; this BGI candidate does not modify the shared helper or relax its refusal behavior
 
 ## Validation and root integration
 

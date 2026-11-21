@@ -10,6 +10,8 @@ No new third-party package, binary, game archive or implementation was downloade
 | MinHook 1.3.3 | `native/shared/minhook`, upstream `https://github.com/TsudaKageyu/minhook` | Existing BSD 2-Clause notices preserved in LICENSE.txt; no source changes |
 | Existing BGI extraction lineage | `preserved/source/lunahoook-adapted/NativeImpl/LunaHook/LunaHook/engine32/BGI.cpp`; upstream `https://github.com/HIllya51/LunaTranslator` | GPL-3.0, existing notices retained; no upstream implementation newly copied |
 | BGI offline archive reader | Existing `services/original-engines/bgi.cjs` on base `ba00434c9961035ef625ebccd773de508c7122c6` | Existing project reader only; no new GARbro/Textractor/unrpyc/vn_re code imported |
+| Private fullscreen guard launcher | Existing MeguLit `native/borderless/Launch.cpp` on base `ba00434c9961035ef625ebccd773de508c7122c6` | GPL-3.0-or-later project code; private fail-closed launch change only, not added to production tooling |
+| Audio API return contract | [Microsoft IAudioSessionControl2::GetProcessId](https://learn.microsoft.com/en-us/windows/win32/api/audiopolicy/nf-audiopolicy-iaudiosessioncontrol2-getprocessid), checked 2026-11-22 | Documentation facts only; no code copied, actual failure HRESULT remains unknown |
 
 Local content pins:
 

@@ -7,3 +7,6 @@
 - Existing Chinese launchers contain the same visible layout bytes but extra `.enigma` sections and an unbacked import RVA; file signature equality does not establish the module actually running or Japanese-language rendering
 - The minimal first-scene sample must exclude system/debug text and opening literary quotations before counting ten narration candidates; role mappings still require live name/choice/menu evidence
 - Repository-root ENGINE-ADAPTATION-NOTES.md is absent at this base; this independent supplement is provided for root's later aggregation, without touching shared handoff files
+- The root-authorized hidden run reached a Direct3D initialization error before dialogue; stop that launch route and keep its screenshot rather than moving to the foreground or counting static rows as live input
+- A real audio guard failure before ready/capture-only means no mute mutation and no audio recovery pass; preserve both facts, stop the owned game, and release its slot only after confirming exit
+- Building the current Hook DLL with a matching source header hash is useful freshness evidence, but this failed launch never attached that DLL and supplies no real I/G/H/D/U proof
