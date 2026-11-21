@@ -36,3 +36,11 @@ Final combined validation after the optional-field budget fix ran26 files with17
 All1549 tracked JS/CJS/MJS files passed node --check on Node22.22.3. After the last native-budget regression, one changed JS test was checked again;1548 identical files reused their same-Node content-hash results. Four Python files passed ast.parse without generating bytecode. Maximum native raw-literal piece is7221 wide units, below8190. git diff --check passed
 
 The final combined native source compiled for x86 and x64 in the private C research directory, without loading either DLL. x86 SHA256cb3cb8307f954f8909e7785113ee9c12f43807385f90b1177c8b9f23f97a045c; x64 SHA256aa2d786dcc053a24f74677b5b16a69cf234dcbb078ee923e4d3bacbb74c254bf. These supersede the earlier combination binaries. Root owns deployment of the matching code, Python producer and DLL pair into the unified isolated test directory
+
+## Owner handoff checkpoint, 2026-11-22 08:02 JST
+
+The owner now accepts all final game experience checks. HidDesk preparation may continue, but a hidden frame or unit replay never counts as that acceptance. The combined candidate was checked against freshly fetched origin/main 7a41ff9a: 18 directly affected suites passed 99/99, with zero failures and skips. This is feature validation, not a fourth CI-repair attempt or a claim that repository CI is green
+
+A complete official MZ sample is now deployed locally. The unchanged production rpgmaker reader/detector read 108 JSON resources from Luise: 2238 body records, 203 choice records and 1783 speaker-field occurrences. JSON byte offsets were read back against the source. Those are script records, not observed rendered frames or counts of distinct characters. The separately downloaded MV sample is one packed executable; no directory script extraction or runtime success is claimed for it
+
+The unified isolated test installation has matching KAG DLLs, Python producer and Reader consumer. Its per-game activation is still being prepared: the ordinary hide switch alone does not grant draw.roles/embed, and these defaults stay off. Shared-executable version seeds cannot provide a title-specific private grant, so no such unsafe grant was published. Missing activation, native TextRender ruby, image menus and unknown RenPy versions remain explicit gaps
