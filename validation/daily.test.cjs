@@ -3,6 +3,28 @@ process.env.MEGULIT_RELAY_BASE??='off';/* tests never reach the real relay */
 /* E415 日报 page: relay RSS parsing + D1 cache + routes, the bridge's cleaning and link gate, and the page markup. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
 const relayDir=path.join(__dirname,'..','relay');
+test('daily uses the configured review translator through the last article paragraph',async()=>{
+ const daily=require('../services/daily.cjs'),{GameReviews}=require('../services/game-reviews.cjs');
+ const reviews=new GameReviews('',undefined,{engine:()=>'api',translate:async text=>'translated '+text});
+ const list=Array.from({length:120},(_,i)=>'記事の段落 '+i);
+ const article=require('../services/news-article.cjs').paragraphs(list.map(t=>'<p>'+t+'</p>').join(''));
+ assert.deepEqual(article,list);
+ const fallback=[];
+ const result=await daily.translate('',{reviews:()=>reviews},article,'en',{withEngine:true,translateFree:async t=>{fallback.push(t);return 'fallback';}});
+ assert.deepEqual({length:result.texts.length,first:result.texts[0],last:result.texts.at(-1),fallback:fallback.length},
+  {length:120,first:'translated '+list[0],last:'translated '+list.at(-1),fallback:0});
+ assert.deepEqual(result,{texts:list.map(t=>'translated '+t),engine:'app'});
+});
+test('daily falls back only for missing paragraphs in a structured engine result',async()=>{
+ const daily=require('../services/daily.cjs'),texts=['記事の冒頭','記事の末尾'],used=[];
+ const runtime={reviews:()=>({translate:async()=>({texts:['opening',''],engine:'api',error:'MODEL_BUSY'})})};
+ const options={withEngine:true,translateFree:async t=>{used.push(t);return 'ending';}};
+ const expected={texts:['opening','ending'],engine:'app+microsoft'};
+ assert.deepEqual(await daily.translate('',runtime,texts,'en',options),expected);
+ assert.deepEqual(used,[texts[1]]);
+ assert.deepEqual(await daily.translate('',runtime,texts,'en',options),expected);
+ assert.deepEqual(used,[texts[1]]);
+});
 const load=name=>import(pathToFileURL(path.join(relayDir,'src',name)).href);
 const MIGRATIONS=fs.readdirSync(path.join(relayDir,'migrations')).filter(f=>f.endsWith('.sql')).sort().map(f=>fs.readFileSync(path.join(relayDir,'migrations',f),'utf8')).join('');
 function d1(){const db=new DatabaseSync(':memory:');db.exec(MIGRATIONS);const stmt=(sql,args=[])=>({bind:(...a)=>stmt(sql,a),first:async()=>db.prepare(sql).get(...args)??null,all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>{db.prepare(sql).run(...args);return {success:true};}});return {prepare:sql=>stmt(sql)};}
