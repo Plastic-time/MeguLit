@@ -88,7 +88,7 @@ test('web: Chromium shells only, switches only, page script hides by one style r
  const p=W.PAGE_SCRIPT;new Function(p);
  for(const k of ['.message_inner','[data-content="dialog"]','[class*="TextBox_main"]'])assert.ok(p.includes(k),k);
  assert.match(p,/color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important/);
- assert.match(p,/r\.getClientRects\(\)/);assert.match(p,/devicePixelRatio/);assert.match(p,/closest\('rt,rp,script,style'\)/,'ruby left out');
+ assert.match(p,/r\.getClientRects\(\)/);assert.match(p,/devicePixelRatio/);assert.match(p,/closest\('rt,rp,script,style,\.megulit-zh'\)/,'ruby (and MeguLit\'s own Chinese block) left out');
  assert.doesNotMatch(p,/localStorage|indexedDB|\.save\(|writeFile/,'never touches game storage');
 });
 
