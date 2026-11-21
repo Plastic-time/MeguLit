@@ -71,7 +71,7 @@ test('native: every engine-draw runtime is armed from the hook build (copied by 
 
 test('kernel: the default profile asks for nothing; no control file without a seed that turns draw on',()=>{
  const P=require('../core/profiles/index.cjs'),E=require('../core/engine-draw.cjs');
- const p=P.profileFor({});assert.equal(P.get(p,'draw.roles',null),false);assert.equal(P.get(p,'draw.embed',null),false);
+ const p=P.profileFor({});assert.equal(P.get(p,'draw.roles',null),false);assert.equal(P.get(p,'draw.embed',null),false);assert.equal(P.get(p,'draw.kemcoSprites',null),false);
  const s=E.settings(p);assert.equal(s.roles,false);assert.equal(s.embed,false);
  assert.match(E.krkrControlText(s,new Map()),/^#cfg roles=0 embed=0/);
  const calls=[];const ed=new E.EngineDraw({profile:p,transport:{write:(...a)=>calls.push(['write',...a]),stop:()=>calls.push(['stop'])}});
@@ -83,6 +83,6 @@ test('seeds: draw.roles / draw.embed stay off except the listed games',()=>{
  for(const eng of fs.readdirSync(dir,{withFileTypes:true}).filter(d=>d.isDirectory()))
   for(const g of fs.readdirSync(path.join(dir,eng.name),{withFileTypes:true}).filter(d=>d.isDirectory())){
    const f=path.join(dir,eng.name,g.name,'game.json');if(!fs.existsSync(f))continue;
-   const d=JSON.parse(fs.readFileSync(f,'utf8')).settings?.draw||{};if(d.roles===true||d.embed===true)on.push(eng.name+'/'+g.name);}
+   const d=JSON.parse(fs.readFileSync(f,'utf8')).settings?.draw||{};assert.notEqual(d.kemcoSprites,true,eng.name+'/'+g.name+': Kemco observer requires separate live acceptance');if(d.roles===true||d.embed===true)on.push(eng.name+'/'+g.name);}
  assert.deepEqual(on.sort(),[...SEEDS_ON].sort());
 });
