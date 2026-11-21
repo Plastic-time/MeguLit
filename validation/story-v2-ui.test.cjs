@@ -8,12 +8,21 @@ test('a removed focused veil restores the open viewer focus without stealing ano
  context.restore(dialog,veil);assert.equal(focused,1);inDialog=true;context.restore(dialog,veil);assert.equal(focused,1);inDialog=false;veil.isConnected=true;context.restore(dialog,veil);assert.equal(focused,1);veil.isConnected=false;dialog.open=false;context.restore(dialog,veil);assert.equal(focused,1);dialog.open=true;windowFocused=false;context.restore(dialog,veil);assert.equal(focused,1);
 });
 test('partial pages distinguish loaded scene metadata from whole-gallery counts in all three languages',()=>{
- const copySource=storySource.slice(storySource.indexOf('const copy='),storySource.indexOf('const lock=')),sections=storySource.slice(storySource.indexOf(' function gallerySections()'),storySource.indexOf(' function renderGallery()')),render=storySource.slice(storySource.indexOf(' function renderGallery()'),storySource.indexOf(' function watchImages()'));
+ const copySource=storySource.slice(storySource.indexOf('const copy='),storySource.indexOf('const lock=')),endingHelpers=storySource.slice(storySource.indexOf(' function endingUnknown()'),storySource.indexOf(' function endingMarkup(')),sections=storySource.slice(storySource.indexOf(' function gallerySections()'),storySource.indexOf(' function renderGallery()')),render=storySource.slice(storySource.indexOf(' function renderGallery()'),storySource.indexOf(' function watchImages()'));
  for(const locale of ['zh','ja','en']){
   const listing={status:'ready',cgUnlocked:26,cgTotal:40,endingDone:2,endingTotal:null,remaining:null,next:24,endings:[],groups:Array.from({length:24},(_,i)=>({id:'g'+i,state:'done'}))},target={innerHTML:'',querySelector:()=>({}),querySelectorAll:()=>[]},context={target,listing,state:{},esc:String,count:v=>v??'—',heading:(t,s)=>t+s,knownEndings:()=>[],galleryColumns:()=>7,sceneMarkup:()=>'',watchImages(){}};
-  vm.runInNewContext(copySource+`\nconst w=copy[${JSON.stringify(locale)}];`+sections+render+'\nrenderGallery();globalThis.expected={loaded:w.loaded(24),more:w.loadMore};',context);
+  vm.runInNewContext(copySource+`\nconst w=copy[${JSON.stringify(locale)}];`+endingHelpers+sections+render+'\nrenderGallery();globalThis.expected={loaded:w.loaded(24),more:w.loadMore};',context);
   assert(target.innerHTML.includes(context.expected.loaded));assert(target.innerHTML.includes(context.expected.more));assert(target.innerHTML.includes('26 / 40'));assert(!target.innerHTML.includes('24 / 24'));assert(!target.innerHTML.includes('2 / 0'));assert(!target.innerHTML.includes('2 / 7'));
   context.listing.next=null;vm.runInNewContext('renderGallery()',context);assert(target.innerHTML.includes('24 / 24'));assert(!target.innerHTML.includes('data-story-more'));
+ }
+});
+test('unknown endings retain a visible section and never turn unknown progress into locked cards',()=>{
+ const copy=storySource.slice(storySource.indexOf('const copy='),storySource.indexOf('const lock=')),known=storySource.split(/\r?\n/).find(line=>line.startsWith(' function knownEndings()')),helpers=storySource.slice(storySource.indexOf(' function endingUnknown()'),storySource.indexOf(' function endingMarkup('));
+ for(const locale of ['zh','en','ja']){
+  const context={listing:{endings:Array.from({length:7},(_,i)=>({id:'hidden'+i,state:'unknown',label:'SECRET'})),endingDone:0,endingTotal:7},esc:String,count:v=>v??'—',endingMarkup:e=>`<article data-known="${e.id}" data-state="${e.state}"></article>`};vm.runInNewContext(copy+`\nconst w=copy[${JSON.stringify(locale)}];`+known+helpers+'\nglobalThis.render=endingSection;globalThis.numbers=endingNumbers;globalThis.expected={unknown:w.endingUnknown,partial:w.endingPartial,confirmed:w.confirmed};',context);
+  let html=context.render();assert(html.includes('story-endings'));assert(html.includes(context.expected.unknown));assert(!html.includes('<article'));assert(!html.includes('SECRET'));assert(context.numbers().includes(context.expected.confirmed));
+  context.listing.endings=[{id:'done',state:'done'},{id:'locked',state:'locked'},{id:'hidden',state:'unknown',label:'SECRET'}];context.listing.endingDone=1;html=context.render();assert(html.includes(context.expected.partial));assert(html.includes('data-known="done"'));assert(html.includes('data-known="locked"'));assert(!html.includes('data-known="hidden"'));assert(!html.includes('SECRET'));
+  context.listing.endings=context.listing.endings.slice(0,2);assert(!context.render().includes('role="status"'));assert.equal(context.numbers(),'1 / 7');
  }
 });
 function layout(){const context={};vm.runInNewContext(layoutSource.replace('export function layoutStory','function layoutStory')+'\nglobalThis.layout=layoutStory;',context);return context.layout;}
