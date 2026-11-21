@@ -90,8 +90,19 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
  return 'abort';}
 (async()=>{
  const out={work,errors:[],console:[],samples:[],sourceEpisodes:[],marks:[],hookSpawned:0,gwbSent:[],hbSent:[],events:[],control:[],choiceOffers:[],hidden:{lines:0,visible:0},krkr:{clears:0,choice:[],cfg:null}};let krkr=null,lastLine=null,browser=null;
+ let disposal=null,stopRequested=false;
+ const finish=()=>{if(disposal)return disposal;disposal=(async()=>{
+  try{runtime.reader?.gal?.stop?.();}catch{}try{runtime.reader?.stop?.();}catch{}
+  await browser?.close().catch(error=>{out.errors.push('browser cleanup: '+String(error?.message||error).slice(0,400));out.cleanupFailure=error.cleanupFailure||{browserPid:browser?.pid||null,processClosed:false,reason:String(error?.message||error)};});
+  if(!process.env.MEGULIT_REPLAY_KEEP&&!out.cleanupFailure)try{fs.rmSync(work,{recursive:true,force:true});}catch(error){out.cleanupFailure={profile:work,processClosed:true,reason:'driver-work-cleanup: '+error.message};}
+  out.cleanupComplete=!out.cleanupFailure;
+  fs.writeFileSync(outFile,JSON.stringify(out,null,1));
+  process.exit(0);
+ })();return disposal;};
+ process.on('message',message=>{if(message?.type!=='cardinal-stop')return;stopRequested=true;out.interrupted=true;if(browser)void finish().catch(error=>{process.stderr.write('cardinal stop cleanup: '+String(error));process.exit(1);});});
  try{
   browser=await require('./cdp.cjs').launch({viewport:scenario.viewport||{width:1920,height:1080}});
+  if(stopRequested)throw Error('replay interrupted before reader setup');
   page=browser.page;
   page.route(url=>{const r=serve(url);if(r&&r!=='abort'&&r.status>=400&&out.console.length<200)out.console.push('http '+r.status+' '+url.slice(0,160));return r;});
   page.on('console',m=>{if(['error','warning'].includes(m.type())&&out.console.length<200)out.console.push(m.type()+': '+m.text().slice(0,300));});
@@ -146,12 +157,6 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
   out.hookEvents=[];for(const f of ['hook-events.log.previous','hook-events.log.1','hook-events.log']){const x=path.join(root,'logs',f);if(fs.existsSync(x))out.hookEvents.push(...fs.readFileSync(x,'utf8').split(/\r?\n/).filter(l=>l&&!/Z (chain|translation|choice aux|art text located) /.test(l)));}
   out.readerHost=fs.existsSync(path.join(root,'logs','reader-host.log'))?fs.readFileSync(path.join(root,'logs','reader-host.log'),'utf8').split('\n').filter(l=>!/"hostFrame"/.test(l)).slice(-200):[];
  }catch(e){out.errors.push('driver: '+String(e.stack||e).slice(0,800));if(e.cleanupFailure)out.cleanupFailure=e.cleanupFailure;}
- finally{
-  try{runtime.reader?.gal?.stop?.();}catch{}try{runtime.reader?.stop?.();}catch{}
-  await browser?.close().catch(error=>{out.errors.push('browser cleanup: '+String(error?.message||error).slice(0,400));out.cleanupFailure=error.cleanupFailure||{browserPid:browser?.pid||null,processClosed:false,reason:String(error?.message||error)};});
-  if(!process.env.MEGULIT_REPLAY_KEEP&&!out.cleanupFailure)try{fs.rmSync(work,{recursive:true,force:true});}catch(error){out.cleanupFailure={profile:work,processClosed:true,reason:'driver-work-cleanup: '+error.message};}
-  out.cleanupComplete=!out.cleanupFailure;
-  fs.writeFileSync(outFile,JSON.stringify(out,null,1));
-  process.exit(0);
- }
+ finally{await finish();}
+
 })();

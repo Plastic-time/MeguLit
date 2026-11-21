@@ -36,7 +36,7 @@ test('an unconfirmed browser cleanup is returned immediately without retry',asyn
 });
 test('stop needs successful process-tree termination and child close, never just exit',async()=>{
  const p=new EventEmitter();p.pid=12;p.exitCode=null;let kills=0;
- const stopping=Run.stop(p,{platform:'win32',timeoutMs:50,spawnSync(){kills++;queueMicrotask(()=>p.emit('exit',1));return {status:0};}});
+ const stopping=Run.stop(p,{platform:'win32',timeoutMs:50,cleanupConfirmed:()=>true,spawnSync(){kills++;queueMicrotask(()=>p.emit('exit',1));return {status:0};}});
  let complete=false;stopping.then(()=>complete=true);await tick();assert.equal(complete,false);p.emit('close',1);assert.equal(await stopping,true);assert.equal(kills,1);assert.equal(await Run.stop(p),true);
  const missing=new EventEmitter();missing.pid=13;assert.equal(await Run.stop(missing,{platform:'win32',timeoutMs:1,spawnSync:()=>({status:1})}),false);
 });
@@ -73,4 +73,29 @@ test('a driver crash without a cleanup acknowledgement blocks cleanup and the ne
 test('normal child close with its explicit cleanup acknowledgement releases owned replay files',async()=>{
  const h=fakeReplay(async()=>true);const read=h.io.fs.readFileSync;h.io.fs.readFileSync=f=>f.endsWith('out.json')?JSON.stringify({errors:[],samples:[1],cleanupComplete:true}):read(f);
  const result=Run.replay({}, {work:'/virtual'},h.io);h.p.emit('close',0);const out=await result;assert.equal(out.cleanupFailure,undefined);assert.equal(out.processClosed,true);assert.equal(h.removed.length,1);
+});
+
+
+test('real background API ignores only this replay and retains unsafe occupancy',async()=>{
+ const id=require.resolve('../services/background-games.cjs');delete require.cache[id];const bg=require(id);
+ const idleReading=async()=>({idleMs:300001,ac:true,fullscreen:false,cpu:0});
+ const games={...bg,idle:(root,options)=>bg.idle(root,{...options,reading:idleReading})};let calls=0;
+ const result=await automatic(job(async()=>{calls++;return {cleanupFailure:{browserPid:99,processClosed:false,reason:'injected unsafe exit'}};}),{}, {},{games,budget:{wait:async()=>true}});
+ assert.ok(result.cleanupFailure);assert.equal(calls,1);assert.equal(bg.occupied(),true);assert.equal(await bg.idle('virtual',{reading:idleReading}),false);await assert.rejects(bg.foreground(),/CARDINAL_TREE_EXIT_UNCONFIRMED/);assert.equal(bg.occupied(),true);await assert.rejects(bg.foreground(),/CARDINAL_TREE_EXIT_UNCONFIRMED/);
+ delete require.cache[id];
+});
+test('real background API still refuses a second task during the final own-token recheck',async()=>{
+ const id=require.resolve('../services/background-games.cjs');delete require.cache[id];const bg=require(id);let calls=0;
+ const off=bg.track('other.exe',async()=>{}),games={...bg,idle:(root,options)=>bg.idle(root,{...options,reading:async()=>({idleMs:300001,ac:true,fullscreen:false,cpu:0})})};
+ const result=await automatic(job(async()=>{calls++;return {};}),{}, {},{games,budget:{wait:async()=>true}});assert.equal(result.deferred,true);assert.equal(calls,0);off();delete require.cache[id];
+});
+
+
+test('a closed driver without browser cleanup proof never confirms the process tree',async()=>{
+ const p=new EventEmitter();p.pid=17;p.exitCode=1;const stopping=Run.stop(p,{platform:'win32',timeoutMs:20,spawnSync:()=>({status:0})});p.emit('close',1);assert.equal(await stopping,false);assert.equal(await Run.stop(p),false);
+});
+test('cooperative stop waits for close and browser cleanup acknowledgement without taskkill',async()=>{
+ const p=new EventEmitter();p.pid=18;p.connected=true;let acknowledged=false,forced=0;
+ p.send=(message,cb)=>{assert.equal(message.type,'cardinal-stop');queueMicrotask(()=>{acknowledged=true;p.emit('close',0);cb();});};
+ assert.equal(await Run.stop(p,{timeoutMs:20,cleanupConfirmed:()=>acknowledged,spawnSync(){forced++;return {status:0};}}),true);assert.equal(forced,0);
 });

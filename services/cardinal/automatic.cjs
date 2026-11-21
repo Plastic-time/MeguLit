@@ -20,7 +20,7 @@ async function automatic(job,scenario,options,{games=Games,budget=Budget,interva
     timer=setInterval(async()=>{if(checking||controller.signal.aborted)return;checking=true;try{if(!await games.idle(job.root,{ignore:release}))controller.abort();}catch{controller.abort();}finally{checking=false;}},intervalMs);timer.unref?.();
     try{out=await operation;}catch(error){out={cleanupFailure:{reason:'replay rejected after start: '+String(error?.message||error),processClosed:false}};}
    }
-  }finally{clearInterval(timer);release();finished();}
+  }finally{clearInterval(timer);if(!out?.cleanupFailure&&out?.processClosed!==false)release();finished();}
   if(out?.cleanupFailure||out?.processClosed===false)return out;
   if(!out?.interrupted)return out;
   job.trace?.('cardinal paused for player activity attempt='+(attempt+1)+' key='+job.key.slice(0,8));
