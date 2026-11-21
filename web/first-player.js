@@ -3,8 +3,10 @@
    calibrated (services/first-player.cjs decides). Three looks: first (play 3-8 minutes), off (sharing is switched off, one switch),
    thanks (the calibration went out). It asks once when the page opens (the service answers from its cache, a slow relay shows
    nothing) and then polls the cache, so the card turns into the thank-you by itself. */
+/* 2026-11-21 店主: 匿名的传火人按顺序用大写数字（传火人壹、贰、叁） */
+const cnNo=n=>{n=Math.floor(Number(n)||0);if(n<=0)return "零";const D="零壹贰叁肆伍陆柒捌玖",U=["","拾","佰","仟"],B=["","万","亿","万亿"];const sec=p=>{let o="",z=false;for(let i=3;i>=0;i--){const x=Math.floor(p/10**i)%10;if(x){if(z&&o)o+="零";o+=D[x]+U[i];z=false;}else z=true;}return o;};const parts=[];for(let i=0;n>0;i++){parts.unshift([n%10000,i]);n=Math.floor(n/10000);}let out="",gap=false;for(const [p,i] of parts){if(!p){if(out)gap=true;continue;}if(out&&(gap||p<1000))out+="零";out+=sec(p)+B[i];gap=false;}return out;};
 const W={
- zh:{eyebrow:'传火计划',cr:{anon:n=>n?'当前显示为「传火人 #'+n+'」':'当前是匿名',named:n=>'已署名：'+n,ph:'署名（最多 30 字，可不填）',sign:'署名',skip:'不署名',edit:'修改',undo:'撤回',privacy:'署名会公开给之后玩同一版本的玩家看；不填就是匿名',local:'已保存在这台电脑上，连上服务器后会同步',failed:'没保存成功，稍后再试',torch:n=>'传火人 #'+n,from:(who,at)=>'这个游戏的适配来自 '+who+(at?' · '+at:'')},tags:['游戏闪退（也算）','打不开','卡住','日文没出来或点不了','翻译不显示或错位','内嵌用不了','选项没翻译','文字闪烁或重叠','其他任何问题'],hint:['遇到这些或其他任何问题，直接点上方「','反馈','」简单说说并上传，我们会手动修复，通常 12 小时到 1 周'],
+ zh:{eyebrow:'传火计划',cr:{anon:n=>n?'当前显示为「传火人'+cnNo(n)+'」':'当前是匿名',named:n=>'已署名：'+n,ph:'署名（最多 30 字，可不填）',sign:'署名',skip:'不署名',edit:'修改',undo:'撤回',privacy:'署名会公开给之后玩同一版本的玩家看；不填就是匿名',local:'已保存在这台电脑上，连上服务器后会同步',failed:'没保存成功，稍后再试',torch:n=>'传火人'+cnNo(n),from:(who,at)=>'这个游戏的适配来自 '+who+(at?' · '+at:'')},tags:['游戏闪退（也算）','打不开','卡住','日文没出来或点不了','翻译不显示或错位','内嵌用不了','选项没翻译','文字闪烁或重叠','其他任何问题'],hint:['遇到这些或其他任何问题，直接点上方「','反馈','」简单说说并上传，我们会手动修复，通常 12 小时到 1 周'],
   first:{title:'恭喜，你是第一位玩这个版本的玩家',body:'这个版本还没有人校准过。启动游戏后请耐心玩 3 到 8 分钟，让自动校准跑完，就算参与传火计划了。校准结果会共享给之后玩同一版本的人，他们打开就能直接用；你现在用到的适配，也是之前的玩家这样共享出来的。大家互相分享，每个人都省事',note:'约 3–8 分钟 · 自动校准 · 结果与之后的玩家共享'},
   off:{title:'打开共享适配，就能参与传火',body:'这个版本还没有人校准过，你是第一位。现在共享适配是关着的，校准结果只留在这台电脑上，之后的玩家用不上。打开后玩 3 到 8 分钟，让自动校准跑完，结果就会共享给之后玩同一版本的人',button:'打开共享适配',busy:'正在打开…',failed:'没打开成功，稍后再试'},
   thanks:{title:'感谢你的分享',body:'你的校准结果已上传，之后玩这个版本的玩家打开就能直接用',note:'已共享'}},
