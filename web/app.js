@@ -1280,7 +1280,9 @@ function syncStage(){const main=document.querySelector('#main'),layer=document.q
  }layer.dataset.glyphStage=stage;}
 let stageWatch=null;function watchStage(){const main=document.querySelector('#main');if(!main||stageWatch?.main===main)return;stageWatch?.observer.disconnect();
  const observer=new MutationObserver(syncStage);observer.observe(main,{childList:true});stageWatch={main,observer};}
+let stopDetailPage=()=>{};
 async function renderRoute(){watchStage();
+  stopDetailPage();stopDetailPage=()=>{};
   stopHistoryTranslations();stopHistoryTranslations=()=>{};
   const token=++pageToken,main=document.querySelector('#main');document.documentElement.dataset.stage=stageFor(route);applyVeil(model.preferences);syncStage();{
    const group=route==='statistics'?'learning':route,leaving=!!main.dataset.lastRoute&&main.dataset.lastRoute!==group,out=!leaving?null:main.querySelector(':scope>.tv-home')||(main.querySelector(':scope>.dtv-bg')?main:null);
@@ -1293,10 +1295,10 @@ async function renderRoute(){watchStage();
    if(route!=='learning'&&route!=='statistics')main.classList.remove('review-page');if(route!=='learning'&&route!=='statistics')delete main.dataset.page;main.scrollTop=0;
   try{
     if(route==='home')home();else if(route==='library')library();else if(route==='series')seriesUI.renderDetail(main,selectedSeriesId);else if(route==='game'){main.innerHTML=loading();
-     await renderGamePage({main,id:selectedGameId,tab:(t=>(gameTab='',t))(gameTab),api,invoke,locale,text,esc,icon,cover,duration,datetime,relativeTime,number,definitions,isCurrent:()=>token===pageToken,
+     const detailCleanup=await renderGamePage({main,id:selectedGameId,tab:(t=>(gameTab='',t))(gameTab),api,invoke,locale,text,esc,icon,cover,duration,datetime,relativeTime,number,definitions,isCurrent:()=>token===pageToken,
      onBack:()=>navigate(gameOrigin),onLaunch:startGame,onEdit:editGame,onJapaneseRestore:only=>japaneseRestore(only),onRemove:removeGame,onForum:game=>{setForumFilter({game:String(game?.title||''),engine:'',
      tag:'',mine:false});setLeaderboardView({tab:'forum'});navigate('leaderboard');},onLookup:word=>{pendingLookup=word;navigate('learning','dictionary');},onOriginalChanged:async()=>{model=await api('home');if(token===pageToken)renderRoute();
-     },toast});}else if(route==='history')await history(token);else if(route==='learning')await learning(token);else if(route==='settings')await settings(token);
+     },toast});if(typeof detailCleanup==='function'){if(token===pageToken)stopDetailPage=detailCleanup;else detailCleanup();}}else if(route==='history')await history(token);else if(route==='learning')await learning(token);else if(route==='settings')await settings(token);
      else if(route==='leaderboard')await mountLeaderboard(main,{api,locale,esc,toast,isCurrent:()=>token===pageToken,lookup:word=>{pendingLookup=word;navigate('learning',
      'dictionary');},openSettings:section=>{settingsSection=section;settingsProfile='';try{localStorage.setItem('megulit-settings-section',section);}catch{}navigate('settings');
      }});else if(route==='daily')await mountDaily(main,{api,locale,esc,toast,isCurrent:()=>token===pageToken,lookup:word=>{pendingLookup=word;navigate('learning',

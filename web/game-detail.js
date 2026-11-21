@@ -75,4 +75,5 @@ export async function renderGamePage({main,id,tab:startTab='',api,locale,text,es
   }show(activeTab);}
  main.querySelectorAll('[data-detail-tab]').forEach(button=>button.onclick=()=>show(button.dataset.detailTab));show(['sessions','words','sentences'].includes(startTab)?startTab:'overview');enrich().catch(()=>{if(isCurrent()){
   loadingMetadata=false;data.reception??={at:Date.now(),reviews:[]};show(activeTab);}});
+ return ()=>{firstPlayer?.dispose?.();unmount();};
 }

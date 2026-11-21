@@ -19,9 +19,9 @@ export function installedReceipt(dto){const r=dto?.receipt;
  return {key:r.key,hash:r.hash,revision:r.revision,serverTime:receiptTime(r.serverTime)?.toISOString()||null,credit:credit(r.credit),cardinalRev:typeof r.cardinalRev==='string'&&/^[A-Za-z0-9._-]{1,40}$/.test(r.cardinalRev)?r.cardinalRev:null};
 }
 const COPY={
- zh:{installed:'已安装此版本的适配',unconfirmed:'适配数据已收到，尚未确认本机安装',installing:'正在匹配并安装适配',failed:'适配安装未完成，稍后会再检查',from:'传火来源',unknown:'来源未提供',time:'服务器记录时间',noTime:'时间未提供',revision:'适配版本',hash:'内容校验值',cardinal:'Cardinal 修订'},
- ja:{installed:'このバージョンの適応をインストール済み',unconfirmed:'適応データを受信しました。この PC へのインストールは未確認です',installing:'適応を照合してインストール中',failed:'適応のインストールは未完了です。後ほど再確認します',from:'火の提供元',unknown:'提供元は未登録',time:'サーバー記録日時',noTime:'日時は未登録',revision:'適応リビジョン',hash:'内容の検証値',cardinal:'Cardinal リビジョン'},
- en:{installed:'Adaptation installed for this version',unconfirmed:'Adaptation data received; installation on this PC is not yet confirmed',installing:'Matching and installing the adaptation',failed:'Adaptation installation is incomplete; it will be checked again later',from:'Flame shared by',unknown:'Source not provided',time:'Server record time',noTime:'Time not provided',revision:'Adaptation revision',hash:'Content checksum',cardinal:'Cardinal revision'}
+ zh:{installed:'已安装此版本的适配',unconfirmed:'适配数据已收到，尚未确认本机安装',installing:'正在匹配并安装适配',failed:'适配安装未完成，稍后会再检查',from:'传火来源',unknown:'来源未提供',time:'发布时间',noTime:'时间未提供',revision:'适配版本',hash:'内容校验值',cardinal:'Cardinal 修订'},
+ ja:{installed:'このバージョンの適応をインストール済み',unconfirmed:'適応データを受信しました。この PC へのインストールは未確認です',installing:'適応を照合してインストール中',failed:'適応のインストールは未完了です。後ほど再確認します',from:'火の提供元',unknown:'提供元は未登録',time:'公開日時',noTime:'日時は未登録',revision:'適応リビジョン',hash:'内容の検証値',cardinal:'Cardinal リビジョン'},
+ en:{installed:'Adaptation installed for this version',unconfirmed:'Adaptation data received; installation on this PC is not yet confirmed',installing:'Matching and installing the adaptation',failed:'Adaptation installation is incomplete; it will be checked again later',from:'Flame shared by',unknown:'Source not provided',time:'Published',noTime:'Time not provided',revision:'Adaptation revision',hash:'Content checksum',cardinal:'Cardinal revision'}
 };
 export function receiptView(dto,{locale='zh',esc,torch=n=>'#'+n}={}){const w=COPY[locale]||COPY.zh,r=installedReceipt(dto),state=dto?.state;
  const text=state==='installing'?w.installing:state==='install-failed'?w.failed:r?w.installed:w.unconfirmed;
