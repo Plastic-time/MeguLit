@@ -31,15 +31,60 @@
 - 方案：在 BGI 的「消息送字」函数（BGI.cpp 现在挂的那个，参数里有窗口对象）旁边同时记窗口编号，然后在 GetGlyphOutlineA 那条路线上把字形点按当前窗口打上角色（名字窗 / 消息窗 / 选项窗）。这是「从外面猜」的升级版：位置来自 API，角色来自引擎自己的窗口
 - 注意：ユースティア 的 BGI.exe 是壳，签名要在解壳后（运行时）找，只能实机验证；素晴日 HD 不是壳，先做它
 
-### SiglusEngine
-- 现有：`native/megulithook/Siglus.cpp` 和 `native/siglus/Siglus.cpp`（LunaHook，ctx2 1/2/3，内嵌写回 role=1 的流；CLANNAD 曾因写 role=3 的 VM 通用串崩，见 `native/EmbedTextPolicy.cs`）
-- 画字：GetGlyphOutlineW ×2（字形缓存）+ d3d9
-- 注音不是行内标记：Siglus 的 ruby 是 VM 命令（`global.ruby(str)`、`mwnd.ruby(int)`，`H:\MeguLit-Work\oss\SiglusSceneScriptUtility\src\siglus_ssu\const.py`），所以内嵌注音要在送字前调用引擎自己的 ruby 命令，不能把标记塞进字符串
-- 方案：
-  1. 坐标：挂 mwnd 的「加一个字」函数（它知道当前窗口和格子位置），比 GetGlyphOutlineW 更准（后者只在字形第一次进缓存时调用）
-  2. 角色：mwnd 编号 + 选项窗（sel）+ 名字（mwnd.name）
-  3. 内嵌：写回中文作为第二段 + 调 ruby 命令；行数上限进版本层差分
-- 风险最高：VM 结构按版本变，CLANNAD Steam 和 Summer Pockets 各要签名
+### SiglusEngine（已做：签名 + 钩子 + 自检，2026-11-21，feat/re-siglus）
+- 现有：`native/megulithook/Siglus.cpp`（LunaHook，ctx2 1/2/3，内嵌写回 role=1 的流；CLANNAD 曾因写 role=3 的 VM 通用串崩，见 `native/EmbedTextPolicy.cs`）；`native/siglus/` 是旧的独立构建，不再用
+- 静态逆向（只读店主的 CLANNAD 1.1.134.0 和 Summer Pockets 1.1.137.0 两个 exe，pefile + capstone，脚本在 `H:\MeguLit-Work\tools-re\siglus\py`；函数名是我们起的，exe 没有符号）：
+  - GetGlyphOutlineW ×2 只是字形缓存（第一次见到某个字才调），不是画字的地方
+  - 每个文字区（mwnd 里的 msg，0x1c0 字节；mwnd+0x228 是 msg 数组，mwnd+0xc34 是名字窗的 msg）有一个字表 `std::vector<moji>`（msg+0x1ac，moji 0x3b4 字节：+0 类型、+4 字码、+8 字号、+0xc 颜色号、+0x18 x、+0x1c y，文字区自己的像素）。**所有文字区的每个字都走同一个 push_back**——这就是画字函数
+  - 排版主循环 msg::add_msg（只有它做「」『』（ 的括号判断，靠这个定位）把字填进栈上的 moji 再 push；注音排版（mwnd.ruby 结束时）、名字窗（mwnd.namae）、mwnd.sel / selmsg 的选项项、global.selbtn 的选项项各有自己的 push 调用点。调用点前面的字节两个版本完全一样，按它分角色；add_msg 自己的调用方（mwnd.print / 名字写进消息里 / 回想页）再从 push 时的 [ebp+4] 分
+  - 角色对 VM 命令：switch 表的分支号就是 SiglusSceneScriptUtility `const.py` 的元素号（mwnd.print 4、sel 5、ruby 12、selmsg 50–52、namae 62/63；global.selbtn 76/77/126/128）
+  - 注音：mwnd.ruby(str) 记下读音（msg+0x14c 的 wstring）和起点（msg+0x180/0x184），之后的字照常排；ruby() 结束时排版函数从起点到笔位（msg+0xe0，字的 x = 笔位 + msg+0xe8）把读音逐字 push 到上方（错误串「ルビの対象の文字列が空です」「ルビの途中で改行されています」都在它里面）
+  - 清屏 / 换页：msg::clear（清读音状态、纯文本、字表）
+- 6 件套：
+  | 部分 | 文件 |
+  |---|---|
+  | 签名（参考实现） | `tools/engine-sigs/siglus-draw.cjs`：括号判断 → add_msg 起点 → 字数计算里的字表偏移 → 那一个 print push → push_back 的全部调用点按尾部字节分 print / ruby×2 / name / msgsel / selbtn（数目不对或有认不出的调用点就不认）→ 注音函数头里的字段偏移 → add_msg 的调用方（line / namemsg / backlog×2）→ msg::clear 的函数头。没有任何写死的地址 |
+  | 签名（原生） | `native/megulithook/SiglusDrawSig.h`，同一算法，纯字节 |
+  | 夹具 | `validation/fixtures/engine-sigs/siglus-draw.json`（两个 exe 各 10 段窗口、4000 字节 + 整文件 SHA-256 + 期望值）+ `native/megulithook/selftest/siglusdraw-snippets.h` |
+  | 静态签名测试 | `validation/engine-draw-sig-siglus.test.cjs`：夹具上两个版本的函数、调用点、角色、偏移全对；两版地址不同而字段一样；近似字节（括号判断、注音调用点、clear 头、多一个认不出的 push）都不认；本机有 exe 时整段代码给出同样结果 |
+  | 原生自检 | `selftest/siglusdraw.cpp`（同一批窗口给 C++ 匹配器）+ `selftest/siglusdraw-gate.cpp`（真 Gate + 真 MinHook 挂在替身 push_back / clear 上，按引擎的调用方式回放一页：台词 + 注音、换行、名字窗、消息里的名字、选项、清屏、回想；验证被挂函数仍拿到自己的参数和寄存器），都在 `selftest/run.cmd` |
+  | 运行时钩子 | `native/megulithook/SiglusDraw.h`（`Siglus::attach_function` 成功后 `SiglusDraw::Arm`）：默认不挂，控制文件 `roles=1`（这部游戏 seed 的 `draw.roles`）才在 push_back 和 msg::clear 入口装 MinHook。每个文字区的一行一条 `ToMe_DRAWRUN engine=siglus run= role=line|name|choice|system id=<来源>:<字表地址> n= x0 y0 x1 y1 size= color= [ruby=起:长:读音|…] text=`，清屏一条 `ToMe_DRAWRUN engine=siglus clear id=<字表地址>`（hook-diagnostics.log）。签名没对上写 `off: <原因>` 不挂 |
+- 屏幕坐标（第二批，2026-11-21）：
+  - 【已核实】msg::frame（CLANNAD 0x5dcd30 / SP 0x5dce80，`ret 0x24`，9 个参数）每帧对每个文字区调一次；mwnd::frame 把 mwnd 的 msg 数组逐个传进来，第 8、9 个参数是这块文字区的偏移（由 mwnd+0x148 / +0x14c 等字段算出，【推测】是窗口位置），第 1 个参数是一个参数块，+0x14 / +0x18 是 float 的 x / y（【推测】父精灵 / 窗口动画的位移）；它算可点字框时用 `(int)param.x + moji.x + 参数8`（`cvttss2si [esi+0x14]; add [moji+0x18]; add [ebp+0x24]`），moji 精灵位置也是 moji.x + 参数8 挂在同一个父精灵下
+  - 【推测】这个和就是游戏逻辑画面的坐标（Gameexe `#SCREEN_SIZE`：CLANNAD 1280×960、SP 1920×1080），依据是引擎拿同一个和做鼠标命中框；到窗口客户区还要按实际窗口大小缩放
+  - 钩子：msg::frame 入口（可选，签名找不到就不挂、其余照常）。每块文字区的原点稳定 3 帧且变了才报一条 `ToMe_DRAWRUN engine=siglus origin id=<字表地址> ox= oy=`（开窗动画滑动时只报落定的位置），之后这块区域的 run 都带 `ox= oy=`，屏幕 x = x0 + ox
+  - 【推测，未查】竖排时引擎把参数8 再减第一个字的字号（`[ebp-0x20]` 那段），只在全局竖排标志 = 1 时走；两部都是横排
+  - 选项项（msgsel / selbtn）不是 msg，不走 msg::frame，这一版没有它们的屏幕原点（run 里不带 ox/oy）
+- 颜色（第二批）：
+  - 【已核实】颜色号 → RGB：引擎的查表函数（CLANNAD 0x5b26b0 / SP 0x5b27f0）= `table[clamp(号, 0, n-1)]`，表是全局 `vector<uint32>`（CLANNAD 0xbac4c0 / SP 0xbad4c0），每项 0xFFRRGGBB，由 Gameexe `#COLOR_TABLE.NNN = r, g, b` 填（解析在 0x69165d，构表在 0x680d10，没写的号是黑色）。签名找到查表函数时 run 带 `rgb=rrggbb`
+  - 【已核实】add_msg 选色只有三个来源：mwnd.color 命令（msg+0xfc，-1 = 没设）→ `#CONFIG.MESSAGE_CHRCOLOR.ONOFF` 开时的角色色组（msg+0x164/168/16c，开关是配置项，不是已读）→ 窗口默认（msg+0x24/28/2c = `#MWND.MOJI_COLOR` 等）；moji::frame 只在链接悬停 / 按下时换色（`NORMAL / HIT / PUSH . COLOR`）。这两段代码都不读已读标志
+  - 【推测】所以这两部游戏已读 / 未读的字同色（已读只影响快进），阅读层不需要做已读变色；店主测试时对比一句已读和未读的截图确认
+  - 两部的 Gameexe（用仓库的 `services/original-engines/siglus-key.cjs` + exe 里的密钥解开，只读）：
+    - CLANNAD：`#MWND.MOJI_COLOR = 0`（000 = 255,255,255 白字）、`SHADOW_COLOR = 255` / `FUCHI_COLOR = 255`（255 = 0,0,0 黑影 / 黑边）；其余 001 255,100,100、002 80,255,80、003 100,100,255、004 255,200,200、005 180,255,180、006 220,220,255、050 128,80,90、051 128,128,128、100 255,116,88、101 0,43,152、102 179,14,14、254 255,255,200；MESSAGE_CHRCOLOR 关
+    - Summer Pockets：`#MWND.MOJI_COLOR = 0`（255,255,255）、`SHADOW_COLOR = 1` / `FUCHI_COLOR = 1`（0,0,0）；其余 002 255,0,0、003 100,255,100、004 0,0,255、005 255,255,100、006 255,0,255、010 20,150,200、011 52,75,105、020 0,95,104、050 54,46,43、051 4,63,7、100 144,59,79、101 87,99,100、102 写了两次（129,141,142 后 42,73,160；解析按行写进同一格，【推测】后一行生效）、103 87,99,100、104 129,141,142、110 175,183,189、111 89,99,105、200 88,115,121
+- 内嵌替换接入点（第二批，只定位，没接）：
+  - 【已核实】台词的必经之路：mwnd::add_msg（mwnd.print）先把原句追加进全局字串 `[0xbac458]+0x2fc`（【推测】回想 / 记录用），再调 `msg::add_msg(const wstring& 句子, wstring* 溢出)`（CLANNAD 0x5ddaa0，调用点 0x5de2f8）；add_msg 自己排版、自动换行，写到文字区底（笔位 y ≥ msg+0x130）时把剩下的字存进「溢出」参数返回（已核实）；mwnd::add_msg 看到溢出非空就调 0x64e880（已核实），【推测】由它等翻页后经 `___over_flow_print`（mwnd 元素 57，已核实它也进 mwnd::add_msg）接着排
+  - 【已核实】注音是 msg 上的三步：开始 = 引擎自己的 wstring::assign 把读音写进 msg+0x14c、置 msg+0x1a6 = 1（mwnd.ruby(str) → 0x5d8c20）；中间的字照常 add_msg；结束 = 注音排版函数 R（mwnd.ruby() → 0x64f0a0 → 0x5de7a0）。换行 = add_msg 里遇到 0x0a 调的 0x5de520；字号 = msg+0xf0（mwnd.size 改的就是它）
+  - 建议（最稳的点）：在 msg::add_msg 入口、且返回地址是 mwnd.print 那个调用点（`A_LINE`，钩子已经能认）时换字——
+    1. 只换台词：名字（namemsg / 名字窗）、选项、回想走别的调用点，天然不受影响
+    2. 那份全局字串在这之前已经写好原文（已核实顺序），【推测】回想、记录和语音对应都还是日文原句；已读判定按场景位置不按字串，换字不影响（推测）
+    3. 排版、换行、溢出换页全由引擎自己做，长句自动进下一页
+    4. 做法【推测，未验证】：不改调用方的字符串，在钩子里按段调原函数——日文段直接调原 add_msg；带注音的底字前后包「开始 / 结束注音」（用引擎的 assign 写读音，不自己写字符串内存）；中文段前调一次换行、把 msg+0xf0 临时改小、调原 add_msg、再改回。所有段都传同一个溢出指针
+  - 风险【推测】：现有 LunaHook Siglus 写回在更早的 VM 字符串上替换，两条路同时开会换两次，接入时要二选一；中文加进同一块文字区会更早溢出换页（这正是想要的行为，但要店主看一次长句）；把读音写进 msg+0x14c 必须用引擎的 assign（读音超过 7 个字会分配堆内存）
+- 没做：按钮 / 系统菜单（Siglus 的系统菜单多是图片按钮，不走 moji，【推测】）；竖排注音（现在只按 x 配底字）
+
+#### 店主测试清单（SiglusEngine：CLANNAD、Summer Pockets）
+1. 在 The Seed 里给这部游戏的游戏差分（`The Seed/siglus/clannad/game.json` 或 `summer-pockets/game.json`）把 `"draw":{"roles":false}` 改成 `true`；或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE 或 UTF-8，内容 `#cfg roles=1`）
+2. 开游戏，开新游戏推 5 句（带一句有注音的、一句有名字的），出一次选项，开一次回想（backlog）再关掉
+3. 看 `logs\hook-diagnostics.log`：
+   - 有一行 `ToMe_DRAWRUN engine=siglus on: push … add_msg … clear …`
+   - 每句台词有 `role=line id=print:…` 的 run，文字 = 这一行；有注音的那句带 `ruby=起:长:读音`，读音的假名不进 text
+   - 名字有 `role=name`（名字窗 `id=name:`，写在消息里的 `id=print:`）；选项每项一条 `role=choice`；回想页是 `role=system`
+   - 翻页时有 `clear id=…`，id 和台词 run 的 id 冒号后一样
+   - 对话框出现后有一条 `origin id=… ox= oy=`；台词 run 带 `rgb=ffffff ox= oy=`。拿 x0+ox、y0+oy 对一下截图里这句第一个字的位置（按窗口和 #SCREEN_SIZE 的比例缩放）：对得上 = 屏幕原点的推测成立
+   - 截一句已读（再读一次）和一句未读的对话框：字色一样 = 「Siglus 没有已读变色」的推测成立
+4. 游戏照常显示、推进不卡、不崩、日志不刷屏（同一句不会每帧重复出现，`origin` 只在窗口挪动后出现）= 过
+5. 不过时发：`hook-diagnostics.log`（含 `on:` 或 `off:` 那一行）、`hook-events.log`、exe 版本；`off: push count differs` 之类 = 这个版本签名没对上
 
 ### MAGES.
 - 现有：`native/megulithook/MagesEngine.cpp`、`MeguLitSg.cpp`、`native/mages/`（SC3 串解码含注音，STEINS;GATE 精确匹配的画字钩子）
@@ -234,3 +279,4 @@ V3（x64）不在这一步。
 3. 同时用一个临时 GDI 钩子（GetGlyphOutline / TextOut / ExtTextOut）记录调用者返回地址，换算成镜像 RVA → 画字点
 4. 在镜像上用 slot-refs / draw-sites 找这些点的模式；Enigma 会把部分 API 调用改成跳到它自己的桩，签名要能认这种「call 桩」形式，届时补进表格式
 5. 镜像不进仓库，只进夹具字节（调用点前后几十字节）+ 主程序 SHA-256
+一个引擎一个逆向会话（Opus high），各自 worktree，交付：签名 + 静态签名测试（对店主本机 exe 命中一次）+ 原生自检 + 店主测试清单。顺序：YU-RIS（一个调用点，4 部游戏）→ BGI（素晴日）→ MAGES（泛化已有钩子）→ Siglus（VM 最复杂；签名 + 钩子已做）→ Unity（先解决引用包）
