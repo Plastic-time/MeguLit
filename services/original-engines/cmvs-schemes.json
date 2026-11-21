@@ -23,6 +23,14 @@
     "indexSubtrahend": "79",
     "dirKeyAddend": ["0", "00112233", "0", "34258765"]
   },
+  "cpz5Late": {
+    "_comment": "CPZ5 packing modes 8 and 9 share a different 96-byte table. Mode 8 retains the old cipher constants with a new digest. Mode 9 uses digest B and changes four constants.",
+    "secret": ["CD90F089", "E982B782", "A282AB88", "CD82718E", "52838A83", "A882AA82", "7592648E", "B582AB82",
+               "E182BF82", "DC82A282", "4281B782", "62838183", "A9824981", "A282ED82", "C682A282", "BE8CA982",
+               "C482C182", "968BE082", "C482B582", "B082A082", "A282C882", "BE82F182", "E782A982", "49819F82"],
+    "mode8Digest": {"init": ["64FE9A8C","C2F93EA8","EF81BA5D","92C8A72F"], "out": [[1,"^","49876325"],[2,"+","54F46D7C"],[3,"^","AC7958B7"],[0,"+","1C0638BD"]]},
+    "mode9": {"decoderFactor":"1A740235","indexSubtrahend":"73","entryInitKey":"2547B39E","entryTailKey":"CB"}
+  },
   "order": ["cpz5", "cpz6"],
   "cpz6": {
     "_comment": "CMVS 3.x CPZ6 (アマツツミ cmvs32 3.26): the CPZ6/7 index and entry constants with the CPZ5 entry seed subtrahend; read from the game's cmvs32.exe, matches Shizuku-in/cmvs-rs crates/cmvs-core/src/cpz/cpz6.rs (Apache-2.0, seed + 0xA3D61785).",
