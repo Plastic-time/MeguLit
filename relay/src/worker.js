@@ -295,7 +295,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
   /* 2026-11-15 adaptation contribution packages, consented in the app (relay/src/contrib.js) */
   else if(path.startsWith('/api/contrib/'))response=await contribRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else if((path==='/dashboard'||path==='/probe/dashboard')&&request.method==='GET')response=new Response(DASHBOARD_HTML,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'public, max-age=60','x-content-type-options':'nosniff'}});
-  else if(path==='/api/seed/stats'&&request.method==='GET')response=await seedStatsGet(env,{json,fail},ctx,now);
+  else if(path==='/api/seed/stats'&&(request.method==='GET'||request.method==='HEAD')){const r=await seedStatsGet(env,{json,fail},ctx,now);response=request.method==='HEAD'?new Response(null,{status:r.status,headers:r.headers}):r;}
   else if(path==='/api/probe/stats'&&request.method==='GET')response=await probeStats(env,now,{json,fail},ctx);
   else if(path.startsWith('/api/adapters/')||path==='/api/probe'||path.startsWith('/api/probe/'))response=await adaptersRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else response=fail('NOT_FOUND',404);

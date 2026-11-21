@@ -98,6 +98,7 @@ test('GET /api/seed/stats: public aggregate for the App about page, open CORS, e
  assert.deepEqual(Object.keys(j).sort(),['confirmed','games','ok','updatedAt','versions','waiting']);
  assert.equal(j.games,4);assert.equal(j.versions,2);assert.equal(j.confirmed,2);assert.equal(j.waiting,2);assert.ok(j.updatedAt>0);
  assert.match(r.headers.get('cache-control'),/max-age=300/);
+ const hd=await handle(new Request('https://relay.test/api/seed/stats',{method:'HEAD'}),ENV,new Date(),{waitUntil:()=>{}});assert.equal(hd.status,200);assert.equal(await hd.text(),'');assert.equal(hd.headers.get('access-control-allow-origin'),'*');
  assert.equal((await handle(new Request('https://relay.test/api/seed/stats',{method:'POST'}),ENV,new Date(),{waitUntil:()=>{}})).status,404,'read only');
 });
 
