@@ -4,6 +4,8 @@
 
 `decode(buffer, {limits, classes})` returns `{value, protocol, counts, bytesRead}`. The default class allowlist contains only `renpy.ast.Say`, `Translate` and `TranslateSay`; a caller can explicitly supply up to 64 inert `renpy.ast` class identities. This is an identity allowlist, not proof that an AST class is supported by a narrative extractor
 
+Both GLOBAL and STACK_GLOBAL require the exact module token `renpy.ast` and a simple class-name token. Qualified names through a parent module are conservatively rejected; concatenated spelling alone is not an identity proof. Unicode data retains a leading U+FEFF literally, rather than treating each string as a file with a removable BOM
+
 Supported data uses protocol 2–5 binary operands, strict UTF-8 unicode, opaque byte strings, finite safe integers/floats, booleans/None, tuples, lists, dictionaries, memo references, allowlisted globals, empty-argument NEWOBJ, and dictionary/slot BUILD state. Protocol 4 frames cannot split an operand. Framed and unframed sections may coexist as permitted by pickle framing; STOP must consume the entire input. Protocol-specific operands reject under an earlier declared protocol
 
 Tuples and lists become `{kind, items}` records, dictionaries become `{kind:'dict', entries:Map}`. Python objects become `{kind:'instance', className, state:Map}`; writable state cannot replace their identity or prototype. Dictionary and merged slot-state duplicates reject. Memo aliases and cycles remain inert graph references: consumers must not recursively serialize or traverse them without their own edge/depth and semantic-cycle policy

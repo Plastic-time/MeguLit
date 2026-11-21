@@ -25,6 +25,8 @@ test('NEWOBJ and BUILD retain class identity apart from writable dictionary and 
 test('global identities remain inert and only the explicit AST allowlist is accepted',()=>{
  assert.deepEqual(read(global()).value,{kind:'global',name:'renpy.ast.Say'});
  reject(stream(Buffer.from('cos\nsystem\n')),'GLOBAL');
+ reject(stream(Buffer.from('crenpy\nast.Say\n')),'GLOBAL');
+ const qualified=Buffer.concat([b(0x80,4),string('renpy'),string('ast.Say'),b(0x93,0x2e)]);reject(qualified,'GLOBAL');
  reject(stream(global(),b(0x29,0x52)),'UNSUPPORTED_OPCODE');
  reject(stream(global(),b(0x4e,0x81)),'NEWOBJ');
  reject(stream(Buffer.from('crenpy.ast\nLabel\n')),'GLOBAL');
@@ -59,12 +61,14 @@ test('dict and instance state never overwrite duplicate keys or writable class m
  reject(stream(instance(),b(0x7d,0x4b,1,0x4e,0x73,0x62)),'STATE_KEY');
 });
 test('string encodings and protocol-specific opcodes fail closed',()=>{
+ assert.equal(read(string('\ufeffliteral')).value,'\ufeffliteral');
  reject(stream(b(0x58,1,0,0,0,0xff)),'UTF8');
  reject(stream(b(0x8c,0)),'PROTOCOL_OPCODE');reject(stream(b(0x43,0)),'PROTOCOL_OPCODE');
  reject(b(0x80,1,0x4e,0x2e),'PROTOCOL');reject(stream(b(0x82,1)),'UNSUPPORTED_OPCODE');
  const huge=Buffer.alloc(8,255);reject(Buffer.concat([b(0x80,4,0x8d),huge,b(0x2e)]),'LENGTH');
 });
 test('all work and allocation budgets can be lowered but never raised',()=>{
+ for(const options of [null,3,'invalid',[]])reject(stream(b(0x4e)),'OPTIONS',options);
  reject(stream(b(0x4e,0x30,0x4e)),'BUDGET_OPERATIONS',{limits:{operations:2}});
  reject(stream(b(0x28,0x4e,0x4e,0x74)),'BUDGET_STACK',{limits:{stack:2}});
  reject(stream(b(0x4e,0x30,0x4e)),'BUDGET_NODES',{limits:{nodes:1}});

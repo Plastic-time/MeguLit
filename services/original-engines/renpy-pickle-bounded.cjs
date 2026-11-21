@@ -6,7 +6,9 @@ const LIMITS=Object.freeze({inputBytes:4<<20,operations:200000,stack:10000,memo:
 const CLASSES=Object.freeze(['renpy.ast.Say','renpy.ast.Translate','renpy.ast.TranslateSay']);
 const MARK=Symbol('pickle mark');
 function fail(code,offset){const error=Error('RENPY_PICKLE_'+code);error.code=error.message;error.offset=offset;throw error;}
-function decode(buffer,{limits:overrides={},classes=CLASSES}={}){
+function decode(buffer,options={}){
+ if(!options||typeof options!=='object'||Array.isArray(options))fail('OPTIONS',0);
+ const {limits:overrides={},classes=CLASSES}=options;
  const limits={...LIMITS};
  if(!overrides||typeof overrides!=='object'||Array.isArray(overrides))fail('LIMITS',0);
  for(const [key,value]of Object.entries(overrides)){
@@ -23,7 +25,7 @@ function decode(buffer,{limits:overrides={},classes=CLASSES}={}){
  const uint=()=>{need(4);const n=buffer.readUInt32LE(at);at+=4;return n;};
  const large=()=>{need(8);const n=buffer.readBigUInt64LE(at);at+=8;if(n>BigInt(Number.MAX_SAFE_INTEGER))fail('LENGTH',at);return Number(n);};
  const raw=n=>{if(n>limits.itemBytes)fail('BUDGET_ITEMBYTES',at);need(n);spend('stringBytes',n);const value=buffer.subarray(at,at+n);at+=n;return value;};
- const utf8=n=>{const value=raw(n);try{return new TextDecoder('utf-8',{fatal:true}).decode(value);}catch{fail('UTF8',at);}};
+ const utf8=n=>{const value=raw(n);try{return new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(value);}catch{fail('UTF8',at);}};
  const line=()=>{const end=buffer.indexOf(10,at);if(end<at||end-at>limits.itemBytes||(frameEnd!==null&&end>=frameEnd))fail('LINE',at);const value=raw(end-at);at++;if(!value.every(n=>n>=0x21&&n<=0x7e))fail('GLOBAL',at);return value.toString('ascii');};
  const push=value=>{spend('nodes',1);if(stack.length>=limits.stack)fail('BUDGET_STACK',at);stack.push(value);};
  const pop=()=>{if(!stack.length||stack.at(-1)===MARK)fail('STACK',at);return stack.pop();};
@@ -39,7 +41,10 @@ function decode(buffer,{limits:overrides={},classes=CLASSES}={}){
  const pairs=(target,items)=>{if(items.length%2)fail('DICT',at);for(let index=0;index<items.length;index+=2)put(target,items[index],items[index+1]);};
  const remember=index=>{if(index>=limits.memo||memo.size>=limits.memo)fail('BUDGET_MEMO',at);if(memo.has(index))fail('DUPLICATE_MEMO',at);memo.set(index,peek());};
  const recall=index=>{if(!memo.has(index))fail('MEMO',at);push(memo.get(index));};
- const global=name=>{if(!allowed.has(name))fail('GLOBAL',at);return Object.freeze({kind:'global',name});};
+ const global=(module,name)=>{
+  if(module!=='renpy.ast'||typeof name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]{0,100}$/.test(name))fail('GLOBAL',at);
+  const identity=module+'.'+name;if(!allowed.has(identity))fail('GLOBAL',at);return Object.freeze({kind:'global',name:identity});
+ };
  if(byte()!==0x80)fail('PROTOCOL',0);const protocol=byte();if(protocol<2||protocol>5)fail('PROTOCOL',1);
  while(at<buffer.length){
   if(frameEnd===at)frameEnd=null;
@@ -74,8 +79,8 @@ function decode(buffer,{limits:overrides={},classes=CLASSES}={}){
    case 0x65:{const items=marked(),target=peek();if(target?.kind!=='list')fail('LIST',at);spend('edges',items.length);for(const item of items)target.items.push(item);break;}
    case 0x73:{const value=pop(),key=pop();put(peek(),key,value);break;}
    case 0x75:{const items=marked();pairs(peek(),items);break;}
-   case 0x63:push(global(line()+'.'+line()));break;
-   case 0x93:{const name=pop(),module=pop();if(typeof name!=='string'||typeof module!=='string')fail('GLOBAL',at);push(global(module+'.'+name));break;}
+   case 0x63:{const module=line(),name=line();push(global(module,name));break;}
+   case 0x93:{const name=pop(),module=pop();push(global(module,name));break;}
    case 0x81:{const args=pop(),cls=pop();if(cls?.kind!=='global'||args?.kind!=='tuple'||args.items.length)fail('NEWOBJ',at);push({kind:'instance',className:cls.name,state:null});break;}
    case 0x62:{const state=pop(),target=peek();if(target?.kind!=='instance'||target.state!==null)fail('STATE',at);let dict=state,slots=null;if(state?.kind==='tuple'){if(state.items.length!==2)fail('STATE',at);[dict,slots]=state.items;}if(![dict,slots].every(item=>item===null||item?.kind==='dict'))fail('STATE',at);const merged=new Map();for(const item of [dict,slots])if(item)for(const [key,value]of item.entries){if(typeof key!=='string'||merged.has(key))fail('STATE_KEY',at);spend('edges',2);merged.set(key,value);}target.state=merged;break;}
    case 0x71:remember(byte());break;case 0x72:remember(uint());break;case 0x94:remember(memo.size);break;
