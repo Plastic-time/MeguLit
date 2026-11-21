@@ -46,7 +46,9 @@ test('read mode chosen on purpose (self-check / text effects): the read-mode lin
  h.textEffectsHold={hookHide:true,why:'效果帧过多'};h.preferences={...h.preferences,hookHide:false};c.apply(true);
  const last=h.sent.filter(m=>'hookEmbedUnsupported' in m).at(-1);assert.equal(last.hookEmbedUnsupported,false);assert.match(last.hookCheckMessage,/已自动改为只显示译文：效果帧过多/);
  const ui=fs.readFileSync(path.join(__dirname,'..','web/reader/modules/hook-panel.js'),'utf8');
- assert.match(ui,/m\.hookEmbedUnsupported===true&&state\.textEffectsRead!==true\)captionFeedback\(\)/);
+ /* d2765cbc (owner): no automatic path switches to read mode any more (textEffectsHold is never set by GalNative), so Alt+T has no
+    automatic read state to spare from the feedback line; its read-mode hint is a separate line shown only while still hiding */
+ assert.match(ui,/if\(m\.hookEmbedUnsupported===true\)captionFeedback\(\);/);assert.match(ui,/fx\.hidden=!\(state\.readModeHint===true&&state\.hookHide===true\)/);
 });
 test('the hint is its own fixed box, never inside the sentence window (an anchored line squeezed it into a strip at the line end)',()=>{
  const ui=fs.readFileSync(path.join(__dirname,'..','web/reader/modules/hook-panel.js'),'utf8'),f=ui.slice(ui.indexOf('function captionFeedback'),ui.indexOf('function captionFeedback')+1600);
