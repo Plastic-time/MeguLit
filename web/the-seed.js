@@ -5,7 +5,7 @@
 export const SEED_URL='https://github.com/ilynthn/MeguLit/tree/main/The%20Seed';
 const W={
  zh:{name:'The Seed · 传火计划',kicker:'传火计划',line:'每部游戏一份几 KB 的差分',
-  lead:'以前想用一套通用术式适配所有游戏，修好一个，另一个的魔力回路就炸了。所以改成每个游戏、每个版本单独一份差分，这就是 The Seed',
+  lead:'每个游戏、每个版本单独一份几 KB 的差分。改一部只动这一部，已经调好的不会被别的游戏的修改带坏。',
   homage:'名字致敬《刀剑神域》里的 The Seed；共享的思路致敬当年大家在论坛上互相贴的 Textractor 钩子码',
   points:[['几 KB 纯数据','没有代码，不带路径和个人信息'],
    ['互不影响','每个游戏只动自己那份，做好的就是做好了'],
@@ -15,7 +15,7 @@ const W={
   soon:'玩的时候自动传火，修好的种子热更新送到',next:'下一步：The Seed',tag:'megulit · the seed',
   count:(g,v)=>`已种下 ${g} 部游戏、${v} 个版本`,live:(c,w)=>`已确认 ${c} 部 · 等传火 ${w} 部`,github:'去 GitHub 看看',close:'关闭',openAria:'打开 The Seed 介绍'},
  en:{name:'The Seed',kicker:'Project Spark',line:'One small diff per game',
-  lead:"We used to try fitting every game with one universal spell: fix one game and another one's magic circuit blew up. So now every game, every version gets its own diff. That is The Seed",
+  lead:'One small diff per game and per version. Fixing one game touches only that game, so a game that already works stays that way.',
   homage:'The name is a nod to The Seed in Sword Art Online; the sharing idea is a nod to the Textractor hook codes people used to post for each other on forums',
   points:[['A few KB of data','No code, no paths, no personal info'],
    ['No cross-talk','Each game only touches its own diff; what works stays working'],
@@ -25,7 +25,7 @@ const W={
   soon:'Seeds spread as you play, and fixed seeds arrive by hot update',next:'Next: The Seed',tag:'megulit · the seed',
   count:(g,v)=>`${g} games, ${v} versions planted`,live:(c,w)=>`${c} confirmed · ${w} waiting for a spark`,github:'See it on GitHub',close:'Close',openAria:'Open the introduction to The Seed'},
  ja:{name:'The Seed · 伝火計画',kicker:'伝火計画',line:'ゲームごとの数 KB の差分',
-  lead:'以前は一つの汎用の術式で全部のゲームに合わせようとして、一本直すと別の一本の魔力回路が吹き飛んでいました。そこで、ゲームごと・バージョンごとに差分を一つ持つ形にしました。これが The Seed です',
+  lead:'ゲームごと・バージョンごとに数 KB の差分を一つずつ。直すのはそのゲームだけで、調整済みのゲームがほかの修正で崩れることはありません。',
   homage:'名前は『ソードアート・オンライン』の The Seed から。共有の発想は、かつて皆が掲示板で貼り合った Textractor のフックコードへのオマージュです',
   points:[['数 KB のデータだけ','コードなし、パスも個人情報も入りません'],
    ['お互い干渉しない','各ゲームは自分の差分だけを触り、動いたものは動いたまま'],
