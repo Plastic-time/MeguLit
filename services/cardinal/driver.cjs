@@ -89,7 +89,7 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
  if(u.host==='ipc.localhost')return {status:200,body:'null',headers:{'content-type':'application/json','Tauri-Response':'ok'}};
  return 'abort';}
 (async()=>{
- const out={work,errors:[],console:[],samples:[],marks:[],hookSpawned:0,gwbSent:[],hbSent:[],events:[],control:[],choiceOffers:[],hidden:{lines:0,visible:0},krkr:{clears:0,choice:[],cfg:null}};let krkr=null,lastLine=null,browser=null;
+ const out={work,errors:[],console:[],samples:[],sourceEpisodes:[],marks:[],hookSpawned:0,gwbSent:[],hbSent:[],events:[],control:[],choiceOffers:[],hidden:{lines:0,visible:0},krkr:{clears:0,choice:[],cfg:null}};let krkr=null,lastLine=null,browser=null;
  try{
   browser=await require('./cdp.cjs').launch({viewport:scenario.viewport||{width:1920,height:1080}});
   page=browser.page;
@@ -120,14 +120,14 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
   /* scenario.attachSettleMs: the reader settles (its profile, the hide route) after the attach before the first line, as on the player's
      PC where the reader is up long before the game says anything */
   let settled=!scenario.attachSettleMs;
-  for(const step of scenario.steps){
+  for(const [stepIndex,step] of scenario.steps.entries()){
    if(!settled&&step.hb?.type==='hookSource'){settled=true;clock+=scenario.attachSettleMs;}
    if(step.t!=null){if(prevT!=null){const gap=Math.min(maxGap,Math.max(0,step.t-prevT));clock+=gap;}prevT=step.t;const wait=t0+clock-Date.now();if(wait>0)await sleep(wait);late.steps.push(Math.max(0,Date.now()-(t0+clock)));}
    if(step.gwb){if(models&&step.gwb.type==='bound'&&!krkr&&fs.existsSync(path.join(REPO,'native','krkrtext','script.inc')))try{const {KrkrModel}=require(path.join(REPO,'tools','reader-replay','krkr-model.cjs'));krkr=new KrkrModel({pid:step.gwb.gameProcessId,tmp:process.env.TEMP});}catch(e){out.krkr.error=String(e.message||e);krkr=false;}
     /* MODEL (labelled): the game clears its message layer at the click ([cm]); the script's own clearSent reports it when the control file says #clearline */
     if(step.gwb.type==='readerInput'&&krkr&&lastLine&&step.pageClear!==false){krkr.tick();const n=krkr.reports.length;krkr.st.clearSent(lastLine);for(const r of krkr.reports.slice(n))hb.line({type:'hookChars',line:r});out.krkr.clears+=krkr.reports.length-n;}
     gwb.line(step.gwb);}
-   if(step.hb){hb.line(step.hb);if(step.hb.type==='hookChars'){const m=/ line=(\d+) hidden=\d sw=(\d+) sh=(\d+) .* n=(\d+) /.exec(step.hb.line);if(m&&!/ role=(?!line)/.test(step.hb.line)&&+m[4]>0)lastLine={line:+m[1],sentLine:+m[1],sw:+m[2],sh:+m[3]};}}
+   if(step.hb){if(step.hb.type==='hookSource')out.sourceEpisodes.push({step:stepIndex,line:step.line,at:Date.now()-t0});hb.line(step.hb);if(step.hb.type==='hookChars'){const m=/ line=(\d+) hidden=\d sw=(\d+) sh=(\d+) .* n=(\d+) /.exec(step.hb.line);if(m&&!/ role=(?!line)/.test(step.hb.line)&&+m[4]>0)lastLine={line:+m[1],sentLine:+m[1],sw:+m[2],sh:+m[3]};}}
    if(step.choicePage&&krkr){krkr.tick();out.krkr.choice.push({mark:step.choicePage,frame:step.frame||'選択肢',ui:krkr.st.uiDraw({parent:{frameGraphic:step.frame||'選択肢',height:400}}),cfg:JSON.parse(JSON.stringify(krkr.st.cfg,(k,v)=>v instanceof RegExp?String(v):v))});}
    if(step.page)await page.evaluate(typeof step.page==="string"?"("+step.page+")()":step.page).catch(e=>out.errors.push('step page: '+e.message));
    if(step.mark){await sleep(step.settle??150);const s=await page.evaluate(()=>window.__replayProbe()).catch(e=>({error:e.message}));s.mark=step.mark;s.at=Date.now()-t0;s.hitRegions=hits();out.samples.push(s);}

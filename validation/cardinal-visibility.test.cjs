@@ -7,7 +7,7 @@ const fixture=require('./fixtures/cardinal/fata-live-visibility-20261121.json');
 test('real faulty DOM: blanking all Japanese cannot remove the penalty and raise its score',()=>{
  const observed=S.score(fixture.run,D.cardinal);
  assert.equal(observed.lines,3);
- assert.equal(observed.scores.row,0,'the actual baseline already failed rows');
+ assert.ok(observed.scores.row<1,'the actual baseline still fails rows after episode isolation');
  assert.equal(observed.scores.leak,0,'the actual baseline already entered read mode');
  assert.ok(fixture.beforeFix.blank.total>fixture.beforeFix.baseline.total,'recorded pre-fix regression');
  for(const clearCn of [false,true])for(const clearHits of [false,true]){

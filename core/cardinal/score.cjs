@@ -16,6 +16,7 @@ const r3=x=>Math.round(Math.max(0,Math.min(1,x))*1000)/1000;
 function score(run,rules={}){const t={...C.T0,...(rules.thresholds||{})},w=rules.weights||{};
  const pl=C.perLine(run,t),ls=pl.lines,n=ls.length,expected=C.expectedLines(run,t).length;
  const sourceCoverage={expected,observed:n,rate:expected?Math.min(1,n/expected):0};
+ const contentCoverage={expected,complete:pl.complete.lines,rate:expected?Math.min(1,pl.complete.lines/expected):0};
  /* Replay providers are synthetic; session pairing comes only from the live reader's actual translations. */
  const pairs=run.livePairing?.source==='live'?run.livePairing:pl.pairs;
  const wh=C.white(run),fl=C.flashes(run),cl=C.clears(run,t,ls),ch=C.choices(run,t),lk=C.leaks(run,t,ls);
@@ -25,7 +26,7 @@ function score(run,rules={}){const t={...C.T0,...(rules.thresholds||{})},w=rules
  const s={
   row:sourceCoverage.rate*lineRate(ls.filter(l=>l.rowBad).length),
   stable:lineRate(ls.filter(l=>l.stableBad).length),
-  clean:sourceCoverage.rate*(pl.visibility.expected?pl.visibility.shown/pl.visibility.expected:1)*(wh.n?1-wh.badN/wh.n:1)*(n?1-Math.min(1,(fl.comebacks+ownerLines)/n):fl.comebacks+ownerLines?0:1),
+  clean:contentCoverage.rate*(pl.visibility.expected?pl.visibility.shown/pl.visibility.expected:1)*(wh.n?1-wh.badN/wh.n:1)*(n?1-Math.min(1,(fl.comebacks+ownerLines)/n):fl.comebacks+ownerLines?0:1),
   clear:cl.n?1-cl.stale/cl.n:1,
   choice:ch.n?ch.ok/ch.n:1,
   pair:pairs.shown?pairs.paired/pairs.shown:n?0:1,
@@ -33,10 +34,10 @@ function score(run,rules={}){const t={...C.T0,...(rules.thresholds||{})},w=rules
  const scores={};for(const k of KEYS)scores[k]=r3(s[k]);
  let sum=0,wsum=0;for(const k of KEYS){const wk=Number(w[k]);if(!applies[k]||!(wk>0))continue;sum+=wk*scores[k];wsum+=wk;}
  /* An absent row cannot earn cleanliness or a stable/clear bonus from having nothing to inspect. */
- const visibility={...pl.visibility,rate:r3(Math.min(sourceCoverage.rate,pl.visibility.expected?pl.visibility.shown/pl.visibility.expected:1))};
+ const visibility={...pl.visibility,rate:r3(Math.min(sourceCoverage.rate,contentCoverage.rate,pl.visibility.expected?pl.visibility.shown/pl.visibility.expected:1))};
  const total=wsum?r3(Math.min(sum/wsum,visibility.rate)):0;
  const below=KEYS.filter(k=>applies[k]&&Number.isFinite(rules.floor?.[k])&&scores[k]<rules.floor[k]);
- return {scores,total,lines:n,applies,below,detail:{pair:{...pairs},sourceCoverage,visibility,row:pl.row.slice(0,6),stable:pl.stable.slice(0,6),owner:pl.owner.slice(0,6),dup:pl.dup.slice(0,6),white:wh.bad.slice(0,6),flash:fl.bad.slice(0,6),clear:cl.bad,choice:ch.bad,leak:lk.bad}};}
+ return {scores,total,lines:n,applies,below,detail:{pair:{...pairs},timeline:{source:Array.isArray(run.o.sourceEpisodes)?'measured-delivery':'legacy-source-transitions',reliable:Array.isArray(run.o.sourceEpisodes)},sourceCoverage,contentCoverage,visibility,row:pl.row.slice(0,6),stable:pl.stable.slice(0,6),owner:pl.owner.slice(0,6),dup:pl.dup.slice(0,6),white:wh.bad.slice(0,6),flash:fl.bad.slice(0,6),clear:cl.bad,choice:ch.bad,leak:lk.bad}};}
 /* several runs of one game: the scores weighted by each run's lines */
 function combine(results,rules={}){const w=rules.weights||{};const tot=results.reduce((a,r)=>a+Math.max(1,r.lines),0)||1;const scores={},applies={};
  for(const k of KEYS){const rs=results.filter(r=>r.applies[k]);applies[k]=rs.length>0;const d=rs.reduce((a,r)=>a+Math.max(1,r.lines),0);scores[k]=rs.length?r3(rs.reduce((a,r)=>a+r.scores[k]*Math.max(1,r.lines),0)/d):1;}

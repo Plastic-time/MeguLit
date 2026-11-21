@@ -26,18 +26,28 @@ const fed=run=>(run.steps||[]).filter(st=>st.hb?.type==='hookSource');
    A line counts once it is the reader's line for lineMs; lines of a skip burst (the next record within burstMs, Ctrl held) only pass by */
 function expectedLines(run,t){t=opts(t);const steps=fed(run).filter(st=>st.line!=null);
  return steps.filter((st,i)=>norm(st.text)&&!(steps[i+1]&&steps[i+1].t-st.t<t.burstMs)&&!(i>0&&st.t-steps[i-1].t<t.burstMs));}
-function lines(run,t){t=opts(t);const o=run.o,out=expectedLines(run,t).map(st=>({line:st.line,text:st.text,t:st.t}));
- const all=(o.samples||[]).filter(s=>!menuOpen(s));
- for(const l of out){let run2=[];for(let i=0;i<all.length;i++){if(norm(all[i].hookSource)&&norm(all[i].hookSource)===norm(l.text)){run2.push(all[i]);}else if(run2.length){if(run2.at(-1).at-run2[0].at>=t.lineMs)break;run2=[];}}
-  l.samples=run2.length&&run2.at(-1).at-run2[0].at>=t.lineMs?run2:[];}
- return out.filter(l=>l.samples.length);}
+function lines(run,t){t=opts(t);const o=run.o,steps=fed(run).filter(st=>st.line!=null),episodes=o.sourceEpisodes;
+ const timeOf=st=>Array.isArray(episodes)?episodes.find(e=>e.line===st.line&&(e.step===undefined||e.step===(run.steps||[]).indexOf(st)))?.at:st.t;
+ const all=(o.samples||[]).filter(s=>!menuOpen(s)),out=[];
+ // Old observations have no replay delivery clock. Consume each observed source transition at most once.
+ if(!Array.isArray(episodes)){const groups=[];for(const sample of all){const key=norm(sample.hookSource);if(groups.at(-1)?.key!==key)groups.push({key,samples:[]});groups.at(-1).samples.push(sample);}let cursor=0;
+  for(const st of expectedLines(run,t)){const at=groups.findIndex((g,i)=>i>=cursor&&g.key===norm(st.text));if(at<0)continue;cursor=at+1;const samples=groups[at].samples;
+   if(samples.at(-1).at-samples[0].at>=t.lineMs)out.push({line:st.line,text:st.text,t:st.t,from:samples[0].at,to:samples.at(-1).at,samples});}return out;}
+ for(const st of expectedLines(run,t)){const index=steps.indexOf(st),next=steps[index+1],start=timeOf(st),end=next?timeOf(next):Infinity;
+  const l={line:st.line,text:st.text,t:st.t,from:start,to:end,samples:[]};if(!Number.isFinite(start)||next&&!Number.isFinite(end))continue;
+  let run2=[];for(const sample of all){if(sample.at<start||sample.at>=end)continue;
+   if(norm(sample.hookSource)&&norm(sample.hookSource)===norm(l.text))run2.push(sample);
+   else if(run2.length){if(run2.at(-1).at-run2[0].at>=t.lineMs)break;run2=[];}}
+  if(run2.length&&run2.at(-1).at-run2[0].at>=t.lineMs){l.samples=run2;out.push(l);}}
+ return out;}
 
 /* per line: 1 the Japanese row is there and clickable, 2 it keeps its place (the Chinese under it, the row's y does not move),
    9 one render owner, and the pairing (a Chinese row while the Japanese is shown) */
-function perLine(run,t){t=opts(t);const name=run.name||'run',row=[],stable=[],owner=[],dup=[],pairs={shown:0,paired:0},visibility={shown:0,expected:0};const ls=lines(run,t);
+function perLine(run,t){t=opts(t);const name=run.name||'run',row=[],stable=[],owner=[],dup=[],pairs={shown:0,paired:0},visibility={shown:0,expected:0},complete={lines:0};const ls=lines(run,t);
  for(const l of ls){const want=norm(l.text);if(!want)continue;let rowBad=false,stableBad=false;
   /* while options are on the reader the line gives way to them (not a missing row) */
-  const settled=l.samples.filter(s=>s.at-l.samples[0].at>=t.settleMs&&!(s.choices||[]).some(c=>c.shown));const shown=settled.filter(s=>norm(lineGlyphs(s).map(g=>g.text).join('')).length>=Math.min(want.length,2));
+  const settled=l.samples.filter(s=>s.at-l.samples[0].at>=t.settleMs&&!(s.choices||[]).some(c=>c.shown));const drawn=s=>norm(lineGlyphs(s).map(g=>g.text).join(''));const shown=settled.filter(s=>{const text=drawn(s);return text.length>=Math.min(want.length,2)&&want.startsWith(text);});
+  l.complete=settled.some(s=>drawn(s)===want);if(l.complete)complete.lines++;else if(settled.length){row.push(name+' line '+l.line+' never completes the expected Japanese text');rowBad=true;}
   visibility.expected+=settled.length;visibility.shown+=shown.length;
   if(settled.length&&shown.length<settled.length*t.shownRate){row.push(name+' line '+l.line+' 「'+l.text+'」 Japanese shown in '+shown.length+'/'+settled.length+' samples');rowBad=true;}
   for(const s of shown){const g=lineGlyphs(s);const out=g.filter(x=>!inside(x,s.hitRegions)||x.pointer==='none');if(out.length){row.push(name+' line '+l.line+' not clickable: '+out.map(x=>x.text).join(''));rowBad=true;break;}}
@@ -45,10 +55,10 @@ function perLine(run,t){t=opts(t);const name=run.name||'run',row=[],stable=[],ow
   const ys=[...new Set(shown.map(s=>Math.round(Math.min(...lineGlyphs(s).map(g=>g.rect.y)))))];if(ys.length>1&&Math.max(...ys)-Math.min(...ys)>t.stablePx){stable.push(name+' line '+l.line+' Japanese y moved: '+ys.join(','));stableBad=true;}
   for(const s of settled){const kinds=new Set(jpGlyphs(s).filter(g=>norm(g.text)&&want.includes(norm(g.text))).map(g=>g.kind));if(kinds.size>1){owner.push(name+' line '+l.line+' drawn by '+[...kinds].join('+'));break;}}
   /* drawn twice (owner: 禁止复读): the line's text appears more than once on the reader's rows */
-  if(want.length>=2)for(const s of shown){const all=norm(lineGlyphs(s).map(g=>g.text).join(''));if(all.split(want).length-1>1){dup.push(name+' line '+l.line+' drawn twice: '+all.slice(0,30));l.dupBad=true;break;}}
+  if(want.length>=2)for(const s of settled){const all=norm(lineGlyphs(s).map(g=>g.text).join(''));if(all.split(want).length-1>1){dup.push(name+' line '+l.line+' drawn twice: '+all.slice(0,30));l.dupBad=true;break;}}
   if(shown.length){pairs.shown++;if(withCn.length)pairs.paired++;}
   l.rowBad=rowBad;l.stableBad=stableBad;}
- return {lines:ls,row,stable,owner,dup,pairs,visibility};}
+ return {lines:ls,row,stable,owner,dup,pairs,visibility,complete};}
 
 /* 10 (owner 2026-11-21): no Japanese that cannot be clicked and read (the placement fallback layer passes clicks to the game) or is not
    in the line's colour; -> bad sample messages (all of them counted, the first ones kept) */

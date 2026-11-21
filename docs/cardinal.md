@@ -25,7 +25,7 @@ Cardinal 回答一个问题：这份种子在玩家机器上到底好不好。�
 
 - 游戏会话结束（`gameClosed`）：一定跑
 - 自动校准完成（self-check-live 第一个窗口记完校准）、或者已校准的游戏自检完成第一个窗口：最多每 `cardinal.minIntervalMin` 分钟一次
-- 一次只跑一个，后来的排队（只留最新一个）；回放进程里不会再触发 Cardinal（`MEGULIT_CARDINAL_REPLAY=1`）
+- 一次只跑一个，最多等待 8 个不同游戏；同 root/版本 SHA 的等待任务只保留最新一份，其他游戏按 FIFO 处理。满队列返回 `deferred / queue full` 并记 trace，不假称已排队，后续有效 kick 可重试。回放进程里不会再触发 Cardinal（`MEGULIT_CARDINAL_REPLAY=1`）
 - 少于 10 句不跑
 - 机器忙（回放每步开始比预定晚，95 分位超过 `cardinal.maxLagMs`，默认 80ms）：这次量的是机器不是种子，只存本机、标 `unreliable`、不上传，以会话结束那次为准。实测单跑 p95 约 16ms，5 个回放同时跑 49–184ms
 
@@ -49,6 +49,10 @@ Cardinal 回答一个问题：这份种子在玩家机器上到底好不好。�
 
 修订 3 另按桥已送出的非跳读日文源句计算 `detail.sourceCoverage`。源句未在 DOM 中持续出现、hookSource 消失或采样全丢，都留在预期分母；总分还受已观察源句比例限制。没有观察到正文时总分为 0，不能再把缺失数据当成全部合格
 
+修订 3 同时核对正文的内容和顺序。打字过程可显示正确前缀，但这一源句的稳定样本中必须出现完整正文，两个字只能完成本来就两个字的句子。只看 line 字形，忽略中文行、姓名旁路、选项和 ruby 读音。probe 记录字形节点自己的文本，避免把 ruby 子节点读音混进底字，正文上限 4000 字符与 native source 上限一致
+
+新 driver 为每条 hookSource 写 `sourceEpisodes`，含输入 step/line 和实际投递时的 elapsed at，评分只用本次投递至下次投递之间的 DOM。输入 epoch 时间不与压缩回放时钟混用。旧观察没有投递映射时，只能按 hookSource 跃迁顺序单次消费样本组，标 `detail.timeline.reliable=false`；服务只存本机，不上传这种兼容评估。重复台词没有新的样本组就缺测，不能复用上一轮
+
 规则全在 profile 里：`core/profiles/defaults.cjs` 的 `cardinal.*`（rev、lines、maxGapMs、sampleMs、minIntervalMin、weights.*、thresholds.*），值域登记在 `core/profiles/domains.cjs`，所以官方签名差分能按游戏调权重和阈值，热更新，不改代码。改了规则就把 `cardinal.rev` 加一（记录里的 `cardinalRev`）。这里只有数字，没有任何用户偏好（字体、颜色、字号、位置）。
 
 ## 上传（services/auto-profile-feed.cjs reportScore）
@@ -62,7 +66,7 @@ Cardinal 回答一个问题：这份种子在玩家机器上到底好不好。�
 
 - 开关：和校准上传同一个（共享适配 `sharedAdaptation` + `autoProfileShare`），关了就只存本机
 - 没送到的分数保留 `sent:false` 和本机 `upload.state/status`，跟着下一次校准 `report()` 重试；送达后才标 `sent:true`
-- 回放报错但仍有部分样本，标 `unreliable`、只存本机；完全没 DOM 样本或驱动拒绝，记本机 `failed.errors`，不上传。队列继续处理下一次会话，`idle()` 等当前及排队的最新作业全部完成
+- 回放报错但仍有部分样本，标 `unreliable`、只存本机；完全没 DOM 样本或驱动拒绝，记本机 `failed.errors`，不上传。队列继续处理下一次会话，`idle()` 等当前及所有等待作业完成
 - 不带任何身份：没有用户名、路径、机器、Steam、IP 之类的字段
 - source：official = 我们的差分（relay 官方或内置 The Seed）；auto = 玩家共识差分、本机校准或本机降级；none = 什么差分都没有。seedRev = 生效差分的版本层 `v<rev>` / 游戏层 `g<rev>`（如 `v1.g6`），只有本机校准时为 null
 

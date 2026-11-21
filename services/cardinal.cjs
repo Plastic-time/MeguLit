@@ -14,7 +14,7 @@ const KEY=/^[0-9a-f]{64}$/;
 const MIN_LINES=10;
 const dir=root=>path.join(root,'data','The Seed','cardinal');
 const fileOf=(root,key)=>path.join(dir(root),key+'.json');
-let running=null,pending=null;const lastRun=new Map();
+let running=null,pending=[];const QUEUE_MAX=8,lastRun=new Map();
 function trace(reader,line){try{reader?.gal?.hooks?.trace?.(line);}catch{}}
 function load(root,key){if(!KEY.test(String(key||'')))return null;try{return JSON.parse(fs.readFileSync(fileOf(root,key),'utf8'));}catch{return null;}}
 function save(root,key,value){fs.mkdirSync(dir(root),{recursive:true});const f=fileOf(root,key),tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(value,null,1));fs.renameSync(tmp,f);}
@@ -43,12 +43,15 @@ function kick(reader,why,{now=Date.now(),replay=null,fetcher=undefined}={}){try{
  if(why!=='session-end'&&now-(lastRun.get(key)||0)<rules.minIntervalMin*60000)return {state:'skipped',why:'ran lately'};
  const snap=Tape.snapshot(rules.lines);if(snap.lines<MIN_LINES)return {state:'skipped',why:'too few lines ('+snap.lines+')'};
  const job={root,key,why,rules,pairing:snap.pairing,rows:snap.rows,lines:snap.lines,game:gameOf(reader,key),...sourceOf(s,profile),reader,replay,fetcher};
+ if(running){const at=pending.findIndex(x=>x.root===root&&x.key===key);
+  if(at>=0){pending[at]=job;lastRun.set(key,now);return {state:'queued',replaced:true};}
+  if(pending.length>=QUEUE_MAX){trace(reader,'cardinal queue full key='+key.slice(0,8)+' deferred: retry on next kick');return {state:'deferred',why:'queue full'};}
+  pending.push(job);lastRun.set(key,now);return {state:'queued'};}
  lastRun.set(key,now);
- if(running){pending=job;return {state:'queued'};}
  running=drain(job);
  return {state:'started'};}catch(e){return {state:'failed',why:String(e?.message||e)};}}
 async function drain(job){try{while(job){try{await go(job);}catch(e){const errors=[String(e?.message||e).slice(0,1200)];trace(job.reader,'cardinal failed key='+job.key.slice(0,8)+' '+errors[0]);try{save(job.root,job.key,{...(load(job.root,job.key)||{}),failed:{at:new Date().toISOString(),why:job.why,errors}});}catch{}}
- job=pending;pending=null;}}finally{running=null;}}
+ job=pending.shift()||null;}}finally{running=null;}}
 async function go(job){const {root,key,rules,reader}=job;const started=Date.now();
  trace(reader,'cardinal replay key='+key.slice(0,8)+' why='+job.why+' lines='+job.lines);
  const steps=fromTape(job.rows,job.game);
@@ -58,13 +61,13 @@ async function go(job){const {root,key,rules,reader}=job;const started=Date.now(
  if(errors.length&&!(o.samples||[]).length){trace(reader,'cardinal failed key='+key.slice(0,8)+' '+String(errors[0]).slice(0,200));save(root,key,{...(load(root,key)||{}),failed:{at:new Date().toISOString(),why:job.why,errors}});return null;}
  const result=Score.score({name:'session',steps,o,livePairing:job.pairing},rules);
  const rec=Score.record({key,seedRev:job.seedRev,source:job.source,app:appVersion(root),result,cardinalRev:rules.rev});
- /* a replay the PC could not keep up with (stepP95 over cardinal.maxLagMs) measured the PC, not the seed: kept here, never uploaded */
- const lag=o.lag||null,unreliable=errors.length>0||!!(lag&&lag.stepP95>(rules.maxLagMs??80));
+ /* Errors, a missing measured delivery clock, or excessive replay lag cannot supply a reliable relay vote. */
+ const lag=o.lag||null,unreliable=!result.detail.timeline.reliable||errors.length>0||!!(lag&&lag.stepP95>(rules.maxLagMs??80));
  const doc={record:rec,why:job.why,applies:result.applies,below:result.below,detail:result.detail,ms:Date.now()-started,lag,unreliable,errors,sent:false};
  try{save(root,key,doc);}catch{}
- trace(reader,'cardinal scored key='+key.slice(0,8)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' ')+(lag?' lagP95='+lag.stepP95:'')+(unreliable?(errors.length?' unreliable (replay errors): not uploaded':' unreliable (busy PC): not uploaded'):''));
+ trace(reader,'cardinal scored key='+key.slice(0,8)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' ')+(lag?' lagP95='+lag.stepP95:'')+(unreliable?(!result.detail.timeline.reliable?' unreliable (missing delivery clock): not uploaded':errors.length?' unreliable (replay errors): not uploaded':' unreliable (busy PC): not uploaded'):''));
  if(unreliable)return doc;
  try{const r=await require('./auto-profile-feed.cjs').reportScore(root,rec,job.fetcher?{fetcher:job.fetcher}:{});doc.upload={state:r.state,...(r.status?{status:r.status}:{})};if(r.state==='sent')doc.sent=true;save(root,key,doc);}catch{}
  return doc;}
 const idle=()=>running||Promise.resolve();
-module.exports={kick,load,fileOf,dir,sourceOf,idle,_reset(){running=null;pending=null;lastRun.clear();}};
+module.exports={kick,load,fileOf,dir,sourceOf,idle,_reset(){running=null;pending=[];lastRun.clear();}};

@@ -21,7 +21,7 @@ function run({lines=[],extra=[],hbSent=[],hookEvents=[],offers=[],choicesShown=t
   for(const o of l.also||[])glyphs.push({text:o.text,kind:'line',rect:{x:100,y:o.y,w:300,h:30},color:[255,255,255],pointer:'auto'});
   const s={at,mark:'tick',watch:true,body:'',hookSource:l.text,glyphs,cn:l.noCn?[]:[{text:'中文',rect:{x:100,y:y+40,w:300,h:30}}],choices:[],hitRegions:[{x:0,y:0,width:1920,height:1080}]};
   for(const o of offers)if(choicesShown&&at>=o.at&&at<o.at+3000)s.choices.push({text:'選択',shown:true,rect:{x:500,y:300,w:200,h:40}});samples.push(s);}});
- return {name:'r',steps,o:{t0:0,samples,hbSent,hookEvents,choiceOffers:offers,hidden:hidden||{lines:0,visible:0},krkr:{choice:[]}}};}
+ return {name:'r',steps,o:{t0:0,samples,sourceEpisodes:lines.map((l,i)=>({line:i+1,at:l.at})),hbSent,hookEvents,choiceOffers:offers,hidden:hidden||{lines:0,visible:0},krkr:{choice:[]}}};}
 const clean3=()=>[{text:'あいうえお',at:0},{text:'かきくけこ',at:2000},{text:'さしすせそ',at:4000}];
 
 test('a clean session scores 1 on every score that applies; nothing to look at leaves the total',()=>{

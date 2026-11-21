@@ -22,6 +22,29 @@ test('real faulty DOM: missing source state or all probe samples never becomes a
   assert.ok(S.score(run,D.cardinal).total<=baseline.total,'dropping observed line '+line.line);
  }
 });
+test('real DOM: wrong Japanese and a two-glyph fragment cannot complete the expected line',()=>{
+ const base=C.perLine(fixture.run),baseline=S.score(fixture.run,D.cardinal);
+ for(const variant of ['wrong-glyphs','two-glyph-prefix']){
+  const run=structuredClone(fixture.run);
+  for(const s of run.o.samples){let n=0;if(variant==='wrong-glyphs')for(const g of s.glyphs||[])if(g.kind==='line')g.text='違';
+   if(variant==='two-glyph-prefix')s.glyphs=s.glyphs.filter(g=>g.kind!=='line'||n++<2);}
+  const result=S.score(run,D.cardinal);assert.equal(result.detail.contentCoverage.complete,0);assert.equal(result.total,0,variant);assert.ok(result.total<=baseline.total);
+ }
+ const typed=structuredClone(fixture.run);
+ for(const line of C.lines(typed)){const last=line.samples.filter(s=>C.norm(C.lineGlyphs(s).map(g=>g.text).join(''))===C.norm(line.text)).at(-1);if(!last)continue;for(const s of line.samples.filter(s=>s.at<last.at)){let n=0;s.glyphs=s.glyphs.filter(g=>g.kind!=='line'||n++<2);}}
+ assert.equal(C.perLine(typed).complete.lines,base.complete.lines,'earlier true prefixes may grow into the unchanged final real text');
+});
+test('a later repeated source with no new DOM cannot reuse the earlier source episode',()=>{
+ const run=structuredClone(fixture.run),baseline=S.score(run,D.cardinal),line=C.lines(run)[0],source=run.steps.find(s=>s.line===line.line&&s.hb?.type==='hookSource');
+ run.steps.push({...structuredClone(source),line:9999,t:Math.max(...run.steps.map(s=>s.t),...run.o.samples.map(s=>s.at))+3000});
+ const result=S.score(run,D.cardinal);assert.equal(result.lines,baseline.lines);assert.ok(result.total<=baseline.total);
+ assert.deepEqual(result.detail.timeline,{source:'legacy-source-transitions',reliable:false});
+});
+test('measured source delivery windows use replay elapsed time rather than input epoch time',()=>{
+ const run={steps:[{t:1795253000000,line:1,text:'本文',hb:{type:'hookSource',text:'本文'}},{t:1795253009000,line:2,text:'本文',hb:{type:'hookSource',text:'本文'}}],o:{sourceEpisodes:[{step:0,line:1,at:500},{step:1,line:2,at:2500}],samples:[500,900,1300,1700].map(at=>({at,hookSource:'本文',body:'',glyphs:[{text:'本文',kind:'line',rect:{x:0,y:0,w:20,h:10},pointer:'auto'}],hitRegions:[{x:0,y:0,width:20,height:10}]}))}};
+ assert.deepEqual(C.lines(run).map(x=>x.line),[1],'the second identical source has no samples in its own measured window');
+ assert.equal(C.perLine(run).complete.lines,1,'a genuinely complete two-character sentence is valid');
+});
 function setup(share=false){
  const root=fs.mkdtempSync(path.join(process.env.MEGULIT_TMP||os.tmpdir(),'cardinal-reliability-'));
  fs.mkdirSync(path.join(root,'data','config'),{recursive:true});fs.writeFileSync(path.join(root,'data','config','library.json'),JSON.stringify({sharedAdaptation:share}));
@@ -29,10 +52,12 @@ function setup(share=false){
  Tape.record('gwb',{type:'bound',gameProcessId:62,gameStarted:'6'},t);
  for(let i=0;i<12;i++)Tape.record('hb',{type:'hookSource',text:'実記録の台詞'+i},t+=1500);
  const reader={root,gameExe:'C:/Games/test.exe',gal:{state:{},hooks:{trace(){}}}};
- const original=Live.current;Live.current=()=>({reader,key:SHA,from:'',profile:Profiles.profileFor({})});
- return {root,reader,close(){Live.current=original;Jobs._reset();Tape.clear();}};
+ const traces=[];reader.gal.hooks.trace=line=>traces.push(line);
+ const original=Live.current;Live.current=()=>({reader,key:reader.cardinalKey||SHA,from:'',profile:Profiles.profileFor({})});
+ return {root,reader,traces,close(){Live.current=original;Jobs._reset();Tape.clear();}};
 }
-const observed=()=>structuredClone(fixture.run.o);
+// Job-control tests inject the replay boundary only; an empty delivery list supplies no positive alignment evidence.
+const observed=()=>({...structuredClone(fixture.run.o),sourceEpisodes:[]});
 test('the queue drains a third job scheduled during its second replay, and idle waits for all three',async()=>{
  const h=setup();let releaseA,releaseB,startedB;const waitA=new Promise(r=>releaseA=r),waitB=new Promise(r=>releaseB=r),bStarted=new Promise(r=>startedB=r),calls=[];
  try{
@@ -42,6 +67,20 @@ test('the queue drains a third job scheduled during its second replay, and idle 
   assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('c');return observed();}}).state,'queued');
   releaseB();await Jobs.idle();assert.deepEqual(calls,['a','b','c']);
  }finally{releaseA();releaseB();h.close();}
+});
+test('different games keep FIFO order, same-game waiting work coalesces, and queue overflow is explicit',async()=>{
+ const h=setup(),calls=[];let release;const blocked=new Promise(r=>release=r);
+ const key=i=>i.toString(16).padStart(64,'0');
+ try{
+  Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('active');await blocked;return observed();}});
+  h.reader.cardinalKey=key(1);assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('obsolete');return observed();}}).state,'queued');
+  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('latest-1');return observed();}}).replaced,true);
+  for(let i=2;i<=8;i++){h.reader.cardinalKey=key(i);assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('game-'+i);return observed();}}).state,'queued');}
+  h.reader.cardinalKey=key(9);assert.deepEqual(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('overflow');return observed();}}),{state:'deferred',why:'queue full'});
+  assert.ok(h.traces.some(s=>/queue full.*deferred/.test(s)));release();await Jobs.idle();
+  assert.deepEqual(calls,['active','latest-1',...Array.from({length:7},(_,i)=>'game-'+(i+2))]);
+  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('retried-9');return observed();}}).state,'started');await Jobs.idle();assert.equal(calls.at(-1),'retried-9');
+ }finally{release();h.close();}
 });
 test('a rejected replay is recorded as a failure and does not strand the next run',async()=>{
  const h=setup();try{
