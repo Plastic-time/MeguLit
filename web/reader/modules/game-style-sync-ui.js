@@ -99,13 +99,13 @@
   const ax=p.x*cw/100+(inkLeft-rx)*dpr,ay=p.y*ch/100+(inkTop-ry)*dpr,dx=target.inkLeft-ax,dy=target.inkTop-ay;
   if(Math.abs(dx)<2&&Math.abs(dy)<2)return true;
   b.applyGalPreferences({x:clamp(p.x+dx*100/cw,0,95),y:clamp(p.y+dy*100/ch,0,95)},{preview:true});return 'again';}
- function runCorrection(target,done){let tries=0,passes=0;clearInterval(correctionTimer);const timer=setInterval(()=>{const r=correct(target);if(r===true||r==='again'&&++passes>=3||++tries>=6){
-  clearInterval(timer);done?.(r===true);}},120);correctionTimer=timer;return timer;}
+ function runCorrection(target,done){let tries=0,passes=0;(window.__megulitReaderIntervals?.clear||clearInterval)(correctionTimer);const timer=(window.__megulitReaderIntervals?.set||setInterval)(()=>{const r=correct(target);if(r===true||r==='again'&&++passes>=3||++tries>=6){
+  (window.__megulitReaderIntervals?.clear||clearInterval)(timer);done?.(r===true);}},120);correctionTimer=timer;return timer;}
 
  /* the one way a measured first ink (client device px: inkLeft/inkTop, client width/height) lands on the reader: box x/y, or the
     game's anchored offset while the line sits on engine places; resolves true once our first ink is within 2 px */
  b.alignToGameInk=target=>new Promise(done=>runCorrection(target,done));
- function stopMeasurement(){measurementSerial++;clearTimeout(correctionTimer);clearInterval(correctionTimer);aligning=false;document.body.classList.remove('tome-style-probing');
+ function stopMeasurement(){measurementSerial++;clearTimeout(correctionTimer);(window.__megulitReaderIntervals?.clear||clearInterval)(correctionTimer);aligning=false;document.body.classList.remove('tome-style-probing');
   send({type:'gameStyleCancel',key:session.key,owner});}
  b.gameProfileKey=()=>session.key;
  b.gameStyleCommitReady=()=>!saving&&!aligning;
@@ -173,7 +173,7 @@
   if(m.gameStyleState==='profile')setTimeout(()=>firstRunTip(m),0);
   if(m.gameStyleState==='profile'){
    const changed=(m.gameStyleKey||'')!==session.key||!!m.gameStyleIdentity&&m.gameStyleIdentity!==gameIdentity;
-   if(changed||!dirty()&&!saving){if(changed){measurementSerial++;clearInterval(correctionTimer);saving=null;aligning=false;gameIdentity=m.gameStyleIdentity||'';
+   if(changed||!dirty()&&!saving){if(changed){measurementSerial++;(window.__megulitReaderIntervals?.clear||clearInterval)(correctionTimer);saving=null;aligning=false;gameIdentity=m.gameStyleIdentity||'';
     window.__tomeTextPosition?.resetSession?.(gameIdentity);}
     const p={...pick(b.galPreferences()),...(tools.followFont?tools.followFont(m.gameStyleEffectivePrefs):m.gameStyleEffectivePrefs)};session.load(m.gameStyleKey,m.gameStyleGameName,p,m.gameStylePositionMap,m.gameStyleSavedAt||Math.max(m.gameStyleTextSavedAt||0,
      m.gameStylePositionSavedAt||0),m.gameStyleHistory||[]);apply(p,m.gameStylePositionMap||null,false);message='';}
@@ -187,7 +187,7 @@
   last={...last,...m};paint();
  };
  const oldStatus=b.galStatus;b.galStatus=m=>{oldStatus?.(m);if(typeof m.gameStylePreview==='boolean')document.body.classList.toggle('tome-style-probing',m.gameStylePreview);if(typeof m.gameStyleReveal==='boolean')document.body.classList.toggle('megulit-original-shown',m.gameStyleReveal);
-  if(m.type==='gameClosed'){measurementSerial++;clearInterval(correctionTimer);aligning=false;document.body.classList.remove('tome-style-probing');}};
+  if(m.type==='gameClosed'){measurementSerial++;(window.__megulitReaderIntervals?.clear||clearInterval)(correctionTimer);aligning=false;document.body.classList.remove('tome-style-probing');}};
  b.calibrationMenuOpened=dialog=>{if(!session.key)session.load('',session.name,values(),getMap(),0,[]);wire(dialog);buildImports(dialog);send({type:'gameStyleImportList'});
   paint();};
  // Two import groups (user, 2026-11-02): text appearance, and position/wrapping with its coordinate map. Each previews a

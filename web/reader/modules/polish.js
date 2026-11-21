@@ -142,7 +142,7 @@
  // so a freshly opened menu never shows the 50% default fill for a moment. The interval stays as a fallback.
  {const desc=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');if(desc?.set&&!HTMLInputElement.prototype.__mgFillPatched){Object.defineProperty(HTMLInputElement.prototype,'value',{...desc,set(v){desc.set.call(this,v);if(this.type==='range')fill(this);}});HTMLInputElement.prototype.__mgFillPatched=true;}}
  new MutationObserver(records=>{for(const r of records)for(const n of r.addedNodes)if(n.nodeType===1){if(n.matches?.('input[type=range]'))fill(n);for(const i of n.querySelectorAll?.('input[type=range]')||[])fill(i);}}).observe(document.documentElement,{childList:true,subtree:true});
- setInterval(()=>{for(const r of document.querySelectorAll('input[type=range]'))fill(r);},400);
+ (window.__megulitReaderIntervals?.set||setInterval)(()=>{for(const r of document.querySelectorAll('input[type=range]'))fill(r);},400);
  // While dragging, a small bubble follows the thumb with the live value.
  const bubble=document.createElement('div');bubble.className='mg-bubble';let dragging=null;
  function format(input){const out=input.parentElement?.querySelector?.('.tomoyo-slider-value');const text=out?.textContent?.trim();if(text)return text;const v=Number(input.value),step=Number(input.step)||1;return step<1?v.toFixed(Math.min(2,String(step).split('.')[1]?.length||2)):String(v);}

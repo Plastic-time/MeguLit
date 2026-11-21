@@ -8,7 +8,7 @@
  window.__tomeWaitForSurface=(node,ready,maxWait=700)=>{
   if(!document.body.classList.contains('tomoyo-ui-translation')){requestAnimationFrame(ready);return;}
   let ack=null,finished=false,frame=0;
-  const cleanup=()=>{finished=true;clearInterval(timer);cancelAnimationFrame(frame);removeEventListener('tome-region-applied',receive);};
+  const cleanup=()=>{finished=true;(window.__megulitReaderIntervals?.clear||clearInterval)(timer);cancelAnimationFrame(frame);removeEventListener('tome-region-applied',receive);};
   const check=()=>{if(finished)return;if(!node.isConnected||node.hasAttribute('data-leaving')){cleanup();return;}
    if(!ack||frame)return;const scale=devicePixelRatio||1;if(Math.abs(innerWidth*scale-ack.surfaceWidth)>2||Math.abs(innerHeight*scale-ack.surfaceHeight)>2)return;
    const w=innerWidth,h=innerHeight;frame=requestAnimationFrame(()=>{frame=requestAnimationFrame(()=>{frame=0;if(!finished&&node.isConnected&&!node.hasAttribute('data-leaving')&&w===innerWidth&&h===innerHeight){cleanup();ready();}});});
@@ -16,7 +16,7 @@
   const receive=e=>{ack=e.detail;check();};addEventListener('tome-region-applied',receive);
   // Never wait forever: if the size acknowledgement does not arrive or never matches (DPI rounding, bridge restart),
   // the panel is shown after 700 ms anyway, as the former fixed fallback did.
-  const started=Date.now(),timer=setInterval(()=>{check();if(finished)return;if(Date.now()-started>=maxWait){cleanup();if(node.isConnected&&!node.hasAttribute('data-leaving'))ready();return;}window.__tomoyoHitRegionsRefresh?.(true);},Math.min(150,Math.max(30,Math.floor(maxWait/2))));
+  const started=Date.now(),timer=(window.__megulitReaderIntervals?.set||setInterval)(()=>{check();if(finished)return;if(Date.now()-started>=maxWait){cleanup();if(node.isConnected&&!node.hasAttribute('data-leaving'))ready();return;}window.__tomoyoHitRegionsRefresh?.(true);},Math.min(150,Math.max(30,Math.floor(maxWait/2))));
   window.__tomoyoHitRegionsRefresh?.(true);
  };
  let queued=false,last='';const watched=new WeakSet(),resize=new ResizeObserver(schedule);

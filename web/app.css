@@ -153,3 +153,8 @@ input,textarea,select,[contenteditable]:not([contenteditable=false]){-webkit-use
 
 /* E593 restore dialog: button labels stay on one line, the row wraps instead; detail-page single-game mode */
 .jr-dialog .dialog-actions{flex-wrap:wrap}.jr-dialog .dialog-actions button{white-space:nowrap;flex:none}.jr-dialog .jr-game{color:var(--text);font-size:13px;font-weight:600;margin:-6px 0 2px;overflow-wrap:anywhere}.detail-actions{flex-wrap:wrap}.detail-actions button{white-space:nowrap}
+
+/* Preserve the visible glass; freeze moving content beneath it while the UI rests. */
+html[data-ui="idle"] *,html[data-ui="idle"] *::before,html[data-ui="idle"] *::after,
+html[data-ui="hidden"] *,html[data-ui="hidden"] *::before,html[data-ui="hidden"] *::after{animation-play-state:paused!important}
+html[data-ui="hidden"] :is(.home-tv,.home-glass,.stage-cover,.library-card,.field-cell){backdrop-filter:none!important;-webkit-backdrop-filter:none!important}

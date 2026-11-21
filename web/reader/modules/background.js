@@ -312,7 +312,7 @@
    const panel=document.createElement('section');panel.className='tome-bg-panel';panel.append(b.backgroundPanel());content.append(panel);}};nav.append(tab);nav.addEventListener('click',
    e=>{if(e.target.closest('button')&&!e.target.closest('[data-tome-bg-tab]')){content.classList.remove('tome-bg-selected');tab.classList.remove('active');}});}
   if(tab.textContent!==t('title'))tab.textContent=t('title');
- };setInterval(tick,600);let tickQueued=false;new MutationObserver(()=>{if(tickQueued)return;tickQueued=true;setTimeout(()=>{tickQueued=false;tick();},0);}).observe(document.body,
+ };(window.__megulitReaderIntervals?.set||setInterval)(tick,600);let tickQueued=false;new MutationObserver(()=>{if(tickQueued)return;tickQueued=true;setTimeout(()=>{tickQueued=false;tick();},0);}).observe(document.body,
   {childList:true,subtree:true});
 
  function menuLayer(dialog){if(dialog?.classList?.contains('tomoyo-cn-dialog')&&!dialog.querySelector(':scope>.tome-menu-bg')){const layer=document.createElement('div');
@@ -383,7 +383,7 @@
    const size=(glassArea.w/scale)+'px '+(glassArea.h/scale)+'px',pos=(glassArea.x/scale-left)+'px '+(glassArea.y/scale-top)+'px';
    if(layer.style.backgroundImage!==glassUrl)layer.style.backgroundImage=glassUrl;if(layer.style.backgroundSize!==size)layer.style.backgroundSize=size;if(layer.style.backgroundPosition!==pos)layer.style.backgroundPosition=pos;
     }}
- setInterval(glassReport,120);window.__tomeGlassReport=glassReport; // style probing hides panels and needs their glass gone at once
+ (window.__megulitReaderIntervals?.set||setInterval)(glassReport,120);window.__tomeGlassReport=glassReport; // style probing hides panels and needs their glass gone at once
  new MutationObserver(()=>{panels();requestAnimationFrame(()=>glassReport());}).observe(document.body,{childList:true});
  // Opening a panel starts the glass reports on its first frame (the 120 ms timer alone missed the start of the unfold).
  new MutationObserver(()=>requestAnimationFrame(()=>glassReport())).observe(document.body,{subtree:true,attributes:true,attributeFilter:["data-open","data-leaving",

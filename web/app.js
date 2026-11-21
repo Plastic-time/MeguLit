@@ -1,3 +1,4 @@
+import './idle-gate.js';
 import {fitLibraryGrid} from './library-grid-fit.js';
 import {formatDefinition} from './dictionary-format.js';
 import './primary-buttons.js';

@@ -125,7 +125,7 @@ function status(root){const s=load(root);return {enabled:enabled(root),busy:!!bu
 
 /* background schedule: FIRST_DELAY after start, then every EVERY; kick() after a runtime harvest or a finished probe */
 let timer=null,opener=null,started=null;
-function schedule(root,delay){if(!opener)return;clearTimeout(timer);timer=setTimeout(async()=>{timer=null;let db;try{db=opener();await run(root,db);}catch{}finally{try{db?.close?.();}catch{}}schedule(root,EVERY);},delay);timer.unref?.();}
+function schedule(root,delay){if(!opener)return;timer?.stop?.();timer=require('./background-budget.cjs').schedule(root,async()=>{timer=null;let db;try{db=opener();await run(root,db);}catch{}finally{try{db?.close?.();}catch{}}schedule(root,EVERY);},{delay});timer.unref?.();}
 function start(root,openDb,{delay=FIRST_DELAY}={}){if(process.env.NODE_TEST_CONTEXT||started===root)return null;started=root;opener=openDb;schedule(root,delay);return true;}
 function kick(root,{delay=KICK_DELAY}={}){if(!opener||started!==root||!enabled(root))return false;schedule(root,delay);return true;}
 

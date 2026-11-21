@@ -186,8 +186,8 @@ function pump(){if(scanBusy||!scanQueue.length)return;const job=scanQueue.shift(
  try{w=new (require('node:worker_threads').Worker)(path.join(__dirname,'game-voice-worker.cjs'),{workerData:{root:job.root,start:job.start}});}catch{return finish(null);}
  w.once('message',finish);w.once('error',()=>finish(null));/* a scan someone awaits (ensureScanned) keeps the process alive */if(!job.hold)w.unref?.();}
 function scanLater(root,executable,delay=8000,{cold=false}={}){if(!executable)return;const start=path.dirname(String(executable)),k=gameKey(start);if(running.has(k))return;const seen=Object.values(lines(root).games).find(g=>g.from===k);if(seen&&!stale(seen)&&Date.now()-seen.scanned<7*864e5)return;running.add(k);
- const t=setTimeout(()=>scanInWorker(root,start,({g,r})=>{running.delete(k);if(!g||!r)return;const e=lines(root).games[gameKey(g.dir)];if(e){e.from=k;save(root);}
-   if(cold&&r.missing?.length){const vc=require('./voice-cold.cjs');const off=vc.onDone(job=>{if(job.game.dir===g.dir){off();scanInWorker(root,g.dir,()=>{});}});vc.consider(root,{executable:String(executable),dir:g.dir,engine:g.engine},r.missing);}}),delay);t.unref?.();}
+ const t=require('./background-budget.cjs').schedule(root,()=>scanInWorker(root,start,({g,r})=>{running.delete(k);if(!g||!r)return;const e=lines(root).games[gameKey(g.dir)];if(e){e.from=k;save(root);}
+   if(cold&&r.missing?.length){const vc=require('./voice-cold.cjs');const off=vc.onDone(job=>{if(job.game.dir===g.dir){off();scanInWorker(root,g.dir,()=>{});}});vc.consider(root,{executable:String(executable),dir:g.dir,engine:g.engine},r.missing);}}),{delay});t.unref?.();}
 /* 2026-11-15 every indexed game whose index is out of date (an engine reader or the quiet keys changed) is scanned again,
    once per process, one at a time in the worker; resolves when all are done. Anki review and saved lines wait for it
    briefly, so a card of a game not started since still gets its clips checked. */

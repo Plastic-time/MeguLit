@@ -120,7 +120,7 @@ const syncNow=root=>inThread(root,'sync'),rollbackNow=(root,id)=>inThread(root,'
 function start(root,{delay=180000,interval=INTERVAL}={}){
  if(process.env.MEGULIT_NO_ADAPTER_SYNC||process.env.NODE_TEST_CONTEXT)return null;
  const run=()=>{let w;try{w=new Worker(__filename,{workerData:{root,mode:'sync'}});}catch{return;}w.on('error',()=>{});w.unref();};
- const t=setTimeout(()=>{run();const i=setInterval(run,interval);i.unref?.();},delay);t.unref?.();return t;}
+ return require('./background-budget.cjs').schedule(root,run,{delay,repeat:interval});}
 if(!isMainThread&&workerData?.mode==='sync'){const store=require('./store.cjs');sync(workerData.root,{openDb:()=>store.openStore(workerData.root)}).then(r=>parentPort.postMessage(r),()=>parentPort.postMessage({state:'error'}));}
 if(!isMainThread&&workerData?.mode==='rollback'){const store=require('./store.cjs');let db;(async()=>{db=store.openStore(workerData.root);return rollback(workerData.root,db,String(workerData.id));})().then(r=>parentPort.postMessage(r),()=>parentPort.postMessage({ok:false,reason:'ERROR'})).finally(()=>{try{db?.close();}catch{}});}
 module.exports={syncNow,rollbackNow,inThread,sync,apply,report,worse,verdict,numbers,status,rollback,start,pendingProbes,probeRequests,matching};

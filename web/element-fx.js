@@ -1,3 +1,4 @@
+import {requestUiFrame,cancelUiFrame,onUiState,uiActive} from './idle-gate.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-12 (user: not the same magic circle for every element — each element its own animation and particles,
    finely made). A canvas scene per element for the 转职 stage. Idle it breathes quietly; cast() raises it to full
@@ -88,7 +89,7 @@ export function mountElementFx(canvas){
  s.boltAt=(x0,y0,x1,y1,w)=>SCENES.thunder.bolt(s,x0,y0,x1,y1,w);
  let el='fire',raf=0,prev=performance.now(),stopped=false;
  const size=()=>{const dpr=Math.min(2,devicePixelRatio||1),W=canvas.clientWidth,H=canvas.clientHeight;if(W&&(canvas.width!==Math.round(W*dpr)||canvas.height!==Math.round(H*dpr))){canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);s.W=W;s.H=H;s.cx=W/2;s.cy=H/2;s.u=Math.max(1,Math.min(W,H)/240);};
- const frame=now=>{if(stopped||!canvas.isConnected)return;if(document.hidden){prev=now;raf=requestAnimationFrame(frame);return;}s.dt=Math.min(.05,(now-prev)/1000);prev=now;s.age+=s.dt;s.I+=(s.target-s.I)*Math.min(1,s.dt*3);size();
+ const frame=now=>{if(stopped||!canvas.isConnected)return;if(document.hidden){prev=now;raf=requestUiFrame(frame);return;}s.dt=Math.min(.05,(now-prev)/1000);prev=now;s.age+=s.dt;s.I+=(s.target-s.I)*Math.min(1,s.dt*3);size();
   const sc=SCENES[el];ctx.clearRect(0,0,s.W,s.H);ctx.globalCompositeOperation='lighter';
   if(s.ct>=0)s.ct+=s.dt;
   sc.spawn(s,s.I);FORMS[el]?.(s,ctx,s.I);sc.draw(s,ctx,s.I);ctx.globalCompositeOperation='lighter';
@@ -101,12 +102,12 @@ export function mountElementFx(canvas){
   if(el==='wind'&&s.ring){s.ring+=s.dt;const k=s.ring-1;if(k>1){s.ring=0;}else{ctx.strokeStyle=`rgba(200,255,232,${1-k})`;ctx.lineWidth=2*(1-k)+.4;ctx.beginPath();ctx.ellipse(s.cx,s.cy,20+k*s.W*.6,(20+k*s.W*.6)*.62,0,0,TAU);ctx.stroke();}}
   s.out*=.97;s.ec+=(1-s.ec)*s.dt*2;
   if(s.flash>0){ctx.globalCompositeOperation='lighter';const fr=Math.max(s.W,s.H)*.75,g=ctx.createRadialGradient(s.cx,s.cy,0,s.cx,s.cy,fr);g.addColorStop(0,hexA(el==='dark'?'#c8a8ff':'#ffffff',Math.min(1,s.flash)));g.addColorStop(.25,hexA(SCENES[el].color,s.flash*.35));g.addColorStop(1,hexA(SCENES[el].color,0));ctx.fillStyle=g;ctx.fillRect(0,0,s.W,s.H);s.flash=Math.max(0,s.flash-s.dt*2.2);}
-  if(calm){return;}raf=requestAnimationFrame(frame);};
- raf=requestAnimationFrame(frame);
+  if(calm){return;}raf=requestUiFrame(frame);};
+ raf=requestUiFrame(frame);
  return {
   setElement(next,glyph){if(glyph)s.glyph=glyph;if(next===el||!SCENES[next])return;el=next;s.ct=-1;s.slabs=null;s.cracks=null;s.grain=null;s.ps=[];s.bolts=[];s.rings=[];s.age=0;s.shattered=0;s.big=1;s.flash=0;s.sun=0;s.ec=1;s.out=0;s.ring=0;s.pull=0;s.implode=0;},
   cast(onBurst){s.target=1;s.ct=0;setTimeout(()=>{SCENES[el].burst(s);BURSTS[el]?.(s);s.target=.7;onBurst?.();},calm?0:1300);},
   color:()=>SCENES[el].color,
-  stop(){stopped=true;cancelAnimationFrame(raf);}
+  stop(){stopped=true;cancelUiFrame(raf);}
  };
 }

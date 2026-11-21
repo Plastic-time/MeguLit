@@ -192,7 +192,7 @@
    palette.append(d.box,rest);palette.append(choiceBox||c.box);colours.remove();choiceColours.remove();palette.dataset.colourMatrix='';
    const dim=()=>{for(const [i,name] of ['galTextGradient','galReadTextGradient'].entries()){const on=!!field(name)?.checked;for(const cell of d.grid.querySelectorAll('.tome-cm-cell[data-cm-row=g][data-cm-col="'+i+'"]'))cell.classList.toggle('tome-cm-off',!on);}
     for(const cell of palette.querySelectorAll('.tome-cm-cell')){const v=cell.querySelector('input[type=color]');if(v)cell.title=v.value;}};
-   form.addEventListener('input',dim);form.addEventListener('change',dim);dim();const tick=setInterval(()=>{if(!document.contains(palette)){clearInterval(tick);return;}dim();},500);
+   form.addEventListener('input',dim);form.addEventListener('change',dim);dim();const tick=(window.__megulitReaderIntervals?.set||setInterval)(()=>{if(!document.contains(palette)){(window.__megulitReaderIntervals?.clear||clearInterval)(tick);return;}dim();},500);
    const css=document.createElement('style');css.textContent=`
  .tome-cm{margin:4px 0 14px}
  .tome-cm-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 6px}

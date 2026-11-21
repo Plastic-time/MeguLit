@@ -1,3 +1,4 @@
+import {requestUiFrame,cancelUiFrame,onUiState,uiActive} from './idle-gate.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-12 the 转职 stage, rebuilt (user: only ice and dark were good; a grand original explosion circle for fire; no
    cheap dot particles anywhere — every particle has a shape and a material; every element keeps moving while it is
@@ -318,7 +319,7 @@ export function mountElementFx(canvas){
  const size=()=>{const dpr=Math.min(2,devicePixelRatio||1),W=canvas.clientWidth,H=canvas.clientHeight;if(W&&(canvas.width!==Math.round(W*dpr)||canvas.height!==Math.round(H*dpr))){canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);for(const s of [cur,old])if(s){s.W=W;s.H=H;if(wide){s.cx=wide.x+wide.w/2;s.cy=wide.y+wide.h/2;s.W0=wide.w;s.H0=wide.h;}else{s.cx=W/2;s.cy=H/2;s.W0=W;s.H0=H;}}};
  const frame=now=>{if(stopped||!canvas.isConnected)return;const raw=(now-prev)/1000,dt=Math.min(.05,raw);prev=now;
   /* the cast keeps wall-clock time, so it stays in step with the reveal even when frames are slow */
-  if(cur&&cur.ct>=0&&raw>dt)cur.ct+=Math.min(.5,raw-dt);if(document.hidden){raf=requestAnimationFrame(frame);return;}size();ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
+  if(cur&&cur.ct>=0&&raw>dt)cur.ct+=Math.min(.5,raw-dt);if(document.hidden){raf=requestUiFrame(frame);return;}size();ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
   /* (user: the old transition was ugly) out: the old scene shrinks, blurs and fades in ~200 ms; in: the new one grows
      from 92% and sharpens over ~360 ms, starting a beat later; one thin light sweep crosses once */
   switchT=Math.min(1,switchT+dt);const W=canvas.clientWidth,H=canvas.clientHeight;
@@ -329,12 +330,12 @@ export function mountElementFx(canvas){
    else render(ctx,cur,1,1);
    if(wide){const R0=Math.max(wide.w,wide.h),g=ctx.createRadialGradient(cur.cx,cur.cy,R0*.45,cur.cx,cur.cy,R0*1.25);g.addColorStop(0,'#000');g.addColorStop(1,'rgba(0,0,0,0)');ctx.globalCompositeOperation='destination-in';ctx.fillStyle=g;ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='source-over';
     if(cur.ct<0||cur.ct>3.8)goBack();}}
-  if(!calm)raf=requestAnimationFrame(frame);};
- raf=requestAnimationFrame(frame);
+  if(!calm)raf=requestUiFrame(frame);};
+ raf=requestUiFrame(frame);
  return {
   setElement(el,glyph){if(!SC[el])return;if(cur&&cur.el===el){if(glyph)cur.glyph=glyph;return;}
-   old=cur&&switchT>=1?cur:(cur||null);switchT=cur?0:1;cur=newScene(el,glyph);size();if(calm)requestAnimationFrame(frame);},
+   old=cur&&switchT>=1?cur:(cur||null);switchT=cur?0:1;cur=newScene(el,glyph);size();if(calm)requestUiFrame(frame);},
   cast(onBurst){if(!cur){onBurst?.();return;}if(!calm)goWide();cur.ct=0;setTimeout(()=>{if(cur){SC[cur.el].burst(cur);}onBurst?.();},calm?0:1300);},
-  stop(){stopped=true;cancelAnimationFrame(raf);goBack();}
+  stop(){stopped=true;cancelUiFrame(raf);goBack();}
  };
 }

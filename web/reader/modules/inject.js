@@ -212,7 +212,7 @@
     }
   }
   /* 2026-11-21: a page line was first seen at the next 300 ms scan, so its 600 ms check came at 0.9 to 1.2 s; the scan is every 100 ms and also runs when a line is shown */
-  setInterval(pageGuard, 100);
+  (window.__megulitReaderIntervals?.set||setInterval)(pageGuard, 100);
   bridge.deliverBackfill = (source, text, kind = '') => {
     if (!enabled || !translationVisible || !String(text || '').trim()) return;
     const shown = bridge.sourceText || bridge.current;
