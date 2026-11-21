@@ -61,7 +61,11 @@ function check(d0,{engine,slug,file}={}){const e=[];const bad=m=>e.push(m);
   if(d.exe&&/[\\/]/.test(d.exe))bad('exe is a file name');}
  if(d.prints!==undefined){const p=gamePrint.check(d.prints);if(Object.keys(p).length!==Object.keys(d.prints).length)bad('prints');}
  if(PRIVATE.test(JSON.stringify(d)))bad('a path, user folder or address');
- return {ok:!e.length,errors:e,ignored:K.ignored,doc:d};}
+ /* pinning (docs/diff-layers.md 当前权威接口): a seed pins non-null behaviour keys only; null (the kernel decides), calibrate.* and
+    selfCheck.* stay out, or a verified seed would cover this PC's calibration, the shared layers and the gate thresholds */
+ const warnings=[];const S=d.settings||{};for(const g of ['calibrate','selfCheck'])if(plain(S[g])&&Object.keys(S[g]).length)warnings.push('pins '+g+'.*');
+ const nulls=(o,at)=>{for(const [k,v] of Object.entries(o||{})){const p=at?at+'.'+k:k;if(v===null)warnings.push('pins '+p+' = null');else if(plain(v)&&p!=='lang')nulls(v,p);}};nulls(S,'');
+ return {ok:!e.length,errors:e,warnings,ignored:K.ignored,doc:d};}
 
 let cache=null;
 function load(dir=SEED_DIR){const games=[],versions=new Map(),errors=[];

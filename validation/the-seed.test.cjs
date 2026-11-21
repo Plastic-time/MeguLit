@@ -15,7 +15,8 @@ test('every file of The Seed passes: format, keys and values, prints, folder nam
  for(const f of files){if(f==='README.md')continue;
   const m=/^([a-z0-9]{2,40})\/([a-z0-9][a-z0-9-]{1,62})\/(game\.json|versions\/[0-9a-f]{64}\.json)$/.exec(f);assert.ok(m,'unexpected file '+f+' (The Seed/<engine>/<slug>/game.json or versions/<exe SHA-256>.json)');
   const text=fs.readFileSync(path.join(DIR,f),'utf8');assert.ok(Buffer.byteLength(text)<=16*1024,f+': a seed stays small');
-  const doc=JSON.parse(text);const r=Seed.check(doc,m[3]==='game.json'?{engine:m[1],slug:m[2]}:{engine:m[1],file:path.basename(f)});assert.deepEqual(r.errors,[],f);}
+  const doc=JSON.parse(text);const r=Seed.check(doc,m[3]==='game.json'?{engine:m[1],slug:m[2]}:{engine:m[1],file:path.basename(f)});assert.deepEqual(r.errors,[],f);
+  assert.deepEqual(r.warnings,[],f+': a seed pins non-null behaviour keys only (no null, no calibrate.*, no selfCheck.*)');}
  const all=Seed.load(DIR);assert.deepEqual(all.errors,[]);
  const slugs=all.games.map(g=>g.key);assert.equal(new Set(slugs).size,slugs.length,'a slug is unique across engines');
  for(const g of all.games)for(const b of g.match.exeSha256)assert.ok(all.versions.has(b),g.key+': build '+b.slice(0,8)+' has no version file');
@@ -47,6 +48,12 @@ test('release, hot package and hot install carry The Seed/',()=>{
  assert.match(rel,/git ls-files --cached --others --exclude-standard core services web setup 'The Seed'\)/);assert.match(rel,/\^\(web\|services\|core\|setup\|The Seed\)\//);
  assert.match(fs.readFileSync(path.join(root,'services','hot-update.cjs'),'utf8'),/const ALLOWED=\/\^\(web\|services\|core\|setup\|The Seed\)\\\/\//);
  assert.equal(Seed.SEED_DIR,DIR,'MeguLit/core/profiles -> MeguLit/The Seed');
+});
+
+test('pinning warnings: null values, calibrate.* and selfCheck.* in a seed',()=>{
+ const g=JSON.parse(fs.readFileSync(path.join(DIR,'kirikiri','senren-banka','game.json'),'utf8')),where={engine:'kirikiri',slug:'senren-banka'};
+ const w=Seed.check({...g,settings:{...g.settings,calibrate:{hideMethod:'hide'},selfCheck:{window:20},page:{...(g.settings.page||{}),holdMs:null}}},where).warnings;
+ assert.ok(w.includes('pins calibrate.*')&&w.includes('pins selfCheck.*')&&w.includes('pins page.holdMs = null'),JSON.stringify(w));
 });
 
 test('forward compatible: seedFormat and ext, unknown fields and unknown settings keys are ignored, known ones stay strict',()=>{
