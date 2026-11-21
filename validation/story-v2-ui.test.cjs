@@ -3,6 +3,11 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const layoutSource=fs.readFileSync(path.join(__dirname,'../web/story-layout.js'),'utf8'),storySource=fs.readFileSync(path.join(__dirname,'../web/detail-story.js'),'utf8');
 function layout(){const context={};vm.runInNewContext(layoutSource.replace('export function layoutStory','function layoutStory')+'\nglobalThis.layout=layoutStory;',context);return context.layout;}
+test('image source allowlist accepts native BMP and existing raster formats but rejects SVG and remote URLs',()=>{
+ const line=storySource.split(/\r?\n/).find(line=>line.startsWith('const validImage=')),context={};assert(line);vm.runInNewContext(line+'\nglobalThis.accept=validImage;',context);
+ for(const type of ['bmp','png','jpeg','webp'])assert.equal(context.accept(`data:image/${type};base64,QUJDRA==#r18`),true);
+ for(const src of ['data:image/svg+xml;base64,QUJDRA==','https://fixture.invalid/image.bmp','file:///image.bmp','data:image/png;base64,***','data:text/html;base64,QUJDRA=='])assert.equal(context.accept(src),false);
+});
 function fixture({width=1100,miniWidth=180,focus}={}){
  const nodes=[{id:'start',kind:'scene',state:'done'},{id:'choice',kind:'choice',state:'done'},{id:'end',kind:'ending',state:'locked'}],edges=[{from:'start',to:'choice',state:'done'},{from:'choice',to:'end',state:'locked'}],geometry=layout()(nodes,edges),frames=new Map(),updates=[];let next=0,resize,disconnected=false;
  const context2d={beginPath(){},moveTo(){},lineTo(){},stroke(){},fillRect(){}},canvas={getContext:()=>context2d},rect={style:{}},mini={clientWidth:miniWidth,clientHeight:miniWidth*96/180,querySelector:s=>s==='canvas'?canvas:rect,getBoundingClientRect:()=>({left:0,top:0})},world={style:{}},map={clientWidth:width,clientHeight:530,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}},scale={},buttons={};for(const name of ['data-zoom-in','data-zoom-out','data-reset'])buttons['['+name+']']={};

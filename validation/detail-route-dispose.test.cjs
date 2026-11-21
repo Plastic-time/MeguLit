@@ -41,7 +41,7 @@ test('A/B interleavings cannot replace or dispose the current detail cleanup',{t
 });
 test('actual game-detail return cleans first-player and active collection mount',{timeout:2000},async()=>{
  const events=[],node=()=>({}),nodes=new Map(),main={querySelector(selector){if(['.detail-cover.tv-holo','.detail-title>h1','[data-jp-restore]','[data-warn-restore]'].includes(selector))return null;if(!nodes.has(selector))nodes.set(selector,node());return nodes.get(selector);},querySelectorAll:()=>[]};
- const noop=()=>{},context={loadGsap:()=>Promise.resolve(),embedStatus:()=>({kind:'safe',label:''}),attachEmbedPopover:noop,mountFirstPlayer:()=>({dispose:()=>events.push('firstPlayer.dispose')}),mountDetailDeveloper:()=>({}),mountCnGuide:noop,
+ let styleLoads=0;const noop=()=>{},context={ensureStoryStyles:()=>{styleLoads++;return Promise.resolve();},loadGsap:()=>Promise.resolve(),embedStatus:()=>({kind:'safe',label:''}),attachEmbedPopover:noop,mountFirstPlayer:()=>({dispose:()=>events.push('firstPlayer.dispose')}),mountDetailDeveloper:()=>({}),mountCnGuide:noop,
   gameLanguageLabel:()=>'',durHTML:()=>'',launchReason:()=>'',receptionMessages:{zh:{}},requestAnimationFrame:noop,matchMedia:()=>({matches:true}),
   mountWords:()=>()=>events.push('words.unmount'),window:{},document:{},Promise};
  vm.createContext(context);
@@ -50,5 +50,5 @@ test('actual game-detail return cleans first-player and active collection mount'
  const game={title:'Synthetic detail',available:true},data={game,info:{},counts:{sessions:0},words:[],sentences:[],sessions:[]};
  const cleanup=await context.renderActual({main,id:'fixture',tab:'words',locale:'zh',text:{},esc:String,icon:noop,cover:()=>'',number:String,relativeTime:()=>'',isCurrent:()=>true,
   api:action=>action==='game_detail'?Promise.resolve(data):new Promise(()=>{}),onBack:noop,onEdit:noop,onLaunch:noop,toast:noop});
- assert.equal(typeof cleanup,'function');assert.deepEqual(events,[]);cleanup();assert.deepEqual(events,['firstPlayer.dispose','words.unmount']);
+ assert.equal(styleLoads,1);assert.equal(typeof cleanup,'function');assert.deepEqual(events,[]);cleanup();assert.deepEqual(events,['firstPlayer.dispose','words.unmount']);
 });
