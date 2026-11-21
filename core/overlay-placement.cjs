@@ -90,7 +90,7 @@ class OverlayPlacement {
      engine's clear report, page.reportClear) and its top is below every row already on it; otherwise it starts a new page. The page
      goes to the reader as textPlacePage: every line on its own boxes, the earlier ones as old lines (ruby, lookups, the line colour) */
   rows(l) {
-    const mode = require('./profiles/index.cjs').get(this.profile, 'page.engineRows', null);
+    const mode = require('./profiles/index.cjs').get(this.profile, 'page.engineRows', false);
     if (mode === false || !l || !Array.isArray(l.rects) || !l.rects.length) return;
     const ok = r => Array.isArray(r) && r.length >= 4, rs = l.rects.filter(ok); if (!rs.length) return;
     const top = Math.min(...rs.map(r => r[1])), P = this.rowPage || (this.rowPage = []), at = P.findIndex(x => x.id === l.id);

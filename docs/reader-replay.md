@@ -61,7 +61,7 @@ KiriKiri 那一侧（`tools/reader-replay/krkr-model.cjs`）：从 `native/krkrt
 
 ## 两行页（page.engineRows）
 
-core/overlay-placement.cjs `rows()`：引擎按行报坐标的游戏，一句在没清页（引擎的清页上报）且起始在已有行下方时并入同一页，否则开新页；页经 textPlacePage 交给阅读层的页模型（每句在自己的格子上，旧行是带 ruby 的克隆、可点读）。true = 每句都走页（海馆），null（默认）= 只有叠行时才组页、单行时回到行模型，false = 不组页。判定写进 hook-events（`placement page: … goes on the page under … / starts a new page / cleared by the game`）。非 KiriKiri 的夹具：validation/fixtures/games/baldr-sky/two-row-page.case.cjs
+core/overlay-placement.cjs `rows()`：引擎按行报坐标的游戏，一句在没清页（引擎的清页上报）且起始在已有行下方时并入同一页，否则开新页；页经 textPlacePage 交给阅读层的页模型（每句在自己的格子上，旧行是带 ruby 的克隆、可点读）。true = 每句都走页（只有海馆 seed 开），null = 只有叠行时才组页、单行时回到行模型，false（内核默认，一个游戏的修复不改别的游戏）= 不组页。判定写进 hook-events（`placement page: … goes on the page under … / starts a new page / cleared by the game`）。非 KiriKiri 的夹具：validation/fixtures/games/baldr-sky/two-row-page.case.cjs
 
 ## 海馆（第一个用户）
 

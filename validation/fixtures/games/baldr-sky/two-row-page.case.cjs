@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-/* 2026-11-21 (owner: no game may draw fewer characters once the placement fallback never redraws a line the reader drew): a
-   coordinate engine that is not KiriKiri (records engine=unity, this game's own profile: page.engineRows unset = auto) shows two lines of one page, each
-   reported hidden with its boxes. Before: the first row came back only through the white fallback layer; now both rows are the
-   reader's own (the earlier one an old line on its own boxes, lookups and ruby kept), nothing on the fallback layer, and a line
-   that starts the next page takes both away. Real code: core/overlay-placement.cjs (rows) and web/reader/modules/text-place.js. */
+/* 2026-11-21 page.engineRows on a coordinate engine that is not KiriKiri (records engine=unity), two lines of one page, each
+   reported hidden with its boxes. (a) this game's own profile (kernel default false): core never sends a row page, the reader keeps
+   the line model of 1.4.22; (b) the same game with page.engineRows=true in its diff: both rows are the reader's own (the earlier
+   one an old line on its own boxes, lookups and ruby kept), nothing on the fallback layer, and a line that starts the next page
+   takes both away. Real code: core/overlay-placement.cjs (rows) and web/reader/modules/text-place.js. */
 const fs = require('node:fs'), path = require('node:path');
-module.exports = async ({ assert, root, profile }) => {
+module.exports = async ({ assert, root, profile, Profiles }) => {
+  for (const rows of [false, true]) await run({ assert, root, rows, profile: rows ? JSON.parse(JSON.stringify({ ...profile, page: { ...profile.page, engineRows: true } })) : profile, Profiles });
+};
+async function run({ assert, root, rows, profile }) {
   let chromium; try { ({ chromium } = require(process.env.MEGULIT_PLAYWRIGHT || 'H:/MeguLit-Work/pw/node_modules/playwright-core')); } catch { return; }
   const { OverlayPlacement } = require(path.join(root, 'core', 'overlay-placement.cjs')), tp = require(path.join(root, 'core', 'text-paths.cjs'));
   const sent = [], p = new OverlayPlacement({ send: m => sent.push(m) }); p.profile = profile; p.wanted = () => true;
@@ -24,8 +27,10 @@ module.exports = async ({ assert, root, profile }) => {
       const msgs = feed(raw); await page.evaluate(ms => { const b = window.__tomoyoChinese; for (const m of ms) (m.type === 'textPlacePage' ? b.textPlacePage : b.textPlace)(m); }, msgs); await page.waitForTimeout(700); };
     const look = () => page.evaluate(() => ({ rows: [...document.querySelectorAll('.sentence-text')].filter(s => getComputedStyle(s).display !== 'none').map(s => ({ old: s.classList.contains('megulit-old-line'), text: [...s.querySelectorAll('.char-token')].filter(t => getComputedStyle(t).display !== 'none' && t.getBoundingClientRect().width > 0).map(t => t.textContent).join(''), y: Math.round(Math.min(...[...s.querySelectorAll('.char-token')].map(t => t.getBoundingClientRect().top).filter(v => v > 0))), pointer: [...s.querySelectorAll('.char-token')].every(t => getComputedStyle(t).pointerEvents !== 'none') })).filter(r => r.text),
       extras: [...document.querySelectorAll('#megulit-place-extras span')].map(s => s.textContent).join('') }));
+    const pages = () => sent.filter(m => m.type === 'textPlacePage').length;
     await say('一行目のせりふ', rec(1, '一行目のせりふ', 400));
     await say('二行目のせりふ', rec(2, '二行目のせりふ', 440));
+    if (!rows) { assert.equal(pages(), 0, 'the kernel default sends no row page (1.4.22 line model)'); const one = await look(); assert.deepEqual(one.rows.filter(r => !r.old).map(r => r.text), ['二行目のせりふ'], JSON.stringify(one)); return; }
     const two = await look();
     assert.equal(two.extras, '', 'nothing on the fallback layer');
     const first = two.rows.find(r => r.text === '一行目のせりふ'), second = two.rows.find(r => r.text === '二行目のせりふ');
@@ -36,4 +41,4 @@ module.exports = async ({ assert, root, profile }) => {
     const next = await look();
     assert.deepEqual(next.rows.map(r => r.text), ['次のページ'], 'a new page takes both rows away: ' + JSON.stringify(next));
   } finally { await browser.close(); }
-};
+}
