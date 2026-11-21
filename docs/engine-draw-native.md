@@ -151,12 +151,13 @@ watcher 安装后继续每两秒刷新；撤权、控制文件缺失或读取失
   - commit：函数头 16 字节内 `cmp [count], eax; jbe`，0x60 内 `movzx edx, word [eax*2+codes]` 和 `mov ecx, info`，函数体里有 stride 和 `inc dword [r + pages+0xC]`；必须正好一个
   - 清页：`imul r, <页号>, stride; push S; (push 0 | push reg); lea eax, [r + glyphCol]`
   - 两种编译形态（SG / LBP：`8b 7d 0c … 69 db`；SG0 / CC / MDE：`69 5d 0c`）都命中，每个 exe 各部件只命中一次
-- 版本层：每个 exe 的地址表（模块偏移）写进 `The Seed/mages/<游戏>/versions/<exe sha256>.json` 的 `settings.draw.engineTable`（新键 `draw.engineTable`，默认 null = 只靠签名）：drawDialogue、drawGlyph、commit、clear、pages、stride、chars、scale、layoutCount/Codes/Info、selPage 7、sysSelPage 5、charset（SG = sghd、SG0 / CC = default、LBP = sglbp、MDE = sgmde）、canvas 1920×1080。内核把它写成控制文件一行 `#table mages …`，DLL 用签名找，和表不一致就不挂
+- 版本层：每个 exe 的地址表（模块偏移）写进 `The Seed/mages/<游戏>/versions/<exe sha256>.json` 的 `settings.draw.engineTable`（新键 `draw.engineTable`，默认 null = 只靠签名）：drawDialogue、drawGlyph、commit、clear、pages、stride、chars、scale、layoutCount/Codes/Info、selPage 7、sysSelPage 5、charset（SG = sghd、SG0 / CC = default、LBP = sglbp、MDE = sgmde）、canvas 1920×1080。内核把它写成控制文件一行 `#table mages …`，DLL 用结构签名找；原生只核对表里的 drawDialogue、drawGlyph、commit、pages、stride，clear 等字段仍由签名确定，不是原生整文件 SHA 校验。核对字段不一致就不挂
 - 运行时（`native/megulithook/MagesDraw.h`，两个 MAGES 入口都调 `MagesDraw::Arm`：STEINS;GATE 精确适配和上游 MAGES 引擎；同一进程只武装一次）：
-  - 默认不挂：控制文件出现 `roles=1`（这部游戏 seed 里 `draw.roles: true`）才装钩子；看守线程每 2 s 查一次
+  - 默认不挂：仅完整首行 `#cfg` 中唯一的精确 `roles=1` 授权。读实际 UTF16LE（BOM / 无 BOM）控制文件，也保留 ASCII / UTF8 BOM；正文伪 cfg、roles=10、重复键、截断首行不授权。地址表只读正文前的完整元数据，坏表不当作无表。看守线程安装后仍每 2 s 复查，失权 / 不可读 / 文件缺失 / 表不一致就撤销观察，清掉 pending、show、菜单去重和视口缓存；原钩子保留，原调用继续透传。后续授权使用新 epoch，页 seq 不复用旧单位
   - commit 前后：前面抄排版缓冲（字码、跳过标记），后面读新加进页的字（字码、框 ×缩放、颜色、标志）→ `ToMe_DRAWRUN engine=mages ev=add page= seq= role=line|choice|system from= n= codes=`（字码含标记）+ `ToMe_DRAWBOX … rects= color= flag=`
   - 清页 → `ev=clear page= seq=`；drawDialogue 第一次画这页 → `ev=show`；drawDialogue 以外的 drawGlyph（菜单、回想、手机……）按调用点成段，内容变了才记一行 `ev=glyph site=<rva> box= size= color=`
-  - 返回值、寄存器、栈原样（pre 门 + 返回跳板），游戏看不到区别
+  - 每个线程 8 个独立 TLS 返回槽，各有 after-thunk；commit / clear 的原函数不持共享锁，撤权不抹在途真实返回地址，返回后只处理同一授权 epoch 的快照。递归超过 8 槽直接透传；原函数异常越过 after-thunk 的槽不猜测回收，该线程槽耗尽后只透传，直到线程退出。假引擎门验证原结果、GPR、flags / DF、ESP、x87 / MXCSR / XMM；这是微型原生回放，尚非这轮真实游戏验收
+  - 撤权是轮询观察边界，不是同步关闭 ACK：已越过最终检查并进入 logger 的一次记录仍可完成；不承诺撤权调用返回后日志已完全静默。若部分 hook 安装失败，保持权限关闭、保留 trampoline 并阻止盲目重试，不卸载仍可能在途的门
 - 内核（`core/mages-draw.cjs`，第二批已接进实时流）：`parse` + `PageTracker`（一页在两次清页之间 = 一个单位 page:seq；名字来自 0x8001/0x8002 标记；注音见下）+ `MagesLive`（实时：DLL 记录 → ToMe_CHARS，每个 page:seq 一个固定行号，文字变长就是同一行再报一次；清页或页重新开始时同一行号报一次空记录（协议里的「离开」）；名字 role=name `N:<页>`；选项每页一个 UI 快照（`C:<号>` / `Y<页>:<号>`），清页时空快照）。链路：MagesDraw.h → hook-diagnostics 行 → HookBridge `EngineInfo`（`hookEngineDraw`，自检里有一条）→ `HookNative.magesDraw` → `charRects` → hookCharRects / hookDrawUi。`core/text-paths.cjs` 登记 `engine=mages`
 - **画布 → 窗口（静态，5 部一致）**：呈现函数在 Present(NULL,NULL,NULL,NULL) 前，把 16:9 的场景画进后备缓冲：宽铺满、高 = (宽 >> 4) × 9、垂直居中（(高 − 那个) × 0.5）；Present 再把后备缓冲整个拉伸到客户区。所以画布 1920×1080 在客户区的位置 = [0, (bh − h16)/2 × ch/bh, cw, h16 × ch/bh]（`viewport()`，写进 ToMe_CHARS 的 vx..vh）：16:10 全屏上下黑边、超宽屏上下被裁（vy < 0）、后备缓冲和窗口形状不同就被拉伸。后备缓冲尺寸是两个 u16 全局（签名：宽 → `shr 4` → `lea ×9` → 高 → `×0.5` → Present；JS `backbuffer()` / C++ `FindBackbuffer`），DLL 在每页第一帧和每 120 帧读一次，连同游戏窗口客户区报 `ev=view bb= client=`（变了才报）；读不到后备缓冲就按客户区，读不到客户区就交给内核按比例放
 - **菜单调用点角色表（推断）**：drawDialogue 以外调用 drawGlyph 的函数里，直接调用次数最多的那个（5 部都是 9 个参数：SG 0x45bc0、SG0 0x62f30、CC 0x73010、LBP 0x4b200、MDE 0x699e0）= LanguageBarrier 的 drawSingleTextLine（系统菜单用）→ role menu；其余（手机、邮件、回想、TIPS、链接高亮）→ role system。根据是参数个数 + 调用次数，不是游戏里的名字。版本层 `menuText: [起, 止]`，`MagesLive.glyphRole(site)`。`ev=glyph` 只有框没有字，所以暂不送进阅读层（只给探针 / diff-maker 用）
@@ -166,6 +167,7 @@ watcher 安装后继续每两秒刷新；撤权、控制文件缺失或读取失
   - `validation/engine-draw-sig-mages.test.cjs`：5 个夹具片段、近似字节不命中、店主 5 个 exe（有就跑，SHA-256 对上）整段只命中一次且等于版本层表、Sel/SysSel 的 commit 调用形态、运行时日志回读、控制文件行
   - `native/megulithook/selftest/magesdraw.cpp`：同样的片段给 C++ 匹配器（41 项）
   - `native/megulithook/selftest/magesgate.cpp`：真 MinHook 挂在仿引擎函数上，跑 commit / 两段 commit / 清页 / 选项 / 菜单，检查返回值、栈、记录；输出就是 `validation/fixtures/engine-sigs/mages-draw-log.txt`
+  - `native/megulithook/selftest/run-mages-permission.cmd`：真实 JS transport 文件经 production ReadControl 的正反例；`mages-permission.cpp` 两线程错序返回、独立 marker 快照、12 层递归、原函数 SEH / C++ 异常、遗弃槽耗尽、observer 异常 / 重入、original 暂停时 off/on、持续 poll、不可读 / 缺失 / 恢复；commit、四个 clear、两个 dialogue 与 glyph 的实际 MinHook / cdecl / FX 门。手动 `selftest/run.cmd` 已调用，native-builds 中 megulithook 的 `ci:false` 不变，普通 CI 不编跑这些原生门
 - 没做：内嵌（方案见下，未接）；`ev=glyph` 的文字解码（菜单字要从源坐标反推字码，描边和本体各画一遍，等探针日志再定）
 - **内嵌替换方案（只写方案，未接）**：
   1. 位置：commit 之前（MagesDraw 已经在 commit 入口拿到排版缓冲）。台词那一页（Mes）在 commit 前把排版缓冲里这一句的字形换掉，不动 SC3 脚本、不动 VM
