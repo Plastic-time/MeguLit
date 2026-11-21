@@ -185,3 +185,13 @@
 - 点：system.dll 0x100350cf（saya.exe 只有 44 KB，引擎在 system.dll），字形例程 0x10034fc0 每个字一次 `GetGlyphOutlineA(hdc, 字, GGO_GRAY4, &gm, 0, NULL, &mat)`（0x100351cf 是栅格化那次，不签）
 - 例程没有 EBP 帧（SEH + 0xbc 局部 + 4 个寄存器，深 0xd8），返回地址在 API 第一个参数上方 0xf4。system.dll 里另外 7 个 TextOutA（0x100355c0、0x1003a892…）是别的例程，先不签
 - 店主测试清单：同 AVG32，行里是 `engine=nitropak`
+
+### 静态做不出签名的（写清缺什么，不硬交）
+| 引擎 / 游戏 | 静态看到的 | 缺什么 | 下一步 |
+|---|---|---|---|
+| Leaf / AQUAPLUS：WHITE ALBUM2（WA2.exe） | 导入表和代码里没有任何 GDI 文字 API，也没有经寄存器的调用；字是 fnt.pak / fon.pak 里的预渲染字库图集，D3D9 + d3dx9_41 画四边形。游戏目录里另有一个 d3d9.dll（中文补丁带的代理） | 送字函数（从剧本串取字 → 查图集 → 出四边形）在哪，只能运行中看 | 位置已经能走现有的层 4 GPU 字形四边形（native/gpuhide）；台词 / 名字 / 选项要在实机里对四边形的纹理坐标找图集查表函数，再出签名 |
+| Spike Chunsoft：ダンガンロンパ 1 / 2（DR1_us.exe / DR2_us.exe） | **SteamStub（`.bind` 节）**：代码在磁盘上是加密的；导入 SDL2 + OpenGL + FreeImage，没有 GDI 文字 API | 解开的代码 | 先用 Steamless 类工具从店主本机文件只读解出一个副本（不改游戏目录），在副本上找字库纹理的送字函数；不脱壳不做 |
+| Spike Chunsoft：ニューダンガンロンパV3（Dangan3Win.exe，x64） | SteamStub + `.text` 熵 8.0（整段加密），D3D11 | 同上，且 DrawSites 只做 x86，要另写 x64 门 | 同上，再加 x64 版本的门 |
+| Nitroplus：みにくいモジカの子 | **Enigma Protector**（`.enigma1` 熵 7.91），导入表只剩壳自己的几个 | 运行中解开的内存镜像 | 只能实机里用 runtimedump 一类的方式取解开后的镜像；静态不做 |
+
+这四个在静态这一步交不出 6 件套。签名表里没有它们，DrawSites 在这些游戏里什么都不挂

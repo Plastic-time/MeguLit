@@ -87,3 +87,5 @@
 1. ReaLive / AVG32 → 2. Softpal PAL.dll → 3. NScripter（月姬）→ 4. Innocent Grey → 5. AdvHD / WillPlus → 6. CMVS → 7. FVP → 8. minori → 9. Musica → 10. BRUNS → 11. Leaf WA2 → 12. Nitroplus（沙耶 Steam / モジカ）→ 13. Spike Chunsoft
 
 后 4 个（Leaf、Nitroplus、Spike Chunsoft、BRUNS 原版）静态普查已经说明拿不到 GDI 调用点：自绘字库或加壳，要在运行中找送字函数或先脱壳，单靠静态做不出签名，做到时会先写清缺什么，不硬交
+
+进度（feat/re-misc）：通用 GDI 画字点部件（native/megulithook/DrawSites.h + DrawSitesSig.h）已交付，签名已有 ReaLive / AVG32、Softpal（两条）、NScripter、Innocent Grey（MFC CDC 三条）、AdvHD、CMVS、FVP（两条）、minori、Musica、BRUNS、Nitroplus（沙耶 Steam）、NitroPlus 2003（沙耶原版），每条在店主本机文件上正好命中、在其他引擎文件里不命中。普查时漏看了「经寄存器调用」的情况：Musica、沙耶 Steam、Softpal 第二条都是这样找到的（签名的 SLOT 形式）。Leaf、Spike Chunsoft、モジカ 静态做不出，见 engine-draw-native.md 末尾
