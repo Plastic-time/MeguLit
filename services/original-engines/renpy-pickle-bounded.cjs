@@ -8,7 +8,8 @@ const MARK=Symbol('pickle mark');
 function fail(code,offset){const error=Error('RENPY_PICKLE_'+code);error.code=error.message;error.offset=offset;throw error;}
 function decode(buffer,options={}){
  if(!options||typeof options!=='object'||Array.isArray(options))fail('OPTIONS',0);
- const {limits:overrides={},classes=CLASSES}=options;
+ const {limits:overrides={},classes=CLASSES,allowDefaultDict=false}=options;
+ if(typeof allowDefaultDict!=='boolean')fail('DEFAULTDICT_OPTION',0);
  const limits={...LIMITS};
  if(!overrides||typeof overrides!=='object'||Array.isArray(overrides))fail('LIMITS',0);
  for(const [key,value]of Object.entries(overrides)){
@@ -35,13 +36,14 @@ function decode(buffer,options={}){
  const list=items=>{spend('edges',items.length);return {kind:'list',items};};
  const mapping=()=>({kind:'dict',entries:new Map()});
  const put=(target,key,value)=>{
-  if(target?.kind!=='dict'||!(typeof key==='string'||typeof key==='number'&&Number.isSafeInteger(key)))fail('DICT',at);
+  if(!['dict','defaultdict'].includes(target?.kind)||!(typeof key==='string'||typeof key==='number'&&Number.isSafeInteger(key)))fail('DICT',at);
   if(target.entries.has(key))fail('DUPLICATE_KEY',at);spend('edges',2);target.entries.set(key,value);
  };
  const pairs=(target,items)=>{if(items.length%2)fail('DICT',at);for(let index=0;index<items.length;index+=2)put(target,items[index],items[index+1]);};
  const remember=index=>{if(index>=limits.memo||memo.size>=limits.memo)fail('BUDGET_MEMO',at);if(memo.has(index))fail('DUPLICATE_MEMO',at);memo.set(index,peek());};
  const recall=index=>{if(!memo.has(index))fail('MEMO',at);push(memo.get(index));};
  const global=(module,name)=>{
+  if(allowDefaultDict&&(module==='collections'&&name==='defaultdict'||(module==='builtins'||module==='__builtin__')&&name==='list'))return Object.freeze({kind:'global',name:module+'.'+name});
   if(module!=='renpy.ast'||typeof name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]{0,100}$/.test(name))fail('GLOBAL',at);
   const identity=module+'.'+name;if(!allowed.has(identity))fail('GLOBAL',at);return Object.freeze({kind:'global',name:identity});
  };
@@ -81,7 +83,18 @@ function decode(buffer,options={}){
    case 0x75:{const items=marked();pairs(peek(),items);break;}
    case 0x63:{const module=line(),name=line();push(global(module,name));break;}
    case 0x93:{const name=pop(),module=pop();push(global(module,name));break;}
-   case 0x81:{const args=pop(),cls=pop();if(cls?.kind!=='global'||args?.kind!=='tuple'||args.items.length)fail('NEWOBJ',at);push({kind:'instance',className:cls.name,state:null});break;}
+   case 0x52:{
+    if(!allowDefaultDict)fail('UNSUPPORTED_OPCODE',at-1);
+    const args=pop(),cls=pop();if(cls?.kind!=='global'||cls.name!=='collections.defaultdict'||args?.kind!=='tuple')fail('REDUCE',at);
+    if(args.items.length>1)fail('REDUCE_ARGS',at);
+    let factory=null;
+    if(args.items.length&&args.items[0]!==null){
+     const value=args.items[0];if(value?.kind!=='global'||!['builtins.list','__builtin__.list'].includes(value.name))fail('REDUCE_FACTORY',at);
+     factory='list';
+    }
+    push({kind:'defaultdict',factory,entries:new Map()});break;
+   }
+   case 0x81:{const args=pop(),cls=pop();if(cls?.kind!=='global'||!allowed.has(cls.name)||args?.kind!=='tuple'||args.items.length)fail('NEWOBJ',at);push({kind:'instance',className:cls.name,state:null});break;}
    case 0x62:{const state=pop(),target=peek();if(target?.kind!=='instance'||target.state!==null)fail('STATE',at);let dict=state,slots=null;if(state?.kind==='tuple'){if(state.items.length!==2)fail('STATE',at);[dict,slots]=state.items;}if(![dict,slots].every(item=>item===null||item?.kind==='dict'))fail('STATE',at);const merged=new Map();for(const item of [dict,slots])if(item)for(const [key,value]of item.entries){if(typeof key!=='string'||merged.has(key))fail('STATE_KEY',at);spend('edges',2);merged.set(key,value);}target.state=merged;break;}
    case 0x71:remember(byte());break;case 0x72:remember(uint());break;case 0x94:remember(memo.size);break;
    case 0x68:recall(byte());break;case 0x6a:recall(uint());break;
