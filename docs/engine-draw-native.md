@@ -148,3 +148,7 @@
 - 例程没有 EBP 帧：sub esp,0xb8 + 4 个寄存器 + 7 个 API 参数，返回地址在第一个参数上方 0xe4（frame=0xe4）。via = 调用者（台词 / 名字 / 选项 / 菜单各是不同的调用点），没有笔位（x=-1），fargs 里有例程的参数
 - ディスコード！ 的 exe 版本不同，签名对不上时会写 `off:`，拿到 exe 再补一条
 - 店主测试清单：同 AVG32，行里是 `engine=advhd`
+
+### CMVS（青い鳥，Steam）
+- 点：cmvs32.exe 0x46145e，字形例程 0x4613b0（EBP 帧，2 个调用者）里每个字一次 `GetGlyphOutlineA(hdc, 字, GGO_GRAY4, &gm, 0, NULL, &mat)`（0x4614b7 是栅格化那次，不签）。字形进 D3D11 纹理，没有笔位，via / via2 是调用者
+- 店主测试清单：同 AVG32，行里是 `engine=cmvs`
