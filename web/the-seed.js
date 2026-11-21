@@ -12,7 +12,7 @@ const W={
    ['认得出版本','认 exe、封包、剧本指纹、Steam / VNDB 编号'],
    ['坏了先退一步','退回读模式并上报，修好后热更新送到大家手上'],
    ['共享运行样本','默认开，只用来修差分，可以在设置里关']],
-  soon:'读取、自动回传、热更新下一个大版本上线',next:'下一步：The Seed',tag:'megulit · the seed',
+  soon:'玩的时候自动传火，修好的种子热更新送到',next:'下一步：The Seed',tag:'megulit · the seed',
   count:(g,v)=>`已种下 ${g} 部游戏、${v} 个版本`,live:(c,w)=>`已确认 ${c} 部 · 等传火 ${w} 部`,github:'去 GitHub 看看',close:'关闭',openAria:'打开 The Seed 介绍'},
  en:{name:'The Seed',kicker:'Project Spark',line:'One small diff per game',
   lead:"We used to try fitting every game with one universal spell: fix one game and another one's magic circuit blew up. So now every game, every version gets its own diff. That is The Seed",
@@ -22,7 +22,7 @@ const W={
    ['Knows the version','Matches exe, archive, script fingerprint and Steam / VNDB ID'],
    ['Breaks, steps back','Falls back to reading mode and reports; a hot update brings the fix'],
    ['Shared run samples','On by default, used only to fix diffs, can be turned off in Settings']],
-  soon:'Reading, automatic upload and hot updates arrive with the next big version',next:'Next: The Seed',tag:'megulit · the seed',
+  soon:'Seeds spread as you play, and fixed seeds arrive by hot update',next:'Next: The Seed',tag:'megulit · the seed',
   count:(g,v)=>`${g} games, ${v} versions planted`,live:(c,w)=>`${c} confirmed · ${w} waiting for a spark`,github:'See it on GitHub',close:'Close',openAria:'Open the introduction to The Seed'},
  ja:{name:'The Seed · 伝火計画',kicker:'伝火計画',line:'ゲームごとの数 KB の差分',
   lead:'以前は一つの汎用の術式で全部のゲームに合わせようとして、一本直すと別の一本の魔力回路が吹き飛んでいました。そこで、ゲームごと・バージョンごとに差分を一つ持つ形にしました。これが The Seed です',
@@ -32,7 +32,7 @@ const W={
    ['バージョンを見分ける','exe、アーカイブ、スクリプトの指紋、Steam / VNDB の ID で判別'],
    ['壊れたら一歩退く','読み取りモードに戻って報告し、直したらホットアップデートで届けます'],
    ['実行サンプルの共有','既定でオン。差分の修正にだけ使い、設定でオフにできます']],
-  soon:'読み込み・自動送信・ホットアップデートは次の大型バージョンで公開',next:'次へ：The Seed',tag:'megulit · the seed',
+  soon:'遊んでいる間に自動で伝火し、直った種はホットアップデートで届きます',next:'次へ：The Seed',tag:'megulit · the seed',
   count:(g,v)=>`${g} 本のゲーム、${v} バージョン分を種まき済み`,live:(c,w)=>`確認済み ${c} 本 · 伝火待ち ${w} 本`,github:'GitHub で見る',close:'閉じる',openAria:'The Seed の紹介を開く'}
 };
 export const seedWords=locale=>W[locale]||W.zh;
@@ -49,15 +49,16 @@ const heroHTML=()=>`<div class="seed-hero"><img src="assets/the-seed-banner.webp
 /* the home entry: a small pill under the top bar, the egg, the name, one line and an arrow; the whole pill is one button */
 export function seedBannerHTML(locale,esc){
  const t=seedWords(locale);
- return `<button type="button" class="seed-banner" data-seed-open aria-label="${esc(t.openAria)}"><span class="seed-pic" aria-hidden="true"><img src="${ASSET}" alt=""></span><span class="seed-txt"><b>The Seed</b><small>${esc(t.line)}</small></span><i class="seed-go" aria-hidden="true">→</i></button>`;
+ return `<button type="button" class="seed-banner" data-seed-open aria-label="${esc(t.openAria)}"><span class="seed-pic" aria-hidden="true"><img src="${ASSET}" alt=""></span><span class="seed-txt"><b>The Seed</b></span><i class="seed-go" aria-hidden="true">→</i></button>`;
 }
-/* the intro body shared by the About section and the dialog; the nod to Sword Art Online and Textractor lives only at the bottom of About */
-export function seedBodyHTML(locale,esc){
+/* the intro parts shared by the About section, the dialog and the start flow; the nod to Sword Art Online and Textractor lives only at the bottom of About */
+const seedParts=(locale,esc)=>{
  const t=seedWords(locale);
- return `<p class="seed-lead">${esc(t.lead)}</p>
-  <dl class="seed-points">${t.points.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
-  <p class="seed-soon">${esc(t.soon)}</p>`;
-}
+ return {lead:`<p class="seed-lead">${esc(t.lead)}</p>`,
+  points:`<dl class="seed-points">${t.points.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`,
+  soon:`<p class="seed-soon">${esc(t.soon)}</p>`};
+};
+export function seedBodyHTML(locale,esc){const p=seedParts(locale,esc);return p.lead+p.points+p.soon;}
 const countText=(locale,s)=>{if(!s||!s.games)return '';const t=seedWords(locale);return t.count(s.games,s.versions)+(Number.isInteger(s.confirmed)&&Number.isInteger(s.waiting)?' · '+t.live(s.confirmed,s.waiting):'');};
 /* the About section: a full-width band under the three columns; the nod sits last, small */
 export function seedAboutHTML(locale,esc){
@@ -79,7 +80,7 @@ export function seedPageHTML(locale,esc,{kicker='传火计划',tag='',left='',ri
  const t=seedWords(locale);
  return `<div class="dev-notice-top"><span>${esc(t.kicker)}</span><span data-page-no>${esc(tag||t.tag)}</span></div>
  <h2>${esc(t.name)}</h2>
- <div class="dev-notice-scroll seed-scroll">${heroHTML()}${seedBodyHTML(locale,esc)}<p class="seed-count" data-seed-count></p></div>
+ <div class="dev-notice-scroll seed-scroll">${(p=>`<div class="seed-top">${heroHTML()}${p.lead}</div>${p.points}${p.soon}`)(seedParts(locale,esc))}<p class="seed-count" data-seed-count></p></div>
  <div class="dev-notice-actions">${left}${right}</div>`;
 }
 export const seedSeen=()=>{try{return localStorage.getItem('megulit.seedIntroSeen')==='1';}catch{return false;}};

@@ -59,7 +59,7 @@ export function successHTML(locale, esc) {
 export function guideHTML(locale, esc) {
   const g = pick(GUIDE, locale);
   /* the by-level section shows the plan for the level chosen on the Learning page (filled in by fillGuideLevel) */
-  return `<div class="guide-steps">${g.sections.map((s, i) => s.level ? levelSectionHTML(locale, null, esc, String(i + 1).padStart(2, '0')) : `<section class="guide-section"><h3><span class="guide-no">${String(i + 1).padStart(2, '0')}</span>${esc(s.h)}</h3>${s.keys
+  return `<div class="guide-steps">${g.sections.map(s => s.level ? levelSectionHTML(locale, null, esc, '') : `<section class="guide-section"><h3>${esc(s.h)}</h3>${s.keys
     ? `<dl class="guide-keys">${s.keys.map(([k, v]) => `<div><dt><kbd>${esc(k)}</kbd></dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`
     : `<ol>${s.steps.map(x => `<li>${kbd(x, esc)}</li>`).join('')}</ol>`}</section>`).join('')}</div>`;
 }
