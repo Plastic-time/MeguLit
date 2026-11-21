@@ -7,7 +7,14 @@
 #include <vector>
 static std::vector<std::string> Logs;
 namespace Msg { static void Log(const char *f,...){char b[1200];va_list a;va_start(a,f);vsnprintf(b,sizeof b,f,a);va_end(a);Logs.push_back(b);} }
+static void (*DuringDecode)()=nullptr;
+static int WINAPI DecodeWithSchedule(UINT codepage,DWORD flags,LPCCH input,int bytes,LPWSTR output,int chars){
+ if(DuringDecode){auto callback=DuringDecode;DuringDecode=nullptr;callback();}
+ return MultiByteToWideChar(codepage,flags,input,bytes,output,chars);
+}
+#define MultiByteToWideChar DecodeWithSchedule
 #include "../MajiroDraw.h"
+#undef MultiByteToWideChar
 #ifdef _WIN64
 int main(){MajiroDraw::Arm();puts("PASS Majiro x64 remains unhooked");return 0;}
 #else
@@ -77,6 +84,7 @@ int wmain(int argc,wchar_t **argv){
  Check(CallA(font,&destination,text,&output)==44&&Calls==before+1&&output==0x12345678&&Logs.empty(),"roles=0 forwards original parameters/output/result without telemetry");
  Control(L"#cfg roles=1\r\n");Check(WaitObserving(1),"same product watcher resumes after roles=1");Logs.clear();CallA(font,&destination,text,&output);Check(Logs.size()==1,"re-enabled observer records again without rebuilding a detour");
  Logs.clear();DuringOriginal=&OffOnDuringOriginal;before=Calls;Check(CallA(font,&destination,text,&output)==44&&Calls==before+1&&Logs.empty(),"off-on inside the original cannot publish the previous permission epoch snapshot");Logs.clear();CallA(font,&destination,text,&output);Check(Logs.size()==1,"the next draw uses the new permission epoch normally");
+ Logs.clear();DuringDecode=&OffOnDuringOriginal;before=Calls;Check(CallA(font,&destination,text,&output)==44&&Calls==before+1&&Logs.empty(),"off-on during real text conversion drops the old snapshot before logger entry");Logs.clear();CallA(font,&destination,text,&output);Check(Logs.size()==1,"the next draw after conversion-time off-on records normally");
  DeleteFileW(ControlFile().c_str());Check(WaitObserving(0),"removing control stops product observation");Logs.clear();Check(CallA(font,&destination,text,&output)==44&&Logs.empty(),"removed control leaves only the original draw");
  SetEvent(stop);Check(WaitForSingleObject(watcher,4000)==WAIT_OBJECT_0,"test watcher exits before MinHook cleanup");CloseHandle(watcher);CloseHandle(stop);
  Check(MH_DisableHook((void *)&Draw)==MH_OK,"detour disables cleanly");Check(CallA(font,&destination,text,&output)==44&&Logs.empty(),"disabled observer leaves original draw untouched");MH_RemoveHook((void *)&Draw);MH_Uninitialize();DeleteFileW(ControlFile().c_str());printf("Majiro real gate: %d failure(s)\n",Failures);return Failures;
