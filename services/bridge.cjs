@@ -56,15 +56,16 @@ const LAUNCH_MILESTONES={prepare:.08,features:.16,'process-check':.26,request:.3
 const launchProgress=new Map();
 function markLaunch(id,key,extra={}){const p=LAUNCH_MILESTONES[key];if(p===undefined&&!extra.state)return;const prev=launchProgress.get(id);const keep=prev&&!extra.state&&prev.state==='run'&&prev.p>p?prev.p:p;
  launchProgress.set(id,{p:extra.state==='failed'?(prev?.p||0):keep,key,state:extra.state||(key==='ready'?'done':'run'),error:extra.error||'',at:Date.now(),next:Object.values(LAUNCH_MILESTONES).find(v=>v>keep)||1});}
-async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redirected=false}={}) {
+async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redirected=false,launchToken}={}) {
   const game=db.prepare('SELECT * FROM games WHERE id=? AND removed_at IS NULL').get(id);
   if(!game)throw Error('GAME_NOT_FOUND');
   /* 2026-11-12 a folder used as another game's Japanese original starts that game (services/import-source.cjs) */
   {let target='';try{const sources=require('./import-source.cjs');sources.backfill(db);target=sources.targetOf(db,db.prepare('SELECT original FROM games WHERE id=?').get(id));}catch{}if(target&&target!==id&&!redirected)return launch(db,target,runtime,windowsLaunch,{redirected:true});}
    const trace=(stage,extra={})=>{try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','game-launch.log'),JSON.stringify({at:new Date().toISOString(),gameId:id,stage,...extra})+'\n');}catch{}};
   let stage='launch-preflight',featureWatch=null,drmPlan=null;if(!retried)markLaunch(id,'prepare');
-  let launcherRun=null;/* the DRM launcher this start runs (services/launcher-cleanup.cjs) */try{
+  let launcherRun=null,launchLease=null;/* the DRM launcher this start runs (services/launcher-cleanup.cjs) */try{
   if(!game.executable||!fs.existsSync(game.executable))throw Error('EXECUTABLE_MISSING');
+  launchLease=require('./embedded-japanese-jobs.cjs').reserveLaunch(path.dirname(game.executable),launchToken);
   stage='background-stop';trace('background-stop');await require('./background-games.cjs').foreground();trace('background-stopped');
   let original={};try{original=JSON.parse(game.original||'{}')||{};}catch{}const profile=original.library || {};
   /* E-SteamOwned: a game Steam installed (appmanifest lists its folder) starts through Steam even when it was added by hand or by a folder scan (core/steam-owned.cjs) */
@@ -79,7 +80,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
     if(plan.changed&&plan.executable&&fs.existsSync(plan.executable)){
      const before=String(game.executable),same=before.toLowerCase()===plan.executable.toLowerCase(),record=profile.drm||{};
      if(!same||String(profile.launchVia||'')!==plan.launchVia||record.kind!==plan.kind){
-      game.executable=plan.executable;
+      launchLease.extend(path.dirname(plan.executable));game.executable=plan.executable;
       original.library={...profile,exe:plan.executable,launchVia:plan.launchVia,drm:{kind:plan.kind,wrapped:plan.wrapped,from:record.from||before,at:Date.now()}};
       db.prepare('UPDATE games SET executable=?,original=? WHERE id=?').run(plan.executable,JSON.stringify(original),id);
       Object.assign(profile,original.library);trace('drm-corrected',{from:path.basename(before),executable:path.basename(plan.executable),launcher:path.basename(plan.launchVia||'')});}
@@ -241,13 +242,13 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
    if(featureWatch){featureWatch.stop();const asked=featureWatch.found;featureWatch=null;
     if(asked.length&&['GAME_PROCESS_EXITED','GAME_WINDOW_NOT_READY','GAME_LAUNCH_FAILED'].includes(error.message)){
      const feature=asked[0];trace('windows-feature-needed',{feature,retried});
-     if(/^directplay$/i.test(feature)&&!retried){const dp=require('../core/directplay.cjs').prepare(path.dirname(game.executable),{root,exe:game.executable,all:true});if(!dp.missing.length)return launch(db,id,runtime,windowsLaunch,{retried:true});}
+     if(/^directplay$/i.test(feature)&&!retried){const dp=require('../core/directplay.cjs').prepare(path.dirname(game.executable),{root,exe:game.executable,all:true});if(!dp.missing.length)return await launch(db,id,runtime,windowsLaunch,{retried:true,launchToken:launchLease?.token});}
      neededFeature.set(id,feature);error=Object.assign(Error(/^directplay$/i.test(feature)?'DIRECTPLAY_REQUIRED':'WINDOWS_FEATURE_REQUIRED'),{detail:feature});}}
    /* E299: a boxed release whose protection plug-in wants the original DVD quits on start; say so (disc-check.cjs). */
    if(['GAME_PROCESS_EXITED','GAME_WINDOW_NOT_READY'].includes(error.message)&&game.executable&&require('./disc-check.cjs').discProtected(path.dirname(game.executable)))error=Object.assign(Error('GAME_DISC_REQUIRED'),{detail:error.message});
    /* E-DRM: say which program needs which licence check and what was or can be used instead (launch_hint has the words) */
    if(drmPlan&&['GAME_PROCESS_EXITED','GAME_WINDOW_NOT_READY','GAME_LAUNCH_FAILED'].includes(error.message))error=Object.assign(Error(drmPlan.kind==='steam'?'GAME_STEAM_REQUIRED':drmPlan.launchVia?'GAME_DRM_LAUNCHER_FAILED':'GAME_DRM_WRAPPED'),{detail:error.message});
-   trace('launch-failed',{phase:stage,error:error.message,detail:error.detail||error.code});markLaunch(id,'failed',{state:'failed',error:error.message});try{require('../core/japanese-auto.cjs').launchResult(root,id,false);}catch{}throw error;}
+   trace('launch-failed',{phase:stage,error:error.message,detail:error.detail||error.code});markLaunch(id,'failed',{state:'failed',error:error.message});try{require('../core/japanese-auto.cjs').launchResult(root,id,false);}catch{}throw error;}finally{launchLease?.release();}
 }
 function deleteWord(db,id) {
   const word=db.prepare('SELECT * FROM vocabulary WHERE id=?').get(id);
@@ -370,9 +371,20 @@ async function dispatch(request,runtime=null) {
       case 'jp_auto_get':return {enabled:require('../core/japanese-auto.cjs').read(root).enabled};
       case 'jp_auto_set':{const ja=require('../core/japanese-auto.cjs');if(request.id!=null){ja.setGameOff(root,String(request.id),request.off===true);return {ok:true};}return ja.setEnabled(root,request.enabled!==false);}
       case 'jp_auto_status':case 'jp_auto_undo':{const id=String(request.id),row=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row?.executable)throw Error('GAME_NOT_FOUND');const dir=path.dirname(row.executable),ja=require('../core/japanese-auto.cjs');
-       if(request.action==='jp_auto_status')return ja.status(root,id,dir,{executable:row.executable,...require('./japanese-restore-options.cjs').forExecutable(row.executable)});if(require('../core/japanese-restore.cjs')._internal.gameRunning(dir))throw Error('GAME_RUNNING');return ja.undo(root,id,dir,{options:require('./japanese-restore-options.cjs').forExecutable(row.executable)});}
+       if(request.action==='jp_auto_status')return ja.status(root,id,dir,{executable:row.executable,...require('./japanese-restore-options.cjs').forExecutable(row.executable)});return require('./embedded-japanese-jobs.cjs').runLegacy(id,dir,{operation:'undo',requestId:request.requestId},async()=>{if(require('../core/japanese-restore.cjs')._internal.gameRunning(dir))throw Error('GAME_RUNNING');return ja.undo(root,id,dir,{options:require('./japanese-restore-options.cjs').forExecutable(row.executable)});});}
+      case 'jp_restore_scan':case 'jp_restore_scan_status':case 'jp_restore_scan_cancel':{
+       const id=String(request.id),row=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row?.executable)throw Error('GAME_NOT_FOUND');
+       const jobs=require('./embedded-japanese-jobs.cjs');
+       const query={jobId:request.jobId?String(request.jobId):undefined,requestId:request.requestId?String(request.requestId):undefined,retireIfMissing:request.retireIfMissing===true,operation:request.operation};
+       if(request.action==='jp_restore_scan_status')return jobs.status(id,query);
+       if(request.action==='jp_restore_scan_cancel')return jobs.cancel(id,query);
+       return jobs.start(id,path.dirname(row.executable),{requestId:String(request.requestId||'')});}
       case 'jp_restore_list':{const fs=require('node:fs'),path=require('node:path');return db.prepare('SELECT id,title,executable FROM games WHERE removed_at IS NULL ORDER BY title').all().map(g=>{const dir=g.executable?path.dirname(g.executable):'';let hint='';try{if(dir&&(fs.existsSync(path.join(dir,'.megulit-japanese'))||fs.existsSync(path.join(dir,'.megulit-japanese-import'))))hint='applied';else if(dir&&require('../core/japanese-import.cjs').translatedOnly(dir,g.executable))hint='translated';else if(dir&&fs.existsSync(path.join(dir,'dat'))&&fs.readdirSync(path.join(dir,'dat')).some(f=>/\.dbs$/i.test(f)))hint='candidate';else if(dir&&fs.readdirSync(dir).some(n=>/^(scene|gameexe)(jp|ja|en|zh|cn|tw)?\.(pck|dat)$/i.test(n)||/_(jp|ja)\.(xp3|pck|arc|dat)$/i.test(n)))hint='unsupported';}catch{}return dir?{id:g.id,title:g.title,hint:hint||'import',dir:dir.toLowerCase()}:null;}).filter(Boolean).filter((g,i,all)=>all.findIndex(o=>o.dir===g.dir)===i).map(({dir,...g})=>g);}
       case 'jp_restore_steam':case 'jp_restore_detect':case 'jp_restore_apply':case 'jp_restore_undo':case 'jp_import_apply':case 'jp_import_preview':case 'jp_import_cancel':case 'jp_import_reveal':{const id=String(request.id),row=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row?.executable)throw Error('GAME_NOT_FOUND');const dir=require('node:path').dirname(row.executable),jr=require('../core/japanese-restore.cjs'),ji=require('../core/japanese-import.cjs');
+       if(request.action==='jp_restore_apply'&&request.embedded===true)return require('./embedded-japanese-jobs.cjs').start(id,dir,{operation:'restore',requestId:String(request.requestId||''),scanToken:String(request.scanToken||''),onDone:()=>runtime?.reader?.refreshTextSource?.()});
+       const jobService=require('./embedded-japanese-jobs.cjs'),knownRequest=request.action==='jp_restore_undo'?jobService.known(id,request.requestId):null;
+       if(request.action==='jp_restore_undo'&&(require('./embedded-japanese.cjs').manifest(dir)||knownRequest&&!knownRequest.legacy&&knownRequest.operation==='undo'))return jobService.start(id,dir,{operation:'undo',requestId:String(request.requestId||''),onDone:()=>runtime?.reader?.refreshTextSource?.()});
+       const perform=async()=>{
        /* E525 Steam store languages (cached by the Chinese-build guide, fetched in the background when missing) */
        const steamApp=require('../core/game-language-switch.cjs')._internal.steamApp(dir),lsOptions=require('./japanese-restore-options.cjs').forExecutable(row.executable);/* engine-draw (Artemis): this game's diff asks the game to draw its own Chinese track under the Japanese */try{const g=db.prepare('SELECT engine,title FROM games WHERE id=?').get(id)||{},P=require('../core/profiles/index.cjs'),pr=P.profileFor({exe:row.executable,engine:g.engine,title:g.title});if(P.get(pr,'draw.embed',false)===true&&P.get(pr,'draw.embedTranslation',true)!==false)lsOptions.bilingual='cn';}catch{}if(steamApp){try{const net=require('./cn-version-guide.cjs').online(root,{appid:steamApp.appid});if(net.state==='done'&&typeof net.steamJapanese==='boolean')lsOptions.steamJapanese=net.steamJapanese;}catch{}}
        if(request.action==='jp_restore_steam'){if(!steamApp)throw Error('NOT_STEAM');const child=spawn('explorer.exe',['steam://nav/games/details/'+steamApp.appid],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {ok:true,appid:steamApp.appid};}
@@ -398,7 +410,8 @@ async function dispatch(request,runtime=null) {
        if(request.action==='jp_restore_undo'&&imported?.state==='imported'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');const r=ji.restore(dir);if(!r.skipped.length)importedExecutable(db,id,r.exe,'zh');return r;}
        /* E595 a Chinese patch over the release: turned off by the import's backed-up remove step (undo = jp_restore_undo) */
        if(request.action==='jp_restore_apply'&&jr.detect(dir,lsOptions).adapter==='overlay-patch'){if(jr._internal.gameRunning(dir))throw Error('GAME_RUNNING');return jio.apply(dir,dir,row.executable).then(r=>{if(changedFiles(r))importedExecutable(db,id,r.exe||row.executable,'ja');return withPatch(r);});}
-       return request.action==='jp_restore_apply'?withPatch(jr.apply(dir,lsOptions)):jr.restore(dir,lsOptions);}
+       return request.action==='jp_restore_apply'?withPatch(jr.apply(dir,lsOptions)):jr.restore(dir,lsOptions);
+       };return ['jp_restore_apply','jp_restore_undo','jp_import_apply'].includes(request.action)?jobService.runLegacy(id,dir,{operation:request.action==='jp_restore_undo'?'undo':'restore',requestId:request.requestId},perform):perform();}
       case 'game_cover':return require('./game-cover.cjs').setCover(db,root,String(request.id),request.path);
       /* E362 adaptation overview + one-click diagnostic package (built locally; shown to the user before any upload) */
       case 'adaptation_overview':return require('./adaptation-overview.cjs').overview(db,root);

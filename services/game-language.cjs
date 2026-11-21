@@ -87,7 +87,8 @@ function originalExecutable(db,id,root,mode,executable){
  const {row,original}=get(db,id),lib=original.library||{};
  const patch=require('./patch-swap.cjs');
  const dir=patch.gameDirectory(root,id,row.executable,lib.dir);
- const valid=file=>typeof file==='string'&&path.isAbsolute(file)&&isFile(file)&&isLauncher(file)&&languageHint(file)!=='zh';
+ let embeddedRestored=false;try{const e=require('./embedded-japanese.cjs'),ownDir=path.dirname(row.executable);embeddedRestored=e._internal.snapshotValid(ownDir,e.manifest(ownDir));}catch{}
+ const valid=file=>typeof file==='string'&&path.isAbsolute(file)&&isFile(file)&&isLauncher(file)&&(languageHint(file)!=='zh'||embeddedRestored&&key(file)===key(row.executable));
  const candidates=[];
  function scan(folder,depth){
   let entries;try{entries=fs.readdirSync(folder,{withFileTypes:true});}catch{return;}
@@ -101,7 +102,7 @@ function originalExecutable(db,id,root,mode,executable){
  const savedSwap=patch.status(root,id,dir,row.executable,lib.engine,{activeOnly:true});
  const sameOriginal=savedSwap.japaneseExecutable&&key(savedSwap.japaneseExecutable)===key(row.executable);
  const legacyBlocked=savedSwap.active?.startsWith('switching-')||sameOriginal&&savedSwap.issue;
- const blocked=!valid(row.executable)||legacyBlocked||(!lib.originalExecutableVerified&&(localTranslated||lib.contentLanguage==='zh'));
+ const blocked=!valid(row.executable)||legacyBlocked||(!embeddedRestored&&!lib.originalExecutableVerified&&(localTranslated||lib.contentLanguage==='zh'));
  const result={directory:dir,executable:blocked?'':row.executable,blocked};
  if(!mode)return result;
  let selected=executable;
