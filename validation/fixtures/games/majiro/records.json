@@ -1,0 +1,21 @@
+{
+ "provenance": "Synthetic Majiro bytecode instructions, not game script text",
+ "ops": [
+  ["ldstr", "ＭＳ ゴシック"],
+  ["ldstr", "設定"],
+  ["text", "これは"], ["ctrl", "n"], ["text", "テストです"], ["proc"],
+  ["text", "同じ文です"], ["ctrl", "p"],
+  ["text", "同じ文です"], ["ctrl", "w"],
+  ["ldstr", "進む"],
+  ["text", "次の行です"], ["ctrl", "r"],
+  ["text", "本文です"], ["proc"],
+  ["text", "表示テスト"], ["proc"],
+  ["text", "入力テスト"], ["proc"],
+  ["text", "解析テスト"], ["proc"],
+  ["text", "境界テスト"], ["proc"],
+  ["text", "日本語です"], ["proc"],
+  ["text", "最後の行です"], ["proc"]
+ ],
+ "messages": ["これは\nテストです", "同じ文です", "同じ文です", "次の行です", "本文です", "表示テスト", "入力テスト", "解析テスト", "境界テスト", "日本語です", "最後の行です"],
+ "literals": ["ＭＳ ゴシック", "設定", "進む"]
+}
