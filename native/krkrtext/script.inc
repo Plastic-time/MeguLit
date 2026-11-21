@@ -358,7 +358,7 @@ LR"MGLT((function(){
      if(this.trOwner!==L) {this.trRestore();this.trRec=void;this.trOwner=L;this.trText='';this.trKey='';}
      var flat=t.replace(/\n/g,'');
      var from=0;
-     if(!(this.trText!='' && (flat.indexOf(this.trText)==0 || this.trText.indexOf(flat)==0))) {this.trLine++;this.trCol=void;this.trTry=0;this.embTrOff();}
+     if(!(this.trText!='' && (flat.indexOf(this.trText)==0 || this.trText.indexOf(flat)==0))) {this.trLine++;this.trCol=void;this.trTry=0;if(typeof this.embTrOff=='Object') this.embTrOff();}
      /* a page that grew by a sentence: its colour is that sentence's own (a read line above a new one keeps its yellow) */
      else if(flat.length>this.trText.length+1 && flat.indexOf(this.trText)==0) {from=this.trText.length;this.trCol=void;this.trTry=0;}
      for(var i=from;i<all.count && pts.count<6;i++) pts.add(all[i]);
@@ -369,7 +369,7 @@ LR"MGLT((function(){
      this.trRec=[h,100000+this.trLine,tail];
      this.report('ToMe_CHARS engine=krkr line='+(100000+this.trLine)+' hidden='+h+tail);
      this.trAll=all;this.trAllL=L;
-     try {if(this.cfg.embed) {this.embPend=this.embTrQueue(L,all,flat,from,t,h);this.embTry();}} catch(e) {this.charsErr='trEmb '+e.message;}
+     try {if(typeof this.cfg=='Object' && this.cfg.embed) {this.embPend=this.embTrQueue(L,all,flat,from,t,h);this.embTry();}} catch(e) {this.charsErr='trEmb '+e.message;}
      this.trHide();
     } catch(e) {this.charsErr='tr '+e.message;}
    } incontextof st;
