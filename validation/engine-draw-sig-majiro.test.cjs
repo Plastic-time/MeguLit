@@ -27,7 +27,10 @@ test('integration is observer-only, needs a unique match and keeps x64 unhooked'
  const src=fs.readFileSync(path.join(__dirname,'..','native','megulithook','MajiroDraw.h'),'utf8');
  assert.match(src,/if\(total!=1\)return false/);assert.match(src,/if\(RolesAsked\(\)\)\{if\(Install\(\)\)/);
  assert.match(src,/if\(!InterlockedCompareExchange\(&Observing,0,0\)\)return Original/);
- assert.match(src,/else InterlockedExchange\(&Observing,0\)/);
+ assert.match(src,/else SetObserving\(false\)/);
+ const setter=src.slice(src.indexOf('static void SetObserving'),src.indexOf('static void RefreshControl'));
+ assert.match(setter,/InterlockedIncrement\(&PermissionEpoch\);InterlockedExchange\(&Observing,next\)/);
+ assert.match(src,/epoch==InterlockedCompareExchange\(&PermissionEpoch,0,0\)/,'an in-flight snapshot retains its permission generation');
  assert.match(src,/for\(;;\)\{RefreshControl\(\)/);
  assert.match(src,/#else\s+namespace MajiroDraw \{ static void Arm\(\) \{\} \}/);
  for(const f of ['build-x86.cmd','build-x64.cmd'])assert.match(fs.readFileSync(path.join(__dirname,'..','native','megulithook',f),'utf8'),/for %%F in \(MajiroDraw\.h MajiroDrawSig\.h\)/);
