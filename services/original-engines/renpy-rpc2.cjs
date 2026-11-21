@@ -4,6 +4,7 @@
 const zlib=require('node:zlib'),crypto=require('node:crypto');
 const PROFILES=Object.freeze({
  'renpy-6.99.12.4.2187':Object.freeze({commit:'e60f170f7f5c152b4f656b5fe94ccc7ed4b2c3d2',digestKind:'source-md5'}),
+ 'renpy-8.4.0.25071206':Object.freeze({commit:'8881389241074a3095dfe7b91c8b6bb0df018f02',digestKind:'source-and-rpyc-magic-md5'}),
  'renpy-8.5.3.26051504':Object.freeze({commit:'39895c1e017f0b36ffea2447d97eccd69d76ee1c',digestKind:'source-and-rpyc-magic-md5'}),
 });
 const LIMITS=Object.freeze({inputBytes:4*1024*1024,directoryBytes:36,slotPackedBytes:2*1024*1024,slotExpandedBytes:4*1024*1024,totalExpandedBytes:8*1024*1024});
