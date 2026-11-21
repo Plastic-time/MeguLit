@@ -20,30 +20,13 @@ const {fold}=require('./samples.cjs');
 
 function thresholdsOf(profile){const t={...DEFAULTS};for(const [k,v] of Object.entries(profile?.selfCheck||{}))if(k in DEFAULTS&&Number.isFinite(+v))t[k]=+v;return t;}
 
-/* the replay's events cut into self-check windows (a short tail counts only when it has minLines, or when it is the only one) */
-function windows(events,t){const out=[];let cur=[],lines=0;
- for(const e of events){cur.push(e);if(e.kind==='line'&&++lines>=t.window){out.push(cur);cur=[];lines=0;}}
- if(cur.length&&(lines>=t.minLines||!out.length))out.push(cur);return out;}
-
-const worse=(k,a,b)=>a==null?b:b==null?a:k==='pairRate'?Math.min(a,b):Math.max(a,b);
-/* one candidate over every window -> {pass, over, metrics (worst per metric), cost (mean), windows:[...]} */
-function evaluate(events,params,t){const ws=windows(events,t).map((w,i)=>{const r=ap.predict(w,params,t);return {window:i+1,lines:r.lines,metrics:r.metrics,over:r.over,pass:r.pass,positionLimit:r.positionLimit};});
- const metrics={};for(const w of ws)for(const [k,v] of Object.entries(w.metrics))metrics[k]=k in metrics?worse(k,metrics[k],v):v;
- const over=[...new Set(ws.flatMap(w=>w.over))];
- const cost=ws.length?Math.round(ws.reduce((a,w)=>a+costOf(w,t),0)/ws.length*1000)/1000:0;
- return {pass:over.length===0,over,metrics,cost,windows:ws};}
-function costOf(r,t){const m=r.metrics;let c=0;
- if(m.hideVisible!=null)c+=m.hideVisible/t.hideVisible;if(m.dropRate!=null)c+=m.dropRate/t.dropRate;if(m.repeatRate!=null)c+=m.repeatRate/t.repeatRate;
- c+=(m.choiceMismatch||0)/Math.max(1,t.choiceMismatch);if(m.positionPx!=null)c+=m.positionPx/(r.positionLimit||t.positionPx);if(m.pairRate!=null)c+=(1-m.pairRate)/(1-t.pairRate);return c;}
+/* 2026-11-21 windows / evaluate / paramsOf live in core/cold-test/score.cjs: the app's idle-time cold test scores its one
+   recording with the same code (the app does not ship tools/) */
+const Core=require('../../core/cold-test/score.cjs');
+const {windows,evaluate,paramsOf}=Core;
 const changes=p=>(p.effectFrames!==null)+(p.filters!=='kernel');
 
 function textBox(events){const b=events.filter(e=>e.kind==='box');if(b.length<3)return null;const x=Math.min(...b.map(e=>e.x)),y=Math.min(...b.map(e=>e.y)),r=Math.max(...b.map(e=>e.x+e.w)),bt=Math.max(...b.map(e=>e.y+e.h));return {x,y,w:r-x,h:bt-y,client:[b[0].cw,b[0].ch]};}
-
-/* candidate params a diff's settings stand for (the fixture replays a diff with these); choice.filters [] is 'none' only when the
-   kernel default is not [] already (a seed pins the default list) */
-function paramsOf(settings){const s=settings||{};const hide=s.calibrate?.hideMethod==='read'||s.hide?.textEffectsRead===true?'read':'hide';
- const anchor=s.placement?.firstLineAnchor;const positionSource=s.calibrate?.positionSource??(anchor==='glyph'?'glyph':anchor==='box'?'ocr':null);
- return {hideMethod:hide,positionSource:hide==='read'?null:positionSource,effectFrames:hide==='read'?null:(s.page?.effectFrames??null),filters:hide!=='read'&&Array.isArray(s.choice?.filters)&&s.choice.filters.length===0&&(require('../../core/profiles/defaults.cjs').choice?.filters||[]).length>0?'none':'kernel'};}
 
 /* the engine-draw roles of the replay (tools/diff-maker/roles.cjs) and, per role, where its unique texts sit in the script:
    a line role whose texts are script choices, or a UI role whose texts are script dialogue, is a misclassification to look at */

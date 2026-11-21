@@ -40,7 +40,7 @@ class Settings{
     for(const panel of ['menu','log','card'])value.panels[panel]={...panelDefaults,...Object.fromEntries(Object.keys(panelDefaults).map(k=>[k,value[k]??panelDefaults[k]])),...value.panels[panel]};return value;
   }
   if(scope==='online')return {relayUrl:'',leaderboardEnabled:false,leaderboardName:'',leaderboardShareGames:false,...readJSON(path.join(this.folder,'online.json'))};
-  if(scope==='library'){const library=readJSON(this.file('library.json'));return {autoSeries:library.autoSeries!==false,sharedAdaptation:library.sharedAdaptation!==false,sceneShots:library.sceneShots!==false,runtimeHarvest:library.runtimeHarvest!==false,probeUpload:library.probeUpload!==false,adapterContrib:require('./adapter-contrib.cjs').enabled(this.root),steamPath:library.steamPath||'',folders:(library.folders||[]).join('\n')};}
+  if(scope==='library'){const library=readJSON(this.file('library.json'));return {autoSeries:library.autoSeries!==false,sharedAdaptation:library.sharedAdaptation!==false,sceneShots:library.sceneShots!==false,runtimeHarvest:library.runtimeHarvest!==false,probeUpload:library.probeUpload!==false,coldTest:library.coldTest!==false,coldTestShots:library.coldTestShots!==false,adapterContrib:require('./adapter-contrib.cjs').enabled(this.root),steamPath:library.steamPath||'',folders:(library.folders||[]).join('\n')};}
   throw Error('SETTINGS_SCOPE_INVALID');
  }
  get(profile=''){
@@ -94,7 +94,7 @@ class Settings{
     if(Object.hasOwn(values,'leaderboardName')&&next.leaderboardName!==''){const checked=require('./leaderboard.cjs').cleanName(next.leaderboardName);if(!checked.ok)throw Error('LEADERBOARD_'+checked.error);next.leaderboardName=checked.name;}
     if(Object.hasOwn(values,'relayUrl')&&next.relayUrl!==''){const base=require('./relay-config.cjs').normalizeBase(next.relayUrl);if(!base)throw Error('SETTINGS_INVALID_URL');next.relayUrl=base;}
     const file=path.join(this.folder,'online.json');atomic(file,{...readJSON(file),relayUrl:next.relayUrl,leaderboardEnabled:next.leaderboardEnabled,leaderboardName:next.leaderboardName,leaderboardShareGames:next.leaderboardShareGames});
-  }else if(scope==='library')atomic(this.file('library.json'),{...readJSON(this.file('library.json')),steamPath:next.steamPath,folders:next.folders.split(/[\r\n;]+/).map(v=>v.trim()).filter(Boolean),autoSeries:next.autoSeries,sharedAdaptation:next.sharedAdaptation!==false,sceneShots:next.sceneShots!==false,runtimeHarvest:next.runtimeHarvest!==false,probeUpload:next.probeUpload!==false});
+  }else if(scope==='library')atomic(this.file('library.json'),{...readJSON(this.file('library.json')),steamPath:next.steamPath,folders:next.folders.split(/[\r\n;]+/).map(v=>v.trim()).filter(Boolean),autoSeries:next.autoSeries,sharedAdaptation:next.sharedAdaptation!==false,sceneShots:next.sceneShots!==false,runtimeHarvest:next.runtimeHarvest!==false,probeUpload:next.probeUpload!==false,coldTest:next.coldTest!==false,coldTestShots:next.coldTestShots!==false});
   /* the contribution switch is the player's decision: written only when it was changed here (an untouched switch must not decide for them) */
   if(scope==='library'&&Object.hasOwn(values,'adapterContrib')&&(c=>c.decided||(next.adapterContrib===true)!==c.enabled)(require('./adapter-contrib.cjs').consentState(this.root)))require('./adapter-contrib.cjs').setConsent(this.root,next.adapterContrib===true,{source:'settings'});
   return this.get(profile);
