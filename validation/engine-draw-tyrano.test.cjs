@@ -57,7 +57,7 @@ domTest('DOM clear reaches the real WebTextPath -> HookNative -> HiddenGate -> p
  try{await r.enable();await r.wait(()=>reports.some(x=>x.hidden));await r.run(()=>{document.querySelector('.message_inner').textContent='';__megulitText.scan();});
  const {HookNative}=require('../core/hook-native.cjs'),{OverlayPlacement}=require('../core/overlay-placement.cjs'),messages=[];
  const placement=new OverlayPlacement({send:m=>messages.push(m)});placement.on=true;placement.client=[1200,720];
- const hook={textPathActive:true,drawLog(){},engineDrawLine(){},now:()=>1,emit:m=>placement.hook(m)};
+ const hook=Object.assign(Object.create(HookNative.prototype),{textPathActive:true,drawLog(){},engineDrawLine(){},now:()=>1,emit:m=>placement.hook(m)});
  const path=new W.WebTextPath({port:1,onChars:wire=>HookNative.prototype.charRects.call(hook,wire)});
  for(const o of await r.run(()=>reports.filter(x=>Array.isArray(x.rects)&&!x.ui)))path.report(JSON.stringify(o));
  assert.ok(messages.some(m=>m.type==='textPlace'&&m.gone===true));assert.equal(hook.charGates.get('web').hidden((await r.body()).line),false);
@@ -104,7 +104,7 @@ domTest('disable and transport stop restore embedding and clear UI while keeping
  try{await r.enable({roles:true,embed:true});await r.run(()=>__megulitText.embed('晴',{ruby:[[0,1,'はれ']],zh:'晴天'}));await r.wait(()=>!!document.querySelector('.megulit-zh'));await r.wait(()=>reports.some(x=>x.ui));await r.run(()=>__megulitText.hide(false));assert.equal(await r.run(()=>document.querySelector('.megulit-ruby,.megulit-zh,[data-megulit-hide]')),null);assert.equal(await r.run(()=>reports.some(x=>x.ui&&x.text==='')),true);
  await r.enable({embed:true});await r.wait(()=>!!document.querySelector('.megulit-zh'));await r.run(()=>__megulitText.stop());assert.equal(await r.run(()=>document.querySelector('.megulit-zh')),null);
  }finally{await r.close();}
- const p=new W.WebTextPath({port:1}),evals=[];let closed=0;p.pages.set('x',{close(){closed++;}});p.evaluate=(c,js)=>{evals.push(js);return Promise.resolve();};p.stop();await new Promise(resolve=>setImmediate(resolve));assert.match(evals[0],/__megulitText\.stop/);assert.equal(closed,1);
+ const p=new W.WebTextPath({port:1}),evals=[],removed=[];let closed=0,release;const pending=new Promise(resolve=>{release=resolve;});p.pages.set('x',{scriptIds:['owned-script'],async send(method,args){if(method==='Runtime.evaluate'){evals.push(args.expression);await pending;return {};}if(method==='Page.removeScriptToEvaluateOnNewDocument')removed.push(args.identifier);},close(){closed++;}});const stopped=p.stop();assert.equal(p.stop(),stopped);await new Promise(resolve=>setImmediate(resolve));assert.match(evals[0],/__megulitText\.stop/);assert.equal(closed,0,'transport remains owned until restoration acknowledges');release();await stopped;assert.deepEqual(removed,['owned-script']);assert.equal(closed,1);assert.equal(p.pages.size,0);
 });
 
 domTest('a stale replacement cannot embed into the new page; zh=false rebuilds ruby without Chinese',async()=>{
