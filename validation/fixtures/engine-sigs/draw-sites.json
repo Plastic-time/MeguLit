@@ -154,6 +154,17 @@
    "slot": "0x54802c",
    "call": "0x5192ee",
    "hex": "05f2ff8b46608945fc83bebc000000008b4e60894df8750e6a00ff15388054008986bc0000008b55f88b46188b4d0868bc615600528b96bc0000005357505152ff152c8054008b1f83c30383e3fc837e"
+  },
+  "mashiroiro/musica": {
+   "id": "musica",
+   "file": "mashiroiro.exe",
+   "sha256": "05f51cfe00436c91c6a0102fb79d8e9d751b6ec88795b164b4640d953842f050",
+   "api": "GetGlyphOutlineA",
+   "va": "0x459d00",
+   "callOffset": 64,
+   "slot": "0x49a020",
+   "call": "0x459d40",
+   "hex": "beac0000005f5b8b065ec3558bec51515356578bf1e854ffffff8b465468b0f249008d5e60506a0053ff76188bce8945fcff7508e81bffffff8b3d20a0490050ffd783f8018945f8720485c0790733c0"
   }
  }
 }

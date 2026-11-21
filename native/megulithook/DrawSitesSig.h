@@ -7,6 +7,9 @@
 // snippets of the owner's exes, tools/engine-sigs/draw-sites.cjs reads this very table and runs the same algorithm on the
 // owner's exes (validation/engine-draw-sig-sites.test.cjs). DrawSites.h hooks the sites at run time.
 //
+// The call is `call dword ptr [IAT slot]` (FF 15), or, when the pattern holds the token SLOT, a `call reg` (FF D0..D7) right after
+// a pattern that loads the API's pointer from its slot (MinHook then also moves the instruction after it: keep such a site off
+// a branch target).
 // Table format (parsed by tools/engine-sigs/draw-sites.cjs, keep one entry per line):
 //   { "id", "module" ("" = the game's exe), "API", "bytes before FF 15", count, frame },
 // frame = 1 when the function holding the site keeps an EBP frame (its callers are read as via=); 0 = unknown; 8 and more = the
@@ -55,15 +58,20 @@ static const Sig Sigs[] = {
   // minori (eden*, Steam English build, eden_en.exe 0x5192ee): the glyph routine 0x519190 (EBP frame, 3 callers) renders each
   // character with GetGlyphOutlineA (0x5191d8 before it is the size query: not signed); no pen, via / via2 = its callers
   { "minori", "", "GetGlyphOutlineA", "8b 46 18 8b 4d 08 68 ?? ?? ?? ?? 52 8b 96 ?? ?? 00 00 53 57 50 51 52", 1, 1 },
+  // Musica / ぱれっと (ましろ色シンフォニー, mashiroiro.exe 0x459d40): the glyph routine 0x459d0b (EBP frame, 2 callers) loads
+  // GetGlyphOutlineA into edi and calls it once (mov edi, [slot]; push eax (the DC from 0x459c54); call edi); the instruction after
+  // it (cmp eax, 1) goes into MinHook's trampoline with it. No pen, via / via2 = its callers
+  { "musica", "", "GetGlyphOutlineA", "8b 3d SLOT 50", 1, 1 },
 };
 static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
 
-// "52 57 ?? 50" -> bytes + mask (mask 0 = any); returns the length
+// "52 57 ?? 50" -> bytes + mask (mask 0 = any, 2 = a byte of the API's IAT slot: the token SLOT is 4 of them); returns the length
 inline int Pattern(const char *s, unsigned char *bytes, unsigned char *mask, int max) {
   int n = 0;
   while (*s && n < max) {
     while (*s == ' ') s++;
     if (!s[0] || !s[1]) break;
+    if (!strncmp(s, "SLOT", 4)) { if (n + 4 > max) return -1; for (int k = 0; k < 4; k++) { bytes[n] = 0; mask[n] = 2; n++; } s += 4; continue; }
     if (s[0] == '?' && s[1] == '?') { bytes[n] = 0; mask[n] = 0; }
     else {
       auto hex = [](char c) -> int { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1; };
@@ -74,17 +82,25 @@ inline int Pattern(const char *s, unsigned char *bytes, unsigned char *mask, int
   }
   return n;
 }
-// every `call dword ptr [slot]` (FF 15 slot) in code[0..size) whose slot is one of `slots` and whose preceding bytes match
-// `pre`; out[] gets the offsets of the FF 15 in code. Returns how many there are (out holds at most `max`).
+// The sites: without SLOT in the pattern, every `call dword ptr [slot]` (FF 15 slot) whose slot is one of `slots` and whose
+// preceding bytes match `pre`; with SLOT (the API pointer loaded into a register first: mov edi, [slot] ... call edi), every
+// `call reg` (FF D0..D7) right after the pattern whose SLOT bytes are one of `slots`. out[] gets the offsets of the call in
+// code. Returns how many there are (out holds at most `max`).
 inline int Find(const unsigned char *code, size_t size, const std::uint32_t *slots, int nslots, const char *pre, size_t *out, int max) {
   unsigned char b[64], m[64]; int len = Pattern(pre, b, m, 64); if (len < 0) return 0;
+  int slotAt = -1; for (int k = 0; k < len; k++) if (m[k] == 2) { slotAt = k; break; }
+  auto known = [&](std::uint32_t v) { for (int k = 0; k < nslots; k++) if (slots[k] == v) return true; return false; };
   int hits = 0;
   for (size_t i = (size_t)len; i + 6 <= size; i++) {
-    if (code[i] != 0xff || code[i + 1] != 0x15) continue;
-    std::uint32_t slot; std::memcpy(&slot, code + i + 2, 4);
-    bool known = false; for (int k = 0; k < nslots; k++) if (slots[k] == slot) { known = true; break; }
-    if (!known) continue;
-    bool ok = true; for (int k = 0; k < len && ok; k++) if (m[k] && code[i - len + k] != b[k]) ok = false;
+    if (code[i] != 0xff) continue;
+    if (slotAt < 0) {
+      if (code[i + 1] != 0x15) continue;
+      std::uint32_t slot; std::memcpy(&slot, code + i + 2, 4); if (!known(slot)) continue;
+    } else {
+      if ((code[i + 1] & 0xf8) != 0xd0) continue;
+      std::uint32_t slot; std::memcpy(&slot, code + i - len + slotAt, 4); if (!known(slot)) continue;
+    }
+    bool ok = true; for (int k = 0; k < len && ok; k++) if (m[k] == 0xff && code[i - len + k] != b[k]) ok = false;
     if (!ok) continue;
     if (hits < max) out[hits] = i;
     hits++;

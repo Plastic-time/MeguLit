@@ -163,3 +163,9 @@
 - 点：eden_en.exe 0x5192ee，字形例程 0x519190（EBP 帧，3 个调用者）里每个字栅格化那次 `GetGlyphOutlineA`（之前 0x5191d8 的量尺寸不签）。字形进 D3D9，没有笔位，via / via2 是调用者
 - 这是英文版：台词是英文，日文版 exe 不同，拿到再补签名
 - 店主测试清单：同 AVG32，行里是 `engine=minori`
+
+### Musica / ぱれっと（ましろ色シンフォニー）
+- 点：mashiroiro.exe 0x459d40。GetGlyphOutlineA 在导入表里，但不是 `call [IAT]`：字形例程 0x459d0b（EBP 帧，2 个调用者）先 `mov edi, [IAT]`，再 `push eax; call edi`，整个程序只此一处。签名用 SLOT 记号（模式里那 4 字节必须是这个 API 的 IAT 槽，站点是紧跟的 `call reg`）；MinHook 会把后面那条 `cmp eax, 1` 一起搬进跳板
+- 本机这个 exe 是打过中文补丁的（和 mashiroiro.exe.bak 不同），签名两边结构一样，正式适配时也查原版
+- 没有笔位，via / via2 是调用者
+- 店主测试清单：同 AVG32，行里是 `engine=musica`
