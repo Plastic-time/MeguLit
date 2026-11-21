@@ -46,10 +46,25 @@ test('kana examples count standalone occurrences and center long excerpts on a r
  assert.deepEqual(mixed.example.matches,[short.indexOf('、')+1,short.indexOf('。')+1]);
  const {exampleHTML}=await import('../web/kana/views/lesson.js');
  const esc=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;');
+ assert.equal(exampleHTML(null,'うん',esc),'<mark>うん</mark>');
+ const olderLong=long.replace('「うん','古うん');
+ assert.equal(kana.gameWords(history([long,olderLong]),['うん']).words['うん'].example.text,hit.example.text);
+ assert.equal(kana.gameWords(history([short,'古「うん」']),['うん']).words['うん'].example.text,short);
  assert.equal(exampleHTML(mixed.example,'うん',esc),'うんめい、<mark>うん</mark>。<mark>うん</mark>！');
  assert.equal(exampleHTML(hit.example,'うん',esc),'…'+'空'.repeat(19)+'「<mark>うん</mark>、<mark>うん</mark>。」'+'星'.repeat(19)+'…');
  const quoted='「<うん>&」',escaped=kana.gameWords(history([quoted]),['うん']).words['うん'];
  assert.equal(exampleHTML(escaped.example,'うん',esc),'&lt;<mark>うん</mark>>&amp;');
+});
+
+test('decomposed kana keep the same word boundaries and highlights as composed kana',async()=>{
+ const composed='めがね。ありがとう！';
+ const decomposed=composed.normalize('NFD');
+ const history=text=>({prepare:()=>({all:()=>[{text,title:'Fixture',read_at:1}]})});
+ const words=['ね','ありがとう'],a=kana.gameWords(history(composed),words).words,b=kana.gameWords(history(decomposed),words).words;
+ assert.equal(b['ね'],undefined);
+ assert.deepEqual(b,a);
+ const {exampleHTML}=await import('../web/kana/views/lesson.js');
+ assert.equal(exampleHTML(b['ありがとう'].example,'ありがとう',String),'めがね。<mark>ありがとう</mark>！');
 });
 
 test('achievement: all CRITICAL PERFECT shows 101.0% with AP and no letter rank',async()=>{
