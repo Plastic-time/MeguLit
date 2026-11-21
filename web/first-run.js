@@ -31,12 +31,11 @@ export function maybeFirstRun({gamesCount,api,invoke,locale,esc,toast,onDone}){
  scan.onclick=async()=>{
   scan.disabled=pick.disabled=true;status.textContent=t.scanning;
   try{
-   const {library}=(await api('settings_get')).values;const old=library.folders.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-   const merged=[...new Set([...old,...folders])].join('\n');const values={folders:merged};
+   const {library}=(await api('settings_get')).values;const values={folders:folders.join('\n')};
    if(!library.steamPath){try{const steam=await api('library_find_steam');if(steam?.path)values.steamPath=steam.path;}catch{}}
-   await api('settings_save',{scope:'library',values});await api('library_scan');
+   await api('settings_save',{scope:'library',values,appendFolders:true});await api('library_scan');
    const home=await api('home').catch(()=>null);
-   if(home){const n=home.games.length;toast(n?t.done(n):t.none);}else toast(t.scanned);
+   if(Array.isArray(home?.games)){const n=home.games.length;toast(n?t.done(n):t.none);}else toast(t.scanned);
    close();onDone?.();
   }catch{status.textContent=t.failed;scan.disabled=pick.disabled=false;}
  };
