@@ -35,7 +35,7 @@ export function initLibraryDevelopers({api,locale,esc=s=>String(s)}){
  let by={};const t=devWords(locale);
  const decorate=card=>{const id=card.dataset.game,d=by[id],caption=card.querySelector('.game-caption');if(!caption)return;let chip=caption.querySelector('.dev-logo');
   if(!d){chip?.remove();return;}if(chip&&chip.dataset.pid===d.pid)return;chip?.remove();
-  caption.insertAdjacentHTML('afterbegin',logoChip(d.name||d.original,d.pid,esc));chip=caption.querySelector('.dev-logo');chip.title=d.original||d.name;fillLogo(chip,api,d.pid);};
+  (caption.querySelector('.mq')||caption).insertAdjacentHTML('afterbegin',logoChip(d.name||d.original,d.pid,esc));chip=caption.querySelector('.dev-logo');chip.title=d.original||d.name;fillLogo(chip,api,d.pid);};
  const scan=root=>{if(root.querySelectorAll)root.querySelectorAll('.library-card .game-card[data-game]').forEach(decorate);};
  const load=async()=>{let r=null;try{r=await api('library_developers',{});}catch{}by=r&&r.byGame&&typeof r.byGame==='object'?r.byGame:{};scan(document);};
  new MutationObserver(list=>{for(const m of list)for(const n of m.addedNodes)if(n.nodeType===1){if(n.matches?.('.library-card')||n.querySelector?.('.library-card'))scan(n);}}).observe(document.documentElement,{childList:true,subtree:true});
