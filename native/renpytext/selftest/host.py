@@ -149,6 +149,18 @@ def install_fakes():
     def say_show(who, what):
         return None
     state = {'tree': None}
+    screenmod = mod('renpy.display.screen')
+    screenmod.get_widget = lambda screen, ident: state.get('who') if (screen, ident) == ('say', 'who') else None
+    screenmod.get_screen = lambda screen: state.get('choice_screen') if screen == 'choice' else None
+    behaviormod = mod('renpy.display.behavior')
+    class Button(object):
+        def __init__(self, action):
+            self.action = action
+        def render(self, *args):
+            result = Render()
+            result.alpha = 1.0
+            return result
+    behaviormod.Button = Button
 
     def display_say(who, what, show_function, interact=True, *rest, **kw):
         show_function(who, what)
@@ -164,11 +176,18 @@ def install_fakes():
     exports.restart_interaction = restart_interaction
 
     def display_menu(items, interact=True):
+        entries = [types.SimpleNamespace(caption=caption, action=object()) for caption, value in items if value is not None]
+        state['choice_screen'] = types.SimpleNamespace(scope={'items': entries})
+        leaves = state['tree'].children[0][0].children
+        for entry, leaf in zip(entries, leaves):
+            leaf[0].render_of.insert(0, Button(entry.action))
         for _ in range(2):
             renpy.display.render.render_screen(state['tree'], 1280, 720)
+        state['choice_screen'] = None
         return items[0][1]
     exports.display_menu = display_menu
     renpy.display_menu = display_menu
+    store.menu = display_menu
     renpy.display_say = display_say
     return renpy, store, Render, Text, Matrix, nvl_show_core, say_show, state
 
@@ -228,6 +247,7 @@ def scenario_draw(fakes, ctl):
             window.blit(Render(t), pos)
         return root
     name = Text('Eileen', 20, ['Eileen'])
+    state['who'] = name
     what = Text('\u4eca\u65e5\u306f\u6674\u308c', 24, ['\u4eca\u65e5\u306f\u6674\u308c'])
     state['tree'] = screen((name, (60, 440)), (what, (60, 500)))
     sys._megulit_renpy_hide = lambda: True
