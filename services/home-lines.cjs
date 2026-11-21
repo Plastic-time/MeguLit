@@ -4,6 +4,7 @@
    choice in data/config/home-lines.json as {gameId:[text,...]} (at most five; an empty list means "automatic") */
 const fs=require('node:fs'),path=require('node:path'),store=require('./store.cjs');
 const MAX=5,file=root=>path.join(root,'data','config','home-lines.json');
+const millis=column=>`CASE WHEN ${column}<1000000000000 THEN ${column}*1000 ELSE ${column} END`;
 const clean=t=>String(t||'').replace(/\s+/g,' ').trim();
 function cleanList(list){const out=[];for(const t of Array.isArray(list)?list:[]){const s=clean(t).slice(0,400);if(s&&!out.includes(s))out.push(s);if(out.length>=MAX)break;}return out;}
 /* (user 2026-11-12: ATRI's home lines were "全てのデータを削除しますか？" and other menu prompts) the home shows story
@@ -31,19 +32,23 @@ function auto(db,id){id=String(id||'');const ok=storyOnly(db,id);
  function take(sql,limit){const result=new Set();
   for(const row of db.prepare(sql).iterate(id)){const t=clean(row.text);if(ok(t))result.add(t);if(result.size===limit)break;}
   return [...result];}
- const saved=take('SELECT text FROM saved_sentences WHERE game_id=? ORDER BY created_at DESC',8);
+ const saved=take(`SELECT text FROM saved_sentences WHERE game_id=? ORDER BY ${millis('created_at')} DESC`,8);
  if(saved.length)return saved;
- return take("SELECT text FROM reading_events WHERE game_id=? AND length(trim(text))>=6 ORDER BY read_at DESC,id DESC",6).reverse();}
+ return take(`SELECT text FROM reading_events WHERE game_id=? AND length(trim(text))>=6 ORDER BY ${millis('read_at')} DESC,id DESC`,6).reverse();}
 function chosen(root,id){const all=store.readJSON(file(root),{});return cleanList(all&&typeof all==='object'?all[String(id)]:[]);}
 function save(root,id,lines){id=String(id||'');if(!id)throw Error('GAME_NOT_FOUND');const f=file(root),all=store.readJSON(f,{}),next=all&&typeof all==='object'&&!Array.isArray(all)?all:{},list=cleanList(lines);
  if(list.length)next[id]=list;else delete next[id];fs.mkdirSync(path.dirname(f),{recursive:true});const tmp=f+'.tmp';fs.writeFileSync(tmp,JSON.stringify(next,null,1));fs.renameSync(tmp,f);return list;}
 function list(db,root,id,{query='',limit=400}={}){id=String(id||'');const q=clean(query),lim=Math.max(1,Math.min(5000,Number(limit)||400)),like='%'+q.replace(/[!%_]/g,c=>'!'+c)+'%';
- const saved=db.prepare("SELECT text,created_at at FROM saved_sentences WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!'").iterate(id,like);
- const ok=storyOnly(db,id),ms=v=>{v=Number(v)||0;return v&&v<1e12?v*1000:v;},rows=new Map();
- for(const r of saved){const t=clean(r.text);if(t&&ok(t))rows.set(t,{text:t,at:Math.max(rows.get(t)?.at??0,ms(r.at)),saved:true});}
- const read=db.prepare("SELECT text,MAX(CASE WHEN read_at<1000000000000 THEN read_at*1000 ELSE read_at END) at FROM reading_events WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!' GROUP BY text ORDER BY at DESC").iterate(id,like);
- const seen=new Set();for(const r of read){const t=clean(r.text);if(seen.has(t)||!ok(t))continue;seen.add(t);
-  const old=rows.get(t);rows.set(t,{text:t,at:Math.max(old?.at??0,r.at),saved:!!old});
-  if(seen.size>=lim)break;}
+ const ok=storyOnly(db,id),rows=new Map();
+ const read=db.prepare(`SELECT text,MAX(${millis('read_at')}) at FROM reading_events WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!' GROUP BY text ORDER BY at DESC`).iterate(id,like);
+ for(const r of read){const t=clean(r.text);if(rows.has(t)||!ok(t))continue;rows.set(t,{text:t,at:r.at,saved:false});if(rows.size>=lim)break;}
+ const unmarked=new Set(rows.keys()),saved=new Set();
+ const bookmarks=db.prepare(`SELECT text,${millis('created_at')} at FROM saved_sentences WHERE game_id=? AND length(trim(text))>=2 AND text LIKE ? ESCAPE '!' ORDER BY at DESC`).iterate(id,like);
+ for(const r of bookmarks){
+  const t=clean(r.text);
+  if(unmarked.delete(t)){const row=rows.get(t);row.saved=true;row.at=Math.max(row.at,r.at);}
+  if(saved.size<lim&&!saved.has(t)&&(rows.has(t)||ok(t))){saved.add(t);if(!rows.has(t))rows.set(t,{text:t,at:r.at,saved:true});}
+  if(saved.size>=lim&&!unmarked.size)break;
+ }
  return {lines:[...rows.values()].sort((a,b)=>b.at-a.at).slice(0,lim),chosen:chosen(root,id)};}
 module.exports={MAX,cleanList,chosen,save,list,auto,systemLine};

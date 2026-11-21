@@ -87,3 +87,18 @@ test('automatic home lines find the saved story or recent dialogue behind menu p
  assert.deepEqual(lines.auto(db,'read'),['風が吹いていた。','今日は晴れだね。']);
  assert.deepEqual(lines.auto(db,'saved'),['古いお気に入りだね。']);
 });
+
+test('old timestamps and mixed seconds and milliseconds keep chronological order',t=>{
+ const {db,root}=fixture(t),ev=db.prepare("INSERT INTO reading_events(game_id,text,read_at) VALUES('g',?,?)"),sv=db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES('g',?,?,'{}')");
+ sv.run('古い台詞です。',-100);sv.run('昨日の台詞です。',-1);ev.run('昔の台詞です。',-2);
+ ev.run('今の台詞です。',1700000001);ev.run('今の台詞です。',1700000000000);
+ assert.deepEqual(lines.list(db,root,'g').lines.map(r=>r.at),[1700000001000,-1000,-2000,-100000]);
+});
+
+test('automatic selections stop at eight saved or six read lines in chronological order',t=>{
+ const {db}=fixture(t),ev=db.prepare("INSERT INTO reading_events(game_id,text,read_at) VALUES('read',?,?)"),sv=db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES('saved',?,?,'{}')");
+ for(let i=0;i<9;i++){ev.run('第'+i+'回の台詞です。',1600000000000+i);sv.run('第'+i+'回の台詞です。',1600000000000+i);}
+ for(const stmt of [ev,sv])stmt.run('最新の台詞ですよ。',1750000000);
+ assert.deepEqual(lines.auto(db,'read'),[4,5,6,7,8].map(i=>'第'+i+'回の台詞です。').concat('最新の台詞ですよ。'));
+ assert.deepEqual(lines.auto(db,'saved'),['最新の台詞ですよ。',...[8,7,6,5,4,3,2].map(i=>'第'+i+'回の台詞です。')]);
+});
