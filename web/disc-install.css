@@ -1,0 +1,15 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+dialog.disc-install{max-height:calc(100vh - 48px);display:flex;flex-direction:column}
+dialog.disc-install:not([open]){display:none}
+.disc-install .disc-body{padding:18px 28px 0;overflow:auto;min-height:0}
+.disc-install .dialog-actions{flex:none;flex-wrap:wrap;margin:18px 0 0;padding:16px 28px}
+.disc-install .disc-input-actions{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+.disc-install .disc-action-list{display:grid;gap:8px}
+.disc-install .disc-path{font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.disc-install .disc-path strong{font-family:inherit}
+.disc-install .disc-consent,.disc-install .disc-mount-choice{font-size:13px;line-height:1.7}
+.disc-install .disc-error{font-size:13px;line-height:1.6;color:var(--accent,#d98b84);overflow-wrap:anywhere}
+.disc-install button{min-height:44px;white-space:normal}
+.disc-install button:disabled{opacity:.5;pointer-events:none}
+.disc-install button:focus-visible{outline:2px solid var(--accent,#d98b84);outline-offset:3px}
+.disc-install .disc-status{min-height:1.6em}
