@@ -15,4 +15,8 @@ All masking, residual-kana checks and privacy verification remain in force. Orig
 
 Archive sampling drops the whole item after a recognized structure rejection. It cannot retry that item as independent 64 KiB blocks. The existing S5 block fallback remains available for unrelated formats. Script sampling and runtime publicize use the same result contract. Dropped items have no sample payload, raw count or packed count; the adapter manifest includes the fixed reason and completeness excludes that payload
 
+Script fitting tries every positive initial window, including inputs smaller than 64 KiB, once. Larger windows retain the existing quartered retries down to 64 KiB. A small result that exceeds the packed limit gets no additional smaller retry. Empty inputs do not invoke sampling and retain the generic `VERIFY` result. A privacy refusal also remains `VERIFY`; attempting a small sample does not imply a recognized format or a structural diagnosis
+
+`validation/probe-small-script.test.cjs` checks tiny, zero, minimum and larger fitting windows entirely in memory, including unchanged privacy refusal and packed-size limits. It writes no temporary archive or script files
+
 `validation/probe-structure.test.cjs` uses neutral synthetic bytes and the actual adapter prepare, bundle, manifest, completeness and runtime publicize methods with controlled dependencies. It does not run a game, upload a probe, or establish that issues 750 and 751 are fixed
