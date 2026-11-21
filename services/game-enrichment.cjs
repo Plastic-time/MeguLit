@@ -50,7 +50,8 @@ class GameEnrichment{
   // A VNDB entry the user set (save_game) wins over every automatic match and is kept outside `library`, which each
   // library scan rewrites. When it differs from the last match, the cover and synopsis follow it like a correction.
   const manualVnid=vndbIdFrom(game.original.vndbManual||'');
-  let lib=game.original.library||{},vn=null,appid=String(lib.appid||'')||steamAppidFor(game.row.executable),cover='';const titles=candidates(game),previousVnid=String(lib.vndbId||'');
+  const lib=game.original.library||{},knownAppid=String(lib.appid||'')||steamAppidFor(game.row.executable);
+  let vn=null,appid=knownAppid,cover='';const titles=candidates(game),previousVnid=String(lib.vndbId||'');
   let vndbSteamAppid=appid&&lib.vndbSteamAppid===appid?appid:null;
   let vnid=manualVnid||(!appid||vndbSteamAppid?previousVnid:'');
   const coverPresent=!!store.imageData(this.root,'covers',game.row.cover);
@@ -66,6 +67,8 @@ class GameEnrichment{
   }catch{}
   if(vn){vnid=vn.id;cover=vn.image?.url||'';const steam=(vn.extlinks||[]).map(x=>x.url).find(u=>/^https:\/\/store\.steampowered\.com\/app\/\d+/.test(u));if(steam&&!appid)appid=/\/app\/(\d+)/.exec(steam)[1];}
   if(vnid&&!appid)try{const r=await json(this.fetch,'https://api.vndb.org/kana/release',post({filters:['vn','=', ['id','=',vnid]],fields:'extlinks.url',results:20}));const steam=(r.results||[]).flatMap(v=>v.extlinks||[]).map(v=>v.url).find(u=>/^https:\/\/store\.steampowered\.com\/app\/\d+/.test(u));if(steam)appid=/\/app\/(\d+)/.exec(steam)[1];}catch{}
+  // VNDB linked this work to the store page, including when we found the work by its folder title.
+  if(!knownAppid&&appid&&!manualVnid)vndbSteamAppid=appid;
   let steamScore=null,reviews=[],critic=null,steamCover='';
   if(/^\d+$/.test(appid))try{const language={zh:'schinese',ja:'japanese',en:'english'}[locale]||'all';const data=await json(this.fetch,`https://store.steampowered.com/appreviews/${appid}?json=1&filter=all&language=${language}&purchase_type=all&num_per_page=3`);const summary=await json(this.fetch,`https://store.steampowered.com/appreviews/${appid}?json=1&filter=all&language=all&purchase_type=all&num_per_page=0`);const total=summary.query_summary?.total_reviews||0,positive=summary.query_summary?.total_positive||0;steamScore={positive,total,percent:total?Math.round(positive/total*100):null,url:`https://store.steampowered.com/app/${appid}/#app_reviews_hash`,language};
    let items=data.reviews||[];if(!items.length&&language!=='english'){const fallback=await json(this.fetch,`https://store.steampowered.com/appreviews/${appid}?json=1&filter=all&language=english&purchase_type=all&num_per_page=3`);items=fallback.reviews||[];}

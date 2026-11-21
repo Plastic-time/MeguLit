@@ -4,7 +4,8 @@
 // program, a cover and whether LunaHook can read its text (by engine, confirmed once text is actually captured).
 // State lives in config\library.json; the page adds the games to the Tomoyo library (media table) itself.
 const {LocaleEmulator,recommended}=require('./locale-emulator.cjs');
-const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{execFile}=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const {registryString}=require('./registry-string.cjs');
 
 /* E601 engine fingerprints and their readers live in one registry (services/original-engines/registry.cjs) */
 const registry=require('../services/original-engines/registry.cjs'),ENGINES=registry.ENGINES;
@@ -98,7 +99,6 @@ function steamRoot(value){
 }
 // reg.exe prints in the console code page (GBK on Chinese Windows), but the output was read as UTF-8, so a Steam folder
 // with Chinese or Japanese in its path came back garbled and was not found. PowerShell is told to print UTF-8.
-function registryString(key,name){return new Promise(resolve=>{execFile('powershell.exe',['-NoProfile','-NonInteractive','-Command','[Console]::OutputEncoding=[Text.Encoding]::UTF8;(Get-ItemProperty -LiteralPath ("Registry::"+$env:MEGULIT_REG_KEY) -Name $env:MEGULIT_REG_NAME -ErrorAction Stop).($env:MEGULIT_REG_NAME)'],{windowsHide:true,timeout:10000,encoding:'utf8',env:{...process.env,MEGULIT_REG_KEY:key,MEGULIT_REG_NAME:name}},(error,out)=>resolve(error?'':String(out||'').replace(/^﻿/,'').trim()));});}
 async function steamFromRegistry(){const p=await registryString('HKCU\\Software\\Valve\\Steam','SteamPath');return p?path.normalize(p):'';}
 async function findSteam(){
  const tries=[await steamFromRegistry(),'C:\\Program Files (x86)\\Steam','C:\\Program Files\\Steam','D:\\Steam','E:\\Steam','D:\\SteamLibrary','E:\\SteamLibrary'];
@@ -195,7 +195,7 @@ class Library{
  async scan(progress=()=>{},{incremental=false}={}){
   // Folders in the user's game folders that could not be confirmed as visual novels (unknown engine and no VNDB
   // match) are reported instead of vanishing, so the library can offer to add them by hand.
-  this.unconfirmed=[];
+  this.unconfirmed=[];this.confirmedFolderMatches=new Set();
   require('./steam-owned.cjs')._internal.cache.clear();
   const found=[],skipped=[];this.restorable=new Map();if(this.state.steamPath)found.push(...steamGames(this.state.steamPath));for(const f of this.state.folders)found.push(...folderGames(f));
   const known=new Map(this.state.games.map(g=>[String(g.dir||'').toLowerCase(),g]));if(!this.state.notGal)this.state.notGal={};const games=[],scanned=new Set();let i=0;
@@ -226,6 +226,7 @@ class Library{
    const names=[...new Set([c.source==='folder'&&g.dir!==c.root?label(g.dir):'',c.title].filter(Boolean))];
    let vn=null,lookupFailed=false;const queries=[...new Set(names.flatMap(n=>[n,n.replace(/\s*[（(][^）)]*[）)]/g,'').trim(),...searchNames(n),...[...n.matchAll(/[（(]([^）)]+)[）)]/g)].map(m=>m[1])]).filter(Boolean))].slice(0,8);if(c.source==='steam'){const hit=await vndbSteam(c.appid);if(hit===undefined)lookupFailed=true;else if(hit)vn=hit;}
    if(c.source!=='steam'&&!vn&&(!g.engine||g.engine.hook===null||c.source==='folder'))for(const n of queries){const result=await vndb(n,false);if(result===undefined)lookupFailed=true;else if(result){vn=result;break;}}
+   if(c.source==='folder'&&vn?.id)this.confirmedFolderMatches.add(g.dir);
    if(!vn&&lookupFailed&&c.source==='steam'&&previous?.appid===c.appid&&previous.vndbSteamAppid===c.appid&&previous.vndbId)vn={id:previous.vndbId,title:previous.names?.[1]||previous.title};
    // Steam also installs software. An AppID link or a specific visual-novel engine confirms an automatic entry.
    if((!g.engine||g.engine.generic)&&!vn){

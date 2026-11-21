@@ -290,6 +290,7 @@ async function lookupEntry(learning,base,key){for(const text of [...new Set([bas
 async function dispatch(request,runtime=null) {
   if(request.action==='backup_export')return require('./backup.cjs').exportBackup(root,request.path);
   if(request.action==='backup_preview')return require('./backup.cjs').previewBackup(root,request.path);
+  if(request.action==='backup_discard')return require('./backup.cjs').discardBackup(root,request.id);
   if(request.action==='backup_apply'){runtime?.reader?.stop();if(runtime){runtime.reader=null;runtime.libraryManager=null;}return require('./backup.cjs').applyBackup(root,request.id);}
   if(request.action==='history_translate'){if(!runtime)throw Error('RUNTIME_REQUIRED');return runtime.history().ensure(Number(request.id));}
   /* E378 account + cloud sync (services/account.cjs); opens the store itself */
@@ -502,7 +503,11 @@ async function dispatch(request,runtime=null) {
           const original=JSON.parse(existing.original);if(original.library)original.library.exe=executable;
           // vndb: a VNDB entry chosen by the user ("" goes back to automatic matching); left out, it stays as it is.
           const vndb=request.vndb===undefined?undefined:require('./game-enrichment.cjs').vndbIdFrom(request.vndb),vndbChanged=vndb!==undefined&&vndb!==(original.vndbManual||'');
-          if(vndbChanged){if(vndb)original.vndbManual=vndb;else delete original.vndbManual;}
+          if(vndbChanged){if(vndb)original.vndbManual=vndb;else delete original.vndbManual;
+            const lib=original.library;
+            if(lib?.appid&&vndb!==lib.vndbId&&['folder','manual'].includes(lib.source)&&!require('../core/library.cjs').steamAppidFor(executable)){
+              lib.appid=null;lib.vndbSteamAppid=null;
+            }}
           original.library={...original.library,exe:executable,executableSignature:require('./library.cjs').signature(executable)};
           db.prepare('UPDATE games SET title=?,executable=?,original=? WHERE id=?').run(title,executable,JSON.stringify(original),existing.id);
           require('./series.cjs').autoGroup(db,root);runtime?.metadata().enqueue([existing.id],vndbChanged);return {id:existing.id,vndbChanged};
