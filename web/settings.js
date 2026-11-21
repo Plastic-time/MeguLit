@@ -107,6 +107,10 @@ export async function renderSettings({main,api,invoke,text,locale,esc,toast,head
   String(button.dataset.page===activePage)));};
  form.querySelectorAll('[data-page]').forEach(button=>button.onclick=()=>{activePage=button.dataset.page;selectedPages.set(section,activePage);search.value='';search.dispatchEvent(new Event('input'));
   form.querySelectorAll('.settings-row').forEach(row=>row.hidden=false);showPage();});
+ /* 2026-11-21 NSFW: turning it on asks "are you 18" first; nothing is saved unless the player confirms */
+ form.addEventListener('change',event=>{const box=event.target;if(!box||box.name!=='nsfw'||box.type!=='checkbox')return;if(box.dataset.confirmed==='1'){delete box.dataset.confirmed;setTimeout(()=>dispatchEvent(new Event('megulit-nsfw-changed')),900);return;}
+  if(!box.checked){setTimeout(()=>dispatchEvent(new Event('megulit-nsfw-changed')),900);return;}
+  event.stopImmediatePropagation();box.checked=false;import('./nsfw.js').then(m=>m.confirmAdult({locale,esc})).then(ok=>{if(!ok)return;box.dataset.confirmed='1';box.checked=true;box.dispatchEvent(new Event('change',{bubbles:true}));});},true);
  if(section==='background')form.addEventListener('input',()=>{const update={};for(const field of fields){const element=form.elements.namedItem(field.key);update[field.key]=field.type==='boolean'?element.checked:field.type==='number'?Number(element.value):element.value;
   }dispatchEvent(new CustomEvent('tome-background-preview',{detail:update}));});
  /* v1.1.6 (user): the slider stays stepless; its number shows a whole value, or one or two decimals on small ranges */

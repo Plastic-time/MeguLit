@@ -7,6 +7,7 @@
 #include "embed_util.h"
 #include "ToMeTextPos.h"
 #include "ToMeIslandFlow.h"
+#include "CS2Draw.h"
 namespace ToMeIslandDraw {
 static bool ExactFile(){
  wchar_t file[MAX_PATH]={};if(!GetModuleFileNameW(nullptr,file,MAX_PATH))return false;
@@ -375,6 +376,6 @@ static bool Install(){
  HookParam hp;hp.address=0x503af0;hp.type=USING_STRING|FULL_STRING|NO_CONTEXT|EMBED_ABLE;hp.offset=regoffset(eax);hp.codepage=932;
  hp.text_fun=[](hook_context* c,HookParam*,TextBuffer* b,uintptr_t* split){auto text=(const char*)c->eax;if(!text||!*text||all_ascii(text))return;auto value=Clean(text);if(value.empty())return;if(Name(text,value)){*split=Engine::NameRole;return;}auto spoken=ToMeIslandFlow::Spoken(value);AcquireSRWLockExclusive(&SourceLock);if(Source.Observe(spoken,SourceToken(spoken),false,GetTickCount())){SourcePendingAt=GetTickCount();LateSource(spoken);}ReleaseSRWLockExclusive(&SourceLock);b->from(std::string(1,'\x1e')+value+RubyPairs(text)+std::string(1,'\x1f'));*split=Engine::ScenarioRole;};
  hp.embed_fun=[](hook_context*,TextBuffer,HookParam*){}; // draw control only, original text remains intact
- Msg::Log("ToMeCS2_DRAW draw preservation installed; scripts/history unchanged");if(NewHook(hp,"EmbedToMeCS2_DrawPreserve")){InstallCache();return true;}for(unsigned j=0;j<8;j++){MH_DisableHook(addresses[j]);MH_RemoveHook(addresses[j]);}return false;
+ Msg::Log("ToMeCS2_DRAW draw preservation installed; scripts/history unchanged");if(NewHook(hp,"EmbedToMeCS2_DrawPreserve")){InstallCache();CS2Draw::Arm(0x400000);return true;}for(unsigned j=0;j<8;j++){MH_DisableHook(addresses[j]);MH_RemoveHook(addresses[j]);}return false;
 }
 }

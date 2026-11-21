@@ -18,11 +18,19 @@ module.exports={
   /* the Japanese stays on the game's text place and its translation only grows down (smaller by at most 15 %); false = the
      kernel: a translation that does not fit above the game's button strip moves the block up */
   translationGrowsDown:false,
+  /* a hidden line the reader cannot pair is drawn from its placement (text-place.js orphan path; drawn in the reader's colour, never a
+     line the engine-placed path drew); false = never drawn there (ファタモルガーナの館: its options are drawn by the game, #choiceframe) */
+  orphanDraw:true,
  },
  page:{
   /* KiriKiri: a message layer cleared by the game (KAG [cm], MessageLayer.clear) after its line was reported takes that line off the
      placement (the reader never redraws a line the game has cleared); false = kernel: nothing is said at a clear */
   reportClear:false,
+  /* the lines of one page (an engine that reports each line with its boxes: KiriKiri ToMe_CHARS) are drawn together, each on its own
+     row: a line goes on the page when the game has not cleared it since (page.reportClear) and it starts below the page's rows; false
+     (core/overlay-placement.cjs rows). true = every line goes through the page (ファタモルガーナの館); null = only when a line has stacked
+     under one still on screen; false (the kernel default: a game's fix never changes another game) = never */
+  engineRows:false,
   /* the game draws one line over several frames (fade, wipe, per-character effects): null = kernel heuristics; true = every
      repaint of the same line is one line (never a new line, never a skip); false = frames are not effects */
   effectFrames:null,
@@ -87,6 +95,13 @@ module.exports={
   embed:false,
   /* with embed on, the Chinese is drawn by the game too (false = ruby only, the reader draws the Chinese) */
   embedTranslation:true,
+  /* the version layer's address table for an engine DLL that finds its draw functions by signature (MAGES: {engine:'mages',
+     drawDialogue, drawGlyph, commit, clear, pages, stride, ...} module offsets); the DLL hooks only when the signature agrees.
+     It also tells the kernel how to read the records (charset, canvas). null = the signature alone */
+  engineTable:null,
+  /* native engines whose message / name / choice sprites share one layout (BGI): which call chain is which role, one entry
+     "<rva>,<rva>,...=<role>" per chain (the via= of the engine's DRAWRUN rows, a prefix is enough); [] = the kernel: no role */
+  viaRoles:[],
  },
  /* 2026-11-21 (owner: 英文学习模式 + 多语言译文) settings that depend on the language of the game's text, one block per BCP 47 tag
     ('ja', 'en', 'zh-Hans'): {annotation:'ruby'|'ipa'|'pinyin'|'none', pairing:'script'|'patch'|'machine'|'none', dictionary:<id>,

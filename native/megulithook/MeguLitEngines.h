@@ -4,6 +4,7 @@
    game sees them; enginecollection32.cpp lists them first. */
 #include "engine32/ToMeIslandDraw.h"
 #include "MeguLitMatch.h"
+#include "MagesDraw.h" /* engine-draw 2026-11-21: STEINS;GATE takes the generic MAGES draw reader too (opt-in) */
 namespace megulit_sg_hookmages { bool MAGES(); }
 /* ISLAND (CatSystem2): ISLAND.exe whose whole file has the supported SHA-256 (ToMeIslandDraw::ExactFile) */
 class ToMeIsland : public ENGINE {
@@ -22,5 +23,5 @@ public:
       return MeguLitMatch::SteinsGate(processName, pe->FileHeader.TimeDateStamp);
     };
   }
-  bool attach_function() override { return megulit_sg_hookmages::MAGES(); }
+  bool attach_function() override { MagesDraw::Arm(processStartAddress); return megulit_sg_hookmages::MAGES(); }
 };

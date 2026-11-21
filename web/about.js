@@ -9,6 +9,7 @@ import {openFeedback} from './feedback-ui.js';
 import {fxPref} from './fx-prefs.js';
 import {mountSupportToy} from './about-toy.js';
 import {seedAboutHTML,fillSeedCount} from './the-seed.js';
+import {bindSeedCatalog} from './seed-catalog.js';
 export const VERSION='1.4.22';
 const REPO='https://github.com/ilynthn/MeguLit';
 const SPONSOR='https://github.com/sponsors/ilynthn';
@@ -135,6 +136,7 @@ export function mountAbout(main,api,toast,model){
  main.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>api('open_source',{url:b.dataset.open}).catch(()=>toast&&toast('…'))));
  /* E394 feedback and logs go through MeguLit's relay, not a GitHub page many users cannot open */
  const escHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+ bindSeedCatalog(main,{api,locale,esc:escHTML,toast});
  main.querySelector('[data-uninstall]')?.addEventListener('click',async e=>{const u=UN[locale],b=e.currentTarget;b.disabled=true;try{await api('uninstall_open',{});toast&&toast(u.opened);}catch(err){toast&&toast(u.failed+(err?.message||err));b.disabled=false;}});
  main.querySelector('[data-feedback]')?.addEventListener('click',()=>openFeedback({api,locale,esc:escHTML,toast,version:VERSION}));
  if(!page)return;

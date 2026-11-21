@@ -57,4 +57,4 @@ function list(db,{source}={}){
   return {...r,source:r.source||'manual',scene:sceneOf(original),words:[...matches.values()]};
  });
 }
-module.exports={save,remove,state,find,findExample,list,migrate,SOURCES};
+module.exports={save,remove,state,find,findExample,list,migrate,SOURCES,localGame};

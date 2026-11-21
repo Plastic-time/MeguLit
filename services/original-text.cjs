@@ -109,11 +109,28 @@ function scanRunning(root,id,executable,opts={}){
  return state;
 }
 // ---- Original import and alignment -------------------------------------------------------------
+function sharedKanaAside(translated,original){
+ const aside=/（[ぁ-ゖァ-ヺー]+）/gu,notes=translated.match(aside);
+ if(!notes)return false;
+ const sourceNotes=original?.match(aside);
+ if(!sourceNotes||notes.length!==sourceNotes.length||!notes.every((note,i)=>note===sourceNotes[i]))return false;
+ const rest=translated.replace(aside,'');
+ return /[一-鿿]/u.test(rest)&&!/[ぁ-ゖァ-ヺ]/u.test(rest)&&japaneseLine(original.replace(aside,''));
+}
+// Test the surrounding script's language once, only when a line has a shared kana annotation.
+function untranslatedJapanese(lines){
+ let chinese;
+ return (text,original)=>japaneseLine(text)&&!(sharedKanaAside(text,original)&&(chinese??=chineseOnly(lines)));
+}
 function align(runtime,original){
  const sameStructure=runtime.structure.messages===original.structure.messages&&runtime.structure.functionHash===original.structure.functionHash;
  let kept=0,equal=0;const n=Math.min(runtime.lines.length,original.lines.length);
  // Lines the patch left in Japanese must equal the original at the same index; this measures the layout empirically.
- for(let i=0;i<n;i++){const t=runtime.lines[i];if(!t.trim()||!japaneseLine(t))continue;kept++;if(norm(t)===norm(original.lines[i]))equal++;}
+ const isUntranslated=untranslatedJapanese(runtime.lines);
+ for(let i=0;i<n;i++){
+  const t=runtime.lines[i],source=original.lines[i];if(!isUntranslated(t,source))continue;
+  kept++;if(norm(t)===norm(source))equal++;
+ }
  /* Kana lines under 0.01 % of a translated script are translator notes quoting the original (CLANNAD's 「原文：「ネコ」（猫）」,
     5 of 102k lines), not lines the patch kept: too few to measure the layout, so the pairing sample (pairCheck) decides */
  const rate=kept?equal/kept:null,reliable=sameStructure&&(rate===null||rate>=.98||kept<n*.0001);
@@ -426,13 +443,32 @@ class Matcher{
   const from=this.last>=0?Math.max(0,this.last-40):0,to=this.last>=0?Math.min(this.normalized.length,this.last+600):this.normalized.length;let best=-1,score=0;
   for(let i=from;i<to;i++){const t=this.normalized[i];if(!t||t.length<s.length*.6||s.length<t.length*.6&&t.length-s.length>12)continue;const d=dice(t.slice(0,s.length+2));if(d>score){score=d;best=i;}}
   if(best<0||score<.8||s.length<this.normalized[best].length*.6)return -1;this.moveTo(best);return best;}
- constructor(runtimeLines,originalLines){this.rt=runtimeLines;this.og=originalLines;this.normalized=runtimeLines.map(matchKey);this.heads=new Map();this.normalized.forEach((t,i)=>{if(!t)return;const k=t.slice(0,4);if(!this.heads.has(k))this.heads.set(k,[]);this.heads.get(k).push(i);});this.last=-1;}
+ constructor(runtimeLines,originalLines){this.isUntranslated=untranslatedJapanese(runtimeLines);this.rt=runtimeLines;this.og=originalLines;this.normalized=runtimeLines.map(matchKey);this.heads=new Map();this.normalized.forEach((t,i)=>{if(!t)return;const k=t.slice(0,4);if(!this.heads.has(k))this.heads.set(k,[]);this.heads.get(k).push(i);});this.last=-1;}
  /* 2026-11-13 (涙 name screen: 「あなたの現在の名前は『春日　光一』、」 lost its head as if it were a speaker): a line after the
     first of a joined text is also tried whole, without the speaker cut */
  /* 2026-11-19 (素晴らしき日々, BGI: 「……そして」 and 「ヒラヒラ服だわね……」」 are two messages with the resource line ev0001_l between
     them; the bridge hands them over as one line): after the first line, a script line that is only a resource name (ASCII, no
     space: ev0001_l, yuki_000002_d, bgm017) and does not continue the text is stepped over, up to 3 in a row; it is no part of the cover */
- cover(start,s){let at=0,i=start,skipped=0;const used=[];while(at<s.length&&i<this.normalized.length){let t=this.normalized[i];if(!t){i++;continue;}if(!s.startsWith(t,at)){const whole=i>start?plainKey(this.rt[i]):'';if(whole&&s.startsWith(whole,at))t=whole;else if(i>start&&skipped<3&&RESOURCE_LINE.test(t)){i++;skipped++;continue;}else return null;}used.push(i);at+=t.length;i++;skipped=0;}return at===s.length?used:null;}
+ cover(start,s,captured){
+  let at=0,i=start,skipped=0;const used=[];
+  while(at<s.length&&i<this.normalized.length){
+   let t=this.normalized[i];if(!t){i++;continue;}
+   // A Han phrase before an inline aside can look like a speaker. Verify that row's full text.
+   if(t.startsWith('（')&&japaneseLine(this.rt[i])&&!this.isUntranslated(this.rt[i],this.og[i])){
+    const whole=plainKey(this.rt[i]);
+    if(i===start){if(!plainKey(captured).startsWith(whole))return null;}
+    else t=whole;
+   }
+   if(!s.startsWith(t,at)){
+    const whole=i>start?plainKey(this.rt[i]):'';
+    if(whole&&s.startsWith(whole,at))t=whole;
+    else if(i>start&&skipped<3&&RESOURCE_LINE.test(t)){i++;skipped++;continue;}
+    else return null;
+   }
+   used.push(i);at+=t.length;i++;skipped=0;
+  }
+  return at===s.length?used:null;
+ }
  /* 2026-11-19 (素晴らしき日々, user test: lines read from the game's LOG screen, たとえば……。 #13845 and 「まだ作り途中…」 #13774, moved the
     reading position 600 lines back; the story lines after it, 700 ahead, were taken for repeated lines and had no translation):
     the last positions read are kept; with no line ahead of the current one, a line ahead of a recent one is taken, then a line
@@ -446,7 +482,7 @@ class Matcher{
   const near=found.filter(c=>c[0]<this.last&&this.last-c.at(-1)<=60).sort((x,y)=>y[0]-x[0]);return near.length?{c:near[0],method:'near-back'}:null;}
  match(text){
   const s=matchKey(text);if(!s)return {status:'none',method:'empty'};const starts=new Set();for(let k=Math.min(4,s.length);k>=1;k--)for(const i of this.heads.get(s.slice(0,k))||[])if(s.startsWith(this.normalized[i]))starts.add(i);
-  const found=[...starts].map(i=>this.cover(i,s)).filter(Boolean);if(!found.length)return {status:'none',method:'no-cover'};
+  const found=[...starts].map(i=>this.cover(i,s,text)).filter(Boolean);if(!found.length)return {status:'none',method:'no-cover'};
   let pick,method,status,alt,cont=[],open=false;
   if(found.length===1){pick=found[0];method='unique';status='exact';}
   else{/* a line that grew (core/sentence-pieces.cjs) starts before the reading position and ends on or past it: the piece's own
@@ -467,7 +503,7 @@ class Matcher{
        most places), at a tie the first in the script (a game starts at its start). Either way the places stay open for the lines after it */const votes=new Map();for(const c of pool)votes.set(same(c),(votes.get(same(c))||0)+1);const top=Math.max(...votes.values()),best=pool.filter(c=>votes.get(same(c))===top);
      pick=this.last>=0?(pool.filter(c=>c[0]>this.last).sort((x,y)=>x[0]-y[0])[0]||pool.filter(c=>c[0]<=this.last).sort((x,y)=>y[0]-x[0])[0]):best.slice().sort((x,y)=>x[0]-y[0])[0];method='guess';status='high';}}
    open=method==='guess'||method==='position'&&cont.length>1;}
-  if(open){this.moveTo(pick.at(-1),false);this.maybe=(method==='guess'&&!cont.length?found:cont).map(c=>c.at(-1));}else if(method!=='same-text')this.moveTo(pick.at(-1));const named=SPEAKER.test(norm(text)),original=pick.map((i,k)=>{const o=inlineTags(this.og[i]??'');return k||named||!SPEAKER.test(norm(this.rt[i]))?o:o.replace(/^[\s　]*/,'').replace(SPEAKER,'');}),already=pick.every(i=>japaneseLine(this.rt[i]));
+  if(open){this.moveTo(pick.at(-1),false);this.maybe=(method==='guess'&&!cont.length?found:cont).map(c=>c.at(-1));}else if(method!=='same-text')this.moveTo(pick.at(-1));const named=SPEAKER.test(norm(text)),original=pick.map((i,k)=>{const o=inlineTags(this.og[i]??'');return k||named||!SPEAKER.test(norm(this.rt[i]))?o:o.replace(/^[\s　]*/,'').replace(SPEAKER,'');}),already=pick.every(i=>this.isUntranslated(this.rt[i],this.og[i]));
   if(original.some(t=>!t.trim()))return {status:'uncertain',method:'empty-original',indices:pick};
   return {status,method,indices:pick,japanese:original.join('\n'),captured:text,alreadyJapanese:already};
  }

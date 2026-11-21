@@ -25,6 +25,9 @@
     'body.megulit-placed .tome-box-deco,body.megulit-placed .sentence-window:not(.megulit-place-window){display:none!important}',
     'body.megulit-placed .megulit-place-window .sentence-text{position:absolute!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;margin:0!important;padding:0!important;transform:none!important;overflow:visible!important}',
     'body.megulit-placed .megulit-place-window .tome-page-lines{display:none!important}',
+    /* 2026-11-21 (ファタ two-row page: every placed row 11 px under its box): the reader's line-height margin (gal.js, a more specific
+       selector) moved the full-window sentence off the surface's top; a placed page's sentence sits exactly at 0,0 */
+    'html body.megulit-placed .sentence-window.megulit-place-window .sentence-text:not(#megulit-x){margin:0!important;top:0!important;left:0!important}',
     '.megulit-anchor-window.megulit-anchor-center .sentence-text,.megulit-anchor-window.megulit-anchor-center .tomoyo-cn-row,.megulit-anchor-window.megulit-anchor-center .tomoyo-cn-output,.megulit-anchor-window.megulit-anchor-center .tome-page-lines{text-align:center!important;text-align-last:center!important}',
     '.megulit-anchor-window .sentence-text{position:relative}',
     'body.megulit-place-gone .sentence-window.tomoyo-hook-reader,body.megulit-place-gone .sentence-window.tomoyo-hook-reader *{opacity:0!important;visibility:hidden!important}', /* 2026-11-20 (CHAOS;CHILD: the game cleared its text at a scene change, the old line stayed): gone with the game's line until the next one */
@@ -250,9 +253,9 @@
   /* 2026-11-21 (owner, ファタモルガーナの館 r30: the choice screen showed its frames and nothing in them): the game draws its options one right
      after the other, each a hidden line of its own; only the last one stayed current for ORPHAN_MS, the others never became orphans. Every
      unclaimed hidden line waits on its own (by text) and is drawn when its time is up, current or not, unless the reader drew it meanwhile */
-  const waits = new Map(), drawnRecent = new Set();
+  const waits = new Map(), drawnRecent = new Set(), readerDrawn = new Set(); /* readerDrawn: lines the engine-placed path drew (one render owner: never an orphan after) */
   /* a placed line replaced before any frame drew it (options arrive within one frame) waits like the current one */
-  function noteReplaced(l) { if (!l || l.fallback || !Array.isArray(l.rects) || !l.text) return; const t = [...l.text].filter(c => !blank(c)).join(''); if (!t || drawnRecent.has(t) || waits.has(t) || orphans.some(o => o.text === t)) return; waits.set(t, { at: performance.now(), l }); setTimeout(schedule, ORPHAN_MS + 20); }
+  function noteReplaced(l) { if (!l || l.fallback || !Array.isArray(l.rects) || !l.text) return; const t = [...l.text].filter(c => !blank(c)).join(''); if (!t || t === goneText || readerDrawn.has(t) || drawnRecent.has(t) || waits.has(t) || orphans.some(o => o.text === t)) return; waits.set(t, { at: performance.now(), l }); setTimeout(schedule, ORPHAN_MS + 20); }
   function flushWaits() { const now = performance.now(); for (const [t, w] of [...waits]) if (now - w.at >= ORPHAN_MS) { waits.delete(t); if (t) { drawnRecent.add(t); if (drawnRecent.size > 40) drawnRecent.delete(drawnRecent.values().next().value); } orphanWait = { text: t, at: w.at }; orphan(w.l); } }
   /* 2026-11-21 (owner, ファタモルガーナの館: 「一直挂着一个文本」, an old line drawn after the player had moved on): the player's advance input
      (readerInput complete: a click, Space or Enter in the game, from GalWindowBridge) cancels every orphan still waiting from before it
@@ -270,9 +273,9 @@
   }
   b.textPlaceAdvance = advanceInput;
   function bindAdvance() { if (b.textPlaceAdvanceBound || typeof b.galStatus !== 'function') return; b.textPlaceAdvanceBound = true; const previous = b.galStatus; b.galStatus = m => { previous(m); if (m?.type === 'readerInput' && m.complete === true) advanceInput(); }; }
-  let gaveWayAt = 0;
-  function giveWay() { const now = performance.now(); if (now - gaveWayAt < 1000) return; gaveWayAt = now; (b.textPlaceGaveWay = (b.textPlaceGaveWay || 0) + 1); try { window.__tomoyoTranslateRequest?.(JSON.stringify({ type: 'engineGiveWay', ms: 3000 })); } catch {} }
-  function orphanItems() { const taken = new Set(extras.items.map(i => [...String(i.text || '')].filter(c => !blank(c)).join(''))); return orphans.filter(o => !taken.has(o.text)).map(o => ({ id: 'orphan:' + o.text, kind: 'l', text: o.text, rects: o.rects, client: o.client })); }
+  /* the reader's own current line, characters only (the engine-placed path draws it: the orphan path never does) */
+  function readerOwns(text) { const t = [...String(text || '')].filter(c => !blank(c)).join(''); if (!t) return false; const s = target()?.querySelector('.sentence-text:not(.megulit-old-line)'); const r = s ? [...s.querySelectorAll('.char-token')].map(x => x.textContent).join('').replace(/[\s　]/g, '') : ''; const src = [...String(b.hookSourceText || '')].filter(c => !blank(c)).join(''); return !!(r && (r === t || r.includes(t) || t.includes(r) && r.length >= t.length * .6)) || !!(src && (src === t || src.includes(t))); }
+  function orphanItems() { const taken = new Set(extras.items.map(i => [...String(i.text || '')].filter(c => !blank(c)).join(''))); return orphans.filter(o => !taken.has(o.text) && !readerOwns(o.text) && !readerDrawn.has(o.text)).map(o => ({ id: 'orphan:' + o.text, kind: 'l', text: o.text, rects: o.rects, client: o.client })); }
   function overlaps(a, b) { return a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3]; }
   /* a new placed line: orphans under its boxes are gone (the game drew over them); a line starting above every orphan is a new page */
   function orphansMeet(l) {
@@ -304,7 +307,11 @@
     const chars = [...l.text], rects = []; chars.forEach((c, i) => { if (!blank(c)) rects.push(l.rects[i]); });
     const text = chars.filter(c => !blank(c)).join('');
     if (text && text === goneText) return; /* the game cleared it (textPlace gone) */
-    if (!text || !rects.length || !rects.every(r => Array.isArray(r) && r[2] > 0 && r[3] > 0)) { giveWay(); return; } /* cannot be drawn here: the game draws it */
+    /* 2026-11-21 (owner: never give way because a line cannot be drawn): a line without real boxes is simply not drawn here */
+    if (!text || !rects.length || !rects.every(r => Array.isArray(r) && r[2] > 0 && r[3] > 0)) return;
+    /* one render owner (owner 2026-11-21): the line the reader draws itself (its current sentence) is never drawn again from the placement */
+    if (readerOwns(text) || readerDrawn.has(text)) return;
+    if (window.MeguLitProfile?.get?.('placement.orphanDraw', true) === false) return; /* the game's diff: nothing is drawn from the placement */
     if (orphans.some(o => o.text === text) || stale.has(text)) return;
     /* 2026-11-21 (owner, ファタモルガーナの館 r33: a clump of characters in the middle of the screen; two lines on top of each other):
        the text effect redraws one place again and again, and a frame of two passes puts two characters on one box
@@ -318,7 +325,9 @@
     orphans = orphans.filter(o => !o.rects.some(a => rects.some(c => overlaps(a, c)))).concat({ text, rects, client: l.client }).slice(-12); extraKey = ''; orphanWait = null; schedule(); waits.delete(text);
     const log = b.textPlaceOrphans || (b.textPlaceOrphans = []); log.push(text.slice(0, 40)); if (log.length > 30) log.shift();
   }
-  function drawn(l) { document.body.classList.remove('megulit-place-garbled'); const t = l ? [...String(l.text || '')].filter(c => !blank(c)).join('') : ''; waits.delete(t); if (orphanWait?.text === t) orphanWait = null; if (orphans.some(o => o.text === t)) { orphans = orphans.filter(o => o.text !== t); extraKey = ''; } }
+  /* 2026-11-21 (ファタ acceptance 3/9: the line just read came back in white 0.45 s after the next one): a line the reader drew is
+     remembered as drawn, so its replacement never queues it as an undrawn option (noteReplaced) */
+  function drawn(l) { document.body.classList.remove('megulit-place-garbled'); const t = l ? [...String(l.text || '')].filter(c => !blank(c)).join('') : ''; waits.delete(t); if (t) { readerDrawn.add(t); if (readerDrawn.size > 40) readerDrawn.delete(readerDrawn.values().next().value); } if (orphanWait?.text === t) orphanWait = null; if (orphans.some(o => o.text === t)) { orphans = orphans.filter(o => o.text !== t); extraKey = ''; } }
   function drawExtras() {
     let layer = document.getElementById('megulit-place-extras');
     const all = extras.items.concat(orphanItems());
@@ -440,6 +449,9 @@
     if (body.classList.contains('megulit-place-asleep') !== asleep) { body.classList.toggle('megulit-place-asleep', asleep); window.__tomoyoHitRegionsRefresh?.(true); }
     if (!live || !sentence) { document.getElementById('megulit-page-ahead')?.replaceChildren(); dropOld(null); clones.clear(); const p = page; page = null; release(); page = p; body.classList.remove('megulit-placed'); /* a page the layer does not hide (not armed, or no line has places yet): the game's own text is on screen, the reader's Japanese is never drawn at its own place over it; the translation stays */ const own = on && page.awake; if (body.classList.contains('megulit-place-game-drawn') !== own) { body.classList.toggle('megulit-place-game-drawn', own); window.__tomoyoHitRegionsRefresh?.(true); } /* only where the reader's line follows the game's place (anchor mode): in its own box elsewhere it stays, Japanese on top */ pageOwn = own === true && anchorMode === true; briefSync(false); if (own && sentence) underGameLine(win, sentence); return; }
     if (pageOwn) { pageOwn = false; briefSync(false); }
+    /* 2026-11-21 (ファタ two-row page, page.engineRows): the line model's anchored pin (the window moved to the line's anchor) is undone
+       before the page places its lines on their own boxes, or every row sits that far off */
+    if (document.querySelector('.megulit-anchor-window')) { const p0 = page; page = null; release(false, false); page = p0; }
     const map = mapper(page.client), readerText = readerLine(), geom = [];
     let cur = null; if (readerText) for (let i = page.lines.length - 1; i >= 0; i--) if (page.lines[i].text.includes(readerText)) { cur = page.lines[i]; break; }
     /* 2026-11-16 (QQ group, ライムライト・レモネードジャム: ruby and translation only, no Japanese): an armed page means the game's
@@ -622,6 +634,10 @@
     const win = target(), sentence = win?.querySelector('.sentence-text:not(.megulit-old-line)');
     orphansMeet(line);
     if (!sentence) { orphan(line); release(); return; }
+    /* 2026-11-21 (ファタ acceptance 3/9: at each click the reader hid its new line as a "broken copy" and drew the old one in white):
+       the game cleared this line (textPlace gone, an engine that reports its clear) and the reader already shows the next one before
+       its placement: the cleared line is the anchor only, never matched against the reader's text */
+    if (goneText && [...String(line.text)].filter(c => !blank(c)).join('') === goneText) { document.body.classList.remove('megulit-place-garbled'); if (anchorMode && anchor) { release(true); pin(win, sentence); } return; }
     const tokens = [...sentence.querySelectorAll('.char-token')].filter(t => !t.closest('.tome-page-lines'));
     const shown = tokens.filter(t => !t.hasAttribute('data-tomoyo-leading-space') && !blank(t.textContent));
     const readerText = shown.map(t => t.textContent).join(''), placeText = [...line.text].filter(c => !blank(c)).join('');
@@ -646,7 +662,7 @@
       if (got0.length && readerText && /[぀-ヿ]/.test(placeText)) { orphan(line); release(); document.body.classList.add('megulit-place-garbled'); return; }
       document.body.classList.remove('megulit-place-garbled');
       if (got0.length && !readerText) orphan(line); /* nothing of the reader's for this hidden line (its hook line was dropped) */
-      if (got0.length) { if (readerText) fxCount('paired', line.text); anchorFrom(got0, median(got0.map(r => r[3])) || 0, map0, String(line.text || '')); release(true); pin(win, sentence); return; } }
+      if (got0.length) { if (readerText) { fxCount('paired', line.text); drawn(line); } anchorFrom(got0, median(got0.map(r => r[3])) || 0, map0, String(line.text || '')); release(true); pin(win, sentence); return; } }
     if (!idx) { if (!gameDrawn()) orphan(line); if (gameDrawn()) release(); else release(true); return; }
     if (document.body.classList.contains('megulit-place-game-drawn')) { document.body.classList.remove('megulit-place-game-drawn'); window.__tomoyoHitRegionsRefresh?.(true); }
     /* record px are game-client px; the reader surface may be larger than the game (galLayoutInfo: client origin and size

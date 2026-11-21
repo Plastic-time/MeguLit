@@ -253,6 +253,9 @@ function shell(){
    }catch(error){toast(errorMessage(error));}}));
   document.querySelectorAll('[data-route]').forEach(button=>button.addEventListener('click',()=>{navigate(button.dataset.route);}));
   document.querySelector('[data-top-guide]')?.addEventListener('click',()=>openGuide({api,locale,esc,toast,version:VERSION}));
+  import('./nsfw.js').then(m=>m.initNsfw({api,locale})).catch(()=>{});
+  import('./developer.js').then(m=>m.initLibraryDevelopers({api,locale,esc})).catch(()=>{});
+  addEventListener('megulit-covers-changed',async()=>{try{model=await api('home');if(['home','library','series'].includes(route)&&!document.querySelector('dialog[open]'))renderRoute();}catch{}});
   document.querySelector('[data-top-feedback]')?.addEventListener('click',()=>openFeedback({api,locale,esc,toast,version:VERSION}));
   /* 2026-11-21 传火碑: a 3D page, loaded (three.js) only when opened, torn down when closed */
   document.querySelector('[data-top-torch]')?.addEventListener('click',()=>import('./torch-monument.js').then(m=>m.openTorchMonument({api,locale,esc,toast})).catch(error=>toast(errorMessage(error))));

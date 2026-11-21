@@ -11,12 +11,12 @@ const DOMAINS={
  'placement.firstLineAnchor':{enum:[null,'glyph','box','page']},
  'placement.lineOffsetY':{number:[-400,400]},
  'placement.drawWhileBlanking':{bool:true},
- 'placement.translationGrowsDown':{bool:true},
+ 'placement.translationGrowsDown':{bool:true},'placement.orphanDraw':{bool:true},
  'page.effectFrames':{enum:[null,true,false]},
  'page.flowPage':{enum:[null,true,false]},
  'page.holdMs':{number:[0,20000],nullable:true},
  'page.pairByDrawn':{bool:true},
- 'page.reportClear':{bool:true},
+ 'page.reportClear':{bool:true},'page.engineRows':{enum:[null,true,false]},
  'page.keepHeld':{bool:true},
  'choice.contentInterleave':{bool:true},
  'choice.dropEffectFrames':{bool:true},
@@ -44,6 +44,8 @@ const DOMAINS={
  'draw.roles':{bool:true},
  'draw.embed':{bool:true,layer:'version'},
  'draw.embedTranslation':{bool:true,layer:'version'},
+ 'draw.engineTable':{engineTable:true,nullable:true,layer:'version'},
+ 'draw.viaRoles':{regexList:{max:16,chars:64},layer:'version'},
  'lang':{langMap:true},
  'library.partLabels':{partLabels:true,nullable:true},
  'safeMode.redrawRate':{number:[0,120],nullable:true},
@@ -58,6 +60,7 @@ function langMap(v){if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v)
   for(const [k,x] of Object.entries(block)){if(!(k in LANG_FIELDS))continue;if(x===null)continue;if(!LANG_FIELDS[k](x))return null;b[k]=Array.isArray(x)?x.slice():x;}out[tag]=b;}
  return out;}
 const plain=v=>v&&typeof v==='object'&&!Array.isArray(v);
+const tableValue=x=>typeof x==='string'&&/^[A-Za-z0-9_.-]{1,40}$/.test(x)||typeof x==='number'&&Number.isFinite(x)&&Math.abs(x)<=0x7fffffff;
 /* a RegExp source that cannot blow up: compiles, no backreference, no quantified group that itself repeats */
 function safeRegex(src,chars=200){if(typeof src!=='string'||!src||src.length>chars)return false;if(/\\[1-9]|\\k</.test(src))return false;if(/\((?:[^()\\]|\\.)*[+*}](?:[^()\\]|\\.)*\)[+*{]/.test(src))return false;try{new RegExp(src,'u');return true;}catch{return false;}}
 function okValue(d,v){
@@ -71,6 +74,8 @@ function okValue(d,v){
  if(d.langMap)return langMap(v)!==null;
  /* library.partLabels (core/library.cjs steamParts): {'.': root label, '<folder>': part label}, a folder name, never a path */
  if(d.partLabels)return plain(v)&&Object.keys(v).length>=1&&Object.keys(v).length<=16&&Object.entries(v).every(([k,x])=>(k==='.'||/^[^\/:*?"<>|]{1,64}$/.test(k)&&k!=='..')&&typeof x==='string'&&x.trim()&&x.length<=40);
+ /* draw.engineTable: one exe's addresses for an engine DLL (data only: module offsets, small numbers, names) */
+ if(d.engineTable)return plain(v)&&/^[a-z0-9]{1,16}$/.test(String(v.engine||''))&&Object.keys(v).length<=32&&Object.entries(v).every(([k,x])=>/^[A-Za-z][A-Za-z0-9]{0,31}$/.test(k)&&(tableValue(x)||Array.isArray(x)&&x.length<=8&&x.every(tableValue)));
  if(d.regexList)return Array.isArray(v)&&v.length<=d.regexList.max&&v.every(s=>safeRegex(s,d.regexList.chars));
  return false;}
 /* settings (a nested layer) -> {value, rejected}: only domain keys with in-domain values survive (any depth: hide.engineTrial.*) */

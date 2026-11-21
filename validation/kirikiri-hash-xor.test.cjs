@@ -75,6 +75,26 @@ test('codepage keeps Shift-JIS when full-width kana far outnumber half-width mid
  assert.equal(kit.codepage(F.gbk('这是中文汉化脚本，里面没有日文假名，只有汉字和标点符号。')),'gbk');
 });
 
+test('the probe reads plain XP3 scenarios with nonzero Adler-32 low bytes',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-plain-kag-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const intro=F.sjis('*start\r\n[cm]\r\n「朝は涼しいね。」[p]\r\n');
+ const route=Buffer.from('*room\r\n「空がきれい。」[p]\r\n');
+ // Adler-32 values from zlib over the bytes stored in the archive.
+ writeXp3(path.join(dir,'data.xp3'),[
+  ['intro.ks',intro,0x1b440f88],['route.ks',route,0x61b81306],
+  ['invalid.ks',intro,0x1b450f88],
+  ['control.ks',Buffer.from('*label\n[x]\n\x01'+'q'.repeat(37)),0xce9d13c5],
+  ['unrelated.ks',Buffer.from('123456789abcdef\n'.repeat(6)),0xbc661969],
+  // This legacy UTF-16 script starts with the ASCII bytes "@A" as stored.
+  ['legacy.ks',Buffer.from('4041b38fcee3d08ff28f338ffb8fbe40b28fe4bfcfbfe2bfb2bfb5bf','hex'),0xfdbd1297],
+ ],false);
+ assert.deepEqual(scenes.read('kirikiri',dir).map(s=>[s.name,s.lines]),[
+  ['control.ks',[]],['intro.ks',['「朝は涼しいね。」']],['invalid.ks',[]],['legacy.ks',['「山はきれい！」']],['route.ks',['「空がきれい。」']],['unrelated.ks',[]],
+ ]);
+ const probe=probeGame({dir,title:'テスト'});
+ assert.deepEqual([probe.step,probe.lines,probe.japaneseLines],['ok',3,3]);
+});
+
 /* 2026-11-20 #472 #417 #415 #404 #411: 45 KiB plug-in (kinglove / hutamata / koirowa / koikari.tpm), key = adlr hash as a
    31-bit ring, byte at offset o XOR key[o % 31]. The adlr hash is the Adler-32 of the plain file. */
 const adler=b=>{let a=1,c=0;for(const x of b){a=(a+x)%65521;c=(c+a)%65521;}return ((c<<16)|a)>>>0;};

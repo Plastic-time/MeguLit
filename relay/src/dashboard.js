@@ -204,6 +204,11 @@ tbody tr:hover td{background:#121212}
       <div id="seed"><div class="empty">-- loading</div></div>
     </section>
 
+    <section class="pane c3 gold">
+      <span class="ti">┤ <b>cardinal</b> ├</span><span class="tr">replay scores · today</span>
+      <div id="cardinal"><div class="empty">-- loading</div></div>
+    </section>
+
     <section class="pane c3">
       <span class="ti">┤ <b>why</b> ├</span><span class="tr">by step</span>
       <div id="steps"><div class="empty">-- no data</div></div>
@@ -462,7 +467,7 @@ function apply(j){
    node"; now each panel draws on its own and a broken one logs "ERR render <panel>" while the others keep updating */
 var badPanels={};
 function safe(name,fn){try{fn();if(badPanels[name]){delete badPanels[name];log("INF","render "+name+" ok again");}}catch(e){if(!badPanels[name])log("ERR","render "+esc(name)+": "+esc(String(e&&e.message||e).slice(0,80)));badPanels[name]=1;}}
-function render(j){safe("spark",spark);safe("stats",function(){renderStats(j);});safe("seed",function(){renderSeed(j.seed);});safe("probe packs",function(){renderPacks(j);});
+function render(j){safe("spark",spark);safe("stats",function(){renderStats(j);});safe("seed",function(){renderSeed(j.seed);});safe("cardinal",function(){renderCardinal(j.cardinal);});safe("probe packs",function(){renderPacks(j);});
  safe("why",function(){renderSteps(j.steps,j);});safe("targets",function(){renderTop(j.top);});safe("now playing",function(){renderPlaying(j.playing);});
  safe("ext",function(){renderExt(j.ext);});safe("storage",function(){renderFullMore(j);});safe("quota",function(){renderQuota(j);});safe("online",function(){renderRow1(j);});
  var er=j.errors||{};Object.keys(er).forEach(function(k){log("ERR","server "+esc(k)+": "+esc(er[k]));});
@@ -491,6 +496,13 @@ function renderSeed(s){var el=$("seed"),se=(s&&s.errors)||{},errH=Object.keys(se
   '<div class="sub" style="margin-top:6px">confirmed = verified + owner-ok · waiting for more players = read + skeleton</div>'+
   '<div class="sub">'+s.sources.map(function(x){return esc(x.source)+' '+x.games;}).join(" · ")+' · updated '+ago(s.at)+'</div>'+errH;
  el.innerHTML=html;meter($("sdOk"),ok,tot);meter($("sdWait"),wait,tot);}
+/* CARDINAL: the replay scores players send up: today's score count, auto diffs upgraded to verified, diffs sent to the repair queue */
+function renderCardinal(c){var el=$("cardinal");
+ if(!c||!c.today){el.innerHTML='<div class="empty">-- no cardinal data</div>';return;}
+ var t=c.today,a=c.total||{};
+ el.innerHTML='<div class="seed-top"><span class="seed-n">'+(t.scores|0)+'</span><span class="seed-u">scores today<br><b>'+(a.scores|0)+'</b> in total</span></div>'+
+  '<div class="chips gold"><span>upgraded today <b>'+(t.upgraded|0)+'</b></span><span>repair queue today <b>'+(t.repair|0)+'</b></span></div>'+
+  '<div class="sub" style="margin-top:6px">verified by Cardinal <b>'+(a.verified|0)+'</b> · in repair queue <b>'+(a.repair|0)+'</b> · day = UTC+8</div>';}
 function nodesLine(){$("node").innerHTML=NODES.map(function(n){var v=lat[n[0]];return n[0]+" "+(v==null?"--":v<0?'<span class="r">down</span>':v+"ms");}).join(" · ");
  var ok=NODES.filter(function(n){return lat[n[0]]>0;}).map(function(n){return lat[n[0]];});$("latT").textContent=ok.length?"latency "+Math.min.apply(null,ok)+"ms":"latency";}
 function tick(){var p=poll();p.first.then(function(j){try{apply(j);}catch(e){log("ERR","render: "+esc(String(e&&e.message||e).slice(0,80)));}},function(){$("mode").textContent="DOWN";$("mode").className="md err";$("code").textContent="timeout";log("ERR","GET /api/probe/stats failed on every node · retry in "+PERIOD+"s");});p.all.then(nodesLine);}

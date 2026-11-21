@@ -64,7 +64,7 @@ class OverlayPlacement {
          engine that reports its cleared line (KiriKiri MessageLayer.clear, page.reportClear in the game's diff) sends it once more,
          empty and not hidden. The game's page is gone: the reader never draws it again from its boxes. The line stays the placement's
          last line (the next one is typed where it was) */
-      if (m.hidden !== true && !flat.length && !rects.length && m.engine !== 'gpu') { const id0 = String(m.engine || 'path') + ':' + (Number(m.line) || 0); if (this.current && !this.current.fallback && this.current.id === id0 && this.goneId !== id0) { this.goneId = id0; this.why('gone:' + id0, 'gone: line ' + (Number(m.line) || 0) + ' cleared by the game'); this.send({ type: 'textPlace', gone: true, text: this.current.text }); } return; }
+      if (m.hidden !== true && !flat.length && !rects.length && m.engine !== 'gpu') { const id0 = String(m.engine || 'path') + ':' + (Number(m.line) || 0); if (this.current && !this.current.fallback && this.current.id === id0 && this.goneId !== id0) { this.goneId = id0; this.why('gone:' + id0, 'gone: line ' + (Number(m.line) || 0) + ' cleared by the game'); this.send({ type: 'textPlace', gone: true, text: this.current.text }); this.rowsCleared(id0); } return; }
       if (rects.length !== flat.length) { this.why('count:' + m.line + ':' + rects.length, 'rejected: line ' + (Number(m.line) || 0) + ' has ' + rects.length + ' boxes for ' + flat.length + ' characters'); return; } // one rect per character is the protocol; anything else is not placeable
       const id = String(m.engine || 'path') + ':' + (Number(m.line) || 0);
       /* 2026-11-15 (沙耶の唄: MeguLit's Japanese drawn a few px off the game's own, unhidden line): the source says the game
@@ -82,8 +82,30 @@ class OverlayPlacement {
       else this.engineHidden = true;
       this.visibleKey = ''; this.why('placed:' + id + ':' + rects.length, 'placed: line ' + (Number(m.line) || 0) + ', ' + rects.length + ' characters, first box ' + (rects[0] ? [].concat(rects[0]).map(v => Math.round(Number(v) || 0)).join(',') : '-') + ' in client ' + this.client.join('x'));
       this.emitLine({ id, engine: m.engine, text: flat.join(''), rects, client: this.client.slice(), ...(m.color ? { color: m.color } : {}), ...(typeof m.read === 'boolean' ? { read: m.read } : {}) });
+      if (m.engine !== 'gpu') this.rows({ id, text: flat.join(''), rects: this.current && !this.current.fallback && this.current.id === id ? this.current.rects : null });
     }
   }
+  /* 2026-11-21 (owner, ファタモルガーナの館 two-row page: the line above went undrawn once the reader moved on, the new one sat on the first
+     row): with page.engineRows the engine's lines make a page. A line joins it when the game has not cleared the page since (the
+     engine's clear report, page.reportClear) and its top is below every row already on it; otherwise it starts a new page. The page
+     goes to the reader as textPlacePage: every line on its own boxes, the earlier ones as old lines (ruby, lookups, the line colour) */
+  rows(l) {
+    const mode = require('./profiles/index.cjs').get(this.profile, 'page.engineRows', false);
+    if (mode === false || !l || !Array.isArray(l.rects) || !l.rects.length) return;
+    const ok = r => Array.isArray(r) && r.length >= 4, rs = l.rects.filter(ok); if (!rs.length) return;
+    const top = Math.min(...rs.map(r => r[1])), P = this.rowPage || (this.rowPage = []), at = P.findIndex(x => x.id === l.id);
+    if (at >= 0) P[at] = { id: l.id, text: l.text, rects: l.rects };
+    else { const bottom = P.length ? Math.max(...P.flatMap(x => x.rects.filter(ok).map(r => r[1] + r[3]))) : -Infinity;
+      if (P.length && top >= bottom - 2) this.why('rows:' + l.id, 'page: ' + l.id + ' goes on the page under ' + P[P.length - 1].id + ' (no clear since, starts below its rows)');
+      else { if (P.length) this.why('rows:' + l.id, 'page: ' + l.id + ' starts a new page (' + (top < bottom - 2 ? 'not below the page' : 'cleared') + ')'); P.length = 0; }
+      P.push({ id: l.id, text: l.text, rects: l.rects }); if (P.length > 12) P.shift(); }
+    if (mode === true || P.length >= 2) { this.rowsPaged = true; this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: P.map(x => ({ id: x.id, text: x.text, rects: x.rects })) }); }
+    else this.rowsUnpage();
+  }
+  /* auto (null): back to the line model once the page holds one line again */
+  rowsUnpage() { if (!this.rowsPaged) return; this.rowsPaged = false; this.pageKey = ''; this.send({ type: 'textPlacePage', lines: null }); }
+  rowsCleared(id) { if (!this.rowPage || !this.rowPage.length) return; this.why('rowsgone:' + id, 'page: cleared by the game with ' + id + ', its ' + this.rowPage.length + ' row(s) go'); this.rowPage = [];
+    if (require('./profiles/index.cjs').get(this.profile, 'page.engineRows', null) === true) this.page({ awake: true, armed: true, sw: this.client[0], sh: this.client[1], lines: [] }); else this.rowsUnpage(); }
   /* ① MeguLitFont blank mode (record spec 3): the current line's table (hook-native state.hookGlyphDots) with a cell
      origin per character. Spaces: c = client px, m<W>x<H> / t<W>x<H> = a surface of that size (scaled to the client),
      g / - = no device position (not placeable). A character the engine drew from its glyph cache has no record: it sits
