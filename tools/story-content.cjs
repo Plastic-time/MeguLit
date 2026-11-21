@@ -5,8 +5,8 @@ const fs=require('node:fs'),path=require('node:path');
 const data=require('../services/story-data.cjs'),content=require('../services/story-content.cjs'),discovery=require('../services/story-discovery.cjs');
 const MAX_ENTRY=8*1024*1024;
 const readYpf=content.readYpf;
-function enrich(story,dir){
- const checked=data.validate(story);if(!checked.ok)throw Error('STORY_INVALID: '+checked.errors.join(','));const doc=structuredClone(story),nodes=doc.chapters.flatMap(c=>c.nodes),names=new Map(doc.gallery.flatMap(g=>g.variants.map(v=>[v.name.toLowerCase(),v.name]))),receipt={entries:[],nodes:[],unresolved:[]};
+function enrich(story,executable){
+ const checked=data.validate(story);if(!checked.ok)throw Error('STORY_INVALID: '+checked.errors.join(','));const build=data.digest(executable);if(!story.builds.includes(build))throw Error('STORY_BUILD_IDENTITY');const dir=path.dirname(executable),doc=structuredClone(story),nodes=doc.chapters.flatMap(c=>c.nodes),names=new Map(doc.gallery.flatMap(g=>g.variants.map(v=>[v.name.toLowerCase(),v.name]))),receipt={buildSHA256:build,entries:[],nodes:[],unresolved:[]};
  const files=doc.scripts.map(s=>{const file=path.join(dir,s.location||'',s.name);if(data.digest(file)!==s.sha256)throw Error('STORY_SOURCE_IDENTITY');return {s,file};});
  let yurisCommands=[],yurisLabels=[];
  for(const {s,file} of files){
@@ -32,7 +32,7 @@ function enrich(story,dir){
    }
   }
  }
- for(const {s,file} of files)if(data.digest(file)!==s.sha256)throw Error('STORY_SOURCE_CHANGED');const validation=data.validate(doc);if(!validation.ok)throw Error('STORY_INVALID: '+validation.errors.join(','));return {story:doc,receipt};
+ for(const {s,file} of files)if(data.digest(file)!==s.sha256)throw Error('STORY_SOURCE_CHANGED');if(data.digest(executable)!==build)throw Error('STORY_BUILD_CHANGED');const validation=data.validate(doc);if(!validation.ok)throw Error('STORY_INVALID: '+validation.errors.join(','));return {story:doc,receipt};
 }
-if(require.main===module){const [storyFile,gameDir,out]=process.argv.slice(2);if(!storyFile||!gameDir||!out)throw Error('Usage: node tools/story-content.cjs <story.json> <game-dir> <out.json>');const result=enrich(JSON.parse(fs.readFileSync(storyFile,'utf8')),gameDir);fs.writeFileSync(out,JSON.stringify(result.story,null,1)+'\n');fs.writeFileSync(out+'.receipt.json',JSON.stringify(result.receipt,null,1)+'\n');console.log(JSON.stringify({entries:result.receipt.entries.length,nodes:result.receipt.nodes.length,firstLines:result.receipt.nodes.filter(n=>n.firstLine).length,images:result.receipt.nodes.filter(n=>n.image).length,unresolved:result.receipt.unresolved.length,progressIncluded:false}));}
+if(require.main===module){const [storyFile,executable,out]=process.argv.slice(2);if(!storyFile||!executable||!out)throw Error('Usage: node tools/story-content.cjs <story.json> <game.exe> <out.json>');const result=enrich(JSON.parse(fs.readFileSync(storyFile,'utf8')),executable);fs.writeFileSync(out,JSON.stringify(result.story,null,1)+'\n');fs.writeFileSync(out+'.receipt.json',JSON.stringify(result.receipt,null,1)+'\n');console.log(JSON.stringify({entries:result.receipt.entries.length,nodes:result.receipt.nodes.length,firstLines:result.receipt.nodes.filter(n=>n.firstLine).length,images:result.receipt.nodes.filter(n=>n.image).length,unresolved:result.receipt.unresolved.length,progressIncluded:false}));}
 module.exports={enrich,readYpf};
