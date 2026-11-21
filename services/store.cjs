@@ -209,7 +209,9 @@ function imageData(root,folder,name) {
   const file=path.join(root,'data','assets',folder,name);
   if(!fs.existsSync(file)||fs.statSync(file).size>12*1024*1024)return '';
   const type={'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp'}[path.extname(file).toLowerCase()];
-  return type?'data:'+type+';base64,'+fs.readFileSync(file).toString('base64'):'';
+  if(!type)return '';
+  /* a cover VNDB rates adult is tagged (#r18, ignored by the browser): web/nsfw.js veils it while the NSFW setting is off */
+  return 'data:'+type+';base64,'+fs.readFileSync(file).toString('base64')+(folder==='covers'&&require('./nsfw.cjs').isFlagged(root,name)?'#r18':'');
 }
 function games(db,root,{includeRemoved=false}={}) {
   /* the readonly verdict of another build is shown as untested (services/hook-verdict.cjs) */let version;const build=()=>version??=require('./hook-verdict.cjs').appVersion(root);

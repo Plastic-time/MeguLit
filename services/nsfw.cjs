@@ -39,8 +39,18 @@ async function refresh(root,ids,{fetcher=globalThis.fetch,now=Date.now()}={}){co
 function state(db,root,{fetcher,now=Date.now(),wait=false}={}){
  const list=games(db),c=readCache(root),flagged=new Set(),unknown=[];
  for(const g of list){if(!g.vid||!g.cover)continue;const e=c.vn[g.vid];if(!e){unknown.push(g.vid);continue;}if(e.miss)continue;if(adult(e))flagged.add(g.cover);}
- const out={on:enabled(root),setting:setting(root),locked:setting(root)&&safeOnly(root),flagged:[...flagged].sort(),pending:unknown.length>0};
+ const rev=saveFlags(root,flagged)?Date.now():0;
+ const out={on:enabled(root),setting:setting(root),locked:setting(root)&&safeOnly(root),flagged:[...flagged].sort(),changed:rev>0,pending:unknown.length>0};
  if(wait)return refresh(root,list.map(g=>g.vid).filter(Boolean),{fetcher,now}).then(()=>state(db,root,{fetcher,now}));
  if((unknown.length||list.some(g=>g.vid&&c.vn[g.vid]&&now-c.vn[g.vid].at>(c.vn[g.vid].miss?MISS:FRESH)))&&!busy){busy=refresh(root,list.map(g=>g.vid).filter(Boolean),{fetcher,now}).finally(()=>{busy=null;});}
  return out;}
-module.exports={state,refresh,enabled,setting,adult,rating,readCache,games,vid};
+/* the cover files VNDB rates adult, kept in data/config/cover-flags.json so store.imageData (every cover the app serves) can tag them:
+   a data: URL of such a cover ends with #r18, and web/nsfw.js veils every picture with that tag while the setting is off */
+const flagsFile=root=>path.join(root,'data','config','cover-flags.json');
+const flagCache=new Map();
+function flags(root){const f=flagsFile(root);let st=null;try{st=fs.statSync(f);}catch{flagCache.delete(root);return new Set();}const c=flagCache.get(root);if(c&&c.mtime===st.mtimeMs)return c.set;
+ const set=new Set(Array.isArray(readJSON(f).names)?readJSON(f).names.filter(x=>typeof x==='string'):[]);flagCache.set(root,{mtime:st.mtimeMs,set});return set;}
+const isFlagged=(root,name)=>flags(root).has(String(name||''));
+function saveFlags(root,names){const cur=[...flags(root)].sort().join(','),next=[...names].sort().join(',');if(cur===next&&fs.existsSync(flagsFile(root)))return false;
+ try{const f=flagsFile(root),tmp=f+'.'+process.pid+'.tmp';fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(tmp,JSON.stringify({names:[...names].sort()}));fs.renameSync(tmp,f);flagCache.delete(root);return true;}catch{return false;}}
+module.exports={state,refresh,enabled,setting,adult,rating,readCache,games,vid,isFlagged,saveFlags};

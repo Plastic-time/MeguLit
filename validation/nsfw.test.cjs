@@ -19,3 +19,11 @@ test('an unknown id is pending (asked in the background); a failed ask is not re
  assert.equal(await nsfw.refresh(root,['v1'],{fetcher:f}),false);assert.equal(n,1);assert.equal(await nsfw.refresh(root,['v1'],{fetcher:f}),false);assert.equal(n,1,'retry only after a while');
  assert.equal(nsfw.state(dbOf(rows),root,{fetcher:async()=>{throw Error('x');}}).pending,true);});
 test('the ids of the library: a manual id first, plain numbers get a v',()=>{assert.deepEqual(nsfw.games(dbOf(rows)).map(g=>g.vid),['v1','v2','','v4']);assert.deepEqual(nsfw.games(dbOf(rows)).map(g=>g.cover),['a.jpg','b.jpg','c.jpg','d.jpg']);assert.equal(nsfw.vid('123'),'v123');assert.equal(nsfw.vid('x1'),'');});
+test('flag file: state writes the adult cover names; store.imageData tags exactly those covers with #r18',async()=>{const root=tmp();const store=require('../services/store.cjs');
+ const dir=path.join(root,'data','assets','covers');fs.mkdirSync(dir,{recursive:true});const PNG=Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]),Buffer.alloc(20)]);fs.writeFileSync(path.join(dir,'a.png'),PNG);fs.writeFileSync(path.join(dir,'b.png'),PNG);
+ assert.ok(!store.imageData(root,'covers','a.png').endsWith('#r18'),'before any rating nothing is tagged');
+ const f=async()=>({ok:true,json:async()=>({results:[{id:'v1',image:{sexual:2,violence:0}},{id:'v2',image:{sexual:0,violence:0}}]})});await nsfw.refresh(root,['v1','v2'],{fetcher:f});
+ const r=[{cover:'a.png',original:JSON.stringify({library:{vndbId:'v1'}})},{cover:'b.png',original:JSON.stringify({library:{vndbId:'v2'}})}];
+ let s=nsfw.state(dbOf(r),root);assert.deepEqual(s.flagged,['a.png']);assert.equal(s.changed,true);
+ assert.ok(store.imageData(root,'covers','a.png').endsWith('#r18'));assert.ok(!store.imageData(root,'covers','b.png').endsWith('#r18'));assert.ok(!store.imageData(root,'word-images','a.png').endsWith('#r18'),'only covers');
+ s=nsfw.state(dbOf(r),root);assert.equal(s.changed,false,'an unchanged set is not a change');});
