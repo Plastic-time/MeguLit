@@ -1,7 +1,66 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {LibraryScans}=require('../services/library-scan.cjs');
+for(const fails of [false,true]){
+ test('a scan requested after changing folders uses the saved roots when the old scan '+(fails?'fails':'succeeds'),async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-rescan-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const {Settings}=require('../services/settings.cjs'),{Runtime}=require('../services/runtime.cjs');
+  const settings=new Settings(root),runtime=new Runtime(root),seen=[];
+  runtime.libraryManager=new(require('../core/library.cjs').Library)({root,config:settings.folder});
+  function save(folders){
+   const request={scope:'library',values:{folders}};
+   settings.save(request);runtime.settingsSaved(request);
+  }
+  save('Old');
+  let release;
+  runtime.libraryScans=new LibraryScans(async({incremental})=>{
+   const folders=settings.read('library').folders;seen.push({folders,incremental});
+   if(seen.length===1){await new Promise(r=>release=r);if(fails)throw Error('old scan failed');}
+   return folders;
+  });
+  const start=runtime.call({action:'library_scan',startup:true});
+  const old=fails?assert.rejects(start,/old scan failed/):start;
+  await Promise.resolve();
+  save('New');
+  const first=runtime.call({action:'library_scan'}),second=runtime.call({action:'library_scan'});
+  await Promise.resolve();assert.equal(seen.length,1);
+  release();await old;
+  assert.deepEqual(await Promise.all([first,second]),['New','New']);
+  assert.deepEqual(seen,[{folders:'Old',incremental:true},{folders:'New',incremental:false}]);
+ });
+}
+test('changing only Steam clears the cached startup scan, other library preferences keep it',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-rescan-steam-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const runtime=new(require('../services/runtime.cjs').Runtime)(root),settings=new(require('../services/settings.cjs').Settings)(root);let runs=0;
+ runtime.libraryManager=new(require('../core/library.cjs').Library)({root,config:settings.folder});
+ function save(values){const request={scope:'library',values};settings.save(request);runtime.settingsSaved(request);}
+ runtime.libraryScans=new LibraryScans(async()=>++runs);
+ const startup=()=>runtime.call({action:'library_scan',startup:true});
+ assert.equal(await startup(),1);
+ save({...settings.read('library'),autoSeries:false});
+ assert.equal(await startup(),1);
+ save({...settings.read('library'),steamPath:'NewSteam'});
+ assert.equal(await startup(),2);assert.equal(await startup(),2);
+});
 test('startup scans once, overlapping requests share work, and later manual refresh runs again',async()=>{
  let runs=0,release;const scanner=new LibraryScans(async()=>{runs++;await new Promise(r=>release=r);return {added:runs};});const first=scanner.run({startup:true}),manual=scanner.run();await Promise.resolve();assert.equal(runs,1);release();assert.deepEqual(await first,{added:1});assert.deepEqual(await manual,{added:1});await scanner.run({startup:true});assert.equal(runs,1);const next=scanner.run();await Promise.resolve();release();await next;assert.equal(runs,2);
+});
+test('queued work uses the same saved roots for scheduling and scanning after another edit',{timeout:5000},async()=>{
+ let folders=['A'];const scanned=[],starts=[],releases=[];
+ const scanner=new LibraryScans(async(_options,state)=>{
+  const root=state.folders[0];scanned.push(root);
+  const block=new Promise(resolve=>releases.push(resolve));starts.shift()?.();await block;return root;
+ });
+ const run=()=>scanner.run({readState:()=>({folders,steamPath:''})});
+ const started=()=>new Promise(resolve=>starts.push(resolve));
+ let ready=started();const a=run();await ready;
+ folders=['B'];const queued=run();
+ folders=['C'];ready=started();releases.shift()();await ready;
+ folders=['B'];const final=run();
+ ready=started();releases.shift()();await ready;releases.shift()();
+ assert.deepEqual(await Promise.all([a,queued,final]),['A','C','B']);
+ assert.deepEqual(scanned,['A','C','B']);
 });
 test('failed startup scanning can retry, without caching a failed result forever',async()=>{let calls=0;const scanner=new LibraryScans(async()=>{if(++calls===1)throw Error('offline');return {added:0};});await assert.rejects(scanner.run({startup:true}));assert.deepEqual(await scanner.run({startup:true}),{added:0});assert.equal(calls,2);});
 test('startup scan reuses known metadata and discovers a newly added game folder',async t=>{
