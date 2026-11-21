@@ -44,14 +44,23 @@ class RuntimeSample{
  save(root,key,prints=null){if(this.done||!key)return '';this.done=true;if(prints)this.sample.prints=require('../core/game-print.cjs').check(prints);const d=keyDir(root,key);try{fs.rmSync(d,{recursive:true,force:true});fs.mkdirSync(d,{recursive:true});
   fs.writeFileSync(path.join(d,'sample.json'),JSON.stringify({...this.sample,key,shots:this.shots.length},null,1));this.shots.forEach((b,i)=>fs.writeFileSync(path.join(d,'shot-'+(i+1)+'.jpg'),b));
   let scrub=t=>t;try{const dg=require('./diagnostics.cjs');if(dg.scrub)scrub=t=>dg.scrub(t);}catch{}
-  const NL=String.fromCharCode(10);fs.writeFileSync(path.join(d,'hook-events.log'),scrub(this.logs.hook.join(NL)+NL));fs.writeFileSync(path.join(d,'reader-host.log'),scrub(this.logs.reader.join(NL)+NL));}catch{return '';}return d;}
+  const NL=String.fromCharCode(10);fs.writeFileSync(path.join(d,'hook-events.log'),scrub(this.logs.hook.join(NL)+NL));fs.writeFileSync(path.join(d,'reader-host.log'),scrub(this.logs.reader.join(NL)+NL));
+  /* 2026-11-21 (diff-maker: engine-draw ToMe_CHARS records) the engine-draw log lines of this window too */
+  const draw=engineDraw(root,this.sample.createdAt,new Date().toISOString());if(draw)fs.writeFileSync(path.join(d,'engine-draw.log'),scrub(draw));}catch{return '';}return d;}
 }
+/* the lines of logs/engine-draw.log (each "ISO time + raw ToMe_CHARS record", feat/engine-draw) between from-5 s and to; at most
+   ENGINE_DRAW_MAX bytes, read from the end of the log only */
+const ENGINE_DRAW_MAX=1536*1024,ENGINE_DRAW_READ=8*1024*1024;
+function engineDraw(root,from,to){const f=path.join(root,'logs','engine-draw.log');let text='';try{const st=fs.statSync(f),start=Math.max(0,st.size-ENGINE_DRAW_READ),fd=fs.openSync(f,'r');try{const b=Buffer.alloc(st.size-start);fs.readSync(fd,b,0,b.length,start);text=b.toString('utf8');}finally{fs.closeSync(fd);}}catch{return '';}
+ const lo=new Date(Date.parse(from)-5000).toISOString(),hi=String(to||'9');const out=[];let bytes=0;
+ for(const line of text.split(/\r?\n/)){const at=line.slice(0,24);if(!/^\d{4}-\d\d-\d\dT/.test(at)||at<lo||at>hi)continue;bytes+=Buffer.byteLength(line)+1;if(bytes>ENGINE_DRAW_MAX)break;out.push(line);}
+ return out.length?out.join(String.fromCharCode(10))+String.fromCharCode(10):'';}
 /* the files a probe packs: [{kind,name,data}] */
-function files(dir){if(!dir)return [];const out=[];try{for(const f of fs.readdirSync(dir).sort()){const p=path.join(dir,f);if(f==='sample.json'||f==='hook-events.log'||f==='reader-host.log')out.push({kind:'runtime',name:f,data:fs.readFileSync(p)});else if(/^shot-\d\.jpg$/.test(f))out.push({kind:'shot',name:f,data:fs.readFileSync(p)});}}catch{}return out;}
+function files(dir){if(!dir)return [];const out=[];try{for(const f of fs.readdirSync(dir).sort()){const p=path.join(dir,f);if(f==='sample.json'||f==='hook-events.log'||f==='reader-host.log'||f==='engine-draw.log')out.push({kind:'runtime',name:f,data:fs.readFileSync(p)});else if(/^shot-\d\.jpg$/.test(f))out.push({kind:'shot',name:f,data:fs.readFileSync(p)});}}catch{}return out;}
 /* a runtime-only bundle (an exe whose scripts and exe the relay already has): {schema,key,files:[{name,kind,sha256,data base64}]},
    gzip; null when there is nothing or it is too big */
 function bundle(dir,key){const list=files(dir);if(!list.length)return null;const doc={schema:'megulit.runtime-bundle',version:1,key,createdAt:new Date().toISOString(),files:list.map(f=>({name:f.name,kind:f.kind,sha256:crypto.createHash('sha256').update(f.data).digest('hex'),data:f.data.toString('base64')}))};
  const z=zlib.gzipSync(Buffer.from(JSON.stringify(doc)),{level:9});return z.length<=BUNDLE_MAX?{data:z,sha256:crypto.createHash('sha256').update(z).digest('hex'),bytes:z.length}:null;}
 /* what changes when the sample changes (the probe remembers it to send a new one only) */
 function stamp(dir){try{return crypto.createHash('sha256').update(fs.readFileSync(path.join(dir,'sample.json'))).digest('hex');}catch{return '';}}
-module.exports={RuntimeSample,dirFor,keyDir,files,bundle,stamp,enabled,setEnabled,SHOTS_AT,BUNDLE_MAX};
+module.exports={RuntimeSample,dirFor,keyDir,files,bundle,stamp,enabled,setEnabled,engineDraw,SHOTS_AT,BUNDLE_MAX};
