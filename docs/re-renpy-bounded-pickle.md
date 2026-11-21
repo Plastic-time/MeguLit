@@ -2,7 +2,7 @@
 
 `original-engines/renpy-pickle-bounded.cjs` is unregistered and does not replace the existing RPYC reader. It accepts an already decompressed Buffer, never a path. It neither imports Python modules nor invokes constructors, reduction callables, state methods, persistent IDs or extension handlers
 
-`decode(buffer, {limits, classes, allowDefaultDict:false})` returns `{value, protocol, counts, bytesRead}`. The default class allowlist contains only `renpy.ast.Say`, `Translate` and `TranslateSay`; a caller can explicitly supply up to 64 inert `renpy.ast` class identities. This is an identity allowlist, not proof that an AST class is supported by a narrative extractor
+`decode(buffer, {limits, classes, allowDefaultDict:false, allowPyCodeState:false})` returns `{value, protocol, counts, bytesRead}`. The default class allowlist contains only `renpy.ast.Say`, `Translate` and `TranslateSay`; a caller can explicitly supply up to 64 inert `renpy.ast` class identities. This is an identity allowlist, not proof that an AST class is supported by a narrative extractor
 
 By default both GLOBAL and STACK_GLOBAL require the exact module token `renpy.ast` and a simple class-name token. Qualified names through a parent module are conservatively rejected; concatenated spelling alone is not an identity proof. Unicode data retains a leading U+FEFF literally, rather than treating each string as a file with a removable BOM
 
@@ -29,3 +29,17 @@ Validation: `node --test validation/renpy-pickle-bounded.test.cjs`
 The small committed CPython fixtures have an adjacent optional producer using only standard-library pickle and neutral synthetic classes. Tests consume the fixed bytes without requiring Python. The recorded Python version and opcode sets describe these controls; they do not pin or emulate a Ren'Py compiler release
 
 `validation/fixtures/renpy-defaultdict-cpython.json` adds six fixed controls from ordinary CPython `collections.defaultdict(None|list)` pickling under protocols 2, 4 and 5, using only neutral alpha/empty keys and integer lists. The same optional producer accepts `--defaultdict` to generate them. No real game bytes or source dialogue are committed. These controls validate the narrow inert container representation, not a game's complete graph or narrative
+
+## Explicit opaque PyCode state
+
+`allowPyCodeState:true` is a separate strict-boolean option, off by default. It does not add a class identity: `classes` must also explicitly contain `renpy.ast.PyCode`. BUILD for that exact identity then accepts only a tuple of four through seven fields, with tag exactly 1. Other classes retain their existing dictionary/slot rules. With the option off, a PyCode BUILD rejects with PYCODE_STATE_DISABLED; the class cannot receive generic state as a workaround
+
+The observed bundled `ast.py` is SHA256 `319ef8a18b3b0ce426240c738405dc90d52d89861e3694c6ef04a2227271aefc`, 85,626 bytes. Its own PyCode getstate at lines 89–90 writes tag/source/location/mode/py/hashcode/col_offset. Setstate at lines 92–126 accepts four through seven fields and supplies py=2, hashcode=None and col_offset=0 when absent. Its tag pattern is a wildcard, while this reader intentionally supports only the observed writer tag 1. This evidence belongs to PyCode's own methods, not the unresolved inherited cslots state of other AST nodes, and does not authenticate a supplied file's compiler version
+
+The supported subset requires a string source, an exact two-element location tuple of string filename and nonnegative safe-integer line number, and mode `exec`, `eval` or `single`. Py is only 2 or 3; hashcode is only None or a safe unsigned 32-bit integer; col_offset is a nonnegative safe integer. These type and value restrictions are a conservative reader contract, not a claim that the permissive original method enforces them. PyExpr and other non-string source forms reject even if their identities have separately been allowed
+
+The instance retains its exact class identity, adds `stateKind:'pycode-opaque'`, and stores a Map with writerTag, source, filename, linenumber, mode, py, hashcode and col_offset. Source and filename are opaque data, never filesystem paths or Say text. No Python setstate, compilation, hash32 calculation, PyExpr import, bytecode generation or all_pycode append occurs. A missing hash stays null instead of imitating the engine's hash calculation. Repeat BUILD still rejects
+
+The new stored eight-entry Map consumes one additional logical node and sixteen stored edges. Input tuple edges, stack/mark pushes, unicode bytes and other existing work still consume their normal budgets. Fixed field-name strings and the stateKind tag are bounded metadata, not input-string bytes; this is not a claim of exact heap/RSS accounting. Errors are fixed RENPY_PICKLE_PYCODE_* codes with offsets and no source contents
+
+`validation/fixtures/renpy-pycode-cpython.json` contains twelve ordinary CPython controls: protocols 2/4/5 crossed with four through seven tuple fields from a neutral fake class's __getstate__. The optional producer accepts `--pycode`. These bytes are synthetic, contain no real game source, and do not prove Ren'Py compiler, cslots, AST layout or narrative compatibility. No scene extraction or automatic registration is added

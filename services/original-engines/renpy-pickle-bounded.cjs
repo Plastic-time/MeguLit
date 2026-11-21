@@ -8,8 +8,9 @@ const MARK=Symbol('pickle mark');
 function fail(code,offset){const error=Error('RENPY_PICKLE_'+code);error.code=error.message;error.offset=offset;throw error;}
 function decode(buffer,options={}){
  if(!options||typeof options!=='object'||Array.isArray(options))fail('OPTIONS',0);
- const {limits:overrides={},classes=CLASSES,allowDefaultDict=false}=options;
+ const {limits:overrides={},classes=CLASSES,allowDefaultDict=false,allowPyCodeState=false}=options;
  if(typeof allowDefaultDict!=='boolean')fail('DEFAULTDICT_OPTION',0);
+ if(typeof allowPyCodeState!=='boolean')fail('PYCODE_OPTION',0);
  const limits={...LIMITS};
  if(!overrides||typeof overrides!=='object'||Array.isArray(overrides))fail('LIMITS',0);
  for(const [key,value]of Object.entries(overrides)){
@@ -46,6 +47,20 @@ function decode(buffer,options={}){
   if(allowDefaultDict&&(module==='collections'&&name==='defaultdict'||(module==='builtins'||module==='__builtin__')&&name==='list'))return Object.freeze({kind:'global',name:module+'.'+name});
   if(module!=='renpy.ast'||typeof name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]{0,100}$/.test(name))fail('GLOBAL',at);
   const identity=module+'.'+name;if(!allowed.has(identity))fail('GLOBAL',at);return Object.freeze({kind:'global',name:identity});
+ };
+ const pyCodeState=state=>{
+  if(!allowPyCodeState)fail('PYCODE_STATE_DISABLED',at);
+  if(state?.kind!=='tuple'||state.items.length<4||state.items.length>7)fail('PYCODE_STATE',at);
+  const [tag,source,location,mode,py=2,hashcode=null,colOffset=0]=state.items;
+  if(tag!==1)fail('PYCODE_TAG',at);
+  if(typeof source!=='string')fail('PYCODE_SOURCE',at);
+  if(location?.kind!=='tuple'||location.items.length!==2||typeof location.items[0]!=='string'||!Number.isSafeInteger(location.items[1])||location.items[1]<0)fail('PYCODE_LOCATION',at);
+  if(!['exec','eval','single'].includes(mode))fail('PYCODE_MODE',at);
+  if(py!==2&&py!==3)fail('PYCODE_PY',at);
+  if(hashcode!==null&&(!Number.isSafeInteger(hashcode)||hashcode<0||hashcode>0xffffffff))fail('PYCODE_HASH',at);
+  if(!Number.isSafeInteger(colOffset)||colOffset<0)fail('PYCODE_OFFSET',at);
+  spend('nodes',1);spend('edges',16);
+  return new Map([['writerTag',tag],['source',source],['filename',location.items[0]],['linenumber',location.items[1]],['mode',mode],['py',py],['hashcode',hashcode],['col_offset',colOffset]]);
  };
  if(byte()!==0x80)fail('PROTOCOL',0);const protocol=byte();if(protocol<2||protocol>5)fail('PROTOCOL',1);
  while(at<buffer.length){
@@ -95,7 +110,7 @@ function decode(buffer,options={}){
     push({kind:'defaultdict',factory,entries:new Map()});break;
    }
    case 0x81:{const args=pop(),cls=pop();if(cls?.kind!=='global'||!allowed.has(cls.name)||args?.kind!=='tuple'||args.items.length)fail('NEWOBJ',at);push({kind:'instance',className:cls.name,state:null});break;}
-   case 0x62:{const state=pop(),target=peek();if(target?.kind!=='instance'||target.state!==null)fail('STATE',at);let dict=state,slots=null;if(state?.kind==='tuple'){if(state.items.length!==2)fail('STATE',at);[dict,slots]=state.items;}if(![dict,slots].every(item=>item===null||item?.kind==='dict'))fail('STATE',at);const merged=new Map();for(const item of [dict,slots])if(item)for(const [key,value]of item.entries){if(typeof key!=='string'||merged.has(key))fail('STATE_KEY',at);spend('edges',2);merged.set(key,value);}target.state=merged;break;}
+   case 0x62:{const state=pop(),target=peek();if(target?.kind!=='instance'||target.state!==null)fail('STATE',at);if(target.className==='renpy.ast.PyCode'){target.state=pyCodeState(state);target.stateKind='pycode-opaque';break;}let dict=state,slots=null;if(state?.kind==='tuple'){if(state.items.length!==2)fail('STATE',at);[dict,slots]=state.items;}if(![dict,slots].every(item=>item===null||item?.kind==='dict'))fail('STATE',at);const merged=new Map();for(const item of [dict,slots])if(item)for(const [key,value]of item.entries){if(typeof key!=='string'||merged.has(key))fail('STATE_KEY',at);spend('edges',2);merged.set(key,value);}target.state=merged;break;}
    case 0x71:remember(byte());break;case 0x72:remember(uint());break;case 0x94:remember(memo.size);break;
    case 0x68:recall(byte());break;case 0x6a:recall(uint());break;
    case 0x30:pop();break;case 0x32:push(peek());break;
