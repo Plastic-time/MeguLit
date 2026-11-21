@@ -99,7 +99,7 @@ test('the settings bridge forwards append mode and ordinary saves still replace 
  const script=`const {dispatch}=require('./services/bridge.cjs');
  dispatch({action:'settings_save',scope:'library',appendFolders:true,values:{folders:'New',steamPath:'Detected'}})
  .catch(e=>{console.error(e);process.exitCode=1;});`;
- require('node:child_process').execFileSync(process.execPath,['-e',script],{cwd:path.join(__dirname,'..'),env:{...process.env,MEGULIT_ROOT:root}});
+ require('node:child_process').execFileSync(process.execPath,['-e',script],{windowsHide:true,cwd:path.join(__dirname,'..'),env:{...process.env,MEGULIT_ROOT:root}});
  assert.equal(settings.read('library').folders,'Original\nNew');assert.equal(settings.read('library').steamPath,'ChosenSteam');
  settings.save({scope:'library',values:{folders:'New',steamPath:'Replacement'}});
  assert.equal(settings.read('library').folders,'New');assert.equal(settings.read('library').steamPath,'Replacement');
