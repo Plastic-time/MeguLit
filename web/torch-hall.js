@@ -333,7 +333,7 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
  const bracketG=mergeGeometries([new THREE.BoxGeometry(.06,.06,.5).translate(0,0,.25),new THREE.BoxGeometry(.05,.34,.05).translate(0,-.16,.08).rotateX(-.6),
   new THREE.TorusGeometry(.1,.02,6,16).rotateX(Math.PI/2).translate(0,.02,.5),new THREE.LatheGeometry([[0,0],[.04,0],[.07,.12],[.13,.24],[.14,.28],[0,.28]].map(([x,y])=>new THREE.Vector2(x,y)),16).translate(0,-.1,.5)].map(g=>g.index?g.toNonIndexed():g));
  inst(bracketG,iron,torchSpots.map(t=>[t.pos.x-t.dir.x*.5,t.pos.y-.18,t.pos.z-t.dir.z*.5,Math.atan2(t.dir.x,t.dir.z)]));
- { const wood=keep(new THREE.MeshStandardMaterial({color:0x3b2718,roughness:.82,metalness:0})),char=keep(new THREE.MeshStandardMaterial({color:0x1d1510,roughness:.95,metalness:0,emissive:0x4a1606,emissiveIntensity:0}));
+ { const wood=keep(new THREE.MeshStandardMaterial({color:0x3b2718,roughness:.82,metalness:0})),char=keep(new THREE.MeshStandardMaterial({color:0x1d1510,roughness:.95,metalness:0,emissive:0x2c1648,emissiveIntensity:0}));
    const handle=new THREE.CylinderGeometry(.03,.024,.62,10).translate(0,-.17,0),head=mergeGeometries([new THREE.CylinderGeometry(.055,.045,.17,12).translate(0,.2,0),new THREE.TorusGeometry(.052,.012,6,14).rotateX(Math.PI/2).translate(0,.15,0),new THREE.TorusGeometry(.055,.012,6,14).rotateX(Math.PI/2).translate(0,.24,0)].map(g=>g.index?g.toNonIndexed():g));
    const at=torchSpots.map(t=>[t.pos.x,t.pos.y-.16,t.pos.z,0]);inst(handle,wood,at);inst(head,char,at);torchHeadMat=char;}
  const standG=mergeGeometries([new THREE.LatheGeometry([[0,0],[.42,0],[.42,.06],[.16,.14],[.1,.3],[.08,1.6],[.1,1.65],[.06,1.75],[.1,2.0],[.3,2.08],[.5,2.3],[.52,2.36],[0,2.36]].map(([x,y])=>new THREE.Vector2(x,y)),32)].map(g=>g.toNonIndexed()));
@@ -349,7 +349,7 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
    float n3(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
     return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z);}
    float fbm(vec3 p){float s=0.,a=.5;for(int i=0;i<4;i++){s+=a*n3(p);p=p*2.07+vec3(.3,.1,.7);a*=.5;}return s;}
-   vec3 heat(float T){vec3 c=mix(vec3(.35,.03,.005),vec3(1.,.28,.03),smoothstep(.05,.45,T));c=mix(c,vec3(1.,.62,.18),smoothstep(.4,.75,T));return mix(c,vec3(1.,.92,.72),smoothstep(.75,1.05,T));}
+   vec3 heat(float T){vec3 c=mix(vec3(.16,.05,.30),vec3(.50,.28,.86),smoothstep(.05,.45,T));c=mix(c,vec3(.74,.60,1.),smoothstep(.4,.75,T));return mix(c,vec3(.95,.92,1.),smoothstep(.75,1.05,T));}
    void main(){vec3 ro=vCam,rd=normalize(vP-vCam);vec3 bmin=vec3(-.5,0.,-.5),bmax=vec3(.5,1.,.5);
     vec3 inv=1./rd,t0=(bmin-ro)*inv,t1=(bmax-ro)*inv,tn=min(t0,t1),tx=max(t0,t1);float ta=max(max(tn.x,tn.y),max(tn.z,0.)),tb=min(min(tx.x,tx.y),tx.z);
     if(tb<=ta)discard;const int N=26;float dt=(tb-ta)/float(N),t=ta+dt*fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453);vec3 acc=vec3(0.);float tm=uTime*1.7+vSeed*31.;
@@ -373,16 +373,16 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
    void main(){float life=fract(uTime*(.32+aSeed*.25)+aSeed*7.3);vec3 p=position;float s=aSeed*43.;
     p+=vec3(sin(s+uTime*1.3)*.12*life+sin(s*2.1+uTime*3.1)*.03,life*aScale*2.2,cos(s*1.7+uTime*1.1)*.12*life);
     vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;vA=(1.-life)*smoothstep(0.,.08,life)*step(.35,fract(aSeed*13.7));gl_PointSize=uPx*(1.2+2.*(1.-life))*(6./-mv.z);}`,
-  fragmentShader:`uniform float uOn;varying float vA;void main(){vec2 c=gl_PointCoord-.5;float d=length(c);if(d>.5)discard;float a=smoothstep(.5,0.,d)*vA*uOn;gl_FragColor=vec4(vec3(1.,.55,.18)*a*2.,a);}`}));
+  fragmentShader:`uniform float uOn;varying float vA;void main(){vec2 c=gl_PointCoord-.5;float d=length(c);if(d>.5)discard;float a=smoothstep(.5,0.,d)*vA*uOn;gl_FragColor=vec4(vec3(.78,.64,1.)*a*2.,a);}`}));
  const sparks=new THREE.Points(sparkGeo,sparkMat);sparks.frustumCulled=false;sparks.renderOrder=7;scene.add(sparks);noAO.push(sparks);
 
  /* soft halo around each flame */
- const haloMat=keep(new THREE.SpriteMaterial({map:T(glowSprite(128,'rgba(255,170,90,.9)','rgba(255,120,50,.25)')),blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,fog:false}));
+ const haloMat=keep(new THREE.SpriteMaterial({map:T(glowSprite(128,'rgba(200,170,255,.9)','rgba(140,100,220,.22)')),blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,fog:false}));
  const halos=flames.map(f=>{const s=new THREE.Sprite(haloMat);s.position.copy(f.p).add(new THREE.Vector3(0,f.s[1]*.35,0));const k=f.s[1]*1.9;s.scale.set(k,k,1);s.renderOrder=6;scene.add(s);noAO.push(s);return s;});
  /* the wall torches' light is baked (torch-bake.js); the two braziers by the stair stay real lights */
  const torchPoints=torchSpots.map(t=>t.pos.clone().add(t.dir.clone().multiplyScalar(.25)).add(new THREE.Vector3(0,.5,0)));
  const lightSpots=braziers.map(b=>({p:new THREE.Vector3(b[0],b[1]+2.9,b[2]),k:1.4}));
- const torchLights=lightSpots.map((s,i)=>{const l=new THREE.PointLight(0xff9445,0,low?11:14,2);l.position.copy(s.p);l.userData={k:s.k,seed:i*1.7};scene.add(l);return l;});
+ const torchLights=lightSpots.map((s,i)=>{const l=new THREE.PointLight(0xa68ae8,0,low?11:14,2);l.position.copy(s.p);l.userData={k:s.k,seed:i*1.7};scene.add(l);return l;});
 
  /* ---- sky, sun and moon ---- */
  const hemi=new THREE.HemisphereLight(0xb8b0e8,0x3a3238,.4);scene.add(hemi);
