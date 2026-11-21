@@ -36,6 +36,23 @@ test('countdown changes at local midnight for both exams',()=>{
     }
   }
 });
+test('a saved sitting keeps its year after New Year, editing and account sync',async t=>{
+  const root=tmp(),other=tmp();
+  t.after(()=>{fs.rmSync(root,{recursive:true,force:true});fs.rmSync(other,{recursive:true,force:true});});
+  const year=new Date().getFullYear()-1,december=new Date(year,11,1,12).getTime(),january=new Date(year+1,0,2,12).getTime();
+  const chosen=G.set(root,{goals:['jlpt','eju'],jlpt:{month:12,year},eju:{month:11,year}},december);
+  for(const goal of [G.get(root,january).goal,G.synced(root)]){
+    assert.deepEqual([goal.jlpt.year,goal.eju.year],[year,year]);
+  }
+  assert.ok(G.get(root,january).countdown.every(s=>s.past));
+  assert.equal(G.applySynced(other,chosen.goal),true);
+  const form=(await import('../web/learning-goal.js')).goalPickerHTML(G.get(other,january).goal,{esc:String,now:january});
+  for(const name of ['jlpt','eju'])assert.match(form,new RegExp('name="'+name+'-year">[^<]*(?:<option[^>]*>[^<]*</option>)*<option value="'+year+'" selected>'));
+  const edited=G.set(root,{...chosen.goal,jlpt:{...chosen.goal.jlpt,level:'N1'}},january);
+  assert.equal(edited.goal.jlpt.year,year);
+  assert.equal(G.get(root,january).goal.eju.year,year);
+  assert.equal(G.set(other,{goals:['jlpt'],jlpt:{year:1999}},january).goal.jlpt.year,year+1);
+});
 test('plan: goals decide which grammar categories come first and where review weighs',()=>{
   const jl=G.plan(G.normalize({goals:['jlpt'],jlpt:{level:'N2',full:true}},NOW));
   assert.equal(jl.level,'N2');assert.equal(jl.groups[0],'particle');assert.equal(jl.review.particle,3);
