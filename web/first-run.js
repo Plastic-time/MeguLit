@@ -3,9 +3,9 @@
 // look for Steam, then scan. Shown at most once per install (localStorage flag); "Later" also counts.
 const KEY='megulit-first-run-folders';
 const w={
- zh:{title:'把游戏放上书架',sub:'选一下你放 Galgame 的文件夹，MeguLit 会自己把里面的游戏找出来。Steam 上的游戏也会一起找',pick:'选择游戏文件夹',picked:'已选择',more:'再加一个',scan:'开始扫描',scanning:'正在翻找游戏…',later:'以后再说',hint:'以后可以在「设置 → 游戏库」里随时修改',done:n=>`找到了 ${n} 个游戏`,none:'没有找到游戏，可以换个文件夹，或者用「添加游戏」手动添加',failed:'扫描失败了，稍后在设置里再试一次'},
- en:{title:'Fill your shelf',sub:'Pick the folders where your visual novels live and MeguLit will find the games inside. Steam games are picked up too.',pick:'Choose game folders',picked:'Selected',more:'Add another',scan:'Scan now',scanning:'Looking for games…',later:'Later',hint:'You can change this any time in Settings → Library',done:n=>`Found ${n} games`,none:'No games found. Try another folder, or add one by hand.',failed:'Scan failed. Try again later from Settings.'},
- ja:{title:'本棚にゲームを並べる',sub:'ギャルゲーを置いているフォルダを選ぶと、中のゲームを MeguLit が探します。Steam のゲームも一緒に探します',pick:'ゲームフォルダを選択',picked:'選択済み',more:'もう一つ追加',scan:'スキャン開始',scanning:'ゲームを探しています…',later:'あとで',hint:'あとから「設定 → ライブラリ」で変更できます',done:n=>`${n} 本のゲームが見つかりました`,none:'ゲームが見つかりませんでした。別のフォルダを選ぶか、手動で追加してください',failed:'スキャンに失敗しました。あとで設定から再試行してください'}
+ zh:{title:'把游戏放上书架',sub:'选一下你放 Galgame 的文件夹，MeguLit 会自己把里面的游戏找出来。Steam 上的游戏也会一起找',pick:'选择游戏文件夹',picked:'已选择',more:'再加一个',scan:'开始扫描',scanning:'正在翻找游戏…',later:'以后再说',hint:'以后可以在「设置 → 游戏库」里随时修改',scanned:'扫描完成',done:n=>`找到了 ${n} 个游戏`,none:'没有找到游戏，可以换个文件夹，或者用「添加游戏」手动添加',failed:'扫描失败了，稍后在设置里再试一次'},
+ en:{title:'Fill your shelf',sub:'Pick the folders where your visual novels live and MeguLit will find the games inside. Steam games are picked up too.',pick:'Choose game folders',picked:'Selected',more:'Add another',scan:'Scan now',scanning:'Looking for games…',later:'Later',hint:'You can change this any time in Settings → Library',scanned:'Scan complete',done:n=>`Found ${n} games`,none:'No games found. Try another folder, or add one by hand.',failed:'Scan failed. Try again later from Settings.'},
+ ja:{title:'本棚にゲームを並べる',sub:'ギャルゲーを置いているフォルダを選ぶと、中のゲームを MeguLit が探します。Steam のゲームも一緒に探します',pick:'ゲームフォルダを選択',picked:'選択済み',more:'もう一つ追加',scan:'スキャン開始',scanning:'ゲームを探しています…',later:'あとで',hint:'あとから「設定 → ライブラリ」で変更できます',scanned:'スキャンが完了しました',done:n=>`${n} 本のゲームが見つかりました`,none:'ゲームが見つかりませんでした。別のフォルダを選ぶか、手動で追加してください',failed:'スキャンに失敗しました。あとで設定から再試行してください'}
 };
 const seen=()=>{try{return localStorage.getItem(KEY)==='1';}catch{return false;}};
 const mark=()=>{try{localStorage.setItem(KEY,'1');}catch{}};
@@ -31,12 +31,12 @@ export function maybeFirstRun({gamesCount,api,invoke,locale,esc,toast,onDone}){
  scan.onclick=async()=>{
   scan.disabled=pick.disabled=true;status.textContent=t.scanning;
   try{
-   const data=await api('settings_get').catch(()=>null);const old=String(data?.values?.library?.folders||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-   const merged=[...new Set([...old,...folders])].join('\n');const values={folders:merged};
-   try{const steam=await api('library_find_steam');if(steam?.path)values.steamPath=steam.path;}catch{}
-   await api('settings_save',{scope:'library',values});await api('library_scan');
-   const home=await api('home').catch(()=>null);const n=home?.games?.length??0;
-   toast(n?t.done(n):t.none);close();onDone?.();
+   const {library}=(await api('settings_get')).values;const values={folders:folders.join('\n')};
+   if(!library.steamPath){try{const steam=await api('library_find_steam');if(steam?.path)values.steamPath=steam.path;}catch{}}
+   await api('settings_save',{scope:'library',values,appendFolders:true});await api('library_scan');
+   const home=await api('home').catch(()=>null);
+   if(Array.isArray(home?.games)){const n=home.games.length;toast(n?t.done(n):t.none);}else toast(t.scanned);
+   close();onDone?.();
   }catch{status.textContent=t.failed;scan.disabled=pick.disabled=false;}
  };
  dialog.showModal();/* A modal dialog makes the top bar inert, so the window could not be moved during first run (user, 2026-11-08): drag from the backdrop or any empty part of the card instead. */dialog.addEventListener('mousedown',event=>{if(event.button!==0||event.detail>1||event.target.closest('button,input,select,textarea,a,label,li'))return;event.preventDefault();window.__TAURI_INTERNALS__?.invoke('plugin:window|start_dragging',{label:'main'}).catch(()=>{});});
