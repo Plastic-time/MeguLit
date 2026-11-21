@@ -22,6 +22,8 @@ test('the validation service releases deadlines for both successful and rejected
   const slow=service.call({action:'settings_get'},31002);expire();
   await assert.rejects(slow,/SERVICE_TIMEOUT/);
   await service.call({action:'settings_get'},31001);assert.equal(deadlines.size,0);
+  await service.stop();
+  await assert.rejects(service.call({action:'settings_get'},200),/SERVICE_CLOSED/);
  }finally{
   for(const timer of deadlines)clear(timer);
   await service.stop();fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});
