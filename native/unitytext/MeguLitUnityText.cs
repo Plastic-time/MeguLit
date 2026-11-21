@@ -238,7 +238,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
  }
 
  // ---- the dialogue component ------------------------------------------------------------------------------------
- Component current; bool hidingCurrent; float nextScan; string lastKey = ""; int line; string lastText = "";
+ Component current; bool hidingCurrent, published; float nextScan; string lastKey = ""; int line; string lastText = "";
  readonly Dictionary<int, string> seen = new Dictionary<int, string>();
  readonly Dictionary<int, float> changedAt = new Dictionary<int, float>();
 
@@ -271,7 +271,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
    int k = Cjk(t); float at; changedAt.TryGetValue(id, out at);
    if (k >= 2 && (at > bestAt || at == bestAt && k > bestLen)) { best = c; bestAt = at; bestLen = k; }
   }
-  if (best != current) { Restore(); current = best; embComp = null; }
+  if (best != current) { ClearPublished(); Restore(); current = best; embComp = null; }
   if (drawRoles) try { RoleScan(list); } catch (Exception e) { Logger.LogWarning("roles " + e.Message); }
  }
 
@@ -305,9 +305,16 @@ public class MeguLitUnityText : BaseUnityPlugin {
  }
  void Restore() { if (hidingCurrent && current != null) HideSet(current, false); hidingCurrent = false; saved.Clear(); }
 
+ // An empty record retires the exact published line; clearing local state alone leaves its reader overlay on screen
+ void ClearPublished() {
+  if (!published) return;
+  published = false; lastKey = ""; lastText = "";
+  Send("ToMe_CHARS engine=unity line=" + line + " hidden=0 sw=" + Screen.width + " sh=" + Screen.height + " vx=0 vy=0 vw=" + Screen.width + " vh=" + Screen.height + " n=0 rects= text=");
+ }
+
  void LateUpdate() {
   if (Time.unscaledTime >= nextScan) { nextScan = Time.unscaledTime + 0.5f; try { Scan(); } catch (Exception e) { Logger.LogWarning("scan " + e.Message); } }
-  if (current == null || !Shown(current)) { Restore(); current = null; return; }
+  if (current == null || !Shown(current)) { ClearPublished(); Restore(); current = null; return; }
   try { EmbedTick(); } catch (Exception e) { Logger.LogWarning("embed " + e.Message); }
   bool want = hideAsked && connected && !drawEmbed; /* the game draws the replacement: never hidden */
   if (want && !hidingCurrent) hidingCurrent = true;
@@ -367,7 +374,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
     add(s[ci], new Vector3(Math.Min(p0.x, p2.x), Math.Min(p0.y, p2.y), 0), new Vector3(Math.Max(p0.x, p2.x), Math.Max(p0.y, p2.y), 0));
    }
   }
-  if (all.Count == 0) return;
+  if (all.Count == 0) { ClearPublished(); return; }
   /* engine-draw: the component carries the replacement: the record keeps the Japanese (the first characters, ruby left out above) */
   bool embedded = embComp == current && (TextOf(current) ?? "") == embSet;
   if (embedded && all.Count > embJp) all.RemoveRange(embJp, all.Count - embJp);
@@ -381,7 +388,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
    if (!float.IsNaN(prevTop) && Math.Abs(mid - prevTop) > median * 0.9f) text.Append('\n');
    prevTop = mid; text.Append(e.Key); rects.Add(r);
   }
-  if (rects.Count == 0) return;
+  if (rects.Count == 0) { ClearPublished(); return; }
   string flat = text.ToString().Replace("\n", "");
   if (!(lastText.Length > 0 && (flat.StartsWith(lastText) || lastText.StartsWith(flat)))) line++;
   bool hidden = hidingCurrent && AllHidden(current);
@@ -389,11 +396,11 @@ public class MeguLitUnityText : BaseUnityPlugin {
   foreach (var r in rects) { if (sb.Length > 0) sb.Append(';'); sb.Append(F(r[0])).Append(',').Append(F(r[1])).Append(',').Append(F(r[2])).Append(',').Append(F(r[3])); }
   string key = line + "|" + hidden + "|" + (embedded ? embLevel : 0) + "|" + sb;
   if (key == lastKey) return;
-  lastKey = key; lastText = flat;
+  lastKey = key; lastText = flat; published = true;
   Send("ToMe_CHARS engine=unity line=" + line + " hidden=" + (hidden ? 1 : 0) + " sw=" + Screen.width + " sh=" + Screen.height + " vx=0 vy=0 vw=" + Screen.width + " vh=" + Screen.height + " n=" + rects.Count + " rects=" + sb + (embedded ? " emb=" + embLevel : "") + " text=" + text);
  }
  static string Keep(string s, bool blanks) { var b = new StringBuilder(); foreach (char c in s) if (c != (char)10 && c != (char)13 && (blanks || !char.IsWhiteSpace(c))) b.Append(c); return b.ToString(); }
  static string F(float v) { return Math.Round(v, 1).ToString(System.Globalization.CultureInfo.InvariantCulture); }
 
- void OnDestroy() { Restore(); }
+ void OnDestroy() { ClearPublished(); Restore(); }
 }
