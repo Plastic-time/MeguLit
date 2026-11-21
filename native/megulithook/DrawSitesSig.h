@@ -62,6 +62,10 @@ static const Sig Sigs[] = {
   // GetGlyphOutlineA into edi and calls it once (mov edi, [slot]; push eax (the DC from 0x459c54); call edi); the instruction after
   // it (cmp eax, 1) goes into MinHook's trampoline with it. No pen, via / via2 = its callers
   { "musica", "", "GetGlyphOutlineA", "8b 3d SLOT 50", 1, 1 },
+  // BRUNS (ダストマニア・グロテスク, libscr.dll 0x1011cc5e): the routine 0x1011ca50 (one caller) makes a Shift-JIS font
+  // (CreateFontW) and draws a string with TextOutW into a bitmap; no EBP frame (SEH + 0x7c locals + 4 registers + the cookie:
+  // depth 0x9c), the return address 0xb0 above the API's first argument
+  { "bruns", "libscr.dll", "TextOutW", "8d 44 24 ?? 8b 94 24 ?? ?? 00 00 52 50 8b 84 24 ?? ?? 00 00 50 50 56", 1, 0xb0 },
 };
 static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
 

@@ -169,3 +169,9 @@
 - 本机这个 exe 是打过中文补丁的（和 mashiroiro.exe.bak 不同），签名两边结构一样，正式适配时也查原版
 - 没有笔位，via / via2 是调用者
 - 店主测试清单：同 AVG32，行里是 `engine=musica`
+
+### BRUNS（ダストマニア・グロテスク）
+- 点：libscr.dll 0x1011cc5e。gameplay.exe 只有 121 KB，umut.dll 里没有任何文字 API；画字在 libscr.dll 的例程 0x1011ca50（1 个调用者）：建一个 Shift-JIS 字体（CreateFontW）后用 TextOutW 把整串字画进位图
+- 例程没有 EBP 帧（SEH + 0x7c 局部 + 4 个寄存器 + 安全 cookie，深 0x9c），返回地址在 API 第一个参数上方 0xb0。x / y 是位图里的位置，fargs 是例程参数
+- 本机这份带中文补丁（libchs.dll、解体插入新书中文版.exe），libscr.dll 是否原版自带要拿日文原版对一下；签名只认这个文件
+- 店主测试清单：同 AVG32，行里是 `engine=bruns`
