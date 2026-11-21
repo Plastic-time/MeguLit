@@ -1,14 +1,13 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');
 
-async function layoutBrowser(t,{refuseClose=false}={}){
+async function layoutBrowser(t,{refuseClose=false,launcherExited=false}={}){
  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-cdp-stop-'));
  t.after(()=>fs.rmSync(profile,{recursive:true,force:true}));
- fs.writeFileSync(path.join(profile,'DevToolsActivePort'),'12345\n');
  const original=process.env.MEGULIT_EDGE;process.env.MEGULIT_EDGE=process.execPath;
  t.after(()=>{if(original==null)delete process.env.MEGULIT_EDGE;else process.env.MEGULIT_EDGE=original;});
- const child={killed:false,kill(){this.killed=true;return true;}};
- t.mock.method(cp,'spawn',()=>child);
+ const child=Object.assign(new(require('node:events').EventEmitter)(),{exitCode:launcherExited?0:null,signalCode:null,killed:false,kill(){this.killed=true;return true;}});
+ t.mock.method(cp,'spawn',()=>{fs.writeFileSync(path.join(profile,'DevToolsActivePort'),'12345\n');return child;});
  t.mock.method(globalThis,'fetch',async()=>({json:async()=>[{type:'page',webSocketDebuggerUrl:'ws://127.0.0.1:12345/page'}]}));
  let socket;const methods=[];
  class Socket extends EventTarget{
@@ -27,7 +26,7 @@ async function layoutBrowser(t,{refuseClose=false}={}){
 }
 
 test('stopping a layout test closes its browser even if the launcher has exited',async t=>{
- const {browser,child,methods,socket}=await layoutBrowser(t);
+ const {browser,child,methods,socket}=await layoutBrowser(t,{launcherExited:true});
  const done=browser.stop(),again=browser.stop();
  assert.equal(methods.filter(m=>m==='Browser.close').length,1);
  assert.equal(done,again);
@@ -45,4 +44,27 @@ test('an unresponsive browser cannot hold teardown open',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  const done=browser.stop();assert.equal(child.killed,false);
  t.mock.timers.tick(3000);await done;assert.equal(child.killed,true);
+});
+
+test('a dropped socket does not hide a launcher that is still running',async t=>{
+ const {browser,child,socket}=await layoutBrowser(t);t.mock.timers.enable({apis:['setTimeout']});
+ const done=browser.stop();socket.close();assert.equal(child.killed,false);
+ t.mock.timers.tick(3000);await done;assert.equal(child.killed,true);
+});
+
+test('an existing debug port is left alone',async t=>{
+ const profile=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-cdp-stop-'));
+ t.after(()=>fs.rmSync(profile,{force:true,recursive:true}));
+ fs.writeFileSync(path.join(profile,'DevToolsActivePort'),'54321\n');
+ const spawned=t.mock.method(cp,'spawn',()=>{throw Error('unexpected launch');});
+ const file=require.resolve('./library-views-perf.cjs');delete require.cache[file];
+ await assert.rejects(require(file).startEdge(profile),/EDGE_PROFILE_ALREADY_HAS_DEBUG_PORT/);
+ assert.equal(spawned.mock.callCount(),0);
+ assert.equal(fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8'),'54321\n');
+});
+
+test('the launcher may exit normally after the browser disconnects',async t=>{
+ const {browser,child,socket}=await layoutBrowser(t);t.mock.timers.enable({apis:['setTimeout']});
+ const done=browser.stop();socket.close();t.mock.timers.tick(100);
+ child.exitCode=0;child.emit('exit',0);await done;assert.equal(child.killed,false);
 });

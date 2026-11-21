@@ -41,8 +41,8 @@ function startWeb(service){const server=http.createServer(async(req,res)=>{try{
 /* ---------- headless Edge over CDP ---------- */
 const CDP_MS=Number(process.env.MEGULIT_CDP_TIMEOUT)||60000;
 function edgePath(){for(const p of [process.env.MEGULIT_EDGE,'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe','C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'])if(p&&fs.existsSync(p))return p;throw Error('EDGE_NOT_FOUND');}
-const {stopLayoutBrowser}=require('./helpers/stop-layout-browser.cjs');
-async function startEdge(profile){const child=spawn(edgePath(),['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--window-size='+String(arg('size','1920x1080')).replace('x',','),'--hide-scrollbars','--force-device-scale-factor=1',
+const {stopLayoutBrowser,checkLayoutProfile}=require('./helpers/stop-layout-browser.cjs');
+async function startEdge(profile){checkLayoutProfile(profile);const child=spawn(edgePath(),['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--window-size='+String(arg('size','1920x1080')).replace('x',','),'--hide-scrollbars','--force-device-scale-factor=1',
   '--no-first-run','--no-default-browser-check','--disable-extensions','--mute-audio','about:blank'],{stdio:'ignore'});
  /* 2026-11-19 (CI of v1.4.17, and 11-17): DevToolsActivePort read while Edge was still writing it threw EBUSY; the caller had no
     handle yet, so nothing stopped Edge and the test file never exited (the job sat until its 30-minute limit). The file is read
