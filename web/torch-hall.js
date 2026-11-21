@@ -14,6 +14,9 @@ import {mergeGeometries} from './vendor/three/addons/utils/BufferGeometryUtils.j
 import {ashlar,relief,coffers,rose,lancet,quarries,marble,marbleHQ,floorHQ,inlay,glowSprite,basalt,basketRelief} from './torch-textures.js';
 import {maps} from './torch-bake.js';
 
+/* Twilight sky stays warm after sunset, but a sun below the horizon cannot cast direct light into the vault. */
+export function directSunVisibility(el){const t=Math.max(0,Math.min(1,el/2));return t*t*(3-2*t);}
+
 export const HALL={HX:10,BACK:-6.5,FRONT:14.5,SPRING:9.3,NZ1:40,AX:13.2};
 
 /* uv from local position, projected along the dominant normal axis (so stone blocks keep their size on any box or wall) */
@@ -126,14 +129,15 @@ export function buildStele({scene,keep,tier}){const low=tier==='low',Q=low?.5:1,
      for(const fz of [-1,1]){const z=fz*.432,ry=fz<0?Math.PI:0;
       const f=new THREE.Mesh(keep(new THREE.PlaneGeometry(L-.3,fh)),carvedB);f.position.set(0,cy,z);f.rotation.y=ry;f.receiveShadow=true;stele.add(f);
       for(const dy of [fh/2+.015,-fh/2-.015])mesh(new THREE.BoxGeometry(L-.26,.018,.016),gilt,0,cy+dy,z,false);}
-     /* medallion: a gilt ring around a dark stone disc carrying a small gilt flame */
+     /* The pale stone inset and satin gilt stay legible from the aisle, even when the metal has no bright reflection. */
      const mr=dieH*.36,mz=.436;
-     const disc=new THREE.Mesh(keep(new THREE.CylinderGeometry(mr,mr,.02,48).rotateX(Math.PI/2)),keep(new THREE.MeshPhysicalMaterial({color:0x1a1222,roughness:.25,metalness:0,clearcoat:low?0:.8,clearcoatRoughness:.08})));disc.position.set(0,cy,mz);stele.add(disc);
-     mesh(new THREE.TorusGeometry(mr,.022,10,48),gilt,0,cy,mz+.01,false);mesh(new THREE.TorusGeometry(mr*1.16,.012,8,48),gilt,0,cy,mz+.006,false);
+     const badgeGilt=keep(new THREE.MeshStandardMaterial({color:0xe4c695,roughness:.58,metalness:.35,envMapIntensity:.6}));
+     const disc=new THREE.Mesh(keep(new THREE.CylinderGeometry(mr,mr,.02,48).rotateX(Math.PI/2)),keep(new THREE.MeshPhysicalMaterial({color:0xc4bad0,roughness:.7,metalness:0,clearcoat:low?0:.2,clearcoatRoughness:.35})));disc.position.set(0,cy,mz);stele.add(disc);
+     mesh(new THREE.TorusGeometry(mr,.022,10,48),badgeGilt,0,cy,mz+.01,false);mesh(new THREE.TorusGeometry(mr*1.16,.012,8,48),badgeGilt,0,cy,mz+.006,false);
      const fs=new THREE.Shape(),k=mr*.62;fs.moveTo(0,-k*.95);fs.bezierCurveTo(k*.75,-k*.9,k*.85,-k*.1,k*.28,k*.35);fs.bezierCurveTo(k*.38,k*.05,k*.2,-k*.15,k*.12,k*.05);
      fs.bezierCurveTo(k*.2,k*.45,k*.05,k*.75,0,k*1.05);fs.bezierCurveTo(-k*.08,k*.7,-k*.3,k*.5,-k*.18,k*.15);fs.bezierCurveTo(-k*.32,k*.3,-k*.45,k*.15,-k*.4,-k*.05);
      fs.bezierCurveTo(-k*.9,-k*.25,-k*.7,-k*.9,0,-k*.95);
-     const fl=new THREE.ExtrudeGeometry(fs,{depth:.012,bevelEnabled:true,bevelThickness:.006,bevelSize:.006,bevelSegments:2,curveSegments:16});mesh(fl,gilt,0,cy-k*.05,mz+.01,false);}
+     const fl=new THREE.ExtrudeGeometry(fs,{depth:.012,bevelEnabled:true,bevelThickness:.006,bevelSize:.006,bevelSegments:2,curveSegments:16});mesh(fl,badgeGilt,0,cy-k*.05,mz+.016,false);}
    part(L+.1,.06,.94,.02);part(L+.2,.07,1.0,.03,inlayRed);part(L+.3,.1,1.06,.035);}
  const s=new THREE.Shape(),w=SW,h=SH,b=.04;s.moveTo(-w/2+b,-h/2);s.lineTo(w/2-b,-h/2);s.quadraticCurveTo(w/2,-h/2,w/2,-h/2+b);s.lineTo(w/2,h/2-b);s.quadraticCurveTo(w/2,h/2,w/2-b,h/2);
  s.lineTo(-w/2+b,h/2);s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-b);s.lineTo(-w/2,-h/2+b);s.quadraticCurveTo(-w/2,-h/2,-w/2+b,-h/2);
@@ -500,6 +504,7 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  const hoursNow=()=>{const d=nowDate();return d.getHours()+d.getMinutes()/60;};
  const hallState={torch:0,beam:0,sunPos:new THREE.Vector3(0,1,0),exposure:1,el:0};
  function applyTime(dt,renderer){const s=sunAt(),k=sample(s.el),a=first?1:1-Math.exp(-dt*1.5);first=false;
+  if(!s.moon){const visible=directSunVisibility(s.el);k.li*=visible;k.beam*=visible;}
   /* torches: lit as the sun goes down (from 10° above the horizon, fully by 1°), out again in the morning */
   k.torch=1-THREE.MathUtils.smoothstep(s.el,1,10);hallState.el=s.el;
   cur.sky.lerp(k.sky,a);cur.gnd.lerp(k.gnd,a);cur.lc.lerp(k.lc,a);cur.glass.lerp(k.glass,a);cur.fog.lerp(k.fog,a);
