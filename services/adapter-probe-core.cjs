@@ -114,6 +114,7 @@ function classify({engines,inventory:inv,unsupported,preparing,title,garbroNeed=
  const readers=engines.filter(e=>e.lines>0&&!(e.dialogueLines===0&&!e.japaneseLines&&!e.chineseLines)).sort((a,b)=>b.lines-a.lines);
  const read=readers.find(e=>!GENERIC.has(e.id)&&e.japaneseLines>=DEDICATED_JP)||readers[0];
  if(read){const lang=judgeLanguage({...read,title});if(lang==='chinese-build'||lang==='decode-suspect'||lang==='not-japanese')return {step:lang,detail:read.id,detected:read.id};return {step:'ok',detail:read.id,detected:read.id};}
+ if(preparing==='budget')return {step:'preparing',detail:'cx-budget-deferred',detected:null};
  if(unsupported)return {step:DECRYPT.test(unsupported.code)?'decrypt-failed':'parse-failed',detail:(unsupported.engine+':'+unsupported.code).slice(0,60),detected:null};
  const failedDecrypt=engines.find(e=>e.error&&!SOFT_ERROR.test(e.error)&&DECRYPT.test(e.error));if(failedDecrypt)return {step:'decrypt-failed',detail:failedDecrypt.id+':'+failedDecrypt.error,detected:null};
  if(preparing==='unpack')return {step:'preparing',detail:'cx-unpack',detected:null};
@@ -150,7 +151,7 @@ function isWindowsDirectory(dir){
  const system=process.env.SystemRoot||process.env.windir;
  return !!(system&&dir&&path.isAbsolute(system)&&path.relative(path.toNamespacedPath(system),path.toNamespacedPath(dir))==='');
 }
-function probeGame({dir,executable,title},{budgetMs=60000,progress=null}={}){
+function probeInScope({dir,executable,title},{budgetMs=60000,progress=null}={}){
  if(isWindowsDirectory(dir))return {schema:'megulit.probe-result',version:1,step:'no-script',detail:'WINDOWS_DIRECTORY',fingerprint:null,
   inventory:{files:0,bytes:0,ext:{},archives:[]},engines:[],lines:0,japaneseLines:0};
  const t=Date.now();let fingerprint=null,deadline=t+budgetMs;
@@ -197,4 +198,5 @@ function probeGame({dir,executable,title},{budgetMs=60000,progress=null}={}){
   engines:engines.map(({sizes,...e})=>e),detected:c.detected,lines:best?.lines||0,japaneseLines:best?.japaneseLines||0,dialogueLines:best?.dialogueLines||0,chineseLines:best?.chineseLines||0,sizes:best?.sizes||[],
   tried:engines.filter(e=>e.routed||e.scenes!==0).map(e=>e.id).slice(0,24),budgetMs,...garbroNeed?{needs:'garbro'}:{},step:c.step,detail:c.detail,original,restore,unsupported:unsupported?{engine:unsupported.engine,code:unsupported.code}:null,preparing,_archives:inv.archives.map(a=>a._path)};
 }
+function probeGame(game,options){return require('./original-engines/scenes.cjs').withCxProbe(()=>probeInScope(game,options));}
 module.exports={probeGame,isWindowsDirectory,routedReaders,scaledBudget,classify,judgeLanguage,countLines,inventory,reader,MAGICS};

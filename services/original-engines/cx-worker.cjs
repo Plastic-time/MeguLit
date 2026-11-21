@@ -44,8 +44,8 @@ function textsOf(doc){
  return scenes;
 }
 const NON_SCN=/\.(?:png|jpe?g|bmp|gif|webp|tlg\d?|psd|pimg|mstand|stage|ogg|wav|mp3|opus|flac|wma|sli|wmv|mp4|avi|mpe?g|mkv|amv|ttf|otf|ttc|tft|fon|ks|tjs|txt|csv|tsv|ini|xml|json|cfg|dll|exe|zip|7z|rar)$/i;
-function build(file){
- const list=xp3.list(file),docs=[];if(!list)return {docs,files:0};let tried=0;
+function build(file,{list=xp3.list(file)}={}){
+ const docs=[];if(!list)return {docs,files:0};let tried=0;
  const hasScn=list.files.some(e=>/\.scn$/i.test(e.name));
  let cx=null;if(list.files.some(e=>e.encrypted))try{cx=require('./cx-filter.cjs').forArchive(file);}catch{}
  for(const entry of list.files){
@@ -60,9 +60,18 @@ function build(file){
  }
  return {docs,files:tried};
 }
-if(parentPort&&workerData){
- const {file,out}=workerData;
- try{const result=build(file);fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out+'.tmp',JSON.stringify({schema:1,file,...result}));fs.renameSync(out+'.tmp',out);parentPort.postMessage({ok:true,docs:result.docs.length});}
- catch(error){parentPort.postMessage({ok:false,error:String(error?.message||error)});}
+function prepare(file,out){
+ const list=xp3.list(file);if(!list||!list.files.some(e=>e.encrypted||/\.scn$/i.test(e.name)))return false;
+ const result=build(file,{list});fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify({schema:1,file,...result}));return true;
 }
-module.exports={build,textsOf,clean,rubyOf};
+if(parentPort&&workerData?.prepare){
+ const signal=new Int32Array(workerData.signal);let status=3;
+ try{status=prepare(workerData.file,workerData.attempt)?1:2;}catch{}
+ finally{Atomics.store(signal,0,status);Atomics.notify(signal,0);}
+}else if(parentPort&&workerData){
+ const {file,out}=workerData;
+ const attempt=out+'.'+process.pid+'.'+require('node:crypto').randomUUID()+'.tmp';
+ try{const result=build(file);fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(attempt,JSON.stringify({schema:1,file,...result}));fs.renameSync(attempt,out);parentPort.postMessage({ok:true,docs:result.docs.length});}
+ catch(error){try{fs.rmSync(attempt,{force:true});}catch{}parentPort.postMessage({ok:false,error:String(error?.message||error)});}
+}
+module.exports={build,prepare,textsOf,clean,rubyOf};

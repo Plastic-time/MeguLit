@@ -16,11 +16,14 @@ function writeXp3(file,name,data){
 test('probe builds the cx cache itself instead of reporting a running background build as decrypt-failed',()=>{
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'probecx-')),game=path.join(tmp,'game'),old=process.env.MEGULIT_GARBRO_ROOT;fs.mkdirSync(game);
  const row=ja=>[null,null,[[null,ja]]];
- const doc={name:'001.ks',scenes:[{label:'a',texts:[row('「おはよう。」'),row('「今日も暑いね。」'),row('「そうだね。」'),row('「行こうか。」')]}]};
+ const doc={name:'001.ks',scenes:[{label:'a',texts:[[null,null,[[null,'「[きょ]今[う]日も暑いね。」'],[null,'It is hot today.'],[null,'今天也很热呢。']],[{voice:'v001'}]],row('「今日も暑いね。」'),row('「そうだね。」'),row('「行こうか。」')]}]};
  writeXp3(path.join(game,'scn.xp3'),'001.ks.scn',buildPsb(doc));
  process.env.MEGULIT_GARBRO_ROOT=path.join(tmp,'nogarbro');
  try{const scenes=require('../services/original-engines/scenes.cjs');
   assert.strictEqual(scenes.cxPrepareSync(game),1);assert.strictEqual(scenes.cxPrepareSync(game),0,'cached once');
+  writeXp3(path.join(game,'scn2.xp3'),'002.ks.scn',buildPsb({...doc,name:'002.ks'}));
+  assert.strictEqual(scenes.cxPrepareSync(game,{deadline:Date.now()+10000}),1,'finite preparation publishes a complete worker result');
+  const [infinite,finite]=scenes.read('kirikiri-cx',game);assert.strictEqual(infinite.zh[0],'今天也很热呢。');assert.deepStrictEqual(infinite.ruby[0],[['今日','きょう']]);assert.strictEqual(infinite.voices[0],'v001');assert.deepStrictEqual(finite.lines,infinite.lines);assert.deepStrictEqual(finite.ruby,infinite.ruby);assert.deepStrictEqual(finite.voices,infinite.voices);assert.deepStrictEqual(finite.zh,infinite.zh);
   const r=require('../services/adapter-probe-core.cjs').probeGame({dir:game,executable:''});
   assert.strictEqual(r.detected,'kirikiri-cx');assert.strictEqual(r.step,'ok');assert.ok(r.lines>=4);
  }finally{if(old===undefined)delete process.env.MEGULIT_GARBRO_ROOT;else process.env.MEGULIT_GARBRO_ROOT=old;}
