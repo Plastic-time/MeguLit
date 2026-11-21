@@ -258,6 +258,40 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
  const glow=new THREE.Mesh(keep(new THREE.PlaneGeometry(1,1)),keep(new THREE.MeshBasicMaterial({map:glowTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0,fog:false})));
  glow.position.set(0,faceY,SD/2+.03);glow.renderOrder=5;stele.add(glow);
  const glowLight=new THREE.PointLight(0xbfe0ff,0,3.2,2);glowLight.position.set(0,faceY,SD/2+.6);stele.add(glowLight);
+ /* the stone's own light: a slow dark-violet swirl sealed inside the polished face (domain-warped noise, additive, dim enough that the
+    names stay readable), a soft violet aura around the slab's outline, and a few motes of light drifting up off the face.
+    Stronger at night (follows the torch level), barely there by day. */
+ const auraU={uTime:{value:0},uI:{value:.3}};
+ const NOISE=`float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+  float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
+  float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*n(p);p=p*2.02+vec2(1.7,9.2);a*=.5;}return s;}`;
+ const swirl=new THREE.Mesh(keep(new THREE.PlaneGeometry(faceW,faceH)),keep(new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,uniforms:auraU,
+  vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader:`uniform float uTime;uniform float uI;varying vec2 vUv;${NOISE}
+   void main(){vec2 p=vUv*vec2(5.,1.3);float t=uTime*.05;
+    vec2 q=vec2(fbm(p+vec2(0.,t)),fbm(p+vec2(5.2,1.3)-t));vec2 r=vec2(fbm(p+3.5*q+vec2(1.7,9.2)+t*.8),fbm(p+3.5*q+vec2(8.3,2.8)-t*.6));float f=fbm(p+3.*r);
+    vec3 c=vec3(.28,.09,.58)*pow(smoothstep(.55,.9,f),2.)*.55+vec3(.72,.52,1.)*pow(smoothstep(.76,.97,f),4.)*.45;
+    float m=smoothstep(0.,.08,vUv.x)*smoothstep(1.,.92,vUv.x)*smoothstep(0.,.12,vUv.y)*smoothstep(1.,.88,vUv.y);
+    gl_FragColor=vec4(c*uI*.32*(.55+.45*m),1.);}`})));
+ swirl.position.set(0,faceY,SD/2+.003);swirl.renderOrder=4;stele.add(swirl);
+ const AW=SW+2.4,AH=SH+2.0;
+ const aura=new THREE.Mesh(keep(new THREE.PlaneGeometry(AW,AH)),keep(new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,uniforms:auraU,
+  vertexShader:`varying vec2 vP;void main(){vP=position.xy;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader:`uniform float uTime;uniform float uI;varying vec2 vP;${NOISE}
+   void main(){vec2 b=vec2(${(SW/2).toFixed(3)},${(SH/2).toFixed(3)});vec2 d=abs(vP)-b;float dist=length(max(d,0.))+min(max(d.x,d.y),0.);
+    float a=exp(-max(dist,0.)*2.6)*step(0.,dist);float wav=.7+.3*fbm(vP*.9+vec2(0.,uTime*.12));
+    gl_FragColor=vec4(vec3(.36,.16,.70)*a*wav*uI*.3,1.);}`})));
+ aura.position.set(0,faceY,-SD/2-.04);aura.renderOrder=1;stele.add(aura);
+ /* motes off the face */
+ const MOTES=90,mp=new Float32Array(MOTES*3),ms=new Float32Array(MOTES);for(let i=0;i<MOTES;i++){mp[i*3]=(Math.random()-.5)*faceW;mp[i*3+1]=faceY-faceH/2+Math.random()*faceH*.9;mp[i*3+2]=SD/2+.05;ms[i]=Math.random();}
+ const moteGeo=keep(new THREE.BufferGeometry());moteGeo.setAttribute('position',new THREE.BufferAttribute(mp,3));moteGeo.setAttribute('aSeed',new THREE.BufferAttribute(ms,1));
+ const motes=new THREE.Points(moteGeo,keep(new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,uniforms:{...auraU,uPx:{value:1}},
+  vertexShader:`uniform float uTime;uniform float uI;uniform float uPx;attribute float aSeed;varying float vA;
+   void main(){float life=fract(uTime*(.05+aSeed*.05)+aSeed*9.1);vec3 p=position+vec3(sin(aSeed*50.+uTime*.4)*.15,life*1.4,.05+life*.35);
+    vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;vA=sin(life*3.14159)*uI;gl_PointSize=uPx*(1.+aSeed*1.6)*(6./-mv.z);}`,
+  fragmentShader:`varying float vA;void main(){vec2 c=gl_PointCoord-.5;float d=length(c);if(d>.5)discard;float a=smoothstep(.5,0.,d)*vA;gl_FragColor=vec4(vec3(.72,.55,1.)*a*1.6,a);}`})));
+ motes.frustumCulled=false;motes.renderOrder=5;stele.add(motes);
+
 
  function ensureFaceSize(){const k=FS();if(faces.scale===k&&faces.base)return;faces.scale=k;const w=Math.round(FW*k),h=Math.round(FH*k);
   for(const n of ['map','emissive','rough','mask','t1','t2']){faces[n].width=w;faces[n].height=h;}
@@ -433,6 +467,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
   if(dust){const u=dust.material.uniforms,L=H.sun;u.uTime.value=time;u.uBase.value=.05+H.state.torch*.06;
    u.uHasShadow.value=L.castShadow&&L.shadow.map?1:0;if(L.shadow.map){u.tShadow.value=L.shadow.map.texture;u.shadowMatrix.value.copy(L.shadow.matrix);}
    u.uLight.value.copy(L.color);u.uLit.value=Math.min(1.6,L.intensity*(H.state.moon?1.25:.45));}if(grade)grade.uniforms.uTime.value=time%97;
+  auraU.uTime.value=time;auraU.uI.value=.12+.88*H.state.torch;motes.material.uniforms.uPx.value=renderer.domElement.height/520;
   if(glow.userData.on){const p=(now-glow.userData.t0)/1000;const o=Math.min(1,p/1.2)*(.42+.1*Math.sin(p*1.6));glow.material.opacity=o;glowLight.intensity=o*2.2;}else{glow.material.opacity*=.9;glowLight.intensity*=.9;}
   updateCamera(dt);draw();
   /* slow frames on the full tier for ~3 s after the intro: switch to the light tier (only in auto mode) */
