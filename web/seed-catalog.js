@@ -68,7 +68,7 @@ function cardHTML(g,locale,mode,esc){
 export function catalogHTML(games,locale,mode,esc,query=''){
  const t=catalogWords(locale),groups=groupGames(games,locale,query);
  if(!groups.length)return `<p class="sc-empty">${esc(t.empty)}</p>`;
- return groups.map(gr=>`<section class="sc-group"><h3><span>${esc(gr.name||t.other)}</span><small>${esc(t.count(gr.games.length))}</small></h3>
+ return groups.map(gr=>`<section class="sc-group"><h3><span class="sc-logo" aria-hidden="true"${gr.id?` data-pid="${esc(gr.id)}"`:''}>${esc(Array.from(gr.name||t.other)[0]||'?')}</span><span>${esc(gr.name||t.other)}</span><small>${esc(t.count(gr.games.length))}</small></h3>
   <ul class="sc-grid">${gr.games.map(g=>cardHTML(g,locale,mode,esc)).join('')}</ul></section>`).join('');
 }
 
@@ -86,6 +86,15 @@ export function loadCovers(root,api,mode,live=()=>root.isConnected,{cache=covers
 }
 function showCover(el,url){const img=new Image();img.alt='';img.decoding='async';img.onload=()=>img.classList.add('is-in');img.src=url;el.prepend(img);el.dataset.loaded='1';}
 
+/* developer logos: the small icon of the developer's own site (services/seed-logo.cjs), three at a time; no icon = the letter badge stays */
+const logos=new Map();
+export function loadLogos(root,api,live=()=>root.isConnected,{cache=logos}={}){
+ const todo=[...root.querySelectorAll('.sc-logo[data-pid]')];let at=0;
+ const next=async()=>{while(at<todo.length&&live()){const el=todo[at++],pid=el.dataset.pid;if(!el.isConnected)continue;
+  let p=cache.get(pid);if(!p){p=Promise.resolve().then(()=>api('seed_logo',{pid})).catch(()=>null).then(u=>{if(!isCover(u))cache.set(pid,Promise.resolve(null));return u;});cache.set(pid,p);}
+  const url=await p;if(isCover(url)&&live()&&el.isConnected){const img=new Image();img.alt='';img.decoding='async';img.onload=()=>{el.textContent='';el.append(img);el.classList.add('has-img');};img.src=url;}}};
+ return Promise.all([next(),next(),next()]);
+}
 export function openSeedCatalog({api,locale,esc,toast}){
  document.querySelector('dialog.seed-catalog')?.close();
  const t=catalogWords(locale),dialog=document.createElement('dialog');let mode=savedMode(),games=[],query='',safeOnly=false;
@@ -100,7 +109,7 @@ export function openSeedCatalog({api,locale,esc,toast}){
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
  const $=s=>dialog.querySelector(s),body=$('[data-body]');
  let run=0;
- const render=()=>{const mine=++run;dialog.dataset.mode=mode;body.innerHTML=catalogHTML(games,locale,mode,esc,query);loadCovers(body,api,mode,()=>mine===run&&dialog.isConnected);};
+ const render=()=>{const mine=++run;dialog.dataset.mode=mode;body.innerHTML=catalogHTML(games,locale,mode,esc,query);loadCovers(body,api,mode,()=>mine===run&&dialog.isConnected);loadLogos(body,api,()=>mine===run&&dialog.isConnected);};
  /* a veil card: a click shows that one cover for now (the setting stays off; the app's R18 filter still refuses it) */
  body.addEventListener('click',async e=>{const b=e.target.closest('[data-reveal]');if(!b||b.disabled)return;const el=b.closest('.sc-cover');b.disabled=true;let u=null;try{u=await api('seed_cover',{vndb:b.dataset.reveal,nsfw:true});}catch{}
   if(isCover(u)&&el.isConnected){b.remove();el.querySelector('.sc-ph')?.remove();showCover(el,u);el.dataset.state='load';}else{b.disabled=false;b.title=safeOnly?t.locked:t.failed;}});

@@ -56,3 +56,8 @@ dialog.game-dialog.seed-catalog .dialog-actions{display:flex;justify-content:fle
 @media (max-width:720px){.sc-bar,.sc-offline,.seed-catalog .dialog-actions{padding-left:18px;padding-right:18px}html:not(#u):not(#v):not(#w) body .seed-catalog .sc-body{padding-left:18px;padding-right:18px}.sc-grid{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:18px 12px}}
 @media (prefers-reduced-motion:reduce){.sc-cover img{transition:none}}
 .sc-offline[hidden]{display:none!important}
+.sc-group h3{display:flex;align-items:center;gap:10px}
+.sc-logo{flex:none;display:inline-grid;place-items:center;width:22px;height:22px;overflow:hidden;border-radius:4px;background:color-mix(in srgb,var(--g-gold,#edb56e) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--g-gold,#edb56e) 35%,transparent);font:600 12px/1 var(--t-serif,serif);color:var(--g-gold,#edb56e)}
+.sc-logo.has-img{background:rgba(255,255,255,.92);box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.sc-logo img{display:block;width:100%;height:100%;object-fit:contain}
+
