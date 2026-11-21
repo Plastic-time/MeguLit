@@ -38,6 +38,11 @@ static const Sig Sigs[] = {
   { "mfc-textoutw", "", "TextOutW", "55 8b ec ff 75 14 ff 75 10 ff 75 0c ff 75 08 ff 71 04", 1, 1 },
   { "mfc-exttextoutw", "", "ExtTextOutW", "55 8b ec ff 75 20 ff 75 1c ff 75 18 ff 75 14 ff 75 10 ff 75 0c ff 75 08 ff 71 04", 1, 1 },
   { "mfc-drawtextw", "", "DrawTextW", "55 8b ec ff 75 14 ff 75 10 ff 75 0c ff 75 08 ff 71 04", 1, 1 },
+  // AdvHD / WillPlus (Under The Moon, utmoon.exe 0x40f5d9): the glyph routine 0x40f2a0 (23 callers: every text the engine
+  // draws) asks GetGlyphOutlineA(hdc, ch, GGO_GRAY8, &gm, 0, NULL, &mat) for each character (0x40f613 renders it, 0x40ff0b /
+  // 0x40ff3a / 0x40fff0 are its TextOutA edge passes: not signed). No EBP frame: sub esp,0xb8 + 4 registers + the 7 API
+  // arguments put the routine's return address 0xe4 above the first one; via = the caller (dialogue, name, choice, menu)
+  { "advhd", "", "GetGlyphOutlineA", "8d 44 24 ?? 50 6a 00 6a 00 8d 4c 24 ?? 51 6a 06 56 52", 1, 0xe4 },
 };
 static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
 

@@ -142,3 +142,9 @@
 - 点：Innocentsetup.exe 里 MFC 的 CDC::TextOutW（0x41adc7）、CDC::ExtTextOutW（0x41a849）、CDC::DrawTextW（0x41a808），三个都是把参数原样转给 GDI、DC 取 `[ecx+4]` 的薄包装，有 EBP 帧
 - 程序经 CDC 画的字都从这里过（游戏自己的界面也是），via 是调用 CDC 的那个游戏例程，用它分台词 / 名字 / 菜单。这段是 MFC 自带代码，别的 MFC 程序也会命中，所以签名名叫 mfc-*，不叫游戏名
 - 店主测试清单：同 AVG32，行里是 `engine=mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw`；推一句后看哪个 via 带着台词
+
+### AdvHD / WillPlus（Under The Moon；seed 里的 ディスコード！ 同引擎，本机没有它的 exe）
+- 点：utmoon.exe 0x40f5d9，通用字形例程 0x40f2a0（23 个调用者，引擎画的所有字都经过它）里每个字一次 `GetGlyphOutlineA(hdc, 字, GGO_GRAY8, &gm, 0, NULL, &mat)`；0x40f613 是真正栅格化那次，0x40ff0b / 0x40ff3a / 0x40fff0 是 TextOutA 描边，不签
+- 例程没有 EBP 帧：sub esp,0xb8 + 4 个寄存器 + 7 个 API 参数，返回地址在第一个参数上方 0xe4（frame=0xe4）。via = 调用者（台词 / 名字 / 选项 / 菜单各是不同的调用点），没有笔位（x=-1），fargs 里有例程的参数
+- ディスコード！ 的 exe 版本不同，签名对不上时会写 `off:`，拿到 exe 再补一条
+- 店主测试清单：同 AVG32，行里是 `engine=advhd`
