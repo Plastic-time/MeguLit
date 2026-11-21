@@ -25,3 +25,15 @@ test('actual fallback attempts keep the request target when display changes betw
 test('background retry results write their original target even after a display switch',()=>{
  const {r}=reader();r.gal.preferences.display='bilingual';r.fillTranslation('本文',{text:'English retry',source:'mt'},{options:{learnerLanguage:'en'}});assert.equal(r.embedCached('本文'),undefined);r.gal.preferences.display='english';assert.equal(r.embedCached('本文'),'English retry');
 });
+
+test('bilingual display uses the resolved learner target for cache, script choice and request overrides',async()=>{
+ const {r}=reader();r.prefs=()=>({provider:'google',learnerLanguage:'en'});r.gal.hooks.scriptTranslation=()=> '旧中文脚本';let called=0;r.chainTranslate=async(text,options)=>{called++;assert.equal(options.learnerLanguage,'en');return {text:'English answer'};};
+ assert.equal(await r.translate({id:1,text:'本文'}),'English answer');assert.equal(called,1);assert.equal(r.embedCache.get('en|'+Reader.normKey('本文')),'English answer');assert.equal(r.embedCache.has(Reader.normKey('本文')),false);assert.equal(r.embedCached('本文'),'English answer');
+ assert.equal(await r.translate({id:2,text:'本文',options:{learnerLanguage:'zh'}}),'旧中文脚本');assert.equal(r.embedCache.get(Reader.normKey('本文')),'旧中文脚本');assert.equal(r.cardinalTarget(),'en');
+});
+
+test('actual Reader replies and late fills carry their request target through a language switch',async()=>{
+ for(const first of ['zh','en']){const {r,events}=reader();r.gal.preferences.display=first==='en'?'english':'bilingual';let finish;r.chainTranslate=()=>new Promise(resolve=>finish=resolve);const pending=r.message({id:10,text:'本文'});r.gal.preferences.display=first==='en'?'bilingual':'english';r.latest=11;finish({text:first==='en'?'English answer':'中文回答'});const replies=await pending;
+  assert.equal(replies.replies.find(x=>x.method==='deliver').args[4].target,first);assert.equal(events.find(x=>x.message.method==='deliverBackfill').message.args[3].target,first);
+ }
+});
