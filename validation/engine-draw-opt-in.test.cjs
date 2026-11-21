@@ -46,8 +46,8 @@ for(const file of RUNTIMES){
    /* ReadControl() as the guard (BGI): it must return the roles=1 flag of the #cfg line */
    if(/ReadControl\s*\(\s*\)\s*&&/.test(line)){const rc=fns.find(f=>f.name==='ReadControl');assert.ok(rc,file+': ReadControl()');const body=raw.slice(rc.start,rc.end);
     if(file==='BgiDraw.h'){
-     // BGI decodes a complete UTF16 first line, then applies permission and role-map changes under its lock.
-     // bgidraw-control.cpp exercises these production functions with the real JS transport file and negative inputs.
+     /* BGI decodes the complete UTF16 first line before applying permission and role-map changes under its lock
+        bgidraw-control.cpp exercises this chain with real JS transport files and negative inputs */
      for(const [parent,child] of [['ReadControl','LoadControl'],['LoadControl','ParseControl'],['ParseControl','CfgRoles']]){
       const f=fns.find(f=>f.name===parent);assert.ok(f,parent+' exists');assert.match(src.slice(f.start,f.end),new RegExp('\\b'+child+'\\s*\\('),parent+' reaches trusted '+child);
      }
@@ -80,7 +80,7 @@ test('native: every engine-draw runtime is armed from the hook build (copied by 
 
 test('kernel: the default profile asks for nothing; no control file without a seed that turns draw on',()=>{
  const P=require('../core/profiles/index.cjs'),E=require('../core/engine-draw.cjs');
- const p=P.profileFor({});assert.equal(P.get(p,'draw.roles',null),false);assert.equal(P.get(p,'draw.embed',null),false);
+ const p=P.profileFor({});assert.equal(P.get(p,'draw.roles',null),false);assert.equal(P.get(p,'draw.embed',null),false);assert.equal(P.get(p,'draw.kemcoSprites',null),false);
  const s=E.settings(p);assert.equal(s.roles,false);assert.equal(s.embed,false);
  assert.match(E.krkrControlText(s,new Map()),/^#cfg roles=0 embed=0/);
  const calls=[];const ed=new E.EngineDraw({profile:p,transport:{write:(...a)=>calls.push(['write',...a]),stop:()=>calls.push(['stop'])}});
@@ -92,6 +92,6 @@ test('seeds: draw.roles / draw.embed stay off except the listed games',()=>{
  for(const eng of fs.readdirSync(dir,{withFileTypes:true}).filter(d=>d.isDirectory()))
   for(const g of fs.readdirSync(path.join(dir,eng.name),{withFileTypes:true}).filter(d=>d.isDirectory())){
    const f=path.join(dir,eng.name,g.name,'game.json');if(!fs.existsSync(f))continue;
-   const d=JSON.parse(fs.readFileSync(f,'utf8')).settings?.draw||{};if(d.roles===true||d.embed===true)on.push(eng.name+'/'+g.name);}
+   const d=JSON.parse(fs.readFileSync(f,'utf8')).settings?.draw||{};assert.notEqual(d.kemcoSprites,true,eng.name+'/'+g.name+': Kemco observer requires separate live acceptance');if(d.roles===true||d.embed===true)on.push(eng.name+'/'+g.name);}
  assert.deepEqual(on.sort(),[...SEEDS_ON].sort());
 });

@@ -1,5 +1,6 @@
 #include "Pal.h"
 #include "ToMeTextPos.h"
+#include "PalTextBounds.h"
 // MeguLit (issues 120/121): where Pal draws its text, for MeguLit's position following (E422). Every Pal.dll export is
 // cdecl. The layout routine locks a text sprite (PalSpriteLock(sprite,&w,&h) returns its pixels), draws the text one
 // glyph per PalFontDrawText(buffer,glyph,x,y,w,h,...) call in sprite pixels, with the size from PalFontGetFontSize(),
@@ -234,57 +235,49 @@ static bool InsertOldPalHook() // this is used in case the new pattern does not 
 }
 namespace
 {
-  template <typename strT>
-  strT trim(strT text, int *size)
+  /* The embed wait may overlap another thread; a single owned snapshot also rejects stale/nested answers */
+  static __declspec(thread) PalTextBounds::Snapshot Pending = {};
+  static bool CaptureText(const char *text)
   {
-    // int length = ::strlen(text);
-    auto length = *size;
-    if (text[0] == '<' && text[1] == 'c')
+    __try
     {
-      auto p = ::strchr(text + 2, '>');
-      if (!p)
-        return text;
-      p++;
-      length -= p - text;
-      text = p; // skip leading '<c .. >'
+      return PalTextBounds::Capture(text, &Pending);
     }
-
-    if (text[length - 1] == '>' && text[length - 2] == 'c' && text[length - 3] == '/' && text[length - 4] == '<')
-      length -= 4; // skip the trailing </c>'
-
-    *size = length;
-    return text;
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+      Pending.valid = false;
+      return false;
+    }
   }
-  LPSTR trimmedText;
-  int trimmedSize;
+  static bool ApplyText(char *text, const char *replacement, size_t bytes)
+  {
+    __try
+    {
+      return PalTextBounds::Apply(&Pending, text, replacement, bytes);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+      Pending.valid = false;
+      return false;
+    }
+  }
   void before(hook_context *s, HookParam *hp, TextBuffer *buffer, uintptr_t *role)
   {
     auto text = (LPSTR)s->stack[2]; // text in arg2
-    if (!text || !*text)
-      return;
-
-    int size = ::strlen(text);
-    trimmedSize = size;
-    trimmedText = trim(text, &trimmedSize);
-    if (trimmedSize <= 0 || !trimmedText || !*trimmedText)
+    if (!CaptureText(text))
       return;
     auto retaddr = s->stack[0];
     if (*(WORD *)(retaddr - 8) == 0x088b) // 8b08  mov ecx,dword ptr ds:[eax]
       *role = s->stack[3] ? Engine::ScenarioRole : Engine::NameRole;
-    buffer->from(trimmedText, trimmedSize);
+    buffer->from(Pending.bytes + Pending.slice.prefix, (int)Pending.slice.body);
   }
   void after(hook_context *s, TextBuffer buffer, HookParam *)
   {
     std::string newData = buffer.strA();
     auto text = (LPSTR)s->stack[2]; // text in arg2
-    int prefixSize = trimmedText - text;
-    int size = ::strlen(text);
-    int suffixSize = size - prefixSize - trimmedSize;
-    // if (prefixSize)
-    //   newData.prepend(text, prefixSize);
-    if (suffixSize)
-      newData.append(trimmedText + trimmedSize, suffixSize);
-    ::strcpy(trimmedText, newData.c_str());
+    /* An unknown allocation cannot safely grow, so a longer translation leaves the original span intact */
+    if (!ApplyText(text, newData.data(), newData.size()))
+      Msg::Log("ToMe_PAL_EMBED rejected reason=unsafe-or-stale-span bytes=%lu", (unsigned long)newData.size());
   }
 
   std::string rubyRemove(std::string text)

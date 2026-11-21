@@ -23,3 +23,14 @@ test('truthy strings cannot enable the Kemco observer',()=>{
  const hook=Object.assign(Object.create(HookNative.prototype),{profile:{...profile,draw:{...profile.draw,kemcoSprites:'true'}},state:{gameProcessId:0},textPath:{drawConfig:cfg=>configs.push(cfg)}});
  hook.drawSync();assert.equal(configs[0].kemcoSprites,false);assert.equal(configs[0].roles,false);assert.equal(configs[0].embed,false);
 });
+
+test('Kemco permission survives strict domain cleaning only as a version-scoped boolean',()=>{
+ const domain=require('../core/profiles/domains.cjs');
+ assert.equal(domain.layerOf('draw.kemcoSprites'),'version');
+ assert.deepEqual(domain.clean({draw:{kemcoSprites:true}}),{value:{draw:{kemcoSprites:true}},rejected:[]});
+ assert.deepEqual(domain.split(domain.clean({draw:{kemcoSprites:true}}).value),{version:{draw:{kemcoSprites:true}},game:{}});
+ for(const value of ['true',1,null,{},[]]){
+  const cleaned=domain.clean({draw:{kemcoSprites:value}});
+  assert.deepEqual(cleaned.value,{});assert.deepEqual(cleaned.rejected,['draw.kemcoSprites']);
+ }
+});

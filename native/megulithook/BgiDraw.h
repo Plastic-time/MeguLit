@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // engine-draw, BGI / Ethornell (docs/engine-draw-native.md, after the YU-RIS template YurisDraw.h). BGI lays every text out
 // at once into a chain of glyph nodes (canvas x / y at node+0x10 / +0x14), draws the chain into the text sprite's bitmap and
-// frees it; message window, speaker name, choices and menus all go through that one layout. BgiDrawSig.h finds, in any build:
+// frees it; the known build routes its text sprites through this layout. BgiDrawSig.h recognizes the validated shape:
 //   the link site    the call right after the layout stored the node's x / y (the node is in a register, the glyph's
 //                    character code and the previous node in the layout's stack, the text colour in its argument [ebp+c])
 //   the chain free   the small function that walks node+0x44 and frees the nodes (called once the text is drawn)
-// so every text BGI lays out comes out row by row (one record a row: same y), and an end record when its chain is freed:
+// authorized observations produce diagnostic rows (one record per y), and an end record when the temporary chain is freed:
 //   ToMe_DRAWRUN engine=bgi run=N row=K n=<chars> x0= y0= x1= y1= size=<advance> color=aarrggbb via=<rva>,<rva>,<rva> [role=R] text=<UTF-8>
 //   ToMe_DRAWRUN engine=bgi end run=N rows=K
-// x0 / y0 = the first glyph's origin, x1 = the last glyph's origin (+ size is the row's right edge). Canvas pixels of that text
-// sprite, not the screen: where each sprite sits on screen is learned per game (version diff) from these rows and the glyph /
-// GPU positions. via = the return addresses of the layout and its two callers (image-relative): which script call laid the
+// x0 / y0 = the first glyph's origin, x1 = the last glyph's origin; size is the maximum observed positive horizontal advance,
+// not measured glyph bounds. These are text-sprite canvas pixels; screen origins have not been validated. via = the return
+// addresses of the layout and its two callers (image-relative): the native caller chain that laid the
 // text out. BGI has no window object at this level (its system scripts make message, name and choice sprites through the
 // same calls), so the role is data: this game's diff maps via prefixes to roles (draw.viaRoles -> "#role <via>=<role>" lines
 // in the control file); a row whose via no line maps has no role field.
 // Opt-in: nothing is hooked until MeguLit's control file %TEMP%\MeguLit\draw\<pid>.txt says roles=1 (draw.roles of this game's
 // diff); a watcher thread checks it every 2 s. Both hooks always continue into the game's own code.
+// This observer does not emit ToMe_CHARS, hide text or acknowledge translation. Chain end is not sprite destruction/clear.
 #pragma once
 #include <windows.h>
 #include <cstdio>

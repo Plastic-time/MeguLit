@@ -10,10 +10,25 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
+#include "siglusdraw-control-write.h"
 static std::vector<std::string> Logs;
 static bool ThrowLog=false,FaultLog=false;static void (*LogTap)()=nullptr;static void (*ConversionTap)()=nullptr;
 static int WINAPI ObserverWideCharToMultiByte(UINT cp,DWORD flags,LPCWCH text,int length,LPSTR out,int cap,LPCCH def,LPBOOL used){if(ConversionTap){auto tap=ConversionTap;ConversionTap=nullptr;tap();}return ::WideCharToMultiByte(cp,flags,text,length,out,cap,def,used);}
-namespace Msg { void Log(const char *f, ...) { if(ThrowLog)throw std::runtime_error("fixture logger");if(FaultLog)RaiseException(EXCEPTION_ACCESS_VIOLATION,0,0,nullptr);char b[700]; va_list a; va_start(a, f); vsnprintf(b, sizeof b, f, a); va_end(a); Logs.push_back(b);if(LogTap)LogTap();__asm {pxor xmm0,xmm0}
+static bool PeerClobber=false,PeerThrow=false,PeerFault=false;
+static volatile LONG PeerInjected=0,PeerLogEntries=0;static DWORD PeerBadMxcsr=0x5f80;
+static __declspec(align(16)) unsigned char PeerFx[512];
+namespace Msg { void Log(const char *f, ...) {
+InterlockedIncrement(&PeerLogEntries);
+if(PeerClobber){InterlockedIncrement(&PeerInjected);
+__asm{pxor xmm0,xmm0}
+__asm{pxor xmm7,xmm7}
+__asm{fninit}
+__asm{ldmxcsr PeerBadMxcsr}
+__asm{clc}
+__asm{fxsave PeerFx}
+if(PeerThrow)throw std::runtime_error("peer FX then C++");
+if(PeerFault)RaiseException(EXCEPTION_ACCESS_VIOLATION,0,0,nullptr);
+} if(ThrowLog)throw std::runtime_error("fixture logger");if(FaultLog)RaiseException(EXCEPTION_ACCESS_VIOLATION,0,0,nullptr);char b[700]; va_list a; va_start(a, f); vsnprintf(b, sizeof b, f, a); va_end(a); Logs.push_back(b);if(LogTap)LogTap();__asm {pxor xmm0,xmm0}
 __asm {pxor xmm7,xmm7}
 __asm {fninit}
 __asm {stc}
@@ -252,7 +267,7 @@ static std::string Find(const char *needle) { for (auto &l : Logs) if (l.find(ne
 static std::string U8(const wchar_t *w) { return SiglusDraw::Utf8(w, (int)wcslen(w)); }
 
 static std::wstring ControlFile(){wchar_t tmp[MAX_PATH],file[MAX_PATH+64];GetTempPathW(MAX_PATH,tmp);std::wstring dir=std::wstring(tmp)+L"MeguLit";CreateDirectoryW(dir.c_str(),nullptr);dir+=L"\\draw";CreateDirectoryW(dir.c_str(),nullptr);swprintf_s(file,L"%s\\%lu.txt",dir.c_str(),GetCurrentProcessId());return file;}
-static void Control(const wchar_t *s){HANDLE h=CreateFileW(ControlFile().c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);if(h==INVALID_HANDLE_VALUE){printf("FIXTURE control open failed: %lu\n",GetLastError());ExitProcess(98);}DWORD size=(DWORD)(wcslen(s)*2),written=0;bool ok=WriteFile(h,s,size,&written,nullptr)&&written==size;CloseHandle(h);if(!ok){puts("FIXTURE control write incomplete");ExitProcess(98);}}
+static void Control(const wchar_t *s){WriteControlFixture(ControlFile(),s,(DWORD)(wcslen(s)*2));}
 static void Refresh(){
 #ifdef SIGLUS_PERMISSION_FIXED
  SiglusDraw::RefreshControl();
@@ -290,6 +305,13 @@ int main() {
   S.colors = (std::uint32_t)(uintptr_t)ColorVec;
   InitializeCriticalSection(&SiglusDraw::Lock);
   Check(MH_Initialize() == MH_OK, "MinHook");
+#ifdef SIGLUS_PERMISSION_FIXED
+  Refresh();
+  Check(!SiglusDraw::Installed&&!SiglusDraw::Observing&&!SiglusDraw::OrigPush&&!SiglusDraw::OrigClear&&!SiglusDraw::OrigFrame,"missing control cannot install any detour");
+  Control(L"\xfeff#cfg roles=0\r\n");Refresh();
+  DWORD initialPushes=Pushes;LineCall(Vec(MsgA),Moji(L'x',0,0));
+  Check(!SiglusDraw::Installed&&!SiglusDraw::Observing&&Pushes==initialPushes+1&&Logs.empty(),"default off leaves original call intact and emits no observer log");
+#endif
   Permit();
   Check(Has("ToMe_DRAWRUN engine=siglus on:") && Find("engine=siglus on:").find(" frame 0 ") == std::string::npos, "hook on, msg::frame too");
   /* the window slides in (two places), then stays: one origin, the settled one = (int)param x + arg 8 */
@@ -378,12 +400,44 @@ int main() {
   Logs.clear();Text(LineCall,MsgA,L"旧",8,0);Sleep(170);ConversionTap=&RevokeResume;SiglusDraw::FlushIdle();Check(Logs.empty()&&EmptyState(),"off-on during Flush UTF16 conversion discards old snapshot before log");
   Logs.clear();Text(LineCall,MsgA,L"漢字",8,0);*(long *)(MsgA+0x180)=0;*(long *)(MsgA+0xe0)=64;ConversionTap=&RevokeResume;Text(RubyPush,MsgA,L"か",8,-16,16);Check(Logs.empty()&&EmptyState(),"ruby conversion off-on cannot append an old reading into fresh epoch");
   for(int i=0;i<2;i++)FrameCall(MsgA,Param,60,20);LogTap=&RevokeResume;FrameCall(MsgA,Param,60,20);Check(EmptyState(),"origin logger off-on cannot resurrect told/origin state");
-  Logs.clear();Text(LineCall,MsgA,L"旧",8,0);AbiTarget=(void *)&FakePush;AbiEcx=(DWORD)Vec(MsgA);AbiWords[0]=(DWORD)Moji(L'新',8,0);AbiCount=1;pushesBefore=Pushes;AbiInvoke();
+  Logs.clear();Text(LineCall,MsgA,L"旧",8,0);AbiTarget=(void *)&FakePush;AbiEcx=(DWORD)Vec(MsgA);AbiWords[0]=(DWORD)Moji(L'新',8,0);AbiCount=1;pushesBefore=Pushes;LONG originalAbiEntries=PeerLogEntries;AbiInvoke();
+  Check(PeerLogEntries==originalAbiEntries+1&&PushRole(S,LastRet)==P_OTHER,"peer original fixed-fixture Push ABI actually executes logger through P_OTHER boundary");
   Check(AbiState((DWORD)&M)&&Pushes==pushesBefore+1&&LastMoji==(DWORD)&M&&LastEcx==AbiEcx,"actual Push ret4 gate preserves entry GPR/flags/ESP/XMM/x87, original argument and opaque return");
-  Text(LineCall,MsgA,L"旧",8,0);AbiTarget=(void *)&FakeClear;AbiEcx=(DWORD)MsgA;AbiCount=0;clearsBefore=Clears;AbiInvoke();
+  Text(LineCall,MsgA,L"旧",8,0);AbiTarget=(void *)&FakeClear;AbiEcx=(DWORD)MsgA;AbiCount=0;clearsBefore=Clears;originalAbiEntries=PeerLogEntries;AbiInvoke();
+  Check(PeerLogEntries==originalAbiEntries+2,"peer original fixed-fixture Clear ABI actually executes flush and clear loggers");
   Check(AbiState(0x24682468)&&Clears==clearsBefore+1&&LastClearEcx==AbiEcx,"actual Clear ret0 gate preserves entry GPR/flags/ESP/XMM/x87 and original return");
-  for(int i=0;i<2;i++)FrameCall(MsgA,Param,60,20);AbiTarget=(void *)&FakeFrame;AbiEcx=(DWORD)MsgA;memset(AbiWords,0,sizeof AbiWords);AbiWords[0]=(DWORD)Param;AbiWords[7]=60;AbiWords[8]=20;AbiCount=9;framesBefore=Frames;AbiInvoke();
+  for(int i=0;i<2;i++)FrameCall(MsgA,Param,60,20);AbiTarget=(void *)&FakeFrame;AbiEcx=(DWORD)MsgA;memset(AbiWords,0,sizeof AbiWords);AbiWords[0]=(DWORD)Param;AbiWords[7]=60;AbiWords[8]=20;AbiCount=9;framesBefore=Frames;originalAbiEntries=PeerLogEntries;AbiInvoke();
+  Check(PeerLogEntries==originalAbiEntries+1,"peer original fixed-fixture Frame ABI actually executes logger");
   Check(AbiState(20)&&Frames==framesBefore+1&&LastFrameArg9==20&&LastFrameEcx==AbiEcx,"actual Frame ret36 gate preserves nine words, GPR/flags/ESP/XMM/x87 and opaque return");
+  // Peer: learn the actual AbiInvoke CALL return while keeping production routing intact.
+  AbiTarget=(void *)&FakePush;AbiEcx=(DWORD)Vec(MsgA);AbiWords[0]=(DWORD)Moji(L'新',8,0);AbiCount=1;
+  LONG injectedBefore=PeerInjected;AbiInvoke();
+  Check(PeerInjected==injectedBefore&&PushRole(S,LastRet)==P_OTHER,"peer baseline ABI Push caller is unlearned P_OTHER, not a rejected role");
+  site(LastRet,P_PRINT);
+  Check(PushRole(S,LastRet)==P_PRINT,"peer ABI Push caller now matches explicitly learned site");
+  for(int kind=0;kind<3;kind++){
+    Revoke();Permit();Logs.clear();Text(LineCall,MsgBk,L"旧",8,0);
+    AbiTarget=(void *)&FakePush;AbiEcx=(DWORD)Vec(MsgA);AbiWords[0]=(DWORD)Moji(L'新',8,0);AbiCount=1;
+    injectedBefore=PeerInjected;pushesBefore=Pushes;PeerClobber=true;PeerThrow=kind==1;PeerFault=kind==2;
+    AbiInvoke();PeerClobber=PeerThrow=PeerFault=false;
+    unsigned char zero[16]={};
+    Check(PeerInjected==injectedBefore+1&&!memcmp(PeerFx+160,zero,16)&&!memcmp(PeerFx+272,zero,16)&&*(DWORD *)(PeerFx+24)==PeerBadMxcsr&&*(WORD *)PeerFx==0x37f,
+       kind==0?"peer matched Push logger actually clobbers XMM0/7 CW and MXCSR":kind==1?"peer C++ path reaches logger FX clobber before throw":"peer SEH path reaches logger FX clobber before raise");
+    Check(AbiState((DWORD)&M)&&Pushes==pushesBefore+1&&LastMoji==(DWORD)&M&&LastEcx==AbiEcx&&LockReleased()&&(kind==0||EmptyState()),
+       kind==0?"peer matched Push forwards ABI after executed logger":kind==1?"peer FX then C++ preserves original ABI and releases lock":"peer FX then SEH preserves original ABI and releases lock");
+  }
+  for(int gate=0;gate<2;gate++)for(int kind=1;kind<3;kind++){
+    Revoke();Permit();Logs.clear();
+    if(gate==0){Text(LineCall,MsgA,L"旧",8,0);AbiTarget=(void *)&FakeClear;AbiEcx=(DWORD)MsgA;AbiCount=0;}
+    else{for(int i=0;i<2;i++)FrameCall(MsgA,Param,60,20);AbiTarget=(void *)&FakeFrame;AbiEcx=(DWORD)MsgA;memset(AbiWords,0,sizeof AbiWords);AbiWords[0]=(DWORD)Param;AbiWords[7]=60;AbiWords[8]=20;AbiCount=9;}
+    injectedBefore=PeerInjected;clearsBefore=Clears;framesBefore=Frames;PeerClobber=true;PeerThrow=kind==1;PeerFault=kind==2;
+    AbiInvoke();PeerClobber=PeerThrow=PeerFault=false;unsigned char zero[16]={};
+    Check(PeerInjected==injectedBefore+1&&!memcmp(PeerFx+160,zero,16)&&!memcmp(PeerFx+272,zero,16)&&*(DWORD *)(PeerFx+24)==PeerBadMxcsr&&*(WORD *)PeerFx==0x37f,
+      gate==0?(kind==1?"peer Clear C++ path clobbers FX before throw":"peer Clear SEH path clobbers FX before raise"):(kind==1?"peer Frame C++ path clobbers FX before throw":"peer Frame SEH path clobbers FX before raise"));
+    bool forwarded=gate==0?Clears==clearsBefore+1&&LastClearEcx==AbiEcx:Frames==framesBefore+1&&LastFrameEcx==AbiEcx&&LastFrameArg9==20;
+    Check(AbiState(gate==0?0x24682468:20)&&forwarded&&LockReleased()&&EmptyState(),
+      gate==0?(kind==1?"peer Clear FX then C++ preserves original ABI and releases lock":"peer Clear FX then SEH preserves original ABI and releases lock"):(kind==1?"peer Frame FX then C++ preserves original ABI and releases lock":"peer Frame FX then SEH preserves original ABI and releases lock"));
+  }
   // Real background watcher continues permission refresh while preserving 150ms idle flush.
   Logs.clear();HANDLE stop=CreateEventW(nullptr,TRUE,FALSE,nullptr);HANDLE watcher=CreateThread(nullptr,0,SiglusDraw::Watch,stop,0,nullptr);
   Control(L"\xfeff#cfg roles=0\r\n");Check(watcher&&WaitObserving(0)&&EmptyState(),"continuous watcher revokes installed paths");

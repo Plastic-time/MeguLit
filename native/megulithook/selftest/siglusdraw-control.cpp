@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <cstdio>
 #include <string>
+#include "siglusdraw-control-write.h"
 namespace Msg{static void Log(const char *,...) {}}
 #ifndef SIGLUS_HEADER
 #define SIGLUS_HEADER "../SiglusDraw.h"
@@ -11,7 +12,7 @@ namespace Msg{static void Log(const char *,...) {}}
 static int Failures=0,Checks=0;
 static void Check(bool ok,const char *s){Checks++;printf("%s %s\n",ok?"PASS":"FAIL",s);if(!ok)Failures++;}
 static std::wstring ControlFile(){wchar_t tmp[MAX_PATH],file[MAX_PATH+64];GetTempPathW(MAX_PATH,tmp);std::wstring dir=std::wstring(tmp)+L"MeguLit";CreateDirectoryW(dir.c_str(),nullptr);dir+=L"\\draw";CreateDirectoryW(dir.c_str(),nullptr);swprintf_s(file,L"%s\\%lu.txt",dir.c_str(),GetCurrentProcessId());return file;}
-static void Raw(const void *text,DWORD bytes){HANDLE h=CreateFileW(ControlFile().c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);DWORD written;WriteFile(h,text,bytes,&written,nullptr);CloseHandle(h);}
+static void Raw(const void *text,DWORD bytes){WriteControlFixture(ControlFile(),text,bytes);}
 static void Control(const wchar_t *s){Raw(s,(DWORD)(wcslen(s)*2));}
 int wmain(int argc,wchar_t **argv){
 #ifdef SIGLUS_PERMISSION_FIXED

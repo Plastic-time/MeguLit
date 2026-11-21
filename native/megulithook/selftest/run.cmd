@@ -11,6 +11,8 @@ cmd /c "call "%MEGULIT_VS%" -arch=x64 -host_arch=x64 -no_logo >nul && cl /nologo
 cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 embedwait.cpp /Fe:"%TEMP%\megulit-gdihide32\embedwait.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
 cmd /c "call "%MEGULIT_VS%" -arch=x64 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 embedwait.cpp /Fe:"%TEMP%\megulit-gdihide64\embedwait.exe" /Fo"%TEMP%\megulit-gdihide64\\" >nul" || exit /b 1
 rem A6 embed wait replay (MeguLitEmbedWait.h): must pass, and the old waiting (--old) must fail, so the test can see a regression
+set "MEGULIT_TEST_OUT=%TEMP%\megulit-pal-text-bounds"
+call "%~dp0pal-text-bounds.cmd" || exit /b 1
 for %%B in (32 64) do (
  echo [embed wait %%B-bit]
  "%TEMP%\megulit-gdihide%%B\embedwait.exe"

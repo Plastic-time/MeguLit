@@ -122,6 +122,21 @@ int main(){
  Permit();Check(BgiDraw::Installed&&BgiDraw::Observing&&BgiDraw::LinkOriginal&&BgiDraw::FreeOriginal,"real link/free detours install after trusted BOM permission");Logs.clear();int before=AdvanceCalls;Layout();Check(Abi()&&AdvanceCalls==before+1&&BgiDraw::RowChars==1,"installed actual call-site gate preserves arguments, GPR/flags/ESP/XMM/x87 and original return");FreeCall(Node);Check(FreeCalls==1&&GotHead==Node,"original free receives its exact head pointer once");Check(Logs.size()==2&&Logs[0].find("role=name")!=std::string::npos&&Logs[0].find("text=\xe3\x81\x82")!=std::string::npos,"authorized row and end preserve via-role contract");
  Logs.clear();Head=1;Layout();Check(BgiDraw::RowChars==1,"row waits pending until its normal boundary");Control(L"\xfeff#cfg roles=0\r\n");BgiDraw::RefreshControl();Check(!BgiDraw::Observing&&!BgiDraw::RowChars&&!BgiDraw::Open&&!BgiDraw::RoleCount,"roles0 atomically discards pending row and role map");before=AdvanceCalls;Layout();int freeBefore=FreeCalls;FreeCall(Node);Check(Logs.empty()&&Abi()&&AdvanceCalls==before+1&&FreeCalls==freeBefore+1,"revoked link/free calls remain original pass-through");
  Permit();Logs.clear();Head=0;GlyphCode=0x82a2;Layout();FreeCall(Node);Check(Logs.size()==2&&Logs[0].find("text=\xe3\x81\x84")!=std::string::npos&&Logs[0].find("text=\xe3\x81\x82")==std::string::npos,"resume starts a fresh row with no pre-revocation text");
+ Logs.clear();Head=1;Layout();LONG oldEpoch=BgiDraw::Epoch;
+ Control(L"\xfeff#cfg roles=1\r\n#role 1234=line\r\n");BgiDraw::RefreshControl();
+ Check(BgiDraw::Observing&&BgiDraw::Epoch!=oldEpoch&&!BgiDraw::Open&&!BgiDraw::RowChars&&Logs.empty()&&!strcmp(BgiDraw::RoleOf("1234,0,0"),"line"),"changing a trusted via-role map discards the old pending row before new role attribution");
+ const DWORD pages[2][3]={{0x82a0,0x82a0,0x82a2},{0x82a4,0x82a4,0x82a6}};
+ const std::string row0="text=\xe3\x81\x82\xe3\x81\x82\xe3\x81\x84",row1="text=\xe3\x81\x86\xe3\x81\x86\xe3\x81\x88";
+ for(int page=0;page<10;page++){
+  Logs.clear();unsigned run=BgiDraw::Run;before=AdvanceCalls;freeBefore=FreeCalls;bool abi=true;
+  for(int row=0;row<2;row++)for(int glyph=0;glyph<3;glyph++){
+   Head=row==0&&glyph==0;GlyphCode=pages[row][glyph];Node[4]=100+glyph*24;Node[5]=200+row*32;Layout();abi=abi&&Abi();
+  }
+  FreeCall(Node);
+  Check(abi&&AdvanceCalls==before+6&&FreeCalls==freeBefore+1&&BgiDraw::Run==run+1&&Logs.size()==3&&Logs[0].find(row0)!=std::string::npos&&Logs[1].find(row1)!=std::string::npos&&Logs[0].find("role=line")!=std::string::npos&&Logs[0].find("size=24")!=std::string::npos&&Logs[1].find("row=1")!=std::string::npos&&Logs[2].find("rows=2")!=std::string::npos&&!BgiDraw::Open&&!BgiDraw::RowChars,"synthetic two-row page preserves repeated glyphs and flushes once (ten pages; not live acceptance)");
+  FreeCall(Node);Check(Logs.size()==3&&FreeCalls==freeBefore+2,"an extra chain free passes through without repeating a completed page");
+ }
+ Permit();Node[4]=100;Node[5]=200;GlyphCode=0x82a2;
  Logs.clear();Head=1;Layout();ThrowLog=true;before=AdvanceCalls;Layout();ThrowLog=false;Check(AdvanceCalls==before+1&&Abi()&&LockReleased(),"C++ logger exception releases lock and still executes the original link");Logs.clear();Layout();ThrowLog=true;freeBefore=FreeCalls;FreeCall(Node);ThrowLog=false;Check(FreeCalls==freeBefore+1&&GotHead==Node&&LockReleased(),"C++ logger exception cannot suppress original free");
  Layout();FaultLog=true;before=AdvanceCalls;Layout();FaultLog=false;Check(AdvanceCalls==before+1&&Abi()&&LockReleased(),"logger SEH fault leaves link pass-through and lock recoverable");
  Logs.clear();Layout();LogTap=&RevokeInLog;before=AdvanceCalls;Layout();LogTap=nullptr;Check(!BgiDraw::Observing&&!BgiDraw::Open&&!BgiDraw::RowChars&&!BgiDraw::RoleCount&&AdvanceCalls==before+1&&Abi(),"reentrant revoke during a flush cannot recreate pending text after off");Permit();Logs.clear();GlyphCode=0x82a4;Layout();FreeCall(Node);Check(Logs.size()==2&&Logs[0].find("text=\xe3\x81\x86")!=std::string::npos,"resume after in-flight revoke has only new text");

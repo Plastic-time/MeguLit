@@ -2,6 +2,26 @@
 
 新体系（店主 2026-11-21）：MeguLitHook 内核 + 每个引擎逆向「画字函数」（从引擎内部直接读状态）+ 每部游戏一份纯数据差分。这份矩阵是地基的盘点：每个主要引擎现在仓库里有什么、离「引擎内部读」还差什么、先做哪个。统一上报格式见 [engine-draw-protocol.md](engine-draw-protocol.md)
 
+## 两级验收（2026-11-22）
+
+一级要求：本机样本静态区分正文、名字和选项，或样本签名唯一命中；回放夹具和相关测试全绿，全部受版本控制的 JS/CJS/MJS 通过 `node --check`；新增钩子默认不挂且 `engine-draw-opt-in` 通过；合入最新 `origin/main` 后重测再推送
+
+二级实机核实单独排队，不阻塞一级；静态完成不代表隐藏、点读、翻译或清页已实机通过，也不授权开启任何游戏 seed
+
+| 引擎 / 本轮范围 | 一级状态 | 静态证据与回放 | 二级 |
+|---|---|---|---|
+| Softpal / 既有 Pal 输入回调的有界写回 | 静态完成、待实机 | 本机 LeyLine.exe SHA `9a502090…56ffb77`，既有 host 签名在可执行节唯一命中 RVA `0x25390`；`pal-text-bounds` 原生 27 项、相关 Node 回放与 opt-in 全过；无新增钩子、flag 或 seed | 同版本正文、名字、选项、隐藏十句、点读、译文、翻页与增长拒绝待核实 |
+| Unity Mono / KEMCO 原版消息组件诊断 | 静态完成、待实机 | 本机原版 Assembly-CSharp SHA `c4d74235…1dd7314`；八个字段类型及唯一 `Message.Mes(string,bool):string` 静态核对；44 项回放与 opt-in、完整 Mono 插件编译通过；`kemcoSprites:false`，无 seed 开启 | 补丁版 DLL 不在支持范围；完整页来源、名字选项、旧页退休及实际 Reader 待核实；不授予隐藏或 IL2CPP 能力 |
+| Siglus / 两个固定 x86 版本的诊断权限与 ABI | 静态完成、待实机 | CLANNAD `1.1.134.0`、Summer Pockets `1.1.137.0` 的完整样本与 fixture 对应；Node 28 项及 x86 控制/真实 MinHook、x86/x64 签名回放通过；默认关闭 | 角色与实际屏幕、隐藏十句、点读、译文、清页及撤权待核实 |
+| MAGES / 五个固定 x86 Steam 版本的诊断权限与签名边界 | 静态完成、待实机 | 五份完整 exe 的静态匹配与 x86/x64 扫描器一致；边界、权限及真实 MinHook 回放通过；roles 默认关闭；仅覆盖现有版本表 | 私有副本启动报 Steam `3:0000065432`，待合法可运行入口；不是 MAGES64 或实际隐藏完成 |
+| BGI / 素晴日 HD 诊断权限与页面回放 | 静态完成、待实机 | 本机 BGI.exe 的 link/free 签名各唯一命中；18 项 Node 回放、控制及真实 MinHook 门回放通过；默认不挂；不导入旧版无条件 sprite hook | 隐藏桌面 D3D 创建设备失败；ユースティア磁盘签名未命中，未宣称该版本完成 |
+| Ren'Py / 8.4 标准 say/menu 的原生脚本修复 | 静态完成、待实机 | 本机自写日文 8.4 样本的名字、正文、选项分开，实际引擎记录可回放；生产脚本控制/还原及相关 22 项测试通过；无 seed 开启 | 仅标准屏幕白盒样本，不代表 Flowers 或任意商业作品；实际 Reader 显示、物理点读和选项译文待核实；混合 RPYC canonical 提取未满足本轮一级，不携带 |
+| Majiro / 姫子固定输入签名、权限与消息记录 | 静态完成、待实机 | 本机固定 exe 签名唯一；50 个 MJO 全量严格遍历的 12773 条 message 与未分类 literal 分开；默认 off、权限撤销和原生门回放通过 | 运行时正文/名字/选项、真实画布和 hide/lookup/translation/clear 待核实；literal 不猜作名字或选项 |
+
+KiriKiri 分两条跟踪：普通 KAG3 `processCh` 的角色与内嵌实现已在 main，相关回归本轮 34/34，但完整本机一级证据尚未在本轮签收；柚子社等 `TextRender` 路线的角色、内嵌、清页另需核实，不随 KAG3 一起标完成
+
+实机步骤维护在本机 `H:/MeguLit-Work/night-1423/live-check-queue.md`，每次一级推送的完整 SHA 记入夜间进度
+
 ## 状态：已进 main（2026-11-21，4f1cb363），默认不挂
 
 下面各引擎的画字钩子都已合进 main。默认全部不挂：只有这部游戏的 seed 打开 `draw.roles`（MeguLit 写出控制文件 `#cfg roles=1`）才装钩子；现在没有任何游戏 seed 打开它。这一点由 `validation/engine-draw-opt-in.test.cjs` 钉住：钩子只在 `Install()` 里装，`Install()` 只在 roles=1 检查之后调，启动时 `Arm()` 从不挂钩；内核默认不写控制文件；seed 要开得先加进测试里的允许名单

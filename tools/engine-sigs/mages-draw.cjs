@@ -59,7 +59,7 @@ function bodyEnd(b,at,cap=0x600){for(let i=at+3;i<Math.min(b.length-3,at+cap);i+
 function glyphCalls(b,at,end){
  const n=new Map();
  for(let i=at;i+5<end;i++){if(b[i]!==0xe8)continue;const t=i+5+i32(b,i+1);
-  for(let k=i+5;k<Math.min(end,i+0x30);k++)if(b[k]===0x83&&b[k+1]===0xc4&&b[k+2]===0x2c){n.set(t,(n.get(t)||0)+1);break;}}
+  for(let k=i+5;k<Math.min(end,i+0x30)&&k+3<=end;k++)if(b[k]===0x83&&b[k+1]===0xc4&&b[k+2]===0x2c){n.set(t,(n.get(t)||0)+1);break;}}
  return n;
 }
 function scaleOf(b,at,end){for(let i=at;i+8<end;i++)if(b[i]===0xf3&&b[i+1]===0x0f&&b[i+2]===0x10&&b[i+3]===0x0d)return u32(b,i+4);return 0;}
@@ -80,7 +80,7 @@ function find(b,va){
   if(!PROLOGUE(b,i))continue;let c=-1;
   for(let k=i+3;k<i+0x10;k++)if(b[k]===0x39&&b[k+1]===0x05&&b[k+6]===0x0f&&b[k+7]===0x86){c=k;break;}
   if(c<0)continue;let codes=0,info=0;
-  for(let k=c;k<i+0x60;k++){if(!codes&&b[k]===0x0f&&b[k+1]===0xb7&&b[k+2]===0x14&&b[k+3]===0x45)codes=u32(b,k+4);if(!info&&b[k]===0xb9)info=u32(b,k+1);}
+  for(let k=c;k<i+0x60;k++){if(!codes&&k+8<=b.length&&b[k]===0x0f&&b[k+1]===0xb7&&b[k+2]===0x14&&b[k+3]===0x45)codes=u32(b,k+4);if(!info&&k+5<=b.length&&b[k]===0xb9)info=u32(b,k+1);}
   if(!codes||!info)continue;
   const end=bodyEnd(b,i,0x200),body=b.subarray(i,end);let inc=false;
   for(let k=0;k+6<=body.length;k++)if(body[k]===0xff&&(body[k+1]&0xf8)===0x80&&body.subarray(k+2,k+6).equals(lenAt)){inc=true;break;}
@@ -108,9 +108,9 @@ function find(b,va){
 function backbuffer(b){const hits=[];
  for(let i=0;i+0x90<b.length;i++){
   if(b[i]!==0x0f||b[i+1]!==0xb7||b[i+2]!==0x05)continue;const W=u32(b,i+3);let k=i+7,end=i+0x40,s4=-1,l9=-1,h=-1;
-  for(let j=k;j<end;j++)if(b[j]===0xc1&&b[j+1]===0xe8&&b[j+2]===0x04){s4=j;break;}if(s4<0)continue;
-  for(let j=s4+3;j<s4+0x30;j++)if(b[j]===0x8d&&b[j+1]===0x04&&b[j+2]===0xc0){l9=j;break;}if(l9<0)continue;
-  for(let j=l9+3;j<l9+0x30;j++)if(b[j]===0x0f&&b[j+1]===0xb7&&b[j+2]===0x05&&u32(b,j+3)===((W+4)>>>0)){h=j;break;}if(h<0)continue;
+  for(let j=k;j<end&&j+3<=b.length;j++)if(b[j]===0xc1&&b[j+1]===0xe8&&b[j+2]===0x04){s4=j;break;}if(s4<0)continue;
+  for(let j=s4+3;j<s4+0x30&&j+3<=b.length;j++)if(b[j]===0x8d&&b[j+1]===0x04&&b[j+2]===0xc0){l9=j;break;}if(l9<0)continue;
+  for(let j=l9+3;j<l9+0x30&&j+7<=b.length;j++)if(b[j]===0x0f&&b[j+1]===0xb7&&b[j+2]===0x05&&u32(b,j+3)===((W+4)>>>0)){h=j;break;}if(h<0)continue;
   let present=false;for(let j=h;j<i+0x90;j++)if(b[j]===0xff&&b[j+1]===0x51&&b[j+2]===0x44){present=true;break;}
   if(present)hits.push({at:i,w:W,h:(W+4)>>>0});
  }
