@@ -9,6 +9,17 @@ const read=(...parts)=>decode(stream(...parts));
 const reject=(buf,code,options)=>assert.throws(()=>decode(buf,options),error=>error.code==='RENPY_PICKLE_'+code&&Number.isSafeInteger(error.offset));
 const global=()=>Buffer.from('crenpy.ast\nSay\n','ascii');
 const instance=()=>Buffer.concat([global(),b(0x29,0x81)]);
+test('ordinary CPython serializer fixtures retain slot-state graphs under protocols 2, 4 and 5',()=>{
+ const fixture=require('./fixtures/renpy-bounded-cpython.json');
+ for(const input of fixture.fixtures){
+  const buffer=Buffer.from(input.base64,'base64'),parsed=decode(buffer);
+  assert.equal(buffer.length,input.bytes);assert.equal(parsed.protocol,input.protocol);
+  assert.equal(parsed.value.items[0].entries.get('version'),1);
+  const translation=parsed.value.items[1].items[0],say=translation.state.get('block').items[0];
+  assert.equal(translation.className,'renpy.ast.Translate');assert.equal(translation.state.get('identifier'),'intro_abcdef');assert.equal(translation.state.get('language'),null);
+  assert.equal(say.className,'renpy.ast.Say');assert.equal(say.state.get('who'),null);assert.equal(say.state.get('what'),'Synthetic oracle text');
+ }
+});
 test('bounded data subset preserves ordered tuples, lists, dictionaries and byte strings',()=>{
  const value=read(b(0x28,0x4e,0x88,0x89,0x4b,7,0x4d,0,1),string('試験'),b(0x55,2,0xff,0),b(0x74)).value;
  assert.equal(value.kind,'tuple');assert.deepEqual(value.items.slice(0,6),[null,true,false,7,256,'試験']);assert.deepEqual(value.items[6],b(0xff,0));

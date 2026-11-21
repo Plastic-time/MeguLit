@@ -19,3 +19,5 @@ Reductions (including copy-reg reconstructors), protocol-0 text operands, sets, 
 No AST traversal, language selection, canonical-ID calculation, translation pairing, RPA discovery, scene registration or game modification is provided here. Those steps require a separately validated schema and real compiler-produced oracle. This primitive must not be used to turn a partial graph into a claimed complete narrative
 
 Validation: `node --test validation/renpy-pickle-bounded.test.cjs`
+
+The small committed CPython fixtures have an adjacent optional producer using only standard-library pickle and neutral synthetic classes. Tests consume the fixed bytes without requiring Python. The recorded Python version and opcode sets describe these controls; they do not pin or emulate a Ren'Py compiler release
