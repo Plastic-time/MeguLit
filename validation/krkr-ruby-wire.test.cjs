@@ -80,3 +80,16 @@ test('KAG embed keeps original native reading once while adding other dictionary
  const h=harness({ctl:'#cfg embed=1\n日日\t0:1:ひ|1:1:にち\t\n'});h.st.ctl();const r=record('日日',[[0,1,'ひ']]);const rec={target:h.L,role:'line',cn:2,ra:r.rects,rb:r.ruby,ct:r.text,size:28,nvl:0,head:TP.formatChars({...r,ruby:[]}).split(' text=')[0],tt:r.text,y1:500,cleared:false,n:0};
  h.st.embPend=h.st.embQueue(rec);h.st.embTry();assert.deepEqual(h.draws.map(d=>d.text),['にち']);assert.deepEqual(TP.parseChars(h.reports.at(-1)).ruby,[[0,1,'ひ']]);
 });
+
+test('KAG native transport budget never loses an otherwise valid body because of optional ruby',()=>{
+ const h=trackRig(),n=1500,ra=Array.from({length:n},(_,i)=>[(i%80)*12,Math.floor(i/80)*12,12,12]);
+ const rec={target:h.L,text:'漢'.repeat(n),line:1,role:'line',cn:n,hc:n,sw:1280,sh:720,rs:ra.map(q=>q.join(',')).join(';'),rb:Array.from({length:64},(_,i)=>[i,1,'あ'.repeat(28)]),ra,ct:'漢'.repeat(n),size:12,nvl:0,y1:216,cleared:false,n:0};
+ h.st.chars(rec);let wire=h.reports.at(-1);assert.ok(wire.length<28000);assert.ok(!wire.includes(' ruby='));assert.ok(TP.parseChars(wire));assert.ok((wire.length+h.st.rubyWire(rec.rb).length)>=28000,'the old optional field would cross the native cap');
+ h.st.cfg.embed=1;h.st.cfg.zh=0;h.st.embPend=h.st.embQueue(rec);h.st.embMap[rec.ct]=['',''];h.st.embTry();wire=h.reports.at(-1);assert.ok(wire.length<28000);assert.equal(TP.parseChars(wire).emb,1);assert.ok(!wire.includes(' ruby='));
+ const small={...rec,text:'漢',tt:'漢',ct:'漢',cn:1,rs:'0,0,12,12',ra:[[0,0,12,12]],rb:[[0,1,'かん']]};h.st.chars(small);assert.deepEqual(TP.parseChars(h.reports.at(-1)).ruby,small.rb,'fitting ruby remains observable');
+ /* emb=N alone can tip a previously fitting optional field over the exact same native cap. */
+ const base='x'.repeat(27970),p={head:base,t:'漢',rubyField:' ruby=0:1:304b3093',rec:{cleared:false,n:0},L:h.L,k:'near',tries:0};h.st.embPend=p;h.st.embMap.near=['',''];const draw=h.st.embDraw;h.st.embDraw=()=>1;h.st.embTry();h.st.embDraw=draw;
+ assert.equal(h.reports.at(-1),base+' emb=1 text=漢');assert.ok(h.reports.at(-1).length<28000);
+ const tooMany=2500,large={...rec,text:'漢'.repeat(tooMany),cn:tooMany,hc:tooMany,rs:Array.from({length:tooMany},(_,i)=>[(i%80)*12,Math.floor(i/80)*12,12,12].join(',')).join(';')};
+ h.st.chars(large);assert.ok(h.reports.at(-1).length>=28000,'an oversized original body remains subject to native rejection, never silently shortened');assert.ok(h.reports.at(-1).endsWith(' text='+large.text));
+});

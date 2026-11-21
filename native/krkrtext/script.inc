@@ -137,7 +137,9 @@ LR"MGLT((function(){
     for(var j=0;j<rec.text.length;j++) {c=rec.text.charAt(j);if(c=="\n") {if(row!='') t+=(t!=''?"\n":'')+row;row='';} else if(c!=' ' && c!='　' && c!="\t") row+=c;}
     if(row!='') t+=(t!=''?"\n":'')+row;
     rec.head='ToMe_CHARS engine=krkr line='+rec.line+' hidden='+h+' sw='+int(rec.sw)+' sh='+int(rec.sh)+' vx=0 vy=0 vw=0 vh=0 n='+rec.cn+' rects='+rec.rs;rec.tt=t;
-    this.report(rec.head+(rec.role=='name'?' role=name':'')+this.rubyWire(rec.rb)+' text='+t);
+    var prefix=rec.head+(rec.role=='name'?' role=name':'');rec.rubyField=this.rubyWire(rec.rb);
+    if((prefix+rec.rubyField+' text='+t).length>=28000) rec.rubyField='';
+    this.report(prefix+rec.rubyField+' text='+t);
     if(rec.role!='name') rec.sentLine=rec.line;
    } incontextof st;
    /* 2026-11-21 (owner's recording, ファタモルガーナの館 1.4.22 v3, 02:57Z: after every click the line just read came back for about
@@ -596,7 +598,7 @@ LR"MGLT((function(){
     if(!this.cfg.embed || rec.role=='name' || !(rec.cn>0) || rec.ra.count!=rec.cn) return void;
     var L=rec.target;if(L.vertical) return void;
     var x0=rec.ra[0][0];for(var i=1;i<rec.ra.count;i++) if(rec.ra[i][0]<x0) x0=rec.ra[i][0];
-    return %['rec'=>rec,'L'=>L,'k'=>rec.ct,'ra'=>rec.ra,'size'=>rec.size,'nvl'=>rec.nvl,'args'=>rec.args,'head'=>rec.head,'t'=>rec.tt,'nativeRuby'=>rec.rb,'rubyField'=>this.rubyWire(rec.rb),'x0'=>x0,'y1'=>rec.y1,'tries'=>0];
+    return %['rec'=>rec,'L'=>L,'k'=>rec.ct,'ra'=>rec.ra,'size'=>rec.size,'nvl'=>rec.nvl,'args'=>rec.args,'head'=>rec.head,'t'=>rec.tt,'nativeRuby'=>rec.rb,'rubyField'=>(rec.rubyField!==void?rec.rubyField:this.rubyWire(rec.rb)),'x0'=>x0,'y1'=>rec.y1,'tries'=>0];
    } incontextof st;
    /* the replacement may come late (MeguLit looks it up when the sentence's record arrives): tried at the click wait and every
       tick after it until the page moves on */
@@ -606,7 +608,7 @@ LR"MGLT((function(){
     var e=this.embMap[p.k];if(e===void || e===null) return;
     this.embPend=void;
     var lvl=this.embDraw(p,e);
-    if(lvl>0) this.report(p.head+' emb='+lvl+(p.rubyField!==void?p.rubyField:'')+' text='+p.t);
+    if(lvl>0) {var head=p.head+' emb='+lvl,field=p.rubyField!==void?p.rubyField:'';if((head+field+' text='+p.t).length>=28000) field='';this.report(head+field+' text='+p.t);}
    } incontextof st;
    st.embSpans=function(s){
     var out=[],t=''+s;
