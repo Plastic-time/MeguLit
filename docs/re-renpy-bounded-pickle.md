@@ -59,3 +59,11 @@ Its one new record is counted by the normal push/node budget, with twelve stored
 `validation/fixtures/renpy-pyexpr-cpython.json` holds twelve ordinary CPython controls from a neutral fake str subclass whose `__reduce__` returns this exact identity and three through six arguments, under protocols 2/4/5. The optional producer accepts `--pyexpr`. It does not import a game or SDK, run a reduction while decoding, or establish actual compiler compatibility
 
 The official fixed `cslots.pyx` source has now also been obtained: 14,917 bytes, SHA256 `ba401f82f1de176c1a34e86afe5f61eb87f151a4c0b762519b3a9374f6e9b9ba`, Git blob `646e07fdc7a3ead45a28cf032a303c783838ed0c`. The old source-availability gap is closed; the decoder still does not restore profile-specific descriptor defaults, interpret Node properties/children, select languages or provide an ordered AST/narrative extractor. Acquiring the source does not make those unimplemented semantics complete
+
+## BUILD wire provenance
+
+A completed instance BUILD also records `stateShape` outside writable state. Generic shapes are `dict`, `none`, and the four `tuple:none,none`, `tuple:none,dict`, `tuple:dict,none`, `tuple:dict,dict` combinations. An unbuilt instance has no shape. The already accepted top-level None state remains an empty Map tagged `none`; it is not relabeled as a dictionary or claimed to be emitted by a particular writer
+
+Opaque PyCode records `pycode:tuple4` through `pycode:tuple7`. These fixed tags retain the consumed BUILD container and part kinds without preserving another copy of the graph. They are bounded metadata, like className/stateKind, and do not change the logical input-node, stored-edge or input-string-byte counts
+
+Equal merged Maps can now be distinguished before applying a profile-specific rule such as requiring the verified cslots writer's `(None, slots_dict)` form. State entries named stateShape cannot overwrite this metadata. The tags do not authenticate the writer, restore descriptor defaults, identify which dictionary supplied each merged key, or prove semantic AST compatibility

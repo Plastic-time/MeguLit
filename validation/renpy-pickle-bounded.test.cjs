@@ -230,6 +230,33 @@ test('PyCode opaque state accounts for its new Map node and all sixteen stored e
  reject(buffer,'BUDGET_STRINGBYTES',{...pyOptions,limits:{stringBytes:out.counts.stringBytes-1}});
 });
 
+test('BUILD provenance distinguishes equal merged maps from different wire shapes',()=>{
+ const dict=()=>Buffer.concat([b(0x7d),string('what'),string('neutral'),b(0x73)]);
+ const cases=[
+  [dict(),'dict'],
+  [Buffer.concat([b(0x4e),dict(),b(0x86)]),'tuple:none,dict'],
+  [Buffer.concat([dict(),b(0x4e,0x86)]),'tuple:dict,none'],
+  [Buffer.concat([dict(),b(0x7d,0x86)]),'tuple:dict,dict'],
+ ];
+ for(const [wire,shape]of cases){const value=read(instance(),wire,b(0x62)).value;assert.equal(value.stateShape,shape);assert.deepEqual([...value.state],[['what','neutral']]);}
+ for(const [wire,shape]of [[b(0x7d),'dict'],[b(0x4e),'none'],[b(0x4e,0x4e,0x86),'tuple:none,none'],[b(0x4e,0x7d,0x86),'tuple:none,dict']]){
+  const value=read(instance(),wire,b(0x62)).value;assert.equal(value.state.size,0);assert.equal(value.stateShape,shape);
+ }
+ assert.equal(read(instance()).value.stateShape,undefined);
+});
+
+test('wire provenance stays outside writable state and preserves memo aliases',()=>{
+ const value=read(instance(),b(0x71,0,0x7d),string('stateShape'),string('pycode:tuple7'),b(0x73),string('self'),b(0x68,0,0x73,0x62)).value;
+ assert.equal(value.stateShape,'dict');assert.equal(value.state.get('stateShape'),'pycode:tuple7');assert.equal(value.state.get('self'),value);
+ reject(stream(instance(),b(0x5d,0x62)),'STATE');
+ reject(stream(instance(),b(0x4e,0x7d,0x86,0x62,0x4e,0x62)),'STATE');
+});
+
+test('ordinary CPython PyCode controls retain their exact BUILD tuple arity',()=>{
+ const fixture=require('./fixtures/renpy-pycode-cpython.json');
+ for(const input of fixture.fixtures){const value=decode(Buffer.from(input.base64,'base64'),pyOptions).value;assert.equal(value.stateKind,'pycode-opaque');assert.equal(value.stateShape,'pycode:tuple'+input.stateLength);}
+});
+
 test('explicit PyExpr reduction reads neutral CPython str-subclass fixtures without invoking a constructor',()=>{
  const fixture=require('./fixtures/renpy-pyexpr-cpython.json');assert.equal(fixture.fixtures.length,12);
  for(const input of fixture.fixtures){

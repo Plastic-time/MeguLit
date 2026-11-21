@@ -126,7 +126,14 @@ function decode(buffer,options={}){
     push({kind:'defaultdict',factory,entries:new Map()});break;
    }
    case 0x81:{const args=pop(),cls=pop();if(cls?.kind!=='global'||!allowed.has(cls.name)||args?.kind!=='tuple'||args.items.length)fail('NEWOBJ',at);push({kind:'instance',className:cls.name,state:null});break;}
-   case 0x62:{const state=pop(),target=peek();if(target?.kind!=='instance'||target.state!==null)fail('STATE',at);if(target.className==='renpy.ast.PyCode'){target.state=pyCodeState(state);target.stateKind='pycode-opaque';break;}let dict=state,slots=null;if(state?.kind==='tuple'){if(state.items.length!==2)fail('STATE',at);[dict,slots]=state.items;}if(![dict,slots].every(item=>item===null||item?.kind==='dict'))fail('STATE',at);const merged=new Map();for(const item of [dict,slots])if(item)for(const [key,value]of item.entries){if(typeof key!=='string'||merged.has(key))fail('STATE_KEY',at);spend('edges',2);merged.set(key,value);}target.state=merged;break;}
+   case 0x62:{
+    const state=pop(),target=peek();if(target?.kind!=='instance'||target.state!==null)fail('STATE',at);
+    if(target.className==='renpy.ast.PyCode'){target.state=pyCodeState(state);target.stateKind='pycode-opaque';target.stateShape='pycode:tuple'+state.items.length;break;}
+    let dict=state,slots=null;if(state?.kind==='tuple'){if(state.items.length!==2)fail('STATE',at);[dict,slots]=state.items;}
+    if(![dict,slots].every(item=>item===null||item?.kind==='dict'))fail('STATE',at);
+    const merged=new Map();for(const item of [dict,slots])if(item)for(const [key,value]of item.entries){if(typeof key!=='string'||merged.has(key))fail('STATE_KEY',at);spend('edges',2);merged.set(key,value);}
+    target.state=merged;target.stateShape=state?.kind==='tuple'?'tuple:'+(dict===null?'none':'dict')+','+(slots===null?'none':'dict'):state===null?'none':'dict';break;
+   }
    case 0x71:remember(byte());break;case 0x72:remember(uint());break;case 0x94:remember(memo.size);break;
    case 0x68:recall(byte());break;case 0x6a:recall(uint());break;
    case 0x30:pop();break;case 0x32:push(peek());break;
