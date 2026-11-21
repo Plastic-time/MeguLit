@@ -25,6 +25,10 @@ An active job survives status/transport errors, and retry queries the same id
 Restore and undo do not expose cancel and `canClose()` remains false until a terminal response
 `dispose()` refuses a write, or awaits confirmed scan termination while suppressing late view callbacks
 Incomplete scan cleanup returns false and reports a fixed error rather than claiming the child stopped
+If a write-start response is lost before a job id arrives, an unknown error preserves the write lock
+Only documented rejection codes release that lock without a job
+The current backend contract has no lookup for a dispatched job with an unknown id, so recovery from that transport ambiguity remains a protocol gap
+The UI must not label it an ended transaction or allow a second write
 
 `mountOriginalScan(container,options)` combines the real controller and DOM view
 `onState` runs synchronously during mounting, so it must not dereference an uninitialized returned handle

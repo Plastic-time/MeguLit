@@ -68,6 +68,9 @@ export function createOriginalScanController({api,onChange=()=>{},onApplied=()=>
  function queue(c){if(!active(c))return;clear(c);c.timer=schedule(()=>{c.timer=null;void call(c,'jp_restore_scan_status',{id:c.id,jobId:c.jobId});},pollMs);}
  function failed(c,error){
   if(!active(c))return;clear(c);
+  if(!c.jobId&&!c.terminal&&c.operation!=='scan'&&!['GAME_RUNNING','SCAN_STALE','EMBEDDED_UNSUPPORTED','EMBEDDED_CONFLICT','NOT_APPLIED','NOTHING_TO_RESTORE'].includes(errorCode(error))){
+   publish({phase:'error',error:errorCode(error),pendingJob:true,cancellable:false,preview:null});c.reject(Error(errorCode(error)));return;
+  }
   if(!c.jobId||c.terminal){finish(c,{phase:'error',error:errorCode(error)});return;}
   publish({phase:'error',error:errorCode(error),pendingJob:true,cancellable:c.operation==='scan'&&c.cancellable,preview:null});
   if(disposed){if(++c.cleanupFailures<3)queue(c);else{cleanupIncomplete=true;current=null;c.reject(Error('ORIGINAL_SCAN_CLEANUP_INCOMPLETE'));onRefreshError('ORIGINAL_SCAN_CLEANUP_INCOMPLETE');}}
