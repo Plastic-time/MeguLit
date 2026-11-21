@@ -66,9 +66,10 @@ test('THE SEED: empty table → first stats call kicks a background refresh; the
  assert.match(fs.readFileSync(path.join(relayDir,'src','worker.js'),'utf8'),/refreshSeedStats\(env/);
 });
 
-test('dashboard: gold THE SEED pane replaces full dumps; probe packs renamed; meter clamps; panels render isolated',async()=>{
+test('dashboard: gold THE SEED pane takes the full dumps slot; full dumps moved next to relay.log; meter clamps; panels render isolated',async()=>{
  const {DASHBOARD_HTML:h}=await mod('dashboard.js');
  assert.match(h,/pane c3 gold/);assert.match(h,/--gold:#e0a84b/);assert.match(h,/>the seed</);
- assert.doesNotMatch(h,/>full dumps</);assert.match(h,/探针包/);assert.match(h,/准备好/);assert.match(h,/上传中/);assert.match(h,/已处理/);
+ /* full dumps keeps its name (owner 2026-11-21), only moved below THE SEED, next to relay.log */
+ assert.ok(h.indexOf('>the seed<')<h.indexOf('>full dumps<')&&h.indexOf('>full dumps<')<h.indexOf('>relay.log<'));
  assert.match(h,/function safe\(name,fn\)/);assert.match(h,/n=Math\.max\(0,Math\.min\(w,n\|0\)\)/);
 });

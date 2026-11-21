@@ -245,17 +245,17 @@ tbody tr:hover td{background:#121212}
     </section>
 
     <section class="pane c3">
-      <span class="ti cjk">┤ <b>探针包</b> ├</span><span class="tr">用户一键上传的诊断包</span>
+      <span class="ti">┤ <b>full dumps</b> ├</span><span class="tr">r2://probe-full</span>
       <div class="cnt">
-        <div><div class="v r" id="fReady">--</div><div class="k">准备好</div></div>
-        <div><div class="v" id="fUp">--</div><div class="k">上传中</div></div>
-        <div><div class="v" id="fDone">--</div><div class="k">已处理</div></div>
+        <div><div class="v r" id="fReady">--</div><div class="k">ready</div></div>
+        <div><div class="v" id="fUp">--</div><div class="k">uploading</div></div>
+        <div><div class="v" id="fDone">--</div><div class="k">done</div></div>
       </div>
-      <div class="m"><span class="k">存储</span><span class="bar" id="bR2"></span><span class="v" id="vR2">--</span></div>
+      <div class="m"><span class="k">r2</span><span class="bar" id="bR2"></span><span class="v" id="vR2">--</span></div>
       <div class="kv" style="margin-top:6px">
-        <span class="k">已存</span><span id="fMB">--</span>
-        <span class="k">平均每个</span><span id="fAvg">--</span>
-        <span class="k">最近上传</span><span id="fLast">--</span>
+        <span class="k">stored</span><span id="fMB">--</span>
+        <span class="k">avg / dump</span><span id="fAvg">--</span>
+        <span class="k">last upload</span><span id="fLast">--</span>
       </div>
     </section>
 
@@ -330,7 +330,7 @@ function renderSteps(list,j){var w=$("steps");j=j||{};var html="";
  html+='<div class="sep"></div><div class="kv">'+
   '<span class="k">vndb matched</span><span><span class="h">'+fmt(j.vndbMatched)+'</span><span class="d"> / '+fmt(j.probedGames)+'</span></span>'+
   '<span class="k">github issues</span><span class="h">'+fmt(j.issues)+'</span>'+
-  '<span class="k">adapted</span><span><span class="h">'+(f.done|0)+'</span><span class="d"> / '+fg+' 探针包 · '+(fg?Math.round((f.done|0)/fg*100):0)+'%</span></span></div>';
+  '<span class="k">adapted</span><span><span class="h">'+(f.done|0)+'</span><span class="d"> / '+fg+' full dumps · '+(fg?Math.round((f.done|0)/fg*100):0)+'%</span></span></div>';
  w.innerHTML=html;
  (list||[]).forEach(function(s,i){meter($("sb"+i),s.n,mx);});
  ps.forEach(function(s,i){meter($("qb"+i),s.n,Math.max.apply(null,ps.map(function(x){return x.n;})));});}
@@ -383,7 +383,7 @@ function renderFullMore(j){var f=j.full||{},el=$("fMore");if(!el){renderStorage(
 function renderStorage(j){var f=j.full||{},x=j.ext||{},el=$("stor");if(!el)return;barQ=[];var html="";
  var bdm=(x.bundles||{}).mb||0,dgm=(x.diagnostics||{}).mb||0,cum=(x.contrib||[]).reduce(function(a,c){return a+(c.mb||0);},0),tot=(f.storedMB||0)+bdm+dgm+cum;
  html+='<div class="m"><span class="k">r2 used</span><span class="bar" id="fr2"></span><span class="v">'+(tot/10240*100).toFixed(1)+'%</span></div>'+
-  kvs([["探针包",hv(mb(f.storedMB||0))],["contrib",hv(mb(cum))],["probe bundles",hv(mb(bdm))],["diagnostics",hv(mb(dgm))],["total",hv(mb(tot))+'<span class="d"> / 10 GB free</span>']]);
+  kvs([["full dumps",hv(mb(f.storedMB||0))],["contrib",hv(mb(cum))],["probe bundles",hv(mb(bdm))],["diagnostics",hv(mb(dgm))],["total",hv(mb(tot))+'<span class="d"> / 10 GB free</span>']]);
  barQ.push(["fr2",tot,10240]);
  var fl=f.inflight||[];html+=sub("in flight");
  if(fl.length)fl.forEach(function(u,i){barQ.push(["fi"+i,u.pct,100]);
@@ -472,7 +472,7 @@ function renderStats(j){
  meter($("b1"),j.active1h,today);$("v1").textContent=fmt(j.active1h);
  $("b2").innerHTML='<span class="d">1h/today '+(j.today?Math.round((j.active1h|0)/j.today*100):0)+'%</span>';$("v2").textContent=fmt(j.today);
  var f=j.full||{};
- $("b3").innerHTML='<span class="d">'+(f.games|0)+' 有探针包</span>';$("v3").textContent=fmt(j.probedGames);
+ $("b3").innerHTML='<span class="d">'+(f.games|0)+' with full dump</span>';$("v3").textContent=fmt(j.probedGames);
  $("v4").textContent=fmt(j.reporters);$("v5").textContent=j.probedGames?(j.reporters/j.probedGames).toFixed(2):"--";}
 function renderPacks(j){var f=j.full||{};
  $("fReady").textContent=fmt(f.ready);$("fUp").textContent=fmt(f.uploading);$("fDone").textContent=fmt(f.done);
