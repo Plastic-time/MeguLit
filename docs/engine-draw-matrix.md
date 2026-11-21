@@ -12,6 +12,7 @@
 |---|---|---|---|
 | Softpal / 既有 Pal 输入回调的有界写回 | 静态完成、待实机 | 本机 LeyLine.exe SHA `9a502090…56ffb77`，既有 host 签名在可执行节唯一命中 RVA `0x25390`；`pal-text-bounds` 原生 27 项、相关 Node 回放与 opt-in 全过；无新增钩子、flag 或 seed | 同版本正文、名字、选项、隐藏十句、点读、译文、翻页与增长拒绝待核实 |
 | Unity Mono / KEMCO 原版消息组件诊断 | 静态完成、待实机 | 本机原版 Assembly-CSharp SHA `c4d74235…1dd7314`；八个字段类型及唯一 `Message.Mes(string,bool):string` 静态核对；44 项回放与 opt-in、完整 Mono 插件编译通过；`kemcoSprites:false`，无 seed 开启 | 补丁版 DLL 不在支持范围；完整页来源、名字选项、旧页退休及实际 Reader 待核实；不授予隐藏或 IL2CPP 能力 |
+| Siglus / 两个固定 x86 版本的诊断权限与 ABI | 静态完成、待实机 | CLANNAD `1.1.134.0`、Summer Pockets `1.1.137.0` 的完整样本与 fixture 对应；Node 28 项及 x86 控制/真实 MinHook、x86/x64 签名回放通过；默认关闭 | 角色与实际屏幕、隐藏十句、点读、译文、清页及撤权待核实 |
 
 实机步骤维护在本机 `H:/MeguLit-Work/night-1423/live-check-queue.md`，每次一级推送的完整 SHA 记入夜间进度
 
