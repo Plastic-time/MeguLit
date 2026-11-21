@@ -104,7 +104,7 @@ export async function monumentGet(env,url,{json,fail},ctx=null){
  const cur=url.searchParams.get('cursor'),lim=url.searchParams.get('limit'),month=url.searchParams.get('month');
  if(cur!==null&&cur!==''&&!/^\d{1,12}$/.test(cur))return fail('INVALID_CURSOR');if(lim!==null&&lim!==''&&!/^\d{1,6}$/.test(lim))return fail('INVALID_LIMIT');
  if(month&&!MONTH.test(month))return fail('INVALID_MONTH');
- const limit=Math.max(1,Math.min(500,lim?Number(lim):100)),after=cur?Number(cur):0;
+ const limit=Math.max(1,Math.min(500,lim?Number(lim):100)),after=cur?Number(cur):-1;
  return cached('https://megulit-relay.internal/torch/monument/'+(month||'all')+'/'+after+'/'+limit,ctx,async()=>{
   const [lo,hi]=month?monthRange(month):[0,0];
   const rows=(await (month?env.DB.prepare('SELECT game_key,torch_no,name,at FROM torch_credits WHERE at>=? AND at<? AND torch_no>? ORDER BY torch_no ASC LIMIT ?').bind(lo,hi,after,limit+1)
