@@ -18,7 +18,7 @@ internal sealed class KemcoSpriteSnapshot {
  internal static bool Box(float[] b, int width, int height) {
   if (b == null || b.Length != 4 || width <= 0 || height <= 0) return false;
   foreach (float n in b) if (float.IsNaN(n) || float.IsInfinity(n)) return false;
-  return b[0] >= 0 && b[1] >= 0 && b[2] > 0 && b[3] > 0 && b[0]+b[2] <= width && b[1]+b[3] <= height;
+  return b[0] >= 0 && b[1] >= 0 && Math.Round(b[2],1) > 0 && Math.Round(b[3],1) > 0 && b[0]+b[2] <= width && b[1]+b[3] <= height;
  }
  internal static bool Text(string s, int max) {
   if (string.IsNullOrEmpty(s) || s.Length > max) return false;

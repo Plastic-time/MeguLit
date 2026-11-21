@@ -24,7 +24,7 @@ class Check {
   Is(Read(R(G(1),G(1)))==null,"duplicate root");Is(Read(R(G(0)))==null,"zero identity");
   Is(Read(R((KemcoSpriteSnapshot.Glyph)null))==null,"null glyph");Is(Read(null)==null,"null rows");
   foreach(var s in new[]{"","日本","\\n","\\u001f","\\ud800","\\udc00"})Is(Read(R(G(1,s)))==null,"not one scalar");
-  foreach(var b in new[]{new float[]{-1,0,2,2},new float[]{0,-1,2,2},new float[]{4095,0,2,2},new float[]{0,4095,2,2},new float[]{0,0,0,2},new float[]{float.NaN,0,2,2},new float[]{0,0,float.PositiveInfinity,2}}){var g=G(1);g.box=b;Is(Read(R(g))==null,"invalid/clipped box");}
+  foreach(var b in new[]{new float[]{-1,0,2,2},new float[]{0,-1,2,2},new float[]{4095,0,2,2},new float[]{0,4095,2,2},new float[]{0,0,0,2},new float[]{0,0,.04f,2},new float[]{float.NaN,0,2,2},new float[]{0,0,float.PositiveInfinity,2}}){var g=G(1);g.box=b;Is(Read(R(g))==null,"invalid/clipped box");}
   var big=new List<IList<KemcoSpriteSnapshot.Glyph>>();int id=1;for(int i=0;i<8;i++){var row=new List<KemcoSpriteSnapshot.Glyph>();for(int j=0;j<256;j++)row.Add(G(id++));big.Add(row);}Is(Read(big).rects.Count==2048,"exact glyph cap");big.Add(new List<KemcoSpriteSnapshot.Glyph>{G(id++)});Is(Read(big)==null,"glyph cap plus one");
   var wide=R();for(int i=0;i<257;i++)wide[0].Add(G(i+1));Is(Read(wide)==null,"row cap");var tall=R();for(int i=0;i<32;i++)tall.Add(new List<KemcoSpriteSnapshot.Glyph>());Is(Read(tall)==null,"row count cap");
   var state=new KemcoSpriteSnapshot();var output=new List<string>();Action<string> sink=s=>output.Add(s);var body=Read(R(G(1),G(2,"本")));

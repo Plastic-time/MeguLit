@@ -451,11 +451,12 @@ public class MeguLitUnityText : BaseUnityPlugin {
  static float[] KemcoBox(GameObject root,out bool shown) {
   shown=false; if (root==null || !root.activeInHierarchy) return null;
   var mesh=root.GetComponent<TextMesh>(); var renderer=root.GetComponent<Renderer>();
-  if (mesh==null || renderer==null || !renderer.enabled || mesh.color.a<=0) return null;
+  if (mesh==null || renderer==null || !renderer.enabled) return null;
+  float alpha=mesh.color.a; if (float.IsNaN(alpha) || float.IsInfinity(alpha)) { shown=true; return null; } if (alpha<=0) return null;
   // Reading sharedMaterial avoids the instantiating material getter and preserves the game's ownership
   var material=renderer.sharedMaterial;
   if (material==null || !material.HasProperty("_Color")) { shown=true; return null; }
-  if (material.color.a<=0) return null;
+  alpha=material.color.a; if (float.IsNaN(alpha) || float.IsInfinity(alpha)) { shown=true; return null; } if (alpha<=0) return null;
   var cameras=Camera.allCameras; if (cameras.Length>8) { shown=true; return null; }
   Camera camera=null;
   foreach (var c in cameras) if (c!=null && c.enabled && c.gameObject.activeInHierarchy && c.targetTexture==null && (c.cullingMask & (1<<root.layer))!=0) { if (camera!=null) { shown=true; return null; } camera=c; }
@@ -464,7 +465,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
   float x=float.PositiveInfinity,y=x,r=float.NegativeInfinity,b=r;
   for (int i=0;i<8;i++) {
    var p=camera.WorldToScreenPoint(new Vector3((i&1)==0?lo.x:hi.x,(i&2)==0?lo.y:hi.y,(i&4)==0?lo.z:hi.z));
-   if (p.z<=0 || float.IsNaN(p.x) || float.IsNaN(p.y) || float.IsInfinity(p.x) || float.IsInfinity(p.y)) return null;
+   if (p.z<=0 || float.IsNaN(p.z) || float.IsInfinity(p.z) || float.IsNaN(p.x) || float.IsNaN(p.y) || float.IsInfinity(p.x) || float.IsInfinity(p.y)) return null;
    x=Math.Min(x,p.x); r=Math.Max(r,p.x); y=Math.Min(y,Screen.height-p.y); b=Math.Max(b,Screen.height-p.y);
   }
   // Completely parked glyphs are a typewriter suffix; a partially clipped glyph is unsupported
