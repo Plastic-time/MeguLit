@@ -10,6 +10,11 @@ const copy = {
   en: { kicker: 'Home lines', hint: 'Pick up to 5 lines you have read; they stand beside the cover in the order you pick them. Pick none to show the latest lines automatically.', search: 'Search lines you have read', count: n => `${n} lines`, auto: 'Automatic', cancel: 'Cancel', save: 'Save', empty: 'No lines read in this game yet', none: 'No line contains that text', loading: 'Loading…', saved: 'Saved', full: 'At most 5 lines: remove one first', failed: 'Could not save, please try again', tray: 'Nothing picked: the latest lines show automatically', remove: 'Remove' }
 };
 export const cleanLine = t => String(t || '').replace(/\s+/g, ' ').trim();
+export function lineSearch(rows,query) {
+  const q=cleanLine(query);if(!q)return rows;
+  const ascii=s=>s.replace(/[A-Z]/g,c=>c.toLowerCase()),literal=ascii(q),lower=q.toLowerCase();
+  return rows.filter(r=>r.text.toLowerCase().includes(lower)||ascii(r.text).includes(literal));
+}
 const bare = t => cleanLine(t).replace(/^[「『（("](.*)[」』）)"]$/s, '$1');
 const same = (a, b) => bare(a) === bare(b);
 
@@ -68,8 +73,8 @@ export function openLinesPicker({ api, locale = 'zh', esc, game, shown = [], rel
   };
   const schedule = () => { if (!frame) frame = requestAnimationFrame(paint); };
   const filter = () => {
-    const q = cleanLine(input.value).toLowerCase();
-    view = q ? rows.filter(r => r.text.toLowerCase().includes(q)) : rows;
+    const q = cleanLine(input.value);
+    view = lineSearch(rows,q);
     space.style.height = view.length * ROW + 'px'; box.querySelectorAll('.lp-row').forEach(el => el.remove()); box.scrollTop = 0;
     empty.hidden = !!view.length; if (!view.length) empty.textContent = q ? t.none : (rows.length ? t.none : t.empty);
     $('.lp-total').textContent = rows.length ? t.count(view.length) : ''; paint();
