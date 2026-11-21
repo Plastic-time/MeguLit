@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),{EventEmitter}=require('node:events');
+const {automatic}=require('../services/cardinal/automatic.cjs'),Run=require('../services/cardinal/run.cjs');
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+function gate(){let paused=false,stops=[],checks=0;return {get checks(){return checks;},blocked:()=>paused,idle:async()=>{checks++;return !paused;},track(exe,stop){stops.push(stop);return ()=>{stops=stops.filter(x=>x!==stop);};},async foreground(){paused=true;await Promise.all(stops.map(stop=>stop()));},resume(){paused=false;}};}
+const job=replay=>({root:'virtual-root',key:'b'.repeat(64),game:{exe:'virtual-game.exe'},replay});
+test('an idle answer arriving after foreground completed cannot spawn a replay',async()=>{
+ const games=gate();let allow,spawned=0;const waiting=new Promise(resolve=>allow=resolve);
+ const result=automatic(job(async()=>{spawned++;}),{}, {},{games,budget:{wait:async()=>waiting}});
+ await games.foreground();allow(true);assert.equal((await result).deferred,true);assert.equal(spawned,0);
+});
+test('foreground before permission recheck completes is remembered and never spawns',async()=>{
+ const games=gate();let answer,spawned=0;games.idle=()=>new Promise(resolve=>answer=resolve);
+ const result=automatic(job(async()=>{spawned++;}),{}, {},{games,budget:{wait:async()=>true}});await tick();
+ const stopped=games.foreground();answer(true);await stopped;await tick();
+ // The retry now waits on a new recheck; do not leave it pending.
+ for(let i=0;i<3;i++){answer?.(false);await tick();}assert.equal((await result).deferred,true);assert.equal(spawned,0);
+});
+test('foreground waits for replay close before allowing retry or returning',async()=>{
+ const games=gate();let finish,spawns=0,waits=0;
+ const result=automatic(job(async(sc,{signal})=>{spawns++;await new Promise(resolve=>{signal.addEventListener('abort',()=>finish=resolve,{once:true});});return {interrupted:true,processClosed:true};}),{}, {},{games,budget:{wait:async()=>++waits===1},intervalMs:10000});
+ await tick();let stopped=false;const foreground=games.foreground().then(()=>stopped=true);await tick();assert.equal(stopped,false);assert.equal(spawns,1);finish();await foreground;assert.equal(stopped,true);assert.equal((await result).deferred,true);assert.equal(spawns,1);
+});
+test('automatic jobs pause on loss of actual idle and activity retries are bounded',async()=>{
+ const games=gate();let calls=0;
+ games.idle=async()=>++calls%2===1;
+ const hold=setInterval(()=>{},100);
+ const result=await automatic(job((sc,{signal})=>new Promise(resolve=>{signal.addEventListener('abort',()=>resolve({interrupted:true,processClosed:true}),{once:true});})),{}, {},{games,budget:{wait:async()=>true},intervalMs:1});
+ clearInterval(hold);assert.equal(result.deferred,true);assert.equal(calls,6);
+});
+test('an unconfirmed browser cleanup is returned immediately without retry',async()=>{
+ const games=gate();let calls=0;const failure={browserPid:42,profile:'owned-profile',processClosed:false};
+ const result=await automatic(job(async()=>{calls++;return {interrupted:true,cleanupFailure:failure};}),{}, {},{games,budget:{wait:async()=>true}});
+ assert.equal(result.cleanupFailure,failure);assert.equal(calls,1);
+});
+test('stop needs successful process-tree termination and child close, never just exit',async()=>{
+ const p=new EventEmitter();p.pid=12;p.exitCode=null;let kills=0;
+ const stopping=Run.stop(p,{platform:'win32',timeoutMs:50,spawnSync(){kills++;queueMicrotask(()=>p.emit('exit',1));return {status:0};}});
+ let complete=false;stopping.then(()=>complete=true);await tick();assert.equal(complete,false);p.emit('close',1);assert.equal(await stopping,true);assert.equal(kills,1);assert.equal(await Run.stop(p),true);
+ const missing=new EventEmitter();missing.pid=13;assert.equal(await Run.stop(missing,{platform:'win32',timeoutMs:1,spawnSync:()=>({status:1})}),false);
+});
+function fakeReplay(stop){const p=new EventEmitter();p.pid=99;p.exitCode=null;const writes=new Map(),removed=[];
+ const io={fs:{mkdirSync(){},mkdtempSync:()=>'/virtual/owned-run',writeFileSync:(f,s)=>writes.set(f,s),openSync:()=>5,closeSync(){},readFileSync(f){if(f.endsWith('out.json'))return JSON.stringify({errors:[],samples:[1]});return '';},rmSync:f=>removed.push(f)},spawn:()=>p,stop};return {p,removed,io};}
+test('runner ignores exit until close, and cancellation waits for tree confirmation',async()=>{
+ let stopped;const h=fakeReplay(()=>new Promise(resolve=>stopped=resolve)),controller=new AbortController();
+ const result=Run.replay({}, {work:'/virtual',signal:controller.signal,onSpawn:p=>p.emit('exit',0)},h.io);
+ let complete=false;result.then(()=>complete=true);await tick();assert.equal(complete,false);controller.abort();await tick();assert.equal(complete,false);assert.deepEqual(h.removed,[]);h.p.emit('close',0);stopped(true);
+ const out=await result;assert.equal(out.interrupted,true);assert.equal(out.processClosed,true);assert.equal(h.removed.length,1);
+});
+test('runner retains its files when tree shutdown cannot be confirmed',async()=>{
+ const h=fakeReplay(async()=>false),controller=new AbortController();const result=Run.replay({}, {work:'/virtual',signal:controller.signal},h.io);controller.abort();const out=await result;
+ assert.equal(out.processClosed,false);assert.equal(out.cleanupFailure.driverPid,99);assert.deepEqual(h.removed,[]);
+});
+
+
+test('foreground rejects when the replay cannot confirm its tree exited',async()=>{
+ const games=gate();const failure={browserPid:42,profile:'owned-profile',processClosed:false};
+ const result=automatic(job((sc,{signal})=>new Promise(resolve=>{signal.addEventListener('abort',()=>resolve({cleanupFailure:failure}),{once:true});})),{}, {},{games,budget:{wait:async()=>true},intervalMs:10000});
+ await tick();await assert.rejects(games.foreground(),/CARDINAL_TREE_EXIT_UNCONFIRMED/);assert.equal((await result).cleanupFailure,failure);
+});
+test('aborted before onSpawn still terminates the child and waits for close',async()=>{
+ let stopped=0;const h=fakeReplay(async p=>{stopped++;p.emit('close',1);return true;}),controller=new AbortController();
+ h.io.spawn=()=>{controller.abort();return h.p;};
+ const out=await Run.replay({}, {work:'/virtual',signal:controller.signal},h.io);assert.equal(stopped,1);assert.equal(out.interrupted,true);assert.equal(out.processClosed,true);
+});
+
+
+test('a driver crash without a cleanup acknowledgement blocks cleanup and the next browser',async()=>{
+ const h=fakeReplay(async()=>true);const result=Run.replay({}, {work:'/virtual'},h.io);h.p.emit('close',1);const out=await result;
+ assert.equal(out.cleanupFailure.reason,'missing-driver-cleanup-ack');assert.deepEqual(h.removed,[]);
+});
+test('normal child close with its explicit cleanup acknowledgement releases owned replay files',async()=>{
+ const h=fakeReplay(async()=>true);const read=h.io.fs.readFileSync;h.io.fs.readFileSync=f=>f.endsWith('out.json')?JSON.stringify({errors:[],samples:[1],cleanupComplete:true}):read(f);
+ const result=Run.replay({}, {work:'/virtual'},h.io);h.p.emit('close',0);const out=await result;assert.equal(out.cleanupFailure,undefined);assert.equal(out.processClosed,true);assert.equal(h.removed.length,1);
+});

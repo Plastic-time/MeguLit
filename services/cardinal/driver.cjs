@@ -149,8 +149,9 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
  finally{
   try{runtime.reader?.gal?.stop?.();}catch{}try{runtime.reader?.stop?.();}catch{}
   await browser?.close().catch(error=>{out.errors.push('browser cleanup: '+String(error?.message||error).slice(0,400));out.cleanupFailure=error.cleanupFailure||{browserPid:browser?.pid||null,processClosed:false,reason:String(error?.message||error)};});
+  if(!process.env.MEGULIT_REPLAY_KEEP&&!out.cleanupFailure)try{fs.rmSync(work,{recursive:true,force:true});}catch(error){out.cleanupFailure={profile:work,processClosed:true,reason:'driver-work-cleanup: '+error.message};}
+  out.cleanupComplete=!out.cleanupFailure;
   fs.writeFileSync(outFile,JSON.stringify(out,null,1));
-  if(!process.env.MEGULIT_REPLAY_KEEP)try{fs.rmSync(work,{recursive:true,force:true});}catch{}
   process.exit(0);
  }
 })();

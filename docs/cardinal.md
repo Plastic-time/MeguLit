@@ -119,3 +119,13 @@ core/overlay-placement.cjs `rows()`：引擎按行报坐标的游戏，一句在
 店主 2026-11-21 日志（`validation/fixtures/games/fata-morgana/owner-20261121/`）三段并行：dialogue 03:35:30–03:36:45（20+ 句、校准、女仆选项页）、art 03:31:50–03:32:32（聖なるかな）、advance 02:56:30–02:58:20（02:57 录屏那段推进）。12 条验收用 Cardinal 跑（`MEGULIT_FATA_ACCEPT_OUT=<file>` 写逐条结果和三段的 Cardinal 分数）。
 
 真实会话的 pair 分数使用 Reader 已输出的日文与实际缓存成功的译文计数，允许迟到译文回填；回放提供者的固定译文只用于布局，不作为实际配对证据。此计数留在本机，上传仍只有七项分数。
+
+## 后台资源与退出确认
+
+产品自动 `kick` 先经 `background-budget.wait` 等真正空闲，再登记自己的 `background-games.track`，按 release 函数身份仅排除自身，重新检查输入、供电、全屏、CPU、播放状态和其它后台任务。用户启动游戏或低频复查发现不再空闲时取消；driver 的 `close` 和进程树停止均确认后才可重试，最多三次活动中断，之后明确 deferred，等下次 kick
+
+显式 CLI 回放直接调用 runner；调度单元测试显式 `manual:true`，不借测试注入默默绕过产品空闲门
+
+runner 不以 `exit` 代替 `close`。正常退出还须 driver 写入 `cleanupComplete:true`；缺确认、浏览器关闭失败、目录清理失败或进程树停止失败，都会保留自有目录并在本机 `data/The Seed/cardinal/blocked.json` 记录 PID、路径与原因，暂停自动队列及后续 kick。核查进程与自有目录后再由维护者正常恢复，不自动删除标记或不断新开浏览器。非 Windows 强停缺少可靠的树退出确认，保守进入同一阻塞状态
+
+`validation/cardinal-background.test.cjs` 只做进程/传输边界故障注入，不启动 Edge；真实隐藏阅读层及游戏验收另行排队

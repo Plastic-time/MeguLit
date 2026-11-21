@@ -68,10 +68,10 @@ const observed=sc=>{let n=0;return {...structuredClone(fixture.run.o),sourceEpis
 test('the queue drains a third job scheduled during its second replay, and idle waits for all three',async()=>{
  const h=setup();let releaseA,releaseB,startedB;const waitA=new Promise(r=>releaseA=r),waitB=new Promise(r=>releaseB=r),bStarted=new Promise(r=>startedB=r),calls=[];
  try{
-  Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('a');await waitA;return observed(sc);}});
-  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('b');startedB();await waitB;return observed(sc);}}).state,'queued');
+  Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{calls.push('a');await waitA;return observed(sc);}});
+  assert.equal(Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{calls.push('b');startedB();await waitB;return observed(sc);}}).state,'queued');
   releaseA();await bStarted;
-  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('c');return observed(sc);}}).state,'queued');
+  assert.equal(Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{calls.push('c');return observed(sc);}}).state,'queued');
   releaseB();await Jobs.idle();assert.deepEqual(calls,['a','b','c']);
  }finally{releaseA();releaseB();h.close();}
 });
@@ -79,29 +79,29 @@ test('different games keep FIFO order, same-game waiting work coalesces, and que
  const h=setup(),calls=[];let release;const blocked=new Promise(r=>release=r);
  const key=i=>i.toString(16).padStart(64,'0');
  try{
-  Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('active');await blocked;return observed(sc);}});
-  h.reader.cardinalKey=key(1);assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('obsolete');return observed(sc);}}).state,'queued');
-  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('latest-1');return observed(sc);}}).replaced,true);
-  for(let i=2;i<=8;i++){h.reader.cardinalKey=key(i);assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('game-'+i);return observed(sc);}}).state,'queued');}
-  h.reader.cardinalKey=key(9);assert.deepEqual(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('overflow');return observed(sc);}}),{state:'deferred',why:'queue full'});
+  Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{calls.push('active');await blocked;return observed(sc);}});
+  h.reader.cardinalKey=key(1);assert.equal(Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{calls.push('obsolete');return observed(sc);}}).state,'queued');
+  assert.equal(Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{calls.push('latest-1');return observed(sc);}}).replaced,true);
+  for(let i=2;i<=8;i++){h.reader.cardinalKey=key(i);assert.equal(Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{calls.push('game-'+i);return observed(sc);}}).state,'queued');}
+  h.reader.cardinalKey=key(9);assert.deepEqual(Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{calls.push('overflow');return observed(sc);}}),{state:'deferred',why:'queue full'});
   assert.ok(h.traces.some(s=>/queue full.*deferred/.test(s)));release();await Jobs.idle();
   assert.deepEqual(calls,['active','latest-1',...Array.from({length:7},(_,i)=>'game-'+(i+2))]);
-  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('retried-9');return observed(sc);}}).state,'started');await Jobs.idle();assert.equal(calls.at(-1),'retried-9');
+  assert.equal(Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{calls.push('retried-9');return observed(sc);}}).state,'started');await Jobs.idle();assert.equal(calls.at(-1),'retried-9');
  }finally{release();h.close();}
 });
 test('a rejected replay is recorded as a failure and does not strand the next run',async()=>{
  const h=setup();try{
-  Jobs.kick(h.reader,'session-end',{replay:async sc=>{throw new Error('probe crashed');}});await Jobs.idle();
+  Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{throw new Error('probe crashed');}});await Jobs.idle();
   assert.match(Jobs.load(h.root,SHA).failed.errors[0],/probe crashed/);
-  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>observed(sc)}).state,'started');await Jobs.idle();assert.ok(Jobs.load(h.root,SHA).record);
+  assert.equal(Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>observed(sc)}).state,'started');await Jobs.idle();assert.ok(Jobs.load(h.root,SHA).record);
  }finally{h.close();}
 });
 test('partial replay errors and missing DOM samples cannot upload a successful record',async()=>{
  const h=setup(true),calls=[];const fetcher=async u=>{calls.push(u);return {ok:true,status:200};};
  try{
-  Jobs.kick(h.reader,'session-end',{replay:async sc=>({...observed(sc),errors:['probe lost its page']}),fetcher});await Jobs.idle();
+  Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>({...observed(sc),errors:['probe lost its page']}),fetcher});await Jobs.idle();
   const doc=Jobs.load(h.root,SHA);assert.equal(doc.unreliable,true);assert.equal(doc.sent,false);assert.deepEqual(calls,[]);
-  Jobs.kick(h.reader,'session-end',{replay:async sc=>({errors:[],samples:[]}),fetcher});await Jobs.idle();
+  Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>({errors:[],samples:[]}),fetcher});await Jobs.idle();
   assert.match(Jobs.load(h.root,SHA).failed.errors[0],/no DOM samples/);assert.deepEqual(calls,[]);
  }finally{h.close();}
 });
@@ -109,7 +109,7 @@ test('missing or corrupt delivery clocks never turn old real DOM into a reliable
  const h=setup(true),calls=[];const fetcher=async u=>{calls.push(u);return {ok:true,status:200};};
  try{
   for(const variant of ['empty','wrong-text','reversed','legacy']){
-   Jobs.kick(h.reader,'session-end',{replay:async sc=>{const out=observed(sc);if(variant==='empty')out.sourceEpisodes=[];if(variant==='wrong-text')out.sourceEpisodes[0].text='別の本文';if(variant==='reversed')out.sourceEpisodes.reverse();if(variant==='legacy')delete out.sourceEpisodes;return out;},fetcher});await Jobs.idle();
+   Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{const out=observed(sc);if(variant==='empty')out.sourceEpisodes=[];if(variant==='wrong-text')out.sourceEpisodes[0].text='別の本文';if(variant==='reversed')out.sourceEpisodes.reverse();if(variant==='legacy')delete out.sourceEpisodes;return out;},fetcher});await Jobs.idle();
    const doc=Jobs.load(h.root,SHA);assert.equal(doc.unreliable,true,variant);assert.equal(doc.sent,false);assert.equal(doc.detail.timeline.reliable,false);assert.deepEqual(calls,[]);
   }
  }finally{h.close();}
@@ -117,10 +117,22 @@ test('missing or corrupt delivery clocks never turn old real DOM into a reliable
 test('a failed score upload stays unsent with its reason, then calibration retries that same record',async()=>{
  const h=setup(true),feed=require('../services/auto-profile-feed.cjs'),auto=require('../core/auto-profile.cjs');
  try{
-  Jobs.kick(h.reader,'session-end',{replay:async sc=>observed(sc),fetcher:async()=>({ok:false,status:503})});await Jobs.idle();
+  Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>observed(sc),fetcher:async()=>({ok:false,status:503})});await Jobs.idle();
   const before=Jobs.load(h.root,SHA);assert.equal(before.sent,false);assert.deepEqual(before.upload,{state:'failed'});
   const bodies=[];await feed.report(h.root,auto.record({key:SHA,engine:'kirikiri',exe:'x.exe',version:'1.4.23',source:'calibration',result:{mode:'hide',settings:{},score:{cost:0},reason:''}}),{fetcher:async(url,init)=>{if(url.endsWith('/api/cardinal/score'))bodies.push(JSON.parse(init.body));return {ok:true,status:200,clone(){return {json:async()=>({})};}};}});
   for(let i=0;i<50&&!Jobs.load(h.root,SHA).sent;i++)await new Promise(r=>setTimeout(r,10));
   assert.equal(Jobs.load(h.root,SHA).sent,true);assert.deepEqual(Jobs.load(h.root,SHA).upload,{state:'sent'});assert.deepEqual(bodies,[before.record]);
  }finally{h.close();}
+});
+
+
+test('cleanup failure stops the whole queue and survives a scheduler restart',async()=>{
+ const h=setup();let release;const wait=new Promise(resolve=>release=resolve);let second=0;
+ try{
+  Jobs.kick(h.reader,'session-end',{manual:true,replay:async()=>{await wait;return {cleanupFailure:{browserPid:123,profile:'owned-profile',processClosed:false},samples:[]};}});
+  Jobs.kick(h.reader,'session-end',{manual:true,replay:async()=>{second++;return {};}});
+  release();await Jobs.idle();assert.equal(second,0);assert.ok(h.traces.some(s=>/queue halted/.test(s)));
+  assert.equal(Jobs.kick(h.reader,'session-end',{manual:true,replay:async()=>{second++;}}).state,'blocked');
+  Jobs._reset();const blocked=Jobs.kick(h.reader,'session-end',{manual:true,replay:async()=>{second++;}});assert.equal(blocked.state,'blocked');assert.equal(blocked.cleanupFailure.browserPid,123);assert.equal(second,0);
+ }finally{release();h.close();}
 });
