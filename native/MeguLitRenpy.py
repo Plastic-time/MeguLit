@@ -189,16 +189,20 @@ def _megulit_renpy_main():
 
         def restore_embed(self):
             pending = []
-            for d, original, replacement, c in self.embedded:
+            for d, original, replacement, c, bounds in self.embedded:
                 try:
                     # Do not overwrite a newer value that the engine set independently.
                     if self.text_of(d) == replacement:
                         d.set_text(original)
+                        if self.text_of(d) != original:
+                            raise RuntimeError('Text refused original restoration')
+                        for attr, value in bounds.items():
+                            setattr(d, attr, value)
                         self.redraw(d)
                     c['wanted'].discard(replacement)
                     c['flat'], c['emb'], c['jp_n'], c['emb_tried'], c['done'] = None, 0, 0, False, False
                 except Exception:
-                    pending.append((d, original, replacement, c))
+                    pending.append((d, original, replacement, c, bounds))
             self.embedded = pending
             if pending:
                 self.set_status('error embed restore pending')
@@ -738,8 +742,22 @@ def _megulit_renpy_main():
                 return
             if len(self.embedded) >= 64 and not self.restore_embed():
                 return
-            d.set_text(text)
-            self.embedded.append((d, original, text, c))
+            # Ren'Py slices raw input using the old say segment's start/end before parsing tags.
+            # Those old indices would cut new ruby tags and the added translation mid-tag.
+            bounds = dict((attr, getattr(d, attr)) for attr in ('start', 'end') if hasattr(d, attr))
+            try:
+                for attr in bounds:
+                    setattr(d, attr, None)
+                d.set_text(text)
+                if self.text_of(d) != text:
+                    for attr, value in bounds.items():
+                        setattr(d, attr, value)
+                    return
+            except Exception:
+                for attr, value in bounds.items():
+                    setattr(d, attr, value)
+                raise
+            self.embedded.append((d, original, text, c, bounds))
             c['wanted'].add(text)
             c['flat'], c['emb'], c['jp_n'], c['done'] = None, lvl, len(chars), False
             ex = sys.modules.get('renpy.exports')

@@ -59,8 +59,11 @@ def embed_line(text):
 def revoke():
     text=Text('neutral literal',24,['neutral literal'])
     original=embed_line(text)
+    assert text.start is None and text.end is None
+    assert len(core.rows(text)) == 2 and len(core.rows(text)[1][1]) == len('neutral target')
     control(b'#cfg roles=0 embed=0 zh=0\n')
     assert text.text_parameter == original
+    assert text.start == 0 and text.end == len(original)
     assert core.cur['emb'] == 0 and core.cur['jp_n'] == 0
     control(b'#cfg roles=0 embed=1 zh=1\n')
     renpy.display.render.render_screen(state['tree'],1280,720)
