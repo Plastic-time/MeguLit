@@ -84,3 +84,8 @@
 5. **语法检查**：web 里的 `torch-*.js` 是 ES 模块，`node --check` 会按 CommonJS 处理漏报错误，要复制成 `.mjs` 再检查。
 6. **截图检查**（不在屏幕上弹窗）：用无头 Chrome 开真实应用外壳，并用 `window.__TORCH_HOUR = 小时数` 指定时间。我用的脚本在 `H:\MeguLit-Work\torch-shots\shot.cjs`，不在仓库里，有需要可以搬进 `tools/`。
 7. **性能**：在省电档基础上还可以继续降的地方：`torch-volumetric.js` 的 `steps`；`applyTier()` 里的阴影尺寸和像素比。
+
+### 黄昏与徽章远景（2026-11-21）
+- 太阳在地平线以下时只保留黄昏天空、玻璃和雾色，不保留人为钳到 1.5° 的直射日光；高度 0–2° 平滑消退，月光分支不变，避免落日后半穹顶出现突兀橙弧
+- 碑座徽章保留金框火焰造型，底石提亮为灰紫色、局部金饰改用较粗糙且低金属度的缎面材质，让远景不再只剩黑圆点
+- 场景修改后重新运行 `node tools/torch-bake.cjs`，并用 `validation/torch-sunset.test.cjs` 覆盖地平线边界
