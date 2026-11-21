@@ -10,7 +10,9 @@
 
 必须先有 `preferences.ownTextOutput=true` 或 `gal-preferences.textRenderer=compositor`，并且这部游戏的最终差分精确含 `draw.roles=true`。`embed=true` 不授予观察权限。RGSS 引擎差分的 roles 和 embed 都是 false，没有开启游戏 seed
 
-`services/bridge.cjs` 在直接启动或日文环境启动前准备完整副本。副本包含普通文件，没有硬链接或目录联接，游戏保存的新存档也留在副本中。原目录已有的存档会随文件复制，测试结束前要保留副本，不能把它当临时文件随意删除
+`services/bridge.cjs` 在直接启动或日文环境启动前准备完整副本。副本包含普通文件，没有硬链接或目录联接。每个原安装路径复用自己的副本，后续启动只更新带有当前 token 的归档，不重复覆盖副本内的存档和设置。归档、exe、DLL 或启动字段被改动时拒绝复用，不覆盖未知文件
+
+再次启动先检查副本进程，仍在运行就聚焦现有游戏，不改写运行中的归档。原目录已有存档只在首次复制，后续新存档留在副本。测试结束前要保留副本，不能当临时文件删除。关闭观察后普通启动仍使用原目录，若要继续副本进度，需先核对和迁移存档，本轮不自动覆盖原存档
 
 观察脚本加在副本归档 `Data/Scripts.rvdata` 的唯一 `Main` 段之前，原 Main 字节接在后面。Main 后只允许空段或精确的 `exit`，不会移动、删除其他脚本。散装 `Data/Scripts.rvdata` 会覆盖归档时拒绝此路线，避免改了归档却没有加载它
 
@@ -50,7 +52,7 @@ $env:MEGULIT_RGSS_SAMPLE='H:/MeguLit-Work/samples/rgss-majonoie-vx-20261122/game
 node --test validation/engine-draw-rgss.test.cjs
 ```
 
-本机 15 项通过，无跳过，包含实际 HookNative 的无进程来源回放和超预算页面拒绝。完整样本检查遍历 446 个归档成员，核对 129 段脚本，确认只有 Main 增加前缀；原目录 441 个文件前后哈希一致。既有只读剧本解析得到 118 个场景、1324 条文本
+本机 16 项通过，无跳过，包含实际 HookNative、生产 launch 聚焦旧副本的无进程回放，以及超预算页面拒绝。完整样本检查遍历 446 个归档成员，核对 129 段脚本，确认只有 Main 增加前缀；复用保留新存档和设置；原目录 441 个文件前后哈希一致。既有只读剧本解析得到 118 个场景、1324 条文本
 
 Ruby 回放使用私有 RubyInstaller 4.0.10 和合成 RGSS API，没有执行游戏脚本。这证明包装和协议逻辑，不证明 RGSS 的 Ruby 1.8、Win32API、DirectX 或真实画面已经通过
 

@@ -24,7 +24,7 @@ async function prepare({root,exe,profile={},title='',enabled=false,shadowRoot=nu
   const R=require('./text-paths-rgss.cjs');let session;
   try{const resolved=R.launchProfile({root,exe,profile,title});if(resolved.draw?.roles!==true)return null;
    const source=R.plan(exe);session=new R.RgssTextPath();session.drawConfig(resolved.draw);const port=await session.listen(),sh=R.makeShadow({source,shadowRoot:shadowRoot||path.join(root,'data','rgss-shadow'),port,token:session.token});
-   trace('text-paths-rgss',{shadow:sh.shadow,files:sh.files,bytes:sh.bytes});return {path:'rgss',exe:sh.exe,args:[],env:steamEnv,cwd:sh.shadow,session,connect:async()=>true};
+   trace('text-paths-rgss',{shadow:sh.shadow,reused:sh.reused,files:sh.files,bytes:sh.bytes});return {path:'rgss',exe:sh.exe,args:[],env:steamEnv,cwd:sh.shadow,session,connect:async()=>true};
   }catch(error){session?.stop();trace('text-paths-rgss-skipped',{error:error.message});return null;}
  }
  if(W.chromiumShell(exe)&&canary.allowed('web')){

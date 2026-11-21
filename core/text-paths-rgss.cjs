@@ -8,12 +8,13 @@ const EXES=new Set(['771017ca0f9d18978a906d00cd4236c8e9f974f3c7388173492ed8f9290
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 function launchProfile({root,exe,profile,title=''}){
  if(profile.layers&&profile.draw)return profile;
+ if(fs.statSync(exe).size>4<<20)throw Error('RGSS_EXE_NOT_VERIFIED');
  const P=require('./profiles/index.cjs'),auto=require('./auto-profile.cjs'),key=hash(fs.readFileSync(exe)),stored=auto.load(root,key);
  return P.profileFor({engine:'rgss',exe,exeSha256:key,folder:path.dirname(exe),title,auto:stored?.source==='gate'?undefined:stored?.settings,stepDown:stored?.source==='gate'?stored.settings:undefined});
 }
 function relative(name){const n=String(name||'').replace(/\\/g,'/');if(!n||/^[\/]|:|\0/.test(n)||n.split('/').some(p=>!p||p==='.'||p==='..'))throw Error('RGSS_UNSAFE_INI_PATH');return n;}
 function plan(exe){
- const dir=path.dirname(exe),ini=fs.readFileSync(path.join(dir,'Game.ini'),'latin1'),get=k=>new RegExp('^'+k+'[ \t]*=[ \t]*([^\r\n]+)','im').exec(ini)?.[1]?.trim();
+ const dir=path.dirname(exe),iniFile=path.join(dir,'Game.ini');if(fs.statSync(iniFile).size>65536)throw Error('RGSS_INI_BUDGET');const ini=fs.readFileSync(iniFile,'latin1'),get=k=>new RegExp('^'+k+'[ \t]*=[ \t]*([^\r\n]+)','im').exec(ini)?.[1]?.trim();
  const library=relative(get('Library')),scripts=relative(get('Scripts'));
  const dll=path.join(dir,library);if(!/^RGSS2\d\d[JE]?\.dll$/i.test(path.basename(library))||fs.statSync(dll).size>4<<20||!DLLS.has(hash(fs.readFileSync(dll))))throw Error('RGSS_DLL_NOT_VERIFIED');
  if(fs.statSync(exe).size>4<<20||!EXES.has(hash(fs.readFileSync(exe))))throw Error('RGSS_EXE_NOT_VERIFIED');
@@ -26,16 +27,34 @@ function plan(exe){
  const original=R.read(archive,entry);if(!SCRIPT_TABLES.has(hash(original)))throw Error('RGSS_SCRIPT_TABLE_NOT_VERIFIED');Codec.scriptTable(original);return {dir,exe,archive,entry,original,library,scripts};
 }
 
+function shadowPath(exe,shadowRoot){return path.join(shadowRoot,'rgss-'+hash(Buffer.from(fs.realpathSync(exe).toLowerCase())).slice(0,24));}
+function regular(file){const st=fs.lstatSync(file);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1)throw Error('RGSS_SHADOW_FILE_CHANGED');return st;}
+function markerAt(shadow){const file=path.join(shadow,'megulit-rgss-shadow.json');if(regular(file).size>8192)throw Error('RGSS_SHADOW_MARKER');const m=JSON.parse(fs.readFileSync(file,'utf8'));if(m.version!==1||!Number.isSafeInteger(m.sourceFiles)||m.sourceFiles<1||m.sourceFiles>5000||!Number.isSafeInteger(m.sourceBytes)||m.sourceBytes<1||m.sourceBytes>256<<20)throw Error('RGSS_SHADOW_MARKER');return m;}
+function existingShadow({exe,shadowRoot}){try{const shadow=shadowPath(exe,shadowRoot),st=fs.lstatSync(shadow);if(!st.isDirectory()||st.isSymbolicLink())return null;const m=markerAt(shadow);return m.sourceExe===fs.realpathSync(exe)?path.join(shadow,path.basename(exe)):null;}catch{return null;}}
+
 function makeShadow({source,shadowRoot,port,token}){
  fs.mkdirSync(shadowRoot,{recursive:true});const base=fs.realpathSync(source.dir),container=fs.realpathSync(shadowRoot);
  if(container===base||container.startsWith(base+path.sep))throw Error('RGSS_SHADOW_INSIDE_GAME');
+ const shadow=shadowPath(source.exe,container),sourceExe=fs.realpathSync(source.exe),originalArchive=fs.readFileSync(source.archive),sourceArchiveSha256=hash(originalArchive),archiveName=path.basename(source.archive);
+ const patched=Codec.patchMain(source.original,pageScript({port,token})),archive=Codec.patchArchiveV1(originalArchive,source.entry,patched);
+ const reused=fs.existsSync(shadow);let sourceFiles=0,sourceBytes=0;
+ if(reused){
+  const st=fs.lstatSync(shadow);if(!st.isDirectory()||st.isSymbolicLink())throw Error('RGSS_SHADOW_CHANGED');const m=markerAt(shadow);
+  if(m.sourceExe!==sourceExe||m.sourceArchiveSha256!==sourceArchiveSha256)throw Error('RGSS_SHADOW_SOURCE_CHANGED');sourceFiles=m.sourceFiles;sourceBytes=m.sourceBytes;
+  for(const name of [path.basename(source.exe),source.library,'Game.ini',archiveName])regular(path.join(shadow,name));
+  if(!EXES.has(hash(fs.readFileSync(path.join(shadow,path.basename(source.exe)))))||!DLLS.has(hash(fs.readFileSync(path.join(shadow,source.library))))||hash(fs.readFileSync(path.join(shadow,archiveName)))!==m.patchedArchiveSha256)throw Error('RGSS_SHADOW_CHANGED');
+  const ini=fs.readFileSync(path.join(shadow,'Game.ini'),'latin1'),get=k=>new RegExp('^'+k+'[ \\t]*=[ \\t]*([^\\r\\n]+)','im').exec(ini)?.[1]?.trim();
+  if(relative(get('Library'))!==source.library||relative(get('Scripts'))!==source.scripts||fs.existsSync(path.join(shadow,source.scripts)))throw Error('RGSS_SHADOW_STARTUP_CHANGED');
+ }else{
  const files=[];let total=0;
  function walk(dir,depth){if(depth>12)throw Error('RGSS_COPY_DEPTH');for(const e of fs.readdirSync(dir,{withFileTypes:true})){const f=path.join(dir,e.name);if(e.isSymbolicLink())throw Error('RGSS_COPY_LINK');if(e.isDirectory())walk(f,depth+1);else if(e.isFile()){total+=fs.statSync(f).size;if(total>256<<20||files.length>=5000)throw Error('RGSS_COPY_BUDGET');files.push(f);}}}
- walk(base,0);const shadow=fs.mkdtempSync(path.join(container,'rgss-'));
+ walk(base,0);fs.mkdirSync(shadow);
  for(const f of files){const target=path.join(shadow,path.relative(base,f));fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(f,target,fs.constants.COPYFILE_EXCL);}
- const patched=Codec.patchMain(source.original,pageScript({port,token})),archive=Codec.patchArchiveV1(fs.readFileSync(source.archive),source.entry,patched);
- fs.writeFileSync(path.join(shadow,path.basename(source.archive)),archive);
- return {shadow,exe:path.join(shadow,path.basename(source.exe)),files:files.length,bytes:total};
+ sourceFiles=files.length;sourceBytes=total;
+ }
+ fs.writeFileSync(path.join(shadow,archiveName),archive);
+ const marker={version:1,sourceExe,sourceArchiveSha256,patchedArchiveSha256:hash(archive),sourceFiles,sourceBytes},file=path.join(shadow,'megulit-rgss-shadow.json'),temp=file+'.'+process.pid+'.tmp';fs.writeFileSync(temp,JSON.stringify(marker,null,2),{flag:'wx'});fs.renameSync(temp,file);
+ return {shadow,exe:path.join(shadow,path.basename(source.exe)),reused,files:sourceFiles,bytes:sourceBytes};
 }
 
 class RgssTextPath{
@@ -72,4 +91,4 @@ class RgssTextPath{
  watch(pid,{alive=p=>{try{process.kill(p,0);return true;}catch(e){return e.code==='EPERM';}},every=1000}={}){clearInterval(this.exitTimer);if(!Number.isSafeInteger(pid)||pid<=0)return;this.exitTimer=setInterval(()=>{if(!alive(pid))this.stop();},every);this.exitTimer.unref();}
  stop(){if(this.stopped)return;this.stopped=true;this.clear();clearInterval(this.timer);clearInterval(this.exitTimer);for(const s of this.sockets)s.destroy();this.sockets.clear();this.server?.close();}
 }
-module.exports={plan,makeShadow,launchProfile,RgssTextPath};
+module.exports={plan,makeShadow,existingShadow,launchProfile,RgssTextPath};

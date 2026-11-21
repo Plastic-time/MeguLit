@@ -112,10 +112,12 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
    if(dp?.missing?.length){neededFeature.set(id,'DirectPlay');throw Object.assign(Error('DIRECTPLAY_REQUIRED'),{detail:dp.missing.join(',')});}}
   stage='process-check';markLaunch(id,'process-check');
   const {gameProcesses}=require('./game-process.cjs');
-  const ready=()=>require('./game-readiness.cjs').waitForVisibleGame(()=>gameProcesses(root,game.executable));
+  const rgssPath=require('../core/profiles/index.cjs').engineId(profile.engine)==='rgss',existingRgss=rgssPath?require('../core/text-paths-rgss.cjs').existingShadow({exe:game.executable,shadowRoot:path.join(root,'data','rgss-shadow')}):null;let focusExe=game.executable;
+  const ready=()=>require('./game-readiness.cjs').waitForVisibleGame(()=>gameProcesses(root,focusExe));
   // Paths are passed as literal process arguments, never interpolated into a shell.
   /* If MeguLit cannot query processes here, launch anyway: a single-instance game handles a second start itself (v1.1.0). */
   let focused='absent';try{focused=await require('./game-process.cjs').gameProcess(root,game.executable,{focus:true});}catch(error){if(error.message!=='PROCESS_QUERY_FAILED')throw error;trace('process-check-unavailable');}
+  if(focused==='absent'&&existingRgss){focused=await require('./game-process.cjs').gameProcess(root,existingRgss,{focus:true});if(focused==='focused'||focused==='running')focusExe=existingRgss;}
   if(focused==='focused'||focused==='running') {
     // An earlier instance that never showed (or lost) its window blocks single-instance games: say so (E215.2, user:
     // サノバウィッチ 'would not start' while a hidden copy from a Japanese-locale launch kept running).
@@ -128,7 +130,6 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
      DirectPlay is prepared while the game runs, anything else is remembered for this folder */
   featureWatch=require('../core/windows-features.cjs').watch(gameDir,{trace,onFeature:feature=>{if(/^directplay$/i.test(feature)){const dp=require('../core/directplay.cjs').prepare(gameDir,{root,exe:game.executable,all:true});trace('directplay',dp);}}});
   const prepareEnginePath=async()=>{if(require('../core/library-mode.cjs').libraryOnly(root))return;try{let prefs={};try{prefs=JSON.parse(fs.readFileSync(path.join(root,'data','preferences.json'),'utf8'))||{};}catch{}textPath=await require('../core/text-paths-launch.cjs').prepare({root,exe:game.executable,profile,title:game.title,enabled:prefs.ownTextOutput===true||(()=>{try{return JSON.parse(fs.readFileSync(path.join(root,'data','config','gal-preferences.json'),'utf8')).textRenderer==='compositor';}catch{return false;}})(),trace});}catch(error){textPath=null;trace('text-paths-failed',{error:String(error?.message||error).slice(0,160)});}};
-  const rgssPath=require('../core/profiles/index.cjs').engineId(profile.engine)==='rgss';
   if(rgssPath&&!launchVia&&!elevation&&!windowsLaunch)await prepareEnginePath();
   let state;
   // "Japanese system environment": non-Unicode Japanese games (WA2) show their own dialogs garbled under a Chinese locale.

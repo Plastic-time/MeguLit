@@ -91,7 +91,7 @@ m.contents.clear;m.contents.draw_text(0,0,48,32,'次頁');frames(4)
 raise 'next page missing' unless $wire.join.scan(/^S /).size==2
 puts JSON.generate({:wire=>$wire.join})
 `;
- const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000});assert.equal(r.status,0,r.stderr);const lines=JSON.parse(r.stdout).wire.split('\n'),body=new Map(),sources=[];
+ const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000,windowsHide:true});assert.equal(r.status,0,r.stderr);const lines=JSON.parse(r.stdout).wire.split('\n'),body=new Map(),sources=[];
  for(const line of lines){if(/^G /.test(line)){const rec=TP.parseChars(line.replace(/^G \d+ /,''));if(rec&&!rec.role)body.set(rec.line,rec.text);}else if(/^S /.test(line))sources.push(body.get(Number(line.split(' ')[2])));}
  assert.deepEqual(sources,['本文','次頁']);
 });
@@ -101,6 +101,20 @@ test('production HookNative receives the paused RGSS source and its following pa
  h.profile=P.profileFor({engine:'rgss',official:{draw:{roles:true}}});require('../core/text-paths-launch.cjs').attach({path:'rgss',session:s},h);h.target={pid:42,started:'1234567890123'};s.pid=42;s.generation=1;
  for(const [line,text] of [[1,'本文です'],[2,'次の文章です']]){const body=TP.formatChars({engine:'rgss',line,hidden:false,sw:544,sh:416,rects:[...text].map((_,i)=>[16+i*24,280,24,24]),text});s.report('G 1 '+body,42);s.report('S 1 '+line+' '+Buffer.from(text).toString('base64'),42);assert.equal(h.state.hookSource,text);assert.equal(h.state.hookSourceEngine,'rgss');assert.equal(h.state.hookSourceLine,line);}
  const count=h.state.hookSequence;h.wanted=false;s.report('S 1 2 '+Buffer.from('次の文章です').toString('base64'),42);assert.equal(h.state.hookSequence,count);assert.ok(events.some(e=>e.type==='hookCharRects'&&e.engine==='rgss'));
+});
+
+test('production launch focuses a running owned shadow before any observer preparation or game start',async t=>{
+ const dir=tmp(t),exe=path.join(dir,'Game.exe'),shadow=path.join(dir,'shadow','Game.exe'),game={id:'one',title:'VX',executable:exe,original:JSON.stringify({library:{engine:'RPG Maker VX/XP'}})},queried=[],bound=[];fs.writeFileSync(exe,'fixture');
+ const modules={
+  './store.cjs':{},'./relay-gate.cjs':{install(){}},'./import-source.cjs':{backfill(){},targetOf:()=>''},'./background-games.cjs':{foreground:async()=>{},unmute:async()=>{}},'../core/steam-owned.cjs':{launchAppid:()=>null},'./game-language.cjs':{originalExecutable:()=>({blocked:false})},'../core/drm-wrap.cjs':{plan:()=>null},'../core/library.cjs':{isTranslated:()=>false},'./locale-launch.cjs':{requiresAdministrator:()=>false},'./shared-adaptation.cjs':{importFor(){}},'./japanese-restore-options.cjs':{forExecutable:()=>({})},'../core/japanese-restore.cjs':{repairNameColumns:()=>({}),repairShared:()=>({}),_internal:{yurisPlan:()=>null}},'./japanese-auto-run.cjs':{beforeLaunch(){}},'../core/directplay.cjs':{prepare:()=>({copied:[],declined:[],missing:[]})},'../core/windows-features.cjs':{prepareDotnet:()=>[]},'../core/profiles/index.cjs':P,'../core/text-paths-rgss.cjs':{existingShadow:()=>shadow},'../core/japanese-auto.cjs':{launchResult(){}},
+  './game-process.cjs':{gameProcess:async(root,file)=>{queried.push(file);return file===shadow?'focused':'absent';},gameProcesses:async(root,file)=>{assert.equal(file,shadow);return [{pid:42,visible:true}];}},
+  './game-readiness.cjs':{waitForVisibleGame:async query=>{const rows=await query();assert.equal(rows[0].pid,42);return {pid:42};}},
+  '../core/text-paths-launch.cjs':{prepare(){throw Error('must not re-patch a running game');}}
+ };
+ const sandbox={module:{exports:{}},__dirname:path.join(__dirname,'..','services'),process:{env:{MEGULIT_ROOT:dir}},Buffer,require:name=>{if(name in modules)return modules[name];if(['node:fs','node:path','node:crypto','node:child_process'].includes(name))return require(name);throw Error('unexpected launch dependency '+name);}};
+ require('node:vm').runInNewContext(fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8'),sandbox);
+ const db={prepare:()=>({get:()=>game,run(){}})},runtime={prepareGame(){},bindLaunched:pid=>bound.push(pid)};const result=await sandbox.module.exports.launch(db,'one',runtime);
+ assert.equal(result.action,'focused');assert.deepEqual(queried,[exe,shadow]);assert.deepEqual(bound,[42]);
 });
 
 test('Ruby geometry replay keeps whitespace, prefix-based squeezing, viewport scroll, partial clears and new contents isolated',{skip:!ruby&&'MEGULIT_RUBY not set; no Ruby replay'},()=>{
@@ -116,7 +130,7 @@ $control << "CFG 3 1\n";frames(3);during.contents.clear;during.contents.draw_tex
 12.times{|i|m.contents.clear;m.contents.draw_text(0,0,48,32,'頁'+i.to_s);frames(3)}
 puts JSON.generate({:wire=>$wire.join})
 `;
- const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000});assert.equal(r.status,0,r.stderr);
+ const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000,windowsHide:true});assert.equal(r.status,0,r.stderr);
  const rows=JSON.parse(r.stdout).wire.split('\n').filter(x=>/^G /.test(x)).map(x=>TP.parseChars(x.replace(/^G \d+ /,'')));assert.ok(rows.every(Boolean));
  const first=rows.find(x=>x.text==='AB CD');assert.ok(first);assert.deepEqual(first.rects[0],[40,59,12,24]);assert.equal(first.rects.length,5);assert.ok(rows.some(x=>x.text==='AB D'));assert.ok(rows.some(x=>x.text==='新'));assert.ok(rows.some(x=>x.text==='復'));assert.ok(!rows.some(x=>/禁|新.*AB|復.*禁/.test(x.text)));
  for(let i=0;i<12;i++)assert.ok(rows.some(x=>x.text==='頁'+i),'complete page '+i);
@@ -129,7 +143,7 @@ raise 'select not used' unless $api_calls.any?{|c|c[0]=='select'}
 raise 'signed FIONBIO lost' unless $api_calls.any?{|c|c[0]=='ioctlsocket' && c[1][1]==-2147195266}
 puts JSON.generate({:wire=>$wire.join})
 `;
- const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000});assert.equal(r.status,0,r.stderr);const wire=JSON.parse(r.stdout).wire;
+ const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000,windowsHide:true});assert.equal(r.status,0,r.stderr);const wire=JSON.parse(r.stdout).wire;
  assert.match(wire,/^HELLO a{32} 42\n/);assert.ok(wire.split('\n').some(x=>x.startsWith('G ')&&TP.parseChars(x.replace(/^G \d+ /,''))?.text==='通信'));
 });
 
@@ -142,7 +156,7 @@ m.contents.clear;m.contents.draw_text(0,0,48,32,'回復');frames(5)
 raise 'recovery missing' unless $wire.join.scan(/^S /).size==1
 puts JSON.generate({:wire=>$wire.join})
 `;
- const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000});assert.equal(r.status,0,r.stderr);const records=JSON.parse(r.stdout).wire.split('\n').filter(x=>x.startsWith('G ')).map(x=>TP.parseChars(x.replace(/^G \d+ /,'')));
+ const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000,windowsHide:true});assert.equal(r.status,0,r.stderr);const records=JSON.parse(r.stdout).wire.split('\n').filter(x=>x.startsWith('G ')).map(x=>TP.parseChars(x.replace(/^G \d+ /,'')));
  assert.ok(records.some(x=>x?.text==='回復'));assert.ok(!records.some(x=>x?.text?.includes('A')));
 });
 
@@ -156,6 +170,10 @@ test('full VX corpus: every archive member and all non-Main scripts survive the 
  const patched=C.scriptTable(R.read(archive,after.find(x=>x.name.toLowerCase()==='data/scripts.rvdata')));for(let i=0;i<scripts.rows.length;i++){assert.equal(patched.rows[i].name,scripts.rows[i].name);if(scripts.rows[i].name==='Main')assert.ok(patched.rows[i].source.subarray(-scripts.rows[i].source.length).equals(scripts.rows[i].source));else assert.deepEqual(patched.rows[i].source,scripts.rows[i].source);}
  const scenes=R.engine.scenes(sample).map(s=>R.engine.parse(s.read()));assert.equal(scenes.length,118);assert.equal(scenes.reduce((n,s)=>n+s.lines.length,0),1324);
  for(const [f,h] of before)assert.equal(digest(fs.readFileSync(path.join(sample,f))),h,'source '+f);
+ const save=path.join(sh.shadow,'Save01.rvdata'),settings=path.join(sh.shadow,'preferences.dat');fs.writeFileSync(save,'new user progress');fs.writeFileSync(settings,'new user settings');
+ const reused=D.makeShadow({source,shadowRoot:dir,port:4321,token:'b'.repeat(32)});assert.equal(reused.shadow,sh.shadow);assert.equal(reused.reused,true);assert.equal(fs.readFileSync(save,'utf8'),'new user progress');assert.equal(fs.readFileSync(settings,'utf8'),'new user settings');assert.equal(D.existingShadow({exe:source.exe,shadowRoot:dir}),sh.exe);
+ const replacement=R.read(archive,R.list(archive).find(x=>x.name.toLowerCase()==='data/scripts.rvdata')),main=C.scriptTable(replacement).rows.find(x=>x.name==='Main').source.toString();assert.ok(main.includes('HELLO '+ 'b'.repeat(32)));assert.ok(!main.includes('HELLO '+ 'a'.repeat(32)));
+ const marker=path.join(sh.shadow,'megulit-rgss-shadow.json'),owned=fs.readFileSync(marker),foreign=JSON.parse(owned);foreign.sourceExe='other';fs.writeFileSync(marker,JSON.stringify(foreign));assert.throws(()=>D.makeShadow({source,shadowRoot:dir,port:4321,token:'b'.repeat(32)}),/SHADOW_SOURCE_CHANGED/);fs.writeFileSync(marker,owned);assert.equal(fs.readFileSync(save,'utf8'),'new user progress');
  // The real sample is read-only above; loose-script refusal is exercised on its disposable shadow
  fs.mkdirSync(path.join(sh.shadow,'Data'),{recursive:true});fs.writeFileSync(path.join(sh.shadow,'Data','Scripts.rvdata'),'override');assert.throws(()=>D.plan(sh.exe),/LOOSE_SCRIPTS_OVERRIDE/);
 });
@@ -179,7 +197,7 @@ raise 'host exception swallowed' unless raised
 raise 'update return lost' unless Graphics.update==:update_return
 puts JSON.generate({:wire=>$wire.join,:draws=>$draws.size})
 `;
- const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000});assert.equal(r.status,0,r.stderr||r.stdout);
+ const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000,windowsHide:true});assert.equal(r.status,0,r.stderr||r.stdout);
  const result=JSON.parse(r.stdout),records=result.wire.split('\n').filter(x=>x.startsWith('G ')).map(x=>({generation:Number(x.split(' ')[1]),rec:TP.parseChars(x.replace(/^G \d+ /,''))}));assert.ok(records.every(x=>x.rec),'every producer record parses');
  const rows=records.map(x=>x.rec);assert.ok(rows.some(x=>x.text==='本文'&&x.rects[0][0]===16&&x.rects[0][1]===280));assert.ok(rows.some(x=>x.role==='choice'&&x.text==='いいえ'&&x.sel));assert.ok(rows.some(x=>x.role==='menu'&&x.text==='ニューゲーム'));assert.ok(rows.some(x=>x.text===''&&!x.role));assert.ok(rows.some(x=>x.role==='menu'&&x.text===''));assert.ok(rows.some(x=>x.text==='再'));assert.ok(!rows.some(x=>x.text.includes('無')));assert.ok(!records.some(x=>x.generation===2));
 });

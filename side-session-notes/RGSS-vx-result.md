@@ -39,7 +39,7 @@
 - `core/rgss-scripts.cjs` 仅解析受限 Marshal 数据并替换 Main 的压缩字符串，保留其他对象、元数据和原 Main 字节；`core/text-paths-rgss.cjs` 只允许固定 exe/DLL/脚本表三哈希，复制完整普通文件到独立副本，拒绝散装脚本覆盖、未知脚本/版本与目录联接
 - 自写 Ruby 观察器在实际 Main 之前随游戏正常脚本流程加载，观察最终 Bitmap 绘字和真实 Window_Message/Window_Choice；pause 时通过同一代次 body 提交来源，进入生产 HookNative.emitSource，无后台线程 RGSSEval、无源文件写入
 - 默认无观察脚本、端口或副本，owner switch 加 roles 精确 true 才准备。WinSock 非阻塞、部分发送、token/绑定 PID/代次、关停清理、实际 game PID、显式日文环境与快速退出重试的同副本路径已接线
-- 当前15项独立 RGSS 测试全过，含真实 HookNative 无进程调用、12页、空格/压缩宽度/viewport滚动/局部清理/contents更换、短UI列表、原返回/异常、撤权、连接换代和完整语料。超预算页面整页拒绝，源提交还须精确匹配当前body的base64，避免被拒的新绘制记录提升旧文本
+- 当前16项独立 RGSS 测试全过，含真实 HookNative 与生产 launch 无进程调用、12页、空格/压缩宽度/viewport滚动/局部清理/contents更换、短UI列表、原返回/异常、撤权、连接换代和完整语料。超预算页面整页拒绝，源提交还须精确匹配当前body的base64，避免被拒的新绘制记录提升旧文本
 - 完整真实归档446成员逐一比较，除 Scripts 成员外445个成员内容一致；129脚本除Main加前缀外全部一致；原441文件前后SHA一致。Main后实际还有仅含exit的脚本段，现保留且明确允许这一种终止段，任意其他后置逻辑仍拒绝
 - RubyInstaller4.0.10私有运行时仅用于合成RGSS API回放，不是原版Ruby1.8/Win32API/DirectX验收。坐标是字体单元与逻辑坐标，非墨迹像素；名字、内嵌、游戏ruby、XP/Ace和其他VX版本均未完成，不宣称完整一级或全引擎适配
 - 完整范围与20句用户验收单在`docs/engine-rgss.md`，固定证据在`validation/fixtures/engine-draw-rgss-vx.json`。游戏与ZIP保留，不修改E测试安装目录，由root统一部署
@@ -48,3 +48,6 @@
 - root通知main已正常推25b466ff，08:05前已fetch确认`25b466ffb46318b192d91cf8dc88e160329ab9df`；先提交本候选，再rebase和重测，CI没有发起第四轮
 - 08:06实际rebase到25b466ff完成，代码候选06ff20f936e5814849be0ba28dd3640fd38827be；仅矩阵和result索引冲突，保留主线MV/KAG等全部既有报告，RGSS本报告移到side-session-notes独立保存
 - 08:08主线后首轮18套182/182，无失败无跳过，日志`H:/MeguLit-Work/reports/engine-rgss-20261122-0718/related-after-rebase.tap`；全部1554受版本控制JS/CJS/MJS语法0失败，逐文件hash见同目录syntax-after-rebase.json。最后预算修正涉及的文件另做fresh语法检查及最终相关回归，待后续封存条目
+- ff175fda后的18套183/183，无失败无跳过，保留related-final.tap；1554语法manifest已经逐文件对比hash，3个变化文件fresh --check，0失败
+- 08:16又补存档边界：同一原安装路径复用自有副本，验证自有marker、原归档指纹和上次patched归档hash，再刷新连接参数；exe/DLL/启动字段或归档被改就拒绝覆盖。副本内新Save01.rvdata和自定义设置文件经两次prepare保留，原目录不回写；关闭观察后普通启动仍原目录，存档迁移需要人工核对，本轮不自动覆盖
+- 生产bridge的真实launch函数通过VM依赖注入回放，先聚焦仍在运行的自有副本，证明未进入prepare/启动分支，不会重写运行中的归档。Ruby回放子进程显式windowsHide；未启动真实游戏或Reader
