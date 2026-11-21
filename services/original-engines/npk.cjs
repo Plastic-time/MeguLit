@@ -7,6 +7,7 @@ const kit=require('./kit.cjs');/* E577 shared engine kit */
    count, segments of (u64 offset, aligned size, size, unpacked size). Each segment is AES-256-CBC with the archive IV;
    a segment whose size is below its unpacked size is raw deflate. */
 const fs=require('node:fs'),crypto=require('node:crypto'),zlib=require('node:zlib'),path=require('node:path');
+const {isUtf8}=require('node:buffer');
 const npk2=require('../../core/nitroplus-npk.cjs'),SCHEMES=require('./nitro-schemes.json').npk2||{};
 // Game title -> key, from nitro-schemes.json (crskycode/GARbro Formats.dat, MIT & marcussacana/MwareStuff NPK3Tool, Unlicense).
 const EXES={'Minikui Mojika no Ko':['mojika.exe'],'Sonicomi':['sonicomi.exe'],'The Song of Saya':['saya_steam.exe'],'The Song of Saya (Steam) [+18]':['saya_steam.exe']};
@@ -35,9 +36,28 @@ function list(file,key){const h=head(file),v=major(h);if(!v)return null;
  return entries.map(e=>{const s=e.segments.map(x=>({offset:x.offset,aligned:x.stored,size:x.size,unpacked:x.unpacked}));return {name:e.name,unpacked:e.length,read:()=>read(file,key,iv,s,v)};});}
 function read(file,key,iv,segs,v=2){const fd=fs.openSync(file,'r');try{return Buffer.concat(segs.map(s=>{const b=Buffer.alloc(s.aligned);fs.readSync(fd,b,0,s.aligned,s.offset);const plain=decrypt(key,iv,b).subarray(0,s.size);return s.size<s.unpacked?unpack(v,plain,s.unpacked):plain;}));}finally{fs.closeSync(fd);}}
 /* Scenes: media/script/nut/*.nut in script.npk, compiled Squirrel ("SCRP" ... "RIQS"). String literals are
-   0x08000010, length, UTF-8. Message text starts with CRLF; a spoken line is "//【名前】" CRLF "<voice ...>" CRLF 「…」.
+   0x08000010, length, encoded text. Message text starts with CRLF; a spoken line is "//【名前】" CRLF "<voice ...>" CRLF 「…」.
    #{・・・}text# marks emphasis dots over text. */
-function strings(d){const out=[];for(let i=0;i+8<d.length;i++){if(d.readUInt32LE(i)===0x08000010){const len=d.readUInt32LE(i+4);if(len>0&&len<8000&&i+8+len<=d.length){out.push(d.toString('utf8',i+8,i+8+len));i+=7+len;}}}return out;}
+function strings(d){
+ const out=[],legacy=[];
+ for(let i=0;i+8<d.length;i++){
+  if(d.readUInt32LE(i)!==0x08000010)continue;
+  const len=d.readUInt32LE(i+4);
+  if(!len||len>=8000||i+8+len>d.length)continue;
+  const b=d.subarray(i+8,i+8+len);
+  const utf8=b.toString('utf8');
+  // Local damage can still be valid GBK or Shift-JIS. Keep the CJK text UTF-8 already recovered.
+  if(isUtf8(b)||(utf8.match(/[ぁ-ゖァ-ヺ一-龯]/g)||[]).length>(utf8.match(/\ufffd/g)||[]).length)out.push(utf8);
+  else{legacy.push(b);out.push(b);}
+  i+=7+len;
+ }
+ if(!legacy.length)return out;
+ const decoder=new TextDecoder(kit.codepageOf(legacy),{fatal:true});
+ return out.map(s=>{
+  if(typeof s==='string')return s;
+  try{return decoder.decode(s);}catch{return s.toString('utf8');}
+ });
+}
 function clean(s){return s.replace(/^\s*\/\/【[^】]*】[^\r\n]*/,'').replace(/<[^>]*>/g,'').replace(/#\{[^}]*\}([^#]*)#/g,'$1').replace(/[\r\n\t]+/g,'').trim();}
 // E450 the <voice src='voice/a00/2000010c16'> of a spoken line goes with its text.
 function parse(d){const lines=[],voices=[];for(const s of strings(d)){if(!s.startsWith('\r\n')&&!s.startsWith('//【'))continue;const name=(s.match(/^\s*\/\/【([^】]*)】/)||[])[1];const t=clean(s);if(!t||!/[ぁ-ゖァ-ヺ一-龯]/.test(t)&&!/^[「『（][^」』）]*[」』）]$/.test(t))continue; /* E594 a quoted line without kana or kanji (「……！」 in a translation) still counts, so both sides keep the same lines */if(name){lines.push(name);voices.push(null);}lines.push(t);const vs=/<voice\b[^>]*\bsrc=['"]([^'"]+)['"]/.exec(s);voices.push(vs?require('./voice-ref.cjs').clean(vs[1]):null);}const v=require('./voice-ref.cjs').keep(voices);return v?{lines,anchors:[],voices:v}:{lines,anchors:[]};}
