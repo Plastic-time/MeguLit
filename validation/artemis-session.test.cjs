@@ -18,12 +18,22 @@ test('effective Lua follows numbered archive order and rejects duplicate/path/ra
  fs.writeFileSync(path.join(dir,'game.pfs.006'),pf8([{name:'../bad',data:Buffer.alloc(0)}]));assert.throws(()=>actual._internal.effectiveModules(dir),/ARTEMIS_INDEX/);
  const h=Buffer.from('706638ffffff7f','hex');fs.writeFileSync(path.join(dir,'game.pfs.006'),h);assert.throws(()=>actual._internal.effectiveModules(dir),/ARTEMIS_INDEX/);
 });
-test('shadow excludes saves/config/extra archives and never links a directory',t=>{
+test('shadow excludes saves/config/extra archives and copies resources without changing their identity',async t=>{
  const dir=temporary(t),game=path.join(dir,'game'),shadow=path.join(dir,'shadow');fs.mkdirSync(game);fs.mkdirSync(shadow);fs.mkdirSync(path.join(game,'savedata'));fs.writeFileSync(path.join(game,'savedata','system.dat'),'personal synthetic save');
  for(const n of ['game.exe','iarsys64.dll','game.pfs','script.ini','game.pfs.001.disabled'])fs.writeFileSync(path.join(game,n),n);
- actual._internal.shadowFiles(game,shadow,['game.pfs']);assert.deepEqual(fs.readdirSync(path.join(shadow,'savedata')),[]);assert.equal(fs.existsSync(path.join(shadow,'script.ini')),false);assert.equal(fs.existsSync(path.join(shadow,'game.pfs.001.disabled')),false);assert.equal(fs.lstatSync(path.join(shadow,'savedata')).isSymbolicLink(),false);
+ const stamp=()=>{const s=fs.statSync(path.join(game,'game.pfs'),{bigint:true});return [s.dev,s.ino,s.size,s.mtimeNs,s.ctimeNs,s.nlink].join(':');},before=stamp();
+ await actual._internal.shadowFiles(game,shadow,['game.pfs']);assert.equal(stamp(),before);assert.notEqual(fs.statSync(path.join(game,'game.pfs')).ino,fs.statSync(path.join(shadow,'game.pfs')).ino);assert.deepEqual(fs.readdirSync(path.join(shadow,'savedata')),[]);assert.equal(fs.existsSync(path.join(shadow,'script.ini')),false);assert.equal(fs.existsSync(path.join(shadow,'game.pfs.001.disabled')),false);assert.equal(fs.lstatSync(path.join(shadow,'savedata')).isSymbolicLink(),false);
  fs.writeFileSync(path.join(shadow,'game.exe'),'private changed');assert.equal(fs.readFileSync(path.join(game,'game.exe'),'utf8'),'game.exe');assert.equal(fs.readFileSync(path.join(game,'savedata','system.dat'),'utf8'),'personal synthetic save');
- fs.mkdirSync(path.join(game,'system'));assert.throws(()=>actual._internal.shadowFiles(game,path.join(dir,'unused'),['game.pfs']));
+ fs.writeFileSync(path.join(shadow,'game.pfs'),'private resource changed');assert.equal(fs.readFileSync(path.join(game,'game.pfs'),'utf8'),'game.pfs');assert.equal(stamp(),before);
+ fs.mkdirSync(path.join(game,'system'));await assert.rejects(actual._internal.shadowFiles(game,path.join(dir,'unused'),['game.pfs']),/ARTEMIS_DIRECTORY/);
+});
+
+test('resource copies reject insufficient target space, expired deadline and revoked permission before copying',async t=>{
+ const dir=temporary(t),game=path.join(dir,'game'),shadow=path.join(dir,'shadow');fs.mkdirSync(game);fs.mkdirSync(shadow);fs.writeFileSync(path.join(game,'game.exe'),'synthetic');
+ const real=fs.statfsSync;t.mock.method(fs,'statfsSync',()=>({bavail:10n*1024n**3n+8n,bsize:1n}));
+ await assert.rejects(actual._internal.shadowFiles(game,shadow,[]),/ARTEMIS_DISK_BUDGET/);assert.deepEqual(fs.readdirSync(shadow),[]);t.mock.restoreAll();assert.equal(fs.statfsSync,real);
+ await assert.rejects(actual._internal.shadowFiles(game,shadow,[],{deadline:performance.now()-1}),/ARTEMIS_COPY_TIMEOUT/);assert.deepEqual(fs.readdirSync(shadow),[]);
+ await assert.rejects(actual._internal.shadowFiles(game,shadow,[],{validate:()=>false}),/ARTEMIS_SESSION_REVOKED/);assert.deepEqual(fs.readdirSync(shadow),[]);
 });
 test('real Lua boot tail and actual Node session exchange bounded records, revoke in-flight and expire stopped owner heartbeat',{skip:!LUA&&'Lua 5.1 unavailable'},async t=>{
  const dir=temporary(t),control=path.join(dir,'megulit-artemis.ctl'),output=path.join(dir,'megulit-artemis.jsonl'),nonce='0123456789abcdef0123456789abcdef';
@@ -50,14 +60,14 @@ mw_textloop({lang='ja',text={ja={{'expired synthetic'}}}})
 io.write('PASS boot filesystem, exact return tuple, stopped heartbeat\n')
 `.replace('__TAIL__',()=>tail);
  const child=spawnSync(LUA,['-'],{input:source,encoding:'utf8',windowsHide:true,timeout:5000,maxBuffer:32768});assert.equal(child.status,0,child.stderr);assert.match(child.stdout,/PASS/);
- const lines=fs.readFileSync(output,'utf8').trim().split('\n');assert.equal(lines.length,3);const observed=[],status=[];s.onSource=m=>{observed.push(m);return true;};s.onStatus=x=>status.push(x);s.consume();assert.equal(status.length,1);assert.equal(observed.length,1);assert.equal(observed[0].text,'合成漢字😀\x1d漢字\x1cかんじ');assert.deepEqual(observed[0].artemisOwner,{pid:42,started:'638990000000000000'});
+ const lines=fs.readFileSync(output,'utf8').trim().split('\n');assert.equal(lines.length,3);const observed=[],status=[];s.onSource=m=>{observed.push(m);return true;};s.onStatus=x=>status.push(x);s.consume();assert.equal(status.length,1);assert.equal(observed.length,1);assert.equal(observed[0].text,'合成漢字😀');assert.deepEqual(observed[0].artemisRuby,[[2,2,'かんじ']]);assert.deepEqual(observed[0].artemisOwner,{pid:42,started:'638990000000000000'});
  permitted=false;assert.equal(s.accept(JSON.parse(lines[2])),false);permitted=true;await s.stop();assert.equal(s.accept(JSON.parse(lines[2])),false);assert.match(fs.readFileSync(control,'utf8'),/ 0\n$/);
 });
 test('source protocol rejects wrong nonce/generation/roles/ruby/text budgets and stop waits pending owned query',async t=>{
  const dir=temporary(t);let finish,queries=0;const S=injected({processes:async()=>{if(++queries===1)return [{pid:42,started:'638990000000000000'}];return await new Promise(r=>finish=r);}}).ArtemisSession;
  const s=new S({root,exe:'synthetic.exe',shadow:dir,identity:'synthetic',nonce:'abc',grant:{}});assert.equal(await s.connect(),true);clearInterval(s.timer);
  const valid={nonce:'abc',generation:s.generation,role:'line',text:'合成正文',ruby:[]};let n=0;s.onSource=()=>{n++;return true;};assert.equal(s.accept(valid),true);
- for(const patch of [{nonce:'wrong'},{generation:1},{role:'button'},{text:'x'.repeat(2049)},{ruby:[[0,99,'a']]}])assert.equal(s.accept({...valid,...patch}),false);assert.equal(n,1);
+ for(const patch of [{nonce:'wrong'},{generation:1},{role:'button'},{text:'x'.repeat(2049)},{text:'\ud800'},{ruby:[[0,99,'a']]},{ruby:[[0,1,'\ud800']]},{ruby:[[0,2,'a'],[1,1,'b']]}])assert.equal(s.accept({...valid,...patch}),false);assert.equal(n,1);
  s.query=s.tick();await new Promise(r=>setImmediate(r));let ended=false;const stopping=s.stop().then(()=>ended=true);await new Promise(r=>setImmediate(r));assert.equal(ended,false);assert.equal(s.accept(valid),false);finish([{pid:42,started:'638990000000000000'}]);await stopping;assert.equal(ended,true);
 });
 test('different or ambiguous process generation cannot activate the transport',async t=>{
@@ -71,10 +81,13 @@ test('actual attach/source/deliver/emit reject a stopped or rebound private sour
  const s=new S.ArtemisSession({root,exe:'synthetic.exe',shadow:dir,identity:'synthetic',nonce:'abc',grant:{}});assert.equal(await s.connect(),true);clearInterval(s.timer);h.target={...s.owner};require('../core/text-paths-launch.cjs').attach({path:'artemis',session:s},h);
  const packet=text=>({nonce:'abc',generation:s.generation,role:'line',text,ruby:[]});
  try{
-  assert.equal(s.accept({...packet('合成名'),role:'name'}),true);assert.equal(s.accept(packet('最初の本文を読みます。')),true);assert.equal(h.state.hookSource,'最初の本文を読みます。');assert.equal(h.state.hookSpeaker,'合成名');
+  const reading='あ'.repeat(159)+'𠮷';assert.equal(s.accept({...packet('合成名'),role:'name'}),true);assert.equal(s.accept({...packet('最初の本文を読みます。'),ruby:[[0,2,reading]]}),true);assert.equal(h.state.hookSource,'最初の本文を読みます。');assert.equal(h.state.hookSpeaker,'合成名');
+  assert.deepEqual(h.state.hookSourceRuby,[['最初',reading,0]]);const shown=await require('../services/example-ruby.cjs').exampleRuby(null,null,[{text:h.state.hookSource,ruby:h.sourceRuby.get(h.state.hookSource)}]);assert.equal(shown.items[0].spans[0].reading,reading);
   let held;const original=s.onSource;s.onSource=x=>{held=x;return original(x);};now+=20;h.engineDialog=false;h.engineDialogAt=now;
   assert.equal(s.accept(packet('遅れて届く本文を拒否します。')),false);assert.equal(h.boxBlink.lines.length,1);
+  assert.deepEqual(h.sourceRuby.get('最初の本文を読みます。'),[['最初',reading,0]],'rejected pending input must not erase the accepted current native ruby');
   await s.stop();now+=1000;t.mock.timers.tick(1000);assert.equal(h.state.hookSource,'最初の本文を読みます。');
+  assert.equal(h.sourceRuby.has('最初の本文を読みます。'),false);
   const sequence=h.state.hookSequence;h.deliverSource('偽の本文です。','artemis-lua-input','',0,held);h.emitSource('偽の本文です。','artemis-lua-input');assert.equal(h.state.hookSequence,sequence);
   h.target={pid:43,started:'638990000000000001'};h.source({...held},'Artemis Lua input');assert.equal(h.state.hookSequence,sequence);
   assert.equal(S.shouldBlock(null,held,h.target),true);assert.equal(S.shouldBlock(null,{origin:'artemis-lua-input'},h.target),true);assert.equal(S.shouldBlock(null,{origin:'live'},h.target),false);
@@ -97,4 +110,34 @@ test('production prepare builds an owned PF8 loader from exact local executable/
  let checks='';for(const entry of index.files){const bytes=sc.pfsRead(file,entry,index.key),text=bytes.toString('utf8');assert.match(text,/MeguLitArtemis1/);assert.ok(!/@(?:KEY|NONCE|CONTROL|OUTPUT|SAVE|OBSERVER)@/.test(text));let equals='=';while(text.includes(']'+equals+']'))equals+='=';checks+='assert(loadstring(['+equals+'['+text+']'+equals+']))\n';}
  const compiled=spawnSync(LUA,['-'],{input:checks+"io.write('PASS complete real Lua sources plus production loader\\n')",encoding:'utf8',windowsHide:true,timeout:5000,maxBuffer:32768});assert.equal(compiled.status,0,compiled.stderr);assert.match(compiled.stdout,/PASS/);await p.session.stop();
  const changed={...modules,'system/msg/ui.lua':Buffer.concat([modules['system/msg/ui.lua'],Buffer.from('\n-- changed')])};fs.writeFileSync(path.join(game,'fixture.pfs'),pf8(Object.entries(changed).map(([name,data])=>({name,data}))));assert.equal(await S.prepare({root:dir,exe,ownerTestGrant:{}}),null);
+});
+test('boot tails tolerate include order/reload and I/O errors without changing held original calls',{skip:!LUA&&'Lua 5.1 unavailable'},t=>{
+ const dir=temporary(t),control=path.join(dir,'control'),output=path.join(dir,'output'),nonce='0123456789abcdef0123456789abcdef',prepared={script:'return (function()\n'+fs.readFileSync(path.join(root,'core/artemis-observer.lua'),'utf8')+'\nend)()'},tail=actual._internal.bootTail(prepared,{nonce,control,output}).toString('utf8');
+ const source=String.raw`
+local cpath=[=[__CONTROL__]=]
+local function ctl(on)local f=assert(io.open(cpath,'wb'));assert(f:write('MeguLitArtemis1 __NONCE__ 2 2 '..on..'\n'));f:close()end
+local calls=0;e={now=function()return 100 end,var=function()return 'savedata'end}
+function getTextBlockFloat(p)return p.ja[1] end
+function mw_textloop(p,...)calls=calls+1;getTextBlockFloat(p.text);return nil,'original',nil,... end
+function message_name(...)return ...end
+function ui_message(...)return ...end
+function select_message(...)return ...end
+function getMWID()return '1.80.120'end
+ctl('0')
+__TAIL__
+local held=mw_textloop
+local open=io.open;io.open=function()error('synthetic IO fault')end
+local function pack(...)return {n=select('#',...),...}end
+local p={lang='ja',text={ja={{'synthetic'}}}}
+local r=pack(held(p,'tail',nil));assert(r.n==5 and r[2]=='original' and r[4]=='tail')
+io.open=open;ctl('1')
+__TAIL__
+__TAIL__
+r=pack(held(p,'late',nil));assert(r[2]=='original' and r[4]=='late')
+r=pack(mw_textloop(p,'live',nil));assert(r[2]=='original' and r[4]=='live')
+mw_textloop=function()error('foreign replacement must not receive old held calls')end
+assert(select(2,held(p))=='original');assert(calls==4)
+io.write('PASS include/reload, held original identity and instrumentation IO fault\n')
+`.replace('__CONTROL__',control.replace(/\\/g,'/')).replace('__NONCE__',nonce).replaceAll('__TAIL__',()=>tail);
+ const child=spawnSync(LUA,['-'],{input:source,encoding:'utf8',windowsHide:true,timeout:5000,maxBuffer:32768});assert.equal(child.status,0,child.stderr);const records=fs.readFileSync(output,'utf8').trim().split('\n').map(JSON.parse);assert.equal(records.filter(m=>m.role==='status').length,2);assert.equal(records.filter(m=>m.role==='line').length,1);
 });

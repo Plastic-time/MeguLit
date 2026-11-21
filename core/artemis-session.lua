@@ -57,6 +57,8 @@ do
    state.installing = false
    if ok and handle then
     state.handle = handle
+    state.installed = {}
+    for _, name in ipairs({'mw_textloop','message_name','select_message'}) do state.installed[name] = rawget(_G, name) end
     local p = control()
     if p.enabled then pcall(sink, {generation=p.generation,role='status',text='installed',ruby={}}) end
     return true
@@ -67,15 +69,18 @@ do
   state.tryInstall = tryInstall
   state.arm = function()
    if state.handle then state.handle.dispose(); state.handle = nil end
+   state.installed = nil
+   for name, fn in pairs(boot) do if rawget(_G, name) == fn then rawset(_G, name, originals[name]) end end
+   boot, originals = {}, {}
    for _, name in ipairs({'mw_textloop','message_name','select_message'}) do
     local fn = rawget(_G, name)
     if type(fn) == 'function' and fn ~= boot[name] and not state.handle then
      originals[name] = fn
      local wrapped
      wrapped = function(...)
-      tryInstall()
+      pcall(tryInstall)
       local next = rawget(_G, name)
-      if next ~= wrapped then return next(...) end
+      if boot[name] == wrapped and state.installed and state.installed[name] == next then return next(...) end
       return fn(...)
      end
      boot[name] = wrapped; rawset(_G, name, wrapped)

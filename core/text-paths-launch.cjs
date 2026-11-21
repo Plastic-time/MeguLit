@@ -46,11 +46,18 @@ async function prepare({root,exe,profile={},enabled=false,shadowRoot=null,ownerT
 function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepared.session;
  if(prepared.path==='artemis'){
   const current=m=>hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&s.permission()&&s.owner&&m?.artemisOwner&&hook.target?.pid===s.owner.pid&&hook.target?.started===s.owner.started&&m.artemisOwner.pid===s.owner.pid&&m.artemisOwner.started===s.owner.started;
-  s.onSource=m=>{if(!current(m))return false;const before=hook.state?.hookSequence||0;hook.source(m,'Artemis Lua input');
-   return current(m)&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='artemis-lua-input'&&hook.state.hookSource===m.text.split('\x1d')[0];};
+  let rubyOwner=null,speakerOwner=null;
+  const clearRuby=()=>{if(rubyOwner)for(const key of rubyOwner.keys)if(hook.sourceRuby?.get(key)===rubyOwner.pairs)hook.sourceRuby.delete(key);rubyOwner=null;};
+  s.onStop=()=>{clearRuby();if(hook.speaker===speakerOwner)hook.speaker=null;speakerOwner=null;};
+  s.onSource=m=>{if(!current(m))return false;const previous=rubyOwner;clearRuby();const before=hook.state?.hookSequence||0,chars=[...m.text];
+   const pairs=m.artemisRuby.map(([at,n,reading])=>[chars.slice(at,at+n).join(''),reading,chars.slice(0,at).filter(c=>!/\s/u.test(c)).length]);
+   if(pairs.length){const keys=[...new Set([m.text,m.text.replace(/\s+/g,'')])],map=hook.sourceRuby||(hook.sourceRuby=new Map());for(const key of keys)map.set(key,pairs);while(map.size>64)map.delete(map.keys().next().value);rubyOwner={keys,pairs};}
+   hook.source(m,'Artemis Lua input');
+   const accepted=current(m)&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='artemis-lua-input'&&hook.state.hookSource===m.text;
+   if(!accepted){clearRuby();if(previous&&current(m)){const map=hook.sourceRuby;for(const key of previous.keys)if(!map.has(key))map.set(key,previous.pairs);rubyOwner=previous;}}return accepted;};
   /* Semantic input metadata is deliberately not CHARS/UI rectangles or a current-pixel visibility acknowledgement. */
   s.onSemantic=m=>{if(!current({artemisOwner:m.owner}))return;
-   if(m.role==='name'){const name=require('./hook-native.cjs').speakerName(m.text);hook.speaker=name?{text:name,at:hook.now()}:null;if(name)hook.noteSpeaker?.(name);return;}
+   if(m.role==='name'){const name=require('./hook-native.cjs').speakerName(m.text);speakerOwner=name?{text:name,at:hook.now()}:null;hook.speaker=speakerOwner;if(name)hook.noteSpeaker?.(name);return;}
    hook.trace?.('artemis input role='+m.role+' variant='+(m.variant||'-')+' chars='+[...m.text].length);};
   s.onStatus=st=>hook.trace?.('text path artemis: '+st);hook.attachTextPath?.(s);return;
  }

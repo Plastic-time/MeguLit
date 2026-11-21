@@ -83,7 +83,7 @@ The sink is protected against Lua errors but is a trusted fast callback, not a s
 `validation/artemis-observer.test.cjs` uses synthetic Lua methods and data to exercise opt-in, UTF-8/scalar bounds, wrapped method call preservation, failure objects, nested calls, policy retirement, overflow and disposal
 `validation/artemis-lua-replay.test.cjs` reads three small original Lua members from each exact local PFS, selects known actual function bodies, and invokes them with a synthetic engine and synthetic text
 The original game source and dialogue are not committed
-Both actual-Lua replays assert identical ordered print-command inputs before and after observation, then check semantic role events and off/on/dispose
+Each actual-Lua replay asserts identical ordered print-command inputs before and after observation, then checks semantic role events and off/on/dispose
 These are Lua CLI tests, not game execution or image acceptance
 The actual engine's coroutine/yield behavior across protected Lua calls has not been accepted, so the stand-in result does not authorize installing this wrapper in an arbitrary running Lua VM
 
@@ -108,9 +108,15 @@ Unknown directories, reparse points, duplicate case-folded entry paths, traversa
 Loose `system` overrides are rejected rather than silently ignored
 
 The launcher creates a unique `root/data/artemis-shadow/session-*` directory outside the source game
-It copies executable/DLL bytes (64 MiB aggregate), verifies the copied EXE hash again, and links only resource files
+It copies executable/DLL bytes (64 MiB aggregate), verifies the copied EXE hash again, and independently copies resource files
 It never junctions any directory or links/copies old saves or configuration
-`savedata` is a new empty directory; only flat known movie extensions are linked, at most 4096 total resource links
+`savedata` is a new empty directory; the optional movie directory accepts at most 4096 flat files with known movie extensions
+Total copies are capped at 4 GiB, including executables, archives and movies
+Before copying, the actual shadow volume must have room for those bytes, a 1 MiB patch/protocol allowance, and a further 10 GiB free margin
+The 256 KiB streaming copy uses a 45-second monotonic deadline and rechecks permission and destination free space every 500 ms
+Both file handles close on failure; an incomplete owned shadow is reported and kept for explicit later handling
+It never silently relocates the shadow to another drive when the target volume is short of space
+Resource hardlinks are deliberately not used: the actual opaque-authority joint replay proved that creating a Windows hardlink changes the source fingerprint ctime and correctly revokes that token
 This is a fresh isolated run, not continuation of the original progress
 The original installation must remain preserved, and root must use a separate game test copy
 The observed Lua `s.savepath` must equal this owned directory or literal relative `savedata` before any wrapper can install
@@ -138,6 +144,9 @@ The installed status proves only wrapper installation and the save-path guard, n
 
 Only exact currently bound PID/start/session input can call the real HookNative source path
 Names use its existing speaker-name parser; choice normal/hover inputs remain semantic diagnostics without fake rectangles
+Accepted body ruby is converted from explicit codepoint spans to the existing exact/whitespace-compacted `sourceRuby` cache and the real Reader ruby consumer
+The actual consumer regression covers an 80-codepoint base and 160-codepoint reading including supplementary characters
+Only values owned by this session are cleared on rejection or stop; a rejected queued row restores the preceding accepted row's ruby
 Private Symbol plus WeakMap authority is checked at source, deliverSource and emitSource; stale stopped/rebound input is rejected even in an existing delayed callback
 Unauthenticated use of the reserved origin is rejected, never treated as permission
 Artemis-tagged NVL/page input is deliberately rejected before it can enter queues that discard that authority
@@ -152,7 +161,7 @@ Private input files remain local to the owned shadow and are not uploaded
 
 Remaining gates:
 
-1. Root's public `owner-tests` module and shared isolated-app wiring must be integrated and tested together with this candidate
+1. Root must integrate the public `owner-tests` module and shared isolated-app wiring; a private joint replay already uses its fixed `499dc63d` implementation for actual resolve/registerLaunch/allowed/bind/revoke, with only the OS process query controlled
 2. Actual engine boot/include order, coroutine/yield behavior, native persistence paths and shutdown must be checked in a complete isolated game copy
 3. Actual per-glyph layout or a fully verified layer transform, clipping and parent hierarchy, not a configured font rectangle or an ASCII classifier byte pattern
 4. Actual Reader placement, name/ruby, choices and menu behavior, followed by ten hidden/readable/translated lines and page cleanup

@@ -67,7 +67,7 @@ First production edit was at 2026-11-21 22:45:56 UTC, more than 15 minutes after
 The bounded Lua observer captures semantic input only, behind explicit opt-in and exact executable/member hashes
 It does not emit `ToMe_CHARS`, fabricate glyph rectangles, hide, replace, run a timer, access files or send network traffic
 The local Lua replay is an input/function-contract test, not a rendering, Reader, DOM, physical lookup or upload acceptance
-The missing production Lua transport remains a separate integration gate
+At that first observer checkpoint the production Lua transport was missing; the later optional session below supplies a bounded loader/transport candidate
 
 The bilingual wrapper now restores a nested pass and the original nil-containing return tuple and error object
 This is a synthetic compatibility repair, not a claim that the commercial game's normal method returns extra values
@@ -90,7 +90,7 @@ The fixed VNR GitHub tree URL returned `Failed to fetch restricted URL`
 That tree was not retried or fetched through an alternate endpoint
 The previously successful fixed `engine.cc` read supplies the listed hook evidence, not mirror-license verification
 
-## Final local validation
+## First observer checkpoint validation
 
 - Seven relevant suites: 40 passed, 0 failed, 0 skipped, including engine-draw default/seed opt-in checks
 - Every tracked JS/CJS/MJS file checked freshly with the current Node executable: 1549 checked, 0 errors, no syntax cache reused
@@ -103,3 +103,27 @@ The previously successful fixed `engine.cc` read supplies the listed hook eviden
 Small local evidence is under `H:/MeguLit-Work/night-1423/artemis-research/`
 `bilingual-before.json` and `role-source-before.json` preserve before evidence, `final-tests.log`, `syntax.json` and `syntax-final.json` record the checks
 The final syntax receipt is checked against current source hashes
+
+## Later production session checkpoint
+
+The optional exact-build PF8 shadow loader now feeds the real HookNative ADV source, delivery and emit methods through a private session authority
+It requires the separately owned opaque local-test grant module, the actual unique shadow PID/start ticks, the current generation and a fresh receipt
+Names use the existing speaker parser and body ruby reaches the real example-ruby consumer; choice variants remain semantic input diagnostics
+NVL/page input, CHARS, glyph coordinates, hide and new translation rendering are not enabled
+
+The joint replay uses the fixed owner-tests implementation at `499dc63d964c9ec76ed56bdc5a8b8ed6c709a594`, not a JSON permission stand-in
+It exposed a real integration failure: creating a resource hardlink changed its Windows ctime and revoked the original fingerprint
+The before receipt is retained as `owner-grant-joint-before-failure.json`
+The correction independently copies resources, preflights the actual target volume with a 10 GiB post-copy margin, and keeps 4 GiB/45-second/256 KiB bounds
+The corrected actual-authority joint checks cover resolve, alias registration, lookup, bind, source ownership, privacy revocation and joined off publication
+Only that replay's OS process-query boundary is controlled with its own Node PID and a synthetic start string; no game or native helper is launched
+See `owner-grant-joint.json`, `production-tests.log`, `production-syntax.json` and `production-receipt.json` under the existing evidence directory
+Final combined replay/contract checks: 64 passed, 0 failed, 0 skipped across twelve relevant suites
+Fresh Node syntax checks: 1554 tracked JS/CJS/MJS files executed, 0 errors, no cached syntax result
+The fixed real-authority private joint replay passed nine checks
+
+The branch includes origin/main `25b466ffb46318b192d91cf8dc88e160329ab9df`, preserving the KAG/RenPy/TextRender/RPGM parser/default-off and native-ruby changes
+No actual game boot, coroutine/yield behavior, native persistence isolation, physical lookup, pixel hiding, Reader layout or final experience has passed in this task
+Root must deploy a complete separate test game and the integrated authority before using the five-minute checklist in `docs/artemis-lua-input.md`
+The formal Amakano 3 EXE-only sample and the trial with omitted media are not complete playable deployments
+Original game files, save data, seeds, defaults, live databases and remote branches remain unchanged

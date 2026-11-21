@@ -18,10 +18,11 @@ function shouldBlock(session,message,owner,origin=message?.origin){
 function allowed(grant,exe){try{return require('./owner-tests.cjs').allowed(grant,{exe,engine:'artemis',capability:'lua-input'})===true;}catch{return false;}}
 function regular(file,max){const s=fs.lstatSync(file);if(!s.isFile()||s.isSymbolicLink()||s.size>max)fail('ARTEMIS_FILE');return s;}
 function exactRead(file,size,offset=0){const fd=fs.openSync(file,'r');try{const b=Buffer.alloc(size);if(fs.readSync(fd,b,0,size,offset)!==size)fail('ARTEMIS_TRUNCATED');return b;}finally{fs.closeSync(fd);}}
+function names(dir,max=4096){const handle=fs.opendirSync(dir),out=[];try{let entry;while((entry=handle.readSync())){if(out.length>=max)fail('ARTEMIS_DIRECTORY_BUDGET');out.push(entry.name);}return out;}finally{handle.closeSync();}}
 function effectiveModules(dir){
- const names=fs.readdirSync(dir),bases=names.filter(n=>/\.pfs$/i.test(n));
+ const entries=names(dir),bases=entries.filter(n=>/\.pfs$/i.test(n));
  if(bases.length!==1)fail('ARTEMIS_ARCHIVES');
- const base=bases[0],files=[base,...names.filter(n=>n.toLowerCase().startsWith(base.toLowerCase()+'.')&&/\.\d{3}$/.test(n)).sort((a,b)=>+a.slice(-3)-+b.slice(-3))];
+ const base=bases[0],files=[base,...entries.filter(n=>n.toLowerCase().startsWith(base.toLowerCase()+'.')&&/\.\d{3}$/.test(n)).sort((a,b)=>+a.slice(-3)-+b.slice(-3))];
  if(files.length>32)fail('ARTEMIS_ARCHIVES');
  const wanted=new Set(Object.keys(Observer.variants[0].modules)),modules={};let total=0;
  for(const name of files){
@@ -51,26 +52,42 @@ function bootTail(prepared,{nonce,control,output}){
  for(const[k,v]of Object.entries({KEY:luaString('__MeguLitArtemis_'+nonce),NONCE:luaString(nonce),CONTROL:luaString(control.replace(/\\/g,'/')),OUTPUT:luaString(output.replace(/\\/g,'/')),SAVE:luaString(path.join(path.dirname(control),'savedata').replace(/\\/g,'/')),OBSERVER:prepared.script}))t=t.replace('@'+k+'@',()=>v);
  return Buffer.from('\n'+t,'utf8');
 }
-/* Every resource link is a file link. No game directory, save or configuration is junctioned into this private run. */
-function shadowFiles(dir,shadow,archiveNames){
- let linked=0,copied=0;
- for(const name of fs.readdirSync(dir)){
+/* Copies preserve the source fingerprint: even creating a hardlink changes its Windows ctime. */
+async function shadowFiles(dir,shadow,archiveNames,{validate=()=>true,deadline=performance.now()+45000}={}){
+ const plan=[];let copied=0,total=0;
+ const add=(from,to,s)=>{if(!s.isFile()||s.isSymbolicLink())fail('ARTEMIS_FILE');total+=s.size;if(total>4*1024**3)fail('ARTEMIS_COPY_BUDGET');plan.push({from,to,bytes:s.size});};
+ for(const name of names(dir)){
   const from=path.join(dir,name),s=fs.lstatSync(from);
   if(s.isSymbolicLink())fail('ARTEMIS_REPARSE');
   if(s.isDirectory()){if(!['savedata','.megulit-japanese','movie'].includes(name.toLowerCase()))fail('ARTEMIS_DIRECTORY');continue;}
-  if(archiveNames.includes(name)){fs.linkSync(from,path.join(shadow,name));linked++;}
-  else if(/\.(exe|dll)$/i.test(name)){copied+=s.size;if(copied>64*1024**2)fail('ARTEMIS_COPY_BUDGET');fs.copyFileSync(from,path.join(shadow,name),fs.constants.COPYFILE_EXCL);}
+  if(archiveNames.includes(name))add(from,path.join(shadow,name),s);
+  else if(/\.(exe|dll)$/i.test(name)){copied+=s.size;if(copied>64*1024**2)fail('ARTEMIS_COPY_BUDGET');add(from,path.join(shadow,name),s);}
  }
  const movies=path.join(dir,'movie');
  if(fs.existsSync(movies)){
   const dest=path.join(shadow,'movie');fs.mkdirSync(dest);
-  for(const name of fs.readdirSync(movies)){
-   if(++linked>4096)fail('ARTEMIS_LINK_BUDGET');const from=path.join(movies,name);regular(from,32*1024**3);
-   if(!/\.(ogv|ogg|mp4|wmv|avi|mpg|mpeg)$/i.test(name))fail('ARTEMIS_MOVIE');fs.linkSync(from,path.join(dest,name));
+  for(const name of names(movies)){
+   const from=path.join(movies,name),s=regular(from,32*1024**3);
+   if(!/\.(ogv|ogg|mp4|wmv|avi|mpg|mpeg)$/i.test(name))fail('ARTEMIS_MOVIE');add(from,path.join(dest,name),s);
   }
  }
+ const free=()=>{const s=fs.statfsSync(shadow,{bigint:true});return s.bavail*s.bsize;},floor=10n*1024n**3n;
+ // Leave room for the bounded three-member patch, manifest and initial protocol files as well
+ if(free()-BigInt(total)-1024n**2n<floor)fail('ARTEMIS_DISK_BUDGET');
+ let lastCheck=-Infinity;const check=()=>{const now=performance.now();if(now>deadline)fail('ARTEMIS_COPY_TIMEOUT');if(now-lastCheck>500){lastCheck=now;if(!validate())fail('ARTEMIS_SESSION_REVOKED');if(free()<floor)fail('ARTEMIS_DISK_BUDGET');}};
+ const stamp=s=>[s.dev,s.ino,s.size,s.mtimeNs,s.ctimeNs].join(':');
+ for(const item of plan){
+  check();const before=fs.statSync(item.from,{bigint:true});let input,output;
+  try{
+   input=await fs.promises.open(item.from,'r');output=await fs.promises.open(item.to,'wx');const opened=await input.stat({bigint:true});if(stamp(opened)!==stamp(before)||Number(opened.size)!==item.bytes)fail('ARTEMIS_IDENTITY_CHANGED');
+   const buffer=Buffer.allocUnsafe(256*1024);let count=0;
+   for(;;){check();const r=await input.read(buffer,0,Math.min(buffer.length,item.bytes-count+1),null);if(!r.bytesRead)break;count+=r.bytesRead;if(count>item.bytes)fail('ARTEMIS_IDENTITY_CHANGED');let at=0;while(at<r.bytesRead){const w=await output.write(buffer,at,r.bytesRead-at,null);if(!w.bytesWritten)fail('ARTEMIS_COPY_WRITE');at+=w.bytesWritten;}}
+   if(count!==item.bytes||stamp(await input.stat({bigint:true}))!==stamp(before)||stamp(fs.statSync(item.from,{bigint:true}))!==stamp(before))fail('ARTEMIS_IDENTITY_CHANGED');
+  }finally{const closed=await Promise.allSettled([input?.close(),output?.close()]);const failed=closed.find(r=>r.status==='rejected');if(failed)throw failed.reason;}
+ }
+ if(!validate())fail('ARTEMIS_SESSION_REVOKED');
  fs.mkdirSync(path.join(shadow,'savedata'));
- return {linked,copied};
+ return {linked:0,copied,resourceBytes:total-copied,totalCopied:total};
 }
 class ArtemisSession{
  constructor({root,exe,shadow,identity,nonce,grant,canary=null,trace=()=>{}}){Object.assign(this,{root,exe,shadow,identity,nonce,grant,canary,trace});this.control=path.join(shadow,'megulit-artemis.ctl');this.output=path.join(shadow,'megulit-artemis.jsonl');this.generation=1;this.sequence=0;this.offset=0;this.partial='';this.decoder=new TextDecoder('utf-8',{fatal:true});this.owner=null;this.onSource=()=>false;this.onSemantic=()=>{};this.onStatus=()=>{};this.query=null;this.on=false;this.stopped=false;this.publish();}
@@ -117,18 +134,16 @@ class ArtemisSession{
   let at;while((at=this.partial.indexOf('\n'))>=0){const line=this.partial.slice(0,at);this.partial=this.partial.slice(at+1);if(Buffer.byteLength(line)>65536)fail('ARTEMIS_TRANSPORT_BUDGET');this.accept(JSON.parse(line));}
  }
  accept(m){
-  if(!this.permission()||!this.on||!this.owner||m?.nonce!==this.nonce||m.generation!==this.generation||!['line','name','choice','status'].includes(m.role)||typeof m.text!=='string'||Buffer.byteLength(m.text)>8192||/[\u0000-\u0009\u000b-\u001f\u007f]/.test(m.text))return false;
+  if(!this.permission()||!this.on||!this.owner||m?.nonce!==this.nonce||m.generation!==this.generation||!['line','name','choice','status'].includes(m.role)||typeof m.text!=='string'||Buffer.byteLength(m.text)>8192||/[\u0000-\u0009\u000b-\u001f\u007f\ud800-\udfff]/u.test(m.text)||m.role!=='line'&&m.text.includes('\n'))return false;
   const length=[...m.text].length;if(length>(m.role==='line'?2048:m.role==='name'?256:1024))return false;
   if(!Array.isArray(m.ruby)||m.ruby.length>64)return false;
-  for(const r of m.ruby)if(!Array.isArray(r)||r.length!==3||!Number.isInteger(r[0])||!Number.isInteger(r[1])||r[0]<0||r[1]<1||r[1]>80||r[0]+r[1]>length||typeof r[2]!=='string'||![...r[2]].length||[...r[2]].length>160||/[\x00-\x1f\x7f]/.test(r[2]))return false;
+  let end=0;for(const r of m.ruby){if(!Array.isArray(r)||r.length!==3||!Number.isInteger(r[0])||!Number.isInteger(r[1])||r[0]<end||r[1]<1||r[1]>80||r[0]+r[1]>length||typeof r[2]!=='string'||![...r[2]].length||[...r[2]].length>160||/[\x00-\x1f\x7f\ud800-\udfff]/u.test(r[2]))return false;end=r[0]+r[1];}
   const owner={...this.owner};
   this.canary?.alive('artemis');
   if(m.role==='status'){if(m.text!=='installed'||m.ruby.length)return false;this.onStatus('Lua input wrappers installed; save path checked; no pixel/hide ACK');return true;}
   if(m.role!=='line'){this.onSemantic({...m,owner});return true;}
   if(!m.text.trim())return false;
-  const cps=[...m.text],ruby=m.ruby.map(r=>[cps.slice(r[0],r[0]+r[1]).join(''),r[2]]);
-  const text=m.text+ruby.map(r=>'\x1d'+r[0]+'\x1c'+r[1]).join('');
-  const message={text,origin:'artemis-lua-input',sourceName:'Artemis Lua input',sourceCode:'HU:ARTEMIS_INPUT',artemisOwner:owner},mark={};
+  const message={text:m.text,artemisRuby:m.ruby.map(r=>r.slice()),origin:'artemis-lua-input',sourceName:'Artemis Lua input',sourceCode:'HU:ARTEMIS_INPUT',artemisOwner:owner},mark={};
   message[AUTH]=mark;authorities.set(mark,{session:this,generation:this.generation,owner,at:performance.now()});
   return this.onSource(message)===true;
  }
@@ -140,7 +155,7 @@ class ArtemisSession{
   this.stopped=true;this.on=false;this.generation++;clearInterval(this.timer);
   this.unsubscribe?.();this.unsubscribe=null;
   try{require('./owner-tests.cjs').revoke(this.grant);}catch{}
-  let error;try{this.publish();}catch(e){error=e;}
+  let error;try{this.onStop?.();}catch(e){error=e;}try{this.publish();}catch(e){error=error||e;}
   const pending=[this.query,this.connecting];Promise.allSettled(pending).then(()=>{this.owner=null;this.grant=null;if(error)failed(Object.assign(Error('READER_STOP_INCOMPLETE'),{cause:error}));else finish();});return this.stopping;
  }
 }
@@ -155,7 +170,7 @@ async function prepare({root,exe,ownerTestGrant,shadowRoot,steamAppId=null,canar
  const canonical=path.relative(fs.realpathSync(dir),fs.realpathSync(ancestor));if(!canonical||!canonical.startsWith('..'+path.sep)&&canonical!=='..'&&!path.isAbsolute(canonical))fail('ARTEMIS_SHADOW_LOCATION');
  fs.mkdirSync(parent,{recursive:true});const shadow=fs.mkdtempSync(path.join(parent,'session-')),nonce=crypto.randomBytes(16).toString('hex');
  try{
-  const stats=shadowFiles(dir,shadow,assets.files),control=path.join(shadow,'megulit-artemis.ctl'),output=path.join(shadow,'megulit-artemis.jsonl'),tail=bootTail(prepared,{nonce,control,output});
+  const stats=await shadowFiles(dir,shadow,assets.files,{validate:()=>allowed(ownerTestGrant,exe)}),control=path.join(shadow,'megulit-artemis.ctl'),output=path.join(shadow,'megulit-artemis.jsonl'),tail=bootTail(prepared,{nonce,control,output});
   if(hash(fs.readFileSync(path.join(shadow,path.basename(exe))))!==prepared.provenance.exe||!allowed(ownerTestGrant,exe))fail('ARTEMIS_IDENTITY_CHANGED');
   const files=Object.entries(assets.modules).map(([name,data])=>({name:name.replace(/\//g,'\\'),data:Buffer.concat([data,tail])}));
   const patch=require('./artemis-language.cjs')._internal.pf8(files);fs.writeFileSync(path.join(shadow,assets.patch),patch,{flag:'wx'});
