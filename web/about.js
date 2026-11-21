@@ -9,7 +9,7 @@ import {openFeedback} from './feedback-ui.js';
 import {fxPref} from './fx-prefs.js';
 import {mountSupportToy} from './about-toy.js';
 import {seedAboutHTML,fillSeedCount} from './the-seed.js';
-export const VERSION='1.4.20';
+export const VERSION='1.4.22';
 const REPO='https://github.com/ilynthn/MeguLit';
 const SPONSOR='https://github.com/sponsors/ilynthn';
 export const aboutLabel={zh:'关于',en:'About',ja:'について'};
