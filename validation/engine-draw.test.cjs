@@ -88,3 +88,12 @@ test('engine-draw.log: every record once, timestamped, for the probe and the off
  const lines=fs.readFileSync(path.join(dir,'engine-draw.log'),'utf8').trim().split('\n');
  assert.equal(lines.length,2,'a repeat is left out');assert.match(lines[0],/^\d{4}-\d\d-\d\dT[\d:.]+Z ToMe_CHARS engine=rpgm .* text=はい$/);
 });
+
+test('a game whose diff turns draw.roles on gets its control file when the profile arrives (YU-RIS arms its hook from it)',()=>{
+ const {HookNative}=require('../core/hook-native.cjs');const tmp=fs.mkdtempSync(path.join(process.env.MEGULIT_TEST_TMP||os.tmpdir(),'megulit-ed-sync-'));
+ const h=Object.create(HookNative.prototype);Object.assign(h,{emit:()=>{},trace:()=>{},notify:()=>{},state:{gameProcessId:4321},profile:Profiles.profileFor({})});
+ const written=[];const orig=ED.KrkrTransport.prototype.write;ED.KrkrTransport.prototype.write=function(cfg){written.push({...cfg});};
+ try{h.drawSync();assert.equal(h.engineDraw,undefined,'draw.* off: no control file');
+  h.setProfile(prof({roles:true}));assert.equal(h.engineDraw.pid,4321);assert.deepEqual(written.at(-1),{roles:true,embed:false,zh:true});
+ }finally{ED.KrkrTransport.prototype.write=orig;h.engineDraw?.stop?.();}
+});
