@@ -5,7 +5,7 @@ const SHA='c4d74235dc06d19630d8b826e49bd3d047c09bc03e8d8badeb0d60dd71dd7314';
 const PREFIX='ToMe_UNITY kemco1 ',AUTH=Symbol('kemco-source-authority'),TTL=500,MAX_BYTES=8223;
 class UnityKemcoSource{
  constructor({onSource=()=>{},now=()=>performance.now(),scope=()=>randomBytes(16).toString('hex')}={}){this.onSource=onSource;this.now=now;this.newScope=scope;this.enabled=false;this.scope='';this.seq=0;this.current=null;}
- configure(on,{force=false}={}){on=on===true;if(on===this.enabled&&!force)return;this.enabled=on;this.current=null;this.seq=0;this.scope=on?this.newScope():'';if(on&&!/^[a-f0-9]{32}$/.test(this.scope)){this.enabled=false;this.scope='';throw Error('UNITY_KEMCO_SCOPE');}}
+ configure(on,{force=false}={}){on=on===true;if(on===this.enabled&&!force)return;this.enabled=false;this.current=null;this.seq=0;this.scope='';if(on){const scope=this.newScope();if(!/^[a-f0-9]{32}$/.test(scope))throw Error('UNITY_KEMCO_SCOPE');this.scope=scope;this.enabled=true;}}
  reconnect(){this.configure(this.enabled,{force:true});}
  command(){return this.enabled?'KEMCO '+this.scope+'\n':'';}
  active(){const c=this.current,t=this.now();if(!this.enabled||!c||!Number.isFinite(t)||t<c.at||t-c.at>=TTL){this.current=null;return false;}return true;}

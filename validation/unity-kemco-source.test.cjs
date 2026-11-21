@@ -40,3 +40,8 @@ test('real Unity transport rotates source scope and stops it without changing de
  const prior=writes.length;p.want('試験の本文です。');assert.equal(writes.length,prior+1);assert.doesNotMatch(writes.at(-1),/DRAW|KEMCO/,'a source WANT does not revoke its own permission epoch');
  p.drawConfig({kemcoSprites:false});assert.equal(p.blockSource({}),false);p.line(packet(scope,2));assert.equal(out.length,1);p.stop();
 });
+test('scope generation failure revokes before failure and cannot restore old authority',()=>{
+ let count=0;const h=new UnityKemcoSource({scope:()=>{if(++count>1)throw Error('CONTROLLED_RANDOM_FAILURE');return 'a'.repeat(32);},onSource:()=>true});h.configure(true);const old=h.scope;h.accept(packet(old,1));assert.equal(h.block({}),true);
+ assert.throws(()=>h.reconnect(),/CONTROLLED_RANDOM_FAILURE/);assert.equal(h.enabled,false);assert.equal(h.scope,'');h.accept(packet(old,2));assert.equal(h.block({}),false);
+ const {UnityTextPath}=require('../core/text-paths-unity.cjs'),writes=[],statuses=[],p=new UnityTextPath({onStatus:s=>statuses.push(s)});p.sock={write:s=>writes.push(s)};p.kemco.newScope=()=>{throw Error('CONTROLLED_RANDOM_FAILURE');};assert.doesNotThrow(()=>p.drawConfig({kemcoSprites:true}));assert.equal(p.kemco.enabled,false);assert.equal(p.blockSource({}),false);assert.equal(writes.length,1);assert.match(statuses[0],/negotiation unavailable/);
+});

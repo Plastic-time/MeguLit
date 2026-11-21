@@ -74,9 +74,10 @@ function makeShadow({exe,shadowRoot,pack,port,steamAppId=null}){
 class UnityTextPath{
  constructor({onChars=()=>{},onStatus=()=>{},onAsk=()=>{},onSource=()=>{},canary=null}={}){Object.assign(this,{onChars,onStatus,onAsk,onSource,canary});this.sock=null;this.on=false;this.wanted='';this.armed=false;this.drawCfg=null;this.embeds=new Map();this.kemco=new(require('./unity-kemco-source.cjs').UnityKemcoSource)({onSource:m=>this.onSource(m)});}
  listen(){return new Promise((resolve,reject)=>{this.server=net.createServer(s=>this.accept(s));this.server.on('error',reject);this.server.listen(0,'127.0.0.1',()=>resolve(this.server.address().port));});}
- accept(s){if(this.sock)this.sock.destroy();this.sock=s;this.kemco.reconnect();s.setEncoding('utf8');s.setNoDelay(true);let buf='';
+ negotiateKemco(){try{this.kemco?.configure(this.drawCfg?.kemcoSprites===true,{force:true});}catch{try{this.onStatus('kemco source negotiation unavailable');}catch{}}}
+ accept(s){if(this.sock)this.sock.destroy();this.sock=s;this.negotiateKemco();s.setEncoding('utf8');s.setNoDelay(true);let buf='';
   s.on('data',d=>{buf+=d;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).replace(/\r$/,'');buf=buf.slice(i+1);this.line(line);}if(buf.length>200000)buf='';});
-  s.on('close',()=>{if(this.sock===s){this.sock=null;this.kemco.reconnect();}});s.on('error',()=>{});this.push(true);}
+  s.on('close',()=>{if(this.sock===s){this.sock=null;this.negotiateKemco();}});s.on('error',()=>{});this.push(true);}
  line(l){if(this.kemco?.accept(l))return;if(l.startsWith('ToMe_UNITY status ')){this.onStatus(l.slice(18));return;}
   if(l.startsWith('ToMe_UNITY ask ')){const k=l.slice(15).trim();if(k)this.onAsk({key:k,text:k,engine:'unity'});return;}
   const r=parseChars(l);if(!r||r.engine!=='unity')return;
@@ -85,7 +86,7 @@ class UnityTextPath{
  push(reset=false){if(!this.sock)return;const controls=this.drawCfg&&(!this.drawCfg.kemcoSprites||reset)?this.drawLine()+(this.kemco?.command()||''):'';this.sock.write('WANT '+this.wanted.replace(/\r?\n/g,'\x1f')+'\nHIDE '+(this.on?1:0)+'\n'+controls+[...this.embeds.values()].join(''));}
  drawLine(){const c=this.drawCfg;return 'DRAW roles='+(c.roles?1:0)+' embed='+(c.embed?1:0)+' zh='+(c.zh?1:0)+(c.kemcoSprites?' kemcoSprites=1':'')+'\n';}
  /* engine-draw: the switches, and one sentence's replacement (kept for a reconnect, newest 64) */
- drawConfig(cfg){const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false,kemcoSprites:cfg?.kemcoSprites===true};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;this.kemco?.configure(c.kemcoSprites,{force:true});if(this.sock){this.sock.write(this.drawLine());const command=this.kemco?.command();if(command)this.sock.write(command);}}
+ drawConfig(cfg){const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false,kemcoSprites:cfg?.kemcoSprites===true};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;if(this.kemco)UnityTextPath.prototype.negotiateKemco.call(this);if(this.sock){this.sock.write(this.drawLine());const command=this.kemco?.command();if(command)this.sock.write(command);}}
  blockSource(message){return this.kemco.block(message);}
  drawEmbed(key,o={}){const {krkrControlText}=require('./engine-draw.cjs');const body=krkrControlText({roles:false,embed:true,zh:true},new Map([[String(key||''),{ruby:o.ruby||[],zh:o.zh||''}]])).split('\r\n')[1]||'';if(!body)return;
   const l='EMB '+body+'\n';this.embeds.delete(key);this.embeds.set(key,l);while(this.embeds.size>64)this.embeds.delete(this.embeds.keys().next().value);if(this.sock)this.sock.write(l);}
