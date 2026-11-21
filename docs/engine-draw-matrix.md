@@ -2,6 +2,18 @@
 
 新体系（店主 2026-11-21）：MeguLitHook 内核 + 每个引擎逆向「画字函数」（从引擎内部直接读状态）+ 每部游戏一份纯数据差分。这份矩阵是地基的盘点：每个主要引擎现在仓库里有什么、离「引擎内部读」还差什么、先做哪个。统一上报格式见 [engine-draw-protocol.md](engine-draw-protocol.md)
 
+## 两级验收（2026-11-22）
+
+一级要求：本机样本静态区分正文、名字和选项，或样本签名唯一命中；回放夹具和相关测试全绿，全部受版本控制的 JS/CJS/MJS 通过 `node --check`；新增钩子默认不挂且 `engine-draw-opt-in` 通过；合入最新 `origin/main` 后重测再推送
+
+二级实机核实单独排队，不阻塞一级；静态完成不代表隐藏、点读、翻译或清页已实机通过，也不授权开启任何游戏 seed
+
+| 引擎 / 本轮范围 | 一级状态 | 静态证据与回放 | 二级 |
+|---|---|---|---|
+| Softpal / 既有 Pal 输入回调的有界写回 | 静态完成、待实机 | 本机 LeyLine.exe SHA `9a502090…56ffb77`，既有 host 签名在可执行节唯一命中 RVA `0x25390`；`pal-text-bounds` 原生 27 项、相关 Node 回放与 opt-in 全过；无新增钩子、flag 或 seed | 同版本正文、名字、选项、隐藏十句、点读、译文、翻页与增长拒绝待核实 |
+
+实机步骤维护在本机 `H:/MeguLit-Work/night-1423/live-check-queue.md`，每次一级推送的完整 SHA 记入夜间进度
+
 ## 状态：已进 main（2026-11-21，4f1cb363），默认不挂
 
 下面各引擎的画字钩子都已合进 main。默认全部不挂：只有这部游戏的 seed 打开 `draw.roles`（MeguLit 写出控制文件 `#cfg roles=1`）才装钩子；现在没有任何游戏 seed 打开它。这一点由 `validation/engine-draw-opt-in.test.cjs` 钉住：钩子只在 `Install()` 里装，`Install()` 只在 roles=1 检查之后调，启动时 `Arm()` 从不挂钩；内核默认不写控制文件；seed 要开得先加进测试里的允许名单
