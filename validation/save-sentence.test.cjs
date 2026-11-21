@@ -24,6 +24,23 @@ test('saving a line keeps one row per game and original text, and fills a missin
  }finally{db.close();}
 });
 
+test('identical saved lines only list words collected from the same game',t=>{
+ const db=openStore(temp(t)),line='明日は晴れる。';
+ try{
+  const word=db.prepare("INSERT INTO vocabulary(id,spelling,reading,definitions,created_at,original) VALUES(?,?,'','[]',1,'{}')");
+  const example=db.prepare("INSERT INTO examples(word_id,game_id,text,original) VALUES(?,?,?,'{}')");
+  for(const [id,game,spelling] of [[1,'a','明日'],[2,'b','晴れる'],[3,null,'は']]){
+   saved.save(db,{gameId:game,text:line});
+   word.run(id,spelling);
+   example.run(id,game,line);
+  }
+  example.run(2,'a','別の文。');
+  example.run(1,'a',line);
+  const rows=saved.list(db);
+  assert.deepEqual(rows.map(r=>[r.game_id,r.words.map(w=>w.id)]),[[null,[3]],['b',[2]],['a',[1]]]);
+ }finally{db.close();}
+});
+
 test('the reader saves the shown line for the attached game and toggles it off again',async t=>{
  const root=temp(t),events=[];
  const runtime={root,folder:path.join(root,'data','config'),emit:(name,payload)=>events.push(payload),config:()=>({}),learning:()=>({installed:()=>true})};
