@@ -1,10 +1,10 @@
 # Explicit bounded pickle data primitive
 
-`original-engines/renpy-pickle-bounded.cjs` is unregistered and does not replace the existing RPYC reader. It accepts an already decompressed Buffer, never a path. It neither imports Python modules nor invokes constructors, reductions, state methods, persistent IDs or extension handlers
+`original-engines/renpy-pickle-bounded.cjs` is unregistered and does not replace the existing RPYC reader. It accepts an already decompressed Buffer, never a path. It neither imports Python modules nor invokes constructors, reduction callables, state methods, persistent IDs or extension handlers
 
-`decode(buffer, {limits, classes})` returns `{value, protocol, counts, bytesRead}`. The default class allowlist contains only `renpy.ast.Say`, `Translate` and `TranslateSay`; a caller can explicitly supply up to 64 inert `renpy.ast` class identities. This is an identity allowlist, not proof that an AST class is supported by a narrative extractor
+`decode(buffer, {limits, classes, allowDefaultDict:false})` returns `{value, protocol, counts, bytesRead}`. The default class allowlist contains only `renpy.ast.Say`, `Translate` and `TranslateSay`; a caller can explicitly supply up to 64 inert `renpy.ast` class identities. This is an identity allowlist, not proof that an AST class is supported by a narrative extractor
 
-Both GLOBAL and STACK_GLOBAL require the exact module token `renpy.ast` and a simple class-name token. Qualified names through a parent module are conservatively rejected; concatenated spelling alone is not an identity proof. Unicode data retains a leading U+FEFF literally, rather than treating each string as a file with a removable BOM
+By default both GLOBAL and STACK_GLOBAL require the exact module token `renpy.ast` and a simple class-name token. Qualified names through a parent module are conservatively rejected; concatenated spelling alone is not an identity proof. Unicode data retains a leading U+FEFF literally, rather than treating each string as a file with a removable BOM
 
 Supported data uses protocol 2–5 binary operands, strict UTF-8 unicode, opaque byte strings, finite safe integers/floats, booleans/None, tuples, lists, dictionaries, memo references, allowlisted globals, empty-argument NEWOBJ, and dictionary/slot BUILD state. Protocol 4 frames cannot split an operand. Framed and unframed sections may coexist as permitted by pickle framing; STOP must consume the entire input. Protocol-specific operands reject under an earlier declared protocol
 
@@ -14,10 +14,18 @@ Every cursor read checks remaining input and frame boundaries. Required line ter
 
 The limits account for logical data and operations, including memo-recall pushes, container edges and merged state edges. They do not claim an operating-system RSS limit or exact JavaScript object overhead. There is no decompression in this module. A future framing caller must independently cap compressed and decompressed input before calling it
 
-Reductions (including copy-reg reconstructors), protocol-0 text operands, sets, arbitrary Python globals, out-of-band buffers and unknown opcode forms are intentionally unsupported. Actual Ren'Py compiler compatibility has not been established. Synthetic byte fixtures and ordinary CPython pickling are useful controls, but neither proves a specific Ren'Py SDK can be read
+Reductions are unsupported by default. The explicit boolean `allowDefaultDict:true` adds only the exact globals `collections/defaultdict`, `builtins/list` and `__builtin__/list` as frozen inert metadata. It permits REDUCE only with the exact defaultdict identity and a tuple containing zero arguments, one None, or one of those exact list globals. The output is `{kind:'defaultdict', factory:null|'list', entries:Map}`. No Python callable or factory runs, no prototype gains a default handler, and reading a missing Map key never inserts a value
+
+SETITEM and SETITEMS accept this explicit record with the same supported key types, duplicate-key rejection and two stored edges per entry as ordinary dictionaries. The fixed factory tag is metadata, like a record's kind or instance className, rather than an additional graph reference. Tuple argument edges and all pushes, strings, memo entries and operations still consume their existing budgets. Cycles remain inert references and require the same consumer traversal policy
+
+The option must be a boolean; invalid values throw RENPY_PICKLE_DEFAULTDICT_OPTION. Other globals still throw GLOBAL. A different callable or non-tuple REDUCE arguments throw REDUCE; excess arguments throw REDUCE_ARGS and an unsupported factory throws REDUCE_FACTORY. These codes retain the normal RENPY_PICKLE_ prefix and offsets. Empty-argument NEWOBJ remains restricted to the explicit `renpy.ast` class allowlist, so the newly admitted defaultdict/list metadata cannot become instances. BUILD state rules are unchanged
+
+Other reductions (including copy-reg reconstructors), protocol-0 text operands, sets, arbitrary Python globals, out-of-band buffers and unknown opcode forms remain unsupported. Actual Ren'Py compiler compatibility has not been established. Synthetic byte fixtures and ordinary CPython pickling are useful controls, but neither proves a specific Ren'Py SDK can be read
 
 No AST traversal, language selection, canonical-ID calculation, translation pairing, RPA discovery, scene registration or game modification is provided here. Those steps require a separately validated schema and real compiler-produced oracle. This primitive must not be used to turn a partial graph into a claimed complete narrative
 
 Validation: `node --test validation/renpy-pickle-bounded.test.cjs`
 
 The small committed CPython fixtures have an adjacent optional producer using only standard-library pickle and neutral synthetic classes. Tests consume the fixed bytes without requiring Python. The recorded Python version and opcode sets describe these controls; they do not pin or emulate a Ren'Py compiler release
+
+`validation/fixtures/renpy-defaultdict-cpython.json` adds six fixed controls from ordinary CPython `collections.defaultdict(None|list)` pickling under protocols 2, 4 and 5, using only neutral alpha/empty keys and integer lists. The same optional producer accepts `--defaultdict` to generate them. No real game bytes or source dialogue are committed. These controls validate the narrow inert container representation, not a game's complete graph or narrative

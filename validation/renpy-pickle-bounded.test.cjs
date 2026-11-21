@@ -9,6 +9,10 @@ const read=(...parts)=>decode(stream(...parts));
 const reject=(buf,code,options)=>assert.throws(()=>decode(buf,options),error=>error.code==='RENPY_PICKLE_'+code&&Number.isSafeInteger(error.offset));
 const global=()=>Buffer.from('crenpy.ast\nSay\n','ascii');
 const instance=()=>Buffer.concat([global(),b(0x29,0x81)]);
+const namedGlobal=(module,name)=>Buffer.from('c'+module+'\n'+name+'\n','ascii');
+const ddGlobal=()=>namedGlobal('collections','defaultdict');
+const ddOptions={classes:[],allowDefaultDict:true};
+const dd=(args=b(0x29))=>Buffer.concat([ddGlobal(),args,b(0x52)]);
 test('ordinary CPython serializer fixtures retain slot-state graphs under protocols 2, 4 and 5',()=>{
  const fixture=require('./fixtures/renpy-bounded-cpython.json');
  for(const input of fixture.fixtures){
@@ -89,4 +93,68 @@ test('all work and allocation budgets can be lowered but never raised',()=>{
  reject(stream(b(0x4e,0x71,1)),'BUDGET_MEMO',{limits:{memo:1}});
  reject(stream(b(0x4e)),'INPUT',{limits:{inputBytes:3}});
  for(const limits of [{unknown:1},{operations:0},{stack:LIMITS.stack+1},{memo:1.5},null])reject(stream(b(0x4e)),'LIMITS',{limits});
+});
+
+test('explicit defaultdict mode reads ordinary CPython None/list controls under protocols 2, 4 and 5',()=>{
+ const fixture=require('./fixtures/renpy-defaultdict-cpython.json');
+ assert.equal(fixture.fixtures.length,6);
+ for(const input of fixture.fixtures){
+  const buffer=Buffer.from(input.base64,'base64'),out=decode(buffer,ddOptions),value=out.value;
+  assert.equal(buffer.length,input.bytes);assert.equal(out.bytesRead,input.bytes);assert.equal(out.protocol,input.protocol);
+  assert.equal(value.kind,'defaultdict');assert.equal(value.factory,input.factory);assert.ok(value.entries instanceof Map);
+  assert.deepEqual(value.entries.get('alpha'),{kind:'list',items:[1,2]});assert.deepEqual(value.entries.get('empty'),{kind:'list',items:[]});
+  assert.equal(value.entries.size,2);assert.equal(value.entries.get('absent'),undefined);assert.equal(value.entries.size,2);
+  assert.equal(Object.getPrototypeOf(value),Object.prototype);
+  reject(buffer,'GLOBAL');reject(buffer,'GLOBAL',{classes:[]});reject(buffer,'GLOBAL',{allowDefaultDict:false});
+ }
+});
+
+test('defaultdict mode is boolean and off unless explicitly enabled',()=>{
+ for(const allowDefaultDict of [null,0,1,'true','false',{},[]])reject(stream(b(0x4e)),'DEFAULTDICT_OPTION',{allowDefaultDict});
+ reject(stream(dd()),'GLOBAL');reject(stream(dd()),'GLOBAL',{allowDefaultDict:false});
+ reject(stream(namedGlobal('builtins','list')),'GLOBAL');reject(stream(namedGlobal('__builtin__','list')),'GLOBAL');
+ for(const [module,name]of [['collections','defaultdict'],['builtins','list'],['__builtin__','list']]){
+  const value=decode(stream(namedGlobal(module,name)),ddOptions).value;
+  assert.deepEqual(value,{kind:'global',name:module+'.'+name});assert.equal(Object.isFrozen(value),true);
+ }
+});
+
+test('defaultdict reduction accepts only empty, None or exact inert list-factory arguments',()=>{
+ for(const args of [b(0x29),b(0x4e,0x85)])assert.deepEqual(decode(stream(dd(args)),ddOptions).value,{kind:'defaultdict',factory:null,entries:new Map()});
+ for(const module of ['builtins','__builtin__']){
+  const args=Buffer.concat([namedGlobal(module,'list'),b(0x85)]);
+  assert.equal(decode(stream(dd(args)),ddOptions).value.factory,'list');
+ }
+ reject(stream(dd(b(0x4e))),'REDUCE',ddOptions);
+ reject(stream(dd(b(0x4e,0x4e,0x86))),'REDUCE_ARGS',ddOptions);
+ for(const args of [b(0x4b,1,0x85),b(0x89,0x85),b(0x5d,0x85),b(0x7d,0x85),Buffer.concat([ddGlobal(),b(0x85)])])reject(stream(dd(args)),'REDUCE_FACTORY',ddOptions);
+ reject(stream(dd(Buffer.concat([namedGlobal('renpy.ast','Say'),b(0x85)]))),'REDUCE_FACTORY',{allowDefaultDict:true});
+});
+
+test('new globals never enable arbitrary reducer, constructor or state execution',()=>{
+ for(const [module,name]of [['collections','OrderedDict'],['collections','defaultdict.extra'],['collections.defaultdict','list'],['builtins','dict'],['__builtin__','tuple'],['os','system']])reject(stream(namedGlobal(module,name)),'GLOBAL',ddOptions);
+ for(const [module,name]of [['builtins','list'],['__builtin__','list'],['collections','defaultdict']]){
+  reject(stream(namedGlobal(module,name),b(0x29,0x81)),'NEWOBJ',ddOptions);
+ }
+ reject(stream(global(),b(0x29,0x52)),'REDUCE',{allowDefaultDict:true});
+ reject(stream(namedGlobal('builtins','list'),b(0x29,0x52)),'REDUCE',ddOptions);
+ reject(stream(b(0x4e,0x29,0x52)),'REDUCE',ddOptions);
+ reject(stream(dd(),b(0x7d,0x62)),'STATE',ddOptions);
+ const ordinary=decode(stream(instance(),b(0x7d,0x62)),{allowDefaultDict:true}).value;
+ assert.equal(ordinary.className,'renpy.ast.Say');reject(stream(instance()),'GLOBAL',ddOptions);
+});
+
+test('defaultdict SETITEM/SETITEMS preserve duplicates and edge budgets without default insertion',()=>{
+ const single=stream(dd(),string('key'),b(0x4b,3,0x73)),many=stream(dd(),b(0x28),string('a'),b(0x4b,1),string('b'),b(0x4b,2,0x75));
+ assert.equal(decode(single,ddOptions).value.entries.get('key'),3);
+ assert.deepEqual([...decode(many,ddOptions).value.entries],[['a',1],['b',2]]);
+ reject(stream(dd(),string('a'),b(0x4e,0x73),string('a'),b(0x4e,0x73)),'DUPLICATE_KEY',ddOptions);
+ reject(stream(dd(),b(0x28),string('a'),b(0x4e),string('a'),b(0x4e,0x75)),'DUPLICATE_KEY',ddOptions);
+ reject(stream(dd(),b(0x4e,0x4e,0x73)),'DICT',ddOptions);
+ reject(single,'BUDGET_EDGES',{...ddOptions,limits:{edges:1}});
+ const exact=decode(single,{...ddOptions,limits:{edges:2}});assert.equal(exact.counts.edges,2);
+ reject(many,'BUDGET_EDGES',{...ddOptions,limits:{edges:3}});
+ assert.equal(decode(many,{...ddOptions,limits:{edges:4}}).counts.edges,4);
+ const cyclic=decode(stream(dd(),b(0x71,0),string('self'),b(0x68,0,0x73)),ddOptions).value;
+ assert.equal(cyclic.entries.get('self'),cyclic);
 });
