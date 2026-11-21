@@ -99,6 +99,25 @@ class LocalLearning{
   });
   this.starting.catch(()=>{});return this.starting;
  }
+ /* 2026-11-21 (user group: 「黒
+ずんでいた」, 「見つ
+めていた」, 「汗
+ばんでいた」 wrapped by the game): a line break inside a sentence is the
+    game's layout, not a word boundary; SudachiDict cut every word it ran through (黒 / ず / ん, 見 / つ / め). The sentence is tokenized
+    without its line breaks and every token's start / end (code points) is mapped back onto the text as given; the breaks come back as
+    blank tokens, so callers see the same text and indices as before. */
+ async tokenizeWhole(text){
+  const lineBreak=c=>c==='\u000d'||c==='\u000a';
+  if(![...text].some(lineBreak))return this.tokenize(text);
+  const chars=[...text],keep=[];chars.forEach((c,i)=>{if(!lineBreak(c))keep.push(i);});
+  const flat=keep.map(i=>chars[i]).join('');if(!flat)return this.tokenize(text);
+  const tokens=await this.tokenize(flat),at=k=>k>=keep.length?chars.length:keep[k],out=[];
+  let pos=0;for(const t of tokens){const start=at(t.start),end=t.end>0?keep[Math.min(t.end,keep.length)-1]+1:start;
+   if(start>pos){const gap=chars.slice(pos,start).join('');out.push({surface:gap,base_form:gap,normalized:gap,reading:'',pos:'空白',start:pos,end:start});}
+   out.push({...t,start,end,surface:chars.slice(start,end).join('')});pos=end;}
+  if(pos<chars.length){const gap=chars.slice(pos).join('');out.push({surface:gap,base_form:gap,normalized:gap,reading:'',pos:'空白',start:pos,end:chars.length});}
+  return out;
+ }
  async tokenize(text){
   if(this.cache.has(text))return this.cache.get(text);await this.ready();
   const tokens=await new Promise((resolve,reject)=>{const id=++this.serial,timer=setTimeout(()=>{this.pending.delete(id);reject(Error('本地分词等待超时，请检查 Full 组件状态'));},45000);this.pending.set(id,{resolve,reject,timer});this.worker.stdin.write(JSON.stringify({id,text})+'\n');});
@@ -201,7 +220,7 @@ class LocalLearning{
 
  async request(command,args,language='zh'){
   const text=args.text;if(typeof text!=='string'||[...text].length>4000)throw Error('无效查词文本');
-  const tokens=await this.tokenize(text);if(command==='tokenize_text')return tokens;
+  const tokens=await this.tokenizeWhole(text);if(command==='tokenize_text')return tokens;
   this.load();const groups=this.groups(tokens).flatMap(t=>{
     const found=[t.base_form,t.normalized,t.surface].some(k=>this.index.has(k));
     return !found&&t.subtokens?.length>1?this.groups(t.subtokens):[t];
@@ -209,11 +228,22 @@ class LocalLearning{
   const make=t=>{const morphology=conjugation(t,language);return {start:t.start,end:t.end,surface:t.surface,entries:this.entries(t,language),related_entries:[],morphology,deconjugated_from:morphology.forms.length?[morphology.forms.join(' · '),morphology.rules.join('；')].filter(Boolean).join('｜'):null};};
   if(command==='scan_sentence')return groups.map(make).filter(r=>r.entries.length);
   let group=command==='lookup_exact'?groups.find(t=>t.start===args.start&&t.end===args.end):groups.find(t=>args.position>=t.start&&args.position<t.end);
-  if(command==='lookup_at_position'&&group){const index=groups.indexOf(group);let best=group;for(let a=Math.max(0,index-5);a<=index;a++){let surface='',parts=[];for(let z=a;z<Math.min(groups.length,a+7);z++){const t=groups[z];if(z>a&&groups[z-1].end!==t.start||t.pos==='補助記号')break;surface+=t.surface;parts.push(...(t.parts||[t]));if(surface.length>60)break;if(z>=index&&surface.length>best.surface.length&&this.index.has(surface)){const readings=[...new Set(this.index.get(surface).flatMap(id=>this.byId.get(id).readings))];best={...groups[a],start:groups[a].start,end:t.end,surface,base_form:surface,normalized:surface,reading:readings.length===1?readings[0]:parts.map(p=>p.reading||'').join(''),parts,aux:[]};}}}group=best;}
+  /* 2026-11-21 (user group, 「全身はじっとりと汗
+ばんでいた」 wrapped after 汗: 汗 and ばんで looked up apart, 汗ばむ never found): SudachiDict Full
+     splits 汗ばむ into 汗 + the suffix ばむ with or without the line break, and the merge below only joined surfaces (汗ばん is no
+     headword). A run of groups is also tried as its earlier surfaces + the last group's dictionary form (汗 + ばむ); a line break or
+     blank inside the run (the game's own wrap) is skipped, never a word boundary. */
+  const blankGroup=t=>t.pos==='空白'||/^[\s　]+$/u.test(t.surface||'');
+  const lemmaOf=(run)=>{const last=run[run.length-1],base=last.base_form||last.surface;return run.slice(0,-1).map(t=>t.surface).join('')+base;};
+  if(command==='lookup_at_position'&&group){const index=groups.indexOf(group);let best=group;for(let a=Math.max(0,index-5);a<=index;a++){if(blankGroup(groups[a]))continue;let surface='',parts=[],run=[];for(let z=a;z<Math.min(groups.length,a+8);z++){const t=groups[z];if(z>a&&groups[z-1].end!==t.start&&[...text].slice(groups[z-1].end,t.start).join('').trim()||t.pos==='補助記号')break;if(blankGroup(t))continue;surface+=t.surface;run.push(t);parts.push(...(t.parts||[t]));if(surface.length>60)break;
+    if(z<index||surface.length<=best.surface.length)continue;const key=this.index.has(surface)?surface:run.length>1&&this.index.has(lemmaOf(run))?lemmaOf(run):'';if(!key)continue;
+    const readings=[...new Set(this.index.get(key).flatMap(id=>this.byId.get(id).readings))];best={...groups[a],start:groups[a].start,end:t.end,surface,base_form:key,normalized:key,reading:readings.length===1?readings[0]:parts.map(p=>p.reading||'').join(''),parts,aux:[]};}}group=best;}
   if(command==='lookup_at_position'&&Number(args.skip)>0)return null;
   if(command==='lookup_exact'){
    const length=[...text].length;if(!Number.isSafeInteger(args.start)||!Number.isSafeInteger(args.end)||args.start<0||args.end<=args.start||args.end>length)throw Error('无效选区');
    const surface=[...text].slice(args.start,args.end).join(''),inside=groups.filter(t=>t.end>args.start&&t.start<args.end);let analysis=inside.map(make),wholeMatch=!!group||this.index.has(surface),exact=group?make(group):make({surface,base_form:surface,start:args.start,end:args.end,aux:[],parts:[]});
+   /* a selection over the game's line break (汗 / ばんで) or a stem + conjugated suffix: the run's surfaces + its last word's dictionary form */
+   if(!exact.entries.length){const run=inside.filter(t=>!blankGroup(t));let key='';for(let k=run.length;k>=2&&!key;k--){const c=lemmaOf(run.slice(0,k));if(this.index.has(c))key=c;}const flat=surface.replace(/[\s　]+/gu,'');const k=this.index.has(flat)&&flat!==surface?flat:key&&this.index.has(key)?key:'';if(k){exact=make({surface,base_form:k,normalized:k,start:args.start,end:args.end,parts:run.flatMap(t=>t.parts||[t])});exact.match_note=k===flat?'':'辞书原形：'+k;wholeMatch=true;}}
    if(!exact.entries.length){const expressive=surface.replace(/っ(?=[か-こさ-そた-とは-ほ])/gu,'');if(expressive!==surface&&this.index.has(expressive)){exact=make({surface,base_form:expressive,start:args.start,end:args.end,parts:inside.flatMap(t=>t.parts||[t])});exact.match_note='口语促音强调写法；辞书原形：'+expressive;wholeMatch=true;}}
    if(!exact.entries.length)exact.entries=[...new Map(analysis.flatMap(a=>a.entries).map(e=>[e.id,e])).values()].slice(0,20);
    exact.selection_analysis={surface,exact:wholeMatch,parts:analysis,source:'SudachiDict Full ＋ JMdict（本地）'};return exact;
