@@ -22,13 +22,13 @@ test('real faulty DOM: blanking all Japanese cannot remove the penalty and raise
  }
 });
 
-test('missing actual translation evidence still lowers the real observed score',()=>{
+test('removing legacy cache-only translation evidence cannot increase the real faulty score',()=>{
  const observed=S.score(fixture.run,D.cardinal),bad=structuredClone(fixture.run);
  bad.livePairing.paired=0;
  for(const s of bad.o.samples)s.cn=[];
  const result=S.score(bad,D.cardinal);
  assert.equal(result.scores.pair,0);
- assert.ok(result.total<observed.total);
+ assert.ok(result.total<=observed.total);assert.equal(result.detail.pairObservation.reliable,false);assert.equal(observed.scores.pair,0,'legacy cache pairing is already unobserved');
 });
 
 test('combining empty-output runs cannot restore a passing total from unobserved metrics',()=>{

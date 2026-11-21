@@ -25,6 +25,6 @@ test('invalid option counts or mismatched source metadata fail closed',()=>{
 test('a later choice page cannot satisfy a withdrawn offer',()=>{
  const run=synthetic();run.o.choiceOffers[0].until=1250;assert.equal(C.choices(run).ok,0);
 });
-test('the existing real faulty session has no choice evidence and keeps its actual score',()=>{
- const fixture=require('./fixtures/cardinal/fata-live-visibility-20261121.json');const result=S.score(fixture.run,D.cardinal);assert.equal(result.total,0.357);assert.equal(result.applies.choice,false);assert.equal(result.detail.choiceObservation.reliable,true);assert.deepEqual(fixture.run.o.choiceOffers,[]);
+test('the existing real faulty session has no choice evidence and keeps a conservative score without legacy cache display proof',()=>{
+ const fixture=require('./fixtures/cardinal/fata-live-visibility-20261121.json');const result=S.score(fixture.run,D.cardinal);assert.equal(result.total,0.257);assert.equal(result.applies.choice,false);assert.equal(result.detail.choiceObservation.reliable,true);assert.deepEqual(fixture.run.o.choiceOffers,[]);
 });

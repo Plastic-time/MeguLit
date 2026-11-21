@@ -139,3 +139,7 @@ runner 不以 `exit` 代替 `close`。停止先请求 driver 通过 IPC 正常�
 已观察的 read、原文可见或停止隐藏仍是失败证据。其余情况标 `leakObservation.observed:false`、leak 保守为0，并禁止作为可靠分数上传；cover/compositor 路径若没有这些证据也只记未观测，尚不宣称其原文隐藏质量已验证。生产回放固定 `models:false`，driver 记录 models；模型输出不上传。CLI 老日志仍能保守评分，缺证据不会获得满分
 
 `validation/cardinal-hide-evidence.test.cjs` 的成功藏字记录与视觉检查均为明确的 synthetic 单元输入；真实坏会话总分仍0.357，删除失败证据后不可升分，不作为健康实机验收
+
+评分规则 rev7 将实际显示配对与缓存可用性分开：每个 source occurrence 有 session/episode、scope、target 和 sourceKey；同序列重绘保留同一次，重复原文的新序列另计。reader_message 的 cardinalPairPolicy / cardinalPair 合同负责开关和目标变更、逐次观测与过期拒收，只有具备对应可用译文且通过该次显示观测才能 paired。快照是固定计数，不被之后同文缓存回填
+
+无显示 ACK 为 unobserved，确实观察到无译文为 unpaired，用户明确关闭则 excluded；全 excluded 时 pair 不适用，记录值0，不伪造满分。缺观测不作可靠上传。缓存 store/hit/near 只登记 availability，不证明DOM已显示。后端合同与实际DOM接线分开验，协议单元中的ACK均明确为 synthetic transport 输入，不是健康实机

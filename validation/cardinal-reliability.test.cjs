@@ -57,7 +57,7 @@ function setup(share=false){
  fs.mkdirSync(path.join(root,'data','config'),{recursive:true});fs.writeFileSync(path.join(root,'data','config','library.json'),JSON.stringify({sharedAdaptation:share}));
  Jobs._reset();Tape.clear();let t=Date.now()-60000;
  Tape.record('gwb',{type:'bound',gameProcessId:62,gameStarted:'6'},t);
- for(let i=0;i<12;i++)Tape.record('hb',{type:'hookSource',text:'実記録の台詞'+i},t+=1500);
+ for(let i=0;i<12;i++){Tape.record('hb',{type:'hookSource',text:'実記録の台詞'+i},t+=1500);require('./helpers/cardinal-display.cjs').display(Tape,'実記録の台詞'+i,'明示的な合成transport訳文'+i,{sequence:i+1});}
  const reader={root,gameExe:'C:/Games/test.exe',gal:{state:{},hooks:{trace(){}}}};
  const traces=[];reader.gal.hooks.trace=line=>traces.push(line);
  const original=Live.current;Live.current=()=>({reader,key:reader.cardinalKey||SHA,from:'',profile:Profiles.profileFor({})});
@@ -152,5 +152,13 @@ test('missing visibility observations and modeled hiding cannot upload success',
    Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{assert.equal(sc.models,false,'automatic production scenarios never request a native hide model');const out=observed(sc);out.hookEvents=[];out.hbSent=[];for(const sample of out.samples){delete sample.readMode;delete sample.hookProfile;delete sample.hookHide;}out.hidden=variant==='modeled'?{source:'native-dialogue',modeled:true,lines:10,visible:0}:{lines:0,visible:0};out.models=variant==='modeled';return out;},fetcher:async u=>{calls.push(u);return {ok:true,status:200};}});await Jobs.idle();
    const doc=Jobs.load(h.root,SHA);assert.equal(doc.unreliable,true);assert.equal(doc.detail.leakObservation.observed,false);assert.equal(doc.sent,false);assert.equal(doc.record.scores.leak,0);assert.deepEqual(calls,[]);
   }
+ }finally{h.close();}
+});
+
+
+test('absence of a display acknowledgement stays unobserved and cannot upload a cache-only score',async()=>{
+ const h=setup(true),calls=[];try{
+  Tape.liveSource('同じ原文がもう一度',{sequence:90});Tape.liveTranslation('同じ原文がもう一度','缓存成功不代表显示');
+  Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>observed(sc),fetcher:async u=>{calls.push(u);return {ok:true,status:200};}});await Jobs.idle();const doc=Jobs.load(h.root,SHA);assert.equal(doc.unreliable,true);assert.equal(doc.detail.pairObservation.reliable,false);assert.equal(doc.detail.pair.unobserved,1);assert.deepEqual(calls,[]);
  }finally{h.close();}
 });

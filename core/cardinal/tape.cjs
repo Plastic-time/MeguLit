@@ -12,11 +12,12 @@ const HEAD=['gwb:ready','gwb:bound','gwb:layout','hb:hookProcess','hb:hookThread
 const MAX_ROWS=30000,MAX_BYTES=12*1024*1024,ROW_MAX=64*1024,MARGIN=20;
 let keepLines=60+MARGIN;
 let tape=fresh();
-const pairKey=text=>String(text||'').normalize('NFKC').replace(/\s+/g,'');
-function liveSource(text){if(process.env.MEGULIT_CARDINAL_REPLAY==='1')return;const key=pairKey(text);if(!key)return;tape.live.push(key);if(tape.live.length>420)tape.live.shift();}
-function liveTranslation(text,translation){if(process.env.MEGULIT_CARDINAL_REPLAY==='1'||!String(translation||'').trim())return;const key=pairKey(text);if(!key)return;tape.translations.add(key);if(tape.translations.size>800)tape.translations.delete(tape.translations.values().next().value);}
-function pairing(n){const live=tape.live.slice(-n);return {source:'live',shown:live.length,paired:live.filter(k=>tape.translations.has(k)).length};}
-function fresh(){return {rows:[],sizes:[],head:new Map(),bytes:0,lines:0,game:'',since:0,live:[],translations:new Set()};}
+function liveSource(text,options){if(process.env.MEGULIT_CARDINAL_REPLAY==='1')return null;if(!String(text||'').trim())return null;return tape.pairs.source(text,options);}
+function liveTranslation(text,translation,options){if(process.env.MEGULIT_CARDINAL_REPLAY==='1')return;tape.pairs.availability(text,translation,options);}
+function pairPolicy(message,target){if(process.env.MEGULIT_CARDINAL_REPLAY==='1')return null;return tape.pairs.setPolicy(message,target);}
+function pairObserved(message,target){if(process.env.MEGULIT_CARDINAL_REPLAY==='1')return false;return tape.pairs.observe(message,target);}
+function pairing(n){return tape.pairs.snapshot(n);}
+function fresh(){return {rows:[],sizes:[],head:new Map(),bytes:0,lines:0,game:'',since:0,pairs:new(require('./display-pairs.cjs').DisplayPairs)()};}
 const kindOf=row=>(row.gwb?'gwb:':'hb:')+(row.gwb||row.hb).type;
 function trim(){const t=tape;while(t.rows.length&&(t.lines>keepLines||t.rows.length>MAX_ROWS||t.bytes>MAX_BYTES)){const row=t.rows.shift(),size=t.sizes.shift();t.bytes-=size;const k=kindOf(row);if(HEAD.includes(k))t.head.set(k,row);if(k==='hb:hookSource')t.lines--;}}
 /* side: 'gwb' | 'hb'; m: the parsed record */
@@ -35,4 +36,4 @@ function snapshot(n=keepLines-MARGIN){const t=tape;if(!t.rows.length)return {row
  return {pairing:pairing(n),rows:[...pre,...body],lines:body.filter(r=>r.hb?.type==='hookSource').length,game:t.game,since:t.since};}
 function clear(){tape=fresh();}
 const stats=()=>({rows:tape.rows.length,lines:tape.lines,bytes:tape.bytes,game:tape.game});
-module.exports={record,keep,snapshot,clear,stats,liveSource,liveTranslation,pairing};
+module.exports={record,keep,snapshot,clear,stats,liveSource,liveTranslation,pairPolicy,pairObserved,pairing};

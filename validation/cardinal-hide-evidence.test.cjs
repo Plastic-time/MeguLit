@@ -26,7 +26,7 @@ test('manual read is observed failure and never scores higher than unknown hidin
  const run=empty();run.o.samples=[{at:0,hookProfile:'read',hookHide:true,glyphs:[]}];const result=C.leaks(run);assert.equal(result.observed,true);assert.equal(result.rate,1);assert.equal(S.score(run,D.cardinal).scores.leak,0);
 });
 test('deleting real failure evidence cannot improve the existing faulty session',()=>{
- const baseline=S.score(fixture.run,D.cardinal);assert.equal(baseline.total,.357);assert.equal(baseline.scores.leak,0);
+ const baseline=S.score(fixture.run,D.cardinal);assert.equal(baseline.total,.257);assert.equal(baseline.scores.leak,0);
  const run=structuredClone(fixture.run);run.o.hookEvents=[];run.o.hbSent=[];run.o.hidden={lines:0,visible:0};for(const sample of run.o.samples){delete sample.readMode;delete sample.hookHide;delete sample.hookProfile;}
  const result=S.score(run,D.cardinal);assert.equal(result.scores.leak,0);assert.equal(result.detail.leakObservation.observed,false);assert.ok(result.total<=baseline.total);
 });
