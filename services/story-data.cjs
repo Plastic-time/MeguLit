@@ -2,11 +2,12 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),seed=require('../core/profiles/seed.cjs');
 const privateValue=/(?:^|[\s"'=])[A-Za-z]:[\\/]|\\\\|\/(?:Users|home)\/|\\Users\\|@[a-z0-9-]+\.[a-z]{2,}/i;
-const badKeys=new Set(['progress','unlocked','achieved','visited','saveValue','executable','personalPath','player','userId']);
+const badKeys=new Set(['progress','unlocked','achieved','visited','savevalue','executable','personalpath','player','userid','email','playerprogress','currentvalue','usersid']);
 const plain=v=>v&&typeof v==='object'&&!Array.isArray(v),name=s=>typeof s==='string'&&s.length>0&&s.length<=240;
+function validatePrivacy(d){const pending=[[d,0]],seen=new WeakSet();let scanned=0;while(pending.length){const [v,depth]=pending.pop();if(++scanned>200000||depth>32)return false;if(typeof v==='string'&&privateValue.test(v))return false;if(v&&typeof v==='object'){if(seen.has(v))return false;seen.add(v);if(Array.isArray(v))for(const x of v)pending.push([x,depth+1]);else for(const [k,x] of Object.entries(v)){if(badKeys.has(k.toLowerCase()))return false;pending.push([x,depth+1]);}}}return true;}
 function validateDocument(d){const errors=[];const bad=s=>errors.push(s);
  if(!plain(d)||d.schema!=='megulit.story'||d.version!==1)return {ok:false,errors:['schema']};
- let scanned=0;const walk=(v,depth=0)=>{if(++scanned>200000||depth>32){bad('nested data budget');return;}if(typeof v==='string'&&privateValue.test(v))bad('private value');else if(Array.isArray(v))v.forEach(x=>walk(x,depth+1));else if(plain(v))for(const [k,value] of Object.entries(v)){if(badKeys.has(k))bad('personal field '+k);walk(value,depth+1);}};walk(d);
+ if(!validatePrivacy(d))bad('private or oversized nested data');
  if(!name(d.gameKey)||!Array.isArray(d.sources)||d.sources.length>40)bad('identity or sources');
  if(!Array.isArray(d.gallery)||d.gallery.length>5000||!Array.isArray(d.endings)||d.endings.length>256||!Array.isArray(d.chapters)||d.chapters.length>500)bad('collections');
  if(errors.length)return {ok:false,errors};
@@ -18,7 +19,7 @@ function validateDocument(d){const errors=[];const bad=s=>errors.push(s);
  if(d.variantTotal!==undefined&&d.variantTotal!==null&&(!Number.isSafeInteger(d.variantTotal)||d.variantTotal<0||d.variantTotal>100000))bad('image total');
  if(!Array.isArray(d.builds)||!d.builds.length||d.builds.length>64||d.builds.some(x=>typeof x!=='string'||!/^[a-f0-9]{64}$/.test(x)))bad('builds');
  if(!Array.isArray(d.scripts)||!d.scripts.length||d.scripts.length>32)bad('scripts');else for(const s of d.scripts){keys(s,['name','location','sha256'],'script');if(!name(s.name)||s.name==='..'||/[\\/]/.test(s.name)||s.location!==undefined&&!/^[a-z0-9-]{1,40}$/i.test(s.location)||typeof s.sha256!=='string'||!/^[a-f0-9]{64}$/.test(s.sha256))bad('script identity');}
- for(const s of d.sources){keys(s,['kind','file','entry','notes','url','documents','adapter'],'source');if(s.url!==undefined&&!/^https:\/\//.test(s.url))bad('source URL');}
+ for(const s of d.sources){keys(s,['kind','file','entry','notes','url','documents','adapter'],'source');if(typeof s.kind!=='string'||!s.kind||s.kind.length>80)bad('source kind');for(const k of ['file','entry','notes','url','adapter'])if(s[k]!==undefined&&(typeof s[k]!=='string'||s[k].length>2048))bad('source text');if(s.documents!==undefined&&(!Number.isSafeInteger(s.documents)||s.documents<0||s.documents>100000))bad('source documents');if(s.url!==undefined&&!/^https:\/\//.test(s.url))bad('source URL');}
  const ids=new Set(),add=(v,kind)=>{if(!name(v)||ids.has(v))bad(kind+' id');ids.add(v);};
  const localized=v=>{keys(v,['zh','ja','en'],'localized text');if(plain(v)&&Object.values(v).some(s=>typeof s!=='string'||s.length>1000))bad('localized text');};
  for(const s of d.gallery){keys(s,['id','variants','variantTotal','unlockComplete'],'gallery');add(s.id,'gallery');if(s.unlockComplete!==undefined&&typeof s.unlockComplete!=='boolean')bad('gallery completion');if(!Array.isArray(s.variants)||s.variants.length>2048||s.variants.some(v=>!plain(v)||!name(v.name)||/[\\/]/.test(v.name)))bad('variants');else for(const v of s.variants)keys(v,['name'],'variant');}
@@ -50,4 +51,4 @@ function find(game,{seedDir=seed.SEED_DIR}={}){
   const proof=require('./story-analysis.cjs').identity(game.executable,d);if(proof.state!=='ready')return {status:proof.state,data:null};
   return {status:'ready',data:d,revision:hash(raw),engine:g.engine};}catch{return {status:'unknown',data:null};}
 }
-module.exports={validate,validateSeed,find,hash,digest};
+module.exports={validate,validateSeed,validatePrivacy,find,hash,digest};
