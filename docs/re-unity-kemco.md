@@ -1,7 +1,8 @@
 # Unity KEMCO message components: static boundary
 
 This task uses an existing Raging Loop deployment, never executes the game, and does not modify its files
-The current small code change only retires published TMP/uGUI pages when their component/text vanishes
+The first change retires published TMP/uGUI pages when their component/text vanishes
+The second adds an independently requested, read-only KEMCO sprite observer for the exact original assembly below
 It does not implement KEMCO TextMesh replacement and does not resolve or certify the user's Raging Loop symptoms
 
 ## Exact local identities
@@ -36,11 +37,68 @@ Its existing generic component scoring and setters cannot discover this per-char
 The Luna Unity hook list does contain TextMesh.set_text, but that sees individual characters and their shadow copies, not a full ordered Message page
 Fixing offline #Select parsing or increasing TextAsset counts alone cannot provide the runtime body, role and clear lifecycle
 
-A future default-off KEMCO adapter should pin both assembly identity and exact field/method schema
-It should read MainScene.message/nameMessage and dialogList/Button.Text through explicit references, preserve row order, separate ruby, and use parentObject identity as the page generation
-A layout snapshot must be bounded, dense, duplicate-free and complete before supplying glyph rectangles; failed bounds or unknown class layouts must remain unsupported
-Hide only the body root renderers and their known shadows, recording every original enabled state and restoring it on revoke/disconnect/change of owner
-No new seed, allowlist entry, shared default, runtime observer or hide capability is enabled by this report
+The read-only observer pins the original assembly's exact length and SHA-256, then its field types and Message.Mes(string,bool) method
+It reads MainScene.message/nameMessage and dialogList/Button.Text through explicit references, preserves row order, excludes child shadows and ruby, and uses parentObject identity as the page generation
+It does not accept the installed patched assembly or a different release merely because its classes have the same names
+No seed, allowlist entry, hide or embed capability is added
+
+## Read-only opt-in contract
+
+UnityTextPath.drawConfig({kemcoSprites:true}) appends the exact token kemcoSprites=1 to DRAW
+False, missing or non-boolean values retain the previous DRAW wire bytes
+The Mono plugin defaults off and accepts only one exact token; missing, malformed or duplicate tokens turn this observer off
+The new branch independently checks an exact roles=1 token for names and choices; the observer flag alone does not grant those roles
+The profile default and HookNative provider wiring are separately owned integration work, not part of this candidate
+IL2CPP support is not added
+
+The observer samples at most ten times per second after frame completion
+It requires one active MainScene, at most 32 rows, 256 roots per row and 2048 roots in total
+Each body root must have the exact parent reference, a unique nonzero instance id, and one valid Unicode scalar in its own TextMesh
+Only an ordered visible prefix is reportable: an invisible suffix may be the game's typewriter, but visible text after a gap rejects the page
+Empty rows do not certify an intentional blank line
+The exact fields are resolved once per plugin lifetime after assembly identification; an unsupported assembly stays unsupported
+File hashing reads exactly 361472 bytes plus an EOF check, not an unbounded stream
+
+Geometry comes from the root Renderer bounds projected through the only enabled, screen-target camera whose culling mask includes that root
+No-camera, multiple-camera, unknown material colour, behind-camera, nonfinite bounds, viewport cropping and partial screen cropping cannot supply a complete rectangle
+Zero-alpha TextMesh/shared material, disabled renderers, inactive objects and completely parked bounds are not observed as visible
+Reading sharedMaterial avoids instantiating a material
+This is renderer/camera metadata, not a pixel-occlusion or shader-ink proof
+Bounds can include unused glyph space; no claim is made about cover objects, postprocessing, arbitrary shaders or actual native mouse hit testing
+
+Names are read from the distinct nameMessage object, not guessed from the body text
+Choices come only from retained enabled Button components and their own Text GameObjects, capped at 16 after a bounded 32-item dialog list
+Their text bounding boxes are observations, not proof that a pointer click would succeed or that all offered choices were captured
+Choice collection finishes its identity/count checks before publishing any of the new set
+
+All records use the existing ToMe_CHARS protocol with hidden=0
+This observer never sets text, alpha, renderer enabled state, input, saves or game files
+It does not manufacture hookSource: old Luna TextMesh setter streams can still compete with full-page sources
+Current-source arbitration, complete text/translation pairing, DOM acknowledgement and any hide operation need a separate reviewed design before runtime acceptance
+
+Every received DRAW request advances this observer's permission epoch, even an off request followed immediately by on
+Sending a fresh observation checks that epoch under the same lock as control updates
+Old page identities are retired before a new epoch, changed parent, invalid snapshot, disconnect or destruction
+Reset records are best-effort ordered socket messages, not a reader acknowledgement
+An observation already queued before revocation can remain in transport; this is not an immediate remote-stop acknowledgement
+Already published geometry is deduplicated, and the same sentence on a different parent gets a fresh line id
+
+## Evidence package and remaining gate
+
+1. Identity: exact original SHA/length plus runtime field/method schema checks
+2. Input/layout evidence: the managed IL locations above, independent body/name/button references, and explicit shadow/ruby exclusion
+3. Producer: bounded read-only KemcoRead/KemcoBox and KemcoSpriteSnapshot, with no renderer mutation
+4. Replay: actual helper compiled into a small console; synthetic row, scalar, clipping, prefix, duplicate, budget, page retirement, role and permission cases; real protocol parser checks its wire output
+5. Default-off: strict optional control token; old wire retained without true opt-in; no automatic seed or native hook allowance
+6. Runtime acceptance: incomplete, no Raging Loop process was started in this task
+
+Existing Tsuki/Higurashi recordings remain separate real-recording regressions, not KEMCO healthy baselines
+The Mono plugin compiles using real Unity 5 and BepInEx 5.4.23.6 reference assemblies
+The six related suites pass 31/31 without skips; these are local pure/console/socket tests, not game or GUI tests
+The helper's synthetic visibility boxes do not certify the actual Unity camera/material implementation
+Before live work the current plugin must be supplied in the on-demand runtime pack and a fresh shadow, original assembly selected, actual audio snapshot guard completed, and a game slot acquired
+Then verify at least ten actual full lines, source ownership, name/choice separation, ruby, point lookup, translated choices and no stale page after close/menu
+No such live check or source-arbitration acceptance is recorded here
 
 ## Small existing-plugin correction
 

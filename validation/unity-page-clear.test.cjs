@@ -39,5 +39,5 @@ test('all actual retirement paths use the publication lifecycle',()=>{
  assert.match(source,/if \(all.Count == 0\) \{ ClearPublished\(\); return; \}/);
  assert.match(source,/if \(rects.Count == 0\) \{ ClearPublished\(\); return; \}/);
  assert.match(source,/lastKey = key; lastText = flat; published = true;/);
- assert.match(source,/void OnDestroy\(\) \{ ClearPublished\(\); Restore\(\); \}/);
+ assert.match(source,/void OnDestroy\(\) \{ (?:kemcoPages.Reset\(Screen.width,Screen.height,Send\); )?ClearPublished\(\); Restore\(\); \}/);
 });

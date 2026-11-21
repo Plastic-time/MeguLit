@@ -83,9 +83,9 @@ class UnityTextPath{
   if(r.hidden&&this.canary){if(!this.armed){this.canary.arm('unity');this.armed=true;}else this.canary.alive('unity');}
   this.onChars(l);}
  push(){if(!this.sock)return;this.sock.write('WANT '+this.wanted.replace(/\r?\n/g,'\x1f')+'\nHIDE '+(this.on?1:0)+'\n'+(this.drawCfg?this.drawLine():'')+[...this.embeds.values()].join(''));}
- drawLine(){const c=this.drawCfg;return 'DRAW roles='+(c.roles?1:0)+' embed='+(c.embed?1:0)+' zh='+(c.zh?1:0)+'\n';}
+ drawLine(){const c=this.drawCfg;return 'DRAW roles='+(c.roles?1:0)+' embed='+(c.embed?1:0)+' zh='+(c.zh?1:0)+(c.kemcoSprites?' kemcoSprites=1':'')+'\n';}
  /* engine-draw: the switches, and one sentence's replacement (kept for a reconnect, newest 64) */
- drawConfig(cfg){const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;if(this.sock)this.sock.write(this.drawLine());}
+ drawConfig(cfg){const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false,kemcoSprites:cfg?.kemcoSprites===true};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;if(this.sock)this.sock.write(this.drawLine());}
  drawEmbed(key,o={}){const {krkrControlText}=require('./engine-draw.cjs');const body=krkrControlText({roles:false,embed:true,zh:true},new Map([[String(key||''),{ruby:o.ruby||[],zh:o.zh||''}]])).split('\r\n')[1]||'';if(!body)return;
   const l='EMB '+body+'\n';this.embeds.delete(key);this.embeds.set(key,l);while(this.embeds.size>64)this.embeds.delete(this.embeds.keys().next().value);if(this.sock)this.sock.write(l);}
  hide(on){this.on=!!on;if(this.on&&this.canary&&!this.canary.allowed('unity')){this.on=false;this.onStatus('unity invisible drawing off for this game (crash canary)');}this.push();}
