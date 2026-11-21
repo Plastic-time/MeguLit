@@ -7,9 +7,14 @@ Call `readSlot({buffer, profile, slot: 2, source, limits})`. The default slot is
 Supported declared little-endian writer profiles are:
 
 - `renpy-6.99.12.4.2187`, official commit `e60f170f7f5c152b4f656b5fe94ccc7ed4b2c3d2`, [script.py](https://github.com/renpy/renpy/blob/e60f170f7f5c152b4f656b5fe94ccc7ed4b2c3d2/renpy/script.py#L459)
+- `renpy-8.4.0.25071206`, official commit `8881389241074a3095dfe7b91c8b6bb0df018f02`, [script.py](https://github.com/renpy/renpy/blob/8881389241074a3095dfe7b91c8b6bb0df018f02/renpy/script.py#L693)
 - `renpy-8.5.3.26051504`, official commit `39895c1e017f0b36ffea2447d97eccd69d76ee1c`, [script.py](https://github.com/renpy/renpy/blob/39895c1e017f0b36ffea2447d97eccd69d76ee1c/renpy/script.py#L752)
 
-These describe framing, not the user's SDK identity. Both writers reserve three 12-byte directory records after the ten-byte magic. This primitive requires the whole 46-byte header, positional slot-1/slot-2 records, unique supported slots, a zero terminator and zero remaining reservation, positive packed lengths, ranges outside the complete directory, no overlap/gaps, contiguous payloads, and exactly a separate 16-byte source-digest trailer. Other layouts are rejected rather than guessed
+These describe framing, not the user's SDK identity. The writers reserve three 12-byte directory records after the ten-byte magic. This primitive requires the whole 46-byte header, positional slot-1/slot-2 records, unique supported slots, a zero terminator and zero remaining reservation, positive packed lengths, ranges outside the complete directory, no overlap/gaps, contiguous payloads, and exactly a separate 16-byte source-digest trailer. Other layouts are rejected rather than guessed
+
+The 8.4 profile is caller-declared, with the same framing checks and limits. A bundled runtime's version string does not select it, prove which compiler produced a supplied file, or establish AST compatibility. The official 8.4 annotated tag resolves through `5af2b9fb4e537c6ba5855292ef10d6caf53abf7c` to the pinned commit above; the fetched `script.py` is 37,203 bytes with SHA256 `897ec29559b1b1b7ab7249f2efccf43c0bf9ce660728d5ed06b8db4e10cef68b`
+
+The retained 8.4 excerpts cover `write_rpyc_header`, `write_rpyc_data`, `read_rpyc_data` and `load_appropriate_file`. They show the reserved directory, slot positioning, compression and external digest reading. They do not retain the top-level magic literal or the digest-append statement, so those two source lines are not separately asserted as reviewed 8.4 evidence. The ten-byte magic is directly observed in the bounded local file; the earlier fixed 6.x/8.5 sources establish the same magic and directory layout. This remains a declared framing profile, not compiler or full-story certification
 
 The trailer is returned as unverified metadata. The older writer hashes source text; the newer one also includes its RPYC magic. This module has neither the source nor that verification context and does not authenticate the digest, game, selected profile, payload meaning or provenance claimed by the caller. SHA256 fields identify the actual supplied input and each packed/expanded slot
 

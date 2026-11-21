@@ -24,6 +24,16 @@ test('declared writer profiles preserve independent slots and exact provenance',
 test('explicit slot 1 is permitted, while absent slot 2 is unsupported without fallback',()=>{
  const buffer=frame([before]);rejects(()=>read(buffer),'UNSUPPORTED_SLOT2');assert.deepEqual(read(buffer,{slot:1}).buffer,before);
 });
+test('8.4 is an explicit framing declaration, with no runtime-version inference',()=>{
+ const name='renpy-8.4.0.25071206',buffer=frame();
+ assert.equal(PROFILES[name].commit,'8881389241074a3095dfe7b91c8b6bb0df018f02');
+ const out=read(buffer,{profile:name});
+ assert.equal(out.profile,name);assert.deepEqual(out.buffer,after);
+ assert.equal(out.sourceDigest.kind,'source-and-rpyc-magic-md5');
+ assert.equal(out.sourceDigest.verified,false);
+ for(const guessed of ['8.4.0.25071206','renpy-8.4','runtime-8.4.0.25071206'])rejects(()=>read(buffer,{profile:guessed}),'PROFILE');
+ const missing=frame([before]);rejects(()=>read(missing,{profile:name}),'UNSUPPORTED_SLOT2');
+});
 test('digest bytes are external metadata, not a payload or source authenticity assertion',()=>{
  const a=frame(),b=Buffer.from(a);b.fill(0,b.length-16);assert.deepEqual(read(a).buffer,read(b).buffer);assert.notEqual(read(a).sourceDigest.hex,read(b).sourceDigest.hex);assert.equal(read(b).sourceDigest.verified,false);
  rejects(()=>read(frame([before,after],{trailer:15})),'TRUNCATED_SLOT');rejects(()=>read(frame([before,after],{trailer:17})),'TRAILER_SIZE');
