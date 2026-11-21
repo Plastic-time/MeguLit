@@ -1,0 +1,35 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "fa769a5ffee8e7495fd0ae4f9eae169058e88adb7dac372a6b65360f4351e119",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {},
+ "exe": "",
+ "engine": "artemis",
+ "app": "",
+ "issuedAt": "",
+ "prints": {
+  "title": "fa769a5ffee8e7495fd0ae4f9eae169058e88adb7dac372a6b65360f4351e119",
+  "vndb": "v50215"
+ },
+ "status": "skeleton",
+ "slug": "amakano-3",
+ "builds": [
+  "5132eed8c2e4a7d0ec4d853cd2b8247f3a0641c4a3825a8210fd435530e7d716"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
+ ],
+ "match": {
+  "exe": [
+   "Amakano3.exe"
+  ],
+  "titles": [
+   "アマカノ3",
+   "アマカノ３"
+  ]
+ }
+}

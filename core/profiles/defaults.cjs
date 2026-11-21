@@ -7,6 +7,10 @@
    the kernel first adds its key here with the old behaviour as default, then the one engine or game that needs it sets it.
    Arrays replace, they never merge: a game that sets choice.filters owns the whole list. */
 module.exports={
+ source:{
+  /* Artemis64x: retain a quoted message split across one callback batch; only a measured version opts in. */
+  artemisQuoteSpans:false,
+ },
  placement:{
   /* where the first line of a page is anchored: null = kernel (glyph records, then the text box); 'glyph' | 'box' | 'page' */
   firstLineAnchor:null,
