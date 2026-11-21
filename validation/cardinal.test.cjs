@@ -125,8 +125,8 @@ test('scores reach the relay only with sharing on, as the bare record',async()=>
   fs.writeFileSync(lib,JSON.stringify({}));assert.equal((await feed.reportScore(root,rec,{fetcher})).state,'sent');
   assert.equal(calls[0].url,'https://relay.test/api/cardinal/score');assert.equal(calls[0].init.method,'POST');assert.deepEqual(JSON.parse(calls[0].init.body),rec);
   assert.ok(!/cookie|authorization/i.test(JSON.stringify(calls[0].init.headers)));
-  /* a score that has not reached the relay goes along with the next calibration report */
-  const C2=require('../services/cardinal.cjs');fs.mkdirSync(C2.dir(root),{recursive:true});fs.writeFileSync(C2.fileOf(root,SHA),JSON.stringify({record:rec,sent:false}));
+  /* Explicit synthetic transport evidence: a compatible unsent score retries with calibration, not a live acceptance fixture. */
+  const C2=require('../services/cardinal.cjs');fs.mkdirSync(C2.dir(root),{recursive:true});fs.writeFileSync(C2.fileOf(root,SHA),JSON.stringify({record:{...rec,cardinalRev:String(D.cardinal.rev)},sent:false,unreliable:false,errors:[],detail:{pairObservation:{source:'live-display',reliable:true},leakObservation:{observed:true},timeline:{source:'measured-delivery',reliable:true},choiceObservation:{reliable:true}}}));
   calls.length=0;const ap=require('../core/auto-profile.cjs');
   await feed.report(root,ap.record({key:SHA,engine:'kirikiri',exe:'x.exe',version:'1.4.23',source:'calibration',result:{mode:'hide',settings:{},score:{cost:0},reason:''}}),{fetcher});
   for(let i=0;i<20&&!calls.some(c=>/cardinal/.test(c.url));i++)await new Promise(r=>setTimeout(r,10));

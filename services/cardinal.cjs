@@ -70,9 +70,9 @@ async function go(job){const {root,key,rules,reader}=job;const started=Date.now(
  /* Errors, a missing measured delivery clock, or excessive replay lag cannot supply a reliable relay vote. */
  const lag=o.lag||null,unreliable=!result.detail.pairObservation.reliable||o.models===true||!result.detail.leakObservation.observed||!result.detail.timeline.reliable||!result.detail.choiceObservation.reliable||errors.length>0||!!(lag&&lag.stepP95>(rules.maxLagMs??80));
  const doc={record:rec,why:job.why,applies:result.applies,below:result.below,detail:result.detail,ms:Date.now()-started,lag,unreliable,errors,sent:false};
- try{save(root,key,doc);}catch{}
+ try{save(root,key,doc);}catch(error){doc.persistenceError=String(error?.message||error);doc.unreliable=true;trace(reader,'cardinal not uploaded: local score persistence failed key='+key.slice(0,8)+' '+doc.persistenceError);return doc;}
  trace(reader,'cardinal scored key='+key.slice(0,8)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' ')+(lag?' lagP95='+lag.stepP95:'')+(unreliable?(!result.detail.pairObservation.reliable?' unreliable (translation display unobserved): not uploaded':o.models===true?' unreliable (modeled visibility): not uploaded':!result.detail.leakObservation.observed?' unreliable (original visibility unobserved): not uploaded':!result.detail.choiceObservation.reliable?' unreliable (unobserved option state): not uploaded':!result.detail.timeline.reliable?' unreliable (missing delivery clock): not uploaded':errors.length?' unreliable (replay errors): not uploaded':' unreliable (busy PC): not uploaded'):''));
- if(unreliable)return doc;
+ if(unreliable||!require('../core/cardinal/upload.cjs').eligible(doc))return doc;
  try{const r=await require('./auto-profile-feed.cjs').reportScore(root,rec,job.fetcher?{fetcher:job.fetcher}:{});doc.upload={state:r.state,...(r.status?{status:r.status}:{})};if(r.state==='sent')doc.sent=true;save(root,key,doc);}catch{}
  return doc;}
 const idle=()=>running||Promise.resolve();

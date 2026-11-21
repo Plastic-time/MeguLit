@@ -111,6 +111,6 @@ async function reportScore(root,record,{fetcher=globalThis.fetch}={}){if(!record
  const body=JSON.stringify(Object.fromEntries(SCORE_FIELDS.map(k=>[k,record[k]])));
  for(const url of endpoints(root,'/api/cardinal/score')){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok)return {state:'sent'};if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
  return {state:'failed'};}
-function pendingScore(root,key,fetcher){let doc=null;try{doc=require('./cardinal.cjs').load(root,key);}catch{}if(!doc?.record||doc.sent||doc.unreliable)return;
+function pendingScore(root,key,fetcher){let doc=null;try{doc=require('./cardinal.cjs').load(root,key);}catch{}if(doc?.sent||!require('../core/cardinal/upload.cjs').eligible(doc))return;
  reportScore(root,doc.record,{fetcher}).then(r=>{if(r.state!=='sent')return;try{const cur=require('./cardinal.cjs').load(root,key);if(cur?.record?.at===doc.record.at){const f=require('./cardinal.cjs').fileOf(root,key);fs.writeFileSync(f,JSON.stringify({...cur,sent:true,upload:{state:'sent'}},null,1));}}catch{}}).catch(()=>{});}
 module.exports={reportScore,sent,markSent,creditOf,setCredit,syncCredit,cleanName,cleanCredit,CREDIT_MAX,cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};

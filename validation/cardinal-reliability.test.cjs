@@ -125,6 +125,25 @@ test('a failed score upload stays unsent with its reason, then calibration retri
  }finally{h.close();}
 });
 
+test('pending upload requires current explicit observation evidence and preserves old documents',async()=>{
+ const h=setup(true),feed=require('../services/auto-profile-feed.cjs'),auto=require('../core/auto-profile.cjs'),{eligible}=require('../core/cardinal/upload.cjs');
+ const detail={pairObservation:{source:'live-display',reliable:true},leakObservation:{observed:true},timeline:{source:'measured-delivery',reliable:true},choiceObservation:{reliable:true}};
+ const valid={record:S.record({key:SHA,result:S.score(fixture.run,D.cardinal),cardinalRev:D.cardinal.rev}),unreliable:false,errors:[],sent:false,detail};
+ try{for(const mutate of [d=>delete d.unreliable,d=>delete d.detail,d=>d.record.cardinalRev='6',d=>d.detail.pairObservation.source='live',d=>d.detail.pairObservation.reliable=false,d=>d.detail.timeline.reliable=false,d=>d.detail.leakObservation.observed=false,d=>d.detail.choiceObservation.reliable=false,d=>d.errors.push('probe failed')]){
+  const doc=structuredClone(valid);mutate(doc);assert.equal(eligible(doc),false);fs.mkdirSync(Jobs.dir(h.root),{recursive:true});const f=Jobs.fileOf(h.root,SHA),raw=JSON.stringify(doc);fs.writeFileSync(f,raw);const calls=[];
+  await feed.report(h.root,auto.record({key:SHA,engine:'kirikiri',exe:'x.exe',version:'1.4.23',source:'calibration',result:{mode:'hide',settings:{},score:{cost:0},reason:''}}),{fetcher:async url=>{calls.push(url);return {ok:false,status:503};}});
+  assert.equal(calls.some(u=>u.endsWith('/api/cardinal/score')),false);assert.equal(fs.readFileSync(f,'utf8'),raw,'old evidence is retained without rewriting its score');
+ }assert.equal(eligible(valid),true,'synthetic contract only, not a healthy game recording');}finally{h.close();}
+});
+
+test('local score persistence failure cannot upload a score',async()=>{
+ const h=setup(true),write=fs.writeFileSync,calls=[];
+ try{fs.writeFileSync=function(file,...args){if(String(file).startsWith(Jobs.fileOf(h.root,SHA)+'.'))throw Object.assign(Error('disk full injected'),{code:'ENOSPC'});return write.call(this,file,...args);};
+  Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>observed(sc),fetcher:async url=>{calls.push(url);return {ok:true,status:200};}});await Jobs.idle();
+  assert.deepEqual(calls,[]);assert.equal(Jobs.load(h.root,SHA),null);assert.ok(h.traces.some(s=>/not uploaded: local score persistence failed.*disk full injected/.test(s)));
+ }finally{fs.writeFileSync=write;h.close();}
+});
+
 
 test('cleanup failure stops the whole queue and survives a scheduler restart',async()=>{
  const h=setup();let release;const wait=new Promise(resolve=>release=resolve);let second=0;
