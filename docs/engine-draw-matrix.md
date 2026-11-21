@@ -62,3 +62,72 @@
 3. TyranoScript（S，DOM 已在，只差角色和 DOM 内嵌）、Ren'Py（S，有官方翻译钩子）：同一套协议，下一批
 4. Unity（M，组件已在内部，角色靠框架）
 5. 其余（Siglus / BGI / YU-RIS / AdvHD / Majiro / QLIE / Malie / Escude / CIRCUS / LiveMaker / NScripter / Artemis）是 L：每个要逆向二进制画字函数、按版本签名。共同的捷径是 GDI 引擎走 VNTextProxy 那条「代理 GDI + 写回字符串」的路，角色继续用 LunaHook 的 ctx2，坐标继续用字形点；真正的「内」要一个引擎一个会话
+
+## 其余原生引擎：静态普查（re-misc，2026-11-21）
+
+只读店主本机的 exe / dll，没开游戏（`H:\MeguLit-Work\tools-re\census.py`：pefile + capstone，数导入表里文字 API 在代码中的 call 数，各节熵值，壳的特征）。按 The Seed 里的游戏数从多到少排，同数的按难度排。原始数据在 `tools-re\census-misc.jsonl` / `census-extra.jsonl`
+
+| 引擎（seed 数） | 游戏 / 文件 | 画字所在模块 | 位数 | 文字 API 调用点 | 图形 | 壳 | LunaHook 现有 | 难度 |
+|---|---|---|---|---|---|---|---|---|
+| Spike Chunsoft（3） | ダンガンロンパ 1 / 2 / V3（Steam） | DR1_us.exe / DR2_us.exe / Dangan3Win.exe | x86 / x86 / x64 | 导入表里没有文字 API | D3D9（1/2）、D3D11（V3） | **SteamStub `.bind`**，V3 的 `.text` 熵 8.0 = 整段加密 | Chunsoft.cpp（x64，78 行） | 难：静态看不到代码，要先脱 SteamStub（Steamless 类工具，只读出一个解开的副本）再找自绘字库 |
+| NScripter（2） | 月姬 v1.4 / v1.6 | Tsukihime.exe（两版同一 exe，400 KB） | x86 | TextOutA ×8、CreateFontA ×13 | GDI DIB（BitBlt / StretchDIBits） | 无 | Onscripter 系（对 NScripter 本体只有通用 GDI） | 易：GDI 画进 DIB，8 个调用点按笔位分出台词 / 名字 / 选项 |
+| FVP（2） | いろとりどりのヒカリ（中文版）/ HD | Hikari.exe（中文版启动器 五彩斑斓的曙光.exe 只是外壳）/ irohika_HD.exe | x86 | GetGlyphOutlineA ×3、CreateFontA ×1 | D3D9 | 无 | FVP.cpp | 中：3 个字形调用点，字形进 D3D9 纹理，坐标在上层排版 |
+| Nitroplus（2） | 沙耶の唄（Steam）/ みにくいモジカの子 | Mware.dll（Steam 版）/ 丑小鸭与文字祸.exe | x86 | Steam 版：Mware.dll 只有 D3D11，exe 只有 CreateFontW ×2；モジカ：没有可见导入 | D3D11 | モジカ：**Enigma Protector**（`.enigma1` 熵 7.91） | Nitroplus.cpp / Nitroplus2.cpp | 难：沙耶 Steam 是自绘字库（字形不走 GDI）；モジカ有壳，静态做不了 |
+| Softpal（1） | 時計仕掛けのレイライン | dll\PAL.dll | x86 | **GetGlyphOutlineA ×1**、CreateFontA ×1 | GDI DIB | 无 | Pal.cpp（本仓库已改：内嵌 + ruby + pal_sprite_v1） | 易：唯一一个字形调用点，和 YU-RIS 一样做锚 |
+| ReaLive / AVG32（1） | 涙 ～流星のザドル～（1997） | AVG3216D.EXE（222 KB） | x86 | TextOutA ×2、CreateFontIndirectA ×1 | GDI DIB | 无 | Reallive.cpp | 最易：2 个调用点，exe 小 |
+| CMVS（1） | 青い鳥（Steam） | cmvs32.exe | x86（带 `_TEXT64` 节） | GetGlyphOutlineA ×2、CreateFontA ×4 | D3D11 | 无 | CMVS.cpp | 中：2 个字形调用点，D3D11 合成 |
+| Musica / ぱれっと（1） | ましろ色シンフォニー | mashiroiro.exe | x86 | 只有 CreateFontA ×1（字形 API 不在导入表：运行时 GetProcAddress 或自绘） | DirectDraw | 无 | Palette.cpp | 中：先找动态取的 API |
+| minori（1） | eden*（Steam 英文版） | eden_en.exe | x86 | GetGlyphOutlineA ×3、CreateFontA ×2 | D3D9 + DirectDraw | 无 | Minori.cpp | 中 |
+| Leaf / AQUAPLUS（1） | WHITE ALBUM2 | WA2.exe | x86 | 没有任何 GDI 文字 API | D3D9 + D3DX（自绘字库） | 无 | Leaf.cpp | 难：和 MAGES 一样是字库图集，要找送字函数 |
+| Innocent Grey（1） | 虚ノ少女 | Innocentsetup.exe（98 MB，资源打在 exe 里） | x86 | DrawTextW ×1、ExtTextOutW ×1、TextOutW ×1 | GDI | 无 | 无专用（通用 GDI） | 易：3 个 W 调用点 |
+| BRUNS（1） | ダストマニア・グロテスク | gameplay.exe（121 KB 启动）+ umut.dll + libscr.dll | x86 | umut.dll 没有文字 API；libscr.dll TextOutW ×1（中文补丁的库） | GDI DIB | 无 | Bruns.cpp | 中：画字可能在中文补丁库里，原版走自绘 |
+| AdvHD / WillPlus（1） | Under The Moon（seed 里是 ディスコード！，本机只有同引擎的 utmoon.exe） | utmoon.exe | x86 | GetGlyphOutlineA ×2、TextOutA ×3、CreateFontIndirectA ×1 | DirectDraw | 无 | WillPlus.cpp（本仓库另有 Euphoria HD 474 精确匹配） | 易 |
+
+做的顺序（从易到难，每个引擎一个提交，交付照 YU-RIS 样板的 6 件套：JS 签名、原生签名头、夹具、静态签名测试、原生自检、运行时钩子 + 店主测试清单）：
+1. ReaLive / AVG32 → 2. Softpal PAL.dll → 3. NScripter（月姬）→ 4. Innocent Grey → 5. AdvHD / WillPlus → 6. CMVS → 7. FVP → 8. minori → 9. Musica → 10. BRUNS → 11. Leaf WA2 → 12. Nitroplus（沙耶 Steam / モジカ）→ 13. Spike Chunsoft
+
+后 4 个（Leaf、Nitroplus、Spike Chunsoft、BRUNS 原版）静态普查已经说明拿不到 GDI 调用点：自绘字库或加壳，要在运行中找送字函数或先脱壳，单靠静态做不出签名，做到时会先写清缺什么，不硬交
+
+进度（feat/re-misc）：通用 GDI 画字点部件（native/megulithook/DrawSites.h + DrawSitesSig.h）已交付，签名已有 ReaLive / AVG32、Softpal（两条）、NScripter、Innocent Grey（MFC CDC 三条）、AdvHD、CMVS、FVP（两条）、minori、Musica、BRUNS、Nitroplus（沙耶 Steam）、NitroPlus 2003（沙耶原版），每条在店主本机文件上正好命中、在其他引擎文件里不命中。普查时漏看了「经寄存器调用」的情况：Musica、沙耶 Steam、Softpal 第二条都是这样找到的（签名的 SLOT 形式）。Leaf、Spike Chunsoft、モジカ 静态做不出，见 engine-draw-native.md 末尾
+
+## 下一批（总指挥 2026-11-21）：本机样本
+
+只读查了 E:\GAL、E:\Steam\steamapps\common、H:\、D:\（4 层深，按引擎特征文件 / exe 名：AI5WIN / AI6WIN、mes.arc、live.dll / .lsb、Rio.arc / Chip.arc、System40 / .ain、Escu:de 的 .bin 包、Kaguya 的 params.dat / LINKPACK / .alp）：
+
+| 引擎 | 本机样本 | 结果 |
+|---|---|---|
+| Silky's（AI5WIN / AI6WIN） | 没有 | 跳过；要一部 Silky's 作品的 exe |
+| LiveMaker | 没有 | 跳过；要一部 LiveMaker 作品的 exe（游戏数据附在 exe 末尾） |
+| Will（ADV 引擎，Rio.arc / Chip.arc） | Under The Moon（已签，advhd）；いじわるMyMaster（mymaster.exe 是 AlphaROM 加壳，导入表空，静态看不了） | 没有新签名；いじわるMyMaster 要运行中解开的镜像 |
+| AliceSoft System4 | 没有 | 跳过；要一部 System 4.x 作品的 System40.exe |
+| Escu:de | 没有 | 跳过；要一部 Escu:de 作品的 exe |
+| Kaguya（アトリエかぐや） | 没有 | 跳过；要一部かぐや作品的 exe |
+
+顺带核对的：時計仕掛けのレイライン 2 的 PAL.dll 两条 Softpal 签名各正好命中一次（已进夹具，413e0cc5）；レイライン 3 是 KiriKiri。Air 的 avg32_cn.dll 导入了 TextOutA 但代码里没有对它 IAT 槽的引用（经别的跳板调用），新版 AVG32 要另看。
+
+## 普查还没覆盖的引擎
+
+| 引擎 | 本机样本 | 备注 |
+|---|---|---|
+| Silky's AI5WIN / AI6WIN、LiveMaker、AliceSoft System4、Escu:de、Kaguya | 无 | 见上表 |
+| Majiro | 无 | GetGlyphOutline 路线，适合 DrawSites |
+| QLIE | 无 | Delphi，画字在 TQLIE 文本对象 |
+| Malie | 无 | 自绘字库，类似 MAGES |
+| CIRCUS | 无 | MES VM，GDI 字形点 |
+| EntisGLS（Entis） | 无 | |
+| SystemNNN、ExHIBIT、Ikura GDL、rUGP（âge）、AGE System | 无 | |
+| RealLive / AVG32 新版（Air） | 有（Air） | 已做（07c599da）：air_cn.exe 是 UPX 压缩，不是绕 IAT；解压副本上原有 avg32 签名正好命中一次，运行时按值找 IAT 槽 |
+| Leaf（WHITE ALBUM2）、Spike Chunsoft（ダンガンロンパ 1 / 2 / V3）、みにくいモジカの子 | 有 | 静态做不出，实机采集方案见 engine-draw-native.md |
+| Unity Naninovel（夏色四叶草）、Unity（デスマッチラブコメ！） | 有 | 归 Unity 组件路线（unitytext），不是原生画字 |
+| BGI、Siglus、MAGES、CatSystem2 | 有 | re-bgi / re-siglus / re-mages / re-cs2 在做 |
+
+## 两部 Unity 走 unitytext 还缺什么（静态，2026-11-21）
+
+unitytext（`native/unitytext/MeguLitUnityText.cs`，BepInEx 5 Mono 插件）看的是 TextMeshPro `TMP_Text` 和 uGUI `UnityEngine.UI.Text` 组件；隐藏 = 组件 alpha 0，内嵌 = 换组件的文字
+
+| 游戏 | Unity / 运行时 | 文字组件 | 缺什么 |
+|---|---|---|---|
+| 夏色四叶草 Summer Clover（官方中文版 1.10） | 2020.3.48f1，Mono（MonoBleedingEdge，Managed 齐全，可直接用 BepInEx 5 Mono 插件） | Naninovel：`NaninovelTMProText` / `RevealableTMProText`（都是 TMP_Text 的子类，插件现有的 TMP 路线能看到） | 1. 这是官方中文版：游戏画的是中文，要先看 Naninovel 的本地化里有没有日文（Naninovel 按 locale 切换脚本），没有就没有日文原文可读；2. Naninovel 的逐字显示是 `TextRevealer` 每帧改顶点颜色，不是 maxVisibleCharacters：插件的「打字机走完放开 maxVisibleCharacters」和「alpha 0 隐藏」可能被它每帧覆盖，要在实机里看一次；角色识别已有 Naninovel `ChoiceHandlerButton` / `AuthorNamePanel` |
+| デスマッチラブコメ！（KEMCO，Steam） | 2019.2.15f1，Mono | 没有 TextMeshPro；Assembly-CSharp 里是 `MESBOX_WINDOW`、`messageSprite`、`fontSprite`、`TextMesh`、`RUBY` / `rubyObject` / `CalculateRubysize`：对白很可能是引擎自己用字体精灵（或旧的 3D `TextMesh`）拼出来的，带自己的注音 | 1. 插件不认 `TextMesh`（旧 3D 文字）和精灵拼字，需要在 Build 里加 `UnityEngine.TextMesh` 一类，或者对精灵拼字的游戏走另一条（读 `MessageText` / `MessageBuffer` 的字符串 + 精灵的屏幕位置），哪一种要实机看对白挂的是什么组件；2. 目录里有「汉化补丁备份\DMLC汉化补丁.zip」：现在装的是中文补丁，要用备份恢复日文原版文件再测 |
+
+两部都不需要 IL2CPP，现有 Mono 插件能装；静态这一步没有可交的代码，缺的都要实机确认（组件类型、Naninovel 逐字显示和 alpha 的冲突）
