@@ -53,12 +53,12 @@ export function seedBodyHTML(locale,esc){
   <p class="seed-soon">${esc(t.soon)}</p>`;
 }
 const countText=(locale,s)=>s&&s.games?seedWords(locale).count(s.games,s.versions):'';
-/* the About section: a full-width band under the three columns, two layouts to pick from (window.__seedLayout 1 or 2); the nod sits last, small */
+/* the About section: a full-width band under the three columns; the nod sits last, small */
 export function seedAboutHTML(locale,esc){
- const t=seedWords(locale),lay=window.__seedLayout==='2'?'2':'1';
+ const t=seedWords(locale);
  const points=`<dl class="seed-points">${t.points.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`;
  const foot=`<div class="seed-foot"><span class="seed-soon">${esc(t.soon)}</span><span class="seed-count" data-seed-count></span><button type="button" class="seed-link" data-open="${SEED_URL}">${esc(t.github)}<i aria-hidden="true">↗</i></button></div>`;
- return `<section class="ab-sec ab-seed" data-lay="${lay}"><h2>${esc(t.name)}</h2>
+ return `<section class="ab-sec ab-seed"><h2>${esc(t.name)}</h2>
   <div class="seed-band"><div class="seed-band-l">${heroHTML()}</div><div class="seed-band-r"><p class="seed-lead">${esc(t.lead)}</p>${points}</div></div>
   ${foot}
   <p class="seed-homage">${esc(t.homage)}</p></section>`;

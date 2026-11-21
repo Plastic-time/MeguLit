@@ -44,8 +44,7 @@ dialog.seed-panel{width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 48
 .seed-panel-body h2{margin:0 0 10px;font-size:20px;letter-spacing:.03em}
 .seed-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
 .ab-seed{grid-column:1/-1;margin-top:34px}
-/* About band. Layout 1: picture left, lead and one column of rows right, both starting on the same top line.
-   Layout 2: picture on top of the left column stretched to the height of a tight two-column list. The rows use the 关于 facts rhythm. */
+/* About band. Picture left, lead and one column of rows right, both starting on the same top line; the rows use the 关于 facts rhythm. */
 .seed-band{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:0 44px;align-items:start}
 .seed-band-l .seed-hero{margin:0}
 .seed-band-r .seed-lead{margin:0 0 6px;font-size:14px;line-height:1.7}
@@ -57,15 +56,7 @@ dialog.seed-panel{width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 48
 .seed-foot .seed-count{margin:0 auto 0 0}
 .seed-foot .seed-count:empty{display:none}
 .seed-homage{font-size:11px!important;color:var(--g-t3,var(--g-t2))}
-.ab-seed[data-lay="2"] .seed-band{grid-template-columns:minmax(0,1fr);gap:16px}
-.ab-seed[data-lay="2"] .seed-band-l .seed-hero{height:170px}
-.ab-seed[data-lay="2"] .seed-band-l .seed-hero img{height:100%;object-fit:cover;object-position:50% 38%}
-.ab-seed[data-lay="2"] .seed-band-r{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:0 44px;align-items:stretch}
-.ab-seed[data-lay="2"] .seed-band-r .seed-lead{grid-column:1;grid-row:1;align-self:start;font-size:15px;line-height:1.75}
-.ab-seed[data-lay="2"] .seed-band-r .seed-points{grid-column:2;grid-row:1;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px}
-.ab-seed[data-lay="2"] .seed-band-r .seed-points>div{grid-template-columns:1fr;gap:2px}
-.ab-seed[data-lay="2"] .seed-band-r .seed-points>div:first-child,.ab-seed[data-lay="2"] .seed-band-r .seed-points>div:nth-child(2){border-top-color:transparent}
-@media (max-width:1100px){.seed-band,.ab-seed[data-lay="2"] .seed-band-r{grid-template-columns:minmax(0,1fr)}.ab-seed[data-lay="2"] .seed-band-r .seed-points{grid-column:1;grid-row:auto}}
+@media (max-width:1100px){.seed-band{grid-template-columns:minmax(0,1fr)}}
 
 /* the start flow (notice, The Seed, tutorial) keeps one size so the dialog does not jump between steps; the body scrolls inside */
 html:not(#u):not(#v):not(#a):not(#b):not(#c) body dialog.game-dialog.dev-notice.seed-flow[open]{height:min(860px,calc(100vh - var(--titlebar-height,56px) - 40px))!important}
