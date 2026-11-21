@@ -60,6 +60,28 @@ test('falsy rejection reasons still block replacing the failed teardown owner',a
  }
 });
 
+test('a failed text path must finish a successful retry before a new reader can attach',async t=>{
+ let attached=0;t.mock.method(Reader.prototype,'attach',()=>{attached++;return {attached:true};});
+ for(const reason of [Error('READER_STOP_INCOMPLETE'),undefined]){
+  const r=runtime(t),reader=new Reader(r);r.reader=reader;let attempts=0,fail=true;
+  const session={stop(){attempts++;return fail?Promise.reject(reason):Promise.resolve();}};r.textPaths=new Set([session]);
+  const first=await Promise.allSettled([r.stopReading()]);assert.equal(first[0].status,'rejected');assert.equal(reader.stopError,null);assert.equal(reader.stopFailed,false);
+  // Frontend health updates do not erase the independent resource-cleanup failure state.
+  r.readerError='';const before=attached,second=await Promise.allSettled([r.call({action:'reader_attach'})]);
+  assert.equal(second[0].status,'rejected');assert.equal(attempts,2);assert.equal(attached,before);assert.equal(r.reader,reader);assert(r.textPaths.has(session));
+  fail=false;assert.deepEqual(await r.call({action:'reader_attach'}),{attached:true});assert.equal(attempts,3);assert.equal(attached,before+1);assert.equal(r.textPaths.size,0);assert.equal(r.readingStopFailed,false);await r.stopReading();
+ }
+});
+
+test('attachment waits for pending text-path cleanup even after Reader.stop has finished',async t=>{
+ const r=runtime(t),reader=new Reader(r);r.reader=reader;let release,attached=0,attempts=0;
+ t.mock.method(Reader.prototype,'attach',()=>{attached++;return {attached:true};});
+ r.textPaths=new Set([{stop(){attempts++;return new Promise(resolve=>{release=resolve;});}}]);
+ const stop=r.stopReading();assert.equal(stop,r.stopReading());await tick();assert.equal(reader.stopping,null);assert.equal(reader.closed,true);
+ const attach=r.call({action:'reader_attach'});await tick();assert.equal(attached,0);assert.equal(attempts,1);assert.equal(r.reader,reader);
+ release();await stop;assert.deepEqual(await attach,{attached:true});assert.equal(attached,1);assert.equal(r.textPaths.size,0);await r.stopReading();
+});
+
 test('a new attach can resume only after retrying the old failed cleanup successfully',async t=>{
  const r=runtime(t),reader=new Reader(r),first=Error('READER_STOP_INCOMPLETE');let attempts=0,attached=0;
  t.mock.method(Reader.prototype,'attach',()=>{attached++;return {attached:true};});

@@ -9,11 +9,16 @@ class Runtime {
  libraryOnly(){return this.libraryOnlyState??=require('../core/library-mode.cjs').libraryOnly(this.root);}
  trackTextPath(prepared){if(!prepared?.session)return;this.textPaths??=new Set();this.textPaths.add(prepared.session);}
  forgetTextPath(session){this.textPaths?.delete(session);}
- async stopReading(){this.bindGeneration=(this.bindGeneration||0)+1;this.pendingGame='';this.pendingExecutable='';this.readerReady=false;this.readerPhase='not-started';const reader=this.reader;
-  try{const paths=[...(this.textPaths||[])],results=await Promise.allSettled([()=>reader?.stop(),...paths.map(p=>()=>p.stop())].map(async stop=>stop()));
-   const failed=results.find(result=>result.status==='rejected');if(failed)throw failed.reason;
-   for(const p of paths)this.textPaths.delete(p);if(this.reader===reader)this.reader=null;this.readerError='';
-  }catch(error){this.readerError='READER_STOP_INCOMPLETE';throw error;}}
+ stopReading(){
+  if(this.readingStopPending)return this.readingStopPending;
+  this.bindGeneration=(this.bindGeneration||0)+1;this.pendingGame='';this.pendingExecutable='';this.readerReady=false;this.readerPhase='not-started';const reader=this.reader,paths=[...(this.textPaths||[])];
+  let resolve,reject;const result=new Promise((yes,no)=>{resolve=yes;reject=no;});this.readingStopPending=result;result.catch(()=>{});
+  const work=(async()=>{const results=await Promise.allSettled([()=>reader?.stop(),...paths.map(p=>()=>p.stop())].map(async stop=>stop()));
+   const failed=results.find(item=>item.status==='rejected');if(failed)throw failed.reason;
+   for(const p of paths)this.textPaths.delete(p);if(this.reader===reader)this.reader=null;
+  })();
+  work.then(()=>{this.readingStopPending=null;this.readingStopFailed=false;this.readerError='';resolve();},error=>{this.readingStopPending=null;this.readingStopFailed=true;this.readerError='READER_STOP_INCOMPLETE';reject(error);});return result;
+ }
  config(){return require('../core/v4-config.cjs').cleanV4(readJSON(path.join(this.folder,'v4-preferences.json')));}
  // Bind the window of a game MeguLit just launched; retried a few times while the reader/bridge finishes starting.
  bindLaunched(pid){if(this.libraryOnly())return;const generation=this.bindGeneration||0,current=()=>!this.stopped&&!this.libraryOnly()&&generation===(this.bindGeneration||0);if(!Number.isInteger(Number(pid))||Number(pid)<=0)return;/* the game MeguLit started itself (its script is injected early) */let marks=0;const mark=()=>{if(!current())return;const h=this.reader?.gal?.hooks;if(h)h.launchedPid=Number(pid);else if(++marks<40)setTimeout(mark,500).unref?.();};mark();let tries=0;const go=()=>{if(!current())return;const g=this.reader?.gal;if(g){g.send({type:'bindProcess',pid:String(pid)});if(++tries<4)setTimeout(go,1500);}else if(++tries<20)setTimeout(go,500);};setTimeout(go,300);}
@@ -70,7 +75,7 @@ case 'library_scan':{this.libraryScans??=new(require('./library-scan.cjs').Libra
    case 'reader_health':{if(this.libraryOnly())return {saved:false,libraryOnly:true};const phase=String(request.phase||'').slice(0,100),error=String(request.error||'').slice(0,3000);this.readerReady=phase==='ready'&&!error;this.readerPhase=phase;this.readerError=error;if(error)await this.reader?.stop();this.emit('reader-health',this.readerStatus());require('node:fs').appendFileSync(path.join(this.root,'logs','reader-startup.log'),new Date().toISOString()+' '+phase+' '+error+'\n');return {saved:true};}
    case 'reader_bootstrap':return {native:{...require('./settings.cjs').nativeDefaults,...readJSON(path.join(this.folder,'native-preferences.json'))},engines:Object.fromEntries(Object.entries(require('../core/engines.cjs').ENGINES).map(([name,engine])=>[name,{label:engine.label,hidden:!!engine.hidden,group:engine.group,kind:engine.kind,keyless:!!engine.keyless,editable:!!engine.editable,pair:!!engine.pair,baseUrl:engine.baseUrl,model:engine.model||'',models:require('../core/engines.cjs').modelsFor(name),hint:engine.hint||''}])),models:{gpt:require('../core/engines.cjs').modelsFor('gpt'),deepseek:require('../core/engines.cjs').modelsFor('deepseek')}};
    case 'reader_detach':await this.stopReading();return {stopped:true};
-   case 'reader_attach':{if(this.reader?.stopping)await this.reader.stopping;if(this.reader?.stopFailed)await this.stopReading();if(this.libraryOnly())return {libraryOnly:true,attached:false};if(!this.reader||this.reader.closed)this.reader=new(require('./reader.cjs').Reader)(this);return this.reader.attach(request);}
+   case 'reader_attach':{if(this.readingStopPending)await this.readingStopPending;if(this.reader?.stopping)await this.reader.stopping;if(this.readingStopFailed||this.reader?.stopFailed)await this.stopReading();if(this.libraryOnly())return {libraryOnly:true,attached:false};if(!this.reader||this.reader.closed)this.reader=new(require('./reader.cjs').Reader)(this);return this.reader.attach(request);}
    case 'reader_message':return (this.reader??=new(require('./reader.cjs').Reader)(this)).message(request.message);
    case 'reader_invoke':return (this.reader??=new(require('./reader.cjs').Reader)(this)).invoke(request.command,request.args);
    case 'model_status':return {...this.models().status(),runtime:this.local().status()};
