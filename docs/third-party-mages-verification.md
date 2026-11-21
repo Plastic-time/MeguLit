@@ -15,3 +15,8 @@
 上游项目指向仓库已有声明：LunaHook / LunaTranslator `https://github.com/HIllya51/LunaTranslator`
 LanguageBarrier 与 impacto 的角色/结构判断来自既有 engine-draw-native.md 历史记录，本轮没有重取上游源或补造授权结论
 新增全代码匹配收据不能替代这些历史语义判断的实机证明
+
+后续私有 DLL 构建复用本机既有 `night-1423/hooktree/src` 与 ATL，未联网获取新实现，LunaHook 的 GPL 许可证一并复制到自有 build tree
+实际复制/覆盖后的944份源文件 SHA、生成构建信息与最终 DLL hash 在外部 `mages-live/combined-inputs.json`，不以产品 commit 名字替代这份组合源码事实
+音频诊断读取 Microsoft 官方 `IAudioSessionControl2::GetProcessId` 返回值定义，仅引用 API 事实，没有复制外部代码
+https://learn.microsoft.com/en-us/windows/win32/api/audiopolicy/nf-audiopolicy-iaudiosessioncontrol2-getprocessid

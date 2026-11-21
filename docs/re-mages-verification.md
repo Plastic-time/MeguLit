@@ -78,9 +78,57 @@ root 若需接入手工检查，可在自己的串行集成中调用该入口，
 复用权限候选 `b3437326490d906887b59acfc1d3f094fac05a84` 和 night-ci 整合 `e18df86440a2f9d97b8a9770cdee4c33beba3bf9`，不重复其 253 项或将其当本轮新成绩
 本候选基于 main `ba00434c9961035ef625ebccd773de508c7122c6`，需 root 在串行集成时保留 b343 权限修复
 
-本轮没有完整 DLL 构建/部署或游戏启动
+首阶段没有 DLL 构建或游戏启动，后续实际启动记录见下一节
 旧六行 live-chain fixture 是仿引擎回放；page observer 输出 `hidden=false` 并透传原画字，实际隐藏需要宿主完整路径另有证据
 10句以上隐藏/点读/真实译文ACK/翻页无残留仍未验收，不能因本报告开启任何游戏 allowlist
-实机 slot 请求及精确计划写在外部 `engine-progress/mages.md`，待 root 分配；main 合并重测和推送也只由 root 执行
+实机 slot 与精确计划写在外部 `engine-progress/mages.md`；main 合并重测和推送只由 root 执行
 
 未删除代码或降低既有运行路径，只替换了静默通过的证据判断并给扫描读操作补边界
+
+## 04:14 后续：私有 DLL 已编，真实启动仍阻断
+
+root 分配 slot3 后，分支补入既有 430f/a255/b343，分别对应本分支 ba5ff476 / 92417737 / 0a2740da
+与 e18 对照，MAGES 权限头除本轮修正的 x64 注释外一致，未再跑旧 253 项
+`selftest/run.cmd` 的冲突只保留本基线并加入 MAGES 入口，没有导入其它候选引擎的调用
+依赖合入后相关 Node 再验证 38/38、0 skip
+
+私有 `LunaHook32.dll` 实际完整编译成功，按 runtime 名复制为 `MeguLitHook32.dll`
+SHA-256 `e99f3fb05d2512f9cb00c591e70ffd1c988a4d8ed04d8a58568d86cc09f6dbe0`，native build tree 195586917B，在 512MiB 预算内
+源码来自既有本机 LunaHook tree 的私有复制，再由本分支 build-x86 覆盖，944 个实际源文件逐项存 SHA，不能将整份 DLL 称为 root 最新完整整合源码
+root 固定的 HookBridge `7d190514ea0c087b0c5e5448ea36208b3e6772e950bd9197decd8912807e6e4d` 实际 `--probe` 通过，九个 host exports 可用；尚无实际游戏注入
+
+| 实际启动 | 所有权与隔离 | 观察 |
+| --- | --- | --- |
+| PID3872 | 私有 save-root 副本，roles=0 | snapshot guard 在 session PID 查询拒绝；未发 start-muter，未进入正文采集 |
+| PID46876 | 同一副本；只改 save-root 函数与对应 relocation，原件未写 | HidDesk 截图为 Steam `Application load error 3:0000065432` |
+| PID41672 | 第二种副本只改保存 namespace 数据，原始 .text/relocation 逐字节不变 | HidDesk 截图仍是同一 Steam 错误 |
+
+两种副本的字框签名表均与原始 exe 一致，来源与精确 hash 在外部 manifest
+启动失败的具体根因未确认，不据这个通用错误断言是 MAGES hook、DRM 校验或某个路径问题
+没有修改授权检查或继续尝试绕过该错误，也没有移动原用户存档、改其 junction 或 DACL
+第二种方法新建的独立 Documents namespace junction 只指向自有 H 盘 save，已正常仅 unlink，不覆盖用户既有目录
+
+原 snapshot 工具实际返回的 HRESULT 已经只读确认是 `0x0889000D`，官方定义为跨进程 session 的 `AUDCLNT_S_NO_SINGLE_PROCESS`
+这是单 PID 采集合同需要独立处理的状态，不能直接把所有非负 HRESULT 当作可安全静音的单 PID session
+来源：[Microsoft GetProcessId 文档](https://learn.microsoft.com/en-us/windows/win32/api/audiopolicy/nf-audiopolicy-iaudiosessioncontrol2-getprocessid)
+共享 guard 未改；后两次使用生产 `ColdCapture.cs` 的私有 trace 编译，只增加原 mute/静音/恢复读回记录，fake 自检通过
+游戏停在启动错误前，未创建被本路捕获的音频 session，实际没有 snapshot/mute 记录，不能把 guard exit0 称为音频验收通过
+
+全部 owner 游戏与控制器/guard 已退出，slot3 已释放，原存档 11 个文件逐项 SHA 未变
+角色开关从未置1，未进行选项、正文或清页采集，也没有有效 I/G/H/D/U 新证据
+静态 roles=0 文件已写但引擎没有进入可测场景，因此同样不是有效的实机默认关闭负控
+
+私有副本清理整条命令被自动审核以 `blocked by policy` 拒绝，连前置预检也未执行，未换工具或父目录重试
+两个自有游戏副本及其只读使用的 USRDIR junction 保留，不能递归清理到原游戏资源
+精确目标、已成功完成的退出/unlink、未执行的删除与证据路径都在外部 `engine-progress/mages.md`
+
+## root 的接线与下一门
+
+1. 保留原有 b343/e18 权限修复，合入本轮 80bbe74f 与最终文档/private opt-in；不必重复 cherry-pick 本分支的三个依赖副本
+2. 完整 Reader 必须取 root 40e 组合的 `HookNative`/Rust，并核固定 Rust/HTML hash；本分支的 `HookNative`/Rust 更旧，不以它拼装 final。`core/mages-draw.cjs` 与 root 40e 一致，无需改共享接收分派
+3. 当前 C# `hookEngineDraw(engine=mages)` → `HookNative.magesDraw` → `MagesLive` → `charRects` 的生产链已存在。不能用绕过中间环节的回调声称实际 Reader 通过
+4. 测试 profile 的 engineTable 需使用版本层**完整表**，包含 `engine=mages`、`charset=default`、page/canvas 等，不只传 `M.table()` 的地址摘要。已补独立 preflight，确认默认 `#cfg roles=0` 与完整 `#table mages` 同时生成；此前实际启动从未启用 roles
+5. 先解决合法启动与原存档隔离能同时成立的目标入口，再领取 slot；现有两种私有副本均未进入正文。没有这个入口，不继续改 Steam 保护或移动用户数据
+6. 之后才能跑默认 off → 精确私有 SHA opt-in → 10句/姓名/选项/清页/off-on；原文隐藏与实际 DOM/译文 ACK 需另有完整证据，observer 自身的 `hidden=false` 不可改成假确认
+
+本轮实际停止点是 `BLOCKED_PRIVATE_COPY_STARTUP`，而非适配完成；MAGES64 的独立样本缺口保持不变
