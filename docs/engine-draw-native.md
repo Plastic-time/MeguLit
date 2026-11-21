@@ -477,6 +477,16 @@ e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4
 5. 第 2–4 步交叉得到排版函数的 RVA 和参数布局，取调用点前后字节进夹具，再照 MAGES 的六件套出静态签名（DR1 / DR2 各一份，结构应一致）
 V3（x64）不在这一步。
 
+### TyranoScript DOM 补全（2026-11-22，静态 / 替身单测）
+
+`core/text-paths-web.cjs` 沿用现有 CDP 注入，不增加 native hook。实际存在 `TYRANO.kag` 时，只读 `getMessageInnerLayer()` 的当前层/页；getter 失败时不改抓其他可见消息。无运行时对象的 DOM 兼容检测仍保留。Tyrano 的 `.char` 只取规范底字，排除 `.stroke/.dummy` 装饰副本和 opacity-zero 的未显现字，读取实际 Range 字框与 DPR；祖先隐藏、同文新页、断开与清页都会撤回旧行证明，超过共享 4000 UTF-16 预算的页保留游戏原文
+
+名字来自 `.chara_name_area` 或引擎配置的名字区域；选项来自 `.glink_button` 或明确的 `data-event-tag=glink/link`（包括改成 button_graphic 的 glink），逐字框保留换行。角色关闭或停止时发空快照。所有 UI 保持原字和原点击；消息中混有链接或名字区域时不隐藏/内嵌整层。`.tyrano_button_text` 仅保留旧兼容选择器，不据此宣称图片按钮支持
+
+内嵌须显式开启且正在读，Tyrano 的 `is_adding_text` 为真或底字尚未显现时不改 DOM。游戏原生 `<ruby>` 优先，字典读音不覆盖或嵌套它。撤权只拆 MeguLit 拥有的 ruby/中文节点，保留游戏元素身份与事件；中文关闭会重建当前内嵌，旧页晚到回复不会写进新页。清页回归包含实际 WebTextPath → HookNative → HiddenGate → OverlayPlacement.gone 链
+
+本轮未找到本机 Tyrano 样本，没有运行游戏、Reader 或 HidDesk，静态/浏览器单测不是实机通过。图片按钮、原生 ruby 读音向 Reader 的公共 wire 转换仍未覆盖，不能把七格标全内。官方引擎是自定义条款，不能由第三方依赖的 MIT credits 推断本体许可；只查接口，不分发引擎源码/素材。固定源版本、相关验证及店主清单见 [限定报告](engine-tyrano/result.md)
+
 **みにくいモジカの子（丑小鸭与文字祸.exe，Enigma Protector）**
 1. 游戏启动到标题画面（Enigma 此时已解开代码），用 native/runtimedump 一类的方式只读取出主模块内存镜像（ReadProcessMemory，整段 SizeOfImage），存到 H:\MeguLit-Work
 2. 镜像里 IAT 已被填成真实地址或 Enigma 的转发桩：把每个槽的目标对照 gdi32 / user32 导出表解析回 API 名（转发桩要跟一跳）
