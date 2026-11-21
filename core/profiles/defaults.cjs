@@ -36,6 +36,9 @@ module.exports={
   keepHeld:false,
  },
  choice:{
+  /* engine-draw: frame pictures (RegExp sources on the KAG message layer's frameGraphic) of the game's choice page: its text is drawn by
+     the game (not hidden) and reported as choices; [] = the kernel: no such page */
+  pageFrames:[],
   /* RegExp sources (flags 'u'); a choice candidate whose text matches one of them is never offered as an option */
   filters:[],
   /* an interleaved effect frame is told by content characters only (ellipses and punctuation repeat in any option); false = the

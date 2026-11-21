@@ -16,6 +16,9 @@
    "keepHeld": true
   },
   "choice": {
+   "pageFrames": [
+    "^選択肢$"
+   ],
    "filters": [
     "^(選択肢|選択ライン)",
     "のテーマ"

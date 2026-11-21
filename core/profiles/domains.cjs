@@ -21,6 +21,7 @@ const DOMAINS={
  'choice.dropEffectFrames':{bool:true},
  'safeMode.effectJudge':{bool:true},
  'choice.filters':{regexList:{max:20,chars:200}},
+ 'choice.pageFrames':{regexList:{max:20,chars:200}},
  'hide.textEffectsRead':{bool:true},
  'hide.preflight':{enum:[null,true,false]},
  'hide.drawsHidden':{enum:[null,true,false]},

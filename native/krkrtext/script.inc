@@ -186,7 +186,10 @@ LR"MGLT((function(){
    /* engine-draw: with draw.embed on the game draws its own (and MeguLit's) text on the processCh path, so it is never hidden there */
    st.hideMsg=function(){return !this.cfg.embed && this.hideOn();} incontextof st;
    /* engine-draw roles: a name plate or [link] text is never hidden (the reader only annotates it, the game keeps drawing it) */
-   st.choicePage=function(P){try {var k=this.kag;return typeof k.historyWriteEnabled!='undefined' && !k.historyWriteEnabled && typeof P.align!='undefined' && +P.align==0;} catch(e) {return false;}} incontextof st;
+)MGLT", LR"MGLT(
+   /* a choice page = a message layer showing a frame picture the game's diff names (choice.pageFrames, regular expressions on
+      MessageLayer.frameGraphic; ファタモルガーナの館: ^選択肢$, the frame its [choice] macro puts on message0). No list = no choice page */
+   st.choicePage=function(P){try {var rs=this.cfg.choiceFrames;if(typeof rs!='Object' || rs===void || rs.count==0 || typeof P.frameGraphic=='undefined') return false;var f=''+P.frameGraphic;if(f=='') return false;for(var i=0;i<rs.count;i++) if(rs[i].test(f)) return true;return false;} catch(e) {return false;}} incontextof st;
    st.uiDraw=function(ll){
     try {var P=ll.parent;if(P===void || P===null || !isvalid P) return '';
      if(typeof P.inLink!='undefined' && +P.inLink>=0) return 'link';
@@ -454,7 +457,9 @@ LR"MGLT((function(){
     var c=%['roles'=>0,'embed'=>0,'zh'=>1],m=%[];
     for(var i=0;i<a.count && i<4000;i++) {
      var t=''+a[i];if(t.length>0 && #t==0xfeff) t=t.substring(1);if(t=='') continue;
-     if(t.charAt(0)=='#') {if(t.indexOf('#cfg')==0) {c.roles=t.indexOf('roles=1')>=0?1:0;c.embed=t.indexOf('embed=1')>=0?1:0;c.zh=t.indexOf('zh=0')>=0?0:1;}continue;}
+     if(t.charAt(0)=='#') {if(t.indexOf('#cfg')==0) {c.roles=t.indexOf('roles=1')>=0?1:0;c.embed=t.indexOf('embed=1')>=0?1:0;c.zh=t.indexOf('zh=0')>=0?0:1;}
+      else if(t.indexOf('#choiceframe ')==0) {try {if(typeof c.choiceFrames!='Object') c.choiceFrames=[];c.choiceFrames.add(new RegExp(t.substring(13)));} catch(e) {}}
+      continue;}
      var j=t.indexOf("\t");if(j<=0) continue;
      var k=t.substring(0,j),r=t.substring(j+1),z='',j2=r.indexOf("\t");if(j2>=0) {z=r.substring(j2+1);r=r.substring(0,j2);}
      m[k]=[r,z];

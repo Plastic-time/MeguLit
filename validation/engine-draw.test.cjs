@@ -8,7 +8,7 @@ const prof=draw=>{const p=Profiles.profileFor({});return {...p,draw:{...p.draw,.
 const fake=()=>{const calls=[];return {calls,write:(cfg,entries)=>calls.push(['write',{...cfg},[...entries.keys()]]),stop:()=>calls.push(['stop'])};};
 
 test('profile defaults: draw.roles / draw.embed off = the behaviour before engine-draw',()=>{
- assert.deepEqual(ED.settings(Profiles.profileFor({})),{roles:false,embed:false,zh:true});
+ assert.deepEqual(ED.settings(Profiles.profileFor({})),{choiceFrames:[],roles:false,embed:false,zh:true});
  const t=fake();const d=new ED.EngineDraw({profile:Profiles.profileFor({}),transport:t});
  assert.deepEqual(t.calls,[['stop']],'nothing written, a stale control file removed');
  assert.equal(d.line({text:'今日は',engine:'krkr'}),false,'no replacement asked');
@@ -20,7 +20,7 @@ test('replacement table: one ask per sentence, newest 64 kept, written through t
  assert.equal(d.line({text:'別',engine:'krkr',emb:2}),false,'the game already drew it');
  assert.deepEqual(asks,[{key:'今日は晴れ',text:'今日は晴れ',engine:'krkr'}]);
  d.put('今日は晴れ',{ruby:[[0,2,'きょう']],zh:'今天晴朗'});
- assert.deepEqual(t.calls.at(-1),['write',{roles:true,embed:true,zh:true},['今日は晴れ']]);
+ assert.deepEqual(t.calls.at(-1),['write',{choiceFrames:[],roles:true,embed:true,zh:true},['今日は晴れ']]);
  for(let i=0;i<70;i++)d.put('文'+i,{zh:'x'});assert.equal(d.entries.size,ED.MAX);assert.equal(d.entries.has('今日は晴れ'),false);
 });
 
@@ -94,6 +94,6 @@ test('a game whose diff turns draw.roles on gets its control file when the profi
  const h=Object.create(HookNative.prototype);Object.assign(h,{emit:()=>{},trace:()=>{},notify:()=>{},state:{gameProcessId:4321},profile:Profiles.profileFor({})});
  const written=[];const orig=ED.KrkrTransport.prototype.write;ED.KrkrTransport.prototype.write=function(cfg){written.push({...cfg});};
  try{h.drawSync();assert.equal(h.engineDraw,undefined,'draw.* off: no control file');
-  h.setProfile(prof({roles:true}));assert.equal(h.engineDraw.pid,4321);assert.deepEqual(written.at(-1),{roles:true,embed:false,zh:true});
+  h.setProfile(prof({roles:true}));assert.equal(h.engineDraw.pid,4321);assert.deepEqual(written.at(-1),{choiceFrames:[],roles:true,embed:false,zh:true});
  }finally{ED.KrkrTransport.prototype.write=orig;h.engineDraw?.stop?.();}
 });
