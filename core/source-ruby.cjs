@@ -1,5 +1,5 @@
 'use strict';
-function extractSourceRuby(value,positioned=false){
+function extractSourceRuby(value,positioned=false,stripTags=false){
  const raw=String(value||''),cut=raw.indexOf('\x1d'),ruby=[],inline=[];let text=cut<0?raw:raw.slice(0,cut);
  if(cut<0&&!text.includes('<')&&!text.includes('《'))return {text,ruby};
  const add=(base,reading,explicit=false)=>{if(!base||!reading||base.length>80||reading.length>160||(!explicit&&!/[ぁ-ヿー]/.test(reading))||ruby.length>=256)return;
@@ -9,8 +9,9 @@ function extractSourceRuby(value,positioned=false){
   /* Carry the offsets from earlier markup formats through this replacement pass. */
   const previous=inline.slice().sort((a,b)=>a.at-b.at);let i=0,removed=0;
   const advance=end=>{while(i<previous.length&&previous[i].at<end)previous[i++].at-=removed;};
-  text=text.replace(pattern,(markup,a,b,at)=>{
-   advance(at);const base=readingFirst?b:a,pair=add(base,readingFirst?a:b,positioned&&allowLabel);
+  text=text.replace(pattern,(...match)=>{
+   const [markup,a,b]=match,at=match.at(-2);advance(at);
+   const base=readingFirst===undefined?'':readingFirst?b:a,pair=base&&add(base,readingFirst?a:b,positioned&&allowLabel);
    if(positioned&&pair)inline.push({pair,at:at-removed});
    removed+=markup.length-base.length;return base;
   });
@@ -21,6 +22,7 @@ function extractSourceRuby(value,positioned=false){
  strip(/[｜|]([^\s《》|｜]+)《([^《》]+)》/g,false);
  /* HuneX puts the reading before the base in <rよみ>漢字</r>. */
  strip(/<r([^<>]*)>([^<>]*?)<\/r>/g,true,true);
+ if(stripTags)strip(/<\/?[a-z][^>]*>/gi);
  if(!inline.length)return {text,ruby};
  /* Study pages can remove spaces and newlines. Anchor repeated bases in the whitespace-free line. */
  const compact=text.replace(/\s+/g,''),repeated=new Map();let offset=0,character=0;

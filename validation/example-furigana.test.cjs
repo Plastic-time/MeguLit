@@ -168,4 +168,11 @@ test('inline readings stay with their own occurrence in study examples and histo
  assert.deepEqual(compacted.spans.map(s=>[s.start,s.end,s.reading]),[[6,8,'こんにち']]);
  const label=await shown({text:'これは人工知能だ。',ruby:grammar.rubyPairs('これは<rAI>人工知能</r>だ。')});
  assert.deepEqual(label.spans.map(s=>s.reading),['AI']);
+ const rich='赤い<br>花と<rはな>花</r>と花と花だ。',rendered=await shown({text:rich});
+ assert.equal(rendered.text,'赤い花と花と花と花だ。');assert.deepEqual(rendered.spans.map(s=>s.start),[4]);
+ const replayed=await shown({text:rendered.text,ruby:grammar.rubyPairs(rich)});
+ assert.deepEqual(replayed.spans,rendered.spans);
+ const alternative=await shown({text:'花と<ruby="はな">花</ruby>。'});assert.deepEqual(alternative.spans.map(s=>s.start),[2]);
+ const mismatched=await shown({text:'本と花。',ruby:[['花','はな',0],['花','はな',99],['花','はな',2],['花','か',2]]});
+ assert.deepEqual(mismatched.spans.map(s=>[s.start,s.reading]),[[2,'はな']]);
 });

@@ -13,7 +13,7 @@ const hira=v=>String(v||'').replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCo
 const isName=t=>{const g=Array.isArray(t.grammar)?t.grammar:[];return g.includes('固有名詞')||/固有名詞/.test(String(t.pos||''))||/固有名詞/.test(String(t.pos_detail||''));};
 
 /* A recorded line (may still carry the engine's ruby markup) → plain text and [[base,reading],…] */
-function plainWithRuby(raw){return extractSourceRuby(raw,true);}
+function plainWithRuby(raw,stripTags=false){return extractSourceRuby(raw,true,stripTags);}
 
 /* The span for one word: okurigana outside, the kanji core inside; '' when the reading does not fit the word. */
 function coreSpan(chars,start,end,reading){
