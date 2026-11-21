@@ -16,11 +16,11 @@ function ystb(lines){const code=[],args=[],res=[];let off=0;
  const segs=[Buffer.concat(code),Buffer.concat(args),Buffer.concat(res),Buffer.alloc(code.length*4)].map(s=>{const x=Buffer.from(s);for(let i=0;i<x.length;i++)x[i]^=KEY[i&3];return x;});
  const head=Buffer.alloc(32);head.write('YSTB',0,'latin1');head.writeUInt32LE(0x1c2,4);head.writeUInt32LE(code.length,8);segs.forEach((s,k)=>head.writeUInt32LE(s.length,12+k*4));
  return Buffer.concat([head,...segs]);}
-function ypf(files){const entries=[],datas=[];let index=0;
- for(const [name] of files)index+=4+1+name.length+18;let off=32+index;
- for(const [name,data] of files){const packed=zlib.deflateSync(data),n=Buffer.from(name,'latin1'),e=Buffer.alloc(4+1+n.length+18);
-  e[4]=n.length^0xff;n.forEach((c,i)=>{e[5+i]=c^0xff;});let p=5+n.length;e[p+1]=1;e.writeUInt32LE(data.length,p+2);e.writeUInt32LE(packed.length,p+6);e.writeUInt32LE(off,p+10);off+=packed.length;entries.push(e);datas.push(packed);}
- const head=Buffer.alloc(32);head.write('YPF\0',0,'latin1');head.writeUInt32LE(450,4);head.writeUInt32LE(files.length,8);head.writeUInt32LE(index,12);
+function ypf(files,nameMask=0xff,wide=false){const entries=[],datas=[],tail=wide?22:18;let index=0;
+ for(const [name] of files)index+=4+1+name.length+tail;let off=32+index;
+ for(const [name,data] of files){const packed=zlib.deflateSync(data),n=Buffer.from(name,'latin1'),e=Buffer.alloc(4+1+n.length+tail);
+  e[4]=n.length^0xff;n.forEach((c,i)=>{e[5+i]=c^nameMask;});let p=5+n.length;e[p+1]=1;e.writeUInt32LE(data.length,p+2);e.writeUInt32LE(packed.length,p+6);e.writeUInt32LE(off,p+10);off+=packed.length;entries.push(e);datas.push(packed);}
+ const head=Buffer.alloc(32);head.write('YPF\0',0,'latin1');head.writeUInt32LE(wide?500:450,4);head.writeUInt32LE(files.length,8);head.writeUInt32LE(index,12);
  return Buffer.concat([head,...entries,...datas]);}
 function put(dir,files){for(const [rel,data] of Object.entries(files)){const f=path.join(dir,rel);fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,data);}}
 async function patchFor(game){
@@ -28,6 +28,39 @@ async function patchFor(game){
  const exe=fs.readdirSync(game).find(f=>/\.exe$/i.test(f)&&!/cn/i.test(f));db.prepare('INSERT INTO games VALUES(?,?,NULL)').run('1',path.join(game,exe));
  const ot=require('../services/original-text.cjs'),data=path.join(path.dirname(game),'data'),r=await ot.autoPatch(data,db,'1',{drives:false,force:true});
  return {r,ot,data,exe:path.join(game,exe)};}
+
+test('YU-RIS: a numbered script identifies the name mask for the whole YPF directory',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yuris-index-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const names=['image\\title.png','ysbin\\yst00100.ybn','ysbin\\yscfg.ybn'];
+ const lines=['ひとつ。','ふたつ。'];
+ const archive=ypf([[names[0],Buffer.from('png')],[names[1],ystb(lines.map(sjis))],[names[2],Buffer.from('config')]],0xc9,true);
+ put(dir,{'pac/bn.ypf':archive});
+ const entries=yuris._internal.ypfList(path.join(dir,'pac','bn.ypf'));
+ assert.deepStrictEqual(entries?.map(e=>e.name),names);
+ const scenes=yuris.scenes(dir);
+ assert.deepStrictEqual(scenes.map(s=>s.name),['yst00100.ybn']);
+ assert.deepStrictEqual(yuris.parse(scenes[0].read()).lines,lines);
+});
+
+test('YU-RIS: an unrelated .ybn file does not select a new directory mask',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yuris-media-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const media=[['image\\title.ybn',Buffer.from('media')]];
+ put(dir,{'normal.ypf':ypf(media),'unknown.ypf':ypf(media,0xc9)});
+ assert.deepStrictEqual(yuris._internal.ypfList(path.join(dir,'normal.ypf')).map(e=>e.name),[media[0][0]]);
+ assert.strictEqual(yuris._internal.ypfList(path.join(dir,'unknown.ypf')),null);
+});
+
+test('YU-RIS: a media name resembling a masked script cannot hide the real script archive',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yuris-mixed-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const media=[['zpw33233-zam',Buffer.from('OggS')],['voice.ogg',Buffer.from('OggS')]];
+ const scene=['ysbin\\yst00200.ybn',ystb(['ひとつ。','ふたつ。'].map(sjis))];
+ put(dir,{'pac/a.ypf':ypf(media),'pac/b.ypf':ypf([...media,scene])});
+ assert.deepStrictEqual(yuris._internal.ypfList(path.join(dir,'pac','a.ypf')).map(e=>e.name),media.map(e=>e[0]));
+ assert.deepStrictEqual(yuris.scenes(dir).map(s=>s.name),['yst00200.ybn']);
+});
 
 test('YU-RIS: Japanese scenes from ysbin.ypf, the Chinese update1.ypf moved aside by the restore is their translation',async()=>{
  const base=fs.mkdtempSync(path.join(os.tmpdir(),'yuris-s-')),game=path.join(base,'game');
