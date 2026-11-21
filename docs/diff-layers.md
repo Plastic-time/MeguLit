@@ -23,9 +23,11 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 - 向前兼容：客户端不认识的顶层字段、`ext` 里不认识的扩展、settings 里不认识的键都忽略（`seed.cjs check()` 的 `ignored`），认识的字段和键严格校验；`seedFormat` 比自己新也照样读
 - `The Seed/<engine>/<slug>/versions/<exe SHA-256>.json`：版本层文档，文件名 = key
 - settings 钉住非空的行为键的当前生效值：做好了就是做好了，内核默认改了它也不变。`null`、`calibrate.*`、`selfCheck.*`、`hide.engineTrial.*` 不钉（verified seed 在本机校准之上，钉了会盖掉每台电脑的本机校准、共享层和闸门阈值）；`seed.cjs check()` 对钉了这些的 seed 报警（`warnings`），`validation/the-seed.test.cjs` 要求仓库里没有报警。The Seed 内容以 `tools/diff-maker/seed-all.cjs` 的输出为准
-- 客户端语义：`verified` / `owner-ok` 直接用（官方游戏层）；`read` 直接读模式（官方游戏层）；`skeleton` 只给身份 + 钉住值，放在本机校准下面，自检闸门照常把关（不过线退读模式）
-- `verified` / `owner-ok` / `read` 的 seed 在自检里也算官方：本机校准不再叠在它下面、也不会把它换成读模式；本机退档照样最高，但在这样的 seed 下闸门只为看得见的损坏退档（漏句 `dropRate`、原文露出 `hideVisible`、复读 `repeatRate`），配对率、选项数单独超线不退（1.4.22 ファタ：开场特效让第一个窗口 pair=0.05，其实每句都画了）
+- 客户端语义：`verified` / `owner-ok` 直接用（官方游戏层）；`read` 照常按隐藏模式跑（官方游戏层），只标记待修、在 Alt+T 给读模式提示；`skeleton` 只给身份 + 钉住值，放在本机校准下面，自检闸门照常把关（不过线只记诊断和提示）
+- `verified` / `owner-ok` / `read` 的 seed 在自检里也算官方：本机校准不再叠在它下面；本机退档照样最高（退档 = 记诊断 + 提示，不切模式），但在这样的 seed 下闸门只为看得见的损坏退档（漏句 `dropRate`、原文露出 `hideVisible`、复读 `repeatRate`），配对率、选项数单独超线不退（1.4.22 ファタ：开场特效让第一个窗口 pair=0.05，其实每句都画了）
 - seed-all：店主名单 `tools/diff-maker/owner-ok.json` 里的游戏，即使样本离线判成 read 也写成 owner-ok + hide（样本可能早于让它能用的修复）
+
+**读模式**（2026-11-21 店主定规矩，取代以前「自检退档到读模式」）：读模式只由用户在设置 / Alt+T 里手动开关（`隐藏游戏原文` 关 = 读模式）。任何自动路径都不改渲染模式，只记诊断、上报、在 Alt+T 给一句「这部游戏可能有显示问题，可以手动切读模式」和一个「切读模式」按钮：阅读层特效判据（`galTextEffects`）、core `effectJudge` / `hookTextEffects`、记住的特效判定、`self-check-live` 退档、本机 / 共享 / 官方校准的 `mode:'read'` / `hide.textEffectsRead:true`、seed 的 `status:'read'`、冷测试结论。实现：所有这些都走 `GalNative.textEffects(true, why)`，它只设 `readHint` 并通知 `readModeHint`，不动 `hookHide`、不重排计划；`textEffectsHold` 永远为空。`owner-ok` / `verified` 的隐藏 seed 连提示也不给（`reader.seedKeepsHide`，记 `keptHide`）。`mode` / `textEffectsRead` 字段保留作数据（诊断、上报、seed-all 判定），不再决定模式。回放：`validation/fata-seed-keeps-hide.test.cjs`
 
 **语言**（2026-11-21，为英文学习模式和多语言译文留的接口）：
 - 跟语言有关的设置放 `settings.lang.<bcp47>`：`{annotation: 'ruby'|'ipa'|'pinyin'|'none', pairing: 'script'|'patch'|'machine'|'none', dictionary: <id>, fontFallback: [字体名]}`（`core/profiles/domains.cjs langMap`，块里不认识的字段忽略）；游戏层键；各层按语言、按字段叠加
@@ -61,9 +63,9 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 | 本机校准 | `data/config/auto-profiles/<key>.json`（`core/auto-profile.cjs`） | `auto` |
 | 官方·游戏层 | 内置 `The Seed/<engine>/<gameId>/game.json`（`seed-game`），或 relay 下发、我们签名、rev 更高的（`official-game`） | `seed-game` / `official-game` |
 | 官方·版本层 | 内置 `The Seed/…/versions/<exe>.json`（`seed`），或 relay 下发、rev 更高的（`official`） | `seed` / `official` |
-| 本机退档 | 自检闸门在这台电脑上看到这个 exe 坏了（读模式） | `stepdown` |
+| 本机退档 | 自检闸门在这台电脑上看到这个 exe 坏了（只记诊断 + 提示，不切读模式） | `stepdown` |
 
-- 本机退档永远在最上面：哪一层出问题，这台电脑都能退回读模式
+- 本机退档永远在最上面：哪一层出问题，这台电脑都会记下来并在 Alt+T 提示可以手动切读模式
 - 数组整组替换，不合并；`null` 表示交给内核原有判断
 - `profileFor({engine,exe,title,folder,steamAppId,vndb,exeSha256,match,sharedGame,shared,auto,officialGame,official,stepDown})` → 冻结对象 `{gameKey,engine,exeSha256,match,layers,matched,rejected,...键}`；后六个是设置对象，由 `services/self-check-live.cjs inputOf` 从本机记录和 relay 下发里取
 - `apply(profile,layer,name)` 在已有 profile 上再盖一层

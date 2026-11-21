@@ -44,7 +44,7 @@
    8000);}
  const previous=b.galStatus;b.galStatus=m=>{previous(m);state={...state,...m};/* E416: the reader knows when the hook can only read (the game's text stays visible); fallbacks key off this class only */if('hookEmbedUnsupported' in m||'hookProfile' in m)document.body.classList.toggle('megulit-readonly-hook',
   state.hookEmbedUnsupported===true&&state.hookProfile!=='off');if(m.sourceChinese===true)chineseNotice();else if(m.sourceChinese===false)document.querySelector('.megulit-chinese-notice')?.remove();if(m.sourceForeign===true)chineseNotice('foreign');else if(m.sourceForeign===false)document.querySelector('.megulit-chinese-notice.is-foreign')?.remove();
-  if(Number.isFinite(m.sharedAdaptation)&&m.sharedAdaptation>0)sharedNotice(m.sharedAdaptation);if(m.hookEmbedUnsupported===true&&state.textEffectsRead!==true)captionFeedback();else if(m.hookEmbedUnsupported===false)document.querySelector('.megulit-embed-feedback')?.remove();
+  if(Number.isFinite(m.sharedAdaptation)&&m.sharedAdaptation>0)sharedNotice(m.sharedAdaptation);if(m.hookEmbedUnsupported===true)captionFeedback();else if(m.hookEmbedUnsupported===false)document.querySelector('.megulit-embed-feedback')?.remove();
   if(m.hookProfile)b.restoreGalSettings?.({hookProfile:m.hookProfile,maskMode:m.hookAutoOcr?'local':'hook',bindEnabled:true});for(const p of panels)if(p.isConnected)paint(p);
   else panels.delete(p);};
  const style=document.createElement('style');style.textContent=`
@@ -54,7 +54,7 @@
  `;document.head.append(style);
  function text(node,value){if(node.textContent!==value)node.textContent=value;}
  function paint(p){
-{const fx=p.querySelector('[data-hook-fx]');if(fx){fx.hidden=state.textEffectsRead!==true;/* 2026-11-21 the self-check gate says why it stepped down, and offers 重新校准 */const why=typeof state.readReason==='string'?state.readReason:'',t=fx.querySelector('[data-hook-fx-why]'),bt=fx.querySelector('[data-hook-fx-back]');if(t)t.textContent=why?'自检未过线，已自动改为只显示译文：'+why:'这部游戏的文字特效和隐藏原文冲突，已自动改为只显示译文';if(bt)bt.textContent=why?'重新校准':'切回隐藏';}}for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookPref==='hookHide'?state.hookHide===true:state[cb.dataset.hookPref]!==false;if(cb.checked!==v&&document.activeElement!==cb)cb.checked=v;
+{const fx=p.querySelector('[data-hook-fx]');if(fx){fx.hidden=!(state.readModeHint===true&&state.hookHide===true);/* 2026-11-21 (owner) read mode is only ever switched by the user: a self-check or text-effects verdict shows this hint and a button, nothing switches by itself */const why=typeof state.readReason==='string'?state.readReason:'',t=fx.querySelector('[data-hook-fx-why]'),bt=fx.querySelector('[data-hook-fx-back]');if(t)t.textContent='这部游戏可能有显示问题，可以手动切读模式'+(why?'（'+why+'）':'');if(bt)bt.textContent='切读模式';}}for(const cb of p.querySelectorAll('[data-hook-pref]')){const v=cb.dataset.hookPref==='hookHide'?state.hookHide===true:state[cb.dataset.hookPref]!==false;if(cb.checked!==v&&document.activeElement!==cb)cb.checked=v;
  }
   {const hiding=['embed','euphoria474'].includes(state.hookProfile),threads=state.hookThreads||[],sel=threads.find(t=>t.selected);let tone='idle',parts=[];
    if(state.hookProfile==='off'){parts.push('Hook 已停止');}
@@ -90,7 +90,7 @@
   const p=document.createElement('section');p.className='tome-hooks';p.setAttribute('aria-label','Hook 引擎启动与效果检查');
   p.innerHTML=`<div class="tome-hook-main">
     <div class="tome-hook-summary" data-hook-summary><i data-hook-dot></i><span data-hook-summary-text></span></div>
-    <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookHide"><span>隐藏游戏原文</span></label><div class="tome-hook-fx" data-hook-fx hidden><span data-hook-fx-why>这部游戏的文字特效和隐藏原文冲突，已自动改为只显示译文</span> <button type="button" data-hook-fx-back>切回隐藏</button></div>
+    <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookHide"><span>隐藏游戏原文</span></label><div class="tome-hook-fx" data-hook-fx hidden><span data-hook-fx-why>这部游戏可能有显示问题，可以手动切读模式</span> <button type="button" data-hook-fx-back>切读模式</button></div>
     <small class="tome-hook-hint">开或关之后约 3 秒，从下一句开始生效；当前已显示的那句不会立刻变</small>
     <div class="tome-hook-actions"><button type="button" data-hook-reselect title="当前文本流读到的是乱码或不是台词时，换一条文本流">文本不对？重新选取文本流</button></div>
     <label class="tome-hook-switch"><input type="checkbox" data-hook-pref="hookAutoStart">全自动：读取台词、同步原文样式并内嵌</label>
@@ -104,7 +104,7 @@
     <h5>已发现的文本流</h5><div data-hook-streams><small>还没有发现文本流，在游戏里推进一句</small></div>
    </details>`;
   p.querySelector('[data-hook-restart]').onclick=()=>send({type:'hookStart',profile:'auto'});
-  {const back=p.querySelector('[data-hook-fx-back]');if(back)back.onclick=()=>{state={...state,hookHide:true,textEffectsRead:false};send({type:'hookPrefs',settings:{hookHide:true}});};}
+  {const back=p.querySelector('[data-hook-fx-back]');if(back)back.onclick=()=>{state={...state,hookHide:false,readModeHint:false};send({type:'hookPrefs',settings:{hookHide:false}});};}
   p.querySelector('[data-hook-reselect]').onclick=()=>send({type:'hookReselect'});
   p.querySelector('[data-hook-feedback]').onclick=openFeedback;
   for(const cb of p.querySelectorAll('[data-hook-pref]'))cb.onchange=()=>{state={...state,[cb.dataset.hookPref]:cb.checked};send({type:'hookPrefs',settings:{[cb.dataset.hookPref]:cb.checked}});

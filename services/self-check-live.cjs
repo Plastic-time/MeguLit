@@ -13,7 +13,7 @@
      4 the other players' agreed diff (relay, signed by the relay)
    This PC calibrates (records its first window) unless an official diff exists or the shared verdict is read mode. A step-down
    is reported with its reason, which puts the exe in the maintainer's repair queue, and asks the automatic probe to run (with
-   the runtime sample of services/runtime-sample.cjs). Read mode goes through GalNative.textEffects(true, reason). */
+   the runtime sample of services/runtime-sample.cjs). Read mode is never switched here: GalNative.textEffects(true, reason) only shows the hint in Alt+T (owner 2026-11-21). */
 const {SelfCheck,traceLine,reasonText,parseTrace,parseReader}=require('../core/self-check.cjs');
 const auto=require('../core/auto-profile.cjs');
 const Profiles=require('../core/profiles/index.cjs');
@@ -107,7 +107,7 @@ function windowDone(s,r){if(live!==s)return;const {reader}=s;
   hookTrace(reader,'selfCheck calibrated key='+s.key+' mode='+res.mode+' settings='+JSON.stringify(rec.settings)+(res.reason?' reason='+res.reason:''));
   reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'calibrated',key:s.key,mode:res.mode,reason:res.reason||'',cost:res.score.cost});
   settle(s);applyLayer(s);feed.report(reader.root,rec,{prints:s.prints}).catch(()=>{});return;}
- if(r.pass||s.from==='local-gate'||reader.gal?.textEffectsHold)return;
+ if(r.pass||s.from==='local-gate'||reader.gal?.textEffectsHold||reader.gal?.readHint)return;
  /* under a verified / owner-ok built-in seed the gate steps down only for damage the player sees (lines dropped, the original
     visible, a line drawn twice); a low pairing or a choice count alone is the measurement's own limit on such a game (ファタ's
     opening effects: pair=0.05 while every line was drawn), not a reason to leave the mode the seed was confirmed in */
