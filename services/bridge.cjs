@@ -432,6 +432,11 @@ async function dispatch(request,runtime=null) {
       case 'daily_open':{const url=String(request.url||'');if(!require('./daily.cjs').canOpen(url))throw Error('URL_NOT_ALLOWED');const child=spawn('explorer.exe',[new URL(url).href],{windowsHide:true,detached:true,stdio:'ignore'});child.on('error',()=>{});child.unref();return {opened:true};}
       /* E377 opt-in leaderboard (services/leaderboard.cjs) */
       case 'profile_chip':return require('./leaderboard.cjs').chip(root);
+      /* 2026-11-21 传火碑 (services/torch-monument.cjs, web/torch-monument.js) */
+      case 'torch_page':return await require('./torch-monument.cjs').page(root,{month:String(request.month||''),cursor:String(request.cursor||''),limit:Number(request.limit)||300});
+      case 'torch_months':return await require('./torch-monument.cjs').months(root);
+      case 'torch_find':return await require('./torch-monument.cjs').find(root,String(request.name||''));
+      case 'torch_me':return await require('./torch-monument.cjs').me(root);
       case 'leaderboard_view':return await require('./leaderboard.cjs').view(root,db,{period:String(request.period||''),metric:String(request.metric||''),game:typeof request.game==='string'?request.game:'',submit:request.submit===true,tab:String(request.tab||''),week:String(request.week||''),category:String(request.category||'')});
       /* E379 avatars (moderated on the relay) and reports */
       case 'leaderboard_avatar_set':return await require('./leaderboard.cjs').setAvatar(root,String(request.data||''));
