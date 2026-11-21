@@ -68,8 +68,37 @@ async function refresh(root,key,{fetcher=globalThis.fetch,now=Date.now(),force=f
    if(r.status===404){const v={none:true,key,fetchedAt:now};keep(root,key,v);return v;}
    if(!r.ok)continue;const text=await r.text();if(text.length>64*1024)continue;const v=JSON.parse(text);if(!layer(v,key))continue;v.fetchedAt=now;keep(root,key,v);return v;}catch{}}
  return old;}
-async function report(root,record,{fetcher=globalThis.fetch,prints=null}={}){if(!record||!sharing(root))return {state:'skipped'};const block=auto.diagnostic(record)?.profile;if(!block||!gameDiff.KEY.test(String(block.key||'')))return {state:'skipped'};
- const pr=prints?require('../core/game-print.cjs').check(prints):null;const body=JSON.stringify({version:1,profile:block,...(pr&&Object.keys(pr).length?{prints:pr}:{})});
- for(const url of endpoints(root,'/api/game-profile/report')){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok)return {state:'sent'};if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
+/* 2026-11-21 this PC's calibration of the exe reached the relay: data/The Seed/<key>.sent.json (the game page's first-player card turns into its thank-you) */
+const sentFile=(root,key)=>path.join(dir(root),key+'.sent.json');
+/* the marker keeps this PC's credit for the diff: {torchNo, name|null, at} as the relay answered, plus localName/synced when a name could not reach the
+   relay yet (an older relay without the credit routes): the card shows it and the next ask retries */
+function readSent(root,key){if(!gameDiff.KEY.test(String(key||'')))return null;try{const v=JSON.parse(fs.readFileSync(sentFile(root,key),'utf8'));return v&&typeof v==='object'?v:null;}catch{return null;}}
+function writeSent(root,key,v){try{fs.mkdirSync(dir(root),{recursive:true});const f=sentFile(root,key),tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(v));fs.renameSync(tmp,f);}catch{}}
+function markSent(root,key,credit=null){const old=readSent(root,key)||{};writeSent(root,key,{...old,key,at:old.at||new Date().toISOString(),...(credit?{credit}:{})});}
+function sent(root,key){return gameDiff.KEY.test(String(key||''))&&fs.existsSync(sentFile(root,key));}
+/* a credit name: plain text, at most 20 characters, no control characters; empty = none (anonymous) */
+const CREDIT_MAX=20;
+const BAD_CP=c=>c<32||c===127||c===0x2028||c===0x2029||(c>=0x202a&&c<=0x202e)||(c>=0x2066&&c<=0x2069);
+function cleanName(v){if(typeof v!=='string')return null;const t=[...v].map(ch=>BAD_CP(ch.codePointAt(0))?' ':ch).join('').replace(/\s+/g,' ').trim();const c=[...t].slice(0,CREDIT_MAX).join('').trim();return c||null;}
+/* what the relay says about a credit: {torchNo, name|null, at} or null */
+function cleanCredit(c){if(!c||typeof c!=='object')return null;const n=Number(c.torchNo);if(!Number.isInteger(n)||n<1)return null;const at=typeof c.at==='string'||Number.isFinite(c.at)?c.at:'';return {torchNo:n,name:cleanName(c.name),at};}
+/* this PC's credit of the diff it sent: the relay's last answer, or the local one still waiting for the relay */
+function creditOf(root,key){const m=readSent(root,key);if(!m)return null;const c=cleanCredit(m.credit)||(m.torchNo?cleanCredit(m):null);
+ if(m.localName!==undefined)return {torchNo:c?.torchNo||0,name:cleanName(m.localName),at:c?.at||m.at||'',synced:false};return c?{...c,synced:true}:{torchNo:0,name:null,at:m.at||'',synced:true};}
+/* PUT /api/game-profile/credit {key, name|null}: change or withdraw the credit. -> {state:'saved'|'local'|'failed', credit}.
+   An old relay (no such route: 404 / 405) or no network keeps the name here (state 'local') and tries again at the next ask. */
+async function setCredit(root,key,name,{fetcher=globalThis.fetch}={}){if(!gameDiff.KEY.test(String(key||''))||!sent(root,key))return {state:'failed',credit:null};const want=cleanName(name);
+ if(!fetcher)return keepLocal(root,key,want);let refused=false;
+ for(const url of endpoints(root,'/api/game-profile/credit')){try{const r=await fetcher(url,{method:'PUT',headers:{'content-type':'application/json','user-agent':'MeguLit'},body:JSON.stringify({key,name:want}),signal:AbortSignal.timeout(TIMEOUT)});
+   if(r.ok){let j=null;try{j=await r.json();}catch{}const c=cleanCredit(j&&(j.credit||j))||cleanCredit({...(readSent(root,key)?.credit||{}),name:want,torchNo:Number(readSent(root,key)?.credit?.torchNo)||0});
+    const old=readSent(root,key)||{};delete old.localName;writeSent(root,key,{...old,key,credit:c||{...(old.credit||{}),name:want}});return {state:'saved',credit:creditOf(root,key)};}
+   if(r.status>=400&&r.status<500&&r.status!==404&&r.status!==405&&r.status!==429)refused=true;}catch{}}
+ return refused?{state:'failed',credit:creditOf(root,key)}:keepLocal(root,key,want);}
+function keepLocal(root,key,want){const old=readSent(root,key)||{};writeSent(root,key,{...old,key,localName:want});return {state:'local',credit:creditOf(root,key)};}
+/* send a name that was kept here (the relay had no credit route then) */
+async function syncCredit(root,key,opts){const m=readSent(root,key);if(!m||m.localName===undefined)return null;return setCredit(root,key,m.localName,opts);}
+async function report(root,record,{fetcher=globalThis.fetch,prints=null,credit:creditName=null}={}){const credit=cleanName(creditName);if(!record||!sharing(root))return {state:'skipped'};const block=auto.diagnostic(record)?.profile;if(!block||!gameDiff.KEY.test(String(block.key||'')))return {state:'skipped'};
+ const pr=prints?require('../core/game-print.cjs').check(prints):null;const body=JSON.stringify({version:1,profile:block,...(credit?{credit:{name:credit}}:{}),...(pr&&Object.keys(pr).length?{prints:pr}:{})});
+ for(const url of endpoints(root,'/api/game-profile/report')){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok){let j=null;try{j=await r.clone().json();}catch{}const c=cleanCredit(j&&(j.credit||j));markSent(root,block.key,c);return {state:'sent',...(c?{credit:c}:{})};}if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
  return {state:'failed'};}
-module.exports={cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};
+module.exports={sent,markSent,creditOf,setCredit,syncCredit,cleanName,cleanCredit,CREDIT_MAX,cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};

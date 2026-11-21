@@ -351,6 +351,9 @@ async function dispatch(request,runtime=null) {
         runtime?.reader?.refreshTextSource?.();return off.run(root,'status',[id]);}
       case 'text_source_clear':{const ot=require('./original-text.cjs'),id=String(request.id);if(request.kind==='patch')ot.clearPatch(root,id);else ot.setMode(root,id,'off');runtime?.reader?.refreshTextSource?.();return ot.status(root,db,id);}
       /* 2026-11-12 Chinese-build guide on the game page: checks, then the one-click fixes the existing code can do */
+      case 'first_player':return await require('./first-player.cjs').state(db,root,String(request.id),{wait:request.poll===true?0:2500});
+      case 'first_player_credit':return await require('./first-player.cjs').setCredit(db,root,String(request.id),typeof request.name==='string'?request.name:null);
+      case 'first_player_share':return {on:require('./first-player.cjs').enableSharing(root)};
       case 'cn_version_guide':{const g=require('./cn-version-guide.cjs').guide(db,root,String(request.id));return g;}
       case 'cn_guide_fix':{const id=String(request.id),cg=require('./cn-version-guide.cjs'),row=db.prepare('SELECT executable,original FROM games WHERE id=? AND removed_at IS NULL').get(id);if(!row?.executable)throw Error('GAME_NOT_FOUND');const dir=require('./patch-swap.cjs').gameDirectory(root,id,row.executable,JSON.parse(row.original||'{}').library?.dir);
         if(request.kind==='swap')return require('./game-language.cjs').select(db,id,'ja',undefined,root);
