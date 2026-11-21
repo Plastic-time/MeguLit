@@ -193,6 +193,8 @@ relay、客户端、签名工具共用这一个纯函数文件，签名的字节
 | `POST /api/game-profile/runtime` | 客户端 | `{version:1, key, identity?, prints?, sha256, data:<base64 gzip 运行时包>}`，≤3 MB，每 IP 每小时 6 次 |
 | `GET /api/game-profile/picks` | 我们 | 等签名的挑选结果（两层，未签名文档，带 rev） |
 | `POST /api/game-profile/signed` | 我们 | `{diff}`；auto 必须正好是该层该 key 的当前挑选，否则 409；official 登记它的 prints 并关掉队列项 |
+
+`rev` 每层每个 key 跨官方和自动一条线只增：自动挑选的 rev = 已下发的最大 rev + 1；官方差分必须带 `rev` 且大于已下发和待签挑选里最大的，否则 409 `{error:"REV_NOT_NEWER", min}`（客户端用 have/haveGame 比 rev 判断 304，同号就会拿不到新文档）。官方差分要盖过客户端内置 The Seed 时，rev 还要高于内置那份（docs/diff-layers.md「当前权威接口」）。
 | `POST /api/game-profile/withdraw` | 我们 | `{key, layer?, source?}` |
 | `GET /api/game-profile/queue[?all=1]` / `POST …/queue/close` | 我们 | 修复队列 |
 | `GET /api/game-profile/runtime/list` / `…/runtime/get?key=` | 我们 | 补传的运行时样本 |

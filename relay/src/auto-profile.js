@@ -97,7 +97,9 @@ async function settle(env,layer,key,now){const since=sec(now)-PROFILE_LIMITS.kee
  const draft=build({key,layer,prints,source:'auto',mode:p.mode,settings:p.settings,exe:layer==='version'?p.exe:'',engine:p.engine,issuedAt:now.toISOString(),agree:p.agree,reporters:p.reporters,cost:p.cost});
  const stamp=await sha256(essence(draft));const old=await env.DB.prepare('SELECT stamp,rev FROM auto_profile_picks WHERE layer=? AND game_key=?').bind(layer,key).first();
  if(old?.stamp===stamp)return p;
- const signedRev=(await env.DB.prepare("SELECT rev FROM game_diffs WHERE layer=? AND game_key=? AND source='auto'").bind(layer,key).first())?.rev||0;
+ /* one rev line per layer and key across both sources: the app asks with the rev it has (have / haveGame), so a new document,
+    auto or official, always carries a higher number than anything handed out before */
+ const signedRev=(await env.DB.prepare('SELECT MAX(rev) AS rev FROM game_diffs WHERE layer=? AND game_key=?').bind(layer,key).first())?.rev||0;
  const rev=Math.max(old?.rev||0,signedRev)+1;const doc={...draft,rev};
  await env.DB.prepare('INSERT INTO auto_profile_picks(layer,game_key,stamp,body,rev,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(layer,game_key) DO UPDATE SET stamp=excluded.stamp,body=excluded.body,rev=excluded.rev,updated_at=excluded.updated_at').bind(layer,key,stamp,JSON.stringify(doc),rev,sec(now)).run();
  return p;}
@@ -145,7 +147,11 @@ async function signedPost(request,env,now,{json,fail,readJSON}){const body=await
  if(d.source==='auto'){const p=await env.DB.prepare('SELECT stamp FROM auto_profile_picks WHERE layer=? AND game_key=?').bind(layer,d.key).first();
   if(!p||p.stamp!==await sha256(essence(d)))return fail('NOT_THE_CURRENT_PICK',409);
   await env.DB.prepare('UPDATE auto_profile_picks SET signed_stamp=stamp WHERE layer=? AND game_key=?').bind(layer,d.key).run();}
- else{/* an official diff defines its game / build: its prints point here */const pr=gamePrint.check(d.prints||{});
+ else{/* 2026-11-21 rev only grows (docs/diff-layers.md: the app takes a relay diff over its built-in The Seed only with a higher
+    rev): an official document needs a rev above the one stored, so an old signed copy can never roll a game back */
+  const top=Math.max((await env.DB.prepare('SELECT MAX(rev) AS rev FROM game_diffs WHERE layer=? AND game_key=?').bind(layer,d.key).first())?.rev|0,(await env.DB.prepare('SELECT rev FROM auto_profile_picks WHERE layer=? AND game_key=?').bind(layer,d.key).first())?.rev|0);
+  if(!Number.isSafeInteger(d.rev)||d.rev<1)return fail('REV_REQUIRED');if(d.rev<=top)return json({ok:false,error:'REV_NOT_NEWER',min:top+1},409);
+  /* an official diff defines its game / build: its prints point here */const pr=gamePrint.check(d.prints||{});
   if(layer==='version')await register(env,'version',d.key,pr,['head','pe'],t);else await register(env,'game',d.key,pr,GAME_KINDS,t);}
  await env.DB.prepare('INSERT INTO game_diffs(layer,game_key,source,body,rev,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(layer,game_key,source) DO UPDATE SET body=excluded.body,rev=excluded.rev,updated_at=excluded.updated_at,withdrawn_at=NULL').bind(layer,d.key,d.source,JSON.stringify(d),d.rev|0,t).run();
  if(d.source==='official'){if(layer==='version')await env.DB.prepare('UPDATE auto_profile_queue SET closed_at=? WHERE game_key=? AND closed_at IS NULL').bind(t,d.key).run();

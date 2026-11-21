@@ -69,17 +69,22 @@ test('relay: best agreed score wins, read mode only with a majority, settings re
  assert.equal((await user('1.2.3.4')('https://relay.test/api/game-profile/fata-morgana')).status,404);});
 
 test('relay: official diff wins over auto, is ours only, can be withdrawn; gate reports fill the repair queue',async()=>{
- const doc=tool.signDoc(gameDiff.build({key:KA,source:'official',mode:'hide',settings:{placement:{firstLineAnchor:'box'}},exe:'senrenbanka.exe',engine:'krkr'}),OURS,'p1');
+ const doc=tool.signDoc(gameDiff.build({key:KA,rev:50,source:'official',mode:'hide',settings:{placement:{firstLineAnchor:'box'}},exe:'senrenbanka.exe',engine:'krkr'}),OURS,'p1');
  assert.equal((await user('1.1.1.1')('https://relay.test/api/game-profile/signed',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({diff:doc})})).status,401,'ours only');
  assert.equal((await maint('POST','/api/game-profile/signed',{diff:{...doc,settings:{code:{x:'y'}}}})).status,400,'values outside the domain refused');
  assert.equal((await maint('POST','/api/game-profile/signed',{diff:gameDiff.unsigned(doc)})).status,400,'unsigned refused');
  assert.equal((await maint('POST','/api/game-profile/signed',{diff:doc})).status,201);
  let r=await get(KA);assert.equal(r.body.diff.source,'official');const l=feed.layer(r.body,KA);assert.equal(l.source,'official');assert.equal(l.settings.placement.firstLineAnchor,'box');
+ /* rev only grows: the same or an older official document is refused, a newer one replaces it */
+ assert.equal((await maint('POST','/api/game-profile/signed',{diff:doc})).status,409,'same rev again');
+ assert.equal((await maint('POST','/api/game-profile/signed',{diff:tool.signDoc(gameDiff.build({key:KA,source:'official',mode:'hide',settings:{}}),OURS,'p1')})).status,400,'an official document needs a rev');
+ const doc2=tool.signDoc(gameDiff.build({key:KA,rev:51,source:'official',mode:'hide',settings:{placement:{firstLineAnchor:'glyph'}}}),OURS,'p1');assert.equal((await maint('POST','/api/game-profile/signed',{diff:doc2})).status,201);
+ assert.equal((await get(KA)).body.diff.rev,51);
  assert.equal((await maint('POST','/api/game-profile/withdraw',{key:KA,source:'official'})).status,200);r=await get(KA);assert.equal(r.body.diff.source,'auto');
  const trip=rec(KC,'read',{hide:{textEffectsRead:true}},0,{source:'gate',gate:{window:1,over:['dropRate','choiceMismatch'],metrics:{dropRate:.3}}});
  const q1=await post('20.0.0.1',trip);assert.equal((await q1.json()).queued,true);await post('20.0.0.2',trip);
  const q=await (await maint('GET','/api/game-profile/queue')).json();const row=q.queue.find(x=>x.key===KC);assert.equal(row.reporters,2);assert.deepEqual(row.reasons,['dropRate','choiceMismatch']);
- assert.equal((await maint('POST','/api/game-profile/signed',{diff:tool.signDoc(gameDiff.build({key:KC,source:'official',mode:'read',settings:{}}),OURS,'p1')})).status,201);
+ assert.equal((await maint('POST','/api/game-profile/signed',{diff:tool.signDoc(gameDiff.build({key:KC,rev:50,source:'official',mode:'read',settings:{}}),OURS,'p1')})).status,201);
  assert.ok(!(await (await maint('GET','/api/game-profile/queue')).json()).queue.some(x=>x.key===KC),'an official diff closes the queue entry');});
 
 test('app: uploads on by default (the switch turns them off), hot-updated layer by precedence (step-down > official > own calibration > shared)',async()=>{
@@ -96,7 +101,7 @@ test('app: uploads on by default (the switch turns them off), hot-updated layer 
   let s=begin();assert.equal(s.from,'shared');assert.ok(s.check.recording,'still calibrating here');assert.equal(s.sample,null,'no runtime sample when the player turned it off');
   ap.store(root,key,ap.record({key,engine:'krkr',exe,version:'x',result:{mode:'hide',settings:{...HIDE,placement:{firstLineAnchor:'glyph'}},score:{cost:0}}}));
   s=begin();assert.equal(s.from,'local','own calibration over the shared one');assert.equal(s.layer.placement.firstLineAnchor,'glyph');
-  await maint('POST','/api/game-profile/signed',{diff:tool.signDoc(gameDiff.build({key,source:'official',mode:'hide',settings:{placement:{firstLineAnchor:'box'}}}),OURS,'p1')});
+  await maint('POST','/api/game-profile/signed',{diff:tool.signDoc(gameDiff.build({key,rev:5,source:'official',mode:'hide',settings:{placement:{firstLineAnchor:'box'}}}),OURS,'p1')});
   await feed.refresh(root,key,{fetcher:user('40.0.0.3'),force:true});s=begin();assert.equal(s.from,'official','official over this PC');assert.equal(s.layer.placement.firstLineAnchor,'box');
   ap.store(root,key,ap.stepDown(ap.load(root,key),{key,engine:'krkr',exe,version:'x',trip:{window:1,over:['dropRate'],metrics:{},reason:'漏句'},window:{lines:20,metrics:{}}}));
   s=begin();assert.equal(s.from,'local-gate','a step-down here wins over everything');assert.equal(modes.length,1);assert.equal(modes[0][1],'漏句');
@@ -156,7 +161,7 @@ test('relay: two layers, best match first: exe > head > pe for a build, archive 
  r=await look('exe='+D+'&steam=1144400');assert.equal(r.body.match,'steam');
  assert.equal((await look('exe='+D+'&title='+T)).status,404,'an unknown title alone finds nothing');
  /* an official game diff defined by its title wins over the agreed one for every build */
- const off=tool.signDoc(gameDiff.build({key:g1.game,layer:'game',prints:{title:T,steam:'1144400'},rev:1,source:'official',mode:'hide',settings:{placement:{firstLineAnchor:'box'}}}),OURS,'p1');
+ const off=tool.signDoc(gameDiff.build({key:g1.game,layer:'game',prints:{title:T,steam:'1144400'},rev:50,source:'official',mode:'hide',settings:{placement:{firstLineAnchor:'box'}}}),OURS,'p1');
  assert.equal((await maint('POST','/api/game-profile/signed',{diff:off})).status,201);
  r=await look('exe='+D+'&title='+T);assert.equal(r.body.match,'title');assert.equal(r.body.gameLayer.diff.source,'official');
  r=await look('exe='+A);assert.equal(r.body.gameLayer.diff.source,'official');assert.equal(r.body.versionLayer.diff.source,'auto','the build layer stays the agreed one');
