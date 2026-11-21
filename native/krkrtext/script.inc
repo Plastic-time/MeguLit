@@ -26,7 +26,7 @@ LR"MGLT((function(){
      KiriKiri builds; typeof does not */
   var st=(typeof global.__megulitKrkrState=='Object')?global.__megulitKrkrState:void;
   if(st===void) {
-   st=%['skipped'=>0,'drawArgs'=>void,'drawOp'=>0,'drawLo'=>256,'drawQuiet'=>0,'lastEnd'=>void,'charsSent'=>0,'charsErr'=>'','trWrapped'=>0,'trLine'=>0,'trText'=>'','trKey'=>'','trOp'=>void,'trT'=>void,'trOwner'=>void,'trRec'=>void,'skippedCls'=>'','lastFont'=>'','pfontName'=>void,'art'=>0,'artText'=>'','artSeen'=>[],'calls'=>0,'hid'=>0,'link'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
+   st=%['skipped'=>0,'drawArgs'=>void,'drawOp'=>0,'drawLo'=>256,'drawQuiet'=>0,'lastEnd'=>void,'charsSent'=>0,'charsErr'=>'','trWrapped'=>0,'trLine'=>0,'trText'=>'','trKey'=>'','trOp'=>void,'trT'=>void,'trOwner'=>void,'trRec'=>void,'skippedCls'=>'','lastFont'=>'','pfontName'=>void,'art'=>0,'artText'=>'','artSeen'=>[],'calls'=>0,'hid'=>0,'link'=>0,'choiceDraws'=>0,'wrapped'=>[],'recs'=>[],'active'=>void,'lastVis'=>-1,'timer'=>void,'line'=>0,'report'=>global.__megulitKrkrReport,'kag'=>k,'hooked'=>0,'oldLB'=>void,'oldPB'=>void,'oldPBC'=>void];
    st.screen=function(){
     var sw=+this.kag.scWidth,sh=+this.kag.scHeight;
     if(!(sw>0) || !(sh>0)) {sw=+this.kag.primaryLayer.width;sh=+this.kag.primaryLayer.height;}
@@ -97,7 +97,7 @@ LR"MGLT((function(){
     }
     var a=this.abs(L);cx+=a[0];cy+=a[1];
     /* engine-draw: a character drawn inside [link]...[endlink] (KAG MessageLayer.inLink >= 0) is a choice, never dialogue */
-    if(this.cfg.roles && role=='line') {var il=-1;try {if(typeof L.inLink!='undefined') il=+L.inLink;} catch(e) {}if(il>=0) {this.linkCh(rec,L,il,ch,cx,cy,size,sw,sh);return;}}
+    if(this.cfg.roles && role=='line') {var il=-1;try {if(typeof L.inLink!='undefined') il=+L.inLink;} catch(e) {}if(il>=0) {this.linkCh(rec,L,il,ch,cx,cy,size,sw,sh);return;}if(this.choicePage(L)) {this.linkCh(rec,L,'R'+int(cy),ch,cx,cy,size,sw,sh);return;}}
     if(rec.n==0) {
      if(role=='line') this.fontReport(L);
      rec.role=role;rec.ra=[];rec.args=void;
@@ -186,9 +186,16 @@ LR"MGLT((function(){
    /* engine-draw: with draw.embed on the game draws its own (and MeguLit's) text on the processCh path, so it is never hidden there */
    st.hideMsg=function(){return !this.cfg.embed && this.hideOn();} incontextof st;
    /* engine-draw roles: a name plate or [link] text is never hidden (the reader only annotates it, the game keeps drawing it) */
+)MGLT", LR"MGLT(
+   /* a choice page = a message layer showing a frame picture the game's diff names (choice.pageFrames, regular expressions on
+      MessageLayer.frameGraphic; ファタモルガーナの館: ^選択肢$, the frame its [choice] macro puts on message0). No list = no choice page */
+   st.choicePage=function(P){try {var rs=this.cfg.choiceFrames;if(typeof rs!='Object' || rs===void || rs.count==0 || typeof P.frameGraphic=='undefined') return false;var f=''+P.frameGraphic;if(f=='') return false;for(var i=0;i<rs.count;i++) if(rs[i].test(f)) return true;return false;} catch(e) {return false;}} incontextof st;
    st.uiDraw=function(ll){
     try {var P=ll.parent;if(P===void || P===null || !isvalid P) return '';
      if(typeof P.inLink!='undefined' && +P.inLink>=0) return 'link';
+     /* 2026-11-21 (1.4.22 owner test, ファタモルガーナの館: the option box empty but for its lines, krkr link=0 hidden=all): the
+        options are plain message text on a choice page (no [link]), drawn as the game asks like link text */
+     if(this.choicePage(P)) return 'choice';
      if(!this.cfg.roles) return '';
      var sh=this.screen()[1];return (sh>0 && P.height<sh*0.2)?'name':'';} catch(e) {return '';}
    } incontextof st;
@@ -207,7 +214,7 @@ LR"MGLT((function(){
           inside a link (KAG MessageLayer.inLink >= 0) is a choice button: the game draws it as it is (its text and its click area
           stay), the choice overlay adds ruby and translation next to it. engine-draw: one rule with the role report (st.uiDraw):
           link text always, name plates with draw.roles */
-       var ui=st.uiDraw(self);if(ui=='link') st.link++;
+       var ui=st.uiDraw(self);if(ui=='link') st.link++;else if(ui=='choice') st.choiceDraws++;
        if(st.hideMsg() && ui=='') {
         var a=[];a.assign(args);
         while(a.count<7) a.add(a.count==4?255:(a.count==5?true:0));
@@ -450,7 +457,9 @@ LR"MGLT((function(){
     var c=%['roles'=>0,'embed'=>0,'zh'=>1],m=%[];
     for(var i=0;i<a.count && i<4000;i++) {
      var t=''+a[i];if(t.length>0 && #t==0xfeff) t=t.substring(1);if(t=='') continue;
-     if(t.charAt(0)=='#') {if(t.indexOf('#cfg')==0) {c.roles=t.indexOf('roles=1')>=0?1:0;c.embed=t.indexOf('embed=1')>=0?1:0;c.zh=t.indexOf('zh=0')>=0?0:1;}continue;}
+     if(t.charAt(0)=='#') {if(t.indexOf('#cfg')==0) {c.roles=t.indexOf('roles=1')>=0?1:0;c.embed=t.indexOf('embed=1')>=0?1:0;c.zh=t.indexOf('zh=0')>=0?0:1;}
+      else if(t.indexOf('#choiceframe ')==0) {try {if(typeof c.choiceFrames!='Object') c.choiceFrames=[];c.choiceFrames.add(new RegExp(t.substring(13)));} catch(e) {}}
+      continue;}
      var j=t.indexOf("\t");if(j<=0) continue;
      var k=t.substring(0,j),r=t.substring(j+1),z='',j2=r.indexOf("\t");if(j2>=0) {z=r.substring(j2+1);r=r.substring(0,j2);}
      m[k]=[r,z];
@@ -710,7 +719,7 @@ LR"MGLT((function(){
       if(typeof ms!='Object' || ms===void || ms===null) continue;
       for(var j=0;j<ms.count && j<32;j++) this.install(ms[j]);
      }
-     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' tr='+(this.trWrapped?1:0)+(typeof this.trWhy=='Object' && this.trWhy!==void?'/layer'+(+this.trWhy.layer)+'/own'+(+this.trWhy.own)+'/scr'+(+this.trWhy.scr)+'/small'+(+this.trWhy.small)+'/hid'+(+this.trWhy.hid)+'/empty'+(+this.trWhy.empty)+'/blank'+(+this.trWhy.blank):'')+'/sent'+(+this.charsSent)+(this.charsErr!==void?'/err:'+this.charsErr:'')+' draws='+this.calls+' hidden='+this.hid+' link='+this.link+' art='+this.art+' artLayers='+this.artSeen.count+' font='+this.fontNow()+' chars='+this.charsSent+(this.charsErr!=''?' charsErr='+this.charsErr:'')+' skipped='+this.skipped+(this.skippedCls!=''?'('+this.skippedCls+')':'');
+     return 'ok layers='+this.recs.count+' lines='+this.line+' wait='+(this.oldLB!==void?1:0)+(this.oldPB!==void?1:0)+' wrapped='+this.wrapped.count+' tr='+(this.trWrapped?1:0)+(typeof this.trWhy=='Object' && this.trWhy!==void?'/layer'+(+this.trWhy.layer)+'/own'+(+this.trWhy.own)+'/scr'+(+this.trWhy.scr)+'/small'+(+this.trWhy.small)+'/hid'+(+this.trWhy.hid)+'/empty'+(+this.trWhy.empty)+'/blank'+(+this.trWhy.blank):'')+'/sent'+(+this.charsSent)+(this.charsErr!==void?'/err:'+this.charsErr:'')+' draws='+this.calls+' hidden='+this.hid+' link='+this.link+' choice='+(+this.choiceDraws)+' art='+this.art+' artLayers='+this.artSeen.count+' font='+this.fontNow()+' chars='+this.charsSent+(this.charsErr!=''?' charsErr='+this.charsErr:'')+' skipped='+this.skipped+(this.skippedCls!=''?'('+this.skippedCls+')':'');
     } catch(e) {return 'error '+e.message;}
    } incontextof st;
    global.__megulitKrkrState=st;

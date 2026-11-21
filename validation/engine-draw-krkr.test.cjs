@@ -154,7 +154,7 @@ test('script wiring: name plates only with roles, links routed before the senten
 test('one rule for glyphs the game keeps drawing: [link] text always (ファタ incr11), name plates with draw.roles',()=>{
  const a=script.indexOf('st.uiDraw=function(ll){'),b=script.indexOf('} incontextof st;',a);
  const fn=new Function('st',('st.uiDraw=function(ll){'+script.slice(a+'st.uiDraw=function(ll){'.length,b)+'}').replace(/typeof P\.inLink!='undefined'/,"P.inLink!==undefined").replace(/!isvalid P/,'false').replace(/\bvoid\b/g,'undefined')+';');
- const st={cfg:{roles:1},screen:()=>[1280,720]};fn(st);
+ const st={cfg:{roles:1},screen:()=>[1280,720],choicePage:()=>false};fn(st); /* the choice page has its own test (fata-choice-page) */
  const msg={height:200,inLink:-1},name={height:60},link={height:200,inLink:2};
  assert.deepEqual([st.uiDraw({parent:msg}),st.uiDraw({parent:name}),st.uiDraw({parent:link}),st.uiDraw({parent:null})],['','name','link','']);
  st.cfg.roles=0;assert.deepEqual([st.uiDraw({parent:name}),st.uiDraw({parent:link})],['','link'],'roles off: links still drawn by the game, name plates as before');
