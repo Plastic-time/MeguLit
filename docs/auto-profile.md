@@ -176,7 +176,7 @@ relay、客户端、签名工具共用这一个纯函数文件，签名的字节
 
 ## 服务端 `relay/src/auto-profile.js`
 
-路由前缀 `/api/game-profile`（`/api/profile/<id>` 已经是社区个人主页）。迁移 `relay/migrations/0021_auto_profiles.sql`：
+路由前缀 `/api/game-profile`（`/api/profile/<id>` 已经是社区个人主页）。迁移 `relay/migrations/0022_auto_profiles.sql`：
 
 - `auto_profile_reports`：每个 exe、每个上报者（IP 哈希）一行，新覆盖旧，每个 exe 最多 50 行；带 `gid`（归到的游戏）和 `prints`
 - `auto_profile_picks`：每层每个 key 的一致最佳结果（未签名，带下一个 `rev`），等我们签

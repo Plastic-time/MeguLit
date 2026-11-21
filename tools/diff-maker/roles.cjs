@@ -29,10 +29,12 @@ const key=r=>roleOf(r)+'|'+(r.id||'')+'|'+String(r.text||'').replace(/\s+/g,'');
 /* protocol breaks: only `line` may be hidden or carry an embedded replacement */
 function violations(r){const out=[];if(roleOf(r)!=='line'){if(r.hidden)out.push('hidden');if(r.emb)out.push('emb='+r.emb);}return out;}
 
+/* an empty snapshot (n=0, box 0,0,0,0, id '<group>:', no text) clears that group of UI items: not an item */
+const clearGroup=r=>!String(r.text||'')&&!(r.rects||[]).length&&(!r.box||r.box.every(v=>v===0));
 /* the records of a replay -> per role {records, unique, texts, emb counts, violations} and the unique UI items */
 function summary(records){const by={};const seen=new Set(),items=[];
- for(const r of records){const role=roleOf(r);const s=by[role]||(by[role]={role,kind:KIND[role],records:0,unique:0,texts:[],emb:{0:0,1:0,2:0},hidden:0,boxOnly:0,violations:0});
+ for(const r of records){if(clearGroup(r))continue;const role=roleOf(r);const s=by[role]||(by[role]={role,kind:KIND[role],records:0,unique:0,texts:[],emb:{0:0,1:0,2:0},hidden:0,boxOnly:0,violations:0});
   s.records++;s.emb[r.emb||0]++;if(r.hidden)s.hidden++;if(!r.rects?.length&&r.box)s.boxOnly++;if(violations(r).length)s.violations++;
   const k=key(r);if(!seen.has(k)){seen.add(k);s.unique++;if(s.texts.length<6)s.texts.push(String(r.text).slice(0,40));if(role!=='line')items.push({role,id:r.id||'',text:r.text,box:r.box||null});}}
  return {roles:Object.values(by).sort((a,b)=>b.records-a.records),items};}
-module.exports={ROLES,KIND,record,roleOf,kindOf,key,violations,summary,parse};
+module.exports={clearGroup,ROLES,KIND,record,roleOf,kindOf,key,violations,summary,parse};

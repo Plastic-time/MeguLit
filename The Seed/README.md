@@ -23,8 +23,6 @@ The Seed/<engine>/<slug>/versions/<exeSha256>.json  版本层：layer version，
 | `status` | `verified` / `owner-ok` / `read` / `skeleton`，见下 |
 | `slug` | 可读的游戏名（罗马字或英文名），也是目录名 |
 | `builds` | 和这部游戏一起用的 exe SHA-256（版本层文件名） |
-| `match` | 可选：`{exe, titles, notTitles}`，可读的程序名和标题（汉化改名、库里标题不同时用来认游戏） |
-| `sourceLangs` | 可选：游戏原文的语言，BCP 47，默认 `["ja"]`，例如 `["en","zh-Hans"]` |
 
 ## 客户端语义
 
@@ -38,9 +36,3 @@ The Seed/<engine>/<slug>/versions/<exeSha256>.json  版本层：layer version，
 - 未签名；签名用 `tools/sign-profile.cjs`
 - slug 表 `tools/diff-maker/slugs.json`；有手写游戏差分的用它的 key
 - 重新生成：`node tools/diff-maker/seed-all.cjs`；按 status 分组的汇总表在维护者本机的输出目录，不进仓库
-
----
-
-## English
-
-The Seed holds MeguLit's built-in game diffs: for every game a `game.json` (game layer: every build) and for every exe a `versions/<exe SHA-256>.json` (version layer: that build only). They ship with GitHub main, live in `MeguLit/The Seed/` of the installer and come with hot updates; fixing a game means changing its seed only. Each file is a `megulit.game-diff` document (`core/game-diff.cjs`) with fingerprints from `core/game-print.cjs`; `game.json` adds `status` (`verified` / `owner-ok` used as the official game layer, `read` read mode, `skeleton` identity and pinned values under this PC's calibration with the self-check gate deciding), `slug` (its folder), `builds` and optionally `match` (readable exe names and titles) and `sourceLangs` (BCP 47, default `["ja"]`). Settings pin the value of every kernel key in effect today, so a later kernel default never changes a game that works. Pure data: no code, no paths, no user names; `validation/the-seed.test.cjs` checks the whole folder. Built-in seeds are official without a signature; diffs downloaded at run time to `data/The Seed/` must be signed. Contributing: upload a probe (shared adaptation) or attach logs to an issue; a maintainer makes the seed offline with `tools/diff-maker`, checks it with the tests and commits it. Full design: `docs/diff-layers.md` ("当前权威接口")

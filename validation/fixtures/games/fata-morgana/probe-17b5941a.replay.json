@@ -1,11 +1,12 @@
 {
  "schema": 1,
- "tool": "diff-maker/2",
+ "tool": "diff-maker/5",
  "gameKey": "fata-morgana",
  "exeSha256": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42",
  "engine": "kirikiri",
  "title": "ファタモルガーナの館",
- "diff": "probe-17b5941a.diff.json",
+ "version": "probe-17b5941a.version.json",
+ "game": "probe-17b5941a.game.json",
  "lines": "probe-17b5941a.lines.json",
  "events": [
   {
