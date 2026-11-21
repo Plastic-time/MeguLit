@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// Case of validation/games-regression.test.cjs (ctx.profile = this game's layered profile).
 // 2026-11-21 ファタモルガーナの館 (KiriKiri2, owner's run 22:51:03Z-22:53:42Z in E:\MeguLit-Test-1421\logs, hook-events.log and
 // hook-diagnostics-20261120-225350-542.log). The game fades each line in with a shuffled per-character effect drawn by
 // tTVPNativeBaseBitmap::DrawText (「そしそて魂しそはて砕魂…」); its KAG message layer page lines and the KiriKiri2 hook (the line in pieces
@@ -6,13 +7,16 @@
 // The texts, their order and their times below are the log's; page lines are where the log placed them (「placement placed: line N, K
 // characters」). Every story line must reach the reader once, the choice 「……おはよう………………」 must survive the choice filter, and core
 // must count this game's lines as broken by the effect (read mode) while a game with clean lines is never switched.
-const test=require('node:test'),assert=require('node:assert/strict');
-const {HookNative}=require('../core/hook-native.cjs');
+const assert=require('node:assert/strict'),{mock}=require('node:test');
+const {HookNative}=require('../../../../core/hook-native.cjs');
+const Profiles=require('../../../../core/profiles/index.cjs');
+let PROFILE=null;
+const CASES=[];const test=(name,fn)=>CASES.push([name,fn]);
 const DRAW='tTVPNativeBaseBitmap::DrawText';
-function fixture(t){t.mock.timers.enable({apis:['setTimeout']});let now=100000;const events=[],traces=[],located=[];
- const hook=new HookNative({native:__dirname,hook:__dirname,logs:'Z:/no-fixture-log'},m=>events.push(m),()=>{},()=>now);hook.trace=s=>traces.push(s);hook.locateChoices=o=>located.push(o);t.after(()=>hook.stop());
+function fixture(t){let now=100000;const events=[],traces=[],located=[];
+ const hook=new HookNative({native:__dirname,hook:__dirname,logs:'Z:/no-fixture-log'},m=>events.push(m),()=>{},()=>now);hook.trace=s=>traces.push(s);hook.locateChoices=o=>located.push(o);if(PROFILE)hook.setProfile(PROFILE);t.after(()=>hook.stop());
  const box={x0:56,y0:459,x1:748,y1:459,size:22,sw:804,sh:604,count:0};
- const at=ms=>{while(ms>now){const step=Math.min(50,ms-now);now+=step;t.mock.timers.tick(step);}};
+ const at=ms=>{while(ms>now){const step=Math.min(50,ms-now);now+=step;mock.timers.tick(step);}};
  return {hook,events,traces,located,at,
   hookLine(ms,text,sourceName='KiriKiri2'){at(ms);hook.source({text,sourceName,origin:'live'},'');},
   aux(ms,text,sourceName=DRAW){at(ms);hook.auxText({text,sourceName,role:0});},
@@ -75,18 +79,39 @@ test('ファタ: a hook line no page line draws (its own layer) is delivered fro
  {const {SelfCheck}=require('../core/self-check.cjs');const sc=new SelfCheck();for(const s of f.traces)sc.trace(s);const r=sc.score();assert.equal(r.drops,0,'no drop: '+JSON.stringify(r));assert.ok(r.redrawn>=1,'the delivered line is a redraw');}
 });
 
-test('ファタ 22:52:51-22:52:54: the choice 「……おはよう………………」 is an option and its hook line is read as the choice rows',t=>{
+test('ファタ 22:52:51-22:52:54: the option 「……おはよう………………」 survives the choice filter, the screen label does not; its hook line is left to the choice layer',t=>{
  const f=fixture(t);prologue(f);f.at(S('2:51.000'));
  assert.equal(HookNative.interleaved('……おはよう………………'),false,'ellipses are no effect frame');
  assert.equal(HookNative.interleaved('……おはよう……………おはよう……………'),true,'the effect frame of it is');
+ assert.deepEqual(f.hook.choiceFilter(['選択肢','……おはよう………………','…………']),['……おはよう………………','…………']);
  f.aux(S('2:51.584'),'選択肢','Krkr2wcs');f.aux(S('2:52.629'),'……おはよう……………おはよう……………');
  f.hookLine(S('2:52.634'),'選択肢選択肢……おはよう………………','Krkr2wcs');f.aux(S('2:52.636'),'……おはよう………………','KiriKiri4');
- f.at(S('2:53.200'));
- assert.ok(f.located.some(o=>o.includes('……おはよう………………')),'the option is located: '+JSON.stringify(f.located)+' '+JSON.stringify(f.traces.filter(s=>/choice/.test(s))));
  f.at(S('2:55.000'));
  const got=f.sources();
- assert.ok(got.some(g=>g.split('\n').includes('……おはよう………………')),'the option text is read with translation and ruby: '+JSON.stringify(got)+JSON.stringify(f.traces.slice(-14)));
+ assert.ok(!got.some(g=>/おはよう/.test(g)),'the choice screen is not read as a dialogue line (that cleared the choice layer): '+JSON.stringify(got));
+ assert.ok(f.traces.some(s=>/left to the choice layer/.test(s)),JSON.stringify(f.traces.slice(-8)));
  assert.equal(f.traces.filter(s=>/dropped/.test(s)).length,0);
+});
+
+/* incr11 (owner, 2026-11-20 23:33:41Z, hook-diagnostics-20261120-232903-812.log): the option came on the selected dialogue stream (KiriKiri4)
+   while the side streams carried the music title and the screen's labels. The game now draws the link text itself (script.inc keeps link
+   text visible); OCR finds the option, the other candidate is only an ellipsis row: the choice layer shows the one option */
+test('ファタ incr11 23:33:41: labels and the music title are no options; the option OCR finds is shown, never read as a line',t=>{
+ const f=fixture(t);prologue(f);f.at(S('3:40.000'));
+ f.aux(S('3:41.210'),'女中のテーマピアノソロ','Krkr2wcs');f.begin(S('3:41.400'),44);f.hookLine(S('3:41.451'),'おはようございます、旦那さま……。','KiriKiri4');f.end(S('3:41.900'),44,'おはようございます、旦那さま……。');
+ f.aux(S('3:41.465'),'…………。　　　おはようございます、旦那さま……。');f.aux(S('3:41.466'),'おはようございます、旦那さま……。','KiriKiri2');
+ f.aux(S('3:41.511'),'選択肢選択肢選択肢……おはよう………………','Krkr2wcs');f.aux(S('3:41.512'),'……おはよう………………');
+ f.hookLine(S('3:41.513'),'……おはよう………………','KiriKiri4');f.aux(S('3:41.709'),'選択ライン選択ライン','Krkr2wcs');
+ f.at(S('3:42.400'));
+ const asked=f.located[f.located.length-1]||[];
+ assert.ok(asked.includes('……おはよう………………'),'the option is located: '+JSON.stringify(f.located)+JSON.stringify(f.traces.filter(s=>/choice/.test(s)).slice(-8)));
+ assert.ok(!asked.some(o=>/テーマ|選択/.test(o)),'no label or music title: '+JSON.stringify(asked));
+ f.hook.choiceBoxes({type:'hookChoiceBoxes',status:'found',sw:804,sh:604,items:[{text:'……おはよう………………',x0:300,y0:262,x1:520,y1:290}],missed:asked.filter(o=>o!=='……おはよう………………'),rows:['……おはよう……']});
+ const shown=f.events.filter(m=>m&&m.hookChoices).pop();
+ assert.ok(shown&&shown.hookChoices.items.length===1&&shown.hookChoices.items[0].text==='……おはよう………………','the choice layer shows the option: '+JSON.stringify(asked)+JSON.stringify(f.traces.filter(s=>/choice/.test(s)).slice(-6)));
+ f.at(S('3:46.000'));
+ assert.ok(!f.sources().some(g=>/おはよう………/.test(g)),'the option is not read as a dialogue line: '+JSON.stringify(f.sources().slice(-3)));
+ assert.ok(!f.events.slice(f.events.indexOf(shown)+1).some(m=>m&&m.hookChoices===null),'the choice stays up');
 });
 
 test('core read-mode judge: ファタ\'s lines broken by the effect switch once; clean lines (千恋＊万花) never',t=>{
@@ -103,3 +128,12 @@ test('core read-mode judge: clean lines (千恋＊万花 22:53:50Z on: ADV lines
  g.at(240000);
  assert.equal(g.events.filter(m=>m.type==='hookTextEffects').length,0,JSON.stringify(g.traces.filter(s=>/text effects/.test(s))));
 });
+
+/* the kernel (every other game, 千恋＊万花 among them) keeps its behaviour: a held hook line no page line takes is dropped as before */
+test('kernel profile: unchanged, the held line is dropped and the judge is off',t=>{
+ const save=PROFILE;PROFILE=Profiles.profileFor({});try{const f=fixture(t);prologue(f);f.hookLine(S('2:26.115'),'…待っていて欲しい…');f.at(S('2:30.000'));
+  assert.ok(!f.sources().map(HookNative.flat).includes('…待っていて欲しい…'));assert.ok(f.traces.some(s=>/drawn nowhere on the page, dropped/.test(s)));
+  assert.equal(f.events.filter(m=>m.type==='hookTextEffects').length,0);assert.equal(HookNative.interleaved('……おはよう………………',false),true,'kernel counting unchanged');}finally{PROFILE=save;}
+});
+module.exports=async({profile})=>{PROFILE=profile;
+ for(const [name,fn] of CASES){mock.timers.enable({apis:['setTimeout']});const after=[];try{fn({after:f=>after.push(f)});}catch(e){e.message=name+': '+e.message;throw e;}finally{for(const f of after)try{f();}catch{}mock.timers.reset();}}};

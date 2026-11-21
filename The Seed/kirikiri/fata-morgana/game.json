@@ -24,7 +24,24 @@
    "法塔莫尔加纳之馆"
   ]
  },
- "rev": 1,
+ "rev": 2,
  "mode": "hide",
- "settings": {}
+ "settings": {
+  "page": {
+   "pairByDrawn": true,
+   "keepHeld": true
+  },
+  "choice": {
+   "contentInterleave": true,
+   "dropEffectFrames": true,
+   "filters": [
+    "^(選択肢|選択ライン)",
+    "のテーマ"
+   ]
+  },
+  "safeMode": {
+   "effectJudge": true
+  }
+ },
+ "note": "incr9/incr11 2026-11-21: shuffled per-character fade and the KiriKiri2 hook cut at its waits dropped lines and paired page lines with the wrong hook piece; the choice screen side streams carry UI labels and the music title (no options)"
 }

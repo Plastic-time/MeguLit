@@ -145,7 +145,10 @@ test('the KiriKiri script fits the compiler: every raw literal piece and the who
     Over the first the build fails with C2026 and the self-test then passes against the previous DLLs (67d07978). */
  const pieces=[...read('native/krkrtext/script.inc').matchAll(/LR"MGLT\(([\s\S]*?)\)MGLT"/g)].map(m=>m[1].length);
  assert.ok(pieces.length>=5);assert.ok(Math.max(...pieces)<=8190,'largest piece '+Math.max(...pieces)+' units');
- const total=pieces.reduce((a,b)=>a+b,0);assert.ok(total<32767,'whole script '+total+' units');});
+ const total=pieces.reduce((a,b)=>a+b,0);
+ /* engine-draw 2026-11-21: the pieces are separate literals joined at run time (KrkrText.cpp ScriptParts), so only a piece has a limit */
+ const cpp=read('native/krkrtext/KrkrText.cpp');assert.ok(cpp.includes('const wchar_t *const ScriptParts[] = {')&&cpp.includes('for (const wchar_t *p : ScriptParts) ScriptText += p;'),'pieces joined at run time');
+ assert.ok(!/\)MGLT" LR"MGLT\(/.test(read('native/krkrtext/script.inc')),'no piece concatenated at compile time');assert.ok(total<200000,'whole script '+total+' units');});
 test('an engine-side hidden confirmation keeps the line in the game: the glyph colour has something to read',()=>{const hb=read('native/HookBridge.cs');
  /* live 千恋＊万花 hide mode: lines were written back hidden (no GDI glyph proof), TextRender drew nothing, no colour; 死に逝く君 kept its lines and its colours */
  assert.ok(hb.includes('line.IndexOf(" hidden=1 ",StringComparison.Ordinal)>0)EngineHideProof(label);'),'ToMe_CHARS hidden=1 is the proof');
@@ -160,7 +163,7 @@ test('pass-through by engine confirmation can be taken back: unconfirmed lines r
    engine hide event reset, three sentences rendered by TextRender with lit glyphs, and still nothing on screen). The KiriKiri text layer
    functions are run as they are written in native/krkrtext/script.inc (TJS2 read as JavaScript: void -> undefined, isvalid -> true). */
 const trScript=()=>{const s=read('native/krkrtext/script.inc'),a=s.indexOf('st.trRestore=function(){'),b=s.indexOf('st.trDone=function(inst){');assert.ok(a>0&&b>a);
- const js=s.slice(a,b).replace(/ incontextof st;/g,';').replace(/isvalid this\.trT/g,'true').replace(/\bvoid\b/g,'undefined').replace(/%\[\]/g,'({})').replace(/\)MGLT" LR"MGLT\(/g,'');
+ const js=s.slice(a,b).replace(/ incontextof st;/g,';').replace(/isvalid this\.trT/g,'true').replace(/\bvoid\b/g,'undefined').replace(/%\[\]/g,'({})').replace(/\)MGLT",? LR"MGLT\(/g,'');
  return ()=>{const T={opacity:255},L={textLayer:T},sent=[],st={trOwner:L,trRec:[0,100001,' sw=1280 sh=720 text=あ'],trKey:'',on:false,trLayer:()=>L,hideOn(){return this.on;},report:l=>sent.push(l)};new Function('st',js)(st);return{T,L,st,sent,tick:()=>st.trHide()};};};
 test('preflight with the engine hide: the text layer is visible again whatever the game did to it while it was hidden',()=>{const rig=trScript();
  {const r=rig();r.st.on=true;r.tick();assert.equal(r.T.opacity,0);r.tick();r.st.on=false;r.tick();assert.equal(r.T.opacity,255,'plain case');assert.deepEqual(r.sent.map(l=>/hidden=(\d)/.exec(l)[1]),['1','0'],'the record follows the state');}
