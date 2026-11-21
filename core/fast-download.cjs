@@ -285,8 +285,8 @@ async function segmented(ctx,sources,st){
   if((best.end-best.pos)/Math.max(src.speed,1e-6)+300>eta)return null;
   return {piece:best,src};
  };
- let total0=0,t0=Date.now(),lastTotal=null,lastPer=null,growAt=0,skip=false;
  const progressBytes=()=>covered(st.done);
+ let total0=progressBytes(),t0=Date.now(),lastTotal=null,lastPer=null,growAt=0,skip=false;
  const monitor=setInterval(()=>{
   const now=Date.now();
   for(const p of active){const dt=now-(p.tick||p.t0);if(dt<250)continue;const win=(p.got-(p.tickGot||0))/dt;p.tick=now;p.tickGot=p.got;if(now-p.t0>=1000)p.ema=p.ema==null?win:p.ema*0.6+win*0.4;}

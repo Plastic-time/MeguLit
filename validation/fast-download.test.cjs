@@ -134,6 +134,22 @@ test('fast-download: every source down gives DOWNLOAD_FAILED with the reason',as
 
 /* ---- 2026-11-20 super assembly ---- */
 const lines=logs=>logs.join(' | ');
+test('fast-download: resumed bytes do not count toward the first connection speed sample',async t=>{
+ const data=crypto.randomBytes(10*MB),saved=8*MB,dest=path.join(tmp(t),'resume.bin'),part=dest+'.part';
+ const digest=sha(data),scaleMs=500,src=await source(data,{rate:256*KB});t.after(()=>src.close());
+ fs.writeFileSync(part,data.subarray(0,saved));fs.truncateSync(part,data.length);
+ fs.writeFileSync(part+'.json',JSON.stringify({v:1,size:data.length,sha256:digest,done:[[0,saved]]}));
+ let sample;
+ await fd.download({...quick,connections:2,maxConnections:6,scaleMs,urls:[src.url],dest,size:data.length,sha256:digest,log:line=>{
+  const m=/^connections \d+ \((\d+) KB\/s\)/.exec(line);
+  if(m&&!sample)sample={rate:Number(m[1]),sent:src.stats.bytes};
+ }});
+ assert.equal(sha(fs.readFileSync(dest)),digest);
+ assert.ok(sample,'the running download sampled its speed');
+ // The source count even includes the probe. It bounds the bytes received within the sample window.
+ assert.ok(sample.rate<=Math.ceil(sample.sent/scaleMs),'reported '+sample.rate+' KB/s after the source sent '+sample.sent+' bytes');
+});
+
 test('fast-download: more connections while that still adds speed (8 -> 16 style), per-host limit kept',async t=>{
  const data=crypto.randomBytes(6*MB),dir=tmp(t);
  /* every connection is capped at 120 KB/s, so the total only grows with more connections */
