@@ -227,7 +227,8 @@ function memoriesThumb(root,exe,name){
  const size=fs.statSync(t.out).size;if(size>512*1024)throw Error('MEMORIES_IMAGE_TOO_LARGE');
  return {src:dataUrl(t.out),w:t.w,h:t.h};
 }
-function memoriesQueue(root,exe,names){
+function memoriesQueue(root,exe,names,{cacheOnly=false}={}){
+ if(cacheOnly)return {status:'resource-limited',cacheOnly:true,pending:0,blocked:Math.min(24,new Set(names).size),paused:true};
  const list=[...new Set(names)].slice(0,24),failed=readFailed(root,exe),need=[];
  for(const n of list)if(!failed.has(itemKey(n))&&!memoriesThumb(root,exe,n))need.push(n);
  // A busy worker owns its current batch. Later page requests retry after it exits.

@@ -6,7 +6,7 @@ function knownFlag(key,p){const a=/^yuris:(\d+):(\d+)$/.exec(key);return !a||p.f
 function state(rule,p){if(p.state!=='valid'||!rule)return 'unknown';if(rule.all){if(rule.all.some(k=>!knownFlag(k,p)))return 'unknown';return rule.all.every(k=>positive(p.flags.get(k)))?'done':'locked';}
  if(rule.any){if(rule.any.some(k=>positive(p.flags.get(k))))return 'done';return rule.any.every(k=>knownFlag(k,p))?'locked':'unknown';}return 'unknown';}
 const label=(value,locale)=>String(value?.[locale]||value?.ja||value?.zh||value?.en||'');
-function createService({cg=require('./game-cg.cjs'),cards=require('./card-wall.cjs'),find=data.find,analyze=(root,exe)=>require('./story-analysis.cjs').ensure(root,exe)}={}){
+function createService({allowExtraction=()=>true,cg=require('./game-cg.cjs'),cards=require('./card-wall.cjs'),find=data.find,analyze=(root,exe)=>require('./story-analysis.cjs').ensure(root,exe)}={}){
  function snapshot(db,root,gameId){const game=db.prepare('SELECT id,title,executable,cover,original FROM games WHERE id=? AND removed_at IS NULL').get(String(gameId||''));if(!game)throw Error('GAME_NOT_FOUND');
   const document=find(game);let story=document.data,analysis='ready';
   if(['preparing','busy','resource-limited','unavailable'].includes(document.status))analysis='preparing';else if(!story){const automatic=analyze(root,game.executable);analysis=['busy','resource-limited','unavailable'].includes(automatic.state)?'preparing':automatic.state;if(automatic.rules){const r=automatic.rules;story={gallery:r.gallery,galleryComplete:!!r.galleryComplete,chapters:r.chapters,endings:[],endingsComplete:false,sources:r.evidence};}}
@@ -48,15 +48,16 @@ function createService({cg=require('./game-cg.cjs'),cards=require('./card-wall.c
   const edges=chapter.edges.map(e=>({from:e.from,to:e.to,state:nodeStates.get(e.from)==='done'&&(nodeStates.get(e.to)||state(allNodes.get(e.to)?.read,s.p))==='done'?'done':'locked',highlight:route.has(e.from)&&route.has(e.to),dependency:!!e.dependency}));
   return {status:s.progressKnown?'ready':'unknown',revision:s.revision,chapter:chapter.id,partial:!!chapter.partial,chapters:chapterList(s,locale),nodes,edges,routeAvailable:!!goal?.route?.length,goal:goal?.id||'',revealed:reveal,goals:s.story.endings.filter(e=>e.route?.length).map((e,i)=>({id:e.id,label:s.endingStates.get(e.id)==='done'?label(e.label,locale):'',position:i+1}))};
  }
+ function queue(root,s,names){let allowed=false;try{allowed=allowExtraction({root,gameId:s.game.id,executable:s.game.executable})===true;}catch{}if(!allowed)return {...cards.memoriesQueue(root,s.game.executable,names,{cacheOnly:true}),status:'resource-limited',cacheOnly:true};return cards.memoriesQueue(root,s.game.executable,names);}
  const fullQueue=new Map();
  const tag=(src,adult)=>String(src).replace(/(?:#r18)+$/g,'')+(adult?'#r18':'');
  const MAX_RESPONSE=4*Math.ceil(24*1024*1024/3)+128;
  async function image(db,root,r){const initial=snapshot(db,root,r.gameId);if(r.revision!==initial.revision)return {status:'changed'};const item=initial.variants.get(r.id);if(!initial.progressKnown||!item?.renderable)return {status:'unavailable'};
   const classified=current=>({adult:current.adult,basis:current.basis,reasons:current.reasons});
   const current=()=>{const s=snapshot(db,root,r.gameId),v=s.variants.get(r.id);return s.revision===r.revision&&s.progressKnown&&v?.renderable&&v.sourceKey===item.sourceKey?{s,v}:null;};
-  if(!r.full){let t;try{t=cards.memoriesThumb(root,initial.game.executable,item.name);}catch{}if(!current())return {status:'changed'};if(t)return {status:'ready',...t,src:tag(t.src,item.adult),...classified(item)};return {status:'pending',...cards.memoriesQueue(root,initial.game.executable,[item.name])};}
+  if(!r.full){let t;try{t=cards.memoriesThumb(root,initial.game.executable,item.name);}catch{}if(!current())return {status:'changed'};if(t)return {status:'ready',...t,src:tag(t.src,item.adult),...classified(item)};return {status:'pending',...queue(root,initial,[item.name])};}
   const key=path.resolve(root)+'|'+String(r.gameId),prior=fullQueue.get(key)||Promise.resolve();const job=prior.catch(()=>{}).then(()=>{const checked=current();if(!checked)return {status:'changed'};const {s,v}=checked;if(require('node:os').freemem()<512*1024*1024)return {status:'resource-limited'};
-   const file=cg.cachedPicture(root,s.game.executable,v.name);if(!file)return {status:'pending',...cards.memoriesQueue(root,s.game.executable,[v.name])};
+   const file=cg.cachedPicture(root,s.game.executable,v.name);if(!file)return {status:'pending',...queue(root,s,[v.name])};
    try{if(!require('./story-image.cjs').check(file))return {status:'unavailable'};const result=cards.memoriesImage(db,root,r.gameId,v.name,{sourceKey:v.sourceKey});if(!current())return {status:'changed'};if(typeof result.src!=='string'||result.src.length>MAX_RESPONSE)return {status:'unavailable'};return {status:'ready',src:tag(result.src,v.adult),w:result.w,h:result.h,...classified(v)};}catch{return {status:'unavailable'};}});
   fullQueue.set(key,job);try{return await job;}finally{if(fullQueue.get(key)===job)fullQueue.delete(key);}
  }
