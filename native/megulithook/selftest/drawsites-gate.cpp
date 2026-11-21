@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <cstring>
 static std::vector<std::string> Logged;
 namespace Msg { static void Log(const char *f, ...) { char b[1024]; va_list a; va_start(a, f); vsnprintf(b, sizeof b, f, a); va_end(a); Logged.push_back(b); } }
 #include "../DrawSites.h"
@@ -47,8 +48,35 @@ static __declspec(noinline) void Draw(const char *s, int n, int x, int y) {
     pop esi
   }
 }
-// two text routines of the game, each drawing a string a character at a time (a loop: one call site each)
+// a glyph routine without an EBP frame, laid out like NScripter's 0x40eb20: 0xfe4 bytes below its return address, then the
+// API's 5 arguments (its own arguments: s, x, y, taken as the TextOutA pen here)
 static volatile int Sink;
+static void *StubN; static DWORD NoFrameRet; static void **DrawSitesOriginal_1 = &DrawSites::DrawSitesOriginal[1];
+static __declspec(naked) void NoFrame(const char *, int, int) {
+  __asm {
+    mov eax, [esp]
+    mov NoFrameRet, eax
+    sub esp, 0xfe4
+    push 2                       // TextOutA(hdc, x, y, s, 2)
+    push dword ptr [esp + 0xfe4 + 4 + 4]       // s   (arg 1: past the 0xfe4, the return address and the 1 push)
+    push dword ptr [esp + 0xfe4 + 12 + 8]      // y   (arg 3)
+    push dword ptr [esp + 0xfe4 + 8 + 12]      // x   (arg 2)
+    push 0x1234
+    lea ecx, back2
+    mov edx, DrawSitesOriginal_1
+    lea eax, tramp2
+    mov [edx], eax
+    jmp StubN
+  tramp2:
+    push ecx
+    jmp dword ptr [FakeSlot]
+  back2:
+    add esp, 0xfe4
+    ret
+  }
+}
+static __declspec(noinline) void NoFrameCaller(const char *s, int x, int y) { NoFrame(s, x, y); Sink++; }
+// two text routines of the game, each drawing a string a character at a time (a loop: one call site each)
 static __declspec(noinline) void CallerA(const char *s, int chars, int x, int y) { for (int i = 0; i < chars; i++) Draw(s + i * 2, 2, x + i * 22, y); Sink++; }
 static __declspec(noinline) void CallerB(const char *s, int chars, int x, int y) { for (int i = 0; i < chars; i++) Draw(s + i * 2, 2, x + i * 22, y); Sink += 2; }
 int main() {
@@ -69,6 +97,22 @@ int main() {
     Check(Logged[1].find("n=1 x0=300 y0=200") != std::string::npos && Logged[1].find("text=\xe3\x81\x82") != std::string::npos, "run 2: another caller, a new run");
     auto via = [](const std::string &l) { size_t a = l.find("via=") + 4; return l.substr(a, l.find(' ', a) - a); };
     Check(via(Logged[0]) != via(Logged[1]) && via(Logged[0]).find("0/") != 0, "via= tells the callers apart");
+  }
+  /* a routine without an EBP frame (NScripter's glyph routine: 0xfe4 bytes of prologue, frame = 0xff8 in the table): its
+     return address and its own arguments are read at the fixed distance above the API's arguments */
+  int ns = -1; for (int i = 0; i < DrawSitesSig::SigCount; i++) if (!strcmp(DrawSitesSig::Sigs[i].id, "nscripter")) ns = i;
+  Check(ns >= 0 && DrawSitesSig::Sigs[ns].frame == 0xff8, "nscripter signature: frame 0xff8");
+  if (ns >= 0) {
+    DrawSites::Sites[1] = { 0, (uintptr_t)GetModuleHandleA(nullptr), ns, DrawSites::A_TextOutA }; DrawSites::NSites = 2;
+    StubN = DrawSites::Stub(1); Logged.clear();
+    NoFrameCaller(ai, 0x111, 0x222);
+    EnterCriticalSection(&DrawSites::Lock); DrawSites::FlushLocked(); LeaveCriticalSection(&DrawSites::Lock);
+    for (auto &l : Logged) printf("  log: %s\n", l.c_str());
+    char want[64]; snprintf(want, sizeof want, "via=%lx/0", (unsigned long)(NoFrameRet - (DWORD)(uintptr_t)GetModuleHandleA(nullptr)));
+    Check(Logged.size() == 1 && Logged[0].find(want) != std::string::npos, std::string("no frame: via = the routine's return address (") + want + ")");
+    char args[64]; snprintf(args, sizeof args, "fargs=%lx,111,222,", (unsigned long)(DWORD)(uintptr_t)ai);
+    Check(Logged.size() == 1 && Logged[0].find(args) != std::string::npos, std::string("no frame: fargs = the routine's arguments (") + args + ")");
+    Check(GotX == 0x111 && GotY == 0x222 && GotStr == ai, "no frame: the API gets the game's arguments");
   }
   printf("draw sites gate: %d failure(s)\n", Failures);
   return Failures;
