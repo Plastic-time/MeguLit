@@ -18,12 +18,12 @@ test('a source arriving within the wait wins', async () => {
   const h = fake(); h.placedHidden('どこかで雨の音を聞いた。'); setTimeout(() => { h.recentSources = [HookNative.flat('どこかで雨の音を聞いた。')]; }, 200);
   await new Promise(r => setTimeout(r, 750)); assert.deepEqual(h.delivered, []);
 });
-test('give way goes to the bridge, bounded; the bridge holds the hide off until then; the reader asks when it cannot draw', () => {
+test('give way goes to the bridge, bounded; the bridge holds the hide off until then; the reader never asks (owner 2026-11-21: never give way because a line cannot be drawn)', () => {
   const h = fake(); h.giveWay(99999); assert.deepEqual(h.sent, [{ type: 'engineGiveWay', ms: 10000 }]);
   const bridge = read('native/HookBridge.cs');
   assert.match(bridge, /bool want=ReplacementEnabled&&!KrkrHideBroken&&over&&DateTime\.UtcNow\.Ticks>=Interlocked\.Read\(ref GiveWayUntil\)/);
   assert.match(bridge, /type=="engineGiveWay"/);
   assert.match(read('services/reader.cjs'), /case 'engineGiveWay':g\?\.hooks\?\.giveWay\?\.\(r\.ms\)/);
   assert.ok(read('core/gal-native.cjs').includes('this.hooks.placedHidden?.(l.text,l)'), 'every placed hidden line is offered with its boxes');
-  assert.match(read('web/reader/modules/text-place.js'), /\{ giveWay\(\); return; \} \/\* cannot be drawn here/);
+  assert.doesNotMatch(read('web/reader/modules/text-place.js'), /engineGiveWay|giveWay\(/, 'the reader never asks the game to show its own text');
 });

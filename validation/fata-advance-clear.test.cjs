@@ -114,7 +114,9 @@ test('replay 02:57Z: no line comes back after a click, the reader keeps drawing 
       return { back: [...new Set(back)], fx };
     };
     const before = await run(false);
-    assert.ok(before.back.some(x => x.startsWith('25:呼吸をひとつする度に')), 'without the clear the replay shows the owner\'s flash: ' + JSON.stringify(before.back));
+    /* 2026-11-21 (ファタ acceptance, one render owner): a line the reader drew is never drawn again from its placement, so even
+       without the clear report nothing comes back (before that change: line 25 came back in white) */
+    assert.deepEqual(before.back, [], 'without the clear no line comes back either: ' + JSON.stringify(before.back));
     const after = await run(true);
     assert.deepEqual(after.back, [], 'with the clear no line comes back after a click');
     assert.deepEqual(after.fx, { paired: 6, orphan: 0, sent: false }, 'all six lines drawn by the reader, none an orphan: ' + JSON.stringify(after.fx));

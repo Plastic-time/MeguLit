@@ -11,7 +11,7 @@ const DOMAINS={
  'placement.firstLineAnchor':{enum:[null,'glyph','box','page']},
  'placement.lineOffsetY':{number:[-400,400]},
  'placement.drawWhileBlanking':{bool:true},
- 'placement.translationGrowsDown':{bool:true},
+ 'placement.translationGrowsDown':{bool:true},'placement.orphanDraw':{bool:true},
  'page.effectFrames':{enum:[null,true,false]},
  'page.flowPage':{enum:[null,true,false]},
  'page.holdMs':{number:[0,20000],nullable:true},

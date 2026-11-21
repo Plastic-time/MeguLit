@@ -18,6 +18,9 @@ module.exports={
   /* the Japanese stays on the game's text place and its translation only grows down (smaller by at most 15 %); false = the
      kernel: a translation that does not fit above the game's button strip moves the block up */
   translationGrowsDown:false,
+  /* a hidden line the reader cannot pair is drawn from its placement (text-place.js orphan path; drawn in the reader's colour, never a
+     line the engine-placed path drew); false = never drawn there (ファタモルガーナの館: its options are drawn by the game, #choiceframe) */
+  orphanDraw:true,
  },
  page:{
   /* KiriKiri: a message layer cleared by the game (KAG [cm], MessageLayer.clear) after its line was reported takes that line off the
