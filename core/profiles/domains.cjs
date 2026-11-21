@@ -26,7 +26,6 @@ const DOMAINS={
  'choice.filters':{regexList:{max:20,chars:200}},
  'choice.pageFrames':{regexList:{max:20,chars:200}},
  'hide.textEffectsRead':{bool:true},
- 'hide.streamFallback':{enum:[null,'engine']},
  'hide.preflight':{enum:[null,true,false]},
  'hide.drawsHidden':{enum:[null,true,false]},
  'hide.engineTrial.enabled':{enum:[null,true,false],layer:'version'},

@@ -233,14 +233,7 @@ class HookNative{
   if(m.state==='dots'&&Array.isArray(m.dots)){const dots=[...next.dots];for(const d of m.dots.slice(0,1024))if(d&&Number.isInteger(d.i)&&typeof d.ch==='string'&&/^[dcprb]$/.test(d.k)&&!dots.some(o=>o.i===d.i&&o.k===d.k&&(d.i>=0||o.ch===d.ch&&o.h===d.h)))dots.push({i:d.i,ch:d.ch.slice(0,2),h:d.h|0,b:d.b|0,a:d.a|0,x:d.x|0,y:d.y|0,s:d.s|0,k:d.k,path:String(m.path||'').slice(0,8),...(d.at&&typeof d.at.space==='string'&&/^(c|g|[mt]\d{1,5}x\d{1,5})$/.test(d.at.space)?{at:{x:d.at.x|0,y:d.at.y|0,space:d.at.space}}:{})});next.dots=dots.slice(0,2048);}
   this.state={...this.state,hookGlyphDots:this.state.hookGlyphPos?fillPlaces(next,this.state.hookGlyphPos):next};this.emit(m);}
  magesDraw(line){if(line.length>1000)return;const pid=this.gamePid?.()||0;if(!this.magesLive||this.magesLive.pid!==pid){const D=require('./mages-draw.cjs'),t=Profiles.get(this.profile,'draw.engineTable',null);this.magesLive=new D.MagesLive({table:t&&t.engine==='mages'?t:{}});this.magesLive.pid=pid;}for(const rec of this.magesLive.feed(line))this.charRects(rec);}
- charRects(raw){const tp=require('./text-paths.cjs'),rec=tp.parseChars(raw);if(!rec)return;this.drawLog(raw);/* engine-draw (docs/engine-draw-protocol.md): a UI item (name, choice, button, menu, system) is annotated beside its box, never hidden or replaced; a dialogue line may ask for its in-game replacement */if(require('./engine-draw.cjs').routeOf(rec)==='ui'){this.emit({...rec,type:'hookDrawUi'});return;}this.engineDrawLine(rec);if(rec.engine==='krkr'){const pid=this.gamePid();if(this.krkrChars?.pid!==pid)this.krkrChars={pid,n:0};this.krkrChars.n++;}const gate=this.charGates||(this.charGates=new Map());if(!gate.has(rec.engine))gate.set(rec.engine,new tp.HiddenGate());rec.hidden=gate.get(rec.engine).report(rec)&&rec.hidden;rec.at=this.now();this.noteEngineRoute('chars',rec);if(!this.textPathActive&&(rec.engine==='unity'||rec.engine==='web')){this.textPathActive=true;this.syncGlyphMode?.();}this.emit(rec);}
- noteEngineRoute(kind,rec){if(this.profile?.hide?.streamFallback!=='engine'||rec.engine!=='krkr'||!(this.pid>0)||!this.started)return;
-  const run=this.pid+'|'+this.started,selected=this.state?.hookThreads?.find(t=>t.selected),stream=selected?selected.id+'|'+selected.code:'';
-  if(this.engineRouteEvidence?.run!==run)this.engineRouteEvidence={run};
-  if(kind==='begin'){delete this.engineRouteEvidence.page;delete this.engineRouteEvidence.chars;return;}
-  if(!String(rec.text||'').trim()||kind==='page'&&!(rec.count>0))return;
-  this.engineRouteEvidence[kind]={line:rec.line,text:rec.text,hidden:rec.hidden===true,stream,at:this.now()};
- }
+ charRects(raw){const tp=require('./text-paths.cjs'),rec=tp.parseChars(raw);if(!rec)return;this.drawLog(raw);/* engine-draw (docs/engine-draw-protocol.md): a UI item (name, choice, button, menu, system) is annotated beside its box, never hidden or replaced; a dialogue line may ask for its in-game replacement */if(require('./engine-draw.cjs').routeOf(rec)==='ui'){this.emit({...rec,type:'hookDrawUi'});return;}this.engineDrawLine(rec);if(rec.engine==='krkr'){const pid=this.gamePid();if(this.krkrChars?.pid!==pid)this.krkrChars={pid,n:0};this.krkrChars.n++;}const gate=this.charGates||(this.charGates=new Map());if(!gate.has(rec.engine))gate.set(rec.engine,new tp.HiddenGate());rec.hidden=gate.get(rec.engine).report(rec)&&rec.hidden;rec.at=this.now();if(!this.textPathActive&&(rec.engine==='unity'||rec.engine==='web')){this.textPathActive=true;this.syncGlyphMode?.();}this.emit(rec);}
  glyphHide(m){if(!m||!['ready','hit','key','cached'].includes(m.state))return;const v={hookGlyphHide:m.state==='key'||m.state==='ready'?(this.state.hookGlyphHide||'learning'):m.state};if(m.state==='ready'&&Number.isFinite(m.version))v.hookGlyphVersion=Number(m.version);if(m.state==='hit'&&typeof m.path==='string')v.hookGlyphPath=m.path.slice(0,16);if(m.state==='key'&&typeof m.face==='string'&&Number.isFinite(m.size))v.hookGlyphFont={face:m.face.slice(0,64),size:Number(m.size)};this.trace('glyph hide '+m.state+(m.path?' '+String(m.path).slice(0,16):'')+(m.size?' '+Number(m.size)+'px':''));this.notify(v);}
  markScriptSource(){try{if(this.state&&!this.state.scriptSource)this.notify({scriptSource:true});}catch{}}
  resolveSource(text){const provider=this.originalText;if(!provider||!text||HookNative.nonDialogue(text))return null;const key=String(text).replace(/\s+/g,'');this.sourceCache??=new Map();const from=typeof provider.position==='function'?provider.position():-1,ok=x=>!!x&&(x.status==='exact'||x.status==='high');
@@ -645,7 +638,7 @@ class HookNative{
     KiriKiri games read exactly as before.
     E301: the same protocol carries Ren'Py (MeguLitRenpy32/64.dll + native/MeguLitRenpy.py, NVL pages); every name
     here takes the engine from the report (PAGE_ENGINES), positions go out as <engine>_screen_v1. */
- pageReset(){this.sentencePieces?.reset();if(this.pageState)clearTimeout(this.pageState.timer);this.pageState=null;this.pageMode=null;this.flowMarkerAt=null;if(this.engineRouteEvidence)this.engineRouteEvidence=null;}
+ pageReset(){this.sentencePieces?.reset();if(this.pageState)clearTimeout(this.pageState.timer);this.pageState=null;this.pageMode=null;this.flowMarkerAt=null;}
  pageNvl(){return this.pageMode?.mode==='nvl'&&this.now()-this.pageMode.at<120000;}
  drawSourceToken(raw){
   let text=require('./language-tracks.cjs').japaneseTrack(scriptSource(cleanSource(String(raw||''))));if(!text.trim())return null;
@@ -659,7 +652,6 @@ class HookNative{
   this.learnEngine(m.engine);
   if(!Number.isSafeInteger(m.line)||m.line<1||!['begin','end'].includes(m.phase))return;
   const now=this.now(),engine=m.engine,K=this.pageState&&this.pageState.engine===engine?this.pageState:(this.pageReset(),this.pageState={engine,lines:new Map(),held:[],timer:null});
-  this.noteEngineRoute(m.phase==='begin'?'begin':'page',m);
   if(!m.nvl){if(this.pageMode?.mode==='nvl')this.trace(engine+' page mode off');this.pageMode={mode:'adv',engine,at:now};this.releasePageHeld();
    /* E550 ADV sentence: where the engine draws it (canvas pixels, with the canvas size) and its colour, so the reader places and
       paints each line like the game without calibration (web text-position.js, <engine>_adv_v1). */

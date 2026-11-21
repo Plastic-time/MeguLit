@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {HookNative}=require('../core/hook-native.cjs'),{HookControl}=require('../core/hook-control.cjs'),Profiles=require('../core/profiles/index.cjs');
-const {decide}=require('../core/engine-routes/kirikiri.cjs'),{formatChars,parseChars}=require('../core/text-paths.cjs');
-const tape=require('./fixtures/games/fata-morgana/stream-left-native.json');
+const {formatChars,parseChars}=require('../core/text-paths.cjs'),tape=require('./fixtures/games/fata-morgana/stream-left-native.json');
 const fata=()=>Profiles.profileFor({exe:'D:/Games/Fata/fata_jp.exe',engine:'kirikiri',title:'ファタモルガーナの館'});
 function rig(profile=fata()){
  let now=tape.page.t;const commands=[],writes=[],notes=[],records=[],sources=[],hooks=Object.create(HookNative.prototype),[pid,started]=tape.game.split('|');
@@ -13,37 +12,32 @@ function rig(profile=fata()){
  const page=(m=tape.page.hb)=>{now++;hooks.pageLine(structuredClone(m));};
  const chars=(raw=tape.chars.hb.line)=>{now++;hooks.charRects(raw);};
  const leave=()=>{hooks.leftCodes.add(tape.left.hb.code);hooks.state.hookThreads=structuredClone(tape.after.hb.hookThreads);now=tape.after.t;};
- const phase=()=>{const s=hooks.state.hookThreads.find(x=>x.selected);return decide(control.engineRouteState,{setting:profile.hide.streamFallback,engine:profile.engine,run:host.state.gameProcessId+'|'+host.state.gameStarted,stream:s.id+'|'+s.code,active:host.preferences.hookHide&&control.plan==='embed',hideActive:hooks.enabled===true&&!hooks.preflight,evidence:hooks.engineRouteEvidence}).phase;};
- return {host,hooks,control,commands,writes,notes,records,sources,page,chars,leave,phase};
+ return {host,hooks,control,commands,writes,notes,records,sources,page,chars,leave};
 }
-test('real ninth-line stream switch retains the engine route without saving read or sending reader-profile disable',()=>{
- const r=rig();r.page();r.chars();assert.equal(r.phase(),'confirmed');assert.equal(r.hooks.charGates.get('krkr').confirmed,true);r.control.apply();r.leave();r.control.apply();
- assert.equal(r.control.plan,'embed');assert.equal(r.hooks.enabled,true);assert.deepEqual(r.writes,[]);assert.deepEqual(r.commands,[]);assert.equal(r.phase(),'waiting','stream changed: the prior stream proof is not current');assert.ok(r.sources.includes(tape.page.hb.text));
- assert.ok(r.notes.every(x=>x.hookVisualVerified!==true));assert.ok(r.hooks.leftCodes.has(tape.left.hb.code));
+
+// This preserves the unresolved real failure evidence; it is not a successful hiding acceptance test.
+test('real ninth-line stream switch still records the unresolved read fallback after removing out-of-scope plumbing',()=>{
+ const r=rig();r.page();r.chars();assert.equal(r.hooks.charGates.get('krkr').confirmed,true);r.control.apply();assert.equal(r.control.plan,'embed');r.leave();r.control.apply();
+ assert.equal(r.control.plan,'read');assert.equal(r.hooks.enabled,false);assert.deepEqual(r.writes,['read']);assert.ok(r.commands.some(m=>m.type==='disable'&&m.reason==='reader-profile'));assert.ok(r.sources.includes(tape.page.hb.text));assert.ok(r.hooks.leftCodes.has(tape.left.hb.code));assert.ok(r.notes.every(x=>x.hookVisualVerified!==true));
 });
-test('only the explicit game capability changes routing; null and other engines keep the legacy fallback',()=>{
- assert.equal(fata().hide.streamFallback,'engine');
- for(const input of [{exe:'D:/g/Unknown.exe',engine:'kirikiri'},{exe:'D:/g/SenrenBanka.exe',engine:'kirikiri'},{exe:'D:/g/Amakano3.exe',engine:'artemis'}]){
-  const profile=Profiles.profileFor(input);assert.equal(profile.hide.streamFallback,null);const r=rig(profile);r.page();r.chars();r.leave();r.control.apply();assert.equal(r.control.plan,'read');assert.deepEqual(r.writes,['read']);assert.ok(r.commands.some(m=>m.type==='disable'&&m.reason==='reader-profile'));assert.equal(r.hooks.engineRouteEvidence,undefined);
+test('Fata, unknown games, other engines and a forged removed setting all retain the original default route',()=>{
+ for(const input of [{exe:'D:/Games/Fata/fata_jp.exe',engine:'kirikiri',title:'ファタモルガーナの館'},{exe:'D:/g/Unknown.exe',engine:'kirikiri'},{exe:'D:/g/SenrenBanka.exe',engine:'kirikiri'},{exe:'D:/g/Amakano3.exe',engine:'artemis'}]){
+  const profile=Profiles.profileFor(input);assert(!Object.hasOwn(profile.hide,'streamFallback'));const r=rig(profile);r.page();r.chars();r.leave();r.control.apply();assert.equal(r.control.plan,'read');assert.deepEqual(r.writes,['read']);assert.equal(r.hooks.engineRouteEvidence,undefined);
  }
- const r=rig({...fata(),engine:'artemis'});r.leave();r.control.apply();assert.equal(r.control.plan,'read');
+ const r=rig({...fata(),hide:{...fata().hide,streamFallback:'engine'}});r.leave();r.control.apply();assert.equal(r.control.plan,'read');
 });
-test('new run, stream, page and hidden=0 invalidate old proof while route intent waits; recovery needs fresh matching records',()=>{
- const r=rig();r.page();r.chars();r.leave();r.control.apply();
- const old=structuredClone(r.hooks.engineRouteEvidence);r.host.state.gameStarted='new-start';r.hooks.started='new-start';r.control.apply();assert.equal(r.phase(),'waiting');assert.equal(r.control.engineRouteState.seenPage,false);assert.deepEqual(r.hooks.engineRouteEvidence,old,'cross-run gates were not repurposed as a proof');
- r.page();assert.equal(r.phase(),'waiting');r.chars();assert.equal(r.phase(),'confirmed');
- r.page({...tape.page.hb,phase:'begin',line:10});assert.equal(r.phase(),'waiting');r.page({...tape.page.hb,line:10});assert.equal(r.phase(),'waiting');
- const next={...parseChars(tape.chars.hb.line),line:10,hidden:false};r.chars(formatChars(next));assert.equal(r.phase(),'waiting');assert.equal(r.records.at(-1).hidden,false,'hidden=0 is emitted unchanged');
- r.chars(formatChars({...next,hidden:true}));assert.equal(r.phase(),'confirmed');r.control.apply();assert.deepEqual(r.writes,[]);assert.ok(r.notes.every(x=>x.hookVisualVerified!==true));
+test('new runs, pages and hidden zero cannot manufacture a removed route proof',()=>{
+ const r=rig();r.page();r.chars();r.host.state.gameStarted='new-start';r.hooks.started='new-start';r.page({...tape.page.hb,phase:'begin',line:10});r.page({...tape.page.hb,line:10});
+ const next={...parseChars(tape.chars.hb.line),line:10,hidden:false};r.chars(formatChars(next));assert.equal(r.records.at(-1).hidden,false);assert.equal(r.hooks.engineRouteEvidence,undefined);
+ r.chars(formatChars({...next,hidden:true}));assert.equal(r.hooks.engineRouteEvidence,undefined);r.leave();r.control.apply();assert.equal(r.control.plan,'read');assert.ok(r.notes.every(x=>x.hookVisualVerified!==true));
 });
-test('manual read/off, binding/cover switches and preflight remain authoritative',()=>{
- for(const change of [r=>{r.host.preferences.hookHide=false;r.host.preferences.hookProfile='read';r.control.plan='read';r.hooks.enabled=false;},r=>{r.control.plan='off';r.host.preferences.hookProfile='off';r.hooks.enabled=false;},r=>{r.host.state.bound=false;r.hooks.enabled=false;},r=>{r.host.state.coverEnabled=false;r.hooks.enabled=false;},r=>{r.host.preferences.bindEnabled=false;r.hooks.enabled=false;}]){
-  const r=rig();r.page();r.chars();r.leave();change(r);const plan=r.control.plan;r.control.apply();assert.equal(r.control.plan,plan);assert.equal(r.hooks.enabled,false);assert.deepEqual(r.writes,[]);assert.ok(!r.commands.some(m=>m.type==='enable'||m.type==='toggleCover'||m.type==='toggleMode'));
+test('manual read/off, binding/cover switches and preflight never enable hiding through the removed fallback',()=>{
+ for(const change of [r=>{r.host.preferences.hookHide=false;r.host.preferences.hookProfile='read';r.control.plan='read';},r=>{r.control.plan='off';r.host.preferences.hookProfile='off';r.host.preferences.hookAutoStart=false;},r=>{r.host.state.bound=false;},r=>{r.host.state.coverEnabled=false;},r=>{r.host.preferences.bindEnabled=false;},r=>{r.hooks.calibrating=true;r.hooks.preflight=true;}]){
+  const r=rig();r.page();r.chars();r.leave();r.hooks.enabled=false;change(r);r.control.apply();assert.equal(r.hooks.enabled,false);assert.ok(!r.commands.some(m=>['enable','toggleCover','toggleMode'].includes(m.type)));assert.equal(r.hooks.engineRouteEvidence,undefined);
  }
- const r=rig();r.page();r.chars();r.leave();r.hooks.enabled=false;r.hooks.calibrating=true;r.hooks.preflight=true;r.control.apply();assert.equal(r.phase(),'waiting');assert.equal(r.hooks.enabled,false);assert.deepEqual(r.writes,[]);assert.deepEqual(r.commands,[]);
 });
-test('an opted-in route without engine frames waits without claiming a proof',()=>{const r=rig();r.leave();r.control.apply();assert.equal(r.phase(),'waiting');assert.equal(r.control.plan,'embed');assert.deepEqual(r.writes,[]);assert.equal(r.control.engineRouteState.seenPage,false);assert.ok(r.notes.every(x=>x.hookVisualVerified===false));});
-test('fallback is a data-only enum and an absent run identity cannot certify a route',()=>{
- const domains=require('../core/profiles/domains.cjs');assert.deepEqual(domains.clean({hide:{streamFallback:'engine'}}).rejected,[]);assert.deepEqual(domains.clean({hide:{streamFallback:null}}).rejected,[]);assert.deepEqual(domains.clean({hide:{streamFallback:'any'}}).rejected,['hide.streamFallback']);
- assert.equal(decide(null,{setting:'engine',engine:'kirikiri',run:'0|',active:true}).keep,false);
+test('no engine frames cannot claim an independent route or visual verification',()=>{const r=rig();r.leave();r.control.apply();assert.equal(r.control.plan,'read');assert.deepEqual(r.writes,['read']);assert.equal(r.control.engineRouteState,undefined);assert.ok(r.notes.every(x=>x.hookVisualVerified!==true));});
+test('removed fallback setting is rejected by the data contract and has no executable helper',()=>{
+ const D=require('../core/profiles/domains.cjs');for(const value of ['engine',null,'any'])assert.deepEqual(D.clean({hide:{streamFallback:value}}).rejected,['hide.streamFallback']);
+ assert(!Object.hasOwn(Profiles.DEFAULTS.hide,'streamFallback'));assert.equal(HookNative.prototype.noteEngineRoute,undefined);assert(!fs.existsSync(path.join(__dirname,'../core/engine-routes/kirikiri.cjs')));
 });

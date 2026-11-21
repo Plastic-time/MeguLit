@@ -65,8 +65,6 @@ module.exports={
   dropEffectFrames:false,
  },
  hide:{
-  /* an independent engine page path retains the user's hide intent after a Luna stream leaves; null keeps legacy routing */
-  streamFallback:null,
   /* the game's text effect cannot be hidden line by line: start this game in read mode (the original stays, MeguLit shows
      the translation), like the per-exe memory of services/text-effects.cjs */
   textEffectsRead:false,
