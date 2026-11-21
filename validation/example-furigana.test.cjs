@@ -143,3 +143,24 @@ test('grammar lesson steps: no 01–06 numbers, names and 第 n / 6 步 stay',()
   assert.match(g,/aria-selected="\$\{i===s\}"><span>\$\{esc\(w\.steps\[k\]\)\}<\/span>/);
   assert.match(g,/data-stepof>/);
 });
+
+test('inline readings stay with their own occurrence in study examples and history exports',async t=>{
+ const {exampleRuby,gameRubyOf}=require('../services/example-ruby.cjs'),{DatabaseSync}=require('node:sqlite');
+ const raw='🌙 今日と <rきょう>今日</r>、｜今日《こんにち》。',text='🌙 今日と 今日、今日。';
+ const shown=async item=>(await exampleRuby(null,null,[item])).items[0];
+ const inline=await shown({text:raw});assert.equal(inline.text,text);
+ assert.deepEqual(inline.spans.map(s=>[s.start,s.end,s.reading]),[[6,8,'きょう'],[9,11,'こんにち']]);
+ const db=new DatabaseSync(':memory:');t.after(()=>db.close());db.exec('CREATE TABLE reading_events(id INTEGER PRIMARY KEY,text TEXT)');
+ db.prepare('INSERT INTO reading_events(text) VALUES(?)').run(raw);
+ const compact=text.replace(/\s+/g,''),pairs=gameRubyOf(db,compact);
+ assert.equal(exampleCardHtml(compact,[],{pairs}),'🌙今日と<ruby>今日<rt>きょう</rt></ruby>、<ruby>今日<rt>こんにち</rt></ruby>。');
+ const plain=await shown({text:'今日も今日も。',ruby:[['今日','きょう']]});
+ assert.deepEqual(plain.spans.map(s=>s.start),[0,3]);
+ const grammar=require('../services/grammar.cjs'),given=grammar.rubyPairs(raw);
+ const replay=await shown({text:compact,ruby:given});assert.deepEqual(replay.spans.map(s=>s.reading),['きょう','こんにち']);
+ const exported=exampleCardHtml(compact,[],{pairs:given,gameRuby:{'今日':'こんじつ'}});
+ assert.match(exported,/🌙<ruby>今日<rt>こんじつ<\/rt><\/ruby>と<ruby>今日<rt>きょう<\/rt>/);
+ const {applySpans}=await import('../web/example-ruby.js'),rare=await shown({text:'𠮷と<ruby>𠮷<rt>よし</rt></ruby>。'});
+ const doc=new Doc0(),el=h(doc,'p',{},rare.text);
+ assert.equal(applySpans(el,rare.text,rare.spans),1);assert.equal(el.html(),'𠮷と<ruby>𠮷<rt>よし</rt></ruby>。');
+});

@@ -13,7 +13,7 @@ const hira=v=>String(v||'').replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCo
 const isName=t=>{const g=Array.isArray(t.grammar)?t.grammar:[];return g.includes('固有名詞')||/固有名詞/.test(String(t.pos||''))||/固有名詞/.test(String(t.pos_detail||''));};
 
 /* A recorded line (may still carry the engine's ruby markup) → plain text and [[base,reading],…] */
-function plainWithRuby(raw){const r=extractSourceRuby(raw);return {text:r.text,ruby:r.ruby};}
+function plainWithRuby(raw){return extractSourceRuby(raw,true);}
 
 /* The span for one word: okurigana outside, the kanji core inside; '' when the reading does not fit the word. */
 function coreSpan(chars,start,end,reading){
@@ -30,12 +30,15 @@ function coreSpan(chars,start,end,reading){
 function exampleSpans(text,tokens,pairs=[]){
   const chars=[...String(text||'')],out=[],taken=new Uint8Array(chars.length+1);
   const free=(a,b)=>{for(let i=a;i<b;i++)if(taken[i])return false;return true;},take=(a,b)=>{for(let i=a;i<b;i++)taken[i]=1;};
-  /* 1. game ruby, wherever its base appears in the line */
-  for(const p of Array.isArray(pairs)?pairs:[]){if(!Array.isArray(p))continue;const base=[...String(p[0]||'')],reading=hira(p[1]);
+  /* Mark explicit occurrences before applying per-word readings to the remaining text. */
+  const entries=Array.isArray(pairs)?pairs.filter(Array.isArray):[];
+  const positioned=p=>Number.isInteger(p[2]);
+  for(const p of [...entries.filter(positioned),...entries.filter(p=>!positioned(p))]){const base=[...String(p[0]||'')],reading=hira(p[1]);
     if(!base.length||!reading||!KANJI.test(base.join('')))continue;
+    let occurrence=0;
     for(let i=0;i+base.length<=chars.length;i++){let ok=true;for(let k=0;k<base.length;k++)if(chars[i+k]!==base[k]){ok=false;break;}
-      if(!ok||!free(i,i+base.length))continue;const c=coreSpan(chars,i,i+base.length,reading)||{start:i,end:i+base.length,reading};
-      out.push({...c,source:'game'});take(i,i+base.length);i+=base.length-1;}}
+      if(!ok||positioned(p)&&occurrence++!==p[2]||!free(i,i+base.length))continue;const c=coreSpan(chars,i,i+base.length,reading)||{start:i,end:i+base.length,reading};
+      out.push({...c,source:'game'});take(i,i+base.length);if(positioned(p))break;i+=base.length-1;}}
   /* 2. dictionary readings from the resolver; names and tokenizer guesses stay bare */
   let cursor=0;
   for(const t of Array.isArray(tokens)?tokens:[]){

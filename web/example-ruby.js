@@ -7,7 +7,7 @@
    skipped: inputs, textareas, [contenteditable] and anything under [data-exr-skip]. 假名注音 off → no ruby;
    注音大小 (rubyScale) sets the reading's size. */
 const SKIP='input,textarea,select,rt,rp,ruby,[contenteditable],[data-exr-skip]';
-const KANJI=/[㐀-鿿豈-﫿々〆ヶ]/;
+const KANJI=/[\p{Script=Han}々〆ヶ]/u;
 const cache=new Map(),waiting=new Map(),tries=new Map();
 let api=null,prefs={on:true,scale:.5},prefsAt=0,queued=null,observer=null;
 
