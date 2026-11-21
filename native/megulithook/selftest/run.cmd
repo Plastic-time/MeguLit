@@ -34,6 +34,15 @@ rem engine-draw YU-RIS signature (YurisDrawSig.h) on bytes of the four known bui
 cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 yurisdraw.cpp /Fe:"%TEMP%\megulit-gdihide32\yurisdraw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
 "%TEMP%\megulit-gdihide32\yurisdraw.exe"
  if errorlevel 1 exit /b 1
+rem engine-draw SiglusEngine signature (SiglusDrawSig.h) on the windows of CLANNAD and Summer Pockets
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 siglusdraw.cpp /Fe:"%TEMP%\megulit-gdihide32\siglusdraw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\siglusdraw.exe"
+ if errorlevel 1 exit /b 1
+rem engine-draw SiglusEngine runtime replay (SiglusDraw.h): the real gates and MinHook on stand-ins, one page with ruby, name, choice, clear, backlog
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 /I"%~dp0..\..\shared\minhook\include" siglusdraw-gate.cpp "%~dp0..\..\shared\minhook\src\hook.c" "%~dp0..\..\shared\minhook\src\buffer.c" "%~dp0..\..\shared\minhook\src\trampoline.c" "%~dp0..\..\shared\minhook\src\hde\hde32.c" /Fe:"%TEMP%\megulit-gdihide32\siglusgate.exe" /Fo"%TEMP%\megulit-gdihide32\\" /link user32.lib >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\siglusgate.exe" >nul
+ if errorlevel 1 (echo FAIL siglus draw gate replay& exit /b 1)
+ echo PASS siglus draw gate replay
 rem one hook runtime (2026-11-19): the ISLAND, STEINS;GATE, euphoria HD adapters are part of MeguLitHook32
 for %%M in (ToMeCS2_DRAW ToMeSG_EMBED EmbedEuphoria474_DrawHide_TEST2) do (
  findstr /m /c:"%%M" "%~dp0..\MeguLitHook32.dll" >nul && (echo PASS MeguLitHook32.dll carries %%M) || (echo FAIL MeguLitHook32.dll lacks %%M & exit /b 1)

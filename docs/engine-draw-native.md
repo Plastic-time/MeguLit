@@ -31,15 +31,38 @@
 - 方案：在 BGI 的「消息送字」函数（BGI.cpp 现在挂的那个，参数里有窗口对象）旁边同时记窗口编号，然后在 GetGlyphOutlineA 那条路线上把字形点按当前窗口打上角色（名字窗 / 消息窗 / 选项窗）。这是「从外面猜」的升级版：位置来自 API，角色来自引擎自己的窗口
 - 注意：ユースティア 的 BGI.exe 是壳，签名要在解壳后（运行时）找，只能实机验证；素晴日 HD 不是壳，先做它
 
-### SiglusEngine
-- 现有：`native/megulithook/Siglus.cpp` 和 `native/siglus/Siglus.cpp`（LunaHook，ctx2 1/2/3，内嵌写回 role=1 的流；CLANNAD 曾因写 role=3 的 VM 通用串崩，见 `native/EmbedTextPolicy.cs`）
-- 画字：GetGlyphOutlineW ×2（字形缓存）+ d3d9
-- 注音不是行内标记：Siglus 的 ruby 是 VM 命令（`global.ruby(str)`、`mwnd.ruby(int)`，`H:\MeguLit-Work\oss\SiglusSceneScriptUtility\src\siglus_ssu\const.py`），所以内嵌注音要在送字前调用引擎自己的 ruby 命令，不能把标记塞进字符串
-- 方案：
-  1. 坐标：挂 mwnd 的「加一个字」函数（它知道当前窗口和格子位置），比 GetGlyphOutlineW 更准（后者只在字形第一次进缓存时调用）
-  2. 角色：mwnd 编号 + 选项窗（sel）+ 名字（mwnd.name）
-  3. 内嵌：写回中文作为第二段 + 调 ruby 命令；行数上限进版本层差分
-- 风险最高：VM 结构按版本变，CLANNAD Steam 和 Summer Pockets 各要签名
+### SiglusEngine（已做：签名 + 钩子 + 自检，2026-11-21，feat/re-siglus）
+- 现有：`native/megulithook/Siglus.cpp`（LunaHook，ctx2 1/2/3，内嵌写回 role=1 的流；CLANNAD 曾因写 role=3 的 VM 通用串崩，见 `native/EmbedTextPolicy.cs`）；`native/siglus/` 是旧的独立构建，不再用
+- 静态逆向（只读店主的 CLANNAD 1.1.134.0 和 Summer Pockets 1.1.137.0 两个 exe，pefile + capstone，脚本在 `H:\MeguLit-Work\tools-re\siglus\py`；函数名是我们起的，exe 没有符号）：
+  - GetGlyphOutlineW ×2 只是字形缓存（第一次见到某个字才调），不是画字的地方
+  - 每个文字区（mwnd 里的 msg，0x1c0 字节；mwnd+0x228 是 msg 数组，mwnd+0xc34 是名字窗的 msg）有一个字表 `std::vector<moji>`（msg+0x1ac，moji 0x3b4 字节：+0 类型、+4 字码、+8 字号、+0xc 颜色号、+0x18 x、+0x1c y，文字区自己的像素）。**所有文字区的每个字都走同一个 push_back**——这就是画字函数
+  - 排版主循环 msg::add_msg（只有它做「」『』（ 的括号判断，靠这个定位）把字填进栈上的 moji 再 push；注音排版（mwnd.ruby 结束时）、名字窗（mwnd.namae）、mwnd.sel / selmsg 的选项项、global.selbtn 的选项项各有自己的 push 调用点。调用点前面的字节两个版本完全一样，按它分角色；add_msg 自己的调用方（mwnd.print / 名字写进消息里 / 回想页）再从 push 时的 [ebp+4] 分
+  - 角色对 VM 命令：switch 表的分支号就是 SiglusSceneScriptUtility `const.py` 的元素号（mwnd.print 4、sel 5、ruby 12、selmsg 50–52、namae 62/63；global.selbtn 76/77/126/128）
+  - 注音：mwnd.ruby(str) 记下读音（msg+0x14c 的 wstring）和起点（msg+0x180/0x184），之后的字照常排；ruby() 结束时排版函数从起点到笔位（msg+0xe0，字的 x = 笔位 + msg+0xe8）把读音逐字 push 到上方（错误串「ルビの対象の文字列が空です」「ルビの途中で改行されています」都在它里面）
+  - 清屏 / 换页：msg::clear（清读音状态、纯文本、字表）
+- 6 件套：
+  | 部分 | 文件 |
+  |---|---|
+  | 签名（参考实现） | `tools/engine-sigs/siglus-draw.cjs`：括号判断 → add_msg 起点 → 字数计算里的字表偏移 → 那一个 print push → push_back 的全部调用点按尾部字节分 print / ruby×2 / name / msgsel / selbtn（数目不对或有认不出的调用点就不认）→ 注音函数头里的字段偏移 → add_msg 的调用方（line / namemsg / backlog×2）→ msg::clear 的函数头。没有任何写死的地址 |
+  | 签名（原生） | `native/megulithook/SiglusDrawSig.h`，同一算法，纯字节 |
+  | 夹具 | `validation/fixtures/engine-sigs/siglus-draw.json`（两个 exe 各 10 段窗口、4000 字节 + 整文件 SHA-256 + 期望值）+ `native/megulithook/selftest/siglusdraw-snippets.h` |
+  | 静态签名测试 | `validation/engine-draw-sig-siglus.test.cjs`：夹具上两个版本的函数、调用点、角色、偏移全对；两版地址不同而字段一样；近似字节（括号判断、注音调用点、clear 头、多一个认不出的 push）都不认；本机有 exe 时整段代码给出同样结果 |
+  | 原生自检 | `selftest/siglusdraw.cpp`（同一批窗口给 C++ 匹配器）+ `selftest/siglusdraw-gate.cpp`（真 Gate + 真 MinHook 挂在替身 push_back / clear 上，按引擎的调用方式回放一页：台词 + 注音、换行、名字窗、消息里的名字、选项、清屏、回想；验证被挂函数仍拿到自己的参数和寄存器），都在 `selftest/run.cmd` |
+  | 运行时钩子 | `native/megulithook/SiglusDraw.h`（`Siglus::attach_function` 成功后 `SiglusDraw::Arm`）：默认不挂，控制文件 `roles=1`（这部游戏 seed 的 `draw.roles`）才在 push_back 和 msg::clear 入口装 MinHook。每个文字区的一行一条 `ToMe_DRAWRUN engine=siglus run= role=line|name|choice|system id=<来源>:<字表地址> n= x0 y0 x1 y1 size= color= [ruby=起:长:读音|…] text=`，清屏一条 `ToMe_DRAWRUN engine=siglus clear id=<字表地址>`（hook-diagnostics.log）。签名没对上写 `off: <原因>` 不挂 |
+- 坐标是文字区自己的像素（x0 y0 = 第一个字格左上，x1 y1 = 最后一个字格右下），不是屏幕：和 YU-RIS 一样，文字区在屏幕上的位置由探针 / diff-maker 按 role 配出偏移写进版本层差分（msg::frame 每帧带着屏幕偏移，下一步可以挂它直接报，静态已定位：CLANNAD 0x5dcd30 的第 8、9 个参数，未做）
+- color 是引擎的颜色号（-1 = 窗口默认色），不是 RGB；颜色号 → RGB 在 Gameexe.dat 的 #COLOR_TABLE（未做）
+- 没做（猜测，未验证）：内嵌（写回中文作为第二段 + 在送字前调引擎自己的 ruby 命令）；按钮 / 系统菜单（Siglus 的系统菜单多是图片按钮，不走 moji）；竖排（引擎全局标志，注音按 y 排，现在只按 x 配底字）
+
+#### 店主测试清单（SiglusEngine：CLANNAD、Summer Pockets）
+1. 在 The Seed 里给这部游戏的游戏差分（`The Seed/siglus/clannad/game.json` 或 `summer-pockets/game.json`）把 `"draw":{"roles":false}` 改成 `true`；或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE 或 UTF-8，内容 `#cfg roles=1`）
+2. 开游戏，开新游戏推 5 句（带一句有注音的、一句有名字的），出一次选项，开一次回想（backlog）再关掉
+3. 看 `logs\hook-diagnostics.log`：
+   - 有一行 `ToMe_DRAWRUN engine=siglus on: push … add_msg … clear …`
+   - 每句台词有 `role=line id=print:…` 的 run，文字 = 这一行；有注音的那句带 `ruby=起:长:读音`，读音的假名不进 text
+   - 名字有 `role=name`（名字窗 `id=name:`，写在消息里的 `id=print:`）；选项每项一条 `role=choice`；回想页是 `role=system`
+   - 翻页时有 `clear id=…`，id 和台词 run 的 id 冒号后一样
+4. 游戏照常显示、推进不卡、不崩、日志不刷屏（同一句不会每帧重复出现）= 过
+5. 不过时发：`hook-diagnostics.log`（含 `on:` 或 `off:` 那一行）、`hook-events.log`、exe 版本；`off: push count differs` 之类 = 这个版本签名没对上
 
 ### MAGES.
 - 现有：`native/megulithook/MagesEngine.cpp`、`MeguLitSg.cpp`、`native/mages/`（SC3 串解码含注音，STEINS;GATE 精确匹配的画字钩子）
@@ -100,4 +123,4 @@
 
 ## 建议的推进方式
 
-一个引擎一个逆向会话（Opus high），各自 worktree，交付：签名 + 静态签名测试（对店主本机 exe 命中一次）+ 原生自检 + 店主测试清单。顺序：YU-RIS（一个调用点，4 部游戏）→ BGI（素晴日）→ MAGES（泛化已有钩子）→ Siglus（VM 最复杂）→ Unity（先解决引用包）
+一个引擎一个逆向会话（Opus high），各自 worktree，交付：签名 + 静态签名测试（对店主本机 exe 命中一次）+ 原生自检 + 店主测试清单。顺序：YU-RIS（一个调用点，4 部游戏）→ BGI（素晴日）→ MAGES（泛化已有钩子）→ Siglus（VM 最复杂；签名 + 钩子已做）→ Unity（先解决引用包）
