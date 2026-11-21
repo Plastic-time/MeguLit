@@ -45,7 +45,16 @@ for(const file of RUNTIMES){
    assert.ok(/RolesAsked\s*\(\s*\)|ReadControl\s*\(\s*\)\s*&&|&&\s*roles\b|\broles\s*\)/.test(line),file+': Install() called without the roles=1 check: '+line.trim());
    /* ReadControl() as the guard (BGI): it must return the roles=1 flag of the #cfg line */
    if(/ReadControl\s*\(\s*\)\s*&&/.test(line)){const rc=fns.find(f=>f.name==='ReadControl');assert.ok(rc,file+': ReadControl()');const body=raw.slice(rc.start,rc.end);
-    assert.ok(/roles\s*=[^;]*roles=1/.test(body)&&/return\s+roles\s*;/.test(body),file+': ReadControl() returns the roles=1 flag');}
+    if(file==='BgiDraw.h'){
+     /* BGI decodes the complete UTF16 first line before applying permission and role-map changes under its lock
+        bgidraw-control.cpp exercises this chain with real JS transport files and negative inputs */
+     for(const [parent,child] of [['ReadControl','LoadControl'],['LoadControl','ParseControl'],['ParseControl','CfgRoles']]){
+      const f=fns.find(f=>f.name===parent);assert.ok(f,parent+' exists');assert.match(src.slice(f.start,f.end),new RegExp('\\b'+child+'\\s*\\('),parent+' reaches trusted '+child);
+     }
+     const cfg=fns.find(f=>f.name==='CfgRoles');assert.ok(cfg);const check=raw.slice(cfg.start,cfg.end);
+     assert.match(check,/token\s*==\s*"roles=1"/,'BGI compares the complete token');assert.match(check,/return\s+keys\s*==\s*1\s*&&\s*on\s*;/,'BGI requires exactly one enabled key');
+     assert.match(body,/return\s+allowed\s*;/,'BGI returns the decoded permission');
+    }else assert.ok(/roles\s*=[^;]*roles=1/.test(body)&&/return\s+roles\s*;/.test(body),file+': ReadControl() returns the roles=1 flag');}
   }
   for(const f of fns.filter(f=>f.name==='Arm'))assert.ok(!/\bMH_(?:CreateHook|EnableHook)\b|\bInstall\s*\(/.test(src.slice(f.start,f.end)),file+': Arm() hooks by itself');
  });
