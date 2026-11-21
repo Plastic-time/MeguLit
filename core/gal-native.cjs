@@ -144,6 +144,15 @@ class GalNative {
   gameFrame(){const now=Date.now(),id=String(++this.mediaSerial||(this.mediaSerial=1));return new Promise(resolve=>{const map=this.mediaPending||(this.mediaPending=new Map());const timer=setTimeout(()=>{map.delete(id);resolve('');},4000);timer.unref?.();map.set(id,m=>{clearTimeout(timer);resolve(m.jpeg||'');});this.send({type:'mediaClip',id,from:now,to:now,screenshot:true});});}
   /* 2026-11-12 art scan (OCR read path, PageLocator.Scan): on while the game is bound and no hook line is current; sent only when it changes */
   artScan(){if(this.stopped)return;/* 2026-11-19 OCR read lines: the scan also runs with artText off (ocrReadLines, default on), then only after 5 s without a hook line */const art=this.preferences?.artText===true,read=this.preferences?.ocrReadLines!==false;const s=this.state.bound===true&&(art||read)?this.hooks.artScanState(undefined,art?2000:5000):{on:false,dialog:'',speaker:'',band:false};if(!art)s.slow=true;const key=JSON.stringify(s);if(key===this.artScanKey)return;this.artScanKey=key;this.send({type:'artScan',...s});}
-  stop() {if(this.stopping)return this.stopping;this.stopped=true;const compositor=this.compositor?.stop();this.locateHost?.stop();this.placement?.stop();clearInterval(this.artScanTimer);clearTimeout(this.choiceWait);clearTimeout(this.controller.styleTimer);this.styleSync.stop();const hooks=this.hooks.stop();const native=require('./owned-exit.cjs').trackStop(this,this.process,()=>{this.send({type:'quit'});this.process?.stdin.end();});this.stopping=Promise.all([native,hooks,compositor]);this.stopping.catch(()=>{});return this.stopping;}
+  stop() {
+    if(this.stopping)return this.stopping;
+    this.stopped=true;clearInterval(this.artScanTimer);clearTimeout(this.choiceWait);clearTimeout(this.controller?.styleTimer);
+    const stops=[()=>this.compositor?.stop(),()=>this.locateHost?.stop(),()=>this.placement?.stop(),()=>this.styleSync?.stop(),()=>this.hooks.stop(),
+      ()=>require('./owned-exit.cjs').trackStop(this,this.process,()=>{this.send({type:'quit'});this.process?.stdin.end();})];
+    const result=Promise.allSettled(stops.map(async stop=>stop())).then(results=>{const failed=results.find(r=>r.status==='rejected');if(failed)throw failed.reason;this.stopError=null;});
+    this.stopping=result;
+    result.catch(error=>{this.stopError=error;if(this.stopping===result)this.stopping=null;});
+    return result;
+  }
 }
 module.exports = { cleanGal, GalNative };

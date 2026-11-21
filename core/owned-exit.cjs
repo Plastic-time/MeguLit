@@ -26,6 +26,6 @@ function trackStop(owner,child,request,options){
   const p=stopOwned(child,request,options);stops.set(child,p);
   p.then(()=>stops.delete(child),()=>{});
  }
- const result=Promise.all([...stops.values()]);result.catch(()=>{});return result;
+ const result=Promise.allSettled([...stops.values()]).then(results=>{const failed=results.find(r=>r.status==='rejected');if(failed)throw failed.reason;});result.catch(()=>{});return result;
 }
 module.exports={stopOwned,trackStop};
