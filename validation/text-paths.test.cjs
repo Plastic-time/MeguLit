@@ -175,11 +175,11 @@ test('launch: off unless switched on; web gets switches, Unity a shadow program;
  fs.rmSync(base,{recursive:true,force:true});
 });
 
-test('Unity IL2CPP: BepInEx 6 flavour from the pack, plugin hides through CanvasRenderers and leaves ruby out',()=>{
+test('Unity IL2CPP: private source-only plugin uses real BepInEx 6 setters and retains original rendering',()=>{
  const cs=read('native/unitytext/MeguLitUnityText.IL2CPP.cs');
- assert.match(cs,/\[BepInPlugin\("com\.megulit\.unitytext\.il2cpp"/);assert.match(cs,/: BasePlugin/);assert.match(cs,/AddComponent<MeguLitTextDriver>\(\)/);
- assert.ok(cs.includes('cr.SetAlpha(0f)'),'CanvasRenderer alpha: the game\'s own vertex-colour animation cannot undo it (live 魔法少女ノ魔女裁判)');
- assert.ok(cs.includes('ci.pointSize < body * 0.75f'),'ruby left out');
+ assert.match(cs,/\[BepInPlugin\("com\.megulit\.unitytext\.il2cpp"/);assert.match(cs,/: BasePlugin/);assert.match(cs,/harmony\.Patch\(setter/);
+ assert.doesNotMatch(cs,/SetAlpha\(|AddComponent<|using TMPro|using UnityEngine/,'source-only hook needs no generated interop at compile time and never hides game text');
+ assert.match(cs,/MeguLitUnityText\.auth/);assert.match(cs,/UnpatchSelf/);
  assert.ok(read('native/unitytext/MeguLitUnityText.cs').includes('cr.SetAlpha(0f)'),'Mono plugin hides the same way');
  const u=read('core/text-paths-unity.cjs');assert.ok(u.includes("const flavour=kind==='il2cpp'?'il2cpp-'+arch:arch"));
  const p=read('tools/unity-text-pack.cjs');assert.match(p,/'il2cpp-x64':\{file:'BepInEx-Unity\.IL2CPP-win-x64-6\.0\.0-be\.793/);

@@ -53,9 +53,28 @@ function bootTail(prepared,{nonce,control,output}){
  for(const[k,v]of Object.entries({KEY:luaString('__MeguLitArtemis_'+nonce),NONCE:luaString(nonce),CONTROL:luaString(control.replace(/\\/g,'/')),OUTPUT:luaString(output.replace(/\\/g,'/')),SAVE:luaString(path.join(path.dirname(control),'savedata').replace(/\\/g,'/')),OBSERVER:prepared.script}))t=t.replace('@'+k+'@',()=>v);
  return Buffer.from('\n'+t,'utf8');
 }
-/* Copies preserve the source fingerprint: even creating a hardlink changes its Windows ctime. */
-async function shadowFiles(dir,shadow,archiveNames,{validate=()=>true,deadline=performance.now()+45000}={}){
- const plan=[];let copied=0,total=0;
+/* Container recognition only: never decode or execute the movie data. Bounds follow ASF's object framing. */
+function asfMovieHeader(file,size,budget){
+ if(size<80||budget<110)fail('ARTEMIS_MOVIE');const prefix=exactRead(file,30),headerGuid='3026b2758e66cf11a6d900aa0062ce6c';
+ if(prefix.subarray(0,16).toString('hex')!==headerGuid)fail('ARTEMIS_MOVIE');
+ const n=prefix.readBigUInt64LE(16),count=prefix.readUInt32LE(24);
+ if(n<30n||n>65536n||n+50n>BigInt(size)||Number(n)+80>budget||count<3||count>256||prefix[28]!==1||prefix[29]!==2)fail('ARTEMIS_MOVIE');
+ const header=exactRead(file,Number(n));let at=30,properties=0,extension=0,streams=0,fileID;
+ for(let i=0;i<count;i++){
+  if(at+24>header.length)fail('ARTEMIS_MOVIE');const id=header.subarray(at,at+16).toString('hex'),length=header.readBigUInt64LE(at+16);
+  if(length<24n||length>BigInt(header.length-at))fail('ARTEMIS_MOVIE');
+  if(id==='a1dcab8c47a9cf118ee400c00c205365'){if(length<104n||++properties>1||header.readBigUInt64LE(at+40)!==BigInt(size))fail('ARTEMIS_MOVIE');fileID=header.subarray(at+24,at+40);}
+  if(id==='b503bf5f2ea9cf118ee300c00c205365')extension++;
+  if(id==='9107dcb7b7a9cf118ee600c00c205365')streams++;
+  at+=Number(length);
+ }
+ if(at!==header.length||properties!==1||extension!==1||!streams)fail('ARTEMIS_MOVIE');
+ const data=exactRead(file,50,Number(n)),bytes=data.readBigUInt64LE(16);
+ if(data.subarray(0,16).toString('hex')!=='3626b2758e66cf11a6d900aa0062ce6c'||bytes<50n||n+bytes>BigInt(size)||!data.subarray(24,40).equals(fileID))fail('ARTEMIS_MOVIE');
+ return {container:'asf',headerBytes:header.length,objects:count,readBytes:header.length+80};
+}
+function shadowPlan(dir,shadow,archiveNames){
+ const plan=[];let copied=0,total=0,movieRead=0;const movieProbes=[];
  const add=(from,to,s)=>{if(!s.isFile()||s.isSymbolicLink())fail('ARTEMIS_FILE');total+=s.size;if(total>4*1024**3)fail('ARTEMIS_COPY_BUDGET');plan.push({from,to,bytes:s.size});};
  for(const name of names(dir)){
   const from=path.join(dir,name),s=fs.lstatSync(from);
@@ -66,12 +85,19 @@ async function shadowFiles(dir,shadow,archiveNames,{validate=()=>true,deadline=p
  }
  const movies=path.join(dir,'movie');
  if(fs.existsSync(movies)){
-  const dest=path.join(shadow,'movie');fs.mkdirSync(dest);
+  const dest=path.join(shadow,'movie');
   for(const name of names(movies)){
    const from=path.join(movies,name),s=regular(from,32*1024**3);
-   if(!/\.(ogv|ogg|mp4|wmv|avi|mpg|mpeg)$/i.test(name))fail('ARTEMIS_MOVIE');add(from,path.join(dest,name),s);
+   if(/\.dat$/i.test(name)){const probe=asfMovieHeader(from,s.size,1024*1024-movieRead);movieRead+=probe.readBytes;movieProbes.push({name,...probe});}
+   else if(!/\.(ogv|ogg|mp4|wmv|avi|mpg|mpeg)$/i.test(name))fail('ARTEMIS_MOVIE');add(from,path.join(dest,name),s);
   }
  }
+ return {plan,copied,total,movies:fs.existsSync(movies),movieProbes};
+}
+/* Copies preserve the source fingerprint: even creating a hardlink changes its Windows ctime. */
+async function shadowFiles(dir,shadow,archiveNames,{validate=()=>true,deadline=performance.now()+45000}={}){
+ const {plan,copied,total,movies}=shadowPlan(dir,shadow,archiveNames);
+ if(movies)fs.mkdirSync(path.join(shadow,'movie'));
  const free=()=>{const s=fs.statfsSync(shadow,{bigint:true});return s.bavail*s.bsize;},floor=10n*1024n**3n;
  // Leave room for the bounded three-member patch, manifest and initial protocol files as well
  if(free()-BigInt(total)-1024n**2n<floor)fail('ARTEMIS_DISK_BUDGET');
@@ -182,4 +208,4 @@ async function prepare({root,exe,ownerTestGrant,shadowRoot,steamAppId=null,canar
   return {path:'artemis',exe:path.join(shadow,path.basename(exe)),args:[],env:steamAppId?{SteamAppId:String(steamAppId),SteamGameId:String(steamAppId)}:{},cwd:shadow,session,connect:()=>session.connect()};
  }catch(e){trace('artemis-shadow-incomplete',{shadow,code:e.message});throw e;}
 }
-module.exports={prepare,ArtemisSession,isTaggedSource,shouldBlock,_internal:{effectiveModules,bootTail,shadowFiles,allowed}};
+module.exports={prepare,ArtemisSession,isTaggedSource,shouldBlock,_internal:{effectiveModules,bootTail,shadowFiles,shadowPlan,asfMovieHeader,allowed}};

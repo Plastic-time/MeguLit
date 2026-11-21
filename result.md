@@ -15,6 +15,7 @@ The integration checkpoint and its consumer regression are recorded in docs/kag-
 - [Artemis source audit and bounded Lua session](side-session-notes/Artemis-result.md)
 - [Artemis production input-session contract and pending owner checklist](docs/artemis-lua-input.md)
 - [Artemis shared owner-test and teardown integration](side-session-notes/Artemis-owner-integration.md)
+- [Unity IL2CPP private source contract and pending owner checks](docs/engine-unity-il2cpp-play.md)
 
 Artemis remains default off and requires an isolated, exact-build local owner-test grant
 Its optional source transport does not implement glyph coordinates, hiding or new translation drawing

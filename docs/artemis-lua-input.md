@@ -111,6 +111,10 @@ The launcher creates a unique `root/data/artemis-shadow/session-*` directory out
 It copies executable/DLL bytes (64 MiB aggregate), verifies the copied EXE hash again, and independently copies resource files
 It never junctions any directory or links/copies old saves or configuration
 `savedata` is a new empty directory; the optional movie directory accepts at most 4096 flat files with known movie extensions
+Movie `.dat` files require bounded ASF recognition: exact header GUID, complete object ranges/count, mandatory properties/extension/stream objects and the following matching Data object
+Each header is at most 64 KiB and total movie probing is at most 1 MiB; this is container recognition, not codec or playback acceptance
+The actual Shell `movie/op1.dat` passes that read-only recognizer; arbitrary DAT bytes remain unsupported
+The layout follows Microsoft's [ASF file structure](https://learn.microsoft.com/en-us/windows/win32/medfound/asf-file-structure) and [30-byte header layout](https://learn.microsoft.com/en-us/windows/win32/api/wmcontainer/nf-wmcontainer-imfasfcontentinfo-parseheader)
 Total copies are capped at 4 GiB, including executables, archives and movies
 Before copying, the actual shadow volume must have room for those bytes, a 1 MiB patch/protocol allowance, and a further 10 GiB free margin
 The 256 KiB streaming copy uses a 45-second monotonic deadline and rechecks permission and destination free space every 500 ms

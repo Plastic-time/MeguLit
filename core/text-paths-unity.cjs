@@ -26,31 +26,35 @@ function linkDir(from,to){fs.symlinkSync(from,to,'junction');}
 /* Mirror the game folder into shadow: every folder a junction, every file a hard link (a copy when the volume differs,
    unless linkOnly: then a failed link throws). Entries gone from the game are removed from the shadow (never anything
    inside a junction); names in OURS are left alone. */
-function mirror(dir,shadow,{linkOnly=false,ours=OURS}={}){
+function mirror(dir,shadow,{linkOnly=false,copyFiles=false,reserveBytes=0,ours=OURS}={}){
  fs.mkdirSync(shadow,{recursive:true});
  /* entries that no longer exist in the game are removed from the shadow */
  const want=new Set(fs.readdirSync(dir).map(n=>n.toLowerCase()));
  /* never a recursive delete here: a junction removed that way would take the game's own files with it. A stale
     junction is removed as a link only (rmdir of the reparse point); a stale file is unlinked. */
  const stats={links:0,copies:0,junctions:0};
+ if(copyFiles){let needed=reserveBytes;for(const n of fs.readdirSync(dir)){if(ours.has(n.toLowerCase()))continue;const from=path.join(dir,n),to=path.join(shadow,n),st=fs.statSync(from),t=fs.existsSync(to)?fs.lstatSync(to):null;if(t?.isFile()&&t.nlink>1)throw Error('UNITY_SHARED_SHADOW_FILE');if(st.isFile())needed+=st.size;}const space=fs.statfsSync(shadow);if(Number(space.bavail)*Number(space.bsize)-needed<10*1024**3)throw Error('UNITY_SHADOW_DISK_BUDGET');}
  const lst=p=>{try{return fs.lstatSync(p);}catch{return null;}};
  const drop=(p,t)=>{if(t.isSymbolicLink())fs.rmdirSync(p);else if(t.isFile())fs.unlinkSync(p);};
  for(const n of fs.readdirSync(shadow)){if(ours.has(n.toLowerCase())||want.has(n.toLowerCase()))continue;const p=path.join(shadow,n),t=lst(p);if(t)drop(p,t);}
  for(const n of fs.readdirSync(dir)){if(ours.has(n.toLowerCase()))continue;const from=path.join(dir,n),to=path.join(shadow,n),st=fs.statSync(from),t=lst(to);
   if(t){if(st.isDirectory()&&t.isSymbolicLink())continue;if(st.isFile()&&t.isFile()&&t.size===st.size&&Math.floor(t.mtimeMs/1000)===Math.floor(st.mtimeMs/1000))continue;if(t.isSymbolicLink()||t.isFile())drop(to,t);else continue;}
-  if(st.isDirectory()){linkDir(from,to);stats.junctions++;}else if(st.isFile()){linkFile(from,to,linkOnly)==='link'?stats.links++:stats.copies++;}}
+  if(st.isDirectory()){linkDir(from,to);stats.junctions++;}else if(st.isFile()){if(copyFiles){fs.copyFileSync(from,to);fs.utimesSync(to,st.atime,st.mtime);stats.copies++;}else linkFile(from,to,linkOnly)==='link'?stats.links++:stats.copies++;}}
  return stats;
 }
 /* (Re)build the shadow folder for one game. pack: the unpacked "unity-text" pack folder holding x86\ and x64\
    (each: winhttp.dll, doorstop_config.ini, BepInEx\core\...) and MeguLitUnityText.dll. Returns the shadow program. */
-function makeShadow({exe,shadowRoot,pack,port,steamAppId=null}){
+function makeShadow({exe,shadowRoot,pack,port,sourceScope=null,steamAppId=null}){
  const dir=path.dirname(exe),b=bits(exe),kind=unityGame(exe),arch=b===64?'x64':b===32?'x86':null;if(!arch)throw Error('UNITY_BITS');
  if(!kind)throw Error('UNITY_NOT_UNITY');
  /* IL2CPP: BepInEx 6 (IL2CPP build, own .NET runtime, interop assemblies generated on the first start inside the shadow) */
  const flavour=kind==='il2cpp'?'il2cpp-'+arch:arch,pluginFile=kind==='il2cpp'?'MeguLitUnityText.IL2CPP.dll':'MeguLitUnityText.dll';
  if(!fs.existsSync(path.join(pack,flavour))||!fs.existsSync(path.join(pack,pluginFile)))throw Error('UNITY_PACK_MISSING '+flavour);if(modded(exe))throw Error('UNITY_ALREADY_MODDED');
- const key=path.basename(exe).replace(/[^A-Za-z0-9._-]/g,'_')+'-'+fs.statSync(exe).size,shadow=path.join(shadowRoot,key);
- const stats=mirror(dir,shadow);
+ if(kind==='il2cpp'&&!/^[a-f0-9]{32}$/.test(sourceScope||''))throw Error('UNITY_IL2CPP_SESSION_REQUIRED');
+ const pathKey=kind==='il2cpp'?'-'+require('node:crypto').createHash('sha256').update(process.platform==='win32'?fs.realpathSync.native(exe).toLowerCase():fs.realpathSync.native(exe)).digest('hex').slice(0,20):'';
+ const key=path.basename(exe).replace(/[^A-Za-z0-9._-]/g,'_')+'-'+fs.statSync(exe).size+pathKey,shadow=path.join(shadowRoot,key);
+ let reserveBytes=0;if(kind==='il2cpp'){let count=0;const size=p=>{const st=fs.lstatSync(p);if(st.isSymbolicLink()||++count>5000)throw Error('UNITY_PACK_PATH');if(st.isDirectory())for(const n of fs.readdirSync(p))size(path.join(p,n));else reserveBytes+=st.size;if(reserveBytes>256*1024**2)throw Error('UNITY_PACK_BUDGET');};size(path.join(pack,flavour));reserveBytes+=fs.statSync(path.join(pack,pluginFile)).size+256*1024**2;}
+ const stats=mirror(dir,shadow,{copyFiles:kind==='il2cpp',reserveBytes});
  /* ours: doorstop + BepInEx (real files in the shadow) */
  const src=path.join(pack,flavour);
  for(const f of ['winhttp.dll','doorstop_config.ini'])fs.copyFileSync(path.join(src,f),path.join(shadow,f));
@@ -58,9 +62,10 @@ function makeShadow({exe,shadowRoot,pack,port,steamAppId=null}){
  const plugins=path.join(shadow,'BepInEx','plugins','MeguLit');fs.mkdirSync(plugins,{recursive:true});
  fs.copyFileSync(path.join(pack,pluginFile),path.join(plugins,pluginFile));
  fs.writeFileSync(path.join(plugins,'MeguLitUnityText.port'),String(port));
+ if(kind==='il2cpp')fs.writeFileSync(path.join(plugins,'MeguLitUnityText.auth'),sourceScope);
  /* quiet BepInEx: no console window, no log file growth beyond the default */
  const cfgDir=path.join(shadow,'BepInEx','config');fs.mkdirSync(cfgDir,{recursive:true});const cfg=path.join(cfgDir,'BepInEx.cfg');
- if(!fs.existsSync(cfg))fs.writeFileSync(cfg,'[Logging.Console]\nEnabled = false\n\n[Logging.Disk]\nEnabled = true\n');
+ if(!fs.existsSync(cfg))fs.writeFileSync(cfg,'[Logging.Console]\nEnabled = false\n\n[Logging.Disk]\nEnabled = true\n'+(kind==='il2cpp'?'\n[IL2CPP]\nUpdateInteropAssemblies = true\nPreloadIL2CPPInteropAssemblies = true\n':''));
  /* a Steam game started from the shadow must not be restarted by Steam from its real folder (SteamAPI_RestartAppIfNecessary):
     steam_appid.txt in the shadow (and SteamAppId in the start environment, services/bridge.cjs) keep it here */
  if(/^\d+$/.test(String(steamAppId||'')))fs.writeFileSync(path.join(shadow,'steam_appid.txt'),String(steamAppId));
@@ -72,28 +77,37 @@ function makeShadow({exe,shadowRoot,pack,port,steamAppId=null}){
    pipes on Windows). Lines in: ToMe_CHARS / ToMe_UNITY status. Lines out: HIDE 0|1, WANT <text>,
    and for engine-draw (docs/engine-draw-protocol.md): DRAW roles= embed= zh=, EMB <sentence> TAB <ruby> TAB <Chinese>; in: ToMe_UNITY ask <sentence>. */
 class UnityTextPath{
- constructor({onChars=()=>{},onStatus=()=>{},onAsk=()=>{},onSource=()=>{},canary=null}={}){Object.assign(this,{onChars,onStatus,onAsk,onSource,canary});this.sock=null;this.on=false;this.wanted='';this.armed=false;this.drawCfg=null;this.embeds=new Map();this.kemco=new(require('./unity-kemco-source.cjs').UnityKemcoSource)({onSource:m=>this.onSource(m)});}
+ constructor({onChars=()=>{},onStatus=()=>{},onAsk=()=>{},onSource=()=>{},onClear=()=>{},sourceOnly=false,canary=null}={}){Object.assign(this,{onChars,onStatus,onAsk,onSource,onClear,sourceOnly,canary});this.sock=null;this.on=false;this.wanted='';this.armed=false;this.drawCfg=null;this.embeds=new Map();this.kemco=new(require('./unity-kemco-source.cjs').UnityKemcoSource)({onSource:m=>this.onSource(m)});if(sourceOnly)this.il2cpp=new(require('./unity-il2cpp-source.cjs').UnityIl2CppSource)({onSource:m=>this.onSource(m),onClear:m=>this.onClear(m),canUse:o=>this.canSource?.(o)===true});}
  listen(){return new Promise((resolve,reject)=>{this.server=net.createServer(s=>this.accept(s));this.server.on('error',reject);this.server.listen(0,'127.0.0.1',()=>resolve(this.server.address().port));});}
  negotiateKemco(){try{this.kemco?.configure(!this.stopped&&this.drawCfg?.kemcoSprites===true,{force:true});}catch{try{this.onStatus('kemco source negotiation unavailable');}catch{}}}
- accept(s){if(this.stopped){s.destroy();return;}if(this.sock)this.sock.destroy();this.sock=s;this.negotiateKemco();s.setEncoding('utf8');s.setNoDelay(true);let buf='';
+ accept(s){if(this.stopped||this.sourceOnly&&this.sock){s.destroy();return;}if(this.sock)this.sock.destroy();this.sock=s;this.negotiateKemco();s.setEncoding('utf8');s.setNoDelay(true);let buf='';
   s.on('data',d=>{buf+=d;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).replace(/\r$/,'');buf=buf.slice(i+1);this.line(line);}if(buf.length>200000)buf='';});
-  s.on('close',()=>{if(this.sock===s){this.sock=null;this.negotiateKemco();}});s.on('error',()=>{});this.push(true);}
- line(l){if(this.stopped)return;if(this.kemco?.accept(l))return;if(l.startsWith('ToMe_UNITY status ')){this.onStatus(l.slice(18));return;}
+  s.on('close',()=>{if(this.sock===s){this.sock=null;clearInterval(this.sourceTimer);this.il2cpp?.disconnect();this.negotiateKemco();}});s.on('error',()=>{});if(this.il2cpp){this.sourceTimer=setInterval(()=>this.push(),250);this.sourceTimer.unref?.();}this.push(true);}
+ line(l){if(this.stopped)return;if(this.il2cpp){this.il2cpp.accept(l);this.push();return;}if(this.kemco?.accept(l))return;if(l.startsWith('ToMe_UNITY status ')){this.onStatus(l.slice(18));return;}
   if(l.startsWith('ToMe_UNITY ask ')){const k=l.slice(15).trim();if(k)this.onAsk({key:k,text:k,engine:'unity'});return;}
   const r=parseChars(l);if(!r||r.engine!=='unity')return;
   if(r.hidden&&this.canary){if(!this.armed){this.canary.arm('unity');this.armed=true;}else this.canary.alive('unity');}
   this.onChars(l);}
- push(reset=false){if(this.stopped||!this.sock)return;const controls=this.drawCfg&&(!this.drawCfg.kemcoSprites||reset)?this.drawLine()+(this.kemco?.command()||''):'';this.sock.write('WANT '+this.wanted.replace(/\r?\n/g,'\x1f')+'\nHIDE '+(this.on?1:0)+'\n'+controls+[...this.embeds.values()].join(''));}
+ push(reset=false){if(this.stopped||!this.sock)return;if(this.il2cpp){const cmd=this.il2cpp.refresh();if(reset||cmd!==this.sourceCommand){this.sourceCommand=cmd;this.sock.write(cmd);}return;}const controls=this.drawCfg&&(!this.drawCfg.kemcoSprites||reset)?this.drawLine()+(this.kemco?.command()||''):'';this.sock.write('WANT '+this.wanted.replace(/\r?\n/g,'\x1f')+'\nHIDE '+(this.on?1:0)+'\n'+controls+[...this.embeds.values()].join(''));}
  drawLine(){const c=this.drawCfg;return 'DRAW roles='+(c.roles?1:0)+' embed='+(c.embed?1:0)+' zh='+(c.zh?1:0)+(c.kemcoSprites?' kemcoSprites=1':'')+'\n';}
  /* engine-draw: the switches, and one sentence's replacement (kept for a reconnect, newest 64) */
- drawConfig(cfg){if(this.stopped)return;const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false,kemcoSprites:cfg?.kemcoSprites===true};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;if(this.kemco)UnityTextPath.prototype.negotiateKemco.call(this);if(this.sock){this.sock.write(this.drawLine());const command=this.kemco?.command();if(command)this.sock.write(command);}}
+ drawConfig(cfg){if(this.stopped)return;if(this.il2cpp){this.push();return;}const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false,kemcoSprites:cfg?.kemcoSprites===true};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;if(this.kemco)UnityTextPath.prototype.negotiateKemco.call(this);if(this.sock){this.sock.write(this.drawLine());const command=this.kemco?.command();if(command)this.sock.write(command);}}
  blockSource(message,owner){return this.kemco.block(message,owner);}
- drawEmbed(key,o={}){if(this.stopped)return;const {krkrControlText}=require('./engine-draw.cjs');const body=krkrControlText({roles:false,embed:true,zh:true},new Map([[String(key||''),{ruby:o.ruby||[],zh:o.zh||''}]])).split('\r\n')[1]||'';if(!body)return;
+ blockIl2CppSource(message,owner){return this.il2cpp?this.il2cpp.block(message,owner):true;}
+ stopIl2CppSource(){return this.il2cpp?this.stop():null;}
+ drawEmbed(key,o={}){if(this.stopped||this.il2cpp)return;const {krkrControlText}=require('./engine-draw.cjs');const body=krkrControlText({roles:false,embed:true,zh:true},new Map([[String(key||''),{ruby:o.ruby||[],zh:o.zh||''}]])).split('\r\n')[1]||'';if(!body)return;
   const l='EMB '+body+'\n';this.embeds.delete(key);this.embeds.set(key,l);while(this.embeds.size>64)this.embeds.delete(this.embeds.keys().next().value);if(this.sock)this.sock.write(l);}
  hide(on){if(this.stopped)return;this.on=!!on;if(this.on&&this.canary&&!this.canary.allowed('unity')){this.on=false;this.onStatus('unity invisible drawing off for this game (crash canary)');}this.push();}
  want(text){if(this.stopped)return;this.wanted=String(text||'');this.push();}
  exited(code){if(this.canary&&this.armed)this.canary.exited('unity',code);}
- stop(){if(this.stopping)return this.stopping;this.stopped=true;this.kemco.configure(false);this.on=false;this.drawCfg={roles:false,embed:false,zh:false};this.embeds.clear();const s=this.sock,server=this.server;this.stopping=new Promise((resolve,reject)=>{let timer;const finish=error=>{clearTimeout(timer);if(error)reject(error);else resolve();};timer=setTimeout(()=>{s?.destroy();finish(Error('READER_STOP_INCOMPLETE'));},2000);const close=()=>{if(!server?.listening){finish();return;}server.close(error=>finish(error));};if(s&&!s.destroyed){s.once('close',close);s.end('HIDE 0\nDRAW roles=0 embed=0 zh=0\n');}else close();});this.stopping.catch(()=>{});return this.stopping;}
+ stop(){
+  if(this.stopping)return this.stopping;let resolve,reject;this.stopping=new Promise((ok,no)=>{resolve=ok;reject=no;});const pending=this.stopping;pending.catch(()=>{if(this.stopping===pending)this.stopping=null;});
+  this.stopped=true;this.il2cpp?.stop();clearInterval(this.sourceTimer);this.sourceCleanup?.();this.kemco.configure(false);this.on=false;this.drawCfg={roles:false,embed:false,zh:false};this.embeds.clear();
+  const s=this.sock,server=this.server;let done=false;const finish=error=>{if(done)return;done=true;clearTimeout(timer);if(error)reject(error);else resolve();};
+  const timer=setTimeout(()=>{s?.destroy();finish(Error('READER_STOP_INCOMPLETE'));},2000);
+  const close=()=>{if(!server?.listening){finish();return;}server.close(error=>finish(error));};
+  if(s&&!s.destroyed){s.once('close',close);s.end(this.il2cpp?this.il2cpp.command():'HIDE 0\nDRAW roles=0 embed=0 zh=0\n');}else close();return this.stopping;
+ }
 }
 
 module.exports={unityGame,modded,bits,mirror,makeShadow,UnityTextPath,formatChars};

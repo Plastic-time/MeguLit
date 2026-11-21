@@ -524,7 +524,7 @@ class HookNative{
   const next=q.rest.shift();if(!q.rest.length)this.pageQueue=null;
   this.trace('page part advance '+JSON.stringify(next.slice(0,20)));this.source({...q.base,text:next},q.name);return true;
  }
- source(m,name){if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,m,this.target)||require('./artemis-session.cjs').shouldBlock(this.textPath,m,this.target,undefined,this.wanted!==false))return;if(m&&/textrender/i.test(String(m.sourceName||'')))this.trSeen=this.gamePid();
+ source(m,name){if(require('./unity-il2cpp-source.cjs').shouldBlock(this.textPath,m,this.target))return;if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,m,this.target)||require('./artemis-session.cjs').shouldBlock(this.textPath,m,this.target,undefined,this.wanted!==false))return;if(m&&/textrender/i.test(String(m.sourceName||'')))this.trSeen=this.gamePid();
   /* E560 Unity setter streams: typewriter steps and whole NVL pages become the one paragraph the game is on (core/unity-source.cjs) */
   {const code=String(m.sourceCode||'');if(code.endsWith(':JIT:UNITY')&&!m.unityBoxed&&typeof m.text==='string'&&!this.skipKey){const {UnityBox}=require('./unity-source.cjs');(this.unityBox||(this.unityBox=new UnityBox(()=>this.now(),(line,p)=>this.source({...p.m,text:line,unityBoxed:true},p.name)))).feed(code,cleanSource(m.text,name,code),{m,name});return;}}
   /* 2026-11-14 (ダストマニア・グロテスク, Chinese patch): Shift-JIS read as GBK (or any Japanese read with the wrong code page:
@@ -630,6 +630,7 @@ class HookNative{
   if(identifierNoise(text)){this.trace('drop identifier text '+JSON.stringify(text.slice(0,60)));return;}
   if(ruby.length){const map=this.sourceRuby||(this.sourceRuby=new Map());map.set(text,ruby);if(map.size>64)map.delete(map.keys().next().value);}
   if(m.sourceName==='EmbedToMeCS2_DrawPreserve'){if(m.origin==='history'&&this.state.receivedText)return;this.queueIslandSource(text,m.origin);return;}
+  if(require('./unity-il2cpp-source.cjs').tagged(m)){this.deliverSource(text,m.origin,'',0,m);return;}
   if((require('./unity-kemco-source.cjs').isTaggedSource(m)||require('./artemis-session.cjs').isTaggedSource(m))&&this.pageNvl())return;
   this.locatePage(text,m.origin);
   if(this.pageRoute(text,m.origin))return;
@@ -868,6 +869,7 @@ class HookNative{
   return s;
  }
  deliverSource(text,origin,engine='',nativeLine=0,authority){
+  if(require('./unity-il2cpp-source.cjs').shouldBlock(this.textPath,authority||{origin},this.target))return;
   if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,authority,this.target)||require('./artemis-session.cjs').shouldBlock(this.textPath,authority,this.target,origin,this.wanted!==false))return;
   const now=this.now(),live=!engine&&!nativeLine&&(origin||'live')==='live',S=this.skipBurst||(this.skipBurst={last:0,held:null,timer:null,count:0});
   if(!live||this.stashFlush){if(this.stashFlush)S.last=now;this.emitSource(text,origin,engine,nativeLine,authority);return;}
@@ -915,7 +917,7 @@ class HookNative{
  placedHidden(raw,info){const text=String(raw||'').replace(/\u001f/g,'\n').replace(/\n/g,''),f=HookNative.flat(text);if(!f||f.length<2)return;const seen=()=>(this.recentSources||[]).some(s=>s.includes(f)||f.includes(s));if(seen()){if(Array.isArray(info?.rects)&&info.rects.length)this.lastDialogRects=info.rects;return;}if((this.placedWait||(this.placedWait=new Map())).has(f))return;
   const serial=this.serial,t=setTimeout(()=>{this.placedWait.delete(f);if(serial!==this.serial||seen())return;const B=this.hiddenBatch||(this.hiddenBatch={items:[],timer:null});B.items.push({text,rects:info?.rects||null});clearTimeout(B.timer);B.timer=setTimeout(()=>{const items=B.items.splice(0);if(serial!==this.serial)return;const boxed=items.filter(i=>Array.isArray(i.rects)&&i.rects.length);if(items.length>=2&&boxed.length===items.length&&items.every(i=>!HookNative.interleaved?.(i.text,Profiles.get(this.profile,'choice.contentInterleave',false)===true))&&HookNative.choiceShape(items,this.lastDialogRects)){this.trace('placement lines without a source line, taken as '+items.length+' options');try{this.onHiddenChoices?.(items);}catch{}return;}for(const i of items){if(Array.isArray(i.rects)&&i.rects.length)this.lastDialogRects=i.rects;this.trace('placement line without a source line, delivered from the placement chars='+HookNative.flat(i.text).length);/* r34: 4 of the 8 misses were script lines delivered from the placement, which never went through the pairing (no patch-text); they do now */try{this.originalTextFor(i.text);}catch{}this.deliverSource(i.text,'placement');}},200);B.timer.unref?.();},450);t.unref?.();this.placedWait.set(f,t);if(this.placedWait.size>16){const k=this.placedWait.keys().next().value;clearTimeout(this.placedWait.get(k));this.placedWait.delete(k);}}
  giveWay(ms){this.send({type:'engineGiveWay',ms:Math.max(0,Math.min(10000,Number(ms)||3000))});}
- emitSource(text,origin,engine='',nativeLine=0,authority){if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,authority,this.target)||require('./artemis-session.cjs').shouldBlock(this.textPath,authority,this.target,origin,this.wanted!==false))return;{const f=HookNative.flat(text);if(f){(this.recentSources||(this.recentSources=[])).push(f);if(this.recentSources.length>24)this.recentSources.shift();}}this.positionsCheck?.();
+ emitSource(text,origin,engine='',nativeLine=0,authority){if(require('./unity-il2cpp-source.cjs').shouldBlock(this.textPath,authority||{origin},this.target))return;if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,authority,this.target)||require('./artemis-session.cjs').shouldBlock(this.textPath,authority,this.target,origin,this.wanted!==false))return;{const f=HookNative.flat(text);if(f){(this.recentSources||(this.recentSources=[])).push(f);if(this.recentSources.length>24)this.recentSources.shift();}}this.positionsCheck?.();
   try{this.textPath?.want(text);}catch{}
   /* E501 every source path (native line, merged batch, skip burst) meets the same frame-dump filter as the aux entries */
   if(require('./language-tracks.cjs').stuttered(text)){this.trace('drop typewriter/redraw frame '+JSON.stringify(String(text).slice(0,40)));return;}
@@ -937,6 +939,7 @@ class HookNative{
   const part=text;let continues=0;/* not when the engine named a new speaker after the last line */if(paged&&!(this.speaker&&this.speaker.at>(this.lastSourceAt||0))){const c=this.pageText.continuation(text,this.now());if(c){this.trace('sentence continues the shown line ('+c.continues+' chars before)');text=c.text;continues=c.continues;}}
   this.learnBareName(text);
   const speaker=this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'';this.speaker=null;/* E416 the choice detector learns every dialogue line and speaker, whatever the engine */(this.choice||(this.choice=this.newChoiceCapture())).noteDialogue(text,speaker);/* E407 a new dialogue line ends the choice screen */if(text.replace(/\s+/g,'')!==String(this.lastSource||'').replace(/\s+/g,''))this.clearChoices('new dialogue line',400,text);this.lastSource=text;this.lastSourceAt=this.now();/* #468 the lines the game's own text gave (never an OCR line): an OCR reading of the same page is refused (ocrLineRefused) */if(origin!=='ocr'){const R=this.hookRecent||(this.hookRecent=[]);R.push({key:HookNative.flat(text),at:this.now()});if(R.length>24)R.shift();}this.palFlush?.();this.lastSourceStream=this.sourceStream||'';this.trace('source chars='+text.length+' sequence='+((this.state.hookSequence||0)+1));this.textEffectsLine(text,this.fxNext===true||origin==='placement');if(paged){/* the reader keeps the page's earlier lines above this one while the page stays (web hook-reader.js) */if(!continues&&this.pageText.pages){const same=this.pageText.samePage(this.now());this.pageSaidSame=same;this.emit({type:'hookPage',engine:'text',line:(this.state.hookSequence||0)+1,same,at:this.now()});}this.pageText.shown(part,text,this.now());}this.notify({...(this.lineUnreadable?(this.lineUnreadable=false,{hookLineUnreadable:false}):{}),hookActive:true,processAttached:true,streamSelected:true,hookRecovering:false,hookSource:text,hookSpeaker:speaker,hookSourceEngine:engine,hookFlowGrid:engine==='nvl'?(this.flowGridName||''):'',...(()=>{const f=engine==='nvl'?this.flowLayout(text):null;/* E410 */return {hookFlowPageStart:f?.pageStart===true,hookFlowRow:f?.row||'',hookSourceIndex:Number.isSafeInteger(f?.index)?f.index:-1};})(),hookSourceContinues:continues,hookSourceLine:nativeLine,hookSourceOrigin:origin||'live',hookSourceRuby:this.sourceRuby?.get(text)||[],hookSequence:(this.state.hookSequence||0)+1,receivedText:!!text.trim(),hookMessage:text.trim()?'已收到真实游戏台词':'收到空文本信号'});
+  this.il2cppShown=require('./unity-il2cpp-source.cjs').tagged(authority)?{authority,sequence:this.state.hookSequence}:null;
  }
  /* #141 (CLANNAD: a bare name sent as its own string, with no brackets, before the 「…」 line). A short name-like line
     followed within 2 s by a quoted line is a name candidate; the second time it happens the name is learned, so from then
@@ -984,11 +987,13 @@ class HookNative{
   const file=path.join(this.layout.logs||path.join(this.folder,'..','logs'),'engine-draw.log');require('./log-sink.cjs').append(file,new Date().toISOString()+' '+String(raw).replace(/[\r\n]/g,' ')+'\n',{rotate:4194304});}catch{}}
  drawEmbedReply(key,o){this.engineDraw?.put(key,o);try{this.textPath?.drawEmbed?.(key,o);}catch{}}
  stop(dispose=true){
+  let sourceStop;try{sourceStop=this.textPath?.stopIl2CppSource?.();}catch(error){sourceStop=Promise.reject(error);}sourceStop?.catch(()=>{});
   if(this.ownerTestGrant)require('./owner-tests.cjs').revoke(this.ownerTestGrant);this.ownerTestCleanup?.();this.ownerTestCleanup=null;
   this.clearNativeRuby();
   if(dispose){this.disposed=true;this.lastSource='';this.identity='';this.wanted=false;clearInterval(this.timer);}if(this.stopPending)return this.stopPending;
   let resolve,reject;const result=new Promise((yes,no)=>{resolve=yes;reject=no;});this.stopPending=result;result.catch(()=>{});
   const tasks=[],draw=this.engineDraw,old=this.process,attempt=fn=>{try{return Promise.resolve(fn());}catch(error){return Promise.reject(error);}};
+  if(sourceStop)tasks.push(sourceStop);
   // Launch can bind the Lua token before Reader's asynchronous profile lookup reaches this hook
   if(this.textPath instanceof require('./artemis-session.cjs').ArtemisSession)tasks.push(attempt(()=>this.textPath.stop()));
   tasks.push(attempt(()=>draw?.stop()).then(()=>{if(this.engineDraw===draw)this.engineDraw=null;}));

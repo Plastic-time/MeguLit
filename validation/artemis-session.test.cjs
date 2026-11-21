@@ -35,6 +35,18 @@ test('resource copies reject insufficient target space, expired deadline and rev
  await assert.rejects(actual._internal.shadowFiles(game,shadow,[],{deadline:performance.now()-1}),/ARTEMIS_COPY_TIMEOUT/);assert.deepEqual(fs.readdirSync(shadow),[]);
  await assert.rejects(actual._internal.shadowFiles(game,shadow,[],{validate:()=>false}),/ARTEMIS_SESSION_REVOKED/);assert.deepEqual(fs.readdirSync(shadow),[]);
 });
+
+test('movie DAT support requires bounded ASF object framing; ordinary fake DAT and malformed headers stay unsupported',async t=>{
+ const dir=temporary(t),game=path.join(dir,'game'),shadow=path.join(dir,'shadow');fs.mkdirSync(path.join(game,'movie'),{recursive:true});fs.writeFileSync(path.join(game,'game.exe'),'synthetic');
+ const object=(guid,size)=>{const b=Buffer.alloc(size);Buffer.from(guid,'hex').copy(b);b.writeBigUInt64LE(BigInt(size),16);return b;};
+ const properties=object('a1dcab8c47a9cf118ee400c00c205365',104),extension=object('b503bf5f2ea9cf118ee300c00c205365',46),stream=object('9107dcb7b7a9cf118ee600c00c205365',78),data=object('3626b2758e66cf11a6d900aa0062ce6c',50),head=object('3026b2758e66cf11a6d900aa0062ce6c',30);
+ const id=Buffer.alloc(16,7);id.copy(properties,24);id.copy(data,24);const n=head.length+properties.length+extension.length+stream.length;head.writeBigUInt64LE(BigInt(n),16);head.writeUInt32LE(3,24);head[28]=1;head[29]=2;properties.writeBigUInt64LE(BigInt(n+data.length),40);
+ const bytes=Buffer.concat([head,properties,extension,stream,data]),file=path.join(game,'movie/op1.dat');fs.writeFileSync(file,bytes);const plan=actual._internal.shadowPlan(game,shadow,[]);assert.equal(plan.movieProbes[0].container,'asf');assert.equal(fs.existsSync(shadow),false,'the plan is read-only');
+ fs.mkdirSync(shadow);await actual._internal.shadowFiles(game,shadow,[]);assert.deepEqual(fs.readFileSync(path.join(shadow,'movie/op1.dat')),bytes);assert.deepEqual(fs.readFileSync(file),bytes);
+ const bad=[Buffer.from('not a media container'),bytes.subarray(0,40),Buffer.from(bytes),Buffer.from(bytes),Buffer.from(bytes)];bad[2][28]=0;bad[3].writeBigUInt64LE(0n,46);bad[4][n]=0;
+ for(const b of bad){fs.writeFileSync(file,b);assert.throws(()=>actual._internal.shadowPlan(game,shadow,[]),/ARTEMIS_MOVIE|ARTEMIS_TRUNCATED/);}
+ fs.writeFileSync(file,bytes);assert.throws(()=>actual._internal.asfMovieHeader(file,bytes.length,100),/ARTEMIS_MOVIE/);
+});
 test('real Lua boot tail and actual Node session exchange bounded records, revoke in-flight and expire stopped owner heartbeat',{skip:!LUA&&'Lua 5.1 unavailable'},async t=>{
  const dir=temporary(t),control=path.join(dir,'megulit-artemis.ctl'),output=path.join(dir,'megulit-artemis.jsonl'),nonce='0123456789abcdef0123456789abcdef';
  const Observer=require('../core/artemis-observer.cjs'),factory=fs.readFileSync(path.join(root,'core/artemis-observer.lua'),'utf8');
