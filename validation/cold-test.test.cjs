@@ -159,7 +159,7 @@ test('service: snapshot, run, restore, score, report; pictures only for fail, an
   const out=await svc.testOne(P.root,game,{budgetMs:60000,deps:{env:P.env,
    runner:async o=>{fs.mkdirSync(o.runDir,{recursive:true});fs.copyFileSync(path.join(FIX,name,'hook-events.log'),path.join(o.runDir,'hook-events.log'));
     for(let i=1;i<=4;i++)fs.writeFileSync(path.join(o.runDir,'shot-'+i+'.jpg'),Buffer.from([0xff,0xd8,0xff,0xe0,1,2,3]));
-    fs.writeFileSync(path.join(P.game,'savedata','data0.kdt'),'played');return {pid:9,lines:20,shots:['shot-1.jpg','shot-2.jpg','shot-3.jpg','shot-4.jpg'],end:'enough',stopped:''};},
+    fs.writeFileSync(path.join(P.game,'savedata','data0.kdt'),'played');return {cleanupConfirmed:true,pid:9,lines:20,shots:['shot-1.jpg','shot-2.jpg','shot-3.jpg','shot-4.jpg'],end:'enough',stopped:''};},
    report:async(root,x)=>{reports.push(x);return {state:'sent'};},upload:async(root,x)=>{uploads.push(x);return {state:'sent'};}}});
   assert.equal(out.verdict,verdict,JSON.stringify(out));assert.equal(out.restored,true);assert.deepEqual(tree(P.game),before,'saves back as they were');
   assert.equal(reports.length,1);assert.equal(uploads.length,verdict==='pass'?0:1,'a pass sends no picture');
@@ -172,7 +172,7 @@ test('service: snapshot, run, restore, score, report; pictures only for fail, an
 
 test('service: a stopped run is retried later; no save place blocks; a Steam build without Steam running waits',async()=>{const svc=require('../services/cold-test.cjs');const P=pc();
  const game={id:'8',title:'千恋＊万花',exe:P.exe,engine:'kirikiri',exeKey:H('3')};
- const out=await svc.testOne(P.root,game,{budgetMs:60000,deps:{env:P.env,runner:async o=>{fs.mkdirSync(o.runDir,{recursive:true});return {pid:9,stopped:'input',shots:[]};},report:async()=>{throw new Error('no report for a stopped run');}}});
+ const out=await svc.testOne(P.root,game,{budgetMs:60000,deps:{env:P.env,runner:async o=>{fs.mkdirSync(o.runDir,{recursive:true});return {cleanupConfirmed:true,pid:9,stopped:'input',shots:[]};},report:async()=>{throw new Error('no report for a stopped run');}}});
  assert.equal(out.verdict,'inconclusive');assert.equal(svc.load(P.root).tested[game.exeKey].verdict,'stopped');
  assert.equal(Pick.candidates([{...game,seedStatus:'skeleton'}],{state:svc.load(P.root)}).length,1,'tried again');
  const bare=path.join(P.base,'Games','Bare');fs.mkdirSync(bare,{recursive:true});fs.writeFileSync(path.join(bare,'Bare.exe'),'MZ');
@@ -180,14 +180,14 @@ test('service: a stopped run is retried later; no save place blocks; a Steam bui
  fs.writeFileSync(path.join(P.game,'steam_api64.dll'),'x');
  const s=await svc.testOne(P.root,{...game,steamAppId:'1144400'},{deps:{env:P.env,steamRunning:()=>false,runner:async()=>{throw new Error('must not run');}}});assert.deepEqual(s,{verdict:'skipped',why:'steam-not-running'});
  /* with Steam running: the app id is there for the run and gone after (the game still goes through Steam) */
- let seen=null;await svc.testOne(P.root,{...game,steamAppId:'1144400',exeKey:H('5')},{deps:{env:P.env,steamRunning:()=>true,report:async()=>({}),runner:async o=>{seen=fs.readFileSync(path.join(P.game,'steam_appid.txt'),'utf8');fs.mkdirSync(o.runDir,{recursive:true});return {pid:1,shots:[]};}}});
+ let seen=null;await svc.testOne(P.root,{...game,steamAppId:'1144400',exeKey:H('5')},{deps:{env:P.env,steamRunning:()=>true,report:async()=>({}),runner:async o=>{seen=fs.readFileSync(path.join(P.game,'steam_appid.txt'),'utf8');fs.mkdirSync(o.runDir,{recursive:true});return {cleanupConfirmed:true,pid:1,shots:[]};}}});
  assert.equal(seen,'1144400');assert.ok(!fs.existsSync(path.join(P.game,'steam_appid.txt')));});
 
 test('service: tick waits on the conditions and takes the first candidate',async()=>{const svc=require('../services/cold-test.cjs');const P=pc();
  const test2=path.join(P.game,'TestGame.exe');fs.writeFileSync(test2,'MZ');/* 千恋＊万花 itself is verified in The Seed: never cold-tested */
  const w=await svc.tick(P.root,{deps:{reading:async()=>({...idle,idleMs:1000}),helper:true,platform:'win32'}});assert.deepEqual(w,{state:'waiting',reason:'active'});
  let ran=null;const t=await svc.tick(P.root,{deps:{reading:async()=>idle,freeMb:()=>idle.freeMb,helper:true,platform:'win32',playing:()=>false,retest:async()=>({keys:{},games:{}}),env:P.env,
-  games:()=>[{id:'1',title:'テストゲーム',exe:test2,engine:'kirikiri'}],report:async()=>({}),runner:async o=>{ran=o;fs.mkdirSync(o.runDir,{recursive:true});return {pid:1,shots:[]};}}});
+  games:()=>[{id:'1',title:'テストゲーム',exe:test2,engine:'kirikiri'}],report:async()=>({}),runner:async o=>{ran=o;fs.mkdirSync(o.runDir,{recursive:true});return {cleanupConfirmed:true,pid:1,shots:[]};}}});
  assert.equal(t.state,'tested',JSON.stringify(t));assert.equal(ran.exe,test2);assert.ok(ran.budgetMs<=6*60000);
  assert.equal((await svc.tick(P.root,{deps:{reading:async()=>idle,helper:true,platform:'win32',playing:()=>true}})).reason,'gameRunning');
  for(const l of ['zh','en','ja']){const w=svc.explain(l);assert.ok(w.steam&&w.saves&&w.share&&w.body);}

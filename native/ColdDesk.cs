@@ -73,6 +73,8 @@ static class ColdDesk{
  [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool CreateProcess(string app,StringBuilder cmd,IntPtr pa,IntPtr ta,bool inherit,uint flags,IntPtr env,string dir,ref STARTUPINFO si,out PROCESS_INFORMATION pi);
  [DllImport("kernel32.dll")] static extern uint ResumeThread(IntPtr h);
  [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+ [DllImport("kernel32.dll",SetLastError=true)] static extern bool TerminateProcess(IntPtr process,uint code);
+ [DllImport("kernel32.dll",SetLastError=true)] static extern uint WaitForSingleObject(IntPtr handle,uint milliseconds);
  [DllImport("kernel32.dll")] static extern bool GetExitCodeProcess(IntPtr h,out uint code);
  [DllImport("kernel32.dll",CharSet=CharSet.Unicode)] static extern IntPtr CreateJobObject(IntPtr a,string n);
  [DllImport("kernel32.dll")] static extern bool SetInformationJobObject(IntPtr j,int c,ref JOBOBJECT_EXTENDED_LIMIT_INFORMATION i,uint n);
@@ -135,6 +137,7 @@ static class ColdDesk{
     var ep=new EncoderParameters(1);ep.Param[0]=new EncoderParameter(System.Drawing.Imaging.Encoder.Quality,70L);Directory.CreateDirectory(Path.GetDirectoryName(file));s.Save(file,Jpeg(),ep);}
    Emit("{\"type\":\"shot\",\"ok\":true,\"path\":"+Q(file)+",\"w\":"+tw+",\"h\":"+th+",\"black\":"+(black?"true":"false")+"}");}}
 
+ static bool StopUnassigned(IntPtr process){try{TerminateProcess(process,1);return WaitForSingleObject(process,4000)==0;}catch{return false;}}
  static int Run(string[] a){string exe=Path.GetFullPath(a[1]);int seconds=600,parentPid=0;for(int i=2;i<a.Length-1;i++){if(a[i]=="--seconds")seconds=Math.Max(10,int.Parse(a[i+1]));if(a[i]=="--parent-pid")parentPid=int.Parse(a[i+1]);}
   using(var owner=Process.GetCurrentProcess())Emit("{\"type\":\"owner\",\"pid\":"+owner.Id+",\"started\":"+Q(owner.StartTime.ToUniversalTime().Ticks.ToString())+"}");
   ImageName=Path.GetFileNameWithoutExtension(exe);
@@ -144,7 +147,7 @@ static class ColdDesk{
   Job=CreateJobObject(IntPtr.Zero,null);var lim=new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();lim.Basic.LimitFlags=0x2000;/* KILL_ON_JOB_CLOSE */if(Job==IntPtr.Zero||!SetInformationJobObject(Job,9,ref lim,(uint)Marshal.SizeOf(lim)))throw new Exception("Job setup failed");
   var si=new STARTUPINFO();si.cb=Marshal.SizeOf(si);si.lpDesktop="WinSta0\\"+DESK;
   if(!CreateProcess(exe,new StringBuilder("\""+exe+"\""),IntPtr.Zero,IntPtr.Zero,false,0x4/* CREATE_SUSPENDED */,IntPtr.Zero,Path.GetDirectoryName(exe),ref si,out pi)){Emit("{\"type\":\"ended\",\"why\":\"create "+Marshal.GetLastWin32Error()+"\"}");return 1;}
-  if(!AssignProcessToJobObject(Job,pi.hProcess)){/* the game could escape the tree kill: never run it so */TerminateJobObject(Job,1);try{Process.GetProcessById(pi.dwProcessId).Kill();}catch{}Emit("{\"type\":\"ended\",\"why\":\"job\"}");return 1;}
+  if(!AssignProcessToJobObject(Job,pi.hProcess)){/* This suspended child is outside the job: only its original handle identifies it safely. */if(!StopUnassigned(pi.hProcess))CleanupSafe=false;Emit("{\"type\":\"ended\",\"why\":\"job\"}");return 1;}
   WatchParent(parentPid);ResumeThread(pi.hThread);CloseHandle(pi.hThread);pi.hThread=IntPtr.Zero;StartedAt=DateTime.UtcNow;
   string started="";try{started=Process.GetProcessById(pi.dwProcessId).StartTime.ToUniversalTime().Ticks.ToString();}catch{}
   Emit("{\"type\":\"started\",\"pid\":"+pi.dwProcessId+",\"started\":"+Q(started)+"}");

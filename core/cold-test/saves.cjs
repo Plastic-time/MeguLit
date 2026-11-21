@@ -99,6 +99,7 @@ function snapshot(root,located,{id=Date.now().toString(36),key='',cap=MAX_BYTES}
 
 /* puts everything back; -> {ok, errors[]}. Safe to run twice (a crash during restore runs it again at the next start) */
 function restore(root,journal){const base=path.join(snapDir(root),journal.id),errors=[];
+ if(Object.prototype.hasOwnProperty.call(journal,'coldCleanup')&&journal.coldCleanup?.state!=='confirmed')return {ok:false,errors:['COLD_CLEANUP_UNCONFIRMED']};
  if(journal.state==='writing'){/* the game never started: nothing to undo, only the half copy to drop */try{fs.rmSync(base,{recursive:true,force:true});}catch{}return {ok:true,errors};}
  journal.state='restoring';try{fs.writeFileSync(journalFile(root,journal.id),JSON.stringify(journal,null,1));}catch{}
  for(const p of journal.places){try{

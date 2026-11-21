@@ -127,11 +127,12 @@ async function testOne(root,game,{budgetMs,deps={}}={}){const s=load(root),id=ga
   current={game,started:t0,snapshot:{root,journal:snap.journal},stop:()=>require('./background-games.cjs').foreground()};
   result=await (deps.runner||runInWorker)({root,exe:game.exe,runDir,budgetMs,profile:profile?JSON.parse(JSON.stringify(profile)):null});}
  finally{current=null;
-  if(!result||result.cleanupConfirmed===false){restored={ok:false,errors:['cold cleanup has not been confirmed']};}
-  else{if(wroteAppid)try{fs.unlinkSync(steam.file);}catch{}
+  if(result?.cleanupConfirmed!==true){restored={ok:false,errors:['cold cleanup has not been confirmed']};}
+  else{snap.journal.coldCleanup={...snap.journal.coldCleanup,state:'confirmed'};
+   if(wroteAppid)try{fs.unlinkSync(steam.file);}catch{}
    restored=Saves.restore(root,snap.journal);
    try{unknown=Saves.sweep(located,t0-1000,deps.env||process.env);}catch{}}}
- if(result?.cleanupConfirmed===false)return block('cleanup-unconfirmed');
+ if(result?.cleanupConfirmed!==true)return block('cleanup-unconfirmed');
  const ms=Math.max(0,now()-t0);
  /* score the one recording */
  const read=f=>{try{return fs.readFileSync(path.join(runDir,f),'utf8');}catch{return '';}};
