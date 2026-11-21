@@ -6,15 +6,15 @@ import {nsfwOn} from './nsfw.js';
 const W={
  zh:{title:'已种下的游戏',sub:(g,s,b)=>`${g} 部游戏 · ${s} 颗种子 · ${b} 个游戏社`,seeds:n=>`${n} 颗种子`,partly:(a,b)=>`${a}/${b} 已确认`,locked:'设置里开着「卡背过滤 R18 图片」，成人封面不能显示',search:'搜索游戏名或游戏社',
   count:n=>`${n} 部`,other:'其他',
-  status:{verified:'已确认','owner-ok':'已确认',read:'只读模式',skeleton:'等传火'},hidden:'成人内容 · 在设置里开启后显示',reveal:'点击只临时查看这一张',
+  status:{verified:'已确认','owner-ok':'已确认',read:'只读模式',skeleton:'等传火'},hidden:'成人内容 · 在设置里开启后显示',reveal:'点击只临时查看这一张',devNone:'暂时读不到这个游戏社的介绍',devSource:'简介来自 VNDB',devOpen:'在浏览器中打开',links:{vndb:'VNDB 游戏社页',site:'官网',moegirl:'萌娘百科',jawiki:'日文维基'},
   offline:'连不上 VNDB，部分游戏名和封面暂时显示不了',empty:'没有找到',close:'关闭',loading:'正在读取…',failed:'读取失败，稍后再试',link:'看看都有哪些游戏'},
  en:{title:'Seeded games',sub:(g,s,b)=>`${g} games · ${s} seeds · ${b} developers`,seeds:n=>`${n} seeds`,partly:(a,b)=>`${a}/${b} confirmed`,locked:'"Keep R18 pictures off the card back" is on in Settings, so only normal mode is shown',search:'Search a game or developer',
   count:n=>`${n} ${n===1?'game':'games'}`,other:'Other',
-  status:{verified:'Confirmed','owner-ok':'Confirmed',read:'Read mode',skeleton:'Waiting for a spark'},hidden:'Adult content · shown when enabled in Settings',reveal:'Click to see only this one for now',
+  status:{verified:'Confirmed','owner-ok':'Confirmed',read:'Read mode',skeleton:'Waiting for a spark'},hidden:'Adult content · shown when enabled in Settings',reveal:'Click to see only this one for now',devNone:'No introduction could be loaded for this developer for now',devSource:'Introduction from VNDB',devOpen:'Open in the browser',links:{vndb:'VNDB developer page',site:'Official site',moegirl:'Moegirlpedia',jawiki:'Japanese Wikipedia'},
   offline:'VNDB cannot be reached, so some names and covers are missing for now',empty:'Nothing found',close:'Close',loading:'Loading…',failed:'Could not load the list, try again later',link:'See which games'},
  ja:{title:'種まき済みのゲーム',sub:(g,s,b)=>`${g} 本 · 種 ${s} 個 · ${b} ブランド`,seeds:n=>`種 ${n} 個`,partly:(a,b)=>`${a}/${b} 確認済み`,locked:'設定で「カード裏の R18 画像を除外」がオンのため、通常モードのみ表示します',search:'ゲーム名・ブランドで検索',
   count:n=>`${n} 本`,other:'その他',
-  status:{verified:'確認済み','owner-ok':'確認済み',read:'読み取りモード',skeleton:'伝火待ち'},hidden:'成人向け · 設定でオンにすると表示',reveal:'クリックでこの 1 枚だけ一時的に表示',
+  status:{verified:'確認済み','owner-ok':'確認済み',read:'読み取りモード',skeleton:'伝火待ち'},hidden:'成人向け · 設定でオンにすると表示',reveal:'クリックでこの 1 枚だけ一時的に表示',devNone:'このブランドの紹介は今は読み込めません',devSource:'紹介文の出典：VNDB',devOpen:'ブラウザで開く',links:{vndb:'VNDB のブランドページ',site:'公式サイト',moegirl:'萌娘百科（中国語）',jawiki:'日本語版ウィキペディア'},
   offline:'VNDB に接続できないため、一部の名前と表紙を表示できません',empty:'見つかりません',close:'閉じる',loading:'読み込み中…',failed:'読み込めませんでした。後でもう一度お試しください',link:'収録ゲームを見る'}
 };
 export const catalogWords=locale=>W[locale]||W.zh;
@@ -68,7 +68,7 @@ function cardHTML(g,locale,mode,esc){
 export function catalogHTML(games,locale,mode,esc,query=''){
  const t=catalogWords(locale),groups=groupGames(games,locale,query);
  if(!groups.length)return `<p class="sc-empty">${esc(t.empty)}</p>`;
- return groups.map(gr=>`<section class="sc-group"><h3><span class="sc-logo" aria-hidden="true"${gr.id?` data-pid="${esc(gr.id)}"`:''}>${esc(Array.from(gr.name||t.other)[0]||'?')}</span><span>${esc(gr.name||t.other)}</span><small>${esc(t.count(gr.games.length))}</small></h3>
+ return groups.map(gr=>`<section class="sc-group"><h3><span class="sc-logo" aria-hidden="true"${gr.id?` data-pid="${esc(gr.id)}"`:''}>${esc(Array.from(gr.name||t.other)[0]||'?')}</span>${gr.id?`<button type="button" class="sc-dev" data-dev="${esc(gr.id)}" aria-expanded="false">${esc(gr.name||t.other)}</button>`:`<span>${esc(gr.name||t.other)}</span>`}<small>${esc(t.count(gr.games.length))}</small></h3>${gr.id?'<div class="sc-panel" data-panel hidden></div>':''}
   <ul class="sc-grid">${gr.games.map(g=>cardHTML(g,locale,mode,esc)).join('')}</ul></section>`).join('');
 }
 
@@ -86,6 +86,12 @@ export function loadCovers(root,api,mode,live=()=>root.isConnected,{cache=covers
 }
 function showCover(el,url){const img=new Image();img.alt='';img.decoding='async';img.onload=()=>img.classList.add('is-in');img.src=url;el.prepend(img);el.dataset.loaded='1';}
 
+/* the panel under a developer's name; the intro is text (escaped), the links are buttons the service opens in the browser */
+export function devPanelHTML(info,t,esc){
+ if(!info||!Array.isArray(info.links))return `<p class="sc-panel-note">${esc(t.devNone)}</p>`;
+ const ok=new Set(['vndb','site','moegirl','jawiki']);
+ return `${info.intro?`<p class="sc-intro">${esc(info.intro)}<small>${esc(t.devSource)}</small></p>`:''}<ul class="sc-links">${info.links.filter(l=>ok.has(l.kind)).map(l=>`<li><button type="button" class="sc-link" data-link="${esc(l.kind)}" title="${esc(t.devOpen)}">${esc(t.links[l.kind]||l.kind)}<span aria-hidden="true"> ↗</span></button></li>`).join('')}</ul>`;
+}
 /* developer logos: the small icon of the developer's own site (services/seed-logo.cjs), three at a time; no icon = the letter badge stays */
 const logos=new Map();
 export function loadLogos(root,api,live=()=>root.isConnected,{cache=logos}={}){
@@ -113,6 +119,9 @@ export function openSeedCatalog({api,locale,esc,toast}){
  /* a veil card: a click shows that one cover for now (the setting stays off; the app's R18 filter still refuses it) */
  body.addEventListener('click',async e=>{const b=e.target.closest('[data-reveal]');if(!b||b.disabled)return;const el=b.closest('.sc-cover');b.disabled=true;let u=null;try{u=await api('seed_cover',{vndb:b.dataset.reveal,nsfw:true});}catch{}
   if(isCover(u)&&el.isConnected){b.remove();el.querySelector('.sc-ph')?.remove();showCover(el,u);el.dataset.state='load';}else{b.disabled=false;b.title=safeOnly?t.locked:t.failed;}});
+ /* a developer's name opens a small panel: VNDB's introduction (cut short, source named) and links; links open in the system browser */
+ body.addEventListener('click',async e=>{const b=e.target.closest('[data-dev]');if(b){const panel=b.closest('.sc-group').querySelector('[data-panel]'),open=panel.hidden;panel.hidden=!open;b.setAttribute('aria-expanded',String(open));if(open&&!panel.dataset.loaded){panel.dataset.loaded='1';panel.innerHTML='<p class="sc-panel-note">'+esc(t.loading)+'</p>';let info=null;try{info=await api('seed_producer',{pid:b.dataset.dev});}catch{}panel.innerHTML=devPanelHTML(info,t,esc);if(!info)delete panel.dataset.loaded;}return;}
+  const l=e.target.closest('[data-link]');if(l){const pid=l.closest('.sc-group').querySelector('[data-dev]')?.dataset.dev;try{await api('seed_producer_open',{pid,kind:l.dataset.link});}catch{toast&&toast(t.failed);}}});
  $('[data-search]').addEventListener('input',e=>{query=e.target.value;render();});
  $('[data-close]').onclick=()=>dialog.close();
  dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
