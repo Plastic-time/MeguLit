@@ -193,3 +193,17 @@ test('动手玩 picks the natural line (no cutting lines into pieces), and dragg
  const src=fs.readFileSync(path.join(__dirname,'..','web','grammar.js'),'utf8');assert.doesNotMatch(src,/dataTransfer|ondragstart|draggable="true"|data-find/);assert.match(src,/pointerDrag\(b,\{over:'\[data-drop\]'/);assert.match(src,/pointerDrag\(t,\{over:'\[data-slot\]'/);
  const d=fs.readFileSync(path.join(__dirname,'..','web','drag.js'),'utf8');for(const k of ['pointerdown','pointermove','pointerup','setPointerCapture','elementFromPoint'])assert.ok(d.includes(k),k);
 });
+
+test('Blue Book examples follow replaced lines, edited card forms and the requested limit',async()=>{
+ const B=require('../services/bluebook.cjs');
+ const cards=[{id:'bb-101',hits:['から']}],lines=[{text:'空から見えた。'},{text:'家から来た。',title:'Old',translation:'old'}];
+ const first=await B.examplesForAsync(cards,lines);
+ assert.equal(first['bb-101'].length,2);
+ const fresh=[lines[0],{text:'駅から来た。',title:'New',translation:'new'}];
+ const changed=await B.examplesForAsync(cards,fresh);
+ assert.deepEqual(changed['bb-101'].map(x=>[x.text,x.title,x.translation]),[['駅から来た。','New','new'],['空から見えた。',undefined,undefined]]);
+ assert.equal((await B.examplesForAsync(cards,fresh,{max:1}))['bb-101'].length,1);
+ const edited=[{id:'bb-101',hits:['駅']}];
+ assert.deepEqual((await B.examplesForAsync(edited,fresh))['bb-101'].map(x=>[x.text,x.start,x.end]),[['駅から来た。',0,1]]);
+ assert.deepEqual(await B.examplesForAsync([{id:'bb-101',hits:['まで']}],fresh),{});
+});

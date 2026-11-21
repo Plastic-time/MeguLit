@@ -66,12 +66,14 @@ function read(root,opts){return fromFiles(root,opts?.env);}
 /* The lines you read that contain each card's forms (at most 4 per card, recorded lines and human translations first). */
 /* E459: the page's version lets other requests run between cards (763 cards × 20 000 lines held the service for seconds)
    and is cached until the cards or the lines change */
-const exampleCache={key:null,value:null};
-async function examplesForAsync(points,list,opts={}){
-  const key=points.length+':'+(points[0]?.id||'')+':'+(points.at(-1)?.id||'')+'|'+list.length+':'+(list[0]?.text||'');if(exampleCache.key===key)return exampleCache.value;
+let exampleCache;
+async function examplesForAsync(points,list,{max=4}={}){
+  /* candidatesCached reuses the list until the recorded lines or the imported scripts change. */
+  const key=JSON.stringify(points.map(p=>[p.id,p.hits]));
+  if(exampleCache?.list===list&&exampleCache.key===key&&exampleCache.max===max)return exampleCache.value;
   const breathe=require('./cooperative.cjs').breather(),out={};
-  for(let i=0;i<points.length;i+=25){Object.assign(out,examplesFor(points.slice(i,i+25),list,opts));await breathe();}
-  exampleCache.key=key;exampleCache.value=out;return out;
+  for(let i=0;i<points.length;i+=25){Object.assign(out,examplesFor(points.slice(i,i+25),list,{max}));await breathe();}
+  exampleCache={list,key,max,value:out};return out;
 }
 function examplesFor(points,list,{max=4}={}){
   const score=e=>(e.translationSource==='group'||e.translationSource==='official'?4:e.translation?1:0)+(e.origin==='history'?2:0);
