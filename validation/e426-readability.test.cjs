@@ -12,6 +12,15 @@ test('local dictionary text is split into clean senses',async()=>{
  const html=definitionHtml('a<b>;→英和 c',esc);assert.match(html,/^<ol class="dict-senses">/);assert.ok(!html.includes('→')&&html.includes('a&lt;b&gt;'));
  const app=read('app.js');assert.match(app,/formatDefinition\(w\.definition\)\.map\(g=>g\.glosses\.join/,'local results show the clean senses (学习 › 词典 uses mountEntries since 2026-11-15)');
 });
+test('dictionary sense markers preserve decimal quantities and fractions',async()=>{
+ const {formatDefinition}=await load('dictionary-format.js');
+ const glosses=text=>formatDefinition(text).map(s=>s.glosses);
+ assert.deepEqual(glosses('1. approx. 3.03 cm 2. 1/10 of a shaku'),[['approx. 3.03 cm'],['1/10 of a shaku']]);
+ assert.deepEqual(glosses('3．14 倍; 半分 / 1/2'),[['3．14 倍','半分','1/2']]);
+ assert.deepEqual(glosses('1．長さ 2)寸法'),[['長さ'],['寸法']]);
+ assert.deepEqual(glosses('1.一般の人\n2.18歳未満の人'),[['一般の人'],['18歳未満の人']]);
+ assert.deepEqual(glosses('1.25 cm\n2.18 cm'),[['1.25 cm'],['2.18 cm']]);
+});
 test('translation guide: short folded card after the settings, animated, icons, three languages',async()=>{
  const g=await load('settings-guides.js'),src=read('settings-guides.js'),css=read('settings-grimoire.css');
  for(const [l,max] of [['zh',700],['en',1400],['ja',700]])assert.ok(g.guideText('translation',l).length<max,'translation guide kept short '+l);
