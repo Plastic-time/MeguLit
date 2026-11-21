@@ -23,7 +23,7 @@ function normalize(o={},now=Date.now(),previous={}){
   if(goals.includes('talk'))out.talk={focus:some(TALK_FOCUS,o.talk?.focus)};
   for(const kind of ['jlpt','eju']){
     const exam=out[kind],old=previous[kind],year=Number(o[kind]?.year);
-    if(!exam||!old||year===exam.year||year!==old.year||exam.month!==old.month)continue;
+    if(!exam||!old||year>=new Date(now).getFullYear()||year!==old.year||exam.month!==old.month)continue;
     const chosenAt=old.sittingSetAt??previous.savedAt;
     if(!Number.isFinite(chosenAt)||chosenAt<=0||chosenAt>previous.savedAt||!Number.isInteger(year))continue;
     /* A synced timestamp can fall on January 1 here and December 31 on the PC that chose the sitting. */

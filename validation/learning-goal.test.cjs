@@ -65,6 +65,8 @@ test('the same saved sitting survives New Year in another time zone',()=>{
   assert.equal(G.normalize(source,now,source).jlpt.year,2026);
   const invalid={...source,jlpt:{month:12,year:2025}};
   assert.equal(G.normalize(invalid,now,invalid).jlpt.year,2027);
+  const future={...source,savedAt:Date.parse('2038-12-01T12:00:00Z'),jlpt:{month:12,year:2043}};
+  assert.equal(G.normalize(future,now,future).jlpt.year,2027);
 });
 test('plan: goals decide which grammar categories come first and where review weighs',()=>{
   const jl=G.plan(G.normalize({goals:['jlpt'],jlpt:{level:'N2',full:true}},NOW));
