@@ -6,7 +6,7 @@ const {pathToFileURL}=require('node:url'),{randomUUID}=require('node:crypto');
 
 test('locale status locates registered directories from literal and escaped file URIs',{skip:process.platform!=='win32'},async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-locale-path-')),key='HKCU\\Software\\MeguLitPathTest-'+randomUUID();
- const realExec=cp.execFile,options={windowsHide:true,stdio:'ignore'};let reads=0;
+ const realExec=cp.execFile;let reads=0;
  // Redirect only the installer lookup to a private test value. Never change the real registration.
  t.mock.method(cp,'execFile',(file,args,config,reply)=>{
   if(file==='reg.exe'&&args[0]==='query'&&args[1].endsWith('\\InprocServer32')){reads++;args=['query',key,...args.slice(2)];}
@@ -15,7 +15,7 @@ test('locale status locates registered directories from literal and escaped file
  });
  const {LocaleEmulator}=require('../core/locale-emulator.cjs');
  t.after(()=>{
-  cp.spawnSync('reg.exe',['delete',key,'/f'],options);
+  cp.spawnSync('reg.exe',['delete',key,'/f'],{windowsHide:true,stdio:'ignore'});
   fs.rmSync(root,{recursive:true,force:true});
  });
  const install=dir=>{
@@ -27,7 +27,7 @@ test('locale status locates registered directories from literal and escaped file
  for(const [name,escaped] of [['Plain folder',false],['游戏 日本語',false],['工具 #100%',false],['旧版 日本語',true],['Copy A',true]])await t.test(name,async()=>{
   const dir=path.join(root,name);install(dir);
   const handler=path.join(dir,'LEContextMenuHandler.dll'),uri=escaped?pathToFileURL(handler).href:'file:///'+handler.replaceAll('\\','/');
-  cp.execFileSync('reg.exe',['add',key,'/v','CodeBase','/t','REG_SZ','/d',uri,'/f'],options);
+  cp.execFileSync('reg.exe',['add',key,'/v','CodeBase','/t','REG_SZ','/d',uri,'/f'],{windowsHide:true,stdio:'ignore'});
   const status=await new LocaleEmulator(path.join(root,'app')).status();
   assert.equal(status.path,path.join(dir,'LEProc.exe'));
  });
