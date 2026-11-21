@@ -1,5 +1,7 @@
 # TyranoScript DOM candidate — 2026-11-22
 
+Follow-up after the complete V5 sample arrived: [SweetDolls hidden-desktop observations and menu ownership fix](sweetdolls-hidden-20261122.md). The original report below preserves its earlier scope/time boundary; the follow-up has actual sample identities, ten complete lines, a discovered/fixed menu defect, cleanup proof and the remaining owner acceptance items.
+
 Scope: `core/text-paths-web.cjs` and its existing DOM/CDP validation, based on origin/main `7a41ff9a9c3632c9f143f01b455085c1d6e4a854`. No game-specific seed or allowlist is enabled. No game or MeguLit process has been launched. Static/unit evidence is not live acceptance.
 
 ## Source audit

@@ -118,3 +118,16 @@ domTest('generic DOM text keeps its own styles and node click handlers through e
  const r=await rig('<div id="dialogue" style="font:28px monospace;min-height:60px"><span id="generic" onclick="window.clicked=1">本文</span></div>');
  try{await r.run(()=>{document.querySelector('.tyrano_base').className='generic-engine';window.original=document.querySelector('#generic');});await r.enable({embed:true});await r.run(()=>__megulitText.embed('本文',{ruby:[[0,2,'ほんぶん']],zh:'正文'}));await r.wait(()=>reports.some(x=>x.emb===2));await r.run(()=>__megulitText.hide(false));assert.equal(await r.run(()=>document.querySelector('#generic')===original),true);await r.page.click('#generic');assert.equal(await r.run(()=>clicked),1);assert.equal(await r.run(()=>document.querySelector('.megulit-zh,.megulit-ruby')),null);}finally{await r.close();}
 });
+
+domTest('visible engine menu retires body/name snapshots and closing it restores the current message',async()=>{
+ const r=await rig('<div class="chara_name_area">名前</div><div id="active" class="message_inner">本文</div><div id="menu" style="position:absolute;inset:0;display:none"><div>履歴</div></div>',{engine:true});
+ try{await r.run(()=>{TYRANO.kag.layer={getMenuLayer:()=>[document.querySelector('#menu')]};});await r.enable({roles:true});await r.wait(()=>reports.some(x=>x.ui&&x.text==='名前'));const before=await r.body();
+ await r.run(()=>{document.querySelector('#menu').style.display='block';__megulitText.scan();});await r.wait(()=>reports.some(x=>x.ui&&x.text===''));assert.equal((await r.body()).text,'');assert.equal((await r.body()).line,before.line);assert.equal(await r.run(()=>document.querySelector('[data-megulit-hide]')),null);assert.equal(await r.run(()=>reports.some(x=>x.text==='履歴'&&!x.ui)),false);
+ await r.run(()=>{document.querySelector('#menu').style.display='none';__megulitText.scan();});await r.wait(()=>reports.filter(x=>x.ui&&x.text==='名前').length===2);assert.equal((await r.body()).text,'本文');assert.ok((await r.body()).line>before.line);assert.equal((await r.body()).hidden,true);
+ }finally{await r.close();}
+});
+
+domTest('unreadable engine menu ownership refuses hiding instead of assuming unobstructed dialogue',async()=>{
+ const r=await rig('<div id="active" class="message_inner">本文</div>',{engine:true});
+ try{await r.enable();await r.wait(()=>reports.some(x=>x.hidden));await r.run(()=>{TYRANO.kag.layer={getMenuLayer(){throw Error('menu unavailable');}};__megulitText.scan();});assert.equal((await r.body()).text,'');assert.equal(await r.run(()=>document.querySelector('[data-megulit-hide]')),null);}finally{await r.close();}
+});
