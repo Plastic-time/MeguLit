@@ -6,7 +6,8 @@
    exactly the term (never a tokenizer guess). No relay / no data → {state:'not-configured'|'error'|'empty'}. */
 const fs=require('node:fs'),path=require('node:path');
 const relay=require('./relay-config.cjs');
-const {MAX_PARAS}=require('./news-article.cjs');
+const {MAX_PARAS,MAX_CHARS}=require('./news-article.cjs');
+const TRANSLATION_CHARS=2000;
 const TIMEOUT=8000,GLOSS_BUDGET=4000;
 const str=(v,n)=>typeof v==='string'?v.slice(0,n):'';
 /* (user 2026-11-12: a Game*Spark article would not open) a source may still give http:// links: they are upgraded to
@@ -129,7 +130,15 @@ const artDir=root=>root?path.join(root,'data','cache','daily-article'):'';
 const hash=v=>crypto.createHash('sha256').update(String(v)).digest('hex').slice(0,32);
 /* sources the relay may cache in full (wrangler.toml NEWS_FULLTEXT_SOURCES); the relay marks those items fulltext:true */
 const fulltext=new Set();
-async function fromRelay(base,link,fetcher){const r=await get(base+'/api/news/article?link='+encodeURIComponent(link),fetcher);return r.state==='ok'&&Array.isArray(r.data?.paragraphs)?{title:str(r.data.title,200),paragraphs:r.data.paragraphs.slice(0,120).map(p=>str(p,2000)).filter(Boolean),via:'relay'}:null;}
+/* Keep the previous total request budget while allowing one long paragraph from the extractor. */
+function articleTexts(values,toText){
+ let remaining=MAX_PARAS*TRANSLATION_CHARS;
+ return values.slice(0,MAX_PARAS).map(value=>{
+  const text=toText(value).slice(0,Math.min(MAX_CHARS,remaining));
+  remaining-=text.length;return text;
+ });
+}
+async function fromRelay(base,link,fetcher){const r=await get(base+'/api/news/article?link='+encodeURIComponent(link),fetcher);return r.state==='ok'&&Array.isArray(r.data?.paragraphs)?{title:str(r.data.title,200),paragraphs:articleTexts(r.data.paragraphs,p=>typeof p==='string'?p:'').filter(Boolean),via:'relay'}:null;}
 async function fromSite(link,options){const page=await require('./fast-fetch.cjs').getText(link,{fetch:options.fetch,doh:options.doh});if(!page.ok)return null;const x=require('./news-article.cjs').extract(page.text,page.url||link);return x.paragraphs.length?{...x,via:page.via}:null;}
 /* readings only when the dictionary settled them (readingSource 'dictionary'), never the tokenizer's guess */
 async function tokens(text,learning){
@@ -151,12 +160,27 @@ async function article(root,link,options={}){
  const paragraphs=[];for(const text of body.paragraphs)paragraphs.push({text,tokens:await tokens(text,learning)});
  return {state:'ok',link,title:body.title,via:body.via,paragraphs};
 }
+function translationParts(text){
+ const parts=[];
+ while(text.length>TRANSLATION_CHARS){
+  const head=text.slice(0,TRANSLATION_CHARS);
+  const sentenceEnd=Math.max(...['。','！','？','!','?','\n'].map(c=>head.lastIndexOf(c)))+1;
+  const cut=sentenceEnd||head.length-(/[\uD800-\uDBFF]$/.test(head)?1:0);
+  parts.push(text.slice(0,cut));text=text.slice(cut);
+ }
+ parts.push(text);return parts.filter(part=>part.trim());
+}
 async function translate(root,runtime,texts,target,options={}){
  const goal={zh:'zh-CN',en:'en','zh-CN':'zh-CN'}[String(target)]||'zh-CN';
- const list=(Array.isArray(texts)?texts:[]).slice(0,MAX_PARAS).map(t=>String(t||'').slice(0,2000));
- const r=await translateList(root,runtime,list,goal,options);
+ const paragraphs=articleTexts(Array.isArray(texts)?texts:[],t=>String(t||'')).map(translationParts);
+ const r=await translateList(root,runtime,paragraphs.flat(),goal,options);
+ let at=0;
+ const translated=paragraphs.map(parts=>{
+  const pieces=r.texts.slice(at,at+parts.length);at+=parts.length;
+  return pieces.every(Boolean)?pieces.join(goal==='en'?' ':''):'';
+ });
  /* withEngine (the reader): also say which engine answered, so the page can point out the Microsoft fallback */
- return options.withEngine?{texts:r.texts,engine:r.engine}:r.texts;
+ return options.withEngine?{texts:translated,engine:r.engine}:translated;
 }
 /* one card per word per article, in the megulit_news deck (created on first use) */
 const NEWS_DECK='megulit_news';

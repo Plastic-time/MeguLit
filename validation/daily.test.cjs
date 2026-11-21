@@ -3,6 +3,36 @@ process.env.MEGULIT_RELAY_BASE??='off';/* tests never reach the real relay */
 /* E415 日报 page: relay RSS parsing + D1 cache + routes, the bridge's cleaning and link gate, and the page markup. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
 const relayDir=path.join(__dirname,'..','relay');
+test('long relay paragraphs keep Unicode characters intact across translation and retry',async()=>{
+ const daily=require('../services/daily.cjs'),url='https://www.4gamer.net/games/91/';
+ const start='文'.repeat(1999),tail='🌸最後',text=start+tail;
+ const fetch=async address=>({ok:true,json:async()=>address.endsWith('/api/news')?{items:[{link:url,title:'Fixture',fulltext:true}]}:
+  address.includes('/article?')?{paragraphs:[text,'別の段落。']}:{words:[]}});
+ const opts={env:{MEGULIT_RELAY_BASE:'https://relay.test'},fetch};
+ await daily.view('',null,opts);
+ const article=await daily.article('',url,opts);
+ assert.equal(article.via,'relay');
+ assert.deepEqual(article.paragraphs.map(p=>p.text),[text,'別の段落。']);
+ let missing=true;
+ const received=[],runtime={reviews:()=>({translate:async list=>{received.push(list);return {texts:list.map(t=>t===tail&&missing?'':t)};}})};
+ const run=()=>daily.translate('',runtime,article.paragraphs.map(p=>p.text),'zh',{withEngine:true,translateFree:async()=>''});
+ assert.deepEqual((await run()).texts,['','別の段落。']);
+ missing=false;
+ assert.deepEqual((await run()).texts,[text,'別の段落。']);
+ assert.deepEqual(received,[[start,tail,'別の段落。'],[tail]]);
+});
+test('translation keeps the end of a long news paragraph and its position in the article',async()=>{
+ const daily=require('../services/daily.cjs'),{GameReviews}=require('../services/game-reviews.cjs');
+ const first='前'.repeat(1700)+'。',second='次'.repeat(1600)+'。',third='終'.repeat(1600)+'。';
+ const body=first+second+third,texts=require('../services/news-article.cjs').paragraphs('<p>'+body+'</p><p>末尾。</p>');
+ const seen=[],reviews=new GameReviews('',undefined,{engine:()=>'follow',translate:async text=>{seen.push(text);return text;}});
+ for(const goal of ['en','zh']){
+  seen.length=0;
+  const result=await daily.translate('',{reviews:()=>reviews},texts,goal,{translateFree:async()=>''});
+  assert.deepEqual(result,[[first,second,third].join(goal==='en'?' ':''),'末尾。']);
+  assert.deepEqual(seen,[first,second,third,'末尾。']);
+ }
+});
 test('daily reports the configured engine error when both translations are empty',async()=>{
  const daily=require('../services/daily.cjs'),runtime={reviews:()=>({translate:async()=>({texts:[''],error:'MODEL_BUSY'})})};
  await assert.rejects(daily.translate('',runtime,['空の応答'],'en',{translateFree:async()=>''}),/TRANSLATION_FAILED:MODEL_BUSY/);
