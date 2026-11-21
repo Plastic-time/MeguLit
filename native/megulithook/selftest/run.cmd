@@ -85,3 +85,5 @@ rem CMVS paired full-input diagnostics, real ECX/two-word callee-cleaned ABI.
 call "%~dp0run-cmvs.cmd" || exit /b 1
 rem FVP raw append diagnostics, real ECX/one-word ret4 ABI.
 call "%~dp0run-fvp.cmd" || exit /b 1
+rem BGI trusted UTF16 control and reversible observation, real link-call/free detours.
+call "%~dp0run-bgi-permission.cmd" || exit /b 1

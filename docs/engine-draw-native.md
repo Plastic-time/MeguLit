@@ -53,7 +53,14 @@
 | 运行时钩子 | `native/megulithook/BgiDraw.h`（`BGI::attach_function` 找到 BGI 文字钩子后 `BgiDraw::Arm`）。默认不挂：控制文件 `roles=1` 才在挂链调用点和释放函数头装 MinHook；挂链点不是正好一处就不挂（`off: N glyph link matches`）。新键 `draw.viaRoles`（版本层，默认 `[]`）经 `core/engine-draw.cjs` 写成控制文件的 `#role` 行 |
 
 #### 店主测试清单（BGI，素晴日 HD）
-1. 在 `The Seed/bgi/subahibi/game.json` 把 `draw.roles` 改成 `true`（或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`，UTF-16LE，内容 `#cfg roles=1`）
+
+权限回归：BGI 现在只接受 UTF-16LE 首条完整 `#cfg` 行（支持 transport 的 BOM），`roles=1` 必须是唯一且精确的 token，正文伪 cfg、重复键、截断及畸形宽字符均不能授权
+watcher 安装后继续每两秒刷新；撤权、控制文件缺失或读取失败会丢弃 pending row/end 与角色映射，重开只记录新文字，原 link/free 始终透传
+`#role` 行保留 `draw.viaRoles` 的六种角色、1..8 位小写 hex RVA、最多六段前缀合同，并只读取数据行前的有效 metadata
+在途日志可能已交给 logger，撤权不是撤回已发送日志的确认；权限代次避免在 logger 内发生 off-on 后，旧调用重建 pending 数据
+`selftest/run-bgi-permission.cmd` 使用真实 JS transport 文件、生产 ReadControl 和小型真 MinHook 调用点/free 回放；它是 native-builds `ci:false` 下的本地自检，不代表真实游戏验收或普通 CI 已跑 native gate
+
+1. 在 `The Seed/bgi/subahibi/game.json` 把 `draw.roles` 改成 `true`（或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`，UTF-16LE，首行内容 `#cfg roles=1` 并以换行结束）
 2. 开游戏，新游戏推 5 句（有名字的句子）、走到第一个选项、开一次系统菜单
 3. 看 `logs\hook-diagnostics.log`：
    - 有一行 `ToMe_DRAWRUN engine=bgi on: link ... node=3 ch=[esp+30] prev=[esp+a0] color=[ebp+2c] free=...` = 钩子装上了
