@@ -12,10 +12,14 @@ const OUT=path.resolve(arg('out',path.join(os.tmpdir(),'megulit-library-views'))
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* ---------- services on a temp root ---------- */
 function startService(root){const child=spawn(process.execPath,[path.join(ROOT,'services','server.cjs')],{env:{...process.env,MEGULIT_ROOT:root},stdio:['pipe','pipe','ignore']});
- let next=1,buf='';const waits=new Map();
- child.stdout.on('data',d=>{buf+=d;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+1);let m;try{m=JSON.parse(line);}catch{continue;}const w=waits.get(m.id);if(w){waits.delete(m.id);m.ok?w[0](m.data):w[1](Error(m.error));}}});
- const call=(request,ms=20000)=>new Promise((res,rej)=>{const id=next++;waits.set(id,[res,rej]);child.stdin.write(JSON.stringify({id,request})+'\n');setTimeout(()=>{if(waits.delete(id))rej(Error('SERVICE_TIMEOUT'));},ms);});
- return {call,stop:async()=>{await call({action:'__shutdown'},5000).catch(()=>{});child.kill();}};}
+ let next=1,buf='',closed;const waits=new Map();
+ const finish=error=>{closed=error;for(const w of waits.values()){clearTimeout(w.timer);w.reject(error);}waits.clear();};
+ child.once('error',finish);child.once('close',()=>finish(Error('SERVICE_CLOSED')));child.stdin.on('error',finish);
+ child.stdout.on('data',d=>{buf+=d;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+1);let m;try{m=JSON.parse(line);}catch{continue;}const w=waits.get(m.id);if(w){waits.delete(m.id);clearTimeout(w.timer);m.ok?w.resolve(m.data):w.reject(Error(m.error));}}});
+ const call=(request,ms=20000)=>new Promise((res,rej)=>{if(closed)return rej(closed);const id=next++;child.stdin.write(JSON.stringify({id,request})+'\n');
+  const timer=setTimeout(()=>{if(waits.delete(id))rej(Error('SERVICE_TIMEOUT'));},ms);
+  waits.set(id,{resolve:res,reject:rej,timer});});
+ return {call,stop:async()=>{if(!closed){await call({action:'__shutdown'},5000).catch(()=>{});finish(Error('SERVICE_CLOSED'));}child.kill();}};}
 
 /* ---------- static server + test transport ---------- */
 const TRANSPORT=`<script>(()=>{const S=JSON.parse(decodeURIComponent((location.hash.slice(1))||'%7B%7D'));const svg=c=>'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080"><rect width="100%" height="100%" fill="'+c+'"/></svg>');

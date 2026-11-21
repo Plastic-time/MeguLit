@@ -57,8 +57,13 @@ class Anki{
  async call(config,action,params={}){const c=cleanV4(config);let response;try{response=await this.fetch(c.ankiUrl,{method:'POST',redirect:'error',signal:AbortSignal.timeout(15000),headers:{'Content-Type':'application/json'},body:JSON.stringify({action,version:6,params})});}catch(e){const code=e?.cause?.code||e?.name||'';if(code==='ECONNREFUSED'){/* tell the two causes apart when the add-on folder can be read */const installed=require('./anki-process.cjs').ankiConnectInstalled?.();if(installed===false)throw Error('没装 AnkiConnect 插件：在 Anki 里点 工具 → 插件 → 获取插件，输入代码 2055492159，装完重启 Anki');throw Error('连不上 '+c.ankiUrl+'：Anki 没打开，或没装 AnkiConnect 插件（插件代码 2055492159，装完要重启 Anki）');}if(code==='TimeoutError')throw Error('AnkiConnect 超时：Anki 可能卡在弹窗或同步中');throw Error('连接 AnkiConnect 失败（'+(code||e.message)+'）：检查地址 '+c.ankiUrl);}if(!response.ok)throw Error('AnkiConnect HTTP '+response.status);const b=await response.json();if(b.error)throw Error('AnkiConnect：'+String(b.error).slice(0,200));if(!Object.hasOwn(b,'result'))throw Error('无效的 AnkiConnect 响应');/* keep MeguLit's own copy of the clips it stores, so cards play them without Anki */if(action==='storeMediaFile'&&this.mediaDir)require('./anki-media-cache.cjs').write(this.mediaDir,params.filename,params.data);return b.result;}
  // Card state + review history for every note in the ToMe deck, for the statistics page.
  async stats(config){const c=cleanV4(config),quote=v=>'"'+v.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"';
-  const ids=await this.call(c,'findNotes',{query:'deck:'+quote(c.ankiDeck)+' note:'+quote(c.ankiModel)});if(!ids.length)return [];
-  const notes=await this.call(c,'notesInfo',{notes:ids.slice(0,5000)}),cardIds=notes.flatMap(n=>n.cards||[]);
+  const ids=await this.call(c,'findNotes',{query:'deck:'+quote(c.ankiDeck)+' note:'+quote(c.ankiModel)}),notes=[];
+  const batchSize=5000;
+  for(let i=0;i<ids.length;i+=batchSize)notes.push(...await this.statsBatch(c,ids.slice(i,i+batchSize)));
+  return notes;
+ }
+ async statsBatch(c,ids){
+  const notes=await this.call(c,'notesInfo',{notes:ids}),cardIds=notes.flatMap(n=>n.cards||[]);
   const cards=cardIds.length?await this.call(c,'cardsInfo',{cards:cardIds}):[],byId=new Map(cards.map(x=>[x.cardId,x]));
   const reviews=cardIds.length?await this.call(c,'getReviewsOfCards',{cards:cardIds.map(String)}):{};
   const text=v=>String(v?.value||'').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').trim();

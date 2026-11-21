@@ -88,31 +88,40 @@ function drawerHTML(state,w,esc){
 export function receptionHTML(value,locale,esc,id=''){
  const w=receptionMessages[locale],state=id?stateFor(id,locale):null,platforms=state?.summary||fromEnrichment(value);
  if(!platforms)return `<section class="panel game-reception" data-reception="${esc(id)}"><h2 class="panel-title">${w.title}</h2><p class="settings-help">${w.loading}</p></section>`;
- if(platforms.length&&platforms.every(p=>!p.available&&!p.pending&&p.error))return `<section class="panel game-reception" data-reception="${esc(id)}"><h2 class="panel-title">${w.title}</h2><p class="u-status" data-state="error">${w.failed}</p></section>`;
-  return `<section class="panel game-reception" data-reception="${esc(id)}"><h2 class="panel-title">${w.title}</h2><div class="review-platforms" role="tablist">${platforms.map(p=>`<button type="button" role="tab" class="review-platform${p.pending?' is-pending':p.available?'':' is-unavailable'}" data-review-platform="${p.key}" aria-expanded="${state?.open===p.key}" aria-selected="${state?.open===p.key}" ${p.available||p.pending?'':'aria-disabled="true"'}><span class="review-region">${w.regions[p.region]}</span><span class="review-name">${esc(p.name)}</span>${scoreHTML(p,w,esc)}</button>`).join('')}</div>${state?.open?drawerHTML(state,w,esc):''}${value?.at?`<small class="settings-help review-fetched">${w.fetched} · ${esc(new Date(value.at).toLocaleDateString({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale]))}</small>`:''}</section>`;
+ if(!state?.open&&platforms.length&&platforms.every(p=>!p.available&&!p.pending&&p.error))return `<section class="panel game-reception" data-reception="${esc(id)}"><h2 class="panel-title">${w.title}</h2><p class="u-status" data-state="error">${w.failed}</p></section>`;
+  return `<section class="panel game-reception" data-reception="${esc(id)}"><h2 class="panel-title">${w.title}</h2><div class="review-platforms" role="tablist">${platforms.map(p=>`<button type="button" role="tab" class="review-platform${p.pending?' is-pending':p.available?'':' is-unavailable'}" data-review-platform="${p.key}" aria-expanded="${state?.open===p.key}" aria-selected="${state?.open===p.key}" ${p.available||p.pending||state?.open===p.key?'':'aria-disabled="true"'}><span class="review-region">${w.regions[p.region]}</span><span class="review-name">${esc(p.name)}</span>${scoreHTML(p,w,esc)}</button>`).join('')}</div>${state?.open?drawerHTML(state,w,esc):''}${value?.at?`<small class="settings-help review-fetched">${w.fetched} · ${esc(new Date(value.at).toLocaleDateString({zh:'zh-CN',ja:'ja-JP',en:'en-US'}[locale]))}</small>`:''}</section>`;
 }
 export function bindReception(target,{api,id,locale,esc,value}){
  const w=receptionMessages[locale],state=stateFor(id,locale);
  const section=()=>target.querySelector(`[data-reception="${CSS.escape(id)}"]`);
  const render=()=>{const old=section();if(!old)return;const wrap=document.createElement('div');wrap.innerHTML=receptionHTML(value,locale,esc,id);const next=wrap.firstElementChild;
   old.replaceWith(next);wire(next);};
- const translatePage=async()=>{if(!state.translate||!state.data?.items?.length)return;const pending=state.data.items.filter(item=>(!item.spoiler||state.revealed.has(item.id))&&!state.translations.has(tkey(state,
-  item)));if(!pending.length){refreshList();return;}state.busy=true;state.translateError='';refreshList();
-  const page=state.data,key=state.source+'|'+state.target;
-  try{for(let at=0;at<pending.length;at+=2){if(state.data!==page||state.source+'|'+state.target!==key||!state.translate)break;const chunk=pending.slice(at,at+2),
-   result=await api('reviews_translate',{texts:chunk.map(i=>textOf(state,i)),source:state.source,target:state.target}),texts=Array.isArray(result)?result:result.texts||[];
-   state.engineUsed=result.engine||'machine';chunk.forEach((item,i)=>{if(texts[i])state.translations.set(tkey(state,item),texts[i]);});if(result.error){state.translateError=result.error;
-   break;}if(section())refreshList();}}catch(error){state.translateError=String(error?.message||error);}
+ const translatePage=async()=>{
+  const run=state.translationRun=Symbol(),page=state.data;
+  const hadStatus=state.busy||!!state.translateError;
+  state.translateError='';state.busy=false;
+  if(!state.translate||!page?.items?.length){if(hadStatus)refreshList();return;}
+  const pending=page.items.filter(item=>(!item.spoiler||state.revealed.has(item.id))&&!state.translations.has(tkey(state,item)));
+  if(!pending.length){refreshList();return;}state.busy=true;refreshList();
+  const current=()=>state.translationRun===run&&state.data===page&&state.translate;
+  try{for(let at=0;at<pending.length;at+=2){
+   const chunk=pending.slice(at,at+2),keys=chunk.map(item=>tkey(state,item));
+   const result=await api('reviews_translate',{texts:chunk.map(item=>textOf(state,item)),source:state.source,target:state.target});
+   if(!current())return;
+   const texts=Array.isArray(result)?result:result.texts||[];
+   state.engineUsed=result.engine||'machine';keys.forEach((key,i)=>{if(texts[i])state.translations.set(key,texts[i]);});
+   if(result.error){state.translateError=result.error;break;}if(section())refreshList();
+  }}catch(error){if(!current())return;state.translateError=String(error?.message||error);}
   state.busy=false;if(section())refreshList();};
  const load=async(page)=>{const ticket=state.ticket=(state.ticket||0)+1;state.translate=state.auto;state.loading=true;state.error='';render();try{const data=await api('game_reviews',
   {id,platform:state.open,page,size:state.size,lang:state.open==='steam'?state.steamLang||'all':'all'});if(ticket!==state.ticket)return;state.data=data;state.page=data.page;
-  }catch(error){if(ticket!==state.ticket)return;state.error=String(error?.message||error);}state.loading=false;if(!section())return;render();section()?.querySelector('.review-toolbar')?.scrollIntoView({
+  }catch(error){if(ticket!==state.ticket)return;state.page=page;state.error=String(error?.message||error);}state.loading=false;if(!section())return;render();section()?.querySelector('.review-toolbar')?.scrollIntoView({
   block:'nearest',behavior:'smooth'});translatePage();};
  const wire=root=>{
   root.querySelectorAll('[data-review-platform]').forEach(button=>button.onclick=()=>{const key=button.dataset.reviewPlatform,p=(state.summary||fromEnrichment(value)||[]).find(x=>x.key===key);
-   if(!p?.available&&!p?.pending)return;if(state.open===key){state.open='';state.data=null;render();return;}state.open=key;state.data=null;state.page=1;load(1);
+   if(state.open===key){state.open='';state.data=null;render();return;}if(!p?.available&&!p?.pending)return;state.open=key;state.data=null;state.page=1;load(1);
    });
-  root.querySelectorAll('[data-rv-page]').forEach(button=>button.onclick=()=>load(Number(button.dataset.reviewPage)));
+  root.querySelectorAll('[data-rv-page]').forEach(button=>button.onclick=()=>load(Number(button.dataset.rvPage)));
   const jump=root.querySelector('[data-review-jump]'),go=()=>{const n=Math.round(Number(jump.value));if(n>=1&&n<=(state.data?.pages||1))load(n);else jump.value=state.page;
    };
   root.querySelector('[data-review-go]')?.addEventListener('click',go);jump?.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();go();

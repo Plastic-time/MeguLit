@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {openStore}=require('./store.cjs');
 const normalize=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu,'');
-function signature(file,saved){try{const stat=fs.statSync(file);if(!stat.isFile())return null;if(saved?.size===stat.size&&saved?.mtime===stat.mtimeMs)return saved;const hash=crypto.createHash('sha256'),chunk=Buffer.alloc(1024*1024),fd=fs.openSync(file,'r');try{let length;while((length=fs.readSync(fd,chunk,0,chunk.length,null)))hash.update(chunk.subarray(0,length));}finally{fs.closeSync(fd);}return {size:stat.size,mtime:stat.mtimeMs,hash:hash.digest('hex')};}catch{return saved||null;}}
+function signature(file,saved){try{const stat=fs.statSync(file);if(!stat.isFile())return null;if(saved?.size===stat.size&&saved?.mtime===stat.mtimeMs&&saved.ctime===stat.ctimeMs)return saved;const hash=crypto.createHash('sha256'),chunk=Buffer.alloc(1024*1024),fd=fs.openSync(file,'r');try{let length;while((length=fs.readSync(fd,chunk,0,chunk.length,null)))hash.update(chunk.subarray(0,length));}finally{fs.closeSync(fd);}return {size:stat.size,mtime:stat.mtimeMs,ctime:stat.ctimeMs,hash:hash.digest('hex')};}catch{return saved||null;}}
 const canonical=file=>file?require('./launch-path.cjs').canonical(file).toLowerCase():'';
 function knownPrograms(row,lib){
  return [row.executable,lib.languageLaunch?.exe,...Object.values(lib.languageExecutables||{}),...(lib.variants||[]).map(v=>v.exe)].filter(file=>typeof file==='string'&&file);
@@ -47,7 +47,7 @@ function activeGameForProgram(db,exe){
  const variants=rows.filter(row=>knownPrograms(row,JSON.parse(row.original||'{}').library||{}).some(file=>canonical(file)===target));
  return variants.length===1?variants[0]:null;
 }
-function reconcile(root,items,{restoreRemoved=false}={}){const db=openStore(root);let added=0,updated=0,committed=false;db.exec('BEGIN IMMEDIATE');try{
+function reconcile(root,items,{restoreRemoved=false,confirmedFolderMatches}={}){const db=openStore(root);let added=0,updated=0,committed=false;db.exec('BEGIN IMMEDIATE');try{
  if(restoreRemoved){const revive=db.prepare('UPDATE games SET removed_at=NULL WHERE id=?');for(const row of db.prepare('SELECT id,executable,original FROM games WHERE removed_at IS NOT NULL').all())if(!JSON.parse(row.original||'{}').mergedInto&&row.executable&&fs.statSync(row.executable,{throwIfNoEntry:false})?.isFile())revive.run(row.id);}
  for(const item of items){
  const existing=matchGame(db,item);
@@ -65,7 +65,18 @@ function reconcile(root,items,{restoreRemoved=false}={}){const db=openStore(root
  // Passive scans leave a removed installation hidden until its executable changes.
  if(existing?.removed_at!=null){if(item.missing||!item.exe||String(existing.executable||'').toLowerCase()===String(item.exe).toLowerCase()||!fs.existsSync(item.exe))continue;db.prepare('UPDATE games SET removed_at=NULL WHERE id=?').run(existing.id);existing.removed_at=null;}
  if(item.missing&&existing?.executable&&existing.executable.toLowerCase()!==String(item.exe||'').toLowerCase()&&fs.existsSync(existing.executable))continue;
- const cover=path.win32.basename(item.cover||''),original=existing?JSON.parse(existing.original):{},saved=original.library||{};original.library=require('./library-dedupe.cjs').keepMergedEditions(saved,{...saved,...item,executableSignature:signature(item.exe,saved.executableSignature)});if(saved.localeMode)original.library.localeMode=saved.localeMode;
+ const cover=path.win32.basename(item.cover||''),original=existing?JSON.parse(existing.original):{},saved=original.library||{};
+ const sameProgram=!!item.exe&&canonical(saved.exe||existing?.executable)===canonical(item.exe);
+ original.library=require('./library-dedupe.cjs').keepMergedEditions(saved,{...saved,...item,executableSignature:signature(item.exe,sameProgram?saved.executableSignature:null)});if(saved.localeMode)original.library.localeMode=saved.localeMode;
+ // The folder scanner's cache predates metadata fetched from the details page.
+ // Keep that match for the same installation unless the scan identifies a different work.
+ const next=original.library;
+ if((item.source==='folder'||item.source==='manual')&&saved.source===item.source&&item.dir&&canonical(saved.dir)===canonical(item.dir)
+    &&sameProgram&&saved.vndbId&&!item.appid&&(!item.vndbId||item.vndbId===saved.vndbId||confirmedFolderMatches?.has(item.dir)===false)
+    &&(!saved.executableSignature||saved.executableSignature.hash===next.executableSignature?.hash)){
+  next.vndbId=saved.vndbId;
+  if(saved.appid&&(saved.vndbSteamAppid===saved.appid||original.vndbManual===saved.vndbId))next.appid=saved.appid;
+ }
  const selected=existing&&saved.contentLanguage&&saved.languageExecutables?.[saved.contentLanguage];
  const preserve=existing&&((saved.originalExecutableVerified&&fs.existsSync(existing.executable))||selected&&canonical(saved.dir)===canonical(item.dir));
  const executable=preserve?existing.executable:item.exe||existing?.executable||'';

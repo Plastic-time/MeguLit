@@ -14,7 +14,10 @@ test('when every source fails, ensure() reports a download failure and logs each
   /* 2026-11-13: MeguLit's own R2 mirror is a source as well (outside mainland China after GitHub, inside it first) */
   /* 2026-11-20: the relays are the ones in setup/runtime.json (core/download-sources.cjs) */
   const relays=require('../core/download-sources.cjs').relays().map(m=>new URL(m.url.replace('{url}','')).hostname);
-  assert.deepEqual(hosts,['github.com','dl.megulit.com','cn-dl.megulit.com',...relays]);
+  const expected=require('../core/fast-download.cjs').inChina()
+   ?['cn-dl.megulit.com','dl.megulit.com',...relays,'github.com']
+   :['github.com','dl.megulit.com','cn-dl.megulit.com',...relays];
+  assert.deepEqual(hosts,expected);
   /* 2026-11-19 core/fast-download.cjs asks all at once; each failed source is logged once */
   assert.equal(fs.readFileSync(path.join(root,'logs','locale-emulator.log'),'utf8').match(/download failed /g).length,3+relays.length);
  }finally{fs.rmSync(root,{recursive:true,force:true});}

@@ -5,20 +5,20 @@
 </div>
 
 > [!NOTE]
-> **The Seed · 传火计划**
+> **The Seed**
 >
-> 一个人留下的种子，交给所有人自由传开，长出无数个世界。名字致敬《刀剑神域》里的 The Seed，做法致敬当年大家在论坛上一行一行分享的 Textractor 钩子码
+> 以前一直想用一套通用术式适配所有游戏，结果修好一个，另一个游戏就又出问题了，来回七八遍都没收拾干净
 >
-> 每部游戏、每个版本一颗几 KB 的种子：文本框在哪、怎么藏原文、选项和按钮怎么认、注音和译文怎么排。玩过的人把它播下，下一个打开同一部游戏的人，直接就是调好的样子
+> 所以换个做法：MeguLit 的内核和各引擎的画字函数管大框架，每个游戏、每个版本单独一份差分，这就是 The Seed
 >
-> - **只是数据**：没有代码，只有哈希、公开编号和设置，没有任何本机路径或个人信息
-> - **游戏之间互不影响**：一部游戏一颗种子，改哪部只动哪部；已经能用的游戏把当前效果钉死，以后怎么更新都不会被带坏
-> - **认得出不同版本**：按 exe、封包、剧本指纹、Steam / VNDB 编号多级识别，补丁版、汉化版、重发版都能找到自己的种子
-> - **坏了会自己退**：运行时一直自检，丢句、没选项、原文没藏住就退回读模式并自动上报，种子修好后热更新几秒送到
+> - 几 KB 的纯数据，没有代码，也不会带你电脑上的路径和个人信息
+> - 每个游戏只动自己那份，互不打扰。做好了的就是做好了，以后更新也不会被连累
+> - 认 exe、封包、剧本指纹、Steam / VNDB 编号，补丁版、汉化版、不同发行版都能找到自己那颗
+> - 玩的时候一直在自检，丢句、没选项、原文没藏住就先退回读模式并上报，我们把那份差分修好，热更新送到大家手上
 >
-> 第一批 55 部游戏的种子已经在 [`The Seed/`](The%20Seed) 里。读取种子、自动回传和热更新随下一个大版本上线，之后会随大家的游玩越长越多
+> 现在 [`The Seed/`](The%20Seed) 里先种下了 55 部游戏。读取、自动回传和热更新会在下一个大版本解封，之后大家玩得越多，长出来的就越多
 >
-> <sub>One small seed per game version, shared by everyone who plays — a nod to <i>Sword Art Online</i>'s The Seed and to the Textractor hook codes people used to swap line by line · ゲームごとの小さな種。『ソードアート・オンライン』の The Seed と、かつて皆で共有した Textractor のフックコードへのオマージュ</sub>
+> <sub>名字致敬《刀剑神域》里的 The Seed；共享的思路致敬当年大家在论坛上互相贴的 Textractor 钩子码 · Named after <i>Sword Art Online</i>'s The Seed; the sharing idea is a nod to the Textractor hook codes people used to post for each other · 名前は『ソードアート・オンライン』の The Seed から。共有の発想は、かつて皆で貼り合った Textractor のフックコードへのオマージュ</sub>
 
 <br>
 

@@ -11,11 +11,25 @@ function link(db,wordId,noteId){schema(db);if(Number.isSafeInteger(wordId)&&Numb
 class AnkiSync{
  constructor({db,anki,config,resolveEntry=async()=>null}){this.db=db;this.anki=anki;this.config=config;this.resolve=resolveEntry;schema(db);}
  async run(){
-  const notes=await this.anki.stats(this.config);if(!Array.isArray(notes))throw Error('ANKI_INVALID_RESPONSE');const resolved=[];let attempts=0;
-  for(const note of notes){if(!Number.isSafeInteger(note.noteId))continue;const linked=this.db.prepare('SELECT word_id FROM anki_links WHERE note_id=?').get(note.noteId);let entry=null,wordId=linked?.word_id;
-   if(!linked){const existing=this.db.prepare('SELECT id FROM vocabulary WHERE spelling=? AND reading=?').get(String(note.word||''),String(note.reading||''));wordId=existing?.id;if(!wordId&&note.word&&attempts++<300){try{entry=await this.resolve(note.word);wordId=entry?.id;}catch{}}}
-   if(!Number.isSafeInteger(wordId))continue;resolved.push({note,wordId,entry,linked:!!linked});
+  const notes=await this.anki.stats(this.config);if(!Array.isArray(notes))throw Error('ANKI_INVALID_RESPONSE');
+  const {ankiUrl,ankiDeck,ankiModel}=require('../core/v4-config.cjs').cleanV4(this.config);
+  const key='anki-lookup-after:'+JSON.stringify([ankiUrl,ankiDeck,ankiModel]);
+  const progress=this.db.prepare('SELECT value FROM meta WHERE key=?'),saved=progress.get(key)?.value;
+  const start=saved?notes.findIndex(n=>n.noteId===Number(saved))+1:0,matches=[];
+  let attempts=0,lastAttempt,more=false;
+  for(let i=0;i<notes.length;i++){
+   const index=(start+i)%notes.length,note=notes[index];if(!Number.isSafeInteger(note.noteId))continue;
+   const linked=this.db.prepare('SELECT word_id FROM anki_links WHERE note_id=?').get(note.noteId);let entry=null,wordId=linked?.word_id;
+   if(!linked){
+    const existing=this.db.prepare('SELECT id FROM vocabulary WHERE spelling=? AND reading=?').get(String(note.word||''),String(note.reading||''));wordId=existing?.id;
+    if(!wordId&&note.word){
+     if(attempts<300){attempts++;lastAttempt=note.noteId;try{entry=await this.resolve(note.word);wordId=entry?.id;}catch{}}
+     else more=true;
+    }
+   }
+   if(Number.isSafeInteger(wordId))matches[index]={note,wordId,entry,linked:!!linked};
   }
+  const resolved=matches.filter(Boolean);
   const result={linked:0,imported:0,reviews:0,status:0,skipped:notes.length-resolved.length};this.db.exec('BEGIN IMMEDIATE');
   try{for(const{note,wordId,entry,linked}of resolved){let word=this.db.prepare('SELECT id FROM vocabulary WHERE id=?').get(wordId);
     // A user deletion has priority over importing an Anki note again.
@@ -24,7 +38,12 @@ class AnkiSync{
     if(!word)continue;link(this.db,wordId,note.noteId);result.linked++;
     const status=Number(note.status);if(Number.isInteger(status)&&status>=0&&status<=4)result.status+=Number(this.db.prepare('UPDATE vocabulary SET status=? WHERE id=? AND status!=?').run(status,wordId,status).changes);
     for(const id of note.reviews||[]){if(!Number.isSafeInteger(id)||id<0)continue;const inserted=this.db.prepare('INSERT OR IGNORE INTO anki_synced_reviews VALUES(?,?)').run(id,wordId);if(inserted.changes){this.db.prepare('INSERT INTO review_events(word_id,reviewed_at) VALUES(?,?)').run(wordId,Math.floor(id/1000));result.reviews++;}}
-   }this.db.exec('COMMIT');return result;
+   }
+   if((more||saved)&&progress.get(key)?.value===saved){
+    if(more)this.db.prepare('INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)').run(key,String(lastAttempt));
+    else this.db.prepare('DELETE FROM meta WHERE key=?').run(key);
+   }
+   this.db.exec('COMMIT');return result;
   }catch(error){this.db.exec('ROLLBACK');throw error;}
  }
 }
