@@ -145,10 +145,10 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
   out.choiceOffers=offers.map(c=>({at:c.at-t0,n:c.n,until:c.until==null?null:c.until-t0}));out.hidden={lines:hidden.lines,visible:hidden.visible};
   out.hookEvents=[];for(const f of ['hook-events.log.previous','hook-events.log.1','hook-events.log']){const x=path.join(root,'logs',f);if(fs.existsSync(x))out.hookEvents.push(...fs.readFileSync(x,'utf8').split(/\r?\n/).filter(l=>l&&!/Z (chain|translation|choice aux|art text located) /.test(l)));}
   out.readerHost=fs.existsSync(path.join(root,'logs','reader-host.log'))?fs.readFileSync(path.join(root,'logs','reader-host.log'),'utf8').split('\n').filter(l=>!/"hostFrame"/.test(l)).slice(-200):[];
- }catch(e){out.errors.push('driver: '+String(e.stack||e).slice(0,800));}
+ }catch(e){out.errors.push('driver: '+String(e.stack||e).slice(0,800));if(e.cleanupFailure)out.cleanupFailure=e.cleanupFailure;}
  finally{
   try{runtime.reader?.gal?.stop?.();}catch{}try{runtime.reader?.stop?.();}catch{}
-  await browser?.close().catch(error=>out.errors.push('browser cleanup: '+String(error?.message||error).slice(0,400)));
+  await browser?.close().catch(error=>{out.errors.push('browser cleanup: '+String(error?.message||error).slice(0,400));out.cleanupFailure=error.cleanupFailure||{browserPid:browser?.pid||null,processClosed:false,reason:String(error?.message||error)};});
   fs.writeFileSync(outFile,JSON.stringify(out,null,1));
   if(!process.env.MEGULIT_REPLAY_KEEP)try{fs.rmSync(work,{recursive:true,force:true});}catch{}
   process.exit(0);

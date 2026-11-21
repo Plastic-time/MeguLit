@@ -60,6 +60,14 @@ test('close is idempotent, bounded after a hung Browser.close, and waits for the
  await Promise.all([browser.close(),browser.close()]);assert.equal(env.state.killed,1);assert.equal(env.state.closed,true);assert.equal(env.state.removed.length,1);
 });
 test('an unclosed process or locked owned profile produces an explicit cleanup failure',async()=>{
- const stuck=environment('init-reject',{neverExit:true});await assert.rejects(launch(stuck.options,stuck.io),/init failure; cleanup: CARDINAL_BROWSER_EXIT_TIMEOUT/);assert.equal(stuck.state.killed,1);
+ const stuck=environment('init-reject',{neverExit:true});await assert.rejects(launch(stuck.options,stuck.io),/init failure; cleanup: CARDINAL_BROWSER_EXIT_TIMEOUT/);assert.equal(stuck.state.killed,1);assert.deepEqual(stuck.state.removed,[],'an unconfirmed process still owns its profile');
  const locked=environment('init-reject',{cleanupFails:true});await assert.rejects(launch(locked.options,locked.io),/init failure; cleanup: CARDINAL_PROFILE_CLEANUP/);assert.equal(locked.state.removed.length,2);
+});
+
+test('a late child close does not let an already-rejected close pretend the profile was cleaned',async()=>{
+ const env=environment('close-hang',{exitDelay:35});env.options.timeouts.exit=10;const browser=await launch(env.options,env.io);
+ const closing=browser.close();await assert.rejects(closing,error=>error.cleanupFailure.processClosed===false&&error.cleanupFailure.browserPid===123456&&/virtual-cardinal-profile/.test(error.cleanupFailure.profile));
+ assert.equal(env.state.closed,false);assert.deepEqual(env.state.removed,[]);
+ await new Promise(r=>setTimeout(r,45));assert.equal(env.state.closed,true);
+ await assert.rejects(browser.close(),/EXIT_TIMEOUT/);assert.deepEqual(env.state.removed,[],'terminal cleanup failure remains explicit, with the owned path retained');
 });

@@ -75,7 +75,8 @@ async function launch({executable=findBrowser(),viewport={width:1920,height:1080
  const dispose=graceful=>{if(disposal)return disposal;disposal=(async()=>{conn?.close();
   if(graceful&&port&&browserPath&&!ended){let browserConn;try{browserConn=connect('ws://127.0.0.1:'+port+browserPath);await bounded(browserConn.ready,limits.close,'cdp browser close connection timeout');await bounded(browserConn.send('Browser.close'),limits.close,'cdp browser close command timeout');}catch{}finally{browserConn?.close();}}
   if(child&&!ended){if(!graceful||!await waitExit())kill();await waitExit();}
-  await cleanup();if(child&&!ended)throw Error('CARDINAL_BROWSER_EXIT_TIMEOUT');})();return disposal;};
+  if(child&&!ended){const error=Error('CARDINAL_BROWSER_EXIT_TIMEOUT pid='+child.pid+' profile='+dir);error.cleanupFailure={browserPid:child.pid,profile:dir,processClosed:false,reason:'exit-timeout'};throw error;}
+  try{await cleanup();}catch(error){error.cleanupFailure={browserPid:child?.pid||null,profile:dir,processClosed:true,reason:'profile-cleanup'};throw error;}})();return disposal;};
  try{
   child=io.spawn(executable,args,{stdio:'ignore',windowsHide:true});ended=child.exitCode!==null;
   child.once('close',()=>{ended=true;finishExit();});child.once('error',error=>{spawnError=error;if(!child.pid){ended=true;finishExit();}});
@@ -85,6 +86,6 @@ async function launch({executable=findBrowser(),viewport={width:1920,height:1080
   if(!target)throw Error('CARDINAL_BROWSER_TARGET');
   conn=connect(target.webSocketDebuggerUrl);await conn.ready;const page=new Page(conn);await bounded(page.init(viewport),limits.init,'CARDINAL_PAGE_INIT_TIMEOUT');
   return {page,pid:child.pid,close:()=>dispose(true)};
- }catch(error){try{await dispose(false);}catch(cleanupError){throw Error(error.message+'; cleanup: '+cleanupError.message,{cause:error});}throw error;}
+ }catch(error){try{await dispose(false);}catch(cleanupError){const combined=Error(error.message+'; cleanup: '+cleanupError.message,{cause:error});combined.cleanupFailure=cleanupError.cleanupFailure;throw combined;}throw error;}
 }
 module.exports={launch,findBrowser,Conn};
