@@ -163,4 +163,9 @@ test('inline readings stay with their own occurrence in study examples and histo
  const {applySpans}=await import('../web/example-ruby.js'),rare=await shown({text:'𠮷と<ruby>𠮷<rt>よし</rt></ruby>。'});
  const doc=new Doc0(),el=h(doc,'p',{},rare.text);
  assert.equal(applySpans(el,rare.text,rare.spans),1);assert.equal(el.html(),'𠮷と<ruby>𠮷<rt>よし</rt></ruby>。');
+ const wrapped='今\n日と今日と<rこんにち>今日</r>だ。';
+ const compacted=await shown({text:'今日と今日と今日だ。',ruby:grammar.rubyPairs(wrapped)});
+ assert.deepEqual(compacted.spans.map(s=>[s.start,s.end,s.reading]),[[6,8,'こんにち']]);
+ const label=await shown({text:'これは人工知能だ。',ruby:grammar.rubyPairs('これは<rAI>人工知能</r>だ。')});
+ assert.deepEqual(label.spans.map(s=>s.reading),['AI']);
 });

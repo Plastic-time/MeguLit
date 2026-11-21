@@ -33,12 +33,17 @@ function exampleSpans(text,tokens,pairs=[]){
   /* Mark explicit occurrences before applying per-word readings to the remaining text. */
   const entries=Array.isArray(pairs)?pairs.filter(Array.isArray):[];
   const positioned=p=>Number.isInteger(p[2]);
+  const offsets=[];if(entries.some(positioned))for(let i=0;i<chars.length;i++)if(!/\s/.test(chars[i]))offsets.push(i);
   for(const p of [...entries.filter(positioned),...entries.filter(p=>!positioned(p))]){const base=[...String(p[0]||'')],reading=hira(p[1]);
     if(!base.length||!reading||!KANJI.test(base.join('')))continue;
-    let occurrence=0;
+    if(positioned(p)){
+      const word=base.filter(c=>!/\s/.test(c)),start=offsets[p[2]],end=offsets[p[2]+word.length-1]+1;
+      if(start===undefined||!word.every((c,k)=>chars[offsets[p[2]+k]]===c)||!free(start,end))continue;
+      const span=coreSpan(chars,start,end,reading)||{start,end,reading};out.push({...span,source:'game'});take(start,end);continue;
+    }
     for(let i=0;i+base.length<=chars.length;i++){let ok=true;for(let k=0;k<base.length;k++)if(chars[i+k]!==base[k]){ok=false;break;}
-      if(!ok||positioned(p)&&occurrence++!==p[2]||!free(i,i+base.length))continue;const c=coreSpan(chars,i,i+base.length,reading)||{start:i,end:i+base.length,reading};
-      out.push({...c,source:'game'});take(i,i+base.length);if(positioned(p))break;i+=base.length-1;}}
+      if(!ok||!free(i,i+base.length))continue;const c=coreSpan(chars,i,i+base.length,reading)||{start:i,end:i+base.length,reading};
+      out.push({...c,source:'game'});take(i,i+base.length);i+=base.length-1;}}
   /* 2. dictionary readings from the resolver; names and tokenizer guesses stay bare */
   let cursor=0;
   for(const t of Array.isArray(tokens)?tokens:[]){
