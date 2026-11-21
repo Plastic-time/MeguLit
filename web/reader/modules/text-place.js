@@ -318,7 +318,9 @@
     orphans = orphans.filter(o => !o.rects.some(a => rects.some(c => overlaps(a, c)))).concat({ text, rects, client: l.client }).slice(-12); extraKey = ''; orphanWait = null; schedule(); waits.delete(text);
     const log = b.textPlaceOrphans || (b.textPlaceOrphans = []); log.push(text.slice(0, 40)); if (log.length > 30) log.shift();
   }
-  function drawn(l) { document.body.classList.remove('megulit-place-garbled'); const t = l ? [...String(l.text || '')].filter(c => !blank(c)).join('') : ''; waits.delete(t); if (orphanWait?.text === t) orphanWait = null; if (orphans.some(o => o.text === t)) { orphans = orphans.filter(o => o.text !== t); extraKey = ''; } }
+  /* 2026-11-21 (ファタ acceptance 3/9: the line just read came back in white 0.45 s after the next one): a line the reader drew is
+     remembered as drawn, so its replacement never queues it as an undrawn option (noteReplaced) */
+  function drawn(l) { document.body.classList.remove('megulit-place-garbled'); const t = l ? [...String(l.text || '')].filter(c => !blank(c)).join('') : ''; waits.delete(t); if (t) { drawnRecent.add(t); if (drawnRecent.size > 40) drawnRecent.delete(drawnRecent.values().next().value); } if (orphanWait?.text === t) orphanWait = null; if (orphans.some(o => o.text === t)) { orphans = orphans.filter(o => o.text !== t); extraKey = ''; } }
   function drawExtras() {
     let layer = document.getElementById('megulit-place-extras');
     const all = extras.items.concat(orphanItems());
@@ -622,6 +624,10 @@
     const win = target(), sentence = win?.querySelector('.sentence-text:not(.megulit-old-line)');
     orphansMeet(line);
     if (!sentence) { orphan(line); release(); return; }
+    /* 2026-11-21 (ファタ acceptance 3/9: at each click the reader hid its new line as a "broken copy" and drew the old one in white):
+       the game cleared this line (textPlace gone, an engine that reports its clear) and the reader already shows the next one before
+       its placement: the cleared line is the anchor only, never matched against the reader's text */
+    if (goneText && [...String(line.text)].filter(c => !blank(c)).join('') === goneText) { document.body.classList.remove('megulit-place-garbled'); if (anchorMode && anchor) { release(true); pin(win, sentence); } return; }
     const tokens = [...sentence.querySelectorAll('.char-token')].filter(t => !t.closest('.tome-page-lines'));
     const shown = tokens.filter(t => !t.hasAttribute('data-tomoyo-leading-space') && !blank(t.textContent));
     const readerText = shown.map(t => t.textContent).join(''), placeText = [...line.text].filter(c => !blank(c)).join('');
