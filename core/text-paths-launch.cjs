@@ -38,6 +38,11 @@ async function prepare({root,exe,profile={},enabled=false,shadowRoot=null,trace=
 
 /* Connect a prepared session to the hook reader (core/hook-native.cjs): records in, replacement switch and lines out. */
 function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepared.session;
+ s.onSource=m=>{const {sameOwner}=require('./unity-kemco-source.cjs');
+  const current=()=>prepared.path==='unity'&&hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&sameOwner(hook.target,m?.unityOwner);
+  if(!current())return false;const before=hook.state?.hookSequence||0;hook.source(m,'KEMCO Message');
+  return current()&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='unity-kemco'&&hook.state.hookSource===m.text;
+ };
  s.onChars=line=>hook.charRects(line);s.onStatus=st=>hook.trace?.('text path '+prepared.path+': '+st);/* engine-draw: a sentence the engine wants to draw itself asks the reader for its ruby and translation */s.onAsk=a=>{try{hook.emit?.({type:'hookDrawEmbed',...a});}catch{}};hook.attachTextPath?.(s);}
 
 /* ③ dot font at the source (native/fontdot, docs/text-architecture.md): when ① starts the game through MeguLitLaunch

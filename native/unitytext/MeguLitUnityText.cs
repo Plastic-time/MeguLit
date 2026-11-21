@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using BepInEx;
@@ -37,6 +38,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
   int port;
   string file = Path.Combine(dir, "MeguLitUnityText.port");
   if (!File.Exists(file) || !int.TryParse(File.ReadAllText(file).Trim(), out port)) { Logger.LogInfo("no MeguLit control port: idle"); enabled = false; return; }
+  KemcoOwner();
   net = new Thread(() => Net(port)) { IsBackground = true, Name = "MeguLitUnityText" };
   net.Start();
   StartCoroutine(EndOfFrame());
@@ -73,7 +75,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
      }
     }
    } catch (Exception) {
-    connected = false; hideAsked = false;
+    connected = false; hideAsked = false; KemcoControl(false);
     Thread.Sleep(1000);
    }
   }
@@ -82,6 +84,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
  void Command(string line) {
   if (line.StartsWith("HIDE ")) hideAsked = line.EndsWith("1");
   else if (line.StartsWith("WANT ")) wanted = line.Substring(5).Replace("\u001f", "\n");
+  else if (line.StartsWith("KEMCO ")) KemcoScope(line.Substring(6));
   else if (line.StartsWith("DRAW ") || line.StartsWith("EMB ")) DrawCommand(line);
  }
 
@@ -103,7 +106,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
  PropertyInfo tmpMaxVisible, tmpOverflow; MethodInfo tmpForce; PropertyInfo uFontSize;
 
  void DrawCommand(string line) {
-  if (line.StartsWith("DRAW ")) { drawRoles = line.Contains("roles=1"); drawEmbed = line.Contains("embed=1"); drawZh = !line.Contains("zh=0"); return; }
+  if (line.StartsWith("DRAW ")) { drawRoles = line.Contains("roles=1"); drawEmbed = line.Contains("embed=1"); drawZh = !line.Contains("zh=0"); KemcoControl(KemcoFlag(line),KemcoFlag(line,"roles")); return; }
   var p = line.Substring(4).Split('\t'); if (p.Length < 2 || p[0].Length == 0) return;
   lock (embeds) {
    if (!embeds.ContainsKey(p[0])) embedOrder.Add(p[0]);
@@ -238,7 +241,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
  }
 
  // ---- the dialogue component ------------------------------------------------------------------------------------
- Component current; bool hidingCurrent; float nextScan; string lastKey = ""; int line; string lastText = "";
+ Component current; bool hidingCurrent, published; float nextScan; string lastKey = ""; int line; string lastText = "";
  readonly Dictionary<int, string> seen = new Dictionary<int, string>();
  readonly Dictionary<int, float> changedAt = new Dictionary<int, float>();
 
@@ -271,7 +274,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
    int k = Cjk(t); float at; changedAt.TryGetValue(id, out at);
    if (k >= 2 && (at > bestAt || at == bestAt && k > bestLen)) { best = c; bestAt = at; bestLen = k; }
   }
-  if (best != current) { Restore(); current = best; embComp = null; }
+  if (best != current) { ClearPublished(); Restore(); current = best; embComp = null; }
   if (drawRoles) try { RoleScan(list); } catch (Exception e) { Logger.LogWarning("roles " + e.Message); }
  }
 
@@ -305,9 +308,16 @@ public class MeguLitUnityText : BaseUnityPlugin {
  }
  void Restore() { if (hidingCurrent && current != null) HideSet(current, false); hidingCurrent = false; saved.Clear(); }
 
+ // An empty record retires the exact published line; clearing local state alone leaves its reader overlay on screen
+ void ClearPublished() {
+  if (!published) return;
+  published = false; lastKey = ""; lastText = "";
+  Send("ToMe_CHARS engine=unity line=" + line + " hidden=0 sw=" + Screen.width + " sh=" + Screen.height + " vx=0 vy=0 vw=" + Screen.width + " vh=" + Screen.height + " n=0 rects= text=");
+ }
+
  void LateUpdate() {
   if (Time.unscaledTime >= nextScan) { nextScan = Time.unscaledTime + 0.5f; try { Scan(); } catch (Exception e) { Logger.LogWarning("scan " + e.Message); } }
-  if (current == null || !Shown(current)) { Restore(); current = null; return; }
+  if (current == null || !Shown(current)) { ClearPublished(); Restore(); current = null; return; }
   try { EmbedTick(); } catch (Exception e) { Logger.LogWarning("embed " + e.Message); }
   bool want = hideAsked && connected && !drawEmbed; /* the game draws the replacement: never hidden */
   if (want && !hidingCurrent) hidingCurrent = true;
@@ -319,6 +329,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
   var wait = new WaitForEndOfFrame();
   while (true) {
    yield return wait;
+   try { KemcoTick(); } catch (Exception) { kemcoPages.Reset(Screen.width,Screen.height,Send); KemcoSendSource("gone",0,""); }
    try { if (current != null && connected) Report(); } catch (Exception e) { Logger.LogWarning("report " + e.Message); }
   }
  }
@@ -367,7 +378,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
     add(s[ci], new Vector3(Math.Min(p0.x, p2.x), Math.Min(p0.y, p2.y), 0), new Vector3(Math.Max(p0.x, p2.x), Math.Max(p0.y, p2.y), 0));
    }
   }
-  if (all.Count == 0) return;
+  if (all.Count == 0) { ClearPublished(); return; }
   /* engine-draw: the component carries the replacement: the record keeps the Japanese (the first characters, ruby left out above) */
   bool embedded = embComp == current && (TextOf(current) ?? "") == embSet;
   if (embedded && all.Count > embJp) all.RemoveRange(embJp, all.Count - embJp);
@@ -381,7 +392,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
    if (!float.IsNaN(prevTop) && Math.Abs(mid - prevTop) > median * 0.9f) text.Append('\n');
    prevTop = mid; text.Append(e.Key); rects.Add(r);
   }
-  if (rects.Count == 0) return;
+  if (rects.Count == 0) { ClearPublished(); return; }
   string flat = text.ToString().Replace("\n", "");
   if (!(lastText.Length > 0 && (flat.StartsWith(lastText) || lastText.StartsWith(flat)))) line++;
   bool hidden = hidingCurrent && AllHidden(current);
@@ -389,11 +400,162 @@ public class MeguLitUnityText : BaseUnityPlugin {
   foreach (var r in rects) { if (sb.Length > 0) sb.Append(';'); sb.Append(F(r[0])).Append(',').Append(F(r[1])).Append(',').Append(F(r[2])).Append(',').Append(F(r[3])); }
   string key = line + "|" + hidden + "|" + (embedded ? embLevel : 0) + "|" + sb;
   if (key == lastKey) return;
-  lastKey = key; lastText = flat;
+  lastKey = key; lastText = flat; published = true;
   Send("ToMe_CHARS engine=unity line=" + line + " hidden=" + (hidden ? 1 : 0) + " sw=" + Screen.width + " sh=" + Screen.height + " vx=0 vy=0 vw=" + Screen.width + " vh=" + Screen.height + " n=" + rects.Count + " rects=" + sb + (embedded ? " emb=" + embLevel : "") + " text=" + text);
  }
  static string Keep(string s, bool blanks) { var b = new StringBuilder(); foreach (char c in s) if (c != (char)10 && c != (char)13 && (blanks || !char.IsWhiteSpace(c))) b.Append(c); return b.ToString(); }
  static string F(float v) { return Math.Round(v, 1).ToString(System.Globalization.CultureInfo.InvariantCulture); }
 
- void OnDestroy() { Restore(); }
+ void OnDestroy() { kemcoPages.Reset(Screen.width,Screen.height,Send); ClearPublished(); Restore(); }
+
+ // Exact original Raging Loop assembly only; this observer never writes renderers, text, roles or input
+ volatile bool kemcoAsked, kemcoRoles;
+ int kemcoEpoch, kemcoObservedEpoch=-1;
+ string kemcoScope=""; long kemcoSequence;
+ int kemcoPid; long kemcoStarted;
+ void KemcoOwner() { try { using(var self=System.Diagnostics.Process.GetCurrentProcess()) { kemcoPid=self.Id; kemcoStarted=self.StartTime.ToUniversalTime().Ticks; } } catch { kemcoPid=0; kemcoStarted=0; } }
+ bool kemcoTried, kemcoReady; float kemcoNext;
+ Type kemcoMain, kemcoMessage, kemcoButton;
+ FieldInfo kemcoBody, kemcoName, kemcoDialogs, kemcoRows, kemcoParent, kemcoLastMes, kemcoButtonText, kemcoButtonEnabled;
+ readonly KemcoSpriteSnapshot kemcoPages = new KemcoSpriteSnapshot();
+ void KemcoControl(bool on,bool roles=false) { lock(gate) { kemcoAsked=on; kemcoRoles=roles; kemcoScope=""; kemcoEpoch++; } }
+ void KemcoSend(string wire) { lock(gate) { if (connected && kemcoAsked && kemcoObservedEpoch==kemcoEpoch) Send(wire); } }
+ void KemcoScope(string scope) {
+  bool valid=scope.Length==32;
+  if(valid) foreach(char c in scope) if (!(c>='a'&&c<='f'||c>='0'&&c<='9')) valid=false;
+  lock(gate) { string next=kemcoAsked&&valid?scope:""; if(next==kemcoScope)return; kemcoScope=next; kemcoEpoch++; }
+ }
+ void KemcoSendSource(string kind,int page,string text) {
+  lock(gate) {
+   if(!connected || !kemcoAsked || kemcoScope.Length!=32 || kemcoObservedEpoch!=kemcoEpoch || kemcoPid<=0 || kemcoStarted<=0) return;
+   if(text.Length>4127 || Encoding.UTF8.GetByteCount(text)>8223) { kind="pending"; text=""; }
+   if(kemcoSequence>=9007199254740991L) return;
+   string encoded=Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+   Send("ToMe_UNITY kemco2 "+kemcoScope+"\t"+(++kemcoSequence).ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+page.ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+kind+"\tc4d74235dc06d19630d8b826e49bd3d047c09bc03e8d8badeb0d60dd71dd7314\t"+kemcoPid.ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+kemcoStarted.ToString(System.Globalization.CultureInfo.InvariantCulture)+"\t"+encoded);
+  }
+ }
+ void KemcoSource(Component message,int page,KemcoSpriteSnapshot.Page p) {
+  if(message==null || page==0) { KemcoSendSource("gone",0,""); return; }
+  string expected=kemcoLastMes.GetValue(message) as string;
+  if(p==null || !p.complete || expected==null || expected.TrimEnd('\n')!=p.text) { KemcoSendSource("pending",page,""); return; }
+  KemcoSendSource("full",page,p.text);
+ }
+ internal static bool KemcoFlag(string command,string name="kemcoSprites") {
+  int count=0; bool on=false;
+  foreach (string token in command.Split(' ')) if (token.StartsWith(name+"=",StringComparison.Ordinal)) { count++; on=token==name+"=1"; }
+  return count==1 && on;
+ }
+ static FieldInfo KemcoField(Type t,string name,Type value) {
+  if (t==null) return null;
+  var f=t.GetField(name,BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance);
+  return f!=null && f.FieldType==value ? f : null;
+ }
+ internal static bool KemcoMethod(Type type) {
+  if (type==null) return false;
+  var mes=type.GetMethod("Mes",BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance,null,new[]{typeof(string),typeof(bool)},null);
+  return mes!=null && mes.ReturnType==typeof(string);
+ }
+ bool KemcoSchema() {
+  if (kemcoTried) return kemcoReady; kemcoTried=true;
+  foreach (var a in AppDomain.CurrentDomain.GetAssemblies()) {
+   if (a.GetName().Name!="Assembly-CSharp") continue;
+   var file=new FileInfo(a.Location); if (!file.Exists || file.Length!=361472) return false;
+   string hash; var bytes=new byte[361472]; using (var s=File.OpenRead(a.Location)) {
+    int at=0; while(at<bytes.Length) { int n=s.Read(bytes,at,bytes.Length-at); if(n<=0) return false; at+=n; }
+    if(s.ReadByte()!=-1) return false;
+   }
+   using (var sha=SHA256.Create()) hash=BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-","").ToLowerInvariant();
+   if (hash!="c4d74235dc06d19630d8b826e49bd3d047c09bc03e8d8badeb0d60dd71dd7314") return false;
+   kemcoMain=a.GetType("MainScene",false); kemcoMessage=a.GetType("Message",false); kemcoButton=a.GetType("Button",false);
+   if (kemcoMain==null || kemcoMessage==null || kemcoButton==null || !typeof(MonoBehaviour).IsAssignableFrom(kemcoMain) || !typeof(MonoBehaviour).IsAssignableFrom(kemcoMessage) || !typeof(Component).IsAssignableFrom(kemcoButton)) return false;
+   kemcoBody=KemcoField(kemcoMain,"message",kemcoMessage); kemcoName=KemcoField(kemcoMain,"nameMessage",kemcoMessage);
+   kemcoDialogs=KemcoField(kemcoMain,"dialogList",typeof(List<GameObject>));
+   kemcoRows=KemcoField(kemcoMessage,"messageSprite",typeof(List<List<GameObject>>)); kemcoParent=KemcoField(kemcoMessage,"parentObject",typeof(GameObject));
+   kemcoLastMes=KemcoField(kemcoMessage,"LastMes",typeof(string));
+   kemcoButtonText=KemcoField(kemcoButton,"Text",typeof(GameObject)); kemcoButtonEnabled=KemcoField(kemcoButton,"Enabled",typeof(bool));
+   kemcoReady=kemcoBody!=null && kemcoName!=null && kemcoDialogs!=null && kemcoRows!=null && kemcoParent!=null && kemcoLastMes!=null && kemcoButtonText!=null && kemcoButtonEnabled!=null && KemcoMethod(kemcoMessage);
+   Send("ToMe_UNITY status kemco-sprites schema="+(kemcoReady?"original-readonly":"unsupported")); return kemcoReady;
+  }
+  return false;
+ }
+ static float[] KemcoBox(GameObject root,out bool shown) {
+  shown=false; if (root==null || !root.activeInHierarchy) return null;
+  var mesh=root.GetComponent<TextMesh>(); var renderer=root.GetComponent<Renderer>();
+  if (mesh==null || renderer==null || !renderer.enabled) return null;
+  float alpha=mesh.color.a; if (float.IsNaN(alpha) || float.IsInfinity(alpha)) { shown=true; return null; } if (alpha<=0) return null;
+  // Reading sharedMaterial avoids the instantiating material getter and preserves the game's ownership
+  var material=renderer.sharedMaterial;
+  if (material==null || !material.HasProperty("_Color")) { shown=true; return null; }
+  alpha=material.color.a; if (float.IsNaN(alpha) || float.IsInfinity(alpha)) { shown=true; return null; } if (alpha<=0) return null;
+  var cameras=Camera.allCameras; if (cameras.Length>8) { shown=true; return null; }
+  Camera camera=null;
+  foreach (var c in cameras) if (c!=null && c.enabled && c.gameObject.activeInHierarchy && c.targetTexture==null && (c.cullingMask & (1<<root.layer))!=0) { if (camera!=null) { shown=true; return null; } camera=c; }
+  if (camera==null) return null;
+  shown=true; var bounds=renderer.bounds; var lo=bounds.min; var hi=bounds.max;
+  float x=float.PositiveInfinity,y=x,r=float.NegativeInfinity,b=r;
+  for (int i=0;i<8;i++) {
+   var p=camera.WorldToScreenPoint(new Vector3((i&1)==0?lo.x:hi.x,(i&2)==0?lo.y:hi.y,(i&4)==0?lo.z:hi.z));
+   if (p.z<=0 || float.IsNaN(p.z) || float.IsInfinity(p.z) || float.IsNaN(p.x) || float.IsNaN(p.y) || float.IsInfinity(p.x) || float.IsInfinity(p.y)) return null;
+   x=Math.Min(x,p.x); r=Math.Max(r,p.x); y=Math.Min(y,Screen.height-p.y); b=Math.Max(b,Screen.height-p.y);
+  }
+  // Completely parked glyphs are a typewriter suffix; a partially clipped glyph is unsupported
+  if (r<=0 || b<=0 || x>=Screen.width || y>=Screen.height) { shown=false; return null; }
+  var box=new[]{x,y,r-x,b-y}; var viewport=camera.pixelRect;
+  if (x<viewport.xMin || r>viewport.xMax || Screen.height-b<viewport.yMin || Screen.height-y>viewport.yMax) return null;
+  return box;
+ }
+ KemcoSpriteSnapshot.Page KemcoRead(Component message,out int generation) {
+  generation=0; if (message==null || !Shown(message)) return null;
+  var parent=kemcoParent.GetValue(message) as GameObject; if (parent==null || !parent.activeInHierarchy) return null;
+  generation=parent.GetInstanceID(); var source=kemcoRows.GetValue(message) as List<List<GameObject>>;
+  if (source==null || source.Count>32) return null;
+  var rows=new List<IList<KemcoSpriteSnapshot.Glyph>>(); int count=0;
+  foreach (var row in source) {
+   if (row==null || row.Count>256 || (count+=row.Count)>2048) return null;
+   var glyphs=new List<KemcoSpriteSnapshot.Glyph>(); rows.Add(glyphs);
+   foreach (var root in row) {
+    if (root==null || root.transform.parent!=parent.transform) return null;
+    var mesh=root.GetComponent<TextMesh>(); if (mesh==null) return null;
+    bool shown; var box=KemcoBox(root,out shown);
+    glyphs.Add(new KemcoSpriteSnapshot.Glyph { id=root.GetInstanceID(),text=mesh.text,shown=shown,box=box });
+   }
+  }
+  return KemcoSpriteSnapshot.Read(rows,Screen.width,Screen.height);
+ }
+ static float[] KemcoUnion(KemcoSpriteSnapshot.Page p) {
+  if (p==null || p.text.IndexOf('\n')>=0) return null;
+  float x=float.PositiveInfinity,y=x,r=0,b=0;
+  foreach(var q in p.rects) { x=Math.Min(x,q[0]); y=Math.Min(y,q[1]); r=Math.Max(r,q[0]+q[2]); b=Math.Max(b,q[1]+q[3]); }
+  return new[]{x,y,r-x,b-y};
+ }
+ sealed class KemcoChoice { internal int generation; internal string text; internal float[] box; }
+ void KemcoTick() {
+  int epoch; lock(gate) epoch=kemcoEpoch;
+  if (epoch!=kemcoObservedEpoch) { kemcoPages.Reset(Screen.width,Screen.height,Send); kemcoObservedEpoch=epoch; }
+  if (!connected || !kemcoAsked) { kemcoPages.Reset(Screen.width,Screen.height,Send); return; }
+  if (Time.unscaledTime<kemcoNext) return; kemcoNext=Time.unscaledTime+0.1f;
+  if (!KemcoSchema()) { kemcoPages.Reset(Screen.width,Screen.height,Send); return; }
+  var all=UnityEngine.Object.FindObjectsOfType(kemcoMain); Component main=null; int active=0;
+  foreach (var obj in all) { var c=obj as Component; if (Shown(c)) { main=c; active++; } }
+  if (active!=1) { kemcoPages.Reset(Screen.width,Screen.height,Send); KemcoSendSource("gone",0,""); return; }
+  int generation; var bodyMessage=kemcoBody.GetValue(main) as Component; var body=KemcoRead(bodyMessage,out generation);
+  kemcoPages.Publish("body",generation,body,null,null,Screen.width,Screen.height,KemcoSend);
+  KemcoSource(bodyMessage,generation,body);
+  var name=kemcoRoles?KemcoRead(kemcoName.GetValue(main) as Component,out generation):null;
+  kemcoPages.Publish("name",generation,null,name==null?null:name.text,KemcoUnion(name),Screen.width,Screen.height,KemcoSend);
+  var dialogs=kemcoDialogs.GetValue(main) as List<GameObject>;
+  if (dialogs==null || dialogs.Count>32) { for (int i=0;i<16;i++) kemcoPages.Drop("choice"+i,Screen.width,Screen.height,Send); return; }
+  var seenChoices=new HashSet<int>(); var choices=new List<KemcoChoice>();
+  foreach (var go in dialogs) {
+   if (!kemcoRoles || go==null || !go.activeInHierarchy) continue;
+   var button=go.GetComponent(kemcoButton); if (button==null || !(bool)kemcoButtonEnabled.GetValue(button)) continue;
+   if (!seenChoices.Add(go.GetInstanceID()) || choices.Count>=16) { for (int i=0;i<16;i++) kemcoPages.Drop("choice"+i,Screen.width,Screen.height,Send); return; }
+   var text=kemcoButtonText.GetValue(button) as GameObject; var mesh=text==null?null:text.GetComponent<TextMesh>(); bool shown;
+   var box=KemcoBox(text,out shown); if (!shown) box=null;
+   choices.Add(new KemcoChoice { generation=go.GetInstanceID(),text=mesh==null?null:mesh.text,box=box });
+  }
+  int index=0;
+  foreach(var choice in choices) kemcoPages.Publish("choice"+index++,choice.generation,null,choice.text,choice.box,Screen.width,Screen.height,KemcoSend);
+  for (;index<16;index++) kemcoPages.Drop("choice"+index,Screen.width,Screen.height,Send);
+ }
 }
