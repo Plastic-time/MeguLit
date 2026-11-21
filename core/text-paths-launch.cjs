@@ -16,7 +16,13 @@ const W=require('./text-paths-web.cjs'),U=require('./text-paths-unity.cjs');
 function unityPack(root){const dir=path.join(root,'runtime','unity-text');try{return require('node:fs').existsSync(path.join(dir,'MeguLitUnityText.dll'))?dir:null;}catch{return null;}}
 
 async function prepare({root,exe,profile={},title='',enabled=false,ownerTestGrant=null,shadowRoot=null,trace=()=>{}}){
- if(!enabled||!exe||require('./library-mode.cjs').libraryOnly(root))return null;
+ if(!exe||require('./library-mode.cjs').libraryOnly(root))return null;
+ /* An opaque, locally validated test grant is independent of compositor/roles. The session rechecks both the
+    authority and the exact executable/effective Lua members before creating any private launch files. */
+ if(ownerTestGrant){const canary=new Canary(root,exe);canary.settle();if(canary.allowed('artemis')){
+  const a=await require('./artemis-session.cjs').prepare({root,exe,ownerTestGrant,shadowRoot,steamAppId:require('./steam-owned.cjs').launchAppid(exe,profile)||null,canary,trace});if(a)return a;
+ }}
+ if(!enabled)return null;
  const canary=new Canary(root,exe);const off=canary.settle();if(Object.keys(off||{}).length)trace('text-paths-canary',{off:Object.keys(off)});
  const steam=require('./steam-owned.cjs').launchAppid(exe,profile)||null; /* E-SteamOwned */
  const steamEnv=steam?{SteamAppId:steam,SteamGameId:steam,SteamOverlayGameId:steam}:{};
@@ -48,6 +54,23 @@ async function prepare({root,exe,profile={},title='',enabled=false,ownerTestGran
 /* Connect a prepared session to the hook reader (core/hook-native.cjs): records in, replacement switch and lines out. */
 function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepared.session;
  if(prepared.path==='rgss')s.owner=()=>hook.wanted===false||hook.disposed||hook.stopPending||hook.stopError?0:hook.gamePid?.()||hook.target?.pid||0;
+ if(prepared.path==='artemis'){
+  const current=m=>hook.textPath===s&&hook.wanted!==false&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&s.permission()&&s.owner&&m?.artemisOwner&&hook.target?.pid===s.owner.pid&&hook.target?.started===s.owner.started&&m.artemisOwner.pid===s.owner.pid&&m.artemisOwner.started===s.owner.started;
+  let rubyOwner=null,speakerOwner=null;
+  const clearRuby=()=>{if(rubyOwner)for(const key of rubyOwner.keys)if(hook.sourceRuby?.get(key)===rubyOwner.pairs)hook.sourceRuby.delete(key);rubyOwner=null;};
+  s.onStop=()=>{clearRuby();if(hook.speaker===speakerOwner)hook.speaker=null;speakerOwner=null;};
+  s.onSource=m=>{if(!current(m))return false;const previous=rubyOwner;clearRuby();const before=hook.state?.hookSequence||0,chars=[...m.text];
+   const pairs=m.artemisRuby.map(([at,n,reading])=>[chars.slice(at,at+n).join(''),reading,chars.slice(0,at).filter(c=>!/\s/u.test(c)).length]);
+   if(pairs.length){const keys=[...new Set([m.text,m.text.replace(/\s+/g,'')])],map=hook.sourceRuby||(hook.sourceRuby=new Map());for(const key of keys)map.set(key,pairs);while(map.size>64)map.delete(map.keys().next().value);rubyOwner={keys,pairs};}
+   hook.source(m,'Artemis Lua input');
+   const accepted=current(m)&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='artemis-lua-input'&&hook.state.hookSource===m.text;
+   if(!accepted){clearRuby();if(previous&&current(m)){const map=hook.sourceRuby;for(const key of previous.keys)if(!map.has(key))map.set(key,previous.pairs);rubyOwner=previous;}}return accepted;};
+  /* Semantic input metadata is deliberately not CHARS/UI rectangles or a current-pixel visibility acknowledgement. */
+  s.onSemantic=m=>{if(!current({artemisOwner:m.owner}))return;
+   if(m.role==='name'){const name=require('./hook-native.cjs').speakerName(m.text);speakerOwner=name?{text:name,at:hook.now()}:null;hook.speaker=speakerOwner;if(name)hook.noteSpeaker?.(name);return;}
+   hook.trace?.('artemis input role='+m.role+' variant='+(m.variant||'-')+' chars='+[...m.text].length);};
+  s.onStatus=st=>hook.trace?.('text path artemis: '+st);hook.attachTextPath?.(s);return;
+ }
  s.onSource=m=>{const {sameOwner}=require('./unity-kemco-source.cjs');
   if(prepared.path==='rgss'){
    const current=()=>hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&hook.wanted!==false&&!s.stopped&&s.roles&&s.generation===m.generation&&hook.gamePid?.()===m.pid&&s.body.get(m.line)?.text===m.text;
