@@ -143,6 +143,17 @@
    "slot": "0x45d01c",
    "call": "0x43288c",
    "hex": "d65801008b4f0cc60100eb3e6a008dae54670000578bcde818f1ffff8b55102b550c7505e8b15801008b450c8b4e0468f8d84500500fb744242057536a015051ff151cd045008b6c24145b8b56108b46"
+  },
+  "eden-en/minori": {
+   "id": "minori",
+   "file": "eden_en.exe",
+   "sha256": "7b0f4be87c1296e62b7425d2ee3470e337e51921c4e28adba67d4a3cfed50fc3",
+   "api": "GetGlyphOutlineA",
+   "va": "0x5192ae",
+   "callOffset": 64,
+   "slot": "0x54802c",
+   "call": "0x5192ee",
+   "hex": "05f2ff8b46608945fc83bebc000000008b4e60894df8750e6a00ff15388054008986bc0000008b55f88b46188b4d0868bc615600528b96bc0000005357505152ff152c8054008b1f83c30383e3fc837e"
   }
  }
 }

@@ -158,3 +158,8 @@
 - 例程没有 EBP 帧（ebp 当普通寄存器存第一个参数）：返回地址在 API 第一个参数上方 0x28 / 0x2c。中文版的启动器 五彩斑斓的曙光.exe 只是外壳，钩子在 Hikari.exe
 - 字形进 D3D9 纹理，没有笔位；via 是调用者，fargs 是例程参数
 - 店主测试清单：同 AVG32，行里是 `engine=fvp` 或 `engine=fvp-bitmap`
+
+### minori（eden*，Steam 英文版）
+- 点：eden_en.exe 0x5192ee，字形例程 0x519190（EBP 帧，3 个调用者）里每个字栅格化那次 `GetGlyphOutlineA`（之前 0x5191d8 的量尺寸不签）。字形进 D3D9，没有笔位，via / via2 是调用者
+- 这是英文版：台词是英文，日文版 exe 不同，拿到再补签名
+- 店主测试清单：同 AVG32，行里是 `engine=minori`

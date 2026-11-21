@@ -52,6 +52,9 @@ static const Sig Sigs[] = {
   // Return address 0x28 / 0x2c above the API's first argument (depth 0xc / 0x10 + the 7 arguments)
   { "fvp", "", "GetGlyphOutlineA", "68 ?? ?? ?? ?? 6a 00 6a 00 8d 86 ?? ?? 00 00 50 6a 00 51 52", 1, 0x28 },
   { "fvp-bitmap", "", "GetGlyphOutlineA", "8b 45 0c 8b 4e 04 68 ?? ?? ?? ?? 50 0f b7 44 24 20 57 53 6a 01 50 51", 1, 0x2c },
+  // minori (eden*, Steam English build, eden_en.exe 0x5192ee): the glyph routine 0x519190 (EBP frame, 3 callers) renders each
+  // character with GetGlyphOutlineA (0x5191d8 before it is the size query: not signed); no pen, via / via2 = its callers
+  { "minori", "", "GetGlyphOutlineA", "8b 46 18 8b 4d 08 68 ?? ?? ?? ?? 52 8b 96 ?? ?? 00 00 53 57 50 51 52", 1, 1 },
 };
 static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
 
