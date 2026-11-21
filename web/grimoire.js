@@ -549,10 +549,10 @@ export function fieldify(grid,filtered=false,tracks=false){
  paint();
  warmLater();
  /* E426 measure again once layout has settled: two frames after mounting, and when the capsule's switch glide ends */
- let settle=requestUiFrame(()=>{settle=requestUiFrame(()=>{settle=0;measure();queue();});});
+ let settle=requestAnimationFrame(()=>{settle=requestAnimationFrame(()=>{settle=0;measure();queue();});});
  pod?.addEventListener('transitionend',()=>{measure();queue();},{signal});
  fieldStop=()=>{
-  events.abort();ro.disconnect();cancelUiFrame(raf);cancelUiFrame(settle);clearTimeout(warmId);if(warmIdle)unidle(warmIdle);
+  events.abort();ro.disconnect();cancelUiFrame(raf);cancelAnimationFrame(settle);clearTimeout(warmId);if(warmIdle)unidle(warmIdle);
   host.classList.remove('dragging','field-moving');pod?.classList.remove('wall-moving');shield.remove();
   fieldStop=()=>{};
  };
