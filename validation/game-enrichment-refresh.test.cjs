@@ -7,6 +7,42 @@ const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-refresh-'));process.env
 const store=require('../services/store.cjs'),{GameEnrichment}=require('../services/game-enrichment.cjs');
 test.after(()=>fs.rmSync(root,{recursive:true,force:true}));
 
+for(const corrected of [false,true])test('two detail languages keep the right work when corrected='+corrected,async t=>{
+ const work=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-detail-langs-'));
+ t.after(()=>fs.rmSync(work,{recursive:true,force:true}));
+ const db=store.openStore(work),exe=path.join(work,'game.exe');
+ try{db.prepare("INSERT INTO games(id,title,executable,cover,source,original) VALUES('g','Game',?,'cover.jpg','folder',?)")
+  .run(exe,JSON.stringify({vndbManual:'v1',library:{vndbId:'v1',appid:'123'}}));}finally{db.close();}
+ const covers=path.join(work,'data','assets','covers');
+ fs.mkdirSync(covers,{recursive:true});fs.writeFileSync(path.join(covers,'cover.jpg'),Buffer.from([255,216,255,224]));
+ const meta=new GameEnrichment(work,()=>{},async url=>{
+  const language=new URL(url).searchParams.get('language');
+  if(language)return Response.json({query_summary:{},reviews:[{review:'review-'+language,language}]});
+  return new Response('',{status:503});
+ });
+ t.after(()=>meta.stop());
+ let started,release;
+ const fetching=new Promise(resolve=>{started=resolve;}),gate=new Promise(resolve=>{release=resolve;});
+ const calls=[];meta.synopses.get=async({lang,vndbId})=>{
+  calls.push(lang);if(lang==='en'){started();await gate;}
+  return {source:'VNDB',text:vndbId+'-'+lang};
+ };
+ const english=meta.ensure('g','en');await fetching;
+ if(corrected){
+  const write=store.openStore(work);
+  try{write.prepare("UPDATE games SET original=json_set(original,'$.vndbManual','v2') WHERE id='g'").run();}finally{write.close();}
+ }
+ const japanese=meta.ensure('g','ja');release();await Promise.all([english,japanese]);
+ const {synopses:saved,reviews}=store.readJSON(meta.file).g;
+ assert.equal(saved.en?.text,corrected?undefined:'v1-en');
+ assert.equal(saved.ja?.text,corrected?'v2-ja':'v1-ja');
+ assert.equal(reviews.en?.[0]?.text,corrected?undefined:'review-english');
+ assert.equal(reviews.ja?.[0]?.text,'review-japanese');
+ if(!corrected)await meta.ensure('g','en');
+ await meta.ensure('g','ja');
+ assert.equal(calls.length,2);
+});
+
 test('a forced refresh asked during a run is not lost',async()=>{
  const exe=path.join(root,'game','game.exe');fs.mkdirSync(path.dirname(exe),{recursive:true});fs.writeFileSync(exe,'MZ');
  const db=store.openStore(root);try{db.prepare('INSERT INTO games(id,title,executable,cover,source,original) VALUES(?,?,?,?,?,?)').run('game-1','月影的幻影',exe,'','folder',JSON.stringify({library:{names:['月影的幻影'],vndbId:'v1'}}));}finally{db.close();}
