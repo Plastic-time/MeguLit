@@ -32,12 +32,23 @@ test('worker exit cannot release foreground or restore saves before native close
   assert.equal(fs.readFileSync(path.join(f.game,'savedata','save.dat'),'utf8'),'original');await turn();assert.equal(fs.readFileSync(path.join(f.game,'savedata','save.dat'),'utf8'),'original');
  }finally{f.cleanup();}
 });
+
+test('a runner must explicitly confirm cleanup before restoring a save snapshot',async()=>{
+ for(const confirmation of [undefined,false,1,'true']){const f=fixture();try{
+  const out=await f.svc.testOne(f.app,{id:'safety',title:'Safety',exe:f.exe,engine:'kirikiri',exeKey:'1'.repeat(64)},{deps:{env:{},runner:async()=>{fs.writeFileSync(path.join(f.game,'savedata','save.dat'),'still owned by cold');return {cleanupConfirmed:confirmation,shots:[]};}}});
+  assert.equal(out.why,'cleanup-unconfirmed',String(confirmation));assert.equal(fs.readFileSync(path.join(f.game,'savedata','save.dat'),'utf8'),'still owned by cold');const journal=require('../core/cold-test/saves.cjs').failed(f.app)[0];assert.equal(journal.coldCleanup.state,'starting');assert.equal(fs.existsSync(path.join(require('../core/cold-test/saves.cjs').snapDir(f.app),journal.id,'place-0','save.dat')),true);
+ }finally{f.cleanup();}}
+});
 test('two stop timeouts keep tracking until late native close confirms cleanup',async()=>{
  const f=fixture();try{const run=f.svc.runInWorker({root:f.app,exe:f.exe,budgetMs:1000});await turn();
   await assert.rejects(f.bg.foreground(),{code:'COLD_STOP_TIMEOUT'});assert.equal(f.bg.occupied(),true);
   await assert.rejects(f.bg.foreground(),{code:'COLD_STOP_TIMEOUT'});assert.equal(f.bg.occupied(),true);
   f.closeHelper();f.exitWorker();const r=await run;assert.equal(r.cleanupConfirmed,true);assert.equal(f.bg.occupied(),false);
  }finally{f.closeHelper();f.exitWorker();f.cleanup();}
+});
+
+test('native failure exit keeps the barrier even when an empty job reported safe cleanup',async()=>{
+ const f=fixture();try{const run=f.svc.runInWorker({root:f.app,exe:f.exe,budgetMs:1000});await turn();f.closeHelper(true,1);f.exitWorker();const out=await run;assert.equal(out.cleanupConfirmed,false);assert.equal(f.bg.occupied(),true);await assert.rejects(f.bg.foreground(),{code:'COLD_CLEANUP_UNCONFIRMED'});}finally{f.cleanup();}
 });
 test('helper error rejects the pending foreground stop; unconfirmed cleanup preserves the save journal',async()=>{
  const f=fixture();try{const run=f.svc.testOne(f.app,{id:'safety',title:'Safety',exe:f.exe,engine:'kirikiri',exeKey:'1'.repeat(64)},{deps:{env:{},runner:o=>f.svc.runInWorker(o)}});await turn();
