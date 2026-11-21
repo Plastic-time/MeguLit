@@ -88,7 +88,11 @@ class HookNative{
     then preflight is off, the hide and the replacement are back (onGiveWayCapped tells the controller to finish). */
  capGiveWay(){if(this.preflight!==true){clearTimeout(this.giveWayTimer);this.giveWayTimer=null;return;}if(this.giveWayTimer)return;
   this.giveWayTimer=setTimeout(()=>{this.giveWayTimer=null;if(this.preflight!==true)return;this.preflight=false;this.calibrating=false;try{this.trace('preflight give way capped at '+HookNative.GIVE_WAY_MS+' ms: hiding and replacement restored');}catch{}try{this.onGiveWayCapped?.();}catch{}if(this.preferences&&this.windowState)this.configure(this.preferences,this.windowState);},HookNative.GIVE_WAY_MS);this.giveWayTimer?.unref?.();}
- configure(preferences,state){this.preferences=preferences;this.windowState=state;this.capGiveWay();const pid=Number(state.gameProcessId),hwnd=String(state.gameHwnd||'');this.wanted=(preferences.hookAutoStart||['hook','local'].includes(preferences.maskMode))&&preferences.bindEnabled===true&&preferences.hookProfile!=='off';this.target=Number.isSafeInteger(pid)&&pid>0&&/^\d{1,19}$/.test(hwnd)?{pid,hwnd,name:String(state.processName||''),started:String(state.gameStarted||'')}:null;
+ /* 2026-11-21 (engine-draw, Fata v5: #choiceframe and #clearline never reached the game): the game's pid lives in configure()'s window
+    state and the target, never in this.state (the hook's notify state); reading this.state.gameProcessId gave 0, so the engine-draw
+    control file (%TEMP%\MeguLit\draw\<pid>.txt) was never written */
+ gamePid(){return Number(this.target?.pid||this.windowState?.gameProcessId||this.state?.gameProcessId)||0;}
+ configure(preferences,state){this.preferences=preferences;this.windowState=state;this.capGiveWay();const pid=Number(state.gameProcessId),hwnd=String(state.gameHwnd||'');this.wanted=(preferences.hookAutoStart||['hook','local'].includes(preferences.maskMode))&&preferences.bindEnabled===true&&preferences.hookProfile!=='off';this.target=Number.isSafeInteger(pid)&&pid>0&&/^\d{1,19}$/.test(hwnd)?{pid,hwnd,name:String(state.processName||''),started:String(state.gameStarted||'')}:null;if(this.profile&&this.gamePid()!==(this.drawPid||0)){this.drawPid=this.gamePid();try{this.drawSync();}catch{}}/* a profile that came before the game's pid writes its control file now */
   if(!this.wanted||!this.target){this.stop(false);return;}if(this.process&&(this.pid!==pid||this.started!==this.target.started))this.stop(false);
   /* E285 (user: Alt+H also switched off the translation the game draws itself): Alt+H hides MeguLit's own layers; the
      game keeps drawing the written-back translation until its own switch is turned off. */
@@ -227,7 +231,7 @@ class HookNative{
   else if(pending.length)next.dots=[...pending];
   if(m.state==='dots'&&Array.isArray(m.dots)){const dots=[...next.dots];for(const d of m.dots.slice(0,1024))if(d&&Number.isInteger(d.i)&&typeof d.ch==='string'&&/^[dcprb]$/.test(d.k)&&!dots.some(o=>o.i===d.i&&o.k===d.k&&(d.i>=0||o.ch===d.ch&&o.h===d.h)))dots.push({i:d.i,ch:d.ch.slice(0,2),h:d.h|0,b:d.b|0,a:d.a|0,x:d.x|0,y:d.y|0,s:d.s|0,k:d.k,path:String(m.path||'').slice(0,8),...(d.at&&typeof d.at.space==='string'&&/^(c|g|[mt]\d{1,5}x\d{1,5})$/.test(d.at.space)?{at:{x:d.at.x|0,y:d.at.y|0,space:d.at.space}}:{})});next.dots=dots.slice(0,2048);}
   this.state={...this.state,hookGlyphDots:this.state.hookGlyphPos?fillPlaces(next,this.state.hookGlyphPos):next};this.emit(m);}
- charRects(raw){const tp=require('./text-paths.cjs'),rec=tp.parseChars(raw);if(!rec)return;this.drawLog(raw);/* engine-draw (docs/engine-draw-protocol.md): a UI item (name, choice, button, menu, system) is annotated beside its box, never hidden or replaced; a dialogue line may ask for its in-game replacement */if(require('./engine-draw.cjs').routeOf(rec)==='ui'){this.emit({...rec,type:'hookDrawUi'});return;}this.engineDrawLine(rec);if(rec.engine==='krkr'){const pid=Number(this.state?.gameProcessId)||0;if(this.krkrChars?.pid!==pid)this.krkrChars={pid,n:0};this.krkrChars.n++;}const gate=this.charGates||(this.charGates=new Map());if(!gate.has(rec.engine))gate.set(rec.engine,new tp.HiddenGate());rec.hidden=gate.get(rec.engine).report(rec)&&rec.hidden;rec.at=this.now();if(!this.textPathActive&&(rec.engine==='unity'||rec.engine==='web')){this.textPathActive=true;this.syncGlyphMode?.();}this.emit(rec);}
+ charRects(raw){const tp=require('./text-paths.cjs'),rec=tp.parseChars(raw);if(!rec)return;this.drawLog(raw);/* engine-draw (docs/engine-draw-protocol.md): a UI item (name, choice, button, menu, system) is annotated beside its box, never hidden or replaced; a dialogue line may ask for its in-game replacement */if(require('./engine-draw.cjs').routeOf(rec)==='ui'){this.emit({...rec,type:'hookDrawUi'});return;}this.engineDrawLine(rec);if(rec.engine==='krkr'){const pid=this.gamePid();if(this.krkrChars?.pid!==pid)this.krkrChars={pid,n:0};this.krkrChars.n++;}const gate=this.charGates||(this.charGates=new Map());if(!gate.has(rec.engine))gate.set(rec.engine,new tp.HiddenGate());rec.hidden=gate.get(rec.engine).report(rec)&&rec.hidden;rec.at=this.now();if(!this.textPathActive&&(rec.engine==='unity'||rec.engine==='web')){this.textPathActive=true;this.syncGlyphMode?.();}this.emit(rec);}
  glyphHide(m){if(!m||!['ready','hit','key','cached'].includes(m.state))return;const v={hookGlyphHide:m.state==='key'||m.state==='ready'?(this.state.hookGlyphHide||'learning'):m.state};if(m.state==='ready'&&Number.isFinite(m.version))v.hookGlyphVersion=Number(m.version);if(m.state==='hit'&&typeof m.path==='string')v.hookGlyphPath=m.path.slice(0,16);if(m.state==='key'&&typeof m.face==='string'&&Number.isFinite(m.size))v.hookGlyphFont={face:m.face.slice(0,64),size:Number(m.size)};this.trace('glyph hide '+m.state+(m.path?' '+String(m.path).slice(0,16):'')+(m.size?' '+Number(m.size)+'px':''));this.notify(v);}
  markScriptSource(){try{if(this.state&&!this.state.scriptSource)this.notify({scriptSource:true});}catch{}}
  resolveSource(text){const provider=this.originalText;if(!provider||!text||HookNative.nonDialogue(text))return null;const key=String(text).replace(/\s+/g,'');this.sourceCache??=new Map();const from=typeof provider.position==='function'?provider.position():-1,ok=x=>!!x&&(x.status==='exact'||x.status==='high');
@@ -507,7 +511,7 @@ class HookNative{
   const next=q.rest.shift();if(!q.rest.length)this.pageQueue=null;
   this.trace('page part advance '+JSON.stringify(next.slice(0,20)));this.source({...q.base,text:next},q.name);return true;
  }
- source(m,name){if(m&&/textrender/i.test(String(m.sourceName||'')))this.trSeen=Number(this.state?.gameProcessId)||0;
+ source(m,name){if(m&&/textrender/i.test(String(m.sourceName||'')))this.trSeen=this.gamePid();
   /* E560 Unity setter streams: typewriter steps and whole NVL pages become the one paragraph the game is on (core/unity-source.cjs) */
   {const code=String(m.sourceCode||'');if(code.endsWith(':JIT:UNITY')&&!m.unityBoxed&&typeof m.text==='string'&&!this.skipKey){const {UnityBox}=require('./unity-source.cjs');(this.unityBox||(this.unityBox=new UnityBox(()=>this.now(),(line,p)=>this.source({...p.m,text:line,unityBoxed:true},p.name)))).feed(code,cleanSource(m.text,name,code),{m,name});return;}}
   /* 2026-11-14 (ダストマニア・グロテスク, Chinese patch): Shift-JIS read as GBK (or any Japanese read with the wrong code page:
@@ -723,7 +727,7 @@ class HookNative{
     text because no page line drew it, from a hidden placement with no hook line, from a page line that drew it shuffled, or when an
     interleaved effect frame of its characters was drawn within 3 s. Six lines or more and over 30 % effect lines: hookTextEffects once
     (services/reader.cjs: read mode for this exe, as galTextEffects). A game whose lines come clean (千恋＊万花) never gets there */
- textEffectsState(){const pid=Number(this.state?.gameProcessId)||0;if(!this.fx||this.fx.pid!==pid)this.fx={pid,lines:[],frames:[],sent:false};return this.fx;}
+ textEffectsState(){const pid=this.gamePid();if(!this.fx||this.fx.pid!==pid)this.fx={pid,lines:[],frames:[],sent:false};return this.fx;}
  static frameOf(set,key){if(set.size<3)return false;const k=new Set(key);let n=0;for(const c of set)if(k.has(c))n++;return n/set.size>=.9;}
  textEffectsLine(text,effect){if(Profiles.get(this.profile,'safeMode.effectJudge',false)!==true)return;const F=this.textEffectsState();if(F.sent)return;const key=HookNative.content(text);if(key.length<2)return;const now=this.now();let l=F.lines.find(x=>x.key===key);
   if(!l){if(F.lines.length>=20)return;l={key,at:now,effect:false};F.lines.push(l);}
@@ -886,7 +890,7 @@ class HookNative{
     the same since v1.4.16). A game on the TextRender plugin that MeguLit did not start itself and whose dialogue stream gives
     three lines without one character record is told once how to get them. Hiding is left as it is: the game's text stays
     hidden by the other layers, only the place is missing (stepping back would show it under the reader's text). */
- positionsCheck(){const pid=Number(this.state?.gameProcessId)||0;if(!pid||this.trSeen!==pid||this.launchedPid===pid)return;const P=this.posCheck&&this.posCheck.pid===pid?this.posCheck:(this.posCheck={pid,lines:0,said:false});
+ positionsCheck(){const pid=this.gamePid();if(!pid||this.trSeen!==pid||this.launchedPid===pid)return;const P=this.posCheck&&this.posCheck.pid===pid?this.posCheck:(this.posCheck={pid,lines:0,said:false});
   if(P.said||(this.krkrChars?.pid===pid&&this.krkrChars.n>0))return;if(!/krkr|kirikiri|textrender/i.test(String(this.dialogueHook||'')))return;
   if(++P.lines<3)return;P.said=true;this.trace('positions: no character records from the TextRender game after '+P.lines+' lines (started before MeguLit)');
   this.notify({hookNotice:'这款游戏要从 MeguLit 游戏库启动（或重启游戏）后，文字位置和隐藏才完整',hookNoticeAt:this.now()});}
@@ -953,12 +957,12 @@ class HookNative{
  /* engine-draw: the profile's draw.* switches go to the engine paths that read them (web / RPG Maker now, KiriKiri with its next line) */
  drawSync(){const ED=require('./engine-draw.cjs'),cfg=ED.settings(this.profile);try{this.textPath?.drawConfig?.(cfg);}catch{}
   /* a game whose diff turns draw.* on gets its control file at once (YU-RIS arms its glyph loop hook from it before any line) */
-  try{const pid=Number(this.state?.gameProcessId)||0;if(pid&&(cfg.roles||cfg.embed||cfg.clear||(cfg.choiceFrames||[]).length))this.ensureEngineDraw(pid);else this.engineDraw?.setProfile(this.profile);}catch{}}
+  try{const pid=this.gamePid();if(pid&&(cfg.roles||cfg.embed||cfg.clear||(cfg.choiceFrames||[]).length))this.ensureEngineDraw(pid);else this.engineDraw?.setProfile(this.profile);}catch{}}
  send(v){if(v&&(v.type==='enable'||v.type==='disable'))try{this.textPath?.hide(v.type==='enable');}catch{}if(this.process?.stdin.writable)this.process.stdin.write(JSON.stringify(v)+'\n');}
  /* engine-draw: one replacement table per game process, handed to the engine's transport (KiriKiri: control file) */
  /* the control file of this game process (every engine DLL that reads draw.* reads it: KiriKiri, Ren'Py, YU-RIS) */
  ensureEngineDraw(pid){const ED=require('./engine-draw.cjs');if(!this.engineDraw||this.engineDraw.pid!==pid){this.engineDraw?.stop();this.engineDraw=new ED.EngineDraw({profile:this.profile,transport:new ED.KrkrTransport(pid),onAsk:a=>this.emit({type:'hookDrawEmbed',...a})});this.engineDraw.pid=pid;}else this.engineDraw.setProfile(this.profile);return this.engineDraw;}
- engineDrawLine(rec){if(rec.engine!=='krkr'&&rec.engine!=='renpy')return;/* both read the same control file (%TEMP%\MeguLit\draw\<pid>.txt) */const pid=Number(this.state?.gameProcessId)||0;if(!pid)return;this.ensureEngineDraw(pid).line(rec);}
+ engineDrawLine(rec){if(rec.engine!=='krkr'&&rec.engine!=='renpy')return;/* both read the same control file (%TEMP%\MeguLit\draw\<pid>.txt) */const pid=this.gamePid();if(!pid)return;this.ensureEngineDraw(pid).line(rec);}
  /* engine-draw: every parsed ToMe_CHARS record, timestamped, in logs/engine-draw.log (its own file: hook-events.log rotates at 1 MB and
     keeps the diagnostics); the probe and the offline diff maker read roles / boxes / emb from it. A record repeated within the last 64 is left out */
  drawLog(raw){try{const seen=this.drawSeen||(this.drawSeen=new Set());if(seen.has(raw))return;seen.add(raw);if(seen.size>64)seen.delete(seen.values().next().value);
