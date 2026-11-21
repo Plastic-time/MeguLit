@@ -42,7 +42,7 @@ inline int GlyphTarget(const unsigned char *b, size_t at, size_t end, std::int64
   for (size_t i = at; i + 5 < end; i++) {
     if (b[i] != 0xe8) continue;
     std::int64_t to = (std::int64_t)i + 5 + (std::int32_t)U32(b + i + 1);
-    for (size_t j = i + 5; j < end && j < i + 0x30; j++) if (b[j] == 0x83 && b[j + 1] == 0xc4 && b[j + 2] == 0x2c) {
+    for (size_t j = i + 5; j < end && j < i + 0x30 && j + 3 <= end; j++) if (b[j] == 0x83 && b[j + 1] == 0xc4 && b[j + 2] == 0x2c) {
       int f = -1; for (int q = 0; q < k; q++) if (t[q] == to) f = q;
       if (f < 0 && k < 16) { t[k] = to; c[k] = 0; f = k++; }
       if (f >= 0) c[f]++;
@@ -60,13 +60,13 @@ inline int FindBackbuffer(const unsigned char *b, size_t n, std::uint32_t &w) {
   for (size_t i = 0; i + 0x90 < n; i++) {
     if (b[i] != 0x0f || b[i + 1] != 0xb7 || b[i + 2] != 0x05) continue;
     std::uint32_t W = U32(b + i + 3); size_t s4 = 0, l9 = 0, h = 0; bool present = false;
-    for (size_t j = i + 7; j < i + 0x40 && !s4; j++) if (b[j] == 0xc1 && b[j + 1] == 0xe8 && b[j + 2] == 0x04) s4 = j;
+    for (size_t j = i + 7; j < i + 0x40 && j + 3 <= n && !s4; j++) if (b[j] == 0xc1 && b[j + 1] == 0xe8 && b[j + 2] == 0x04) s4 = j;
     if (!s4) continue;
-    for (size_t j = s4 + 3; j < s4 + 0x30 && !l9; j++) if (b[j] == 0x8d && b[j + 1] == 0x04 && b[j + 2] == 0xc0) l9 = j;
+    for (size_t j = s4 + 3; j < s4 + 0x30 && j + 3 <= n && !l9; j++) if (b[j] == 0x8d && b[j + 1] == 0x04 && b[j + 2] == 0xc0) l9 = j;
     if (!l9) continue;
-    for (size_t j = l9 + 3; j < l9 + 0x30 && !h; j++) if (b[j] == 0x0f && b[j + 1] == 0xb7 && b[j + 2] == 0x05 && U32(b + j + 3) == W + 4) h = j;
+    for (size_t j = l9 + 3; j < l9 + 0x30 && j + 7 <= n && !h; j++) if (b[j] == 0x0f && b[j + 1] == 0xb7 && b[j + 2] == 0x05 && U32(b + j + 3) == W + 4) h = j;
     if (!h) continue;
-    for (size_t j = h; j < i + 0x90; j++) if (b[j] == 0xff && b[j + 1] == 0x51 && b[j + 2] == 0x44) { present = true; break; }
+    for (size_t j = h; j < i + 0x90 && j + 3 <= n; j++) if (b[j] == 0xff && b[j + 1] == 0x51 && b[j + 2] == 0x44) { present = true; break; }
     if (present) { if (!hits) w = W; hits++; }
   }
   return hits;
@@ -103,8 +103,8 @@ inline Result Find(const unsigned char *b, size_t n) {
     for (size_t k = i + 3; k < i + 0x10; k++) if (b[k] == 0x39 && b[k + 1] == 0x05 && b[k + 6] == 0x0f && b[k + 7] == 0x86) { c = k; hasC = true; break; }
     if (!hasC) continue; std::uint32_t codes = 0, info = 0;
     for (size_t k = c; k < i + 0x60; k++) {
-      if (!codes && b[k] == 0x0f && b[k + 1] == 0xb7 && b[k + 2] == 0x14 && b[k + 3] == 0x45) codes = U32(b + k + 4);
-      if (!info && b[k] == 0xb9) info = U32(b + k + 1);
+      if (!codes && k + 8 <= n && b[k] == 0x0f && b[k + 1] == 0xb7 && b[k + 2] == 0x14 && b[k + 3] == 0x45) codes = U32(b + k + 4);
+      if (!info && k + 5 <= n && b[k] == 0xb9) info = U32(b + k + 1);
     }
     if (!codes || !info) continue;
     size_t end = BodyEnd(b, n, i, 0x200); bool inc = false, hasStride = false;

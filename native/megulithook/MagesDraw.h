@@ -31,7 +31,7 @@
 // agree with the signature or nothing is hooked. Every hook calls the game's own function and changes nothing it sees.
 #pragma once
 #ifdef _WIN64
-// MAGES ships 32-bit only; a 64-bit build that includes this header gets a no-op
+// This dialogue-page implementation covers the five x86 fixtures only; MAGES64 draw signatures are not implemented
 #include <cstdint>
 namespace MagesDraw { inline void Arm(uintptr_t) {} }
 #else

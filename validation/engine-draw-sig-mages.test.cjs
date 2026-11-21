@@ -11,12 +11,22 @@
    4. the runtime's own log (validation/fixtures/engine-sigs/mages-draw-log.txt, written by selftest/magesgate.cpp through real
       MinHook detours) read back by core/mages-draw.cjs: a sentence committed in two pieces is one page unit (CHAOS;CHILD), the
       name comes from the engine's markers, choices keep their numbers, the records are valid ToMe_CHARS. */
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const M=require('../tools/engine-sigs/mages-draw.cjs'),SS=require('../tools/engine-sigs/steamstub.cjs');
+const Sample=require('../tools/engine-sigs/mages-sample.cjs');
 const D=require('../core/mages-draw.cjs'),T=require('../core/text-paths.cjs'),ED=require('../core/engine-draw.cjs');
 const fx=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures','engine-sigs','mages-draw.json'),'utf8'));
 const STEAM='E:/Steam/steamapps/common/';
 const hex=v=>'0x'+v.toString(16);
+
+test('incomplete commit operands and presentation tails never read outside the supplied bytes',()=>{
+ const tails=require('./helpers/mages-truncated-code.cjs');
+ const s=fx.snippets['chaos-child'],b=Buffer.from(s.hex,'hex'),va=parseInt(s.va,16);
+ const r=M.find(Buffer.concat([b,tails.commitTail()]),va);
+ assert.deepEqual(r.problems,[],'unrelated incomplete trailing candidate does not erase the complete signature');
+ assert.equal(r.commit.at-va,s.expect.commit);
+ assert.equal(M.backbuffer(tails.presentTail()),null,'truncated absolute address is not a presentation');
+});
 
 test('fixture snippets: every part found once, at the expected offsets',()=>{
  assert.equal(Object.keys(fx.snippets).length,5);
@@ -46,9 +56,9 @@ test('near misses never match: a glyph call fewer, no pageLength++, another stri
 
 for(const [name,s] of Object.entries(fx.snippets)){
  const exe=STEAM+s.exe,here=fs.existsSync(exe);
- test('owner\'s exe '+name+': found once, = the version table, Sel / SysSel pages',{skip:!here&&'not on this PC'},()=>{
-  const buf=fs.readFileSync(exe),sha=crypto.createHash('sha256').update(buf).digest('hex');
-  if(sha!==s.sha256)return; /* another build: the version table is not this one's */
+ test('owner\'s exe '+name+': found once, = the version table, Sel / SysSel pages',{skip:!here&&'not on this PC'},ctx=>{
+  const buf=fs.readFileSync(exe),identity=Sample.inspect(buf,s.sha256),sha=identity.sha256;
+  if(identity.status!=='matched'){ctx.skip(identity.status+': '+sha);return;}
   const t=SS.plainText(buf);assert.ok(t.steamstub,'SteamStub decrypted');
   const r=M.find(t.code,t.va);assert.deepEqual(r.problems,[]);
   const table=M.table({...r,base:t.base});assert.deepEqual(table,s.table);
@@ -129,8 +139,9 @@ test('presentation: the back buffer size globals in each build (fixture snippet 
    Still inferred: that 0x09 starts the ruby base (SC3 / impacto's STT_RubyBaseStart; the 0x09 case only keeps its marker). */
 for(const [name,s] of Object.entries(fx.snippets)){
  const exe=STEAM+s.exe,here=fs.existsSync(exe);
- test('owner\'s exe '+name+': SC3 controls 0x01 / 0x0A / 0x0B stay in the layout as markers; 0x0A / 0x0B switch one ruby flag',{skip:!here&&'not on this PC'},()=>{
-  const buf=fs.readFileSync(exe);if(crypto.createHash('sha256').update(buf).digest('hex')!==s.sha256)return;
+ test('owner\'s exe '+name+': SC3 controls 0x01 / 0x0A / 0x0B stay in the layout as markers; 0x0A / 0x0B switch one ruby flag',{skip:!here&&'not on this PC'},ctx=>{
+  const buf=fs.readFileSync(exe),identity=Sample.inspect(buf,s.sha256);
+  if(identity.status!=='matched'){ctx.skip(identity.status+': '+identity.sha256);return;}
   const t=SS.plainText(buf),c=t.code,codes=parseInt(s.table.layoutCodes,16)+t.base;const cb=Buffer.alloc(4);cb.writeUInt32LE(codes);
   let found=0;
   for(let i=0;i+40<c.length;i++){
