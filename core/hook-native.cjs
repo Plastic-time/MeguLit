@@ -128,7 +128,7 @@ class HookNative{
  /* the engine's text window state (ToMe_DIALOG); lines held during a moment's hide are dialogue when it comes back */
  dialogState(visible){this.engineDialog=visible;this.engineDialogAt=this.now();if(visible&&this.boxBlink){const b=this.boxBlink;this.boxBlink=null;clearTimeout(b.timer);this.trace('line kept as dialogue: the text window was hidden only for a moment');for(const x of b.lines)this.source(x.m,x.name);}}
  retry(message){this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.enabled=false;this.retryAt=this.now()+Math.min(30000,1000*2**Math.min(this.attempt++,5));/* #468 (live: a bridge that could not reach the hook DLL again said 「LunaHook 未连接当前游戏」 every 45 s for ever): after HOOK_RETRY_MAX failures in a row without a line from the game, this game process is given up on with a clear state; a new game process, or a line, starts over */if(this.attempt>=HOOK_RETRY_MAX&&this.target){this.gaveUp=this.target.pid+'|'+this.target.started;this.retryAt=Infinity;this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,hookRecovering:false,hookGaveUp:true,hookMessage:'钩子连续 '+this.attempt+' 次没能接上这局游戏，已停止重连；重启游戏后会重新连接，期间由画面识别兜底'});this.trace('hook reconnect given up after '+this.attempt+' attempts ('+message+')');return;}this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'unverified',hookSource:this.lastSource||null,hookRecovering:!!this.lastSource,hookThreads:[],hookMessage:message+'；正在自动重连'});}
- start({pid,hwnd,name,started}){if(!/^[A-Za-z0-9_\-. \u0080-\uffff]{1,100}$/.test(name)||!/^\d{10,20}$/.test(started))return;
+ start({pid,hwnd,name,started}){if(this.disposed||this.stopPending||this.stopError)return;if(!/^[A-Za-z0-9_\-. \u0080-\uffff]{1,100}$/.test(name)||!/^\d{10,20}$/.test(started))return;this.drawSync();
   // Do not keep re-attaching to a game process that has exited; wait for the window bridge to bind the new one.
   if(this.spawn===spawn)try{process.kill(pid,0);}catch(e){if(e.code==='ESRCH'){this.retryAt=this.now()+3000;this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,hookMessage:'游戏进程已退出，等待游戏重新启动后自动绑定'});return;}}
   // A HookBridge built while ToMe ran is staged as HookBridge.updated.exe and installed here, before the bridge starts.
@@ -957,7 +957,7 @@ class HookNative{
  /* Text architecture ③ (core/text-paths-launch.cjs): a web / Unity engine path follows the same replacement switch and gets each source line to find the dialogue */
  attachTextPath(p){this.textPath=p;try{p.hide(this.enabled===true);}catch{}this.drawSync();}
  /* engine-draw: the profile's draw.* switches go to the engine paths that read them (web / RPG Maker now, KiriKiri with its next line) */
- drawSync(){const ED=require('./engine-draw.cjs'),cfg=ED.settings(this.profile);try{this.textPath?.drawConfig?.(cfg);}catch{}
+ drawSync(){if(this.disposed||this.stopPending||this.stopError)return;const ED=require('./engine-draw.cjs'),cfg=ED.settings(this.profile);try{this.textPath?.drawConfig?.(cfg);}catch{}
   /* a game whose diff turns draw.* on gets its control file at once (YU-RIS arms its glyph loop hook from it before any line) */
   try{const pid=this.gamePid();if(pid&&(cfg.roles||cfg.embed||cfg.clear||cfg.advhdInput===true||cfg.cmvsInput===true||cfg.fvpInput===true||cfg.minoriInput===true||(cfg.choiceFrames||[]).length))this.ensureEngineDraw(pid);else this.engineDraw?.setProfile(this.profile);}catch{}}
  send(v){if(v&&(v.type==='enable'||v.type==='disable'))try{this.textPath?.hide(v.type==='enable');}catch{}if(this.process?.stdin.writable)this.process.stdin.write(JSON.stringify(v)+'\n');}
@@ -970,7 +970,20 @@ class HookNative{
  drawLog(raw){try{const seen=this.drawSeen||(this.drawSeen=new Set());if(seen.has(raw))return;seen.add(raw);if(seen.size>64)seen.delete(seen.values().next().value);
   const file=path.join(this.layout.logs||path.join(this.folder,'..','logs'),'engine-draw.log');require('./log-sink.cjs').append(file,new Date().toISOString()+' '+String(raw).replace(/[\r\n]/g,' ')+'\n',{rotate:4194304});}catch{}}
  drawEmbedReply(key,o){this.engineDraw?.put(key,o);try{this.textPath?.drawEmbed?.(key,o);}catch{}}
- stop(dispose=true){if(dispose)this.disposed=true;this.embedModeSent=undefined;this.probing=false;this.engineDraw?.stop();this.engineDraw=null;if(this.lineUnreadable){this.lineUnreadable=false;this.notify({hookLineUnreadable:false});}if(this.state?.scriptSource)this.notify({scriptSource:false});if(this.state?.embedTranslating)this.notify({embedTranslating:false});clearTimeout(this.skipBurst?.timer);this.skipBurst=null;this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.retryAt=0;this.attempt=0;this.markerKey='';this.waitTarget=null;const old=this.process;const stopping=require('./owned-exit.cjs').trackStop(this,old,()=>{this.send({type:'quit'});old.stdin.end();});this.process=null;if(old)++this.serial;this.enabled=false;this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'disabled',hookSource:null,hookThreads:[],hookDrawCount:0,hookDrawAt:0});if(dispose){this.lastSource='';this.identity='';this.wanted=false;clearInterval(this.timer);}return stopping;}
+ stop(dispose=true){
+  if(dispose){this.disposed=true;this.lastSource='';this.identity='';this.wanted=false;clearInterval(this.timer);}if(this.stopPending)return this.stopPending;
+  let resolve,reject;const result=new Promise((yes,no)=>{resolve=yes;reject=no;});this.stopPending=result;result.catch(()=>{});
+  const tasks=[],draw=this.engineDraw,old=this.process,attempt=fn=>{try{return Promise.resolve(fn());}catch(error){return Promise.reject(error);}};
+  tasks.push(attempt(()=>draw?.stop()).then(()=>{if(this.engineDraw===draw)this.engineDraw=null;}));
+  tasks.push(attempt(()=>{this.embedModeSent=undefined;this.probing=false;if(this.lineUnreadable){this.lineUnreadable=false;this.notify({hookLineUnreadable:false});}if(this.state?.scriptSource)this.notify({scriptSource:false});if(this.state?.embedTranslating)this.notify({embedTranslating:false});clearTimeout(this.skipBurst?.timer);this.skipBurst=null;this.pageReset();this.islandSources.clear();this.islandDraw=null;this.islandDraws=[];this.islandDelivered=0;clearTimeout(this.islandTimer);clearTimeout(this.sourceTimer);clearTimeout(this.sourceDeadline);this.sourceDeadline=null;this.pendingSource=null;this.verified=false;this.retryAt=0;this.attempt=0;this.markerKey='';this.waitTarget=null;}));
+  // Even failed control revocation must request and await the owned helper's shutdown.
+  tasks.push(attempt(()=>require('./owned-exit.cjs').trackStop(this,old,()=>{try{this.send({type:'quit'});}finally{old.stdin.end();}})));
+  this.process=null;if(old)++this.serial;this.enabled=false;
+  tasks.push(attempt(()=>this.notify({hookActive:false,processAttached:false,streamSelected:false,receivedText:false,replacementState:'disabled',hookSource:null,hookThreads:[],hookDrawCount:0,hookDrawAt:0})));
+  Promise.allSettled(tasks).then(results=>{this.stopPending=null;const failed=results.find(r=>r.status==='rejected');
+   if(failed){const error=Error('READER_STOP_INCOMPLETE',{cause:failed.reason});error.code='READER_STOP_INCOMPLETE';this.stopError=error;reject(error);}else{this.stopError=null;resolve();}
+  });return result;
+ }
 }
 HookNative.GIVE_WAY_MS=2000;
 module.exports={FLOW_PAGE_EXES,HookNative,PAGE_ENGINES,cleanSource,scriptSource,identifierNoise,splitSpeaker,speakerName};

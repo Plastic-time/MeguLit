@@ -46,24 +46,31 @@ function krkrControlText(cfg,entries){
 }
 class KrkrTransport{
  constructor(pid,{tmp=os.tmpdir(),delay=40}={}){this.file=krkrControlPath(pid,tmp);this.delay=delay;this.timer=null;this.last='';}
- write(cfg,entries){clearTimeout(this.timer);this.timer=setTimeout(()=>this.flush(cfg,entries),this.delay);this.timer.unref?.();}
- flush(cfg,entries){clearTimeout(this.timer);this.timer=null;const text=krkrControlText(cfg,entries);if(text===this.last)return;this.last=text;
+ write(cfg,entries){if(this.closed)return;clearTimeout(this.timer);this.timer=setTimeout(()=>this.flush(cfg,entries),this.delay);this.timer.unref?.();}
+ flush(cfg,entries){if(this.closed)return;clearTimeout(this.timer);this.timer=null;const text=krkrControlText(cfg,entries);if(text===this.last)return;this.last=text;
   try{fs.mkdirSync(path.dirname(this.file),{recursive:true});const t=this.file+'.'+process.pid+'.tmp';fs.writeFileSync(t,Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(text,'utf16le')]));fs.renameSync(t,this.file);}catch{}}
- stop(){clearTimeout(this.timer);this.timer=null;try{fs.unlinkSync(this.file);}catch{}}
+ stop({terminal=false}={}){if(terminal)this.closed=true;clearTimeout(this.timer);this.timer=null;
+  try{fs.unlinkSync(this.file);}catch(error){if(error.code!=='ENOENT'){
+   // A locked file may still allow writing. This confirms the control bytes, not a native drain ACK.
+   const text='#cfg roles=0 embed=0 zh=0 advhdInput=0 cmvsInput=0 fvpInput=0 minoriInput=0\r\n',off=Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(text,'utf16le')]);
+   try{fs.writeFileSync(this.file,off);if(!fs.readFileSync(this.file).equals(off))throw Error('CONTROL_READBACK_MISMATCH');}
+   catch(cause){const failed=Error('READER_STOP_INCOMPLETE',{cause});failed.code='READER_STOP_INCOMPLETE';failed.controlFile=this.file;failed.unlinkError=error;throw failed;}
+  }}this.last='';
+ }
 }
 
 /* One game process. `transport` = {write(cfg, entries), stop()} */
 class EngineDraw{
  constructor({profile,transport,onAsk=()=>{}}){this.cfg=settings(profile);this.transport=transport;this.onAsk=onAsk;this.entries=new Map();this.asked=new Set();this.sync();}
- setProfile(profile){const c=settings(profile);if(JSON.stringify(c)===JSON.stringify(this.cfg))return;this.cfg=c;this.sync();}
- get active(){return this.cfg.roles||this.cfg.embed||this.cfg.clear||this.cfg.advhdInput===true||this.cfg.cmvsInput===true||this.cfg.fvpInput===true||this.cfg.minoriInput===true||(this.cfg.choiceFrames||[]).length>0;}
- sync(){if(this.active)this.transport.write(this.cfg,this.entries);else this.transport.stop();}
+ setProfile(profile){if(this.closed)return;const c=settings(profile);if(JSON.stringify(c)===JSON.stringify(this.cfg))return;this.cfg=c;this.sync();}
+ get active(){return !this.closed&&(this.cfg.roles||this.cfg.embed||this.cfg.clear||this.cfg.advhdInput===true||this.cfg.cmvsInput===true||this.cfg.fvpInput===true||this.cfg.minoriInput===true||(this.cfg.choiceFrames||[]).length>0);}
+ sync(){if(this.closed)return;if(this.active)this.transport.write(this.cfg,this.entries);else this.transport.stop();}
  /* a dialogue record (role=line) without emb: ask the reader for its replacement once */
- line(rec){if(!this.cfg.embed||!rec||rec.emb)return false;const k=keyOf(rec.text);if(!k||this.entries.has(k)||this.asked.has(k))return false;
+ line(rec){if(this.closed||!this.cfg.embed||!rec||rec.emb)return false;const k=keyOf(rec.text);if(!k||this.entries.has(k)||this.asked.has(k))return false;
   this.asked.add(k);if(this.asked.size>4*MAX)this.asked.delete(this.asked.values().next().value);this.onAsk({key:k,text:k,engine:rec.engine});return true;}
- put(key,{ruby=[],zh=''}={}){const k=keyOf(key);if(!k)return;this.entries.delete(k);this.entries.set(k,{ruby,zh:String(zh||'')});
+ put(key,{ruby=[],zh=''}={}){if(this.closed)return;const k=keyOf(key);if(!k)return;this.entries.delete(k);this.entries.set(k,{ruby,zh:String(zh||'')});
   while(this.entries.size>MAX)this.entries.delete(this.entries.keys().next().value);if(this.cfg.embed)this.transport.write(this.cfg,this.entries);}
- stop(){this.transport.stop();this.entries.clear();this.asked.clear();}
+ stop(){this.closed=true;try{return this.transport.stop({terminal:true});}finally{this.entries.clear();this.asked.clear();}}
 }
 
 /* ---- UI items -> the reader's art-text items (web/reader/modules/art-text.js: an invisible, look-up-able copy of each row
