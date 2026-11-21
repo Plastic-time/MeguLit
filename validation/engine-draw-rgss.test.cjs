@@ -174,6 +174,7 @@ test('full VX corpus: every archive member and all non-Main scripts survive the 
  const reused=D.makeShadow({source,shadowRoot:dir,port:4321,token:'b'.repeat(32)});assert.equal(reused.shadow,sh.shadow);assert.equal(reused.reused,true);assert.equal(fs.readFileSync(save,'utf8'),'new user progress');assert.equal(fs.readFileSync(settings,'utf8'),'new user settings');assert.equal(D.existingShadow({exe:source.exe,shadowRoot:dir}),sh.exe);
  const replacement=R.read(archive,R.list(archive).find(x=>x.name.toLowerCase()==='data/scripts.rvdata')),main=C.scriptTable(replacement).rows.find(x=>x.name==='Main').source.toString();assert.ok(main.includes('HELLO '+ 'b'.repeat(32)));assert.ok(!main.includes('HELLO '+ 'a'.repeat(32)));
  const marker=path.join(sh.shadow,'megulit-rgss-shadow.json'),owned=fs.readFileSync(marker),foreign=JSON.parse(owned);foreign.sourceExe='other';fs.writeFileSync(marker,JSON.stringify(foreign));assert.throws(()=>D.makeShadow({source,shadowRoot:dir,port:4321,token:'b'.repeat(32)}),/SHADOW_SOURCE_CHANGED/);fs.writeFileSync(marker,owned);assert.equal(fs.readFileSync(save,'utf8'),'new user progress');
+ for(const [f,h] of before)assert.equal(digest(fs.readFileSync(path.join(sample,f))),h,'source after reuse '+f);
  // The real sample is read-only above; loose-script refusal is exercised on its disposable shadow
  fs.mkdirSync(path.join(sh.shadow,'Data'),{recursive:true});fs.writeFileSync(path.join(sh.shadow,'Data','Scripts.rvdata'),'override');assert.throws(()=>D.plan(sh.exe),/LOOSE_SCRIPTS_OVERRIDE/);
 });
