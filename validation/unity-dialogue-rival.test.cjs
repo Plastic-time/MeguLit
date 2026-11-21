@@ -30,6 +30,7 @@ test('E610 the twin is hidden only after the selected stream wrote the same line
  assert.match(s,/SameLine\(text,LastEmbedText\)&&\(\(DateTime\.UtcNow-LastEmbedAt\)\.TotalMilliseconds<1500\|\|\(DateTime\.UtcNow-JaTwinHiddenAt\)\.TotalMilliseconds<1500\)/);
  assert.match(s,/RememberedCode!=""&&rv\.code==RememberedCode\?1:/);
  assert.match(s,/Emit\(new\{type="hookStreamLeft",id=was,code=wasCode,to=tp\.Key\(\)\}\)/);
+ assert.match(s,/Select\(tp\.Key\(\)\);\/\*[^*]*\*\/lock\(Gate\)\{if\(DialogueLike\(text\)\)\{LastSelectedLine=text;LastSelectedLineAt=DateTime\.UtcNow;\}\}/,'the line that won the switch counts for its twins');
  const n=fs.readFileSync(path.join(__dirname,'..','core','hook-native.cjs'),'utf8');
  assert.match(n,/gdilessSelected\(sel\)\{[^\n]*return \/:JIT:UNITY\$\|IL2CPP\/i\.test/);assert.match(n,/this\.ownTextFn\?\.\(\)===true&&!this\.gdilessSelected\(\)/,'calibration can pause a Unity stream under placement');assert.match(n,/own&&!this\.textPathActive&&!gdiless/);
  assert.match(n,/if\(m\.type==='hookStreamLeft'\)/);
