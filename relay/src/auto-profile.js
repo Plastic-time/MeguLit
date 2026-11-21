@@ -40,6 +40,7 @@
 import gameDiff from '../../core/game-diff.cjs';
 import domains from '../../core/profiles/domains.cjs';
 import gamePrint from '../../core/game-print.cjs';
+import {parseCredit,noteUpload,creditOfDiff,creditPut} from './torch-credit.js';
 const {canonical,validate,build,unsigned,KEY}=gameDiff;
 const {VERSION_KINDS,GAME_KINDS}=gamePrint;
 export const PROFILE_LIMITS={body:16*1024,signed:32*1024,runtime:3*1024*1024,agree:2,keepDays:180,reportsPerKey:50,queue:200,picks:200};
@@ -109,26 +110,32 @@ async function settle(env,layer,key,now){const since=sec(now)-PROFILE_LIMITS.kee
 /* ---- public --------------------------------------------------------------------------------------------------------- */
 async function report(request,env,ip,now,{json,fail,readJSON}){
  const body=await readJSON(request,PROFILE_LIMITS.body);if(body.error)return fail(body.error,body.error==='PAYLOAD_TOO_LARGE'?413:400);
- const v=validateReport(body.value);if(!v.ok)return fail(v.error);const r=v.value,t=sec(now),hash=(await sha256(r.mode+'|'+canonical(r.settings))).slice(0,32);
+ const v=validateReport(body.value);if(!v.ok)return fail(v.error);const r=v.value,t=sec(now);
+ /* 2026-11-21 传火署名: credit:{name?} next to profile (or inside it); refused whole when it is not a clean name (relay/src/torch-credit.js) */
+ const cr=parseCredit(body.value.credit!==undefined?body.value.credit:body.value.profile?.credit,env);if(!cr.ok)return fail('INVALID_CREDIT');
+ const hash=(await sha256(r.mode+'|'+canonical(r.settings))).slice(0,32);
  const gid=await gidFor(env,r.prints);
  await env.DB.prepare('INSERT INTO auto_profile_reports(game_key,reporter,gid,prints,settings_hash,settings,mode,source,cost,metrics,engine,exe,app,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(game_key,reporter) DO UPDATE SET gid=excluded.gid,prints=excluded.prints,settings_hash=excluded.settings_hash,settings=excluded.settings,mode=excluded.mode,source=excluded.source,cost=excluded.cost,metrics=excluded.metrics,engine=excluded.engine,exe=excluded.exe,app=excluded.app,updated_at=excluded.updated_at')
   .bind(r.key,ip,gid,JSON.stringify(r.prints),hash,canonical(r.settings),r.mode,r.source,r.cost,JSON.stringify(r.metrics),r.engine,r.exe,r.app,t).run();
  await env.DB.prepare('DELETE FROM auto_profile_reports WHERE game_key=? AND reporter NOT IN (SELECT reporter FROM auto_profile_reports WHERE game_key=? ORDER BY updated_at DESC LIMIT ?)').bind(r.key,r.key,PROFILE_LIMITS.reportsPerKey).run();
  await register(env,'version',r.key,r.prints,['head','pe'],t);if(gid)await register(env,'game',gid,r.prints,['exe',...GAME_KINDS],t);
+ const credit=await noteUpload(env,r.key,ip,cr,now);
  /* 2026-11-21 kind: 'newVersion' = a shared diff found by head / pe / the game (not this exe) failed its first window here (the
     client's reason starts 「同游戏新版本」): this build needs its own version layer; 'broken' = the self-check stepped it down */
  if(r.source==='gate'){const kind=r.reason.startsWith('同游戏新版本')?'newVersion':'broken';await env.DB.prepare("INSERT INTO auto_profile_queue(game_key,gid,prints,exe,engine,reasons,note,kind,reporters,app,first_at,last_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?) ON CONFLICT(game_key) DO UPDATE SET gid=excluded.gid,prints=excluded.prints,exe=excluded.exe,engine=excluded.engine,reasons=excluded.reasons,note=excluded.note,kind=excluded.kind,reporters=auto_profile_queue.reporters+1,app=excluded.app,last_at=excluded.last_at,closed_at=NULL")
   .bind(r.key,gid,JSON.stringify(r.prints),r.exe,r.engine,JSON.stringify(r.over),r.reason,kind,r.app,t,t).run();}
  await settle(env,'version',r.key,now);if(gid)await settle(env,'game',gid,now);
- return json({ok:true,queued:r.source==='gate',game:gid||null},201);}
+ return json({ok:true,queued:r.source==='gate',game:gid||null,torchNo:credit.torchNo,name:credit.name,at:credit.at,credit},201);}
 async function lookup(env,url,exeFromPath,{json,fail}){const q=Object.fromEntries(['exe','head','pe','pack','script','steam','vndb','title'].map(k=>[k,url.searchParams.get(k)||'']));if(exeFromPath)q.exe=exeFromPath;
  const prints=gamePrint.check(q);if(!Object.keys(prints).length)return fail('NO_PRINTS',400);
  const version=await find(env,'version',prints),game=await find(env,'game',prints);
  if(!version&&!game)return fail('NOT_FOUND',404,{'cache-control':'public, max-age=900'});
  const have=url.searchParams.get('have'),haveGame=url.searchParams.get('haveGame');
  if((have!==null||haveGame!==null)&&String(version?.diff?.rev??'')===String(have??'')&&String(game?.diff?.rev??'')===String(haveGame??''))return new Response(null,{status:304,headers:{'cache-control':'public, max-age=3600'}});
- const out=x=>x?{match:x.match,key:x.key,diff:x.diff}:null;const top=version||game;
- return json({schema:'megulit.game-diff-feed',version:2,key:prints.exe||'',match:top.match,versionLayer:out(version),gameLayer:out(game),diff:top.diff},200,{'cache-control':'public, max-age=3600'});}
+ const hashOf=async d=>(await sha256(d.mode+'|'+canonical(d.settings))).slice(0,32);
+ if(version)version.credit=await creditOfDiff(env,'version',version.key,version.diff,hashOf);if(game)game.credit=await creditOfDiff(env,'game',game.key,game.diff,hashOf);
+ const out=x=>x?{match:x.match,key:x.key,diff:x.diff,credit:x.credit}:null;const top=version||game;
+ return json({schema:'megulit.game-diff-feed',version:2,key:prints.exe||'',match:top.match,versionLayer:out(version),gameLayer:out(game),diff:top.diff,credit:top.credit},200,{'cache-control':'public, max-age=3600'});}
 async function runtimePost(request,env,ip,now,{json,fail,readJSON}){const body=await readJSON(request,Math.ceil(PROFILE_LIMITS.runtime*4/3)+4096);if(body.error)return fail(body.error,body.error==='PAYLOAD_TOO_LARGE'?413:400);const v=body.value||{};
  if(v.version!==1||!KEY.test(String(v.key||''))||!/^[0-9a-f]{64}$/.test(String(v.sha256||''))||typeof v.data!=='string'||v.identity!==undefined&&!/^[0-9a-f]{64}$/.test(String(v.identity)))return fail('INVALID_RUNTIME');
  let bytes;try{const bin=atob(v.data);bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);}catch{return fail('INVALID_RUNTIME');}
@@ -183,6 +190,7 @@ const OURS={'/api/game-profile/picks':['GET',picksGet,'q'],'/api/game-profile/qu
 export async function profileRoute(request,env,ip,now,url,path,deps){const {fail,hit}=deps,m=request.method;
  if(path==='/api/game-profile/report')return m==='POST'?(await hit(env,'autoprof-report',ip,now.getTime())?report(request,env,ip,now,deps):fail('RATE_LIMITED',429)):fail('METHOD_NOT_ALLOWED',405);
  if(path==='/api/game-profile/runtime')return m==='POST'?(await hit(env,'profile-runtime',ip,now.getTime())?runtimePost(request,env,ip,now,deps):fail('RATE_LIMITED',429)):fail('METHOD_NOT_ALLOWED',405);
+ if(path==='/api/game-profile/credit')return m==='PUT'?(await hit(env,'autoprof-credit',ip,now.getTime())?creditPut(request,env,ip,now,deps,KEY):fail('RATE_LIMITED',429)):fail('METHOD_NOT_ALLOWED',405);
  const o=OURS[path];if(o){if(!ours(request,env))return fail('UNAUTHORIZED',401);if(m!==o[0])return fail('METHOD_NOT_ALLOWED',405);return o[2]==='q'?o[1](env,url,deps):o[1](request,env,now,deps);}
  /* no rate-limit row on reads (D1 write budget): the global per-IP limiter covers them */
  if(path==='/api/game-profile/retest')return m==='GET'?retestGet(env,url,deps):fail('METHOD_NOT_ALLOWED',405);
