@@ -254,6 +254,24 @@
   /* a placed line replaced before any frame drew it (options arrive within one frame) waits like the current one */
   function noteReplaced(l) { if (!l || l.fallback || !Array.isArray(l.rects) || !l.text) return; const t = [...l.text].filter(c => !blank(c)).join(''); if (!t || drawnRecent.has(t) || waits.has(t) || orphans.some(o => o.text === t)) return; waits.set(t, { at: performance.now(), l }); setTimeout(schedule, ORPHAN_MS + 20); }
   function flushWaits() { const now = performance.now(); for (const [t, w] of [...waits]) if (now - w.at >= ORPHAN_MS) { waits.delete(t); if (t) { drawnRecent.add(t); if (drawnRecent.size > 40) drawnRecent.delete(drawnRecent.values().next().value); } orphanWait = { text: t, at: w.at }; orphan(w.l); } }
+  /* 2026-11-21 (owner, ファタモルガーナの館: 「一直挂着一个文本」, an old line drawn after the player had moved on): the player's advance input
+     (readerInput complete: a click, Space or Enter in the game, from GalWindowBridge) cancels every orphan still waiting from before it
+     (ADV_GRACE: native polling may report the click just after the next line was placed); a line placed before it is not drawn as an
+     orphan any more unless the game places it again (stale). A single drawn orphan (an ADV line) goes unless the game places its text
+     again within ADV_SETTLE; two or more (a choice screen, an NVL page) stay, a click beside the options moves nothing on. Only stale
+     drawing goes: nothing new is drawn, hiding and positions are untouched. */
+  const ADV_GRACE = 150, ADV_SETTLE = 350;
+  let advance = null; const stale = new Set();
+  function advanceInput() {
+    const now = performance.now(); let changed = false;
+    for (const [t, w] of [...waits]) if (w.at < now - ADV_GRACE) { waits.delete(t); stale.add(t); changed = true; }
+    if (orphanWait && orphanWait.at < now - ADV_GRACE) { stale.add(orphanWait.text); orphanWait = null; changed = true; }
+    if (stale.size > 32) stale.delete(stale.values().next().value);
+    if (orphans.length === 1) { const mine = advance = { at: now, keep: new Set() }; setTimeout(() => { if (advance !== mine) return; advance = null; const next = orphans.filter(o => mine.keep.has(o.text)); if (next.length !== orphans.length) { orphans = next; extraKey = ''; schedule(); } }, ADV_SETTLE); }
+    (b.textPlaceAdvances = (b.textPlaceAdvances || 0) + 1); return changed;
+  }
+  b.textPlaceAdvance = advanceInput;
+  function bindAdvance() { if (b.textPlaceAdvanceBound || typeof b.galStatus !== 'function') return; b.textPlaceAdvanceBound = true; const previous = b.galStatus; b.galStatus = m => { previous(m); if (m?.type === 'readerInput' && m.complete === true) advanceInput(); }; }
   let gaveWayAt = 0;
   function giveWay() { const now = performance.now(); if (now - gaveWayAt < 1000) return; gaveWayAt = now; (b.textPlaceGaveWay = (b.textPlaceGaveWay || 0) + 1); try { window.__tomoyoTranslateRequest?.(JSON.stringify({ type: 'engineGiveWay', ms: 3000 })); } catch {} }
   function orphanItems() { const taken = new Set(extras.items.map(i => [...String(i.text || '')].filter(c => !blank(c)).join(''))); return orphans.filter(o => !taken.has(o.text)).map(o => ({ id: 'orphan:' + o.text, kind: 'l', text: o.text, rects: o.rects, client: o.client })); }
@@ -289,7 +307,7 @@
     const text = chars.filter(c => !blank(c)).join('');
     if (text && text === goneText) return; /* the game cleared it (textPlace gone) */
     if (!text || !rects.length || !rects.every(r => Array.isArray(r) && r[2] > 0 && r[3] > 0)) { giveWay(); return; } /* cannot be drawn here: the game draws it */
-    if (orphans.some(o => o.text === text)) return;
+    if (orphans.some(o => o.text === text) || stale.has(text)) return;
     /* 2026-11-21 (owner, ファタモルガーナの館 r33: a clump of characters in the middle of the screen; two lines on top of each other):
        the text effect redraws one place again and again, and a frame of two passes puts two characters on one box
        (「………自分……の自死体…分…の自だ…」). Such a frame is not a line: it is never drawn */
@@ -754,7 +772,7 @@
     /* 2026-11-20 (CHAOS;CHILD: the click that clears a page at a scene change makes the game draw the whole page once more as plain text,
        earlier lines and the placed one together, while its hidden line leaves the screen): the placed line goes with the page until the next line */
     if (m.hiding === true && cur && vis.length > cur.length && vis.endsWith(cur)) { document.body.classList.add('megulit-place-gone'); line = null; schedule(); return; }
-    drawnEmbedded = m.embedded === 1 || m.embedded === 2 ? m.embedded : 0; drawnByGame = vis; drawnHiding = m.hiding === true; schedule(); return; } if (m && Array.isArray(m.rects) && m.text) drawnByGame = ''; { const nb = t => [...String(t || '')].filter(c => !blank(c)).join(''), cur = line && !line.fallback ? nb(line.text) : '', nt = m?.fallback && m.text ? nb(m.text) : '';
+    drawnEmbedded = m.embedded === 1 || m.embedded === 2 ? m.embedded : 0; drawnByGame = vis; drawnHiding = m.hiding === true; schedule(); return; } if (m && Array.isArray(m.rects) && m.text) { drawnByGame = ''; { const t = [...String(m.text)].filter(c => !blank(c)).join(''); if (advance) advance.keep.add(t); stale.delete(t); } } { const nb = t => [...String(t || '')].filter(c => !blank(c)).join(''), cur = line && !line.fallback ? nb(line.text) : '', nt = m?.fallback && m.text ? nb(m.text) : '';
     /* the same page redraw seen first as an unplaced line of the whole page (earlier lines + the placed one) */
     if (cur && nt.length > cur.length && nt.endsWith(cur)) { document.body.classList.add('megulit-place-gone'); line = null; schedule(); return; } }
     document.body.classList.remove('megulit-place-gone'); if (m?.clear) line = null; else if (m?.fallback && m.text) line = { fallback: true, text: String(m.text) }; else if (m && Array.isArray(m.rects) && m.text) { if (line && !line.fallback && line.text !== String(m.text)) noteReplaced(line); } if (m?.clear) {} else if (m?.fallback && m.text) {} else if (m && Array.isArray(m.rects) && m.text) line = { text: String(m.text), rects: m.rects, client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] }; schedule(); };
@@ -764,7 +782,7 @@
   b.textPlacePage = m => { const had = !!page; if (m?.elsewhere === true || !m || !Array.isArray(m.lines)) { if (pageOwn) { pageOwn = false; briefSync(false); } } if (m?.elsewhere === true) { page = null; drawnByGame = ''; if (had) { pageGone(); dropOld(null); document.getElementById('megulit-page-ahead')?.replaceChildren(); document.body.classList.remove('megulit-place-game-drawn'); } schedule(); return; } page = m && Array.isArray(m.lines) ? { awake: m.awake === true, armed: m.armed === true, lines: m.lines.filter(l => l && typeof l.text === 'string' && Array.isArray(l.rects)), client: Array.isArray(m.client) ? m.client : [innerWidth, innerHeight] } : null; if (page) { line = null; drawnByGame = ''; } else if (had) pageGone(); schedule(); };
   b.textPlaceExtra = m => { extras = { items: Array.isArray(m?.items) ? m.items.filter(i => i && typeof i.text === 'string' && Array.isArray(i.rects)) : [], client: Array.isArray(m?.client) ? m.client : null }; schedule(); };
   let modeGame = null;
-  b.textPlaceMode = m => { on = m?.on === true; if (!on) waits.clear(); if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; boxBottom = 0; boxKey = ''; if (page) { page = null; pageGone(); } } schedule(); };
+  b.textPlaceMode = m => { on = m?.on === true; if (on) bindAdvance(); if (!on) { advance = null; stale.clear(); } if (!on) waits.clear(); if (!on) { orphans = []; orphanWait = null; } const g = m && 'game' in m ? String(m.game || '') : modeGame; if (!on || g !== modeGame) { anchor = null; anchorLine = ''; cnBelow = { key: null, below: false }; } modeGame = g; if (!on) { if (pageOwn) { pageOwn = false; briefSync(false); } line = null; drawnByGame = ''; boxBottom = 0; boxKey = ''; if (page) { page = null; pageGone(); } } schedule(); };
   /* 2026-11-21 (owner's recording 08:28, 千恋＊万花): game-fit.js measured the reader on its own place in the gap between two lines and cut the
      next line's translation; while this module anchors lines on the game's place it owns their layout, gaps included */
   b.textPlaceOwns = () => on && anchorMode && !!anchor;
