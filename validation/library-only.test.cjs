@@ -128,6 +128,7 @@ function launchHarness(mode,existing,{stopError=false}={}){
  const modules={
   '../core/library-mode.cjs':{libraryOnly:()=>mode},'./import-source.cjs':{backfill(){},targetOf:()=>''},
   './background-games.cjs':{foreground:async()=>calls.push('foreground'),unmute:async()=>calls.push('unmute')},
+  './embedded-japanese-jobs.cjs':require('../services/embedded-japanese-jobs.cjs'),
   '../core/steam-owned.cjs':{launchAppid:()=>'',partOf:()=>null},'./game-language.cjs':{originalExecutable:()=>{calls.push('jp-check');return {blocked:false};}},
   '../core/drm-wrap.cjs':{plan:()=>null},'./locale-launch.cjs':{requiresAdministrator:()=>false},
   './shared-adaptation.cjs':{importFor(){}},'./japanese-restore-options.cjs':{forExecutable:()=>({})},
@@ -143,9 +144,9 @@ function launchHarness(mode,existing,{stopError=false}={}){
  vm.createContext(context);vm.runInContext(body+';globalThis.launch=launch',context);return {calls,run:()=>context.launch(db,'g',{stopReading:async()=>{calls.push('reader-stop');if(stopError)throw Error('READER_STOP_INCOMPLETE');},prepareGame:()=>calls.push('prepare'),bindLaunched:()=>calls.push('bind')})};
 }
 test('actual launch flow in library mode retains foreground cleanup, readiness and audio for new/existing games',async()=>{
- for(const existing of [false,true]){const h=launchHarness(true,existing);const result=await h.run();assert.equal(result.action,existing?'focused':'launched');assert.equal(h.calls[0],'foreground');assert(h.calls.includes('reader-stop'));assert(h.calls.includes('unmute'));assert(!h.calls.includes('jp-check'));assert(!h.calls.includes('jp-repair'));assert(!h.calls.includes('jp-auto'));assert(!h.calls.includes('text-path'));}
+ for(const existing of [false,true]){const h=launchHarness(true,existing);const result=await h.run();assert.equal(result.action,existing?'focused':'launched');assert.equal(h.calls[0],'foreground');assert(h.calls.includes('reader-stop'));assert(h.calls.includes('unmute'));assert(!h.calls.includes('jp-check'));assert(!h.calls.includes('jp-repair'));assert(!h.calls.includes('jp-auto'));assert(!h.calls.includes('text-path'));assert.doesNotThrow(()=>require('../services/embedded-japanese-jobs.cjs').assertLaunchSafe('H:/fake'));}
  const h=launchHarness(false,true);await h.run();assert(h.calls.includes('jp-check'));assert(h.calls.includes('jp-repair'));assert(h.calls.includes('jp-auto'));
 });
 test('a previously incomplete reader shutdown pauses library-only launch after cold cleanup',async()=>{
- const h=launchHarness(true,false,{stopError:true});await assert.rejects(h.run(),/READER_STOP_INCOMPLETE/);assert.equal(h.calls[0],'foreground');assert(!h.calls.includes('launch'));assert(!h.calls.includes('jp-auto'));
+ const h=launchHarness(true,false,{stopError:true});await assert.rejects(h.run(),/READER_STOP_INCOMPLETE/);assert.equal(h.calls[0],'foreground');assert(!h.calls.includes('launch'));assert(!h.calls.includes('jp-auto'));assert.doesNotThrow(()=>require('../services/embedded-japanese-jobs.cjs').assertLaunchSafe('H:/fake'));
 });

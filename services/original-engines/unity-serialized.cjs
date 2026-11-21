@@ -9,7 +9,7 @@
 const COMMON=['AABB','AnimationClip','AnimationCurve','AnimationState','Array','Base','BitField','bitset','bool','char','ColorRGBA','Component','data','deque','double','dynamic_array','FastPropertyName','first','float','Font','GameObject','Generic Mono','GradientNEW','GUID','GUIStyle','int','list','long long','map','Matrix4x4f','MdFour','MonoBehaviour','MonoScript','m_ByteSize','m_Curve','m_EditorClassIdentifier','m_EditorHideFlags','m_Enabled','m_ExtensionPtr','m_GameObject','m_Index','m_IsArray','m_IsStatic','m_MetaFlag','m_Name','m_ObjectHideFlags','m_PrefabInternal','m_PrefabParentObject','m_Script','m_StaticEditorFlags','m_Type','m_Version','Object','pair','PPtr<Component>','PPtr<GameObject>','PPtr<Material>','PPtr<MonoBehaviour>','PPtr<MonoScript>','PPtr<Object>','PPtr<Prefab>','PPtr<Sprite>','PPtr<TextAsset>','PPtr<Texture>','PPtr<Texture2D>','PPtr<Transform>','Prefab','Quaternionf','Rectf','RectInt','RectOffset','second','set','short','size','SInt16','SInt32','SInt64','SInt8','staticvector','string','TextAsset','TextMesh','Texture','Texture2D','Transform','TypelessData','UInt16','UInt32','UInt64','UInt8','unsigned int','unsigned long long','unsigned short','vector','Vector2f','Vector3f','Vector4f','m_ScriptingClassIdentifier','Gradient','Type*','int2_storage','int3_storage','BoundsInt','m_CorrespondingSourceObject','m_PrefabInstance','m_PrefabAsset','FileSize','Hash128'];
 const COMMON_AT=(()=>{const m=new Map();let o=0;for(const s of COMMON){m.set(o,s);o+=s.length+1;}return m;})();
 
-function parse(buf,{externals=false}={}){
+function parse(buf,{externals=false,layout=false}={}){
  let p=0;const be=()=>{const v=buf.readUInt32BE(p);p+=4;return v;};
  let metaSize=be(),fileSize=be();const version=be();let dataOffset=be();let little=true;
  if(version<9||version>40)return null;
@@ -31,10 +31,12 @@ function parse(buf,{externals=false}={}){
  if(version>=7&&version<14)p+=4;
  const n=i32();if(n<0||n>5000000)return null;const objects=[];
  for(let i=0;i<n;i++){if(version>=14)p=(p+3)&~3;const o={};o.id=version>=14?i64():version>=7?(i32()):0;
-  o.offset=(version>=22?i64():u32())+dataOffset;o.size=u32();
+  const offsetAt=p;o.offset=(version>=22?i64():u32())+dataOffset;const sizeAt=p;o.size=u32();
+  if(layout){o.offsetAt=offsetAt;o.sizeAt=sizeAt;}
   if(version>=16){const ti=i32();o.type=types[ti]?.classId??-1;o.tree=types[ti]?.tree||null;o.scriptIndex=types[ti]?.scriptIndex;}else{const tid=i32();const t=types.find(x=>x.classId===tid);o.type=t?t.classId:tid;o.tree=t?.tree||null;i16();if(version>=11)i16();if(version>=15)p++;}
   objects.push(o);}
  const result={version,unity,typeTree,little,objects};
+ if(layout)Object.assign(result,{dataOffset,fileSize});
  if(externals&&version>=17){
   const limit=Math.min(dataOffset,buf.length),scripts=i32();
   if(scripts<0||scripts>(limit-p)/12)return null;

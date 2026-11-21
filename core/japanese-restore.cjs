@@ -131,6 +131,7 @@ const langSwitch=()=>require('./game-language-switch.cjs'),artemis=()=>require('
 function detect(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));if(!fs.existsSync(gameDir))return {state:'missing'};
  const manifest=readManifest(gameDir);
+ if(manifest?.adapter==='utage-embedded')return {state:'applied',adapter:'utage-embedded',files:manifest.files.length,cells:manifest.coverage?.rows||0,pending:0,coverage:manifest.coverage};
  if(manifest?.adapter==='language-switch')return langSwitch().detect(gameDir,options);
  if(manifest?.adapter==='artemis-pfs')return artemis().detect(gameDir);
  if(manifest?.adapter==='yuris-update')return {state:'applied',adapter:'yuris-update',files:manifest.files.length,cells:0,pending:0,manifest:{at:manifest.at,files:manifest.files.length}};
@@ -169,6 +170,7 @@ function nativeRunning(gameDir){
  return false;
 }
 function gameRunning(gameDir){
+ try{gameDir=fs.realpathSync.native(path.resolve(gameDir));}catch{}
  {const quick=nativeRunning(gameDir);if(quick!==null)return quick;}
  // PowerShell prints in the console code page unless told otherwise; Japanese and Chinese paths must come back as UTF-8.
  // A cold PowerShell start can take well over 15 s on a busy machine; a timeout used to read as "not running",
@@ -188,6 +190,7 @@ function writeAtomic(file,data){const tmp=file+'.megulit-tmp';fs.writeFileSync(t
 
 function apply(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));if(gameRunning(gameDir))throw Error('GAME_RUNNING');
+ if(Object.hasOwn(options,'embeddedScanToken'))return require('../services/embedded-japanese.cjs').apply(gameDir,{scanToken:options.embeddedScanToken,progress:options.embeddedProgress});
  const repaired=repairNameColumns(gameDir,options);if(repaired.repaired)return {applied:repaired.applied,cells:repaired.cells||0,repaired:true};
  {const y=readManifest(gameDir)?null:yurisPlan(gameDir);if(y&&y.updates.length)return yurisApply(gameDir,y);}
  const plan=siglusPlan(gameDir,options);if(!plan||!plan.changes.length){if(!readManifest(gameDir)&&langSwitch().detect(gameDir,options).state==='restorable')return langSwitch().apply(gameDir,options);if(!readManifest(gameDir)&&artemis().detect(gameDir).state==='restorable')return artemis().apply(gameDir,{bilingual:options.bilingual});throw Error('NOTHING_TO_RESTORE');}
@@ -215,6 +218,7 @@ function restore(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));if(gameRunning(gameDir))throw Error('GAME_RUNNING');
  repairNameColumns(gameDir,options);
  const manifest=readManifest(gameDir);if(!manifest)throw Error('NOT_APPLIED');if(manifest.adapter==='yuris-update')return yurisRestore(gameDir,manifest);if(manifest.adapter==='language-switch')return langSwitch().restore(gameDir,options);if(manifest.adapter==='artemis-pfs')return artemis().restore(gameDir);
+ if(manifest.adapter==='utage-embedded')return require('../services/embedded-japanese.cjs').undo(gameDir);
  const dat=path.join(gameDir,'dat'),backup=path.join(gameDir,BACKUP_DIR,'dat'),skipped=[];let restored=0;
  for(const e of manifest.files){const target=path.join(dat,e.file),keep=path.join(backup,e.file);
   if(!fs.existsSync(keep)){skipped.push(e.file);continue;}
@@ -243,4 +247,4 @@ function repairShared(gameDir,options={}){
  const undone=restore(gameDir,options);if(undone.skipped.length)return {repaired:false,skipped:undone.skipped};
  const done=apply(gameDir,options);return {repaired:true,applied:done.applied};
 }
-module.exports={repairShared,repairNameColumns,detect,apply,restore,_internal:{sharedPool,readManifest,siglusPlan,shownJapanese,isIdent,nameColumn,yurisPlan,gameRunning,nativeRunning,decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};
+module.exports={repairShared,repairNameColumns,detect,apply,restore,_internal:{sharedPool,readManifest,siglusPlan,shownJapanese,isIdent,nameColumn,yurisPlan,gameRunning,nativeRunning,writeAtomic,decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};
