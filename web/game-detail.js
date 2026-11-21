@@ -1,6 +1,6 @@
 import {sessionsView,durHTML} from './detail-sessions.js';
 import {mountWords,mountSentences} from './detail-collect.js';
-import {mountStory} from './detail-story.js';
+import {mountStory,ensureStoryStyles} from './detail-story.js';
 import {loadGsap} from './gsap-loader.js';
 import {attachEmbedPopover} from './embed-popover.js';
 import {launchReason,launchShort,launchRestorable} from './launch-feedback.js';
@@ -33,6 +33,7 @@ const labels={zh:{back:'返回',launch:'启动游戏',edit:'编辑作品',overvi
  refresh:'あらすじを更新',noSynopsis:'保存済みの紹介文がありません。更新すると取得します',noItems:'まだ記録がありません',last:'前回のプレイ',remove:'ライブラリから削除',count:'回の読書',failed:'紹介文を更新できませんでした',missing:'実行ファイルが見つかりません。パスを編集してください'}};
 export async function renderGamePage({main,id,tab:startTab='',api,locale,text,esc,icon,cover,duration,datetime,relativeTime,number,definitions,isCurrent,onBack,onLaunch,onEdit,
  onRemove,onOriginalChanged,onForum,onLookup,toast,invoke,onJapaneseRestore}){
+ ensureStoryStyles();
  /* 2026-11-13 关联单词 / 收录句子 keep their selection, filter and paging across re-renders; GSAP is warmed now so the tab intros start with the markup */
  const collect={words:{},sentences:{},story:{}};let unmount=()=>{};loadGsap().catch(()=>{});
  let activeTab='overview',loadingMetadata=true,synopsisExpanded=false;const w={...labels[locale],...({zh:{memories:'回想',flowchart:'分支图'},ja:{memories:'回想',flowchart:'分岐図'},en:{memories:'Memories',flowchart:'Flowchart'}}[locale]||{})},rw=receptionMessages[locale],data=await api('game_detail',{id,locale});
