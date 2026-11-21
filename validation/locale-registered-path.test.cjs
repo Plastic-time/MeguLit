@@ -23,7 +23,8 @@ test('locale status locates registered directories from literal and escaped file
   for(const file of ['LEProc.exe','LECommonLibrary.dll','LoaderDll.dll','LocaleEmulator.dll'])fs.writeFileSync(path.join(dir,file),'fixture');
   fs.writeFileSync(path.join(dir,'LEConfig.xml'),'<Profile Guid="b56f4ea1-f9ac-418a-add7-653dc2302e91"><Location>ja-JP</Location></Profile>');
  };
- for(const [name,escaped] of [['Plain folder',false],['游戏 日本語',false],['工具 #100%',false],['旧版 日本語',true]])await t.test(name,async()=>{
+ install(path.join(root,'Copy%20A'));
+ for(const [name,escaped] of [['Plain folder',false],['游戏 日本語',false],['工具 #100%',false],['旧版 日本語',true],['Copy A',true]])await t.test(name,async()=>{
   const dir=path.join(root,name);install(dir);
   const handler=path.join(dir,'LEContextMenuHandler.dll'),uri=escaped?pathToFileURL(handler).href:'file:///'+handler.replaceAll('\\','/');
   cp.execFileSync('reg.exe',['add',key,'/v','CodeBase','/t','REG_SZ','/d',uri,'/f'],options);

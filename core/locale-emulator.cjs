@@ -41,8 +41,8 @@ class LocaleEmulator{
    const uri=await require('./registry-string.cjs').registryString('HKEY_CLASSES_ROOT\\CLSID\\{C52B9871-E5E9-41FD-B84D-C5ACADBEC7AE}\\InprocServer32','CodeBase',2500);
    // The .NET Framework installer stores literal paths. Also accept escaped file URIs.
    const literal=/^file:\/\/\/([a-z]:\/.*)$/i.exec(uri);
+   if(/^file:\/\/\//i.test(uri)&&!/[?#]/.test(uri))try{dirs.push(path.dirname(require('node:url').fileURLToPath(uri)));}catch{}
    if(literal)dirs.push(path.win32.dirname(path.win32.normalize(literal[1])));
-   if(/^file:\/\/\//i.test(uri))try{dirs.push(path.dirname(require('node:url').fileURLToPath(uri)));}catch{}
   }
   const home=process.env.USERPROFILE||'';
   for(const base of [path.join(home,'Downloads'),path.join(home,'Desktop'),path.dirname(this.root),process.env.ProgramFiles,process.env['ProgramFiles(x86)']].filter(Boolean)){
