@@ -4,7 +4,8 @@
 // program, a cover and whether LunaHook can read its text (by engine, confirmed once text is actually captured).
 // State lives in config\library.json; the page adds the games to the Tomoyo library (media table) itself.
 const {LocaleEmulator,recommended}=require('./locale-emulator.cjs');
-const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{execFile}=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const {registryString}=require('./registry-string.cjs');
 
 /* E601 engine fingerprints and their readers live in one registry (services/original-engines/registry.cjs) */
 const registry=require('../services/original-engines/registry.cjs'),ENGINES=registry.ENGINES;
@@ -98,7 +99,6 @@ function steamRoot(value){
 }
 // reg.exe prints in the console code page (GBK on Chinese Windows), but the output was read as UTF-8, so a Steam folder
 // with Chinese or Japanese in its path came back garbled and was not found. PowerShell is told to print UTF-8.
-function registryString(key,name){return new Promise(resolve=>{execFile('powershell.exe',['-NoProfile','-NonInteractive','-Command','[Console]::OutputEncoding=[Text.Encoding]::UTF8;(Get-ItemProperty -LiteralPath ("Registry::"+$env:MEGULIT_REG_KEY) -Name $env:MEGULIT_REG_NAME -ErrorAction Stop).($env:MEGULIT_REG_NAME)'],{windowsHide:true,timeout:10000,encoding:'utf8',env:{...process.env,MEGULIT_REG_KEY:key,MEGULIT_REG_NAME:name}},(error,out)=>resolve(error?'':String(out||'').replace(/^﻿/,'').trim()));});}
 async function steamFromRegistry(){const p=await registryString('HKCU\\Software\\Valve\\Steam','SteamPath');return p?path.normalize(p):'';}
 async function findSteam(){
  const tries=[await steamFromRegistry(),'C:\\Program Files (x86)\\Steam','C:\\Program Files\\Steam','D:\\Steam','E:\\Steam','D:\\SteamLibrary','E:\\SteamLibrary'];

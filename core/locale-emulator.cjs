@@ -37,7 +37,13 @@ class LocaleEmulator{
  async status(refresh=false){
   if(!refresh&&this.cached&&Date.now()-this.cached.at<15000)return {...this.cached.value,job:this.job};
   const dirs=[];try{const chosen=JSON.parse(fs.readFileSync(path.join(this.root,'data/config/library.json'),'utf8')).localePath;if(chosen)dirs.push(path.extname(chosen)?path.dirname(chosen):chosen);}catch{}dirs.push(this.dir);
-  try{const output=await run('reg.exe',['query','HKCR\\CLSID\\{C52B9871-E5E9-41FD-B84D-C5ACADBEC7AE}\\InprocServer32','/v','CodeBase'],2500);const uri=/CodeBase\s+REG_SZ\s+(file:\/\/\/[^\r\n]+)/i.exec(output)?.[1];if(uri)dirs.push(path.dirname(require('node:url').fileURLToPath(uri.trim())));}catch{}
+  if(!dirs.some(dir=>complete(dir)&&profile(dir))){
+   const uri=await require('./registry-string.cjs').registryString('HKEY_CLASSES_ROOT\\CLSID\\{C52B9871-E5E9-41FD-B84D-C5ACADBEC7AE}\\InprocServer32','CodeBase',2500);
+   // The .NET Framework installer stores literal paths. Also accept escaped file URIs.
+   const literal=/^file:\/\/\/([a-z]:\/.*)$/i.exec(uri);
+   if(literal)dirs.push(path.win32.dirname(path.win32.normalize(literal[1])));
+   if(/^file:\/\/\//i.test(uri))try{dirs.push(path.dirname(require('node:url').fileURLToPath(uri)));}catch{}
+  }
   const home=process.env.USERPROFILE||'';
   for(const base of [path.join(home,'Downloads'),path.join(home,'Desktop'),path.dirname(this.root),process.env.ProgramFiles,process.env['ProgramFiles(x86)']].filter(Boolean)){
    try{for(const e of fs.readdirSync(base,{withFileTypes:true}))if(e.isDirectory()&&/locale[ ._-]*emulator/i.test(e.name))dirs.push(path.join(base,e.name));}catch{}
