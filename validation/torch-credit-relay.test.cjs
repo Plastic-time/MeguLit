@@ -93,3 +93,49 @@ test('传火碑 GET /api/torch/monument: oldest first, cursor paging, total, wit
  assert.equal((await call('7.7.7.7','GET','/api/torch/monument?cursor=abc')).status,400);assert.equal((await call('7.7.7.7','GET','/api/torch/monument?limit=x')).status,400);
  const before=a.total;await report('5.5.5.5',KB,{name:'新人'});assert.equal((await page('')).total,before+1,'only grows');
 });
+
+test('传火碑 at scale: month filter + /months, /find prefix, /me, counter rows (no COUNT(*)), withdraw / rename keep the search right',async()=>{
+ const {report,call,ENV}=mk();const day=(y,m,d)=>Math.floor(Date.UTC(y,m-1,d,12)/1000);
+ for(const [i,n] of ['Alice','alice b','Albert','Bob','Alina'].entries())await report('3.3.3.'+(i+1),i%2?KB:KA,{name:n});
+ await report('3.3.3.6',KA);/* #6 never named */
+ /* move the numbers into months (the clock of the test is today) */
+ const at={1:day(2026,9,30),2:day(2026,10,1),3:day(2026,10,15),4:day(2026,10,31),5:day(2026,11,2),6:day(2026,11,3)};
+ for(const [no,t] of Object.entries(at))ENV.DB.raw.prepare('UPDATE torch_credits SET at=? WHERE torch_no=?').run(t,+no);
+ ENV.DB.raw.exec("DELETE FROM torch_months");for(const m of ['2026-09','2026-10','2026-10','2026-10','2026-11','2026-11'])ENV.DB.raw.prepare('INSERT INTO torch_months(month,n) VALUES(?,1) ON CONFLICT(month) DO UPDATE SET n=n+1').run(m);
+ const get=async(r,ip='7.7.7.7')=>{const x=await call(ip,'GET',r);return {status:x.status,body:await x.json(),h:x.headers};};
+ let m=await get('/api/torch/months');assert.deepEqual(m.body.months,[{month:'2026-09',n:1},{month:'2026-10',n:3},{month:'2026-11',n:2}]);assert.equal(m.body.total,6);assert.match(m.h.get('cache-control'),/max-age=60/);
+ let o=await get('/api/torch/monument?month=2026-10&limit=2');assert.deepEqual(o.body.items.map(i=>i.torchNo),[2,3]);assert.equal(o.body.total,3);assert.equal(o.body.next,'3');assert.equal(o.body.month,'2026-10');
+ o=await get('/api/torch/monument?month=2026-10&cursor=3');assert.deepEqual(o.body.items.map(i=>i.torchNo),[4]);assert.equal(o.body.next,null);
+ assert.equal((await get('/api/torch/monument?month=2026-13')).status,400);assert.equal((await get('/api/torch/monument?month=2030-01')).body.items.length,0);
+ /* the totals come from counter rows */
+ assert.equal(ENV.DB.raw.prepare('SELECT total FROM torch_counter WHERE id=1').get().total,6);
+ /* find: prefix, case and spaces folded, name order, at most 50 */
+ let f=await get('/api/torch/find?name=al');assert.deepEqual(f.body.items.map(i=>[i.torchNo,i.month]),[[3,'2026-10'],[1,'2026-09'],[2,'2026-10'],[5,'2026-11']],'in name order (Albert, Alice, alice b, Alina), so a wide prefix stays an index scan');
+ assert.deepEqual((await get('/api/torch/find?name=ALICE')).body.items.map(i=>i.torchNo),[1,2],'case folded; "alice b" matches the prefix');
+ assert.deepEqual((await get('/api/torch/find?name=bob')).body.items.map(i=>i.torchNo),[4]);assert.equal((await get('/api/torch/find?name=zzz')).body.items.length,0);
+ assert.equal((await get('/api/torch/find?name=')).status,400);assert.equal((await get('/api/torch/find?name='+'a'.repeat(31))).status,400);
+ /* withdraw / rename: the search follows */
+ await call('3.3.3.1','PUT','/api/game-profile/credit',{key:KA,name:null});
+ assert.deepEqual((await get('/api/torch/find?name=alice')).body.items.map(i=>i.torchNo),[2],'a withdrawn name is not findable');
+ await call('3.3.3.3','PUT','/api/game-profile/credit',{key:KA,name:'Zed'});
+ assert.deepEqual((await get('/api/torch/find?name=zed')).body.items.map(i=>i.torchNo),[3]);assert.ok(!(await get('/api/torch/find?name=albert')).body.items.length);
+ /* me: only the caller's numbers, optionally one game, not cached, no key / reporter in the answer */
+ let me=await get('/api/torch/me',' 3.3.3.2'.trim());assert.deepEqual(me.body.items.map(i=>[i.torchNo,i.name,i.month]),[[2,'alice b','2026-10']]);assert.equal(me.h.get('cache-control'),'private, no-store');
+ assert.equal((await get('/api/torch/me?key='+KA,'3.3.3.2')).body.items.length,0);assert.equal((await get('/api/torch/me?key='+KB,'3.3.3.2')).body.items.length,1);
+ assert.equal((await get('/api/torch/me?key=zz','3.3.3.2')).status,400);assert.equal((await get('/api/torch/me','9.9.9.9')).body.items.length,0);
+ assert.doesNotMatch(JSON.stringify(me.body),/reporter|game_key|[0-9a-f]{32}/);
+ /* a re-upload does not move the counters; a new number does */
+ await report('3.3.3.1',KA);assert.equal(ENV.DB.raw.prepare('SELECT total FROM torch_counter WHERE id=1').get().total,6);
+ await report('3.3.3.9',KA,{name:'New'});assert.equal(ENV.DB.raw.prepare('SELECT total FROM torch_counter WHERE id=1').get().total,7);
+ assert.equal((await get('/api/torch/months')).body.months.pop().n,3,'this month (the test clock) got the new number');
+});
+
+test('0026 backfills the counters from rows that already exist',async()=>{
+ const db=new DatabaseSync(':memory:');const files=fs.readdirSync(path.join(relayDir,'migrations')).filter(f=>f.endsWith('.sql')).sort();
+ for(const f of files.filter(f=>f<'0026'))db.exec(fs.readFileSync(path.join(relayDir,'migrations',f),'utf8'));
+ db.exec("INSERT INTO torch_credits VALUES('k','r1',1,'Ann',1790000000),('k','r2',2,NULL,1790000100),('k','r3',3,'Bo B',1795000000)");
+ db.exec(fs.readFileSync(path.join(relayDir,'migrations','0026_torch_scale.sql'),'utf8'));
+ assert.equal(db.prepare('SELECT total FROM torch_counter').get().total,3);
+ assert.deepEqual(db.prepare('SELECT month,n FROM torch_months ORDER BY month').all().map(r=>[r.month,r.n]),[['2026-09',2],['2026-11',1]]);
+ assert.deepEqual(db.prepare('SELECT * FROM torch_names ORDER BY torch_no').all().map(r=>r.name_key),['ann','bob']);
+});

@@ -37,17 +37,27 @@ export function parseCredit(credit,env){
  if(!('name' in credit)||credit.name===undefined)return {ok:true,present:true};
  const c=cleanName(credit.name,env);return c.ok?{ok:true,present:true,name:c.name}:{ok:false};}
 
+export const monthOf=at=>new Date((at|0)*1000).toISOString().slice(0,7);
+const nameKey=n=>String(n||'').normalize('NFKC').toLowerCase().replace(/\s+/gu,'');
+async function setNameKey(env,torchNo,name){if(name)await env.DB.prepare('INSERT INTO torch_names(torch_no,name_key) VALUES(?,?) ON CONFLICT(torch_no) DO UPDATE SET name_key=excluded.name_key').bind(torchNo,nameKey(name)).run();
+ else await env.DB.prepare('DELETE FROM torch_names WHERE torch_no=?').bind(torchNo).run();}
 export const creditOut=r=>r?{torchNo:r.torch_no|0,name:r.name??null,at:r.at|0}:null;
 
 /* file the upload: first time → the next number; later → the same number, the name only when mentioned */
-export async function noteUpload(env,key,reporter,credit,now){const t=sec(now);
+export async function noteUpload(env,key,reporter,credit,now){const t=sec(now);let fresh=false;
  const old=await env.DB.prepare('SELECT torch_no,name,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();
  if(old){if(credit.present&&credit.name!==undefined)await env.DB.prepare('UPDATE torch_credits SET name=? WHERE game_key=? AND reporter_hash=?').bind(credit.name,key,reporter).run();
+  if(credit.present&&credit.name!==undefined)await setNameKey(env,old.torch_no,credit.name);
   return creditOut({...old,name:credit.present&&credit.name!==undefined?credit.name:old.name});}
  for(let i=0;i<5;i++){try{/* the number is taken inside the insert; the unique index catches two uploads racing for the same one */
-  await env.DB.prepare('INSERT INTO torch_credits(game_key,reporter_hash,torch_no,name,at) VALUES(?,?,(SELECT COALESCE(MAX(torch_no),0)+1 FROM torch_credits),?,?)').bind(key,reporter,credit.name??null,t).run();break;}
+  await env.DB.prepare('INSERT INTO torch_credits(game_key,reporter_hash,torch_no,name,at) VALUES(?,?,(SELECT COALESCE(MAX(torch_no),0)+1 FROM torch_credits),?,?)').bind(key,reporter,credit.name??null,t).run();fresh=true;break;}
   catch(e){const again=await env.DB.prepare('SELECT 1 AS x FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();if(again)break;if(i===4)throw e;}}
- return creditOut(await env.DB.prepare('SELECT torch_no,name,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first());}
+ const row=await env.DB.prepare('SELECT torch_no,name,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();
+ if(fresh){/* the counters follow the insert: the total and the month the number belongs to */
+  await env.DB.prepare('INSERT INTO torch_counter(id,total) VALUES(1,1) ON CONFLICT(id) DO UPDATE SET total=total+1').run();
+  await env.DB.prepare('INSERT INTO torch_months(month,n) VALUES(?,1) ON CONFLICT(month) DO UPDATE SET n=n+1').bind(monthOf(row.at)).run();
+  if(row.name)await setNameKey(env,row.torch_no,row.name);}
+ return creditOut(row);}
 
 /* credit of an auto diff: the first reporter (oldest report) whose calibration has the diff's settings; null for official or none */
 export async function creditOfDiff(env,layer,key,diff,hashOf){
@@ -63,7 +73,7 @@ export async function creditPut(request,env,reporter,now,{json,fail,readJSON},KE
  const key=String(v.key||'');if(!KEY.test(key))return fail('INVALID_KEY');
  const c=cleanName(v.name,env);if(!c.ok||v.name===undefined)return fail('INVALID_CREDIT');
  const row=await env.DB.prepare('SELECT torch_no,at FROM torch_credits WHERE game_key=? AND reporter_hash=?').bind(key,reporter).first();if(!row)return fail('NO_CREDIT',404);
- await env.DB.prepare('UPDATE torch_credits SET name=? WHERE game_key=? AND reporter_hash=?').bind(c.name,key,reporter).run();
+ await env.DB.prepare('UPDATE torch_credits SET name=? WHERE game_key=? AND reporter_hash=?').bind(c.name,key,reporter).run();await setNameKey(env,row.torch_no,c.name);
  return json({ok:true,...creditOut({...row,name:c.name})});}
 
 /* GET /api/torch/monument?cursor=&limit=  传火碑: every credit ever filed, oldest first, never shrinking.
@@ -79,17 +89,51 @@ async function titlesFor(env,keys){const out=new Map();if(!keys.length)return ou
   for(const c of chunks(ids)){const rows=(await env.DB.prepare("SELECT vndb,title FROM probe_full WHERE title<>'' AND vndb IN ("+c.map(()=>'?').join(',')+') ORDER BY updated_at ASC').bind(...c).all()).results||[];for(const r of rows)title.set(r.vndb,String(r.title).slice(0,120));}
   for(const [k,v] of vndbOf)if(title.has(v))out.set(k,title.get(v));}catch{}
  return out;}
+/* edge cache (Cache API, 60 s): one D1 read per page per data centre per minute */
+async function cached(ck,ctx,make){const c=globalThis.caches?.default;
+ if(c){try{const hit=await c.match(ck);if(hit)return new Response(hit.body,hit);}catch{}}
+ const res=await make();if(c&&ctx?.waitUntil&&res.status===200){try{ctx.waitUntil(c.put(ck,res.clone()));}catch{}}return res;}
+const PUBLIC={'access-control-allow-origin':'*','cache-control':'public, max-age=60'};
+const MONTH=/^\d{4}-(0[1-9]|1[0-2])$/;
+const monthRange=m=>{const [y,mo]=m.split('-').map(Number);return [Date.UTC(y,mo-1,1)/1000,Date.UTC(y,mo,1)/1000];};
+const totalOf=async env=>(await env.DB.prepare('SELECT total FROM torch_counter WHERE id=1').first())?.total|0;
+const shape=(r,titles)=>({torchNo:r.torch_no|0,name:r.name??null,at:r.at|0,game:titles?.get(r.game_key)??null,display:r.name||'传火人 #'+(r.torch_no|0)});
+
 export async function monumentGet(env,url,{json,fail},ctx=null){
  if(!env.DB)return fail('NOT_CONFIGURED',503);
- const cur=url.searchParams.get('cursor'),lim=url.searchParams.get('limit');
+ const cur=url.searchParams.get('cursor'),lim=url.searchParams.get('limit'),month=url.searchParams.get('month');
  if(cur!==null&&cur!==''&&!/^\d{1,12}$/.test(cur))return fail('INVALID_CURSOR');if(lim!==null&&lim!==''&&!/^\d{1,6}$/.test(lim))return fail('INVALID_LIMIT');
+ if(month&&!MONTH.test(month))return fail('INVALID_MONTH');
  const limit=Math.max(1,Math.min(500,lim?Number(lim):100)),after=cur?Number(cur):0;
- const c=globalThis.caches?.default,ck='https://megulit-relay.internal/torch/monument/'+after+'/'+limit;
- if(c){try{const hit=await c.match(ck);if(hit)return new Response(hit.body,hit);}catch{}}
- const rows=(await env.DB.prepare('SELECT game_key,torch_no,name,at FROM torch_credits WHERE torch_no>? ORDER BY torch_no ASC LIMIT ?').bind(after,limit+1).all()).results||[];
- const more=rows.length>limit,page=rows.slice(0,limit),titles=await titlesFor(env,[...new Set(page.map(r=>r.game_key))]);
- const total=(await env.DB.prepare('SELECT COUNT(*) AS n FROM torch_credits').first())?.n|0;
- const items=page.map(r=>({torchNo:r.torch_no|0,name:r.name??null,at:r.at|0,game:titles.get(r.game_key)??null,display:r.name||'传火人 #'+(r.torch_no|0)}));
- const res=json({ok:true,total,items,next:more?String(page[page.length-1].torch_no):null},200,{'access-control-allow-origin':'*','cache-control':'public, max-age=60'});
- if(c&&ctx?.waitUntil){try{ctx.waitUntil(c.put(ck,res.clone()));}catch{}}
- return res;}
+ return cached('https://megulit-relay.internal/torch/monument/'+(month||'all')+'/'+after+'/'+limit,ctx,async()=>{
+  const [lo,hi]=month?monthRange(month):[0,0];
+  const rows=(await (month?env.DB.prepare('SELECT game_key,torch_no,name,at FROM torch_credits WHERE at>=? AND at<? AND torch_no>? ORDER BY torch_no ASC LIMIT ?').bind(lo,hi,after,limit+1)
+   :env.DB.prepare('SELECT game_key,torch_no,name,at FROM torch_credits WHERE torch_no>? ORDER BY torch_no ASC LIMIT ?').bind(after,limit+1)).all()).results||[];
+  const more=rows.length>limit,page=rows.slice(0,limit),titles=await titlesFor(env,[...new Set(page.map(r=>r.game_key))]);
+  const total=month?(await env.DB.prepare('SELECT n FROM torch_months WHERE month=?').bind(month).first())?.n|0:await totalOf(env);
+  return json({ok:true,total,month:month||null,items:page.map(r=>shape(r,titles)),next:more?String(page[page.length-1].torch_no):null},200,PUBLIC);});}
+
+/* GET /api/torch/months -> {ok,total,months:[{month,n}]} oldest first, from the counter rows */
+export async function monthsGet(env,url,{json,fail},ctx=null){
+ if(!env.DB)return fail('NOT_CONFIGURED',503);
+ return cached('https://megulit-relay.internal/torch/months',ctx,async()=>{
+  const rows=(await env.DB.prepare('SELECT month,n FROM torch_months WHERE n>0 ORDER BY month ASC').all()).results||[];
+  return json({ok:true,total:await totalOf(env),months:rows.map(r=>({month:r.month,n:r.n|0}))},200,PUBLIC);});}
+
+/* GET /api/torch/find?name= prefix of the shown name (folded: NFKC, lower case, no spaces), at most 50, in name order (an index scan even for a one-letter prefix), the older number first among equal names -> {ok,items:[{torchNo,name,at,month}]} */
+export async function findGet(env,url,{json,fail},ctx=null){
+ if(!env.DB)return fail('NOT_CONFIGURED',503);
+ const raw=String(url.searchParams.get('name')||'').replace(ZERO_WIDTH,'').replace(CONTROL,' ').slice(0,60),k=nameKey(raw);
+ if(!k||[...k].length>MAX_NAME)return fail('INVALID_NAME');
+ return cached('https://megulit-relay.internal/torch/find/'+encodeURIComponent(k),ctx,async()=>{
+  const rows=(await env.DB.prepare('SELECT c.torch_no,c.name,c.at FROM torch_names n JOIN torch_credits c ON c.torch_no=n.torch_no WHERE n.name_key>=? AND n.name_key<? AND c.name IS NOT NULL ORDER BY n.name_key,n.torch_no LIMIT 50').bind(k,k+'￿').all()).results||[];
+  return json({ok:true,items:rows.map(r=>({torchNo:r.torch_no|0,name:r.name,at:r.at|0,month:monthOf(r.at)}))},200,PUBLIC);});}
+
+/* GET /api/torch/me[?key=<exe hash>] the caller's own numbers (the same salted IP hash the uploads used), optionally for one game; never cached */
+export async function meGet(env,url,reporter,{json,fail},KEY){
+ if(!env.DB)return fail('NOT_CONFIGURED',503);const key=url.searchParams.get('key');
+ if(key&&!KEY.test(key))return fail('INVALID_KEY');
+ const rows=(await (key?env.DB.prepare('SELECT game_key,torch_no,name,at FROM torch_credits WHERE reporter_hash=? AND game_key=? ORDER BY torch_no ASC LIMIT 500').bind(reporter,key)
+  :env.DB.prepare('SELECT game_key,torch_no,name,at FROM torch_credits WHERE reporter_hash=? ORDER BY torch_no ASC LIMIT 500').bind(reporter)).all()).results||[];
+ const titles=await titlesFor(env,[...new Set(rows.map(r=>r.game_key))]);
+ return json({ok:true,items:rows.map(r=>({...shape(r,titles),month:monthOf(r.at)}))},200,{'cache-control':'private, no-store'});}
