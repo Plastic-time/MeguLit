@@ -7,6 +7,12 @@
 - 结论：**隐藏重画**，参数 `{"hideMethod":"hide","positionSource":null,"effectFrames":null,"filters":"kernel"}`，cost 0
 - 草稿未签名：签名用 tools/game-diff.cjs sign，下发格式和目录归 diff-layers
 
+## 两层
+
+- 版本层 `version-20a57cfa736d946ede4ccc91b5b158091c031e9a54869aecacdb52c6cfa35086.json`（key `20a57cfa…`，指纹 exe）：这个 exe 没有版本层的键
+- 游戏层 `game-rpgm-sample.json`（key `0aaebca4…`，指纹 script/title）：按 主封包 `data/System.json` `079136fc`、剧本指纹 `c7d366b9`、标题「MeguLit 見本」 认
+- 游戏层覆盖的已知版本：`Game.exe` `20a57cfa`（本探针）
+
 ## 自检指标（每个窗口取最差值）
 
 | 指标 | 选中方案 | 最好的隐藏方案 | 阈值 | 状态 |

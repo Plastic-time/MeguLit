@@ -1,0 +1,65 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "6cb32b6b39a1a07469879dd601586a33a399d74febcf0091cfebeab4a86bcb11",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "advhd",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "b30abb325532d2c6ca5d492f07c12269a83e32edf5dd5aecf7a82af4319b1480",
+  "script": "8596fb3787c3d1a811d1faa9f8a4771273bd0110d351c4854982baacd472e62f",
+  "title": "952caa1ad5651bc6616e4dd9e6c484529eecc2f7e2802fb63d9b0b595815b6bc",
+  "vndb": "v19434"
+ },
+ "status": "skeleton",
+ "slug": "discord-under-the-moon",
+ "builds": [
+  "cf7b3a19ef818d67682192dabb29528129c90c4ff7d861d89074c309cc2e3282"
+ ]
+}

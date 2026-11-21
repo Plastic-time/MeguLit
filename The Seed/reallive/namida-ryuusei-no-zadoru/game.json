@@ -1,0 +1,63 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "aeee9acc87a33d9659861f3201144bfdf18bcea57f025a395dd9db953fe936fd",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "reallive",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "29582aac6837667dcabcd302db25654e6201a6067971d2f7847e662690c052f2",
+  "title": "fea33be33413cef427b4dbb69f6344fcc27aea318c9e3133c623ce13963a04c9"
+ },
+ "status": "skeleton",
+ "slug": "namida-ryuusei-no-zadoru",
+ "builds": [
+  "5654c6bdff43af5d796fcf54df23d8bad950b747bea656b0163f87cf8e16f225"
+ ]
+}

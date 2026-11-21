@@ -7,6 +7,12 @@
 - 结论：**隐藏重画**，参数 `{"hideMethod":"hide","positionSource":"engine","effectFrames":null,"filters":"kernel"}`，cost 0.141
 - 草稿未签名：签名用 tools/game-diff.cjs sign，下发格式和目录归 diff-layers
 
+## 两层
+
+- 版本层 `version-fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3.json`（key `fd37d708…`，指纹 exe）：这个 exe 没有版本层的键
+- 游戏层 `game-senren-banka.json`（key `0e804d57…`，指纹 script/title/steam）：按 主封包 `scn.xp3` `6b6b65d6`、剧本指纹 `c95c5afb`、Steam 1144400、标题「千恋＊万花」 认
+- 游戏层覆盖的已知版本：`SenrenBanka.exe` `fd37d708`（本探针）；手写游戏差分登记的程序名：SenrenBanka.exe、SenrenBanka_chs.exe、Senren_chs.exe、Senren_jp.exe、senren.exe
+
 ## 自检指标（每个窗口取最差值）
 
 | 指标 | 选中方案 | 最好的隐藏方案 | 阈值 | 状态 |

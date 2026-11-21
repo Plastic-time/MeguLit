@@ -1,0 +1,65 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "087854e4fda66f342cd3a1cdf36a35b727707e5b671e5b0c6a5466e51b347e7d",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "unity",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "79f59fb9675b4e6df8340c6f67e51e0f774a4a003016998355605ba007475fbe",
+  "title": "aede806e3ce525388ca7fa077dd025d0dd13a543995f94d573a386147d0f764c",
+  "steam": "2401970",
+  "vndb": "v1719"
+ },
+ "status": "skeleton",
+ "slug": "ace-attorney-investigations-collection",
+ "builds": [
+  "f4bc41434796377965d04afa34150b89bfc04213ece1dd894bb975a5a6da62ea"
+ ]
+}

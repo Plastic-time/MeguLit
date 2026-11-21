@@ -9,13 +9,18 @@
  },
  "files": [
   {
-   "path": "Game.exe"
+   "path": "Game.exe",
+   "sha256": "20a57cfa736d946ede4ccc91b5b158091c031e9a54869aecacdb52c6cfa35086"
   },
   {
    "path": "js/rmmz_core.js"
   },
   {
    "path": "js/plugins.js"
+  },
+  {
+   "path": "data/System.json",
+   "sha256": "079136fc1918c629d6d0a73b6234be3cee353d9fa2d868db3bcf3f6d2977d254"
   }
  ]
 }

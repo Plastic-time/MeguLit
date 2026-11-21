@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "fee5d7e1835cc934a3422afa5fdebca28b5df6288b2bfee57d83fe4ff42048f3",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "Tsukihime.exe",
+ "engine": "nscripter",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "fee5d7e1835cc934a3422afa5fdebca28b5df6288b2bfee57d83fe4ff42048f3",
+  "head": "1a9e311c16d3138991014cb17e1596ab8b44806eeeb8da9dd8fd9d576d009ec5",
+  "pe": "0.0.0.0@43c89951"
+ }
+}

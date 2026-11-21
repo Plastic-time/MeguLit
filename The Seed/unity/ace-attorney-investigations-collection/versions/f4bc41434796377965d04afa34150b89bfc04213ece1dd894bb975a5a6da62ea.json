@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "f4bc41434796377965d04afa34150b89bfc04213ece1dd894bb975a5a6da62ea",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "GK12.exe",
+ "engine": "unity",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "f4bc41434796377965d04afa34150b89bfc04213ece1dd894bb975a5a6da62ea",
+  "head": "a4ba49eafd790b2fea9be58b3473ed3e4cfdb2a5926b009927af22c1c768a0bd",
+  "pe": "1.0.3.0@68f06ca4"
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "3aa85167bbf9729e6db9cc73279dda8a3412c699b2f95fb97cce549e76e6418d",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "gameplay.exe",
+ "engine": "bruns",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "3aa85167bbf9729e6db9cc73279dda8a3412c699b2f95fb97cce549e76e6418d",
+  "head": "e3cfc48bdad02c17fc98f744510d03127cde75b65aa97fb9b3e51fbc1615b5d7",
+  "pe": "0.0.0.0@49a6c75e"
+ }
+}

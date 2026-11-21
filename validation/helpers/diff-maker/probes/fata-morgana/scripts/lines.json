@@ -1,5 +1,6 @@
 {
- "note": "trimmed by tools/diff-maker trim: only the script lines this replay touches",
+ "note": "trimmed by tools/diff-maker trim: only the script lines this replay touches; fingerprint is of the full script",
+ "fingerprint": "142ca8b7402f4bada2eaea0464a1115dade123b83e46107a365788e262566de3",
  "lines": [
   "まるで屋敷全体を暗闇が包み込んでいるようだ。",
   "「あなた」は周囲を見渡そうとするが、その必要はなかった。",

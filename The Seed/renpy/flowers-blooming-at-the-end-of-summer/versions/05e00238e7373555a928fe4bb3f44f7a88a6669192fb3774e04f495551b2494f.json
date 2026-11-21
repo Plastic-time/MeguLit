@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "05e00238e7373555a928fe4bb3f44f7a88a6669192fb3774e04f495551b2494f",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "flowersblooming.exe",
+ "engine": "renpy",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "05e00238e7373555a928fe4bb3f44f7a88a6669192fb3774e04f495551b2494f",
+  "head": "eabd1752ef5db6b3321f1828857ae128e626ca3b10a4a19e70ea6edddb5bbcbd",
+  "pe": "0.0.0.0@68728e56"
+ }
+}

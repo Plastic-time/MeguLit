@@ -1,7 +1,8 @@
 {
  "schema": "megulit.lines",
- "format": 1,
- "exeSha256": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3",
+ "version": 1,
+ "key": "0e804d57cc9b3b84c2c788c72b303358d40b2bdf4901d459611bf9908b4a618f",
+ "script": "c95c5afbc3236a92ada0821c2dba7751c6a6db283f48710858f8c39e1a3852b4",
  "lines": [
   {
    "k": "『お客さん』",

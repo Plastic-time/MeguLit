@@ -1,0 +1,65 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "adb9524dd4f15369b151b0cf4a1329c739189a47d0d44de4b3392f4b56b4e87e",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "artemis",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "1a7acda5281e6a80385fedc56bda3471cc8fd2acd7bbdb451f125cbd1b1ce3e3",
+  "title": "2b1c095223a82d21ff2019b05d0c7e345065a11dfdbf3513099d943562133a11",
+  "steam": "3296790",
+  "vndb": "v17012"
+ },
+ "status": "skeleton",
+ "slug": "the-shell-part-iii-paradiso",
+ "builds": [
+  "fda1516ac25dfdd1a1ed2064163124b364be9f6241df77fc17e103d695288daa"
+ ]
+}

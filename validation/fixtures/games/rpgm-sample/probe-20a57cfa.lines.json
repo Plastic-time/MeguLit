@@ -1,6 +1,7 @@
 {
  "schema": "megulit.lines",
- "format": 1,
- "exeSha256": "20a57cfa736d946ede4ccc91b5b158091c031e9a54869aecacdb52c6cfa35086",
+ "version": 1,
+ "key": "0aaebca4942647ac75ee4a86248b2a12038d1696b1eae9b428128b353d83e7b1",
+ "script": "c7d366b98588429e8dc2d218b7f89ad5589eb7570461acba5e077da60b55e172",
  "lines": []
 }

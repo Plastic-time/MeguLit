@@ -1,5 +1,6 @@
 {
- "note": "trimmed by tools/diff-maker trim: only the script lines this replay touches",
+ "note": "trimmed by tools/diff-maker trim: only the script lines this replay touches; fingerprint is of the full script",
+ "fingerprint": "c95c5afbc3236a92ada0821c2dba7751c6a6db283f48710858f8c39e1a3852b4",
  "lines": [
   "『お客さん』",
   "「………」",

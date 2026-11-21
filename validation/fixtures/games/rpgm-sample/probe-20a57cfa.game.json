@@ -1,0 +1,26 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "0aaebca4942647ac75ee4a86248b2a12038d1696b1eae9b428128b353d83e7b1",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": "hide"
+  },
+  "hide": {
+   "textEffectsRead": false
+  }
+ },
+ "exe": "",
+ "engine": "rpgmaker",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "c7d366b98588429e8dc2d218b7f89ad5589eb7570461acba5e077da60b55e172",
+  "title": "675f64b978d5fd50f74f5ad5d8719cec2668af27fbb20e00ca60161aae7273f9"
+ }
+}

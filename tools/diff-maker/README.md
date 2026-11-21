@@ -1,32 +1,41 @@
-# diff-maker：探针包 → 未签名差分草稿 + 回放夹具 + 报告
+# diff-maker：探针包 → 版本层 + 游戏层差分草稿 + 回放夹具 + 报告
 
-拿到玩家一键上传的探针包，不下游戏、不开游戏，离线做出这部游戏（按 exe 完整文件 SHA-256 区分版本）的差分草稿、台词替换数据、回放夹具和报告。签名用 `tools/game-diff.cjs sign`；下发格式、下发目录、客户端加载归 diff-layers（`docs/diff-layers.md`）；画字角色协议归 engine-draw（`docs/engine-draw-protocol.md`）
+拿到玩家一键上传的探针（解包目录或 `.mlfp`），不下游戏、不开游戏，离线做出未签名的差分草稿、台词替换数据、回放夹具和报告。签名用 `tools/sign-profile.cjs`，发布、下发、客户端加载归 diff-layers（`docs/diff-layers.md`）；画字角色协议归 engine-draw（`docs/engine-draw-protocol.md`）
 
 ```
-node tools/diff-maker/index.cjs <探针目录>... [--key <gameKey>] [--out <目录>] [--write-repo]
+node tools/diff-maker/index.cjs <探针目录|probe.mlfp>... [--key <gameKey>] [--runtime <bundle.json.gz>] [--out <目录>] [--write-repo]
 node tools/diff-maker/index.cjs trim <探针目录> <输出目录>
 ```
 
-- 默认输出到 `H:\MeguLit-Work\diff-maker\out\<gameKey>-<sha8>\`：
-  - `<exeSha256>.json` 差分草稿：未签名的 `megulit.game-diff`（`core/game-diff.cjs`，key = exe 完整 SHA-256），用 `tools/sign-profile.cjs` 签名后 `POST /api/game-profile/signed` 发布；gameKey、标题、判定写在 report.json
-  - `<exeSha256>.lines.json` 台词替换数据 `{schema:"megulit.lines",format:1,exeSha256,lines:[{k,ruby:[[start,len,"よみ"]],zh}]}`（k = 原句去空白，start/len 按 k 的码位）
-  - `probe-<sha8>.replay.json`、`report.md`、`report.json`（探针来源、exe 名、标题、候选、角色统计都在这里，不进草稿）
-- `--write-repo` 另外写夹具 `validation/fixtures/games/<gameKey>/probe-<sha8>.{replay.json,diff.json,lines.json,case.cjs,report.md}`（lines.json 只放回放碰到的句子）
-- `--key` 指定 gameKey；不给就用 `core/profiles` 认出的游戏，认不出是 `auto-<hash>`
-- `trim` 把完整探针裁成只含工具读到的日志行、只含回放碰到的剧本行的小探针（仓库样本就是这样来的，不放整部剧本）
+## 两层（店主 2026-11-21：传火不能只靠 exe 哈希）
+
+| 层 | 文件 | 按什么认 | 装什么 |
+|---|---|---|---|
+| 版本层 | `version-<exeSha256>.json` | `core/game-diff.cjs build({layer:'version'})`，key = exe 整文件 SHA-256，prints = exe / head / pe | `core/profiles/domains.cjs` 里 layer 为 version 的键（这个构建的引擎钩子：hide.engineTrial.*、draw.embed…）；不带 mode，读模式是游戏层的事 |
+| 游戏层 | `game-<gameKey>.json` | `build({layer:'game'})`，key = 游戏身份（relay gidFor：SHA-256('game\|'+种类+':'+指纹)，pack → script → steam → vndb → title 最强的一个），prints = 这些游戏指纹 | 其余所有键：布局、特效、选项、隐藏方式；同一作品别的 exe 构建按指纹认到这个游戏就能用 |
+| 台词数据 | `lines-<gameKey>.json` | 同游戏层（按剧本） | engine-draw 替换数据 `[{k, ruby:[[start,len,"よみ"]], zh}]` |
+
+- 指纹按 `core/game-print.cjs`（exe、head、pe；pack、script、steam、vndb、title；engine）；探针 manifest.prints / 运行时样本里带的优先；看起来不像量测结果的值（文本框只有一个字框、贴顶、过高、出界）不写进差分，只进报告
+- 剧本指纹（报告用）：original-text 的源哈希，没有时剧本每行去空白后的 SHA-256
+- 主封包：名字像剧本的封包（scn/script/scenario…），否则最大的封包；RPG Maker 用 data/System.json
+- 默认输出到 `H:\MeguLit-Work\diff-maker\out\<gameKey>-<sha8>\`：上面三份 + `probe-<sha8>.replay.json`、`report.md`、`report.json`
+- `--write-repo` 写夹具 `validation/fixtures/games/<gameKey>/probe-<sha8>.{version.json,game.json,lines.json,replay.json,case.cjs,report.md}`（lines 只放回放碰到的句子）
+- `--runtime` 把 relay 补传的运行时包（`megulit.runtime-bundle`，gzip JSON）放进探针的 runtime/
+- `trim` 把完整探针裁成只含工具读到的日志行、只含回放碰到的剧本行的小探针（剧本指纹保留完整剧本的值）
 
 ## 探针目录
 
 ```
-manifest.json          probe-full 解包后的 manifest，至少要有：
-                         title, detected（引擎）, exe:{name, sha256}, files:[{path}]
-                         sha256 = exe 整个文件的 SHA-256；没有就从 bin/<exe> 算；都没有报错
+manifest.json          probe-full 的 manifest：title, detected（引擎）, exe（路径，或 {name, sha256}）, files:[{path,size,sha256}], vndb, steamAppId
+                         exe 的 SHA-256 取 manifest.exe.sha256，否则取 files[] 里 exe 那一项（probe-full 整文件哈希 exe；bin/ 里是瘦身 PE，不拿来算）
+                         .mlfp 直接给也行：用 services/probe-full.cjs unpack 解到 H:\MeguLit-Work\diff-maker\unpacked\
                          runtime:{from,to}（ISO，可选）：日志里属于这一局的时间段
 scripts/lines.json     剧本台词 + 游戏 ruby（original-text 索引 {lines:[...], ruby:[[[原文,读音],...]|null,...]}）
 scripts/patch.json     和 lines.json 逐行对齐的译文（original-text patch 索引 {lines:[...]}）；行数不同视为没对齐，不用
 scripts/**/*.ks|txt    KAG 剧本：去掉标签的是台词，[link]/[glink text=]/[seladd text=] 是选项
 scripts/data/*.json    RPG Maker MV/MZ：401/405 台词、102 选项，System.json 用语和数据库名字算 UI 词
-runtime/hook-events.log + runtime/reader-host.log   MeguLit 自己的日志（自检事件）
+runtime/hook-events.log + runtime/reader-host.log   MeguLit 自己的日志（自检事件；探针里是首个自检窗口的原始行）；.mlfp 解包在 other/runtime/ 也认
+runtime/sample.json、runtime/shot-*.jpg   auto-profile 的运行时样本和截图（读进 report.json）
 runtime/*.log          其余日志里的 ToMe_CHARS 行（engine-draw 记录，可带时间戳前缀）
 runtime/info.json      一键诊断 info.json（可选）
 ```
@@ -55,3 +64,14 @@ MEGULIT_GAMES=senren-banka,fata-morgana node --test validation/games-regression.
 node tools/diff-maker/index.cjs validation/helpers/diff-maker/probes/senren-banka validation/helpers/diff-maker/probes/fata-morgana --write-repo
 node tools/diff-maker/index.cjs validation/helpers/diff-maker/probes/rpgm-sample --key rpgm-sample --write-repo
 ```
+
+## The Seed（批量种子）
+
+```
+node tools/diff-maker/seed-all.cjs [--root <MeguLit 安装>]... [--out "H:\MeguLit-Work\The Seed"] [--seed "<仓库>/The Seed"] [--owner-ok <owner-ok.json>] [--only <标题片段>]
+```
+
+只读两个安装（默认 `E:\MeguLit-Test-1421`、`E:\MeguLit`）的游戏库、original-text 剧本索引、game-launch.log 和 hook-events / reader-host 日志，按启动记录切出每部游戏最新一局（够 selfCheck.minLines 句的），跑同一套离线搜索。除了程序不在本机的，每部都写进仓库 `The Seed/<engine>/<slug>/`（结构、status、钉住当前生效值、客户端语义见 `The Seed/README.md`）：
+- 有样本且隐藏全过线 → `verified`；有样本没过线 → `read`；没样本但在 `owner-ok.json` → `owner-ok`；其余 → `skeleton`
+- slug 从 `slugs.json` 取，没有就用手写游戏差分的 key 或英文标题
+- 每部的报告、身份、替换数据（含补丁译文，不进仓库）和按 status 分组的汇总在 `<out>`
