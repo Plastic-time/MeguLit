@@ -1,0 +1,65 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "4de6457d1fedab42e2929fa7f94f1328c4b9a4401b2f48b16b786dda31678eb4",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "nscripter",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "67ff7d6a021f7b039579b1f7255aeb904f02b01b303986a1844f69ea4f9038d9",
+  "script": "07b42a943c0cf8e6a9d3e95a857c896611f06d90fb04087c5b598bbbe087e807",
+  "title": "e5879fc06511d3e0eef479c2a41b24ce99a837213cd51b3e5e77273fd6abbe4b",
+  "vndb": "v7"
+ },
+ "status": "skeleton",
+ "slug": "tsukihime-v1-4",
+ "builds": [
+  "fee5d7e1835cc934a3422afa5fdebca28b5df6288b2bfee57d83fe4ff42048f3"
+ ]
+}

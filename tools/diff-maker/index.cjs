@@ -13,7 +13,7 @@ const ROOT=path.join(__dirname,'..','..');
 /* make(probeDir,{key}) -> {probe,key,name,profile,rep,ix,result,diff,lines,fixtureLines,replay,report} (nothing written) */
 function make(dir,{key=''}={}){const probe=Probe.load(dir);
  const base=Profiles.profileFor(probe.input);const gameKey=key||base.gameKey;
- const gameFile=Profiles.games().find(g=>g.key===gameKey)||null;
+ /* a hand-written game file is carried into the draft; a seed (The Seed/, pinned values) is what the draft will replace */const gameFile=Profiles.games().find(g=>g.key===gameKey&&!g.seed)||null;
  const rep=Samples.replay(probe);
  const ix=Scripts.load(path.join(dir,'scripts'),probe.scriptFiles);
  const result=Search.search(rep,base,ix);

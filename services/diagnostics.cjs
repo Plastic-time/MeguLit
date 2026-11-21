@@ -8,7 +8,7 @@
    a screenshot already sits on disk. Every text file is scrubbed: Windows user name and profile paths become placeholders,
    e-mail addresses are removed. */
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),zlib=require('node:zlib');
-const LOGS=['hook-diagnostics.log','hook-events.log','reader-host.log','game-launch.log'];
+const LOGS=['hook-diagnostics.log','hook-events.log','reader-host.log','game-launch.log',/* engine-draw: every ToMe_CHARS record (roles, boxes, emb) */'engine-draw.log'];
 const MAX_LINES=2000,READ_BYTES=8*1024*1024,RUN_LEAD_MS=5000,RUN_MAX_MS=12*3600*1000;
 /* the library stores some times in seconds, some in ms */
 const ms=v=>{const n=Number(v);return Number.isFinite(n)&&n>0?(n<1e12?n*1000:n):null;};

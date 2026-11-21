@@ -6,10 +6,6 @@
  "source": "official",
  "mode": "hide",
  "settings": {
-  "placement": {
-   "drawWhileBlanking": true,
-   "translationGrowsDown": true
-  },
   "calibrate": {
    "positionSource": "engine",
    "textBox": {

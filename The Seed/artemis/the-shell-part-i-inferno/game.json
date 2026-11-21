@@ -1,0 +1,66 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "6f4215161d02a67f7d013d380bd9a0e774100e00a9c79ae76ecc7ebfa8b6bf72",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "artemis",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "pack": "f279a8dacfb037d2c8ce5502d6db86f9581f2444db7369110dfba91a7c3f0b50",
+  "script": "c4d41c0eb3695e496bc0f3ef3fbad1bd9676ab4e08b4c55a142421b8ae9584bf",
+  "title": "a0f7fc6e72711577d57ab3e665af55cae2ea17c48936330e793324c317c7acc8",
+  "steam": "2258770",
+  "vndb": "v810"
+ },
+ "status": "skeleton",
+ "slug": "the-shell-part-i-inferno",
+ "builds": [
+  "7f256e7395b62ba2298b1cde30e68097a23ce36e9f8f31753c64257d8181b68c"
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "1c9b98c9d1ef4eb9f07fb8083192dc7b6ca40ccc71534074f46bbb6860ae432a",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "ATRI-MyDearMoments-.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "1c9b98c9d1ef4eb9f07fb8083192dc7b6ca40ccc71534074f46bbb6860ae432a",
+  "head": "36080cafc55215f9ad6f4b95816f54b4b41dc4908900ee5ae982a07fc84bc563",
+  "pe": "1.2.0.3@5a1fee71"
+ }
+}

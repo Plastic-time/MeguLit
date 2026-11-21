@@ -36,6 +36,8 @@ test('every engine and game file uses kernel keys only, every game has fixtures'
   assert.equal(e.engine,f.slice(0,-4),f+': engine id = file name');assert.deepEqual(require('../core/profiles/domains.cjs').clean(e.settings).rejected,[],f+': keys/values not allowed by core/profiles/domains.cjs');}
  for(const g of Profiles.games()){assert.match(g.key,/^[a-z0-9][a-z0-9-]{1,62}$/);assert.ok(!g.key.startsWith('auto-'),g.key+': auto- is reserved');
   assert.deepEqual(require('../core/profiles/domains.cjs').clean(g.settings).rejected,[],g.key+': keys/values not allowed by core/profiles/domains.cjs');
+  /* seeds (The Seed/) are checked by validation/the-seed.test.cjs; their engines need no engine file and their replays are optional */
+  if(g.seed)continue;
   const eng=Profiles.engineId(g.engine);if(eng)assert.ok(fs.existsSync(path.join(Profiles.ENGINE_DIR,eng+'.cjs')),g.key+': engine file '+eng+'.cjs missing');
   assert.ok(fs.existsSync(path.join(FIX,g.key,'identity.json')),g.key+': validation/fixtures/games/'+g.key+'/identity.json missing');}
 });
@@ -49,7 +51,7 @@ test('the kernel never branches on a program name (the game diff does)',()=>{
 
 for(const key of all){
  test('game '+key+(run.includes(key)?'':' (skipped: not touched)'),{skip:!run.includes(key)},async()=>{
-  const dir=path.join(FIX,key),id=JSON.parse(fs.readFileSync(path.join(dir,'identity.json'),'utf8'));
+  const dir=path.join(FIX,key);if(!fs.existsSync(path.join(dir,'identity.json')))return;const id=JSON.parse(fs.readFileSync(path.join(dir,'identity.json'),'utf8'));
   for(const input of id.same||[]){const p=Profiles.profileFor(input);assert.equal(p.gameKey,key,'should be '+key+': '+JSON.stringify(input));assert.match(p.layers,/\+(?:seed-)?game/);}
   for(const input of id.other||[])assert.notEqual(Profiles.profileFor(input).gameKey,key,'should not be '+key+': '+JSON.stringify(input));
   /* isolation: no other game's copies resolve to this game */

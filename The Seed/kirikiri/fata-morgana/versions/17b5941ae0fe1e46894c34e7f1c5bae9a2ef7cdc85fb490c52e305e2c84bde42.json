@@ -1,13 +1,30 @@
 {
- "schema": "megulit.seed",
+ "schema": "megulit.game-diff",
  "version": 1,
- "layer": "version",
  "key": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42",
- "prints": {
-  "exe": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42"
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
  },
- "exe": "fata.exe",
- "rev": 1,
- "settings": {},
- "note": "the build of the owner's sample probe (validation/helpers/diff-maker/probes/fata-morgana)"
+ "exe": "fata_jp.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42",
+  "head": "99c2df61dddf09ac0ce868681c075705e7b5f789e9a3fc92e5736b234a7ba58d",
+  "pe": "2.31.2013.411@516666b8"
+ }
 }

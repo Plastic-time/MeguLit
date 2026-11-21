@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "7746c668c90c4a6bc4c50fceecb2be83fab4b7ad758b5d758267914cc220e76a",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "PureStation.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "7746c668c90c4a6bc4c50fceecb2be83fab4b7ad758b5d758267914cc220e76a",
+  "head": "d63a36ced70907e18996f0734439a0bcb4916a418ade62e51e5f3b21b52a2089",
+  "pe": "1.2.0.3@5a1fee71"
+ }
+}

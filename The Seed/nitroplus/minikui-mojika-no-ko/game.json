@@ -1,0 +1,64 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "681a1b1a92d64aa7cf1a98b2ae72325b536ed47d7249544c50acd191da4958e4",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "nitroplus",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "8e3b2b202c53384b37ed6d2f633e34245b18a2a197f8eb7a3b2c7018d79294ca",
+  "title": "faa1bd261f6ad9487efd7f093e3d0419bba7cb060e75555dc8c114e883e536a3",
+  "vndb": "v21667"
+ },
+ "status": "skeleton",
+ "slug": "minikui-mojika-no-ko",
+ "builds": [
+  "659b2a04667f8f10cb6c7bb812f70ef98cb3550c53427015a71cf0b6f3846282"
+ ]
+}

@@ -1,0 +1,65 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "feb8134c5fbd2cce29cc9153f2a977a0c6b77fd7b1273c72a4d1a5ebe629ca40",
+ "layer": "game",
+ "source": "official",
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "firstLineAnchor": null,
+   "lineOffsetY": 0,
+   "drawWhileBlanking": false,
+   "translationGrowsDown": false
+  },
+  "page": {
+   "effectFrames": null,
+   "flowPage": null,
+   "holdMs": null
+  },
+  "choice": {
+   "filters": []
+  },
+  "hide": {
+   "textEffectsRead": false,
+   "preflight": null,
+   "drawsHidden": null
+  },
+  "selfCheck": {
+   "window": 20,
+   "minLines": 8,
+   "hideVisible": 0.25,
+   "dropRate": 0.15,
+   "repeatRate": 0.1,
+   "choiceMismatch": 1,
+   "positionPx": 96,
+   "pairRate": 0.8
+  },
+  "calibrate": {
+   "positionSource": null,
+   "textBox": null,
+   "hideMethod": null
+  },
+  "draw": {
+   "roles": false
+  },
+  "safeMode": {
+   "redrawRate": null
+  }
+ },
+ "exe": "",
+ "engine": "unity",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "947554480fc82633925c8ae14ba4883a832bf20e4e07696f8634dc3cdd731207",
+  "title": "7647316c2c8cf77d88a8652b1ddfaf67abdf10e2210157b0f1b0bf1ea71036f2",
+  "steam": "310360",
+  "vndb": "v67"
+ },
+ "status": "skeleton",
+ "slug": "higurashi-hou-ch1-onikakushi",
+ "builds": [
+  "e7ff5060c42bcbe78f8c7bb64d0d5a48a8ad60362cd86324bd00877cdb41a98d"
+ ]
+}

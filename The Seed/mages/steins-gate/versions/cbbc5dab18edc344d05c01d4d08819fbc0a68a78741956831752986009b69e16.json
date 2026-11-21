@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "cbbc5dab18edc344d05c01d4d08819fbc0a68a78741956831752986009b69e16",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "Game.exe",
+ "engine": "mages",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "cbbc5dab18edc344d05c01d4d08819fbc0a68a78741956831752986009b69e16",
+  "head": "bfa8d4f4de739955a0dc9fafe6bd14dceeab31145532416d6a7130cf17545af3",
+  "pe": "1.0.0.1@5ddf7af0"
+ }
+}

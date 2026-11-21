@@ -58,7 +58,7 @@ for(const [name,key,mode] of SAMPLES){
 test('samples: the live gate verdicts (Fata read, Senren hide), the engine-draw roles of the RPG Maker sample',()=>{
  const f=Maker.make(path.join(PROBES,'fata-morgana')),s=Maker.make(path.join(PROBES,'senren-banka')),r=Maker.make(path.join(PROBES,'rpgm-sample'),{key:'rpgm-sample'});
  assert.ok(f.result.hideBest.over.includes('dropRate'),'Fata: lines drawn nowhere');assert.equal(f.diff.settings.hide.textEffectsRead,true);
- assert.equal(s.result.best.pass,true);assert.equal(s.diff.settings.placement.drawWhileBlanking,true,'the hand-written game diff is carried into the draft');
+ assert.equal(s.result.best.pass,true);assert.equal(s.diff.settings.placement?.drawWhileBlanking,undefined,'a seed is not copied into the draft (the draft is what replaces it)');assert.equal(require('../core/profiles/index.cjs').profileFor({exe:'D:/g/SenrenBanka.exe'}).placement.drawWhileBlanking,true,'the seed keeps it');
  assert.ok(s.lines.length>0&&s.lines.every(l=>l.zh),'Senren: the aligned Chinese patch gives zh');assert.equal(f.lines.length,0,'Fata: the patch is not aligned (other line count), no zh');
  assert.ok(s.report.look.some(x=>/没有 engine-draw 记录/.test(x)),'old KiriKiri probes carry no roles: said in the report');
  const roles=Object.fromEntries(r.result.draw.roles.map(x=>[x.role,x]));

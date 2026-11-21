@@ -43,7 +43,9 @@ function matchScore(g,input){const m=g.match||{};let score=0;const why=[];
  if(Array.isArray(m.exeSha256)&&input.exeSha256&&m.exeSha256.map(x=>String(x).toLowerCase()).includes(String(input.exeSha256).toLowerCase())){score+=10;why.push('sha256');}
  if(m.steamAppId&&String(input.steamAppId||'')===String(m.steamAppId)){score+=3;why.push('steam');}
  /* the game prints of a seed (core/game-print.cjs) against the running game's: an archive or script print names the game */
- {const mp=m.prints||{},ip=input.prints||{};for(const [k,w] of [['pack',10],['script',10],['vndb',3],['title',3]])if(mp[k]&&ip[k]&&mp[k]===ip[k]){score+=w;why.push(k);}}
+ {const mp=m.prints||{},ip={...(input.prints||{})};if(!ip.title&&input.title&&mp.title)try{ip.title=require('../game-print.cjs').titleHash(input.title);}catch{}
+  if(!ip.vndb&&input.vndb)ip.vndb=String(input.vndb).toLowerCase();
+  for(const [k,w] of [['pack',10],['script',10],['vndb',3],['title',3]])if(mp[k]&&ip[k]&&mp[k]===ip[k]){score+=w;why.push(k);}}
  if(Array.isArray(m.files)&&m.files.length&&input.folder){const ok=m.files.every(f=>{try{return fs.existsSync(path.join(input.folder,f));}catch{return false;}});if(ok){score+=3;why.push('files');}}
  else if(Array.isArray(m.files)&&m.files.length&&Array.isArray(input.files)){const have=new Set(input.files.map(f=>String(f).toLowerCase().replace(/\\/g,'/')));if(m.files.every(f=>have.has(String(f).toLowerCase())))
   {score+=3;why.push('files');}}
@@ -83,18 +85,21 @@ function apply(profile,layer,name){const meta={gameKey:profile.gameKey,engine:pr
 const OUTSIDE=[['sharedGame','shared-game'],['shared','shared'],['auto','auto'],['officialGame','official-game'],['official','official'],['stepDown','stepdown']];
 function profileFor(input={}){input=input||{};const hit=findGame(input);const game=hit?.game||null;const {clean}=require('./domains.cjs');
  const engine=engineId(input.engine)||engineId(game?.engine)||'';const eng=loadEngine(engine);
- let s=clone(DEFAULTS);const layers=['core'],rejected=[];if(eng){s=merge(s,clone(eng.settings||{}));layers.push('engine');}if(game&&!game.seed){s=merge(s,clone(game.settings||{}));layers.push('game');}
+  let s=clone(DEFAULTS);const layers=['core'],rejected=[];if(eng){s=merge(s,clone(eng.settings||{}));layers.push('engine');}
+ /* a repository game file, or a skeleton seed (identity + pinned values: under this PC's calibration, the gate decides) */
+ if(game&&(!game.seed||game.status==='skeleton')){s=merge(s,clone(game.settings||{}));layers.push(game.seed?'seed-skeleton':'game');}
  /* built-in seeds (The Seed/) stand where the downloaded official diff of their layer stands; a downloaded one with a higher rev
     replaces them (input.officialGameRev / input.officialRev from services/self-check-live.cjs inputOf) */
  const seedVersion=/^[0-9a-f]{64}$/.test(String(input.exeSha256||''))?require('./seed.cjs').versionOf(input.exeSha256):null;
- const take=(seedDoc,field,rev)=>seedDoc&&(!plain(input[field])||!(Number(input[rev])>Number(seedDoc.rev)));
- const slots={officialGame:take(game?.seed?game:null,'officialGame','officialGameRev')?['seed-game',game.settings]:null,official:take(seedVersion,'official','officialRev')?['seed',seedVersion.settings]:null};
+ const take=(seedDoc,field,rev)=>seedDoc&&(!plain(input[field])||!(Number(input[rev])>Number(seedDoc.rev||0)));
+ const seedGame=game?.seed&&game.status!=='skeleton'?game:null;
+ const slots={officialGame:take(seedGame,'officialGame','officialGameRev')?['seed-game',game.settings]:null,official:take(seedVersion,'official','officialRev')?['seed',seedVersion.settings]:null};
  for(const [field,name0] of OUTSIDE){let v=input[field],name=name0;if(slots[field]){[name,v]=slots[field];}if(!plain(v))continue;const c=clean(v);if(c.rejected.length){rejected.push(name+': '+c.rejected.slice(0,3).join(','));continue;}s=merge(s,c.value);layers.push(name);}
  const exe=/^[0-9a-f]{64}$/.test(String(input.exeSha256||''))?String(input.exeSha256):'';
  /* how the game was recognised, most exact first (docs/diff-layers.md): input.match is the relay's ('exe' | 'bin' | 'game:<basis>');
     else the repo game file's ('exe' when it lists this exe hash, game:<why> otherwise); else 'engine' or 'none' */
  const match=/^(exe|head|pe|game:[a-z~(),]{2,40})$/.test(String(input.match||''))?String(input.match):hit?(hit.why.includes('sha256')?'exe':'game:'+hit.why.filter(w=>w!=='sha256').map(w=>/^exe/.test(w)?'name':w.replace('~','')).join(',')):eng?'engine':'none';
- return freeze({gameKey:game?game.key:autoKey(input),engine:engine||'unknown',exeSha256:exe,match,layers:layers.join('+'),matched:hit?hit.why.join(','):'',rejected:rejected.join('; '),...s});}
+ return freeze({gameKey:game?game.key:autoKey(input),seedStatus:game?.seed?game.status:'',sourceLangs:game?.sourceLangs||['ja'],engine:engine||'unknown',exeSha256:exe,match,layers:layers.join('+'),matched:hit?hit.why.join(','):'',rejected:rejected.join('; '),...s});}
 /* the trace line every run writes once (hook-events.log), so the owner's log tells which layers this game ran with */
 const traceLine=p=>'profile '+p.gameKey+' match='+(p.match||'none')+' exe='+(p.exeSha256?p.exeSha256.slice(0,8):'-')+' layers='+p.layers+' engine='+p.engine+(p.rejected?' rejected='+p.rejected:'');
 /* a dotted key of a profile, with the fallback when the profile or the key is missing */

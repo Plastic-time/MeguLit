@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.game-diff",
+ "version": 1,
+ "key": "0adf662a06220364c0407460e7b9e26a129b5203cb26b6f726be012ba2c99d54",
+ "layer": "version",
+ "source": "official",
+ "settings": {
+  "hide": {
+   "engineTrial": {
+    "enabled": null,
+    "unconfirmedLines": null,
+    "clickMs": null,
+    "skipAside": null
+   }
+  },
+  "draw": {
+   "embed": false,
+   "embedTranslation": true
+  }
+ },
+ "exe": "bug02_yakata.exe",
+ "engine": "kirikiri",
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "exe": "0adf662a06220364c0407460e7b9e26a129b5203cb26b6f726be012ba2c99d54",
+  "head": "287ae6ee778e18dc162bfeb06d40f5ccd3a963bb24a638258aad8c24e7432c0c",
+  "pe": "2.31.2013.330@5156d643"
+ }
+}

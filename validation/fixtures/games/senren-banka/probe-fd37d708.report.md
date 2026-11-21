@@ -50,10 +50,6 @@ UI 项（按 role、id、文字去重）：0 个
 
 ```json
 {
- "placement": {
-  "drawWhileBlanking": true,
-  "translationGrowsDown": true
- },
  "calibrate": {
   "positionSource": "engine",
   "textBox": {

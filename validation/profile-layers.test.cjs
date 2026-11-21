@@ -47,9 +47,9 @@ test('page/hide knobs: null keeps the kernel rule, a diff value wins for that ga
 });
 
 test('auto layer (this PC measured) stacks over the game diff, a bad key leaves it out whole; apply() adds one layer',()=>{
- assert.equal(Profiles.profileFor({exe:'D:/g/SenrenBanka.exe',auto:{selfCheck:{window:30},bogus:{x:1}}}).layers,'core+engine+seed-game');
- const p=Profiles.profileFor({exe:'D:/g/SenrenBanka.exe',auto:{calibrate:{hideMethod:'glyph',textBox:{x:1,y:2,w:3,h:4}},selfCheck:{window:30}}});
- assert.equal(p.layers,'core+engine+auto+seed-game');assert.equal(p.calibrate.hideMethod,'glyph');assert.deepEqual({...p.calibrate.textBox},{x:1,y:2,w:3,h:4});assert.equal(p.selfCheck.window,30);assert.equal(p.selfCheck.minLines,8);assert.ok(!('bogus' in p));
- const q=Profiles.apply(Profiles.profileFor({exe:'D:/g/SenrenBanka.exe'}),{page:{holdMs:900},nope:1},'auto');
- assert.equal(q.layers,'core+engine+seed-game+auto');assert.equal(q.page.holdMs,900);assert.equal(q.gameKey,'senren-banka');assert.ok(Object.isFrozen(q.page));
+ assert.equal(Profiles.profileFor({exe:'D:/g/Unknown.exe',engine:'kirikiri',auto:{selfCheck:{window:30},bogus:{x:1}}}).layers,'core+engine');
+ const p=Profiles.profileFor({exe:'D:/g/Unknown.exe',engine:'kirikiri',auto:{calibrate:{hideMethod:'glyph',textBox:{x:1,y:2,w:3,h:4}},selfCheck:{window:30}}});
+ assert.equal(p.layers,'core+engine+auto');assert.equal(p.calibrate.hideMethod,'glyph');assert.deepEqual({...p.calibrate.textBox},{x:1,y:2,w:3,h:4});assert.equal(p.selfCheck.window,30);assert.equal(p.selfCheck.minLines,8);assert.ok(!('bogus' in p));
+ const q=Profiles.apply(Profiles.profileFor({exe:'D:/g/Unknown.exe',engine:'kirikiri'}),{page:{holdMs:900},nope:1},'auto');
+ assert.equal(q.layers,'core+engine+auto');assert.equal(q.page.holdMs,900);assert.match(q.gameKey,/^auto-/);assert.ok(Object.isFrozen(q.page));
 });
