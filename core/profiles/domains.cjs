@@ -9,6 +9,7 @@
    sources with flags 'u': no backreferences, no nested quantifiers, bounded size). */
 const DOMAINS={
  'source.artemisQuoteSpans':{bool:true,layer:'version'},
+ 'source.siglusDbsNameColumn':{number:[0,2147483647],nullable:true,int:true,layer:'version'},
  'placement.firstLineAnchor':{enum:[null,'glyph','box','page']},
  'placement.lineOffsetY':{number:[-400,400]},
  'placement.drawWhileBlanking':{bool:true},
@@ -25,7 +26,6 @@ const DOMAINS={
  'choice.filters':{regexList:{max:20,chars:200}},
  'choice.pageFrames':{regexList:{max:20,chars:200}},
  'hide.textEffectsRead':{bool:true},
- 'hide.streamFallback':{enum:[null,'engine']},
  'hide.preflight':{enum:[null,true,false]},
  'hide.drawsHidden':{enum:[null,true,false]},
  'hide.engineTrial.enabled':{enum:[null,true,false],layer:'version'},

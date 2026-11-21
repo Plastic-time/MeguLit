@@ -5,6 +5,9 @@
  "layer": "version",
  "source": "official",
  "settings": {
+  "source": {
+   "siglusDbsNameColumn": 50
+  },
   "draw": {
    "embed": false,
    "embedTranslation": true
@@ -19,5 +22,5 @@
   "head": "27c87e4242516f33d2b85f686732880f351a442b905eda7cfd88fed46cd9c2e6",
   "pe": "1.1.134.0@5b3ecb72"
  },
- "rev": 1
+ "rev": 2
 }
