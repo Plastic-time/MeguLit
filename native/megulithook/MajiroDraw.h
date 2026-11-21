@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <intrin.h>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include "MinHook.h"
 #include "MajiroDrawSig.h"
@@ -14,7 +15,7 @@ namespace MajiroDraw {
 using DrawFn=int(__cdecl *)(void *,void *,const char *,void *,int);
 static DrawFn Original=nullptr;
 static uintptr_t Image=0,ImageEnd=0,DrawAt=0;
-static volatile LONG Armed=0,Installed=0,Observing=0,Run=0;
+static volatile LONG Armed=0,Installed=0,Observing=0,PermissionEpoch=0,Run=0;
 struct Snapshot { long x,y,size;unsigned paint;char text[4096];int bytes; };
 static bool Capture(void *font,const char *text,Snapshot *s){
  __try{
@@ -32,10 +33,11 @@ static std::string Utf8(const char *text,int bytes){
  if(m)WideCharToMultiByte(CP_UTF8,0,w.data(),n,&s[0],m,nullptr,nullptr);return s;
 }
 static int __cdecl Gate(void *font,void *destination,const char *text,void *output,int flags){
+ LONG epoch=InterlockedCompareExchange(&PermissionEpoch,0,0);
  if(!InterlockedCompareExchange(&Observing,0,0))return Original(font,destination,text,output,flags);
  Snapshot s{};bool captured=Capture(font,text,&s);uintptr_t caller=(uintptr_t)_ReturnAddress();
  int width=Original(font,destination,text,output,flags);
- if(captured&&InterlockedCompareExchange(&Observing,0,0)){try{
+ if(captured&&InterlockedCompareExchange(&Observing,0,0)&&epoch==InterlockedCompareExchange(&PermissionEpoch,0,0)){try{
   std::string u=Utf8(s.text,s.bytes);int chars=0;for(unsigned char c:u)if((c&0xc0)!=0x80)chars++;
   if(u.size()>240){size_t cut=240;while(cut&&((unsigned char)u[cut]&0xc0)==0x80)cut--;u.resize(cut);}
   for(char &c:u)if(c=='\r'||c=='\n')c=' ';
@@ -52,12 +54,40 @@ static bool FindInImage(uintptr_t base){
  }
  if(total!=1)return false;Image=base;ImageEnd=base+nt->OptionalHeader.SizeOfImage;DrawAt=found;return true;
 }
+static bool RolesFromControl(const unsigned char *bytes,size_t length){
+ char line[256];size_t used=0,pos=0;bool wide=false,complete=false;
+ if(length>=2&&bytes[0]==0xff&&bytes[1]==0xfe){wide=true;pos=2;}
+ else if(length>=2&&bytes[0]=='#'&&!bytes[1])wide=true;
+ else if(length>=3&&bytes[0]==0xef&&bytes[1]==0xbb&&bytes[2]==0xbf)pos=3;
+ while(pos<length&&used<sizeof(line)-1){
+  if(wide&&(pos+1>=length||bytes[pos+1]))return false;
+  unsigned char c=bytes[pos];pos+=wide?2:1;
+  if(c=='\r'){
+   if(pos>=length||bytes[pos]!='\n'||(wide&&(pos+1>=length||bytes[pos+1])))return false;
+   complete=true;break;
+  }
+  if(c=='\n'){complete=true;break;}
+  if(c!='\t'&&(c<32||c>126))return false;
+  line[used++]=(char)c;
+ }
+ if(!complete||used<5||std::memcmp(line,"#cfg",4)||(line[4]!=' '&&line[4]!='\t'))return false;
+ bool found=false,enabled=false;
+ for(size_t i=4;i<used;){
+  while(i<used&&(line[i]==' '||line[i]=='\t'))i++;
+  size_t start=i;while(i<used&&line[i]!=' '&&line[i]!='\t')i++;
+  size_t size=i-start;
+  if(size==5&&!std::memcmp(line+start,"roles",5))return false;
+  if(size>=6&&!std::memcmp(line+start,"roles=",6)){
+   if(found)return false;found=true;enabled=size==7&&line[start+6]=='1';
+  }
+ }
+ return found&&enabled;
+}
 static bool RolesAsked(){
  wchar_t tmp[MAX_PATH],file[MAX_PATH+64];DWORD n=GetTempPathW(MAX_PATH,tmp);if(!n||n>=MAX_PATH)return false;
  swprintf_s(file,L"%sMeguLit\\draw\\%lu.txt",tmp,GetCurrentProcessId());HANDLE h=CreateFileW(file,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,0,nullptr);if(h==INVALID_HANDLE_VALUE)return false;
- char bytes[512]={};DWORD got=0;ReadFile(h,bytes,sizeof bytes-1,&got,nullptr);CloseHandle(h);std::string ascii;for(DWORD i=0;i<got;i++)if(bytes[i])ascii+=bytes[i];
- size_t p=ascii.find("#cfg ");if(p==std::string::npos)return false;size_t end=ascii.find_first_of("\r\n",p);std::string cfg=ascii.substr(p,end==std::string::npos?end:end-p);
- p=cfg.find("roles=1");return p!=std::string::npos&&(p==0||cfg[p-1]==' ')&&(p+7==cfg.size()||cfg[p+7]==' ');
+ unsigned char bytes[512];DWORD got=0;BOOL ok=ReadFile(h,bytes,sizeof bytes,&got,nullptr);CloseHandle(h);
+ return ok&&RolesFromControl(bytes,got);
 }
 static bool Install(){
  if(Installed)return true;
@@ -65,9 +95,16 @@ static bool Install(){
  if(MH_EnableHook((void *)DrawAt)!=MH_OK){MH_RemoveHook((void *)DrawAt);Original=nullptr;return false;}
  InterlockedExchange(&Installed,1);Msg::Log("ToMe_DRAWRUN engine=majiro on: complete string draw rva=%lx",(unsigned long)(DrawAt-Image));return true;
 }
+static void SetObserving(bool on){
+ LONG next=on?1:0;
+ if(InterlockedCompareExchange(&Observing,0,0)!=next){
+  // Reopening permission cannot publish a snapshot taken by an older in-flight draw.
+  InterlockedIncrement(&PermissionEpoch);InterlockedExchange(&Observing,next);
+ }
+}
 static void RefreshControl(){
- if(RolesAsked()){if(Install())InterlockedExchange(&Observing,1);}
- else InterlockedExchange(&Observing,0);
+ if(RolesAsked()){if(Install())SetObserving(true);}
+ else SetObserving(false);
 }
 // The installed detour stays stable; only the atomic observation flag changes on each low-frequency poll.
 static DWORD WINAPI Watch(void *stop){for(;;){RefreshControl();if(stop){if(WaitForSingleObject((HANDLE)stop,2000)==WAIT_OBJECT_0)return 0;}else Sleep(2000);}}
