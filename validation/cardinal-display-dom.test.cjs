@@ -59,3 +59,7 @@ test('flag API failure after policy negotiation suppresses measurements until ev
  const h=harness(),jp=node('本文です'),cn=node('正文'),meta=h.source('本文です',1);h.pairs.availability('本文です','正文');const policies=h.messages.length;h.b.isEnabled=()=>{throw Error('late API failure');};h.b.cardinalPair.bind(meta,jp,cn);h.flush();assert.equal(h.messages.length,policies);assert.equal(h.pairs.snapshot(1).unobserved,1);
  h.b.isEnabled=()=>true;h.b.cardinalPair.bind(null,jp,cn);h.flush();assert.equal(h.pairs.snapshot(1).paired,1);assert.equal(h.messages.filter(m=>m.type==='cardinalPairPolicy').length,2,'a valid existing event renegotiates instead of remaining locked');
 });
+
+test('an existing mutation or reveal notification can recover valid flag APIs without another source or binding',()=>{
+ const h=harness(),jp=node('本文です'),cn=node('正文');h.b.isEnabled=()=>undefined;h.pairs.availability('本文です','正文');h.b.cardinalPair.bind(h.source('本文です',1),jp,cn);h.flush();assert.equal(h.messages.length,0);h.b.isEnabled=()=>true;h.b.cardinalPair.notify();h.flush();assert.equal(h.pairs.snapshot(1).paired,1);assert.equal(h.messages.filter(m=>m.type==='cardinalPairPolicy').length,1);assert.equal(h.frames.length,0,'one renegotiation does not create an animation loop');
+});
