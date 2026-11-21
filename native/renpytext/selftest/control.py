@@ -128,5 +128,30 @@ def menu_alias():
     assert len(choices)==2, choices
     assert 'id=C:0 box=100,200,' in choices[0] and 'id=C:1 box=100,280,' in choices[1]
 check('preinjection store alias and duplicate captions retain action identity',menu_alias)
+
+def narrator_clears_name():
+    name_identity()
+    text=Text('narration',24,['narration'])
+    state['tree']=Render(text)
+    state['who']=None
+    before=len(out)
+    renpy.character.display_say(None,'narration',say_show)
+    empty=[x for x in out[before:] if ' role=name ' in x and x.endswith('text=')]
+    assert len(empty)==1 and 'id=N: ' in empty[0], empty
+    renpy.display.render.render_screen(state['tree'],1280,720)
+    assert len([x for x in out[before:] if ' role=name ' in x])==1
+check('speaker to narrator clears previous name once',narrator_clears_name)
+
+def empty_caption():
+    root=Render()
+    window=root.blit(Render(),(0,0))
+    window.blit(Render(Text('visible',24,['visible'])),(100,200))
+    state['tree']=root
+    control(b'#cfg roles=1 embed=0 zh=0\n')
+    before=len(out)
+    store.menu([('visible',1),('',2),('heading',None)])
+    choices=[x for x in out[before:] if ' role=choice ' in x and not x.endswith('text=')]
+    assert len(choices)==1 and choices[0].endswith('text=visible'), choices
+check('empty labels are nonaction headings in the standard menu',empty_caption)
 sys.stdout.write(json.dumps({'scope':'actual script with inert host, not game','checks':len(results),'results':results}))
 sys.exit(1 if any(not item['pass'] for item in results) else 0)

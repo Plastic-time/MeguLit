@@ -27,6 +27,7 @@ def install_fakes():
         sys.modules[name] = m
         return m
     renpy = mod('renpy')
+    renpy.version_tuple = (8, 4, 0, 25071206)
     for n in ('display', 'text'):
         setattr(renpy, n, mod('renpy.' + n))
     render, textmod, extras = mod('renpy.display.render'), mod('renpy.text.text'), mod('renpy.text.extras')
@@ -92,6 +93,7 @@ def install_fakes():
 
         def __init__(self, lines):
             self.lines = lines
+            self.paragraph_glyphs = [list(line.glyphs) for line in lines]
 
         def unscale_pair(self, x, y):
             return x / self.oversample, y / self.oversample
@@ -101,17 +103,18 @@ def install_fakes():
             self.size = size
 
     class Text(object):
-        def __init__(self, what, size, rows, ruby=None):
+        def __init__(self, what, size, rows, ruby=None, ruby_count=None):
             self.text_parameter, self.text, self.style = what, [what], Style(size)
             self.start, self.end = 0, len(what)
             lines = []
             for r, row in enumerate(rows):
                 glyphs = []
+                base_count = ruby_count if ruby_count is not None else len(row)
                 for i, ch in enumerate(row):
-                    glyphs.append(Glyph(ch, i * size * 2, size * 2, 1 if ruby else 0))
-                if ruby and r == 0:
-                    for i, ch in enumerate(ruby):
-                        glyphs.append(Glyph(ch, i * size, size // 2, 2))
+                    glyphs.append(Glyph(ch, i * size * 2, size * 2, 1 if ruby and r == 0 and i < base_count else 0))
+                    if ruby and r == 0 and i == base_count - 1:
+                        for j, reading in enumerate(ruby):
+                            glyphs.append(Glyph(reading, j * size, size // 2, 2))
                 glyphs.append(Glyph('\ufffc', len(row) * size * 2, size * 2))  # the click-to-continue mark
                 lines.append(Line(r * (size + 10) * 2, (size + 10) * 2, glyphs))
             self._layout = Layout(lines)
@@ -178,7 +181,7 @@ def install_fakes():
     exports.restart_interaction = restart_interaction
 
     def display_menu(items, interact=True):
-        entries = [types.SimpleNamespace(caption=caption, action=object()) for caption, value in items if value is not None]
+        entries = [types.SimpleNamespace(caption=caption, action=object()) for caption, value in items if caption and value is not None]
         state['choice_screen'] = types.SimpleNamespace(scope={'items': entries})
         leaves = state['tree'].children[0][0].children
         for entry, leaf in zip(entries, leaves):
@@ -213,7 +216,7 @@ def scenario(fakes):
     state['tree'] = screen((t1, (20, 30), None))
     renpy.character.display_say(None, '\u6625\u306e\u98a8\u304c\u5439\u3044\u305f\u3002{w}\u4e8c\u884c\u76ee\u3067\u3059\u3002', nvl_show_core)
     what2 = '{rb}\u6f22\u5b57{/rb}{rt}\u304b\u3093\u3058{/rt}\u3092\u8aad\u3080\u3002'
-    t2 = Text('rebuilt by the screen', 28, ['\u6f22\u5b57\u3092\u8aad\u3080\u3002'], ruby='\u304b\u3093\u3058')
+    t2 = Text('rebuilt by the screen', 28, ['\u6f22\u5b57\u3092\u8aad\u3080\u3002'], ruby='\u304b\u3093\u3058', ruby_count=2)
     store.nvl_list.append(('b', 'y', {}))
     state['tree'] = screen((t1, (20, 30), None), (t2, (40, 0), 0.5))
     renpy.exports.display_say(None, what2, nvl_show_core)
