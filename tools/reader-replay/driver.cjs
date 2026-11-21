@@ -81,7 +81,7 @@ const {KrkrModel}=require('./krkr-model.cjs');
   await page.goto('http://tauri.localhost/reader/index.html');
   try{await page.waitForFunction(()=>window.__TOME_READER_READY__===true,null,{timeout:30000});}catch(e){out.errors.push('not ready: '+await page.evaluate(()=>document.querySelector('#reader-status')?.textContent).catch(()=>'?'));const f=path.join(root,'logs','reader-startup.log');if(fs.existsSync(f))out.errors.push(fs.readFileSync(f,'utf8').slice(-1500));throw e;}
   for(const m of early.splice(0))await page.evaluate(m=>window.__replayEvent(m),m).catch(()=>{});
-  await page.addScriptTag({path:path.join(__dirname,'probe.js')});
+  await page.addScriptTag({path:path.join(REPO,'web','reader','replay-probe.js')});
   /* ---- the timeline: bridge lines at their log times (gaps over maxGap shortened) ---- */
   const t0=Date.now();out.t0=t0;let clock=0;const maxGap=scenario.maxGap||2500;
   let prevT=null,sampling=!!scenario.sampleEvery;

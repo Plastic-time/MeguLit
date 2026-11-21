@@ -29,7 +29,7 @@ KiriKiri 那一侧（`tools/reader-replay/krkr-model.cjs`）：从 `native/krkrt
 |---|---|
 | `tools/reader-replay/driver.cjs` | 一次回放（一个子进程，`MEGULIT_ROOT` 指向临时根）：`node driver.cjs <scenario.json> <out.json>`，环境变量 `MEGULIT_REPLAY_DATA`（含 `config/` 的设置目录）、`MEGULIT_REPLAY_WORK`、`MEGULIT_PLAYWRIGHT`、`MEGULIT_REPLAY_KEEP` |
 | `tools/reader-replay/from-logs.cjs` | 日志 → 时间线：`extract(logsDir, fromIso, toIso)`、`attachSteps(game, t)`、`timeline(ex, game, {actions})` |
-| `tools/reader-replay/probe.js` | 页面里量：每个可见日文字的位置 / 颜色 / pointer、中文行、各 `.sentence-window`、选项层、body class |
+| `web/reader/replay-probe.js` | 页面里量：每个可见日文字的位置 / 颜色 / pointer、中文行、各 `.sentence-window`、选项层、body class |
 | `tools/reader-replay/krkr-model.cjs` | 控制文件的脚本侧 |
 | `validation/fixtures/games/<game>/acceptance.case.cjs` | 这部游戏的验收（games-regression 会跑；`MEGULIT_FATA_ACCEPT=0` 跳过；`MEGULIT_FATA_ACCEPT_OUT=<file>` 写逐条结果） |
 
@@ -45,6 +45,13 @@ KiriKiri 那一侧（`tools/reader-replay/krkr-model.cjs`）：从 `native/krkrt
 ```
 
 `out.json`：`samples`（每个 mark 和每 `sampleEvery` 毫秒一份页面测量，带当时的 `hitRegions`）、`hookEvents`、`readerHost`、`hbSent`（core 发给 HookBridge 的）、`control`（控制文件内容）、`krkr`（脚本侧读到的 cfg、清页次数、选项页判定）、`errors`。
+
+## 两种宿主（店主 2026-11-21）
+
+最终要在用户电脑上跑：用户的 MeguLit 用自己的阅读层（隐藏的 WebView 实例，不显示）把运行时样本 / 冷测试录制重放一遍，按 DOM 级断言给种子候选打分，只回传分数（不传截图）。所以分两层：
+
+- 页面侧（`web/reader/`，随 web 热更新）：`replay-probe.js` 量页面（`window.__replayProbe()`），断言也要放到这里（下一步 `web/reader/replay-checks.js`，纯函数：样本序列 → 逐条结果），不依赖 Playwright 或仓库外工具
+- 驱动侧：开发时是 `tools/reader-replay/driver.cjs`（无头 Edge + 假原生桥）；App 里是 services 侧驱动（同样把样本包的记录当两个原生桥的输出喂给 GalNative / HookNative，把 'reader-event' 发给隐藏阅读层，按时间轴取 `__replayProbe()`），两者共用 `from-logs.cjs` 的时间线格式
 
 ## 通用断言（每部游戏都该过）
 
