@@ -36,8 +36,11 @@ test('identical saved lines only list words collected from the same game',t=>{
   }
   example.run(2,'a','別の文。');
   example.run(1,'a',line);
+  db.prepare('INSERT INTO examples(word_id,game_id,text,original) VALUES(2,NULL,?,?)').run(line,JSON.stringify({sync:true,game:'On another device'}));
   const rows=saved.list(db);
   assert.deepEqual(rows.map(r=>[r.game_id,r.words.map(w=>w.id)]),[[null,[3]],['b',[2]],['a',[1]]]);
+  db.prepare('UPDATE saved_sentences SET original=? WHERE game_id IS NULL').run(JSON.stringify({sync:true,game:'ON ANOTHER DEVICE'}));
+  assert.deepEqual(saved.list(db)[0].words.map(w=>w.id),[2]);
  }finally{db.close();}
 });
 
@@ -67,6 +70,24 @@ test('mining and syncing the same word in the same line keeps one example per ga
   const rows=db.prepare('SELECT game_id,COUNT(*) n FROM examples GROUP BY game_id ORDER BY game_id').all();
   assert.deepEqual(rows.map(r=>[r.game_id,r.n]),[[null,3],['a',3],['b',3]]);
  }finally{db.close();}
+});
+
+test('the Anki callback schedules sync without re-mining a word saved by the host',async t=>{
+ const root=temp(t),delays=[],window={__TAURI_INTERNALS__:{invoke:(command,args)=>{
+  return require('../services/legacy-reader-sql.cjs').request(root,command,args);
+ }}};
+ const context={window,history:{pushState(){},replaceState(){}},location:{hostname:'tauri.localhost',pathname:'/'},localStorage:{getItem:()=>null},
+  document:{documentElement:{},body:{},head:{append(){}},createElement:()=>({})},addEventListener(){},
+  setTimeout:(f,ms)=>delays.push(ms),clearTimeout(){},setInterval(){},console};
+ require('node:vm').runInNewContext(fs.readFileSync(path.join(ROOT,'web/reader/modules/anki-sync.js'),'utf8'),context);
+ const entry={id:5,spellings:['晴れ'],readings:['はれ']},args={text:'明日は晴れ。'};
+ await window.__tomeAnkiMined({entry,args,noteId:8,wordMined:true});
+ assert.equal(delays.at(-1),4000);
+ const afterHost=openStore(root);
+ try{assert.equal(afterHost.prepare('SELECT COUNT(*) n FROM examples').get().n,0);}finally{afterHost.close();}
+ await window.__tomeAnkiMined({entry,args,noteId:8});
+ const db=openStore(root);
+ try{assert.deepEqual({...db.prepare('SELECT game_id,text FROM examples').get()},{game_id:null,text:args.text});}finally{db.close();}
 });
 
 test('the reader saves the shown line for the attached game and toggles it off again',async t=>{

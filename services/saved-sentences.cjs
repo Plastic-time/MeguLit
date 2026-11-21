@@ -37,9 +37,14 @@ function state(db,{gameId,text}={}){const found=find(db,gameId?String(gameId):nu
 function list(db,{source}={}){
  const filter=SOURCES.includes(source)?' WHERE s.source=?':'';
  const rows=db.prepare('SELECT s.id,s.game_id,s.text,s.translation,s.created_at,s.source,s.original,g.title FROM saved_sentences s LEFT JOIN games g ON s.game_id=g.id'+filter+' ORDER BY s.created_at DESC,s.id DESC LIMIT 1000').all(...(filter?[source]:[]));
- const words=db.prepare('SELECT DISTINCT v.id,v.spelling,v.reading FROM examples e JOIN vocabulary v ON v.id=e.word_id WHERE e.text=? AND e.game_id IS ? ORDER BY e.id');
+ const words=db.prepare(`SELECT DISTINCT v.id,v.spelling,v.reading FROM saved_sentences s
+  JOIN examples e ON e.text=s.text AND e.game_id IS s.game_id JOIN vocabulary v ON v.id=e.word_id
+  WHERE s.id=? AND (s.game_id IS NOT NULL OR
+   COALESCE(json_extract(CASE WHEN json_valid(e.original) THEN e.original END,'$.game'),'') =
+   COALESCE(json_extract(CASE WHEN json_valid(s.original) THEN s.original END,'$.game'),'') COLLATE NOCASE)
+  ORDER BY e.id`);
  /* 2026-11-13 scene {file,hash,at}|null and source, the same fields as game_detail's sentences (the 学习 › 句子 hero and strip show the frame) */
  const {sceneOf}=require('./sentence-scenes.cjs');
- return rows.map(({original,...r})=>({...r,source:r.source||'manual',scene:sceneOf(original),words:words.all(r.text,r.game_id).map(w=>({...w}))}));
+ return rows.map(({original,...r})=>({...r,source:r.source||'manual',scene:sceneOf(original),words:words.all(r.id).map(w=>({...w}))}));
 }
 module.exports={save,remove,state,find,list,migrate,SOURCES};

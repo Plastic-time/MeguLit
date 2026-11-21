@@ -36,7 +36,7 @@
   if(noteId)await run('INSERT OR REPLACE INTO tome_anki_links (word_id, note_id) VALUES ($1, $2)',[id,Number(noteId)]);
   return id;
  }
- window.__tomeAnkiMined=async({entry,args,noteId})=>{try{const chars=[...(args?.text||'')];await mine({entry,sentence:args?.text||'',start:args?.start||0,end:args?.end||0,noteId});schedule(4000);}catch(e){console.warn('[MeguLit] mine failed',e);}};
+ window.__tomeAnkiMined=async({entry,args,noteId,wordMined})=>{try{await mine({entry,sentence:wordMined?'':args?.text||'',start:args?.start||0,end:args?.end||0,noteId});schedule(4000);}catch(e){console.warn('[MeguLit] mine failed',e);}};
  // Anki -> MeguLit
  let syncing=null,last={at:0,words:0,imported:0,reviews:0,status:0,error:''};
  async function sync(){

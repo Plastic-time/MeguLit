@@ -459,7 +459,7 @@ class Reader{
      if(!extra.sentenceAudio&&(!args.dictionary||word.sentence))try{extra.sentenceAudio=await this.runtime.speech().synthesize({surface:args.dictionary?word.sentence:args.text,reading:'',pitch:[]},config);}catch{}
     }
    }
-   await this.prepareMiningModel(config);const result=await new(require('../core/anki.cjs').Anki)(fetch,{mediaDir:require('../core/anki-media-cache.cjs').dirFor(this.root)}).sync(word,config,audio,extra);const entries=(await this.invoke('lookup_exact',args)).entries||[];const mined=await this.mine({entry:entries.find(e=>e.id===args.entryId)||entries[0],args:args.dictionary?{...args,text:''}:args,noteId:result.id});if(mined?.sentenceSaved)result.sentenceSaved=true;
+   await this.prepareMiningModel(config);const result=await new(require('../core/anki.cjs').Anki)(fetch,{mediaDir:require('../core/anki-media-cache.cjs').dirFor(this.root)}).sync(word,config,audio,extra);const entries=(await this.invoke('lookup_exact',args)).entries||[];const mined=await this.mine({entry:entries.find(e=>e.id===args.entryId)||entries[0],args:args.dictionary?{...args,text:''}:args,noteId:result.id});if(mined)result.wordMined=true;if(mined?.sentenceSaved)result.sentenceSaved=true;
    if(config.ankiGameMedia!==false&&!args.dictionary&&!result.screenshotAttached)result.mediaWarning='SCREENSHOT_UNAVAILABLE';
    result.sentenceAudioSource=extra.gameAudio?'game':extra.sentenceAudio?'synthesized':'';
    /* E455 a recorded clip on the card is replaced by its voice alone once separated (same media file name, so the
