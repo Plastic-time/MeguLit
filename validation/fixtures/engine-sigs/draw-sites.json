@@ -187,6 +187,17 @@
    "slot": "0x5ab014",
    "call": "0x460f87",
    "hex": "8b4c2418ba01000000894424388944243c8b435cbb060000006a006a0083c0b0c74424480000010083b9a800000000508bc30f45c250ff7508578b3d14b05a00ffd733c98d54241383f8ff884c241352"
+  },
+  "leyline-1/softpal-2": {
+   "id": "softpal-2",
+   "file": "PAL.dll",
+   "sha256": "bea18b1b34b01936ea57a8098009e4c268a722e968bc6ada19de51bf820c3364",
+   "api": "GetGlyphOutlineA",
+   "va": "0x10008930",
+   "callOffset": 64,
+   "slot": "0x100db01c",
+   "call": "0x10008970",
+   "hex": "83c40485ff0f84b0040000a1184111156683b8c8010000040f84860000008b95b0feffff8b351cb00d108d85c8feffff506a006a008d8dd8feffff516a065752ffd68b0d1c4111158bd88d85c8feffff"
   }
  }
 }

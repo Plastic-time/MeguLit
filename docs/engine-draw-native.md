@@ -180,3 +180,8 @@
 - 点：Saya_Steam.exe 0x460f87。普查时导入表看着只有 CreateFontW，其实 GetGlyphOutlineW 也在导入表里，只是经寄存器调用：字形例程 0x460d90（EBP 帧，1 个调用者）`push edi; mov edi, [IAT]; call edi`，全程序只此一处（SLOT 形式）。字形进 Mware.dll 的 D3D11 纹理，没有笔位
 - 2003 年原版（system.dll，GetGlyphOutlineA ×2、TextOutA ×7，seed 里归 nitropak）和 みにくいモジカの子（Enigma 壳）不在这一条里
 - 店主测试清单：同 AVG32，行里是 `engine=nitroplus`
+
+### Softpal（時計仕掛けのレイライン）
+- 点：dll\PAL.dll 0x10008295（`call [IAT]`）和 0x1000897c（另一个字形例程，先 `mov esi, [IAT]` 再 `call esi`），都是 `GetGlyphOutlineA(hdc, 字, GGO_GRAY8, &gm, 0, NULL, &mat)` 量尺寸那次，两条签名 `softpal` / `softpal-2`。都有 EBP 帧（第一次提交时漏了第二个，以为字体类型 4 不走 GDI）
+- 没有笔位：位置已经由 Pal.cpp 的 pal_sprite_v1 文字精灵给出，这里补的是「哪段字从哪个例程画出来」（via）
+- 店主测试清单：同 AVG32，行里是 `engine=softpal`，`x0=-1`
