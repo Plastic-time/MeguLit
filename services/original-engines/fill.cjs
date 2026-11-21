@@ -16,4 +16,13 @@ function lookup(ja){if(ASSET.test(ja))return {zh:'',source:'asset'};const t=entr
 function scene(s){if(!s||!Array.isArray(s.lines)||!Array.isArray(s.zh))return s;const zh=s.zh.slice(),src=[];
  s.lines.forEach((ja,i)=>{if(zh[i]){src[i]='release';return;}const f=lookup(ja);if(f){zh[i]=f.zh;src[i]=f.source;}else src[i]='';});
  return {...s,zh,zhSource:src};}
-module.exports={lookup,scene,key,ASSET,_entries:entries};
+function patchLines(base){
+ let any=false;
+ const list=base.map(scene=>{
+  const zh=scene.zh||[];if(!zh.some(Boolean))return scene;
+  any=true;return {...scene,patched:true,lines:scene.lines.map((t,k)=>zh[k]||t)};
+ });
+ return any?list:null;
+}
+
+module.exports={lookup,scene,key,patchLines,ASSET,_entries:entries};

@@ -263,15 +263,6 @@ function parse(buf){
  return out;
 }
 
-function patchLines(base){
- let any=false;
- const list=base.map(scene=>{
-  const zh=scene.zh||[];if(!zh.some(Boolean))return scene;
-  any=true;return {...scene,patched:true,lines:scene.lines.map((t,k)=>zh[k]||t)};
- });
- return any?list:null;
-}
-
 function foreign(dir){
  const key=require('../original-text.cjs').foreignKey,out=new Map(),seq=[];out.seq=seq;
  for(const [other,ja] of loadDir(dir).foreignRows){
@@ -292,7 +283,7 @@ module.exports={
  sources:dir=>loadDir(dir).sources,
  parse,
  test:()=>false,
- patchLines,
+ patchLines:require('./fill.cjs').patchLines,
  foreign,
  _internal:{parseBook,parseChapter,clean,pickColumns,speakerResolver},
 };
