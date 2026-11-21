@@ -28,6 +28,9 @@ rem MinHook's instruction decoder for the MAGES register scan (native\mages\mage
 for %%F in (hde32.h pstdint.h) do copy /y "%~dp0..\shared\minhook\src\hde\%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engine32\%%F" >nul || exit /b 1
 rem the upstream MAGES engine (5pb games: CHAOS;CHILD, STEINS;GATE 0, ...) with the same instruction-aligned register scan
 copy /y "%~dp0MagesEngine.cpp" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\mages\mages.cpp" >nul || exit /b 1
+rem engine-draw Unity IL2CPP: LunaHook's Unity engine with the text setters observed (UnityEngine.cpp) and its roles reader
+copy /y "%~dp0UnityEngine.cpp" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\unity\unity.cpp" >nul || exit /b 1
+for %%F in (Il2cppDraw.h Il2cppDrawRoles.h) do copy /y "%~dp0%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\unity\%%F" >nul || exit /b 1
 for %%F in (hde32.h pstdint.h) do copy /y "%~dp0..\shared\minhook\src\hde\%%F" "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook\LunaHook\engines\mages\%%F" >nul || exit /b 1
 cmake -S "%MEGULIT_HOOK_TREE%\src\src\NativeImpl\LunaHook" -B "%MEGULIT_HOOK_TREE%\build-x86-vs" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_HOST=OFF -DBUILD_HOOK=ON -DWIN10ABOVE=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DFETCHCONTENT_SOURCE_DIR_MINHOOK="%~dp0..\shared\minhook" -DFETCHCONTENT_FULLY_DISCONNECTED=ON || exit /b 1
 cmake --build "%MEGULIT_HOOK_TREE%\build-x86-vs" --target LunaHook --parallel 8
