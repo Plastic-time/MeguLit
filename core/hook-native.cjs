@@ -513,7 +513,7 @@ class HookNative{
   const next=q.rest.shift();if(!q.rest.length)this.pageQueue=null;
   this.trace('page part advance '+JSON.stringify(next.slice(0,20)));this.source({...q.base,text:next},q.name);return true;
  }
- source(m,name){if(m&&/textrender/i.test(String(m.sourceName||'')))this.trSeen=this.gamePid();
+ source(m,name){if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,m,this.target))return;if(m&&/textrender/i.test(String(m.sourceName||'')))this.trSeen=this.gamePid();
   /* E560 Unity setter streams: typewriter steps and whole NVL pages become the one paragraph the game is on (core/unity-source.cjs) */
   {const code=String(m.sourceCode||'');if(code.endsWith(':JIT:UNITY')&&!m.unityBoxed&&typeof m.text==='string'&&!this.skipKey){const {UnityBox}=require('./unity-source.cjs');(this.unityBox||(this.unityBox=new UnityBox(()=>this.now(),(line,p)=>this.source({...p.m,text:line,unityBoxed:true},p.name)))).feed(code,cleanSource(m.text,name,code),{m,name});return;}}
   /* 2026-11-14 (ダストマニア・グロテスク, Chinese patch): Shift-JIS read as GBK (or any Japanese read with the wrong code page:
@@ -619,9 +619,10 @@ class HookNative{
   if(identifierNoise(text)){this.trace('drop identifier text '+JSON.stringify(text.slice(0,60)));return;}
   if(ruby.length){const map=this.sourceRuby||(this.sourceRuby=new Map());map.set(text,ruby);if(map.size>64)map.delete(map.keys().next().value);}
   if(m.sourceName==='EmbedToMeCS2_DrawPreserve'){if(m.origin==='history'&&this.state.receivedText)return;this.queueIslandSource(text,m.origin);return;}
+  if(require('./unity-kemco-source.cjs').isTaggedSource(m)&&this.pageNvl())return;
   this.locatePage(text,m.origin);
   if(this.pageRoute(text,m.origin))return;
-  if(!/EmbedToMeCS2_DrawPreserve|EmbedEuphoria474_DrawHide/.test(m.sourceName||'')){this.deliverSource(text,m.origin);return;}
+  if(!/EmbedToMeCS2_DrawPreserve|EmbedEuphoria474_DrawHide/.test(m.sourceName||'')){this.deliverSource(text,m.origin,'',0,m);return;}
   const pending=this.pendingSource;
   if(pending&&text!==pending.text&&!text.startsWith(pending.text)&&!pending.text.startsWith(text))this.flushSource();
   if(this.pendingSource){if(text.length>=this.pendingSource.text.length)this.pendingSource={text,origin:m.origin};return;}
@@ -855,12 +856,13 @@ class HookNative{
   if(speakers.length>=2){const at=speakers[speakers.length-1].index+(/^[。！？!?…」』]/.test(speakers[speakers.length-1][0])?1:0);const tail=s.slice(at).trim();if(tail.length>=2&&tail.length<s.length*.6)return tail;}
   return s;
  }
- deliverSource(text,origin,engine='',nativeLine=0){
+ deliverSource(text,origin,engine='',nativeLine=0,authority){
+  if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,authority,this.target))return;
   const now=this.now(),live=!engine&&!nativeLine&&(origin||'live')==='live',S=this.skipBurst||(this.skipBurst={last:0,held:null,timer:null,count:0});
-  if(!live||this.stashFlush){if(this.stashFlush)S.last=now;this.emitSource(text,origin,engine,nativeLine);return;}
+  if(!live||this.stashFlush){if(this.stashFlush)S.last=now;this.emitSource(text,origin,engine,nativeLine,authority);return;}
   {const last=this.lastOfMerged(text);if(last!==text){this.trace('merged skip text: kept the last line of '+text.length+' chars');text=last;/* 2026-11-19 (素晴らしき日々: 「それか、…とか言ってるヤツだ。」 untranslated) the script translation was looked up for the merged text; the kept line is looked up itself */try{this.originalTextFor(text);}catch{}}}
   const gap=now-S.last;S.last=now;
-  if(gap>=300&&!S.held){S.count=0;this.emitSource(text,origin,engine,nativeLine);return;}
+  if(gap>=300&&!S.held){S.count=0;this.emitSource(text,origin,engine,nativeLine,authority);return;}
   S.count++;S.held={text,origin};clearTimeout(S.timer);
   if(S.count===1)this.trace('skip burst: holding lines until the game stops');
   const serial=this.serial;S.timer=setTimeout(()=>{const held=S.held;S.held=null;S.timer=null;if(!held||serial!==this.serial)return;this.trace('skip burst settled; skipped='+(S.count-1));S.count=0;this.emitSource(held.text,held.origin);},400);S.timer.unref?.();
@@ -902,7 +904,7 @@ class HookNative{
  placedHidden(raw,info){const text=String(raw||'').replace(/\u001f/g,'\n').replace(/\n/g,''),f=HookNative.flat(text);if(!f||f.length<2)return;const seen=()=>(this.recentSources||[]).some(s=>s.includes(f)||f.includes(s));if(seen()){if(Array.isArray(info?.rects)&&info.rects.length)this.lastDialogRects=info.rects;return;}if((this.placedWait||(this.placedWait=new Map())).has(f))return;
   const serial=this.serial,t=setTimeout(()=>{this.placedWait.delete(f);if(serial!==this.serial||seen())return;const B=this.hiddenBatch||(this.hiddenBatch={items:[],timer:null});B.items.push({text,rects:info?.rects||null});clearTimeout(B.timer);B.timer=setTimeout(()=>{const items=B.items.splice(0);if(serial!==this.serial)return;const boxed=items.filter(i=>Array.isArray(i.rects)&&i.rects.length);if(items.length>=2&&boxed.length===items.length&&items.every(i=>!HookNative.interleaved?.(i.text,Profiles.get(this.profile,'choice.contentInterleave',false)===true))&&HookNative.choiceShape(items,this.lastDialogRects)){this.trace('placement lines without a source line, taken as '+items.length+' options');try{this.onHiddenChoices?.(items);}catch{}return;}for(const i of items){if(Array.isArray(i.rects)&&i.rects.length)this.lastDialogRects=i.rects;this.trace('placement line without a source line, delivered from the placement chars='+HookNative.flat(i.text).length);/* r34: 4 of the 8 misses were script lines delivered from the placement, which never went through the pairing (no patch-text); they do now */try{this.originalTextFor(i.text);}catch{}this.deliverSource(i.text,'placement');}},200);B.timer.unref?.();},450);t.unref?.();this.placedWait.set(f,t);if(this.placedWait.size>16){const k=this.placedWait.keys().next().value;clearTimeout(this.placedWait.get(k));this.placedWait.delete(k);}}
  giveWay(ms){this.send({type:'engineGiveWay',ms:Math.max(0,Math.min(10000,Number(ms)||3000))});}
- emitSource(text,origin,engine='',nativeLine=0){{const f=HookNative.flat(text);if(f){(this.recentSources||(this.recentSources=[])).push(f);if(this.recentSources.length>24)this.recentSources.shift();}}this.positionsCheck?.();
+ emitSource(text,origin,engine='',nativeLine=0,authority){if(require('./unity-kemco-source.cjs').shouldBlock(this.textPath,authority,this.target))return;{const f=HookNative.flat(text);if(f){(this.recentSources||(this.recentSources=[])).push(f);if(this.recentSources.length>24)this.recentSources.shift();}}this.positionsCheck?.();
   try{this.textPath?.want(text);}catch{}
   /* E501 every source path (native line, merged batch, skip burst) meets the same frame-dump filter as the aux entries */
   if(require('./language-tracks.cjs').stuttered(text)){this.trace('drop typewriter/redraw frame '+JSON.stringify(String(text).slice(0,40)));return;}
@@ -957,7 +959,7 @@ class HookNative{
  /* Text architecture ③ (core/text-paths-launch.cjs): a web / Unity engine path follows the same replacement switch and gets each source line to find the dialogue */
  attachTextPath(p){this.textPath=p;try{p.hide(this.enabled===true);}catch{}this.drawSync();}
  /* engine-draw: the profile's draw.* switches go to the engine paths that read them (web / RPG Maker now, KiriKiri with its next line) */
- drawSync(){if(this.disposed||this.stopPending||this.stopError)return;const ED=require('./engine-draw.cjs'),cfg=ED.settings(this.profile);try{this.textPath?.drawConfig?.(cfg);}catch{}
+ drawSync(){if(this.disposed||this.stopPending||this.stopError)return;const ED=require('./engine-draw.cjs'),cfg=ED.settings(this.profile);try{this.textPath?.drawConfig?.({...cfg,kemcoSprites:Profiles.get(this.profile,'draw.kemcoSprites',false)===true});}catch{}
   /* a game whose diff turns draw.* on gets its control file at once (YU-RIS arms its glyph loop hook from it before any line) */
   try{const pid=this.gamePid();if(pid&&(cfg.roles||cfg.embed||cfg.clear||cfg.advhdInput===true||cfg.cmvsInput===true||cfg.fvpInput===true||cfg.minoriInput===true||(cfg.choiceFrames||[]).length))this.ensureEngineDraw(pid);else this.engineDraw?.setProfile(this.profile);}catch{}}
  send(v){if(v&&(v.type==='enable'||v.type==='disable'))try{this.textPath?.hide(v.type==='enable');}catch{}if(this.process?.stdin.writable)this.process.stdin.write(JSON.stringify(v)+'\n');}

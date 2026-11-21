@@ -11,5 +11,5 @@ $compiler=$candidates|Where-Object{$_ -and (Test-Path -LiteralPath $_)}|Select-O
 if(-not $compiler){throw 'Roslyn csc not found (MEGULIT_ROSLYN_CSC)'}
 if(-not $OutputPath){$OutputPath=Join-Path (Split-Path $PSScriptRoot) 'MeguLitUnityText.dll'}
 $refs=@('mscorlib.dll','System.dll','System.Core.dll','UnityEngine.dll')|ForEach-Object{'/reference:'+(Join-Path $Managed $_)}
-& $compiler /nologo /noconfig /nostdlib+ /langversion:7.3 /optimize+ /target:library /platform:anycpu /codepage:65001 "/out:$OutputPath" @refs ('/reference:'+(Join-Path $BepInEx 'BepInEx.dll')) (Join-Path $PSScriptRoot 'MeguLitUnityText.cs')
+& $compiler /nologo /noconfig /nostdlib+ /langversion:7.3 /optimize+ /target:library /platform:anycpu /codepage:65001 "/out:$OutputPath" @refs ('/reference:'+(Join-Path $BepInEx 'BepInEx.dll')) (Join-Path $PSScriptRoot 'MeguLitUnityText.cs') (Join-Path $PSScriptRoot 'KemcoSpriteSnapshot.cs')
 if($LASTEXITCODE -ne 0){throw 'MeguLitUnityText compilation failed'}
