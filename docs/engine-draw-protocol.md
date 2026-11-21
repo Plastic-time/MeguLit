@@ -64,7 +64,7 @@ ToMe_CHARS engine=<e> line=N hidden=0|1 sw=W sh=H vx= vy= vw= vh= n=K rects=x,y,
 | 引擎 | 读法（引擎差分） | 角色 | 内嵌 | 默认 |
 |---|---|---|---|---|
 | KiriKiri（KAG processCh 路线） | `native/krkrtext/script.inc` | name（<20% 屏高的层）、choice（`inLink`，id `L<层>:<link>`）、button（`ButtonLayer.caption`，id `B<n>`） | 点击等待时 MessageLayer 自己的 drawText 画注音 + 中文，`emb=1/2` | 关（引擎差分 kirikiri 未开，给某部游戏开就在它的游戏差分里设 `draw`） |
-| KiriKiri（TextRender 插件） | 未做 | — | — | — |
+| KiriKiri Z（TextRender 插件，柚子社） | `script.inc` trDone / nameScan / trLinkScan（成员名取自 千恋＊万花 的 MessageLayer / TextRender 字节码字符串表） | name（`nameLayer` 框 + `processNameText` / `processName` 收到的名字，id `N:<层>`）、choice（KAG `links[i].x/y/w/h` 热区里的字，id `K<层>:<link>`） | 新句出现时在消息层本身（文字层下面）画注音 + 中文，先整层备份，下一句换行时还原；同页新增句只要新的那句 | 关 |
 | RPG Maker MV/MZ | `core/text-paths-rpgm.cjs`（随 web 路线注入页面） | name（Window_NameBox）、choice（Window_ChoiceList）、menu（标题 / 菜单 / 选项 / 存档 / 其他 Selectable）、button（其他 Window_Command）、system（Window_Help），id `W<窗口>:<项>` | 消息最多等 1.2 s 要替换；到了就主字号 85%、注音 45%、中文作为后续行（80%，放不下 70%，再放不下不画，`emb=1`）；没到就照原样，阅读层兜底 | 开（引擎差分 `core/profiles/engines/rpgmaker.cjs`；只在 画进游戏画面 开、web 路线运行时生效） |
 
 ## 和离线差分（diff-maker）的约定
