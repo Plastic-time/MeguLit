@@ -91,12 +91,32 @@ static __declspec(noinline) void NoFrameCaller(const char *s, int x, int y) { No
 // two text routines of the game, each drawing a string a character at a time (a loop: one call site each)
 static __declspec(noinline) void CallerA(const char *s, int chars, int x, int y) { for (int i = 0; i < chars; i++) Draw(s + i * 2, 2, x + i * 22, y); Sink++; }
 static __declspec(noinline) void CallerB(const char *s, int chars, int x, int y) { for (int i = 0; i < chars; i++) Draw(s + i * 2, 2, x + i * 22, y); Sink += 2; }
+static bool Asked(const std::string &text) { return DrawSites::RolesFromControl((const unsigned char *)text.data(), text.size()); }
+static DWORD WINAPI Revoke(void *) { DrawSites::SetObserving(false); return 0; }
+static void ControlTests() {
+  Check(Asked("#cfg roles=1 embed=0 zh=0\r\n"), "exact first-line opt-in");
+  Check(Asked("#cfg\troles=1\tembed=0\n"), "tab separated config");
+  Check(!Asked("#cfg roles=10\n") && !Asked("#cfg roles=01\n") && !Asked("#cfg roles=1x\n"), "roles values require exact 1");
+  Check(!Asked("#cfg roles=0\ntranslated roles=1\n") && !Asked("roles=1\n#cfg roles=1\n"), "body and non-config cannot opt in");
+  Check(!Asked("#cfg roles=1 roles=0\n") && !Asked("#cfg roles=1 roles=1\n"), "duplicate permission rejected");
+  Check(!Asked("#cfg otherroles=1\n") && !Asked("#cfg roles=1") && !Asked("#cfg roles=1" + std::string(260, ' ') + "\n"), "wrong key and truncated header rejected");
+  const std::wstring wide = L"#cfg roles=1 embed=0\r\n";
+  std::string utf16("\xff\xfe", 2); utf16.append((const char *)wide.data(), wide.size() * 2);
+  Check(Asked(utf16) && Asked(utf16.substr(2)), "UTF16LE writer header with and without BOM");
+  Check(!Asked(utf16.substr(0, utf16.size() - 4)) && !Asked(std::string("#cfg roles=1\0\n", 14)), "incomplete UTF16 and embedded NUL rejected");
+  Check(Asked(std::string("\xef\xbb\xbf") + "#cfg roles=1\n"), "UTF8 BOM header");
+}
 int main() {
   InitializeCriticalSection(&DrawSites::Lock);
+  ControlTests();
   DrawSites::Sites[0] = { 0, (uintptr_t)GetModuleHandleA(nullptr), 0, DrawSites::A_TextOutA }; DrawSites::NSites = 1;
   StubK = DrawSites::Stub(0);
   Check(StubK != nullptr, "stub");
   const char *ai = "\x82\xa0\x82\xa2"; /* あい */
+  DrawSites::DrawSitesOnCall(0, (const DWORD *)1, 1);
+  CallerA(ai, 1, 10, 20);
+  Check(Logged.empty() && !DrawSites::RunChars && GotStr == ai && AfterEax == 77, "default off neither observes bad pointers nor alters original API");
+  DrawSites::SetObserving(true);
   CallerA(ai, 2, 100, 40);
   Check(GotHdc == 0x1234 && GotX == 122 && GotY == 40 && GotStr == ai + 2 && GotLen == 2, "the API gets the game's arguments");
   Check(AfterEax == 77 && AfterEsi == 0x5151 && AfterEbx == 0x7373, "the API's result and the game's registers survive");
@@ -110,6 +130,19 @@ int main() {
     auto via = [](const std::string &l) { size_t a = l.find("via=") + 4; return l.substr(a, l.find(' ', a) - a); };
     Check(via(Logged[0]) != via(Logged[1]) && via(Logged[0]).find("0/") != 0, "via= tells the callers apart");
   }
+  Logged.clear(); CallerA(ai, 1, 10, 20);
+  Check(DrawSites::RunChars == 1, "enabled run is pending");
+  DrawSites::SetObserving(false);
+  DrawSites::FlushLocked(); CallerA(ai + 2, 1, 11, 21);
+  Check(Logged.empty() && !DrawSites::RunChars && DrawSites::RunText.empty(), "revocation discards pending text and blocks future calls and flush");
+  Check(GotStr == ai + 2 && AfterEax == 77 && AfterEsi == 0x5151 && AfterEbx == 0x7373, "disabled detour preserves original call and registers");
+  DrawSites::SetObserving(true);
+  DrawSites::DrawSitesOnCall(0, (const DWORD *)1, 1);
+  HANDLE revoked = CreateThread(nullptr, 0, Revoke, nullptr, 0, nullptr);
+  Check(revoked && WaitForSingleObject(revoked, 2000) == WAIT_OBJECT_0, "SEH releases observation lock for another thread");
+  if (revoked) CloseHandle(revoked);
+  DrawSites::SetObserving(true); CallerB(ai + 2, 1, 50, 60); DrawSites::FlushLocked();
+  Check(Logged.size() == 1 && Logged[0].find("text=\xe3\x81\x84") != std::string::npos && Logged[0].find("text=\xe3\x81\x82") == std::string::npos, "re-enable starts a fresh run without revoked text");
   /* a routine without an EBP frame, with NScripter's captured stack shape: its
      return address and its own arguments are read at the fixed distance above the API's arguments */
   int ns = -1; for (int i = 0; i < DrawSitesSig::SigCount; i++) if (!strcmp(DrawSitesSig::Sigs[i].id, "nscripter")) ns = i;

@@ -6,6 +6,11 @@
 
 ## 静态普查（店主本机的 exe）
 
+GDI `DrawSites` 诊断只接受控制文件首个完整 `#cfg` 行里唯一、精确的 `roles=1` 字段，默认关闭
+观察器整个进程生命周期约每 2 秒复查一次权限，删除文件、读取失败或 `roles=0` 会停止读取与输出，并丢弃尚未输出的 run；重新开启从新 run 开始
+撤权与读取共用锁，撤权完成后不会继续读取先前调用的参数；已安装的跳板保留，原游戏调用继续原样执行，避免运行中卸钩
+这是只读诊断的权限边界，不授予原文隐藏、译文替换、角色或屏幕坐标能力；各游戏仍需独立实机验收
+
 | 游戏 | exe | 位数 | 文字 API 调用点（导入表 → 代码里的 call 数） | 图形 |
 |---|---|---|---|---|
 | CLANNAD | SiglusEngine_Steam.exe | x86 | GetGlyphOutlineW ×2、GetGlyphOutlineA ×1、TextOutW ×1、ExtTextOutW/A ×1、GetTextExtentPoint32W ×2、CreateFontW ×4 | d3d9 |

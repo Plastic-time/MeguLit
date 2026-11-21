@@ -42,6 +42,9 @@ rem engine-draw GDI draw sites, the run-time gate (DrawSites.h) driven like MinH
 cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 /I stub drawsites-gate.cpp /Fe:"%TEMP%\megulit-gdihide32\drawsites-gate.exe" /Fo"%TEMP%\megulit-gdihide32\\" user32.lib gdi32.lib >nul" || exit /b 1
 "%TEMP%\megulit-gdihide32\drawsites-gate.exe"
  if errorlevel 1 exit /b 1
+rem Permission toggles and SEH use a real MinHook patch and relocated trampoline in this self-test process.
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 /I ..\..\shared\minhook\include drawsites-permission.cpp ..\..\shared\minhook\src\buffer.c ..\..\shared\minhook\src\hook.c ..\..\shared\minhook\src\trampoline.c ..\..\shared\minhook\src\hde\hde32.c /Fe:"%TEMP%\megulit-gdihide32\drawsites-permission.exe" /Fo"%TEMP%\megulit-gdihide32\\" user32.lib gdi32.lib >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\drawsites-permission.exe" || exit /b 1
 rem engine-draw SiglusEngine signature (SiglusDrawSig.h) on the windows of CLANNAD and Summer Pockets
 cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 siglusdraw.cpp /Fe:"%TEMP%\megulit-gdihide32\siglusdraw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
 "%TEMP%\megulit-gdihide32\siglusdraw.exe"
