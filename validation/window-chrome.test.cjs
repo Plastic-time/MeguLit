@@ -96,5 +96,5 @@ test('opening the menu puts no focus ring anywhere; Tab shows MeguLit\'s own rin
   for(const type of ['mousePressed','mouseReleased'])await cdp.send('Input.dispatchMouseEvent',{type,x:at.x,y:at.y,button:'left',clickCount:1});await sleep(250);
   const clicked=JSON.parse(await cdp.evaluate(RINGS));
   assert.deepEqual(clicked.ringed,[],'no ring after a mouse click: '+JSON.stringify(clicked));
- }finally{cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });

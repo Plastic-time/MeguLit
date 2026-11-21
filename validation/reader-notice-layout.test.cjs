@@ -35,5 +35,5 @@ test('reader notice: one-line title and buttons, readable message, buttons wrap 
     if(err==='SERVICE_FAILED'){assert.doesNotMatch(s.detail,/SERVICE_FAILED/,'no bare error code in the message');assert.match(s.detail,/游戏连接服务启动失败/);assert.equal(s.tip,'SERVICE_FAILED','raw code kept in the tooltip');}
     else assert.match(s.detail,/READER_START_TIMEOUT/);
    }}
- }finally{cdp?.stop();web?.close();await service.stop();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();web?.close();await service.stop();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });
