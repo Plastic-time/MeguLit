@@ -198,6 +198,17 @@
    "slot": "0x100db01c",
    "call": "0x10008970",
    "hex": "83c40485ff0f84b0040000a1184111156683b8c8010000040f84860000008b95b0feffff8b351cb00d108d85c8feffff506a006a008d8dd8feffff516a065752ffd68b0d1c4111158bd88d85c8feffff"
+  },
+  "saya-2003/nitropak": {
+   "id": "nitropak",
+   "file": "system.dll",
+   "sha256": "c6e07748fb79915ef0e415c3d29e17a04ee8246ffeba66fcdfa5fbfa2482494b",
+   "api": "GetGlyphOutlineA",
+   "va": "0x1003508f",
+   "callOffset": 64,
+   "slot": "0x100a3064",
+   "call": "0x100350cf",
+   "hex": "ff15f4310a105068e0e00a108d74241ce8ec5301008b44242083c4083bc3740950e81dae020083c4048b7424288d44245c5053538d8c248c000000516a055655ff1564300a1083f8ff894424300f8593"
   }
  }
 }

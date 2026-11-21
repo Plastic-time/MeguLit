@@ -181,3 +181,7 @@
 - 2003 年原版（system.dll，GetGlyphOutlineA ×2、TextOutA ×7，seed 里归 nitropak）和 みにくいモジカの子（Enigma 壳）不在这一条里
 - 店主测试清单：同 AVG32，行里是 `engine=nitroplus`
 
+### NitroPlus 2003 原版（沙耶の唄，seed 里的 nitropak）
+- 点：system.dll 0x100350cf（saya.exe 只有 44 KB，引擎在 system.dll），字形例程 0x10034fc0 每个字一次 `GetGlyphOutlineA(hdc, 字, GGO_GRAY4, &gm, 0, NULL, &mat)`（0x100351cf 是栅格化那次，不签）
+- 例程没有 EBP 帧（SEH + 0xbc 局部 + 4 个寄存器，深 0xd8），返回地址在 API 第一个参数上方 0xf4。system.dll 里另外 7 个 TextOutA（0x100355c0、0x1003a892…）是别的例程，先不签
+- 店主测试清单：同 AVG32，行里是 `engine=nitropak`

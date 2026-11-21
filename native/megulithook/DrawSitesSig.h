@@ -70,6 +70,10 @@ static const Sig Sigs[] = {
   // Nitroplus (沙耶の唄 Steam, Saya_Steam.exe 0x460f87): the glyph routine 0x460d90 (EBP frame, one caller) loads GetGlyphOutlineW
   // into edi and calls it at once (push edi; mov edi, [slot]; call edi); the glyphs go into Mware.dll's D3D11 textures. No pen
   { "nitroplus", "", "GetGlyphOutlineW", "50 ff 75 08 57 8b 3d SLOT", 1, 1 },
+  // NitroPlus 2003 (沙耶の唄 original, system.dll 0x100350cf): the glyph routine 0x10034fc0 asks GetGlyphOutlineA(hdc, ch,
+  // GGO_GRAY4, &gm, 0, NULL, &mat) per character (0x100351cf renders it: not signed); no EBP frame (SEH + 0xbc locals + 4
+  // registers: depth 0xd8), the return address 0xf4 above the API's first argument
+  { "nitropak", "system.dll", "GetGlyphOutlineA", "8d 44 24 ?? 50 53 53 8d 8c 24 ?? ?? 00 00 51 6a 05 56 55", 1, 0xf4 },
 };
 static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
 
