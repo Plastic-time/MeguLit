@@ -26,6 +26,44 @@ test('nitro-npk: Squirrel string literals become lines, voice tags dropped',()=>
  const lit=s=>{const b=Buffer.from(s,'utf8'),h=Buffer.alloc(8);h.writeUInt32LE(0x08000010,0);h.writeUInt32LE(b.length,4);return Buffer.concat([h,b]);};
  const data=Buffer.concat([lit('se_click'),lit("//【双葉】\r\n<voice name='双葉' src='v/1'>\r\n「起立」"),lit('\r\n#{・・}はなれない#。\r\n')]);
  assert.deepEqual(engine.parse(data).lines,['双葉','「起立」','はなれない。']);});
+test('nitro-npk: legacy Japanese dialogue keeps its speaker and voice beside UTF-8 literals',()=>{
+ const {engine}=require('../services/original-engines/npk.cjs');
+ const sjis=s=>require('../services/original-engines/kit.cjs').encodeSjis(s);
+ const literal=b=>{const h=Buffer.alloc(8);h.writeUInt32LE(0x08000010);h.writeUInt32LE(b.length,4);return Buffer.concat([h,b]);};
+ const data=Buffer.concat([literal(sjis("//【あお】\r\n<voice src='v/123'>\r\n「おはよう。」")),literal(Buffer.from('\r\n「おやすみ。」')),literal(sjis('メニュー'))]);
+ const p=engine.parse(data);
+ assert.deepEqual(p.lines,['あお','「おはよう。」','「おやすみ。」']);
+ assert.deepEqual(p.voices,[null,'v/123',null]);
+});
+
+test('nitro-npk: a GBK narration stays Chinese',()=>{
+ const {engine}=require('../services/original-engines/npk.cjs');
+ const b=Buffer.from('0d0ace d2 c3 c7 d4 da d5 e2 c0 ef a1 a3'.replace(/ /g,''),'hex'); // 我们在这里。
+ const h=Buffer.alloc(8);h.writeUInt32LE(0x08000010);h.writeUInt32LE(b.length,4);
+ assert.deepEqual(engine.parse(Buffer.concat([h,b])).lines,['我们在这里。']);
+});
+
+test('nitro-npk: damaged UTF-8 keeps the readable dialogue and voice',()=>{
+ const {engine}=require('../services/original-engines/npk.cjs');
+ const rows=["//【あお】\r\n<voice src='v/123'>\r\n「おはようございます。」",'\r\nあたらしいあさ。'];
+ const data=rows.map(s=>{
+  const b=Buffer.concat([Buffer.from(s),Buffer.from([0xff])]),h=Buffer.alloc(8);
+  h.writeUInt32LE(0x08000010);h.writeUInt32LE(b.length,4);return Buffer.concat([h,b]);
+ });
+ const p=engine.parse(Buffer.concat(data));
+ assert.deepEqual(p.lines,['あお','「おはようございます。」�','あたらしいあさ。�']);
+ assert.deepEqual(p.voices,[null,'v/123',null]);
+});
+
+test('nitro-npk: a truncated UTF-8 character can also be valid legacy text',()=>{
+ const {engine}=require('../services/original-engines/npk.cjs');
+ for(const text of ['こんにちは','聞こえますか']){
+  const b=Buffer.from('\r\n'+text+'。').subarray(0,-1),h=Buffer.alloc(8);
+  h.writeUInt32LE(0x08000010);h.writeUInt32LE(b.length,4);
+  assert.deepEqual(engine.parse(Buffer.concat([h,b])).lines,[text+'�']);
+ }
+});
+
 test('re-pak: UTF-16 runs joined across line-break codes, other codes split, non-Japanese dropped',()=>{
  const {parse}=require('../services/original-engines/re-pak.cjs');const u=[];const put=s=>{for(const c of s)u.push(c.charCodeAt(0));};
  put('USR\0');put('このマユなら、');u.push(6);put('ずいぶん前に');u.push(0xe001);put('ウチの課だ。');u.push(0x1b,4);put('いいね');u.push(0x1c);put('中文文本');u.push(0x1d);
