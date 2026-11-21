@@ -36,6 +36,27 @@ test('dictionary lookup includes saved homophones outside the bundled list',asyn
  assert.deepEqual(upper.find(x=>x.t==='上手'),{t:'上手',why:'reading',status:2});
 });
 
+test('up to five distinct displayable homophones fit in the field',()=>{
+ const vocab=['長'.repeat(9),'甲','甲','乙','丙','丁','戊','己'].map(spelling=>({spelling,reading:'こう'}));
+ assert.deepEqual(related({query:'こう'},{vocab,list:[]}).map(r=>r.t),['甲','乙','丙','丁','戊']);
+});
+test('homophone colours use the current reading without changing the word pool',async t=>{
+ const canvas={getContext:()=>({measureText:()=>({width:12}),scale(){},fillText(){}})};
+ const globals={document:{addEventListener(){},querySelector(){return null;},createElement:()=>canvas},
+  MutationObserver:class{observe(){}},addEventListener(){},requestAnimationFrame(){},devicePixelRatio:1};
+ for(const [key,value] of Object.entries(globals)){
+  const old=Object.getOwnPropertyDescriptor(globalThis,key);
+  Object.defineProperty(globalThis,key,{value,configurable:true});
+  t.after(()=>{if(old)Object.defineProperty(globalThis,key,old);else delete globalThis[key];});
+ }
+ const {relatedParts}=await import('../web/dict-idle.js');
+ const field={status:new Map([['上手',4]]),words:[],W:200,H:200};
+ const tone=status=>relatedParts(field,[{t:'上手',why:'reading',status}],{x:0,y:0,w:100})[0].tone;
+ assert.equal(tone(null),'stranger');
+ assert.equal(tone(0),'fresh');
+ assert.equal(tone(null),'stranger');
+ assert.equal(field.status.get('上手'),4);
+});
 test('the dictionary field colours glyphs by proficiency and takes related words after a search; the smear has no canvas filter',()=>{
  const s=fs.readFileSync(path.join(__dirname,'..','web','dict-idle.js'),'utf8');
  assert.match(s,/fresh:'#[0-9a-f]{6}',learning:'#[0-9a-f]{6}',known:'#[0-9a-f]{6}'/);
