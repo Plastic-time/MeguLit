@@ -25,7 +25,7 @@ const arg=(k,d)=>{const i=process.argv.indexOf('--'+k);return i>0?process.argv[i
  else if(arg('logs')){const ex=L.extract(arg('logs'),arg('from'),arg('to'));steps=[...L.attachSteps(game,Date.parse(arg('from'))),...L.timeline(ex,game),{t:Date.parse(arg('to')),mark:'end'}];}
  else{console.error('usage: node tools/cardinal.cjs --tape <file> | --logs <dir> --from <ISO> --to <ISO> [--game <json>] [--data <dir>] [--out <file>]');process.exit(2);}
  const lines=steps.filter(s=>s.hb?.type==='hookSource').length;console.log('# cardinal: '+lines+' dialogue lines, '+steps.length+' records, profile '+profile.gameKey+' ('+profile.layers+')');
- const scenario={game:{...game,sha:game.sha||''},steps,maxGap:rules.maxGapMs,sampleEvery:rules.sampleMs,models,tailMs:1200};
+ const scenario={game:{...game,sha:game.sha||''},steps,maxGap:rules.maxGapMs,sampleEvery:rules.sampleMs,models,tailMs:1200,attachSettleMs:models?0:2000};
  const o=await require(path.join(REPO,'services','cardinal','run.cjs')).replay(scenario,{data:arg('data',''),keep:flag('keep'),name:'cli'});
  if((o.errors||[]).length)console.log('# replay errors: '+JSON.stringify(o.errors).slice(0,800));
  const r=S.score({name:'session',steps,o},rules);

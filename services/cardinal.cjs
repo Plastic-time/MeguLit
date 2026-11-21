@@ -50,7 +50,7 @@ function kick(reader,why,{now=Date.now(),replay=null,fetcher=undefined}={}){try{
 async function go(job){const {root,key,rules,reader}=job;const started=Date.now();
  trace(reader,'cardinal replay key='+key.slice(0,8)+' why='+job.why+' lines='+job.lines);
  const steps=fromTape(job.rows,job.game);
- const scenario={game:job.game,steps,maxGap:rules.maxGapMs,sampleEvery:rules.sampleMs,models:false,tailMs:1200};
+ const scenario={game:job.game,steps,maxGap:rules.maxGapMs,sampleEvery:rules.sampleMs,models:false,tailMs:1200,attachSettleMs:2000};
  const o=await (job.replay||require('./cardinal/run.cjs').replay)(scenario,{data:path.join(root,'data'),work:path.join(os.tmpdir(),'megulit-cardinal'),low:true,timeoutMs:15*60000,name:'cardinal'});
  const errors=(o.errors||[]).slice(0,4);
  if(errors.length&&!(o.samples||[]).length){trace(reader,'cardinal failed key='+key.slice(0,8)+' '+String(errors[0]).slice(0,200));save(root,key,{...(load(root,key)||{}),failed:{at:new Date().toISOString(),why:job.why,errors}});return null;}

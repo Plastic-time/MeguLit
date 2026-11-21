@@ -11,7 +11,7 @@
             hookEvents, hbSent, hookSpawned, choiceOffers, hidden, krkr ...
    Every check -> {bad:[messages], n:<units looked at>, ...counts}; nothing here reads a file, a clock or the profile:
    the thresholds come in as t (core/profiles/defaults.cjs cardinal.thresholds). */
-const T0={settleMs:300,shownRate:0.9,stablePx:0,cnOverlapPx:2,lineMs:700,burstMs:300,calibGapMs:1000,calibWatchMs:2500,choiceMs:3000,staleChars:4};
+const T0={settleMs:300,shownRate:0.9,stablePx:0,cnOverlapPx:2,lineMs:700,burstMs:300,calibGapMs:1000,calibWatchMs:2500,choiceMs:3000,staleChars:4,preflightMs:1500};
 const JP=/[぀-ヿ㐀-鿿]/;
 const norm=t=>String(t||'').replace(/[^぀-ヿ㐀-鿿]/g,'');
 /* the Japanese glyphs the player sees on the reader (no UI, no Chinese rows, nothing unclassified) */
@@ -125,7 +125,7 @@ function choices(run,t){t=opts(t);const name=run.name||'run',o=run.o,bad=[];let 
    record the game drew visible while core's hide was on (o.hidden), and every line after the hide was given up or read mode came on */
 function leaks(run,t,ls){t=opts(t);const name=run.name||'run',o=run.o,bad=[];ls=ls||lines(run,t);
  let checked=0,visible=0;try{const {parseTrace}=require('../self-check.cjs');for(const l of o.hookEvents||[]){const e=parseTrace(l);if(e&&e.kind==='hide'){checked++;if(e.visible)visible++;}}}catch{}
- const h=o.hidden||{lines:0,visible:0};const off=offSpans(run);
+ const h=o.hidden||{lines:0,visible:0};const off=offSpans(run,t);
  /* a line shown while the hide was off (disabled, given way) or the reader was in read mode: the original showed */
  const during=ls.filter(l=>{const a=l.samples[0].at,b=l.samples.at(-1).at;return off.some(s=>s.from<b&&s.to>a);});
  const rates=[checked>=4?visible/checked:0,h.lines?h.visible/h.lines:0,ls.length?during.length/ls.length:0];
@@ -134,7 +134,10 @@ function leaks(run,t,ls){t=opts(t);const name=run.name||'run',o=run.o,bad=[];ls=
  return {bad,rate:Math.min(1,Math.max(...rates)),checked,visible,records:h,during:during.length,off};}
 /* when the original could show, on the run's clock: from a disable / probeHide off / give way until core enables again, and from a switch
    to read mode until the switch away from it; a span still open runs to the end */
-function offSpans(run){const o=run.o,ev=[];const at=l=>Date.parse(String(l).slice(0,24))-(o.t0||0);
+/* the kernel's preflight (hide.preflight: the original shown once and checked before the hide, hook-events 'check baseline') is a
+   designed step of every game, not a leak of the seed: a span that starts with it and is back on within preflightMs is left out */
+function offSpans(run,t){t=opts(t);const o=run.o,ev=[];const at=l=>Date.parse(String(l).slice(0,24))-(o.t0||0);
+ const checks=(o.hookEvents||[]).filter(l=>/ check baseline /.test(l)).map(at).filter(Number.isFinite);
  for(const m of o.hbSent||[]){if(m.type==='disable'||m.type==='probeHide'&&m.on===false)ev.push({at:m.at,k:'hide',on:false,why:m.type+(m.reason?':'+m.reason:'')});else if(m.type==='enable'||m.type==='probeHide'&&m.on===true)ev.push({at:m.at,k:'hide',on:true});}
  for(const l of o.hookEvents||[]){let x;if(/give way|gave way|giving way/i.test(l)&&!/no give way/i.test(l))ev.push({at:at(l),k:'hide',on:false,why:'give way'});
   else if((x=/render mode switched in place (\S+) -> (\S+)/.exec(l)))ev.push({at:at(l),k:'read',on:x[2]!=='read',why:'read mode'});
@@ -142,6 +145,6 @@ function offSpans(run){const o=run.o,ev=[];const at=l=>Date.parse(String(l).slic
  ev.sort((a,b)=>a.at-b.at);const spans=[],open={};const end=Math.max(0,...(o.samples||[]).map(s=>s.at))+1;
  for(const e of ev){if(!Number.isFinite(e.at))continue;if(!e.on&&!open[e.k])open[e.k]={from:e.at,why:e.why};else if(e.on&&open[e.k]){spans.push({...open[e.k],to:e.at});open[e.k]=null;}}
  for(const k of Object.keys(open))if(open[k])spans.push({...open[k],to:end});
- return spans;}
+ return spans.filter(s=>!(s.to-s.from<=t.preflightMs&&checks.some(c=>Math.abs(c-s.from)<=300)));}
 
 module.exports={T0,JP,norm,jpGlyphs,lineGlyphs,inside,lines,perLine,white,flashes,hold,readMode,calibration,clears,choices,leaks,offSpans};

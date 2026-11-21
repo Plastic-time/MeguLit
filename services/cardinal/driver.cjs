@@ -117,7 +117,11 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
   /* how late the replay ran (a busy PC stretches it and the scores would blame the reader): each step's start past its time, each sample's gap past sampleEvery */
   const late={steps:[],samples:[]};let lastSample=0;
   const sampler=(async()=>{while(sampling){const s=await page.evaluate(()=>window.__replayProbe()).catch(()=>null);{const now=Date.now();if(lastSample)late.samples.push(Math.max(0,now-lastSample-scenario.sampleEvery));lastSample=now;}if(s){s.mark='tick';s.watch=true;s.at=Date.now()-t0;s.hitRegions=hits();s.src=s.hookSource;out.samples.push(s);}await sleep(scenario.sampleEvery);}})();
+  /* scenario.attachSettleMs: the reader settles (its profile, the hide route) after the attach before the first line, as on the player's
+     PC where the reader is up long before the game says anything */
+  let settled=!scenario.attachSettleMs;
   for(const step of scenario.steps){
+   if(!settled&&step.hb?.type==='hookSource'){settled=true;clock+=scenario.attachSettleMs;}
    if(step.t!=null){if(prevT!=null){const gap=Math.min(maxGap,Math.max(0,step.t-prevT));clock+=gap;}prevT=step.t;const wait=t0+clock-Date.now();if(wait>0)await sleep(wait);late.steps.push(Math.max(0,Date.now()-(t0+clock)));}
    if(step.gwb){if(models&&step.gwb.type==='bound'&&!krkr&&fs.existsSync(path.join(REPO,'native','krkrtext','script.inc')))try{const {KrkrModel}=require(path.join(REPO,'tools','reader-replay','krkr-model.cjs'));krkr=new KrkrModel({pid:step.gwb.gameProcessId,tmp:process.env.TEMP});}catch(e){out.krkr.error=String(e.message||e);krkr=false;}
     /* MODEL (labelled): the game clears its message layer at the click ([cm]); the script's own clearSent reports it when the control file says #clearline */

@@ -68,6 +68,7 @@ const DOMAINS={
  'cardinal.thresholds.calibWatchMs':{number:[500,20000]},
  'cardinal.thresholds.choiceMs':{number:[200,20000]},
  'cardinal.thresholds.staleChars':{number:[1,40],int:true},
+ 'cardinal.thresholds.preflightMs':{number:[0,10000]},
 };
 /* lang.<bcp47>.{annotation, pairing, dictionary, fontFallback}: known fields are checked strictly, unknown fields of a block are
    dropped (an older client reading a newer diff); -> the cleaned map, or null when a known field is out of its domain */

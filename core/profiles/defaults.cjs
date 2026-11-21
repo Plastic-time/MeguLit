@@ -129,7 +129,8 @@ module.exports={
      its settled samples; stablePx: the Japanese row may move this much; cnOverlapPx: the Chinese may reach this far over the Japanese;
      lineMs: a line counts once shown that long; burstMs: lines closer than this are a skip burst; calibGapMs / calibWatchMs: the
      Japanese may be gone at most calibGapMs within calibWatchMs of a calibration; choiceMs: options visible within this; staleChars:
-     an earlier line's row of at least this many characters left on the page is stale */
-  thresholds:{settleMs:300,shownRate:0.9,stablePx:0,cnOverlapPx:2,lineMs:700,burstMs:300,calibGapMs:1000,calibWatchMs:2500,choiceMs:3000,staleChars:4},
+     an earlier line's row of at least this many characters left on the page is stale; preflightMs: the kernel's preflight (the original
+     shown once and checked before the hide) may keep the hide off this long without counting as a leak */
+  thresholds:{settleMs:300,shownRate:0.9,stablePx:0,cnOverlapPx:2,lineMs:700,burstMs:300,calibGapMs:1000,calibWatchMs:2500,choiceMs:3000,staleChars:4,preflightMs:1500},
  },
 };

@@ -49,6 +49,10 @@ test('each score sees its own fault',()=>{
  {const ls=clean3();ls[2].noCn=true;const r=S.score(run({lines:ls}),D.cardinal);assert.ok(Math.abs(r.scores.pair-2/3)<0.01,'pair '+r.scores.pair);}
  /* 7 leak: the hide is disabled during the second line, and back on before the third */
  {const r=S.score(run({lines:clean3(),hbSent:[{at:2100,type:'disable'},{at:3500,type:'enable'}]}),D.cardinal);assert.ok(Math.abs(r.scores.leak-2/3)<0.01,'leak '+r.scores.leak);}
+ /* 7 leak: the kernel's preflight (check baseline, back on within preflightMs) is not a leak; a longer one is */
+ {const iso=ms=>new Date(ms).toISOString();const ev=[iso(2100)+' check baseline x'];
+  assert.equal(S.score(run({lines:clean3(),hookEvents:ev,hbSent:[{at:2100,type:'disable'},{at:2500,type:'enable'}]}),D.cardinal).scores.leak,1);
+  assert.ok(S.score(run({lines:clean3(),hookEvents:ev,hbSent:[{at:2100,type:'disable'},{at:3900,type:'enable'}]}),D.cardinal).scores.leak<1);}
  /* 7 leak: switched to read mode and never back */
  {const iso=ms=>new Date(ms).toISOString();const r=S.score(run({lines:clean3(),hookEvents:[iso(1500)+' render mode switched in place custom -> read']}),D.cardinal);assert.ok(r.scores.leak<0.5,'leak '+r.scores.leak);}
  /* 7 leak: dialogue records drawn visible while the hide was on */
@@ -140,7 +144,7 @@ test('a background run writes data/The Seed/cardinal/<sha>.json and never touche
  const live=require('../services/self-check-live.cjs');const orig=live.current;live.current=()=>({reader,key:SHA,from:'',profile:Profiles.profileFor({})});
  try{assert.equal(C2.kick(reader,'session-end',{replay,fetcher}).state,'started');await C2.idle();}finally{live.current=orig;}
  assert.deepEqual(net,[],'sharing off: nothing leaves the PC');
- assert.equal(scenario.models,false,'a tape carries what the game did: no models');assert.equal(scenario.maxGap,D.cardinal.maxGapMs);
+ assert.equal(scenario.models,false,'a tape carries what the game did: no models');assert.equal(scenario.attachSettleMs,2000);assert.equal(scenario.maxGap,D.cardinal.maxGapMs);
  const doc=C2.load(root,SHA);assert.ok(doc&&doc.record,'written');assert.equal(doc.record.key,SHA);assert.equal(doc.record.lines,12);assert.equal(doc.record.source,'none');assert.equal(doc.record.total,1);
  assert.deepEqual(touched.filter(k=>!k.startsWith('trace:')),[],'nothing but the trace was called on the live reader');
  /* a calibration right after a run waits for cardinal.minIntervalMin; a session's end does not */
