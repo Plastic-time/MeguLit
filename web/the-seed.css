@@ -76,7 +76,6 @@ html:not(#u):not(#v):not(#a):not(#b):not(#c) body dialog.game-dialog.dev-notice.
 .seed-scroll .seed-points dt{font-size:14px}
 .seed-scroll .seed-points dd{font-size:13px;line-height:1.65}
 .seed-scroll .seed-soon{margin:8px 0 6px}
-.seed-scroll .seed-points>div:last-child{grid-column:1/-1}
 @media (max-width:900px){.seed-scroll .seed-points{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:900px){.seed-top{grid-template-columns:minmax(0,1fr)}}
 /* the top-bar tutorial panel keeps the same frame: the tab body scrolls inside, the button row stays put */
