@@ -16,7 +16,7 @@
 > - 认 exe、封包、剧本指纹、Steam / VNDB 编号，补丁版、汉化版、不同发行版都能找到自己那颗
 > - 玩的时候一直在自检，丢句、没选项、原文没藏住就先退回读模式并上报，我们把那份差分修好，热更新送到大家手上
 >
-> 现在 [`The Seed/`](The%20Seed) 里先种下了 55 部游戏。读取、自动回传和热更新会在下一个大版本解封，之后大家玩得越多，长出来的就越多
+> 现在 [`The Seed/`](The%20Seed) 里先种下了 55 部游戏。读取、自动回传和热更新从 1.4.22 起已经上线，大家玩得越多，长出来的就越多
 >
 > <sub>名字致敬《刀剑神域》里的 The Seed；共享的思路致敬当年大家在论坛上互相贴的 Textractor 钩子码 · Named after <i>Sword Art Online</i>'s The Seed; the sharing idea is a nod to the Textractor hook codes people used to post for each other · 名前は『ソードアート・オンライン』の The Seed から。共有の発想は、かつて皆で貼り合った Textractor のフックコードへのオマージュ</sub>
 
