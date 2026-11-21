@@ -13,7 +13,7 @@ function validateDocument(d){const errors=[];const bad=s=>errors.push(s);
  if(errors.length)return {ok:false,errors};
  if([...d.sources,...d.gallery,...d.endings,...d.chapters].some(x=>!plain(x)))return {ok:false,errors:['collection object']};
  const keys=(object,allowed,where)=>{if(!plain(object)||Object.keys(object).some(k=>!allowed.includes(k)))bad('unknown '+where+' field');};
- keys(d,['schema','version','gameKey','builds','scripts','sources','galleryComplete','variantTotal','gallery','endingsComplete','endings','chapters'],'story');
+ keys(d,['schema','version','gameKey','builds','scripts','sources','galleryComplete','variantTotal','gallery','contentRatings','endingsComplete','endings','chapters'],'story');
  const rule=r=>{if(r===undefined)return;if(!plain(r)){bad('rule');return;}keys(r,['any','all'],'rule');const sets=[r.any,r.all].filter(Boolean);if(sets.length!==1||sets.some(a=>!Array.isArray(a)||!a.length||a.length>64||a.some(k=>!name(k)||/[\x00-\x1f]/.test(k))))bad('rule');};
  for(const key of ['galleryComplete','endingsComplete'])if(d[key]!==undefined&&typeof d[key]!=='boolean')bad(key);
  if(d.variantTotal!==undefined&&d.variantTotal!==null&&(!Number.isSafeInteger(d.variantTotal)||d.variantTotal<0||d.variantTotal>100000))bad('image total');
@@ -23,10 +23,11 @@ function validateDocument(d){const errors=[];const bad=s=>errors.push(s);
  const ids=new Set(),add=(v,kind)=>{if(!name(v)||ids.has(v))bad(kind+' id');ids.add(v);};
  const localized=v=>{keys(v,['zh','ja','en'],'localized text');if(plain(v)&&Object.values(v).some(s=>typeof s!=='string'||s.length>1000))bad('localized text');};
  for(const s of d.gallery){keys(s,['id','variants','variantTotal','unlockComplete'],'gallery');add(s.id,'gallery');if(s.unlockComplete!==undefined&&typeof s.unlockComplete!=='boolean')bad('gallery completion');if(!Array.isArray(s.variants)||s.variants.length>2048||s.variants.some(v=>!plain(v)||!name(v.name)||/[\\/]/.test(v.name)))bad('variants');else for(const v of s.variants)keys(v,['name'],'variant');}
+ if(d.contentRatings!==undefined&&!require('./story-content-rating.cjs').validateRatings(d.contentRatings,{names:d.gallery.flatMap(g=>g.variants?.map(v=>v.name)||[])}))bad('content ratings');
  for(const e of d.endings){keys(e,['id','type','label','unlock','node','route','requires','image'],'ending');add(e.id,'ending');if(!['true','good','normal','bad','extra'].includes(e.type))bad('ending type');localized(e.label);rule(e.unlock);}
  const nodeIds=new Set();let nodeCount=0;
  for(const ch of d.chapters){keys(ch,['id','label','nodes','edges','partial'],'chapter');localized(ch.label);if(!name(ch.id)||!Array.isArray(ch.nodes)||ch.nodes.length>5000||!Array.isArray(ch.edges)||ch.edges.length>20000){bad('chapter');continue;}
-  for(const n of ch.nodes){if(!plain(n)){bad('node');continue;}keys(n,['id','kind','label','read','source'],'node');localized(n.label);rule(n.read);if(n.source)keys(n.source,['storage','label'],'node source');if(!name(n.id)||nodeIds.has(n.id)||!['scene','choice','option','ending'].includes(n.kind))bad('node');nodeIds.add(n.id);nodeCount++;}
+  for(const n of ch.nodes){if(!plain(n)){bad('node');continue;}keys(n,['id','kind','label','firstLine','read','source'],'node');localized(n.label);if(n.firstLine!==undefined)localized(n.firstLine);rule(n.read);if(n.source)keys(n.source,['storage','label'],'node source');if(!name(n.id)||nodeIds.has(n.id)||!['scene','choice','option','ending'].includes(n.kind))bad('node');nodeIds.add(n.id);nodeCount++;}
  }
  if(nodeCount>50000)bad('node limit');
  const edgeSet=new Set();for(const ch of d.chapters)for(const e of ch.edges||[]){if(!plain(e)){bad('edge');continue;}keys(e,['from','to','condition','dependency'],'edge');if(!nodeIds.has(e.from)||!nodeIds.has(e.to))bad('edge target');edgeSet.add(e.from+'|'+e.to);}

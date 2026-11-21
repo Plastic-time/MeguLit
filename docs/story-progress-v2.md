@@ -1,0 +1,9 @@
+# Save-only memories backend v2
+
+The memories page no longer requests or waits for an image rating model. Its NSFW information is static metadata validated by story-content-rating. A normal CG catalog is not evidence that its pictures are general content. Missing classifications remain conservatively adult with basis unknown; this is a veil decision, not a verified H-scene count.
+
+Current save permission and the current CG source identity are required for both thumbnail and full requests. Full requests are serialized per root/game, then repeat revision, save permission and source checks after delivery preparation. Static classification never grants access. The dedicated card-wall memoriesImage path returns the original cached image, without the card wall framing resize. Headers remain limited to 24 MiB binary, 8192 per side and 16 megapixels. The base64 response cap matches that binary budget. A full request requires at least 512 MiB free memory. These bounds do not represent a complete process RSS cap.
+
+Unknown or unsupported progress produces an unknown whole page with empty groups, endings and chapters and null counters. It does not manufacture locked states. Preparing is separate. Counts retain null when complete mapping or coverage is unknown. CG aliases unlocked/total remain, with cgUnlocked/cgTotal. Choice counts require known option rules and chapters without partial markers. Groups expose variants and the old items alias, with null routeId/character until verified. Ending target chapter/node only refer to actual known graph nodes. firstLine is empty unless explicitly sourced and authorized. Image and variant reasons are strings derived from validated facts.
+
+This change does not establish new engine, gallery, route, character, H-scene, or completion semantics. In particular, it does not make a PIMG decoder or user-provided rating a source of unlock evidence. No player saves or flag values belong in shared story documents.

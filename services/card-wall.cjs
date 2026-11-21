@@ -211,6 +211,14 @@ function pending(db,root,gameId){const g=gameRow(db,gameId),{list,later,need}=sp
 function image(db,root,gameId,srcId){
  const g=gameRow(db,gameId),s=sources(root,g).find(x=>x.id===String(srcId||''));if(!s)throw Error('CARD_SOURCE_LOCKED');
  const f=fileOf(root,g,s),t=f&&scaled(root,[f],VIEW).get(f);if(!t)throw Error('CARD_SOURCE_UNREADABLE');return {id:s.id,src:dataUrl(t.out),w:t.w,h:t.h};}
+/* Story CGs use current save permission and a source identity; static NSFW labels are handled by the shared veil. */
+function memoriesImage(db,root,gameId,name,{sourceKey}={}){
+ const cg=require('./game-cg.cjs'),g=gameRow(db,gameId),key=String(name||'').toLowerCase();
+ const source=()=>sources(root,g,{safe:false,settle:false}).find(s=>s.source==='save'&&s.kind==='cg'&&String(s.name).toLowerCase()===key);
+ const allowed=()=>/^[a-f0-9]{64}$/.test(String(sourceKey||''))&&cg.sourceKey(g.executable,key)===sourceKey&&source();
+ const current=allowed();if(!current)throw Error('CARD_SOURCE_LOCKED');const file=cg.cachedPicture(root,g.executable,current.name);if(!file)throw Error('CARD_SOURCE_UNREADABLE');
+ const picture=require('./story-image.cjs').read(file);if(!allowed())throw Error('CARD_SOURCE_CHANGED');return {id:current.id,...picture};
+}
 
 /* A bounded save-only view of the existing warmer. No image is decoded on a list request. */
 function memoriesThumb(root,exe,name){
@@ -289,5 +297,5 @@ function handle(db,root,r){
   case 'cards_set_mode':return setMode(root,r.mode);
  }
  throw Error('UNKNOWN_ACTION');}
-module.exports={memoriesThumb,memoriesQueue,handle,state,games,unlocked,image,create,sources,noteSeen,readState,_setRunner:f=>{runner=f;},_setSpawnWarm:f=>{spawnWarm=f;},warm,warmRun,noteGame,DEFAULT_TOPLOADERS};
+module.exports={memoriesThumb,memoriesQueue,memoriesImage,handle,state,games,unlocked,image,create,sources,noteSeen,readState,_setRunner:f=>{runner=f;},_setSpawnWarm:f=>{spawnWarm=f;},warm,warmRun,noteGame,DEFAULT_TOPLOADERS};
 if(require.main===module&&process.argv[2]==='--warm'){setTimeout(()=>process.exit(0),30*60000).unref();try{const j=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));warmRun(j.root,j.exe,j.items||j.names||[]).catch(()=>{}).finally(()=>{try{fs.rmSync(warmFile(j.root,j.exe),{force:true});fs.rmSync(process.argv[3],{force:true});}catch{}process.exit(0);});}catch{}}

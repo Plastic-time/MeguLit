@@ -2,6 +2,8 @@
 
 This is an inventory, not a claim that the complete project's license audit is finished.
 
+- GARbro `ArcFormats/Emote/ArcPSB.cs`, morkt, MIT, exact commit `b09ee4570ccb1daf6ac56710ee8934dc0b8baeb0`: PIMG PSB3 resource/layer layout consulted for the independent bounded implementation in `services/story-pimg.cjs`; no GARbro code/binary added. Existing project TLG/PNG decoder reused. FreeMote current CC-BY-NC-SA implementation was not imported
+
 - New project code uses the existing project's GPL-3.0-or-later declaration. See LICENSE
 - Tauri, Wry, WebView2 bindings, native menu/tray/dialog libraries, Serde and transitive dependencies: exact versions in `desktop/Cargo.lock`; retain their individual package notices when producing a distribution
 - Node.js: bundled runtime with its original `runtime/NODE-LICENSE.txt`

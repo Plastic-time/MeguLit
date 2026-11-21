@@ -4,9 +4,9 @@
 
 ## 普通用户管道
 
-`story_list` / `story_graph` / `story_image` 经 bridge 调用 `services/story-progress.cjs`。已有作品规则须同时匹配完整 EXE SHA-256 与声明的完整剧本档案 SHA-256，才用于解释个人进度。完整哈希与结构分析共用一个低优先级 worker 队列；首次返回 preparing，主服务不读大档案做哈希。已核对结果仅在 canonical 路径、dev、ino、size、mtime、ctime 全部相同的进程内 stat 证明下复用，内容变化立即撤销并重新核对。标题、VNDB 或文件名只用于提出作品候选，不能授权进度套用
+`story_list` / `story_graph` / `story_image` 经 bridge 调用 `services/story-progress.cjs`。已有作品规则须同时匹配完整 EXE SHA-256 与声明的完整剧本档案 SHA-256，才用于解释个人进度。完整哈希与结构分析共用一个有界 worker 队列；首次返回 preparing，主服务不读大档案做哈希。已核对结果仅在 canonical 路径、dev、ino、size、mtime、ctime 全部相同的进程内 stat 证明下复用，内容变化立即撤销并重新核对。标题、VNDB 或文件名只用于提出作品候选，不能授权进度套用
 
-缺少兼容规则时，`story-analysis.cjs` 自动排队一个低优先级 worker：识别引擎，复用已有 original-engines reader，有界读取结构，产生纯规则和待核候选。缓存写入本机 `data/story-rules/`，不含玩家进度。未确认候选不会自动成为结局完成规则。支持不足时返回可理解的未知状态
+缺少兼容规则时，`story-analysis.cjs` 自动排队一个有界 worker：识别引擎，复用已有 original-engines reader，有界读取结构，产生纯规则和待核候选。缓存写入本机 `data/story-rules/`，不含玩家进度。未确认候选不会自动成为结局完成规则。支持不足时返回可理解的未知状态
 
 图像接口每次重新检查存档、规则版本、Safe CG 和当前允许集合。仅 `source=save` 的 CG 可使用制卡器的后台缩略图队列与单张图像渲染；封面、截图、运行时缓存和历史制卡结果不能作为解锁凭据。锁定节点响应不含原始名称、选择文本、图像路径或图片字节。主动显示路线只揭示已核路线上的文字，不授予图片访问
 
@@ -38,6 +38,10 @@ node tools/story-seed.cjs <game.exe> <game.json> <draft.json>
 身份 worker 同时准备私有 CG 资源索引，避免首次可用响应在主服务同步扫描大型档案。索引和存档位置仅作进程内交接，不属于可分享的规则正文；主服务核对存档的 dev/ino/size/mtime/ctime，变化时立即用当前标记收窄旧集合，并由同一个 worker 队列刷新索引。索引交接前后存档不一致则丢弃；图片缓存与安全评级另行绑定当前源文件的 canonical 路径和 stat 身份，恢复旧 mtime 不能复用旧评级
 
 队列最多等待 8 项，相同 proof 或 CG 索引任务合并；进程可用内存不足 512MiB 时不启动 worker。每个 worker 设 V8 old/young/code/stack 上限 192/16/16/4MiB 和 120 秒超时，V8 限制不等于完整 RSS / 外部分配上限。所有结果、异常与超时均先请求终止，再由实际 exit 释放唯一活动槽位；`story-analysis.stop()` 清空自己的等待项、关闭入队并等待活动 worker 退出，供 Runtime.stop 的 allSettled 调用。资源拒绝不会改走主线程同步 CG 扫描
+
+analysis worker 不改变宿主 Node 进程的调度优先级。[Node os.setPriority 文档](https://nodejs.org/api/os.html#ossetprioritypid-priority) 说明 pid=0 操作当前进程，而 [worker_threads](https://nodejs.org/api/worker_threads.html) 的线程仍在同一进程内；因此不能把此调用当作线程独享的优先级设置。隔离子进程回归核对真实 analysis worker 完成前后 getPriority 不变。已有 card-wall warmRun 的旧设置位于 spawn 出来的专用制卡进程，此次未改
+
+回想 v2 不调用图片评级模型或其准备队列。显示资格由当前只读存档的解锁标记、资源身份和图像边界决定，成人内容采用 `contentRatings` 的静态事实，未评级不再阻止图片读取。只有被标为成人的图携带 `#r18`，由现有 NSFW 遮罩处理；开启 NSFW 正常显示，关闭时可临时查看单图。作品分类和实际两作核对仍需各自证据，不能用普通 CG 总表冒充非成人分组
 
 规则正文的证据使用与 story.sources 相同的严格字段和值类型检查，全树拒绝个人状态键与地址等私有值。章节的原始全部边直接校验；无目标边或未知字段使整个正文无效，不经过过滤后再认证原件
 
