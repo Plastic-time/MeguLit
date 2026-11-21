@@ -61,7 +61,7 @@ async function translate(text,list,attempt,{isCurrent=()=>true,budgetMs=0,trace=
    gets its translation is filled in (fill(text, result)) and forgotten. */
 class Retries{
  constructor(run,fill,{delays=[5000,20000,60000,120000,120000,120000,120000,120000],timers={set:setTimeout,clear:clearTimeout}}={}){this.run=run;this.fill=fill;this.delays=delays;this.timers=timers;this.jobs=new Map();}
- add(text,context={}){const key=String(text||'').replace(/\s+/g,'');if(!key||this.jobs.has(key))return;const job={text,context,tries:0,timer:null};this.jobs.set(key,job);this.next(key,job);}
+ add(text,context={}){const body=String(text||'').replace(/\s+/g,'');if(!body)return;const key=(context.options?.learnerLanguage==='en'?'en':'zh')+'|'+body;if(this.jobs.has(key))return;const job={text,context,tries:0,timer:null};this.jobs.set(key,job);this.next(key,job);}
  next(key,job){if(job.tries>=this.delays.length){this.jobs.delete(key);return;}job.timer=this.timers.set(async()=>{job.tries++;try{const r=await this.run(job.text,job.context);if(r&&r.text){this.jobs.delete(key);this.fill(job.text,r,job.context);return;}}catch{}if(this.jobs.get(key)===job)this.next(key,job);},this.delays[job.tries]);job.timer?.unref?.();}
  clear(){for(const j of this.jobs.values())this.timers.clear(j.timer);this.jobs.clear();}
  get size(){return this.jobs.size;}
