@@ -198,7 +198,7 @@ export function mountDevNotice({ api, locale = 'zh', esc, toast, version = '', f
 export function openGuide({ api, locale = 'zh', esc, toast, version = '', tab = 'guide' }) {
   document.querySelector('dialog.guide-panel')?.close();
   const t = words(locale), dialog = document.createElement('dialog'), tabs = [['updates', t.tabUpdates], ['guide', t.tabGuide], ['report', t.tabReport], ['game', t.tabGame]];
-  dialog.className = 'game-dialog dev-notice guide-panel';
+  dialog.className = 'game-dialog dev-notice seed-flow guide-panel';
   dialog.innerHTML = `<div class="dev-notice-top"><span>${esc(t.guideKicker)}</span><span>megulit</span></div>
 <h2>${esc(t.guide)}</h2>
 <nav class="guide-tabs" role="tablist">${tabs.map(([k, v]) => `<button type="button" role="tab" data-tab="${k}">${esc(v)}</button>`).join('')}</nav>
