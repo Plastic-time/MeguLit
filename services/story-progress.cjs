@@ -6,16 +6,16 @@ function knownFlag(key,p){const a=/^yuris:(\d+):(\d+)$/.exec(key);return !a||p.f
 function state(rule,p){if(p.state!=='valid'||!rule)return 'unknown';if(rule.all){if(rule.all.some(k=>!knownFlag(k,p)))return 'unknown';return rule.all.every(k=>positive(p.flags.get(k)))?'done':'locked';}
  if(rule.any){if(rule.any.some(k=>positive(p.flags.get(k))))return 'done';return rule.any.every(k=>knownFlag(k,p))?'locked':'unknown';}return 'unknown';}
 const label=(value,locale)=>String(value?.[locale]||value?.ja||value?.zh||value?.en||'');
-function createService({cg=require('./game-cg.cjs'),cards=require('./card-wall.cjs'),find=data.find,analyze=(root,exe)=>require('./story-analysis.cjs').ensure(root,exe)}={}){
+function createService({cg=require('./game-cg.cjs'),rating=require('./cg-rating.cjs'),cards=require('./card-wall.cjs'),find=data.find,analyze=(root,exe)=>require('./story-analysis.cjs').ensure(root,exe)}={}){
  function snapshot(db,root,gameId){const game=db.prepare('SELECT id,title,executable,cover,original FROM games WHERE id=? AND removed_at IS NULL').get(String(gameId||''));if(!game)throw Error('GAME_NOT_FOUND');
   const document=find(game);let story=document.data,analysis='ready';
   if(['preparing','busy','resource-limited','unavailable'].includes(document.status))analysis='preparing';else if(!story){const automatic=analyze(root,game.executable);analysis=['busy','resource-limited','unavailable'].includes(automatic.state)?'preparing':automatic.state;if(automatic.rules){const r=automatic.rules;story={gallery:r.gallery,galleryComplete:!!r.galleryComplete,chapters:r.chapters,endings:[],endingsComplete:false,sources:r.evidence};}}
   if(analysis==='preparing'&&!story)return {game,story:null,p:{state:'preparing',flags:new Map()},scan:{items:new Map()},safe:true,allowed:new Set(),variants:new Map(),groups:[],endingStates:new Map(),revision:data.hash('preparing:'+game.id),analysis};
   let p={state:'unknown',flags:new Map()},scan={items:new Map()};try{p=cg.storyProgress(game.executable);scan=cg.scan(game.executable);}catch{}
   let safe=true;try{safe=JSON.parse(fs.readFileSync(path.join(root,'data/config/native-preferences.json'),'utf8')).safe_cg!==false;}catch{}
-  if(safe&&require('./cg-rating.cjs').ready(root)){try{cg.list?.(game.executable,{root,safe:true,cold:false,freshRating:true,ratingLimit:24});}catch{}}
+  const marked=scan.engine==='KiriKiri'?cg.kirikiriMarked(game.executable):p.galleryUnlocked||scan.unlocked||new Set(scan.items.keys()),ratingNames=[...scan.items.keys()].filter(n=>marked?.has(n));let ratingState='idle';
+  if(safe&&ratingNames.length){try{const queued=cg.list?.(game.executable,{root,safe:true,cold:false,freshRating:true,ratingLimit:24,names:ratingNames});if(queued?.pending){const status=rating.status(root);ratingState=status.error&&!status.ready&&!status.preparing?'failed':'preparing';}}catch{ratingState='failed';}}
   let allowed=new Set();try{allowed=new Set(cards.sources(root,game,{safe,settle:false}).filter(s=>s.source==='save'&&s.kind==='cg'&&(!safe||!cg.ratingCurrent||cg.ratingCurrent(root,game.executable,s.name))).map(s=>s.name));}catch{}
-  const marked=scan.engine==='KiriKiri'?cg.kirikiriMarked(game.executable):p.galleryUnlocked||scan.unlocked||new Set(scan.items.keys());
   const galleryState=scan.engine==='YU-RIS'?p.galleryState||scan.progressState:p.state;
   const variants=new Map(),groups=(story?.gallery||[]).map(g=>{const items=g.variants.filter(v=>marked?.has(v.name.toLowerCase())).map(v=>{const id=data.hash('cg:'+v.name);variants.set(id,{...v,renderable:allowed.has(v.name.toLowerCase())});return {id,renderable:allowed.has(v.name.toLowerCase())};});return {id:g.id,state:galleryState==='valid'?items.length?'done':g.unlockComplete?'locked':'unknown':'unknown',items,total:g.variantTotal??null};});
   /* Supported engines without a Seed catalog still show their save-only scenes, without claiming a complete total. */
@@ -23,13 +23,13 @@ function createService({cg=require('./game-cg.cjs'),cards=require('./card-wall.c
   const endingStates=new Map((story?.endings||[]).map(e=>[e.id,state(e.unlock,p)]));
   for(const e of story?.endings||[])if(e.requires?.some(id=>endingStates.get(id)==='locked'))endingStates.set(e.id,'locked');
   const revision=data.hash((document.revision||'')+'|'+[...p.flags].sort().map(x=>x.join(':')).join('|')+'|'+safe);
-  return {game,story,p,scan,safe,allowed,variants,groups,endingStates,revision,analysis};
+  return {game,story,p,scan,safe,allowed,variants,groups,endingStates,revision,analysis,ratingState};
  }
  function list(db,root,r){const s=snapshot(db,root,r.gameId),locale=r.locale||'zh',offset=Number.isSafeInteger(r.offset)&&r.offset>=0?r.offset:0;
   const endings=(s.story?.endings||[]).map(e=>{const status=s.endingStates.get(e.id);return {id:e.id,state:status,label:status==='done'?label(e.label,locale):'',type:status==='done'?e.type:'unknown',image:status==='done'?imageId(s,e.image):null,requires:(e.requires||[]).length,requiresDone:(e.requires||[]).filter(id=>s.endingStates.get(id)==='done').length};});
   const known=endings.every(e=>e.state!=='unknown'),complete=!!s.story?.endingsComplete,remaining=complete&&known?endings.filter(e=>e.state!=='done').length:null;
   const galleryKnown=s.p.state==='valid'&&s.groups.length>0&&!s.groups.some(g=>g.state==='unknown'),unlockedKnown=s.groups.filter(g=>g.state==='done').length;
-  return {status:s.analysis==='preparing'?'preparing':s.p.state==='valid'?'ready':'unknown',analysis:s.analysis,catalog:!!s.story,revision:s.revision,safe:s.safe,unlocked:galleryKnown?unlockedKnown:null,unlockedKnown,total:s.story?.galleryComplete?s.groups.length:null,picturesUnlocked:galleryKnown?s.variants.size:null,picturesTotal:s.story?.variantTotal??null,
+  return {status:s.analysis==='preparing'?'preparing':s.p.state==='valid'?'ready':'unknown',analysis:s.analysis,ratingState:s.ratingState||'idle',catalog:!!s.story,revision:s.revision,safe:s.safe,unlocked:galleryKnown?unlockedKnown:null,unlockedKnown,total:s.story?.galleryComplete?s.groups.length:null,picturesUnlocked:galleryKnown?s.variants.size:null,picturesTotal:s.story?.variantTotal??null,
    groups:s.groups.slice(offset,offset+24),next:offset+24<s.groups.length?offset+24:null,endings,remaining,endingTotal:complete?endings.length:null,endingDone:endings.filter(e=>e.state==='done').length,chapters:chapterList(s,locale)};
  }
  function imageId(s,name){if(!name)return null;const id=data.hash('cg:'+name);return s.variants.has(id)&&s.variants.get(id).renderable?id:null;}

@@ -258,7 +258,7 @@ const cacheDirOf=(root,executable)=>path.join(root,'data','cg-cache',crypto.crea
 /* opts: root; cold (the cold-run setting: the game may be started in the background to read CGs only it can open);
    safe (the R18 filter: only CGs the local rating model called safe, the rest rated in the background, cg-rating.cjs) */
 function list(executable,opts={}){
- const r=scan(executable),{root}=opts;let items=[...r.items.keys()],pending=0;
+ const r=scan(executable),{root}=opts;let items=[...r.items.keys()].filter(n=>!Array.isArray(opts.names)||opts.names.includes(n)),pending=0;
  if(root&&opts.cold&&r.wanted?.length){try{const dir=path.dirname(String(executable));require('./voice-cold.cjs').consider(root,{executable:String(executable),dir,engine:'kirikiri-cg'},r.wanted,{enabled:true});}catch{}}
  if(root&&opts.safe&&items.length){const rating=require('./cg-rating.cjs'),cacheDir=cacheDirOf(root,executable),known=rating.ratings(cacheDir),todo=items.filter(n=>!known[n]||opts.freshRating&&!ratingCurrent(root,executable,n)).slice(0,opts.ratingLimit||items.length);
   pending=todo.length;if(todo.length)rating.rateLater(root,cacheDir,todo,name=>pictureFile(root,executable,name));items=items.filter(n=>rating.isSafe(known[n])&&(!opts.freshRating||ratingCurrent(root,executable,n)));}
