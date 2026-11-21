@@ -547,8 +547,8 @@ class Reader{
   // Keep failed teardown resources out of the live reader, but reachable for another stop.
   const gal=this.gal||this.stoppingGal,child=gal?.process;this.stoppingGal=gal;this.gal=null;
   const stops=[()=>this.translation?.clearContext?.(),()=>this.retryQueue?.clear(),()=>this.stats.reset(),()=>gal?.send?.({type:'unbind'}),()=>gal?.stop(),()=>require('../core/owned-exit.cjs').trackStop(this,child)];
-  const result=Promise.allSettled(stops.map(async stop=>stop())).then(results=>{const failed=results.find(r=>r.status==='rejected');if(failed)throw failed.reason;this.stoppingGal=null;this.stopError=null;});
-  this.stopping=result;result.then(()=>{if(this.stopping===result)this.stopping=null;},error=>{this.stopError=error;if(this.stopping===result)this.stopping=null;});return result;
+  const result=Promise.allSettled(stops.map(async stop=>stop())).then(results=>{const failed=results.find(r=>r.status==='rejected');if(failed)throw failed.reason;this.stoppingGal=null;this.stopError=null;this.stopFailed=false;});
+  this.stopping=result;result.then(()=>{if(this.stopping===result)this.stopping=null;},error=>{this.stopError=error;this.stopFailed=true;if(this.stopping===result)this.stopping=null;});return result;
  }
 }
 module.exports={Reader,notJapanese};

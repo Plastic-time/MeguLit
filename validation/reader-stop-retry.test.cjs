@@ -4,6 +4,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {spawn}=require('node:child_process'),{once}=require('node:events');
 const {Reader}=require('../services/reader.cjs'),{Runtime}=require('../services/runtime.cjs'),{GalNative}=require('../core/gal-native.cjs');
 const {trackStop}=require('../core/owned-exit.cjs');
+const {HookNative}=require('../core/hook-native.cjs'),{EngineDraw,KrkrTransport}=require('../core/engine-draw.cjs'),Profiles=require('../core/profiles/index.cjs');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function runtime(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'reader-stop-retry-'));fs.mkdirSync(path.join(root,'logs'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return new Runtime(root);}
 async function child(t,delay=30){const p=spawn(process.execPath,['-e',`process.stdin.resume();process.stdin.on('end',()=>setTimeout(()=>process.exit(0),${delay}));console.log('ready');`],{windowsHide:true,stdio:['pipe','pipe','ignore']});t.after(()=>{if(p.exitCode===null&&p.signalCode===null)p.kill();});await once(p.stdout,'data');return p;}
@@ -47,6 +48,18 @@ test('a new attach cannot discard resources whose cleanup still fails',async t=>
  await assert.rejects(r.call({action:'reader_attach'}),error=>error===first);assert.equal(attempts,2);assert.equal(attached,0);assert.equal(r.reader,reader);
 });
 
+test('falsy rejection reasons still block replacing the failed teardown owner',async t=>{
+ let attached=0;t.mock.method(Reader.prototype,'attach',()=>{attached++;return {attached:true};});
+ for(const reason of [undefined,null,false,0,'']){
+  const r=runtime(t),reader=new Reader(r);let attempts=0;
+  reader.gal={send(){},stop(){attempts++;return Promise.reject(reason);}};r.reader=reader;
+  for(const run of [()=>r.stopReading(),()=>r.call({action:'reader_attach'})]){
+   const result=await Promise.allSettled([run()]);assert.equal(result[0].status,'rejected');assert.equal(result[0].reason,reason);
+  }
+  assert.equal(reader.stopFailed,true);assert.equal(attempts,2);assert.equal(attached,0);assert.equal(r.reader,reader);assert(reader.stoppingGal);
+ }
+});
+
 test('a new attach can resume only after retrying the old failed cleanup successfully',async t=>{
  const r=runtime(t),reader=new Reader(r),first=Error('READER_STOP_INCOMPLETE');let attempts=0,attached=0;
  t.mock.method(Reader.prototype,'attach',()=>{attached++;return {attached:true};});
@@ -61,4 +74,20 @@ test('owned aggregate waits for a second real child after another child already 
  const old=trackStop(owner,failed);await assert.rejects(old,/READER_STOP_INCOMPLETE/);let done=false;
  const result=trackStop(owner,slow,()=>slow.stdin.end()).then(()=>{done=true;},error=>{done=true;return error;});
  await tick();assert.equal(done,false);assert.equal(slow.exitCode,null);assert.match((await result).message,/READER_STOP_INCOMPLETE/);assert.equal(slow.exitCode,0);
+});
+
+test('full native reader stop retains a failed control revocation and retries after both owned helpers exit',async t=>{
+ const r=runtime(t),reader=new Reader(r),hookChild=await child(t,80),galChild=await child(t,20),profile=structuredClone(Profiles.profileFor({}));profile.draw.advhdInput=true;
+ const transport=new KrkrTransport(hookChild.pid,{tmp:r.root}),draw=new EngineDraw({profile,transport});transport.flush(draw.cfg,draw.entries);
+ const h=Object.assign(Object.create(HookNative.prototype),{profile,process:hookChild,engineDraw:draw,state:{},serial:0,islandSources:new Map(),pageReset(){},notify(){},send(m){hookChild.stdin.write(JSON.stringify(m)+'\n');}});
+ const g=gal({process:galChild,hooks:h});reader.gal=g;r.reader=reader;
+ const unlink=fs.unlinkSync,write=fs.writeFileSync,denied=()=>Object.assign(Error('owned test control locked'),{code:'EACCES'});
+ try{
+  fs.unlinkSync=function(file,...args){if(file===transport.file)throw denied();return unlink(file,...args);};
+  fs.writeFileSync=function(file,...args){if(file===transport.file)throw denied();return write(file,...args);};
+  const stopped=r.stopReading();await assert.rejects(stopped,/READER_STOP_INCOMPLETE/);
+  assert.equal(hookChild.exitCode,0);assert.equal(galChild.exitCode,0);assert.equal(r.reader,reader);assert.equal(reader.stoppingGal,g);assert.equal(h.engineDraw,draw);assert.equal(draw.closed,true);assert.equal(transport.closed,true);
+  assert.match(fs.readFileSync(transport.file).subarray(2).toString('utf16le'),/advhdInput=1/);
+ }finally{fs.unlinkSync=unlink;fs.writeFileSync=write;}
+ await r.stopReading();assert.equal(r.reader,null);assert.equal(reader.stoppingGal,null);assert.equal(h.engineDraw,null);assert.equal(fs.existsSync(transport.file),false);
 });
