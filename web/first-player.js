@@ -17,14 +17,19 @@ const W={
   off:{title:'共有適応をオンにすると火を継げます',body:'このバージョンはまだ誰も校正していないので、あなたが最初になります。いまは共有適応がオフで、結果はこの PC に残るだけ、後のプレイヤーには届きません。オンにして 3〜8 分遊び、自動校正を走らせれば、結果は同じバージョンを遊ぶ人に共有されます',button:'共有適応をオンにする',busy:'オンにしています…',failed:'オンにできませんでした。あとでもう一度'},
   thanks:{title:'火は無事に継がれました',body:'校正結果をアップロードしました。このバージョンを次に遊ぶ人は、開くだけで使えます。あなたが灯した火です。ありがとう、火を継ぐ人',note:'共有済み · 後のプレイヤーはすぐ使えます'}}};
 const POLL_MS=20000,POLL_MAX=90;
-export function mountFirstPlayer({host,id,api,locale,esc,isCurrent=()=>true}){
+export function mountFirstPlayer({host,id,api,locale,esc,isCurrent=()=>true,placement='tabs'}){
  if(!host)return;const w=W[locale]||W.zh;let timer=0,shown='',polls=0;
  const box=document.createElement('section');box.className='first-player';box.hidden=true;box.setAttribute('aria-live','polite');host.after(box);
  const render=(state,{failed=false,busy=false}={})=>{if(state==='hidden'){box.hidden=true;box.innerHTML='';shown='';return;}const t=w[state],sig=state+(failed?'!':'')+(busy?'…':'');if(sig===shown)return;shown=sig;box.dataset.state=state;
-  box.innerHTML=`<i class="first-player-glyph" aria-hidden="true">${esc(w.glyph)}</i><div class="first-player-copy"><span class="first-player-eyebrow">${esc(w.eyebrow)}</span><h2>${esc(t.title)}</h2><p>${esc(t.body)}</p>${state==='off'?`<div class="first-player-act"><button type="button" class="primary" data-fp-share ${busy?'disabled':''}>${esc(busy?t.busy:t.button)}</button>${failed?`<span class="first-player-fail">${esc(t.failed)}</span>`:''}</div>`:`<span class="first-player-note">${esc(t.note)}</span>`}</div>`;box.hidden=false;
+  box.innerHTML=`<div class="first-player-copy"><div class="first-player-head"><span class="first-player-eyebrow">${esc(w.eyebrow)}</span><h2>${esc(t.title)}</h2></div><p>${esc(t.body)}</p>${state==='off'?`<div class="first-player-act"><button type="button" class="primary" data-fp-share ${busy?'disabled':''}>${esc(busy?t.busy:t.button)}</button>${failed?`<span class="first-player-fail">${esc(t.failed)}</span>`:''}</div>`:`<span class="first-player-note">${esc(t.note)}</span>`}</div>`;box.hidden=false;
   const b=box.querySelector('[data-fp-share]');if(b)b.onclick=async()=>{render('off',{busy:true});try{await api('first_player_share',{});await load(false);}catch{render('off',{failed:true});}};};
  async function load(first){let r;try{r=await api('first_player',{id,poll:!first});}catch{r=null;}if(!isCurrent()||!box.isConnected){clearTimeout(timer);return;}
   const state=r&&['first','off','thanks'].includes(r.state)?r.state:'hidden';render(state);
   clearTimeout(timer);if(state!=='thanks'&&polls++<POLL_MAX&&(state!=='hidden'||first))timer=setTimeout(()=>load(false),POLL_MS);}
- load(true);
+ /* where the card sits (it survives tab swaps, so it is moved, not re-created): tabs = a slim strip under the tab bar (every tab),
+    main = top of the overview's left column, aside = top of its right column; other tabs keep it under the tab bar */
+ const place=(tab='overview')=>{const root=host.closest('.main')||document;const tabs=root.querySelector('.detail-tabs');let to=null;
+  if(tab==='overview'&&placement==='main')to=root.querySelector('.detail-main');else if(tab==='overview'&&placement==='aside')to=root.querySelector('.detail-aside');
+  if(to){if(box.parentNode!==to||to.firstChild!==box)to.prepend(box);}else if(tabs&&tabs.nextElementSibling!==box)tabs.after(box);box.dataset.place=to?placement:'tabs';};
+ place('overview');load(true);return {place};
 }
