@@ -84,4 +84,3 @@ function entry(buf,o,file,ids){
  }catch{return null;}
 }
 module.exports={scriptIds,entry};
-

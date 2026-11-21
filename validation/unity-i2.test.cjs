@@ -59,6 +59,8 @@ test('I2 uses locale codes and pairs translations by term, omitting non-text and
  assert.equal(result.step,'ok');assert.equal(result.detail,'unity-assets');assert.equal(result.japaneseLines,35);
 });
 test('I2 validates the source class, term widths, language table and term boundaries',t=>{
+ const plain=scenes.ENGINES['unity-assets'].parse(Buffer.from('\u0001I2\n普通の台詞です。'));
+ assert.deepEqual(plain.lines,['普通の台詞です。']);
  const valid=source(['ja','zh-TW'],[term('a',0,['日本語。','繁體文字'])]);
  for(const [raw,script,external] of [[valid,sourceScript('Other')],[valid,sourceScript(),'other.assets'],[valid.subarray(0,valid.length-3)],
   [source(['ja'],[term('a',0,['日本語','多出来的一列'])])],[source(['en'],[term('a',0,['English'])])]]){

@@ -95,7 +95,12 @@ function textLines(text){return text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l
 const clean=t=>t.replace(/<br\s*\/?>|\\n|\[n\]/gi,'\n').replace(/<\/?(?:color|size|b|i|ruby|rt|sprite)[^>]*>/gi,'').replace(/\[rb,([^,\]]*),[^\]]*\]/g,'$1').trim();
 function parse(buf){
  let text=buf.toString('utf8');if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
- if(text.startsWith('\u0001I2\n'))return JSON.parse(text.slice(4));
+ if(text.startsWith('\u0001I2\n')){
+  try{
+   const doc=JSON.parse(text.slice(4));
+   if([doc.lines,doc.zh,doc.anchors].every(a=>Array.isArray(a)&&a.every(v=>typeof v==='string')))return doc;
+  }catch{}
+ }
  let rows=null;
  if(text.startsWith('\u0001MONO\n'))rows=text.slice(6).split('\n').map(t=>({text:t,speaker:''}));
  else{const t=text.trimStart();if(t[0]==='['||t[0]==='{'){try{rows=[];jsonLines(JSON.parse(t),rows);}catch{rows=null;}}
