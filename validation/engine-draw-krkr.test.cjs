@@ -36,6 +36,7 @@ function toJs(src){
   .replace(/invalidate ([\w.]+);/g,'__inv($1);')
   .replace(/\((\w+) instanceof "(\w+)"\)/g,'__io($1,"$2")')
   .replace(/#t==0xfeff/g,'t.charCodeAt(0)==0xfeff')
+  .replace(/#(c|next|prev)\b/g,'$1.charCodeAt(0)')
   .replace(/\bint\(/g,'__int(')
   .replace(/\bvoid\b/g,'undefined');
 }
@@ -67,12 +68,13 @@ function harness({ctl=null}={}){
   Array.prototype.load=function(p){const t=__read(p);this.length=0;for(const l of t.replace(/\\r/g,'').split('\\n'))this.push(l);if(this.length&&this[this.length-1]==='')this.pop();return this;};
   String.prototype.substring=function(s,n){return n===undefined?this.substr(s):this.substr(s,n);};`,Object.assign(sandbox,{__read:p=>{const b=fs.readFileSync(p);return b[0]===0xff&&b[1]===0xfe?b.subarray(2).toString('utf16le'):b.toString('utf8');}}));
  sandbox.global=sandbox;sandbox.Layer=Layer;sandbox.__megulitKrkrCtlPath=ctlFile;
- const st={kag,recs:[],report:s=>reports.push(s),charsErr:'',
+ /* KrkrText.cpp ReportFunction turns embedded line breaks into the protocol's U+001F before Push */
+ const st={kag,recs:[],report:s=>reports.push(s.replace(/\n/g,'\x1f').replace(/\r/g,' ')),charsErr:'',
   screen(){return [1280,720];},
   abs(l){let ax=0,ay=0;for(let i=0;i<16&&l.parent;i++){ax+=l.left;ay+=l.top;l=l.parent;}return [ax,ay];},
   drawFont(l){return l.font;}};
  sandbox.st=st;vm.runInContext(toJs(block()),sandbox);
- return {st,L,kag,reports,draws,copies,ButtonLayer,Layer,base,ctx};
+ return {st,L,kag,reports,draws,copies,ButtonLayer,Layer,base,ctx,ctlFile,sandbox};
 }
 
 test('engine-draw block: control file sets roles / embed / zh and the replacement table; no file = everything off',()=>{
@@ -140,7 +142,7 @@ test('embed: no room under the sentence = ruby only (emb=1); no entry yet = wait
 });
 
 test('script wiring: name plates only with roles, links routed before the sentence starts, processCh path never hidden while embedding',()=>{
- assert.ok(script.includes("if(L.height<sh*0.2) {if(!this.cfg.roles) return;role='name';}"));
+ assert.ok(script.includes("if(!choice && L.height<sh*0.2) {if(!this.cfg.roles) return;role='name';}"));
  assert.ok(script.includes("if(il>=0) {this.linkCh(rec,L,il,ch,cx,cy,size,sw,sh);return;}"));
  assert.ok(script.indexOf("this.linkCh(rec,L,il")<script.indexOf("if(rec.n==0) {\n     if(role=='line') this.fontReport(L);"));
  assert.ok(script.includes("st.hideMsg=function(){return !this.cfg.embed && this.hideOn();}"));
@@ -199,4 +201,51 @@ test('TextRender roles: name plate from processNameText (the game method still r
  assert.deepEqual(ls.map(x=>[x.role,x.id,x.text,x.box,x.sel]),[['choice','K0:0','はい',[60,560,56,28],true],['choice','K0:1','いいえ',[116,560,84,28],false]]);
  h.L.numLinks=0;h.st.trLinkScan();assert.equal(TP.parseChars(h.reports.at(-1)).text,'');
  assert.ok(script.includes("var T=L.textLayer,on=this.hideOn() && !(typeof this.cfg=='Object' && this.cfg.embed);"),'never hidden while the game draws the replacement');
+});
+
+
+test('TextRender explicit empty name clears its visible plate without replacing the game method',()=>{
+ const h=trRig('#cfg roles=1\n');const nl=new h.Layer();Object.assign(nl,{width:180,height:36,parent:h.L});h.L.nameLayer=nl;
+ let calls=0;h.L.processNameText=function(v){calls++;return v;};h.st.nameScan();
+ h.L.processNameText('芳乃');h.st.nameScan();assert.equal(TP.parseChars(h.reports.at(-1)).text,'芳乃');
+ assert.equal(h.L.processNameText(''),'');h.st.nameScan();assert.equal(TP.parseChars(h.reports.at(-1)).text,'');assert.equal(calls,2);
+});
+
+test('TextRender multi-row links use actual row hot spots and each message-layer glyph owner',()=>{
+ const h=trRig('#cfg roles=1\n');
+ const other=new h.Layer();Object.assign(other,{left:40,top:500,width:1200,height:200,parent:h.base,textLayer:{opacity:255},numLinks:1,keyLink:0});
+ h.kag.fore.messages.push(other);
+ h.L.numLinks=1;h.L.links=[{x:[20,20],y:[60,116],w:[56,56],h:[28,28]}];
+ h.L.__mgTrAll=[...trAll('はい',60,560),...trAll('混入',60,600),...trAll('続き',60,616)];
+ other.links=[{x:[20],y:[60],w:[56],h:[28]}];other.__mgTrAll=trAll('別枠',60,560);
+ h.st.trAll=other.__mgTrAll;h.st.trAllL=other;h.st.trLinkScan();
+ assert.deepEqual(h.reports.map(TP.parseChars).map(r=>[r.id,r.text]),[['K0:0','はい\n続き'],['K1:0','別枠']]);
+ const first=TP.parseChars(h.reports[0]);assert.equal(first.rects.length,4);
+ const rows=require('../core/engine-draw.cjs').rowsOf(first);
+ assert.deepEqual(rows.map(r=>[r.text,r.x,r.y,r.w,r.h]),[['はい',60,560,56,28],['続き',60,616,56,28]]);
+ assert.ok(rows.every(r=>!(r.y<=600 && r.y+r.h>600)),'reader rows do not cover the gap');
+});
+
+
+test('TextRender link snapshots retire the same K<layer> group when one layer clears',()=>{
+ const h=trRig('#cfg roles=1\n');h.L.numLinks=1;h.L.links=[{x:[20],y:[60],w:[56],h:[28]}];h.L.__mgTrAll=trAll('選択',60,560);
+ h.st.trLinkScan();assert.equal(TP.parseChars(h.reports.at(-1)).id,'K0:0');
+ h.L.numLinks=0;h.st.trLinkScan();assert.equal(TP.parseChars(h.reports.at(-1)).id,'K0:');
+ assert.equal(TP.parseChars(h.reports.at(-1)).text,'');
+});
+
+test('TextRender roles revocation clears its name/choice groups once and reopening reports fresh state',()=>{
+ const h=trRig('#cfg roles=1\n');const nl=new h.Layer();Object.assign(nl,{width:180,height:36,parent:h.L});h.L.nameLayer=nl;
+ h.L.processNameText=v=>v;h.st.nameScan();h.L.processNameText('芳乃');h.st.nameScan();
+ h.L.numLinks=1;h.L.links=[{x:[20],y:[60],w:[56],h:[28]}];h.L.__mgTrAll=trAll('選択',60,560);h.st.trLinkScan();
+ const count=h.reports.length;h.st.cfg.roles=0;h.st.trRolesOff();
+ assert.deepEqual(h.reports.slice(count).map(TP.parseChars).map(r=>[r.role,r.id,r.text]),[['name','N:',''],['choice','K0:','']]);
+ h.st.trRolesOff();assert.equal(h.reports.length,count+2,'retire once, no polling spam');
+ h.st.cfg.roles=1;h.st.nameScan();h.st.trLinkScan();
+ assert.deepEqual(h.reports.slice(-2).map(TP.parseChars).map(r=>[r.role,r.text]),[['name','芳乃'],['choice','選択']]);
+});
+
+test('TextRender default-off UI lifecycle emits nothing before an explicit roles opt-in',()=>{
+ const h=trRig('');assert.equal(h.st.cfg.roles,0);h.st.trRolesOff();assert.equal(h.reports.length,0);
+ assert.equal(h.L.processNameText,undefined);assert.equal(h.L.__mgTrAll,undefined);
 });

@@ -284,7 +284,7 @@ class Reader{
   return Promise.all(list.map(async row=>{try{let t=this.embedCached(row,undefined,{language:cacheLanguage})||'';if(!t){t=(await this.chainTranslate(row,options,{current:()=>Date.now()<until})).text;this.embedCached(row,t,{language:cacheLanguage});}return t||'';}catch{return '';}}));}
  /* engine-draw: ruby (game ruby, then dictionary-settled readings) and translation (script, then the fallback chain) for one dialogue line the engine will draw itself */
  async drawEmbed(m){const cacheLanguage=this.targetLanguage();const text=String(m?.text||'');if(!text||text.length>600||notJapanese(text))return;let ruby=[],zh='';
-  try{const x=await require('./example-ruby.cjs').exampleRuby(null,this.runtime.learning(),[{text}]);const it=x?.items?.[0];if(it?.text===text&&Array.isArray(it.spans))ruby=it.spans.map(sp=>[sp.start,sp.end,String(sp.reading||'')]);}catch{}
+  try{const x=await require('./example-ruby.cjs').exampleRuby(null,this.runtime.learning(),[{text,ruby:this.gal?.hooks?.sourceRuby?.get(text)||[]}]);const it=x?.items?.[0];if(it?.text===text&&Array.isArray(it.spans))ruby=it.spans.map(sp=>[sp.start,sp.end,String(sp.reading||'')]);}catch{}
   try{zh=this.embedCached(text,undefined,{language:cacheLanguage})||'';if(!zh&&cacheLanguage!=='en')zh=this.gal?.hooks?.scriptTranslation?.(text)||'';if(!zh){const until=Date.now()+4000;zh=(await this.chainTranslate(text,this.baseOptions(cacheLanguage),{current:()=>Date.now()<until})).text||'';}if(zh)this.embedCached(text,zh,{language:cacheLanguage});}catch{}
   if(zh&&(/[\ufffd\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(zh)||require('../core/text-sanity.cjs').garbledSource(zh)))zh='';
   this.gal?.hooks?.drawEmbedReply?.(m.key,{ruby,zh});}

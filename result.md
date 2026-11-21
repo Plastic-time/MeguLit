@@ -1,7 +1,19 @@
-# Artemis bounded Lua candidate
+# Engine integration reports
 
-Full ordered source audit, exact samples and capability boundaries are in [the Artemis report](side-session-notes/Artemis-result.md)
-The constructor and pending owner checklist are in [Artemis Lua input](docs/artemis-lua-input.md)
+Original reports are preserved without replacing each other
 
-The observer is default off, unregistered and has no production transport
-It is not an engine-complete or live-passed result
+- [KAG source and ruby report](side-session-notes/KAG-ruby-result-7ff69e9a.md)
+- [RenPy source and ruby report](side-session-notes/RenPy-ruby-result-9b23220c.md)
+
+The integration checkpoint and its consumer regression are recorded in docs/kag-renpy-ruby-integration.md
+
+- [TextRender lifetime and role report](side-session-notes/TextRender-roles-result-ec6a304b.md)
+
+- [RPG Maker CDP and page-state report](side-session-notes/RPGMaker-cdp-result-ff1063a0.md)
+
+- [Artemis source audit and bounded Lua session](side-session-notes/Artemis-result.md)
+- [Artemis production input-session contract and pending owner checklist](docs/artemis-lua-input.md)
+
+Artemis remains default off and requires an isolated, exact-build local owner-test grant
+Its optional source transport does not implement glyph coordinates, hiding or new translation drawing
+No live pass or engine-complete result is claimed
