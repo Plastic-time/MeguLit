@@ -97,6 +97,18 @@ module.exports=async ({assert,root,fixture})=>{
    if(o.hookSpawned>1)bad.push('hook restarted ('+o.hookSpawned+' starts)');if(o.hbSent.some(m=>m.type==='disable'))bad.push('hide disabled');
    for(const l of o.hookEvents)if(/render mode switched|reselect|select id=|stream .*switched|hook reconnect/i.test(l)&&Date.parse(l.slice(0,24))-o.t0>=cal.at-50)bad.push(l.slice(25,120));}
   put('8',!bad.length,bad.slice(0,6).join(' | '));}
+ /* 12: the two-row page of 03:36:18 (line 38 on the first row y485, line 39 under it y514, no clear between): both drawn, each on its
+    own row (game y + client 264), clickable; once the game clears the page (the next line starts on the first row) both are gone */
+ {const r=by.dialogue,o=r.o,A='「あなた」に声をかける人物がいる。',B='「あなた」は周囲を見渡そうとするが、その必要はなかった。',bad=[];
+  const rowOf=(s,t)=>{const g=jpGlyphs(s).filter(x=>x.kind==='line');const want=norm(t);let hit=null;for(const y of [...new Set(g.map(x=>Math.round(x.rect.y)))]){const row=g.filter(x=>Math.abs(x.rect.y-y)<=3);if(want.startsWith(norm(row.map(x=>x.text).join('')).slice(0,6))&&norm(row.map(x=>x.text).join('')).length>=6)hit={y,row};}return hit;};
+  const during=o.samples.filter(s=>norm(s.hookSource)===norm(B)&&!s.body.includes('megulit-menu-open'));const settled=during.filter(s=>s.at-during[0]?.at>=600);
+  if(!settled.length)bad.push('line 39 never shown long enough');
+  for(const s of settled){const a=rowOf(s,A),b=rowOf(s,B);if(!a)bad.push('@'+s.at+' line 38 (the row above) not drawn');else if(Math.abs(a.y-(264+485))>6)bad.push('@'+s.at+' line 38 at y '+a.y+' (its row 749)');
+   if(!b)bad.push('@'+s.at+' line 39 not drawn');else if(Math.abs(b.y-(264+514))>6)bad.push('@'+s.at+' line 39 at y '+b.y+' (its row 778)');
+   for(const x of [a,b])if(x&&x.row.some(g=>!inside(g,s.hitRegions)))bad.push('@'+s.at+' a row not clickable');if(bad.length>4)break;}
+  const after=o.samples.filter(s=>during.length&&s.at>during.at(-1).at+600&&s.hookSource&&norm(s.hookSource)!==norm(B)).slice(0,20);
+  for(const s of after){if(rowOf(s,A)||rowOf(s,B)){bad.push('@'+s.at+' the cleared page still drawn under 「'+String(s.hookSource).slice(0,10)+'」');break;}}
+  put('12',!bad.length,[...new Set(bad)].slice(0,6).join(' | '));}
  /* 11: profile -> hook-native (real pid) -> control file -> the script's reader */
  {const r=by.dialogue,o=r.o,f=(o.control.at(-1)?.files||[]).find(x=>x.name==='42452.txt'),cfg=o.krkr.cfg||{};
   const ok=!!f&&/#clearline/.test(f.text)&&/#choiceframe \^選択肢\$/.test(f.text)&&cfg.clear===1&&Array.isArray(cfg.choiceFrames)&&cfg.choiceFrames.length===1&&o.krkr.clears>0;

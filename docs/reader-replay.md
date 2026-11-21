@@ -59,6 +59,10 @@ KiriKiri 那一侧（`tools/reader-replay/krkr-model.cjs`）：从 `native/krkrt
 
 现在这些断言写在海馆的 `acceptance.case.cjs` 里。下一步（未做）：抽到 `tools/reader-replay/checks.cjs`，加一个 `tools/reader-replay/run.cjs <seed 目录> <日志或样本包>`，读 seed 的 profile、按 docs/auto-profile.md / docs/cold-test.md 的样本包格式建时间线，跑通用断言 + seed 旁 `acceptance.case.cjs` 的游戏专属断言，输出逐条结果，给 diff-maker / 冷测试 / 服务器判 verified 用。
 
+## 两行页（page.engineRows）
+
+core/overlay-placement.cjs `rows()`：引擎按行报坐标的游戏，一句在没清页（引擎的清页上报）且起始在已有行下方时并入同一页，否则开新页；页经 textPlacePage 交给阅读层的页模型（每句在自己的格子上，旧行是带 ruby 的克隆、可点读）。true = 每句都走页（海馆），null（默认）= 只有叠行时才组页、单行时回到行模型，false = 不组页。判定写进 hook-events（`placement page: … goes on the page under … / starts a new page / cleared by the game`）。非 KiriKiri 的夹具：validation/fixtures/games/baldr-sky/two-row-page.case.cjs
+
 ## 海馆（第一个用户）
 
 店主 2026-11-21 日志（`validation/fixtures/games/fata-morgana/owner-20261121/`）三段并行：dialogue 03:35:30–03:36:45（20+ 句、校准、女仆选项页）、art 03:31:50–03:32:32（聖なるかな）、advance 02:56:30–02:58:20（02:57 录屏那段推进）。

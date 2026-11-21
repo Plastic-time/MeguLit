@@ -16,7 +16,7 @@ const DOMAINS={
  'page.flowPage':{enum:[null,true,false]},
  'page.holdMs':{number:[0,20000],nullable:true},
  'page.pairByDrawn':{bool:true},
- 'page.reportClear':{bool:true},
+ 'page.reportClear':{bool:true},'page.engineRows':{enum:[null,true,false]},
  'page.keepHeld':{bool:true},
  'choice.contentInterleave':{bool:true},
  'choice.dropEffectFrames':{bool:true},

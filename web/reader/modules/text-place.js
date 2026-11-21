@@ -25,6 +25,9 @@
     'body.megulit-placed .tome-box-deco,body.megulit-placed .sentence-window:not(.megulit-place-window){display:none!important}',
     'body.megulit-placed .megulit-place-window .sentence-text{position:absolute!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;margin:0!important;padding:0!important;transform:none!important;overflow:visible!important}',
     'body.megulit-placed .megulit-place-window .tome-page-lines{display:none!important}',
+    /* 2026-11-21 (ファタ two-row page: every placed row 11 px under its box): the reader's line-height margin (gal.js, a more specific
+       selector) moved the full-window sentence off the surface's top; a placed page's sentence sits exactly at 0,0 */
+    'html body.megulit-placed .sentence-window.megulit-place-window .sentence-text:not(#megulit-x){margin:0!important;top:0!important;left:0!important}',
     '.megulit-anchor-window.megulit-anchor-center .sentence-text,.megulit-anchor-window.megulit-anchor-center .tomoyo-cn-row,.megulit-anchor-window.megulit-anchor-center .tomoyo-cn-output,.megulit-anchor-window.megulit-anchor-center .tome-page-lines{text-align:center!important;text-align-last:center!important}',
     '.megulit-anchor-window .sentence-text{position:relative}',
     'body.megulit-place-gone .sentence-window.tomoyo-hook-reader,body.megulit-place-gone .sentence-window.tomoyo-hook-reader *{opacity:0!important;visibility:hidden!important}', /* 2026-11-20 (CHAOS;CHILD: the game cleared its text at a scene change, the old line stayed): gone with the game's line until the next one */
@@ -446,6 +449,9 @@
     if (body.classList.contains('megulit-place-asleep') !== asleep) { body.classList.toggle('megulit-place-asleep', asleep); window.__tomoyoHitRegionsRefresh?.(true); }
     if (!live || !sentence) { document.getElementById('megulit-page-ahead')?.replaceChildren(); dropOld(null); clones.clear(); const p = page; page = null; release(); page = p; body.classList.remove('megulit-placed'); /* a page the layer does not hide (not armed, or no line has places yet): the game's own text is on screen, the reader's Japanese is never drawn at its own place over it; the translation stays */ const own = on && page.awake; if (body.classList.contains('megulit-place-game-drawn') !== own) { body.classList.toggle('megulit-place-game-drawn', own); window.__tomoyoHitRegionsRefresh?.(true); } /* only where the reader's line follows the game's place (anchor mode): in its own box elsewhere it stays, Japanese on top */ pageOwn = own === true && anchorMode === true; briefSync(false); if (own && sentence) underGameLine(win, sentence); return; }
     if (pageOwn) { pageOwn = false; briefSync(false); }
+    /* 2026-11-21 (ファタ two-row page, page.engineRows): the line model's anchored pin (the window moved to the line's anchor) is undone
+       before the page places its lines on their own boxes, or every row sits that far off */
+    if (document.querySelector('.megulit-anchor-window')) { const p0 = page; page = null; release(false, false); page = p0; }
     const map = mapper(page.client), readerText = readerLine(), geom = [];
     let cur = null; if (readerText) for (let i = page.lines.length - 1; i >= 0; i--) if (page.lines[i].text.includes(readerText)) { cur = page.lines[i]; break; }
     /* 2026-11-16 (QQ group, ライムライト・レモネードジャム: ruby and translation only, no Japanese): an armed page means the game's

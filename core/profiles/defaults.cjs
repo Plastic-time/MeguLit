@@ -26,6 +26,12 @@ module.exports={
   /* KiriKiri: a message layer cleared by the game (KAG [cm], MessageLayer.clear) after its line was reported takes that line off the
      placement (the reader never redraws a line the game has cleared); false = kernel: nothing is said at a clear */
   reportClear:false,
+  /* the lines of one page (an engine that reports each line with its boxes: KiriKiri ToMe_CHARS) are drawn together, each on its own
+     row: a line goes on the page when the game has not cleared it since (page.reportClear) and it starts below the page's rows; false
+     (core/overlay-placement.cjs rows). true = every line goes through the page (ファタモルガーナの館); null = only when a line has stacked
+     under one still on screen (otherwise the line model as before: the row above would be drawn by nobody now that the placement
+     fallback never redraws a line the reader drew); false = never */
+  engineRows:null,
   /* the game draws one line over several frames (fade, wipe, per-character effects): null = kernel heuristics; true = every
      repaint of the same line is one line (never a new line, never a skip); false = frames are not effects */
   effectFrames:null,

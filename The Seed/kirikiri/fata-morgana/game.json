@@ -15,6 +15,7 @@
   "page": {
    "pairByDrawn": true,
    "reportClear": true,
+   "engineRows": true,
    "keepHeld": true
   },
   "choice": {
@@ -77,5 +78,5 @@
  "sourceLangs": [
   "ja"
  ],
- "rev": 5
+ "rev": 6
 }
