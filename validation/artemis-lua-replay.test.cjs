@@ -54,16 +54,17 @@ io.write('PASS actual Lua functions, unchanged 7 print calls, 6 semantic inputs,
 `;
 const games=[
  {dir:'H:/MeguLit-Work/samples/amakano3-trial',exe:'Amakano3_tr.exe',pfs:'Amakano3_tr.pfs',id:'amakano3-trial-lua-input-v1'},
- {dir:'E:/Steam/steamapps/common/The Shell Part I',exe:'TheShell.exe',pfs:'TheShell.pfs',id:'the-shell1-lua-input-v1'}
+ {dir:'E:/Steam/steamapps/common/The Shell Part I',exe:'TheShell.exe',pfs:'TheShell.pfs',id:'the-shell1-lua-input-v1'},
+ {dir:'E:/Steam/steamapps/common/The Shell Part I',exe:'TheShell.exe',pfs:'TheShell.pfs',id:'the-shell1-ja-lua-input-v1',effective:true}
 ];
 for(const g of games)test(g.id+': exact source constructor and actual Lua methods preserve rendering-command inputs',{skip:(!LUA&&'Lua 5.1 interpreter unavailable')||(!fs.existsSync(path.join(g.dir,g.pfs))&&'known local PFS unavailable')},()=>{
  const file=path.join(g.dir,g.pfs),fd=fs.openSync(file,'r'),h=Buffer.alloc(7);try{assert.equal(fs.readSync(fd,h,0,7,0),7);}finally{fs.closeSync(fd);}
  assert.ok(h.readUInt32LE(3)<=1024*1024);
  assert.ok(fs.statSync(path.join(g.dir,g.exe)).size<=16*1024*1024);
- const exe=fs.readFileSync(path.join(g.dir,g.exe)),list=sc.pfsList(file),modules={};let bytes=0;
+ const exe=fs.readFileSync(path.join(g.dir,g.exe)),list=sc.pfsList(file),modules=g.effective?require('../core/artemis-session.cjs')._internal.effectiveModules(g.dir).modules:{};let bytes=0;
  for(const name of Object.keys(A.variants.find(v=>v.id===g.id).modules)){
   const e=list.files.find(e=>e.name.replace(/\\/g,'/')===name);assert.ok(e&&e.size<=65536);bytes+=e.size;assert.ok(bytes<=192*1024);
-  modules[name]=sc.pfsRead(file,e,list.key);
+  if(!g.effective)modules[name]=sc.pfsRead(file,e,list.key);
  }
  const prepared=A.prepare({enabled:true,exe,modules});assert.equal(prepared.state,'prepared');assert.equal(prepared.identity,g.id);assert.equal(prepared.provenance.exe,sha(exe));
  const text=Object.fromEntries(Object.entries(modules).map(([n,b])=>[n,b.toString('utf8')]));

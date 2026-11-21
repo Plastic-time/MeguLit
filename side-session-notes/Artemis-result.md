@@ -75,9 +75,9 @@ See `docs/artemis-lua-input.md` for the exact constructor, generation contract, 
 
 | Capability | This candidate |
 |---|---|
-| Text | Internal selected Lua row, two exact input sets, no production transport |
+| Text | Internal selected Lua row, three exact input sets; optional production PF8 shadow/file transport with opaque local-test grant |
 | Coordinates | Not implemented, configured extents and parent offsets are not glyph rectangles |
-| Name | Internal method input, no visible-glyph assertion, image/novel branch distinction retained |
+| Name | Internal method input and existing Reader speaker parser, no visible-glyph assertion, image/novel branch distinction retained |
 | Choice | Internal invocation and actual layer ID, normal/hover distinguished, no visibility or click ACK |
 | Button/menu | Not implemented, image buttons are not guessed from generic UI text |
 | Embed | Existing The Shell language-track layout only, nested-pass compatibility repaired, no new writeback |

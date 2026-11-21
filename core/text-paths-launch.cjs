@@ -15,8 +15,14 @@ const W=require('./text-paths-web.cjs'),U=require('./text-paths-unity.cjs');
 
 function unityPack(root){const dir=path.join(root,'runtime','unity-text');try{return require('node:fs').existsSync(path.join(dir,'MeguLitUnityText.dll'))?dir:null;}catch{return null;}}
 
-async function prepare({root,exe,profile={},enabled=false,shadowRoot=null,trace=()=>{}}){
- if(!enabled||!exe)return null;
+async function prepare({root,exe,profile={},enabled=false,shadowRoot=null,ownerTestGrant=null,trace=()=>{}}){
+ if(!exe)return null;
+ /* An opaque, locally validated test grant is independent of compositor/roles. The session rechecks both the
+    authority and the exact executable/effective Lua members before creating any private launch files. */
+ if(ownerTestGrant){const canary=new Canary(root,exe);canary.settle();if(canary.allowed('artemis')){
+  const a=await require('./artemis-session.cjs').prepare({root,exe,ownerTestGrant,shadowRoot,steamAppId:require('./steam-owned.cjs').launchAppid(exe,profile)||null,canary,trace});if(a)return a;
+ }}
+ if(!enabled)return null;
  const canary=new Canary(root,exe);const off=canary.settle();if(Object.keys(off||{}).length)trace('text-paths-canary',{off:Object.keys(off)});
  const steam=require('./steam-owned.cjs').launchAppid(exe,profile)||null; /* E-SteamOwned */
  const steamEnv=steam?{SteamAppId:steam,SteamGameId:steam,SteamOverlayGameId:steam}:{};
@@ -38,6 +44,16 @@ async function prepare({root,exe,profile={},enabled=false,shadowRoot=null,trace=
 
 /* Connect a prepared session to the hook reader (core/hook-native.cjs): records in, replacement switch and lines out. */
 function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepared.session;
+ if(prepared.path==='artemis'){
+  const current=m=>hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&s.permission()&&s.owner&&m?.artemisOwner&&hook.target?.pid===s.owner.pid&&hook.target?.started===s.owner.started&&m.artemisOwner.pid===s.owner.pid&&m.artemisOwner.started===s.owner.started;
+  s.onSource=m=>{if(!current(m))return false;const before=hook.state?.hookSequence||0;hook.source(m,'Artemis Lua input');
+   return current(m)&&Number.isSafeInteger(hook.state?.hookSequence)&&hook.state.hookSequence>before&&hook.state.hookSourceOrigin==='artemis-lua-input'&&hook.state.hookSource===m.text.split('\x1d')[0];};
+  /* Semantic input metadata is deliberately not CHARS/UI rectangles or a current-pixel visibility acknowledgement. */
+  s.onSemantic=m=>{if(!current({artemisOwner:m.owner}))return;
+   if(m.role==='name'){const name=require('./hook-native.cjs').speakerName(m.text);hook.speaker=name?{text:name,at:hook.now()}:null;if(name)hook.noteSpeaker?.(name);return;}
+   hook.trace?.('artemis input role='+m.role+' variant='+(m.variant||'-')+' chars='+[...m.text].length);};
+  s.onStatus=st=>hook.trace?.('text path artemis: '+st);hook.attachTextPath?.(s);return;
+ }
  s.onSource=m=>{const {sameOwner}=require('./unity-kemco-source.cjs');
   const current=()=>prepared.path==='unity'&&hook.textPath===s&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&sameOwner(hook.target,m?.unityOwner);
   if(!current())return false;const before=hook.state?.hookSequence||0;hook.source(m,'KEMCO Message');

@@ -1,6 +1,7 @@
 # Artemis Lua input candidate
 
-This candidate has no production loader or transport
+The Buffer-only observer is now joined by an optional production PF8 shadow loader and bounded file transport
+That path requires the separate local `owner-tests` authority module and root's isolated-app wiring; without that module/token it stays off
 It does not complete Artemis glyph coordinates, Reader placement, hiding or translation rendering
 No game seed or engine default enables it
 
@@ -13,8 +14,10 @@ Only literal boolean `enabled: true` prepares anything
 An unknown EXE, modified module, missing module or accessor-valued module returns unsupported
 Disabled preparation does not read the EXE or module fields
 
-Two exact input sets are declared in `variants`
-They are the local Amakano 3 trial and The Shell Part I original Lua versions, not all releases of either title
+Three exact input sets are declared in `variants`
+They are the local Amakano 3 trial, The Shell Part I original Lua, and its separately pinned existing MeguLit Japanese-text patch
+For the latter, the actual source differs only at message.lua 225/436/532 and select.lua 509/709: `get_language(true)` becomes `"ja"`, with the existing comment marker
+These do not identify all releases of either title
 The formal Amakano 3 EXE is deliberately not accepted with trial Lua
 The caller must resolve real archive override order before supplying effective module buffers
 This constructor proves supplied bytes, not that a running game loaded those bytes
@@ -23,7 +26,8 @@ Successful preparation returns a Lua 5.1 chunk and provenance hashes
 It writes no patch, game file, cache or control file
 Evaluating that chunk returns `install(env, control, sink)`
 Installation requires all six known methods to exist and the initial policy to be valid and enabled
-There is no automatic installation, global profile key, timer, filesystem I/O or network I/O
+This observer constructor itself has no automatic installation, global profile key, timer or external transport
+The optional session below supplies file I/O and lifecycle control separately
 
 `control()` must be a fast in-memory callback returning a table with own fields:
 
@@ -90,10 +94,66 @@ The existing actual The Shell bilingual-font/ruby replay remains a separate regr
 No native C++ source or DLL changed in this candidate, so no replacement DLL is supplied
 Lua 5.1 loads and executes the modules in the bounded CLI tests
 
-## Remaining integration gates
+## Production session and remaining gates
 
-1. A normal nonblocking way to install the verified Lua module in the actual process, with effective archive/module identity and explicit consent
-2. An owned process/session-bound transport with generation validation at consumption, bounded queues and confirmed shutdown
+`core/artemis-session.cjs.prepare({root, exe, ownerTestGrant, ...})` rejects a plain JSON grant
+It calls the separate `core/owner-tests.cjs.allowed` WeakMap authority, then independently validates actual EXE and effective Lua bytes
+No global default, `draw.roles`, verified Seed or calibration record enables this path
+`text-paths-launch.prepare` accepts the opaque `ownerTestGrant` parameter even when compositor mode is off
+The root integrator supplies that validated token from the public local-test authority; this branch does not create an authorization manifest
+
+The reader accepts one PF8 base plus at most 31 numbered patches in numeric order
+Index budget is 1 MiB each and 4 MiB aggregate, at most 20,000 entries per index, three selected members at most 64 KiB each
+Unknown directories, reparse points, duplicate case-folded entry paths, traversal, invalid ranges, unsupported PF6 and a full patch namespace fail closed
+Loose `system` overrides are rejected rather than silently ignored
+
+The launcher creates a unique `root/data/artemis-shadow/session-*` directory outside the source game
+It copies executable/DLL bytes (64 MiB aggregate), verifies the copied EXE hash again, and links only resource files
+It never junctions any directory or links/copies old saves or configuration
+`savedata` is a new empty directory; only flat known movie extensions are linked, at most 4096 total resource links
+This is a fresh isolated run, not continuation of the original progress
+The original installation must remain preserved, and root must use a separate game test copy
+The observed Lua `s.savepath` must equal this owned directory or literal relative `savedata` before any wrapper can install
+That is a runtime guard, not proof that all native game persistence has been isolated; actual save-path behavior is still unaccepted
+
+The last numbered private PF8 appends a lazy boot tail to all three verified modules
+That avoids assuming their include order and retries installation only on ordinary name/body/choice method calls
+Complete patched actual modules compile under Lua 5.1 in the regression
+The patch writer is the existing MeguLit PF8 writer; original archives are not rewritten
+The new shadow EXE must also pass `owner-tests.registerLaunch` before preparation can return
+
+`connect()` queries the real unique shadow EXE with existing `GalWindowBridge --process-status`, then binds the opaque token to actual PID and UTC .NET start ticks
+It never latches an earlier Reader target
+The existing native query is hidden and bounded by its 8-second timeout; no game/helper is launched by the tests
+Each active 500 ms poll revalidates this process generation and local grant before renewing the control file and consuming events
+This experimental path's query overhead has not been measured in a game
+
+Control is an atomic, complete line with random 128-bit session nonce, generation, renewal counter and explicit on/off
+Lua checks its actual `e:now()` heartbeat age (4 seconds maximum), save path and the complete control line on each observation
+It only writes a private JSONL file: at most 2 MiB total, 64 KiB per event, 256 KiB consumed per poll and 320 KiB partial-line buffering
+Node decodes streaming UTF-8, validates role/scalar/ruby limits, nonce and generation, and never publishes CHARS, hide, embed or pixel visibility evidence
+A brief Windows read/delete-sharing collision retains the last complete heartbeat for at most 3 seconds; it does not publish partial control
+After a delayed renewal a new generation retires older buffered input
+The installed status proves only wrapper installation and the save-path guard, not rendering or hidden text
+
+Only exact currently bound PID/start/session input can call the real HookNative source path
+Names use its existing speaker-name parser; choice normal/hover inputs remain semantic diagnostics without fake rectangles
+Private Symbol plus WeakMap authority is checked at source, deliverSource and emitSource; stale stopped/rebound input is rejected even in an existing delayed callback
+Unauthenticated use of the reserved origin is rejected, never treated as permission
+Artemis-tagged NVL/page input is deliberately rejected before it can enter queues that discard that authority
+Ordinary fallback and the existing Unity three-gate behavior remain separate
+
+`stop()` immediately revokes authority, increments generation and writes off, cancels its timer, and awaits initial/pending native queries
+It never terminates the game
+Off-write failure raises `READER_STOP_INCOMPLETE` and keeps a subsequent stop retry possible
+Off readback is not a native ACK: Lua wrappers become inert on their next control read, with the bounded heartbeat as crash fallback
+The existing crash canary is retained for this path
+Private input files remain local to the owned shadow and are not uploaded
+
+Remaining gates:
+
+1. Root's public `owner-tests` module and shared isolated-app wiring must be integrated and tested together with this candidate
+2. Actual engine boot/include order, coroutine/yield behavior, native persistence paths and shutdown must be checked in a complete isolated game copy
 3. Actual per-glyph layout or a fully verified layer transform, clipping and parent hierarchy, not a configured font rectangle or an ASCII classifier byte pattern
 4. Actual Reader placement, name/ruby, choices and menu behavior, followed by ten hidden/readable/translated lines and page cleanup
 
@@ -104,8 +164,9 @@ The old D3D11 black-frame route is not retried
 
 ## Five-minute owner checklist after a real deployment
 
-The new observer cannot currently be checked merely by launching MeguLit because it has no production loader
-Keep this checklist pending until the integration gates above have been met
+Use the isolated owner-test application with the explicit local `lua-input` grant and a complete separately deployed game copy
+An ordinary MeguLit launch or a server Seed does not enable the loader
+Keep this checklist pending until root has assembled and verified that exact deployment
 Use a complete known installation, not the EXE-only formal sample or the trial's intentionally omitted audio/video files
 
 1. Read ten ordinary Japanese lines, including a line with native ruby, and verify whole text, names and lookup locations
@@ -115,4 +176,4 @@ Use a complete known installation, not the EXE-only formal sample or the trial's
 5. Disable the feature and leave the reading window, checking original presentation and sound are restored
 
 Record actual program/build hashes and which installed version was tested
-Until then this branch is an input-observer proposal, not an engine-complete or live-passed claim
+Until then this branch is an input-source session candidate, not an engine-complete or live-passed claim

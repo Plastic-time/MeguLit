@@ -45,7 +45,7 @@ test('Artemis observer preparation is strictly opt-in and rejects unpinned execu
  assert.deepEqual(A.prepare({enabled:true,get exe(){throw Error('must not read');}}),{state:'unsupported',reason:'ARTEMIS_EXE'});
  assert.deepEqual(A.prepare({enabled:true,exe:Buffer.from('foreign')}),{state:'unsupported',reason:'ARTEMIS_EXE'});
  assert.equal(A.prepare({enabled:true,exe:Buffer.alloc(16*1024*1024+1)}).reason,'ARTEMIS_EXE');
- assert.equal(A.variants.length,2);assert.ok(A.variants.every(v=>Object.isFrozen(v)&&Object.isFrozen(v.modules)));
+ assert.equal(A.variants.length,3);assert.ok(A.variants.every(v=>Object.isFrozen(v)&&Object.isFrozen(v.modules)));
 });
 
 test('default false/invalid policy leaves the actual method identities unchanged',opt,()=>lua(String.raw`
