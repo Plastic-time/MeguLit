@@ -116,6 +116,19 @@ test('the public running-game guard canonicalizes a junction alias before compar
  try{assert.throws(()=>require('../core/japanese-restore.cjs').apply(alias),/GAME_RUNNING/);assert.throws(()=>require('../core/japanese-restore.cjs').restore(alias),/GAME_RUNNING/);}finally{cp.execFileSync=old;}
 });
 
+test('a dead transaction owner cannot start writing, and its journal lock can be recovered by undo',async t=>{
+ const f=fixture(t),scan=embedded.scan(f.dir),before=[hash(f.baseFile),hash(f.patchFile)];embedded.apply(f.dir,{scanToken:scan.scanToken,_io:quiet});
+ const child=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{windowsHide:true,stdio:'ignore'});
+ await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
+ const lock=path.join(f.dir,'.megulit-embedded-lock');fs.mkdirSync(lock);fs.writeFileSync(path.join(lock,'owner.json'),JSON.stringify({pid:child.pid,token:'fixture-owner'}));
+ try{assert.equal(embedded.lockState(f.dir),'live');}finally{child.kill();await new Promise(resolve=>child.once('close',resolve));}
+ assert.equal(embedded.lockState(f.dir),'stale');
+ const jobs=require('../services/embedded-japanese-jobs.cjs'),started=jobs.start('stale-owner',f.dir,{operation:'undo',requestId:'stale-owner-recovery'});await jobs._internal.jobs.get(started.jobId).closed;
+ const done=jobs.status('stale-owner',started.jobId);assert.equal(done.state,'done',done.error);assert.deepEqual(done.result.skipped,[]);assert.deepEqual([hash(f.baseFile),hash(f.patchFile)],before);assert.equal(fs.existsSync(lock),false);
+ const previous=process.env.MEGULIT_EMBEDDED_OWNER_PID;process.env.MEGULIT_EMBEDDED_OWNER_PID=String(child.pid);
+ try{assert.throws(()=>embedded.apply(f.dir,{scanToken:embedded.scan(f.dir).scanToken}),/EMBEDDED_OWNER_GONE/);assert.equal(embedded.manifest(f.dir),null);}finally{if(previous===undefined)delete process.env.MEGULIT_EMBEDDED_OWNER_PID;else process.env.MEGULIT_EMBEDDED_OWNER_PID=previous;}
+});
+
 test('retirement is bounded without forgetting sealed nonces or allowing a late start',t=>{
  const f=fixture(t),jobs=require('../services/embedded-japanese-jobs.cjs'),{requests,MAX_REQUESTS}=jobs._internal;
  const sealed=jobs.status('capacity',{requestId:'first-sealed-request',operation:'restore',retireIfMissing:true});

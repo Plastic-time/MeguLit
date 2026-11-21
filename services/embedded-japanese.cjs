@@ -5,9 +5,21 @@ const engine=require('./original-engines/utage-embedded.cjs');
 const ADAPTER='utage-embedded',BACKUP='.megulit-japanese',MAX_FILE=128<<20;
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const folder=dir=>path.join(dir,BACKUP),manifestFile=dir=>path.join(folder(dir),'manifest.json');
+const lockFolder=dir=>path.join(dir,'.megulit-embedded-lock');
 const key=text=>String(text||'').replace(/[\s　]+/g,'');
 function read(file,max=MAX_FILE){if(fs.statSync(file).size>max)throw Error('EMBEDDED_BYTE_BUDGET');return fs.readFileSync(file);}
 function atomic(file,bytes){const tmp=file+'.megulit-tmp';try{fs.writeFileSync(tmp,bytes);fs.renameSync(tmp,file);}catch(error){try{fs.rmSync(tmp,{force:true});}catch{}throw error;}}
+function lockState(dir){
+ const lock=lockFolder(dir);if(!fs.existsSync(lock))return 'none';
+ try{if(fs.lstatSync(lock).isSymbolicLink())return 'unknown';const owner=path.join(lock,'owner.json');if(fs.lstatSync(owner).isSymbolicLink())return 'unknown';const data=JSON.parse(read(owner,4096));if(!Number.isSafeInteger(data.pid)||data.pid<=0)return 'unknown';try{process.kill(data.pid,0);return 'live';}catch(error){return error.code==='ESRCH'?'stale':'unknown';}}catch{return 'unknown';}
+}
+function acquireLock(dir,recover=false){
+ const lock=lockFolder(dir),owner=path.join(lock,'owner.json');
+ if(recover&&lockState(dir)==='stale'){fs.rmSync(owner);fs.rmdirSync(lock);}
+ fs.mkdirSync(lock);const token=crypto.randomBytes(16).toString('hex');
+ try{fs.writeFileSync(owner,JSON.stringify({pid:process.pid,token}),{flag:'wx'});}catch(error){try{fs.rmdirSync(lock);}catch{}throw error;}
+ return ()=>{const current=JSON.parse(read(owner,4096));if(current.pid!==process.pid||current.token!==token)throw Error('EMBEDDED_LOCK_CHANGED');fs.rmSync(owner);fs.rmdirSync(lock);};
+}
 function manifest(dir){try{const m=JSON.parse(read(manifestFile(dir),1<<20));return m?.adapter===ADAPTER?m:null;}catch{return null;}}
 function target(dir,relative){
  if(typeof relative!=='string'||path.isAbsolute(relative))throw Error('EMBEDDED_MANIFEST_PATH');
@@ -37,7 +49,10 @@ function scan(dir,options={}){
  if(fs.existsSync(folder(dir)))return {state:'unsupported',adapter:ADAPTER,canRestore:false,scanToken:'',sources:[],coverage:{tables:0,rows:0,japaneseLines:0,localTranslations:0,missingTranslations:0},warnings:['EMBEDDED_CONFLICT']};
  try{return summary(engine.plan(dir,options));}catch(error){return {state:'unsupported',adapter:ADAPTER,canRestore:false,scanToken:'',sources:[],coverage:{tables:0,rows:0,japaneseLines:0,kanaLines:0,localTranslations:0,missingTranslations:0,voicedLines:0},warnings:[String(error.message||error)]};}
 }
-function io(){const j=require('../core/japanese-restore.cjs')._internal;return {running:j.gameRunning,atomic:j.writeAtomic};}
+function io(){
+ const j=require('../core/japanese-restore.cjs')._internal,check=()=>{const pid=Number(process.env.MEGULIT_EMBEDDED_OWNER_PID||0);if(pid>0)try{process.kill(pid,0);}catch{throw Error('EMBEDDED_OWNER_GONE');}};
+ return {running(dir){check();const result=j.gameRunning(dir);check();return result;},atomic:j.writeAtomic};
+}
 function apply(dir,{scanToken,progress=()=>{},_io=io()}={}){
  dir=path.resolve(dir);if(_io.running(dir))throw Error('GAME_RUNNING');
  const prior=manifest(dir);
@@ -46,7 +61,7 @@ function apply(dir,{scanToken,progress=()=>{},_io=io()}={}){
  const plan=engine.plan(dir,{progress});if(!scanToken||plan.token!==scanToken)throw Error('SCAN_STALE');
  if(!plan.writes.length)throw Error('NOTHING_TO_RESTORE');
  if(_io.running(dir))throw Error('GAME_RUNNING');
- const lock=path.join(dir,'.megulit-embedded-lock');fs.mkdirSync(lock);
+ const release=acquireLock(dir);
  const written=[];let saved=false;
  try{
   fs.mkdirSync(folder(dir));
@@ -80,11 +95,11 @@ function apply(dir,{scanToken,progress=()=>{},_io=io()}={}){
   else if(!saved)error.message='EMBEDDED_ROLLBACK_INCOMPLETE';
   if(!clean)error.rollbackIncomplete=true;
   throw error;
- }finally{fs.rmdirSync(lock);}
+ }finally{release();}
 }
 function undo(dir,{_io=io()}={}){
  dir=path.resolve(dir);if(_io.running(dir))throw Error('GAME_RUNNING');const m=manifest(dir);if(!m)throw Error('NOT_APPLIED');
- const lock=path.join(dir,'.megulit-embedded-lock');fs.mkdirSync(lock);const skipped=[];let restored=0;
+ const release=acquireLock(dir,true);const skipped=[];let restored=0;
  try{
   for(const entry of m.files){
    const file=target(dir,entry.file);if(!/^embedded-\d+\.bak$/.test(entry.backup))throw Error('EMBEDDED_MANIFEST_PATH');
@@ -96,7 +111,7 @@ function undo(dir,{_io=io()}={}){
   }
   if(!skipped.length)fs.rmSync(folder(dir),{recursive:true,force:true});
   return {restored,skipped};
- }finally{fs.rmdirSync(lock);}
+ }finally{release();}
 }
 function stamp(dir){
  const m=manifest(dir);if(!m)return '';
@@ -131,4 +146,4 @@ function provider(dir){
   return {status:'exact',method:shared?'same-text':translations.size===1?'unique':'position',indices:[at],translation:pair.chinese,rowId:pair.id,speaker:pair.speaker,source:'embedded-local'};
  }};
 }
-module.exports={scan,apply,undo,provider,stamp,manifest,ADAPTER,_internal:{atomic,valid,snapshotValid,target,summary,coverage,key}};
+module.exports={scan,apply,undo,provider,stamp,manifest,lockState,ADAPTER,_internal:{atomic,valid,snapshotValid,target,summary,coverage,key,acquireLock}};

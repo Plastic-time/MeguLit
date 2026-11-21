@@ -68,7 +68,7 @@ async function run(job,previous){
  try{
   for(const prior of previous)await cancel(prior.id,{jobId:prior.jobId});
   if(job.cancelled)return;
-  const child=fork(path.join(__dirname,'embedded-japanese-worker.cjs'),[],{execPath:process.execPath,execArgv:['--max-old-space-size=384'],stdio:['ignore','ignore','ignore','ipc'],windowsHide:true,env:{...process.env,MEGULIT_NO_PREWARM:'1'}});
+  const child=fork(path.join(__dirname,'embedded-japanese-worker.cjs'),[],{execPath:process.execPath,execArgv:['--max-old-space-size=384'],stdio:['ignore','ignore','ignore','ipc'],windowsHide:true,env:{...process.env,MEGULIT_NO_PREWARM:'1',MEGULIT_EMBEDDED_OWNER_PID:String(process.pid)}});
   job.child=child;job.state='running';job.progress={phase:'starting'};
   const timer=job.operation==='scan'?setTimeout(()=>{job.error='EMBEDDED_TIME_BUDGET';child.kill();},TIMEOUT_MS):null;timer?.unref?.();
   child.on('message',message=>{if(message.type==='progress')job.progress=message.value;else if(message.type==='result'){job.result=message.result;job.error=message.error;job.received=true;}});
@@ -95,7 +95,8 @@ function start(id,dir,{operation='scan',scanToken,requestId,onDone}={}){
  /* Register before cancellation waits or fork. A retired nonce cannot be revived
     by a late start on the same service connection. */
  requests.set(requestKey(id,requestId),job);jobs.set(job.jobId,job);
- if(legacyWrites.has(job.directory)||launches.has(job.directory)||locked(dir)||previous.some(prior=>prior.operation!=='scan'||operation!=='scan')){job.error='EMBEDDED_JOB_BUSY';finish(job);throw Error(job.error);}
+ const recoverable=operation==='undo'&&require('./embedded-japanese.cjs').lockState(dir)==='stale';
+ if(legacyWrites.has(job.directory)||launches.has(job.directory)||locked(dir)&&!recoverable||previous.some(prior=>prior.operation!=='scan'||operation!=='scan')){job.error='EMBEDDED_JOB_BUSY';finish(job);throw Error(job.error);}
  if(operation==='restore'&&recoveryPending(dir)){job.error='EMBEDDED_RECOVERY_REQUIRED';finish(job);throw Error(job.error);}
  void run(job,previous);return dto(job);
 }
