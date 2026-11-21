@@ -89,3 +89,5 @@ rem BGI trusted UTF16 control and reversible observation, real link-call/free de
 call "%~dp0run-bgi-permission.cmd" || exit /b 1
 rem YU-RIS trusted UTF16 control and reversible observation, real glyph-call detour.
 call "%~dp0run-yuris-permission.cmd" || exit /b 1
+rem Siglus trusted control, reversible Push/Clear/Frame observation and idle flush.
+call "%~dp0run-siglus-permission.cmd" || exit /b 1

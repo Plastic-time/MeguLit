@@ -36,7 +36,9 @@
 namespace SiglusDraw {
 static void *OrigPush = nullptr, *OrigClear = nullptr, *OrigFrame = nullptr;
 static SiglusDrawSig::Result Sig;
-static volatile LONG Armed = 0, Installed = 0;
+static volatile LONG Armed = 0, Installed = 0, Observing = 0;
+static bool Permitted=false,Blocked=false;
+static LONG Epoch=0;
 static CRITICAL_SECTION Lock;
 // moji layout (both builds): +0 type (0 = character), +4 code, +8 size, +0xc colour no., +0x18 x, +0x1c y
 struct Moji { int type, code, size, color, x, y; long rgb; };
@@ -53,6 +55,12 @@ static uintptr_t Drawn[32]; static int NDrawn = 0;
 // screen origin per text area (keyed by its glyph vector, like the run ids)
 struct Origin { uintptr_t vec; long ox, oy, cx, cy; int same; bool known, told; };
 static Origin Origins[32]; static int NOrigins = 0;
+static void ResetPending(){
+ RunVec=0;RunRole=RunSrc=-1;RunColor=0;RunRgb=-1;RunNo=0;
+ RunG.clear();RunRuby.clear();LastTick=0;InRuby=false;
+ NDrawn=NOrigins=0;memset(Drawn,0,sizeof Drawn);memset(Origins,0,sizeof Origins);
+}
+static void RevokeLocked(){Epoch++;Permitted=false;InterlockedExchange(&Observing,0);ResetPending();}
 static Origin *OriginOf(uintptr_t vec, bool make) {
   for (int i = 0; i < NOrigins; i++) if (Origins[i].vec == vec) return &Origins[i];
   if (!make) return nullptr;
@@ -70,22 +78,27 @@ static void Clean(std::string &t, size_t cap) {
   for (char &c : t) if (c == '\r' || c == '\n' || c == '\t') c = ' ';
 }
 static void Flush() {
-  if (RunG.empty()) return;
-  long x0 = RunG[0].x, y0 = RunG[0].y, x1 = x0, y1 = y0, size = 0; std::wstring w;
-  for (auto &g : RunG) {
-    if (g.x < x0) x0 = g.x; if (g.y < y0) y0 = g.y;
-    if (g.x + g.size > x1) x1 = g.x + g.size; if (g.y + g.size > y1) y1 = g.y + g.size;
-    if (g.size > size) size = g.size; w.push_back(g.c);
+  if(!Observing){ResetPending();return;}
+  if(RunG.empty())return;
+  LONG epoch=Epoch;int role=RunRole,src=RunSrc,color=RunColor;uintptr_t vec=RunVec;unsigned number=RunNo;size_t count=RunG.size();
+  if(role<0||role>R_SYSTEM||src<0||src>=SiglusDrawSig::P_COUNT){ResetPending();return;}
+  long x0=RunG[0].x,y0=RunG[0].y,x1=x0,y1=y0,size=0;std::wstring w;
+  for(auto &g:RunG){
+    if(g.x<x0)x0=g.x;if(g.y<y0)y0=g.y;
+    if(g.x+g.size>x1)x1=g.x+g.size;if(g.y+g.size>y1)y1=g.y+g.size;
+    if(g.size>size)size=g.size;w.push_back(g.c);
   }
-  std::string t = Utf8(w.data(), (int)w.size()); Clean(t, 120);
-  std::string ruby = RunRuby; Clean(ruby, 90);
-  char extra[64] = ""; Origin *o = OriginOf(RunVec, false);
-  if (RunRgb >= 0) sprintf_s(extra, " rgb=%06lx", RunRgb & 0xffffff);
-  if (o && o->known) { size_t n = strlen(extra); sprintf_s(extra + n, sizeof extra - n, " ox=%ld oy=%ld", o->ox, o->oy); }
+  std::string ruby=RunRuby;Clean(ruby,90);
+  char extra[64]="";Origin *o=OriginOf(vec,false);
+  if(RunRgb>=0)sprintf_s(extra," rgb=%06lx",RunRgb&0xffffff);
+  if(o&&o->known){size_t n=strlen(extra);sprintf_s(extra+n,sizeof extra-n," ox=%ld oy=%ld",o->ox,o->oy);}
+  std::string t=Utf8(w.data(),(int)w.size());Clean(t,120);
+  if(!Observing||epoch!=Epoch)return;
   Msg::Log("ToMe_DRAWRUN engine=siglus run=%u role=%s id=%s:%x n=%d x0=%ld y0=%ld x1=%ld y1=%ld size=%ld color=%d%s%s%s text=%s",
-           RunNo, RoleName[RunRole], SiglusDrawSig::PushName[RunSrc], (unsigned)RunVec, (int)RunG.size(),
-           x0, y0, x1, y1, size, RunColor, extra, ruby.empty() ? "" : " ruby=", ruby.c_str(), t.c_str());
-  RunG.clear(); RunRuby.clear();
+           number,RoleName[role],SiglusDrawSig::PushName[src],(unsigned)vec,(int)count,
+           x0,y0,x1,y1,size,color,extra,ruby.empty()?"":" ruby=",ruby.c_str(),t.c_str());
+  if(!Observing||epoch!=Epoch)return;
+  RunG.clear();RunRuby.clear();
 }
 static void MarkDrawn(uintptr_t msg) {
   for (int i = 0; i < NDrawn; i++) if (Drawn[i] == msg) return;
@@ -107,22 +120,24 @@ static RubyInfo ReadRuby(uintptr_t msg) {
   return r;
 }
 static void OnRubyStart(uintptr_t vec) {
-  if (vec != RunVec || RunG.empty()) return; // the base run was already reported: no ruby for it
-  RubyInfo r = ReadRuby(vec - (uintptr_t)Sig.vec); if (!r.ok) return;
-  long y = RunG.back().y; int start = -1, len = 0;
-  for (int i = 0; i < (int)RunG.size(); i++) {
-    long px = RunG[i].x - r.penAdd;
-    if (RunG[i].y == y && px >= r.startX && px < r.penX) { if (start < 0) start = i; len = i - start + 1; }
+  if(!Observing||vec!=RunVec||RunG.empty())return;
+  LONG epoch=Epoch;RubyInfo r=ReadRuby(vec-(uintptr_t)Sig.vec);if(!r.ok)return;
+  long y=RunG.back().y;int start=-1,len=0;
+  for(int i=0;i<(int)RunG.size();i++){
+    long px=RunG[i].x-r.penAdd;
+    if(RunG[i].y==y&&px>=r.startX&&px<r.penX){if(start<0)start=i;len=i-start+1;}
   }
-  if (start < 0) return;
-  char head[32]; sprintf_s(head, "%d:%d:", start, len);
-  if (!RunRuby.empty()) RunRuby += '|';
-  RunRuby += head; std::string t = Utf8(r.text, r.n); for (char &c : t) if (c == '|' || c == ' ') c = '_'; RunRuby += t;
+  if(start<0)return;
+  char head[32];sprintf_s(head,"%d:%d:",start,len);
+  std::string reading=Utf8(r.text,r.n);for(char &c:reading)if(c=='|'||c==' ')c='_';
+  if(!Observing||epoch!=Epoch)return;
+  if(!RunRuby.empty())RunRuby+='|';RunRuby+=head;RunRuby+=reading;
 }
-static void Handle(int src, int addSrc, uintptr_t vec, const Moji &m) {
-  EnterCriticalSection(&Lock);
+static void HandleUnsafe(int src, int addSrc, uintptr_t vec, const Moji &m) {
+  if(!Observing||src<0||src>=SiglusDrawSig::P_COUNT)return;
+  LONG epoch=Epoch;
   LastTick = GetTickCount();
-  if (src == SiglusDrawSig::P_RUBY) { if (!InRuby) { InRuby = true; OnRubyStart(vec); } LeaveCriticalSection(&Lock); return; }
+  if (src == SiglusDrawSig::P_RUBY) { if (!InRuby) { InRuby = true; OnRubyStart(vec); } return; }
   InRuby = false;
   int role = R_LINE;
   if (src == SiglusDrawSig::P_PRINT) role = addSrc == SiglusDrawSig::A_NAMEMSG ? R_NAME : addSrc == SiglusDrawSig::A_BACKLOG ? R_SYSTEM : R_LINE;
@@ -130,13 +145,12 @@ static void Handle(int src, int addSrc, uintptr_t vec, const Moji &m) {
   else if (src == SiglusDrawSig::P_MSGSEL || src == SiglusDrawSig::P_SELBTN) role = R_CHOICE;
   else role = R_SYSTEM;
   bool same = !RunG.empty() && vec == RunVec && role == RunRole && src == RunSrc && m.y == RunG.back().y && m.x >= RunG.back().x;
-  if (!same) { Flush(); RunNo = ++Run; RunVec = vec; RunRole = role; RunSrc = src; RunColor = m.color; RunRgb = m.rgb; }
+  if (!same) { Flush();if(!Observing||epoch!=Epoch)return;RunNo = ++Run; RunVec = vec; RunRole = role; RunSrc = src; RunColor = m.color; RunRgb = m.rgb; }
   Glyph g; g.x = m.x; g.y = m.y; g.size = m.size; g.c = m.type == 0 ? (wchar_t)m.code : (wchar_t)0xfffc; RunG.push_back(g);
   if (src == SiglusDrawSig::P_PRINT || src == SiglusDrawSig::P_NAME) MarkDrawn(vec - (uintptr_t)Sig.vec);
   if (RunG.size() > 400) Flush();
-  LeaveCriticalSection(&Lock);
 }
-static void __cdecl OnPush(DWORD ret, const unsigned char *moji, uintptr_t vec, const unsigned char *callerEbp) {
+static void OnPushUnsafe(DWORD ret, const unsigned char *moji, uintptr_t vec, const unsigned char *callerEbp) {
   Moji m{}; int src, addSrc = -1;
   __try {
     src = SiglusDrawSig::PushRole(Sig, ret);
@@ -149,26 +163,27 @@ static void __cdecl OnPush(DWORD ret, const unsigned char *moji, uintptr_t vec, 
       long n = (long)(e - b);
       if (b && n > 0) { long i = m.color < 0 ? 0 : m.color > n - 1 ? n - 1 : m.color; m.rgb = (long)(b[i] & 0xffffff); }
     }
-  } __except (EXCEPTION_EXECUTE_HANDLER) { return; }
-  Handle(src, addSrc, vec, m);
+  } __except (EXCEPTION_EXECUTE_HANDLER) { ResetPending();return; }
+  HandleUnsafe(src, addSrc, vec, m);
 }
-static void __cdecl OnClear(uintptr_t msg) {
-  EnterCriticalSection(&Lock);
-  bool news = false;
-  for (int i = 0; i < NDrawn; i++) if (Drawn[i] == msg) { news = true; Drawn[i] = Drawn[--NDrawn]; break; }
-  if (news) { if (RunVec - (uintptr_t)Sig.vec == msg) Flush(); InRuby = false; Msg::Log("ToMe_DRAWRUN engine=siglus clear id=%x", (unsigned)(msg + (uintptr_t)Sig.vec)); }
-  LeaveCriticalSection(&Lock);
+static void OnClearUnsafe(uintptr_t msg) {
+  LONG epoch=Epoch;bool news=false;
+  for(int i=0;i<NDrawn;i++)if(Drawn[i]==msg){news=true;Drawn[i]=Drawn[--NDrawn];break;}
+  if(news){
+    if(RunVec-(uintptr_t)Sig.vec==msg){Flush();if(!Observing||epoch!=Epoch)return;}
+    InRuby=false;Msg::Log("ToMe_DRAWRUN engine=siglus clear id=%x",(unsigned)(msg+(uintptr_t)Sig.vec));
+  }
 }
 // at msg::frame: ecx = the msg, the arguments on the caller's stack (entry esp + ebp displacement - 4)
-static void __cdecl OnFrame(uintptr_t msg, const unsigned char *esp) {
-  long ox, oy;
+static void OnFrameUnsafe(uintptr_t msg, const unsigned char *esp) {
+  LONG epoch=Epoch;long ox, oy;
   __try {
     const unsigned char *param = *(const unsigned char *const *)(esp + 4);
     ox = (long)*(const float *)(param + Sig.frameX) + *(const long *)(esp + Sig.frameArgX - 4);
     oy = (long)*(const float *)(param + Sig.frameY) + *(const long *)(esp + Sig.frameArgY - 4);
-  } __except (EXCEPTION_EXECUTE_HANDLER) { return; }
+  } __except (EXCEPTION_EXECUTE_HANDLER) { ResetPending();return; }
   uintptr_t vec = msg + (uintptr_t)Sig.vec;
-  EnterCriticalSection(&Lock);
+  if(!Observing||epoch!=Epoch)return;
   Origin *o = OriginOf(vec, true);
   if (ox == o->cx && oy == o->cy) o->same++; else { o->cx = ox; o->cy = oy; o->same = 1; }
   // settled (3 frames) and new: a window opening slides, its last place is the one that counts
@@ -176,46 +191,87 @@ static void __cdecl OnFrame(uintptr_t msg, const unsigned char *esp) {
     o->ox = ox; o->oy = oy; o->known = true; o->told = true;
     Msg::Log("ToMe_DRAWRUN engine=siglus origin id=%x ox=%ld oy=%ld", (unsigned)vec, ox, oy);
   }
-  LeaveCriticalSection(&Lock);
 }
+static int ObservationException(DWORD code){return code==0xe06d7363?EXCEPTION_CONTINUE_SEARCH:EXCEPTION_EXECUTE_HANDLER;}
+static void PushSafe(DWORD ret,const unsigned char *moji,uintptr_t vec,const unsigned char *ebp){__try{OnPushUnsafe(ret,moji,vec,ebp);}__except(ObservationException(GetExceptionCode())){ResetPending();}}
+static void ClearSafe(uintptr_t msg){__try{OnClearUnsafe(msg);}__except(ObservationException(GetExceptionCode())){ResetPending();}}
+static void FrameSafe(uintptr_t msg,const unsigned char *esp){__try{OnFrameUnsafe(msg,esp);}__except(ObservationException(GetExceptionCode())){ResetPending();}}
+static void __cdecl OnPush(DWORD ret,const unsigned char *moji,uintptr_t vec,const unsigned char *ebp){
+ EnterCriticalSection(&Lock);try{if(Observing)PushSafe(ret,moji,vec,ebp);}catch(...){ResetPending();}LeaveCriticalSection(&Lock);
+}
+static void __cdecl OnClear(uintptr_t msg){
+ EnterCriticalSection(&Lock);try{if(Observing)ClearSafe(msg);}catch(...){ResetPending();}LeaveCriticalSection(&Lock);
+}
+static void __cdecl OnFrame(uintptr_t msg,const unsigned char *esp){
+ EnterCriticalSection(&Lock);try{if(Observing)FrameSafe(msg,esp);}catch(...){ResetPending();}LeaveCriticalSection(&Lock);
+}
+static void Handle(int src,int add,uintptr_t vec,const Moji &m){
+ EnterCriticalSection(&Lock);try{if(Observing)HandleUnsafe(src,add,vec,m);}catch(...){ResetPending();}LeaveCriticalSection(&Lock);
+}
+static const DWORD ObserverMxcsr=0x1f80;
 static __declspec(naked) void FrameGate() {
   __asm {
     pushfd
     pushad
-    lea eax, [esp + 36]          // the entry esp: [esp] = return address, the arguments above it
+    mov ebx,esp
+    sub esp,527
+    and esp,0xfffffff0
+    fxsave [esp]
+    fninit
+    ldmxcsr ObserverMxcsr
+    cld
+    lea eax,[ebx+36]
     push eax
-    push dword ptr [esp + 28]    // saved ECX (+24, moved by one push): the msg
+    push dword ptr [ebx+24]
     call OnFrame
-    add esp, 8
+    add esp,8
+    fxrstor [esp]
+    mov esp,ebx
     popad
     popfd
     jmp dword ptr [OrigFrame]
   }
 }
-// at the push: [esp] = return address, [esp+4] = the moji, ecx = the vector, ebp = the caller's frame
 static __declspec(naked) void PushGate() {
   __asm {
     pushfd
     pushad
-    push dword ptr [esp + 8]     // saved EBP: the caller's frame
-    push dword ptr [esp + 28]    // saved ECX (+24, moved by one push): the vector
-    push dword ptr [esp + 48]    // the moji argument (+40, moved by two pushes)
-    push dword ptr [esp + 48]    // the return address (+36, moved by three pushes)
+    mov ebx,esp
+    sub esp,527
+    and esp,0xfffffff0
+    fxsave [esp]
+    fninit
+    ldmxcsr ObserverMxcsr
+    cld
+    push dword ptr [ebx+8]
+    push dword ptr [ebx+24]
+    push dword ptr [ebx+40]
+    push dword ptr [ebx+36]
     call OnPush
-    add esp, 16
+    add esp,16
+    fxrstor [esp]
+    mov esp,ebx
     popad
     popfd
     jmp dword ptr [OrigPush]
   }
 }
-// at msg::clear: ecx = the msg
 static __declspec(naked) void ClearGate() {
   __asm {
     pushfd
     pushad
-    push dword ptr [esp + 24]    // saved ECX
+    mov ebx,esp
+    sub esp,527
+    and esp,0xfffffff0
+    fxsave [esp]
+    fninit
+    ldmxcsr ObserverMxcsr
+    cld
+    push dword ptr [ebx+24]
     call OnClear
-    add esp, 4
+    add esp,4
+    fxrstor [esp]
+    mov esp,ebx
     popad
     popfd
     jmp dword ptr [OrigClear]
@@ -234,31 +290,72 @@ static bool FindInImage(uintptr_t base) {
   return true;
 }
 // a run nobody continued for 150 ms is complete (Siglus lays out a whole print at once)
-static void FlushIdle() { EnterCriticalSection(&Lock); if (!RunG.empty() && GetTickCount() - LastTick > 150) Flush(); LeaveCriticalSection(&Lock); }
-static void Install() {
-  if (InterlockedExchange(&Installed, 1)) return;
-  if (MH_CreateHook((void *)(uintptr_t)Sig.push, (void *)PushGate, &OrigPush) != MH_OK || MH_CreateHook((void *)(uintptr_t)Sig.clear, (void *)ClearGate, &OrigClear) != MH_OK ||
-      MH_EnableHook((void *)(uintptr_t)Sig.push) != MH_OK || MH_EnableHook((void *)(uintptr_t)Sig.clear) != MH_OK) {
-    Msg::Log("ToMe_DRAWRUN engine=siglus off: hook failed at push %x clear %x", Sig.push, Sig.clear); return;
+static void IdleSafe(){__try{if(!RunG.empty()&&GetTickCount()-LastTick>150)Flush();}__except(ObservationException(GetExceptionCode())){ResetPending();}}
+static void FlushIdle(){EnterCriticalSection(&Lock);try{if(Observing)IdleSafe();}catch(...){ResetPending();}LeaveCriticalSection(&Lock);}
+static bool Install() {
+  if(Installed)return true;if(Blocked)return false;
+  if(MH_CreateHook((void *)(uintptr_t)Sig.push,(void *)PushGate,&OrigPush)!=MH_OK||
+     MH_CreateHook((void *)(uintptr_t)Sig.clear,(void *)ClearGate,&OrigClear)!=MH_OK||
+     MH_EnableHook((void *)(uintptr_t)Sig.push)!=MH_OK||MH_EnableHook((void *)(uintptr_t)Sig.clear)!=MH_OK){
+    // Any enabled gate remains pass-through; keep its trampoline and block uncertain retries.
+    Blocked=true;Msg::Log("ToMe_DRAWRUN engine=siglus off: hook failed at push %x clear %x",Sig.push,Sig.clear);return false;
   }
-  bool frame = Sig.frame && MH_CreateHook((void *)(uintptr_t)Sig.frame, (void *)FrameGate, &OrigFrame) == MH_OK && MH_EnableHook((void *)(uintptr_t)Sig.frame) == MH_OK;
-  Msg::Log("ToMe_DRAWRUN engine=siglus on: push %x add_msg %x clear %x frame %x colors %x vec=%x sites=%d adds=%d", Sig.push, Sig.addMsg, Sig.clear, frame ? Sig.frame : 0, Sig.colors, Sig.vec, Sig.nSites, Sig.nAdds);
+  bool frame=Sig.frame&&MH_CreateHook((void *)(uintptr_t)Sig.frame,(void *)FrameGate,&OrigFrame)==MH_OK&&MH_EnableHook((void *)(uintptr_t)Sig.frame)==MH_OK;
+  InterlockedExchange(&Installed,1);
+  Msg::Log("ToMe_DRAWRUN engine=siglus on: push %x add_msg %x clear %x frame %x colors %x vec=%x sites=%d adds=%d",Sig.push,Sig.addMsg,Sig.clear,frame?Sig.frame:0,Sig.colors,Sig.vec,Sig.nSites,Sig.nAdds);
+  return true;
 }
-static bool RolesAsked() {
-  wchar_t tmp[MAX_PATH]; DWORD n = GetTempPathW(MAX_PATH, tmp); if (!n || n >= MAX_PATH) return false;
-  wchar_t path[MAX_PATH + 64]; swprintf_s(path, L"%sMeguLit\\draw\\%lu.txt", tmp, GetCurrentProcessId());
-  HANDLE h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
-  if (h == INVALID_HANDLE_VALUE) return false;
-  char buf[256] = {}; DWORD got = 0; ReadFile(h, buf, sizeof(buf) - 2, &got, nullptr); CloseHandle(h);
-  // UTF-16LE or UTF-8: "#cfg roles=1" (zero bytes skipped)
-  static const char want[] = "roles=1"; size_t k = 0;
-  for (DWORD i = 0; i < got; i++) { if (!buf[i]) continue; k = buf[i] == want[k] ? k + 1 : (buf[i] == want[0] ? 1 : 0); if (!want[k]) return true; }
-  return false;
+static bool RolesFromControl(const unsigned char *bytes,size_t length){
+ char line[256];size_t used=0,pos=0;bool wide=false,complete=false;
+ if(length>=2&&bytes[0]==0xff&&bytes[1]==0xfe){wide=true;pos=2;}
+ else if(length>=2&&bytes[0]=='#'&&!bytes[1])wide=true;
+ else if(length>=3&&bytes[0]==0xef&&bytes[1]==0xbb&&bytes[2]==0xbf)pos=3;
+ while(pos<length&&used<sizeof(line)-1){
+  if(wide&&(pos+1>=length||bytes[pos+1]))return false;
+  unsigned char c=bytes[pos];pos+=wide?2:1;
+  if(c=='\r'){
+   if(pos>=length||bytes[pos]!='\n'||(wide&&(pos+1>=length||bytes[pos+1])))return false;
+   complete=true;break;
+  }
+  if(c=='\n'){complete=true;break;}
+  if(c!='\t'&&(c<32||c>126))return false;
+  line[used++]=(char)c;
+ }
+ if(!complete||used<5||std::memcmp(line,"#cfg",4)||(line[4]!=' '&&line[4]!='\t'))return false;
+ bool found=false,enabled=false;
+ for(size_t i=4;i<used;){
+  while(i<used&&(line[i]==' '||line[i]=='\t'))i++;
+  size_t start=i;while(i<used&&line[i]!=' '&&line[i]!='\t')i++;
+  size_t size=i-start;
+  if(size==5&&!std::memcmp(line+start,"roles",5))return false;
+  if(size>=6&&!std::memcmp(line+start,"roles=",6)){
+   if(found)return false;found=true;enabled=size==7&&line[start+6]=='1';
+  }
+ }
+ return found&&enabled;
 }
-static DWORD WINAPI Watch(void *) {
-  for (int i = 0; i < 1800 && !Installed; i++) { if (RolesAsked()) Install(); if (!Installed) Sleep(2000); }
-  while (Installed) { Sleep(50); FlushIdle(); }
-  return 0;
+static bool LoadControl(){
+ wchar_t tmp[MAX_PATH],file[MAX_PATH+64];DWORD n=GetTempPathW(MAX_PATH,tmp);if(!n||n>=MAX_PATH)return false;
+ swprintf_s(file,L"%sMeguLit\\draw\\%lu.txt",tmp,GetCurrentProcessId());HANDLE h=CreateFileW(file,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,0,nullptr);if(h==INVALID_HANDLE_VALUE)return false;
+ unsigned char bytes[512];DWORD got=0;BOOL ok=ReadFile(h,bytes,sizeof bytes,&got,nullptr);CloseHandle(h);
+ return ok&&RolesFromControl(bytes,got);
+}
+static bool RolesAsked(){
+ EnterCriticalSection(&Lock);bool allowed=false;
+ try{allowed=LoadControl();if(!allowed)RevokeLocked();else{if(!Permitted){Epoch++;ResetPending();}Permitted=true;}}catch(...){RevokeLocked();}
+ LeaveCriticalSection(&Lock);return allowed;
+}
+static void RefreshControl(){
+ try{if(RolesAsked()&&Install()){EnterCriticalSection(&Lock);if(Permitted)InterlockedExchange(&Observing,1);LeaveCriticalSection(&Lock);}}
+ catch(...){EnterCriticalSection(&Lock);RevokeLocked();LeaveCriticalSection(&Lock);}
+}
+static DWORD WINAPI Watch(void *stop){
+ DWORD last=GetTickCount()-2000;
+ for(;;){
+  DWORD now=GetTickCount();if(now-last>=2000){RefreshControl();last=now;}
+  if(Observing)FlushIdle();
+  DWORD delay=Observing?50:2000;if(stop){if(WaitForSingleObject((HANDLE)stop,delay)==WAIT_OBJECT_0)return 0;}else Sleep(delay);
+ }
 }
 // called from Siglus::attach_function; never fails the engine
 static void Arm(uintptr_t imageBase) {
