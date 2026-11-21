@@ -168,6 +168,30 @@
 4. 开新游戏推 5 句：对话框里日文（带游戏自己的注音）在上，官方中文在正下方，小一号；中文不缺字
 5. 长句看中文有没有超出对话框底部；超了把截图发来（字号 / 位置以后进版本层差分调）
 
+### CatSystem2（ISLAND 已做，按引擎特征码，2026-11-21）
+- 静态结论（只读 `ISLAND.exe`，SHA-256 474cc11d…05f1；`ISLAND_CHS.exe` 是同一份代码、同一地址，只是汉化补丁，不算第二个版本）。本机只有这一部 CatSystem2，别的版本没有实物：下面「其他版本」都是**猜测**，要店主拿别的 CS2 游戏的 exe 跑一次静态测试（`MEGULIT_CS2_EXES`）或者实机日志才算数
+- 画字结构：每个字先排成一条「字记录」（ISLAND：步长 0x50，+4 SJIS 字码、+8 填色 RGB、+0xc 描边 RGB、+0x10 x、+0x14 y、+0x1c 字号、+0x34 字形缓存对），再由「逐字合成」把一条记录画到字串表面的原点上，合成里调字体对象的虚函数 1（`kcFontImage_Win` / `_FT`）取字形
+  - origin 形（消息窗，`kcTaskStringPlaneNv` 等的更新 → 0x545980）：`x = rec.x + 字形偏移 + ox`，钩子点 0x545aa2
+  - direct 形（`kcTaskStringPlane2` 的框，0x543b90，旧钩子说的「语音居中行」直接画那条路）：`x = rec.x + 字形偏移`，原点 0，钩子点 0x543d06
+- 签名（`tools/engine-sigs/cs2-draw.cjs` / `native/megulithook/CS2DrawSig.h`，同一算法）：认 `mov eax,[rec+X]; add eax,[esp+bx]; (add eax,[esp+ox];) mov [..],eax; mov eax,[rec+X+4] ...`，前面 0x100 字节内要有 `push [rec+S]; movzx eax,word [rec+C]; push eax; … call [reg+4]`（取字形），颜色从再往前的三连 `movzx byte [rec+K+2/+1/+0]` 读出；字段偏移、记录寄存器、栈槽全从代码里读，不写死地址；被替换的 7 字节里不能有跳转落点。整个 ISLAND 代码段只命中这两处。顺带数两个 LunaHook 记录过跨版本稳定的锚点（剧本文字拷贝 `call; mov esi,buf; mov ecx,eax; sub esi,eax` 0x503aeb，见 LunaHook EmbedCS2 注释里的 Grisaia 1/3、果つることなき未来ヨリ；光栅化跳空格 `cmp r16,0x20 … mov r32,0x8140` 0x53e1fc）
+- 角色：钩子点往上扫栈，第一个 vtable 属于已知文字类（或其子类，走 MSVC RTTI 的类层次）的对象就是这段字的主人。ISLAND 里静态确认主人的 this 被下层函数 push 存在栈上（0x4fc2c0 → 0x545700 push edi；0x4fb470 → 0x544220 push edi）。类名是 CS2 框架的（kc*），跨版本应该不变（猜测，ISLAND 一部为证）：
+  - `kcTaskStringPlane` / `2` / `Nv` → line；其中「单行、≤12 字、没有句读」且不是上一句台词那块字串板的 → name（**猜测**：有的版本名字和台词可能在同一块板上）
+  - `kcFEScriptObjButton` / `kcTaskButton` → ≥6 字 choice，否则 button（**猜测**：选项走不走按钮类要看店主日志的 `cls=`）
+  - `kcFEScriptObjString` / `NvString` / `StrTable`、`kcFEScriptObjLogString`、`kcTaskMesList`（回想）→ system；找不到主人 → system、`cls=?`
+- 换页 / 清屏：同一个主人从（不晚于）它这页第一条记录重新排、而且文字变了 → `page`（启发式；窗口隐藏没有通用点，ISLAND 仍由精确适配器的 ToMe_DIALOG 报）
+- 注音：比这段最大字号小 30% 以上的字是假名注音，只计数 `rb=`，不进文字和框（游戏的注音读法随剧本文字已经拿到：ToMeIslandDraw RubyPairs / LunaHook EmbedCS2）
+- 运行时：`native/megulithook/CS2Draw.h`。`CatSystem::attach_function`（所有 CS2）和 `ToMeIslandDraw::Install`（ISLAND 精确适配器）末尾各 `CS2Draw::Arm` 一次（只装一次）；默认不挂，控制文件 `roles=1` 才装 MinHook，只读，不改游戏的画字。一段一条：
+  `ToMe_DRAWRUN engine=cs2 run= shape=origin|direct role= cls= owner= rec= n= rb= x0 y0 x1 y1 size= color=rrggbb text=`；`ToMe_DRAWRUN engine=cs2 page owner= cls=`；同一段重画只记一次。origin 形正好一处、direct 形最多一处才挂，否则 `off: N origin / M direct composers`
+- 坐标是字串表面像素（记录 x/y + 原点；x1/y1 = 最后一个字的笔位 + 字号），不是屏幕；表面在屏幕上的位置（ISLAND：主人 +0x44c/+0x450）每部游戏由探针 / diff-maker 配进版本层差分
+- 没做：一段的最后一个字要等下一段开始才记（和 YU-RIS 一样）；UTF-8 新版 CS2（LunaHook `CatSystem2new`，2019 年后的 cs2.exe）记录里的字码可能是 UTF-16，没有实物没法确认（猜测）；ISLAND 精确适配器（隐藏、换页、语音行）不动，泛化的这一层只上报
+
+#### 店主测试清单（CatSystem2）
+1. 在 The Seed 里给 ISLAND（或任何 CatSystem2 游戏）的游戏差分设 `"draw":{"roles":true}`，或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（内容 `#cfg roles=1`）
+2. 开游戏推 5 句（要有一句带名字、一句语音居中行）、出一次选项、开一次回想
+3. 看 `logs\hook-diagnostics.log`：有 `ToMe_DRAWRUN engine=cs2 on: origin …` 一行（ISLAND 还有一行 `on: direct …`），`classes=` 大于 0
+4. 每句有 `ToMe_DRAWRUN engine=cs2 run=… role=line cls=kcTaskStringPlane… text=<这句>`；名字那行 `role=name`；选项 `role=choice`（或 button）带选项文字；回想 `role=system`；翻页时有 `page`
+5. 游戏照常显示、不卡、不崩 = 过。没有 `on:` 而有 `off: …composers` = 这个版本签名没对上，把那行和 exe 发来；角色不对（比如名字报成 line、选项 cls=?）就把那几行 `run=` 发来，按 `cls=` 改映射
+
 ## 样板：YU-RIS（已做，其他原生引擎照这个写）
 
 | 部分 | 文件 | 写法 |

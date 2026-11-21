@@ -58,6 +58,9 @@ cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo
 rem engine-draw MAGES runtime (MagesDraw.h): real MinHook detours on a stand-in engine, the whole commit / clear / show / glyph chain
 cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 /I..\..\shared\minhook\include magesgate.cpp ..\..\shared\minhook\src\hook.c ..\..\shared\minhook\src\buffer.c ..\..\shared\minhook\src\trampoline.c ..\..\shared\minhook\src\hde\hde32.c /Fe:"%TEMP%\megulit-gdihide32\magesgate.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
 "%TEMP%\megulit-gdihide32\magesgate.exe"
+rem engine-draw CatSystem2 signature (CS2DrawSig.h) on bytes of the known build (ISLAND)
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 cs2draw.cpp /Fe:"%TEMP%\megulit-gdihide32\cs2draw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\cs2draw.exe"
  if errorlevel 1 exit /b 1
 rem one hook runtime (2026-11-19): the ISLAND, STEINS;GATE, euphoria HD adapters are part of MeguLitHook32
 for %%M in (ToMeCS2_DRAW ToMeSG_EMBED EmbedEuphoria474_DrawHide_TEST2) do (
