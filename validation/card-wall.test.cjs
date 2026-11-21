@@ -5,7 +5,8 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),zlib=require('node:zlib');
 const wall=require('../services/card-wall.cjs');
 /* pictures are not drawn in tests: copy the input and report a fixed size */
-wall._setRunner(jobs=>jobs.map(j=>{fs.mkdirSync(path.dirname(j.out),{recursive:true});fs.copyFileSync(j.in,j.out);return {ok:true,w:1280,h:720};}));
+const draw=jobs=>jobs.map(j=>{fs.mkdirSync(path.dirname(j.out),{recursive:true});fs.copyFileSync(j.in,j.out);return {ok:true,w:1280,h:720};});
+wall._setRunner(draw);
 /* the background decoder runs inline in tests */
 wall._setSpawnWarm((root,exe,names)=>wall.warm(root,exe,names));
 const PNG=Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da6364f8ffbf1e000502027fa1d5d9a40000000049454e44ae426082','hex');
@@ -55,6 +56,41 @@ test('create, insert, eject, delete, add Toploaders, mode',()=>{
  wall.handle(db,root,{action:'cards_insert',toploaderId:'t0',cardId:card.id});
  s=wall.handle(db,root,{action:'cards_delete',cardId:card.id});assert.equal(s.cards.length,0);assert.equal(s.toploaders[0].cardId,null);
  assert.equal(fs.readdirSync(path.join(root,'data','cards','img')).length,0);});
+
+for(const stage of ['full picture','wall state']){
+ test('failed card creation cleans up when writing the '+stage,t=>{
+  const {root,db}=setup();t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const create=()=>wall.handle(db,root,{action:'cards_create',gameId:'g1',srcId:'cover'});
+  const original=create(),dir=path.join(root,'data','cards'),img=path.join(dir,'img');
+  const before=fs.readdirSync(img).sort();
+  const method=stage==='wall state'?'renameSync':'copyFileSync',real=fs[method];
+  const fault=t.mock.method(fs,method,(source,dest,...args)=>{
+   if(dest.endsWith(stage==='wall state'?'cards.json':'-full.jpg'))throw Error('write failed');
+   return real(source,dest,...args);
+  });
+  assert.throws(create,/write failed/);
+  fault.mock.restore();
+  assert.deepEqual(wall.state(root).cards.map(c=>c.id),[original.id]);
+  assert.deepEqual(fs.readdirSync(img).sort(),before);
+  assert.deepEqual(fs.readdirSync(dir).filter(f=>f.endsWith('.tmp')||f==='.lock'),[]);
+  assert.notEqual(create().id,original.id);
+ });
+}
+
+test('an unsuccessful crop or thumbnail leaves no new card or picture',t=>{
+ const {root,db}=setup();t.after(()=>fs.rmSync(root,{recursive:true,force:true}));t.after(()=>wall._setRunner(draw));
+ for(const failed of [0,1]){
+  wall._setRunner(jobs=>{
+   const results=draw(jobs);
+   fs.renameSync(jobs[failed].out,jobs[failed].out+'.tmp');
+   results[failed].ok=false;
+   return results;
+  });
+  assert.throws(()=>wall.handle(db,root,{action:'cards_create',gameId:'g1',srcId:'cover'}),/CARD_IMAGE_FAILED/);
+  assert.deepEqual(wall.state(root).cards,[]);
+  assert.deepEqual(fs.readdirSync(path.join(root,'data','cards','img')),[]);
+ }
+});
 
 test('a damaged cards.json falls back to a clean wall; writes leave no temp files',()=>{
  const {root}=setup();fs.mkdirSync(path.join(root,'data','cards'),{recursive:true});fs.writeFileSync(path.join(root,'data','cards','cards.json'),'{oops');
