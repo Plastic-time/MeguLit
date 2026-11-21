@@ -82,11 +82,52 @@ function csvLines(text){const rows=text.split(/\r?\n/).filter(Boolean);if(rows.l
  return cells.slice(1).filter(r=>r[best]&&CJK.test(r[best])).map(r=>({text:r[best],speaker:sc>=0&&r[sc]&&speakerLike(r[sc])?r[sc]:''}));}
 function textLines(text){return text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>=2&&CJK.test(l)&&!/^(\/\/|#|;)/.test(l)&&!noise(l)).map(l=>({text:l,speaker:''}));}
 const clean=t=>t.replace(/<br\s*\/?>|\\n|\[n\]/gi,'\n').replace(/<\/?(?:color|size|b|i|ruby|rt|sprite)[^>]*>/gi,'').replace(/\[rb,([^,\]]*),[^\]]*\]/g,'$1').trim();
+// These TextAssets store one displayed message between MesSta and MesEnd, sometimes across several lines.
+function messageText(text, readings){
+ return clean(text.replace(/%rbs([^%{}\n]+?)\{([^%{}\n]+)\}%rbe|%rbs([^%()\n]+?)\(([^%()\n]+)\)%rbe/g,
+  (_,base,reading,altBase,altReading)=>{
+   if(readings)readings.push([base||altBase,reading||altReading]);
+   return base||altBase;
+  }).replace(/%dot\(([^()]*)\)/g,'$1').replace(/%co\d+|%coe|%hos|%hoe/g,''));
+}
+function messageBlocks(text){
+ const messages=[];
+ let speaker='',parts=null,complete=false,cjk=0,letters=0;
+ function flush(){
+  if(parts&&parts.length){
+   const readings=[],line=messageText(parts.join('\n'),readings);
+   if(CJK.test(line))cjk++;
+   if(/\p{L}/u.test(line))letters++;
+   messages.push({line,speaker,readings});
+   parts.length=0;
+  }
+ }
+ for(const raw of text.split(/\r?\n/)){
+  const line=raw.trim();
+  const name=/^#MesName\((.*)\)$/.exec(line);
+  if(name){flush();speaker=messageText(name[1]).replace(/@s/g,' ');}
+  else if(/^#MesSta\(.*\)$/.test(line)){flush();parts=[];}
+  else if(line==='#MesEnd()'&&parts){flush();complete=true;}
+  else if(parts&&line&&!/^(#|\/\/|;)/.test(line))parts.push(line);
+ }
+ flush();
+ if(!complete||!messages.length)return null;
+ const lines=[],speakers=[],ruby=[];
+ for(const msg of messages){
+  // Keep pauses such as 「……」 in CJK scripts. The same player can carry a separate English copy.
+  if(!CJK.test(msg.line)&&!(cjk>0&&cjk*2>=letters&&/^[\p{P}\p{S}\s]+$/u.test(msg.line)))continue;
+  lines.push(msg.line);speakers.push(msg.speaker);ruby.push(msg.readings.length?msg.readings:null);
+ }
+ const result={lines,anchors:[],speakers};
+ if(ruby.some(Boolean))result.ruby=ruby;
+ return result;
+}
 function parse(buf){
  let text=buf.toString('utf8');if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
  let rows=null;
  if(text.startsWith('\u0001MONO\n'))rows=text.slice(6).split('\n').map(t=>({text:t,speaker:''}));
  else{const t=text.trimStart();if(t[0]==='['||t[0]==='{'){try{rows=[];jsonLines(JSON.parse(t),rows);}catch{rows=null;}}
+  if(!rows&&text.includes('#MesSta(')){const messages=messageBlocks(text);if(messages)return messages;}
   if(!rows||!rows.length)rows=csvLines(text);if(!rows||!rows.length)rows=textLines(text);}
  const lines=[],speakers=[];const seen=new Set();
  for(const r of rows||[]){const t=clean(r.text);if(!t||!CJK.test(t))continue;const sp=(r.speaker||'').replace(/^\d+_(?:[A-Za-z ]+_)?/,'');lines.push(sp?sp+'：'+t:t);speakers.push(sp);}
