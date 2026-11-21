@@ -30,15 +30,15 @@ const cnParse=q=>{const D="零壹贰叁肆伍陆柒捌玖",U={"拾":10,"佰":100
 const COPY={
  zh:{title:'传火碑',sub:'分享过校准结果的玩家，名字都刻在这里',count:n=>'已刻 '+n+' 人',monthCount:(m,n)=>m+' · '+n+' 人',range:(a,b)=>'第 '+a+'–'+b+' 位',all:'全部',
   anon:n=>'传火人'+cnNo(n),empty:'还没有人刻下名字',find:'找名字',findGo:'查找',me:'我的名字',meNone:'这台电脑还没有传过火',quality:{high:'画质 标准',low:'画质 省电'},
-  close:'关闭',prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',loading:'正在读取…',preparing:'正在准备殿堂…',nth:n=>n===0?'创始':'第 '+n+' 位',more:'只显示前 50 个',
+  close:'关闭',prev:'往前',next:'往后',none:'没找到这个名字',offline:'暂时连不上服务器，过一会儿再打开看看',loading:'正在读取…',preparing:'正在准备殿堂…',nth:n=>n===0?'#0':'第 '+n+' 位',more:'只显示前 50 个',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')},
  en:{title:'Monument',sub:'Everyone who shared a calibration is carved here',count:n=>n+' names',monthCount:(m,n)=>m+' · '+n,range:(a,b)=>'#'+a+'–'+b,all:'All',
   anon:n=>'Torch bearer #'+n,empty:'No names carved yet',find:'Find a name',findGo:'Find',me:'My name',meNone:'This PC has not shared yet',quality:{high:'Quality: full',low:'Quality: light'},
-  close:'Close',prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',loading:'Loading…',preparing:'Preparing the hall…',nth:n=>n===0?'Founder':'#'+n,more:'First 50 only',
+  close:'Close',prev:'Back',next:'On',none:'No such name',offline:'Cannot reach the server right now. Try again later.',loading:'Loading…',preparing:'Preparing the hall…',nth:n=>'#'+n,more:'First 50 only',
   ym:m=>m},
  ja:{title:'継火の碑',sub:'キャリブレーションを共有した人の名前が刻まれています',count:n=>n+' 名',monthCount:(m,n)=>m+' · '+n+' 名',range:(a,b)=>a+'–'+b+' 番目',all:'すべて',
   anon:n=>'火を継ぐ人 #'+n,empty:'まだ誰の名前も刻まれていません',find:'名前を探す',findGo:'探す',me:'自分の名前',meNone:'この PC からはまだ共有していません',quality:{high:'画質 標準',low:'画質 軽量'},
-  close:'閉じる',prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',loading:'読み込み中…',preparing:'聖堂を準備しています…',nth:n=>n===0?'創始':n+' 番目',more:'最初の 50 件のみ',
+  close:'閉じる',prev:'前へ',next:'次へ',none:'見つかりませんでした',offline:'サーバーに接続できません。しばらくしてからもう一度開いてください',loading:'読み込み中…',preparing:'聖堂を準備しています…',nth:n=>n===0?'#0':n+' 番目',more:'最初の 50 件のみ',
   ym:m=>m.replace(/^(\d{4})-(\d{2})$/,(x,y,mo)=>y+' 年 '+Number(mo)+' 月')}};
 const QUALITY_KEY='megulit-torch-quality';
 const FONT='"Torch Serif","Noto Serif SC","Source Han Serif SC","Noto Serif JP","Songti SC","SimSun","Yu Mincho",serif';
