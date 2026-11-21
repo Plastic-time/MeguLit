@@ -133,3 +133,9 @@ runner 不以 `exit` 代替 `close`。停止先请求 driver 通过 IPC 正常�
 评分规则 rev5 要求一个 offer 的全部 n 个选项在该 offer 撤回前可见、可点击；有原文记录时须逐项匹配，启用翻译时每项译文须可见且非空。probe 分开记录日文（不混 ruby）、译文、指针与翻译开关。缺少翻译观测字段标 unobserved，不作为可靠上传；它证明页面状态，不证明译文语义正确，也不代替实机查看选项译文。选项数非法或源元数据不完整保守失败；没有选项的会话仍不计这一项
 
 `validation/cardinal-choice.test.cjs` 的完整选项是明确标注的 synthetic UI/transport 单元夹具；旧真实失败会话没有选项证据，仍保留原分数和未验收状态
+
+评分规则 rev6 不再把缺少原文状态视为隐藏成功。成功观测只接受：非模型的有效 native 正文 hidden 记录（非空、正文 role、字形数/有限几何合法，summary 的 lines/visible 为有效整数），或至少四个不同 sequence 的有效隐藏视觉检查。重复检查、姓名/选项/UI/清空记录、坏计数与模型藏字不能充数；同一原生句后续任何 hidden=0 不被较早 hidden=1 掩盖
+
+已观察的 read、原文可见或停止隐藏仍是失败证据。其余情况标 `leakObservation.observed:false`、leak 保守为0，并禁止作为可靠分数上传；cover/compositor 路径若没有这些证据也只记未观测，尚不宣称其原文隐藏质量已验证。生产回放固定 `models:false`，driver 记录 models；模型输出不上传。CLI 老日志仍能保守评分，缺证据不会获得满分
+
+`validation/cardinal-hide-evidence.test.cjs` 的成功藏字记录与视觉检查均为明确的 synthetic 单元输入；真实坏会话总分仍0.357，删除失败证据后不可升分，不作为健康实机验收

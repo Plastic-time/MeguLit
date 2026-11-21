@@ -128,7 +128,7 @@ module.exports={
     sampleMs); minIntervalMin = at most one run per exe in that time (a session's end always runs); maxLagMs = a run whose steps started
     later than this (95th percentile: a busy PC, the game running) is kept on this PC only, never uploaded */
  cardinal:{
-  rev:5,lines:60,maxGapMs:1500,sampleMs:90,minIntervalMin:30,maxLagMs:80,
+  rev:6,lines:60,maxGapMs:1500,sampleMs:90,minIntervalMin:30,maxLagMs:80,
   /* the total = applicable-score weighted mean, capped by visible expected dialogue coverage */
   weights:{row:3,stable:1,clean:2,clear:1,choice:1,pair:1,leak:2},
   /* core/cardinal/checks.cjs T0: a line is settled settleMs after it became the reader's line, the row counts as shown in shownRate of

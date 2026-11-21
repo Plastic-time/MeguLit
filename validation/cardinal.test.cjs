@@ -12,7 +12,7 @@ const C=require('../core/cardinal/checks.cjs'),S=require('../core/cardinal/score
 const D=require('../core/profiles/defaults.cjs'),domains=require('../core/profiles/domains.cjs'),Profiles=require('../core/profiles/index.cjs');
 const tmp=()=>fs.mkdtempSync(path.join(process.env.MEGULIT_TMP||os.tmpdir(),'cardinal-'));
 const SHA='a'.repeat(64);
-/* a synthetic run: lines of text shown from `at` for `ms`, glyphs at y, Chinese under them, all inside one hit region */
+/* Explicit synthetic hide evidence is unit input, never a healthy live baseline. A synthetic run: lines of text shown from `at` for `ms`, glyphs at y, Chinese under them, all inside one hit region */
 function run({lines=[],extra=[],hbSent=[],hookEvents=[],offers=[],choicesShown=true,hidden,sourceSteps=null}={}){const steps=[],samples=[];let t=1000;
  lines.forEach((l,i)=>{steps.push({t,hb:{type:'hookSource',text:l.text},line:i+1,text:l.text});t+=2000;});
  lines.forEach((l,i)=>{for(let at=l.at;at<l.at+(l.ms||1500);at+=90){const y=typeof l.y==='function'?l.y(at-l.at):(l.y??700);
@@ -22,7 +22,7 @@ function run({lines=[],extra=[],hbSent=[],hookEvents=[],offers=[],choicesShown=t
   const s={at,mark:'tick',watch:true,body:'',hookSource:l.text,glyphs,cn:l.noCn?[]:[{text:'中文',rect:{x:100,y:y+40,w:300,h:30}}],choices:[],hitRegions:[{x:0,y:0,width:1920,height:1080}]};
   for(const o of offers)if(choicesShown&&at>=o.at&&at<o.at+3000)s.choices.push(...Array.from({length:o.n},(_,i)=>({sourceText:o.texts?.[i]||'選択'+i,text:'選択'+i,translation:'译文'+i,translationShown:true,translationRequired:true,pointer:'auto',shown:true,rect:{x:500,y:300+i*50,w:200,h:40}})));samples.push(s);}});
  const sourceEpisodes=[];for(const [step,st] of (sourceSteps||steps).entries())if(st.hb?.type==='hookSource')sourceEpisodes.push({step,line:st.line,text:st.hb.text,at:lines[sourceEpisodes.length].at});
- return {name:'r',steps,o:{t0:0,samples,sourceEpisodes,hbSent,hookEvents,choiceOffers:offers,hidden:hidden||{lines:0,visible:0},krkr:{choice:[]}}};}
+ return {name:'r',steps,o:{t0:0,samples,sourceEpisodes,hbSent,hookEvents,choiceOffers:offers,hidden:{source:'native-dialogue',modeled:false,...(hidden||{lines:3,visible:0})},krkr:{choice:[]}}};}
 const clean3=()=>[{text:'あいうえお',at:0},{text:'かきくけこ',at:2000},{text:'さしすせそ',at:4000}];
 
 test('a clean session scores 1 on every score that applies; nothing to look at leaves the total',()=>{

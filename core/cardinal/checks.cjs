@@ -150,14 +150,18 @@ function choices(run,t){t=opts(t);const name=run.name||'run',o=run.o,bad=[];let 
 /* the original showing through: the bridge's own hide check (hookVisual stage=hidden, read back by core/self-check.cjs), a dialogue
    record the game drew visible while core's hide was on (o.hidden), and every line after the hide was given up or read mode came on */
 function leaks(run,t,ls){t=opts(t);const name=run.name||'run',o=run.o,bad=[];ls=ls||lines(run,t);
- let checked=0,visible=0;try{const {parseTrace}=require('../self-check.cjs');for(const l of o.hookEvents||[]){const e=parseTrace(l);if(e&&e.kind==='hide'){checked++;if(e.visible)visible++;}}}catch{}
- const h=o.hidden||{lines:0,visible:0};const off=offSpans(run,t);
+ let checked=0,visible=0;const sequences=new Set();try{const {parseTrace}=require('../self-check.cjs');for(const l of o.hookEvents||[]){const e=parseTrace(l);let raw=null;try{const text=/\bvisual (\{.*\})\s*$/.exec(l)?.[1];if(text)raw=JSON.parse(text);}catch{}if(e&&e.kind==='hide'&&typeof raw?.matched==='boolean'&&Number.isFinite(e.at)&&Number.isSafeInteger(e.seq)&&e.seq>0&&!sequences.has(e.seq)){sequences.add(e.seq);checked++;if(e.visible)visible++;}}}catch{}
+ const h=o.hidden||{lines:0,visible:0},nativeObserved=require('./native-hide.cjs').validCounts(h);const off=offSpans(run,t);
  /* a line shown while the hide was off (disabled, given way) or the reader was in read mode: the original showed */
  const during=ls.filter(l=>{const a=l.samples[0].at,b=l.samples.at(-1).at;return off.some(s=>s.from<b&&s.to>a);});
- const rates=[checked>=4?visible/checked:0,h.lines?h.visible/h.lines:0,ls.length?during.length/ls.length:0];
- if(checked>=4&&visible)bad.push(name+' hide check read Japanese on '+visible+'/'+checked+' lines');if(h.visible)bad.push(name+' '+h.visible+'/'+h.lines+' dialogue records drawn visible while hidden');
+ const readObserved=(o.samples||[]).some(s=>s.readMode===true||s.hookProfile==='read');
+ const failed=visible>0||nativeObserved&&h.visible>0||during.length>0||readObserved||off.length>0;
+ const observed=failed||checked>=4||nativeObserved;
+ const rates=[checked&&visible?visible/checked:0,nativeObserved?h.visible/h.lines:0,ls.length?during.length/ls.length:0,readObserved||off.length&&!during.length?1:0];
+ if(visible)bad.push(name+' hide check read Japanese on '+visible+'/'+checked+' lines');if(nativeObserved&&h.visible)bad.push(name+' '+h.visible+'/'+h.lines+' dialogue records drawn visible while hidden');
  for(const l of during.slice(0,4))bad.push(name+' line '+l.line+' shown while the hide was off ('+(off.find(s=>s.from<l.samples.at(-1).at&&s.to>l.samples[0].at)?.why||'')+')');
- return {bad,rate:Math.min(1,Math.max(...rates)),checked,visible,records:h,during:during.length,off};}
+ if(!observed)bad.push(name+' original visibility unobserved: no valid native dialogue records or four distinct hide checks');
+ return {bad,rate:observed?Math.min(1,Math.max(...rates)):1,observed,checked,visible,records:h,nativeObserved,readObserved,during:during.length,off};}
 /* when the original could show, on the run's clock: from a disable / probeHide off / give way until core enables again, and from a switch
    to read mode until the switch away from it; a span still open runs to the end */
 /* the kernel's preflight (hide.preflight: the original shown once and checked before the hide, hook-events 'check baseline') is a

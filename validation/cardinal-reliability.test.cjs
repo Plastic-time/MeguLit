@@ -144,3 +144,13 @@ test('unknown option translation instrumentation cannot upload a reliable relay 
   const doc=Jobs.load(h.root,SHA);assert.equal(doc.unreliable,true);assert.equal(doc.detail.choiceObservation.reliable,false);assert.equal(doc.sent,false);assert.deepEqual(calls,[]);
  }finally{h.close();}
 });
+
+
+test('missing visibility observations and modeled hiding cannot upload success',async()=>{
+ const h=setup(true),calls=[];try{
+  for(const variant of ['unobserved','modeled']){
+   Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{assert.equal(sc.models,false,'automatic production scenarios never request a native hide model');const out=observed(sc);out.hookEvents=[];out.hbSent=[];for(const sample of out.samples){delete sample.readMode;delete sample.hookProfile;delete sample.hookHide;}out.hidden=variant==='modeled'?{source:'native-dialogue',modeled:true,lines:10,visible:0}:{lines:0,visible:0};out.models=variant==='modeled';return out;},fetcher:async u=>{calls.push(u);return {ok:true,status:200};}});await Jobs.idle();
+   const doc=Jobs.load(h.root,SHA);assert.equal(doc.unreliable,true);assert.equal(doc.detail.leakObservation.observed,false);assert.equal(doc.sent,false);assert.equal(doc.record.scores.leak,0);assert.deepEqual(calls,[]);
+  }
+ }finally{h.close();}
+});

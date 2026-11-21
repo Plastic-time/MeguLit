@@ -54,14 +54,13 @@ function fakeProc(name){const p=new EventEmitter();p.stdout=new PassThrough();p.
 const gwb=fakeProc('GalWindowBridge');let hookSpawned=0;
 /* HookBridge: a new process per start (core/hook-native.cjs start), the newest one gets the timeline's lines. Like the real bridge it
    says it is alive every second (hookHeartbeat). With models on it also follows core's hide switch (see the MODEL above) */
-const hbs=[];let hideOn=false;const hbAll={sent:[]};const hidden={lines:0,visible:0,seen:new Set()};
+const hbs=[];let hideOn=false;const hbAll={sent:[]};const hidden=require('../../core/cardinal/native-hide.cjs').collector({modeled:models});
 function newHook(){const p=fakeProc('HookBridge');p.stdin.on('data',()=>{for(const x of p.sent.splice(0)){hbAll.sent.push(x);if(x.m.type==='enable')hideOn=true;if(x.m.type==='disable')hideOn=false;}});
  p.beat=setInterval(()=>{if(p.exitCode===null)p.line({type:'hookHeartbeat',hookActive:true,processAttached:true,streamSelected:true,receivedText:true,replacementState:'callback-acknowledged'});},1000);p.beat.unref?.();
  p.kill=()=>{clearInterval(p.beat);p.exitCode=0;p.emit('exit',0);};p.stdin.on('finish',()=>{});hbs.push(p);return p;}
 const hb={line:o=>{const p=hbs.at(-1);if(!p||p.exitCode!==null)return;
   if(o.type==='hookChars'&&models&&scenario.adaptiveHidden!==false&&/ hidden=[01] /.test(o.line)&&!/ role=(?!line)/.test(o.line))o={...o,line:o.line.replace(/ hidden=[01] /,' hidden='+(hideOn?1:0)+' ')};
-  /* the original showing through: a dialogue record the game drew visible while core's hide was on (once per line) */
-  if(o.type==='hookChars'&&!/ role=(?!line)/.test(o.line)&&/ n=[1-9]/.test(o.line)){const id=/ line=(\d+)/.exec(o.line)?.[1];if(id&&!hidden.seen.has(id)&&hideOn){hidden.seen.add(id);hidden.lines++;if(/ hidden=0 /.test(o.line))hidden.visible++;}}
+  if(o.type==='hookChars')hidden.report(o.line,hideOn);
   p.line(o);},get sent(){return hbAll.sent;}};
 const events=[];const offers=[];let lastOffer='';
 const {Runtime}=require(path.join(REPO,'services','runtime.cjs'));
@@ -89,7 +88,7 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
  if(u.host==='ipc.localhost')return {status:200,body:'null',headers:{'content-type':'application/json','Tauri-Response':'ok'}};
  return 'abort';}
 (async()=>{
- const out={work,errors:[],console:[],samples:[],sourceEpisodes:[],marks:[],hookSpawned:0,gwbSent:[],hbSent:[],events:[],control:[],choiceOffers:[],hidden:{lines:0,visible:0},krkr:{clears:0,choice:[],cfg:null}};let krkr=null,lastLine=null,browser=null;
+ const out={work,models,errors:[],console:[],samples:[],sourceEpisodes:[],marks:[],hookSpawned:0,gwbSent:[],hbSent:[],events:[],control:[],choiceOffers:[],hidden:{lines:0,visible:0},krkr:{clears:0,choice:[],cfg:null}};let krkr=null,lastLine=null,browser=null;
  let disposal=null,stopRequested=false;
  const finish=()=>{if(disposal)return disposal;disposal=(async()=>{
   try{runtime.reader?.gal?.stop?.();}catch{}try{runtime.reader?.stop?.();}catch{}
@@ -153,7 +152,7 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
   out.hookSpawned=hookSpawned;out.gwbSent=gwb.sent.filter(x=>x.m.type!=='hitRegions').slice(-200).map(x=>x.m);out.hbSent=hb.sent.map(x=>({at:x.at-t0,...x.m})).filter(m=>m.type!=='source');
   out.events=events.map(e=>({at:e.at-t0,type:e.m.type,keys:Object.keys(e.m).slice(0,12)})).slice(-400);
   {const q=(a,p)=>{if(!a.length)return 0;const b=[...a].sort((x,y)=>x-y);return b[Math.min(b.length-1,Math.floor(b.length*p))];};out.lag={stepP95:q(late.steps,0.95),stepMax:q(late.steps,1),sampleP95:q(late.samples,0.95),sampleMax:q(late.samples,1)};}
-  out.choiceOffers=offers.map(c=>({at:c.at-t0,n:c.n,until:c.until==null?null:c.until-t0}));out.hidden={lines:hidden.lines,visible:hidden.visible};
+  out.choiceOffers=offers.map(c=>({at:c.at-t0,n:c.n,texts:c.texts,until:c.until==null?null:c.until-t0}));out.hidden=hidden.snapshot();
   out.hookEvents=[];for(const f of ['hook-events.log.previous','hook-events.log.1','hook-events.log']){const x=path.join(root,'logs',f);if(fs.existsSync(x))out.hookEvents.push(...fs.readFileSync(x,'utf8').split(/\r?\n/).filter(l=>l&&!/Z (chain|translation|choice aux|art text located) /.test(l)));}
   out.readerHost=fs.existsSync(path.join(root,'logs','reader-host.log'))?fs.readFileSync(path.join(root,'logs','reader-host.log'),'utf8').split('\n').filter(l=>!/"hostFrame"/.test(l)).slice(-200):[];
  }catch(e){out.errors.push('driver: '+String(e.stack||e).slice(0,800));if(e.cleanupFailure)out.cleanupFailure=e.cleanupFailure;}

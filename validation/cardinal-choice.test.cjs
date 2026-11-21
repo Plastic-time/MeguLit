@@ -6,7 +6,7 @@ function synthetic(){const texts=['扉を開ける','庭へ戻る','その場で
  const steps=['これは最初の本文です','これは次の本文です'].map((text,i)=>({line:i+1,text,t:1795253000000+i*2000,hb:{type:'hookSource',text}}));
  const samples=[];for(const [i,st]of steps.entries())for(let at=i*2000;at<=i*2000+1000;at+=100)samples.push({at,hookSource:st.text,body:'',glyphs:[{text:st.text,kind:'line',pointer:'auto',rect:{x:100,y:500,w:350,h:30}}],cn:[{text:'正文译文',rect:{x:100,y:550,w:350,h:30}}],choices:[],hitRegions:[{x:0,y:0,width:1000,height:1000}]});
  for(const at of [1300,1500,1700])samples.push({...structuredClone(samples[0]),at,choices:structuredClone(choices)});samples.sort((a,b)=>a.at-b.at);
- return {name:'synthetic-choice-transport',steps,o:{samples,sourceEpisodes:steps.map((st,step)=>({step,line:st.line,text:st.text,at:step*2000})),choiceOffers:[{at:1200,n:3,texts,until:1900}],hookEvents:[],hbSent:[],hidden:{lines:0,visible:0}}};}
+ return {name:'synthetic-choice-transport',steps,o:{samples,sourceEpisodes:steps.map((st,step)=>({step,line:st.line,text:st.text,at:step*2000})),choiceOffers:[{at:1200,n:3,texts,until:1900}],hookEvents:[],hbSent:[],hidden:{source:'native-dialogue',modeled:false,lines:2,visible:0}}};}
 const altered=mutate=>{const run=synthetic();for(const sample of run.o.samples.filter(s=>s.choices.length))mutate(sample.choices,sample);return run;};
 test('all offered options must be present, source-matched, clickable and translated when enabled',()=>{
  const baseline=S.score(synthetic(),D.cardinal);assert.equal(baseline.scores.choice,1);
