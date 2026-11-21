@@ -45,6 +45,7 @@ const DOMAINS={
  'calibrate.hideMethod':{enum:[null,'hide','engine','glyph','gpu','read']},
  'draw.roles':{bool:true},
  'draw.advhdInput':{bool:true,layer:'version'},
+ 'draw.minoriInput':{bool:true,layer:'version'},
  'draw.embed':{bool:true,layer:'version'},
  'draw.embedTranslation':{bool:true,layer:'version'},
  'draw.engineTable':{engineTable:true,nullable:true,layer:'version'},

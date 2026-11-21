@@ -81,3 +81,6 @@ rem Majiro complete-string observer: signatures and real MinHook gate, x86 and x
 call "%~dp0run-majiro.cmd" || exit /b 1
 rem AdvHD version-pinned diagnostic input, custom EAX + eleven-word ABI and x64 no-op.
 call "%~dp0run-advhd.cmd" || exit /b 1
+
+rem minori exact English-build byte-string input observer, default off; no game execution.
+call "%~dp0run-minori.cmd" || exit /b 1
