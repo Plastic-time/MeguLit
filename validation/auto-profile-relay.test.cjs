@@ -162,3 +162,12 @@ test('relay: two layers, best match first: exe > head > pe for a build, archive 
  const rev0=r.body.versionLayer.diff.rev;for(const ip of ['61.0.0.1','61.0.0.2','61.0.0.3'])await send(ip,A,{pack:P},{...HIDE,page:{effectFrames:true}},0.01);await signRun();
  r=await look('exe='+A);assert.ok(r.body.versionLayer.diff.rev>rev0);assert.equal(r.body.versionLayer.diff.settings.page.effectFrames,true);
  assert.equal((await look('')).status,400,'no prints, no answer');});
+
+test('relay: a shared candidate that failed its first window queues the build as newVersion; a game-level official diff leaves it open',async()=>{
+ const X=H('d'),T=require('../core/game-print.cjs').titleHash('新しい版');
+ const send=(ip,extra)=>user(ip)('https://relay.test/api/game-profile/report',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({version:1,profile:ap.diagnostic(rec(X,'read',{hide:{textEffectsRead:true}},0,{source:'gate',gate:{window:1,over:['dropRate'],metrics:{}},...extra})).profile,prints:{title:T}})});
+ const g=(await (await send('70.0.0.1',{reason:'同游戏新版本：下发差分（match=title）第一个窗口未过线：漏句'})).json()).game;
+ let q=(await (await maint('GET','/api/game-profile/queue')).json()).queue.find(x=>x.key===X);assert.equal(q.kind,'newVersion');assert.match(q.note,/^同游戏新版本/);
+ assert.equal((await maint('POST','/api/game-profile/signed',{diff:tool.signDoc(gameDiff.build({key:g,layer:'game',prints:{title:T},rev:1,source:'official',mode:'hide',settings:{}}),OURS,'p1')})).status,201);
+ q=(await (await maint('GET','/api/game-profile/queue')).json()).queue.find(x=>x.key===X);assert.ok(q,'still open: the build needs its own version layer');
+ await send('70.0.0.2',{reason:'有台词没有画到阅读层（漏句）'});q=(await (await maint('GET','/api/game-profile/queue')).json()).queue.find(x=>x.key===X);assert.equal(q.kind,'broken');});

@@ -182,7 +182,7 @@ relay、客户端、签名工具共用这一个纯函数文件，签名的字节
 - `auto_profile_picks`：每层每个 key 的一致最佳结果（未签名，带下一个 `rev`），等我们签
 - `game_diffs`：每层每个 key 每种来源一份我们签好的文档（`official` / `auto`），官方优先
 - `diff_prints`：指纹 → 层 key（`exe/head/pe` → 版本层，`exe/pack/script/steam/vndb/title` → 游戏层）
-- `auto_profile_queue`：修复队列，每个 exe 一行（带 gid、prints）
+- `auto_profile_queue`：修复队列，每个 exe 一行（带 gid、prints、`note`=客户端 reason）；`kind` = `broken`（自检退档）或 `newVersion`（reason 以「同游戏新版本」开头：head/pe/游戏层命中的下发差分第一个窗口没过线，这个构建要补自己的版本层；游戏层官方差分上传时不会关掉它）
 - `profile_runtime`：单独补传的运行时样本（R2 `profile-runtime/<key>.json.gz`）
 
 | 接口 | 谁 | 说明 |

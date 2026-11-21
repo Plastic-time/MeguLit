@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS auto_profile_queue (
   exe TEXT NOT NULL DEFAULT '',
   engine TEXT NOT NULL DEFAULT '',
   reasons TEXT NOT NULL DEFAULT '[]',
+  note TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT 'broken',
   reporters INTEGER NOT NULL DEFAULT 1,
   app TEXT NOT NULL DEFAULT '',
   first_at INTEGER NOT NULL,

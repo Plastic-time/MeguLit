@@ -62,7 +62,7 @@ export function validateReport(body){const p=body?.profile;if(body?.version!==1|
  const metrics={};const m=p.score?.metrics;if(plain(m))for(const k of METRICS){const v=m[k];metrics[k]=v===null||v===undefined?null:num(v,-1,1e6);}
  const over=Array.isArray(p.gate?.over)?p.gate.over.filter(x=>METRICS.includes(x)):[];
  const prints={...gamePrint.check(body.prints||p.prints),exe:key};
- return {ok:true,value:{key,mode,settings,prints,source:p.source==='gate'?'gate':'calibration',cost:num(p.score?.cost,0,1e6)??0,metrics,over,
+ return {ok:true,value:{key,mode,settings,prints,source:p.source==='gate'?'gate':'calibration',reason:String(p.reason||'').replace(/[\u0000-\u001f]/g,' ').slice(0,200),cost:num(p.score?.cost,0,1e6)??0,metrics,over,
   engine:String(p.engine||'').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,32),exe:String(p.exe||'').toLowerCase().replace(/[\\/:*?"<>|]/g,'').slice(0,80),app:SEMVER.test(String(p.version||''))?String(p.version):''}};}
 
 /* the agreed best result from report rows, or null */
@@ -111,8 +111,10 @@ async function report(request,env,ip,now,{json,fail,readJSON}){
   .bind(r.key,ip,gid,JSON.stringify(r.prints),hash,canonical(r.settings),r.mode,r.source,r.cost,JSON.stringify(r.metrics),r.engine,r.exe,r.app,t).run();
  await env.DB.prepare('DELETE FROM auto_profile_reports WHERE game_key=? AND reporter NOT IN (SELECT reporter FROM auto_profile_reports WHERE game_key=? ORDER BY updated_at DESC LIMIT ?)').bind(r.key,r.key,PROFILE_LIMITS.reportsPerKey).run();
  await register(env,'version',r.key,r.prints,['head','pe'],t);if(gid)await register(env,'game',gid,r.prints,['exe',...GAME_KINDS],t);
- if(r.source==='gate')await env.DB.prepare("INSERT INTO auto_profile_queue(game_key,gid,prints,exe,engine,reasons,reporters,app,first_at,last_at) VALUES(?,?,?,?,?,?,1,?,?,?) ON CONFLICT(game_key) DO UPDATE SET gid=excluded.gid,prints=excluded.prints,exe=excluded.exe,engine=excluded.engine,reasons=excluded.reasons,reporters=auto_profile_queue.reporters+1,app=excluded.app,last_at=excluded.last_at,closed_at=NULL")
-  .bind(r.key,gid,JSON.stringify(r.prints),r.exe,r.engine,JSON.stringify(r.over),r.app,t,t).run();
+ /* 2026-11-21 kind: 'newVersion' = a shared diff found by head / pe / the game (not this exe) failed its first window here (the
+    client's reason starts 「同游戏新版本」): this build needs its own version layer; 'broken' = the self-check stepped it down */
+ if(r.source==='gate'){const kind=r.reason.startsWith('同游戏新版本')?'newVersion':'broken';await env.DB.prepare("INSERT INTO auto_profile_queue(game_key,gid,prints,exe,engine,reasons,note,kind,reporters,app,first_at,last_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?) ON CONFLICT(game_key) DO UPDATE SET gid=excluded.gid,prints=excluded.prints,exe=excluded.exe,engine=excluded.engine,reasons=excluded.reasons,note=excluded.note,kind=excluded.kind,reporters=auto_profile_queue.reporters+1,app=excluded.app,last_at=excluded.last_at,closed_at=NULL")
+  .bind(r.key,gid,JSON.stringify(r.prints),r.exe,r.engine,JSON.stringify(r.over),r.reason,kind,r.app,t,t).run();}
  await settle(env,'version',r.key,now);if(gid)await settle(env,'game',gid,now);
  return json({ok:true,queued:r.source==='gate',game:gid||null},201);}
 async function lookup(env,url,exeFromPath,{json,fail}){const q=Object.fromEntries(['exe','head','pe','pack','script','steam','vndb','title'].map(k=>[k,url.searchParams.get(k)||'']));if(exeFromPath)q.exe=exeFromPath;
@@ -147,14 +149,14 @@ async function signedPost(request,env,now,{json,fail,readJSON}){const body=await
   if(layer==='version')await register(env,'version',d.key,pr,['head','pe'],t);else await register(env,'game',d.key,pr,GAME_KINDS,t);}
  await env.DB.prepare('INSERT INTO game_diffs(layer,game_key,source,body,rev,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(layer,game_key,source) DO UPDATE SET body=excluded.body,rev=excluded.rev,updated_at=excluded.updated_at,withdrawn_at=NULL').bind(layer,d.key,d.source,JSON.stringify(d),d.rev|0,t).run();
  if(d.source==='official'){if(layer==='version')await env.DB.prepare('UPDATE auto_profile_queue SET closed_at=? WHERE game_key=? AND closed_at IS NULL').bind(t,d.key).run();
-  else await env.DB.prepare('UPDATE auto_profile_queue SET closed_at=? WHERE gid=? AND closed_at IS NULL').bind(t,d.key).run();}
+  else await env.DB.prepare("UPDATE auto_profile_queue SET closed_at=? WHERE gid=? AND kind<>'newVersion' AND closed_at IS NULL").bind(t,d.key).run();/* a build that needs its own version layer stays open */}
  return json({ok:true,key:d.key,layer,source:d.source},201);}
 async function withdraw(request,env,now,{json,fail,readJSON}){const body=await readJSON(request,4096);const v=body.value||{},key=String(v.key||''),source=v.source==='auto'?'auto':'official',layer=v.layer==='game'?'game':'version';if(!KEY.test(key))return fail('INVALID_KEY');
  await env.DB.prepare('UPDATE game_diffs SET withdrawn_at=? WHERE layer=? AND game_key=? AND source=?').bind(sec(now),layer,key,source).run();return json({ok:true});}
 async function queueGet(env,url,{json}){const all=url.searchParams.get('all')==='1';
- const rows=(await env.DB.prepare('SELECT game_key,gid,prints,exe,engine,reasons,reporters,app,first_at,last_at,closed_at FROM auto_profile_queue'+(all?'':' WHERE closed_at IS NULL')+' ORDER BY last_at DESC LIMIT ?').bind(PROFILE_LIMITS.queue).all()).results||[];
+ const rows=(await env.DB.prepare('SELECT game_key,gid,prints,exe,engine,reasons,note,kind,reporters,app,first_at,last_at,closed_at FROM auto_profile_queue'+(all?'':' WHERE closed_at IS NULL')+' ORDER BY last_at DESC LIMIT ?').bind(PROFILE_LIMITS.queue).all()).results||[];
  const j=(s,f)=>{try{return JSON.parse(s);}catch{return f;}};
- return json({queue:rows.map(r=>({key:r.game_key,game:r.gid||null,prints:j(r.prints,{}),exe:r.exe,engine:r.engine,reasons:j(r.reasons,[]),reporters:r.reporters,app:r.app,firstAt:r.first_at,lastAt:r.last_at,closedAt:r.closed_at||null}))});}
+ return json({queue:rows.map(r=>({key:r.game_key,game:r.gid||null,kind:r.kind,prints:j(r.prints,{}),exe:r.exe,engine:r.engine,reasons:j(r.reasons,[]),note:r.note,reporters:r.reporters,app:r.app,firstAt:r.first_at,lastAt:r.last_at,closedAt:r.closed_at||null}))});}
 async function queueClose(request,env,now,{json,fail,readJSON}){const body=await readJSON(request,4096);const key=String(body.value?.key||'');if(!KEY.test(key))return fail('INVALID_KEY');
  await env.DB.prepare('UPDATE auto_profile_queue SET closed_at=? WHERE game_key=?').bind(sec(now),key).run();return json({ok:true});}
 async function runtimeList(env,url,{json}){const rows=(await env.DB.prepare('SELECT game_key,identity,gid,prints,size,reporters,updated_at FROM profile_runtime ORDER BY updated_at DESC LIMIT 500').all()).results||[];
