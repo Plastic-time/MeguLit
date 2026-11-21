@@ -62,6 +62,7 @@ def _megulit_renpy_main():
             self.hide_tried = 0.0
             self.page, self.want, self.hidden = [], False, []
             self.embedded = []
+            self.restart_pending = False
             self.cfg, self.emb, self.ctl_raw, self.ctl_at, self.ui, self.menu = {'roles': 0, 'embed': 0, 'zh': 1}, {}, None, 0.0, 0, None
             if self.sink is None:
                 t = threading.Thread(target=self.writer, name='MeguLitRenpy')
@@ -210,9 +211,7 @@ def _megulit_renpy_main():
                 # Let the interaction rebuild it before reporting the restored original's layout.
                 if self.cur is not None:
                     self.cur['settle_frames'] = 2
-                ex = sys.modules.get('renpy.exports')
-                if ex is not None and hasattr(ex, 'restart_interaction'):
-                    ex.restart_interaction()
+                self.restart_pending = True
             if pending:
                 self.set_status('error embed restore pending')
             return not pending
@@ -420,6 +419,11 @@ def _megulit_renpy_main():
                     core.draw_embed(c)
                 except Exception as e:
                     core.set_status('error draw %s' % (e,))
+                if core.restart_pending:
+                    core.restart_pending = False
+                    ex = sys.modules.get('renpy.exports')
+                    if ex is not None and hasattr(ex, 'restart_interaction'):
+                        ex.restart_interaction()
                 return rv
             render_screen._megulit = True
             return render_screen
