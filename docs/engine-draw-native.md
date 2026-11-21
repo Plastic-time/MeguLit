@@ -127,3 +127,8 @@
   2. 开游戏推 5 句、出一次选项
   3. `logs\hook-diagnostics.log` 里先有 `ToMe_DRAWRUN engine=avg32 found: 1 site(s) of TextOutA` 和 `on: site 0`，之后每句有 `ToMe_DRAWRUN engine=avg32 site=0 ... text=` 带这句的文字；名字和选项各自 via 不同
   4. 游戏照常显示、不卡、不崩 = 过。只有 `off: N sites match` = 这个版本签名没对上，把那行和 exe 发来
+
+### Softpal（時計仕掛けのレイライン）
+- 点：dll\PAL.dll 0x10008295，字形例程里唯一的 `GetGlyphOutlineA(hdc, 字, GGO_GRAY8, &gm, 0, NULL, &mat)`（量尺寸那次；字体类型 4 走引擎自己的栅格化，不经过这里）。有 EBP 帧
+- 没有笔位：位置已经由 Pal.cpp 的 pal_sprite_v1 文字精灵给出，这里补的是「哪段字从哪个例程画出来」（via）
+- 店主测试清单：同 AVG32，行里是 `engine=softpal`，`x0=-1`

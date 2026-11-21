@@ -11,6 +11,17 @@
    "slot": "0x4653e0",
    "call": "0x413880",
    "hex": "46008b4d108b45f8688600ee00578b51188b4dfc535250508b4514505156ff15385446008b5dfc8b7d0ceb1a8b55188b4514525750a1b45d45008bcb2bc85156ff15e05346008b4d188b550803f903da"
+  },
+  "leyline-1": {
+   "id": "softpal",
+   "file": "PAL.dll",
+   "sha256": "bea18b1b34b01936ea57a8098009e4c268a722e968bc6ada19de51bf820c3364",
+   "api": "GetGlyphOutlineA",
+   "va": "0x10008255",
+   "callOffset": 64,
+   "slot": "0x100db01c",
+   "call": "0x10008295",
+   "hex": "4604e87b4402008bf883c40485ff0f844c0200008b1d184111156683bbc801000004742a8b85b4feffff8d8de0feffff516a006a008d95ccfeffff526a065750ff151cb00d108b1d18411115eb216a00"
   }
  }
 }

@@ -21,6 +21,10 @@ static const Sig Sigs[] = {
   // ReaLive / AVG32 (涙 ～流星のザドル～, AVG3216D.EXE 0x413880): the one routine that draws a string into the text DIB,
   // a character a call: TextOutA(hdc, x - scroll, y, s, 1 | 2); x / y are the canvas pen
   { "avg32", "", "TextOutA", "52 57 50 a1 ?? ?? ?? ?? 8b cb 2b c8 51 56", 1, 1 },
+  // Softpal (時計仕掛けのレイライン, dll\PAL.dll 0x10008295): the glyph routine's one GetGlyphOutlineA(hdc, ch, GGO_GRAY8, &gm,
+  // 0, NULL, &mat) (the size query; a font of type 4 takes the engine's own rasteriser instead and never comes here). No pen:
+  // the places come from Pal.cpp's pal_sprite_v1 sprites
+  { "softpal", "PAL.dll", "GetGlyphOutlineA", "8d 8d ?? ?? ff ff 51 6a 00 6a 00 8d 95 ?? ?? ff ff 52 6a 06 57 50", 1, 1 },
 };
 static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
 
