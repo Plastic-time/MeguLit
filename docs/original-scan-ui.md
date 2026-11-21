@@ -6,12 +6,14 @@ The shared Japanese-restore modal owns the detail-page and Tools entries
 
 ## Controller contract
 
-`createOriginalScanController({api,recoverJob,onChange,onApplied,onRefreshError,schedule,unschedule,pollMs})`
+`createOriginalScanController({api,recoverJob,makeRequestId,onChange,onApplied,onRefreshError,schedule,unschedule,pollMs})`
 uses the documented `jp_restore_scan`, `jp_restore_scan_status`, `jp_restore_scan_cancel`,
 `jp_restore_apply` and `jp_restore_undo` commands
 Polling defaults to400ms and accepts integer300–500ms
 Only the selected library id, returned job id and confirmed scan token are sent to scan/restore
 No client folder path is accepted by this flow
+Every start also includes a fresh validated requestId, generated with crypto.randomUUID by default
+Queued jobs are busy, and every job reply must match the operation and exact requestId
 
 Call `selectGame(id)` before changing the modal's selected game
 It returns false while an operation is owned, and clears old preview/token when selection succeeds
@@ -27,13 +29,16 @@ Restore and undo do not expose cancel and `canClose()` remains false until a ter
 Incomplete scan cleanup returns false and reports a fixed error rather than claiming the child stopped
 If a write-start response is lost before a job id arrives, an unknown error preserves the write lock
 Only documented rejection codes release that lock without a job
-An optional `recoverJob({id,operation,attempt})` seam can recover an authoritative Job DTO
-The local attempt counter is not server correlation proof: the owner must bind the query to this actual dispatched request/session
+The default recovery sends jp_restore_scan_status with id, operation, requestId and retireIfMissing:true
+It either recovers the same authoritative Job DTO or requires an exact cancelled/retired:true/notStarted:true proof for that nonce
+Only this atomic retirement proof can release an unknown write without a job terminal response
+The backend must permanently reject a later start using that retired nonce
+An optional recoverJob({id,operation,requestId}) transport seam must implement the identical contract
 Absent or mismatched responses never prove that a worker stopped, and do not release a write lock
 The visible progress-retry button uses that seam for an unknown id, then resumes ordinary status polling
 Scan disposal uses it too, requests real cancellation after recovering identity, and awaits terminal status
 Without a proof it explicitly reports incomplete cleanup rather than reporting a stopped child
-The current backend contract still needs to define the recovery command and reliable request/session correlation
+The documented backend contract defines that correlation, but actual backend dispatch/retirement behavior needs independent integration testing
 The UI must not label it an ended transaction or allow a second write
 
 `mountOriginalScan(container,options)` combines the real controller and DOM view

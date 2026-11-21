@@ -9,6 +9,7 @@ const ERROR_ALIASES={SCAN_STALE:'JP_SCAN_SOURCE_CHANGED',EMBEDDED_UNSUPPORTED:'J
 Object.assign(WORDS.zh,{sources:'已检查的游戏文件'});Object.assign(WORDS.en,{sources:'Checked game files'});Object.assign(WORDS.ja,{sources:'確認したゲームファイル'});
 Object.assign(WORDS.zh,{refresh:'重新查询进度',undoing:'正在还原，请等待完成后再关闭'});Object.assign(WORDS.en,{refresh:'Check progress again',undoing:'Undoing; wait for completion before closing'});Object.assign(WORDS.ja,{refresh:'進行状況を再確認',undoing:'元に戻しています。完了するまで閉じないでください'});
 Object.assign(WORDS.zh,{unknown:'任务未完成，请重新查询进度或查看诊断日志'});Object.assign(WORDS.en,{unknown:'The task did not finish; check progress again or consult the diagnostic log'});Object.assign(WORDS.ja,{unknown:'処理が完了していません。進行状況または診断ログを確認してください'});
+WORDS.zh.errors.ORIGINAL_SCAN_NOT_STARTED='后台已确认这次任务未启动，可以重试';WORDS.en.errors.ORIGINAL_SCAN_NOT_STARTED='The backend confirmed this request never started; you can retry';WORDS.ja.errors.ORIGINAL_SCAN_NOT_STARTED='今回の処理が開始されていないことを確認しました。再試行できます';
 export const originalScanWords=locale=>WORDS[locale]||WORDS.zh;
 const count=value=>Number.isSafeInteger(value)&&value>=0&&value<=1000000000;
 const byteCount=value=>Number.isSafeInteger(value)&&value>=0;
@@ -50,7 +51,7 @@ export function originalScanPresentation(state={},locale='zh'){
   closeAllowed:phase!=='applying'&&!(writing&&state.pendingJob)};
 }
 
-export function createOriginalScanController({api,recoverJob,onChange=()=>{},onApplied=()=>{},onRefreshError=()=>{},schedule=setTimeout,unschedule=clearTimeout,pollMs=400}={}){
+export function createOriginalScanController({api,recoverJob,makeRequestId=()=>globalThis.crypto.randomUUID(),onChange=()=>{},onApplied=()=>{},onRefreshError=()=>{},schedule=setTimeout,unschedule=clearTimeout,pollMs=400}={}){
  if(typeof api!=='function'||recoverJob!==undefined&&typeof recoverJob!=='function'||!Number.isInteger(pollMs)||pollMs<300||pollMs>500)throw Error('ORIGINAL_SCAN_OPTIONS');
  let state=Object.freeze({phase:'idle',gameId:'',preview:null,progress:null,error:'',pendingJob:false,operation:'',cancellable:false});
  let current=null,serial=0,disposed=false,cleanupIncomplete=false;
@@ -70,21 +71,22 @@ export function createOriginalScanController({api,recoverJob,onChange=()=>{},onA
  function failed(c,error){
   if(!active(c))return;clear(c);
   if(c.terminal||!c.jobId&&['GAME_RUNNING','SCAN_STALE','EMBEDDED_UNSUPPORTED','EMBEDDED_CONFLICT','NOT_APPLIED','NOTHING_TO_RESTORE'].includes(errorCode(error))){finish(c,{phase:'error',error:errorCode(error)});return;}
-  publish({phase:'error',error:errorCode(error),pendingJob:true,cancellable:c.operation==='scan'&&!!c.jobId&&c.cancellable,recoverable:!!c.jobId||typeof recoverJob==='function',preview:null});
+  publish({phase:'error',error:errorCode(error),pendingJob:true,cancellable:c.operation==='scan'&&!!c.jobId&&c.cancellable,recoverable:true,preview:null});
   if(!c.jobId&&!disposed)c.reject(Error(errorCode(error)));
   if(disposed){if(++c.cleanupFailures<3)queue(c);else{cleanupIncomplete=true;current=null;c.resolveCleanup(false);c.reject(Error('ORIGINAL_SCAN_CLEANUP_INCOMPLETE'));onRefreshError('ORIGINAL_SCAN_CLEANUP_INCOMPLETE');}}
  }
  function accept(c,dto){
   if(!active(c))return;
+  if(dto?.retired===true&&dto?.notStarted===true&&dto.state==='cancelled'&&dto.requestId===c.requestId&&dto.operation===c.operation&&!c.jobId){c.terminal=true;c.notifyApplied=false;finish(c,{phase:'error',error:'ORIGINAL_SCAN_NOT_STARTED'});return;}
   if(c.allowDirect&&dto&&typeof dto==='object'&&!Object.hasOwn(dto,'jobId')){
-   if(Object.hasOwn(dto,'operation')||['running','cancelling','cancelled','done','failed'].includes(dto.state))throw Error('ORIGINAL_SCAN_PROTOCOL');
+   if(Object.hasOwn(dto,'operation')||['queued','running','cancelling','cancelled','done','failed'].includes(dto.state))throw Error('ORIGINAL_SCAN_PROTOCOL');
    if(c.operation==='undo'?(!count(dto.restored)||!Array.isArray(dto.skipped)):(!count(dto.applied)||!count(dto.cells)))throw Error('ORIGINAL_SCAN_PROTOCOL');
    finish(c,{phase:'idle',result:dto});return;
   }
   if(!dto||typeof dto.jobId!=='string'||!dto.jobId||dto.jobId.length>512||c.jobId&&c.jobId!==dto.jobId)throw Error('ORIGINAL_SCAN_PROTOCOL');
-  if(dto.operation!==c.operation)throw Error('ORIGINAL_SCAN_PROTOCOL');
+  if(dto.operation!==c.operation||dto.requestId!==c.requestId)throw Error('ORIGINAL_SCAN_PROTOCOL');
   c.jobId=dto.jobId;
-  if(!['running','cancelling','cancelled','done','failed'].includes(dto.state)||typeof dto.cancellable!=='boolean')throw Error('ORIGINAL_SCAN_PROTOCOL');
+  if(!['queued','running','cancelling','cancelled','done','failed'].includes(dto.state)||typeof dto.cancellable!=='boolean')throw Error('ORIGINAL_SCAN_PROTOCOL');
   c.terminal=['done','failed','cancelled'].includes(dto.state);
   if(dto.state==='failed'){finish(c,{phase:'error',error:typeof dto.error==='string'?dto.error:'ORIGINAL_SCAN_FAILED'});return;}
   if(dto.state==='cancelled'){
@@ -109,21 +111,22 @@ export function createOriginalScanController({api,recoverJob,onChange=()=>{},onA
  }
  async function call(c,action,params){
   if(!active(c)||c.inFlight)return;clear(c);c.inFlight=true;
-  try{const dto=await (action?api(action,params):recoverJob(Object.freeze({id:c.id,operation:c.operation,attempt:c.serial})));c.inFlight=false;accept(c,dto);}catch(error){c.inFlight=false;if(action==='jp_restore_scan_cancel')c.cancelSent=false;failed(c,error);}
+  try{const context=Object.freeze({id:c.id,operation:c.operation,requestId:c.requestId}),dto=await (action?api(action,params):typeof recoverJob==='function'?recoverJob(context):api('jp_restore_scan_status',{...context,retireIfMissing:true}));c.inFlight=false;accept(c,dto);}catch(error){c.inFlight=false;if(action==='jp_restore_scan_cancel')c.cancelSent=false;failed(c,error);}
  }
- function query(c){if(c.jobId)return call(c,'jp_restore_scan_status',{id:c.id,jobId:c.jobId});if(typeof recoverJob==='function')return call(c,null);failed(c,Error('ORIGINAL_SCAN_STATUS_UNKNOWN'));}
+ function query(c){if(c.jobId)return call(c,'jp_restore_scan_status',{id:c.id,jobId:c.jobId});return call(c,null);}
  function begin(operation,action,params,{allowDirect=false,notifyApplied=false}={}){
   if(disposed||current||!state.gameId)return Promise.resolve(false);
+  let requestId;try{requestId=makeRequestId();if(typeof requestId!=='string'||!/^[a-z0-9_-]{8,80}$/i.test(requestId))throw Error('ORIGINAL_SCAN_OPTIONS');}catch{return Promise.reject(Error('ORIGINAL_SCAN_OPTIONS'));}
   let resolve,reject,resolveCleanup;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;}),cleanupPromise=new Promise(yes=>{resolveCleanup=yes;});
-  const c={serial:++serial,id:state.gameId,operation,jobId:'',timer:null,inFlight:false,cancelRequested:false,cancelSent:false,cancellable:true,terminal:false,cleanupFailures:0,allowDirect,notifyApplied,resolve,reject,promise,cleanupPromise,resolveCleanup};current=c;
+  const c={serial:++serial,id:state.gameId,operation,requestId,jobId:'',timer:null,inFlight:false,cancelRequested:false,cancelSent:false,cancellable:true,terminal:false,cleanupFailures:0,allowDirect,notifyApplied,resolve,reject,promise,cleanupPromise,resolveCleanup};current=c;
   publish({phase:operation==='scan'?'scanning':'applying',operation,preview:operation==='scan'?null:state.preview,progress:null,error:'',pendingJob:true,cancellable:operation==='scan'});
-  void call(c,action,params);return promise;
+  void call(c,action,{...params,requestId});return promise;
  }
  const controller={
   state:()=>state,busy:()=>!!current,canClose:closeAllowed,
   selectGame(id){if(disposed||current||typeof id!=='string'||!id||id.length>512)return false;++serial;publish({phase:'idle',gameId:id,preview:null,progress:null,error:'',pendingJob:false,operation:'',cancellable:false});return true;},
   scan(){if(current){if(state.phase==='error')return controller.refresh();return Promise.resolve(false);}return begin('scan','jp_restore_scan',{id:state.gameId});},
-  refresh(){const c=current;if(!c||c.inFlight||!c.jobId&&typeof recoverJob!=='function'||disposed)return Promise.resolve(false);void query(c);return Promise.resolve(true);},
+  refresh(){const c=current;if(!c||c.inFlight||disposed)return Promise.resolve(false);void query(c);return Promise.resolve(true);},
   cancel(){const c=current;if(disposed||!c||c.operation!=='scan'||!c.cancellable)return false;c.cancelRequested=true;publish({phase:'cancelling'});if(c.jobId&&!c.inFlight&&!c.cancelSent){c.cancelSent=true;void call(c,'jp_restore_scan_cancel',{id:c.id,jobId:c.jobId});}return true;},
   requestRestore(){if(disposed||current||!originalScanPresentation(state).canRestore)return false;publish({phase:'confirm'});return true;},
   back(){if(disposed||current||state.phase!=='confirm')return false;publish({phase:'preview'});return true;},
