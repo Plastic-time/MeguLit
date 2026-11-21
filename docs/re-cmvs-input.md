@@ -16,9 +16,21 @@ Gate 保存 flags、所有 GPR 与 FXSAVE 状态，读取原始 ECX 和两个栈
 
 `draw.cmvsInput` 是版本层布尔键，默认 false，通过控制文件的 `cmvsInput=1` 独立启用，不依赖 `draw.roles`。EngineDraw.active 只允许写这个控制，不改变旧角色、隐藏、嵌入、自动路由或 reader 正文来源
 
-只有两处 detour 都启用成功才开始采集。第二处创建失败会移除从未启用的第一处；若启用过程失败则关闭采集、尝试停用两处，并保留原始 trampoline 供可能在途的 pass-through 使用，本进程不再重试，避免部分采集和释放在途跳转目标
+只有两处 detour 都启用成功才开始采集。任意位置 Create 或 Enable 失败都会关闭采集并阻止本进程重试，尝试停用已创建项，同时保留所有已经获得的 trampoline，失败处理不调用 RemoveHook 或清空原函数指针
+第一处创建失败时通常没有 trampoline；第二处创建失败时保留第一处，两个入口均创建后启用失败则保留两处，不能把缺失的 original 当作可调用入口
+控制刷新使用 CMVS 独立递归锁和请求序号；安装状态日志里的再次撤权请求不会被外层旧授权覆盖，异常通过独立保护层释放控制锁
+输入观察器和原函数不使用该控制锁
 
-`ToMe_CMVS_INPUT begin` 包含 run、入口 RVA、caller RVA、原始 this 和两个栈参数；`data` 按 offset 分块输出完整原始 hex；`end` 给出字节数。接受完整 NUL 串的上限为 32768 字节，空串可记录，不可读或超限输入直接拒绝，不把残段当完整文本，也不猜编码或剥离引擎控制串
+控制授权只接受首条完整 `#cfg` 行，使用 UTF-16LE（可选 BOM），该行码元必须是可打印 ASCII，`cmvsInput=1` 必须唯一且精确匹配
+正文子串、后续 cfg、重复 flag、截断或无换行、错误宽字符、UTF-16BE、raw ASCII、不可读及缺失文件均不能授权
+raw ASCII 与某些非 ASCII UTF-16 字节可相同，因此不再将剥 NUL 后的任意字节解释为授权；现有 transport 使用 UTF-16LE
+
+`ToMe_CMVS_INPUT begin` 包含 run、入口 RVA、caller RVA、原始 this 和两个栈参数；`data` 按 offset 分块输出完整原始 hex；`end` 给出字节数，三者都带权限 epoch。接受完整 NUL 串的上限为 32768 字节，空串可记录，不可读或超限输入直接拒绝，不把残段当完整文本，也不猜编码或剥离引擎控制串
+
+watcher 仍每两秒尝试刷新权限；实际 on/off 转换推进原子票据，复制后、begin、每块 data 与 end 前复核同一代次
+begin/data 内 off-on 会终止旧块的后续输出，新的输入用新代次；缺少 end 或跨 run/epoch 的碎片不得拼成完整文本
+这不是同步关闭 ACK：已进入的 logger 可以完成，最后复核与进入 logger 之间没有原子撤权屏障，阻塞日志或安装工作也可能延长刷新时间
+测试用 watcher 停止事件会撤权后退出，生产 watcher 仍随进程存续
 
 日志走现有 HookBridge info 诊断通道，普通 reader 路由不识别这个前缀。`hook-diagnostics.log` 有 1 MiB 上限，回放须按 run/offset/字节数确认 begin/data/end 完整，缺块不能当作有效证据
 
@@ -39,7 +51,7 @@ Gate 保存 flags、所有 GPR 与 FXSAVE 状态，读取原始 ECX 和两个栈
 | JS/native 签名 | 同源实际字节、两个唯一 RVA、完整 SHA/大小 | 其他 exe 版本独立取证 |
 | 实字节 fixture | prologue、参数载入、ret8、循环、caller、缓存分支与测量负例 | 真实截图/tape 配对 |
 | JS 回归 | 变异/截断/歧义/缺入口、实际本机文件、版本层、根 The Seed 含 versions 禁开、roles0 隔离与 Fata 接线 | 实机文本与画面 |
-| native gate | 两个实际 thiscall/ret8、原始结果/GPR/flags/ESP/FPU、输入边界/重入/off-on、部分安装失败、x64 no-op | 完整 DLL 构建、隐藏桌面安装 |
+| native gate | 两个实际 thiscall/ret8、原始结果/GPR/flags/ESP/FPU、XMM0/7、CW/MXCSR、异常、输入边界/真实 detour 重入/off-on、跨线程 held logger、两个创建/启用失败位置、x64 no-op | 完整 DLL 构建、隐藏桌面安装 |
 | 文档/测量步骤 | 输入契约与缓存限制清楚记录 | 角色、屏幕变换、编码与渲染验收 |
 
 普通 CI 运行 JS 回归。`megulithook/selftest/run.cmd` 调用新增的 `run-cmvs.cmd`，但该 native 部件在 `native-builds.json` 为 `ci:false`，本地原生 gate 通过不等于 CI 已构建或游戏已验收，本次不改 CI 配置

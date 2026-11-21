@@ -14,28 +14,37 @@ namespace CmvsDraw {
 static void *Original0=nullptr,*Original1=nullptr;
 static uintptr_t Image=0,ImageEnd=0,DrawAt[2]={};
 static bool VersionPinned=false;
-static volatile LONG Armed=0,Installed=0,Observing=0,Blocked=0,Run=0;
+static volatile LONG Armed=0,Installed=0,Permission=0,Blocked=0,Run=0;
+static INIT_ONCE ControlOnce=INIT_ONCE_STATIC_INIT;
+static CRITICAL_SECTION ControlLock;
+static ULONG ControlRequest=0;
 static __declspec(thread) bool InObserver=false;
 static const DWORD ObserverMxcsr=0x1f80;
 static const int MaxText=32768,ChunkBytes=128;
 struct Snapshot{DWORD entry,self,caller,args[2];int bytes;char text[MaxText+1];};
+static LONG Ticket(){return InterlockedCompareExchange(&Permission,0,0);}
+static bool Allowed(LONG ticket){return (ticket&1)&&Ticket()==ticket;}
+static void SetPermission(bool on){for(;;){LONG old=Ticket();if(((old&1)!=0)==on)return;if(InterlockedCompareExchange(&Permission,(LONG)((ULONG)old+1),old)==old)return;}}
 static bool Capture(DWORD entry,DWORD self,const DWORD *stack,Snapshot *out){
  __try{if(entry>=2||!stack||!out)return false;out->entry=entry;out->self=self;out->caller=stack[0];out->args[0]=stack[1];out->args[1]=stack[2];
   const char *text=(const char *)out->args[0];if(!text)return false;
   int n=0;while(n<MaxText&&text[n]){out->text[n]=text[n];n++;}if(n==MaxText&&text[n])return false;out->text[n]=0;out->bytes=n;return true;
  }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
 }
-static void EmitSnapshot(const Snapshot &s){
- try{LONG run=InterlockedIncrement(&Run);DWORD via=s.caller>=Image&&s.caller<ImageEnd?s.caller-(DWORD)Image:0;
-  Msg::Log("ToMe_CMVS_INPUT begin run=%lu entry=%lx via=%lx this=%lx words=2 bytes=%d args=%lx,%lx",(unsigned long)run,(unsigned long)CmvsDrawSig::Entries[s.entry].rva,(unsigned long)via,(unsigned long)s.self,s.bytes,(unsigned long)s.args[0],(unsigned long)s.args[1]);
-  for(int offset=0;offset<s.bytes;offset+=ChunkBytes){char hex[ChunkBytes*2+1];int n=s.bytes-offset;if(n>ChunkBytes)n=ChunkBytes;const char digits[]="0123456789abcdef";for(int j=0;j<n;j++){unsigned b=(unsigned char)s.text[offset+j];hex[j*2]=digits[b>>4];hex[j*2+1]=digits[b&15];}hex[n*2]=0;
-   Msg::Log("ToMe_CMVS_INPUT data run=%lu offset=%d hex=%s",(unsigned long)run,offset,hex);}
-  Msg::Log("ToMe_CMVS_INPUT end run=%lu bytes=%d",(unsigned long)run,s.bytes);
+static void EmitSnapshot(const Snapshot &s,LONG ticket){
+ try{if(!Allowed(ticket))return;LONG run=InterlockedIncrement(&Run);DWORD via=s.caller>=Image&&s.caller<ImageEnd?s.caller-(DWORD)Image:0;
+  Msg::Log("ToMe_CMVS_INPUT begin run=%lu entry=%lx via=%lx this=%lx words=2 bytes=%d args=%lx,%lx epoch=%lu",(unsigned long)run,(unsigned long)CmvsDrawSig::Entries[s.entry].rva,(unsigned long)via,(unsigned long)s.self,s.bytes,(unsigned long)s.args[0],(unsigned long)s.args[1],(unsigned long)ticket);
+  for(int offset=0;offset<s.bytes;offset+=ChunkBytes){if(!Allowed(ticket))return;char hex[ChunkBytes*2+1];int n=s.bytes-offset;if(n>ChunkBytes)n=ChunkBytes;const char digits[]="0123456789abcdef";for(int j=0;j<n;j++){unsigned b=(unsigned char)s.text[offset+j];hex[j*2]=digits[b>>4];hex[j*2+1]=digits[b&15];}hex[n*2]=0;
+   Msg::Log("ToMe_CMVS_INPUT data run=%lu offset=%d epoch=%lu hex=%s",(unsigned long)run,offset,(unsigned long)ticket,hex);}
+  if(Allowed(ticket))Msg::Log("ToMe_CMVS_INPUT end run=%lu bytes=%d epoch=%lu",(unsigned long)run,s.bytes,(unsigned long)ticket);
  }catch(...){}
 }
+static void ObserveSafe(DWORD entry,DWORD self,const DWORD *stack,LONG ticket){
+ __try{Snapshot s;if(Capture(entry,self,stack,&s)&&Allowed(ticket))EmitSnapshot(s,ticket);}__except(EXCEPTION_EXECUTE_HANDLER){}
+}
 static void Observe(DWORD entry,DWORD self,const DWORD *stack){
- if(!InterlockedCompareExchange(&Observing,0,0)||InObserver)return;InObserver=true;
- __try{Snapshot s;if(Capture(entry,self,stack,&s))EmitSnapshot(s);}__except(EXCEPTION_EXECUTE_HANDLER){}InObserver=false;
+ LONG ticket=Ticket();if(!(ticket&1)||InObserver)return;InObserver=true;
+ __try{ObserveSafe(entry,self,stack,ticket);}__finally{InObserver=false;}
 }
 // ECX is the this input; the originals consume two stack words with ret 8 and own their EAX returns.
 static __declspec(naked) void Gate0(){__asm{
@@ -106,28 +115,48 @@ static bool FindInImage(uintptr_t base){
  uintptr_t rvas[2]={found[0]-base,found[1]-base};if(!CmvsDrawSig::ValidPair(total,rvas))return false;
  Image=base;ImageEnd=base+imageBytes;DrawAt[0]=found[0];DrawAt[1]=found[1];VersionPinned=true;return true;
 }
-static bool Token(const std::string &cfg,const char *word){size_t p=cfg.find(word),n=std::strlen(word);return p!=std::string::npos&&(p==0||cfg[p-1]==' ')&&(p+n==cfg.size()||cfg[p+n]==' ');}
+static bool ConfigAsked(const unsigned char *bytes,size_t size){
+ if(!bytes||!size)return false;
+ size_t p=0;const size_t step=2;if(size>=2&&bytes[0]==0xff&&bytes[1]==0xfe)p=2;else if(size<2||bytes[1]!=0)return false;
+ std::string line;bool complete=false;
+ for(;p+step<=size;p+=step){unsigned c=bytes[p];if(step==2&&bytes[p+1])return false;
+  if(c=='\n'){complete=true;break;}if(c=='\r'){if(p+step*2>size||bytes[p+step]!='\n'||(step==2&&bytes[p+step+1]))return false;complete=true;break;}
+  if(c<0x20||c>0x7e)return false;line+=(char)c;
+ }
+ if(!complete||line.compare(0,5,"#cfg "))return false;
+ int keys=0;bool enabled=false;for(size_t begin=5;begin<line.size();){while(begin<line.size()&&line[begin]==' ')begin++;size_t end=line.find(' ',begin);if(end==std::string::npos)end=line.size();
+  std::string token=line.substr(begin,end-begin);if(token.compare(0,10,"cmvsInput=")==0){keys++;enabled=token=="cmvsInput=1";}else if(token=="cmvsInput")return false;begin=end;
+ }
+ return keys==1&&enabled;
+}
 static bool DiagnosticAsked(){
  wchar_t tmp[MAX_PATH],file[MAX_PATH+64];DWORD n=GetTempPathW(MAX_PATH,tmp);if(!n||n>=MAX_PATH)return false;swprintf_s(file,L"%sMeguLit\\draw\\%lu.txt",tmp,GetCurrentProcessId());
  HANDLE h=CreateFileW(file,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,0,nullptr);if(h==INVALID_HANDLE_VALUE)return false;
- char bytes[1024]={};DWORD got=0;bool ok=ReadFile(h,bytes,sizeof bytes-1,&got,nullptr)!=FALSE;CloseHandle(h);if(!ok)return false;std::string ascii;for(DWORD i=0;i<got;i++)if(bytes[i])ascii+=bytes[i];
- size_t p=ascii.find("#cfg ");if(p==std::string::npos)return false;size_t end=ascii.find_first_of("\r\n",p);return Token(ascii.substr(p,end==std::string::npos?end:end-p),"cmvsInput=1");
+ unsigned char bytes[1024]={};DWORD got=0;bool ok=ReadFile(h,bytes,sizeof bytes,&got,nullptr)!=FALSE;CloseHandle(h);return ok&&ConfigAsked(bytes,got);
 }
 static bool Install(){
  if(Installed)return true;if(Blocked||!VersionPinned||!DrawAt[0]||!DrawAt[1]||DrawAt[0]==DrawAt[1])return false;
- void *detours[2]={(void *)&Gate0,(void *)&Gate1};void **originals[2]={&Original0,&Original1};int created=0;bool enableAttempted=false;
+ void *detours[2]={(void *)&Gate0,(void *)&Gate1};void **originals[2]={&Original0,&Original1};int created=0;
  for(int i=0;i<2;i++){if(MH_CreateHook((void *)DrawAt[i],detours[i],originals[i])!=MH_OK)goto failed;created++;}
- for(int i=0;i<2;i++){enableAttempted=true;if(MH_EnableHook((void *)DrawAt[i])!=MH_OK)goto failed;}
+ for(int i=0;i<2;i++){if(MH_EnableHook((void *)DrawAt[i])!=MH_OK)goto failed;}
  InterlockedExchange(&Installed,1);Msg::Log("ToMe_CMVS_INPUT on entries=2 diagnostic=1");return true;
 failed:
- InterlockedExchange(&Observing,0);
- // An enable error may leave an in-flight pass-through gate. Retain its trampoline and forbid retry.
- if(enableAttempted){InterlockedExchange(&Blocked,1);for(int i=0;i<created;i++)MH_DisableHook((void *)DrawAt[i]);return false;}
- for(int i=0;i<created;i++)if(MH_RemoveHook((void *)DrawAt[i])!=MH_OK){InterlockedExchange(&Blocked,1);return false;}
- Original0=Original1=nullptr;return false;
+ SetPermission(false);InterlockedExchange(&Blocked,1);
+ // Keep every created trampoline: failed installation never frees a possible pass-through target.
+ for(int i=0;i<created;i++)MH_DisableHook((void *)DrawAt[i]);return false;
 }
-static void RefreshControl(){if(DiagnosticAsked()){if(Install())InterlockedExchange(&Observing,1);}else InterlockedExchange(&Observing,0);}
-static DWORD WINAPI Watch(void *stop){for(;;){RefreshControl();if(stop){if(WaitForSingleObject((HANDLE)stop,2000)==WAIT_OBJECT_0)return 0;}else Sleep(2000);}}
+static BOOL CALLBACK InitControl(PINIT_ONCE,PVOID,PVOID *){return InitializeCriticalSectionAndSpinCount(&ControlLock,0);}
+static void RefreshWork(ULONG request){
+ try{bool on=DiagnosticAsked()&&Install();if(request==ControlRequest)SetPermission(on);}
+ catch(...){if(request==ControlRequest)SetPermission(false);}
+}
+static void RefreshControl(){
+ if(!InitOnceExecuteOnce(&ControlOnce,InitControl,nullptr,nullptr)){SetPermission(false);return;}
+ EnterCriticalSection(&ControlLock);ULONG request=++ControlRequest;
+ __try{__try{RefreshWork(request);}__except(EXCEPTION_EXECUTE_HANDLER){if(request==ControlRequest)SetPermission(false);}}
+ __finally{LeaveCriticalSection(&ControlLock);}
+}
+static DWORD WINAPI Watch(void *stop){for(;;){RefreshControl();if(stop){if(WaitForSingleObject((HANDLE)stop,2000)==WAIT_OBJECT_0){SetPermission(false);return 0;}}else Sleep(2000);}}
 static void Arm(){if(InterlockedExchange(&Armed,1))return;__try{if(!FindInImage((uintptr_t)GetModuleHandleA(nullptr)))return;}__except(EXCEPTION_EXECUTE_HANDLER){return;}HANDLE thread=CreateThread(nullptr,0,Watch,nullptr,0,nullptr);if(thread)CloseHandle(thread);}
 }
 #else
