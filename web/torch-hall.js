@@ -113,16 +113,11 @@ export function buildStele({scene,keep,tier}){const low=tier==='low',Q=low?.5:1,
      panels (gilt frame and rosette, front and back), a moulded cap with a red band */
   const rbox=(w,h,d,r)=>{const sh=new THREE.Shape(),x=w/2-r,y=h/2-r;sh.moveTo(-x,-y);sh.lineTo(x,-y);sh.lineTo(x,y);sh.lineTo(-x,y);sh.closePath();
    const g=new THREE.ExtrudeGeometry(sh,{depth:d-2*r,bevelEnabled:true,bevelThickness:r,bevelSize:r,bevelSegments:3,curveSegments:4});g.translate(0,0,-(d-2*r)/2);return stepUV(g,1);};
-  const panelMat=keep(new THREE.MeshPhysicalMaterial({map:stepMat.map,color:0xd6ccbd,roughness:.55,metalness:0,envMapIntensity:.5}));
-  { const L=SW+.7;let y=POST_Y;const part=(w,h,d,r,m=stepMat)=>{mesh(rbox(w,h,d,r),m,0,y+h/2,0);y+=h;};
+  /* plain marble, one long cut of the texture across the whole base so the veins never repeat along it */
+  const baseMat=keep(stepMat.clone());for(const k of ['map','roughnessMap','normalMap']){baseMat[k]=keep(stepMat[k].clone());baseMat[k].repeat.set(1/14,1/14);baseMat[k].offset.set(.31,.17);}
+  { const L=SW+.7;let y=POST_Y;const part=(w,h,d,r,m=baseMat)=>{mesh(rbox(w,h,d,r),m,0,y+h/2,0);y+=h;};
    part(L+.5,.2,1.2,.02);part(L+.3,.07,1.04,.03);part(L+.2,.06,.98,.025);
-   const dieH=BASE_Y-POST_Y-(.2+.07+.06)-(.06+.07+.1);part(L,dieH,.86,.012);const cy=y-dieH/2,N=5,cell=L/N;
-   for(let k=0;k<=N;k++){const x=-L/2+k*cell;mesh(rbox(.36,dieH,.94,.01),stepMat,x,cy,0);}
-   for(let k=0;k<N;k++){const x=-L/2+(k+.5)*cell;for(const fz of [-1,1]){const z=fz*.431,pw=cell-.7;
-    mesh(new THREE.BoxGeometry(pw,dieH*.56,.012),panelMat,x,cy,z,false);
-    for(const [w,h,dx,dy] of [[pw+.04,.02,0,dieH*.29],[pw+.04,.02,0,-dieH*.29],[.02,dieH*.6,pw/2+.01,0],[.02,dieH*.6,-pw/2-.01,0]])mesh(new THREE.BoxGeometry(w,h,.02),gilt,x+dx,cy+dy,z+fz*.004,false);
-    mesh(new THREE.CylinderGeometry(.07,.07,.02,24).rotateX(Math.PI/2),gilt,x,cy,z+fz*.008,false);
-    for(let q=0;q<8;q++){const a=q/8*Math.PI*2;mesh(new THREE.SphereGeometry(.026,10,8),gilt,x+Math.cos(a)*.105,cy+Math.sin(a)*.105,z+fz*.006,false);}}}
+   const dieH=BASE_Y-POST_Y-(.2+.07+.06)-(.06+.07+.1);part(L,dieH,.86,.012);
    part(L+.1,.06,.94,.02);part(L+.2,.07,1.0,.03,inlayRed);part(L+.3,.1,1.06,.035);}
  const s=new THREE.Shape(),w=SW,h=SH,b=.04;s.moveTo(-w/2+b,-h/2);s.lineTo(w/2-b,-h/2);s.quadraticCurveTo(w/2,-h/2,w/2,-h/2+b);s.lineTo(w/2,h/2-b);s.quadraticCurveTo(w/2,h/2,w/2-b,h/2);
  s.lineTo(-w/2+b,h/2);s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-b);s.lineTo(-w/2,-h/2+b);s.quadraticCurveTo(-w/2,-h/2,-w/2+b,-h/2);
@@ -181,9 +176,25 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  const halfMat=keep(new THREE.MeshStandardMaterial({map:T(half.map),normalMap:T(half.normal,false),roughness:.85,metalness:0,side:THREE.BackSide,envMapIntensity:.3}));
  const naveTex={map:T(nave.map),normal:T(nave.normal,false)};naveTex.map.repeat.set(5,4);naveTex.normal.repeat.set(5,4);
  const naveMat=keep(new THREE.MeshStandardMaterial({map:naveTex.map,normalMap:naveTex.normal,roughness:.85,side:THREE.BackSide,envMapIntensity:.3}));
- /* glass: unlit, tinted by the time of day (glassTint below) */
- const glass=[roseTex,quarryTex,lanTex].map(t=>keep(new THREE.MeshBasicMaterial({map:t,side:THREE.DoubleSide,fog:false,toneMapped:true})));
- const [roseMat,drumGlassMat,lanMat]=glass;
+ /* glass: one material per window. The pane darkens toward its frame (the reveal and the cames shade it), is a little brighter at
+    the top (more sky), and its brightness follows the sky plus how squarely it faces the sun or moon (applyTime). Clear glass lets
+    the sun through to the shadow map; stained glass does not. `spill` is the soft coloured light the pane throws on its reveal and wall. */
+ const glassWins=[];
+ const GLASS_VS=`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
+ function glassMat(tex,{round=false,normal,clear=false,avg=new THREE.Color(1,1,1)}){
+  const u={map:{value:tex},uTint:{value:new THREE.Color(1,1,1)},uBright:{value:1},uRound:{value:round?1:0},uAvg:{value:avg}};
+  const m=keep(new THREE.ShaderMaterial({uniforms:u,side:THREE.DoubleSide,vertexShader:GLASS_VS,
+   fragmentShader:`uniform sampler2D map;uniform vec3 uTint;uniform float uBright;uniform float uRound;varying vec2 vUv;
+    void main(){vec3 t=texture2D(map,vUv).rgb;t=mix(vec3(dot(t,vec3(.2126,.7152,.0722))),t,.82);float e=uRound>.5?(.5-length(vUv-.5)):min(min(vUv.x,1.-vUv.x)*.55,min(vUv.y,1.-vUv.y));
+     float frame=smoothstep(0.,.09,e);float grad=mix(.7,1.08,vUv.y);gl_FragColor=vec4(t*uTint*uBright*grad*(.3+.7*frame),1.);
+     #include <tonemapping_fragment>
+     #include <colorspace_fragment>
+    }`}));
+  m.userData.glass=true;m.userData.clear=clear;glassWins.push({u,n:normal.clone().normalize(),clear});return m;}
+ const spillTex=T(glowSprite(128,'rgba(255,255,255,.9)','rgba(255,255,255,.25)'));
+ function spillMat(glassM){const g=glassM.uniforms;return keep(new THREE.ShaderMaterial({uniforms:{map:{value:spillTex},uTint:g.uTint,uBright:g.uBright,uAvg:g.uAvg},transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,
+  vertexShader:GLASS_VS,fragmentShader:`uniform sampler2D map;uniform vec3 uTint;uniform float uBright;uniform vec3 uAvg;varying vec2 vUv;void main(){float a=texture2D(map,vUv).r;gl_FragColor=vec4(uAvg*uTint*uBright*a*.05,1.);}`}));}
+ const ROSE_AVG=new THREE.Color(.42,.26,.56),LANCET_AVG=new THREE.Color(.30,.26,.62);
 
  const add=(geo,mat,pos,rot,{cast=true,recv=true}={})=>{const m=new THREE.Mesh(keep(geo),mat);if(pos)m.position.set(...pos);if(rot)m.rotation.set(...rot);m.castShadow=cast;m.receiveShadow=recv;hall.add(m);return m;};
  const inst=(geo,mat,list,{cast=true,pattern=false}={})=>{const m=new THREE.InstancedMesh(keep(geo),mat,list.length),o=new THREE.Object3D();
@@ -257,7 +268,8 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  for(const sx of [-1,1]){bigArch([sx*HX,SP,BAYZ],[0,Math.PI/2,0]);
   const s=new THREE.Shape();s.moveTo(-R,0);s.absarc(0,0,R,Math.PI,0,true);s.closePath();const ry=4.6,rr=2.7;const h=new THREE.Path();h.absarc(0,ry,rr,0,Math.PI*2,true);s.holes.push(h);
   add(worldUV(new THREE.ExtrudeGeometry(s,{depth:.5,bevelEnabled:false,curveSegments:48}),4),stone,[sx<0?-(HX+1.1):HX+.6,SP,BAYZ],[0,Math.PI/2,0]);
-  add(new THREE.CircleGeometry(rr,48),roseMat,[sx*(HX+.85),SP+ry,BAYZ],[0,Math.PI/2,0],{cast:false,recv:false});
+  { const gm=glassMat(roseTex,{round:true,normal:new THREE.Vector3(sx,0,0),avg:ROSE_AVG});add(new THREE.CircleGeometry(rr,48),gm,[sx*(HX+.85),SP+ry,BAYZ],[0,Math.PI/2,0],{cast:false,recv:false});
+   const sp=add(new THREE.PlaneGeometry(rr*3.4,rr*3.4),spillMat(gm),[sx*(HX+.08),SP+ry,BAYZ],[0,-sx*Math.PI/2,0],{cast:false,recv:false});sp.renderOrder=2;noAO.push(sp);}
   add(new THREE.TorusGeometry(rr+.08,.16,10,64),smooth,[sx*(HX+.5),SP+ry,BAYZ],[0,Math.PI/2,0]);add(new THREE.TorusGeometry(rr*.22,.08,8,32),smooth,[sx*(HX+.55),SP+ry,BAYZ],[0,Math.PI/2,0]);
   const spokes=[];for(let i=0;i<12;i++)spokes.push([sx*(HX+.55),SP+ry,BAYZ,Math.PI/2,i/12*Math.PI*2,0]);
   inst(new THREE.BoxGeometry(.07,rr*.78,.07).translate(0,rr*.61,0),smooth,spokes.map(p=>[p[0],p[1],p[2],0,0,0]).map((p,i)=>{const a=i/12*Math.PI*2;return [p[0],p[1],p[2],Math.PI/2,a,0];}),{cast:false});
@@ -274,7 +286,8 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
   const wall=wallWithArchesG(w,APSE_H,[niche,win],.8);wall.translate(-w/2,0,-.8);put(worldUV(wall,4),stone,0,0,0);
   put(new THREE.PlaneGeometry(niche.w,niche.h),nicheMat,0,niche.y+niche.h/2,-.5,{cast:false});
   put(new THREE.TorusGeometry(niche.w/2+.06,.07,6,20,Math.PI),smooth,0,niche.y+niche.h-niche.w/2,.02);
-  put(new THREE.PlaneGeometry(win.w,win.h),lanMat,0,win.y+win.h/2,-.4,{cast:false,recv:false});
+  { const gm=glassMat(lanTex,{normal:new THREE.Vector3(cx,0,cz),avg:LANCET_AVG});put(new THREE.PlaneGeometry(win.w,win.h),gm,0,win.y+win.h/2,-.52,{cast:false,recv:false});
+   const sp=put(new THREE.PlaneGeometry(win.w*3.2,win.h*1.7),spillMat(gm),0,win.y+win.h/2,.015,{cast:false,recv:false});sp.renderOrder=2;noAO.push(sp);}
   put(new THREE.TorusGeometry(win.w/2+.08,.09,8,24,Math.PI),smooth,0,win.y+win.h-win.w/2,.03);put(box(win.w+.5,.14,.36),smooth,0,win.y-.07,.12);
   /* base, entablature (architrave, carved frieze, cornice) and pilasters at the corners */
   put(box(w,.45,.22),smooth,0,.22,.11);put(box(w,.3,.16),smooth,0,EN_Y+.15,.08);put(scaleUV(new THREE.PlaneGeometry(w,.7),w/5.6,1),carved,0,EN_Y+.65,.02,{cast:false});
@@ -302,7 +315,7 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  const drum=[],pil=[],pilCap=[];
  for(let i=0;i<DRUM_N;i++){const a=(i+.5)/DRUM_N*Math.PI*2,cx=Math.sin(a),cz=Math.cos(a);
   add(panelWall(drumPanel,DRUM_H,[{x:drumPanel/2-DW/2,y:DWY,w:DW,h:DWH}],.8),stone,[cx*(R+.8),DRUM_Y,BAYZ+cz*(R+.8)],[0,a+Math.PI,0]);
-  add(new THREE.PlaneGeometry(DW,DWH),drumGlassMat,[cx*(R+.42),DRUM_Y+DWY+DWH/2,BAYZ+cz*(R+.42)],[0,a+Math.PI,0],{cast:false,recv:false});
+  add(new THREE.PlaneGeometry(DW,DWH),glassMat(quarryTex,{normal:new THREE.Vector3(cx,0,cz),clear:true}),[cx*(R+.42),DRUM_Y+DWY+DWH/2,BAYZ+cz*(R+.42)],[0,a+Math.PI,0],{cast:false,recv:false});
   add(new THREE.TorusGeometry(DW/2+.07,.07,6,20,Math.PI),smooth,[cx*(R-.02),DRUM_Y+DWY+DWH-DW/2,BAYZ+cz*(R-.02)],[0,a+Math.PI,0]);
   drum.push({pos:new THREE.Vector3(cx*(R-.1),DRUM_Y+DWY+DWH*.55,BAYZ+cz*(R-.1)),n:new THREE.Vector3(cx,0,cz),r:.55,str:.85});
   /* paired pilasters at each corner of the polygon */
@@ -320,7 +333,7 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  const EYE_Y=DOME_Y+Math.cos(th0)*R;
  add(new THREE.TorusGeometry(EYE+.05,.16,10,48).rotateX(Math.PI/2),gilt,[0,EYE_Y,BAYZ],null,{cast:false});
  add(new THREE.CylinderGeometry(EYE+.1,EYE+.1,3.2,32,1,true),keep(new THREE.MeshStandardMaterial({map:T(pale.map),color:0xd8d0c4,roughness:.85,side:THREE.DoubleSide})),[0,EYE_Y+1.6,BAYZ]);
- const lantern=[];for(let i=0;i<8;i++){const a=(i+.5)/8*Math.PI*2;add(new THREE.PlaneGeometry(.42,2.1),drumGlassMat,[Math.sin(a)*(EYE+.04),EYE_Y+1.6,BAYZ+Math.cos(a)*(EYE+.04)],[0,a+Math.PI,0],{cast:false,recv:false});
+ const lantern=[];for(let i=0;i<8;i++){const a=(i+.5)/8*Math.PI*2;add(new THREE.PlaneGeometry(.42,2.1),glassMat(quarryTex,{normal:new THREE.Vector3(Math.sin(a),.4,Math.cos(a)),clear:true}),[Math.sin(a)*(EYE+.04),EYE_Y+1.6,BAYZ+Math.cos(a)*(EYE+.04)],[0,a+Math.PI,0],{cast:false,recv:false});
   lantern.push({pos:new THREE.Vector3(Math.sin(a)*(EYE-.2),EYE_Y+1.4,BAYZ+Math.cos(a)*(EYE-.2)),n:new THREE.Vector3(Math.sin(a),.35,Math.cos(a)).normalize(),r:.35,str:.6});}
  add(new THREE.SphereGeometry(EYE+.1,32,12,0,Math.PI*2,0,Math.PI/2),keep(new THREE.MeshStandardMaterial({map:T(pale.map),color:0xcfc6b8,roughness:.9,side:THREE.BackSide})),[0,EYE_Y+3.2,BAYZ]);
  add(new THREE.RingGeometry(R-.1,R+1.2,64).rotateX(Math.PI/2),stone,[0,RING_Y+.54,BAYZ]);add(new THREE.RingGeometry(R-.1,R+1.2,64).rotateX(Math.PI/2),stone,[0,DOME_Y-.02,BAYZ]);
@@ -328,7 +341,7 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  /* coffered barrel vault down the nave, transverse ribs, west wall with a rose */
  { const len=NZ1-FRONT;const g=new THREE.CylinderGeometry(R+.6,R+.6,len,64,1,true,-Math.PI/2,Math.PI).rotateX(-Math.PI/2);add(g,naveMat,[0,SP,(FRONT+NZ1)/2]);
    const ribs=[];for(let z=FRONT+3.4;z<NZ1;z+=3.4)ribs.push([0,SP,z]);inst(new THREE.TorusGeometry(R+.5,.16,8,48,Math.PI),smooth,ribs);
-   add(box(2*AX+1,30,.8),stone,[0,15,NZ1]);const wr=3.2,wy=SP+3.6;add(new THREE.CircleGeometry(wr,48),roseMat,[0,wy,NZ1-.45],[0,Math.PI,0],{cast:false,recv:false});
+   add(box(2*AX+1,30,.8),stone,[0,15,NZ1]);const wr=3.2,wy=SP+3.6;add(new THREE.CircleGeometry(wr,48),glassMat(roseTex,{round:true,normal:new THREE.Vector3(0,0,1),avg:ROSE_AVG}),[0,wy,NZ1-.45],[0,Math.PI,0],{cast:false,recv:false});
    add(new THREE.TorusGeometry(wr+.1,.18,10,64),smooth,[0,wy,NZ1-.5]);windows.west={pos:new THREE.Vector3(0,wy,NZ1-.5),normal:new THREE.Vector3(0,0,1),r:wr};}
 
  /* ---- floor: mirror under polished marble; an inlaid runner up the nave and a porphyry rota before the stair ---- */
@@ -481,7 +494,7 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
   hemi.color.copy(cur.sky);hemi.groundColor.copy(cur.gnd);hemi.intensity=hallState.skyI;
   /* the light tier has no shadows, so the sun would come through the roof: keep it to a soft key there */
   sun.color.copy(cur.lc);sun.intensity=hallState.li;sun.position.copy(sun.target.position).addScaledVector(hallState.sunPos,90);
-  for(const m of glass)m.color.copy(cur.glass).multiplyScalar(hallState.gi);
+  for(const g of glassWins){const face=Math.max(0,g.n.dot(hallState.sunPos)),lit=hallState.li*(hallState.moon?.5:.25)*face;g.u.uTint.value.copy(cur.glass);g.u.uBright.value=hallState.gi*(g.clear?.5:.32)+lit*(g.clear?.8:.5);}
   scene.fog.color.copy(cur.fog);scene.fog.density=hallState.fd;scene.background.copy(cur.fog);
   renderer.toneMappingExposure=hallState.exp;
   /* shafts: travel along -sunPos; a window side gets them when it faces the sun */
@@ -503,7 +516,7 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  function shadowDirty(){if(shadowState.dirty||shadowAt.angleTo(hallState.sunPos)>.0018){shadowAt.copy(hallState.sunPos);shadowState.dirty=false;return true;}return false;}
 
  /* clear glass (drum, lantern) lets the sun and moon through; stained glass holds most of it back */
- hall.traverse(o=>{if(o.isMesh&&glass.includes(o.material))o.castShadow=o.material!==drumGlassMat;});
+ hall.traverse(o=>{if(o.isMesh&&o.material&&o.material.userData&&o.material.userData.glass)o.castShadow=!o.material.userData.clear;});
  return {hall,skipInMirror,noAO,floorMat,inlayMat,FL_W,FL_L,FL_Z,update,setShadows,shadowDirty,sun,state:hallState,torchPoints,
   shafts:shaftBeams,windows,colZ,hours:hoursNow};
 }
