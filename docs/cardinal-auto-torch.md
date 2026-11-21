@@ -88,6 +88,9 @@ bulk 复用 `background-budget.wait` 的真实 idle gate，运行中每两秒复
 缓存快速身份同时记录 dev/ino、大小和 mtime/ctime；整文件散列在安装时验证，不能代替持续重新散列或声称抵抗任意文件系统篡改
 单个容器的完整 hash 不证明整个游戏的全部文件相同，审核者必须为该版本选对身份容器
 安装时真正散列内容；后续 loader 每次重验签名、审核 revision、内置版本及本地文件 stat/路径，不把 stat 快速检查说成持续全量散列
+新协议 `layer(answer,key,{exe})` 和 `installed(root,key,{exe})` 必须携带当前调用方的 exe；缺少上下文拒绝，canonical exe 必须等于本次安装绑定路径，不能借另一目录中相同 EXE 的缓存核验脚本
+运行中再次消费 layer 前由 `forExe(layer,key,exe)` 重验当前上下文；新协议 layer 的私有 WeakMap 来源丢失或被复制时拒绝，旧 legacy layer 合同保持
+当前仍按 EXE key 共用一份安装 cache；同 EXE 的另一副本需要独立完成接收并覆盖绑定，未做多安装并存的复合 cache，不会自动假定脚本相同
 
 请求回来后重新读游戏行、确认未移除/换 exe、核对本地文件未变，再用一个临时文件原子替换 cache
 profile、release、来源和本地身份在同一个 JSON 内，不会出现新 profile 配旧 receipt
@@ -118,6 +121,7 @@ profile、release、来源和本地身份在同一个 JSON 内，不会出现新
 ## 集成和未完成项
 
 root 独占 shared 接线：手动保存/更新游戏、原 exe 选择和可见聚焦卡片刷新调用 `enqueue(...,{priority:'user'})`，library_scan 完成默认 bulk；Runtime 停止/重建调用 stop/resume；Worker 注册 torchReleaseRoute
+`self-check-live` 的 bind/refresh 必须传当前 exe，`inputOf`、`choose` 和 `settle` 消费当前 shared layer 前必须调用 `forExe`；未合这份调用方补丁时，不能认为真实 Reader 的跨安装路径门已闭合
 `core/profiles/seed.cjs` 必须明确忽略保留的 history 目录，原 seed 验证只对 history 分流到独立严格审计；在此之前只能向私有 staging 导出
 新迁移 `0027_torch_releases.sql` 只是候选，未在任何生产 DB 执行
 

@@ -14,15 +14,15 @@ async function state(db,root,id,{wait=2500,fetcher=globalThis.fetch,hash,torchKe
  const auto=require('../core/auto-profile.cjs'),feed=require('./auto-profile-feed.cjs');
  const key=(hash?await timeout(hash(row.executable),wait):await timeout(auto.exeKey(root,row.executable),Math.max(wait,3000)))||'';if(!key)return HIDDEN;
  const receiver=require('./torch-receive.cjs'),pending=receiver.status(root,id);
- const receipt=await receiver.installed(root,key,torchKeys?{keys:torchKeys}:{});if(receipt)return {state:'received',key,receipt};
+ const receipt=await receiver.installed(root,key,{exe:row.executable,...(torchKeys?{keys:torchKeys}:{})});if(receipt)return {state:'received',key,receipt};
  if(pending?.key===key&&['installing','install-failed'].includes(pending.state))return {...pending,key};
  let storedEngine=row.engine||'';try{storedEngine=JSON.parse(row.original||'{}').library?.engine||storedEngine;}catch{}
  const engine=engineKnown(storedEngine);
  let answer=feed.cached(root,key);
- if(!answer||(!answer.none&&!feed.layer(answer,key))||Date.now()-(answer.fetchedAt||0)>(answer.none?6*3600000:24*3600000)){
-  if(wait>0){const got=await timeout(feed.refresh(root,key,{fetcher}),wait);if(got)answer=got;}}
+ if(!answer||(!answer.none&&!feed.layer(answer,key,{exe:row.executable}))||Date.now()-(answer.fetchedAt||0)>(answer.none?6*3600000:24*3600000)){
+  if(wait>0){const got=await timeout(feed.refresh(root,key,{fetcher,exe:row.executable}),wait);if(got)answer=got;}}
  /* another player's diff reached this PC: who passed it on (the relay's credit of the answer), shown as one line */
- if(answer&&!answer.none&&feed.layer(answer,key)){const credit=feed.cleanCredit(answer.credit);if(credit)return {state:'received',key,credit,receipt:null};}
+ if(answer&&!answer.none&&feed.layer(answer,key,{exe:row.executable})){const credit=feed.cleanCredit(answer.credit);if(credit)return {state:'received',key,credit,receipt:null};}
  if(feed.sent(root,key)){if(wait>0)await timeout(feed.syncCredit(root,key,{fetcher}),wait);return {state:'thanks',key,credit:feed.creditOf(root,key)};}
  if(engine&&localSeed(root,row,engine,key))return HIDDEN;
  if(!answer||!answer.none)return HIDDEN;
