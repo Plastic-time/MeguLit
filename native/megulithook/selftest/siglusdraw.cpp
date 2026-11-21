@@ -33,6 +33,8 @@ int main() {
     if (!r.ok) continue;
     Check(r.addMsg == g.addMsg && r.push == g.pushFn && r.clear == g.clear, n + ": add_msg / push / clear");
     Check(r.vec == g.vec && r.penAdd == g.penAdd && r.penX == g.penX && r.rubyStr == g.rubyStr && r.rubyX == g.rubyX && r.rubyY == g.rubyY, n + ": msg field offsets");
+    Check(r.frame == g.frame && r.frameX == g.frameX && r.frameY == g.frameY && r.frameArgX == g.frameArgX && r.frameArgY == g.frameArgY, n + ": msg::frame and its screen origin fields");
+    Check(r.colorFn == g.colorFn && r.colors == g.colors, n + ": the colour lookup and its table");
     bool sites = r.nSites == g.np; for (int i = 0; i < g.np; i++) sites &= SiglusDrawSig::PushRole(r, g.push[i].va + 5) == g.push[i].role;
     Check(sites, n + ": every push call site and its role");
     bool adds = r.nAdds == g.na; for (int i = 0; i < g.na; i++) adds &= SiglusDrawSig::AddRole(r, g.add[i].va + 5) == g.add[i].role;

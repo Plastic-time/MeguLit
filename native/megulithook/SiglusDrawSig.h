@@ -20,6 +20,8 @@ struct Result {
   bool ok = false; const char *why = "";
   std::uint32_t addMsg = 0, push = 0, clear = 0; int vec = -1;
   int penAdd = -1, penX = -1, rubyStr = -1, rubyX = -1, rubyY = -1;
+  // optional: msg::frame (screen origin = (int)param->X + arg at [ebp+frameArgX], same for y) and the colour table
+  std::uint32_t frame = 0, colorFn = 0, colors = 0; int frameX = -1, frameY = -1, frameArgX = -1, frameArgY = -1;
   int nSites = 0; std::uint32_t site[MaxSites] = {}; int siteRole[MaxSites] = {};
   int nAdds = 0; std::uint32_t add[MaxSites] = {}; int addRole[MaxSites] = {};
   int count(int role) const { int n = 0; for (int i = 0; i < nSites; i++) n += siteRole[i] == role; return n; }
@@ -58,6 +60,9 @@ static const char PRINT[] = "8d 85 ?? ?? ff ff 50 8d 8b ?? ?? 00 00 e8 ?? ?? ?? 
 static const char CLEAR[] = "55 8b ec 83 ec 08 33 c0 56 57 8b f9 66 89 87 ?? ?? 00 00 89 87 ?? ?? 00 00 89 87 ?? ?? 00 00 89 87";
 static const char RUBYSTR[] = "83 bf ?? ?? 00 00 08 8d 87 ?? ?? 00 00";
 static const char RUBYPOS[] = "8b b7 ?? ?? 00 00 8b 9f ?? ?? 00 00 8b 8f ?? ?? 00 00";
+static const char FRAME[] = "f3 0f 2c 7e ?? 03 93 ?? ?? 00 00 f3 0f 2c 76 ?? 8b 4a 1c 03 7a 18 03 7d ?? 89 4d ?? 8b 4a ?? 89 4d ?? 89 7d ?? 03 72 1c 8b 52 ?? 03 75 ??";
+static const char FRAMEPRO[] = "cc 55 8b ec 83 ec";
+static const char COLORS[] = "55 8b ec 51 a1 ?? ?? ?? ?? 8b 4d 0c 8b 10 8b 40 04 2b c2 c1 f8 02 48 85 c9 79";
 // the bytes right before a call, in this order (the first that fits wins)
 static const char *const PushTail[] = {
   "c6 85 ?? ?? ff ff 01",                                         // ruby
@@ -133,6 +138,16 @@ inline Result Find(const Seg *s, int ns) {
   int nc = 0;
   for (int k = 0; k < ns; k++) for (size_t i = 0; i < s[k].n; i++) if (s[k].b[i] == 0x55 && Match(s[k].b + i, s[k].n - i, CLEAR)) { if (!nc) r.clear = s[k].va + (std::uint32_t)i; nc++; }
   if (nc != 1) { r.why = nc ? "several clear functions" : "no clear function"; return r; }
+  // optional: msg::frame and the colour lookup (each must be unique, else left out)
+  int nf = 0; const Seg *fs = nullptr; size_t fi = 0;
+  for (int k = 0; k < ns; k++) for (size_t i = 0; i < s[k].n; i++) if (s[k].b[i] == 0xf3 && Match(s[k].b + i, s[k].n - i, FRAME) && U16(s[k].b + i + 7) == r.vec) { if (!nf) { fs = &s[k]; fi = i; } nf++; }
+  if (nf == 1) {
+    long st = -1; for (size_t i = fi > 0x500 ? fi - 0x500 : 0; i < fi; i++) if (fs->b[i] == 0xcc && Match(fs->b + i, fs->n - i, FRAMEPRO)) st = (long)i + 1;
+    if (st >= 0) { r.frame = fs->va + (std::uint32_t)st; r.frameX = fs->b[fi + 4]; r.frameY = fs->b[fi + 15]; r.frameArgX = fs->b[fi + 24]; r.frameArgY = fs->b[fi + 45]; }
+  }
+  int nl = 0;
+  for (int k = 0; k < ns; k++) for (size_t i = 0; i < s[k].n; i++) if (s[k].b[i] == 0x55 && Match(s[k].b + i, s[k].n - i, COLORS)) { if (!nl) { r.colorFn = s[k].va + (std::uint32_t)i; r.colors = (std::uint32_t)I32(s[k].b + i + 5); } nl++; }
+  if (nl != 1) { r.colorFn = 0; r.colors = 0; }
   r.ok = true; r.why = "";
   return r;
 }

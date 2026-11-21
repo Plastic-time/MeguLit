@@ -17,6 +17,11 @@
 // glyph / GPU positions, as for YU-RIS. color = the engine's colour number (-1 = the window's default), not RGB. A text
 // area cleared for a new page (msg::clear):
 //   ToMe_DRAWRUN engine=siglus clear id=<text area>
+// Where a text area sits on the game's screen (msg::frame, when the build has it; Gameexe #SCREEN_SIZE pixels, guessed
+// from the engine using the same sum for its mouse hit rects): once it has held for 3 frames and changed,
+//   ToMe_DRAWRUN engine=siglus origin id=<text area> ox= oy=
+// and every later run of that area carries ox= oy= too (screen x = x0 + ox). rgb= is the colour number through the
+// engine's own colour table (#COLOR_TABLE, 0xFFRRGGBB entries), when the build has the lookup.
 // Opt-in: nothing is hooked until MeguLit's control file %TEMP%\MeguLit\draw\<pid>.txt says roles=1 (draw.roles of this
 // game's diff in The Seed); a watcher thread checks it every 2 s. The hooks call the game's own functions in every case
 // and only read the engine's memory (inside __try).
@@ -29,22 +34,31 @@
 #include "MinHook.h"
 #include "SiglusDrawSig.h"
 namespace SiglusDraw {
-static void *OrigPush = nullptr, *OrigClear = nullptr;
+static void *OrigPush = nullptr, *OrigClear = nullptr, *OrigFrame = nullptr;
 static SiglusDrawSig::Result Sig;
 static volatile LONG Armed = 0, Installed = 0;
 static CRITICAL_SECTION Lock;
 // moji layout (both builds): +0 type (0 = character), +4 code, +8 size, +0xc colour no., +0x18 x, +0x1c y
-struct Moji { int type, code, size, color, x, y; };
+struct Moji { int type, code, size, color, x, y; long rgb; };
 struct Glyph { long x, y, size; wchar_t c; };
 enum { R_LINE, R_NAME, R_CHOICE, R_SYSTEM };
 static const char *const RoleName[] = {"line", "name", "choice", "system"};
 // the current run (under Lock)
-static uintptr_t RunVec = 0; static int RunRole = -1, RunSrc = -1, RunColor = 0; static unsigned Run = 0, RunNo = 0;
+static uintptr_t RunVec = 0; static int RunRole = -1, RunSrc = -1, RunColor = 0; static long RunRgb = -1; static unsigned Run = 0, RunNo = 0;
 static std::vector<Glyph> RunG; static std::string RunRuby; static DWORD LastTick = 0;
 // the ruby being laid out: the glyphs of one ruby call come one after another
 static bool InRuby = false;
 // text areas that drew since their last clear (a clear of any other is not news)
 static uintptr_t Drawn[32]; static int NDrawn = 0;
+// screen origin per text area (keyed by its glyph vector, like the run ids)
+struct Origin { uintptr_t vec; long ox, oy, cx, cy; int same; bool known, told; };
+static Origin Origins[32]; static int NOrigins = 0;
+static Origin *OriginOf(uintptr_t vec, bool make) {
+  for (int i = 0; i < NOrigins; i++) if (Origins[i].vec == vec) return &Origins[i];
+  if (!make) return nullptr;
+  if (NOrigins == 32) { memmove(Origins, Origins + 1, sizeof(Origins) - sizeof(Origins[0])); NOrigins--; }
+  Origin *o = &Origins[NOrigins++]; memset(o, 0, sizeof *o); o->vec = vec; return o;
+}
 
 static std::string Utf8(const wchar_t *w, int n) {
   if (n <= 0) return std::string();
@@ -65,9 +79,12 @@ static void Flush() {
   }
   std::string t = Utf8(w.data(), (int)w.size()); Clean(t, 120);
   std::string ruby = RunRuby; Clean(ruby, 90);
-  Msg::Log("ToMe_DRAWRUN engine=siglus run=%u role=%s id=%s:%x n=%d x0=%ld y0=%ld x1=%ld y1=%ld size=%ld color=%d%s%s text=%s",
-           RunNo, RoleName[RunRole], SiglusDrawSig::PushName[RunSrc == -2 ? SiglusDrawSig::P_PRINT : RunSrc], (unsigned)RunVec, (int)RunG.size(),
-           x0, y0, x1, y1, size, RunColor, ruby.empty() ? "" : " ruby=", ruby.c_str(), t.c_str());
+  char extra[64] = ""; Origin *o = OriginOf(RunVec, false);
+  if (RunRgb >= 0) sprintf_s(extra, " rgb=%06lx", RunRgb & 0xffffff);
+  if (o && o->known) { size_t n = strlen(extra); sprintf_s(extra + n, sizeof extra - n, " ox=%ld oy=%ld", o->ox, o->oy); }
+  Msg::Log("ToMe_DRAWRUN engine=siglus run=%u role=%s id=%s:%x n=%d x0=%ld y0=%ld x1=%ld y1=%ld size=%ld color=%d%s%s%s text=%s",
+           RunNo, RoleName[RunRole], SiglusDrawSig::PushName[RunSrc], (unsigned)RunVec, (int)RunG.size(),
+           x0, y0, x1, y1, size, RunColor, extra, ruby.empty() ? "" : " ruby=", ruby.c_str(), t.c_str());
   RunG.clear(); RunRuby.clear();
 }
 static void MarkDrawn(uintptr_t msg) {
@@ -113,7 +130,7 @@ static void Handle(int src, int addSrc, uintptr_t vec, const Moji &m) {
   else if (src == SiglusDrawSig::P_MSGSEL || src == SiglusDrawSig::P_SELBTN) role = R_CHOICE;
   else role = R_SYSTEM;
   bool same = !RunG.empty() && vec == RunVec && role == RunRole && src == RunSrc && m.y == RunG.back().y && m.x >= RunG.back().x;
-  if (!same) { Flush(); RunNo = ++Run; RunVec = vec; RunRole = role; RunSrc = src; RunColor = m.color; }
+  if (!same) { Flush(); RunNo = ++Run; RunVec = vec; RunRole = role; RunSrc = src; RunColor = m.color; RunRgb = m.rgb; }
   Glyph g; g.x = m.x; g.y = m.y; g.size = m.size; g.c = m.type == 0 ? (wchar_t)m.code : (wchar_t)0xfffc; RunG.push_back(g);
   if (src == SiglusDrawSig::P_PRINT || src == SiglusDrawSig::P_NAME) MarkDrawn(vec - (uintptr_t)Sig.vec);
   if (RunG.size() > 400) Flush();
@@ -126,6 +143,12 @@ static void __cdecl OnPush(DWORD ret, const unsigned char *moji, uintptr_t vec, 
     if (src == SiglusDrawSig::P_PRINT) addSrc = SiglusDrawSig::AddRole(Sig, *(const DWORD *)(callerEbp + 4));
     m.type = *(const int *)moji; m.code = *(const int *)(moji + 4) & 0xffff; m.size = *(const int *)(moji + 8);
     m.color = *(const int *)(moji + 0xc); m.x = *(const int *)(moji + 0x18); m.y = *(const int *)(moji + 0x1c);
+    m.rgb = -1;
+    if (Sig.colors) { // the engine's lookup: table[clamp(no, 0, n - 1)]
+      const DWORD *b = *(const DWORD *const *)(uintptr_t)Sig.colors, *e = *(const DWORD *const *)((uintptr_t)Sig.colors + 4);
+      long n = (long)(e - b);
+      if (b && n > 0) { long i = m.color < 0 ? 0 : m.color > n - 1 ? n - 1 : m.color; m.rgb = (long)(b[i] & 0xffffff); }
+    }
   } __except (EXCEPTION_EXECUTE_HANDLER) { return; }
   Handle(src, addSrc, vec, m);
 }
@@ -135,6 +158,39 @@ static void __cdecl OnClear(uintptr_t msg) {
   for (int i = 0; i < NDrawn; i++) if (Drawn[i] == msg) { news = true; Drawn[i] = Drawn[--NDrawn]; break; }
   if (news) { if (RunVec - (uintptr_t)Sig.vec == msg) Flush(); InRuby = false; Msg::Log("ToMe_DRAWRUN engine=siglus clear id=%x", (unsigned)(msg + (uintptr_t)Sig.vec)); }
   LeaveCriticalSection(&Lock);
+}
+// at msg::frame: ecx = the msg, the arguments on the caller's stack (entry esp + ebp displacement - 4)
+static void __cdecl OnFrame(uintptr_t msg, const unsigned char *esp) {
+  long ox, oy;
+  __try {
+    const unsigned char *param = *(const unsigned char *const *)(esp + 4);
+    ox = (long)*(const float *)(param + Sig.frameX) + *(const long *)(esp + Sig.frameArgX - 4);
+    oy = (long)*(const float *)(param + Sig.frameY) + *(const long *)(esp + Sig.frameArgY - 4);
+  } __except (EXCEPTION_EXECUTE_HANDLER) { return; }
+  uintptr_t vec = msg + (uintptr_t)Sig.vec;
+  EnterCriticalSection(&Lock);
+  Origin *o = OriginOf(vec, true);
+  if (ox == o->cx && oy == o->cy) o->same++; else { o->cx = ox; o->cy = oy; o->same = 1; }
+  // settled (3 frames) and new: a window opening slides, its last place is the one that counts
+  if (o->same == 3 && (!o->told || o->ox != ox || o->oy != oy)) {
+    o->ox = ox; o->oy = oy; o->known = true; o->told = true;
+    Msg::Log("ToMe_DRAWRUN engine=siglus origin id=%x ox=%ld oy=%ld", (unsigned)vec, ox, oy);
+  }
+  LeaveCriticalSection(&Lock);
+}
+static __declspec(naked) void FrameGate() {
+  __asm {
+    pushfd
+    pushad
+    lea eax, [esp + 36]          // the entry esp: [esp] = return address, the arguments above it
+    push eax
+    push dword ptr [esp + 28]    // saved ECX (+24, moved by one push): the msg
+    call OnFrame
+    add esp, 8
+    popad
+    popfd
+    jmp dword ptr [OrigFrame]
+  }
 }
 // at the push: [esp] = return address, [esp+4] = the moji, ecx = the vector, ebp = the caller's frame
 static __declspec(naked) void PushGate() {
@@ -185,7 +241,8 @@ static void Install() {
       MH_EnableHook((void *)(uintptr_t)Sig.push) != MH_OK || MH_EnableHook((void *)(uintptr_t)Sig.clear) != MH_OK) {
     Msg::Log("ToMe_DRAWRUN engine=siglus off: hook failed at push %x clear %x", Sig.push, Sig.clear); return;
   }
-  Msg::Log("ToMe_DRAWRUN engine=siglus on: push %x add_msg %x clear %x vec=%x sites=%d adds=%d", Sig.push, Sig.addMsg, Sig.clear, Sig.vec, Sig.nSites, Sig.nAdds);
+  bool frame = Sig.frame && MH_CreateHook((void *)(uintptr_t)Sig.frame, (void *)FrameGate, &OrigFrame) == MH_OK && MH_EnableHook((void *)(uintptr_t)Sig.frame) == MH_OK;
+  Msg::Log("ToMe_DRAWRUN engine=siglus on: push %x add_msg %x clear %x frame %x colors %x vec=%x sites=%d adds=%d", Sig.push, Sig.addMsg, Sig.clear, frame ? Sig.frame : 0, Sig.colors, Sig.vec, Sig.nSites, Sig.nAdds);
 }
 static bool RolesAsked() {
   wchar_t tmp[MAX_PATH]; DWORD n = GetTempPathW(MAX_PATH, tmp); if (!n || n >= MAX_PATH) return false;

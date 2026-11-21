@@ -32,6 +32,17 @@ test('both builds: same moji layout and msg fields, only the addresses move',()=
  /* what the manual reverse engineering found in CLANNAD (msg::add_msg 0x5ddaa0, vector<moji>::push_back 0x5b4a00,
     msg::clear 0x5dbf60, ruby layout pushes at 0x5deaba / 0x5ded7a) */
  assert.deepEqual([a.addMsg,a.push,a.clear,a.sites.ruby],['0x5ddaa0','0x5b4a00','0x5dbf60',['0x5deaba','0x5ded7a']]);
+ /* msg::frame 0x5dcd30 (screen x = (int)param+0x14 + [ebp+0x24]), the colour lookup 0x5b26b0 over the vector at 0xbac4c0 */
+ assert.deepEqual([a.frame,a.colorFn,a.colors,b.frame,b.colorFn,b.colors],['0x5dcd30','0x5b26b0','0xbac4c0','0x5dce80','0x5b27f0','0xbad4c0']);
+ assert.deepEqual([a.off.frameX,a.off.frameY,a.off.frameArgX,a.off.frameArgY],['0x14','0x18','0x24','0x28']);
+});
+
+test('the optional parts stay optional: without msg::frame / the colour lookup the rest still matches',()=>{
+ for(const [name,g] of Object.entries(fx.games)){
+  const segs=segsOf(g).map(s=>({va:s.va,code:Buffer.from(s.code)}));
+  for(const s of segs){const i=s.code.indexOf(Buffer.from([0xf3,0x0f,0x2c,0x7e]));if(i>=0)s.code[i+1]=0x90;const j=s.code.indexOf(Buffer.from([0x8b,0x4d,0x0c,0x8b,0x10,0x8b,0x40,0x04]));if(j>=0)s.code[j]=0x90;}
+  const r=S.find(segs);assert.equal(r.ok,true,name);assert.equal(r.frame,undefined,name);assert.equal(r.colorFn,undefined,name);
+ }
 });
 
 test('near misses never match: bracket check, a ruby call site, clear, an extra unknown push',()=>{

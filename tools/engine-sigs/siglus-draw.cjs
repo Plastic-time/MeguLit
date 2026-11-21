@@ -29,6 +29,12 @@
      backlog push 0; push ecx; lea ecx,[esi+d]; call add_msg   (x2)              the backlog page (name, then text)
    and the push hook reads add_msg's return address ([ebp+4]: push is called with add_msg's frame) to tell them apart.
      clear   msg::clear(): resets the ruby state, the plain text, the glyph vector; called on a new page / clear.
+   Optional (the hook works without them, the records then carry no screen origin / RGB):
+     frame   msg::frame(param*, ..., arg8 x, arg9 y): every frame, per text area. Its loop over the clickable glyph rects
+             computes  screen x = (int)param->X + moji.x + arg8,  y = (int)param->Y + moji.y + arg9  (cvttss2si [esi+X];
+             add [moji+0x18]; add [ebp+AX]). That origin is what the hook reports per text area.
+     colors  the colour lookup  table[clamp(no, 0, n-1)]  (mov eax,[COLORS]; vector<uint32> begin / end), entries
+             0xFFRRGGBB built from Gameexe #COLOR_TABLE.NNN = r, g, b.
    Nothing here is an absolute address: everything is found by these patterns, so another build with the same code
    shape matches too; one that does not, matches nothing and the hook stays off. */
 
@@ -41,6 +47,9 @@ const PROLOGUE=/\xcc\x55\x8b\xec\x6a\xff\x68[\s\S]{4}\x64\xa1\x00\x00\x00\x00/g;
 const CLEAR=/\x55\x8b\xec\x83\xec\x08\x33\xc0\x56\x57\x8b\xf9\x66\x89\x87[\s\S]{2}\x00\x00\x89\x87[\s\S]{2}\x00\x00\x89\x87[\s\S]{2}\x00\x00\x89\x87/g;
 const RUBYSTR=/\x83\xbf[\s\S]{2}\x00\x00\x08\x8d\x87([\s\S]{2})\x00\x00/;
 const RUBYPOS=/\x8b\xb7([\s\S]{2})\x00\x00\x8b\x9f([\s\S]{2})\x00\x00\x8b\x8f([\s\S]{2})\x00\x00/;
+const FRAME=/\xf3\x0f\x2c\x7e([\s\S])\x03\x93([\s\S]{2})\x00\x00\xf3\x0f\x2c\x76([\s\S])\x8b\x4a\x1c\x03\x7a\x18\x03\x7d([\s\S])\x89\x4d[\s\S]\x8b\x4a[\s\S]\x89\x4d[\s\S]\x89\x7d[\s\S]\x03\x72\x1c\x8b\x52[\s\S]\x03\x75([\s\S])/g;
+const FRAMEPRO=/\xcc\x55\x8b\xec\x83\xec/g;
+const COLORS=/\x55\x8b\xec\x51\xa1([\s\S]{4})\x8b\x4d\x0c\x8b\x10\x8b\x40\x04\x2b\xc2\xc1\xf8\x02\x48\x85\xc9\x79/g;
 /* the bytes right before a call (the regex must end at the E8) */
 const PUSH_TAILS={
  ruby:/\xc6\x85[\s\S]{2}\xff\xff\x01$/,
@@ -110,6 +119,12 @@ function find(segs){
  const clears=[];each(segs,CLEAR,(s,m)=>clears.push(s.va+m.index));
  if(clears.length!==1){r.why=clears.length+' clear functions (want 1)';return r;}
  r.clear=clears[0];
+ /* optional: msg::frame (screen origin of a text area) and the colour table */
+ const frames=[];each(segs,FRAME,(s,m)=>{if(u16(m[2])===r.vec)frames.push({s,i:m.index,m});});
+ if(frames.length===1){const {s:fs,i:fi,m:fm}=frames[0],ft=fs.code.toString('latin1');let st=-1;FRAMEPRO.lastIndex=Math.max(0,fi-0x500);let k;while((k=FRAMEPRO.exec(ft))&&k.index<fi)st=k.index+1;
+  if(st>=0){r.frame=fs.va+st;r.off.frameX=fm[1].charCodeAt(0);r.off.frameY=fm[3].charCodeAt(0);r.off.frameArgX=fm[4].charCodeAt(0);r.off.frameArgY=fm[5].charCodeAt(0);r.frameAt=fs.va+fi;}}
+ const colors=[];each(segs,COLORS,(s,m)=>colors.push({fn:s.va+m.index,g:Buffer.from(m[1],'latin1').readUInt32LE(0)}));
+ if(colors.length===1){r.colorFn=colors[0].fn;r.colors=colors[0].g;}
  r.ok=true;return r;
 }
 /* the .text section of a PE file (x86 only); same as yuris-draw.cjs */
@@ -130,6 +145,8 @@ function windows(segs,r){
  for(const role of Object.keys(r.sites))for(const s of r.sites[role])add(s,role==='ruby'?0x300:0x40,8);
  for(const role of Object.keys(r.adds))for(const s of r.adds[role])add(s,0x20,8);
  add(r.clear,0x10,0x40);
+ if(r.frame)add(r.frame,0x10,r.frameAt-r.frame+0x40); /* prologue to the rect loop: one window */
+ if(r.colorFn)add(r.colorFn,0x10,0x20);
  w.sort((a,b)=>a[0]-b[0]);const merged=[];
  for(const x of w){const last=merged[merged.length-1];if(last&&x[0]<=last[1])last[1]=Math.max(last[1],x[1]);else merged.push(x.slice());}
  return merged.map(([a,b])=>{const s=at(segs,a);return {va:a,code:s.code.subarray(a-s.va,b-s.va)};});
@@ -138,6 +155,7 @@ const hex=v=>'0x'+v.toString(16);
 function describe(r){if(!r.ok)return {ok:false,why:r.why};
  const o={ok:true,addMsg:hex(r.addMsg),push:hex(r.push),vec:hex(r.vec),clear:hex(r.clear),sites:{},adds:{},off:{}};
  for(const [k,v] of Object.entries(r.sites))o.sites[k]=v.map(hex);for(const [k,v] of Object.entries(r.adds))o.adds[k]=v.map(hex);
+ if(r.frame)o.frame=hex(r.frame);if(r.colorFn){o.colorFn=hex(r.colorFn);o.colors=hex(r.colors);}
  for(const [k,v] of Object.entries(r.off))o.off[k]=hex(v);return o;}
 
 module.exports={find,textOf,scanFile,windows,describe,callsTo,TRIPLE,WANT};

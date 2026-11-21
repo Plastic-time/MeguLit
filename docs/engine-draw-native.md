@@ -49,9 +49,29 @@
   | 静态签名测试 | `validation/engine-draw-sig-siglus.test.cjs`：夹具上两个版本的函数、调用点、角色、偏移全对；两版地址不同而字段一样；近似字节（括号判断、注音调用点、clear 头、多一个认不出的 push）都不认；本机有 exe 时整段代码给出同样结果 |
   | 原生自检 | `selftest/siglusdraw.cpp`（同一批窗口给 C++ 匹配器）+ `selftest/siglusdraw-gate.cpp`（真 Gate + 真 MinHook 挂在替身 push_back / clear 上，按引擎的调用方式回放一页：台词 + 注音、换行、名字窗、消息里的名字、选项、清屏、回想；验证被挂函数仍拿到自己的参数和寄存器），都在 `selftest/run.cmd` |
   | 运行时钩子 | `native/megulithook/SiglusDraw.h`（`Siglus::attach_function` 成功后 `SiglusDraw::Arm`）：默认不挂，控制文件 `roles=1`（这部游戏 seed 的 `draw.roles`）才在 push_back 和 msg::clear 入口装 MinHook。每个文字区的一行一条 `ToMe_DRAWRUN engine=siglus run= role=line|name|choice|system id=<来源>:<字表地址> n= x0 y0 x1 y1 size= color= [ruby=起:长:读音|…] text=`，清屏一条 `ToMe_DRAWRUN engine=siglus clear id=<字表地址>`（hook-diagnostics.log）。签名没对上写 `off: <原因>` 不挂 |
-- 坐标是文字区自己的像素（x0 y0 = 第一个字格左上，x1 y1 = 最后一个字格右下），不是屏幕：和 YU-RIS 一样，文字区在屏幕上的位置由探针 / diff-maker 按 role 配出偏移写进版本层差分（msg::frame 每帧带着屏幕偏移，下一步可以挂它直接报，静态已定位：CLANNAD 0x5dcd30 的第 8、9 个参数，未做）
-- color 是引擎的颜色号（-1 = 窗口默认色），不是 RGB；颜色号 → RGB 在 Gameexe.dat 的 #COLOR_TABLE（未做）
-- 没做（猜测，未验证）：内嵌（写回中文作为第二段 + 在送字前调引擎自己的 ruby 命令）；按钮 / 系统菜单（Siglus 的系统菜单多是图片按钮，不走 moji）；竖排（引擎全局标志，注音按 y 排，现在只按 x 配底字）
+- 屏幕坐标（第二批，2026-11-21）：
+  - 【已核实】msg::frame（CLANNAD 0x5dcd30 / SP 0x5dce80，`ret 0x24`，9 个参数）每帧对每个文字区调一次；mwnd::frame 把 mwnd 的 msg 数组逐个传进来，第 8、9 个参数是这块文字区的偏移（由 mwnd+0x148 / +0x14c 等字段算出，【推测】是窗口位置），第 1 个参数是一个参数块，+0x14 / +0x18 是 float 的 x / y（【推测】父精灵 / 窗口动画的位移）；它算可点字框时用 `(int)param.x + moji.x + 参数8`（`cvttss2si [esi+0x14]; add [moji+0x18]; add [ebp+0x24]`），moji 精灵位置也是 moji.x + 参数8 挂在同一个父精灵下
+  - 【推测】这个和就是游戏逻辑画面的坐标（Gameexe `#SCREEN_SIZE`：CLANNAD 1280×960、SP 1920×1080），依据是引擎拿同一个和做鼠标命中框；到窗口客户区还要按实际窗口大小缩放
+  - 钩子：msg::frame 入口（可选，签名找不到就不挂、其余照常）。每块文字区的原点稳定 3 帧且变了才报一条 `ToMe_DRAWRUN engine=siglus origin id=<字表地址> ox= oy=`（开窗动画滑动时只报落定的位置），之后这块区域的 run 都带 `ox= oy=`，屏幕 x = x0 + ox
+  - 【推测，未查】竖排时引擎把参数8 再减第一个字的字号（`[ebp-0x20]` 那段），只在全局竖排标志 = 1 时走；两部都是横排
+  - 选项项（msgsel / selbtn）不是 msg，不走 msg::frame，这一版没有它们的屏幕原点（run 里不带 ox/oy）
+- 颜色（第二批）：
+  - 【已核实】颜色号 → RGB：引擎的查表函数（CLANNAD 0x5b26b0 / SP 0x5b27f0）= `table[clamp(号, 0, n-1)]`，表是全局 `vector<uint32>`（CLANNAD 0xbac4c0 / SP 0xbad4c0），每项 0xFFRRGGBB，由 Gameexe `#COLOR_TABLE.NNN = r, g, b` 填（解析在 0x69165d，构表在 0x680d10，没写的号是黑色）。签名找到查表函数时 run 带 `rgb=rrggbb`
+  - 【已核实】add_msg 选色只有三个来源：mwnd.color 命令（msg+0xfc，-1 = 没设）→ `#CONFIG.MESSAGE_CHRCOLOR.ONOFF` 开时的角色色组（msg+0x164/168/16c，开关是配置项，不是已读）→ 窗口默认（msg+0x24/28/2c = `#MWND.MOJI_COLOR` 等）；moji::frame 只在链接悬停 / 按下时换色（`NORMAL / HIT / PUSH . COLOR`）。这两段代码都不读已读标志
+  - 【推测】所以这两部游戏已读 / 未读的字同色（已读只影响快进），阅读层不需要做已读变色；店主测试时对比一句已读和未读的截图确认
+  - 两部的 Gameexe（用仓库的 `services/original-engines/siglus-key.cjs` + exe 里的密钥解开，只读）：
+    - CLANNAD：`#MWND.MOJI_COLOR = 0`（000 = 255,255,255 白字）、`SHADOW_COLOR = 255` / `FUCHI_COLOR = 255`（255 = 0,0,0 黑影 / 黑边）；其余 001 255,100,100、002 80,255,80、003 100,100,255、004 255,200,200、005 180,255,180、006 220,220,255、050 128,80,90、051 128,128,128、100 255,116,88、101 0,43,152、102 179,14,14、254 255,255,200；MESSAGE_CHRCOLOR 关
+    - Summer Pockets：`#MWND.MOJI_COLOR = 0`（255,255,255）、`SHADOW_COLOR = 1` / `FUCHI_COLOR = 1`（0,0,0）；其余 002 255,0,0、003 100,255,100、004 0,0,255、005 255,255,100、006 255,0,255、010 20,150,200、011 52,75,105、020 0,95,104、050 54,46,43、051 4,63,7、100 144,59,79、101 87,99,100、102 写了两次（129,141,142 后 42,73,160；解析按行写进同一格，【推测】后一行生效）、103 87,99,100、104 129,141,142、110 175,183,189、111 89,99,105、200 88,115,121
+- 内嵌替换接入点（第二批，只定位，没接）：
+  - 【已核实】台词的必经之路：mwnd::add_msg（mwnd.print）先把原句追加进全局字串 `[0xbac458]+0x2fc`（【推测】回想 / 记录用），再调 `msg::add_msg(const wstring& 句子, wstring* 溢出)`（CLANNAD 0x5ddaa0，调用点 0x5de2f8）；add_msg 自己排版、自动换行，写到文字区底（笔位 y ≥ msg+0x130）时把剩下的字存进「溢出」参数返回（已核实）；mwnd::add_msg 看到溢出非空就调 0x64e880（已核实），【推测】由它等翻页后经 `___over_flow_print`（mwnd 元素 57，已核实它也进 mwnd::add_msg）接着排
+  - 【已核实】注音是 msg 上的三步：开始 = 引擎自己的 wstring::assign 把读音写进 msg+0x14c、置 msg+0x1a6 = 1（mwnd.ruby(str) → 0x5d8c20）；中间的字照常 add_msg；结束 = 注音排版函数 R（mwnd.ruby() → 0x64f0a0 → 0x5de7a0）。换行 = add_msg 里遇到 0x0a 调的 0x5de520；字号 = msg+0xf0（mwnd.size 改的就是它）
+  - 建议（最稳的点）：在 msg::add_msg 入口、且返回地址是 mwnd.print 那个调用点（`A_LINE`，钩子已经能认）时换字——
+    1. 只换台词：名字（namemsg / 名字窗）、选项、回想走别的调用点，天然不受影响
+    2. 那份全局字串在这之前已经写好原文（已核实顺序），【推测】回想、记录和语音对应都还是日文原句；已读判定按场景位置不按字串，换字不影响（推测）
+    3. 排版、换行、溢出换页全由引擎自己做，长句自动进下一页
+    4. 做法【推测，未验证】：不改调用方的字符串，在钩子里按段调原函数——日文段直接调原 add_msg；带注音的底字前后包「开始 / 结束注音」（用引擎的 assign 写读音，不自己写字符串内存）；中文段前调一次换行、把 msg+0xf0 临时改小、调原 add_msg、再改回。所有段都传同一个溢出指针
+  - 风险【推测】：现有 LunaHook Siglus 写回在更早的 VM 字符串上替换，两条路同时开会换两次，接入时要二选一；中文加进同一块文字区会更早溢出换页（这正是想要的行为，但要店主看一次长句）；把读音写进 msg+0x14c 必须用引擎的 assign（读音超过 7 个字会分配堆内存）
+- 没做：按钮 / 系统菜单（Siglus 的系统菜单多是图片按钮，不走 moji，【推测】）；竖排注音（现在只按 x 配底字）
 
 #### 店主测试清单（SiglusEngine：CLANNAD、Summer Pockets）
 1. 在 The Seed 里给这部游戏的游戏差分（`The Seed/siglus/clannad/game.json` 或 `summer-pockets/game.json`）把 `"draw":{"roles":false}` 改成 `true`；或临时写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE 或 UTF-8，内容 `#cfg roles=1`）
@@ -61,7 +81,9 @@
    - 每句台词有 `role=line id=print:…` 的 run，文字 = 这一行；有注音的那句带 `ruby=起:长:读音`，读音的假名不进 text
    - 名字有 `role=name`（名字窗 `id=name:`，写在消息里的 `id=print:`）；选项每项一条 `role=choice`；回想页是 `role=system`
    - 翻页时有 `clear id=…`，id 和台词 run 的 id 冒号后一样
-4. 游戏照常显示、推进不卡、不崩、日志不刷屏（同一句不会每帧重复出现）= 过
+   - 对话框出现后有一条 `origin id=… ox= oy=`；台词 run 带 `rgb=ffffff ox= oy=`。拿 x0+ox、y0+oy 对一下截图里这句第一个字的位置（按窗口和 #SCREEN_SIZE 的比例缩放）：对得上 = 屏幕原点的推测成立
+   - 截一句已读（再读一次）和一句未读的对话框：字色一样 = 「Siglus 没有已读变色」的推测成立
+4. 游戏照常显示、推进不卡、不崩、日志不刷屏（同一句不会每帧重复出现，`origin` 只在窗口挪动后出现）= 过
 5. 不过时发：`hook-diagnostics.log`（含 `on:` 或 `off:` 那一行）、`hook-events.log`、exe 版本；`off: push count differs` 之类 = 这个版本签名没对上
 
 ### MAGES.
