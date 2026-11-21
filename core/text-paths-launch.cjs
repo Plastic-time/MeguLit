@@ -45,6 +45,9 @@ function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepa
    suspended. Off with MEGULIT_FONTDOT_OFF=1, without the DLL, or once the crash canary saw the game die with it. The DLL
    itself serves dots only while the compositor's heartbeat says it is presenting (else the real fonts). */
 function fontDot(root,exe,early,trace=()=>{}){
+ /* 2026-11-21 (owner: 打点可以不要了，精度差、容易漏点) the dot font is retired: never loaded into a game. Kept as code only so an
+    old install's canary record still reads; MEGULIT_FONTDOT_FORCE=1 (tests, research) is the one way in */
+ if(process.env.MEGULIT_FONTDOT_FORCE!=='1')return null;
  if(!early||process.env.MEGULIT_FONTDOT_OFF==='1')return null;/* dot font = marks: only with the capture compositor (off by default since 2026-11-14) */if(process.env.MEGULIT_CAPTURE_COMPOSITOR!=='1')return null;
  const bit=/MeguLitLaunch32\.exe$/i.test(early.file)?'32':'64',dll=path.join(root,'native','MeguLitFontDot'+bit+'.dll');
  if(!require('node:fs').existsSync(dll))return null;

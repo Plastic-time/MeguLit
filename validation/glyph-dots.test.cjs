@@ -83,4 +83,4 @@ test('front end: hookGlyphDots builds the current line table per seq and is re-e
  assert.deepEqual(h.state.hookGlyphDots.dots.filter(d=>d.k==='b').map(d=>[d.i,d.ch]),[[3,'雨'],[4,'だ']],'blind dots of the previous seq mapped to the next line by reading order');
  h.glyphDots({type:'hookGlyphDots',state:'dots',seq:5,path:'text',dots:[{i:0,ch:'今',h:28,b:24,a:28,x:0,y:0,s:0,k:'d',at:{x:120,y:40,space:'c'}},{i:1,ch:'日',h:28,b:24,a:28,x:0,y:0,s:0,k:'d',at:{x:1,y:2,space:'evil'}}]});
  const placed=h.state.hookGlyphDots.dots.filter(d=>d.k==='d');assert.deepEqual(placed.find(d=>d.i===0).at,{x:120,y:40,space:'c'},'cell origin kept');assert.equal(placed.find(d=>d.i===1).at,undefined,'unknown space dropped');
- h.setGlyphMode('dot');h.setGlyphMode('weird');assert.deepEqual(sent,[{type:'glyphMode',mode:'dot'},{type:'glyphMode',mode:'blank'}]);});
+ h.setGlyphMode('dot');h.setGlyphMode('weird');assert.deepEqual(sent,[{type:'glyphMode',mode:'blank'},{type:'glyphMode',mode:'blank'}],'dot glyphs are retired (owner 2026-11-21): always blank');});

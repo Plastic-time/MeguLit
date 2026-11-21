@@ -203,6 +203,8 @@ test('dot font in the normal launch: rides along MeguLitLaunch, crash canary, co
  const L=require('../core/text-paths-launch.cjs'),base=tmp();
  fs.mkdirSync(path.join(base,'native'));const exe=path.join(base,'Game.exe');fs.writeFileSync(exe,'MZ');
  const early={file:path.join(base,'native','MeguLitLaunch64.exe'),args:['x.dll',exe],env:{MEGULIT_GLYPH_MODE:'dot-blind'}};
+ fs.writeFileSync(path.join(base,'native','MeguLitFontDot64.dll'),'x');process.env.MEGULIT_CAPTURE_COMPOSITOR='1';assert.equal(L.fontDot(base,exe,{...early,env:{}}),null,'the dot font is retired: never loaded without MEGULIT_FONTDOT_FORCE');fs.unlinkSync(path.join(base,'native','MeguLitFontDot64.dll'));
+ process.env.MEGULIT_FONTDOT_FORCE='1';
  assert.equal(L.fontDot(base,exe,early),null,'no DLL: nothing');
  fs.writeFileSync(path.join(base,'native','MeguLitFontDot64.dll'),'x');
  const fd=L.fontDot(base,exe,early);assert.ok(fd);assert.equal(early.env.MEGULIT_LAUNCH_EXTRA,path.join(base,'native','MeguLitFontDot64.dll'));
