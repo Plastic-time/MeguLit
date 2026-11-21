@@ -17,7 +17,10 @@ static int (*CommitAction)(int,int,int)=nullptr;
 namespace Msg { inline void Log(const char *f, ...) { char b[1024]; va_list a; va_start(a, f); vsnprintf(b, sizeof b, f, a); va_end(a); if(LogAction)LogAction(); if (strlen(b) > 500) printf("LONG %zu %s\n", strlen(b), b); Lines.push_back(b); } }
 static BOOL WINAPI FixtureEnumWindows(WNDENUMPROC,LPARAM){return TRUE;}
 #define EnumWindows FixtureEnumWindows
-#include "../MagesDraw.h"
+#ifndef MAGES_HEADER
+#define MAGES_HEADER "../MagesDraw.h"
+#endif
+#include MAGES_HEADER
 #undef EnumWindows
 static int Failures = 0;
 static void Check(bool ok, const std::string &what) { printf("%s %s\n", ok ? "PASS" : "FAIL", what.c_str()); if (!ok) Failures++; }

@@ -49,6 +49,8 @@ static uintptr_t Pages = 0, Count = 0, Codes = 0, Info = 0, ScaleAt = 0; static 
 static void *CommitOrig = nullptr, *ClearOrig[4] = {}, *DlgOrig[2] = {}, *GlyphOrig = nullptr;
 static volatile LONG Armed = 0, Installed = 0, Blocked = 0, Permission = 0;
 static CRITICAL_SECTION Lock;
+// Separate from observation epochs: even an off-to-off control request supersedes an older refresh.
+static unsigned __int64 RefreshRequest=0;
 static __declspec(thread) bool InObserver=false;
 static LONG Ticket(){return InterlockedCompareExchange(&Permission,0,0);}
 static bool Allowed(LONG ticket){return (ticket&1)&&Ticket()==ticket;}
@@ -374,17 +376,27 @@ static bool Install(){
 static bool TableAgrees(const Table &t){
  return !t.has||(t.dlg[0]==Dlg[0]-Base&&t.dlg[1]==Dlg[1]-Base&&t.glyph==Glyph-Base&&t.commit==Commit-Base&&t.stride==Stride&&t.pages==Pages-Base);
 }
-static void RefreshSafe(){
+static void RefreshSafe(unsigned __int64 request){
  bool roles=false;Table t;
  if(ReadControl(roles,t)&&roles){
-  if(!Installed&&!Blocked&&!FindInImage(t)){SetPermissionLocked(false);return;}
-  if(TableAgrees(t)&&roles&&Install()){SetPermissionLocked(true);return;}
+  if(!Installed&&!Blocked){
+   bool found=FindInImage(t);if(request!=RefreshRequest)return;
+   if(!found){SetPermissionLocked(false);return;}
+  }
+  if(request!=RefreshRequest)return;
+  if(TableAgrees(t)&&roles&&Install()){if(request==RefreshRequest)SetPermissionLocked(true);return;}
  }
- SetPermissionLocked(false);
+ if(request==RefreshRequest)SetPermissionLocked(false);
 }
-static void RefreshSeh(){__try{RefreshSafe();}__except(ObservationException(GetExceptionCode())){SetPermissionLocked(false);}}
+static void RefreshSeh(unsigned __int64 request){
+ __try{RefreshSafe(request);}__except(ObservationException(GetExceptionCode())){if(request==RefreshRequest)SetPermissionLocked(false);}
+}
+static void RefreshLocked(unsigned __int64 request){
+ try{RefreshSeh(request);}catch(...){if(request==RefreshRequest)SetPermissionLocked(false);}
+}
 static void RefreshControl(){
- EnterCriticalSection(&Lock);try{RefreshSeh();}catch(...){SetPermissionLocked(false);}LeaveCriticalSection(&Lock);
+ EnterCriticalSection(&Lock);
+ __try{RefreshLocked(++RefreshRequest);}__finally{LeaveCriticalSection(&Lock);}
 }
 static DWORD WINAPI Watch(void *stop){
  for(;;){RefreshControl();if(stop){if(WaitForSingleObject((HANDLE)stop,2000)==WAIT_OBJECT_0)return 0;}else Sleep(2000);}

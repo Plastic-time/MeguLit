@@ -4,6 +4,7 @@
 #include "magesgate.cpp"
 #undef main
 #include <stdexcept>
+#include "magesdraw-snippets.h"
 using namespace MagesDraw;
 static HANDLE Entered[2],Resume[2];
 static int Results[2],Continuations[2],SlotsAtDeep=0,RecursiveCalls=0;
@@ -211,6 +212,50 @@ static void AbiCase(const char*name,void*gate,void**orig){
  Check(Used()==0,std::string(name)+" original return context released");
  MH_DisableHook((void*)AbiOriginal);MH_RemoveHook((void*)AbiOriginal);
 }
+
+static LONG NestedRefreshTicket=-1;
+static void RevokeAtInstall(){
+ if(!Installed)return;LogAction=nullptr;WriteControl("#cfg roles=0\n");RefreshControl();NestedRefreshTicket=Ticket();
+}
+static void RevokeAtFind(){LogAction=nullptr;WriteControl("#cfg roles=0\n");RefreshControl();NestedRefreshTicket=Ticket();}
+static int NestedRefreshFault=0;
+static void GrantThenFault(){
+ if(!Installed)return;LogAction=nullptr;WriteControl("#cfg roles=1\n");RefreshControl();NestedRefreshTicket=Ticket();
+ if(NestedRefreshFault==1)throw std::runtime_error("outer logger after newer grant");
+ RaiseException(0xe1237654,0,0,nullptr);
+}
+static void ResetInstallCase(){
+ SetPermission(false);for(int i=0;i<NHooked;i++){MH_DisableHook((void*)Hooked[i]);MH_RemoveHook((void*)Hooked[i]);}
+ NHooked=0;Installed=Blocked=Permission=0;ResetPending();NestedRefreshTicket=-1;LogAction=nullptr;
+}
+static void InstallReentryCases(){
+ // Original snippet bytes stay unchanged. Only the missing out-of-snippet glyph's tiny stand-in
+ // prologue and synthetic PE metadata are supplied; no fixture engine function is executed.
+ std::vector<unsigned char> code;for(size_t i=0;MagesSnippets[0].hex[i];i+=2){unsigned b=0;sscanf(MagesSnippets[0].hex+i,"%2x",&b);code.push_back((unsigned char)b);}
+ BYTE *allocation=(BYTE*)VirtualAlloc(nullptr,0x80000,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE);
+ Check(allocation!=nullptr,"reentry fixture private executable allocation");if(!allocation)return;
+ BYTE *image=allocation+0x40000;memcpy(image+0x1000,code.data(),code.size());
+ auto dos=(IMAGE_DOS_HEADER*)image;dos->e_magic=IMAGE_DOS_SIGNATURE;dos->e_lfanew=0x100;
+ auto nt=(IMAGE_NT_HEADERS*)(image+0x100);nt->Signature=IMAGE_NT_SIGNATURE;nt->FileHeader.NumberOfSections=1;nt->FileHeader.SizeOfOptionalHeader=sizeof(IMAGE_OPTIONAL_HEADER);nt->OptionalHeader.Magic=IMAGE_NT_OPTIONAL_HDR32_MAGIC;nt->OptionalHeader.SizeOfImage=0x20000;
+ auto section=IMAGE_FIRST_SECTION(nt);section->VirtualAddress=0x1000;section->Misc.VirtualSize=(DWORD)code.size();section->Characteristics=IMAGE_SCN_MEM_EXECUTE;
+ auto sig=MagesDrawSig::Find(code.data(),code.size());Check(sig.ok&&sig.drawGlyphRel<0&&sig.drawGlyphRel>-0x40000,"unchanged real snippet accepted and glyph target fits private allocation");
+ if(!sig.ok){VirtualFree(allocation,0,MEM_RELEASE);return;}
+ BYTE *glyph=image+0x1000+sig.drawGlyphRel;const BYTE tiny[]={0x55,0x8b,0xec,0x90,0x90,0x90,0x5d,0xc3};memcpy(glyph,tiny,sizeof tiny);
+ uintptr_t savedBase=Base;ResetInstallCase();Base=(uintptr_t)image;
+ WriteControl("#cfg roles=0\n");RefreshControl();Check(!Installed&&!Ticket()&&!NHooked,"initial explicit off installs nothing");
+ WriteControl("#cfg roles=1\n");LogAction=RevokeAtFind;RefreshControl();
+ Check(LogAction==nullptr&&NestedRefreshTicket==0&&!Installed&&!Ticket()&&!NHooked,"newer off-to-off refresh during Find logging prevents stale installation/grant");
+ ResetInstallCase();WriteControl("#cfg roles=1\n");LogAction=RevokeAtInstall;RefreshControl();
+ Check(Installed&&NHooked==6&&NestedRefreshTicket==0&&!(Ticket()&1),"actual MinHook install logger off-to-off request supersedes outer old grant");
+ bool roles=true;Table table;Check(ReadControl(roles,table)&&!roles,"latest control remains explicitly off after reentrant first install");
+ WriteControl("#cfg roles=1\n");RefreshControl();Check(Ticket()&1,"later fresh control request grants retained real hooks");
+ for(int fault=1;fault<=2;fault++){
+  ResetInstallCase();WriteControl("#cfg roles=1\n");NestedRefreshFault=fault;LogAction=GrantThenFault;RefreshControl();
+  Check(Installed&&NHooked==6&&(NestedRefreshTicket&1)&&Ticket()==NestedRefreshTicket,"outer logger C++/SEH failure cannot revoke a newer nested valid grant");
+  Check(OtherThreadCanLock(),"control refresh releases lock after nested grant and outer logger exception");
+ }
+ ResetInstallCase();Base=savedBase;DeleteFileW(ControlPath().c_str());VirtualFree(allocation,0,MEM_RELEASE);
+}
 int main(int argc,char**argv){
  SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);_set_abort_behavior(0,_WRITE_ABORT_MSG|_CALL_REPORTFAULT);
  setvbuf(stdout,nullptr,_IONBF,0);int code=BaselineMain(0,nullptr);if(code)return code;
@@ -261,5 +306,5 @@ int main(int argc,char**argv){
  AbiCase("dialogue 1 pre", (void*)DlgGate1,&DlgOrig[1]);
  AbiCase("dialogue pre", (void*)DlgGate0,&DlgOrig[0]);
  AbiCase("glyph pre", (void*)GlyphGate,&GlyphOrig);
- MH_Uninitialize();printf("mages permission lifecycle: %d failure(s)\n",Failures);return Failures;
+ InstallReentryCases();MH_Uninitialize();printf("mages permission lifecycle: %d failure(s)\n",Failures);return Failures;
 }
