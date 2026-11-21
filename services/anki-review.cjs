@@ -86,7 +86,7 @@ class AnkiReviewer{
   const out=[];for(const name of [...new Set(names)].filter(n=>n&&!/[\\/]/.test(n)).slice(0,6)){const data=await this.mediaFile(name);if(!data)continue;const cache=require('../core/anki-media-cache.cjs'),clip={name,src:'data:'+cache.mimeOf(data,name)+';base64,'+data};if(cache.isSynth(this.mediaDir,name))clip.channel='sentence';out.push(clip);}return out;}
  /* one media file: MeguLit's own copy first, then Anki's media folder (copied here for next time) */
  async mediaFile(name){const cache=require('../core/anki-media-cache.cjs');const local=cache.read(this.mediaDir,name);if(local)return local;
-  const data=await this.call('retrieveMediaFile',{filename:name});if(!cache.fitsBase64(data))return null;cache.write(this.mediaDir,name,data);return data;}
+  const data=cache.boundedBase64(await this.call('retrieveMediaFile',{filename:name}));if(!data)return null;cache.write(this.mediaDir,name,data);return data;}
  async withMedia(html,card){
   const audio=require('./anki-media.cjs');let play=new Map();if(card&&/\[anki:play:[qa]:\d+\]/.test(html)){try{play=audio.playMap(card,await this.call('modelTemplates',{modelName:card.modelName}),html);}catch{}}
   const names=new Set([...play.values()].filter(name=>name&&!/[\\/]/.test(name)));for(const match of html.matchAll(/\[sound:([^\]\r\n]+)\]|(?:src|href)\s*=\s*["']([^"']+)["']/gi)){const name=match[1]||match[2];if(name&&!/^(?:https?:|data:|javascript:|#)/i.test(name)&&!/[\\/]/.test(name))names.add(name);}

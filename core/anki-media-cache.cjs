@@ -5,11 +5,17 @@
    Anki stays the fallback for cards mined before this copy existed; what comes back from Anki is copied here too. */
 const fs=require('node:fs'),path=require('node:path');
 const LIMIT=12*1024*1024;
-const fitsBase64=data=>typeof data==='string'&&data.length>0&&data.length<=4*Math.ceil(LIMIT/3);
+const MAX_ENCODED=4*Math.ceil(LIMIT/3);
+function boundedBase64(data){
+ if(typeof data!=='string'||!data)return null;
+ if(data.length<=MAX_ENCODED)return data;
+ const compact=data.replace(/[\t\n\r ]+/g,'');
+ return compact&&compact.length<=MAX_ENCODED?compact:null;
+}
 /* only MeguLit's own clip names: no folders, no other add-ons' files */
 const ours=name=>typeof name==='string'&&/^tomoyo_[A-Za-z0-9_]{1,120}\.(?:wav|mp3|ogg)$/.test(name);
 function read(dir,name){if(!dir||!ours(name))return null;try{const file=path.join(dir,name),size=fs.statSync(file).size;if(!size||size>LIMIT)return null;return fs.readFileSync(file).toString('base64');}catch{return null;}}
-function write(dir,name,base64){if(!dir||!ours(name)||!fitsBase64(base64))return false;try{
+function write(dir,name,base64){if(!dir||!ours(name))return false;base64=boundedBase64(base64);if(!base64)return false;try{
  fs.mkdirSync(dir,{recursive:true});const file=path.join(dir,name),tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,Buffer.from(base64,'base64'));fs.renameSync(tmp,file);return true;}catch{return false;}}
 const dirFor=root=>path.join(root,'data','cache','anki-media');
 /* 2026-11-15 (user: AI 合成的例句要拉「游戏原声」才能调音量) a synthesized sentence kept under a tomoyo_g_ name (it replaced a
@@ -20,4 +26,4 @@ function isSynth(dir,name){if(!dir||!ours(name))return false;try{return fs.exist
 /* what an audio clip really is (a game's ogg may sit under a .wav name) */
 function mimeOf(base64,name){const h=String(base64||'').slice(0,8);if(h.startsWith('T2dnUw'))return 'audio/ogg';if(h.startsWith('UklGR'))return 'audio/wav';if(h.startsWith('SUQz')||h.startsWith('//'))return 'audio/mpeg';if(h.startsWith('ZkxhQw'))return 'audio/flac';
  return /\.mp3$/i.test(name)?'audio/mpeg':/\.ogg$/i.test(name)?'audio/ogg':'audio/wav';}
-module.exports={ours,read,write,dirFor,markSynth,isSynth,mimeOf,fitsBase64};
+module.exports={ours,read,write,dirFor,markSynth,isSynth,mimeOf,boundedBase64};

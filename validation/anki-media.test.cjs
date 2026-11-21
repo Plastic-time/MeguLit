@@ -54,11 +54,18 @@ test('a clip at the cache size limit plays on the first retrieval and from disk'
  assert.equal(fs.statSync(path.join(reviewer.mediaDir,name)).size,limit);
  assert.equal((await reviewer.mediaFile(name))?.length,data.length);
  assert.equal(calls,1);
+ const wrapped=data.slice(0,80)+'\r\n'+data.slice(80)+'\r\n';
+ assert.equal(cache.write(reviewer.mediaDir,'tomoyo_g_wrapped.wav',wrapped),true);
+ assert.equal(cache.read(reviewer.mediaDir,'tomoyo_g_wrapped.wav')===data,true);
  data=Buffer.alloc(limit+1).toString('base64');
  const other='tomoyo_g_over.wav';
  assert.equal(await reviewer.mediaFile(other),null);
  assert.equal(cache.write(reviewer.mediaDir,other,data),false);
  assert.equal(fs.existsSync(path.join(reviewer.mediaDir,other)),false);
+ data=false;
+ assert.equal(await reviewer.mediaFile(other),null);
+ data='YQ==\r\n';
+ assert.equal(await reviewer.mediaFile('external.wav'),data);
 });
 test('fit keeps an ordinary card within its viewport and bounds the reduction for long illustrated notes',()=>{
  assert.equal(fitScale(900,400,900,600),2/3);assert.equal(fitScale(900,700,900,600),1);assert.equal(fitScale(900,300,900,1200),.6);assert.equal(fitScale(900,400,900,600,false),1);assert.equal(fitScale(0,0,0,0),1);
