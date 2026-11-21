@@ -102,11 +102,17 @@ test('automatic selections stop at eight saved or six read lines in chronologica
  assert.deepEqual(lines.auto(db,'read'),[4,5,6,7,8].map(i=>'第'+i+'回の台詞です。').concat('最新の台詞ですよ。'));
  assert.deepEqual(lines.auto(db,'saved'),['最新の台詞ですよ。',...[8,7,6,5,4,3,2].map(i=>'第'+i+'回の台詞です。')]);
 });
-test('searching a displayed phrase preserves the saved mark across whitespace variants',t=>{
+test('searching a displayed phrase preserves the saved mark across whitespace variants',async t=>{
  const {db,root}=fixture(t),save=db.prepare("INSERT INTO saved_sentences(game_id,text,created_at,original) VALUES('g',?,1,'{}')"),read=db.prepare("INSERT INTO reading_events(game_id,text,read_at) VALUES('g',?,2)");
  save.run('空から　光が来た。');read.run('空から 光が来た。');read.run('空から強い光が来た。');
  for(const q of ['空から 光','空から　光','空から\t光']){
   assert.deepEqual(lines.list(db,root,'g',{query:q,limit:1}).lines,[{text:'空から 光が来た。',at:2000,saved:true}]);
  }
  assert.equal(lines.list(db,root,'g',{query:'空から 強い光'}).lines.length,0);
+ save.run('これは　AΣΑ と書く。');read.run('これは 違うAΣΑ と書く。');
+ assert.deepEqual(lines.list(db,root,'g',{query:'これは aΣ'}).lines.map(r=>r.text),['これは AΣΑ と書く。']);
+ save.run('空から強い風が来た。');assert.deepEqual(lines.list(db,root,'g',{query:'空から 風'}).lines,[]);
+ const {lineSearch}=await import('../web/home-lines.js');
+ const hits=lines.list(db,root,'g',{query:'これは aΣ'}).lines;
+ assert.deepEqual(lineSearch(hits,'これは　aΣ'),hits);
 });
