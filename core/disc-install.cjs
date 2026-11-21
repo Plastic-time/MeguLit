@@ -13,6 +13,12 @@ function local(file,{directory=false,within}={}){
  const real=fs.realpathSync(full);if(within&&!inside(fs.realpathSync(within),real))fail('UNSAFE_PATH');return real;
 }
 function companion(file,extension){const dir=path.dirname(file),stem=path.basename(file,path.extname(file));const found=fs.readdirSync(dir).find(n=>n.toLowerCase()===(stem+extension).toLowerCase());return found?local(path.join(dir,found),{within:dir}):'';}
+function discText(data){
+ const bom=data.length>1?(data[0]<<8)|data[1]:0;
+ if(bom===0xfffe||bom===0xfeff){try{return new TextDecoder(bom===0xfffe?'utf-16le':'utf-16be',{fatal:true}).decode(data.subarray(2));}catch{fail('PAIR_MISSING');}}
+ for(const encoding of ['utf-8','shift_jis'])try{return new TextDecoder(encoding,{fatal:true}).decode(data).replace(/^\ufeff/,'');}catch{}
+ fail('PAIR_MISSING');
+}
 function selectImage(paths){
  if(!Array.isArray(paths)||!paths.length||paths.length>32)fail('IMAGE_TYPE');const selected=new Map();
  for(const input of paths){const original=local(input);if(!IMAGE.test(original))fail('IMAGE_TYPE');let image=original;const ext=path.extname(image).toLowerCase();
@@ -20,7 +26,7 @@ function selectImage(paths){
   const descriptor=path.extname(image).toLowerCase();
   if(descriptor==='.mds'&&!companion(image,'.mdf')||descriptor==='.ccd'&&!companion(image,'.img'))fail('PAIR_MISSING');
   if(descriptor==='.cue'){
-   if(fs.statSync(image).size>LIMITS.autorunBytes)fail('PAIR_MISSING');const text=fs.readFileSync(image,'latin1'),names=[...text.matchAll(/^\s*FILE\s+(?:"([^"]+)"|(\S+))\s+\S+\s*$/gmi)].map(m=>m[1]||m[2]);
+   if(fs.statSync(image).size>LIMITS.autorunBytes)fail('PAIR_MISSING');const text=discText(fs.readFileSync(image)),names=[...text.matchAll(/^\s*FILE\s+(?:"([^"]+)"|(\S+))\s+\S+\s*$/gmi)].map(m=>m[1]||m[2]);
    if(!names.length||names.length>32)fail('PAIR_MISSING');for(const n of names){if(path.isAbsolute(n)||/[\0\r\n:]/.test(n))fail('UNSAFE_PATH');local(path.resolve(path.dirname(image),n),{within:path.dirname(image)});}
   }
   const k=image.toLowerCase();if(!selected.has(k))selected.set(k,{image,pairedFrom:original===image?'':original});
@@ -107,4 +113,4 @@ class DiscInstall{
   fail('ACTION');
  }
 }
-module.exports={DiscInstall,IMAGE,LIMITS,local,inside,selectImage,rootsOf,snapshot,argv,discoverInstallers};
+module.exports={DiscInstall,IMAGE,LIMITS,local,inside,selectImage,rootsOf,snapshot,argv,discoverInstallers,discText};
