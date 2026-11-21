@@ -14,11 +14,11 @@ const mk=()=>{const ENV={DB:d1(),BUCKET:{},HASH_SALT:'salt',ADAPTER_ADMIN_TOKEN:
  const report=(ip,key,credit,extra={})=>call(ip,'POST','/api/game-profile/report',{version:1,profile:{key,engine:'krkr',exe:'a.exe',version:'1.4.23',source:'calibration',mode:'hide',settings:{},score:{cost:0,metrics:{}},...extra},...(credit===undefined?{}:{credit})});
  return {ENV,call,report};};
 
-test('cleanName: control / zero-width removed, 1-20 characters, links / @ / email refused, block list -> anonymous',async()=>{
+test('cleanName: control / zero-width removed, 1-30 characters, links / @ / email refused, block list -> anonymous',async()=>{
  const {cleanName}=await mod('torch-credit.js');
  assert.deepEqual(cleanName('  惠惠​\u0007 fan  '),{ok:true,name:'惠惠 fan'});
- assert.equal(cleanName('あ'.repeat(20)).name.length,20);assert.equal(cleanName('あ'.repeat(21)).ok,false);
- assert.equal(cleanName('😀'.repeat(20)).ok,true,'counted by character, not UTF-16 unit');
+ assert.equal(cleanName('あ'.repeat(30)).name.length,30);assert.equal(cleanName('あ'.repeat(31)).ok,false);
+ assert.equal(cleanName('😀'.repeat(30)).ok,true,'counted by character, not UTF-16 unit');
  for(const bad of ['','   ','​​','a@b.com','＠abc','http://x.y','www.abc.com','abc.cn','nick.com',7,{},[]])assert.equal(cleanName(bad).ok,false,String(bad));
  assert.deepEqual(cleanName(null),{ok:true,name:null});
  for(const blocked of ['管理员小王','Ad min','O.F.F.I.C.I.A.L','ＦＵＣＫ','傻 逼'])assert.deepEqual([cleanName(blocked).ok,cleanName(blocked).name],[true,null],blocked);
@@ -27,7 +27,7 @@ test('cleanName: control / zero-width removed, 1-20 characters, links / @ / emai
 
 test('credit shape: only name allowed; anything else refuses the report, nothing stored',async()=>{
  const {report,ENV}=mk();
- for(const [i,c] of [{name:'a',email:'x'},{userId:1},[],'x',{name:'a@b.c'},{name:'x'.repeat(21)},{name:5}].entries()){
+ for(const [i,c] of [{name:'a',email:'x'},{userId:1},[],'x',{name:'a@b.c'},{name:'x'.repeat(31)},{name:5}].entries()){
   const r=await report('8.8.8.'+i,KA,c);assert.equal(r.status,400,JSON.stringify(c));assert.equal((await r.json()).error,'INVALID_CREDIT');}
  assert.equal(ENV.DB.raw.prepare('SELECT COUNT(*) n FROM torch_credits').get().n,0);assert.equal(ENV.DB.raw.prepare('SELECT COUNT(*) n FROM auto_profile_reports').get().n,0);
 });
@@ -70,4 +70,26 @@ test('GET /api/game-profile: auto diff carries credit (first reporter of the pic
  b=await (await call('9.9.9.9','GET','/api/game-profile/'+KA)).json();assert.equal(b.credit.torchNo,1);assert.equal(b.credit.name,null);
  ENV.DB.raw.prepare("UPDATE game_diffs SET source='official',body=? WHERE game_key=?").run(JSON.stringify({...doc,source:'official'}),KA);
  b=await (await call('9.9.9.9','GET','/api/game-profile/'+KA)).json();assert.equal(b.credit,null,'official diffs carry no credit');
+});
+
+test('传火碑 GET /api/torch/monument: oldest first, cursor paging, total, withdrawn = 匿名 #N and stays, no key / reporter, game title when known, 30 characters',async()=>{
+ const {report,call,ENV}=mk();
+ await report('1.1.1.1',KA,{name:'あ'.repeat(30)},{});assert.equal((await report('9.9.9.1',KA,{name:'あ'.repeat(31)})).status,400,'31 characters refused');
+ for(let i=2;i<=7;i++)await report('1.1.1.'+i,i%2?KA:KB,i===4?undefined:{name:'传火'+i});
+ await call('1.1.1.1','PUT','/api/game-profile/credit',{key:KA,name:null});/* withdrawn: the record stays */
+ /* a title the relay knows: the VNDB id of KB's calibrations -> a probe title */
+ const prints=JSON.stringify({exe:KB,vndb:'v17'});ENV.DB.raw.prepare('UPDATE auto_profile_reports SET prints=? WHERE game_key=?').run(prints,KB);
+ ENV.DB.raw.prepare("INSERT INTO probe_full(identity,upload,object_key,sha256,size,parts,state,title,vndb,created_at,updated_at,expires_at) VALUES('i','u','k','d',1,1,'ready','千恋＊万花','v17',0,0,9999999999)").run();
+ const page=async q=>{const r=await call('7.7.7.7','GET','/api/torch/monument'+q);assert.equal(r.status,200);assert.match(r.headers.get('cache-control'),/max-age=60/);return r.json();};
+ let a=await page('?limit=3');assert.equal(a.total,7);assert.deepEqual(a.items.map(i=>i.torchNo),[1,2,3]);assert.equal(a.next,'3');
+ assert.equal(a.items[0].name,null);assert.equal(a.items[0].display,'传火人 #1','withdrawn shows as 传火人 #N');assert.equal(a.items[1].name,'传火2');
+ assert.equal(a.items[1].game,'千恋＊万花');assert.equal(a.items[2].game,null,'KA has no known title');
+ for(const it of a.items)assert.deepEqual(Object.keys(it).sort(),['at','display','game','name','torchNo']);
+ assert.doesNotMatch(JSON.stringify(a),/aaaaaaaa|bbbbbbbb|reporter|1\.1\.1/);
+ let b=await page('?cursor='+a.next+'&limit=3');assert.deepEqual(b.items.map(i=>i.torchNo),[4,5,6]);assert.equal(b.items[0].display,'传火人 #4','never named = 匿名 too');
+ let c=await page('?cursor='+b.next+'&limit=3');assert.deepEqual(c.items.map(i=>i.torchNo),[7]);assert.equal(c.next,null);
+ assert.ok(a.items.every((x,i,arr)=>!i||arr[i-1].at<=x.at),'oldest first');
+ assert.equal((await page('?limit=99999')).items.length,7,'limit is capped at 500, default 100');
+ assert.equal((await call('7.7.7.7','GET','/api/torch/monument?cursor=abc')).status,400);assert.equal((await call('7.7.7.7','GET','/api/torch/monument?limit=x')).status,400);
+ const before=a.total;await report('5.5.5.5',KB,{name:'新人'});assert.equal((await page('')).total,before+1,'only grows');
 });
