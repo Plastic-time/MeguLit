@@ -157,3 +157,6 @@ DOM 薄接线使用 `cardinal-pair.js`，在普通单行与 island-page 实际�
 step/sample 的 P95 和 max 摘要必须是有限非负数，并与原始计时重算一致；两个 P95 不得超过 maxLagMs。每段采样间隔、开始前和结束后的未采样窗口不得超过 sampleMs+maxLagMs，至少四个成功采样；缺计数、丢探针、稀疏采样、非单调／错误时间域、字段损坏或采样器截断全部保留本地且不上传，不靠改分数掩盖忙机。detail.timing 保留明确的当前证明，缺此证明的本地旧记录也不补传
 
 原海馆真实 fixture 仅为427帧中的41个选帧，缺完整采样时钟且保留 epoch 时间，不能被伪对齐成可靠连续采样。调度／上传单元使用明确的 synthetic 单调时钟与坏 DOM 形状，成功上传的低分控制也不是健康实机验收；完整 driver sampler 代码另有无浏览器的可执行时钟回放
+
+
+回放自身的 HookBridge stdin、reader event 和 choice offer 时间也与 DOM 共用 performance.now 原点，真实 hook-events 文本保留原始系统时间，以 out.t0 对齐。driver 在单调计时采样/投递/自身事件处记录系统时间对照点，要求覆盖测量区间与每个 step/probe/source clock；任一已观测系统时间相对单调时钟漂移超过 25ms、缺对照点或时钟字段损坏，均标 unreliable，不上传，也不补传缺此证明的旧记录。该门只证明采点处的钟差，不能声称检测到采点之间瞬间跳变又恢复的系统时间变化；真实日志仍保留，不改低分掩盖钟差

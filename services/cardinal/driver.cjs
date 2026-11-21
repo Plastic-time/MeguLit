@@ -48,8 +48,9 @@ process.env.MEGULIT_ROOT=root;process.env.MEGULIT_RELAY_BASE='off';process.env.M
 const fonts=require(path.join(REPO,'core','game-fonts.cjs'));fonts.exePath=async()=>scenario.game.exe;
 const providers=require(path.join(REPO,'core','providers.cjs'));
 providers.createTranslationService=()=>({setKey(){},hasKey(){return true;},observeSource(){},clearContext(){},lookup:async()=>null,translate:async text=>(scenario.translations||{})[text]||('中文：'+text)});
+let measureTime=null;const stamp=()=>measureTime?measureTime():performance.now();
 function fakeProc(name){const p=new EventEmitter();p.stdout=new PassThrough();p.stdin=new PassThrough();p.exitCode=null;p.pid=90000+Math.floor(Math.random()*999);p.kill=()=>{p.exitCode=0;p.emit('exit',0);};p.sent=[];let buf='';
- p.stdin.on('data',d=>{buf+=String(d);let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+1);try{p.sent.push({at:Date.now(),m:JSON.parse(line)});}catch{}}});
+ p.stdin.on('data',d=>{buf+=String(d);let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+1);try{p.sent.push({at:stamp(),m:JSON.parse(line)});}catch{}}});
  p.line=o=>p.stdout.write(JSON.stringify(o)+'\n');p.name=name;return p;}
 const gwb=fakeProc('GalWindowBridge');let hookSpawned=0;
 /* HookBridge: a new process per start (core/hook-native.cjs start), the newest one gets the timeline's lines. Like the real bridge it
@@ -65,10 +66,10 @@ const hb={line:o=>{const p=hbs.at(-1);if(!p||p.exitCode!==null)return;
 const events=[];const offers=[];let lastOffer='';
 const {Runtime}=require(path.join(REPO,'services','runtime.cjs'));
 let page=null;const early=[];
-const runtime=new Runtime(root,(channel,payload)=>{if(channel!=='reader-event')return;events.push({at:Date.now(),m:payload});
+const runtime=new Runtime(root,(channel,payload)=>{if(channel!=='reader-event')return;events.push({at:stamp(),m:payload});
  /* the options core offered the reader (hookChoices), once per new set */
  /* core/hook-native.cjs notify({hookChoices:{items:[{text,x0,y0,x1,y1}],sw,sh,at,unboxed}}) or {hookChoices:null} */
- if(payload&&Object.prototype.hasOwnProperty.call(payload,'hookChoices')){const c=payload.hookChoices,items=Array.isArray(c)?c:Array.isArray(c?.items)?c.items:[];const k=JSON.stringify(items.map(x=>x?.text??x));if(k!==lastOffer&&offers.length&&offers.at(-1).until==null)offers.at(-1).until=Date.now();if(items.length&&k!==lastOffer)offers.push({at:Date.now(),n:items.length,texts:items.map(x=>String(x?.text??x).slice(0,4000)),until:null});lastOffer=items.length?k:'';}
+ if(payload&&Object.prototype.hasOwnProperty.call(payload,'hookChoices')){const c=payload.hookChoices,items=Array.isArray(c)?c:Array.isArray(c?.items)?c.items:[];const k=JSON.stringify(items.map(x=>x?.text??x));if(k!==lastOffer&&offers.length&&offers.at(-1).until==null)offers.at(-1).until=stamp();if(items.length&&k!==lastOffer)offers.push({at:stamp(),n:items.length,texts:items.map(x=>String(x?.text??x).slice(0,4000)),until:null});lastOffer=items.length?k:'';}
  if(page)page.evaluate(m=>window.__replayEvent(m),payload).catch(()=>{});else early.push(payload);});
 runtime.spawnReaderNative=()=>gwb;
 /* the tokenizer runtime is absent here and never installed (no pip / dictionary download from a replay): requests fail like an uninstalled one */
@@ -120,7 +121,7 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
   for(const m of early.splice(0))await page.evaluate(m=>window.__replayEvent(m),m).catch(()=>{});
   await page.addScriptTag({path:path.join(REPO,'web','reader','replay-probe.js')});
   /* ---- the timeline: bridge lines at their recorded times (gaps over maxGap shortened) ---- */
-  const t0=Date.now();out.t0=t0;const Timing=require('../../core/cardinal/timing.cjs'),timing=Timing.recorder({sampleMs:scenario.sampleEvery}),elapsed=timing.elapsed;let clock=0;const maxGap=scenario.maxGap||2500;
+  const Timing=require('../../core/cardinal/timing.cjs'),timing=Timing.recorder({sampleMs:scenario.sampleEvery}),elapsed=timing.elapsed,t0=timing.origin;out.t0=timing.wallOrigin;measureTime=()=>t0+elapsed();let clock=0;const maxGap=scenario.maxGap||2500;
   let prevT=null,sampling=!!scenario.sampleEvery;
   const hits=()=>(gwb.sent.filter(x=>x.m.type==='hitRegions').at(-1)?.m.regions)||[];
   /* a sampler beside the timeline: what the page shows every sampleEvery ms (flashes between two marks) */
@@ -146,7 +147,7 @@ function serve(url){let u;try{u=new URL(url);}catch{return 'abort';}if(/^(data|b
   }
   /* the last line stays on screen a moment, so it is measured like the others */
   if(scenario.tailMs)await sleep(scenario.tailMs);
-  sampling=false;await sampler;out.timing=timing.finish();out.lag=Timing.statistics(out.timing.steps,out.timing.probes,scenario.sampleEvery).lag;
+  sampling=false;await sampler;out.timing=timing.finish();measureTime=null;out.lag=Timing.statistics(out.timing.steps,out.timing.probes,scenario.sampleEvery).lag;
   {const dir=path.join(process.env.TEMP,'MeguLit','draw');const files=fs.existsSync(dir)?fs.readdirSync(dir).filter(f=>/^\d+\.txt$/.test(f)):[];out.control.push({mark:'end',files:files.map(f=>({name:f,text:fs.readFileSync(path.join(dir,f)).slice(2).toString('utf16le')}))});}
   if(krkr){krkr.tick();out.krkr.cfg=JSON.parse(JSON.stringify(krkr.st.cfg,(k,v)=>v instanceof RegExp?String(v):v));out.krkr.ctl=krkr.ctl;}
   out.hookSpawned=hookSpawned;out.gwbSent=gwb.sent.filter(x=>x.m.type!=='hitRegions').slice(-200).map(x=>x.m);out.hbSent=hb.sent.map(x=>({at:x.at-t0,...x.m})).filter(m=>m.type!=='source');
