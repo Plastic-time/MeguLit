@@ -49,9 +49,9 @@ Cardinal 回答一个问题：这份种子在玩家机器上到底好不好。�
 
 修订 3 另按桥已送出的非跳读日文源句计算 `detail.sourceCoverage`。源句未在 DOM 中持续出现、hookSource 消失或采样全丢，都留在预期分母；总分还受已观察源句比例限制。没有观察到正文时总分为 0，不能再把缺失数据当成全部合格
 
-修订 3 同时核对正文的内容和顺序。打字过程可显示正确前缀，但这一源句的稳定样本中必须出现完整正文，两个字只能完成本来就两个字的句子。只看 line 字形，忽略中文行、姓名旁路、选项和 ruby 读音。probe 记录字形节点自己的文本，避免把 ruby 子节点读音混进底字，正文上限 4000 字符与 native source 上限一致
+修订 4 同时核对正文的内容和顺序。打字过程可显示正确前缀，但这一源句的稳定样本中必须出现完整正文，两个字只能完成本来就两个字的句子。只看 line 字形，忽略中文行、姓名旁路、选项和 ruby 读音。probe 记录字形节点自己的文本，避免把 ruby 子节点读音混进底字，正文上限 4000 字符与 native source 上限一致
 
-新 driver 为每条 hookSource 写 `sourceEpisodes`，含输入 step/line 和实际投递时的 elapsed at，评分只用本次投递至下次投递之间的 DOM。输入 epoch 时间不与压缩回放时钟混用。旧观察没有投递映射时，只能按 hookSource 跃迁顺序单次消费样本组，标 `detail.timeline.reliable=false`；服务只存本机，不上传这种兼容评估。重复台词没有新的样本组就缺测，不能复用上一轮
+新 driver 为每条 hookSource 写 `sourceEpisodes`，含输入 step/line/text 和实际投递时的 elapsed at，评分只用本次投递至下次投递之间的 DOM。每条输入 hookSource 必须恰好对应一条同文本、同 step/line 的投递记录，at 有限、非负且单调，缺失、重复、乱序均标不可靠。输入 epoch 时间不与压缩回放时钟混用。旧观察没有投递映射时，只能按 hookSource 跃迁顺序单次消费样本组，标 `detail.timeline.reliable=false`；服务只存本机，不上传这种兼容评估。重复台词没有新的样本组就缺测，不能复用上一轮
 
 规则全在 profile 里：`core/profiles/defaults.cjs` 的 `cardinal.*`（rev、lines、maxGapMs、sampleMs、minIntervalMin、weights.*、thresholds.*），值域登记在 `core/profiles/domains.cjs`，所以官方签名差分能按游戏调权重和阈值，热更新，不改代码。改了规则就把 `cardinal.rev` 加一（记录里的 `cardinalRev`）。这里只有数字，没有任何用户偏好（字体、颜色、字号、位置）。
 

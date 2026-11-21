@@ -26,9 +26,14 @@ const fed=run=>(run.steps||[]).filter(st=>st.hb?.type==='hookSource');
    A line counts once it is the reader's line for lineMs; lines of a skip burst (the next record within burstMs, Ctrl held) only pass by */
 function expectedLines(run,t){t=opts(t);const steps=fed(run).filter(st=>st.line!=null);
  return steps.filter((st,i)=>norm(st.text)&&!(steps[i+1]&&steps[i+1].t-st.t<t.burstMs)&&!(i>0&&st.t-steps[i-1].t<t.burstMs));}
+function deliveryClock(run){const records=run.o.sourceEpisodes;if(!Array.isArray(records))return {source:'legacy-source-transitions',reliable:false};
+ const sent=(run.steps||[]).map((st,step)=>({st,step})).filter(x=>x.st.hb?.type==='hookSource');let previous=-Infinity;const seen=new Set();
+ if(records.length!==sent.length)return {source:'invalid-delivery',reliable:false,why:'source delivery count mismatch'};
+ for(let i=0;i<sent.length;i++){const {st,step}=sent[i],record=records[i];if(!record||record.step!==step||!Number.isInteger(record.line)||record.line!==st.line||seen.has(record.line)||!Number.isFinite(record.at)||record.at<0||record.at<previous||record.text!==st.hb.text)return {source:'invalid-delivery',reliable:false,why:'source delivery identity/order/text mismatch'};seen.add(record.line);previous=record.at;}
+ return {source:'measured-delivery',reliable:true};}
 function lines(run,t){t=opts(t);const o=run.o,steps=fed(run).filter(st=>st.line!=null),episodes=o.sourceEpisodes;
  const timeOf=st=>Array.isArray(episodes)?episodes.find(e=>e.line===st.line&&(e.step===undefined||e.step===(run.steps||[]).indexOf(st)))?.at:st.t;
- const all=(o.samples||[]).filter(s=>!menuOpen(s)),out=[];
+ const all=(o.samples||[]).filter(s=>!menuOpen(s)),out=[];if(Array.isArray(episodes)&&!deliveryClock(run).reliable)return out;
  // Old observations have no replay delivery clock. Consume each observed source transition at most once.
  if(!Array.isArray(episodes)){const groups=[];for(const sample of all){const key=norm(sample.hookSource);if(groups.at(-1)?.key!==key)groups.push({key,samples:[]});groups.at(-1).samples.push(sample);}let cursor=0;
   for(const st of expectedLines(run,t)){const at=groups.findIndex((g,i)=>i>=cursor&&g.key===norm(st.text));if(at<0)continue;cursor=at+1;const samples=groups[at].samples;
@@ -159,4 +164,4 @@ function offSpans(run,t){t=opts(t);const o=run.o,ev=[];const at=l=>Date.parse(St
  for(const k of Object.keys(open))if(open[k])spans.push({...open[k],to:end});
  return spans.filter(s=>!(s.to-s.from<=t.preflightMs&&checks.some(c=>Math.abs(c-s.from)<=300)));}
 
-module.exports={T0,JP,norm,jpGlyphs,lineGlyphs,inside,expectedLines,lines,perLine,white,flashes,hold,readMode,calibration,clears,choices,leaks,offSpans};
+module.exports={T0,JP,norm,jpGlyphs,lineGlyphs,inside,expectedLines,deliveryClock,lines,perLine,white,flashes,hold,readMode,calibration,clears,choices,leaks,offSpans};

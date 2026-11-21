@@ -13,7 +13,7 @@ const D=require('../core/profiles/defaults.cjs'),domains=require('../core/profil
 const tmp=()=>fs.mkdtempSync(path.join(process.env.MEGULIT_TMP||os.tmpdir(),'cardinal-'));
 const SHA='a'.repeat(64);
 /* a synthetic run: lines of text shown from `at` for `ms`, glyphs at y, Chinese under them, all inside one hit region */
-function run({lines=[],extra=[],hbSent=[],hookEvents=[],offers=[],choicesShown=true,hidden}={}){const steps=[],samples=[];let t=1000;
+function run({lines=[],extra=[],hbSent=[],hookEvents=[],offers=[],choicesShown=true,hidden,sourceSteps=null}={}){const steps=[],samples=[];let t=1000;
  lines.forEach((l,i)=>{steps.push({t,hb:{type:'hookSource',text:l.text},line:i+1,text:l.text});t+=2000;});
  lines.forEach((l,i)=>{for(let at=l.at;at<l.at+(l.ms||1500);at+=90){const y=typeof l.y==='function'?l.y(at-l.at):(l.y??700);
   const glyphs=(l.hide&&at-l.at>=300?[]:[{text:l.text,kind:'line',rect:{x:100,y,w:300,h:30},color:[255,255,255],pointer:'auto'}]);
@@ -21,7 +21,8 @@ function run({lines=[],extra=[],hbSent=[],hookEvents=[],offers=[],choicesShown=t
   for(const o of l.also||[])glyphs.push({text:o.text,kind:'line',rect:{x:100,y:o.y,w:300,h:30},color:[255,255,255],pointer:'auto'});
   const s={at,mark:'tick',watch:true,body:'',hookSource:l.text,glyphs,cn:l.noCn?[]:[{text:'中文',rect:{x:100,y:y+40,w:300,h:30}}],choices:[],hitRegions:[{x:0,y:0,width:1920,height:1080}]};
   for(const o of offers)if(choicesShown&&at>=o.at&&at<o.at+3000)s.choices.push({text:'選択',shown:true,rect:{x:500,y:300,w:200,h:40}});samples.push(s);}});
- return {name:'r',steps,o:{t0:0,samples,sourceEpisodes:lines.map((l,i)=>({line:i+1,at:l.at})),hbSent,hookEvents,choiceOffers:offers,hidden:hidden||{lines:0,visible:0},krkr:{choice:[]}}};}
+ const sourceEpisodes=[];for(const [step,st] of (sourceSteps||steps).entries())if(st.hb?.type==='hookSource')sourceEpisodes.push({step,line:st.line,text:st.hb.text,at:lines[sourceEpisodes.length].at});
+ return {name:'r',steps,o:{t0:0,samples,sourceEpisodes,hbSent,hookEvents,choiceOffers:offers,hidden:hidden||{lines:0,visible:0},krkr:{choice:[]}}};}
 const clean3=()=>[{text:'あいうえお',at:0},{text:'かきくけこ',at:2000},{text:'さしすせそ',at:4000}];
 
 test('a clean session scores 1 on every score that applies; nothing to look at leaves the total',()=>{
@@ -138,7 +139,7 @@ test('a background run writes data/The Seed/cardinal/<sha>.json and never touche
  Tape.record('gwb',{type:'bound',gameProcessId:11,gameStarted:'3'},t);for(let i=0;i<12;i++){Tape.record('hb',{type:'hookSource',text:'台詞'+i},t+=1500);Tape.liveSource('台詞'+i);Tape.liveTranslation('台詞'+i,'真实会话译文'+i);}
  const touched=[];const gal=new Proxy({state:{gameProcessId:11},hooks:{trace:l=>touched.push('trace:'+l.split(' ')[1])}},{get(o,k){if(k in o)return o[k];return (...a)=>{touched.push(String(k));};}});
  const reader={root,gameExe:'C:/Games/x.exe',gal};
- let scenario=null;const replay=async sc=>{scenario=sc;const lines=sc.steps.filter(s=>s.line);return run({lines:lines.map((s,i)=>({text:s.text,at:i*1600}))}).o;};
+ let scenario=null;const replay=async sc=>{scenario=sc;const lines=sc.steps.filter(s=>s.line);return run({sourceSteps:sc.steps,lines:lines.map((s,i)=>({text:s.text,at:i*1600}))}).o;};
  const prev=process.env.MEGULIT_CARDINAL_REPLAY;process.env.MEGULIT_CARDINAL_REPLAY='1';assert.equal(C2.kick(reader,'session-end',{replay}).why,'inside a replay');if(prev===undefined)delete process.env.MEGULIT_CARDINAL_REPLAY;
  /* no exe key here: tell it through a stand-in self-check session */
  const live=require('../services/self-check-live.cjs');const orig=live.current;live.current=()=>({reader,key:SHA,from:'',profile:Profiles.profileFor({})});
@@ -158,7 +159,7 @@ test('a replay the PC could not keep up with is kept on this PC and never upload
  Tape.record('gwb',{type:'bound',gameProcessId:12,gameStarted:'4'},t);for(let i=0;i<12;i++){Tape.record('hb',{type:'hookSource',text:'台詞'+i},t+=1500);Tape.liveSource('台詞'+i);Tape.liveTranslation('台詞'+i,'真实会话译文'+i);}
  const reader={root,gameExe:'C:/Games/x.exe',gal:{state:{},hooks:{trace(){}}}};const live=require('../services/self-check-live.cjs'),orig=live.current;live.current=()=>({reader,key:SHA,from:'',profile:Profiles.profileFor({})});
  const net=[];const fetcher=async u=>{net.push(u);return {ok:true,status:200};};const prev=process.env.MEGULIT_RELAY_BASE;process.env.MEGULIT_RELAY_BASE='https://relay.test';
- const replay=lag=>async sc=>{const o=run({lines:sc.steps.filter(s=>s.line).map((s,i)=>({text:s.text,at:i*1600}))}).o;o.lag={stepP95:lag,stepMax:lag};return o;};
+ const replay=lag=>async sc=>{const o=run({sourceSteps:sc.steps,lines:sc.steps.filter(s=>s.line).map((s,i)=>({text:s.text,at:i*1600}))}).o;o.lag={stepP95:lag,stepMax:lag};return o;};
  try{C2.kick(reader,'session-end',{replay:replay(400),fetcher});await C2.idle();const doc=C2.load(root,SHA);assert.equal(doc.unreliable,true);assert.equal(doc.sent,false);assert.deepEqual(net,[]);
   C2._reset();C2.kick(reader,'session-end',{replay:replay(10),fetcher});await C2.idle();assert.equal(C2.load(root,SHA).unreliable,false);assert.deepEqual(net,['https://relay.test/api/cardinal/score']);}
  finally{live.current=orig;if(prev===undefined)delete process.env.MEGULIT_RELAY_BASE;else process.env.MEGULIT_RELAY_BASE=prev;Tape.clear();C2._reset();}

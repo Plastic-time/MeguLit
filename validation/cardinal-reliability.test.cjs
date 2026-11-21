@@ -41,9 +41,16 @@ test('a later repeated source with no new DOM cannot reuse the earlier source ep
  assert.deepEqual(result.detail.timeline,{source:'legacy-source-transitions',reliable:false});
 });
 test('measured source delivery windows use replay elapsed time rather than input epoch time',()=>{
- const run={steps:[{t:1795253000000,line:1,text:'本文',hb:{type:'hookSource',text:'本文'}},{t:1795253009000,line:2,text:'本文',hb:{type:'hookSource',text:'本文'}}],o:{sourceEpisodes:[{step:0,line:1,at:500},{step:1,line:2,at:2500}],samples:[500,900,1300,1700].map(at=>({at,hookSource:'本文',body:'',glyphs:[{text:'本文',kind:'line',rect:{x:0,y:0,w:20,h:10},pointer:'auto'}],hitRegions:[{x:0,y:0,width:20,height:10}]}))}};
+ const run={steps:[{t:1795253000000,line:1,text:'本文',hb:{type:'hookSource',text:'本文'}},{t:1795253009000,line:2,text:'本文',hb:{type:'hookSource',text:'本文'}}],o:{sourceEpisodes:[{step:0,line:1,text:'本文',at:500},{step:1,line:2,text:'本文',at:2500}],samples:[500,900,1300,1700].map(at=>({at,hookSource:'本文',body:'',glyphs:[{text:'本文',kind:'line',rect:{x:0,y:0,w:20,h:10},pointer:'auto'}],hitRegions:[{x:0,y:0,width:20,height:10}]}))}};
  assert.deepEqual(C.lines(run).map(x=>x.line),[1],'the second identical source has no samples in its own measured window');
  assert.equal(C.perLine(run).complete.lines,1,'a genuinely complete two-character sentence is valid');
+});
+test('delivery clocks require every source exactly once with its identity, text and monotonic finite time',()=>{
+ const run={steps:[{t:100,line:1,text:'本文',hb:{type:'hookSource',text:'本文'}},{t:200,line:2,text:'後文',hb:{type:'hookSource',text:'後文'}}],o:{sourceEpisodes:[{step:0,line:1,text:'本文',at:10},{step:1,line:2,text:'後文',at:20}],samples:[]}};
+ assert.equal(C.deliveryClock(run).reliable,true,'controlled transport fixture only, no healthy DOM claim');
+ for(const mutate of [r=>r.o.sourceEpisodes=[],r=>r.o.sourceEpisodes.pop(),r=>r.o.sourceEpisodes.push({...r.o.sourceEpisodes[0]}),r=>r.o.sourceEpisodes[1].line=1,r=>r.o.sourceEpisodes[1].step=0,r=>r.o.sourceEpisodes[1].text='違う文',r=>r.o.sourceEpisodes[1].at=NaN,r=>r.o.sourceEpisodes[0].at=-1,r=>r.o.sourceEpisodes.reverse(),r=>r.o.sourceEpisodes[1].at=5]){
+  const bad=structuredClone(run);mutate(bad);assert.equal(C.deliveryClock(bad).reliable,false);assert.equal(S.score(bad,D.cardinal).total,0);
+ }
 });
 function setup(share=false){
  const root=fs.mkdtempSync(path.join(process.env.MEGULIT_TMP||os.tmpdir(),'cardinal-reliability-'));
@@ -56,15 +63,15 @@ function setup(share=false){
  const original=Live.current;Live.current=()=>({reader,key:reader.cardinalKey||SHA,from:'',profile:Profiles.profileFor({})});
  return {root,reader,traces,close(){Live.current=original;Jobs._reset();Tape.clear();}};
 }
-// Job-control tests inject the replay boundary only; an empty delivery list supplies no positive alignment evidence.
-const observed=()=>({...structuredClone(fixture.run.o),sourceEpisodes:[]});
+// Job-control tests inject a controlled delivery clock; their old real DOM is not a fabricated healthy alignment.
+const observed=sc=>{let n=0;return {...structuredClone(fixture.run.o),sourceEpisodes:(sc?.steps||[]).flatMap((st,step)=>st.hb?.type==='hookSource'?[{step,line:st.line,text:st.hb.text,at:n++*1600}]:[])};};
 test('the queue drains a third job scheduled during its second replay, and idle waits for all three',async()=>{
  const h=setup();let releaseA,releaseB,startedB;const waitA=new Promise(r=>releaseA=r),waitB=new Promise(r=>releaseB=r),bStarted=new Promise(r=>startedB=r),calls=[];
  try{
-  Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('a');await waitA;return observed();}});
-  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('b');startedB();await waitB;return observed();}}).state,'queued');
+  Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('a');await waitA;return observed(sc);}});
+  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('b');startedB();await waitB;return observed(sc);}}).state,'queued');
   releaseA();await bStarted;
-  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('c');return observed();}}).state,'queued');
+  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('c');return observed(sc);}}).state,'queued');
   releaseB();await Jobs.idle();assert.deepEqual(calls,['a','b','c']);
  }finally{releaseA();releaseB();h.close();}
 });
@@ -72,37 +79,45 @@ test('different games keep FIFO order, same-game waiting work coalesces, and que
  const h=setup(),calls=[];let release;const blocked=new Promise(r=>release=r);
  const key=i=>i.toString(16).padStart(64,'0');
  try{
-  Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('active');await blocked;return observed();}});
-  h.reader.cardinalKey=key(1);assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('obsolete');return observed();}}).state,'queued');
-  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('latest-1');return observed();}}).replaced,true);
-  for(let i=2;i<=8;i++){h.reader.cardinalKey=key(i);assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('game-'+i);return observed();}}).state,'queued');}
-  h.reader.cardinalKey=key(9);assert.deepEqual(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('overflow');return observed();}}),{state:'deferred',why:'queue full'});
+  Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('active');await blocked;return observed(sc);}});
+  h.reader.cardinalKey=key(1);assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('obsolete');return observed(sc);}}).state,'queued');
+  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('latest-1');return observed(sc);}}).replaced,true);
+  for(let i=2;i<=8;i++){h.reader.cardinalKey=key(i);assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('game-'+i);return observed(sc);}}).state,'queued');}
+  h.reader.cardinalKey=key(9);assert.deepEqual(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('overflow');return observed(sc);}}),{state:'deferred',why:'queue full'});
   assert.ok(h.traces.some(s=>/queue full.*deferred/.test(s)));release();await Jobs.idle();
   assert.deepEqual(calls,['active','latest-1',...Array.from({length:7},(_,i)=>'game-'+(i+2))]);
-  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>{calls.push('retried-9');return observed();}}).state,'started');await Jobs.idle();assert.equal(calls.at(-1),'retried-9');
+  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>{calls.push('retried-9');return observed(sc);}}).state,'started');await Jobs.idle();assert.equal(calls.at(-1),'retried-9');
  }finally{release();h.close();}
 });
 test('a rejected replay is recorded as a failure and does not strand the next run',async()=>{
  const h=setup();try{
-  Jobs.kick(h.reader,'session-end',{replay:async()=>{throw new Error('probe crashed');}});await Jobs.idle();
+  Jobs.kick(h.reader,'session-end',{replay:async sc=>{throw new Error('probe crashed');}});await Jobs.idle();
   assert.match(Jobs.load(h.root,SHA).failed.errors[0],/probe crashed/);
-  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async()=>observed()}).state,'started');await Jobs.idle();assert.ok(Jobs.load(h.root,SHA).record);
+  assert.equal(Jobs.kick(h.reader,'session-end',{replay:async sc=>observed(sc)}).state,'started');await Jobs.idle();assert.ok(Jobs.load(h.root,SHA).record);
  }finally{h.close();}
 });
 test('partial replay errors and missing DOM samples cannot upload a successful record',async()=>{
  const h=setup(true),calls=[];const fetcher=async u=>{calls.push(u);return {ok:true,status:200};};
  try{
-  const partial=observed();partial.errors=['probe lost its page'];
-  Jobs.kick(h.reader,'session-end',{replay:async()=>partial,fetcher});await Jobs.idle();
+  Jobs.kick(h.reader,'session-end',{replay:async sc=>({...observed(sc),errors:['probe lost its page']}),fetcher});await Jobs.idle();
   const doc=Jobs.load(h.root,SHA);assert.equal(doc.unreliable,true);assert.equal(doc.sent,false);assert.deepEqual(calls,[]);
-  Jobs.kick(h.reader,'session-end',{replay:async()=>({errors:[],samples:[]}),fetcher});await Jobs.idle();
+  Jobs.kick(h.reader,'session-end',{replay:async sc=>({errors:[],samples:[]}),fetcher});await Jobs.idle();
   assert.match(Jobs.load(h.root,SHA).failed.errors[0],/no DOM samples/);assert.deepEqual(calls,[]);
+ }finally{h.close();}
+});
+test('missing or corrupt delivery clocks never turn old real DOM into a reliable relay vote',async()=>{
+ const h=setup(true),calls=[];const fetcher=async u=>{calls.push(u);return {ok:true,status:200};};
+ try{
+  for(const variant of ['empty','wrong-text','reversed','legacy']){
+   Jobs.kick(h.reader,'session-end',{replay:async sc=>{const out=observed(sc);if(variant==='empty')out.sourceEpisodes=[];if(variant==='wrong-text')out.sourceEpisodes[0].text='別の本文';if(variant==='reversed')out.sourceEpisodes.reverse();if(variant==='legacy')delete out.sourceEpisodes;return out;},fetcher});await Jobs.idle();
+   const doc=Jobs.load(h.root,SHA);assert.equal(doc.unreliable,true,variant);assert.equal(doc.sent,false);assert.equal(doc.detail.timeline.reliable,false);assert.deepEqual(calls,[]);
+  }
  }finally{h.close();}
 });
 test('a failed score upload stays unsent with its reason, then calibration retries that same record',async()=>{
  const h=setup(true),feed=require('../services/auto-profile-feed.cjs'),auto=require('../core/auto-profile.cjs');
  try{
-  Jobs.kick(h.reader,'session-end',{replay:async()=>observed(),fetcher:async()=>({ok:false,status:503})});await Jobs.idle();
+  Jobs.kick(h.reader,'session-end',{replay:async sc=>observed(sc),fetcher:async()=>({ok:false,status:503})});await Jobs.idle();
   const before=Jobs.load(h.root,SHA);assert.equal(before.sent,false);assert.deepEqual(before.upload,{state:'failed'});
   const bodies=[];await feed.report(h.root,auto.record({key:SHA,engine:'kirikiri',exe:'x.exe',version:'1.4.23',source:'calibration',result:{mode:'hide',settings:{},score:{cost:0},reason:''}}),{fetcher:async(url,init)=>{if(url.endsWith('/api/cardinal/score'))bodies.push(JSON.parse(init.body));return {ok:true,status:200,clone(){return {json:async()=>({})};}};}});
   for(let i=0;i<50&&!Jobs.load(h.root,SHA).sent;i++)await new Promise(r=>setTimeout(r,10));
