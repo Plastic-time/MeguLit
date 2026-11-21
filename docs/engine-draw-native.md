@@ -217,6 +217,15 @@ BGI、Siglus 等只要画字最终经过 TextOut / ExtTextOut / DrawText / GetGl
 3. DrawPrimitiveUP / DrawIndexedPrimitiveUP 时绑定的是字库纹理的那几次：抓 4 层返回地址（栈回溯），按调用点分组 → 候选「画字形四边形」函数
 4. 对 LunaHook 给出的字符串地址下硬件读断点（第一字节），第一个读它的函数是排版 / 送字函数；记录它的参数（笔位、窗口号）
 5. 结果：送字函数和画字形函数的 RVA、参数布局、调用栈，写进夹具，再按 DrawSites 的写法出静态签名（WA2 不走 GDI，签名要另做一种「函数入口」形式，届时补进表格式）
+**ダンガンロンパ 1 / 2（DR1_us.exe / DR2_us.exe，Abstraction 自己的引擎，静态 FreeType + SDL2 + OpenGL）**
+结论（2026-11-21，静态）：exe 里有整套 FreeType（truetype / cff / type1 / smooth / autofitter / psaux 模块名都在），字体在 font.pak；导入 glTexSubImage2D，字形增量写进一张纹理图集 = 有字形缓存。FT_Load_Glyph 一层和 BGI 的 GDI 点一样只在字第一次进缓存时调用、没有坐标，所以不在那一层签名；要找的是排版 / 送字函数。exe 里没有可用的字符串锚点，也没有 GDI 调用点，静态从零找风险太高，改在实机上定位：
+1. 经 MeguLit 启动 DR1（或 DR2），开 LunaHook 拿当前句的字符串和内存地址
+2. 钩 glTexSubImage2D（opengl32）：每次往字库纹理写字形时抓 6 层返回地址 → 字形缓存函数和它的调用者
+3. 钩 glDrawArrays / glDrawElements，在绑定的是字库纹理时抓调用栈 → 画字四边形的函数
+4. 对 LunaHook 给出的字符串第一字节下硬件读断点：第一个读它的函数是排版 / 送字函数，记录参数（笔位、窗口、字号）
+5. 第 2–4 步交叉得到排版函数的 RVA 和参数布局，取调用点前后字节进夹具，再照 MAGES 的六件套出静态签名（DR1 / DR2 各一份，结构应一致）
+V3（x64）不在这一步。
+
 **みにくいモジカの子（丑小鸭与文字祸.exe，Enigma Protector）**
 1. 游戏启动到标题画面（Enigma 此时已解开代码），用 native/runtimedump 一类的方式只读取出主模块内存镜像（ReadProcessMemory，整段 SizeOfImage），存到 H:\MeguLit-Work
 2. 镜像里 IAT 已被填成真实地址或 Enigma 的转发桩：把每个槽的目标对照 gdi32 / user32 导出表解析回 API 名（转发桩要跟一跳）
