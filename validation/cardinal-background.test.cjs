@@ -112,3 +112,13 @@ test('the actual server error boundary preserves the exact Cardinal stop reason'
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../services/server.cjs'),'utf8'),sandbox);input.emit('line',JSON.stringify({id:7,request:{action:'library_launch',id:1}}));await tick();
  assert.deepEqual(replies,[{id:7,ok:false,error:'CARDINAL_TREE_EXIT_UNCONFIRMED'}]);assert.equal(unexpectedFs,0,'the reason was not degraded to SERVICE_FAILED');
 });
+
+
+test('known driver exit or signal never taskkills a reusable PID while close is delayed',async()=>{
+ for(const field of ['exitCode','signalCode']){
+  const p=new EventEmitter();p.pid=31;p.exitCode=null;p.signalCode=null;p[field]=field==='exitCode'?0:'SIGTERM';p.connected=true;let kills=0,sends=0;p.send=()=>sends++;
+  const stopping=Run.stop(p,{platform:'win32',timeoutMs:30,cleanupConfirmed:()=>true,spawnSync:()=>{kills++;return {status:0};}});let complete=false;stopping.then(()=>complete=true);await tick();assert.equal(complete,false);assert.equal(kills,0);assert.equal(sends,0);p.emit('close',0);assert.equal(await stopping,true);assert.equal(kills,0);
+  const unsafe=new EventEmitter();unsafe.pid=32;unsafe.exitCode=null;unsafe.signalCode=null;unsafe[field]=field==='exitCode'?0:'SIGTERM';
+  assert.equal(await Run.stop(unsafe,{platform:'win32',timeoutMs:1,spawnSync:()=>{kills++;return {status:0};}}),false);assert.equal(kills,0);
+ }
+});

@@ -69,18 +69,19 @@ async function launch({executable=findBrowser(),viewport={width:1920,height:1080
  const args=['--headless=new','--remote-debugging-port=0','--user-data-dir='+dir,'--no-first-run','--no-default-browser-check','--disable-extensions','--disable-gpu','--mute-audio','--disable-sync','--disable-background-networking','--disable-component-update','--disable-default-apps','--disable-features=Translate,msEdgeSidebarV2,msImplicitSignin,EdgeCollections','--hide-scrollbars','--window-size='+viewport.width+','+viewport.height,'about:blank'];
  let child=null,conn=null,port=0,browserPath='',ended=false,spawnError=null,disposal=null;let finishExit;const exited=new Promise(resolve=>finishExit=resolve);
  const connect=url=>new Conn(url,{WebSocketCtor:io.WebSocket||globalThis.WebSocket,connectMs:limits.connect,commandMs:limits.command});
- const kill=()=>{if(!child||ended||!child.pid)return;try{if(process.platform==='win32')io.spawnSync('taskkill',['/T','/F','/PID',String(child.pid)],{windowsHide:true,stdio:'ignore',timeout:limits.exit});else child.kill('SIGKILL');}catch{}};
+ const hasExited=()=>child&&(child.exitCode!=null||child.signalCode!=null);
+ const kill=()=>{if(!child||ended||hasExited()||!child.pid)return;try{if(process.platform==='win32')io.spawnSync('taskkill',['/T','/F','/PID',String(child.pid)],{windowsHide:true,stdio:'ignore',timeout:limits.exit});else child.kill('SIGKILL');}catch{}};
  const waitExit=async()=>{if(ended||!child)return true;try{await bounded(exited,limits.exit,'CARDINAL_BROWSER_EXIT_TIMEOUT');}catch{}return ended;};
  const cleanup=async()=>{if(!owned)return;for(let i=0;i<limits.cleanupAttempts;i++){try{if(path.resolve(dir)!==ownedPath)throw Error('CARDINAL_PROFILE_PATH_CHANGED');io.fs.rmSync(dir,{recursive:true,force:true});return;}catch(error){if(i+1===limits.cleanupAttempts)throw Error('CARDINAL_PROFILE_CLEANUP: '+error.message);await io.sleep(250);}}};
  const dispose=graceful=>{if(disposal)return disposal;disposal=(async()=>{conn?.close();
-  if(graceful&&port&&browserPath&&!ended){let browserConn;try{browserConn=connect('ws://127.0.0.1:'+port+browserPath);await bounded(browserConn.ready,limits.close,'cdp browser close connection timeout');await bounded(browserConn.send('Browser.close'),limits.close,'cdp browser close command timeout');}catch{}finally{browserConn?.close();}}
+  if(graceful&&port&&browserPath&&!ended&&!hasExited()){let browserConn;try{browserConn=connect('ws://127.0.0.1:'+port+browserPath);await bounded(browserConn.ready,limits.close,'cdp browser close connection timeout');await bounded(browserConn.send('Browser.close'),limits.close,'cdp browser close command timeout');}catch{}finally{browserConn?.close();}}
   if(child&&!ended){if(!graceful||!await waitExit())kill();await waitExit();}
   if(child&&!ended){const error=Error('CARDINAL_BROWSER_EXIT_TIMEOUT pid='+child.pid+' profile='+dir);error.cleanupFailure={browserPid:child.pid,profile:dir,processClosed:false,reason:'exit-timeout'};throw error;}
   try{await cleanup();}catch(error){error.cleanupFailure={browserPid:child?.pid||null,profile:dir,processClosed:true,reason:'profile-cleanup'};throw error;}})();return disposal;};
  try{
-  child=io.spawn(executable,args,{stdio:'ignore',windowsHide:true});ended=child.exitCode!==null;
+  child=io.spawn(executable,args,{stdio:'ignore',windowsHide:true});
   child.once('close',()=>{ended=true;finishExit();});child.once('error',error=>{spawnError=error;if(!child.pid){ended=true;finishExit();}});
-  const until=Date.now()+limits.startup;while(Date.now()<until){try{const [p,b]=io.fs.readFileSync(path.join(dir,'DevToolsActivePort'),'utf8').split(/\r?\n/);if(+p){port=+p;browserPath=b;break;}}catch{}if(ended||spawnError)break;await io.sleep(100);}
+  const until=Date.now()+limits.startup;while(Date.now()<until){try{const [p,b]=io.fs.readFileSync(path.join(dir,'DevToolsActivePort'),'utf8').split(/\r?\n/);if(+p){port=+p;browserPath=b;break;}}catch{}if(ended||hasExited()||spawnError)break;await io.sleep(100);}
   if(!port)throw Error('CARDINAL_BROWSER_START'+(spawnError?': '+spawnError.message:''));
   let target=null;const targetUntil=Date.now()+limits.target;while(Date.now()<targetUntil&&!target){try{const remaining=Math.max(1,Math.min(1000,targetUntil-Date.now()));const response=await bounded(io.fetch('http://127.0.0.1:'+port+'/json/list',{signal:AbortSignal.timeout(remaining)}),remaining,'cdp target timeout');const list=await bounded(response.json(),remaining,'cdp target JSON timeout');target=list.find(t=>t.type==='page');}catch{}if(!target)await io.sleep(100);}
   if(!target)throw Error('CARDINAL_BROWSER_TARGET');

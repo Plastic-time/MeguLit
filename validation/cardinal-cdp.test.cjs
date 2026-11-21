@@ -42,7 +42,7 @@ function environment(stage,{exitDelay=0,neverExit=false,cleanupFails=false}={}){
   spawnSync(_cmd,args,options){assert.ok(args.includes(String(child.pid)));assert.equal(options.windowsHide,true);terminate();return {status:0};},
   fetch:async()=>stage==='target-hang'?new Promise(()=>{}):{json:async()=>[{type:'page',webSocketDebuggerUrl:'ws://unit/page/one'}]},
   sleep:()=>new Promise(r=>setTimeout(r,1))};
- return {io,state,options:{executable:'virtual-edge.exe',timeouts:{startup:15,target:15,connect:15,command:15,init:25,close:15,exit:60,cleanupAttempts:2}}};
+ return {io,state,child,options:{executable:'virtual-edge.exe',timeouts:{startup:15,target:15,connect:15,command:15,init:25,close:15,exit:60,cleanupAttempts:2}}};
 }
 test('every failure after profile creation kills the spawned process and cleans only its owned profile',async()=>{
  for(const stage of ['spawn-throw','start-fail','target-hang','connect-fail','connect-hang','init-reject','init-hang']){
@@ -70,4 +70,15 @@ test('a late child close does not let an already-rejected close pretend the prof
  assert.equal(env.state.closed,false);assert.deepEqual(env.state.removed,[]);
  await new Promise(r=>setTimeout(r,45));assert.equal(env.state.closed,true);
  await assert.rejects(browser.close(),/EXIT_TIMEOUT/);assert.deepEqual(env.state.removed,[],'terminal cleanup failure remains explicit, with the owned path retained');
+});
+
+
+test('known browser exit or signal preserves its profile until close without targeting a reusable PID',async()=>{
+ for(const field of ['exitCode','signalCode']){
+  const env=environment('close-hang');const browser=await launch(env.options,env.io);env.child[field]=field==='exitCode'?0:'SIGTERM';
+  const before=env.state.sockets.length,closing=browser.close();let complete=false;closing.then(()=>complete=true);await new Promise(r=>setImmediate(r));assert.equal(complete,false);assert.deepEqual(env.state.removed,[]);assert.equal(env.state.killed,0);assert.equal(env.state.sockets.length,before,'no Browser.close reconnect after known exit');
+  env.state.closed=true;env.child.emit('close',0);await closing;assert.equal(env.state.killed,0);assert.equal(env.state.removed.length,1);
+  const stuck=environment('start-fail');stuck.child[field]=field==='exitCode'?0:'SIGTERM';stuck.options.timeouts.exit=2;
+  await assert.rejects(launch(stuck.options,stuck.io),error=>error.cleanupFailure?.processClosed===false);assert.equal(stuck.state.killed,0);assert.deepEqual(stuck.state.removed,[]);
+ }
 });

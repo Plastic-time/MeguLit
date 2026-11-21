@@ -4,12 +4,12 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),chil
 const states=new WeakMap();
 function watch(p){let state=states.get(p);if(state)return state;let finish;state={closed:false,stopping:null,done:new Promise(resolve=>finish=resolve)};states.set(p,state);p.once('close',()=>{state.closed=true;finish();});return state;}
 async function stop(p,{timeoutMs=8000,platform=process.platform,spawnSync=childProcess.spawnSync,cleanupConfirmed=null}={}){
- if(!p)return true;const state=watch(p),confirmed=()=>{try{return (cleanupConfirmed||state.cleanupConfirmed)?.()===true;}catch{return false;}};
+ if(!p)return true;const exited=()=>p.exitCode!=null||p.signalCode!=null;const state=watch(p),confirmed=()=>{try{return (cleanupConfirmed||state.cleanupConfirmed)?.()===true;}catch{return false;}};
  if(state.stopping)return state.stopping;if(state.closed)return confirmed();
  const wait=async()=>{let timer;await Promise.race([state.done,new Promise(resolve=>timer=setTimeout(resolve,timeoutMs))]);clearTimeout(timer);return state.closed;};
  state.stopping=(async()=>{
-  try{if(typeof p.send==='function'&&p.connected!==false){p.send({type:'cardinal-stop'},()=>{});if(await wait())return confirmed();}}catch{}
-  try{if(platform==='win32')spawnSync('taskkill',['/T','/F','/PID',String(p.pid)],{windowsHide:true,stdio:'ignore',timeout:timeoutMs});else p.kill('SIGKILL');}catch{}
+  try{if(!exited()&&typeof p.send==='function'&&p.connected!==false){p.send({type:'cardinal-stop'},()=>{});if(await wait())return confirmed();}}catch{}
+  try{if(!state.closed&&!exited()){if(platform==='win32')spawnSync('taskkill',['/T','/F','/PID',String(p.pid)],{windowsHide:true,stdio:'ignore',timeout:timeoutMs});else p.kill('SIGKILL');}}catch{}
   await wait();return state.closed&&confirmed();
  })();return state.stopping;
 }
