@@ -1,0 +1,112 @@
+[
+ {
+  "id": "avg32",
+  "name": "namida-zadoru",
+  "path": "E:/GAL/[971128][ZERO] 涙 ～流星のザドル～ (SD ccd)/AVG3216D.EXE"
+ },
+ {
+  "id": "softpal",
+  "name": "leyline-1",
+  "path": "E:/GAL/[120727][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -黄昏時の境界線-/dll/PAL.dll"
+ },
+ {
+  "id": "nscripter",
+  "name": "tsukihime-1.4",
+  "path": "E:/GAL/月姬 v1.4/Tsukihime.exe"
+ },
+ {
+  "id": "nscripter",
+  "name": "tsukihime-1.6",
+  "path": "E:/GAL/[001229][TYPE-MOON] 月姬 v1.6/月姬 v1.6/Tsukihime.exe"
+ },
+ {
+  "id": "mfc-textoutw",
+  "name": "utsuro-no-shoujo",
+  "path": "E:/GAL/[130208][Innocent Grey] 虚ノ少女/虚之少女/Innocentsetup.exe"
+ },
+ {
+  "id": "mfc-exttextoutw",
+  "name": "utsuro-no-shoujo",
+  "path": "E:/GAL/[130208][Innocent Grey] 虚ノ少女/虚之少女/Innocentsetup.exe"
+ },
+ {
+  "id": "mfc-drawtextw",
+  "name": "utsuro-no-shoujo",
+  "path": "E:/GAL/[130208][Innocent Grey] 虚ノ少女/虚之少女/Innocentsetup.exe"
+ },
+ {
+  "id": "advhd",
+  "name": "under-the-moon",
+  "path": "E:/GAL/[061215][シュガービーンズ] Under The Moon～ (iso)/[NoDVD & Windows7起動 Patch] Under The Moon/utmoon.exe"
+ },
+ {
+  "id": "cmvs",
+  "name": "aoi-tori",
+  "path": "E:/Steam/steamapps/common/Aoi Tori/cmvs32.exe"
+ },
+ {
+  "id": "fvp",
+  "name": "irohika-cn",
+  "path": "E:/GAL/[120831][FAVORITE] いろとりどりのヒカリ/五彩斑斓的曙光/Hikari.exe"
+ },
+ {
+  "id": "fvp",
+  "name": "irohika-hd",
+  "path": "E:/GAL/[220930][FAVORITE] いろとりどりのヒカリHD/いろとりどりのヒカリHD/irohika_HD.exe"
+ },
+ {
+  "id": "fvp-bitmap",
+  "name": "irohika-cn",
+  "path": "E:/GAL/[120831][FAVORITE] いろとりどりのヒカリ/五彩斑斓的曙光/Hikari.exe"
+ },
+ {
+  "id": "fvp-bitmap",
+  "name": "irohika-hd",
+  "path": "E:/GAL/[220930][FAVORITE] いろとりどりのヒカリHD/いろとりどりのヒカリHD/irohika_HD.exe"
+ },
+ {
+  "id": "minori",
+  "name": "eden-en",
+  "path": "E:/Steam/steamapps/common/eden/eden_en.exe"
+ },
+ {
+  "id": "musica",
+  "name": "mashiroiro",
+  "path": "E:/GAL/[091030][ぱれっと] ましろ色シンフォニー -Love is pure white-/纯白交响曲/mashiroiro.exe"
+ },
+ {
+  "id": "bruns",
+  "name": "dustmania",
+  "path": "E:/GAL/[090522][Belisama] ダストマニア・グロテスク～解体挿入新書～/解体插入新书/libscr.dll"
+ },
+ {
+  "id": "nitroplus",
+  "name": "saya-steam",
+  "path": "E:/Steam/steamapps/common/The Song of Saya/Saya_Steam.exe"
+ },
+ {
+  "id": "softpal-2",
+  "name": "leyline-1",
+  "path": "E:/GAL/[120727][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -黄昏時の境界線-/dll/PAL.dll"
+ },
+ {
+  "id": "nitropak",
+  "name": "saya-2003",
+  "path": "E:/GAL/[031226][Nitro+] 沙耶の唄/system.dll"
+ },
+ {
+  "id": "softpal",
+  "name": "leyline-2",
+  "path": "E:/GAL/[130125][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -残影の夜が明ける時-/時計仕掛けのレイライン-残影の夜が明ける時-/dll/PAL.dll"
+ },
+ {
+  "id": "softpal-2",
+  "name": "leyline-2",
+  "path": "E:/GAL/[130125][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -残影の夜が明ける時-/時計仕掛けのレイライン-残影の夜が明ける時-/dll/PAL.dll"
+ },
+ {
+  "id": "avg32",
+  "name": "air-cn-upx-unpacked",
+  "path": "H:/MeguLit-Work/re-copies/air_cn.upx-unpacked.exe"
+ }
+]

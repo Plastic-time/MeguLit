@@ -34,6 +34,44 @@ rem engine-draw YU-RIS signature (YurisDrawSig.h) on bytes of the four known bui
 cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 yurisdraw.cpp /Fe:"%TEMP%\megulit-gdihide32\yurisdraw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
 "%TEMP%\megulit-gdihide32\yurisdraw.exe"
  if errorlevel 1 exit /b 1
+rem engine-draw GDI draw sites (DrawSitesSig.h) on bytes around every known site of the owner's exes
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 drawsites.cpp /Fe:"%TEMP%\megulit-gdihide32\drawsites.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\drawsites.exe"
+ if errorlevel 1 exit /b 1
+rem engine-draw GDI draw sites, the run-time gate (DrawSites.h) driven like MinHook drives it on a call site
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 /I stub drawsites-gate.cpp /Fe:"%TEMP%\megulit-gdihide32\drawsites-gate.exe" /Fo"%TEMP%\megulit-gdihide32\\" user32.lib gdi32.lib >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\drawsites-gate.exe"
+ if errorlevel 1 exit /b 1
+rem engine-draw SiglusEngine signature (SiglusDrawSig.h) on the windows of CLANNAD and Summer Pockets
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 siglusdraw.cpp /Fe:"%TEMP%\megulit-gdihide32\siglusdraw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\siglusdraw.exe"
+ if errorlevel 1 exit /b 1
+rem engine-draw SiglusEngine runtime replay (SiglusDraw.h): the real gates and MinHook on stand-ins, one page with ruby, name, choice, clear, backlog
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 /I"%~dp0..\..\shared\minhook\include" siglusdraw-gate.cpp "%~dp0..\..\shared\minhook\src\hook.c" "%~dp0..\..\shared\minhook\src\buffer.c" "%~dp0..\..\shared\minhook\src\trampoline.c" "%~dp0..\..\shared\minhook\src\hde\hde32.c" /Fe:"%TEMP%\megulit-gdihide32\siglusgate.exe" /Fo"%TEMP%\megulit-gdihide32\\" /link user32.lib >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\siglusgate.exe" >nul
+ if errorlevel 1 (echo FAIL siglus draw gate replay& exit /b 1)
+ echo PASS siglus draw gate replay
+rem engine-draw MAGES signature (MagesDrawSig.h) on the decrypted code of the five known Steam builds
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 magesdraw.cpp /Fe:"%TEMP%\megulit-gdihide32\magesdraw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\magesdraw.exe"
+ if errorlevel 1 exit /b 1
+rem engine-draw MAGES runtime (MagesDraw.h): real MinHook detours on a stand-in engine, the whole commit / clear / show / glyph chain
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 /I..\..\shared\minhook\include magesgate.cpp ..\..\shared\minhook\src\hook.c ..\..\shared\minhook\src\buffer.c ..\..\shared\minhook\src\trampoline.c ..\..\shared\minhook\src\hde\hde32.c /Fe:"%TEMP%\megulit-gdihide32\magesgate.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\magesgate.exe"
+rem engine-draw CatSystem2 signature (CS2DrawSig.h) on bytes of the known build (ISLAND)
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 cs2draw.cpp /Fe:"%TEMP%\megulit-gdihide32\cs2draw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\cs2draw.exe"
+rem engine-draw BGI signature (BgiDrawSig.h) on bytes of the known builds
+cmd /c "call "%MEGULIT_VS%" -arch=x86 -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 bgidraw.cpp /Fe:"%TEMP%\megulit-gdihide32\bgidraw.exe" /Fo"%TEMP%\megulit-gdihide32\\" >nul" || exit /b 1
+"%TEMP%\megulit-gdihide32\bgidraw.exe"
+ if errorlevel 1 exit /b 1
+rem engine-draw Unity IL2CPP: the role rules and ranges on the owner's two IL2CPP games, and the runtime (fake il2cpp API, real unwind), 32- and 64-bit
+for %%A in (x86 x64) do (
+ cmd /c "call "%MEGULIT_VS%" -arch=%%A -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 il2cppdraw.cpp /Fe:"%TEMP%\megulit-il2cpp-%%A-roles.exe" /Fo"%TEMP%\\" >nul" || exit /b 1
+ "%TEMP%\megulit-il2cpp-%%A-roles.exe" || exit /b 1
+ cmd /c "call "%MEGULIT_VS%" -arch=%%A -host_arch=x64 -no_logo >nul && cl /nologo /O2 /EHsc /std:c++17 /utf-8 il2cppgate.cpp /Fe:"%TEMP%\megulit-il2cpp-%%A-gate.exe" /Fo"%TEMP%\\" >nul" || exit /b 1
+ "%TEMP%\megulit-il2cpp-%%A-gate.exe" || exit /b 1
+)
 rem one hook runtime (2026-11-19): the ISLAND, STEINS;GATE, euphoria HD adapters are part of MeguLitHook32
 for %%M in (ToMeCS2_DRAW ToMeSG_EMBED EmbedEuphoria474_DrawHide_TEST2) do (
  findstr /m /c:"%%M" "%~dp0..\MeguLitHook32.dll" >nul && (echo PASS MeguLitHook32.dll carries %%M) || (echo FAIL MeguLitHook32.dll lacks %%M & exit /b 1)

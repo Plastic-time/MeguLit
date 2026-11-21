@@ -7,7 +7,42 @@
  "settings": {
   "draw": {
    "embed": false,
-   "embedTranslation": true
+   "embedTranslation": true,
+   "engineTable": {
+    "engine": "mages",
+    "drawDialogue": [
+     "0x50af0",
+     "0x50f20"
+    ],
+    "drawGlyph": "0x2f8b0",
+    "commit": "0x501f0",
+    "clear": [
+     "0x50490",
+     "0x507c0"
+    ],
+    "pages": "0x1b09130",
+    "stride": "0xea9c",
+    "chars": 2000,
+    "scale": "0xbd3c4",
+    "layoutCount": "0x1aba7d0",
+    "layoutCodes": "0x1aba7d8",
+    "layoutInfo": "0x1abd6c0",
+    "backbuffer": [
+     "0x2f8c3b0",
+     "0x2f8c3b4"
+    ],
+    "menuText": [
+     "0x4b200",
+     "0x4b550"
+    ],
+    "selPage": 7,
+    "sysSelPage": 5,
+    "charset": "sglbp",
+    "canvas": [
+     1920,
+     1080
+    ]
+   }
   }
  },
  "exe": "Game.exe",

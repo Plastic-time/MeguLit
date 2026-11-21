@@ -7,7 +7,7 @@
    Each word comes back with the learner's proficiency (vocabulary.status: 0 new, 1 learning, 2+ known; unsaved = null). */
 const fs=require('node:fs'),path=require('node:path');
 const KANJI=/[㐀-鿿]/g;
-const hira=s=>String(s||'').replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+const hira=s=>String(s||'').normalize('NFKC').replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
 let cache=null;
 function words(file=path.join(__dirname,'..','core','jlpt-words.json')){
   if(cache&&cache.file===file)return cache.list;
@@ -24,18 +24,24 @@ function tokens(def){
 }
 function related({query,reading='',definition=''},{list=words(),vocab=[],limit=16}={}){
   const q=String(query||'').trim();if(!q)return [];
-  const qr=hira(reading||(/^[ぁ-ゟァ-ーー]+$/.test(q)?q:'')),kan=new Set(q.match(KANJI)||[]);
+  const kana=hira(q),qr=reading?hira(reading):/^[ぁ-ゟー]+$/.test(kana)?kana:'',kan=new Set(q.match(KANJI)||[]);
   const status=new Map();for(const v of vocab){const s=String(v?.spelling||'').trim();if(s&&!status.has(s))status.set(s,Number(v.status)||0);}
   const seen=new Set([q]),out=[];
-  const add=(t,why)=>{if(!t||seen.has(t)||t.length>8)return;seen.add(t);out.push({t,why,status:status.has(t)?status.get(t):null});};
-  const byKanji=[],byReading=[];
+  const add=(t,why,proficiency=status.get(t)??null)=>{if(!t||seen.has(t)||t.length>8)return;seen.add(t);out.push({t,why,status:proficiency});};
+  const byKanji=[],byReading=new Map();
+  for(const v of vocab){
+    const spelling=String(v?.spelling||'').trim();
+    if(qr&&spelling&&spelling!==q&&hira(v.reading)===qr&&!byReading.has(spelling))byReading.set(spelling,Number(v.status)||0);
+  }
   for(const w of list){
-    if(qr&&w.reading===qr&&w.t!==q)byReading.push(w.t);
+    if(qr&&w.reading===qr&&w.t!==q&&!byReading.has(w.t))byReading.set(w.t,null);
     if(kan.size){const ks=w.t.match(KANJI)||[];if(ks.some(k=>kan.has(k)))byKanji.push(w.t);}
   }
   /* saved words first in each kind: they are the learner's own */
   const mine=t=>status.has(t)?0:1;
-  byReading.sort((a,b)=>mine(a)-mine(b)).slice(0,5).forEach(t=>add(t,'reading'));
+  for(const [t,proficiency] of byReading){
+    add(t,'reading',proficiency);if(out.length>=5)break;
+  }
   byKanji.sort((a,b)=>mine(a)-mine(b)||a.length-b.length).slice(0,8).forEach(t=>add(t,'kanji'));
   for(const v of vocab){const t=String(v?.spelling||'').trim();if(!t||seen.has(t))continue;if(kan.size&&(t.match(KANJI)||[]).some(k=>kan.has(k)))add(t,'kanji');}
   const qt=tokens(definition);

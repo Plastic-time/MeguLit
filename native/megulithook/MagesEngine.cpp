@@ -5,6 +5,7 @@
    file by build-x86.cmd), so an operand byte is never taken for an opcode. */
 #ifndef _WIN64
 #include "hde32.h"
+#include "MagesDraw.h" /* engine-draw 2026-11-21: the dialogue pages of any MAGES build (opt-in, docs/engine-draw-native.md) */
 #endif
 
 namespace
@@ -58,6 +59,7 @@ static void MAGES_mail()
 #ifndef _WIN64
 bool hookmages::MAGES()
 {
+    MagesDraw::Arm(processStartAddress); /* only a watcher until the game's diff turns draw.roles on */
     auto dialogSigOffset = 2;
     BYTE dialogSig1[] = {
         0x85, XX, 0x74, XX, 0x83, XX, 0x01, 0x74, XX, 0x83, XX, 0x04, 0x74, XX, 0xc7, 0x05, XX, XX, XX, XX, 0x01, 0x00, 0x00, 0x00};

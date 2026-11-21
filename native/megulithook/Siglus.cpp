@@ -1,4 +1,5 @@
 #include "Siglus.h"
+#include "SiglusDraw.h" /* engine-draw 2026-11-21: every glyph of every text area, ruby and clear (opt-in, docs/engine-draw-native.md) */
 namespace
 { // unnamed
 
@@ -1930,7 +1931,7 @@ bool Siglus::attach_function()
   }
   bool b1 = InsertSiglusHook();
   bool b2 = InsertSiglusHookZ();
-  return [&]()
+  bool ok = [&]()
   {
     auto b = false;
     for (auto hp : hps)
@@ -1938,4 +1939,7 @@ bool Siglus::attach_function()
     return b;
   }() || b1 ||
          b2 || h3();
+  if (ok)
+    SiglusDraw::Arm(processStartAddress);
+  return ok;
 }

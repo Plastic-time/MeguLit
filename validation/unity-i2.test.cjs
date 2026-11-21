@@ -111,3 +111,76 @@ test('an I2 object leaves a single sibling line intact and cannot replace an ind
  assert.equal(scenes.ENGINES['unity-assets'].originalLines(mixed),null);
  assert.equal(probeGame({dir:mixed,executable:'Game.exe'}).step,'chinese-build');
 });
+
+function catArchive(dir,entries,pack='data_01.dat'){
+ const folder=path.join(dir,'CatSystem');fs.mkdirSync(folder,{recursive:true});
+ const names=Object.keys(entries);
+ const buf=require('./helpers/engine-fixtures.cjs').zip(Object.fromEntries(names.map(n=>[n,'fixture'])),{flagged:names.filter(n=>entries[n])});
+ fs.writeFileSync(path.join(folder,pack),buf);
+}
+function monoScript(name,ns){return Buffer.concat([str(name),Buffer.alloc(20),str(name),str(ns),str('Game.dll')]);}
+function component(text,id){const h=Buffer.alloc(32);h.writeInt32LE(1,16);h.writeBigInt64LE(BigInt(id),20);return Buffer.concat([h,...text.map(str)]);}
+
+test('protected CatSystem scenes are reported without treating Unity UI or font strings as the original',t=>{
+ const scripts=asset(115,[monoScript('Text','UnityEngine.UI'),monoScript('TMP_FontAsset','TMPro'),monoScript('TextMeshProUGUI','TMPro'),monoScript('Text','Game')]);
+ const ui=['最初から始めます。','続きから読みます。'];
+ const dir=install(t,[component(ui,1),component(ui,2),component(ui,3)],scripts),d=path.join(dir,'Game_Data');
+ fs.writeFileSync(path.join(d,'sharedassets1.assets'),asset(49,Buffer.concat([str('LineBreaking Following Characters'),str('〕〉》ぁぃぅぇぉっゃゅょ')])));
+ catArchive(dir,{'fes/menu.cstx':true,'voice/a.ogg':true});
+ assert.equal(scenes.ENGINES['unity-assets'].unsupported?.(dir)||'','');
+ assert.equal(scenes.read('unity-assets',dir).flatMap(s=>s.lines).length,7);
+ catArchive(dir,{'scene/first.cstx':true},'data_02.dat');
+ const probe=()=>probeGame({dir,executable:'Game.exe'});
+ assert.equal(probe().step,'decrypt-failed');
+ assert.equal(probe().detail,'unity-assets:CATSYSTEM_CSTX_ENCRYPTED');
+ assert.equal(scenes.read('unity-assets',dir).length,0);
+ // A different script with the same class name and a reference to a different file both survive.
+ fs.writeFileSync(path.join(d,'level0'),asset(114,[component(ui,1),component(['ここが物語の始まりです。'],4)]));
+ fs.writeFileSync(path.join(d,'level1'),asset(114,component(['別の台詞です。','また明日。'],1),'other.assets'));
+ assert.deepEqual(scenes.read('unity-assets',dir).flatMap(s=>s.lines).sort(),['ここが物語の始まりです。','別の台詞です。','また明日。'].sort());
+ assert.equal(probe().step,'ok');
+ catArchive(dir,{'scene/a-longer-plaintext-entry.cstx':false},'data_03.dat');
+ assert.equal(scenes.ENGINES['unity-assets'].unsupported(dir),'');
+ assert.equal(scenes.read('unity-assets',dir).flatMap(s=>s.lines).length,12);
+});
+
+test('a protected scene does not promote a lone untyped menu label or require script metadata to recognize line breaking',t=>{
+ const dir=install(t,component(['セーブデータ選択'],1),asset(115,monoScript('OptionsPanel','Game')));
+ const d=path.join(dir,'Game_Data');
+ fs.writeFileSync(path.join(d,'sharedassets1.assets'),asset(49,Buffer.concat([str('LineBreaking Leading Characters'),str('「『【ちいさい')])));
+ catArchive(dir,{'scene/story.cstx':true});
+ assert.equal(probeGame({dir,executable:'Game.exe'}).step,'decrypt-failed');
+ fs.unlinkSync(path.join(d,'globalgamemanagers.assets'));
+ assert.equal(probeGame({dir,executable:'Game.exe'}).step,'decrypt-failed');
+});
+
+test('a separate I2 source remains readable alongside a protected CatSystem story',t=>{
+ const dir=install(t,source(['ja','zh'],[term('line',0,['真夏の物語です。','盛夏的故事。'])]));
+ catArchive(dir,{'scene/first.cstx':true});
+ const rows=scenes.read('unity-assets',dir);
+ assert.deepEqual(rows.flatMap(v=>v.lines),['真夏の物語です。']);
+ assert.deepEqual(rows.flatMap(v=>v.zh),['盛夏的故事。']);
+});
+
+test('incomplete ZIP directories do not establish that every scene is protected',t=>{
+ const dir=install(t,component(['最初から始めます。','続きから読みます。'],1),asset(115,monoScript('Text','UnityEngine.UI')));
+ catArchive(dir,{'scene/chapter.cstx':true,'scene/plain.cstx':false});
+ const file=path.join(dir,'CatSystem','data_01.dat'),bytes=fs.readFileSync(file),end=bytes.length-22;
+ const central=bytes.readUInt32LE(end+16);
+ bytes.writeUInt32LE(0,central+46+bytes.readUInt16LE(central+28));
+ fs.writeFileSync(file,bytes);
+ assert.equal(scenes.ENGINES['unity-assets'].unsupported(dir),'');
+ assert.equal(scenes.read('unity-assets',dir).flatMap(s=>s.lines).length,2);
+ bytes.writeUInt32LE(16<<20,end+12);fs.writeFileSync(file,bytes);
+ assert.equal(scenes.ENGINES['unity-assets'].unsupported(dir),'');
+});
+
+test('installing CatSystem scenes invalidates the saved Unity original index',t=>{
+ const dir=install(t,component(['最初から始めます。','続きから読みます。'],1),asset(115,monoScript('Text','UnityEngine.UI')));
+ const folder=path.join(dir,'Game_Data','StreamingAssets');fs.mkdirSync(folder);
+ fs.writeFileSync(path.join(folder,'story.json'),JSON.stringify([{text:'ある日の物語です。'}]));
+ const scan=()=>require('../services/original-text.cjs').scanRunning(dir,'sample',path.join(dir,'Game.exe'),{noBackup:true});
+ assert.equal(scan().runtime.lines,3);
+ catArchive(dir,{'scene/first.cstx':true});
+ assert.equal(scan().runtime.lines,1);
+});

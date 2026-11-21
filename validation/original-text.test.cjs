@@ -29,6 +29,55 @@ test('alignment uses the lines the patch left in Japanese and the script structu
  const shifted=ot.align({lines:patched,structure:{messages:7,functionHash:'x'}},{lines:['x',...original.slice(0,6)],structure:{messages:7,functionHash:'x'}});assert.equal(shifted.reliable,false);
  assert.equal(ot.align({lines:patched,structure:{messages:7,functionHash:'x'}},{lines:original,structure:{messages:8,functionHash:'x'}}).reliable,false);
 });
+test('a Japanese aside carried into a Chinese translation is not an untranslated line',()=>{
+ const filler=Array(40).fill('「推开窗户就能看到远处的山。」');
+ const runtime=[...filler,'「夜空很美（きらり）」','「おはよう」'];
+ const original=[...Array(40).fill('「窓を開ければ遠くの山が見える。」'),'「夜空がきれいだ（きらり）」','「おはよう」'];
+ const structure={messages:runtime.length,functionHash:'same'};
+ const check=(zh,ja)=>ot.align({lines:zh,structure},{lines:ja,structure});
+ const a=check(runtime,original);
+ assert.equal(a.keptJapanese,1);assert.equal(a.keptEqual,1);assert.equal(a.reliable,true);
+ const matcher=new ot.Matcher(runtime,original),lookup=matcher.match(runtime.at(-2));
+ assert.equal(lookup.japanese,original.at(-2));assert.equal(lookup.alreadyJapanese,false);
+ assert.equal(matcher.match(runtime.at(-1)).alreadyJapanese,true);
+ const japaneseContext=check([...original.slice(0,-2),runtime.at(-2)],original.slice(0,-1));
+ assert.equal(japaneseContext.keptJapanese,filler.length+1);
+ assert.equal(new ot.Matcher([runtime.at(-2)],[original.at(-2)]).match(runtime.at(-2)).alreadyJapanese,true);
+
+ // The surrounding Japanese, a changed aside and a stand-alone aside still measure the layout.
+ for(const [zh,ja] of [
+  ['「星が光る（きらり）」','「夜空がきれいだ（きらり）」'],
+  ['「空が光る」','「夜空がきれいだ（きらり）」'],
+  ['「夜空很美（どきり）」','「夜空がきれいだ（きらり）」'],
+  ['「（きらり）」','「夜空がきれいだ（きらり）」'],
+  ['「夜空很美（きらり）」','「星空（きらり）」'],
+  ['「夜空很美（きらり）」','「星空（きらり）（さらり）」'],
+  ['「夜空很美（きらり）」',''],
+ ]){
+  const result=check([...filler,zh],[...original.slice(0,filler.length),ja]);
+  assert.equal(result.keptJapanese,1);assert.equal(result.reliable,false);
+ }
+ const shifted=check(runtime,[...original.slice(0,-1),'「さようなら」']);
+ assert.equal(shifted.reliable,false);
+ const twice=check([...filler,'夜空很美（きらり）（さらり）'],[...original.slice(0,-2),'夜がきれい（きらり）（さらり）']);
+ assert.equal(twice.keptJapanese,0);
+});
+
+test('an inline annotation cannot match a capture whose Chinese sentence differs',()=>{
+ const zh=[...Array(40).fill('推开窗户就能看到远处的山。'),'夜空很美（きらり）','钻石很亮（きらり）'];
+ const ja=[...Array(40).fill('窓を開ければ遠くの山が見える。'),'夜空がきれいだ（きらり）','宝石が光った（きらり）'];
+ const matcher=new ot.Matcher(zh,ja);
+ assert.equal(matcher.match('钻戒发光（きらり）').japanese,undefined);
+ assert.equal(matcher.match('（きらり）').japanese,undefined);
+ for(let i=zh.length-2;i<zh.length;i++){
+  const found=matcher.match(zh[i]);assert.equal(found.japanese,ja[i]);assert.equal(found.alreadyJapanese,false);
+ }
+ const joined=new ot.Matcher([...zh,'葵「等我一下」',zh.at(-2)],[...ja,'葵「少し待って」',ja.at(-2)]);
+ assert.equal(joined.match('「等我一下」\n'+zh.at(-2)).japanese,'「少し待って」\n'+ja.at(-2));
+ assert.equal(joined.match('「等我一下」\n（きらり）').japanese,undefined);
+ const other=new ot.Matcher(['「你好」','「明天再见」'],['「どうも」','「また明日」']);
+ assert.equal(other.match('「你好」「外面下雨」').japanese,undefined);
+});
 test('matcher covers multi-line captures, refuses ambiguous repeats and resolves them by reading position',()=>{
  const m=new ot.Matcher(patched,original);
  const first=m.match('「你终于来了啊」\n　我一直在等你呢');assert.equal(first.status,'exact');assert.deepEqual(first.indices,[0,1]);assert.equal(first.japanese,'「やっと来たね」\n　ずっと待ってたんだから');
