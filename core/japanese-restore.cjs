@@ -188,6 +188,7 @@ function writeAtomic(file,data){const tmp=file+'.megulit-tmp';fs.writeFileSync(t
 
 function apply(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));if(gameRunning(gameDir))throw Error('GAME_RUNNING');
+ const repaired=repairNameColumns(gameDir,options);if(repaired.repaired)return {applied:repaired.applied,cells:repaired.cells||0,repaired:true};
  {const y=readManifest(gameDir)?null:yurisPlan(gameDir);if(y&&y.updates.length)return yurisApply(gameDir,y);}
  const plan=siglusPlan(gameDir,options);if(!plan||!plan.changes.length){if(!readManifest(gameDir)&&langSwitch().detect(gameDir,options).state==='restorable')return langSwitch().apply(gameDir,options);if(!readManifest(gameDir)&&artemis().detect(gameDir).state==='restorable')return artemis().apply(gameDir,{bilingual:options.bilingual});throw Error('NOTHING_TO_RESTORE');}
  const backup=path.join(gameDir,BACKUP_DIR,'dat');fs.mkdirSync(backup,{recursive:true});
@@ -212,6 +213,7 @@ function apply(gameDir,options={}){
 
 function restore(gameDir,options={}){
  gameDir=path.resolve(String(gameDir||''));if(gameRunning(gameDir))throw Error('GAME_RUNNING');
+ repairNameColumns(gameDir,options);
  const manifest=readManifest(gameDir);if(!manifest)throw Error('NOT_APPLIED');if(manifest.adapter==='yuris-update')return yurisRestore(gameDir,manifest);if(manifest.adapter==='language-switch')return langSwitch().restore(gameDir,options);if(manifest.adapter==='artemis-pfs')return artemis().restore(gameDir);
  const dat=path.join(gameDir,'dat'),backup=path.join(gameDir,BACKUP_DIR,'dat'),skipped=[];let restored=0;
  for(const e of manifest.files){const target=path.join(dat,e.file),keep=path.join(backup,e.file);
@@ -228,11 +230,17 @@ function restore(gameDir,options={}){
 // Summer Pockets crashed on start (0xC0000005, user 2026-11-09). Before a launch, a table MeguLit itself wrote that
 // still has shared strings is rewritten: restore the kept original, then apply again with the current writer.
 function sharedPool(file){const {marker,raw}=decrypt(fs.readFileSync(file)),t=parse(raw,marker),offs=[];for(let r=0;r<t.rows;r++)for(let c=0;c<t.cols;c++)if(t.columns[c].type===0x53)offs.push(raw.readUInt32LE(t.data+(r*t.cols+c)*4));return new Set(offs).size<offs.length;}
-function repairShared(gameDir){
+function repairNameColumns(gameDir,options={}){
+ gameDir=path.resolve(String(gameDir||''));const column=nameColumn(options);
+ if(column===null&&!fs.existsSync(path.join(gameDir,BACKUP_DIR,'name-column-transaction.json')))return {repaired:false};
+ return require('./siglus-dbs-name-repair.cjs').repair(gameDir,column,{decrypt,encrypt,parse,rebuild,shownJapanese,languageColumns,gameRunning,writeAtomic});
+}
+function repairShared(gameDir,options={}){
+ const repaired=repairNameColumns(gameDir,options);if(repaired.repaired)return repaired;
  gameDir=path.resolve(String(gameDir||''));const manifest=readManifest(gameDir);if(!manifest||manifest.adapter!=='siglus-dbs')return {repaired:false};
  const dat=path.join(gameDir,'dat'),ours=manifest.files.find(e=>{try{return sha(fs.readFileSync(path.join(dat,e.file)))===e.patchedSha256;}catch{return false;}});
  if(!ours||!sharedPool(path.join(dat,ours.file)))return {repaired:false};
- const undone=restore(gameDir);if(undone.skipped.length)return {repaired:false,skipped:undone.skipped};
- const done=apply(gameDir);return {repaired:true,applied:done.applied};
+ const undone=restore(gameDir,options);if(undone.skipped.length)return {repaired:false,skipped:undone.skipped};
+ const done=apply(gameDir,options);return {repaired:true,applied:done.applied};
 }
-module.exports={repairShared,detect,apply,restore,_internal:{sharedPool,readManifest,siglusPlan,shownJapanese,isIdent,nameColumn,yurisPlan,gameRunning,nativeRunning,decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};
+module.exports={repairShared,repairNameColumns,detect,apply,restore,_internal:{sharedPool,readManifest,siglusPlan,shownJapanese,isIdent,nameColumn,yurisPlan,gameRunning,nativeRunning,decrypt,encrypt,parse,rebuild,lzss,literal,languageColumns}};

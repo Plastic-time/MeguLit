@@ -97,6 +97,7 @@ test('global switch (default on) and per-game off',()=>{
 
 test('library scan queue: each game once, off the start-up path',async()=>{
  const run=require('../services/japanese-auto-run.cjs'),root=tmp('root'),{g}=siglusGame(),done=[];
+ fs.writeFileSync(path.join(g,'game.exe'),'unknown synthetic executable');
  run.considerLibrary(root,[{id:'q1',executable:path.join(g,'game.exe')}],{delay:5,gap:5,onDone:id=>done.push(id)});
  await new Promise(r=>setTimeout(r,8000));assert.deepEqual(done,['q1']);
  assert.equal(run.considerLibrary(root,[{id:'q1',executable:path.join(g,'game.exe')}],{delay:5}),0,'not queued again');

@@ -1,13 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const jr=require('../core/japanese-restore.cjs'),I=jr._internal;
-function table(cells,ids=cells[0].map((_,i)=>i)){
- const rows=cells.length,cols=cells[0].length,fmt=28,data=fmt+cols*8,text=data+rows*cols*4,head=Buffer.alloc(text),pool=[];let offset=0;
- [0,rows,cols,0,fmt,data,text].forEach((v,i)=>head.writeUInt32LE(v,i*4));
- for(let c=0;c<cols;c++){head.writeUInt32LE(ids[c],fmt+c*8);head.writeUInt32LE(0x53,fmt+c*8+4);}
- cells.forEach((row,r)=>row.forEach((v,c)=>{const b=Buffer.from(v+'\0','utf16le');head.writeUInt32LE(offset,data+(r*cols+c)*4);pool.push(b);offset+=b.length;}));
- const raw=Buffer.concat([head,...pool]);raw.writeUInt32LE(raw.length,0);return I.encrypt(1,raw);
-}
+const table=require('./helpers/siglus-dbs-table.cjs');
 function plan(rows,options,run,ids){const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-jr-speaker-'));try{fs.mkdirSync(path.join(root,'dat'));fs.writeFileSync(path.join(root,'dat','story.dbs'),table(rows,ids));return run(I.siglusPlan(root,options),root);}finally{fs.rmSync(root,{recursive:true,force:true});}}
 const dialogue=i=>'「きょうの台詞を話します」'+i,cap={siglusDbsNameColumn:50};
 test('exact version name column is excluded by call ID, preserving names, empty narration and scene headers',()=>{
@@ -42,4 +36,3 @@ test('built-in version capability is exact and has a nullable signed integer dom
  assert.equal(P.profileFor({exeSha256:key}).source.siglusDbsNameColumn,50);assert.equal(P.profileFor({exe:'SiglusEngine_Steam.exe',title:'CLANNAD'}).source.siglusDbsNameColumn,null);assert.equal(P.profileFor({exeSha256:'f'.repeat(64)}).source.siglusDbsNameColumn,null);
  assert.equal(D.layerOf('source.siglusDbsNameColumn'),'version');assert.equal(D.clean({source:{siglusDbsNameColumn:0}}).value.source.siglusDbsNameColumn,0);assert(D.clean({source:{siglusDbsNameColumn:1.5}}).rejected.length);
 });
-module.exports={table};
