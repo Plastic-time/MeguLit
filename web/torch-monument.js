@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-21 传火碑: everyone who shared a calibration (The Seed) is carved on one black stone in a dim marble hall.
-   A real three.js scene (web/vendor/three, r168, offline): basilica hall with arcades, a drum of high windows under a dome,
-   cold light shafts, drifting dust, a polished marble floor that mirrors the shafts and the inscription, and a black
-   basalt stele on three steps. Names are drawn into the stele's textures one page at a time (canvas, carved look), so a
+   A real three.js scene (web/vendor/three, r168, offline): an old stone church (web/torch-hall.js, textures in web/torch-textures.js)
+   lit by the PC's clock, torches from dusk, a polished marble floor that mirrors it, and a black basalt stele on a wide stair. Names are drawn into the stele's textures one page at a time (canvas, carved look), so a
    monument with hundreds of thousands of names only ever holds a few hundred in memory.
 
    Data: services/torch-monument.cjs through the bridge (torch_page / torch_months / torch_find / torch_me).
    Life cycle: the scene is built when the page opens and fully disposed when it closes (GPU context released). It stops
    drawing while the window is hidden or not focused, and closes itself when a game starts (event megulit-game-launch).
-   Quality: 'high' (mirror floor, bloom, shadows) or 'low' (no mirror, no bloom, lower resolution); auto picks low on weak
+   Quality: 'high' (mirror floor, MSAA, ambient occlusion, sun shadows, bloom, grading) or 'low' (none of those, lower resolution); auto picks low on weak
    machines and drops to low when frames run slow. */
 import * as THREE from './vendor/three/three.module.min.js';
 import {Reflector} from './vendor/three/addons/objects/Reflector.js';
@@ -16,6 +15,10 @@ import {EffectComposer} from './vendor/three/addons/postprocessing/EffectCompose
 import {RenderPass} from './vendor/three/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from './vendor/three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from './vendor/three/addons/postprocessing/OutputPass.js';
+import {ShaderPass} from './vendor/three/addons/postprocessing/ShaderPass.js';
+import {GTAOPass} from './vendor/three/addons/postprocessing/GTAOPass.js';
+import {rng,canvas2d,basalt,marble,glowSprite} from './torch-textures.js';
+import {buildHall,HALL} from './torch-hall.js';
 import {loadGsap} from './gsap-loader.js';
 
 const COPY={
@@ -136,7 +139,7 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  await document.fonts.load('44px "Torch Serif"','传火碑人').catch(()=>{});
  gsap=await loadGsap().catch(()=>null);
  if(disposed)return null;
- scene=buildScene({host,canvas:$('.tm-canvas'),state,t,tier:pickTier(quality()),reduced,gsap,onTier:()=>updateChrome()});
+ scene=buildScene({host,canvas:$('.tm-canvas'),state,t,tier:pickTier(quality()),reduced,gsap,onTier:()=>updateChrome()});if(typeof window.__TORCH_HOUR==='number')host.__torch=scene;
  const ctl={close,focus:()=>$('.tm-close').focus()};current=ctl;
 
  /* first data: page 1, then the side routes (their buttons stay hidden until the relay has them) */
@@ -209,206 +212,36 @@ function pickTier(q){if(q!=='auto')return q;const cores=navigator.hardwareConcur
   const name=ext?String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)):'';soft=/swiftshader|basic render|llvmpipe|software/i.test(name);gl?.getExtension('WEBGL_lose_context')?.loseContext();}catch{}
  return soft||cores<=2||mem<=2?'low':'high';}
 
-/* ================= procedural textures ================= */
-function rng(seed){let s=seed>>>0||1;return ()=>{s^=s<<13;s^=s>>>17;s^=s<<5;return (s>>>0)/4294967296;};}
-/* tileable value noise + fbm on a period-p lattice */
-function makeNoise(seed){const r=rng(seed),P=256,v=new Float32Array(P*P);for(let i=0;i<v.length;i++)v[i]=r();
- const at=(x,y,p)=>v[((y%p+p)%p)*P+((x%p+p)%p)];
- const n=(x,y,p)=>{const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),w=yf*yf*(3-2*yf);
-  const a=at(xi,yi,p),b=at(xi+1,yi,p),c=at(xi,yi+1,p),d=at(xi+1,yi+1,p);return a+(b-a)*u+(c-a)*w+(a-b-c+d)*u*w;};
- return (x,y,base=4,oct=5)=>{let s=0,amp=.5,f=base;for(let o=0;o<oct;o++){s+=amp*n(x*f,y*f,f);amp*=.5;f*=2;}return s;};}
-function canvas2d(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c;}
-function pixels(w,h,fn){const c=canvas2d(w,h),g=c.getContext('2d'),img=g.createImageData(w,h),d=img.data;
- for(let y=0;y<h;y++)for(let x=0;x<w;x++){const o=(y*w+x)*4,px=fn(x/w,y/h,x,y);d[o]=px[0];d[o+1]=px[1];d[o+2]=px[2];d[o+3]=px[3]??255;}g.putImageData(img,0,0);return c;}
-/* dark marble: domain-warped veins */
-function marbleTextures(size,seed,{base=[16,18,22],vein=[86,92,104],veinK=7,warp=2.6,repeat=1}={}){const fbm=makeNoise(seed);const tone=[],rough=[];
- const col=pixels(size,size,(u,v)=>{const w=fbm(u,v,3,5),w2=fbm(u+.31,v+.77,5,4);const s=Math.abs(Math.sin((u*veinK*repeat+v*2.3+w*warp)*Math.PI));
-  const veinA=Math.pow(1-s,18)*.95+Math.pow(1-Math.abs(Math.sin((v*veinK*1.7+u*.9+w2*warp*1.4)*Math.PI)),40)*.5;const m=.82+w2*.36;
-  return [base[0]*m+(vein[0]-base[0])*veinA,base[1]*m+(vein[1]-base[1])*veinA,base[2]*m+(vein[2]-base[2])*veinA];});
- const rgh=pixels(size>>1,size>>1,(u,v)=>{const n=fbm(u*2,v*2,6,3);const g=40+n*40;return [g,g,g];});
- tone.push(col);rough.push(rgh);return {map:col,rough:rgh};}
-/* polished basalt: near-black with fine grain; normal from fbm height */
-function basaltTextures(size,seed){const fbm=makeNoise(seed),h=new Float32Array(size*size);
- for(let y=0;y<size;y++)for(let x=0;x<size;x++)h[y*size+x]=fbm(x/size,y/size,8,5);
- const r=rng(seed+7);
- const map=pixels(size,size,(u,v,x,y)=>{const n=h[y*size+x];const s=r()<.004?26:0;const g=9+n*9+s;return [g,g*1.02+.4,g*1.08+.8];});
- const normal=pixels(size,size,(u,v,x,y)=>{const at=(i,j)=>h[((j+size)%size)*size+((i+size)%size)];const dx=(at(x+1,y)-at(x-1,y))*6,dy=(at(x,y+1)-at(x,y-1))*6;
-  const l=Math.hypot(dx,dy,1);return [(-dx/l*.5+.5)*255,(-dy/l*.5+.5)*255,(1/l*.5+.5)*255];});
- const rough=pixels(size,size,(u,v,x,y)=>{const n=h[y*size+x];const g=30+n*36+(r()<.01?60:0);return [g,g,g];});
- return {map,normal,rough};}
-function stoneTexture(size,seed,base=[20,21,24]){const fbm=makeNoise(seed);return pixels(size,size,(u,v)=>{const n=fbm(u,v,2,4);const m=.9+n*.18;return [base[0]*m,base[1]*m,base[2]*m];});}
-/* floor: big marble slabs with joints */
-/* floor: pale polished marble in staggered slabs of different lengths (8 m per tile of texture), violet-grey veins, thin joints */
-function floorTextures(size,seed){const m=marbleTextures(size,seed,{base:[150,148,158],vein:[128,122,140],veinK:5,warp:3.2});const g=m.map.getContext('2d'),r=m.rough.getContext('2d');
- const rnd=rng(seed+5),rows=8,rh=size/rows,k=m.rough.width/size,fbm=makeNoise(seed+9);
- /* each slab slightly different in tone */
- const slabs=[];for(let y=0;y<rows;y++){let x=-rnd()*rh*1.6;while(x<size){const w=rh*(1.1+rnd()*1.5);slabs.push([x,y*rh,w,rh]);x+=w;}}
- for(const [x,y,w,h] of slabs){const t=rnd();g.fillStyle=t<.5?'rgba(20,16,30,'+(t*.12)+')':'rgba(255,250,244,'+((t-.5)*.1)+')';g.fillRect(x,y,w,h);if(x<0){g.fillRect(x+size,y,w,h);}}
- /* soft water-like stains */
- g.globalCompositeOperation='multiply';for(let i=0;i<14;i++){const cx=rnd()*size,cy=rnd()*size,rr=size*(.05+rnd()*.1);const gr=g.createRadialGradient(cx,cy,0,cx,cy,rr);gr.addColorStop(0,'rgba(150,150,165,.35)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(cx-rr,cy-rr,rr*2,rr*2);}
- g.globalCompositeOperation='source-over';
- g.strokeStyle='rgba(60,54,70,.75)';g.lineWidth=Math.max(1.5,size/900);r.strokeStyle='#cfcfcf';r.lineWidth=Math.max(1.5,size/1200);
- for(const [x,y,w,h] of slabs){g.strokeRect(x,y,w,h);if(x<0)g.strokeRect(x+size,y,w,h);r.strokeRect(x*k,y*k,w*k,h*k);if(x<0)r.strokeRect((x+size)*k,y*k,w*k,h*k);}
- return m;}
-function glowSprite(size,inner='rgba(210,232,255,1)'){const c=canvas2d(size,size),g=c.getContext('2d'),gr=g.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
- gr.addColorStop(0,inner);gr.addColorStop(.25,'rgba(190,180,240,.45)');gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.fillRect(0,0,size,size);return c;}
-/* painted vault: cream ground, black-violet ribs and borders, Megumin red and orange bands and medallions (original pattern) */
-function domePainting(w,h,half){const c=canvas2d(w,h),g=c.getContext('2d'),fbm=makeNoise(half?71:73);
- const base=pixels(w>>2,h>>2,(u,v)=>{const n=fbm(u,v,3,4);const k=.86+n*.22;return [206*k,192*k,170*k];});g.imageSmoothingEnabled=true;g.drawImage(base,0,0,w,h);
- const ribs=half?10:16;
- /* ribs from the crown down */
- for(let i=0;i<ribs;i++){const x=i/ribs*w;g.fillStyle='rgba(40,26,52,.9)';g.fillRect(x-w*.006,0,w*.012,h);g.fillStyle='rgba(232,116,44,.85)';g.fillRect(x-w*.0016,0,w*.0032,h);}
- /* panels between ribs: a pale lozenge and a red medallion */
- for(let i=0;i<ribs;i++){const cx=(i+.5)/ribs*w,cy=h*(half?.42:.5),rw=w/ribs*.28,rh=h*.16;g.fillStyle='rgba(244,236,222,.55)';g.beginPath();g.moveTo(cx,cy-rh);g.lineTo(cx+rw,cy);g.lineTo(cx,cy+rh);g.lineTo(cx-rw,cy);g.closePath();g.fill();
-  g.strokeStyle='rgba(40,26,52,.75)';g.lineWidth=w*.002;g.stroke();g.fillStyle='rgba(173,21,57,.85)';g.beginPath();g.arc(cx,cy,Math.min(rw,rh)*.34,0,Math.PI*2);g.fill();
-  g.strokeStyle='rgba(232,116,44,.9)';g.lineWidth=w*.0016;g.beginPath();g.arc(cx,cy,Math.min(rw,rh)*.46,0,Math.PI*2);g.stroke();}
- /* lower border: black-violet band with a running orange wave and a red line */
- const by=h*(half?.8:.86),bh=h*.07;g.fillStyle='rgba(34,22,44,.95)';g.fillRect(0,by,w,bh);g.strokeStyle='rgba(232,116,44,.9)';g.lineWidth=h*.006;g.beginPath();
- for(let x=0;x<=w;x+=2){const y=by+bh/2+Math.sin(x/w*Math.PI*2*(half?20:32))*bh*.28;x?g.lineTo(x,y):g.moveTo(x,y);}g.stroke();
- g.fillStyle='rgba(173,21,57,.9)';g.fillRect(0,by-h*.008,w,h*.006);g.fillRect(0,by+bh+h*.002,w,h*.006);
- /* crown: a dark violet disc */
- const cg=g.createLinearGradient(0,0,0,h*.12);cg.addColorStop(0,'rgba(30,20,40,.9)');cg.addColorStop(1,'rgba(30,20,40,0)');g.fillStyle=cg;g.fillRect(0,0,w,h*.12);
- return c;}
-/* frieze: running vine scroll in cream on black-violet, a red bead line top and bottom (original pattern) */
-function friezeTexture(w,h){const c=canvas2d(w,h),g=c.getContext('2d');g.fillStyle='#22162c';g.fillRect(0,0,w,h);
- g.strokeStyle='#d9ccb6';g.lineWidth=h*.045;g.lineCap='round';const n=8,step=w/n,mid=h/2;
- g.beginPath();for(let x=0;x<=w;x+=2){const y=mid+Math.sin(x/step*Math.PI*2)*h*.16;x?g.lineTo(x,y):g.moveTo(x,y);}g.stroke();
- for(let i=0;i<n*2;i++){const x=(i+.5)*step/2,up=i%2===0,cy=mid+(up?-1:1)*h*.06,r=h*.17;g.beginPath();
-  for(let a=0;a<Math.PI*1.75;a+=.05){const rr=r*(1-a/(Math.PI*2.2));const px=x+Math.cos(a+(up?Math.PI:0))*rr,py=cy+(up?-1:1)*Math.sin(a)*rr*.9;a?g.lineTo(px,py):g.moveTo(px,py);}g.stroke();
-  g.fillStyle='#e8742c';g.beginPath();g.arc(x,cy+(up?-1:1)*h*.02,h*.035,0,Math.PI*2);g.fill();}
- g.fillStyle='#ad1539';for(let x=step/8;x<w;x+=step/4){g.beginPath();g.arc(x,h*.08,h*.025,0,Math.PI*2);g.fill();g.beginPath();g.arc(x,h*.92,h*.025,0,Math.PI*2);g.fill();}
- g.fillStyle='#d9ccb6';g.fillRect(0,0,w,h*.03);g.fillRect(0,h*.97,w,h*.03);return c;}
-
 /* ================= the scene ================= */
 function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
  const bag=new Set();const keep=o=>{bag.add(o);return o;};
  const tex=(c,srgb=true,rep=1)=>{const x=keep(new THREE.CanvasTexture(c));x.colorSpace=srgb?THREE.SRGBColorSpace:THREE.NoColorSpace;x.wrapS=x.wrapT=THREE.RepeatWrapping;x.repeat.set(rep,rep);x.anisotropy=8;return x;};
- let renderer,composer=null,bloom=null,reflector=null,active=true,raf=0,last=performance.now(),slow=0,frames=0,introDone=false,dragMoved=false;
+ let renderer,composer=null,bloom=null,gtao=null,grade=null,reflector=null,active=true,raf=0,last=performance.now(),slow=0,frames=0,introDone=false,dragMoved=false;
  const scene=new THREE.Scene();scene.background=new THREE.Color(0x0e0c14);scene.fog=new THREE.FogExp2(0x16131f,0.015);
  const camera=new THREE.PerspectiveCamera(44,1,0.1,160);
  const START={pos:new THREE.Vector3(0,3.2,38.5),look:new THREE.Vector3(0,5.2,0)},END={pos:new THREE.Vector3(0,2.3,20.5),look:new THREE.Vector3(0,4.7,0)};
  const view={pos:START.pos.clone(),look:START.look.clone(),yaw:0,pitch:0,yawT:0,pitchT:0,dragYaw:0,dragPitch:0,px:0,pxT:0,read:null};
  camera.position.copy(view.pos);camera.lookAt(view.look);
 
- /* ---- materials (all procedural). Palette: cream white stone, black-violet marble, Megumin red and orange as inlay accents;
-    the daylight itself is a cold violet ---- */
- const fl=floorTextures(2048,11),col=marbleTextures(512,23,{base:[40,26,54],vein:[120,86,140],veinK:3,warp:2.4}),bas=basaltTextures(512,37);
- const creamTex=tex(stoneTexture(512,41,[178,168,152]),true,2),domeTex=tex(domePainting(2048,1024,false),true),halfTex=tex(domePainting(1024,512,true),true),friezeTex=tex(friezeTexture(1024,128),true);
- friezeTex.wrapT=THREE.ClampToEdgeWrapping;
- const cream=keep(new THREE.MeshStandardMaterial({map:creamTex,roughness:.84,metalness:0,envMapIntensity:.4}));
- const creamLight=keep(new THREE.MeshStandardMaterial({map:creamTex,color:0xf3ece0,roughness:.66,metalness:0,envMapIntensity:.5}));
- const violet=keep(new THREE.MeshStandardMaterial({map:tex(col.map,true),roughnessMap:tex(col.rough,false),roughness:.4,metalness:0,envMapIntensity:.85}));
- const frieze=keep(new THREE.MeshStandardMaterial({map:friezeTex,roughness:.75,metalness:0,envMapIntensity:.3}));
- /* inlay strips: Megumin red and orange, a little self-lit so they read in the dim hall */
- const inlayRed=keep(new THREE.MeshStandardMaterial({color:0xad1539,emissive:0xad1539,emissiveIntensity:.22,roughness:.35,metalness:.2}));
- const inlayOrange=keep(new THREE.MeshStandardMaterial({color:0xe8742c,emissive:0xe8742c,emissiveIntensity:.28,roughness:.3,metalness:.35}));
- const darkGlass=keep(new THREE.MeshStandardMaterial({color:0x1a1424,roughness:.25,metalness:.1,envMapIntensity:1}));
- const basaltBody=keep(new THREE.MeshStandardMaterial({map:tex(bas.map,true,2),normalMap:tex(bas.normal,false,2),normalScale:new THREE.Vector2(.18,.18),roughnessMap:tex(bas.rough,false,2),
-  roughness:1,metalness:0,envMapIntensity:.9}));
- const stepMat=keep(new THREE.MeshStandardMaterial({map:creamTex,color:0xf1e9da,roughness:.5,metalness:0,envMapIntensity:.5}));
- /* the painted vault is cut to the square bay with clip planes (a sail vault over four arches) */
- const domeMat=keep(new THREE.MeshStandardMaterial({map:domeTex,roughness:.9,metalness:0,side:THREE.BackSide,envMapIntensity:.2,
-  clippingPlanes:[new THREE.Plane(new THREE.Vector3(1,0,0),10.6),new THREE.Plane(new THREE.Vector3(-1,0,0),10.6),new THREE.Plane(new THREE.Vector3(0,0,1),7.2),new THREE.Plane(new THREE.Vector3(0,0,-1),15.2)]}));
- const halfMat=keep(new THREE.MeshStandardMaterial({map:halfTex,roughness:.9,metalness:0,side:THREE.BackSide,envMapIntensity:.2}));
- const oculusMat=keep(new THREE.MeshBasicMaterial({color:new THREE.Color(0xe2dcff).multiplyScalar(2.6),fog:false}));
- const oculusSide=keep(new THREE.MeshBasicMaterial({color:new THREE.Color(0xe2dcff).multiplyScalar(2.6),fog:false,side:THREE.DoubleSide}));
+ /* ---- stele materials: polished black basalt with a clear coat, cream marble stair, gilt nosing ---- */
+ const bas=basalt(512,37),stoneW=marble(512,61,{base:[220,210,194],vein:[180,168,152],veinK:4,warp:2});
+ const basaltBody=keep(new THREE.MeshPhysicalMaterial({map:tex(bas.map,true,2),normalMap:tex(bas.normal,false,2),normalScale:new THREE.Vector2(.12,.12),roughnessMap:tex(bas.rough,false,2),
+  roughness:1,metalness:0,clearcoat:tier==='low'?0:1,clearcoatRoughness:.05,envMapIntensity:1}));
+ const stepMat=keep(new THREE.MeshPhysicalMaterial({map:tex(stoneW.map,true,1.5),roughnessMap:tex(stoneW.rough,false,1.5),roughness:1,metalness:0,clearcoat:tier==='low'?0:.5,clearcoatRoughness:.12,envMapIntensity:.5}));
+ const inlayRed=keep(new THREE.MeshStandardMaterial({color:0x6e1222,roughness:.35,metalness:.05}));
+ const inlayOrange=keep(new THREE.MeshStandardMaterial({color:0xb48a4a,roughness:.3,metalness:.9,envMapIntensity:1.2}));
 
- /* ---- environment for reflections: a dim hall with bright violet-white round windows high up ---- */
- function envMap(){const pm=new THREE.PMREMGenerator(renderer);const es=new THREE.Scene();es.background=new THREE.Color(0x2c2638);
-  const box=new THREE.Mesh(new THREE.BoxGeometry(40,30,40),new THREE.MeshBasicMaterial({color:0x3a3446,side:THREE.BackSide}));box.position.y=10;es.add(box);
+ /* ---- environment for reflections: a dim stone room with a few bright windows (scaled with the daylight, see frame) ---- */
+ function envMap(){const pm=new THREE.PMREMGenerator(renderer);const es=new THREE.Scene();es.background=new THREE.Color(0x2c2834);
+  const box=new THREE.Mesh(new THREE.BoxGeometry(40,30,40),new THREE.MeshBasicMaterial({color:0x4a4448,side:THREE.BackSide}));box.position.y=10;es.add(box);
   const flr=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshBasicMaterial({color:0x6e6a72}));flr.rotation.x=-Math.PI/2;flr.position.y=-4.9;es.add(flr);
-  const win=new THREE.MeshBasicMaterial({color:new THREE.Color(0xe2dcff).multiplyScalar(5)});
-  for(let i=0;i<9;i++){const a=(i/8-.5)*Math.PI*.9,m=new THREE.Mesh(new THREE.CircleGeometry(1.1,20),win);m.position.set(Math.sin(a)*14,12,-Math.cos(a)*14);m.lookAt(0,8,0);es.add(m);}
-  for(const s of [-1,1])for(const z of [-1,4]){const m=new THREE.Mesh(new THREE.CircleGeometry(1.4,20),win);m.position.set(s*15,14,z);m.lookAt(0,10,z);es.add(m);}
+  const win=new THREE.MeshBasicMaterial({color:new THREE.Color(0xf0e8ff).multiplyScalar(4)});
+  for(let i=0;i<7;i++){const a=(i/6-.5)*Math.PI*.8,m=new THREE.Mesh(new THREE.CircleGeometry(.9,20),win);m.position.set(Math.sin(a)*14,13,-Math.cos(a)*14);m.lookAt(0,8,0);es.add(m);}
+  for(const s of [-1,1]){const m=new THREE.Mesh(new THREE.CircleGeometry(2.4,24),win);m.position.set(s*15,14,4);m.lookAt(0,10,4);es.add(m);}
   const rt=pm.fromScene(es,.02);es.traverse(o=>{o.geometry?.dispose();o.material?.dispose?.();});pm.dispose();return keep(rt);}
 
- /* ---- hall: a square bay (x ±10, z -6.5…14.5) under a sail vault, a nave running back toward the camera ---- */
- const hall=new THREE.Group();scene.add(hall);
- const HX=10,BACK=-6.5,FRONT=14.5,SPRING=9.3,NZ1=40,AX=13.2,R=HX;
- const add=(geo,mat,pos,rot,shadow)=>{const m=new THREE.Mesh(keep(geo),mat);if(pos)m.position.set(...pos);if(rot)m.rotation.set(...rot);if(shadow){m.castShadow=true;m.receiveShadow=true;}hall.add(m);return m;};
- function instanced(geo,mat,list){const m=new THREE.InstancedMesh(keep(geo),mat,list.length);const o=new THREE.Object3D();list.forEach((p,i)=>{o.position.set(p[0],p[1],p[2]);o.rotation.set(p[4]||0,p[3]||0,0);o.updateMatrix();m.setMatrixAt(i,o.matrix);});
-  m.instanceMatrix.needsUpdate=true;hall.add(m);return m;}
- /* an arch band (half annulus) in the XY plane, extruded `d` along z, centred on z */
- const archBand=(r0,r1,d)=>{const s=new THREE.Shape();s.moveTo(r1,0);s.absarc(0,0,r1,0,Math.PI,false);s.lineTo(-r0,0);s.absarc(0,0,r0,Math.PI,0,true);s.lineTo(r1,0);
-  const g=new THREE.ExtrudeGeometry(s,{depth:d,bevelEnabled:false,curveSegments:48});g.translate(0,0,-d/2);return g;};
- /* a wall w×h (bottom-left at the origin) with round-headed openings {x,y,w,h}, extruded `d` */
- const wallWithArches=(w,h,holes,d)=>{const s=new THREE.Shape();s.moveTo(0,0);s.lineTo(w,0);s.lineTo(w,h);s.lineTo(0,h);s.lineTo(0,0);
-  for(const o of holes){const p=new THREE.Path();p.moveTo(o.x,o.y);p.lineTo(o.x+o.w,o.y);p.lineTo(o.x+o.w,o.y+o.h-o.w/2);p.absarc(o.x+o.w/2,o.y+o.h-o.w/2,o.w/2,0,Math.PI,false);p.lineTo(o.x,o.y);s.holes.push(p);}
-  return new THREE.ExtrudeGeometry(s,{depth:d,bevelEnabled:false,curveSegments:14});};
- /* four great piers at the corners of the bay: cream stone, a black-violet panel, red and orange bands under the cap */
- for(const sx of [-1,1])for(const z of [BACK+.9,FRONT-.4]){add(new THREE.BoxGeometry(2.4,SPRING,2.4),cream,[sx*(HX+.2),SPRING/2,z],null,true);
-  add(new THREE.BoxGeometry(1.5,5.2,.06),violet,[sx*(HX+.2),3.6,z+(z<0?1.23:-1.23)]);add(new THREE.BoxGeometry(.06,5.2,1.5),violet,[sx*(HX+.2)-sx*1.23,3.6,z]);
-  add(new THREE.BoxGeometry(2.48,.07,2.48),inlayOrange,[sx*(HX+.2),SPRING-1.32,z]);add(new THREE.BoxGeometry(2.46,.12,2.46),inlayRed,[sx*(HX+.2),SPRING-1.18,z]);
-  add(new THREE.BoxGeometry(2.8,.36,2.8),creamLight,[sx*(HX+.2),SPRING-.9,z]);add(new THREE.BoxGeometry(3.0,.5,3.0),creamLight,[sx*(HX+.2),SPRING+.25,z]);
-  add(new THREE.BoxGeometry(2.6,.5,2.6),violet,[sx*(HX+.2),.25,z]);}
- /* back wall: two tall round-headed windows beside the stele, a carved frieze, a dentil cornice with a red line */
- { const w=2*HX,g=wallWithArches(w,7.2,[{x:1.3,y:1.2,w:1.9,h:5.0},{x:w-3.2,y:1.2,w:1.9,h:5.0}],.8);g.translate(-HX,0,0);add(g,cream,[0,0,BACK-.4]);
-   for(const x of [-HX+2.25,HX-2.25]){add(new THREE.PlaneGeometry(1.9,5.0),darkGlass,[x,3.7,BACK-.3]);add(new THREE.BoxGeometry(.1,5,.1),creamLight,[x,3.7,BACK-.28]);add(new THREE.BoxGeometry(1.9,.1,.1),creamLight,[x,3.4,BACK-.28]);}
-   add(new THREE.BoxGeometry(w,.5,.84),violet,[0,.25,BACK]);add(new THREE.BoxGeometry(w,.05,.86),inlayOrange,[0,.52,BACK]);
-   add(new THREE.BoxGeometry(w,1.3,.9),frieze,[0,7.85,BACK]);add(new THREE.BoxGeometry(w,.08,.95),inlayRed,[0,7.17,BACK]);
-   add(new THREE.BoxGeometry(w+.4,.22,1.2),creamLight,[0,8.6,BACK+.1]);
-   const dent=[];for(let x=-HX;x<=HX;x+=.42)dent.push([x,8.84,BACK+.55]);instanced(new THREE.BoxGeometry(.22,.26,.3),creamLight,dent);
-   add(new THREE.BoxGeometry(w+.8,.36,1.5),creamLight,[0,9.12,BACK+.2]);}
- /* side colonnades under the side arches and down the nave: black-violet marble shafts, cream bases and capitals, an orange collar */
- const colZ=[];for(let z=BACK+2.6;z<NZ1-2;z+=1.7)if(Math.abs(z-(FRONT-.4))>1.6)colZ.push(z);
- const colP=[];for(const z of colZ)for(const sx of [-1,1])colP.push([sx*HX,0,z]);
- instanced(new THREE.BoxGeometry(.85,.32,.85),cream,colP.map(p=>[p[0],.16,p[2]]));
- instanced(new THREE.CylinderGeometry(.36,.4,.18,20),creamLight,colP.map(p=>[p[0],.41,p[2]]));
- instanced(new THREE.CylinderGeometry(.27,.31,5.0,20),violet,colP.map(p=>[p[0],3.0,p[2]]));
- instanced(new THREE.TorusGeometry(.285,.035,6,20).rotateX(Math.PI/2),inlayOrange,colP.map(p=>[p[0],5.45,p[2]]));
- instanced(new THREE.CylinderGeometry(.5,.3,.55,4).rotateY(Math.PI/4),creamLight,colP.map(p=>[p[0],5.77,p[2]]));
- instanced(new THREE.BoxGeometry(.9,.16,.9),creamLight,colP.map(p=>[p[0],6.12,p[2]]));
- /* the arcade wall riding the colonnade, its frieze and cornice */
- for(const sx of [-1,1]){for(const [z0,z1] of [[BACK+1.8,FRONT-1.6],[FRONT+.8,NZ1-1]]){const cz=colZ.filter(z=>z>z0-.01&&z<z1+.01);if(cz.length<2)continue;
-   const s=new THREE.Shape(),A=6.2,T=7.2,r=(1.7-.5)/2;
-   s.moveTo(cz[0]-.85,T);s.lineTo(cz[0]-.85,A);for(let i=0;i<cz.length;i++){s.lineTo(cz[i]+.25,A);if(i<cz.length-1)s.absarc(cz[i]+.85,A,r*.98,Math.PI,0,true);}
-   s.lineTo(cz[cz.length-1]+.85,A);s.lineTo(cz[cz.length-1]+.85,T);s.lineTo(cz[0]-.85,T);
-   add(new THREE.ExtrudeGeometry(s,{depth:.7,bevelEnabled:false,curveSegments:16}),cream,[sx*HX+.35,0,0],[0,-Math.PI/2,0]);
-   const L=z1-z0+1.6,zc=(z0+z1)/2;
-   add(new THREE.BoxGeometry(1.0,1.2,L),frieze,[sx*HX,7.8,zc]);add(new THREE.BoxGeometry(1.04,.07,L),inlayRed,[sx*HX,7.2,zc]);
-   add(new THREE.BoxGeometry(1.4,.3,L),creamLight,[sx*HX,8.55,zc]);
-   const dent=[];for(let z=z0-.6;z<=z1+.6;z+=.42)dent.push([sx*(HX-.45),8.8,z]);instanced(new THREE.BoxGeometry(.3,.26,.22),creamLight,dent);
-   add(new THREE.BoxGeometry(1.6,.34,L),creamLight,[sx*HX,9.1,zc]);}}
- /* aisles behind the colonnades: darker walls with arched niches, low ceilings */
- const aisleMat=keep(new THREE.MeshStandardMaterial({map:creamTex,color:0x7d7470,roughness:.92})),nicheMat=keep(new THREE.MeshStandardMaterial({color:0x140f1a,roughness:.9}));
- for(const sx of [-1,1]){const L=NZ1-BACK,holes=[];for(let z=1.2;z<L-2;z+=3.4)holes.push({x:z,y:.9,w:1.5,h:4.2});
-  add(wallWithArches(L,SPRING,holes,.5),aisleMat,[sx*AX+(sx>0?.5:0),0,BACK],[0,-Math.PI/2,0]);
-  for(const o of holes)add(new THREE.PlaneGeometry(1.5,4.2),nicheMat,[sx*(AX+.3),3.0,BACK+o.x+.75],[0,-sx*Math.PI/2,0]);
-  add(new THREE.BoxGeometry(AX-HX+.8,.4,NZ1-BACK),cream,[sx*(HX+AX)/2,SPRING-.1,(BACK+NZ1)/2]);}
- /* four great arches: the back one opens into the half dome, the side ones hold round windows, the front one leads to the nave.
-    Each carries a black-violet soffit and a red edge line. */
- const bigArch=(pos,rot)=>{add(archBand(R-.05,R+.8,1.4),creamLight,pos,rot);add(archBand(R-.08,R+.02,1.0),violet,pos,rot);
-  const a=add(archBand(R+.79,R+.86,1.45),inlayRed,pos,rot);return a;};
- bigArch([0,SPRING,BACK]);bigArch([0,SPRING,FRONT]);
- for(const sx of [-1,1]){bigArch([sx*HX,SPRING,(BACK+FRONT)/2],[0,Math.PI/2,0]);
-  /* lunette in the side arch with three round windows */
-  const s=new THREE.Shape();s.moveTo(-R,0);s.absarc(0,0,R,Math.PI,0,true);s.lineTo(-R,0);
-  const holes=[[-3.2,4.2,1.25],[3.2,4.2,1.25],[0,6.8,1.0]];for(const [x,y,r] of holes){const h=new THREE.Path();h.absarc(x,y,r,0,Math.PI*2,true);s.holes.push(h);}
-  add(new THREE.ExtrudeGeometry(s,{depth:.5,bevelEnabled:false,curveSegments:40}),cream,[sx<0?-(HX+1.1):HX+.6,SPRING,(BACK+FRONT)/2],[0,Math.PI/2,0]);
-  for(const [x,y,r] of holes){add(new THREE.CircleGeometry(r,28),oculusSide,[sx*(HX+.85),SPRING+y,(BACK+FRONT)/2-x],[0,Math.PI/2,0]);
-   add(new THREE.TorusGeometry(r+.06,.06,6,32),inlayOrange,[sx*(HX+.55),SPRING+y,(BACK+FRONT)/2-x],[0,Math.PI/2,0]);}}
- /* half dome behind the back arch, a ring of round windows at its foot */
- add(new THREE.CylinderGeometry(R,R,1.6,40,1,true,Math.PI/2,Math.PI),keep(new THREE.MeshStandardMaterial({map:creamTex,roughness:.9,side:THREE.BackSide})),[0,SPRING+.8,BACK]);
- add(new THREE.SphereGeometry(R,48,20,Math.PI,Math.PI,0,Math.PI/2),halfMat,[0,SPRING+1.6,BACK]);
- /* the ring of round windows sits on the curve of the half dome, high enough to be seen over the back wall */
- { const N=7,el=.42,rr=(R-.08)*Math.cos(el),yy=SPRING+1.6+(R-.08)*Math.sin(el);for(let i=0;i<N;i++){const a=Math.PI/2+(i+.5)/N*Math.PI,x=Math.sin(a)*rr,z=BACK+Math.cos(a)*rr;
-   const c=add(new THREE.CircleGeometry(.78,28),oculusMat,[x,yy,z]);c.lookAt(0,SPRING+1.6,BACK);const f=add(new THREE.TorusGeometry(.84,.06,6,32),inlayOrange,[x,yy,z]);f.lookAt(0,SPRING+1.6,BACK);}}
- /* sail vault over the bay: one sphere through the four arch crowns, clipped to the square, painted */
- add(new THREE.SphereGeometry(Math.hypot(HX,10.5),64,32,0,Math.PI*2,0,Math.PI/2),domeMat,[0,SPRING,(BACK+FRONT)/2]);
- /* nave vault toward the camera, ribbed */
- add(new THREE.CylinderGeometry(R+.6,R+.6,NZ1-FRONT,48,1,true,-Math.PI/2,Math.PI).rotateX(-Math.PI/2),keep(new THREE.MeshStandardMaterial({map:halfTex,roughness:.92,side:THREE.BackSide,color:0xc8c0b8})),[0,SPRING,(FRONT+NZ1)/2]);
- { const ribs=[];for(let z=FRONT+3.4;z<NZ1;z+=3.4)ribs.push([0,SPRING,z]);instanced(new THREE.TorusGeometry(R+.5,.16,6,40,Math.PI),violet,ribs);}
- add(new THREE.BoxGeometry(2*AX+1,26,.8),cream,[0,13,NZ1]);
-
- /* ---- floor: mirror under a polished pale marble skin (light tier: the skin alone) ---- */
- const FL_W=2*AX+1,FL_Z0=BACK-1,FL_L=NZ1-FL_Z0,FL_Z=(FL_Z0+NZ1)/2;
- const floorMat=keep(new THREE.MeshStandardMaterial({map:tex(fl.map,true,1),roughnessMap:tex(fl.rough,false,1),roughness:.42,metalness:0,envMapIntensity:.5}));
- floorMat.map.repeat.set(FL_W/8,FL_L/8);floorMat.roughnessMap.repeat.set(FL_W/8,FL_L/8);
- const floor=add(new THREE.PlaneGeometry(FL_W,FL_L),floorMat,[0,0,FL_Z],[-Math.PI/2,0,0]);floor.receiveShadow=true;floor.renderOrder=-2;
- const skipInMirror=[];skipInMirror.push(floor);
- /* a black-violet runner with red edging leads up the nave to the stair */
- { const run=add(new THREE.PlaneGeometry(3.2,NZ1-4.4),keep(new THREE.MeshStandardMaterial({color:0x22172c,roughness:.96,metalness:0,envMapIntensity:.1})),[0,.004,(4.4+NZ1)/2],[-Math.PI/2,0,0]);run.receiveShadow=true;skipInMirror.push(run);
-   for(const sx of [-1,1]){const e=add(new THREE.PlaneGeometry(.08,NZ1-4.4),inlayRed,[sx*1.66,.005,(4.4+NZ1)/2],[-Math.PI/2,0,0]);skipInMirror.push(e);}}
+ /* ---- the hall (web/torch-hall.js) ---- */
+ const H=buildHall({scene,keep,tex,tier,maxAniso:8});const {skipInMirror,floorMat,FL_W,FL_L,FL_Z}=H;
 
  /* ---- the stele: a long black slab on two square posts, a wide low stair in front ---- */
  const stele=new THREE.Group();scene.add(stele);
@@ -509,80 +342,51 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
   glow.scale.set(COL_W/FW*faceW*2.2,(e.box.len+80)/FH*faceH*1.35,1);glow.userData.on=true;glow.userData.t0=performance.now();
   glowLight.position.set(glow.position.x,glow.position.y,SD/2+.5);glow.userData.world=new THREE.Vector3(glow.position.x,glow.position.y,0);}
 
- /* ---- light: cool violet daylight from the round windows; faint parallel shafts from the side lunettes; dust ---- */
- scene.add(keep(new THREE.HemisphereLight(0xb4aaf0,0x2a2430,.42)));
- const amb=new THREE.AmbientLight(0x6c64a0,.12);scene.add(amb);
- /* daylight through the half dome behind the stele: throws the slab's soft shadow forward onto the stair */
- const sky=new THREE.DirectionalLight(0xcfc4ff,1.05);sky.position.set(1.5,20,-16);sky.target.position.set(0,0,4);scene.add(sky);scene.add(sky.target);
- { const sc=sky.shadow.camera;sc.left=-14;sc.right=14;sc.top=14;sc.bottom=-14;sc.near=1;sc.far=50;}
- /* a soft fill from the nave so the face of the stone is never pitch black */
- const fill=new THREE.DirectionalLight(0x9088c8,.16);fill.position.set(-4,8,24);scene.add(fill);
- const beams=new THREE.Group();scene.add(beams);
- const beamMat=keep(new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false,
-  uniforms:{uTime:{value:0},uColor:{value:new THREE.Color(0xd2caf8)},uStrength:{value:1},uGain:{value:1}},
-  vertexShader:`varying vec2 vUv;varying vec3 vN;varying vec3 vV;varying vec3 vW;void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;vN=normalize(mat3(modelMatrix)*normal);vV=normalize(cameraPosition-w.xyz);gl_Position=projectionMatrix*viewMatrix*w;}`,
-  fragmentShader:`uniform float uTime;uniform vec3 uColor;uniform float uStrength;uniform float uGain;varying vec2 vUv;varying vec3 vN;varying vec3 vV;varying vec3 vW;
-   float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-   float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
-   void main(){float edge=abs(dot(normalize(vN),normalize(vV)));edge=pow(edge,3.2);
-    float along=vUv.y;float fade=smoothstep(0.,.3,along)*smoothstep(1.,.7,along);
-    float streak=.82+.18*n(vec2(vUv.x*14.,along*1.2-uTime*.02))+.06*n(vec2(vUv.x*48.,along*4.+uTime*.04));
-    float floorFade=smoothstep(-.4,2.6,vW.y);
-    float a=edge*fade*streak*floorFade*.3*uStrength*uGain;gl_FragColor=vec4(uColor*a,a);}`}));
- /* the side lunettes' round windows: two light directions (left and right), parallel within each side */
- const SHAFTS=[];
- for(const sx of [-1,1]){const dir=new THREE.Vector3(-sx*.62,-1,.22).normalize();
-  for(const [x,y,w,str] of [[-3.2,4.2,1.15,.9],[3.2,4.2,1.15,.75],[0,6.8,.95,.6]]){const from=new THREE.Vector3(sx*(HX+.9),SPRING+y,(BACK+FRONT)/2-x);const k=from.y/-dir.y;
-   SHAFTS.push([dir,from,from.clone().addScaledVector(dir,k),w,str]);}}
- const pools=[];
- const poolTex=tex(glowSprite(256,'rgba(222,214,255,.8)'),true);
- for(const [dir,from,to,w,str] of SHAFTS){const len=from.distanceTo(to);
-  const g=new THREE.CylinderGeometry(w*.9,w*1.15,len,32,1,true);g.translate(0,-len/2,0);
-  const m=new THREE.Mesh(keep(g),beamMat.clone());keep(m.material);m.material.uniforms.uStrength.value=str;m.position.copy(from);
-  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),dir);m.renderOrder=3;beams.add(m);
-  const pool=new THREE.Mesh(keep(new THREE.PlaneGeometry(w*2.4,w*2.4/Math.max(.4,-dir.y))),keep(new THREE.MeshBasicMaterial({map:poolTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:.12*str,fog:false})));
-  pool.rotation.x=-Math.PI/2;pool.rotation.z=-Math.atan2(dir.x,dir.z);pool.position.set(to.x,.012,to.z);pool.renderOrder=2;scene.add(pool);pools.push(pool);skipInMirror.push(pool);}
- /* the light those windows carry */
- const spots=[];
- for(const i of [0,3]){const [dir,from]=SHAFTS[i];const s=new THREE.SpotLight(0xd2c8ff,320,40,.3,1,1.4);s.position.copy(from);s.target.position.copy(from.clone().addScaledVector(dir,14));scene.add(s);scene.add(s.target);spots.push(s);}
- /* dust */
+ /* ---- dust drifting in the bay; brighter in daylight and by torchlight ---- */
  let dust=null;
  function makeDust(n){const pos=new Float32Array(n*3),seed=new Float32Array(n),lit=new Float32Array(n),r=rng(91);
-  const shafts=SHAFTS.map(([,a,b])=>({a,b}));
-  for(let i=0;i<n;i++){let p;if(i<n*.6){const s=shafts[Math.floor(r()*shafts.length)],k=.25+r()*.7;p=s.a.clone().lerp(s.b,k);p.x+=(r()-.5)*1.6*k;p.z+=(r()-.5)*1.6*k;p.y+=(r()-.5)*.6;lit[i]=1;}
-   else{p=new THREE.Vector3((r()-.5)*HX*2,r()*14,-6+r()*34);lit[i]=.3;}
+  for(let i=0;i<n;i++){const p=new THREE.Vector3((r()-.5)*HALL.HX*1.9,.3+r()*13,HALL.BACK+.5+r()*(i<n*.7?18:34));lit[i]=.4+r()*.6;
    pos[i*3]=p.x;pos[i*3+1]=p.y;pos[i*3+2]=p.z;seed[i]=r();}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('aSeed',new THREE.BufferAttribute(seed,1));g.setAttribute('aLit',new THREE.BufferAttribute(lit,1));
-  const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,uniforms:{uTime:{value:0},uScale:{value:1},uSpeed:{value:reduced?.25:1}},
-   vertexShader:`uniform float uTime;uniform float uScale;uniform float uSpeed;attribute float aSeed;attribute float aLit;varying float vA;
+  const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,uniforms:{uTime:{value:0},uScale:{value:1},uSpeed:{value:reduced?.25:1},uBright:{value:.5}},
+   vertexShader:`uniform float uTime;uniform float uScale;uniform float uSpeed;uniform float uBright;attribute float aSeed;attribute float aLit;varying float vA;
     void main(){vec3 p=position;float t=uTime*uSpeed;p.x+=sin(t*.11+aSeed*40.)*.35;p.y+=sin(t*.07+aSeed*17.)*.45-mod(t*.03+aSeed*3.,1.)*.25;p.z+=cos(t*.09+aSeed*29.)*.35;
      vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;float tw=.55+.45*sin(t*(.6+aSeed)+aSeed*60.);
-     vA=aLit*tw*smoothstep(28.,6.,-mv.z)*smoothstep(1.2,4.5,-mv.z);gl_PointSize=uScale*(.8+aSeed*1.6)*(8./-mv.z);}`,
-   fragmentShader:`varying float vA;void main(){vec2 c=gl_PointCoord-.5;float d=length(c);if(d>.5)discard;float a=smoothstep(.5,0.,d)*vA*.5;gl_FragColor=vec4(vec3(.86,.84,1.)*a,a);}`});
+     vA=aLit*uBright*tw*smoothstep(28.,6.,-mv.z)*smoothstep(1.2,4.5,-mv.z);gl_PointSize=uScale*(.8+aSeed*1.6)*(8./-mv.z);}`,
+   fragmentShader:`varying float vA;void main(){vec2 c=gl_PointCoord-.5;float d=length(c);if(d>.5)discard;float a=smoothstep(.5,0.,d)*vA*.5;gl_FragColor=vec4(vec3(1.,.94,.88)*a,a);}`});
   keep(g);keep(m);const p=new THREE.Points(g,m);p.renderOrder=4;p.frustumCulled=false;return p;}
 
  /* ---- renderer & tiers ---- */
  function makeRenderer(){renderer=new THREE.WebGLRenderer({canvas,antialias:tier!=='low',powerPreference:tier==='low'?'low-power':'high-performance',stencil:false});
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.95;renderer.localClippingEnabled=true;renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.shadowMap.enabled=tier!=='low';renderer.shadowMap.type=THREE.PCFSoftShadowMap;}
+ /* grading on the full tier: a soft vignette, a touch of saturation, fine grain against banding */
+ const GRADE={uniforms:{tDiffuse:{value:null},uTime:{value:0},uVig:{value:.34}},vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader:`uniform sampler2D tDiffuse;uniform float uTime;uniform float uVig;varying vec2 vUv;float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+   void main(){vec4 c=texture2D(tDiffuse,vUv);vec2 d=vUv-.5;c.rgb*=1.-uVig*smoothstep(.28,.9,length(d*vec2(1.05,1.)));float l=dot(c.rgb,vec3(.2126,.7152,.0722));c.rgb=mix(vec3(l),c.rgb,1.06);
+    c.rgb+=(h(vUv*913.+fract(uTime))-.5)*.014*(c.rgb+.015);gl_FragColor=c;}`};
  makeRenderer();
  let env=envMap();scene.environment=env.texture;
  function applyTier(){const low=tier==='low';
-  renderer.setPixelRatio(Math.min(devicePixelRatio||1,low?.75:1.5));renderer.shadowMap.enabled=!low;
-  sky.castShadow=!low;if(!low){sky.shadow.mapSize.set(2048,2048);sky.shadow.bias=-.0004;sky.shadow.normalBias=.02;sky.shadow.radius=6;}
-  /* floor: mirror + translucent marble, or the marble alone */
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,low?.75:1.75));renderer.shadowMap.enabled=!low;H.setShadows(!low,4096);
+  /* floor: mirror under the translucent polished marble (and the inlaid runner), or the marble alone */
   if(reflector){scene.remove(reflector);reflector.getRenderTarget().dispose();reflector.material.dispose();reflector=null;}
-  if(!low){const s=host.getBoundingClientRect();reflector=new Reflector(new THREE.PlaneGeometry(FL_W,FL_L),{clipBias:.003,textureWidth:Math.max(256,s.width*.6),textureHeight:Math.max(256,s.height*.6),color:0xb4b0c4,multisample:0});
+  if(!low){const s=host.getBoundingClientRect();reflector=new Reflector(new THREE.PlaneGeometry(FL_W,FL_L),{clipBias:.003,textureWidth:Math.max(256,s.width*.75),textureHeight:Math.max(256,s.height*.75),color:0xb8b4c4,multisample:4});
    keep(reflector.geometry);reflector.rotation.x=-Math.PI/2;reflector.position.set(0,-.001,FL_Z);reflector.renderOrder=-3;scene.add(reflector);
-   const before=reflector.onBeforeRender;reflector.onBeforeRender=function(...a){const v=skipInMirror.map(o=>o.visible);skipInMirror.forEach(o=>o.visible=false);
+   const before=reflector.onBeforeRender;reflector.onBeforeRender=function(...a){if(scene.overrideMaterial)return;const v=skipInMirror.map(o=>o.visible);skipInMirror.forEach(o=>o.visible=false);
     before.apply(this,a);skipInMirror.forEach((o,i)=>o.visible=v[i]);};
-   floorMat.transparent=true;floorMat.opacity=.7;floorMat.depthWrite=true;}
-  else{floorMat.transparent=false;floorMat.opacity=1;}
-  floorMat.needsUpdate=true;
-  beams.children.forEach(b=>b.material.uniforms.uGain.value=low?1.6:1);
-  if(dust){scene.remove(dust);}dust=makeDust(low?700:2400);scene.add(dust);
-  if(composer){composer.dispose();composer.renderTarget1.dispose();composer.renderTarget2.dispose();bloom?.dispose();composer=null;bloom=null;}
-  if(!low){composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));bloom=new UnrealBloomPass(new THREE.Vector2(512,512),.55,.7,.82);composer.addPass(bloom);composer.addPass(new OutputPass());}
+   floorMat.transparent=true;floorMat.opacity=.66;floorMat.depthWrite=true;H.inlayMat.transparent=true;H.inlayMat.opacity=.82;}
+  else{floorMat.transparent=false;floorMat.opacity=1;H.inlayMat.transparent=false;H.inlayMat.opacity=1;}
+  floorMat.needsUpdate=true;H.inlayMat.needsUpdate=true;
+  if(dust){scene.remove(dust);dust.geometry.dispose();dust.material.dispose();}dust=makeDust(low?700:2600);scene.add(dust);
+  if(composer){composer.passes.forEach(p=>p.dispose?.());composer.dispose();composer=null;bloom=null;gtao=null;grade=null;}
+  if(!low){const size=renderer.getDrawingBufferSize(new THREE.Vector2());
+   composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(size.x,size.y,{type:THREE.HalfFloatType,samples:4}));composer.addPass(new RenderPass(scene,camera));
+   /* ambient occlusion: everything solid; the light effects, the mirror and the dust stay out of it */
+   gtao=new GTAOPass(scene,camera,size.x,size.y);gtao.blendIntensity=.9;
+   gtao.updateGtaoMaterial({radius:.8,distanceExponent:1.5,thickness:1.4,scale:1.15,samples:16,distanceFallOff:1});gtao.updatePdMaterial({lumaPhi:10,depthPhi:2,normalPhi:3,radius:5,rings:2,samples:16});
+   const hide=[...H.noAO,glow,reflector].filter(Boolean),ov=gtao.overrideVisibility.bind(gtao);gtao.overrideVisibility=()=>{ov();for(const o of hide)o.visible=false;};
+   composer.addPass(gtao);bloom=new UnrealBloomPass(new THREE.Vector2(512,512),.5,.65,.85);composer.addPass(bloom);grade=new ShaderPass(GRADE);composer.addPass(grade);composer.addPass(new OutputPass());}
   resize();queuePaint();}
 
  /* ---- view ---- */
@@ -628,7 +432,8 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
  function draw(){if(composer)composer.render();else renderer.render(scene,camera);}
  function frame(now){raf=0;if(!active)return;const dt=Math.min(.1,(now-last)/1000);last=now;
   if(tier==='low'&&now-(frame.lastDraw||0)<31){raf=requestAnimationFrame(frame);return;}frame.lastDraw=now;
-  const time=now/1000;beamMat.uniforms.uTime.value=time;beams.children.forEach(b=>b.material.uniforms.uTime.value=time);if(dust)dust.material.uniforms.uTime.value=time;
+  const time=now/1000;H.update(time,dt,renderer);const day=Math.min(1,H.state.skyI/1.1);scene.environmentIntensity=.2+.8*day;
+  if(dust){dust.material.uniforms.uTime.value=time;dust.material.uniforms.uBright.value=Math.max(.12,day*H.state.beam*.9,H.state.torch*.45);}if(grade)grade.uniforms.uTime.value=time%97;
   if(glow.userData.on){const p=(now-glow.userData.t0)/1000;const o=Math.min(1,p/1.2)*(.42+.1*Math.sin(p*1.6));glow.material.opacity=o;glowLight.intensity=o*2.2;}else{glow.material.opacity*=.9;glowLight.intensity*=.9;}
   updateCamera(dt);draw();
   /* slow frames on the full tier for ~3 s after the intro: switch to the light tier (only in auto mode) */
@@ -640,7 +445,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier}){
  let disposed=false;
  function dispose(){disposed=true;active=false;if(raf)cancelAnimationFrame(raf);raf=0;if(paintQueued)cancelAnimationFrame(paintQueued);
   canvas.removeEventListener('pointermove',onMove);canvas.removeEventListener('pointerdown',onDown);canvas.removeEventListener('pointerup',onUp);canvas.removeEventListener('pointercancel',onUp);
-  if(composer){composer.renderTarget1.dispose();composer.renderTarget2.dispose();composer.passes.forEach(p=>p.dispose?.());composer.dispose?.();}
+  if(composer){composer.passes.forEach(p=>p.dispose?.());composer.dispose?.();}
   if(reflector){reflector.getRenderTarget().dispose();reflector.material.dispose();}
   if(dust){dust.geometry.dispose();dust.material.dispose();}
   scene.traverse(o=>{if(o.isMesh||o.isPoints||o.isInstancedMesh){o.geometry?.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(!m)return;for(const k in m){const v=m[k];if(v&&v.isTexture)v.dispose();}m.dispose();});}

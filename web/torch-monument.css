@@ -4,7 +4,7 @@
  position:fixed;left:0;right:0;bottom:0;top:0;z-index:60;background:#05070b;color:var(--tm-ink);overflow:hidden;isolation:isolate;
  font-family:"Torch Serif","Noto Serif SC","Source Han Serif SC","Yu Mincho",serif;contain:strict}
 .torch-monument .tm-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
-.torch-monument::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;background:radial-gradient(120% 90% at 50% 46%,transparent 52%,rgba(6,4,10,.55) 100%)}
+
 .torch-monument .tm-veil{position:absolute;inset:0;background:#000;pointer-events:none;z-index:3}
 .torch-monument .tm-head{position:absolute;left:clamp(20px,3.2vw,44px);top:clamp(16px,3vh,30px);z-index:2;pointer-events:none;max-width:min(560px,60vw)}
 .torch-monument .tm-title{margin:0;font-size:clamp(26px,2.6vw,36px);font-weight:600;letter-spacing:.42em;line-height:1.1;color:#eef4fb;text-shadow:0 0 24px rgba(140,190,255,.28)}
