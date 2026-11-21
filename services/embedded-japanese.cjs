@@ -56,7 +56,7 @@ function io(){
 function apply(dir,{scanToken,progress=()=>{},_io=io()}={}){
  dir=path.resolve(dir);if(_io.running(dir))throw Error('GAME_RUNNING');
  const prior=manifest(dir);
- if(prior){if(prior.scanToken===scanToken&&valid(dir,prior))return {applied:0,already:true,patch:true,localIndex:true,coverage:prior.coverage};throw Error('EMBEDDED_CONFLICT');}
+ if(prior){if(prior.scanToken===scanToken&&valid(dir,prior))return {applied:0,cells:prior.coverage.rows,already:true,patch:true,localIndex:true,coverage:prior.coverage};throw Error('EMBEDDED_CONFLICT');}
  if(fs.existsSync(folder(dir)))throw Error('EMBEDDED_CONFLICT');
  const plan=engine.plan(dir,{progress});if(!scanToken||plan.token!==scanToken)throw Error('SCAN_STALE');
  if(!plan.writes.length)throw Error('NOTHING_TO_RESTORE');

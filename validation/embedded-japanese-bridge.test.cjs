@@ -27,7 +27,7 @@ test('production bridge → scan worker → explicit core restore → provider �
  const state=await dispatch({action:'jp_restore_detect',id:'chain'});assert.equal(state.adapter,'utage-embedded');assert.equal(state.state,'applied');
  const ready=store.openStore(root);try{assert.equal(require('../services/game-language.cjs').originalExecutable(ready,'chain',root).blocked,false);}finally{ready.close();}
  assert.equal(require('../services/original-text.cjs').provider(root,f.exe).resolve('これから最初の旅に出ます。').translation,'从这里出发踏上旅程。');
- const again=await completed('chain',await dispatch({action:'jp_restore_apply',id:'chain',embedded:true,scanToken:scan.scanToken}));assert.equal(again.already,true);
+ const again=await completed('chain',await dispatch({action:'jp_restore_apply',id:'chain',embedded:true,scanToken:scan.scanToken}));assert.equal(again.already,true);assert.equal(again.cells,scan.coverage.rows);assert.equal(again.applied,0);
  const undoJob=await dispatch({action:'jp_restore_undo',id:'chain'},runtime),undo=await completed('chain',undoJob);assert.equal(undo.restored,2);assert.deepEqual(undo.skipped,[]);assert.equal(refreshed,2);assert.equal(embedded.manifest(f.dir),null);
  const recoveredUndo=await dispatch({action:'jp_restore_scan_status',id:'chain',requestId:undoJob.requestId,operation:'undo',retireIfMissing:true});assert.equal(recoveredUndo.state,'done');assert.equal(recoveredUndo.result.restored,2);
  assert.equal((await dispatch({action:'jp_restore_undo',id:'chain',requestId:undoJob.requestId})).jobId,undoJob.jobId);

@@ -130,11 +130,16 @@ test('a dead transaction owner cannot start writing, and its journal lock can be
  try{assert.throws(()=>embedded.apply(f.dir,{scanToken:embedded.scan(f.dir).scanToken}),/EMBEDDED_OWNER_GONE/);assert.equal(embedded.manifest(f.dir),null);}finally{if(previous===undefined)delete process.env.MEGULIT_EMBEDDED_OWNER_PID;else process.env.MEGULIT_EMBEDDED_OWNER_PID=previous;}
 });
 
-test('retirement is bounded without forgetting sealed nonces or allowing a late start',t=>{
+test('retirement is bounded without forgetting sealed nonces or allowing a late start',async t=>{
  const f=fixture(t),jobs=require('../services/embedded-japanese-jobs.cjs'),{requests,MAX_REQUESTS}=jobs._internal;
+ const before=fs.readFileSync(f.baseFile),existing=jobs.start('capacity',f.dir,{requestId:'capacity-existing-scan',operation:'scan'});
  const sealed=jobs.status('capacity',{requestId:'first-sealed-request',operation:'restore',retireIfMissing:true});
  for(let i=0;requests.size<MAX_REQUESTS;i++)jobs.status('capacity',{requestId:'sealed-request-'+i,operation:'restore',retireIfMissing:true});
- const size=requests.size;assert.throws(()=>jobs.status('capacity',{requestId:'one-more-retirement',operation:'restore',retireIfMissing:true}),/EMBEDDED_REQUEST_LIMIT/);assert.equal(requests.size,size);
+ const size=requests.size,query={requestId:'one-more-retirement',operation:'restore',retireIfMissing:true},retired=jobs.status('capacity',query);assert.equal(retired.retiredByCapacity,true);assert.equal(retired.notStarted,true);assert.equal(retired.requestId,query.requestId);assert.equal(retired.operation,'restore');assert.deepEqual(jobs.status('capacity',query),retired);assert.equal(requests.size,size);
  assert.throws(()=>jobs.start('capacity',f.dir,{requestId:'new-late-write-request',operation:'restore',scanToken:'0'.repeat(64)}),/EMBEDDED_REQUEST_LIMIT/);
+ assert.throws(()=>jobs.start('capacity',f.dir,{requestId:query.requestId,operation:'restore',scanToken:'0'.repeat(64)}),/EMBEDDED_REQUEST_LIMIT/);
+ let called=false;await assert.rejects(jobs.runLegacy('capacity',f.dir,{requestId:'capacity-legacy-write',operation:'undo'},()=>{called=true;}),/EMBEDDED_REQUEST_LIMIT/);assert.equal(called,false);
  const late=jobs.start('capacity',f.dir,{requestId:'first-sealed-request',operation:'restore',scanToken:'0'.repeat(64)});assert.equal(late.state,'cancelled');assert.equal(late.jobId,sealed.jobId);assert.equal(embedded.manifest(f.dir),null);
+ const known=jobs.status('capacity',{requestId:existing.requestId});assert.equal(known.jobId,existing.jobId);assert.equal(known.notStarted,undefined);await jobs._internal.jobs.get(existing.jobId).closed;assert.equal(jobs.status('capacity',{requestId:existing.requestId}).state,'done');
+ requests.delete([...requests.keys()].at(-1));assert.throws(()=>jobs.start('capacity',f.dir,{requestId:'late-after-capacity-seal',operation:'scan'}),/EMBEDDED_REQUEST_LIMIT/);assert.deepEqual(jobs.status('capacity',query),retired);assert.ok(fs.readFileSync(f.baseFile).equals(before));assert.equal(embedded.manifest(f.dir),null);
 });

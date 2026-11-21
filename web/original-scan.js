@@ -10,6 +10,8 @@ Object.assign(WORDS.zh,{sources:'已检查的游戏文件'});Object.assign(WORDS
 Object.assign(WORDS.zh,{refresh:'重新查询进度',undoing:'正在还原，请等待完成后再关闭'});Object.assign(WORDS.en,{refresh:'Check progress again',undoing:'Undoing; wait for completion before closing'});Object.assign(WORDS.ja,{refresh:'進行状況を再確認',undoing:'元に戻しています。完了するまで閉じないでください'});
 Object.assign(WORDS.zh,{unknown:'任务未完成，请重新查询进度或查看诊断日志'});Object.assign(WORDS.en,{unknown:'The task did not finish; check progress again or consult the diagnostic log'});Object.assign(WORDS.ja,{unknown:'処理が完了していません。進行状況または診断ログを確認してください'});
 WORDS.zh.errors.ORIGINAL_SCAN_NOT_STARTED='后台已确认这次任务未启动，可以重试';WORDS.en.errors.ORIGINAL_SCAN_NOT_STARTED='The backend confirmed this request never started; you can retry';WORDS.ja.errors.ORIGINAL_SCAN_NOT_STARTED='今回の処理が開始されていないことを確認しました。再試行できます';
+WORDS.zh.errors.EMBEDDED_REQUEST_LIMIT='这次扫描服务的任务数已满，本次任务未启动，请重启应用后重新扫描';WORDS.en.errors.EMBEDDED_REQUEST_LIMIT='This scanning session has reached its task limit. This request never started; restart the app before scanning again';WORDS.ja.errors.EMBEDDED_REQUEST_LIMIT='このスキャンサービスの処理数が上限に達しました。今回は開始されていません。アプリを再起動してからスキャンしてください';
+WORDS.zh.capacityPending='扫描服务的任务数已满，请重新查询，确认这次任务是否启动';WORDS.en.capacityPending='The scanning service has reached its task limit. Check progress again to confirm whether this request started';WORDS.ja.capacityPending='スキャンサービスの処理数が上限に達しました。進行状況を再確認し、今回の処理が開始されたか確認してください';
 export const originalScanWords=locale=>WORDS[locale]||WORDS.zh;
 const count=value=>Number.isSafeInteger(value)&&value>=0&&value<=1000000000;
 const byteCount=value=>Number.isSafeInteger(value)&&value>=0;
@@ -39,10 +41,10 @@ export function originalScanPresentation(state={},locale='zh'){
  const showResult=valid&&['preview','confirm','applying','applied'].includes(phase),writing=state.operation==='restore'||state.operation==='undo';
  const progress=state.progress;
  const knownProgress=!!progress&&count(progress.done)&&count(progress.total)&&progress.total>0&&progress.done<=progress.total;
- return {phase,lead:t.lead,status:phase==='error'?(t.errors[ERROR_ALIASES[state.error]||state.error]||t.unknown):phase==='idle'&&!hasGame?t.pick:phase==='applying'&&state.operation==='undo'?t.undoing:t[phase]||t.unknown,
+ return {phase,lead:t.lead,status:phase==='error'?(state.pendingJob&&state.error==='EMBEDDED_REQUEST_LIMIT'?t.capacityPending:t.errors[ERROR_ALIASES[state.error]||state.error]||t.unknown):phase==='idle'&&!hasGame?t.pick:phase==='applying'&&state.operation==='undo'?t.undoing:t[phase]||t.unknown,
   showCounts:showResult,counts:valid?[p.japanese,p.local,p.missing]:[],
   localNote:showResult&&p.local>0?t.localNote:showResult?t.noLocal:'',missingNote:showResult&&p.missing>0?t.missingNote:'',
-  canScan:hasGame&&(phase==='error'&&state.pendingJob?state.recoverable===true:!['scanning','cancelling','applying'].includes(phase)&&!(writing&&state.pendingJob)),canCancel:!writing&&(state.pendingJob||['scanning','cancelling'].includes(phase))&&state.cancellable!==false,
+  canScan:hasGame&&(state.error!=='EMBEDDED_REQUEST_LIMIT'||state.pendingJob)&&(phase==='error'&&state.pendingJob?state.recoverable===true:!['scanning','cancelling','applying'].includes(phase)&&!(writing&&state.pendingJob)),canCancel:!writing&&(state.pendingJob||['scanning','cancelling'].includes(phase))&&state.cancellable!==false,
   cancelPending:phase==='cancelling',showRestore:phase==='preview',canRestore:hasGame&&ready&&phase==='preview',
   showConfirm:phase==='confirm',canConfirm:hasGame&&ready&&phase==='confirm',
   blockedNote:phase==='preview'&&!ready?(valid&&p.local===0?t.noLocal:t.notReady):'',
@@ -77,7 +79,7 @@ export function createOriginalScanController({api,recoverJob,makeRequestId=()=>g
  }
  function accept(c,dto){
   if(!active(c))return;
-  if(dto?.retired===true&&dto?.notStarted===true&&dto.state==='cancelled'&&dto.requestId===c.requestId&&dto.operation===c.operation&&!c.jobId){c.terminal=true;c.notifyApplied=false;finish(c,{phase:'error',error:'ORIGINAL_SCAN_NOT_STARTED'});return;}
+  if(dto?.retired===true&&dto?.notStarted===true&&dto.state==='cancelled'&&dto.requestId===c.requestId&&dto.operation===c.operation&&!c.jobId){c.terminal=true;c.notifyApplied=false;finish(c,{phase:'error',error:dto.retiredByCapacity===true?'EMBEDDED_REQUEST_LIMIT':'ORIGINAL_SCAN_NOT_STARTED'});return;}
   if(c.allowDirect&&dto&&typeof dto==='object'&&!Object.hasOwn(dto,'jobId')){
    if(Object.hasOwn(dto,'operation')||['queued','running','cancelling','cancelled','done','failed'].includes(dto.state))throw Error('ORIGINAL_SCAN_PROTOCOL');
    if(c.operation==='undo'?(!count(dto.restored)||!Array.isArray(dto.skipped)):(!count(dto.applied)||!count(dto.cells)))throw Error('ORIGINAL_SCAN_PROTOCOL');
