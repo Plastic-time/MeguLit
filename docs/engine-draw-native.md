@@ -332,9 +332,10 @@ e-copiesir_cn.upx-unpacked.exe，游戏目录不动），同一条签名在 0x4
 - 第二部（時計仕掛けのレイライン -残影の夜が明ける時-）的 PAL.dll 两条签名也各正好命中一次，已进夹具；第三部（陽炎に彷徨う魔女）是 KiriKiri，不归这里
 
 ### NScripter（月姬 v1.4 / v1.6，两版是同一个 exe）
-- 点：Tsukihime.exe 0x40eefe，字形例程 0x40eb20（thiscall，第一个参数是字串，5 个调用者）每个字 `TextOutA(hdc, x, 0, 字, 2)` 画进字形小图；0x40f061 / 0x40f085 是它带条件的额外描边 / 阴影遍，不签。另外 5 个 TextOutA（0x41878a、0x41cb2e、0x41d28d、0x430b31、0x43fad3）在别的例程里，等实机记录看清是什么再签
-- 例程没有 EBP 帧：序言 0xfe4 字节（SEH + 0xfc4 局部 + 4 个寄存器）加 5 个 API 参数，返回地址在 API 第一个参数上方 0xff8（签名 frame=0xff8）。x / y 是字形小图里的位置，页面上的笔位是例程自己的参数之一，看 `fargs=`
-- 店主测试清单：同 AVG32，行里是 `engine=nscripter`；看 `fargs=` 里哪一项随每个字递增（那就是笔位 x）
+- 已核实的点：同一 SHA-256 的两份 Tsukihime.exe，字形例程 `0x40eb20` 是 thiscall、10 个栈参数，`ret 0x28`，第一个参数是完整输入字串，有 5 个调用者。现有签名只覆盖 **mode 1** 的 `0x40eefe`，通过 `TextOutA(hdc, x, 0, 字, 2)` 画进字形小图；mode 2 走 `0x40ef87` 等 5 个描边调用，mode 0 走 `0x40f061` / 条件 `0x40f085`，均未签。另 5 个 TextOutA（0x41878a、0x41cb2e、0x41d28d、0x430b31、0x43fad3）在别的例程里，角色也未核实
+- 栈修正：3 次 SEH push 共 `0x0c`、局部 `0xfc4`、4 个寄存器共 `0x10`，序言深度为 `0xfe0`。再加 5 个 API 参数 `0x14`，返回地址距 API 首参为 `0xff4`，原 `0xff8` 会把输入字串指针误当返回地址，并使 `fargs` 偏一项。JS 从同一原生签名头读取 frame；真实序言夹具、独立栈模拟和原生 gate 回归检查返回地址及 4 个参数
+- 坐标与编码限制：x / y 是字形小图位置；`fargs` 前四项为字串、paint 值和字形尺寸，不能当成页面笔位。第 5 个参数参与从 0 开始的横向步进，页面原点与合成变换、台词/名字/选项角色仍未知。样本 `CreateFontA` 的 charset 为 `0x86`，脚本有中文编码证据；通用 DrawSites 的 CP932 解码不能据此称为本样本已验证。没有启用 seed，没有新增完整输入 observer，也未完成实机验收
+- 后续验收清单：先静态追踪调用者的页面合成坐标和角色，再进入全局单游戏实测队列；隐藏桌面验证重复字、模式和角色覆盖。未证明前不写角色或页面坐标，不把一次签名命中当完整逆向
 
 ### Innocent Grey（虚ノ少女）：MFC 的 CDC 文字包装
 - 点：Innocentsetup.exe 里 MFC 的 CDC::TextOutW（0x41adc7）、CDC::ExtTextOutW（0x41a849）、CDC::DrawTextW（0x41a808），三个都是把参数原样转给 GDI、DC 取 `[ecx+4]` 的薄包装，有 EBP 帧

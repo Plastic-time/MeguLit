@@ -1,0 +1,102 @@
+{
+ "note": "Read-only bytes from Tsukihime.exe; both sample folders contain this identical build. Stack instructions, not a configured frame constant, determine the return slot.",
+ "sha256": "fee5d7e1835cc934a3422afa5fdebca28b5df6288b2bfee57d83fe4ff42048f3",
+ "entry": "0x40eb20",
+ "prologue": [
+  {
+   "va": "0x40eb20",
+   "hex": "6aff"
+  },
+  {
+   "va": "0x40eb22",
+   "hex": "687d064500"
+  },
+  {
+   "va": "0x40eb27",
+   "hex": "64a100000000"
+  },
+  {
+   "va": "0x40eb2d",
+   "hex": "50"
+  },
+  {
+   "va": "0x40eb2e",
+   "hex": "64892500000000"
+  },
+  {
+   "va": "0x40eb35",
+   "hex": "81ecc40f0000"
+  },
+  {
+   "va": "0x40eb3b",
+   "hex": "a17c044600"
+  },
+  {
+   "va": "0x40eb40",
+   "hex": "53"
+  },
+  {
+   "va": "0x40eb41",
+   "hex": "55"
+  },
+  {
+   "va": "0x40eb42",
+   "hex": "898424c80f0000"
+  },
+  {
+   "va": "0x40eb49",
+   "hex": "8b8424dc0f0000"
+  },
+  {
+   "va": "0x40eb50",
+   "hex": "56"
+  },
+  {
+   "va": "0x40eb51",
+   "hex": "8be9"
+  },
+  {
+   "va": "0x40eb53",
+   "hex": "8d942414040000"
+  },
+  {
+   "va": "0x40eb5a",
+   "hex": "57"
+  }
+ ],
+ "apiSetup": [
+  {
+   "va": "0x40eeef",
+   "hex": "be02000000"
+  },
+  {
+   "va": "0x40eef4",
+   "hex": "56"
+  },
+  {
+   "va": "0x40eef5",
+   "hex": "8d442414"
+  },
+  {
+   "va": "0x40eef9",
+   "hex": "50"
+  },
+  {
+   "va": "0x40eefa",
+   "hex": "6a00"
+  },
+  {
+   "va": "0x40eefc",
+   "hex": "57"
+  },
+  {
+   "va": "0x40eefd",
+   "hex": "51"
+  }
+ ],
+ "apiCall": "0x40eefe",
+ "return": {
+  "va": "0x40f5bc",
+  "hex": "c22800"
+ }
+}
