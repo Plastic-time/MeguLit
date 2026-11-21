@@ -128,7 +128,11 @@ export function buildStele({scene,keep,tier}){const low=tier==='low',Q=low?.5:1,
  s.lineTo(-w/2+b,h/2);s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-b);s.lineTo(-w/2,-h/2+b);s.quadraticCurveTo(-w/2,-h/2,-w/2+b,-h/2);
  const g=new THREE.ExtrudeGeometry(s,{depth:SD-.06,bevelEnabled:true,bevelThickness:.03,bevelSize:.03,bevelSegments:3,curveSegments:6});g.translate(0,0,-(SD-.06)/2);
  const slab=mesh(g,basaltBody,0,BASE_Y+SH/2,0);
- return {stele,slab,SW,SH,SD,basaltBody,bas};}
+ /* the stele's light comes off its face and its outline: points just in front of the face and around the edge, in four groups along x */
+ const emit=[[],[],[],[]],grp=x=>Math.max(0,Math.min(3,Math.floor((x+SW/2)/SW*4))),cy=BASE_Y+SH/2;
+ for(let x=-SW/2+.45;x<=SW/2-.4;x+=.85){for(const dy of [-.95,0,.95])emit[grp(x)].push({x,y:cy+dy,z:SD/2+.25,w:.1});emit[grp(x)].push({x,y:BASE_Y+SH+.25,z:0,w:.08});emit[grp(x)].push({x,y:cy,z:-SD/2-.25,w:.05});}
+ for(const sx of [-1,1])for(const dy of [-1.2,0,1.2])emit[grp(sx*SW/2*.99)].push({x:sx*(SW/2+.25),y:cy+dy,z:0,w:.08});
+ return {stele,slab,SW,SH,SD,basaltBody,bas,emit};}
 
 /* ---------- the hall ---------- */
 export function buildHall({scene,keep,tex,tier,maxAniso=8}){
@@ -144,7 +148,7 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
   nave=maps('naveVault',()=>coffers(1024*Q,1024*Q,{cols:6,rows:6,v0:0,v1:1})),
   col=maps('violetMarble',()=>marbleHQ(2048*HQ(),23,PAL.violet)),pale=maps('paleMarble',()=>marbleHQ(1024*HQ(),61,PAL.cream)),
   fl=maps('floor',()=>floorHQ(4096*HQ(),11,PAL.floor)),roseTex=T(maps('rose',()=>({map:rose(1024*Q,3)})).map),quarryTex=T(maps('quarries',()=>({map:quarries(256*Q,512*Q,9)})).map),
-  lanTex=T(maps('lancet',()=>({map:lancet(256*Q,640*Q,13)})).map);
+  lanTex=T(maps('lancet',()=>({map:lancet(Math.round(512*HQ()*2),Math.round(1280*HQ()*2),13)})).map);
  const stone=keep(new THREE.MeshStandardMaterial({map:T(ash.map),normalMap:T(ash.normal,false),roughnessMap:T(ash.rough,false),roughness:1,metalness:0,envMapIntensity:.35}));
  const stoneDark=keep(new THREE.MeshStandardMaterial({map:T(ashDark.map),normalMap:T(ashDark.normal,false),roughnessMap:T(ashDark.rough,false),roughness:1,metalness:0,envMapIntensity:.25}));
  const carved=keep(new THREE.MeshStandardMaterial({map:T(rel.map),normalMap:T(rel.normal,false),roughness:.82,metalness:0,envMapIntensity:.3}));
@@ -152,6 +156,18 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
  const violet=keep(new THREE.MeshPhysicalMaterial({map:T(col.map),roughnessMap:T(col.rough,false),normalMap:T(col.normal,false),roughness:1,metalness:0,clearcoat:low?0:.35,clearcoatRoughness:.12,envMapIntensity:.7}));
  /* shafts are 1.7 m round and 5 m tall: three repeats up the height keep the veins in proportion */
  for(const k of ['map','roughnessMap','normalMap'])violet[k].repeat.set(1,3);
+ /* every instance reads its own part of the texture (offset and scale from aPat); meshes without aPat read it as it is */
+ violet.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <common>',`#include <common>
+attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
+  #ifdef USE_MAP
+  vMapUv=vMapUv*(1.+aPat.z)+aPat.xy;
+  #endif
+  #ifdef USE_NORMALMAP
+  vNormalMapUv=vNormalMapUv*(1.+aPat.z)+aPat.xy;
+  #endif
+  #ifdef USE_ROUGHNESSMAP
+  vRoughnessMapUv=vRoughnessMapUv*(1.+aPat.z)+aPat.xy;
+  #endif`);};violet.customProgramCacheKey=()=>'violet-pattern';
  const capMat=keep(new THREE.MeshStandardMaterial({map:T(pale.map),color:0xefe6d6,roughness:.75,metalness:0,side:THREE.DoubleSide,envMapIntensity:.4}));
  const bask=maps('basketCapital',()=>basketRelief(1024,512,19));
  const basketMat=keep(new THREE.MeshStandardMaterial({map:T(bask.map),normalMap:T(bask.normal,false),roughness:.78,metalness:0,envMapIntensity:.4}));
@@ -170,7 +186,9 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
  const [roseMat,drumGlassMat,lanMat]=glass;
 
  const add=(geo,mat,pos,rot,{cast=true,recv=true}={})=>{const m=new THREE.Mesh(keep(geo),mat);if(pos)m.position.set(...pos);if(rot)m.rotation.set(...rot);m.castShadow=cast;m.receiveShadow=recv;hall.add(m);return m;};
- const inst=(geo,mat,list,{cast=true}={})=>{const m=new THREE.InstancedMesh(keep(geo),mat,list.length),o=new THREE.Object3D();
+ const inst=(geo,mat,list,{cast=true,pattern=false}={})=>{const m=new THREE.InstancedMesh(keep(geo),mat,list.length),o=new THREE.Object3D();
+  if(pattern){const pr=new Float32Array(list.length*3),rr=(i,k)=>{const v=Math.sin((i+1)*12.9898+k*78.233)*43758.5453;return v-Math.floor(v);};
+   for(let i=0;i<list.length;i++){pr[i*3]=rr(i,1);pr[i*3+1]=rr(i,2)*3;pr[i*3+2]=(rr(i,3)-.4)*.35;}m.geometry=keep(geo.clone());m.geometry.setAttribute('aPat',new THREE.InstancedBufferAttribute(pr,3));}
   list.forEach((p,i)=>{o.position.set(p[0],p[1],p[2]);o.rotation.set(p[4]||0,p[3]||0,p[5]||0);const s=p[6]||1;o.scale.set(s,s,s);o.updateMatrix();m.setMatrixAt(i,o.matrix);});
   m.instanceMatrix.needsUpdate=true;m.castShadow=cast;m.receiveShadow=true;hall.add(m);return m;};
  const box=(w,h,d)=>worldUV(new THREE.BoxGeometry(w,h,d),4);
@@ -188,7 +206,7 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
  const colZ=[];for(let z=BACK+2.6;z<NZ1-2;z+=1.7)if(Math.abs(z-(FRONT-.4))>1.6)colZ.push(z);
  const colP=[];for(const z of colZ)for(const sx of [-1,1])colP.push([sx*HX,0,z]);
  inst(plinthG,smooth,colP.map(p=>[p[0],.15,p[2]]));inst(new THREE.TorusGeometry(COL_R*1.36,.022,6,32).rotateX(Math.PI/2),smooth,colP.map(p=>[p[0],.305,p[2]]),{cast:false});inst(baseG,smooth,colP.map(p=>[p[0],.3,p[2]]));
- inst(shaftG,violet,colP.map(p=>[p[0],.3+COL_R*.5+COL_H/2,p[2]]));{const at=colP.map(p=>[p[0],.3+COL_R*.5+COL_H,p[2]]);inst(capG.bowl,basketMat,at);inst(capG.impost,smooth,at);}
+ inst(shaftG,violet,colP.map(p=>[p[0],.3+COL_R*.5+COL_H/2,p[2]]),{pattern:true});{const at=colP.map(p=>[p[0],.3+COL_R*.5+COL_H,p[2]]);inst(capG.bowl,basketMat,at);inst(capG.impost,smooth,at);}
  const CAP_TOP=.3+COL_R*.5+COL_H+COL_R*2.1+COL_R*.32;
 
  /* ---- the four piers, each with an engaged column on its two faces toward the bay ---- */
@@ -202,7 +220,7 @@ export function buildHall({scene,keep,tex,tier,maxAniso=8}){
     pil.push([px-sx*(1.2+PD/2),P0+PH/2,pz,Math.PI/2]);caps.push([px-sx*(1.2+PD),PTOP-CAPH/2,pz,Math.PI/2]);plinths.push([px-sx*(1.2+PD/2+.02),P0-.1,pz,Math.PI/2]);
     pil.push([px,P0+PH/2,pz+inZ*(1.2+PD/2),0]);caps.push([px,PTOP-CAPH/2,pz+inZ*(1.2+PD),0]);plinths.push([px,P0-.1,pz+inZ*(1.2+PD/2+.02),0]);
     for(let f=-2;f<=2;f++){const o=f*.17;flutes.push([px-sx*(1.2+PD+.005),P0+PH/2,pz+o,Math.PI/2]);flutes.push([px+o,P0+PH/2,pz+inZ*(1.2+PD+.005),0]);}}
-   inst(worldUV(new THREE.BoxGeometry(PW,PH,PD),4),violet,pil);inst(new THREE.BoxGeometry(PW+.14,.2,PD+.1),smooth,plinths);
+   inst(worldUV(new THREE.BoxGeometry(PW,PH,PD),4),violet,pil,{pattern:true});inst(new THREE.BoxGeometry(PW+.14,.2,PD+.1),smooth,plinths);
    inst(new THREE.BoxGeometry(.07,PH-.3,.012),keep(new THREE.MeshStandardMaterial({color:0x140c1a,roughness:.4,metalness:0})),flutes,{cast:false});
    /* capital: a moulded block with a band of carved leaves (the frieze relief) and an abacus */
    const capG=mergeGeometries([new THREE.BoxGeometry(PW+.08,CAPH*.62,.28).translate(0,-CAPH*.19,0),new THREE.BoxGeometry(PW+.26,CAPH*.18,.36).translate(0,CAPH*.21,0),

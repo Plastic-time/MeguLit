@@ -1,5 +1,5 @@
 {
- "hash": "df0edb5c9ffd61f1439a6421",
+ "hash": "8e1f6a5bb8b1e5bc091fc9ac",
  "textures": {
   "ashlar": {
    "map": "ashlar.map.webp",
@@ -92,6 +92,27 @@
  },
  "torch": {
   "file": "torch.bin",
+  "dims": [
+   49,
+   68,
+   100
+  ],
+  "box": {
+   "min": [
+    -14.7,
+    -0.3,
+    -18.3
+   ],
+   "max": [
+    14.7,
+    40.2,
+    41.4
+   ]
+  },
+  "res": 0.6
+ },
+ "stele": {
+  "file": "stele.bin",
   "dims": [
    49,
    68,

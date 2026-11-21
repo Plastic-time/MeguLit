@@ -33,18 +33,19 @@ export async function loadBaked(low){baked=null;record=window.__TORCH_BAKE?new M
   const ao=await inflate(await (await fetch(new URL(man.ao.file,BASE))).arrayBuffer());
   if(ao.length!==man.ao.dims[0]*man.ao.dims[1]*man.ao.dims[2])return {ok:false,reason:'ao-size'};
   const tl=await inflate(await (await fetch(new URL(man.torch.file,BASE))).arrayBuffer());if(tl.length!==man.torch.dims[0]*man.torch.dims[1]*man.torch.dims[2])return {ok:false,reason:'torch-size'};
-  baked={tex,ao:{data:ao,dims:man.ao.dims,box:man.ao.box},torch:{data:tl,dims:man.torch.dims,box:man.torch.box}};return {ok:true};}
+  const st=await inflate(await (await fetch(new URL(man.stele.file,BASE))).arrayBuffer());if(st.length!==man.stele.dims[0]*man.stele.dims[1]*man.stele.dims[2]*4)return {ok:false,reason:'stele-size'};
+  baked={tex,ao:{data:ao,dims:man.ao.dims,box:man.ao.box},torch:{data:tl,dims:man.torch.dims,box:man.torch.box},stele:{data:st,dims:man.stele.dims,box:man.stele.box}};return {ok:true};}
  catch(e){return {ok:false,reason:String(e&&e.message||e)};}}
 /* a set of maps by name: the baked images when there are some, else drawn now (and noted when baking) */
 export function maps(key,make){if(baked&&baked.tex[key])return baked.tex[key];const t0=performance.now();const o=make();if(record){record.set(key,o);console.log('BAKESTEP texture',key,Math.round(performance.now()-t0),'ms');}return o;}
-export function bakedAO(){return baked?{ao:baked.ao,torch:baked.torch}:null;}
+export function bakedAO(){return baked?{ao:baked.ao,torch:baked.torch,stele:baked.stele}:null;}
 export function recorded(){return record;}
 
 /* ---- ambient occlusion volume ----
    Solid surfaces are marked in a voxel grid (every triangle sampled finer than a cell, clipping planes honoured), then occlusion is how
    much more solid surrounds a cell than a single flat wall would (two box blurs, 1 and 3 cells): 1 in the open and on plain walls,
    darker in corners, under cornices, between columns, under the stele. */
-export function computeVolumes(scene,torches=[]){const {min,max,res}=AO_BOX,nx=Math.ceil((max[0]-min[0])/res),ny=Math.ceil((max[1]-min[1])/res),nz=Math.ceil((max[2]-min[2])/res),N=nx*ny*nz;
+export function computeVolumes(scene,torches=[],stele=[[],[],[],[]]){const {min,max,res}=AO_BOX,nx=Math.ceil((max[0]-min[0])/res),ny=Math.ceil((max[1]-min[1])/res),nz=Math.ceil((max[2]-min[2])/res),N=nx*ny*nz;
  const occ=new Float32Array(N),a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),p=new THREE.Vector3(),m=new THREE.Matrix4(),im=new THREE.Matrix4();
  scene.updateMatrixWorld(true);
  scene.traverse(o=>{if(!o.isMesh||o.userData.noAO)return;const mt=o.material;if(Array.isArray(mt)||!mt||!mt.isMeshStandardMaterial)return;
@@ -72,22 +73,28 @@ export function computeVolumes(scene,torches=[]){const {min,max,res}=AO_BOX,nx=M
    for(let q=1;q<n;q++){const f=q/n,dist=d*f;if(dist<.45||d-dist<.55)continue;if(solid(cx+dx*f,cy+dy*f,cz+dz*f)){tr2*=.2;if(tr2<.02)break;}}
    I+=tr2*(t.w||1)/(d2+.5);}
   tl[(k*ty+j)*tx+i]=Math.round(Math.sqrt(Math.min(1,I/2))*255);}
- return {ao:{data:out,dims:[nx,ny,nz],box:{min,max}},torch:{data:tl,dims:[tx,ty,tz],box:{min,max}}};}
+ /* the stele's own light, in four groups along its length (RGBA), so each part can breathe on its own at run time */
+ const sl=new Uint8Array(tx*ty*tz*4);
+ for(let k=0;k<tz;k++)for(let j=0;j<ty;j++)for(let i=0;i<tx;i++){const cx=min[0]+(i+.5)*tr,cy=min[1]+(j+.5)*tr,cz=min[2]+(k+.5)*tr,o=((k*ty+j)*tx+i)*4;
+  for(let g=0;g<4;g++){let I=0;for(const t of stele[g]||[]){const dx=t.x-cx,dy=t.y-cy,dz=t.z-cz,d2=dx*dx+dy*dy+dz*dz;if(d2>144)continue;const d=Math.sqrt(d2),n=Math.ceil(d/(res*.8));let tr2=1;
+    for(let q=1;q<n;q++){const f=q/n,dist=d*f;if(dist<.3||d-dist<.35)continue;if(solid(cx+dx*f,cy+dy*f,cz+dz*f)){tr2*=.2;if(tr2<.02)break;}}I+=tr2*(t.w||1)/(d2+.4);}
+   sl[o+g]=Math.round(Math.sqrt(Math.min(1,I/2))*255);}}
+ return {ao:{data:out,dims:[nx,ny,nz],box:{min,max}},torch:{data:tl,dims:[tx,ty,tz],box:{min,max}},stele:{data:sl,dims:[tx,ty,tz],box:{min,max}}};}
 
 /* sample the volume in every stone/marble material: indirect light (and a little of the direct) is darkened by it */
-const vol3d=v=>{const t=new THREE.Data3DTexture(v.data,...v.dims);t.format=THREE.RedFormat;t.type=THREE.UnsignedByteType;t.minFilter=t.magFilter=THREE.LinearFilter;
+const vol3d=(v,rgba=false)=>{const t=new THREE.Data3DTexture(v.data,...v.dims);t.format=rgba?THREE.RGBAFormat:THREE.RedFormat;t.type=THREE.UnsignedByteType;t.minFilter=t.magFilter=THREE.LinearFilter;
  t.wrapS=t.wrapT=t.wrapR=THREE.ClampToEdgeWrapping;t.unpackAlignment=1;t.needsUpdate=true;return t;};
-export function applyAO(scene,vols){const ao=vol3d(vols.ao),torch=vol3d(vols.torch),mn=vols.ao.box.min,mx=vols.ao.box.max;
+export function applyAO(scene,vols){const ao=vol3d(vols.ao),torch=vol3d(vols.torch),stele=vol3d(vols.stele,true),mn=vols.ao.box.min,mx=vols.ao.box.max;
  const uni={uAoVol:{value:ao},uTorchVol:{value:torch},uAoMin:{value:new THREE.Vector3(...mn)},uAoSize:{value:new THREE.Vector3(mx[0]-mn[0],mx[1]-mn[1],mx[2]-mn[2])},uAoStrength:{value:1},
-  uTorchColor:{value:new THREE.Color(0xa68ae8)},uTorchLevel:{value:0}};
+  uTorchColor:{value:new THREE.Color(0xa68ae8)},uTorchLevel:{value:0},uSteleVol:{value:stele},uSteleColor:{value:new THREE.Color(0x9a6cf0)},uSteleLevels:{value:new THREE.Vector4()}};
  const done=new Set();scene.traverse(o=>{const m=o.material;if(!m||Array.isArray(m)||!m.isMeshStandardMaterial||done.has(m))return;done.add(m);patch(m,uni);});
- return {textures:[ao,torch],uniforms:uni};}
-function patch(m,uni){m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,uni);
+ return {textures:[ao,torch,stele],uniforms:uni};}
+function patch(m,uni){const prev=m.onBeforeCompile,prevKey=m.customProgramCacheKey.bind(m);m.onBeforeCompile=(sh,r)=>{prev.call(m,sh,r);Object.assign(sh.uniforms,uni);
  sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vAoWorld;')
   .replace('#include <project_vertex>','#include <project_vertex>\n{vec4 aw=vec4(transformed,1.);\n#ifdef USE_INSTANCING\naw=instanceMatrix*aw;\n#endif\naw=modelMatrix*aw;vAoWorld=aw.xyz;}');
- sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vAoWorld;uniform highp sampler3D uAoVol;uniform highp sampler3D uTorchVol;uniform vec3 uAoMin;uniform vec3 uAoSize;uniform float uAoStrength;uniform vec3 uTorchColor;uniform float uTorchLevel;')
+ sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vAoWorld;uniform highp sampler3D uAoVol;uniform highp sampler3D uTorchVol;uniform vec3 uAoMin;uniform vec3 uAoSize;uniform float uAoStrength;uniform vec3 uTorchColor;uniform float uTorchLevel;uniform highp sampler3D uSteleVol;uniform vec3 uSteleColor;uniform vec4 uSteleLevels;')
   .replace('#include <aomap_fragment>',`{vec3 aoN=inverseTransformDirection(normal,viewMatrix);float vao=texture(uAoVol,clamp((vAoWorld+aoN*.33-uAoMin)/uAoSize,0.,1.)).r;
-   float tq=texture(uTorchVol,clamp((vAoWorld+aoN*.45-uAoMin)/uAoSize,0.,1.)).r;
+   float tq=texture(uTorchVol,clamp((vAoWorld+aoN*.45-uAoMin)/uAoSize,0.,1.)).r;vec4 sv=texture(uSteleVol,clamp((vAoWorld+aoN*.4-uAoMin)/uAoSize,0.,1.));
    float ambientOcclusion=mix(1.,vao,uAoStrength);
    #ifdef USE_AOMAP
    ambientOcclusion*=(texture2D(aoMap,vAoMapUv).r-1.)*aoMapIntensity+1.;
@@ -95,6 +102,7 @@ function patch(m,uni){m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,uni);
    reflectedLight.indirectDiffuse*=ambientOcclusion;reflectedLight.directDiffuse*=mix(1.,ambientOcclusion,.3);
    /* baked torch light: what the old point lights gave (16 cd, 1/d²), with an average cosine of .6 */
    reflectedLight.indirectDiffuse+=uTorchColor*(uTorchLevel*16.*.6*tq*tq*2.)*BRDF_Lambert(material.diffuseColor)*mix(1.,ambientOcclusion,.5);
+   reflectedLight.indirectDiffuse+=uSteleColor*(dot(sv*sv*2.,uSteleLevels)*7.)*BRDF_Lambert(material.diffuseColor)*mix(1.,ambientOcclusion,.5);
    #if defined(USE_CLEARCOAT)
    clearcoatSpecularIndirect*=ambientOcclusion;
    #endif
@@ -102,16 +110,16 @@ function patch(m,uni){m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,uni);
    {float dotNV=saturate(dot(geometryNormal,geometryViewDir));reflectedLight.indirectSpecular*=computeSpecularOcclusion(dotNV,ambientOcclusion,material.roughness);}
    #endif
   }`);};
- m.customProgramCacheKey=()=>'torch-ao';m.needsUpdate=true;}
+ m.customProgramCacheKey=()=>prevKey()+'|torch-ao';m.needsUpdate=true;}
 
 const b64=u8=>{let bin='';for(let i=0;i<u8.length;i+=8192)bin+=String.fromCharCode(...u8.subarray(i,i+8192));return btoa(bin);};
 /* used by tools/torch-bake.cjs inside a headless browser: every recorded canvas as webp, the volume deflated, and the manifest */
-export async function exportBake(scene,torches){const out={files:{},textures:{}};
+export async function exportBake(scene,torches,stele){const out={files:{},textures:{}};
  /* encode every canvas at once (the browser encodes off the main thread, in parallel) */
  const jobs=[];for(const [key,o] of record||[]){out.textures[key]={};for(const [f,c] of Object.entries(o)){if(!c||!c.toBlob)continue;
   const name=key+'.'+f+'.webp',q=f==='normal'?.96:.9;out.textures[key][f]=name;
   jobs.push(new Promise(r=>c.toBlob(r,'image/webp',q)).then(async blob=>{out.files[name]=b64(new Uint8Array(await blob.arrayBuffer()));}));}}
  const te=performance.now();await Promise.all(jobs);console.log('BAKESTEP encoded',jobs.length,'images',Math.round(performance.now()-te),'ms');
- const tv=performance.now();const vols=computeVolumes(scene,torches);console.log('BAKESTEP volumes',Math.round(performance.now()-tv),'ms');const zip=async u8=>new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
- out.files['ao.bin']=b64(await zip(vols.ao.data));out.files['torch.bin']=b64(await zip(vols.torch.data));
- out.manifest={hash:await sourceHash(),textures:out.textures,ao:{file:'ao.bin',dims:vols.ao.dims,box:vols.ao.box,res:AO_BOX.res},torch:{file:'torch.bin',dims:vols.torch.dims,box:vols.torch.box,res:TORCH_RES}};return out;}
+ const tv=performance.now();const vols=computeVolumes(scene,torches,stele);console.log('BAKESTEP volumes',Math.round(performance.now()-tv),'ms');const zip=async u8=>new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+ out.files['ao.bin']=b64(await zip(vols.ao.data));out.files['torch.bin']=b64(await zip(vols.torch.data));out.files['stele.bin']=b64(await zip(vols.stele.data));
+ out.manifest={hash:await sourceHash(),textures:out.textures,ao:{file:'ao.bin',dims:vols.ao.dims,box:vols.ao.box,res:AO_BOX.res},torch:{file:'torch.bin',dims:vols.torch.dims,box:vols.torch.box,res:TORCH_RES},stele:{file:'stele.bin',dims:vols.stele.dims,box:vols.stele.box,res:TORCH_RES}};return out;}

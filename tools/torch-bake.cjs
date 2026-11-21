@@ -23,7 +23,7 @@ const api=async a=>a==='torch_page'?{ok:true,total:0,items:[],next:null}:{ok:tru
 await m.openTorchMonument({api,locale:'zh'});
 let host;for(let i=0;i<600&&!(host=document.querySelector('.torch-monument'))?.__torch;i++)await new Promise(r=>setTimeout(r,100));
 const {exportBake}=await import('/web/torch-bake.js');
-window.__bake=await exportBake(host.__torch.debug.scene,host.__torch.debug.torchPoints);
+window.__bake=await exportBake(host.__torch.debug.scene,host.__torch.debug.torchPoints,host.__torch.debug.steleEmit);
 </script>`;
 
 async function main(){const browser=BROWSERS.find(b=>fs.existsSync(b));if(!browser)throw Error('Chrome or Edge not found');
