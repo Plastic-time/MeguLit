@@ -217,6 +217,7 @@ relay、客户端、签名工具共用这一个纯函数文件，签名的字节
 | `sample.json` | 下面的结构化样本 |
 | `hook-events.log` | 这个窗口的 hook-events 原始行（自检和校准的输入，diff-maker 直接拿来跑 `predict/calibrate`） |
 | `reader-host.log` | 这个窗口的 reader-host 原始行（不含 hostFrame） |
+| `engine-draw.log` | `logs/engine-draw.log`（feat/engine-draw 的 ToMe_CHARS 记录）里这个窗口时段（开始前 5 秒到保存时）的行，≤1.5 MB |
 | `shot-1..3.jpg` | 第 3、10、18 句时各一张，`GalNative.sceneShot` 只截游戏自己的客户区（不含 MeguLit 图层和桌面），JPEG，每张 ≤600 KB |
 
 两份日志写盘前过 `diagnostics.scrub`（用户名、用户目录、邮箱）。

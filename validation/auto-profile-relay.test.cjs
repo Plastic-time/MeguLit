@@ -112,9 +112,13 @@ test('runtime sample: on by default, the switch turns it off; first lines, boxes
  assert.deepEqual(want,[3,10,18]);const jpg=Buffer.concat([Buffer.from([0xff,0xd8]),crypto.randomBytes(500)]).toString('base64');
  assert.ok(sample.shot(jpg));assert.ok(!sample.shot(Buffer.from('x'.repeat(300)).toString('base64')),'only JPEG');
  const exe=path.join(root,'G','game.exe');fs.mkdirSync(path.dirname(exe),{recursive:true});fs.writeFileSync(exe,'MZ-runtime');const K=await ap.exeKey(root,exe);
+ /* engine-draw.log: only this run's lines go into the sample */
+ fs.mkdirSync(path.join(root,'logs'),{recursive:true});const now=Date.now(),iso=ms=>new Date(ms).toISOString();
+ fs.writeFileSync(path.join(root,'logs','engine-draw.log'),[iso(now-3600e3)+' ToMe_CHARS old',iso(now)+' ToMe_CHARS role=1 id=7 box=1,2,3,4 sel=0 emb=1',iso(now+3600e3)+' ToMe_CHARS later'].join('\n')+'\n');
  const d=sample.save(root,K);const s=JSON.parse(fs.readFileSync(path.join(d,'sample.json'),'utf8'));
+ const draw=fs.readFileSync(path.join(d,'engine-draw.log'),'utf8');assert.match(draw,/role=1 id=7/);assert.ok(!/old|later/.test(draw),'only this window');
  assert.equal(s.exe,'game.exe');assert.equal(s.lines[0].name,'綾');assert.deepEqual(s.client,[800,600]);assert.equal(s.shots,1);
- assert.deepEqual(rs.files(d).map(f=>f.name),['hook-events.log','reader-host.log','sample.json','shot-1.jpg']);
+ assert.deepEqual(rs.files(d).map(f=>f.name),['engine-draw.log','hook-events.log','reader-host.log','sample.json','shot-1.jpg']);
  if(process.env.USERNAME&&process.env.USERNAME.length>=2)assert.ok(!fs.readFileSync(path.join(d,'reader-host.log'),'utf8').includes(process.env.USERNAME),'logs scrubbed');
  const src=fs.readFileSync(path.join(__dirname,'..','services','probe-full.cjs'),'latin1');assert.match(src,/runtime-sample\.cjs'\)\.files\(runtime\)/);assert.match(src,/kind!=='shot'&&isMediaBytes/);
  /* the full probe of this game is on the relay already: only the runtime bundle goes, once per sample */
@@ -123,7 +127,7 @@ test('runtime sample: on by default, the switch turns it off; first lines, boxes
  const r2=await pa.runtimeOnly(root,{executable:exe},ident,{state:'sent',runtime:r1.stamp},{fetcher:user('50.0.0.1')});assert.equal(r2.state,'nothing','the same sample is not sent again');
  const list=(await (await maint('GET','/api/game-profile/runtime/list')).json()).runtime;assert.equal(list[0].key,K);assert.equal(list[0].identity,ident.id);
  const got=await maint('GET','/api/game-profile/runtime/get?key='+K);const bundle=JSON.parse(zlib.gunzipSync(Buffer.from(await got.arrayBuffer())));
- assert.equal(bundle.schema,'megulit.runtime-bundle');assert.deepEqual(bundle.files.map(f=>f.kind).sort(),['runtime','runtime','runtime','shot']);
+ assert.equal(bundle.schema,'megulit.runtime-bundle');assert.deepEqual(bundle.files.map(f=>f.kind).sort(),['runtime','runtime','runtime','runtime','shot']);
  rs.setEnabled(root,false);assert.equal((await pa.runtimeOnly(root,{executable:exe},ident,{state:'sent'},{fetcher:user('50.0.0.1')})).state,'off');
 }finally{fs.rmSync(root,{recursive:true,force:true});}});
 
