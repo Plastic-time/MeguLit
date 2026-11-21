@@ -19,7 +19,7 @@ const dir=root=>path.join(root,'data','The Seed');
 /* 2026-11-21 (owner: 「这两个可以都开了 我已经和他们说了 全答应了」) uploading calibrations has its own switch, library.json
    autoProfileShare, on unless the player turns it off (=== false), on top of 共享适配 (sharedAdaptation, used by other features, untouched).
    Fetching diffs is not an upload and is always on. */
-function sharing(root){let lib={};try{lib=JSON.parse(fs.readFileSync(path.join(root,'data','config','library.json'),'utf8'))||{};}catch{}if(lib.autoProfileShare===false)return false;try{return require('./shared-adaptation.cjs').enabled(root);}catch{return false;}}
+function sharing(root){if(require('../core/owner-tests.cjs').privateMode(root))return false;let lib={};try{lib=JSON.parse(fs.readFileSync(path.join(root,'data','config','library.json'),'utf8'))||{};}catch{}if(lib.autoProfileShare===false)return false;try{return require('./shared-adaptation.cjs').enabled(root);}catch{return false;}}
 function setSharing(root,on){const f=path.join(root,'data','config','library.json');let lib={};try{lib=JSON.parse(fs.readFileSync(f,'utf8'))||{};}catch{}fs.mkdirSync(path.dirname(f),{recursive:true});const tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify({...lib,autoProfileShare:on===true},null,2));fs.renameSync(tmp,f);return sharing(root);}
 function endpoints(root,route){try{return require('./relay-config.cjs').endpoints(root,route);}catch{return [];}}
 function keyList(file){try{const raw=JSON.parse(fs.readFileSync(path.join(__dirname,file),'utf8'));return (Array.isArray(raw.keys)?raw.keys:[]).filter(k=>k&&k.alg==='ed25519'&&typeof k.id==='string'&&typeof k.publicKey==='string'&&!k.revoked);}catch{return [];}}

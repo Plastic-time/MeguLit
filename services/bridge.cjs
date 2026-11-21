@@ -129,7 +129,7 @@ async function launch(db,id,runtime=null,windowsLaunch=false,{retried=false,redi
   /* a Windows feature install window the game still opens is closed at once (the game goes on as if it was cancelled);
      DirectPlay is prepared while the game runs, anything else is remembered for this folder */
   featureWatch=require('../core/windows-features.cjs').watch(gameDir,{trace,onFeature:feature=>{if(/^directplay$/i.test(feature)){const dp=require('../core/directplay.cjs').prepare(gameDir,{root,exe:game.executable,all:true});trace('directplay',dp);}}});
-  const prepareEnginePath=async()=>{if(require('../core/library-mode.cjs').libraryOnly(root))return;try{let prefs={};try{prefs=JSON.parse(fs.readFileSync(path.join(root,'data','preferences.json'),'utf8'))||{};}catch{}textPath=await require('../core/text-paths-launch.cjs').prepare({root,exe:game.executable,profile,title:game.title,enabled:prefs.ownTextOutput===true||(()=>{try{return JSON.parse(fs.readFileSync(path.join(root,'data','config','gal-preferences.json'),'utf8')).textRenderer==='compositor';}catch{return false;}})(),trace});}catch(error){textPath=null;trace('text-paths-failed',{error:String(error?.message||error).slice(0,160)});}};
+  const prepareEnginePath=async()=>{if(require('../core/library-mode.cjs').libraryOnly(root))return;try{let ownerTestGrant=null;try{const P=require('../core/profiles/index.cjs'),engine=P.engineId(profile.engine||game.engine||require('../core/library.cjs').engineOf(path.dirname(game.executable))?.name);ownerTestGrant=await require('../core/owner-tests.cjs').resolve(root,{exe:game.executable,engine});}catch{}let prefs={};try{prefs=JSON.parse(fs.readFileSync(path.join(root,'data','preferences.json'),'utf8'))||{};}catch{}textPath=await require('../core/text-paths-launch.cjs').prepare({root,exe:game.executable,profile,title:game.title,ownerTestGrant,enabled:prefs.ownTextOutput===true||(()=>{try{return JSON.parse(fs.readFileSync(path.join(root,'data','config','gal-preferences.json'),'utf8')).textRenderer==='compositor';}catch{return false;}})(),trace});}catch(error){textPath=null;trace('text-paths-failed',{error:String(error?.message||error).slice(0,160)});}};
   if(rgssPath&&!launchVia&&!elevation&&!windowsLaunch)await prepareEnginePath();
   let state;
   // "Japanese system environment": non-Unicode Japanese games (WA2) show their own dialogs garbled under a Chinese locale.
@@ -711,6 +711,7 @@ async function dispatch(request,runtime=null) {
       }
       case 'statistics':return require('./statistics.cjs').statistics(db,request);
       case 'focus_game':{const game=db.prepare('SELECT executable FROM games WHERE id=? AND removed_at IS NULL').get(String(request.id));if(!game)throw Error('GAME_NOT_FOUND');return {status:await require('./game-process.cjs').gameProcess(root,game.executable,{focus:true})};}
+      case 'owner_test_status':return require('../core/owner-tests.cjs').status(root);
       case 'launch_progress':return launchProgress.get(String(request.id))||{p:0,state:'idle',next:.08};
       case 'launch':return await launch(db,String(request.id),runtime,request.windowsLaunch===true);
       /* E-DRM: the words for a DRM launch failure (which program, which licence check, what to choose instead) */

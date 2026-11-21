@@ -15,7 +15,7 @@ const W=require('./text-paths-web.cjs'),U=require('./text-paths-unity.cjs');
 
 function unityPack(root){const dir=path.join(root,'runtime','unity-text');try{return require('node:fs').existsSync(path.join(dir,'MeguLitUnityText.dll'))?dir:null;}catch{return null;}}
 
-async function prepare({root,exe,profile={},title='',enabled=false,shadowRoot=null,trace=()=>{}}){
+async function prepare({root,exe,profile={},title='',enabled=false,ownerTestGrant=null,shadowRoot=null,trace=()=>{}}){
  if(!enabled||!exe||require('./library-mode.cjs').libraryOnly(root))return null;
  const canary=new Canary(root,exe);const off=canary.settle();if(Object.keys(off||{}).length)trace('text-paths-canary',{off:Object.keys(off)});
  const steam=require('./steam-owned.cjs').launchAppid(exe,profile)||null; /* E-SteamOwned */
@@ -38,6 +38,7 @@ async function prepare({root,exe,profile={},title='',enabled=false,shadowRoot=nu
   const session=new U.UnityTextPath({canary});const port=await session.listen();
   if(require('./library-mode.cjs').libraryOnly(root)){session.stop();return null;}
   let sh;try{sh=U.makeShadow({exe,shadowRoot:shadowRoot||path.join(root,'data','unity-shadow'),pack,port,steamAppId:steam});}catch(e){session.stop();trace('text-paths-unity-skipped',{error:e.message});return null;}
+  if(ownerTestGrant&&!await require('./owner-tests.cjs').registerLaunch(ownerTestGrant,{exe:sh.exe,engine:'unity'})){await session.stop();trace('owner-test-shadow-refused');return null;}
   trace('text-paths-unity',{shadow:sh.shadow,links:sh.links,copies:sh.copies,junctions:sh.junctions});
   return {path:'unity',exe:sh.exe,args:[],env:steamEnv,cwd:sh.shadow,session,connect:async()=>true};
  }

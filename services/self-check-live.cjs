@@ -41,7 +41,7 @@ function inputOf(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe
     still say read); a gate step-down always is */
  const seedOk=['verified','owner-ok'].includes(s.profile?.seedStatus);
  if(st&&st.settings){if(st.source==='gate')out.stepDown=st.settings;else if(!seedOk)out.auto=st.settings;}return out;}
-function applyLayer(s){try{const p=Profiles.profileFor(inputOf(s));s.profile=p;/* Cardinal's tape keeps the lines this game's rules replay */require('../core/cardinal/tape.cjs').keep(p.cardinal?.lines);s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
+function applyLayer(s){try{const p=require('../core/owner-tests.cjs').apply(Profiles.profileFor(inputOf(s)),s.reader.gal?.hooks?.ownerTestGrant,{exe:s.exe,engine:s.profile?.engine});s.profile=p;/* Cardinal's tape keeps the lines this game's rules replay */require('../core/cardinal/tape.cjs').keep(p.cardinal?.lines);s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
 /* which layer wins (see above) */
 function choose(s){const st=s.stored,sh=feed.forExe(s.shared,s.key,s.input?.exe||s.exe);
  if(st&&st.source==='gate')return {from:'local-gate',mode:'read',settings:st.settings,reason:st.reason||''};

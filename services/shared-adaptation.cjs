@@ -85,7 +85,7 @@ const empty=r=>!r||!r.hook.stream&&!r.hook.embed&&!r.layout.box&&!r.layout.scan&
 function read(root){const v=readJSON(storeFile(root));return {version:1,records:v.records&&typeof v.records==='object'?v.records:{},applied:v.applied&&typeof v.applied==='object'?v.applied:{},notice:v.notice&&typeof v.notice==='object'?v.notice:{}};}
 function write(root,doc){atomic(storeFile(root),doc);}
 /* The user's switch (Settings → 游戏库 → 共享适配数据（匿名）); on unless turned off. */
-function enabled(root){return readJSON(path.join(root,'data','config','library.json')).sharedAdaptation!==false;}
+function enabled(root){if(require('../core/owner-tests.cjs').privateMode(root))return false;return readJSON(path.join(root,'data','config','library.json')).sharedAdaptation!==false;}
 /* Keeps this PC's record for the game. A remote record never replaces a local one. */
 function save(root,record,origin='local'){
  const r=clean(record);if(!r||empty(r))return null;const doc=read(root),old=doc.records[r.key];

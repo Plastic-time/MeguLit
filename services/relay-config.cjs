@@ -44,6 +44,7 @@ function maybeRace(env){
  raceAt=Date.now();racing=raceDefault().catch(()=>null).finally(()=>{racing=null;});
 }
 function relayBase(root,env=process.env){
+ if(require('../core/owner-tests.cjs').privateMode(root,env))return '';
  const off=String(env.MEGULIT_RELAY_BASE||'').trim().toLowerCase()==='off';
  const fromEnv=normalizeBase(env.MEGULIT_RELAY_BASE||'');if(fromEnv)return fromEnv;
  const saved=root?normalizeBase(readJSON(onlineFile(root)).relayUrl||''):'';if(saved)return saved;

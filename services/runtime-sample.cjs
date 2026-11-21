@@ -28,7 +28,7 @@ function shotPolicy(verdict){if(!verdict||typeof verdict!=='object')return 'none
  if(Number.isFinite(m.pairRate)&&Number.isFinite(t.pairRate)&&m.pairRate<t.pairRate+0.05)return 'edge';return 'pass';}
 function readLib(root){try{return JSON.parse(fs.readFileSync(path.join(root,'data','config','library.json'),'utf8'))||{};}catch{return {};}}
 /* the player's switch (on by default, off when set to false) */
-const enabled=root=>readLib(root).runtimeSampleShare!==false;
+const enabled=root=>!require('../core/owner-tests.cjs').privateMode(root)&&readLib(root).runtimeSampleShare!==false;
 function setEnabled(root,on){const f=path.join(root,'data','config','library.json');fs.mkdirSync(path.dirname(f),{recursive:true});const tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify({...readLib(root),runtimeSampleShare:on===true},null,2));fs.renameSync(tmp,f);return enabled(root);}
 const dirFor=(root,executable)=>{const key=auto.exeKeySync(root,executable);return key?path.join(root,'data','runtime-samples',key):'';};
 const keyDir=(root,key)=>path.join(root,'data','runtime-samples',key);

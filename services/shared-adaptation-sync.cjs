@@ -23,6 +23,7 @@ function readJSON(file){try{return JSON.parse(fs.readFileSync(file,'utf8'))||{};
 function endpointOf(value){if(typeof value!=='string'||!value.trim())return '';let url;try{url=new URL(value.trim());}catch{return '';}
  const local=['127.0.0.1','localhost','[::1]'].includes(url.hostname);if(url.username||url.password||url.search||url.hash||!(url.protocol==='https:'||url.protocol==='http:'&&local))return '';return url.href.replace(/\/+$/,'');}
 function config(root,options={}){
+ if(require('../core/owner-tests.cjs').privateMode(root))return {enabled:false,endpoint:''};
  const lib=root?readJSON(path.join(root,'data','config','library.json')):{};
  const enabled=options.enabled??(lib.sharedAdaptation!==false);
  const endpoint=endpointOf(options.endpoint??process.env.MEGULIT_ADAPTATION_ENDPOINT??lib.sharedAdaptationEndpoint??'');
