@@ -79,7 +79,7 @@ const vol3d=v=>{const t=new THREE.Data3DTexture(v.data,...v.dims);t.format=THREE
  t.wrapS=t.wrapT=t.wrapR=THREE.ClampToEdgeWrapping;t.unpackAlignment=1;t.needsUpdate=true;return t;};
 export function applyAO(scene,vols){const ao=vol3d(vols.ao),torch=vol3d(vols.torch),mn=vols.ao.box.min,mx=vols.ao.box.max;
  const uni={uAoVol:{value:ao},uTorchVol:{value:torch},uAoMin:{value:new THREE.Vector3(...mn)},uAoSize:{value:new THREE.Vector3(mx[0]-mn[0],mx[1]-mn[1],mx[2]-mn[2])},uAoStrength:{value:1},
-  uTorchColor:{value:new THREE.Color(0xff9445)},uTorchLevel:{value:0}};
+  uTorchColor:{value:new THREE.Color(0xa68ae8)},uTorchLevel:{value:0}};
  const done=new Set();scene.traverse(o=>{const m=o.material;if(!m||Array.isArray(m)||!m.isMeshStandardMaterial||done.has(m))return;done.add(m);patch(m,uni);});
  return {textures:[ao,torch],uniforms:uni};}
 function patch(m,uni){m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,uni);

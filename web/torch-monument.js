@@ -332,16 +332,22 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
 
  /* ---- dust drifting in the bay; brighter in daylight and by torchlight ---- */
  let dust=null;
- function makeDust(n){const pos=new Float32Array(n*3),seed=new Float32Array(n),lit=new Float32Array(n),r=rng(91);
-  for(let i=0;i<n;i++){const p=new THREE.Vector3((r()-.5)*HALL.HX*1.9,.3+r()*13,HALL.BACK+.5+r()*(i<n*.7?18:34));lit[i]=.4+r()*.6;
-   pos[i*3]=p.x;pos[i*3+1]=p.y;pos[i*3+2]=p.z;seed[i]=r();}
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('aSeed',new THREE.BufferAttribute(seed,1));g.setAttribute('aLit',new THREE.BufferAttribute(lit,1));
-  const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,uniforms:{uTime:{value:0},uScale:{value:1},uSpeed:{value:reduced?.25:1},uBright:{value:.5}},
-   vertexShader:`uniform float uTime;uniform float uScale;uniform float uSpeed;uniform float uBright;attribute float aSeed;attribute float aLit;varying float vA;
-    void main(){vec3 p=position;float t=uTime*uSpeed;p.x+=sin(t*.11+aSeed*40.)*.35;p.y+=sin(t*.07+aSeed*17.)*.45-mod(t*.03+aSeed*3.,1.)*.25;p.z+=cos(t*.09+aSeed*29.)*.35;
-     vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;float tw=.55+.45*sin(t*(.6+aSeed)+aSeed*60.);
-     vA=aLit*uBright*tw*smoothstep(28.,6.,-mv.z)*smoothstep(1.2,4.5,-mv.z);gl_PointSize=uScale*(.8+aSeed*1.6)*(8./-mv.z);}`,
-   fragmentShader:`varying float vA;void main(){vec2 c=gl_PointCoord-.5;float d=length(c);if(d>.5)discard;float a=smoothstep(.5,0.,d)*vA*.5;gl_FragColor=vec4(vec3(1.,.94,.88)*a,a);}`});
+ /* motes in the air: tiny and dim, but where the sun or the moon reaches them (their own lookup in its shadow map) they light up in
+    its colour, so a moonbeam through the drum fills with drifting specks */
+ function makeDust(n){const pos=new Float32Array(n*3),seed=new Float32Array(n),r=rng(91);
+  for(let i=0;i<n;i++){pos[i*3]=(r()-.5)*HALL.HX*1.9;pos[i*3+1]=.2+Math.pow(r(),1.4)*22;pos[i*3+2]=HALL.BACK+.5+r()*(i<n*.75?18:34);seed[i]=r();}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('aSeed',new THREE.BufferAttribute(seed,1));
+  const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,
+   uniforms:{uTime:{value:0},uScale:{value:1},uSpeed:{value:reduced?.25:1},uBase:{value:.08},uLit:{value:0},uLight:{value:new THREE.Color(1,1,1)},uWarm:{value:new THREE.Color(0xc8b8f0)},
+    tShadow:{value:null},shadowMatrix:{value:new THREE.Matrix4()},uHasShadow:{value:0}},
+   vertexShader:`#include <packing>
+    uniform float uTime;uniform float uScale;uniform float uSpeed;uniform float uBase;uniform float uLit;uniform vec3 uLight;uniform vec3 uWarm;uniform sampler2D tShadow;uniform mat4 shadowMatrix;uniform float uHasShadow;
+    attribute float aSeed;varying vec3 vC;
+    void main(){vec3 p=position;float t=uTime*uSpeed;p.x+=sin(t*.09+aSeed*40.)*.4;p.y+=sin(t*.06+aSeed*17.)*.5;p.z+=cos(t*.08+aSeed*29.)*.4;
+     float lit=0.;if(uHasShadow>.5){vec4 sc=shadowMatrix*vec4(p,1.);if(sc.x>0.&&sc.x<1.&&sc.y>0.&&sc.y<1.&&sc.z<1.)lit=step(sc.z-.0015,unpackRGBAToDepth(texture2D(tShadow,sc.xy)));}
+     vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;float tw=.6+.4*sin(t*(.5+aSeed)+aSeed*60.);float fade=smoothstep(34.,6.,-mv.z)*smoothstep(.8,3.,-mv.z);
+     vC=(uWarm*uBase+uLight*lit*uLit)*tw*fade;gl_PointSize=uScale*(.55+aSeed*.9+lit*.5)*(7./-mv.z);}`,
+   fragmentShader:`varying vec3 vC;void main(){vec2 c=gl_PointCoord-.5;float d=length(c);if(d>.5)discard;float a=smoothstep(.5,0.,d);gl_FragColor=vec4(vC*a,a*max(vC.r,max(vC.g,vC.b)));}`});
   keep(g);keep(m);const p=new THREE.Points(g,m);p.renderOrder=4;p.frustumCulled=false;return p;}
 
  /* ---- renderer & tiers ---- */
@@ -366,7 +372,7 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
    floorMat.transparent=true;floorMat.opacity=.66;floorMat.depthWrite=true;H.inlayMat.transparent=true;H.inlayMat.opacity=.82;}
   else{floorMat.transparent=false;floorMat.opacity=1;H.inlayMat.transparent=false;H.inlayMat.opacity=1;}
   floorMat.needsUpdate=true;H.inlayMat.needsUpdate=true;
-  if(dust){scene.remove(dust);dust.geometry.dispose();dust.material.dispose();}dust=makeDust(low?700:2600);scene.add(dust);
+  if(dust){scene.remove(dust);dust.geometry.dispose();dust.material.dispose();}dust=makeDust(low?1200:4200);scene.add(dust);
   if(composer){composer.passes.forEach(p=>p.dispose?.());composer.dispose();composer=null;bloom=null;grade=null;vol=null;}
   /* both tiers go through the composer: the scene (MSAA on the full tier), light in the air, then bloom and grading on the full tier */
   { const size=renderer.getDrawingBufferSize(new THREE.Vector2());
@@ -424,7 +430,9 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
  function frame(now){raf=0;if(!active)return;const dt=Math.min(.1,(now-last)/1000);last=now;
   if(tier==='low'&&now-(frame.lastDraw||0)<31){raf=requestAnimationFrame(frame);return;}frame.lastDraw=now;
   const time=now/1000;H.update(time,dt,renderer);if(H.shadowDirty())renderer.shadowMap.needsUpdate=true;if(aoUni)aoUni.uTorchLevel.value=H.state.torch*(H.state.flicker||1);if(vol)vol.strength=H.state.beam*(H.state.moon?.8:1);const day=Math.min(1,H.state.skyI/1.1);scene.environmentIntensity=.2+.8*day;
-  if(dust){dust.material.uniforms.uTime.value=time;dust.material.uniforms.uBright.value=Math.max(.12,day*H.state.beam*.9,H.state.torch*.45);}if(grade)grade.uniforms.uTime.value=time%97;
+  if(dust){const u=dust.material.uniforms,L=H.sun;u.uTime.value=time;u.uBase.value=.05+H.state.torch*.06;
+   u.uHasShadow.value=L.castShadow&&L.shadow.map?1:0;if(L.shadow.map){u.tShadow.value=L.shadow.map.texture;u.shadowMatrix.value.copy(L.shadow.matrix);}
+   u.uLight.value.copy(L.color);u.uLit.value=Math.min(1.6,L.intensity*(H.state.moon?1.25:.45));}if(grade)grade.uniforms.uTime.value=time%97;
   if(glow.userData.on){const p=(now-glow.userData.t0)/1000;const o=Math.min(1,p/1.2)*(.42+.1*Math.sin(p*1.6));glow.material.opacity=o;glowLight.intensity=o*2.2;}else{glow.material.opacity*=.9;glowLight.intensity*=.9;}
   updateCamera(dt);draw();
   /* slow frames on the full tier for ~3 s after the intro: switch to the light tier (only in auto mode) */
