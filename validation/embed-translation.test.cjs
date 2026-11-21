@@ -37,7 +37,7 @@ test('the reader translates a held line once and shares it with the page',async(
  const src=fs.readFileSync(path.join(__dirname,'..','services','reader.cjs'),'utf8');
  assert.match(src,/if\(message\.type==='hookEmbedRequest'\)\{this\.embedTranslate\(message\.id,message\.text\);return;\}/);
  assert.match(src,/this\.gal\?\.hooks\?\.embedReply\(id,hide\?'':trans,/);
- assert.match(src,/\{const cached=this\.embedCached\(text\);if\(cached\)return cached;\}/);
+ assert.match(src,/\{const cached=this\.embedCached\(text,undefined,\{language:cacheLanguage\}\);if\(cached\)return cached;\}/);
 });
 
 test('the native bridge holds the line, answers with the translation, and lets the original through on timeout',()=>{

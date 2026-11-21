@@ -213,7 +213,10 @@
   }
   /* 2026-11-21: a page line was first seen at the next 300 ms scan, so its 600 ms check came at 0.9 to 1.2 s; the scan is every 100 ms and also runs when a line is shown */
   (window.__megulitReaderIntervals?.set||setInterval)(pageGuard, 100);
-  bridge.deliverBackfill = (source, text, kind = '') => {
+  bridge.translationTarget = () => /^(english|bilingual-en)$/.test(bridge.galPreferences?.().display || '') || bridge.options?.().learnerLanguage === 'en' ? 'en' : 'zh';
+  bridge.acceptTranslationTarget = context => !context || context.target === bridge.translationTarget();
+  bridge.deliverBackfill = (source, text, kind = '', context = null) => {
+    if (!bridge.acceptTranslationTarget(context)) return;
     if (!enabled || !translationVisible || !String(text || '').trim()) return;
     const shown = bridge.sourceText || bridge.current;
     if (!sameLine(shown, source)) { window.__tomoyoChinese?.pageTranslationFill?.(source, text); return; }
@@ -224,7 +227,8 @@
     output.dataset.state = 'ready';
     bridge.lastTranslationError = ''; setText(text, false, true); bridge.alignText?.();
   };
-  bridge.deliver = (id, text, error, message = '') => {
+  bridge.deliver = (id, text, error, message = '', context = null) => {
+    if (!bridge.acceptTranslationTarget(context)) return;
     if(bridge.deliverPageTranslation?.(id,text,error,message))return;
     if (id !== bridge.serial || !enabled || !translationVisible || !output?.isConnected) return;
     if ((error || !String(text || '').trim()) && bridge.growingId === id && output.textContent) {

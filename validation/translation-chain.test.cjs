@@ -51,7 +51,12 @@ test('reader.translate: script translation first, else the chain; a total failur
  const fill=events.find(e=>e.method==='deliverBackfill');assert.deepEqual(fill.args.slice(0,2),['私(あるいはこれを読むあなた)は世界に属さない。',mt],'filled in on screen');
  assert.deepEqual(stats.at(-1),['game-1','私(あるいはこれを読むあなた)は世界に属さない。',mt],'and in the dialogue log (as a machine translation)');
  assert.equal(cache.get('私(あるいはこれを読むあなた)は世界に属さない。'),mt);
- assert.match(fs.readFileSync(path.join(__dirname,'../web/reader/modules/inject.js'),'utf8'),/bridge\.deliverBackfill = \(source, text(?:, kind = '')?\) => \{/);
+ assert.match(fs.readFileSync(path.join(__dirname,'../web/reader/modules/inject.js'),'utf8'),/bridge\.deliverBackfill = \(source, text, kind = '', context = null\) => \{/);
+});
+
+test('retry deduplication keeps independent target languages for the same source',async()=>{
+ const queue=[],fills=[],R=new chain.Retries(async(t,c)=>({text:c.options.learnerLanguage+' answer'}),(t,r,c)=>fills.push([r.text,c.options.learnerLanguage]),{timers:{set:f=>{queue.push(f);},clear(){}}});
+ R.add('同じ本文',{options:{learnerLanguage:'zh'}});R.add('同じ本文',{options:{learnerLanguage:'en'}});R.add('同じ 本文',{options:{learnerLanguage:'en'}});assert.equal(R.size,2);await queue.shift()();await queue.shift()();assert.deepEqual(fills,[['zh answer','zh'],['en answer','en']]);assert.equal(R.size,0);
 });
 
 test('a LOG line far back does not cost the story lines after it their translation (the scene is twice in the script)',()=>{
