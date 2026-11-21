@@ -19,7 +19,7 @@ function startService(root){const child=spawn(process.execPath,[path.join(ROOT,'
  const call=(request,ms=20000)=>new Promise((res,rej)=>{if(closed)return rej(closed);const id=next++;child.stdin.write(JSON.stringify({id,request})+'\n');
   const timer=setTimeout(()=>{if(waits.delete(id))rej(Error('SERVICE_TIMEOUT'));},ms);
   waits.set(id,{resolve:res,reject:rej,timer});});
- return {call,stop:async()=>{if(closed)return;await call({action:'__shutdown'},5000).catch(()=>{});finish(Error('SERVICE_CLOSED'));child.kill();}};}
+ return {call,stop:async()=>{if(!closed){await call({action:'__shutdown'},5000).catch(()=>{});finish(Error('SERVICE_CLOSED'));}child.kill();}};}
 
 /* ---------- static server + test transport ---------- */
 const TRANSPORT=`<script>(()=>{const S=JSON.parse(decodeURIComponent((location.hash.slice(1))||'%7B%7D'));const svg=c=>'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080"><rect width="100%" height="100%" fill="'+c+'"/></svg>');
