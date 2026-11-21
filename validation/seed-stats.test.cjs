@@ -86,3 +86,17 @@ test('THE SEED: GraphQL refused → tree counts still shown, the error reaches t
  const ENV2=env({fetch:async()=>new Response('x',{status:500}),GITHUB_TOKEN:'t'});assert.equal(await refreshSeedStatsSafe(ENV2,new Date()),null);
  assert.match((await seedSummary(ENV2)).errors.github,/tree HTTP 500/);
 });
+
+test('GET /api/seed/stats: public aggregate for the App about page, open CORS, edge cached once counted',async()=>{
+ const gh=fakeGitHub([{status:'verified',versions:['a']},{status:'owner-ok'},{status:'read',versions:['b']},{status:'skeleton'}]);
+ const ENV=env({fetch:gh.fetch,GITHUB_TOKEN:'t'});const {handle}=await mod('worker.js');const tasks=[];
+ const get=()=>handle(new Request('https://relay.test/api/seed/stats'),ENV,new Date(),{waitUntil:p=>tasks.push(p)});
+ let r=await get();assert.equal(r.status,200);assert.equal(r.headers.get('access-control-allow-origin'),'*');assert.equal(r.headers.get('cache-control'),'no-store','not counted yet: not cached');
+ let j=await r.json();assert.deepEqual(j,{ok:true,games:0,versions:0,confirmed:0,waiting:0,updatedAt:0});
+ await Promise.all(tasks);assert.equal(gh.calls.tree,1,'first call counted in the background');
+ r=await get();j=await r.json();
+ assert.deepEqual(Object.keys(j).sort(),['confirmed','games','ok','updatedAt','versions','waiting']);
+ assert.equal(j.games,4);assert.equal(j.versions,2);assert.equal(j.confirmed,2);assert.equal(j.waiting,2);assert.ok(j.updatedAt>0);
+ assert.match(r.headers.get('cache-control'),/max-age=300/);
+ assert.equal((await handle(new Request('https://relay.test/api/seed/stats',{method:'POST'}),ENV,new Date(),{waitUntil:()=>{}})).status,404,'read only');
+});

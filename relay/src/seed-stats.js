@@ -66,3 +66,16 @@ export async function seedSummary(env){
   out.sources.push({source:String(r.source),games:d.games,versions:d.versions,at:r.at|0});out.at=Math.max(out.at,r.at|0);}
  out.confirmed=out.status.verified+out.status['owner-ok'];out.waiting=out.status.read+out.status.skeleton;
  return out;}
+
+/* 2026-11-21 GET /api/seed/stats: the App's about page line (已种下 N 部游戏、M 个版本) live. Public, read-only, aggregate:
+   {ok,games,versions,confirmed,waiting,updatedAt}. Open CORS (WebView origins vary), 5 min at the edge and in the
+   Cache API, so many apps cost one D1 read per colo per 5 min. Empty table → background count, zeros + updatedAt 0. */
+export async function seedStatsGet(env,{json,fail},ctx=null,now=new Date()){
+ if(!env.DB)return fail('NOT_CONFIGURED',503);
+ const c=globalThis.caches?.default,key='https://megulit-relay.internal/seed/public-v1';
+ let body=null;if(c){try{const hit=await c.match(key);if(hit)body=await hit.json();}catch{}}
+ if(!body){let s;try{s=await seedSummary(env);}catch{return fail('UNAVAILABLE',503);}
+  body={ok:true,games:s.games,versions:s.versions,confirmed:s.confirmed,waiting:s.waiting,updatedAt:s.at};
+  if(!s.sources.length){if(ctx?.waitUntil)ctx.waitUntil(refreshSeedStatsSafe(env,now));}
+  else if(c){try{await c.put(key,new Response(JSON.stringify(body),{headers:{'content-type':'application/json','cache-control':'max-age=300'}}));}catch{}}}
+ return json(body,200,{'access-control-allow-origin':'*','cache-control':body.updatedAt?'public, max-age=300':'no-store'});}

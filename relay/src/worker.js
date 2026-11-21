@@ -6,7 +6,7 @@
 import {cleanupProbeFull} from './probe-full.js';
 import {pulse,probeStats,cleanupProbeStats} from './probe-stats.js';
 import {DASHBOARD_HTML} from './dashboard.js';
-import {refreshSeedStatsSafe} from './seed-stats.js';
+import {refreshSeedStatsSafe,seedStatsGet} from './seed-stats.js';
 import {LIMITS,validateLeaderboard,validateBoardQuery,validateAdaptationRecord,validateKeys,validateMeta,issueBody,validateHot,INSTALL_ID,HEX64} from './validate.js';
 /* E379 accounts (relay/ACCOUNTS.md) and community features (avatars, hot words) */
 import {handleAccounts,isAccountsPath,authenticate,ROTATED} from './accounts.js';
@@ -295,6 +295,7 @@ export async function handle(request,env,now=new Date(),ctx=null){
   /* 2026-11-15 adaptation contribution packages, consented in the app (relay/src/contrib.js) */
   else if(path.startsWith('/api/contrib/'))response=await contribRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else if((path==='/dashboard'||path==='/probe/dashboard')&&request.method==='GET')response=new Response(DASHBOARD_HTML,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'public, max-age=60','x-content-type-options':'nosniff'}});
+  else if(path==='/api/seed/stats'&&request.method==='GET')response=await seedStatsGet(env,{json,fail},ctx,now);
   else if(path==='/api/probe/stats'&&request.method==='GET')response=await probeStats(env,now,{json,fail},ctx);
   else if(path.startsWith('/api/adapters/')||path==='/api/probe'||path.startsWith('/api/probe/'))response=await adaptersRoute(request,env,ip,now,url,path,{json,fail,hit,readJSON})||fail('NOT_FOUND',404);
   else response=fail('NOT_FOUND',404);
