@@ -15,28 +15,37 @@ static void *Original=nullptr;
 static uintptr_t Image=0,ImageEnd=0,DrawAt=0;
 static int BuildIndex=-1;
 static bool VersionPinned=false;
-static volatile LONG Armed=0,Installed=0,Observing=0,Blocked=0,Run=0;
+static volatile LONG Armed=0,Installed=0,Permission=0,Blocked=0,Run=0;
+static INIT_ONCE ControlOnce=INIT_ONCE_STATIC_INIT;
+static CRITICAL_SECTION ControlLock;
+static ULONG ControlRequest=0;
 static __declspec(thread) bool InObserver=false;
 static const DWORD ObserverMxcsr=0x1f80;
 static const int MaxText=32768,ChunkBytes=128;
 struct Snapshot{DWORD build,self,caller,arg;int bytes;char text[MaxText+1];};
+static LONG Ticket(){return InterlockedCompareExchange(&Permission,0,0);}
+static bool Allowed(LONG ticket){return (ticket&1)&&Ticket()==ticket;}
+static void SetPermission(bool on){for(;;){LONG old=Ticket();if(((old&1)!=0)==on)return;if(InterlockedCompareExchange(&Permission,(LONG)((ULONG)old+1),old)==old)return;}}
 static bool Capture(DWORD self,const DWORD *stack,Snapshot *out){
  __try{if(BuildIndex<0||BuildIndex>=2||!stack||!out)return false;out->build=BuildIndex;out->self=self;out->caller=stack[0];out->arg=stack[1];
   const char *text=(const char *)out->arg;if(!text)return false;
   int n=0;while(n<MaxText&&text[n]){out->text[n]=text[n];n++;}if(n==MaxText&&text[n])return false;out->text[n]=0;out->bytes=n;return true;
  }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
 }
-static void EmitSnapshot(const Snapshot &s){
- try{LONG run=InterlockedIncrement(&Run);DWORD via=s.caller>=Image&&s.caller<ImageEnd?s.caller-(DWORD)Image:0;
-  Msg::Log("ToMe_FVP_INPUT begin run=%lu event=append build=%lu entry=%lx via=%lx this=%lx words=1 bytes=%d arg=%lx",(unsigned long)run,(unsigned long)s.build,(unsigned long)FvpDrawSig::Builds[s.build].rva,(unsigned long)via,(unsigned long)s.self,s.bytes,(unsigned long)s.arg);
-  for(int offset=0;offset<s.bytes;offset+=ChunkBytes){char hex[ChunkBytes*2+1];int n=s.bytes-offset;if(n>ChunkBytes)n=ChunkBytes;const char digits[]="0123456789abcdef";for(int j=0;j<n;j++){unsigned b=(unsigned char)s.text[offset+j];hex[j*2]=digits[b>>4];hex[j*2+1]=digits[b&15];}hex[n*2]=0;
-   Msg::Log("ToMe_FVP_INPUT data run=%lu offset=%d hex=%s",(unsigned long)run,offset,hex);}
-  Msg::Log("ToMe_FVP_INPUT end run=%lu bytes=%d",(unsigned long)run,s.bytes);
+static void EmitSnapshot(const Snapshot &s,LONG ticket){
+ try{if(!Allowed(ticket))return;LONG run=InterlockedIncrement(&Run);DWORD via=s.caller>=Image&&s.caller<ImageEnd?s.caller-(DWORD)Image:0;
+  Msg::Log("ToMe_FVP_INPUT begin run=%lu event=append build=%lu entry=%lx via=%lx this=%lx words=1 bytes=%d arg=%lx epoch=%lu",(unsigned long)run,(unsigned long)s.build,(unsigned long)FvpDrawSig::Builds[s.build].rva,(unsigned long)via,(unsigned long)s.self,s.bytes,(unsigned long)s.arg,(unsigned long)ticket);
+  for(int offset=0;offset<s.bytes;offset+=ChunkBytes){if(!Allowed(ticket))return;char hex[ChunkBytes*2+1];int n=s.bytes-offset;if(n>ChunkBytes)n=ChunkBytes;const char digits[]="0123456789abcdef";for(int j=0;j<n;j++){unsigned b=(unsigned char)s.text[offset+j];hex[j*2]=digits[b>>4];hex[j*2+1]=digits[b&15];}hex[n*2]=0;
+   Msg::Log("ToMe_FVP_INPUT data run=%lu offset=%d epoch=%lu hex=%s",(unsigned long)run,offset,(unsigned long)ticket,hex);}
+  if(Allowed(ticket))Msg::Log("ToMe_FVP_INPUT end run=%lu bytes=%d epoch=%lu",(unsigned long)run,s.bytes,(unsigned long)ticket);
  }catch(...){}
 }
+static void ObserveSafe(DWORD self,const DWORD *stack,LONG ticket){
+ __try{Snapshot s;if(Capture(self,stack,&s)&&Allowed(ticket))EmitSnapshot(s,ticket);}__except(EXCEPTION_EXECUTE_HANDLER){}
+}
 static void Observe(DWORD self,const DWORD *stack){
- if(!InterlockedCompareExchange(&Observing,0,0)||InObserver)return;InObserver=true;
- __try{Snapshot s;if(Capture(self,stack,&s))EmitSnapshot(s);}__except(EXCEPTION_EXECUTE_HANDLER){}InObserver=false;
+ LONG ticket=Ticket();if(!(ticket&1)||InObserver)return;InObserver=true;
+ __try{ObserveSafe(self,stack,ticket);}__finally{InObserver=false;}
 }
 // ECX is this and arg1 is consumed with ret 4. Copy before the original reuses its arg slot.
 static __declspec(naked) void Gate(){__asm{
@@ -106,16 +115,26 @@ static bool DiagnosticAsked(){
 }
 static bool Install(){
  if(Installed)return true;if(Blocked||!VersionPinned||BuildIndex<0||BuildIndex>=2||!DrawAt)return false;
- if(MH_CreateHook((void *)DrawAt,(void *)&Gate,&Original)!=MH_OK)return false;
+ if(MH_CreateHook((void *)DrawAt,(void *)&Gate,&Original)!=MH_OK){SetPermission(false);InterlockedExchange(&Blocked,1);return false;}
  if(MH_EnableHook((void *)DrawAt)!=MH_OK){
-  InterlockedExchange(&Observing,0);InterlockedExchange(&Blocked,1);
+  SetPermission(false);InterlockedExchange(&Blocked,1);
   // Keep the trampoline if an enable error raced with an in-flight pass-through gate.
   MH_DisableHook((void *)DrawAt);return false;
  }
  InterlockedExchange(&Installed,1);Msg::Log("ToMe_FVP_INPUT on build=%d diagnostic=1 event=append",BuildIndex);return true;
 }
-static void RefreshControl(){if(DiagnosticAsked()){if(Install())InterlockedExchange(&Observing,1);}else InterlockedExchange(&Observing,0);}
-static DWORD WINAPI Watch(void *stop){for(;;){RefreshControl();if(stop){if(WaitForSingleObject((HANDLE)stop,2000)==WAIT_OBJECT_0)return 0;}else Sleep(2000);}}
+static BOOL CALLBACK InitControl(PINIT_ONCE,PVOID,PVOID *){return InitializeCriticalSectionAndSpinCount(&ControlLock,0);}
+static void RefreshWork(ULONG request){
+ try{bool on=DiagnosticAsked()&&Install();if(request==ControlRequest)SetPermission(on);}
+ catch(...){if(request==ControlRequest)SetPermission(false);}
+}
+static void RefreshControl(){
+ if(!InitOnceExecuteOnce(&ControlOnce,InitControl,nullptr,nullptr)){SetPermission(false);return;}
+ EnterCriticalSection(&ControlLock);ULONG request=++ControlRequest;
+ __try{__try{RefreshWork(request);}__except(EXCEPTION_EXECUTE_HANDLER){if(request==ControlRequest)SetPermission(false);}}
+ __finally{LeaveCriticalSection(&ControlLock);}
+}
+static DWORD WINAPI Watch(void *stop){for(;;){RefreshControl();if(stop){if(WaitForSingleObject((HANDLE)stop,2000)==WAIT_OBJECT_0){SetPermission(false);return 0;}}else Sleep(2000);}}
 static void Arm(){if(InterlockedExchange(&Armed,1))return;__try{if(!FindInImage((uintptr_t)GetModuleHandleA(nullptr)))return;}__except(EXCEPTION_EXECUTE_HANDLER){return;}HANDLE thread=CreateThread(nullptr,0,Watch,nullptr,0,nullptr);if(thread)CloseHandle(thread);}
 }
 #else

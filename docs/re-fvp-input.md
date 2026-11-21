@@ -23,15 +23,20 @@
 两个版本各自只有一个输入入口，不要求在同一个模块里找到两个版本的入口
 运行时先检查文件长度与完整 SHA，再验证内存 PE 头、节界限、签名全镜像唯一和该版本预期 RVA
 文件缺失、读取失败、长度异常、错 SHA、缺失/重复签名、错误 RVA 均不安装
-Enable 失败会关闭观察、保留可能在途调用需要的 trampoline，并禁止再次安装，原函数继续 pass-through
+Create 或 Enable 失败都会关闭观察并禁止再次安装，保留可能在途调用需要的 trampoline，原函数继续 pass-through
+控制刷新使用 FVP 独立的递归锁与请求序号；安装日志回调里再次撤权时，外层旧授权不能覆盖更新的请求
+该锁不进入输入观察器或原函数，安装日志的 C++ / SEH 异常关闭观察并释放控制锁
 
 控制授权只读取首条完整 `#cfg` 行，要求 UTF-16LE（可选 BOM）且该行每个字符为可打印 ASCII、`fvpInput=1` 键唯一且值精确匹配
 正文子串、后续 cfg 行、重复键、截断无换行、不可读或缺失文件、非 ASCII 宽字符、UTF-16BE 与 raw ASCII 都不能授权
 不兼容 raw ASCII 是有意的：某些非 ASCII UTF-16 码元拼接后的原始字节与合法 ASCII 控制行完全相同，接受二者会重新引入畸形宽字符授权缺口；现有 transport 使用 UTF-16LE
 
-watcher 最多每两秒重新读取权限；撤销后尚未进入的调用不再诊断，但已经进入的快照可能继续输出到 end
-原生回归在 begin 日志回调中撤销权限，确认该快照仍可能完成、下一次调用无日志
-因此当前控制没有等待 in-flight observer 结束的关闭确认，不能把删除开关或 `Observing=0` 当作该确认
+watcher 每两秒尝试重新读取权限；每次实际 on/off 转换改变原子权限票据，快照在复制后、每个分块和 end 前复核同一票据
+begin 或 data 日志回调里 off-on 会使旧快照失效，不能借重新打开的权限继续输出旧 data/end，新的输入使用新代次
+日志带有 `epoch`；缺少 end 的部分块不应当作完整输入，读取方也不能将不同 run/epoch 拼接成完整文本
+已进入 logger 的那一条仍可能完成，检查与调用 logger 之间也没有同步撤权屏障；阻塞 logger 或安装工作会延长实际刷新时间
+控制没有等待 in-flight observer 结束的关闭确认，不能把删除开关或偶数权限票据当作该确认
+测试用 watcher 停止事件会先撤权再退出；生产 watcher 仍随进程存续，不新增产品关闭入口
 
 ## 实字节 ABI 与输入语义
 
@@ -50,6 +55,7 @@ watcher 最多每两秒重新读取权限；撤销后尚未进入的调用不再
 original 自己的返回值和 `ret 4` 语义不由诊断替代
 小型真 MinHook fixture 让 original 覆盖参数槽、返回不透明 EAX，logger 改写 volatile GPR、flags、临时栈、XMM0/XMM7 和 x87
 检查原函数看到的 ECX/参数/GPR/flags、返回后的寄存器、ESP、XMM 和 x87；同时覆盖空串、长串、边界 NUL、不可读/半可读地址、异常、真正递归 detour、off-on 和安装失败
+原生回归包含先破坏 XMM0/XMM7、x87/CW、MXCSR 再抛 C++ / SEH 异常，真实跨线程挂起 begin logger 后 off-on，以及实际 Enable 成功后返回错误时保留 gate 的原函数透传
 logger 仍遵守 C 调用约定的栈平衡，测试不把无法返回的损坏 ESP 当作合法 logger 行为
 
 ## 缓存与角色的明确限制
