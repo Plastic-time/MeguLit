@@ -11,14 +11,14 @@ class ReadingStatistics{
   const key=gameId+':'+sequence;if(key===this.last)return false;
   const ms=this.retry?.key===key?this.retry.ms:this.now(),at=Math.floor(ms/1000),clean=text.replace(/\s+/g,'');let s=this.session;
   if(s&&(s.gameId!==gameId||at-s.lastAt>900||at<s.lastAt))s=null;
-  if(s?.recent.includes(clean)){this.last=key;return false;}this.retry={key,ms};const db=openStore(this.root);
-  try{db.exec('BEGIN IMMEDIATE');if(!db.prepare('SELECT 1 FROM games WHERE id=?').get(gameId)){db.exec('ROLLBACK');this.retry=null;return false;}
+  if(s?.recent.includes(clean)){this.last=key;return false;}this.retry={key,ms};let db;
+  try{db=openStore(this.root);db.exec('BEGIN IMMEDIATE');if(!db.prepare('SELECT 1 FROM games WHERE id=?').get(gameId)){db.exec('ROLLBACK');this.retry=null;return false;}
    this.credit(db,ms);
    if(s&&!db.prepare('SELECT 1 FROM reading_sessions WHERE id=? AND game_id=?').get(s.id,gameId))s=null;
    if(!s){const row=db.prepare('INSERT INTO reading_sessions(game_id,started_at,ended_at,active_seconds,characters,sentences) VALUES(?,?,?,0,0,1)').run(gameId,at,at);s={id:Number(row.lastInsertRowid),gameId,lastAt:at,recent:[]};}
    else db.prepare('UPDATE reading_sessions SET ended_at=?,active_seconds=active_seconds+?,sentences=sentences+1 WHERE id=?').run(at,Math.min(180,at-s.lastAt),s.id);
    db.prepare('INSERT INTO reading_events(session_id,game_id,text,read_at,original) VALUES(?,?,?,?,?)').run(s.id,gameId,text.slice(0,4000),at,JSON.stringify((t=>t?{translation:t.value,translationSource:t.source}:{translation:''})(this.translations.get(gameId+':'+clean))));db.exec('COMMIT');this.retry=null;this.last=key;s.lastAt=at;this.pending={sessionId:s.id,chars:[...clean].length,shownAt:ms};s.recent.push(clean);s.recent=s.recent.slice(-40);this.session=s;return true;
-  }catch(error){if(db.isTransaction)db.exec('ROLLBACK');throw error;}finally{db.close();}
+  }catch(error){if(this.pending)this.pending.endedAt??=ms;if(db?.isTransaction)db.exec('ROLLBACK');throw error;}finally{db?.close();}
  }
  /* A line's characters are credited when the next line replaces it, capped by how long it was on screen
     (READ_RATE chars/s), so skipped or click-through lines no longer count as read (issue #79). */

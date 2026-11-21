@@ -35,6 +35,17 @@ test('a rejected or rolled-back line preserves pending characters and can be ret
   now+=60000;
   stats.flush();
   assert.equal(chars(root),27);
+  assert.equal(line('a',4,'日'.repeat(120)),true);
+  now+=1000;
+  db.exec('BEGIN IMMEDIATE');
+  try{assert.throws(()=>line('a',5,'最後の文'),/locked|busy/i);}finally{db.exec('ROLLBACK');}
+  now+=9000;
+  stats.reset();
+  assert.equal(chars(root),39);
+  assert.equal(line('a',6,'別の回'),true);
+  now+=901000;
+  assert.equal(line('a',7,'別の回'),true);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM reading_sessions').get().n,4);
  }finally{db.close();}
 });
 test('skipped lines are not credited as read characters (#79)',t=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-dwell-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const db=openStore(root);db.prepare('INSERT INTO games(id,title) VALUES(?,?)').run('a','A');db.close();let now=1e12;const stats=new ReadingStatistics(root,()=>now);
