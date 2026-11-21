@@ -1,3 +1,4 @@
+import {requestUiFrame,cancelUiFrame} from './idle-gate.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-12 the dictionary's drifting field, made like the website hero (site/public/assets/js/spell.js; user: full
    screen, in layers, white or red at random, random sizes, the nearer the blurrier — real depth of field). Every glyph
@@ -62,7 +63,7 @@ function build(host){
 function frame(now){
  const f=field;if(!f||!f.cv.isConnected||!f.host.isConnected||!document.querySelector('#lookup-results')){f?.cv.remove();field=null;return;}
  const dt=Math.min(.05,(now-f.prev)/1000);f.prev=now;const ctx=f.ctx;ctx.clearRect(0,0,f.W,f.H);
- const pref=fxPref('dictField');if(!pref.on){if(!calm)setTimeout(()=>{if(field===f)f.raf=requestAnimationFrame(frame);},250);return;}
+ const pref=fxPref('dictField');if(!pref.on){if(!calm)setTimeout(()=>{if(field===f)f.raf=requestUiFrame(frame);},250);return;}
  const res=document.querySelector('#lookup-results'),busy=res&&(res.children.length||res.textContent.trim())?1:0;f.dim=(f.dim??1)+((busy?.45:1)-(f.dim??1))*Math.min(1,dt*3);
  const order=f.parts;f.pvx=(f.pvx||0)*Math.exp(-8*dt);f.pvy=(f.pvy||0)*Math.exp(-8*dt);
  /* (user: the field has no fixed places — a pushed glyph stays where it was pushed; the whole only rebalances, slowly)
@@ -102,13 +103,13 @@ function frame(now){
   ctx.globalAlpha=base;ctx.save();ctx.translate(p.x+p.ox,p.y+p.oy);ctx.rotate(p.rot+(p.orot||0));ctx.drawImage(s.c,-s.w/2,-s.h/2,s.w,s.h);ctx.restore();
  }
  ctx.globalAlpha=1;
- if(!calm)f.raf=requestAnimationFrame(frame);
+ if(!calm)f.raf=requestUiFrame(frame);
 }
 let tick=0;
 function scan(){tick=0;const results=document.querySelector('#lookup-results');if(!results)return;const host=results.closest('#learning-content')||results.parentElement;if(!host)return;
  if(field&&field.host===host&&field.cv.isConnected)return;if(field){field.cv.remove();field=null;}
- build(host);requestAnimationFrame(frame);}
-new MutationObserver(()=>{if(!tick)tick=requestAnimationFrame(scan);}).observe(document.body,{childList:true,subtree:true});
+ build(host);requestUiFrame(frame);}
+new MutationObserver(()=>{if(!tick)tick=requestUiFrame(scan);}).observe(document.body,{childList:true,subtree:true});
 addEventListener('resize',()=>field?.fit());
 if(!calm){document.addEventListener('pointermove',e=>{if(!field)return;const now=performance.now(),dt=Math.max(8,now-(field.pt||now-16))/1000;if(field.pt){field.pvx=(e.clientX-field.mx)/dt;field.pvy=(e.clientY-field.my)/dt;}field.mx=e.clientX;field.my=e.clientY;field.pt=now;},{passive:true});
  /* a click (not on a control) sends a ring of force out from the pointer */

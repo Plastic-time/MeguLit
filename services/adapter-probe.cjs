@@ -43,15 +43,15 @@ function results(root){return load(root).results;}
 
 function spawnWorker(){const child=fork(path.join(__dirname,'adapter-probe-worker.cjs'),[],{execPath:process.execPath,stdio:['ignore','ignore','ignore','ipc'],windowsHide:true,env:{...process.env,MEGULIT_PROBE_WORKER:'1',MEGULIT_NO_PREWARM:'1'}});
  child.on('error',()=>{});try{os.setPriority(child.pid,os.constants.priority.PRIORITY_LOW);}catch{}return child;}
-function start(root,db,{ids=null,reason='manual',budgetMs=DEFAULT_BUDGET,perGameMs=PER_GAME,force=false,resume=false,emit=()=>{}}={}){
+function start(root,db,{ids=null,reason='manual',budgetMs=DEFAULT_BUDGET,perGameMs=PER_GAME,force=false,resume=false,automatic=false,emit=()=>{}}={}){
  const key=path.resolve(root);if(runs.has(key))return status(root);
  const s=load(root),rows=libraryRows(db),allGames=rows.filter(eligible);
  if(!(resume&&s.run?.queue?.length&&s.run.done.length<s.run.queue.length)){
   let games=allGames;if(Array.isArray(ids)&&ids.length){const want=new Set(ids.map(String));games=games.filter(g=>want.has(g.id));}
   const fresh=Date.now()-FRESH_DAYS*86400000;
   const queue=games.filter(g=>force||!s.results[g.id]||s.results[g.id].stamp!==stampOf(g.executable)||s.results[g.id].step==='preparing'||(s.results[g.id].at||0)<fresh);
-  s.run={reason:String(reason).slice(0,30),queue,done:[],state:'running',startedAt:Date.now(),updatedAt:Date.now(),budgetMs,perGameMs,usedMs:0};}
- else Object.assign(s.run,{state:'running',updatedAt:Date.now(),budgetMs:Math.max(budgetMs,s.run.budgetMs||0),usedMs:0});
+  s.run={automatic,reason:String(reason).slice(0,30),queue,done:[],state:'running',startedAt:Date.now(),updatedAt:Date.now(),budgetMs,perGameMs,usedMs:0};}
+ else Object.assign(s.run,{automatic:automatic||s.run.automatic===true,state:'running',updatedAt:Date.now(),budgetMs:Math.max(budgetMs,s.run.budgetMs||0),usedMs:0});
  if(rows.length){const known=new Set(allGames.map(g=>g.id));for(const id of Object.keys(s.results))if(!known.has(id))delete s.results[id];}
  if(!s.run.queue.length||s.run.done.length>=s.run.queue.length){s.run.state='done';save(root,s);return status(root);}
  save(root,s);
@@ -60,10 +60,11 @@ function start(root,db,{ids=null,reason='manual',budgetMs=DEFAULT_BUDGET,perGame
  return status(root);}
 function resume(root,db,options={}){const s=load(root);if(!s.run||!['running','paused','cancelled'].includes(s.run.state)||!s.run.queue?.length)return status(root);return start(root,db,{...options,resume:true});}
 async function loop(root,live){
- const began=Date.now();
+ let began=Date.now();
  for(;;){const s=load(root),run=s.run;if(!run||live.cancelled)return;
   const next=run.queue.find(g=>!run.done.includes(g.id));if(!next){run.state='done';run.updatedAt=Date.now();save(root,s);return;}
   if(Date.now()-began>=run.budgetMs){run.state='paused';run.updatedAt=Date.now();save(root,s);return;}
+  if(run.automatic){const waiting=Date.now();if(!await require('./background-budget.cjs').wait(root,{cancelled:()=>live.cancelled}))return;began+=Date.now()-waiting;}
   live.current={id:next.id,title:next.title};try{live.emit('adapter-probe',status(root));}catch{}
   let result;const dir=path.dirname(next.executable);
   if(!fs.existsSync(next.executable))result={schema:'megulit.probe-result',version:1,step:'no-script',detail:'GAME_MISSING',engines:[],inventory:{files:0,bytes:0,ext:{},archives:[]},lines:0,japaneseLines:0};
@@ -108,7 +109,7 @@ function cancel(root){const key=path.resolve(root),live=runs.get(key);if(live){l
  const s=load(root);if(s.run&&s.run.state==='running'){s.run.state='cancelled';s.run.updatedAt=Date.now();save(root,s);}return {...status(root),state:'cancelled'};}
 /* a run the app was closed in the middle of goes on a while after the next start */
 function resumeLater(root,openDb,{delay=180000}={}){if(process.env.NODE_TEST_CONTEXT)return null;const s=load(root);if(!s.run||!['running','paused'].includes(s.run.state))return null;
- const t=setTimeout(()=>{let db;try{db=openDb();const games=libraryRows(db);try{db.close();}catch{}resume(root,{prepare:()=>({all:()=>games})});}catch{try{db?.close();}catch{}}},delay);t.unref?.();return t;}
+ const t=require('./background-budget.cjs').schedule(root,()=>{let db;try{db=openDb();const games=libraryRows(db);try{db.close();}catch{}resume(root,{prepare:()=>({all:()=>games})},{automatic:true});}catch{try{db?.close();}catch{}}},{delay});t.unref?.();return t;}
 /* the games whose probe found a problem: [{id,title,step,detail}] */
 /* #468 (ひぐらしのなく頃に解: the library probe found Unity and its script, step ok, while the reader fell back to OCR every few
    lines; nothing was ever uploaded). What the reader saw at runtime counts too: a game whose lines came from OCR is a problem

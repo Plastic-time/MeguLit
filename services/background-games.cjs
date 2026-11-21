@@ -6,7 +6,7 @@ const running=new Set();let blockedUntil=0,playing=()=>false;
 function configure(fn){playing=fn;}
 function pause(ms=300000){blockedUntil=Math.max(blockedUntil,Date.now()+ms);}
 function blocked(){return Date.now()<blockedUntil||playing();}
-async function idle(root,{reading=require('./cold-test.cjs').reading}={}){if(blocked()||running.size)return false;const r=await reading(root);return !blocked()&&!running.size&&!!r&&r.idleMs>=300000&&r.ac!==false&&!r.fullscreen&&r.cpu<.5;}
+async function idle(root,{reading=require('./cold-test.cjs').reading}={}){if(blocked()||running.size)return false;const r=await reading(root);return !blocked()&&!running.size&&!!r&&r.idleMs>=300000&&r.ac!==false&&!r.fullscreen&&Number.isFinite(r.cpu)&&r.cpu<.2;}
 function track(exe,stop){const entry={exe,stop};running.add(entry);return ()=>running.delete(entry);}
 async function foreground(){pause();await Promise.all([...running].map(e=>e.stop()));}
 function unmute(root,pid,{execute=require('node:child_process').execFile}={}){if(!Number.isInteger(Number(pid))||Number(pid)<=0)return Promise.resolve(false);const helper=path.join(root,'native','ColdCapture64.exe');if(!fs.existsSync(helper))return Promise.resolve(false);return new Promise(resolve=>{try{execute(helper,['--unmute',String(pid)],{windowsHide:true,timeout:12000},error=>resolve(!error));}catch{resolve(false);}});}

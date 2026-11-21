@@ -31,5 +31,5 @@
  const previous=b.galStatus;b.galStatus=m=>{if(typeof m.hookSource==='string')setSource(m.hookSource);if(m.hookSource===null||m.hookActive===false||m.type==='gameClosed'){source='';clear();}previous(m);place();};
  const style=document.createElement('style');style.textContent='.tome-inline-wait{display:inline-block!important;position:static!important;height:1em!important;max-width:none!important;max-height:none!important;margin:0 0 0 .05em!important;padding:0!important;border:0!important;vertical-align:-.12em!important;object-fit:contain!important;pointer-events:none!important;user-select:none!important;-webkit-text-stroke:0!important;filter:none!important;background:transparent!important;box-shadow:none!important}body:not(.tomoyo-ui-translation) .tome-inline-wait{display:none!important}';document.head.append(style);
  new MutationObserver(records=>{if(records.some(r=>r.target!==image&&![...r.addedNodes,...r.removedNodes].every(n=>n===image)))place();}).observe(document.body,{childList:true,subtree:true,characterData:true});
- window.addEventListener('resize',place);setInterval(place,150);
+ window.addEventListener('resize',place);(window.__megulitReaderIntervals?.set||setInterval)(place,150);
 })();

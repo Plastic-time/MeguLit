@@ -87,7 +87,7 @@
  const SCOPE='.tomoyo-cn-dialog input[type=color],.tomoyo-learning-panel input[type=color],.tome-bg-menu input[type=color],.tome-backlog input[type=color]';
  function scan(){for(const input of document.querySelectorAll(SCOPE))enhance(input);for(const field of document.querySelectorAll('.tome-color-field')){if(!field.__tomeInput?.isConnected){field.remove();continue;}refresh(field);}}
  // Programmatic value changes (style sync, profile restore, history preview) fire no events: keep the field in step.
- setInterval(scan,400);new MutationObserver(()=>scan()).observe(document.body,{childList:true,subtree:true});scan();
+ (window.__megulitReaderIntervals?.set||setInterval)(scan,400);new MutationObserver(()=>scan()).observe(document.body,{childList:true,subtree:true});scan();
  // Any other colour input: same picker instead of the system dialog (cancelling the click keeps the dialog closed).
  // A click on a field's label reaches its hidden native input (label activation): that opened the system picker at the
  // screen's top-left in the overlay. Cancel it and open MeguLit's window for that field instead (user, 2026-11-02).
@@ -96,7 +96,7 @@
  // Working in the Alt+T menu keeps the window open (it is a window, not a popup); anywhere else closes it, and it also
  // closes when its colour input goes away (menu closed or rebuilt).
  document.addEventListener('pointerdown',e=>{if(panel&&!panel.contains(e.target)&&!e.target.closest?.('.tome-color-swatch,.tomoyo-cn-dialog')&&e.target!==owner)close();},true);
- setInterval(()=>{if(panel&&(!owner?.isConnected||owner.closest('dialog:not([open])')))close();},300);
+ (window.__megulitReaderIntervals?.set||setInterval)(()=>{if(panel&&(!owner?.isConnected||owner.closest('dialog:not([open])')))close();},300);
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&panel){e.stopPropagation();close();}},true);
  addEventListener('tome-language-change',()=>{for(const field of document.querySelectorAll('.tome-color-field'))field.__tomeLabel?.();});
  const style=document.createElement('style');style.textContent=`
