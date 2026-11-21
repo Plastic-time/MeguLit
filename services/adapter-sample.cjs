@@ -34,10 +34,9 @@ const readRange=(file,at,n)=>require('./original-engines/kit.cjs').readAt(file,a
 
 /* ---- worker side ------------------------------------------------------------------------------------------------ */
 const SCRIPTY=/script|scenario|scene|scn|story|text|txt|msg|data|sys|main|game/i;
-/* a compressed sample that fits SAMPLE_PACKED_MAX: the window is quartered until it does (null when even MIN_WINDOW does
-   not, or verify() refused it) */
+/* Try a positive small input once. Larger windows keep their existing quartered retries down to MIN_WINDOW. */
 const packedSize=s=>s?d.sampleSizes(s).packed:0;
-function fitted(make,window){for(let w=window;w>=MIN_WINDOW;w=Math.floor(w/4)){const s=make(w);if(!s)return null;if(packedSize(s)<=SAMPLE_PACKED_MAX)return s;}return null;}
+function fitted(make,window){const minimum=Math.min(MIN_WINDOW,window);for(let w=window;w>0&&w>=minimum;w=Math.floor(w/4)){const s=make(w);if(!s)return null;if(packedSize(s)<=SAMPLE_PACKED_MAX)return s;}return null;}
 const sized=(entry,s)=>{if(s){const z=d.sampleSizes(s);entry.raw=z.raw;entry.packed=z.packed;}return entry;};
 function sampleAttempt(bytes,options,state){const result=d.sampleResult(bytes,options);if(result.structure)state.structure=result.structure;if(!result.sample)state.reason=result.reason;return result.sample;}
 const droppedSample=(name,role,size,state)=>({name,role,size,dropped:state.reason||'VERIFY'});
