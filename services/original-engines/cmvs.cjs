@@ -39,6 +39,9 @@ function scheme(params,set='cpz5'){const s=params||SCHEMES,c={...SCHEMES[set],..
 const DEFAULT=scheme(),DEFAULT7=scheme(null,'cpz7');
 /* CPZ5/CPZ6 archives try each constant set in cmvs-schemes.json "order": the GARbro CPZ5 set, then the CMVS 3.x CPZ6 set */
 const ORDER=(SCHEMES.order||['cpz5']).filter(n=>SCHEMES[n]),DEFAULTS=ORDER.map(n=>scheme(null,n));
+const late5=SCHEMES.cpz5Late,CPZ5_SETS=[...DEFAULTS,
+ scheme({cpz5:{secret:late5.secret},md5:{Mode8:late5.mode8Digest}}),
+ scheme({cpz5:{secret:late5.secret,...late5.mode9},md5:{B:SCHEMES.md5.B}})];
 const rotl=(v,n)=>{n&=31;return n?((v<<n)|(v>>>(32-n)))>>>0:v>>>0;},rotr=(v,n)=>{n&=31;return n?((v>>>n)|(v<<(32-n)))>>>0:v>>>0;};
 
 /* ---- modified MD5: one compression of {w0..w3, 0x80, 0 …, 0x80 (bit length), 0} from the variant's state ---------- */
@@ -135,7 +138,7 @@ const memo=new Map();
 /* {version, entries, md5, h, sc[, values]} for a CPZ5/CPZ6/CPZ7 archive; null for anything else */
 function open(file,params){const fsz=kit.size(file),stamp=file+'|'+fsz+'|'+(kit.isFile(file)?fs.statSync(file).mtimeMs:0);if(memo.has(stamp))return memo.get(stamp);
  let r=null;try{const h=header(kit.head(file,0x48));if(h&&h.version===7)r=open7(file,h,fsz,params);
-  else if(h){const sets=params?ORDER.map(n=>scheme(params,n)):DEFAULTS,raw=kit.readAt(file,h.indexAt,h.dirSize+h.fileSize);
+  else if(h){const sets=params?ORDER.map(n=>scheme(params,n)):h.version===5?CPZ5_SETS:DEFAULTS,raw=kit.readAt(file,h.indexAt,h.dirSize+h.fileSize);
   if(raw.length===h.dirSize+h.fileSize&&md5sum(raw).equals(h.indexMd5))
    find:for(const sc of sets)for(const v of sc.md5){const x=readIndex(raw,h,v,sc,fsz);if(x&&x.entries.length){r={...x,h,sc};break find;}}}}catch{r=null;}
  if(memo.size>64)memo.clear();memo.set(stamp,r);return r;}
