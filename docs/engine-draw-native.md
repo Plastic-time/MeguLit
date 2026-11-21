@@ -47,13 +47,14 @@
 - 方案：把 STEINS;GATE 那个精确匹配的画字钩子泛化：MAGES 各作共用 SC3 VM，送字函数的参数里有字形索引和屏幕位置；按 exe 版本表（版本层差分）登记各作的函数地址，角色来自 SC3 的窗口命令（名字框是单独的 `NameBox` 区）。内嵌：SC3 串本来就支持注音标记（`native/mages/readString.cpp` 已能解），写回「日文带注音 + 中文」即可，前提是字库图集里有中文字形（没有就用 `core/mages-font.cjs` 补字库）
 - 参考：Committee of Zero 的 LanguageBarrier（开源，正是 MAGES 的画字 + 字库钩子）
 
-### Unity（7 部）
-- 现有：`native/unitytext`（BepInEx 5 插件，Mono + IL2CPP；按组件读 TMP / uGUI 的逐字框，alpha 0 隐藏）
-- 方案（插件内，C#）：
-  1. 角色：组件往上找 `UnityEngine.UI.Button` / `Toggle` / `Selectable` → button / choice；框架识别（Utage `AdvUguiMessageWindow` / `AdvUguiSelection`，Naninovel `TextPrinter` / `ChoiceHandler`，各厂自研按类名）→ line / name / choice
-  2. 内嵌：台词组件直接改 `TMP_Text.text`（`<size>` 第二段中文 + TMP 的 `<voffset><size>` 注音，或 XUnity.AutoTranslator 的做法）；uGUI Text 同理
-  3. 上报：沿用控制套接字，多发带 role 的 ToMe_CHARS
-- 阻塞：本机没有 BepInEx 5.4.23 core 和 Unity 5/2017 Managed 引用（`Build-UnityText.ps1` 需要 `MEGULIT_UNITY_MANAGED` / `MEGULIT_BEPINEX_CORE`），编不了也测不了；需要店主同意下载 BepInEx 引用包，或在有引用的机器上编
+### Unity（7 部）——Mono 已做
+- 分布（静态看游戏目录）：Mono = Doki Doki Literature Club Plus、ひぐらし、月に寄りそう乙女の作法、夏色四叶草 Summer Clover；IL2CPP = 逆転検事 1&2（GK12，il2cpp_data）、魔法少女ノ魔女裁判（manosaba）；haisha-fengyun 本机未找到
+- 做了（`native/unitytext/MeguLitUnityText.cs`，Mono 插件）：
+  - 角色：对白以外的可见文字按组件判断：Utage `AdvUguiSelection` / Naninovel `ChoiceHandlerButton` / 任何 `*Choice*`、`*Selection*` → choice；Utage 消息窗里名字字段指向的文字、Naninovel `AuthorNamePanel` / `AuthorNameText`、物体名含 name / speaker / author 的短文字 → name；`Button` / `Toggle` / `*Button` → button。只报屏幕框（`id=U<role>:<n>`），不改不藏
+  - 内嵌：对白组件直接换成替换文字：TextMeshPro 在基字后用 `<space><voffset=1em><size=50%>` 把注音居中放到基字上方，中文作为 `<size=80%>` 第二段（溢出 70%，再溢出不画）；uGUI Text 富文本没有上移，只加中文（`<size=字号×0.8>`）。游戏自己的标签和换行保留；按游戏字数走的打字机走完后把 maxVisibleCharacters 放开；记录只报日文、带 emb；内嵌时不隐藏
+  - 控制：套接字新增 `DRAW roles= embed= zh=`、`EMB <句>	<注音>	<中文>`（重连时重发），插件发 `ToMe_UNITY ask <句>`
+- 验证：用 ひぐらし 自带的 Managed（Unity 5，mscorlib 2.0）+ 仓库外的 BepInEx 桩（`H:\MeguLit-Work\depsepinex-stub`，不发布）编译通过；`validation/engine-draw-unity.test.cjs` 把插件里的 `Build` 抽出来编成小程序跑（注音位置、标签保留、uGUI）+ 节点侧协议
+- 没做：IL2CPP 插件（`MeguLitUnityText.IL2CPP.cs`）同样的改动——需要 Il2CppInterop 引用才能编；正式发布的 Mono 插件仍按 `Build-UnityText.ps1` 用真 BepInEx 5.4.23 引用编（这次没下载任何东西）
 
 ## 样板：YU-RIS（已做，其他原生引擎照这个写）
 

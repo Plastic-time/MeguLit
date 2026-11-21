@@ -82,7 +82,135 @@ public class MeguLitUnityText : BaseUnityPlugin {
  void Command(string line) {
   if (line.StartsWith("HIDE ")) hideAsked = line.EndsWith("1");
   else if (line.StartsWith("WANT ")) wanted = line.Substring(5).Replace("\u001f", "\n");
+  else if (line.StartsWith("DRAW ") || line.StartsWith("EMB ")) DrawCommand(line);
  }
+
+ // ---- engine-draw (docs/engine-draw-protocol.md): roles and the in-game replacement ------------------------------------
+ // DRAW roles=0|1 embed=0|1 zh=0|1 and EMB <sentence> TAB <start:len:reading|...> TAB <Chinese> come over the control socket.
+ // roles: other visible texts are reported as UI items with their screen boxes: a name plate (Utage's message window
+ // nameText field, Naninovel's author name, or an object named name / speaker / author), a choice (Utage AdvUguiSelection,
+ // Naninovel ChoiceHandlerButton, any *Choice* / *Selection* component above it), a button (UnityEngine.UI.Button / Toggle
+ // or any *Button component above it). Never changed, never hidden: the game keeps drawing them and taking their clicks.
+ // embed: the dialogue component gets the replacement as its own text: TextMeshPro draws the ruby (<voffset><size=50%>
+ // over its base, centred with <space>) and the Chinese as a smaller second paragraph; uGUI Text only the Chinese (no
+ // ruby in its rich text). The game's own tags and line breaks stay. The record then holds the Japanese only, emb=1|2.
+ volatile bool drawRoles, drawEmbed, drawZh = true;
+ readonly Dictionary<string, string[]> embeds = new Dictionary<string, string[]>();
+ readonly List<string> embedOrder = new List<string>();
+ readonly HashSet<string> asked = new HashSet<string>();
+ Component embComp; string embSet = "", lastRaw = ""; int embJp, embLevel, ui; float lastRawAt;
+ readonly Dictionary<string, string> roleSig = new Dictionary<string, string>();
+ PropertyInfo tmpMaxVisible, tmpOverflow; MethodInfo tmpForce; PropertyInfo uFontSize;
+
+ void DrawCommand(string line) {
+  if (line.StartsWith("DRAW ")) { drawRoles = line.Contains("roles=1"); drawEmbed = line.Contains("embed=1"); drawZh = !line.Contains("zh=0"); return; }
+  var p = line.Substring(4).Split('\t'); if (p.Length < 2 || p[0].Length == 0) return;
+  lock (embeds) {
+   if (!embeds.ContainsKey(p[0])) embedOrder.Add(p[0]);
+   embeds[p[0]] = new[] { p[1], p.Length > 2 ? p[2].Replace('\u001f', '\n') : "" };
+   while (embedOrder.Count > 64) { embeds.Remove(embedOrder[0]); embedOrder.RemoveAt(0); }
+  }
+ }
+
+ static float[] ScreenBox(Component c) {
+  var rt = c.transform as RectTransform; if (rt == null) return null;
+  var corners = new Vector3[4]; rt.GetWorldCorners(corners); var cam = CameraOf(c);
+  Vector2 a = Screen2(cam, corners[0]), b = Screen2(cam, corners[2]);
+  float x = Math.Min(a.x, b.x), w = Math.Abs(b.x - a.x), h = Math.Abs(b.y - a.y), top = Screen.height - Math.Max(a.y, b.y);
+  return w > 0 && h > 0 ? new[] { x, top, w, h } : null;
+ }
+ static string RoleOf(Component c, string t) {
+  bool button = false, name = false; Transform tr = c.transform;
+  for (int d = 0; tr != null && d < 6; d++, tr = tr.parent) {
+   foreach (var comp in tr.GetComponents<Component>()) {
+    if (comp == null) continue; string n = comp.GetType().Name;
+    if (n == "AdvUguiSelection" || n == "ChoiceHandlerButton" || n.IndexOf("Choice", StringComparison.Ordinal) >= 0 || n.IndexOf("Selection", StringComparison.Ordinal) >= 0) return "choice";
+    if (n == "AuthorNamePanel" || n == "AuthorNameText") return "name";
+    if (n.IndexOf("MessageWindow", StringComparison.Ordinal) >= 0) {
+     foreach (var f in comp.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)) {
+      if (f.Name.IndexOf("name", StringComparison.OrdinalIgnoreCase) < 0) continue;
+      object v = null; try { v = f.GetValue(comp); } catch { }
+      var vc = v as Component; if (vc != null && vc.gameObject == c.gameObject) return "name";
+     }
+    }
+    if (n == "Button" || n == "Toggle" || n.EndsWith("Button", StringComparison.Ordinal)) button = true;
+   }
+   string go = tr.gameObject.name.ToLowerInvariant();
+   if (d <= 2 && t.Length <= 16 && (go.Contains("name") || go.Contains("speaker") || go.Contains("author"))) name = true;
+  }
+  return name ? "name" : button ? "button" : null;
+ }
+ void RoleScan(List<Component> list) {
+  var groups = new Dictionary<string, List<KeyValuePair<string, float[]>>> { { "name", new List<KeyValuePair<string, float[]>>() }, { "choice", new List<KeyValuePair<string, float[]>>() }, { "button", new List<KeyValuePair<string, float[]>>() } };
+  foreach (var c in list) {
+   if (c == current) continue; string t = Norm(TextOf(c)); if (t.Length == 0 || t.Length > 40) continue;
+   string role = RoleOf(c, t); if (role == null) continue; var box = ScreenBox(c); if (box == null) continue;
+   groups[role].Add(new KeyValuePair<string, float[]>(t, box));
+  }
+  foreach (var g in groups) {
+   var sig = new StringBuilder(); foreach (var it in g.Value) sig.Append(it.Key).Append('|').Append(F(it.Value[0])).Append(',').Append(F(it.Value[1])).Append(';');
+   string old; roleSig.TryGetValue(g.Key, out old); string now = sig.ToString();
+   if (old == now || old == null && now.Length == 0) continue; roleSig[g.Key] = now; ui++;
+   string head = "ToMe_CHARS engine=unity line=" + ui + " hidden=0 sw=" + Screen.width + " sh=" + Screen.height + " vx=0 vy=0 vw=" + Screen.width + " vh=" + Screen.height + " n=0 rects= role=" + g.Key;
+   if (g.Value.Count == 0) { Send(head + " id=U" + g.Key + ": box=0,0,0,0 text="); continue; }
+   for (int i = 0; i < g.Value.Count; i++) { var b = g.Value[i].Value; Send(head + " id=U" + g.Key + ":" + i + " box=" + F(b[0]) + "," + F(b[1]) + "," + F(b[2]) + "," + F(b[3]) + " text=" + g.Value[i].Key); }
+  }
+ }
+
+ void SetText(Component c, string s) { try { var p = tmpType != null && tmpType.IsInstanceOfType(c) ? tmpText : uText; p.SetValue(c, s, null); } catch { } }
+ bool Overflowing(Component c) {
+  try {
+   if (tmpForce == null) tmpForce = tmpType.GetMethod("ForceMeshUpdate", Type.EmptyTypes);
+   if (tmpOverflow == null) tmpOverflow = tmpType.GetProperty("isTextOverflowing");
+   if (tmpForce != null) tmpForce.Invoke(c, null);
+   return tmpOverflow != null && (bool)tmpOverflow.GetValue(c, null);
+  } catch { return false; }
+ }
+ // the game's text with the ruby after each base and the Chinese appended; the game's tags and breaks are copied as they are
+ static string Build(string raw, string ruby, string zh, bool tmp, float zhScale, int uguiSize) {
+  var spans = new Dictionary<int, KeyValuePair<int, string>>();
+  foreach (var one in (ruby ?? "").Split('|')) { var q = one.Split(new[] { ':' }, 3); int s, n; if (q.Length == 3 && q[2].Length > 0 && int.TryParse(q[0], out s) && int.TryParse(q[1], out n) && n > 0) spans[s] = new KeyValuePair<int, string>(n, q[2]); }
+  var sb = new StringBuilder(); bool tag = false; int k = 0, closeAt = -1; string reading = null; int baseLen = 0;
+  foreach (char ch in raw) {
+   if (ch == '<') tag = true;
+   if (tag || char.IsWhiteSpace(ch) || ch == '　') { sb.Append(ch); if (ch == '>') tag = false; continue; }
+   KeyValuePair<int, string> sp;
+   if (tmp && closeAt < 0 && spans.TryGetValue(k, out sp)) { closeAt = k + sp.Key - 1; reading = sp.Value; baseLen = sp.Key; }
+   sb.Append(ch);
+   if (k == closeAt) {
+    float n = baseLen, m = reading.Length * 0.5f;
+    sb.Append("<space=-").Append(F((n + m) / 2)).Append("em><voffset=1em><size=50%>").Append(reading).Append("</size></voffset><space=").Append(F((n - m) / 2)).Append("em>");
+    closeAt = -1;
+   }
+   k++;
+  }
+  if (!string.IsNullOrEmpty(zh)) sb.Append('\n').Append(tmp ? "<size=" + Math.Round(zhScale * 100) + "%><noparse>" + zh + "</noparse></size>" : (uguiSize > 0 ? "<size=" + uguiSize + ">" + zh + "</size>" : zh));
+  return sb.ToString();
+ }
+ void EmbedTick() {
+  if (!drawEmbed || current == null) return;
+  string raw = TextOf(current) ?? "";
+  if (embComp == current && raw == embSet) { RevealAll(); return; }
+  if (raw != lastRaw) { lastRaw = raw; lastRawAt = Time.unscaledTime; return; }
+  if (Time.unscaledTime - lastRawAt < 0.3f) return; // the game is still writing the line
+  string key = Norm(raw); if (key.Length < 2) return;
+  string[] e; lock (embeds) embeds.TryGetValue(key, out e);
+  if (e == null) { if (asked.Add(key)) Send("ToMe_UNITY ask " + key); return; }
+  bool tmp = tmpType != null && tmpType.IsInstanceOfType(current);
+  string zh = drawZh ? e[1] : "";
+  int size = 0; if (!tmp) { try { if (uFontSize == null) uFontSize = uguiText.GetProperty("fontSize"); size = (int)Math.Round((int)uFontSize.GetValue(current, null) * 0.8); } catch { } }
+  if (!tmp && zh.Length == 0) return; // uGUI cannot show ruby: nothing to draw
+  string text = Build(raw, e[0], zh, tmp, 0.8f, size); int level = zh.Length > 0 ? 2 : 1;
+  SetText(current, text);
+  if (tmp && level == 2 && Overflowing(current)) { text = Build(raw, e[0], zh, tmp, 0.7f, size); SetText(current, text); if (Overflowing(current)) { text = Build(raw, e[0], "", tmp, 0.8f, size); SetText(current, text); level = 1; } }
+  embComp = current; embSet = text; embJp = key.Length; embLevel = level; lastKey = "";
+ }
+ // a typewriter that counts the game's own characters stops before the added ones: once it reached the game's length, all are shown
+ void RevealAll() {
+  if (tmpType == null || !tmpType.IsInstanceOfType(current)) return;
+  try { if (tmpMaxVisible == null) tmpMaxVisible = tmpType.GetProperty("maxVisibleCharacters"); int v = (int)tmpMaxVisible.GetValue(current, null); if (v >= embJp && v < 99999) tmpMaxVisible.SetValue(current, 99999, null); } catch { }
+ }
+
 
  // ---- components by type name ----------------------------------------------------------------------------------
  Type tmpType, uguiText, graphic;
@@ -143,7 +271,8 @@ public class MeguLitUnityText : BaseUnityPlugin {
    int k = Cjk(t); float at; changedAt.TryGetValue(id, out at);
    if (k >= 2 && (at > bestAt || at == bestAt && k > bestLen)) { best = c; bestAt = at; bestLen = k; }
   }
-  if (best != current) { Restore(); current = best; }
+  if (best != current) { Restore(); current = best; embComp = null; }
+  if (drawRoles) try { RoleScan(list); } catch (Exception e) { Logger.LogWarning("roles " + e.Message); }
  }
 
  // ---- hide / restore --------------------------------------------------------------------------------------------
@@ -179,7 +308,8 @@ public class MeguLitUnityText : BaseUnityPlugin {
  void LateUpdate() {
   if (Time.unscaledTime >= nextScan) { nextScan = Time.unscaledTime + 0.5f; try { Scan(); } catch (Exception e) { Logger.LogWarning("scan " + e.Message); } }
   if (current == null || !Shown(current)) { Restore(); current = null; return; }
-  bool want = hideAsked && connected;
+  try { EmbedTick(); } catch (Exception e) { Logger.LogWarning("embed " + e.Message); }
+  bool want = hideAsked && connected && !drawEmbed; /* the game draws the replacement: never hidden */
   if (want && !hidingCurrent) hidingCurrent = true;
   if (!want) Restore();
   if (hidingCurrent) HideSet(current, true);
@@ -238,6 +368,9 @@ public class MeguLitUnityText : BaseUnityPlugin {
    }
   }
   if (all.Count == 0) return;
+  /* engine-draw: the component carries the replacement: the record keeps the Japanese (the first characters, ruby left out above) */
+  bool embedded = embComp == current && (TextOf(current) ?? "") == embSet;
+  if (embedded && all.Count > embJp) all.RemoveRange(embJp, all.Count - embJp);
   // Quads far smaller than the line's glyphs in both directions are not readable characters (markup some games leave as near-empty
   // glyphs, underline / cursor quads): left out, so the record holds what a reader sees.
   var hs = new List<float>(); foreach (var e in all) hs.Add(e.Value[3]); hs.Sort(); float median = hs[hs.Count / 2];
@@ -254,10 +387,10 @@ public class MeguLitUnityText : BaseUnityPlugin {
   bool hidden = hidingCurrent && AllHidden(current);
   var sb = new StringBuilder();
   foreach (var r in rects) { if (sb.Length > 0) sb.Append(';'); sb.Append(F(r[0])).Append(',').Append(F(r[1])).Append(',').Append(F(r[2])).Append(',').Append(F(r[3])); }
-  string key = line + "|" + hidden + "|" + sb;
+  string key = line + "|" + hidden + "|" + (embedded ? embLevel : 0) + "|" + sb;
   if (key == lastKey) return;
   lastKey = key; lastText = flat;
-  Send("ToMe_CHARS engine=unity line=" + line + " hidden=" + (hidden ? 1 : 0) + " sw=" + Screen.width + " sh=" + Screen.height + " vx=0 vy=0 vw=" + Screen.width + " vh=" + Screen.height + " n=" + rects.Count + " rects=" + sb + " text=" + text);
+  Send("ToMe_CHARS engine=unity line=" + line + " hidden=" + (hidden ? 1 : 0) + " sw=" + Screen.width + " sh=" + Screen.height + " vx=0 vy=0 vw=" + Screen.width + " vh=" + Screen.height + " n=" + rects.Count + " rects=" + sb + (embedded ? " emb=" + embLevel : "") + " text=" + text);
  }
  static string Keep(string s, bool blanks) { var b = new StringBuilder(); foreach (char c in s) if (c != (char)10 && c != (char)13 && (blanks || !char.IsWhiteSpace(c))) b.Append(c); return b.ToString(); }
  static string F(float v) { return Math.Round(v, 1).ToString(System.Globalization.CultureInfo.InvariantCulture); }

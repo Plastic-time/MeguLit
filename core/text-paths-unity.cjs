@@ -69,18 +69,25 @@ function makeShadow({exe,shadowRoot,pack,port,steamAppId=null}){
 }
 
 /* The plugin's control socket: MeguLit listens on loopback, the plugin connects (Unity's Mono has no reliable named
-   pipes on Windows). Lines in: ToMe_CHARS / ToMe_UNITY status. Lines out: HIDE 0|1, WANT <text>. */
+   pipes on Windows). Lines in: ToMe_CHARS / ToMe_UNITY status. Lines out: HIDE 0|1, WANT <text>,
+   and for engine-draw (docs/engine-draw-protocol.md): DRAW roles= embed= zh=, EMB <sentence> TAB <ruby> TAB <Chinese>; in: ToMe_UNITY ask <sentence>. */
 class UnityTextPath{
- constructor({onChars=()=>{},onStatus=()=>{},canary=null}={}){Object.assign(this,{onChars,onStatus,canary});this.sock=null;this.on=false;this.wanted='';this.armed=false;}
+ constructor({onChars=()=>{},onStatus=()=>{},onAsk=()=>{},canary=null}={}){Object.assign(this,{onChars,onStatus,onAsk,canary});this.sock=null;this.on=false;this.wanted='';this.armed=false;this.drawCfg=null;this.embeds=new Map();}
  listen(){return new Promise((resolve,reject)=>{this.server=net.createServer(s=>this.accept(s));this.server.on('error',reject);this.server.listen(0,'127.0.0.1',()=>resolve(this.server.address().port));});}
  accept(s){if(this.sock)this.sock.destroy();this.sock=s;s.setEncoding('utf8');s.setNoDelay(true);let buf='';
   s.on('data',d=>{buf+=d;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).replace(/\r$/,'');buf=buf.slice(i+1);this.line(line);}if(buf.length>200000)buf='';});
   s.on('close',()=>{if(this.sock===s)this.sock=null;});s.on('error',()=>{});this.push();}
  line(l){if(l.startsWith('ToMe_UNITY status ')){this.onStatus(l.slice(18));return;}
+  if(l.startsWith('ToMe_UNITY ask ')){const k=l.slice(15).trim();if(k)this.onAsk({key:k,text:k,engine:'unity'});return;}
   const r=parseChars(l);if(!r||r.engine!=='unity')return;
   if(r.hidden&&this.canary){if(!this.armed){this.canary.arm('unity');this.armed=true;}else this.canary.alive('unity');}
   this.onChars(l);}
- push(){if(!this.sock)return;this.sock.write('WANT '+this.wanted.replace(/\r?\n/g,'\x1f')+'\nHIDE '+(this.on?1:0)+'\n');}
+ push(){if(!this.sock)return;this.sock.write('WANT '+this.wanted.replace(/\r?\n/g,'\x1f')+'\nHIDE '+(this.on?1:0)+'\n'+(this.drawCfg?this.drawLine():'')+[...this.embeds.values()].join(''));}
+ drawLine(){const c=this.drawCfg;return 'DRAW roles='+(c.roles?1:0)+' embed='+(c.embed?1:0)+' zh='+(c.zh?1:0)+'\n';}
+ /* engine-draw: the switches, and one sentence's replacement (kept for a reconnect, newest 64) */
+ drawConfig(cfg){const c={roles:cfg?.roles===true,embed:cfg?.embed===true,zh:cfg?.zh!==false};if(JSON.stringify(c)===JSON.stringify(this.drawCfg))return;this.drawCfg=c;if(this.sock)this.sock.write(this.drawLine());}
+ drawEmbed(key,o={}){const {krkrControlText}=require('./engine-draw.cjs');const body=krkrControlText({roles:false,embed:true,zh:true},new Map([[String(key||''),{ruby:o.ruby||[],zh:o.zh||''}]])).split('\r\n')[1]||'';if(!body)return;
+  const l='EMB '+body+'\n';this.embeds.delete(key);this.embeds.set(key,l);while(this.embeds.size>64)this.embeds.delete(this.embeds.keys().next().value);if(this.sock)this.sock.write(l);}
  hide(on){this.on=!!on;if(this.on&&this.canary&&!this.canary.allowed('unity')){this.on=false;this.onStatus('unity invisible drawing off for this game (crash canary)');}this.push();}
  want(text){this.wanted=String(text||'');this.push();}
  exited(code){if(this.canary&&this.armed)this.canary.exited('unity',code);}
