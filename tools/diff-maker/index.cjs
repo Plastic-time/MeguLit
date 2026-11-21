@@ -14,7 +14,11 @@ const ROOT=path.join(__dirname,'..','..');
 /* make(probeDir,{key}) -> {probe,key,name,profile,rep,ix,result,diff,lines,fixtureLines,replay,report} (nothing written) */
 function make(dir,{key='',runtime=''}={}){const probe=Probe.load(dir,{runtime});dir=probe.dir;
  const base=Profiles.profileFor(probe.input);const gameKey=key||base.gameKey;
- /* a hand-written game file is carried into the draft; a seed (The Seed/, pinned values) is what the draft will replace */const gameFile=Profiles.games().find(g=>g.key===gameKey&&!g.seed)||null;
+ /* the game's own settings are carried into the draft: a hand-written game file whole; a seed (The Seed/, every key pinned) only
+    where it differs from the kernel + engine profile, so the draft holds what was tuned for this game, not the pinned defaults */
+ const gameFile=(()=>{const g=Profiles.games().find(x=>x.key===gameKey);if(!g||!g.seed)return g||null;const ref=Profiles.profileFor({engine:g.engine});
+  const own=(s,r)=>{const out={};for(const [k,v] of Object.entries(s||{})){const b=r?.[k];if(v&&typeof v==='object'&&!Array.isArray(v)&&b&&typeof b==='object'&&!Array.isArray(b)){const o=own(v,b);if(Object.keys(o).length)out[k]=o;}else if(JSON.stringify(v)!==JSON.stringify(b))out[k]=v;}return out;};
+  return {...g,settings:own(g.settings,ref)};})();
  const rep=Samples.replay(probe);
  const ix=Scripts.load(path.join(dir,'scripts'),probe.scriptFiles);
  /* a script without an original-text index (RPG Maker data, KAG files): the fingerprint over its dialogue lines, sorted */

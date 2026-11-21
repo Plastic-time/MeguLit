@@ -11,7 +11,7 @@
 
 - 版本层 `version-17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42.json`（key `17b5941a…`，指纹 exe）：这个 exe 没有版本层的键
 - 游戏层 `game-fata-morgana.json`（key `b5724d2d…`，指纹 script/title）：按 主封包 `data.xp3` `b7831b34`、剧本指纹 `142ca8b7`、标题「ファタモルガーナの館」 认
-- 游戏层覆盖的已知版本：`fata_jp.exe` `17b5941a`（本探针）；`fata_cn.exe` `7a81b36a`（同目录，未实测）；`fata_en.exe` `5d3ad108`（同目录，未实测）；手写游戏差分登记的程序名：fata.exe、fata_jp.exe、fata_cn.exe、fata_en.exe
+- 游戏层覆盖的已知版本：`fata_jp.exe` `17b5941a`（本探针）；`fata_cn.exe` `7a81b36a`（同目录，未实测）；`fata_en.exe` `5d3ad108`（同目录，未实测）；手写游戏差分登记的程序名：fata_jp.exe、fata.exe、fata_cn.exe、fata_en.exe
 
 ## 自检指标（每个窗口取最差值）
 
@@ -58,8 +58,22 @@ UI 项（按 role、id、文字去重）：0 个
 
 ```json
 {
+ "page": {
+  "pairByDrawn": true,
+  "keepHeld": true
+ },
+ "choice": {
+  "filters": [
+   "^(選択肢|選択ライン)",
+   "のテーマ"
+  ],
+  "contentInterleave": true,
+  "dropEffectFrames": true
+ },
+ "hide": {
+  "textEffectsRead": true
+ },
  "calibrate": {
-  "positionSource": null,
   "textBox": {
    "x": 70,
    "y": 488,
@@ -70,10 +84,11 @@ UI 项（按 role、id、文字去重）：0 个
     604
    ]
   },
-  "hideMethod": "read"
+  "hideMethod": "read",
+  "positionSource": null
  },
- "hide": {
-  "textEffectsRead": true
+ "safeMode": {
+  "effectJudge": true
  }
 }
 ```
