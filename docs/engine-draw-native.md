@@ -129,7 +129,7 @@
   4. 游戏照常显示、不卡、不崩 = 过。只有 `off: N sites match` = 这个版本签名没对上，把那行和 exe 发来
 
 ### Softpal（時計仕掛けのレイライン）
-- 点：dll\PAL.dll 0x10008295，字形例程里唯一的 `GetGlyphOutlineA(hdc, 字, GGO_GRAY8, &gm, 0, NULL, &mat)`（量尺寸那次；字体类型 4 走引擎自己的栅格化，不经过这里）。有 EBP 帧
+- 点：dll\PAL.dll 0x10008295（`call [IAT]`）和 0x1000897c（另一个字形例程，先 `mov esi, [IAT]` 再 `call esi`），都是 `GetGlyphOutlineA(hdc, 字, GGO_GRAY8, &gm, 0, NULL, &mat)` 量尺寸那次，两条签名 `softpal` / `softpal-2`。都有 EBP 帧（第一次提交时漏了第二个，以为字体类型 4 不走 GDI）
 - 没有笔位：位置已经由 Pal.cpp 的 pal_sprite_v1 文字精灵给出，这里补的是「哪段字从哪个例程画出来」（via）
 - 店主测试清单：同 AVG32，行里是 `engine=softpal`，`x0=-1`
 
@@ -181,7 +181,3 @@
 - 2003 年原版（system.dll，GetGlyphOutlineA ×2、TextOutA ×7，seed 里归 nitropak）和 みにくいモジカの子（Enigma 壳）不在这一条里
 - 店主测试清单：同 AVG32，行里是 `engine=nitroplus`
 
-### Softpal（時計仕掛けのレイライン）
-- 点：dll\PAL.dll 0x10008295（`call [IAT]`）和 0x1000897c（另一个字形例程，先 `mov esi, [IAT]` 再 `call esi`），都是 `GetGlyphOutlineA(hdc, 字, GGO_GRAY8, &gm, 0, NULL, &mat)` 量尺寸那次，两条签名 `softpal` / `softpal-2`。都有 EBP 帧（第一次提交时漏了第二个，以为字体类型 4 不走 GDI）
-- 没有笔位：位置已经由 Pal.cpp 的 pal_sprite_v1 文字精灵给出，这里补的是「哪段字从哪个例程画出来」（via）
-- 店主测试清单：同 AVG32，行里是 `engine=softpal`，`x0=-1`
