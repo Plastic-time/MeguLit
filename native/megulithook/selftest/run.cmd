@@ -83,3 +83,5 @@ rem Majiro complete-string observer: signatures and real MinHook gate, x86 and x
 call "%~dp0run-majiro.cmd" || exit /b 1
 rem AdvHD version-pinned diagnostic input, custom EAX + eleven-word ABI and x64 no-op.
 call "%~dp0run-advhd.cmd" || exit /b 1
+rem MAGES strict control, persistent permission epochs, TLS return ownership and actual cdecl gates.
+call "%~dp0run-mages-permission.cmd" || exit /b 1

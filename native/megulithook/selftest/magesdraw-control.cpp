@@ -26,6 +26,7 @@ int wmain(int argc,wchar_t **argv){
  Control(L"\xfeff#cfg roles=1\r\n#table mages drawDialogue=0x10,0x20 drawGlyph=0x30 commit=0x40 clear=0x50 pages=0x70 stride=0xea9c");Check(!Allowed(),"truncated table cannot silently remove version constraints");
  Control(L"\xfeff#cfg roles=1\r\n#table mages drawDialogue=0x10,0x20 drawGlyph=0x30 commit=0x40 commit=0x41 clear=0x50 pages=0x70 stride=0xea9c\r\n");Check(!Allowed(),"duplicate address key cannot choose an ambiguous pin");
  const char utf8[]="\xef\xbb\xbf#cfg\troles=1\tembed=0\r\n";Raw(utf8,sizeof utf8-1);Check(Allowed(),"legacy UTF8 BOM and tab tokens remain supported");
+ Control(L"\xfeff#cfg roles=1\r\n#table mages drawDialogue=0x10,0x20 drawGlyph=0x30 commit=0x40 clear=0x50 pages=0x70 stride=0xea9c\x0130\r\n");Check(!Allowed(),"non-ASCII address metadata cannot discard its version constraints");
  Control(L"\xfeff#cfg roles=1 embed=0 zh=1\r\n本文\t译文\r\n");Check(Allowed(),"BOM first line permits non-ASCII body data");
  Control(L"#cfg roles=1 embed=0\n");Check(Allowed(),"BOM-less UTF16LE with complete LF line remains supported");
  std::wstring big=L"\xfeff#cfg roles=1 "+std::wstring(9000,L' ')+L"\r\n";Control(big.c_str());Check(!Allowed(),"bounded read cannot authorize an incomplete first line");
