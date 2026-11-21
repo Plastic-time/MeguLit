@@ -1,0 +1,9 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.main .first-player[data-state="received"],.main .first-player[data-state="installing"],.main .first-player[data-state="install-failed"]{padding-top:12px;padding-bottom:12px}
+.main .first-player-receipt-source{margin-top:5px!important;overflow-wrap:anywhere;color:var(--g-t1,#eee1d9)!important}
+.main .first-player-receipt-time{margin-top:3px!important;font-size:11.5px!important;color:var(--g-t2,#c8b7aa)!important;font-variant-numeric:tabular-nums}
+.main .first-player-receipt-details{font-size:11px;color:var(--g-t2,#c8b7aa);margin-top:7px;max-width:72ch}
+.main .first-player-receipt-details summary{cursor:pointer;min-height:24px;line-height:24px;overflow-wrap:anywhere;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--g-gold,#d1a000)}
+.main .first-player-receipt-details summary:focus-visible{outline:2px solid var(--g-gold,#d1a000);outline-offset:3px}
+.main .first-player-receipt-details dl{margin:8px 0 0;display:grid;gap:6px}.main .first-player-receipt-details dl>div{display:grid;grid-template-columns:minmax(95px,auto) minmax(0,1fr);gap:16px}.main .first-player-receipt-details dt,.main .first-player-receipt-details dd{margin:0;overflow-wrap:anywhere}.main .first-player-receipt-details dd{font-variant-numeric:tabular-nums;color:var(--g-t1,#eee1d9)}
+@media(max-width:520px){.main .first-player-receipt-details dl>div{grid-template-columns:1fr;gap:2px}}

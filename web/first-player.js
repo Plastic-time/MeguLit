@@ -1,3 +1,4 @@
+import {receiptView} from './seed-receipt.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-21 首位玩家: the big card on the game page for the first player of an exe the engine layer already reads but nobody has
    calibrated (services/first-player.cjs decides). Three looks: first (play 3-8 minutes), off (sharing is switched off, one switch),
@@ -18,38 +19,45 @@ const W={
   first:{title:'おめでとう、このバージョンを最初に遊ぶプレイヤーです',body:'このバージョンはまだ誰も校正していません。起動したら 3〜8 分ほど遊び続けて、自動校正を最後まで走らせてください。校正結果は同じバージョンを後から遊ぶ人に共有され、開くだけで使えます。いま使っている適応も、先に遊んだ人たちが共有してくれたものです。みんなで分け合えば、みんなが楽になります',note:'約 3〜8 分 · 自動校正 · 後のプレイヤーと共有'},
   off:{title:'共有適応をオンにすると参加できます',body:'このバージョンはまだ誰も校正していないので、あなたが最初です。いまは共有適応がオフで、結果はこの PC に残るだけ、後のプレイヤーには届きません。オンにして 3〜8 分遊び、自動校正を走らせれば、結果は同じバージョンを遊ぶ人に共有されます',button:'共有適応をオンにする',busy:'オンにしています…',failed:'オンにできませんでした。あとでもう一度'},
   thanks:{title:'共有ありがとうございます',body:'校正結果をアップロードしました。このバージョンを遊ぶ人は、開くだけで使えます',note:'共有済み'}}};
-const POLL_MS=20000,POLL_MAX=90;
+const POLL_MS=20000,RECEIPT_POLL_MS=60000;
 export function mountFirstPlayer({host,id,api,locale,esc,isCurrent=()=>true,placement='main'}){
- if(!host)return;const w=W[locale]||W.zh;let timer=0,shown='',polls=0;
+ if(!host)return;const w=W[locale]||W.zh;let timer=0,shown='',dead=false,epoch=0,inflight=false,failures=0,mutating=false,pendingRender=false;
  const box=document.createElement('section');box.className='first-player';box.hidden=true;box.setAttribute('aria-live','polite');host.after(box);
  const decidedKey='megulit-fp-anon:'+id;const decided=()=>{try{return localStorage.getItem(decidedKey)==='1';}catch{return false;}};const decide=v=>{try{v?localStorage.setItem(decidedKey,'1'):localStorage.removeItem(decidedKey);}catch{}};
  let last={state:'hidden'},mode='view',credErr='';
- const when=at=>{const d=new Date(/^\d+$/.test(String(at))?Number(at):at);return isNaN(d)?'':d.toLocaleString(locale==='zh'?'zh-CN':locale==='ja'?'ja-JP':'en-US',{dateStyle:'medium',timeStyle:'short'});};
  /* the credit box of the thank-you: ask (input + sign / stay anonymous), or show the name / anonymous number with the way back. Names are plain text (esc). */
  const creditHTML=cr=>{const c=cr||{torchNo:0,name:null},q=w.cr,named=!!c.name,ask=mode==='edit'||(!named&&!decided());
   if(ask)return `<div class="first-player-credit"><div class="first-player-credit-row"><input type="text" maxlength="30" data-fp-name value="${esc(c.name||'')}" placeholder="${esc(q.ph)}" aria-label="${esc(q.ph)}"><button type="button" class="primary" data-fp-sign>${esc(q.sign)}</button><button type="button" class="secondary" data-fp-skip>${esc(q.skip)}</button></div><span class="first-player-privacy">${esc(q.privacy)}</span>${credErr?`<span class="first-player-fail">${esc(credErr)}</span>`:''}</div>`;
   return `<div class="first-player-credit"><div class="first-player-credit-row"><span class="first-player-who">${esc(named?q.named(c.name):q.anon(c.torchNo))}</span>${named?`<button type="button" class="secondary" data-fp-edit>${esc(q.edit)}</button><button type="button" class="secondary" data-fp-undo>${esc(q.undo)}</button>`:`<button type="button" class="secondary" data-fp-edit>${esc(q.sign)}</button>`}</div>${c.synced===false?`<span class="first-player-privacy">${esc(q.local)}</span>`:''}${credErr?`<span class="first-player-fail">${esc(credErr)}</span>`:''}</div>`;};
- const render=(r,{failed=false,busy=false}={})=>{const state=r.state;if(state==='hidden'){box.hidden=true;box.innerHTML='';shown='';return;}const t=w[state]||{},cr=r.credit||null,sig=state+(failed?'!':'')+(busy?'…':'')+mode+credErr+JSON.stringify(cr)+(decided()?'d':'');if(sig===shown)return;
+ const render=(r,{failed=false,busy=false}={})=>{if(dead)return;const state=r.state;const t=w[state]||{},cr=r.credit||null,received=['received','installing','install-failed'].includes(state),receipt=received?receiptView(r,{locale,esc,torch:w.cr.torch}):null,sig=state+(failed?'!':'')+(busy?'…':'')+mode+credErr+JSON.stringify(cr)+(receipt?.signature||'')+(decided()?'d':'');if(sig===shown)return;
   /* a poll never replaces a box the player is typing in */
-  if(box.contains(document.activeElement)&&document.activeElement.matches('input')&&shown.startsWith(state))return;shown=sig;box.dataset.state=state;
-  if(state==='received'){const q=w.cr,who=cr.name?cr.name:q.torch(cr.torchNo);box.innerHTML=`<div class="first-player-copy"><div class="first-player-head"><span class="first-player-eyebrow">${esc(w.eyebrow)}</span><p class="first-player-from">${esc(q.from(who,when(cr.at)))}</p></div></div>`;box.hidden=false;return;}
+  if(box.contains(document.activeElement)&&shown){pendingRender=true;return;}pendingRender=false;if(state==='hidden'){box.hidden=true;box.innerHTML='';shown='';return;}shown=sig;box.dataset.state=state;
+  if(received){box.innerHTML=`<div class="first-player-copy">${receipt.html}</div>`;box.hidden=false;return;}
   const lower=state==='off'?`<div class="first-player-act"><button type="button" class="primary" data-fp-share ${busy?'disabled':''}>${esc(busy?t.busy:t.button)}</button>${failed?`<span class="first-player-fail">${esc(t.failed)}</span>`:''}</div>`:state==='thanks'?creditHTML(cr):`<span class="first-player-note">${esc(t.note)}</span>`;
   box.innerHTML=`<div class="first-player-copy"><div class="first-player-head"><span class="first-player-eyebrow">${esc(w.eyebrow)}</span><h2>${esc(t.title)}</h2></div><p>${esc(t.body)}</p>${lower}<ul class="first-player-tags" aria-hidden="true">${w.tags.map((x,i)=>`<li${i===0?' class="is-key"':''}>${esc(x)}</li>`).join('')}</ul><p class="first-player-hint">${esc(w.hint[0])}<button type="button" class="first-player-link" data-fp-feedback>${esc(w.hint[1])}</button>${esc(w.hint[2])}</p></div>`;box.hidden=false;
   /* the same entry as the top bar's feedback button (app.js openFeedback): click it instead of building a second one */
   box.querySelector('[data-fp-feedback]').onclick=()=>document.querySelector('[data-top-feedback]')?.click();
-  const b=box.querySelector('[data-fp-share]');if(b)b.onclick=async()=>{render({state:'off'},{busy:true});try{await api('first_player_share',{});await load(false);}catch{render({state:'off'},{failed:true});}};
-  const save=async name=>{credErr='';try{const res=await api('first_player_credit',{id,name});if(!res||res.state==='failed')credErr=w.cr.failed;else{last={...last,credit:res.credit};decide(!name);mode='view';}}catch{credErr=w.cr.failed;}shown='';render(last);};
+  const b=box.querySelector('[data-fp-share]');if(b)b.onclick=async()=>{if(dead||mutating)return;mutating=true;const token=epoch;b.disabled=true;b.textContent=t.busy;try{await api('first_player_share',{});if(dead||token!==epoch)return;mutating=false;await load(false);}catch{if(!dead&&token===epoch){shown='';render({state:'off'},{failed:true});}}finally{mutating=false;schedule();}};
+  const save=async name=>{if(mutating||dead)return;mutating=true;const token=epoch,base=last;credErr='';try{const res=await api('first_player_credit',{id,name});if(dead||token!==epoch||!isCurrent())return;if(!res||res.state==='failed')credErr=w.cr.failed;else{if(last===base)last={...last,credit:res.credit};decide(!name);mode='view';}}catch{if(!dead&&token===epoch)credErr=w.cr.failed;}finally{mutating=false;}if(dead||token!==epoch)return;shown='';render(last);};
   const input=box.querySelector('[data-fp-name]');
   if(input){box.querySelector('[data-fp-sign]').onclick=()=>{const v=input.value.trim();if(v)save(v);else input.focus();};box.querySelector('[data-fp-skip]').onclick=()=>save(null);input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();box.querySelector('[data-fp-sign]').click();}};}
   const ed=box.querySelector('[data-fp-edit]');if(ed)ed.onclick=()=>{mode='edit';credErr='';shown='';render(last);box.querySelector('[data-fp-name]')?.focus();};
   const un=box.querySelector('[data-fp-undo]');if(un)un.onclick=()=>save(null);};
- async function load(first){let r;try{r=await api('first_player',{id,poll:!first});}catch{r=null;}if(!isCurrent()||!box.isConnected){clearTimeout(timer);return;}
-  const state=r&&['first','off','thanks','received'].includes(r.state)?r.state:'hidden';last=state==='hidden'?{state}:r;render(last);
-  clearTimeout(timer);if(state!=='received'&&polls++<POLL_MAX&&(state!=='hidden'||first))timer=setTimeout(()=>load(false),POLL_MS);}
+ const visible=()=>!dead&&isCurrent()&&box.isConnected&&!document.hidden&&document.hasFocus();
+ function dispose(){if(dead)return;dead=true;epoch++;clearTimeout(timer);timer=0;document.removeEventListener('visibilitychange',visibility);removeEventListener('focus',visibility);removeEventListener('blur',visibility);box.removeEventListener('focusout',leaveInput);box.remove();}
+ function schedule(){clearTimeout(timer);timer=0;if(dead)return;if(!isCurrent()||!box.isConnected){dispose();return;}if(!visible())return;
+  const normal=['received','hidden'].includes(last.state)?RECEIPT_POLL_MS:POLL_MS,delay=Math.min(120000,normal*2**Math.min(failures,2));timer=setTimeout(()=>load(false),delay);}
+ async function load(first=false){if(dead||inflight||mutating||!visible()){schedule();return;}inflight=true;const token=epoch;try{
+  const r=await api('first_player',{id,poll:!first});if(dead||token!==epoch||!visible())return;failures=0;
+  const state=r&&['first','off','thanks','received','installing','install-failed'].includes(r.state)?r.state:'hidden';last=state==='hidden'?{state}:r;render(last);
+ }catch{if(!dead&&token===epoch)failures++;}finally{inflight=false;schedule();}}
+ function visibility(){epoch++;clearTimeout(timer);timer=0;if(!isCurrent()||!box.isConnected){dispose();return;}if(visible()){if(pendingRender&&!box.contains(document.activeElement))render(last);load(false);}}
+ function leaveInput(){queueMicrotask(()=>{if(!dead&&pendingRender&&!box.contains(document.activeElement))render(last);});}
+ document.addEventListener('visibilitychange',visibility);addEventListener('focus',visibility);addEventListener('blur',visibility);box.addEventListener('focusout',leaveInput);
  /* where the card sits (it survives tab swaps, so it is moved, not re-created): tabs = a slim strip under the tab bar (every tab),
     main = top of the overview's left column, aside = top of its right column; other tabs keep it under the tab bar */
  const place=(tab='overview')=>{const root=host.closest('.main')||document;const tabs=root.querySelector('.detail-tabs');let to=null;
   if(tab==='overview'&&placement==='main')to=root.querySelector('.detail-main');else if(tab==='overview'&&placement==='aside')to=root.querySelector('.detail-aside');
   if(to){if(box.parentNode!==to||to.firstChild!==box)to.prepend(box);}else if(tabs&&tabs.nextElementSibling!==box)tabs.after(box);box.dataset.place=to?placement:'tabs';};
- place('overview');load(true);return {place};
+ place('overview');load(true);return {place,dispose,refresh:()=>load(false)};
 }
