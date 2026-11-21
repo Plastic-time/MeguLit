@@ -10,7 +10,10 @@ No database, relay, game, audio or actual receive/install operation is performed
 
 ## Result
 
-14/14 tests passed, zero skips, Node 22.22.3, 128 MiB heap, 5-second per-file test deadline
+14/14 behavioral tests passed, zero skips, Node 22.22.3
+Standard `node --test` runs one supervisor test that requires all fourteen child tests to pass with no skips
+The owned child has a 128 MiB heap, a 4-second test deadline, a 5-second process timeout and a 1 MiB output cap
+It enables VM modules itself and clears the inherited Node test-runner child context before launch
 Source syntax and `git diff --check` passed
 No wiring defect found within this finite scope
 
@@ -36,15 +39,24 @@ SHA256 of complete UTF-8 source bytes read by the VM
 
 ## Reproduce
 
-Set `MEGULIT_PEER_SOURCE_ROOT` to the tree containing the source identity above, then run
+Standard repository invocation needs no environment variable or VM flag
+
+```powershell
+node --test validation/torch-dispatch-peer.test.cjs
+```
+
+The source root defaults to the test's repository parent
+For an independent review of another source tree, optionally set `MEGULIT_PEER_SOURCE_ROOT` to that tree
 
 ```powershell
 $env:MEGULIT_PEER_SOURCE_ROOT='H:/MeguLit-Work/wt/night-ci'
-node --max-old-space-size=128 --experimental-vm-modules --test-timeout=5000 --test validation/torch-dispatch-peer.test.cjs
+node --test validation/torch-dispatch-peer.test.cjs
 ```
 
 The test emits the actual source hashes so a later changed tree is distinguishable
-It intentionally requires the source-root variable instead of silently testing this older peer branch
+The historical peer branch predates receiver integration, so reviewing that older branch against the later target still needs the optional override
+The standard integration tree uses its own sources without an override
+Synthetic executable paths are derived from the test directory and do not require any drive letter
 
 ## Limits
 
