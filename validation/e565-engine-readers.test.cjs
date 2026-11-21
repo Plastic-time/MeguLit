@@ -106,6 +106,46 @@ test('TyranoScript: loose, app.asar, package.nw and exe-appended NW.js builds re
  assert.deepEqual(a.map(s=>s.lines.length),b.map(s=>s.lines.length));assert.equal(b[0].lines[3],'天空很蓝。');assert.deepEqual(a[0].anchors,b[0].anchors);
 });
 
+test('TyranoScript: the probe reads the scenario appended to a legacy NW.js executable',t=>{
+ const dir=tmp(t),script='こんにちは。[p]\n次の場面です。[p]\n';
+ const archive=F.zip({'tyrano/tyrano.base.js':'//','data/scenario/first.ks':script});
+ F.writeTree(dir,{'Game.exe':Buffer.concat([Buffer.from('MZ'),archive]),'nw.pak':'x',
+  'credits.html':'<html></html>','index.html':'<html></html>','package.json':'{}'});
+ const probe=require('../services/adapter-probe-core.cjs').probeGame({dir,executable:path.join(dir,'Game.exe')});
+ assert.deepEqual([probe.step,probe.detected,probe.lines,probe.japaneseLines],['ok','tyrano',2,2]);
+ assert.equal(probe.engines.find(e=>e.id==='tyrano').routed,true);
+ assert.deepEqual(scenes.read('tyrano',dir)[0].lines,['こんにちは。','次の場面です。']);
+ fs.unlinkSync(path.join(dir,'nw.pak'));
+ assert.notEqual(library.engineOf(dir)?.name,'TyranoScript');
+ assert.deepEqual(tyrano.engine.scenes(dir),[]);
+});
+
+test('TyranoScript: an NW.js runtime alone cannot identify a game without both archive markers',t=>{
+ for(const entries of [{'data/scenario/first.ks':KS_JA},{'tyrano/tyrano.base.js':'//'}]){
+  const dir=tmp(t);
+  F.writeTree(dir,{'Game.exe':F.zip(entries,{prefix:Buffer.from('MZ')}),'nw.pak':'x'});
+  assert.notEqual(library.engineOf(dir)?.name,'TyranoScript');
+  assert.deepEqual(tyrano.engine.scenes(dir),[]);
+ }
+});
+
+test('TyranoScript: a helper executable cannot replace scenes from package.nw',t=>{
+ const dir=tmp(t);
+ const script='本編です。[p]',other='別の場面です。[p]';
+ F.writeTree(dir,{'nw.pak':'x','package.nw':F.zip({'tyrano/tyrano.base.js':'//','data/scenario/first.ks':script}),
+  'Apatch.exe':F.zip({'data/scenario/first.ks':other,'data/scenario/tool.ks':other},{prefix:Buffer.from('MZ')})});
+ assert.deepEqual(scenes.read('tyrano',dir).map(s=>[s.name,s.lines]),[['first.ks',['本編です。']]]);
+ assert.deepEqual(tyrano.engine.sources(dir).map(f=>path.basename(f)),['package.nw']);
+});
+
+test('TyranoScript: a separate package.nw does not change the reader of a loose RPG Maker game',t=>{
+ const dir=tmp(t);
+ F.writeTree(dir,{'nw.pak':'x','Game.exe':'MZ','package.json':'{"main":"www/index.html"}','www/index.html':'',
+  'www/js/rpg_core.js':'','www/data/Map001.json':'{}',
+  'package.nw':F.zip({'tyrano/tyrano.base.js':'//','data/scenario/first.ks':KS_JA})});
+ assert.equal(library.engineOf(dir)?.name,'RPG Maker MV/MZ');
+});
+
 /* ---- Softpal ADV (E568) ---------------------------------------------------------------------------------------- */
 const softpal=require('../services/original-engines/softpal.cjs');
 test('Softpal: data.pac with encrypted TEXT.DAT, names before messages, choices; a GBK patch pairs',t=>{
