@@ -10,7 +10,7 @@ internal sealed class KemcoSpriteSnapshot {
   internal int id; internal string text; internal bool shown; internal float[] box;
  }
  internal sealed class Page {
-  internal string text; internal readonly List<float[]> rects = new List<float[]>();
+  internal string text; internal bool complete; internal readonly List<float[]> rects = new List<float[]>();
  }
  sealed class Published { internal int generation, line; internal string wire; }
  readonly Dictionary<string, Published> pages = new Dictionary<string, Published>();
@@ -44,7 +44,7 @@ internal sealed class KemcoSpriteSnapshot {
    }
   }
   if (p.rects.Count == 0) return null;
-  p.text=text.ToString(); return p;
+  p.text=text.ToString(); p.complete=!gap; return p;
  }
  static string N(float n) { return Math.Round(n,1).ToString(CultureInfo.InvariantCulture); }
  static string B(float[] b) { return N(b[0])+","+N(b[1])+","+N(b[2])+","+N(b[3]); }

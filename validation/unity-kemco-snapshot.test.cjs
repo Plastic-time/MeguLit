@@ -12,7 +12,7 @@ class StaticMes { public static string Mes(string text,bool flag){return text;} 
 class WrongMes { public string Mes(string text,int flag){return text;} }
 class Check {
  static int checks; static void Is(bool ok,string why){checks++;if(!ok)throw new Exception(why);}
- readonly object gate=new object();bool connected=true,kemcoAsked,kemcoRoles;int kemcoEpoch,kemcoObservedEpoch=-1;List<string> sent=new List<string>();void Send(string s){sent.Add(s);}
+ readonly object gate=new object();bool connected=true,kemcoAsked,kemcoRoles;string kemcoScope="";int kemcoEpoch,kemcoObservedEpoch=-1;List<string> sent=new List<string>();void Send(string s){sent.Add(s);}
  ${method('internal static bool KemcoFlag(')}
  ${method('internal static bool KemcoMethod(')}
  ${method('void KemcoControl(')}
@@ -59,7 +59,7 @@ test('new observer is a strict opt-in and old control bytes remain unchanged',()
  const {UnityTextPath}=require('../core/text-paths-unity.cjs'),p=new UnityTextPath(),writes=[];p.sock={write:s=>writes.push(s)};
  p.drawConfig({roles:true,embed:false,zh:false});assert.equal(writes.pop(),'DRAW roles=1 embed=0 zh=0\n');
  p.drawConfig({roles:false,embed:false,kemcoSprites:'true'});assert.equal(writes.pop(),'DRAW roles=0 embed=0 zh=1\n');
- p.drawConfig({kemcoSprites:true});assert.equal(writes.pop(),'DRAW roles=0 embed=0 zh=1 kemcoSprites=1\n');
+ p.drawConfig({kemcoSprites:true});assert.match(writes.pop(),/^KEMCO [a-f0-9]{32}\n$/);assert.equal(writes.pop(),'DRAW roles=0 embed=0 zh=1 kemcoSprites=1\n');
  p.drawConfig({});assert.equal(writes.pop(),'DRAW roles=0 embed=0 zh=1\n');
  assert.match(source,/file.Length!=361472/);assert.match(source,/c4d74235dc06d19630d8b826e49bd3d047c09bc03e8d8badeb0d60dd71dd7314/);
  const observer=source.slice(source.indexOf('// Exact original Raging Loop'));

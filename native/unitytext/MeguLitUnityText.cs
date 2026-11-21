@@ -83,6 +83,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
  void Command(string line) {
   if (line.StartsWith("HIDE ")) hideAsked = line.EndsWith("1");
   else if (line.StartsWith("WANT ")) wanted = line.Substring(5).Replace("\u001f", "\n");
+  else if (line.StartsWith("KEMCO ")) KemcoScope(line.Substring(6));
   else if (line.StartsWith("DRAW ") || line.StartsWith("EMB ")) DrawCommand(line);
  }
 
@@ -327,7 +328,7 @@ public class MeguLitUnityText : BaseUnityPlugin {
   var wait = new WaitForEndOfFrame();
   while (true) {
    yield return wait;
-   try { KemcoTick(); } catch (Exception) { kemcoPages.Reset(Screen.width,Screen.height,Send); }
+   try { KemcoTick(); } catch (Exception) { kemcoPages.Reset(Screen.width,Screen.height,Send); KemcoSendSource("gone",0,""); }
    try { if (current != null && connected) Report(); } catch (Exception e) { Logger.LogWarning("report " + e.Message); }
   }
  }
@@ -409,12 +410,33 @@ public class MeguLitUnityText : BaseUnityPlugin {
  // Exact original Raging Loop assembly only; this observer never writes renderers, text, roles or input
  volatile bool kemcoAsked, kemcoRoles;
  int kemcoEpoch, kemcoObservedEpoch=-1;
+ string kemcoScope=""; long kemcoSequence;
  bool kemcoTried, kemcoReady; float kemcoNext;
  Type kemcoMain, kemcoMessage, kemcoButton;
- FieldInfo kemcoBody, kemcoName, kemcoDialogs, kemcoRows, kemcoParent, kemcoButtonText, kemcoButtonEnabled;
+ FieldInfo kemcoBody, kemcoName, kemcoDialogs, kemcoRows, kemcoParent, kemcoLastMes, kemcoButtonText, kemcoButtonEnabled;
  readonly KemcoSpriteSnapshot kemcoPages = new KemcoSpriteSnapshot();
- void KemcoControl(bool on,bool roles=false) { lock(gate) { kemcoAsked=on; kemcoRoles=roles; kemcoEpoch++; } }
+ void KemcoControl(bool on,bool roles=false) { lock(gate) { kemcoAsked=on; kemcoRoles=roles; kemcoScope=""; kemcoEpoch++; } }
  void KemcoSend(string wire) { lock(gate) { if (connected && kemcoAsked && kemcoObservedEpoch==kemcoEpoch) Send(wire); } }
+ void KemcoScope(string scope) {
+  bool valid=scope.Length==32;
+  if(valid) foreach(char c in scope) if (!(c>='a'&&c<='f'||c>='0'&&c<='9')) valid=false;
+  lock(gate) { string next=kemcoAsked&&valid?scope:""; if(next==kemcoScope)return; kemcoScope=next; kemcoEpoch++; }
+ }
+ void KemcoSendSource(string kind,int page,string text) {
+  lock(gate) {
+   if(!connected || !kemcoAsked || kemcoScope.Length!=32 || kemcoObservedEpoch!=kemcoEpoch) return;
+   if(text.Length>4127 || Encoding.UTF8.GetByteCount(text)>8223) { kind="pending"; text=""; }
+   if(kemcoSequence>=9007199254740991L) return;
+   string encoded=Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+   Send("ToMe_UNITY kemco1 "+kemcoScope+"\t"+(++kemcoSequence)+"\t"+page+"\t"+kind+"\tc4d74235dc06d19630d8b826e49bd3d047c09bc03e8d8badeb0d60dd71dd7314\t"+encoded);
+  }
+ }
+ void KemcoSource(Component message,int page,KemcoSpriteSnapshot.Page p) {
+  if(message==null || page==0) { KemcoSendSource("gone",0,""); return; }
+  string expected=kemcoLastMes.GetValue(message) as string;
+  if(p==null || !p.complete || expected==null || expected.TrimEnd('\n')!=p.text) { KemcoSendSource("pending",page,""); return; }
+  KemcoSendSource("full",page,p.text);
+ }
  internal static bool KemcoFlag(string command,string name="kemcoSprites") {
   int count=0; bool on=false;
   foreach (string token in command.Split(' ')) if (token.StartsWith(name+"=",StringComparison.Ordinal)) { count++; on=token==name+"=1"; }
@@ -446,8 +468,9 @@ public class MeguLitUnityText : BaseUnityPlugin {
    kemcoBody=KemcoField(kemcoMain,"message",kemcoMessage); kemcoName=KemcoField(kemcoMain,"nameMessage",kemcoMessage);
    kemcoDialogs=KemcoField(kemcoMain,"dialogList",typeof(List<GameObject>));
    kemcoRows=KemcoField(kemcoMessage,"messageSprite",typeof(List<List<GameObject>>)); kemcoParent=KemcoField(kemcoMessage,"parentObject",typeof(GameObject));
+   kemcoLastMes=KemcoField(kemcoMessage,"LastMes",typeof(string));
    kemcoButtonText=KemcoField(kemcoButton,"Text",typeof(GameObject)); kemcoButtonEnabled=KemcoField(kemcoButton,"Enabled",typeof(bool));
-   kemcoReady=kemcoBody!=null && kemcoName!=null && kemcoDialogs!=null && kemcoRows!=null && kemcoParent!=null && kemcoButtonText!=null && kemcoButtonEnabled!=null && KemcoMethod(kemcoMessage);
+   kemcoReady=kemcoBody!=null && kemcoName!=null && kemcoDialogs!=null && kemcoRows!=null && kemcoParent!=null && kemcoLastMes!=null && kemcoButtonText!=null && kemcoButtonEnabled!=null && KemcoMethod(kemcoMessage);
    Send("ToMe_UNITY status kemco-sprites schema="+(kemcoReady?"original-readonly":"unsupported")); return kemcoReady;
   }
   return false;
@@ -511,9 +534,10 @@ public class MeguLitUnityText : BaseUnityPlugin {
   if (!KemcoSchema()) { kemcoPages.Reset(Screen.width,Screen.height,Send); return; }
   var all=UnityEngine.Object.FindObjectsOfType(kemcoMain); Component main=null; int active=0;
   foreach (var obj in all) { var c=obj as Component; if (Shown(c)) { main=c; active++; } }
-  if (active!=1) { kemcoPages.Reset(Screen.width,Screen.height,Send); return; }
-  int generation; var body=KemcoRead(kemcoBody.GetValue(main) as Component,out generation);
+  if (active!=1) { kemcoPages.Reset(Screen.width,Screen.height,Send); KemcoSendSource("gone",0,""); return; }
+  int generation; var bodyMessage=kemcoBody.GetValue(main) as Component; var body=KemcoRead(bodyMessage,out generation);
   kemcoPages.Publish("body",generation,body,null,null,Screen.width,Screen.height,KemcoSend);
+  KemcoSource(bodyMessage,generation,body);
   var name=kemcoRoles?KemcoRead(kemcoName.GetValue(main) as Component,out generation):null;
   kemcoPages.Publish("name",generation,null,name==null?null:name.text,KemcoUnion(name),Screen.width,Screen.height,KemcoSend);
   var dialogs=kemcoDialogs.GetValue(main) as List<GameObject>;

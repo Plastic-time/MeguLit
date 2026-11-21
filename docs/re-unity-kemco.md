@@ -74,8 +74,9 @@ Choice collection finishes its identity/count checks before publishing any of th
 
 All records use the existing ToMe_CHARS protocol with hidden=0
 This observer never sets text, alpha, renderer enabled state, input, saves or game files
-It does not manufacture hookSource: old Luna TextMesh setter streams can still compete with full-page sources
-Current-source arbitration, complete text/translation pairing, DOM acknowledgement and any hide operation need a separate reviewed design before runtime acceptance
+The geometry observer does not manufacture hookSource
+The companion bounded source proposal below needs separately reviewed HookNative wiring before it can claim current-source ownership
+Complete text/translation pairing, DOM acknowledgement and any hide operation remain outside this candidate
 
 Every received DRAW request advances this observer's permission epoch, even an off request followed immediately by on
 Sending a fresh observation checks that epoch under the same lock as control updates
@@ -97,11 +98,56 @@ Existing Tsuki/Higurashi recordings remain separate real-recording regressions, 
 The Mono plugin compiles using real Unity 5 and BepInEx 5.4.23.6 reference assemblies
 The first observer candidate incorrectly required a void Mes return; a follow-up corrects it to the actual string return after a fresh metadata-only audit of every field/type gate
 The actual method predicate is compiled in the console harness with a matching string-return neutral class and void/static/wrong-parameter negative classes
-The six related suites pass 31/31 without skips; these are local pure/console/socket tests, not game or GUI tests
+The initial six related suites pass 31/31 without skips; the added source/opt-in suites are described below
+These are local pure/console/socket tests, not game or GUI tests
 The helper's synthetic visibility boxes do not certify the actual Unity camera/material implementation
 Before live work the current plugin must be supplied in the on-demand runtime pack and a fresh shadow, original assembly selected, actual audio snapshot guard completed, and a game slot acquired
 Then verify at least ten actual full lines, source ownership, name/choice separation, ruby, point lookup, translated choices and no stale page after close/menu
 No such live check or source-arbitration acceptance is recorded here
+
+## Bounded complete-source proposal
+
+KemcoSpriteSnapshot distinguishes a visible prefix from a complete root list
+A complete source additionally requires the exact string field LastMes to equal the observed root text after removing only its trailing LF characters
+No general whitespace removal, language guessing, ruby guessing or two-character prefix match supplies this proof
+An incomplete/mismatching page sends pending; a missing body/single-main context sends gone
+
+The source transport is separately negotiated with KEMCO followed by a 128-bit random lowercase hexadecimal scope
+Only explicit kemcoSprites permission permits it; DRAW off clears the remote scope
+The local UnityTextPath rotates scope on permission/config changes and reconnect, and clears ownership on stop/disconnect
+An ordinary source WANT does not resend DRAW and thereby invalidate its own observer permission epoch
+Default-off control bytes remain unchanged
+
+The versioned wire has six tab-separated fields after ToMe_UNITY kemco1: scope, positive sequence, signed nonzero page for full, state, fixed original-assembly SHA and canonical base64 UTF-8 text
+No pickle, executable code, remote command or new hide request is carried
+The Mono sender binds it to the current permission epoch and the already verified exact assembly/schema
+This is the plugin's own identity assertion over the existing loopback transport, not process attestation against a malicious local client
+Source bytes are limited to 8223, non-newline scalars to 2048 and row separators to 31
+Source messages are bounded to 12000 characters before parsing; unknown state, bad identity, invalid UTF-8, extra fields, aliases and invalid budgets cannot grant ownership
+Out-of-order sequences and old scopes cannot revive an old page
+
+UnityKemcoSource uses a monotonic timer-free 500ms lease, refreshed by a complete, identical current-page heartbeat
+Pending, gone, off, reconnect, changed page or expired heartbeat remove the previous authority
+The callback receives a private Symbol authority which survives internal object spread but not JSON serialization
+An owned callback with a revoked token stays rejected even after ordinary native input has been restored
+Only current owned proposals enter while pending; other native sources are suppressed only if onSource returns strict true
+Undefined, false or an exception does not grant a lease
+The callback must establish actual current HookNative source acceptance, rather than assuming a call to source succeeded through its existing filters
+That acknowledgement concerns backend current text only, not visible DOM, translated text or native pixels
+
+Required shared integration, owned by the coordinating task:
+
+- attachTextPath installs a callback bound to the same currently attached path and actual game identity; a late old game's callback must return false
+- source checks the optional text-path blockSource before UnityBox or any deferred-source processing, so an old queued setter callback cannot overwrite the complete body
+- the callback returns true only after actual accepted current-source evidence; an asynchronous/filtered path without a definite receipt stays unsupported
+- UI/name/choice metadata continues through charRects and does not pass through this body-source gate
+
+No integration is inferred from the pure helper tests
+The source helper tests use explicit synthetic acceptance callbacks and disclose that boundary
+The actual Mono complete-source predicate, scope/epoch guard and encoder are compiled with the production snapshot helper into a tiny console
+Its output is consumed by the production Node source parser, including complete/prefix/mismatch/absence/revoke/budget cases
+The fixture's reflected LastMes holder is a neutral stand-in, not a running Unity object
+No source lease or callback is permission to hide the game
 
 ## Small existing-plugin correction
 
