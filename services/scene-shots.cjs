@@ -13,7 +13,9 @@ const KEEP=48,MIN_SCORE=38,SAME=10,LINE_GAP=30000,HIDE_GAP=5000;
 const keyOf=exe=>crypto.createHash('sha1').update(path.resolve(String(exe)).toLowerCase()).digest('hex').slice(0,16);
 const dirOf=(root,exe)=>path.join(root,'data','scene-shots',keyOf(exe));
 function readIndex(dir){try{const v=JSON.parse(fs.readFileSync(path.join(dir,'index.json'),'utf8'));return Array.isArray(v)?v:[];}catch{return [];}}
-function writeIndex(dir,list){fs.mkdirSync(dir,{recursive:true});const f=path.join(dir,'index.json');fs.writeFileSync(f+'.tmp',JSON.stringify(list));fs.renameSync(f+'.tmp',f);}
+function writeIndex(dir,list){const file=path.join(dir,'index.json'),tmp=file+'.'+process.pid+'.tmp';
+ try{fs.writeFileSync(tmp,JSON.stringify(list));fs.renameSync(tmp,file);}
+ catch(error){try{fs.rmSync(tmp,{force:true});}catch{}throw error;}}
 function hamming(a,b){if(!a||!b||a.length!==b.length)return 64;let x=BigInt('0x'+a)^BigInt('0x'+b),n=0;while(x){n+=Number(x&1n);x>>=1n;}return n;}
 /* keep one capture: returns what happened, for the log and the tests */
 function keep(root,exe,shot,now=Date.now()){
@@ -22,11 +24,18 @@ function keep(root,exe,shot,now=Date.now()){
  if(near&&near.score>=shot.score)return 'duplicate';
  /* a full shelf where every kept shot scores higher: the new one would be written and deleted at once */
  {const others=list.filter(it=>it!==near);if(others.length>=KEEP&&others.every(it=>it.score>=shot.score))return 'skipped';}
- const file=now.toString(36)+'-'+shot.hash.slice(0,6)+'.jpg';fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,file),Buffer.from(shot.jpeg,'base64'));
- let next=list.filter(it=>it!==near);if(near)try{fs.rmSync(path.join(dir,near.file),{force:true});}catch{}
+ const file=now.toString(36)+crypto.randomBytes(4).toString('hex')+'-'+shot.hash.slice(0,6)+'.jpg';
+ fs.mkdirSync(dir,{recursive:true});const target=path.join(dir,file);
+ const next=list.filter(it=>it!==near);
  next.push({file,score:shot.score,hash:shot.hash,at:now,clean:shot.clean!==false});next.sort((a,b)=>b.score-a.score);
- for(const drop of next.slice(KEEP))try{fs.rmSync(path.join(dir,drop.file),{force:true});}catch{}
- writeIndex(dir,next.slice(0,KEEP));return near?'replaced':'kept';
+ const fd=fs.openSync(target,'wx');
+ try{
+  try{fs.writeFileSync(fd,Buffer.from(shot.jpeg,'base64'));}finally{fs.closeSync(fd);}
+  writeIndex(dir,next.slice(0,KEEP));
+ }catch(error){try{fs.rmSync(target,{force:true});}catch{}throw error;}
+ const dropped=next.slice(KEEP);if(near)dropped.push(near);
+ for(const drop of dropped)try{fs.rmSync(path.join(dir,drop.file),{force:true});}catch{}
+ return near?'replaced':'kept';
 }
 /* 2026-11-13 (user: "不要截图有对话框的时候", "以后只要有对话框 除非用户主动截图 否则不要拿来当卡牌") a capture is only ever taken while
    no dialogue box is on screen: a new line (hidden=false) or a box coming back only marks the box as shown, and the capture
