@@ -51,6 +51,20 @@ for(const file of RUNTIMES){
  });
 }
 
+/* Unity IL2CPP (Il2cppDraw.h): it adds no hook of its own, LunaHook's Unity engine hands it the text setters it already
+   observes; Observe() does nothing until Ready, Ready is only set in Build(), Build() is only reached through SafeBuild(),
+   and SafeBuild() only behind RolesAsked() */
+test('native Il2cppDraw.h: nothing observed until the control file says roles=1',()=>{
+ const raw=fs.readFileSync(path.join(hook,'Il2cppDraw.h'),'utf8'),src=strip(raw),fns=bodies(src);
+ assert.ok(/roles=1/.test(raw)&&!/\bMH_(?:CreateHook|EnableHook)\b/.test(src),'reads roles=1, creates no hook');
+ const obs=fns.find(f=>f.name==='Observe');assert.ok(obs);assert.match(src.slice(obs.start,obs.end),/\{\s*if\s*\(\s*!Ready\b[^)]*\)\s*return\s*;/,'Observe() returns at once unless Ready');
+ const sets=[...src.matchAll(/InterlockedExchange\s*\(\s*&Ready\s*,\s*1\s*\)|\bReady\s*=\s*1\b/g)];assert.ok(sets.length>=1);
+ for(const m of sets)assert.equal(inner(fns,m.index)?.name,'Build','Ready is set only in Build()');
+ for(const m of src.matchAll(/\bBuild\s*\(\s*\)/g)){const f=inner(fns,m.index);if(!f||f.start===m.index)continue;if(f.name==='Build')continue;assert.equal(f.name,'SafeBuild','Build() only from SafeBuild()');}
+ for(const m of src.matchAll(/\bSafeBuild\s*\(\s*\)/g)){if(fns.some(f=>f.name==='SafeBuild'&&f.start===m.index))continue;
+  const line=raw.slice(src.lastIndexOf('\n',m.index)+1,src.indexOf('\n',m.index));assert.match(line,/RolesAsked\s*\(\s*\)/,'SafeBuild() only behind RolesAsked(): '+line.trim());}
+});
+
 test('native: every engine-draw runtime is armed from the hook build (copied by build-x86.cmd)',()=>{
  const b=fs.readFileSync(path.join(hook,'build-x86.cmd'),'utf8');for(const f of RUNTIMES)assert.ok(b.includes(f),f+' in build-x86.cmd');
 });
