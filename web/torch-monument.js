@@ -406,7 +406,9 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
   if(reflector){scene.remove(reflector);reflector.getRenderTarget().dispose();reflector.material.dispose();reflector=null;}
   if(!low){const s=host.getBoundingClientRect();reflector=new Reflector(new THREE.PlaneGeometry(FL_W,FL_L),{clipBias:.003,textureWidth:Math.max(256,s.width*.5),textureHeight:Math.max(256,s.height*.5),color:0xb8b4c4,multisample:0});
    keep(reflector.geometry);reflector.rotation.x=-Math.PI/2;reflector.position.set(0,-.001,FL_Z);reflector.renderOrder=-3;scene.add(reflector);
-   const before=reflector.onBeforeRender;reflector.onBeforeRender=function(...a){if(scene.overrideMaterial)return;const v=skipInMirror.map(o=>o.visible);skipInMirror.forEach(o=>o.visible=false);
+   const before=reflector.onBeforeRender;reflector.onBeforeRender=function(...a){if(scene.overrideMaterial)return;
+    /* a still camera sees the same reflection: redraw it only every third frame then */
+    if(idle&&mirrorTick%3!==0)return;const v=skipInMirror.map(o=>o.visible);skipInMirror.forEach(o=>o.visible=false);
     before.apply(this,a);skipInMirror.forEach((o,i)=>o.visible=v[i]);};
    floorMat.transparent=true;floorMat.opacity=.66;floorMat.depthWrite=true;H.inlayMat.transparent=true;H.inlayMat.opacity=.82;}
   else{floorMat.transparent=false;floorMat.opacity=1;H.inlayMat.transparent=false;H.inlayMat.opacity=1;}
@@ -466,9 +468,14 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
  function setRead(p){view.read=p?new THREE.Vector3(THREE.MathUtils.clamp(p.x,-5.2,5.2),THREE.MathUtils.clamp(p.y,2.2,4.6),0):null;}
 
  /* ---- loop ---- */
+ let idle=false,mirrorTick=0;
  function draw(){if(composer)composer.render();else renderer.render(scene,camera);}
  function frame(now){raf=0;if(!active)return;const dt=Math.min(.1,(now-last)/1000);last=now;
-  if(tier==='low'&&now-(frame.lastDraw||0)<31){raf=requestAnimationFrame(frame);return;}frame.lastDraw=now;
+  /* idle: when the camera has settled (no intro, no drag, no walk-up in progress) the scene only drifts slowly, so 30 fps is enough;
+     the light tier is always 30 */
+  { const cp=camera.position,cm=frame.cam||(frame.cam=new THREE.Vector3(1e9,0,0)),moving=cm.distanceToSquared(cp)>1e-6||Math.abs((frame.yaw||0)-view.yaw)>1e-5||!introDone||pointer.down;
+    cm.copy(cp);frame.yaw=view.yaw;if(moving)frame.moveAt=now;idle=now-(frame.moveAt||0)>1500;}
+  if((tier==='low'||idle)&&now-(frame.lastDraw||0)<31){raf=requestAnimationFrame(frame);return;}frame.lastDraw=now;mirrorTick++;
   const time=now/1000;H.update(time,dt,renderer);if(H.shadowDirty())renderer.shadowMap.needsUpdate=true;if(aoUni)aoUni.uTorchLevel.value=H.state.torch*(H.state.flicker||1);if(vol)vol.strength=H.state.beam*(H.state.moon?.8:1);const day=Math.min(1,H.state.skyI/1.1);scene.environmentIntensity=.2+.8*day;
   if(dust){const u=dust.material.uniforms,L=H.sun;u.uTime.value=time;u.uBase.value=.05+H.state.torch*.06;
    u.uHasShadow.value=L.castShadow&&L.shadow.map?1:0;if(L.shadow.map){u.tShadow.value=L.shadow.map.texture;u.shadowMatrix.value.copy(L.shadow.matrix);}
