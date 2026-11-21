@@ -120,6 +120,7 @@ class HookControl{
  // Turn hiding on/off to match preferences.hookHide. explicit = the user just flipped the switch.
  apply(explicit=false){
   const h=this.host,p=h.preferences;if(this.plan==='off'&&!explicit&&!p.hookAutoStart)return;
+  if(h.profile?.engine==='kirikiri'&&h.profile.hide?.streamFallback==='engine'&&this.plan==='off'&&!explicit)return;
   if(h.hooks.state.hookFramework==='siglus'){
    if(this.plan!=='read'){this.plan='read';this.running=true;this.status({hookCheckState:'reading',hookCheckMessage:'已识别脚本字符串流，使用安全读取，保留游戏原文'});}
    return;
@@ -138,6 +139,12 @@ class HookControl{
   // that can be embedded; once its streams carry text and none can, fall back below instead of leaving the
   // original visible.
   if(hiding&&(t||!threads.some(x=>x.selected&&x.sample))){const selected=threads.find(x=>x.selected);if(t&&selected&&t.id!==selected.id&&(streamRank(t)>streamRank(selected)||t===foreignPicked)){h.hooks.preferredThread=t.id;h.hooks.select?.(t.id);}return;}
+  if(hiding&&!t&&h.profile?.hide?.streamFallback==='engine'){
+   const selected=threads.find(x=>x.selected),fallback=require('./engine-routes/kirikiri.cjs').decide(this.engineRouteState,{setting:h.profile.hide.streamFallback,engine:h.profile.engine,run:identity,stream:selected?selected.id+'|'+selected.code:'',active:this.running&&this.plan==='embed'&&p.hookProfile==='embed'&&p.hookHide===true&&p.bindEnabled===true&&h.state.bound===true&&h.state.coverEnabled!==false,hideActive:h.hooks.enabled===true&&!h.hooks.preflight,evidence:h.hooks.engineRouteEvidence});
+   this.engineRouteState=fallback.state;
+   if(fallback.phase==='inactive')return;
+   if(fallback.keep){this.status({hookEmbedUnsupported:false,hookVisualVerified:false,hookCheckState:fallback.phase==='confirmed'?'captured':'waiting',hookCheckMessage:fallback.phase==='confirmed'?'台词由引擎报告，继续沿用隐藏设置':'沿用引擎文本路线，等待本句隐藏确认'});return;}
+  }
   if(hiding)this.start('read');
   if(!t){if(this.plan==='off')this.start('read');
    // Streams carry text but none can be embedded: this game is covered by OCR instead.

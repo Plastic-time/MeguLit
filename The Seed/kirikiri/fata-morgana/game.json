@@ -30,6 +30,7 @@
    "dropEffectFrames": true
   },
   "hide": {
+   "streamFallback": "engine",
    "textEffectsRead": false
   },
   "draw": {
@@ -78,5 +79,5 @@
  "sourceLangs": [
   "ja"
  ],
- "rev": 6
+ "rev": 7
 }

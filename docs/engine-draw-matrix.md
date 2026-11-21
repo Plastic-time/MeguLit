@@ -30,9 +30,9 @@
 
 GetGlyphOutline 类的签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、沙耶两版）以及 NScripter 的字形小图，是不是字形缓存（只有第一次出现的字）还要实机确认，见 engine-draw-native.md「注意：字形缓存」
 
-## Majiro 本轮分支交付
+## Majiro 本轮交付
 
-`codex/night-engine-majiro` 补齐旧版 Majiro 六件套，尚待总指挥合并。`MajiroDraw.h` 在字体缓存判断之前观察完整字符串，签名只在本机姫子样本命中一次，22 个其他引擎程序均未命中。默认不挂，没有游戏 seed 开启。真实游戏坐标、角色、注音和译文效果尚未验收，不能据此写“适配完成”。详细证据及下一步见 [engine-draw-native.md](engine-draw-native.md) 的 Majiro 节
+旧版 Majiro 六件套已随 `aa22ae6e` 合入 main，双架构 DLL 编译及完整原生自检通过。`MajiroDraw.h` 在字体缓存判断之前观察完整字符串，签名只在本机姫子样本命中一次，22 个其他引擎程序均未命中。默认不挂，没有游戏 seed 开启。真实游戏坐标、角色、注音和译文效果尚未验收，不能据此写“适配完成”。详细证据及下一步见 [engine-draw-native.md](engine-draw-native.md) 的 Majiro 节
 
 ## 图例
 

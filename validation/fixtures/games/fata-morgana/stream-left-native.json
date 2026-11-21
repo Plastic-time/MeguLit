@@ -1,0 +1,120 @@
+{
+ "sourceSha256": "c95db72108fb277c7267cf44f28bf21fa17cdbf98c6fca22f6757e3cecb3c87e",
+ "scope": "Minimal unchanged native records around the ninth-line stream switch; not live acceptance.",
+ "game": "37428|639308495291015937",
+ "before": {
+  "t": 1795253133065,
+  "hb": {
+   "type": "hookThreads",
+   "hookThreads": [
+    {
+     "id": "575310:0:0",
+     "name": "Krkr2wcs",
+     "code": "EXHQXN8@175310:fata_jp.exe",
+     "sample": "",
+     "embeddable": true,
+     "hideTrying": false,
+     "hideOnly": false,
+     "selected": true
+    },
+    {
+     "id": "52c3a7:0:32",
+     "name": "UserHook1",
+     "code": "HWN-10*-2:-8@12C3A7:fata_jp.exe",
+     "sample": "……けれど……",
+     "embeddable": false,
+     "hideTrying": false,
+     "hideOnly": false,
+     "selected": false
+    },
+    {
+     "id": "538f14:0:b",
+     "name": "tTVPNativeBaseBitmap::DrawText",
+     "code": "HQXN0@138F14:fata_jp.exe",
+     "sample": "………けれ……どけ…れ…………どけれ……どけ…れ……どけ…れ…ど………",
+     "embeddable": false,
+     "hideTrying": false,
+     "hideOnly": false,
+     "selected": false
+    }
+   ]
+  }
+ },
+ "page": {
+  "t": 1795253134600,
+  "hb": {
+   "type": "hookEngineLine",
+   "engine": "krkr",
+   "phase": "end",
+   "line": 9,
+   "same": false,
+   "nvl": true,
+   "x0": 239,
+   "y0": 485,
+   "x1": 538,
+   "y1": 485,
+   "size": 22,
+   "sw": 800,
+   "sh": 600,
+   "count": 16,
+   "color": "#9d9d9d",
+   "paint": "f:9d9d9dff,e:000000ff:1",
+   "text": "……とこしえの闇に溶けゆく中……",
+   "at": 1795253134600
+  }
+ },
+ "chars": {
+  "t": 1795253134603,
+  "hb": {
+   "type": "hookChars",
+   "line": "ToMe_CHARS engine=krkr line=9 hidden=1 sw=800 sh=600 vx=0 vy=0 vw=0 vh=0 n=16 rects=239,485,22,22;261,485,22,22;283,485,16,22;299,485,17,22;316,485,17,22;333,485,20,22;353,485,21,22;374,485,22,22;396,485,21,22;417,485,22,22;439,485,20,22;459,485,21,22;480,485,14,22;494,485,22,22;516,485,22,22;538,485,22,22 text=……とこしえの闇に溶けゆく中……"
+  }
+ },
+ "left": {
+  "t": 1795253134786,
+  "hb": {
+   "type": "hookStreamLeft",
+   "id": "575310:0:0",
+   "code": "EXHQXN8@175310:fata_jp.exe",
+   "to": "52c3a7:0:32"
+  }
+ },
+ "after": {
+  "t": 1795253134787,
+  "hb": {
+   "type": "hookThreads",
+   "hookThreads": [
+    {
+     "id": "52c3a7:0:32",
+     "name": "UserHook1",
+     "code": "HWN-10*-2:-8@12C3A7:fata_jp.exe",
+     "sample": "……けれど……",
+     "embeddable": false,
+     "hideTrying": true,
+     "hideOnly": false,
+     "selected": true
+    },
+    {
+     "id": "575310:0:0",
+     "name": "Krkr2wcs",
+     "code": "EXHQXN8@175310:fata_jp.exe",
+     "sample": "",
+     "embeddable": true,
+     "hideTrying": false,
+     "hideOnly": false,
+     "selected": false
+    },
+    {
+     "id": "538f14:0:b",
+     "name": "tTVPNativeBaseBitmap::DrawText",
+     "code": "HQXN0@138F14:fata_jp.exe",
+     "sample": "………けれ……どけ…れ…………どけれ……どけ…れ……どけ…れ…ど………",
+     "embeddable": false,
+     "hideTrying": false,
+     "hideOnly": false,
+     "selected": false
+    }
+   ]
+  }
+ }
+}
