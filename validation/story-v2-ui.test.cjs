@@ -2,6 +2,15 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const layoutSource=fs.readFileSync(path.join(__dirname,'../web/story-layout.js'),'utf8'),storySource=fs.readFileSync(path.join(__dirname,'../web/detail-story.js'),'utf8');
+test('partial pages distinguish loaded scene metadata from whole-gallery counts in all three languages',()=>{
+ const copySource=storySource.slice(storySource.indexOf('const copy='),storySource.indexOf('const lock=')),sections=storySource.slice(storySource.indexOf(' function gallerySections()'),storySource.indexOf(' function renderGallery()')),render=storySource.slice(storySource.indexOf(' function renderGallery()'),storySource.indexOf(' function watchImages()'));
+ for(const locale of ['zh','ja','en']){
+  const listing={status:'ready',cgUnlocked:26,cgTotal:40,endingDone:2,endingTotal:null,remaining:null,next:24,endings:[],groups:Array.from({length:24},(_,i)=>({id:'g'+i,state:'done'}))},target={innerHTML:'',querySelector:()=>({}),querySelectorAll:()=>[]},context={target,listing,state:{},esc:String,count:v=>v??'—',heading:(t,s)=>t+s,knownEndings:()=>[],galleryColumns:()=>7,sceneMarkup:()=>'',watchImages(){}};
+  vm.runInNewContext(copySource+`\nconst w=copy[${JSON.stringify(locale)}];`+sections+render+'\nrenderGallery();globalThis.expected={loaded:w.loaded(24),more:w.loadMore};',context);
+  assert(target.innerHTML.includes(context.expected.loaded));assert(target.innerHTML.includes(context.expected.more));assert(target.innerHTML.includes('26 / 40'));assert(!target.innerHTML.includes('24 / 24'));assert(!target.innerHTML.includes('2 / 0'));assert(!target.innerHTML.includes('2 / 7'));
+  context.listing.next=null;vm.runInNewContext('renderGallery()',context);assert(target.innerHTML.includes('24 / 24'));assert(!target.innerHTML.includes('data-story-more'));
+ }
+});
 function layout(){const context={};vm.runInNewContext(layoutSource.replace('export function layoutStory','function layoutStory')+'\nglobalThis.layout=layoutStory;',context);return context.layout;}
 test('image source allowlist accepts native BMP and existing raster formats but rejects SVG and remote URLs',()=>{
  const line=storySource.split(/\r?\n/).find(line=>line.startsWith('const validImage=')),context={};assert(line);vm.runInNewContext(line+'\nglobalThis.accept=validImage;',context);
