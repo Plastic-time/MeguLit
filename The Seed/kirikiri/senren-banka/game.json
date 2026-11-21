@@ -1,0 +1,38 @@
+{
+ "schema": "megulit.seed",
+ "version": 1,
+ "layer": "game",
+ "id": "senren-banka",
+ "engine": "kirikiri",
+ "title": {
+  "ja": "千恋＊万花",
+  "zh": "千恋万花"
+ },
+ "prints": {
+  "steam": "1144400",
+  "title": "e509cab0c761c1dc3b943435278da7e4de8da21966f3264a684487160bc9f20f"
+ },
+ "match": {
+  "exe": [
+   "SenrenBanka.exe",
+   "SenrenBanka_chs.exe",
+   "Senren_chs.exe",
+   "Senren_jp.exe",
+   "senren.exe"
+  ],
+  "titles": [
+   "千恋万花",
+   "Senren Banka",
+   "Senren＊Banka"
+  ]
+ },
+ "rev": 1,
+ "mode": "hide",
+ "settings": {
+  "placement": {
+   "drawWhileBlanking": true,
+   "translationGrowsDown": true
+  }
+ },
+ "note": "incr9 2026-11-21: short lines showed the translation alone (the game hid them, no hidden glyph came back); the Japanese sat over the name box when two translation rows did not fit"
+}

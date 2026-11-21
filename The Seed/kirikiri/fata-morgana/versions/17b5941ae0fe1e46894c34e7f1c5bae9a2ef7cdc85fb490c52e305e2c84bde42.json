@@ -1,0 +1,13 @@
+{
+ "schema": "megulit.seed",
+ "version": 1,
+ "layer": "version",
+ "key": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42",
+ "prints": {
+  "exe": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42"
+ },
+ "exe": "fata.exe",
+ "rev": 1,
+ "settings": {},
+ "note": "the build of the owner's sample probe (validation/helpers/diff-maker/probes/fata-morgana)"
+}

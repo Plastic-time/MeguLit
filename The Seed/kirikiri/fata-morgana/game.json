@@ -1,0 +1,30 @@
+{
+ "schema": "megulit.seed",
+ "version": 1,
+ "layer": "game",
+ "id": "fata-morgana",
+ "engine": "kirikiri",
+ "title": {
+  "ja": "ファタモルガーナの館",
+  "zh": "魔女之馆"
+ },
+ "prints": {
+  "steam": "303310",
+  "title": "b875bbc5bee84c5b84c550da5934f1115f680233162baf3120f30d9822940cb3"
+ },
+ "match": {
+  "exe": [
+   "fata.exe",
+   "fata_jp.exe",
+   "fata_cn.exe",
+   "fata_en.exe"
+  ],
+  "titles": [
+   "The House in Fata Morgana",
+   "法塔莫尔加纳之馆"
+  ]
+ },
+ "rev": 1,
+ "mode": "hide",
+ "settings": {}
+}

@@ -50,7 +50,7 @@ test('the kernel never branches on a program name (the game diff does)',()=>{
 for(const key of all){
  test('game '+key+(run.includes(key)?'':' (skipped: not touched)'),{skip:!run.includes(key)},async()=>{
   const dir=path.join(FIX,key),id=JSON.parse(fs.readFileSync(path.join(dir,'identity.json'),'utf8'));
-  for(const input of id.same||[]){const p=Profiles.profileFor(input);assert.equal(p.gameKey,key,'should be '+key+': '+JSON.stringify(input));assert.match(p.layers,/\+game$/);}
+  for(const input of id.same||[]){const p=Profiles.profileFor(input);assert.equal(p.gameKey,key,'should be '+key+': '+JSON.stringify(input));assert.match(p.layers,/\+(?:seed-)?game/);}
   for(const input of id.other||[])assert.notEqual(Profiles.profileFor(input).gameKey,key,'should not be '+key+': '+JSON.stringify(input));
   /* isolation: no other game's copies resolve to this game */
   for(const other of all.filter(k=>k!==key)){const f=path.join(FIX,other,'identity.json');if(!fs.existsSync(f))continue;for(const input of JSON.parse(fs.readFileSync(f,'utf8')).same||[])assert.notEqual(Profiles.profileFor(input).gameKey,key,other+' copy resolved to '+key);}

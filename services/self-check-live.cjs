@@ -30,10 +30,12 @@ function readMode(reader,reason){try{const g=reader.gal;if(g&&!g.textEffectsHold
    shared (the players' agreed diff) <- auto (this PC's calibration) <- official (the maintainer's diff) <- stepDown (this PC's
    gate step-down, always last so a game that broke here can always fall back). choose() still names the deciding one (reason,
    read mode, whether to calibrate). */
-function inputOf(s){const st=s.stored,sh=s.shared,out={...(s.input||{})};for(const k of ['sharedGame','shared','auto','officialGame','official','stepDown','match'])delete out[k];
+function inputOf(s){const st=s.stored,sh=s.shared,out={...(s.input||{})};for(const k of ['sharedGame','shared','auto','officialGame','official','officialGameRev','officialRev','sharedGameRev','sharedRev','stepDown','match','prints'])delete out[k];
  if(/^[0-9a-f]{64}$/.test(String(s.key||'')))out.exeSha256=s.key;
  /* the relay's two layers, each official or agreed (services/auto-profile-feed.cjs layer) */
- if(sh){const put=(p,field)=>{if(p&&p.settings)out[(p.source==='official'?'official':'shared')+field]=p.settings;};put(sh.game,'Game');put(sh.version,'');if(sh.match)out.match=sh.match;}
+ if(sh){const put=(p,field)=>{if(!p||!p.settings)return;const f=(p.source==='official'?'official':'shared')+field;out[f]=p.settings;out[f+'Rev']=p.rev|0;};put(sh.game,'Game');put(sh.version,'');if(sh.match)out.match=sh.match;}
+ /* the game prints let a built-in seed (The Seed/) find its game by archive / script / VNDB / title */
+ if(s.prints)out.prints=s.prints;
  if(st&&st.settings){if(st.source==='gate')out.stepDown=st.settings;else out.auto=st.settings;}return out;}
 function applyLayer(s){try{const p=Profiles.profileFor(inputOf(s));s.profile=p;s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
 /* which layer wins (see above) */

@@ -8,18 +8,29 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 |---|---|---|
 | 内核 | `core/profiles/defaults.cjs` | `core` |
 | 引擎差分 | `core/profiles/engines/<engine>.cjs` | `engine` |
-| 仓库游戏差分 | `core/profiles/games/<gameKey>.cjs` | `game` |
+| 仓库游戏差分（需要代码的极少数情况） | `core/profiles/games/<gameKey>.cjs` | `game` |
 | 共享自动·游戏层 | relay 下发，多人校准一致，我们签名 | `shared-game` |
 | 共享自动·版本层 | 同上，只对这个 exe | `shared` |
 | 本机校准 | `data/config/auto-profiles/<key>.json`（`core/auto-profile.cjs`） | `auto` |
-| 下发官方·游戏层 | relay 下发，我们签名，对这部游戏所有版本 | `official-game` |
-| 下发官方·版本层 | relay 下发，我们签名，只对这个 exe | `official` |
+| 官方·游戏层 | 内置 `The Seed/<engine>/<gameId>/game.json`（`seed-game`），或 relay 下发、我们签名、rev 更高的（`official-game`） | `seed-game` / `official-game` |
+| 官方·版本层 | 内置 `The Seed/…/versions/<exe>.json`（`seed`），或 relay 下发、rev 更高的（`official`） | `seed` / `official` |
 | 本机退档 | 自检闸门在这台电脑上看到这个 exe 坏了（读模式） | `stepdown` |
 
 - 本机退档永远在最上面：哪一层出问题，这台电脑都能退回读模式
 - 数组整组替换，不合并；`null` 表示交给内核原有判断
 - `profileFor({engine,exe,title,folder,steamAppId,vndb,exeSha256,match,sharedGame,shared,auto,officialGame,official,stepDown})` → 冻结对象 `{gameKey,engine,exeSha256,match,layers,matched,rejected,...键}`；后六个是设置对象，由 `services/self-check-live.cjs inputOf` 从本机记录和 relay 下发里取
 - `apply(profile,layer,name)` 在已有 profile 上再盖一层
+
+## The Seed（内置游戏差分）
+
+仓库根目录 `The Seed/` 是正式产物：随 GitHub main 发布，安装包里在 `MeguLit/The Seed/`（只多一个子目录，安装包名和 `MeguLit/` 结构不变），热更新也带（`services/hot-update.cjs` 允许 `The Seed/`，`Release.ps1` 打包和热更新包都列进去）。格式、贡献方式见 `The Seed/README.md`（中英双语）
+
+- `The Seed/<engine>/<gameId>/game.json`：游戏层，`prints`（pack/script/steam/vndb/title）、`match`（程序名、标题）、`title {ja, zh}`；只能放游戏层键
+- `The Seed/<engine>/<gameId>/versions/<exe SHA-256>.json`：版本层，`prints`（exe/head/pe）；只对这个 exe
+- 纯数据，`core/profiles/seed.cjs check()` 校验格式、值域、指纹、无路径无用户名；`validation/the-seed.test.cjs` 扫整个目录
+- 内置 seed 视为官方，不签名；运行时下发到用户电脑 `data/The Seed/` 的才验签。层顺序里内置 seed 和下发官方同一位置，下发的 rev 更高才覆盖
+- 认游戏：游戏 seed 按程序名、标题、Steam、VNDB、pack/script 指纹；版本 seed 只按 exe 完整哈希（它的 exe 哈希也让游戏 seed 精确命中）
+- `core/profiles/games/*.cjs` 只留给需要代码的极少数游戏；千恋＊万花、ファタモルガーナの館 已迁成 seed
 
 ## 键和值域
 

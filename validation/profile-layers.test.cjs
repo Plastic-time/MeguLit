@@ -12,7 +12,7 @@ function hook(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-profile-
 test('hook-native starts on the kernel layer and takes the game profile',()=>{
  const {h,events,log}=hook();assert.equal(h.profile.layers,'core');
  const p=Profiles.profileFor({exe:'D:/g/SenrenBanka.exe'});h.setProfile(p);
- assert.equal(h.profile,p);assert.match(log(),/profile senren-banka match=game:name exe=- layers=core\+engine\+game engine=kirikiri/);
+ assert.equal(h.profile,p);assert.match(log(),/profile senren-banka match=game:name exe=- layers=core\+engine\+seed-game engine=kirikiri/);
  assert.ok(events.some(e=>e.type==='hook'&&e.gameProfile?.gameKey==='senren-banka'));
 });
 
@@ -47,9 +47,9 @@ test('page/hide knobs: null keeps the kernel rule, a diff value wins for that ga
 });
 
 test('auto layer (this PC measured) stacks over the game diff, a bad key leaves it out whole; apply() adds one layer',()=>{
- assert.equal(Profiles.profileFor({exe:'D:/g/SenrenBanka.exe',auto:{selfCheck:{window:30},bogus:{x:1}}}).layers,'core+engine+game');
+ assert.equal(Profiles.profileFor({exe:'D:/g/SenrenBanka.exe',auto:{selfCheck:{window:30},bogus:{x:1}}}).layers,'core+engine+seed-game');
  const p=Profiles.profileFor({exe:'D:/g/SenrenBanka.exe',auto:{calibrate:{hideMethod:'glyph',textBox:{x:1,y:2,w:3,h:4}},selfCheck:{window:30}}});
- assert.equal(p.layers,'core+engine+game+auto');assert.equal(p.calibrate.hideMethod,'glyph');assert.deepEqual({...p.calibrate.textBox},{x:1,y:2,w:3,h:4});assert.equal(p.selfCheck.window,30);assert.equal(p.selfCheck.minLines,8);assert.ok(!('bogus' in p));
+ assert.equal(p.layers,'core+engine+auto+seed-game');assert.equal(p.calibrate.hideMethod,'glyph');assert.deepEqual({...p.calibrate.textBox},{x:1,y:2,w:3,h:4});assert.equal(p.selfCheck.window,30);assert.equal(p.selfCheck.minLines,8);assert.ok(!('bogus' in p));
  const q=Profiles.apply(Profiles.profileFor({exe:'D:/g/SenrenBanka.exe'}),{page:{holdMs:900},nope:1},'auto');
- assert.equal(q.layers,'core+engine+game+auto');assert.equal(q.page.holdMs,900);assert.equal(q.gameKey,'senren-banka');assert.ok(Object.isFrozen(q.page));
+ assert.equal(q.layers,'core+engine+seed-game+auto');assert.equal(q.page.holdMs,900);assert.equal(q.gameKey,'senren-banka');assert.ok(Object.isFrozen(q.page));
 });

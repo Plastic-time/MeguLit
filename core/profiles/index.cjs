@@ -28,8 +28,11 @@ const exeName=p=>path.win32.basename(String(p||'')).toLowerCase();
 const cache={engines:new Map(),games:null};
 function readDir(dir){try{return fs.readdirSync(dir).filter(f=>f.endsWith('.cjs')).sort();}catch{return [];}}
 function loadEngine(id){if(!id)return null;if(cache.engines.has(id))return cache.engines.get(id);let e=null;const file=path.join(ENGINE_DIR,id+'.cjs');if(fs.existsSync(file))e=require(file);cache.engines.set(id,e);return e;}
-function games(){if(cache.games)return cache.games;cache.games=readDir(GAME_DIR).map(f=>{const g=require(path.join(GAME_DIR,f));return {...g,key:f.slice(0,-4)};});return cache.games;}
-function reload(){for(const dir of [ENGINE_DIR,GAME_DIR])for(const f of readDir(dir))delete require.cache[path.join(dir,f)];cache.engines.clear();cache.games=null;}
+/* the games the repository knows: The Seed/ (built-in seeds, data, core/profiles/seed.cjs) and core/profiles/games/<key>.cjs (only
+   for the rare game whose diff needs code); a seed and a games/ file of one key: the games/ file wins */
+function games(){if(cache.games)return cache.games;const files=readDir(GAME_DIR).map(f=>{const g=require(path.join(GAME_DIR,f));return {...g,key:f.slice(0,-4)};});
+ const have=new Set(files.map(g=>g.key));cache.games=[...files,...require('./seed.cjs').seeds().games.filter(g=>!have.has(g.key))];return cache.games;}
+function reload(){for(const dir of [ENGINE_DIR,GAME_DIR])for(const f of readDir(dir))delete require.cache[path.join(dir,f)];cache.engines.clear();cache.games=null;require('./seed.cjs').reload();}
 
 /* how strongly a running copy looks like game g: steam 3, all fingerprint files 3, a distinctive exe 3, a generic exe 1,
    a title 3 (2 when the title only contains it), the same known engine +1. An engine both sides know that differs
@@ -39,6 +42,8 @@ function matchScore(g,input){const m=g.match||{};let score=0;const why=[];
  /* the program's SHA-256 is the version itself: a listed hash names the game whatever the file is called */
  if(Array.isArray(m.exeSha256)&&input.exeSha256&&m.exeSha256.map(x=>String(x).toLowerCase()).includes(String(input.exeSha256).toLowerCase())){score+=10;why.push('sha256');}
  if(m.steamAppId&&String(input.steamAppId||'')===String(m.steamAppId)){score+=3;why.push('steam');}
+ /* the game prints of a seed (core/game-print.cjs) against the running game's: an archive or script print names the game */
+ {const mp=m.prints||{},ip=input.prints||{};for(const [k,w] of [['pack',10],['script',10],['vndb',3],['title',3]])if(mp[k]&&ip[k]&&mp[k]===ip[k]){score+=w;why.push(k);}}
  if(Array.isArray(m.files)&&m.files.length&&input.folder){const ok=m.files.every(f=>{try{return fs.existsSync(path.join(input.folder,f));}catch{return false;}});if(ok){score+=3;why.push('files');}}
  else if(Array.isArray(m.files)&&m.files.length&&Array.isArray(input.files)){const have=new Set(input.files.map(f=>String(f).toLowerCase().replace(/\\/g,'/')));if(m.files.every(f=>have.has(String(f).toLowerCase())))
   {score+=3;why.push('files');}}
@@ -78,8 +83,13 @@ function apply(profile,layer,name){const meta={gameKey:profile.gameKey,engine:pr
 const OUTSIDE=[['sharedGame','shared-game'],['shared','shared'],['auto','auto'],['officialGame','official-game'],['official','official'],['stepDown','stepdown']];
 function profileFor(input={}){input=input||{};const hit=findGame(input);const game=hit?.game||null;const {clean}=require('./domains.cjs');
  const engine=engineId(input.engine)||engineId(game?.engine)||'';const eng=loadEngine(engine);
- let s=clone(DEFAULTS);const layers=['core'],rejected=[];if(eng){s=merge(s,clone(eng.settings||{}));layers.push('engine');}if(game){s=merge(s,clone(game.settings||{}));layers.push('game');}
- for(const [field,name] of OUTSIDE){const v=input[field];if(!plain(v))continue;const c=clean(v);if(c.rejected.length){rejected.push(name+': '+c.rejected.slice(0,3).join(','));continue;}s=merge(s,c.value);layers.push(name);}
+ let s=clone(DEFAULTS);const layers=['core'],rejected=[];if(eng){s=merge(s,clone(eng.settings||{}));layers.push('engine');}if(game&&!game.seed){s=merge(s,clone(game.settings||{}));layers.push('game');}
+ /* built-in seeds (The Seed/) stand where the downloaded official diff of their layer stands; a downloaded one with a higher rev
+    replaces them (input.officialGameRev / input.officialRev from services/self-check-live.cjs inputOf) */
+ const seedVersion=/^[0-9a-f]{64}$/.test(String(input.exeSha256||''))?require('./seed.cjs').versionOf(input.exeSha256):null;
+ const take=(seedDoc,field,rev)=>seedDoc&&(!plain(input[field])||!(Number(input[rev])>Number(seedDoc.rev)));
+ const slots={officialGame:take(game?.seed?game:null,'officialGame','officialGameRev')?['seed-game',game.settings]:null,official:take(seedVersion,'official','officialRev')?['seed',seedVersion.settings]:null};
+ for(const [field,name0] of OUTSIDE){let v=input[field],name=name0;if(slots[field]){[name,v]=slots[field];}if(!plain(v))continue;const c=clean(v);if(c.rejected.length){rejected.push(name+': '+c.rejected.slice(0,3).join(','));continue;}s=merge(s,c.value);layers.push(name);}
  const exe=/^[0-9a-f]{64}$/.test(String(input.exeSha256||''))?String(input.exeSha256):'';
  /* how the game was recognised, most exact first (docs/diff-layers.md): input.match is the relay's ('exe' | 'bin' | 'game:<basis>');
     else the repo game file's ('exe' when it lists this exe hash, game:<why> otherwise); else 'engine' or 'none' */

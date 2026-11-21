@@ -18,9 +18,9 @@ test('every kernel key has a value domain, at any depth; a bad key or value is l
 test('layers stack in one order, the local step-down last; a layer with a bad key is left out whole',()=>{
  const input={exe:'D:/g/SenrenBanka.exe',exeSha256:HASH,shared:{page:{holdMs:1,flowPage:true}},auto:{page:{holdMs:2}},official:{page:{holdMs:3}},stepDown:{hide:{textEffectsRead:true}}};
  const p=Profiles.profileFor(input);
- assert.equal(p.layers,'core+engine+game+shared+auto+official+stepdown');assert.equal(p.page.holdMs,3);assert.equal(p.page.flowPage,true);assert.equal(p.hide.textEffectsRead,true);
- assert.match(Profiles.traceLine(p),/^profile senren-banka match=game:name exe=abababab layers=core\+engine\+game\+shared\+auto\+official\+stepdown engine=kirikiri/);
- const q=Profiles.profileFor({...input,official:{page:{holdMs:3,bogus:1}}});assert.equal(q.layers,'core+engine+game+shared+auto+stepdown');assert.equal(q.page.holdMs,2);assert.match(q.rejected,/official: page\.bogus/);
+ assert.equal(p.layers,'core+engine+shared+auto+seed-game+official+stepdown');assert.equal(p.page.holdMs,3);assert.equal(p.page.flowPage,true);assert.equal(p.hide.textEffectsRead,true);
+ assert.match(Profiles.traceLine(p),/^profile senren-banka match=game:name exe=abababab layers=core\+engine\+shared\+auto\+seed-game\+official\+stepdown engine=kirikiri/);
+ const q=Profiles.profileFor({...input,official:{page:{holdMs:3,bogus:1}}});assert.equal(q.layers,'core+engine+shared+auto+seed-game+stepdown');assert.equal(q.page.holdMs,2);assert.match(q.rejected,/official: page\.bogus/);
  assert.equal(Profiles.profileFor({}).exeSha256,'');assert.match(Profiles.traceLine(Profiles.profileFor({exe:'D:/x/a.exe'})),/ exe=- /);
  assert.ok(Profiles.matchScore({match:{exeSha256:[HASH]}},{exe:'D:/x/renamed.exe',exeSha256:HASH}).score>=10,'a repo game file may name its versions by hash');
 });

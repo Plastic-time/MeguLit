@@ -1,0 +1,13 @@
+{
+ "schema": "megulit.seed",
+ "version": 1,
+ "layer": "version",
+ "key": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3",
+ "prints": {
+  "exe": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3"
+ },
+ "exe": "SenrenBanka.exe",
+ "rev": 1,
+ "settings": {},
+ "note": "the build of the owner's sample probe (validation/helpers/diff-maker/probes/senren-banka)"
+}
