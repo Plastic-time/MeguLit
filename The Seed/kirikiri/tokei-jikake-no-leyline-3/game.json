@@ -7,44 +7,27 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
   }
  },
  "exe": "",
@@ -61,5 +44,16 @@
  "slug": "tokei-jikake-no-leyline-3",
  "builds": [
   "0ed5c0e3f718224f89f1a990d3dac604745bcf71e0912449aad83782dc95c142"
- ]
+ ],
+ "match": {
+  "exe": [
+   "Ley-line4.exe"
+  ],
+  "titles": [
+   "時計仕掛けのレイライン －残影の夜が明ける時－",
+   "时钟机关的Leyline阳炎中彷徨的魔女",
+   "[130125][ユニゾンシフト：ブロッサム] 時計仕掛けのレイライン -残影の夜が明ける時-"
+  ]
+ },
+ "rev": 2
 }

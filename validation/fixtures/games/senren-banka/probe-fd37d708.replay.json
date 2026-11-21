@@ -1,11 +1,12 @@
 {
  "schema": 1,
- "tool": "diff-maker/2",
+ "tool": "diff-maker/5",
  "gameKey": "senren-banka",
  "exeSha256": "fd37d708774f8f45fa32375ec067f58c04038e17fc1c4e5180e9eed9092434d3",
  "engine": "kirikiri",
  "title": "千恋＊万花",
- "diff": "probe-fd37d708.diff.json",
+ "version": "probe-fd37d708.version.json",
+ "game": "probe-fd37d708.game.json",
  "lines": "probe-fd37d708.lines.json",
  "events": [
   {

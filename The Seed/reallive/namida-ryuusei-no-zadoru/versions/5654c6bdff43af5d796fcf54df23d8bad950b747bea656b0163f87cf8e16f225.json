@@ -5,14 +5,6 @@
  "layer": "version",
  "source": "official",
  "settings": {
-  "hide": {
-   "engineTrial": {
-    "enabled": null,
-    "unconfirmedLines": null,
-    "clickMs": null,
-    "skipAside": null
-   }
-  },
   "draw": {
    "embed": false,
    "embedTranslation": true
@@ -26,5 +18,6 @@
   "exe": "5654c6bdff43af5d796fcf54df23d8bad950b747bea656b0163f87cf8e16f225",
   "head": "50a31bde0e3209a58b51097393d765041db8807e12e44c4975fc81b55be8e7c6",
   "pe": "1.0.3.2@346d644e"
- }
+ },
+ "rev": 2
 }

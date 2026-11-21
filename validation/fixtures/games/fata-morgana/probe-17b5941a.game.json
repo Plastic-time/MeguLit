@@ -1,8 +1,8 @@
 {
  "schema": "megulit.game-diff",
  "version": 1,
- "key": "17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42",
- "layer": "version",
+ "key": "b5724d2d17594438fa52fe7358be8418207e303f9052fb21f066a31276a0b71c",
+ "layer": "game",
  "source": "official",
  "mode": "read",
  "settings": {
@@ -24,8 +24,12 @@
    "textEffectsRead": true
   }
  },
- "exe": "fata_jp.exe",
+ "exe": "",
  "engine": "kirikiri",
- "app": "diff-maker/2",
- "issuedAt": ""
+ "app": "diff-maker/5",
+ "issuedAt": "",
+ "prints": {
+  "script": "142ca8b7402f4bada2eaea0464a1115dade123b83e46107a365788e262566de3",
+  "title": "b875bbc5bee84c5b84c550da5934f1115f680233162baf3120f30d9822940cb3"
+ }
 }

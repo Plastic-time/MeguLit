@@ -7,44 +7,27 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
   }
  },
  "exe": "",
@@ -60,5 +43,15 @@
  "slug": "summer-clover",
  "builds": [
   "6392bbb3714b0e92523b655c631eb6bdda5669fffe44e04a28955d45812fbefa"
- ]
+ ],
+ "match": {
+  "exe": [
+   "SummerClover.exe"
+  ],
+  "titles": [
+   "SIYECAO1.1",
+   "[ADV中文] 夏色四叶草 Summer Clover Ver1.10 官方中文无修版+全CG存档"
+  ]
+ },
+ "rev": 2
 }

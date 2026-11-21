@@ -7,44 +7,27 @@
  "mode": "hide",
  "settings": {
   "placement": {
-   "firstLineAnchor": null,
    "lineOffsetY": 0,
    "drawWhileBlanking": false,
    "translationGrowsDown": false
   },
   "page": {
-   "effectFrames": null,
-   "flowPage": null,
-   "holdMs": null
+   "pairByDrawn": false,
+   "keepHeld": false
   },
   "choice": {
-   "filters": []
+   "filters": [],
+   "contentInterleave": false,
+   "dropEffectFrames": false
   },
   "hide": {
-   "textEffectsRead": false,
-   "preflight": null,
-   "drawsHidden": null
-  },
-  "selfCheck": {
-   "window": 20,
-   "minLines": 8,
-   "hideVisible": 0.25,
-   "dropRate": 0.15,
-   "repeatRate": 0.1,
-   "choiceMismatch": 1,
-   "positionPx": 96,
-   "pairRate": 0.8
-  },
-  "calibrate": {
-   "positionSource": null,
-   "textBox": null,
-   "hideMethod": null
+   "textEffectsRead": false
   },
   "draw": {
    "roles": false
   },
   "safeMode": {
-   "redrawRate": null
+   "effectJudge": false
   }
  },
  "exe": "",
@@ -61,5 +44,15 @@
  "slug": "higurashi-hou-ch1-onikakushi",
  "builds": [
   "e7ff5060c42bcbe78f8c7bb64d0d5a48a8ad60362cd86324bd00877cdb41a98d"
- ]
+ ],
+ "match": {
+  "exe": [
+   "HigurashiEp01.exe"
+  ],
+  "titles": [
+   "Higurashi When They Cry Hou - Ch.1 Onikakushi",
+   "ひぐらしのなく頃に"
+  ]
+ },
+ "rev": 2
 }

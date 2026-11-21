@@ -7,6 +7,12 @@
 - 结论：**读模式**，参数 `{"hideMethod":"read","positionSource":null,"effectFrames":null,"filters":"kernel"}`，cost 0
 - 草稿未签名：签名用 tools/game-diff.cjs sign，下发格式和目录归 diff-layers
 
+## 两层
+
+- 版本层 `version-17b5941ae0fe1e46894c34e7f1c5bae9a2ef7cdc85fb490c52e305e2c84bde42.json`（key `17b5941a…`，指纹 exe）：这个 exe 没有版本层的键
+- 游戏层 `game-fata-morgana.json`（key `b5724d2d…`，指纹 script/title）：按 主封包 `data.xp3` `b7831b34`、剧本指纹 `142ca8b7`、标题「ファタモルガーナの館」 认
+- 游戏层覆盖的已知版本：`fata_jp.exe` `17b5941a`（本探针）；`fata_cn.exe` `7a81b36a`（同目录，未实测）；`fata_en.exe` `5d3ad108`（同目录，未实测）
+
 ## 自检指标（每个窗口取最差值）
 
 | 指标 | 选中方案 | 最好的隐藏方案 | 阈值 | 状态 |
