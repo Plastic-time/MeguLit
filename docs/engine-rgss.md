@@ -50,7 +50,7 @@ $env:MEGULIT_RGSS_SAMPLE='H:/MeguLit-Work/samples/rgss-majonoie-vx-20261122/game
 node --test validation/engine-draw-rgss.test.cjs
 ```
 
-本机 14 项通过，无跳过，包含实际 HookNative 的无进程来源回放。完整样本检查遍历 446 个归档成员，核对 129 段脚本，确认只有 Main 增加前缀；原目录 441 个文件前后哈希一致。既有只读剧本解析得到 118 个场景、1324 条文本
+本机 15 项通过，无跳过，包含实际 HookNative 的无进程来源回放和超预算页面拒绝。完整样本检查遍历 446 个归档成员，核对 129 段脚本，确认只有 Main 增加前缀；原目录 441 个文件前后哈希一致。既有只读剧本解析得到 118 个场景、1324 条文本
 
 Ruby 回放使用私有 RubyInstaller 4.0.10 和合成 RGSS API，没有执行游戏脚本。这证明包装和协议逻辑，不证明 RGSS 的 Ruby 1.8、Win32API、DirectX 或真实画面已经通过
 

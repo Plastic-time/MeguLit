@@ -70,7 +70,7 @@ unless defined?(MeguLitRGSS)
    end
    def active?; @roles; end
    def forget
-    @windows.each_value{|c|c[:glyphs]=[];c[:items]={};c[:signature]=nil;c[:source_signature]=nil;c[:shown]=false}
+    @windows.each_value{|c|c[:glyphs]=[];c[:items]={};c[:signature]=nil;c[:source_signature]=nil;c[:shown]=false;c[:overflow]=false}
    end
    def serial; @serial+=1; end
    def register(w)
@@ -83,7 +83,7 @@ unless defined?(MeguLitRGSS)
     return unless bmp
     c=@windows[w.object_id];return unless c
     if c[:bitmap] && c[:bitmap]!=bmp
-     clear(c);@owners.delete(c[:bitmap].object_id);c[:glyphs]=[];c[:items]={};c[:line]=serial
+     clear(c);@owners.delete(c[:bitmap].object_id);c[:glyphs]=[];c[:items]={};c[:line]=serial;c[:overflow]=false
     end
     c[:bitmap]=bmp;@owners[bmp.object_id]=c
    end
@@ -112,7 +112,9 @@ unless defined?(MeguLitRGSS)
      return
     end
     font=bmp.font.size;return unless number(font) && font>0
-    points=text.unpack('U*');tw=bmp.text_size(text).width;return unless tw>0
+    points=text.unpack('U*');if points.size+c[:glyphs].size>1000;c[:overflow]=true;return;end
+    return if c[:overflow]
+    tw=bmp.text_size(text).width;return unless tw>0
     scale=tw>width ? width.to_f/tw : 1.0;drawn=tw*scale
     left=x;left+=(width-drawn)/2.0 if align==1;left+=width-drawn if align==2
     top=y+(height-font)/2.0;prefix='';previous=0
@@ -163,7 +165,7 @@ unless defined?(MeguLitRGSS)
      hit=lambda{|q|q[0]<x+width && q[0]+q[2]>x && q[1]<y+height && q[1]+q[3]>y}
      c[:glyphs].delete_if{|g|hit.call(g[1,4])};c[:items].delete_if{|key,v|hit.call(v[1])}
     else
-     clear(c);c[:glyphs]=[];c[:items]={};c[:line]=serial
+     clear(c);c[:glyphs]=[];c[:items]={};c[:line]=serial;c[:overflow]=false
     end
    end
    def dispose(w)
@@ -173,7 +175,7 @@ unless defined?(MeguLitRGSS)
     w=c[:window];return clear(c) unless visible?(w)
     r=role(w);return unless r;o=origin(w)
     if r=='line'
-     return clear(c) if c[:glyphs].empty?
+     return clear(c) if c[:glyphs].empty? || c[:overflow]
      rects=[];text='';last_y=nil
      c[:glyphs].each do |g|
       text << "\n" if last_y && (g[2]-last_y).abs>g[4]/2.0
@@ -184,7 +186,7 @@ unless defined?(MeguLitRGSS)
       if record(c,text,rects);c[:signature]=signature;c[:shown]=true;end
      end
      if c[:shown] && c[:signature]==signature && w.respond_to?(:pause) && w.pause && c[:source_signature]!=signature
-      c[:source_signature]=signature if queue("S #{@generation} #{c[:line]}\n")
+      c[:source_signature]=signature if queue("S #{@generation} #{c[:line]} #{[text].pack('m').delete("\r\n")}\n")
      end
     else
      return clear(c) if c[:items].empty?

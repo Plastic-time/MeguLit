@@ -77,8 +77,8 @@ test('paused message sources require a current body, bound owner and generation,
  require('../core/text-paths-launch.cjs').attach({path:'rgss',session:s},hook);await s.listen();const client=net.connect(s.port,'127.0.0.1');t.after(()=>client.destroy());
  await new Promise(resolve=>client.once('connect',resolve));client.write('HELLO '+s.token+' 42\n');await new Promise(resolve=>setTimeout(resolve,20));
  const body=TP.formatChars({engine:'rgss',line:11,hidden:false,sw:544,sh:416,rects:[[16,20,24,24],[40,20,24,24]],text:'本文'}),send=line=>s.report(line,42);
- send('S '+s.generation+' 11');assert.equal(calls.length,0,'no source without rendered body');send('G '+s.generation+' '+body);send('S '+s.generation+' 11');send('S '+s.generation+' 11');assert.deepEqual(calls,[['本文','rgss','rgss',11]]);
- s.drawConfig({roles:false});send('S '+s.generation+' 11');assert.equal(calls.length,1);s.drawConfig({roles:true});send('G '+s.generation+' '+body);hook.textPath=null;send('S '+s.generation+' 11');assert.equal(calls.length,1,'replaced reader refuses stale callback');
+ const paused=()=> 'S '+s.generation+' 11 '+Buffer.from('本文').toString('base64');send(paused());assert.equal(calls.length,0,'no source without rendered body');send('G '+s.generation+' '+body);send('S '+s.generation+' 11 '+Buffer.from('別文').toString('base64'));assert.equal(calls.length,0,'a rejected or replaced body cannot promote stale text');send(paused());send(paused());assert.deepEqual(calls,[['本文','rgss','rgss',11]]);
+ s.drawConfig({roles:false});send(paused());assert.equal(calls.length,1);s.drawConfig({roles:true});send('G '+s.generation+' '+body);hook.textPath=null;send(paused());assert.equal(calls.length,1,'replaced reader refuses stale callback');
 });
 
 test('Ruby pauses publish one source signal per visible message and never for selectable UI',{skip:!ruby&&'MEGULIT_RUBY not set; no Ruby replay'},()=>{
@@ -99,8 +99,8 @@ puts JSON.generate({:wire=>$wire.join})
 test('production HookNative receives the paused RGSS source and its following page without starting a native helper',t=>{
  const dir=tmp(t),events=[],{HookNative}=require('../core/hook-native.cjs'),h=new HookNative({native:dir,hook:dir,logs:dir},m=>events.push(m),()=>{throw Error('native spawn forbidden in replay');}),s=new D.RgssTextPath();h.trace=()=>{};t.after(()=>{s.stop();h.stop();});
  h.profile=P.profileFor({engine:'rgss',official:{draw:{roles:true}}});require('../core/text-paths-launch.cjs').attach({path:'rgss',session:s},h);h.target={pid:42,started:'1234567890123'};s.pid=42;s.generation=1;
- for(const [line,text] of [[1,'本文です'],[2,'次の文章です']]){const body=TP.formatChars({engine:'rgss',line,hidden:false,sw:544,sh:416,rects:[...text].map((_,i)=>[16+i*24,280,24,24]),text});s.report('G 1 '+body,42);s.report('S 1 '+line,42);assert.equal(h.state.hookSource,text);assert.equal(h.state.hookSourceEngine,'rgss');assert.equal(h.state.hookSourceLine,line);}
- const count=h.state.hookSequence;h.wanted=false;s.report('S 1 2',42);assert.equal(h.state.hookSequence,count);assert.ok(events.some(e=>e.type==='hookCharRects'&&e.engine==='rgss'));
+ for(const [line,text] of [[1,'本文です'],[2,'次の文章です']]){const body=TP.formatChars({engine:'rgss',line,hidden:false,sw:544,sh:416,rects:[...text].map((_,i)=>[16+i*24,280,24,24]),text});s.report('G 1 '+body,42);s.report('S 1 '+line+' '+Buffer.from(text).toString('base64'),42);assert.equal(h.state.hookSource,text);assert.equal(h.state.hookSourceEngine,'rgss');assert.equal(h.state.hookSourceLine,line);}
+ const count=h.state.hookSequence;h.wanted=false;s.report('S 1 2 '+Buffer.from('次の文章です').toString('base64'),42);assert.equal(h.state.hookSequence,count);assert.ok(events.some(e=>e.type==='hookCharRects'&&e.engine==='rgss'));
 });
 
 test('Ruby geometry replay keeps whitespace, prefix-based squeezing, viewport scroll, partial clears and new contents isolated',{skip:!ruby&&'MEGULIT_RUBY not set; no Ruby replay'},()=>{
@@ -131,6 +131,19 @@ puts JSON.generate({:wire=>$wire.join})
 `;
  const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000});assert.equal(r.status,0,r.stderr);const wire=JSON.parse(r.stdout).wire;
  assert.match(wire,/^HELLO a{32} 42\n/);assert.ok(wire.split('\n').some(x=>x.startsWith('G ')&&TP.parseChars(x.replace(/^G \d+ /,''))?.text==='通信'));
+});
+
+test('Ruby capture budget refuses an oversized page without publishing a truncated source and recovers after clear',{skip:!ruby&&'MEGULIT_RUBY not set; no Ruby replay'},()=>{
+ const stand=fs.readFileSync(path.join(__dirname,'helpers','rgss-standin.rb'),'utf8'),script=pageScript({port:1234,token:'a'.repeat(32)}),checks=String.raw`
+$control << "CFG 1 1\n";m=Window_Message.new(0,0,300,100);m.pause=true
+raise 'host return changed' unless m.contents.draw_text(0,0,200,32,'A'*1001)==:draw_return
+frames(5);raise 'oversized source leaked' if $wire.join.scan(/^S /).size>0
+m.contents.clear;m.contents.draw_text(0,0,48,32,'回復');frames(5)
+raise 'recovery missing' unless $wire.join.scan(/^S /).size==1
+puts JSON.generate({:wire=>$wire.join})
+`;
+ const r=spawnSync(ruby,['--disable-gems'],{input:stand+'\n'+script+'\n'+checks,encoding:'utf8',timeout:10000});assert.equal(r.status,0,r.stderr);const records=JSON.parse(r.stdout).wire.split('\n').filter(x=>x.startsWith('G ')).map(x=>TP.parseChars(x.replace(/^G \d+ /,'')));
+ assert.ok(records.some(x=>x?.text==='回復'));assert.ok(!records.some(x=>x?.text?.includes('A')));
 });
 
 const sample=process.env.MEGULIT_RGSS_SAMPLE;

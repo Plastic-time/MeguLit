@@ -56,8 +56,8 @@ class RgssTextPath{
  drawConfig(cfg){const roles=cfg?.roles===true;if(roles!==this.roles){this.roles=roles;this.clear();this.lastSync='';this.sync();}if(cfg?.embed===true&&!this.embedNoted){this.embedNoted=true;this.onStatus('RGSS: internal embed/ruby is unavailable; reader fallback remains active');}}
  report(line,pid){
   if(this.stopped||!this.roles||Number(this.owner())!==pid)return;
-  const source=/^S ([1-9]\d{0,9}) ([1-9]\d{0,9})$/.exec(line);
-  if(source){if(Number(source[1])!==this.generation)return;const rec=this.body.get(Number(source[2])),key=rec&&rec.line+'|'+rec.text;if(!rec||!rec.text||this.sources.has(key))return;
+  const source=/^S ([1-9]\d{0,9}) ([1-9]\d{0,9}) ([A-Za-z0-9+/=]{1,8000})$/.exec(line);
+  if(source){if(Number(source[1])!==this.generation)return;const rec=this.body.get(Number(source[2])),key=rec&&rec.line+'|'+rec.text;if(!rec||!rec.text||Buffer.from(rec.text).toString('base64')!==source[3]||this.sources.has(key))return;
    if(this.onSource({text:rec.text,line:rec.line,generation:this.generation,pid})===true){this.sources.add(key);if(this.sources.size>128)this.sources.delete(this.sources.values().next().value);}return;}
   const m=/^G ([1-9]\d{0,9}) (ToMe_CHARS .*)$/.exec(line);if(!m||Number(m[1])!==this.generation)return;
   const rec=TP.parseChars(m[2]);if(!rec||rec.engine!=='rgss'||rec.hidden||rec.emb||!Number.isSafeInteger(rec.line)||rec.line<1||rec.line>0x7fffffff||rec.rects.length>1000||rec.viewport.some(n=>n!==0)||![rec.sw,rec.sh].every(n=>Number.isFinite(n)&&n>0&&n<=16384))return;
