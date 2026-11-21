@@ -299,6 +299,7 @@ function restoreWord(db,id) {
 function localEntries(result,query){return (result?.entries||[]).slice(0,20).map(e=>({spelling:e.spellings?.[0]||e.readings?.[0]||query,reading:(e.readings||[]).join(' · '),definition:(Array.isArray(e.definition_groups)&&e.definition_groups.length?e.definition_groups.map(g=>g.text):(e.definitions||[])).map(String).join('\n')})).filter(e=>e.definition);}
 async function lookupEntry(learning,base,key){for(const text of [...new Set([base,key].filter(Boolean))]){const result=await learning.request('lookup_exact',{text,start:0,end:[...text].length},'zh');const entry=result?.entries?.find(e=>require('./learning-insights.cjs').entryMatches(e,base,key));if(entry)return entry;}return null;}
 async function dispatch(request,runtime=null) {
+  if(String(request.action).startsWith('disc_'))return await require('./disc-install.cjs').handle(root,request,runtime,values=>dispatch({action:'save_game',...values},runtime));
   if(request.action==='backup_export')return require('./backup.cjs').exportBackup(root,request.path);
   if(request.action==='backup_preview')return require('./backup.cjs').previewBackup(root,request.path);
   if(request.action==='backup_discard')return require('./backup.cjs').discardBackup(root,request.id);
