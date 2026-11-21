@@ -11,8 +11,7 @@ test('settings actions can be retried after their service calls fail',{skip:!has
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-settings-buttons-'));
  let server,browser;
  t.after(async()=>{
-  await browser?.send('Browser.close').catch(()=>{});
-  browser?.stop();
+  await browser?.stop();
   server?.close();
   await fs.promises.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:150});
  });

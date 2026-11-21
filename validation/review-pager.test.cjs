@@ -10,8 +10,7 @@ test('the review page number and both arrows load their displayed page',{skip:!h
  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-review-pager-'));
  let browser;
  t.after(async()=>{
-  await browser?.send('Browser.close').catch(()=>{});
-  browser?.stop();
+  await browser?.stop();
   await fs.promises.rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:150});
  });
  browser=await startEdge(profile);

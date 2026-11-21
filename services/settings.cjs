@@ -15,12 +15,18 @@ const nativeDefaults=require('./native-defaults.cjs');
 const getPath=(obj,key)=>key.split('.').reduce((value,k)=>value?.[k],obj);
 function setPath(obj,key,value){const parts=key.split('.');let parent=obj;for(const part of parts.slice(0,-1)){if(!parent[part]||typeof parent[part]!=='object')parent[part]={};parent=parent[part];}parent[parts.at(-1)]=value;}
 function atomic(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(value,null,2));fs.renameSync(tmp,file);}
+function libraryForSave(file){
+ let text;try{text=fs.readFileSync(file,'utf8');}catch(error){if(error.code==='ENOENT')return {};throw error;}
+ const value=JSON.parse(text);
+ if(!value||typeof value!=='object'||Array.isArray(value))throw Error('SETTINGS_INVALID_VALUE');
+ return value;
+}
 class Settings{
  constructor(root){this.root=root;this.folder=path.join(root,'data','config');fs.mkdirSync(this.folder,{recursive:true});}
  file(name){return path.join(this.folder,name);}
  ui(){return readJSON(path.join(this.root,'data','ui-state.json'));}
  uiObject(name,fallback){try{return {...fallback,...JSON.parse(this.ui()[name]||'{}')};}catch{return {...fallback};}}
- read(scope,profile=''){
+ read(scope,profile='',libraryConfig){
   if(gameScopes.has(scope)){
     // Text style for works without saved settings comes from the global preset edited here (E215), not from the live
     // session file, so one work's Alt+T save never becomes another work's default.
@@ -40,7 +46,7 @@ class Settings{
     for(const panel of ['menu','log','card'])value.panels[panel]={...panelDefaults,...Object.fromEntries(Object.keys(panelDefaults).map(k=>[k,value[k]??panelDefaults[k]])),...value.panels[panel]};return value;
   }
   if(scope==='online')return {relayUrl:'',leaderboardEnabled:false,leaderboardName:'',leaderboardShareGames:false,...readJSON(path.join(this.folder,'online.json'))};
-  if(scope==='library'){const library=readJSON(this.file('library.json'));return {autoSeries:library.autoSeries!==false,sharedAdaptation:library.sharedAdaptation!==false,sceneShots:library.sceneShots!==false,runtimeHarvest:library.runtimeHarvest!==false,probeUpload:library.probeUpload!==false,adapterContrib:require('./adapter-contrib.cjs').enabled(this.root),steamPath:library.steamPath||'',folders:(library.folders||[]).join('\n')};}
+  if(scope==='library'){const library=libraryConfig??readJSON(this.file('library.json'));return {autoSeries:library.autoSeries!==false,sharedAdaptation:library.sharedAdaptation!==false,sceneShots:library.sceneShots!==false,runtimeHarvest:library.runtimeHarvest!==false,probeUpload:library.probeUpload!==false,adapterContrib:require('./adapter-contrib.cjs').enabled(this.root),steamPath:library.steamPath||'',folders:(library.folders||[]).join('\n')};}
   throw Error('SETTINGS_SCOPE_INVALID');
  }
  get(profile=''){
@@ -52,11 +58,12 @@ class Settings{
   const providers={};for(const option of fields.find(field=>field.scope==='translation'&&field.key==='provider').options){const provider=option.value,base=resolveOptions({provider});providers[provider]={defaultBaseUrl:base.baseUrl||'',defaultModel:base.model||'',baseUrl:base.baseUrl||'',model:base.model||(provider==='gpt'?'gpt-4.1-mini':''),editable:provider==='gpt'||ENGINES[provider]?.editable===true,keyless:provider==='google'||ENGINES[provider]?.keyless===true,...translationProfiles[provider]};}
   return {groups,fields,values,providers,profile,profiles:Object.entries(entries).filter(([key])=>/^[a-f0-9]{64}$/.test(key)).map(([key,entry])=>({id:key,name:String(entry.name||key.slice(0,12)),savedAt:entry.savedAt||0})),hasSavedKeys:fs.existsSync(this.file('secrets.dpapi'))};
  }
- save({scope,values,profile=''}){
+ save({scope,values,profile='',appendFolders=false}){
   if(!groups.some(group=>group.id===scope))throw Error('SETTINGS_SCOPE_INVALID');
   if(profile&&(!/^[a-f0-9]{64}$/.test(profile)||!readJSON(this.file('game-style-profiles.json')).entries?.[profile]))throw Error('SETTINGS_PROFILE_INVALID');
   if(!values||typeof values!=='object'||Array.isArray(values))throw Error('SETTINGS_INVALID_VALUE');
-  const current=this.read(scope,profile),next=structuredClone(current),allowed=new Map(fields.filter(f=>f.scope===scope).map(field=>[field.key,field]));
+  const library=scope==='library'?libraryForSave(this.file('library.json')):undefined;
+  const current=this.read(scope,profile,library),next=structuredClone(current),allowed=new Map(fields.filter(f=>f.scope===scope).map(field=>[field.key,field]));
   for(const[key,input]of Object.entries(values||{})){
     const field=allowed.get(key);if(!field)throw Error('SETTINGS_FIELD_INVALID');let value=input;
     if(field.readOnly&&value!==getPath(current,key))throw Error('SETTINGS_READ_ONLY');
@@ -94,7 +101,14 @@ class Settings{
     if(Object.hasOwn(values,'leaderboardName')&&next.leaderboardName!==''){const checked=require('./leaderboard.cjs').cleanName(next.leaderboardName);if(!checked.ok)throw Error('LEADERBOARD_'+checked.error);next.leaderboardName=checked.name;}
     if(Object.hasOwn(values,'relayUrl')&&next.relayUrl!==''){const base=require('./relay-config.cjs').normalizeBase(next.relayUrl);if(!base)throw Error('SETTINGS_INVALID_URL');next.relayUrl=base;}
     const file=path.join(this.folder,'online.json');atomic(file,{...readJSON(file),relayUrl:next.relayUrl,leaderboardEnabled:next.leaderboardEnabled,leaderboardName:next.leaderboardName,leaderboardShareGames:next.leaderboardShareGames});
-  }else if(scope==='library')atomic(this.file('library.json'),{...readJSON(this.file('library.json')),steamPath:next.steamPath,folders:next.folders.split(/[\r\n;]+/).map(v=>v.trim()).filter(Boolean),autoSeries:next.autoSeries,sharedAdaptation:next.sharedAdaptation!==false,sceneShots:next.sceneShots!==false,runtimeHarvest:next.runtimeHarvest!==false,probeUpload:next.probeUpload!==false});
+  }else if(scope==='library'){
+    let folders=next.folders.split(/[\r\n;]+/).map(v=>v.trim()).filter(Boolean);
+    if(appendFolders){
+     folders=[...new Set([...(library.folders||[]),...folders])];
+     next.steamPath=current.steamPath||next.steamPath;
+    }
+    atomic(this.file('library.json'),{...library,steamPath:next.steamPath,folders,autoSeries:next.autoSeries,sharedAdaptation:next.sharedAdaptation!==false,sceneShots:next.sceneShots!==false,runtimeHarvest:next.runtimeHarvest!==false,probeUpload:next.probeUpload!==false});
+  }
   /* the contribution switch is the player's decision: written only when it was changed here (an untouched switch must not decide for them) */
   if(scope==='library'&&Object.hasOwn(values,'adapterContrib')&&(c=>c.decided||(next.adapterContrib===true)!==c.enabled)(require('./adapter-contrib.cjs').consentState(this.root)))require('./adapter-contrib.cjs').setConsent(this.root,next.adapterContrib===true,{source:'settings'});
   return this.get(profile);

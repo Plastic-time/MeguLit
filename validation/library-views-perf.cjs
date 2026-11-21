@@ -11,7 +11,7 @@ const arg=(name,fallback)=>{const i=process.argv.indexOf('--'+name);return i>0?p
 const OUT=path.resolve(arg('out',path.join(os.tmpdir(),'megulit-library-views')));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* ---------- services on a temp root ---------- */
-function startService(root){const child=spawn(process.execPath,[path.join(ROOT,'services','server.cjs')],{env:{...process.env,MEGULIT_ROOT:root},stdio:['pipe','pipe','ignore']});
+function startService(root){const child=spawn(process.execPath,[path.join(ROOT,'services','server.cjs')],{windowsHide:true,env:{...process.env,MEGULIT_ROOT:root},stdio:['pipe','pipe','ignore']});
  let next=1,buf='',closed;const waits=new Map();
  const finish=error=>{closed=error;for(const w of waits.values()){clearTimeout(w.timer);w.reject(error);}waits.clear();};
  child.once('error',finish);child.once('close',()=>finish(Error('SERVICE_CLOSED')));child.stdin.on('error',finish);
@@ -41,7 +41,8 @@ function startWeb(service){const server=http.createServer(async(req,res)=>{try{
 /* ---------- headless Edge over CDP ---------- */
 const CDP_MS=Number(process.env.MEGULIT_CDP_TIMEOUT)||60000;
 function edgePath(){for(const p of [process.env.MEGULIT_EDGE,'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe','C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'])if(p&&fs.existsSync(p))return p;throw Error('EDGE_NOT_FOUND');}
-async function startEdge(profile){const child=spawn(edgePath(),['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--window-size='+String(arg('size','1920x1080')).replace('x',','),'--hide-scrollbars','--force-device-scale-factor=1',
+const {stopLayoutBrowser,checkLayoutProfile}=require('./helpers/stop-layout-browser.cjs');
+async function startEdge(profile){checkLayoutProfile(profile);const child=spawn(edgePath(),['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--window-size='+String(arg('size','1920x1080')).replace('x',','),'--hide-scrollbars','--force-device-scale-factor=1',
   '--no-first-run','--no-default-browser-check','--disable-extensions','--mute-audio','about:blank'],{stdio:'ignore'});
  /* 2026-11-19 (CI of v1.4.17, and 11-17): DevToolsActivePort read while Edge was still writing it threw EBUSY; the caller had no
     handle yet, so nothing stopped Edge and the test file never exited (the job sat until its 30-minute limit). The file is read
@@ -63,8 +64,9 @@ async function connect(child,profile){
  const send=(method,params={},ms=CDP_MS)=>new Promise((res,rej)=>{const id=next++,t=setTimeout(()=>{if(waits.delete(id))rej(Error('CDP_TIMEOUT '+method));},ms);
   waits.set(id,[v=>{clearTimeout(t);res(v);},e=>{clearTimeout(t);rej(e);}]);try{ws.send(JSON.stringify({id,method,params}));}catch(e){waits.delete(id);clearTimeout(t);rej(e);}});
  const evaluate=async(expression)=>{const r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error('EVAL: '+(r.exceptionDetails.exception?.description||r.exceptionDetails.text));return r.result.value;};
- await send('Page.enable');await send('Runtime.enable');await send('Emulation.setDeviceMetricsOverride',{width:Number(String(arg('size','1920x1080')).split('x')[0]),height:Number(String(arg('size','1920x1080')).split('x')[1]),deviceScaleFactor:1,mobile:false});
- const api={send,evaluate,set onEvent(f){globalThis.__cdpEvent=f;},get onEvent(){return globalThis.__cdpEvent;},stop:()=>{fail(Error('CDP_STOPPED'));try{ws.close();}catch{}child.kill();}};return api;}
+ const stop=stopLayoutBrowser(ws,child);
+ try{await send('Page.enable');await send('Runtime.enable');await send('Emulation.setDeviceMetricsOverride',{width:Number(String(arg('size','1920x1080')).split('x')[0]),height:Number(String(arg('size','1920x1080')).split('x')[1]),deviceScaleFactor:1,mobile:false});}catch(error){await stop();throw error;}
+ const api={send,evaluate,set onEvent(f){globalThis.__cdpEvent=f;},get onEvent(){return globalThis.__cdpEvent;},stop:()=>{fail(Error('CDP_STOPPED'));return stop();}};return api;}
 
 
 /* tiny PNG writer: a vertical two-colour gradient cover */
@@ -128,7 +130,7 @@ async function main(){fs.mkdirSync(OUT,{recursive:true});const temp=fs.mkdtempSy
   /* the same numbers without the first cycle (cold caches, first GSAP/raster warm-up) */
   report.summaryWarm={presented:{p95:p95(all(r=>r.presented?.gaps,3)),max:Math.round(Math.max(0,...all(r=>r.presented?.gaps,3))*10)/10},main:{p95:p95(all(r=>r.main?.intervals,3)),max:Math.round(Math.max(0,...all(r=>r.main?.intervals,3))*10)/10}};
   report.perSwitch=report.rounds.map(r=>({from:r.from,to:r.to,presented_p95:r.presented?.p95,presented_max:r.presented?.max,main_p95:r.main?.p95,main_max:r.main?.max,loaf:r.loaf.map(l=>l.d)}));
-  fs.writeFileSync(path.join(OUT,'perf.json'),JSON.stringify({summary:report.summary,summaryWarm:report.summaryWarm,perSwitch:report.perSwitch,strips:report.strips,rounds:report.rounds},null,1));cdp.stop();web.close();await service.stop();await sleep(500);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+  fs.writeFileSync(path.join(OUT,'perf.json'),JSON.stringify({summary:report.summary,summaryWarm:report.summaryWarm,perSwitch:report.perSwitch,strips:report.strips,rounds:report.rounds},null,1));await cdp.stop();web.close();await service.stop();await sleep(500);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
  console.log('screenshots and report.json in '+OUT);}
 if(require.main===module)main().catch(e=>{console.error(e);process.exitCode=2;});
 module.exports={startService,startWeb,startEdge,png};

@@ -77,8 +77,7 @@ test('backup previews can be cancelled, retried, and restored',{skip:!hasEdge},a
  let server,browser;
  t.after(async()=>{
   if(previous===undefined)delete process.env.MEGULIT_ROOT;else process.env.MEGULIT_ROOT=previous;
-  await browser?.send('Browser.close').catch(()=>{});
-  browser?.stop();server?.close();
+  await browser?.stop();server?.close();
   await fs.promises.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:150});
  });
  const file=path.join(root,'copy.megulitbak');

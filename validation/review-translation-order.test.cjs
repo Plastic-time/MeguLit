@@ -9,7 +9,7 @@ const hasEdge=[process.env.MEGULIT_EDGE,'C:/Program Files (x86)/Microsoft/Edge/A
 test('late translations and failures leave the selected review language intact',{skip:!hasEdge},async t=>{
  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-review-language-'));
  let browser;t.after(async()=>{
-  await browser?.send('Browser.close').catch(()=>{});browser?.stop();
+  await browser?.stop();
   await fs.promises.rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:150});
  });
  browser=await startEdge(profile);

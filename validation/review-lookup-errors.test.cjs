@@ -45,8 +45,7 @@ test('a failed summary leaves an open review page readable and closable',{skip:!
  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-review-summary-'));
  let browser;
  t.after(async()=>{
-  await browser?.send('Browser.close').catch(()=>{});
-  browser?.stop();
+  await browser?.stop();
   await fs.promises.rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:150});
  });
  browser=await require('./library-views-perf.cjs').startEdge(profile);

@@ -92,5 +92,5 @@ test('reader 对话记录 / Alt+T / 点读卡 open at full size, readable, rows 
   const card=await cdp.evaluate(CARD);
   assert.equal(card.transform,'none');assert.ok(card.scale==='none'||card.scale==='1','card scale '+card.scale);assert.ok(card.h>60,'card height '+card.h);assert.equal(card.minText,1,'card text keeps full opacity');
   assert.equal(card.senses,3);assert.equal(card.numbers,0,'no 01/02/03 prefixes on the senses');assert.ok(card.tint>=.88,'card tint floor over a bright game: '+card.tint);
- }finally{cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });

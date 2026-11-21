@@ -63,7 +63,25 @@ function xp3Scenes(file,test){let t;try{t=xp3.list(file);}catch{return [];}if(!t
  const flagged=t.files.filter(e=>e.encrypted&&test(e.name)),open=flagged.length>0&&plain(flagged[0]);
  // E449 a cx archive of a title GARbro knows is decrypted with that title's filter (cx-filter.cjs).
  const cx=flagged.length&&!open?require('./cx-filter.cjs').forArchive(file):null;
- return t.files.filter(e=>(!e.encrypted||open||cx)&&test(e.name)).map(e=>({name:path.basename(e.name.replace(/\\/g,'/')),read:()=>e.encrypted?xp3.read(file,e,open?null:cx):unscramble(xp3.read(file,e))}));}
+ return t.files.filter(e=>(!e.encrypted||open||cx)&&test(e.name)).map(e=>({name:path.basename(e.name.replace(/\\/g,'/')),read:()=>e.encrypted?xp3.read(file,e,open?null:cx):readUnflagged(xp3.read(file,e),e.hash)}));}
+/* Unflagged XP3 scripts can use the low byte of their original Adler-32 as a mask. */
+function readUnflagged(data,hash){
+ if(hash===undefined)return unscramble(data);
+ const key=hash&0xff;
+ const {adler32}=require('./shiinario-crypt.cjs');
+ if(key){
+  if(adler32(data,0,data.length)!==hash){
+   const plain=kit.xor(data,key);
+   if(adler32(plain,0,plain.length)===hash&&!/[\x00-\x08\x0e-\x1f]/.test(decode(plain)))return plain;
+  }
+  return unscramble(data);
+ }
+ // A zero mask leaves bytes untouched and can also match an ordinary binary or a UTF-16 patch.
+ const legacy=unscramble(data);
+ if(legacy.length||adler32(data,0,data.length)!==hash||data.some(b=>b<9||(b>13&&b<32)))return legacy;
+ const text=decode(data);
+ return !text.includes('\ufffd')&&/(?:\[[a-z_]\w*[\s\]]|^[@*]\w)/im.test(text)?data:legacy;
+}
 /* E595 a translation's patch.xp3 can XOR its scripts (死に逝く君 汉化硬盘版: UTF-16 text whose BOM reads 2B 2A): undone when
    the BOM gives a two-byte key under which the whole file reads as UTF-16 text. A file that does not, or is plainly not
    text, is dropped instead of being read as lines of noise. */

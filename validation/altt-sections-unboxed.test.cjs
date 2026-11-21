@@ -24,5 +24,5 @@ test('Alt+T sections sit on the panel: no section frames or glass boxes in any t
   await cdp.evaluate(`(()=>{window.__tomoyoMode.set('translation');document.body.classList.add('tomoyo-gal-bound');setTimeout(()=>dispatchEvent(new CustomEvent('tome-region-applied',{detail:{surfaceWidth:innerWidth*devicePixelRatio,surfaceHeight:innerHeight*devicePixelRatio}})),0);window.__tomoyoChinese.toggleGalMenu();return 1})()`);
   await sleep(1500);const tabs=await cdp.evaluate(PROBE);assert.ok(Object.keys(tabs).length>=8,'every tab visited: '+Object.keys(tabs));
   for(const [tab,list] of Object.entries(tabs))for(const key of Object.keys(list))assert.match(key,/tome-reset-zone|tome-log-preview|tome-log-item|mg-subtabs/,tab+': boxed section left: '+key);
- }finally{cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });

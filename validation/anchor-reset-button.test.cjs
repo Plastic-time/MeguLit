@@ -38,5 +38,5 @@ test('校准: 回到游戏原字位置 is greyed without engine places; with the
   assert.deepEqual(s.enabled,[false,''],'usable on engine places');assert.equal(s.offsetBefore,43,'a large offset was set');
   assert.deepEqual(s.after.saved,[0,0],'saved to the game profile as 0');assert.equal(s.after.anchorDX,0);assert.equal(s.after.anchorDY,0,'applied at once');
   assert.deepEqual(s.after.fields.map(Number),[0,0]);assert.equal(s.after.global,undefined,'the global preferences never hold an offset');
- }finally{cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
+ }finally{await cdp?.stop();server?.close();await sleep(400);try{fs.rmSync(temp,{recursive:true,force:true});}catch{}}
 });
