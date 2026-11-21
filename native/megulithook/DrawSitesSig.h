@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// engine-draw, GDI draw sites (docs/engine-draw-native.md, "其余原生引擎"): the native engines that draw their text with a
+// GDI text call (TextOut / ExtTextOut / DrawText / GetGlyphOutline) have one or a few call sites of it in their code. Each
+// signature below names one such site: the module, the API it calls through its import table (call dword ptr [IAT slot],
+// FF 15) and the bytes right before that call, with ?? for what differs between builds. A signature must match exactly
+// `count` times in its module or it is not used. Pure byte matching, no Windows calls: selftest/drawsites.cpp runs it on
+// snippets of the owner's exes, tools/engine-sigs/draw-sites.cjs reads this very table and runs the same algorithm on the
+// owner's exes (validation/engine-draw-sig-sites.test.cjs). DrawSites.h hooks the sites at run time.
+//
+// Table format (parsed by tools/engine-sigs/draw-sites.cjs, keep one entry per line):
+//   { "id", "module" ("" = the game's exe), "API", "bytes before FF 15", count, frame },
+// frame = 1 when the function holding the site keeps an EBP frame (its callers are read as via=); 0 = unknown; 8 and more = the
+// function keeps no frame and its return address is that many bytes above the API's first argument at the call.
+#pragma once
+#include <cstdint>
+#include <cstddef>
+#include <cstring>
+namespace DrawSitesSig {
+struct Sig { const char *id, *module, *api, *pre; int count, frame; };
+static const Sig Sigs[] = {
+  // ReaLive / AVG32 (涙 ～流星のザドル～, AVG3216D.EXE 0x413880): the one routine that draws a string into the text DIB,
+  // a character a call: TextOutA(hdc, x - scroll, y, s, 1 | 2); x / y are the canvas pen
+  { "avg32", "", "TextOutA", "52 57 50 a1 ?? ?? ?? ?? 8b cb 2b c8 51 56", 1, 1 },
+};
+static const int SigCount = (int)(sizeof(Sigs) / sizeof(Sigs[0]));
+
+// "52 57 ?? 50" -> bytes + mask (mask 0 = any); returns the length
+inline int Pattern(const char *s, unsigned char *bytes, unsigned char *mask, int max) {
+  int n = 0;
+  while (*s && n < max) {
+    while (*s == ' ') s++;
+    if (!s[0] || !s[1]) break;
+    if (s[0] == '?' && s[1] == '?') { bytes[n] = 0; mask[n] = 0; }
+    else {
+      auto hex = [](char c) -> int { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1; };
+      int a = hex(s[0]), b = hex(s[1]); if (a < 0 || b < 0) return -1;
+      bytes[n] = (unsigned char)(a * 16 + b); mask[n] = 0xff;
+    }
+    n++; s += 2;
+  }
+  return n;
+}
+// every `call dword ptr [slot]` (FF 15 slot) in code[0..size) whose slot is one of `slots` and whose preceding bytes match
+// `pre`; out[] gets the offsets of the FF 15 in code. Returns how many there are (out holds at most `max`).
+inline int Find(const unsigned char *code, size_t size, const std::uint32_t *slots, int nslots, const char *pre, size_t *out, int max) {
+  unsigned char b[64], m[64]; int len = Pattern(pre, b, m, 64); if (len < 0) return 0;
+  int hits = 0;
+  for (size_t i = (size_t)len; i + 6 <= size; i++) {
+    if (code[i] != 0xff || code[i + 1] != 0x15) continue;
+    std::uint32_t slot; std::memcpy(&slot, code + i + 2, 4);
+    bool known = false; for (int k = 0; k < nslots; k++) if (slots[k] == slot) { known = true; break; }
+    if (!known) continue;
+    bool ok = true; for (int k = 0; k < len && ok; k++) if (m[k] && code[i - len + k] != b[k]) ok = false;
+    if (!ok) continue;
+    if (hits < max) out[hits] = i;
+    hits++;
+  }
+  return hits;
+}
+// SJIS lead byte (one character = two bytes)
+inline bool SjisLead(unsigned char c) { return (c >= 0x81 && c <= 0x9f) || (c >= 0xe0 && c <= 0xfc); }
+}

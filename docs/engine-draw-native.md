@@ -101,3 +101,29 @@
 ## 建议的推进方式
 
 一个引擎一个逆向会话（Opus high），各自 worktree，交付：签名 + 静态签名测试（对店主本机 exe 命中一次）+ 原生自检 + 店主测试清单。顺序：YU-RIS（一个调用点，4 部游戏）→ BGI（素晴日）→ MAGES（泛化已有钩子）→ Siglus（VM 最复杂）→ Unity（先解决引用包）
+
+## GDI 画字点：其余原生引擎的通用部件（re-misc）
+
+普查见 [engine-draw-matrix.md](engine-draw-matrix.md)「其余原生引擎」。用 GDI 画字（TextOut / ExtTextOut / DrawText / GetGlyphOutline）的引擎，画字都集中在一两个调用点。YU-RIS 是一个引擎一套钩子；这里改成一个通用部件 + 每个引擎一条签名，新引擎只加一行签名、夹具和测试清单
+
+| 部分 | 文件 | 写法 |
+|---|---|---|
+| 签名表 + 匹配（原生） | `native/megulithook/DrawSitesSig.h` | 一条签名 = 模块（空 = 游戏 exe）+ API + 调用前的字节（`??` 是版本间会变的字节）+ 应命中次数 + frame。匹配：模块导入表里该 API 的 IAT 槽 → 代码里所有 `call dword ptr [槽]`（FF 15）→ 调用前字节对上。命中数不正好等于 count 就不用。纯字节、不调 Windows |
+| 签名（参考实现） | `tools/engine-sigs/draw-sites.cjs` | 直接读上面那个头文件里的表（只有一份），同一个算法，自己解析 PE 导入表 |
+| 夹具 | `validation/fixtures/engine-sigs/draw-sites-files.json`（店主本机文件清单）→ `tools/engine-sigs/draw-sites-fixture.cjs` 生成 `draw-sites.json` + `native/megulithook/selftest/drawsites-snippets.h` | 每个命中点取调用前 0x40 到调用后 0x10 的字节 + IAT 槽 + 整文件 SHA-256（只读） |
+| 静态签名测试 | `validation/engine-draw-sig-sites.test.cjs` | 夹具上每条只在调用处命中一次；换一个 IAT 槽或改一个字节就不命中；本机有这个文件（SHA-256 一致）时整个模块正好命中 count 次、位置和夹具一致；签名在普查里其他引擎的文件中一次都不命中 |
+| 原生自检 | `selftest/drawsites.cpp`（同样的夹具字节给 C++ 匹配器）+ `selftest/drawsites-gate.cpp`（运行时门：照 MinHook 在调用点的方式驱动，参数已压栈 → 桩 → 门 → 跳板做原调用；查 API 拿到的参数、返回值、游戏寄存器都不变，记录的文字 / 笔位 / via 对） | `selftest/run.cmd` 里跑 |
+| 运行时钩子 | `native/megulithook/DrawSites.h`（`enginecontrol.cpp` checkengine 开头 `DrawSites::Arm()`，不管 LunaHook 匹配到哪个引擎） | 所有签名在各自模块里找一遍；默认不挂：控制文件 `%TEMP%\MeguLit\draw\<pid>.txt` 出现 `roles=1`（这部游戏 seed 的 `draw.roles`）才在每个命中点装 MinHook。每次调用读栈上的 API 参数，按「同一点 + 同一调用者 + 同一行、x 递增」连成一段，一段一条 `ToMe_DRAWRUN engine=<id> site=<k> via=<rva>/<rva> run= n= x0 y0 x1 y1 size= fargs=<4 个 hex> text=`（hook-diagnostics.log）；没字 250 ms 就把最后一段写出。只有 x86（64 位编译时为空） |
+
+字段：x / y 是引擎文字画布（DC）上的笔位，不是屏幕；GetGlyphOutline 点没有笔位（-1）。via = 包着调用点的函数的返回地址（和再上一层），用来分台词 / 名字 / 选项例程；frame=1 按 EBP 帧读，frame≥8 表示这个函数没有 EBP 帧，返回地址在 API 第一个参数上方固定字节处。fargs = 这个函数前 4 个参数（不少引擎把笔位当参数传给字形例程）。角色和「画布 → 屏幕」偏移和 YU-RIS 一样，由探针 / diff-maker 用这些记录和 hook 流配出，写进版本层差分
+
+现在的签名（每个都在店主本机文件上正好命中 count 次，在其他引擎的文件里不命中）：
+
+### ReaLive / AVG32（涙 ～流星のザドル～）
+- 点：AVG3216D.EXE 0x413880，例程 0x413730（把一串字画进文字 DIB，一字一次 `TextOutA(hdc, x - 滚动, y, 字, 1|2)`，有 EBP 帧，5 个调用者）。x / y 就是画布笔位
+- 另一个 TextOutA（0x41f888）在设置对话框里，不签
+- 店主测试清单：
+  1. 写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`），或在 The Seed 里给这部游戏的差分设 `"draw":{"roles":true}`
+  2. 开游戏推 5 句、出一次选项
+  3. `logs\hook-diagnostics.log` 里先有 `ToMe_DRAWRUN engine=avg32 found: 1 site(s) of TextOutA` 和 `on: site 0`，之后每句有 `ToMe_DRAWRUN engine=avg32 site=0 ... text=` 带这句的文字；名字和选项各自 via 不同
+  4. 游戏照常显示、不卡、不崩 = 过。只有 `off: N sites match` = 这个版本签名没对上，把那行和 exe 发来

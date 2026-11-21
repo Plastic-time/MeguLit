@@ -75,8 +75,10 @@ bool safeattach(ENGINE *m, const char *enginename)
     }
     return attached;
 }
+#include "DrawSites.h" /* engine-draw 2026-11-21: GDI draw sites of the native engines (opt-in, docs/engine-draw-native.md) */
 bool checkengine()
 {
+    DrawSites::Arm();
 
     auto engines = check_engines();
     std::vector<const char *> infomations = {
