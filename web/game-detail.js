@@ -6,6 +6,7 @@ import {launchReason,launchShort,launchRestorable} from './launch-feedback.js';
 import {embedStatus} from './embed-status.js';
 import {gameLanguageLabel,openGameLanguage,originalExecutableError} from './game-language.js';
 import {mountCnGuide} from './cn-version-guide.js';
+import {mountDetailDeveloper} from './developer.js';
 import {synopsisHTML,bindSynopsis} from './synopsis-view.js';
 import {receptionHTML,receptionMessages,bindReception} from './game-reception.js';
 import {openDiagnostics,diagnosticsLabel} from './diagnostics-ui.js';
@@ -40,6 +41,7 @@ export async function renderGamePage({main,id,tab:startTab='',api,locale,text,es
   /* long titles shrink (down to a floor) until they fit the two-line title box; the box itself never changes size */
   {const h1=main.querySelector('.detail-title>h1'),host=main.querySelector('.detail-title');if(h1&&host){const fit=()=>{if(!h1.isConnected)return;h1.style.removeProperty('--dfit');const base=parseFloat(getComputedStyle(h1).fontSize);let size=base;while(h1.scrollHeight>h1.clientHeight+1&&size>26){size-=2;h1.style.setProperty('--dfit',size+'px');}};
    fit();document.fonts?.ready?.then(fit);if(window.ResizeObserver){let w=host.clientWidth;const ro=new ResizeObserver(()=>{if(!h1.isConnected){ro.disconnect();return;}if(Math.abs(host.clientWidth-w)>1){w=host.clientWidth;fit();}});ro.observe(host);}}}
+ /* 2026-11-21 the developer line under the title: logo, name, a small panel with VNDB's introduction and links */mountDetailDeveloper({main,id,api,locale,esc,toast,isCurrent});
  /* 2026-11-12 Chinese build: the big guide card under the title, filled by its own checks */mountCnGuide({host:main.querySelector('.game-detail-hero'),id,api,locale,
   esc,toast,isCurrent,onChanged:onOriginalChanged,openLanguage:()=>main.querySelector('[data-language]')?.click()});
  main.querySelector('[data-language]').onclick=()=>openGameLanguage({id,api,invoke,locale,esc,toast,onChanged:onOriginalChanged}).catch(error=>toast(originalExecutableError(error,

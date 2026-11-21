@@ -20,20 +20,21 @@ function safeOnly(root){return readJSON(path.join(root,'data','config','native-p
 /* the switch as the player set it, and what is in force (the R18 filter wins) */
 function setting(root){return readJSON(path.join(root,'data','config','library.json')).nsfw===true;}
 function enabled(root){return setting(root)&&!safeOnly(root);}
+function dev(x){return x&&typeof x==='object'&&/^p\d{1,7}$/.test(String(x.id||''))?{id:x.id,name:String(x.name||'').slice(0,120),original:String(x.original||'').slice(0,120)}:null;}
 function readCache(root){const v=readJSON(cacheFile(root)),out={vn:{},failedAt:Number.isFinite(v.failedAt)?v.failedAt:0};
- for(const [id,e] of Object.entries(v.vn&&typeof v.vn==='object'?v.vn:{})){if(!VID.test(id)||!e||!Number.isFinite(e.at))continue;out.vn[id]=e.miss===true?{miss:true,at:e.at}:{sexual:rating(e.sexual),violence:rating(e.violence),at:e.at};}return out;}
+ for(const [id,e] of Object.entries(v.vn&&typeof v.vn==='object'?v.vn:{})){if(!VID.test(id)||!e||!Number.isFinite(e.at))continue;out.vn[id]=e.miss===true?{miss:true,at:e.at,dv:e.dv===1?1:0}:{sexual:rating(e.sexual),violence:rating(e.violence),at:e.at,dv:e.dv===1?1:0,dev:dev(e.dev)};}return out;}
 function writeCache(root,v){const f=cacheFile(root),tmp=f+'.'+process.pid+'.tmp';fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(tmp,JSON.stringify(v));fs.renameSync(tmp,f);}
 /* every library game with a VNDB id: {id, cover basename} (the id the game page uses: a manual one first) */
-function games(db){const out=[];try{for(const r of db.prepare("SELECT cover,original FROM games WHERE removed_at IS NULL AND cover<>''").all()){let o={};try{o=JSON.parse(r.original||'{}');}catch{}
-  const id=vid(o.vndbManual||o.library?.vndbId||'');out.push({vid:id,cover:path.win32.basename(String(r.cover)).split('?')[0]});}}catch{}return out;}
+function games(db){const out=[];try{for(const r of db.prepare("SELECT id,cover,original FROM games WHERE removed_at IS NULL AND cover<>''").all()){let o={};try{o=JSON.parse(r.original||'{}');}catch{}
+  const id=vid(o.vndbManual||o.library?.vndbId||'');out.push({gid:String(r.id),vid:id,cover:path.win32.basename(String(r.cover)).split('?')[0]});}}catch{}return out;}
 let busy=null;
-async function refresh(root,ids,{fetcher=globalThis.fetch,now=Date.now()}={}){const c=readCache(root);const want=[...new Set(ids)].filter(id=>{const e=c.vn[id];return !e||now-e.at>(e.miss?MISS:FRESH);});
+async function refresh(root,ids,{fetcher=globalThis.fetch,now=Date.now()}={}){const c=readCache(root);const want=[...new Set(ids)].filter(id=>{const e=c.vn[id];return !e||e.dv!==1||now-e.at>(e.miss?MISS:FRESH);});
  if(!want.length||!fetcher||now-c.failedAt<RETRY)return false;
  try{for(let i=0;i<want.length;i+=PAGE){const part=want.slice(i,i+PAGE),filters=part.length===1?['id','=',part[0]]:['or',...part.map(id=>['id','=',id])];
-   const r=await fetcher(VNDB,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filters,fields:'image.sexual,image.violence',results:PAGE}),signal:AbortSignal.timeout(TIMEOUT)});
+   const r=await fetcher(VNDB,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filters,fields:'image.sexual,image.violence,developers.id,developers.name,developers.original',results:PAGE}),signal:AbortSignal.timeout(TIMEOUT)});
    if(!r.ok)throw Error('VNDB_HTTP_'+r.status);const j=await r.json();if(!Array.isArray(j?.results))throw Error('VNDB_BAD_ANSWER');const seen=new Set();
-   for(const x of j.results){const id=vid(x?.id);if(!id||!part.includes(id))continue;seen.add(id);c.vn[id]=x.image&&typeof x.image==='object'?{sexual:rating(x.image.sexual),violence:rating(x.image.violence),at:now}:{miss:true,at:now};}
-   for(const id of part)if(!seen.has(id))c.vn[id]={miss:true,at:now};}
+   for(const x of j.results){const id=vid(x?.id);if(!id||!part.includes(id))continue;seen.add(id);c.vn[id]=x.image&&typeof x.image==='object'?{sexual:rating(x.image.sexual),violence:rating(x.image.violence),at:now,dv:1,dev:dev((Array.isArray(x.developers)?x.developers:[])[0])}:{miss:true,at:now,dv:1};}
+   for(const id of part)if(!seen.has(id))c.vn[id]={miss:true,at:now,dv:1};}
   c.failedAt=0;writeCache(root,c);return true;}catch{c.failedAt=now;try{writeCache(root,c);}catch{}return false;}}
 /* the state for the page: {on, flagged:[cover file names VNDB rates adult], pending}. Answers from the cache at once; an unknown id is asked in the background. */
 function state(db,root,{fetcher,now=Date.now(),wait=false}={}){
@@ -42,7 +43,7 @@ function state(db,root,{fetcher,now=Date.now(),wait=false}={}){
  const rev=saveFlags(root,flagged)?Date.now():0;
  const out={on:enabled(root),setting:setting(root),locked:setting(root)&&safeOnly(root),flagged:[...flagged].sort(),changed:rev>0,pending:unknown.length>0};
  if(wait)return refresh(root,list.map(g=>g.vid).filter(Boolean),{fetcher,now}).then(()=>state(db,root,{fetcher,now}));
- if((unknown.length||list.some(g=>g.vid&&c.vn[g.vid]&&now-c.vn[g.vid].at>(c.vn[g.vid].miss?MISS:FRESH)))&&!busy){busy=refresh(root,list.map(g=>g.vid).filter(Boolean),{fetcher,now}).finally(()=>{busy=null;});}
+ if((unknown.length||list.some(g=>g.vid&&c.vn[g.vid]&&(c.vn[g.vid].dv!==1||now-c.vn[g.vid].at>(c.vn[g.vid].miss?MISS:FRESH))))&&!busy){busy=refresh(root,list.map(g=>g.vid).filter(Boolean),{fetcher,now}).finally(()=>{busy=null;});}
  return out;}
 /* the cover files VNDB rates adult, kept in data/config/cover-flags.json so store.imageData (every cover the app serves) can tag them:
    a data: URL of such a cover ends with #r18, and web/nsfw.js veils every picture with that tag while the setting is off */
@@ -53,4 +54,14 @@ function flags(root){const f=flagsFile(root);let st=null;try{st=fs.statSync(f);}
 const isFlagged=(root,name)=>flags(root).has(String(name||''));
 function saveFlags(root,names){const cur=[...flags(root)].sort().join(','),next=[...names].sort().join(',');if(cur===next&&fs.existsSync(flagsFile(root)))return false;
  try{const f=flagsFile(root),tmp=f+'.'+process.pid+'.tmp';fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(tmp,JSON.stringify({names:[...names].sort()}));fs.renameSync(tmp,f);flagCache.delete(root);return true;}catch{return false;}}
-module.exports={state,refresh,enabled,setting,adult,rating,readCache,games,vid,isFlagged,saveFlags};
+/* each library game's first developer (VNDB producer id, name), from the same answers: {byGame:{<game id>:{pid,name,original}}} */
+function developers(db,root,{fetcher,now=Date.now()}={}){const c=readCache(root),byGame={};
+ for(const g of games(db)){const e=g.vid&&c.vn[g.vid];if(e&&e.dev)byGame[g.gid]={pid:e.dev.id,name:e.dev.name,original:e.dev.original};}
+ if(!busy&&games(db).some(g=>g.vid&&(!c.vn[g.vid]||c.vn[g.vid].dv!==1)))busy=refresh(root,games(db).map(g=>g.vid).filter(Boolean),{fetcher,now}).finally(()=>{busy=null;});
+ return {byGame};}
+/* one game's developer for the game page; an unknown one is asked now (a few seconds at most) */
+async function developerOf(db,root,id,{fetcher,now=Date.now(),wait=2500}={}){const g=games(db).find(x=>x.gid===String(id));if(!g||!g.vid)return null;
+ let e=readCache(root).vn[g.vid];
+ if((!e||e.dv!==1)&&wait>0){await Promise.race([busy||refresh(root,[g.vid],{fetcher,now}),new Promise(r=>setTimeout(r,wait))]);e=readCache(root).vn[g.vid];}
+ return e&&e.dev?{pid:e.dev.id,name:e.dev.name,original:e.dev.original}:null;}
+module.exports={developerOf,developers,state,refresh,enabled,setting,adult,rating,readCache,games,vid,isFlagged,saveFlags};

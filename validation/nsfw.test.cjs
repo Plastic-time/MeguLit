@@ -11,8 +11,8 @@ const rows=[{cover:'C:/x/covers/a.jpg',original:JSON.stringify({library:{vndbId:
 test('off by default; on only when set; the R18 filter wins',()=>{const root=tmp();assert.equal(nsfw.enabled(root),false);put(root,'library.json',{nsfw:true});assert.equal(nsfw.enabled(root),true);put(root,'native-preferences.json',{safe_cg:true});assert.equal(nsfw.enabled(root),false);assert.equal(nsfw.setting(root),true);});
 test('adult rule: sexual or violence at 1 or more, a missing rating counts as adult',()=>{assert.equal(nsfw.adult({sexual:0,violence:0}),false);assert.equal(nsfw.adult({sexual:0.9,violence:0.2}),false);assert.equal(nsfw.adult({sexual:1,violence:0}),true);assert.equal(nsfw.adult({sexual:0,violence:1.5}),true);assert.equal(nsfw.adult(null),true);assert.equal(nsfw.adult({}),true);});
 test('refresh: asks VNDB for the ids only, keeps the ratings, then state flags the adult covers by file name',async()=>{const root=tmp();let body=null;
- const f=async(url,init)=>{body=JSON.parse(init.body);return {ok:true,json:async()=>({results:[{id:'v1',image:{sexual:1.8,violence:0}},{id:'v2',image:{sexual:0,violence:0}},{id:'v4',image:null}]})};};
- assert.equal(await nsfw.refresh(root,['v1','v2','v4'],{fetcher:f}),true);assert.deepEqual(body.filters,['or',['id','=','v1'],['id','=','v2'],['id','=','v4']]);assert.equal(body.fields,'image.sexual,image.violence');assert.ok(!/title|path|exe/i.test(JSON.stringify(body.filters)));
+ const f=async(url,init)=>{body=JSON.parse(init.body);return {ok:true,json:async()=>({results:[{id:'v1',image:{sexual:1.8,violence:0},developers:[{id:'p24',name:'Key',original:null}]},{id:'v2',image:{sexual:0,violence:0},developers:[]},{id:'v4',image:null}]})};};
+ assert.equal(await nsfw.refresh(root,['v1','v2','v4'],{fetcher:f}),true);assert.deepEqual(body.filters,['or',['id','=','v1'],['id','=','v2'],['id','=','v4']]);assert.equal(body.fields,'image.sexual,image.violence,developers.id,developers.name,developers.original');assert.ok(!/title|path|exe/i.test(JSON.stringify(body.filters)));
  const s=nsfw.state(dbOf(rows),root);assert.deepEqual(s.flagged,['a.jpg']);assert.equal(s.on,false);assert.equal(s.pending,false,'a cover with no id, or an id with no image, is not pending and not flagged');
  put(root,'library.json',{nsfw:true});assert.equal(nsfw.state(dbOf(rows),root).on,true);});
 test('an unknown id is pending (asked in the background); a failed ask is not repeated at once',async()=>{const root=tmp();let n=0;const f=async()=>{n++;throw Error('offline');};
@@ -27,3 +27,9 @@ test('flag file: state writes the adult cover names; store.imageData tags exactl
  let s=nsfw.state(dbOf(r),root);assert.deepEqual(s.flagged,['a.png']);assert.equal(s.changed,true);
  assert.ok(store.imageData(root,'covers','a.png').endsWith('#r18'));assert.ok(!store.imageData(root,'covers','b.png').endsWith('#r18'));assert.ok(!store.imageData(root,'word-images','a.png').endsWith('#r18'),'only covers');
  s=nsfw.state(dbOf(r),root);assert.equal(s.changed,false,'an unchanged set is not a change');});
+
+test('developers: each game gets its first VNDB developer from the same answers; old cache entries without developers are asked again',async()=>{const root=tmp();put(root,'cover-ratings.json',{vn:{v1:{sexual:0,violence:0,at:Date.now()}}});
+ const f=async()=>({ok:true,json:async()=>({results:[{id:'v1',image:{sexual:0,violence:0},developers:[{id:'p24',name:'Key',original:'Key'}]}]})});
+ const r=[{id:'7',cover:'a.jpg',original:JSON.stringify({library:{vndbId:'v1'}})},{id:'8',cover:'b.jpg',original:'{}'}];
+ assert.deepEqual(nsfw.developers(dbOf(r),root,{fetcher:f}).byGame,{},'asked in the background first');await new Promise(r=>setTimeout(r,50));
+ assert.deepEqual(nsfw.developers(dbOf(r),root,{fetcher:f}).byGame,{7:{pid:'p24',name:'Key',original:'Key'}});});

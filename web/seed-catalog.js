@@ -86,12 +86,8 @@ export function loadCovers(root,api,mode,live=()=>root.isConnected,{cache=covers
 }
 function showCover(el,url){const img=new Image();img.alt='';img.decoding='async';img.onload=()=>img.classList.add('is-in');img.src=url;el.prepend(img);el.dataset.loaded='1';}
 
-/* the panel under a developer's name; the intro is text (escaped), the links are buttons the service opens in the browser */
-export function devPanelHTML(info,t,esc){
- if(!info||!Array.isArray(info.links))return `<p class="sc-panel-note">${esc(t.devNone)}</p>`;
- const ok=new Set(['vndb','site','moegirl','jawiki']);
- return `${info.intro?`<p class="sc-intro">${esc(info.intro)}<small>${esc(t.devSource)}</small></p>`:''}<ul class="sc-links">${info.links.filter(l=>ok.has(l.kind)).map(l=>`<li><button type="button" class="sc-link" data-link="${esc(l.kind)}" title="${esc(t.devOpen)}">${esc(t.links[l.kind]||l.kind)}<span aria-hidden="true"> ↗</span></button></li>`).join('')}</ul>`;
-}
+import {devPanelHTML,openPanel,devWords} from './developer.js';
+export {devPanelHTML};
 /* developer logos: the small icon of the developer's own site (services/seed-logo.cjs), three at a time; no icon = the letter badge stays */
 const logos=new Map();
 export function loadLogos(root,api,live=()=>root.isConnected,{cache=logos}={}){
@@ -120,8 +116,7 @@ export function openSeedCatalog({api,locale,esc,toast}){
  body.addEventListener('click',async e=>{const b=e.target.closest('[data-reveal]');if(!b||b.disabled)return;const el=b.closest('.sc-cover');b.disabled=true;let u=null;try{u=await api('seed_cover',{vndb:b.dataset.reveal,nsfw:true});}catch{}
   if(isCover(u)&&el.isConnected){b.remove();el.querySelector('.sc-ph')?.remove();showCover(el,u);el.dataset.state='load';}else{b.disabled=false;b.title=safeOnly?t.locked:t.failed;}});
  /* a developer's name opens a small panel: VNDB's introduction (cut short, source named) and links; links open in the system browser */
- body.addEventListener('click',async e=>{const b=e.target.closest('[data-dev]');if(b){const panel=b.closest('.sc-group').querySelector('[data-panel]'),open=panel.hidden;panel.hidden=!open;b.setAttribute('aria-expanded',String(open));if(open&&!panel.dataset.loaded){panel.dataset.loaded='1';panel.innerHTML='<p class="sc-panel-note">'+esc(t.loading)+'</p>';let info=null;try{info=await api('seed_producer',{pid:b.dataset.dev});}catch{}panel.innerHTML=devPanelHTML(info,t,esc);if(!info)delete panel.dataset.loaded;}return;}
-  const l=e.target.closest('[data-link]');if(l){const pid=l.closest('.sc-group').querySelector('[data-dev]')?.dataset.dev;try{await api('seed_producer_open',{pid,kind:l.dataset.link});}catch{toast&&toast(t.failed);}}});
+ body.addEventListener('click',async e=>{const b=e.target.closest('[data-dev]');if(!b)return;const panel=b.closest('.sc-group').querySelector('[data-panel]'),open=panel.hidden;panel.hidden=!open;b.setAttribute('aria-expanded',String(open));if(open)openPanel({panel,pid:b.dataset.dev,api,t:{...t,...devWords(locale)},esc,toast,locale});});
  $('[data-search]').addEventListener('input',e=>{query=e.target.value;render();});
  $('[data-close]').onclick=()=>dialog.close();
  dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
