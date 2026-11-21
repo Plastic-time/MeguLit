@@ -61,7 +61,7 @@
    try{return (await request('ankiScreenshot',{},5000)).id;}catch{return;}
   }
   async function act(action){if(action==='anki'){if(ankiBusy)return;ankiBusy=true;anki.dataset.state='busy';}audio.disabled=anki.disabled=true;status.textContent=action==='speak'?'合成读音中…':'同步 Anki 中…';
-   const started=Date.now(),ticker=action==='speak'?(window.__megulitReaderIntervals?.set||setInterval)(()=>{if(!alive())return;const s=Math.round((Date.now()-started)/1000);status.textContent='合成读音中… '+s+' 秒'+(s>=5?'（语音引擎首次启动或加载模型会慢一些）':'');
+   const started=Date.now(),ticker=action==='speak'?setInterval(()=>{if(!alive())return;const s=Math.round((Date.now()-started)/1000);status.textContent='合成读音中… '+s+' 秒'+(s>=5?'（语音引擎首次启动或加载模型会慢一些）':'');
    },1000):0;try{const value=await request(action,{...scope,pitchChoice:pitch.hidden?undefined:pitchValue,...(action==='anki'?{aiNote:card.__megulitAi||undefined,
    translation:currentTranslation(scope.text),screenshotId:(await(card.__megulitShot||Promise.resolve(null)).then(v=>v&&Date.now()-v.at<170000?v.id:null).catch(()=>null).finally(()=>{
    card.__megulitShot=null;}))||await captureReader()}:{})});if(!alive())return;if(action==='speak'){currentAudio?.pause();const bytes=Uint8Array.from(atob(value.data),
@@ -72,7 +72,7 @@
    if(value.sentenceAudioSource){const labels={game:['例句：游戏原声','Example: game voice','例文：ゲーム音声'],synthesized:['例句：合成语音','Example: synthesized voice','例文：合成音声']};
    const lang=document.documentElement.lang;status.textContent+=' · '+labels[value.sentenceAudioSource][lang.startsWith('ja')?2:lang.startsWith('en')?1:0];}try{
    window.__tomeAnkiMined?.({entry:result?.entries?.find(e=>e.id===entryId)||result?.entries?.[0],args,noteId:value.id,word,wordMined:value.wordMined});}catch{}}}catch(e){if(alive())status.textContent=e.message;
-   }finally{(window.__megulitReaderIntervals?.clear||clearInterval)(ticker);if(action==='anki'){ankiBusy=false;if(anki.dataset.state==='busy')delete anki.dataset.state;}if(alive()){audio.disabled=false;anki.disabled=minedKeys.has(minedKey());if(anki.disabled)markMined();
+   }finally{clearInterval(ticker);if(action==='anki'){ankiBusy=false;if(anki.dataset.state==='busy')delete anki.dataset.state;}if(alive()){audio.disabled=false;anki.disabled=minedKeys.has(minedKey());if(anki.disabled)markMined();
    }}}
   request('word',scope).then(value=>{if(!alive())return;word=value;status.textContent=(value.pronunciationForm==='lemma'?'原形朗读：':'')+(value.reading||value.surface)+(value.pitch?.length?' · 音调 '+value.pitch.join(' / '):'')+' · '+value.pitchSource;
    if(value.pitch?.length>1){pitch.hidden=false;const morae=(value.reading.match(/[ぁ-ゖァ-ヺー][ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ]?/g)||[]);const pick=p=>{pitchValue=p;for(const c of pitch.children)c.setAttribute('aria-checked',

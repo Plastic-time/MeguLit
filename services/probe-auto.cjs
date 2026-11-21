@@ -94,27 +94,27 @@ async function fullOne(root,db,game,result,s,{fetcher,fullBase,fuller,now=Date.n
 
 /* run(root,db,opts) → {state, results:{gameId:outcome}}: the library probe when due, then every problem game in turn */
 let busy=null;
-async function run(root,db,{ids=null,fetcher=globalThis.fetch,endpoint,hasEndpoint,fullBase,sampler,fuller,probeFirst=true,wait=ms=>new Promise(r=>setTimeout(r,ms))}={}){
+async function run(root,db,{ids=null,fetcher=globalThis.fetch,endpoint,hasEndpoint,fullBase,sampler,fuller,probeFirst=true,automatic=false,checkpoint=automatic?()=>require('./background-budget.cjs').wait(root):async()=>{},wait=ms=>new Promise(r=>setTimeout(r,ms))}={}){
  if(!enabled(root))return {state:'off',results:{}};
  if(busy)return {state:'busy',results:{}};
  busy=(async()=>{const probe=require('./adapter-probe.cjs');sampler=sampler||probe.sampleInWorker;fuller=fuller||probe.fullInWorker;try{require('./probe-full.cjs').sweep(root);}catch{}
-  const s=load(root);
+  const s=load(root);await checkpoint();
   if(probeFirst&&!ids&&Date.now()-s.probedAt>PROBE_EVERY&&probe.status(root).state!=='running'){
-   s.probedAt=Date.now();save(root,s);probe.start(root,db,{reason:'auto'});
+   s.probedAt=Date.now();save(root,s);probe.start(root,db,{reason:'auto',automatic});
    for(let i=0;i<2400&&probe.status(root).state==='running';i++)await wait(1000);}
   const results=probe.results(root),games=probe.libraryGames(db),want=ids?new Set(ids.map(String)):null,out={},errors={},full={},contrib=require('./adapter-contrib.cjs'),contribOut={};
   /* rule 3 (adapter-contrib.cjs): local packages never stay longer than KEEP_DAYS, nor at all once the switch is off */
   contrib.purgeOutbox(root,contrib.enabled(root)?{olderThan:contrib.KEEP_DAYS*86400000}:{});
   for(const p of probe.problems(root)){if(want&&!want.has(p.id))continue;const g=games.find(x=>x.id===p.id);if(!g||!results[p.id])continue;
-   const keep=s.games[p.id]?.full;let o;try{o=await one(root,db,g,results[p.id],s,{fetcher,endpoint,hasEndpoint,sampler});}catch(e){o='failed';/* an exception used to leave no record (no error code, no backoff): the dialog said 上传失败 with nothing to go on */const rec=s.games[p.id]||{},attempts=(rec.attempts|0)+1;s.games[p.id]={...rec,state:'failed',error:('EXC '+String(e?.message||e)).replace(/[^ -~]/g,'?').slice(0,40),at:Date.now(),attempts,nextAt:Date.now()+Math.min(RETRY_MAX,RETRY_MIN*2**Math.min(6,attempts-1))};}
+   await checkpoint();const keep=s.games[p.id]?.full;let o;try{o=await one(root,db,g,results[p.id],s,{fetcher,endpoint,hasEndpoint,sampler});}catch(e){o='failed';/* an exception used to leave no record (no error code, no backoff): the dialog said 上传失败 with nothing to go on */const rec=s.games[p.id]||{},attempts=(rec.attempts|0)+1;s.games[p.id]={...rec,state:'failed',error:('EXC '+String(e?.message||e)).replace(/[^ -~]/g,'?').slice(0,40),at:Date.now(),attempts,nextAt:Date.now()+Math.min(RETRY_MAX,RETRY_MIN*2**Math.min(6,attempts-1))};}
    if(o==='failed')errors[p.id]=String(s.games[p.id]?.error||'');
    if(keep&&s.games[p.id]&&!s.games[p.id].full)s.games[p.id].full=keep;
    out[p.id]=o;save(root,s);if(o==='offline')break;
    /* 2026-11-16 informed consent (adapter-contrib.cjs consentState): the contribution and the full script + exe upload
       run only after the player agreed (update card 同意并下一步 or the Settings switch); without it nothing of the game is sent */
    if(contrib.enabled(root)){
-    try{contribOut[p.id]=await contrib.forGame(root,db,g,results[p.id],{fetcher});}catch{contribOut[p.id]='failed';}
-    let fo;try{fo=await fullOne(root,db,g,results[p.id],s,{fetcher,fullBase,fuller});}catch{fo='failed';}
+    await checkpoint();try{contribOut[p.id]=await contrib.forGame(root,db,g,results[p.id],{fetcher});}catch{contribOut[p.id]='failed';}
+    await checkpoint();let fo;try{fo=await fullOne(root,db,g,results[p.id],s,{fetcher,fullBase,fuller});}catch{fo='failed';}
     full[p.id]=fo;save(root,s);if(fo==='offline')break;if(fo!=='skipped')await wait(1500);}
    await wait(o==='skipped'?0:1500);}
   save(root,s);return {state:'done',results:out,errors,contrib:contribOut,full};})();
@@ -125,7 +125,7 @@ function status(root){const s=load(root);return {enabled:enabled(root),busy:!!bu
 
 /* background schedule: FIRST_DELAY after start, then every EVERY; kick() after a runtime harvest or a finished probe */
 let timer=null,opener=null,started=null;
-function schedule(root,delay){if(!opener)return;timer?.stop?.();timer=require('./background-budget.cjs').schedule(root,async()=>{timer=null;let db;try{db=opener();await run(root,db);}catch{}finally{try{db?.close?.();}catch{}}schedule(root,EVERY);},{delay});timer.unref?.();}
+function schedule(root,delay){if(!opener)return;timer?.stop?.();timer=require('./background-budget.cjs').schedule(root,async()=>{timer=null;let db;try{db=opener();await run(root,db,{automatic:true});}catch{}finally{try{db?.close?.();}catch{}}schedule(root,EVERY);},{delay});timer.unref?.();}
 function start(root,openDb,{delay=FIRST_DELAY}={}){if(process.env.NODE_TEST_CONTEXT||started===root)return null;started=root;opener=openDb;schedule(root,delay);return true;}
 function kick(root,{delay=KICK_DELAY}={}){if(!opener||started!==root||!enabled(root))return false;schedule(root,delay);return true;}
 

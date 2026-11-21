@@ -1,4 +1,4 @@
-import {requestUiFrame,cancelUiFrame,onUiState,uiActive} from './idle-gate.js';
+import {requestUiFrame,cancelUiFrame} from './idle-gate.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-12 the dictionary's drifting field, made like the website hero (site/public/assets/js/spell.js; user: full
    screen, in layers, white or red at random, random sizes, the nearer the blurrier — real depth of field). Every glyph

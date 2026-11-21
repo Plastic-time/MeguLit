@@ -179,9 +179,11 @@ const running=new Set();
 /* Voices the scan could not open go to a cold run (voice-cold.cjs) when the setting allows it; the game is scanned again
    once that run ends, so the clips it read count. */
 // One scan at a time in a worker thread (game-voice-worker.cjs); the line index is reloaded when it is done.
-const scanQueue=[];let scanBusy=false;
+const scanQueue=[];let scanBusy=false,scanRetry=null;
 function scanInWorker(root,start,done,hold=false){scanQueue.push({root,start,done,hold});pump();}
-function pump(){if(scanBusy||!scanQueue.length)return;const job=scanQueue.shift();scanBusy=true;let w;
+async function pump(){if(scanBusy||!scanQueue.length)return;clearTimeout(scanRetry);scanRetry=null;const manual=scanQueue.findIndex(job=>job.hold),job=scanQueue.splice(manual<0?0:manual,1)[0];scanBusy=true;let w;
+ let idle=job.hold;try{if(!idle)idle=await require('./background-games.cjs').idle(job.root);}catch{}
+ if(!idle){scanBusy=false;scanQueue.push(job);if(scanQueue.some(next=>next.hold))pump();else{scanRetry=setTimeout(pump,30000);scanRetry.unref?.();}return;}
  const finish=msg=>{scanBusy=false;memo=null;if(msg?.g)catalogs.delete(gameKey(msg.g.dir));try{job.done(msg||{});}catch{}pump();};
  try{w=new (require('node:worker_threads').Worker)(path.join(__dirname,'game-voice-worker.cjs'),{workerData:{root:job.root,start:job.start}});}catch{return finish(null);}
  w.once('message',finish);w.once('error',()=>finish(null));/* a scan someone awaits (ensureScanned) keeps the process alive */if(!job.hold)w.unref?.();}

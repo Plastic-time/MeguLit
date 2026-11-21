@@ -49,12 +49,12 @@
   d.querySelector('[data-reset-confirm]').onclick=e=>{e.currentTarget.disabled=true;pending='reset';send({type:'settingsReset'});};
  }
  let bar=null,timer=0;
- function closeBar(){(window.__megulitReaderIntervals?.clear||clearInterval)(timer);if(bar){try{bar.hidePopover?.();}catch{}bar.remove();bar=null;}}
- function note(text){closeBar();bar=el('div','tome-reset-undo',`<span>${esc(text)}</span>`);bar.setAttribute('popover','manual');bar.setAttribute('role','status');document.body.append(bar);try{bar.showPopover();}catch{}const n=bar;timer=(window.__megulitReaderIntervals?.set||setInterval)(()=>{if(bar===n)closeBar();},3000);}
+ function closeBar(){clearInterval(timer);if(bar){try{bar.hidePopover?.();}catch{}bar.remove();bar=null;}}
+ function note(text){closeBar();bar=el('div','tome-reset-undo',`<span>${esc(text)}</span>`);bar.setAttribute('popover','manual');bar.setAttribute('role','status');document.body.append(bar);try{bar.showPopover();}catch{}const n=bar;timer=setInterval(()=>{if(bar===n)closeBar();},3000);}
  b.settingsResetDone=id=>{pending=null;dialog?.close();const w=t();closeBar();
   bar=el('div','tome-reset-undo',`<span>${esc(w.done)}</span><button type="button" data-reset-undo>${esc(w.undo)} <b data-seconds>10</b></button>`);bar.setAttribute('popover','manual');bar.setAttribute('role','status');document.body.append(bar);try{bar.showPopover();}catch{}
-  let left=10;const n=bar;timer=(window.__megulitReaderIntervals?.set||setInterval)(()=>{left-=1;const s=n.querySelector('[data-seconds]');if(s)s.textContent=String(left);if(left<=0&&bar===n)closeBar();},1000);
-  n.querySelector('[data-reset-undo]').onclick=e=>{e.currentTarget.disabled=true;(window.__megulitReaderIntervals?.clear||clearInterval)(timer);pending='undo';send({type:'settingsResetUndo',id:String(id||'')});};};
+  let left=10;const n=bar;timer=setInterval(()=>{left-=1;const s=n.querySelector('[data-seconds]');if(s)s.textContent=String(left);if(left<=0&&bar===n)closeBar();},1000);
+  n.querySelector('[data-reset-undo]').onclick=e=>{e.currentTarget.disabled=true;clearInterval(timer);pending='undo';send({type:'settingsResetUndo',id:String(id||'')});};};
  b.settingsResetUndone=()=>{pending=null;note(t().undone);};
  b.settingsResetFailed=()=>{const was=pending;pending=null;const c=dialog?.querySelector('[data-reset-confirm]');if(c)c.disabled=false;if(was==='undo')note(t().failed);else if(!dialog)note(t().failed);else{let p=dialog.querySelector('.tome-reset-error');if(!p){p=el('p','tome-reset-error');dialog.querySelector('.tome-reset-actions').before(p);}p.textContent=t().failed;}};
  let queued=false;const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;mount();});};

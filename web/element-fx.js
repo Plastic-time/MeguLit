@@ -1,4 +1,4 @@
-import {requestUiFrame,cancelUiFrame,onUiState,uiActive} from './idle-gate.js';
+import {requestUiFrame,cancelUiFrame} from './idle-gate.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-12 (user: not the same magic circle for every element — each element its own animation and particles,
    finely made). A canvas scene per element for the 转职 stage. Idle it breathes quietly; cast() raises it to full

@@ -1,4 +1,4 @@
-import {requestUiFrame,cancelUiFrame,onUiState,uiActive} from './idle-gate.js';
+import {requestUiFrame,cancelUiFrame} from './idle-gate.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* 2026-11-12 the 转职 stage, rebuilt (user: only ice and dark were good; a grand original explosion circle for fire; no
    cheap dot particles anywhere — every particle has a shape and a material; every element keeps moving while it is

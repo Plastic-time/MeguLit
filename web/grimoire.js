@@ -1,4 +1,4 @@
-import {requestUiFrame,cancelUiFrame,onUiState,uiActive} from './idle-gate.js';
+import {requestUiFrame,cancelUiFrame} from './idle-gate.js';
 import {driftMount} from './library-drift.js';
 import {fxPref} from './fx-prefs.js';
 // SPDX-License-Identifier: GPL-3.0-or-later

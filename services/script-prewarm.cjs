@@ -8,7 +8,7 @@ const path=require('node:path'),fs=require('node:fs'),{Worker,isMainThread,worke
 
 function start(root,{delay=45000,onDone=()=>{}}={}){
  if(process.env.MEGULIT_NO_PREWARM)return null;
- const timer=require('./background-budget.cjs').schedule(root,()=>{let worker;try{worker=new Worker(__filename,{workerData:{root}});}catch{return;}
+ const timer=require('./background-budget.cjs').schedule(root,()=>{let worker;try{worker=require('./background-budget.cjs').attach(new Worker(__filename,{workerData:{root,backgroundBudget:true}}),root);}catch{return;}
   worker.on('message',m=>{if(m?.done)onDone(m);});worker.on('error',()=>{});worker.unref();},{delay});
  timer.unref?.();return timer;}
 

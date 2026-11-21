@@ -1,4 +1,4 @@
-import {requestUiFrame,cancelUiFrame,onUiState,uiActive} from './idle-gate.js';
+import {requestUiFrame,cancelUiFrame} from './idle-gate.js';
 /* 2026-11-13 (user: "整个首页加景深效果，并参与鼠标互动，不要静止") home depth: every layer of the home page sits at its own depth and follows
    the pointer on a spring; near layers move more than far ones, far layers carry a fixed pre-set blur (CSS), and an idle page drifts very slightly.
    Only `translate`/`transform` are written per frame, so the loop stays on the compositor. Also holds the daily-news cache and the flat-picture
