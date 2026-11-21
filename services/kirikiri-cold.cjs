@@ -37,7 +37,9 @@ function consider(root,game,{enabled=true,force=false}={}){
  if(!bit||!fs.existsSync(helper)||!fs.existsSync(dll))return false;
  queue.push({root,key,exe,dir,helper,dll,id:game.id});next();return true;
 }
+let checking=false,retry=null;
 function next(){
+ if(!next.allowed){if(checking)return;checking=true;const job=queue[0];if(!job){checking=false;return;}require('./background-games.cjs').idle(job.root).then(ok=>{checking=false;if(ok){next.allowed=true;next();next.allowed=false;}else{clearTimeout(retry);retry=setTimeout(next,30000);retry.unref?.();}});return;}
  if(busy||!queue.length)return;const job=queue.shift();busy=true;active.add(job.key);
  const finish=result=>{writeState(job.root,job.key,{result,exe:job.exe});active.delete(job.key);busy=false;log(job.root,job.exe+' '+result);for(const f of listeners)try{f(job,result);}catch{}next();};
  // The player has the game open: its own hook reads the archives, nothing to start.
@@ -46,10 +48,10 @@ function next(){
  runner(job,path.join(d,'cold-done.txt'),word=>finish(word==='done'&&prepared(job.dir)?'done':word==='done'?'empty':word||'failed'));
 }
 // The helper process; tests replace it.
-let runner=(job,report,done)=>execFile(job.helper,[job.exe,job.dll,report,'45'],{windowsHide:true,timeout:120000},(error,stdout)=>done(String(stdout||'').trim().split(/\s+/).pop()||(error?'failed':'')));
+let runner=(job,report,done)=>require('./background-games.cjs').capture(job,[job.exe,job.dll,report,'45'],done);
 let isRunning=running;
 function log(root,line){try{fs.mkdirSync(path.join(root,'logs'),{recursive:true});fs.appendFileSync(path.join(root,'logs','kirikiri-cold.log'),new Date().toISOString()+' '+line+'\n');}catch{}}
 // After a library scan: every game that needs it, one after another.
 function considerLibrary(root,games,options){let n=0;for(const g of games||[])if(consider(root,g,options))n++;return n;}
 const onDone=f=>{listeners.add(f);return ()=>listeners.delete(f);};
-module.exports={_setRunner:(f,r)=>{runner=f;if(r)isRunning=r;},consider,considerLibrary,status,prepared,hxArchives,bitness,onDone,_queue:queue};
+module.exports={_setRunner:(f,r)=>{runner=f;next.allowed=true;if(r)isRunning=r;},consider,considerLibrary,status,prepared,hxArchives,bitness,onDone,_queue:queue};

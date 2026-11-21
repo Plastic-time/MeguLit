@@ -148,7 +148,7 @@ async function testOne(root,game,{budgetMs,deps={}}={}){const s=load(root),id=ga
  return out;}
 
 function runInWorker(opts){return new Promise(resolve=>{let w;try{w=fork(path.join(__dirname,'cold-test-worker.cjs'),[],{stdio:['ignore','ignore','ignore','ipc'],windowsHide:true});}catch(e){return resolve({end:'fork '+String(e?.message||e).slice(0,80),lines:0,shots:[]});}
- if(current)current.worker=w;let done=false;const fin=r=>{if(done)return;done=true;clearTimeout(guard);resolve(r);};
+ if(current)current.worker=w;const untrack=require('./background-games.cjs').track(opts.exe,()=>new Promise(resolve=>{w.once('exit',resolve);try{w.send({stop:'foreground'});}catch{}const timer=setTimeout(()=>{try{w.kill();}catch{}},7000);w.once('exit',()=>clearTimeout(timer));}));w.once('exit',untrack);let done=false;const fin=r=>{if(done)return;done=true;clearTimeout(guard);resolve(r);};
  /* the worker never outlives its budget by much (ColdDesk ends the game with it in any case: KILL_ON_JOB_CLOSE) */
  const guard=setTimeout(()=>{try{w.kill();}catch{}fin({end:'watchdog',lines:0,shots:[]});},(opts.budgetMs||360000)+90000);guard.unref?.();
  w.on('message',r=>fin(r));w.on('exit',()=>fin({end:'worker-exit',lines:0,shots:[],stopped:'killed'}));w.send(opts);});}
@@ -185,11 +185,12 @@ function pruneRuns(root){let dirs=[];try{dirs=fs.readdirSync(runsDir(root),{with
 /* ---- the schedule --------------------------------------------------------------------------------------------------- */
 let timer=null,busy=false,started='',opener=null,playing=()=>false;
 /* one check: -> {state, reason?, result?} */
-async function tick(root,{db=null,deps={}}={}){if(busy)return {state:'busy'};busy=true;try{
+async function tick(root,{db=null,deps={}}={}){if(require('./background-games.cjs').blocked())return {state:'waiting',reason:'foreground'};if(busy)return {state:'busy'};busy=true;try{
   const s=load(root);const cfg=Cond.config(readLib(root).coldTestLimits);
   const r=await (deps.reading||reading)(root);
   const c=Cond.check(r?{...r,gameRunning:(deps.playing||playing)(),freeMb:freeMb(root)}:null,{cfg,today:today(s),enabled:enabled(root),helper:!!(deps.helper??helperPath(root)),platform:deps.platform||process.platform});
   if(!c.ok)return {state:'waiting',reason:c.reason};
+  if(require('./background-games.cjs').blocked())return {state:'waiting',reason:'foreground'};
   const games=withSeeds(root,(deps.games||libraryGames)(db));
   const list=Pick.candidates(games,{retest:await (deps.retest||retest)(root),state:s,exists:deps.exists||(f=>fs.existsSync(f)),running:deps.running||(()=>false)});
   if(!list.length)return {state:'nothing'};

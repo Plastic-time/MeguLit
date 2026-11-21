@@ -106,9 +106,11 @@ static class ColdDesk{
  static List<uint> JobPids(){var l=new List<uint>();int size=8+4*1024;IntPtr buf=Marshal.AllocHGlobal(size);try{if(QueryInformationJobObject(Job,3,buf,(uint)size,IntPtr.Zero)){int n=Marshal.ReadInt32(buf,4);for(int i=0;i<n;i++)l.Add((uint)Marshal.ReadIntPtr(buf,8+i*IntPtr.Size).ToInt64());}}finally{Marshal.FreeHGlobal(buf);}return l;}
  static IntPtr Biggest(){IntPtr best=IntPtr.Zero;long area=-1;var pids=new HashSet<uint>(JobPids());EnumProc cb=(h,_)=>{uint p;GetWindowThreadProcessId(h,out p);if(!pids.Contains(p)||!IsWindowVisible(h))return true;RECT r;GetWindowRect(h,out r);long s=(long)(r.R-r.L)*(r.B-r.T);if(s>area){area=s;best=h;}return true;};
   EnumDesktopWindows(Desk,cb,IntPtr.Zero);return best;}
- static void Mute(){try{var pids=new HashSet<uint>(JobPids());if(pids.Count==0)return;var en=(IMMDeviceEnumerator)new MMDeviceEnumeratorCls();Guid iid=typeof(IAudioSessionManager2).GUID,g=Guid.Empty;IMMDeviceCollection c;en.EnumAudioEndpoints(0,1,out c);int n;c.GetCount(out n);
-  for(int i=0;i<n;i++){IMMDevice d;c.Item(i,out d);object o;d.Activate(ref iid,23,IntPtr.Zero,out o);var m=(IAudioSessionManager2)o;IAudioSessionEnumerator se;m.GetSessionEnumerator(out se);int k;se.GetCount(out k);
-   for(int j=0;j<k;j++){IAudioSessionControl2 s;se.GetSession(j,out s);uint pid;s.GetProcessId(out pid);if(pids.Contains(pid)){var v=(ISimpleAudioVolume)s;bool mu;v.GetMute(out mu);if(!mu)v.SetMute(true,ref g);}}}}catch{}}
+ static Dictionary<uint,Process> audioGuards=new Dictionary<uint,Process>();
+ static void StopAudioGuards(){foreach(var p in audioGuards.Values){try{p.StandardInput.WriteLine("stop");p.WaitForExit(4000);}catch{}}audioGuards.Clear();}
+ static readonly Dictionary<ISimpleAudioVolume,bool> originalMute=new Dictionary<ISimpleAudioVolume,bool>();
+ static void RestoreAudio(){foreach(var kv in originalMute){try{Guid g=Guid.Empty;kv.Key.SetMute(kv.Value,ref g);}catch{}}originalMute.Clear();}
+ static void Mute(){foreach(uint pid in JobPids()){if(audioGuards.ContainsKey(pid))continue;var helper=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"ColdCapture64.exe");var s=new ProcessStartInfo(helper,"--audio-watch "+Process.GetCurrentProcess().Id+" "+pid);s.UseShellExecute=false;s.CreateNoWindow=true;s.RedirectStandardInput=true;try{audioGuards[pid]=Process.Start(s);}catch{throw new Exception("Audio guard unavailable");}}}
  static IntPtr Lp(uint vk,bool up){uint sc=MapVirtualKey(vk,0);long l=1|(sc<<16);if(up)l|=0xC0000000L;return (IntPtr)unchecked((int)l);}
  static void Key(uint vk,bool down,bool up){if(GameWin==IntPtr.Zero)return;if(down)PostMessage(GameWin,0x100,(IntPtr)vk,Lp(vk,false));if(down&&up&&(vk==0x0d||vk==0x20||vk==0x1b))PostMessage(GameWin,0x102,(IntPtr)vk,Lp(vk,false));if(up)PostMessage(GameWin,0x101,(IntPtr)vk,Lp(vk,true));}
  static void Click(int x,int y){if(GameWin==IntPtr.Zero)return;var w=GameWin;/* the deepest child under the point (KiriKiri draws in a child) */for(int i=0;i<8;i++){POINT pt;pt.X=x;pt.Y=y;var c=ChildWindowFromPointEx(w,pt,1);if(c==IntPtr.Zero||c==w)break;POINT o;o.X=0;o.Y=0;MapWindowPoints(c,w,ref o,1);x-=o.X;y-=o.Y;w=c;}
@@ -166,7 +168,7 @@ static class ColdDesk{
    if((DateTime.UtcNow-lastPower).TotalSeconds>5){lastPower=DateTime.UtcNow;if(Ac()=="false")Emit("{\"type\":\"power\",\"ac\":false}");int q=Quns();bool full=q>=2&&q<=4;if(full&&!wasFull)Emit("{\"type\":\"fullscreen\",\"on\":true}");wasFull=full;}
    if(DateTime.UtcNow>end){Emit("{\"type\":\"timeout\"}");why="timeout";break;}
    Thread.Sleep(100);}
-  TerminateJobObject(Job,1);CloseHandle(Job);CloseHandle(pi.hProcess);
+  StopAudioGuards();RestoreAudio();TerminateJobObject(Job,1);CloseHandle(Job);CloseHandle(pi.hProcess);
   /* the desktop goes away with its last handle once the game's windows are gone */
   Thread.Sleep(300);CloseDesktop(Desk);
   Emit("{\"type\":\"ended\",\"why\":"+Q(why)+"}");return 0;}

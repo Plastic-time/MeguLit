@@ -34,9 +34,23 @@ public static class ColdCapture {
  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h,int cmd);
  const uint CREATE_SUSPENDED=4,CREATE_UNICODE_ENVIRONMENT=0x400;const int STARTF_USESHOWWINDOW=1;const short SW_SHOWMINNOACTIVE=7;
 
+ [StructLayout(LayoutKind.Sequential)] struct LASTINPUTINFO{public uint cbSize,dwTime;}
+ [DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
+ static volatile bool cancelled=false;
+ [DllImport("user32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern IntPtr CreateDesktop(string name,IntPtr dev,IntPtr mode,uint flags,uint access,IntPtr sa);
+ [DllImport("kernel32.dll")] static extern IntPtr CreateJobObject(IntPtr attr,string name);
+ [DllImport("kernel32.dll")] static extern bool SetInformationJobObject(IntPtr job,int cls,IntPtr info,uint size);
+ [DllImport("kernel32.dll")] static extern bool AssignProcessToJobObject(IntPtr job,IntPtr process);
+ [DllImport("user32.dll")] static extern bool CloseDesktop(IntPtr desk);
+ static IntPtr job,desk;static Process audioGuard;
+ static void StopAudio(){if(audioGuard==null)return;try{audioGuard.StandardInput.WriteLine("stop");audioGuard.WaitForExit(4000);}catch{}}
  public static int Main(string[] args){
+  if(args.Length==3&&args[0]=="--audio-watch"){Audio.Watch(Int32.Parse(args[1]),Int32.Parse(args[2]));return 0;}
+  if(args.Length==1&&args[0]=="--audio-selftest")return Audio.Selftest();
+  if(args.Length==2&&args[0]=="--unmute"){Audio.Unmute(Int32.Parse(args[1]));return 0;}
   string word="failed";PROCESS_INFORMATION pi=new PROCESS_INFORMATION();
   try{
+   new Thread(()=>{try{Console.ReadLine();cancelled=true;}catch{}}){IsBackground=true}.Start();
    if(args.Length!=4)throw new Exception("Expected game exe, capture DLL, report file and seconds");
    string exe=Path.GetFullPath(args[0]),dll=Path.GetFullPath(args[1]),report=Path.GetFullPath(args[2]);int seconds=Math.Max(10,Math.Min(1200,Int32.Parse(args[3])));
    if(!File.Exists(exe)||!File.Exists(dll))throw new Exception("Missing game or capture DLL");
@@ -47,11 +61,15 @@ public static class ColdCapture {
    foreach(System.Collections.DictionaryEntry e in Environment.GetEnvironmentVariables())env[(string)e.Key]=(string)e.Value;env["MEGULIT_COLD"]="1";
    var block=new StringBuilder();foreach(var kv in env)block.Append(kv.Key).Append('=').Append(kv.Value).Append('\0');block.Append('\0');
    var si=new STARTUPINFO();si.cb=Marshal.SizeOf(si);si.dwFlags=STARTF_USESHOWWINDOW;si.wShowWindow=SW_SHOWMINNOACTIVE;
+   desk=CreateDesktop("MeguLitCapture",IntPtr.Zero,IntPtr.Zero,0,0x10000000,IntPtr.Zero);if(desk==IntPtr.Zero)throw new Exception("Hidden desktop unavailable");si.lpDesktop="WinSta0\\MeguLitCapture";
+   job=CreateJobObject(IntPtr.Zero,null);IntPtr limits=Marshal.AllocHGlobal(144);try{for(int n=0;n<144;n++)Marshal.WriteByte(limits,n,0);Marshal.WriteInt32(limits,16,0x2000);if(job==IntPtr.Zero||!SetInformationJobObject(job,9,limits,(uint)(IntPtr.Size==8?144:112)))throw new Exception("Job setup failed");}finally{Marshal.FreeHGlobal(limits);}
    if(!CreateProcess(exe,new StringBuilder("\""+exe+"\""),IntPtr.Zero,IntPtr.Zero,false,CREATE_SUSPENDED|CREATE_UNICODE_ENVIRONMENT,block.ToString(),Path.GetDirectoryName(exe),ref si,out pi))throw new Exception("Game did not start");
+   if(!AssignProcessToJobObject(job,pi.hProcess))throw new Exception("Job assignment failed");
    bool wow;if(!IsWow64Process(pi.hProcess,out wow)||Environment.Is64BitOperatingSystem&&((!wow)!=(IntPtr.Size==8))){word="failed";throw new Exception("Helper bitness differs from the game");}
-   ResumeThread(pi.hThread);
-   var started=DateTime.UtcNow;bool loaded=false;
+   audioGuard=Audio.Guard(pi.dwProcessId);ResumeThread(pi.hThread);
+   var started=DateTime.UtcNow;bool loaded=false;var input=new LASTINPUTINFO();input.cbSize=(uint)Marshal.SizeOf(input);GetLastInputInfo(ref input);uint initialInput=input.dwTime;
    while(true){
+    if(cancelled||(GetLastInputInfo(ref input)&&input.dwTime!=initialInput)){word="cancelled";break;}
     if(WaitForSingleObject(pi.hProcess,200)==0){
      // A Steam build that restarts itself through Steam leaves at once.
      word=(DateTime.UtcNow-started).TotalSeconds<15&&File.Exists(Path.Combine(Path.GetDirectoryName(exe),"steam_api.dll"))?"steam":"exited";break;}
@@ -62,7 +80,7 @@ public static class ColdCapture {
     if(age>seconds){word="timeout";break;}
    }
   }catch(Exception e){Console.Error.WriteLine(e.Message);}
-  finally{if(pi.hProcess!=IntPtr.Zero){if(WaitForSingleObject(pi.hProcess,0)!=0)TerminateProcess(pi.hProcess,0);CloseHandle(pi.hProcess);}if(pi.hThread!=IntPtr.Zero)CloseHandle(pi.hThread);}
+  finally{StopAudio();Audio.Restore();if(pi.hProcess!=IntPtr.Zero){if(WaitForSingleObject(pi.hProcess,0)!=0)TerminateProcess(pi.hProcess,0);CloseHandle(pi.hProcess);}if(pi.hThread!=IntPtr.Zero)CloseHandle(pi.hThread);if(job!=IntPtr.Zero)CloseHandle(job);if(desk!=IntPtr.Zero)CloseDesktop(desk);}
   Console.WriteLine(word);return word=="done"?0:1;
  }
  static bool Inject(IntPtr process,string dll){
@@ -79,7 +97,7 @@ public static class ColdCapture {
  static void Quiet(int pid){
   try{EnumWindows((h,l)=>{uint p;GetWindowThreadProcessId(h,out p);if(p==(uint)pid&&IsWindowVisible(h)&&!IsIconic(h))ShowWindow(h,SW_SHOWMINNOACTIVE);return true;},IntPtr.Zero);}catch{}
   if((DateTime.UtcNow-lastMute).TotalMilliseconds<700)return;lastMute=DateTime.UtcNow;
-  try{Audio.Mute(pid);}catch{}
+  /* The independent guard restores even if this helper is terminated. */
  }
 }
 // Core Audio: mute every audio session of one process (best effort).
@@ -93,10 +111,18 @@ static class Audio {
   int GetState(out int s);int GetDisplayName(out IntPtr n);int SetDisplayName(string n,ref Guid g);int GetIconPath(out IntPtr p);int SetIconPath(string p,ref Guid g);int GetGroupingParam(out Guid g);int SetGroupingParam(ref Guid g,ref Guid c);
   int RegisterAudioSessionNotification(IntPtr n);int UnregisterAudioSessionNotification(IntPtr n);int GetSessionIdentifier(out IntPtr s);int GetSessionInstanceIdentifier(out IntPtr s);int GetProcessId(out uint pid);}
  [ComImport,Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)] interface ISimpleAudioVolume{int SetMasterVolume(float v,ref Guid g);int GetMasterVolume(out float v);int SetMute(bool m,ref Guid g);int GetMute(out bool m);}
- public static void Mute(int pid){
+ public static Process Guard(int pid){var s=new ProcessStartInfo(Process.GetCurrentProcess().MainModule.FileName,"--audio-watch "+Process.GetCurrentProcess().Id+" "+pid);s.UseShellExecute=false;s.CreateNoWindow=true;s.RedirectStandardInput=true;return Process.Start(s);}
+ public static void Watch(int parent,int pid){Process owner=Process.GetProcessById(parent);bool stop=false;new Thread(()=>{try{Console.ReadLine();}catch{}stop=true;}){IsBackground=true}.Start();try{while(!stop&&!owner.HasExited){Mute(pid);Thread.Sleep(150);}}finally{Restore();}}
+ sealed class FakeVolume:ISimpleAudioVolume{public bool muted;public FakeVolume(bool m){muted=m;}public int SetMasterVolume(float v,ref Guid g){return 0;}public int GetMasterVolume(out float v){v=1;return 0;}public int SetMute(bool m,ref Guid g){muted=m;return 0;}public int GetMute(out bool m){m=muted;return 0;}}
+ public static int Selftest(){foreach(bool initial in new[]{false,true}){var v=new FakeVolume(initial);prior.Add(v,initial);Guid g=Guid.Empty;v.SetMute(true,ref g);Restore();if(v.muted!=initial)return 1;}Console.WriteLine("audio restore false/true: pass");return 0;}
+ static readonly System.Collections.Generic.Dictionary<ISimpleAudioVolume,bool> prior=new System.Collections.Generic.Dictionary<ISimpleAudioVolume,bool>();
+ public static void Restore(){foreach(var kv in prior){try{Guid g=Guid.Empty;kv.Key.SetMute(kv.Value,ref g);}catch{}}prior.Clear();}
+ public static void Unmute(int pid){Set(pid,false);}
+ public static void Mute(int pid){Set(pid,true);}
+ static void Set(int pid,bool mute){
   var en=(IMMDeviceEnumerator)new MMDeviceEnumerator();IMMDevice dev;if(en.GetDefaultAudioEndpoint(0,1,out dev)!=0)return;
   Guid iid=typeof(IAudioSessionManager2).GUID;object o;if(dev.Activate(ref iid,23,IntPtr.Zero,out o)!=0)return;
   IAudioSessionEnumerator sessions;if(((IAudioSessionManager2)o).GetSessionEnumerator(out sessions)!=0)return;int n;sessions.GetCount(out n);
-  for(int i=0;i<n;i++){object s;if(sessions.GetSession(i,out s)!=0)continue;uint p;if(((IAudioSessionControl2)s).GetProcessId(out p)==0&&p==(uint)pid){Guid none=Guid.Empty;((ISimpleAudioVolume)s).SetMute(true,ref none);}}
+  for(int i=0;i<n;i++){object s;if(sessions.GetSession(i,out s)!=0)continue;uint p;if(((IAudioSessionControl2)s).GetProcessId(out p)==0&&p==(uint)pid){Guid none=Guid.Empty;var v=(ISimpleAudioVolume)s;bool was;if(mute&&!prior.ContainsKey(v)&&v.GetMute(out was)==0)prior.Add(v,was);v.SetMute(mute,ref none);}}
  }
 }

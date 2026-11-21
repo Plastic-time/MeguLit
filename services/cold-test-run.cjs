@@ -13,6 +13,7 @@ const {createInterface}=require('node:readline');
 const {Driver}=require('../core/cold-test/drive.cjs');
 const {parseTrace}=require('../core/self-check.cjs');
 
+let stopActive=null;
 const helperPath=root=>{for(const p of [path.join(root||'','native','ColdDesk.exe'),path.join(__dirname,'..','native','ColdDesk.exe')])if(fs.existsSync(p))return p;return '';};
 
 /* engine-draw UI runs (button / menu / choice) in game client px, newest first, for the driver's 「はじめから」 and choice clicks */
@@ -31,9 +32,10 @@ function runOne(opts,deps={}){const {root='',exe,runDir,budgetMs=360000,profile=
   let child;try{child=spawn(helper,['run',exe,'--seconds',String(Math.ceil(budgetMs/1000)+20)],{windowsHide:true,stdio:['pipe','pipe','ignore']});}catch(e){res.end='spawn '+String(e?.message||e).slice(0,80);return resolve(res);}
   const send=line=>{try{child.stdin.write(line+'\n');}catch{}};
   const driver=new Driver(deps.driver||{});const menu=[];let hooks=null,timer=null,done=false,started='',shotN=0;
-  const finish=why=>{if(done)return;done=true;clearInterval(timer);res.end=res.end||why;try{hooks?.stop?.();}catch{}send('kill');
+  const finish=why=>{if(done)return;done=true;stopActive=null;clearInterval(timer);res.end=res.end||why;try{hooks?.stop?.();}catch{}send('kill');
    const wait=setTimeout(()=>{try{child.kill();}catch{}},4000);wait.unref?.();child.once?.('exit',()=>clearTimeout(wait));
-   res.endedAt=new Date(now()).toISOString();res.ms=now()-t0;try{fs.writeFileSync(path.join(runDir,'run.json'),JSON.stringify(res,null,1));}catch{}resolve(res);};
+   res.endedAt=new Date(now()).toISOString();res.ms=now()-t0;try{fs.writeFileSync(path.join(runDir,'run.json'),JSON.stringify(res,null,1));}catch{}if(child.exitCode!==null&&child.exitCode!==undefined)resolve(res);else child.once('exit',()=>resolve(res));};
+  stopActive=()=>{res.stopped='foreground';finish('foreground');};
   /* the hook: same component a played game gets, its trace into the run folder; every trace line is counted here too */
   const attach=()=>{if(hooks||!res.pid||!res.window||!started)return;try{
    const Hook=deps.Hook||require('../core/hook-native.cjs').HookNative;const layout={...(deps.layout||require('../core/layout.cjs')),logs:runDir};
@@ -64,4 +66,4 @@ function runOne(opts,deps={}){const {root='',exe,runDir,budgetMs=360000,profile=
     else if(a.do==='shot'){const file=path.join(runDir,'shot-'+(++shotN)+'-'+String(a.tag).replace(/[^a-z0-9-]/gi,'')+'.jpg');send('shot '+shotWidth+' '+file);}}},TICK);
   timer.unref?.();});}
 
-module.exports={runOne,helperPath,menuItem};
+module.exports={runOne,helperPath,menuItem,stopActive:()=>stopActive?.()};
