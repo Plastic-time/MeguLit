@@ -27,8 +27,9 @@ function toJs(src){
   out+=c;i++;
  }
  return out
-  .replace(/\} incontextof st;/g,'}.bind(st);')
-  .replace(/\(([\w.]+) incontextof (\w+)\)/g,'($1).bind($2)')
+  .replace(/\} incontextof (\w+);/g,'}.bind($1);')
+  .replace(/function\(args\*\)/g,'function(...args)').replace(/\(args\*\)/g,'(...args)')
+  .replace(/\(([\w.]+) incontextof ([\w.]+)\)/g,'($1).bind($2)')
   .replace(/\(global\.Layer\.drawText\)\.bind/g,'(global.Layer.drawText).bind')
   .replace(/typeof ([\w.$]+(?:\[\w+\])?)/g,'__t($1)')
   .replace(/!isvalid ([\w.]+)/g,'!__v($1)').replace(/isvalid ([\w.]+)/g,'__v($1)')
@@ -159,4 +160,43 @@ test('one rule for glyphs the game keeps drawing: [link] text always (ファタ 
  st.cfg.roles=0;assert.deepEqual([st.uiDraw({parent:name}),st.uiDraw({parent:link})],['','link'],'roles off: links still drawn by the game, name plates as before');
  assert.ok(script.includes("var ui=st.uiDraw(self);if(ui=='link') st.link++;")&&script.includes("if(st.hideMsg() && ui=='') {"));
  assert.ok(!script.includes('inLink=true'),'no second inLink rule (the drawText wrapper asks uiDraw only)');
+});
+
+/* ---- KiriKiri Z TextRender (Yuzusoft) ---- */
+function trRig(ctl){const h=harness({ctl});h.st.ctl();Object.assign(h.st,{shown:()=>1,trLine:7,trTailA:' sw=1280 sh=720 vx=0 vy=0 vw=0 vh=0 n=5 rects=x',trCol:'f7f77b'});
+ h.L.textLayer={opacity:255};h.L.defaultEdge=true;h.L.defaultEdgeColor=0x202020;return h;}
+const trAll=(t,x=60,y=560)=>[...t].map((c,i)=>[x+28*i,y,28,28,c]);
+
+test('TextRender embed: ruby and Chinese on the message layer under its text layer, whole layer saved, record emb=2, taken off with the next line',()=>{
+ const h=trRig('#cfg embed=1\n今日は晴れ\t0:2:きょう\t今天晴朗\n'),all=trAll('今日は晴れ');
+ h.st.embPend=h.st.embTrQueue(h.L,all,'今日は晴れ',0,'今日は晴れ',0);h.st.embTry();
+ const ruby=h.draws.find(d=>d.text==='きょう'),zh=h.draws.find(d=>d.text==='今天晴朗');
+ assert.ok(ruby&&zh,JSON.stringify(h.draws));assert.equal(ruby.color,0xf7f77b,'the colour sampled from the glyphs');
+ assert.ok(h.copies.some(c=>c.from==='msg'&&c.w===1200&&c.h===200),'the whole layer saved (its image is not cleared with the text)');
+ const r=TP.parseChars(h.reports.at(-1).replace('rects=x','rects=').replace('n=5','n=0'));
+ assert.ok(h.reports.at(-1).startsWith('ToMe_CHARS engine=krkr line=100007 hidden=0 sw=1280')&&/ color=f7f77b emb=2 text=今日は晴れ$/.test(h.reports.at(-1)),h.reports.at(-1));
+ h.st.embTrOff();assert.ok(h.copies.some(c=>c.to==='msg'),'put back for the next line');
+ h.st.trLine=8;const q=h.st.embTrQueue(h.L,all,'今日は晴れ',0,'今日は晴れ',0);h.st.trLine=9;h.st.embPend=q;h.st.embTry();assert.equal(h.st.embPend,undefined,'a line that moved on is given up');
+});
+
+test('TextRender embed: a page that grew by a sentence asks for the new sentence only',()=>{
+ const h=trRig('#cfg embed=1\n二文目\t\t第二句\n'),all=trAll('一文目二文目');
+ const q=h.st.embTrQueue(h.L,all,'一文目二文目',3,'一文目二文目',0);assert.equal(q.k,'二文目');assert.equal(q.ra.length,3);assert.equal(q.x0,60+28*3);
+ assert.equal(h.st.embTrQueue(h.L,all.slice(0,4),'一文目二文目',0,'',0),undefined,'boxes and text out of step: nothing');
+});
+
+test('TextRender roles: name plate from processNameText (the game method still runs), links from KAG hot spots with their characters',()=>{
+ const h=trRig('#cfg roles=1\n');let called=0;
+ const nl=new h.Layer();Object.assign(nl,{name:'name',left:20,top:-40,width:200,height:36,parent:h.L});h.L.nameLayer=nl;h.L.processNameText=function(n){called++;return 'ok:'+n;};
+ h.st.nameScan();assert.equal(h.reports.length,0,'no name yet');
+ assert.equal(h.L.processNameText('ハルカ'),'ok:ハルカ');assert.equal(called,1);
+ h.st.nameScan();const n=TP.parseChars(h.reports.at(-1));assert.deepEqual([n.role,n.id,n.text,n.box],['name','N:0','ハルカ',[60,460,200,36]]);
+ h.st.nameScan();assert.equal(h.reports.length,1,'unchanged');
+ nl.visible=false;h.st.nameScan();assert.deepEqual(TP.parseChars(h.reports.at(-1)).box,[0,0,0,0]);
+ h.st.trAll=trAll('はいいいえ',60,560);h.st.trAllL=h.L;h.L.numLinks=2;h.L.keyLink=0;
+ h.L.links=[{x:[20],y:[60],w:[56],h:[28]},{x:[76],y:[60],w:[84],h:[28]}];
+ h.st.trLinkScan();const ls=h.reports.slice(-2).map(TP.parseChars);
+ assert.deepEqual(ls.map(x=>[x.role,x.id,x.text,x.box,x.sel]),[['choice','K0:0','はい',[60,560,56,28],true],['choice','K0:1','いいえ',[116,560,84,28],false]]);
+ h.L.numLinks=0;h.st.trLinkScan();assert.equal(TP.parseChars(h.reports.at(-1)).text,'');
+ assert.ok(script.includes("var T=L.textLayer,on=this.hideOn() && !(typeof this.cfg=='Object' && this.cfg.embed);"),'never hidden while the game draws the replacement');
 });

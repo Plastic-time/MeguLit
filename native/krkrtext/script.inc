@@ -266,7 +266,7 @@ LR"MGLT((function(){
      return result;
     } incontextof rec;
     rec.clr=function(){
-     try {this.st.flush(this,true);this.cleared=true;this.st.linkClear(this);var bk=this.st.embBk;if(bk!==void && bk.L===this.target) this.st.embDrop();} catch(e) {}
+     try {this.st.flush(this,true);this.cleared=true;this.st.linkClear(this);var bk=this.st.embBk;if(bk!==void && bk.L===this.target) {if(bk.tr) this.st.embRestore(); else this.st.embDrop();}} catch(e) {}
      if(typeof this.oldClear!='Object') return (global.MessageLayer.clear incontextof this)(...);
      return (this.oldClear incontextof this.target)(...);
     } incontextof rec;
@@ -321,7 +321,7 @@ LR"MGLT((function(){
     try {
      var L=this.trLayer();
      if(L===void || this.trOwner!==L || this.trRec===void) {this.trRestore();return;}
-     var T=L.textLayer,on=this.hideOn();
+     var T=L.textLayer,on=this.hideOn() && !(typeof this.cfg=='Object' && this.cfg.embed);
      if(this.trT!==void && this.trT!==T) this.trRestore();
      if(on) {if(this.trOp===void || this.trT!==T) {this.trT=T;this.trOp=T.opacity;}
       /* a value other than 0 was set by the game since the last tick (its text window came back after a scene change): that is the game's own opacity now */
@@ -351,14 +351,14 @@ LR"MGLT((function(){
       var c=cs[i],ch=''+c.text;if(ch=='' || ch==' ' || ch=='　' || ch=="\t" || ch=="\n") continue;
       var y=+c.y;if(ly!==void && y!=ly) t+="\n";ly=y;t+=ch;
       rs+=(n>0?';':'')+int(ox+(+c.x))+','+int(oy+y+pad)+','+int(+c.cw)+','+int(+c.size);n++;
-      if(all.count<400) all.add([ox+(+c.x),oy+y+pad,+c.cw,+c.size]);
+      if(all.count<400) all.add([ox+(+c.x),oy+y+pad,+c.cw,+c.size,ch]);
      }
      /* 2026-11-21 (owner incr9, 千恋＊万花): a line written back blank (the hide fell back to write-back) lays out only spaces: counted, so the status line says so */
      if(n==0) {this.trNote('blank');return;}
      if(this.trOwner!==L) {this.trRestore();this.trRec=void;this.trOwner=L;this.trText='';this.trKey='';}
      var flat=t.replace(/\n/g,'');
      var from=0;
-     if(!(this.trText!='' && (flat.indexOf(this.trText)==0 || this.trText.indexOf(flat)==0))) {this.trLine++;this.trCol=void;this.trTry=0;}
+     if(!(this.trText!='' && (flat.indexOf(this.trText)==0 || this.trText.indexOf(flat)==0))) {this.trLine++;this.trCol=void;this.trTry=0;this.embTrOff();}
      /* a page that grew by a sentence: its colour is that sentence's own (a read line above a new one keeps its yellow) */
      else if(flat.length>this.trText.length+1 && flat.indexOf(this.trText)==0) {from=this.trText.length;this.trCol=void;this.trTry=0;}
      for(var i=from;i<all.count && pts.count<6;i++) pts.add(all[i]);
@@ -368,6 +368,8 @@ LR"MGLT((function(){
      var tail=this.trTailA+(this.trCol!==void?' color='+this.trCol:'')+this.trTailB;
      this.trRec=[h,100000+this.trLine,tail];
      this.report('ToMe_CHARS engine=krkr line='+(100000+this.trLine)+' hidden='+h+tail);
+     this.trAll=all;this.trAllL=L;
+     try {if(this.cfg.embed) {this.embPend=this.embTrQueue(L,all,flat,from,t,h);this.embTry();}} catch(e) {this.charsErr='trEmb '+e.message;}
      this.trHide();
     } catch(e) {this.charsErr='tr '+e.message;}
    } incontextof st;
@@ -440,7 +442,7 @@ LR"MGLT((function(){
       Chinese under it on the message layer itself, with the layer's font and the colour / edge / shadow arguments the
       sentence was drawn with; the sentence's record is then sent again with emb=1 (ruby) or emb=2 (ruby and Chinese). The
       Chinese is taken off again (the pixels under it put back) when the next sentence of the same page starts. */
-   st.cfg=%['roles'=>0,'embed'=>0,'zh'=>1];st.embMap=%[];st.ctlRaw='';st.ctlTick=0;st.uiLine=0;st.btnKey='';st.embPend=void;st.embBk=void;st.embArgs=void;
+   st.cfg=%['roles'=>0,'embed'=>0,'zh'=>1];st.embMap=%[];st.ctlRaw='';st.ctlTick=0;st.uiLine=0;st.btnKey='';st.embPend=void;st.embBk=void;st.embArgs=void;st.nameKey='';st.trLinkKey='';st.trAll=void;st.trAllL=void;
    st.ctl=function(){
     var p=global.__megulitKrkrCtlPath;if(typeof p!='String' || p=='') return;
     var a;try {a=[].load(p);} catch(e) {if(this.ctlRaw!='') {this.ctlRaw='';this.cfg=%['roles'=>0,'embed'=>0,'zh'=>1];this.embMap=%[];}return;}
@@ -514,7 +516,7 @@ LR"MGLT((function(){
       tick after it until the page moves on */
    st.embTry=function(){
     var p=this.embPend;if(p===void || p===null) return;
-    var r=p.rec;if(!isvalid p.L || r.cleared || r.n>0 || ++p.tries>40) {this.embPend=void;return;}
+    var r=p.rec;if(!isvalid p.L || (p.tr?(p.line!=this.trLine):(r.cleared || r.n>0)) || ++p.tries>40) {this.embPend=void;return;}
     var e=this.embMap[p.k];if(e===void || e===null) return;
     this.embPend=void;
     var lvl=this.embDraw(p,e);
@@ -545,8 +547,10 @@ LR"MGLT((function(){
    } incontextof st;
    st.embDraw=function(p,e){
     var L=p.L,a=this.abs(L),f=L.font,oh=f.height,of=f.face,ob=f.bold,size=p.size,lvl=0,A=p.args;
-    var col=(A!==void && A.count>3)?(+A[3]):((typeof L.chColor=='Integer')?+L.chColor:0xffffff);
+    var col=(A!==void && A.count>3)?(+A[3]):((p.col!==void)?+p.col:((typeof L.chColor=='Integer')?+L.chColor:0xffffff));
+    if(p.tr) this.embBackup(L,0,0,L.width,L.height,true);
     var aa=(A!==void && A.count>5)?A[5]:true,sl=(A!==void && A.count>6)?+A[6]:0,sc=(A!==void && A.count>7)?+A[7]:0,sw=(A!==void && A.count>8)?+A[8]:0,ox=(A!==void && A.count>9)?+A[9]:0,oy=(A!==void && A.count>10)?+A[10]:0;
+    if(p.tr && A===void && p.edge!==void) {sl=255;sc=+p.edge;sw=1;}
     var dt=global.Layer.drawText;
     try {
      var df=this.drawFont(L);f.face=df.face;f.bold=df.bold;
@@ -575,18 +579,18 @@ LR"MGLT((function(){
     for(var cs=int(size*0.8);cs>=int(size*0.6) && cs>=10;cs-=2) {
      f.height=cs;var rows=this.embWrap(f,z,w),pitch=cs+int(cs/4),h=rows.count*pitch;
      if(rows.count==0 || top+h-int(cs/4)>bottom) continue;
-     this.embBackup(L,left,top,w,h);
+     if(!p.tr) this.embBackup(L,left,top,w,h);
      for(var i=0;i<rows.count;i++) (global.Layer.drawText incontextof L)(int(left),int(top+i*pitch),rows[i],g[0],255,g[1],g[2],g[3],g[4],g[5],g[6]);
      return true;
     }
     return false;
    } incontextof st;
-   st.embBackup=function(L,x,y,w,h){
+   st.embBackup=function(L,x,y,w,h,tr){
     this.embRestore();
     try {
      var b=new global.Layer(this.kag,this.kag.primaryLayer);b.visible=false;b.setImageSize(int(w),int(h));
      b.copyRect(0,0,L,int(x),int(y),int(w),int(h));
-     this.embBk=%['L'=>L,'b'=>b,'x'=>int(x),'y'=>int(y),'w'=>int(w),'h'=>int(h)];
+     this.embBk=%['L'=>L,'b'=>b,'x'=>int(x),'y'=>int(y),'w'=>int(w),'h'=>int(h),'tr'=>tr?1:0];
     } catch(e) {this.embBk=void;}
    } incontextof st;
    st.embDrop=function(){var bk=this.embBk;this.embBk=void;try {if(bk!==void && isvalid bk.b) invalidate bk.b;} catch(e) {}} incontextof st;
@@ -596,7 +600,70 @@ LR"MGLT((function(){
     this.embDrop();
    } incontextof st;
 )MGLT", LR"MGLT(
+   /* ---- engine-draw, KiriKiri Z TextRender (Yuzusoft; members read from 千恋＊万花's MessageLayer / TextRender bytecode: nameLayer,
+      processNameText, links / numLinks / keyLink, defaultChColor / defaultEdge / defaultEdgeColor / defaultRubySize) ---- */
+   st.embTrOff=function(){var bk=this.embBk;if(bk!==void && bk.tr) this.embRestore();} incontextof st;
+   st.embTrQueue=function(L,all,flat,from,t,h){
+    if(L.vertical || all.count!=flat.length || from>=all.count) return void;
+    var ra=[],x0=1e9,y1=-1e9,size=0;
+    for(var i=from;i<all.count;i++) {var a=all[i];ra.add(a);if(a[0]<x0) x0=a[0];if(a[1]>y1) y1=a[1];if(a[3]>size) size=a[3];}
+    var col=void;try {if(this.trCol!==void) {col=0;var hx=''+this.trCol;for(var z=0;z<hx.length;z++) col=col*16+'0123456789abcdef'.indexOf(hx.charAt(z));}else if(typeof L.defaultChColor=='Integer') col=+L.defaultChColor;} catch(e) {}
+    var edge=void;try {if(L.defaultEdge && typeof L.defaultEdgeColor=='Integer') edge=+L.defaultEdgeColor;} catch(e) {}
+    var scr=this.screen();
+    return %['tr'=>1,'line'=>this.trLine,'L'=>L,'rec'=>void,'k'=>flat.substring(from),'ra'=>ra,'size'=>size,'nvl'=>(L.height>=scr[1]*0.45)?1:0,'args'=>void,'col'=>col,'edge'=>edge,
+     'head'=>'ToMe_CHARS engine=krkr line='+(100000+this.trLine)+' hidden='+h+this.trTailA+(this.trCol!==void?' color='+this.trCol:''),'t'=>t,'x0'=>x0,'y1'=>y1,'tries'=>0];
+   } incontextof st;
+   /* name plate: the name the layer was given (processNameText / processName, wrapped on the instance, the game's own method
+      always called) and the plate's box; one snapshot per change, an empty one when the plate goes */
+   st.nameWrap=function(L){
+    try {
+     if(typeof L.__mgName!='undefined') return;L.__mgName='';
+     var names=['processNameText','processName'];
+     for(var i=0;i<names.count;i++) {
+      var n=names[i];if(typeof L[n]!='Object') continue;
+      var old=L[n],o=%['L'=>L,'old'=>old];
+      o.fn=function(args*){try {var a=args.count>0?args[0]:void;var s=(typeof a=='String')?a:((typeof a=='Object' && a!==void && a!==null && typeof a.text=='String')?a.text:'');if(s!='') this.L.__mgName=s;} catch(e) {}return (this.old incontextof this.L)(args*);} incontextof o;
+      L[n]=o.fn;
+     }
+    } catch(e) {}
+   } incontextof st;
+   st.nameScan=function(){
+    var out='',ix=0,scr=this.screen(),ms=this.kag.fore.messages;
+    for(var i=0;i<ms.count && i<8;i++) {
+     var L=ms[i];if(!isvalid L || typeof L.textLayer!='Object') continue;this.nameWrap(L);
+     var nl=void;try {nl=L.nameLayer;} catch(e) {nl=void;}
+     var t=''+L.__mgName;if(t=='' || nl===void || nl===null || !isvalid nl || !nl.visible || !this.shown(L)) continue;
+     var a=this.abs(nl);out='box='+int(a[0])+','+int(a[1])+','+int(nl.width)+','+int(nl.height)+' text='+t;ix=i;break;
+    }
+    if(out==this.nameKey) return;this.nameKey=out;
+    var head='ToMe_CHARS engine=krkr line='+(++this.uiLine)+' hidden=0 sw='+int(scr[0])+' sh='+int(scr[1])+' vx=0 vy=0 vw=0 vh=0 n=0 rects= role=name';
+    this.report(head+(out==''?' id=N: box=0,0,0,0 text=':' id=N:'+ix+' '+out));
+   } incontextof st;
+   /* KAG links on a TextRender layer: the hot spots (links[i].x / y / w / h, one entry a row) and the characters inside them */
+   st.trLinkScan=function(){
+    var scr=this.screen(),ms=this.kag.fore.messages,items=[],key='';
+    for(var i=0;i<ms.count && i<8;i++) {
+     var L=ms[i];if(!isvalid L || typeof L.textLayer!='Object' || !this.shown(L)) continue;
+     var n=0;try {n=+L.numLinks;} catch(e) {n=0;}if(!(n>0) || typeof L.links!='Object') continue;
+     var a=this.abs(L),kl=-1;try {if(typeof L.keyLink!='undefined') kl=+L.keyLink;} catch(e) {}
+     for(var j=0;j<n && j<16;j++) {
+      var lk=L.links[j];if(lk===void || lk===null || typeof lk.x!='Object') continue;
+      var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+      for(var r=0;r<lk.x.count;r++) {var x=a[0]+(+lk.x[r]),y=a[1]+(+lk.y[r]),w=+lk.w[r],hh=+lk.h[r];if(x<x0) x0=x;if(y<y0) y0=y;if(x+w>x1) x1=x+w;if(y+hh>y1) y1=y+hh;}
+      if(!(x1>x0)) continue;
+      var t='';if(this.trAllL===L && this.trAll!==void) for(var c=0;c<this.trAll.count;c++) {var q=this.trAll[c],cx=q[0]+q[2]/2,cy=q[1]+q[3]/2;if(cx>=x0 && cx<=x1 && cy>=y0 && cy<=y1) t+=q[4];}
+      if(t=='') continue;
+      var rec=' role=choice id=K'+i+':'+j+' box='+int(x0)+','+int(y0)+','+int(x1-x0)+','+int(y1-y0)+(kl>=0?' sel='+(kl==j?1:0):'')+' text='+t;items.add(rec);key+=rec;
+     }
+    }
+    if(key==this.trLinkKey) return;this.trLinkKey=key;
+    var head='ToMe_CHARS engine=krkr line='+(++this.uiLine)+' hidden=0 sw='+int(scr[0])+' sh='+int(scr[1])+' vx=0 vy=0 vw=0 vh=0 n=0 rects=';
+    if(items.count==0) {this.report(head+' role=choice id=K: box=0,0,0,0 text=');return;}
+    for(var i=0;i<items.count;i++) this.report(head+items[i]);
+   } incontextof st;
+)MGLT", LR"MGLT(
    st.vis=function(){
+    try {if(this.cfg.roles && this.ctlTick%5==2) {this.nameScan();this.trLinkScan();}} catch(e) {}
     try {if(++this.ctlTick%5==1) this.ctl();} catch(e) {}
     try {this.embTry();} catch(e) {}
     try {for(var i=0;i<this.recs.count;i++) {var r=this.recs[i];if(r.lkDirty && ++r.lkQuiet>=2) this.sendLinks(r);}} catch(e) {}
