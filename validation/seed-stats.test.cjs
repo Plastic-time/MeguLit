@@ -100,3 +100,14 @@ test('GET /api/seed/stats: public aggregate for the App about page, open CORS, e
  assert.match(r.headers.get('cache-control'),/max-age=300/);
  assert.equal((await handle(new Request('https://relay.test/api/seed/stats',{method:'POST'}),ENV,new Date(),{waitUntil:()=>{}})).status,404,'read only');
 });
+
+test('D1 reads: live stats computed once per LIVE_TTL for every node (stats_snapshot), one probe_pulse scan per compute',async()=>{
+ const ENV=env(),raw=ENV.DB;let pulseScans=0;ENV.DB={prepare:sql=>{if(/FROM probe_pulse/.test(sql)&&/^SELECT/.test(sql))pulseScans++;return raw.prepare(sql);},raw:raw.raw};
+ const {LIVE_TTL}=await mod('probe-stats.js');const {handle}=await mod('worker.js');
+ const at=ms=>handle(new Request('https://relay.test/api/probe/stats'),ENV,new Date(ms),{waitUntil:()=>{}});
+ const t0=Date.now();await at(t0);const first=pulseScans;
+ assert.ok(first<=2,'one pulse scan in live (+ the hourly one in wide), got '+first);
+ await at(t0+5000);await at(t0+60000);assert.equal(pulseScans,first,'within the TTL: snapshot row only');
+ await at(t0+(LIVE_TTL+1)*1000);assert.equal(pulseScans,first+1,'after the TTL: live recomputed once, wide still cached');
+ assert.equal(raw.raw.prepare("SELECT COUNT(*) n FROM stats_snapshot").get().n,2);
+});

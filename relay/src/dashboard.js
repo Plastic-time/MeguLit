@@ -200,7 +200,7 @@ tbody tr:hover td{background:#121212}
     </section>
 
     <section class="pane c3 gold">
-      <span class="ti">┤ <b>the seed</b> ├</span><span class="tr">The Seed/ · 差分种子</span>
+      <span class="ti">┤ <b>the seed</b> ├</span><span class="tr">The Seed/ · game diffs</span>
       <div id="seed"><div class="empty">-- loading</div></div>
     </section>
 
@@ -483,13 +483,13 @@ function renderPacks(j){var f=j.full||{};
 function renderSeed(s){var el=$("seed"),se=(s&&s.errors)||{},errH=Object.keys(se).map(function(k){return '<div class="sub"><span class="r">'+esc(k)+'</span> '+esc(se[k])+'</div>';}).join("");
  if(!s||!s.sources||!s.sources.length){el.innerHTML='<div class="empty">-- counting The Seed/ (first count runs in the background)</div>'+errH;return;}
  var st=s.status||{},tot=Math.max(1,s.games|0),ok=s.confirmed|0,wait=s.waiting|0;
- var html='<div class="seed-top"><span class="seed-n">'+(s.games|0)+'</span><span class="seed-u">部游戏的 seed<br><b>'+(s.versions|0)+'</b> 个 exe 版本</span></div>'+
-  '<div class="m m4 seed-ok"><span class="k">已确认</span><span class="bar" id="sdOk"></span><span class="v">'+ok+'</span><span class="pc">'+Math.round(ok/tot*100)+'%</span></div>'+
-  '<div class="m m4"><span class="k">等更多人传火</span><span class="bar" id="sdWait"></span><span class="v">'+wait+'</span><span class="pc">'+Math.round(wait/tot*100)+'%</span></div>'+
+ var html='<div class="seed-top"><span class="seed-n">'+(s.games|0)+'</span><span class="seed-u">games seeded<br><b>'+(s.versions|0)+'</b> exe versions</span></div>'+
+  '<div class="m m4 seed-ok"><span class="k">confirmed</span><span class="bar" id="sdOk"></span><span class="v">'+ok+'</span><span class="pc">'+Math.round(ok/tot*100)+'%</span></div>'+
+  '<div class="m m4"><span class="k">waiting</span><span class="bar" id="sdWait"></span><span class="v">'+wait+'</span><span class="pc">'+Math.round(wait/tot*100)+'%</span></div>'+
   '<div class="chips gold">'+[["verified",st.verified],["owner-ok",st["owner-ok"]],["read",st.read],["skeleton",st.skeleton]].map(function(c){return '<span>'+c[0]+' <b>'+(c[1]|0)+'</b></span>';}).join("")+
   (s.other?'<span>other <b>'+s.other+'</b></span>':'')+'</div>'+
-  '<div class="sub" style="margin-top:6px">已确认 = verified + owner-ok · 等传火 = read + skeleton</div>'+
-  '<div class="sub">'+s.sources.map(function(x){return esc(x.source)+' '+x.games;}).join(" · ")+' · 更新 '+ago(s.at)+'</div>'+errH;
+  '<div class="sub" style="margin-top:6px">confirmed = verified + owner-ok · waiting for more players = read + skeleton</div>'+
+  '<div class="sub">'+s.sources.map(function(x){return esc(x.source)+' '+x.games;}).join(" · ")+' · updated '+ago(s.at)+'</div>'+errH;
  el.innerHTML=html;meter($("sdOk"),ok,tot);meter($("sdWait"),wait,tot);}
 function nodesLine(){$("node").innerHTML=NODES.map(function(n){var v=lat[n[0]];return n[0]+" "+(v==null?"--":v<0?'<span class="r">down</span>':v+"ms");}).join(" · ");
  var ok=NODES.filter(function(n){return lat[n[0]]>0;}).map(function(n){return lat[n[0]];});$("latT").textContent=ok.length?"latency "+Math.min.apply(null,ok)+"ms":"latency";}

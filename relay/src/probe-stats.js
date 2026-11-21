@@ -11,7 +11,8 @@
    D1 free tier counts rows read: the live part is cached 10 s and the wide aggregates (ext) 5 min in the Cache API, so
    many open dashboards cost about the same as one. Cleanup (cleanupProbeStats, cron): pulse rows older than a day go. */
 import {seedSummary,refreshSeedStatsSafe} from './seed-stats.js';
-const BUCKET=600;/* seconds: a 10-minute activity bucket */
+const BUCKET=600;
+export const LIVE_TTL=120,WIDE_TTL=600;/* seconds: a 10-minute activity bucket */
 export const nowBucket=now=>Math.floor(now.getTime()/1000/BUCKET);
 
 /* record a live MeguLit client; cheap and deduped per 10-min bucket. never throws into the request path */
@@ -21,6 +22,11 @@ export async function pulse(env,ipHash,now){try{if(!env.DB||!/^[a-f0-9]{8,}$/.te
 const one=async(env,sql,...args)=>{try{return (await env.DB.prepare(sql).bind(...args).first())||{};}catch{return {};}};
 const all=async(env,sql,...args)=>{try{return (await env.DB.prepare(sql).bind(...args).all()).results||[];}catch{return [];}};
 const mb=bytes=>Math.round((Number(bytes)||0)/104857.6)/10;
+/* global snapshot in D1 (stats_snapshot): computed at most once per ttl for all nodes / colos; the Cache API in front
+   only saves the 1-row read. No table (migration not applied) → compute every time, as before. */
+async function snap(env,key,ttl,fn,now){const t=Math.floor(now.getTime()/1000);
+ try{const r=await env.DB.prepare('SELECT data,at FROM stats_snapshot WHERE key=?').bind(key).first();if(r&&t-(r.at|0)<ttl)return JSON.parse(r.data);}catch{return fn();}
+ const v=await fn();try{await env.DB.prepare('INSERT INTO stats_snapshot(key,data,at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data, at=excluded.at').bind(key,JSON.stringify(v),t).run();}catch{}return v;}
 /* the Cache API is there on the custom domains; tests and workers.dev simply compute every time */
 async function cached(key,ttl,fn){const c=globalThis.caches?.default,url='https://megulit-relay.internal/stats/'+key;
  if(c){try{const hit=await c.match(url);if(hit)return await hit.json();}catch{}}
@@ -30,31 +36,41 @@ async function live(env,now){
  /* "today" is the players' day (Beijing time, UTC+8), not the Worker's UTC day */
  const t=Math.floor(now.getTime()/1000),dayStart=Math.floor((t+8*3600)/86400)*86400-8*3600;
  const b=nowBucket(now),todayBucket=Math.floor(dayStart/BUCKET);
- const online=(await one(env,'SELECT COUNT(DISTINCT ip_hash) n FROM probe_pulse WHERE bucket>=?',b-1)).n|0;
- const active1h=(await one(env,'SELECT COUNT(DISTINCT ip_hash) n FROM probe_pulse WHERE bucket>=?',b-6)).n|0;
- const today=(await one(env,'SELECT COUNT(DISTINCT ip_hash) n FROM probe_pulse WHERE bucket>=?',todayBucket)).n|0;
+ /* 2026-11-21 D1 reads: one pass per table, aggregated here. The old block ran 8 COUNT(DISTINCT) scans of probe_pulse
+    (each read the whole table, ~1.1k rows) and 12 scans of probe_full / probe_games: ~10k rows per compute, ~1.9M a
+    day with one dashboard open. Now ~1.9k rows per compute (pulse ~1.1k + probe_full + probe_games + the two joins). */
+ const pulse=await all(env,'SELECT ip_hash h, bucket b FROM probe_pulse WHERE bucket>?',b-144);
+ const perBucket=new Map(),seen=(from)=>{const s=new Set();for(const r of pulse)if((r.b|0)>=from)s.add(r.h);return s.size;};
+ for(const r of pulse){const k=r.b|0;perBucket.set(k,(perBucket.get(k)||0)+1);}/* (ip_hash,bucket) is the key: rows per bucket = distinct callers */
+ const online=seen(b-1),active1h=seen(b-6),today=seen(todayBucket),d24=seen(b-143);
  /* pulse detail: 10-min series for the last 6 h, rolling 24 h, the busiest 10 min, time online today */
- const series=new Map((await all(env,'SELECT bucket b, COUNT(DISTINCT ip_hash) n FROM probe_pulse WHERE bucket>? GROUP BY bucket',b-36)).map(r=>[r.b|0,r.n|0])),s6=[];
- for(let k=b-35;k<=b;k++)s6.push({at:k*BUCKET,n:series.get(k)||0});
- const d24=(await one(env,'SELECT COUNT(DISTINCT ip_hash) n FROM probe_pulse WHERE bucket>?',b-144)).n|0;
- const pk10=(await one(env,'SELECT MAX(n) m FROM (SELECT COUNT(DISTINCT ip_hash) n FROM probe_pulse WHERE bucket>? GROUP BY bucket)',b-144)).m|0;
- const ss=await one(env,'SELECT AVG(c) avg, COALESCE(SUM(CASE WHEN c>=6 THEN 1 ELSE 0 END),0) long FROM (SELECT COUNT(*) c FROM probe_pulse WHERE bucket>=? GROUP BY ip_hash)',todayBucket);
- const pg=await one(env,'SELECT COUNT(*) games, COALESCE(SUM(reporters),0) reporters FROM probe_games');
- const pf=await one(env,"SELECT COUNT(*) games, COALESCE(SUM(CASE WHEN state='ready' THEN 1 ELSE 0 END),0) ready, COALESCE(SUM(CASE WHEN state='uploading' THEN 1 ELSE 0 END),0) uploading, COALESCE(SUM(CASE WHEN state='done' THEN 1 ELSE 0 END),0) done, COALESCE(SUM(CASE WHEN state='ready' THEN size ELSE 0 END),0) bytes FROM probe_full");
- const top=(await all(env,"SELECT title, reporters, state, step, size FROM probe_full WHERE title<>'' ORDER BY reporters DESC, updated_at DESC LIMIT 24"))
+ const s6=[];for(let k=b-35;k<=b;k++)s6.push({at:k*BUCKET,n:perBucket.get(k)||0});
+ const pk10=Math.max(0,...perBucket.values());
+ const perIp=new Map();for(const r of pulse)if((r.b|0)>=todayBucket)perIp.set(r.h,(perIp.get(r.h)||0)+1);
+ const ss={avg:perIp.size?[...perIp.values()].reduce((a,c)=>a+c,0)/perIp.size:0,long:[...perIp.values()].filter(c=>c>=6).length};
+ /* probe quality and matching, from the desensitized probes (probe_games): one pass */
+ const games=await all(env,'SELECT state, reporters, vndb, issue_url FROM probe_games');
+ const pg={games:games.length,reporters:games.reduce((a,r)=>a+(Number(r.reporters)||0),0)};
+ const groupCount=(rows,key,label)=>{const m=new Map();for(const r of rows){const k=label(r[key]);m.set(k,(m.get(k)||0)+1);}return [...m].map(([k,n])=>({k,n})).sort((x,y)=>y.n-x.n);};
+ const pstates=groupCount(games,'state',v=>String(v||'?')).map(r=>({state:r.k,n:r.n}));
+ const pv={vndb:games.filter(r=>r.vndb!=null&&r.vndb!=='').length,issues:games.filter(r=>r.issue_url!=null&&r.issue_url!=='').length};
+ /* the full dumps: one pass for counts, sizes, pace, expiry, the newest, the top list, why games fail, client versions */
+ const full=await all(env,'SELECT title, reporters, state, step, size, app, vndb, created_at, updated_at, expires_at FROM probe_full');
+ const sz=r=>Number(r.size)||0,ready=full.filter(r=>r.state==='ready');
+ const pf={games:full.length,ready:ready.length,uploading:full.filter(r=>r.state==='uploading').length,done:full.filter(r=>r.state==='done').length,bytes:ready.reduce((a,r)=>a+sz(r),0)};
+ const titled=full.filter(r=>r.title!=null&&r.title!=='');
+ const top=[...titled].sort((x,y)=>(y.reporters|0)-(x.reporters|0)||(y.updated_at|0)-(x.updated_at|0)).slice(0,24)
   .map(r=>({title:String(r.title).slice(0,80),reporters:r.reporters|0,step:String(r.step||''),state:String(r.state||''),mb:mb(r.size),full:true}));
- /* the newest full dumps and why games fail */
- const recent=(await all(env,"SELECT title,state,step,size,updated_at FROM probe_full WHERE title<>'' ORDER BY updated_at DESC LIMIT 8"))
+ const recent=[...titled].sort((x,y)=>(y.updated_at|0)-(x.updated_at|0)).slice(0,8)
   .map(r=>({title:String(r.title).slice(0,80),state:String(r.state||''),step:String(r.step||''),mb:mb(r.size),at:r.updated_at|0}));
- const steps=(await all(env,"SELECT step, COUNT(*) n FROM probe_full GROUP BY step ORDER BY n DESC LIMIT 12")).map(r=>({step:String(r.step||'?')||'?',n:r.n|0}));
- /* probe quality and matching, from the desensitized probes (probe_games) */
- const pstates=(await all(env,"SELECT state, COUNT(*) n FROM probe_games GROUP BY state ORDER BY n DESC")).map(r=>({state:String(r.state||'?'),n:r.n|0}));
- const pv=await one(env,"SELECT COALESCE(SUM(CASE WHEN vndb<>'' THEN 1 ELSE 0 END),0) vndb, COALESCE(SUM(CASE WHEN issue_url<>'' THEN 1 ELSE 0 END),0) issues FROM probe_games");
- /* more about the full dumps: sizes, pace, expiry, in-flight uploads, client versions */
- const fx=await one(env,"SELECT MIN(size) mn, MAX(size) mx, COALESCE(SUM(reporters),0) rep, COALESCE(SUM(CASE WHEN created_at>? THEN 1 ELSE 0 END),0) d1, COALESCE(SUM(CASE WHEN created_at>? THEN 1 ELSE 0 END),0) d7, COALESCE(SUM(CASE WHEN state='ready' AND expires_at<? THEN 1 ELSE 0 END),0) expiring, MIN(CASE WHEN state='ready' THEN created_at END) oldest, COALESCE(SUM(CASE WHEN vndb<>'' THEN 1 ELSE 0 END),0) vndb FROM probe_full",t-86400,t-7*86400,t+7*86400);
+ const steps=groupCount(full,'step',v=>String(v||'?')||'?').slice(0,12).map(r=>({step:r.k,n:r.n}));
+ const fx={mn:full.length?Math.min(...full.map(sz)):null,mx:full.length?Math.max(...full.map(sz)):null,rep:full.reduce((a,r)=>a+(Number(r.reporters)||0),0),
+  d1:full.filter(r=>(r.created_at|0)>t-86400).length,d7:full.filter(r=>(r.created_at|0)>t-7*86400).length,
+  expiring:ready.filter(r=>(Number(r.expires_at)||0)<t+7*86400).length,oldest:ready.length?Math.min(...ready.map(r=>Number(r.created_at)||0)):0,
+  vndb:full.filter(r=>r.vndb!=null&&r.vndb!=='').length};
  const inflight=(await all(env,"SELECT f.title title, f.size size, f.parts parts, COUNT(p.part) got, COALESCE(SUM(p.size),0) bytes, f.updated_at at FROM probe_full f LEFT JOIN probe_full_parts p ON p.identity=f.identity WHERE f.state='uploading' GROUP BY f.identity ORDER BY f.updated_at DESC LIMIT 5"))
   .map(r=>({title:String(r.title||'?').slice(0,60),mb:mb(r.size),parts:r.parts|0,got:r.got|0,pct:r.size?Math.min(100,Math.round((r.bytes||0)/r.size*100)):0,at:r.at|0}));
- const apps=(await all(env,"SELECT app, COUNT(*) n FROM probe_full GROUP BY app ORDER BY n DESC LIMIT 5")).map(r=>({app:String(r.app||'?').slice(0,24)||'?',n:r.n|0}));
+ const apps=groupCount(full,'app',v=>String(v||'?').slice(0,24)||'?').slice(0,5).map(r=>({app:r.k,n:r.n}));
  /* what players are reading lately (leaderboard game rows, opted-in players only) */
  const playing=(await all(env,'SELECT MAX(title) title, COUNT(*) readers, COALESCE(SUM(characters),0) characters, COALESCE(SUM(seconds),0) seconds, MAX(updated_at) at FROM leaderboard_games WHERE updated_at>? GROUP BY game_key ORDER BY at DESC LIMIT 10',t-7*86400))
   .map(r=>({title:String(r.title||'').slice(0,80),readers:r.readers|0,characters:Number(r.characters)||0,seconds:Number(r.seconds)||0,at:r.at|0}));
@@ -137,7 +153,8 @@ async function quota(env,now){
    has been counted yet the first stats call kicks a refresh in the background. */
 export async function probeStats(env,now,{json,fail},ctx=null){
  if(!env.DB)return fail('NOT_CONFIGURED',503);
- const parts=[['live',10,()=>live(env,now)],['wide',300,()=>wide(env,now)],['quota-v2',600,()=>quota(env,now)],['seed',60,()=>seedSummary(env)]];
+ /* live: 120 s globally (pulse buckets are 10 min anyway), wide: 10 min; ~1.9k + ~2.5k rows per compute */
+ const parts=[['live',10,()=>snap(env,'live',LIVE_TTL,()=>live(env,now),now)],['wide',300,()=>snap(env,'wide',WIDE_TTL,()=>wide(env,now),now)],['quota-v2',600,()=>quota(env,now)],['seed',60,()=>seedSummary(env)]];
  const got=await Promise.allSettled(parts.map(([k,ttl,fn])=>cached(k,ttl,fn))),errors={};
  const val=i=>{if(got[i].status==='fulfilled')return got[i].value;errors[parts[i][0]]=String(got[i].reason?.message||got[i].reason).slice(0,120);return null;};
  const base=val(0)||{ok:true,now:Math.floor(now.getTime()/1000)},ext=val(1),q=val(2),seed=val(3);
