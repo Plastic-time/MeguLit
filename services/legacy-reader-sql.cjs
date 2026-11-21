@@ -11,6 +11,10 @@ function request(root,command,args={},{sentenceTranslation}={}){
   require('./anki-sync.cjs').schema(db);
   if(command==='plugin:sql|select'){
    if(/^SELECT id FROM words WHERE id = \$1$/i.test(q))return db.prepare('SELECT id FROM vocabulary WHERE id=?').all(Number(v[0]));
+   if(/^SELECT id FROM word_sentences WHERE word_id = \$1 AND sentence_text = \$2 AND media_id IS \$3$/i.test(q)){
+    const game=v[2]==null?null:db.prepare('SELECT id FROM games WHERE legacy_id=? AND removed_at IS NULL').get(Number(v[2]));
+    return db.prepare('SELECT id FROM examples WHERE word_id=? AND text=? AND game_id IS ?').all(Number(v[0]),String(v[1]),game?.id||null);
+   }
    if(/^SELECT id FROM word_sentences WHERE word_id = \$1 AND sentence_text = \$2$/i.test(q))return db.prepare('SELECT id FROM examples WHERE word_id=? AND text=?').all(Number(v[0]),String(v[1]));
    if(/^SELECT word_id, note_id FROM tome_anki_links$/i.test(q))return db.prepare('SELECT word_id,note_id FROM anki_links').all();
    throw Error('LEGACY_SQL_NOT_SUPPORTED');
@@ -28,7 +32,7 @@ function request(root,command,args={},{sentenceTranslation}={}){
   }
   if(/^INSERT INTO word_sentences /i.test(q)){
    const game=v[4]==null?null:db.prepare('SELECT id FROM games WHERE legacy_id=? AND removed_at IS NULL').get(Number(v[4]));
-   if(db.prepare('SELECT 1 FROM examples WHERE word_id=? AND text=?').get(Number(v[0]),String(v[1])))return {rowsAffected:0,lastInsertId:0};
+   if(db.prepare('SELECT 1 FROM examples WHERE word_id=? AND text=? AND game_id IS ?').get(Number(v[0]),String(v[1]),game?.id||null))return {rowsAffected:0,lastInsertId:0};
    /* The game's own line is the example; its human translation (zero-latency) comes before the machine one. */
    let t={};try{t=sentenceTranslation?.(String(v[1]))||{};}catch{}
    return execute('INSERT INTO examples(word_id,text,translation,highlight_start,highlight_end,game_id,created_at,original) VALUES(?,?,?,?,?,?,?,?)',[Number(v[0]),String(v[1]),t.translation||null,Number(v[2]),Number(v[3]),game?.id||null,Number(v[5])||Math.floor(Date.now()/1000),JSON.stringify({...(t.translationSource?{translationSource:t.translationSource}:{}),readAt:Math.floor(Date.now()/1000)})]);

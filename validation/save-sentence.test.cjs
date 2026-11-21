@@ -41,6 +41,34 @@ test('identical saved lines only list words collected from the same game',t=>{
  }finally{db.close();}
 });
 
+test('mining and syncing the same word in the same line keeps one example per game',async t=>{
+ const root=temp(t),db=openStore(root),reader=new Reader({root,folder:path.join(root,'data','config')});
+ const entry={id:8,spellings:['明日'],readings:['あした']},ctx={now:Date.now};
+ const saveWord=require('../services/learning-insights.cjs').saveWord;
+ const sql=(command,query,values)=>require('../services/legacy-reader-sql.cjs').request(root,'plugin:sql|'+command,{db:'sqlite:immersion.db',query,values});
+ const check='SELECT id FROM word_sentences WHERE word_id = $1 AND sentence_text = $2 AND media_id IS $3';
+ const insert='INSERT INTO word_sentences (word_id,sentence_text,highlight_start,highlight_end,media_id) VALUES ($1,$2,$3,$4,$5)';
+ try{
+  db.exec("INSERT INTO games(id,title,legacy_id) VALUES('a','First',1),('b','Second',2)");
+  for(const [game,media] of [['a',1],['b',2],[null,null]]){
+   reader.gameId=game;
+   for(let i=0;i<2;i++){
+    await reader.mine({entry,args:{text:'明日は晴れ。'},noteId:1});
+    saveWord(db,entry,{gameId:game,text:'明日は雨。'});
+    assert.equal(sql('select',check,[8,'明日は雪。',media]).length,i);
+    assert.equal(sql('execute',insert,[8,'明日は雪。',0,2,media]).rowsAffected,1-i);
+   }
+  }
+  assert.deepEqual(saved.list(db).map(r=>r.words.map(w=>w.id)),[[8],[8],[8]]);
+  const [record]=kinds.words.collect(db).values();
+  assert.equal(record.examples.length,9);
+  db.exec('DELETE FROM examples');
+  for(let i=0;i<2;i++)kinds.words.apply(db,'明日\tあした',{data:record},root,ctx);
+  const rows=db.prepare('SELECT game_id,COUNT(*) n FROM examples GROUP BY game_id ORDER BY game_id').all();
+  assert.deepEqual(rows.map(r=>[r.game_id,r.n]),[[null,3],['a',3],['b',3]]);
+ }finally{db.close();}
+});
+
 test('the reader saves the shown line for the attached game and toggles it off again',async t=>{
  const root=temp(t),events=[];
  const runtime={root,folder:path.join(root,'data','config'),emit:(name,payload)=>events.push(payload),config:()=>({}),learning:()=>({installed:()=>true})};
