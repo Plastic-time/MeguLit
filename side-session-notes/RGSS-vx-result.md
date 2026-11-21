@@ -51,3 +51,13 @@
 - ff175fda后的18套183/183，无失败无跳过，保留related-final.tap；1554语法manifest已经逐文件对比hash，3个变化文件fresh --check，0失败
 - 08:16又补存档边界：同一原安装路径复用自有副本，验证自有marker、原归档指纹和上次patched归档hash，再刷新连接参数；exe/DLL/启动字段或归档被改就拒绝覆盖。副本内新Save01.rvdata和自定义设置文件经两次prepare保留，原目录不回写；关闭观察后普通启动仍原目录，存档迁移需要人工核对，本轮不自动覆盖
 - 生产bridge的真实launch函数通过VM依赖注入回放，先聚焦仍在运行的自有副本，证明未进入prepare/启动分支，不会重写运行中的归档。Ruby回放子进程显式windowsHide；未启动真实游戏或Reader
+
+## 08:22 封存结果
+
+- 分支`codex/engine-complete-rgss`，工作树`H:/MeguLit-Work/wt/engine-rgss`；08:19再次fetch/rebase确认最新origin/main仍为`25b466ffb46318b192d91cf8dc88e160329ab9df`。最终受测代码`6762a93a80af89d26db22922d1bda33856c84af4`，此后只追加报告
+- 最终18套184/184，0fail、0skip，`H:/MeguLit-Work/reports/engine-rgss-20261122-0718/related-sealed.tap`；其中RGSS独立16项，包括真实完整语料、生产HookNative及生产launch的无进程回放
+- 1554受版本控制JS/CJS/MJS全部node --check通过；最后core/text-paths-launch.cjs、core/text-paths-rgss.cjs、services/bridge.cjs、validation/engine-draw-rgss.test.cjs的hash变化已fresh复核。完整manifest和HEAD见`syntax-sealed.json`，没有用旧语法检查冒充最后代码
+- `source-preserved.json`最终全量清点原441文件、43703591字节，exe/DLL/归档哈希仍与固定证据一致。原ZIP、完整游戏、私有Ruby验证运行时都保留，没有删除已部署样本
+- 收尾资源C29.42/E13.80/H49.40GiB，空闲RAM10.84GiB；未停止守护程序，没有后台游戏或Reader由本任务启动。没有push/main/PR/发版、没有第四轮CI重试，也没有写E测试安装目录
+- root可按base25b466ff到本分支tip串行集成；result.md仅追加索引，主线KAG/RenPy/TextRender/RPGM报告全部保留。E测试需要由root部署本分支文件，并仅在测试包合并diagnostic-profile-template.json的固定exe设置，不覆盖现有用户差分和生产DB
+- 交付的是固定VX观察候选，默认关闭。原版Ruby1.8/Win32API、实际20句、位置/点读/译文/选项体验仍待店主；名字、内嵌、游戏ruby、XP/Ace与其他VX版本未实现。关闭观察后的副本存档迁移没有自动化，不能将它表述成全引擎生产适配完成
