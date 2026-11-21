@@ -97,7 +97,9 @@ const PUBLIC={'access-control-allow-origin':'*','cache-control':'public, max-age
 const MONTH=/^\d{4}-(0[1-9]|1[0-2])$/;
 const monthRange=m=>{const [y,mo]=m.split('-').map(Number);return [Date.UTC(y,mo-1,1)/1000,Date.UTC(y,mo,1)/1000];};
 const totalOf=async env=>(await env.DB.prepare('SELECT total FROM torch_counter WHERE id=1').first())?.total|0;
-const shape=(r,titles)=>({torchNo:r.torch_no|0,name:r.name??null,at:r.at|0,game:titles?.get(r.game_key)??null,display:r.name||'传火人 #'+(r.torch_no|0)});
+/* 2026-11-21 店主: 匿名的传火人按顺序用大写数字（传火人壹、贰、叁） */
+const cnNo=n=>{n=Math.floor(Number(n)||0);if(n<=0)return "零";const D="零壹贰叁肆伍陆柒捌玖",U=["","拾","佰","仟"],B=["","万","亿","万亿"];const sec=p=>{let o="",z=false;for(let i=3;i>=0;i--){const x=Math.floor(p/10**i)%10;if(x){if(z&&o)o+="零";o+=D[x]+U[i];z=false;}else z=true;}return o;};const parts=[];for(let i=0;n>0;i++){parts.unshift([n%10000,i]);n=Math.floor(n/10000);}let out="",gap=false;for(const [p,i] of parts){if(!p){if(out)gap=true;continue;}if(out&&(gap||p<1000))out+="零";out+=sec(p)+B[i];gap=false;}return out;};
+const shape=(r,titles)=>({torchNo:r.torch_no|0,name:r.name??null,at:r.at|0,game:titles?.get(r.game_key)??null,display:r.name||'传火人'+cnNo(r.torch_no|0)});
 
 export async function monumentGet(env,url,{json,fail},ctx=null){
  if(!env.DB)return fail('NOT_CONFIGURED',503);
