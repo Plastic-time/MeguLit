@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -61,5 +66,9 @@
  "slug": "the-shell-part-iii-paradiso",
  "builds": [
   "fda1516ac25dfdd1a1ed2064163124b364be9f6241df77fc17e103d695288daa"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

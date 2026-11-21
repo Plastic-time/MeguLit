@@ -78,6 +78,11 @@ module.exports={
   /* with embed on, the Chinese is drawn by the game too (false = ruby only, the reader draws the Chinese) */
   embedTranslation:true,
  },
+ /* 2026-11-21 (owner: 英文学习模式 + 多语言译文) settings that depend on the language of the game's text, one block per BCP 47 tag
+    ('ja', 'en', 'zh-Hans'): {annotation:'ruby'|'ipa'|'pinyin'|'none', pairing:'script'|'patch'|'machine'|'none', dictionary:<id>,
+    fontFallback:[font names]}. The client takes the block of the source language it reads (Profiles.forLang), else the
+    language-free settings around it. Empty = the kernel as before (Japanese: ruby, the script's pairing). */
+ lang:{},
  safeMode:{
   /* reader redraws per second while the game is in a page effect; null = kernel default */
   redrawRate:null,

@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -61,5 +66,9 @@
  "slug": "irotoridori-no-hikari-chs",
  "builds": [
   "ea2cb0cd2d01808cf80ec68da2713a96e6aa91c425c2b16e4e6667b226cb47f3"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

@@ -62,6 +62,11 @@
   "safeMode": {
    "redrawRate": null,
    "effectJudge": true
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -92,5 +97,9 @@
    "魔女之馆",
    "法塔莫尔加纳之馆"
   ]
- }
+ },
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
+ ]
 }

@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -61,5 +66,9 @@
  "slug": "danganronpa-trigger-happy-havoc",
  "builds": [
   "9debd9f6aed2339e540aa9526ea3f16f38ad91c19ad9a842a5b0b2fab21303e3"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

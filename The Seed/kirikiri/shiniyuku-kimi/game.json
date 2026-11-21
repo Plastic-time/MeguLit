@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -61,5 +66,9 @@
  "slug": "shiniyuku-kimi",
  "builds": [
   "0adf662a06220364c0407460e7b9e26a129b5203cb26b6f726be012ba2c99d54"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

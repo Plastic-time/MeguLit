@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -62,5 +67,9 @@
  "slug": "atri-my-dear-moments",
  "builds": [
   "1c9b98c9d1ef4eb9f07fb8083192dc7b6ca40ccc71534074f46bbb6860ae432a"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

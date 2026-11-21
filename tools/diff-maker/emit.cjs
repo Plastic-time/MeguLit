@@ -48,7 +48,9 @@ function diffsOf(probe,key,result,gameFile){const measured=require('./search.cjs
  const d=docs({prints:probe.prints,exeSha:probe.exe.sha256,exeName:probe.exe.name,engine:probe.engine,mode,settings:all,gid:require('./probe.cjs').gameId(probe.prints)});
  return {...d,covers:probe.versions.map(x=>({exe:x.exe,sha256:x.sha256,probed:x.probed})),knownExe:(gameFile?.match?.exe||[]).map(String),suspect:sus};}
 
-function linesOf(probe,key,entries,gid){return {schema:'megulit.lines',version:1,key:gid||require('./probe.cjs').gameId(probe.prints),script:probe.game.script,lines:entries};}
+/* pairing data per language pair (owner: 汉化/翻译配对按 源语言→目标语言 区分): one file per pair, source = the game's text, target = the
+   translation's language (BCP 47); a game can have several (ja->zh-Hans, en->zh-Hans, en->ja) */
+function linesOf(probe,key,entries,gid,{source=(probe.manifest?.sourceLang||'ja'),target=(probe.manifest?.targetLang||'zh-Hans')}={}){return {schema:'megulit.lines',version:1,key:gid||require('./probe.cjs').gameId(probe.prints),source,target,script:probe.game.script,lines:entries};}
 
 function replayOf(probe,key,rep,result,name){return {schema:1,tool:TOOL,gameKey:key,exeSha256:probe.exe.sha256,engine:probe.engine,title:probe.title,
  version:name+'.version.json',game:name+'.game.json',lines:name+'.lines.json',

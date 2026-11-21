@@ -19,10 +19,18 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 - `mode:'read'` 必须带 `hide.textEffectsRead:true`；`rev` 只增
 
 **The Seed 文件**（仓库内置，官方，不签名）：
-- `The Seed/<engine>/<slug>/game.json`：游戏层文档 + seed 字段 `status`（`verified` / `owner-ok` / `read` / `skeleton`）、`slug`（= 目录名）、`builds`（exe SHA-256 列表）、可选 `match {exe, titles, notTitles}`（可读的程序名和标题，汉化改名时用）、可选 `sourceLangs`（BCP 47，默认 `['ja']`，例如 `['en','zh-Hans']`）
+- `The Seed/<engine>/<slug>/game.json`：游戏层文档 + seed 字段 `seedFormat`（seed 格式版本，现为 1，不写 = 1）、`status`（`verified` / `owner-ok` / `read` / `skeleton`）、`slug`（= 目录名）、`builds`（exe SHA-256 列表，版本文件可以在别的游戏目录下：一个 exe 被几部共用时版本层只有一份）、`sourceLangs`（游戏原文的语言，BCP 47，默认 `["ja"]`，例如 `["en","zh-Hans"]`）、可选 `match {exe, titles, notTitles}`（可读的程序名和标题，汉化改名时用）、可选 `ext {<扩展名>: …}`（扩展区）
+- 向前兼容：客户端不认识的顶层字段、`ext` 里不认识的扩展、settings 里不认识的键都忽略（`seed.cjs check()` 的 `ignored`），认识的字段和键严格校验；`seedFormat` 比自己新也照样读
 - `The Seed/<engine>/<slug>/versions/<exe SHA-256>.json`：版本层文档，文件名 = key
 - settings 钉住每个键的当前生效值：做好了就是做好了，内核默认改了它也不变
 - 客户端语义：`verified` / `owner-ok` 直接用（官方游戏层）；`read` 直接读模式（官方游戏层）；`skeleton` 只给身份 + 钉住值，放在本机校准下面，自检闸门照常把关（不过线退读模式）
+
+**语言**（2026-11-21，为英文学习模式和多语言译文留的接口）：
+- 跟语言有关的设置放 `settings.lang.<bcp47>`：`{annotation: 'ruby'|'ipa'|'pinyin'|'none', pairing: 'script'|'patch'|'machine'|'none', dictionary: <id>, fontFallback: [字体名]}`（`core/profiles/domains.cjs langMap`，块里不认识的字段忽略）；游戏层键；各层按语言、按字段叠加
+- 客户端按「当前学习模式读的源语言」取块：`Profiles.forLang(profile, 'en')`（`zh-Hans` 找不到时退到 `zh`），没有就用语言无关的公共设置
+- 现有 55 份 seed 已迁：`seedFormat:1`、`sourceLangs:["ja"]`、`settings.lang.ja.annotation:"ruby"`；没有这些字段的旧 seed 照样能读
+- 配对数据按语言对分：`megulit.lines` 带 `source` / `target`（BCP 47），一部游戏可以有多份（ja→zh-Hans、en→zh-Hans、en→ja）
+- 学习模式（jp-learning / en-learning）是客户端维度，不进 seed；seed 只描述游戏和它的语言
 
 **层顺序**（全部叠加，后面盖前面）：内核 ← 引擎差分 ← 仓库游戏文件 / skeleton seed ← 共享自动·游戏层 ← 共享自动·版本层 ← 本机校准 ← 官方·游戏层（内置 seed 或下发，rev 更高的下发覆盖内置）← 官方·版本层（同上）← 本机退档
 

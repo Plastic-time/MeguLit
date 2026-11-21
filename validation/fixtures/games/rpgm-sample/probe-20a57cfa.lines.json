@@ -2,6 +2,8 @@
  "schema": "megulit.lines",
  "version": 1,
  "key": "0aaebca4942647ac75ee4a86248b2a12038d1696b1eae9b428128b353d83e7b1",
+ "source": "ja",
+ "target": "zh-Hans",
  "script": "c7d366b98588429e8dc2d218b7f89ad5589eb7570461acba5e077da60b55e172",
  "lines": []
 }

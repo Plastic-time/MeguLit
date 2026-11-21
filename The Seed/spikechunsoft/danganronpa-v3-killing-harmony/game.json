@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -60,5 +65,9 @@
  "slug": "danganronpa-v3-killing-harmony",
  "builds": [
   "503073a67a2cc0056b7d11d400fb9736c65eec46ec6877478e6ff1ccb6526438"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

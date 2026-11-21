@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -62,5 +67,9 @@
  "slug": "maitetsu-pure-station",
  "builds": [
   "7746c668c90c4a6bc4c50fceecb2be83fab4b7ad758b5d758267914cc220e76a"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

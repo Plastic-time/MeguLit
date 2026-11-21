@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -60,5 +65,9 @@
  "slug": "summer-clover",
  "builds": [
   "6392bbb3714b0e92523b655c631eb6bdda5669fffe44e04a28955d45812fbefa"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -60,5 +65,9 @@
  "slug": "minikui-mojika-no-ko",
  "builds": [
   "659b2a04667f8f10cb6c7bb812f70ef98cb3550c53427015a71cf0b6f3846282"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

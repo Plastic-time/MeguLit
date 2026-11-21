@@ -89,6 +89,11 @@ UI 项（按 role、id、文字去重）：0 个
  },
  "safeMode": {
   "effectJudge": true
+ },
+ "lang": {
+  "ja": {
+   "annotation": "ruby"
+  }
  }
 }
 ```

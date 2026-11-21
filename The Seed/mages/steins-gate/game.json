@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -62,5 +67,9 @@
  "slug": "steins-gate",
  "builds": [
   "cbbc5dab18edc344d05c01d4d08819fbc0a68a78741956831752986009b69e16"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

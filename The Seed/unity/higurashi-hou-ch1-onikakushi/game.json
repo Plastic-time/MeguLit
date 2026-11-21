@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -61,5 +66,9 @@
  "slug": "higurashi-hou-ch1-onikakushi",
  "builds": [
   "e7ff5060c42bcbe78f8c7bb64d0d5a48a8ad60362cd86324bd00877cdb41a98d"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

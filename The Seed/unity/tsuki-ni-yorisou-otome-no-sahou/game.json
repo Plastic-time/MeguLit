@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -62,5 +67,9 @@
  "slug": "tsuki-ni-yorisou-otome-no-sahou",
  "builds": [
   "c7375fbb24e54a960d784530809e1a3f8c5f0463104b6fad60c50d4d3916a16c"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

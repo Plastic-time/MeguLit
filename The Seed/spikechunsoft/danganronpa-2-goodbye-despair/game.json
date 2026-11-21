@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -61,5 +66,9 @@
  "slug": "danganronpa-2-goodbye-despair",
  "builds": [
   "8840bd4fd7aa2aaccb376f141e8ea12fce265107c2d94b87d243f77356893c4b"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

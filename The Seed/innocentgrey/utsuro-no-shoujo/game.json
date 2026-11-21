@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -60,5 +65,9 @@
  "slug": "utsuro-no-shoujo",
  "builds": [
   "72caa0a0b105f972e1fe7b0ea1ff491d91107d5aa14ac562d4eeac81a163f188"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

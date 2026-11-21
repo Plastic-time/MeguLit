@@ -42,8 +42,18 @@ const DOMAINS={
  'draw.roles':{bool:true},
  'draw.embed':{bool:true,layer:'version'},
  'draw.embedTranslation':{bool:true,layer:'version'},
+ 'lang':{langMap:true},
  'safeMode.redrawRate':{number:[0,120],nullable:true},
 };
+/* lang.<bcp47>.{annotation, pairing, dictionary, fontFallback}: known fields are checked strictly, unknown fields of a block are
+   dropped (an older client reading a newer diff); -> the cleaned map, or null when a known field is out of its domain */
+const LANG_TAG=/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,3}$/;
+const LANG_FIELDS={annotation:v=>['ruby','ipa','pinyin','none'].includes(v),pairing:v=>['script','patch','machine','none'].includes(v),
+ dictionary:v=>typeof v==='string'&&/^[a-z0-9][a-z0-9.-]{0,39}$/.test(v),fontFallback:v=>Array.isArray(v)&&v.length<=8&&v.every(f=>typeof f==='string'&&f&&f.length<=80&&!/[\/]/.test(f))};
+function langMap(v){if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).length>16)return null;const out={};
+ for(const [tag,block] of Object.entries(v)){if(!LANG_TAG.test(tag)||!block||typeof block!=='object'||Array.isArray(block))return null;const b={};
+  for(const [k,x] of Object.entries(block)){if(!(k in LANG_FIELDS))continue;if(x===null)continue;if(!LANG_FIELDS[k](x))return null;b[k]=Array.isArray(x)?x.slice():x;}out[tag]=b;}
+ return out;}
 const plain=v=>v&&typeof v==='object'&&!Array.isArray(v);
 /* a RegExp source that cannot blow up: compiles, no backreference, no quantified group that itself repeats */
 function safeRegex(src,chars=200){if(typeof src!=='string'||!src||src.length>chars)return false;if(/\\[1-9]|\\k</.test(src))return false;if(/\((?:[^()\\]|\\.)*[+*}](?:[^()\\]|\\.)*\)[+*{]/.test(src))return false;try{new RegExp(src,'u');return true;}catch{return false;}}
@@ -55,13 +65,14 @@ function okValue(d,v){
  if(d.rect){if(!plain(v))return false;const keys=Object.keys(v);if(!keys.every(k=>['x','y','w','h','client'].includes(k)))return false;
   if(!['x','y','w','h'].every(k=>typeof v[k]==='number'&&Number.isFinite(v[k])&&Math.abs(v[k])<=100000))return false;
   return v.client===undefined||Array.isArray(v.client)&&v.client.length===2&&v.client.every(n=>typeof n==='number'&&n>0&&n<=100000);}
+ if(d.langMap)return langMap(v)!==null;
  if(d.regexList)return Array.isArray(v)&&v.length<=d.regexList.max&&v.every(s=>safeRegex(s,d.regexList.chars));
  return false;}
 /* settings (a nested layer) -> {value, rejected}: only domain keys with in-domain values survive (any depth: hide.engineTrial.*) */
 const groups=new Set(Object.keys(DOMAINS).flatMap(k=>{const p=k.split('.'),out=[];for(let i=1;i<p.length;i++)out.push(p.slice(0,i).join('.'));return out;}));
 function clean(settings){const value={},rejected=[];if(!plain(settings))return {value,rejected:settings==null?[]:['(not an object)']};
  const walk=(obj,at,out)=>{for(const [k,v] of Object.entries(obj)){const p=at?at+'.'+k:k,d=DOMAINS[p];
-  if(d){if(okValue(d,v))out[k]=Array.isArray(v)?v.slice():plain(v)?JSON.parse(JSON.stringify(v)):v;else rejected.push(p);continue;}
+  if(d){if(okValue(d,v))out[k]=d.langMap?langMap(v):Array.isArray(v)?v.slice():plain(v)?JSON.parse(JSON.stringify(v)):v;else rejected.push(p);continue;}
   if(groups.has(p)&&plain(v)){const inner={};walk(v,p,inner);if(Object.keys(inner).length)out[k]=inner;continue;}
   if(plain(v)&&Object.keys(v).length){for(const c of Object.keys(v))rejected.push(p+'.'+c);continue;}rejected.push(p);}};
  walk(settings,'',value);return {value,rejected};}
@@ -79,4 +90,4 @@ const layerOf=key=>DOMAINS[key]?.layer==='version'?'version':'game',tierOf=layer
 function split(settings){const out={version:{},game:{}};const walk=(obj,at,dst)=>{for(const [k,v] of Object.entries(obj||{})){const p=at?at+'.'+k:k;
   if(DOMAINS[p]){let o=dst[layerOf(p)];const path=p.split('.');for(const seg of path.slice(0,-1))o=o[seg]||(o[seg]={});o[path.at(-1)]=v;continue;}
   if(plain(v))walk(v,p,dst);}};walk(settings,'',out);return out;}
-module.exports={layerOf,tierOf,split,DOMAINS,clean,okValue,safeRegex,leaves};
+module.exports={langMap,LANG_TAG,layerOf,tierOf,split,DOMAINS,clean,okValue,safeRegex,leaves};

@@ -74,6 +74,11 @@ UI 项（按 role、id、文字去重）：0 个
    ]
   }
  },
+ "lang": {
+  "ja": {
+   "annotation": "ruby"
+  }
+ },
  "hide": {
   "textEffectsRead": false
  }

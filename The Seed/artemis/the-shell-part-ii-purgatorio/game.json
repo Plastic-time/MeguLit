@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -62,5 +67,9 @@
  "slug": "the-shell-part-ii-purgatorio",
  "builds": [
   "2141fbb5f5fdc10ee9b6bc6fba5dd571b6b64343da71255e456f09082c2f60e0"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

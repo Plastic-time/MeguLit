@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -60,5 +65,9 @@
  "slug": "flowers-blooming-at-the-end-of-summer",
  "builds": [
   "05e00238e7373555a928fe4bb3f44f7a88a6669192fb3774e04f495551b2494f"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

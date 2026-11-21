@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -77,5 +82,9 @@
    "Senren Banka",
    "Senren＊Banka"
   ]
- }
+ },
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
+ ]
 }

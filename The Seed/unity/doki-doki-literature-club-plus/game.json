@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -61,5 +66,9 @@
  "slug": "doki-doki-literature-club-plus",
  "builds": [
   "b17b6a1e21e7beae66b256da045c02a5bf624e0c3ed3d7590167ee4d2f3cb7c5"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

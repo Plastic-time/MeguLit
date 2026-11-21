@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -59,5 +64,9 @@
  "slug": "namida-ryuusei-no-zadoru",
  "builds": [
   "5654c6bdff43af5d796fcf54df23d8bad950b747bea656b0163f87cf8e16f225"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

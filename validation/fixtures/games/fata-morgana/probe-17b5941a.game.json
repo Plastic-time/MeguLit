@@ -37,6 +37,11 @@
   },
   "safeMode": {
    "effectJudge": true
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",

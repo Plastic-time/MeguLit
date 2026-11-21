@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -61,5 +66,9 @@
  "slug": "tokei-jikake-no-leyline-1",
  "builds": [
   "9a502090106c713c6a7ee1b9ca2cfb57eb3c6ef375c9d2006ae89dbe356ffb77"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

@@ -16,15 +16,28 @@ const fs=require('node:fs'),path=require('node:path');
 const gameDiff=require('../game-diff.cjs'),gamePrint=require('../game-print.cjs');
 const SEED_DIR=path.join(__dirname,'..','..','The Seed');
 const SLUG=/^[a-z0-9][a-z0-9-]{1,62}$/,HEX=/^[0-9a-f]{64}$/,ENGINE=/^[a-z0-9]{2,40}$/,STATUS=['verified','owner-ok','read','skeleton'];
-const SEED_FIELDS=['status','slug','builds','match','sourceLangs'];
+const SEED_FIELDS=['status','slug','builds','match','sourceLangs','seedFormat','ext'];
+/* 2026-11-21 (owner: seed 格式带版本号和扩展区，向前兼容) seedFormat: the seed format this file was written for (absent = 1).
+   ext: an extension area ({<name>: anything}) a client that does not know <name> ignores. Unknown top-level fields and unknown
+   settings keys are ignored too (an older client reading a newer seed); known fields and keys are checked strictly. */
+const SEED_FORMAT=1;
+const GAME_DIFF_FIELDS=new Set(['schema','version','key','layer','prints','rev','source','mode','settings','exe','engine','app','issuedAt','agree','reporters','cost','signature']);
+const {clean,DOMAINS}=require('./domains.cjs');
+/* the document as this client understands it: known fields only, settings without unknown keys; ignored = what was left out */
+function known(d){const ignored=[],doc={};for(const [k,v] of Object.entries(d)){if(GAME_DIFF_FIELDS.has(k)||SEED_FIELDS.includes(k))doc[k]=v;else ignored.push(k);}
+ const c=clean(plain(d.settings)?d.settings:{});const bad=[];for(const r of c.rejected){if(DOMAINS[r])bad.push(r);else ignored.push('settings.'+r);}
+ if(plain(d.settings))doc.settings=c.value;return {doc,ignored,bad};}
 const LANG=/^[a-z]{2,3}(?:-[A-Za-z]{2,8})*$/;
 const plain=v=>v&&typeof v==='object'&&!Array.isArray(v);
 /* a path, a drive, a user folder or an e-mail never belongs in a seed */
 const PRIVATE=/[A-Za-z]:[\\/]|\\\\|\/(?:home|Users)\/|\\Users\\|@[a-z0-9-]+\.[a-z]{2,}/i;
 const strip=d=>{const o={...d};for(const k of SEED_FIELDS)delete o[k];return o;};
 /* {ok, errors[]}; where = {engine, slug} from the folder (game.json) or {file} (versions/<sha>.json) */
-function check(d,{engine,slug,file}={}){const e=[];const bad=m=>e.push(m);
- if(!plain(d))return {ok:false,errors:['not an object']};
+function check(d0,{engine,slug,file}={}){const e=[];const bad=m=>e.push(m);
+ if(!plain(d0))return {ok:false,errors:['not an object'],ignored:[]};
+ const K=known(d0),d=K.doc;for(const k of K.bad)bad('settings '+k+' out of its domain');
+ if(d.seedFormat!==undefined&&!(Number.isInteger(d.seedFormat)&&d.seedFormat>=1))bad('seedFormat');
+ if(d.ext!==undefined&&!plain(d.ext))bad('ext is an object');
  const isGame=d.layer==='game';
  const v=gameDiff.validate(strip(d));if(!v.ok)bad('game-diff '+v.error+(v.rejected?' '+v.rejected.join(','):''));
  if('signature' in d)bad('a built-in seed is not signed');
@@ -48,7 +61,7 @@ function check(d,{engine,slug,file}={}){const e=[];const bad=m=>e.push(m);
   if(d.exe&&/[\\/]/.test(d.exe))bad('exe is a file name');}
  if(d.prints!==undefined){const p=gamePrint.check(d.prints);if(Object.keys(p).length!==Object.keys(d.prints).length)bad('prints');}
  if(PRIVATE.test(JSON.stringify(d)))bad('a path, user folder or address');
- return {ok:!e.length,errors:e};}
+ return {ok:!e.length,errors:e,ignored:K.ignored,doc:d};}
 
 let cache=null;
 function load(dir=SEED_DIR){const games=[],versions=new Map(),errors=[];
@@ -57,8 +70,8 @@ function load(dir=SEED_DIR){const games=[],versions=new Map(),errors=[];
  for(const engine of engines){let slugs=[];try{slugs=fs.readdirSync(path.join(dir,engine),{withFileTypes:true}).filter(d=>d.isDirectory()).map(d=>d.name);}catch{}
   for(const slug of slugs){const base=path.join(dir,engine,slug);
    let files=[];try{files=fs.readdirSync(path.join(base,'versions')).filter(f=>f.endsWith('.json'));}catch{}
-   for(const f of files){const v=read(path.join(base,'versions',f));if(!v)continue;const r=check(v,{engine,file:f});if(!r.ok){errors.push(engine+'/'+slug+'/versions/'+f+': '+r.errors.join('; '));continue;}versions.set(v.key,{...v,slug});}
-   const g=read(path.join(base,'game.json'));if(!g)continue;const r=check(g,{engine,slug});if(!r.ok){errors.push(engine+'/'+slug+'/game.json: '+r.errors.join('; '));continue;}
+   for(const f of files){const v0=read(path.join(base,'versions',f));if(!v0)continue;const r=check(v0,{engine,file:f});if(!r.ok){errors.push(engine+'/'+slug+'/versions/'+f+': '+r.errors.join('; '));continue;}const v=r.doc;versions.set(v.key,{...v,slug});}
+   const g0=read(path.join(base,'game.json'));if(!g0)continue;const r=check(g0,{engine,slug});if(!r.ok){errors.push(engine+'/'+slug+'/game.json: '+r.errors.join('; '));continue;}const g=r.doc;
    /* builds: its own version files and the shared ones it lists; their exe names also name the game (a generic name only weakly) */
    const builds=[...new Set([...(g.builds||[]),...files.map(f=>f.slice(0,-5))])];
    games.push({key:slug,engine:g.engine,seed:true,status:g.status,sourceLangs:g.sourceLangs||['ja'],mode:g.mode,gameId:g.key,prints:g.prints||{},settings:g.settings||{},
@@ -68,4 +81,4 @@ function load(dir=SEED_DIR){const games=[],versions=new Map(),errors=[];
  return {games,versions,errors,dir};}
 function seeds(){return cache||(cache=load());}
 function reload(){cache=null;}
-module.exports={SEED_DIR,STATUS,check,load,seeds,reload,versionOf:key=>seeds().versions.get(String(key||''))||null};
+module.exports={SEED_DIR,SEED_FORMAT,STATUS,check,known,load,seeds,reload,versionOf:key=>seeds().versions.get(String(key||''))||null};

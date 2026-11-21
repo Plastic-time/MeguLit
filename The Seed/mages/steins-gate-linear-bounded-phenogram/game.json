@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -62,5 +67,9 @@
  "slug": "steins-gate-linear-bounded-phenogram",
  "builds": [
   "29d8b394d720a517ded1b6d3bd2371241bc51009ee84e066404c4d4fc4e136ae"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

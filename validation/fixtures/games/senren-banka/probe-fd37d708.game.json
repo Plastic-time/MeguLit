@@ -24,6 +24,11 @@
     ]
    }
   },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
+  },
   "hide": {
    "textEffectsRead": false
   }

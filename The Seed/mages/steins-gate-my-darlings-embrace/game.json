@@ -45,6 +45,11 @@
   },
   "safeMode": {
    "redrawRate": null
+  },
+  "lang": {
+   "ja": {
+    "annotation": "ruby"
+   }
   }
  },
  "exe": "",
@@ -62,5 +67,9 @@
  "slug": "steins-gate-my-darlings-embrace",
  "builds": [
   "a6dcce350d4c406ed78978da125575fb36bf97cf76a3fd980fb2554f0ffb88fb"
+ ],
+ "seedFormat": 1,
+ "sourceLangs": [
+  "ja"
  ]
 }

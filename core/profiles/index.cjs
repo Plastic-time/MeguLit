@@ -60,10 +60,12 @@ function autoKey(input){const exe=exeName(input.exe),t=fold(input.title);if(!exe
 const plain=v=>v&&typeof v==='object'&&!Array.isArray(v)&&!(v instanceof RegExp);
 /* open maps: dictionaries whose entries are data, not kernel keys (draw.roleMap: identity -> role). A layer adds or overrides entries,
    the entries of the layers under it stay */
-const OPEN=new Set();
+const OPEN=new Set(['lang']);
 /* keys a layer may set: the kernel tree only (a typo or an unknown key is an error, found by validation/games-regression) */
 function unknownKeys(settings,base=DEFAULTS,at=''){const out=[];for(const [k,v] of Object.entries(settings||{})){if(!(k in base)){out.push(at+k);continue;}if(plain(base[k])){if(!plain(v))out.push(at+k);else if(!OPEN.has(at+k))out.push(...unknownKeys(v,base[k],at+k+'.'));}}return out;}
-function merge(a,b,at=''){if(!plain(b))return a;const out={...a};for(const [k,v] of Object.entries(b)){if(!(k in a))continue;out[k]=OPEN.has(at+k)&&plain(v)?{...(plain(a[k])?a[k]:{}),...v}:plain(a[k])&&plain(v)?merge(a[k],v,at+k+'.'):Array.isArray(v)?v.slice():v;}return out;}
+/* an open map (lang): entries add up across layers, one entry's own fields too (lang.ja.annotation from one layer, pairing from another) */
+function mergeOpen(a,b){const out={...a};for(const [k,v] of Object.entries(b))out[k]=plain(v)&&plain(a[k])?{...a[k],...v}:v;return out;}
+function merge(a,b,at=''){if(!plain(b))return a;const out={...a};for(const [k,v] of Object.entries(b)){if(!(k in a))continue;out[k]=OPEN.has(at+k)&&plain(v)?mergeOpen(plain(a[k])?a[k]:{},v):plain(a[k])&&plain(v)?merge(a[k],v,at+k+'.'):Array.isArray(v)?v.slice():v;}return out;}
 function freeze(v){if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.freeze(v);for(const x of Object.values(v))freeze(x);}return v;}
 const clone=v=>JSON.parse(JSON.stringify(v));
 /* only the kernel keys of a layer (an auto layer read from disk may carry stale or unknown keys: they are dropped, not errors) */
@@ -104,6 +106,9 @@ function profileFor(input={}){input=input||{};const hit=findGame(input);const ga
 const traceLine=p=>'profile '+p.gameKey+' match='+(p.match||'none')+' exe='+(p.exeSha256?p.exeSha256.slice(0,8):'-')+' layers='+p.layers+' engine='+p.engine+(p.rejected?' rejected='+p.rejected:'');
 /* a dotted key of a profile, with the fallback when the profile or the key is missing */
 function get(p,key,fallback){let v=p;for(const k of String(key).split('.')){if(v==null||typeof v!=='object')return fallback;v=v[k];}return v===undefined||v===null?fallback:v;}
+/* the language block of a profile for the source language the reader reads ('ja', 'en', 'zh-Hans' -> 'zh-Hans', else 'zh'), {} when the
+   profile has none: the caller then keeps the language-free settings */
+function forLang(p,tag){const L=p?.lang||{};const t=String(tag||'ja');return L[t]||L[t.split('-')[0]]||{};}
 /* the RegExps of choice.filters (bad sources are skipped) */
 function choiceFilters(p){const out=[];for(const src of get(p,'choice.filters',[]))try{out.push(new RegExp(String(src),'u'));}catch{}return out;}
-module.exports={DEFAULTS,OPEN,profileFor,merge,apply,known,engineId,matchScore,findGame,games,loadEngine,unknownKeys,traceLine,get,choiceFilters,reload,GENERIC_EXE,ENGINE_DIR,GAME_DIR};
+module.exports={DEFAULTS,OPEN,forLang,profileFor,merge,apply,known,engineId,matchScore,findGame,games,loadEngine,unknownKeys,traceLine,get,choiceFilters,reload,GENERIC_EXE,ENGINE_DIR,GAME_DIR};

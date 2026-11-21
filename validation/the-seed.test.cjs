@@ -24,7 +24,7 @@ test('every file of The Seed passes: format, keys and values, prints, folder nam
 test('check() refuses what a seed must not carry',()=>{
  const g={...GameDiff.build({key:'ab'.repeat(32),layer:'game',source:'official',mode:'hide',engine:'kirikiri',issuedAt:'',settings:{page:{holdMs:1}}}),status:'skeleton',slug:'some-game',builds:[]};
  assert.deepEqual(Seed.check(g,{engine:'kirikiri',slug:'some-game'}).errors,[]);
- for(const [bad,why] of [[{settings:{draw:{embed:true}}},'LAYER_KEYS'],[{settings:{page:{holdMs:-1}}},'SETTINGS'],[{prints:{exe:'a'.repeat(64)}},'exe prints'],[{exe:'C:\\Users\\me\\game.exe'},'path'],
+ for(const [bad,why] of [[{settings:{draw:{embed:true}}},'LAYER_KEYS'],[{settings:{page:{holdMs:-1}}},'out of its domain'],[{prints:{exe:'a'.repeat(64)}},'exe prints'],[{exe:'C:\\Users\\me\\game.exe'},'path'],
   [{status:'great'},'status'],[{status:'read'},'mode read'],[{slug:'other-game'},'folder'],[{signature:{alg:'ed25519',keyId:'k',value:'x'}},'not signed'],[{sourceLangs:['japanese!']},'sourceLangs'],[{match:{exe:['a/b.exe']}},'match']])
   assert.ok(Seed.check({...g,...bad},{engine:'kirikiri',slug:'some-game'}).errors.some(e=>e.includes(why)),why+' '+JSON.stringify(Seed.check({...g,...bad},{engine:'kirikiri',slug:'some-game'}).errors));
  const v={...GameDiff.build({key:'cd'.repeat(32),source:'official',engine:'kirikiri',issuedAt:'',settings:{draw:{embed:true}}})};
@@ -47,4 +47,25 @@ test('release, hot package and hot install carry The Seed/',()=>{
  assert.match(rel,/git ls-files --cached --others --exclude-standard core services web setup 'The Seed'\)/);assert.match(rel,/\^\(web\|services\|core\|setup\|The Seed\)\//);
  assert.match(fs.readFileSync(path.join(root,'services','hot-update.cjs'),'utf8'),/const ALLOWED=\/\^\(web\|services\|core\|setup\|The Seed\)\\\/\//);
  assert.equal(Seed.SEED_DIR,DIR,'MeguLit/core/profiles -> MeguLit/The Seed');
+});
+
+test('forward compatible: seedFormat and ext, unknown fields and unknown settings keys are ignored, known ones stay strict',()=>{
+ const g=JSON.parse(fs.readFileSync(path.join(DIR,'kirikiri','senren-banka','game.json'),'utf8')),where={engine:'kirikiri',slug:'senren-banka'};
+ const newer=Seed.check({...g,seedFormat:7,ext:{'en-learning':{anything:true}},laterField:{x:1},settings:{...g.settings,laterGroup:{k:1},page:{...g.settings.page,laterKey:true}}},where);
+ assert.deepEqual(newer.errors,[]);assert.deepEqual(newer.ignored.sort(),['laterField','settings.laterGroup.k','settings.page.laterKey'].sort());assert.ok(!('laterGroup' in newer.doc.settings));
+ assert.ok(Seed.check({...g,settings:{...g.settings,page:{...g.settings.page,holdMs:-1}}},where).errors.some(e=>e.includes('page.holdMs')),'a known key stays strict');
+ assert.ok(Seed.check({...g,ext:[1]},where).errors.some(e=>e.includes('ext')));assert.ok(Seed.check({...g,seedFormat:0},where).errors.some(e=>e.includes('seedFormat')));
+ const old={...g};delete old.seedFormat;delete old.sourceLangs;old.settings={...g.settings};delete old.settings.lang;assert.deepEqual(Seed.check(old,where).errors,[],'a seed written before the language blocks still reads');
+});
+
+test('languages: sourceLangs, settings.lang.<bcp47> per source language, pairing data per language pair',()=>{
+ const D=require('../core/profiles/domains.cjs');
+ assert.deepEqual(D.clean({lang:{ja:{annotation:'ruby',pairing:'patch'},en:{annotation:'ipa',fontFallback:['Noto Serif'],later:1},'zh-Hans':{annotation:'pinyin'}}}).value,{lang:{ja:{annotation:'ruby',pairing:'patch'},en:{annotation:'ipa',fontFallback:['Noto Serif']},'zh-Hans':{annotation:'pinyin'}}});
+ for(const bad of [{ja:{annotation:'kana'}},{'日本':{}},{ja:{fontFallback:['C:/x.ttf']}},{ja:{dictionary:'Bad Id'}}])assert.deepEqual(D.clean({lang:bad}).rejected,['lang'],JSON.stringify(bad));
+ assert.equal(D.layerOf('lang'),'game');
+ for(const g of Seed.seeds().games){assert.ok(Array.isArray(g.sourceLangs)&&g.sourceLangs.length,g.key);}
+ const s=Profiles.profileFor({exe:'D:/g/SenrenBanka.exe'});assert.deepEqual({...Profiles.forLang(s,'ja')},{annotation:'ruby'});assert.deepEqual(Profiles.forLang(s,'en'),{},'no block: the language-free settings apply');
+ const both=Profiles.profileFor({engine:'kirikiri',shared:{lang:{ja:{annotation:'ruby'}}},auto:{lang:{ja:{pairing:'machine'},en:{annotation:'ipa'}}}});
+ assert.deepEqual(JSON.parse(JSON.stringify(both.lang)),{ja:{annotation:'ruby',pairing:'machine'},en:{annotation:'ipa'}},'language blocks add up across layers');assert.deepEqual({...Profiles.forLang(both,'en-US')},{annotation:'ipa'});
+ const lines=JSON.parse(fs.readFileSync(path.join(root,'validation','fixtures','games','senren-banka','probe-fd37d708.lines.json'),'utf8'));assert.equal(lines.source,'ja');assert.equal(lines.target,'zh-Hans');
 });
