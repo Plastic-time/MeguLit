@@ -6,7 +6,8 @@ const cp=require('node:child_process'),{once}=require('node:events');
 test('a broken service pipe releases pending callers and stop still ends its child',async t=>{
  const spawn=cp.spawn;let child;
  t.mock.method(cp,'spawn',(file,_args,options)=>{
-  child=spawn(file,['-e','process.stdin.resume();setInterval(()=>{},1000)'],options);
+  assert.equal(options.windowsHide,true);
+  child=spawn(file,['-e','process.stdin.resume();setInterval(()=>{},1000)'],{...options,windowsHide:true});
   return child;
  });
  const service=require('./library-views-perf.cjs').startService(__dirname);

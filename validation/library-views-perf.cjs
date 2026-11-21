@@ -11,7 +11,7 @@ const arg=(name,fallback)=>{const i=process.argv.indexOf('--'+name);return i>0?p
 const OUT=path.resolve(arg('out',path.join(os.tmpdir(),'megulit-library-views')));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* ---------- services on a temp root ---------- */
-function startService(root){const child=spawn(process.execPath,[path.join(ROOT,'services','server.cjs')],{env:{...process.env,MEGULIT_ROOT:root},stdio:['pipe','pipe','ignore']});
+function startService(root){const child=spawn(process.execPath,[path.join(ROOT,'services','server.cjs')],{windowsHide:true,env:{...process.env,MEGULIT_ROOT:root},stdio:['pipe','pipe','ignore']});
  let next=1,buf='',closed;const waits=new Map();
  const finish=error=>{closed=error;for(const w of waits.values()){clearTimeout(w.timer);w.reject(error);}waits.clear();};
  child.once('error',finish);child.once('close',()=>finish(Error('SERVICE_CLOSED')));child.stdin.on('error',finish);
