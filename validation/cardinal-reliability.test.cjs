@@ -136,3 +136,11 @@ test('cleanup failure stops the whole queue and survives a scheduler restart',as
   Jobs._reset();const blocked=Jobs.kick(h.reader,'session-end',{manual:true,replay:async()=>{second++;}});assert.equal(blocked.state,'blocked');assert.equal(blocked.cleanupFailure.browserPid,123);assert.equal(second,0);
  }finally{release();h.close();}
 });
+
+
+test('unknown option translation instrumentation cannot upload a reliable relay vote',async()=>{
+ const h=setup(true),calls=[];try{
+  Jobs.kick(h.reader,'session-end',{manual:true,replay:async sc=>{const out=observed(sc),sample=out.samples[0];out.choiceOffers=[{at:sample.at,n:1,texts:['扉を開ける']}];sample.choices=[{sourceText:'扉を開ける',shown:true,pointer:'auto',rect:{x:1,y:1,w:20,h:10}}];return out;},fetcher:async u=>{calls.push(u);return {ok:true,status:200};}});await Jobs.idle();
+  const doc=Jobs.load(h.root,SHA);assert.equal(doc.unreliable,true);assert.equal(doc.detail.choiceObservation.reliable,false);assert.equal(doc.sent,false);assert.deepEqual(calls,[]);
+ }finally{h.close();}
+});

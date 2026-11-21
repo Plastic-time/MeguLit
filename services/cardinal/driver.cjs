@@ -69,7 +69,7 @@ let page=null;const early=[];
 const runtime=new Runtime(root,(channel,payload)=>{if(channel!=='reader-event')return;events.push({at:Date.now(),m:payload});
  /* the options core offered the reader (hookChoices), once per new set */
  /* core/hook-native.cjs notify({hookChoices:{items:[{text,x0,y0,x1,y1}],sw,sh,at,unboxed}}) or {hookChoices:null} */
- if(payload&&Object.prototype.hasOwnProperty.call(payload,'hookChoices')){const c=payload.hookChoices,items=Array.isArray(c)?c:Array.isArray(c?.items)?c.items:[];const k=JSON.stringify(items.map(x=>x?.text??x));if(k!==lastOffer&&offers.length&&offers.at(-1).until==null)offers.at(-1).until=Date.now();if(items.length&&k!==lastOffer)offers.push({at:Date.now(),n:items.length,until:null});lastOffer=items.length?k:'';}
+ if(payload&&Object.prototype.hasOwnProperty.call(payload,'hookChoices')){const c=payload.hookChoices,items=Array.isArray(c)?c:Array.isArray(c?.items)?c.items:[];const k=JSON.stringify(items.map(x=>x?.text??x));if(k!==lastOffer&&offers.length&&offers.at(-1).until==null)offers.at(-1).until=Date.now();if(items.length&&k!==lastOffer)offers.push({at:Date.now(),n:items.length,texts:items.map(x=>String(x?.text??x).slice(0,4000)),until:null});lastOffer=items.length?k:'';}
  if(page)page.evaluate(m=>window.__replayEvent(m),payload).catch(()=>{});else early.push(payload);});
 runtime.spawnReaderNative=()=>gwb;
 /* the tokenizer runtime is absent here and never installed (no pip / dictionary download from a replay): requests fail like an uninstalled one */

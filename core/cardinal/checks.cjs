@@ -124,10 +124,19 @@ function clears(run,t,ls){t=opts(t);const name=run.name||'run',steps=run.steps||
 
 /* choices: every set of options core offered the reader (o.choiceOffers: a reader event with hookChoices) is visible and clickable
    within choiceMs, or the game draws them itself (a KiriKiri choice frame the script keeps: o.krkr.choice ui 'choice') */
-function choices(run,t){t=opts(t);const name=run.name||'run',o=run.o,bad=[];let n=0,ok=0;
- for(const c of o.choiceOffers||[]){n++;const w=(o.samples||[]).filter(s=>s.at>=c.at&&s.at<=c.at+t.choiceMs);
-  const good=w.some(s=>{const sh=(s.choices||[]).filter(x=>x.shown&&x.rect&&x.rect.w>0);return sh.length>=Math.min(c.n||1,1)&&sh.every(x=>inside({rect:x.rect},s.hitRegions));});
-  if(good)ok++;else if(bad.length<6)bad.push(name+' @'+c.at+' '+(c.n||0)+' options offered, none visible and clickable');}
+function choices(run,t){t=opts(t);const name=run.name||'run',o=run.o,bad=[];let n=0,ok=0,unobserved=0;
+ const textKey=value=>String(value??'').normalize('NFKC').replace(/\s+/g,'');
+ for(const c of o.choiceOffers||[]){n++;
+  if(!Number.isSafeInteger(c.n)||c.n<1||!Number.isFinite(c.at)||c.until!=null&&(!Number.isFinite(c.until)||c.until<c.at)){bad.push(name+' invalid choice offer');unobserved++;continue;}
+  const expected=Array.isArray(c.texts)?c.texts:null;
+  if(expected&&(expected.length!==c.n||expected.some(text=>typeof text!=='string'||!textKey(text)))){bad.push(name+' invalid choice source texts');unobserved++;continue;}
+  const w=(o.samples||[]).filter(s=>s.at>=c.at&&s.at<=Math.min(c.at+t.choiceMs,c.until??Infinity));let measured=false;
+  const good=w.some(s=>{const sh=(s.choices||[]).filter(x=>x.shown);
+   const observed=sh.length>0&&sh.every(x=>typeof x.translationRequired==='boolean'&&(!expected||typeof x.sourceText==='string'));
+   if(observed)measured=true;if(sh.length!==c.n||!observed)return false;
+   return sh.every((x,i)=>x.rect&&['x','y','w','h'].every(key=>Number.isFinite(x.rect[key]))&&x.rect.w>0&&x.rect.h>0&&x.pointer!=='none'&&inside({rect:x.rect},s.hitRegions)&&(!expected||textKey(x.sourceText)===textKey(expected[i]))&&(!x.translationRequired||x.translationShown===true&&typeof x.translation==='string'&&!!x.translation.trim()));});
+  if(!measured&&w.some(s=>(s.choices||[]).some(x=>x.shown)))unobserved++;
+  if(good)ok++;else if(bad.length<6)bad.push(name+' @'+c.at+' '+c.n+' options not all visible, clickable, source-matched and translated when enabled');}
  /* the game's options were on screen (the window bridge found them: hook-events 'choice ocr found found=<n>', n >= 1; one choice's
     answers within choiceMs counted once) and the reader was never given any within choiceMs: options the player could not see.
     A locate that found nothing is not counted: core also asks about candidates that were never options (names, narration) */
@@ -136,7 +145,7 @@ function choices(run,t){t=opts(t);const name=run.name||'run',o=run.o,bad=[];let 
   /* given to the reader within choiceMs, or still there from before (the bridge reports one choice again and again) */
   if(offered.some(c=>c.at<=at+t.choiceMs&&(c.until==null||c.until>=at-200)))continue;n++;if(bad.length<6)bad.push(name+' @'+at+' options '+m[1].slice(0,60)+' never reached the reader');}
  for(const c of o.krkr?.choice||[]){n++;if(c.ui==='choice')ok++;else if(bad.length<6)bad.push(name+' '+c.mark+' choice frame not kept for the game');}
- return {bad,n,ok};}
+ return {bad,n,ok,unobserved,reliable:unobserved===0};}
 
 /* the original showing through: the bridge's own hide check (hookVisual stage=hidden, read back by core/self-check.cjs), a dialogue
    record the game drew visible while core's hide was on (o.hidden), and every line after the hide was given up or read mode came on */

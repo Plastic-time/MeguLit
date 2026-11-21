@@ -20,7 +20,7 @@ function run({lines=[],extra=[],hbSent=[],hookEvents=[],offers=[],choicesShown=t
   for(const e of extra)if(e.at>=at&&e.at<at+90)glyphs.push({text:e.text,kind:e.kind||'extra',rect:{x:100,y:e.y??600,w:100,h:30},color:[200,200,200],pointer:'none'});
   for(const o of l.also||[])glyphs.push({text:o.text,kind:'line',rect:{x:100,y:o.y,w:300,h:30},color:[255,255,255],pointer:'auto'});
   const s={at,mark:'tick',watch:true,body:'',hookSource:l.text,glyphs,cn:l.noCn?[]:[{text:'中文',rect:{x:100,y:y+40,w:300,h:30}}],choices:[],hitRegions:[{x:0,y:0,width:1920,height:1080}]};
-  for(const o of offers)if(choicesShown&&at>=o.at&&at<o.at+3000)s.choices.push({text:'選択',shown:true,rect:{x:500,y:300,w:200,h:40}});samples.push(s);}});
+  for(const o of offers)if(choicesShown&&at>=o.at&&at<o.at+3000)s.choices.push(...Array.from({length:o.n},(_,i)=>({sourceText:o.texts?.[i]||'選択'+i,text:'選択'+i,translation:'译文'+i,translationShown:true,translationRequired:true,pointer:'auto',shown:true,rect:{x:500,y:300+i*50,w:200,h:40}})));samples.push(s);}});
  const sourceEpisodes=[];for(const [step,st] of (sourceSteps||steps).entries())if(st.hb?.type==='hookSource')sourceEpisodes.push({step,line:st.line,text:st.hb.text,at:lines[sourceEpisodes.length].at});
  return {name:'r',steps,o:{t0:0,samples,sourceEpisodes,hbSent,hookEvents,choiceOffers:offers,hidden:hidden||{lines:0,visible:0},krkr:{choice:[]}}};}
 const clean3=()=>[{text:'あいうえお',at:0},{text:'かきくけこ',at:2000},{text:'さしすせそ',at:4000}];

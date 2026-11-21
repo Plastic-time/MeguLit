@@ -129,3 +129,7 @@ core/overlay-placement.cjs `rows()`：引擎按行报坐标的游戏，一句在
 runner 不以 `exit` 代替 `close`。停止先请求 driver 通过 IPC 正常收尾，超时才强停；taskkill 成功不能单独证明浏览器后代退出，重试还须 driver 写入 `cleanupComplete:true`；缺确认、浏览器关闭失败、目录清理失败或进程树停止失败，都会保留自有目录并在本机 `data/The Seed/cardinal/blocked.json` 记录 PID、路径与原因，暂停自动队列及后续 kick；未确认退出的后台注册也保留，后续 foreground 仍拒绝假称停止成功。核查进程与自有目录后再由维护者正常恢复，不自动删除标记或不断新开浏览器。非 Windows 强停缺少可靠的树退出确认，保守进入同一阻塞状态
 
 `validation/cardinal-background.test.cjs` 只做进程/传输边界故障注入，不启动 Edge；真实隐藏阅读层及游戏验收另行排队
+
+评分规则 rev5 要求一个 offer 的全部 n 个选项在该 offer 撤回前可见、可点击；有原文记录时须逐项匹配，启用翻译时每项译文须可见且非空。probe 分开记录日文（不混 ruby）、译文、指针与翻译开关。缺少翻译观测字段标 unobserved，不作为可靠上传；它证明页面状态，不证明译文语义正确，也不代替实机查看选项译文。选项数非法或源元数据不完整保守失败；没有选项的会话仍不计这一项
+
+`validation/cardinal-choice.test.cjs` 的完整选项是明确标注的 synthetic UI/transport 单元夹具；旧真实失败会话没有选项证据，仍保留原分数和未验收状态

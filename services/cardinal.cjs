@@ -68,10 +68,10 @@ async function go(job){const {root,key,rules,reader}=job;const started=Date.now(
  const result=Score.score({name:'session',steps,o,livePairing:job.pairing},rules);
  const rec=Score.record({key,seedRev:job.seedRev,source:job.source,app:appVersion(root),result,cardinalRev:rules.rev});
  /* Errors, a missing measured delivery clock, or excessive replay lag cannot supply a reliable relay vote. */
- const lag=o.lag||null,unreliable=!result.detail.timeline.reliable||errors.length>0||!!(lag&&lag.stepP95>(rules.maxLagMs??80));
+ const lag=o.lag||null,unreliable=!result.detail.timeline.reliable||!result.detail.choiceObservation.reliable||errors.length>0||!!(lag&&lag.stepP95>(rules.maxLagMs??80));
  const doc={record:rec,why:job.why,applies:result.applies,below:result.below,detail:result.detail,ms:Date.now()-started,lag,unreliable,errors,sent:false};
  try{save(root,key,doc);}catch{}
- trace(reader,'cardinal scored key='+key.slice(0,8)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' ')+(lag?' lagP95='+lag.stepP95:'')+(unreliable?(!result.detail.timeline.reliable?' unreliable (missing delivery clock): not uploaded':errors.length?' unreliable (replay errors): not uploaded':' unreliable (busy PC): not uploaded'):''));
+ trace(reader,'cardinal scored key='+key.slice(0,8)+' total='+rec.total+' lines='+rec.lines+' source='+rec.source+' seedRev='+(rec.seedRev||'-')+' '+Score.KEYS.map(k=>k+'='+rec.scores[k]).join(' ')+(lag?' lagP95='+lag.stepP95:'')+(unreliable?(!result.detail.choiceObservation.reliable?' unreliable (unobserved option state): not uploaded':!result.detail.timeline.reliable?' unreliable (missing delivery clock): not uploaded':errors.length?' unreliable (replay errors): not uploaded':' unreliable (busy PC): not uploaded'):''));
  if(unreliable)return doc;
  try{const r=await require('./auto-profile-feed.cjs').reportScore(root,rec,job.fetcher?{fetcher:job.fetcher}:{});doc.upload={state:r.state,...(r.status?{status:r.status}:{})};if(r.state==='sent')doc.sent=true;save(root,key,doc);}catch{}
  return doc;}
