@@ -5,7 +5,7 @@
 /* 2026-11-15 (user: 我游戏里有cv的例句怎么出来朗读还是ai合成？) a saved line passes its id: the voice kept when it was saved
    plays first (services/saved-line-voice.cjs). labelVoices() names each button before it is clicked: 「原声」 when the game
    voiced the line, the page's own 「朗读」 otherwise. */
-let current=null;
+let latest=0,current=null;
 const CSS='.cv-badge{display:inline-block;margin-left:6px;padding:0 5px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.04em;line-height:16px;vertical-align:middle;background:var(--mg-accent,#c04a5a);color:#fff}';
 const GAME={zh:['原声','游戏原声 · 这句台词的 CV'],ja:['原音声','ゲームの音声 · このセリフの CV'],en:['Game voice','The game\'s own voice for this line']};
 const locale=()=>{const l=String(document.documentElement.lang||'').toLowerCase();return l.startsWith('ja')?'ja':l.startsWith('en')?'en':'zh';};
@@ -22,6 +22,19 @@ export function markSource(button,source,estimated=false){if(!button)return;styl
 export async function labelVoices(api,buttons){const list=(buttons||[]).filter(x=>x?.button&&x.text);if(!list.length)return;
  try{const r=await api('sentence_voice_has',{items:list.map(x=>({id:x.id??null,text:String(x.text).slice(0,400)}))});(r?.has||[]).forEach((h,i)=>{if(list[i].button.isConnected)setLabel(list[i].button,!!h);});}catch{}}
 export async function playSentence(api,text,button,{id}={}){
- const r=await api('sentence_voice',{text:String(text||'').slice(0,400),...(id!==undefined&&id!==null?{id:Number(id)}:{})});
- current?.pause();const bytes=Uint8Array.from(atob(r.data),c=>c.charCodeAt(0));
- current=new Audio(URL.createObjectURL(new Blob([bytes],{type:r.mime||'audio/wav'})));markSource(button,r.source,r.estimated);await current.play();return r.source;}
+ const request=++latest;
+ if(current){current.audio.pause();current.release();}
+ try{
+  const r=await api('sentence_voice',{text:String(text||'').slice(0,400),...(id!==undefined&&id!==null?{id:Number(id)}:{})});
+  if(request!==latest)return;
+  const bytes=Uint8Array.from(atob(r.data),c=>c.charCodeAt(0)),audio=new Audio();
+  const url=URL.createObjectURL(new Blob([bytes],{type:r.mime||'audio/wav'}));
+  const release=()=>{if(current?.audio===audio){current=null;URL.revokeObjectURL(url);}};
+  current={audio,release};
+  audio.addEventListener('ended',release,{once:true});audio.addEventListener('error',release,{once:true});
+  audio.src=url;markSource(button,r.source,r.estimated);
+  await audio.play();return r.source;
+ }catch(error){
+  if(request!==latest)return;
+  current?.release();throw error;
+ }}
