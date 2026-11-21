@@ -123,8 +123,8 @@ test('web path wiring: the RPG Maker reader rides along, asks go to onAsk, confi
  await p.drawConfig({roles:true,embed:true,zh:true});await p.drawConfig({roles:true,embed:true,zh:true});
  assert.equal(evals.filter(j=>j.includes('__megulitRpgm.config({"roles":true,"embed":true,"zh":true})')).length,1,'sent once per change');
  await p.drawEmbed('今日は',{ruby:[[0,2,'きょう']],zh:'今天'});assert.ok(evals.at(-1).includes('__megulitRpgm.embed("今日は",{"ruby":[[0,2,"きょう"]],"zh":"今天"})'));
- const prof=require('../core/profiles/index.cjs');assert.deepEqual(prof.profileFor({engine:'RPG Maker MV/MZ'}).draw,{roles:true,advhdInput:false,embed:true,embedTranslation:true,engineTable:null,viaRoles:[]},'RPG Maker enables its existing rendering only; AdvHD diagnostics remain off');
- assert.deepEqual(prof.profileFor({engine:'KiriKiri'}).draw,{roles:false,advhdInput:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]});
+ const prof=require('../core/profiles/index.cjs');assert.deepEqual(prof.profileFor({engine:'RPG Maker MV/MZ'}).draw,{roles:true,advhdInput:false,cmvsInput:false,fvpInput:false,embed:true,embedTranslation:true,engineTable:null,viaRoles:[]},'RPG Maker enables its existing rendering only; AdvHD diagnostics remain off');
+ assert.deepEqual(prof.profileFor({engine:'KiriKiri'}).draw,{roles:false,advhdInput:false,cmvsInput:false,fvpInput:false,embed:false,embedTranslation:true,engineTable:null,viaRoles:[]});
 });
 
 test('MZ: text drawn in buffered runs (flushTextState) still gives one box per character; rows use the window line height',()=>{
