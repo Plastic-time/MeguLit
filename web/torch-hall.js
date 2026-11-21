@@ -118,6 +118,22 @@ export function buildStele({scene,keep,tier}){const low=tier==='low',Q=low?.5:1,
   { const L=SW+.7;let y=POST_Y;const part=(w,h,d,r,m=baseMat)=>{mesh(rbox(w,h,d,r),m,0,y+h/2,0);y+=h;};
    part(L+.5,.2,1.2,.02);part(L+.3,.07,1.04,.03);part(L+.2,.06,.98,.025);
    const dieH=BASE_Y-POST_Y-(.2+.07+.06)-(.06+.07+.1);part(L,dieH,.86,.012);
+   /* one continuous carved vine frieze along both faces of the die, gilt fillets above and below, and a single medallion with a gilt
+      flame in the middle of the front (the only accent, so nothing repeats as boxes) */
+   { const cy=y-dieH/2,fh=dieH*.58,rel=maps('relief',()=>relief(2048*Q,256*Q,5));
+     const carvedB=keep(new THREE.MeshStandardMaterial({map:T(rel.map),normalMap:T(rel.normal,false),color:0xe8e0d2,roughness:.7,metalness:0,envMapIntensity:.4}));
+     carvedB.map.repeat.set((L-.3)/(fh*8),1);carvedB.normalMap.repeat.set((L-.3)/(fh*8),1);
+     for(const fz of [-1,1]){const z=fz*.432,ry=fz<0?Math.PI:0;
+      const f=new THREE.Mesh(keep(new THREE.PlaneGeometry(L-.3,fh)),carvedB);f.position.set(0,cy,z);f.rotation.y=ry;f.receiveShadow=true;stele.add(f);
+      for(const dy of [fh/2+.015,-fh/2-.015])mesh(new THREE.BoxGeometry(L-.26,.018,.016),gilt,0,cy+dy,z,false);}
+     /* medallion: a gilt ring around a dark stone disc carrying a small gilt flame */
+     const mr=dieH*.36,mz=.436;
+     const disc=new THREE.Mesh(keep(new THREE.CylinderGeometry(mr,mr,.02,48).rotateX(Math.PI/2)),keep(new THREE.MeshPhysicalMaterial({color:0x1a1222,roughness:.25,metalness:0,clearcoat:low?0:.8,clearcoatRoughness:.08})));disc.position.set(0,cy,mz);stele.add(disc);
+     mesh(new THREE.TorusGeometry(mr,.022,10,48),gilt,0,cy,mz+.01,false);mesh(new THREE.TorusGeometry(mr*1.16,.012,8,48),gilt,0,cy,mz+.006,false);
+     const fs=new THREE.Shape(),k=mr*.62;fs.moveTo(0,-k*.95);fs.bezierCurveTo(k*.75,-k*.9,k*.85,-k*.1,k*.28,k*.35);fs.bezierCurveTo(k*.38,k*.05,k*.2,-k*.15,k*.12,k*.05);
+     fs.bezierCurveTo(k*.2,k*.45,k*.05,k*.75,0,k*1.05);fs.bezierCurveTo(-k*.08,k*.7,-k*.3,k*.5,-k*.18,k*.15);fs.bezierCurveTo(-k*.32,k*.3,-k*.45,k*.15,-k*.4,-k*.05);
+     fs.bezierCurveTo(-k*.9,-k*.25,-k*.7,-k*.9,0,-k*.95);
+     const fl=new THREE.ExtrudeGeometry(fs,{depth:.012,bevelEnabled:true,bevelThickness:.006,bevelSize:.006,bevelSegments:2,curveSegments:16});mesh(fl,gilt,0,cy-k*.05,mz+.01,false);}
    part(L+.1,.06,.94,.02);part(L+.2,.07,1.0,.03,inlayRed);part(L+.3,.1,1.06,.035);}
  const s=new THREE.Shape(),w=SW,h=SH,b=.04;s.moveTo(-w/2+b,-h/2);s.lineTo(w/2-b,-h/2);s.quadraticCurveTo(w/2,-h/2,w/2,-h/2+b);s.lineTo(w/2,h/2-b);s.quadraticCurveTo(w/2,h/2,w/2-b,h/2);
  s.lineTo(-w/2+b,h/2);s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-b);s.lineTo(-w/2,-h/2+b);s.quadraticCurveTo(-w/2,-h/2,-w/2+b,-h/2);
@@ -300,7 +316,7 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  add(new THREE.TorusGeometry(R+.02,.16,8,64,Math.PI).rotateX(Math.PI/2),smooth,[0,SP+.08,BACK],[0,Math.PI,0]);
  add(new THREE.SphereGeometry(R,64,24,Math.PI,Math.PI,0,Math.PI/2),halfMat,[0,SP+.1,BACK]);
  { const ribs=[];for(let i=1;i<APSE_N;i++)ribs.push([0,SP+.1,BACK,Math.PI/2+i/APSE_N*Math.PI]);
-   const rib=new THREE.TorusGeometry(R-.06,.11,6,40,Math.PI/2).rotateY(Math.PI/2);inst(rib,gilt,ribs.map(p=>[p[0],p[1],p[2],p[3]-Math.PI]),{cast:false});}
+   const rib=new THREE.TorusGeometry(R-.08,.15,8,64,Math.PI/2).rotateY(Math.PI/2);inst(rib,gilt,ribs.map(p=>[p[0],p[1],p[2],p[3]-Math.PI]),{cast:false});}
  windows.east={list:east};
 
  /* ---- the crossing: pendentives carry a ring; on it a drum of sixteen arched windows with paired pilasters; a ribbed, coffered dome
@@ -328,7 +344,7 @@ attribute vec3 aPat;`).replace('#include <uv_vertex>',`#include <uv_vertex>
  const DOME_Y=DRUM_Y+DRUM_H+.25,EYE=1.6,th0=Math.asin(EYE/R);
  add(new THREE.SphereGeometry(R+.05,96,40,0,Math.PI*2,th0,Math.PI/2-th0),domeMat,[0,DOME_Y,BAYZ]);
  { const ribs=[];for(let i=0;i<DRUM_N;i++)ribs.push([0,DOME_Y,BAYZ,i/DRUM_N*Math.PI*2]);
-   inst(new THREE.TorusGeometry(R-.04,.13,6,48,Math.PI/2-th0).rotateY(Math.PI/2),smooth,ribs.map(p=>[p[0],p[1],p[2],p[3]+Math.PI/2]),{cast:true});}
+   inst(new THREE.TorusGeometry(R-.06,.17,8,64,Math.PI/2-th0).rotateY(Math.PI/2),smooth,ribs.map(p=>[p[0],p[1],p[2],p[3]+Math.PI/2]),{cast:true});}
  /* the eye and the lantern above it: a ring, eight slit windows, a small dome */
  const EYE_Y=DOME_Y+Math.cos(th0)*R;
  add(new THREE.TorusGeometry(EYE+.05,.16,10,48).rotateX(Math.PI/2),gilt,[0,EYE_Y,BAYZ],null,{cast:false});

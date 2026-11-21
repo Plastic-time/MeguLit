@@ -17,6 +17,7 @@ import {RenderPass} from './vendor/three/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from './vendor/three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from './vendor/three/addons/postprocessing/OutputPass.js';
 import {ShaderPass} from './vendor/three/addons/postprocessing/ShaderPass.js';
+import {SMAAPass} from './vendor/three/addons/postprocessing/SMAAPass.js';
 import {rng,canvas2d,glowSprite} from './torch-textures.js';
 import {buildHall,buildStele,HALL} from './torch-hall.js';
 import {loadBaked,bakedAO,computeVolumes,applyAO} from './torch-bake.js';
@@ -416,12 +417,13 @@ function buildScene({host,canvas,state,t,tier,reduced,gsap,onTier,bakeInfo=null}
   { const size=renderer.getDrawingBufferSize(new THREE.Vector2());
    composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(size.x,size.y,{type:THREE.HalfFloatType}));
    for(const t of [composer.renderTarget1,composer.renderTarget2])t.depthTexture=new THREE.DepthTexture(size.x,size.y);
-   /* RenderPass writes into renderTarget2 (the read buffer; an even number of swaps per frame on the full tier) */
-   if(!low)composer.renderTarget2.samples=4;
+   /* with SMAA the passes swap an odd number of times on the full tier, so the scene lands in either target: both get MSAA */
+   if(!low){composer.renderTarget1.samples=4;composer.renderTarget2.samples=4;}
    composer.addPass(new RenderPass(scene,camera));
    vol=new VolumetricPass({camera,light:H.sun,box:{min:[-14.5,0,-17.4],max:[14.5,38,40]},scale:low?.25:.5,steps:low?24:48});composer.addPass(vol);if(aoUni)vol.setVolumes(aoUni);
    if(!low){bloom=new UnrealBloomPass(new THREE.Vector2(512,512),.5,.65,.85);composer.addPass(bloom);grade=new ShaderPass(GRADE);composer.addPass(grade);}
-   composer.addPass(new OutputPass());}
+   /* SMAA last, on the display-encoded image: thin gilt ribs and coffer edges stay clean (on top of MSAA on the full tier) */
+   composer.addPass(new OutputPass());composer.addPass(new SMAAPass(size.x,size.y));}
   resize();queuePaint();}
 
  /* ---- view ---- */
