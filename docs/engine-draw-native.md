@@ -119,11 +119,23 @@
 
 现在的签名（每个都在店主本机文件上正好命中 count 次，在其他引擎的文件里不命中）：
 
+### 给其他逆向会话：GDI 类引擎直接加签名，不要各写一套钩子
+BGI、Siglus 等只要画字最终经过 TextOut / ExtTextOut / DrawText / GetGlyphOutline（A 或 W），就复用 DrawSites：
+1. **找点**：`node tools/engine-sigs/draw-sites.cjs <exe或dll>` 不带签名时没输出；先用 `node tools/engine-sigs/slot-refs.cjs <文件>` 看这个 API 的 IAT 槽**所有**引用（`FF 15 槽` 是直接调用，`8B xx 槽` 是先装进寄存器，后者要用 SLOT 形式），再对每个点反汇编看是哪一个例程
+2. **写一行签名**（`native/megulithook/DrawSitesSig.h` 表里，前面写注释：游戏、文件、地址、例程是什么）：`{ "id", "模块（空=exe）", "API", "调用前的字节，版本间会变的写 ??", 应命中次数, frame }`
+   - 直接调用：模式就是 `FF 15` 前面的字节
+   - 经寄存器：模式里放 `SLOT`（那 4 字节必须是该 API 的 IAT 槽），站点是模式后紧跟的 `call reg`；MinHook 会连后面一条指令一起搬，别签在跳转目标前
+   - frame：例程有 EBP 帧写 1；没有帧写「从 API 第一个参数到例程返回地址的字节数」= 序言的栈深（SEH、sub esp、压的寄存器）+ 4×API 参数个数，用例程在两个不同栈深读同一个参数来核对；不知道写 0（没有 via / fargs）
+3. **夹具**：在 `validation/fixtures/engine-sigs/draw-sites-files.json` 加 `{"id","name","path"}`（店主本机文件，只读），跑 `node tools/engine-sigs/draw-sites-fixture.cjs`，生成 JSON 夹具和 `selftest/drawsites-snippets.h`
+4. **测**：`node --test validation/engine-draw-sig-sites.test.cjs`（正好命中 count 次、在普查里别的引擎文件中不命中；新引擎的文件也加进 OTHERS）+ `native/megulithook/selftest/run.cmd`（C++ 匹配器 + 运行时门）
+5. **店主测试清单**：照上面 AVG32 那条写，行里是 `engine=<id>`
+运行时不用改：`DrawSites::Arm()` 在 checkengine 开头对所有签名都找一遍，DLL 晚加载也会重找；64 位见下（x64 门在做）。签名的 id 就是记录里的 engine=，同一引擎多条用 `<引擎>-<用途>`
+
 ### ReaLive / AVG32（涙 ～流星のザドル～）
 - 点：AVG3216D.EXE 0x413880，例程 0x413730（把一串字画进文字 DIB，一字一次 `TextOutA(hdc, x - 滚动, y, 字, 1|2)`，有 EBP 帧，5 个调用者）。x / y 就是画布笔位
 - 另一个 TextOutA（0x41f888）在设置对话框里，不签
 - 店主测试清单：
-  1. 写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`），或在 The Seed 里给这部游戏的差分设 `"draw":{"roles":true}`
+  1. 在 The Seed 里给这部游戏的差分设 `"draw":{"roles":true}`，hook-native 会写出控制文件（c7601aa8 起 pid 取对了）。手写 `%TEMP%\MeguLit\draw\<游戏pid>.txt`（UTF-16LE，内容 `#cfg roles=1`）只是兜底
   2. 开游戏推 5 句、出一次选项
   3. `logs\hook-diagnostics.log` 里先有 `ToMe_DRAWRUN engine=avg32 found: 1 site(s) of TextOutA` 和 `on: site 0`，之后每句有 `ToMe_DRAWRUN engine=avg32 site=0 ... text=` 带这句的文字；名字和选项各自 via 不同
   4. 游戏照常显示、不卡、不崩 = 过。只有 `off: N sites match` = 这个版本签名没对上，把那行和 exe 发来
