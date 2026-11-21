@@ -125,7 +125,8 @@ function relinkGames(db){
 const parse=text=>{try{const v=JSON.parse(text||'{}');return v&&typeof v==='object'?v:{};}catch{return {};}};
 const wordKey=(spelling,reading)=>String(spelling)+'\t'+String(reading);
 function fitExamples(data,cap){while(data.examples.length&&bytes(data)>cap)data.examples.pop();if(bytes(data)>cap)delete data.entry;return data;}
-function unionExamples(a=[],b=[]){const seen=new Map();for(const e of [...a,...b])if(e&&typeof e.text==='string'&&!seen.has(e.text))seen.set(e.text,e);return [...seen.values()].sort((x,y)=>(y.created_at||0)-(x.created_at||0)).slice(0,20);}
+const exampleKey=(text,game)=>JSON.stringify([text,cleanTitle(game).toLowerCase()]);
+function unionExamples(a=[],b=[]){const seen=new Map();for(const e of [...a,...b])if(e&&typeof e.text==='string'){const key=exampleKey(e.text,e.game);if(!seen.has(key))seen.set(key,e);}return [...seen.values()].sort((x,y)=>(y.created_at||0)-(x.created_at||0)).slice(0,20);}
 
 const kinds={
  words:{
@@ -161,8 +162,8 @@ const kinds={
     const original=JSON.stringify({sync:true,...(d.entry&&typeof d.entry==='object'?{entry:d.entry}:{})});
     id=Number(db.prepare('INSERT INTO vocabulary(id,spelling,reading,definitions,status,created_at,original) VALUES(?,?,?,?,?,?,?)').run(free?d.entryId:null,String(d.spelling??spelling),String(d.reading??reading),definitions,status,Number(d.created_at)||Math.floor(ctx.now()/1000),original).lastInsertRowid);
    }else db.prepare('UPDATE vocabulary SET definitions=?,status=? WHERE id=?').run(definitions,status,id);
-   const games=gameByTitle(db),have=new Set(db.prepare('SELECT text FROM examples WHERE word_id IN ('+[id,...rows.slice(1).map(r=>r.id)].join(',')+')').all().map(r=>r.text));
-   for(const e of Array.isArray(d.examples)?d.examples:[]){if(typeof e?.text!=='string'||have.has(e.text))continue;have.add(e.text);
+    const games=gameByTitle(db),have=new Set(db.prepare('SELECT e.text,e.original,g.title FROM examples e LEFT JOIN games g ON g.id=e.game_id WHERE e.word_id IN ('+[id,...rows.slice(1).map(r=>r.id)].join(',')+')').all().map(e=>exampleKey(e.text,e.title||syncedTitle(e.original))));
+    for(const e of Array.isArray(d.examples)?d.examples:[]){if(typeof e?.text!=='string')continue;const key=exampleKey(e.text,e.game);if(have.has(key))continue;have.add(key);
     db.prepare('INSERT INTO examples(word_id,game_id,text,translation,highlight_start,highlight_end,created_at,original) VALUES(?,?,?,?,?,?,?,?)').run(id,games.get(String(e.game||'').toLowerCase())||null,e.text.slice(0,4000),String(e.translation||''),Number(e.start)||0,Number(e.end)||0,Number(e.created_at)||Math.floor(ctx.now()/1000),syncOriginal(e.game));}
   }
  },

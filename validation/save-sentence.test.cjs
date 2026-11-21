@@ -24,6 +24,77 @@ test('saving a line keeps one row per game and original text, and fills a missin
  }finally{db.close();}
 });
 
+test('identical saved lines only list words collected from the same game',t=>{
+ const db=openStore(temp(t)),line='明日は晴れる。';
+ try{
+  const word=db.prepare("INSERT INTO vocabulary(id,spelling,reading,definitions,created_at,original) VALUES(?,?,'','[]',1,'{}')");
+  const example=db.prepare("INSERT INTO examples(word_id,game_id,text,original) VALUES(?,?,?,'{}')");
+  for(const [id,game,spelling] of [[1,'a','明日'],[2,'b','晴れる'],[3,null,'は']]){
+   saved.save(db,{gameId:game,text:line});
+   word.run(id,spelling);
+   example.run(id,game,line);
+  }
+  example.run(2,'a','別の文。');
+  example.run(1,'a',line);
+  db.prepare('INSERT INTO examples(word_id,game_id,text,original) VALUES(2,NULL,?,?)').run(line,JSON.stringify({sync:true,game:'Élan'}));
+  const rows=saved.list(db);
+  assert.deepEqual(rows.map(r=>[r.game_id,r.words.map(w=>w.id)]),[[null,[3]],['b',[2]],['a',[1]]]);
+  db.prepare('UPDATE saved_sentences SET original=? WHERE game_id IS NULL').run(JSON.stringify({sync:true,game:'élan'}));
+  assert.deepEqual(saved.list(db)[0].words.map(w=>w.id),[2]);
+  assert.equal(saved.state(db,{gameId:null,text:line}).saved,false);
+  assert.equal(saved.save(db,{gameId:null,text:line}).created,true);
+  require('../services/learning-insights.cjs').saveWord(db,{id:2},{gameId:null,text:line});
+  const pending=saved.list(db).filter(r=>r.game_id==null);
+  assert.deepEqual(pending.map(r=>r.words.map(w=>w.id)),[[3,2],[2]]);
+ }finally{db.close();}
+});
+
+test('mining and syncing the same word in the same line keeps one example per game',async t=>{
+ const root=temp(t),db=openStore(root),reader=new Reader({root,folder:path.join(root,'data','config')});
+ const entry={id:8,spellings:['明日'],readings:['あした']},ctx={now:Date.now};
+ const saveWord=require('../services/learning-insights.cjs').saveWord;
+ const sql=(command,query,values)=>require('../services/legacy-reader-sql.cjs').request(root,'plugin:sql|'+command,{db:'sqlite:immersion.db',query,values});
+ const check='SELECT id FROM word_sentences WHERE word_id = $1 AND sentence_text = $2 AND media_id IS $3';
+ const insert='INSERT INTO word_sentences (word_id,sentence_text,highlight_start,highlight_end,media_id) VALUES ($1,$2,$3,$4,$5)';
+ try{
+  db.exec("INSERT INTO games(id,title,legacy_id) VALUES('a','First',1),('b','Second',2)");
+  for(const [game,media] of [['a',1],['b',2],[null,null]]){
+   reader.gameId=game;
+   for(let i=0;i<2;i++){
+    await reader.mine({entry,args:{text:'明日は晴れ。'},noteId:1});
+    saveWord(db,entry,{gameId:game,text:'明日は雨。'});
+    assert.equal(sql('select',check,[8,'明日は雪。',media]).length,i);
+    assert.equal(sql('execute',insert,[8,'明日は雪。',0,2,media]).rowsAffected,1-i);
+   }
+  }
+  assert.deepEqual(saved.list(db).map(r=>r.words.map(w=>w.id)),[[8],[8],[8]]);
+  const [record]=kinds.words.collect(db).values();
+  assert.equal(record.examples.length,9);
+  db.exec('DELETE FROM examples');
+  for(let i=0;i<2;i++)kinds.words.apply(db,'明日\tあした',{data:record},root,ctx);
+  const rows=db.prepare('SELECT game_id,COUNT(*) n FROM examples GROUP BY game_id ORDER BY game_id').all();
+  assert.deepEqual(rows.map(r=>[r.game_id,r.n]),[[null,3],['a',3],['b',3]]);
+ }finally{db.close();}
+});
+
+test('the Anki callback schedules sync without re-mining a word saved by the host',async t=>{
+ const root=temp(t),delays=[],window={__TAURI_INTERNALS__:{invoke:(command,args)=>{
+  return require('../services/legacy-reader-sql.cjs').request(root,command,args);
+ }}};
+ const context={window,history:{pushState(){},replaceState(){}},location:{hostname:'tauri.localhost',pathname:'/'},localStorage:{getItem:()=>null},
+  document:{documentElement:{},body:{},head:{append(){}},createElement:()=>({})},addEventListener(){},
+  setTimeout:(f,ms)=>delays.push(ms),clearTimeout(){},setInterval(){},console};
+ require('node:vm').runInNewContext(fs.readFileSync(path.join(ROOT,'web/reader/modules/anki-sync.js'),'utf8'),context);
+ const entry={id:5,spellings:['晴れ'],readings:['はれ']},args={text:'明日は晴れ。'};
+ await window.__tomeAnkiMined({entry,args,noteId:8,wordMined:true});
+ assert.equal(delays.at(-1),4000);
+ const afterHost=openStore(root);
+ try{assert.equal(afterHost.prepare('SELECT COUNT(*) n FROM examples').get().n,0);}finally{afterHost.close();}
+ await window.__tomeAnkiMined({entry,args,noteId:8});
+ const db=openStore(root);
+ try{assert.deepEqual({...db.prepare('SELECT game_id,text FROM examples').get()},{game_id:null,text:args.text});}finally{db.close();}
+});
+
 test('the reader saves the shown line for the attached game and toggles it off again',async t=>{
  const root=temp(t),events=[];
  const runtime={root,folder:path.join(root,'data','config'),emit:(name,payload)=>events.push(payload),config:()=>({}),learning:()=>({installed:()=>true})};
