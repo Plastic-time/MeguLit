@@ -126,7 +126,7 @@ function launchHarness(mode,existing,{stopError=false}={}){
  const calls=[],source=fs.readFileSync(path.join(__dirname,'../services/bridge.cjs'),'utf8'),body=source.slice(source.indexOf('async function launch('),source.indexOf('\nfunction deleteWord'));
  const game={id:'g',executable:'H:/fake/中文版.exe',original:'{"library":{}}'},db={prepare(sql){return {get(){return sql.includes('SELECT original')?{original:'{}'}:game;},run(){calls.push('db-update');}};}};
  const modules={
-  '../core/library-mode.cjs':{libraryOnly:()=>mode},'./import-source.cjs':{backfill(){},targetOf:()=>''},
+  '../core/library-mode.cjs':{libraryOnly:()=>mode},'../core/profiles/index.cjs':require('../core/profiles/index.cjs'),'./import-source.cjs':{backfill(){},targetOf:()=>''},
   './background-games.cjs':{foreground:async()=>calls.push('foreground'),unmute:async()=>calls.push('unmute')},
   './embedded-japanese-jobs.cjs':require('../services/embedded-japanese-jobs.cjs'),
   '../core/steam-owned.cjs':{launchAppid:()=>'',partOf:()=>null},'./game-language.cjs':{originalExecutable:()=>{calls.push('jp-check');return {blocked:false};}},
