@@ -6,8 +6,28 @@ const WORDS={
 };
 const PHASES=new Set(['idle','scanning','cancelling','cancelled','preview','confirm','applying','applied','error']);
 const ERROR_ALIASES={SCAN_STALE:'JP_SCAN_SOURCE_CHANGED',EMBEDDED_UNSUPPORTED:'JP_SCAN_UNSUPPORTED',EMBEDDED_CONFLICT:'JP_SCAN_SOURCE_CHANGED'};
+Object.assign(WORDS.zh,{sources:'已检查的游戏文件'});Object.assign(WORDS.en,{sources:'Checked game files'});Object.assign(WORDS.ja,{sources:'確認したゲームファイル'});
+Object.assign(WORDS.zh,{refresh:'重新查询进度',undoing:'正在还原，请等待完成后再关闭'});Object.assign(WORDS.en,{refresh:'Check progress again',undoing:'Undoing; wait for completion before closing'});Object.assign(WORDS.ja,{refresh:'進行状況を再確認',undoing:'元に戻しています。完了するまで閉じないでください'});
+Object.assign(WORDS.zh,{unknown:'任务未完成，请重新查询进度或查看诊断日志'});Object.assign(WORDS.en,{unknown:'The task did not finish; check progress again or consult the diagnostic log'});Object.assign(WORDS.ja,{unknown:'処理が完了していません。進行状況または診断ログを確認してください'});
 export const originalScanWords=locale=>WORDS[locale]||WORDS.zh;
 const count=value=>Number.isSafeInteger(value)&&value>=0&&value<=1000000000;
+const byteCount=value=>Number.isSafeInteger(value)&&value>=0;
+
+/* Only the documented embedded-scan result is accepted; a file path never becomes a client scan argument */
+export function normalizeOriginalScanPreview(result){
+ const fail=code=>{throw Error(code);};
+ if(!result||typeof result!=='object')fail('ORIGINAL_SCAN_PROTOCOL');
+ if(result.state==='unsupported')fail('EMBEDDED_UNSUPPORTED');
+ if(result.state==='stale')fail('SCAN_STALE');
+ if(!['restorable','applied'].includes(result.state)||result.adapter!=='utage-embedded')fail('ORIGINAL_SCAN_PROTOCOL');
+ const c=result.coverage;
+ if(!c||!['japaneseLines','localTranslations','missingTranslations'].every(k=>count(c[k]))||c.localTranslations+c.missingTranslations!==c.japaneseLines)fail('ORIGINAL_SCAN_PROTOCOL');
+ if(typeof result.canRestore!=='boolean'||result.canRestore&&(typeof result.scanToken!=='string'||!result.scanToken||result.scanToken.length>512))fail('ORIGINAL_SCAN_PROTOCOL');
+ if(!Array.isArray(result.sources)||result.sources.length>128||!result.sources.length)fail('ORIGINAL_SCAN_PROTOCOL');
+ const sources=result.sources.map(s=>{if(!s||typeof s.path!=='string'||!s.path||s.path.length>4096||!Number.isSafeInteger(s.bytes)||s.bytes<0||typeof s.sha256!=='string'||!/^[0-9a-f]{64}$/i.test(s.sha256))fail('ORIGINAL_SCAN_PROTOCOL');return Object.freeze({path:s.path,bytes:s.bytes,sha256:s.sha256});});
+ return Object.freeze({state:result.state,japanese:c.japaneseLines,local:c.localTranslations,missing:c.missingTranslations,
+  canRestore:result.state==='restorable'&&result.canRestore,scanToken:result.canRestore?result.scanToken:'',sources:Object.freeze(sources)});
+}
 
 /* Counts arrive through a backend adapter; malformed totals never become an actionable preview */
 export function originalScanPresentation(state={},locale='zh'){
@@ -15,40 +35,131 @@ export function originalScanPresentation(state={},locale='zh'){
  const p=state.preview,valid=!!p&&count(p.japanese)&&count(p.local)&&count(p.missing)&&p.local+p.missing===p.japanese;
  const hasGame=typeof state.gameId==='string'&&state.gameId.length>0;
  const ready=valid&&p.japanese>0&&p.local>0&&p.canRestore===true;
+ const showResult=valid&&['preview','confirm','applying','applied'].includes(phase),writing=state.operation==='restore'||state.operation==='undo';
  const progress=state.progress;
  const knownProgress=!!progress&&count(progress.done)&&count(progress.total)&&progress.total>0&&progress.done<=progress.total;
- return {phase,lead:t.lead,status:phase==='error'?(t.errors[ERROR_ALIASES[state.error]||state.error]||t.unknown):t[phase]||t.unknown,
-  showCounts:valid&&['preview','confirm','applying','applied'].includes(phase),counts:valid?[p.japanese,p.local,p.missing]:[],
-  localNote:valid&&p.local>0?t.localNote:valid?t.noLocal:'',missingNote:valid&&p.missing>0?t.missingNote:'',
-  canScan:hasGame&&!['scanning','cancelling','applying'].includes(phase),canCancel:['scanning','cancelling'].includes(phase),
+ return {phase,lead:t.lead,status:phase==='error'?(t.errors[ERROR_ALIASES[state.error]||state.error]||t.unknown):phase==='idle'&&!hasGame?t.pick:phase==='applying'&&state.operation==='undo'?t.undoing:t[phase]||t.unknown,
+  showCounts:showResult,counts:valid?[p.japanese,p.local,p.missing]:[],
+  localNote:showResult&&p.local>0?t.localNote:showResult?t.noLocal:'',missingNote:showResult&&p.missing>0?t.missingNote:'',
+  canScan:hasGame&&!['scanning','cancelling','applying'].includes(phase)&&!(writing&&state.pendingJob),canCancel:!writing&&(state.pendingJob||['scanning','cancelling'].includes(phase))&&state.cancellable!==false,
   cancelPending:phase==='cancelling',showRestore:phase==='preview',canRestore:hasGame&&ready&&phase==='preview',
   showConfirm:phase==='confirm',canConfirm:hasGame&&ready&&phase==='confirm',
   blockedNote:phase==='preview'&&!ready?(valid&&p.local===0?t.noLocal:t.notReady):'',
-  progressVisible:['scanning','cancelling'].includes(phase),progressValue:knownProgress?Math.floor(progress.done*100/progress.total):null,
-  progressText:knownProgress?progress.done.toLocaleString(locale)+' / '+progress.total.toLocaleString(locale):t.wait,
-  closeAllowed:phase!=='applying'};
+  progressVisible:['scanning','cancelling','applying'].includes(phase),progressValue:knownProgress?Math.floor(progress.done*100/progress.total):null,
+  progressText:knownProgress?progress.done.toLocaleString(locale)+' / '+progress.total.toLocaleString(locale):progress&&(progress.file||byteCount(progress.bytes))?[progress.file?.split(/[/\\]/).pop(),byteCount(progress.bytes)?progress.bytes.toLocaleString(locale)+' B':''].filter(Boolean).join(' · '):t.wait,
+  closeAllowed:phase!=='applying'&&!(writing&&state.pendingJob)};
+}
+
+export function createOriginalScanController({api,onChange=()=>{},onApplied=()=>{},onRefreshError=()=>{},schedule=setTimeout,unschedule=clearTimeout,pollMs=400}={}){
+ if(typeof api!=='function'||!Number.isInteger(pollMs)||pollMs<300||pollMs>500)throw Error('ORIGINAL_SCAN_OPTIONS');
+ let state=Object.freeze({phase:'idle',gameId:'',preview:null,progress:null,error:'',pendingJob:false,operation:'',cancellable:false});
+ let current=null,serial=0,disposed=false,cleanupIncomplete=false;
+ const publish=patch=>{state=Object.freeze({...state,...patch});if(!disposed)try{onChange(state);}catch{onRefreshError('ORIGINAL_SCAN_VIEW_FAILED');}};
+ const active=c=>current===c&&c.serial===serial;
+ const clear=c=>{if(c.timer!==null){unschedule(c.timer);c.timer=null;}};
+ const errorCode=e=>typeof e==='string'?e:typeof e?.message==='string'?e.message:'ORIGINAL_SCAN_FAILED';
+ const closeAllowed=()=>!current||current.operation==='scan';
+ function finish(c,{phase,result,error,preview=null}){
+  if(!active(c))return;clear(c);current=null;
+  publish({phase,preview,progress:null,pendingJob:false,cancellable:false,error:error||'',operation:''});
+  if(error)c.reject(Error(error));else c.resolve(result);
+  if(!error&&c.notifyApplied&&!disposed)Promise.resolve().then(()=>onApplied(result)).catch(()=>onRefreshError('ORIGINAL_SCAN_REFRESH_FAILED'));
+ }
+ function queue(c){if(!active(c))return;clear(c);c.timer=schedule(()=>{c.timer=null;void call(c,'jp_restore_scan_status',{id:c.id,jobId:c.jobId});},pollMs);}
+ function failed(c,error){
+  if(!active(c))return;clear(c);
+  if(!c.jobId||c.terminal){finish(c,{phase:'error',error:errorCode(error)});return;}
+  publish({phase:'error',error:errorCode(error),pendingJob:true,cancellable:c.operation==='scan'&&c.cancellable,preview:null});
+  if(disposed){if(++c.cleanupFailures<3)queue(c);else{cleanupIncomplete=true;current=null;c.reject(Error('ORIGINAL_SCAN_CLEANUP_INCOMPLETE'));onRefreshError('ORIGINAL_SCAN_CLEANUP_INCOMPLETE');}}
+ }
+ function accept(c,dto){
+  if(!active(c))return;
+  if(c.allowDirect&&dto&&typeof dto==='object'&&!Object.hasOwn(dto,'jobId')){
+   if(Object.hasOwn(dto,'operation')||['running','cancelling','cancelled','done','failed'].includes(dto.state))throw Error('ORIGINAL_SCAN_PROTOCOL');
+   if(c.operation==='undo'?(!count(dto.restored)||!Array.isArray(dto.skipped)):(!count(dto.applied)||!count(dto.cells)))throw Error('ORIGINAL_SCAN_PROTOCOL');
+   finish(c,{phase:'idle',result:dto});return;
+  }
+  if(!dto||typeof dto.jobId!=='string'||!dto.jobId||dto.jobId.length>512||c.jobId&&c.jobId!==dto.jobId)throw Error('ORIGINAL_SCAN_PROTOCOL');
+  c.jobId=dto.jobId;
+  if(dto.operation!==c.operation||!['running','cancelling','cancelled','done','failed'].includes(dto.state)||typeof dto.cancellable!=='boolean')throw Error('ORIGINAL_SCAN_PROTOCOL');
+  c.terminal=['done','failed','cancelled'].includes(dto.state);
+  if(dto.state==='failed'){finish(c,{phase:'error',error:typeof dto.error==='string'?dto.error:'ORIGINAL_SCAN_FAILED'});return;}
+  if(dto.state==='cancelled'){
+   if(c.operation!=='scan')throw Error('ORIGINAL_SCAN_PROTOCOL');
+   finish(c,{phase:'cancelled',result:false});return;
+  }
+  if(dto.state==='done'){
+   if(c.operation==='scan'){
+    if(c.cancelRequested){finish(c,{phase:'cancelled',result:false});return;}
+    const preview=normalizeOriginalScanPreview(dto.result);
+    finish(c,{phase:preview.state==='applied'?'applied':'preview',result:preview,preview});return;
+   }
+   const r=dto.result;
+   if(!r||typeof r!=='object'||(c.operation==='restore'&&(!count(r.applied)||!count(r.cells)||r.patch!==true||r.localIndex!==true))||(c.operation==='undo'&&(!count(r.restored)||!Array.isArray(r.skipped))))throw Error('ORIGINAL_SCAN_PROTOCOL');
+   finish(c,{phase:c.operation==='restore'?'applied':'idle',result:r,preview:c.operation==='restore'?state.preview:null});return;
+  }
+  if(c.operation!=='scan'&&dto.cancellable)throw Error('ORIGINAL_SCAN_PROTOCOL');
+  const p=dto.progress,progress=p&&typeof p==='object'?Object.freeze({phase:typeof p.phase==='string'?p.phase.slice(0,80):'',file:typeof p.file==='string'?p.file.slice(0,4096):'',...(byteCount(p.bytes)?{bytes:p.bytes}:{})}):null;
+  c.cancellable=dto.cancellable&&p?.cancellable!==false;
+  publish({phase:c.operation==='scan'?(c.cancelRequested||dto.state==='cancelling'?'cancelling':'scanning'):'applying',progress,pendingJob:true,cancellable:c.cancellable,error:''});
+  if(c.cancelRequested&&c.cancellable&&!c.cancelSent){c.cancelSent=true;void call(c,'jp_restore_scan_cancel',{id:c.id,jobId:c.jobId});}else queue(c);
+ }
+ async function call(c,action,params){
+  if(!active(c)||c.inFlight)return;clear(c);c.inFlight=true;
+  try{const dto=await api(action,params);c.inFlight=false;accept(c,dto);}catch(error){c.inFlight=false;if(action==='jp_restore_scan_cancel')c.cancelSent=false;failed(c,error);}
+ }
+ function begin(operation,action,params,{allowDirect=false,notifyApplied=false}={}){
+  if(disposed||current||!state.gameId)return Promise.resolve(false);
+  let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});
+  const c={serial:++serial,id:state.gameId,operation,jobId:'',timer:null,inFlight:false,cancelRequested:false,cancelSent:false,cancellable:true,terminal:false,cleanupFailures:0,allowDirect,notifyApplied,resolve,reject,promise};current=c;
+  publish({phase:operation==='scan'?'scanning':'applying',operation,preview:operation==='scan'?null:state.preview,progress:null,error:'',pendingJob:true,cancellable:operation==='scan'});
+  void call(c,action,params);return promise;
+ }
+ const controller={
+  state:()=>state,busy:()=>!!current,canClose:closeAllowed,
+  selectGame(id){if(disposed||current||typeof id!=='string'||!id||id.length>512)return false;++serial;publish({phase:'idle',gameId:id,preview:null,progress:null,error:'',pendingJob:false,operation:'',cancellable:false});return true;},
+  scan(){if(current){if(state.phase==='error')return controller.refresh();return Promise.resolve(false);}return begin('scan','jp_restore_scan',{id:state.gameId});},
+  refresh(){const c=current;if(!c||c.inFlight||!c.jobId||disposed)return Promise.resolve(false);void call(c,'jp_restore_scan_status',{id:c.id,jobId:c.jobId});return Promise.resolve(true);},
+  cancel(){const c=current;if(disposed||!c||c.operation!=='scan'||!c.cancellable)return false;c.cancelRequested=true;publish({phase:'cancelling'});if(c.jobId&&!c.inFlight&&!c.cancelSent){c.cancelSent=true;void call(c,'jp_restore_scan_cancel',{id:c.id,jobId:c.jobId});}return true;},
+  requestRestore(){if(disposed||current||!originalScanPresentation(state).canRestore)return false;publish({phase:'confirm'});return true;},
+  back(){if(disposed||current||state.phase!=='confirm')return false;publish({phase:'preview'});return true;},
+  confirm(){if(disposed||current||!originalScanPresentation(state).canConfirm||!state.preview?.scanToken)return Promise.resolve(false);return begin('restore','jp_restore_apply',{id:state.gameId,embedded:true,scanToken:state.preview.scanToken},{notifyApplied:true});},
+  runExisting(action,params={}){if(disposed||current)return Promise.reject(Error('ORIGINAL_SCAN_BUSY'));if(!['jp_restore_apply','jp_restore_undo'].includes(action)||!state.gameId||params.id!==state.gameId)return Promise.reject(Error('ORIGINAL_SCAN_OPTIONS'));return begin(action==='jp_restore_undo'?'undo':'restore',action,{id:state.gameId},{allowDirect:true});},
+  dispose(){if(!closeAllowed()||cleanupIncomplete)return Promise.resolve(false);disposed=true;const c=current;if(!c){++serial;return Promise.resolve(true);}c.cancelRequested=true;if(c.jobId&&!c.inFlight){if(c.cancellable){c.cancelSent=true;void call(c,'jp_restore_scan_cancel',{id:c.id,jobId:c.jobId});}else queue(c);}return c.promise.then(()=>true,()=>false);}
+ };
+ publish({});return controller;
 }
 
 export function mountOriginalScanView(container,{locale='zh',actions={}}={}){
  const doc=container.ownerDocument,t=originalScanWords(locale),section=doc.createElement('section');
  section.className='jr-folder-scan';
- section.innerHTML='<p class="jr-folder-scan-lead"></p><p class="settings-help" role="status" aria-live="polite" data-os-status></p><div data-os-progress><progress max="100"></progress><p class="settings-help" data-os-progress-text></p></div><dl class="jr-folder-scan-counts" data-os-counts></dl><p class="settings-help" data-os-local></p><p class="settings-help" data-os-missing></p><p class="settings-help" data-os-blocked></p><p class="settings-help" data-os-confirm-note></p><div class="jr-folder-scan-actions"><button type="button" class="secondary" data-os-scan></button><button type="button" class="secondary" data-os-cancel></button><button type="button" class="primary" data-os-restore></button><button type="button" class="secondary" data-os-back></button><button type="button" class="primary" data-os-confirm></button></div>';
+ section.innerHTML='<p class="jr-folder-scan-lead"></p><p class="settings-help" role="status" aria-live="polite" data-os-status></p><div data-os-progress><progress max="100"></progress><p class="settings-help" data-os-progress-text></p></div><dl class="jr-folder-scan-counts" data-os-counts></dl><details data-os-sources><summary></summary><ul class="jr-folder-scan-sources"></ul></details><p class="settings-help" data-os-local></p><p class="settings-help" data-os-missing></p><p class="settings-help" data-os-blocked></p><p class="settings-help" data-os-confirm-note></p><div class="jr-folder-scan-actions"><button type="button" class="secondary" data-os-scan></button><button type="button" class="secondary" data-os-cancel></button><button type="button" class="primary" data-os-restore></button><button type="button" class="secondary" data-os-back></button><button type="button" class="primary" data-os-confirm></button></div>';
  const node=selector=>section.querySelector(selector),buttons={scan:node('[data-os-scan]'),cancel:node('[data-os-cancel]'),restore:node('[data-os-restore]'),back:node('[data-os-back]'),confirm:node('[data-os-confirm]')};
  node('.jr-folder-scan-lead').textContent=t.lead;
- for(const [name,button] of Object.entries(buttons)){button.textContent=t[{scan:'scan',cancel:'cancel',restore:'restore',back:'cancelConfirm',confirm:'confirm'}[name]];button.addEventListener('click',()=>{if(!button.disabled&&!button.hidden)actions[name]?.();});}
+ for(const [name,button] of Object.entries(buttons)){button.textContent=t[{scan:'scan',cancel:'cancel',restore:'restore',back:'cancelConfirm',confirm:'confirm'}[name]];button.addEventListener('click',()=>{if(!button.disabled&&!button.hidden)Promise.resolve(actions[name]?.()).catch(()=>{});});}
+ node('progress').setAttribute('aria-label',t.scanning);
  for(const label of [t.jp,t.local,t.missing]){const row=doc.createElement('div'),dt=doc.createElement('dt'),dd=doc.createElement('dd');dt.textContent=label;row.append(dt,dd);node('[data-os-counts]').append(row);}
  container.append(section);let disposed=false;
  function render(state){if(disposed)return;const v=originalScanPresentation(state,locale);section.dataset.phase=v.phase;section.setAttribute('aria-busy',String(['scanning','cancelling','applying'].includes(v.phase)));node('[data-os-status]').textContent=v.status;
   const progress=node('progress');if(v.progressValue===null)progress.removeAttribute('value');else progress.value=v.progressValue;
   node('[data-os-progress]').hidden=!v.progressVisible;node('[data-os-progress-text]').textContent=v.progressText;
   const counts=node('[data-os-counts]');counts.hidden=!v.showCounts;counts.querySelectorAll('dd').forEach((dd,i)=>{dd.textContent=v.counts[i]===undefined?'':v.counts[i].toLocaleString(locale);});
+  const sources=node('[data-os-sources]');sources.hidden=!v.showCounts;sources.querySelector('summary').textContent=t.sources;
+  const list=sources.querySelector('ul');list.replaceChildren();for(const source of v.showCounts?(state.preview.sources||[]):[]){const item=doc.createElement('li');item.textContent=source.path+' · '+source.bytes.toLocaleString(locale)+' B';list.append(item);}
   for(const [selector,value] of [['[data-os-local]',v.localNote],['[data-os-missing]',v.missingNote],['[data-os-blocked]',v.blockedNote]]){node(selector).textContent=value;node(selector).hidden=!value;}
   node('[data-os-confirm-note]').textContent=t.confirmNote;node('[data-os-confirm-note]').hidden=!v.showConfirm;
-  buttons.scan.disabled=!v.canScan;buttons.scan.textContent=v.phase==='idle'?t.scan:t.retry;
+  buttons.scan.disabled=!v.canScan;buttons.scan.textContent=state.pendingJob&&v.phase==='error'?t.refresh:v.phase==='idle'?t.scan:t.retry;
   buttons.cancel.hidden=!v.canCancel;buttons.cancel.disabled=v.cancelPending;
   buttons.restore.hidden=!v.showRestore;buttons.restore.disabled=!v.canRestore;
   buttons.confirm.hidden=!v.showConfirm;buttons.confirm.disabled=!v.canConfirm;buttons.back.hidden=!v.showConfirm;
  }
  render({phase:'idle'});
  return {render,dispose(){disposed=true;section.remove();}};
+}
+
+export function mountOriginalScan(container,{api,locale='zh',onApplied,onRefreshError,onState}={}){
+ let controller;
+ const view=mountOriginalScanView(container,{locale,actions:{scan:()=>controller.scan(),cancel:()=>controller.cancel(),restore:()=>controller.requestRestore(),back:()=>controller.back(),confirm:()=>controller.confirm()}});
+ controller=createOriginalScanController({api,onApplied,onRefreshError,onChange:state=>{view.render(state);onState?.(state);}});
+ return {...controller,async dispose(){const complete=await controller.dispose();if(complete)view.dispose();return complete;}};
 }
