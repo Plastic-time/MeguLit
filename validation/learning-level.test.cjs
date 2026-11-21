@@ -199,6 +199,7 @@ test('Blue Book examples follow replaced lines, edited card forms and the reques
  const cards=[{id:'bb-101',hits:['から']}],lines=[{text:'空から見えた。'},{text:'家から来た。',title:'Old',translation:'old'}];
  const first=await B.examplesForAsync(cards,lines);
  assert.equal(first['bb-101'].length,2);
+ assert.strictEqual(await B.examplesForAsync([{id:'bb-101',hits:['から']}],lines),first);
  const fresh=[lines[0],{text:'駅から来た。',title:'New',translation:'new'}];
  const changed=await B.examplesForAsync(cards,fresh);
  assert.deepEqual(changed['bb-101'].map(x=>[x.text,x.title,x.translation]),[['駅から来た。','New','new'],['空から見えた。',undefined,undefined]]);
@@ -206,4 +207,37 @@ test('Blue Book examples follow replaced lines, edited card forms and the reques
  const edited=[{id:'bb-101',hits:['駅']}];
  assert.deepEqual((await B.examplesForAsync(edited,fresh))['bb-101'].map(x=>[x.text,x.start,x.end]),[['駅から来た。',0,1]]);
  assert.deepEqual(await B.examplesForAsync([{id:'bb-101',hits:['まで']}],fresh),{});
+});
+
+test('editing a recorded translation refreshes the examples in an open collection',async t=>{
+ const B=require('../services/bluebook.cjs'),{ReadingStatistics}=require('../services/reading-statistics.cjs');
+ const root=temp(),db=openStore(root);t.after(()=>{db.close();fs.rmSync(root,{recursive:true,force:true});});
+ const text='駅から帰りました。',points=[{id:'bb-25',hits:['から']}];
+ db.prepare("INSERT INTO games(id,title) VALUES('g','Example')").run();
+ db.prepare("INSERT INTO reading_events(game_id,text,read_at,original) VALUES('g',?,1,?)").run(text,JSON.stringify({translation:'旧译'}));
+ const example=async()=>(await B.examplesForAsync(points,await G.candidatesCached(db,{root})))['bb-25'][0];
+ assert.equal((await example()).translation,'旧译');
+ new ReadingStatistics(root).translation('g',text,'修订译文','official');
+ assert.equal((await example()).translation,'修订译文');
+});
+
+test('revisiting grammar refreshes imported examples without replacing built-in ones',async t=>{
+ const {pathToFileURL}=require('node:url'),g=await import(pathToFileURL(path.join(__dirname,'../web/grammar.js')).href+'?revisit');
+ let now=Date.now(),blue=0,reports=0,available=true;t.mock.method(Date,'now',()=>now);
+ const doc={scrollingElement:{scrollTop:0},createElement:()=>({style:{},isConnected:true,addEventListener(){},querySelector:()=>null,querySelectorAll:()=>[],closest:()=>null})};
+ for(const [name,value] of Object.entries({document:doc,matchMedia:()=>({matches:true})})){
+  const old=Object.getOwnPropertyDescriptor(globalThis,name);Object.defineProperty(globalThis,name,{value,configurable:true});
+  t.after(()=>{if(old)Object.defineProperty(globalThis,name,old);else delete globalThis[name];});
+ }
+ const api=async action=>{
+  if(action==='grammar_bluebook'){blue++;return {available,points:[],examples:{'bb-25':[{text:'entry-'+blue}],shared:[]}};}
+  if(action==='grammar_report'){reports++;return {progress:{},examples:{shared:[{text:'built-in'}]}};}
+  return action==='learning_level'?{level:'none'}:{};
+ };
+ const visit=async()=>{const close=await g.mountGrammar({replaceChildren(){}},{api,locale:'zh',esc:String});
+  try{await new Promise(resolve=>setImmediate(resolve));return g.grammarMemo().data.examples;}finally{close();}};
+ assert.equal((await visit())['bb-25'][0].text,'entry-1');
+ await visit();assert.equal(blue,1);
+ now+=6*60000;const updated=await visit();assert.equal(updated['bb-25'][0].text,'entry-2');assert.equal(updated.shared[0].text,'built-in');assert.equal(reports,2);
+ available=false;now+=6*60000;assert.equal((await visit())['bb-25'],undefined);
 });

@@ -91,9 +91,9 @@ function* candidateSteps(db,{root=null,scriptPairs=null,limitScript=4000}={}){
    every few seconds while lines are still being checked), and building it lets other requests run in between. */
 const candidateCache=new Map(),reportCache=new Map();
 function candidateStamp(db,root){
-  const r=db.prepare('SELECT COALESCE(MAX(id),0) m,COUNT(*) n FROM reading_events').get();let s=0;
+  const r=db.prepare("SELECT COALESCE(MAX(id),0) m,COUNT(*) n,(SELECT value FROM meta WHERE key='grammar-reading-revision') rev FROM reading_events").get();let s=0;
   try{s=require('fs').statSync(require('path').join(String(root||''),'data','config','original-text.json')).mtimeMs;}catch{}
-  return r.m+':'+r.n+':'+s;
+  return r.m+':'+r.n+':'+(r.rev||0)+':'+s;
 }
 async function candidatesCached(db,{root=null,scriptPairs=null}={}){
   const key=String(root)+'|'+(scriptPairs?1:0),stamp=candidateStamp(db,root),hit=candidateCache.get(key);
