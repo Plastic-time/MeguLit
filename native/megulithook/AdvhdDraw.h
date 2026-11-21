@@ -16,6 +16,9 @@ static void *Original=nullptr;
 static uintptr_t Image=0,ImageEnd=0,DrawAt=0;
 static bool VersionPinned=false;
 static volatile LONG Armed=0,Installed=0,Observing=0,Permission=0,Blocked=0,Run=0;
+static INIT_ONCE ControlOnce=INIT_ONCE_STATIC_INIT;
+static CRITICAL_SECTION ControlLock;
+static LONG ControlRequests=0;
 static __declspec(thread) bool InObserver=false;
 static const DWORD ObserverMxcsr=0x1f80;
 static const int MaxText=32768,ChunkBytes=128;
@@ -117,8 +120,14 @@ static bool Install(){
  if(MH_EnableHook((void *)DrawAt)!=MH_OK){SetPermission(false);InterlockedExchange(&Blocked,1);MH_DisableHook((void *)DrawAt);return false;}
  InterlockedExchange(&Installed,1);Msg::Log("ToMe_ADVHD_INPUT on rva=%lx diagnostic=1",(unsigned long)(DrawAt-Image));return true;
 }
-static void RefreshControlCpp(){try{SetPermission(DiagnosticAsked()&&Install());}catch(...){SetPermission(false);}}
-static void RefreshControl(){__try{RefreshControlCpp();}__except(EXCEPTION_EXECUTE_HANDLER){SetPermission(false);}}
+static BOOL CALLBACK InitControl(PINIT_ONCE,void *,void **){InitializeCriticalSection(&ControlLock);return TRUE;}
+static void RefreshControlCpp(){try{LONG request=InterlockedIncrement(&ControlRequests);bool on=DiagnosticAsked()&&Install();
+ // The installation logger can recursively refresh a newer off request before this one returns.
+ if(request==InterlockedCompareExchange(&ControlRequests,0,0))SetPermission(on);
+ }catch(...){SetPermission(false);}}
+static void RefreshControlSeh(){__try{RefreshControlCpp();}__except(EXCEPTION_EXECUTE_HANDLER){SetPermission(false);}}
+static void RefreshControl(){if(!InitOnceExecuteOnce(&ControlOnce,&InitControl,nullptr,nullptr)){SetPermission(false);return;}EnterCriticalSection(&ControlLock);
+ __try{RefreshControlSeh();}__finally{LeaveCriticalSection(&ControlLock);}}
 static DWORD WINAPI Watch(void *stop){for(;;){RefreshControl();if(stop){if(WaitForSingleObject((HANDLE)stop,2000)==WAIT_OBJECT_0){SetPermission(false);return 0;}}else Sleep(2000);}}
 static void Arm(){if(InterlockedExchange(&Armed,1))return;__try{if(!FindInImage((uintptr_t)GetModuleHandleA(nullptr)))return;}__except(EXCEPTION_EXECUTE_HANDLER){return;}HANDLE thread=CreateThread(nullptr,0,Watch,nullptr,0,nullptr);if(thread)CloseHandle(thread);}
 }
