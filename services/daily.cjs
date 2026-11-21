@@ -60,10 +60,11 @@ async function translateList(root,runtime,list,goal,options={}){
  const cachedEngines=new Set(list.map(t=>val(cache.get(key(t))).e).filter(Boolean));
  const todo=list.map((t,i)=>i).filter(i=>list[i].trim()&&!out[i]);if(!todo.length)return {texts:out,engine:[...cachedEngines].join('+')||'cache'};
  let engine='',reason='';
- if(runtime?.reviews)for(let start=0;start<todo.length;start+=60){
+ let reviews;try{const service=runtime?.reviews?.();if(service?.engine?.()!=='machine')reviews=service;}catch(e){reason=String(e?.message||e);}
+ if(reviews)for(let start=0;start<todo.length;start+=60){
   const batch=todo.slice(start,start+60);
   try{
-   const result=await runtime.reviews().translate(batch.map(i=>list[i]),goal,'ja');
+   const result=await reviews.translate(batch.map(i=>list[i]),goal,'ja');
    const texts=Array.isArray(result)?result:result?.texts;
    if(Array.isArray(texts)&&texts.some(Boolean)){
     batch.forEach((i,n)=>{out[i]=String(texts[n]||'');});

@@ -3,6 +3,40 @@ process.env.MEGULIT_RELAY_BASE??='off';/* tests never reach the real relay */
 /* E415 日报 page: relay RSS parsing + D1 cache + routes, the bridge's cleaning and link gate, and the page markup. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url'),{DatabaseSync}=require('node:sqlite');
 const relayDir=path.join(__dirname,'..','relay');
+test('daily reports the configured engine error when both translations are empty',async()=>{
+ const daily=require('../services/daily.cjs'),runtime={reviews:()=>({translate:async()=>({texts:[''],error:'MODEL_BUSY'})})};
+ await assert.rejects(daily.translate('',runtime,['空の応答'],'en',{translateFree:async()=>''}),/TRANSLATION_FAILED:MODEL_BUSY/);
+});
+test('the daily machine setting uses the reader fallback and keeps its source in cache',async()=>{
+ const daily=require('../services/daily.cjs'),{GameReviews}=require('../services/game-reviews.cjs');
+ let reviewCalls=0;
+ const reviews=new GameReviews('',async()=>{reviewCalls++;throw Error('unexpected review request');});
+ const calls=[],options={withEngine:true,translateFree:async(_,o)=>{calls.push(o.preferred);return '译文';}};
+ const run=()=>daily.translate('',{reviews:()=>reviews},['機械翻訳の設定'],'zh',options);
+ const expected={texts:['译文'],engine:'microsoft'};
+ assert.deepEqual(await run(),expected);
+ assert.deepEqual(await run(),expected);
+ assert.equal(reviewCalls,0);
+ assert.deepEqual(calls,['microsoft']);
+});
+test('English daily articles fall back when the selected local model is Chinese-only',async t=>{
+ const daily=require('../services/daily.cjs'),{Runtime}=require('../services/runtime.cjs');
+ const root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'megulit-daily-lang-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const runtime=Object.assign(Object.create(Runtime.prototype),{root,folder:root,local:()=>({ensure:async()=>{}}),
+  reviewTranslator:{translate:async()=> '中文译文'}});
+ for(const [provider,reviewEngine] of [['google','local'],['sakura','follow']]){
+  fs.writeFileSync(path.join(root,'preferences.json'),JSON.stringify({provider,reviewEngine}));
+  const text='言語のテスト '+provider,used=[];
+  const options={withEngine:true,translateFree:async(t,o)=>{used.push([t,o.target]);return 'English';}};
+  const result=await daily.translate(root,runtime,[text],'en',options);
+  assert.deepEqual(result,{texts:['English'],engine:'microsoft'});
+  assert.deepEqual(used,[[text,'en']]);
+  assert.deepEqual(await daily.translate(root,runtime,[text],'en',options),result);
+  assert.equal(used.length,1);
+  assert.deepEqual(await daily.translate(root,runtime,[text],'zh',options),{texts:['中文译文'],engine:'app'});
+ }
+});
 test('daily uses the configured review translator through the last article paragraph',async()=>{
  const daily=require('../services/daily.cjs'),{GameReviews}=require('../services/game-reviews.cjs');
  const reviews=new GameReviews('',undefined,{engine:()=>'api',translate:async text=>'translated '+text});

@@ -24,6 +24,7 @@ class Runtime {
  // Community reviews through the user's translation engine, or a local model.
  async reviewTranslate(text,lang,mode){if(this.stopped)throw Error('RUNTIME_STOPPED');const {createTranslationService,resolveOptions}=require('../core/providers.cjs'),{ENGINES}=require('../core/engines.cjs'),preferences=require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json')));
   const useConfigured=mode!=='local'||ENGINES[preferences.provider]?.group==='local',options={...resolveOptions(useConfigured?preferences:{provider:'sakura'}),learnerLanguage:lang==='en'?'en':'zh',contextEnabled:false},translator=this.reviewTranslator??=createTranslationService();
+  if(lang==='en'&&options.provider==='sakura')throw Error('UNSUPPORTED_TARGET_LANGUAGE');
   if(options.provider!=='google'&&!ENGINES[options.provider]?.keyless){const {SecretStore}=require('../core/secrets.cjs');for(const[base,key]of new SecretStore(this.folder,undefined,path.join(this.root,'native','KeyVault.exe')).entries())translator.setKey(base,key);}
   await this.local().ensure(options);return translator.translate(text,options);}
  // Synopses: free machine translation first, then the user's own translation engine (Chinese or English).
