@@ -1,8 +1,8 @@
 'use strict';
 // Runs the actual shared dialog functions against controlled transport in a headless browser
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict'),crypto=require('node:crypto');
-const {chromium}=require('H:/MeguLit-Work/pw/node_modules/playwright-core');
-const root=process.env.ORIGINAL_SCAN_TARGET||'H:/MeguLit-Work/wt/night-disc',out=process.env.ORIGINAL_SCAN_ARTIFACTS||'H:/MeguLit-Work/night-1423/original-folder-scan-ui/integration';
+const {chromium}=require(process.env.ORIGINAL_SCAN_PLAYWRIGHT||'playwright-core');
+const root=process.env.ORIGINAL_SCAN_TARGET||path.resolve(__dirname,'..'),out=process.env.ORIGINAL_SCAN_ARTIFACTS||path.join(require('node:os').tmpdir(),'megulit-original-scan-integration');
 fs.mkdirSync(out,{recursive:true});const web=path.join(root,'web'),app=fs.readFileSync(path.join(web,'app.js'),'utf8');
 const slice=(a,b)=>app.slice(app.indexOf(a),app.indexOf(b,app.indexOf(a)));
 const restore=slice('function japaneseRestore(only){','\nfunction modal(html)'),modal=slice('function modal(html){','\nfunction gameDetail('),auto=slice('const jpAutoWords=','\n/* one notice per automatic switch');
