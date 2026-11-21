@@ -17,7 +17,7 @@ const W={
   off:{title:'共有適応をオンにすると参加できます',body:'このバージョンはまだ誰も校正していないので、あなたが最初です。いまは共有適応がオフで、結果はこの PC に残るだけ、後のプレイヤーには届きません。オンにして 3〜8 分遊び、自動校正を走らせれば、結果は同じバージョンを遊ぶ人に共有されます',button:'共有適応をオンにする',busy:'オンにしています…',failed:'オンにできませんでした。あとでもう一度'},
   thanks:{title:'共有ありがとうございます',body:'校正結果をアップロードしました。このバージョンを遊ぶ人は、開くだけで使えます',note:'共有済み'}}};
 const POLL_MS=20000,POLL_MAX=90;
-export function mountFirstPlayer({host,id,api,locale,esc,isCurrent=()=>true,placement='tabs'}){
+export function mountFirstPlayer({host,id,api,locale,esc,isCurrent=()=>true,placement='main'}){
  if(!host)return;const w=W[locale]||W.zh;let timer=0,shown='',polls=0;
  const box=document.createElement('section');box.className='first-player';box.hidden=true;box.setAttribute('aria-live','polite');host.after(box);
  const render=(state,{failed=false,busy=false}={})=>{if(state==='hidden'){box.hidden=true;box.innerHTML='';shown='';return;}const t=w[state],sig=state+(failed?'!':'')+(busy?'…':'');if(sig===shown)return;shown=sig;box.dataset.state=state;
