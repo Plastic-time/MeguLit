@@ -5,10 +5,16 @@
    Account sync picks rows up by diffing the table (services/account.cjs). */
 const SOURCES=['manual','auto'];
 const clean=v=>String(v??'').replace(/\r\n?/g,'\n').trim();
+/* Synced rows keep the title in original until that game is added on this PC. */
+const pendingTitle="CASE WHEN game_id IS NULL AND json_valid(original) THEN json_extract(original,'$.game') END";
+const localGame=`game_id IS ? AND COALESCE(${pendingTitle},'')=''`;
+function findExample(db,wordId,text,gameId){
+ return db.prepare(`SELECT id FROM examples WHERE word_id=? AND text=? AND ${localGame} ORDER BY id LIMIT 1`).get(wordId,text,gameId||null);
+}
 function migrate(db){if(!db.prepare('PRAGMA table_info(saved_sentences)').all().some(c=>c.name==='source'))db.exec("ALTER TABLE saved_sentences ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'");}
 function find(db,gameId,text){
  text=clean(text);if(!text)return null;
- return db.prepare('SELECT id,game_id,text,translation,created_at,source FROM saved_sentences WHERE text=? AND game_id IS ? ORDER BY id LIMIT 1').get(text,gameId||null)||null;
+ return db.prepare(`SELECT id,game_id,text,translation,created_at,source FROM saved_sentences WHERE text=? AND ${localGame} ORDER BY id LIMIT 1`).get(text,gameId||null)||null;
 }
 function save(db,{gameId,text,translation,source}={},now=Date.now()){
  text=clean(text);translation=clean(translation);source=SOURCES.includes(source)?source:'manual';
@@ -37,9 +43,18 @@ function state(db,{gameId,text}={}){const found=find(db,gameId?String(gameId):nu
 function list(db,{source}={}){
  const filter=SOURCES.includes(source)?' WHERE s.source=?':'';
  const rows=db.prepare('SELECT s.id,s.game_id,s.text,s.translation,s.created_at,s.source,s.original,g.title FROM saved_sentences s LEFT JOIN games g ON s.game_id=g.id'+filter+' ORDER BY s.created_at DESC,s.id DESC LIMIT 1000').all(...(filter?[source]:[]));
- const words=db.prepare('SELECT DISTINCT v.id,v.spelling,v.reading FROM examples e JOIN vocabulary v ON v.id=e.word_id WHERE e.text=? ORDER BY e.id');
+ const words=db.prepare(`SELECT v.id,v.spelling,v.reading,e.title FROM
+  (SELECT id,word_id,${pendingTitle} title FROM examples WHERE text=? AND game_id IS ?) e
+  JOIN vocabulary v ON v.id=e.word_id ORDER BY e.id`);
  /* 2026-11-13 scene {file,hash,at}|null and source, the same fields as game_detail's sentences (the 学习 › 句子 hero and strip show the frame) */
  const {sceneOf}=require('./sentence-scenes.cjs');
- return rows.map(({original,...r})=>({...r,source:r.source||'manual',scene:sceneOf(original),words:words.all(r.text).map(w=>({...w}))}));
+ return rows.map(({original,...r})=>{
+  let title='';if(r.game_id==null)try{title=String(JSON.parse(original)?.game||'').trim().toLowerCase();}catch{}
+  const matches=new Map();
+  for(const {title:game,...word} of words.all(r.text,r.game_id)){
+   if(String(game||'').trim().toLowerCase()===title)matches.set(word.id,word);
+  }
+  return {...r,source:r.source||'manual',scene:sceneOf(original),words:[...matches.values()]};
+ });
 }
-module.exports={save,remove,state,find,list,migrate,SOURCES};
+module.exports={save,remove,state,find,findExample,list,migrate,SOURCES};

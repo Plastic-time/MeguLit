@@ -112,7 +112,7 @@ test('backup previews can be cancelled, retried, and restored',{skip:!hasEdge},a
    await closed;await lastCall;
   };
   window.retryRestore=async()=>{
-   const dialog=document.querySelector('dialog'),button=dialog.querySelector('[data-restore]');
+   const dialog=document.querySelector('dialog[open]'),button=dialog.querySelector('[data-restore]');
    window.failOnce=true;
    button.click();dialog.requestClose();
    const pending=dialog.open&&button.disabled&&dialog.querySelector('[data-cancel]').disabled;
@@ -121,8 +121,9 @@ test('backup previews can be cancelled, retried, and restored',{skip:!hasEdge},a
   };
   window.restore=async refreshFails=>{
    window.refreshFails=refreshFails;
-   const button=document.querySelector('[data-restore]');
-   button.click();await lastCall;await new Promise(resolve=>setTimeout(resolve,0));
+   const dialog=document.querySelector('dialog[open]');
+   const closed=new Promise(resolve=>dialog.addEventListener('close',resolve,{once:true}));
+   dialog.querySelector('[data-restore]').click();await lastCall;await closed;
    return {message:messages.at(-1),rollback:document.querySelector('[data-result]').textContent};
   };
  })()`);
@@ -138,9 +139,9 @@ test('backup previews can be cancelled, retried, and restored',{skip:!hasEdge},a
  await browser.evaluate('openPreview()');
  assert.equal(await browser.evaluate(`(async()=>{
   window.busyDiscard=true;
-  const cancel=document.querySelector('[data-cancel]');
+  const dialog=document.querySelector('dialog[open]'),cancel=dialog.querySelector('[data-cancel]');
   cancel.click();await new Promise(resolve=>setTimeout(resolve,0));
-  return cancel.closest('dialog').open&&!cancel.disabled&&document.querySelector('[data-restore]').disabled;
+  return dialog.open&&!cancel.disabled&&dialog.querySelector('[data-restore]').disabled;
  })()`),true);
  assert.equal(previews().length,2);
  await browser.evaluate('dismiss(true)');

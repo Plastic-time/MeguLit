@@ -6,6 +6,7 @@
    exactly the term (never a tokenizer guess). No relay / no data → {state:'not-configured'|'error'|'empty'}. */
 const fs=require('node:fs'),path=require('node:path');
 const relay=require('./relay-config.cjs');
+const {MAX_PARAS}=require('./news-article.cjs');
 const TIMEOUT=8000,GLOSS_BUDGET=4000;
 const str=(v,n)=>typeof v==='string'?v.slice(0,n):'';
 /* (user 2026-11-12: a Game*Spark article would not open) a source may still give http:// links: they are upgraded to
@@ -59,7 +60,18 @@ async function translateList(root,runtime,list,goal,options={}){
  const cachedEngines=new Set(list.map(t=>val(cache.get(key(t))).e).filter(Boolean));
  const todo=list.map((t,i)=>i).filter(i=>list[i].trim()&&!out[i]);if(!todo.length)return {texts:out,engine:[...cachedEngines].join('+')||'cache'};
  let engine='',reason='';
- if(runtime?.reviews)try{const got=await runtime.reviews().translate(todo.map(i=>list[i]),goal,'ja');if(Array.isArray(got)&&got.some(Boolean)){todo.forEach((i,n)=>{out[i]=String(got[n]||'');});engine='app';}else reason='ENGINE_EMPTY';}catch(e){reason=String(e?.message||e);}
+ let reviews;try{reviews=runtime?.reviews?.({daily:true});}catch(e){reason=String(e?.message||e);}
+ if(reviews)for(let start=0;start<todo.length;start+=60){
+  const batch=todo.slice(start,start+60);
+  try{
+   const result=await reviews.translate(batch.map(i=>list[i]),goal,'ja');
+   const texts=Array.isArray(result)?result:result?.texts;
+   if(Array.isArray(texts)&&texts.some(Boolean)){
+    batch.forEach((i,n)=>{out[i]=String(texts[n]||'');});
+    engine='app';
+   }else reason=result?.error||'ENGINE_EMPTY';
+  }catch(e){reason=String(e?.message||e);}
+ }
  const left=todo.filter(i=>!out[i]);
  if(left.length){const free=options.translateFree||require('../core/translate.cjs').translateFree;let failed='';
   for(const i of left){try{out[i]=String(await free(list[i],{source:'ja',target:goal,preferred:'microsoft',fetcher:options.fetch||fetch})||'');}catch(e){failed=String(e?.message||e);}}
@@ -141,7 +153,7 @@ async function article(root,link,options={}){
 }
 async function translate(root,runtime,texts,target,options={}){
  const goal={zh:'zh-CN',en:'en','zh-CN':'zh-CN'}[String(target)]||'zh-CN';
- const list=(Array.isArray(texts)?texts:[]).slice(0,60).map(t=>String(t||'').slice(0,2000));
+ const list=(Array.isArray(texts)?texts:[]).slice(0,MAX_PARAS).map(t=>String(t||'').slice(0,2000));
  const r=await translateList(root,runtime,list,goal,options);
  /* withEngine (the reader): also say which engine answered, so the page can point out the Microsoft fallback */
  return options.withEngine?{texts:r.texts,engine:r.engine}:r.texts;

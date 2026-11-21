@@ -71,7 +71,7 @@
    keep.markSaved(args.text);status.textContent+=' · '+keep.t().also;paintKeep();}if(value.mediaWarning==='SCREENSHOT_UNAVAILABLE')status.textContent+=' · '+(document.documentElement.lang.startsWith('ja')?'ゲーム画像を取得できませんでした':document.documentElement.lang.startsWith('en')?'Game screenshot unavailable':'未获取到游戏截图');
    if(value.sentenceAudioSource){const labels={game:['例句：游戏原声','Example: game voice','例文：ゲーム音声'],synthesized:['例句：合成语音','Example: synthesized voice','例文：合成音声']};
    const lang=document.documentElement.lang;status.textContent+=' · '+labels[value.sentenceAudioSource][lang.startsWith('ja')?2:lang.startsWith('en')?1:0];}try{
-   window.__tomeAnkiMined?.({entry:result?.entries?.find(e=>e.id===entryId)||result?.entries?.[0],args,noteId:value.id,word});}catch{}}}catch(e){if(alive())status.textContent=e.message;
+   window.__tomeAnkiMined?.({entry:result?.entries?.find(e=>e.id===entryId)||result?.entries?.[0],args,noteId:value.id,word,wordMined:value.wordMined});}catch{}}}catch(e){if(alive())status.textContent=e.message;
    }finally{clearInterval(ticker);if(action==='anki'){ankiBusy=false;if(anki.dataset.state==='busy')delete anki.dataset.state;}if(alive()){audio.disabled=false;anki.disabled=minedKeys.has(minedKey());if(anki.disabled)markMined();
    }}}
   request('word',scope).then(value=>{if(!alive())return;word=value;status.textContent=(value.pronunciationForm==='lemma'?'原形朗读：':'')+(value.reading||value.surface)+(value.pitch?.length?' · 音调 '+value.pitch.join(' / '):'')+' · '+value.pitchSource;

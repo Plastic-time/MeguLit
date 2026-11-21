@@ -31,12 +31,12 @@
    else await run('INSERT INTO words (id, spelling, reading, definitions, word_type) VALUES ($1, $2, $3, $4, $5)',[id,spelling,reading,JSON.stringify(entry.definitions||[]),(entry.pos||[]).join(', ')]);
   }
   if(media!==null)await run('INSERT OR IGNORE INTO word_tags (word_id, media_id) VALUES ($1, $2)',[id,media]).catch(()=>{});
-  if(sentence){const dup=await sel('SELECT id FROM word_sentences WHERE word_id = $1 AND sentence_text = $2',[id,sentence]);
+  if(sentence){const dup=await sel('SELECT id FROM word_sentences WHERE word_id = $1 AND sentence_text = $2 AND media_id IS $3',[id,sentence,media]);
    if(!dup.length)await run('INSERT INTO word_sentences (word_id, sentence_text, highlight_start, highlight_end, media_id'+(createdAt?', created_at':'')+') VALUES ($1, $2, $3, $4, $5'+(createdAt?', $6':'')+')',createdAt?[id,sentence,start,end,media,createdAt]:[id,sentence,start,end,media]);}
   if(noteId)await run('INSERT OR REPLACE INTO tome_anki_links (word_id, note_id) VALUES ($1, $2)',[id,Number(noteId)]);
   return id;
  }
- window.__tomeAnkiMined=async({entry,args,noteId})=>{try{const chars=[...(args?.text||'')];await mine({entry,sentence:args?.text||'',start:args?.start||0,end:args?.end||0,noteId});schedule(4000);}catch(e){console.warn('[MeguLit] mine failed',e);}};
+ window.__tomeAnkiMined=async({entry,args,noteId,wordMined})=>{try{await mine({entry,sentence:wordMined?'':args?.text||'',start:args?.start||0,end:args?.end||0,noteId});schedule(4000);}catch(e){console.warn('[MeguLit] mine failed',e);}};
  // Anki -> MeguLit
  let syncing=null,last={at:0,words:0,imported:0,reviews:0,status:0,error:''};
  async function sync(){
