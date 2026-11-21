@@ -87,6 +87,9 @@ module.exports={
   embed:false,
   /* with embed on, the Chinese is drawn by the game too (false = ruby only, the reader draws the Chinese) */
   embedTranslation:true,
+  /* native engines whose message / name / choice sprites share one layout (BGI): which call chain is which role, one entry
+     "<rva>,<rva>,...=<role>" per chain (the via= of the engine's DRAWRUN rows, a prefix is enough); [] = the kernel: no role */
+  viaRoles:[],
  },
  /* 2026-11-21 (owner: 英文学习模式 + 多语言译文) settings that depend on the language of the game's text, one block per BCP 47 tag
     ('ja', 'en', 'zh-Hans'): {annotation:'ruby'|'ipa'|'pinyin'|'none', pairing:'script'|'patch'|'machine'|'none', dictionary:<id>,

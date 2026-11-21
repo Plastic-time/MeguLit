@@ -13,7 +13,10 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const Profiles=require('./profiles/index.cjs');
 const MAX=64;
 
-function settings(profile){const frames=Profiles.get(profile,'choice.pageFrames',[]);return {clear:Profiles.get(profile,'page.reportClear',false)===true,choiceFrames:Array.isArray(frames)?frames.filter(f=>typeof f==='string'&&f&&!/[\r\n]/.test(f)).slice(0,20):[],roles:Profiles.get(profile,'draw.roles',false)===true,embed:Profiles.get(profile,'draw.embed',false)===true,zh:Profiles.get(profile,'draw.embedTranslation',true)!==false};}
+/* draw.viaRoles entries the engine DLL understands: "<hex rva>[,<hex rva>...]=<role>" (BGI, native/megulithook/BgiDraw.h) */
+const VIA_ROLE=/^[0-9a-f]{1,8}(?:,[0-9a-f]{1,8}){0,5}=(?:line|name|choice|button|menu|system)$/;
+function viaRoles(v){const r=Array.isArray(v)?v.filter(s=>typeof s==='string'&&VIA_ROLE.test(s)).slice(0,16):[];return r.length?{viaRoles:r}:{};}/* none = the settings as before */
+function settings(profile){const frames=Profiles.get(profile,'choice.pageFrames',[]);return {clear:Profiles.get(profile,'page.reportClear',false)===true,choiceFrames:Array.isArray(frames)?frames.filter(f=>typeof f==='string'&&f&&!/[\r\n]/.test(f)).slice(0,20):[],roles:Profiles.get(profile,'draw.roles',false)===true,...viaRoles(Profiles.get(profile,'draw.viaRoles',[])),embed:Profiles.get(profile,'draw.embed',false)===true,zh:Profiles.get(profile,'draw.embedTranslation',true)!==false};}
 /* the key both sides use: the sentence's characters without blanks or line breaks */
 const keyOf=t=>String(t||'').replace(/[\s　\u001f]/g,'');
 /* reader spans [start, end, reading] (end exclusive, code points of the key) -> start:len:reading|... */
@@ -30,6 +33,7 @@ function krkrControlText(cfg,entries){
  const lines=['#cfg roles='+(cfg.roles?1:0)+' embed='+(cfg.embed?1:0)+' zh='+(cfg.zh?1:0)];
  if(cfg.clear)lines.push('#clearline');
  for(const f of cfg.choiceFrames||[])lines.push('#choiceframe '+f);
+ for(const r of cfg.viaRoles||[])lines.push('#role '+r);
  for(const [k,e] of entries)if(k&&!/[\t\r\n]/.test(k))lines.push(k+'\t'+rubyField(e.ruby)+'\t'+(cfg.zh?clean(e.zh):''));
  return lines.join('\r\n')+'\r\n';
 }

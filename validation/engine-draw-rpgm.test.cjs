@@ -123,8 +123,8 @@ test('web path wiring: the RPG Maker reader rides along, asks go to onAsk, confi
  await p.drawConfig({roles:true,embed:true,zh:true});await p.drawConfig({roles:true,embed:true,zh:true});
  assert.equal(evals.filter(j=>j.includes('__megulitRpgm.config({"roles":true,"embed":true,"zh":true})')).length,1,'sent once per change');
  await p.drawEmbed('今日は',{ruby:[[0,2,'きょう']],zh:'今天'});assert.ok(evals.at(-1).includes('__megulitRpgm.embed("今日は",{"ruby":[[0,2,"きょう"]],"zh":"今天"})'));
- const prof=require('../core/profiles/index.cjs');assert.deepEqual(prof.profileFor({engine:'RPG Maker MV/MZ'}).draw,{roles:true,embed:true,embedTranslation:true},'engine diff turns it on for RPG Maker only');
- assert.deepEqual(prof.profileFor({engine:'KiriKiri'}).draw,{roles:false,embed:false,embedTranslation:true});
+ const prof=require('../core/profiles/index.cjs');assert.deepEqual(prof.profileFor({engine:'RPG Maker MV/MZ'}).draw,{roles:true,embed:true,embedTranslation:true,viaRoles:[]},'engine diff turns it on for RPG Maker only');
+ assert.deepEqual(prof.profileFor({engine:'KiriKiri'}).draw,{roles:false,embed:false,embedTranslation:true,viaRoles:[]});
 });
 
 test('MZ: text drawn in buffered runs (flushTextState) still gives one box per character; rows use the window line height',()=>{

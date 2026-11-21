@@ -58,6 +58,7 @@ ToMe_CHARS engine=<e> line=N hidden=0|1 sw=W sh=H vx= vy= vw= vh= n=K rects=x,y,
 - `draw.roles`（false）：引擎差分按角色上报；关着时名字 / 选项照旧（不报或混进台词）
 - `draw.embed`（false）：台词内嵌替换
 - `draw.embedTranslation`（true）：内嵌时中文也让游戏画（false = 只画注音，中文给阅读层）
+- `draw.viaRoles`（[]，版本层）：消息 / 名字 / 选项共用一个排版函数的原生引擎（BGI）按调用链给角色，一条 `"<rva>,<rva>=<role>"`（DRAWRUN 的 via 前缀）；内核写成控制文件的 `#role <via>=<role>` 行，其他引擎的读法跳过 `#` 开头的行
 
 ## 各引擎现状（本分支）
 

@@ -1,4 +1,5 @@
 #include "BGI.h"
+#include "BgiDraw.h" /* engine-draw 2026-11-21: the glyph layout of any BGI build (opt-in, docs/engine-draw-native.md) */
 /********************************************************************************************
 BGI hook:
   Usually game folder contains BGI.*. After first run BGI.gdb appears.
@@ -1357,9 +1358,9 @@ namespace
 }
 bool BGI::attach_function()
 {
-  if (InsertBGI4Hook())
-    return true;
-  return InsertBGI2Hook() || (PcHooks::hookOtherPcFunctions(), InsertBGI1Hook()) || veryold();
+  bool ok = InsertBGI4Hook() || InsertBGI2Hook() || (PcHooks::hookOtherPcFunctions(), InsertBGI1Hook()) || veryold();
+  if (ok) BgiDraw::Arm(processStartAddress);
+  return ok;
 }
 
 uintptr_t queryrelativeret(HookParam &hp, uintptr_t retaddr);
