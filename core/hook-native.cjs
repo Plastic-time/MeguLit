@@ -957,7 +957,7 @@ class HookNative{
  /* Text architecture ③ (core/text-paths-launch.cjs): a web / Unity engine path follows the same replacement switch and gets each source line to find the dialogue */
  attachTextPath(p){this.textPath=p;try{p.hide(this.enabled===true);}catch{}this.drawSync();}
  /* engine-draw: the profile's draw.* switches go to the engine paths that read them (web / RPG Maker now, KiriKiri with its next line) */
- drawSync(){const ED=require('./engine-draw.cjs'),cfg=ED.settings(this.profile);try{this.textPath?.drawConfig?.(cfg);}catch{}
+ drawSync(){const ED=require('./engine-draw.cjs'),cfg=ED.settings(this.profile);try{this.textPath?.drawConfig?.({...cfg,kemcoSprites:Profiles.get(this.profile,'draw.kemcoSprites',false)===true});}catch{}
   /* a game whose diff turns draw.* on gets its control file at once (YU-RIS arms its glyph loop hook from it before any line) */
   try{const pid=this.gamePid();if(pid&&(cfg.roles||cfg.embed||cfg.clear||cfg.advhdInput===true||(cfg.choiceFrames||[]).length))this.ensureEngineDraw(pid);else this.engineDraw?.setProfile(this.profile);}catch{}}
  send(v){if(v&&(v.type==='enable'||v.type==='disable'))try{this.textPath?.hide(v.type==='enable');}catch{}if(this.process?.stdin.writable)this.process.stdin.write(JSON.stringify(v)+'\n');}
