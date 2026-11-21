@@ -332,9 +332,12 @@ const MEDIA_XP3=/^(?:bg|fg|ev|sd)?image|^(?:bgm|voice|sound|se|movie|video|thum|
 const cxArchives=dir=>{try{return fs.readdirSync(dir).filter(f=>/\.xp3$/i.test(f)&&!MEDIA_XP3.test(f)).map(f=>path.join(dir,f));}catch{return [];}};
 const cxCache=file=>{const st=fs.statSync(file);return path.join(os.tmpdir(),'megulit-cx',crypto.createHash('sha256').update(path.resolve(file).toLowerCase()+'|'+st.size+'|'+st.mtimeMs+'|6').digest('hex').slice(0,24)+'.json');};
 const cxBuilds=new Map(),cxMemo=new Map(),cxQueue=[],cxStarted=new Map();let cxRunning=false;
+let cxProbe=null;
+function withCxProbe(fn){const previous=cxProbe;cxProbe={deferred:false};try{return fn();}finally{cxProbe=previous;}}
 function cxDocs(file){
  let out;try{out=cxCache(file);}catch{return null;}
  try{const st=fs.statSync(out),hit=cxMemo.get(out);if(hit&&hit.at===st.mtimeMs)return hit.docs;const docs=JSON.parse(fs.readFileSync(out,'utf8')).docs||[];cxMemo.set(out,{at:st.mtimeMs,docs});return docs;}catch{}
+ if(cxProbe)return null;
  if(!cxBuilds.has(out)){
   // Only archives that look like cx KiriKiri (encrypted entries) are worth a worker; one worker at a time.
   /* E595 a translation's patch.xp3 keeps its scene files unencrypted (each byte XOR-ed, which the worker undoes) */
@@ -348,9 +351,22 @@ function cxDocs(file){
    the missing caches in this thread, within a deadline; the probe calls it before reading. */
 function cxPrepareSync(dir,{deadline=Infinity}={}){let built=0;
  const size=f=>{try{return fs.statSync(f).size;}catch{return 0;}},order=cxArchives(dir).sort((a,b)=>(/^scn/i.test(path.basename(b))-/^scn/i.test(path.basename(a)))||size(a)-size(b));
- for(const file of order){if(Date.now()>deadline)break;let out;try{out=cxCache(file);}catch{continue;}if(fs.existsSync(out))continue;
-  let list;try{list=xp3.list(file);}catch{list=null;}if(!list||!list.files.some(e=>e.encrypted||/\.scn$/i.test(e.name)))continue;
-  try{const r=require('./cx-worker.cjs').build(file);fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out+'.tmp',JSON.stringify({schema:1,file,...r}));fs.renameSync(out+'.tmp',out);built++;}catch{}}
+ for(const file of order){let out;try{out=cxCache(file);}catch{continue;}if(fs.existsSync(out)||cxBuilds.has(out))continue;
+  if(Date.now()>=deadline){if(cxProbe)cxProbe.deferred=true;break;}
+  const attempt=out+'.'+process.pid+'.'+crypto.randomUUID()+'.tmp';
+  if(Number.isFinite(deadline)){
+   const left=Math.floor(deadline-Date.now());if(left<=0){if(cxProbe)cxProbe.deferred=true;break;}
+   const signal=new Int32Array(new SharedArrayBuffer(4));let worker,cleanExited;
+   try{
+    const {Worker}=require('node:worker_threads');worker=new Worker(path.join(__dirname,'cx-worker.cjs'),{workerData:{prepare:true,file,attempt,signal:signal.buffer}});worker.on('error',()=>{});worker.unref();cxBuilds.set(out,worker);cxStarted.set(out,Date.now());
+    const owned=worker;cleanExited=()=>{if(cxBuilds.get(out)===owned)cxBuilds.delete(out);try{fs.rmSync(attempt,{force:true});}catch{}};worker.once('exit',cleanExited);
+    const remaining=Math.floor(deadline-Date.now());if(remaining>0&&Atomics.load(signal,0)===0)Atomics.wait(signal,0,0,remaining);
+    const status=Atomics.load(signal,0);
+    if(Date.now()>=deadline||status===0){if(cxProbe)cxProbe.deferred=true;break;}
+    if(status===1){if(cxCache(file)!==out||Date.now()>=deadline){if(cxProbe)cxProbe.deferred=true;break;}fs.renameSync(attempt,out);built++;}
+   }catch{}finally{if(worker)try{worker.terminate().then(cleanExited,()=>{});}catch{}}
+  }else try{if(require('./cx-worker.cjs').prepare(file,attempt)){fs.renameSync(attempt,out);built++;}}catch{}finally{try{fs.rmSync(attempt,{force:true});}catch{}}
+ }
  return built;}
 function cxNext(){
  if(cxRunning||!cxQueue.length)return;const {file,out}=cxQueue.shift();cxRunning=true;
@@ -637,6 +653,7 @@ function fingerprint(id,dir){return crypto.createHash('sha256').update(id+'\n'+E
    be read yet is waiting for. 'unpack': its cx archives are being decrypted in the background (started: when);
    'capture': strongly encrypted KiriKiri archives, read while the game runs (kirikiri-dump), nothing saved yet. */
 function preparing(dir){
+ if(cxProbe?.deferred)return {kind:'budget'};
  const viaGarbro=(()=>{try{return garbro.preparing(dir);}catch{return null;}})();if(viaGarbro)return viaGarbro;
  let started=0;for(const file of cxArchives(dir)){let out;try{out=cxCache(file);}catch{continue;}if(cxBuilds.has(out))started=Math.min(started||Infinity,cxStarted.get(out)||Date.now());}
  if(started)return {kind:'unpack',startedAt:started};
@@ -646,4 +663,4 @@ function preparing(dir){
 }
 /* E375 why a recognised game cannot be read (an engine's own check, e.g. encrypted WOLF archives), or null. */
 function unsupportedReason(dir){for(const e of Object.values(ENGINES)){if(typeof e.unsupported!=='function')continue;let code='';try{code=e.unsupported(dir);}catch{}if(code)return {engine:e.id,code,detail:e.REASONS?.[code]||''};}return null;}
-module.exports={layerOriginal,sceneLanguage,cxChineseOnly,cxPrepareSync,ownCx,unquoteSlot,unsupportedReason,preparing,cxBuilds,chineseColumn,ENGINES,detect,readable,read,fingerprint,parseKs,parseAst,parseRpy,pfsList,pfsRead,tlPairs,decode};
+module.exports={layerOriginal,sceneLanguage,cxChineseOnly,cxPrepareSync,withCxProbe,ownCx,unquoteSlot,unsupportedReason,preparing,cxBuilds,chineseColumn,ENGINES,detect,readable,read,fingerprint,parseKs,parseAst,parseRpy,pfsList,pfsRead,tlPairs,decode};
