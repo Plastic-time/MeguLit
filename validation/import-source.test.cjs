@@ -28,6 +28,38 @@ test('an import made before links were recorded: the same work next to a game wi
  db.prepare('UPDATE games SET hidden_at=NULL WHERE id=?').run('old');
  assert.deepEqual(src.backfill(db,{now:9}),[],'a card the user shows again stays shown');
 });
+test('two imported editions of one work remain separate library games',t=>{
+ const {db,steam,old,other}=setup();t.after(()=>{db.close();fs.rmSync(path.dirname(path.dirname(steam)),{recursive:true,force:true});});
+ for(const dir of [steam,old])fs.mkdirSync(path.join(dir,'.megulit-japanese-import'));
+ const folder=JSON.stringify({library:{source:'folder',vndbId:'v97'}});
+ db.prepare("UPDATE games SET original=? WHERE id IN ('steam','other')").run(folder);
+ assert.deepEqual(src.backfill(db),[]);
+ for(const id of ['steam','old','other']){
+  assert.equal(row(db,id).hidden_at,null);
+  assert.equal(src.targetOf(db,row(db,id)),'');
+ }
+ assert.deepEqual(src.link(db,'old',other),['other']);
+ assert.equal(src.targetOf(db,row(db,'other')),'old');
+});
+test('backfill uses the manually corrected work for targets and sources',t=>{
+ const {db,steam,old}=setup();t.after(()=>{db.close();fs.rmSync(path.dirname(path.dirname(steam)),{recursive:true,force:true});});
+ for(const dir of [steam,old])fs.mkdirSync(path.join(dir,'.megulit-japanese-import'));
+ const corrected=(id,vndbManual)=>db.prepare('UPDATE games SET original=? WHERE id=?')
+  .run(JSON.stringify({...JSON.parse(row(db,id).original),vndbManual}),id);
+ corrected('old','v2');
+ corrected('other','v97');
+ assert.deepEqual(src.backfill(db),['other']);
+ assert.equal(src.targetOf(db,row(db,'other')),'steam');
+ assert.equal(row(db,'old').hidden_at,null);
+});
+test('backfill requires a known work and a folder source',t=>{
+ const {db,steam}=setup();t.after(()=>{db.close();fs.rmSync(path.dirname(path.dirname(steam)),{recursive:true,force:true});});
+ fs.mkdirSync(path.join(steam,'.megulit-japanese-import'));
+ db.prepare("UPDATE games SET original=?").run(JSON.stringify({library:{source:'folder'}}));
+ assert.deepEqual(src.backfill(db),[]);
+ db.prepare("UPDATE games SET original=?").run(JSON.stringify({library:{source:'steam',vndbId:'v97'}}));
+ assert.deepEqual(src.backfill(db),[]);
+});
 test('launch and home use the link; both imports record it',()=>{
  const bridge=fs.readFileSync(path.join(__dirname,'..','services','bridge.cjs'),'utf8');
  assert.match(bridge,/sources\.targetOf\(db,[\s\S]{0,140}return launch\(db,target,runtime,windowsLaunch,\{redirected:true\}\)/);
