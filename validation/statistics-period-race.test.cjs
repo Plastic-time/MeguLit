@@ -7,13 +7,33 @@ const hasEdge=[process.env.MEGULIT_EDGE,'C:/Program Files (x86)/Microsoft/Edge/A
 const source=name=>fs.readFileSync(path.join(__dirname,'../web',name),'utf8');
 const moduleURL=js=>'data:text/javascript;base64,'+Buffer.from(js).toString('base64');
 
-test('late statistics requests leave the selected period, panels and loading state intact',{skip:!hasEdge},async t=>{
+async function dashboard(t){
  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-statistics-period-'));
  let browser;
  t.after(async()=>{try{await browser?.stop();}finally{await fs.promises.rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:150});}});
  browser=await startEdge(profile);
  const view=source('statistics-view.js').replace('./statistics-i18n.js',moduleURL(source('statistics-i18n.js')));
  const module=moduleURL(source('statistics-grimoire.js').replace('./statistics-view.js',moduleURL(view)));
+ return {browser,module};
+}
+
+test('rounded reading minutes carry into the next hour',{skip:!hasEdge},async t=>{
+ const {browser,module}=await dashboard(t);
+ const result=await browser.evaluate(`(async()=>{
+  const {mountStatistics}=await import('${module}'),root=document.body,labels=[];
+  for(const seconds of [0,59,3569,3570,7169,7170,7200]){
+   const period={date:'2026-11-05',range:'day'},data={period,totals:{seconds},games:[],buckets:[],hours:[],weekdays:[],topLookups:[]};
+   await mountStatistics(root,{api:async()=>data,env:{locale:'en',esc:String},selection:period});
+   await new Promise(r=>setTimeout(r,0));
+   labels.push(root.querySelector('[data-p="keys"] > div:nth-child(2) b').textContent);
+  }
+  return labels;
+ })()`);
+ assert.deepEqual(result,['0m','1m','59m','1h0m','1h59m','2h0m','2h0m']);
+});
+
+test('late statistics requests leave the selected period, panels and loading state intact',{skip:!hasEdge},async t=>{
+ const {browser,module}=await dashboard(t);
  const result=await browser.evaluate(`(async()=>{
   const {mountStatistics}=await import('${module}');
   const root=document.body,requests=[],tick=()=>new Promise(r=>setTimeout(r,0));
