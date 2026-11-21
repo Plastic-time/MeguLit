@@ -1,5 +1,6 @@
 const labels={zh:['游戏启动失败','关闭'],en:['Game could not start','Close'],ja:['ゲームを起動できませんでした','閉じる']};
 const reasons={
+ CARDINAL_TREE_EXIT_UNCONFIRMED:['无法确认后台阅读回放已安全退出，已暂停本次游戏启动并保留诊断日志。请通过「关于 → 一键上传问题反馈」发送日志','The background reader replay could not confirm a safe shutdown. Game launch is paused and diagnostic logs are retained. Send them through About → Report a problem','バックグラウンドの読書リプレイが安全に終了したことを確認できないため、ゲームの起動を中止し、診断ログを保持しています。「About → 問題を報告」からログを送信してください'],
  JAPANESE_EXECUTABLE_REQUIRED:['没有找到可用的日文原版启动程序。这份可能是纯汉化包。请安装日文原版并选择启动程序，或到「工具 → 日文原版恢复」从日文原版导入剧本。MeguLit 需要日文原文才能使用','A usable Japanese original executable is required. This may be a Chinese-only package. Install the Japanese release and choose its program, or import its script under Tools → Restore Japanese original.','中国語だけのパッケージかもしれません。日本語版をインストールして実行ファイルを選ぶか、「ツール → 日本語原版に戻す」で日本語版からシナリオを取り込んでください'],
  PATCH_STATE_INVALID:['无法读取语言切换记录，请查看启动诊断日志','Could not read the language switch record. See the launch log','言語切替の記録を読めません。起動ログを確認してください'],
  PATCH_UNSAFE_PATH:['补丁文件夹包含异常路径，请从完整安装中选择启动程序','The patch contains an unsupported path. Choose the executable from a complete installation','未対応のパスが含まれています。完全なインストールの実行ファイルを選んでください'],
