@@ -79,3 +79,5 @@ for %%M in (ToMeCS2_DRAW ToMeSG_EMBED EmbedEuphoria474_DrawHide_TEST2) do (
 
 rem Majiro complete-string observer: signatures and real MinHook gate, x86 and x64 stub
 call "%~dp0run-majiro.cmd" || exit /b 1
+rem AdvHD version-pinned diagnostic input, custom EAX + eleven-word ABI and x64 no-op.
+call "%~dp0run-advhd.cmd" || exit /b 1

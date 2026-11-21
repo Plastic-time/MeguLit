@@ -6,13 +6,15 @@
 
 下面各引擎的画字钩子都已合进 main。默认全部不挂：只有这部游戏的 seed 打开 `draw.roles`（MeguLit 写出控制文件 `#cfg roles=1`）才装钩子；现在没有任何游戏 seed 打开它。这一点由 `validation/engine-draw-opt-in.test.cjs` 钉住：钩子只在 `Install()` 里装，`Install()` 只在 roles=1 检查之后调，启动时 `Arm()` 从不挂钩；内核默认不写控制文件；seed 要开得先加进测试里的允许名单
 
+AdvHD 新增的单版本输入诊断使用独立、默认 false 的 `draw.advhdInput`，不授予上段角色或渲染能力，也没有 seed 开启，详见下表及诊断文档
+
 | 引擎 | 部件（native/megulithook） | 状态 |
 |---|---|---|
 | ReaLive / AVG32（涙、Air） | DrawSites（GDI 画字点）签名 `avg32` | 已进 main，默认不挂 |
 | Softpal（レイライン 1 / 2） | DrawSites `softpal`、`softpal-2` | 已进 main，默认不挂 |
 | NScripter（月姬 v1.4 / v1.6，同一 exe） | DrawSites `nscripter`（mode 1 字形点） | 默认不挂；页面坐标、角色、mode 0/2 和样本编码尚未验收 |
 | Innocent Grey（虚ノ少女，MFC） | DrawSites `mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw` | 已进 main，默认不挂 |
-| AdvHD / WillPlus（Under The Moon） | DrawSites `advhd` | 已进 main，默认不挂 |
+| AdvHD / WillPlus（Under The Moon） | DrawSites `advhd`；AdvhdDraw 输入诊断 | 默认不挂；诊断钉住单一 exe，仅完整原始输入，不授予正文角色、隐藏或嵌入能力 |
 | CMVS（青い鳥） | DrawSites `cmvs` | 已进 main，默认不挂 |
 | FVP（ヒカリ 中文版 / HD） | DrawSites `fvp`、`fvp-bitmap` | 已进 main，默认不挂 |
 | minori（eden 英文版） | DrawSites `minori` | 已进 main，默认不挂 |
@@ -28,7 +30,7 @@
 | WHITE ALBUM2、ダンガンロンパ 1 / 2 / V3、みにくいモジカの子 | 无 | 没做：静态做不出，实机采集方案见 engine-draw-native.md |
 | Silky's、LiveMaker、System4、Escu:de、Kaguya 等 | 无 | 没做：本机没有样本 |
 
-GetGlyphOutline 类的签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、沙耶两版）以及 NScripter 的字形小图，是不是字形缓存（只有第一次出现的字）还要实机确认，见 engine-draw-native.md「注意：字形缓存」
+AdvHD 的本机样本已静态确认缓存命中会绕过旧 GetGlyphOutline 点，新输入诊断在缓存判断之前，尚未游戏实测，见 [AdvHD 诊断交付](re-advhd-input.md)。其余 GetGlyphOutline 类签名和 NScripter 字形小图仍需确认缓存覆盖，见 engine-draw-native.md「注意：字形缓存」
 
 ## Majiro 本轮交付
 
