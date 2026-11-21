@@ -2,7 +2,7 @@
 'use strict';
 /* rc/1.4.23-engines: every engine-draw hook is off by default and goes on only when the game's seed asks for it
    (draw.roles -> MeguLit's control file %TEMP%\MeguLit\draw\<pid>.txt says roles=1). Pinned on both sides:
-   - native: in each engine-draw runtime (GDI draw sites, YU-RIS, SiglusEngine, MAGES, CatSystem2) MinHook is only created /
+   - native: in each engine-draw runtime (GDI draw sites, YU-RIS, SiglusEngine, MAGES, CatSystem2, BGI) MinHook is only created /
      enabled inside Install() (or a helper only Install() calls), Install() is only called right behind the roles=1 check,
      and Arm() (run at engine detection in every game) never hooks;
    - kernel: the default profile has draw.roles / draw.embed off, its control text says roles=0, an EngineDraw with nothing
@@ -11,7 +11,7 @@
      per game after a live check). */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const root=path.join(__dirname,'..'),hook=path.join(root,'native','megulithook');
-const RUNTIMES=['DrawSites.h','YurisDraw.h','SiglusDraw.h','MagesDraw.h','CS2Draw.h'];
+const RUNTIMES=['DrawSites.h','YurisDraw.h','SiglusDraw.h','MagesDraw.h','CS2Draw.h','BgiDraw.h'];
 const SEEDS_ON=[]; /* seed folders (engine/game) allowed to turn draw.roles or draw.embed on */
 
 const strip=s=>s.replace(/\/\*[\s\S]*?\*\//g,m=>m.replace(/[^\n]/g,' ')).replace(/\/\/[^\n]*/g,m=>' '.repeat(m.length)).replace(/"(?:[^"\\\n]|\\.)*"/g,m=>'"'+' '.repeat(m.length-2)+'"');
@@ -42,7 +42,10 @@ for(const file of RUNTIMES){
   for(const m of src.matchAll(/\bInstall\s*\(\s*\)/g)){
    if(install.some(f=>f.start===m.index))continue;
    const lineStart=src.lastIndexOf('\n',m.index)+1,lineEnd=src.indexOf('\n',m.index),line=raw.slice(lineStart,lineEnd);
-   assert.ok(/RolesAsked\s*\(\s*\)|&&\s*roles\b|\broles\s*\)/.test(line),file+': Install() called without the roles=1 check: '+line.trim());
+   assert.ok(/RolesAsked\s*\(\s*\)|ReadControl\s*\(\s*\)\s*&&|&&\s*roles\b|\broles\s*\)/.test(line),file+': Install() called without the roles=1 check: '+line.trim());
+   /* ReadControl() as the guard (BGI): it must return the roles=1 flag of the #cfg line */
+   if(/ReadControl\s*\(\s*\)\s*&&/.test(line)){const rc=fns.find(f=>f.name==='ReadControl');assert.ok(rc,file+': ReadControl()');const body=raw.slice(rc.start,rc.end);
+    assert.ok(/roles\s*=[^;]*roles=1/.test(body)&&/return\s+roles\s*;/.test(body),file+': ReadControl() returns the roles=1 flag');}
   }
   for(const f of fns.filter(f=>f.name==='Arm'))assert.ok(!/\bMH_(?:CreateHook|EnableHook)\b|\bInstall\s*\(/.test(src.slice(f.start,f.end)),file+': Arm() hooks by itself');
  });
