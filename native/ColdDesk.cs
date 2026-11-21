@@ -11,7 +11,7 @@
 //       {"type":"started","pid":n,"started":"<StartTime UTC ticks>"}   {"type":"window","hwnd":"…","w":n,"h":n,"title":"…"}
 //       {"type":"input"}  the user touched keyboard or mouse: the game is ended at once
 //       {"type":"power","ac":false}  {"type":"fullscreen","on":true}   (reported; the service decides)
-//       {"type":"relaunched","pid":n}  the game exited and the same program came back outside the job (Steam): it is ended
+//       {"type":"relaunched","pid":n}  the same program appeared outside our job: report only; never kill the player's process
 //       {"type":"shot","ok":true,"path":"…","w":n,"h":n,"black":false}  {"type":"timeout"}  {"type":"exited","code":n}
 //       {"type":"ended","why":"…"}  last line
 //     stdin commands, one per line: key <vk> | keydown <vk> | keyup <vk> | click <x> <y> | activate | shot <maxWidth> <path> | kill
@@ -99,18 +99,25 @@ static class ColdDesk{
  static ulong Ft(FILETIME f){return ((ulong)f.Hi<<32)|f.Lo;}
  static double Cpu(){FILETIME i0,k0,u0,i1,k1,u1;if(!GetSystemTimes(out i0,out k0,out u0))return -1;Thread.Sleep(1000);GetSystemTimes(out i1,out k1,out u1);
   double idle=Ft(i1)-Ft(i0),total=(Ft(k1)-Ft(k0))+(Ft(u1)-Ft(u0));return total<=0?0:Math.Max(0,Math.Min(1,1-idle/total));}
- static string Status(){int q=Quns();return "{\"idleMs\":"+IdleMs()+",\"ac\":"+Ac()+",\"fullscreen\":"+(q==2||q==3||q==4?"true":"false")+",\"quns\":"+q+",\"cpu\":"+Cpu().ToString("0.000",System.Globalization.CultureInfo.InvariantCulture)+"}";}
+ static string Status(){double cpu=Cpu();int q=Quns();return "{\"idleMs\":"+IdleMs()+",\"ac\":"+Ac()+",\"fullscreen\":"+(q==2||q==3||q==4?"true":"false")+",\"quns\":"+q+",\"cpu\":"+cpu.ToString("0.000",System.Globalization.CultureInfo.InvariantCulture)+"}";}
 
  /* ---- run ------------------------------------------------------------------------------------------------------- */
  static IntPtr Job,Desk,GameWin;static HashSet<uint> Pids=new HashSet<uint>();static string ImageName="";static DateTime StartedAt;
- static List<uint> JobPids(){var l=new List<uint>();int size=8+4*1024;IntPtr buf=Marshal.AllocHGlobal(size);try{if(QueryInformationJobObject(Job,3,buf,(uint)size,IntPtr.Zero)){int n=Marshal.ReadInt32(buf,4);for(int i=0;i<n;i++)l.Add((uint)Marshal.ReadIntPtr(buf,8+i*IntPtr.Size).ToInt64());}}finally{Marshal.FreeHGlobal(buf);}return l;}
+ static readonly object CleanupLock=new object();static volatile bool Stopping;static bool Cleaned,CleanupSafe=true;static int StopRequested;
+ static List<uint> JobPids(){var l=new List<uint>();int size=8+IntPtr.Size*1024;IntPtr buf=Marshal.AllocHGlobal(size);try{if(!QueryInformationJobObject(Job,3,buf,(uint)size,IntPtr.Zero))throw new Exception("Cannot confirm cold job process list");int n=Marshal.ReadInt32(buf,4);for(int i=0;i<n;i++)l.Add((uint)Marshal.ReadIntPtr(buf,8+i*IntPtr.Size).ToInt64());}finally{Marshal.FreeHGlobal(buf);}return l;}
  static IntPtr Biggest(){IntPtr best=IntPtr.Zero;long area=-1;var pids=new HashSet<uint>(JobPids());EnumProc cb=(h,_)=>{uint p;GetWindowThreadProcessId(h,out p);if(!pids.Contains(p)||!IsWindowVisible(h))return true;RECT r;GetWindowRect(h,out r);long s=(long)(r.R-r.L)*(r.B-r.T);if(s>area){area=s;best=h;}return true;};
   EnumDesktopWindows(Desk,cb,IntPtr.Zero);return best;}
  static Dictionary<uint,Process> audioGuards=new Dictionary<uint,Process>();
- static void StopAudioGuards(){foreach(var p in audioGuards.Values){try{p.StandardInput.WriteLine("stop");p.WaitForExit(4000);}catch{}}audioGuards.Clear();}
+ static void StopAudioGuards(){foreach(var p in audioGuards.Values){try{if(p.HasExited){if(p.ExitCode!=0)CleanupSafe=false;continue;}p.StandardInput.WriteLine("stop");if(!p.WaitForExit(4000)||p.ExitCode!=0)CleanupSafe=false;}catch{try{if(!p.HasExited||p.ExitCode!=0)CleanupSafe=false;}catch{CleanupSafe=false;}}}audioGuards.Clear();}
  static readonly Dictionary<ISimpleAudioVolume,bool> originalMute=new Dictionary<ISimpleAudioVolume,bool>();
- static void RestoreAudio(){foreach(var kv in originalMute){try{Guid g=Guid.Empty;kv.Key.SetMute(kv.Value,ref g);}catch{}}originalMute.Clear();}
- static void Mute(){foreach(uint pid in JobPids()){if(audioGuards.ContainsKey(pid))continue;var helper=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"ColdCapture64.exe");var s=new ProcessStartInfo(helper,"--audio-watch "+Process.GetCurrentProcess().Id+" "+pid);s.UseShellExecute=false;s.CreateNoWindow=true;s.RedirectStandardInput=true;try{audioGuards[pid]=Process.Start(s);}catch{throw new Exception("Audio guard unavailable");}}}
+ static void RestoreAudio(){foreach(var kv in originalMute){try{Guid g=Guid.Empty;kv.Key.SetMute(kv.Value,ref g);}catch{CleanupSafe=false;}}originalMute.Clear();}
+ static void Mute(){lock(CleanupLock){if(Stopping)return;foreach(uint pid in JobPids()){if(audioGuards.ContainsKey(pid)){if(audioGuards[pid].HasExited)throw new Exception("Audio guard stopped before cleanup");continue;}long started;using(var game=Process.GetProcessById((int)pid))started=game.StartTime.ToUniversalTime().Ticks;if(!JobPids().Contains(pid))continue;var helper=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"ColdCapture64.exe");var s=new ProcessStartInfo(helper,"--audio-watch "+Process.GetCurrentProcess().Id+" "+pid+" "+started);s.UseShellExecute=false;s.CreateNoWindow=true;s.RedirectStandardInput=true;try{audioGuards[pid]=Process.Start(s);}catch{throw new Exception("Audio guard unavailable");}}}}
+ static void Cleanup(){lock(CleanupLock){if(Cleaned)return;Stopping=true;
+  StopAudioGuards();RestoreAudio();if(Job!=IntPtr.Zero){try{if(!TerminateJobObject(Job,1))CleanupSafe=false;var until=DateTime.UtcNow.AddSeconds(4);while(JobPids().Count>0&&DateTime.UtcNow<until)Thread.Sleep(20);if(JobPids().Count!=0)CleanupSafe=false;}catch{CleanupSafe=false;}finally{CloseHandle(Job);Job=IntPtr.Zero;}}
+  Cleaned=true;Emit("{\"type\":\"cleanup\",\"safe\":"+(CleanupSafe?"true":"false")+"}");}}
+ /* Independent of PrintWindow and the command queue: parent death/EOF can always end this owned job. */
+ static void RequestStop(){Stopping=true;if(Interlocked.Exchange(ref StopRequested,1)==0)new Thread(Cleanup){IsBackground=true}.Start();}
+ static void WatchParent(int pid){if(pid<=0)return;new Thread(()=>{try{using(var owner=Process.GetProcessById(pid)){while(!Stopping&&!owner.HasExited)Thread.Sleep(100);if(owner.HasExited)RequestStop();}}catch{RequestStop();}}){IsBackground=true}.Start();}
  static IntPtr Lp(uint vk,bool up){uint sc=MapVirtualKey(vk,0);long l=1|(sc<<16);if(up)l|=0xC0000000L;return (IntPtr)unchecked((int)l);}
  static void Key(uint vk,bool down,bool up){if(GameWin==IntPtr.Zero)return;if(down)PostMessage(GameWin,0x100,(IntPtr)vk,Lp(vk,false));if(down&&up&&(vk==0x0d||vk==0x20||vk==0x1b))PostMessage(GameWin,0x102,(IntPtr)vk,Lp(vk,false));if(up)PostMessage(GameWin,0x101,(IntPtr)vk,Lp(vk,true));}
  static void Click(int x,int y){if(GameWin==IntPtr.Zero)return;var w=GameWin;/* the deepest child under the point (KiriKiri draws in a child) */for(int i=0;i<8;i++){POINT pt;pt.X=x;pt.Y=y;var c=ChildWindowFromPointEx(w,pt,1);if(c==IntPtr.Zero||c==w)break;POINT o;o.X=0;o.Y=0;MapWindowPoints(c,w,ref o,1);x-=o.X;y-=o.Y;w=c;}
@@ -128,7 +135,8 @@ static class ColdDesk{
     var ep=new EncoderParameters(1);ep.Param[0]=new EncoderParameter(System.Drawing.Imaging.Encoder.Quality,70L);Directory.CreateDirectory(Path.GetDirectoryName(file));s.Save(file,Jpeg(),ep);}
    Emit("{\"type\":\"shot\",\"ok\":true,\"path\":"+Q(file)+",\"w\":"+tw+",\"h\":"+th+",\"black\":"+(black?"true":"false")+"}");}}
 
- static int Run(string[] a){string exe=Path.GetFullPath(a[1]);int seconds=600;for(int i=2;i<a.Length-1;i++){if(a[i]=="--seconds")seconds=Math.Max(10,int.Parse(a[i+1]));}
+ static int Run(string[] a){string exe=Path.GetFullPath(a[1]);int seconds=600,parentPid=0;for(int i=2;i<a.Length-1;i++){if(a[i]=="--seconds")seconds=Math.Max(10,int.Parse(a[i+1]));if(a[i]=="--parent-pid")parentPid=int.Parse(a[i+1]);}
+  using(var owner=Process.GetCurrentProcess())Emit("{\"type\":\"owner\",\"pid\":"+owner.Id+",\"started\":"+Q(owner.StartTime.ToUniversalTime().Ticks.ToString())+"}");
   ImageName=Path.GetFileNameWithoutExtension(exe);
   Desk=OpenDesktop(DESK,0,false,0x10000000);if(Desk==IntPtr.Zero)Desk=CreateDesktop(DESK,IntPtr.Zero,IntPtr.Zero,0,0x10000000,IntPtr.Zero);if(Desk==IntPtr.Zero){Emit("{\"type\":\"ended\",\"why\":\"desktop\"}");return 1;}
   PROCESS_INFORMATION pi=new PROCESS_INFORMATION();string why="";
@@ -137,14 +145,15 @@ static class ColdDesk{
   var si=new STARTUPINFO();si.cb=Marshal.SizeOf(si);si.lpDesktop="WinSta0\\"+DESK;
   if(!CreateProcess(exe,new StringBuilder("\""+exe+"\""),IntPtr.Zero,IntPtr.Zero,false,0x4/* CREATE_SUSPENDED */,IntPtr.Zero,Path.GetDirectoryName(exe),ref si,out pi)){Emit("{\"type\":\"ended\",\"why\":\"create "+Marshal.GetLastWin32Error()+"\"}");return 1;}
   if(!AssignProcessToJobObject(Job,pi.hProcess)){/* the game could escape the tree kill: never run it so */TerminateJobObject(Job,1);try{Process.GetProcessById(pi.dwProcessId).Kill();}catch{}Emit("{\"type\":\"ended\",\"why\":\"job\"}");return 1;}
-  ResumeThread(pi.hThread);CloseHandle(pi.hThread);pi.hThread=IntPtr.Zero;StartedAt=DateTime.UtcNow;
+  WatchParent(parentPid);ResumeThread(pi.hThread);CloseHandle(pi.hThread);pi.hThread=IntPtr.Zero;StartedAt=DateTime.UtcNow;
   string started="";try{started=Process.GetProcessById(pi.dwProcessId).StartTime.ToUniversalTime().Ticks.ToString();}catch{}
   Emit("{\"type\":\"started\",\"pid\":"+pi.dwProcessId+",\"started\":"+Q(started)+"}");
-  var cmds=new Queue<string>();var reader=new Thread(()=>{string l;try{while((l=Console.In.ReadLine())!=null)lock(cmds)cmds.Enqueue(l);}catch{}lock(cmds)cmds.Enqueue("kill");});reader.IsBackground=true;reader.Start();
+  var cmds=new Queue<string>();var reader=new Thread(()=>{string l;try{while((l=Console.In.ReadLine())!=null){if(l.Trim()=="kill"){RequestStop();return;}lock(cmds)cmds.Enqueue(l);}}catch{}RequestStop();});reader.IsBackground=true;reader.Start();
   uint baseInput=0;{var li=new LASTINPUTINFO();li.cbSize=(uint)Marshal.SizeOf(li);GetLastInputInfo(ref li);baseInput=li.dwTime;}
   int lastW=0,lastH=0;IntPtr lastHwnd=IntPtr.Zero;DateTime lastMute=DateTime.MinValue,lastPower=DateTime.MinValue;bool everAlive=false;DateTime goneAt=DateTime.MinValue;bool wasFull=Quns()>=2&&Quns()<=4;
   var end=DateTime.UtcNow.AddSeconds(seconds);
   while(why==""){
+   if(Stopping){why="stopped";break;}
    /* the user is back: end now, before anything else */
    {var li=new LASTINPUTINFO();li.cbSize=(uint)Marshal.SizeOf(li);if(GetLastInputInfo(ref li)&&li.dwTime!=baseInput){Emit("{\"type\":\"input\"}");why="input";break;}}
    string c=null;lock(cmds)if(cmds.Count>0)c=cmds.Dequeue();
@@ -160,8 +169,8 @@ static class ColdDesk{
    var pids=JobPids();
    if(pids.Count>0){everAlive=true;goneAt=DateTime.MinValue;}
    else if(everAlive){if(goneAt==DateTime.MinValue){goneAt=DateTime.UtcNow;}
-    /* Steam: the game exits and the client starts it again on the user's desktop. Push its windows away and end it */
-    foreach(var pr in Process.GetProcessesByName(ImageName)){try{if(pr.StartTime.ToUniversalTime()>StartedAt&&!pids.Contains((uint)pr.Id)){EnumProc off=(h,_)=>{uint wp;GetWindowThreadProcessId(h,out wp);if(wp==pr.Id)SetWindowPos(h,(IntPtr)1,-30000,-30000,0,0,0x0001|0x0010);return true;};EnumWindows(off,IntPtr.Zero);pr.Kill();Emit("{\"type\":\"relaunched\",\"pid\":"+pr.Id+"}");why="relaunched";}}catch{}}
+    /* A matching process outside our job may belong to the player. Report it; never move or kill it. */
+    foreach(var pr in Process.GetProcessesByName(ImageName)){try{if(pr.StartTime.ToUniversalTime()>StartedAt&&!pids.Contains((uint)pr.Id)&&String.Equals(Path.GetFullPath(pr.MainModule.FileName),exe,StringComparison.OrdinalIgnoreCase)){Emit("{\"type\":\"relaunched\",\"pid\":"+pr.Id+"}");why="relaunched";CleanupSafe=false;}}catch{}finally{pr.Dispose();}}
     if(why!="")break;
     if((DateTime.UtcNow-goneAt).TotalSeconds>12){uint code=0;GetExitCodeProcess(pi.hProcess,out code);Emit("{\"type\":\"exited\",\"code\":"+code+"}");why="exited";break;}}
    var w=Biggest();if(w!=IntPtr.Zero){RECT r;GetClientRect(w,out r);int cw=r.R-r.L,ch=r.B-r.T;if(w!=lastHwnd||cw!=lastW||ch!=lastH){lastHwnd=w;lastW=cw;lastH=ch;GameWin=w;var t=new StringBuilder(256);GetWindowText(w,t,256);Activate();
@@ -170,9 +179,9 @@ static class ColdDesk{
    if((DateTime.UtcNow-lastPower).TotalSeconds>5){lastPower=DateTime.UtcNow;if(Ac()=="false")Emit("{\"type\":\"power\",\"ac\":false}");int q=Quns();bool full=q>=2&&q<=4;if(full&&!wasFull)Emit("{\"type\":\"fullscreen\",\"on\":true}");wasFull=full;}
    if(DateTime.UtcNow>end){Emit("{\"type\":\"timeout\"}");why="timeout";break;}
    Thread.Sleep(100);}
-  }finally{
-  StopAudioGuards();RestoreAudio();if(Job!=IntPtr.Zero){TerminateJobObject(Job,1);CloseHandle(Job);}if(pi.hThread!=IntPtr.Zero)CloseHandle(pi.hThread);if(pi.hProcess!=IntPtr.Zero)CloseHandle(pi.hProcess);
+  }catch(Exception){if(!Stopping)throw;why="stopped";}finally{
+  Cleanup();if(pi.hThread!=IntPtr.Zero)CloseHandle(pi.hThread);if(pi.hProcess!=IntPtr.Zero)CloseHandle(pi.hProcess);
   /* the desktop goes away with its last handle once the game's windows are gone */
   Thread.Sleep(300);CloseDesktop(Desk);}
-  Emit("{\"type\":\"ended\",\"why\":"+Q(why)+"}");return 0;}
+  Emit("{\"type\":\"ended\",\"why\":"+Q(why)+"}");return CleanupSafe?0:1;}
 }
