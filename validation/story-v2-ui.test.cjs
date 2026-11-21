@@ -2,6 +2,14 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const layoutSource=fs.readFileSync(path.join(__dirname,'../web/story-layout.js'),'utf8'),storySource=fs.readFileSync(path.join(__dirname,'../web/detail-story.js'),'utf8');
+test('only a proven true goal gets the true-ending label; extra and unknown goals stay neutral',()=>{
+ const source=storySource.split(/\r?\n/).find(line=>line.startsWith('function routeButtonLabel(')),context={};vm.runInNewContext(source+'\nglobalThis.label=routeButtonLabel;',context);const w={hide:'hide',reveal:'true',revealTarget:'target'},g={goal:'extra'};
+ for(const type of ['extra','unknown','normal','good','bad'])assert.equal(context.label(w,g,{endings:[{id:'extra',type}]},false),'target');assert.equal(context.label(w,g,{endings:[]},false),'target');assert.equal(context.label(w,g,{endings:[{id:'extra',type:'true'}]},false),'true');assert.equal(context.label(w,g,{endings:[]},true),'hide');
+});
+test('an unknown graph node is not a lock and explicit route text never authorizes its picture',()=>{
+ const source=storySource.split(/\r?\n/).find(line=>line.startsWith(' function nodeMarkup(')),context={w:{node:{scene:'Scene'},progressUnknown:'Unconfirmed',locked:'Locked',unreached:'Unreached'},esc:String,lock:'LOCK_ICON',thumb:id=>`PICTURE_${id}`};vm.runInNewContext(source+'\nglobalThis.render=nodeMarkup;',context);const p={x:0,y:0,w:232,h:148},node={id:'n',kind:'scene',state:'unknown',label:'SECRET',firstLine:'SOURCE_LINE',image:'NO_AUTH'};
+ let html=context.render(node,p);assert(html.includes('story-node unknown'));assert(html.includes('Unconfirmed'));assert(!html.includes('LOCK_ICON'));assert(!html.includes('SECRET'));assert(!html.includes('SOURCE_LINE'));assert(!html.includes('PICTURE_'));html=context.render({...node,highlight:true},p);assert(html.includes('SOURCE_LINE'));assert(!html.includes('PICTURE_'));html=context.render({...node,state:'done'},p);assert(html.includes('PICTURE_NO_AUTH'));
+});
 test('a removed focused veil restores the open viewer focus without stealing another control or blurred window',()=>{
  const actual=storySource.split(/\r?\n/).find(line=>line.startsWith('function restoreViewerFocus('));assert(actual);let focused=0,inDialog=false,windowFocused=true;
  const context={document:{activeElement:{},hasFocus:()=>windowFocused}},dialog={open:true,contains:()=>inDialog,querySelector:()=>({focus:()=>focused++})},veil={isConnected:false};vm.runInNewContext(actual+'\nglobalThis.restore=restoreViewerFocus;',context);
