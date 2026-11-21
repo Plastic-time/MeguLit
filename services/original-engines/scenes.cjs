@@ -69,16 +69,16 @@ function readUnflagged(data,hash){
  if(hash===undefined)return unscramble(data);
  const key=hash&0xff;
  const {adler32}=require('./shiinario-crypt.cjs');
- if(key){
-  if(adler32(data,0,data.length)!==hash){
+ if(adler32(data,0,data.length)!==hash){
+  if(key){
    const plain=kit.xor(data,key);
    if(adler32(plain,0,plain.length)===hash&&!/[\x00-\x08\x0e-\x1f]/.test(decode(plain)))return plain;
   }
   return unscramble(data);
  }
- // A zero mask leaves bytes untouched and can also match an ordinary binary or a UTF-16 patch.
+ // An ordinary XP3 stores the checksum of the script as-is, regardless of its low byte.
  const legacy=unscramble(data);
- if(legacy.length||adler32(data,0,data.length)!==hash||data.some(b=>b<9||(b>13&&b<32)))return legacy;
+ if(legacy.length||data.some(b=>b<9||(b>13&&b<32)))return legacy;
  const text=decode(data);
  return !text.includes('\ufffd')&&/(?:\[[a-z_]\w*[\s\]]|^[@*]\w)/im.test(text)?data:legacy;
 }
