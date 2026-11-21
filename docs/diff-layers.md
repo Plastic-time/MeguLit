@@ -2,6 +2,42 @@
 
 MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部写成**键**，每部游戏用一份冻结的设置对象运行，修一部游戏只改它自己的差分
 
+
+## 当前权威接口（2026-11-21，其他会话只照这一节做）
+
+这一节是唯一准绳；和它不一致的旧说法（`core/profiles/identity.cjs`、`scope`/`game` 字段、`megulit.seed`、`x-` 前缀、`/api/auto-profile/…`、`files` 指纹）都已作废
+
+**指纹**（`core/game-print.cjs prints()/check()`，app、探针、diff-maker、relay 同一份）：
+- 版本层：`exe` 整文件 SHA-256（64 hex）、`head` 首尾 64 KB + 大小的 SHA-256、`pe` 文件版本 + PE 链接时间（`1.2.0.0@5f3a1b2c`）
+- 游戏层：`pack` 最大封包首尾 1 MB + 大小、`script` 剧本指纹、`steam` appid、`vndb`（`v1234`）、`title` 折叠标题的 SHA-256
+- 另有 `engine`（引擎 id，只用来选仓库引擎差分）
+
+**键**：`core/profiles/defaults.cjs` 登记默认值（= 旧行为），`core/profiles/domains.cjs` 登记值域和所属层（`layer:'version'|'game'`，`layerOf`/`split`）。任何来源的差分只能用登记过的键，值必须在值域内，否则整层不用
+
+**文档**（`core/game-diff.cjs`）：`{schema:'megulit.game-diff', version:1, key, layer:'version'|'game', prints, rev, source:'official'|'auto', mode:'hide'|'read', settings, exe, engine, app, issuedAt, agree?, reporters?, cost?, signature?}`
+- 版本层 key = exe SHA-256，可以放任何键，`mode` 可省；游戏层 key = 游戏身份（relay `gidFor`），只能放游戏层键
+- `mode:'read'` 必须带 `hide.textEffectsRead:true`；`rev` 只增
+
+**The Seed 文件**（仓库内置，官方，不签名）：
+- `The Seed/<engine>/<slug>/game.json`：游戏层文档 + seed 字段 `status`（`verified` / `owner-ok` / `read` / `skeleton`）、`slug`（= 目录名）、`builds`（exe SHA-256 列表）、可选 `match {exe, titles, notTitles}`（可读的程序名和标题，汉化改名时用）、可选 `sourceLangs`（BCP 47，默认 `['ja']`，例如 `['en','zh-Hans']`）
+- `The Seed/<engine>/<slug>/versions/<exe SHA-256>.json`：版本层文档，文件名 = key
+- settings 钉住每个键的当前生效值：做好了就是做好了，内核默认改了它也不变
+- 客户端语义：`verified` / `owner-ok` 直接用（官方游戏层）；`read` 直接读模式（官方游戏层）；`skeleton` 只给身份 + 钉住值，放在本机校准下面，自检闸门照常把关（不过线退读模式）
+
+**层顺序**（全部叠加，后面盖前面）：内核 ← 引擎差分 ← 仓库游戏文件 / skeleton seed ← 共享自动·游戏层 ← 共享自动·版本层 ← 本机校准 ← 官方·游戏层（内置 seed 或下发，rev 更高的下发覆盖内置）← 官方·版本层（同上）← 本机退档
+
+**认游戏**：①`exe` → ②`head`/`pe` → ③`pack`/`script`/`steam`/`vndb`/`title`（加上 seed `builds`、`match` 名字）→ ④`engine`。版本层只在 ①② 用（① 时 key 必须是这个 exe），游戏层任一级都用；② ③ 命中的下发差分是候选，第一个自检窗口不过线就拒用并上报。trace：`profile <gameKey> match=exe|head|pe|game:<依据>|engine|none exe=<前8位> layers=… engine=…`
+
+**接口**（relay，`relay/src/auto-profile.js`）：
+- `GET /api/game-profile?exe=&head=&pe=&pack=&script=&steam=&vndb=&title=&engine=&have=<版本层rev>&haveGame=<游戏层rev>` → `200 {schema:'megulit.game-diff-feed', version:2, key, match, versionLayer:{match,key,diff}|null, gameLayer:{match,key,diff}|null, diff}` / `304` 都最新 / `404` 都没有
+- `POST /api/game-profile/report {version:1, profile:{…}, prints?}`：校准和退档上报（`autoProfileShare` 默认开，用户设 false 才关，另需「共享适配」）；reason 以「同游戏新版本」开头的 gate 上报进修复队列 `kind=newVersion`，其余 `broken`
+- `POST /api/game-profile/runtime`：运行时样本（`runtimeSampleShare` 默认开）
+- `POST /api/game-profile/signed {diff, …}`：我们本机签过的文档
+
+**签名**：Ed25519，签去掉 `signature` 的规范 JSON；只在我们本机签（`tools/sign-profile.cjs`，私钥走 `MEGULIT_PROFILE_KEY`），relay 不持私钥；客户端公钥 `services/profile-keys.json`（官方和自动同一组）。内置 The Seed 不签名
+
+**本机文件**：下发缓存 `data/The Seed/<exe SHA-256>.json`（relay 整份回复）和 `<exe SHA-256>.rejected.json`（被拒候选）；本机校准 `data/config/auto-profiles/`；exe 哈希缓存 `data/config/exe-hashes.json`
+
 ## 层（后面盖前面，全部叠加）
 
 | 层 | 来源 | layers 里的名字 |
@@ -23,14 +59,7 @@ MeguLitHook 是所有游戏共用的内核。会因游戏而异的行为全部�
 
 ## The Seed（内置游戏差分）
 
-仓库根目录 `The Seed/` 是正式产物：随 GitHub main 发布，安装包里在 `MeguLit/The Seed/`（只多一个子目录，安装包名和 `MeguLit/` 结构不变），热更新也带（`services/hot-update.cjs` 允许 `The Seed/`，`Release.ps1` 打包和热更新包都列进去）。格式、贡献方式见 `The Seed/README.md`（中英双语）
-
-- `The Seed/<engine>/<gameId>/game.json`：游戏层，`prints`（pack/script/steam/vndb/title）、`match`（程序名、标题）、`title {ja, zh}`；只能放游戏层键
-- `The Seed/<engine>/<gameId>/versions/<exe SHA-256>.json`：版本层，`prints`（exe/head/pe）；只对这个 exe
-- 纯数据，`core/profiles/seed.cjs check()` 校验格式、值域、指纹、无路径无用户名；`validation/the-seed.test.cjs` 扫整个目录
-- 内置 seed 视为官方，不签名；运行时下发到用户电脑 `data/The Seed/` 的才验签。层顺序里内置 seed 和下发官方同一位置，下发的 rev 更高才覆盖
-- 认游戏：游戏 seed 按程序名、标题、Steam、VNDB、pack/script 指纹；版本 seed 只按 exe 完整哈希（它的 exe 哈希也让游戏 seed 精确命中）
-- `core/profiles/games/*.cjs` 只留给需要代码的极少数游戏；千恋＊万花、ファタモルガーナの館 已迁成 seed
+仓库根目录 `The Seed/` 是正式产物：随 GitHub main 发布，安装包里在 `MeguLit/The Seed/`（只多一个子目录），热更新也带（`services/hot-update.cjs`、`Release.ps1`）。以后改游戏只改它的 seed。格式见上面「当前权威接口」，生成工具 `tools/diff-maker/seed-all.cjs`（diff-maker 分支，待合），加载 `core/profiles/seed.cjs`，校验 `validation/the-seed.test.cjs`
 
 ## 键和值域
 
