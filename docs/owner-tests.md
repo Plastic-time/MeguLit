@@ -104,6 +104,10 @@ The original resource pins remain authoritative and continuously checked
 At most four aliases belong to one token; stop invalidates all of them
 An arbitrary other installation with the same executable SHA is not a shadow alias
 
+RGSS adds `data/rgss-shadow` with a stricter registration contract. `registerLaunch` additionally requires `artifact`, the exact object returned by the RGSS module after verified-source copying and patching. A JSON clone or matching exe alone is insufficient. The original archive must be a checked grant resource; registration hashes the copied executable, DLL, startup INI, patched archive and marker, then keeps their identities in the token. No RPC accepts this artifact
+
+On a native Reader bind, a registered opaque alias can identify its original catalog executable while binding the actual PID and process birth. A new birth rejects stale path replies and invalidates the prior session. This is identity lookup, not permission derived from a path or SHA
+
 `inspect`/`describe` are private feedback data, not a new telemetry format
 `ready` means local identity checks passed; `phase=prepared` has `active=false`, `checkReason=AWAITING_PROCESS`
 `active=true` means a bound local permission is usable, not that a native hook installed or that a visible page was accepted

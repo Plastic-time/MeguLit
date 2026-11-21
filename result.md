@@ -20,3 +20,4 @@ The integration checkpoint and its consumer regression are recorded in docs/kag-
 Artemis remains default off and requires an isolated, exact-build local owner-test grant
 Its optional source transport does not implement glyph coordinates, hiding or new translation drawing
 No live pass or engine-complete result is claimed
+- [RGSS opaque grant and actual-path Reader integration](side-session-notes/RGSS-vx-grant-result.md)

@@ -10,6 +10,8 @@
 
 必须先有 `preferences.ownTextOutput=true` 或 `gal-preferences.textRenderer=compositor`，并且这部游戏的最终差分精确含 `draw.roles=true`。`embed=true` 不授予观察权限。RGSS 引擎差分的 roles 和 embed 都是 false，没有开启游戏 seed
 
+隔离私测现在通过 [opaque owner-test grant](owner-tests.md) 准备权限，不在 auto-profiles 中伪造 calibration。RGSS 副本登记要求模块实际生成的对象、原始归档资源 pin 及副本文件完整核对，Reader 通过已登记的 opaque 身份找回原 catalog，实际 PID/birth 保持不变，详见 [接线回放](../side-session-notes/RGSS-vx-grant-result.md)
+
 `services/bridge.cjs` 在直接启动或日文环境启动前准备完整副本。副本包含普通文件，没有硬链接或目录联接。每个原安装路径复用自己的副本，后续启动只更新带有当前 token 的归档，不重复覆盖副本内的存档和设置。归档、exe、DLL 或启动字段被改动时拒绝复用，不覆盖未知文件
 
 再次启动先检查副本进程，仍在运行就聚焦现有游戏，不改写运行中的归档。原目录已有存档只在首次复制，后续新存档留在副本。测试结束前要保留副本，不能当临时文件删除。关闭观察后普通启动仍使用原目录，若要继续副本进度，需先核对和迁移存档，本轮不自动覆盖原存档
@@ -58,7 +60,7 @@ Ruby 回放使用私有 RubyInstaller 4.0.10 和合成 RGSS API，没有执行�
 
 ## 给总测试包的验收单
 
-保留完整样本和原 ZIP，不发布游戏文件。总测试包只在自己的配置目录为 exe 哈希 `771017ca0f9d18978a906d00cd4236c8e9f974f3c7388173492ed8f92901a7e8` 加入 `draw.roles=true, draw.embed=false` 的临时差分。合并现有配置，不能覆盖用户已有差分或生产数据库
+保留完整样本和原 ZIP，不发布游戏文件。总测试包通过自己的 owner-tests manifest 为原 exe 路径核对哈希 `771017ca0f9d18978a906d00cd4236c8e9f974f3c7388173492ed8f92901a7e8`、完整 Game.rgss2a，并请求 roles 权限及 `draw.roles=true, draw.embed=false`。旧 calibration 模板不部署，不能覆盖用户已有差分或生产数据库
 
 1. 通过测试包导入上述原 Game.exe，先关隐藏游戏原文，再由 MeguLit 启动。记录实际副本路径，之后在副本内产生的存档要保留
 2. 标题菜单必须能操作，注释对应原有菜单，不出现正文伪台词。日志应有 `text-paths-rgss` 和 `text path rgss: observer on owner=`，仅生成副本不算加载成功

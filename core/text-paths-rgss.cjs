@@ -5,6 +5,7 @@ const R=require('../services/original-engines/rgss.cjs'),Codec=require('./rgss-s
 const DLLS=new Set(['ac186c2e0103ddf208aafe027065284ee5bebaa4be791a4a3594e349a32103bf']);
 const SCRIPT_TABLES=new Set(['ba4a87812cd7a758c99db81dae4530f50ce2fddff135a3cef8ecb2962309a355']);
 const EXES=new Set(['771017ca0f9d18978a906d00cd4236c8e9f974f3c7388173492ed8f92901a7e8']);
+const plans=new WeakSet(),artifacts=new WeakMap();
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 function launchProfile({root,exe,profile,title=''}){
  if(profile.layers&&profile.draw)return profile;
@@ -24,7 +25,7 @@ function plan(exe){
  const header=fs.openSync(archive,'r');const b=Buffer.alloc(8);try{fs.readSync(header,b,0,8,0);}finally{fs.closeSync(header);}
  if(b.toString('hex')!=='5247535341440001')throw Error('RGSS_ARCHIVE_VERSION');
  const entry=R.list(archive)?.find(e=>e.name.toLowerCase()===scripts.toLowerCase());if(!entry||entry.size>8<<20)throw Error('RGSS_SCRIPTS_MISSING');
- const original=R.read(archive,entry);if(!SCRIPT_TABLES.has(hash(original)))throw Error('RGSS_SCRIPT_TABLE_NOT_VERIFIED');Codec.scriptTable(original);return {dir,exe,archive,entry,original,library,scripts};
+ const original=R.read(archive,entry);if(!SCRIPT_TABLES.has(hash(original)))throw Error('RGSS_SCRIPT_TABLE_NOT_VERIFIED');Codec.scriptTable(original);const result={dir,exe,archive,entry,original,library,scripts};plans.add(result);return result;
 }
 
 function shadowPath(exe,shadowRoot){return path.join(shadowRoot,'rgss-'+hash(Buffer.from(fs.realpathSync(exe).toLowerCase())).slice(0,24));}
@@ -33,6 +34,7 @@ function markerAt(shadow){const file=path.join(shadow,'megulit-rgss-shadow.json'
 function existingShadow({exe,shadowRoot}){try{const shadow=shadowPath(exe,shadowRoot),st=fs.lstatSync(shadow);if(!st.isDirectory()||st.isSymbolicLink())return null;const m=markerAt(shadow);return m.sourceExe===fs.realpathSync(exe)?path.join(shadow,path.basename(exe)):null;}catch{return null;}}
 
 function makeShadow({source,shadowRoot,port,token}){
+ if(!plans.has(source))throw Error('RGSS_SOURCE_REQUIRED');
  fs.mkdirSync(shadowRoot,{recursive:true});const base=fs.realpathSync(source.dir),container=fs.realpathSync(shadowRoot);
  if(container===base||container.startsWith(base+path.sep))throw Error('RGSS_SHADOW_INSIDE_GAME');
  const shadow=shadowPath(source.exe,container),sourceExe=fs.realpathSync(source.exe),originalArchive=fs.readFileSync(source.archive),sourceArchiveSha256=hash(originalArchive),archiveName=path.basename(source.archive);
@@ -54,27 +56,30 @@ function makeShadow({source,shadowRoot,port,token}){
  }
  fs.writeFileSync(path.join(shadow,archiveName),archive);
  const marker={version:1,sourceExe,sourceArchiveSha256,patchedArchiveSha256:hash(archive),sourceFiles,sourceBytes},file=path.join(shadow,'megulit-rgss-shadow.json'),temp=file+'.'+process.pid+'.tmp';fs.writeFileSync(temp,JSON.stringify(marker,null,2),{flag:'wx'});fs.renameSync(temp,file);
- return {shadow,exe:path.join(shadow,path.basename(source.exe)),reused,files:sourceFiles,bytes:sourceBytes};
+ const result={shadow,exe:path.join(shadow,path.basename(source.exe)),reused,files:sourceFiles,bytes:sourceBytes},files=[path.basename(source.exe),source.library,'Game.ini',archiveName,'megulit-rgss-shadow.json'].map(name=>{const file=path.join(shadow,name);return {file,bytes:fs.statSync(file).size,sha256:hash(fs.readFileSync(file))};});
+ artifacts.set(result,{sourceExe,sourceArchive:fs.realpathSync(source.archive),container,exe:result.exe,files});return result;
 }
 
+function launchArtifact(artifact,{exe,sourceExe,shadowRoot}){const a=artifacts.get(artifact);if(!a||a.sourceExe!==sourceExe||a.exe!==exe||a.container!==shadowRoot)return null;return {sourceArchive:a.sourceArchive,files:a.files.map(f=>({...f}))};}
+
 class RgssTextPath{
- constructor({onChars=()=>{},onStatus=()=>{},onSource=()=>false,owner=()=>0}={}){this.onChars=onChars;this.onStatus=onStatus;this.onSource=onSource;this.owner=owner;this.token=crypto.randomBytes(16).toString('hex');this.roles=false;this.generation=0;this.body=new Map();this.ui=new Map();this.sources=new Set();this.sockets=new Set();this.stopped=false;}
+ constructor({onChars=()=>{},onStatus=()=>{},onSource=()=>false,owner=()=>0,ownerBirth=()=>''}={}){this.onChars=onChars;this.onStatus=onStatus;this.onSource=onSource;this.owner=owner;this.ownerBirth=ownerBirth;this.birth='';this.token=crypto.randomBytes(16).toString('hex');this.roles=false;this.generation=0;this.body=new Map();this.ui=new Map();this.sources=new Set();this.sockets=new Set();this.stopped=false;}
  async listen(){this.server=net.createServer(s=>this.accept(s));this.server.unref();await new Promise((resolve,reject)=>{this.server.on('error',reject);this.server.listen(0,'127.0.0.1',resolve);});this.port=this.server.address().port;this.timer=setInterval(()=>this.sync(),100);this.timer.unref();return this.port;}
  accept(socket){
   if(this.stopped||this.sockets.size>=4){socket.destroy();return;}this.sockets.add(socket);socket.setNoDelay(true);const decoder=new StringDecoder('utf8');let pending='',pid=0;
   const deadline=setTimeout(()=>{if(!pid)socket.destroy();},2000);deadline.unref();
   socket.on('data',data=>{pending+=decoder.write(data);if(Buffer.byteLength(pending)>65536){socket.destroy();return;}
    let at;while((at=pending.indexOf('\n'))>=0){const line=pending.slice(0,at);pending=pending.slice(at+1);
-    if(!pid){const m=/^HELLO ([a-f0-9]{32}) ([1-9]\d{0,9})$/.exec(line);if(!m||m[1]!==this.token){socket.destroy();return;}pid=Number(m[2]);clearTimeout(deadline);if(this.socket)this.socket.destroy();this.socket=socket;this.pid=pid;this.lastSync='';this.sync();}
+    if(!pid){const m=/^HELLO ([a-f0-9]{32}) ([1-9]\d{0,9})$/.exec(line);if(!m||m[1]!==this.token){socket.destroy();return;}pid=Number(m[2]);clearTimeout(deadline);if(this.socket)this.socket.destroy();this.socket=socket;this.pid=pid;this.birth='';this.lastSync='';this.sync();}
     else if(this.socket===socket)this.report(line,pid);
    }});
   socket.on('error',()=>{});socket.on('close',()=>{clearTimeout(deadline);this.sockets.delete(socket);if(this.socket===socket){this.socket=null;this.clear();}});
  }
- sync(){if(!this.socket||this.stopped)return;const value=Number(this.owner()),owner=Number.isSafeInteger(value)&&value>0?value:0;if(!owner&&!this.lastSync)return;const on=this.roles&&owner===this.pid,key=owner+'|'+on;if(key===this.lastSync)return;
+ sync(){if(!this.socket||this.stopped)return;const value=Number(this.owner()),owner=Number.isSafeInteger(value)&&value>0?value:0,birth=String(this.ownerBirth()||'');if(!owner&&!this.lastSync)return;if(this.birth&&owner===this.pid&&birth!==this.birth){this.clear();this.generation++;this.socket.destroy();return;}const on=this.roles&&owner===this.pid,key=owner+'|'+birth+'|'+on;if(on)this.birth=birth;if(key===this.lastSync)return;
   this.lastSync=key;this.clear();this.generation++;this.socket.write('CFG '+this.generation+' '+(on?'1':'0')+'\n');this.onStatus('observer '+(on?'on':'off')+' owner='+owner+' generation='+this.generation);}
  drawConfig(cfg){const roles=cfg?.roles===true;if(roles!==this.roles){this.roles=roles;this.clear();this.lastSync='';this.sync();}if(cfg?.embed===true&&!this.embedNoted){this.embedNoted=true;this.onStatus('RGSS: internal embed/ruby is unavailable; reader fallback remains active');}}
  report(line,pid){
-  if(this.stopped||!this.roles||Number(this.owner())!==pid)return;
+  if(this.stopped||!this.roles||Number(this.owner())!==pid||String(this.ownerBirth()||'')!==this.birth)return;
   const source=/^S ([1-9]\d{0,9}) ([1-9]\d{0,9}) ([A-Za-z0-9+/=]{1,8000})$/.exec(line);
   if(source){if(Number(source[1])!==this.generation)return;const rec=this.body.get(Number(source[2])),key=rec&&rec.line+'|'+rec.text;if(!rec||!rec.text||Buffer.from(rec.text).toString('base64')!==source[3]||this.sources.has(key))return;
    if(this.onSource({text:rec.text,line:rec.line,generation:this.generation,pid})===true){this.sources.add(key);if(this.sources.size>128)this.sources.delete(this.sources.values().next().value);}return;}
@@ -91,4 +96,4 @@ class RgssTextPath{
  watch(pid,{alive=p=>{try{process.kill(p,0);return true;}catch(e){return e.code==='EPERM';}},every=1000}={}){clearInterval(this.exitTimer);if(!Number.isSafeInteger(pid)||pid<=0)return;this.exitTimer=setInterval(()=>{if(!alive(pid))this.stop();},every);this.exitTimer.unref();}
  stop(){if(this.stopped)return;this.stopped=true;this.clear();clearInterval(this.timer);clearInterval(this.exitTimer);for(const s of this.sockets)s.destroy();this.sockets.clear();this.server?.close();}
 }
-module.exports={plan,makeShadow,existingShadow,launchProfile,RgssTextPath};
+module.exports={plan,makeShadow,existingShadow,launchProfile,launchArtifact,RgssTextPath};

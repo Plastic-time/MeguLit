@@ -29,8 +29,9 @@ async function prepare({root,exe,profile={},title='',enabled=false,ownerTestGran
  const steamEnv=steam?{SteamAppId:steam,SteamGameId:steam,SteamOverlayGameId:steam}:{};
  if(require('./profiles/index.cjs').engineId(profile.engine)==='rgss'&&canary.allowed('rgss')){
   const R=require('./text-paths-rgss.cjs');let session;
-  try{const resolved=R.launchProfile({root,exe,profile,title});if(resolved.draw?.roles!==true)return null;
+  try{const resolved=require('./owner-tests.cjs').apply(R.launchProfile({root,exe,profile,title}),ownerTestGrant,{exe,engine:'rgss',prepared:true});if(resolved.draw?.roles!==true)return null;
    const source=R.plan(exe);session=new R.RgssTextPath();session.drawConfig(resolved.draw);const port=await session.listen(),sh=R.makeShadow({source,shadowRoot:shadowRoot||path.join(root,'data','rgss-shadow'),port,token:session.token});
+   if(ownerTestGrant&&!await require('./owner-tests.cjs').registerLaunch(ownerTestGrant,{exe:sh.exe,engine:'rgss',artifact:sh})){session.stop();trace('text-paths-rgss-skipped',{error:'RGSS_OWNER_ALIAS_REJECTED'});return null;}
    trace('text-paths-rgss',{shadow:sh.shadow,reused:sh.reused,files:sh.files,bytes:sh.bytes});return {path:'rgss',exe:sh.exe,args:[],env:steamEnv,cwd:sh.shadow,session,connect:async()=>true};
   }catch(error){session?.stop();trace('text-paths-rgss-skipped',{error:error.message});return null;}
  }
@@ -57,7 +58,7 @@ async function prepare({root,exe,profile={},title='',enabled=false,ownerTestGran
 
 /* Connect a prepared session to the hook reader (core/hook-native.cjs): records in, replacement switch and lines out. */
 function attach(prepared,hook){if(!prepared?.session||!hook)return;const s=prepared.session;
- if(prepared.path==='rgss')s.owner=()=>hook.wanted===false||hook.disposed||hook.stopPending||hook.stopError?0:hook.gamePid?.()||hook.target?.pid||0;
+ if(prepared.path==='rgss'){s.owner=()=>hook.wanted===false||hook.disposed||hook.stopPending||hook.stopError?0:hook.gamePid?.()||hook.target?.pid||0;s.ownerBirth=()=>String(hook.target?.started||hook.windowState?.gameStarted||'');}
  if(prepared.path==='artemis'){
   const current=m=>hook.textPath===s&&hook.wanted!==false&&!hook.disposed&&!hook.stopPending&&!hook.stopError&&s.permission()&&s.owner&&m?.artemisOwner&&hook.target?.pid===s.owner.pid&&hook.target?.started===s.owner.started&&m.artemisOwner.pid===s.owner.pid&&m.artemisOwner.started===s.owner.started;
   let rubyOwner=null,speakerOwner=null;
