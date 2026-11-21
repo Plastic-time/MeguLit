@@ -464,7 +464,7 @@ html:not(#u):not(#v) body .gm-lesson .gm-stepnav button{font-size:14px!important
 /* one left edge for every page: content starts at the main column's padding */
 html:not(#u):not(#v) body .main :is(.leaderboard-page,.dl,.about-page){padding-left:0!important;padding-right:0!important}
 /* leaderboard: the ranked cards fill their row whatever the count; values never break */
-html:not(#u):not(#v) body .leaderboard-page :is(.lb-gvalue,.lb-local strong,.lb-local b,.lb-mychip span,.leaderboard-local strong){white-space:nowrap}
+html:not(#u):not(#v) body .leaderboard-page :is(.lb-gvalue,.lb-local strong,.lb-local b,.lb-mychip-value,.leaderboard-local strong){white-space:nowrap}
 /* hot words 4–10: term, reason, then the count on the right */
 html:not(#u):not(#v) body .leaderboard-page .lb-honours li{grid-template-columns:44px minmax(160px,240px) minmax(0,1fr) auto!important}
 html:not(#u):not(#v) body .leaderboard-page .lb-honours .lb-honour-term{display:contents}

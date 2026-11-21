@@ -71,7 +71,7 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
  const frame=document.querySelector('.app-frame')||document.body;frame.append(host);
  const place=()=>{const bar=document.querySelector('.titlebar');const top=bar?Math.round(bar.getBoundingClientRect().bottom):0;host.style.top=top+'px';};place();
  const $=s=>host.querySelector(s);
- const state={month:'',months:[],monthsOn:false,findOn:false,mine:[],mineAt:0,items:[],off:0,next:null,atStart:true,total:0,loading:false,offline:false,focusNo:0,fit:0,layout:null,
+ const state={month:'',months:[],monthsOn:false,findOn:false,mine:[],mineAt:0,items:[],off:0,next:null,atStart:true,total:0,loading:false,offline:false,focusNo:null,fit:0,layout:null,
   bandWindow:0,hover:null,hoverMonth:null};
  let disposed=false,scene=null,gsap=null;
  const quality=()=>{let q='auto';try{q=localStorage.getItem(QUALITY_KEY)||'auto';}catch{}return q==='high'||q==='low'?q:'auto';};
@@ -98,9 +98,9 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
   const ok=await loadAt({month,cursor:item.torchNo-80>0?String(item.torchNo-80):''});if(!ok)return;
   if(state.items.length&&item.torchNo-80>0)state.atStart=false;
   const idx=state.items.findIndex(i=>i.torchNo===item.torchNo);
-  if(idx<0){state.focusNo=0;}else{const half=Math.floor((state.fit||160)/2);state.off=Math.max(0,idx-half);layoutNow();
+  if(idx<0){state.focusNo=null;}else{const half=Math.floor((state.fit||160)/2);state.off=Math.max(0,idx-half);layoutNow();
    if(!state.layout.entries.some(e=>e.item.torchNo===item.torchNo)){state.off=idx;}}
-  redraw(true);await ahead();if(state.focusNo)scene?.lookAtFocus();}
+  redraw(true);await ahead();if(state.focusNo!==null)scene?.lookAtFocus();}
 
  /* ---------- UI ---------- */
  function status(msg){const el=$('.tm-status');el.textContent=msg||'';el.hidden=!msg;}
@@ -187,7 +187,7 @@ export async function openTorchMonument({api,locale='zh',esc=s=>String(s??''),to
   if(!hit){if(scene.reading())scene.setRead(null);return;}
   if(!hit.band){scene.setRead(scene.reading()?null:hit.point);return;}const b=hit.band;
   if(b.kind==='shift'){state.bandWindow=Math.max(0,Math.min(Math.max(0,state.months.length-12),state.bandWindow+b.dir*6));redraw();return;}
-  state.focusNo=0;await loadAt({month:b.month,cursor:''});redraw(true);await ahead();redraw();});
+  state.focusNo=null;await loadAt({month:b.month,cursor:''});redraw(true);await ahead();redraw();});
  /* stop drawing in the background; close before a game starts */
  const onVis=()=>scene.setActive(!document.hidden&&document.hasFocus());
  const onBlur=()=>scene.setActive(false),onFocus=()=>scene.setActive(!document.hidden);

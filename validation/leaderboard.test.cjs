@@ -305,7 +305,7 @@ test('E404 the 我的主页 chip shows on every tab and opens the panel; signed 
  const follow=view.leaderboardHTML({...base,joined:true,account:true,name:'めぐみん',tab:'follow',self:{avatar:null},social:{state:'ok',following:[],kindred:[],avatars:{}}},'ja',esc);
  assert.match(chip(follow),/マイページ/);assert.match(chip(follow),/めぐみん/);
  const board=view.leaderboardHTML({...base,joined:true,account:true,name:'A',tab:'board',board:{state:'ok',entries:[{rank:3,name:'A',value:9,me:true}],me:{rank:3,value:9}}},'en',esc);
- assert.match(chip(board),/My profile/);assert.doesNotMatch(chip(board),/#3/,'E419 no rank on the chip');assert.match(chip(board),/data-lb-me/);
+ assert.match(chip(board),/My profile/);assert.doesNotMatch(chip(board),/#3/,'E419 no rank on the chip');assert.match(chip(board),/data-lb-me/);assert.match(chip(board),/<span class="lb-mychip-value">[^<]+<\/span>/,'the value has its own class: .lb-mychip>span also hit the default avatar');assert.doesNotMatch(chip(guest),/lb-mychip-value/,'signed out: no value, so the avatar span is the only span');
  for(const html of [guest,follow,board])assert.equal((chip(html).match(/<small>/g)||[]).length,1,'same two-line chip in every state');
  const settings=fs.readFileSync(path.join(__dirname,'..','web','settings.js'),'utf8');assert.match(settings,/section==='personal'\)\{openProfilePanel/);assert.doesNotMatch(settings,/mountProfileSettings/);
  const panel=fs.readFileSync(path.join(__dirname,'..','web','profile-panel.js'),'utf8');assert.match(panel,/mountEmailLogin/);assert.match(panel,/onSignedOut:\(\)=>paint\(\)/);
