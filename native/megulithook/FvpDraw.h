@@ -85,12 +85,24 @@ static bool FindInImage(uintptr_t base){
  if(!FvpDrawSig::ValidSite(build,total,found-base))return false;
  Image=base;ImageEnd=base+imageBytes;DrawAt=found;BuildIndex=build;VersionPinned=true;return true;
 }
-static bool Token(const std::string &cfg,const char *word){size_t p=cfg.find(word),n=std::strlen(word);return p!=std::string::npos&&(p==0||cfg[p-1]==' ')&&(p+n==cfg.size()||cfg[p+n]==' ');}
+static bool ConfigAsked(const unsigned char *bytes,size_t size){
+ if(!bytes||!size)return false;
+ size_t p=0;const size_t step=2;if(size>=2&&bytes[0]==0xff&&bytes[1]==0xfe)p=2;else if(size<2||bytes[1]!=0)return false;
+ std::string line;bool complete=false;
+ for(;p+step<=size;p+=step){unsigned c=bytes[p];if(step==2&&bytes[p+1])return false;
+  if(c=='\n'){complete=true;break;}if(c=='\r'){if(p+step*2>size||bytes[p+step]!='\n'||(step==2&&bytes[p+step+1]))return false;complete=true;break;}
+  if(c<0x20||c>0x7e)return false;line+=(char)c;
+ }
+ if(!complete||line.compare(0,5,"#cfg "))return false;
+ int keys=0;bool enabled=false;for(size_t begin=5;begin<line.size();){while(begin<line.size()&&line[begin]==' ')begin++;size_t end=line.find(' ',begin);if(end==std::string::npos)end=line.size();
+  std::string token=line.substr(begin,end-begin);if(token.compare(0,9,"fvpInput=")==0){keys++;enabled=token=="fvpInput=1";}else if(token=="fvpInput")return false;begin=end;
+ }
+ return keys==1&&enabled;
+}
 static bool DiagnosticAsked(){
  wchar_t tmp[MAX_PATH],file[MAX_PATH+64];DWORD n=GetTempPathW(MAX_PATH,tmp);if(!n||n>=MAX_PATH)return false;swprintf_s(file,L"%sMeguLit\\draw\\%lu.txt",tmp,GetCurrentProcessId());
  HANDLE h=CreateFileW(file,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,0,nullptr);if(h==INVALID_HANDLE_VALUE)return false;
- char bytes[1024]={};DWORD got=0;bool ok=ReadFile(h,bytes,sizeof bytes-1,&got,nullptr)!=FALSE;CloseHandle(h);if(!ok)return false;std::string ascii;for(DWORD i=0;i<got;i++)if(bytes[i])ascii+=bytes[i];
- size_t p=ascii.find("#cfg ");if(p==std::string::npos)return false;size_t end=ascii.find_first_of("\r\n",p);return Token(ascii.substr(p,end==std::string::npos?end:end-p),"fvpInput=1");
+ unsigned char bytes[1024]={};DWORD got=0;bool ok=ReadFile(h,bytes,sizeof bytes,&got,nullptr)!=FALSE;CloseHandle(h);return ok&&ConfigAsked(bytes,got);
 }
 static bool Install(){
  if(Installed)return true;if(Blocked||!VersionPinned||BuildIndex<0||BuildIndex>=2||!DrawAt)return false;

@@ -25,6 +25,14 @@
 文件缺失、读取失败、长度异常、错 SHA、缺失/重复签名、错误 RVA 均不安装
 Enable 失败会关闭观察、保留可能在途调用需要的 trampoline，并禁止再次安装，原函数继续 pass-through
 
+控制授权只读取首条完整 `#cfg` 行，要求 UTF-16LE（可选 BOM）且该行每个字符为可打印 ASCII、`fvpInput=1` 键唯一且值精确匹配
+正文子串、后续 cfg 行、重复键、截断无换行、不可读或缺失文件、非 ASCII 宽字符、UTF-16BE 与 raw ASCII 都不能授权
+不兼容 raw ASCII 是有意的：某些非 ASCII UTF-16 码元拼接后的原始字节与合法 ASCII 控制行完全相同，接受二者会重新引入畸形宽字符授权缺口；现有 transport 使用 UTF-16LE
+
+watcher 最多每两秒重新读取权限；撤销后尚未进入的调用不再诊断，但已经进入的快照可能继续输出到 end
+原生回归在 begin 日志回调中撤销权限，确认该快照仍可能完成、下一次调用无日志
+因此当前控制没有等待 in-flight observer 结束的关闭确认，不能把删除开关或 `Observing=0` 当作该确认
+
 ## 实字节 ABI 与输入语义
 
 两个入口都是 ECX=this、一个栈参数、callee `ret 4`
