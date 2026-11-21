@@ -6,6 +6,7 @@ for(const fails of [false,true]){
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const {Settings}=require('../services/settings.cjs'),{Runtime}=require('../services/runtime.cjs');
   const settings=new Settings(root),runtime=new Runtime(root),seen=[];
+  runtime.libraryManager=new(require('../core/library.cjs').Library)({root,config:settings.folder});
   function save(folders){
    const request={scope:'library',values:{folders}};
    settings.save(request);runtime.settingsSaved(request);
@@ -31,13 +32,15 @@ for(const fails of [false,true]){
 test('changing only Steam clears the cached startup scan, other library preferences keep it',async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'megulit-rescan-steam-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
- const runtime=new(require('../services/runtime.cjs').Runtime)(root);let runs=0;
+ const runtime=new(require('../services/runtime.cjs').Runtime)(root),settings=new(require('../services/settings.cjs').Settings)(root);let runs=0;
+ runtime.libraryManager=new(require('../core/library.cjs').Library)({root,config:settings.folder});
+ function save(values){const request={scope:'library',values};settings.save(request);runtime.settingsSaved(request);}
  runtime.libraryScans=new LibraryScans(async()=>++runs);
  const startup=()=>runtime.call({action:'library_scan',startup:true});
  assert.equal(await startup(),1);
- runtime.settingsSaved({scope:'library',values:{autoSeries:false}});
+ save({...settings.read('library'),autoSeries:false});
  assert.equal(await startup(),1);
- runtime.settingsSaved({scope:'library',values:{steamPath:'NewSteam'}});
+ save({...settings.read('library'),steamPath:'NewSteam'});
  assert.equal(await startup(),2);assert.equal(await startup(),2);
 });
 test('startup scans once, overlapping requests share work, and later manual refresh runs again',async()=>{

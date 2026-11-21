@@ -28,9 +28,7 @@ class Runtime {
   await this.local().ensure(options);return translator.translate(text,options);}
  // Synopses: free machine translation first, then the user's own translation engine (Chinese or English).
  metadata(){const {machine}=require('../core/library.cjs');return this.gameEnrichment??=new(require('./game-enrichment.cjs').GameEnrichment)(this.root,this.emit,fetch,async(text,lang)=>(await machine(text,lang))||(lang!=='ja'?String(await this.reviewTranslate(text,lang,'follow').catch(()=>'')||'').trim():''));}
- settingsSaved(request){if(request.scope==='library'){
-  if(Object.hasOwn(request.values||{},'folders')||Object.hasOwn(request.values||{},'steamPath'))this.libraryScans?.invalidateFolders();
-  const db=require('./store.cjs').openStore(this.root);try{require('./series.cjs').autoGroup(db,this.root);}finally{db.close();}}const reader=this.reader,g=reader?.gal;if(!g)return;const settings=new(require('./settings.cjs').Settings)(this.root);
+ settingsSaved(request){if(request.scope==='library'){const db=require('./store.cjs').openStore(this.root);try{require('./series.cjs').autoGroup(db,this.root);}finally{db.close();}}const reader=this.reader,g=reader?.gal;if(!g)return;const settings=new(require('./settings.cjs').Settings)(this.root);
   if(['background','panels'].includes(request.scope))this.emit('reader-event',{type:'panelAppearance',values:settings.ui()});
   if(['text','embedding','position'].includes(request.scope)&&(!request.profile||request.profile===g.styleSync.profileKey)){const active=g.styleSync.profileKey,entries=readJSON(path.join(this.folder,'game-style-profiles.json')).entries||{},sizes=Object.keys(request.values||{}).filter(k=>SIZE_KEYS.includes(k));if(request.scope==='text'&&!request.profile&&active&&entries[active]&&sizes.length)try{settings.save({scope:'text',profile:active,values:Object.fromEntries(sizes.map(k=>[k,request.values[k]]))});}catch{}const global=settings.read('text'),profile=readJSON(path.join(this.folder,'game-style-profiles.json')).entries?.[active]?.prefs||{};const effective={...global,...profile,gameProcess:g.preferences.gameProcess,gameExecutable:g.preferences.gameExecutable,bindEnabled:g.preferences.bindEnabled};g.preferences=require('../core/game-style.js').clean(effective);g.preview(g.preferences);this.emit('reader-event',{type:'call',method:'restoreGalSettings',args:[g.preferences]});}
   /* the profiles file was written outside the reader (reset, a game's style edited in Settings): its next save starts from the file */
@@ -51,7 +49,9 @@ class Runtime {
      try{require('./japanese-auto-run.cjs').considerLibrary(this.root,db.prepare('SELECT id,executable FROM games WHERE removed_at IS NULL').all(),{onDone:(id,r)=>this.emit('japanese-auto',{id,mode:r.mode})});}catch{}
      /* E450 the game's own voices for every game in the library, a game every 20 s, off the start-up path */
      try{const coldOn=require('../core/preferences.cjs').cleanPreferences(readJSON(path.join(this.folder,'preferences.json'))).scriptColdRun!==false,gv=require('./game-voice.cjs');db.prepare('SELECT executable FROM games WHERE removed_at IS NULL').all().forEach((g,i)=>gv.scanLater(this.root,g.executable,30000+i*20000,{cold:coldOn}));}catch{}
-    }finally{db.close();}return {...result,games:library.load().games,unconfirmed:(library.unconfirmed||[]).slice(0,50)};});return this.libraryScans.run({startup:request.startup===true});}
+    }finally{db.close();}return {...result,games:library.load().games,unconfirmed:(library.unconfirmed||[]).slice(0,50)};});
+    const {steamPath,folders}=this.library().read();
+    return this.libraryScans.run({startup:request.startup===true,foldersKey:JSON.stringify([steamPath,folders])});}
    case 'library_find_steam':return this.library().findSteam();
    case 'reader_status':return this.readerStatus();
    case 'reader_health':{const phase=String(request.phase||'').slice(0,100),error=String(request.error||'').slice(0,3000);this.readerReady=phase==='ready'&&!error;this.readerPhase=phase;this.readerError=error;if(error)await this.reader?.stop();this.emit('reader-health',this.readerStatus());require('node:fs').appendFileSync(path.join(this.root,'logs','reader-startup.log'),new Date().toISOString()+' '+phase+' '+error+'\n');return {saved:true};}
