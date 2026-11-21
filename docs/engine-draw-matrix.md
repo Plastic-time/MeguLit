@@ -2,6 +2,34 @@
 
 新体系（店主 2026-11-21）：MeguLitHook 内核 + 每个引擎逆向「画字函数」（从引擎内部直接读状态）+ 每部游戏一份纯数据差分。这份矩阵是地基的盘点：每个主要引擎现在仓库里有什么、离「引擎内部读」还差什么、先做哪个。统一上报格式见 [engine-draw-protocol.md](engine-draw-protocol.md)
 
+## 状态：已进 main（2026-11-21，4f1cb363），默认不挂
+
+下面各引擎的画字钩子都已合进 main。默认全部不挂：只有这部游戏的 seed 打开 `draw.roles`（MeguLit 写出控制文件 `#cfg roles=1`）才装钩子；现在没有任何游戏 seed 打开它。这一点由 `validation/engine-draw-opt-in.test.cjs` 钉住：钩子只在 `Install()` 里装，`Install()` 只在 roles=1 检查之后调，启动时 `Arm()` 从不挂钩；内核默认不写控制文件；seed 要开得先加进测试里的允许名单
+
+| 引擎 | 部件（native/megulithook） | 状态 |
+|---|---|---|
+| ReaLive / AVG32（涙、Air） | DrawSites（GDI 画字点）签名 `avg32` | 已进 main，默认不挂 |
+| Softpal（レイライン 1 / 2） | DrawSites `softpal`、`softpal-2` | 已进 main，默认不挂 |
+| NScripter（月姬 v1.4 / v1.6） | DrawSites `nscripter` | 已进 main，默认不挂 |
+| Innocent Grey（虚ノ少女，MFC） | DrawSites `mfc-textoutw` / `mfc-exttextoutw` / `mfc-drawtextw` | 已进 main，默认不挂 |
+| AdvHD / WillPlus（Under The Moon） | DrawSites `advhd` | 已进 main，默认不挂 |
+| CMVS（青い鳥） | DrawSites `cmvs` | 已进 main，默认不挂 |
+| FVP（ヒカリ 中文版 / HD） | DrawSites `fvp`、`fvp-bitmap` | 已进 main，默认不挂 |
+| minori（eden 英文版） | DrawSites `minori` | 已进 main，默认不挂 |
+| Musica（ましろ色シンフォニー） | DrawSites `musica` | 已进 main，默认不挂 |
+| BRUNS（ダストマニア） | DrawSites `bruns` | 已进 main，默认不挂 |
+| Nitroplus（沙耶 Steam / 2003 原版） | DrawSites `nitroplus`、`nitropak` | 已进 main，默认不挂 |
+| YU-RIS（euphoria 等 4 部） | YurisDraw.h | 已进 main，默认不挂 |
+| SiglusEngine（CLANNAD、Summer Pockets） | SiglusDraw.h | 已进 main，默认不挂 |
+| MAGES（STEINS;GATE 系、CHAOS;CHILD） | MagesDraw.h | 已进 main，默认不挂 |
+| CatSystem2 | CS2Draw.h | 已进 main，默认不挂 |
+| BGI（素晴日 HD） | BgiDraw.h（排版字节点链，不用 DrawSites） | 已进 main，默认不挂；ユースティア 要实机扫解开后的镜像 |
+| Unity IL2CPP（魔法少女ノ魔女裁判、海沙风云） | Il2cppDraw.h（LunaHook Unity 引擎里看文字 setter，自己不建钩子） | 已进 main，默认不观察 |
+| WHITE ALBUM2、ダンガンロンパ 1 / 2 / V3、みにくいモジカの子 | 无 | 没做：静态做不出，实机采集方案见 engine-draw-native.md |
+| Silky's、LiveMaker、System4、Escu:de、Kaguya 等 | 无 | 没做：本机没有样本 |
+
+GetGlyphOutline 类的签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、沙耶两版）以及 NScripter 的字形小图，是不是字形缓存（只有第一次出现的字）还要实机确认，见 engine-draw-native.md「注意：字形缓存」
+
 ## 图例
 
 - **内**：引擎内部读。在引擎自己的脚本层 / 画字函数里拿到（KAG 的 processCh、Ren'Py 的 Layout、RPG Maker 的 Window_Message、TMP 的 characterInfo、ISLAND 的画字调用）。知道是谁在画、画的是什么角色
@@ -91,7 +119,7 @@
 
 后 4 个（Leaf、Nitroplus、Spike Chunsoft、BRUNS 原版）静态普查已经说明拿不到 GDI 调用点：自绘字库或加壳，要在运行中找送字函数或先脱壳，单靠静态做不出签名，做到时会先写清缺什么，不硬交
 
-进度（feat/re-misc）：通用 GDI 画字点部件（native/megulithook/DrawSites.h + DrawSitesSig.h）已交付，签名已有 ReaLive / AVG32、Softpal（两条）、NScripter、Innocent Grey（MFC CDC 三条）、AdvHD、CMVS、FVP（两条）、minori、Musica、BRUNS、Nitroplus（沙耶 Steam）、NitroPlus 2003（沙耶原版），每条在店主本机文件上正好命中、在其他引擎文件里不命中。普查时漏看了「经寄存器调用」的情况：Musica、沙耶 Steam、Softpal 第二条都是这样找到的（签名的 SLOT 形式）。Leaf、Spike Chunsoft、モジカ 静态做不出，见 engine-draw-native.md 末尾
+进度（feat/re-misc，已进 main 4f1cb363，默认不挂）：通用 GDI 画字点部件（native/megulithook/DrawSites.h + DrawSitesSig.h）已交付，签名已有 ReaLive / AVG32、Softpal（两条）、NScripter、Innocent Grey（MFC CDC 三条）、AdvHD、CMVS、FVP（两条）、minori、Musica、BRUNS、Nitroplus（沙耶 Steam）、NitroPlus 2003（沙耶原版），每条在店主本机文件上正好命中、在其他引擎文件里不命中。普查时漏看了「经寄存器调用」的情况：Musica、沙耶 Steam、Softpal 第二条都是这样找到的（签名的 SLOT 形式）。Leaf、Spike Chunsoft、モジカ 静态做不出，见 engine-draw-native.md 末尾
 
 ## 下一批（总指挥 2026-11-21）：本机样本
 
