@@ -74,10 +74,15 @@ static bool VerifyFileBuild(const wchar_t *file){
 }
 static bool FindInImage(uintptr_t base){
  VersionPinned=false;DrawAt=0;
- auto dos=(IMAGE_DOS_HEADER *)base;if(dos->e_magic!=IMAGE_DOS_SIGNATURE)return false;auto nt=(IMAGE_NT_HEADERS *)(base+dos->e_lfanew);if(nt->Signature!=IMAGE_NT_SIGNATURE||nt->FileHeader.Machine!=IMAGE_FILE_MACHINE_I386)return false;
+ wchar_t file[32768];DWORD n=GetModuleFileNameW((HMODULE)base,file,32768);if(!n||n>=32768||!VerifyFileBuild(file))return false;
+ MEMORY_BASIC_INFORMATION region={};if(!VirtualQuery((void *)base,&region,sizeof region)||region.AllocationBase!=(void *)base||region.Type!=MEM_IMAGE||region.RegionSize<sizeof(IMAGE_NT_HEADERS))return false;
+ auto dos=(IMAGE_DOS_HEADER *)base;if(dos->e_magic!=IMAGE_DOS_SIGNATURE||dos->e_lfanew<sizeof(IMAGE_DOS_HEADER)||(size_t)dos->e_lfanew>region.RegionSize-sizeof(IMAGE_NT_HEADERS))return false;
+ auto nt=(IMAGE_NT_HEADERS *)(base+dos->e_lfanew);if(nt->Signature!=IMAGE_NT_SIGNATURE||nt->FileHeader.Machine!=IMAGE_FILE_MACHINE_I386||nt->OptionalHeader.Magic!=IMAGE_NT_OPTIONAL_HDR32_MAGIC||nt->FileHeader.SizeOfOptionalHeader<sizeof(IMAGE_OPTIONAL_HEADER32))return false;
+ size_t imageBytes=nt->OptionalHeader.SizeOfImage,headers=nt->OptionalHeader.SizeOfHeaders;if(imageBytes<headers||imageBytes>64*1024*1024||headers>region.RegionSize||!nt->FileHeader.NumberOfSections||nt->FileHeader.NumberOfSections>96)return false;
  auto section=IMAGE_FIRST_SECTION(nt);int total=0;uintptr_t found=0;
- for(int i=0;i<nt->FileHeader.NumberOfSections;i++,section++)if(section->Characteristics&IMAGE_SCN_MEM_EXECUTE){size_t sites[2];int n=AdvhdDrawSig::Find((const unsigned char *)(base+section->VirtualAddress),section->Misc.VirtualSize,sites,2);if(n&&!total)found=base+section->VirtualAddress+sites[0];total+=n;}
- if(total!=1||found-base!=AdvhdDrawSig::EntryRva)return false;wchar_t file[32768];DWORD n=GetModuleFileNameW((HMODULE)base,file,32768);if(!n||n>=32768||!VerifyFileBuild(file))return false;
+ size_t offset=(uintptr_t)section-base;if(offset>headers||nt->FileHeader.NumberOfSections>(headers-offset)/sizeof(IMAGE_SECTION_HEADER))return false;
+ for(int i=0;i<nt->FileHeader.NumberOfSections;i++,section++){if(section->VirtualAddress>imageBytes||section->Misc.VirtualSize>imageBytes-section->VirtualAddress)return false;if(section->Characteristics&IMAGE_SCN_MEM_EXECUTE){size_t sites[2];int n=AdvhdDrawSig::Find((const unsigned char *)(base+section->VirtualAddress),section->Misc.VirtualSize,sites,2);if(n&&!total)found=base+section->VirtualAddress+sites[0];total+=n;}}
+ if(total!=1||found-base!=AdvhdDrawSig::EntryRva)return false;
  Image=base;ImageEnd=base+nt->OptionalHeader.SizeOfImage;DrawAt=found;VersionPinned=true;return true;
 }
 static bool Token(const std::string &cfg,const char *word){size_t p=cfg.find(word),n=std::strlen(word);return p!=std::string::npos&&(p==0||cfg[p-1]==' ')&&(p+n==cfg.size()||cfg[p+n]==' ');}

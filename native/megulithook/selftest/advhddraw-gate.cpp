@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
-static std::vector<std::string> Logs;static bool ThrowLog=false;
-namespace Msg{static void Log(const char *format,...){if(ThrowLog)throw std::runtime_error("fixture logger failure");char b[1200];va_list args;va_start(args,format);vsnprintf(b,sizeof b,format,args);va_end(args);Logs.push_back(b);
+static std::vector<std::string> Logs;static bool ThrowLog=false;static void (*LogTap)()=nullptr;
+namespace Msg{static void Log(const char *format,...){if(ThrowLog)throw std::runtime_error("fixture logger failure");char b[1200];va_list args;va_start(args,format);vsnprintf(b,sizeof b,format,args);va_end(args);Logs.push_back(b);if(LogTap)LogTap();
 #ifndef _WIN64
  __asm{
   pxor xmm0,xmm0
@@ -26,6 +26,8 @@ static const DWORD StatusMask=0xcd5,StatusBits=0xc45,OriginalResult=0x13572468;
 static __declspec(align(16)) unsigned char SavedFx[512];
 static __declspec(align(16)) DWORD XmmPattern[4]={0x12345678,0xabcdef01,0x99887766,0x11223344},AfterXmm[4];
 static double AfterX87;
+static bool NestedSkipped=true;static int NestedCalls=0;
+static void Reenter(){auto saved=LogTap;LogTap=nullptr;DWORD stack[12]={};stack[7]=(DWORD)"nested";size_t before=Logs.size();AdvhdDraw::Observe(99,stack);NestedSkipped=NestedSkipped&&before==Logs.size();NestedCalls++;LogTap=saved;}
 static void Check(bool ok,const char *why){Checks++;printf("%s %s\n",ok?"PASS":"FAIL",why);if(!ok)Failures++;}
 static __declspec(naked) void Draw(){__asm{
  pushfd
@@ -145,7 +147,9 @@ int wmain(int argc,wchar_t **argv){
  Args[6]=1;Logs.clear();CallFixture();Check(Logs.empty()&&AbiOkay(),"unreadable input cannot interfere with original draw");
  std::string tooLong(AdvhdDraw::MaxText+1,'x');Args[6]=(DWORD)tooLong.c_str();Logs.clear();CallFixture();Check(Logs.empty()&&AbiOkay(),"over-limit input is refused rather than silently truncated");
  Args[6]=(DWORD)text;ThrowLog=true;CallFixture();ThrowLog=false;Logs.clear();CallFixture();Check(HexText()==Hex(text,4)&&AbiOkay(),"logger exception leaves the ABI and recursion guard intact");
+ Logs.clear();LogTap=&Reenter;CallFixture();LogTap=nullptr;Check(NestedCalls>0&&NestedSkipped&&HexText()==Hex(text,4)&&AbiOkay(),"logger reentry cannot recursively capture another input or change the original ABI");
  Control(L"#cfg roles=0 embed=0 advhdInput=0\r\n");AdvhdDraw::RefreshControl();Logs.clear();CallFixture();Check(!AdvhdDraw::Observing&&Logs.empty()&&AbiOkay(),"installed gate becomes pass-through after diagnostic permission is removed");
+ Control(L"#cfg roles=0 embed=0 advhdInput=1\r\n");AdvhdDraw::RefreshControl();Logs.clear();CallFixture();Check(AdvhdDraw::Observing&&HexText()==Hex(text,4)&&AbiOkay(),"diagnostic permission can reopen the same detour without changing original behavior");Control(L"#cfg roles=0 embed=0 advhdInput=0\r\n");AdvhdDraw::RefreshControl();Logs.clear();
  Check(MH_DisableHook((void *)&Draw)==MH_OK,"real detour disables cleanly");CallFixture();Check(Logs.empty()&&AbiOkay(),"original remains unchanged after unhook");MH_RemoveHook((void *)&Draw);MH_Uninitialize();
  printf("AdvHD actual ABI gate: %d checks, %d failures\n",Checks,Failures);return Failures;
 }

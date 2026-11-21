@@ -7,8 +7,12 @@ test('AdvHD diagnostic permission stays version-only and no game or engine seed 
  const D=require('../core/profiles/domains.cjs');assert.equal(D.layerOf('draw.advhdInput'),'version');
  assert.deepEqual(D.split({draw:{roles:true,advhdInput:true}}),{version:{draw:{advhdInput:true}},game:{draw:{roles:true}}});
  assert.deepEqual(D.clean({draw:{advhdInput:'true'}}).rejected,['draw.advhdInput']);
- function walk(dir){for(const e of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory())walk(p);else if(/\.(?:cjs|json)$/.test(e.name))assert.doesNotMatch(fs.readFileSync(p,'utf8'),/advhdInput\s*["']?\s*:\s*true/,p);}}
- for(const p of ['core/profiles/games','core/profiles/engines','data/The Seed']){const dir=path.join(root,p);if(fs.existsSync(dir))walk(dir);}
+ const enabled=src=>/(?:["']?advhdInput["']?|["']draw\.advhdInput["'])\s*:\s*true\b/.test(src);
+ const reject=(src,p)=>assert.equal(enabled(src),false,p);
+ for(const [p,src] of [['The Seed/advhd/game.json','{"settings":{"draw":{"advhdInput":true}}}'],['The Seed/advhd/game/versions/hash.json','{"version":{"draw":{"advhdInput":true}}}']])assert.throws(()=>reject(src,p),assert.AssertionError,'a game or version opt-in must fail the same scanner');
+ const seen=[];function walk(dir){for(const e of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory())walk(p);else if(/\.(?:cjs|json)$/.test(e.name)){reject(fs.readFileSync(p,'utf8'),p);seen.push(p);}}}
+ for(const p of ['core/profiles/games','core/profiles/engines','The Seed']){const dir=path.join(root,p);assert.ok(fs.statSync(dir).isDirectory(),p);walk(dir);}
+ assert.ok(seen.some(p=>p.includes(path.sep+'The Seed'+path.sep)));assert.ok(seen.some(p=>p.includes(path.sep+'versions'+path.sep)),'actual version seeds must be scanned');
 });
 test('AdvHD actual entry bytes expose EAX height, arg7 and 11 caller-cleaned stack words',()=>{
  assert.equal(A.find(bytes).length,1);assert.deepEqual(A.find(bytes)[0],{offset:0,heightRegister:'eax',stackWords:11,textArg:7});

@@ -16,6 +16,8 @@ Gate 保存 flags、全部 GPR 和 FXSAVE 状态，再读取入口 EAX 与原始
 
 `ToMe_ADVHD_INPUT begin` 带调用者 RVA、EAX 高度和 11 个原始栈参数，`data` 按 offset 分块记录原始 hex，`end` 标记完整字节数。只接受可读且不超过 32768 字节的完整 NUL 串，超过上限直接拒绝，不能将残段当完整输入。未证明文本编码，诊断不会猜解码
 
+记录沿现有 HookBridge info 诊断通道进入 `hook-diagnostics.log`，该日志有 1 MiB 上限。回放必须按 run/offset/字节数核对 begin 与 end，日志容量或传输造成的缺块不能当成完整输入证据
+
 arg3/arg4 在本机例程内参与画布位置计算，但尚未建立屏幕变换。原始参数不是已验收屏幕坐标，23 个调用者也没有被硬编码成正文、名字或选项
 
 ## 六件套与剩余门槛
@@ -32,6 +34,8 @@ arg3/arg4 在本机例程内参与画布位置计算，但尚未建立屏幕变�
 ## 可重复的局部检查
 
 在仓库根设置 TEMP/TMP 到 H 盘，运行 `node --test --test-concurrency=2 validation/engine-draw-sig-advhd.test.cjs validation/engine-draw.test.cjs validation/engine-draw-opt-in.test.cjs`，再运行 `native\megulithook\selftest\run-advhd.cmd`
+
+AdvHD 原生脚本已接到 `megulithook/selftest/run.cmd`，但该部件在 `native-builds.json` 标为 `ci:false`，普通 CI 不编译或执行此原生 gate。本次是本地真实双架构验证，CI 运行的是 JS 回归，没有修改 CI 配置
 
 若设置 `MEGULIT_ADVHD_SAMPLE` 为实际 utmoon.exe 路径，原生 gate 会额外只读核验完整 SHA，并生成一个同大小错 SHA 的小测试文件作为负例。该测试不运行样本，输出只在 TEMP 的 `megulit-advhd` 及当前测试 PID 的诊断控制文件；不替换 DLL 或正式安装目录
 

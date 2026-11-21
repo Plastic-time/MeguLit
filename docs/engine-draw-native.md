@@ -300,7 +300,7 @@
 
 现在的签名（每个都在店主本机文件上正好命中 count 次，在其他引擎的文件里不命中）：
 
-**注意：字形缓存（re-bgi 在素晴日 BGI 上确认的情况）**：很多引擎的 GetGlyphOutline / TextOut 调用点在「字形缓存」函数里，一个字只在第一次进缓存时画一次（画在缓存位图的 0,0），之后再显示同一个字不再调用。这种点的记录只有「这次新进缓存的字」，拼不出整句，也没有画布坐标。DrawSites 适合的是每次显示都调用、带笔位的点（AVG32 的 TextOutA 每个字都画进文字 DIB）。GetGlyphOutline 签名（Softpal、AdvHD、CMVS、FVP、minori、Musica、沙耶两版）以及 NScripter 的字形小图都还没确认是不是缓存：实机看同一个字在第二句里还出不出现就知道。是缓存的，就要像 re-bgi 那样往上找排版函数（BGI 的字节点链）再签，GDI 点只留作「字形 → 例程」的旁证
+**注意：字形缓存（re-bgi 在素晴日 BGI 上确认的情况）**：很多引擎的 GetGlyphOutline / TextOut 调用点在「字形缓存」函数里，一个字只在第一次进缓存时画一次（画在缓存位图的 0,0），之后再显示同一个字不再调用。这种点的记录只有「这次新进缓存的字」，拼不出整句，也没有画布坐标。DrawSites 适合的是每次显示都调用、带笔位的点（AVG32 的 TextOutA 每个字都画进文字 DIB）。AdvHD 本机版本已静态确认缓存命中绕过旧点，输入诊断见下节。其余 GetGlyphOutline 签名（Softpal、CMVS、FVP、minori、Musica、沙耶两版）以及 NScripter 的字形小图都还没确认是不是缓存：实机看同一个字在第二句里还出不出现就知道。是缓存的，就要像 re-bgi 那样往上找排版函数（BGI 的字节点链）再签，GDI 点只留作「字形 → 例程」的旁证
 
 ### 给其他逆向会话：GDI 类引擎直接加签名，不要各写一套钩子
 BGI、Siglus 等只要画字最终经过 TextOut / ExtTextOut / DrawText / GetGlyphOutline（A 或 W），就复用 DrawSites：
