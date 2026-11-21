@@ -193,7 +193,7 @@ function myChip(data,w,locale,esc){
  const me=view.tab==='board'||data.tab==='board'?data.board?.me:null,ranked=!!(data.joined&&me&&data.tab!=='hot'&&data.tab!=='follow');
  const metric=view.metric==='games'?'characters':view.metric,self={name:data.name||'?',avatar:data.self?.avatar||null};
  const line=ranked?esc(data.name||w.myPage):data.joined||data.account?esc(data.name||w.myPage):w.signIn;
- return `<button type="button" class="lb-mychip" data-lb-me aria-label="${esc(w.myPage)}">${avatarHTML(self,data.avatars||{},esc)}<div><small>${w.myPage}</small><strong>${line}</strong></div>${ranked?`<span>${esc(formatValue(metric,me.value,locale))}</span>`:''}</button>`;
+ return `<button type="button" class="lb-mychip" data-lb-me aria-label="${esc(w.myPage)}">${avatarHTML(self,data.avatars||{},esc)}<div><small>${w.myPage}</small><strong>${line}</strong></div>${ranked?`<span class="lb-mychip-value">${esc(formatValue(metric,me.value,locale))}</span>`:''}</button>`;
 }
 export function leaderboardHTML(data,locale,esc){
  const w=words(locale);
