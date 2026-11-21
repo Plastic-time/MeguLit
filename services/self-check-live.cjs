@@ -30,11 +30,10 @@ function readMode(reader,reason){try{const g=reader.gal;if(g&&!g.textEffectsHold
    shared (the players' agreed diff) <- auto (this PC's calibration) <- official (the maintainer's diff) <- stepDown (this PC's
    gate step-down, always last so a game that broke here can always fall back). choose() still names the deciding one (reason,
    read mode, whether to calibrate). */
-function inputOf(s){const st=s.stored,sh=s.shared,out={...(s.input||{})};for(const k of ['shared','auto','officialGame','official','stepDown','match'])delete out[k];
+function inputOf(s){const st=s.stored,sh=s.shared,out={...(s.input||{})};for(const k of ['sharedGame','shared','auto','officialGame','official','stepDown','match'])delete out[k];
  if(/^[0-9a-f]{64}$/.test(String(s.key||'')))out.exeSha256=s.key;
- if(sh&&sh.source==='auto'&&sh.settings)out.shared=sh.settings;
- if(sh&&sh.source==='official'){if(sh.gameSettings)out.officialGame=sh.gameSettings;else if(sh.settings&&!sh.versionSettings)out.official=sh.settings;if(sh.versionSettings)out.official=sh.versionSettings;}
- if(sh&&sh.match)out.match=sh.match;
+ /* the relay's two layers, each official or agreed (services/auto-profile-feed.cjs layer) */
+ if(sh){const put=(p,field)=>{if(p&&p.settings)out[(p.source==='official'?'official':'shared')+field]=p.settings;};put(sh.game,'Game');put(sh.version,'');if(sh.match)out.match=sh.match;}
  if(st&&st.settings){if(st.source==='gate')out.stepDown=st.settings;else out.auto=st.settings;}return out;}
 function applyLayer(s){try{const p=Profiles.profileFor(inputOf(s));s.profile=p;s.reader.gal?.setGameProfile?.(p,s.input);}catch{}}
 /* which layer wins (see above) */
@@ -69,9 +68,9 @@ function bindKey(s,key){const {reader}=s;s.key=key;s.stored=auto.load(reader.roo
  reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'bound',key,layer:s.from||'none',mode:c?.mode||'',calibrating:!s.calibrated});
  hookTrace(reader,'selfCheck key='+key+' layer='+(s.from||'none')+(c?' mode='+c.mode:'')+(s.calibrated?'':' calibrating (first '+s.check.t.window+' lines)'));
  /* the relay's copy is refreshed in the background (hot update: a new diff applies at once) */
- /* the relay is asked with every fingerprint (core/profiles/identity.cjs): exe hash, binary, game identity, engine */
- if(!s.skipFeed)require('../core/profiles/identity.cjs').identityOf({root:reader.root,exe:s.exe,folder:s.input?.folder,title:s.input?.title,steamAppId:s.input?.steamAppId,vndb:s.input?.vndb,engine:s.input?.engine||s.profile?.engine,exeSha256:key})
-  .then(identity=>feed.refresh(reader.root,key,{identity})).then(v=>{if(live!==s)return;const l=feed.layer(v,key);if(!l||feed.rejected(reader.root,key,l)||JSON.stringify(l)===JSON.stringify(s.shared))return;s.shared=l;const before=s.from;settle(s);
+ /* the relay is asked with every fingerprint (core/game-print.cjs): exe, head, pe, main archive, Steam, VNDB, title, engine */
+ if(!s.skipFeed)new Promise(res=>setImmediate(()=>{try{s.prints=require('../core/game-print.cjs').prints(s.exe,{exe:key,title:s.input?.title||'',steamAppId:s.input?.steamAppId||'',vndb:s.input?.vndb||'',engine:s.input?.engine||s.profile?.engine||''});}catch{s.prints={exe:key};}res(s.prints);}))
+  .then(prints=>feed.refresh(reader.root,key,{prints})).then(v=>{if(live!==s)return;const l=feed.layer(v,key);if(!l||feed.rejected(reader.root,key,l)||JSON.stringify(l)===JSON.stringify(s.shared))return;s.shared=l;const before=s.from;settle(s);
   if(s.from!==before||s.from==='official'||s.from==='shared'){hookTrace(reader,'selfCheck fetched key='+key+' '+l.source+' match='+l.match+' mode='+l.mode+' layer='+(s.from||'none'));applyLayer(s);}}).catch(()=>{});
  /* a window that closed before the key was known */
  if(s.pending){const r=s.pending;s.pending=null;windowDone(s,r);}}
@@ -80,7 +79,9 @@ function windowDone(s,r){if(live!==s)return;const {reader}=s;
  if(!s.key){s.pending=r;return;}
  hookTrace(reader,traceLine(r));
  reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'window',key:s.key,window:r.window,lines:r.lines,pass:r.pass,over:r.over.join(','),layer:s.from||'none',...Object.fromEntries(Object.entries(r.metrics).map(([k,v])=>[k,v==null?-1:v]))});
- if(r.window===1&&s.sample){try{s.sample.save(reader.root,s.key);}catch{}}
+ if(r.window===1&&s.sample){/* the fingerprints the relay matches diffs by (core/game-print.cjs); the exe hash is known, the rest is small reads */
+  let prints=null;try{prints=require('../core/game-print.cjs').prints(s.exe,{exe:s.key,title:s.input?.title||'',steamAppId:s.input?.steamAppId||'',engine:engineOf(s)});}catch{}
+  try{s.sample.save(reader.root,s.key,prints);}catch{}}
  const engine=engineOf(s);
  /* 2026-11-21 (owner: 非精确命中的下发差分只是候选) a diff the relay found by the binary or the game identity, not this exe: its
     first window decides. Over a threshold: this PC stops using it (remembered until the relay hands out another), falls back to its
@@ -89,13 +90,13 @@ function windowDone(s,r){if(live!==s)return;const {reader}=s;
   feed.reject(reader.root,s.key,l,why);s.shared=null;hookTrace(reader,'selfCheck candidate refused key='+s.key+' match='+l.match+' over='+r.over.join(','));
   reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'candidateRefused',key:s.key,match:l.match,over:r.over.join(',')});
   const rec={...auto.stepDown(null,{key:s.key,engine,exe:s.exe,version:s.ver,trip:{window:r.window,over:r.over,metrics:r.metrics,reason:why},window:r}),reason:why};
-  feed.report(reader.root,rec).catch(()=>{});try{require('./probe-auto.cjs').kick(reader.root);}catch{}
+  feed.report(reader.root,rec,{prints:s.prints}).catch(()=>{});try{require('./probe-auto.cjs').kick(reader.root);}catch{}
   settle(s);applyLayer(s);}
  if(!s.calibrated){s.calibrated=true;let res;try{res=auto.calibrate(s.check.recording||[],{thresholds:s.check.t});}catch(e){hookTrace(reader,'selfCheck calibration failed '+String(e?.message||e).slice(0,120));return;}
   const rec=auto.record({key:s.key,engine,exe:s.exe,version:s.ver,source:'calibration',result:res});try{auto.store(reader.root,s.key,rec);}catch{}s.stored=rec;s.check.recording=null;
   hookTrace(reader,'selfCheck calibrated key='+s.key+' mode='+res.mode+' settings='+JSON.stringify(rec.settings)+(res.reason?' reason='+res.reason:''));
   reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'calibrated',key:s.key,mode:res.mode,reason:res.reason||'',cost:res.score.cost});
-  settle(s);applyLayer(s);feed.report(reader.root,rec).catch(()=>{});return;}
+  settle(s);applyLayer(s);feed.report(reader.root,rec,{prints:s.prints}).catch(()=>{});return;}
  if(r.pass||s.from==='local-gate'||reader.gal?.textEffectsHold)return;
  const trip={window:r.window,over:r.over,metrics:r.metrics,reason:reasonText(r.over)};
  const rec=auto.stepDown(s.stored,{key:s.key,engine,exe:s.exe,version:s.ver,trip,window:r});try{auto.store(reader.root,s.key,rec);}catch{}s.stored=rec;
@@ -103,7 +104,7 @@ function windowDone(s,r){if(live!==s)return;const {reader}=s;
  reader.logVisibility?.({type:'layoutDiagnostic',kind:'selfCheck',what:'stepDown',key:s.key,window:r.window,over:r.over.join(','),reason:trip.reason,layer:s.from||'none'});
  settle(s);applyLayer(s);
  /* the repair queue: the report carries the reason; the automatic probe (with the runtime sample) is asked to run */
- feed.report(reader.root,rec).catch(()=>{});try{require('./probe-auto.cjs').kick(reader.root);}catch{}}
+ feed.report(reader.root,rec,{prints:s.prints}).catch(()=>{});try{require('./probe-auto.cjs').kick(reader.root);}catch{}}
 
 function stop(){const s=live;live=null;if(!s)return null;try{s.check.flush();}catch{}return s;}
 /* 重新校准: forget this PC's diff, ignore the relay for this run, record the next window again */

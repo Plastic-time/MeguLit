@@ -2,6 +2,7 @@
  "schema": "megulit.game-diff",
  "version": 1,
  "key": "20a57cfa736d946ede4ccc91b5b158091c031e9a54869aecacdb52c6cfa35086",
+ "layer": "version",
  "source": "official",
  "mode": "hide",
  "settings": {

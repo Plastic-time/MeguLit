@@ -19,10 +19,10 @@ const DOMAINS={
  'hide.textEffectsRead':{bool:true},
  'hide.preflight':{enum:[null,true,false]},
  'hide.drawsHidden':{enum:[null,true,false]},
- 'hide.engineTrial.enabled':{enum:[null,true,false],tier:'version'},
- 'hide.engineTrial.unconfirmedLines':{number:[1,10],nullable:true,int:true,tier:'version'},
- 'hide.engineTrial.clickMs':{number:[100,10000],nullable:true,int:true,tier:'version'},
- 'hide.engineTrial.skipAside':{enum:[null,true,false],tier:'version'},
+ 'hide.engineTrial.enabled':{enum:[null,true,false],layer:'version'},
+ 'hide.engineTrial.unconfirmedLines':{number:[1,10],nullable:true,int:true,layer:'version'},
+ 'hide.engineTrial.clickMs':{number:[100,10000],nullable:true,int:true,layer:'version'},
+ 'hide.engineTrial.skipAside':{enum:[null,true,false],layer:'version'},
  'selfCheck.window':{number:[5,200]},
  'selfCheck.minLines':{number:[1,200]},
  'selfCheck.hideVisible':{number:[0,1]},
@@ -35,8 +35,8 @@ const DOMAINS={
  'calibrate.textBox':{rect:true,nullable:true},
  'calibrate.hideMethod':{enum:[null,'hide','engine','glyph','gpu','read']},
  'draw.roles':{bool:true},
- 'draw.embed':{bool:true,tier:'version'},
- 'draw.embedTranslation':{bool:true,tier:'version'},
+ 'draw.embed':{bool:true,layer:'version'},
+ 'draw.embedTranslation':{bool:true,layer:'version'},
  'safeMode.redrawRate':{number:[0,120],nullable:true},
 };
 const plain=v=>v&&typeof v==='object'&&!Array.isArray(v);
@@ -67,10 +67,11 @@ function leaves(tree,at=''){const out=[];for(const [k,v] of Object.entries(tree)
             the probe's size + first/last MiB hash / PE time stamp)
    game     for every version of the game (text box, effect frames, choice filters, hide method, self-check, placement): used when
             the exe or the game identity matched (archive fingerprint, Steam app id, VNDB id, title)
-   A key without tier is a game key. */
-const tierOf=key=>DOMAINS[key]?.tier==='version'?'version':'game';
+   Every key is labelled (DOMAINS[k].layer); a key not marked 'version' is a game key. */
+for(const d of Object.values(DOMAINS))if(d.layer!=='version')d.layer='game';
+const layerOf=key=>DOMAINS[key]?.layer==='version'?'version':'game',tierOf=layerOf;
 /* settings -> {version, game}: the same nested shape, each key in its tier's half */
 function split(settings){const out={version:{},game:{}};const walk=(obj,at,dst)=>{for(const [k,v] of Object.entries(obj||{})){const p=at?at+'.'+k:k;
-  if(DOMAINS[p]){let o=dst[tierOf(p)];const path=p.split('.');for(const seg of path.slice(0,-1))o=o[seg]||(o[seg]={});o[path.at(-1)]=v;continue;}
+  if(DOMAINS[p]){let o=dst[layerOf(p)];const path=p.split('.');for(const seg of path.slice(0,-1))o=o[seg]||(o[seg]={});o[path.at(-1)]=v;continue;}
   if(plain(v))walk(v,p,dst);}};walk(settings,'',out);return out;}
-module.exports={tierOf,split,DOMAINS,clean,okValue,safeRegex,leaves};
+module.exports={layerOf,tierOf,split,DOMAINS,clean,okValue,safeRegex,leaves};

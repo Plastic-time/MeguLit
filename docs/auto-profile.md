@@ -29,7 +29,7 @@ auto 层按顺序取第一个有的：
 
 有官方差分或共享结论是读模式时，本机不再录制校准。「重新校准」删掉本机差分，这一局不看 relay，只按本机重测。key 按路径+大小+修改时间记在 `data/config/exe-hashes.json`，首次算哈希是异步流式读。
 
-两个开关（`data/config/library.json`，都默认关，等店主定）：
+两个开关（`data/config/library.json`，默认都开，玩家可在设置里关；店主 2026-11-21：「这两个可以都开了 我已经和他们说了 全答应了」）：
 
 | 键 | 管什么 |
 |---|---|
@@ -160,39 +160,57 @@ relay、客户端、签名工具共用这一个纯函数文件，签名的字节
 | `picks <relay> <输出目录> [--upload]` | 拉 relay 上等签名的自动挑选结果，逐个校验、签名、写文件，`--upload` 传回 relay |
 | `check <signed.json>` | 按客户端规则验形状、值和签名 |
 
+## 指纹和两层（`core/game-print.cjs`）
+
+「传火不能只靠 exe 哈希」：差分分两层，按指纹从精确到宽松匹配。
+
+| 层 | 指纹（按顺序） | 说明 |
+|---|---|---|
+| 版本层（一个 exe 构建） | `exe` 全文件 SHA-256 → `head` 首尾各 64 KB + 大小 → `pe` 文件版本 + 链接时间戳（`1.2.0.0@5f3a1b2c`） | 重签名/小补丁的同一构建也能命中 |
+| 游戏层（所有构建） | `exe`（已归到这个游戏的构建）→ `pack` 最大封包首尾各 1 MB + 大小 → `script` 剧本指纹（调用方给） → `steam` appid → `vndb` id → `title` 归一化标题的 SHA-256 | 新版本、汉化版、改名版都能拿到 |
+| 引擎 | `engine` | 仓库里的引擎差分，不走服务端 |
+
+`check(prints)` 只放过格式正确的值（哈希 64 位 hex、steam 数字、vndb `v\d+`、pe 版本@8 位 hex）。全是哈希、id、版本号，没有路径和名字。`prints(exe, {title, steamAppId, vndb, script, engine})` 同步读文件，探针 worker 和 diff-maker 用；运行时样本 `sample.json.prints`、探针 manifest `prints` 都带。
+
+游戏身份 key（game layer key）：报告里第一个已经登记过的游戏指纹所属的游戏；都没登记过就用最强的那个指纹派生（`sha256('game|'+kind+':'+value)`），然后把它的所有游戏指纹和 exe 都登记到这个游戏（先到先得），这样只带 Steam id 的另一个构建也会并进来。官方游戏层差分上传时，它的 `prints` 定义这个游戏。
+
 ## 服务端 `relay/src/auto-profile.js`
 
-路由前缀 `/api/game-profile/`（`/api/profile/<id>` 已经是社区个人主页）。迁移 `relay/migrations/0021_auto_profiles.sql`：
+路由前缀 `/api/game-profile`（`/api/profile/<id>` 已经是社区个人主页）。迁移 `relay/migrations/0021_auto_profiles.sql`：
 
-- `auto_profile_reports`：每个 exe、每个上报者（IP 哈希）一行，新覆盖旧，每个 exe 最多 50 行
-- `auto_profile_picks`：每个 exe 的一致最佳结果（未签名），等我们签
-- `game_diffs`：每个 exe 每种来源一份我们签好的文档（`official` / `auto`），官方优先
-- `auto_profile_queue`：修复队列，每个 exe 一行
+- `auto_profile_reports`：每个 exe、每个上报者（IP 哈希）一行，新覆盖旧，每个 exe 最多 50 行；带 `gid`（归到的游戏）和 `prints`
+- `auto_profile_picks`：每层每个 key 的一致最佳结果（未签名，带下一个 `rev`），等我们签
+- `game_diffs`：每层每个 key 每种来源一份我们签好的文档（`official` / `auto`），官方优先
+- `diff_prints`：指纹 → 层 key（`exe/head/pe` → 版本层，`exe/pack/script/steam/vndb/title` → 游戏层）
+- `auto_profile_queue`：修复队列，每个 exe 一行（带 gid、prints）
 - `profile_runtime`：单独补传的运行时样本（R2 `profile-runtime/<key>.json.gz`）
 
 | 接口 | 谁 | 说明 |
 |---|---|---|
-| `POST /api/game-profile/report` | 客户端 | `{version:1, profile:<autoProfile.profile>}`，每 IP 每小时 30 次；settings 按值域过滤；`source:'gate'` 的同时进修复队列 |
-| `GET /api/game-profile/<exeHash>` | 客户端 | `{schema:'megulit.game-diff-feed', version:1, key, diff}`；有官方给官方，否则给签过的自动差分；都没有 404 |
-| `POST /api/game-profile/runtime` | 客户端 | `{version:1, key, identity?, sha256, data:<base64 gzip 运行时包>}`，≤3 MB，每 IP 每小时 6 次；同一份不重复存 |
-| `GET /api/game-profile/picks` | 我们 | 等签名的挑选结果（未签名文档） |
-| `POST /api/game-profile/signed` | 我们 | `{diff}` 签好的文档；auto 必须正好是当前挑选，否则 409；official 同时关掉队列项 |
-| `POST /api/game-profile/withdraw` | 我们 | `{key, source}` 下架 |
+| `POST /api/game-profile/report` | 客户端 | `{version:1, profile:<autoProfile.profile>, prints?:{head,pe,pack,script,steam,vndb,title}}`，每 IP 每小时 30 次；同时归到版本层（exe）和游戏层（gid）；`source:'gate'` 进修复队列 |
+| `GET /api/game-profile?exe=&head=&pe=&pack=&script=&steam=&vndb=&title=[&have=<rev>&haveGame=<rev>]` | 客户端 | `{schema:'megulit.game-diff-feed', version:2, key, match, versionLayer:{match,key,diff}\|null, gameLayer:{match,key,diff}\|null, diff:<两层里更好的那份>}`；`match` 是找到它的那个指纹；两层各自官方优先；`have`/`haveGame` 都是最新时 304；都没匹配 404 |
+| `GET /api/game-profile/<exeHash>` | 客户端 | 同上，只带 exe |
+| `POST /api/game-profile/runtime` | 客户端 | `{version:1, key, identity?, prints?, sha256, data:<base64 gzip 运行时包>}`，≤3 MB，每 IP 每小时 6 次 |
+| `GET /api/game-profile/picks` | 我们 | 等签名的挑选结果（两层，未签名文档，带 rev） |
+| `POST /api/game-profile/signed` | 我们 | `{diff}`；auto 必须正好是该层该 key 的当前挑选，否则 409；official 登记它的 prints 并关掉队列项 |
+| `POST /api/game-profile/withdraw` | 我们 | `{key, layer?, source?}` |
 | `GET /api/game-profile/queue[?all=1]` / `POST …/queue/close` | 我们 | 修复队列 |
 | `GET /api/game-profile/runtime/list` / `…/runtime/get?key=` | 我们 | 补传的运行时样本 |
 
 「我们」= `Authorization: Bearer ADAPTER_ADMIN_TOKEN`。relay 没有任何私钥。
 
-自动挑选（最近 180 天）：相同 mode+settings 算一组；超过半数是读模式且至少 2 人 → 读模式；否则在 ≥2 人一致的隐藏组里取平均代价最低的；只有 1 人报过的永远不挑。挑选变了才写一次。读取不写 D1。
+差分文档多了三个字段：`layer`（`version`/`game`，默认 version）、`prints`（这一层的指纹）、`rev`（同一层同一 key 每次新挑选 +1，客户端用它判断要不要更新）。
+
+自动挑选（最近 180 天）：版本层用这个 exe 的报告，游戏层用归到这个游戏的所有构建的报告；相同 mode+settings 算一组；超过半数是读模式且至少 2 人 → 读模式；否则在 ≥2 人一致的隐藏组里取平均代价最低的；只有 1 人报过的永远不挑。读取不写 D1。
 
 部署（等店主说再做）：
 1. 本机 `node tools/sign-profile.cjs keygen <仓库外目录>`，公钥条目加进 `services/profile-keys.json`（随下个版本发）
 2. `wrangler d1 migrations apply megulit-relay --remote`，然后 `wrangler deploy`
-3. 定期本机跑 `sign-profile.cjs picks https://cn-api.megulit.com <目录> --upload`
+3. 定期本机跑 `sign-profile.cjs picks https://cn-api.megulit.com <目录> --upload`；官方差分 `make <key> <settings.json> --layer game --prints prints.json` → `sign` → POST `signed`
 
 ## 运行时样本 `services/runtime-sample.cjs`
 
-只在 `runtimeSampleShare` 打开时收集。首个自检窗口（前 20 句）里收集，存 `data/runtime-samples/<key>/`：
+`runtimeSampleShare` 没被关掉时收集（默认开）。首个自检窗口（前 20 句）里收集，存 `data/runtime-samples/<key>/`：
 
 | 文件 | 内容 |
 |---|---|
@@ -207,6 +225,7 @@ relay、客户端、签名工具共用这一个纯函数文件，签名的字节
 {
   "schema": "megulit.runtime-sample", "version": 1, "key": "<64 hex>", "exe": "fata_jp.exe", "engine": "krkr", "app": "1.4.21",
   "createdAt": "ISO", "client": [804, 604], "shots": 3,
+  "prints":  { "exe": "…", "head": "…", "pe": "1.0.0.0@5f3a1b2c", "pack": "…", "steam": "303310", "title": "…", "engine": "krkr" },
   "lines":   [{ "at": 0, "seq": 5, "chars": 18, "name": "綾" }],
   "boxes":   [{ "at": 0, "line": 1, "x": 220, "y": 488, "w": 20, "h": 22 }],
   "choices": [{ "at": 0, "raw": 3, "shown": 0 }],
@@ -229,6 +248,6 @@ relay、客户端、签名工具共用这一个纯函数文件，签名的字节
 - 千恋＊万花（22:53:42Z 之后）：窗口全部过线，校准保持隐藏重画
 - 在线服务：首次校准写盘、读模式带原因、重新校准、已存的隐藏差分运行中退档
 
-`validation/auto-profile-relay.test.cjs`：Worker 进程内跑（D1 用 node:sqlite，R2 用 Map），覆盖值域表完整、私钥只能在仓库外、单人不挑、relay 不签名且未签不下发、本机工具签名后客户端验签通过、篡改/别的密钥/错 key 被拒、非当前挑选 409、最低代价胜出、读模式要过半、危险正则和未知键被滤、官方优先/撤回/只能我们传、退档进修复队列且官方差分关单、客户端四级优先级、两个开关默认关、运行时样本（日志脱敏、只补传一次）
+`validation/auto-profile-relay.test.cjs`：Worker 进程内跑（D1 用 node:sqlite，R2 用 Map），覆盖值域表完整、私钥只能在仓库外、单人不挑、relay 不签名且未签不下发、本机工具签名后客户端验签通过、篡改/别的密钥/错 key 被拒、非当前挑选 409、最低代价胜出、读模式要过半、危险正则和未知键被滤、官方优先/撤回/只能我们传、退档进修复队列且官方差分关单、客户端四级优先级、两个开关默认开、可关、运行时样本（日志脱敏、只补传一次）
 
 `validation/fata-effects-replay.test.cjs`（海馆新 core 夹具）：自检在同一批 trace 上丢句率 0，补送行记为补画

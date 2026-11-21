@@ -7,8 +7,8 @@
    'runtime' and 'shot'). Format: docs/auto-profile.md.
    Privacy: only the game's own window is captured (GalNative.sceneShot: the game's client area, MeguLit's layers and the desktop
    are not in it), at most 3 pictures, each at most 600 KB; the text is the game's own; logs are scrubbed (services/diagnostics.cjs
-   scrub: user name, profile paths, e-mails). Nothing is collected unless the player agreed: library.json runtimeSampleShare ===
-   true (default off until the owner decides; 2026-11-21).
+   scrub: user name, profile paths, e-mails). The player's switch: library.json runtimeSampleShare, on unless turned off (=== false;
+   owner 2026-11-21: 「这两个可以都开了 我已经和他们说了 全答应了」).
    Also kept: the first window's own log lines (runtime/hook-events.log, runtime/reader-host.log), the input of
    core/self-check.cjs and core/auto-profile.cjs, so the offline diff maker scores exactly what ran here. */
 const fs=require('node:fs'),path=require('node:path');
@@ -16,8 +16,8 @@ const auto=require('../core/auto-profile.cjs');
 const MAX_LINES=40,MAX_EVENTS=400,MAX_LOG=800,SHOTS_AT=[3,10,18],SHOT_MAX=600*1024,BUNDLE_MAX=3*1024*1024;
 const zlib=require('node:zlib'),crypto=require('node:crypto');
 function readLib(root){try{return JSON.parse(fs.readFileSync(path.join(root,'data','config','library.json'),'utf8'))||{};}catch{return {};}}
-/* the consent switch (default off) */
-const enabled=root=>readLib(root).runtimeSampleShare===true;
+/* the player's switch (on by default, off when set to false) */
+const enabled=root=>readLib(root).runtimeSampleShare!==false;
 function setEnabled(root,on){const f=path.join(root,'data','config','library.json');fs.mkdirSync(path.dirname(f),{recursive:true});const tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify({...readLib(root),runtimeSampleShare:on===true},null,2));fs.renameSync(tmp,f);return enabled(root);}
 const dirFor=(root,executable)=>{const key=auto.exeKeySync(root,executable);return key?path.join(root,'data','runtime-samples',key):'';};
 const keyDir=(root,key)=>path.join(root,'data','runtime-samples',key);
@@ -41,7 +41,7 @@ class RuntimeSample{
   return null;}
  shot(jpegBase64){if(this.shots.length>=SHOTS_AT.length||typeof jpegBase64!=='string')return false;const b=Buffer.from(jpegBase64,'base64');if(b.length<100||b.length>SHOT_MAX||b[0]!==0xff||b[1]!==0xd8)return false;this.shots.push(b);return true;}
  /* written once, after the first window; an older sample of the same exe is replaced */
- save(root,key){if(this.done||!key)return '';this.done=true;const d=keyDir(root,key);try{fs.rmSync(d,{recursive:true,force:true});fs.mkdirSync(d,{recursive:true});
+ save(root,key,prints=null){if(this.done||!key)return '';this.done=true;if(prints)this.sample.prints=require('../core/game-print.cjs').check(prints);const d=keyDir(root,key);try{fs.rmSync(d,{recursive:true,force:true});fs.mkdirSync(d,{recursive:true});
   fs.writeFileSync(path.join(d,'sample.json'),JSON.stringify({...this.sample,key,shots:this.shots.length},null,1));this.shots.forEach((b,i)=>fs.writeFileSync(path.join(d,'shot-'+(i+1)+'.jpg'),b));
   let scrub=t=>t;try{const dg=require('./diagnostics.cjs');if(dg.scrub)scrub=t=>dg.scrub(t);}catch{}
   const NL=String.fromCharCode(10);fs.writeFileSync(path.join(d,'hook-events.log'),scrub(this.logs.hook.join(NL)+NL));fs.writeFileSync(path.join(d,'reader-host.log'),scrub(this.logs.reader.join(NL)+NL));}catch{return '';}return d;}

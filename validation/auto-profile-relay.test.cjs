@@ -48,8 +48,8 @@ test('relay: one report is not enough; two agreeing reporters make a pick; the r
  const r=await get(KA);assert.equal(r.status,200);assert.equal(r.body.schema,'megulit.game-diff-feed');assert.equal(r.body.diff.source,'auto');assert.equal(r.body.diff.agree,2);
  const l=feed.layer(r.body,KA);assert.ok(l,'signature and values check out');assert.deepEqual(l.settings.calibrate,HIDE.calibrate);
  /* poisoned: a value changed after signing, a document signed by another key, a document moved to another exe */
- const bad=JSON.parse(JSON.stringify(r.body));bad.diff.settings.calibrate.positionSource='ocr';assert.equal(feed.layer(bad,KA),null);
- assert.equal(feed.layer({...r.body,diff:tool.signDoc(r.body.diff,EVIL,'p1')},KA),null);assert.equal(feed.layer({...r.body,key:KB},KB),null);
+ const bad=JSON.parse(JSON.stringify(r.body));for(const d of [bad.diff,bad.versionLayer?.diff,bad.gameLayer?.diff])if(d)d.settings.calibrate&&(d.settings.calibrate.positionSource='ocr');assert.equal(feed.layer(bad,KA),null);
+ {const evil=L=>L&&{...L,diff:tool.signDoc(L.diff,EVIL,'p1')};assert.equal(feed.layer({...r.body,diff:tool.signDoc(r.body.diff,EVIL,'p1'),versionLayer:evil(r.body.versionLayer),gameLayer:evil(r.body.gameLayer)},KA),null);}assert.equal(feed.layer({...r.body,key:KB},KB),null);
  /* an auto document that is not the current pick is refused */
  const stale=tool.signDoc({...gameDiff.unsigned(r.body.diff),settings:{hide:{textEffectsRead:false}}},OURS,'p1');assert.equal((await maint('POST','/api/game-profile/signed',{diff:stale})).status,409);});
 
@@ -82,9 +82,9 @@ test('relay: official diff wins over auto, is ours only, can be withdrawn; gate 
  assert.equal((await maint('POST','/api/game-profile/signed',{diff:tool.signDoc(gameDiff.build({key:KC,source:'official',mode:'read',settings:{}}),OURS,'p1')})).status,201);
  assert.ok(!(await (await maint('GET','/api/game-profile/queue')).json()).queue.some(x=>x.key===KC),'an official diff closes the queue entry');});
 
-test('app: uploads off by default, hot-updated layer by precedence (step-down > official > own calibration > shared)',async()=>{
+test('app: uploads on by default (the switch turns them off), hot-updated layer by precedence (step-down > official > own calibration > shared)',async()=>{
  const root=tmp();try{
-  assert.equal((await feed.report(root,rec(H('f'),'hide',HIDE),{fetcher:user('40.0.0.8')})).state,'skipped','calibration uploads are off by default');feed.setSharing(root,true);
+  assert.equal(feed.sharing(root),true,'calibration uploads are on by default');feed.setSharing(root,false);assert.equal((await feed.report(root,rec(H('f'),'hide',HIDE),{fetcher:user('40.0.0.8')})).state,'skipped','the switch turns them off');feed.setSharing(root,true);require('../services/runtime-sample.cjs').setEnabled(root,false);
   const exe=path.join(root,'Game','game.exe');fs.mkdirSync(path.dirname(exe),{recursive:true});fs.writeFileSync(exe,'MZ-precedence');const key=await ap.exeKey(root,exe);
   assert.equal(key,crypto.createHash('sha256').update('MZ-precedence').digest('hex'));
   await feed.report(root,rec(key,'hide',HIDE,0.1),{fetcher:user('40.0.0.1')});await feed.report(root,rec(key,'hide',HIDE,0.1),{fetcher:user('40.0.0.2')});await signRun();
@@ -93,7 +93,7 @@ test('app: uploads off by default, hot-updated layer by precedence (step-down > 
   const live=require('../services/self-check-live.cjs'),P=require('../core/profiles/index.cjs');const modes=[];
   const gal={setGameProfile(){},textEffectsHold:null,textEffects(on,why){modes.push([on,why]);this.textEffectsHold=on?{why}:null;},hooks:{pageMode:{engine:'krkr'},trace(){}}};
   const reader={root,gal,gameExe:exe,logVisibility(){}};const begin=()=>{live.stop();gal.textEffectsHold=null;modes.length=0;return live.start(reader,exe,P.profileFor({exe}),{exe});};
-  let s=begin();assert.equal(s.from,'shared');assert.ok(s.check.recording,'still calibrating here');assert.equal(s.sample,null,'no runtime sample without consent');
+  let s=begin();assert.equal(s.from,'shared');assert.ok(s.check.recording,'still calibrating here');assert.equal(s.sample,null,'no runtime sample when the player turned it off');
   ap.store(root,key,ap.record({key,engine:'krkr',exe,version:'x',result:{mode:'hide',settings:{...HIDE,placement:{firstLineAnchor:'glyph'}},score:{cost:0}}}));
   s=begin();assert.equal(s.from,'local','own calibration over the shared one');assert.equal(s.layer.placement.firstLineAnchor,'glyph');
   await maint('POST','/api/game-profile/signed',{diff:tool.signDoc(gameDiff.build({key,source:'official',mode:'hide',settings:{placement:{firstLineAnchor:'box'}}}),OURS,'p1')});
@@ -104,8 +104,8 @@ test('app: uploads off by default, hot-updated layer by precedence (step-down > 
   fs.writeFileSync(path.join(root,'data','config','library.json'),JSON.stringify({autoProfileShare:true,sharedAdaptation:false}));assert.equal((await feed.report(root,rec(key,'hide',HIDE),{fetcher:user('40.0.0.9')})).state,'skipped','共享适配 off too');
  }finally{fs.rmSync(root,{recursive:true,force:true});}});
 
-test('runtime sample: consent off by default; first lines, boxes, names, logs, at most 3 JPEG shots; sent alone when the full probe is there',async()=>{const root=tmp();try{
- const rs=require('../services/runtime-sample.cjs');assert.equal(rs.enabled(root),false,'off by default');rs.setEnabled(root,true);
+test('runtime sample: on by default, the switch turns it off; first lines, boxes, names, logs, at most 3 JPEG shots; sent alone when the full probe is there',async()=>{const root=tmp();try{
+ const rs=require('../services/runtime-sample.cjs');assert.equal(rs.enabled(root),true,'on by default');rs.setEnabled(root,false);assert.equal(rs.enabled(root),false);rs.setEnabled(root,true);
  const sample=new rs.RuntimeSample({exe:'D:\\G\\game.exe',engine:'krkr'});const want=[];
  for(let i=1;i<=25;i++){sample.rawTrace('source chars=10 sequence='+i);const w=sample.event({kind:'line',at:i,seq:i,chars:10},i%2?'綾':'');if(w)want.push(i);sample.event({kind:'box',at:i,line:i,x:1,y:2,w:3,h:4,cw:800,ch:600});}
  sample.rawReader({type:'layoutDiagnostic',text:'C:\\Users\\'+(process.env.USERNAME||'someone')+'\\x'});
@@ -126,3 +126,39 @@ test('runtime sample: consent off by default; first lines, boxes, names, logs, a
  assert.equal(bundle.schema,'megulit.runtime-bundle');assert.deepEqual(bundle.files.map(f=>f.kind).sort(),['runtime','runtime','runtime','shot']);
  rs.setEnabled(root,false);assert.equal((await pa.runtimeOnly(root,{executable:exe},ident,{state:'sent'},{fetcher:user('50.0.0.1')})).state,'off');
 }finally{fs.rmSync(root,{recursive:true,force:true});}});
+
+test('fingerprints: exe, head, pe, main archive, Steam, title from a game folder; only well-formed values pass',()=>{const root=tmp();try{
+ const gp=require('../core/game-print.cjs'),dir=path.join(root,'Game');fs.mkdirSync(dir,{recursive:true});
+ const exe=Buffer.alloc(0x400);exe.write('MZ',0,'latin1');exe.writeUInt32LE(0x80,0x3c);exe.writeUInt32LE(0x4550,0x80);exe.writeUInt32LE(0x5f3a1b2c,0x88);fs.writeFileSync(path.join(dir,'game.exe'),exe);
+ fs.writeFileSync(path.join(dir,'data.xp3'),crypto.randomBytes(3<<20));fs.writeFileSync(path.join(dir,'small.xp3'),crypto.randomBytes(2<<20));fs.writeFileSync(path.join(dir,'steam_appid.txt'),'303310\n');
+ const p=gp.prints(path.join(dir,'game.exe'),{title:'ファタモルガーナの館',vndb:'V12402',engine:'krkr'});
+ assert.equal(p.exe,crypto.createHash('sha256').update(exe).digest('hex'));assert.match(p.head,/^[0-9a-f]{64}$/);assert.equal(p.pe,'0.0.0.0@5f3a1b2c');assert.match(p.pack,/^[0-9a-f]{64}$/);
+ assert.equal(p.steam,'303310');assert.equal(p.vndb,'v12402');assert.equal(p.title,gp.titleHash('ファタモルガーナの館 '));assert.equal(p.engine,'krkr');
+ assert.deepEqual(gp.check({exe:'x',steam:'12a',vndb:'v1',title:'../..',pe:'1.2.3.4@zz'}),{vndb:'v1'});
+}finally{fs.rmSync(root,{recursive:true,force:true});}});
+
+test('relay: two layers, best match first: exe > head > pe for a build, archive > script > Steam > VNDB > title for the game',async()=>{
+ const gp=require('../core/game-print.cjs');const A=H('1'),B=H('2'),C=H('3'),D=H('4'),E=H('5');const P=H('6'),T=gp.titleHash('千恋＊万花'),HEAD=H('7');
+ const send=(ip,key,prints,settings=HIDE,cost=0.1)=>user(ip)('https://relay.test/api/game-profile/report',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({version:1,profile:ap.diagnostic(rec(key,'hide',settings,cost)).profile,prints})});
+ const look=async qs=>{const r=await user('9.9.9.8')('https://relay.test/api/game-profile?'+qs);return {status:r.status,body:r.status===200?await r.json():null};};
+ /* two players of build A (archive P, Steam 1144400, head HEAD); one player of build E who only has the Steam id */
+ const g1=await (await send('60.0.0.1',A,{pack:P,steam:'1144400',head:HEAD})).json();const g2=await (await send('60.0.0.2',A,{pack:P,steam:'1144400',head:HEAD})).json();
+ assert.ok(g1.game);assert.equal(g1.game,g2.game,'same game identity');
+ const g3=await (await send('60.0.0.3',E,{steam:'1144400'})).json();assert.equal(g3.game,g1.game,'a known Steam id joins the same game');
+ await signRun();
+ let r=await look('exe='+A);assert.equal(r.body.match,'exe');assert.equal(r.body.versionLayer.match,'exe');assert.equal(r.body.gameLayer.match,'exe','the build is filed under its game');assert.ok(feed.layer(r.body,A));
+ r=await look('exe='+B+'&head='+HEAD);assert.equal(r.body.match,'head','a re-signed build with the same head');assert.equal(r.body.versionLayer.key,A);
+ r=await look('exe='+C+'&pack='+P);assert.equal(r.body.versionLayer,null);assert.equal(r.body.match,'pack');assert.equal(r.body.gameLayer.diff.layer,'game');assert.equal(r.body.gameLayer.key,g1.game);assert.ok(feed.layer(r.body,C),'a game-layer diff serves another build');
+ r=await look('exe='+D+'&steam=1144400');assert.equal(r.body.match,'steam');
+ assert.equal((await look('exe='+D+'&title='+T)).status,404,'an unknown title alone finds nothing');
+ /* an official game diff defined by its title wins over the agreed one for every build */
+ const off=tool.signDoc(gameDiff.build({key:g1.game,layer:'game',prints:{title:T,steam:'1144400'},rev:1,source:'official',mode:'hide',settings:{placement:{firstLineAnchor:'box'}}}),OURS,'p1');
+ assert.equal((await maint('POST','/api/game-profile/signed',{diff:off})).status,201);
+ r=await look('exe='+D+'&title='+T);assert.equal(r.body.match,'title');assert.equal(r.body.gameLayer.diff.source,'official');
+ r=await look('exe='+A);assert.equal(r.body.gameLayer.diff.source,'official');assert.equal(r.body.versionLayer.diff.source,'auto','the build layer stays the agreed one');
+ /* hot update: the revs the app has */
+ const nr=(await user('9.9.9.8')('https://relay.test/api/game-profile?exe='+A+'&have='+r.body.versionLayer.diff.rev+'&haveGame='+r.body.gameLayer.diff.rev));assert.equal(nr.status,304);
+ /* a new pick of the build gets the next rev */
+ const rev0=r.body.versionLayer.diff.rev;for(const ip of ['61.0.0.1','61.0.0.2','61.0.0.3'])await send(ip,A,{pack:P},{...HIDE,page:{effectFrames:true}},0.01);await signRun();
+ r=await look('exe='+A);assert.ok(r.body.versionLayer.diff.rev>rev0);assert.equal(r.body.versionLayer.diff.settings.page.effectFrames,true);
+ assert.equal((await look('')).status,400,'no prints, no answer');});

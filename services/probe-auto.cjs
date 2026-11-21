@@ -68,7 +68,8 @@ const appVersion=root=>{try{return require('./shared-adaptation.cjs').appVersion
 const runtimeStamp=(root,exe)=>{try{const rs=require('./runtime-sample.cjs');return rs.enabled(root)?rs.stamp(rs.dirFor(root,exe)):'';}catch{return '';}};
 async function runtimeOnly(root,game,ident,f,{fetcher=globalThis.fetch}={}){const rs=require('./runtime-sample.cjs');if(!rs.enabled(root))return {state:'off'};
  const key=require('../core/auto-profile.cjs').exeKeySync(root,game.executable),dir=key?rs.keyDir(root,key):'',stamp=dir?rs.stamp(dir):'';if(!stamp||stamp===f.runtime)return {state:'nothing'};
- const b=rs.bundle(dir,key);if(!b)return {state:'nothing'};const body=JSON.stringify({version:1,key,identity:ident.id,sha256:b.sha256,data:b.data.toString('base64')});
+ const b=rs.bundle(dir,key);if(!b)return {state:'nothing'};let prints;try{prints=JSON.parse(fs.readFileSync(path.join(dir,'sample.json'),'utf8')).prints;}catch{}
+ const body=JSON.stringify({version:1,key,identity:ident.id,...(prints?{prints}:{}),sha256:b.sha256,data:b.data.toString('base64')});
  let urls=[];try{urls=require('./relay-config.cjs').endpoints(root,'/api/game-profile/runtime');}catch{}
  for(const url of urls){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(60000)});if(r.ok)return {state:'sent',stamp};if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused'};}catch{}}
  return {state:'failed'};}

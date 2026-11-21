@@ -14,11 +14,12 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const auto=require('../core/auto-profile.cjs'),gameDiff=require('../core/game-diff.cjs');
 const TIMEOUT=15000,FRESH_MS=24*3600000,NONE_MS=6*3600000;
-const dir=root=>path.join(root,'data','profiles','remote');/* 2026-11-21 one download folder for the relay's diffs of this PC's exes (docs/diff-layers.md) */
-/* 2026-11-21 (owner via dispatch: 「共享适配开关保留且默认要店主定，先默认关」) uploading calibrations needs its own switch
-   library.json autoProfileShare === true (default off) on top of 共享适配 (sharedAdaptation, used by other features, untouched).
+/* 2026-11-21 (owner: 存放下发差分的文件夹叫「The Seed」) the relay's answers for this PC's exes: data/The Seed/<exe SHA-256>.json */
+const dir=root=>path.join(root,'data','The Seed');
+/* 2026-11-21 (owner: 「这两个可以都开了 我已经和他们说了 全答应了」) uploading calibrations has its own switch, library.json
+   autoProfileShare, on unless the player turns it off (=== false), on top of 共享适配 (sharedAdaptation, used by other features, untouched).
    Fetching diffs is not an upload and is always on. */
-function sharing(root){let lib={};try{lib=JSON.parse(fs.readFileSync(path.join(root,'data','config','library.json'),'utf8'))||{};}catch{}if(lib.autoProfileShare!==true)return false;try{return require('./shared-adaptation.cjs').enabled(root);}catch{return false;}}
+function sharing(root){let lib={};try{lib=JSON.parse(fs.readFileSync(path.join(root,'data','config','library.json'),'utf8'))||{};}catch{}if(lib.autoProfileShare===false)return false;try{return require('./shared-adaptation.cjs').enabled(root);}catch{return false;}}
 function setSharing(root,on){const f=path.join(root,'data','config','library.json');let lib={};try{lib=JSON.parse(fs.readFileSync(f,'utf8'))||{};}catch{}fs.mkdirSync(path.dirname(f),{recursive:true});const tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify({...lib,autoProfileShare:on===true},null,2));fs.renameSync(tmp,f);return sharing(root);}
 function endpoints(root,route){try{return require('./relay-config.cjs').endpoints(root,route);}catch{return [];}}
 function keyList(file){try{const raw=JSON.parse(fs.readFileSync(path.join(__dirname,file),'utf8'));return (Array.isArray(raw.keys)?raw.keys:[]).filter(k=>k&&k.alg==='ed25519'&&typeof k.id==='string'&&typeof k.publicKey==='string'&&!k.revoked);}catch{return [];}}
@@ -29,43 +30,46 @@ function keys(){return trusted||keyList('profile-keys.json');}
 function _trust(v){trusted=v||null;}
 function verify(doc,list){const s=doc?.signature;if(!s||s.alg!=='ed25519'||typeof s.keyId!=='string'||typeof s.value!=='string')return false;const k=list.find(x=>x.id===s.keyId);if(!k)return false;
  try{return crypto.verify(null,Buffer.from(gameDiff.canonical(gameDiff.unsigned(doc))),crypto.createPublicKey({key:Buffer.from(k.publicKey,'base64'),format:'der',type:'spki'}),Buffer.from(s.value,'base64'));}catch{return false;}}
-/* the relay's answer as layers, or null. version 1: {diff} for this exe. version 2 (multi-level match, docs/diff-layers.md):
-   {match:'exe'|'bin'|'game:<basis>', diffs:[...]}: an 'exe' / 'version' document is used only when the exe itself matched (exe or
-   bin), a 'game' document on any match. Every document is checked (shape, values, tier, signature); a bad one is left out.
-   -> {source, mode, match, exact, settings (all usable, game then version), gameSettings, versionSettings, agree, reporters,
-       issuedAt, stamp}; exact = the exe hash matched (anything else is a candidate the self-check gate has to accept first) */
-const ok=d=>gameDiff.validate(d).ok&&verify(d,keys());
+/* the relay's answer as layers, or null (docs/diff-layers.md). Version 2 (multi-level match, core/game-print.cjs):
+     {versionLayer:{match:'exe'|'head'|'pe',key,diff}|null, gameLayer:{match:'pack'|'script'|'steam'|'vndb'|'title',key,diff}|null}
+   (relay/src/auto-profile.js; 'version' is the feed's own format number)
+   version 1: {diff} for this exe. Each document is checked (shape, values, layer, signature); a bad one is left out.
+   A version document counts only on an exe-level match (exe / head / pe) and, matched by exe, only for this exe; a game document
+   on any match. -> {source, mode, match, exact, settings, version:{source,mode,settings,rev}|null, game:{...}|null, stamp}
+   exact: this exe's own hash matched the version layer; anything else is a candidate the self-check gate has to accept first. */
+const VERSION_MATCH=['exe','head','pe'],GAME_MATCH=['exe','head','pe','pack','script','steam','vndb','title'];
+const docOk=d=>gameDiff.validate(d).ok&&verify(d,keys());
+const part=d=>({source:d.source,mode:d.mode||'hide',settings:d.settings||{},rev:d.rev|0,issuedAt:d.issuedAt||'',agree:d.agree|0,reporters:d.reporters|0});
 function layer(answer,key){if(!answer||answer.schema!=='megulit.game-diff-feed'||answer.key!==key)return null;
- let match='exe',docs=[];
- if(answer.version===2){match=String(answer.match||'');if(!/^(exe|bin|game:[a-z]{2,12})$/.test(match)||!Array.isArray(answer.diffs))return null;docs=answer.diffs.slice(0,4);}
- else{if(!answer.diff||answer.diff.key!==key)return null;docs=[answer.diff];}
- const exeLevel=match==='exe'||match==='bin';const use={version:null,game:null};
- for(const d of docs){if(!d||!ok(d))continue;const scope=d.scope||'exe';
-  if(scope==='game'){if(!use.game)use.game=d;continue;}
-  if(!exeLevel)continue;if(match==='exe'&&d.key!==key)continue;if(!use.version)use.version=d;}
- if(!use.version&&!use.game)return null;
- const {split}=require('../core/profiles/domains.cjs');
- /* an 'exe' document carries both tiers: its game half counts as the game layer when no game document came */
- const v=use.version,g=use.game,vs=v?(v.scope==='version'?v.settings:split(v.settings).version):null,gs=g?g.settings:(v&&v.scope!=='version'?split(v.settings).game:null);
- const lead=v||g;const merged=JSON.parse(JSON.stringify(gs||{}));const deep=(a,b)=>{for(const [k,x] of Object.entries(b||{}))a[k]=x&&typeof x==='object'&&!Array.isArray(x)&&a[k]&&typeof a[k]==='object'?deep(a[k],x):x;return a;};deep(merged,vs||{});
- const mode=(g||v).mode==='read'||(v&&v.mode==='read')?'read':'hide';
- return {source:lead.source,mode,match,exact:match==='exe',settings:merged,gameSettings:gs,versionSettings:vs,agree:lead.agree|0,reporters:lead.reporters|0,issuedAt:lead.issuedAt||'',
-  stamp:[v?.issuedAt||'',g?.issuedAt||''].join('|')};}
-/* a candidate (not the exact exe) the self-check gate refused on this PC: never applied again until the relay hands out another */
+ let v=null,g=null,vm='',gm='';
+ if(answer.version===2){const V=answer.versionLayer,G=answer.gameLayer;
+  if(V&&V.diff&&VERSION_MATCH.includes(V.match)&&V.diff.layer!=='game'&&(V.match!=='exe'||V.diff.key===key)&&docOk(V.diff)){v=V.diff;vm=V.match;}
+  if(G&&G.diff&&GAME_MATCH.includes(G.match)&&G.diff.layer==='game'&&docOk(G.diff)){const {split}=require('../core/profiles/domains.cjs');if(!Object.keys(split(G.diff.settings).version).length){g=G.diff;gm=G.match;}}}
+ if(!v&&!g&&answer.diff){const d=answer.diff;if(d.layer==='game'){if(docOk(d)){g=d;gm='title';}}else if(d.key===key&&docOk(d)){v=d;vm='exe';}}
+ if(!v&&!g)return null;
+ const P={version:v?part(v):null,game:g?part(g):null};const lead=P.version||P.game;
+ const merged=JSON.parse(JSON.stringify(P.game?.settings||{}));const deep=(a,b)=>{for(const [k,x] of Object.entries(b||{}))a[k]=x&&typeof x==='object'&&!Array.isArray(x)&&a[k]&&typeof a[k]==='object'?deep(a[k],x):x;return a;};deep(merged,P.version?.settings);
+ const mode=(P.version&&P.version.mode==='read')||(P.game&&P.game.mode==='read')?'read':'hide';
+ return {source:lead.source,mode,match:v?vm:VERSION_MATCH.includes(gm)?gm:'game:'+gm,exact:vm==='exe'||!v&&gm==='exe',settings:merged,version:P.version,game:P.game,agree:lead.agree,reporters:lead.reporters,issuedAt:lead.issuedAt,
+  stamp:(v?v.key+'@'+(v.rev|0)+'@'+(v.issuedAt||''):'-')+'|'+(g?g.key+'@'+(g.rev|0)+'@'+(g.issuedAt||''):'-')};}
+/* a candidate (not this exe's own hash) the self-check gate refused on this PC: not applied again until the relay hands out another */
 const rejectFile=(root,key)=>path.join(dir(root),key+'.rejected.json');
 function rejected(root,key,l){if(!l||l.exact)return false;try{return JSON.parse(fs.readFileSync(rejectFile(root,key),'utf8')).stamp===l.stamp;}catch{return false;}}
-function reject(root,key,l,why=''){try{fs.mkdirSync(dir(root),{recursive:true});fs.writeFileSync(rejectFile(root,key),JSON.stringify({stamp:l.stamp,match:l.match,why:String(why).slice(0,200),at:new Date().toISOString()}));}catch{}}
+function reject(root,key,l,why=''){if(!l||l.exact)return;try{fs.mkdirSync(dir(root),{recursive:true});fs.writeFileSync(rejectFile(root,key),JSON.stringify({stamp:l.stamp,match:l.match,why:String(why).slice(0,200),at:new Date().toISOString()}));}catch{}}
+/* the query of GET /api/game-profile: every print (core/game-print.cjs check) + the revisions this PC has */
+function query(key,prints,old){const p={...require('../core/game-print.cjs').check(prints||{}),exe:key};const q=new URLSearchParams();for(const k of ['exe','head','pe','pack','script','steam','vndb','title','engine'])if(p[k])q.set(k,p[k]);
+ const l=old&&!old.none?layer(old,key):null;if(l?.version)q.set('have',String(l.version.rev));if(l?.game)q.set('haveGame',String(l.game.rev));return '?'+q.toString();}
 function cached(root,key){if(!gameDiff.KEY.test(String(key||'')))return null;try{const v=JSON.parse(fs.readFileSync(path.join(dir(root),key+'.json'),'utf8'));return v&&typeof v==='object'?v:null;}catch{return null;}}
 function keep(root,key,v){fs.mkdirSync(dir(root),{recursive:true});const f=path.join(dir(root),key+'.json'),tmp=f+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(v));fs.renameSync(tmp,f);}
-async function refresh(root,key,{fetcher=globalThis.fetch,now=Date.now(),force=false,identity=null}={}){if(!gameDiff.KEY.test(String(key||''))||!fetcher)return null;
+async function refresh(root,key,{fetcher=globalThis.fetch,now=Date.now(),force=false,prints=null}={}){if(!gameDiff.KEY.test(String(key||''))||!fetcher)return null;
  const old=cached(root,key);if(!force&&old&&now-(old.fetchedAt||0)<(old.none?NONE_MS:FRESH_MS))return old;
- const q=identity?require('../core/profiles/identity.cjs').query(identity):'';
- for(const url of endpoints(root,'/api/game-profile/'+key+q)){try{const r=await fetcher(url,{headers:{'user-agent':'MeguLit',accept:'application/json'},signal:AbortSignal.timeout(TIMEOUT)});
+ for(const url of endpoints(root,'/api/game-profile'+query(key,prints,old))){try{const r=await fetcher(url,{headers:{'user-agent':'MeguLit',accept:'application/json'},signal:AbortSignal.timeout(TIMEOUT)});
+   if(r.status===304&&old&&!old.none){const v={...old,fetchedAt:now};keep(root,key,v);return v;}
    if(r.status===404){const v={none:true,key,fetchedAt:now};keep(root,key,v);return v;}
    if(!r.ok)continue;const text=await r.text();if(text.length>64*1024)continue;const v=JSON.parse(text);if(!layer(v,key))continue;v.fetchedAt=now;keep(root,key,v);return v;}catch{}}
  return old;}
-async function report(root,record,{fetcher=globalThis.fetch}={}){if(!record||!sharing(root))return {state:'skipped'};const block=auto.diagnostic(record)?.profile;if(!block||!gameDiff.KEY.test(String(block.key||'')))return {state:'skipped'};
- const body=JSON.stringify({version:1,profile:block});
+async function report(root,record,{fetcher=globalThis.fetch,prints=null}={}){if(!record||!sharing(root))return {state:'skipped'};const block=auto.diagnostic(record)?.profile;if(!block||!gameDiff.KEY.test(String(block.key||'')))return {state:'skipped'};
+ const pr=prints?require('../core/game-print.cjs').check(prints):null;const body=JSON.stringify({version:1,profile:block,...(pr&&Object.keys(pr).length?{prints:pr}:{})});
  for(const url of endpoints(root,'/api/game-profile/report')){try{const r=await fetcher(url,{method:'POST',headers:{'content-type':'application/json','user-agent':'MeguLit'},body,signal:AbortSignal.timeout(TIMEOUT)});if(r.ok)return {state:'sent'};if(r.status>=400&&r.status<500&&r.status!==429)return {state:'refused',status:r.status};}catch{}}
  return {state:'failed'};}
-module.exports={cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject};
+module.exports={cached,refresh,report,layer,verify,keys,_trust,dir,sharing,setSharing,rejected,reject,query};
