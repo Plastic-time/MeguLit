@@ -8,7 +8,7 @@
    Only sources the user has set up are used; nothing new is switched on for them. Only when all fail does the line say so,
    and a background retry keeps going (Retries) and fills the translation in on screen and in the dialogue log.
    Per line, the same for every game; the result says which source gave it (never recorded as a group pairing). */
-const {ENGINES}=require('../core/engines.cjs');
+const {ENGINES,supportsTranslationTarget}=require('../core/engines.cjs');
 const API_BUILTIN=['gpt','deepseek','bing','deepl'];
 const isLocal=p=>ENGINES[p]?.group==='local';
 const isMt=p=>p==='google'||ENGINES[p]?.kind==='mt'&&ENGINES[p]?.keyless===true;
@@ -18,7 +18,7 @@ const isApi=p=>!isLocal(p)&&!isMt(p)&&(API_BUILTIN.includes(p)||!!ENGINES[p]);
    prefs: the reader preferences (provider, baseUrl, model, ...); hasKey(baseUrl): a key is stored for that API;
    localInstalled: a local model is installed (the runtime can start it). resolve: core/providers resolveOptions. */
 function candidates(prefs,{hasKey=()=>false,localInstalled=false,resolve=require('../core/providers.cjs').resolveOptions}={}){
- const out=[],seen=new Set(),add=o=>{try{const r=resolve(o);const k=r.provider+'|'+(r.baseUrl||'')+'|'+(r.model||'');if(seen.has(k))return;seen.add(k);out.push(r);}catch{}};
+ const out=[],seen=new Set(),add=o=>{try{const r=resolve(o);if(!supportsTranslationTarget(r.provider,r.learnerLanguage))return;const k=r.provider+'|'+(r.baseUrl||'')+'|'+(r.model||'');if(seen.has(k))return;seen.add(k);out.push(r);}catch{}};
  const chosen=String(prefs?.provider||'');
  if(isLocal(chosen))add({...prefs});else if(localInstalled)add({...prefs,provider:'sakura',baseUrl:'',model:''});
  const keyed=o=>{try{return ENGINES[o.provider]?.keyless===true||hasKey(resolve(o).baseUrl);}catch{return false;}};
